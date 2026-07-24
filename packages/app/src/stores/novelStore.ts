@@ -1,21 +1,18 @@
-import { createRoot } from "solid-js";
-import { createInfiniteQuery } from "@tanstack/solid-query";
+import { createSignal } from "solid-js";
+import { createTQFeedStore } from "./shared/createTQFeedStore";
 import { loadRecommended, loadBookmarks, loadFollow } from "../api/novel";
 import type { PixivNovel, RestrictType, ApiError } from "../api/types";
 import { ApiErrorType } from "../api/types";
 import { filterNovels } from "../utils/r18Filter";
-import { normalizeQueryError } from "../api/normalizeQueryError";
 import { currentTab } from "./uiStore";
 import { user } from "./authStore";
 import { apiClient } from "../api/client";
-import { queryClient } from "../api/queryClient";
 import {
   createFeedScrollStore,
   type ScrollRestoreState,
 } from "../primitives/createFeedScrollStore";
 
 // ── Signals (kept for backward compatibility) ──
-import { createSignal } from "solid-js";
 
 const [followTabState, setNovelFollowTab] = createSignal<"all" | "public" | "private">("all");
 const [bookmarkRestrictState, setBookmarkRestrict] = createSignal<RestrictType>("public");
@@ -26,294 +23,136 @@ export const novelFollowTab = followTabState;
 export { setNovelFollowTab };
 export { bookmarkRestrictState as bookmarkRestrict, setBookmarkRestrict };
 
-// ── TQ Infinite Queries ──
+// ── SubTab adapter (factory uses "all" for merge mode) ──
 
-// Query 1: follow_novel_public
-const followPublicQuery = createRoot(() =>
-  createInfiniteQuery(
-    () => ({
-      queryKey: ["novel", "follow_public"] as const,
-      queryFn: ({ pageParam, signal }: { pageParam?: string; signal?: AbortSignal }) => {
-        if (pageParam) {
-          return apiClient.get<{ novels: PixivNovel[]; next_url: string | null }>(
-            pageParam,
-            undefined,
-            signal,
-          );
-        }
-        return loadFollow("public");
-      },
-      getNextPageParam: (last: { next_url: string | null }) => last.next_url ?? undefined,
-      initialPageParam: undefined as string | undefined,
-      enabled:
-        currentTab() === "follow" && (followTabState() === "all" || followTabState() === "public"),
-      staleTime: 30_000,
-      gcTime: 5 * 60_000,
-    }),
-    () => queryClient,
-  ),
-);
+function toFactorySubTab(tab: string, sub: string): string {
+  // follow: "all" → "all" (already match)
+  // bookmarks/recommended: any sub → "all" (single query tabs)
+  return tab === "follow" ? sub : "all";
+}
 
-// Query 2: follow_novel_private
-const followPrivateQuery = createRoot(() =>
-  createInfiniteQuery(
-    () => ({
-      queryKey: ["novel", "follow_private"] as const,
-      queryFn: ({ pageParam, signal }: { pageParam?: string; signal?: AbortSignal }) => {
-        if (pageParam) {
-          return apiClient.get<{ novels: PixivNovel[]; next_url: string | null }>(
-            pageParam,
-            undefined,
-            signal,
-          );
-        }
-        return loadFollow("private");
-      },
-      getNextPageParam: (last: { next_url: string | null }) => last.next_url ?? undefined,
-      initialPageParam: undefined as string | undefined,
-      enabled:
-        currentTab() === "follow" && (followTabState() === "all" || followTabState() === "private"),
-      staleTime: 30_000,
-      gcTime: 5 * 60_000,
-    }),
-    () => queryClient,
-  ),
-);
+// ── Response adapter: { novels, next_url } → { items, next_url } ──
 
-// Query 3: recommended_novel
-const recommendedQuery = createRoot(() =>
-  createInfiniteQuery(
-    () => ({
-      queryKey: ["novel", "recommended"] as const,
-      queryFn: ({ pageParam, signal }: { pageParam?: string; signal?: AbortSignal }) => {
-        if (pageParam) {
-          return apiClient.get<{ novels: PixivNovel[]; next_url: string | null }>(
-            pageParam,
-            undefined,
-            signal,
-          );
-        }
-        return loadRecommended();
-      },
-      getNextPageParam: (last: { next_url: string | null }) => last.next_url ?? undefined,
-      initialPageParam: undefined as string | undefined,
-      enabled: currentTab() === "recommended",
-      staleTime: 30_000,
-      gcTime: 5 * 60_000,
-    }),
-    () => queryClient,
-  ),
-);
+type NovelListResponse = { novels: PixivNovel[]; next_url: string | null };
 
-// Query 4: bookmark_novel (with restrict in queryKey for separate caching)
-const bookmarkQuery = createRoot(() =>
-  createInfiniteQuery(
-    () => {
-      const u = user();
-      const r = bookmarkRestrictState();
-      return {
-        queryKey: ["novel", "bookmarks", u?.id ?? 0, r] as const,
-        queryFn: ({ pageParam, signal }: { pageParam?: string; signal?: AbortSignal }) => {
-          if (pageParam) {
-            return apiClient.get<{ novels: PixivNovel[]; next_url: string | null }>(
-              pageParam,
-              undefined,
-              signal,
-            );
-          }
-          return loadBookmarks(u?.id ?? 0, r);
+function adaptNovelResponse(
+  pageParam: string | undefined,
+  loader: (signal?: AbortSignal) => Promise<NovelListResponse>,
+  signal?: AbortSignal,
+): Promise<{ items: PixivNovel[]; next_url: string | null }> {
+  if (pageParam) {
+    return apiClient
+      .get<NovelListResponse>(pageParam, undefined, signal)
+      .then((r) => ({ items: r.novels, next_url: r.next_url }));
+  }
+  return loader(signal).then((r) => ({ items: r.novels, next_url: r.next_url }));
+}
+
+// ── Deps type for bookmarks tab ──
+
+type NovelDeps = {
+  userId: number | null;
+  restrict: RestrictType;
+};
+
+// ── Factory instance ──
+
+const store = createTQFeedStore<PixivNovel, "follow" | "recommended" | "bookmarks", NovelDeps>({
+  name: "novel",
+  currentTab: () => currentTab() as "follow" | "recommended" | "bookmarks",
+  enabled: () => currentTab() !== "bookmarks" || !!user(),
+  getDeps: () => ({ userId: user()?.id ?? 0, restrict: bookmarkRestrictState() }),
+  staleTime: 30_000,
+  gcTime: 5 * 60_000,
+  errorStrategy: "allMustFail",
+  filterFn: filterNovels,
+
+  tabs: {
+    follow: {
+      allMode: { type: "merge", subTabs: ["public", "private"] },
+      getSubTab: () => toFactorySubTab("follow", followTabState()),
+      setSubTab: (v) => setNovelFollowTab(v as "all" | "public" | "private"),
+      queries: {
+        public: {
+          queryKey: () => ["novel", "follow_public"] as const,
+          queryFn: (_deps, pageParam, signal) =>
+            adaptNovelResponse(pageParam, () => loadFollow("public"), signal),
         },
-        getNextPageParam: (last: { next_url: string | null }) => last.next_url ?? undefined,
-        initialPageParam: undefined as string | undefined,
-        enabled: currentTab() === "bookmarks" && !!u?.id,
-        staleTime: 30_000,
-        gcTime: 5 * 60_000,
-      };
+        private: {
+          queryKey: () => ["novel", "follow_private"] as const,
+          queryFn: (_deps, pageParam, signal) =>
+            adaptNovelResponse(pageParam, () => loadFollow("private"), signal),
+        },
+      },
     },
-    () => queryClient,
-  ),
-);
+    recommended: {
+      allMode: { type: "single", subTabs: ["all"] },
+      queries: {
+        all: {
+          queryKey: () => ["novel", "recommended"] as const,
+          queryFn: (_deps, pageParam, signal) =>
+            adaptNovelResponse(pageParam, () => loadRecommended(), signal),
+        },
+      },
+    },
+    bookmarks: {
+      allMode: { type: "single", subTabs: ["all"] },
+      queries: {
+        all: {
+          queryKey: (deps) => ["novel", "bookmarks", deps.userId, deps.restrict] as const,
+          queryFn: (deps, pageParam, signal) =>
+            adaptNovelResponse(
+              pageParam,
+              () => loadBookmarks(deps.userId ?? 0, deps.restrict),
+              signal,
+            ),
+        },
+      },
+    },
+  },
+});
 
-// ── Helpers ──
+// ── Derived state (re-export from factory) ──
 
-function flattenNovels(query: { data?: { pages: { novels: PixivNovel[] }[] } }): PixivNovel[] {
-  if (!query.data?.pages) return [];
-  return query.data.pages.flatMap((p) => p.novels);
-}
+export const novels = store.items;
+export const nextUrl = store.nextUrl;
+export const loading = store.loading;
+export const refreshing = store.refreshing;
 
-function getLastNextUrl(query: { data?: { pages: { next_url: string | null }[] } }): string | null {
-  if (!query.data?.pages?.length) return null;
-  return query.data.pages[query.data.pages.length - 1].next_url ?? null;
-}
-
-function mergeAndSort(a: PixivNovel[], b: PixivNovel[]): PixivNovel[] {
-  const result: PixivNovel[] = [];
-  let i = 0,
-    j = 0;
-  while (i < a.length && j < b.length) {
-    if (a[i].create_date >= b[j].create_date) {
-      result.push(a[i++]);
-    } else {
-      result.push(b[j++]);
-    }
-  }
-  result.push(...a.slice(i), ...b.slice(j));
-  return result;
-}
-
-// ── Derived state ──
-
-function activeQueries(): any[] {
-  const tab = currentTab();
-  if (tab === "follow") {
-    const ft = followTabState();
-    if (ft === "public") return [followPublicQuery];
-    if (ft === "private") return [followPrivateQuery];
-    return [followPublicQuery, followPrivateQuery];
-  }
-  if (tab === "recommended") return [recommendedQuery];
-  if (tab === "bookmarks") return [bookmarkQuery];
-  return [];
-}
-
-export const novels = (): PixivNovel[] => {
-  const tab = currentTab();
-  if (tab === "follow") {
-    const ft = followTabState();
-    if (ft === "public") return filterNovels(flattenNovels(followPublicQuery));
-    if (ft === "private") return filterNovels(flattenNovels(followPrivateQuery));
-    const pub = flattenNovels(followPublicQuery);
-    const priv = flattenNovels(followPrivateQuery);
-    if (pub.length === 0) return filterNovels(priv);
-    if (priv.length === 0) return filterNovels(pub);
-    return filterNovels(mergeAndSort(pub, priv));
-  }
-  if (tab === "recommended") return filterNovels(flattenNovels(recommendedQuery));
-  if (tab === "bookmarks") return filterNovels(flattenNovels(bookmarkQuery));
-  return [];
-};
-
-export const nextUrl = (): string | null => {
-  const tab = currentTab();
-  if (tab === "follow") {
-    const ft = followTabState();
-    if (ft === "public") return getLastNextUrl(followPublicQuery);
-    if (ft === "private") return getLastNextUrl(followPrivateQuery);
-    return getLastNextUrl(followPublicQuery) || getLastNextUrl(followPrivateQuery);
-  }
-  if (tab === "recommended") return getLastNextUrl(recommendedQuery);
-  if (tab === "bookmarks") return getLastNextUrl(bookmarkQuery);
-  return null;
-};
-
-export const loading = (): boolean => activeQueries().some((q) => q.isFetching);
-export const refreshing = (): boolean => activeQueries().some((q) => q.isFetching);
-
-const ERROR_TYPE_PRIORITY = [
-  "PROXY",
-  "NETWORK",
-  "UNAUTHORIZED",
-  "RATE_LIMIT",
-  "SERVER",
-  "UNKNOWN",
-] as const;
-
-function pickBestError(...errors: (ApiError | null)[]): ApiError | null {
-  const filtered = errors.filter((e): e is ApiError => e !== null);
-  if (filtered.length === 0) return null;
-  for (const priority of ERROR_TYPE_PRIORITY) {
-    const match = filtered.find((e) => e.type === priority);
-    if (match) return match;
-  }
-  return filtered[0];
-}
+// ── Error (factory + fallbackError) ──
 
 export const error = (): ApiError | null => {
-  const fb = fallbackError();
-  if (fb) return fb;
-  const qs = activeQueries();
-  const errs = qs.map((q) => normalizeQueryError(q.error));
-  if (qs.length <= 1) return pickBestError(...errs);
-  const allFailed = errs.length > 0 && errs.every((e) => e !== null);
-  return allFailed ? pickBestError(...errs) : null;
+  return fallbackError() ?? store.error();
 };
+
+// ── Cache check ──
+
+export function isNovelCached(_tab?: string): boolean {
+  void _tab;
+  return store.isCached();
+}
 
 // ── Actions ──
 
 export async function ensureLoaded(): Promise<void> {
   setFallbackError(null); // 清除兜底错误，允许 TQ 错误自然生效
-  const tab = currentTab();
-  if (tab === "follow") {
-    const ft = followTabState();
-    const keys: string[] = [];
-    if (ft === "all" || ft === "public") keys.push("follow_public");
-    if (ft === "all" || ft === "private") keys.push("follow_private");
-    await Promise.all(
-      keys.map((k) =>
-        queryClient.ensureInfiniteQueryData({
-          queryKey: ["novel", k] as const,
-          queryFn: () => loadFollow(k as "public" | "private"),
-          getNextPageParam: (last: any) => last.next_url ?? undefined,
-          initialPageParam: undefined,
-        }),
-      ),
-    );
+  // Fallback for unauthenticated bookmark loading
+  if (currentTab() === "bookmarks" && !user()) {
+    setFallbackError({ type: ApiErrorType.UNAUTHORIZED, message: "未登录" });
     return;
   }
-  if (tab === "recommended") {
-    await queryClient.ensureInfiniteQueryData({
-      queryKey: ["novel", "recommended"] as const,
-      queryFn: () => loadRecommended(),
-      getNextPageParam: (last: any) => last.next_url ?? undefined,
-      initialPageParam: undefined,
-    });
-    return;
-  }
-  if (tab === "bookmarks") {
-    const u = user();
-    if (!u) {
-      setFallbackError({ type: ApiErrorType.UNAUTHORIZED, message: "未登录" });
-      return;
-    }
-    await queryClient.ensureInfiniteQueryData({
-      queryKey: ["novel", "bookmarks", u.id, bookmarkRestrictState()] as const,
-      queryFn: () => loadBookmarks(u.id, bookmarkRestrictState()),
-      getNextPageParam: (last: any) => last.next_url ?? undefined,
-      initialPageParam: undefined,
-    });
-  }
+  await store.ensureLoaded();
 }
 
 export async function refresh(): Promise<void> {
-  const qs = activeQueries();
-  await Promise.all(qs.map((q) => q.refetch()));
+  await store.refresh();
 }
 
-export async function fetchMore(): Promise<void> {
-  const qs = activeQueries();
-  for (const q of qs) {
-    if (q.hasNextPage && !q.isFetchingNextPage) {
-      await q.fetchNextPage();
-    }
-  }
+export function fetchMore(_signal?: AbortSignal): Promise<unknown> | undefined {
+  return store.fetchMore(_signal);
 }
 
-// ── Cache check ──
-
-export function isNovelCached(tab?: string): boolean {
-  const t = tab ?? currentTab();
-  if (t === "follow") {
-    return (
-      (followPublicQuery.data?.pages?.length ?? 0) > 0 ||
-      (followPrivateQuery.data?.pages?.length ?? 0) > 0
-    );
-  }
-  if (t === "recommended") return (recommendedQuery.data?.pages?.length ?? 0) > 0;
-  if (t === "bookmarks") return (bookmarkQuery.data?.pages?.length ?? 0) > 0;
-  return false;
-}
-
-// ── Scroll position ──
+// ── Scroll restore (kept from original createFeedScrollStore) ──
 
 const novelScroll = createFeedScrollStore("novel_", novelFollowTab);
 export const saveTabScroll = novelScroll.saveTabScroll;
