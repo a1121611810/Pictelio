@@ -34,14 +34,14 @@ import {
   setCheckCompleted,
   lastDismissedVersion,
 } from "@/stores/settingsStore";
-import { loadThemePreference, loadContentTypePreference } from "@/stores/uiStore";
+import { loadThemePreference, loadPageStyleThemePreference } from "@/stores/themeStore";
+import { loadContentTypePreference } from "@/stores/uiStore";
 import { checkForUpdate } from "@/services/updateService";
 import { clearOverlays, registerBackGesture } from "@/services/backGestureService";
 import { warmCacheFromDisk } from "@/utils/imageLoader";
 import { loadReportedIds } from "@/stores/reportStore";
 import { loadBlockedIds } from "@/stores/blockStore";
 import { loadImageHostPreference } from "@/stores/imageHostStore";
-import { loadPageStyleThemePreference } from "@/stores/themeStore";
 
 const StartupUpdateDialog = lazy(() => import("@/components/StartupUpdateDialog"));
 

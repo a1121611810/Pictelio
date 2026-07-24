@@ -1,6 +1,11 @@
 import { type Component, For } from "solid-js";
-import { pageStyleTheme, setPageStyleTheme, type PageStyleThemeId } from "@/stores/themeStore";
-import { theme, setThemePersisted } from "@/stores/uiStore";
+import {
+  pageStyleTheme,
+  setPageStyleTheme,
+  getTheme,
+  setThemePersisted,
+  type PageStyleThemeId,
+} from "@/stores/themeStore";
 import FluentIcon from "@/components/ui/FluentIcon";
 
 const PAGE_STYLE_OPTIONS: {
@@ -76,7 +81,7 @@ const ThemeSelector: Component = () => {
         <div class="grid grid-cols-3 gap-3" role="group" aria-label="明暗主题选择">
           <For each={THEME_OPTIONS}>
             {(option) => {
-              const selected = () => theme() === option.id;
+              const selected = () => getTheme() === option.id;
               return (
                 <button
                   type="button"

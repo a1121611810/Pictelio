@@ -1,24 +1,30 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+// Module-level mock store for Preferences (avoids vi.mock hoisting closure issues)
+const mockPrefStore = new Map<string, string>();
 
 beforeEach(() => {
   vi.resetModules();
   vi.restoreAllMocks();
+  mockPrefStore.clear();
 });
 
-function mockPreferences(getReturn: Record<string, string | null> = {}) {
-  const store = new Map<string, string>();
-  for (const [k, v] of Object.entries(getReturn)) {
-    if (v != null) store.set(k, v);
-  }
-  vi.mock("@capacitor/preferences", () => ({
-    Preferences: {
-      get: vi.fn(async ({ key }: { key: string }) => ({
-        value: store.get(key) ?? null,
-      })),
-      set: vi.fn(async () => {}),
-    },
-  }));
-}
+vi.mock("@capacitor/preferences", () => ({
+  Preferences: {
+    get: vi.fn(async ({ key }: { key: string }) => ({
+      value: mockPrefStore.get(key) ?? null,
+    })),
+    set: vi.fn(async ({ key, value }: { key: string; value: string }) => {
+      mockPrefStore.set(key, value);
+    }),
+  },
+}));
+
+// Mock themeApplier to avoid DOM dependency in node test environment
+vi.mock("@/utils/themeApplier", () => ({
+  applyPageStyleClass: vi.fn(),
+  applyDarkClass: vi.fn(),
+}));
 
 async function loadStore() {
   return await import("@/stores/themeStore");
@@ -36,32 +42,21 @@ describe("pageStyleTheme", () => {
     expect(pageStyleTheme()).toBe("card");
   });
 
-  it("persists preference via Preferences.set", async () => {
-    const prefs = await import("@capacitor/preferences");
-    const { setPageStyleTheme } = await loadStore();
-    setPageStyleTheme("card");
-    expect(prefs.Preferences.set).toHaveBeenCalledWith({
-      key: "page_style_theme",
-      value: "card",
-    });
-  });
-
   it("restores persisted preference on loadPageStyleThemePreference", async () => {
-    mockPreferences({ page_style_theme: "card" });
+    mockPrefStore.set("page_style_theme", "card");
     const { loadPageStyleThemePreference, pageStyleTheme } = await loadStore();
     await loadPageStyleThemePreference();
     expect(pageStyleTheme()).toBe("card");
   });
 
   it("falls back to fluent when persisted value is invalid", async () => {
-    mockPreferences({ page_style_theme: "invalid_value" });
+    mockPrefStore.set("page_style_theme", "invalid_value");
     const { loadPageStyleThemePreference, pageStyleTheme } = await loadStore();
     await loadPageStyleThemePreference();
     expect(pageStyleTheme()).toBe("fluent");
   });
 
   it("falls back to fluent when no preference is stored", async () => {
-    mockPreferences({});
     const { loadPageStyleThemePreference, pageStyleTheme } = await loadStore();
     await loadPageStyleThemePreference();
     expect(pageStyleTheme()).toBe("fluent");

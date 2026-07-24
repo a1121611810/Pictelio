@@ -5,6 +5,8 @@ import ThemeSelector from "@/components/ThemeSelector";
 vi.mock("@/stores/themeStore", () => ({
   pageStyleTheme: () => "fluent",
   setPageStyleTheme: vi.fn(),
+  setThemePersisted: vi.fn(),
+  getTheme: () => "system" as const,
   PAGE_STYLE_THEME_IDS: ["fluent", "card"],
 }));
 

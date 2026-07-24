@@ -16,7 +16,7 @@ beforeAll(() => {
   originalDocument = (globalThis as any).document;
   (globalThis as any).document = {
     documentElement: {
-      classList: { add: vi.fn(), remove: vi.fn() },
+      classList: { add: vi.fn(), remove: vi.fn(), toggle: vi.fn() },
     },
   };
   // Mock window.matchMedia for theme system
@@ -197,8 +197,6 @@ describe("resetUiStore", () => {
   it("resets all ui signals to defaults and persists preferences", async () => {
     const {
       resetUiStore,
-      theme,
-      setTheme,
       setShowR18,
       setShowR18G,
       setLayoutMode,
@@ -217,7 +215,6 @@ describe("resetUiStore", () => {
       imageCachePrefetch,
     } = await loadBothStores();
 
-    await setTheme("dark");
     await setShowR18(true);
     await setShowR18G(true);
     await setLayoutMode("grid");
@@ -227,7 +224,6 @@ describe("resetUiStore", () => {
 
     await resetUiStore();
 
-    expect(theme()).toBe("system");
     expect(showR18()).toBe(false);
     expect(showR18G()).toBe(false);
     expect(layoutMode()).toBe("waterfall");
