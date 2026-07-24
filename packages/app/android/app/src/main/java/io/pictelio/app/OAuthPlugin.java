@@ -99,6 +99,8 @@ public class OAuthPlugin extends Plugin {
             return;
         }
 
+        final String targetLoginUrl = loginUrl;
+
         getBridge().getActivity().runOnUiThread(() -> {
             // ── 构建 WebView ──
             WebView webView = new WebView(getContext());
@@ -214,7 +216,7 @@ public class OAuthPlugin extends Plugin {
             }, OAuthConfig.TIMEOUT_OAUTH_DIALOG_READ);
 
             // ── 加载登录页 ──
-            webView.loadUrl(loginUrl);
+            webView.loadUrl(targetLoginUrl);
         });
     }
 
