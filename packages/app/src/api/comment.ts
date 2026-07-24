@@ -56,6 +56,7 @@ export function loadRootCommentsNext(
   return apiClient.get<PixivCommentRootResponse>(url, undefined, signal);
 }
 
+/** @internal 评论回复功能已预留 API，当前 UI 尚未接入 */
 export function loadReplies(
   type: CommentContentType,
   commentId: number,
