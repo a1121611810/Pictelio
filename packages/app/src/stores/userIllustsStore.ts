@@ -10,6 +10,21 @@ import { apiClient } from "../api/client";
 import { queryClient } from "../api/queryClient";
 import { scrollRestoreGlobal } from "../primitives/createScrollRestore";
 
+/**
+ * userIllustsStore 暂不迁移到 createTQFeedStore。
+ *
+ * 原因（ADR-0022）：
+ * 1. illust/manga 和 novel 使用不同的 API 响应类型（{ illusts } vs { novels }），
+ *    工厂要求统一的 { items } 格式，适配需要额外的映射层。
+ * 2. 切换 content type 时使用 placeholderData 保留旧数据避免闪烁，
+ *    工厂不提供此钩子。
+ * 3. factory 的 currentTab 切换会立即禁用旧查询，而 userIllustsStore
+ *    需要在 inactive 查询上保留占位数据。
+ *
+ * 这三个问题使得迁移到工厂的收益不足以覆盖风险和复杂度。
+ * 待 factory 支持 heterogeneous 响应类型 + placeholderData 后再评估。
+ */
+
 // ── Content type signal ──
 const [contentType, setContentType] = createSignal<ContentType>("illust");
 

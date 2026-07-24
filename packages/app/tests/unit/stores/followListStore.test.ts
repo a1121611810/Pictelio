@@ -2,14 +2,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { PixivUserPreview } from "@/api/types";
 
 // ── Mock TanStack Query for followListStore ──
+// Note: createTQFeedStore 工厂内部使用 createInfiniteQuery，
+// 工厂的 items 访问器读取 data.pages[].items，因此 mock data
+// 使用 items 字段（与 API 原始 user_previews 不同）。
 type MockInfiniteData<T> = {
   pages: T[];
   pageParams: unknown[];
 };
 
-let mockData:
-  | MockInfiniteData<{ user_previews: PixivUserPreview[]; next_url: string | null }>
-  | undefined;
+let mockData: MockInfiniteData<{ items: PixivUserPreview[]; next_url: string | null }> | undefined;
 let mockIsFetching = false;
 let mockIsFetchingNext = false;
 let mockError: Error | null = null;
@@ -75,7 +76,7 @@ async function loadStore() {
 describe("followListStore", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockData = { pages: [{ user_previews: [], next_url: null }], pageParams: [undefined] };
+    mockData = { pages: [{ items: [], next_url: null }], pageParams: [undefined] };
     mockIsFetching = false;
     mockIsFetchingNext = false;
     mockError = null;
@@ -95,7 +96,7 @@ describe("followListStore", () => {
   describe("loadList", () => {
     it("loads following list", async () => {
       mockData = {
-        pages: [{ user_previews: [createPreview(1), createPreview(2)], next_url: "next" }],
+        pages: [{ items: [createPreview(1), createPreview(2)], next_url: "next" }],
         pageParams: [undefined],
       };
       mockHasNext = true;
@@ -109,7 +110,7 @@ describe("followListStore", () => {
 
     it("loads followers list", async () => {
       mockData = {
-        pages: [{ user_previews: [createPreview(3)], next_url: null }],
+        pages: [{ items: [createPreview(3)], next_url: null }],
         pageParams: [undefined],
       };
 
@@ -133,7 +134,7 @@ describe("followListStore", () => {
   describe("loadMore", () => {
     it("loads next page of following", async () => {
       mockData = {
-        pages: [{ user_previews: [createPreview(1)], next_url: "next-following" }],
+        pages: [{ items: [createPreview(1)], next_url: "next-following" }],
         pageParams: [undefined],
       };
       mockHasNext = true;
@@ -160,7 +161,7 @@ describe("followListStore", () => {
   describe("toggleFollow", () => {
     it("optimistically toggles follow state", async () => {
       mockData = {
-        pages: [{ user_previews: [createPreview(10, false)], next_url: null }],
+        pages: [{ items: [createPreview(10, false)], next_url: null }],
         pageParams: [undefined],
       };
 
@@ -176,7 +177,7 @@ describe("followListStore", () => {
     it("rolls back on API failure", async () => {
       mockFollowUser.mockRejectedValue(new Error("err"));
       mockData = {
-        pages: [{ user_previews: [createPreview(10, false)], next_url: null }],
+        pages: [{ items: [createPreview(10, false)], next_url: null }],
         pageParams: [undefined],
       };
 
@@ -197,7 +198,7 @@ describe("followListStore", () => {
   describe("reset", () => {
     it("resets all state", async () => {
       mockData = {
-        pages: [{ user_previews: [createPreview(1)], next_url: "next" }],
+        pages: [{ items: [createPreview(1)], next_url: "next" }],
         pageParams: [undefined],
       };
 
