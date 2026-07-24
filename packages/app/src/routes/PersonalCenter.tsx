@@ -1,17 +1,13 @@
-import { type Component, onMount, Show, createSignal, createEffect } from "solid-js";
+import { type Component, onMount, Show } from "solid-js";
 import { useNavigate, useParams, useRouter, useLocation, Outlet } from "@tanstack/solid-router";
-import { Capacitor } from "@capacitor/core";
-import { user } from "@/stores/authStore";
 import { setCurrentTab } from "@/stores/uiStore";
-import { profile, viewedUser, loadProfile } from "@/stores/userStore";
-import { resolveImageUrl, loadImage } from "@/utils/imageLoader";
+import { profile, loadProfile } from "@/stores/userStore";
+import { useUserProfile } from "@/primitives/useUserProfile";
 import FluentIcon from "@/components/ui/FluentIcon";
 
 interface Props {
   userId?: string;
 }
-
-const isNative = Capacitor.isNativePlatform();
 
 /** 为 role="button" 的 div 提供键盘激活（Enter/Space） */
 function handleKeyDown(e: KeyboardEvent, action: () => void) {
@@ -26,60 +22,22 @@ const PersonalCenter: Component<Props> = (props) => {
   const router = useRouter();
   const params = useParams({ strict: false });
   const location = useLocation();
-  const targetUserId = () => {
-    // /me 路由一定指向当前登录用户，不依赖可能残留的 params().id
-    if (location().pathname === "/me") return user()?.id ?? 0;
-    return Number(props.userId || params().id || user()?.id || 0);
-  };
-  const displayUser = () => viewedUser() || user();
-  const isCurrentUser = () => {
-    // /me 路由一定是自己的个人中心（不依赖 params().id）
-    if (location().pathname === "/me") return true;
-    return targetUserId() === user()?.id;
-  };
-  // 判断是否在子路由（/user/$id/illusts、/user/$id/following、/user/$id/followers）
-  // 如果在子路由，只渲染 <Outlet /> 让子页面显示；否则渲染个人中心主页内容
-  const isRootUserPage = () => /^\/(?:me|user\/\d+)$/.test(location().pathname);
-  const totalWorks = () =>
-    (profile()?.total_illusts ?? 0) +
-    (profile()?.total_manga ?? 0) +
-    (profile()?.total_novels ?? 0);
-
-  //── 头像加载 ──
-  const [avatarUrl, setAvatarUrl] = createSignal("");
-  const [avatarErrored, setAvatarErrored] = createSignal(false);
-
-  createEffect(() => {
-    const u = displayUser();
-    if (!u) {
-      setAvatarUrl("");
-      return;
-    }
-    const src = u.profile_image_urls.px_50x50 || u.profile_image_urls.medium || "";
-    if (!src) {
-      setAvatarUrl("");
-      return;
-    }
-    setAvatarErrored(false);
-    if (isNative) {
-      loadImage(src)
-        .then((r) => setAvatarUrl(r.url))
-        .catch(() => setAvatarErrored(true));
-    } else {
-      setAvatarUrl(resolveImageUrl(src));
-    }
-  });
+  const profileState = useUserProfile(
+    () => location().pathname,
+    () => params().id,
+    props.userId,
+  );
 
   onMount(() => {
     setCurrentTab("me");
-    const uid = targetUserId();
+    const uid = profileState.targetUserId();
     if (uid) {
       loadProfile(uid);
     }
   });
 
   return (
-    <Show when={isRootUserPage()} fallback={<Outlet />}>
+    <Show when={profileState.isRootUserPage()} fallback={<Outlet />}>
       <div class="min-h-screen bg-[var(--pageCardBg)]">
         {/* 顶部栏：返回按钮 + 搜索入口 */}
         <div class="flex items-center justify-between px-4 pt-3">
@@ -109,23 +67,23 @@ const PersonalCenter: Component<Props> = (props) => {
         <div class="px-4 mt-4">
           <div class="bg-[var(--pageCardSurface)] rounded-[var(--pageCardRadius)] p-5 flex items-center gap-4 shadow-[var(--pageCardShadow)]">
             <Show
-              when={!avatarErrored() && avatarUrl()}
+              when={!profileState.avatarErrored() && profileState.avatarUrl()}
               fallback={
                 <div class="w-14 h-14 rounded-full bg-[var(--colorBrandBackground)] flex items-center justify-center text-[var(--colorNeutralForegroundInverted)] [font-size:var(--fontSizeBase500)] font-semibold flex-shrink-0">
-                  {displayUser()?.name?.charAt(0) || "P"}
+                  {profileState.displayUser()?.name?.charAt(0) || "P"}
                 </div>
               }
             >
               <img
-                src={avatarUrl()}
-                alt={displayUser()?.name ?? ""}
+                src={profileState.avatarUrl()}
+                alt={profileState.displayUser()?.name ?? ""}
                 class="w-14 h-14 rounded-full object-cover flex-shrink-0"
-                onError={() => setAvatarErrored(true)}
+                onError={() => profileState.setAvatarErrored(true)}
               />
             </Show>
             <div class="flex-1 min-w-0">
               <div class="text-lg font-bold text-[var(--pageCardTextPrimary)] truncate font-sans">
-                {displayUser()?.name || "Pictelio"}
+                {profileState.displayUser()?.name || "Pictelio"}
               </div>
             </div>
           </div>
@@ -137,9 +95,11 @@ const PersonalCenter: Component<Props> = (props) => {
             {/* 我的作品 */}
             <div
               class="flex items-center px-5 py-4 gap-3 cursor-pointer active:scale-[0.98] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] border-b border-[var(--pageCardBorder)] focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-[-2px] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
-              onClick={() => void navigate({ to: `/user/${targetUserId()}/illusts` })}
+              onClick={() => void navigate({ to: `/user/${profileState.targetUserId()}/illusts` })}
               onKeyDown={(e) =>
-                handleKeyDown(e, () => navigate({ to: `/user/${targetUserId()}/illusts` }))
+                handleKeyDown(e, () =>
+                  navigate({ to: `/user/${profileState.targetUserId()}/illusts` }),
+                )
               }
               role="button"
               tabIndex={0}
@@ -147,13 +107,15 @@ const PersonalCenter: Component<Props> = (props) => {
             >
               <FluentIcon name="image" size={22} />
               <span class="flex-1 text-base font-medium text-[var(--pageCardTextPrimary)] font-sans">
-                {isCurrentUser() ? "我的作品" : "TA 的作品"}
+                {profileState.isCurrentUser() ? "我的作品" : "TA 的作品"}
               </span>
-              <span class="text-sm text-[var(--pageCardTextSecondary)] mr-1">{totalWorks()}</span>
+              <span class="text-sm text-[var(--pageCardTextSecondary)] mr-1">
+                {profileState.totalWorks()}
+              </span>
               <FluentIcon name="chevronRight" size={16} />
             </div>
 
-            <Show when={isCurrentUser()}>
+            <Show when={profileState.isCurrentUser()}>
               {/* 我的收藏 */}
               <div
                 class="flex items-center px-5 py-4 gap-3 cursor-pointer active:scale-[0.98] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] border-b border-[var(--pageCardBorder)] focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-[-2px] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
@@ -176,23 +138,27 @@ const PersonalCenter: Component<Props> = (props) => {
               class="flex items-center px-5 py-4 gap-3 cursor-pointer active:scale-[0.98] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] border-b border-[var(--pageCardBorder)] focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-[-2px] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
               onClick={() =>
                 void navigate({
-                  to: isCurrentUser() ? "/following" : `/user/${targetUserId()}/following`,
+                  to: profileState.isCurrentUser()
+                    ? "/following"
+                    : `/user/${profileState.targetUserId()}/following`,
                 })
               }
               onKeyDown={(e) =>
                 handleKeyDown(e, () =>
                   navigate({
-                    to: isCurrentUser() ? "/following" : `/user/${targetUserId()}/following`,
+                    to: profileState.isCurrentUser()
+                      ? "/following"
+                      : `/user/${profileState.targetUserId()}/following`,
                   }),
                 )
               }
               role="button"
               tabIndex={0}
-              aria-label={isCurrentUser() ? "我的关注" : "TA 的关注"}
+              aria-label={profileState.isCurrentUser() ? "我的关注" : "TA 的关注"}
             >
               <FluentIcon name="people" size={22} />
               <span class="flex-1 text-base font-medium text-[var(--pageCardTextPrimary)] font-sans">
-                {isCurrentUser() ? "我的关注" : "TA 的关注"}
+                {profileState.isCurrentUser() ? "我的关注" : "TA 的关注"}
               </span>
               <span class="text-sm text-[var(--pageCardTextSecondary)] mr-1">
                 {profile()?.total_follow_users ?? 0}
@@ -205,30 +171,34 @@ const PersonalCenter: Component<Props> = (props) => {
               class="flex items-center px-5 py-4 gap-3 cursor-pointer active:scale-[0.98] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-[-2px] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
               onClick={() =>
                 void navigate({
-                  to: isCurrentUser() ? "/my/followers" : `/user/${targetUserId()}/followers`,
+                  to: profileState.isCurrentUser()
+                    ? "/my/followers"
+                    : `/user/${profileState.targetUserId()}/followers`,
                 })
               }
               onKeyDown={(e) =>
                 handleKeyDown(e, () =>
                   navigate({
-                    to: isCurrentUser() ? "/my/followers" : `/user/${targetUserId()}/followers`,
+                    to: profileState.isCurrentUser()
+                      ? "/my/followers"
+                      : `/user/${profileState.targetUserId()}/followers`,
                   }),
                 )
               }
               role="button"
               tabIndex={0}
-              aria-label={isCurrentUser() ? "我的粉丝" : "TA 的粉丝"}
+              aria-label={profileState.isCurrentUser() ? "我的粉丝" : "TA 的粉丝"}
             >
               <FluentIcon name="people" size={22} />
               <span class="flex-1 text-base font-medium text-[var(--pageCardTextPrimary)] font-sans">
-                {isCurrentUser() ? "我的粉丝" : "TA 的粉丝"}
+                {profileState.isCurrentUser() ? "我的粉丝" : "TA 的粉丝"}
               </span>
               <FluentIcon name="chevronRight" size={16} />
             </div>
           </div>
         </div>
 
-        <Show when={isCurrentUser()}>
+        <Show when={profileState.isCurrentUser()}>
           {/* 设置卡片 */}
           <div class="px-4 mt-3">
             <div class="bg-[var(--pageCardSurface)] rounded-[var(--pageCardRadius)] shadow-[var(--pageCardShadow)]">
