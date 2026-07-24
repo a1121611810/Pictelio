@@ -29,7 +29,7 @@ import NavBar from "../components/NavBar";
 import NovelFeedPage from "./NovelFeedPage";
 import PageTransition from "../components/PageTransition";
 import { scrollToTop } from "../utils/scrollToTop";
-import { createScrollDrivenVisibility } from "../primitives/createScrollDrivenVisibility";
+import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior";
 
 interface Props {
   tab: Tab;
@@ -41,8 +41,7 @@ const TabFeedPage: Component<Props> = (props) => {
   const navigate = useNavigate();
   const cached = isFeedCached(props.tab);
   const [isSwitchingSubTab, setIsSwitchingSubTab] = createSignal(false);
-  const { visible: headerVisible, suppress: suppressHeaderVisibility } =
-    createScrollDrivenVisibility();
+  const { visible: headerVisible, suppress: suppressHeaderVisibility } = createScrollBehavior();
   let abortController: AbortController | null = null;
 
   const filteredIllusts = createMemo<PixivIllust[]>(() => {

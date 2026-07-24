@@ -18,12 +18,11 @@ import { layoutMode } from "../stores/settingsStore";
 import VirtualFeed from "../components/VirtualFeed";
 import NavBar from "../components/NavBar";
 import PageTransition from "../components/PageTransition";
-import { createScrollDrivenVisibility } from "../primitives/createScrollDrivenVisibility";
+import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior";
 const Feed: Component = () => {
   const navigate = useNavigate();
   const cached = isFeedCached();
-  const { visible: headerVisible, suppress: suppressHeaderVisibility } =
-    createScrollDrivenVisibility();
+  const { visible: headerVisible, suppress: suppressHeaderVisibility } = createScrollBehavior();
   let prevTab = currentTab();
 
   onMount(() => {

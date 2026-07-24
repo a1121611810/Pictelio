@@ -8,12 +8,11 @@ import PageTransition from "../components/PageTransition";
 import IllustBookmarks from "./IllustBookmarks";
 import NovelBookmarks from "./NovelBookmarks";
 import { scrollToTop } from "../utils/scrollToTop";
-import { createScrollDrivenVisibility } from "../primitives/createScrollDrivenVisibility";
+import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior";
 
 const Bookmarks: Component = () => {
   const navigate = useNavigate();
-  const { visible: headerVisible, suppress: suppressHeaderVisibility } =
-    createScrollDrivenVisibility();
+  const { visible: headerVisible, suppress: suppressHeaderVisibility } = createScrollBehavior();
 
   onMount(() => {
     setCurrentTab("bookmarks");

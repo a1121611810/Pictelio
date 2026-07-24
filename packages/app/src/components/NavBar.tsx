@@ -3,8 +3,7 @@ import { autoHideNavBar } from "../stores/settingsStore";
 import { currentTab, setCurrentTab } from "../stores/uiStore";
 import { useNavigate } from "@tanstack/solid-router";
 import FluentIcon, { type FluentIconName } from "./ui/FluentIcon";
-import { createScrolledPast } from "../primitives/createScrolledPast";
-import { createScrollDirection } from "../primitives/createScrollDirection";
+import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior";
 
 // ── Tab definitions ──
 type NavTab = "recommended" | "follow" | "bookmarks" | "history";
@@ -62,10 +61,15 @@ const NavBar: Component = () => {
   // ── Scroll-driven compact/expand ──
   const HIDE_THRESHOLD = 20;
   const TOP_ZONE = 100;
-  const { direction: scrollDirection, reset: resetScrollDirection } = createScrollDirection({
-    threshold: HIDE_THRESHOLD,
+  const {
+    direction: scrollDirection,
+    reset: resetScrollDirection,
+    scrolledPast: createPast,
+  } = createScrollBehavior({
+    directionThreshold: HIDE_THRESHOLD,
+    topGuard: TOP_ZONE,
   });
-  const pastTopZone = createScrolledPast(TOP_ZONE);
+  const pastTopZone = createPast(TOP_ZONE);
 
   createEffect(() => {
     // 如果用户关闭了自动隐藏，始终展开

@@ -21,7 +21,7 @@ import LoadingSpinner from "../components/LoadingSpinner";
 import FluentIcon from "../components/ui/FluentIcon";
 import NovelSearchBar from "../components/NovelSearchBar";
 import { NOVEL_INTERACTIVE_MARGIN } from "../primitives/rootMargins";
-import { createScrollDirection } from "../primitives/createScrollDirection";
+import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior";
 import { createScrollPosition } from "@solid-primitives/scroll";
 import { createVisibilityObserver } from "@solid-primitives/intersection-observer";
 import { createNovelSearch } from "../primitives/createNovelSearch";
@@ -592,8 +592,8 @@ const NovelDetail: Component = () => {
   });
 
   // ── Scroll-driven bottom toolbar hide/show ──
-  const { direction: scrollDirection, reset: resetScrollDirection } = createScrollDirection({
-    threshold: 30,
+  const { direction: scrollDirection, reset: resetScrollDirection } = createScrollBehavior({
+    directionThreshold: 30,
     accumulate: true,
   });
   const scroll = createScrollPosition();

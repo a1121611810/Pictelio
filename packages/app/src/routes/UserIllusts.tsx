@@ -18,15 +18,14 @@ import NavBar from "../components/NavBar";
 import PageTransition from "../components/PageTransition";
 import { layoutMode } from "../stores/settingsStore";
 import { scrollToTop } from "../utils/scrollToTop";
-import { createScrollDrivenVisibility } from "../primitives/createScrollDrivenVisibility";
+import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior";
 
 const UserIllusts: Component = () => {
   const navigate = useNavigate();
   const router = useRouter();
   const params = useParams({ strict: false });
   const userId = () => Number(params().id);
-  const { visible: headerVisible, suppress: suppressHeaderVisibility } =
-    createScrollDrivenVisibility();
+  const { visible: headerVisible, suppress: suppressHeaderVisibility } = createScrollBehavior();
 
   // R18 开关切换时自动刷新
   onMount(() => {

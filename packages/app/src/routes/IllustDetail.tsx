@@ -21,7 +21,7 @@ import { scrollToTop } from "../utils/scrollToTop";
 import ReportSheet from "../components/ReportSheet";
 import IllustTags from "../components/IllustTags";
 import CommentOverlay from "../components/CommentOverlay";
-import { createScrolledPast } from "../primitives/createScrolledPast";
+import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior";
 
 const routeApi = getRouteApi("/illust/$id");
 
@@ -34,7 +34,9 @@ const IllustDetail: Component = () => {
   const [viewerStartPage, setViewerStartPage] = createSignal(0);
   const [currentVisiblePage, setCurrentVisiblePage] = createSignal(0);
   const BACK_TO_TOP_THRESHOLD = 300;
-  const showBackToTop = createScrolledPast(BACK_TO_TOP_THRESHOLD);
+  const showBackToTop = createScrollBehavior({ hideOnScrollDown: false }).scrolledPast(
+    BACK_TO_TOP_THRESHOLD,
+  );
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<ApiError | null>(null);
   const [bookmarking, setBookmarking] = createSignal(false);

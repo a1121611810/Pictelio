@@ -6,7 +6,7 @@ import PageTransition from "../components/PageTransition";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { SENTINEL_MARGIN } from "../primitives/rootMargins";
 import { createSentinel } from "@/primitives/visibility";
-import { createScrollDrivenVisibility } from "../primitives/createScrollDrivenVisibility";
+import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior";
 import { scrollToTop } from "../utils/scrollToTop";
 import {
   users,
@@ -49,7 +49,7 @@ function avatarUrl(urls: { medium?: string; px_50x50?: string; px_170x170?: stri
 const FollowListPage: Component<Props> = (props) => {
   const navigate = useNavigate();
   const router = useRouter();
-  const { visible: headerVisible } = createScrollDrivenVisibility();
+  const { visible: headerVisible } = createScrollBehavior();
 
   // 初始数据由路由 loader 加载；组件卸载时重置列表。
   onCleanup(() => {

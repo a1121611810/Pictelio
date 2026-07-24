@@ -13,8 +13,7 @@ import TagInput from "@/components/ui/TagInput";
 import { createSearchStore } from "@/stores/searchStore";
 import SearchResults from "@/components/SearchResults";
 import { createScrollRestore } from "@/primitives/createScrollRestore";
-import { createScrolledPast } from "@/primitives/createScrolledPast";
-import { createScrollDirection } from "@/primitives/createScrollDirection";
+import { createScrollBehavior } from "@/primitives/scroll/createScrollBehavior";
 import type { SearchScope, SearchSort } from "@/api/types";
 import PageTransition from "@/components/PageTransition";
 import { scrollToTop } from "@/utils/scrollToTop";
@@ -84,7 +83,10 @@ const Search: Component = () => {
 
   // ── Back-to-top state & compact header state ──
   const BACK_TO_TOP_THRESHOLD = 300;
-  const showBackToTop = createScrolledPast(BACK_TO_TOP_THRESHOLD);
+  const SCROLL_HEADER_THRESHOLD = 150;
+  const SCROLL_DIRECTION_DEADZONE = 10;
+  const sb = createScrollBehavior({ directionThreshold: SCROLL_DIRECTION_DEADZONE });
+  const showBackToTop = sb.scrolledPast(BACK_TO_TOP_THRESHOLD);
   const [showCompactHeader, setShowCompactHeader] = createSignal(false);
 
   // ── Scroll position restoration ──
@@ -95,12 +97,8 @@ const Search: Component = () => {
   onCleanup(() => scrollRestore.save());
 
   // ── Scroll-driven compact header ──
-  const SCROLL_HEADER_THRESHOLD = 150;
-  const SCROLL_DIRECTION_DEADZONE = 10;
-  const pastHeaderThreshold = createScrolledPast(SCROLL_HEADER_THRESHOLD);
-  const { direction: scrollDirection } = createScrollDirection({
-    threshold: SCROLL_DIRECTION_DEADZONE,
-  });
+  const pastHeaderThreshold = sb.scrolledPast(SCROLL_HEADER_THRESHOLD);
+  const scrollDirection = sb.direction;
 
   createEffect(() => {
     if (!pastHeaderThreshold()) {
