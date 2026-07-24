@@ -5,6 +5,9 @@ import { getEffectiveImageUrl, getRaceCandidateUrls } from "../services/imageHos
 
 const isNative = Capacitor.isNativePlatform();
 
+// 定时器 ID —— 必须在模块顶层调用之前声明，避免 let 暂时性死区（TDZ）
+let gcTimerId: ReturnType<typeof setInterval> | undefined;
+
 // 模块加载时自动启动定时 GC（测试环境下不启动）
 if (typeof setInterval !== "undefined" && typeof process !== "object") {
   schedulePeriodicGC();
@@ -57,8 +60,6 @@ function cacheSet(key: string) {
 }
 
 // ─── 定时 GC ───
-
-let gcTimerId: ReturnType<typeof setInterval> | undefined;
 
 /**
  * 启动定时 GC。每 GC_INTERVAL_MS 检查一次缓存大小，
