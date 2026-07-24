@@ -1,4 +1,4 @@
-import { type Component } from "solid-js";
+import { type Component, Switch, Match } from "solid-js";
 import type { PixivIllust, PixivNovel, ApiError, ContentType } from "../api/types";
 import type { LayoutMode } from "../primitives/types";
 import type { ScrollRestoreState } from "../stores/feedStore";
@@ -24,12 +24,8 @@ interface Props {
 
 const UserWorksFeed: Component<Props> = (props) => {
   return (
-    <>
-      {/* Illust/manga feed: always mounted, hidden via CSS when novel */}
-      <div
-        data-feed-type="illust"
-        style={{ display: props.contentType === "novel" ? "none" : "block" }}
-      >
+    <Switch>
+      <Match when={props.contentType === "illust"}>
         <VirtualFeed
           illusts={props.illusts}
           loading={props.loading}
@@ -43,13 +39,8 @@ const UserWorksFeed: Component<Props> = (props) => {
           onScrollStateChange={props.onIllustScrollStateChange}
           suppressHeaderVisibility={props.suppressHeaderVisibility}
         />
-      </div>
-
-      {/* Novel feed: always mounted, hidden via CSS when not novel */}
-      <div
-        data-feed-type="novel"
-        style={{ display: props.contentType === "novel" ? "block" : "none" }}
-      >
+      </Match>
+      <Match when={props.contentType === "novel"}>
         <NovelVirtualFeed
           novels={props.novels}
           loading={props.loading}
@@ -60,8 +51,8 @@ const UserWorksFeed: Component<Props> = (props) => {
           onRefresh={props.onRefresh}
           suppressHeaderVisibility={props.suppressHeaderVisibility}
         />
-      </div>
-    </>
+      </Match>
+    </Switch>
   );
 };
 
