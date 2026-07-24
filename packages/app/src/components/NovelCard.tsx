@@ -1,40 +1,11 @@
 import { type Component, createSignal, For } from "solid-js";
 import type { PixivNovel } from "../api/types";
 import { addBookmark, deleteBookmark } from "../api/novel";
+import HeartIcon from "./ui/HeartIcon";
 import HeartBurstEffect from "./HeartBurstEffect";
 import IllustTags from "./IllustTags";
 import SearchableTag from "./SearchableTag";
 import { resolveImageUrl } from "../utils/imageLoader";
-
-/** 收藏爱心 SVG — 24×24 viewBox，与 FluentIcon 风格一致 */
-function HeartSvg(props: { filled: boolean; size?: number }) {
-  const s = props.size ?? 24;
-  return (
-    <svg
-      width={s}
-      height={s}
-      viewBox="0 0 24 24"
-      fill={props.filled ? "currentColor" : "none"}
-      aria-hidden="true"
-    >
-      {props.filled ? (
-        <path
-          d="M12.82 5.58l-.82.82-.82-.82a4.5 4.5 0 0 0-6.36 6.36l.82.82L12 20.06l6.36-6.36.82-.82a4.5 4.5 0 0 0-6.36-6.36z"
-          fill="currentColor"
-        />
-      ) : (
-        <path
-          d="M12.82 5.58l-.82.82-.82-.82a4.5 4.5 0 0 0-6.36 6.36l.82.82L12 20.06l6.36-6.36.82-.82a4.5 4.5 0 0 0-6.36-6.36z"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
-      )}
-    </svg>
-  );
-}
 
 interface Props {
   novel: PixivNovel;
@@ -180,7 +151,7 @@ const NovelCard: Component<Props> = (props) => {
             onClick={(e) => e.stopPropagation()}
             aria-label={bookmarked() ? "取消收藏" : "收藏"}
           >
-            <HeartSvg filled={bookmarked()} size={16} />
+            <HeartIcon filled={bookmarked()} size={16} />
           </button>
           <HeartBurstEffect trigger={bookmarkBurstTrigger} size={80} particleCount={6} />
         </div>
@@ -303,7 +274,7 @@ export const NovelCoverCard: Component<Props> = (props) => {
             onClick={(e) => e.stopPropagation()}
             aria-label={bookmarked() ? "取消收藏" : "收藏"}
           >
-            <HeartSvg filled={bookmarked()} size={16} />
+            <HeartIcon filled={bookmarked()} size={16} />
           </button>
           <HeartBurstEffect trigger={bookmarkBurstTrigger} size={60} particleCount={6} />
         </div>

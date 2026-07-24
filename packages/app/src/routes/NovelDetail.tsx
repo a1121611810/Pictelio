@@ -14,12 +14,13 @@ import {
   untrack,
 } from "solid-js";
 import { useParams, useNavigate, useRouter, getRouteApi } from "@tanstack/solid-router";
-import { resolveImageUrl } from "../utils/imageLoader";
 import PixivImage from "../components/PixivImage";
 import ImageViewer from "@/components/ImageViewer";
 import LoadingSpinner from "../components/LoadingSpinner";
 import FluentIcon from "../components/ui/FluentIcon";
 import NovelSearchBar from "../components/NovelSearchBar";
+import NovelCoverHeader from "../components/NovelCoverHeader";
+import NovelFooterNav from "../components/NovelFooterNav";
 import { NOVEL_INTERACTIVE_MARGIN } from "../primitives/rootMargins";
 import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior";
 import { createScrollPosition } from "@solid-primitives/scroll";
@@ -48,7 +49,6 @@ import ReaderSettingsSheet from "../components/ReaderSettingsSheet";
 import SeriesSheet from "../components/SeriesSheet";
 import PageTransition from "../components/PageTransition";
 import CommentOverlay from "../components/CommentOverlay";
-import SearchableTag from "../components/SearchableTag";
 import { ApiErrorType, type ApiError } from "../api/types";
 import ErrorDisplay from "../components/ErrorDisplay";
 import { pushOverlay, popOverlay } from "../stores/backGestureStore";
@@ -726,73 +726,13 @@ const NovelDetail: Component = () => {
         <Show when={novelData()}>
           {(novel) => (
             <>
-              {/* ── Cover & metadata ── */}
-              <div class="bg-[var(--colorNeutralBackground1)]">
-                <div class="relative w-full aspect-[16/9] max-h-64 overflow-hidden">
-                  <PixivImage
-                    src={resolveImageUrl(novel().image_urls.large)}
-                    alt={novel().title}
-                    width={1200}
-                    height={675}
-                    loading="eager"
-                    class="w-full h-full object-cover"
-                  />
-                  <div class="absolute inset-0 bg-gradient-to-t from-[var(--colorNeutralBackground1)] to-transparent" />
-                </div>
-
-                <div class="px-4 pb-4 -mt-8 relative z-1">
-                  <h1
-                    ref={setTitleEl}
-                    class="[font-size:var(--fontSizeBase500)] font-bold text-[var(--colorNeutralForeground1)] leading-tight mb-1"
-                  >
-                    {novel().title}
-                  </h1>
-                  <button
-                    class="[font-size:var(--fontSizeBase200)] text-[var(--colorBrandForeground1)] hover:underline bg-transparent border-none p-0 cursor-pointer"
-                    onClick={() => void navigate({ to: `/user/${novel().user.id}` })}
-                  >
-                    @{novel().user.name}
-                  </button>
-
-                  <Show when={novel().series?.id}>
-                    <button
-                      class="[font-size:var(--fontSizeBase100)] text-[var(--colorBrandForeground1)] mt-1 bg-transparent border-none p-0 cursor-pointer hover:underline focus-visible:outline focus-visible:outline-[var(--colorStrokeFocus2)] focus-visible:outline-2 focus-visible:-outline-offset-2"
-                      onClick={() => setSeriesOpen(true)}
-                      aria-label={`打开系列目录：${novel().series?.title ?? ""}`}
-                    >
-                      系列：{novel().series?.title}
-                    </button>
-                  </Show>
-
-                  {/* Tags */}
-                  <div class="flex flex-wrap gap-1.5 mt-2">
-                    {novel().tags.map((tag) => (
-                      <SearchableTag
-                        name={tag.name}
-                        translatedName={tag.translated_name}
-                        class="[font-size:var(--fontSizeBase100)] px-[var(--spacingHorizontalXS)] py-[var(--spacingVerticalXXS)] rounded-[var(--borderRadiusSmall)] bg-[var(--colorNeutralBackground2)] text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground2Hover)]"
-                      />
-                    ))}
-                  </div>
-
-                  {/* Stats row */}
-                  <div class="flex items-center gap-3 mt-2 text-[var(--colorNeutralForeground3)] [font-size:var(--fontSizeBase100)]">
-                    <span>📖 {novel().text_length.toLocaleString()}字</span>
-                    <span>⭐ {novel().total_bookmarks}</span>
-                    <Show when={novel().total_comments != null}>
-                      <span
-                        class="flex items-center gap-1 cursor-pointer hover:text-[var(--colorBrandForeground1)] transition-colors"
-                        onClick={() => setShowComments(true)}
-                      >
-                        💬 {novel().total_comments}
-                      </span>
-                    </Show>
-                    <Show when={novel().total_view != null}>
-                      <span>👁 {novel().total_view}</span>
-                    </Show>
-                  </div>
-                </div>
-              </div>
+              <NovelCoverHeader
+                novel={novel()}
+                onAuthorClick={() => void navigate({ to: `/user/${novel().user.id}` })}
+                onSeriesClick={() => setSeriesOpen(true)}
+                onCommentsClick={() => setShowComments(true)}
+                onTitleRef={setTitleEl}
+              />
 
               {/* ── Text content ── */}
               <div class="px-4 py-6 max-w-2xl mx-auto pb-[64px]">
@@ -858,59 +798,15 @@ const NovelDetail: Component = () => {
                 </Show>
               </div>
 
-              {/* ── Footer: Nav + Settings ── */}
-              <div
-                class="fixed bottom-0 left-0 right-0 surface-appbar border-t border-[var(--colorNeutralStroke2)] px-4 py-2"
-                style={{
-                  "z-index": 20,
-                  transform: footerHidden()
-                    ? "translateY(calc(100% + 8px + env(safe-area-inset-bottom, 0px)))"
-                    : "translateY(0)",
-                  transition: "transform var(--durationNormal) var(--curveEasyEase)",
-                }}
-              >
-                <div class="max-w-2xl mx-auto flex items-center justify-center gap-1 overflow-x-auto">
-                  <Show when={novel().series?.id ? novelNav()?.prevNovel : undefined}>
-                    {(prev) => (
-                      <button
-                        class="flex-shrink-0 whitespace-nowrap px-3 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] font-medium hover:bg-[var(--colorNeutralBackground3)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer flex items-center gap-1"
-                        onClick={() => switchNovel(prev().id)}
-                      >
-                        ◀ 上一章
-                      </button>
-                    )}
-                  </Show>
-                  <Show when={novel().series?.id}>
-                    <button
-                      class="flex-shrink-0 whitespace-nowrap px-3 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] font-medium hover:bg-[var(--colorNeutralBackground3)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer flex items-center gap-2"
-                      onClick={() => setSeriesOpen(true)}
-                      aria-label="打开系列目录"
-                    >
-                      <FluentIcon name="list" size={20} />
-                      目录
-                    </button>
-                  </Show>
-                  <button
-                    class="flex-shrink-0 whitespace-nowrap px-3 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] font-medium hover:bg-[var(--colorNeutralBackground3)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer flex items-center gap-2"
-                    onClick={() => setSettingsOpen(true)}
-                  >
-                    <span class="font-bold tracking-tight" style="font-size:var(--fontSizeBase400)">
-                      Aa
-                    </span>
-                    显示设置
-                  </button>
-                  <Show when={novel().series?.id ? novelNav()?.nextNovel : undefined}>
-                    {(next) => (
-                      <button
-                        class="flex-shrink-0 whitespace-nowrap px-3 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorBrandBackground)] text-white [font-size:var(--fontSizeBase200)] font-medium hover:opacity-90 active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer flex items-center gap-1"
-                        onClick={() => switchNovel(next().id)}
-                      >
-                        下一章 ▶
-                      </button>
-                    )}
-                  </Show>
-                </div>
-              </div>
+              <NovelFooterNav
+                novel={novel()}
+                novelNav={novelNav()}
+                footerHidden={footerHidden()}
+                onPrevChapter={(id) => switchNovel(id)}
+                onNextChapter={(id) => switchNovel(id)}
+                onOpenSeries={() => setSeriesOpen(true)}
+                onOpenSettings={() => setSettingsOpen(true)}
+              />
 
               <ReaderSettingsSheet isOpen={settingsOpen()} onClose={() => setSettingsOpen(false)} />
 

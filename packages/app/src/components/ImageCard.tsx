@@ -3,6 +3,7 @@ import type { PixivIllust } from "../api/types";
 import { listQuality } from "../stores/settingsStore";
 import PixivImage from "./PixivImage";
 import HeartBurstEffect from "./HeartBurstEffect";
+import HeartIcon from "./ui/HeartIcon";
 import IllustTags from "./IllustTags";
 import SkeletonShimmer from "./SkeletonShimmer";
 import { resolveImageUrl } from "../utils/imageLoader";
@@ -18,36 +19,6 @@ function resolveUrl(illust: PixivIllust): string {
   }
   // Original: use original_image_url if available, otherwise fallback to large
   return illust.meta_single_page?.original_image_url ?? illust.image_urls.large;
-}
-
-/** 收藏爱心 SVG — 24×24 viewBox，与 FluentIcon 风格一致 */
-function HeartSvg(props: { filled: boolean; size?: number }) {
-  const s = props.size ?? 24;
-  return (
-    <svg
-      width={s}
-      height={s}
-      viewBox="0 0 24 24"
-      fill={props.filled ? "currentColor" : "none"}
-      aria-hidden="true"
-    >
-      {props.filled ? (
-        <path
-          d="M12.82 5.58l-.82.82-.82-.82a4.5 4.5 0 0 0-6.36 6.36l.82.82L12 20.06l6.36-6.36.82-.82a4.5 4.5 0 0 0-6.36-6.36z"
-          fill="currentColor"
-        />
-      ) : (
-        <path
-          d="M12.82 5.58l-.82.82-.82-.82a4.5 4.5 0 0 0-6.36 6.36l.82.82L12 20.06l6.36-6.36.82-.82a4.5 4.5 0 0 0-6.36-6.36z"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
-      )}
-    </svg>
-  );
 }
 
 interface Props {
@@ -163,7 +134,7 @@ const ImageCard: Component<Props> = (props) => {
             onClick={(e) => e.stopPropagation()}
             aria-label={bookmarked() ? "取消收藏" : "收藏"}
           >
-            <HeartSvg filled={bookmarked()} size={16} />
+            <HeartIcon filled={bookmarked()} size={16} />
           </button>
           <HeartBurstEffect trigger={bookmarkBurstTrigger} size={80} particleCount={6} />
         </div>
