@@ -9,8 +9,10 @@ import type { ApiError } from "../api/types";
 export interface OAuthWebViewProps {
   /** 是否显示 OAuth 登录弹窗。 */
   open: boolean;
-  /** Pixiv OAuth 登录 URL（Android Native 使用）。 */
+  /** Pixiv OAuth 登录 URL（Android Native 使用）。传入空字符串时使用 codeChallenge */
   loginUrl: string;
+  /** PKCE code_challenge。Native 层自动构建完整 OAuth URL。 */
+  codeChallenge?: string;
   /** 成功获取 authorization_code 后的回调。 */
   onSuccess: (code: string) => void;
   /** 用户取消登录时的回调。 */
@@ -32,7 +34,9 @@ const OAuthWebView: Component<OAuthWebViewProps> = (props) => {
   const startNativeOAuth = async () => {
     try {
       const { OAuthPlugin } = await import("@/native/OAuthPlugin");
-      const result = await OAuthPlugin.startOAuth({ loginUrl: props.loginUrl });
+      const result = props.loginUrl
+        ? await OAuthPlugin.startOAuth({ loginUrl: props.loginUrl })
+        : await OAuthPlugin.startOAuth({ codeChallenge: props.codeChallenge });
       props.onSuccess(result.code);
     } catch (e: any) {
       if (e?.message === "cancelled") {

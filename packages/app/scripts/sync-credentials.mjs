@@ -49,6 +49,7 @@ const lines = [
   "",
   "  // ── C: 端点 URL ──",
   `  public static final String AUTH_URL = "${cfg.authUrl}";`,
+  `  public static final String LOGIN_URL = "${cfg.loginUrl}";`,
   `  public static final String IMAGE_CDN_URL = "${cfg.imageCdnUrl}";`,
   `  public static final String REDIRECT_URI = "${cfg.redirectUri}";`,
   "",

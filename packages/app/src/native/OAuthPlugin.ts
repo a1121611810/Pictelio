@@ -4,8 +4,10 @@ import { registerPlugin } from "@capacitor/core";
  * OAuthPlugin.startOAuth 的请求参数。
  */
 export interface OAuthStartOptions {
-  /** Pixiv OAuth 登录 URL（含 PKCE code_challenge）。 */
-  loginUrl: string;
+  /** Pixiv OAuth 登录 URL（含 PKCE code_challenge）。提供时直接使用此 URL。 */
+  loginUrl?: string;
+  /** PKCE code_challenge。未提供 loginUrl 时，Native 层自动构建完整 URL。 */
+  codeChallenge?: string;
 }
 
 /**

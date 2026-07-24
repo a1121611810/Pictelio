@@ -83,8 +83,19 @@ public class OAuthPlugin extends Plugin {
     @PluginMethod
     public void startOAuth(PluginCall call) {
         String loginUrl = call.getString("loginUrl");
+        String codeChallenge = call.getString("codeChallenge");
+
+        // 若提供了 codeChallenge 但无 loginUrl，从 OAuthConfig 构建完整 URL
+        if ((loginUrl == null || loginUrl.isEmpty()) && codeChallenge != null && !codeChallenge.isEmpty()) {
+            loginUrl = OAuthConfig.LOGIN_URL
+                + "?client_id=" + OAuthConfig.CLIENT_ID
+                + "&code_challenge=" + codeChallenge
+                + "&code_challenge_method=S256&response_type=code&redirect_uri="
+                + OAuthConfig.REDIRECT_URI;
+        }
+
         if (loginUrl == null || loginUrl.isEmpty()) {
-            call.reject("loginUrl is required");
+            call.reject("loginUrl or codeChallenge is required");
             return;
         }
 

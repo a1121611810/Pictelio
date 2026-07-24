@@ -20,6 +20,7 @@ const Login: Component = () => {
 
   const [showOAuth, setShowOAuth] = createSignal(false);
   const [codeVerifier, setCodeVerifier] = createSignal("");
+  const [codeChallenge, setCodeChallenge] = createSignal("");
 
   onMount(() => {
     if (isLoggedIn()) {
@@ -45,6 +46,7 @@ const Login: Component = () => {
     try {
       const pkce = await generatePKCE();
       setCodeVerifier(pkce.codeVerifier);
+      setCodeChallenge(pkce.codeChallenge);
       setShowOAuth(true);
     } catch (e) {
       setError(toApiError(e, "无法创建登录链接"));
@@ -212,6 +214,7 @@ const Login: Component = () => {
       <OAuthWebView
         open={showOAuth()}
         loginUrl=""
+        codeChallenge={codeChallenge()}
         onSuccess={handleOAuthSuccess}
         onCancel={handleOAuthCancel}
         onError={handleOAuthError}
