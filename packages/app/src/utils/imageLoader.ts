@@ -5,6 +5,11 @@ import { getEffectiveImageUrl, getRaceCandidateUrls } from "../services/imageHos
 
 const isNative = Capacitor.isNativePlatform();
 
+// 模块加载时自动启动定时 GC（测试环境下不启动）
+if (typeof setInterval !== "undefined" && typeof process !== "object") {
+  schedulePeriodicGC();
+}
+
 // ─── 惰性加载 ImageCache 插件（避免在测试/Web 环境下误注册） ───
 let imageCacheImpl: ImageCachePlugin | null = null;
 
@@ -27,6 +32,12 @@ function getImageCache(): ImageCachePlugin | null {
 
 /** 最大条目数（Pixiv 原图 URL ~100 字符，1 万条约 1-2MB 字符串内存） */
 const MAX_CACHE_ENTRIES = 10_000;
+/** GC 阈值：条目数超过此值时触发定时淘汰 */
+const GC_THRESHOLD = 8_000;
+/** GC 间隔（毫秒）：每 5 分钟检查一次 */
+const GC_INTERVAL_MS = 300_000;
+/** GC 淘汰比例：每次淘汰最旧条目的比率 */
+const GC_EVICT_RATIO = 0.2;
 /** key → 插入序号。Map 迭代序即插入序，重复 set 不挪位，需 delete+set 刷新。 */
 const loadedKeys = new Map<string, number>();
 let insertCounter = 0;
@@ -43,6 +54,83 @@ function cacheSet(key: string) {
     }
   }
   loadedKeys.set(key, ++insertCounter);
+}
+
+// ─── 定时 GC ───
+
+let gcTimerId: ReturnType<typeof setInterval> | undefined;
+
+/**
+ * 启动定时 GC。每 GC_INTERVAL_MS 检查一次缓存大小，
+ * 超过 GC_THRESHOLD 时淘汰最旧 GC_EVICT_RATIO 比例的条目。
+ */
+export function schedulePeriodicGC(): void {
+  if (gcTimerId !== undefined) return;
+  gcTimerId = setInterval(() => {
+    if (loadedKeys.size > GC_THRESHOLD) {
+      const evictCount = Math.ceil(loadedKeys.size * GC_EVICT_RATIO);
+      const keys = [...loadedKeys.keys()];
+      for (let i = 0; i < evictCount && i < keys.length; i++) {
+        loadedKeys.delete(keys[i]);
+      }
+    }
+  }, GC_INTERVAL_MS);
+}
+
+/** 停止定时 GC */
+export function stopPeriodicGC(): void {
+  if (gcTimerId !== undefined) {
+    clearInterval(gcTimerId);
+    gcTimerId = undefined;
+  }
+}
+
+// ─── 上下文感知淘汰 ───
+
+/**
+ * 清除满足过滤条件的缓存条目。
+ * @param filter 返回 true 的 key 将被清除
+ */
+export function clearCacheWithFilter(filter: (key: string) => boolean): void {
+  for (const key of loadedKeys.keys()) {
+    if (filter(key)) {
+      loadedKeys.delete(key);
+    }
+  }
+}
+
+/**
+ * 清除指定前缀的所有缓存条目。
+ * @param keyPrefix URL 前缀，例如 "/pixiv-img/12345"
+ */
+export function clearCacheForPrefix(keyPrefix: string): void {
+  for (const key of loadedKeys.keys()) {
+    if (key.startsWith(keyPrefix)) {
+      loadedKeys.delete(key);
+    }
+  }
+}
+
+export interface CacheMemoryStats {
+  totalEntries: number;
+  maxEntries: number;
+  gcThreshold: number;
+  estimatedBytes: number;
+  gcRunning: boolean;
+}
+
+/**
+ * 获取当前缓存状态统计。
+ */
+export function getMemoryUsage(): CacheMemoryStats {
+  const estimatedBytes = [...loadedKeys.keys()].reduce((sum, key) => sum + key.length * 2, 0);
+  return {
+    totalEntries: loadedKeys.size,
+    maxEntries: MAX_CACHE_ENTRIES,
+    gcThreshold: GC_THRESHOLD,
+    estimatedBytes,
+    gcRunning: gcTimerId !== undefined,
+  };
 }
 
 /** 同步检查图片是否已加载过（不触发加载），命中时返回代理 URL 并刷新 LRU 位置。
@@ -67,6 +155,7 @@ export function injectCacheEntry(key: string): void {
 /** 清空已加载标记（"清除本地数据"时调用） */
 export function clearImageCache() {
   loadedKeys.clear();
+  insertCounter = 0;
 }
 
 /** 获取缓存条目数 */
@@ -193,13 +282,10 @@ export function loadImage(originalUrl: string): Promise<LoadedImage> {
   }
 
   // 3. 创建加载 Promise 并注册到飞行中 Map
-  const promise = loadImageInner(originalUrl);
-  inflightRequests.set(originalUrl, promise);
-
-  // 4. 无论成功/失败，加载完成后从飞行中 Map 移除
-  promise.finally(() => {
+  const promise = loadImageInner(originalUrl).finally(() => {
     inflightRequests.delete(originalUrl);
   });
+  inflightRequests.set(originalUrl, promise);
 
   return promise;
 }
