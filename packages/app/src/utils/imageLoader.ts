@@ -5,8 +5,17 @@ import { getEffectiveImageUrl, getRaceCandidateUrls } from "../services/imageHos
 
 const isNative = Capacitor.isNativePlatform();
 
-// 定时器 ID —— 必须在模块顶层调用之前声明，避免 let 暂时性死区（TDZ）
+// 定时器 ID —— 必须在模块顶层调用之前声明，避免 let/const 暂时性死区（TDZ）
 let gcTimerId: ReturnType<typeof setInterval> | undefined;
+
+/** 最大条目数（Pixiv 原图 URL ~100 字符，1 万条约 1-2MB 字符串内存） */
+const MAX_CACHE_ENTRIES = 10_000;
+/** GC 阈值：条目数超过此值时触发定时淘汰 */
+const GC_THRESHOLD = 8_000;
+/** GC 间隔（毫秒）：每 5 分钟检查一次 */
+const GC_INTERVAL_MS = 300_000;
+/** GC 淘汰比例：每次淘汰最旧条目的比率 */
+const GC_EVICT_RATIO = 0.2;
 
 // 模块加载时自动启动定时 GC（测试环境下不启动）
 if (typeof setInterval !== "undefined" && typeof process !== "object") {
@@ -33,14 +42,6 @@ function getImageCache(): ImageCachePlugin | null {
 // 历史上 L1 曾缓存 200MB Blob + blobUrl，但所有消费方都只拿代理 URL，
 // Blob 本体从未被读取，纯属内存驻留（含重复写入泄漏）。因此退化为纯 key 集合。
 
-/** 最大条目数（Pixiv 原图 URL ~100 字符，1 万条约 1-2MB 字符串内存） */
-const MAX_CACHE_ENTRIES = 10_000;
-/** GC 阈值：条目数超过此值时触发定时淘汰 */
-const GC_THRESHOLD = 8_000;
-/** GC 间隔（毫秒）：每 5 分钟检查一次 */
-const GC_INTERVAL_MS = 300_000;
-/** GC 淘汰比例：每次淘汰最旧条目的比率 */
-const GC_EVICT_RATIO = 0.2;
 /** key → 插入序号。Map 迭代序即插入序，重复 set 不挪位，需 delete+set 刷新。 */
 const loadedKeys = new Map<string, number>();
 let insertCounter = 0;
