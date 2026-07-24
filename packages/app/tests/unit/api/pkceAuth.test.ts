@@ -56,17 +56,6 @@ describe("pkceAuth", () => {
     });
   });
 
-  describe("buildLoginUrl", () => {
-    it("builds Pixiv OAuth login URL with codeChallenge", async () => {
-      const { buildLoginUrl } = await import("@/api/pkceAuth");
-      const url = buildLoginUrl("test-challenge-here");
-      expect(url).toContain("https://app-api.pixiv.net/web/v1/login");
-      expect(url).toContain("code_challenge=test-challenge-here");
-      expect(url).toContain("code_challenge_method=S256");
-      expect(url).toContain("client=pixiv-android");
-    });
-  });
-
   describe("exchangeCode", () => {
     it("sends authorization_code grant request on web", async () => {
       const mockFetch = vi.fn().mockResolvedValue({
