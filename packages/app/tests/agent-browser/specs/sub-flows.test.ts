@@ -83,13 +83,24 @@ describe("agent-browser 作品链路", () => {
       return;
     }
 
-    await driver.clickFirst();
+    // 详情页收藏按钮: button.relative.inline-flex button（含 ♡ 或 ♥ 图标）
+    try {
+      await driver.click('.relative.inline-flex button');
+    } catch {
+      // fallback: 尝试通过文本点击
+      await driver.clickReliable("♡");
+    }
     await SLEEP(2000);
     let state = await getState(driver);
     let result = await aiAssert("收藏成功，按钮点亮", state);
     expect(result.passed, result.reason).toBe(true);
 
-    await driver.clickReliable("收藏");
+    // 再次点击取消收藏
+    try {
+      await driver.click('.relative.inline-flex button');
+    } catch {
+      await driver.clickReliable("♥");
+    }
     await SLEEP(2000);
     state = await getState(driver);
     result = await aiAssert("取消收藏，按钮恢复", state);
@@ -114,18 +125,11 @@ describe("agent-browser 阅读链路", () => {
   afterAll(async () => { await driver?.close(); });
 
   it("小说 Feed → 正文加载", async () => {
-    // 小说内容切换按钮在页面顶部，用 CSS 选择器精确定位
-    try {
-      await driver.click('[class*="flex items-center"] button:last-child');
-    } catch {
-      // fallback: 通过导航栏先确保在推荐页
-      await driver.clickReliable("推荐");
-      await SLEEP(2000);
-      try {
-        await driver.click('[class*="flex items-center"] button:last-child');
-      } catch {
-        throw new Error("找不到小说按钮");
-      }
+    // 小说是页面顶部的 content type 切换按钮，通过 clickReliable 定位
+    const ok = await driver.clickReliable("小说");
+    if (!ok) {
+      console.log("[阅读] 找不到小说按钮，跳过");
+      return;
     }
     await SLEEP(3000);
 

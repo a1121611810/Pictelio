@@ -45,9 +45,16 @@ export function findRefByText(snapshot: string, text: string): string | null {
 /**
  * 从 snapshot 中获取第一个可点击元素的 ref。
  */
+/**
+ * 从 snapshot 中获取第一个可点击元素的 ref。
+ * 跳过第一个 ref（通常是用户头像 h1），取第二个作为卡片。
+ */
 function firstClickableRef(snapshot: string): string | null {
-  const refMatch = snapshot.match(/ref=(e\d+)/u);
-  return refMatch ? refMatch[1] : null;
+  const matches = [...snapshot.matchAll(/ref=(e\d+)/ug)];
+  if (matches.length === 0) return null;
+  if (matches.length === 1) return matches[0][1];
+  // 取第二个 ref，跳过用户头像/标题等顶部元素
+  return matches[1][1];
 }
 
 // ─── Driver 类 ──────────────────────────────────────
@@ -112,8 +119,12 @@ export class AgentBrowserDriver {
     const snap = await this.snapshot();
     const ref = findRefByText(snap, text);
     if (ref) {
-      await this.click(`@${ref}`);
-      return true;
+      try {
+        await this.click(`@${ref}`);
+        return true;
+      } catch {
+        console.log(`[driver] @${ref} 点击失败，尝试 fallback`);
+      }
     }
 
     // 2. 尝试 aria-label
@@ -143,11 +154,12 @@ export class AgentBrowserDriver {
   /**
    * 点击第一个可交互元素（用于点卡片等通用操作）。
    */
-  async clickFirst(): Promise<boolean> {
+  async clickFirst(skipCount = 1): Promise<boolean> {
     const snap = await this.snapshot();
-    const ref = firstClickableRef(snap);
-    if (ref) {
-      await this.click(`@${ref}`);
+    const matches = [...snap.matchAll(/ref=(e\d+)/ug)];
+    const idx = Math.min(skipCount, matches.length - 1);
+    if (matches[idx]) {
+      await this.click(`@${matches[idx][1]}`);
       return true;
     }
     return false;

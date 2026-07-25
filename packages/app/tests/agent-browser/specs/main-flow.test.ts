@@ -96,14 +96,23 @@ describe("agent-browser 超长链", () => {
       return;
     }
 
-    const ok = await driver.clickFirst();
-    if (ok) await SLEEP(2000);
+    // 详情页收藏按钮: div.relative.inline-flex button
+    try {
+      await driver.click('.relative.inline-flex button');
+    } catch {
+      await driver.clickReliable("♡");
+    }
+    await SLEEP(2000);
 
     let state = await getPageState(driver);
     let result = await aiAssert("点击收藏后按钮点亮，作品已收藏", state);
     expect(result.passed, result.reason).toBe(true);
 
-    await driver.clickReliable("收藏");
+    try {
+      await driver.click('.relative.inline-flex button');
+    } catch {
+      await driver.clickReliable("♥");
+    }
     await SLEEP(2000);
     state = await getPageState(driver);
     result = await aiAssert("取消收藏后按钮回到未收藏状态", state);
@@ -124,9 +133,8 @@ describe("agent-browser 超长链", () => {
 
   it("[E1-E4] 小说 Feed → 小说详情", async () => {
     // 小说是页面顶部的 content type 切换按钮，CSS 选择器精准定位
-    try {
-      await driver.click('[class*="flex items-center"] button:last-child');
-    } catch {
+    const ok = await driver.clickReliable("小说");
+    if (!ok) {
       console.log("[E] 找不到小说按钮，跳过");
       return;
     }
