@@ -59,8 +59,8 @@ const VirtualFeed: Component<Props> = (props) => {
     if (!ill) return 200;
     const mode = layoutMode();
     if (mode === "grid") return 200 + CARD_INFO_HEIGHT;
-    const effH = ill.type === "ugoira" ? Math.round(ill.height * 0.75) : ill.height;
-    const aspectRatio = effH > 0 ? ill.width / effH : 1;
+    // 动图卡片固定 1:1 正方形，其余用图片原始宽高比
+    const aspectRatio = ill.type === "ugoira" ? 1 : ill.height > 0 ? ill.width / ill.height : 1;
     return cw() / aspectRatio + CARD_INFO_HEIGHT;
   };
 

@@ -14,8 +14,12 @@ interface Props {
 /**
  * 从 illust 数据中提取骨架屏所需的宽高。
  * 优先使用 API 返回的 width/height，缺失时从主图 URL 解析。
+ * 动图固定返回 1:1 正方形。
  */
 function getSkeletonDimensions(illust: PixivIllust): { width: number; height: number } | null {
+  if (illust.type === "ugoira") {
+    return { width: 1, height: 1 };
+  }
   if (illust.width > 0 && illust.height > 0) {
     return { width: illust.width, height: illust.height };
   }
