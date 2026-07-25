@@ -42,7 +42,6 @@ const ImageCard: Component<Props> = (props) => {
     onPointerUp,
     onPointerLeave,
   } = useCardInteractions(props.illust);
-  const [ugoiraHeight] = createSignal(Math.round(h() * 0.75));
   const [thumbLoaded, setThumbLoaded] = createSignal(false);
   const [mainLoaded, setMainLoaded] = createSignal(false);
 
@@ -64,10 +63,7 @@ const ImageCard: Component<Props> = (props) => {
           onError={() => setThumbLoaded(true)}
         />
         {isUgoira() ? (
-          <div
-            style={{ "aspect-ratio": `${w()} / ${ugoiraHeight()}` }}
-            class="overflow-hidden z-2 relative"
-          >
+          <div style={{ "aspect-ratio": "1 / 1" }} class="overflow-hidden z-2 relative">
             <PixivImage
               src={img()}
               alt={props.illust.title}
