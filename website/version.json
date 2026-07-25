@@ -1,5 +1,5 @@
 {
-  "version": "3.17.5",
-  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.17.5",
-  "changelog": "🐛 修复\n  fix(app): 移除动图宽高比中残余的 Math.round(h*0.75)\n  fix(app): 修复动图虚拟滚动估算和骨架屏宽高比\n  fix(app): 列表动图卡片改为 1:1 正方形宽高比\n✨ 新功能\n  feat(app): 插画详情动图原地播放，加载显示百分比进度"
+  "version": "3.17.6",
+  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.17.6",
+  "changelog": "🐛 修复\n  fix(app): 添加 createEffect 二次保障确保自动更新弹窗显示\n  fix(app): 修复从详情页返回列表时滚动位置被污染的问题"
 }
