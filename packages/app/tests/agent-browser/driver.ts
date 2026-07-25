@@ -154,13 +154,27 @@ export class AgentBrowserDriver {
   /**
    * 点击第一个可交互元素（用于点卡片等通用操作）。
    */
-  async clickFirst(skipCount = 1): Promise<boolean> {
-    const snap = await this.snapshot();
-    const matches = [...snap.matchAll(/ref=(e\d+)/ug)];
-    const idx = Math.min(skipCount, matches.length - 1);
-    if (matches[idx]) {
-      await this.click(`@${matches[idx][1]}`);
+  async clickFirst(skipCount = 6): Promise<boolean> {
+    // 1. 尝试 CSS 选择器（不受 snapshot ref 过期影响）
+    try {
+      await this.click('.image-card');
       return true;
+    } catch { /* fall through */ }
+
+    // 2. snapshot ref + 重试（处理页面重新渲染导致 ref 过期）
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const snap = await this.snapshot();
+      const matches = [...snap.matchAll(/ref=(e\d+)/ug)];
+      const idx = Math.min(skipCount, matches.length - 1);
+      if (matches[idx]) {
+        try {
+          await this.click(`@${matches[idx][1]}`);
+          return true;
+        } catch {
+          // ref 过期，重试
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+      }
     }
     return false;
   }
