@@ -1,5 +1,5 @@
 {
-  "version": "3.17.6",
-  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.17.6",
-  "changelog": "🐛 修复\n  fix(app): 添加 createEffect 二次保障确保自动更新弹窗显示\n  fix(app): 修复从详情页返回列表时滚动位置被污染的问题"
+  "version": "3.17.7",
+  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.17.7",
+  "changelog": "✨ 新功能\n  feat(app): 全量覆盖第三方用户名点击跳转个人中心"
 }
