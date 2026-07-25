@@ -9,7 +9,8 @@ tags: [testing, vitest, playwright, e2e, agent-tests, unit-tests]
 
 Pictelio uses a four-tier testing architecture, each with its own configuration and purpose. Tests live under `/packages/app/tests/`. The canonical conventions are documented in `/packages/app/tests/TESTING.md`.
 
-```mermaid
+<!-- openwiki: mermaid parse failed and this diagram was converted to a text fence so it does not break rendering. Fix the diagram source and restore the mermaid fence. Parser error: Heuristic: an unescaped angle bracket inside a label breaks rendering; rephrase the label. -->
+```text
 flowchart TD
     U[Unit Tests<br/>vitest.config.ts] --> S[Pure logic: API, utils, stores, router]
     B[Browser Tests<br/>vitest.browser.config.ts] --> C[Component rendering: UI, interaction]
@@ -42,6 +43,11 @@ flowchart TD
 - Has its own `TESTING.md` for conventions
 - **Custom infrastructure:** Agent driver, fixtures, setup scripts, and spec files
 - Designed for testing multi-step flows that are tedious to script manually
+- **Recent stability improvements (v3.17.2-3.17.6):**
+  - **Daemon socket conflict resolution** — per-file namespace with aggressive cleanup prevents port collisions
+  - **`clickFirst` fix** — skips the first DOM match (user avatar ref) and targets the second (card click surface)
+  - **`clickReliable`** — wraps `event.target.click()` in a try-catch fallback chain for resilience against stale references
+  - **DOM-based navigation** — replaced fragile JavaScript-based `evaluate` calls with DOM button clicks via `clickReliable`
 
 ### 4. End-to-End Tests (`tests/e2e/`)
 

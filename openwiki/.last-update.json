@@ -1,18 +1,6 @@
 {
-  "version": "1.5.6",
-  "timestamp": "2026-07-18",
-  "type": "update",
-  "pages_created": [
-    "/openwiki/domain/feed-and-browsing.md",
-    "/openwiki/domain/novel-reader.md",
-    "/openwiki/integrations/android-native.md",
-    "/openwiki/testing/overview.md"
-  ],
-  "pages_updated": [
-    "/openwiki/quickstart.md"
-  ],
-  "pages_deleted": [
-    "/openwiki/_plan.md"
-  ],
-  "summary": "Completed missing domain, integration, and testing documentation. Cleaned up plan file and consolidated backlog."
+  "updatedAt": "2026-07-25T17:45:44.631Z",
+  "command": "update",
+  "gitHead": "b2055cec99dd48b9df30dc6d041773694d9632bd",
+  "model": "deepseek-v4-flash"
 }

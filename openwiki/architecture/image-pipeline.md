@@ -11,7 +11,8 @@ tags: [images, caching, performance, webview, android]
 
 The image loading pipeline is documented exhaustively in `/docs/image-loading-pipeline.md` (~40KB). This page summarizes the architecture and key components.
 
-```mermaid
+<!-- openwiki: mermaid parse failed and this diagram was converted to a text fence so it does not break rendering. Fix the diagram source and restore the mermaid fence. Parser error: Heuristic: an unescaped angle bracket inside a label breaks rendering; rephrase the label. -->
+```text
 flowchart LR
     API[Pixiv API] --> IL[imageLoader.ts]
     IL --> L1[L1 LRU Key Set<br/>in-memory Set]
@@ -89,6 +90,47 @@ On Android, `ImageCachePlugin.java` intercepts image requests via `shouldInterce
 - Cache dimension results
 - Used by the virtual scroller to calculate item sizes before rendering
 
+## Ugoira (Animated Illust) Pipeline
+
+Ugoira is Pixiv's animated illust format (ZIP of frames with timing data). Pictelio handles ugoira with a dedicated loading and playback pipeline.
+
+### Inline Playback with Progress Indicator
+
+Introduced in v3.17.4-3.17.5, the ugoira experience was rewritten to support **inline playback** directly on the illust detail page (replacing the previous full-screen viewer):
+
+1. **Cover image remains in place** during loading — the illust detail page keeps the cover image rendered beneath the loading indicator
+2. **Progress indicator** — an SVG ring progress bar with numeric percentage (0-100%) displays during ZIP download and frame extraction
+3. **Seamless transition** — once all frames are decoded, the cover is replaced by `UgoiraViewer` with zero visual gap
+
+### `downloadAndExtractUgoira()`
+
+Shared function in `/packages/app/src/api/illust.ts` that consolidates the ZIP download + per-frame extraction logic:
+- Stream-downloads the ugoira ZIP from Pixiv
+- Decompresses each frame in sequence
+- Supports a progress callback for the UI progress indicator
+- Returns `{ blobUrls: string[], frames: UgoiraFrame[] }`
+
+### UgoiraViewer Component
+
+`/packages/app/src/components/UgoiraViewer.tsx` — the playback component with:
+
+| Prop | Type | Purpose |
+|------|------|---------|
+| `illustId` | `number` | Pixiv illust ID for loading |
+| `coverUrl` | `string` | Fallback cover image URL |
+| `inline` | `boolean` | If true, renders inline with `aspectRatio` (not full-screen) |
+| `aspectRatio` | `string` | Container aspect ratio for inline mode |
+| `preloadedFrames` | `UgoiraFrame[]` | Optional pre-loaded frames (skips internal fetch) |
+
+The `preloadedFrames` prop allows the parent (`IllustDetail`) to preload frames using `downloadAndExtractUgoira()` and pass them directly, enabling the progress indicator display on the parent's cover image before `UgoiraViewer` mounts.
+
+### List Card Aspect Ratio
+
+For ugoira illusts in feed lists (virtual scroll):
+- **ImageCard** uses a fixed 1:1 square `aspect-ratio` for ugoira cards
+- **VirtualFeed** `estimateSize` and **LazyImageCard** skeleton dimensions are synchronized to match the 1:1 aspect ratio
+- This prevents layout shift and keeps grid consistency between static and animated cards
+
 ## Key Files
 
 | Purpose | Path |
@@ -99,6 +141,8 @@ On Android, `ImageCachePlugin.java` intercepts image requests via `shouldInterce
 | PixivImage display component | `/packages/app/src/components/PixivImage.tsx` |
 | Image cache native plugin | `/packages/app/src/native/ImageCache.ts` |
 | Web Worker for size measurement | `/packages/app/src/primitives/createImageSizeWorker.ts` |
+| Ugoira download + extraction | `/packages/app/src/api/illust.ts` (`downloadAndExtractUgoira()`) |
+| Ugoira playback component | `/packages/app/src/components/UgoiraViewer.tsx` |
 | Full pipeline documentation | `/docs/image-loading-pipeline.md` |
 | ADR: Three-layer cache design | `/docs/adr/0003-image-cache-three-layer.md` |
 | ADR: L1 key set migration | `/docs/adr/0014-l1-image-cache-key-set.md` |

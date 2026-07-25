@@ -37,7 +37,8 @@ Both feed stores now use `createTQFeedStore` (`/packages/app/src/stores/shared/c
 - Scroll state save/restore (`saveFeedScrollState` / `getFeedScrollState`)
 - Sub-tab adapter functions converting between feed-store and factory naming conventions
 
-```mermaid
+<!-- openwiki: mermaid parse failed and this diagram was converted to a text fence so it does not break rendering. Fix the diagram source and restore the mermaid fence. Parser error: Heuristic: an unescaped angle bracket inside a label breaks rendering; rephrase the label. -->
+```text
 flowchart LR
     TFP[TabFeedPage] --> FS[feedStore]
     FS --> TQ[createTQFeedStore]
@@ -96,6 +97,36 @@ User settings control visibility of each tier. An **AgeConfirmation** gate (`/pa
 - `/packages/app/src/routes/NovelBookmarks.tsx` — Novel bookmark list
 
 Bookmark state is managed by `/packages/app/src/stores/bookmarkStore.ts`, which integrates with the Pixiv API and drive, also a `bookmarkStore` that toggles bookmarks with optimistic UI updates.
+
+## Author Click Navigation
+
+Per [ADR-0032](/docs/adr/ADR-0032-author-click-navigation.md), all card components now support clicking a third-party username to navigate to that user's personal center (`/user/${userId}`). The feature uses a uniform `onAuthorClick` prop chain:
+
+```
+Route Page (navigate) → VirtualFeed (prop pass-through)
+  → LazyImageCard/ImageCard/GridCard (prop pass-through)
+  → button onClick → e.stopPropagation() → onAuthorClick(user.id)
+```
+
+### Affected Components
+
+| Component | Route / Usage | Change |
+|-----------|--------------|--------|
+| `ImageCard` | Feed (waterfall/single) | `onAuthorClick` prop, `@user.name` is now a clickable button |
+| `GridCard` | Feed (grid mode) | Same pattern as ImageCard |
+| `NovelCard` | Novel feed (list mode) | `onAuthorClick` prop added |
+| `NovelCoverCard` | Novel feed (cover wall) | `onAuthorClick` prop added |
+| `VirtualFeed` | All illust feeds | Passes `onAuthorClick` through to cards |
+| `NovelVirtualFeed` | Novel feeds | Passes `onAuthorClick` through to cards |
+| `SearchResults` | Search page | Author names are clickable |
+| `UserWorksFeed` | User profile / illusts | Author names are clickable |
+| `HistoryPage` / `HistoryEntry` | Browsing history | `authorId` field stored; old entries degrade gracefully to plain text |
+
+### Key Implementation Details
+
+- **`e.stopPropagation()`** prevents the click from bubbling to the card container, which would trigger navigation to the illust/novel detail page
+- **Fluent-compliant touch targets:** all author buttons have `min-h-[40px]` for mobile usability
+- **`historyStore`** now stores an optional `authorId` field for history entries; entries without it render as plain text
 
 ## Browsing History
 

@@ -117,6 +117,19 @@ All commands are run from the monorepo root:
 | `pnpm build:android:release` | Signed release APK |
 | `pnpm dev:android` | One-command Android dev with hot reload |
 | `pnpm release` | Full release pipeline to GitHub Releases |
+| `pnpm openwiki:update` | Regenerate OpenWiki documentation from source |
+
+## Tooling & Commit Standards
+
+The project enforces [Conventional Commits](https://www.conventionalcommits.org/) via:
+
+- **`commitlint`** (`.commitlintrc.json`) — Validates commit message format against allowed types (`feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`) with max 72-char header
+- **`husky`** pre-commit hook (`.husky/pre-commit`) — Automatically runs `pnpm openwiki:update` when `src/`, `packages/`, `AGENTS.md`, or `CLAUDE.md` change
+- **`husky`** commit-msg hook (`.husky/commit-msg`) — Runs `commitlint` on the message
+
+The **CLAUDE.md** file at the repository root contains agent-specific instructions including OpenWiki maintenance rules and a commitment to run `pnpm openwiki:update` before committing source changes.
+
+A scheduled **OpenWiki GitHub Actions workflow** (`.github/workflows/openwiki-update.yml`) refreshes the repository wiki on a recurring basis, as a fallback guard if the pre-commit hook is bypassed.
 
 ## Repo Evolution (Recent History)
 

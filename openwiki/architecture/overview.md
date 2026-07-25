@@ -28,7 +28,8 @@ The application boots in `packages/app/src/main.tsx`:
 4. **Auth initialization** — `initializeAuth()` loads token from secure storage and sets up refresh, ensuring the auth `refreshPromise` is available before any API call
 5. **Solid root render** — `render(() => <App />, root)`
 
-```mermaid
+<!-- openwiki: mermaid parse failed and this diagram was converted to a text fence so it does not break rendering. Fix the diagram source and restore the mermaid fence. Parser error: Heuristic: an unescaped angle bracket inside a label breaks rendering; rephrase the label. -->
+```text
 sequenceDiagram
     participant M as main.tsx
     participant S as startup.ts
@@ -78,6 +79,7 @@ Routes are defined in `/packages/app/src/router.tsx` using `@tanstack/solid-rout
 | `/search` | `Search` | — |
 | `/about` | `About` | — |
 | `/age-confirmation` | `AgeConfirmation` | — |
+| `/debug` | `DebugPage` | — |
 | `/settings` | `Settings` | — |
 | `/layout-settings` | `LayoutSettings` | — |
 | `/image-host` | `ImageHostSettings` | — |
