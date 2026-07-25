@@ -92,12 +92,12 @@ const ImageCard: Component<Props> = (props) => {
           />
         )}
         {isUgoira() && (
-          <div class="absolute top-[var(--spacingVerticalXS)] right-[var(--spacingHorizontalXS)]">
+          <div class="absolute top-[var(--spacingVerticalXS)] right-[var(--spacingHorizontalXS)] z-10">
             <fluent-badge appearance="filled">动图</fluent-badge>
           </div>
         )}
         {/* Badge group — 左上角 */}
-        <div class="absolute top-[var(--spacingVerticalXS)] left-[var(--spacingHorizontalXS)] flex items-center gap-[var(--spacingHorizontalXXS)] pointer-events-none select-none z-1">
+        <div class="absolute top-[var(--spacingVerticalXS)] left-[var(--spacingHorizontalXS)] flex items-center gap-[var(--spacingHorizontalXXS)] pointer-events-none select-none z-10">
           {props.illust.x_restrict === 1 && (
             <fluent-badge appearance="filled" color="danger">
               R-18
@@ -115,7 +115,7 @@ const ImageCard: Component<Props> = (props) => {
           )}
         </div>
         {props.illust.page_count > 1 && (
-          <div class="absolute bottom-[var(--spacingVerticalXS)] left-[var(--spacingHorizontalXS)]">
+          <div class="absolute bottom-[var(--spacingVerticalXS)] left-[var(--spacingHorizontalXS)] z-10">
             <fluent-badge appearance="subtle">{props.illust.page_count}p</fluent-badge>
           </div>
         )}

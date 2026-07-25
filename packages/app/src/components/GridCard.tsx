@@ -72,7 +72,7 @@ const GridCard: Component<Props> = (props) => {
           hideLoadingPlaceholder
         />
         {/* Badges — top-left */}
-        <div class="absolute top-1 left-1 flex items-center gap-[var(--spacingHorizontalXXS)] pointer-events-none select-none z-1 flex-wrap">
+        <div class="absolute top-1 left-1 flex items-center gap-[var(--spacingHorizontalXXS)] pointer-events-none select-none z-10 flex-wrap">
           {props.illust.x_restrict === 1 && (
             <fluent-badge
               appearance="filled"
@@ -99,7 +99,7 @@ const GridCard: Component<Props> = (props) => {
         </div>
         {/* Multi-page indicator */}
         {props.illust.page_count > 1 && (
-          <div class="absolute bottom-1 left-1">
+          <div class="absolute bottom-1 left-1 z-10">
             <fluent-badge appearance="subtle" style="font-size:var(--fontSizeBase100)">
               📄 {props.illust.page_count}
             </fluent-badge>
