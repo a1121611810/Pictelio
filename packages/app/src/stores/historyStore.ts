@@ -21,6 +21,7 @@ export interface HistoryEntry {
   key: string;
   // Pixiv API 返回的 id 实际为字符串
   userId: string;
+  authorId?: number;
   type: "illust" | "novel";
   id: number;
   title: string;
@@ -72,6 +73,7 @@ export function recordVisit(item: PixivIllust | PixivNovel, type: "illust" | "no
     historyCollection.insert({
       key,
       userId: String(currentUser.id),
+      authorId: item.user.id,
       type,
       id,
       title: item.title,

@@ -168,12 +168,14 @@ const NovelVirtualFeed: Component<Props> = (props) => {
                   <NovelCoverCard
                     novel={novel}
                     onClick={props.onNovelClick}
+                    onAuthorClick={props.onAuthorClick}
                     onSeriesClick={props.onSeriesClick}
                   />
                 ) : (
                   <NovelCard
                     novel={novel}
                     onClick={props.onNovelClick}
+                    onAuthorClick={props.onAuthorClick}
                     onSeriesClick={props.onSeriesClick}
                   />
                 )}

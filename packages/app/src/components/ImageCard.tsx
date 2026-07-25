@@ -24,6 +24,7 @@ function resolveUrl(illust: PixivIllust): string {
 interface Props {
   illust: PixivIllust;
   onClick: (id: number) => void;
+  onAuthorClick?: (userId: number) => void;
 }
 
 const ImageCard: Component<Props> = (props) => {
@@ -148,7 +149,15 @@ const ImageCard: Component<Props> = (props) => {
           {props.illust.title}
         </p>
         <p class="[font-size:var(--fontSizeBase100)] text-[var(--colorNeutralForeground2)] truncate mt-[var(--spacingVerticalXXS)] flex items-baseline gap-[var(--spacingHorizontalXS)]">
-          <span class="truncate">@{props.illust.user.name}</span>
+          <button
+            class="bg-transparent border-none p-0 cursor-pointer text-[var(--colorNeutralForeground2)] hover:text-[var(--colorBrandForeground1)] hover:underline truncate min-h-[40px] flex items-center active:scale-[0.98] focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)]"
+            onClick={(e) => {
+              e.stopPropagation();
+              props.onAuthorClick?.(props.illust.user.id);
+            }}
+          >
+            @{props.illust.user.name}
+          </button>
           <span class="text-[var(--colorNeutralForegroundDisabled)] flex-shrink-0 select-none">
             ·
           </span>

@@ -77,6 +77,7 @@ const Feed: Component = () => {
             error={error()}
             hasMore={nextUrl() !== null}
             onIllustClick={(id) => void navigate({ to: `/illust/${id}` })}
+            onAuthorClick={(id) => void navigate({ to: `/user/${id}` })}
             onLoadMore={fetchMore}
             onRefresh={refresh}
             skipAnimation={cached}

@@ -9,6 +9,7 @@ import { parsePixivUrlDimensions } from "../utils/imageLoader";
 interface Props {
   illust: PixivIllust;
   onClick: (id: number) => void;
+  onAuthorClick?: (userId: number) => void;
 }
 
 /**
@@ -51,7 +52,11 @@ const LazyImageCard: Component<Props> = (props) => {
   return (
     <div ref={setRef}>
       {everVisible() ? (
-        <ImageCard illust={props.illust} onClick={props.onClick} />
+        <ImageCard
+          illust={props.illust}
+          onClick={props.onClick}
+          onAuthorClick={props.onAuthorClick}
+        />
       ) : (
         <SkeletonCard width={skeletonDims?.width} height={skeletonDims?.height} />
       )}

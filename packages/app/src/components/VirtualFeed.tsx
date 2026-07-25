@@ -26,6 +26,7 @@ interface Props {
   error: ApiError | null;
   hasMore: boolean;
   onIllustClick: (id: number) => void;
+  onAuthorClick?: (userId: number) => void;
   onLoadMore: () => void;
   onRefresh: () => Promise<void> | void;
   onNavigateToSettings?: () => void;
@@ -208,11 +209,23 @@ const VirtualFeed: Component<Props> = (props) => {
                 class="surface-card"
               >
                 {layoutMode() === "grid" ? (
-                  <GridCard illust={illust} onClick={props.onIllustClick} />
+                  <GridCard
+                    illust={illust}
+                    onClick={props.onIllustClick}
+                    onAuthorClick={props.onAuthorClick}
+                  />
                 ) : vItem.index < 4 ? (
-                  <ImageCard illust={illust} onClick={props.onIllustClick} />
+                  <ImageCard
+                    illust={illust}
+                    onClick={props.onIllustClick}
+                    onAuthorClick={props.onAuthorClick}
+                  />
                 ) : (
-                  <LazyImageCard illust={illust} onClick={props.onIllustClick} />
+                  <LazyImageCard
+                    illust={illust}
+                    onClick={props.onIllustClick}
+                    onAuthorClick={props.onAuthorClick}
+                  />
                 )}
               </div>
             );

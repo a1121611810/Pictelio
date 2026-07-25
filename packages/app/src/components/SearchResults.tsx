@@ -13,6 +13,7 @@ interface Props {
   onLoadMore: () => void;
   onIllustClick: (id: number) => void;
   onNovelClick: (id: number) => void;
+  onAuthorClick?: (userId: number) => void;
   onRefresh: () => Promise<void> | void;
   error?: ApiError | null;
 }
@@ -35,12 +36,14 @@ const SearchResults: Component<Props> = (props) => {
                   <NovelCard
                     novel={item.entity as PixivNovel}
                     onClick={() => props.onNovelClick(item.entity.id)}
+                    onAuthorClick={props.onAuthorClick}
                   />
                 }
               >
                 <ImageCard
                   illust={item.entity as PixivIllust}
                   onClick={() => props.onIllustClick(item.entity.id)}
+                  onAuthorClick={props.onAuthorClick}
                 />
               </Show>
             )}

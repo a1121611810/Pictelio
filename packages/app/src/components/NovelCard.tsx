@@ -10,6 +10,7 @@ import { resolveImageUrl } from "../utils/imageLoader";
 interface Props {
   novel: PixivNovel;
   onClick: (id: number) => void;
+  onAuthorClick?: (userId: number) => void;
   onSeriesClick?: (seriesId: number) => void;
 }
 
@@ -98,9 +99,15 @@ const NovelCard: Component<Props> = (props) => {
           <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground1)] line-clamp-3 leading-tight">
             {props.novel.title}
           </p>
-          <p class="[font-size:var(--fontSizeBase100)] text-[var(--colorNeutralForeground2)] truncate">
+          <button
+            class="bg-transparent border-none p-0 cursor-pointer text-[var(--colorNeutralForeground2)] hover:text-[var(--colorBrandForeground1)] hover:underline truncate text-left min-h-[40px] flex items-center active:scale-[0.98] focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)]"
+            onClick={(e) => {
+              e.stopPropagation();
+              props.onAuthorClick?.(props.novel.user.id);
+            }}
+          >
             @{props.novel.user.name}
-          </p>
+          </button>
           <div class="flex items-center gap-[var(--spacingHorizontalS)] text-[var(--colorNeutralForeground3)] [font-size:var(--fontSizeBase100)]">
             <span>{props.novel.total_bookmarks}</span>
             {props.novel.page_count > 1 && (
@@ -290,9 +297,15 @@ export const NovelCoverCard: Component<Props> = (props) => {
           <span aria-hidden="true">·</span>
           <span>{props.novel.total_bookmarks}</span>
         </div>
-        <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorBrandForeground1)] truncate">
+        <button
+          class="bg-transparent border-none p-0 cursor-pointer text-[var(--colorBrandForeground1)] hover:underline truncate text-left min-h-[40px] flex items-center [font-size:var(--fontSizeBase200)] active:scale-[0.98] focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)]"
+          onClick={(e) => {
+            e.stopPropagation();
+            props.onAuthorClick?.(props.novel.user.id);
+          }}
+        >
           @{props.novel.user.name}
-        </p>
+        </button>
         <div class="flex items-center gap-[var(--spacingHorizontalXXS)] flex-wrap min-w-0 overflow-hidden">
           <For each={tags().visible}>
             {(tag) => (

@@ -476,14 +476,27 @@ const HistoryPage: Component = () => {
                         {highlightText(e.title, searchQuery())}
                       </div>
                       <div
-                        class="mt-0.5"
+                        class="mt-0.5 flex items-center gap-1"
                         style={{
                           "font-size": "var(--fontSizeBase200)",
                           "line-height": "var(--lineHeightBase200)",
                           color: "var(--colorNeutralForeground3)",
                         }}
                       >
-                        {e.userName} · {formatTime(e.visitedAt)} · {e.visitCount}次
+                        <Show when={e.authorId} fallback={<span>{e.userName}</span>}>
+                          <button
+                            class="bg-transparent border-none p-0 cursor-pointer text-[var(--colorBrandForeground1)] hover:underline truncate min-h-[40px] active:scale-[0.98] focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)]"
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              void navigate({ to: `/user/${e.authorId}` });
+                            }}
+                          >
+                            {e.userName}
+                          </button>
+                        </Show>
+                        <span>
+                          · {formatTime(e.visitedAt)} · {e.visitCount}次
+                        </span>
                       </div>
                     </div>
 

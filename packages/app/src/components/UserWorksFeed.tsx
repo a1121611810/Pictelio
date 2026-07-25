@@ -14,6 +14,7 @@ interface Props {
   hasMore: boolean;
   onIllustClick: (id: number) => void;
   onNovelClick: (id: number) => void;
+  onAuthorClick?: (userId: number) => void;
   onLoadMore: () => void;
   onRefresh: () => Promise<void> | void;
   layoutMode?: LayoutMode;
@@ -32,6 +33,7 @@ const UserWorksFeed: Component<Props> = (props) => {
           error={props.error}
           hasMore={props.hasMore}
           onIllustClick={props.onIllustClick}
+          onAuthorClick={props.onAuthorClick}
           onLoadMore={props.onLoadMore}
           onRefresh={props.onRefresh}
           layoutMode={props.layoutMode}
@@ -47,6 +49,7 @@ const UserWorksFeed: Component<Props> = (props) => {
           error={props.error}
           hasMore={props.hasMore}
           onNovelClick={props.onNovelClick}
+          onAuthorClick={props.onAuthorClick}
           onLoadMore={props.onLoadMore}
           onRefresh={props.onRefresh}
           suppressHeaderVisibility={props.suppressHeaderVisibility}

@@ -116,6 +116,7 @@ const UserIllusts: Component = () => {
             hasMore={nextUrl() !== null}
             onIllustClick={(id) => void navigate({ to: `/illust/${id}` })}
             onNovelClick={(id) => void navigate({ to: `/novel/${id}` })}
+            onAuthorClick={(id) => void navigate({ to: `/user/${id}` })}
             onLoadMore={loadMore}
             onRefresh={async () => {
               const uid = userId();

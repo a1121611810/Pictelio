@@ -227,6 +227,7 @@ const TabFeedPage: Component<Props> = (props) => {
               error={error()}
               hasMore={nextUrl() !== null}
               onIllustClick={(id) => void navigate({ to: `/illust/${id}` })}
+              onAuthorClick={(id) => void navigate({ to: `/user/${id}` })}
               onLoadMore={() => fetchMore(abortController?.signal)}
               onRefresh={() => refresh(abortController?.signal)}
               onNavigateToSettings={() => void navigate({ to: "/settings" })}

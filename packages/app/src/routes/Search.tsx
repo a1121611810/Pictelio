@@ -400,6 +400,7 @@ const Search: Component = () => {
                 onLoadMore={() => store.loadMore()}
                 onIllustClick={(id) => navigate({ to: "/illust/$id", params: { id: String(id) } })}
                 onNovelClick={(id) => navigate({ to: "/novel/$id", params: { id: String(id) } })}
+                onAuthorClick={(id) => void navigate({ to: `/user/${id}` })}
                 onRefresh={() => store.executeSearch()}
                 error={store.error()}
               />
