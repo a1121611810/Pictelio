@@ -1,0 +1,150 @@
+---
+type: Concept
+title: Architecture Overview
+description: High-level architecture of Pictelio — a SolidJS SPA with Capacitor Android native runtime. Covers monorepo layout, boot sequence, routing, build tooling, CSS architecture, and design system.
+tags: [architecture, pictelio, solidjs, capacitor, monorepo]
+---
+
+# Architecture Overview
+
+## Monorepo Layout
+
+`pixivizer/` is a **pnpm workspace** monorepo:
+
+| Package | Location | Purpose |
+|---------|----------|---------|
+| `pictelio-app` | `/packages/app/` | SolidJS SPA — the core application |
+| `pictelio-website` | `/packages/website/` | VitePress landing page (GitHub Pages) |
+
+Root `package.json` delegates all commands via `pnpm --filter`. Build tooling uses **vite-plus** (`vp` CLI), which wraps Vite with oxlint, oxfmt, and vitest.
+
+## Boot Sequence
+
+The application boots in `packages/app/src/main.tsx`:
+
+1. **CSS loading** — Imports layer CSS: `reset.css` → `tokens.css` → `base.css` → `virtual:uno.css` → `novel-reader.css`
+2. **Fluent Web Components** — Registers individual Fluent components (badge, button, dialog, etc.) and syncs theme via `MutationObserver` on `<html>.dark`
+3. **Preference initialization** — `initializeStartupPreferences()` reads stored preferences before rendering
+4. **Auth initialization** — `initializeAuth()` loads token from secure storage and sets up refresh, ensuring the auth `refreshPromise` is available before any API call
+5. **Solid root render** — `render(() => <App />, root)`
+
+```mermaid
+sequenceDiagram
+    participant M as main.tsx
+    participant S as startup.ts
+    participant A as authStore
+    participant R as App.tsx
+
+    M->>M: Load CSS layers (reset → tokens → base → uno)
+    M->>M: Register Fluent web components
+    M->>S: initializeStartupPreferences()
+    M->>A: initializeAuth()
+    A-->>M: refreshPromise ready
+    M->>R: render(<App />)
+    Note over R: QueryClientProvider + RouterProvider
+```
+
+## Application Shell
+
+`App.tsx` wraps everything in two providers:
+
+```typescript
+<QueryClientProvider client={queryClient}>
+  <RouterProvider router={router} />
+</QueryClientProvider>
+```
+
+- **`queryClient`** (`/packages/app/src/api/queryClient.ts`) — TanStack Query client with custom error normalization
+- **`router`** (`/packages/app/src/router.tsx`) — TanStack Router with route definitions and data loaders
+
+## Routing
+
+Routes are defined in `/packages/app/src/router.tsx` using `@tanstack/solid-router`:
+
+| Route | Component | Loader |
+|-------|-----------|--------|
+| `/login` | `Login` | — |
+| `/recommended` | `TabFeedPage tab="recommended"` | `ensureLoaded` |
+| `/following` | `TabFeedPage tab="follow"` | `ensureLoaded` |
+| `/illust/:id` | `IllustDetail` | `loadDetail` |
+| `/novel/:id` | `NovelDetail` | novel cache check |
+| `/bookmarks` | `Bookmarks` | — |
+| `/me` | `PersonalCenter` | — |
+| `/user/:id` | `PersonalCenter` | `loadProfile` |
+| `/user/:id/illusts` | `UserIllusts` | tab-based loader |
+| `/user/:id/following` | `FollowListPage` | follow loader |
+| `/user/:id/followers` | `FollowListPage` | follower loader |
+| `/history` | `HistoryPage` | — |
+| `/search` | `Search` | — |
+| `/about` | `About` | — |
+| `/age-confirmation` | `AgeConfirmation` | — |
+| `/settings` | `Settings` | — |
+| `/layout-settings` | `LayoutSettings` | — |
+| `/image-host` | `ImageHostSettings` | — |
+| `/image-cache` | `ImageCacheSettings` | — |
+
+**Root layout** (`/packages/app/src/routes/__root.tsx`) provides:
+- NavBar component (auto-hiding on scroll)
+- Bottom navigation bar
+- Pull-to-refresh behavior
+- Update dialog (startup check)
+- Error boundary
+- Page transition wrapper
+
+## Design System
+
+Pictelio enforces **Microsoft Fluent Design System 2**:
+
+- **Tokens:** Colors, spacing, border-radius, shadows as CSS variables in `/packages/app/src/styles/tokens.css` (derived from `@fluentui/tokens`)
+- **Animation:** Only Fluent-authorized curves (decelerate, standard, accelerate, linear) and durations (100/150/200/300/500ms)
+- **States:** All interactive elements must cover hover, active, and focus-visible
+- **Touch targets:** Minimum 40×40px
+- **Web Components:** Fluent badge, button, checkbox, dialog, divider, drawer, message-bar, radio, spinner, switch, textarea
+
+Style is enforced via code review and documented in the CI linting pipeline.
+
+## CSS Architecture
+
+CSS loads in strict order via `main.tsx` imports:
+
+1. **`reset.css`** — `modern-css-reset`, normalizes browser defaults
+2. **`tokens.css`** — Fluent design tokens as CSS custom properties (~500 lines)
+3. **`base.css`** — Typography, layout utilities, prose styles (~300 lines)
+4. **`virtual:uno.css`** — UnoCSS-generated utility classes (on-demand scanning)
+5. **`novel-reader.css`** — Novel-specific reading layout styles
+
+Font sizes use fluid `clamp(rem + vw)` via UnoCSS preflights, defined in `/packages/app/uno.config.ts`.
+
+## Build Tooling
+
+| Tool | Config | Purpose |
+|------|--------|---------|
+| vite-plus | `vite.config.ts` | Wraps Vite + Vite plugins + oxlint + oxfmt + vitest |
+| Vite | `vite.config.ts` | Bundler with Babel/SWC transforms |
+| UnoCSS | `uno.config.ts` | On-demand atomic CSS generation |
+| TypeScript | `tsconfig.json` | Strict mode, path aliases (`@/`) |
+| oxlint | `.oxlintrc.json` | Fast Rust-based linter |
+| oxfmt | (oxlint config) | Opinionated formatter |
+
+**Credentials injection:** Pixiv API credentials are stored in `credentials.json5` (gitignored). `vite.config.ts` splits them into `__CREDENTIALS__` (full, for native plugins) and `__PUBLIC_CONFIG__` (non-sensitive, for module code). Sensitive fields are never inlined into the production JS bundle.
+
+**Proxy:** Web dev mode uses a Vite proxy for `/pixiv-img` to Pixiv's image CDN. Proxy URL is read from `https_proxy`/`HTTP_PROXY` env vars or defaults to `http://127.0.0.1:10808`.
+
+## Component Architecture
+
+The app has three key component layers:
+
+1. **Route components** (`/packages/app/src/routes/`) — Page-level components, compose primitives and stores
+2. **UI components** (`/packages/app/src/components/`) — Reusable visual components (cards, overlays, dialogs)
+3. **Primitives** (`/packages/app/src/primitives/`) — Logic-only hooks and factories (virtual scroll, scroll restoration, novel layout)
+
+Key relationship: Routes → Components + Primitives → Stores → API Client
+
+## Related Pages
+
+- [Source Map](/openwiki/source-map.md) — Complete directory layout
+- [API Layer & Authentication](/openwiki/architecture/api-layer.md) — Pixiv HTTP client, OAuth, request dedup
+- [Image Loading Pipeline](/openwiki/architecture/image-pipeline.md) — Three-layer cache, image host selection, WebView proxy
+- [Store Pattern & State Management](/openwiki/domain/store-pattern.md) — TanStack Query factory pattern
+- [Android Native & Build](/openwiki/integrations/android-native.md) — Capacitor plugins, Gradle, signing
+- [Testing Strategy](/openwiki/testing/overview.md) — Four test layers
