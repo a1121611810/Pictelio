@@ -1,4 +1,4 @@
-import { type Component, Show } from "solid-js";
+import { type Component, Show, createEffect } from "solid-js";
 import {
   showUpdateDialog,
   setShowUpdateDialog,
@@ -6,6 +6,9 @@ import {
   latestReleaseUrl,
   latestChangelog,
   setLastDismissedVersion,
+  hasUpdate,
+  checkCompleted,
+  lastDismissedVersion,
 } from "../stores/settingsStore";
 
 /**
@@ -29,6 +32,22 @@ function handleDismiss() {
  *   shown again until an even newer version is available.
  */
 const StartupUpdateDialog: Component = () => {
+  // 二次保障：监控 store 状态变化，在条件满足时自动弹窗。
+  // createEffect 会自动跟踪体内所有读取的信号，包括：
+  // hasUpdate / checkCompleted / latestVersion / lastDismissedVersion / showUpdateDialog。
+  // 当 setShowUpdateDialog(true) 导致 showUpdateDialog 变化时 effect 会重跑，
+  // 但 !showUpdateDialog() 守卫条件阻止二次触发，不会死循环。
+  createEffect(() => {
+    if (
+      hasUpdate() &&
+      checkCompleted() &&
+      latestVersion() &&
+      latestVersion() !== lastDismissedVersion() &&
+      !showUpdateDialog()
+    ) {
+      setShowUpdateDialog(true);
+    }
+  });
   function handleDownload() {
     const url = latestReleaseUrl();
     if (url) {
