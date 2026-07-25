@@ -103,7 +103,7 @@ const PersonalCenter: Component<Props> = (props) => {
               }
               role="button"
               tabIndex={0}
-              aria-label={isCurrentUser() ? "我的作品" : "TA 的作品"}
+              aria-label={profileState.isCurrentUser() ? "我的作品" : "TA 的作品"}
             >
               <FluentIcon name="image" size={22} />
               <span class="flex-1 text-base font-medium text-[var(--pageCardTextPrimary)] font-sans">
