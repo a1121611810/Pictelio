@@ -23,8 +23,12 @@ async function getState(d: AgentBrowserDriver): Promise<string> {
 describe("agent-browser 发现链路", () => {
   let driver: AgentBrowserDriver;
 
-  beforeAll(async () => { driver = await createLoggedInDriver(); }, 120_000);
-  afterAll(async () => { await driver?.close(); });
+  beforeAll(async () => {
+    driver = await createLoggedInDriver();
+  }, 120_000);
+  afterAll(async () => {
+    await driver?.close();
+  });
 
   it("推荐 Feed 首屏 → 滚动加载", async () => {
     await SLEEP(3000);
@@ -62,8 +66,12 @@ describe("agent-browser 发现链路", () => {
 describe("agent-browser 作品链路", () => {
   let driver: AgentBrowserDriver;
 
-  beforeAll(async () => { driver = await createLoggedInDriver(); }, 120_000);
-  afterAll(async () => { await driver?.close(); });
+  beforeAll(async () => {
+    driver = await createLoggedInDriver();
+  }, 120_000);
+  afterAll(async () => {
+    await driver?.close();
+  });
 
   it("点卡片 → 详情页", async () => {
     await SLEEP(3000);
@@ -85,7 +93,7 @@ describe("agent-browser 作品链路", () => {
 
     // 详情页收藏按钮: button.relative.inline-flex button（含 ♡ 或 ♥ 图标）
     try {
-      await driver.click('.relative.inline-flex button');
+      await driver.click(".relative.inline-flex button");
     } catch {
       // fallback: 尝试通过文本点击
       await driver.clickReliable("♡");
@@ -97,7 +105,7 @@ describe("agent-browser 作品链路", () => {
 
     // 再次点击取消收藏
     try {
-      await driver.click('.relative.inline-flex button');
+      await driver.click(".relative.inline-flex button");
     } catch {
       await driver.clickReliable("♥");
     }
@@ -121,8 +129,12 @@ describe("agent-browser 作品链路", () => {
 describe("agent-browser 阅读链路", () => {
   let driver: AgentBrowserDriver;
 
-  beforeAll(async () => { driver = await createLoggedInDriver(); }, 120_000);
-  afterAll(async () => { await driver?.close(); });
+  beforeAll(async () => {
+    driver = await createLoggedInDriver();
+  }, 120_000);
+  afterAll(async () => {
+    await driver?.close();
+  });
 
   it("小说 Feed → 正文加载", async () => {
     // 直接点击页面中的"小说"按钮（触发 onClick → setContentType，绕过 Preferences）
@@ -158,8 +170,12 @@ describe("agent-browser 阅读链路", () => {
 describe("agent-browser 个人链路", () => {
   let driver: AgentBrowserDriver;
 
-  beforeAll(async () => { driver = await createLoggedInDriver(); }, 120_000);
-  afterAll(async () => { await driver?.close(); });
+  beforeAll(async () => {
+    driver = await createLoggedInDriver();
+  }, 120_000);
+  afterAll(async () => {
+    await driver?.close();
+  });
 
   it("个人中心 → 用户信息", async () => {
     // 点击页面顶部用户名（client-side 路由跳转到 /me）

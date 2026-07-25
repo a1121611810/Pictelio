@@ -41,10 +41,7 @@ describe("agent-browser 超长链", () => {
 
   it("[B1] Feed 首屏展示", async () => {
     const state = await getPageState(driver);
-    const result = await aiAssert(
-      "推荐 Feed 已加载出插画卡片瀑布流，展示多张作品缩略图",
-      state,
-    );
+    const result = await aiAssert("推荐 Feed 已加载出插画卡片瀑布流，展示多张作品缩略图", state);
     expect(result.passed, result.reason).toBe(true);
   }, 30_000);
 
@@ -52,10 +49,7 @@ describe("agent-browser 超长链", () => {
     await driver.scroll("down", 1000);
     await SLEEP(3000);
     const state = await getPageState(driver);
-    const result = await aiAssert(
-      "向下滚动后瀑布流加载出新作品卡片，无白屏或错误",
-      state,
-    );
+    const result = await aiAssert("向下滚动后瀑布流加载出新作品卡片，无白屏或错误", state);
     expect(result.passed, result.reason).toBe(true);
   }, 60_000);
 
@@ -107,7 +101,7 @@ describe("agent-browser 超长链", () => {
 
     // 详情页收藏按钮: div.relative.inline-flex button
     try {
-      await driver.click('.relative.inline-flex button');
+      await driver.click(".relative.inline-flex button");
     } catch {
       await driver.clickReliable("♡");
     }
@@ -118,7 +112,7 @@ describe("agent-browser 超长链", () => {
     expect(result.passed, result.reason).toBe(true);
 
     try {
-      await driver.click('.relative.inline-flex button');
+      await driver.click(".relative.inline-flex button");
     } catch {
       await driver.clickReliable("♥");
     }

@@ -74,7 +74,11 @@ ${pageState}
       body: JSON.stringify({
         model: options.model,
         messages: [
-          { role: "system", content: "你是一个严格的 Web 应用 E2E 测试断言助手。请基于页面文本状态判断页面是否正常。请始终以 JSON 格式输出。" },
+          {
+            role: "system",
+            content:
+              "你是一个严格的 Web 应用 E2E 测试断言助手。请基于页面文本状态判断页面是否正常。请始终以 JSON 格式输出。",
+          },
           { role: "user", content: prompt },
         ],
         temperature: 0.1,
@@ -90,7 +94,7 @@ ${pageState}
       };
     }
 
-    const data = await response.json() as any;
+    const data = (await response.json()) as any;
     const content = data.choices?.[0]?.message?.content?.trim() ?? "";
 
     // 尝试解析 JSON

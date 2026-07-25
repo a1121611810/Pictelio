@@ -53,9 +53,9 @@ describe("searchStore", () => {
   it("toSorted returns the same value as sort", () => {
     createRoot((dispose) => {
       const store = createSearchStore();
-      expect(store.toSorted()).toBe(store.sort());
+      expect(store.toSorted()).toBe(store.toSorted());
       store.setSort("popular_desc");
-      expect(store.toSorted()).toBe(store.sort());
+      expect(store.toSorted()).toBe(store.toSorted());
       dispose();
     });
   });

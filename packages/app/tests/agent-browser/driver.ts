@@ -50,7 +50,7 @@ export function findRefByText(snapshot: string, text: string): string | null {
  * 跳过第一个 ref（通常是用户头像 h1），取第二个作为卡片。
  */
 function firstClickableRef(snapshot: string): string | null {
-  const matches = [...snapshot.matchAll(/ref=(e\d+)/ug)];
+  const matches = [...snapshot.matchAll(/ref=(e\d+)/gu)];
   if (matches.length === 0) return null;
   if (matches.length === 1) return matches[0][1];
   // 取第二个 ref，跳过用户头像/标题等顶部元素
@@ -110,11 +110,7 @@ export class AgentBrowserDriver {
   /**
    * 带 fallback 链的可靠点击：@e ref → aria-label → 直接 text → CSS。
    */
-  async clickReliable(
-    text: string,
-    ariaLabel?: string,
-    cssFallback?: string,
-  ): Promise<boolean> {
+  async clickReliable(text: string, ariaLabel?: string, cssFallback?: string): Promise<boolean> {
     // 1. 尝试 @e ref
     const snap = await this.snapshot();
     const ref = findRefByText(snap, text);
@@ -132,20 +128,26 @@ export class AgentBrowserDriver {
     try {
       await this.click(`[aria-label*="${label}"]`);
       return true;
-    } catch { /* 继续 */ }
+    } catch {
+      /* 继续 */
+    }
 
     // 3. 尝试直接文本点击
     try {
       await this.click(text);
       return true;
-    } catch { /* 继续 */ }
+    } catch {
+      /* 继续 */
+    }
 
     // 4. CSS fallback
     if (cssFallback) {
       try {
         await this.click(cssFallback);
         return true;
-      } catch { /* 继续 */ }
+      } catch {
+        /* 继续 */
+      }
     }
 
     return false;
@@ -157,14 +159,16 @@ export class AgentBrowserDriver {
   async clickFirst(skipCount = 6): Promise<boolean> {
     // 1. 尝试 CSS 选择器（不受 snapshot ref 过期影响）
     try {
-      await this.click('.image-card');
+      await this.click(".image-card");
       return true;
-    } catch { /* fall through */ }
+    } catch {
+      /* fall through */
+    }
 
     // 2. snapshot ref + 重试（处理页面重新渲染导致 ref 过期）
     for (let attempt = 0; attempt < 3; attempt++) {
       const snap = await this.snapshot();
-      const matches = [...snap.matchAll(/ref=(e\d+)/ug)];
+      const matches = [...snap.matchAll(/ref=(e\d+)/gu)];
       const idx = Math.min(skipCount, matches.length - 1);
       if (matches[idx]) {
         try {

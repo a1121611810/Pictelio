@@ -5,7 +5,6 @@ import {
   createSignal,
   createEffect,
   onCleanup,
-  lazy,
   ErrorBoundary,
 } from "solid-js";
 import { useNavigate, useLocation, useRouter, Outlet } from "@tanstack/solid-router";
@@ -37,14 +36,12 @@ import {
 import { loadThemePreference, loadPageStyleThemePreference } from "@/stores/themeStore";
 import { loadContentTypePreference } from "@/stores/uiStore";
 import { checkForUpdate } from "@/services/updateService";
+import StartupUpdateDialog from "@/components/StartupUpdateDialog";
 import { clearOverlays, registerBackGesture } from "@/services/backGestureService";
 import { warmCacheFromDisk } from "@/utils/imageLoader";
 import { loadReportedIds } from "@/stores/reportStore";
 import { loadBlockedIds } from "@/stores/blockStore";
 import { loadImageHostPreference } from "@/stores/imageHostStore";
-
-const StartupUpdateDialog = lazy(() => import("@/components/StartupUpdateDialog"));
-
 /** 启动后检查更新的延迟时间（ms），确保页面渲染完成后再弹窗 */
 const STARTUP_CHECK_DELAY_MS = 500;
 /** "再按一次退出应用" toast 的显示时长（ms） */
@@ -87,6 +84,7 @@ const RootLayout: Component = () => {
       setLatestVersion(result.latestVersion);
       setLatestReleaseUrl(result.latestReleaseUrl);
       setLatestChangelog(result.latestChangelog);
+
       if (
         result.hasUpdate &&
         result.latestVersion &&

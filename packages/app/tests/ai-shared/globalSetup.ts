@@ -10,10 +10,7 @@ import { resolve as pathResolve } from "node:path";
 
 const DEV_SERVER_PORT = 5173;
 const serverProcessKey = "aiServerProcess";
-const DAEMON_SOCKET = pathResolve(
-  process.env.HOME || "/tmp",
-  ".agent-browser/default.sock",
-);
+const DAEMON_SOCKET = pathResolve(process.env.HOME || "/tmp", ".agent-browser/default.sock");
 
 function loadEnvFile(): void {
   const envPath = pathResolve(new URL("../../.env", import.meta.url).pathname);
@@ -36,7 +33,10 @@ function isPortInUse(port: number): Promise<boolean> {
   return new Promise((resolve) => {
     const s = createServer();
     s.once("error", () => resolve(true));
-    s.once("listening", () => { s.close(); resolve(false); });
+    s.once("listening", () => {
+      s.close();
+      resolve(false);
+    });
     s.listen(port);
   });
 }
@@ -48,7 +48,9 @@ function killProcessOnPort(port: number): void {
       execSync(`kill -9 ${pid}`, { timeout: 3000 });
       console.log(`[AI-E2E] Killed existing process on port ${port} (PID ${pid})`);
     }
-  } catch { /* nothing listening */ }
+  } catch {
+    /* nothing listening */
+  }
 }
 
 async function waitForServer(url: string, timeoutMs = 30_000): Promise<void> {
@@ -57,7 +59,9 @@ async function waitForServer(url: string, timeoutMs = 30_000): Promise<void> {
     try {
       const res = await fetch(url);
       if (res.ok || res.status === 404) return;
-    } catch { /* retry */ }
+    } catch {
+      /* retry */
+    }
     await new Promise((r) => setTimeout(r, 500));
   }
   throw new Error(`Dev server did not start within ${timeoutMs}ms`);
@@ -73,7 +77,9 @@ export default async function globalSetup(): Promise<void> {
       rmSync(DAEMON_SOCKET);
       console.log("[AI-E2E] Cleaned stale agent-browser daemon socket");
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   if (!process.env.PIXIV_REFRESH_TOKEN) {
     console.warn("[AI-E2E] PIXIV_REFRESH_TOKEN not set. Login tests will be skipped.");
