@@ -1,68 +1,47 @@
-import { createSignal, onMount, onCleanup } from "solid-js";
+import { createSignal, onMount, onCleanup, createEffect } from "solid-js";
 import type { Component } from "solid-js";
-import { loadUgoiraMetadata } from "../api/illust";
+import { downloadAndExtractUgoira, type UgoiraFrame } from "../api/illust";
 import PixivImage from "./PixivImage";
 
 interface Props {
   illustId: number;
   coverUrl: string;
   onClose: () => void;
-}
-
-interface Frame {
-  // Blob URL for the frame JPEG
-  url: string;
-  // Milliseconds
-  delay: number;
+  /** 内联模式：在页面内原地播放，不占全屏 */
+  inline?: boolean;
+  /** 内联模式用于 aspect-ratio，优先于 width/height */
+  aspectRatio?: string;
+  /** 内联模式回退用，仅当 aspectRatio 未提供时生效 */
+  width?: number;
+  height?: number;
+  /** 预加载的帧数据（由父组件提供时跳过内部加载流程） */
+  preloadedFrames?: UgoiraFrame[];
 }
 
 const UgoiraViewer: Component<Props> = (props) => {
-  const [frames, setFrames] = createSignal<Frame[]>([]);
+  const [frames, setFrames] = createSignal<UgoiraFrame[]>([]);
   const [currentFrame, setCurrentFrame] = createSignal(0);
   const [status, setStatus] = createSignal<"loading" | "playing" | "paused">("loading");
   const [error, setError] = createSignal<string | null>(null);
+  const [frameAspectRatio, setFrameAspectRatio] = createSignal<string | null>(null);
   let timer: ReturnType<typeof setTimeout> | null = null;
   let blobUrls: string[] = [];
 
   onMount(async () => {
-    try {
-      // 1. Fetch metadata
-      const meta = await loadUgoiraMetadata(props.illustId);
-      const zipUrl = meta.zip_urls.medium;
-
-      // 2. Download ZIP
-      const zipResp = await fetch(`/pixiv-img/${zipUrl.split("/").slice(3).join("/")}`);
-      if (!zipResp.ok) {
-        throw new Error(`ZIP download failed: HTTP ${zipResp.status}`);
-      }
-      const zipBlob = await zipResp.blob();
-
-      // 3. 解压帧（JSZip 按需加载，不随作品详情 chunk 一同打包）
-      const { default: JSZip } = await import("jszip");
-      const zip = await JSZip.loadAsync(zipBlob);
-      const extracted: Frame[] = [];
-
-      // 帧必须按顺序逐一解压并生成 blob URL，避免并发导致内存峰值
-      // eslint-disable-next-line no-await-in-loop
-      for (const frameMeta of meta.frames) {
-        const file = zip.file(frameMeta.file);
-        if (!file) {
-          continue;
-        }
-        // eslint-disable-next-line no-await-in-loop
-        const blob = await file.async("blob");
-        const url = URL.createObjectURL(blob);
-        blobUrls.push(url);
-        extracted.push({ url, delay: frameMeta.delay });
-      }
-
-      if (extracted.length === 0) {
-        throw new Error("No frames found in ZIP");
-      }
-
-      setFrames(extracted);
+    // 如果父组件已预加载帧数据，跳过加载流程
+    if (props.preloadedFrames && props.preloadedFrames.length > 0) {
+      setFrames(props.preloadedFrames);
       setStatus("playing");
-      scheduleNext(0, extracted);
+      scheduleNext(0, props.preloadedFrames);
+      return;
+    }
+
+    try {
+      const result = await downloadAndExtractUgoira(props.illustId);
+      blobUrls = result.blobUrls;
+      setFrames(result.frames);
+      setStatus("playing");
+      scheduleNext(0, result.frames);
     } catch (error) {
       console.error("[UgoiraViewer] Error:", error);
       setError((error as Error).message || "加载动图失败");
@@ -70,7 +49,7 @@ const UgoiraViewer: Component<Props> = (props) => {
     }
   });
 
-  function scheduleNext(index: number, frameList: Frame[]) {
+  function scheduleNext(index: number, frameList: UgoiraFrame[]) {
     if (timer) {
       clearTimeout(timer);
     }
@@ -105,39 +84,98 @@ const UgoiraViewer: Component<Props> = (props) => {
     }
   });
 
+  // 帧加载完成后，测量第一帧的实际宽高比，更新容器
+  createEffect(() => {
+    if (status() === "playing" && frames().length > 0) {
+      const url = frames()[0].url;
+      const img = new Image();
+      let alive = true;
+      img.onload = () => {
+        if (alive) {
+          setFrameAspectRatio(`${img.naturalWidth} / ${img.naturalHeight}`);
+        }
+      };
+      img.src = url;
+      onCleanup(() => {
+        alive = false;
+      });
+    }
+  });
+
+  // Inline mode wrapper
+  const containerStyle = (): Record<string, string> => {
+    if (props.inline) {
+      // 帧加载完成后优先用帧的实际尺寸
+      if (frameAspectRatio()) {
+        return { "aspect-ratio": frameAspectRatio()! };
+      }
+      if (props.aspectRatio) {
+        return { "aspect-ratio": props.aspectRatio };
+      }
+      if (props.width && props.height) {
+        return { "aspect-ratio": `${props.width} / ${props.height}` };
+      }
+    }
+    return {};
+  };
+
   return (
     <div
-      class="fixed inset-0 z-50 touch-none select-none flex items-start justify-center"
-      style={{ "background-color": "var(--colorOverlayBackground)" }}
+      class={
+        props.inline
+          ? "w-full overflow-hidden cursor-pointer"
+          : "fixed inset-0 z-50 touch-none select-none flex items-start justify-center cursor-pointer"
+      }
+      style={
+        props.inline
+          ? { ...containerStyle(), "background-color": "var(--colorNeutralBackground2)" }
+          : { "background-color": "var(--colorOverlayBackground)" }
+      }
       onClick={togglePause}
     >
-      {/* Close button */}
-      <button
-        class="absolute top-4 left-4 w-10 h-10 flex items-center justify-center rounded-[var(--borderRadiusCircular)] bg-[var(--colorOverlaySurface)] text-[var(--colorOverlayForeground)] text-xl hover:bg-[var(--colorOverlaySurfaceHover)] active:bg-[var(--colorOverlaySurfaceHover)] transition-all duration-[var(--durationFast)] border-none outline-none appearance-none cursor-pointer z-10"
-        onClick={(e) => {
-          e.stopPropagation();
-          props.onClose();
-        }}
-        aria-label="关闭"
-      >
-        ←
-      </button>
+      {/* Close button — only in full-screen mode */}
+      {!props.inline && (
+        <button
+          class="absolute top-4 left-4 w-10 h-10 flex items-center justify-center rounded-[var(--borderRadiusCircular)] bg-[var(--colorOverlaySurface)] text-[var(--colorOverlayForeground)] text-xl hover:bg-[var(--colorOverlaySurfaceHover)] active:bg-[var(--colorOverlaySurfaceHover)] transition-all duration-[var(--durationFast)] border-none outline-none appearance-none cursor-pointer z-10"
+          onClick={(e) => {
+            e.stopPropagation();
+            props.onClose();
+          }}
+          aria-label="关闭"
+        >
+          ←
+        </button>
+      )}
 
-      {/* Status badge */}
-      {status() === "loading" && (
+      {/* Status: loading — full-screen: text badge; inline: centered spinner */}
+      {status() === "loading" && !props.inline && (
         <div class="absolute top-4 right-4 px-2.5 py-1 rounded-[var(--borderRadiusCircular)] bg-[var(--colorOverlaySurface)] text-[var(--colorOverlayForeground)] text-[var(--fontSizeBase200)] font-medium z-10">
           加载中...
         </div>
       )}
+
       {status() === "paused" && (
-        <div class="absolute top-4 right-4 px-2.5 py-1 rounded-[var(--borderRadiusCircular)] bg-[var(--colorOverlaySurface)] text-[var(--colorOverlayForeground)] text-[var(--fontSizeBase200)] font-medium z-10">
+        <div
+          class="px-2.5 py-1 rounded-[var(--borderRadiusCircular)] bg-[var(--colorOverlaySurface)] text-[var(--colorOverlayForeground)] text-[var(--fontSizeBase200)] font-medium z-10"
+          classList={{
+            "absolute top-4 right-4": !props.inline,
+            "absolute top-2 right-2": props.inline,
+          }}
+        >
           已暂停
         </div>
       )}
 
       {/* Error state */}
       {error() && (
-        <div class="text-[var(--colorOverlayForeground)] text-center px-6">
+        <div
+          class="text-center px-6"
+          classList={{
+            "text-[var(--colorOverlayForeground)]": !props.inline,
+            "text-[var(--colorNeutralForeground1)] absolute inset-0 flex flex-col items-center justify-center bg-[var(--colorNeutralBackground2)]":
+              props.inline,
+          }}
+        >
           <p class="[font-size:var(--fontSizeBase300)] mb-4">{error()}</p>
           <fluent-button appearance="secondary" on:click={props.onClose}>
             返回
@@ -151,9 +189,28 @@ const UgoiraViewer: Component<Props> = (props) => {
           src={props.coverUrl}
           alt="cover"
           loading="eager"
-          class="max-w-full max-h-full object-cover object-top"
+          classList={{
+            "max-w-full max-h-full object-cover object-top": !props.inline,
+            "w-full h-full object-cover object-top": props.inline,
+          }}
           draggable={false}
         />
+      )}
+
+      {/* Inline loading: spinner overlay */}
+      {status() === "loading" && props.inline && (
+        <div class="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+          <div
+            class="rounded-full"
+            style={{
+              width: "32px",
+              height: "32px",
+              border: "3px solid var(--colorNeutralStroke2)",
+              "border-top-color": "var(--colorBrandForeground1)",
+              animation: "spin 500ms linear infinite",
+            }}
+          />
+        </div>
       )}
 
       {/* Frame playback */}
@@ -161,7 +218,10 @@ const UgoiraViewer: Component<Props> = (props) => {
         <img
           src={frames()[currentFrame()].url}
           alt={`frame ${currentFrame() + 1}`}
-          class="max-w-full max-h-full object-contain object-top"
+          classList={{
+            "max-w-full max-h-full object-contain object-top": !props.inline,
+            "w-full h-full object-cover object-top": props.inline,
+          }}
           draggable={false}
         />
       )}

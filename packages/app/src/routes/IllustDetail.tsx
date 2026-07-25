@@ -1,7 +1,14 @@
 import { type Component, Show, createSignal, onCleanup, createEffect, createMemo } from "solid-js";
 import { createIntersectionObserver } from "@solid-primitives/intersection-observer";
 import { useNavigate, useRouter, getRouteApi } from "@tanstack/solid-router";
-import { addBookmark, deleteBookmark, followUser, unfollowUser } from "../api/illust";
+import {
+  addBookmark,
+  deleteBookmark,
+  followUser,
+  unfollowUser,
+  downloadAndExtractUgoira,
+  type UgoiraFrame,
+} from "../api/illust";
 import { ApiErrorType, type ApiError } from "../api/types";
 import type { PixivIllust } from "../api/types";
 import ErrorDisplay from "../components/ErrorDisplay";
@@ -43,6 +50,10 @@ const IllustDetail: Component = () => {
   const [bookmarking, setBookmarking] = createSignal(false);
   const [bookmarkBurstTrigger, setBookmarkBurstTrigger] = createSignal(0);
   const [ugoiraCoverHeight, setUgoiraCoverHeight] = createSignal(0);
+  const [ugoiraProgress, setUgoiraProgress] = createSignal(-1); // -1=未开始, 0-100=进度, 100=已就绪
+  const [ugoiraFrames, setUgoiraFrames] = createSignal<UgoiraFrame[]>([]);
+  const [ugoiraReady, setUgoiraReady] = createSignal(false);
+  let ugoiraBlobUrls: string[] = [];
   const [isFollowed, setIsFollowed] = createSignal(false);
   const [following, setFollowing] = createSignal(false);
   const [showReportSheet, setShowReportSheet] = createSignal(false);
@@ -130,6 +141,36 @@ const IllustDetail: Component = () => {
       }
     }
   }
+
+  /** 在后台加载 ugoira ZIP 并解压帧，返回进度百分比信号 */
+  async function startUgoiraLoad(illustId: number) {
+    setUgoiraProgress(0);
+    setUgoiraReady(false);
+    setUgoiraFrames([]);
+    // 清理旧 blob URL
+    for (const url of ugoiraBlobUrls) {
+      URL.revokeObjectURL(url);
+    }
+    ugoiraBlobUrls = [];
+
+    try {
+      // 使用共享的下载+解压函数（自动跟踪进度）
+      const result = await downloadAndExtractUgoira(illustId, (pct) => setUgoiraProgress(pct));
+      ugoiraBlobUrls = result.blobUrls;
+      setUgoiraFrames(result.frames);
+      setUgoiraReady(true);
+      setUgoiraProgress(100);
+    } catch (err) {
+      console.error("[IllustDetail] Ugoira load failed:", err);
+      setUgoiraProgress(-2);
+    }
+  }
+
+  onCleanup(() => {
+    for (const url of ugoiraBlobUrls) {
+      URL.revokeObjectURL(url);
+    }
+  });
 
   let longPressTimer: ReturnType<typeof setTimeout>;
 
@@ -513,26 +554,108 @@ const IllustDetail: Component = () => {
                 })}
               </div>
             ) : illust()!.type === "ugoira" ? (
-              <div
-                class="flex justify-center bg-[var(--colorNeutralBackground2)] cursor-pointer border-b border-[var(--colorNeutralStroke2)]"
-                onClick={() => openViewer(0)}
-              >
-                <div
-                  style={{
-                    "aspect-ratio": `${illust()!.width} / ${ugoiraCoverHeight() || Math.round(illust()!.height * 0.75)}`,
-                  }}
-                  class="overflow-hidden w-full"
-                >
-                  <PixivImage
-                    src={coverUrl()}
-                    alt={illust()!.title}
-                    width={illust()!.width}
-                    height={illust()!.height}
-                    loading="eager"
-                    class="w-full h-full object-cover object-top cursor-pointer"
-                    onLoad={measureCoverContent}
+              <div class="relative bg-[var(--colorNeutralBackground2)] border-b border-[var(--colorNeutralStroke2)] w-full">
+                {!ugoiraReady() ? (
+                  <div
+                    style={{
+                      "aspect-ratio": `${illust()!.width} / ${ugoiraCoverHeight() || Math.round(illust()!.height * 0.75)}`,
+                    }}
+                    class="overflow-hidden w-full"
+                  >
+                    <PixivImage
+                      src={coverUrl()}
+                      alt={illust()!.title}
+                      width={illust()!.width}
+                      height={illust()!.height}
+                      loading="eager"
+                      class="w-full h-full object-cover object-top"
+                      onLoad={measureCoverContent}
+                    />
+
+                    {/* 未开始 → 播放按钮 */}
+                    {ugoiraProgress() === -1 && (
+                      <div
+                        class="absolute inset-0 flex items-center justify-center transition-colors duration-[var(--durationFast)] bg-[var(--colorOverlayBackground)]/20 hover:bg-[var(--colorOverlayBackground)]/30"
+                        onClick={() => startUgoiraLoad(illust()!.id)}
+                      >
+                        <div class="w-16 h-16 rounded-full bg-[var(--colorNeutralBackground1)]/90 flex items-center justify-center shadow-[var(--elevation4)]">
+                          <svg
+                            width="28"
+                            height="28"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M6.5 4.5L18.5 12L6.5 19.5V4.5Z"
+                              fill="currentColor"
+                              class="text-[var(--colorNeutralForeground1)]"
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 加载中 → 百分比进度 */}
+                    {ugoiraProgress() >= 0 && !ugoiraReady() && (
+                      <div class="absolute inset-0 flex items-center justify-center bg-[var(--colorOverlayBackground)]/30 pointer-events-none">
+                        <div class="flex flex-col items-center gap-2">
+                          {/* 圆形进度环 */}
+                          <svg width="56" height="56" viewBox="0 0 56 56">
+                            <circle
+                              cx="28"
+                              cy="28"
+                              r="24"
+                              fill="none"
+                              stroke="var(--colorNeutralStroke2)"
+                              stroke-width="4"
+                            />
+                            <circle
+                              cx="28"
+                              cy="28"
+                              r="24"
+                              fill="none"
+                              stroke="var(--colorBrandForeground1)"
+                              stroke-width="4"
+                              stroke-linecap="round"
+                              stroke-dasharray={`${2 * Math.PI * 24}`}
+                              stroke-dashoffset={`${2 * Math.PI * 24 * (1 - Math.max(0, Math.min(ugoiraProgress(), 100)) / 100)}`}
+                              transform="rotate(-90 28 28)"
+                              style="transition: stroke-dashoffset var(--durationNormal) cubic-bezier(0.33,0,0.67,1)"
+                            />
+                          </svg>
+                          <span class="text-[var(--colorNeutralForeground1)] font-semibold [font-size:var(--fontSizeBase200)] bg-[var(--colorNeutralBackground1)]/80 px-2.5 py-0.5 rounded-[var(--borderRadiusCircular)]">
+                            {ugoiraProgress()}%
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 加载失败 → 重试按钮 */}
+                    {ugoiraProgress() === -2 && (
+                      <div
+                        class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[var(--colorOverlayBackground)]/30 cursor-pointer"
+                        onClick={() => startUgoiraLoad(illust()!.id)}
+                      >
+                        <span class="text-[var(--colorStatusDangerForeground1)] [font-size:var(--fontSizeBase300)]">
+                          加载失败
+                        </span>
+                        <span class="text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] underline">
+                          点击重试
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <UgoiraViewer
+                    illustId={illust()!.id}
+                    coverUrl={coverUrl()}
+                    aspectRatio={`${illust()!.width} / ${ugoiraCoverHeight() || Math.round(illust()!.height * 0.75)}`}
+                    onClose={() => setUgoiraReady(false)}
+                    inline
+                    preloadedFrames={ugoiraFrames()}
                   />
-                </div>
+                )}
               </div>
             ) : (
               <div
@@ -650,13 +773,11 @@ const IllustDetail: Component = () => {
               )}
             </div>
 
-            {/* Viewer hint — only for single page */}
-            {illust()!.page_count === 1 && (
+            {/* Viewer hint — only for single page non-ugoira */}
+            {illust()!.page_count === 1 && illust()!.type !== "ugoira" && (
               <div class="px-4 pb-8">
                 <p class="text-center text-[var(--colorNeutralForeground3)] [font-size:var(--fontSizeBase200)]">
-                  {illust()!.type === "ugoira"
-                    ? "点击图片播放动图"
-                    : "点击图片查看原图 · 双指缩放 · 左右滑动翻页"}
+                  点击图片查看原图 · 双指缩放 · 左右滑动翻页
                 </p>
               </div>
             )}
@@ -726,10 +847,6 @@ const IllustDetail: Component = () => {
               </nav>
             )}
           </>
-        )}
-
-        {viewerOpen() && illust()!.type === "ugoira" && (
-          <UgoiraViewer illustId={illust()!.id} coverUrl={imageUrls()[0]} onClose={closeViewer} />
         )}
 
         {viewerOpen() && illust()!.type !== "ugoira" && (

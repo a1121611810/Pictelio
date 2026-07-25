@@ -71,6 +71,77 @@ export async function loadUgoiraMetadata(
   return res.ugoira_metadata;
 }
 
+// ─── Ugoira 帧类型（与 UgoiraViewer 共享） ───
+
+export interface UgoiraFrame {
+  url: string;
+  delay: number;
+}
+
+/**
+ * 下载 ugoira ZIP 并解压为帧列表。
+ * @param illustId - 作品 ID
+ * @param onProgress - 进度回调 (0-100)，可选
+ * @returns 解压后的帧列表（blob URL，调用方负责释放）
+ */
+export async function downloadAndExtractUgoira(
+  illustId: number,
+  onProgress?: (pct: number) => void,
+): Promise<{ frames: UgoiraFrame[]; blobUrls: string[] }> {
+  // 1. 获取元数据
+  onProgress?.(5);
+  const meta = await loadUgoiraMetadata(illustId);
+  const zipUrl = meta.zip_urls.medium;
+
+  // 2. 流式下载 ZIP（5%-80%）
+  const zipResp = await fetch(`/pixiv-img/${zipUrl.split("/").slice(3).join("/")}`);
+  if (!zipResp.ok) {
+    throw new Error(`ZIP download failed: HTTP ${zipResp.status}`);
+  }
+  const contentLength = zipResp.headers.get("content-length");
+  const total = contentLength ? parseInt(contentLength, 10) : 0;
+  const reader = zipResp.body!.getReader();
+  const chunks: Uint8Array[] = [];
+  let loaded = 0;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    loaded += value.length;
+    if (total > 0) {
+      onProgress?.(Math.round((loaded / total) * 75) + 5);
+    }
+  }
+  const zipBlob = new Blob(chunks);
+  onProgress?.(80);
+
+  // 3. 解压帧（80%-99%）
+  const { default: JSZip } = await import("jszip");
+  const zip = await JSZip.loadAsync(zipBlob);
+  const extracted: UgoiraFrame[] = [];
+  const blobUrls: string[] = [];
+  for (let fi = 0; fi < meta.frames.length; fi++) {
+    const frameMeta = meta.frames[fi];
+    // eslint-disable-next-line no-await-in-loop
+    const file = zip.file(frameMeta.file);
+    if (!file) continue;
+    // eslint-disable-next-line no-await-in-loop
+    const blob = await file.async("blob");
+    const url = URL.createObjectURL(blob);
+    blobUrls.push(url);
+    extracted.push({ url, delay: frameMeta.delay });
+    onProgress?.(80 + Math.round(((fi + 1) / meta.frames.length) * 19));
+  }
+
+  if (extracted.length === 0) {
+    throw new Error("No frames found in ZIP");
+  }
+
+  onProgress?.(100);
+  return { frames: extracted, blobUrls };
+}
+
 export function addBookmark(illustId: number, restrict: RestrictType = "public"): Promise<void> {
   return apiClient.post("/v2/illust/bookmark/add", {
     illust_id: String(illustId),
