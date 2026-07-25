@@ -558,7 +558,7 @@ const IllustDetail: Component = () => {
                 {!ugoiraReady() ? (
                   <div
                     style={{
-                      "aspect-ratio": `${illust()!.width} / ${ugoiraCoverHeight() || Math.round(illust()!.height * 0.75)}`,
+                      "aspect-ratio": `${illust()!.width} / ${ugoiraCoverHeight() || illust()!.height}`,
                     }}
                     class="overflow-hidden w-full"
                   >
@@ -650,7 +650,7 @@ const IllustDetail: Component = () => {
                   <UgoiraViewer
                     illustId={illust()!.id}
                     coverUrl={coverUrl()}
-                    aspectRatio={`${illust()!.width} / ${ugoiraCoverHeight() || Math.round(illust()!.height * 0.75)}`}
+                    aspectRatio={`${illust()!.width} / ${ugoiraCoverHeight() || illust()!.height}`}
                     onClose={() => setUgoiraReady(false)}
                     inline
                     preloadedFrames={ugoiraFrames()}
