@@ -49,9 +49,9 @@
     "@solid-primitives/scheduled": "^1.5.3",
     "@solid-primitives/scroll": "^2.1.6",
     "@tanstack/solid-db": "^0.2.30",
-    "@tanstack/solid-query": "^5.101.2",
+    "@tanstack/solid-query": "^5.101.4",
     "@tanstack/solid-router": "1.170.18",
-    "@tanstack/solid-virtual": "^3.13.33",
+    "@tanstack/solid-virtual": "^3.13.35",
     "comlink": "^4.4.2",
     "jszip": "^3.10.1",
     "ora": "^9.4.1",
@@ -67,7 +67,7 @@
     "@vitest/browser": "^4.1.10",
     "@vitest/browser-playwright": "^4.1.10",
     "canvas": "^3.2.3",
-    "happy-dom": "^20.11.0",
+    "happy-dom": "^20.11.1",
     "https-proxy-agent": "^9.1.0",
     "jsdom": "^29.1.1",
     "json5": "^2.2.3",
@@ -77,7 +77,7 @@
     "unocss": "^66.7.5",
     "vite": "^8.1.5",
     "vite-plugin-solid": "^2.11.13",
-    "vite-plus": "^0.2.5",
+    "vite-plus": "^0.2.6",
     "vitest": "^4.1.10"
   }
 }
