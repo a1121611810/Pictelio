@@ -1,5 +1,5 @@
 {
-  "version": "3.17.3",
-  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.17.3",
-  "changelog": "🐛 修复\n  fix(app): 修复启动时更新弹窗不显示的问题"
+  "version": "3.17.4",
+  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.17.4",
+  "changelog": "🔧 其他\n  build(app): 升级多个依赖包到最新补丁版本\n💄 样式\n  style(card components): 调整卡片内徽章和页码标识的z轴层级"
 }
