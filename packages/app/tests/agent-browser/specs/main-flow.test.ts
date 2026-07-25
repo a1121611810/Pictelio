@@ -163,12 +163,13 @@ describe("agent-browser 超长链", () => {
 
   it("[F1-F4] 个人中心 → 收藏夹", async () => {
     // "我的"是页面顶部用户名区域，直接导航到 /me
-    await driver.navigate("/me");
-    // 等待个人中心数据加载（最多 15 秒）
-    for (let i = 0; i < 15; i++) {
+    // 点击页面顶部用户名（client-side 路由跳转到 /me）
+    await driver.evaluate('document.querySelector("h1")?.click()');
+    // 等待个人中心数据加载
+    for (let i = 0; i < 10; i++) {
       await SLEEP(1000);
       const snap = await driver.snapshot();
-      if (!snap.includes("加载中") && !snap.includes("Loading")) break;
+      if (snap.includes("我的作品") || snap.includes("我的收藏")) break;
     }
 
     let state = await getPageState(driver);
