@@ -1,5 +1,5 @@
 {
-  "version": "3.17.1",
-  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.17.1",
-  "changelog": "🐛 修复\n  fix(login): make loginUrl effectively final for lambda capture\n  fix(login): construct OAuth login URL from codeChallenge in native layer\n⚡ 性能\n  perf(image-loader): add periodic GC and context"
+  "version": "3.17.2",
+  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.17.2",
+  "changelog": "🐛 修复\n  fix(test): replace evaluate dynamic import with DOM button click\n  fix(test): stabilize remaining flaky tests\n  fix(test): navigate to /me via h1 click instead of full page reload\n  fix(test):"
 }
