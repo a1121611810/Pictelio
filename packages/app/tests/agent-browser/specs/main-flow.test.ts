@@ -142,8 +142,10 @@ describe("agent-browser 超长链", () => {
 
   it("[E1-E4] 小说 Feed → 小说详情", async () => {
     // 小说是页面顶部的 content type 切换按钮，CSS 选择器精准定位
-    // 通过 JS 直接调用 setContentType 切换为小说模式
-    await driver.evaluate('import("/src/stores/uiStore.ts").then(m => m.setContentType("novel"))');
+    // 直接点击页面中的"小说"按钮（触发 onClick → setContentType，绕过 Preferences）
+    await driver.evaluate(
+      '[...document.querySelectorAll("button")].find(b => b.textContent.includes("小说"))?.click()',
+    );
     await SLEEP(3000);
 
     let state = await getPageState(driver);

@@ -125,8 +125,10 @@ describe("agent-browser 阅读链路", () => {
   afterAll(async () => { await driver?.close(); });
 
   it("小说 Feed → 正文加载", async () => {
-    // 通过 JS 直接调用 setContentType 切换为小说模式（比点击按钮更可靠）
-    await driver.evaluate('import("/src/stores/uiStore.ts").then(m => m.setContentType("novel"))');
+    // 直接点击页面中的"小说"按钮（触发 onClick → setContentType，绕过 Preferences）
+    await driver.evaluate(
+      '[...document.querySelectorAll("button")].find(b => b.textContent.includes("小说"))?.click()',
+    );
     await SLEEP(3000);
 
     let state = await getState(driver);
