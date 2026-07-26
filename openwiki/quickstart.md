@@ -86,6 +86,7 @@ Architecture Decision Records live in `/docs/adr/`. Notable ones:
 | 0028 | OAuth transport deduplication |
 | 0030 | Image cache periodic GC |
 | 0032 | Author click navigation (unified prop chain) |
+| 0033 | Startup update dialog: pure CSS overlay replaces Fluent dialog |
 
 ## Key Source Files
 
@@ -142,6 +143,7 @@ The repository has been actively refactored through v3.17.x. Key themes in recen
 - **Testing:** AI-driven agent-browser E2E framework added; flaky tests stabilized with DOM-based navigation and button clicks.
 - **OAuth:** Transport layer deduplication between `auth.ts` and `pkceAuth.ts` (ADR-0028); loginUrl lambda capture fix for iOS.
 - **Author navigation:** Full coverage of third-party username click → personal center (ADR-0032).
+- **Update dialog fix:** Startup update dialog migrated from `<fluent-dialog>` (invisible on dynamic creation) to a pure CSS fixed overlay. `autoCheckUpdate` default changed to `true` (ADR-0033).
 
 ## Backlog
 
