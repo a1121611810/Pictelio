@@ -1,0 +1,1 @@
+import{c as e}from"./vendor-BPofj0XI.js";export{e as PreferencesWeb};
