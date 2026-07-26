@@ -32,11 +32,9 @@ function handleDismiss() {
  *   shown again until an even newer version is available.
  */
 const StartupUpdateDialog: Component = () => {
+  let dialogRef: HTMLElement | undefined;
+
   // 二次保障：监控 store 状态变化，在条件满足时自动弹窗。
-  // createEffect 会自动跟踪体内所有读取的信号，包括：
-  // hasUpdate / checkCompleted / latestVersion / lastDismissedVersion / showUpdateDialog。
-  // 当 setShowUpdateDialog(true) 导致 showUpdateDialog 变化时 effect 会重跑，
-  // 但 !showUpdateDialog() 守卫条件阻止二次触发，不会死循环。
   createEffect(() => {
     if (
       hasUpdate() &&
@@ -48,6 +46,36 @@ const StartupUpdateDialog: Component = () => {
       setShowUpdateDialog(true);
     }
   });
+
+  // 当 fluent-dialog 挂载到 DOM 时，调用 showModal 使其可见。
+  // Web 组件在动态创建时 open 属性不触发内部 showModal，
+  // 必须通过 ref 回调直接调用。
+  function onDialogMount(el: HTMLElement) {
+    dialogRef = el;
+  }
+
+  // 当 showUpdateDialog 变为 true 且 fluent-dialog 挂载到 DOM 后，
+  // 启用一个短轮询等待 Web 组件完全初始化后再调用 showModal。
+  // Web 组件在动态创建时 open 属性不触发内部 showModal，
+  // 必须通过 JS 手动调用。
+  createEffect(() => {
+    if (showUpdateDialog()) {
+      const tryShow = () => {
+        const host = document.querySelector('fluent-dialog');
+        if (host && host.shadowRoot) {
+          const d = host.shadowRoot.querySelector('dialog') as any;
+          if (d && typeof d.showModal === 'function' && !d.open) {
+            d.showModal();
+            return;
+          }
+        }
+        // 还没就绪，50ms 后重试
+        setTimeout(tryShow, 50);
+      };
+      setTimeout(tryShow, 0);
+    }
+  });
+
   function handleDownload() {
     const url = latestReleaseUrl();
     if (url) {
@@ -58,7 +86,12 @@ const StartupUpdateDialog: Component = () => {
 
   return (
     <Show when={showUpdateDialog()}>
-      <fluent-dialog open modal on:close={handleDismiss} aria-label="发现新版本">
+      <fluent-dialog
+        ref={onDialogMount}
+        modal
+        on:close={handleDismiss}
+        aria-label="发现新版本"
+      >
         <h3
           slot="title"
           class="text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase500)] font-semibold"
