@@ -24,7 +24,7 @@ This wiki helps humans and agents understand the architecture, workflows, integr
 | Local DB | @tanstack/solid-db 0.2 (IndexedDB) |
 | Mobile Runtime | Capacitor 8.4 (Android target) |
 | Package Manager | pnpm 11.9 |
-| Monorepo Packages | `pictelio-app` (SPA), `pictelio-website` (VitePress landing page) |
+| Monorepo Packages | `pictelio-app` (SPA), `pictelio-website` (Astro landing page, GitHub Pages) |
 
 ## Documentation Map
 

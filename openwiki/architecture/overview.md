@@ -14,7 +14,7 @@ tags: [architecture, pictelio, solidjs, capacitor, monorepo]
 | Package | Location | Purpose |
 |---------|----------|---------|
 | `pictelio-app` | `/packages/app/` | SolidJS SPA — the core application |
-| `pictelio-website` | `/packages/website/` | VitePress landing page (GitHub Pages) |
+| `pictelio-website` | `/packages/website/` | Astro landing page (GitHub Pages) |
 
 Root `package.json` delegates all commands via `pnpm --filter`. Build tooling uses **vite-plus** (`vp` CLI), which wraps Vite with oxlint, oxfmt, and vitest.
 
