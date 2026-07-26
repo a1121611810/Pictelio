@@ -81,6 +81,38 @@ CodeGraph MCP 服务器的 `projectPath` 参数用于指定要查询的项目。
 - 对同一问题重复调用 `resolve-library-id` 超过 2 次。
 - 在单个 `query-docs` 调用中放入多个独立概念。
 
+## OpenWiki 查询规范（OpenWiki Query）
+
+OpenWiki 提供人工整理的高层次项目概览，与 CodeGraph（精确代码结构）互补。按主题分流使用。
+
+### 默认原则
+
+- **当问题涉及架构概览、领域概念、集成方式、测试指南等主题时，优先读取 `openwiki/` 目录下对应的文档页面，获取高层次理解后再深入代码细节。**
+- OpenWiki 页面由 AI 定期从源码生成，内容涵盖设计意图和整体流程，CodeGraph 无法替代。
+
+### 优先级决策链
+
+| 场景 | 首选文档 | 说明 |
+|------|---------|------|
+| 快速了解项目全貌 | `openwiki/quickstart.md` | 入口点，再根据链接深入具体页面 |
+| 架构概览（启动流程、路由、CSS、工具链） | `openwiki/architecture/overview.md` | 了解设计意图和整体结构 |
+| API 层设计（OAuth、双模式、401 重试） | `openwiki/architecture/api-layer.md` | 设计决策与数据流 |
+| 图片流水线（缓存、代理、CDN） | `openwiki/architecture/image-pipeline.md` | 三层缓存架构 |
+| Feed 与浏览（推荐、虚拟滚动、R18 过滤） | `openwiki/domain/feed-and-browsing.md` | 业务逻辑与数据流 |
+| 小说阅读器（虚拟布局、搜索、系列导航） | `openwiki/domain/novel-reader.md` | 核心交互流程 |
+| Android 原生集成（Capacitor 插件、构建） | `openwiki/integrations/android-native.md` | 原生桥接与构建配置 |
+| 测试策略（单元测试、E2E 测试） | `openwiki/testing/overview.md` | 测试分层与工具链 |
+
+### 与 CodeGraph 的协作规则
+
+- **架构概览 / 领域概念 / 集成 / 测试指南** → 先读 OpenWiki 获取高层次理解
+- **具体符号定义 / 调用链 / 影响分析** → 使用 CodeGraph 精确追踪
+- **理解一个功能时** → 先用 OpenWiki 了解"为什么这样做"，再用 CodeGraph 了解"代码在哪、怎么调用"
+
+### 禁止的默认行为
+
+- 在未查阅对应 OpenWiki 页面的情况下，直接用 CodeGraph / Read 从零摸索架构层面问题。
+
 ## 命令
 
 所有命令在项目根目录执行，通过 pnpm workspace 委托给 `pictelio-app`。
@@ -439,6 +471,7 @@ packages/app/src/
 
 - **代码智能规范**：涉及代码理解、调用链追踪、影响分析时，默认优先使用 CodeGraph（工具选择见上方「代码智能规范」工具选择速查表），完整规范参考全局 memory `mcp-codegraph-usage.md`。
 - **文档查询规范**：查询第三方库/框架文档优先使用 Context7，浏览器标准 API 优先使用 MDN（优先级链见上方「文档查询规范」决策表），完整规范参考全局 memory `mcp-doc-query.md`。
+- **OpenWiki 查询规范**：涉及架构概览、领域概念、集成方式、测试指南等主题时，优先查阅 `openwiki/` 目录下对应的文档页面（详见上方「OpenWiki 查询规范」优先级决策链）。先获取高层次理解，再使用 CodeGraph 精确追踪代码细节。
 - **路由数据规则**：路由级异步数据统一通过 `@tanstack/solid-router` 的 `loader` 获取；组件内局部异步仍使用 `createSignal` + `createEffect` + 手动 fetch（带 AbortController）。`createResource` 不用于路由组件。
 
 ## 任务完成前自检
@@ -447,6 +480,7 @@ packages/app/src/
 - **Fallback 合理性**：未用 CodeGraph 时，是否属于允许的例外？（不可用、已知路径读取、非代码搜索等，详见全局 memory `mcp-codegraph-usage.md`）
 - **索引健康**：CodeGraph 返回异常时，是否检查了 `codegraph_status` 并考虑重建索引？
 - **文档查询优先性**：涉及库/框架/浏览器 API 查询时，是否遵循了「文档查询规范」的优先级链？（优先 Context7 或 MDN，降级见 `mcp-doc-query.md`）
+- **OpenWiki 查询优先性**：涉及架构概览、领域概念、集成、测试指南等主题时，是否先查阅了对应的 OpenWiki 页面再深入代码？
 - **OpenWiki 文档同步**：修改了 `src/` 或 `packages/` 中的代码后，是否执行了 `pnpm openwiki:update` 来同步文档？
 - **Conventional Commits 规范**：提交的 commit message 是否符合 Conventional Commits 格式（`type(scope): description`）？commitlint 会强制校验。
 
@@ -473,6 +507,11 @@ The scheduled OpenWiki GitHub Actions workflow refreshes the repository wiki. Do
 
 ## OpenWiki 维护规则
 
+### 查询时使用
+- **当问题涉及架构概览、领域概念、集成方式、测试指南等主题时**，应优先读取 `openwiki/` 目录下对应的文档页面（详见上方「OpenWiki 查询规范」优先级决策链）。
+- 先通过 OpenWiki 获取高层次理解，再使用 CodeGraph 精确追踪代码细节。
+
+### 更新维护
 - **AI Agent 在提交代码前**（尤其是修改了 `src/` 或 `packages/` 目录中的代码后），应主动执行 `pnpm openwiki:update` 更新文档。
 - 如 `pnpm openwiki:update` 执行失败，不阻塞后续操作，但应在回复中提示用户。
 - **禁止手动编辑** `openwiki/` 目录下的生成文件。如需更新文档内容，应修改源码后通过 `pnpm openwiki:update` 重新生成。
