@@ -1,0 +1,165 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+const features = [
+  {
+    title: "双 Feed 内容浏览",
+    details: "插画推荐/关注双 Tab，支持插画/漫画子分类与关注页三层过滤。小说三 Feed（推荐/关注/收藏）。三种布局模式自由切换，无限滚动加载，位置自动记忆。",
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>`,
+  },
+  {
+    title: "沉浸查看 + 小说阅读",
+    details: "大图缩放、Ugoira 动图播放、多页楼梯导航、评论查看。小说虚拟化正文布局，支持字号/字重/字体/行高/配色自定义，正文搜索高亮与系列目录。",
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
+  },
+  {
+    title: "发现与社交",
+    details: "多维度搜索（插画/小说/全部 + 最新/最早/热门）。收藏管理双 Tab 公开/非公开。浏览历史日期时间线。用户主页/作品列表/关注粉丝管理。",
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>`,
+  },
+  {
+    title: "个性化与安全",
+    details: "三级图片缓存 + 自定义图片托管竞速/负载均衡/最快IP。亮暗主题 + 阅读器独立配色。年龄门、R-18/G 过滤、举报屏蔽。Pixiv 官方 OAuth 登录。",
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>`,
+  },
+];
+
+const screenshots = [
+  { src: "/pixivizer/screenshots/01_feed.png", alt: "推荐 Feed 页面" },
+  { src: "/pixivizer/screenshots/02_detail.png", alt: "作品详情页面" },
+  { src: "/pixivizer/screenshots/03_settings.png", alt: "设置页面" },
+  { src: "/pixivizer/screenshots/04_login.png", alt: "登录页面" },
+];
+---
+
+<BaseLayout title="首页">
+  <div class="variant-c">
+    <!-- Hero -->
+    <section class="vc-hero">
+      <div class="vc-hero-inner">
+        <div class="vc-content">
+          <div class="vc-badge vc-reveal">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            第三方客户端
+          </div>
+          <h1 class="vc-title vc-reveal vc-reveal-delay-1">Pictelio</h1>
+          <p class="vc-sub vc-reveal vc-reveal-delay-2">为 Android 打造的 Pixiv 浏览体验 — 插画、小说、收藏、发现，一切尽在掌握。</p>
+          <div class="vc-actions vc-reveal vc-reveal-delay-3">
+            <a href="https://github.com/a1121611810/pixivizer/releases" class="vc-btn-primary" target="_blank" rel="noopener noreferrer">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              下载 APK
+            </a>
+          </div>
+        </div>
+        <div class="vc-visual vc-reveal vc-reveal-delay-2">
+          <div class="vc-phone">
+            <div class="vc-notch"></div>
+            <div class="vc-screen" id="phone-screen">
+              {screenshots.map((s) => (<div class="vc-slide"><img src={s.src} alt={s.alt} loading="lazy" /></div>))}
+            </div>
+          </div>
+          <div class="vc-dots" id="carousel-dots">
+            {screenshots.map((_, i) => (<button class="vc-dot" class:list={{ active: i === 0 }} data-index={i} aria-label={`截图 ${i + 1}`} />))}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="vc-features">
+      <h2 class="vc-features-title vc-reveal">功能亮点</h2>
+      <p class="vc-features-sub vc-reveal vc-reveal-delay-1">一个应用，畅享插画与小说的双重世界</p>
+      <div class="vc-grid">
+        {features.map((f, i) => (
+          <div class="vc-card vc-reveal" class:list={{ [`vc-reveal-delay-${i + 1}`]: true }}>
+            <div class="vc-card-icon" set:html={f.icon} />
+            <h3 class="vc-card-title">{f.title}</h3>
+            <p class="vc-card-desc">{f.details}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <!-- Download -->
+    <section class="vc-cta">
+      <h2 class="vc-cta-title vc-reveal">立即下载</h2>
+      <p class="vc-cta-sub vc-reveal vc-reveal-delay-1">开源 · 免费 · 无广告 · 无需第三方账户</p>
+      <a href="https://github.com/a1121611810/pixivizer/releases" class="vc-btn-glow vc-reveal vc-reveal-delay-2" target="_blank" rel="noopener noreferrer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        从 GitHub Releases 下载
+      </a>
+    </section>
+  </div>
+</BaseLayout>
+
+<script>
+  // ── Screenshot carousel ──
+  const screen = document.getElementById("phone-screen");
+  const dots = document.querySelectorAll(".vc-dot");
+  if (screen && dots.length) {
+    screen.addEventListener("scroll", () => {
+      const slideWidth = screen.clientWidth;
+      const index = Math.round(screen.scrollLeft / slideWidth);
+      dots.forEach((dot, i) => dot.classList.toggle("active", i === index));
+    });
+  }
+
+  // ── Phone tilt + cursor glow ──
+  const hero = document.querySelector(".vc-hero");
+  const phone = document.querySelector(".vc-phone");
+  if (hero && phone) {
+    const BASE_Y = -8;
+    const MAX_Y = 10;
+    const MAX_X = 5;
+    let targetY = BASE_Y, targetX = 0;
+    let currentY = BASE_Y, currentX = 0;
+    let rafId = null;
+
+    function lerp(a, b, t) { return a + (b - a) * t; }
+    function smooth(n) { return Math.sin(n * Math.PI / 2); }
+
+    function tick() {
+      currentY = lerp(currentY, targetY, 0.1);
+      currentX = lerp(currentX, targetX, 0.1);
+      phone.style.transform = `perspective(800px) rotateX(${currentX}deg) rotateY(${currentY}deg)`;
+      if (Math.abs(currentY - targetY) > 0.01 || Math.abs(currentX - targetX) > 0.01) {
+        rafId = requestAnimationFrame(tick);
+      } else {
+        rafId = null;
+      }
+    }
+
+    function kick() { if (!rafId) rafId = requestAnimationFrame(tick); }
+
+    hero.addEventListener("mousemove", (e) => {
+      const rect = hero.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const nx = (x / rect.width - 0.5) * 2;
+      const ny = (0.5 - y / rect.height) * 2;
+
+      targetY = BASE_Y + smooth(nx) * MAX_Y;
+      targetX = smooth(ny) * MAX_X;
+      kick();
+    });
+
+    hero.addEventListener("mouseleave", () => {
+      targetY = BASE_Y;
+      targetX = 0;
+      kick();
+    });
+  }
+
+  // ── Scroll reveal ──
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("visible");
+        }
+      });
+    },
+    { threshold: 0.15 }
+  );
+  document.querySelectorAll(".vc-reveal").forEach((el) => observer.observe(el));
+</script>

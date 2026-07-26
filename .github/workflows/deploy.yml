@@ -42,16 +42,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Build VitePress
+      - name: Build Astro
         run: pnpm --filter pictelio-website build
 
       - name: Copy version.json
-        run: cp packages/website/version.json packages/website/docs/.vitepress/dist/
+        run: cp packages/website/version.json packages/website/dist/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: packages/website/docs/.vitepress/dist
+          path: packages/website/dist
 
       - name: Deploy to GitHub Pages
         id: deployment
