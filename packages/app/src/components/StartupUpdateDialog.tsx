@@ -20,20 +20,15 @@ function handleDismiss() {
 }
 
 /**
- * Startup update dialog.
+ * Startup update dialog — 自定义模态覆盖层。
  *
- * Shown automatically on app launch when the background update check detects
- * a version newer than the running build and the user has not already dismissed
- * this particular version.
+ * 不使用 <fluent-dialog> 的原因是其在动态创建时 open 属性不
+ * 触发内部 showModal，且 slot 系统会导致按钮不可见。
+ * 改为纯 CSS fixed 覆盖层，完全控制布局。
  *
- * Interaction:
- * - "前往下载" opens the release URL in the system browser.
- * - "稍后再说" persists the current version as dismissed so it won't be
- *   shown again until an even newer version is available.
+ * Fluent 2 设计令牌通过 tokens.css 的 CSS 变量使用。
  */
 const StartupUpdateDialog: Component = () => {
-  let dialogRef: HTMLElement | undefined;
-
   // 二次保障：监控 store 状态变化，在条件满足时自动弹窗。
   createEffect(() => {
     if (
@@ -47,35 +42,6 @@ const StartupUpdateDialog: Component = () => {
     }
   });
 
-  // 当 fluent-dialog 挂载到 DOM 时，调用 showModal 使其可见。
-  // Web 组件在动态创建时 open 属性不触发内部 showModal，
-  // 必须通过 ref 回调直接调用。
-  function onDialogMount(el: HTMLElement) {
-    dialogRef = el;
-  }
-
-  // 当 showUpdateDialog 变为 true 且 fluent-dialog 挂载到 DOM 后，
-  // 启用一个短轮询等待 Web 组件完全初始化后再调用 showModal。
-  // Web 组件在动态创建时 open 属性不触发内部 showModal，
-  // 必须通过 JS 手动调用。
-  createEffect(() => {
-    if (showUpdateDialog()) {
-      const tryShow = () => {
-        const host = document.querySelector('fluent-dialog');
-        if (host && host.shadowRoot) {
-          const d = host.shadowRoot.querySelector('dialog') as any;
-          if (d && typeof d.showModal === 'function' && !d.open) {
-            d.showModal();
-            return;
-          }
-        }
-        // 还没就绪，50ms 后重试
-        setTimeout(tryShow, 50);
-      };
-      setTimeout(tryShow, 0);
-    }
-  });
-
   function handleDownload() {
     const url = latestReleaseUrl();
     if (url) {
@@ -86,39 +52,83 @@ const StartupUpdateDialog: Component = () => {
 
   return (
     <Show when={showUpdateDialog()}>
-      <fluent-dialog
-        ref={onDialogMount}
-        modal
-        on:close={handleDismiss}
-        aria-label="发现新版本"
+      {/* 半透明背景遮罩 */}
+      <div
+        class="fixed inset-0 z-50 flex items-center justify-center"
+        style="background-color: var(--colorNeutralBackground6);"
+        onClick={handleDismiss}
       >
-        <h3
-          slot="title"
-          class="text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase500)] font-semibold"
+        {/* 弹窗卡片 */}
+        <div
+          class="flex flex-col w-[min(85vw,360px)] rounded-[var(--borderRadius2XLarge)] shadow-[var(--elevation16)] overflow-hidden"
+          style="background-color: var(--colorNeutralBackground1); animation: fluent-scale-enter 200ms cubic-bezier(0.33, 0, 0, 1) both;"
+          onClick={(e) => e.stopPropagation()}
         >
-          发现新版本 v{latestVersion()}
-        </h3>
+          {/* 顶部标题栏 */}
+          <div class="flex items-start justify-between px-5 pt-5 pb-2">
+            <div class="flex-1 min-w-0">
+              <h2
+                class="text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase500)] font-semibold leading-tight m-0"
+              >
+                发现新版本
+              </h2>
+              <p
+                class="mt-0.5 text-[var(--colorBrandForeground1)] [font-size:var(--fontSizeBase300)] font-semibold leading-snug"
+              >
+                v{latestVersion()}
+              </p>
+            </div>
+            {/* 关闭按钮 */}
+            <button
+              class="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-[var(--borderRadiusMedium)] text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-[0.92] focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-[var(--strokeWidthThick)] focus-visible:outline-[color:var(--colorStrokeFocus2)] transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] -mr-1 -mt-1"
+              onClick={handleDismiss}
+              aria-label="关闭"
+              type="button"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M4.22 4.22a.75.75 0 0 1 1.06 0L12 10.94l6.72-6.72a.75.75 0 1 1 1.06 1.06L13.06 12l6.72 6.72a.75.75 0 1 1-1.06 1.06L12 13.06l-6.72 6.72a.75.75 0 0 1-1.06-1.06L10.94 12 4.22 5.28a.75.75 0 0 1 0-1.06z" fill="currentColor" />
+              </svg>
+            </button>
+          </div>
 
-        <div class="text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase300)] leading-relaxed max-w-[min(80vw,360px)]">
-          <p class="mb-3">
-            Pictelio {latestVersion()} 已发布，当前版本为 v{APP_VERSION}。
-          </p>
+          {/* 正文内容 */}
+          <div class="px-5 py-2 text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase300)] leading-relaxed">
+            <p class="m-0">
+              Pictelio <span class="font-semibold">v{latestVersion()}</span> 已发布，当前版本为 <span class="font-semibold">v{APP_VERSION}</span>。
+            </p>
+          </div>
+
+          {/* 更新日志 */}
           <Show when={latestChangelog()}>
-            <div class="rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)] p-3 [font-size:var(--fontSizeBase200)] whitespace-pre-wrap text-[var(--colorNeutralForeground2)] max-h-[30vh] overflow-y-auto">
-              {latestChangelog()}
+            <div class="px-5 pb-1">
+              <div
+                class="rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)] px-3 py-2.5 [font-size:var(--fontSizeBase200)] whitespace-pre-wrap text-[var(--colorNeutralForeground2)] leading-relaxed max-h-[25vh] overflow-y-auto"
+                style="scrollbar-width: thin;"
+              >
+                {latestChangelog()}
+              </div>
             </div>
           </Show>
-        </div>
 
-        <div slot="actions" class="flex gap-2 justify-end">
-          <fluent-button appearance="secondary" on:click={handleDismiss} class="min-h-[40px]">
-            稍后再说
-          </fluent-button>
-          <fluent-button appearance="primary" on:click={handleDownload} class="min-h-[40px]">
-            前往下载
-          </fluent-button>
+          {/* 操作按钮 */}
+          <div class="flex gap-2 px-5 pb-5 pt-3">
+            <fluent-button
+              appearance="secondary"
+              onClick={handleDismiss}
+              class="flex-1 min-h-[44px] text-[var(--fontSizeBase300)] font-semibold"
+            >
+              稍后再说
+            </fluent-button>
+            <fluent-button
+              appearance="primary"
+              onClick={handleDownload}
+              class="flex-1 min-h-[44px] text-[var(--fontSizeBase300)] font-semibold"
+            >
+              前往下载
+            </fluent-button>
+          </div>
         </div>
-      </fluent-dialog>
+      </div>
     </Show>
   );
 };
