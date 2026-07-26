@@ -89,6 +89,7 @@ Architecture Decision Records live in `/docs/adr/`. Notable ones:
 | 0033 | Startup update dialog: pure CSS overlay replaces Fluent dialog |
 | 0034 | Migrate Playwright E2E tests to agent-browser (AI-driven E2E) |
 | 0035 | Migrate browser component tests to unit + agent-browser E2E |
+| 0036 | Error tuple pattern replaces try-catch across all layers (tryAsync/trySync) |
 
 ## Key Source Files
 

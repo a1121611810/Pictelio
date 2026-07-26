@@ -142,6 +142,30 @@ The app has three key component layers:
 
 Key relationship: Routes → Components + Primitives → Stores → API Client
 
+## Error Handling Pattern
+
+[ADR-0036](/docs/adr/ADR-0036-error-tuple-pattern.md) introduced the **error tuple pattern** as a project-wide replacement for try-catch:
+
+```typescript
+// Before: try-catch blocks block V8 TurboFan happy-path optimization
+try { const data = await fetch(); return data; }
+catch (e) { handle(e); return fallback; }
+
+// After: error tuple, V8-friendly
+const [err, data] = await tryAsync(fetch());
+if (err) { handle(err); return fallback; }
+```
+
+**Key mechanism:**
+
+- **`tryAsync`** (`src/utils/tryAsync.ts`) — wraps `Promise<T>` to return `[null, T] | [Error, undefined]`. Replaces `try { await ... } catch` without blocking V8 TurboFan optimization on the calling function.
+- **`trySync`** (`src/utils/tryAsync.ts`) — wraps a factory `() => T` for synchronous operations (`JSON.parse`, DOM reads). Keeps the throwing code lazily evaluated inside the factory.
+- **`unplugin-auto-import`** — automatically injects `import { tryAsync, trySync } from '@/utils/tryAsync'` into every source file at build time. Globals are declared as `readonly` in `.oxlintrc.json`. The generated `auto-imports.d.ts` is gitignored.
+
+**Unified cleanup:** finally-block logic (`loading.set(false)`, `clearTimeout()`) moves after the `tryAsync` call and before the `err` check, written once instead of duplicated across try/catch/finally branches.
+
+**Scope:** ~45 source files across API layer, stores, routes, components, primitives, services, and utils (110+ try-catch/try-finally blocks replaced).
+
 ## Related Pages
 
 - [Source Map](/openwiki/source-map.md) — Complete directory layout
