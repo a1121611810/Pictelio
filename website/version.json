@@ -1,5 +1,5 @@
 {
-  "version": "3.17.7",
-  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.17.7",
-  "changelog": "✨ 新功能\n  feat(app): 全量覆盖第三方用户名点击跳转个人中心"
+  "version": "3.17.8",
+  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.17.8",
+  "changelog": "🧹 杂项\n  chore: 更新最后更新时间与git HEAD，新增ADR-0033记录\n  chore: 集成 OpenWiki + Husky + commitlint 工具链\n🐛 修复\n  fix(app): 修复弹窗遮罩 token 无效和添加 Escape 键关闭\n  fix(app): 用自定义覆盖层替换 Fluent dialog，修复按钮不可见问题\n  fix(app): 使用"
 }
