@@ -50,24 +50,16 @@ const BG_COLORS = ["", "#f5e6c8", "#c7edcc", "#1a1a1a", "#f0f0f0", "#2b2b2b"] as
 // ── Storage ──
 
 function loadSettings(): ReaderSettings {
-  try {
-    const stored = localStorage.getItem(STORAGE_PREFIX + "settings");
-    if (stored) {
-      const parsed = JSON.parse(stored) as Partial<ReaderSettings>;
-      return { ...DEFAULTS, ...parsed };
-    }
-  } catch {
-    /* Ignore */
+  const [err, stored] = trySync(() => localStorage.getItem(STORAGE_PREFIX + "settings"));
+  if (!err && stored) {
+    const [parseErr, parsed] = trySync(() => JSON.parse(stored) as Partial<ReaderSettings>);
+    if (!parseErr) return { ...DEFAULTS, ...parsed };
   }
   return { ...DEFAULTS };
 }
 
 function saveSettings(settings: ReaderSettings): void {
-  try {
-    localStorage.setItem(STORAGE_PREFIX + "settings", JSON.stringify(settings));
-  } catch {
-    /* Ignore */
-  }
+  trySync(() => localStorage.setItem(STORAGE_PREFIX + "settings", JSON.stringify(settings)));
 }
 
 // ── Signal-based store (module-level, shared by NovelDetail and ReaderSettingsSheet) ──

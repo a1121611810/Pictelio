@@ -65,11 +65,9 @@ function extractBalancedObject(html: string, key: string): unknown {
       } else if (char === "}") {
         depth--;
         if (depth === 0) {
-          try {
-            return JSON.parse(html.slice(start, i + 1));
-          } catch {
-            return undefined;
-          }
+          const [parseErr, parsed] = trySync(() => JSON.parse(html.slice(start, i + 1)));
+          if (parseErr) return undefined;
+          return parsed;
         }
       }
     }
@@ -89,11 +87,11 @@ export function extractNovelTextFromHtml(html: string): string {
     return "";
   }
   // 解义 JSON 转义序列
-  try {
-    return JSON.parse(`"${match[1]}"`) as string;
-  } catch {
+  const [parseErr, parsed] = trySync(() => JSON.parse(`"${match[1]}"`) as string);
+  if (parseErr) {
     return match[1].replace(/\\n/gu, "\n").replace(/\\r/gu, "").replace(/\\t/gu, " ");
   }
+  return parsed;
 }
 
 /**
@@ -124,14 +122,12 @@ export function extractNovelDataFromHtml(html: string): {
   let navigation: SeriesNavigation = {};
   const navMatch = html.match(/"seriesNavigation"\s*:\s*(\{(?:[^{}]|\{[^{}]*\})*\})/u);
   if (navMatch) {
-    try {
-      const parsed = JSON.parse(navMatch[1]);
+    const [navErr, parsed] = trySync(() => JSON.parse(navMatch[1]));
+    if (!navErr) {
       navigation = {
         nextNovel: parsed.nextNovel ?? null,
         prevNovel: parsed.prevNovel ?? null,
       };
-    } catch {
-      /* Ignore */
     }
   }
 

@@ -243,12 +243,14 @@ async function fetchWithTimeout(
   if (externalSignal?.aborted) controller.abort();
   const onAbort = () => controller.abort();
   externalSignal?.addEventListener("abort", onAbort);
+  let result: Response;
   try {
-    return await fetch(url, { ...init, signal: controller.signal });
+    result = await fetch(url, { ...init, signal: controller.signal });
   } finally {
     clearTimeout(timeoutId);
     externalSignal?.removeEventListener("abort", onAbort);
   }
+  return result;
 }
 
 /**
@@ -287,11 +289,8 @@ async function sendRequest(
           body: method === "POST" && data ? new URLSearchParams(data).toString() : undefined,
         }),
       );
-      try {
-        return { status: resp.status, data: JSON.parse(resp.data) };
-      } catch {
-        return { status: resp.status, data: resp.data };
-      }
+      const [parseErr, parsed] = trySync(() => JSON.parse(resp.data));
+      return { status: resp.status, data: parseErr ? resp.data : parsed };
     } else if (method === "GET") {
       const resp = await withTimeout(
         CapacitorHttp.request({ method: "GET", url, headers, params: data as any }),
@@ -319,7 +318,8 @@ async function sendRequest(
     if (contentType.includes("application/json")) {
       return { status: res.status, data: await res.json() };
     }
-    const text = await res.text().catch(() => "");
+    const [_err, textResult] = await tryAsync(Promise.resolve(res.text()));
+    const text = _err ? "" : textResult!;
     throw new Error(`服务器返回非 JSON (HTTP ${res.status}): ${text.slice(0, 300)}`);
   }
 }
@@ -389,15 +389,11 @@ function request<T>(
     }
     const promise = executeRequest<T>(method, path, data, signal);
     inflightGetRequests.set(key, promise);
-    promise
-      .finally(() => {
+    void tryAsync(
+      promise.finally(() => {
         inflightGetRequests.delete(key);
-      })
-      .catch(() => {
-        // 忽略：原始 promise 的 rejection 由调用方处理，
-        // .finally() 返回的中间 promise 在 source 被 reject 时也会 reject，
-        // 不 catch 会导致 Node/vitest 的 unhandledRejection 检测误报
-      });
+      }),
+    );
     return promise;
   }
 

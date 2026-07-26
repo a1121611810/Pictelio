@@ -47,17 +47,19 @@ const Settings: Component = () => {
   });
 
   async function handleLogout() {
-    try {
+    const [logoutErr] = await tryAsync((async () => {
       await logout();
       void navigate({ to: "/login", replace: true });
-      setActionToast("已退出登录");
-    } catch {
+    })());
+    if (logoutErr) {
       setActionToast("退出登录失败");
+    } else {
+      setActionToast("已退出登录");
     }
   }
 
   async function handleClearLocalData() {
-    try {
+    const [clearErr] = await tryAsync((async () => {
       await logout();
       clearImageCache();
       await clearNovelCache();
@@ -66,9 +68,11 @@ const Settings: Component = () => {
       await Preferences.clear();
       await resetUiStore();
       void navigate({ to: "/login", replace: true });
-      setActionToast("本地数据已清除");
-    } catch {
+    })());
+    if (clearErr) {
       setActionToast("清除失败，请重试");
+    } else {
+      setActionToast("本地数据已清除");
     }
   }
 

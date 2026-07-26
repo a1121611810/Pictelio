@@ -8,6 +8,7 @@ import { queryKeys } from "../api/queryKeys";
 import { queryClient } from "../api/queryClient";
 import { apiClient } from "../api/client";
 
+
 export type FollowMode = "following" | "followers";
 
 // ── Reactive source signals ──
@@ -113,13 +114,10 @@ export async function toggleFollow(index: number): Promise<void> {
     },
   );
 
-  try {
-    if (prev) {
-      await unfollowUser(preview.user.id);
-    } else {
-      await followUser(preview.user.id);
-    }
-  } catch {
+  const [err] = prev
+    ? await tryAsync(unfollowUser(preview.user.id))
+    : await tryAsync(followUser(preview.user.id));
+  if (err) {
     // Rollback
     preview.user.is_followed = prev;
     queryClient.setQueryData(

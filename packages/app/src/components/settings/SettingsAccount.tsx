@@ -43,12 +43,8 @@ const SettingsAccount: Component<Props> = (props) => {
   const navigate = useNavigate();
 
   function handleClearImageCache() {
-    try {
-      clearImageCache();
-      props.onActionToast("图片缓存已清除");
-    } catch {
-      props.onActionToast("清除图片缓存失败");
-    }
+    const [err] = trySync(() => clearImageCache());
+    props.onActionToast(err ? "清除图片缓存失败" : "图片缓存已清除");
   }
 
   return (

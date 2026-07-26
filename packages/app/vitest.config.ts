@@ -1,9 +1,10 @@
 import { defineConfig } from "vite-plus/test/config";
 import solid from "vite-plugin-solid";
+import AutoImport from "unplugin-auto-import/vite";
 import { resolve } from "node:path";
 
 export default defineConfig({
-  plugins: [solid()],
+  plugins: [AutoImport({ imports: [{ "@/utils/tryAsync": ["tryAsync", "trySync"] }], dts: "./src/auto-imports.d.ts" }), solid()],
   define: {
     __CREDENTIALS__: JSON.stringify({
       clientId: "MOBrBDS8blbauoSck0ZfDbtuzpyT",

@@ -3,6 +3,7 @@ import { ImageCache, type ImageCachePlugin } from "../native/ImageCache";
 import { isImageHostEnabled } from "../stores/imageHostStore";
 import { getEffectiveImageUrl, getRaceCandidateUrls } from "../services/imageHostService";
 
+
 const isNative = Capacitor.isNativePlatform();
 
 // 定时器 ID —— 必须在模块顶层调用之前声明，避免 let/const 暂时性死区（TDZ）
@@ -296,54 +297,57 @@ export function loadImage(originalUrl: string): Promise<LoadedImage> {
 async function loadImageInner(originalUrl: string): Promise<LoadedImage> {
   const targetUrl = isImageHostEnabled() ? getEffectiveImageUrl(originalUrl) : originalUrl;
 
-  try {
-    let blob: Blob;
+  const [loadErr, loadResult] = await tryAsync(
+    (async () => {
+      let blob: Blob;
 
-    if (isNative) {
-      // 1) 先检查 Android 文件缓存（异常时降级到网络，不阻塞加载路径）
-      const imageCache = getImageCache();
-      try {
-        const cached = await imageCache!.getImage({ key: originalUrl });
-        if (cached?.base64) {
+      if (isNative) {
+        // 1) 先检查 Android 文件缓存（异常时降级到网络，不阻塞加载路径）
+        const imageCache = getImageCache();
+        const [cacheErr, cached] = await tryAsync(imageCache!.getImage({ key: originalUrl }));
+        if (cacheErr) {
+          console.warn("[ImageCache] Disk cache check failed, falling back to network", cacheErr);
+        } else if (cached?.base64) {
           // 磁盘缓存命中：只登记 key，不再 base64 解码进内存（省掉整张图的内存峰值）
           cacheSet(originalUrl);
           return { url: resolveImageUrl(originalUrl), cleanup: () => {} };
         }
-      } catch (error) {
-        console.warn("[ImageCache] Disk cache check failed, falling back to network", error);
+
+        // 2) 未命中，发网络请求
+        blob = await fetchNative(targetUrl, originalUrl);
+
+        // 3) 后台保存到磁盘缓存（异常不影响主加载路径）
+        const [encodeErr, base64] = await tryAsync(blobToBase64(blob));
+        if (encodeErr) {
+          console.warn("[ImageCache] Failed to encode blob for disk cache", encodeErr);
+        } else {
+          const [saveErr] = await tryAsync(imageCache!.saveImage({ key: originalUrl, base64 }));
+          if (saveErr) {
+            console.warn("[ImageCache] Failed to save to disk", saveErr);
+          }
+        }
+      } else {
+        blob = await fetchWeb(targetUrl, originalUrl);
       }
 
-      // 2) 未命中，发网络请求
-      blob = await fetchNative(targetUrl, originalUrl);
+      // 登记已加载标记（Blob 本体交给浏览器 HTTP 缓存，不进 L1）
+      cacheSet(originalUrl);
 
-      // 3) 后台保存到磁盘缓存（异常不影响主加载路径）
-      try {
-        const base64 = await blobToBase64(blob);
-        imageCache!
-          .saveImage({ key: originalUrl, base64 })
-          .catch((error) => console.warn("[ImageCache] Failed to save to disk", error));
-      } catch (error) {
-        console.warn("[ImageCache] Failed to encode blob for disk cache", error);
-      }
-    } else {
-      blob = await fetchWeb(targetUrl, originalUrl);
-    }
-
-    // 登记已加载标记（Blob 本体交给浏览器 HTTP 缓存，不进 L1）
-    cacheSet(originalUrl);
-
-    // 返回代理 URL（不走 blob: URL，避免 Network 面板条目 + 0.5ms 开销）
-    return {
-      url: resolveImageUrl(originalUrl),
-      cleanup: () => {},
-    };
-  } catch (error) {
-    console.warn(`[ImageCache] Load failed: ${originalUrl}`, error);
+      // 返回代理 URL（不走 blob: URL，避免 Network 面板条目 + 0.5ms 开销）
+      return {
+        url: resolveImageUrl(originalUrl),
+        cleanup: () => {},
+      };
+    })(),
+  );
+  if (loadErr) {
+    console.warn(`[ImageCache] Load failed: ${originalUrl}`, loadErr);
     return {
       url: resolveImageUrl(originalUrl),
       cleanup: () => {},
     };
   }
+  return loadResult;
 }
 
 // ─── 带进度回调的图片加载 ───
@@ -401,28 +405,32 @@ export async function loadImageWithProgress(
 
   const startTime = performance.now();
 
-  try {
-    // 2. 解析目标 URL（图床代理 / 原生 URL）
-    const targetUrl = isImageHostEnabled() ? getEffectiveImageUrl(originalUrl) : originalUrl;
+  const [progressErr, progressResult] = await tryAsync(
+    (async () => {
+      // 2. 解析目标 URL（图床代理 / 原生 URL）
+      const targetUrl = isImageHostEnabled() ? getEffectiveImageUrl(originalUrl) : originalUrl;
 
-    // 3. 带进度下载（统一走 WebView 代理）
-    const proxyUrl = toWebProxyUrl(targetUrl);
-    const blob = await loadWithProgressWeb(proxyUrl, onProgress);
+      // 3. 带进度下载（统一走 WebView 代理）
+      const proxyUrl = toWebProxyUrl(targetUrl);
+      const blob = await loadWithProgressWeb(proxyUrl, onProgress);
 
-    // 4. 登记已加载标记
-    cacheSet(originalUrl);
+      // 4. 登记已加载标记
+      cacheSet(originalUrl);
 
-    const durationMs = Math.round(performance.now() - startTime);
+      const durationMs = Math.round(performance.now() - startTime);
 
-    // 5. 最终 100% 回调
-    onProgress({ loaded: blob.size, total: blob.size, percent: 100 });
+      // 5. 最终 100% 回调
+      onProgress({ loaded: blob.size, total: blob.size, percent: 100 });
 
-    return { url: resolveImageUrl(originalUrl), cleanup: () => {}, durationMs };
-  } catch (error) {
-    console.warn(`[ImageCache] LoadWithProgress failed: ${originalUrl}`, error);
+      return { url: resolveImageUrl(originalUrl), cleanup: () => {}, durationMs };
+    })(),
+  );
+  if (progressErr) {
+    console.warn(`[ImageCache] LoadWithProgress failed: ${originalUrl}`, progressErr);
     onProgress({ loaded: 0, total: 0, percent: -1 });
     return { url: resolveImageUrl(originalUrl), cleanup: () => {}, durationMs: 0 };
   }
+  return progressResult;
 }
 
 /** Web 模式：fetch + ReadableStream 逐 chunk 读取并报告进度 */
@@ -507,19 +515,19 @@ async function raceFetch<T>(
   fallbackUrl: string,
 ): Promise<T> {
   const pending = urls.map(async (url): Promise<T> => {
-    try {
-      return await fetcher(url);
-    } catch {
+    const [fetchErr, fetchResult] = await tryAsync(fetcher(url));
+    if (fetchErr) {
       throw new Error(`Failed: ${url}`);
     }
+    return fetchResult;
   });
 
-  try {
-    return await Promise.any(pending);
-  } catch {
+  const [anyErr, anyResult] = await tryAsync(Promise.any(pending));
+  if (anyErr) {
     console.warn(`[ImageCache] All race candidates failed, fallback to ${fallbackUrl}`);
     return fetcher(fallbackUrl);
   }
+  return anyResult;
 }
 
 // ─── Blob → Base64 工具（用于 ImageCache 插件写盘） ───
@@ -556,22 +564,25 @@ export async function warmCacheFromDisk(): Promise<void> {
     return;
   }
 
-  try {
-    const imageCache = getImageCache();
-    const { keys } = await imageCache!.getCachedKeys();
-    if (!keys || keys.length === 0) {
-      return;
-    }
+  const [warmErr] = await tryAsync(
+    (async () => {
+      const imageCache = getImageCache();
+      const { keys } = await imageCache!.getCachedKeys();
+      if (!keys || keys.length === 0) {
+        return;
+      }
 
-    // 取最近 50 张，同步登记到 L1（只读 key，不解码图片本体）
-    const recentKeys = keys.slice(-50);
-    for (const key of recentKeys) {
-      injectCacheEntry(key);
-    }
+      // 取最近 50 张，同步登记到 L1（只读 key，不解码图片本体）
+      const recentKeys = keys.slice(-50);
+      for (const key of recentKeys) {
+        injectCacheEntry(key);
+      }
 
-    console.log(`[ImageCache] Warmup: registered ${recentKeys.length}/${keys.length} entries`);
-  } catch (error) {
+      console.log(`[ImageCache] Warmup: registered ${recentKeys.length}/${keys.length} entries`);
+    })(),
+  );
+  if (warmErr) {
     // 预热失败不阻塞启动
-    console.warn("[ImageCache] Warmup failed", error);
+    console.warn("[ImageCache] Warmup failed", warmErr);
   }
 }

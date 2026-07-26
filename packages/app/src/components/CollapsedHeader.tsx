@@ -51,9 +51,7 @@ const CollapsedHeader: Component<Props> = (props) => {
     }
     setErrored(false);
     if (isNative) {
-      loadImage(src)
-        .then((r) => setAvatarUrl(r.url))
-        .catch(() => {});
+      void tryAsync(loadImage(src).then((r) => setAvatarUrl(r.url)));
     } else {
       setAvatarUrl(resolveImageUrl(src));
     }

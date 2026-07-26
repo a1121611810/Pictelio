@@ -78,7 +78,7 @@ const RootLayout: Component = () => {
    */
   async function runStartupUpdateCheck(): Promise<void> {
     setIsCheckingUpdate(true);
-    try {
+    const [updateErr] = await tryAsync((async () => {
       const result = await checkForUpdate();
       setHasUpdate(result.hasUpdate);
       setLatestVersion(result.latestVersion);
@@ -92,11 +92,11 @@ const RootLayout: Component = () => {
       ) {
         setShowUpdateDialog(true);
       }
-    } catch (error) {
-      console.warn("[App] Startup update check failed", error);
-    } finally {
-      setIsCheckingUpdate(false);
-      setCheckCompleted(true);
+    })());
+    setIsCheckingUpdate(false);
+    setCheckCompleted(true);
+    if (updateErr) {
+      console.warn("[App] Startup update check failed", updateErr);
     }
   }
 
@@ -155,7 +155,7 @@ const RootLayout: Component = () => {
       dispatchExitHint: () => window.dispatchEvent(new CustomEvent("exitHint")),
     });
 
-    try {
+    const [authErr] = await tryAsync((async () => {
       // 如果尚未确认年龄，先导航到年龄确认页面，不进行登录判断
       if (!ageConfirmed()) {
         await navigate({ to: "/age-confirmation", replace: true });
@@ -172,21 +172,18 @@ const RootLayout: Component = () => {
           await navigate({ to: "/login", replace: true });
         }
       }
-    } catch (error) {
-      console.error("[App] Auth initialization failed", error);
-      try {
-        await navigate({ to: "/login", replace: true });
-      } catch {
-        // 导航异常不影响 loading 状态释放
-      }
-    } finally {
-      setIsLoading(false);
-      // 启动后延迟检查更新 — 确保页面渲染完成后再弹窗
-      if (autoCheckUpdate()) {
-        setTimeout(() => {
-          runStartupUpdateCheck();
-        }, STARTUP_CHECK_DELAY_MS);
-      }
+    })());
+    setIsLoading(false);
+    // 启动后延迟检查更新 — 确保页面渲染完成后再弹窗
+    if (autoCheckUpdate()) {
+      setTimeout(() => {
+        runStartupUpdateCheck();
+      }, STARTUP_CHECK_DELAY_MS);
+    }
+    if (authErr) {
+      console.error("[App] Auth initialization failed", authErr);
+      const [navErr] = await tryAsync(navigate({ to: "/login", replace: true }));
+      if (navErr) { /* 导航异常不影响 loading 状态释放 */ }
     }
   });
 

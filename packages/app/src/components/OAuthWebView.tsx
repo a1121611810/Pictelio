@@ -3,6 +3,7 @@ import { Capacitor } from "@capacitor/core";
 import { toApiError } from "../api/client";
 import type { ApiError } from "../api/types";
 
+
 /**
  * OAuthWebView 组件的属性。
  */
@@ -32,18 +33,23 @@ const isNative = Capacitor.isNativePlatform();
 const OAuthWebView: Component<OAuthWebViewProps> = (props) => {
   // ── Android Native: 通过 Capacitor 插件打开 WebView ──
   const startNativeOAuth = async () => {
-    try {
-      const { OAuthPlugin } = await import("@/native/OAuthPlugin");
-      const result = props.loginUrl
-        ? await OAuthPlugin.startOAuth({ loginUrl: props.loginUrl })
-        : await OAuthPlugin.startOAuth({ codeChallenge: props.codeChallenge });
-      props.onSuccess(result.code);
-    } catch (e: any) {
-      if (e?.message === "cancelled") {
+    const [err, result] = await tryAsync(
+      (async () => {
+        const { OAuthPlugin } = await import("@/native/OAuthPlugin");
+        return props.loginUrl
+          ? await OAuthPlugin.startOAuth({ loginUrl: props.loginUrl })
+          : await OAuthPlugin.startOAuth({ codeChallenge: props.codeChallenge });
+      })(),
+    );
+
+    if (err) {
+      if (err?.message === "cancelled") {
         props.onCancel();
       } else {
-        props.onError(toApiError(e, "OAuth 登录失败"));
+        props.onError(toApiError(err, "OAuth 登录失败"));
       }
+    } else {
+      props.onSuccess(result.code);
     }
   };
 

@@ -19,6 +19,7 @@ import {
   type NovelSeriesDetailResponse,
 } from "@/api/novel";
 
+
 // ─── Constants ───
 
 const HOT_NOVELS_MAX = 10;
@@ -200,11 +201,14 @@ export async function getSeries(id: number): Promise<SeriesCacheEntry | undefine
 /** 写入缓存（IndexedDB + 热缓存）。写入后自动清理超限条目。 */
 export async function setEntry(id: number, data: CacheEntry): Promise<void> {
   const now = Date.now();
-  try {
-    await getStore().put("novels", { id, ...data, cachedAt: now });
-    await enforceLimits("novels", MAX_NOVELS);
-  } catch (error) {
-    console.warn("[novelCache] Failed to persist entry", id, error);
+  const [err] = await tryAsync(
+    (async () => {
+      await getStore().put("novels", { id, ...data, cachedAt: now });
+      await enforceLimits("novels", MAX_NOVELS);
+    })(),
+  );
+  if (err) {
+    console.warn("[novelCache] Failed to persist entry", id, err);
   }
   setHotNovel(id, data);
 }
@@ -218,20 +222,22 @@ export async function setEntry(id: number, data: CacheEntry): Promise<void> {
  * 空 images 的条目，调用方仍可正常渲染详情页。为避免把无效结果固化到缓存，
  * 只有在 text 非空时才写入 IndexedDB / 热缓存。
  */
+
 export async function loadNovelEntry(id: number): Promise<NovelCacheEntry> {
-  const [{ novel }, novelData] = await Promise.all([
-    loadDetail(id),
-    fetchNovelData(id).catch(() => ({
-      text: "",
-      navigation: {} as SeriesNavigation,
-      images: {} as NovelImagesMap,
-    })),
+  const [detailRes, novelDataRes] = await Promise.all([
+    tryAsync(loadDetail(id)),
+    tryAsync(fetchNovelData(id)),
   ]);
+  const [detailErr, detail] = detailRes;
+  const [novelDataErr, novelData] = novelDataRes;
+  const safeNovelData = novelDataErr
+    ? { text: "", navigation: {} as SeriesNavigation, images: {} as NovelImagesMap }
+    : novelData;
   const entry: NovelCacheEntry = {
-    detail: novel,
-    text: novelData.text,
-    nav: novelData.navigation,
-    images: novelData.images ?? {},
+    detail: detailErr ? null : detail.novel,
+    text: safeNovelData.text,
+    nav: safeNovelData.navigation,
+    images: safeNovelData.images ?? {},
   };
   if (entry.text) {
     await setEntry(id, entry);
@@ -242,11 +248,14 @@ export async function loadNovelEntry(id: number): Promise<NovelCacheEntry> {
 /** 写入系列缓存。 */
 export async function setSeries(id: number, data: SeriesCacheEntry): Promise<void> {
   const now = Date.now();
-  try {
-    await getStore().put("series", { id, ...data, cachedAt: now });
-    await enforceLimits("series", MAX_SERIES);
-  } catch (error) {
-    console.warn("[novelCache] Failed to persist series", id, error);
+  const [err] = await tryAsync(
+    (async () => {
+      await getStore().put("series", { id, ...data, cachedAt: now });
+      await enforceLimits("series", MAX_SERIES);
+    })(),
+  );
+  if (err) {
+    console.warn("[novelCache] Failed to persist series", id, err);
   }
   setHotSeries(id, data);
 }

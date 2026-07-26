@@ -29,15 +29,16 @@ export { reportedIds };
 
 /** 从 Capacitor Preferences 加载已举报作品 ID */
 export async function loadReportedIds(): Promise<void> {
-  try {
-    const { value } = await Preferences.get({ key: PREF_KEY_REPORTED_IDS });
+  const [err, result] = await tryAsync(Preferences.get({ key: PREF_KEY_REPORTED_IDS }));
+  if (err) {
+    console.warn("[reportStore] Failed to load reported ids", err);
+  } else {
+    const { value } = result!;
     if (value) {
       const records: ReportRecord[] = JSON.parse(value);
       setReportRecords(records);
       setReportedIds(new Set(records.map((r) => r.id)));
     }
-  } catch (error) {
-    console.warn("[reportStore] Failed to load reported ids", error);
   }
 }
 
@@ -52,10 +53,9 @@ export async function reportIllust(id: number, reason: ReportReason): Promise<vo
   const nextRecords = [...reportRecords(), { id, reason, reportedAt: Date.now() }];
   setReportRecords(nextRecords);
   setReportedIds(new Set(nextRecords.map((r) => r.id)));
-  try {
-    await Preferences.set({ key: PREF_KEY_REPORTED_IDS, value: JSON.stringify(nextRecords) });
-  } catch (error) {
-    console.warn("[reportStore] Failed to persist reported ids", error);
+  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_REPORTED_IDS, value: JSON.stringify(nextRecords) }));
+  if (err) {
+    console.warn("[reportStore] Failed to persist reported ids", err);
   }
 }
 

@@ -16,14 +16,13 @@ export type ImageSizeOutput =
 function measureImages(items: ImageSizeInput[]): Promise<ImageSizeOutput[]> {
   return Promise.all(
     items.map(async (item): Promise<ImageSizeOutput> => {
-      try {
-        const bitmap = await createImageBitmap(item.blob);
-        const { width, height } = bitmap;
-        bitmap.close();
-        return { id: item.id, width, height };
-      } catch {
+      const [err, bitmap] = await tryAsync(createImageBitmap(item.blob));
+      if (err) {
         return { id: item.id, error: true };
       }
+      const { width, height } = bitmap;
+      bitmap.close();
+      return { id: item.id, width, height };
     }),
   );
 }

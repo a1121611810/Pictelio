@@ -156,14 +156,14 @@ const ImageHostSettings: Component = () => {
     }
 
     setIsProbing(true);
-    try {
+    const [probeErr] = await tryAsync((async () => {
       const results = await probeHosts();
       const reachable = results.filter((r) => r.reachable).length;
       setProbeToast(`测速完成：${reachable}/${results.length} 个可用`);
-    } catch {
+    })());
+    setIsProbing(false);
+    if (probeErr) {
       setProbeToast("测速失败");
-    } finally {
-      setIsProbing(false);
     }
   }
 

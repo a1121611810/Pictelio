@@ -3,6 +3,7 @@ import { getUserDetail } from "../api/user";
 import { type PixivProfile, type PixivUser } from "../api/types";
 import { user } from "./authStore";
 
+
 const [profile, setProfile] = createSignal<PixivProfile | null>(null);
 const [viewedUser, setViewedUser] = createSignal<PixivUser | null>(null);
 
@@ -25,12 +26,12 @@ export async function loadProfile(userId?: number, forceRefresh?: boolean) {
       return;
     }
   }
-  try {
-    const data = await getUserDetail(id);
-    setProfile(data.profile);
-    setViewedUser(data.user);
-    profileCache.set(Number(id), { profile: data.profile, user: data.user });
-  } catch (error) {
-    console.warn("[userStore] Failed to load profile", error);
+  const [err, data] = await tryAsync(getUserDetail(id));
+  if (err) {
+    console.warn("[userStore] Failed to load profile", err);
+  } else {
+    setProfile(data!.profile);
+    setViewedUser(data!.user);
+    profileCache.set(Number(id), { profile: data!.profile, user: data!.user });
   }
 }

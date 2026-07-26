@@ -1,4 +1,8 @@
 {
+  "globals": {
+    "tryAsync": "readonly",
+    "trySync": "readonly"
+  },
   "rules": {
     "no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
     "curly": ["warn"],

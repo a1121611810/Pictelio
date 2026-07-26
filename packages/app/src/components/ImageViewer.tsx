@@ -2,6 +2,7 @@ import { createSignal, createEffect, onMount, Show, onCleanup } from "solid-js";
 import type { Component } from "solid-js";
 import { checkImageCache, loadImageWithProgress } from "../utils/imageLoader";
 
+
 interface Props {
   imageUrls: string[];
   /** 预览图 URL 列表（与 imageUrls 一一对应），用于打开时从 LRU 缓存取模糊占位图 */
@@ -71,17 +72,19 @@ const ImageViewer: Component<Props> = (props) => {
 
     setProgressMap((prev) => ({ ...prev, [pageIndex]: 0 }));
 
-    try {
-      const result = await loadImageWithProgress(originalUrl, (p) => {
+    const [err, result] = await tryAsync(
+      loadImageWithProgress(originalUrl, (p) => {
         if (p.percent >= 0) {
           setProgressMap((prev) => ({ ...prev, [pageIndex]: p.percent }));
         }
-      });
+      }),
+    );
 
+    if (err) {
+      setProgressMap((prev) => ({ ...prev, [pageIndex]: -1 }));
+    } else {
       setLoadedUrls((prev) => ({ ...prev, [pageIndex]: result.url }));
       setProgressMap((prev) => ({ ...prev, [pageIndex]: 100 }));
-    } catch {
-      setProgressMap((prev) => ({ ...prev, [pageIndex]: -1 }));
     }
   }
 

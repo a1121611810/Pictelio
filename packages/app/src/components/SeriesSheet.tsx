@@ -15,6 +15,7 @@ import { SHEET_LAZY_MARGIN } from "../primitives/rootMargins";
 import { createSentinel } from "@/primitives/visibility";
 import { getSeries, setSeries } from "../stores/novelCache";
 
+
 interface Props {
   seriesId: number;
   seriesTitle: string;
@@ -109,9 +110,9 @@ const SeriesSheet: Component<Props> = (props) => {
     setLoading(true);
     setError(null);
 
-    try {
-      const result = await loadSeries(props.seriesId);
-      if (!abortController.signal.aborted) {
+    const [err, result] = await tryAsync(loadSeries(props.seriesId));
+    if (!abortController.signal.aborted) {
+      if (!err) {
         applyResult(result, false);
         await setSeries(props.seriesId, {
           detail: result.novel_series_detail,
@@ -119,13 +120,10 @@ const SeriesSheet: Component<Props> = (props) => {
           nextUrl: result.next_url,
         });
       }
-    } catch (error) {
-      if (!abortController.signal.aborted) {
-        setError((error as { message?: string }).message ?? "加载失败");
-      }
-    } finally {
-      if (!abortController.signal.aborted) {
-        setLoading(false);
+      setLoading(false);
+      if (err) {
+        setError((err as { message?: string }).message ?? "加载失败");
+        return;
       }
     }
   }
@@ -141,17 +139,18 @@ const SeriesSheet: Component<Props> = (props) => {
 
     setLoadingMore(true);
 
-    try {
-      const result = await loadSeriesNext(url);
+    const [err, result] = await tryAsync(loadSeriesNext(url));
+    if (!err) {
       applyResult(result, true);
-    } catch (error) {
-      setError((error as { message?: string }).message ?? "加载失败");
-    } finally {
-      setLoadingMore(false);
+    }
+    setLoadingMore(false);
+    if (err) {
+      setError((err as { message?: string }).message ?? "加载失败");
+      return;
     }
   }
 
-  function refetch() {
+  async function refetch() {
     abortController?.abort();
     abortController = new AbortController();
     setNovels([]);
@@ -160,27 +159,20 @@ const SeriesSheet: Component<Props> = (props) => {
     setNextUrl(null);
     setError(null);
     setLoading(true);
-    loadSeries(props.seriesId)
-      .then((result) => {
-        if (!abortController?.signal.aborted) {
-          applyResult(result, false);
-          void setSeries(props.seriesId, {
-            detail: result.novel_series_detail,
-            novels: result.novels,
-            nextUrl: result.next_url,
-          });
-        }
-      })
-      .catch((error) => {
-        if (!abortController?.signal.aborted) {
-          setError((error as { message?: string }).message ?? "加载失败");
-        }
-      })
-      .finally(() => {
-        if (!abortController?.signal.aborted) {
-          setLoading(false);
-        }
-      });
+    const [err, result] = await tryAsync(loadSeries(props.seriesId));
+    if (!abortController?.signal.aborted) {
+      if (err) {
+        setError((err as { message?: string }).message ?? "加载失败");
+      } else {
+        applyResult(result, false);
+        void setSeries(props.seriesId, {
+          detail: result.novel_series_detail,
+          novels: result.novels,
+          nextUrl: result.next_url,
+        });
+      }
+      setLoading(false);
+    }
   }
 
   // 打开 Sheet 时锁定背景滚动

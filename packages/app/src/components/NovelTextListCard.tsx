@@ -4,6 +4,7 @@ import { addBookmark, deleteBookmark } from "../api/novel";
 import HeartBurstEffect from "./HeartBurstEffect";
 import SearchableTag from "./SearchableTag";
 
+
 interface Props {
   novel: PixivNovel;
   onClick: (id: number) => void;
@@ -17,17 +18,15 @@ const NovelTextListCard: Component<Props> = (props) => {
 
   const toggleBookmark = async (e: MouseEvent) => {
     e.stopPropagation();
-    try {
-      if (bookmarked()) {
-        await deleteBookmark(props.novel.id);
-        setBookmarked(false);
-      } else {
-        await addBookmark(props.novel.id, "public");
+    if (bookmarked()) {
+      const [err] = await tryAsync(deleteBookmark(props.novel.id));
+      if (!err) setBookmarked(false);
+    } else {
+      const [err] = await tryAsync(addBookmark(props.novel.id, "public"));
+      if (!err) {
         setBookmarked(true);
         setBookmarkBurstTrigger((n) => n + 1);
       }
-    } catch {
-      /* Silently fail */
     }
   };
 

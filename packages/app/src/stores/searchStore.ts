@@ -13,6 +13,8 @@ import { toApiError } from "@/api/client";
 import { ApiErrorType } from "@/api/types";
 import { mergeSearchResults } from "@/utils/searchMerger";
 
+
+
 export interface SearchStoreState {
   /** Current search keyword */
   keyword: () => string;
@@ -173,59 +175,61 @@ export function createSearchStore(): SearchStoreState {
     setNextIllustUrl(null);
     setNextNovelUrl(null);
 
-    try {
-      const currentTarget = searchTarget();
-      let anySucceeded = false;
+    const [err] = await tryAsync(
+      (async () => {
+        const currentTarget = searchTarget();
+        let anySucceeded = false;
 
-      if (currentScope === "illust" || currentScope === "all") {
-        try {
-          const illustRes = await searchIllust(kw, currentSort, currentTarget, signal);
-          setIllustResults(illustRes.illusts);
-          setHasMoreIllust(illustRes.next_url != null);
-          setNextIllustUrl(illustRes.next_url);
-          anySucceeded = true;
-        } catch (err) {
-          if ((err as Error).name === "AbortError") throw err;
-          if (currentScope === "illust") throw err;
+        if (currentScope === "illust" || currentScope === "all") {
+          const [illustErr, illustRes] = await tryAsync(
+            searchIllust(kw, currentSort, currentTarget, signal),
+          );
+          if (illustErr) {
+            if ((illustErr as Error).name === "AbortError") throw illustErr;
+            if (currentScope === "illust") throw illustErr;
+          } else {
+            setIllustResults(illustRes!.illusts);
+            setHasMoreIllust(illustRes!.next_url != null);
+            setNextIllustUrl(illustRes!.next_url);
+            anySucceeded = true;
+          }
         }
-      }
 
-      if (currentScope === "novel" || currentScope === "all") {
-        try {
-          const novelRes = await searchNovel(kw, currentSort, currentTarget, signal);
-          setNovelResults(novelRes.novels);
-          setHasMoreNovel(novelRes.next_url != null);
-          setNextNovelUrl(novelRes.next_url);
-          anySucceeded = true;
-        } catch (err) {
-          if ((err as Error).name === "AbortError") throw err;
-          if (currentScope === "novel") throw err;
+        if (currentScope === "novel" || currentScope === "all") {
+          const [novelErr, novelRes] = await tryAsync(
+            searchNovel(kw, currentSort, currentTarget, signal),
+          );
+          if (novelErr) {
+            if ((novelErr as Error).name === "AbortError") throw novelErr;
+            if (currentScope === "novel") throw novelErr;
+          } else {
+            setNovelResults(novelRes!.novels);
+            setHasMoreNovel(novelRes!.next_url != null);
+            setNextNovelUrl(novelRes!.next_url);
+            anySucceeded = true;
+          }
         }
-      }
 
-      // scope=all: both failed, set error
-      if (currentScope === "all" && !anySucceeded) {
-        setError({ type: ApiErrorType.UNKNOWN, message: "搜索失败，请稍后重试" });
-      }
+        // scope=all: both failed, set error
+        if (currentScope === "all" && !anySucceeded) {
+          setError({ type: ApiErrorType.UNKNOWN, message: "搜索失败，请稍后重试" });
+        }
 
-      // 写入搜索结果缓存
-      writeSearchCache(kw, currentScope, currentSort, {
-        illustResults: illustResults(),
-        novelResults: novelResults(),
-        hasMoreIllust: hasMoreIllust(),
-        hasMoreNovel: hasMoreNovel(),
-        nextIllustUrl: nextIllustUrl(),
-        nextNovelUrl: nextNovelUrl(),
-      });
-
-      decPending();
-    } catch (err) {
-      if ((err as Error).name === "AbortError") {
-        decPending();
-        return;
-      }
+        // 写入搜索结果缓存
+        writeSearchCache(kw, currentScope, currentSort, {
+          illustResults: illustResults(),
+          novelResults: novelResults(),
+          hasMoreIllust: hasMoreIllust(),
+          hasMoreNovel: hasMoreNovel(),
+          nextIllustUrl: nextIllustUrl(),
+          nextNovelUrl: nextNovelUrl(),
+        });
+      })(),
+    );
+    decPending();
+    if (err) {
+      if ((err as Error).name === "AbortError") return;
       setError(toApiError(err));
-      decPending();
     }
   }
 
@@ -242,16 +246,15 @@ export function createSearchStore(): SearchStoreState {
           const url = nextIllustUrl();
           if (!url) return;
           incPending();
-          try {
-            const res = await searchIllustNext(url, abortController?.signal ?? undefined);
-            setIllustResults((prev) => [...prev, ...res.illusts]);
-            setHasMoreIllust(res.next_url != null);
-            setNextIllustUrl(res.next_url);
-          } catch (err) {
+          const [err, res] = await tryAsync(searchIllustNext(url, abortController?.signal ?? undefined));
+          decPending();
+          if (err) {
             if ((err as Error).name === "AbortError") return;
             setError(toApiError(err));
-          } finally {
-            decPending();
+          } else {
+            setIllustResults((prev) => [...prev, ...res!.illusts]);
+            setHasMoreIllust(res!.next_url != null);
+            setNextIllustUrl(res!.next_url);
           }
         })()
       : Promise.resolve();
@@ -262,16 +265,15 @@ export function createSearchStore(): SearchStoreState {
           const url = nextNovelUrl();
           if (!url) return;
           incPending();
-          try {
-            const res = await searchNovelNext(url, abortController?.signal ?? undefined);
-            setNovelResults((prev) => [...prev, ...res.novels]);
-            setHasMoreNovel(res.next_url != null);
-            setNextNovelUrl(res.next_url);
-          } catch (err) {
+          const [err, res] = await tryAsync(searchNovelNext(url, abortController?.signal ?? undefined));
+          decPending();
+          if (err) {
             if ((err as Error).name === "AbortError") return;
             setError(toApiError(err));
-          } finally {
-            decPending();
+          } else {
+            setNovelResults((prev) => [...prev, ...res!.novels]);
+            setHasMoreNovel(res!.next_url != null);
+            setNextNovelUrl(res!.next_url);
           }
         })()
       : Promise.resolve();

@@ -1,6 +1,7 @@
 import { defineConfig } from "vite-plus";
 import solid from "vite-plugin-solid";
 import UnoCSS from "unocss/vite";
+import AutoImport from "unplugin-auto-import/vite";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import pkg from "./package.json";
@@ -45,7 +46,7 @@ export default defineConfig({
       "@": resolve(__dirname, "src"),
     },
   },
-  plugins: [solid(), UnoCSS()],
+  plugins: [AutoImport({ imports: [{ "@/utils/tryAsync": ["tryAsync", "trySync"] }], dts: "./src/auto-imports.d.ts" }), solid(), UnoCSS()],
   define: {
     APP_VERSION: JSON.stringify(pkg.version),
     __CREDENTIALS__,

@@ -147,11 +147,8 @@ function parseProgress(raw: string | null): NovelProgress | null {
   if (!raw) {
     return null;
   }
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (typeof parsed !== "object" || parsed === null) {
-      return null;
-    }
+  const [parseErr, parsed] = trySync(() => JSON.parse(raw) as unknown);
+  if (!parseErr && typeof parsed === "object" && parsed !== null) {
     const p = parsed as Record<string, unknown>;
     if (
       Number.isInteger(p.paragraphIndex) &&
@@ -165,8 +162,6 @@ function parseProgress(raw: string | null): NovelProgress | null {
         progress: typeof p.progress === "number" ? p.progress : 0,
       };
     }
-  } catch {
-    /* Ignore */
   }
   return null;
 }
@@ -294,7 +289,7 @@ const NovelDetail: Component = () => {
     }
     setDetailLoading(true);
     setDetailError(null);
-    try {
+    const [novelErr] = await tryAsync((async () => {
       const dbEntry = await getEntry(id);
       if (dbEntry) {
         applyEntry(dbEntry);
@@ -302,8 +297,9 @@ const NovelDetail: Component = () => {
       }
       const entry = await loadNovelEntry(id);
       applyEntry(entry);
-    } catch (error) {
-      setDetailError(toApiError(error));
+    })());
+    if (novelErr) {
+      setDetailError(toApiError(novelErr));
       setDetailLoading(false);
     }
   }

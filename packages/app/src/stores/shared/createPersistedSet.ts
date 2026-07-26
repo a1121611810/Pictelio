@@ -1,6 +1,7 @@
 import { createSignal } from "solid-js";
 import { Preferences } from "@capacitor/preferences";
 
+
 interface PersistedSet<T> {
   /** 响应式集合信号 */
   values: () => Set<T>;
@@ -22,18 +23,20 @@ interface PersistedSet<T> {
  * @param storageKey - Preferences 中存储的键名
  * @param logPrefix - console.warn 的前缀标签
  */
+
 export function createPersistedSet<T>(storageKey: string, logPrefix: string): PersistedSet<T> {
   const [values, setValues] = createSignal<Set<T>>(new Set());
 
   async function load(): Promise<void> {
-    try {
-      const { value } = await Preferences.get({ key: storageKey });
+    const [err, result] = await tryAsync(Preferences.get({ key: storageKey }));
+    if (err) {
+      console.warn(`[${logPrefix}] Failed to load ${storageKey}`, err);
+    } else {
+      const { value } = result!;
       if (value) {
         const items: T[] = JSON.parse(value);
         setValues(new Set(items));
       }
-    } catch (error) {
-      console.warn(`[${logPrefix}] Failed to load ${storageKey}`, error);
     }
   }
 
@@ -42,10 +45,9 @@ export function createPersistedSet<T>(storageKey: string, logPrefix: string): Pe
     const next = new Set(values());
     next.add(value);
     setValues(next);
-    try {
-      await Preferences.set({ key: storageKey, value: JSON.stringify([...next]) });
-    } catch (error) {
-      console.warn(`[${logPrefix}] Failed to persist ${storageKey}`, error);
+    const [err] = await tryAsync(Preferences.set({ key: storageKey, value: JSON.stringify([...next]) }));
+    if (err) {
+      console.warn(`[${logPrefix}] Failed to persist ${storageKey}`, err);
     }
   }
 
@@ -54,10 +56,9 @@ export function createPersistedSet<T>(storageKey: string, logPrefix: string): Pe
     const next = new Set(values());
     next.delete(value);
     setValues(next);
-    try {
-      await Preferences.set({ key: storageKey, value: JSON.stringify([...next]) });
-    } catch (error) {
-      console.warn(`[${logPrefix}] Failed to persist ${storageKey}`, error);
+    const [err2] = await tryAsync(Preferences.set({ key: storageKey, value: JSON.stringify([...next]) }));
+    if (err2) {
+      console.warn(`[${logPrefix}] Failed to persist ${storageKey}`, err2);
     }
   }
 

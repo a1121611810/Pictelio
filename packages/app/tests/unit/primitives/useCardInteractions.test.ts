@@ -6,10 +6,10 @@ import type { PixivIllust } from "@/api/types";
 
 // Mock the API module before importing useCardInteractions
 vi.mock("@/api/illust", () => ({
-  addBookmark: vi.fn(),
-  deleteBookmark: vi.fn(),
-  followUser: vi.fn(),
-  unfollowUser: vi.fn(),
+  addBookmark: vi.fn().mockResolvedValue(undefined),
+  deleteBookmark: vi.fn().mockResolvedValue(undefined),
+  followUser: vi.fn().mockResolvedValue(undefined),
+  unfollowUser: vi.fn().mockResolvedValue(undefined),
 }));
 
 import * as illustApi from "@/api/illust";

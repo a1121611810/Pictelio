@@ -1,4 +1,5 @@
 import { createSignal, createEffect, onCleanup } from "solid-js";
+
 import type { Accessor } from "solid-js";
 import type { PixivComment } from "../api/types";
 import type { CommentContentType } from "../api/comment";
@@ -52,17 +53,19 @@ export function useComments(
     setRootComments([]);
     setNextUrl(null);
 
-    loadRootComments(t, id, ac.signal)
-      .then((res) => {
+    void (async () => {
+      const [loadErr, res] = await tryAsync(loadRootComments(t, id, ac.signal));
+      if (ac.signal.aborted) return;
+      if (loadErr) {
+        if ((loadErr as { name?: string }).name !== "AbortError") {
+          setError("加载评论失败，请重试");
+        }
+      } else {
         setRootComments(res.comments);
         setNextUrl(res.next_url);
         setHasLoaded(true);
-      })
-      .catch((err) => {
-        if ((err as { name?: string }).name !== "AbortError") {
-          setError("加载评论失败，请重试");
-        }
-      });
+      }
+    })();
 
     onCleanup(() => ac.abort());
   });
@@ -72,14 +75,13 @@ export function useComments(
     const url = nextUrl();
     if (!url || loadingMore()) return;
     setLoadingMore(true);
-    try {
-      const res = await loadRootCommentsNext(url);
+    const [err, res] = await tryAsync(loadRootCommentsNext(url));
+    setLoadingMore(false);
+    if (err) {
+      setError("加载更多失败");
+    } else {
       setRootComments((prev) => [...prev, ...res.comments]);
       setNextUrl(res.next_url);
-    } catch {
-      setError("加载更多失败");
-    } finally {
-      setLoadingMore(false);
     }
   }
 
@@ -94,28 +96,32 @@ export function useComments(
   async function post(text: string, parentId?: number): Promise<void> {
     setPosting(true);
     setPostError(null);
-    try {
-      await apiPostComment(type(), targetId(), text, parentId);
-      const res = await loadRootComments(type(), targetId());
-      setRootComments(res.comments);
-      setNextUrl(res.next_url);
-    } catch {
-      setPostError("发送失败，请重试");
-    } finally {
+    const [apiErr] = await tryAsync(apiPostComment(type(), targetId(), text, parentId));
+    if (apiErr) {
       setPosting(false);
+      setPostError("发送失败，请重试");
+      return;
     }
+    const [loadErr, res] = await tryAsync(loadRootComments(type(), targetId()));
+    setPosting(false);
+    if (loadErr) {
+      setPostError("发送失败，请重试");
+      return;
+    }
+    setRootComments(res.comments);
+    setNextUrl(res.next_url);
   }
 
   // 删除评论
   async function remove(commentId: number): Promise<void> {
     setDeletingId(commentId);
-    try {
-      await apiDeleteComment(type(), commentId);
+    const [delErr] = await tryAsync(apiDeleteComment(type(), commentId));
+    if (!delErr) {
       setRootComments((prev) => prev.filter((c) => c.id !== commentId));
-    } catch {
+    }
+    setDeletingId(null);
+    if (delErr) {
       setError("删除失败");
-    } finally {
-      setDeletingId(null);
     }
   }
 

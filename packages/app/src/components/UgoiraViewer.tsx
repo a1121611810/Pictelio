@@ -3,6 +3,7 @@ import type { Component } from "solid-js";
 import { downloadAndExtractUgoira, type UgoiraFrame } from "../api/illust";
 import PixivImage from "./PixivImage";
 
+
 interface Props {
   illustId: number;
   coverUrl: string;
@@ -36,16 +37,16 @@ const UgoiraViewer: Component<Props> = (props) => {
       return;
     }
 
-    try {
-      const result = await downloadAndExtractUgoira(props.illustId);
+    const [err, result] = await tryAsync(downloadAndExtractUgoira(props.illustId));
+    if (err) {
+      console.error("[UgoiraViewer] Error:", err);
+      setError((err as Error).message || "加载动图失败");
+      setStatus("paused");
+    } else {
       blobUrls = result.blobUrls;
       setFrames(result.frames);
       setStatus("playing");
       scheduleNext(0, result.frames);
-    } catch (error) {
-      console.error("[UgoiraViewer] Error:", error);
-      setError((error as Error).message || "加载动图失败");
-      setStatus("paused");
     }
   });
 

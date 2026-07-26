@@ -32,38 +32,39 @@ const Login: Component = () => {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
-    try {
+    const [loginErr] = await tryAsync((async () => {
       await loginWithToken(tokenInput().trim());
       void navigate({ to: "/recommended", replace: true });
-    } catch (err) {
-      setError(toApiError(err, "登录失败"));
-    } finally {
-      setSubmitting(false);
+    })());
+    setSubmitting(false);
+    if (loginErr) {
+      setError(toApiError(loginErr, "登录失败"));
     }
   };
 
   const handleOAuthStart = async () => {
-    try {
+    const [pkceErr] = await tryAsync((async () => {
       const pkce = await generatePKCE();
       setCodeVerifier(pkce.codeVerifier);
       setCodeChallenge(pkce.codeChallenge);
       setShowOAuth(true);
-    } catch (e) {
-      setError(toApiError(e, "无法创建登录链接"));
+    })());
+    if (pkceErr) {
+      setError(toApiError(pkceErr, "无法创建登录链接"));
     }
   };
 
   const handleOAuthSuccess = async (code: string) => {
     setSubmitting(true);
     setError(null);
-    try {
+    const [pkceLoginErr] = await tryAsync((async () => {
       await loginWithPKCE(code, codeVerifier());
       void navigate({ to: "/recommended", replace: true });
-    } catch (err) {
-      setError(toApiError(err, "PKCE 登录失败"));
-    } finally {
-      setSubmitting(false);
-      setShowOAuth(false);
+    })());
+    setSubmitting(false);
+    setShowOAuth(false);
+    if (pkceLoginErr) {
+      setError(toApiError(pkceLoginErr, "PKCE 登录失败"));
     }
   };
 

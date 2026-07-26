@@ -59,7 +59,8 @@ export async function oauthFetch(
   });
 
   if (!resp.ok) {
-    const text = await resp.text().catch(() => "");
+    const [_err, textResult] = await tryAsync(Promise.resolve(resp.text()));
+    const text = _err ? "" : textResult!;
     throw new Error(`OAuth 失败 (HTTP ${resp.status}): ${text.slice(0, 300)}`);
   }
 

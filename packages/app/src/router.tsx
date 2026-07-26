@@ -19,6 +19,7 @@ import { setCurrentTab } from "@/stores/uiStore";
 import { load as loadUserIllusts, contentType } from "@/stores/userIllustsStore";
 import { loadProfile } from "@/stores/userStore";
 import { toApiError } from "./api/client";
+
 import LoadingSpinner from "@/components/LoadingSpinner";
 
 /** 将普通 Solid 组件/懒加载组件断言为 TanStack RouteComponent，避免每处重复转换。 */
@@ -91,15 +92,11 @@ const illustRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "illust/$id",
   loader: async ({ params }) => {
-    try {
-      const data = await loadDetail(Number(params.id));
-      return { illust: data.illust, error: null };
-    } catch (error) {
-      return {
-        illust: null,
-        error: toApiError(error),
-      };
+    const [err, data] = await tryAsync(loadDetail(Number(params.id)));
+    if (err) {
+      return { illust: null, error: toApiError(err) };
     }
+    return { illust: data.illust, error: null };
   },
   component: asRoute(IllustDetail),
 });
@@ -114,32 +111,36 @@ const novelRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "novel/$id",
   loader: async ({ params }) => {
-    try {
-      const id = Number(params.id);
+    const [novelErr, novelResult] = await tryAsync(
+      (async () => {
+        const id = Number(params.id);
 
-      // 辅助函数：从缓存条目加载 profile 并返回 route data
-      async function fromEntry(e: import("@/stores/novelCache").CacheEntry) {
-        await loadProfile(e.detail.user.id);
-        return { novel: e.detail, text: e.text, nav: e.nav, images: e.images, error: null };
-      }
+        // 辅助函数：从缓存条目加载 profile 并返回 route data
+        async function fromEntry(e: import("@/stores/novelCache").CacheEntry) {
+          await loadProfile(e.detail.user.id);
+          return { novel: e.detail, text: e.text, nav: e.nav, images: e.images, error: null };
+        }
 
-      // 优先从缓存读取，零网络请求
-      const cached = peekEntry(id);
-      if (cached) return fromEntry(cached);
-      const dbEntry = await getEntry(id);
-      if (dbEntry) return fromEntry(dbEntry);
+        // 优先从缓存读取，零网络请求
+        const cached = peekEntry(id);
+        if (cached) return fromEntry(cached);
+        const dbEntry = await getEntry(id);
+        if (dbEntry) return fromEntry(dbEntry);
 
-      const entry = await loadNovelEntry(id);
-      return fromEntry(entry);
-    } catch (error) {
+        const entry = await loadNovelEntry(id);
+        return fromEntry(entry);
+      })(),
+    );
+    if (novelErr) {
       return {
         novel: null,
         text: "",
         nav: {},
         images: {},
-        error: toApiError(error),
+        error: toApiError(novelErr),
       };
     }
+    return novelResult;
   },
   component: asRoute(NovelDetail),
 });

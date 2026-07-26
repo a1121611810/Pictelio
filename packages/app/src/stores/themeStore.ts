@@ -17,11 +17,8 @@ const PREF_KEY_PAGE_STYLE_THEME = "page_style_theme";
 
 /** 根据 OS 偏好获取当前系统主题（安全兜底） */
 function getSystemTheme(): "dark" | "light" {
-  try {
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  } catch {
-    return "light";
-  }
+  const [err, isDark] = trySync(() => window.matchMedia("(prefers-color-scheme: dark)").matches);
+  return err ? "light" : (isDark ? "dark" : "light");
 }
 
 /** 根据用户选择的 theme 计算出实际生效的主题 */
@@ -50,27 +47,28 @@ export async function setThemePersisted(newTheme: Theme): Promise<void> {
   currentTheme = newTheme;
   currentResolved = computeResolvedTheme(newTheme);
   applyDarkClass(currentResolved === "dark");
-  try {
-    await Preferences.set({ key: PREF_KEY_THEME, value: newTheme });
+  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_THEME, value: newTheme }));
+  if (err) {
+    console.warn("[themeStore] Failed to persist theme", err);
+  } else {
     localStorage.setItem(PREF_KEY_THEME, newTheme);
-  } catch (error) {
-    console.warn("[themeStore] Failed to persist theme", error);
   }
 }
 
 export async function loadThemePreference(): Promise<void> {
-  try {
-    const { value } = await Preferences.get({ key: PREF_KEY_THEME });
-    const userTheme: Theme =
-      value === "light" || value === "dark" || value === "system" ? value : "system";
-    currentTheme = userTheme;
-    currentResolved = computeResolvedTheme(userTheme);
-    applyDarkClass(currentResolved === "dark");
-  } catch (error) {
-    console.warn("[themeStore] Failed to load theme preference", error);
+  const [err, result] = await tryAsync(Preferences.get({ key: PREF_KEY_THEME }));
+  if (err) {
+    console.warn("[themeStore] Failed to load theme preference", err);
     currentResolved = getSystemTheme();
     applyDarkClass(currentResolved === "dark");
+    return;
   }
+  const { value } = result!;
+  const userTheme: Theme =
+    value === "light" || value === "dark" || value === "system" ? value : "system";
+  currentTheme = userTheme;
+  currentResolved = computeResolvedTheme(userTheme);
+  applyDarkClass(currentResolved === "dark");
 }
 
 // ── 页面风格主题状态 ──
@@ -89,20 +87,21 @@ export function setPageStyleTheme(id: PageStyleThemeId): void {
 }
 
 export async function loadPageStyleThemePreference(): Promise<void> {
-  try {
-    const { value } = await Preferences.get({ key: PREF_KEY_PAGE_STYLE_THEME });
-    if (value != null && (PAGE_STYLE_THEME_IDS as readonly string[]).includes(value)) {
-      setInternalPageStyleTheme(value as PageStyleThemeId);
-    }
-  } catch (error) {
-    console.warn("[themeStore] Failed to load page style theme preference", error);
+  const [err, result] = await tryAsync(Preferences.get({ key: PREF_KEY_PAGE_STYLE_THEME }));
+  if (err) {
+    console.warn("[themeStore] Failed to load page style theme preference", err);
+    return;
+  }
+  const { value } = result!;
+  if (value != null && (PAGE_STYLE_THEME_IDS as readonly string[]).includes(value)) {
+    setInternalPageStyleTheme(value as PageStyleThemeId);
   }
 }
 
 // ── 模块级副作用 ──
 
 // 监听系统主题变化，用户选 "system" 时自动跟随
-try {
+trySync(() => {
   const mql = window.matchMedia("(prefers-color-scheme: dark)");
   mql.addEventListener("change", () => {
     if (currentTheme === "system") {
@@ -110,9 +109,7 @@ try {
       applyDarkClass(currentResolved === "dark");
     }
   });
-} catch {
-  // 测试环境或 SSR 中 window.matchMedia 不可用，静默跳过
-}
+});
 
 // 自动持久化页面风格主题到 Preferences
 let lastPersistedPageStyle: string | undefined;
@@ -122,9 +119,11 @@ createRoot(() => {
     if (typeof document === "undefined") return;
     if (id !== lastPersistedPageStyle) {
       lastPersistedPageStyle = id;
-      Preferences.set({ key: PREF_KEY_PAGE_STYLE_THEME, value: id }).catch((error) => {
-        console.warn("[themeStore] Failed to persist page style theme", error);
-      });
+      tryAsync(Preferences.set({ key: PREF_KEY_PAGE_STYLE_THEME, value: id })).then(
+        ([err]) => {
+          if (err) console.warn("[themeStore] Failed to persist page style theme", err);
+        },
+      );
     }
   });
 });

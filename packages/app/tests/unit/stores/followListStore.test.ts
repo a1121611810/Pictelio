@@ -44,8 +44,8 @@ vi.mock("@tanstack/solid-query", async (importOriginal) => {
 // Mock API
 const mockGetUserFollowing = vi.fn();
 const mockGetUserFollowers = vi.fn();
-const mockFollowUser = vi.fn();
-const mockUnfollowUser = vi.fn();
+const mockFollowUser = vi.fn().mockResolvedValue(undefined);
+const mockUnfollowUser = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("@/api/user", () => ({
   getUserFollowing: (...args: unknown[]) => mockGetUserFollowing(...args),

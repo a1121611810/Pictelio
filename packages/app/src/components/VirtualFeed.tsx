@@ -149,7 +149,7 @@ const VirtualFeed: Component<Props> = (props) => {
       if (!ill) break;
       const url = ill.image_urls.medium || ill.image_urls.large;
       if (url && !checkImageCache(url)) {
-        loadImage(url).catch(() => {});
+        void tryAsync(loadImage(url));
       }
     }
   });

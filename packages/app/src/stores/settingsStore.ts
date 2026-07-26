@@ -80,65 +80,59 @@ const [state, setState] = createStore(initialState());
 export const layoutMode = () => state.layoutMode;
 export const setLayoutMode = async (mode: LayoutMode): Promise<void> => {
   setState("layoutMode", mode);
-  try {
-    await Preferences.set({ key: PREF_KEY_LAYOUT_MODE, value: mode });
-  } catch (error) {
-    console.warn("[settingsStore] Failed to persist layoutMode", error);
-  }
+  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_LAYOUT_MODE, value: mode }));
+  if (err) console.warn("[settingsStore] Failed to persist layoutMode", err);
   window.dispatchEvent(new CustomEvent("layoutModeChanged"));
 };
 
 export async function loadLayoutModePreference(): Promise<void> {
-  try {
-    const { value } = await Preferences.get({ key: PREF_KEY_LAYOUT_MODE });
-    if (value !== null && (value === "waterfall" || value === "single" || value === "grid")) {
-      setState("layoutMode", value as LayoutMode);
-    }
-  } catch (error) {
-    console.warn("[settingsStore] Failed to load layoutMode preference", error);
+  const [err, result] = await tryAsync(Preferences.get({ key: PREF_KEY_LAYOUT_MODE }));
+  if (err) {
+    console.warn("[settingsStore] Failed to load layoutMode preference", err);
+    return;
+  }
+  const { value } = result!;
+  if (value !== null && (value === "waterfall" || value === "single" || value === "grid")) {
+    setState("layoutMode", value as LayoutMode);
   }
 }
 
 export const novelLayoutMode = () => state.novelLayoutMode;
 export const setNovelLayoutMode = async (mode: NovelLayoutMode): Promise<void> => {
   setState("novelLayoutMode", mode);
-  try {
-    await Preferences.set({ key: PREF_KEY_NOVEL_LAYOUT_MODE, value: mode });
-  } catch (error) {
-    console.warn("[settingsStore] Failed to persist novelLayoutMode", error);
-  }
+  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_NOVEL_LAYOUT_MODE, value: mode }));
+  if (err) console.warn("[settingsStore] Failed to persist novelLayoutMode", err);
   window.dispatchEvent(new CustomEvent("novelLayoutModeChanged"));
 };
 
 export async function loadNovelLayoutModePreference(): Promise<void> {
-  try {
-    const { value } = await Preferences.get({ key: PREF_KEY_NOVEL_LAYOUT_MODE });
-    if (value !== null && (value === "list" || value === "coverWall" || value === "textList")) {
-      setState("novelLayoutMode", value as NovelLayoutMode);
-    }
-  } catch (error) {
-    console.warn("[settingsStore] Failed to load novelLayoutMode preference", error);
+  const [err, result] = await tryAsync(Preferences.get({ key: PREF_KEY_NOVEL_LAYOUT_MODE }));
+  if (err) {
+    console.warn("[settingsStore] Failed to load novelLayoutMode preference", err);
+    return;
+  }
+  const { value } = result!;
+  if (value !== null && (value === "list" || value === "coverWall" || value === "textList")) {
+    setState("novelLayoutMode", value as NovelLayoutMode);
   }
 }
 
 export const autoHideNavBar = () => state.autoHideNavBar;
 export async function setAutoHideNavBar(enabled: boolean): Promise<void> {
   setState("autoHideNavBar", enabled);
-  try {
-    await Preferences.set({ key: PREF_KEY_AUTO_HIDE_NAV_BAR, value: String(enabled) });
-  } catch (error) {
-    console.warn("[settingsStore] Failed to persist autoHideNavBar", error);
-  }
+  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_AUTO_HIDE_NAV_BAR, value: String(enabled) }));
+  if (err) console.warn("[settingsStore] Failed to persist autoHideNavBar", err);
 }
 
 export async function loadAutoHideNavBarPreference(): Promise<void> {
-  try {
-    const { value } = await Preferences.get({ key: PREF_KEY_AUTO_HIDE_NAV_BAR });
-    if (value !== null) {
-      setState("autoHideNavBar", value === "true");
-    }
-  } catch (error) {
-    console.warn("[settingsStore] Failed to load autoHideNavBar preference", error);
+  const [err, result] = await tryAsync(Preferences.get({ key: PREF_KEY_AUTO_HIDE_NAV_BAR }));
+  if (err) {
+    console.warn("[settingsStore] Failed to load autoHideNavBar preference", err);
+    return;
+  }
+  const { value } = result!;
+  if (value !== null) {
+    setState("autoHideNavBar", value === "true");
   }
 }
 
@@ -147,65 +141,59 @@ export async function loadAutoHideNavBarPreference(): Promise<void> {
 export const showR18 = () => state.showR18;
 export async function setShowR18(enabled: boolean): Promise<void> {
   setState("showR18", enabled);
-  try {
-    await Preferences.set({ key: PREF_KEY_SHOW_R18, value: String(enabled) });
-  } catch (error) {
-    console.warn("[settingsStore] Failed to persist showR18", error);
-  }
+  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_SHOW_R18, value: String(enabled) }));
+  if (err) console.warn("[settingsStore] Failed to persist showR18", err);
   window.dispatchEvent(new CustomEvent("r18Changed"));
 }
 
 export async function loadShowR18Preference(): Promise<void> {
-  try {
-    const { value } = await Preferences.get({ key: PREF_KEY_SHOW_R18 });
-    if (value !== null) {
-      setState("showR18", value === "true");
-    }
-  } catch (error) {
-    console.warn("[settingsStore] Failed to load showR18 preference", error);
+  const [err, result] = await tryAsync(Preferences.get({ key: PREF_KEY_SHOW_R18 }));
+  if (err) {
+    console.warn("[settingsStore] Failed to load showR18 preference", err);
+    return;
+  }
+  const { value } = result!;
+  if (value !== null) {
+    setState("showR18", value === "true");
   }
 }
 
 export const showR18G = () => state.showR18G;
 export async function setShowR18G(enabled: boolean): Promise<void> {
   setState("showR18G", enabled);
-  try {
-    await Preferences.set({ key: PREF_KEY_SHOW_R18G, value: String(enabled) });
-  } catch (error) {
-    console.warn("[settingsStore] Failed to persist showR18G", error);
-  }
+  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_SHOW_R18G, value: String(enabled) }));
+  if (err) console.warn("[settingsStore] Failed to persist showR18G", err);
   window.dispatchEvent(new CustomEvent("r18gChanged"));
 }
 
 export async function loadShowR18GPreference(): Promise<void> {
-  try {
-    const { value } = await Preferences.get({ key: PREF_KEY_SHOW_R18G });
-    if (value !== null) {
-      setState("showR18G", value === "true");
-    }
-  } catch (error) {
-    console.warn("[settingsStore] Failed to load showR18G preference", error);
+  const [err, result] = await tryAsync(Preferences.get({ key: PREF_KEY_SHOW_R18G }));
+  if (err) {
+    console.warn("[settingsStore] Failed to load showR18G preference", err);
+    return;
+  }
+  const { value } = result!;
+  if (value !== null) {
+    setState("showR18G", value === "true");
   }
 }
 
 export const showDetailStairs = () => state.showDetailStairs;
 export async function setShowDetailStairs(enabled: boolean): Promise<void> {
   setState("showDetailStairs", enabled);
-  try {
-    await Preferences.set({ key: PREF_KEY_SHOW_DETAIL_STAIRS, value: String(enabled) });
-  } catch (error) {
-    console.warn("[settingsStore] Failed to persist showDetailStairs", error);
-  }
+  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_SHOW_DETAIL_STAIRS, value: String(enabled) }));
+  if (err) console.warn("[settingsStore] Failed to persist showDetailStairs", err);
 }
 
 export async function loadShowDetailStairsPreference(): Promise<void> {
-  try {
-    const { value } = await Preferences.get({ key: PREF_KEY_SHOW_DETAIL_STAIRS });
-    if (value !== null) {
-      setState("showDetailStairs", value === "true");
-    }
-  } catch (error) {
-    console.warn("[settingsStore] Failed to load showDetailStairs preference", error);
+  const [err, result] = await tryAsync(Preferences.get({ key: PREF_KEY_SHOW_DETAIL_STAIRS }));
+  if (err) {
+    console.warn("[settingsStore] Failed to load showDetailStairs preference", err);
+    return;
+  }
+  const { value } = result!;
+  if (value !== null) {
+    setState("showDetailStairs", value === "true");
   }
 }
 
@@ -215,11 +203,14 @@ export const ageConfirmed = () => state.ageConfirmed;
 export const isAdult = () => state.isAdult;
 
 export async function loadAgePreference(): Promise<void> {
-  try {
-    const [{ value: confirmed }, { value: adult }] = await Promise.all([
-      Preferences.get({ key: PREF_KEY_AGE_CONFIRMED }),
-      Preferences.get({ key: PREF_KEY_IS_ADULT }),
-    ]);
+  const [err, results] = await tryAsync(Promise.all([
+    Preferences.get({ key: PREF_KEY_AGE_CONFIRMED }),
+    Preferences.get({ key: PREF_KEY_IS_ADULT }),
+  ]));
+  if (err) {
+    console.warn("[settingsStore] Failed to load age preference", err);
+  } else {
+    const [{ value: confirmed }, { value: adult }] = results!;
     setState(
       produce((s) => {
         if (confirmed !== null) {
@@ -230,8 +221,6 @@ export async function loadAgePreference(): Promise<void> {
         }
       }),
     );
-  } catch (error) {
-    console.warn("[settingsStore] Failed to load age preference", error);
   }
 
   // 如果用户不是成年人，强制关闭 R-18/R-18G 并持久化
@@ -248,12 +237,11 @@ export async function setAgeConfirmation(confirmed: boolean, adult: boolean): Pr
       s.isAdult = adult;
     }),
   );
-  try {
-    await Preferences.set({ key: PREF_KEY_AGE_CONFIRMED, value: String(confirmed) });
-    await Preferences.set({ key: PREF_KEY_IS_ADULT, value: String(adult) });
-  } catch (error) {
-    console.warn("[settingsStore] Failed to persist age confirmation", error);
-  }
+  const [err] = await tryAsync(Promise.all([
+    Preferences.set({ key: PREF_KEY_AGE_CONFIRMED, value: String(confirmed) }),
+    Preferences.set({ key: PREF_KEY_IS_ADULT, value: String(adult) }),
+  ]));
+  if (err) console.warn("[settingsStore] Failed to persist age confirmation", err);
   if (!adult) {
     await setShowR18(false);
     await setShowR18G(false);
@@ -273,46 +261,34 @@ export const setDetailQuality = (q: ImageQuality) => setState("detailQuality", q
 export const imageCacheDisk = () => state.imageCacheDisk;
 export const setImageCacheDisk = async (v: boolean): Promise<void> => {
   setState("imageCacheDisk", v);
-  try {
-    await Preferences.set({ key: PREF_KEY_IMAGE_CACHE_DISK, value: String(v) });
-  } catch (error) {
-    console.warn("[settingsStore] Failed to persist imageCacheDisk", error);
-  }
+  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_IMAGE_CACHE_DISK, value: String(v) }));
+  if (err) console.warn("[settingsStore] Failed to persist imageCacheDisk", err);
 };
 
 export const imageCacheBrowser = () => state.imageCacheBrowser;
 export const setImageCacheBrowser = async (v: boolean): Promise<void> => {
   setState("imageCacheBrowser", v);
-  try {
-    await Preferences.set({ key: PREF_KEY_IMAGE_CACHE_BROWSER, value: String(v) });
-  } catch (error) {
-    console.warn("[settingsStore] Failed to persist imageCacheBrowser", error);
-  }
+  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_IMAGE_CACHE_BROWSER, value: String(v) }));
+  if (err) console.warn("[settingsStore] Failed to persist imageCacheBrowser", err);
 };
 
 export const imageCachePrefetch = () => state.imageCachePrefetch;
 export const setImageCachePrefetch = async (v: boolean): Promise<void> => {
   setState("imageCachePrefetch", v);
-  try {
-    await Preferences.set({ key: PREF_KEY_IMAGE_CACHE_PREFETCH, value: String(v) });
-  } catch (error) {
-    console.warn("[settingsStore] Failed to persist imageCachePrefetch", error);
-  }
+  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_IMAGE_CACHE_PREFETCH, value: String(v) }));
+  if (err) console.warn("[settingsStore] Failed to persist imageCachePrefetch", err);
 };
 
 export const imageCacheDiskSize = () => state.imageCacheDiskSize;
 export const setImageCacheDiskSize = async (v: number): Promise<void> => {
   const clamped = Math.max(50, Math.min(1000, Math.round(v / 50) * 50));
   setState("imageCacheDiskSize", clamped);
-  try {
-    await Preferences.set({ key: PREF_KEY_IMAGE_CACHE_DISK_SIZE, value: String(clamped) });
-  } catch (error) {
-    console.warn("[settingsStore] Failed to persist imageCacheDiskSize", error);
-  }
+  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_IMAGE_CACHE_DISK_SIZE, value: String(clamped) }));
+  if (err) console.warn("[settingsStore] Failed to persist imageCacheDiskSize", err);
 };
 
 export async function loadImageCachePrefs(): Promise<void> {
-  try {
+  const [err] = await tryAsync((async () => {
     const disk = await Preferences.get({ key: PREF_KEY_IMAGE_CACHE_DISK });
     if (disk.value !== null) {
       setState("imageCacheDisk", disk.value === "true");
@@ -329,9 +305,8 @@ export async function loadImageCachePrefs(): Promise<void> {
     if (size.value !== null) {
       setState("imageCacheDiskSize", parseInt(size.value, 10));
     }
-  } catch (error) {
-    console.warn("[settingsStore] Failed to load image cache prefs", error);
-  }
+  })());
+  if (err) console.warn("[settingsStore] Failed to load image cache prefs", err);
 }
 
 // ── 更新检测 ──
@@ -339,21 +314,19 @@ export async function loadImageCachePrefs(): Promise<void> {
 export const autoCheckUpdate = () => state.autoCheckUpdate;
 export async function setAutoCheckUpdate(enabled: boolean): Promise<void> {
   setState("autoCheckUpdate", enabled);
-  try {
-    await Preferences.set({ key: PREF_KEY_AUTO_CHECK_UPDATE, value: String(enabled) });
-  } catch (error) {
-    console.warn("[settingsStore] Failed to persist autoCheckUpdate", error);
-  }
+  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_AUTO_CHECK_UPDATE, value: String(enabled) }));
+  if (err) console.warn("[settingsStore] Failed to persist autoCheckUpdate", err);
 }
 
 export async function loadAutoCheckUpdatePreference(): Promise<void> {
-  try {
-    const { value } = await Preferences.get({ key: PREF_KEY_AUTO_CHECK_UPDATE });
-    if (value !== null) {
-      setState("autoCheckUpdate", value === "true");
-    }
-  } catch (error) {
-    console.warn("[settingsStore] Failed to load autoCheckUpdate preference", error);
+  const [err, result] = await tryAsync(Preferences.get({ key: PREF_KEY_AUTO_CHECK_UPDATE }));
+  if (err) {
+    console.warn("[settingsStore] Failed to load autoCheckUpdate preference", err);
+    return;
+  }
+  const { value } = result!;
+  if (value !== null) {
+    setState("autoCheckUpdate", value === "true");
   }
 }
 
@@ -378,21 +351,19 @@ export const setCheckCompleted = (v: boolean) => setState("checkCompleted", v);
 export const lastDismissedVersion = () => state.lastDismissedVersion;
 export async function setLastDismissedVersion(v: string): Promise<void> {
   setState("lastDismissedVersion", v);
-  try {
-    await Preferences.set({ key: PREF_KEY_DISMISSED_UPDATE_VERSION, value: v });
-  } catch (error) {
-    console.warn("[settingsStore] Failed to persist dismissed update version", error);
-  }
+  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_DISMISSED_UPDATE_VERSION, value: v }));
+  if (err) console.warn("[settingsStore] Failed to persist dismissed update version", err);
 }
 
 export async function loadLastDismissedVersionPreference(): Promise<void> {
-  try {
-    const { value } = await Preferences.get({ key: PREF_KEY_DISMISSED_UPDATE_VERSION });
-    if (value !== null) {
-      setState("lastDismissedVersion", value);
-    }
-  } catch (error) {
-    console.warn("[settingsStore] Failed to load dismissed update version preference", error);
+  const [err, result] = await tryAsync(Preferences.get({ key: PREF_KEY_DISMISSED_UPDATE_VERSION }));
+  if (err) {
+    console.warn("[settingsStore] Failed to load dismissed update version preference", err);
+    return;
+  }
+  const { value } = result!;
+  if (value !== null) {
+    setState("lastDismissedVersion", value);
   }
 }
 
@@ -404,21 +375,19 @@ export const setShowUpdateDialog = (v: boolean) => setState("showUpdateDialog", 
 export const useDnsOverride = () => state.useDnsOverride;
 export async function setUseDnsOverride(enabled: boolean): Promise<void> {
   setState("useDnsOverride", enabled);
-  try {
-    await Preferences.set({ key: PREF_KEY_USE_DNS_OVERRIDE, value: String(enabled) });
-  } catch (error) {
-    console.warn("[settingsStore] Failed to persist useDnsOverride", error);
-  }
+  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_USE_DNS_OVERRIDE, value: String(enabled) }));
+  if (err) console.warn("[settingsStore] Failed to persist useDnsOverride", err);
 }
 
 export async function loadUseDnsOverridePreference(): Promise<void> {
-  try {
-    const { value } = await Preferences.get({ key: PREF_KEY_USE_DNS_OVERRIDE });
-    if (value !== null) {
-      setState("useDnsOverride", value === "true");
-    }
-  } catch (error) {
-    console.warn("[settingsStore] Failed to load useDnsOverride preference", error);
+  const [err, result] = await tryAsync(Preferences.get({ key: PREF_KEY_USE_DNS_OVERRIDE }));
+  if (err) {
+    console.warn("[settingsStore] Failed to load useDnsOverride preference", err);
+    return;
+  }
+  const { value } = result!;
+  if (value !== null) {
+    setState("useDnsOverride", value === "true");
   }
 }
 

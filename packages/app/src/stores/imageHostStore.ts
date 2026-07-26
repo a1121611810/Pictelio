@@ -128,10 +128,9 @@ const [state, setState] = createSignal<ImageHostState>(defaultState());
 export const imageHostState = state;
 
 async function persist(snapshot: ImageHostState): Promise<void> {
-  try {
-    await Preferences.set({ key: PREF_KEY, value: JSON.stringify(snapshot) });
-  } catch (error) {
-    console.warn("[imageHostStore] Failed to persist state", error);
+  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY, value: JSON.stringify(snapshot) }));
+  if (err) {
+    console.warn("[imageHostStore] Failed to persist state", err);
   }
 }
 
@@ -279,15 +278,16 @@ export function modeLabel(mode: ImageHostMode): string {
 }
 
 export async function loadImageHostPreference(): Promise<void> {
-  try {
-    const { value } = await Preferences.get({ key: PREF_KEY });
+  const [err, result] = await tryAsync(Preferences.get({ key: PREF_KEY }));
+  if (err) {
+    console.warn("[imageHostStore] Failed to load preference", err);
+    setState(defaultState());
+  } else {
+    const { value } = result!;
     if (value !== null) {
       const parsed = JSON.parse(value);
       setState(migrateLegacyState(parsed));
     }
-  } catch (error) {
-    console.warn("[imageHostStore] Failed to load preference", error);
-    setState(defaultState());
   }
 }
 

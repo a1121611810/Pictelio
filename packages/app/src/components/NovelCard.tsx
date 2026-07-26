@@ -7,6 +7,7 @@ import IllustTags from "./IllustTags";
 import SearchableTag from "./SearchableTag";
 import { resolveImageUrl } from "../utils/imageLoader";
 
+
 interface Props {
   novel: PixivNovel;
   onClick: (id: number) => void;
@@ -28,20 +29,20 @@ const NovelCard: Component<Props> = (props) => {
 
   const toggleBookmark = async (e: MouseEvent, privateBookmark = false) => {
     e.stopPropagation();
-    try {
-      if (bookmarked()) {
-        await deleteBookmark(props.novel.id);
-        setBookmarked(false);
-      } else {
-        await addBookmark(props.novel.id, privateBookmark ? "private" : "public");
+    if (bookmarked()) {
+      const [err] = await tryAsync(deleteBookmark(props.novel.id));
+      if (!err) setBookmarked(false);
+    } else {
+      const [err] = await tryAsync(
+        addBookmark(props.novel.id, privateBookmark ? "private" : "public"),
+      );
+      if (!err) {
         setBookmarked(true);
         setBookmarkBurstTrigger((n) => n + 1);
         if (privateBookmark) {
           showPrivateToast();
         }
       }
-    } catch {
-      /* Silently fail */
     }
   };
 
@@ -191,20 +192,20 @@ export const NovelCoverCard: Component<Props> = (props) => {
 
   const toggleBookmark = async (e: MouseEvent, privateBookmark = false) => {
     e.stopPropagation();
-    try {
-      if (bookmarked()) {
-        await deleteBookmark(props.novel.id);
-        setBookmarked(false);
-      } else {
-        await addBookmark(props.novel.id, privateBookmark ? "private" : "public");
+    if (bookmarked()) {
+      const [err] = await tryAsync(deleteBookmark(props.novel.id));
+      if (!err) setBookmarked(false);
+    } else {
+      const [err] = await tryAsync(
+        addBookmark(props.novel.id, privateBookmark ? "private" : "public"),
+      );
+      if (!err) {
         setBookmarked(true);
         setBookmarkBurstTrigger((n) => n + 1);
         if (privateBookmark) {
           showPrivateToast();
         }
       }
-    } catch {
-      /* Silently fail */
     }
   };
 

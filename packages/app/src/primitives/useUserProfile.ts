@@ -64,16 +64,16 @@ export function useUserProfile(
       onCleanup(() => {
         cancelled = true;
       });
-      loadImage(src)
-        .then((r) => {
-          if (!cancelled) {
-            setAvatarUrl(r.url);
-            r.cleanup();
-          }
-        })
-        .catch(() => {
-          if (!cancelled) setAvatarErrored(true);
-        });
+      void tryAsync((async () => {
+        const [err, r] = await tryAsync(loadImage(src));
+        if (cancelled) return;
+        if (err) {
+          setAvatarErrored(true);
+          return;
+        }
+        setAvatarUrl(r!.url);
+        r!.cleanup();
+      })());
     } else {
       setAvatarUrl(resolveImageUrl(src));
     }

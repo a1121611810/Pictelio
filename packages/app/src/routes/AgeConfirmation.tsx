@@ -30,22 +30,19 @@ const AgeConfirmation: Component = () => {
     if (isReconfirm()) {
       void navigate({ to: "/recommended", replace: true });
     } else {
-      try {
+      const [authErr] = await tryAsync((async () => {
         await initializeAuth();
         if (isLoggedIn()) {
           await navigate({ to: "/recommended", replace: true });
         } else {
           await navigate({ to: "/login", replace: true });
         }
-      } catch (error) {
-        console.error("[AgeConfirmation] Auth initialization failed", error);
-        try {
-          await navigate({ to: "/login", replace: true });
-        } catch {
-          // 导航异常不影响 loading 状态释放
-        }
-      } finally {
-        setIsLoading(false);
+      })());
+      setIsLoading(false);
+      if (authErr) {
+        console.error("[AgeConfirmation] Auth initialization failed", authErr);
+        const [navErr] = await tryAsync(navigate({ to: "/login", replace: true }));
+        if (navErr) { /* 导航异常不影响 loading 状态释放 */ }
       }
     }
   }

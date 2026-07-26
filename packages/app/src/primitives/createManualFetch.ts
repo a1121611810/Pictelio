@@ -36,18 +36,13 @@ export function createManualFetch<T extends {}>(fetcher: (signal: AbortSignal) =
     setError(null);
     setData(null);
 
-    try {
-      const result = await fetcher(signal);
-      if (!signal.aborted) {
+    const [err, result] = await tryAsync(fetcher(signal));
+    if (!signal.aborted) {
+      setLoading(false);
+      if (err) {
+        setError((err as { message?: string }).message ?? String(err));
+      } else {
         setData(() => result);
-      }
-    } catch (error) {
-      if (!signal.aborted) {
-        setError((error as { message?: string }).message ?? String(error));
-      }
-    } finally {
-      if (!signal.aborted) {
-        setLoading(false);
       }
     }
   }

@@ -99,6 +99,23 @@ Pixiv OAuth 端点在 refresh_token 已过期/无效时返回 HTTP 400 而非 40
 **统一错误展示组件（ErrorDisplay）**：
 `src/components/ErrorDisplay.tsx` — 所有页面共享的错误展示组件。接收 `ApiError` 对象，按类型渲染不同操作指引 + 重试按钮。替代各页面各自为政的 `setState("error", msg)`。
 
+### 错误处理模式
+
+**错误元组模式（Error Tuple Pattern）**：
+用 `[err, data]` 两元素元组替代 throw/try-catch 的错误传递方式。第一个元素为错误对象（成功时为 `null`），第二个元素为正常数据（失败时为 `undefined`）。优先于 try-catch 使用。
+
+**tryAsync**：
+`src/utils/tryAsync.ts` 导出的异步错误包装函数。接收 `Promise<T>`，返回 `Promise<[Error, undefined] | [null, T]>`。用于替代 `try { await ... } catch` 模式。与 try-catch 相比，不阻止 V8 对调用函数的全量优化，且无需 finally 清理。
+
+**trySync**：
+`src/utils/tryAsync.ts` 导出的同步错误包装函数。接收工厂函数 `() => T`，返回 `[Error, undefined] | [null, T]`。用于替代 `try { JSON.parse(...) } catch` 等同步操作的 try-catch。工厂函数形式确保可能抛出的同步代码惰性执行，不影响调用函数的 V8 优化。
+
+**统一清理模式（Unified Cleanup Pattern）**：
+配合 tryAsync 的 finally 替代方案。try-catch-finally 中的清理逻辑移至 tryAsync 调用之后、err 判断之前执行。`loading.set(false)`、`clearTimeout()` 等清理操作只写一次，不再因 try-catch 的 finally 块而拆分为两个分支。每个 tryAsync 调用对应一条清理线。
+
+**自动导入（Auto-import）**：
+通过 `unplugin-auto-import` 在构建时自动向所有源文件注入 `tryAsync` 和 `trySync` 的 import 语句，无需在源码中显式书写 `import { tryAsync, trySync } from '@/utils/tryAsync'`。自动生成的 `auto-imports.d.ts` 文件加入 `.gitignore`，由 `pnpm dev` 首次运行生成。
+
 ### 浏览历史（Browsing History）
 
 **浏览历史记录（HistoryEntry）**：

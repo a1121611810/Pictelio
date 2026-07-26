@@ -25,7 +25,7 @@ vi.stubGlobal("IntersectionObserver", MockIntersectionObserver);
 
 const mockLoadRootComments = vi.fn();
 const mockLoadRootCommentsNext = vi.fn();
-const mockPostComment = vi.fn();
+const mockPostComment = vi.fn().mockResolvedValue(undefined);
 const mockDeleteComment = vi.fn();
 
 vi.mock("@/api/comment", () => ({
@@ -71,7 +71,7 @@ describe("useComments primitive", () => {
   beforeEach(() => {
     mockLoadRootComments.mockReset();
     mockLoadRootCommentsNext.mockReset();
-    mockPostComment.mockReset();
+    mockPostComment.mockClear();
     mockDeleteComment.mockReset();
   });
 

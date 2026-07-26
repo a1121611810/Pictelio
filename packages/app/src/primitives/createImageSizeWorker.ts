@@ -1,4 +1,5 @@
 import * as Comlink from "comlink";
+
 import type { ImageSizeWorkerAPI } from "./imageSize.worker";
 
 let workerInstance: Promise<Comlink.Remote<ImageSizeWorkerAPI> | null> | null = null;
@@ -17,18 +18,19 @@ export function getImageSizeWorker(): Promise<Comlink.Remote<ImageSizeWorkerAPI>
   }
 
   workerPromise = (() => {
-    try {
+    const [err, instance] = trySync(() => {
       const worker = new Worker(new URL("./imageSize.worker.ts", import.meta.url), {
         type: "module",
       });
-      workerInstance = Comlink.wrap<ImageSizeWorkerAPI>(
+      return Comlink.wrap<ImageSizeWorkerAPI>(
         worker,
       ) as unknown as Promise<Comlink.Remote<ImageSizeWorkerAPI> | null>;
-      return workerInstance;
-    } catch (error) {
-      console.warn("[imageSize] Worker creation failed, falling back to main thread", error);
+    });
+    if (err) {
+      console.warn("[imageSize] Worker creation failed, falling back to main thread", err);
       return Promise.resolve(null);
     }
+    return instance;
   })();
 
   return workerPromise ?? Promise.resolve(null);

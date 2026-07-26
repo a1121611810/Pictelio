@@ -4,13 +4,12 @@ import { SecureStorage } from "@aparajita/capacitor-secure-storage";
 const REFRESH_TOKEN_KEY = "refresh_token";
 
 export async function getRefreshToken(): Promise<string | null> {
-  try {
-    const value = await SecureStorage.get(REFRESH_TOKEN_KEY);
-    return typeof value === "string" ? value : null;
-  } catch (error) {
-    console.error("[secureStorage] failed to get refresh_token", error);
+  const [err, value] = await tryAsync(SecureStorage.get(REFRESH_TOKEN_KEY));
+  if (err) {
+    console.error("[secureStorage] failed to get refresh_token", err);
     return null;
   }
+  return typeof value === "string" ? value : null;
 }
 
 export async function setRefreshToken(token: string): Promise<void> {
@@ -31,18 +30,17 @@ const BACKUP_MARKER_KEY = "__pictelio_backup_marker";
  * - 备份还原后：SecureStorage 异常 → 清除 token → 返回 false
  */
 export async function checkBackupIntegrity(): Promise<boolean> {
-  try {
-    const marker = await SecureStorage.get(BACKUP_MARKER_KEY);
-    if (marker === null || marker === undefined) {
-      await SecureStorage.set(BACKUP_MARKER_KEY, "1");
-    }
-    return true;
-  } catch {
+  const [err, marker] = await tryAsync(SecureStorage.get(BACKUP_MARKER_KEY));
+  if (err) {
     // SecureStorage 访问失败（备份还原后 Keystore 不可用）
     // 清除 refresh_token 防止泄露
     await removeRefreshToken();
     return false;
   }
+  if (marker === null || marker === undefined) {
+    await SecureStorage.set(BACKUP_MARKER_KEY, "1");
+  }
+  return true;
 }
 
 /** 从旧的 Preferences 迁移 refresh_token 到 SecureStorage（一次性） */

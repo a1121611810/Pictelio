@@ -75,17 +75,17 @@ const IllustDetail: Component = () => {
     const prev = isFollowed();
     setIsFollowed(!prev);
     setFollowing(true);
-    try {
+    const [followErr] = await tryAsync((async () => {
       if (prev) {
         await unfollowUser(i.user.id);
       } else {
         await followUser(i.user.id);
       }
       setIllust({ ...i, user: { ...i.user, is_followed: !prev } });
-    } catch {
+    })());
+    setFollowing(false);
+    if (followErr) {
       setIsFollowed(prev);
-    } finally {
-      setFollowing(false);
     }
   }
 
@@ -153,15 +153,16 @@ const IllustDetail: Component = () => {
     }
     ugoiraBlobUrls = [];
 
-    try {
+    const [ugoiraErr] = await tryAsync((async () => {
       // 使用共享的下载+解压函数（自动跟踪进度）
       const result = await downloadAndExtractUgoira(illustId, (pct) => setUgoiraProgress(pct));
       ugoiraBlobUrls = result.blobUrls;
       setUgoiraFrames(result.frames);
       setUgoiraReady(true);
       setUgoiraProgress(100);
-    } catch (err) {
-      console.error("[IllustDetail] Ugoira load failed:", err);
+    })());
+    if (ugoiraErr) {
+      console.error("[IllustDetail] Ugoira load failed:", ugoiraErr);
       setUgoiraProgress(-2);
     }
   }
@@ -180,7 +181,7 @@ const IllustDetail: Component = () => {
       return;
     }
     setBookmarking(true);
-    try {
+    const [bookmarkErr] = await tryAsync((async () => {
       if (i.is_bookmarked) {
         await deleteBookmark(i.id);
       } else {
@@ -195,10 +196,10 @@ const IllustDetail: Component = () => {
       if (!i.is_bookmarked) {
         setBookmarkBurstTrigger((n) => n + 1);
       }
-    } catch (error) {
-      console.error("Bookmark toggle failed:", error);
-    } finally {
-      setBookmarking(false);
+    })());
+    setBookmarking(false);
+    if (bookmarkErr) {
+      console.error("Bookmark toggle failed:", bookmarkErr);
     }
   }
 

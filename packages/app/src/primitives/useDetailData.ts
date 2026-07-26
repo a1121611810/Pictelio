@@ -1,8 +1,8 @@
 import { createSignal, createEffect } from "solid-js";
+
 import type { Accessor } from "solid-js";
 import { toApiError } from "../api/client";
 import type { ApiError } from "../api/types";
-
 export interface DetailDataResult<T> {
   /** 加载完成的数据，初始为 null */
   data: Accessor<T | null>;
@@ -44,16 +44,14 @@ export function useDetailData<T, R extends { error?: ApiError | null }>(
       return;
     }
 
-    try {
-      const extracted = extractData(rd);
-      if (extracted !== null) {
-        setData(extracted);
-        setError(null);
-        setLoading(false);
-      }
-    } catch (err) {
+    const [err, extracted] = trySync(() => extractData(rd));
+    if (err) {
       setError(toApiError(err));
       setData(null);
+      setLoading(false);
+    } else if (extracted !== null) {
+      setData(extracted);
+      setError(null);
       setLoading(false);
     }
   });

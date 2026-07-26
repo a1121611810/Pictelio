@@ -12,12 +12,8 @@ function assertPixivUrl(url: string, fnName: string): void {
   // 允许本地代理路径
   if (url.startsWith("/pixiv-api")) return;
   // 验证绝对 URL 的 hostname
-  try {
-    const parsed = new URL(url);
-    if (parsed.hostname === "app-api.pixiv.net") return;
-  } catch {
-    // URL 解析失败也拒绝
-  }
+  const [urlErr, parsed] = trySync(() => new URL(url));
+  if (!urlErr && parsed.hostname === "app-api.pixiv.net") return;
   throw new Error(`${fnName}: invalid next_url — must point to app-api.pixiv.net`);
 }
 

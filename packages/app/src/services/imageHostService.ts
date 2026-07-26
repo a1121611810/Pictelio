@@ -7,6 +7,7 @@ import {
   setProbeResults,
 } from "../stores/imageHostStore";
 
+
 export interface HostInput {
   name: string;
   baseUrl: string;
@@ -23,16 +24,15 @@ export function validateHostInput(input: HostInput): string | null {
     return "代理 URL 不能为空";
   }
 
-  try {
-    const url = new URL(baseUrl);
-    if (!/^https?:$/u.test(url.protocol)) {
-      return "仅支持 http:// 或 https:// 协议";
-    }
-    if (url.hostname.includes("pximg.net")) {
-      return "图床 URL 不能直接使用 Pixiv 官方域名";
-    }
-  } catch {
+  const [err, url] = trySync(() => new URL(baseUrl));
+  if (err) {
     return "请输入有效的 URL";
+  }
+  if (!/^https?:$/u.test(url!.protocol)) {
+    return "仅支持 http:// 或 https:// 协议";
+  }
+  if (url!.hostname.includes("pximg.net")) {
+    return "图床 URL 不能直接使用 Pixiv 官方域名";
   }
 
   return null;
@@ -57,7 +57,7 @@ export function transformUrl(originalUrl: string, baseUrl: string): string {
     return "";
   }
 
-  try {
+  const [err, result] = trySync(() => {
     if (baseUrl.includes("{path}")) {
       const originalPath = new URL(originalUrl).pathname.slice(1);
       return baseUrl.replace("{path}", originalPath);
@@ -69,9 +69,11 @@ export function transformUrl(originalUrl: string, baseUrl: string): string {
     source.hostname = proxy.hostname;
     source.port = proxy.port;
     return source.toString();
-  } catch {
+  });
+  if (err) {
     return originalUrl;
   }
+  return result;
 }
 
 /** 按权重随机选择一个启用的图床。 */
@@ -219,25 +221,28 @@ export async function probeHosts(): Promise<ProbeResult[]> {
   const promises = enabled.map(async (host): Promise<ProbeResult> => {
     const url = probeUrl ? transformUrl(probeUrl, host.baseUrl) : host.baseUrl;
     const start = performance.now();
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      const resp = await fetch(url, {
-        method: "HEAD",
-        mode: "no-cors",
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      const latency = Math.round(performance.now() - start);
-      // No-cors  opaque response status 为 0，视为可达
-      return {
-        hostId: host.id,
-        hostName: host.name,
-        baseUrl: host.baseUrl,
-        reachable: resp.ok || resp.status === 0,
-        latencyMs: latency,
-      };
-    } catch {
+    const [probeErr, probeResult] = await tryAsync(
+      (async () => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const resp = await fetch(url, {
+          method: "HEAD",
+          mode: "no-cors",
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        const latency = Math.round(performance.now() - start);
+        // No-cors  opaque response status 为 0，视为可达
+        return {
+          hostId: host.id,
+          hostName: host.name,
+          baseUrl: host.baseUrl,
+          reachable: resp.ok || resp.status === 0,
+          latencyMs: latency,
+        };
+      })(),
+    );
+    if (probeErr) {
       return {
         hostId: host.id,
         hostName: host.name,
@@ -246,6 +251,7 @@ export async function probeHosts(): Promise<ProbeResult[]> {
         latencyMs: null,
       };
     }
+    return probeResult;
   });
 
   const results = await Promise.all(promises);

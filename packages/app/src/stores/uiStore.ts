@@ -38,23 +38,23 @@ export async function setContentType(type: ContentType): Promise<void> {
     return;
   }
   setState("contentType", type);
-  try {
-    await Preferences.set({ key: PREF_KEY_CONTENT_TYPE, value: type });
-  } catch (error) {
-    console.warn("[uiStore] Failed to persist contentType", error);
+  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_CONTENT_TYPE, value: type }));
+  if (err) {
+    console.warn("[uiStore] Failed to persist contentType", err);
     setState("contentType", prev);
   }
   window.dispatchEvent(new CustomEvent("contentTypeChanged"));
 }
 
 export async function loadContentTypePreference(): Promise<void> {
-  try {
-    const { value } = await Preferences.get({ key: PREF_KEY_CONTENT_TYPE });
+  const [err, result] = await tryAsync(Preferences.get({ key: PREF_KEY_CONTENT_TYPE }));
+  if (err) {
+    console.warn("[uiStore] Failed to load contentType preference", err);
+  } else {
+    const { value } = result!;
     if (value === "illust" || value === "novel") {
       setState("contentType", value as ContentType);
     }
-  } catch (error) {
-    console.warn("[uiStore] Failed to load contentType preference", error);
   }
 }
 

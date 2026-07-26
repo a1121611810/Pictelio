@@ -197,14 +197,16 @@ const TabFeedPage: Component<Props> = (props) => {
                       // 中止当前请求，创建新的 AbortController
                       abortController?.abort();
                       abortController = new AbortController();
-                      try {
+                      const [tabErr] = await tryAsync((async () => {
                         saveTabScroll(props.tab);
                         setRecommendSubTab(opt.key);
                         await ensureLoaded(abortController.signal);
                         suppressHeaderVisibility();
                         window.scrollTo(0, getFeedScrollY(props.tab));
-                      } finally {
-                        setIsSwitchingSubTab(false);
+                      })());
+                      setIsSwitchingSubTab(false);
+                      if (tabErr) {
+                        throw tabErr;
                       }
                     }}
                   >

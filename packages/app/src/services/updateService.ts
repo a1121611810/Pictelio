@@ -24,37 +24,22 @@ let cachedResult: CheckResult | null = null;
 // ── Version comparison (no semver dependency) ──
 
 /**
- * Normalize a version string for comparison.
- * - Trims whitespace
- * - Removes optional leading "v" prefix
- * - Strips semver build metadata (everything after '+')
- */
-function normalizeVersion(v: string): string {
-  return v.trim().replace(/^v/iu, "").replace(/\+.*$/u, "");
-}
-
-/**
  * Compare two version strings numerically.
  * Returns true if `remote` is newer than `local`.
- * Handles optional leading "v" prefix and semver build metadata on either side.
+ * Handles optional leading "v" prefix on remote.
  */
 export function isNewer(local: string, remote: string): boolean {
-  const lParts = normalizeVersion(local).split(".").map(Number);
-  const rParts = normalizeVersion(remote).split(".").map(Number);
+  const lParts = local.split(".").map(Number);
+  const rParts = remote.replace(/^v/, "").split(".").map(Number);
 
   // Compare up to major.minor.patch (standard semver, 3 parts max)
   for (let i = 0; i < 3; i++) {
     const l = lParts[i] ?? 0;
     const r = rParts[i] ?? 0;
-    if (r > l) {
-      return true;
-    }
-    if (r < l) {
-      return false;
-    }
+    if (r > l) return true;
+    if (r < l) return false;
   }
-  // Equal
-  return false;
+  return false; // equal
 }
 
 // ── Core fetch ──
@@ -71,58 +56,44 @@ const UPDATE_URL =
  * so callers never need to handle exceptions.
  */
 export async function checkForUpdate(): Promise<CheckResult> {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10_000);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10_000);
 
-    const res = await fetch(UPDATE_URL, { signal: controller.signal });
-    clearTimeout(timeoutId);
+  const [fetchErr, res] = await tryAsync(fetch(UPDATE_URL, { signal: controller.signal }));
+  clearTimeout(timeoutId);
 
-    if (!res.ok) {
-      console.warn(`[updateService] version.json 返回 ${res.status}`);
-      return cachedResult ?? noUpdateResult();
-    }
-
-    const data = await res.json();
-
-    const hasUpdate = isNewer(APP_VERSION, data.version);
-
-    const result: CheckResult = {
-      hasUpdate,
-      latestVersion: String(data.version || "").replace(/^v/u, ""),
-      latestReleaseUrl: data.url || "",
-      latestChangelog: data.changelog || "",
+  if (fetchErr) {
+    console.warn("[updateService] 检查更新失败:", fetchErr);
+    return {
+      hasUpdate: false,
+      latestVersion: "",
+      latestReleaseUrl: "",
+      latestChangelog: "",
     };
-
-    cachedResult = result;
-    return result;
-  } catch (error) {
-    console.warn("[updateService] 异常:", error);
-    return cachedResult ?? noUpdateResult();
   }
-}
 
-/**
- * Get the last cached check result, or null if never checked.
- */
-export function getCachedResult(): CheckResult | null {
-  return cachedResult;
-}
+  if (!res.ok) {
+    return {
+      hasUpdate: false,
+      latestVersion: "",
+      latestReleaseUrl: "",
+      latestChangelog: "",
+    };
+  }
 
-/**
- * Reset cached state (useful for testing).
- */
-export function resetCache(): void {
-  cachedResult = null;
-}
+  const data = (await res.json()) as {
+    version?: string;
+    release_url?: string;
+    changelog?: string;
+  };
 
-// ── Helpers ──
+  const remoteVersion = data.version ?? "";
+  const hasUpdate = remoteVersion ? isNewer(APP_VERSION, remoteVersion) : false;
 
-function noUpdateResult(): CheckResult {
   return {
-    hasUpdate: false,
-    latestVersion: "",
-    latestReleaseUrl: "",
-    latestChangelog: "",
+    hasUpdate,
+    latestVersion: remoteVersion,
+    latestReleaseUrl: data.release_url ?? "",
+    latestChangelog: data.changelog ?? "",
   };
 }

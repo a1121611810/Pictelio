@@ -1,4 +1,5 @@
 import { createSignal } from "solid-js";
+
 import type { Accessor } from "solid-js";
 import type { PixivIllust } from "../api/types";
 import { addBookmark, deleteBookmark, followUser, unfollowUser } from "../api/illust";
@@ -34,16 +35,12 @@ export function useCardInteractions(illust: PixivIllust): CardInteractions {
     const prev = isFollowed();
     setIsFollowed(!prev);
     setFollowing(true);
-    try {
-      if (prev) {
-        await unfollowUser(illust.user.id);
-      } else {
-        await followUser(illust.user.id);
-      }
-    } catch {
+    const [err] = await tryAsync(
+      prev ? unfollowUser(illust.user.id) : followUser(illust.user.id),
+    );
+    setFollowing(false);
+    if (err) {
       setIsFollowed(prev);
-    } finally {
-      setFollowing(false);
     }
   };
 
@@ -55,20 +52,20 @@ export function useCardInteractions(illust: PixivIllust): CardInteractions {
 
   const toggleBookmark = async (e: MouseEvent, privateBookmark = false) => {
     e.stopPropagation();
-    try {
-      if (bookmarked()) {
-        await deleteBookmark(illust.id);
+    if (bookmarked()) {
+      const [err] = await tryAsync(deleteBookmark(illust.id));
+      if (!err) {
         setBookmarked(false);
-      } else {
-        await addBookmark(illust.id, privateBookmark ? "private" : "public");
+      }
+    } else {
+      const [err] = await tryAsync(addBookmark(illust.id, privateBookmark ? "private" : "public"));
+      if (!err) {
         setBookmarked(true);
         setBookmarkBurstTrigger((n) => n + 1);
         if (privateBookmark) {
           showPrivateToast();
         }
       }
-    } catch {
-      /* Silently fail */
     }
   };
 

@@ -24,7 +24,7 @@ vi.mock("@capacitor/core", () => {
   return mockCapacitor;
 });
 vi.mock("@capacitor/preferences", () => ({
-  Preferences: { get: vi.fn(), set: vi.fn() },
+  Preferences: { get: vi.fn().mockResolvedValue({ value: null }), set: vi.fn().mockResolvedValue(undefined) },
 }));
 
 const store: Record<string, string> = {};

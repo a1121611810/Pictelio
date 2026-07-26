@@ -65,14 +65,14 @@ export async function loadNovelImageDimensions(
   const workerOutputs: ImageSizeOutput[] = [];
   const worker = await getImageSizeWorker();
   if (worker) {
-    try {
-      const workerResults = await worker.measureImages(items);
-      workerOutputs.push(...workerResults);
-    } catch (error) {
+    const [workerErr, workerResults] = await tryAsync(worker.measureImages(items));
+    if (workerErr) {
       console.warn(
         "[novelImageDimensions] Worker measurement failed, fallback to main thread",
-        error,
+        workerErr,
       );
+    } else {
+      workerOutputs.push(...workerResults);
     }
   }
 

@@ -49,6 +49,7 @@ async function bootstrap() {
   }
 }
 
-bootstrap().catch((error) => {
-  console.error("[main] Bootstrap failed", error);
-});
+const [_err] = await tryAsync(bootstrap());
+if (_err) {
+  console.error("[main] Bootstrap failed", _err);
+}
