@@ -1,4 +1,4 @@
-import { type Component, type Accessor, Show, onMount } from "solid-js";
+import type { Component, Accessor } from "solid-js";
 import FluentIcon from "./ui/FluentIcon";
 
 interface Props {

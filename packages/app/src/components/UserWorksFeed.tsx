@@ -1,4 +1,4 @@
-import { type Component, Switch, Match } from "solid-js";
+import type { Component } from "solid-js";
 import type { PixivIllust, PixivNovel, ApiError, ContentType } from "../api/types";
 import type { LayoutMode } from "../primitives/types";
 import type { ScrollRestoreState } from "../stores/feedStore";

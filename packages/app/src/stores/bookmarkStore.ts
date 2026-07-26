@@ -1,4 +1,3 @@
-import { createRoot, createSignal } from "solid-js";
 import { createTQFeedStore } from "./shared/createTQFeedStore";
 import { loadBookmarks } from "../api/illust";
 import { user } from "./authStore";

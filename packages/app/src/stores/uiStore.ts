@@ -1,4 +1,3 @@
-import { createStore } from "solid-js/store";
 import { Preferences } from "@capacitor/preferences";
 
 type Tab = "recommended" | "follow" | "bookmarks" | "me" | "history";

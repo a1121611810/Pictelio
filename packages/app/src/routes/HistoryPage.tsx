@@ -6,8 +6,7 @@
  * 支持：按标题搜索（ilike，300ms 防抖）、日期范围筛选（gte/lte）、搜索高亮。
  */
 
-import { type Component, createMemo, createSignal, Show, createEffect, onCleanup } from "solid-js";
-import { useNavigate } from "@tanstack/solid-router";
+import type { Component } from "solid-js";
 import { useLiveQuery, eq, ilike, gte, lte, and } from "@tanstack/solid-db";
 import { historyCollection, removeHistoryEntry, clearAllHistory } from "@/stores/historyStore";
 import { user } from "@/stores/authStore";

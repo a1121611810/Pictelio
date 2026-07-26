@@ -1,19 +1,4 @@
-import {
-  type Accessor,
-  type Component,
-  type JSX,
-  createSignal,
-  createEffect,
-  createMemo,
-  Show,
-  Switch,
-  Match,
-  For,
-  onCleanup,
-  batch,
-  untrack,
-} from "solid-js";
-import { useParams, useNavigate, useRouter, getRouteApi } from "@tanstack/solid-router";
+import type { Accessor, Component, JSX } from "solid-js";
 import PixivImage from "../components/PixivImage";
 import ImageViewer from "@/components/ImageViewer";
 import LoadingSpinner from "../components/LoadingSpinner";

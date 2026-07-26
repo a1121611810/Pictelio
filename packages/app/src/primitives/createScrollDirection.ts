@@ -1,4 +1,3 @@
-import { createSignal, createEffect } from "solid-js";
 import { createScrollPosition } from "@solid-primitives/scroll";
 
 export type ScrollDirection = "up" | "down" | null;

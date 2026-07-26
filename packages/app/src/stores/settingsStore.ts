@@ -1,4 +1,3 @@
-import { createStore, produce } from "solid-js/store";
 import { Preferences } from "@capacitor/preferences";
 
 // ── 类型定义 ──

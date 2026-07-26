@@ -1,5 +1,4 @@
 import { type Component } from "solid-js";
-import { useRouter } from "@tanstack/solid-router";
 import PageTransition from "../components/PageTransition";
 import FluentIcon from "../components/ui/FluentIcon";
 

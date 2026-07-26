@@ -1,5 +1,4 @@
 import { type Component } from "solid-js";
-import { useNavigate } from "@tanstack/solid-router";
 import { Capacitor } from "@capacitor/core";
 import FluentIcon from "../ui/FluentIcon";
 import {

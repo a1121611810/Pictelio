@@ -1,4 +1,4 @@
-import { type Component, Show, For } from "solid-js";
+import type { Component } from "solid-js";
 import type { PixivNovel } from "@/api/types";
 import { resolveImageUrl } from "../utils/imageLoader";
 import PixivImage from "./PixivImage";

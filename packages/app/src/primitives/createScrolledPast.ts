@@ -1,4 +1,3 @@
-import { createMemo } from "solid-js";
 import { createScrollPosition } from "@solid-primitives/scroll";
 
 /**

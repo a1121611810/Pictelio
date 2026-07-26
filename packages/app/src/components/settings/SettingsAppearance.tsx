@@ -1,5 +1,4 @@
 import { type Component } from "solid-js";
-import { useNavigate } from "@tanstack/solid-router";
 import ThemeSelector from "../ThemeSelector";
 
 const SettingsAppearance: Component = () => {

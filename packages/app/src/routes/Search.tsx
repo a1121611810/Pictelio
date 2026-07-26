@@ -1,13 +1,4 @@
-import {
-  createEffect,
-  createMemo,
-  createSignal,
-  For,
-  onCleanup,
-  Show,
-  type Component,
-} from "solid-js";
-import { useNavigate, useSearch } from "@tanstack/solid-router";
+import type { Component } from "solid-js";
 import FluentIcon from "@/components/ui/FluentIcon";
 import TagInput from "@/components/ui/TagInput";
 import { createSearchStore } from "@/stores/searchStore";

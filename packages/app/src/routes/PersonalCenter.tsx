@@ -1,5 +1,4 @@
-import { type Component, onMount, Show } from "solid-js";
-import { useNavigate, useParams, useRouter, useLocation, Outlet } from "@tanstack/solid-router";
+import type { Component } from "solid-js";
 import { setCurrentTab } from "@/stores/uiStore";
 import { profile, loadProfile } from "@/stores/userStore";
 import { useUserProfile } from "@/primitives/useUserProfile";

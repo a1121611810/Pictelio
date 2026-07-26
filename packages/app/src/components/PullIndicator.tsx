@@ -1,5 +1,4 @@
 import type { Component } from "solid-js";
-import { Switch, Match } from "solid-js";
 
 export type PullZone = "idle" | "pulling" | "refresh-ready" | "refreshing" | "settings-ready";
 

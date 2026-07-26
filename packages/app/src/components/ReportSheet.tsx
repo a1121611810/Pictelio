@@ -1,4 +1,4 @@
-import { type Component, Show, createSignal } from "solid-js";
+import type { Component } from "solid-js";
 import {
   reportIllust,
   hasReported,

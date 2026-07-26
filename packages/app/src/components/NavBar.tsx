@@ -1,7 +1,6 @@
-import { type Component, createEffect, createSignal, onCleanup } from "solid-js";
+import type { Component } from "solid-js";
 import { autoHideNavBar } from "../stores/settingsStore";
 import { currentTab, setCurrentTab } from "../stores/uiStore";
-import { useNavigate } from "@tanstack/solid-router";
 import FluentIcon, { type FluentIconName } from "./ui/FluentIcon";
 import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior";
 

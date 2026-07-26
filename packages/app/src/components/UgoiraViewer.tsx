@@ -1,4 +1,3 @@
-import { createSignal, onMount, onCleanup, createEffect } from "solid-js";
 import type { Component } from "solid-js";
 import { downloadAndExtractUgoira, type UgoiraFrame } from "../api/illust";
 import PixivImage from "./PixivImage";

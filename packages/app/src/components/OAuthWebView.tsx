@@ -1,4 +1,4 @@
-import { type Component, Show, createEffect } from "solid-js";
+import type { Component } from "solid-js";
 import { Capacitor } from "@capacitor/core";
 import { toApiError } from "../api/client";
 import type { ApiError } from "../api/types";

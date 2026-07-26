@@ -1,4 +1,3 @@
-import { createSignal } from "solid-js";
 
 /** 当前打开的 overlay 类型。 */
 export type OverlayType =

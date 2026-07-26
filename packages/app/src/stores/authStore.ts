@@ -1,4 +1,3 @@
-import { createSignal } from "solid-js";
 import { setAccessToken, setOnUnauthorized, setRefreshPromise } from "../api/client";
 import { refreshToken, exchangeCodeForToken } from "../api/auth";
 import type { PixivUser } from "../api/types";

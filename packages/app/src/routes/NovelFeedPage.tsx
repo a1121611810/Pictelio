@@ -1,13 +1,4 @@
-import {
-  type Component,
-  createSignal,
-  createEffect,
-  onMount,
-  onCleanup,
-  Show,
-  For,
-} from "solid-js";
-import { useNavigate } from "@tanstack/solid-router";
+import type { Component } from "solid-js";
 import {
   novels,
   nextUrl,

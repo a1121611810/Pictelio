@@ -1,5 +1,4 @@
 import { type Component } from "solid-js";
-import { useNavigate } from "@tanstack/solid-router";
 
 interface SearchableTagProps {
   /** 标签名（搜索关键词） */

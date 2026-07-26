@@ -1,4 +1,4 @@
-import { type Component, Show, createEffect, onCleanup } from "solid-js";
+import type { Component } from "solid-js";
 import {
   showUpdateDialog,
   setShowUpdateDialog,

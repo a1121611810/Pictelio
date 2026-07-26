@@ -1,4 +1,3 @@
-import { createSignal, createEffect } from "solid-js";
 import { createScrollPosition } from "@solid-primitives/scroll";
 import { debounce } from "@solid-primitives/scheduled";
 

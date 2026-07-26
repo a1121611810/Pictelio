@@ -5,7 +5,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mockGet = vi.fn<() => Promise<{ value: string | null }>>();
 const mockSet = vi.fn<() => Promise<void>>();
 vi.mock("@capacitor/preferences", () => ({
-  Preferences: { get: (...args: unknown[]) => mockGet(...args), set: (...args: unknown[]) => mockSet(...args) },
+  Preferences: {
+    get: (...args: unknown[]) => mockGet(...args),
+    set: (...args: unknown[]) => mockSet(...args),
+  },
 }));
 
 // ── 被测试模块 ──
@@ -43,7 +46,10 @@ describe("settingsStore — setLayoutMode", () => {
 
     await expect(setLayoutMode("grid")).resolves.toBeUndefined();
     expect(layoutMode()).toBe("grid");
-    expect(warnSpy).toHaveBeenCalledWith("[settingsStore] Failed to persist layoutMode", expect.any(Error));
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[settingsStore] Failed to persist layoutMode",
+      expect.any(Error),
+    );
 
     warnSpy.mockRestore();
   });
@@ -84,7 +90,10 @@ describe("settingsStore — loadLayoutModePreference", () => {
 
     await expect(loadLayoutModePreference()).resolves.toBeUndefined();
     expect(layoutMode()).toBe("waterfall");
-    expect(warnSpy).toHaveBeenCalledWith("[settingsStore] Failed to load layoutMode preference", expect.any(Error));
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[settingsStore] Failed to load layoutMode preference",
+      expect.any(Error),
+    );
 
     warnSpy.mockRestore();
   });

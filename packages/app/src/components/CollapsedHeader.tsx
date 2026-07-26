@@ -1,5 +1,4 @@
-import { type Component, Show, createSignal, createEffect } from "solid-js";
-import { useRouter, useNavigate } from "@tanstack/solid-router";
+import type { Component } from "solid-js";
 import { user } from "../stores/authStore";
 import { viewedUser } from "../stores/userStore";
 import { Capacitor } from "@capacitor/core";

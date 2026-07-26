@@ -1,4 +1,3 @@
-import { createSignal, batch } from "solid-js";
 import { createTQFeedStore } from "./shared/createTQFeedStore";
 import { loadRecommended, loadFollow } from "../api/illust";
 import type { PixivIllust } from "../api/types";

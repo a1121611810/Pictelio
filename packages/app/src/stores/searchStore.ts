@@ -1,4 +1,3 @@
-import { createMemo, createSignal } from "solid-js";
 import type {
   PixivIllust,
   PixivNovel,

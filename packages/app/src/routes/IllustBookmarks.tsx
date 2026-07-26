@@ -1,5 +1,4 @@
-import { type Component, createEffect, onMount, onCleanup } from "solid-js";
-import { useNavigate } from "@tanstack/solid-router";
+import type { Component } from "solid-js";
 import {
   illusts,
   nextUrl,

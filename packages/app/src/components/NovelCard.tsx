@@ -1,4 +1,4 @@
-import { type Component, createSignal, For } from "solid-js";
+import type { Component } from "solid-js";
 import type { PixivNovel } from "../api/types";
 import { addBookmark, deleteBookmark } from "../api/novel";
 import HeartIcon from "./ui/HeartIcon";

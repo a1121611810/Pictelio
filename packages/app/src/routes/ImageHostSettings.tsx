@@ -1,5 +1,4 @@
-import { type Component, createSignal, Show, For, createEffect } from "solid-js";
-import { useRouter } from "@tanstack/solid-router";
+import type { Component } from "solid-js";
 import {
   imageHostState,
   setMasterEnabled,

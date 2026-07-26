@@ -1,4 +1,4 @@
-import { type Component, Show } from "solid-js";
+import type { Component } from "solid-js";
 
 // ── 作品操作菜单：举报、屏蔽作者 ──
 

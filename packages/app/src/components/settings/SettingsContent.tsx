@@ -1,5 +1,4 @@
-import { type Component, Show } from "solid-js";
-import { useNavigate } from "@tanstack/solid-router";
+import type { Component } from "solid-js";
 import {
   showR18,
   setShowR18,

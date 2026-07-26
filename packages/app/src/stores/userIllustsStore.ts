@@ -1,4 +1,3 @@
-import { createRoot, createSignal } from "solid-js";
 import { createInfiniteQuery } from "@tanstack/solid-query";
 import { loadUserIllusts } from "../api/illust";
 import { loadUserNovels } from "../api/novel";

@@ -1,4 +1,3 @@
-import { createSignal } from "solid-js";
 import { createTQFeedStore } from "./shared/createTQFeedStore";
 import { loadRecommended, loadBookmarks, loadFollow } from "../api/novel";
 import type { PixivNovel, RestrictType, ApiError } from "../api/types";

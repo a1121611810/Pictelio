@@ -1,4 +1,4 @@
-import { type Component, createSignal, onMount, type JSXElement } from "solid-js";
+import type { Component, JSXElement } from "solid-js";
 
 /**
  * Fluent 2 page transition: quick fade on mount.

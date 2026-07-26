@@ -1,5 +1,4 @@
-import { type Component, onCleanup, Show, For } from "solid-js";
-import { useNavigate, useRouter } from "@tanstack/solid-router";
+import type { Component } from "solid-js";
 import { resolveImageUrl } from "../utils/imageLoader";
 import NavBar from "../components/NavBar";
 import PageTransition from "../components/PageTransition";

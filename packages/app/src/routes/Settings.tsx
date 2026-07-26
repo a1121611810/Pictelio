@@ -1,5 +1,4 @@
-import { type Component, Show, createSignal, createEffect, onCleanup } from "solid-js";
-import { useNavigate, useRouter } from "@tanstack/solid-router";
+import type { Component } from "solid-js";
 import { Preferences } from "@capacitor/preferences";
 import { isLoggedIn, logout } from "../stores/authStore";
 import { clearImageCache } from "../utils/imageLoader";

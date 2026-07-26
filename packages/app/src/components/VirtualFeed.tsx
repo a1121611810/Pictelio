@@ -1,4 +1,3 @@
-import { createEffect, For, createMemo } from "solid-js";
 import type { Component } from "solid-js";
 import ImageCard from "./ImageCard";
 import LazyImageCard from "./LazyImageCard";

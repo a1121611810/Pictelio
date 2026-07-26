@@ -1,4 +1,4 @@
-import { type Component, Show, mergeProps } from "solid-js";
+import type { Component } from "solid-js";
 import type { PixivNovel } from "../api/types";
 import { resolveImageUrl } from "../utils/imageLoader";
 import IllustTags from "./IllustTags";

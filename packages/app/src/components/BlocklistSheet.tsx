@@ -1,4 +1,4 @@
-import { type Component, Show } from "solid-js";
+import type { Component } from "solid-js";
 import { blockedIds, unblockUser } from "../stores/blockStore";
 
 function ids() {

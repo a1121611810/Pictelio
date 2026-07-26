@@ -1,5 +1,4 @@
-import { type Component, Show, createSignal } from "solid-js";
-import { useNavigate } from "@tanstack/solid-router";
+import type { Component } from "solid-js";
 import type { PixivComment } from "../api/types";
 import { type CommentContentType } from "../api/comment";
 import { useComments } from "../primitives/useComments";

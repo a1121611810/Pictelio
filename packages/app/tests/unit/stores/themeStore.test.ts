@@ -92,7 +92,10 @@ describe("loadThemePreference", () => {
 
     await expect(loadThemePreference()).resolves.toBeUndefined();
     expect(getResolvedTheme()).toBe("light");
-    expect(warnSpy).toHaveBeenCalledWith("[themeStore] Failed to load theme preference", expect.any(Error));
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[themeStore] Failed to load theme preference",
+      expect.any(Error),
+    );
     warnSpy.mockRestore();
   });
 });

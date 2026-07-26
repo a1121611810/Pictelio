@@ -1,4 +1,4 @@
-import { createSignal, type Component } from "solid-js";
+import type { Component } from "solid-js";
 import ImageCard from "./ImageCard";
 import SkeletonCard from "./SkeletonCard";
 import type { PixivIllust } from "../api/types";

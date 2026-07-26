@@ -1,5 +1,4 @@
-import { type Component, onMount, onCleanup } from "solid-js";
-import { useNavigate, useParams, useRouter } from "@tanstack/solid-router";
+import type { Component } from "solid-js";
 import { user } from "../stores/authStore";
 import {
   illusts,

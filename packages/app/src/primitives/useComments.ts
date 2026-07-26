@@ -1,4 +1,3 @@
-import { createSignal, createEffect, onCleanup } from "solid-js";
 
 import type { Accessor } from "solid-js";
 import type { PixivComment } from "../api/types";

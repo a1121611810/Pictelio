@@ -1,4 +1,3 @@
-import { createSignal, createEffect, onMount, Show, onCleanup } from "solid-js";
 import type { Component } from "solid-js";
 import { checkImageCache, loadImageWithProgress } from "../utils/imageLoader";
 

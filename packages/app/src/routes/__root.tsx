@@ -1,13 +1,4 @@
-import {
-  type Component,
-  onMount,
-  Show,
-  createSignal,
-  createEffect,
-  onCleanup,
-  ErrorBoundary,
-} from "solid-js";
-import { useNavigate, useLocation, useRouter, Outlet } from "@tanstack/solid-router";
+import type { Component } from "solid-js";
 import { isLoggedIn, isLoading, setIsLoading, initializeAuth } from "@/stores/authStore";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import {

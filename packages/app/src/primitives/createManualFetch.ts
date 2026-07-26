@@ -1,4 +1,3 @@
-import { createSignal, onCleanup } from "solid-js";
 
 /**
  * 手动 fetch 封装，替代 createResource 用于路由级组件。

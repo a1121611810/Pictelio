@@ -1,4 +1,3 @@
-import { createSignal } from "solid-js";
 import { getUserDetail } from "../api/user";
 import { type PixivProfile, type PixivUser } from "../api/types";
 import { user } from "./authStore";

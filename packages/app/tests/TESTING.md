@@ -2,20 +2,20 @@
 
 ## 分层
 
-| 层级           | 配置                       | 命令                     | 用途                                   | 速度 |
-| -------------- | -------------------------- | ------------------------ | -------------------------------------- | ---- |
-| **单元测试**   | `vitest.config.ts`         | `pnpm test`              | 纯逻辑：store、utils、API 参数验证     | 快   |
-| **E2E 测试**   | `vitest.agent-browser.config.ts` | `pnpm test:agent-browser` | AI 驱动 E2E：用户流、页面渲染、交互 | 慢   |
-| **全量**       | —                          | `pnpm test:all`          | 单元 + E2E 全部测试                    | —    |
+| 层级         | 配置                             | 命令                      | 用途                                | 速度 |
+| ------------ | -------------------------------- | ------------------------- | ----------------------------------- | ---- |
+| **单元测试** | `vitest.config.ts`               | `pnpm test`               | 纯逻辑：store、utils、API 参数验证  | 快   |
+| **E2E 测试** | `vitest.agent-browser.config.ts` | `pnpm test:agent-browser` | AI 驱动 E2E：用户流、页面渲染、交互 | 慢   |
+| **全量**     | —                                | `pnpm test:all`           | 单元 + E2E 全部测试                 | —    |
 
 ## 核心规则
 
 ### 文件命名
 
-| 前缀                | 存放目录              | 说明                                    |
-| ------------------- | --------------------- | --------------------------------------- |
-| `*.test.ts`         | `tests/unit/`         | 纯逻辑测试，`vitest.config.ts` 匹配     |
-| `*.test.ts`         | `tests/agent-browser/`| AI 驱动 E2E 测试，`vitest.agent-browser.config.ts` 匹配 |
+| 前缀        | 存放目录               | 说明                                                    |
+| ----------- | ---------------------- | ------------------------------------------------------- |
+| `*.test.ts` | `tests/unit/`          | 纯逻辑测试，`vitest.config.ts` 匹配                     |
+| `*.test.ts` | `tests/agent-browser/` | AI 驱动 E2E 测试，`vitest.agent-browser.config.ts` 匹配 |
 
 ### E2E 测试模式
 

@@ -1,4 +1,4 @@
-import { type Component, Show, For } from "solid-js";
+import type { Component } from "solid-js";
 import type { PixivComment } from "../api/types";
 import { user } from "../stores/authStore";
 import { resolveImageUrl } from "../utils/imageLoader";

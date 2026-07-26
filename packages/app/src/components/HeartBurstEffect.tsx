@@ -1,4 +1,4 @@
-import { type Component, type Accessor, createEffect, onCleanup } from "solid-js";
+import type { Component, Accessor } from "solid-js";
 
 interface Props {
   trigger: Accessor<number>;

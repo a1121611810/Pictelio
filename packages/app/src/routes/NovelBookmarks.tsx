@@ -1,5 +1,4 @@
-import { type Component, createEffect, onMount, onCleanup, Show } from "solid-js";
-import { useNavigate } from "@tanstack/solid-router";
+import type { Component } from "solid-js";
 import {
   novels,
   nextUrl,
@@ -16,7 +15,6 @@ import NovelVirtualFeed from "../components/NovelVirtualFeed";
 import SeriesSheet from "../components/SeriesSheet";
 import { novelLayoutMode } from "../stores/settingsStore";
 import { pushOverlay, popOverlay } from "../stores/backGestureStore";
-import { createSignal } from "solid-js";
 
 const r18Handler = () => refresh();
 

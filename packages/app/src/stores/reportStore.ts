@@ -1,4 +1,3 @@
-import { createSignal } from "solid-js";
 import { Preferences } from "@capacitor/preferences";
 
 const PREF_KEY_REPORTED_IDS = "reported_ids";

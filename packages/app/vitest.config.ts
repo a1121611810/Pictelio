@@ -4,7 +4,28 @@ import AutoImport from "unplugin-auto-import/vite";
 import { resolve } from "node:path";
 
 export default defineConfig({
-  plugins: [AutoImport({ imports: [{ "@/utils/tryAsync": ["tryAsync", "trySync"] }], dts: "./src/auto-imports.d.ts" }), solid()],
+  plugins: [
+    AutoImport({
+      imports: [
+        "solid-js",
+        {
+          "@tanstack/solid-router": [
+            "useNavigate",
+            "useRouter",
+            "useParams",
+            "useSearch",
+            "useLocation",
+            "Outlet",
+            "getRouteApi",
+            "RouterProvider",
+          ],
+        },
+        { "@/utils/tryAsync": ["tryAsync", "trySync"] },
+      ],
+      dts: "./src/auto-imports.d.ts",
+    }),
+    solid(),
+  ],
   define: {
     __CREDENTIALS__: JSON.stringify({
       clientId: "MOBrBDS8blbauoSck0ZfDbtuzpyT",

@@ -1,4 +1,4 @@
-import { createSignal, createMemo, type Component } from "solid-js";
+import type { Component } from "solid-js";
 import PixivImage from "./PixivImage";
 import { createEverVisible } from "@/primitives/visibility";
 import { LAZY_LOAD_MARGIN } from "../primitives/rootMargins";

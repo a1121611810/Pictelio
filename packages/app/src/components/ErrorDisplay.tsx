@@ -1,5 +1,4 @@
 import { type Component, type JSX } from "solid-js";
-import { useNavigate } from "@tanstack/solid-router";
 import { ApiErrorType, type ApiError } from "../api/types";
 import { isLoggedIn } from "../stores/authStore";
 

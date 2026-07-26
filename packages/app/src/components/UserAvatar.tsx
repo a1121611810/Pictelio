@@ -1,4 +1,4 @@
-import { type Component, createSignal, createEffect, Show } from "solid-js";
+import type { Component } from "solid-js";
 import { Capacitor } from "@capacitor/core";
 import { user } from "../stores/authStore";
 import { loadImage, resolveImageUrl } from "../utils/imageLoader";

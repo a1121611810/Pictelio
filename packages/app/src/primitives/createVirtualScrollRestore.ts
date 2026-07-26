@@ -1,4 +1,3 @@
-import { onCleanup } from "solid-js";
 import type { VirtualItem, Virtualizer } from "@tanstack/solid-virtual";
 import type { ScrollRestoreState } from "./createScrollRestore";
 

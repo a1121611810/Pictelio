@@ -1,5 +1,4 @@
-import { type Component, createSignal, onMount, Show } from "solid-js";
-import { useNavigate } from "@tanstack/solid-router";
+import type { Component } from "solid-js";
 import { Capacitor } from "@capacitor/core";
 import { loginWithToken, isLoggedIn } from "../stores/authStore";
 import { type ApiError } from "../api/types";

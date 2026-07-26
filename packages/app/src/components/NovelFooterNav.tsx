@@ -1,5 +1,4 @@
 import { type Component } from "solid-js";
-import { Show } from "solid-js";
 import type { PixivNovel, SeriesNavigation } from "../api/types";
 import FluentIcon from "./ui/FluentIcon";
 

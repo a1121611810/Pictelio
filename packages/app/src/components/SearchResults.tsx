@@ -1,4 +1,4 @@
-import { For, Show, type Component } from "solid-js";
+import type { Component } from "solid-js";
 import type { SearchResultItem, ApiError, PixivIllust, PixivNovel } from "@/api/types";
 import ImageCard from "@/components/ImageCard";
 import NovelCard from "@/components/NovelCard";

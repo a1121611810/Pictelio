@@ -1,4 +1,4 @@
-import { createSignal, onCleanup, type Accessor } from "solid-js";
+import type { Accessor } from "solid-js";
 
 /**
  * Tracks container element width via ResizeObserver.

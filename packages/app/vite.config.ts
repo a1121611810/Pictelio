@@ -46,7 +46,29 @@ export default defineConfig({
       "@": resolve(__dirname, "src"),
     },
   },
-  plugins: [AutoImport({ imports: [{ "@/utils/tryAsync": ["tryAsync", "trySync"] }], dts: "./src/auto-imports.d.ts" }), solid(), UnoCSS()],
+  plugins: [
+    AutoImport({
+      imports: [
+        "solid-js",
+        {
+          "@tanstack/solid-router": [
+            "useNavigate",
+            "useRouter",
+            "useParams",
+            "useSearch",
+            "useLocation",
+            "Outlet",
+            "getRouteApi",
+            "RouterProvider",
+          ],
+        },
+        { "@/utils/tryAsync": ["tryAsync", "trySync"] },
+      ],
+      dts: "./src/auto-imports.d.ts",
+    }),
+    solid(),
+    UnoCSS(),
+  ],
   define: {
     APP_VERSION: JSON.stringify(pkg.version),
     __CREDENTIALS__,
@@ -268,10 +290,7 @@ export default defineConfig({
     },
     overrides: [
       {
-        files: [
-          "tests/**/*.test.ts",
-          "tests/**/*.test.tsx",
-        ],
+        files: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
         // Override 设置 plugins 会替换（而非合并）基线列表，必须包含所有所需插件
         plugins: ["typescript", "unicorn", "oxc", "vitest"],
         env: { node: true },

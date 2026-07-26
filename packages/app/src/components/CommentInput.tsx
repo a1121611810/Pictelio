@@ -1,4 +1,4 @@
-import { type Component, Show, createSignal, createEffect } from "solid-js";
+import type { Component } from "solid-js";
 import type { PixivComment } from "../api/types";
 
 export interface CommentInputProps {

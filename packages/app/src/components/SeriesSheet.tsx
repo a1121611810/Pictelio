@@ -1,12 +1,4 @@
-import {
-  type Component,
-  Show,
-  createSignal,
-  createEffect,
-  For,
-  onCleanup,
-  createMemo,
-} from "solid-js";
+import type { Component } from "solid-js";
 import { loadSeries, loadSeriesNext, type NovelSeriesDetailResponse } from "../api/novel";
 import type { PixivNovel } from "../api/types";
 import SeriesSheetItem from "./SeriesSheetItem";

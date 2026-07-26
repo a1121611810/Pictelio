@@ -1,4 +1,4 @@
-import { createSignal, createEffect, onCleanup, untrack, batch, type Accessor } from "solid-js";
+import type { Accessor } from "solid-js";
 import { loadDetail, fetchNovelData, type NovelImagesMap } from "@/api/novel";
 import type { PixivNovel, SeriesNavigation } from "@/api/types";
 import { peekEntry, getEntry, setEntry, type CacheEntry } from "@/stores/novelCache";

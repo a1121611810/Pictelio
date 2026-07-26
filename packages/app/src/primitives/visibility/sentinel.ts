@@ -1,4 +1,4 @@
-import { createSignal, createMemo, createEffect, type Accessor } from "solid-js";
+import type { Accessor } from "solid-js";
 import { createIntersectionObserver } from "@solid-primitives/intersection-observer";
 import { SENTINEL_MARGIN } from "../rootMargins";
 

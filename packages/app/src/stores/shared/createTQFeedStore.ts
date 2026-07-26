@@ -13,7 +13,7 @@
  *  - 处理 allMode merge/sort + 可选去重
  */
 
-import { createRoot, type Accessor } from "solid-js";
+import type { Accessor } from "solid-js";
 import { createInfiniteQuery } from "@tanstack/solid-query";
 import { queryClient } from "../../api/queryClient";
 import { normalizeQueryError } from "../../api/normalizeQueryError";

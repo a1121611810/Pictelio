@@ -9,7 +9,6 @@
  * 用户隔离：复合 key `${userId}_${type}_${id}`。
  */
 
-import { createSignal } from "solid-js";
 import { createCollection } from "@tanstack/solid-db";
 import { localStorageCollectionOptions } from "@tanstack/solid-db";
 import type { PixivIllust, PixivNovel } from "@/api/types";

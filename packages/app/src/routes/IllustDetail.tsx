@@ -1,6 +1,5 @@
-import { type Component, Show, createSignal, onCleanup, createEffect, createMemo } from "solid-js";
+import type { Component } from "solid-js";
 import { createIntersectionObserver } from "@solid-primitives/intersection-observer";
-import { useNavigate, useRouter, getRouteApi } from "@tanstack/solid-router";
 import {
   addBookmark,
   deleteBookmark,

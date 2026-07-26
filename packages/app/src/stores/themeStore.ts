@@ -1,4 +1,3 @@
-import { createSignal, createRoot, createEffect } from "solid-js";
 import { Preferences } from "@capacitor/preferences";
 import { applyPageStyleClass, applyDarkClass } from "@/utils/themeApplier";
 

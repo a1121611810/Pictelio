@@ -1,4 +1,4 @@
-import { createSignal, For, type Component } from "solid-js";
+import type { Component } from "solid-js";
 import FluentIcon from "@/components/ui/FluentIcon";
 
 interface TagInputProps {
