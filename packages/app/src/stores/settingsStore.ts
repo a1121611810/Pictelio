@@ -57,7 +57,7 @@ const initialState = () => ({
   imageCacheDiskSize: 300,
 
   // 更新检测
-  autoCheckUpdate: false,
+  autoCheckUpdate: true,
   hasUpdate: false,
   latestVersion: "",
   latestReleaseUrl: "",
@@ -439,7 +439,7 @@ export async function resetSettingsStore(): Promise<void> {
   await setNovelLayoutMode("list");
   await setShowDetailStairs(false);
   await setAgeConfirmation(false, false);
-  await setAutoCheckUpdate(false);
+  await setAutoCheckUpdate(true);
   await setLastDismissedVersion("");
   setHasUpdate(false);
   setLatestVersion("");
