@@ -8,6 +8,7 @@
  */
 
 export interface AiAssertResult {
+  passed: boolean;
   reason: string;
 }
 

@@ -45,7 +45,7 @@ This wiki helps humans and agents understand the architecture, workflows, integr
 
 ### Testing & Operations
 
-- **[Testing Strategy](/openwiki/testing/overview.md)** — Four test layers (unit/browser/agent-browser/e2e), file naming conventions, test helpers, CI workflows
+- **[Testing Strategy](/openwiki/testing/overview.md)** — Three test tiers (unit/browser/agent-browser E2E), Playwright-to-agent-browser migration (ADR-0034), file naming conventions, test helpers, CI workflows
 
 ## Development Quick Start
 
@@ -87,6 +87,7 @@ Architecture Decision Records live in `/docs/adr/`. Notable ones:
 | 0030 | Image cache periodic GC |
 | 0032 | Author click navigation (unified prop chain) |
 | 0033 | Startup update dialog: pure CSS overlay replaces Fluent dialog |
+| 0034 | Migrate Playwright E2E tests to agent-browser (AI-driven E2E) |
 
 ## Key Source Files
 
@@ -109,9 +110,7 @@ All commands are run from the monorepo root:
 | `pnpm dev` | Start Vite dev server |
 | `pnpm build` | TypeScript check + Vite build |
 | `pnpm test` | Vitest unit tests |
-| `pnpm test:browser` | Vitest browser tests (Playwright) |
-| `pnpm test:e2e` | Playwright E2E tests |
-| `pnpm test:agent-browser` | AI-driven agent-browser tests |
+| `pnpm test:agent-browser` | AI-driven agent-browser E2E tests |
 | `pnpm lint` | oxlint code check |
 | `pnpm fmt` | oxfmt code formatting |
 | `pnpm build:android` | Full Android debug build chain |

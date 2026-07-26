@@ -2,55 +2,54 @@
 
 ## 分层
 
-| 层级           | 配置                       | 命令                | 用途                               | 速度 |
-| -------------- | -------------------------- | ------------------- | ---------------------------------- | ---- |
-| **单元测试**   | `vitest.config.ts`         | `pnpm test`         | 纯逻辑：store、utils、API 参数验证 | 快   |
-| **浏览器测试** | `vitest.browser.config.ts` | `pnpm test:browser` | DOM 操作、组件加载验证             | 中   |
-| **全量**       | —                          | `pnpm test:all`     | CLI + Browser 全部测试             | —    |
+| 层级           | 配置                       | 命令                     | 用途                                   | 速度 |
+| -------------- | -------------------------- | ------------------------ | -------------------------------------- | ---- |
+| **单元测试**   | `vitest.config.ts`         | `pnpm test`              | 纯逻辑：store、utils、API 参数验证     | 快   |
+| **E2E 测试**   | `vitest.agent-browser.config.ts` | `pnpm test:agent-browser` | AI 驱动 E2E：用户流、页面渲染、交互 | 慢   |
+| **全量**       | —                          | `pnpm test:all`          | 单元 + E2E 全部测试                    | —    |
 
 ## 核心规则
 
-### 组件测试文件必须渲染组件
-
-`*.test.tsx` 文件中如果被测对象是组件，必须至少有一个测试用例实际渲染该组件（使用 `@solidjs/testing-library` 的 `render`）。
-
-仅测试子函数/子模块的文件应按被测模块命名，**不使用组件名**。
-
-> 反例：`SeriesSheet.test.tsx` 内容全是 `loadSeries` API 测试，和组件无关。
-> 正例：API 测试放 `tests/unit/api/novel.test.ts`，组件渲染测试放 `tests/browser/SeriesSheet.browser.test.ts`。
-
 ### 文件命名
 
-| 前缀                | 存放目录         | 说明                                            |
-| ------------------- | ---------------- | ----------------------------------------------- |
-| `*.test.ts`         | `tests/unit/`    | 纯逻辑测试，`vitest.config.ts` 匹配             |
-| `*.browser.test.ts` | `tests/browser/` | 浏览器环境测试，`vitest.browser.config.ts` 匹配 |
+| 前缀                | 存放目录              | 说明                                    |
+| ------------------- | --------------------- | --------------------------------------- |
+| `*.test.ts`         | `tests/unit/`         | 纯逻辑测试，`vitest.config.ts` 匹配     |
+| `*.test.ts`         | `tests/agent-browser/`| AI 驱动 E2E 测试，`vitest.agent-browser.config.ts` 匹配 |
 
-### 何时需要浏览器测试
+### E2E 测试模式
 
-以下场景必须使用浏览器测试（`.browser.test.ts`）：
-
-- 组件模块加载验证（export 是否正确）
-- DOM API 调用（`document.body.style.overflow` 等）
-- 浏览器特有 API（IntersectionObserver、ResizeObserver 等）
-- 异步渲染结果验证（配合 `@solidjs/testing-library`）
-
-### 渲染组件需要 @solidjs/testing-library
-
-已安装。`vitest.browser.config.ts` 已配置 `vite-plugin-solid`，支持组件渲染。
-
-在浏览器测试中写：
+每个 E2E 测试步骤遵循：操作（click/fill/scroll）→ `aiAssert` → `expect` 模式。
 
 ```typescript
-import { render, screen } from "@solidjs/testing-library";
-import { SeriesSheet } from "@/components/SeriesSheet";
-
-// 需要 mock 依赖
-vi.mock("@capacitor/core", () => ({ ... }));
-vi.mock("@tanstack/solid-router", () => ({ useNavigate: () => vi.fn() }));
-
-it("renders when open", () => {
-  render(() => <SeriesSheet isOpen={true} ... />);
-  expect(screen.getByText("系列作品")).toBeTruthy();
-});
+const state = await getState(driver);
+const result = await aiAssert("推荐 Feed 展示插画卡片瀑布流", state);
+expect(result.passed, result.reason).toBe(true);
 ```
+
+`aiAssert` 将页面 accessibility tree + innerText 发给 DeepSeek Flash 做语义化判断，失败自动重试 2 次。
+
+### 精确 DOM 属性检查
+
+需要精确检查 CSS class、计算样式、DOM 属性时，使用 `driver.evaluate()` 或 `driver.getAttribute()`/`driver.getComputedStyle()`：
+
+```typescript
+const pressed = await driver.getAttribute('[aria-label="浅色"]', "aria-pressed");
+expect(pressed).toBe("true");
+```
+
+### 何时使用 E2E
+
+- 用户登录流
+- Feed 加载、滚动、Tab 切换
+- 作品/小说详情页渲染
+- 收藏、关注等用户操作
+- 设置页功能
+- 页面导航和路由
+
+### 何时使用单元测试
+
+- Store 状态管理逻辑
+- API 参数拼接和响应处理
+- 工具函数
+- 纯数据转换

@@ -270,9 +270,6 @@ export default defineConfig({
         files: [
           "tests/**/*.test.ts",
           "tests/**/*.test.tsx",
-          "tests/**/*.browser.test.ts",
-          "tests/**/*.e2e.ts",
-          "tests/e2e/*.ts",
         ],
         // Override 设置 plugins 会替换（而非合并）基线列表，必须包含所有所需插件
         plugins: ["typescript", "unicorn", "oxc", "vitest"],

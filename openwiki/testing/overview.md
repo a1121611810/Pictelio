@@ -1,21 +1,18 @@
 ---
 type: Concept
 title: Testing Strategy
-description: Four-tier testing architecture — unit tests (Vitest), browser component tests (Vitest browser mode), AI agent-driven browser tests, and Playwright end-to-end tests. Covers conventions, file naming, test helpers, and infrastructure.
-tags: [testing, vitest, playwright, e2e, agent-tests, unit-tests]
+description: Two testing tiers — unit tests (Vitest) and AI agent-driven browser E2E tests (agent-browser). Component tests and Playwright E2E have been migrated to agent-browser per ADR-0034/ADR-0035.
+tags: [testing, vitest, agent-browser, e2e, unit-tests]
 ---
 
 # Testing Strategy
 
-Pictelio uses a four-tier testing architecture, each with its own configuration and purpose. Tests live under `/packages/app/tests/`. The canonical conventions are documented in `/packages/app/tests/TESTING.md`.
+Pictelio uses two active testing tiers. Previously there were component-level browser tests (Vitest browser mode) and Playwright E2E — both have been fully migrated to agent-browser per [ADR-0034](/docs/adr/ADR-0034-migrate-playwright-e2e-to-agent-browser.md) and [ADR-0035](/docs/adr/ADR-0035-migrate-component-tests-to-e2e-and-unit.md). Tests live under `/packages/app/tests/`. The canonical conventions are documented in `/packages/app/tests/TESTING.md`.
 
-<!-- openwiki: mermaid parse failed and this diagram was converted to a text fence so it does not break rendering. Fix the diagram source and restore the mermaid fence. Parser error: Heuristic: an unescaped angle bracket inside a label breaks rendering; rephrase the label. -->
-```text
+```mermaid
 flowchart TD
-    U[Unit Tests<br/>vitest.config.ts] --> S[Pure logic: API, utils, stores, router]
-    B[Browser Tests<br/>vitest.browser.config.ts] --> C[Component rendering: UI, interaction]
-    A[Agent Browser Tests<br/>vitest.agent-browser.config.ts] --> AI[AI-driven user flow verification]
-    E[E2E Tests<br/>vitest.e2e.config.ts] --> PW[Playwright: full app workflows]
+    U["Unit Tests (vitest.config.ts)"] --> S["Pure logic: API, utils, stores, router"]
+    A["Agent-Browser Tests (vitest.agent-browser.config.ts)"] --> AI["AI-driven user flow verification"]
 ```
 
 ## Test Tiers
@@ -28,37 +25,28 @@ flowchart TD
 - **Key pattern:** `createManualFetch` (`/packages/app/src/primitives/createManualFetch.ts`) — a test-oriented primitive that allows injecting mock responses into the API client, simulating any Pixiv API response without actual network calls
 - Runs via: `pnpm test`
 
-### 2. Browser Tests (`tests/browser/`)
+### 2. Agent-Browser E2E Tests (`tests/agent-browser/`)
 
-- **Runner:** Vitest browser mode (`vitest.browser.config.ts`)
-- **Scope:** Component rendering with `@solidjs/testing-library` — VirtualFeed, IllustDetail, NovelDetail, Login, NavBar, SeriesSheet, ThemeSelector, etc.
-- **Provides a real browser environment** (Playwright-based) for DOM interaction
-- Can test reactive behavior, user interaction, and component lifecycle
-- Runs via: `pnpm test:browser`
-
-### 3. Agent Browser Tests (`tests/agent-browser/`)
-
-- **Runner:** Custom Vitest config (`vitest.agent-browser.config.ts`)
-- **Scope:** AI-driven user flow verification — uses a custom agent driver to simulate complex user interactions
-- Has its own `TESTING.md` for conventions
-- **Custom infrastructure:** Agent driver, fixtures, setup scripts, and spec files
-- Designed for testing multi-step flows that are tedious to script manually
-- **Recent stability improvements (v3.17.2-3.17.6):**
-  - **Daemon socket conflict resolution** — per-file namespace with aggressive cleanup prevents port collisions
-  - **`clickFirst` fix** — skips the first DOM match (user avatar ref) and targets the second (card click surface)
-  - **`clickReliable`** — wraps `event.target.click()` in a try-catch fallback chain for resilience against stale references
-  - **DOM-based navigation** — replaced fragile JavaScript-based `evaluate` calls with DOM button clicks via `clickReliable`
-
-### 4. End-to-End Tests (`tests/e2e/`)
-
-- **Runner:** Playwright (`vitest.e2e.config.ts`)
-- **Scope:** Full app workflows — login, feed browsing, novel reading, settings changes
+- **Runner:** Vitest (`vitest.agent-browser.config.ts`)
+- **Scope:** AI-driven user flow verification — covers core user flows, UI component behavior, page navigation, and settings
 - **Infrastructure:**
-  - Global setup (`global-setup.ts`) — loads Pixiv auth token from environment
-  - Global teardown (`global-teardown.ts`)
-  - Fixtures and helpers for common test patterns
-  - Spec files organized by feature
-- Runs via: `pnpm test:e2e`
+  - **AgentBrowserDriver** (`driver.ts`) — spawns `agent-browser` CLI via `spawnSync` (migrated from `execSync`/`shell:true` for better error handling and security)
+  - **`clickFirst`** — targets clickable elements; `skipCount` parameter skips top UI elements (avatar, title) to land on content cards
+  - **`clickReliable`** — fallback chain: `@e` ref → aria-label → direct text → CSS selector
+  - **`getAttribute`/`getComputedStyle`** — bridge methods for precise DOM property assertions via `evaluate()`
+  - **`aiAssert`** (`tests/ai-shared/assertion.ts`) — sends page state (accessibility tree + page text) to DeepSeek Flash for semantic validation
+- **File structure:**
+  - `main-flow.test.ts` — single long-chain test covering end-to-end user journey
+  - `sub-flows.test.ts` — medium-chain tests organized by feature (discovery, artwork, reading, personal, login, settings, navigation)
+- Runs via: `pnpm test:agent-browser`
+
+### Migration History
+
+Previously Pictelio had:
+- **Playwright E2E tests** (11 spec files) — migrated to agent-browser per ADR-0034
+- **Vitest browser component tests** (29 files, `@vitest/browser-playwright`) — migrated to agent-browser E2E or removed per ADR-0035
+
+Both `playwright` and `@vitest/browser-playwright` dependencies have been removed.
 
 ## File Naming Conventions
 
@@ -67,9 +55,7 @@ Per `TESTING.md`:
 | Pattern | Test Tier | Purpose |
 |---------|-----------|---------|
 | `*.test.ts`  | Unit | Pure logic tests (no DOM) |
-| `*.browser.test.ts` | Browser | Component rendering tests |
-| `*.agent-browser.test.ts` | Agent browser | AI-driven flow tests |
-| `*.e2e.test.ts` | E2E | Playwright end-to-end tests |
+| `*.test.ts` (in agent-browser/) | Agent-browser E2E | AI-driven flow tests |
 
 ## Test Infrastructure
 
@@ -108,11 +94,8 @@ Shared infrastructure between agent-browser and other AI-driven test types:
 |---------|-------|
 | `pnpm test` | Unit tests (Vitest) |
 | `pnpm test:watch` | Unit tests in watch mode |
-| `pnpm test:browser` | Browser component tests |
-| `pnpm test:e2e` | Playwright E2E tests |
-| `pnpm test:e2e:ui` | Playwright with UI mode |
-| `pnpm test:all` | Unit + browser tests combined |
-| `pnpm test:browser --run` | Single-run browser tests (no watch) |
+| `pnpm test:agent-browser` | Agent-browser E2E tests |
+| `pnpm test:all` | Unit + agent-browser E2E combined |
 
 ## Key Source Files
 
@@ -120,14 +103,12 @@ Shared infrastructure between agent-browser and other AI-driven test types:
 |---------|------|
 | Testing conventions doc | `/packages/app/tests/TESTING.md` |
 | Unit test config | `/packages/app/vitest.config.ts` |
-| Browser test config | `/packages/app/vitest.browser.config.ts` |
-| Agent browser config | `/packages/app/vitest.agent-browser.config.ts` |
-| E2E test config | `/packages/app/vitest.e2e.config.ts` |
+| Agent-browser test config | `/packages/app/vitest.agent-browser.config.ts` |
 | Test helpers | `/packages/app/tests/helpers.ts` |
 | Manual fetch primitive | `/packages/app/src/primitives/createManualFetch.ts` |
 | Memory store | `/packages/app/src/stores/db.ts` |
 | Unit tests | `/packages/app/tests/unit/` |
 | Browser tests | `/packages/app/tests/browser/` |
-| Agent browser tests | `/packages/app/tests/agent-browser/` |
-| E2E tests | `/packages/app/tests/e2e/` |
+| Agent-browser tests | `/packages/app/tests/agent-browser/` |
 | AI shared utilities | `/packages/app/tests/ai-shared/` |
+| E2E migration ADR | `/docs/adr/ADR-0034-migrate-playwright-e2e-to-agent-browser.md` |

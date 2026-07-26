@@ -7,23 +7,29 @@
  * 核心设计原则：每次交互前都获取新 snapshot，避免 @e ref 过期。
  */
 
-import { execSync, type ExecSyncOptions } from "node:child_process";
+import { spawnSync } from "node:child_process";
 
 const BASE_URL = "http://localhost:5173";
 const SNAPSHOT_FLAGS = "-i";
 
-const EXEC_OPTIONS: ExecSyncOptions = {
-  encoding: "utf-8",
-  timeout: 30_000,
-  shell: true,
-};
+const SPAWN_TIMEOUT = 30_000;
 
 // ─── 底层 CLI 调用 ─────────────────────────────────
 
 function ab(...args: string[]): string {
-  const cmd = `agent-browser ${args.join(" ")}`;
-  console.log(`[agent-browser] ${cmd}`);
-  return execSync(cmd, EXEC_OPTIONS).trim();
+  console.log(`[agent-browser] agent-browser ${args.join(" ")}`);
+  const result = spawnSync("agent-browser", args, {
+    encoding: "utf-8",
+    timeout: SPAWN_TIMEOUT,
+    shell: false,
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(
+      `agent-browser exited code ${result.status}: ${(result.stderr ?? "").trim() || (result.stdout ?? "").trim()}`,
+    );
+  }
+  return (result.stdout ?? "").trim();
 }
 
 // ─── 工具函数（导出以便 fixture 使用） ─────────────
@@ -199,6 +205,38 @@ export class AgentBrowserDriver {
 
   async pageText(): Promise<string> {
     return ab("eval", '"document.body.innerText"');
+  }
+
+  /**
+   * 获取指定 CSS 选择器匹配的第一个元素的属性值。
+   * 用于精确 DOM 属性断言（如 aria-pressed、class 等）。
+   * @param selector - CSS 选择器
+   * @param attr - 属性名
+   * @returns 属性值，元素不存在时返回 null 的字符串表示
+   */
+  async getAttribute(selector: string, attr: string): Promise<string | null> {
+    const js = `(() => {
+      const el = document.querySelector('${selector.replace(/'/g, "\\'")}');
+      return el ? el.getAttribute('${attr}') : null;
+    })()`;
+    const result = await this.evaluate(js);
+    return result === "null" ? null : result;
+  }
+
+  /**
+   * 获取指定 CSS 选择器匹配的第一个元素的计算样式值。
+   * 用于精确样式断言（如 opacity、transition 等）。
+   * @param selector - CSS 选择器
+   * @param prop - CSS 属性名（驼峰命名，如 "opacity"、"transition"）
+   * @returns 计算样式值字符串
+   */
+  async getComputedStyle(selector: string, prop: string): Promise<string | null> {
+    const js = `(() => {
+      const el = document.querySelector('${selector.replace(/'/g, "\\'")}');
+      return el ? getComputedStyle(el).getPropertyValue('${prop}') : null;
+    })()`;
+    const result = await this.evaluate(js);
+    return result === "null" ? null : result;
   }
 
   async screenshot(path?: string): Promise<string> {

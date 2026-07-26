@@ -407,11 +407,10 @@ packages/app/src/
 ## 测试
 
 - **框架**: Vitest 4.1，通过 `vite-plus` 的 `vp test` 运行
-- **环境**: `node`、`browser`（Playwright provider，配置在 `vitest.config.ts`）
+- **环境**: `node`
 - **测试文件位置**:
   - `tests/unit/**/*.test.{ts,tsx}` — 单元测试，按源目录结构组织
-  - `tests/browser/**/*.browser.test.{ts,tsx}` — 浏览器环境组件测试
-  - `tests/e2e/specs/` — 端到端测试
+  - `tests/agent-browser/specs/**/*.test.ts` — AI 驱动 E2E 测试
   - `src/**/*.test.ts` — 辅助函数/内部模块的就近测试
 - **单元测试覆盖**:
   - `api/` — 10 测试文件（auth、client、client401Retry、client429Retry、comment、illust、novel、ssrfWhitelistContract、user、userAgent）

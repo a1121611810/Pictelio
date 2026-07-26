@@ -1,3 +1,3 @@
 # Files
 
-- [Testing Strategy](overview.md) - Four-tier testing architecture — unit tests (Vitest), browser component tests (Vitest browser mode), AI agent-driven browser tests, and Playwright end-to-end tests. Covers conventions, file naming, test helpers, and infrastructure.
+- [Testing Strategy](overview.md) - Three testing tiers — unit tests (Vitest), browser component tests (Vitest browser mode), and AI agent-driven browser E2E tests (agent-browser). Playwright E2E tests are being migrated to agent-browser per ADR-0034. Covers conventions, file naming, test helpers, and infrastructure.
