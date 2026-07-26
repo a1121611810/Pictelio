@@ -1,4 +1,4 @@
-import { type Component, Show, createEffect } from "solid-js";
+import { type Component, Show, createEffect, onCleanup } from "solid-js";
 import {
   showUpdateDialog,
   setShowUpdateDialog,
@@ -26,7 +26,7 @@ function handleDismiss() {
  * 触发内部 showModal，且 slot 系统会导致按钮不可见。
  * 改为纯 CSS fixed 覆盖层，完全控制布局。
  *
- * Fluent 2 设计令牌通过 tokens.css 的 CSS 变量使用。
+ * Fluent 2 设计令牌通过 tokens.css 的 CSS 变量使用，自动跟随主题。
  */
 const StartupUpdateDialog: Component = () => {
   // 二次保障：监控 store 状态变化，在条件满足时自动弹窗。
@@ -42,6 +42,19 @@ const StartupUpdateDialog: Component = () => {
     }
   });
 
+  // Escape 键关闭弹窗（无障碍支持）
+  createEffect(() => {
+    if (showUpdateDialog()) {
+      const onKeyDown = (e: KeyboardEvent) => {
+        if (e.key === "Escape") {
+          handleDismiss();
+        }
+      };
+      document.addEventListener("keydown", onKeyDown);
+      onCleanup(() => document.removeEventListener("keydown", onKeyDown));
+    }
+  });
+
   function handleDownload() {
     const url = latestReleaseUrl();
     if (url) {
@@ -52,11 +65,10 @@ const StartupUpdateDialog: Component = () => {
 
   return (
     <Show when={showUpdateDialog()}>
-      {/* 半透明背景遮罩 */}
+      {/* 半透明背景遮罩 — 不可点击关闭，用户只能通过按钮操作 */}
       <div
         class="fixed inset-0 z-50 flex items-center justify-center"
-        style="background-color: var(--colorNeutralBackground6);"
-        onClick={handleDismiss}
+        style="background-color: var(--colorOverlayBackground);"
       >
         {/* 弹窗卡片 */}
         <div
@@ -64,31 +76,18 @@ const StartupUpdateDialog: Component = () => {
           style="background-color: var(--colorNeutralBackground1); animation: fluent-scale-enter 200ms cubic-bezier(0.33, 0, 0, 1) both;"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* 顶部标题栏 */}
-          <div class="flex items-start justify-between px-5 pt-5 pb-2">
-            <div class="flex-1 min-w-0">
-              <h2
-                class="text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase500)] font-semibold leading-tight m-0"
-              >
-                发现新版本
-              </h2>
-              <p
-                class="mt-0.5 text-[var(--colorBrandForeground1)] [font-size:var(--fontSizeBase300)] font-semibold leading-snug"
-              >
-                v{latestVersion()}
-              </p>
-            </div>
-            {/* 关闭按钮 */}
-            <button
-              class="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-[var(--borderRadiusMedium)] text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-[0.92] focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-[var(--strokeWidthThick)] focus-visible:outline-[color:var(--colorStrokeFocus2)] transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] -mr-1 -mt-1"
-              onClick={handleDismiss}
-              aria-label="关闭"
-              type="button"
+          {/* 顶部标题 */}
+          <div class="px-5 pt-5 pb-2">
+            <h2
+              class="text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase500)] font-semibold leading-tight m-0"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M4.22 4.22a.75.75 0 0 1 1.06 0L12 10.94l6.72-6.72a.75.75 0 1 1 1.06 1.06L13.06 12l6.72 6.72a.75.75 0 1 1-1.06 1.06L12 13.06l-6.72 6.72a.75.75 0 0 1-1.06-1.06L10.94 12 4.22 5.28a.75.75 0 0 1 0-1.06z" fill="currentColor" />
-              </svg>
-            </button>
+              发现新版本
+            </h2>
+            <p
+              class="mt-0.5 text-[var(--colorBrandForeground1)] [font-size:var(--fontSizeBase300)] font-semibold leading-snug"
+            >
+              v{latestVersion()}
+            </p>
           </div>
 
           {/* 正文内容 */}
