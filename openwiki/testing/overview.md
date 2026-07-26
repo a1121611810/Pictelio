@@ -83,10 +83,10 @@ jest.mock("../stores/db", () => ({
 
 ### AI-Shared Test Utilities (`tests/ai-shared/`)
 
-Shared infrastructure between agent-browser and other AI-driven test types:
-- Assertion helpers for common patterns
-- Global setup/teardown for auth token loading
-- Driver abstraction for the agent browser
+Shared infrastructure for AI-driven E2E tests:
+- **`assertion.ts`** — The `aiAssert` function that sends the page accessibility tree + innerText to DeepSeek Flash (`DEEPSEEK_API_KEY` env var required) and returns a structured `{passed, reason}` result with automatic retries
+- **`globalSetup.ts`** — Loads `.env`, checks `PIXIV_REFRESH_TOKEN`, manages the agent-browser daemon socket, and starts/reuses the Vite dev server on port 5173
+- **`globalTeardown.ts`** — Kills the Vite dev server if started by globalSetup
 
 ## Running Tests
 
@@ -108,7 +108,9 @@ Shared infrastructure between agent-browser and other AI-driven test types:
 | Manual fetch primitive | `/packages/app/src/primitives/createManualFetch.ts` |
 | Memory store | `/packages/app/src/stores/db.ts` |
 | Unit tests | `/packages/app/tests/unit/` |
-| Browser tests | `/packages/app/tests/browser/` |
+| Unit component tests (migrated from browser/) | `/packages/app/tests/unit/components/` |
 | Agent-browser tests | `/packages/app/tests/agent-browser/` |
+| Agent-browser conventions | `/packages/app/tests/agent-browser/TESTING.md` |
 | AI shared utilities | `/packages/app/tests/ai-shared/` |
-| E2E migration ADR | `/docs/adr/ADR-0034-migrate-playwright-e2e-to-agent-browser.md` |
+| Playwright→agent-browser ADR | `/docs/adr/ADR-0034-migrate-playwright-e2e-to-agent-browser.md` |
+| Component test→unit/E2E ADR | `/docs/adr/ADR-0035-migrate-component-tests-to-e2e-and-unit.md` |

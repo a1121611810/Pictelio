@@ -45,7 +45,7 @@ This wiki helps humans and agents understand the architecture, workflows, integr
 
 ### Testing & Operations
 
-- **[Testing Strategy](/openwiki/testing/overview.md)** — Three test tiers (unit/browser/agent-browser E2E), Playwright-to-agent-browser migration (ADR-0034), file naming conventions, test helpers, CI workflows
+- **[Testing Strategy](/openwiki/testing/overview.md)** — Two test tiers (unit + agent-browser E2E), Playwright/browser-component migration completed (ADR-0034, ADR-0035), file naming conventions, test helpers, CI workflows
 
 ## Development Quick Start
 
@@ -88,6 +88,7 @@ Architecture Decision Records live in `/docs/adr/`. Notable ones:
 | 0032 | Author click navigation (unified prop chain) |
 | 0033 | Startup update dialog: pure CSS overlay replaces Fluent dialog |
 | 0034 | Migrate Playwright E2E tests to agent-browser (AI-driven E2E) |
+| 0035 | Migrate browser component tests to unit + agent-browser E2E |
 
 ## Key Source Files
 
@@ -139,7 +140,7 @@ The repository has been actively refactored through v3.17.x. Key themes in recen
 - **Scroll primitives unification:** Scroll restoration, scroll direction, and scroll-driven visibility were extracted into shared factories. Virtual scroll restoration now uses explicit `window.scrollTo` with ResizeObserver retry, not Virtualizer internals (ADR-0010, ADR-0013, ADR-0023, ADR-0031).
 - **Image pipeline:** Periodic GC with context-aware eviction for the L1 image cache; L1 key set migrated to Set-based `LRUSet` (ADR-0030, ADR-0014).
 - **Ugoira (animated illust):** In-place playback with percentage loading progress indicator; list card aspect ratio changed to 1:1 square for consistency.
-- **Testing:** AI-driven agent-browser E2E framework added; flaky tests stabilized with DOM-based navigation and button clicks.
+- **Testing:** Playwright E2E and Vitest browser component tests fully migrated to agent-browser (AI-driven) E2E + unit tests (ADR-0034, ADR-0035); Playwright and `@vitest/browser-playwright` dependencies removed; ~40 test files consolidated into 2 tiers
 - **OAuth:** Transport layer deduplication between `auth.ts` and `pkceAuth.ts` (ADR-0028); loginUrl lambda capture fix for iOS.
 - **Author navigation:** Full coverage of third-party username click → personal center (ADR-0032).
 - **Update dialog fix:** Startup update dialog migrated from `<fluent-dialog>` (invisible on dynamic creation) to a pure CSS fixed overlay. `autoCheckUpdate` default changed to `true` (ADR-0033).
