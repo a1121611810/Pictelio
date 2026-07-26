@@ -142,7 +142,7 @@ export const ensureLoaded = store.ensureLoaded;
 export const refresh = store.refresh;
 
 /** 串行翻页（匹配原 feedStore 行为） */
-export function fetchMore(_signal?: AbortSignal): Promise<void | undefined> {
+export function fetchMore(_signal?: AbortSignal): Promise<unknown> | undefined {
   return store.fetchMore(_signal);
 }
 

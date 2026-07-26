@@ -123,12 +123,8 @@ export function createScrollBehavior(config?: ScrollBehaviorConfig): ScrollBehav
   });
 
   // 空闲重现
-  let lastScrollTime = 0;
-
   createEffect(() => {
     void scroll.y; // 跟踪滚动
-    const now = Date.now();
-    lastScrollTime = now;
 
     if (idleTimer) clearTimeout(idleTimer);
     idleTimer = setTimeout(() => {

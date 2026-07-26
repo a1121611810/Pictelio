@@ -28,7 +28,7 @@ export function useDetailData<T, R extends { error?: ApiError | null }>(
 
   createEffect(() => {
     const rd = routeData();
-    const _ = retryKey();
+    retryKey();
     if (!rd) {
       setData(null);
       setError(null);
@@ -49,7 +49,7 @@ export function useDetailData<T, R extends { error?: ApiError | null }>(
       setData(null);
       setLoading(false);
     } else if (extracted !== null) {
-      setData(extracted);
+      setData(extracted as any);
       setError(null);
       setLoading(false);
     }

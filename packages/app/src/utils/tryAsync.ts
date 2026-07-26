@@ -15,7 +15,7 @@
  * const [err, illust] = await tryAsync(loadIllust(id));
  * if (err) return <ErrorDisplay error={err} />;
  */
-export async function tryAsync<T, E = Error>(
+export async function tryAsync<T, E extends {} = Error>(
   promise: Promise<T>,
   errorExt?: Record<string, unknown>,
 ): Promise<[null, T] | [E, undefined]> {

@@ -19,8 +19,6 @@ export interface CheckResult {
 
 // ── State ──
 
-let cachedResult: CheckResult | null = null;
-
 // ── Version comparison (no semver dependency) ──
 
 /**

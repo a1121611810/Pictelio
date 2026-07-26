@@ -78,7 +78,7 @@ const Feed: Component = () => {
             onIllustClick={(id) => void navigate({ to: `/illust/${id}` })}
             onAuthorClick={(id) => void navigate({ to: `/user/${id}` })}
             onLoadMore={fetchMore}
-            onRefresh={refresh}
+            onRefresh={() => { refresh(); }}
             skipAnimation={cached}
             layoutMode={layoutMode()}
             scrollKey={cached ? currentTab() : undefined}

@@ -233,8 +233,9 @@ export async function loadNovelEntry(id: number): Promise<NovelCacheEntry> {
   const safeNovelData = novelDataErr
     ? { text: "", navigation: {} as SeriesNavigation, images: {} as NovelImagesMap }
     : novelData;
+  if (detailErr) throw detailErr;
   const entry: NovelCacheEntry = {
-    detail: detailErr ? null : detail.novel,
+    detail: detail.novel,
     text: safeNovelData.text,
     nav: safeNovelData.navigation,
     images: safeNovelData.images ?? {},

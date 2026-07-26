@@ -18,7 +18,7 @@ import { createInfiniteQuery } from "@tanstack/solid-query";
 import { queryClient } from "../../api/queryClient";
 import { normalizeQueryError } from "../../api/normalizeQueryError";
 import { scrollRestoreGlobal } from "../../primitives/createScrollRestore";
-import type { ApiError } from "../../api/types";
+import { ApiErrorType, type ApiError } from "../../api/types";
 
 // ─── 内部类型 ───
 
@@ -167,14 +167,14 @@ function getLastNextUrl(data: { pages?: any[] }): string | null {
 }
 
 /** 错误类型优先级（索引越小越重要） */
-const ERROR_PRIORITY: ApiError["type"][] = [
-  "PROXY",
-  "NETWORK",
-  "UNAUTHORIZED",
-  "RATE_LIMIT",
-  "FORBIDDEN",
-  "SERVER",
-  "UNKNOWN",
+const ERROR_PRIORITY: ApiErrorType[] = [
+  ApiErrorType.PROXY,
+  ApiErrorType.NETWORK,
+  ApiErrorType.UNAUTHORIZED,
+  ApiErrorType.RATE_LIMIT,
+  ApiErrorType.FORBIDDEN,
+  ApiErrorType.SERVER,
+  ApiErrorType.UNKNOWN,
 ];
 
 function pickBestError(errors: (ApiError | null)[]): ApiError | null {
@@ -207,8 +207,8 @@ export function createTQFeedStore<
     const queryMap = new Map<string, ReturnType<typeof createInfiniteQuery>>();
     const queryDefMap = new Map<string, QueryDef<TItem, TDeps>>();
 
-    for (const [tabKey, tabDef] of Object.entries(config.tabs)) {
-      for (const [subKey, qDef] of Object.entries(tabDef.queries)) {
+    for (const [tabKey, tabDef] of Object.entries(config.tabs) as [TTab, TabQueriesDef<TItem, TDeps>][]) {
+      for (const [subKey, qDef] of Object.entries(tabDef.queries) as [string, QueryDef<TItem, TDeps>][]) {
         const mapKey = `${tabKey}:${subKey}`;
 
         // 存储 qDef 供 ensureLoaded 动态计算 queryKey
@@ -301,7 +301,7 @@ export function createTQFeedStore<
       if (sub && sub !== "all") {
         const q = queryMap.get(`${config.currentTab()}:${sub}`);
         if (!q) return [];
-        return config.filterFn(flattenPages(q.data ?? {}));
+        return config.filterFn(flattenPages(q.data ?? {}) as TItem[]);
       }
 
       // "all" 模式
@@ -314,12 +314,12 @@ export function createTQFeedStore<
 
       // single → 单数据源
       if (allCfg.type === "single") {
-        return config.filterFn(flattenPages(sources[0].data ?? {}));
+        return config.filterFn(flattenPages(sources[0].data ?? {}) as TItem[]);
       }
 
       // merge → 多数据源排序合并 + 可选去重
       const results = sources
-        .map((q) => sortByDate(flattenPages(q.data ?? {})))
+        .map((q) => sortByDate(flattenPages(q.data ?? {}) as TItem[]))
         .filter((r) => r.length > 0);
 
       if (results.length === 0) return [];
@@ -370,7 +370,7 @@ export function createTQFeedStore<
     // ── 4. 缓存判断 ──
 
     const isCached = (): boolean => {
-      return activeQueries().some((q) => (q.data?.pages?.length ?? 0) > 0);
+      return activeQueries().some((q) => ((q.data as any)?.pages?.length ?? 0) > 0);
     };
 
     // ── 5. 动作 ──

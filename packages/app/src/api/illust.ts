@@ -113,7 +113,7 @@ export async function downloadAndExtractUgoira(
       onProgress?.(Math.round((loaded / total) * 75) + 5);
     }
   }
-  const zipBlob = new Blob(chunks);
+  const zipBlob = new Blob(chunks as BlobPart[]);
   onProgress?.(80);
 
   // 3. 解压帧（80%-99%）

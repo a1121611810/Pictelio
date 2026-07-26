@@ -99,15 +99,15 @@ export function createNovelLoader(novelId: Accessor<number>): NovelLoaderResult 
         return;
       }
 
-      const entry: CacheEntry = {
+      const networkEntry: CacheEntry = {
         detail: detail!.novel,
         text: novelData.text,
         nav: novelData.navigation,
         images: novelData.images ?? {},
       };
-      applyEntry(entry);
-      if (entry.text) {
-        setEntry(id, entry);
+      applyEntry(networkEntry);
+      if (networkEntry.text) {
+        setEntry(id, networkEntry);
       }
     })());
   });

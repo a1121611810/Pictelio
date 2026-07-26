@@ -28,20 +28,19 @@ The application boots in `packages/app/src/main.tsx`:
 4. **Auth initialization** — `initializeAuth()` loads token from secure storage and sets up refresh, ensuring the auth `refreshPromise` is available before any API call
 5. **Solid root render** — `render(() => <App />, root)`
 
-<!-- openwiki: mermaid parse failed and this diagram was converted to a text fence so it does not break rendering. Fix the diagram source and restore the mermaid fence. Parser error: Heuristic: an unescaped angle bracket inside a label breaks rendering; rephrase the label. -->
-```text
+```mermaid
 sequenceDiagram
     participant M as main.tsx
     participant S as startup.ts
     participant A as authStore
     participant R as App.tsx
 
-    M->>M: Load CSS layers (reset → tokens → base → uno)
+    M->>M: Load CSS layers (reset, tokens, base, uno)
     M->>M: Register Fluent web components
     M->>S: initializeStartupPreferences()
     M->>A: initializeAuth()
     A-->>M: refreshPromise ready
-    M->>R: render(<App />)
+    M->>R: render App component
     Note over R: QueryClientProvider + RouterProvider
 ```
 
@@ -160,7 +159,14 @@ if (err) { handle(err); return fallback; }
 
 - **`tryAsync`** (`src/utils/tryAsync.ts`) — wraps `Promise<T>` to return `[null, T] | [Error, undefined]`. Replaces `try { await ... } catch` without blocking V8 TurboFan optimization on the calling function.
 - **`trySync`** (`src/utils/tryAsync.ts`) — wraps a factory `() => T` for synchronous operations (`JSON.parse`, DOM reads). Keeps the throwing code lazily evaluated inside the factory.
-- **`unplugin-auto-import`** — automatically injects `import { tryAsync, trySync } from '@/utils/tryAsync'` into every source file at build time. Globals are declared as `readonly` in `.oxlintrc.json`. The generated `auto-imports.d.ts` is gitignored.
+- **`unplugin-auto-import`** — automatically injects commonly-used APIs at build time, eliminating ~50 explicit import statements per source file across the project. Configured in both `vite.config.ts` (dev) and `vitest.config.ts` (test), the plugin auto-imports:
+  - **All of `solid-js`** (createSignal, createEffect, createMemo, onMount, Show, For, etc. — 32 core APIs)
+  - **`solid-js/store`** (createStore, produce, reconcile, createMutable)
+  - **`solid-js/web`** (Dynamic, render, Portal, isServer, etc.)
+  - **`@tanstack/solid-router`** (useNavigate, useNavigate, Outlet, RouterProvider, etc. — 8 APIs)
+  - **`@/utils/tryAsync`** (`tryAsync`, `trySync` — from the error tuple pattern)
+- All auto-imported APIs are declared as `readonly` globals in `.oxlintrc.json`. The generated `auto-imports.d.ts` is gitignored.
+- A cleanup script at `scripts/cleanup-auto-imports.mjs` was provided for the one-time migration to scan all `.ts`/`.tsx` source files, remove redundant explicit imports now covered by auto-import, and rewrite multi-line import statements to single-line where applicable.
 
 **Unified cleanup:** finally-block logic (`loading.set(false)`, `clearTimeout()`) moves after the `tryAsync` call and before the `err` check, written once instead of duplicated across try/catch/finally branches.
 

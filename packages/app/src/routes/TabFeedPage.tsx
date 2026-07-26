@@ -230,7 +230,7 @@ const TabFeedPage: Component<Props> = (props) => {
               onIllustClick={(id) => void navigate({ to: `/illust/${id}` })}
               onAuthorClick={(id) => void navigate({ to: `/user/${id}` })}
               onLoadMore={() => fetchMore(abortController?.signal)}
-              onRefresh={() => refresh(abortController?.signal)}
+              onRefresh={() => { refresh(abortController?.signal); }}
               onNavigateToSettings={() => void navigate({ to: "/settings" })}
               skipAnimation={cached}
               layoutMode={layoutMode()}

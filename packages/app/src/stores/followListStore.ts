@@ -32,7 +32,7 @@ const store = createTQFeedStore<FollowItem, "followList", { mode: FollowMode; us
   staleTime: 30_000,
   gcTime: 5 * 60_000,
   errorStrategy: "allMustFail",
-  filterFn: (items) => filterUserPreviews(items),
+  filterFn: (items) => filterUserPreviews(items).map(toFollowItem),
 
   tabs: {
     followList: {
@@ -41,7 +41,7 @@ const store = createTQFeedStore<FollowItem, "followList", { mode: FollowMode; us
       setSubTab: (v) => setMode(v as FollowMode),
       queries: {
         following: {
-          queryKey: (deps) => queryKeys.followList("following", deps.userId),
+          queryKey: (deps) => queryKeys.followList("following", deps.userId) as unknown as unknown[],
           queryFn: (deps, pageParam) =>
             pageParam
               ? apiClient
@@ -56,7 +56,7 @@ const store = createTQFeedStore<FollowItem, "followList", { mode: FollowMode; us
                 })),
         },
         followers: {
-          queryKey: (deps) => queryKeys.followList("followers", deps.userId),
+          queryKey: (deps) => queryKeys.followList("followers", deps.userId) as unknown as unknown[],
           queryFn: (deps, pageParam) =>
             pageParam
               ? apiClient

@@ -189,10 +189,7 @@ const UgoiraViewer: Component<Props> = (props) => {
           src={props.coverUrl}
           alt="cover"
           loading="eager"
-          classList={{
-            "max-w-full max-h-full object-cover object-top": !props.inline,
-            "w-full h-full object-cover object-top": props.inline,
-          }}
+          class={`${!props.inline ? "max-w-full max-h-full" : "w-full h-full"} object-cover object-top`}
           draggable={false}
         />
       )}
