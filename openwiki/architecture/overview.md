@@ -18,6 +18,10 @@ tags: [architecture, pictelio, solidjs, capacitor, monorepo]
 
 Root `package.json` delegates all commands via `pnpm --filter`. Build tooling uses **vite-plus** (`vp` CLI), which wraps Vite with oxlint, oxfmt, and vitest.
 
+**Mobile targets:**
+- **Android** — Four custom Capacitor plugins (Auth, ImageCache, OAuth, PictelioHttp) with Java implementations under `/packages/app/android/`. See [Android Native & Build](/openwiki/integrations/android-native.md).
+- **iOS** (new in v3.18.0) — Capacitor iOS target infrastructure at `/packages/app/ios/`. Currently has Cordova config and built web assets; no custom native plugins implemented yet. No CI/CD pipeline for iOS release at this time.
+
 ## Boot Sequence
 
 The application boots in `packages/app/src/main.tsx`:

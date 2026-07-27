@@ -151,7 +151,7 @@ The repository has been actively refactored through v3.17.x. Key themes in recen
 The following areas are either already well-documented in existing docs or too narrow for a dedicated wiki page:
 
 - **Image loading pipeline deep-dive** — 40KB+ doc at `/docs/image-loading-pipeline.md` covers timing, diagrams, and optimization matrix. The [wiki page](/openwiki/architecture/image-pipeline.md) links there.
-- **Website package** (`/packages/website/`) — Standard VitePress landing page, low project-specific complexity.
+- **Website package** (`/packages/website/`) — Astro 7 landing page with full redesign (migrated from VitePress in v3.18.0). Dark-first theme with light toggle, cursor glow effect, CSP headers, Open Graph metadata. Low project-specific complexity.
 - **Fluent Design token reference** — Covered in `AGENTS.md` and `/packages/app/src/styles/tokens.css`.
 - **Comment system design** — Documented at `/docs/comment-system-design.md`. Structurally simple and stable.
 - **Individual store deep-dives** — Stores are well-structured and self-documenting; document if refactoring is needed.
