@@ -25,9 +25,12 @@ export async function refreshToken(token: string): Promise<PixivAuthResponse> {
     await PixivApi.setRefreshToken({ refreshToken: token });
     const result = await AuthPlugin.refreshToken({ refreshToken: token });
     await PixivApi.setAccessToken({ accessToken: result.accessToken });
-    setAccessToken(result.accessToken);
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (import.meta.env.DEV) {
+      setAccessToken(result.accessToken);
+    }
     return {
-      access_token: result.accessToken,
+      access_token: import.meta.env.DEV ? result.accessToken : "",
       expires_in: 3600,
       refresh_token: result.refreshToken,
       token_type: "bearer",
@@ -66,9 +69,12 @@ export async function exchangeCodeForToken(
     const { OAuthPlugin } = await import("@/native/OAuthPlugin");
     const result = await OAuthPlugin.exchangeCode({ code, codeVerifier });
     await PixivApi.setAccessToken({ accessToken: result.accessToken });
-    setAccessToken(result.accessToken);
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (import.meta.env.DEV) {
+      setAccessToken(result.accessToken);
+    }
     return {
-      access_token: result.accessToken,
+      access_token: import.meta.env.DEV ? result.accessToken : "",
       expires_in: 3600,
       refresh_token: result.refreshToken,
       token_type: "bearer",
