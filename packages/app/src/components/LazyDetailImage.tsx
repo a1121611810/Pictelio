@@ -5,7 +5,7 @@ import { LAZY_LOAD_MARGIN } from "../primitives/rootMargins";
 import { loadImage } from "../utils/imageLoader";
 
 /** 预加载视口前页数 — OkHttp 默认 5 并发/主机，4 页安全 */
-const PRELOAD_WINDOW = 3;
+const PRELOAD_WINDOW = 3 as const;
 
 interface Props {
   /** 用户设定质量的图片 URL（medium / large） */
@@ -61,11 +61,13 @@ const LazyDetailImage: Component<Props> = (props) => {
   createEffect(() => {
     const src = props.src;
     if (shouldLoad() && src && cacheReadyFor() !== src) {
-      loadImage(src).finally(() => setCacheReadyFor(src));
+      loadImage(src).finally(() => {
+        if (props.src === src) setCacheReadyFor(src);
+      });
     }
   });
 
-  const canDisplayImage = createMemo(() => cacheReadyFor() === props.src && shouldLoad());
+  const canDisplayImage = createMemo(() => props.src && cacheReadyFor() === props.src && shouldLoad());
 
   return (
     <div
