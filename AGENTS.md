@@ -521,6 +521,13 @@ The scheduled OpenWiki GitHub Actions workflow refreshes the repository wiki. Do
 
 ## OpenWiki 维护规则
 
+### 强制约束（违反视为违规）
+
+- **任何涉及架构概览、领域概念、集成方式、测试指南的问题，必须先读取 `openwiki/` 对应页面再深入代码。**
+- **禁止**在未查阅对应 OpenWiki 页面的情况下，直接使用 CodeGraph / Read 从零摸索架构层面问题。
+- 先通过 OpenWiki 获取高层次理解，再使用 CodeGraph 精确追踪代码细节。
+- 违规示例：直接读 `src/api/client.ts` 而不先读 `openwiki/architecture/api-layer.md`
+
 ### 查询时使用
 - **当问题涉及架构概览、领域概念、集成方式、测试指南等主题时**，应优先读取 `openwiki/` 目录下对应的文档页面（详见上方「OpenWiki 查询规范」优先级决策链）。
 - 先通过 OpenWiki 获取高层次理解，再使用 CodeGraph 精确追踪代码细节。
