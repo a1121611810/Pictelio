@@ -380,6 +380,15 @@ Grill 澄清 → to-spec → to-tickets → implement
 3. **to-tickets**：把 spec 拆分为可独立执行的 ticket（每个 ticket 声明前置依赖，blocker 未完成时不可开工）。
 4. **implement**（`/implement` 内置 `/tdd` + `/code-review`）：按 ticket 实现，每个 ticket 开始前清空上下文。
 
+   **强制闭环**：每次实现或修改后必须执行以下循环，直到零问题：
+   ```
+   实现/修改 → /code-review 检查 → 发现问题？
+     ├─ 是 → /tdd 修复 → 回到 /code-review 检查
+     └─ 否 → 提交 ✅
+   ```
+   - `/tdd` 和 `/code-review` 均可独立调用（不强制走 `/implement`），但上述闭环规则不变。
+   - 优先利用子代理（`fleet` / `parallel_tasks` / `task`）并行执行独立的检查和修复，减少等待。
+
 **允许的例外**：
 - 纯 Bug 修复（有确切复现步骤 + 期望行为）可直接走 `/diagnosing-bugs`，无需走完整四阶段。
 - 纯重构（不变更外部行为）可直接提方案执行。
