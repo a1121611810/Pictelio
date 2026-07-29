@@ -93,8 +93,7 @@ public class AuthPlugin extends Plugin {
                 .post(RequestBody.create(body, MediaType.parse(OAuthConfig.CONTENT_TYPE)))
                 .build();
 
-        saveCall(call);
-
+        bridge.saveCall(call);
         getClient().newCall(request).enqueue(new okhttp3.Callback() {
             @Override
             public void onResponse(okhttp3.Call c, Response response) {
@@ -103,7 +102,7 @@ public class AuthPlugin extends Plugin {
                     if (!response.isSuccessful()) {
                         call.reject("OAuth failed (HTTP " + response.code() + "): "
                                 + responseBody.substring(0, Math.min(300, responseBody.length())));
-                        releaseCall(call);
+                        bridge.releaseCall(call);
                         return;
                     }
 
@@ -139,20 +138,20 @@ public class AuthPlugin extends Plugin {
                     }
 
                     call.resolve(result);
-                    releaseCall(call);
+                    bridge.releaseCall(call);
                 } catch (JSONException e) {
                     call.reject("Failed to parse OAuth response: " + e.getMessage());
-                    releaseCall(call);
+                    bridge.releaseCall(call);
                 } catch (Exception e) {
                     call.reject("Unexpected error: " + e.getMessage());
-                    releaseCall(call);
+                    bridge.releaseCall(call);
                 }
             }
 
             @Override
             public void onFailure(okhttp3.Call c, IOException e) {
                 call.reject("Network error: " + e.getMessage());
-                releaseCall(call);
+                bridge.releaseCall(call);
             }
         });
     }
