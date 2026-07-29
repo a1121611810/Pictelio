@@ -33,10 +33,10 @@
       <td align="center"><strong>Login</strong></td>
     </tr>
     <tr>
-      <td><img src="packages/website/docs/public/screenshots/01_feed.png" width="180" alt="Feed"></td>
-      <td><img src="packages/website/docs/public/screenshots/02_detail.png" width="180" alt="Detail"></td>
-      <td><img src="packages/website/docs/public/screenshots/03_settings.png" width="180" alt="Settings"></td>
-      <td><img src="packages/website/docs/public/screenshots/04_login.png" width="180" alt="Login"></td>
+      <td><img src="packages/website/public/screenshots/01_feed.png" width="180" alt="Feed"></td>
+      <td><img src="packages/website/public/screenshots/02_detail.png" width="180" alt="Detail"></td>
+      <td><img src="packages/website/public/screenshots/03_settings.png" width="180" alt="Settings"></td>
+      <td><img src="packages/website/public/screenshots/04_login.png" width="180" alt="Login"></td>
     </tr>
   </table>
 </div>
