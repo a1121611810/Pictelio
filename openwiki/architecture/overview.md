@@ -109,7 +109,7 @@ Routes are defined in `/packages/app/src/router.tsx` using `@tanstack/solid-rout
 | `/image-host` | `ImageHostSettings` | — |
 | `/image-cache` | `ImageCacheSettings` | — |
 
-## Splash Screen Lifecycle (v3.20.0, refined v3.21.0)
+## Splash Screen Lifecycle (v3.21.0)
 
 The native Splash Screen uses AndroidX `core-splashscreen` (compat library) with dismiss controlled from JavaScript via a custom Capacitor plugin bridge:
 

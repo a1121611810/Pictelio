@@ -85,7 +85,7 @@ Introduced in **v3.18.0** as the sole gateway for all Pixiv API communication (A
 
 ### Splash Screen JS Bridge
 
-**TypeScript:** `/packages/app/src/native/splashBridge.ts` (new in v3.20.0, migrated in v3.21.0)
+**TypeScript:** `/packages/app/src/native/splashBridge.ts` (new in v3.21.0)
 **Java:** `AuthPlugin.hideSplash()` method in `/packages/app/android/app/src/main/java/io/pictelio/app/AuthPlugin.java`
 
 Controls the native Splash Screen via a custom Capacitor plugin bridge. `markContentReady()` calls `AuthPlugin.hideSplash()`, which sets `MainActivity.keepSplashVisible` `AtomicBoolean` to `false`, triggering the `SplashScreen.setKeepOnScreenCondition()` closure on the native AndroidX `SplashScreen` (compat library).
@@ -247,3 +247,4 @@ The full release process is documented in `/docs/release-checklist.md` (6.2 KB),
 | Release signing guide | `/docs/release-signing.md` |
 | Platform compat | `/docs/platform-compatibility.md` |
 | GitHub release docs | `/docs/github-release.md` |
+ease.md` |

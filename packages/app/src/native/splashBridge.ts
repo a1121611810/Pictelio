@@ -4,6 +4,9 @@
  * 通过 AuthPlugin.hideSplash() 通知 Native 侧（MainActivity）
  * 将 keepSplashVisible 置为 false，触发 SplashScreen 退出。
  *
+ * - 通过 AuthPlugin.hideSplash() 调用 Native 层关闭 Splash
+ * - Web 环境下 AuthPlugin 不可用，catch 静默跳过
+ *
  * markContentReady() 是幂等的：首次调用后即锁定，后续调用不生效。
  */
 import { AuthPlugin } from "./AuthPlugin";

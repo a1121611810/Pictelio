@@ -42,6 +42,8 @@ public class MainActivity extends BridgeActivity {
         SplashScreen splashScreen = SplashScreen.installSplashScreen(this);
         splashScreen.setKeepOnScreenCondition(() -> keepSplashVisible.get());
         if (!isWebViewVersionOk()) {
+            // WebView 版本不足时立即关闭 Splash，显示升级提示页
+            keepSplashVisible.set(false);
             showWebViewUpgradeError();
             return;
         }
