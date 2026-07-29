@@ -91,20 +91,28 @@ Since `preloaded()` is always `true`, the `shouldLoad()` memo (`preloaded() || i
 
 **Fallback on retry exhaustion (v3.21.4):** When all `MAX_RETRIES` attempts fail, the `.catch()` handler now falls through to `setCacheReadyFor(src)` instead of leaving the image in an unready state. This marks the image ready for `PixivImage` rendering, and `shouldInterceptRequest` performs a synchronous fallback download via the shared OkHttp client. The degraded performance (UI-thread fetch) is preferable to a permanently blank image area.
 
+**Route-level preload kickoff (v4.0+):** `IllustDetail` (the route component) now calls `loadImage(url)` for all pages of multi-page illusts (`page_count > 1`) immediately upon receiving illust data — before any `LazyDetailImage` components mount. This starts the native `PixivApi.prefetchImage()` → OkHttp download → disk cache write earlier in the component lifecycle. `loadImage`'s in-flight deduplication in `imageLoader.ts` (`inflightRequests` Map, line 250) ensures that when `LazyDetailImage`'s `createEffect` later calls the same URL, it reuses the same promise instead of issuing a duplicate network request. The route-level preload does not set `cacheReadyFor` (that remains the responsibility of each `LazyDetailImage`), but seeding the L3 disk cache before component mount significantly improves the odds that `loadImage()` inside `LazyDetailImage` finds a cache hit and resolves quickly.
+
 ```mermaid
 sequenceDiagram
-    participant ILD as IllustDetail (parent)
-    participant LDI as LazyDetailImage
+    participant ILD as IllustDetail (route)
     participant IL as imageLoader.ts
+    participant LDI as LazyDetailImage
     participant PP as PixivApiPlugin (native)
     participant DC as L3 Disk Cache
     participant WV as WebView shouldInterceptRequest
 
+    ILD->>ILD: illust data arrives
+    alt page_count > 1 (multi-page)
+        ILD->>IL: loadImage(url) for all page URLs
+        IL->>PP: prefetchImage(url)
+        PP->>DC: OkHttp download → disk cache write
+        Note over IL: inflight dedup registers URLs
+    end
     ILD->>LDI: mount → preloaded() = true (always, all pages)
     LDI->>LDI: shouldLoad = preloaded || ioVisible → always true
-    LDI->>IL: createEffect → loadImage(src)
-    IL->>PP: prefetchImage(url)
-    PP->>DC: OkHttp download → disk cache write
+    LDI->>IL: createEffect → loadImage(src) [dedup → no-op]
+    Note over IL: Same promise reused via inflightRequests
     LDI->>LDI: cacheReadyFor = src (on then success)
     Note over LDI: Up to MAX_RETRIES retries; on exhaustion → setCacheReadyFor(src) as fallback
     Note over WV: Later, PixivImage renders

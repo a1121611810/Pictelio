@@ -23,6 +23,7 @@ import { blockUser, isBlocked } from "../stores/blockStore";
 import { recordVisit } from "../stores/historyStore";
 import { pushOverlay, popOverlay } from "../stores/backGestureStore";
 import { sanitizeHtml } from "../utils/html";
+import { loadImage } from "../utils/imageLoader";
 import { scrollToTop } from "../utils/scrollToTop";
 import ReportSheet from "../components/ReportSheet";
 import IllustTags from "../components/IllustTags";
@@ -355,6 +356,13 @@ const IllustDetail: Component = () => {
       setPageRefs(new Map());
       recordVisit(i, "illust");
       setIsFollowed(i.user.is_followed ?? false);
+      // 多图作品：在组件渲染前预加载所有页面到磁盘缓存
+      if (i.page_count > 1) {
+        const preloadUrls = i.meta_pages.map(p => p.image_urls.large);
+        for (const url of preloadUrls) {
+          loadImage(url);
+        }
+      }
       setLoading(false);
     }).catch(err => {
       if (cancelled) return;
