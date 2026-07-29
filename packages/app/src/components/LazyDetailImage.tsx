@@ -2,6 +2,7 @@ import type { Component } from "solid-js";
 import PixivImage from "./PixivImage";
 import { createEverVisible } from "@/primitives/visibility";
 import { LAZY_LOAD_MARGIN } from "../primitives/rootMargins";
+import { loadImage } from "../utils/imageLoader";
 
 interface Props {
   /** 用户设定质量的图片 URL（medium / large） */
@@ -33,6 +34,16 @@ const LazyDetailImage: Component<Props> = (props) => {
   })(() => ref());
 
   const everVisible = createMemo(() => preloaded() || ioVisible());
+
+  // 预加载到 Java 磁盘缓存：preloaded() 为 true 时（即将进入视口），
+  // 提前调用 loadImage() 走 Native prefetchImage（OkHttp + 连接池），
+  // 确保 shouldInterceptRequest 的 interceptImage 能从磁盘缓存命中，
+  // 避免回退到 HttpURLConnection 同步下载（无连接池、易超时）。
+  createEffect(() => {
+    if (preloaded() && props.src) {
+      void loadImage(props.src);
+    }
+  });
 
   return (
     <div

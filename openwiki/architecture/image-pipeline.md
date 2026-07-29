@@ -72,6 +72,34 @@ Host health is tracked with success/failure counts and timeouts.
 3. Handles loading states with skeleton shimmer
 4. Integrates with the three-layer cache
 
+## LazyDetailImage Component
+
+`/packages/app/src/components/LazyDetailImage.tsx` — Lazy-loading wrapper for multi-page illust detail images. Two-phase loading strategy:
+
+1. **Signal-driven preload** — When the parent `IllustDetail` provides a `visiblePage` signal, any image with `pageIndex <= visiblePage + 1` (next page) is preloaded immediately
+2. **IntersectionObserver fallback** — Without `visiblePage`, falls back to `createEverVisible` IntersectionObserver with a `LAZY_LOAD_MARGIN` root margin
+
+**Native cache prefill (v3.21+):** When the signal-driven `preloaded()` memo returns true, a `createEffect` eagerly calls `loadImage(src)` from `imageLoader.ts`, which triggers native `PixivApiPlugin.prefetchImage()` (OkHttp + connection pool). This seeds the L3 Android disk cache before `PixivImage` renders, ensuring the WebView's `shouldInterceptRequest` can serve a cached `WebResourceResponse` rather than falling back to a synchronous `HttpURLConnection` download (no connection pool, prone to timeout).
+
+```mermaid
+sequenceDiagram
+    participant ILD as IllustDetail (parent)
+    participant LDI as LazyDetailImage
+    participant IL as imageLoader.ts
+    participant PP as PixivApiPlugin (native)
+    participant DC as L3 Disk Cache
+    participant WV as WebView shouldInterceptRequest
+
+    ILD->>LDI: pageIndex <= visiblePage + 1 → preloaded() = true
+    LDI->>IL: createEffect → loadImage(src)
+    IL->>PP: prefetchImage(url)
+    PP->>DC: OkHttp download → disk cache write
+    Note over WV: Later, PixivImage triggers render
+    WV->>DC: interceptImage() → cache HIT
+    DC-->>WV: WebResourceResponse (instant)
+    Note over WV: No fallback to HttpURLConnection
+```
+
 ## WebView Proxy Interception
 
 On Android, `ImageCachePlugin.java` intercepts image requests via `shouldInterceptRequest()`:
@@ -138,6 +166,7 @@ For ugoira illusts in feed lists (virtual scroll):
 | Image host selection and management | `/packages/app/src/stores/imageHostStore.ts` |
 | Image host service | `/packages/app/src/services/imageHostService.ts` |
 | PixivImage display component | `/packages/app/src/components/PixivImage.tsx` |
+| LazyDetailImage lazy-loading wrapper | `/packages/app/src/components/LazyDetailImage.tsx` |
 | Image cache native plugin | `/packages/app/src/native/ImageCache.ts` |
 | Web Worker for size measurement | `/packages/app/src/primitives/createImageSizeWorker.ts` |
 | Ugoira download + extraction | `/packages/app/src/api/illust.ts` (`downloadAndExtractUgoira()`) |
