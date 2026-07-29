@@ -57,25 +57,9 @@ const TabFeedPage: Component<Props> = (props) => {
     ensureLoaded(abortController.signal);
   });
 
-  // 检测到 TanStack Query 开始 fetch（loading=true，骨架屏已渲染）后关闭 Splash
-  let splashDismissed = false;
-  createEffect(() => {
-    if (splashDismissed) return;
-    if (loading()) {
-      splashDismissed = true;
-      // 等待浏览器完成当前帧绘制（骨架屏已显示到屏幕），再关闭 Splash
-      requestAnimationFrame(() => markContentReady());
-    }
-  });
-
-  // 兜底：100ms 后确保 Splash 关闭（数据已缓存时 loading 可能从不变为 true）
+  // 组件已挂载，关闭 Splash（exit 动画已移除，立即消失）
   onMount(() => {
-    setTimeout(() => {
-      if (!splashDismissed) {
-        splashDismissed = true;
-        markContentReady();
-      }
-    }, 100);
+    markContentReady();
   });
 
   // Save scroll + abort pending requests on unmount

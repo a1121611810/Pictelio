@@ -111,7 +111,6 @@ sequenceDiagram
     MA->>SS: setKeepOnScreenCondition → false
     Note over MA,SS: keepSplashVisible = false
     SS->>SS: setOnExitAnimationListener fires
-    SS->>SS: scale(1.8x) + alpha(0) over 100ms (DecelerateInterpolator)
     SS-->>MA: Splash exits (splashScreenView.remove())
 ```
 
@@ -119,12 +118,12 @@ sequenceDiagram
 | Location | When Called | Purpose |
 |----------|-------------|---------|
 | `Login.tsx` `onMount` | Login page renders | Closes splash when user needs to authenticate |
-| `TabFeedPage.tsx` (loading-triggered) | TanStack Query `loading()` becomes `true` → `requestAnimationFrame` → splash dismiss | Closes splash as soon as the skeleton screen frame is guaranteed visible. Falls back to 100ms timeout (cache hit: loading may never fire). |
+| `TabFeedPage.tsx` (`onMount`) | Component mounts → `markContentReady()` | Native exit animation removed (commit `505957c`), so plain `onMount` dismiss is safe — no need to delay for animation synchronization |
 | `__root.tsx` `onMount` | Auth init completes (fallback) | Closes splash for non-feed pages (age-confirmation, etc.) if Login/TabFeedPage haven't already |
 
 **Android native:**
 - `MainActivity.java`: retains `SplashScreen.installSplashScreen(this)` + `setKeepOnScreenCondition(() -> keepSplashVisible.get())`. The private `keepSplashVisible` `AtomicBoolean` defaults to `true` and is set to `false` via the package-private `dismissSplash()` method, called by `AuthPlugin.hideSplash()`
-- **Exit animation (ADR-0040):** `setOnExitAnimationListener` applies a scale(1.8x) + alpha(0) combo over 100ms with `DecelerateInterpolator(2f)` to the splash icon view, then calls `splashScreenView.remove()`. The animation is entirely native (60fps, zero JS involvement), giving a "expand and fade" visual transition.
+- **Exit animation removed (commit `505957c`):** The `setOnExitAnimationListener` previously applied a scale(1.8x) + alpha(0) combo over 100ms with `DecelerateInterpolator(2f)` (ADR-0040). This was replaced with a direct `splashScreenView.remove()` call — the splash now disappears immediately. The animation was removed because the loading-triggered splash dismiss strategy was also simplified back to `onMount`-only in TabFeedPage (commit `505957c`), and without the animation there is no need to delay splash dismissal for visual synchronization.
 - `styles.xml`: `AppTheme.NoActionBarLaunch` inherits `Theme.SplashScreen` — splash background and icon defined in theme XML
 - `build.gradle`: retains `androidx.core:core-splashscreen` dependency
 - `variables.gradle`: retains `coreSplashScreenVersion = '1.2.0'`

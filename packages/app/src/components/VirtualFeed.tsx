@@ -171,7 +171,7 @@ const VirtualFeed: Component<Props> = (props) => {
 
       {props.error && <ErrorDisplay error={props.error} onRetry={() => props.onRefresh()} />}
 
-      {props.loading && props.illusts.length === 0 && pullPhase() !== "refreshing" && (
+      {(props.loading || !loadAttempted) && props.illusts.length === 0 && pullPhase() !== "refreshing" && (
         <div class="px-3">
           <div
             style={{
