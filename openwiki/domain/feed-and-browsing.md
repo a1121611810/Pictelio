@@ -67,7 +67,7 @@ flowchart LR
 
 **Empty-state & skeleton fix (`loadAttempted`, v3.21.6+):** VirtualFeed tracks a component-level `loadAttempted` boolean that becomes `true` once `loading`, `error`, or `illusts.length > 0` is observed.
 - The "暂无新作品" empty-text message only renders when `loadAttempted` is `true` — preventing an empty-state flash before the first data load completes.
-- The skeleton `<div>` now renders when either `loading` is `true` **or** `loadAttempted` is `false` (commit `505957c`). This ensures the skeleton fills the viewport even in the brief window before TanStack Query begins its first fetch — when `loading` is still `false` and no data or error has been observed. Previously this gap could show a blank area.
+- The skeleton `<div>` now renders when either `loading` is `true` **or** `loadAttempted` is `false` (commit `fa2015c`). This ensures the skeleton fills the viewport even in the brief window before TanStack Query begins its first fetch — when `loading` is still `false` and no data or error has been observed. Previously this gap could show a blank area.
 
 ## Layout Modes
 

@@ -57,9 +57,9 @@ const TabFeedPage: Component<Props> = (props) => {
     ensureLoaded(abortController.signal);
   });
 
-  // 组件已挂载，关闭 Splash（exit 动画已移除，立即消失）
+  // 等待骨架屏渲染完成后再关闭 Splash（固定延时，避免竞态）
   onMount(() => {
-    markContentReady();
+    setTimeout(() => markContentReady(), 400);
   });
 
   // Save scroll + abort pending requests on unmount
