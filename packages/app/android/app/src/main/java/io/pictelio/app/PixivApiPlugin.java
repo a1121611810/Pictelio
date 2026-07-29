@@ -62,7 +62,14 @@ public class PixivApiPlugin extends Plugin {
             client = new OkHttpClient.Builder()
                     .connectTimeout(OAuthConfig.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
                     .readTimeout(OAuthConfig.TIMEOUT_READ, TimeUnit.MILLISECONDS)
+                    .callTimeout(OAuthConfig.TIMEOUT_CONNECT + OAuthConfig.TIMEOUT_READ, TimeUnit.MILLISECONDS)
+                    .dispatcher(new okhttp3.Dispatcher(
+                            java.util.concurrent.Executors.newCachedThreadPool()
+                    ))
                     .build();
+            // 提高每主机并发上限，避免大量多图请求时排队超时
+            client.dispatcher().setMaxRequestsPerHost(10);
+            client.dispatcher().setMaxRequests(20);
         }
         return client;
     }

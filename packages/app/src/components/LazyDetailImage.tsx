@@ -27,9 +27,12 @@ interface Props {
 /**
  * 详情页多图懒加载组件：
  *
- * 加载分两阶段：
- * 1. preloaded() 为 true（pageIndex <= visiblePage + PRELOAD_WINDOW）时触发 loadImage 预下载到磁盘缓存
- * 2. cacheReady 为 true 后才渲染 PixivImage，确保 shouldInterceptRequest 能命中磁盘缓存
+ * 双重可见性检测：
+ * 1. preloaded() — visiblePage 驱动，提前预加载（pageIndex <= visiblePage + PRELOAD_WINDOW）
+ * 2. ioVisible() — 本地 IntersectionObserver，元素进入视口时独立触发
+ *
+ * 两者 OR 关系：任一条件满足即触发 loadImage 预下载到磁盘缓存。
+ * cacheReady 为 true 后才渲染 PixivImage，确保 shouldInterceptRequest 能命中磁盘缓存。
  *
  * 无 visiblePage 时退回到 IntersectionObserver 兜底。
  */
@@ -44,9 +47,9 @@ const LazyDetailImage: Component<Props> = (props) => {
     const vp = props.visiblePage;
     return vp !== undefined && props.pageIndex <= vp + PRELOAD_WINDOW;
   });
+  // 始终启用本地 IntersectionObserver，作为 parent observer 的独立兜底
   const ioVisible = createEverVisible({
     rootMargin: LAZY_LOAD_MARGIN,
-    skipObserver: props.visiblePage !== undefined,
   })(() => ref());
 
   const shouldLoad = createMemo(() => preloaded() || ioVisible());
@@ -76,7 +79,18 @@ const LazyDetailImage: Component<Props> = (props) => {
       let retryTimer: ReturnType<typeof setTimeout> | undefined;
       onCleanup(() => { if (retryTimer) clearTimeout(retryTimer); });
 
-      loadImage(src).then(() => {
+      // 12s 超时兜底：OkHttp 队列可能因并发上限导致请求长时间等待，
+      // 超时后触发重试，让下次尝试分配到不同的连接槽。
+      const LOAD_TIMEOUT = 12_000;
+      const loadWithTimeout = Promise.race([
+        loadImage(src),
+        new Promise<never>((_, reject) => {
+          const t = setTimeout(() => reject(new Error('loadImage timeout')), LOAD_TIMEOUT);
+          onCleanup(() => clearTimeout(t));
+        }),
+      ]);
+
+      loadWithTimeout.then(() => {
         if (!cancelled && props.src === src) {
           setCacheReadyFor(src);
         }
