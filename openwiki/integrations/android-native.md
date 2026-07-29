@@ -79,6 +79,7 @@ Introduced in **v3.18.0** as the sole gateway for all Pixiv API communication (A
 - **access_token is never exposed to the JavaScript layer** — stored in a Java `volatile` field, injected into OkHttp requests internally
 - **401 auto-refresh** — Java side detects 401 responses, uses `synchronized` + `isRefreshing` flag to refresh the token internally, then retries once. No JS-side Promise queue needed in production.
 - **`prefetchImage({ url })`** — downloads images directly to the Android disk cache directory, zero bytes enter the JS heap
+- **`getSharedClient()`** (static, package-private) — exposes the internal shared `OkHttpClient` so `MainActivity.interceptImage()` can reuse the same connection pool instead of creating per-request `HttpURLConnection` instances. Reduces connection setup overhead for image proxy requests.
 - Credentials and OAuth config live only in compiled Java bytecode
 
 **Deprecated/Deleted:** PictelioHttpPlugin.java and PictelioHttp.ts — the dual-path transport for native HTTP is gone. All native API requests now route through PixivApiPlugin.
@@ -141,6 +142,7 @@ The Android entry point. Key responsibilities:
 - Initializes the image cache and auth plugin on startup
 - Handles Android lifecycle events
 - Intercepts `/pixiv-img/` WebView requests via `shouldInterceptRequest` for image caching (retained from previous architecture)
+- Image proxy via `shouldInterceptRequest` was upgraded from `HttpURLConnection` to the shared `OkHttpClient` from `PixivApiPlugin.getSharedClient()`, reusing the connection pool instead of creating a fresh connection per request
 
 > **v3.20.0–v3.21.0:** Splash Screen dismiss moved from Android-only `core-splashscreen` API to JS-controlled via `AuthPlugin.hideSplash()` bridge. `MainActivity` retains `SplashScreen.installSplashScreen(this)` but defers exit to `keepSplashVisible` AtomicBoolean controlled by the plugin (see [Splash Screen JS Bridge](#splash-screen-js-bridge)).
 
@@ -167,7 +169,7 @@ Custom `Application` class for app-level initialization.
 - **DOM Storage:** Enabled
 - **Mixed Content:** Allowed (Pixiv API uses both HTTP and HTTPS)
 - **User Agent:** Customized for Pixiv API compatibility
-- **Image interception:** `shouldInterceptRequest` in MainActivity intercepts `/pixiv-img/` requests and serves from the Android disk cache (ImageCachePlugin) or proxies to the Pixiv CDN with proper Referer headers
+- **Image interception:** `shouldInterceptRequest` in MainActivity intercepts `/pixiv-img/` requests and serves from the Android disk cache (ImageCachePlugin) or proxies to the Pixiv CDN via the shared OkHttpClient (from `PixivApiPlugin.getSharedClient()`) with proper Referer headers
 - **shouldInterceptRequest:** ImageCachePlugin intercepts image URLs
 - **SSRF Whitelist:** Only Pixiv domains and configured image hosts are accessible via WebView proxy (ADR-0002)
 

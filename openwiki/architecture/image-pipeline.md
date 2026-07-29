@@ -79,11 +79,13 @@ Host health is tracked with success/failure counts and timeouts.
 1. **Signal-driven preload** — When the parent `IllustDetail` provides a `visiblePage` signal, any image with `pageIndex <= visiblePage + PRELOAD_WINDOW` (default `PRELOAD_WINDOW = 3`, i.e. up to 3 pages ahead) triggers eager `loadImage()` prefetch to disk cache
 2. **IntersectionObserver fallback** — Without `visiblePage`, falls back to `createEverVisible` IntersectionObserver with a `LAZY_LOAD_MARGIN` root margin
 
-**Native cache prefill (v3.21+):** When the combined `shouldLoad()` memo (preloaded OR ioVisible) returns true, a `createEffect` calls `loadImage(src)` from `imageLoader.ts`, which triggers native `PixivApiPlugin.prefetchImage()` (OkHttp + connection pool). This seeds the L3 Android disk cache before `PixivImage` renders, ensuring the WebView's `shouldInterceptRequest` can serve a cached `WebResourceResponse` rather than falling back to a synchronous `HttpURLConnection` download (no connection pool, prone to timeout).
+**Native cache prefill (v3.21+):** When the combined `shouldLoad()` memo (preloaded OR ioVisible) returns true, a `createEffect` calls `loadImage(src)` from `imageLoader.ts`, which triggers native `PixivApiPlugin.prefetchImage()` (OkHttp + connection pool). This seeds the L3 Android disk cache before `PixivImage` renders, ensuring the WebView's `shouldInterceptRequest` can serve a cached `WebResourceResponse` rather than doing a synchronous network fetch on the UI thread. Starting in v3.21.2, `shouldInterceptRequest` itself uses the same shared `OkHttpClient` from `PixivApiPlugin.getSharedClient()`, so even cache-miss requests benefit from connection pooling.
 
 **Race condition elimination (v3.21.1):** The initial implementation used a simple `cacheReady: boolean` signal. The current version uses `cacheReadyFor: Signal<string>` — keyed by the image URL string, not a boolean. A dedicated `createEffect` resets `cacheReadyFor` to `""` on `props.src` change (cross-illust navigation), and the `loadImage().finally()` callback checks `if (props.src === src)` before marking the URL as ready — a stale-closure guard that prevents an in-flight async completion from incorrectly signaling a _different_ illust's image as ready. The `canDisplayImage` memo returns true only when `cacheReadyFor() === props.src && shouldLoad()` (with an additional `props.src` truthiness guard). See the [detail image loading glossary](/docs/adr/glossary-detail-image-loading.md) for all related terminology.
 
 **Preload window** (`PRELOAD_WINDOW = 3`): The expanded window from `+1` (v3.21.0) to `+3` ensures up to 4 concurrent prefetches at scroll start (pages 0–3). This stays within OkHttp's default 5-connection-per-host limit and improves rapid-scroll coverage significantly. See [ADR-0039](/docs/adr/ADR-0039-detail-image-cache-ready.md) for the full design rationale.
+
+**Prefetch retry on failure (v3.21.2):** If `loadImage()` → `PixivApiPlugin.prefetchImage()` fails, `imageLoader.ts` now throws rather than silently falling through to a non-cached path. `LazyDetailImage`'s `createEffect` catches the failure and retries via a `retryTrigger` signal, up to `MAX_RETRIES = 3` attempts with `RETRY_DELAY_MS = 2000` between them. Cleanup via `onCleanup` cancels any pending retry on component unmount or `props.src` change. This improves robustness on flaky connections without blocking the UI.
 
 ```mermaid
 sequenceDiagram
@@ -104,7 +106,7 @@ sequenceDiagram
     Note over WV: Later, PixivImage renders
     WV->>DC: interceptImage() → cache HIT
     DC-->>WV: WebResourceResponse (instant)
-    Note over WV: No fallback to HttpURLConnection
+    Note over WV: Cache hit via shared OkHttpClient; misses also use connection pool
 ```
 
 ## WebView Proxy Interception

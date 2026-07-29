@@ -67,6 +67,14 @@ public class PixivApiPlugin extends Plugin {
         return client;
     }
 
+    /**
+     * 对外暴露共享 OkHttp 客户端，供 MainActivity.interceptImage 复用连接池，
+     * 避免每次图片请求都创建新的 HttpURLConnection。
+     */
+    static OkHttpClient getSharedClient() {
+        return getClient();
+    }
+
     // ─── 插件方法：通用 API 请求 ─────────────────────────────
 
     @PluginMethod

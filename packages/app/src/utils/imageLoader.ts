@@ -298,49 +298,43 @@ export function loadImage(originalUrl: string): Promise<LoadedImage> {
 async function loadImageInner(originalUrl: string): Promise<LoadedImage> {
   const targetUrl = isImageHostEnabled() ? getEffectiveImageUrl(originalUrl) : originalUrl;
 
-  const [loadErr, loadResult] = await tryAsync(
-    (async () => {
-      if (isNative) {
-        // 1) 先检查 Android 文件缓存
-        const imageCache = getImageCache();
-        const [cacheErr, cached] = await tryAsync(imageCache!.getImage({ key: originalUrl }));
-        if (!cacheErr && cached?.base64) {
-          cacheSet(originalUrl);
-          return { url: resolveImageUrl(originalUrl), cleanup: () => {} };
-        }
-
-        // 2) 未命中：通过 PixivApi 让 Java 侧下载+缓存（二进制不进 JS 堆）
-        const [prefetchErr] = await tryAsync(PixivApi.prefetchImage({ url: targetUrl }));
-        if (prefetchErr) {
-          console.warn("[ImageCache] Prefetch failed, falling back to proxy URL", prefetchErr);
-        }
-
-        // 3) 登记已加载标记
-        cacheSet(originalUrl);
-        // 返回代理 URL（shouldInterceptRequest 将从磁盘缓存读取）
-        return { url: resolveImageUrl(originalUrl), cleanup: () => {} };
-      } else {
-        await fetchWeb(targetUrl, originalUrl);
-      }
-
-      // 登记已加载标记（Blob 本体交给浏览器 HTTP 缓存，不进 L1）
+  if (isNative) {
+    // 1) 先检查 Android 文件缓存
+    const imageCache = getImageCache();
+    const [cacheErr, cached] = await tryAsync(imageCache!.getImage({ key: originalUrl }));
+    if (!cacheErr && cached?.base64) {
       cacheSet(originalUrl);
+      return { url: resolveImageUrl(originalUrl), cleanup: () => {} };
+    }
 
-      // 返回代理 URL（不走 blob: URL，避免 Network 面板条目 + 0.5ms 开销）
-      return {
-        url: resolveImageUrl(originalUrl),
-        cleanup: () => {},
-      };
-    })(),
-  );
-  if (loadErr) {
-    console.warn(`[ImageCache] Load failed: ${originalUrl}`, loadErr);
-    return {
-      url: resolveImageUrl(originalUrl),
-      cleanup: () => {},
-    };
+    // 2) 未命中：通过 PixivApi 让 Java 侧下载+缓存（二进制不进 JS 堆）
+    const [prefetchErr] = await tryAsync(PixivApi.prefetchImage({ url: targetUrl }));
+    if (prefetchErr) {
+      // prefetch 失败时不标记 L1，让调用方（LazyDetailImage）重试
+      console.warn("[ImageCache] Prefetch failed, caller will retry", prefetchErr);
+      throw new Error("Prefetch failed");
+    }
+
+    // 3) 登记已加载标记
+    cacheSet(originalUrl);
+    // 返回代理 URL（shouldInterceptRequest 将从磁盘缓存读取）
+    return { url: resolveImageUrl(originalUrl), cleanup: () => {} };
   }
-  return loadResult;
+
+  // Web 模式
+  try {
+    await fetchWeb(targetUrl, originalUrl);
+  } catch (err) {
+    console.warn(`[ImageCache] Fetch failed: ${originalUrl}`, err);
+    // 也标记 L1，让 checkImageCache 能命中（Web 模式无 shouldInterceptRequest 兜底）
+    cacheSet(originalUrl);
+    return { url: resolveImageUrl(originalUrl), cleanup: () => {} };
+  }
+  cacheSet(originalUrl);
+  return {
+    url: resolveImageUrl(originalUrl),
+    cleanup: () => {},
+  };
 }
 
 // ─── 带进度回调的图片加载 ───

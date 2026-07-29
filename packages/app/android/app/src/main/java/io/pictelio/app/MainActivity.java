@@ -169,23 +169,31 @@ public class MainActivity extends BridgeActivity {
                 }
             }
 
-            HttpURLConnection conn = (HttpURLConnection) new URL(pixivUrl).openConnection();
-            conn.setRequestProperty("Referer", OAuthConfig.REFERER);
-            conn.setRequestProperty("User-Agent", OAuthConfig.USER_AGENT);
-            conn.setConnectTimeout(OAuthConfig.TIMEOUT_IMAGE_PROXY_CONNECT);
-            conn.setReadTimeout(OAuthConfig.TIMEOUT_IMAGE_PROXY_READ);
+            // ── B: OkHttp 下载（连接池共享，比 HttpURLConnection 稳定） ──
+            okhttp3.Request okRequest = new okhttp3.Request.Builder()
+                    .url(pixivUrl)
+                    .addHeader("Referer", OAuthConfig.REFERER)
+                    .addHeader("User-Agent", OAuthConfig.USER_AGENT)
+                    .build();
 
-            String mime = conn.getContentType();
+            okhttp3.Response okResponse = PixivApiPlugin.getSharedClient().newCall(okRequest).execute();
+
+            String mime = okResponse.header("Content-Type");
             if (mime == null) mime = "image/jpeg";
 
-            // ── B: Cache-Control immutable 头 ──────────────────────
+            // ── C: Cache-Control immutable 头 ──
             Map<String, String> headers = new HashMap<>();
             if (browserCacheEnabled) {
                 headers.put("Cache-Control", "public, max-age=31536000, immutable");
             }
 
-            // 磁盘缓存由 JS 侧 ImageCachePlugin.saveImage() 负责写入，Java 侧不做重复写入
-            return new WebResourceResponse(mime, conn.getContentEncoding(), 200, "OK", headers, conn.getInputStream());
+            return new WebResourceResponse(
+                    mime,
+                    okResponse.header("Content-Encoding"),
+                    200, "OK",
+                    headers,
+                    okResponse.body().byteStream()
+            );
         } catch (Exception e) {
             e.printStackTrace();
             return null;

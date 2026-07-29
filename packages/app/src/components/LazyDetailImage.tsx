@@ -1,4 +1,5 @@
 import type { Component } from "solid-js";
+import { onCleanup } from "solid-js";
 import PixivImage from "./PixivImage";
 import { createEverVisible } from "@/primitives/visibility";
 import { LAZY_LOAD_MARGIN } from "../primitives/rootMargins";
@@ -6,6 +7,10 @@ import { loadImage } from "../utils/imageLoader";
 
 /** 预加载视口前页数 — OkHttp 默认 5 并发/主机，4 页安全 */
 const PRELOAD_WINDOW = 3 as const;
+
+/** prefetch 失败时重试次数和间隔 */
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 2000;
 
 interface Props {
   /** 用户设定质量的图片 URL（medium / large） */
@@ -33,6 +38,7 @@ const LazyDetailImage: Component<Props> = (props) => {
   // cacheReadyFor 存已就绪的图片 URL，空串表示未就绪
   // 用 URL 而非 boolean 可消除竞态：旧 loadImage 的 finally 不会错误标记新 src
   const [cacheReadyFor, setCacheReadyFor] = createSignal("");
+  const [retryTrigger, setRetryTrigger] = createSignal(0);
 
   const preloaded = createMemo(() => {
     const vp = props.visiblePage;
@@ -58,11 +64,27 @@ const LazyDetailImage: Component<Props> = (props) => {
 
   // 2. cacheReadyFor 不是当前 src 且 shouldLoad 为 true 时触发 loadImage
   //    用 cacheReadyFor(src) 而非 boolean 避免旧 finally 误标记新 src
+  //    成功后设 cacheReadyFor；失败则重试（最多 MAX_RETRIES 次）
   createEffect(() => {
+    let cancelled = false;
+    onCleanup(() => { cancelled = true; });
+
     const src = props.src;
+    const attempt = retryTrigger();
     if (shouldLoad() && src && cacheReadyFor() !== src) {
-      loadImage(src).finally(() => {
-        if (props.src === src) setCacheReadyFor(src);
+      let retryTimer: ReturnType<typeof setTimeout> | undefined;
+      onCleanup(() => { if (retryTimer) clearTimeout(retryTimer); });
+
+      loadImage(src).then(() => {
+        if (!cancelled && props.src === src) {
+          setCacheReadyFor(src);
+        }
+      }).catch(() => {
+        if (!cancelled && props.src === src && attempt < MAX_RETRIES) {
+          retryTimer = setTimeout(() => {
+            if (!cancelled) setRetryTrigger(attempt + 1);
+          }, RETRY_DELAY_MS);
+        }
       });
     }
   });
