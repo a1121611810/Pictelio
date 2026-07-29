@@ -93,7 +93,7 @@ Architecture Decision Records live in `/docs/adr/`. Notable ones:
 | 0037 | PixivApiPlugin gateway — native-only Pixiv API, access_token hidden from JS heap |
 | 0038 | Immediate navigation — render first, load data later; shallow loaders + skeleton screens |
 | 0039 | Detail image cache-ready rendering — two-phase preload with URL-keyed cacheReadyFor signal; eliminates HttpURLConnection fallback race for multi-page illusts |
-| 0040 | Splash lifecycle evolution: ADR-0040 introduced scale+fade exit animation; removed in `fa2015c` (v3.21.7); **reintroduced in working tree** with 120ms scale+fade + loading-triggered 350ms dismiss delay to ensure skeleton paint before splash exit |
+| 0040 | Splash lifecycle evolution: ADR-0040 introduced scale+fade exit animation; removed in `fa2015c` (v3.21.7); **reintroduced** with 120ms scale+fade + loading-triggered 350ms dismiss delay to ensure skeleton paint before splash exit |
 
 ## Key Source Files
 

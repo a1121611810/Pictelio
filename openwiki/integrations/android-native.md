@@ -124,7 +124,7 @@ sequenceDiagram
 
 **Android native:**
 - `MainActivity.java`: retains `SplashScreen.installSplashScreen(this)` + `setKeepOnScreenCondition(() -> keepSplashVisible.get())`. The private `keepSplashVisible` `AtomicBoolean` defaults to `true` and is set to `false` via the package-private `dismissSplash()` method, called by `AuthPlugin.hideSplash()`
-- **Exit animation (reintroduced in working tree):** The previously-removed `setOnExitAnimationListener` is back: the splash icon now scales to 1.8x with alpha(0) over 120ms using `DecelerateInterpolator(2f)`, then `splashScreenView.remove()` is called. This animation had been removed in commit `fa2015c` when the splash dismiss was simplified to immediate `onMount`-only. Now that dismiss is loading-triggered again, the animation was restored for visual polish. See [TabFeedPage](/openwiki/domain/feed-and-browsing.md#tabfeedpage) for the full loading-triggered dismiss flow.
+- **Exit animation (reintroduced):** The previously-removed `setOnExitAnimationListener` is back: the splash icon now scales to 1.8x with alpha(0) over 120ms using `DecelerateInterpolator(2f)`, then `splashScreenView.remove()` is called. This animation had been removed in commit `fa2015c` when the splash dismiss was simplified to immediate `onMount`-only. Now that dismiss is loading-triggered again, the animation was restored for visual polish. See [TabFeedPage](/openwiki/domain/feed-and-browsing.md#tabfeedpage) for the full loading-triggered dismiss flow.
 - `styles.xml`: `AppTheme.NoActionBarLaunch` inherits `Theme.SplashScreen` — splash background and icon defined in theme XML
 - `build.gradle`: retains `androidx.core:core-splashscreen` dependency
 - `variables.gradle`: retains `coreSplashScreenVersion = '1.2.0'`
