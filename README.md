@@ -45,14 +45,13 @@
 
 ## Features
 
-| Browsing | Utilities | Native |
-|:---------|:----------|:-------|
-| Recommended & Following feeds | Bookmarks management | Predictive back gesture |
-| Illust detail with Ugoira playback | User pages & follow/unfollow | Bottom navigation bar |
-| Novel reader (virtualized, search) | Report & Block | Pull-to-refresh & auto-hide nav |
-| Waterfall / single / grid layouts | Browsing history | Android Keystore secure storage |
-| Novel discovery feed | Comment browsing | PWA offline cache |
-| Age gate & R18 filtering | Update check via GitHub Releases | Theme switching (light/dark/system) |
+- **Browse** — Recommended and Following feeds for both illustrations and novels
+- **Illust Detail** — Full-resolution images, multi-page support, Ugoira animated playback
+- **Novel Reader** — Virtualized text layout, keyword search, series navigation with reading progress
+- **Layout Modes** — Waterfall masonry, single column, or grid
+- **Social** — Bookmark, comment, follow/unfollow artists
+- **Content Control** — Age gate on first launch, R18/R18G blurred filtering
+- **Theme** — Light, Dark, and System-follow themes
 
 ---
 
