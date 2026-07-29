@@ -120,6 +120,7 @@ sequenceDiagram
 
 **Android native:**
 - `MainActivity.java`: retains `SplashScreen.installSplashScreen(this)` + `setKeepOnScreenCondition(() -> keepSplashVisible.get())`. The private `keepSplashVisible` `AtomicBoolean` defaults to `true` and is set to `false` via the package-private `dismissSplash()` method, called by `AuthPlugin.hideSplash()`
+- **Exit animation (ADR-0040):** `setOnExitAnimationListener` applies a scale(1.8x) + alpha(0) combo over 280ms with `DecelerateInterpolator(2f)` to the splash icon view, then calls `splashScreenView.remove()`. The animation is entirely native (60fps, zero JS involvement), giving a "expand and fade" visual transition.
 - `styles.xml`: `AppTheme.NoActionBarLaunch` inherits `Theme.SplashScreen` — splash background and icon defined in theme XML
 - `build.gradle`: retains `androidx.core:core-splashscreen` dependency
 - `variables.gradle`: retains `coreSplashScreenVersion = '1.2.0'`

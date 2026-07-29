@@ -3,7 +3,6 @@ import ImageCard from "./ImageCard";
 import LazyImageCard from "./LazyImageCard";
 import SkeletonCard from "./SkeletonCard";
 import GridCard from "./GridCard";
-import LoadingSpinner from "./LoadingSpinner";
 import PullIndicator from "./PullIndicator";
 import ErrorDisplay from "./ErrorDisplay";
 import type { PixivIllust, ApiError } from "../api/types";
@@ -231,10 +230,6 @@ const VirtualFeed: Component<Props> = (props) => {
           }}
         </For>
       </div>
-
-      {props.loading && props.illusts.length > 0 && pullPhase() !== "refreshing" && (
-        <LoadingSpinner text="加载中..." />
-      )}
 
       {!props.hasMore && props.illusts.length > 0 && (
         <p class="text-[var(--colorNeutralForeground3)] text-center py-4 [font-size:var(--fontSizeBase200)]">
