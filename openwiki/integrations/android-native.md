@@ -108,7 +108,10 @@ sequenceDiagram
     JS->>AP: markContentReady() → AuthPlugin.hideSplash()
     AP->>MA: dismissSplash()
     MA->>SS: setKeepOnScreenCondition → false
-    SS-->>MA: Splash exits
+    Note over MA,SS: keepSplashVisible = false
+    SS->>SS: setOnExitAnimationListener fires
+    SS->>SS: scale(1.8x) + alpha(0) over 280ms (DecelerateInterpolator)
+    SS-->>MA: Splash exits (splashScreenView.remove())
 ```
 
 **Call sites:**

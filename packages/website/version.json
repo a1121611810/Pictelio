@@ -1,5 +1,5 @@
 {
-  "version": "3.21.1",
-  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.21.1",
-  "changelog": "🐛 修复\n  fix(illust-detail): 预加载多图详情页后续图片到磁盘缓存\n  fix(android): keepSplashVisible 改为 private + dismissSplash() setter\n  fix(android): WebView error path 关闭 Splash + 注释修正\n  fix(android): 回退至 Jetpack Spla"
+  "version": "3.21.2",
+  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.21.2",
+  "changelog": "✨ 新功能\n  feat(android): SplashScreen 退出动画 + 移除列表页双重 loading\n🐛 修复\n  fix(illust-detail): 空 src 守卫 + stale finally 防护\n  fix(illust-detail): 缓存就绪后渲染多图 + 消除 src 变化竞态"
 }
