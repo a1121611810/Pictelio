@@ -1,6 +1,5 @@
 import type { Component } from "solid-js";
 import { isLoggedIn, isLoading, setIsLoading, initializeAuth } from "@/stores/authStore";
-import LoadingSpinner from "@/components/LoadingSpinner";
 import {
   loadAutoHideNavBarPreference,
   loadShowR18Preference,
@@ -207,11 +206,9 @@ const RootLayout: Component = () => {
         <Outlet />
       </ErrorBoundary>
 
-      {/* 启动加载覆盖层：浮在内容之上，不卸载 Outlet */}
+      {/* 启动加载覆盖层：由原生 Splash 承担加载指示，JS 侧不做重复覆盖 */}
       <Show when={isLoading()}>
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-[var(--colorNeutralBackground3)]">
-          <LoadingSpinner size="lg" text="加载中..." />
-        </div>
+        <div class="fixed inset-0 z-50" />
       </Show>
 
       {/* Exit hint toast */}
