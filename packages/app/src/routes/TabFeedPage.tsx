@@ -50,9 +50,10 @@ const TabFeedPage: Component<Props> = (props) => {
     return illusts();
   });
 
-  // Initialize abort controller for subsequent feed operations
+  // Initialize abort controller and trigger data loading in background
   onMount(() => {
     abortController = new AbortController();
+    ensureLoaded(abortController.signal);
   });
 
   // Save scroll + abort pending requests on unmount

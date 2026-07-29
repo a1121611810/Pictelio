@@ -1,5 +1,6 @@
+// @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "solid-testing-library";
+import { render, screen } from "@solidjs/testing-library";
 import ThemeSelector from "@/components/ThemeSelector";
 
 vi.mock("@/stores/themeStore", () => ({
@@ -18,7 +19,7 @@ describe("ThemeSelector", () => {
   it("renders page style options", async () => {
     render(() => <ThemeSelector />);
     expect(screen.getByText("Fluent 默认")).toBeTruthy();
-    expect(screen.getByText("卡片风格")).toBeTruthy();
+    expect(screen.getByText("卡片式")).toBeTruthy();
   });
 
   it("renders without color theme swatches", async () => {
@@ -29,7 +30,7 @@ describe("ThemeSelector", () => {
 
   it("marks Fluent as selected by default", async () => {
     render(() => <ThemeSelector />);
-    const fluentBtn = screen.getByLabelText("Fluent 默认");
+    const fluentBtn = screen.getAllByRole("button", { name: "Fluent 默认" })[0];
     expect(fluentBtn.getAttribute("aria-pressed")).toBe("true");
   });
 });

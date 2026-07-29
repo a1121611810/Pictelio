@@ -1,7 +1,7 @@
 import type { Accessor, Component, JSX } from "solid-js";
 import PixivImage from "../components/PixivImage";
 import ImageViewer from "@/components/ImageViewer";
-import LoadingSpinner from "../components/LoadingSpinner";
+import NovelDetailSkeleton from "../components/skeletons/NovelDetailSkeleton";
 import FluentIcon from "../components/ui/FluentIcon";
 import NovelSearchBar from "../components/NovelSearchBar";
 import NovelCoverHeader from "../components/NovelCoverHeader";
@@ -34,14 +34,13 @@ import ReaderSettingsSheet from "../components/ReaderSettingsSheet";
 import SeriesSheet from "../components/SeriesSheet";
 import PageTransition from "../components/PageTransition";
 import CommentOverlay from "../components/CommentOverlay";
-import { ApiErrorType, type ApiError } from "../api/types";
+import { type ApiError } from "../api/types";
 import ErrorDisplay from "../components/ErrorDisplay";
 import { pushOverlay, popOverlay } from "../stores/backGestureStore";
 import { scrollToTop } from "../utils/scrollToTop";
 import { toApiError } from "../api/client";
 import { recordVisit } from "../stores/historyStore";
 
-const routeApi = getRouteApi("/novel/$id");
 
 // ── Scroll-driven hide/show constants ──
 const BOTTOM_THRESHOLD = 80;
@@ -234,8 +233,6 @@ const NovelDetail: Component = () => {
     setCurrentNovelId(id);
   }
 
-  const data = routeApi.useLoaderData();
-
   // URL 参数变化时同步内部小说 ID（外部链接/前进后退），系列内切换不触发此效果。
   createEffect(() => {
     const paramId = Number(params().id);
@@ -263,12 +260,15 @@ const NovelDetail: Component = () => {
     recordVisit(entry.detail, "novel");
   }
 
-  async function loadNovelById(id: number) {
+  let loadGeneration = 0;
+
+  async function loadNovelById(id: number, generation: number) {
     if (!id) {
       return;
     }
     const cached = peekEntry(id);
     if (cached) {
+      if (loadGeneration !== generation) return;
       applyEntry(cached);
       return;
     }
@@ -277,58 +277,33 @@ const NovelDetail: Component = () => {
     const [novelErr] = await tryAsync((async () => {
       const dbEntry = await getEntry(id);
       if (dbEntry) {
+        if (loadGeneration !== generation) return;
         applyEntry(dbEntry);
         return;
       }
       const entry = await loadNovelEntry(id);
+      if (loadGeneration !== generation) return;
       applyEntry(entry);
     })());
     if (novelErr) {
+      if (loadGeneration !== generation) return;
       setDetailError(toApiError(novelErr));
       setDetailLoading(false);
     }
   }
 
-  // Hydrate initial data from route loader
-  createEffect(() => {
-    const d = data() as { error: ApiError | null };
-    if (d.error) {
-      setDetailError(
-        typeof d.error === "string" ? { type: ApiErrorType.UNKNOWN, message: d.error } : d.error,
-      );
-      setDetailLoading(false);
-      return;
-    }
-    const full = data() as {
-      novel: PixivNovel | null;
-      text: string;
-      nav: SeriesNavigation;
-      images: NovelImagesMap;
-    };
-    if (full.novel) {
-      applyEntry({
-        detail: full.novel,
-        text: full.text ?? "",
-        nav: full.nav ?? {},
-        images: full.images ?? {},
-      });
-    }
-  });
-
-  // 系列内切换时手动加载；URL 变化导致的 ID 变化由路由 loader 提供数据，避免重复请求。
+  // 组件内加载小说数据：currentNovelId 变化时自动请求（首次加载 + 系列内切换）
   createEffect(() => {
     const id = currentNovelId();
     if (!id) {
       return;
     }
-    const d = data();
-    if (id === d.novel?.id && d.error === null) {
+    // 已加载该 ID 的数据时跳过
+    if (novelData()?.id === id) {
       return;
     }
-    if (id === Number(params().id)) {
-      return;
-    }
-    void loadNovelById(id);
+    const gen = ++loadGeneration;
+    void loadNovelById(id, gen);
   });
 
   const [imageDimensions, setImageDimensions] = createSignal<NovelImageDimensions>({});
@@ -691,11 +666,9 @@ const NovelDetail: Component = () => {
           </Show>
         </header>
 
-        {/* ── Loading state ── */}
+        {/* ── Loading state：全页骨架屏 ── */}
         <Show when={detailLoading() && !novelData()}>
-          <div class="flex justify-center py-16">
-            <LoadingSpinner text="加载中..." />
-          </div>
+          <NovelDetailSkeleton />
         </Show>
 
         {/* ── Error state ── */}

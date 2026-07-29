@@ -26,8 +26,13 @@ const UserIllusts: Component = () => {
   const userId = () => Number(params().id);
   const { visible: headerVisible, suppress: suppressHeaderVisibility } = createScrollBehavior();
 
-  // R18 开关切换时自动刷新
+  // 组件挂载后立即加载数据（路由 loader 已触发，此处作为兜底）
   onMount(() => {
+    const uid = userId();
+    if (uid) {
+      load(uid, contentType());
+    }
+
     const handler = () => {
       const uid = userId();
       if (uid) {

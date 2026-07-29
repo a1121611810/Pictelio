@@ -6,6 +6,7 @@ import {
   followUser,
   unfollowUser,
   downloadAndExtractUgoira,
+  loadDetail,
   type UgoiraFrame,
 } from "../api/illust";
 import { ApiErrorType, type ApiError } from "../api/types";
@@ -15,7 +16,6 @@ import ImageViewer from "../components/ImageViewer";
 import UgoiraViewer from "../components/UgoiraViewer";
 import LazyDetailImage from "../components/LazyDetailImage";
 import PixivImage from "../components/PixivImage";
-import LoadingSpinner from "../components/LoadingSpinner";
 import PageTransition from "../components/PageTransition";
 import HeartBurstEffect from "../components/HeartBurstEffect";
 import { detailQuality, showDetailStairs } from "../stores/settingsStore";
@@ -29,11 +29,10 @@ import IllustTags from "../components/IllustTags";
 import CommentOverlay from "../components/CommentOverlay";
 import IllustActionMenu from "../components/IllustActionMenu";
 import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior";
-
-const routeApi = getRouteApi("/illust/$id");
+import IllustDetailSkeleton from "../components/skeletons/IllustDetailSkeleton";
 
 const IllustDetail: Component = () => {
-  const data = routeApi.useLoaderData();
+  const params = useParams({ from: "/illust/$id" });
   const navigate = useNavigate();
   const router = useRouter();
   const [illust, setIllust] = createSignal<PixivIllust | null>(null);
@@ -332,25 +331,37 @@ const IllustDetail: Component = () => {
     }
   });
 
-  // 由路由 loader 提供初始数据；params 变化时自动重新进入该路由并重新加载。
+  // 组件内加载数据：先渲染骨架屏，params 变化时自动重新请求
   createEffect(() => {
-    const d = data();
-    if (d.error) {
-      if (d.error && typeof d.error === "object" && "type" in d.error) {
-        setError(d.error as ApiError);
-      } else if (d.error) {
-        setError({ type: ApiErrorType.UNKNOWN, message: d.error as string });
-      }
-      setLoading(false);
-      return;
-    }
-    if (d.illust) {
-      setIllust(d.illust);
+    const id = Number(params().id);
+    if (!id) return;
+
+    // 清理旧请求，避免竞态条件
+    let cancelled = false;
+    const controller = new AbortController();
+    onCleanup(() => {
+      cancelled = true;
+      controller.abort();
+    });
+
+    setLoading(true);
+    setError(null);
+    setIllust(null);
+
+    loadDetail(id, controller.signal).then(res => {
+      if (cancelled) return;
+      const i = res.illust;
+      setIllust(i);
       setPageRefs(new Map());
-      recordVisit(d.illust, "illust");
-      setIsFollowed(d.illust.user.is_followed ?? false);
+      recordVisit(i, "illust");
+      setIsFollowed(i.user.is_followed ?? false);
       setLoading(false);
-    }
+    }).catch(err => {
+      if (cancelled) return;
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      setError({ type: ApiErrorType.UNKNOWN, message: err?.message ?? "加载失败" });
+      setLoading(false);
+    });
   });
 
   /** Parse Pixiv internal caption links and navigate in-app */
@@ -458,9 +469,9 @@ const IllustDetail: Component = () => {
   return (
     <PageTransition>
       <div class="page">
-        {loading() && <LoadingSpinner text="加载作品中..." />}
+        {loading() && !illust() && <IllustDetailSkeleton />}
 
-        {error() && <ErrorDisplay error={error()!} onRetry={() => window.location.reload()} />}
+        {error() && !illust() && <ErrorDisplay error={error()!} onRetry={() => window.location.reload()} />}
 
         {illust() && !viewerOpen() && isBlockedAuthor() && (
           <div class="flex flex-col items-center justify-center h-screen gap-4 px-6">

@@ -11,11 +11,13 @@ import {
   users,
   loading,
   error,
+  loadList,
   loadMore,
   reset,
   toggleFollow,
   type FollowMode,
 } from "../stores/followListStore";
+import { user } from "../stores/authStore";
 
 interface Props {
   mode: FollowMode;
@@ -48,9 +50,18 @@ function avatarUrl(urls: { medium?: string; px_50x50?: string; px_170x170?: stri
 const FollowListPage: Component<Props> = (props) => {
   const navigate = useNavigate();
   const router = useRouter();
+  const routeParams = useParams({ strict: false });
   const { visible: headerVisible } = createScrollBehavior();
 
-  // 初始数据由路由 loader 加载；组件卸载时重置列表。
+  // 组件挂载后立即发起数据请求（不在 loader 中阻塞导航）
+  onMount(() => {
+    const uid = routeParams().id ? Number(routeParams().id) : user()?.id;
+    if (uid && uid > 0) {
+      loadList(props.mode, uid);
+    }
+  });
+
+  // 组件卸载时重置列表状态
   onCleanup(() => {
     reset();
   });

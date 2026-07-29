@@ -6,19 +6,12 @@ import {
   type RouteComponent,
 } from "@tanstack/solid-router";
 import RootLayout from "@/routes/__root";
-import { loadDetail } from "@/api/illust";
-import { user } from "@/stores/authStore";
-import { ensureLoaded } from "@/stores/feedStore";
 import {
-  loadList as loadFollowList,
   reset as resetFollowList,
   type FollowMode,
 } from "@/stores/followListStore";
-import { loadNovelEntry, peekEntry, getEntry } from "@/stores/novelCache";
 import { setCurrentTab } from "@/stores/uiStore";
 import { load as loadUserIllusts, contentType } from "@/stores/userIllustsStore";
-import { loadProfile } from "@/stores/userStore";
-import { toApiError } from "./api/client";
 
 import LoadingSpinner from "@/components/LoadingSpinner";
 
@@ -30,20 +23,19 @@ function asRoute(component: Component): RouteComponent {
 /** Feed 页签类型。 */
 type FeedTab = "recommended" | "follow";
 
-/** 构造 Feed 路由的 loader，仅 tab 不同。 */
+/** 构造 Feed 路由的 loader，仅设置 tab，组件内加载数据。 */
 function makeFeedLoader(tab: FeedTab) {
-  return async ({ abortController }: { abortController: AbortController }) => {
+  return () => {
     setCurrentTab(tab);
-    await ensureLoaded(abortController.signal);
     return {};
   };
 }
 
 /** 构造用户关注/粉丝列表路由的 loader，仅 mode 不同。 */
-function makeFollowLoader(mode: FollowMode) {
-  return async ({ params }: { params: { id: string } }) => {
+/** 构造用户关注/粉丝列表路由的 loader，仅重置列表状态，组件内加载数据。 */
+function makeFollowLoader(_mode: FollowMode) {
+  return () => {
     resetFollowList();
-    await loadFollowList(mode, Number(params.id));
     return {};
   };
 }
@@ -91,13 +83,6 @@ const followingRoute = createRoute({
 const illustRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "illust/$id",
-  loader: async ({ params }) => {
-    const [err, data] = await tryAsync(loadDetail(Number(params.id)));
-    if (err) {
-      return { illust: null, error: toApiError(err) };
-    }
-    return { illust: data.illust, error: null };
-  },
   component: asRoute(IllustDetail),
 });
 
@@ -110,38 +95,6 @@ const debugRoute = createRoute({
 const novelRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "novel/$id",
-  loader: async ({ params }) => {
-    const [novelErr, novelResult] = await tryAsync(
-      (async () => {
-        const id = Number(params.id);
-
-        // 辅助函数：从缓存条目加载 profile 并返回 route data
-        async function fromEntry(e: import("@/stores/novelCache").CacheEntry) {
-          await loadProfile(e.detail.user.id);
-          return { novel: e.detail, text: e.text, nav: e.nav, images: e.images, error: null };
-        }
-
-        // 优先从缓存读取，零网络请求
-        const cached = peekEntry(id);
-        if (cached) return fromEntry(cached);
-        const dbEntry = await getEntry(id);
-        if (dbEntry) return fromEntry(dbEntry);
-
-        const entry = await loadNovelEntry(id);
-        return fromEntry(entry);
-      })(),
-    );
-    if (novelErr) {
-      return {
-        novel: null,
-        text: "",
-        nav: {},
-        images: {},
-        error: toApiError(novelErr),
-      };
-    }
-    return novelResult;
-  },
   component: asRoute(NovelDetail),
 });
 
@@ -166,12 +119,8 @@ const searchRoute = createRoute({
 const meRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "me",
-  loader: async () => {
+  loader: () => {
     setCurrentTab("me");
-    const uid = user()?.id;
-    if (uid) {
-      await loadProfile(uid, true);
-    }
     return {};
   },
   component: asRoute(PersonalCenter),
@@ -216,11 +165,9 @@ const ageConfirmationRoute = createRoute({
 const userRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "user/$id",
-  loader: async ({ params }) => {
+  loader: ({ params }) => {
     setCurrentTab("me");
-    const uid = Number(params.id);
-    await loadProfile(uid, uid === user()?.id);
-    return { userId: uid };
+    return { userId: Number(params.id) };
   },
   component: asRoute(PersonalCenter),
 });
@@ -228,10 +175,10 @@ const userRoute = createRoute({
 const userIllustsRoute = createRoute({
   getParentRoute: () => userRoute,
   path: "illusts",
-  loader: async ({ params }) => {
+  loader: ({ params }) => {
     const uid = Number(params.id);
+    // 提前触发数据加载（fire-and-forget），组件挂载后 TanStack Query 自动去重
     loadUserIllusts(uid, contentType());
-    await loadProfile(uid);
     return { userId: uid };
   },
   component: asRoute(UserIllusts),
@@ -254,12 +201,8 @@ const userFollowersRoute = createRoute({
 const myFollowersRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "my/followers",
-  loader: async () => {
-    const uid = user()?.id;
-    if (!uid) return {};
+  loader: () => {
     resetFollowList();
-    await loadFollowList("followers", uid);
-    await loadProfile(uid, true);
     return {};
   },
   component: () => <FollowListPage mode="followers" />,

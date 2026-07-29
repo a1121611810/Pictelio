@@ -42,9 +42,6 @@ vi.mock("@tanstack/solid-router", () => ({
   useParams: () => () => ({ id: "42" }),
   useNavigate: () => mockNavigate,
   useRouter: () => ({ history: { back: mockBack } }),
-  getRouteApi: () => ({
-    useLoaderData: () => loaderData,
-  }),
 }));
 
 vi.mock("@/stores/novelCache", () => ({
@@ -172,10 +169,6 @@ vi.mock("@tanstack/solid-virtual", () => {
     })),
   };
 });
-
-vi.mock("@/components/LoadingSpinner", () => ({
-  default: () => <div>Loading...</div>,
-}));
 
 vi.mock("@/utils/novelImageDimensions", () => ({
   loadNovelImageDimensions: () => Promise.resolve({}),
