@@ -363,6 +363,28 @@ packages/app/src/
 3. **竞态防护**：组件内所有异步数据请求必须使用 generation-gate、AbortController 或等效机制防护，防止请求参数变化后旧响应覆盖新数据。
 4. **数据层分流**：跨组件共享数据使用全局缓存/去重层；页面独有数据由组件自身管理生命周期。
 
+### 工作流强制规范
+
+**硬约束**（违反视为架构违规）：
+
+所有涉及需求实现的任务，必须走以下四阶段流水线，**禁止跳过环节，禁止在前置阶段直接进入开发实现**：
+
+```
+Grill 澄清 → to-spec → to-tickets → implement
+```
+
+各阶段要求：
+
+1. **Grill 澄清**（`/grill-me` 无代码库 / `/grill-with-docs` 有代码库）：通过面试式提问把模糊需求收敛为明确约束。产出：需求边界、验收条件、排除项。
+2. **to-spec**：把 Grill 产出转为结构化的功能规格文档（含数据流、状态变化、边界条件）。
+3. **to-tickets**：把 spec 拆分为可独立执行的 ticket（每个 ticket 声明前置依赖，blocker 未完成时不可开工）。
+4. **implement**（`/implement` 内置 `/tdd` + `/code-review`）：按 ticket 实现，每个 ticket 开始前清空上下文。
+
+**允许的例外**：
+- 纯 Bug 修复（有确切复现步骤 + 期望行为）可直接走 `/diagnosing-bugs`，无需走完整四阶段。
+- 纯重构（不变更外部行为）可直接提方案执行。
+- 极小的局部改动（≤ 20 行，不影响抽象边界）可酌情简化。
+
 ## Fluent Design 规范
 
 本项目**强制**遵循 Microsoft Fluent Design System 2。以下规则无例外。
