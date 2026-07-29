@@ -119,7 +119,7 @@ sequenceDiagram
 | Location | When Called | Purpose |
 |----------|-------------|---------|
 | `Login.tsx` `onMount` | Login page renders | Closes splash when user needs to authenticate |
-| `TabFeedPage.tsx` `onMount` | Component mounts (skeleton visible) | Closes splash immediately for recommended/following feeds, before data arrives |
+| `TabFeedPage.tsx` (loading-triggered) | TanStack Query `loading()` becomes `true` → `requestAnimationFrame` → splash dismiss | Closes splash as soon as the skeleton screen frame is guaranteed visible. Falls back to 500ms timeout if loading never fires. |
 | `__root.tsx` `onMount` | Auth init completes (fallback) | Closes splash for non-feed pages (age-confirmation, etc.) if Login/TabFeedPage haven't already |
 
 **Android native:**
