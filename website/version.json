@@ -1,5 +1,5 @@
 {
-  "version": "3.18.0",
-  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.18.0",
-  "changelog": "🧹 杂项\n  chore: 更新站点信息与最后提交时间\n  chore: 完成测试体系迁移并更新依赖\n✨ 新功能\n  feat(website): migrate from VitePress to Astro 7 with full redesign\n  feat(app): enable auto-import for solid-js and tanstack-router\n🐛 修复\n "
+  "version": "3.19.0",
+  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.19.0",
+  "changelog": "🐛 修复\n  fix(PixivApiPlugin): 使用 JSObject.opt() 替代 get() 修复 JSONException 编译错误\n  fix(AuthPlugin): 使用 bridge.saveCall/bridge.releaseCall 替代不存在的 releaseCall(PluginCall)\n  fix(AuthPlugin): 添加 saveCall/rel"
 }

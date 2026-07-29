@@ -1,8 +1,8 @@
 ---
 type: Concept
 title: Android Native & Build
-description: The Capacitor Android native runtime layer — four custom Java plugins (AuthPlugin, ImageCachePlugin, OAuthPlugin, PictelioHttpPlugin), TypeScript bridge files, Gradle build pipeline, release signing, and WebView configuration.
-tags: [android, capacitor, native, gradle, build, plugins]
+description: The Capacitor Android native runtime layer — four custom Java plugins (AuthPlugin, ImageCachePlugin, OAuthPlugin, PixivApiPlugin), TypeScript bridge files, Gradle build pipeline, release signing, and WebView configuration. Updated in v3.18.0 with PixivApiPlugin gateway replacing PictelioHttpPlugin.
+tags: [android, capacitor, native, gradle, build, plugins, pixiv-api-gateway]
 ---
 
 # Android Native & Build
@@ -19,13 +19,13 @@ flowchart LR
         A[AuthPlugin.ts]
         I[ImageCache.ts]
         O[OAuthPlugin.ts]
-        P[PictelioHttp.ts]
+        P[PixivApi.ts]
     end
     subgraph Java[Android Java]
         JA[AuthPlugin.java]
         JI[ImageCachePlugin.java]
         JO[OAuthPlugin.java]
-        JP[PictelioHttpPlugin.java]
+        JP[PixivApiPlugin.java]
     end
     TS -->|Capacitor bridge| Java
 ```
@@ -63,28 +63,45 @@ The largest native plugin, handling the PKCE authorization code flow:
 - Extracts the code from the redirect and returns it to JavaScript
 - SSRF protection via URL whitelist (per ADR-0002)
 
-### PictelioHttpPlugin
+### PixivApiPlugin (Gateway)
 
-**Java:** `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioHttpPlugin.java` (6.4 KB)
-**TypeScript:** `/packages/app/src/native/PictelioHttp.ts`
+**Java:** `/packages/app/android/app/src/main/java/io/pictelio/app/PixivApiPlugin.java` (9 KB)
+**TypeScript:** `/packages/app/src/native/PixivApi.ts`
 
-Native HTTP client replacement for environments where `fetch` is unreliable (some Android WebView configurations):
-- `nativeGet(options)` / `nativePost(options)` — native HTTP calls with proper TLS handling
-- Used as the transport backend in the [dual-mode API client](/openwiki/architecture/api-layer.md) when running natively
-- Supports custom headers, timeout, and response streaming
+Introduced in **v3.18.0** as the sole gateway for all Pixiv API communication (ADR-0037). Replaces the former PictelioHttpPlugin, which was deleted:
+
+- `request({ method, path, params, body })` — all Pixiv App-API requests go through this single plugin method
+- **access_token is never exposed to the JavaScript layer** — stored in a Java `volatile` field, injected into OkHttp requests internally
+- **401 auto-refresh** — Java side detects 401 responses, uses `synchronized` + `isRefreshing` flag to refresh the token internally, then retries once. No JS-side Promise queue needed in production.
+- **`prefetchImage({ url })`** — downloads images directly to the Android disk cache directory, zero bytes enter the JS heap
+- Credentials and OAuth config live only in compiled Java bytecode
+
+**Deprecated/Deleted:** PictelioHttpPlugin.java and PictelioHttp.ts — the dual-path transport for native HTTP is gone. All native API requests now route through PixivApiPlugin.
 
 ## Main Activity & Application
 
 ### MainActivity.java
 
-`/packages/app/android/app/src/main/java/io/pictelio/app/MainActivity.java` (8.5 KB)
+`/packages/app/android/app/src/main/java/io/pictelio/app/MainActivity.java` (11 KB)
 
 The Android entry point. Key responsibilities:
-- Registers all four custom plugins
+- Registers all four custom plugins: **`ImageCachePlugin`**, **`AuthPlugin`**, **`OAuthPlugin`**, **`PixivApiPlugin`** (v3.18.0+, replaced PictelioHttpPlugin)
 - Configures WebView settings (JavaScript enabled, DOM storage, mixed content)
 - Sets up the back-gesture handler for predictive back navigation
 - Initializes the image cache and auth plugin on startup
 - Handles Android lifecycle events
+- Intercepts `/pixiv-img/` WebView requests via `shouldInterceptRequest` for image caching (retained from previous architecture)
+
+### OAuthUtils
+
+**Java:** `/packages/app/android/app/src/main/java/io/pictelio/app/OAuthUtils.java`
+
+Extracted shared utility class (v3.18.0) containing helper methods used by native plugins:
+- `md5Hex()` — MD5 hashing for OAuth code challenge verification
+- `urlEncode()` — URL-safe encoding for OAuth parameters
+- `URLSearchParams` — query string construction from key-value pairs
+
+Previously duplicated across plugins; now centralized in a single utility class.
 
 ### PictelioApp.java
 
@@ -98,6 +115,7 @@ Custom `Application` class for app-level initialization.
 - **DOM Storage:** Enabled
 - **Mixed Content:** Allowed (Pixiv API uses both HTTP and HTTPS)
 - **User Agent:** Customized for Pixiv API compatibility
+- **Image interception:** `shouldInterceptRequest` in MainActivity intercepts `/pixiv-img/` requests and serves from the Android disk cache (ImageCachePlugin) or proxies to the Pixiv CDN with proper Referer headers
 - **shouldInterceptRequest:** ImageCachePlugin intercepts image URLs
 - **SSRF Whitelist:** Only Pixiv domains and configured image hosts are accessible via WebView proxy (ADR-0002)
 

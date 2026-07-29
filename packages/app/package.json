@@ -1,6 +1,6 @@
 {
   "name": "pictelio-app",
-  "version": "3.18.0",
+  "version": "3.19.0",
   "private": true,
   "description": "Pictelio SPA - Pixiv illustration browser built with SolidJS + Capacitor",
   "type": "module",
@@ -18,8 +18,8 @@
     "fmt:check": "vp fmt --check",
     "cap:init": "pnpm exec cap init pictelio io.pictelio.app",
     "cap:add:android": "pnpm exec cap add android",
-    "cap:copy": "pnpm exec cap copy",
-    "cap:sync": "pnpm exec cap sync",
+    "cap:copy": "pnpm exec cap copy android",
+    "cap:sync": "pnpm exec cap sync android",
     "cap:open:android": "pnpm exec cap open android",
     "sync:android-version": "node scripts/sync-android-version.mjs",
     "sync:credentials": "node scripts/sync-credentials.mjs",
