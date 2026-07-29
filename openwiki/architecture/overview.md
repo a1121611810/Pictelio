@@ -20,7 +20,7 @@ Root `package.json` delegates all commands via `pnpm --filter`. Build tooling us
 
 **Mobile targets:**
 - **Android** — Four custom Capacitor plugins (Auth, ImageCache, OAuth, PixivApi) with Java implementations under `/packages/app/android/`. The **PixivApiPlugin** (v3.18.0+) replaced the now-deleted PictelioHttpPlugin as the single gateway for all Pixiv API requests (ADR-0037). See [Android Native & Build](/openwiki/integrations/android-native.md).
-- **iOS** (new in v3.18.0) — Capacitor iOS target infrastructure at `/packages/app/ios/`. Currently has Cordova config and built web assets; no custom native plugins implemented yet. No CI/CD pipeline for iOS release at this time.
+- **iOS** — Initially introduced in v3.18.0, iOS platform support and files (`/packages/app/ios/`) were **removed in v3.19.1** — the project is now **Android-only**.
 
 ## Boot Sequence
 
