@@ -19,7 +19,7 @@ tags: [architecture, pictelio, solidjs, capacitor, monorepo]
 Root `package.json` delegates all commands via `pnpm --filter`. Build tooling uses **vite-plus** (`vp` CLI), which wraps Vite with oxlint, oxfmt, and vitest.
 
 **Mobile targets:**
-- **Android** — Four custom Capacitor plugins (Auth, ImageCache, OAuth, PictelioHttp) with Java implementations under `/packages/app/android/`. See [Android Native & Build](/openwiki/integrations/android-native.md).
+- **Android** — Four custom Capacitor plugins (Auth, ImageCache, OAuth, PixivApi) with Java implementations under `/packages/app/android/`. The **PixivApiPlugin** (v3.18.0+) replaced the now-deleted PictelioHttpPlugin as the single gateway for all Pixiv API requests (ADR-0037). See [Android Native & Build](/openwiki/integrations/android-native.md).
 - **iOS** (new in v3.18.0) — Capacitor iOS target infrastructure at `/packages/app/ios/`. Currently has Cordova config and built web assets; no custom native plugins implemented yet. No CI/CD pipeline for iOS release at this time.
 
 ## Boot Sequence
@@ -124,8 +124,8 @@ Font sizes use fluid `clamp(rem + vw)` via UnoCSS preflights, defined in `/packa
 
 | Tool | Config | Purpose |
 |------|--------|---------|
-| vite-plus | `vite.config.ts` | Wraps Vite + Vite plugins + oxlint + oxfmt + vitest |
-| Vite | `vite.config.ts` | Bundler with Babel/SWC transforms |
+| vite-plus / Rolldown | `vite.config.ts` | Wraps Rolldown bundler with Oxc minifier (production), dev mode uses Vite dev server; integrates oxlint, oxfmt, vitest |
+| Rolldown + Oxc | (via vite-plus) | Production bundler and Rust-based minifier (replaced terser in v3.18.0) |
 | UnoCSS | `uno.config.ts` | On-demand atomic CSS generation |
 | TypeScript | `tsconfig.json` | Strict mode, path aliases (`@/`) |
 | oxlint | `.oxlintrc.json` | Fast Rust-based linter |

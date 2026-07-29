@@ -17,7 +17,7 @@ This wiki helps humans and agents understand the architecture, workflows, integr
 |-----------|-------|
 | Framework | SolidJS 1.9 |
 | Language | TypeScript 6.0 (strict) |
-| Bundler | Vite 8.1 via vite-plus |
+| Bundler | Rolldown (production) via vite-plus; Vite dev server |
 | Styling | UnoCSS 66.7 + Microsoft Fluent Design System 2 |
 | Routing | @tanstack/solid-router 1.170 |
 | Data Fetching | @tanstack/solid-query 5.101 |
@@ -90,6 +90,7 @@ Architecture Decision Records live in `/docs/adr/`. Notable ones:
 | 0034 | Migrate Playwright E2E tests to agent-browser (AI-driven E2E) |
 | 0035 | Migrate browser component tests to unit + agent-browser E2E |
 | 0036 | Error tuple pattern replaces try-catch across all layers (tryAsync/trySync) |
+| 0037 | PixivApiPlugin gateway — native-only Pixiv API, access_token hidden from JS heap |
 
 ## Key Source Files
 
@@ -145,6 +146,8 @@ The repository has been actively refactored through v3.17.x. Key themes in recen
 - **OAuth:** Transport layer deduplication between `auth.ts` and `pkceAuth.ts` (ADR-0028); loginUrl lambda capture fix for iOS.
 - **Author navigation:** Full coverage of third-party username click → personal center (ADR-0032).
 - **Update dialog fix:** Startup update dialog migrated from `<fluent-dialog>` (invisible on dynamic creation) to a pure CSS fixed overlay. `autoCheckUpdate` default changed to `true` (ADR-0033).
+- **PixivApiPlugin gateway (v3.18.0, ADR-0037):** All Pixiv API traffic unified through a single Java Capacitor plugin. `access_token` removed from JS heap entirely — stored in a Java `volatile` field. Image prefetching writes directly to disk, zero bytes into JS heap. 401 auto-refresh moved from JS Promise queue to Java `synchronized` lock. Old `PictelioHttpPlugin` and `PictelioHttp.ts` deleted; `client.ts` simplified by ~120 lines. **Security:** `access_token` is only present in JS during DEV mode (`import.meta.env.DEV` dead-code eliminated by Oxc minifier in production builds). OAuth credentials exist only in compiled Java bytecode (`OAuthConfig` auto-generated from `credentials.json5`).
+- **Rolldown + Oxc minifier (v3.18.0):** Production bundler switched from Vite/terser to Rolldown with Rust-based Oxc minifier. Build comments updated across codebase.
 
 ## Backlog
 
