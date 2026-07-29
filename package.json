@@ -29,6 +29,10 @@
   },
   "packageManager": "pnpm@11.9.0",
   "devEngines": {
+    "node": {
+      "version": ">=20.19",
+      "onFail": "error"
+    },
     "packageManager": {
       "name": "pnpm",
       "version": "11.9.0",
