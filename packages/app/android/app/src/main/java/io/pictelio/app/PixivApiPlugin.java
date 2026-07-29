@@ -13,10 +13,9 @@ import org.json.JSONException;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import android.util.Base64;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -114,18 +113,12 @@ public class PixivApiPlugin extends Plugin {
                 .addHeader("Referer", OAuthConfig.REFERER)
                 .addHeader("User-Agent", OAuthConfig.USER_AGENT);
 
-        if ("POST".equalsIgnoreCase(method) || "PUT".equalsIgnoreCase(method) || "PATCH".equalsIgnoreCase(method)) {
-            MediaType mediaType = MediaType.parse(body != null ? "application/json" : OAuthConfig.CONTENT_TYPE);
+        if ("POST".equalsIgnoreCase(method)) {
+            MediaType mediaType = MediaType.parse(OAuthConfig.CONTENT_TYPE);
             RequestBody requestBody = body != null
                     ? RequestBody.create(body, mediaType)
                     : RequestBody.create("", null);
-            if ("POST".equalsIgnoreCase(method)) {
-                builder.post(requestBody);
-            } else if ("PUT".equalsIgnoreCase(method)) {
-                builder.put(requestBody);
-            } else {
-                builder.patch(requestBody);
-            }
+            builder.post(requestBody);
         }
 
         try (Response response = getClient().newCall(builder.build()).execute()) {
@@ -179,6 +172,19 @@ public class PixivApiPlugin extends Plugin {
         call.resolve(result);
     }
 
+    @PluginMethod
+    public void setAccessToken(PluginCall call) {
+        String token = call.getString("accessToken");
+        if (token == null || token.isEmpty()) {
+            call.reject("accessToken is required");
+            return;
+        }
+        accessToken = token;
+        JSObject result = new JSObject();
+        result.put("success", true);
+        call.resolve(result);
+    }
+
     // ─── 插件方法：预缓存图片 ─────────────────────────────────
 
     @PluginMethod
@@ -198,7 +204,7 @@ public class PixivApiPlugin extends Plugin {
 
             // 以 URL 的 MD5 作为文件名，保留扩展名
             String ext = extractExtension(url);
-            String filename = md5Hex(url) + ext;
+            String filename = Base64.encodeToString(url.getBytes(), Base64.URL_SAFE | Base64.NO_PADDING | Base64.NO_WRAP);
             File cacheFile = new File(cacheDir, filename);
 
             if (cacheFile.exists() && cacheFile.length() > 0) {
@@ -263,9 +269,9 @@ public class PixivApiPlugin extends Plugin {
                     .format(Instant.now())
                     .replace("Z", "+00:00");
 
-            String clientHash = md5Hex(localTime + OAuthConfig.HASH_SECRET);
+            String clientHash = OAuthUtils.md5Hex(localTime + OAuthConfig.HASH_SECRET);
 
-            String formBody = new URLSearchParams()
+            String formBody = new OAuthUtils.URLSearchParams()
                     .add("client_id", OAuthConfig.CLIENT_ID)
                     .add("client_secret", OAuthConfig.CLIENT_SECRET)
                     .add("grant_type", "refresh_token")
@@ -337,7 +343,7 @@ public class PixivApiPlugin extends Plugin {
             Object value = obj.get(key);
             if (value == null) continue;
             if (sb.length() > 0) sb.append('&');
-            sb.append(urlEncode(key)).append('=').append(urlEncode(value.toString()));
+            sb.append(OAuthUtils.urlEncode(key)).append('=').append(OAuthUtils.urlEncode(value.toString()));
         }
         return sb.length() > 0 ? sb.toString() : null;
     }
@@ -360,56 +366,5 @@ public class PixivApiPlugin extends Plugin {
         return "";
     }
 
-    /**
-     * 计算 UTF-8 字符串的 MD5 十六进制摘要。
-     */
-    private static String md5Hex(String input) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            byte[] digest = md.digest(input.getBytes(StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder(32);
-            for (byte b : digest) {
-                sb.append(String.format("%02x", b & 0xff));
-            }
-            return sb.toString();
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("MD5 not available", e);
-        }
-    }
 
-    /**
-     * 轻量的 URL 编码（保留字母数字、- _ . *，空格转 +，其余 %XX）。
-     */
-    private static String urlEncode(String s) {
-        StringBuilder out = new StringBuilder(s.length());
-        for (byte b : s.getBytes(StandardCharsets.UTF_8)) {
-            int c = b & 0xff;
-            if (c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
-                    || c >= '0' && c <= '9' || c == '-' || c == '_'
-                    || c == '.' || c == '*') {
-                out.append((char) c);
-            } else if (c == ' ') {
-                out.append('+');
-            } else {
-                out.append('%').append(String.format("%02X", c));
-            }
-        }
-        return out.toString();
-    }
-
-    // ─── 轻量 URLSearchParams 构建（与 AuthPlugin 保持一致） ──
-
-    static class URLSearchParams {
-        private final StringBuilder sb = new StringBuilder();
-
-        URLSearchParams add(String key, String value) {
-            if (sb.length() > 0) sb.append('&');
-            sb.append(urlEncode(key)).append('=').append(urlEncode(value));
-            return this;
-        }
-
-        String build() {
-            return sb.toString();
-        }
-    }
 }

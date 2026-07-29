@@ -29,8 +29,6 @@ export default defineConfig({
       minWebviewVersion: 85,
       cacheDir: "pictelio-images",
       cacheMaxBytes: 314572800,
-      dohUrl: "https://cloudflare-dns.com/dns-query?name=",
-      allowedHosts: ["app-api.pixiv.net", "i.pximg.net"],
     }),
     __PUBLIC_CONFIG__: JSON.stringify({
       userAgent: "PixivIOSApp/7.18.3 (iOS 18.5; iPhone15,4)",
@@ -55,8 +53,6 @@ export default defineConfig({
       minWebviewVersion: 85,
       cacheDir: "pictelio-images",
       cacheMaxBytes: 314572800,
-      dohUrl: "https://cloudflare-dns.com/dns-query?name=",
-      allowedHosts: ["app-api.pixiv.net", "i.pximg.net"],
     }),
   },
   test: {

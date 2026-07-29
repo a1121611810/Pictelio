@@ -10,6 +10,8 @@ export interface PixivApiPlugin {
 
   setRefreshToken(options: { refreshToken: string }): Promise<void>;
 
+  setAccessToken(options: { accessToken: string }): Promise<void>;
+
   prefetchImage(options: { url: string }): Promise<{ cached: boolean }>;
 }
 

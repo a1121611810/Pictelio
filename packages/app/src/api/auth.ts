@@ -24,6 +24,7 @@ export async function refreshToken(token: string): Promise<PixivAuthResponse> {
   if (isNative) {
     await PixivApi.setRefreshToken({ refreshToken: token });
     const result = await AuthPlugin.refreshToken({ refreshToken: token });
+    await PixivApi.setAccessToken({ accessToken: result.accessToken });
     setAccessToken(result.accessToken);
     return {
       access_token: result.accessToken,
@@ -64,6 +65,7 @@ export async function exchangeCodeForToken(
   if (isNative) {
     const { OAuthPlugin } = await import("@/native/OAuthPlugin");
     const result = await OAuthPlugin.exchangeCode({ code, codeVerifier });
+    await PixivApi.setAccessToken({ accessToken: result.accessToken });
     setAccessToken(result.accessToken);
     return {
       access_token: result.accessToken,

@@ -128,7 +128,7 @@ public class MainActivity extends BridgeActivity {
 
             // ── A: 磁盘缓存检查 ────────────────────────────────────
             if (diskCacheEnabled) {
-                String filename = Base64.encodeToString(url.getBytes(), Base64.URL_SAFE | Base64.NO_PADDING | Base64.NO_WRAP);
+                String filename = Base64.encodeToString(pixivUrl.getBytes(), Base64.URL_SAFE | Base64.NO_PADDING | Base64.NO_WRAP);
                 File cacheFile = new File(getCacheDir() + "/" + OAuthConfig.CACHE_DIR + "/", filename);
                 if (cacheFile.exists()) {
                     String mime = "image/jpeg";

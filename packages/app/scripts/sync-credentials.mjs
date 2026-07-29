@@ -70,10 +70,6 @@ const lines = [
   `  public static final int MIN_WEBVIEW_VERSION = ${cfg.minWebviewVersion};`,
   `  public static final String CACHE_DIR = "${cfg.cacheDir}";`,
   `  public static final long CACHE_MAX_BYTES = ${cfg.cacheMaxBytes}L;`,
-  `  public static final String DOH_URL = "${cfg.dohUrl}";`,
-  `  public static final String[] ALLOWED_HOSTS = {`,
-  cfg.allowedHosts.map((h) => `    "${h}"`).join(",\n"),
-  "  };",
   "}",
   "",
 ];
