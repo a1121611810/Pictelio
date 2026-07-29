@@ -16,9 +16,7 @@ import androidx.core.splashscreen.SplashScreen;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
 
-import java.net.HttpURLConnection;
 import java.net.URI;
-import java.net.URL;
 
 import android.util.Base64;
 

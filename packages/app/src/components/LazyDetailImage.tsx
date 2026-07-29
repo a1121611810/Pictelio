@@ -56,10 +56,11 @@ const LazyDetailImage: Component<Props> = (props) => {
   // 完成后设 cacheReady 为 true，触发 PixivImage 渲染。
   // loadImage 内部有 inflight dedup，同一 URL 重复调用只发一次请求。
 
-  // 1. src 变化时重置 cacheReadyFor，确保跨插图导航时从骨架屏重新开始
+  // 1. src 变化时重置 cacheReadyFor 和 retryTrigger，确保跨插图导航时从骨架屏重新开始
   createEffect(() => {
     props.src;
     setCacheReadyFor("");
+    setRetryTrigger(0);
   });
 
   // 2. cacheReadyFor 不是当前 src 且 shouldLoad 为 true 时触发 loadImage
