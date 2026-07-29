@@ -354,6 +354,15 @@ packages/app/src/
 - 通过 `/github-api` 代理直连 GitHub（不经过 Pixiv 代理，避免被拦截）。
 - 开发者可通过设置面板开关控制自动检查。
 
+### 即时导航规则（ADR-0038）
+
+**硬约束**（违反视为架构违规）：
+
+1. **先渲染、后加载**：用户主动点击进入任何页面/弹窗/详情时，必须**先渲染页面框架 + 骨架屏**（骨架屏组件位于 `src/components/skeletons/`），再发起数据请求。不允许 TanStack Router `loader` `await` 网络请求阻塞导航。
+2. **全局权衡**：任何方案必须同时满足高可维护性 + 高性能 + 高安全性 + 低内存占用。不允模糊表述。必须从宏观（全局架构）和微观（单个组件）两个角度验证。
+3. **竞态防护**：组件内数据请求必须使用 generation-gate 或 AbortController 防护，防止 params/id 变化后旧请求覆盖新数据（参考 `IllustDetail.tsx` 的 `cancelled` 标志 + `AbortController` 双保险模式）。
+4. **数据层**：跨组件数据（Feed、用户列表等）使用 TanStack Query 去重；独立数据（作品详情、小说正文）使用 `createEffect` + 手动 fetch 直接在组件内加载。
+
 ## Fluent Design 规范
 
 本项目**强制**遵循 Microsoft Fluent Design System 2。以下规则无例外。
