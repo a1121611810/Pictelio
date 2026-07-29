@@ -10,11 +10,11 @@
     <a href="https://github.com/a1121611810/pixivizer/blob/main/LICENSE">
       <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT">
     </a>
-    <img src="https://img.shields.io/badge/SolidJS-1.9.13-2c4f7c?logo=solid" alt="SolidJS">
+    <img src="https://img.shields.io/badge/SolidJS-1.9.14-2c4f7c?logo=solid" alt="SolidJS">
     <img src="https://img.shields.io/badge/TypeScript-6.0.3-3178C6?logo=typescript" alt="TypeScript">
-    <img src="https://img.shields.io/badge/UnoCSS-66.7.3-333333?logo=unocss" alt="UnoCSS">
-    <img src="https://img.shields.io/badge/Capacitor-8.4.0-119EFF?logo=capacitor" alt="Capacitor">
-    <img src="https://img.shields.io/badge/Vite-8.1.0-646CFF?logo=vite" alt="Vite">
+    <img src="https://img.shields.io/badge/UnoCSS-66.7.5-333333?logo=unocss" alt="UnoCSS">
+    <img src="https://img.shields.io/badge/Capacitor-8.4.2-119EFF?logo=capacitor" alt="Capacitor">
+    <img src="https://img.shields.io/badge/Vite-8.1.5-646CFF?logo=vite" alt="Vite">
     <br>
     <img src="https://img.shields.io/badge/PRs-welcome-brightgreen" alt="PRs Welcome">
   </p>
@@ -72,17 +72,17 @@
 
 | 类别             | 技术                                                                  |   版本 |
 | :--------------- | :-------------------------------------------------------------------- | -----: |
-| **框架**         | [SolidJS](https://www.solidjs.com/)                                   | 1.9.13 |
-| **路由**         | [@tanstack/solid-router](https://github.com/TanStack/router)            | 1.170.17 |
-| **数据获取**     | [@tanstack/solid-query](https://tanstack.com/query)                     | 6.15.1 |
-| **本地数据库**   | [@tanstack/solid-db](https://tanstack.com/db)                           | 0.4.3 |
-| **构建工具**     | [vite-plus](https://github.com/asonkeri/vite-plus)（封装 Vite）       |  0.2.1 |
-| **打包工具**     | [Vite](https://vite.dev/)                                             |  8.1.0 |
-| **样式引擎**     | [UnoCSS](https://unocss.dev/)                                         | 66.7.3 |
+| **框架**         | [SolidJS](https://www.solidjs.com/)                                   | 1.9.14 |
+| **路由**         | [@tanstack/solid-router](https://github.com/TanStack/router)            | 1.170.18 |
+| **数据获取**     | [@tanstack/solid-query](https://tanstack.com/query)                     | 5.101.4 |
+| **本地数据库**   | [@tanstack/solid-db](https://tanstack.com/db)                           | 0.2.30 |
+| **构建工具**     | [vite-plus](https://github.com/asonkeri/vite-plus)（封装 Vite）        |  0.2.6 |
+| **打包工具**     | [Vite](https://vite.dev/)                                             |  8.1.5 |
+| **样式引擎**     | [UnoCSS](https://unocss.dev/)                                         | 66.7.5 |
 | **设计语言**     | [Microsoft Fluent Design System 2](https://fluent2.microsoft.design/) |      — |
-| **移动端运行时** | [Capacitor](https://capacitorjs.com/)                                 |  8.4.0 |
+| **移动端运行时** | [Capacitor](https://capacitorjs.com/)                                 |  8.4.2 |
 | **类型系统**     | [TypeScript](https://www.typescriptlang.org/) (strict 模式)           |  6.0.3 |
-| **测试**         | [Vitest](https://vitest.dev/)                                         |  4.1.9 |
+| **测试**         | [Vitest](https://vitest.dev/)                                         |  4.1.10 |
 | **包管理器**     | [pnpm](https://pnpm.io/)                                              | 11.9.0 |
 
 ### 📁 项目结构
@@ -96,9 +96,10 @@ pixivizer/
 │   │   ├── src/
 │   │   │   ├── api/             # Pixiv API 层 (auth, client, illust, user, types)
 │   │   │   ├── components/      # 可复用 UI 组件
+│   │   │   ├── native/          # 原生桥接 (AuthPlugin, PixivApi, ImageCache)
 │   │   │   ├── primitives/      # 底层逻辑单元（虚拟滚动、瀑布流计算、Web Worker）
 │   │   │   ├── routes/          # 页面组件
-│   │   │   ├── services/        # 服务封装 (pixiv, updateService)
+│   │   │   ├── services/        # 服务封装 (backGestureService, imageHostService, updateService)
 │   │   │   ├── stores/          # SolidJS 响应式状态管理
 │   │   │   ├── styles/          # CSS 分层 (reset.css, tokens.css, base.css)
 │   │   │   ├── types/           # 环境类型声明
@@ -108,8 +109,8 @@ pixivizer/
 │   │   ├── android/             # Capacitor Android 原生项目
 │   │   ├── scripts/             # 构建/发布/Android 开发脚本
 │   │   └── package.json
-│   └── website/                 # pictelio-website — VitePress 落地页
-│       ├── docs/
+│   └── website/                 # pictelio-website — Astro 落地页
+│       ├── src/               # Astro 页面源码
 │       └── package.json
 ├── scripts/
 ├── docs/                        # 项目文档
@@ -169,6 +170,8 @@ pnpm dev
 | `pnpm preview`            | 预览生产构建                                      |
 | `pnpm test`               | 运行 Vitest 测试                                  |
 | `pnpm test:watch`         | Vitest watch 模式                                 |
+| `pnpm test:agent-browser` | AI 驱动 E2E 浏览器测试                             |
+| `pnpm test:all`           | 运行所有测试（单元 + agent-browser）               |
 | `pnpm lint`               | oxlint 代码检查                                   |
 | `pnpm fmt`                | oxfmt 代码格式化                                  |
 | `pnpm fmt:check`          | oxfmt 格式检查（不修改）                          |
@@ -183,6 +186,7 @@ pnpm dev
 | `pnpm release:dry`        | 发布流程干跑                                      |
 | `pnpm deploy`             | 本地预览部署 landing 页面到 `_site/`              |
 | `pnpm deploy:dry`         | 部署干跑                                          |
+| `pnpm openwiki:update`    | 更新 OpenWiki 项目文档                            |
 
 ### ⚠️ 免责声明
 
@@ -252,17 +256,17 @@ pnpm dev
 
 | Category            | Technology                                                            |  Version |
 | :------------------ | :-------------------------------------------------------------------- | -------: |
-| **Framework**       | [SolidJS](https://www.solidjs.com/)                                   |   1.9.13 |
-| **Routing**         | [@tanstack/solid-router](https://github.com/TanStack/router)            |   1.170.17 |
-| **Data Fetching**   | [@tanstack/solid-query](https://tanstack.com/query)                     |   6.15.1 |
-| **Local Database**  | [@tanstack/solid-db](https://tanstack.com/db)                           |   0.4.3 |
-| **Build Tool**      | [vite-plus](https://github.com/asonkeri/vite-plus) (wraps Vite)       |    0.2.1 |
-| **Bundler**         | [Vite](https://vite.dev/)                                             |    8.1.0 |
-| **Styling Engine**  | [UnoCSS](https://unocss.dev/)                                         |   66.7.3 |
+| **Framework**       | [SolidJS](https://www.solidjs.com/)                                   |   1.9.14 |
+| **Routing**         | [@tanstack/solid-router](https://github.com/TanStack/router)            |   1.170.18 |
+| **Data Fetching**   | [@tanstack/solid-query](https://tanstack.com/query)                     |   5.101.4 |
+| **Local Database**  | [@tanstack/solid-db](https://tanstack.com/db)                           |   0.2.30 |
+| **Build Tool**      | [vite-plus](https://github.com/asonkeri/vite-plus) (wraps Vite)       |    0.2.6 |
+| **Bundler**         | [Vite](https://vite.dev/)                                             |    8.1.5 |
+| **Styling Engine**  | [UnoCSS](https://unocss.dev/)                                         |   66.7.5 |
 | **Design Language** | [Microsoft Fluent Design System 2](https://fluent2.microsoft.design/) |        — |
-| **Mobile Runtime**  | [Capacitor](https://capacitorjs.com/)                                 |    8.4.0 |
+| **Mobile Runtime**  | [Capacitor](https://capacitorjs.com/)                                 |    8.4.2 |
 | **Type System**     | [TypeScript](https://www.typescriptlang.org/) (strict mode)           |    6.0.3 |
-| **Testing**         | [Vitest](https://vitest.dev/)                                         |    4.1.9 |
+| **Testing**         | [Vitest](https://vitest.dev/)                                         |    4.1.10 |
 | **Package Manager** | [pnpm](https://pnpm.io/)                                              |   11.9.0 |
 
 ---
@@ -278,9 +282,10 @@ pixivizer/
 │   │   ├── src/
 │   │   │   ├── api/             # Pixiv API layer (auth, client, illust, user, types)
 │   │   │   ├── components/      # Reusable UI components
+│   │   │   ├── native/          # Native bridge (AuthPlugin, PixivApi, ImageCache)
 │   │   │   ├── primitives/      # Low-level logic (virtual scroll, masonry, Web Worker)
 │   │   │   ├── routes/          # Page components
-│   │   │   ├── services/        # Service layer (pixiv, updateService)
+│   │   │   ├── services/        # Service layer (backGestureService, imageHostService, updateService)
 │   │   │   ├── stores/          # SolidJS reactive state management
 │   │   │   ├── styles/          # CSS layers (reset.css, tokens.css, base.css)
 │   │   │   ├── types/           # Ambient type declarations
@@ -290,8 +295,8 @@ pixivizer/
 │   │   ├── android/             # Capacitor Android native project
 │   │   ├── scripts/             # Build/release/Android dev scripts
 │   │   └── package.json
-│   └── website/                 # pictelio-website — VitePress landing page
-│       ├── docs/
+│   └── website/                 # pictelio-website — Astro landing page
+│       ├── src/               # Astro page sources
 │       └── package.json
 ├── scripts/
 ├── docs/                        # Project docs
@@ -406,6 +411,8 @@ This project enforces **Microsoft Fluent Design System 2**:
 | `pnpm preview`              | Preview production build                                 |
 | `pnpm test`                 | Run Vitest tests                                         |
 | `pnpm test:watch`           | Run tests in watch mode                                  |
+| `pnpm test:agent-browser` | Run AI-driven E2E browser tests                          |
+| `pnpm test:all`           | Run all tests (unit + agent-browser)                     |
 | `pnpm lint`                 | Run oxlint                                               |
 | `pnpm fmt`                  | Run oxfmt formatter (write)                              |
 | `pnpm fmt:check`            | Run oxfmt formatter (check only)                         |
@@ -420,6 +427,7 @@ This project enforces **Microsoft Fluent Design System 2**:
 | `pnpm release:dry`          | Release workflow dry-run                                 |
 | `pnpm deploy`               | Preview deploy landing page to `_site/`                  |
 | `pnpm deploy:dry`           | Deploy dry-run                                           |
+| `pnpm openwiki:update`    | Update OpenWiki project documentation                   |
 
 ---
 

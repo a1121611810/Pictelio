@@ -153,9 +153,9 @@ pixivizer/
 │   │   ├── tsconfig.json        # TypeScript strict 配置
 │   │   ├── vitest.config.ts     # Vitest 配置
 │   │   └── capacitor.config.ts  # Capacitor 配置（appId: io.pictelio.app）
-│   └── website/                 # pictelio-website — VitePress 落地页
-│       ├── docs/                # Markdown 文档
-│       │   └── .vitepress/      # VitePress 配置
+│   └── website/                 # pictelio-website — Astro 落地页
+│       ├── src/                # Astro 页面源码
+│       │   └── pages/          # Astro 路由页面
 │       ├── version.json         # 版本信息
 │       └── package.json
 ├── scripts/
@@ -515,7 +515,7 @@ Grill 澄清 → to-spec → to-tickets → implement
 
 ## 部署
 
-- **Website**: GitHub Actions 自动部署 VitePress 站点到 GitHub Pages（`.github/workflows/deploy.yml`）
+- **Website**: GitHub Actions 自动部署 Astro 站点到 GitHub Pages（`.github/workflows/deploy.yml`）
   - 触发: push 到 `main` 分支且改动 `packages/website/**` 或 workflow 文件
   - 构建: `pnpm --filter pictelio-website build`
   - 复制 `version.json` 到构建产物
