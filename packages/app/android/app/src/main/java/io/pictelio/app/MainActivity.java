@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class MainActivity extends BridgeActivity {
 
-    /** SplashScreen 保持可见的标志位，由 AuthPlugin.dismissSplash() 通过 setter 控制 */
+    /** SplashScreen 保持可见的标志位，由 AuthPlugin.hideSplash() 通过 dismissSplash() setter 控制 */
     private static final AtomicBoolean keepSplashVisible = new AtomicBoolean(true);
 
     /** 供同包下的 AuthPlugin 调用，通知 SplashScreen 可退出 */
