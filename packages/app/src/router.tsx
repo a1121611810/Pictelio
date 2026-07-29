@@ -13,7 +13,25 @@ import {
 import { setCurrentTab } from "@/stores/uiStore";
 import { load as loadUserIllusts, contentType } from "@/stores/userIllustsStore";
 
-/** 将普通 Solid 组件/懒加载组件断言为 TanStack RouteComponent，避免每处重复转换。 */
+import Login from "@/routes/Login";
+import AgeConfirmation from "@/routes/AgeConfirmation";
+import IllustDetail from "@/routes/IllustDetail";
+import DebugImage from "@/routes/DebugImage";
+import Bookmarks from "@/routes/Bookmarks";
+import TabFeedPage from "@/routes/TabFeedPage";
+import PersonalCenter from "@/routes/PersonalCenter";
+import UserIllusts from "@/routes/UserIllusts";
+import About from "@/routes/About";
+import ImageHostSettings from "@/routes/ImageHostSettings";
+import ImageCacheSettings from "@/routes/ImageCacheSettings";
+import FollowListPage from "@/routes/FollowListPage";
+import NovelDetail from "@/routes/NovelDetail";
+import HistoryPage from "@/routes/HistoryPage";
+import Search from "@/routes/Search";
+import LayoutSettings from "@/routes/LayoutSettings";
+import Settings from "@/routes/Settings";
+
+/** 将普通 Solid 组件断言为 TanStack RouteComponent，避免每处重复转换。 */
 function asRoute(component: Component): RouteComponent {
   return component as unknown as RouteComponent;
 }
@@ -29,7 +47,6 @@ function makeFeedLoader(tab: FeedTab) {
   };
 }
 
-/** 构造用户关注/粉丝列表路由的 loader，仅 mode 不同。 */
 /** 构造用户关注/粉丝列表路由的 loader，仅重置列表状态，组件内加载数据。 */
 function makeFollowLoader(_mode: FollowMode) {
   return () => {
@@ -37,24 +54,6 @@ function makeFollowLoader(_mode: FollowMode) {
     return {};
   };
 }
-
-const Login = lazy(() => import("@/routes/Login"));
-const AgeConfirmation = lazy(() => import("@/routes/AgeConfirmation"));
-const IllustDetail = lazy(() => import("@/routes/IllustDetail"));
-const DebugImage = lazy(() => import("@/routes/DebugImage"));
-const Bookmarks = lazy(() => import("@/routes/Bookmarks"));
-const TabFeedPage = lazy(() => import("@/routes/TabFeedPage"));
-const PersonalCenter = lazy(() => import("@/routes/PersonalCenter"));
-const UserIllusts = lazy(() => import("@/routes/UserIllusts"));
-const About = lazy(() => import("@/routes/About"));
-const ImageHostSettings = lazy(() => import("@/routes/ImageHostSettings"));
-const ImageCacheSettings = lazy(() => import("@/routes/ImageCacheSettings"));
-const FollowListPage = lazy(() => import("@/routes/FollowListPage"));
-const NovelDetail = lazy(() => import("@/routes/NovelDetail"));
-const HistoryPage = lazy(() => import("@/routes/HistoryPage"));
-const Search = lazy(() => import("@/routes/Search"));
-const LayoutSettings = lazy(() => import("@/routes/LayoutSettings"));
-const Settings = lazy(() => import("@/routes/Settings"));
 
 const rootRoute = createRootRoute({ component: RootLayout });
 
