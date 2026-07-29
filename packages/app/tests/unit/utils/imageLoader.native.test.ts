@@ -1,42 +1,38 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const mockFetch = vi.fn();
+vi.mock("@/native/PixivApi", () => ({
+  PixivApi: {
+    prefetchImage: vi.fn(() => Promise.resolve({ cached: false })),
+    request: vi.fn(),
+    setRefreshToken: vi.fn(),
+  },
+}));
 
-vi.mock("@capacitor/core", async () => {
-  const actual = await vi.importActual<typeof import("@capacitor/core")>("@capacitor/core");
-  return {
-    ...actual,
-    Capacitor: { isNativePlatform: vi.fn(() => true) },
-    CapacitorHttp: { request: vi.fn() },
-    registerPlugin: vi.fn(() => ({
-      saveImage: vi.fn().mockResolvedValue({}),
-      getImage: vi.fn().mockResolvedValue({}),
-      getCachedKeys: vi.fn().mockResolvedValue({ keys: [] }),
-      clearCache: vi.fn(),
-    })),
-  };
-});
+vi.mock("@capacitor/core", () => ({
+  Capacitor: { isNativePlatform: () => true },
+  registerPlugin: vi.fn(() => ({
+    saveImage: vi.fn().mockResolvedValue({}),
+    getImage: vi.fn().mockResolvedValue({}),
+    getCachedKeys: vi.fn().mockResolvedValue({ keys: [] }),
+    clearCache: vi.fn(),
+  })),
+}));
 
 describe("loadImage on native platform", () => {
   beforeEach(() => {
-    mockFetch.mockReset();
-    // Native 平台使用 fetch() 走 Vite 代理，而非 CapacitorHttp
-    globalThis.fetch = mockFetch;
+    vi.clearAllMocks();
   });
 
-  it("fetches image via proxy URL and returns proxy path", async () => {
-    const testBytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]); // JPEG magic bytes
-    const testBlob = new Blob([testBytes], { type: "image/jpeg" });
-    mockFetch.mockResolvedValue(new Response(testBlob));
-
+  it("prefetches image via PixivApi and returns proxy path", async () => {
+    const { PixivApi } = await import("@/native/PixivApi");
     const { loadImage } = await import("@/utils/imageLoader");
     const result = await loadImage("https://i.pximg.net/img.jpg");
 
-    // Native 路径走 fetch() 到 Vite 代理，而非 CapacitorHttp
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(mockFetch).toHaveBeenCalledWith("/pixiv-img/img.jpg");
+    // Native 路径先检查 ImageCache 磁盘缓存（未命中），然后调用 PixivApi.prefetchImage
+    expect(PixivApi.prefetchImage).toHaveBeenCalledTimes(1);
+    expect(PixivApi.prefetchImage).toHaveBeenCalledWith({ url: "https://i.pximg.net/img.jpg" });
 
-    // LoadImage 返回代理 URL（不走 blob: URL，避免 Network 面板条目 + 0.5ms 开销）
+    // LoadImage 返回代理 URL
     expect(result.url).toMatch(/^\/pixiv-img\//u);
   });
 });

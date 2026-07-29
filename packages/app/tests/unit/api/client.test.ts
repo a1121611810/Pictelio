@@ -5,17 +5,15 @@ vi.mock("@capacitor/core", () => ({
   Capacitor: {
     isNativePlatform: () => false,
   },
-  CapacitorHttp: {
+  registerPlugin: vi.fn(() => ({
     request: vi.fn(),
-  },
+    setRefreshToken: vi.fn(),
+    prefetchImage: vi.fn(),
+  })),
 }));
 
-vi.mock("@/native/PictelioHttp", () => ({
-  PictelioHttp: { request: vi.fn() },
-}));
-
-vi.mock("@/stores/uiStore", () => ({
-  useDnsOverride: () => false,
+vi.mock("@/native/PixivApi", () => ({
+  PixivApi: { request: vi.fn(), setRefreshToken: vi.fn(), prefetchImage: vi.fn() },
 }));
 
 async function loadModule() {
@@ -248,7 +246,7 @@ describe("rewriteUrl", () => {
   });
 });
 
-describe("setAccessToken / setOnUnauthorized", () => {
+describe("setAccessToken / setOnUnauthorized / setRefreshPromise", () => {
   it("setAccessToken stores token", async () => {
     const { setAccessToken } = await loadModule();
     setAccessToken("test-token");
@@ -260,54 +258,50 @@ describe("setAccessToken / setOnUnauthorized", () => {
   });
 });
 
-describe("executeRequest 400 OAuth integration", () => {
+describe("apiClient.get — error classification", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     delete (globalThis as any).fetch;
   });
 
-  it("triggers onUnauthorized and returns UNAUTHORIZED on 400 OAuth error", async () => {
-    // 使用普通对象而非 Response 构造器，避免 Node 环境下 Response 兼容性问题
+  it("classifies 400 OAuth error as UNAUTHORIZED via web path", async () => {
     const mockResponseData = {
       error: { message: "Error occurred at the OAuth process. invalid_request" },
     };
-    // 第二次调用模拟 token 清空后的 401
-    const mockRetryResponseData = { error: { message: "invalid grant" } };
-    let callCount = 0;
-    const mockFetch = vi.fn(() => {
-      callCount++;
-      if (callCount === 1) {
-        return Promise.resolve({
-          status: 400,
-          ok: false,
-          json: () => Promise.resolve(mockResponseData),
-          headers: { get: () => "application/json" },
-        });
-      }
-      // 第二次请求：token 已被清空，API 返回 401
-      return Promise.resolve({
-        status: 401,
+    const mockFetch = vi.fn(() =>
+      Promise.resolve({
+        status: 400,
         ok: false,
-        json: () => Promise.resolve(mockRetryResponseData),
+        json: () => Promise.resolve(mockResponseData),
         headers: { get: () => "application/json" },
-      });
-    });
+      }),
+    );
 
-    // stub fetch before loading module, then re-stub after resetModules
     vi.stubGlobal("fetch", mockFetch);
-    const { setAccessToken, setOnUnauthorized, apiClient } = await loadModule();
+    const { apiClient } = await loadModule();
     globalThis.fetch = mockFetch;
-    const onUnauth = vi.fn(async () => {
-      setAccessToken(""); // 模拟退出登录，清空 token
-    });
-
-    setAccessToken("stale-token");
-    setOnUnauthorized(onUnauth);
 
     await expect(apiClient.get("/v1/illust/recommended")).rejects.toMatchObject({
       type: ApiErrorType.UNAUTHORIZED,
     });
+  });
 
-    expect(onUnauth).toHaveBeenCalledOnce();
+  it("classifies 401 as UNAUTHORIZED via web path", async () => {
+    const mockFetch = vi.fn(() =>
+      Promise.resolve({
+        status: 401,
+        ok: false,
+        json: () => Promise.resolve({}),
+        headers: { get: () => "application/json" },
+      }),
+    );
+
+    vi.stubGlobal("fetch", mockFetch);
+    const { apiClient } = await loadModule();
+    globalThis.fetch = mockFetch;
+
+    await expect(apiClient.get("/v1/illust/recommended")).rejects.toMatchObject({
+      type: ApiErrorType.UNAUTHORIZED,
+    });
   });
 });

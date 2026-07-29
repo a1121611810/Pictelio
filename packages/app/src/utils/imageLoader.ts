@@ -1,5 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { ImageCache, type ImageCachePlugin } from "../native/ImageCache";
+import { PixivApi } from "../native/PixivApi";
 import { isImageHostEnabled } from "../stores/imageHostStore";
 import { getEffectiveImageUrl, getRaceCandidateUrls } from "../services/imageHostService";
 
@@ -299,35 +300,27 @@ async function loadImageInner(originalUrl: string): Promise<LoadedImage> {
 
   const [loadErr, loadResult] = await tryAsync(
     (async () => {
-      let blob: Blob;
-
       if (isNative) {
-        // 1) 先检查 Android 文件缓存（异常时降级到网络，不阻塞加载路径）
+        // 1) 先检查 Android 文件缓存
         const imageCache = getImageCache();
         const [cacheErr, cached] = await tryAsync(imageCache!.getImage({ key: originalUrl }));
-        if (cacheErr) {
-          console.warn("[ImageCache] Disk cache check failed, falling back to network", cacheErr);
-        } else if (cached?.base64) {
-          // 磁盘缓存命中：只登记 key，不再 base64 解码进内存（省掉整张图的内存峰值）
+        if (!cacheErr && cached?.base64) {
           cacheSet(originalUrl);
           return { url: resolveImageUrl(originalUrl), cleanup: () => {} };
         }
 
-        // 2) 未命中，发网络请求
-        blob = await fetchNative(targetUrl, originalUrl);
-
-        // 3) 后台保存到磁盘缓存（异常不影响主加载路径）
-        const [encodeErr, base64] = await tryAsync(blobToBase64(blob));
-        if (encodeErr) {
-          console.warn("[ImageCache] Failed to encode blob for disk cache", encodeErr);
-        } else {
-          const [saveErr] = await tryAsync(imageCache!.saveImage({ key: originalUrl, base64 }));
-          if (saveErr) {
-            console.warn("[ImageCache] Failed to save to disk", saveErr);
-          }
+        // 2) 未命中：通过 PixivApi 让 Java 侧下载+缓存（二进制不进 JS 堆）
+        const [prefetchErr] = await tryAsync(PixivApi.prefetchImage({ url: targetUrl }));
+        if (prefetchErr) {
+          console.warn("[ImageCache] Prefetch failed, falling back to proxy URL", prefetchErr);
         }
+
+        // 3) 登记已加载标记
+        cacheSet(originalUrl);
+        // 返回代理 URL（shouldInterceptRequest 将从磁盘缓存读取）
+        return { url: resolveImageUrl(originalUrl), cleanup: () => {} };
       } else {
-        blob = await fetchWeb(targetUrl, originalUrl);
+        await fetchWeb(targetUrl, originalUrl);
       }
 
       // 登记已加载标记（Blob 本体交给浏览器 HTTP 缓存，不进 L1）
@@ -492,18 +485,6 @@ async function fetchSingleWeb(url: string): Promise<Blob> {
   return blob;
 }
 
-/** Native 模式：通过 WebView 代理获取图片（同 Web 模式一致，绕过 CapacitorHttp） */
-function fetchNative(targetUrl: string, originalUrl: string): Promise<Blob> {
-  const urls = getRaceCandidateUrls(targetUrl);
-
-  if (urls.length > 1) {
-    const proxyUrls = urls.map(toWebProxyUrl);
-    return raceFetch(proxyUrls, fetchSingleWeb, toWebProxyUrl(originalUrl));
-  }
-
-  return fetchSingleWeb(toWebProxyUrl(targetUrl));
-}
-
 /**
  * 并发请求多个候选 URL，返回最快成功响应。
  *
@@ -528,26 +509,6 @@ async function raceFetch<T>(
     return fetcher(fallbackUrl);
   }
   return anyResult;
-}
-
-// ─── Blob → Base64 工具（用于 ImageCache 插件写盘） ───
-
-/** 将 Blob 转为 Base64 字符串 */
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      if (typeof reader.result === "string") {
-        // 去掉 data:...;base64, 前缀
-        const base64 = reader.result.split(",")[1] ?? reader.result;
-        resolve(base64);
-      } else {
-        reject(new Error("FileReader did not return a string"));
-      }
-    };
-    reader.onerror = () => reject(reader.error ?? new Error("FileReader error"));
-    reader.readAsDataURL(blob);
-  });
 }
 
 // ─── 磁盘缓存预热 ───

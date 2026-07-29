@@ -16,7 +16,6 @@ const PREF_KEY_SHOW_DETAIL_STAIRS = "show_detail_stairs";
 const PREF_KEY_AGE_CONFIRMED = "age_confirmed";
 const PREF_KEY_IS_ADULT = "is_adult";
 const PREF_KEY_AUTO_CHECK_UPDATE = "auto_check_update";
-const PREF_KEY_USE_DNS_OVERRIDE = "use_dns_override";
 const PREF_KEY_NOVEL_LAYOUT_MODE = "novel_layout_mode";
 const PREF_KEY_IMAGE_CACHE_DISK = "image_cache_disk";
 const PREF_KEY_IMAGE_CACHE_BROWSER = "image_cache_browser";
@@ -67,7 +66,6 @@ const initialState = () => ({
   showUpdateDialog: false,
 
   // 自定义 DNS 解析（实验性，仅 Android）
-  useDnsOverride: false,
 });
 
 const [state, setState] = createStore(initialState());
@@ -369,26 +367,6 @@ export async function loadLastDismissedVersionPreference(): Promise<void> {
 export const showUpdateDialog = () => state.showUpdateDialog;
 export const setShowUpdateDialog = (v: boolean) => setState("showUpdateDialog", v);
 
-// ── 自定义 DNS 解析 ──
-
-export const useDnsOverride = () => state.useDnsOverride;
-export async function setUseDnsOverride(enabled: boolean): Promise<void> {
-  setState("useDnsOverride", enabled);
-  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_USE_DNS_OVERRIDE, value: String(enabled) }));
-  if (err) console.warn("[settingsStore] Failed to persist useDnsOverride", err);
-}
-
-export async function loadUseDnsOverridePreference(): Promise<void> {
-  const [err, result] = await tryAsync(Preferences.get({ key: PREF_KEY_USE_DNS_OVERRIDE }));
-  if (err) {
-    console.warn("[settingsStore] Failed to load useDnsOverride preference", err);
-    return;
-  }
-  const { value } = result!;
-  if (value !== null) {
-    setState("useDnsOverride", value === "true");
-  }
-}
 
 // ── 重置所有设置到默认值 ──
 
@@ -416,5 +394,4 @@ export async function resetSettingsStore(): Promise<void> {
   setIsCheckingUpdate(false);
   setCheckCompleted(false);
   setShowUpdateDialog(false);
-  await setUseDnsOverride(false);
 }

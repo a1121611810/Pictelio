@@ -1,13 +1,11 @@
-import { Capacitor, CapacitorHttp } from "@capacitor/core";
+import { Capacitor } from "@capacitor/core";
 import { ApiErrorType, type ApiError } from "./types";
-import { PictelioHttp } from "../native/PictelioHttp";
-import { useDnsOverride } from "../stores/settingsStore";
 import { PIXIV_USER_AGENT } from "./userAgent";
+import { PixivApi } from "../native/PixivApi";
 
 // ─── 端点（编译时常量，从 credentials.json5 注入） ───
 const PIXIV_API_BASE = __PUBLIC_CONFIG__.apiBaseUrl;
 const PIXIV_AUTH_URL = __PUBLIC_CONFIG__.authUrl;
-const REQUEST_TIMEOUT_MS = __PUBLIC_CONFIG__.timeout.connect;
 
 // ─── 平台检测 ───
 const isNative = Capacitor.isNativePlatform();
@@ -18,11 +16,28 @@ export interface PixivApiClient {
   post<T>(path: string, body: Record<string, string>): Promise<T>;
 }
 
-// ─── 状态 ───
-let accessToken = "";
-let onUnauthorized: (() => Promise<void>) | null = null;
-/** 401 刷新 Promise — 共享给所有并发 401 请求，确保 refresh 只执行一次 */
-let refreshPromise: Promise<void> | null = null;
+// ─── 仅 DEV 模式：access_token 与 401 管理 ───
+// 生产 Native 模式下 access_token 和 401 刷新由 PixivApiPlugin 内部处理。
+// DEV 模式（浏览器 pnpm dev）仍需要本地管理。
+let devAccessToken = "";
+const devAuth: { onUnauthorized: (() => Promise<void>) | null; refreshPromise: Promise<void> | null } =
+  { onUnauthorized: null, refreshPromise: null };
+
+export function setAccessToken(token: string) {
+  devAccessToken = token;
+}
+
+export function getAccessToken(): string {
+  return devAccessToken;
+}
+
+export function setOnUnauthorized(handler: (() => Promise<void>) | null) {
+  devAuth.onUnauthorized = handler;
+}
+
+export function setRefreshPromise(p: Promise<void> | null) {
+  devAuth.refreshPromise = p;
+}
 
 // ─── GET 请求去重 ───
 /** 飞行中的 GET 请求，相同 URL+参数只发一个真实 HTTP 请求 */
@@ -30,26 +45,6 @@ const inflightGetRequests = new Map<string, Promise<any>>();
 
 function getRequestKey(path: string, data?: Record<string, string>): string {
   return `GET:${path}:${JSON.stringify(data ?? {})}`;
-}
-
-export function setAccessToken(token: string) {
-  accessToken = token;
-}
-
-export function getAccessToken(): string {
-  return accessToken;
-}
-
-export function setOnUnauthorized(handler: () => Promise<void>) {
-  onUnauthorized = handler;
-}
-
-/**
- * 设置/清除 refreshPromise，让 executeRequest 中的并发请求
- * 在 token 刷新期间等待，避免用旧/空 token 发注定失败的请求。
- */
-export function setRefreshPromise(p: Promise<void> | null) {
-  refreshPromise = p;
 }
 
 /** 尝试从 Pixiv 错误响应体中提取人类可读的错误消息 */
@@ -231,143 +226,52 @@ export function rewriteUrl(path: string): string {
   return `${PIXIV_API_BASE}${path}`;
 }
 
-/** 用 AbortController 实现带超时的 fetch，同时支持外部 signal 取消 */
-async function fetchWithTimeout(
-  url: string,
-  init: RequestInit,
-  externalSignal?: AbortSignal,
-): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  // 处理 signal 在检查与监听之间的竞态
-  if (externalSignal?.aborted) controller.abort();
-  const onAbort = () => controller.abort();
-  externalSignal?.addEventListener("abort", onAbort);
-  let result: Response;
-  try {
-    result = await fetch(url, { ...init, signal: controller.signal });
-  } finally {
-    clearTimeout(timeoutId);
-    externalSignal?.removeEventListener("abort", onAbort);
-  }
-  return result;
-}
-
 /**
- * 发送一个 HTTP 请求并返回 {status, data}。
- * 纯传输层：不重试、不退避、不处理认证刷新。
+ * 统一请求执行函数。
+ * 原生模式：通过 PixivApi 插件发出请求；
+ * Web 模式：通过 fetch 走 Vite 代理。
  */
-async function sendRequest(
-  method: "GET" | "POST",
-  url: string,
-  data: Record<string, string> | undefined,
-  headers: Record<string, string>,
-  signal?: AbortSignal,
-): Promise<{ status: number; data: unknown }> {
-  if (isNative) {
-    if (method === "POST") headers["Content-Type"] = __PUBLIC_CONFIG__.contentType;
-
-    // 原生路径用 Promise.race 实现超时（CapacitorHttp/PictelioHttp 不支持 AbortController）
-    const withTimeout = <T>(promise: Promise<T>): Promise<T> => {
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      const result = Promise.race([
-        promise,
-        new Promise<never>((_, reject) => {
-          timer = setTimeout(() => reject(new TypeError("Request timeout")), REQUEST_TIMEOUT_MS);
-        }),
-      ]);
-      result.finally(() => clearTimeout(timer));
-      return result;
-    };
-
-    if (useDnsOverride()) {
-      const resp = await withTimeout(
-        PictelioHttp.request({
-          url,
-          method,
-          headers,
-          body: method === "POST" && data ? new URLSearchParams(data).toString() : undefined,
-        }),
-      );
-      const [parseErr, parsed] = trySync(() => JSON.parse(resp.data));
-      return { status: resp.status, data: parseErr ? resp.data : parsed };
-    } else if (method === "GET") {
-      const resp = await withTimeout(
-        CapacitorHttp.request({ method: "GET", url, headers, params: data as any }),
-      );
-      return { status: resp.status, data: resp.data };
-    } else {
-      const body = data ? new URLSearchParams(data).toString() : "";
-      const resp = await withTimeout(
-        CapacitorHttp.request({ method: "POST", url, headers, data: body }),
-      );
-      return { status: resp.status, data: resp.data };
-    }
-  }
-
-  // Web 模式
-  if (method === "GET") {
-    const params = data ? "?" + new URLSearchParams(data).toString() : "";
-    const res = await fetchWithTimeout(url + params, { method: "GET", headers }, signal);
-    return { status: res.status, data: await res.json() };
-  } else {
-    const body = data ? new URLSearchParams(data).toString() : "";
-    headers["Content-Type"] = __PUBLIC_CONFIG__.contentType;
-    const res = await fetchWithTimeout(url, { method: "POST", headers, body }, signal);
-    const contentType = res.headers.get("content-type") || "";
-    if (contentType.includes("application/json")) {
-      return { status: res.status, data: await res.json() };
-    }
-    const [_err, textResult] = await tryAsync(Promise.resolve(res.text()));
-    const text = _err ? "" : textResult!;
-    throw new Error(`服务器返回非 JSON (HTTP ${res.status}): ${text.slice(0, 300)}`);
-  }
-}
-
-/** 刷新 token 或抛出 UNAUTHORIZED。多个并发请求共享同一个 refresh Promise */
-async function refreshAuth(): Promise<void> {
-  if (!onUnauthorized) throw classifyError(401, null);
-  if (!refreshPromise) {
-    refreshPromise = onUnauthorized().finally(() => {
-      refreshPromise = null;
-    });
-  }
-  await refreshPromise;
-}
-
-/** 执行 HTTP 请求（不含去重层），含 401/400OAuth 自动刷新（最多 1 次递归） */
-async function executeRequest<T>(
+async function nativeExecuteRequest<T>(
   method: "GET" | "POST",
   path: string,
   data?: Record<string, string>,
+  body?: Record<string, string>,
   signal?: AbortSignal,
-  /** 已刷新过一次，再次 401/400 不再递归，直接抛出 */
-  refreshed?: boolean,
 ): Promise<T> {
-  if (signal?.aborted) throw new DOMException("请求已取消", "AbortError");
-  if (refreshPromise) await refreshPromise;
+  if (isNative) {
+    const result = await PixivApi.request({
+      method,
+      path,
+      params: data,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (result.status >= 400) {
+      let parsedBody: unknown = null;
+      try { parsedBody = JSON.parse(result.data); } catch { /* ignore parse errors */ }
+      throw classifyError(result.status, null, parsedBody);
+    }
+    return JSON.parse(result.data) as T;
+  }
 
-  const url = rewriteUrl(path);
+  // Web 模式：走 Vite 代理
   const headers: Record<string, string> = {
     "User-Agent": PIXIV_USER_AGENT,
     Referer: __PUBLIC_CONFIG__.referer,
   };
-  if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
-
-  const result = await sendRequest(method, url, data, headers, signal);
-
-  // 401/400OAuth → 刷新 token 后重试（最多一次，refreshed 标志防止无限递归）
-  if (
-    !refreshed &&
-    (result.status === 401 || isOAuthTokenErrorResponse(result.status, result.data))
-  ) {
-    if (!onUnauthorized) throw classifyError(result.status, null, result.data);
-    await refreshAuth();
-    return executeRequest<T>(method, path, data, signal, true);
+  if (method === "GET") {
+    if (devAccessToken) headers["Authorization"] = `Bearer ${devAccessToken}`;
+    const params = data ? "?" + new URLSearchParams(data).toString() : "";
+    const res = await fetch(rewriteUrl(path) + params, { method: "GET", headers, signal });
+    if (!res.ok) throw classifyError(res.status, null, await res.json().catch(() => null));
+    return res.json() as Promise<T>;
+  } else {
+    if (devAccessToken) headers["Authorization"] = `Bearer ${devAccessToken}`;
+    headers["Content-Type"] = __PUBLIC_CONFIG__.contentType;
+    const bodyStr = data ? new URLSearchParams(data).toString() : "";
+    const res = await fetch(rewriteUrl(path), { method: "POST", headers, body: bodyStr });
+    if (!res.ok) throw classifyError(res.status, null, await res.json().catch(() => null));
+    return res.json() as Promise<T>;
   }
-
-  if (result.status >= 400) throw classifyError(result.status, null, result.data);
-  return result.data as T;
 }
 
 /**
@@ -387,7 +291,7 @@ function request<T>(
     if (existing) {
       return existing as Promise<T>;
     }
-    const promise = executeRequest<T>(method, path, data, signal);
+    const promise = nativeExecuteRequest<T>(method, path, data, undefined, signal);
     inflightGetRequests.set(key, promise);
     void tryAsync(
       promise.finally(() => {
@@ -398,7 +302,7 @@ function request<T>(
   }
 
   // POST 请求透传（不做去重，因为涉及收藏/关注等副作用）
-  return executeRequest<T>(method, path, data, signal);
+  return nativeExecuteRequest<T>(method, path, data);
 }
 
 export const apiClient: PixivApiClient = {

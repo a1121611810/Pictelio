@@ -1,17 +1,18 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
-// Mock Capacitor: web 模式
-vi.mock("@capacitor/core", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@capacitor/core")>();
-  return {
-    ...actual,
-    Capacitor: { isNativePlatform: () => false },
-    CapacitorHttp: { request: vi.fn() },
-  };
-});
+// Mock @capacitor/core: keep Capacitor (isNativePlatform) + registerPlugin, remove CapacitorHttp
+vi.mock("@capacitor/core", () => ({
+  Capacitor: { isNativePlatform: () => true },
+  registerPlugin: vi.fn(),
+}));
 
-vi.mock("@/native/PictelioHttp", () => ({
-  PictelioHttp: { request: vi.fn() },
+// Mock PixivApi (used by client.ts for native requests)
+vi.mock("@/native/PixivApi", () => ({
+  PixivApi: {
+    request: vi.fn(),
+    setRefreshToken: vi.fn(),
+    prefetchImage: vi.fn(),
+  },
 }));
 
 async function loadModule() {
@@ -19,103 +20,173 @@ async function loadModule() {
   return import("@/api/client");
 }
 
-describe("401 并发重试 — Promise 队列", () => {
-  let originalFetch: typeof globalThis.fetch;
-  let mockFetch: ReturnType<typeof vi.fn>;
-
-  beforeEach(() => {
-    originalFetch = globalThis.fetch;
-    mockFetch = vi.fn();
-    globalThis.fetch = mockFetch;
-  });
-
-  afterEach(() => {
-    globalThis.fetch = originalFetch;
-  });
-
-  /** 构造一个 401 响应 */
-  function make401Response() {
-    return {
-      ok: false,
-      status: 401,
-      headers: new Headers({ "content-type": "application/json" }),
-      json: () => Promise.resolve({}),
-      text: () => Promise.resolve(""),
-      clone: () => make401Response(),
-    } as unknown as Response;
-  }
-
-  /** 构造一个成功的 200 响应 */
-  function make200Response(data = {}) {
-    return {
-      ok: true,
+describe("apiClient — PixivApi native mode", () => {
+  it("successful GET returns parsed data", async () => {
+    const { apiClient } = await loadModule();
+    const { PixivApi } = await import("@/native/PixivApi");
+    vi.mocked(PixivApi.request).mockResolvedValue({
       status: 200,
-      headers: new Headers({ "content-type": "application/json" }),
-      json: () => Promise.resolve(data),
-      text: () => Promise.resolve(JSON.stringify(data)),
-      clone: () => make200Response(data),
-    } as unknown as Response;
-  }
-
-  it("并发 401 请求共享一次 refresh，全部成功", async () => {
-    const { setAccessToken, setOnUnauthorized, apiClient } = await loadModule();
-
-    let refreshCallCount = 0;
-    const mockRefresh = vi.fn(async () => {
-      refreshCallCount++;
-      setAccessToken("new-token");
+      data: JSON.stringify({ illust: { id: 123, title: "Test" } }),
     });
 
-    setAccessToken("expired-token");
-    setOnUnauthorized(mockRefresh);
+    const result = await apiClient.get("/v1/illust/123");
 
-    // MockFetch: 前两次调用返回 401，后续返回 200
-    mockFetch
-      .mockResolvedValueOnce(make401Response()) // 请求 A 首次
-      .mockResolvedValueOnce(make401Response()) // 请求 B 首次（并发）
-      .mockResolvedValueOnce(make200Response({ data: "A" })) // 请求 A 重试
-      .mockResolvedValueOnce(make200Response({ data: "B" })); // 请求 B 重试
+    expect(result).toEqual({ illust: { id: 123, title: "Test" } });
+    expect(PixivApi.request).toHaveBeenCalledWith({
+      method: "GET",
+      path: "/v1/illust/123",
+      params: undefined,
+      body: undefined,
+    });
+  });
 
-    // 并发发起两个请求
+  it("passes query params to PixivApi.request", async () => {
+    const { apiClient } = await loadModule();
+    const { PixivApi } = await import("@/native/PixivApi");
+    vi.mocked(PixivApi.request).mockResolvedValue({
+      status: 200,
+      data: JSON.stringify({}),
+    });
+
+    await apiClient.get("/v1/search", { q: "test" });
+
+    expect(PixivApi.request).toHaveBeenCalledWith({
+      method: "GET",
+      path: "/v1/search",
+      params: { q: "test" },
+      body: undefined,
+    });
+  });
+
+  it("401 response throws UNAUTHORIZED error via classifyError", async () => {
+    const { apiClient } = await loadModule();
+    const { PixivApi } = await import("@/native/PixivApi");
+    vi.mocked(PixivApi.request).mockResolvedValue({
+      status: 401,
+      data: null,
+    });
+
+    await expect(apiClient.get("/v1/illust/123")).rejects.toMatchObject({
+      type: "UNAUTHORIZED",
+      message: expect.stringContaining("401"),
+    });
+  });
+
+  it("403 response throws FORBIDDEN error", async () => {
+    const { apiClient } = await loadModule();
+    const { PixivApi } = await import("@/native/PixivApi");
+    vi.mocked(PixivApi.request).mockResolvedValue({
+      status: 403,
+      data: null,
+    });
+
+    await expect(apiClient.get("/v1/illust/123")).rejects.toMatchObject({
+      type: "FORBIDDEN",
+    });
+  });
+
+  it("429 response throws RATE_LIMIT error", async () => {
+    const { apiClient } = await loadModule();
+    const { PixivApi } = await import("@/native/PixivApi");
+    vi.mocked(PixivApi.request).mockResolvedValue({
+      status: 429,
+      data: null,
+    });
+
+    await expect(apiClient.get("/v1/illust/123")).rejects.toMatchObject({
+      type: "RATE_LIMIT",
+    });
+  });
+
+  it("500+ response throws SERVER error", async () => {
+    const { apiClient } = await loadModule();
+    const { PixivApi } = await import("@/native/PixivApi");
+    vi.mocked(PixivApi.request).mockResolvedValue({
+      status: 503,
+      data: null,
+    });
+
+    await expect(apiClient.get("/v1/illust/123")).rejects.toMatchObject({
+      type: "SERVER",
+    });
+  });
+
+  it("GET request deduplication: same URL shares one PixivApi.request", async () => {
+    const { apiClient } = await loadModule();
+    const { PixivApi } = await import("@/native/PixivApi");
+    vi.mocked(PixivApi.request).mockResolvedValue({
+      status: 200,
+      data: JSON.stringify({ data: "shared" }),
+    });
+
+    const [resultA, resultB] = await Promise.all([
+      apiClient.get("/v1/illust/123"),
+      apiClient.get("/v1/illust/123"),
+    ]);
+
+    expect(resultA).toEqual({ data: "shared" });
+    expect(resultB).toEqual({ data: "shared" });
+    expect(PixivApi.request).toHaveBeenCalledTimes(1);
+  });
+
+  it("different URLs make separate PixivApi.request calls", async () => {
+    const { apiClient } = await loadModule();
+    const { PixivApi } = await import("@/native/PixivApi");
+    vi.mocked(PixivApi.request)
+      .mockResolvedValueOnce({ status: 200, data: JSON.stringify({ data: "A" }) })
+      .mockResolvedValueOnce({ status: 200, data: JSON.stringify({ data: "B" }) });
+
     const [resultA, resultB] = await Promise.all([
       apiClient.get("/v1/illust/A"),
       apiClient.get("/v1/illust/B"),
     ]);
 
-    // 两个请求都应该拿到数据
     expect(resultA).toEqual({ data: "A" });
     expect(resultB).toEqual({ data: "B" });
-
-    // Refresh 只被调用一次
-    expect(refreshCallCount).toBe(1);
+    expect(PixivApi.request).toHaveBeenCalledTimes(2);
   });
 
-  it("refresh 失败后，所有并发请求一致抛 401", async () => {
-    const { setAccessToken, setOnUnauthorized, apiClient } = await loadModule();
-
-    let refreshCallCount = 0;
-    const mockRefresh = vi.fn(async () => {
-      refreshCallCount++;
-      // Refresh 失败，token 为空
-      setAccessToken("");
+  it("extracts Pixiv error message from response body via classifyError", async () => {
+    const { apiClient } = await loadModule();
+    const { PixivApi } = await import("@/native/PixivApi");
+    vi.mocked(PixivApi.request).mockResolvedValue({
+      status: 403,
+      data: JSON.stringify({
+        errors: { system: { message: "rate limit", code: 100 } },
+      }),
     });
 
-    setAccessToken("expired-token");
-    setOnUnauthorized(mockRefresh);
+    const err = await apiClient.get("/v1/illust/123").catch((e) => e);
+    expect(err.type).toBe("FORBIDDEN");
+    expect(err.message).toContain("[100] rate limit");
+  });
 
-    mockFetch.mockResolvedValue(make401Response());
+  it("OAuth 400 error is classified as UNAUTHORIZED", async () => {
+    const { apiClient } = await loadModule();
+    const { PixivApi } = await import("@/native/PixivApi");
+    vi.mocked(PixivApi.request).mockResolvedValue({
+      status: 400,
+      data: JSON.stringify({
+        error: { message: "OAuth error: invalid_request" },
+      }),
+    });
 
-    // 并发发起两个请求
-    const [errA, errB] = await Promise.all([
-      apiClient.get("/v1/illust/A").catch((error: Error) => error),
-      apiClient.get("/v1/illust/B").catch((error: Error) => error),
-    ]);
+    await expect(apiClient.get("/v1/illust/123")).rejects.toMatchObject({
+      type: "UNAUTHORIZED",
+      status: 400,
+    });
+  });
 
-    // 两个请求都收到 401 错误
-    expect(errA.message).toContain("401");
-    expect(errB.message).toContain("401");
+  it("non-OAuth 400 returns UNKNOWN error", async () => {
+    const { apiClient } = await loadModule();
+    const { PixivApi } = await import("@/native/PixivApi");
+    vi.mocked(PixivApi.request).mockResolvedValue({
+      status: 400,
+      data: JSON.stringify({ error: "bad_request" }),
+    });
 
-    // Refresh 只被调用一次
-    expect(refreshCallCount).toBe(1);
+    await expect(apiClient.get("/v1/illust/123")).rejects.toMatchObject({
+      type: "UNKNOWN",
+    });
   });
 });

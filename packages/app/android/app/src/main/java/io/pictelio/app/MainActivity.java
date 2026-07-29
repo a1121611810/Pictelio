@@ -40,10 +40,10 @@ public class MainActivity extends BridgeActivity {
             return;
         }
 
-        registerPlugin(PictelioHttpPlugin.class);
         registerPlugin(ImageCachePlugin.class);
         registerPlugin(AuthPlugin.class);
         registerPlugin(OAuthPlugin.class);
+        registerPlugin(PixivApiPlugin.class);
         super.onCreate(savedInstanceState);
         // 调试模式 — debug 构建时启用
         if (BuildConfig.DEBUG) {

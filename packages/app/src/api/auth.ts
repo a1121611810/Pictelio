@@ -1,7 +1,7 @@
 import { Capacitor } from "@capacitor/core";
-import { setAccessToken } from "./client";
 import type { PixivAuthResponse } from "./types";
 import { AuthPlugin } from "@/native/AuthPlugin";
+import { PixivApi } from "@/native/PixivApi";
 
 // ─── 平台检测 ───
 const isNative = Capacitor.isNativePlatform();
@@ -21,12 +21,12 @@ const isNative = Capacitor.isNativePlatform();
  */
 export async function refreshToken(token: string): Promise<PixivAuthResponse> {
   if (isNative) {
+    await PixivApi.setRefreshToken({ refreshToken: token });
     const result = await AuthPlugin.refreshToken({ refreshToken: token });
-    setAccessToken(result.accessToken);
     return {
-      access_token: result.accessToken,
+      access_token: "",
       expires_in: 3600,
-      refresh_token: result.refreshToken,
+      refresh_token: "",
       token_type: "bearer",
       user: {
         id: result.userId,
@@ -62,11 +62,10 @@ export async function exchangeCodeForToken(
   if (isNative) {
     const { OAuthPlugin } = await import("@/native/OAuthPlugin");
     const result = await OAuthPlugin.exchangeCode({ code, codeVerifier });
-    setAccessToken(result.accessToken);
     return {
-      access_token: result.accessToken,
+      access_token: "",
       expires_in: 3600,
-      refresh_token: result.refreshToken,
+      refresh_token: "",
       token_type: "bearer",
       user: {
         id: result.userId,

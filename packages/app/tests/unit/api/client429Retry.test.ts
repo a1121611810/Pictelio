@@ -1,17 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ApiErrorType } from "@/api/types";
 
-vi.mock("@capacitor/core", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@capacitor/core")>();
-  return {
-    ...actual,
-    Capacitor: { isNativePlatform: () => false },
-    CapacitorHttp: { request: vi.fn() },
-  };
-});
+vi.mock("@capacitor/core", () => ({
+  Capacitor: { isNativePlatform: () => false },
+  registerPlugin: vi.fn(),
+}));
 
-vi.mock("@/native/PictelioHttp", () => ({
-  PictelioHttp: { request: vi.fn() },
+vi.mock("@/native/PixivApi", () => ({
+  PixivApi: { request: vi.fn(), setRefreshToken: vi.fn(), prefetchImage: vi.fn() },
 }));
 
 async function loadModule() {
@@ -89,32 +85,19 @@ describe("429 重试 — 指数退避", () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
-  it("401 优先于 429 处理，不受重试影响", async () => {
-    const { setAccessToken, setOnUnauthorized, apiClient } = await loadModule();
+  it("401 response classified as UNAUTHORIZED via web path", async () => {
+    const { apiClient } = await loadModule();
 
-    setAccessToken("expired");
-    const mockRefresh = vi.fn(async () => {
-      setAccessToken("new-token");
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 401,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: () => Promise.resolve({}),
+      text: () => Promise.resolve(""),
+    } as unknown as Response);
+
+    await expect(apiClient.get("/v1/illust/detail")).rejects.toMatchObject({
+      type: ApiErrorType.UNAUTHORIZED,
     });
-    setOnUnauthorized(mockRefresh);
-
-    // 首次 401 → refresh → 重试 200
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: false,
-        status: 401,
-        headers: new Headers({ "content-type": "application/json" }),
-        json: () => Promise.resolve({}),
-        text: () => Promise.resolve(""),
-        clone: function () {
-          return this;
-        },
-      } as unknown as Response)
-      .mockResolvedValueOnce(make200Response({ data: "ok" }));
-
-    const result = await apiClient.get("/v1/illust/detail");
-
-    expect(result).toEqual({ data: "ok" });
-    expect(mockRefresh).toHaveBeenCalledTimes(1);
   });
 });
