@@ -68,14 +68,14 @@ const TabFeedPage: Component<Props> = (props) => {
     }
   });
 
-  // 兜底：500ms 后确保 Splash 关闭
+  // 兜底：100ms 后确保 Splash 关闭（数据已缓存时 loading 可能从不变为 true）
   onMount(() => {
     setTimeout(() => {
       if (!splashDismissed) {
         splashDismissed = true;
         markContentReady();
       }
-    }, 500);
+    }, 100);
   });
 
   // Save scroll + abort pending requests on unmount

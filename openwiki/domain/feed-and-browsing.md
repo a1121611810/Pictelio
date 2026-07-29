@@ -65,6 +65,8 @@ flowchart LR
 - `scrollKey`, `initialScrollState`, `onScrollStateChange` — scroll restoration
 - `emptyText`, `skipAnimation`, `suppressHeaderVisibility`, `onNavigateToSettings`
 
+**Empty-state fix (`loadAttempted`, v3.21.6+):** VirtualFeed tracks a component-level `loadAttempted` boolean that becomes `true` once `loading`, `error`, or `illusts.length > 0` is observed. The "暂无新作品" empty-text message only renders when `loadAttempted` is `true` — preventing an empty-state flash before the first data load completes (i.e., while the skeleton screen is the intended visual).
+
 ## Layout Modes
 
 | Mode | Columns | Card Component | Description |

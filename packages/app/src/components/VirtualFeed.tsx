@@ -53,6 +53,14 @@ const VirtualFeed: Component<Props> = (props) => {
   const layoutMode = createMemo(() => props.layoutMode ?? "waterfall");
   const columnCount = createMemo(() => LAYOUT_COLUMNS[layoutMode()]);
 
+  // 标记是否已发起过数据加载（用于抑制首次渲染时的空状态）
+  let loadAttempted = false;
+  createEffect(() => {
+    if (props.loading || props.error || props.illusts.length > 0) {
+      loadAttempted = true;
+    }
+  });
+
   const estimateSize = (index: number) => {
     const ill = props.illusts[index];
     if (!ill) return 200;
@@ -237,7 +245,7 @@ const VirtualFeed: Component<Props> = (props) => {
         </p>
       )}
 
-      {props.illusts.length === 0 && !props.loading && !props.error && (
+      {props.illusts.length === 0 && !props.loading && !props.error && loadAttempted && (
         <p class="text-[var(--colorNeutralForeground2)] text-center py-16 [font-size:var(--fontSizeBase300)]">
           {props.emptyText ?? "暂无新作品"}
         </p>
