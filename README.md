@@ -130,10 +130,8 @@ pixivizer/
 
 ---
 
-## ⚠️ Disclaimer
+Pictelio is not affiliated with Pixiv Inc. All content displayed is sourced from [Pixiv](https://www.pixiv.net) public API and belongs to their respective creators.
 
-Pictelio is **not affiliated with** Pixiv Inc. All illustrations are sourced from the [Pixiv](https://www.pixiv.net) public API and belong to their respective creators. This project is for **educational purposes only**. Users must comply with Pixiv's Terms of Service and applicable laws.
-
-## 📄 License
+## License
 
 [MIT](LICENSE) © 2026
