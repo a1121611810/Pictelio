@@ -101,7 +101,7 @@ sequenceDiagram
     LDI->>IL: createEffect → loadImage(src)
     IL->>PP: prefetchImage(url)
     PP->>DC: OkHttp download → disk cache write
-    LDI->>LDI: cacheReadyFor = src (via finally)
+    LDI->>LDI: cacheReadyFor = src (on then success)
     Note over LDI: canDisplayImage = cacheReadyFor === src && shouldLoad
     Note over WV: Later, PixivImage renders
     WV->>DC: interceptImage() → cache HIT
