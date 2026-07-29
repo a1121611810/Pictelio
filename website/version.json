@@ -1,5 +1,5 @@
 {
-  "version": "3.19.0",
-  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.19.0",
-  "changelog": "🐛 修复\n  fix(PixivApiPlugin): 使用 JSObject.opt() 替代 get() 修复 JSONException 编译错误\n  fix(AuthPlugin): 使用 bridge.saveCall/bridge.releaseCall 替代不存在的 releaseCall(PluginCall)\n  fix(AuthPlugin): 添加 saveCall/rel"
+  "version": "3.19.1",
+  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.19.1",
+  "changelog": "📝 文档\n  docs: 同步 OpenWiki 文档（架构/集成/快速开始）\n  docs: PixivApiPlugin 网关 ADR-0037 + AGENTS.md 架构更新 + 术语表\n  docs: 更新 build 注释 — terser → Oxc minifier（Rolldown 内置）\n  docs: 更新文档与最后更新时间\n🧹 杂项\n  chore: 移除 iOS 平台"
 }
