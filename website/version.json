@@ -1,5 +1,5 @@
 {
-  "version": "3.20.0",
-  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.20.0",
-  "changelog": "✨ 新功能\n  feat(app): implement immediate navigation — render first, load data later\n🧹 杂项\n  chore: pre-commit hook 自动 git add openwiki/，消除后续脏提交"
+  "version": "3.21.0",
+  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.21.0",
+  "changelog": "✨ 新功能\n  feat(android): 迁移 Splash Screen 至 @capacitor/splash-screen，JS 侧控制关闭时机"
 }

@@ -8,8 +8,8 @@ android {
         applicationId "io.pictelio.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 32000
-        versionName "3.20.0"
+        versionCode 32100
+        versionName "3.21.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
