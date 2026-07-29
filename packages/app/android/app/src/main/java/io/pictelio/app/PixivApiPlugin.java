@@ -340,7 +340,7 @@ public class PixivApiPlugin extends Plugin {
         java.util.Iterator<String> keys = obj.keys();
         while (keys.hasNext()) {
             String key = keys.next();
-            Object value = obj.get(key);
+            Object value = obj.opt(key);
             if (value == null) continue;
             if (sb.length() > 0) sb.append('&');
             sb.append(OAuthUtils.urlEncode(key)).append('=').append(OAuthUtils.urlEncode(value.toString()));
