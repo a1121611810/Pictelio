@@ -38,8 +38,7 @@ Both feed stores now use `createTQFeedStore` (`/packages/app/src/stores/shared/c
 - Scroll state save/restore (`saveFeedScrollState` / `getFeedScrollState`)
 - Sub-tab adapter functions converting between feed-store and factory naming conventions
 
-<!-- openwiki: mermaid parse failed and this diagram was converted to a text fence so it does not break rendering. Fix the diagram source and restore the mermaid fence. Parser error: Heuristic: an unescaped angle bracket inside a label breaks rendering; rephrase the label. -->
-```text
+```mermaid
 flowchart LR
     TFP[TabFeedPage] --> FS[feedStore]
     FS --> TQ[createTQFeedStore]
@@ -47,7 +46,7 @@ flowchart LR
     QC --> API[api/client.ts]
     API --> P[Pixiv API]
     TFP --> VF[VirtualFeed]
-    VF --> IC[ImageCard<br/>GridCard]
+    VF --> IC[ImageCard / GridCard]
     VF --> CFV[createFeedVirtualizer]
 ```
 

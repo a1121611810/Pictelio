@@ -11,16 +11,15 @@ tags: [images, caching, performance, webview, android]
 
 The image loading pipeline is documented exhaustively in `/docs/image-loading-pipeline.md` (~40KB). This page summarizes the architecture and key components.
 
-<!-- openwiki: mermaid parse failed and this diagram was converted to a text fence so it does not break rendering. Fix the diagram source and restore the mermaid fence. Parser error: Heuristic: an unescaped angle bracket inside a label breaks rendering; rephrase the label. -->
-```text
+```mermaid
 flowchart LR
     API[Pixiv API] --> IL[imageLoader.ts]
-    IL --> L1[L1 LRU Key Set<br/>in-memory Set]
-    IL --> L2[L2 Browser Cache<br/>fetch cache]
-    IL --> L3[L3 Android Disk Cache<br/>ImageCachePlugin]
-    IL --> HS[ImageHostService<br/>host selection]
-    HS --> PX[PixivImage.tsx<br/>Component render]
-    PX --> WV[WebView<br/>shouldInterceptRequest]
+    IL --> L1[L1 LRU Key Set - in-memory]
+    IL --> L2[L2 Browser Cache - fetch cache]
+    IL --> L3[L3 Android Disk Cache - ImageCachePlugin]
+    IL --> HS[ImageHostService - host selection]
+    HS --> PX[PixivImage.tsx - Component render]
+    PX --> WV[WebView - shouldInterceptRequest]
     WV --> L3
 ```
 
