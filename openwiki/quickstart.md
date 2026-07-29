@@ -92,6 +92,7 @@ Architecture Decision Records live in `/docs/adr/`. Notable ones:
 | 0036 | Error tuple pattern replaces try-catch across all layers (tryAsync/trySync) |
 | 0037 | PixivApiPlugin gateway — native-only Pixiv API, access_token hidden from JS heap |
 | 0038 | Immediate navigation — render first, load data later; shallow loaders + skeleton screens |
+| 0039 | Detail image cache-ready rendering — two-phase preload with URL-keyed cacheReadyFor signal; eliminates HttpURLConnection fallback race for multi-page illusts |
 
 ## Key Source Files
 

@@ -76,10 +76,14 @@ Host health is tracked with success/failure counts and timeouts.
 
 `/packages/app/src/components/LazyDetailImage.tsx` — Lazy-loading wrapper for multi-page illust detail images. Two-phase loading strategy:
 
-1. **Signal-driven preload** — When the parent `IllustDetail` provides a `visiblePage` signal, any image with `pageIndex <= visiblePage + 1` (next page) is preloaded immediately
+1. **Signal-driven preload** — When the parent `IllustDetail` provides a `visiblePage` signal, any image with `pageIndex <= visiblePage + PRELOAD_WINDOW` (default `PRELOAD_WINDOW = 3`, i.e. up to 3 pages ahead) triggers eager `loadImage()` prefetch to disk cache
 2. **IntersectionObserver fallback** — Without `visiblePage`, falls back to `createEverVisible` IntersectionObserver with a `LAZY_LOAD_MARGIN` root margin
 
-**Native cache prefill (v3.21+):** When the signal-driven `preloaded()` memo returns true, a `createEffect` eagerly calls `loadImage(src)` from `imageLoader.ts`, which triggers native `PixivApiPlugin.prefetchImage()` (OkHttp + connection pool). This seeds the L3 Android disk cache before `PixivImage` renders, ensuring the WebView's `shouldInterceptRequest` can serve a cached `WebResourceResponse` rather than falling back to a synchronous `HttpURLConnection` download (no connection pool, prone to timeout).
+**Native cache prefill (v3.21+):** When the combined `shouldLoad()` memo (preloaded OR ioVisible) returns true, a `createEffect` calls `loadImage(src)` from `imageLoader.ts`, which triggers native `PixivApiPlugin.prefetchImage()` (OkHttp + connection pool). This seeds the L3 Android disk cache before `PixivImage` renders, ensuring the WebView's `shouldInterceptRequest` can serve a cached `WebResourceResponse` rather than falling back to a synchronous `HttpURLConnection` download (no connection pool, prone to timeout).
+
+**Race condition elimination (v3.21.1):** The initial implementation used a simple `cacheReady: boolean` signal. The current version uses `cacheReadyFor: Signal<string>` — keyed by the image URL string, not a boolean. This prevents a race where an old `loadImage().finally()` callback could incorrectly mark a new image's src as ready. On src change (cross-illust navigation), `cacheReadyFor` resets to `""`, ensuring the skeleton placeholder re-appears. The `canDisplayImage` memo returns true only when `cacheReadyFor() === props.src && shouldLoad()`.
+
+**Preload window** (`PRELOAD_WINDOW = 3`): The expanded window from `+1` (v3.21.0) to `+3` ensures up to 4 concurrent prefetches at scroll start (pages 0–3). This stays within OkHttp's default 5-connection-per-host limit and improves rapid-scroll coverage significantly. See [ADR-0039](/docs/adr/ADR-0039-detail-image-cache-ready.md) for the full design rationale.
 
 ```mermaid
 sequenceDiagram
@@ -90,11 +94,14 @@ sequenceDiagram
     participant DC as L3 Disk Cache
     participant WV as WebView shouldInterceptRequest
 
-    ILD->>LDI: pageIndex <= visiblePage + 1 → preloaded() = true
+    ILD->>LDI: pageIndex <= visiblePage + 3 → preloaded() = true
+    LDI->>LDI: shouldLoad = preloaded || ioVisible
     LDI->>IL: createEffect → loadImage(src)
     IL->>PP: prefetchImage(url)
     PP->>DC: OkHttp download → disk cache write
-    Note over WV: Later, PixivImage triggers render
+    LDI->>LDI: cacheReadyFor = src (via finally)
+    Note over LDI: canDisplayImage = cacheReadyFor === src && shouldLoad
+    Note over WV: Later, PixivImage renders
     WV->>DC: interceptImage() → cache HIT
     DC-->>WV: WebResourceResponse (instant)
     Note over WV: No fallback to HttpURLConnection
@@ -176,9 +183,11 @@ For ugoira illusts in feed lists (virtual scroll):
 | ADR: L1 key set migration | `/docs/adr/0014-l1-image-cache-key-set.md` |
 | ADR: Periodic GC | `/docs/adr/0030-image-cache-periodic-gc.md` |
 | ADR: SSRF whitelist | `/docs/adr/0002-ssrf-url-whitelist-strategy.md` |
+| ADR: Detail image cache-ready rendering | `/docs/adr/ADR-0039-detail-image-cache-ready.md` |
+| Glossary: Detail image loading | `/docs/adr/glossary-detail-image-loading.md` |
 
 ## Related
 
 - [Architecture Overview](/openwiki/architecture/overview.md)
 - [Android Native & Build](/openwiki/integrations/android-native.md)
-- ADR-0003, ADR-0014, ADR-0030
+- ADR-0003, ADR-0014, ADR-0030, ADR-0039

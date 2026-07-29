@@ -4,6 +4,9 @@ import { createEverVisible } from "@/primitives/visibility";
 import { LAZY_LOAD_MARGIN } from "../primitives/rootMargins";
 import { loadImage } from "../utils/imageLoader";
 
+/** 预加载视口前页数 — OkHttp 默认 5 并发/主机，4 页安全 */
+const PRELOAD_WINDOW = 3;
+
 interface Props {
   /** 用户设定质量的图片 URL（medium / large） */
   src: string;
@@ -19,31 +22,50 @@ interface Props {
 /**
  * 详情页多图懒加载组件：
  *
- * 加载由 visiblePage 信号驱动：pageIndex <= visiblePage + 1 的图片立即加载，
- * 其余保持在 aspect-ratio 占位状态。无 visiblePage 时退回到 IntersectionObserver 兜底。
+ * 加载分两阶段：
+ * 1. preloaded() 为 true（pageIndex <= visiblePage + PRELOAD_WINDOW）时触发 loadImage 预下载到磁盘缓存
+ * 2. cacheReady 为 true 后才渲染 PixivImage，确保 shouldInterceptRequest 能命中磁盘缓存
+ *
+ * 无 visiblePage 时退回到 IntersectionObserver 兜底。
  */
 const LazyDetailImage: Component<Props> = (props) => {
   const [ref, setRef] = createSignal<HTMLDivElement>();
+  // cacheReadyFor 存已就绪的图片 URL，空串表示未就绪
+  // 用 URL 而非 boolean 可消除竞态：旧 loadImage 的 finally 不会错误标记新 src
+  const [cacheReadyFor, setCacheReadyFor] = createSignal("");
+
   const preloaded = createMemo(() => {
     const vp = props.visiblePage;
-    return vp !== undefined && props.pageIndex <= vp + 1;
+    return vp !== undefined && props.pageIndex <= vp + PRELOAD_WINDOW;
   });
   const ioVisible = createEverVisible({
     rootMargin: LAZY_LOAD_MARGIN,
     skipObserver: props.visiblePage !== undefined,
   })(() => ref());
 
-  const everVisible = createMemo(() => preloaded() || ioVisible());
+  const shouldLoad = createMemo(() => preloaded() || ioVisible());
 
-  // 预加载到 Java 磁盘缓存：preloaded() 为 true 时（即将进入视口），
-  // 提前调用 loadImage() 走 Native prefetchImage（OkHttp + 连接池），
-  // 确保 shouldInterceptRequest 的 interceptImage 能从磁盘缓存命中，
-  // 避免回退到 HttpURLConnection 同步下载（无连接池、易超时）。
+  // 预加载到 Java 磁盘缓存：shouldLoad 为 true 时（即将进入视口），
+  // 调用 loadImage() 走 Native prefetchImage（OkHttp + 连接池），
+  // 完成后设 cacheReady 为 true，触发 PixivImage 渲染。
+  // loadImage 内部有 inflight dedup，同一 URL 重复调用只发一次请求。
+
+  // 1. src 变化时重置 cacheReadyFor，确保跨插图导航时从骨架屏重新开始
   createEffect(() => {
-    if (preloaded() && props.src) {
-      void loadImage(props.src);
+    props.src;
+    setCacheReadyFor("");
+  });
+
+  // 2. cacheReadyFor 不是当前 src 且 shouldLoad 为 true 时触发 loadImage
+  //    用 cacheReadyFor(src) 而非 boolean 避免旧 finally 误标记新 src
+  createEffect(() => {
+    const src = props.src;
+    if (shouldLoad() && src && cacheReadyFor() !== src) {
+      loadImage(src).finally(() => setCacheReadyFor(src));
     }
   });
+
+  const canDisplayImage = createMemo(() => cacheReadyFor() === props.src && shouldLoad());
 
   return (
     <div
@@ -52,7 +74,7 @@ const LazyDetailImage: Component<Props> = (props) => {
       data-page-index={props.pageIndex}
       onClick={props.onClick}
     >
-      {everVisible() ? (
+      {canDisplayImage() ? (
         <div class="relative">
           <PixivImage
             src={props.src}
