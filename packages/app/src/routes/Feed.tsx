@@ -18,7 +18,6 @@ import VirtualFeed from "../components/VirtualFeed";
 import NavBar from "../components/NavBar";
 import PageTransition from "../components/PageTransition";
 import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior";
-import { markContentReady } from "@/native/splashBridge";
 const Feed: Component = () => {
   const navigate = useNavigate();
   const cached = isFeedCached();
@@ -27,18 +26,6 @@ const Feed: Component = () => {
 
   onMount(() => {
     markFeedMounted();
-  });
-
-  // 首屏数据就绪后关闭原生 Splash Screen（仅触发一次）
-  let firstLoadDone = false;
-  createEffect(() => {
-    if (firstLoadDone) return;
-    const isLoading = loading();
-    const itemsData = illusts();
-    if (!isLoading && (itemsData.length > 0 || error())) {
-      firstLoadDone = true;
-      markContentReady();
-    }
   });
 
   // Tab change: save old tab's scroll, restore new tab's scroll, load data

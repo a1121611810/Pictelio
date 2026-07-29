@@ -29,6 +29,7 @@ import NovelFeedPage from "./NovelFeedPage";
 import PageTransition from "../components/PageTransition";
 import { scrollToTop } from "../utils/scrollToTop";
 import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior";
+import { markContentReady } from "@/native/splashBridge";
 
 interface Props {
   tab: Tab;
@@ -54,6 +55,8 @@ const TabFeedPage: Component<Props> = (props) => {
   onMount(() => {
     abortController = new AbortController();
     ensureLoaded(abortController.signal);
+    // 组件已挂载，骨架屏已渲染，关闭 Splash 让用户立即看到骨架屏
+    markContentReady();
   });
 
   // Save scroll + abort pending requests on unmount

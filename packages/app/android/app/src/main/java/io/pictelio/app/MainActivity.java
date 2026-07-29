@@ -51,7 +51,7 @@ public class MainActivity extends BridgeActivity {
                 icon.animate()
                         .scaleX(1.8f).scaleY(1.8f)
                         .alpha(0f)
-                        .setDuration(280L)
+                        .setDuration(100L)
                         .setInterpolator(new DecelerateInterpolator(2f))
                         .withEndAction(splashScreenView::remove)
                         .start();

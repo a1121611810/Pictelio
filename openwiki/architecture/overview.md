@@ -109,6 +109,8 @@ Routes are defined in `/packages/app/src/router.tsx` using `@tanstack/solid-rout
 | `/image-host` | `ImageHostSettings` | — |
 | `/image-cache` | `ImageCacheSettings` | — |
 
+> **v3.21.5+ (commit `9aba13f`):** All 17 route components were converted from `lazy(() => import(...))` to **top-level static imports**. In a local APK, lazy loading provides no network benefit — it only added 17 extra chunk requests and route-switch latency from Promise + module resolution overhead. Combined with the removal of `defaultPendingComponent: LoadingSpinner` (commit `607c6f4`), there is no longer any TanStack Router loading state between route transitions. Routes are resolved synchronously from the single JS bundle.
+
 ## Splash Screen Lifecycle (v3.21.0)
 
 The native Splash Screen uses AndroidX `core-splashscreen` (compat library) with dismiss controlled from JavaScript via a custom Capacitor plugin bridge:
@@ -123,8 +125,10 @@ The native Splash Screen uses AndroidX `core-splashscreen` (compat library) with
 | Route | Who closes splash | When |
 |-------|-------------------|------|
 | `/login` | `Login.tsx` `onMount` | Login page renders (user needs to authenticate) |
-| `/recommended` or `/following` | `Feed.tsx` `createEffect` | First data load completes (content visible) |
+| `/recommended` or `/following` | `TabFeedPage.tsx` `onMount` | Component mounts (skeleton visible, data loads after splash exit) |
 | Other routes (age-confirmation, etc.) | `__root.tsx` fallback | Auth init completes (after `setIsLoading(false)`) |
+
+> **v3.21.5+:** Splash close for feed routes moved from `Feed.tsx` (waited for first data load) to `TabFeedPage.tsx` (closes immediately on component mount, showing skeleton content). The JS loading overlay in `__root.tsx` was also made invisible — the native Splash now handles the full loading indicator lifecycle, eliminating the redundant `LoadingSpinner` flash after Splash exit. The router's `defaultPendingComponent: LoadingSpinner` was also removed (`router.tsx` commit `607c6f4`), removing a second source of loading flash during lazy route resolution.
 
 This ensures the splash screen is dismissed at the earliest meaningful point — either when login UI is ready, feed content is visible, or the app has finished loading for non-feed pages. See [Android Native & Build](/openwiki/integrations/android-native.md#splash-screen-js-bridge) for full details.
 
