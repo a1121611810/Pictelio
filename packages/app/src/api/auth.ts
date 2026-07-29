@@ -18,7 +18,8 @@ const isNative = Capacitor.isNativePlatform();
  * ── 开发环境（浏览器 pnpm dev） ──
  * 通过 JS fallback 处理，凭证在此分支中明文出现。
  * pnpm build 时 Rolldown 将 import.meta.env.DEV 替换为 false，
- * terser 消除 if (false) { ... } 整个块，此分支的凭证和 spark-md5 均不进入生产 bundle。
+ * Oxc minifier（Rolldown 内置，Rust）消除 if (false) { ... } 整个块，
+ * 此分支的凭证和 spark-md5 均不进入生产 bundle。
  */
 export async function refreshToken(token: string): Promise<PixivAuthResponse> {
   if (isNative) {

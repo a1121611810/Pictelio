@@ -6,7 +6,8 @@
  *
  * 注意：此文件仅被 auth.ts 和 pkceAuth.ts 在 `if (import.meta.env.DEV)` 分支中
  * 动态导入。生产构建中 Rolldown 替换 import.meta.env.DEV 为 false，
- * terser 消除整个分支，此文件及 __CREDENTIALS__ 引用均不进入生产 bundle。
+ * Oxc minifier（Rolldown 内置，Rust）消除整个分支，此文件及
+ * __CREDENTIALS__ 引用均不进入生产 bundle。
  */
 import { setAccessToken } from "./client";
 import type { PixivAuthResponse } from "./types";
