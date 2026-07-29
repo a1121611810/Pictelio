@@ -5,8 +5,8 @@ import { createEverVisible } from "@/primitives/visibility";
 import { LAZY_LOAD_MARGIN } from "../primitives/rootMargins";
 import { loadImage } from "../utils/imageLoader";
 
-/** 预加载视口前页数 — OkHttp 默认 5 并发/主机，4 页安全 */
-const PRELOAD_WINDOW = 3 as const;
+/** 预加载窗口：可见页 + 当前页后 N 页 — OkHttp 10 并发安全 */
+const PRELOAD_WINDOW = 6 as const;
 
 /** prefetch 失败时重试次数和间隔 */
 const MAX_RETRIES = 3;
@@ -43,7 +43,10 @@ const LazyDetailImage: Component<Props> = (props) => {
   const [cacheReadyFor, setCacheReadyFor] = createSignal("");
   const [retryTrigger, setRetryTrigger] = createSignal(0);
 
-  const preloaded = createMemo(() => true);
+  const preloaded = createMemo(() => {
+    const vp = props.visiblePage;
+    return vp !== undefined && props.pageIndex <= vp + PRELOAD_WINDOW;
+  });
   const ioVisible = createEverVisible({
     rootMargin: LAZY_LOAD_MARGIN,
   })(() => ref());
