@@ -43,11 +43,7 @@ const LazyDetailImage: Component<Props> = (props) => {
   const [cacheReadyFor, setCacheReadyFor] = createSignal("");
   const [retryTrigger, setRetryTrigger] = createSignal(0);
 
-  const preloaded = createMemo(() => {
-    // 多图作品：不依赖 IntersectionObserver，所有页面直接预加载
-    return true;
-  });
-  // 始终启用本地 IntersectionObserver，作为 parent observer 的独立兜底
+  const preloaded = createMemo(() => true);
   const ioVisible = createEverVisible({
     rootMargin: LAZY_LOAD_MARGIN,
   })(() => ref());
@@ -67,8 +63,6 @@ const LazyDetailImage: Component<Props> = (props) => {
   });
 
   // 2. cacheReadyFor 不是当前 src 且 shouldLoad 为 true 时触发 loadImage
-  //    用 cacheReadyFor(src) 而非 boolean 避免旧 finally 误标记新 src
-  //    成功后设 cacheReadyFor；失败则重试（最多 MAX_RETRIES 次）
   createEffect(() => {
     let cancelled = false;
     onCleanup(() => { cancelled = true; });
@@ -79,8 +73,6 @@ const LazyDetailImage: Component<Props> = (props) => {
       let retryTimer: ReturnType<typeof setTimeout> | undefined;
       onCleanup(() => { if (retryTimer) clearTimeout(retryTimer); });
 
-      // 12s 超时兜底：OkHttp 队列可能因并发上限导致请求长时间等待，
-      // 超时后触发重试，让下次尝试分配到不同的连接槽。
       const LOAD_TIMEOUT = 12_000;
       const loadWithTimeout = Promise.race([
         loadImage(src),
