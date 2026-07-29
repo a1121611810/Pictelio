@@ -302,11 +302,25 @@ packages/app/src/
 
 ## 关键设计决策
 
-### API 客户端双模式
+### PixivApiPlugin 网关架构
 
-- **Web 模式** (`fetch`): 通过 Vite dev server 代理路径 `/pixiv-api/`、`/pixiv-img/`、`/pixiv-oauth/` 访问 Pixiv，避开 CORS。生产环境默认不走代理（直接使用 CapacitorHttp）。
-- **Native 模式** (`CapacitorHttp`): 直接 HTTPS 访问 `app-api.pixiv.net`，Android WebView 中通过 `MainActivity.java` 拦截 `/pixiv-img/` 请求并注入 Referer 头。
-- **401 防死循环**: `isRetryingAfter401` 标志防止 refresh 失败 → logout 清空 token → 重试 → 再次 401 的无限循环。
+**架构变更**（ADR-0037）：所有 Pixiv API 请求和图片下载统一由 Java 侧管理。
+
+### API 客户端（PixivApiPlugin）
+
+- **单路径架构**：前端调用 `PixivApi.request()` → Capacitor bridge → `PixivApiPlugin.java` → OkHttp → Pixiv
+- **双模式**：Native 走 JSBridge、Web 走 Vite 代理 fetch（`devAccessToken` 编译期保护）
+- **access_token**：仅 Java 堆中，JS 零知。DEV 模式的 `devAccessToken` 被 `import.meta.env.DEV` + Oxc minifier 消除
+- **401 自动刷新**：Java 侧 `synchronized` + `isRefreshing` 锁，防并发刷新风暴
+- **图片预缓存**：Java 侧 `prefetchImage()` 直接写磁盘，零字节进 JS 堆
+
+### 图片流水线（缓存、代理、CDN）
+
+- **三层缓存架构**（ADR-0003 → ADR-0037 修订）：
+  - L1：JS 已加载标记集合（`Map<string, number>` LRU，仅 key）
+  - L2：WebView / 磁盘缓存（`shouldInterceptRequest` + `ImageCachePlugin`）
+  - L3：CDN（`i.pximg.net`，Java 注入 Referer）
+- **图片二进制零进 JS 堆**：下载、写盘、读取全在 Java/文件系统/WebView 渲染引擎间流转
 
 ### Android 原生增强
 
