@@ -1,5 +1,5 @@
 {
-  "version": "3.21.0",
-  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.21.0",
-  "changelog": "✨ 新功能\n  feat(android): 迁移 Splash Screen 至 @capacitor/splash-screen，JS 侧控制关闭时机"
+  "version": "3.21.1",
+  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.21.1",
+  "changelog": "🐛 修复\n  fix(illust-detail): 预加载多图详情页后续图片到磁盘缓存\n  fix(android): keepSplashVisible 改为 private + dismissSplash() setter\n  fix(android): WebView error path 关闭 Splash + 注释修正\n  fix(android): 回退至 Jetpack Spla"
 }
