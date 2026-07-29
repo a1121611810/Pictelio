@@ -75,11 +75,7 @@ const LazyDetailImage: Component<Props> = (props) => {
 
     const src = props.src;
     const attempt = retryTrigger();
-    const sl = shouldLoad();
-    const cr = cacheReadyFor();
-    console.log(`[LazyDetailImage ${props.pageIndex}] effect: shouldLoad=${sl} src=${!!src} cr=="${cr.substring(0, 20)}" attempt=${attempt}`);
     if (shouldLoad() && src && cacheReadyFor() !== src) {
-      console.log(`[LazyDetailImage ${props.pageIndex}] STARTING loadImage attempt=${attempt}`);
       let retryTimer: ReturnType<typeof setTimeout> | undefined;
       onCleanup(() => { if (retryTimer) clearTimeout(retryTimer); });
 
@@ -95,16 +91,20 @@ const LazyDetailImage: Component<Props> = (props) => {
       ]);
 
       loadWithTimeout.then(() => {
-        console.log(`[LazyDetailImage ${props.pageIndex}] loadImage SUCCESS`);
         if (!cancelled && props.src === src) {
           setCacheReadyFor(src);
         }
-      }).catch((err) => {
-        console.log(`[LazyDetailImage ${props.pageIndex}] loadImage FAILED: ${err?.message || ''} attempt=${attempt}`);
-        if (!cancelled && props.src === src && attempt < MAX_RETRIES) {
-          retryTimer = setTimeout(() => {
-            if (!cancelled) setRetryTrigger(attempt + 1);
-          }, RETRY_DELAY_MS);
+      }).catch(() => {
+        if (!cancelled && props.src === src) {
+          if (attempt < MAX_RETRIES) {
+            retryTimer = setTimeout(() => {
+              if (!cancelled) setRetryTrigger(attempt + 1);
+            }, RETRY_DELAY_MS);
+          } else {
+            // 所有重试均失败，仍标记就绪让 PixivImage 渲染，
+            // shouldInterceptRequest 通过 OkHttp 兜底下载
+            setCacheReadyFor(src);
+          }
         }
       });
     }

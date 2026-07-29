@@ -89,7 +89,7 @@ Since `preloaded()` is always `true`, the `shouldLoad()` memo (`preloaded() || i
 
 **Prefetch retry on failure (v3.21.2+):** If `loadImage()` → `PixivApiPlugin.prefetchImage()` fails or exceeds a 12-second timeout, `LazyDetailImage`'s `createEffect` catches the failure and retries via a `retryTrigger` signal, up to `MAX_RETRIES = 3` attempts with `RETRY_DELAY_MS = 2000` between them. The 12s timeout (v3.21.3+) uses `Promise.race` against `loadImage()` and guards against OkHttp queue congestion when many concurrent image requests are queued — timing out allows the retry to land on a different connection slot. Cleanup via `onCleanup` cancels any pending retry or timeout timer on component unmount or `props.src` change.
 
-**Debug logging (v3.21.3+):** The `createEffect` now logs `shouldLoad`, `src`, `cacheReadyFor`, and `attempt` values before each load attempt, plus `SUCCESS`/`FAILED` with error message and attempt count for each `loadImage` outcome. These aid in diagnosing timeout and retry behavior in production.
+**Fallback on retry exhaustion (v3.21.4):** When all `MAX_RETRIES` attempts fail, the `.catch()` handler now falls through to `setCacheReadyFor(src)` instead of leaving the image in an unready state. This marks the image ready for `PixivImage` rendering, and `shouldInterceptRequest` performs a synchronous fallback download via the shared OkHttp client. The degraded performance (UI-thread fetch) is preferable to a permanently blank image area.
 
 ```mermaid
 sequenceDiagram
@@ -106,7 +106,7 @@ sequenceDiagram
     IL->>PP: prefetchImage(url)
     PP->>DC: OkHttp download → disk cache write
     LDI->>LDI: cacheReadyFor = src (on then success)
-    Note over LDI: Up to MAX_RETRIES retries on failure/timeout
+    Note over LDI: Up to MAX_RETRIES retries; on exhaustion → setCacheReadyFor(src) as fallback
     Note over WV: Later, PixivImage renders
     WV->>DC: interceptImage() → cache HIT
     DC-->>WV: WebResourceResponse (instant)
