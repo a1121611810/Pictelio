@@ -44,8 +44,8 @@ const LazyDetailImage: Component<Props> = (props) => {
   const [retryTrigger, setRetryTrigger] = createSignal(0);
 
   const preloaded = createMemo(() => {
-    const vp = props.visiblePage;
-    return vp !== undefined && props.pageIndex <= vp + PRELOAD_WINDOW;
+    // 多图作品：不依赖 IntersectionObserver，所有页面直接预加载
+    return true;
   });
   // 始终启用本地 IntersectionObserver，作为 parent observer 的独立兜底
   const ioVisible = createEverVisible({
@@ -75,7 +75,11 @@ const LazyDetailImage: Component<Props> = (props) => {
 
     const src = props.src;
     const attempt = retryTrigger();
+    const sl = shouldLoad();
+    const cr = cacheReadyFor();
+    console.log(`[LazyDetailImage ${props.pageIndex}] effect: shouldLoad=${sl} src=${!!src} cr=="${cr.substring(0, 20)}" attempt=${attempt}`);
     if (shouldLoad() && src && cacheReadyFor() !== src) {
+      console.log(`[LazyDetailImage ${props.pageIndex}] STARTING loadImage attempt=${attempt}`);
       let retryTimer: ReturnType<typeof setTimeout> | undefined;
       onCleanup(() => { if (retryTimer) clearTimeout(retryTimer); });
 
@@ -91,10 +95,12 @@ const LazyDetailImage: Component<Props> = (props) => {
       ]);
 
       loadWithTimeout.then(() => {
+        console.log(`[LazyDetailImage ${props.pageIndex}] loadImage SUCCESS`);
         if (!cancelled && props.src === src) {
           setCacheReadyFor(src);
         }
-      }).catch(() => {
+      }).catch((err) => {
+        console.log(`[LazyDetailImage ${props.pageIndex}] loadImage FAILED: ${err?.message || ''} attempt=${attempt}`);
         if (!cancelled && props.src === src && attempt < MAX_RETRIES) {
           retryTimer = setTimeout(() => {
             if (!cancelled) setRetryTrigger(attempt + 1);
