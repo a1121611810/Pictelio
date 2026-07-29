@@ -16,7 +16,7 @@ tags: [architecture, pictelio, solidjs, capacitor, monorepo]
 | `pictelio-app` | `/packages/app/` | SolidJS SPA — the core application |
 | `pictelio-website` | `/packages/website/` | Astro landing page (GitHub Pages) |
 
-Root `package.json` delegates all commands via `pnpm --filter`. Build tooling uses **vite-plus** (`vp` CLI), which wraps Vite with oxlint, oxfmt, and vitest.
+Root `package.json` delegates all commands via `vp run --filter`. Build tooling uses **vite-plus** (`vp` CLI), which wraps Vite with oxlint, oxfmt, and vitest.
 
 **Mobile targets:**
 - **Android** — Four custom Capacitor plugins (Auth, ImageCache, OAuth, PixivApi) with Java implementations under `/packages/app/android/`. The **PixivApiPlugin** (v3.18.0+) replaced the now-deleted PictelioHttpPlugin as the single gateway for all Pixiv API requests (ADR-0037). See [Android Native & Build](/openwiki/integrations/android-native.md).

@@ -67,7 +67,7 @@ export default defineConfig({
       dts: "./src/auto-imports.d.ts",
     }),
     solid(),
-    UnoCSS(),
+    UnoCSS({ configFile: resolve(_root, "uno.config.ts") }),
   ],
   define: {
     APP_VERSION: JSON.stringify(pkg.version),
