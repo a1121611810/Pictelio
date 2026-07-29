@@ -91,6 +91,7 @@ Architecture Decision Records live in `/docs/adr/`. Notable ones:
 | 0035 | Migrate browser component tests to unit + agent-browser E2E |
 | 0036 | Error tuple pattern replaces try-catch across all layers (tryAsync/trySync) |
 | 0037 | PixivApiPlugin gateway — native-only Pixiv API, access_token hidden from JS heap |
+| 0038 | Immediate navigation — render first, load data later; shallow loaders + skeleton screens |
 
 ## Key Source Files
 
@@ -127,7 +128,7 @@ All commands are run from the monorepo root:
 The project enforces [Conventional Commits](https://www.conventionalcommits.org/) via:
 
 - **`commitlint`** (`.commitlintrc.json`) — Validates commit message format against allowed types (`feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`) with max 72-char header
-- **`husky`** pre-commit hook (`.husky/pre-commit`) — Automatically runs `pnpm openwiki:update` when `src/`, `packages/`, `AGENTS.md`, or `CLAUDE.md` change
+- **`husky`** pre-commit hook (`.husky/pre-commit`) — Automatically runs `pnpm openwiki:update` when `src/`, `packages/`, `AGENTS.md`, or `CLAUDE.md` change, then stages any updated `openwiki/` files (eliminates dirty subsequent commits)
 - **`husky`** commit-msg hook (`.husky/commit-msg`) — Runs `commitlint` on the message
 
 The **CLAUDE.md** file at the repository root contains agent-specific instructions including OpenWiki maintenance rules and a commitment to run `pnpm openwiki:update` before committing source changes.
@@ -147,6 +148,7 @@ The repository has been actively refactored through v3.17.x. Key themes in recen
 - **Author navigation:** Full coverage of third-party username click → personal center (ADR-0032).
 - **Update dialog fix:** Startup update dialog migrated from `<fluent-dialog>` (invisible on dynamic creation) to a pure CSS fixed overlay. `autoCheckUpdate` default changed to `true` (ADR-0033).
 - **PixivApiPlugin gateway (v3.18.0, ADR-0037):** All Pixiv API traffic unified through a single Java Capacitor plugin. `access_token` removed from JS heap entirely — stored in a Java `volatile` field. Image prefetching writes directly to disk, zero bytes into JS heap. 401 auto-refresh moved from JS Promise queue to Java `synchronized` lock. Old `PictelioHttpPlugin` and `PictelioHttp.ts` deleted; `client.ts` simplified by ~120 lines. **Security:** `access_token` is only present in JS during DEV mode (`import.meta.env.DEV` dead-code eliminated by Oxc minifier in production builds). OAuth credentials exist only in compiled Java bytecode (`OAuthConfig` auto-generated from `credentials.json5`).
+- **Immediate navigation (v3.20.0, ADR-0038):** Router loaders no longer await network I/O. Pages render chrome + skeleton screens instantly and load data in the component via `onMount`/`createEffect`. Six `*Skeleton` components match each data route's layout. Redundant loader→hydration indirection removed from IllustDetail and NovelDetail.
 - **Rolldown + Oxc minifier (v3.18.0):** Production bundler switched from Vite/terser to Rolldown with Rust-based Oxc minifier. Build comments updated across codebase.
 
 ## Backlog

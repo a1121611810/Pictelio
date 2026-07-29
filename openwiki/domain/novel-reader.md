@@ -13,6 +13,8 @@ Pictelio includes a full-featured novel reader for Pixiv novels, with virtualize
 
 `/packages/app/src/routes/NovelDetail.tsx` (~28 KB) — The main novel reader at route `/novel/$id`. It manages:
 
+- **Data loading:** Component-level via `createEffect` reacting to `currentNovelId()` (not via router loader). Shows `NovelDetailSkeleton` while `detailLoading` is true. Cache-first: `peekEntry()` fills data synchronously on mount, avoiding the skeleton entirely when cached (ADR-0038).
+
 - **Content rendering:** Parses novel content into typed blocks (`TextBlock`, `ImageBlock`) via `parseNovelBlocks`
 - **Virtual layout:** Only renders visible paragraphs using `createNovelVirtualLayout`
 - **In-text search:** `NovelSearchBar` component with highlighting

@@ -61,23 +61,44 @@ sequenceDiagram
 - **`queryClient`** (`/packages/app/src/api/queryClient.ts`) — TanStack Query client with custom error normalization
 - **`router`** (`/packages/app/src/router.tsx`) — TanStack Router with route definitions and data loaders
 
+## Immediate Navigation Pattern (ADR-0038, v3.20.0)
+
+Since v3.20.0, **router loaders no longer await network requests**. The project adopted the **immediate navigation pattern** (see [ADR-0038](/docs/adr/ADR-0038-immediate-navigation.md)):
+
+```
+用户点击链接
+  → 路由匹配
+  → loader 执行（仅设导航状态，无 await） ← 不再阻塞导航
+  → 组件即时挂载
+  → 渲染页面 chrome + 骨架屏
+  → createEffect / onMount 发起数据请求
+  → 数据到达 → 骨架屏替换为真实内容
+```
+
+**Key changes:**
+- **Loaders are shallow:** They set tab state, reset store, or fire-and-forget trigger data fetch — never `await` network I/O.
+- **Data loading moves to components:** Routes use `onMount` (TabFeedPage, FollowListPage) or `createEffect` (NovelDetail, IllustDetail) to fetch data after render.
+- **Skeleton screens:** Each data-driven route shows a dedicated skeleton component matching its layout while data loads. Six skeleton components live under `/packages/app/src/components/skeletons/`.
+- **Cache-first mount:** `peekEntry()` in novelCache bypasses the skeleton entirely when sync cache hits.
+
 ## Routing
 
-Routes are defined in `/packages/app/src/router.tsx` using `@tanstack/solid-router`:
+Routes are defined in `/packages/app/src/router.tsx` using `@tanstack/solid-router`. Loaders now only perform lightweight navigation side effects — no async data fetching:
 
-| Route | Component | Loader |
-|-------|-----------|--------|
+| Route | Component | Loader (shallow only) |
+|-------|-----------|-----------------------|
 | `/login` | `Login` | — |
-| `/recommended` | `TabFeedPage tab="recommended"` | `ensureLoaded` |
-| `/following` | `TabFeedPage tab="follow"` | `ensureLoaded` |
-| `/illust/:id` | `IllustDetail` | `loadDetail` |
-| `/novel/:id` | `NovelDetail` | novel cache check |
+| `/recommended` | `TabFeedPage tab="recommended"` | `makeFeedLoader("recommended")` — sets current tab |
+| `/following` | `TabFeedPage tab="follow"` | `makeFeedLoader("follow")` — sets current tab |
+| `/illust/:id` | `IllustDetail` | — (data loaded in component via `createEffect`) |
+| `/novel/:id` | `NovelDetail` | — (data loaded in component via `createEffect`) |
 | `/bookmarks` | `Bookmarks` | — |
-| `/me` | `PersonalCenter` | — |
-| `/user/:id` | `PersonalCenter` | `loadProfile` |
-| `/user/:id/illusts` | `UserIllusts` | tab-based loader |
-| `/user/:id/following` | `FollowListPage` | follow loader |
-| `/user/:id/followers` | `FollowListPage` | follower loader |
+| `/me` | `PersonalCenter` | `() => { setCurrentTab("me"); return {}; }` |
+| `/user/:id` | `PersonalCenter` | `() => { setCurrentTab("me"); return { userId }; }` |
+| `/user/:id/illusts` | `UserIllusts` | Fire-and-forget `load(uid, contentType())` + return `{ userId }` |
+| `/user/:id/following` | `FollowListPage` | `makeFollowLoader("following")` — resets list |
+| `/user/:id/followers` | `FollowListPage` | `makeFollowLoader("followers")` — resets list |
+| `/my/followers` | `FollowListPage mode="followers"` | `() => { resetFollowList(); return {}; }` |
 | `/history` | `HistoryPage` | — |
 | `/search` | `Search` | — |
 | `/about` | `About` | — |
@@ -137,13 +158,14 @@ Font sizes use fluid `clamp(rem + vw)` via UnoCSS preflights, defined in `/packa
 
 ## Component Architecture
 
-The app has three key component layers:
+The app has four key component layers:
 
 1. **Route components** (`/packages/app/src/routes/`) — Page-level components, compose primitives and stores
-2. **UI components** (`/packages/app/src/components/`) — Reusable visual components (cards, overlays, dialogs)
-3. **Primitives** (`/packages/app/src/primitives/`) — Logic-only hooks and factories (virtual scroll, scroll restoration, novel layout)
+2. **Skeleton components** (`/packages/app/src/components/skeletons/`) — Full-page shimmer placeholders matching each data route's layout (FeedSkeleton, IllustDetailSkeleton, NovelDetailSkeleton, ProfileSkeleton, ListSkeleton, GridSkeleton). Introduced by ADR-0038 for immediate navigation.
+3. **UI components** (`/packages/app/src/components/`) — Reusable visual components (cards, overlays, dialogs)
+4. **Primitives** (`/packages/app/src/primitives/`) — Logic-only hooks and factories (virtual scroll, scroll restoration, novel layout)
 
-Key relationship: Routes → Components + Primitives → Stores → API Client
+Key relationship: Routes → Skeletons/Components + Primitives → Stores → API Client
 
 ## Error Handling Pattern
 

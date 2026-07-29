@@ -24,9 +24,10 @@ Two main feed types are defined in `/packages/app/src/routes/` and backed by sto
 `/packages/app/src/routes/TabFeedPage.tsx` — The shared feed page with sub-tab support:
 - **Recommended sub-tabs:** mixed / illust / manga
 - **Follow sub-tabs:** all / public / private
+- **Data loaded in `onMount`** (not via router loader): `ensureLoaded(signal)` with AbortController for cancel-on-unmount
 - Per-tab scroll state restoration via `scrollKey`
-- Abort controller cleanup on unmount
 - R18 filter reactivity via `r18Handler` closure
+- Shows `FeedSkeleton` while no data is available (ADR-0038 immediate navigation pattern)
 
 ### Feed Store Factory
 
