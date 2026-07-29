@@ -32,6 +32,7 @@ import { warmCacheFromDisk } from "@/utils/imageLoader";
 import { loadReportedIds } from "@/stores/reportStore";
 import { loadBlockedIds } from "@/stores/blockStore";
 import { loadImageHostPreference } from "@/stores/imageHostStore";
+import { markContentReady } from "@/native/splashBridge";
 /** 启动后检查更新的延迟时间（ms），确保页面渲染完成后再弹窗 */
 const STARTUP_CHECK_DELAY_MS = 500;
 /** "再按一次退出应用" toast 的显示时长（ms） */
@@ -163,6 +164,12 @@ const RootLayout: Component = () => {
       }
     })());
     setIsLoading(false);
+    // 兜底关闭 Splash：非 Feed 页面（login / age-confirmation 等）
+    // 由 Login.tsx 或 Feed.tsx 负责主动触发，此处兜底确保不会泄漏
+    const currentPath = location().pathname;
+    if (currentPath !== "/recommended" && currentPath !== "/following") {
+      markContentReady();
+    }
     // 启动后延迟检查更新 — 确保页面渲染完成后再弹窗
     if (autoCheckUpdate()) {
       setTimeout(() => {

@@ -11,7 +11,7 @@ import android.webkit.WebViewClient;
 
 import com.getcapacitor.BridgeActivity;
 
-import androidx.core.splashscreen.SplashScreen; // SplashScreen API
+// SplashScreen 已迁移至 @capacitor/splash-screen，由 JS 侧控制
 
 import java.net.HttpURLConnection;
 import java.net.URI;
@@ -34,7 +34,7 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        SplashScreen.installSplashScreen(this);
+        // SplashScreen 已迁移至 @capacitor/splash-screen，由 JS 侧控制关闭
         if (!isWebViewVersionOk()) {
             showWebViewUpgradeError();
             return;

@@ -109,6 +109,24 @@ Routes are defined in `/packages/app/src/router.tsx` using `@tanstack/solid-rout
 | `/image-host` | `ImageHostSettings` | — |
 | `/image-cache` | `ImageCacheSettings` | — |
 
+## Splash Screen Lifecycle (v3.20.0)
+
+The native Splash Screen is controlled from JavaScript via `@capacitor/splash-screen`, replacing Android's `androidx.core:core-splashscreen`:
+
+1. **Capacitor config** (`capacitor.config.ts`): `launchShowDuration: 0` and `launchAutoHide: false` — JS holds exclusive control over hide timing
+2. **Android native**: `MainActivity.onCreate()` no longer calls `SplashScreen.installSplashScreen()`; the `Theme.SplashScreen` theme and `core-splashscreen` dependency are removed
+3. **`markContentReady()`** (`/packages/app/src/native/splashBridge.ts`): idempotent function that calls `SplashScreen.hide()` via dynamic import
+
+**Close decision matrix:**
+
+| Route | Who closes splash | When |
+|-------|-------------------|------|
+| `/login` | `Login.tsx` `onMount` | Login page renders (user needs to authenticate) |
+| `/recommended` or `/following` | `Feed.tsx` `createEffect` | First data load completes (content visible) |
+| Other routes (age-confirmation, etc.) | `__root.tsx` fallback | Auth init completes (after `setIsLoading(false)`) |
+
+This ensures the splash screen is dismissed at the earliest meaningful point — either when login UI is ready, feed content is visible, or the app has finished loading for non-feed pages. See [Android Native & Build](/openwiki/integrations/android-native.md#splash-screen-js-bridge) for full details.
+
 **Root layout** (`/packages/app/src/routes/__root.tsx`) provides:
 - NavBar component (auto-hiding on scroll)
 - Bottom navigation bar

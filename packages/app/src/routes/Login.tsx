@@ -7,6 +7,7 @@ import ErrorDisplay from "../components/ErrorDisplay";
 import OAuthWebView from "../components/OAuthWebView";
 import { generatePKCE } from "../api/pkceAuth";
 import { loginWithPKCE } from "../stores/authStore";
+import { markContentReady } from "@/native/splashBridge";
 
 const isNative = Capacitor.isNativePlatform();
 
@@ -25,6 +26,8 @@ const Login: Component = () => {
     if (isLoggedIn()) {
       void navigate({ to: "/recommended", replace: true });
     }
+    // 登录页已渲染，通知原生关闭 Splash Screen
+    markContentReady();
   });
 
   const handleSubmit = async (e: Event) => {

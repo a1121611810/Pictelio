@@ -78,6 +78,34 @@ Introduced in **v3.18.0** as the sole gateway for all Pixiv API communication (A
 
 **Deprecated/Deleted:** PictelioHttpPlugin.java and PictelioHttp.ts — the dual-path transport for native HTTP is gone. All native API requests now route through PixivApiPlugin.
 
+### Splash Screen JS Bridge
+
+**TypeScript:** `/packages/app/src/native/splashBridge.ts` (new in v3.20.0)
+
+Controls the native Splash Screen via `@capacitor/splash-screen`. Previously managed by Android's `androidx.core:core-splashscreen` with `SplashScreen.installSplashScreen(this)` in `MainActivity.onCreate()`.
+
+- **`markContentReady()`** — idempotent function that calls `SplashScreen.hide()` via dynamic import
+- Only activates on Capacitor native platforms; silently skipped in web/dev environments
+- Dynamic import prevents build errors in Vite web dev where native modules are unavailable
+
+**Call sites:**
+| Location | When Called | Purpose |
+|----------|-------------|---------|
+| `Login.tsx` `onMount` | Login page renders | Closes splash when user needs to authenticate |
+| `Feed.tsx` `createEffect` | First data load completes | Closes splash after feed content is visible |
+| `__root.tsx` `onMount` | Auth init completes (fallback) | Closes splash for non-feed pages (age-confirmation, etc.) if Login/Feed haven't already |
+
+**Capacitor config** (`capacitor.config.ts`, `plugins.SplashScreen`):
+- `launchShowDuration: 0` — no forced display duration; JS controls hide timing
+- `launchAutoHide: false` — JS must explicitly call `hide()`
+- `backgroundColor`, `androidScaleType`, `showSpinner` — visual configuration
+
+**Android native changes:**
+- `MainActivity.java`: removed `SplashScreen.installSplashScreen(this)` call and the `androidx.core:core-splashscreen` import
+- `styles.xml`: `AppTheme.NoActionBarLaunch` parent changed from `Theme.SplashScreen` to `AppTheme.NoActionBar` — the splash screen is no longer defined in Android themes
+- `build.gradle`: removed `androidx.core:core-splashscreen` dependency
+- `variables.gradle`: removed `coreSplashScreenVersion = '1.2.0'`
+
 ## Main Activity & Application
 
 ### MainActivity.java
@@ -91,6 +119,8 @@ The Android entry point. Key responsibilities:
 - Initializes the image cache and auth plugin on startup
 - Handles Android lifecycle events
 - Intercepts `/pixiv-img/` WebView requests via `shouldInterceptRequest` for image caching (retained from previous architecture)
+
+> **v3.20.0:** Removed `SplashScreen.installSplashScreen(this)` — Splash Screen management moved to `@capacitor/splash-screen`, controlled from JavaScript via `markContentReady()`. The native `androidx.core:core-splashscreen` dependency was also removed (see [Splash Screen JS Bridge](#splash-screen-js-bridge)).
 
 ### OAuthUtils
 
@@ -126,6 +156,8 @@ Custom `Application` class for app-level initialization.
 - App Name: `Pictelio`
 - Server URL: (varies by build — localhost for dev, none for production)
 - Android-specific settings for back gesture and navigation
+- `plugins.CapacitorHttp: { enabled: true }` — enables Capacitor's native HTTP plugin for API requests
+- `plugins.SplashScreen` — JS-controlled splash screen (see [Splash Screen JS Bridge](#splash-screen-js-bridge))
 
 ## Build Pipeline
 
@@ -187,6 +219,7 @@ The full release process is documented in `/docs/release-checklist.md` (6.2 KB),
 | ImageCache TS bridge | `/packages/app/src/native/ImageCache.ts` |
 | OAuthPlugin TS bridge | `/packages/app/src/native/OAuthPlugin.ts` |
 | PictelioHttp TS bridge | `/packages/app/src/native/PictelioHttp.ts` |
+| Splash Bridge | `/packages/app/src/native/splashBridge.ts` |
 | Capacitor config | `/packages/app/capacitor.config.ts` |
 | Dev Android script | `/packages/app/scripts/dev-android.mjs` |
 | Release script | `/packages/app/scripts/release.mjs` |

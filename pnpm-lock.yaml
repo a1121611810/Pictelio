@@ -237,6 +237,9 @@ importers:
       '@capacitor/preferences':
         specifier: ^8.0.1
         version: 8.0.1(@capacitor/core@8.4.2)
+      '@capacitor/splash-screen':
+        specifier: ^8.0.2
+        version: 8.0.2(@capacitor/core@8.4.2)
       '@chenglou/pretext':
         specifier: ^0.0.8
         version: 0.0.8
@@ -620,6 +623,11 @@ packages:
 
   '@capacitor/preferences@8.0.1':
     resolution: {integrity: sha512-T6no3ebi79XJCk91U3Jp/liJUwgBdvHR+s6vhvPkPxSuch7z3zx5Rv1bdWM6sWruNx+pViuEGqZvbfCdyBvcHQ==}
+    peerDependencies:
+      '@capacitor/core': '>=8.0.0'
+
+  '@capacitor/splash-screen@8.0.2':
+    resolution: {integrity: sha512-0C6rYScr13WfAE9nPl4ScOQynmjFv9NT3Th+RZkD4ezYHmER6mcl1/lDYsv7jg3Rj3FOvLrlTlmNkUrr83kZzQ==}
     peerDependencies:
       '@capacitor/core': '>=8.0.0'
 
@@ -4606,6 +4614,10 @@ snapshots:
     dependencies:
       '@capacitor/core': 8.4.2
 
+  '@capacitor/splash-screen@8.0.2(@capacitor/core@8.4.2)':
+    dependencies:
+      '@capacitor/core': 8.4.2
+
   '@capsizecss/unpack@4.0.1':
     dependencies:
       fontkitten: 1.0.3
@@ -8049,6 +8061,7 @@ time:
   '@capacitor/core@8.4.2': '2026-07-14T17:32:52.820Z'
   '@capacitor/device@8.0.3': '2026-07-15T10:23:28.310Z'
   '@capacitor/preferences@8.0.1': '2026-02-12T18:04:12.324Z'
+  '@capacitor/splash-screen@8.0.2': '2026-07-15T10:23:33.969Z'
   '@chenglou/pretext@0.0.8': '2026-06-12T07:17:05.585Z'
   '@commitlint/cli@21.2.1': '2026-07-08T07:48:07.331Z'
   '@commitlint/config-conventional@21.2.0': '2026-06-30T09:53:56.373Z'
