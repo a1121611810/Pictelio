@@ -28,6 +28,7 @@ Two main feed types are defined in `/packages/app/src/routes/` and backed by sto
 - Per-tab scroll state restoration via `scrollKey`
 - R18 filter reactivity via `r18Handler` closure
 - Shows `FeedSkeleton` while no data is available (ADR-0038 immediate navigation pattern)
+- **Splash dismiss:** Loading-triggered strategy — a `createEffect` watches TanStack Query's `loading()` signal; when it becomes `true`, a 350ms `setTimeout` calls `markContentReady()` to ensure the skeleton screen has painted before the native splash exits. An 800ms `onMount` fallback handles the cached-data case where `loading()` never transitions. The native exit animation (120ms scale+fade via `setOnExitAnimationListener`) is controlled in `MainActivity.java`. See [Architecture — Splash Screen](/openwiki/architecture/overview.md#splash-screen-js-bridge) for full version history.
 
 ### Feed Store Factory
 

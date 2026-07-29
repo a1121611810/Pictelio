@@ -46,8 +46,18 @@ public class MainActivity extends BridgeActivity {
         SplashScreen splashScreen = SplashScreen.installSplashScreen(this);
         splashScreen.setKeepOnScreenCondition(() -> keepSplashVisible.get());
         splashScreen.setOnExitAnimationListener(splashScreenView -> {
-            // 立即移除 Splash，不做动画
-            splashScreenView.remove();
+            View icon = splashScreenView.getIconView();
+            if (icon != null) {
+                icon.animate()
+                        .scaleX(1.8f).scaleY(1.8f)
+                        .alpha(0f)
+                        .setDuration(120L)
+                        .setInterpolator(new DecelerateInterpolator(2f))
+                        .withEndAction(splashScreenView::remove)
+                        .start();
+            } else {
+                splashScreenView.remove();
+            }
         });
         if (!isWebViewVersionOk()) {
             // WebView 版本不足时立即关闭 Splash，显示升级提示页

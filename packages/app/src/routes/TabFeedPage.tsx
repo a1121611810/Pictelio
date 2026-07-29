@@ -51,15 +51,29 @@ const TabFeedPage: Component<Props> = (props) => {
     return illusts();
   });
 
-  // Initialize abort controller and trigger data loading in background
+  // ── Splash Screen 关闭控制 ──
+  let splashDismissed = false;
+  // 骨架屏渲染后（loading=true），延时 350ms 再触发退出动画
+  createEffect(() => {
+    if (splashDismissed) return;
+    if (loading()) {
+      splashDismissed = true;
+      setTimeout(() => markContentReady(), 350);
+    }
+  });
+
+  // 初始化数据加载 + 兜底超时（合并为一个 onMount）
   onMount(() => {
     abortController = new AbortController();
     ensureLoaded(abortController.signal);
-  });
 
-  // 等待骨架屏渲染完成后再关闭 Splash（固定延时，避免竞态）
-  onMount(() => {
-    setTimeout(() => markContentReady(), 400);
+    // 兜底：800ms 后确保 Splash 关闭（数据已缓存时 loading 从不变 true）
+    setTimeout(() => {
+      if (!splashDismissed) {
+        splashDismissed = true;
+        markContentReady();
+      }
+    }, 800);
   });
 
   // Save scroll + abort pending requests on unmount
