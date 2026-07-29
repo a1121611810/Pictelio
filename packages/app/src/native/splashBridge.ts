@@ -1,12 +1,12 @@
 /**
  * Splash Bridge — 控制原生 Splash Screen 关闭。
  *
- * 通过 @capacitor/splash-screen 的 SplashScreen.hide() 方法，
- * 在 JS 侧确认内容已就绪后通知 Native 侧关闭 Splash。
+ * 通过 AuthPlugin.hideSplash() 通知 Native 侧（MainActivity）
+ * 将 keepSplashVisible 置为 false，触发 SplashScreen 退出。
  *
  * markContentReady() 是幂等的：首次调用后即锁定，后续调用不生效。
  */
-import { Capacitor } from "@capacitor/core";
+import { AuthPlugin } from "./AuthPlugin";
 
 let contentReady = false;
 
@@ -21,12 +21,8 @@ export function markContentReady(): void {
   if (contentReady) return;
   contentReady = true;
 
-  if (!Capacitor.isNativePlatform()) return;
-
-  // 动态导入避免 Web 端 Vite 打包时因 native 模块报错
-  import("@capacitor/splash-screen")
-    .then(({ SplashScreen }) => SplashScreen.hide())
-    .catch(() => {
-      // @capacitor/splash-screen 不可用（例如 Web 开发环境），静默忽略
-    });
+  AuthPlugin.hideSplash().catch((err) => {
+    // Web 环境下 AuthPlugin 不可用，静默忽略
+    console.warn("[splashBridge] hideSplash failed:", err);
+  });
 }

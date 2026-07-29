@@ -157,6 +157,18 @@ public class AuthPlugin extends Plugin {
     }
 
     /**
+     * 通知 Native 层关闭 Splash Screen。
+     *
+     * 由 JS 侧在内容就绪后调用，将 MainActivity.keepSplashVisible 置为 false，
+     * 触发 setKeepOnScreenCondition 退出 SplashScreen。
+     */
+    @PluginMethod
+    public void hideSplash(PluginCall call) {
+        MainActivity.keepSplashVisible.set(false);
+        call.resolve();
+    }
+
+    /**
      * 计算 UTF-8 字符串的 MD5 十六进制摘要。
      * 使用 java.security.MessageDigest，无外部依赖。
      */

@@ -35,9 +35,14 @@ flowchart LR
 **Java:** `/packages/app/android/app/src/main/java/io/pictelio/app/AuthPlugin.java` (8.1 KB)
 **TypeScript:** `/packages/app/src/native/AuthPlugin.ts`
 
-Handles OAuth token refresh with Pixiv credentials **hidden from the JavaScript layer**:
+Handles OAuth token refresh with Pixiv credentials **hidden from the JavaScript layer**, plus native splash screen control:
+
+**Methods:**
 - `setCredentials(credentials)` — stores Pixiv client credentials in native memory
 - `refreshToken(refreshToken)` — performs the OAuth token refresh call natively, returning the new token pair
+- `hideSplash()` — sets `MainActivity.keepSplashVisible` to `false`, triggering native Splash Screen exit. Called from `splashBridge.ts` when content is ready (v3.21.0+, see [Splash Screen JS Bridge](#splash-screen-js-bridge))
+
+**Security:**
 - Credentials are never exposed to the WebView, preventing credential theft via XSS
 
 ### ImageCachePlugin
@@ -80,13 +85,31 @@ Introduced in **v3.18.0** as the sole gateway for all Pixiv API communication (A
 
 ### Splash Screen JS Bridge
 
-**TypeScript:** `/packages/app/src/native/splashBridge.ts` (new in v3.20.0)
+**TypeScript:** `/packages/app/src/native/splashBridge.ts` (new in v3.20.0, migrated in v3.21.0)
+**Java:** `AuthPlugin.hideSplash()` method in `/packages/app/android/app/src/main/java/io/pictelio/app/AuthPlugin.java`
 
-Controls the native Splash Screen via `@capacitor/splash-screen`. Previously managed by Android's `androidx.core:core-splashscreen` with `SplashScreen.installSplashScreen(this)` in `MainActivity.onCreate()`.
+Controls the native Splash Screen via a custom Capacitor plugin bridge. `markContentReady()` calls `AuthPlugin.hideSplash()`, which sets `MainActivity.keepSplashVisible` `AtomicBoolean` to `false`, triggering the `SplashScreen.setKeepOnScreenCondition()` closure on the native AndroidX `SplashScreen` (compat library).
 
-- **`markContentReady()`** — idempotent function that calls `SplashScreen.hide()` via dynamic import
-- Only activates on Capacitor native platforms; silently skipped in web/dev environments
-- Dynamic import prevents build errors in Vite web dev where native modules are unavailable
+This replaced a prior attempt to use `@capacitor/splash-screen` npm package; the final implementation uses the existing AuthPlugin bridge to avoid adding a new dependency.
+
+- **`markContentReady()`** — idempotent function that calls `AuthPlugin.hideSplash()`. After first call, a module-level `contentReady` flag prevents subsequent calls.
+- Silently skipped in web/dev environments — `AuthPlugin.hideSplash()` catch handler logs a warning without crashing.
+- No dynamic import needed; `AuthPlugin` is always registered as a Capacitor plugin.
+
+**Architecture:**
+
+```mermaid
+sequenceDiagram
+    participant JS as JS (splashBridge.ts)
+    participant AP as AuthPlugin (Capacitor bridge)
+    participant MA as MainActivity
+    participant SS as AndroidX SplashScreen
+
+    JS->>AP: markContentReady() → AuthPlugin.hideSplash()
+    AP->>MA: keepSplashVisible.set(false)
+    MA->>SS: setKeepOnScreenCondition → false
+    SS-->>MA: Splash exits
+```
 
 **Call sites:**
 | Location | When Called | Purpose |
@@ -95,16 +118,11 @@ Controls the native Splash Screen via `@capacitor/splash-screen`. Previously man
 | `Feed.tsx` `createEffect` | First data load completes | Closes splash after feed content is visible |
 | `__root.tsx` `onMount` | Auth init completes (fallback) | Closes splash for non-feed pages (age-confirmation, etc.) if Login/Feed haven't already |
 
-**Capacitor config** (`capacitor.config.ts`, `plugins.SplashScreen`):
-- `launchShowDuration: 0` — no forced display duration; JS controls hide timing
-- `launchAutoHide: false` — JS must explicitly call `hide()`
-- `backgroundColor`, `androidScaleType`, `showSpinner` — visual configuration
-
-**Android native changes:**
-- `MainActivity.java`: removed `SplashScreen.installSplashScreen(this)` call and the `androidx.core:core-splashscreen` import
-- `styles.xml`: `AppTheme.NoActionBarLaunch` parent changed from `Theme.SplashScreen` to `AppTheme.NoActionBar` — the splash screen is no longer defined in Android themes
-- `build.gradle`: removed `androidx.core:core-splashscreen` dependency
-- `variables.gradle`: removed `coreSplashScreenVersion = '1.2.0'`
+**Android native:**
+- `MainActivity.java`: retains `SplashScreen.installSplashScreen(this)` + `setKeepOnScreenCondition(() -> keepSplashVisible.get())`. The `keepSplashVisible` `AtomicBoolean` defaults to `true` and is set to `false` by `AuthPlugin.hideSplash()`
+- `styles.xml`: `AppTheme.NoActionBarLaunch` inherits `Theme.SplashScreen` — splash background and icon defined in theme XML
+- `build.gradle`: retains `androidx.core:core-splashscreen` dependency
+- `variables.gradle`: retains `coreSplashScreenVersion = '1.2.0'`
 
 ## Main Activity & Application
 
@@ -120,7 +138,7 @@ The Android entry point. Key responsibilities:
 - Handles Android lifecycle events
 - Intercepts `/pixiv-img/` WebView requests via `shouldInterceptRequest` for image caching (retained from previous architecture)
 
-> **v3.20.0:** Removed `SplashScreen.installSplashScreen(this)` — Splash Screen management moved to `@capacitor/splash-screen`, controlled from JavaScript via `markContentReady()`. The native `androidx.core:core-splashscreen` dependency was also removed (see [Splash Screen JS Bridge](#splash-screen-js-bridge)).
+> **v3.20.0–v3.21.0:** Splash Screen dismiss moved from Android-only `core-splashscreen` API to JS-controlled via `AuthPlugin.hideSplash()` bridge. `MainActivity` retains `SplashScreen.installSplashScreen(this)` but defers exit to `keepSplashVisible` AtomicBoolean controlled by the plugin (see [Splash Screen JS Bridge](#splash-screen-js-bridge)).
 
 ### OAuthUtils
 
@@ -157,7 +175,6 @@ Custom `Application` class for app-level initialization.
 - Server URL: (varies by build — localhost for dev, none for production)
 - Android-specific settings for back gesture and navigation
 - `plugins.CapacitorHttp: { enabled: true }` — enables Capacitor's native HTTP plugin for API requests
-- `plugins.SplashScreen` — JS-controlled splash screen (see [Splash Screen JS Bridge](#splash-screen-js-bridge))
 
 ## Build Pipeline
 

@@ -109,13 +109,14 @@ Routes are defined in `/packages/app/src/router.tsx` using `@tanstack/solid-rout
 | `/image-host` | `ImageHostSettings` | — |
 | `/image-cache` | `ImageCacheSettings` | — |
 
-## Splash Screen Lifecycle (v3.20.0)
+## Splash Screen Lifecycle (v3.20.0, refined v3.21.0)
 
-The native Splash Screen is controlled from JavaScript via `@capacitor/splash-screen`, replacing Android's `androidx.core:core-splashscreen`:
+The native Splash Screen uses AndroidX `core-splashscreen` (compat library) with dismiss controlled from JavaScript via a custom Capacitor plugin bridge:
 
-1. **Capacitor config** (`capacitor.config.ts`): `launchShowDuration: 0` and `launchAutoHide: false` — JS holds exclusive control over hide timing
-2. **Android native**: `MainActivity.onCreate()` no longer calls `SplashScreen.installSplashScreen()`; the `Theme.SplashScreen` theme and `core-splashscreen` dependency are removed
-3. **`markContentReady()`** (`/packages/app/src/native/splashBridge.ts`): idempotent function that calls `SplashScreen.hide()` via dynamic import
+1. **Native setup**: `MainActivity.onCreate()` calls `SplashScreen.installSplashScreen(this)` with `setKeepOnScreenCondition(() -> keepSplashVisible.get())`. The `keepSplashVisible` `AtomicBoolean` starts as `true`.
+2. **JS bridge**: `splashBridge.ts` exports `markContentReady()`, which calls `AuthPlugin.hideSplash()`. The native method sets `keepSplashVisible` to `false`, triggering the SplashScreen exit.
+3. **Idempotent**: `markContentReady()` guards with a module-level `contentReady` flag; subsequent calls are no-ops.
+4. **No `@capacitor/splash-screen` dependency**: The bridge uses the existing `AuthPlugin` Capacitor plugin, avoiding an additional npm dependency.
 
 **Close decision matrix:**
 

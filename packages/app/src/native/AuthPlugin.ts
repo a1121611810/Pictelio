@@ -40,6 +40,13 @@ export interface AuthPlugin {
    * @returns 认证结果
    */
   refreshToken(options: AuthRefreshOptions): Promise<AuthRefreshResult>;
+
+  /**
+   * 通知 Native 层关闭 Splash Screen。
+   *
+   * 内容就绪时由 JS 侧调用，MainActivity 中的 SplashScreen 会优雅退出。
+   */
+  hideSplash(): Promise<void>;
 }
 
 export const AuthPlugin = registerPlugin<AuthPlugin>("AuthPlugin");

@@ -11,7 +11,7 @@ import android.webkit.WebViewClient;
 
 import com.getcapacitor.BridgeActivity;
 
-// SplashScreen 已迁移至 @capacitor/splash-screen，由 JS 侧控制
+import androidx.core.splashscreen.SplashScreen;
 
 import java.net.HttpURLConnection;
 import java.net.URI;
@@ -25,16 +25,22 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Pictelio Android 客户端 — 拦截 /pixiv-img/ 请求并代理到 i.pximg.net（注入 Referer 头）。
  */
 public class MainActivity extends BridgeActivity {
 
+    /** SplashScreen 保持可见的标志位，由 JS 侧通过 AuthPlugin.hideSplash() 控制 */
+    public static final AtomicBoolean keepSplashVisible = new AtomicBoolean(true);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // SplashScreen 已迁移至 @capacitor/splash-screen，由 JS 侧控制关闭
+        // 确保每次 Activity 重建时 Splash 可重新显示
+        keepSplashVisible.set(true);
+        SplashScreen splashScreen = SplashScreen.installSplashScreen(this);
+        splashScreen.setKeepOnScreenCondition(() -> keepSplashVisible.get());
         if (!isWebViewVersionOk()) {
             showWebViewUpgradeError();
             return;
