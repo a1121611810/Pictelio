@@ -40,7 +40,7 @@ Handles OAuth token refresh with Pixiv credentials **hidden from the JavaScript 
 **Methods:**
 - `setCredentials(credentials)` — stores Pixiv client credentials in native memory
 - `refreshToken(refreshToken)` — performs the OAuth token refresh call natively, returning the new token pair
-- `hideSplash()` — sets `MainActivity.keepSplashVisible` to `false`, triggering native Splash Screen exit. Called from `splashBridge.ts` when content is ready (v3.21.0+, see [Splash Screen JS Bridge](#splash-screen-js-bridge))
+- `hideSplash()` — calls `MainActivity.dismissSplash()`, triggering native Splash Screen exit. Called from `splashBridge.ts` when content is ready (v3.21.0+, see [Splash Screen JS Bridge](#splash-screen-js-bridge))
 
 **Security:**
 - Credentials are never exposed to the WebView, preventing credential theft via XSS
@@ -88,7 +88,7 @@ Introduced in **v3.18.0** as the sole gateway for all Pixiv API communication (A
 **TypeScript:** `/packages/app/src/native/splashBridge.ts` (new in v3.21.0)
 **Java:** `AuthPlugin.hideSplash()` method in `/packages/app/android/app/src/main/java/io/pictelio/app/AuthPlugin.java`
 
-Controls the native Splash Screen via a custom Capacitor plugin bridge. `markContentReady()` calls `AuthPlugin.hideSplash()`, which sets `MainActivity.keepSplashVisible` `AtomicBoolean` to `false`, triggering the `SplashScreen.setKeepOnScreenCondition()` closure on the native AndroidX `SplashScreen` (compat library).
+Controls the native Splash Screen via a custom Capacitor plugin bridge. `markContentReady()` calls `AuthPlugin.hideSplash()`, which calls `MainActivity.dismissSplash()`, setting the private `keepSplashVisible` `AtomicBoolean` to `false`. This triggers the `SplashScreen.setKeepOnScreenCondition()` closure on the native AndroidX `SplashScreen` (compat library).
 
 This replaced a prior attempt to use `@capacitor/splash-screen` npm package; the final implementation uses the existing AuthPlugin bridge to avoid adding a new dependency.
 
@@ -106,7 +106,7 @@ sequenceDiagram
     participant SS as AndroidX SplashScreen
 
     JS->>AP: markContentReady() → AuthPlugin.hideSplash()
-    AP->>MA: keepSplashVisible.set(false)
+    AP->>MA: dismissSplash()
     MA->>SS: setKeepOnScreenCondition → false
     SS-->>MA: Splash exits
 ```
@@ -119,7 +119,7 @@ sequenceDiagram
 | `__root.tsx` `onMount` | Auth init completes (fallback) | Closes splash for non-feed pages (age-confirmation, etc.) if Login/Feed haven't already |
 
 **Android native:**
-- `MainActivity.java`: retains `SplashScreen.installSplashScreen(this)` + `setKeepOnScreenCondition(() -> keepSplashVisible.get())`. The `keepSplashVisible` `AtomicBoolean` defaults to `true` and is set to `false` by `AuthPlugin.hideSplash()`
+- `MainActivity.java`: retains `SplashScreen.installSplashScreen(this)` + `setKeepOnScreenCondition(() -> keepSplashVisible.get())`. The private `keepSplashVisible` `AtomicBoolean` defaults to `true` and is set to `false` via the package-private `dismissSplash()` method, called by `AuthPlugin.hideSplash()`
 - `styles.xml`: `AppTheme.NoActionBarLaunch` inherits `Theme.SplashScreen` — splash background and icon defined in theme XML
 - `build.gradle`: retains `androidx.core:core-splashscreen` dependency
 - `variables.gradle`: retains `coreSplashScreenVersion = '1.2.0'`
@@ -247,4 +247,14 @@ The full release process is documented in `/docs/release-checklist.md` (6.2 KB),
 | Release signing guide | `/docs/release-signing.md` |
 | Platform compat | `/docs/platform-compatibility.md` |
 | GitHub release docs | `/docs/github-release.md` |
+ease.md` |
+b release docs | `/docs/github-release.md` |
+ease.md` |
+ease.md` |
+ease.md` |
+/github-release.md` |
+ease.md` |
+ease.md` |
+ease.md` |
+ease.md` |
 ease.md` |
