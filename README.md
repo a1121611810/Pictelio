@@ -18,48 +18,7 @@
     <br>
     <img src="https://img.shields.io/badge/PRs-welcome-brightgreen" alt="PRs Welcome">
   </p>
-  <p>
-    🌐 <b>English</b> · <a href="#中文">中文</a>
-  </p>
 </div>
-
----
-
-<a id="中文"></a>
-
-<details>
-  <summary><strong>中文</strong> — 简体中文版本</summary>
-
-  <div align="center">
-    <img src="packages/app/assets/logo/pictelio-logo.svg" width="80" height="80" alt="Pictelio Logo">
-    <h2>Pictelio</h2>
-    <p>基于 SolidJS 的第三方 Pixiv 客户端，通过 Capacitor 打包为 Android 原生应用</p>
-  </div>
-
-  **功能一览**
-
-  - 推荐 / 关注 / 搜索插画与小说瀑布流
-  - 作品详情（大图、多页、Ugoira 动图播放）
-  - 小说阅读（虚拟化排版、关键词搜索、系列导航）
-  - 收藏 / 评论 / 关注 / 屏蔽 / 举报
-  - 浏览历史自动追踪
-  - 亮/暗主题切换，R18 内容分级过滤
-  - 图片 CDN 代理缓存、PWA 离线支持
-
-  **技术栈：** SolidJS + TypeScript + Vite + UnoCSS + Capacitor + TanStack Router/Query/Virtual + Fluent Design 2
-
-  **快速开始：**
-
-  ```bash
-  pnpm install   # 安装依赖
-  pnpm dev       # 启动开发服务器
-  ```
-
-  > 开发阶段需配置 HTTP 代理（环境变量 `https_proxy`），默认回退 `http://127.0.0.1:10808`
-
-  详情参见[英文版](#english)。
-
-</details>
 
 ---
 
