@@ -227,20 +227,20 @@ const IllustDetail: Component = () => {
   createIntersectionObserver(
     pageElements,
     (entries) => {
-      let best: { index: number; ratio: number } | null = null;
+      let maxIndex = -1;
       for (const entry of entries) {
-        if (entry.intersectionRatio > 0) {
+        if (entry.isIntersecting) {
           const idx = Number((entry.target as HTMLElement).dataset.pageIndex);
-          if (!Number.isNaN(idx) && entry.intersectionRatio > (best?.ratio ?? 0)) {
-            best = { index: idx, ratio: entry.intersectionRatio };
+          if (!Number.isNaN(idx) && idx > maxIndex) {
+            maxIndex = idx;
           }
         }
       }
-      if (best && !ignorePageObserver) {
-        setCurrentVisiblePage(best.index);
+      if (maxIndex >= 0 && !ignorePageObserver) {
+        setCurrentVisiblePage(maxIndex);
       }
     },
-    { threshold: [0, 0.25, 0.5, 0.75] },
+    { threshold: [0] },
   );
 
   // 组件卸载时确保移除即时注入的过渡遮罩，避免 DOM 泄漏
