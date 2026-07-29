@@ -132,6 +132,8 @@ pixivizer/
 
 Pictelio is not affiliated with Pixiv Inc. All content displayed is sourced from [Pixiv](https://www.pixiv.net) public API and belongs to their respective creators.
 
+This project is for learning and research purposes only. If you are evaluating it, please delete the app and all cached content within 24 hours. Do not use it for any purpose that violates Pixiv's Terms of Service or applicable laws.
+
 ## License
 
 [MIT](LICENSE) © 2026
