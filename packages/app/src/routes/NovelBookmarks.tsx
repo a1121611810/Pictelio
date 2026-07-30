@@ -10,7 +10,7 @@ import {
   refresh,
   setBookmarkRestrict,
   saveTabScroll,
-} from "../stores/novelStore";
+} from "../stores/novelBookmarkStore";
 import NovelVirtualFeed from "../components/NovelVirtualFeed";
 import SeriesSheet from "../components/SeriesSheet";
 import { novelLayoutMode } from "../stores/settingsStore";
@@ -134,6 +134,7 @@ const NovelBookmarks: Component<Props> = (props) => {
             authorId={s().authorId}
             isOpen={sheetOpen()}
             onClose={() => setSheetOpen(false)}
+            onNovelSelect={(id) => void navigate({ to: `/novel/${id}` })}
           />
         )}
       </Show>

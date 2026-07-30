@@ -17,7 +17,7 @@ import {
 } from "../stores/recommendedStore";
 import type { PixivIllust } from "../api/types";
 import VirtualFeed from "./VirtualFeed";
-import NovelFeedPage from "../routes/NovelFeedPage";
+import NovelRecommendedFeed from "../routes/NovelRecommendedFeed";
 import { contentType } from "../stores/uiStore";
 import { layoutMode } from "../stores/settingsStore";
 
@@ -121,7 +121,7 @@ const RecommendedFeed: Component<Props> = (props) => {
       <Show
         when={contentType() === "illust"}
         fallback={
-          <NovelFeedPage tab="recommended" suppressHeaderVisibility={props.suppressHeaderVisibility} />
+          <NovelRecommendedFeed suppressHeaderVisibility={props.suppressHeaderVisibility} />
         }
       >
         <VirtualFeed

@@ -15,7 +15,7 @@ import {
 } from "../stores/followStore";
 import type { PixivIllust } from "../api/types";
 import VirtualFeed from "./VirtualFeed";
-import NovelFeedPage from "../routes/NovelFeedPage";
+import NovelFollowFeed from "../routes/NovelFollowFeed";
 import { contentType } from "../stores/uiStore";
 import { layoutMode } from "../stores/settingsStore";
 
@@ -101,7 +101,7 @@ const FollowFeed: Component<Props> = (props) => {
       <Show
         when={contentType() === "illust"}
         fallback={
-          <NovelFeedPage tab="follow" suppressHeaderVisibility={props.suppressHeaderVisibility} />
+          <NovelFollowFeed suppressHeaderVisibility={props.suppressHeaderVisibility} />
         }
       >
         <VirtualFeed
