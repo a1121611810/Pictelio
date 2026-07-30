@@ -162,6 +162,8 @@ function createMockConfig(overrides: Record<string, unknown> = {}) {
     estimateSize: (overrides.estimateSize as (i: number) => number) ?? ((_i: number) => 100),
     getItemKey: (overrides.getItemKey as (i: number) => string | number) ?? ((i: number) => i),
     emptyText: (overrides.emptyText as string) ?? "暂无内容",
+    onReady: (overrides.onReady as () => void) ?? vi.fn(),
+    suppressHeaderVisibility: (overrides.suppressHeaderVisibility as (d?: number) => void) ?? vi.fn(),
   };
 }
 
@@ -406,6 +408,104 @@ describe("createFeedVirtualizer", () => {
 
       expect(mockResizeObserver).toHaveBeenCalled();
       expect(mockResizeObserverInstance.observe).toHaveBeenCalledWith(el);
+    });
+  });
+
+  describe("scroll restoration timing", () => {
+    it("does not call onReady or suppressHeaderVisibility when count is 0", () => {
+      const onReady = vi.fn();
+      const suppressHeaderVisibility = vi.fn();
+      const [items, setItems] = createSignal<any[]>([]);
+      const config = createMockConfig({
+        items,
+        onReady,
+        suppressHeaderVisibility,
+      });
+
+      runWithRoot(() => createFeedVirtualizer(config as any));
+
+      expect(onReady).not.toHaveBeenCalled();
+      expect(suppressHeaderVisibility).not.toHaveBeenCalled();
+    });
+
+    it("calls onReady and suppressHeaderVisibility when data arrives (count > 0)", async () => {
+      const onReady = vi.fn();
+      const suppressHeaderVisibility = vi.fn();
+      const [items, setItems] = createSignal<any[]>([]);
+      const config = createMockConfig({
+        items,
+        onReady,
+        suppressHeaderVisibility,
+      });
+
+      runWithRoot(() => createFeedVirtualizer(config as any));
+
+      // Simulate data arrival
+      setItems([{ id: 1 }, { id: 2 }, { id: 3 }]);
+
+      // Flush microtasks (Solid effects fire in the next microtask)
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(onReady).toHaveBeenCalledTimes(1);
+      expect(suppressHeaderVisibility).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not call onReady again on subsequent count changes (hasRetriedRestore guard)", async () => {
+      const onReady = vi.fn();
+      const suppressHeaderVisibility = vi.fn();
+      const [items, setItems] = createSignal<any[]>([]);
+      const config = createMockConfig({
+        items,
+        onReady,
+        suppressHeaderVisibility,
+      });
+
+      runWithRoot(() => createFeedVirtualizer(config as any));
+
+      // First data arrival
+      setItems([{ id: 1 }, { id: 2 }]);
+      await new Promise((r) => setTimeout(r, 0));
+      expect(onReady).toHaveBeenCalledTimes(1);
+
+      // Second data change (simulating pagination)
+      setItems([{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }]);
+      await new Promise((r) => setTimeout(r, 0));
+
+      // Should NOT call onReady again (guarded by hasRetriedRestore)
+      expect(onReady).toHaveBeenCalledTimes(1);
+      expect(suppressHeaderVisibility).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls onReady in correct order: after onMount, when items arrive", async () => {
+      const callOrder: string[] = [];
+      const [items, setItems] = createSignal<any[]>([]);
+
+      const onReady = vi.fn(() => callOrder.push("onReady"));
+      const suppressHeaderVisibility = vi.fn(() => callOrder.push("suppressHeader"));
+
+      runWithRoot(() => createFeedVirtualizer({
+        items: () => items(),
+        loading: () => false,
+        error: () => null as any,
+        hasMore: () => false,
+        onLoadMore: () => {},
+        onRefresh: async () => {},
+        lanes: () => 1,
+        estimateSize: (i: number) => 100,
+        getItemKey: (i: number) => i,
+        emptyText: "",
+        onReady,
+        suppressHeaderVisibility,
+      } as any));
+
+      // Simulate data arrival
+      setItems([{ id: 1 }]);
+      await new Promise((r) => setTimeout(r, 0));
+
+      // Order: suppressHeader should be called before onReady
+      expect(callOrder.indexOf("suppressHeader")).toBeLessThan(
+        callOrder.indexOf("onReady"),
+      );
     });
   });
 });
