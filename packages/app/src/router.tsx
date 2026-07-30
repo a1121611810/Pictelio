@@ -17,7 +17,6 @@ import Login from "@/routes/Login";
 import AgeConfirmation from "@/routes/AgeConfirmation";
 import IllustDetail from "@/routes/IllustDetail";
 import DebugImage from "@/routes/DebugImage";
-import Bookmarks from "@/routes/Bookmarks";
 import HomePage from "@/routes/HomePage";
 import PersonalCenter from "@/routes/PersonalCenter";
 import UserIllusts from "@/routes/UserIllusts";
@@ -26,7 +25,6 @@ import ImageHostSettings from "@/routes/ImageHostSettings";
 import ImageCacheSettings from "@/routes/ImageCacheSettings";
 import FollowListPage from "@/routes/FollowListPage";
 import NovelDetail from "@/routes/NovelDetail";
-import HistoryPage from "@/routes/HistoryPage";
 import Search from "@/routes/Search";
 import LayoutSettings from "@/routes/LayoutSettings";
 import Settings from "@/routes/Settings";
@@ -78,18 +76,6 @@ const novelRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "novel/$id",
   component: asRoute(NovelDetail),
-});
-
-const bookmarksRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "bookmarks",
-  component: asRoute(Bookmarks),
-});
-
-const historyRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "history",
-  component: asRoute(HistoryPage),
 });
 
 const searchRoute = createRoute({
@@ -202,8 +188,6 @@ const routeTree = rootRoute.addChildren([
   illustRoute,
   debugRoute,
   novelRoute,
-  bookmarksRoute,
-  historyRoute,
   searchRoute,
   meRoute,
   aboutRoute,

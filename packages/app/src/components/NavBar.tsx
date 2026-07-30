@@ -23,14 +23,6 @@ const rightTabs: TabDef[] = [
   { key: "history", label: "历史", icon: "history" },
 ];
 
-/** 路由路径映射 */
-const TAB_PATH: Record<NavTab, string> = {
-  recommended: "/home",
-  follow: "/home",
-  bookmarks: "/bookmarks",
-  history: "/history",
-};
-
 /** 类型守卫：判断 Tab 是否属于 NavTab */
 function toNavTab(tab: string): NavTab | null {
   if (tab === "recommended" || tab === "follow" || tab === "bookmarks" || tab === "history") {
@@ -132,15 +124,11 @@ const NavBar: Component = () => {
   // ── Tab 导航 ──
   function handleTabClick(key: NavTab) {
     setCurrentTab(key);
-    // 推荐/关注：已在首页则同页 CSS 切换，否则导航到首页
-    if (key === "recommended" || key === "follow") {
-      if (window.location.pathname === "/home") {
-        window.history.replaceState(null, "", "/home");
-      } else {
-        void navigate({ to: "/home" });
-      }
+    // 所有 Tab：已在首页则同页 CSS 切换，否则导航到首页
+    if (window.location.pathname === "/home") {
+      window.history.replaceState(null, "", "/home");
     } else {
-      void navigate({ to: TAB_PATH[key] });
+      void navigate({ to: "/home" });
     }
   }
 

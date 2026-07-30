@@ -118,8 +118,8 @@ const PersonalCenter: Component<Props> = (props) => {
               {/* 我的收藏 */}
               <div
                 class="flex items-center px-5 py-4 gap-3 cursor-pointer active:scale-[0.98] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] border-b border-[var(--pageCardBorder)] focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-[-2px] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
-                onClick={() => void navigate({ to: "/bookmarks" })}
-                onKeyDown={(e) => handleKeyDown(e, () => navigate({ to: "/bookmarks" }))}
+                onClick={() => { setCurrentTab("bookmarks"); void navigate({ to: "/home" }); }}
+                onKeyDown={(e) => handleKeyDown(e, () => { setCurrentTab("bookmarks"); navigate({ to: "/home" }); })}
                 role="button"
                 tabIndex={0}
                 aria-label="我的收藏"
@@ -138,7 +138,7 @@ const PersonalCenter: Component<Props> = (props) => {
               onClick={() =>
                 void navigate({
                   to: profileState.isCurrentUser()
-                    ? "/home"
+                    ? (() => { setCurrentTab("follow"); return "/home"; })()
                     : `/user/${profileState.targetUserId()}/following`,
                 })
               }
@@ -146,7 +146,7 @@ const PersonalCenter: Component<Props> = (props) => {
                 handleKeyDown(e, () =>
                   navigate({
                     to: profileState.isCurrentUser()
-                      ? "/home"
+                      ? (() => { setCurrentTab("follow"); return "/home"; })()
                       : `/user/${profileState.targetUserId()}/following`,
                   }),
                 )

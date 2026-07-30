@@ -6,6 +6,8 @@ import { loading as folLoading } from "../stores/followStore";
 import UserAvatar from "../components/UserAvatar";
 import RecommendedFeed from "../components/RecommendedFeed";
 import FollowFeed from "../components/FollowFeed";
+import BookmarksFeed from "../components/BookmarksFeed";
+import HistoryFeed from "../components/HistoryFeed";
 import NavBar from "../components/NavBar";
 import PageTransition from "../components/PageTransition";
 import { scrollToTop } from "../utils/scrollToTop";
@@ -61,7 +63,8 @@ const HomePage: Component = () => {
               </Show>
             </h1>
 
-            {/* ── Content type toggle ── */}
+            {/* ── Content type toggle (隐藏于历史 tab) ── */}
+            <Show when={currentTab() !== "history"}>
             <div class="flex items-center bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusSmall)] p-0.5 gap-0.5">
               <button
                 class="px-2.5 py-1 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase100)] font-semibold transition-all active:scale-95 appearance-none border-none outline-none cursor-pointer"
@@ -87,6 +90,7 @@ const HomePage: Component = () => {
                 小说
               </button>
             </div>
+            </Show>
           </header>
 
           {/* ── Tab content panels (CSS display toggling) ── */}
@@ -99,6 +103,16 @@ const HomePage: Component = () => {
             style={{ display: currentTab() === "follow" ? "block" : "none" }}
           >
             <FollowFeed suppressHeaderVisibility={suppressHeaderVisibility} />
+          </div>
+          <div
+            style={{ display: currentTab() === "bookmarks" ? "block" : "none" }}
+          >
+            <BookmarksFeed suppressHeaderVisibility={suppressHeaderVisibility} />
+          </div>
+          <div
+            style={{ display: currentTab() === "history" ? "block" : "none" }}
+          >
+            <HistoryFeed />
           </div>
         </div>
       </PageTransition>
