@@ -53,28 +53,24 @@ vi.mock("@tanstack/solid-query", async (importOriginal) => {
       Object.defineProperties(mock, {
         data: {
           get() {
-            if (currentOpts().enabled === false) return undefined;
             return getQ((currentOpts().queryKey as string[])[1]).data;
           },
           enumerable: true,
         },
         isFetching: {
           get() {
-            if (currentOpts().enabled === false) return false;
             return getQ((currentOpts().queryKey as string[])[1]).isFetching;
           },
           enumerable: true,
         },
         error: {
           get() {
-            if (currentOpts().enabled === false) return null;
             return getQ((currentOpts().queryKey as string[])[1]).error;
           },
           enumerable: true,
         },
         hasNextPage: {
           get() {
-            if (currentOpts().enabled === false) return false;
             return getQ((currentOpts().queryKey as string[])[1]).hasNextPage;
           },
           enumerable: true,

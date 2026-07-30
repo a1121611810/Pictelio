@@ -256,22 +256,11 @@ export function createTQFeedStore<
                 initialPageParam: undefined as string | undefined,
 
                 /**
-                 * 自动推导 enabled：
-                 * 1. 延迟激活门控（lazy:true 时需先调用 activate()）
-                 * 2. 全局条件（登录态等）
-                 * 3. 仅当前 tab 的查询可运行
-                 * 4. subTab 匹配（"all" 模式下所有 sub-query 启用）
+                 * 按需查询（ADR-0042）：禁用自动 fetch，由 ensureLoaded 驱动。
+                 * enabled 设为 false，确保模块加载时不发起任何请求。
+                 * 组件挂载 → 骨架屏渲染 → ensureLoaded → fetch 开始。
                  */
-                enabled:
-                  activated() &&
-                  config.enabled() &&
-                  (() => {
-                    const activeTab = config.currentTab();
-                    if (activeTab !== tabKey) return false;
-                    const sub = tabDef.getSubTab?.();
-                    if (!sub || sub === "all") return true;
-                    return sub === subKey;
-                  })(),
+                enabled: false,
 
                 staleTime: configStaleTime,
                 gcTime: configGcTime,

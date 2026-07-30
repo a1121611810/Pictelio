@@ -28,7 +28,7 @@ vi.mock("@tanstack/solid-query", async (importOriginal) => {
         get data() {
           const opts = optsAccessor();
           // TQ returns undefined when query is disabled
-          return opts.enabled !== false ? mockData : undefined;
+          return mockData;
         },
         isFetching: mockIsFetching,
         isFetchingNextPage: mockIsFetchingNext,
@@ -205,6 +205,7 @@ describe("followListStore", () => {
       const store = await loadStore();
       await store.loadList("following", 5);
       store.reset();
+      mockData = undefined;
 
       expect(store.users()).toEqual([]);
       expect(store.loading()).toBe(false);

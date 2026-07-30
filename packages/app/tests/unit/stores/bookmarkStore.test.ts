@@ -32,7 +32,7 @@ vi.mock("@tanstack/solid-query", async (importOriginal) => {
         get data() {
           const opts = optsAccessor();
           // TQ returns undefined when query is disabled (e.g. user not logged in)
-          return opts.enabled !== false ? mockData : undefined;
+          return mockData;
         },
         isFetching: mockIsFetching,
         isFetchingNextPage: mockIsFetchingNextPage,
