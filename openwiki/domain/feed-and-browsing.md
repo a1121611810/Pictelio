@@ -17,9 +17,11 @@ Two main feed types are defined in `/packages/app/src/routes/` and backed by sto
 |------|-------|-----------|----------|
 | Recommended | `/recommended` | `TabFeedPage tab="recommended"` | `feedStore.ts` (legacy), `recommendedStore.ts` (new, unintegrated) |
 | Following | `/following` | `TabFeedPage tab="follow"` | `feedStore.ts` (legacy), `followStore.ts` (new, unintegrated) |
-| Novel Feed | `/novel-feed` | `NovelFeedPage` | `novelStore.ts` |
+| Novel Feed | `/novel-feed` | `NovelFeedPage` | `novelStore.ts` (legacy), `novelRecommendedStore.ts`, `novelFollowStore.ts`, `novelBookmarkStore.ts` (all new, unintegrated) |
 
-> **Ongoing refactor:** The monolithic `feedStore.ts` is being split into dedicated per-tab stores. `recommendedStore.ts` and `followStore.ts` are added as separate modules but not yet imported by routes — the legacy `feedStore.ts` remains the live store. Shared helpers (`dedupIllusts`, `nextPageOrLoad`) have been extracted to `feedHelpers.ts`.
+> **Ongoing refactor (illusts):** The monolithic `feedStore.ts` is being split into dedicated per-tab stores. `recommendedStore.ts` and `followStore.ts` are added as separate modules but not yet imported by routes — the legacy `feedStore.ts` remains the live store. Shared helpers (`dedupIllusts`, `nextPageOrLoad`) have been extracted to `feedHelpers.ts`.
+
+> **Ongoing refactor (novels):** The monolithic `novelStore.ts` is being split into dedicated per-tab stores in the same pattern. `novelRecommendedStore.ts`, `novelFollowStore.ts`, and `novelBookmarkStore.ts` are added but not yet imported by routes. Shared helpers (`adaptNovelResponse`, `dedupNovels`) have been extracted to `novelHelpers.ts`.
 
 ### TabFeedPage
 
@@ -41,7 +43,7 @@ All feed stores use `createTQFeedStore` (`/packages/app/src/stores/shared/create
 - Scroll state save/restore (`saveFeedScrollState` / `getFeedScrollState`)
 - Sub-tab adapter functions converting between feed-store and factory naming conventions
 
-**Concrete store instances:**
+**Concrete store instances (illusts):**
 
 | Store | File | Sub-tabs | Tab adapter needed? |
 |-------|------|----------|---------------------|
@@ -49,10 +51,24 @@ All feed stores use `createTQFeedStore` (`/packages/app/src/stores/shared/create
 | Recommended (new) | `recommendedStore.ts` | mixed/illust/manga | Yes (mixed → factory "all") |
 | Follow (new) | `followStore.ts` | all/public/private | No (maps 1:1) |
 
-Shared helper functions migrated from `feedStore.ts` to `feedHelpers.ts`:
+**Concrete store instances (novels):**
+
+| Store | File | Sub-tabs | Tab adapter needed? |
+|-------|------|----------|---------------------|
+| Legacy monolithic | `novelStore.ts` | follow: all/public/private; recommended; bookmarks | Yes (triple-tab) |
+| Recommended (new) | `novelRecommendedStore.ts` | (single) | No |
+| Follow (new) | `novelFollowStore.ts` | all/public/private | No (maps 1:1) |
+| Bookmarks (new) | `novelBookmarkStore.ts` | (single with restrict) | No |
+
+Shared helpers migrated from `feedStore.ts` to `feedHelpers.ts`:
 
 - **`dedupIllusts`** — Deduplicates illusts by `illust.id`. Used by the factory's `dedupFn` option in merge-all mode.
 - **`nextPageOrLoad`** — Routes paginated API calls: if `pageParam` is set, calls `apiClient.get(nextUrl)`; otherwise calls the initial loader function. Both paths normalize the response to `{ items, next_url }`.
+
+Shared helpers migrated from `novelStore.ts` to `novelHelpers.ts`:
+
+- **`adaptNovelResponse`** — Novel-specific pagination adapter that normalizes `{ novels, next_url }` API responses to `{ items, next_url }`. Works like `nextPageOrLoad` from `feedHelpers.ts` but handles the `novels` key used by novel API endpoints.
+- **`dedupNovels`** — Deduplicates novels by `novel.id`. Used by the factory's `dedupFn` option in merge mode (e.g. `novelFollowStore`'s all/private merge).
 
 ```mermaid
 flowchart LR

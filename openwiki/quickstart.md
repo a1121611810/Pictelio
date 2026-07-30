@@ -110,6 +110,11 @@ Architecture Decision Records live in `/docs/adr/`. Notable ones:
 | Recommended feed store (new split) | `/packages/app/src/stores/recommendedStore.ts` |
 | Follow feed store (new split) | `/packages/app/src/stores/followStore.ts` |
 | Feed helpers (dedup, pagination) | `/packages/app/src/stores/shared/feedHelpers.ts` |
+| Novel store (legacy monolithic) | `/packages/app/src/stores/novelStore.ts` |
+| Novel recommended store (new split) | `/packages/app/src/stores/novelRecommendedStore.ts` |
+| Novel follow store (new split) | `/packages/app/src/stores/novelFollowStore.ts` |
+| Novel bookmark store (new split) | `/packages/app/src/stores/novelBookmarkStore.ts` |
+| Novel feed helpers | `/packages/app/src/stores/shared/novelHelpers.ts` |
 
 ## Available Scripts
 
@@ -146,6 +151,7 @@ A scheduled **OpenWiki GitHub Actions workflow** (`.github/workflows/openwiki-up
 The repository has been actively refactored through v3.17.x. Key themes in recent commits:
 
 - **Store migration:** All list stores migrated from hand-written `createStore` patterns to the `createTQFeedStore` factory wrapping TanStack Query's `createInfiniteQuery` (ADR-0016, ADR-0022). This eliminated 200-300 lines of boilerplate.
+- **Feed store split:** The monolithic `feedStore.ts` (illusts) and `novelStore.ts` (novels) are being split into dedicated per-tab stores using the same factory. `recommendedStore.ts`, `followStore.ts`, `novelRecommendedStore.ts`, `novelFollowStore.ts`, and `novelBookmarkStore.ts` are added but not yet integrated into routes. Shared helpers extracted to `feedHelpers.ts` and `novelHelpers.ts`.
 - **Scroll primitives unification:** Scroll restoration, scroll direction, and scroll-driven visibility were extracted into shared factories. Virtual scroll restoration now uses explicit `window.scrollTo` with ResizeObserver retry, not Virtualizer internals (ADR-0010, ADR-0013, ADR-0023, ADR-0031).
 - **Image pipeline:** Periodic GC with context-aware eviction for the L1 image cache; L1 key set migrated to Set-based `LRUSet` (ADR-0030, ADR-0014).
 - **Ugoira (animated illust):** In-place playback with percentage loading progress indicator; list card aspect ratio changed to 1:1 square for consistency.

@@ -108,7 +108,13 @@ Three layout modes for the novel feed:
 
 - `/packages/app/src/routes/NovelFeedPage.tsx` — Novel feed discovery page
 - `/packages/app/src/components/NovelVirtualFeed.tsx` — Virtualized novel feed renderer
-- `/packages/app/src/stores/novelStore.ts` — Novel feed state (uses `createTQFeedStore` factory per ADR-0021)
+- `/packages/app/src/stores/novelStore.ts` — Legacy monolithic novel feed store (uses `createTQFeedStore` factory per ADR-0021)
+- `/packages/app/src/stores/novelRecommendedStore.ts` — New dedicated recommended store (unintegrated)
+- `/packages/app/src/stores/novelFollowStore.ts` — New dedicated follow store with `all`/`public`/`private` sub-tabs (unintegrated)
+- `/packages/app/src/stores/novelBookmarkStore.ts` — New dedicated bookmark store with `public`/`private` restrict (unintegrated)
+- `/packages/app/src/stores/shared/novelHelpers.ts` — Shared helpers (`adaptNovelResponse`, `dedupNovels`) extracted from `novelStore.ts`
+
+> **Ongoing refactor:** The monolithic `novelStore.ts` is being split into dedicated per-tab stores, mirroring the illust `feedStore.ts` split. `novelRecommendedStore.ts`, `novelFollowStore.ts`, and `novelBookmarkStore.ts` are added as separate modules but not yet imported by routes.
 
 ## Key Source Files
 
@@ -116,7 +122,11 @@ Three layout modes for the novel feed:
 |---------|------|
 | Novel detail page | `/packages/app/src/routes/NovelDetail.tsx` |
 | Novel feed page | `/packages/app/src/routes/NovelFeedPage.tsx` |
-| Novel store | `/packages/app/src/stores/novelStore.ts` |
+| Novel store (legacy) | `/packages/app/src/stores/novelStore.ts` |
+| Novel recommended store (new) | `/packages/app/src/stores/novelRecommendedStore.ts` |
+| Novel follow store (new) | `/packages/app/src/stores/novelFollowStore.ts` |
+| Novel bookmark store (new) | `/packages/app/src/stores/novelBookmarkStore.ts` |
+| Novel feed helpers | `/packages/app/src/stores/shared/novelHelpers.ts` |
 | Novel cache | `/packages/app/src/stores/novelCache.ts` |
 | Novel loader primitive | `/packages/app/src/primitives/createNovelLoader.ts` |
 | Novel virtual layout | `/packages/app/src/primitives/createNovelVirtualLayout.ts` |
