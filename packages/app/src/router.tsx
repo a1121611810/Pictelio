@@ -44,7 +44,7 @@ export const routes: RouteDefinition[] = [
       { path: "/user/:id/following", component: () => <FollowListPage mode="following" /> },
       { path: "/user/:id/followers", component: FollowersPage },
       { path: "/my/followers", component: FollowersPage },
-      { path: "/*all", component: Login },
+      { path: "/*all", component: HomePage },
     ],
   },
 ];
