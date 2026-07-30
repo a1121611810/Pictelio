@@ -13,11 +13,13 @@ The feed and browsing system covers the primary user experience: discovering and
 
 Two main feed types are defined in `/packages/app/src/routes/` and backed by stores in `/packages/app/src/stores/`:
 
-| Feed | Route | Component | Store |
-|------|-------|-----------|-------|
-| Recommended | `/recommended` | `TabFeedPage tab="recommended"` | `feedStore.ts` |
-| Following | `/following` | `TabFeedPage tab="follow"` | `feedStore.ts` |
+| Feed | Route | Component | Store(s) |
+|------|-------|-----------|----------|
+| Recommended | `/recommended` | `TabFeedPage tab="recommended"` | `feedStore.ts` (legacy), `recommendedStore.ts` (new, unintegrated) |
+| Following | `/following` | `TabFeedPage tab="follow"` | `feedStore.ts` (legacy), `followStore.ts` (new, unintegrated) |
 | Novel Feed | `/novel-feed` | `NovelFeedPage` | `novelStore.ts` |
+
+> **Ongoing refactor:** The monolithic `feedStore.ts` is being split into dedicated per-tab stores. `recommendedStore.ts` and `followStore.ts` are added as separate modules but not yet imported by routes — the legacy `feedStore.ts` remains the live store. Shared helpers (`dedupIllusts`, `nextPageOrLoad`) have been extracted to `feedHelpers.ts`.
 
 ### TabFeedPage
 
@@ -32,12 +34,25 @@ Two main feed types are defined in `/packages/app/src/routes/` and backed by sto
 
 ### Feed Store Factory
 
-Both feed stores now use `createTQFeedStore` (`/packages/app/src/stores/shared/createTQFeedStore.ts`), a shared factory that provides:
+All feed stores use `createTQFeedStore` (`/packages/app/src/stores/shared/createTQFeedStore.ts`), a shared factory that provides:
 - TanStack Query-based data fetching with pagination
 - Illust deduplication (`dedupIllusts` by illust ID)
 - R18/R18G content filtering
 - Scroll state save/restore (`saveFeedScrollState` / `getFeedScrollState`)
 - Sub-tab adapter functions converting between feed-store and factory naming conventions
+
+**Concrete store instances:**
+
+| Store | File | Sub-tabs | Tab adapter needed? |
+|-------|------|----------|---------------------|
+| Legacy monolithic | `feedStore.ts` | recommended: mixed/illust/manga; follow: all/public/private | Yes (dual-tab) |
+| Recommended (new) | `recommendedStore.ts` | mixed/illust/manga | Yes (mixed → factory "all") |
+| Follow (new) | `followStore.ts` | all/public/private | No (maps 1:1) |
+
+Shared helper functions migrated from `feedStore.ts` to `feedHelpers.ts`:
+
+- **`dedupIllusts`** — Deduplicates illusts by `illust.id`. Used by the factory's `dedupFn` option in merge-all mode.
+- **`nextPageOrLoad`** — Routes paginated API calls: if `pageParam` is set, calls `apiClient.get(nextUrl)`; otherwise calls the initial loader function. Both paths normalize the response to `{ items, next_url }`.
 
 ```mermaid
 flowchart LR

@@ -106,6 +106,10 @@ Architecture Decision Records live in `/docs/adr/`. Notable ones:
 | Auth store | `/packages/app/src/stores/authStore.ts` |
 | Feed virtualizer | `/packages/app/src/primitives/createFeedVirtualizer.ts` |
 | Feed store factory | `/packages/app/src/stores/shared/createTQFeedStore.ts` |
+| Feed store (legacy monolithic) | `/packages/app/src/stores/feedStore.ts` |
+| Recommended feed store (new split) | `/packages/app/src/stores/recommendedStore.ts` |
+| Follow feed store (new split) | `/packages/app/src/stores/followStore.ts` |
+| Feed helpers (dedup, pagination) | `/packages/app/src/stores/shared/feedHelpers.ts` |
 
 ## Available Scripts
 

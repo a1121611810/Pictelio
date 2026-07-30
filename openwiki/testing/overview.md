@@ -68,6 +68,17 @@ Located at `/packages/app/src/primitives/createManualFetch.ts`. This primitive i
 - Supports simulating error states (401, 400, network failure)
 - Works in both unit and browser test environments
 
+### TQ Query Mock Pattern (Store Tests)
+
+`tests/unit/stores/followStore.test.ts` and `recommendedStore.test.ts` introduce a complementary pattern for testing TanStack Query-based stores: they mock `@tanstack/solid-query`'s `createInfiniteQuery` directly, returning configurable mock data per query key (e.g. `"follow_public"`, `"recommended_illust"`). This allows testing sub-tab routing and merge behavior at the store level without API calls:
+
+- `getQ(key)` returns a `QueryMock` with controllable `data`, `isFetching`, `error`, `hasNextPage`, `fetchNextPage`, and `refetch`
+- `setQueryData(key, illusts, next_url)` populates paginated mock data
+- `resetQueryMocks()` clears state between tests
+- The mock respects `enabled: false` by returning `undefined` data
+
+This pattern is lighter than `createManualFetch` when the goal is to verify store-level signal derivation and action delegation rather than HTTP behavior.
+
 ### Memory Store
 
 `/packages/app/src/stores/db.ts` exports `createMemoryStore` — a TanStack DB collection backed by in-memory storage instead of IndexedDB. This allows testing browsing history, bookmarks, and other persisted stores without side effects:
