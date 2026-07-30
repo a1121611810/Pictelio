@@ -9,6 +9,8 @@ vi.mock("@/api/client", () => ({
   setAccessToken: (...args: unknown[]) => mockSetAccessToken(...args),
   setOnUnauthorized: (...args: unknown[]) => mockSetOnUnauthorized(...args),
   setRefreshPromise: vi.fn(),
+  setTokenReadyPromise: vi.fn(),
+  setAuthPermanentFailure: vi.fn(),
 }));
 
 const mockRefreshToken = vi.fn();

@@ -1,4 +1,4 @@
-import { setAccessToken, setOnUnauthorized, setRefreshPromise } from "../api/client";
+import { setAccessToken, setOnUnauthorized, setRefreshPromise, setTokenReadyPromise, setAuthPermanentFailure } from "../api/client";
 import { refreshToken, exchangeCodeForToken } from "../api/auth";
 import type { PixivUser } from "../api/types";
 import {
@@ -65,8 +65,14 @@ export async function initializeAuth() {
   if (token) {
     setRefreshTokenSig(token);
     await setupUnauthorizedHandler();
+    // 设置 tokenReady barrier：在此 barrier resolve 之前所有 API 请求被阻塞在 client.ts 入口
+    let resolveTokenReady: () => void;
+    setTokenReadyPromise(new Promise((r) => { resolveTokenReady = r; }));
     // 设置 refreshPromise，让并发请求在初始 token 刷新期间等待
-    const promise = performRefresh(token).finally(() => setRefreshPromise(null));
+    const promise = performRefresh(token).finally(() => {
+      setRefreshPromise(null);
+      resolveTokenReady?.();
+    });
     setRefreshPromise(promise);
     await promise;
   }
@@ -113,6 +119,9 @@ export async function loginWithPKCE(code: string, codeVerifier: string) {
 }
 
 export async function logout() {
+  // 设置永久失效标记，阻塞后续所有 API 请求
+  setAuthPermanentFailure(true);
+  setTokenReadyPromise(Promise.resolve());
   appStateListener?.remove();
   appStateListener = null;
   syncToken("");

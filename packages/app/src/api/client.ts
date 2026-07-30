@@ -23,7 +23,16 @@ let devAccessToken = "";
 const devAuth: {
   onUnauthorized: (() => Promise<void>) | null;
   refreshPromise: Promise<void> | null;
-} = { onUnauthorized: null, refreshPromise: null };
+  /** 认证就绪信号：首次 token 刷新完成后 resolve。所有请求在入口处 await 此 barrier */
+  tokenReady: Promise<void>;
+  /** 永久失效标记：token 刷新失败后设为 true，后续请求立即失败，不产生网络流量 */
+  authPermanentFailure: boolean;
+} = {
+  onUnauthorized: null,
+  refreshPromise: null,
+  tokenReady: Promise.resolve(),
+  authPermanentFailure: false,
+};
 
 export function setAccessToken(token: string) {
   devAccessToken = token;
@@ -39,6 +48,16 @@ export function setOnUnauthorized(handler: (() => Promise<void>) | null) {
 
 export function setRefreshPromise(p: Promise<void> | null) {
   devAuth.refreshPromise = p;
+}
+
+/** 设置 tokenReady barrier：所有 API 请求 await 此 promise 后才发送 */
+export function setTokenReadyPromise(p: Promise<void>) {
+  devAuth.tokenReady = p;
+}
+
+/** 设置认证永久失效标记 */
+export function setAuthPermanentFailure(v: boolean) {
+  devAuth.authPermanentFailure = v;
 }
 
 // ─── GET 请求去重 ───
@@ -240,6 +259,13 @@ async function nativeExecuteRequest<T>(
   body?: Record<string, string>,
   signal?: AbortSignal,
 ): Promise<T> {
+  // 认证永久失效 → 快速失败，不产生网络流量
+  if (devAuth.authPermanentFailure) {
+    throw new Error("认证已失效，请重新登录");
+  }
+  // 等待首次 token 刷新完成
+  await devAuth.tokenReady;
+
   /** 实际执行请求（不包含重试逻辑） */
   async function exec(): Promise<T> {
     if (isNative) {
