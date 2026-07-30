@@ -9,7 +9,6 @@ import {
   fetchMore,
   refresh,
   setBookmarkRestrict,
-  saveTabScroll,
 } from "../stores/novelBookmarkStore";
 import NovelVirtualFeed from "../components/NovelVirtualFeed";
 import SeriesSheet from "../components/SeriesSheet";
@@ -69,10 +68,6 @@ const NovelBookmarks: Component<Props> = (props) => {
     });
   });
 
-  onCleanup(() => {
-    saveTabScroll("bookmarks");
-  });
-
   createEffect(() => {
     // Track restrict changes
     bookmarkRestrict();
@@ -119,7 +114,6 @@ const NovelBookmarks: Component<Props> = (props) => {
         onAuthorClick={(id) => navigate(`/user/${id}`)}
         onLoadMore={fetchMore}
         onRefresh={refresh}
-        scrollKey="bookmarks"
         onSeriesClick={openSeriesSheet}
         layoutMode={novelLayoutMode()}
         suppressHeaderVisibility={props.suppressHeaderVisibility}

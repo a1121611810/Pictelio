@@ -46,15 +46,6 @@ export interface FeedVirtualizerConfig<T> {
   settingsThreshold?: number;
   /** Called when pull exceeds settingsThreshold (two-stage pull) */
   onNavigateToSettings?: () => void;
-  /** Optional scroll restoration state (initialOffset + measurements) */
-  scrollRestore?: {
-    initialOffset: number;
-    initialMeasurementsCache: VirtualItem[];
-  };
-  /** Called after virtualizer is mounted and ready (for scroll restoration) */
-  onReady?: () => void;
-  /** Optional callback to suppress header visibility during scroll restoration */
-  suppressHeaderVisibility?: (durationMs?: number) => void;
   /** Lane assignment mode for multi-column layouts (coverWall uses "measured") */
   laneAssignmentMode?: "measured" | "estimate";
 }
@@ -172,7 +163,6 @@ export function createFeedVirtualizer<T>(config: FeedVirtualizerConfig<T>): Feed
 
   const estimateSizeFn = (index: number) => config.estimateSize(index);
 
-  const sr = config.scrollRestore;
   const laneMode = config.laneAssignmentMode;
   const instance = new Virtualizer<Window, HTMLElement>({
     count: config.items().length,
@@ -185,8 +175,6 @@ export function createFeedVirtualizer<T>(config: FeedVirtualizerConfig<T>): Feed
     observeElementRect: observeWindowRect,
     observeElementOffset: observeWindowOffset,
     scrollToFn: windowScroll,
-    initialOffset: sr?.initialOffset ?? 0,
-    initialMeasurementsCache: sr?.initialMeasurementsCache ?? [],
     laneAssignmentMode: laneMode,
   });
 
@@ -212,9 +200,6 @@ export function createFeedVirtualizer<T>(config: FeedVirtualizerConfig<T>): Feed
     setTotalSize(instance.getTotalSize());
   });
 
-  // ── 数据就绪后的一次性滚动恢复重试（防止 onMount 时 count=0 导致 scrollTo 被 clamp） ──
-  let hasRetriedRestore = false;
-
   // Mount lifecycle
   onMount(() => {
     const cleanup = instance._didMount();
@@ -227,20 +212,6 @@ export function createFeedVirtualizer<T>(config: FeedVirtualizerConfig<T>): Feed
     instance.measure();
     setVirtualItems([...instance.getVirtualItems()] as VirtualItem[]);
     setTotalSize(instance.getTotalSize());
-  });
-
-  // 数据就绪后执行滚动恢复（仅首次数据到达时执行一次，onMount 时 count=0 导致 scrollTo 被 clamp 的问题由此修复）
-  createEffect(() => {
-    const count = config.items().length;
-    if (!hasRetriedRestore && count > 0) {
-      hasRetriedRestore = true;
-      config.suppressHeaderVisibility?.();
-      config.onReady?.();
-      // 恢复后再校准一次，使 Virtualizer 感知新的 scrollY
-      instance.measure();
-      setVirtualItems([...instance.getVirtualItems()] as VirtualItem[]);
-      setTotalSize(instance.getTotalSize());
-    }
   });
 
   // Scroll + resize listeners for window mode

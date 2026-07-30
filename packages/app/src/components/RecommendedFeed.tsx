@@ -8,9 +8,7 @@ import {
   ensureLoaded,
   fetchMore,
   refresh,
-  saveTabScroll,
   isRecommendedCached,
-  getFeedScrollY,
   recommendSubTab,
   setRecommendSubTab,
   type RecommendSubTab,
@@ -21,13 +19,9 @@ import NovelRecommendedFeed from "../routes/NovelRecommendedFeed";
 import { contentType } from "../stores/uiStore";
 import { layoutMode } from "../stores/settingsStore";
 
-interface Props {
-  suppressHeaderVisibility?: (durationMs?: number) => void;
-}
-
 const r18Handler = () => refresh();
 
-const RecommendedFeed: Component<Props> = (props) => {
+const RecommendedFeed: Component = () => {
   const navigate = useNavigate();
   const cached = isRecommendedCached();
   const [isSwitchingSubTab, setIsSwitchingSubTab] = createSignal(false);
@@ -49,7 +43,6 @@ const RecommendedFeed: Component<Props> = (props) => {
   // Save scroll + abort pending requests on unmount
   onCleanup(() => {
     abortController?.abort();
-    saveTabScroll("recommended");
   });
 
   // R18 / R-18G switch toggle auto-refresh
@@ -60,15 +53,6 @@ const RecommendedFeed: Component<Props> = (props) => {
       window.removeEventListener("r18Changed", r18Handler);
       window.removeEventListener("r18gChanged", r18Handler);
     });
-  });
-
-  // Content type changed -> save scroll position
-  const contentTypeHandler = () => {
-    saveTabScroll("recommended");
-  };
-  onMount(() => {
-    window.addEventListener("contentTypeChanged", contentTypeHandler);
-    onCleanup(() => window.removeEventListener("contentTypeChanged", contentTypeHandler));
   });
 
   return (
@@ -102,11 +86,8 @@ const RecommendedFeed: Component<Props> = (props) => {
                   abortController?.abort();
                   abortController = new AbortController();
                   const [tabErr] = await tryAsync((async () => {
-                    saveTabScroll("recommended");
                     setRecommendSubTab(opt.key);
                     await ensureLoaded(abortController.signal);
-                    props.suppressHeaderVisibility?.();
-                    window.scrollTo(0, getFeedScrollY("recommended"));
                   })());
                   setIsSwitchingSubTab(false);
                   if (tabErr) {
@@ -124,7 +105,7 @@ const RecommendedFeed: Component<Props> = (props) => {
       <Show
         when={contentType() === "illust"}
         fallback={
-          <NovelRecommendedFeed suppressHeaderVisibility={props.suppressHeaderVisibility} />
+          <NovelRecommendedFeed />
         }
       >
         <VirtualFeed
@@ -139,8 +120,6 @@ const RecommendedFeed: Component<Props> = (props) => {
           onNavigateToSettings={() => void navigate("/settings")}
           skipAnimation={cached}
           layoutMode={layoutMode()}
-          scrollKey="recommended"
-          suppressHeaderVisibility={props.suppressHeaderVisibility}
         />
       </Show>
     </>

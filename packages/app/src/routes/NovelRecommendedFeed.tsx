@@ -8,7 +8,6 @@ import {
   ensureLoaded,
   fetchMore,
   refresh,
-  saveTabScroll,
 } from "../stores/novelRecommendedStore";
 import { novelLayoutMode } from "../stores/settingsStore";
 import NovelVirtualFeed from "../components/NovelVirtualFeed";
@@ -48,9 +47,6 @@ const NovelRecommendedFeed: Component<Props> = (props) => {
     void ensureLoaded();
   });
 
-  onCleanup(() => {
-    saveTabScroll("recommended");
-  });
 
   return (
     <>
@@ -63,7 +59,6 @@ const NovelRecommendedFeed: Component<Props> = (props) => {
         onAuthorClick={(id) => navigate(`/user/${id}`)}
         onLoadMore={fetchMore}
         onRefresh={() => { refresh(); }}
-        scrollKey="recommended"
         onSeriesClick={openSeriesSheet}
         layoutMode={novelLayoutMode()}
         suppressHeaderVisibility={props.suppressHeaderVisibility}

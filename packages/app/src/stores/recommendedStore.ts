@@ -2,10 +2,6 @@ import { createTQFeedStore } from "./shared/createTQFeedStore";
 import { loadRecommended } from "../api/illust";
 import type { PixivIllust } from "../api/types";
 import { filterFeedIllusts } from "../utils/r18Filter";
-import {
-  createFeedScrollStore,
-  type ScrollRestoreState,
-} from "../primitives/createFeedScrollStore";
 import { dedupIllusts, nextPageOrLoad } from "./shared/feedHelpers";
 
 export type RecommendSubTab = "mixed" | "illust" | "manga";
@@ -92,11 +88,3 @@ export function fetchMore(_signal?: AbortSignal): Promise<unknown> | undefined {
   return store.fetchMore(_signal);
 }
 
-// ── Scroll restore ──
-
-const feedScroll = createFeedScrollStore("", undefined, recommendSubTab);
-export const saveTabScroll = feedScroll.saveTabScroll;
-export const getFeedScrollY = feedScroll.getFeedScrollY;
-export const saveFeedScrollState = feedScroll.saveScrollState;
-export const getFeedScrollState = feedScroll.getScrollState;
-export type { ScrollRestoreState };

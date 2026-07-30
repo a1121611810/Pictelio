@@ -1,7 +1,6 @@
 import type { Component } from "solid-js";
 import type { PixivIllust, PixivNovel, ApiError, ContentType } from "../api/types";
 import type { LayoutMode } from "../primitives/types";
-import type { ScrollRestoreState } from "../primitives/createScrollRestore";
 import VirtualFeed from "./VirtualFeed";
 import NovelVirtualFeed from "./NovelVirtualFeed";
 
@@ -18,9 +17,6 @@ interface Props {
   onLoadMore: () => void;
   onRefresh: () => Promise<void> | void;
   layoutMode?: LayoutMode;
-  illustScrollState?: ScrollRestoreState;
-  onIllustScrollStateChange?: (state: ScrollRestoreState) => void;
-  suppressHeaderVisibility?: (durationMs?: number) => void;
 }
 
 const UserWorksFeed: Component<Props> = (props) => {
@@ -37,9 +33,6 @@ const UserWorksFeed: Component<Props> = (props) => {
           onLoadMore={props.onLoadMore}
           onRefresh={props.onRefresh}
           layoutMode={props.layoutMode}
-          initialScrollState={props.illustScrollState}
-          onScrollStateChange={props.onIllustScrollStateChange}
-          suppressHeaderVisibility={props.suppressHeaderVisibility}
         />
       </Match>
       <Match when={props.contentType === "novel"}>
@@ -52,7 +45,6 @@ const UserWorksFeed: Component<Props> = (props) => {
           onAuthorClick={props.onAuthorClick}
           onLoadMore={props.onLoadMore}
           onRefresh={props.onRefresh}
-          suppressHeaderVisibility={props.suppressHeaderVisibility}
         />
       </Match>
     </Switch>

@@ -19,7 +19,7 @@ This wiki helps humans and agents understand the architecture, workflows, integr
 | Language | TypeScript 6.0 (strict) |
 | Bundler | Rolldown (production) via vite-plus; Vite dev server |
 | Styling | UnoCSS 66.7 + Microsoft Fluent Design System 2 |
-| Routing | @tanstack/solid-router 1.170 |
+| Routing | @solidjs/router 1.0 |
 | Data Fetching | @tanstack/solid-query 5.101 |
 | Local DB | @tanstack/solid-db 0.2 (IndexedDB) |
 | Mobile Runtime | Capacitor 8.4 (Android target) |
@@ -94,6 +94,9 @@ Architecture Decision Records live in `/docs/adr/`. Notable ones:
 | 0038 | Immediate navigation — render first, load data later; shallow loaders + skeleton screens |
 | 0039 | Detail image cache-ready rendering — two-phase preload with URL-keyed cacheReadyFor signal; eliminates HttpURLConnection fallback race for multi-page illusts |
 | 0040 | Splash lifecycle evolution: ADR-0040 introduced scale+fade exit animation; removed in `fa2015c` (v3.21.7); **reintroduced** with 120ms scale+fade + loading-triggered 350ms dismiss delay to ensure skeleton paint before splash exit |
+| 0041 | Token barrier — `tokenReady` Promise blocks API requests before auth init completes; `authPermanentFailure` prevents request avalanche on token failure |
+| 0042 | Demand query — `createTQFeedStore` default `enabled: false` defers all store queries to explicit `ensureLoaded` calls; skeleton renders before first fetch |
+| 0043 | Skeleton rendering guarantee — `setTimeout(0)` replaces `requestAnimationFrame` in feed `onMount` to ensure skeleton paints before data load |
 
 ## Key Source Files
 
@@ -106,14 +109,12 @@ Architecture Decision Records live in `/docs/adr/`. Notable ones:
 | Auth store | `/packages/app/src/stores/authStore.ts` |
 | Feed virtualizer | `/packages/app/src/primitives/createFeedVirtualizer.ts` |
 | Feed store factory | `/packages/app/src/stores/shared/createTQFeedStore.ts` |
-| Feed store (legacy monolithic) | `/packages/app/src/stores/feedStore.ts` |
-| Recommended feed store (new split) | `/packages/app/src/stores/recommendedStore.ts` |
-| Follow feed store (new split) | `/packages/app/src/stores/followStore.ts` |
+| Recommended feed store | `/packages/app/src/stores/recommendedStore.ts` |
+| Follow feed store | `/packages/app/src/stores/followStore.ts` |
 | Feed helpers (dedup, pagination) | `/packages/app/src/stores/shared/feedHelpers.ts` |
-| Novel store (legacy monolithic) | `/packages/app/src/stores/novelStore.ts` |
-| Novel recommended store (new split) | `/packages/app/src/stores/novelRecommendedStore.ts` |
-| Novel follow store (new split) | `/packages/app/src/stores/novelFollowStore.ts` |
-| Novel bookmark store (new split) | `/packages/app/src/stores/novelBookmarkStore.ts` |
+| Novel recommended store | `/packages/app/src/stores/novelRecommendedStore.ts` |
+| Novel follow store | `/packages/app/src/stores/novelFollowStore.ts` |
+| Novel bookmark store | `/packages/app/src/stores/novelBookmarkStore.ts` |
 | Novel feed helpers | `/packages/app/src/stores/shared/novelHelpers.ts` |
 
 ## Available Scripts
@@ -151,8 +152,8 @@ A scheduled **OpenWiki GitHub Actions workflow** (`.github/workflows/openwiki-up
 The repository has been actively refactored through v3.17.x. Key themes in recent commits:
 
 - **Store migration:** All list stores migrated from hand-written `createStore` patterns to the `createTQFeedStore` factory wrapping TanStack Query's `createInfiniteQuery` (ADR-0016, ADR-0022). This eliminated 200-300 lines of boilerplate.
-- **Feed store split:** The monolithic `feedStore.ts` (illusts) and `novelStore.ts` (novels) are being split into dedicated per-tab stores using the same factory. The illust split is now **integrated** into routes: `recommendedStore.ts` and `followStore.ts` power the new `RecommendedFeed` and `FollowFeed` components inside the consolidated `HomePage` at `/home`. The novel split (`novelRecommendedStore.ts`, `novelFollowStore.ts`, `novelBookmarkStore.ts`) is added but not yet integrated — `NovelFeedPage` still imports from the legacy `novelStore.ts`. Shared helpers extracted to `feedHelpers.ts` and `novelHelpers.ts`.
-- **Scroll primitives unification:** Scroll restoration, scroll direction, and scroll-driven visibility were extracted into shared factories. Virtual scroll restoration now uses explicit `window.scrollTo` with ResizeObserver retry, not Virtualizer internals (ADR-0010, ADR-0013, ADR-0023, ADR-0031).
+- **Feed store split + legacy cleanup:** The monolithic `feedStore.ts` (illusts) and `novelStore.ts` (novels) have been split into dedicated per-tab stores using the same factory. `recommendedStore.ts` and `followStore.ts` power the new `RecommendedFeed` and `FollowFeed` components inside the consolidated `HomePage` at `/home`. `novelRecommendedStore.ts`, `novelFollowStore.ts`, and `novelBookmarkStore.ts` are now also **integrated** — `NovelRecommendedFeed` and `NovelFollowFeed` import directly from split stores. Both legacy monolithic stores and their tests have been **deleted** (commit `b30366f`). Shared helpers extracted to `feedHelpers.ts` and `novelHelpers.ts`.
+- **Scroll restoration consolidation:** Custom scroll restoration primitives (`createScrollRestore`, `createVirtualScrollRestore`, `createFeedScrollStore`) have been **deleted** — `@solidjs/router`'s built-in `<Router scrollRestoration>` prop now handles scroll position save/restore via sessionStorage. Login and age-confirmation pages clear `sessionStorage.removeItem("solid-router:scroll")` to prevent stale position restoration after auth flow. Per-tab scroll state within `/home` is no longer saved or restored.
 - **Image pipeline:** Periodic GC with context-aware eviction for the L1 image cache; L1 key set migrated to Set-based `LRUSet` (ADR-0030, ADR-0014).
 - **Ugoira (animated illust):** In-place playback with percentage loading progress indicator; list card aspect ratio changed to 1:1 square for consistency.
 - **Testing:** Playwright E2E and Vitest browser component tests fully migrated to agent-browser (AI-driven) E2E + unit tests (ADR-0034, ADR-0035); Playwright and `@vitest/browser-playwright` dependencies removed; ~40 test files consolidated into 2 tiers

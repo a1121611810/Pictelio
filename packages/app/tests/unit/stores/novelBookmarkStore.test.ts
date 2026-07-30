@@ -120,7 +120,6 @@ vi.mock("@/utils/r18Filter", () => ({
   filterNovels: (novels: PixivNovel[]) => novels,
 }));
 
-import { scrollRestoreGlobal } from "@/primitives/createScrollRestore";
 
 function createNovel(id: number, createDate: string): PixivNovel {
   return {
@@ -162,7 +161,6 @@ describe("novelBookmarkStore", () => {
     vi.clearAllMocks();
     resetQueryMocks();
     mockUserId = 1;
-    scrollRestoreGlobal.clearAll();
   });
 
   it("novels() returns bookmarked novels", async () => {
@@ -231,18 +229,4 @@ describe("novelBookmarkStore", () => {
     expect(store.isNovelBookmarkCached()).toBe(true);
   });
 
-  it("scroll positions save/restore correctly", async () => {
-    (globalThis as any).window = { scrollY: 100 };
-    const store = await loadStore();
-    store.saveTabScroll("bookmarks");
-    expect(store.getFeedScrollY("bookmarks")).toBe(100);
-  });
-
-  it("saveNovelScrollState / getNovelScrollState persist VirtualItem state", async () => {
-    (globalThis as any).window = { scrollY: 0 };
-    const store = await loadStore();
-    const state = { snapshot: [] as any[], offset: 50, version: 1 };
-    store.saveNovelScrollState("bookmarks", state);
-    expect(store.getNovelScrollState("bookmarks")).toEqual(state);
-  });
 });

@@ -9,7 +9,6 @@ import {
   fetchMore,
   refresh,
   setRestrict,
-  saveBookmarkScroll,
 } from "../stores/bookmarkStore";
 import { user } from "../stores/authStore";
 import { layoutMode } from "../stores/settingsStore";
@@ -17,11 +16,7 @@ import VirtualFeed from "../components/VirtualFeed";
 
 const r18Handler = () => refresh();
 
-interface Props {
-  suppressHeaderVisibility?: (durationMs?: number) => void;
-}
-
-const IllustBookmarks: Component<Props> = (props) => {
+const IllustBookmarks: Component = () => {
   const navigate = useNavigate();
 
   onMount(() => {
@@ -35,11 +30,6 @@ const IllustBookmarks: Component<Props> = (props) => {
     onCleanup(() => {
       window.removeEventListener("r18Changed", r18Handler);
     });
-  });
-
-  // Save scroll position when leaving
-  onCleanup(() => {
-    saveBookmarkScroll();
   });
 
   // Load data when restrict changes or when user becomes available
@@ -97,8 +87,6 @@ const IllustBookmarks: Component<Props> = (props) => {
         emptyText={restrict() === "public" ? "公开收藏夹为空" : "非公开收藏夹为空"}
         skipAnimation={true}
         layoutMode={layoutMode()}
-        scrollKey="illust-bookmarks"
-        suppressHeaderVisibility={props.suppressHeaderVisibility}
       />
     </>
   );

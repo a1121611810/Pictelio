@@ -19,7 +19,7 @@ import { markContentReady } from "@/native/splashBridge";
 const HomePage: Component = () => {
   console.log("[RENDER] HomePage rendering");
   const navigate = useNavigate();
-  const { visible: headerVisible, suppress: suppressHeaderVisibility } = createScrollBehavior();
+  const { visible: headerVisible } = createScrollBehavior();
 
   // ── LRU Tab DOM 管理 + 延迟激活 ──
   const MAX_DOM_TABS = 2;
@@ -118,21 +118,21 @@ const HomePage: Component = () => {
           <div
             style={{ display: currentTab() === "recommended" ? "block" : "none" }}
           >
-            <RecommendedFeed suppressHeaderVisibility={suppressHeaderVisibility} />
+            <RecommendedFeed />
           </div>
           </Show>
           <Show when={isDomActive("follow")}>
           <div
             style={{ display: currentTab() === "follow" ? "block" : "none" }}
           >
-            <FollowFeed suppressHeaderVisibility={suppressHeaderVisibility} />
+            <FollowFeed />
           </div>
           </Show>
           <Show when={isDomActive("bookmarks")}>
           <div
             style={{ display: currentTab() === "bookmarks" ? "block" : "none" }}
           >
-            <BookmarksFeed suppressHeaderVisibility={suppressHeaderVisibility} />
+            <BookmarksFeed />
           </div>
           </Show>
           <Show when={isDomActive("history")}>

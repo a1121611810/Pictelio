@@ -106,9 +106,8 @@ vi.mock("@/api/illust", () => ({
   loadFollow: vi.fn(),
 }));
 
-import { scrollRestoreGlobal } from "@/primitives/createScrollRestore";
 
-// ── mock uiStore for createFeedScrollStore ──
+// ── mock uiStore ──
 vi.mock("@/stores/uiStore", () => ({
   get currentTab() {
     return () => "follow";
@@ -170,7 +169,6 @@ describe("followStore — sub-tab routing", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetQueryMocks();
-    scrollRestoreGlobal.clearAll();
   });
 
   it("illusts() returns public follow data when followTab is public", async () => {
@@ -224,7 +222,6 @@ describe("followStore — actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetQueryMocks();
-    scrollRestoreGlobal.clearAll();
   });
 
   it("fetchMore calls fetchNextPage on the active query", async () => {
@@ -246,20 +243,6 @@ describe("followStore — actions", () => {
     expect(getQ("follow_public").refetch).toHaveBeenCalled();
   });
 
-  it("scroll positions save/restore correctly per sub-tab", async () => {
-    (globalThis as any).window = { scrollY: 100 };
-    const store = await loadStore();
-    store.setFollowTab("public");
-    store.saveTabScroll("follow");
-
-    (globalThis as any).window = { scrollY: 200 };
-    store.setFollowTab("private");
-    store.saveTabScroll("follow");
-
-    expect(store.getFeedScrollY("follow")).toBe(200);
-    store.setFollowTab("public");
-    expect(store.getFeedScrollY("follow")).toBe(100);
-  });
 });
 
 describe("followStore — loading and error states", () => {
@@ -366,20 +349,4 @@ describe("followStore — ensureLoaded", () => {
   });
 });
 
-describe("followStore — virtual scroll state", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    resetQueryMocks();
-    scrollRestoreGlobal.clearAll();
-  });
 
-  it("saveFeedScrollState / getFeedScrollState persist and restore VirtualItem state", async () => {
-    (globalThis as any).window = { scrollY: 0 };
-    const store = await loadStore();
-    store.setFollowTab("public");
-
-    const state = { snapshot: [] as any[], offset: 100, version: 1 };
-    store.saveFeedScrollState("follow", state);
-    expect(store.getFeedScrollState("follow")).toEqual(state);
-  });
-});

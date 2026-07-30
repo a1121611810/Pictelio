@@ -24,7 +24,7 @@ Two feed content types are rendered inside the consolidated **HomePage** (`/pack
 
 > **Illust stores — integrated (v3.21.x):** The illust feed split is now live. `RecommendedFeed` and `FollowFeed` import directly from the new split stores (`recommendedStore.ts` and `followStore.ts`). The legacy `feedStore.ts` remains in the codebase but is no longer imported by any route component. Shared helpers (`dedupIllusts`, `nextPageOrLoad`) live in `feedHelpers.ts`.
 
-> **Ongoing refactor (novels):** The monolithic `novelStore.ts` is being split into dedicated per-tab stores in the same pattern. `novelRecommendedStore.ts`, `novelFollowStore.ts`, and `novelBookmarkStore.ts` are added but not yet imported by routes — the novel feed components embedded in HomePage still pass through to `NovelFeedPage`, which imports from `novelStore.ts`. Shared helpers (`adaptNovelResponse`, `dedupNovels`) have been extracted to `novelHelpers.ts`.
+> **Novel store split — integrated:** The monolithic `novelStore.ts` has been split and the split stores are now **imported by route components**. `NovelRecommendedFeed` and `NovelFollowFeed` import directly from `novelRecommendedStore.ts` and `novelFollowStore.ts`. `NovelBookmarks` imports from `novelBookmarkStore.ts`. The legacy `novelStore.ts` has been **deleted**. Shared helpers (`adaptNovelResponse`, `dedupNovels`) live in `novelHelpers.ts`.
 
 ### HomePage (Consolidated Home)
 
@@ -32,12 +32,12 @@ Two feed content types are rendered inside the consolidated **HomePage** (`/pack
 
 - **Shared sticky header** with user avatar, app title, and content-type toggle (illust / novel)
 - **Content type switching** toggles between illust feeds and novel feeds via `contentType()` from `uiStore` — **hidden on the history tab** (`currentTab() !== "history"`) since browsing history is text-based timeline
-- **Tab panels** use CSS `display` toggling (`currentTab() === "recommended" ? "block" : "none"`) — all feed components are mounted, only one visible at a time
+- **Tab panels** use CSS `display` toggling (`currentTab() === "recommended" ? "block" : "none"`) — at most **2 feed components** are mounted at a time (LRU eviction via `isDomActive()`, commit `fcb2c6f`). When switching to a previously evicted tab, its component remounts and re-fetches data. Non-active tabs are unmounted to save memory.
   - **Bookmarks tab:** Renders `BookmarksFeed` (`/packages/app/src/components/BookmarksFeed.tsx`), which delegates to `IllustBookmarks` (illust mode) or `NovelBookmarks` (novel mode) based on `contentType()`
   - **History tab:** Renders `HistoryFeed` (`/packages/app/src/components/HistoryFeed.tsx`), a full browsing history timeline with inline search and date-range filtering, backed by `useLiveQuery` from TanStack DB
 - **Data loaded in `onMount`** (not via router loader): each feed component calls `ensureLoaded(signal)` with AbortController for cancel-on-unmount
-- **Splash dismiss:** Merges `recLoading()` and `folLoading()` into one `createEffect` — fires 350ms `setTimeout` → `markContentReady()` on first loading signal; 800ms `onMount` fallback for cached-data case
-- **Scroll state saved per-tab** via `saveTabScroll("recommended")` / `saveTabScroll("follow")` on unmount
+- **Splash dismiss:** Simple `onMount` → `markContentReady()`. The skeleton guarantee is now provided by **ADR-0042** (`createTQFeedStore` queries default `enabled: false`) and **ADR-0043** (`setTimeout(0)` defers data load to ensure skeleton paints before first fetch), rather than by delaying splash exit.
+- **No per-tab scroll preservation** — the custom scroll restoration system (`createScrollRestore`, `createVirtualScrollRestore`, `createFeedScrollStore`) has been deleted. Cross-navigation scroll restore is handled by `@solidjs/router`'s `<Router scrollRestoration>` prop, which uses sessionStorage keyed by history depth. Tab switches within `/home` do not restore scroll position.
 
 ### Feed Store Factory
 
@@ -45,25 +45,24 @@ All feed stores use `createTQFeedStore` (`/packages/app/src/stores/shared/create
 - TanStack Query-based data fetching with pagination
 - Illust deduplication (`dedupIllusts` by illust ID)
 - R18/R18G content filtering
-- Scroll state save/restore (`saveFeedScrollState` / `getFeedScrollState`)
 - Sub-tab adapter functions converting between feed-store and factory naming conventions
 
 **Concrete store instances (illusts):**
 
 | Store | File | Sub-tabs | Tab adapter needed? |
 |-------|------|----------|---------------------|
-| Legacy monolithic | `feedStore.ts` | recommended: mixed/illust/manga; follow: all/public/private | Yes (dual-tab) |
-| Recommended (new) | `recommendedStore.ts` | mixed/illust/manga | Yes (mixed → factory "all") |
-| Follow (new) | `followStore.ts` | all/public/private | No (maps 1:1) |
+| Recommended (active) | `recommendedStore.ts` | mixed/illust/manga | Yes (mixed → factory "all") |
+| Follow (active) | `followStore.ts` | all/public/private | No (maps 1:1) |
+| Legacy monolithic | `feedStore.ts` | — | **Deleted** (commit `b30366f`) |
 
 **Concrete store instances (novels):**
 
 | Store | File | Sub-tabs | Tab adapter needed? |
 |-------|------|----------|---------------------|
-| Legacy monolithic | `novelStore.ts` | follow: all/public/private; recommended; bookmarks | Yes (triple-tab) |
-| Recommended (new) | `novelRecommendedStore.ts` | (single) | No |
-| Follow (new) | `novelFollowStore.ts` | all/public/private | No (maps 1:1) |
-| Bookmarks (new) | `novelBookmarkStore.ts` | (single with restrict) | No |
+| Recommended (active) | `novelRecommendedStore.ts` | (single) | No |
+| Follow (active) | `novelFollowStore.ts` | all/public/private | No (maps 1:1) |
+| Bookmarks (active) | `novelBookmarkStore.ts` | (single with restrict) | No |
+| Legacy monolithic | `novelStore.ts` | — | **Deleted** (commit `b30366f`) |
 
 Shared helpers migrated from `feedStore.ts` to `feedHelpers.ts`:
 
@@ -96,16 +95,15 @@ flowchart LR
 
 `/packages/app/src/primitives/createFeedVirtualizer.ts` — The core virtualizer for efficient rendering of large illust lists. It:
 - Manages a virtual window of visible items
-- Coordinates pull-to-refresh, infinite scroll, and scroll restoration
+- Coordinates pull-to-refresh and infinite scroll
 - Supports three layout modes (waterfall, single, grid)
-- Works with `createVirtualScrollRestore` for scroll position memory
+- **Scroll restoration** is handled by `@solidjs/router`'s built-in `<Router scrollRestoration>` prop, backed by sessionStorage. The custom `createScrollRestore`, `createVirtualScrollRestore`, and `createFeedScrollStore` primitives have been **deleted** (working tree, commit `b30366f`). Scroll restoration is now automatic at the router level for cross-navigation — the virtualizer does not manage its own scroll position memory or retry logic. Per-tab scroll state within `/home` is no longer saved or restored. On login and age-confirmation, `sessionStorage.removeItem("solid-router:scroll")` clears the router's scroll cache to prevent stale position restoration after auth flow.
 
-**`VirtualFeed`** (`/packages/app/src/components/VirtualFeed.tsx`) is the reusable component accepting 16 props:
+**`VirtualFeed`** (`/packages/app/src/components/VirtualFeed.tsx`) is the reusable component accepting props:
 - `illusts`, `loading`, `error`, `hasMore` — data state
 - `onIllustClick`, `onAuthorClick`, `onLoadMore`, `onRefresh` — callbacks
 - `layoutMode` — `waterfall` | `single` | `grid`
-- `scrollKey`, `initialScrollState`, `onScrollStateChange` — scroll restoration
-- `emptyText`, `skipAnimation`, `suppressHeaderVisibility`, `onNavigateToSettings`
+- `emptyText`, `skipAnimation`, `onNavigateToSettings`
 
 **Empty-state & skeleton fix (`loadAttempted`, v3.21.6+):** VirtualFeed tracks a component-level `loadAttempted` boolean that becomes `true` once `loading`, `error`, or `illusts.length > 0` is observed.
 - The "暂无新作品" empty-text message only renders when `loadAttempted` is `true` — preventing an empty-state flash before the first data load completes.
@@ -218,10 +216,8 @@ User profile data is loaded via `/packages/app/src/primitives/useUserProfile.ts`
 | Home page (consolidated) | `/packages/app/src/routes/HomePage.tsx` |
 | Recommended feed component | `/packages/app/src/components/RecommendedFeed.tsx` |
 | Follow feed component | `/packages/app/src/components/FollowFeed.tsx` |
-| Tab feed page (legacy, unused by routes) | `/packages/app/src/routes/TabFeedPage.tsx` |
-| Recommended store (new) | `/packages/app/src/stores/recommendedStore.ts` |
-| Follow store (new) | `/packages/app/src/stores/followStore.ts` |
-| Feed store (legacy) | `/packages/app/src/stores/feedStore.ts` |
+| Recommended store | `/packages/app/src/stores/recommendedStore.ts` |
+| Follow store | `/packages/app/src/stores/followStore.ts` |
 | TQ feed store factory | `/packages/app/src/stores/shared/createTQFeedStore.ts` |
 | Feed helpers | `/packages/app/src/stores/shared/feedHelpers.ts` |
 | Virtual feed component | `/packages/app/src/components/VirtualFeed.tsx` |
@@ -234,11 +230,14 @@ User profile data is loaded via `/packages/app/src/primitives/useUserProfile.ts`
 | Search page | `/packages/app/src/routes/Search.tsx` |
 | Search store | `/packages/app/src/stores/searchStore.ts` |
 | History store | `/packages/app/src/stores/historyStore.ts` |
-| History page | `/packages/app/src/routes/HistoryPage.tsx` |
+| Novel recommended feed component | `/packages/app/src/routes/NovelRecommendedFeed.tsx` |
+| Novel follow feed component | `/packages/app/src/routes/NovelFollowFeed.tsx` |
 | Bookmark store | `/packages/app/src/stores/bookmarkStore.ts` |
 | R18 filter utility | `/packages/app/src/utils/r18Filter.ts` |
 | Age confirmation | `/packages/app/src/routes/AgeConfirmation.tsx` |
 | Block/report store | `/packages/app/src/stores/blockStore.ts` |
 | User illusts | `/packages/app/src/routes/UserIllusts.tsx` |
 | Follow list page | `/packages/app/src/routes/FollowListPage.tsx` |
+| Personal center | `/packages/app/src/routes/PersonalCenter.tsx` |
+stPage.tsx` |
 | Personal center | `/packages/app/src/routes/PersonalCenter.tsx` |

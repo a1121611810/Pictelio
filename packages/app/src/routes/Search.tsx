@@ -4,7 +4,6 @@ import FluentIcon from "@/components/ui/FluentIcon";
 import TagInput from "@/components/ui/TagInput";
 import { createSearchStore } from "@/stores/searchStore";
 import SearchResults from "@/components/SearchResults";
-import { createScrollRestore } from "@/primitives/createScrollRestore";
 import { createScrollBehavior } from "@/primitives/scroll/createScrollBehavior";
 import type { SearchScope, SearchSort } from "@/api/types";
 import PageTransition from "@/components/PageTransition";
@@ -83,13 +82,6 @@ const Search: Component = () => {
   const showBackToTop = sb.scrolledPast(BACK_TO_TOP_THRESHOLD);
   const [showCompactHeader, setShowCompactHeader] = createSignal(false);
 
-  // ── Scroll position restoration ──
-  const scrollRestore = createScrollRestore(() =>
-    store.keyword().trim() ? `search_${store.keyword()}` : undefined,
-  );
-
-  onCleanup(() => scrollRestore.save());
-
   // ── Scroll-driven compact header ──
   const pastHeaderThreshold = sb.scrolledPast(SCROLL_HEADER_THRESHOLD);
   const scrollDirection = sb.direction;
@@ -122,7 +114,7 @@ const Search: Component = () => {
         // Hydration 后的 URL 变化（浏览器前进/后退）触发搜索
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
-          store.executeSearch().then(() => scrollRestore.restore());
+          store.executeSearch();
         }, 300);
       }
     }
@@ -140,23 +132,13 @@ const Search: Component = () => {
       syncFromUrl(word);
       if (params.scope) store.setScope(params.scope as SearchScope);
       if (params.sort) store.setSort(params.sort as SearchSort);
-      store.executeSearch().then(() => scrollRestore.restore());
+      store.executeSearch();
     }
     if (!hydrated() && params.word === undefined) {
       setHydrated(true);
     }
   });
 
-  // ── Restore scroll position when results finish loading ──
-  const [scrollRestored, setScrollRestored] = createSignal(false);
-  createEffect(() => {
-    const results = store.results();
-    if (hydrated() && !scrollRestored() && results.length > 0) {
-      const restored = scrollRestore.restore();
-      void restored;
-      setScrollRestored(true);
-    }
-  });
 
   // ── Debounced search execution ──
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;

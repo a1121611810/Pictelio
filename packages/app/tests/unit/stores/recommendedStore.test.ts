@@ -106,9 +106,8 @@ vi.mock("@/api/illust", () => ({
   loadRecommended: vi.fn(),
 }));
 
-import { scrollRestoreGlobal } from "@/primitives/createScrollRestore";
 
-// ── mock uiStore for createFeedScrollStore ──
+// ── mock uiStore ──
 vi.mock("@/stores/uiStore", () => ({
   get currentTab() {
     return () => "recommended";
@@ -172,7 +171,6 @@ describe("recommendedStore — sub-tab routing", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetQueryMocks();
-    scrollRestoreGlobal.clearAll();
   });
 
   it("illusts() returns illust data when sub-tab is illust", async () => {
@@ -256,7 +254,6 @@ describe("recommendedStore — actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetQueryMocks();
-    scrollRestoreGlobal.clearAll();
   });
 
   it("fetchMore calls fetchNextPage on the active query", async () => {
@@ -278,20 +275,6 @@ describe("recommendedStore — actions", () => {
     expect(getQ("recommended_illust").refetch).toHaveBeenCalled();
   });
 
-  it("scroll positions save/restore correctly per sub-tab", async () => {
-    (globalThis as any).window = { scrollY: 100 };
-    const store = await loadStore();
-    store.setRecommendSubTab("illust");
-    store.saveTabScroll("recommended");
-
-    (globalThis as any).window = { scrollY: 200 };
-    store.setRecommendSubTab("manga");
-    store.saveTabScroll("recommended");
-
-    expect(store.getFeedScrollY("recommended")).toBe(200);
-    store.setRecommendSubTab("illust");
-    expect(store.getFeedScrollY("recommended")).toBe(100);
-  });
 });
 
 describe("recommendedStore — loading and error states", () => {
@@ -417,20 +400,4 @@ describe("recommendedStore — ensureLoaded", () => {
   });
 });
 
-describe("recommendedStore — virtual scroll state", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    resetQueryMocks();
-    scrollRestoreGlobal.clearAll();
-  });
 
-  it("saveFeedScrollState / getFeedScrollState persist and restore VirtualItem state", async () => {
-    (globalThis as any).window = { scrollY: 0 };
-    const store = await loadStore();
-    store.setRecommendSubTab("illust");
-
-    const state = { snapshot: [] as any[], offset: 100, version: 1 };
-    store.saveFeedScrollState("recommended", state);
-    expect(store.getFeedScrollState("recommended")).toEqual(state);
-  });
-});

@@ -7,8 +7,6 @@ import { queryKeys } from "../api/queryKeys";
 import { normalizeQueryError } from "../api/normalizeQueryError";
 import { apiClient } from "../api/client";
 import { queryClient } from "../api/queryClient";
-import { scrollRestoreGlobal } from "../primitives/createScrollRestore";
-
 /**
  * userIllustsStore 暂不迁移到 createTQFeedStore。
  *
@@ -93,9 +91,6 @@ const novelQuery = createRoot(() =>
     () => queryClient,
   ),
 );
-
-// ── Scroll positions per content type ──
-// 通过 scrollRestoreGlobal 统一管理
 
 // ── Derived exports ──
 
@@ -182,12 +177,3 @@ export function switchType(type: ContentType) {
   setContentType(type);
 }
 
-/** Save scroll position for current content type. */
-export function saveScrollPosition(pos: number) {
-  scrollRestoreGlobal.setSimple(contentType(), pos);
-}
-
-/** Get saved scroll position for a content type. */
-export function getScrollPosition(type: ContentType): number {
-  return scrollRestoreGlobal.getSimple(type) ?? 0;
-}

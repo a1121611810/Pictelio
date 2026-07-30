@@ -4,10 +4,7 @@ import type { PixivNovel } from "../api/types";
 import { filterNovels } from "../utils/r18Filter";
 import { contentType } from "./uiStore";
 import { adaptNovelResponse, dedupNovels } from "./shared/novelHelpers";
-import {
-  createFeedScrollStore,
-  type ScrollRestoreState,
-} from "../primitives/createFeedScrollStore";
+
 
 // ── Sub-tab signal ──
 
@@ -74,11 +71,3 @@ export function fetchMore(_signal?: AbortSignal): Promise<unknown> | undefined {
   return store.fetchMore(_signal);
 }
 
-// ── Scroll restore ──
-
-const novelScroll = createFeedScrollStore("novel_", novelFollowTab);
-export const saveTabScroll = novelScroll.saveTabScroll;
-export const getFeedScrollY = novelScroll.getFeedScrollY;
-export const saveNovelScrollState = novelScroll.saveScrollState;
-export const getNovelScrollState = novelScroll.getScrollState;
-export type { ScrollRestoreState };

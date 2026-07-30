@@ -8,7 +8,6 @@ import {
   ensureLoaded,
   fetchMore,
   refresh,
-  saveTabScroll,
   isFollowCached,
   followTab,
   setFollowTab,
@@ -19,13 +18,9 @@ import NovelFollowFeed from "../routes/NovelFollowFeed";
 import { contentType } from "../stores/uiStore";
 import { layoutMode } from "../stores/settingsStore";
 
-interface Props {
-  suppressHeaderVisibility?: (durationMs?: number) => void;
-}
-
 const r18Handler = () => refresh();
 
-const FollowFeed: Component<Props> = (props) => {
+const FollowFeed: Component = () => {
   const navigate = useNavigate();
   const cached = isFollowCached();
   let abortController: AbortController | null = null;
@@ -43,10 +38,9 @@ const FollowFeed: Component<Props> = (props) => {
     }, 0);
   });
 
-  // Save scroll + abort pending requests on unmount
+  // Abort pending requests on unmount
   onCleanup(() => {
     abortController?.abort();
-    saveTabScroll("follow");
   });
 
   // R18 / R-18G switch toggle auto-refresh
@@ -57,15 +51,6 @@ const FollowFeed: Component<Props> = (props) => {
       window.removeEventListener("r18Changed", r18Handler);
       window.removeEventListener("r18gChanged", r18Handler);
     });
-  });
-
-  // Content type changed -> save scroll position
-  const contentTypeHandler = () => {
-    saveTabScroll("follow");
-  };
-  onMount(() => {
-    window.addEventListener("contentTypeChanged", contentTypeHandler);
-    onCleanup(() => window.removeEventListener("contentTypeChanged", contentTypeHandler));
   });
 
   return (
@@ -103,7 +88,7 @@ const FollowFeed: Component<Props> = (props) => {
       <Show
         when={contentType() === "illust"}
         fallback={
-          <NovelFollowFeed suppressHeaderVisibility={props.suppressHeaderVisibility} />
+          <NovelFollowFeed />
         }
       >
         <VirtualFeed
@@ -118,8 +103,7 @@ const FollowFeed: Component<Props> = (props) => {
           onNavigateToSettings={() => void navigate("/settings")}
           skipAnimation={cached}
           layoutMode={layoutMode()}
-          scrollKey="follow"
-          suppressHeaderVisibility={props.suppressHeaderVisibility}
+
         />
       </Show>
     </>

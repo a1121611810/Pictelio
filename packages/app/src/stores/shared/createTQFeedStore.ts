@@ -9,7 +9,6 @@
  *  - 自动推导每个查询的 enabled（仅当前 tab + subTab 的查询运行）
  *  - 提供派生数据：items / nextUrl / loading / refreshing / error
  *  - 提供动作：ensureLoaded（router loader 预取）/ refresh / fetchMore
- *  - 提供滚动持久化：saveScroll / getScrollY（key 含 subTab 以隔离）
  *  - 处理 allMode merge/sort + 可选去重
  */
 
@@ -17,7 +16,6 @@ import type { Accessor } from "solid-js";
 import { createInfiniteQuery } from "@tanstack/solid-query";
 import { queryClient } from "../../api/queryClient";
 import { normalizeQueryError } from "../../api/normalizeQueryError";
-import { scrollRestoreGlobal } from "../../primitives/createScrollRestore";
 import { ApiErrorType, type ApiError } from "../../api/types";
 
 // ─── 内部类型 ───
@@ -123,10 +121,6 @@ export type TQFeedStoreResult<TItem> = {
 
   /** 判断当前 tab 是否有缓存数据 */
   isCached: () => boolean;
-
-  /** 滚动位置持久化（key = `${name}_${tab}_${subTab}`） */
-  saveScroll: () => void;
-  getScrollY: () => number;
 
   /**
    * 路由 loader 预取：通过 queryClient.ensureInfiniteQueryData 触发
@@ -279,11 +273,6 @@ export function createTQFeedStore<
       return config.tabs[config.currentTab()];
     }
 
-    /** 获取当前 subTab 值（含 "all"） */
-    function getCurrentSubTab(): string | undefined {
-      return getCurrentTabDef()?.getSubTab?.();
-    }
-
     /** 获取当前 tab 下所有活跃查询的 map key 列表 */
     function activeKeys(): string[] {
       const tabDef = getCurrentTabDef();
@@ -417,23 +406,6 @@ export function createTQFeedStore<
       return first.fetchNextPage();
     };
 
-    // ── 6. 滚动持久化 ──
-
-    function scrollKey(): string {
-      const base = `${config.name}_${config.currentTab()}`;
-      const sub = getCurrentSubTab();
-      if (sub && sub !== "all") return `${base}_${sub}`;
-      return base;
-    }
-
-    const saveScroll = () => {
-      scrollRestoreGlobal.saveSimple(scrollKey());
-    };
-
-    const getScrollY = () => {
-      return scrollRestoreGlobal.getSimple(scrollKey()) ?? 0;
-    };
-
     // ── 7. 公开 API ──
 
     return {
@@ -443,8 +415,6 @@ export function createTQFeedStore<
       refreshing,
       error,
       isCached,
-      saveScroll,
-      getScrollY,
       ensureLoaded,
       refresh,
       fetchMore,

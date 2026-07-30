@@ -235,13 +235,12 @@ The full release process is documented in `/docs/release-checklist.md` (6.2 KB),
 | AuthPlugin (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/AuthPlugin.java` |
 | ImageCachePlugin (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/ImageCachePlugin.java` |
 | OAuthPlugin (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/OAuthPlugin.java` |
-| PictelioHttpPlugin (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioHttpPlugin.java` |
+| PixivApiPlugin (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PixivApiPlugin.java` |
 | MainActivity (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/MainActivity.java` |
 | PictelioApp (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioApp.java` |
 | AuthPlugin TS bridge | `/packages/app/src/native/AuthPlugin.ts` |
 | ImageCache TS bridge | `/packages/app/src/native/ImageCache.ts` |
 | OAuthPlugin TS bridge | `/packages/app/src/native/OAuthPlugin.ts` |
-| PictelioHttp TS bridge | `/packages/app/src/native/PictelioHttp.ts` |
 | Splash Bridge | `/packages/app/src/native/splashBridge.ts` |
 | Capacitor config | `/packages/app/capacitor.config.ts` |
 | Dev Android script | `/packages/app/scripts/dev-android.mjs` |

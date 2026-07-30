@@ -10,7 +10,6 @@ import {
   contentType,
   load,
   loadMore,
-  saveScrollPosition,
 } from "../stores/userIllustsStore";
 import { viewedUser } from "../stores/userStore";
 import UserWorksFeed from "../components/UserWorksFeed";
@@ -24,7 +23,7 @@ const UserIllusts: Component = () => {
   const navigate = useNavigate();
   const params = useParams();
   const userId = () => Number(params.id);
-  const { visible: headerVisible, suppress: suppressHeaderVisibility } = createScrollBehavior();
+  const { visible: headerVisible } = createScrollBehavior();
 
   // 组件挂载后立即加载数据（路由 loader 已触发，此处作为兜底）
   onMount(() => {
@@ -44,14 +43,9 @@ const UserIllusts: Component = () => {
   });
 
   function handleTabSwitch(type: "illust" | "manga" | "novel") {
-    // Save current scroll position before switching; restoreScrollTop prop handles restoration
-    saveScrollPosition(window.scrollY);
     load(userId(), type);
   }
 
-  onCleanup(() => {
-    saveScrollPosition(window.scrollY);
-  });
 
   return (
     <>
@@ -129,7 +123,6 @@ const UserIllusts: Component = () => {
               }
             }}
             layoutMode={layoutMode()}
-            suppressHeaderVisibility={suppressHeaderVisibility}
           />
         </div>
       </PageTransition>

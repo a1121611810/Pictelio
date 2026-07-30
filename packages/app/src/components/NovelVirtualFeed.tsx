@@ -8,8 +8,6 @@ import ErrorDisplay from "./ErrorDisplay";
 import PullIndicator from "./PullIndicator";
 import type { PixivNovel, ApiError } from "../api/types";
 import type { NovelLayoutMode } from "../stores/settingsStore";
-import { scrollRestoreGlobal } from "../primitives/createScrollRestore";
-import { createVirtualScrollRestore } from "../primitives/createVirtualScrollRestore";
 
 const GAP = 12;
 
@@ -23,7 +21,6 @@ interface Props {
   onRefresh: () => Promise<void> | void;
   onSeriesClick?: (seriesId: number) => void;
   onAuthorClick?: (userId: number) => void;
-  scrollKey?: string;
   layoutMode?: NovelLayoutMode;
   suppressHeaderVisibility?: (durationMs?: number) => void;
 }
@@ -44,21 +41,7 @@ const NovelVirtualFeed: Component<Props> = (props) => {
     return Math.max(COVER_HEIGHT + CARD_VERTICAL_PADDING, 160);
   };
 
-  // ── Scroll restoration ──
-  let feedVirtualizer!: ReturnType<typeof createFeedVirtualizer<PixivNovel>>;
-
-  const scrollRestore = createVirtualScrollRestore({
-    getVirtualizer: () => feedVirtualizer.getVirtualizer(),
-    getState: () =>
-      props.scrollKey ? (scrollRestoreGlobal.getVirtual(props.scrollKey) ?? undefined) : undefined,
-    saveState: (state) => {
-      if (props.scrollKey) {
-        scrollRestoreGlobal.saveVirtual(props.scrollKey, state);
-      }
-    },
-  });
-
-  feedVirtualizer = createFeedVirtualizer<PixivNovel>({
+  const feedVirtualizer = createFeedVirtualizer<PixivNovel>({
     items: () => props.novels,
     loading: () => props.loading,
     error: () => props.error,
@@ -68,14 +51,6 @@ const NovelVirtualFeed: Component<Props> = (props) => {
     lanes: columnCount,
     estimateSize,
     getItemKey: (i) => props.novels[i]?.id ?? i,
-    scrollRestore: {
-      initialOffset: scrollRestore.initialOffset ?? 0,
-      initialMeasurementsCache: scrollRestore.initialMeasurementsCache,
-    },
-    onReady: () => {
-      scrollRestore.restoreScroll();
-    },
-    suppressHeaderVisibility: (d) => props.suppressHeaderVisibility?.(d),
     laneAssignmentMode: mode() === "coverWall" ? "measured" : "estimate",
   });
 

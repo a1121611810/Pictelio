@@ -8,8 +8,6 @@ import {
   ensureLoaded,
   fetchMore,
   refresh,
-  saveTabScroll,
-  getFeedScrollY,
   novelFollowTab,
   setNovelFollowTab,
 } from "../stores/novelFollowStore";
@@ -51,10 +49,6 @@ const NovelFollowFeed: Component<Props> = (props) => {
     void ensureLoaded();
   });
 
-  onCleanup(() => {
-    saveTabScroll("follow");
-  });
-
   return (
     <>
       {/* ── 关注页三层过滤 ── */}
@@ -75,10 +69,8 @@ const NovelFollowFeed: Component<Props> = (props) => {
               }}
               onClick={() => {
                 if (novelFollowTab() !== opt.key) {
-                  saveTabScroll("follow");
                   setNovelFollowTab(opt.key);
                   props.suppressHeaderVisibility?.();
-                  window.scrollTo(0, getFeedScrollY("follow"));
                 }
               }}
             >
@@ -97,7 +89,6 @@ const NovelFollowFeed: Component<Props> = (props) => {
         onAuthorClick={(id) => navigate(`/user/${id}`)}
         onLoadMore={fetchMore}
         onRefresh={() => { refresh(); }}
-        scrollKey="follow"
         onSeriesClick={openSeriesSheet}
         layoutMode={novelLayoutMode()}
         suppressHeaderVisibility={props.suppressHeaderVisibility}

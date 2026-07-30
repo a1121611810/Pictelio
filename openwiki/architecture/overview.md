@@ -29,74 +29,79 @@ The application boots in `packages/app/src/main.tsx`:
 1. **CSS loading** — Imports layer CSS: `reset.css` → `tokens.css` → `base.css` → `virtual:uno.css` → `novel-reader.css`
 2. **Fluent Web Components** — Registers individual Fluent components (badge, button, dialog, etc.) and syncs theme via `MutationObserver` on `<html>.dark`
 3. **Preference initialization** — `initializeStartupPreferences()` reads stored preferences before rendering
-4. **Auth initialization** — `initializeAuth()` loads token from secure storage and sets up refresh, ensuring the auth `refreshPromise` is available before any API call
-5. **Solid root render** — `render(() => <App />, root)`
+4. **Solid root render** — `render(() => <App />, root)` — renders **before** auth to show skeleton/UI immediately
+5. **Auth initialization (non-blocking)** — `void initializeAuth()` called after render, does not block the first paint. `RootLayout.onMount` waits for auth result before navigating to `/home` or `/login`.
 
 ```mermaid
 sequenceDiagram
     participant M as main.tsx
     participant S as startup.ts
-    participant A as authStore
     participant R as App.tsx
+    participant RL as RootLayout
+    participant A as authStore
 
     M->>M: Load CSS layers (reset, tokens, base, uno)
     M->>M: Register Fluent web components
     M->>S: initializeStartupPreferences()
-    M->>A: initializeAuth()
-    A-->>M: refreshPromise ready
-    M->>R: render App component
-    Note over R: QueryClientProvider + RouterProvider
+    M->>R: render App (skeleton first)
+    Note over R: QueryClientProvider + Router
+    M->>A: void initializeAuth() (non-blocking)
+    Note over RL: onMount fires
+    RL->>A: await initializeAuth() result
+    A-->>RL: token ready or null
+    RL->>R: navigate("/home") or navigate("/login")
 ```
 
 ## Application Shell
 
-`App.tsx` wraps everything in two providers:
+`App.tsx` wraps everything in the QueryClient provider and the router:
 
 ```typescript
 <QueryClientProvider client={queryClient}>
-  <RouterProvider router={router} />
+  <Router scrollRestoration>{routes}</Router>
 </QueryClientProvider>
 ```
 
 - **`queryClient`** (`/packages/app/src/api/queryClient.ts`) — TanStack Query client with custom error normalization
-- **`router`** (`/packages/app/src/router.tsx`) — TanStack Router with route definitions and data loaders
+- **`routes`** (`/packages/app/src/router.tsx`) — `@solidjs/router` `RouteDefinition[]` array (migrated from `@tanstack/solid-router`). See [Routing](#routing).
 
-## Immediate Navigation Pattern (ADR-0038, v3.20.0)
+## Immediate Navigation Pattern
 
-Since v3.20.0, **router loaders no longer await network requests**. The project adopted the **immediate navigation pattern** (see [ADR-0038](/docs/adr/ADR-0038-immediate-navigation.md)):
+Since v3.20.0, the project adopted the **immediate navigation pattern**: routes render chrome + skeleton screens instantly, and data loads in the component after mount. With the migration to `@solidjs/router` (v3.22.0, see [spec](/docs/spec/routing-migration.md)), this is now the **only** option — `@solidjs/router` does not have loader/Suspense concepts, so route transitions are synchronous by nature.
 
 ```
 用户点击链接
-  → 路由匹配
-  → loader 执行（仅设导航状态，无 await） ← 不再阻塞导航
-  → 组件即时挂载
+  → 路由匹配（纯 Signal，零 async）
+  → 组件即时挂载，无 Suspense 过渡
   → 渲染页面 chrome + 骨架屏
-  → createEffect / onMount 发起数据请求
+  → onMount / createEffect 发起数据请求
   → 数据到达 → 骨架屏替换为真实内容
 ```
 
-**Key changes:**
-- **Loaders are shallow:** They set tab state, reset store, or fire-and-forget trigger data fetch — never `await` network I/O.
-- **Data loading moves to components:** Routes use `onMount` (HomePage, FollowListPage) or `createEffect` (NovelDetail, IllustDetail) to fetch data after render.
-- **Skeleton screens:** Each data-driven route shows a dedicated skeleton component matching its layout while data loads. Six skeleton components live under `/packages/app/src/components/skeletons/`.
-- **Cache-first mount:** `peekEntry()` in novelCache bypasses the skeleton entirely when sync cache hits.
-
 ## Routing
 
-Routes are defined in `/packages/app/src/router.tsx` using `@tanstack/solid-router`. Loaders now only perform lightweight navigation side effects — no async data fetching:
+Routes are defined in `/packages/app/src/router.tsx` as a `@solidjs/router` `RouteDefinition[]` array (migrated from `@tanstack/solid-router` in v3.22.0). See [spec](/docs/spec/routing-migration.md).
 
-| Route | Component | Loader (shallow only) |
-|-------|-----------|-----------------------|
+Key differences from TanStack Router:
+- **No loaders:** `@solidjs/router` does not have a loader concept. All data loading happens in component `onMount`/`createEffect`.
+- **No Suspense transitions:** Route matching uses pure Signal + `createMemo`, no pending/Suspense state. Route switches are synchronous — no white flash.
+- **Simpler API:** `path + component` only. No `createRoute()`, `asRoute()`, route tree construction, or `declare module` type registration.
+- **Path syntax:** `$id` → `:id`, catch-all `$` → `*all`.
+- **Outlet:** Child routes pass as `props.children` rather than TanStack `<Outlet>`.
+- **History/navigate:** `navigate("/path")` with optional options as second argument.
+
+| Route | Component | Data Loading |
+|-------|-----------|-------------|
 | `/login` | `Login` | — |
-| `/home` | `HomePage` | — (all 4 tabs — recommended, follow, bookmarks, history — use NavBar in-page CSS display switching via `currentTab()`) |
-| `/illust/:id` | `IllustDetail` | — (data loaded in component via `createEffect`) |
-| `/novel/:id` | `NovelDetail` | — (data loaded in component via `createEffect`) |
-| `/me` | `PersonalCenter` | `() => { setCurrentTab("me"); return {}; }` |
-| `/user/:id` | `PersonalCenter` | `() => { setCurrentTab("me"); return { userId }; }` |
-| `/user/:id/illusts` | `UserIllusts` | Fire-and-forget `load(uid, contentType())` + return `{ userId }` |
-| `/user/:id/following` | `FollowListPage` | `makeFollowLoader("following")` — resets list |
-| `/user/:id/followers` | `FollowListPage` | `makeFollowLoader("followers")` — resets list |
-| `/my/followers` | `FollowListPage mode="followers"` | `() => { resetFollowList(); return {}; }` |
+| `/home` | `HomePage` | All 4 tabs — recommended, follow, bookmarks, history — load data in `onMount` via `ensureLoaded` |
+| `/illust/:id` | `IllustDetail` | `createEffect` on mount |
+| `/novel/:id` | `NovelDetail` | `createEffect` on mount |
+| `/me` | `PersonalCenter` | — |
+| `/user/:id` | `PersonalCenter` | — |
+| `/user/:id/illusts` | `UserIllusts` | `onMount` → `load(uid, contentType())` |
+| `/user/:id/following` | `FollowListPage` | `onMount` → `load()` |
+| `/user/:id/followers` | `FollowListPage` | `onMount` → `load()` |
+| `/my/followers` | `FollowListPage` | `onMount` → `load()` |
 | `/search` | `Search` | — |
 | `/about` | `About` | — |
 | `/age-confirmation` | `AgeConfirmation` | — |
@@ -104,9 +109,9 @@ Routes are defined in `/packages/app/src/router.tsx` using `@tanstack/solid-rout
 | `/settings` | `Settings` | — |
 | `/layout-settings` | `LayoutSettings` | — |
 | `/image-host` | `ImageHostSettings` | — |
-| `/image-cache` | `ImageCacheSettings` | — |
+| `/image-cache` | `ImageCacheSettings` | — | |
 
-> **v3.21.5+ (commit `9aba13f`):** All 17 route components were converted from `lazy(() => import(...))` to **top-level static imports**. In a local APK, lazy loading provides no network benefit — it only added 17 extra chunk requests and route-switch latency from Promise + module resolution overhead. Combined with the removal of `defaultPendingComponent: LoadingSpinner` (commit `607c6f4`), there is no longer any TanStack Router loading state between route transitions. Routes are resolved synchronously from the single JS bundle.
+> **v3.21.5+ (commit `9aba13f`):** All 17 route components were converted from `lazy(() => import(...))` to **top-level static imports**. In a local APK, lazy loading provides no network benefit — it only added 17 extra chunk requests. Routes are resolved synchronously from the single JS bundle. **v3.22.0:** With the migration to `@solidjs/router`, there are no route-level loaders or pending states at all — the framework is inherently synchronous.
 
 ## Splash Screen Lifecycle (v3.21.0)
 
@@ -122,7 +127,7 @@ The native Splash Screen uses AndroidX `core-splashscreen` (compat library) with
 | Route | Who closes splash | When |
 |-------|-------------------|------|
 | `/login` | `Login.tsx` `onMount` | Login page renders (user needs to authenticate) |
-| `/home` | `HomePage.tsx` (`createEffect` + `onMount`) | **Loading-triggered** — `createEffect` watches `recLoading()` and `folLoading()` from recommended/follow stores, waits 350ms for skeleton paint, then `markContentReady()`. 800ms fallback `onMount` guarantees splash never stuck. Splash exit animation (120ms scale+fade) reintroduced in `MainActivity`. |
+| `/home` | `HomePage.tsx` `onMount` | **Immediate on mount** — `markContentReady()` called directly in `onMount`. Splash exit animation (120ms scale+fade) runs from `MainActivity`. Skeleton is guaranteed visible because `createTQFeedStore` now uses `enabled: false` (ADR-0042) and data loading is deferred via `setTimeout(0)` (ADR-0043). |
 | Other routes (age-confirmation, etc.) | `__root.tsx` fallback | Auth init completes (after `setIsLoading(false)`) |
 
 > **v3.21.5+:** Splash close for feed routes moved from `Feed.tsx` (waited for first data load) to `TabFeedPage.tsx` (closes immediately on component mount, showing skeleton content). The JS loading overlay in `__root.tsx` was also made invisible — the native Splash now handles the full loading indicator lifecycle, eliminating the redundant `LoadingSpinner` flash after Splash exit. The router's `defaultPendingComponent: LoadingSpinner` was also removed (`router.tsx` commit `607c6f4`), removing a second source of loading flash during lazy route resolution.
@@ -132,6 +137,8 @@ The native Splash Screen uses AndroidX `core-splashscreen` (compat library) with
 > **v3.21.7+ (commit `fa2015c`):** Loading-triggered strategy reverted back to simple `onMount` → `markContentReady()`. The `createEffect` watching `loading()` and the 100ms fallback timeout were both removed. This simplification is safe because the native splash exit animation was also removed — the splash now disappears immediately rather than animating, so there is no need to delay dismissal for animation synchronization. `MainActivity` no longer applies scale+fade to the splash icon view; it calls `splashScreenView.remove()` directly.
 >
 > **v3.21.8+ (committed, loading-triggered + exit animation):** TabFeedPage splash dismiss changed from a simple 400ms `onMount` timeout back to a **loading-triggered strategy**: a `createEffect` watches `loading()` (TanStack Query fetch start signal), and when `loading()` becomes `true`, it sets a 350ms `setTimeout` for `markContentReady()` — ensuring the skeleton screen has been painted to display before the native Splash exits. An 800ms `onMount` fallback guarantees the splash is never left visible indefinitely. The exit animation was **reintroduced** in `MainActivity` (`setOnExitAnimationListener`): the splash icon scales to 1.8x, fades to 0 over 120ms with `DecelerateInterpolator(2f)`, then the view is removed. This combines the skeleton-show guarantee of v3.21.6 (via `loading()` signal) with the visual polish of the original ADR-0040 animation.
+>
+> **Current (v3.22.0, simplified):** The loading-triggered strategy was replaced by a simple `onMount` → `markContentReady()` in HomePage. The skeleton guarantee is now achieved through **ADR-0042** (all queries `enabled: false`, data only loads on explicit `ensureLoaded`) and **ADR-0043** (data load deferred via `setTimeout(0)` to ensure skeleton paints before fetch). Splash exit animation retained.
 
 This ensures the splash screen is dismissed at the earliest meaningful point — either when login UI is ready, feed content is visible, or the app has finished loading for non-feed pages. See [Android Native & Build](/openwiki/integrations/android-native.md#splash-screen-js-bridge) for full details.
 
@@ -189,7 +196,7 @@ The app has four key component layers:
 1. **Route components** (`/packages/app/src/routes/`) — Page-level components, compose primitives and stores
 2. **Skeleton components** (`/packages/app/src/components/skeletons/`) — Full-page shimmer placeholders matching each data route's layout (FeedSkeleton, IllustDetailSkeleton, NovelDetailSkeleton, ProfileSkeleton, ListSkeleton, GridSkeleton). Introduced by ADR-0038 for immediate navigation.
 3. **UI components** (`/packages/app/src/components/`) — Reusable visual components (cards, overlays, dialogs)
-4. **Primitives** (`/packages/app/src/primitives/`) — Logic-only hooks and factories (virtual scroll, scroll restoration, novel layout)
+4. **Primitives** (`/packages/app/src/primitives/`) — Logic-only hooks and factories (virtual scroll, novel layout). Custom scroll restoration primitives (`createScrollRestore`, `createVirtualScrollRestore`, `createFeedScrollStore`) have been **deleted** — scroll restoration is now handled by `@solidjs/router`'s built-in `<Router scrollRestoration>` prop.
 
 Key relationship: Routes → Skeletons/Components + Primitives → Stores → API Client
 
@@ -215,7 +222,7 @@ if (err) { handle(err); return fallback; }
   - **All of `solid-js`** (createSignal, createEffect, createMemo, onMount, Show, For, etc. — 32 core APIs)
   - **`solid-js/store`** (createStore, produce, reconcile, createMutable)
   - **`solid-js/web`** (Dynamic, render, Portal, isServer, etc.)
-  - **`@tanstack/solid-router`** (useNavigate, useNavigate, Outlet, RouterProvider, etc. — 8 APIs)
+  - **`@solidjs/router`** (useNavigate, useNavigate, Outlet, etc. — core APIs)
   - **`@/utils/tryAsync`** (`tryAsync`, `trySync` — from the error tuple pattern)
 - All auto-imported APIs are declared as `readonly` globals in `.oxlintrc.json`. The generated `auto-imports.d.ts` is gitignored.
 - A cleanup script at `scripts/cleanup-auto-imports.mjs` was provided for the one-time migration to scan all `.ts`/`.tsx` source files, remove redundant explicit imports now covered by auto-import, and rewrite multi-line import statements to single-line where applicable.

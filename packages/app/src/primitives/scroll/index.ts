@@ -7,17 +7,3 @@
 
 export { createScrollBehavior } from "./createScrollBehavior";
 export type { ScrollBehaviorConfig, ScrollBehaviorResult } from "./createScrollBehavior";
-
-// 保持独立引用的原语（服务不同抽象层次）
-export { createScrollRestore, scrollRestoreGlobal } from "../createScrollRestore";
-export type {
-  ScrollRestoreState,
-  ScrollRestoreAPI,
-  ScrollRestoreOptions,
-} from "../createScrollRestore";
-export { createVirtualScrollRestore } from "../createVirtualScrollRestore";
-export type {
-  VirtualScrollRestoreOptions,
-  VirtualScrollRestoreAPI,
-} from "../createVirtualScrollRestore";
-export { createFeedScrollStore } from "../createFeedScrollStore";

@@ -47,8 +47,7 @@ export function createScrollDrivenVisibility(options?: ScrollDrivenVisibilityOpt
   });
 
   function suppress(
-    // 默认时长须覆盖 createVirtualScrollRestore 的 500ms 兜底重试窗口，
-    // 否则 300–500ms 间的重试 scrollTo 会被误判为下滑导致 header 闪烁
+    // 默认时长 600ms：覆盖首次数据到达后 scroll 事件的延迟
     durationMs = 600,
   ) {
     suppressUntil = Date.now() + durationMs;

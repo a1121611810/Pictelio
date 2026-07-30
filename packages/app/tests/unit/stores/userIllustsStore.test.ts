@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { PixivIllust, PixivNovel } from "@/api/types";
-import { scrollRestoreGlobal } from "@/primitives/createScrollRestore";
 
 // ── Mock TanStack Query ──
 // Two createInfiniteQuery calls: illust (first) and novel (second)
@@ -135,7 +134,6 @@ describe("userIllustsStore", () => {
     mockNovelFetchingNext = false;
     mockNovelError = null;
     mockNovelHasNext = false;
-    scrollRestoreGlobal.clearAll();
   });
 
   describe("initial state", () => {
@@ -292,35 +290,4 @@ describe("userIllustsStore", () => {
     });
   });
 
-  describe("scrollPositions", () => {
-    it("saves and retrieves scroll position for current type", async () => {
-      const store = await loadStore();
-      store.saveScrollPosition(100);
-      expect(store.getScrollPosition("illust")).toBe(100);
-    });
-
-    it("saves and retrieves scroll position for novel type", async () => {
-      const store = await loadStore();
-      store.load(42, "novel");
-      store.saveScrollPosition(250);
-      expect(store.getScrollPosition("novel")).toBe(250);
-    });
-
-    it("saves positions independently per type", async () => {
-      const store = await loadStore();
-      store.saveScrollPosition(50); // Illust
-      store.load(42, "manga");
-      store.saveScrollPosition(80); // Manga
-      store.load(42, "novel");
-      store.saveScrollPosition(200); // Novel
-      expect(store.getScrollPosition("illust")).toBe(50);
-      expect(store.getScrollPosition("manga")).toBe(80);
-      expect(store.getScrollPosition("novel")).toBe(200);
-    });
-
-    it("returns 0 for unsaved position", async () => {
-      const store = await loadStore();
-      expect(store.getScrollPosition("novel")).toBe(0);
-    });
-  });
 });

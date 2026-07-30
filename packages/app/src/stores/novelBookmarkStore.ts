@@ -6,11 +6,6 @@ import { filterNovels } from "../utils/r18Filter";
 import { contentType } from "./uiStore";
 import { user } from "./authStore";
 import { adaptNovelResponse } from "./shared/novelHelpers";
-import {
-  createFeedScrollStore,
-  type ScrollRestoreState,
-} from "../primitives/createFeedScrollStore";
-
 // ── Signals ──
 
 const [bookmarkRestrictState, setBookmarkRestrict] = createSignal<RestrictType>("public");
@@ -90,11 +85,3 @@ export function fetchMore(_signal?: AbortSignal): Promise<unknown> | undefined {
 export const activate = store.activate;
 export const isActivated = store.isActivated;
 
-// ── Scroll restore ──
-
-const novelScroll = createFeedScrollStore("novel_");
-export const saveTabScroll = novelScroll.saveTabScroll;
-export const getFeedScrollY = novelScroll.getFeedScrollY;
-export const saveNovelScrollState = novelScroll.saveScrollState;
-export const getNovelScrollState = novelScroll.getScrollState;
-export type { ScrollRestoreState };

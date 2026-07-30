@@ -11,9 +11,6 @@ import { createFeedVirtualizer } from "../primitives/createFeedVirtualizer";
 import { loadImage, checkImageCache } from "../utils/imageLoader";
 import { isImageHostEnabled } from "../stores/imageHostStore";
 import { imageCachePrefetch } from "../stores/settingsStore";
-import { scrollRestoreGlobal } from "../primitives/createScrollRestore";
-import type { ScrollRestoreState } from "../primitives/createScrollRestore";
-import { createVirtualScrollRestore } from "../primitives/createVirtualScrollRestore";
 
 interface Props {
   illusts: PixivIllust[];
@@ -28,10 +25,6 @@ interface Props {
   emptyText?: string;
   skipAnimation?: boolean;
   layoutMode?: LayoutMode;
-  scrollKey?: string;
-  initialScrollState?: ScrollRestoreState;
-  onScrollStateChange?: (state: ScrollRestoreState) => void;
-  suppressHeaderVisibility?: (durationMs?: number) => void;
 }
 
 const LAYOUT_COLUMNS: Record<LayoutMode, number> = {
@@ -68,23 +61,8 @@ const VirtualFeed: Component<Props> = (props) => {
     return cw() / aspectRatio + CARD_INFO_HEIGHT;
   };
 
-  // ── Scroll restoration ──
+  // ── Feed virtualizer ──
   let feedVirtualizer!: ReturnType<typeof createFeedVirtualizer<PixivIllust>>;
-
-  const scrollRestore = createVirtualScrollRestore({
-    getVirtualizer: () => feedVirtualizer.getVirtualizer(),
-    getState: () =>
-      props.scrollKey
-        ? (scrollRestoreGlobal.getVirtual(props.scrollKey) ?? undefined)
-        : props.initialScrollState,
-    saveState: (state) => {
-      if (props.scrollKey) {
-        scrollRestoreGlobal.saveVirtual(props.scrollKey, state);
-      } else {
-        props.onScrollStateChange?.(state);
-      }
-    },
-  });
 
   feedVirtualizer = createFeedVirtualizer<PixivIllust>({
     items: () => props.illusts,
@@ -99,14 +77,6 @@ const VirtualFeed: Component<Props> = (props) => {
     emptyText: props.emptyText,
     settingsThreshold: PULL_THRESHOLD_SETTINGS,
     onNavigateToSettings: props.onNavigateToSettings,
-    scrollRestore: {
-      initialOffset: scrollRestore.initialOffset ?? 0,
-      initialMeasurementsCache: scrollRestore.initialMeasurementsCache,
-    },
-    onReady: () => {
-      scrollRestore.restoreScroll();
-    },
-    suppressHeaderVisibility: (d) => props.suppressHeaderVisibility?.(d),
   });
 
   const cw = createMemo(() => {

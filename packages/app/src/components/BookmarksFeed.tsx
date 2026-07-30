@@ -3,17 +3,13 @@ import { contentType } from "../stores/uiStore";
 import IllustBookmarks from "../routes/IllustBookmarks";
 import NovelBookmarks from "../routes/NovelBookmarks";
 
-interface Props {
-  suppressHeaderVisibility?: (durationMs?: number) => void;
-}
-
-const BookmarksFeed: Component<Props> = (props) => {
+const BookmarksFeed: Component = () => {
   return (
     <Show
       when={contentType() === "illust"}
-      fallback={<NovelBookmarks suppressHeaderVisibility={props.suppressHeaderVisibility} />}
+      fallback={<NovelBookmarks />}
     >
-      <IllustBookmarks suppressHeaderVisibility={props.suppressHeaderVisibility} />
+      <IllustBookmarks />
     </Show>
   );
 };

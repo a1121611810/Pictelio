@@ -71,14 +71,6 @@ export const loading = store.loading;
 export const error = store.error;
 export { restrict };
 
-export function saveBookmarkScroll() {
-  store.saveScroll();
-}
-
-export function getBookmarkScrollY(): number {
-  return store.getScrollY();
-}
-
 export const ensureLoaded = store.ensureLoaded;
 export const fetchMore = store.fetchMore;
 export const refresh = store.refresh;
