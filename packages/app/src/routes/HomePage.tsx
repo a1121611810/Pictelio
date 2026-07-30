@@ -17,11 +17,11 @@ import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior"
 import { markContentReady } from "@/native/splashBridge";
 
 const HomePage: Component = () => {
+  console.log("[RENDER] HomePage rendering");
   const navigate = useNavigate();
   const { visible: headerVisible, suppress: suppressHeaderVisibility } = createScrollBehavior();
 
-  // ── LRU Tab DOM 管理 ──
-  // 追踪每个 Tab 的最后访问时间，仅保留最近 2 个 Tab 的完整 DOM
+  // ── LRU Tab DOM 管理 + 延迟激活 ──
   const MAX_DOM_TABS = 2;
   const [lastAccess, setLastAccess] = createStore<Record<string, number>>({
     recommended: Date.now(),
@@ -31,12 +31,8 @@ const HomePage: Component = () => {
   });
 
   createEffect(() => {
-    setLastAccess(currentTab(), Date.now());
-  });
-
-  // ── 延迟激活：仅当对应 Tab 首次被访问时才激活 store 的查询 ──
-  createEffect(() => {
     const tab = currentTab();
+    setLastAccess(tab, Date.now());
     if (tab === "follow") {
       followActivate();
       novelFollowActivate();
@@ -65,6 +61,7 @@ const HomePage: Component = () => {
 
   return (
     <>
+      <div style="position:fixed;top:0;left:0;right:0;height:4px;background:red;z-index:99999;"></div>
       <PageTransition>
         <div class="pb-16">
           {/* ── Shared Header ── */}
