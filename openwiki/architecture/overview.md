@@ -88,17 +88,15 @@ Routes are defined in `/packages/app/src/router.tsx` using `@tanstack/solid-rout
 | Route | Component | Loader (shallow only) |
 |-------|-----------|-----------------------|
 | `/login` | `Login` | — |
-| `/home` | `HomePage` | — (uiStore defaults to "recommended"; NavBar manages tab switching) |
+| `/home` | `HomePage` | — (all 4 tabs — recommended, follow, bookmarks, history — use NavBar in-page CSS display switching via `currentTab()`) |
 | `/illust/:id` | `IllustDetail` | — (data loaded in component via `createEffect`) |
 | `/novel/:id` | `NovelDetail` | — (data loaded in component via `createEffect`) |
-| `/bookmarks` | `Bookmarks` | — |
 | `/me` | `PersonalCenter` | `() => { setCurrentTab("me"); return {}; }` |
 | `/user/:id` | `PersonalCenter` | `() => { setCurrentTab("me"); return { userId }; }` |
 | `/user/:id/illusts` | `UserIllusts` | Fire-and-forget `load(uid, contentType())` + return `{ userId }` |
 | `/user/:id/following` | `FollowListPage` | `makeFollowLoader("following")` — resets list |
 | `/user/:id/followers` | `FollowListPage` | `makeFollowLoader("followers")` — resets list |
 | `/my/followers` | `FollowListPage mode="followers"` | `() => { resetFollowList(); return {}; }` |
-| `/history` | `HistoryPage` | — |
 | `/search` | `Search` | — |
 | `/about` | `About` | — |
 | `/age-confirmation` | `AgeConfirmation` | — |
@@ -124,7 +122,7 @@ The native Splash Screen uses AndroidX `core-splashscreen` (compat library) with
 | Route | Who closes splash | When |
 |-------|-------------------|------|
 | `/login` | `Login.tsx` `onMount` | Login page renders (user needs to authenticate) |
-| `/recommended` or `/following` | `TabFeedPage.tsx` (`onMount` + `createEffect`) | **Loading-triggered** — `createEffect` watches `loading()`, waits 350ms for skeleton paint, then `markContentReady()`. 800ms fallback `onMount` guarantees splash never stuck. Splash exit animation (120ms scale+fade) reintroduced in `MainActivity`. |
+| `/home` | `HomePage.tsx` (`createEffect` + `onMount`) | **Loading-triggered** — `createEffect` watches `recLoading()` and `folLoading()` from recommended/follow stores, waits 350ms for skeleton paint, then `markContentReady()`. 800ms fallback `onMount` guarantees splash never stuck. Splash exit animation (120ms scale+fade) reintroduced in `MainActivity`. |
 | Other routes (age-confirmation, etc.) | `__root.tsx` fallback | Auth init completes (after `setIsLoading(false)`) |
 
 > **v3.21.5+:** Splash close for feed routes moved from `Feed.tsx` (waited for first data load) to `TabFeedPage.tsx` (closes immediately on component mount, showing skeleton content). The JS loading overlay in `__root.tsx` was also made invisible — the native Splash now handles the full loading indicator lifecycle, eliminating the redundant `LoadingSpinner` flash after Splash exit. The router's `defaultPendingComponent: LoadingSpinner` was also removed (`router.tsx` commit `607c6f4`), removing a second source of loading flash during lazy route resolution.

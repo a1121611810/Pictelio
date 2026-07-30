@@ -93,7 +93,7 @@ const sections: AboutSection[] = [
 
 // ── Component ──
 const About: Component = () => {
-  const router = useRouter();
+  const navigate = useNavigate();
 
   return (
     <PageTransition>
@@ -103,7 +103,7 @@ const About: Component = () => {
           <fluent-button
             appearance="subtle"
             aria-label="返回"
-            on:click={() => router.history.back()}
+            on:click={() => navigate(-1)}
             class="w-8 h-8 p-0 min-w-8"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">

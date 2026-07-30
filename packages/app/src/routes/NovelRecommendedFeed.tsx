@@ -59,8 +59,8 @@ const NovelRecommendedFeed: Component<Props> = (props) => {
         loading={loading() || refreshing()}
         error={error()}
         hasMore={nextUrl() !== null}
-        onNovelClick={(id) => void navigate({ to: `/novel/${id}` })}
-        onAuthorClick={(id) => void navigate({ to: `/user/${id}` })}
+        onNovelClick={(id) => navigate(`/novel/${id}`)}
+        onAuthorClick={(id) => navigate(`/user/${id}`)}
         onLoadMore={fetchMore}
         onRefresh={() => { refresh(); }}
         scrollKey="recommended"
@@ -77,7 +77,7 @@ const NovelRecommendedFeed: Component<Props> = (props) => {
             authorId={s().authorId}
             isOpen={sheetOpen()}
             onClose={() => setSheetOpen(false)}
-            onNovelSelect={(id) => void navigate({ to: `/novel/${id}` })}
+            onNovelSelect={(id) => navigate(`/novel/${id}`)}
           />
         )}
       </Show>

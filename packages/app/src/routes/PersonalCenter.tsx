@@ -1,4 +1,5 @@
 import type { Component } from "solid-js";
+import { useNavigate, useParams, useLocation } from "@solidjs/router";
 import { setCurrentTab } from "@/stores/uiStore";
 import { profile, loadProfile } from "@/stores/userStore";
 import { useUserProfile } from "@/primitives/useUserProfile";
@@ -6,6 +7,7 @@ import FluentIcon from "@/components/ui/FluentIcon";
 
 interface Props {
   userId?: string;
+  children?: any;
 }
 
 /** 为 role="button" 的 div 提供键盘激活（Enter/Space） */
@@ -18,12 +20,11 @@ function handleKeyDown(e: KeyboardEvent, action: () => void) {
 
 const PersonalCenter: Component<Props> = (props) => {
   const navigate = useNavigate();
-  const router = useRouter();
-  const params = useParams({ strict: false });
+  const params = useParams();
   const location = useLocation();
   const profileState = useUserProfile(
-    () => location().pathname,
-    () => params().id,
+    () => location.pathname,
+    () => params.id,
     props.userId,
   );
 
@@ -36,14 +37,14 @@ const PersonalCenter: Component<Props> = (props) => {
   });
 
   return (
-    <Show when={profileState.isRootUserPage()} fallback={<Outlet />}>
+    <Show when={profileState.isRootUserPage()} fallback={props.children}>
       <div class="min-h-screen bg-[var(--pageCardBg)]">
         {/* 顶部栏：返回按钮 + 搜索入口 */}
         <div class="flex items-center justify-between px-4 pt-3">
           <fluent-button
             appearance="subtle"
             aria-label="返回"
-            on:click={() => router.history.back()}
+            on:click={() => window.history.back()}
             class="w-10 h-10 p-0 min-w-10"
           >
             ←
@@ -51,8 +52,8 @@ const PersonalCenter: Component<Props> = (props) => {
 
           <div
             class="flex items-center gap-1.5 rounded-full bg-[var(--pageCardSearchBg)] px-4 py-2 cursor-pointer active:scale-[0.97] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-[var(--strokeWidthThick)] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
-            onClick={() => void navigate({ to: "/search" })}
-            onKeyDown={(e) => handleKeyDown(e, () => navigate({ to: "/search" }))}
+            onClick={() => void navigate("/search")}
+            onKeyDown={(e) => handleKeyDown(e, () => navigate("/search"))}
             role="button"
             tabIndex={0}
             aria-label="搜索"
@@ -94,10 +95,10 @@ const PersonalCenter: Component<Props> = (props) => {
             {/* 我的作品 */}
             <div
               class="flex items-center px-5 py-4 gap-3 cursor-pointer active:scale-[0.98] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] border-b border-[var(--pageCardBorder)] focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-[-2px] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
-              onClick={() => void navigate({ to: `/user/${profileState.targetUserId()}/illusts` })}
+              onClick={() => void navigate(`/user/${profileState.targetUserId()}/illusts`)}
               onKeyDown={(e) =>
                 handleKeyDown(e, () =>
-                  navigate({ to: `/user/${profileState.targetUserId()}/illusts` }),
+                  navigate(`/user/${profileState.targetUserId()}/illusts`),
                 )
               }
               role="button"
@@ -118,8 +119,8 @@ const PersonalCenter: Component<Props> = (props) => {
               {/* 我的收藏 */}
               <div
                 class="flex items-center px-5 py-4 gap-3 cursor-pointer active:scale-[0.98] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] border-b border-[var(--pageCardBorder)] focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-[-2px] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
-                onClick={() => { setCurrentTab("bookmarks"); void navigate({ to: "/home" }); }}
-                onKeyDown={(e) => handleKeyDown(e, () => { setCurrentTab("bookmarks"); navigate({ to: "/home" }); })}
+                onClick={() => { setCurrentTab("bookmarks"); void navigate("/home"); }}
+                onKeyDown={(e) => handleKeyDown(e, () => { setCurrentTab("bookmarks"); navigate("/home"); })}
                 role="button"
                 tabIndex={0}
                 aria-label="我的收藏"
@@ -136,19 +137,19 @@ const PersonalCenter: Component<Props> = (props) => {
             <div
               class="flex items-center px-5 py-4 gap-3 cursor-pointer active:scale-[0.98] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] border-b border-[var(--pageCardBorder)] focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-[-2px] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
               onClick={() =>
-                void navigate({
-                  to: profileState.isCurrentUser()
+                void navigate(
+                  profileState.isCurrentUser()
                     ? (() => { setCurrentTab("follow"); return "/home"; })()
                     : `/user/${profileState.targetUserId()}/following`,
-                })
+                )
               }
               onKeyDown={(e) =>
                 handleKeyDown(e, () =>
-                  navigate({
-                    to: profileState.isCurrentUser()
+                  navigate(
+                    profileState.isCurrentUser()
                       ? (() => { setCurrentTab("follow"); return "/home"; })()
                       : `/user/${profileState.targetUserId()}/following`,
-                  }),
+                  ),
                 )
               }
               role="button"
@@ -169,19 +170,19 @@ const PersonalCenter: Component<Props> = (props) => {
             <div
               class="flex items-center px-5 py-4 gap-3 cursor-pointer active:scale-[0.98] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-[-2px] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
               onClick={() =>
-                void navigate({
-                  to: profileState.isCurrentUser()
+                void navigate(
+                  profileState.isCurrentUser()
                     ? "/my/followers"
                     : `/user/${profileState.targetUserId()}/followers`,
-                })
+                )
               }
               onKeyDown={(e) =>
                 handleKeyDown(e, () =>
-                  navigate({
-                    to: profileState.isCurrentUser()
+                  navigate(
+                    profileState.isCurrentUser()
                       ? "/my/followers"
                       : `/user/${profileState.targetUserId()}/followers`,
-                  }),
+                  ),
                 )
               }
               role="button"
@@ -203,8 +204,8 @@ const PersonalCenter: Component<Props> = (props) => {
             <div class="bg-[var(--pageCardSurface)] rounded-[var(--pageCardRadius)] shadow-[var(--pageCardShadow)]">
               <div
                 class="flex items-center px-5 py-4 gap-3 cursor-pointer active:scale-[0.98] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-[-2px] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
-                onClick={() => void navigate({ to: "/settings" })}
-                onKeyDown={(e) => handleKeyDown(e, () => navigate({ to: "/settings" }))}
+                onClick={() => void navigate("/settings")}
+                onKeyDown={(e) => handleKeyDown(e, () => navigate("/settings"))}
                 role="button"
                 tabIndex={0}
                 aria-label="设置"

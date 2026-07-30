@@ -254,12 +254,12 @@ const SettingsAccount: Component<Props> = (props) => {
       <div
         class="flex items-center justify-between mx-0 mt-2 mb-4 px-1 py-3 cursor-pointer hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-[0.98] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-[var(--strokeWidthThick)] focus-visible:outline-[color:var(--colorStrokeFocus2)] rounded-[var(--borderRadiusMedium)]"
         onClick={() => {
-          void navigate({ to: "/about" });
+          void navigate("/about");
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            void navigate({ to: "/about" });
+            void navigate("/about");
           }
         }}
         role="button"

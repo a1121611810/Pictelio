@@ -38,14 +38,15 @@ async function bootstrap() {
     attributeFilter: ["class"],
   });
 
-  // 在渲染前初始化认证并设置 refreshPromise，让路由 loaders 在
-  // executeRequest 中 await refreshPromise 等待 token 就绪后再发送请求
-  await initializeAuth();
-
+  // 先渲染应用骨架屏，再在 React 树外并行初始化认证。
+  // RootLayout.onMount 中等待 auth 恢复结果后执行导航。
   const root = document.getElementById("root");
   if (root) {
     render(() => <App />, root);
   }
+
+  // 认证初始化不阻塞渲染，让骨架屏立即可见
+  void initializeAuth();
 }
 
 const [_err] = await tryAsync(bootstrap());

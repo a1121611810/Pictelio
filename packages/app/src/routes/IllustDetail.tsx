@@ -1,4 +1,5 @@
 import type { Component } from "solid-js";
+import { useNavigate, useParams } from "@solidjs/router";
 import { createIntersectionObserver } from "@solid-primitives/intersection-observer";
 import {
   addBookmark,
@@ -32,9 +33,8 @@ import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior"
 import IllustDetailSkeleton from "../components/skeletons/IllustDetailSkeleton";
 
 const IllustDetail: Component = () => {
-  const params = useParams({ from: "/illust/$id" });
+  const params = useParams();
   const navigate = useNavigate();
-  const router = useRouter();
   const [illust, setIllust] = createSignal<PixivIllust | null>(null);
   const [viewerOpen, setViewerOpen] = createSignal(false);
   const [viewerStartPage, setViewerStartPage] = createSignal(0);
@@ -339,7 +339,7 @@ const IllustDetail: Component = () => {
 
   // 组件内加载数据：先渲染骨架屏，params 变化时自动重新请求
   createEffect(() => {
-    const id = Number(params().id);
+    const id = Number(params.id);
     if (!id) return;
 
     // 清理旧请求，避免竞态条件
@@ -387,28 +387,28 @@ const IllustDetail: Component = () => {
     const pixivProtocol = href.match(/^pixiv:\/\/users\/(\d+)/u);
     if (pixivProtocol) {
       e.preventDefault();
-      void navigate({ to: `/user/${pixivProtocol[1]}` });
+      void navigate(`/user/${pixivProtocol[1]}`);
       return;
     }
     // pixiv://illusts/12345678 → /illust/12345678
     const illustProtocol = href.match(/^pixiv:\/\/illusts\/(\d+)/u);
     if (illustProtocol) {
       e.preventDefault();
-      void navigate({ to: `/illust/${illustProtocol[1]}` });
+      void navigate(`/illust/${illustProtocol[1]}`);
       return;
     }
     // https://www.pixiv.net/(en/)?users/123456 → /user/123456
     const webUser = href.match(/pixiv\.net\/(?:en\/)?users\/(\d+)/u);
     if (webUser) {
       e.preventDefault();
-      void navigate({ to: `/user/${webUser[1]}` });
+      void navigate(`/user/${webUser[1]}`);
       return;
     }
     // https://www.pixiv.net/(en/)?artworks/12345678 → /illust/12345678
     const webArtwork = href.match(/pixiv\.net\/(?:en\/)?artworks\/(\d+)/u);
     if (webArtwork) {
       e.preventDefault();
-      void navigate({ to: `/illust/${webArtwork[1]}` });
+      void navigate(`/illust/${webArtwork[1]}`);
       return;
     }
     // External links (fanbox, twitter, etc.) — let browser handle
@@ -488,7 +488,7 @@ const IllustDetail: Component = () => {
             <p class="text-[var(--colorNeutralForeground2)] [font-size:var(--fontSizeBase300)]">
               该作者已被屏蔽
             </p>
-            <fluent-button appearance="secondary" on:click={() => router.history.back()}>
+            <fluent-button appearance="secondary" on:click={() => window.history.back()}>
               返回
             </fluent-button>
           </div>
@@ -504,7 +504,7 @@ const IllustDetail: Component = () => {
               <fluent-button
                 appearance="subtle"
                 aria-label="返回"
-                on:click={() => router.history.back()}
+                on:click={() => window.history.back()}
                 class="w-8 h-8 p-0 min-w-8"
               >
                 ←

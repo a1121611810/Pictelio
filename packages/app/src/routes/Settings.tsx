@@ -21,7 +21,6 @@ function openDeleteAccountPage() {
 
 const Settings: Component = () => {
   const navigate = useNavigate();
-  const router = useRouter();
   const [ageGateMessage, setAgeGateMessage] = createSignal<string | null>(null);
   const [showBlocklist, setShowBlocklist] = createSignal(false);
   const [actionToast, setActionToast] = createSignal<string | null>(null);
@@ -49,7 +48,7 @@ const Settings: Component = () => {
     const [logoutErr] = await tryAsync(
       (async () => {
         await logout();
-        void navigate({ to: "/login", replace: true });
+        navigate("/login", { replace: true });
       })(),
     );
     if (logoutErr) {
@@ -69,7 +68,7 @@ const Settings: Component = () => {
         resetReportedIds();
         await Preferences.clear();
         await resetUiStore();
-        void navigate({ to: "/login", replace: true });
+        navigate("/login", { replace: true });
       })(),
     );
     if (clearErr) {
@@ -107,7 +106,7 @@ const Settings: Component = () => {
           <fluent-button
             appearance="subtle"
             aria-label="返回"
-            on:click={() => router.history.back()}
+            on:click={() => navigate(-1)}
             class="w-8 h-8 p-0 min-w-8"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">

@@ -264,7 +264,9 @@ async function nativeExecuteRequest<T>(
     throw new Error("认证已失效，请重新登录");
   }
   // 等待首次 token 刷新完成
-  await devAuth.tokenReady;
+  if (devAuth.tokenReady) {
+    await devAuth.tokenReady;
+  }
 
   // Web 模式且无 access_token → 未登录，快速失败
   if (!isNative && !devAccessToken) {

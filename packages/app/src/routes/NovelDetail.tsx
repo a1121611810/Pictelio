@@ -1,4 +1,5 @@
 import type { Accessor, Component, JSX } from "solid-js";
+import { useNavigate, useParams } from "@solidjs/router";
 import PixivImage from "../components/PixivImage";
 import ImageViewer from "@/components/ImageViewer";
 import NovelDetailSkeleton from "../components/skeletons/NovelDetailSkeleton";
@@ -209,15 +210,14 @@ const NovelContentBlock: Component<NovelContentBlockProps> = (props) => {
 };
 
 const NovelDetail: Component = () => {
-  const params = useParams({ strict: false });
+  const params = useParams();
   const navigate = useNavigate();
-  const router = useRouter();
 
   function handleBack() {
     if (typeof window !== "undefined" && window.history.length > 1) {
-      router.history.back();
+      window.history.back();
     } else {
-      void navigate({ to: "/home", resetScroll: false });
+      void navigate("/home");
     }
   }
 
@@ -225,7 +225,7 @@ const NovelDetail: Component = () => {
   // 入口 URL 对应的 params.id 作为初始值，后续章节/目录跳转都通过这里。
   let skipRestoreProgress = false;
 
-  const [currentNovelId, setCurrentNovelId] = createSignal(Number(params().id));
+  const [currentNovelId, setCurrentNovelId] = createSignal(Number(params.id));
   const novelId = currentNovelId;
 
   function switchNovel(id: number) {
@@ -235,7 +235,7 @@ const NovelDetail: Component = () => {
 
   // URL 参数变化时同步内部小说 ID（外部链接/前进后退），系列内切换不触发此效果。
   createEffect(() => {
-    const paramId = Number(params().id);
+    const paramId = Number(params.id);
     if (paramId && paramId !== currentNovelId()) {
       setCurrentNovelId(paramId);
     }
@@ -682,7 +682,7 @@ const NovelDetail: Component = () => {
             <>
               <NovelCoverHeader
                 novel={novel()}
-                onAuthorClick={() => void navigate({ to: `/user/${novel().user.id}` })}
+                onAuthorClick={() => void navigate(`/user/${novel().user.id}`)}
                 onSeriesClick={() => setSeriesOpen(true)}
                 onCommentsClick={() => setShowComments(true)}
                 onTitleRef={setTitleEl}
@@ -773,7 +773,7 @@ const NovelDetail: Component = () => {
                   isOpen={seriesOpen()}
                   onClose={() => setSeriesOpen(false)}
                   onNovelSelect={(id) => switchNovel(id)}
-                  onAuthorClick={() => void navigate({ to: `/user/${novel().user.id}` })}
+                  onAuthorClick={() => void navigate(`/user/${novel().user.id}`)}
                   activeNovelId={currentNovelId()}
                 />
               </Show>

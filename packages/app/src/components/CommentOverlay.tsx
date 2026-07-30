@@ -32,7 +32,7 @@ const CommentOverlay: Component<CommentOverlayProps> = (props) => {
 
   function goToUser(userId: number) {
     props.onClose();
-    void navigate({ to: `/user/${userId}` });
+    void navigate(`/user/${userId}`);
   }
 
   // 发表/回复

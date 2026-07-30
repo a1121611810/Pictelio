@@ -49,13 +49,12 @@ function avatarUrl(urls: { medium?: string; px_50x50?: string; px_170x170?: stri
 
 const FollowListPage: Component<Props> = (props) => {
   const navigate = useNavigate();
-  const router = useRouter();
-  const routeParams = useParams({ strict: false });
+  const routeParams = useParams();
   const { visible: headerVisible } = createScrollBehavior();
 
   // 组件挂载后立即发起数据请求（不在 loader 中阻塞导航）
   onMount(() => {
-    const uid = routeParams().id ? Number(routeParams().id) : user()?.id;
+    const uid = routeParams.id ? Number(routeParams.id) : user()?.id;
     if (uid && uid > 0) {
       loadList(props.mode, uid);
     }
@@ -89,7 +88,7 @@ const FollowListPage: Component<Props> = (props) => {
               appearance="subtle"
               aria-label="返回"
               class="w-8 h-8 p-0 min-w-8"
-              on:click={() => router.history.back()}
+              on:click={() => navigate(-1)}
             >
               ←
             </fluent-button>
@@ -112,7 +111,7 @@ const FollowListPage: Component<Props> = (props) => {
               {(preview, index) => (
                 <div
                   class="surface-card p-3 hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-[0.98] cursor-pointer select-none"
-                  onClick={() => void navigate({ to: `/user/${preview.user.id}` })}
+                  onClick={() => navigate(`/user/${preview.user.id}`)}
                 >
                   <div class="flex items-center gap-3">
                     <div class="relative w-10 h-10 flex-shrink-0">

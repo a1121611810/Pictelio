@@ -88,8 +88,8 @@ const IllustBookmarks: Component<Props> = (props) => {
         loading={loading()}
         error={error()}
         hasMore={nextUrl() !== null}
-        onIllustClick={(id) => void navigate({ to: `/illust/${id}` })}
-        onAuthorClick={(id) => void navigate({ to: `/user/${id}` })}
+        onIllustClick={(id) => navigate(`/illust/${id}`)}
+        onAuthorClick={(id) => navigate(`/user/${id}`)}
         onLoadMore={fetchMore}
         onRefresh={() => {
           refresh();

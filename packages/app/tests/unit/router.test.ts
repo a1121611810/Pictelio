@@ -1,75 +1,95 @@
 /**
  * @vitest-environment happy-dom
+ *
+ * 验证 @solidjs/router 路由配置结构。
+ * 不做框架内部测试，只验证：
+ * 1. 路由定义数组可解析（不抛异常）
+ * 2. 所有预期路径存在
+ * 3. catch-all 路由存在
  */
 
-import { describe, expect, it, vi } from "vitest";
-import type { AnyRoute } from "@tanstack/solid-router";
+import { describe, expect, it } from "vitest";
 
-// FollowListStore 和 userIllustsStore 在模块级别调用 createInfiniteQuery，
-// 需要 QueryClientProvider。该测试只验证路由结构，mock TQ 即可。
-vi.mock("@tanstack/solid-query", () => ({
-  QueryClient: class {
-    defaultQueryOptions = (opts: unknown) => opts;
-  } as never,
-  QueryClientProvider: (props: { children: unknown }) => props.children,
-  createInfiniteQuery: () => ({
-    data: undefined,
-    isFetching: false,
-    isFetchingNextPage: false,
-    error: null,
-    hasNextPage: false,
-    fetchNextPage: vi.fn(),
-    refetch: vi.fn(),
-  }),
-}));
+// 所有 sync 导入的路由组件不需 mock（无渲染，只验证配置结构）
+const { routes } = await import("@/router");
 
-const { router } = await import("@/router");
-
-function collectRoutePaths(route: AnyRoute): { paths: string[]; fullPaths: string[] } {
+/** 递归收集所有路由 path */
+function collectPaths(defs: any[]): string[] {
   const paths: string[] = [];
-  const fullPaths: string[] = [];
-
-  if (route.path) {
-    paths.push(route.path);
+  for (const def of defs) {
+    if (def.path) paths.push(def.path);
+    if (def.children) paths.push(...collectPaths(Array.isArray(def.children) ? def.children : [def.children]));
   }
-  if (route.fullPath) {
-    fullPaths.push(route.fullPath);
-  }
-
-  for (const child of route.children ?? []) {
-    const childPaths = collectRoutePaths(child as AnyRoute);
-    paths.push(...childPaths.paths);
-    fullPaths.push(...childPaths.fullPaths);
-  }
-
-  return { paths, fullPaths };
+  return paths;
 }
 
-describe("router", () => {
+describe("router configuration", () => {
   it("can be imported without throwing", () => {
-    expect(router).toBeDefined();
-    expect(router.routeTree).toBeDefined();
+    expect(routes).toBeDefined();
+    expect(Array.isArray(routes)).toBe(true);
   });
 
-  it("contains expected routes", () => {
-    const { fullPaths } = collectRoutePaths(router.routeTree);
-    const pathsSet = new Set(fullPaths);
+  it("contains expected top-level hierarchy", () => {
+    expect(routes.length).toBe(1);
+    expect(routes[0].path).toBe("/");
+    expect(routes[0].component).toBeDefined();
+    expect(routes[0].children).toBeDefined();
+    expect(Array.isArray(routes[0].children)).toBe(true);
+  });
+
+  it("contains expected application routes", () => {
+    const paths = collectPaths(routes[0].children as any[]);
 
     const expected = [
       "/login",
       "/home",
-      "/illust/$id",
-      "/user/$id/illusts",
+      "/illust/:id",
+      "/novel/:id",
+      "/search",
+      "/me",
+      "/about",
+      "/image-host",
+      "/image-cache",
+      "/layout-settings",
+      "/settings",
       "/age-confirmation",
+      "/debug",
+      "/user/:id",
+      "/user/:id/illusts",
+      "/user/:id/following",
+      "/user/:id/followers",
+      "/my/followers",
     ];
+
     for (const path of expected) {
-      expect(pathsSet).toContain(path);
+      expect(paths).toContain(path);
     }
   });
 
   it("has a catch-all route", () => {
-    const { fullPaths } = collectRoutePaths(router.routeTree);
-    const pathsSet = new Set(fullPaths);
-    expect(pathsSet).toContain("/$");
+    const paths = collectPaths(routes[0].children as any[]);
+    const catchAll = paths.find((p) => p.includes("*"));
+    expect(catchAll).toBeDefined();
+  });
+
+  it("has no loaders (data loading moved to components)", () => {
+    // 遍历所有路由，确认没有预加载函数
+    function checkDefs(defs: any[]) {
+      for (const def of defs) {
+        expect(def.load).toBeUndefined();
+        expect(def.preload).toBeUndefined();
+        if (def.children) checkDefs(Array.isArray(def.children) ? def.children : [def.children]);
+      }
+    }
+    checkDefs(routes);
+  });
+
+  it("uses @solidjs/router path syntax (colon params, not dollar)", () => {
+    const paths = collectPaths(routes[0].children as any[]);
+    const paramRoutes = paths.filter((p) => p.includes(":"));
+    expect(paramRoutes.length).toBeGreaterThan(0);
+    // 确认没有 $ 语法残留
+    const dollarRoutes = paths.filter((p) => p.includes("$"));
+    expect(dollarRoutes.length).toBe(0);
   });
 });

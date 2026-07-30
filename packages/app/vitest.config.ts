@@ -9,15 +9,14 @@ export default defineConfig({
       imports: [
         "solid-js",
         {
-          "@tanstack/solid-router": [
+          "@solidjs/router": [
             "useNavigate",
-            "useRouter",
-            "useParams",
-            "useSearch",
             "useLocation",
-            "Outlet",
-            "getRouteApi",
-            "RouterProvider",
+            "useParams",
+            "useSearchParams",
+            "useBeforeLeave",
+            "useIsRouting",
+            "useMatch",
           ],
         },
         { "@/utils/tryAsync": ["tryAsync", "trySync"] },
@@ -78,6 +77,7 @@ export default defineConfig({
       cacheDir: "pictelio-images",
       cacheMaxBytes: 314572800,
     }),
+    APP_VERSION: JSON.stringify("3.21.2"),
   },
   test: {
     include: ["tests/unit/**/*.test.{ts,tsx}"],

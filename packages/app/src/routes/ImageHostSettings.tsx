@@ -12,7 +12,7 @@ import {
 import { validateHostInput, hasDuplicateBaseUrl, probeHosts } from "../services/imageHostService";
 
 const ImageHostSettings: Component = () => {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [showConfirmDialog, setShowConfirmDialog] = createSignal(false);
   const [, setPendingEnable] = createSignal(false);
 
@@ -181,7 +181,7 @@ const ImageHostSettings: Component = () => {
           appearance="subtle"
           aria-label="返回"
           class="w-8 h-8 p-0 min-w-8"
-          on:click={() => router.history.back()}
+          on:click={() => navigate(-1)}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path

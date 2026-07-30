@@ -27,7 +27,7 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
 
   function reconfirmAge() {
     setAgeConfirmation(false, false);
-    void navigate({ to: "/age-confirmation", search: { reconfirm: "true" } });
+    void navigate("/age-confirmation?reconfirm=true");
   }
 
   return (

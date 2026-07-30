@@ -101,11 +101,11 @@ const ErrorDisplay: Component<ErrorDisplayProps> = (props) => {
 
   const handleAction = () => {
     if (type() === ApiErrorType.UNAUTHORIZED) {
-      void navigate({ to: "/login", replace: true });
+      void navigate("/login", { replace: true });
       return;
     }
     if (type() === ApiErrorType.FORBIDDEN) {
-      void navigate({ to: "/home", replace: true });
+      void navigate("/home", { replace: true });
       return;
     }
     props.onRetry?.();

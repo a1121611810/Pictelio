@@ -30,7 +30,6 @@ function AvatarFallback(props: { class?: string }) {
 }
 
 const CollapsedHeader: Component<Props> = (props) => {
-  const router = useRouter();
   const navigate = useNavigate();
   const displayUser = () => user() || viewedUser();
   const isNative = Capacitor.isNativePlatform();
@@ -74,7 +73,7 @@ const CollapsedHeader: Component<Props> = (props) => {
         appearance="subtle"
         aria-label="返回"
         class="w-10 h-10 min-w-10 min-h-10 p-0 flex-shrink-0 flex items-center justify-center"
-        on:click={() => (props.onBack ? props.onBack() : router.history.back())}
+        on:click={() => (props.onBack ? props.onBack() : navigate(-1))}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" fill="currentColor" />
@@ -104,7 +103,7 @@ const CollapsedHeader: Component<Props> = (props) => {
         appearance="subtle"
         aria-label="设置"
         class="w-10 h-10 min-w-10 min-h-10 p-0 flex-shrink-0 flex items-center justify-center"
-        on:click={() => navigate({ to: "/settings" })}
+        on:click={() => navigate("/settings")}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path

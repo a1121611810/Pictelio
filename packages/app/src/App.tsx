@@ -1,11 +1,12 @@
 import { type Component } from "solid-js";
+import { Router } from "@solidjs/router";
 import { QueryClientProvider } from "@tanstack/solid-query";
-import { router } from "./router";
+import { routes } from "./router";
 import { queryClient } from "./api/queryClient";
 
 const App: Component = () => (
   <QueryClientProvider client={queryClient}>
-    <RouterProvider router={router} />
+    <Router scrollRestoration>{routes}</Router>
   </QueryClientProvider>
 );
 

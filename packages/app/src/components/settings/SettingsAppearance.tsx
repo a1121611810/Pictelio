@@ -25,12 +25,12 @@ const SettingsAppearance: Component = () => {
       <div
         class="flex items-center justify-between py-3 cursor-pointer hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-[0.98] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-[var(--strokeWidthThick)] focus-visible:outline-[color:var(--colorStrokeFocus2)] rounded-[var(--borderRadiusMedium)] -mx-2 px-2"
         onClick={() => {
-          void navigate({ to: "/layout-settings" });
+          void navigate("/layout-settings");
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            void navigate({ to: "/layout-settings" });
+            void navigate("/layout-settings");
           }
         }}
         role="button"

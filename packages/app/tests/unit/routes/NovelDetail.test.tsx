@@ -38,11 +38,14 @@ const loaderData = () => ({
   },
 });
 
-vi.mock("@tanstack/solid-router", () => ({
-  useParams: () => () => ({ id: "42" }),
-  useNavigate: () => mockNavigate,
-  useRouter: () => ({ history: { back: mockBack } }),
-}));
+vi.mock("@solidjs/router", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    useParams: () => ({ id: "42" }),
+    useNavigate: () => mockNavigate,
+  } as typeof actual;
+});
 
 vi.mock("@/stores/novelCache", () => ({
   peekEntry: () => undefined,

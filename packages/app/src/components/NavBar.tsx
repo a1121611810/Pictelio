@@ -118,7 +118,7 @@ const NavBar: Component = () => {
       swiped = false;
       return;
     }
-    void navigate({ to: "/search" });
+    void navigate("/search");
   }
 
   // ── Tab 导航 ──
@@ -128,7 +128,7 @@ const NavBar: Component = () => {
     if (window.location.pathname === "/home") {
       window.history.replaceState(null, "", "/home");
     } else {
-      void navigate({ to: "/home" });
+      void navigate("/home");
     }
   }
 

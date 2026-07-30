@@ -19,14 +19,14 @@ const SearchableTag: Component<SearchableTagProps> = (props) => {
 
   const handleClick = (e: MouseEvent) => {
     e.stopPropagation();
-    navigate({ to: "/search", search: { word: props.name } });
+    navigate(`/search?word=${encodeURIComponent(props.name)}`);
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       e.stopPropagation();
-      navigate({ to: "/search", search: { word: props.name } });
+      navigate(`/search?word=${encodeURIComponent(props.name)}`);
     }
   };
 

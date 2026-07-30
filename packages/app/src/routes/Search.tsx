@@ -1,4 +1,5 @@
 import type { Component } from "solid-js";
+import { useNavigate, useSearchParams } from "@solidjs/router";
 import FluentIcon from "@/components/ui/FluentIcon";
 import TagInput from "@/components/ui/TagInput";
 import { createSearchStore } from "@/stores/searchStore";
@@ -28,7 +29,7 @@ function scopeLabel(value: SearchScope): string {
 
 const Search: Component = () => {
   const navigate = useNavigate();
-  const searchParams = useSearch({ strict: false });
+  const [searchParams] = useSearchParams();
 
   const store = createSearchStore();
 
@@ -43,10 +44,12 @@ const Search: Component = () => {
     debounceTimer = setTimeout(() => {
       if (newTags.length > 0) {
         addToHistory(newTags.join(" "));
-        void navigate({
-          to: "/search",
-          search: { word: newTags.join(" "), scope: store.scope(), sort: store.toSorted() },
-        });
+        const qs = new URLSearchParams({
+          word: newTags.join(" "),
+          scope: store.scope(),
+          sort: store.toSorted(),
+        }).toString();
+        void navigate(`/search?${qs}`);
         store.executeSearch();
       }
     }, 300);
@@ -111,7 +114,7 @@ const Search: Component = () => {
   // ── Sync URL params → store ──
   let prevUrlWord: string | undefined;
   createEffect(() => {
-    const params = searchParams() as Record<string, string | undefined>;
+    const params = searchParams as Record<string, string | undefined>;
     if (params.word !== undefined && params.word !== prevUrlWord) {
       prevUrlWord = params.word;
       syncFromUrl(params.word);
@@ -130,7 +133,7 @@ const Search: Component = () => {
   // ── Execute search on URL param hydration (only on initial load / deep links) ──
   const [hydrated, setHydrated] = createSignal(false);
   createEffect(() => {
-    const params = searchParams() as Record<string, string | undefined>;
+    const params = searchParams as Record<string, string | undefined>;
     if (!hydrated() && params.word?.trim()) {
       setHydrated(true);
       const word = params.word.trim();
@@ -162,7 +165,7 @@ const Search: Component = () => {
     clearTimeout(debounceTimer);
     setTags([]);
     store.setKeyword("");
-    void navigate({ to: "/search", search: {} });
+    void navigate("/search");
   }
 
   function handleScopeChange(scope: SearchScope) {
@@ -170,10 +173,8 @@ const Search: Component = () => {
     const kw = store.keyword().trim();
     if (kw) {
       clearTimeout(debounceTimer);
-      void navigate({
-        to: "/search",
-        search: { word: kw, scope, sort: store.toSorted() },
-      });
+      const qs = new URLSearchParams({ word: kw, scope, sort: store.toSorted() }).toString();
+      void navigate(`/search?${qs}`);
       store.executeSearch();
     }
   }
@@ -183,10 +184,8 @@ const Search: Component = () => {
     const kw = store.keyword().trim();
     if (kw) {
       clearTimeout(debounceTimer);
-      void navigate({
-        to: "/search",
-        search: { word: kw, scope: store.scope(), sort },
-      });
+      const qs = new URLSearchParams({ word: kw, scope: store.scope(), sort }).toString();
+      void navigate(`/search?${qs}`);
       store.executeSearch();
     }
   }
@@ -377,10 +376,8 @@ const Search: Component = () => {
                 setTags(tagList);
                 store.setKeyword(word);
                 addToHistory(word);
-                void navigate({
-                  to: "/search",
-                  search: { word, scope: store.scope(), sort: store.toSorted() },
-                });
+                const qs = new URLSearchParams({ word, scope: store.scope(), sort: store.toSorted() }).toString();
+                void navigate(`/search?${qs}`);
                 store.executeSearch();
               }}
               onRemove={(word) => removeFromHistory(word)}
@@ -396,9 +393,9 @@ const Search: Component = () => {
                 loading={store.loading()}
                 hasMore={store.hasMore()}
                 onLoadMore={() => store.loadMore()}
-                onIllustClick={(id) => navigate({ to: "/illust/$id", params: { id: String(id) } })}
-                onNovelClick={(id) => navigate({ to: "/novel/$id", params: { id: String(id) } })}
-                onAuthorClick={(id) => void navigate({ to: `/user/${id}` })}
+                onIllustClick={(id) => navigate(`/illust/${id}`)}
+                onNovelClick={(id) => navigate(`/novel/${id}`)}
+                onAuthorClick={(id) => void navigate(`/user/${id}`)}
                 onRefresh={() => store.executeSearch()}
                 error={store.error()}
               />

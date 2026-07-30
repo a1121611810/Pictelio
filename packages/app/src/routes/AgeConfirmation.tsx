@@ -19,30 +19,21 @@ const shieldIcon = {
  */
 const AgeConfirmation: Component = () => {
   const navigate = useNavigate();
-  const searchParams = useSearch({ strict: false });
-  const isReconfirm = () =>
-    (searchParams() as Record<string, string | undefined>).reconfirm === "true";
+  const [searchParams] = useSearchParams();
+  const isReconfirm = () => searchParams.reconfirm === "true";
 
   async function handleConfirm(isAdult: boolean) {
     await setAgeConfirmation(true, isAdult);
 
     if (isReconfirm()) {
-      void navigate({ to: "/home", replace: true });
+      navigate("/home", { replace: true });
     } else {
-      const [authErr] = await tryAsync((async () => {
-        await initializeAuth();
-        if (isLoggedIn()) {
-          await navigate({ to: "/home", replace: true });
-        } else {
-          await navigate({ to: "/login", replace: true });
-        }
-      })());
+      const [authErr] = await tryAsync(initializeAuth());
       setIsLoading(false);
       if (authErr) {
         console.error("[AgeConfirmation] Auth initialization failed", authErr);
-        const [navErr] = await tryAsync(navigate({ to: "/login", replace: true }));
-        if (navErr) { /* 导航异常不影响 loading 状态释放 */ }
       }
+      navigate(isLoggedIn() ? "/home" : "/login", { replace: true });
     }
   }
 

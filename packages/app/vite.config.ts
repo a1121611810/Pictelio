@@ -51,15 +51,14 @@ export default defineConfig({
       imports: [
         "solid-js",
         {
-          "@tanstack/solid-router": [
+          "@solidjs/router": [
             "useNavigate",
-            "useRouter",
-            "useParams",
-            "useSearch",
             "useLocation",
-            "Outlet",
-            "getRouteApi",
-            "RouterProvider",
+            "useParams",
+            "useSearchParams",
+            "useBeforeLeave",
+            "useIsRouting",
+            "useMatch",
           ],
         },
         { "@/utils/tryAsync": ["tryAsync", "trySync"] },

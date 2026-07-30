@@ -132,11 +132,11 @@ const RecommendedFeed: Component<Props> = (props) => {
           loading={loading() || refreshing()}
           error={error()}
           hasMore={nextUrl() !== null}
-          onIllustClick={(id) => void navigate({ to: `/illust/${id}` })}
-          onAuthorClick={(id) => void navigate({ to: `/user/${id}` })}
+          onIllustClick={(id) => void navigate(`/illust/${id}`)}
+          onAuthorClick={(id) => void navigate(`/user/${id}`)}
           onLoadMore={() => fetchMore(abortController?.signal)}
           onRefresh={() => { refresh(abortController?.signal); }}
-          onNavigateToSettings={() => void navigate({ to: "/settings" })}
+          onNavigateToSettings={() => void navigate("/settings")}
           skipAnimation={cached}
           layoutMode={layoutMode()}
           scrollKey="recommended"

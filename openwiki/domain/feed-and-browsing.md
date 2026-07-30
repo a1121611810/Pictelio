@@ -11,12 +11,14 @@ The feed and browsing system covers the primary user experience: discovering and
 
 ## Feed Architecture
 
-Two feed content types are rendered inside the consolidated **HomePage** (`/packages/app/src/routes/HomePage.tsx`) at the `/home` route. Navigation between the recommended, follow, bookmarks, and history tabs is handled by **NavBar** (`/packages/app/src/components/NavBar.tsx`), which maps both "recommended" and "follow" tabs to `/home` and uses in-page CSS display toggling via `currentTab()` for the illust tabs (no router-level navigation for recommend/follow switching).
+Two feed content types are rendered inside the consolidated **HomePage** (`/packages/app/src/routes/HomePage.tsx`) at the `/home` route. Navigation between all four tabs — recommended, follow, bookmarks, and history — is handled by **NavBar** (`/packages/app/src/components/NavBar.tsx`), which maps every tab to `/home` and uses in-page CSS display toggling via `currentTab()` (no router-level navigation between tabs). The standalone `/bookmarks` and `/history` routes were removed; bookmarks and history are now HomePage sub-components only.
 
 | Feed | Route | Component | Store(s) |
 |------|-------|-----------|----------|
 | Recommended (illusts) | `/home` (tab: recommended) | `RecommendedFeed` | `recommendedStore.ts` (new split store) |
 | Follow (illusts) | `/home` (tab: follow) | `FollowFeed` | `followStore.ts` (new split store) |
+| Bookmarks (illusts/novels) | `/home` (tab: bookmarks) | `BookmarksFeed` | `bookmarkStore.ts` (delegates to `IllustBookmarks`/`NovelBookmarks`) |
+| History | `/home` (tab: history) | `HistoryFeed` | `historyStore.ts` (TanStack DB, localStorage) |
 | Novel Feed (recommended) | `/home` (tab: recommended, novel mode) | `NovelFeedPage tab="recommended"` (embedded fallback) | `novelStore.ts` (legacy) |
 | Novel Feed (follow) | `/home` (tab: follow, novel mode) | `NovelFeedPage tab="follow"` (embedded fallback) | `novelStore.ts` (legacy) |
 
@@ -26,11 +28,13 @@ Two feed content types are rendered inside the consolidated **HomePage** (`/pack
 
 ### HomePage (Consolidated Home)
 
-`/packages/app/src/routes/HomePage.tsx` — The single home page at `/home` replacing the old separate `/recommended` and `/following` routes:
+`/packages/app/src/routes/HomePage.tsx` — The single home page at `/home` replacing the old separate `/recommended`, `/following`, `/bookmarks`, and `/history` routes:
 
 - **Shared sticky header** with user avatar, app title, and content-type toggle (illust / novel)
-- **Content type switching** toggles between illust feeds (`RecommendedFeed`/`FollowFeed`) and novel feeds (`NovelFeedPage`) via `contentType()` from `uiStore`
-- **Tab panels** use CSS `display` toggling (`currentTab() === "recommended" ? "block" : "none"`) — both RecommendedFeed and FollowFeed are mounted, only one visible at a time
+- **Content type switching** toggles between illust feeds and novel feeds via `contentType()` from `uiStore` — **hidden on the history tab** (`currentTab() !== "history"`) since browsing history is text-based timeline
+- **Tab panels** use CSS `display` toggling (`currentTab() === "recommended" ? "block" : "none"`) — all feed components are mounted, only one visible at a time
+  - **Bookmarks tab:** Renders `BookmarksFeed` (`/packages/app/src/components/BookmarksFeed.tsx`), which delegates to `IllustBookmarks` (illust mode) or `NovelBookmarks` (novel mode) based on `contentType()`
+  - **History tab:** Renders `HistoryFeed` (`/packages/app/src/components/HistoryFeed.tsx`), a full browsing history timeline with inline search and date-range filtering, backed by `useLiveQuery` from TanStack DB
 - **Data loaded in `onMount`** (not via router loader): each feed component calls `ensureLoaded(signal)` with AbortController for cancel-on-unmount
 - **Splash dismiss:** Merges `recLoading()` and `folLoading()` into one `createEffect` — fires 350ms `setTimeout` → `markContentReady()` on first loading signal; 800ms `onMount` fallback for cached-data case
 - **Scroll state saved per-tab** via `saveTabScroll("recommended")` / `saveTabScroll("follow")` on unmount
@@ -138,9 +142,11 @@ User settings control visibility of each tier. An **AgeConfirmation** gate (`/pa
 
 ## Bookmarks
 
-`/packages/app/src/routes/Bookmarks.tsx` — Displays user's saved illusts and novels. Sub-pages:
-- `/packages/app/src/routes/IllustBookmarks.tsx` — Illust bookmark list
-- `/packages/app/src/routes/NovelBookmarks.tsx` — Novel bookmark list
+Bookmarks is no longer a standalone route. The **bookmarks tab** inside `/home` renders `BookmarksFeed` (`/packages/app/src/components/BookmarksFeed.tsx`), which delegates to:
+- `/packages/app/src/routes/IllustBookmarks.tsx` — Illust bookmark list (when `contentType() === "illust"`)
+- `/packages/app/src/routes/NovelBookmarks.tsx` — Novel bookmark list (when `contentType() === "novel"`)
+
+These sub-pages are still full route components but are embedded inside `HomePage` rather than mounted at their own route. The `PersonalCenter` "My Bookmarks" link now navigates to `/home` with `setCurrentTab("bookmarks")`.
 
 Bookmark state is managed by `/packages/app/src/stores/bookmarkStore.ts`, which integrates with the Pixiv API and drive, also a `bookmarkStore` that toggles bookmarks with optimistic UI updates.
 
@@ -183,7 +189,16 @@ Route Page (navigate) → VirtualFeed (prop pass-through)
 - Lazy expiry: entries older than 30 days cleared on write
 - `historyVersion` signal acts as a non-reactive invalidation token
 
-**`HistoryPage`** (`/packages/app/src/routes/HistoryPage.tsx`) displays grouped browsing history with clear-all support.
+**History tab:** The history tab inside `/home` renders `HistoryFeed` (`/packages/app/src/components/HistoryFeed.tsx`), a full browsing history timeline with:
+- **Timeline view:** Entries grouped by date headers, sorted oldest-first within each day
+- **Inline search:** Debounced 300ms search input with highlighted match `<mark>` elements
+- **Date-range filtering:** Start/end date inputs with memoized timestamp conversion
+- **Clear all:** Confirmation dialog before clearing all history
+- **Author click navigation:** Author names are clickable per [ADR-0032](/docs/adr/ADR-0032-author-click-navigation.md); old entries without `authorId` degrade gracefully to plain text
+- **R18/R18G filtering:** Respects user's adult content settings and filters out entries exceeding those thresholds
+- **Virtual scroll:** Offloaded to `useLiveQuery` with conditional `where` clauses — the content-type toggle is hidden on the history tab since browsing history is a single text-based timeline
+
+The `contentType()` toggle from `uiStore` is hidden on the history tab (`<Show when={currentTab() !== "history"}>` in `HomePage.tsx`) — history is displayed as a single unified timeline regardless of content type.
 
 ## User Pages
 
@@ -214,6 +229,8 @@ User profile data is loaded via `/packages/app/src/primitives/useUserProfile.ts`
 | Image card | `/packages/app/src/components/ImageCard.tsx` |
 | Grid card | `/packages/app/src/components/GridCard.tsx` |
 | Nav bar (tab router) | `/packages/app/src/components/NavBar.tsx` |
+| Bookmarks feed component | `/packages/app/src/components/BookmarksFeed.tsx` |
+| History feed component | `/packages/app/src/components/HistoryFeed.tsx` |
 | Search page | `/packages/app/src/routes/Search.tsx` |
 | Search store | `/packages/app/src/stores/searchStore.ts` |
 | History store | `/packages/app/src/stores/historyStore.ts` |

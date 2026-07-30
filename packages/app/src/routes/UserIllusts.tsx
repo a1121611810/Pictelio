@@ -1,4 +1,5 @@
 import type { Component } from "solid-js";
+import { useNavigate, useParams } from "@solidjs/router";
 import { user } from "../stores/authStore";
 import {
   illusts,
@@ -21,9 +22,8 @@ import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior"
 
 const UserIllusts: Component = () => {
   const navigate = useNavigate();
-  const router = useRouter();
-  const params = useParams({ strict: false });
-  const userId = () => Number(params().id);
+  const params = useParams();
+  const userId = () => Number(params.id);
   const { visible: headerVisible, suppress: suppressHeaderVisibility } = createScrollBehavior();
 
   // 组件挂载后立即加载数据（路由 loader 已触发，此处作为兜底）
@@ -69,7 +69,7 @@ const UserIllusts: Component = () => {
               appearance="subtle"
               aria-label="返回"
               class="w-8 h-8 p-0 min-w-8"
-              on:click={() => router.history.back()}
+              on:click={() => window.history.back()}
             >
               ←
             </fluent-button>
@@ -118,9 +118,9 @@ const UserIllusts: Component = () => {
             loading={loading()}
             error={error()}
             hasMore={nextUrl() !== null}
-            onIllustClick={(id) => void navigate({ to: `/illust/${id}` })}
-            onNovelClick={(id) => void navigate({ to: `/novel/${id}` })}
-            onAuthorClick={(id) => void navigate({ to: `/user/${id}` })}
+            onIllustClick={(id) => void navigate(`/illust/${id}`)}
+            onNovelClick={(id) => void navigate(`/novel/${id}`)}
+            onAuthorClick={(id) => void navigate(`/user/${id}`)}
             onLoadMore={loadMore}
             onRefresh={async () => {
               const uid = userId();

@@ -119,12 +119,12 @@ sequenceDiagram
 | Location | When Called | Purpose |
 |----------|-------------|---------|
 | `Login.tsx` `onMount` | Login page renders | Closes splash when user needs to authenticate |
-| `TabFeedPage.tsx` (`onMount` + `createEffect`) | `createEffect` watches `loading()` → 350ms delay → `markContentReady()`; 800ms fallback | Loading-triggered strategy ensures skeleton paints before splash closes. Exit animation (120ms scale+fade) reintroduced for visual polish. |
-| `__root.tsx` `onMount` | Auth init completes (fallback) | Closes splash for non-feed pages (age-confirmation, etc.) if Login/TabFeedPage haven't already |
+| `HomePage.tsx` (`createEffect` + `onMount`) | `createEffect` watches `recLoading()`/`folLoading()` → 350ms delay → `markContentReady()`; 800ms fallback | Loading-triggered strategy ensures skeleton paints before splash closes. Exit animation (120ms scale+fade) reintroduced for visual polish. |
+| `__root.tsx` `onMount` | Auth init completes (fallback) | Closes splash for non-feed pages (age-confirmation, etc.) if Login/HomePage haven't already |
 
 **Android native:**
 - `MainActivity.java`: retains `SplashScreen.installSplashScreen(this)` + `setKeepOnScreenCondition(() -> keepSplashVisible.get())`. The private `keepSplashVisible` `AtomicBoolean` defaults to `true` and is set to `false` via the package-private `dismissSplash()` method, called by `AuthPlugin.hideSplash()`
-- **Exit animation (reintroduced):** The previously-removed `setOnExitAnimationListener` is back: the splash icon now scales to 1.8x with alpha(0) over 120ms using `DecelerateInterpolator(2f)`, then `splashScreenView.remove()` is called. This animation had been removed in commit `fa2015c` when the splash dismiss was simplified to immediate `onMount`-only. Now that dismiss is loading-triggered again, the animation was restored for visual polish. See [TabFeedPage](/openwiki/domain/feed-and-browsing.md#tabfeedpage) for the full loading-triggered dismiss flow.
+- **Exit animation (reintroduced):** The previously-removed `setOnExitAnimationListener` is back: the splash icon now scales to 1.8x with alpha(0) over 120ms using `DecelerateInterpolator(2f)`, then `splashScreenView.remove()` is called. This animation had been removed in commit `fa2015c` when the splash dismiss was simplified to immediate `onMount`-only. Now that dismiss is loading-triggered again, the animation was restored for visual polish. See [HomePage](/openwiki/domain/feed-and-browsing.md#homepage-consolidated-home) for the full loading-triggered dismiss flow.
 - `styles.xml`: `AppTheme.NoActionBarLaunch` inherits `Theme.SplashScreen` — splash background and icon defined in theme XML
 - `build.gradle`: retains `androidx.core:core-splashscreen` dependency
 - `variables.gradle`: retains `coreSplashScreenVersion = '1.2.0'`

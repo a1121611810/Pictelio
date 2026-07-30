@@ -115,8 +115,8 @@ const NovelBookmarks: Component<Props> = (props) => {
         loading={loading()}
         error={error()}
         hasMore={nextUrl() !== null}
-        onNovelClick={(id) => void navigate({ to: `/novel/${id}` })}
-        onAuthorClick={(id) => void navigate({ to: `/user/${id}` })}
+        onNovelClick={(id) => navigate(`/novel/${id}`)}
+        onAuthorClick={(id) => navigate(`/user/${id}`)}
         onLoadMore={fetchMore}
         onRefresh={refresh}
         scrollKey="bookmarks"
@@ -134,7 +134,7 @@ const NovelBookmarks: Component<Props> = (props) => {
             authorId={s().authorId}
             isOpen={sheetOpen()}
             onClose={() => setSheetOpen(false)}
-            onNovelSelect={(id) => void navigate({ to: `/novel/${id}` })}
+            onNovelSelect={(id) => navigate(`/novel/${id}`)}
           />
         )}
       </Show>

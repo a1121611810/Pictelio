@@ -75,7 +75,7 @@ const HomePage: Component = () => {
             <h1
               class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] tracking-tight leading-none flex items-center gap-2 min-w-0"
               classList={{ "cursor-pointer": isLoggedIn() }}
-              onClick={() => isLoggedIn() && navigate({ to: "/me" })}
+              onClick={() => isLoggedIn() && navigate("/me")}
             >
               <Show when={isLoggedIn() && user()} fallback={<>Pictelio</>}>
                 <UserAvatar />

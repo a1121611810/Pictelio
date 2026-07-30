@@ -37,28 +37,27 @@ const STARTUP_CHECK_DELAY_MS = 500;
 /** "再按一次退出应用" toast 的显示时长（ms） */
 const EXIT_HINT_DURATION_MS = 2000;
 
-const RootLayout: Component = () => {
+const RootLayout: Component = (props: { children?: any }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const router = useRouter();
   const [showExitHint, setShowExitHint] = createSignal(false);
   let exitHintTimer: ReturnType<typeof setTimeout>;
 
   // 路由切换时清空 overlay 栈，避免旧路由未关闭的 overlay 阻塞新路由的返回手势。
   createEffect(() => {
     // 依赖 location 变化
-    void location().pathname;
+    void location.pathname;
     clearOverlays();
   });
 
   // 监听登录过期：当 isLoggedIn 从 true 变为 false 时自动跳转登录页
   createEffect(() => {
     const loggedIn = isLoggedIn();
-    const path = location().pathname;
+    const path = location.pathname;
     // 跳过启动阶段（startup 代码在 onMount 中处理了初始导航）
     if (isLoading()) return;
     if (!loggedIn && path !== "/login" && path !== "/age-confirmation") {
-      navigate({ to: "/login", replace: true });
+      navigate("/login", { replace: true });
     }
   });
 
@@ -91,11 +90,7 @@ const RootLayout: Component = () => {
   }
 
   onMount(async () => {
-    // Disable browser native scroll restoration — we manage scroll ourselves via stores + restoreScrollTop.
-    // Without this, window.history.go(-1) triggers popstate and the browser may fight our scroll restoration.
-    if (history.scrollRestoration) {
-      history.scrollRestoration = "manual";
-    }
+    // 滚动恢复由 @solidjs/router 内置 scrollRestoration 管理，无需手动设置
 
     // Show "press again to exit" toast handler
     const onExitHint = () => {
@@ -139,33 +134,33 @@ const RootLayout: Component = () => {
     // Register native back gesture handler. Overlay closure is handled by backGestureStore
     // Once components push overlays in Phase 5; for now the service closes top overlay if any.
     unregisterBackGesture = await registerBackGesture({
-      getPathname: () => location().pathname,
-      navigateBack: () => router.history.back(),
+      getPathname: () => location.pathname,
+      navigateBack: () => navigate(-1),
       dispatchExitHint: () => window.dispatchEvent(new CustomEvent("exitHint")),
     });
 
     const [authErr] = await tryAsync((async () => {
       // 如果尚未确认年龄，先导航到年龄确认页面，不进行登录判断
       if (!ageConfirmed()) {
-        await navigate({ to: "/age-confirmation", replace: true });
+        await navigate("/age-confirmation", { replace: true });
         return;
       }
 
       await initializeAuth();
       if (isLoggedIn()) {
-        if (location().pathname !== "/home") {
-          await navigate({ to: "/home", replace: true });
+        if (location.pathname !== "/home") {
+          await navigate("/home", { replace: true });
         }
       } else {
-        if (location().pathname !== "/login") {
-          await navigate({ to: "/login", replace: true });
+        if (location.pathname !== "/login") {
+          await navigate("/login", { replace: true });
         }
       }
     })());
     setIsLoading(false);
     // 兜底关闭 Splash：非 Feed 页面（login / age-confirmation 等）
     // 由 Login.tsx 或 Feed.tsx 负责主动触发，此处兜底确保不会泄漏
-    const currentPath = location().pathname;
+    const currentPath = location.pathname;
     if (currentPath !== "/home") {
       markContentReady();
     }
@@ -177,8 +172,7 @@ const RootLayout: Component = () => {
     }
     if (authErr) {
       console.error("[App] Auth initialization failed", authErr);
-      const [navErr] = await tryAsync(navigate({ to: "/login", replace: true }));
-      if (navErr) { /* 导航异常不影响 loading 状态释放 */ }
+      navigate("/login", { replace: true });
     }
   });
 
@@ -202,8 +196,8 @@ const RootLayout: Component = () => {
           </div>
         )}
       >
-        {/* 始终渲染 Outlet，不让 Router 因 Outlet 卸载/重挂载而中止 Loader 的 AbortSignal */}
-        <Outlet />
+        {/* 子路由由 @solidjs/router 自动通过 props.children 传入 */}
+        {props.children}
       </ErrorBoundary>
 
       {/* Exit hint toast */}

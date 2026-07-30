@@ -269,9 +269,9 @@ const HistoryFeed: Component = () => {
               return (
                 <div
                   class="surface-card flex items-center gap-[var(--spacingHorizontalM)] p-[var(--spacingHorizontalM)] mt-[var(--spacingVerticalM)] hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-[0.98] cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--colorStrokeFocus2)] focus-visible:outline-offset-2 transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)]"
-                  onClick={() => { void navigate({ to: e.type === "illust" ? "/illust/$id" : "/novel/$id", params: { id: String(e.id) } }); }}
+                  onClick={() => { void navigate(e.type === "illust" ? `/illust/${e.id}` : `/novel/${e.id}`); }}
                   role="button" tabIndex={0}
-                  onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); void navigate({ to: e.type === "illust" ? "/illust/$id" : "/novel/$id", params: { id: String(e.id) } }); } }}
+                  onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); void navigate(e.type === "illust" ? `/illust/${e.id}` : `/novel/${e.id}`); } }}
                 >
                   <div class="relative flex-shrink-0 w-10 h-10 rounded-[var(--borderRadiusMedium)] overflow-hidden" style={{ background: "var(--colorNeutralBackground2)" }}>
                     {e.thumbnailUrl && <img src={resolveImageUrl(e.thumbnailUrl)} alt={e.title} class={`w-full h-full object-cover ${hideByR18 ? "filter blur-[8px]" : ""}`} />}
@@ -281,7 +281,7 @@ const HistoryFeed: Component = () => {
                     <div class="truncate" style={{ "font-size": "var(--fontSizeBase300)", "line-height": "var(--lineHeightBase300)", color: "var(--colorNeutralForeground1)" }}>{highlightText(e.title, searchQuery())}</div>
                     <div class="mt-0.5 flex items-center gap-1" style={{ "font-size": "var(--fontSizeBase200)", "line-height": "var(--lineHeightBase200)", color: "var(--colorNeutralForeground3)" }}>
                       <Show when={e.authorId} fallback={<span>{e.userName}</span>}>
-                        <button class="bg-transparent border-none p-0 cursor-pointer text-[var(--colorBrandForeground1)] hover:underline truncate min-h-[40px] active:scale-[0.98] focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)]" onClick={(ev) => { ev.stopPropagation(); void navigate({ to: `/user/${e.authorId}` }); }}>{e.userName}</button>
+                        <button class="bg-transparent border-none p-0 cursor-pointer text-[var(--colorBrandForeground1)] hover:underline truncate min-h-[40px] active:scale-[0.98] focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)]" onClick={(ev) => { ev.stopPropagation(); void navigate(`/user/${e.authorId}`); }}>{e.userName}</button>
                       </Show>
                       <span>· {formatTime(e.visitedAt)} · {e.visitCount}次</span>
                     </div>
