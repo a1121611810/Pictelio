@@ -3,6 +3,7 @@
 dist/
 *.local
 *.bak
+.scratch/
 .playwright-cli/*
 .reasonix/*
 .codegraph/*
