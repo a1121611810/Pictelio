@@ -3,6 +3,7 @@ import { loadBookmarks } from "../api/novel";
 import type { PixivNovel, RestrictType, ApiError } from "../api/types";
 import { ApiErrorType } from "../api/types";
 import { filterNovels } from "../utils/r18Filter";
+import { contentType } from "./uiStore";
 import { user } from "./authStore";
 import { adaptNovelResponse } from "./shared/novelHelpers";
 import {
@@ -26,7 +27,7 @@ type NovelDeps = { userId: number | null; restrict: RestrictType };
 const store = createTQFeedStore<PixivNovel, "bookmarks", NovelDeps>({
   name: "novel_bookmarks",
   currentTab: () => "bookmarks" as const,
-  enabled: () => !!user(),
+  enabled: () => contentType() === "novel" && !!user(),
   lazy: true,
   getDeps: () => ({ userId: user()?.id ?? 0, restrict: bookmarkRestrictState() }),
   staleTime: 30_000,

@@ -2,6 +2,7 @@ import { createTQFeedStore } from "./shared/createTQFeedStore";
 import { loadRecommended } from "../api/novel";
 import type { PixivNovel } from "../api/types";
 import { filterNovels } from "../utils/r18Filter";
+import { contentType } from "./uiStore";
 import { adaptNovelResponse } from "./shared/novelHelpers";
 import {
   createFeedScrollStore,
@@ -13,7 +14,7 @@ import {
 const store = createTQFeedStore<PixivNovel, "recommended", undefined>({
   name: "novel_recommended",
   currentTab: () => "recommended" as const,
-  enabled: () => true,
+  enabled: () => contentType() === "novel",
   getDeps: () => undefined,
   staleTime: 30_000,
   gcTime: 5 * 60_000,

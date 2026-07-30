@@ -117,6 +117,7 @@ vi.mock("@/stores/uiStore", () => ({
   setCurrentTab: vi.fn(),
   showR18: () => false,
   showR18G: () => false,
+  contentType: () => "novel",
 }));
 
 vi.mock("@/utils/r18Filter", () => ({

@@ -2,6 +2,7 @@ import { createTQFeedStore } from "./shared/createTQFeedStore";
 import { loadFollow } from "../api/novel";
 import type { PixivNovel } from "../api/types";
 import { filterNovels } from "../utils/r18Filter";
+import { contentType } from "./uiStore";
 import { adaptNovelResponse, dedupNovels } from "./shared/novelHelpers";
 import {
   createFeedScrollStore,
@@ -20,7 +21,7 @@ export { setNovelFollowTab };
 const store = createTQFeedStore<PixivNovel, "follow", undefined>({
   name: "novel_follow",
   currentTab: () => "follow" as const,
-  enabled: () => true,
+  enabled: () => contentType() === "novel",
   lazy: true,
   getDeps: () => undefined,
   staleTime: 30_000,

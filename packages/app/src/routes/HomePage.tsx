@@ -1,8 +1,6 @@
 import type { Component } from "solid-js";
 import { currentTab, setContentType, contentType } from "../stores/uiStore";
 import { user, isLoggedIn } from "../stores/authStore";
-import { loading as recLoading } from "../stores/recommendedStore";
-import { loading as folLoading } from "../stores/followStore";
 import { activate as followActivate } from "../stores/followStore";
 import { activate as novelFollowActivate } from "../stores/novelFollowStore";
 import { activate as bookmarkActivate } from "../stores/bookmarkStore";
@@ -57,25 +55,9 @@ const HomePage: Component = () => {
     return domActiveTabs().has(tab);
   }
 
-  // ── Splash Screen 关闭控制 ──
-  // 合并两个 Feed 的 loading 状态：任一变为 true 即触发 splash 关闭
-  let splashDismissed = false;
-  createEffect(() => {
-    if (splashDismissed) return;
-    if (recLoading() || folLoading()) {
-      splashDismissed = true;
-      setTimeout(() => markContentReady(), 350);
-    }
-  });
-
-  // 兜底超时
+  // ── Splash Screen 关闭：组件挂载后立即关闭，让骨架屏立即可见 ──
   onMount(() => {
-    setTimeout(() => {
-      if (!splashDismissed) {
-        splashDismissed = true;
-        markContentReady();
-      }
-    }, 800);
+    markContentReady();
   });
 
   return (
