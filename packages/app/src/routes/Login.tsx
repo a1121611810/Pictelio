@@ -26,6 +26,9 @@ const Login: Component = () => {
     if (isLoggedIn()) {
       navigate("/home", { replace: true });
     }
+    // 进入登录页时清除路由层的滚动缓存（避免 @solidjs/router 的
+    // scrollRestoration 从 sessionStorage 恢复旧位置覆盖自定义恢复）
+    try { sessionStorage.removeItem("solid-router:scroll"); } catch {}
     // 登录页已渲染，通知原生关闭 Splash Screen
     markContentReady();
   });
