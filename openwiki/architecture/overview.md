@@ -77,7 +77,7 @@ Since v3.20.0, **router loaders no longer await network requests**. The project 
 
 **Key changes:**
 - **Loaders are shallow:** They set tab state, reset store, or fire-and-forget trigger data fetch — never `await` network I/O.
-- **Data loading moves to components:** Routes use `onMount` (TabFeedPage, FollowListPage) or `createEffect` (NovelDetail, IllustDetail) to fetch data after render.
+- **Data loading moves to components:** Routes use `onMount` (HomePage, FollowListPage) or `createEffect` (NovelDetail, IllustDetail) to fetch data after render.
 - **Skeleton screens:** Each data-driven route shows a dedicated skeleton component matching its layout while data loads. Six skeleton components live under `/packages/app/src/components/skeletons/`.
 - **Cache-first mount:** `peekEntry()` in novelCache bypasses the skeleton entirely when sync cache hits.
 
@@ -88,8 +88,7 @@ Routes are defined in `/packages/app/src/router.tsx` using `@tanstack/solid-rout
 | Route | Component | Loader (shallow only) |
 |-------|-----------|-----------------------|
 | `/login` | `Login` | — |
-| `/recommended` | `TabFeedPage tab="recommended"` | `makeFeedLoader("recommended")` — sets current tab |
-| `/following` | `TabFeedPage tab="follow"` | `makeFeedLoader("follow")` — sets current tab |
+| `/home` | `HomePage` | — (uiStore defaults to "recommended"; NavBar manages tab switching) |
 | `/illust/:id` | `IllustDetail` | — (data loaded in component via `createEffect`) |
 | `/novel/:id` | `NovelDetail` | — (data loaded in component via `createEffect`) |
 | `/bookmarks` | `Bookmarks` | — |

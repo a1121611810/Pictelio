@@ -36,13 +36,30 @@ describe("api/search.ts", () => {
   it("searchIllust passes custom sort and searchTarget", async () => {
     mockGet.mockResolvedValue({ illusts: [], next_url: null });
     const { searchIllust } = await loadApi();
-    await searchIllust("Fate", "popular_desc", "title_and_caption");
+    await searchIllust("Fate", "date_asc", "title_and_caption");
 
     expect(mockGet).toHaveBeenCalledWith(
       "/v1/search/illust",
       {
         word: "Fate",
-        sort: "popular_desc",
+        sort: "date_asc",
+        search_target: "title_and_caption",
+        filter: "for_ios",
+      },
+      undefined,
+    );
+  });
+
+  it("searchIllust with sort=popular_desc calls popular-preview endpoint", async () => {
+    mockGet.mockResolvedValue({ illusts: [], next_url: null });
+    const { searchIllust } = await loadApi();
+    await searchIllust("Fate", "popular_desc", "title_and_caption");
+
+    // popular_desc 应路由到独立预览端点，不含 sort 参数
+    expect(mockGet).toHaveBeenCalledWith(
+      "/v1/search/popular-preview/illust",
+      {
+        word: "Fate",
         search_target: "title_and_caption",
         filter: "for_ios",
       },
@@ -77,6 +94,22 @@ describe("api/search.ts", () => {
       {
         word: "test",
         sort: "date_asc",
+        search_target: "exact_match_for_tags",
+        filter: "for_ios",
+      },
+      undefined,
+    );
+  });
+
+  it("searchNovel with sort=popular_desc calls popular-preview endpoint", async () => {
+    mockGet.mockResolvedValue({ novels: [], next_url: null });
+    const { searchNovel } = await loadApi();
+    await searchNovel("test", "popular_desc", "exact_match_for_tags");
+
+    expect(mockGet).toHaveBeenCalledWith(
+      "/v1/search/popular-preview/novel",
+      {
+        word: "test",
         search_target: "exact_match_for_tags",
         filter: "for_ios",
       },

@@ -1,10 +1,12 @@
 import type { Component } from "solid-js";
+import { For, Show } from "solid-js";
 import type { SearchResultItem, ApiError, PixivIllust, PixivNovel } from "@/api/types";
 import ImageCard from "@/components/ImageCard";
 import NovelCard from "@/components/NovelCard";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ErrorDisplay from "@/components/ErrorDisplay";
 import FluentIcon from "@/components/ui/FluentIcon";
+import { createSentinel } from "@/primitives/visibility";
 
 interface Props {
   results: SearchResultItem[];
@@ -19,6 +21,12 @@ interface Props {
 }
 
 const SearchResults: Component<Props> = (props) => {
+  // 哨兵自动分页：滚动到底部时自动触发 onLoadMore
+  const { attach: sentinelAttach } = createSentinel({
+    enabled: () => props.hasMore && !props.loading,
+    onTrigger: () => props.onLoadMore(),
+  });
+
   return (
     <div>
       <Show when={props.error}>
@@ -57,28 +65,20 @@ const SearchResults: Component<Props> = (props) => {
           </div>
         </Show>
 
-        {/* Load more or end indicator */}
-        <Show when={!props.loading}>
-          <Show when={props.hasMore && props.results.length > 0}>
-            <div class="flex justify-center py-[var(--spacingVerticalXL)]">
-              <button
-                class="px-[var(--spacingHorizontalXXL)] py-[var(--spacingVerticalM)] min-h-11 rounded-[var(--borderRadiusMedium)] bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] text-sm font-semibold hover:bg-[var(--colorBrandBackgroundHover)] active:scale-[0.98] transition-all duration-[var(--durationFast)] focus-visible:outline-[var(--colorStrokeFocus2)] focus-visible:outline-2 focus-visible:outline-offset-1"
-                onClick={props.onLoadMore}
-              >
-                加载更多
-              </button>
-            </div>
-          </Show>
+        {/* Sentinel for auto-load more (IntersectionObserver) */}
+        <Show when={props.hasMore && props.results.length > 0}>
+          <div ref={sentinelAttach} class="h-1" />
+        </Show>
 
-          <Show when={!props.hasMore && props.results.length > 0}>
-            <div class="flex items-center gap-3 py-[var(--spacingVerticalXXL)]" role="separator">
-              <span class="flex-1 h-[var(--strokeWidthThin)] bg-[var(--colorNeutralStroke2)]" />
-              <span class="text-[var(--colorNeutralForeground4)] [font-size:var(--fontSizeBase200)] flex-shrink-0">
-                没有更多了
-              </span>
-              <span class="flex-1 h-[var(--strokeWidthThin)] bg-[var(--colorNeutralStroke2)]" />
-            </div>
-          </Show>
+        {/* End indicator — hasMore 为 false 且非加载中时显示 */}
+        <Show when={!props.loading && !props.hasMore && props.results.length > 0}>
+          <div class="flex items-center gap-3 py-[var(--spacingVerticalXXL)]" role="separator">
+            <span class="flex-1 h-[var(--strokeWidthThin)] bg-[var(--colorNeutralStroke2)]" />
+            <span class="text-[var(--colorNeutralForeground4)] [font-size:var(--fontSizeBase200)] flex-shrink-0">
+              没有更多了
+            </span>
+            <span class="flex-1 h-[var(--strokeWidthThin)] bg-[var(--colorNeutralStroke2)]" />
+          </div>
         </Show>
 
         {/* Empty state */}

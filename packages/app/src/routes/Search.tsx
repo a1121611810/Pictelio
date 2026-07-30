@@ -277,6 +277,13 @@ const Search: Component = () => {
         <div class="max-w-3xl mx-auto">
           {/* ── Search bar — Fluent 2 flat surface card ── */}
           <div class="surface-card mx-4 mt-4 flex items-center gap-2 px-[var(--spacingHorizontalM)] py-[var(--spacingVerticalM)]">
+            <button
+              class="flex items-center justify-center min-w-10 min-h-10 rounded-[var(--borderRadiusSmall)] text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-95 transition-all duration-[var(--durationFast)] flex-shrink-0"
+              onClick={() => window.history.back()}
+              aria-label="返回"
+            >
+              <FluentIcon name="chevronLeft" size={20} />
+            </button>
             <span class="flex-shrink-0 text-[var(--colorNeutralForeground3)]">
               <FluentIcon name="search" size={20} />
             </span>

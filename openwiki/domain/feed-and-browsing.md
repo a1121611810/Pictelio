@@ -11,28 +11,29 @@ The feed and browsing system covers the primary user experience: discovering and
 
 ## Feed Architecture
 
-Two main feed types are defined in `/packages/app/src/routes/` and backed by stores in `/packages/app/src/stores/`:
+Two feed content types are rendered inside the consolidated **HomePage** (`/packages/app/src/routes/HomePage.tsx`) at the `/home` route. Navigation between the recommended, follow, bookmarks, and history tabs is handled by **NavBar** (`/packages/app/src/components/NavBar.tsx`), which maps both "recommended" and "follow" tabs to `/home` and uses in-page CSS display toggling via `currentTab()` for the illust tabs (no router-level navigation for recommend/follow switching).
 
 | Feed | Route | Component | Store(s) |
 |------|-------|-----------|----------|
-| Recommended | `/recommended` | `TabFeedPage tab="recommended"` | `feedStore.ts` (legacy), `recommendedStore.ts` (new, unintegrated) |
-| Following | `/following` | `TabFeedPage tab="follow"` | `feedStore.ts` (legacy), `followStore.ts` (new, unintegrated) |
-| Novel Feed | `/novel-feed` | `NovelFeedPage` | `novelStore.ts` (legacy), `novelRecommendedStore.ts`, `novelFollowStore.ts`, `novelBookmarkStore.ts` (all new, unintegrated) |
+| Recommended (illusts) | `/home` (tab: recommended) | `RecommendedFeed` | `recommendedStore.ts` (new split store) |
+| Follow (illusts) | `/home` (tab: follow) | `FollowFeed` | `followStore.ts` (new split store) |
+| Novel Feed (recommended) | `/home` (tab: recommended, novel mode) | `NovelFeedPage tab="recommended"` (embedded fallback) | `novelStore.ts` (legacy) |
+| Novel Feed (follow) | `/home` (tab: follow, novel mode) | `NovelFeedPage tab="follow"` (embedded fallback) | `novelStore.ts` (legacy) |
 
-> **Ongoing refactor (illusts):** The monolithic `feedStore.ts` is being split into dedicated per-tab stores. `recommendedStore.ts` and `followStore.ts` are added as separate modules but not yet imported by routes — the legacy `feedStore.ts` remains the live store. Shared helpers (`dedupIllusts`, `nextPageOrLoad`) have been extracted to `feedHelpers.ts`.
+> **Illust stores — integrated (v3.21.x):** The illust feed split is now live. `RecommendedFeed` and `FollowFeed` import directly from the new split stores (`recommendedStore.ts` and `followStore.ts`). The legacy `feedStore.ts` remains in the codebase but is no longer imported by any route component. Shared helpers (`dedupIllusts`, `nextPageOrLoad`) live in `feedHelpers.ts`.
 
-> **Ongoing refactor (novels):** The monolithic `novelStore.ts` is being split into dedicated per-tab stores in the same pattern. `novelRecommendedStore.ts`, `novelFollowStore.ts`, and `novelBookmarkStore.ts` are added but not yet imported by routes. Shared helpers (`adaptNovelResponse`, `dedupNovels`) have been extracted to `novelHelpers.ts`.
+> **Ongoing refactor (novels):** The monolithic `novelStore.ts` is being split into dedicated per-tab stores in the same pattern. `novelRecommendedStore.ts`, `novelFollowStore.ts`, and `novelBookmarkStore.ts` are added but not yet imported by routes — the novel feed components embedded in HomePage still pass through to `NovelFeedPage`, which imports from `novelStore.ts`. Shared helpers (`adaptNovelResponse`, `dedupNovels`) have been extracted to `novelHelpers.ts`.
 
-### TabFeedPage
+### HomePage (Consolidated Home)
 
-`/packages/app/src/routes/TabFeedPage.tsx` — The shared feed page with sub-tab support:
-- **Recommended sub-tabs:** mixed / illust / manga
-- **Follow sub-tabs:** all / public / private
-- **Data loaded in `onMount`** (not via router loader): `ensureLoaded(signal)` with AbortController for cancel-on-unmount
-- Per-tab scroll state restoration via `scrollKey`
-- R18 filter reactivity via `r18Handler` closure
-- Shows `FeedSkeleton` while no data is available (ADR-0038 immediate navigation pattern)
-- **Splash dismiss:** Loading-triggered strategy — a `createEffect` watches TanStack Query's `loading()` signal; when it becomes `true`, a 350ms `setTimeout` calls `markContentReady()` to ensure the skeleton screen has painted before the native splash exits. An 800ms `onMount` fallback handles the cached-data case where `loading()` never transitions. The native exit animation (120ms scale+fade via `setOnExitAnimationListener`) is controlled in `MainActivity.java`. See [Architecture — Splash Screen](/openwiki/architecture/overview.md#splash-screen-js-bridge) for full version history.
+`/packages/app/src/routes/HomePage.tsx` — The single home page at `/home` replacing the old separate `/recommended` and `/following` routes:
+
+- **Shared sticky header** with user avatar, app title, and content-type toggle (illust / novel)
+- **Content type switching** toggles between illust feeds (`RecommendedFeed`/`FollowFeed`) and novel feeds (`NovelFeedPage`) via `contentType()` from `uiStore`
+- **Tab panels** use CSS `display` toggling (`currentTab() === "recommended" ? "block" : "none"`) — both RecommendedFeed and FollowFeed are mounted, only one visible at a time
+- **Data loaded in `onMount`** (not via router loader): each feed component calls `ensureLoaded(signal)` with AbortController for cancel-on-unmount
+- **Splash dismiss:** Merges `recLoading()` and `folLoading()` into one `createEffect` — fires 350ms `setTimeout` → `markContentReady()` on first loading signal; 800ms `onMount` fallback for cached-data case
+- **Scroll state saved per-tab** via `saveTabScroll("recommended")` / `saveTabScroll("follow")` on unmount
 
 ### Feed Store Factory
 
@@ -72,12 +73,17 @@ Shared helpers migrated from `novelStore.ts` to `novelHelpers.ts`:
 
 ```mermaid
 flowchart LR
-    TFP[TabFeedPage] --> FS[feedStore]
-    FS --> TQ[createTQFeedStore]
+    HP[HomePage /home] --> RF[RecommendedFeed]
+    HP --> FF[FollowFeed]
+    RF --> RS[recommendedStore]
+    FF --> FS[followStore]
+    RS --> TQ[createTQFeedStore]
+    FS --> TQ
     TQ --> QC[queryClient.ts]
     QC --> API[api/client.ts]
     API --> P[Pixiv API]
-    TFP --> VF[VirtualFeed]
+    RF --> VF[VirtualFeed]
+    FF --> VF
     VF --> IC[ImageCard / GridCard]
     VF --> CFV[createFeedVirtualizer]
 ```
@@ -122,9 +128,13 @@ User settings control visibility of each tier. An **AgeConfirmation** gate (`/pa
 
 ## Search
 
-`/packages/app/src/routes/Search.tsx` — Dedicated search page for illusts and novels. Backed by:
+`/packages/app/src/routes/Search.tsx` — Dedicated search page for illusts and novels with a back button in the search bar. Backed by:
 - `/packages/app/src/api/search.ts` — API search endpoints
 - `/packages/app/src/stores/searchStore.ts` — Search state (query, history, results)
+
+**Popular sort routing:** When `sort=popular_desc` is selected, the search API routes to Pixiv's `/v1/search/popular-preview/illust` or `/v1/search/popular-preview/novel` endpoints instead of the standard `/v1/search/illust` or `/v1/search/novel` endpoints. These popular-preview endpoints return a single un-paginated page of popular results in that category without the `sort` parameter — the `popular_desc` sort mode is implicit in the endpoint choice.
+
+**Auto-load via sentinel:** `SearchResults` (`/packages/app/src/components/SearchResults.tsx`) uses an IntersectionObserver sentinel (`createSentinel`) placed at the bottom of the results list. When the sentinel scrolls into view and `hasMore` is true, `onLoadMore` fires automatically — replacing the earlier manual "Load more" button UX. An end-of-results separator ("没有更多了") appears when `hasMore` becomes false.
 
 ## Bookmarks
 
@@ -190,14 +200,20 @@ User profile data is loaded via `/packages/app/src/primitives/useUserProfile.ts`
 
 | Purpose | Path |
 |---------|------|
-| Feed page | `/packages/app/src/routes/Feed.tsx` |
-| Tab feed page | `/packages/app/src/routes/TabFeedPage.tsx` |
-| Feed store | `/packages/app/src/stores/feedStore.ts` |
+| Home page (consolidated) | `/packages/app/src/routes/HomePage.tsx` |
+| Recommended feed component | `/packages/app/src/components/RecommendedFeed.tsx` |
+| Follow feed component | `/packages/app/src/components/FollowFeed.tsx` |
+| Tab feed page (legacy, unused by routes) | `/packages/app/src/routes/TabFeedPage.tsx` |
+| Recommended store (new) | `/packages/app/src/stores/recommendedStore.ts` |
+| Follow store (new) | `/packages/app/src/stores/followStore.ts` |
+| Feed store (legacy) | `/packages/app/src/stores/feedStore.ts` |
 | TQ feed store factory | `/packages/app/src/stores/shared/createTQFeedStore.ts` |
+| Feed helpers | `/packages/app/src/stores/shared/feedHelpers.ts` |
 | Virtual feed component | `/packages/app/src/components/VirtualFeed.tsx` |
 | Feed virtualizer | `/packages/app/src/primitives/createFeedVirtualizer.ts` |
 | Image card | `/packages/app/src/components/ImageCard.tsx` |
 | Grid card | `/packages/app/src/components/GridCard.tsx` |
+| Nav bar (tab router) | `/packages/app/src/components/NavBar.tsx` |
 | Search page | `/packages/app/src/routes/Search.tsx` |
 | Search store | `/packages/app/src/stores/searchStore.ts` |
 | History store | `/packages/app/src/stores/historyStore.ts` |

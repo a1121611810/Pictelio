@@ -23,6 +23,14 @@ export function searchIllust(
   searchTarget: SearchTarget = "partial_match_for_tags",
   signal?: AbortSignal,
 ): Promise<PixivIllustListResponse> {
+  // sort=popular_desc 路由到独立热门预览端点（不分页），其他排序走标准搜索端点
+  if (sort === "popular_desc") {
+    return apiClient.get<PixivIllustListResponse>(
+      "/v1/search/popular-preview/illust",
+      { word, search_target: searchTarget, filter: "for_ios" },
+      signal,
+    );
+  }
   return apiClient.get<PixivIllustListResponse>(
     "/v1/search/illust",
     { word, sort, search_target: searchTarget, filter: "for_ios" },
@@ -36,6 +44,14 @@ export function searchNovel(
   searchTarget: SearchTarget = "partial_match_for_tags",
   signal?: AbortSignal,
 ): Promise<PixivNovelListResponse> {
+  // sort=popular_desc 路由到独立热门预览端点（不分页），其他排序走标准搜索端点
+  if (sort === "popular_desc") {
+    return apiClient.get<PixivNovelListResponse>(
+      "/v1/search/popular-preview/novel",
+      { word, search_target: searchTarget, filter: "for_ios" },
+      signal,
+    );
+  }
   return apiClient.get<PixivNovelListResponse>(
     "/v1/search/novel",
     { word, sort, search_target: searchTarget, filter: "for_ios" },
