@@ -61,7 +61,6 @@ const HomePage: Component = () => {
 
   return (
     <>
-      <div style="position:fixed;top:0;left:0;right:0;height:4px;background:red;z-index:99999;"></div>
       <PageTransition>
         <div class="pb-16">
           {/* ── Shared Header ── */}
