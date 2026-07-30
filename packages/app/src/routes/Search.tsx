@@ -284,7 +284,7 @@ const Search: Component = () => {
             >
               <FluentIcon name="chevronLeft" size={20} />
             </button>
-            <span class="flex-shrink-0 text-[var(--colorNeutralForeground3)]">
+            <span class="flex-shrink-0 text-[var(--colorNeutralForeground3)] leading-[normal]">
               <FluentIcon name="search" size={20} />
             </span>
             <TagInput
