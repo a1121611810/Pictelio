@@ -240,43 +240,72 @@ async function nativeExecuteRequest<T>(
   body?: Record<string, string>,
   signal?: AbortSignal,
 ): Promise<T> {
-  if (isNative) {
-    const result = await PixivApi.request({
-      method,
-      path,
-      params: data,
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    if (result.status >= 400) {
-      let parsedBody: unknown = null;
-      try {
-        parsedBody = JSON.parse(result.data);
-      } catch {
-        /* ignore parse errors */
+  /** 实际执行请求（不包含重试逻辑） */
+  async function exec(): Promise<T> {
+    if (isNative) {
+      const result = await PixivApi.request({
+        method,
+        path,
+        params: data,
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      if (result.status >= 400) {
+        let parsedBody: unknown = null;
+        try {
+          parsedBody = JSON.parse(result.data);
+        } catch {
+          /* ignore parse errors */
+        }
+        throw classifyError(result.status, null, parsedBody);
       }
-      throw classifyError(result.status, null, parsedBody);
+      return JSON.parse(result.data) as T;
     }
-    return JSON.parse(result.data) as T;
+
+    // Web 模式：走 Vite 代理
+    const headers: Record<string, string> = {
+      "User-Agent": PIXIV_USER_AGENT,
+      Referer: __PUBLIC_CONFIG__.referer,
+    };
+    if (method === "GET") {
+      if (devAccessToken) headers["Authorization"] = `Bearer ${devAccessToken}`;
+      const params = data ? "?" + new URLSearchParams(data).toString() : "";
+      const res = await fetch(rewriteUrl(path) + params, { method: "GET", headers, signal });
+      if (!res.ok) throw classifyError(res.status, null, await res.json().catch(() => null));
+      return res.json() as Promise<T>;
+    } else {
+      if (devAccessToken) headers["Authorization"] = `Bearer ${devAccessToken}`;
+      headers["Content-Type"] = __PUBLIC_CONFIG__.contentType;
+      const bodyStr = data ? new URLSearchParams(data).toString() : "";
+      const res = await fetch(rewriteUrl(path), { method: "POST", headers, body: bodyStr });
+      if (!res.ok) throw classifyError(res.status, null, await res.json().catch(() => null));
+      return res.json() as Promise<T>;
+    }
   }
 
-  // Web 模式：走 Vite 代理
-  const headers: Record<string, string> = {
-    "User-Agent": PIXIV_USER_AGENT,
-    Referer: __PUBLIC_CONFIG__.referer,
-  };
-  if (method === "GET") {
-    if (devAccessToken) headers["Authorization"] = `Bearer ${devAccessToken}`;
-    const params = data ? "?" + new URLSearchParams(data).toString() : "";
-    const res = await fetch(rewriteUrl(path) + params, { method: "GET", headers, signal });
-    if (!res.ok) throw classifyError(res.status, null, await res.json().catch(() => null));
-    return res.json() as Promise<T>;
-  } else {
-    if (devAccessToken) headers["Authorization"] = `Bearer ${devAccessToken}`;
-    headers["Content-Type"] = __PUBLIC_CONFIG__.contentType;
-    const bodyStr = data ? new URLSearchParams(data).toString() : "";
-    const res = await fetch(rewriteUrl(path), { method: "POST", headers, body: bodyStr });
-    if (!res.ok) throw classifyError(res.status, null, await res.json().catch(() => null));
-    return res.json() as Promise<T>;
+  // 等待启动中的 auth 刷新完成（避免在 token 就绪前发送请求）
+  if (devAuth.refreshPromise) {
+    await devAuth.refreshPromise;
+  }
+
+  // 认证失效重试：UNAUTHORIZED 错误（含 400 OAuth 错误）先调 onUnauthorized 刷新 token
+  // 并发 401 通过 refreshPromise 去重：第一个触发刷新，后续等待同一个 promise
+  try {
+    return await exec();
+  } catch (err) {
+    const apiErr = err as ApiError;
+    if (apiErr.type === ApiErrorType.UNAUTHORIZED && devAuth.onUnauthorized) {
+      if (devAuth.refreshPromise) {
+        // 已有请求在刷新 token，等待即可
+        await devAuth.refreshPromise;
+      } else {
+        // 第一个遇到 401 的请求触发刷新
+        const promise = devAuth.onUnauthorized().finally(() => setRefreshPromise(null));
+        setRefreshPromise(promise);
+        await promise;
+      }
+      return await exec();
+    }
+    throw err;
   }
 }
 
