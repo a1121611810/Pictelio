@@ -31,6 +31,7 @@ import { warmCacheFromDisk } from "@/utils/imageLoader";
 import { loadReportedIds } from "@/stores/reportStore";
 import { loadBlockedIds } from "@/stores/blockStore";
 import { loadImageHostPreference } from "@/stores/imageHostStore";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { markContentReady } from "@/native/splashBridge";
 /** 启动后检查更新的延迟时间（ms），确保页面渲染完成后再弹窗 */
 const STARTUP_CHECK_DELAY_MS = 500;
@@ -178,7 +179,15 @@ const RootLayout: Component = (props: { children?: any }) => {
 
   return (
     <div class="page">
-      <ErrorBoundary
+      <Show
+        when={!isLoading()}
+        fallback={
+          <div class="min-h-screen flex items-center justify-center bg-[var(--colorNeutralBackground2)]">
+            <LoadingSpinner size="lg" text="加载中" />
+          </div>
+        }
+      >
+        <ErrorBoundary
         fallback={(err, reset) => (
           <div class="flex flex-col items-center justify-center min-h-screen gap-4 p-8">
             <p class="text-[var(--colorStatusDangerForeground1)] text-lg font-semibold">
@@ -199,6 +208,7 @@ const RootLayout: Component = (props: { children?: any }) => {
         {/* 子路由由 @solidjs/router 自动通过 props.children 传入 */}
         {props.children}
       </ErrorBoundary>
+      </Show>
 
       {/* Exit hint toast */}
       <Show when={showExitHint()}>

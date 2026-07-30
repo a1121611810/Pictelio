@@ -130,7 +130,9 @@ The native Splash Screen uses AndroidX `core-splashscreen` (compat library) with
 | `/home` | `HomePage.tsx` `onMount` | **Immediate on mount** — `markContentReady()` called directly in `onMount`. Splash exit animation (120ms scale+fade) runs from `MainActivity`. Skeleton is guaranteed visible because `createTQFeedStore` now uses `enabled: false` (ADR-0042) and data loading is deferred via `setTimeout(0)` (ADR-0043). |
 | Other routes (age-confirmation, etc.) | `__root.tsx` fallback | Auth init completes (after `setIsLoading(false)`) |
 
-> **v3.21.5+:** Splash close for feed routes moved from `Feed.tsx` (waited for first data load) to `TabFeedPage.tsx` (closes immediately on component mount, showing skeleton content). The JS loading overlay in `__root.tsx` was also made invisible — the native Splash now handles the full loading indicator lifecycle, eliminating the redundant `LoadingSpinner` flash after Splash exit. The router's `defaultPendingComponent: LoadingSpinner` was also removed (`router.tsx` commit `607c6f4`), removing a second source of loading flash during lazy route resolution.
+> **v3.21.5+:** Splash close for feed routes moved from `Feed.tsx` (waited for first data load) to `TabFeedPage.tsx` (closes immediately on component mount, showing skeleton content). The JS loading overlay in `__root.tsx` was made invisible — the native Splash handled the full loading indicator lifecycle, eliminating a redundant `LoadingSpinner` flash after Splash exit. The router's `defaultPendingComponent: LoadingSpinner` was also removed (`router.tsx` commit `607c6f4`), removing a second source of loading flash during lazy route resolution.
+
+> **Current (loading overlay re-introduced):** The `__root.tsx` loading overlay has been re-introduced as a full-screen `LoadingSpinner` wrapper (`<Show when={!isLoading()}>`) shown during the auth initialization phase — from app render until `initializeAuth()` resolves (`setIsLoading(false)`). After auth completes, the real route content renders. This provides visual feedback during the auth-boot window without router-level lazy loading indicators. The catch-all route `/*all` was also changed from `Login` to `HomePage`, so unknown paths now render the home page (which redirects to `/login` if unauthenticated via the auth guard in `__root.tsx`).
 >
 > **v3.21.6+ (commit `6ff2c6d`):** TabFeedPage splash dismiss refined from immediate `onMount` → `markContentReady()` to a **loading-triggered strategy**: a `createEffect` watches `loading()` (TanStack Query fetch start signal), and when `loading()` becomes `true`, it calls `markContentReady()` inside `requestAnimationFrame` — ensuring the skeleton screen has been painted to the display before the native Splash exits. A 100ms `setTimeout` fallback (reduced from 500ms) guarantees the splash is never left visible indefinitely. Splash exit animation duration reduced from 280ms to 100ms.
 >
@@ -143,6 +145,7 @@ The native Splash Screen uses AndroidX `core-splashscreen` (compat library) with
 This ensures the splash screen is dismissed at the earliest meaningful point — either when login UI is ready, feed content is visible, or the app has finished loading for non-feed pages. See [Android Native & Build](/openwiki/integrations/android-native.md#splash-screen-js-bridge) for full details.
 
 **Root layout** (`/packages/app/src/routes/__root.tsx`) provides:
+- **Auth-loading wrapper** — Full-screen `LoadingSpinner` via `<Show when={!isLoading()}>` shown during the auth initialization phase (from app render until `initializeAuth()` resolves)
 - NavBar component (auto-hiding on scroll)
 - Bottom navigation bar
 - Pull-to-refresh behavior

@@ -21,7 +21,7 @@ const LoadingSpinner: Component<Props> = (props) => {
 
   return (
     <div
-      class="flex flex-col items-center justify-center py-12 gap-3"
+      class="flex flex-col items-center justify-center gap-3"
       style={{
         animation: "fluent-scale-enter var(--durationNormal) var(--curveDecelerateMid) both",
       }}
