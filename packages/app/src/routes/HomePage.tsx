@@ -18,6 +18,31 @@ const HomePage: Component = () => {
   const navigate = useNavigate();
   const { visible: headerVisible, suppress: suppressHeaderVisibility } = createScrollBehavior();
 
+  // ── LRU Tab DOM 管理 ──
+  // 追踪每个 Tab 的最后访问时间，仅保留最近 2 个 Tab 的完整 DOM
+  const MAX_DOM_TABS = 2;
+  const [lastAccess, setLastAccess] = createStore<Record<string, number>>({
+    recommended: Date.now(),
+    follow: 0,
+    bookmarks: 0,
+    history: 0,
+  });
+
+  createEffect(() => {
+    setLastAccess(currentTab(), Date.now());
+  });
+
+  const domActiveTabs = createMemo(() => {
+    const entries = Object.entries(lastAccess)
+      .filter(([, ts]) => ts > 0)
+      .sort(([, a], [, b]) => b - a);
+    return new Set(entries.slice(0, MAX_DOM_TABS).map(([key]) => key));
+  });
+
+  function isDomActive(tab: string): boolean {
+    return domActiveTabs().has(tab);
+  }
+
   // ── Splash Screen 关闭控制 ──
   // 合并两个 Feed 的 loading 状态：任一变为 true 即触发 splash 关闭
   let splashDismissed = false;
@@ -93,27 +118,35 @@ const HomePage: Component = () => {
             </Show>
           </header>
 
-          {/* ── Tab content panels (CSS display toggling) ── */}
+          {/* ── Tab content panels ── */}
+          <Show when={isDomActive("recommended")}>
           <div
             style={{ display: currentTab() === "recommended" ? "block" : "none" }}
           >
             <RecommendedFeed suppressHeaderVisibility={suppressHeaderVisibility} />
           </div>
+          </Show>
+          <Show when={isDomActive("follow")}>
           <div
             style={{ display: currentTab() === "follow" ? "block" : "none" }}
           >
             <FollowFeed suppressHeaderVisibility={suppressHeaderVisibility} />
           </div>
+          </Show>
+          <Show when={isDomActive("bookmarks")}>
           <div
             style={{ display: currentTab() === "bookmarks" ? "block" : "none" }}
           >
             <BookmarksFeed suppressHeaderVisibility={suppressHeaderVisibility} />
           </div>
+          </Show>
+          <Show when={isDomActive("history")}>
           <div
             style={{ display: currentTab() === "history" ? "block" : "none" }}
           >
             <HistoryFeed />
           </div>
+          </Show>
         </div>
       </PageTransition>
 
