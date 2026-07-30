@@ -1,5 +1,5 @@
 {
-  "version": "3.21.3",
-  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.21.3",
-  "changelog": "首页全面翻新，Tab 结构让你在推荐、关注、书签、历史之间切换更快更流畅。启动速度提升、翻页更跟手，小说和图片浏览体验也做了大量优化。累积 49 个提交，大量性能与稳定性改进。"
+  "version": "3.21.4",
+  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.21.4",
+  "changelog": "🐛 修复\n  fix(auth): 修复启动时 token 恢复竞态条件"
 }

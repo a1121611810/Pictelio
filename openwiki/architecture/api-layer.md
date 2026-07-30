@@ -85,8 +85,8 @@ For first-time login, Pictelio uses the PKCE authorization code flow:
 Pixiv returns HTTP 400 (not 401) for expired `refresh_token`. The function `isOAuthTokenErrorResponse()` in `client.ts` detects this specific case (`400` + error body containing "invalid_request").
 
 **Permanent vs transient error branching** (`authStore.ts`): When `performRefresh` catches an error, the auth store distinguishes:
-- **Permanent errors** (OAuth HTTP 400-409): The `refresh_token` is irrecoverably expired or revoked. `isAuthErrorPermanent()` matches `"HTTP 40"` in the error message (covering 400 through 409), triggering full `logout()` which deletes the persisted token.
-- **Transient errors** (TypeError/network timeout/HTTP 429 rate limiting): Temporary connectivity or throttling failure. `clearAuthState()` resets the in-memory signal state (`isLoggedIn`, `user`, `tokenReady`) but **preserves** the persisted `refresh_token` so the next `initializeAuth()` call (e.g. on app resume) can retry.
+- **Permanent errors** (OAuth HTTP 400-409): The `refresh_token` is irrecoverably expired or revoked. `isAuthErrorPermanent()` first short-circuits on `err instanceof TypeError` (always transient), then checks for `"HTTP 40"` in the error message (covering 400 through 409). Errors that match neither (unknown types) default to transient. Triggers full `logout()` which deletes the persisted token.
+- **Transient errors** (TypeError/network timeout/HTTP 429 rate limiting): Temporary connectivity or throttling failure. `clearAuthState()` resets the in-memory signal state (`isLoggedIn`, `user`, `tokenReady`) and calls `appStateListener?.remove()` to prevent duplicate listener registration, but **preserves** the persisted `refresh_token` so the next `initializeAuth()` call (e.g. on app resume) can retry.
 
 This replaces the earlier unconditional `logout()` on any refresh failure — introducing resilience to network flakiness during startup auth.
 
