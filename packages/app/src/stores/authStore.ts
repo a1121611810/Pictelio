@@ -73,14 +73,16 @@ export async function initializeAuth() {
 }
 
 async function performRefresh(token: string) {
-  const [err] = await tryAsync(refreshToken(token).then(async (resp) => {
-    syncToken(resp.access_token);
-    setRefreshTokenSig(resp.refresh_token);
-    setUser(resp.user);
-    setIsLoggedIn(true);
-    lastRefreshTime = Date.now();
-    await setRefreshToken(resp.refresh_token);
-  }));
+  const [err] = await tryAsync(
+    refreshToken(token).then(async (resp) => {
+      syncToken(resp.access_token);
+      setRefreshTokenSig(resp.refresh_token);
+      setUser(resp.user);
+      setIsLoggedIn(true);
+      lastRefreshTime = Date.now();
+      await setRefreshToken(resp.refresh_token);
+    }),
+  );
   if (err) await logout();
 }
 

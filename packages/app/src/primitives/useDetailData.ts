@@ -1,4 +1,3 @@
-
 import type { Accessor } from "solid-js";
 import { toApiError } from "../api/client";
 import type { ApiError } from "../api/types";

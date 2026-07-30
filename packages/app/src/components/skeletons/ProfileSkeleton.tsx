@@ -20,8 +20,7 @@ const ProfileSkeleton: Component = () => (
           display: "flex",
           "align-items": "center",
           "justify-content": "space-between",
-          padding:
-            "var(--spacingVerticalM) var(--spacingHorizontalL)",
+          padding: "var(--spacingVerticalM) var(--spacingHorizontalL)",
         }}
       >
         {/* Back button placeholder */}
@@ -54,8 +53,7 @@ const ProfileSkeleton: Component = () => (
           style={{
             background: "var(--pageCardSurface)",
             "border-radius": "var(--pageCardRadius)",
-            padding:
-              "var(--spacingVerticalL) var(--spacingHorizontalXL)",
+            padding: "var(--spacingVerticalL) var(--spacingHorizontalXL)",
             display: "flex",
             "align-items": "center",
             gap: "var(--spacingHorizontalL)",
@@ -97,53 +95,49 @@ const ProfileSkeleton: Component = () => (
           }}
         >
           {/* 5 menu items: 我的作品, 我的收藏, 我的关注, 我的粉丝, 设置 */}
-          {["我的作品", "我的收藏", "我的关注", "我的粉丝", "设置"].map(
-            (_label, i) => (
-              <div
+          {["我的作品", "我的收藏", "我的关注", "我的粉丝", "设置"].map((_label, i) => (
+            <div
+              style={{
+                display: "flex",
+                "align-items": "center",
+                padding: "var(--spacingVerticalL) var(--spacingHorizontalXL)",
+                gap: "var(--spacingHorizontalM)",
+                ...(i < 4
+                  ? {
+                      "border-bottom": "1px solid var(--pageCardBorder)",
+                    }
+                  : {}),
+              }}
+            >
+              {/* Icon placeholder */}
+              <SkeletonShimmer
                 style={{
-                  display: "flex",
-                  "align-items": "center",
-                  padding:
-                    "var(--spacingVerticalL) var(--spacingHorizontalXL)",
-                  gap: "var(--spacingHorizontalM)",
-                  ...(i < 4
-                    ? {
-                        "border-bottom":
-                          "1px solid var(--pageCardBorder)",
-                      }
-                    : {}),
+                  width: "22px",
+                  height: "22px",
+                  "border-radius": "var(--borderRadiusSmall)",
+                  "flex-shrink": "0",
                 }}
-              >
-                {/* Icon placeholder */}
-                <SkeletonShimmer
-                  style={{
-                    width: "22px",
-                    height: "22px",
-                    "border-radius": "var(--borderRadiusSmall)",
-                    "flex-shrink": "0",
-                  }}
-                />
-                {/* Label placeholder */}
-                <SkeletonShimmer
-                  style={{
-                    flex: "1",
-                    height: "var(--spacingVerticalL)",
-                    "border-radius": "var(--borderRadiusSmall)",
-                    "max-width": "100px",
-                  }}
-                />
-                {/* Chevron placeholder */}
-                <SkeletonShimmer
-                  style={{
-                    width: "16px",
-                    height: "16px",
-                    "border-radius": "var(--borderRadiusSmall)",
-                    "flex-shrink": "0",
-                  }}
-                />
-              </div>
-            ),
-          )}
+              />
+              {/* Label placeholder */}
+              <SkeletonShimmer
+                style={{
+                  flex: "1",
+                  height: "var(--spacingVerticalL)",
+                  "border-radius": "var(--borderRadiusSmall)",
+                  "max-width": "100px",
+                }}
+              />
+              {/* Chevron placeholder */}
+              <SkeletonShimmer
+                style={{
+                  width: "16px",
+                  height: "16px",
+                  "border-radius": "var(--borderRadiusSmall)",
+                  "flex-shrink": "0",
+                }}
+              />
+            </div>
+          ))}
         </div>
       </div>
     </div>

@@ -1,7 +1,6 @@
 import type { Component } from "solid-js";
 import { checkImageCache, loadImageWithProgress } from "../utils/imageLoader";
 
-
 interface Props {
   imageUrls: string[];
   /** 预览图 URL 列表（与 imageUrls 一一对应），用于打开时从 LRU 缓存取模糊占位图 */

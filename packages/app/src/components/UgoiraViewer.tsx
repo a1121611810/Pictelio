@@ -2,7 +2,6 @@ import type { Component } from "solid-js";
 import { downloadAndExtractUgoira, type UgoiraFrame } from "../api/illust";
 import PixivImage from "./PixivImage";
 
-
 interface Props {
   illustId: number;
   coverUrl: string;

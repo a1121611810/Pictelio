@@ -63,16 +63,18 @@ export function useUserProfile(
       onCleanup(() => {
         cancelled = true;
       });
-      void tryAsync((async () => {
-        const [err, r] = await tryAsync(loadImage(src));
-        if (cancelled) return;
-        if (err) {
-          setAvatarErrored(true);
-          return;
-        }
-        setAvatarUrl(r!.url);
-        r!.cleanup();
-      })());
+      void tryAsync(
+        (async () => {
+          const [err, r] = await tryAsync(loadImage(src));
+          if (cancelled) return;
+          if (err) {
+            setAvatarErrored(true);
+            return;
+          }
+          setAvatarUrl(r!.url);
+          r!.cleanup();
+        })(),
+      );
     } else {
       setAvatarUrl(resolveImageUrl(src));
     }

@@ -16,17 +16,19 @@ const DebugImage: Component = () => {
     const proxyUrl = resolveImageUrl(url);
     setResult(`测试: ${url}\n代理: ${proxyUrl}\n请求中...`);
 
-    const [fetchErr] = await tryAsync((async () => {
-      const resp = await fetch(proxyUrl);
-      const blob = await resp.blob();
-      if (resp.ok && blob.size > 0) {
-        setResult(`✅ 成功! HTTP ${resp.status}, 大小: ${blob.size} bytes, 类型: ${blob.type}`);
-        const objUrl = URL.createObjectURL(blob);
-        setImgSrc(objUrl);
-      } else {
-        setResult(`❌ 失败: HTTP ${resp.status}, 大小: ${blob.size}`);
-      }
-    })());
+    const [fetchErr] = await tryAsync(
+      (async () => {
+        const resp = await fetch(proxyUrl);
+        const blob = await resp.blob();
+        if (resp.ok && blob.size > 0) {
+          setResult(`✅ 成功! HTTP ${resp.status}, 大小: ${blob.size} bytes, 类型: ${blob.type}`);
+          const objUrl = URL.createObjectURL(blob);
+          setImgSrc(objUrl);
+        } else {
+          setResult(`❌ 失败: HTTP ${resp.status}, 大小: ${blob.size}`);
+        }
+      })(),
+    );
     if (fetchErr) {
       setResult(`❌ 网络错误: ${(fetchErr as Error).message}`);
     }

@@ -1,4 +1,3 @@
-
 import type { Accessor } from "solid-js";
 import type { PixivComment } from "../api/types";
 import type { CommentContentType } from "../api/comment";

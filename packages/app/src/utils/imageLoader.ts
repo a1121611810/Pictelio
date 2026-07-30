@@ -4,7 +4,6 @@ import { PixivApi } from "../native/PixivApi";
 import { isImageHostEnabled } from "../stores/imageHostStore";
 import { getEffectiveImageUrl, getRaceCandidateUrls } from "../services/imageHostService";
 
-
 const isNative = Capacitor.isNativePlatform();
 
 // 定时器 ID —— 必须在模块顶层调用之前声明，避免 let/const 暂时性死区（TDZ）

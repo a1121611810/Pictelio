@@ -1,4 +1,3 @@
-
 import type { Accessor } from "solid-js";
 import type { PixivIllust } from "../api/types";
 import { addBookmark, deleteBookmark, followUser, unfollowUser } from "../api/illust";
@@ -34,9 +33,7 @@ export function useCardInteractions(illust: PixivIllust): CardInteractions {
     const prev = isFollowed();
     setIsFollowed(!prev);
     setFollowing(true);
-    const [err] = await tryAsync(
-      prev ? unfollowUser(illust.user.id) : followUser(illust.user.id),
-    );
+    const [err] = await tryAsync(prev ? unfollowUser(illust.user.id) : followUser(illust.user.id));
     setFollowing(false);
     if (err) {
       setIsFollowed(prev);

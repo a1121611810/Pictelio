@@ -7,7 +7,6 @@ import { queryKeys } from "../api/queryKeys";
 import { queryClient } from "../api/queryClient";
 import { apiClient } from "../api/client";
 
-
 export type FollowMode = "following" | "followers";
 
 // ── Reactive source signals ──
@@ -41,7 +40,8 @@ const store = createTQFeedStore<FollowItem, "followList", { mode: FollowMode; us
       setSubTab: (v) => setMode(v as FollowMode),
       queries: {
         following: {
-          queryKey: (deps) => queryKeys.followList("following", deps.userId) as unknown as unknown[],
+          queryKey: (deps) =>
+            queryKeys.followList("following", deps.userId) as unknown as unknown[],
           queryFn: (deps, pageParam) =>
             pageParam
               ? apiClient
@@ -56,7 +56,8 @@ const store = createTQFeedStore<FollowItem, "followList", { mode: FollowMode; us
                 })),
         },
         followers: {
-          queryKey: (deps) => queryKeys.followList("followers", deps.userId) as unknown as unknown[],
+          queryKey: (deps) =>
+            queryKeys.followList("followers", deps.userId) as unknown as unknown[],
           queryFn: (deps, pageParam) =>
             pageParam
               ? apiClient

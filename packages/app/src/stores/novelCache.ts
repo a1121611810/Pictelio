@@ -19,7 +19,6 @@ import {
   type NovelSeriesDetailResponse,
 } from "@/api/novel";
 
-
 // ─── Constants ───
 
 const HOT_NOVELS_MAX = 10;

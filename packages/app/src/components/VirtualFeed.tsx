@@ -11,11 +11,8 @@ import { createFeedVirtualizer } from "../primitives/createFeedVirtualizer";
 import { loadImage, checkImageCache } from "../utils/imageLoader";
 import { isImageHostEnabled } from "../stores/imageHostStore";
 import { imageCachePrefetch } from "../stores/settingsStore";
-import {
-  saveFeedScrollState,
-  getFeedScrollState,
-  type ScrollRestoreState,
-} from "../stores/feedStore";
+import { scrollRestoreGlobal } from "../primitives/createScrollRestore";
+import type { ScrollRestoreState } from "../primitives/createScrollRestore";
 import { createVirtualScrollRestore } from "../primitives/createVirtualScrollRestore";
 
 interface Props {
@@ -78,11 +75,11 @@ const VirtualFeed: Component<Props> = (props) => {
     getVirtualizer: () => feedVirtualizer.getVirtualizer(),
     getState: () =>
       props.scrollKey
-        ? (getFeedScrollState(props.scrollKey) ?? undefined)
+        ? (scrollRestoreGlobal.getVirtual(props.scrollKey) ?? undefined)
         : props.initialScrollState,
     saveState: (state) => {
       if (props.scrollKey) {
-        saveFeedScrollState(props.scrollKey, state);
+        scrollRestoreGlobal.saveVirtual(props.scrollKey, state);
       } else {
         props.onScrollStateChange?.(state);
       }
@@ -171,25 +168,27 @@ const VirtualFeed: Component<Props> = (props) => {
 
       {props.error && <ErrorDisplay error={props.error} onRetry={() => props.onRefresh()} />}
 
-      {(props.loading || !loadAttempted) && props.illusts.length === 0 && pullPhase() !== "refreshing" && (
-        <div class="px-3">
-          <div
-            style={{
-              position: "relative",
-              width: "100%",
-              height: `${skeletonCount() > 0 ? Math.ceil(skeletonCount() / columnCount()) * (SKELETON_ITEM_HEIGHT + VERTICAL_GAP) - VERTICAL_GAP : 1}px`,
-            }}
-          >
-            <For each={Array.from({ length: skeletonCount() })}>
-              {(_item, i) => (
-                <div style={skeletonStyle(i())}>
-                  <SkeletonCard width={400} height={SKELETON_ITEM_HEIGHT} />
-                </div>
-              )}
-            </For>
+      {(props.loading || !loadAttempted) &&
+        props.illusts.length === 0 &&
+        pullPhase() !== "refreshing" && (
+          <div class="px-3">
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+                height: `${skeletonCount() > 0 ? Math.ceil(skeletonCount() / columnCount()) * (SKELETON_ITEM_HEIGHT + VERTICAL_GAP) - VERTICAL_GAP : 1}px`,
+              }}
+            >
+              <For each={Array.from({ length: skeletonCount() })}>
+                {(_item, i) => (
+                  <div style={skeletonStyle(i())}>
+                    <SkeletonCard width={400} height={SKELETON_ITEM_HEIGHT} />
+                  </div>
+                )}
+              </For>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       <div
         style={{

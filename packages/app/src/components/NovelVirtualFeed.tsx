@@ -8,7 +8,7 @@ import ErrorDisplay from "./ErrorDisplay";
 import PullIndicator from "./PullIndicator";
 import type { PixivNovel, ApiError } from "../api/types";
 import type { NovelLayoutMode } from "../stores/settingsStore";
-import { saveNovelScrollState, getNovelScrollState } from "../stores/novelStore";
+import { scrollRestoreGlobal } from "../primitives/createScrollRestore";
 import { createVirtualScrollRestore } from "../primitives/createVirtualScrollRestore";
 
 const GAP = 12;
@@ -50,10 +50,10 @@ const NovelVirtualFeed: Component<Props> = (props) => {
   const scrollRestore = createVirtualScrollRestore({
     getVirtualizer: () => feedVirtualizer.getVirtualizer(),
     getState: () =>
-      props.scrollKey ? (getNovelScrollState(props.scrollKey) ?? undefined) : undefined,
+      props.scrollKey ? (scrollRestoreGlobal.getVirtual(props.scrollKey) ?? undefined) : undefined,
     saveState: (state) => {
       if (props.scrollKey) {
-        saveNovelScrollState(props.scrollKey, state);
+        scrollRestoreGlobal.saveVirtual(props.scrollKey, state);
       }
     },
   });

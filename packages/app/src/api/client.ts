@@ -20,8 +20,10 @@ export interface PixivApiClient {
 // 生产 Native 模式下 access_token 和 401 刷新由 PixivApiPlugin 内部处理。
 // DEV 模式（浏览器 pnpm dev）仍需要本地管理。
 let devAccessToken = "";
-const devAuth: { onUnauthorized: (() => Promise<void>) | null; refreshPromise: Promise<void> | null } =
-  { onUnauthorized: null, refreshPromise: null };
+const devAuth: {
+  onUnauthorized: (() => Promise<void>) | null;
+  refreshPromise: Promise<void> | null;
+} = { onUnauthorized: null, refreshPromise: null };
 
 export function setAccessToken(token: string) {
   devAccessToken = token;
@@ -247,7 +249,11 @@ async function nativeExecuteRequest<T>(
     });
     if (result.status >= 400) {
       let parsedBody: unknown = null;
-      try { parsedBody = JSON.parse(result.data); } catch { /* ignore parse errors */ }
+      try {
+        parsedBody = JSON.parse(result.data);
+      } catch {
+        /* ignore parse errors */
+      }
       throw classifyError(result.status, null, parsedBody);
     }
     return JSON.parse(result.data) as T;

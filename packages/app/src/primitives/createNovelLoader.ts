@@ -76,40 +76,42 @@ export function createNovelLoader(novelId: Accessor<number>): NovelLoaderResult 
     setNovelImages({});
 
     // 2. 异步：IndexedDB → 网络
-    void tryAsync((async () => {
-      const [entryErr, entry] = await tryAsync(getEntry(id));
-      if (signal.aborted) return;
-      if (!entryErr && entry) {
-        applyEntry(entry);
-        return;
-      }
+    void tryAsync(
+      (async () => {
+        const [entryErr, entry] = await tryAsync(getEntry(id));
+        if (signal.aborted) return;
+        if (!entryErr && entry) {
+          applyEntry(entry);
+          return;
+        }
 
-      // 3. 网络请求（并行）
-      const [[detailErr, detail], [novelErr, novelResult]] = await Promise.all([
-        tryAsync(loadDetail(id)),
-        tryAsync(fetchNovelData(id)),
-      ]);
-      if (signal.aborted) return;
+        // 3. 网络请求（并行）
+        const [[detailErr, detail], [novelErr, novelResult]] = await Promise.all([
+          tryAsync(loadDetail(id)),
+          tryAsync(fetchNovelData(id)),
+        ]);
+        if (signal.aborted) return;
 
-      const novelData = novelErr ? { text: "", navigation: {}, images: {} } : novelResult!;
+        const novelData = novelErr ? { text: "", navigation: {}, images: {} } : novelResult!;
 
-      if (detailErr) {
-        setDetailError((detailErr as { message?: string }).message ?? "加载失败");
-        setDetailLoading(false);
-        return;
-      }
+        if (detailErr) {
+          setDetailError((detailErr as { message?: string }).message ?? "加载失败");
+          setDetailLoading(false);
+          return;
+        }
 
-      const networkEntry: CacheEntry = {
-        detail: detail!.novel,
-        text: novelData.text,
-        nav: novelData.navigation,
-        images: novelData.images ?? {},
-      };
-      applyEntry(networkEntry);
-      if (networkEntry.text) {
-        setEntry(id, networkEntry);
-      }
-    })());
+        const networkEntry: CacheEntry = {
+          detail: detail!.novel,
+          text: novelData.text,
+          nav: novelData.navigation,
+          images: novelData.images ?? {},
+        };
+        applyEntry(networkEntry);
+        if (networkEntry.text) {
+          setEntry(id, networkEntry);
+        }
+      })(),
+    );
   });
 
   onCleanup(() => {

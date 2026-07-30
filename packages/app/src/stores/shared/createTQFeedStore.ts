@@ -207,8 +207,14 @@ export function createTQFeedStore<
     const queryMap = new Map<string, ReturnType<typeof createInfiniteQuery>>();
     const queryDefMap = new Map<string, QueryDef<TItem, TDeps>>();
 
-    for (const [tabKey, tabDef] of Object.entries(config.tabs) as [TTab, TabQueriesDef<TItem, TDeps>][]) {
-      for (const [subKey, qDef] of Object.entries(tabDef.queries) as [string, QueryDef<TItem, TDeps>][]) {
+    for (const [tabKey, tabDef] of Object.entries(config.tabs) as [
+      TTab,
+      TabQueriesDef<TItem, TDeps>,
+    ][]) {
+      for (const [subKey, qDef] of Object.entries(tabDef.queries) as [
+        string,
+        QueryDef<TItem, TDeps>,
+      ][]) {
         const mapKey = `${tabKey}:${subKey}`;
 
         // 存储 qDef 供 ensureLoaded 动态计算 queryKey

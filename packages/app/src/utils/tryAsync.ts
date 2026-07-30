@@ -35,9 +35,7 @@ export async function tryAsync<T, E extends {} = Error>(
  * const [err, parsed] = trySync(() => JSON.parse(str));
  * const result = err ? defaultValue : parsed;
  */
-export function trySync<T, E = Error>(
-  fn: () => T,
-): [null, T] | [E, undefined] {
+export function trySync<T, E = Error>(fn: () => T): [null, T] | [E, undefined] {
   try {
     return [null, fn()];
   } catch (err) {

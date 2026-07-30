@@ -20,9 +20,11 @@ const UserAvatar: Component = () => {
       return;
     }
     if (isNative) {
-      void tryAsync(loadImage(src).then((r) => {
+      void tryAsync(
+        loadImage(src).then((r) => {
           setAvatarUrl(r.url);
-        }));
+        }),
+      );
     } else {
       const url = resolveImageUrl(src);
       setAvatarUrl(url);

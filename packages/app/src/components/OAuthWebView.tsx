@@ -3,7 +3,6 @@ import { Capacitor } from "@capacitor/core";
 import { toApiError } from "../api/client";
 import type { ApiError } from "../api/types";
 
-
 /**
  * OAuthWebView 组件的属性。
  */

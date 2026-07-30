@@ -1,6 +1,5 @@
 import { Preferences } from "@capacitor/preferences";
 
-
 interface PersistedSet<T> {
   /** 响应式集合信号 */
   values: () => Set<T>;
@@ -44,7 +43,9 @@ export function createPersistedSet<T>(storageKey: string, logPrefix: string): Pe
     const next = new Set(values());
     next.add(value);
     setValues(next);
-    const [err] = await tryAsync(Preferences.set({ key: storageKey, value: JSON.stringify([...next]) }));
+    const [err] = await tryAsync(
+      Preferences.set({ key: storageKey, value: JSON.stringify([...next]) }),
+    );
     if (err) {
       console.warn(`[${logPrefix}] Failed to persist ${storageKey}`, err);
     }
@@ -55,7 +56,9 @@ export function createPersistedSet<T>(storageKey: string, logPrefix: string): Pe
     const next = new Set(values());
     next.delete(value);
     setValues(next);
-    const [err2] = await tryAsync(Preferences.set({ key: storageKey, value: JSON.stringify([...next]) }));
+    const [err2] = await tryAsync(
+      Preferences.set({ key: storageKey, value: JSON.stringify([...next]) }),
+    );
     if (err2) {
       console.warn(`[${logPrefix}] Failed to persist ${storageKey}`, err2);
     }

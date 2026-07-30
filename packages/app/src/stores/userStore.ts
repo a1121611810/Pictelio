@@ -2,7 +2,6 @@ import { getUserDetail } from "../api/user";
 import { type PixivProfile, type PixivUser } from "../api/types";
 import { user } from "./authStore";
 
-
 const [profile, setProfile] = createSignal<PixivProfile | null>(null);
 const [viewedUser, setViewedUser] = createSignal<PixivUser | null>(null);
 

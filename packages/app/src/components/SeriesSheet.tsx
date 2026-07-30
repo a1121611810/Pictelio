@@ -7,7 +7,6 @@ import { SHEET_LAZY_MARGIN } from "../primitives/rootMargins";
 import { createSentinel } from "@/primitives/visibility";
 import { getSeries, setSeries } from "../stores/novelCache";
 
-
 interface Props {
   seriesId: number;
   seriesTitle: string;

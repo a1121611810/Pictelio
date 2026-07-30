@@ -7,10 +7,7 @@ import PageTransition from "@/components/PageTransition";
  *  and footer nav bar. Uses Fluent Design tokens for all spacing and colors. */
 const NovelDetailSkeleton: Component = () => (
   <PageTransition>
-    <div
-      class="min-h-screen"
-      style={{ "background-color": "var(--colorNeutralBackground2)" }}
-    >
+    <div class="min-h-screen" style={{ "background-color": "var(--colorNeutralBackground2)" }}>
       {/* ── Sticky header: back + title + search ── */}
       <header
         class="sticky top-0 z-20 flex h-12 items-center gap-2 px-4"
@@ -97,20 +94,8 @@ const NovelDetailSkeleton: Component = () => (
       </div>
 
       {/* ── Text paragraphs (8 lines with varying widths) ── */}
-      <div
-        class="mx-auto max-w-2xl space-y-4 px-4 pb-24"
-        style={{ "padding-bottom": "96px" }}
-      >
-        {[
-          "100%",
-          "100%",
-          "85%",
-          "100%",
-          "70%",
-          "100%",
-          "90%",
-          "55%",
-        ].map((width) => (
+      <div class="mx-auto max-w-2xl space-y-4 px-4 pb-24" style={{ "padding-bottom": "96px" }}>
+        {["100%", "100%", "85%", "100%", "70%", "100%", "90%", "55%"].map((width) => (
           <SkeletonShimmer
             class="rounded-[var(--borderRadiusSmall)]"
             style={{

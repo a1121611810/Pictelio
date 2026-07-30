@@ -52,7 +52,9 @@ export async function reportIllust(id: number, reason: ReportReason): Promise<vo
   const nextRecords = [...reportRecords(), { id, reason, reportedAt: Date.now() }];
   setReportRecords(nextRecords);
   setReportedIds(new Set(nextRecords.map((r) => r.id)));
-  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_REPORTED_IDS, value: JSON.stringify(nextRecords) }));
+  const [err] = await tryAsync(
+    Preferences.set({ key: PREF_KEY_REPORTED_IDS, value: JSON.stringify(nextRecords) }),
+  );
   if (err) {
     console.warn("[reportStore] Failed to persist reported ids", err);
   }

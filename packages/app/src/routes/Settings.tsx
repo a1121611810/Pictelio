@@ -46,10 +46,12 @@ const Settings: Component = () => {
   });
 
   async function handleLogout() {
-    const [logoutErr] = await tryAsync((async () => {
-      await logout();
-      void navigate({ to: "/login", replace: true });
-    })());
+    const [logoutErr] = await tryAsync(
+      (async () => {
+        await logout();
+        void navigate({ to: "/login", replace: true });
+      })(),
+    );
     if (logoutErr) {
       setActionToast("退出登录失败");
     } else {
@@ -58,16 +60,18 @@ const Settings: Component = () => {
   }
 
   async function handleClearLocalData() {
-    const [clearErr] = await tryAsync((async () => {
-      await logout();
-      clearImageCache();
-      await clearNovelCache();
-      resetBlockedIds();
-      resetReportedIds();
-      await Preferences.clear();
-      await resetUiStore();
-      void navigate({ to: "/login", replace: true });
-    })());
+    const [clearErr] = await tryAsync(
+      (async () => {
+        await logout();
+        clearImageCache();
+        await clearNovelCache();
+        resetBlockedIds();
+        resetReportedIds();
+        await Preferences.clear();
+        await resetUiStore();
+        void navigate({ to: "/login", replace: true });
+      })(),
+    );
     if (clearErr) {
       setActionToast("清除失败，请重试");
     } else {

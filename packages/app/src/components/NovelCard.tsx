@@ -7,7 +7,6 @@ import IllustTags from "./IllustTags";
 import SearchableTag from "./SearchableTag";
 import { resolveImageUrl } from "../utils/imageLoader";
 
-
 interface Props {
   novel: PixivNovel;
   onClick: (id: number) => void;

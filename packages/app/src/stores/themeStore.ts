@@ -17,7 +17,7 @@ const PREF_KEY_PAGE_STYLE_THEME = "page_style_theme";
 /** 根据 OS 偏好获取当前系统主题（安全兜底） */
 function getSystemTheme(): "dark" | "light" {
   const [err, isDark] = trySync(() => window.matchMedia("(prefers-color-scheme: dark)").matches);
-  return err ? "light" : (isDark ? "dark" : "light");
+  return err ? "light" : isDark ? "dark" : "light";
 }
 
 /** 根据用户选择的 theme 计算出实际生效的主题 */
@@ -118,11 +118,9 @@ createRoot(() => {
     if (typeof document === "undefined") return;
     if (id !== lastPersistedPageStyle) {
       lastPersistedPageStyle = id;
-      tryAsync(Preferences.set({ key: PREF_KEY_PAGE_STYLE_THEME, value: id })).then(
-        ([err]) => {
-          if (err) console.warn("[themeStore] Failed to persist page style theme", err);
-        },
-      );
+      tryAsync(Preferences.set({ key: PREF_KEY_PAGE_STYLE_THEME, value: id })).then(([err]) => {
+        if (err) console.warn("[themeStore] Failed to persist page style theme", err);
+      });
     }
   });
 });

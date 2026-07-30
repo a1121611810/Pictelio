@@ -205,18 +205,12 @@ describe("followStore — sub-tab routing", () => {
   it("illusts() deduplicates merged results by illust id", async () => {
     setQueryData(
       "follow_public",
-      [
-        createIllust(1, "2026-07-01T12:00:00+09:00"),
-        createIllust(2, "2026-07-01T11:00:00+09:00"),
-      ],
+      [createIllust(1, "2026-07-01T12:00:00+09:00"), createIllust(2, "2026-07-01T11:00:00+09:00")],
       null,
     );
     setQueryData(
       "follow_private",
-      [
-        createIllust(2, "2026-07-01T11:00:00+09:00"),
-        createIllust(4, "2026-07-01T10:00:00+09:00"),
-      ],
+      [createIllust(2, "2026-07-01T11:00:00+09:00"), createIllust(4, "2026-07-01T10:00:00+09:00")],
       null,
     );
 

@@ -117,7 +117,9 @@ export async function loadNovelLayoutModePreference(): Promise<void> {
 export const autoHideNavBar = () => state.autoHideNavBar;
 export async function setAutoHideNavBar(enabled: boolean): Promise<void> {
   setState("autoHideNavBar", enabled);
-  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_AUTO_HIDE_NAV_BAR, value: String(enabled) }));
+  const [err] = await tryAsync(
+    Preferences.set({ key: PREF_KEY_AUTO_HIDE_NAV_BAR, value: String(enabled) }),
+  );
   if (err) console.warn("[settingsStore] Failed to persist autoHideNavBar", err);
 }
 
@@ -158,7 +160,9 @@ export async function loadShowR18Preference(): Promise<void> {
 export const showR18G = () => state.showR18G;
 export async function setShowR18G(enabled: boolean): Promise<void> {
   setState("showR18G", enabled);
-  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_SHOW_R18G, value: String(enabled) }));
+  const [err] = await tryAsync(
+    Preferences.set({ key: PREF_KEY_SHOW_R18G, value: String(enabled) }),
+  );
   if (err) console.warn("[settingsStore] Failed to persist showR18G", err);
   window.dispatchEvent(new CustomEvent("r18gChanged"));
 }
@@ -178,7 +182,9 @@ export async function loadShowR18GPreference(): Promise<void> {
 export const showDetailStairs = () => state.showDetailStairs;
 export async function setShowDetailStairs(enabled: boolean): Promise<void> {
   setState("showDetailStairs", enabled);
-  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_SHOW_DETAIL_STAIRS, value: String(enabled) }));
+  const [err] = await tryAsync(
+    Preferences.set({ key: PREF_KEY_SHOW_DETAIL_STAIRS, value: String(enabled) }),
+  );
   if (err) console.warn("[settingsStore] Failed to persist showDetailStairs", err);
 }
 
@@ -200,10 +206,12 @@ export const ageConfirmed = () => state.ageConfirmed;
 export const isAdult = () => state.isAdult;
 
 export async function loadAgePreference(): Promise<void> {
-  const [err, results] = await tryAsync(Promise.all([
-    Preferences.get({ key: PREF_KEY_AGE_CONFIRMED }),
-    Preferences.get({ key: PREF_KEY_IS_ADULT }),
-  ]));
+  const [err, results] = await tryAsync(
+    Promise.all([
+      Preferences.get({ key: PREF_KEY_AGE_CONFIRMED }),
+      Preferences.get({ key: PREF_KEY_IS_ADULT }),
+    ]),
+  );
   if (err) {
     console.warn("[settingsStore] Failed to load age preference", err);
   } else {
@@ -234,10 +242,12 @@ export async function setAgeConfirmation(confirmed: boolean, adult: boolean): Pr
       s.isAdult = adult;
     }),
   );
-  const [err] = await tryAsync(Promise.all([
-    Preferences.set({ key: PREF_KEY_AGE_CONFIRMED, value: String(confirmed) }),
-    Preferences.set({ key: PREF_KEY_IS_ADULT, value: String(adult) }),
-  ]));
+  const [err] = await tryAsync(
+    Promise.all([
+      Preferences.set({ key: PREF_KEY_AGE_CONFIRMED, value: String(confirmed) }),
+      Preferences.set({ key: PREF_KEY_IS_ADULT, value: String(adult) }),
+    ]),
+  );
   if (err) console.warn("[settingsStore] Failed to persist age confirmation", err);
   if (!adult) {
     await setShowR18(false);
@@ -258,21 +268,27 @@ export const setDetailQuality = (q: ImageQuality) => setState("detailQuality", q
 export const imageCacheDisk = () => state.imageCacheDisk;
 export const setImageCacheDisk = async (v: boolean): Promise<void> => {
   setState("imageCacheDisk", v);
-  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_IMAGE_CACHE_DISK, value: String(v) }));
+  const [err] = await tryAsync(
+    Preferences.set({ key: PREF_KEY_IMAGE_CACHE_DISK, value: String(v) }),
+  );
   if (err) console.warn("[settingsStore] Failed to persist imageCacheDisk", err);
 };
 
 export const imageCacheBrowser = () => state.imageCacheBrowser;
 export const setImageCacheBrowser = async (v: boolean): Promise<void> => {
   setState("imageCacheBrowser", v);
-  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_IMAGE_CACHE_BROWSER, value: String(v) }));
+  const [err] = await tryAsync(
+    Preferences.set({ key: PREF_KEY_IMAGE_CACHE_BROWSER, value: String(v) }),
+  );
   if (err) console.warn("[settingsStore] Failed to persist imageCacheBrowser", err);
 };
 
 export const imageCachePrefetch = () => state.imageCachePrefetch;
 export const setImageCachePrefetch = async (v: boolean): Promise<void> => {
   setState("imageCachePrefetch", v);
-  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_IMAGE_CACHE_PREFETCH, value: String(v) }));
+  const [err] = await tryAsync(
+    Preferences.set({ key: PREF_KEY_IMAGE_CACHE_PREFETCH, value: String(v) }),
+  );
   if (err) console.warn("[settingsStore] Failed to persist imageCachePrefetch", err);
 };
 
@@ -280,29 +296,33 @@ export const imageCacheDiskSize = () => state.imageCacheDiskSize;
 export const setImageCacheDiskSize = async (v: number): Promise<void> => {
   const clamped = Math.max(50, Math.min(1000, Math.round(v / 50) * 50));
   setState("imageCacheDiskSize", clamped);
-  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_IMAGE_CACHE_DISK_SIZE, value: String(clamped) }));
+  const [err] = await tryAsync(
+    Preferences.set({ key: PREF_KEY_IMAGE_CACHE_DISK_SIZE, value: String(clamped) }),
+  );
   if (err) console.warn("[settingsStore] Failed to persist imageCacheDiskSize", err);
 };
 
 export async function loadImageCachePrefs(): Promise<void> {
-  const [err] = await tryAsync((async () => {
-    const disk = await Preferences.get({ key: PREF_KEY_IMAGE_CACHE_DISK });
-    if (disk.value !== null) {
-      setState("imageCacheDisk", disk.value === "true");
-    }
-    const browser = await Preferences.get({ key: PREF_KEY_IMAGE_CACHE_BROWSER });
-    if (browser.value !== null) {
-      setState("imageCacheBrowser", browser.value === "true");
-    }
-    const prefetch = await Preferences.get({ key: PREF_KEY_IMAGE_CACHE_PREFETCH });
-    if (prefetch.value !== null) {
-      setState("imageCachePrefetch", prefetch.value === "true");
-    }
-    const size = await Preferences.get({ key: PREF_KEY_IMAGE_CACHE_DISK_SIZE });
-    if (size.value !== null) {
-      setState("imageCacheDiskSize", parseInt(size.value, 10));
-    }
-  })());
+  const [err] = await tryAsync(
+    (async () => {
+      const disk = await Preferences.get({ key: PREF_KEY_IMAGE_CACHE_DISK });
+      if (disk.value !== null) {
+        setState("imageCacheDisk", disk.value === "true");
+      }
+      const browser = await Preferences.get({ key: PREF_KEY_IMAGE_CACHE_BROWSER });
+      if (browser.value !== null) {
+        setState("imageCacheBrowser", browser.value === "true");
+      }
+      const prefetch = await Preferences.get({ key: PREF_KEY_IMAGE_CACHE_PREFETCH });
+      if (prefetch.value !== null) {
+        setState("imageCachePrefetch", prefetch.value === "true");
+      }
+      const size = await Preferences.get({ key: PREF_KEY_IMAGE_CACHE_DISK_SIZE });
+      if (size.value !== null) {
+        setState("imageCacheDiskSize", parseInt(size.value, 10));
+      }
+    })(),
+  );
   if (err) console.warn("[settingsStore] Failed to load image cache prefs", err);
 }
 
@@ -311,7 +331,9 @@ export async function loadImageCachePrefs(): Promise<void> {
 export const autoCheckUpdate = () => state.autoCheckUpdate;
 export async function setAutoCheckUpdate(enabled: boolean): Promise<void> {
   setState("autoCheckUpdate", enabled);
-  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_AUTO_CHECK_UPDATE, value: String(enabled) }));
+  const [err] = await tryAsync(
+    Preferences.set({ key: PREF_KEY_AUTO_CHECK_UPDATE, value: String(enabled) }),
+  );
   if (err) console.warn("[settingsStore] Failed to persist autoCheckUpdate", err);
 }
 
@@ -348,7 +370,9 @@ export const setCheckCompleted = (v: boolean) => setState("checkCompleted", v);
 export const lastDismissedVersion = () => state.lastDismissedVersion;
 export async function setLastDismissedVersion(v: string): Promise<void> {
   setState("lastDismissedVersion", v);
-  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_DISMISSED_UPDATE_VERSION, value: v }));
+  const [err] = await tryAsync(
+    Preferences.set({ key: PREF_KEY_DISMISSED_UPDATE_VERSION, value: v }),
+  );
   if (err) console.warn("[settingsStore] Failed to persist dismissed update version", err);
 }
 
@@ -366,7 +390,6 @@ export async function loadLastDismissedVersionPreference(): Promise<void> {
 
 export const showUpdateDialog = () => state.showUpdateDialog;
 export const setShowUpdateDialog = (v: boolean) => setState("showUpdateDialog", v);
-
 
 // ── 重置所有设置到默认值 ──
 

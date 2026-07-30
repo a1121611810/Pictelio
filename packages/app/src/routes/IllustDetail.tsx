@@ -73,14 +73,16 @@ const IllustDetail: Component = () => {
     const prev = isFollowed();
     setIsFollowed(!prev);
     setFollowing(true);
-    const [followErr] = await tryAsync((async () => {
-      if (prev) {
-        await unfollowUser(i.user.id);
-      } else {
-        await followUser(i.user.id);
-      }
-      setIllust({ ...i, user: { ...i.user, is_followed: !prev } });
-    })());
+    const [followErr] = await tryAsync(
+      (async () => {
+        if (prev) {
+          await unfollowUser(i.user.id);
+        } else {
+          await followUser(i.user.id);
+        }
+        setIllust({ ...i, user: { ...i.user, is_followed: !prev } });
+      })(),
+    );
     setFollowing(false);
     if (followErr) {
       setIsFollowed(prev);
@@ -151,14 +153,16 @@ const IllustDetail: Component = () => {
     }
     ugoiraBlobUrls = [];
 
-    const [ugoiraErr] = await tryAsync((async () => {
-      // 使用共享的下载+解压函数（自动跟踪进度）
-      const result = await downloadAndExtractUgoira(illustId, (pct) => setUgoiraProgress(pct));
-      ugoiraBlobUrls = result.blobUrls;
-      setUgoiraFrames(result.frames);
-      setUgoiraReady(true);
-      setUgoiraProgress(100);
-    })());
+    const [ugoiraErr] = await tryAsync(
+      (async () => {
+        // 使用共享的下载+解压函数（自动跟踪进度）
+        const result = await downloadAndExtractUgoira(illustId, (pct) => setUgoiraProgress(pct));
+        ugoiraBlobUrls = result.blobUrls;
+        setUgoiraFrames(result.frames);
+        setUgoiraReady(true);
+        setUgoiraProgress(100);
+      })(),
+    );
     if (ugoiraErr) {
       console.error("[IllustDetail] Ugoira load failed:", ugoiraErr);
       setUgoiraProgress(-2);
@@ -179,22 +183,24 @@ const IllustDetail: Component = () => {
       return;
     }
     setBookmarking(true);
-    const [bookmarkErr] = await tryAsync((async () => {
-      if (i.is_bookmarked) {
-        await deleteBookmark(i.id);
-      } else {
-        await addBookmark(i.id, privateBookmark ? "private" : "public");
-      }
-      setIllust({
-        ...i,
-        is_bookmarked: !i.is_bookmarked,
-        total_bookmarks: i.is_bookmarked ? i.total_bookmarks - 1 : i.total_bookmarks + 1,
-      });
+    const [bookmarkErr] = await tryAsync(
+      (async () => {
+        if (i.is_bookmarked) {
+          await deleteBookmark(i.id);
+        } else {
+          await addBookmark(i.id, privateBookmark ? "private" : "public");
+        }
+        setIllust({
+          ...i,
+          is_bookmarked: !i.is_bookmarked,
+          total_bookmarks: i.is_bookmarked ? i.total_bookmarks - 1 : i.total_bookmarks + 1,
+        });
 
-      if (!i.is_bookmarked) {
-        setBookmarkBurstTrigger((n) => n + 1);
-      }
-    })());
+        if (!i.is_bookmarked) {
+          setBookmarkBurstTrigger((n) => n + 1);
+        }
+      })(),
+    );
     setBookmarking(false);
     if (bookmarkErr) {
       console.error("Bookmark toggle failed:", bookmarkErr);
@@ -348,20 +354,22 @@ const IllustDetail: Component = () => {
     setError(null);
     setIllust(null);
 
-    loadDetail(id, controller.signal).then(res => {
-      if (cancelled) return;
-      const i = res.illust;
-      setIllust(i);
-      setPageRefs(new Map());
-      recordVisit(i, "illust");
-      setIsFollowed(i.user.is_followed ?? false);
-      setLoading(false);
-    }).catch(err => {
-      if (cancelled) return;
-      if (err instanceof DOMException && err.name === "AbortError") return;
-      setError({ type: ApiErrorType.UNKNOWN, message: err?.message ?? "加载失败" });
-      setLoading(false);
-    });
+    loadDetail(id, controller.signal)
+      .then((res) => {
+        if (cancelled) return;
+        const i = res.illust;
+        setIllust(i);
+        setPageRefs(new Map());
+        recordVisit(i, "illust");
+        setIsFollowed(i.user.is_followed ?? false);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setError({ type: ApiErrorType.UNKNOWN, message: err?.message ?? "加载失败" });
+        setLoading(false);
+      });
   });
 
   /** Parse Pixiv internal caption links and navigate in-app */
@@ -471,7 +479,9 @@ const IllustDetail: Component = () => {
       <div class="page">
         {loading() && !illust() && <IllustDetailSkeleton />}
 
-        {error() && !illust() && <ErrorDisplay error={error()!} onRetry={() => window.location.reload()} />}
+        {error() && !illust() && (
+          <ErrorDisplay error={error()!} onRetry={() => window.location.reload()} />
+        )}
 
         {illust() && !viewerOpen() && isBlockedAuthor() && (
           <div class="flex flex-col items-center justify-center h-screen gap-4 px-6">

@@ -7,7 +7,6 @@ import {
   setProbeResults,
 } from "../stores/imageHostStore";
 
-
 export interface HostInput {
   name: string;
   baseUrl: string;

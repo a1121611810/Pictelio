@@ -1,4 +1,3 @@
-
 // ── Types ──
 
 export interface ReaderSettings {

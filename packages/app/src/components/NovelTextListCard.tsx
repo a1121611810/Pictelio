@@ -4,7 +4,6 @@ import { addBookmark, deleteBookmark } from "../api/novel";
 import HeartBurstEffect from "./HeartBurstEffect";
 import SearchableTag from "./SearchableTag";
 
-
 interface Props {
   novel: PixivNovel;
   onClick: (id: number) => void;

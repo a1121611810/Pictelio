@@ -78,14 +78,10 @@ const StartupUpdateDialog: Component = () => {
         >
           {/* 顶部标题 */}
           <div class="px-5 pt-5 pb-2">
-            <h2
-              class="text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase500)] font-semibold leading-tight m-0"
-            >
+            <h2 class="text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase500)] font-semibold leading-tight m-0">
               发现新版本
             </h2>
-            <p
-              class="mt-0.5 text-[var(--colorBrandForeground1)] [font-size:var(--fontSizeBase300)] font-semibold leading-snug"
-            >
+            <p class="mt-0.5 text-[var(--colorBrandForeground1)] [font-size:var(--fontSizeBase300)] font-semibold leading-snug">
               v{latestVersion()}
             </p>
           </div>
@@ -93,7 +89,8 @@ const StartupUpdateDialog: Component = () => {
           {/* 正文内容 */}
           <div class="px-5 py-2 text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase300)] leading-relaxed">
             <p class="m-0">
-              Pictelio <span class="font-semibold">v{latestVersion()}</span> 已发布，当前版本为 <span class="font-semibold">v{APP_VERSION}</span>。
+              Pictelio <span class="font-semibold">v{latestVersion()}</span> 已发布，当前版本为{" "}
+              <span class="font-semibold">v{APP_VERSION}</span>。
             </p>
           </div>
 

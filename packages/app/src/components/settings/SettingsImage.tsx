@@ -154,7 +154,6 @@ const SettingsImage: Component = () => {
           </svg>
         </div>
       </div>
-
     </div>
   );
 };

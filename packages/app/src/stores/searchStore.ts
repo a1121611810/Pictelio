@@ -12,8 +12,6 @@ import { toApiError } from "@/api/client";
 import { ApiErrorType } from "@/api/types";
 import { mergeSearchResults } from "@/utils/searchMerger";
 
-
-
 export interface SearchStoreState {
   /** Current search keyword */
   keyword: () => string;
@@ -245,7 +243,9 @@ export function createSearchStore(): SearchStoreState {
           const url = nextIllustUrl();
           if (!url) return;
           incPending();
-          const [err, res] = await tryAsync(searchIllustNext(url, abortController?.signal ?? undefined));
+          const [err, res] = await tryAsync(
+            searchIllustNext(url, abortController?.signal ?? undefined),
+          );
           decPending();
           if (err) {
             if ((err as Error).name === "AbortError") return;
@@ -264,7 +264,9 @@ export function createSearchStore(): SearchStoreState {
           const url = nextNovelUrl();
           if (!url) return;
           incPending();
-          const [err, res] = await tryAsync(searchNovelNext(url, abortController?.signal ?? undefined));
+          const [err, res] = await tryAsync(
+            searchNovelNext(url, abortController?.signal ?? undefined),
+          );
           decPending();
           if (err) {
             if ((err as Error).name === "AbortError") return;

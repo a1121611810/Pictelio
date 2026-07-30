@@ -68,44 +68,52 @@ const LazyDetailImage: Component<Props> = (props) => {
   // 2. cacheReadyFor 不是当前 src 且 shouldLoad 为 true 时触发 loadImage
   createEffect(() => {
     let cancelled = false;
-    onCleanup(() => { cancelled = true; });
+    onCleanup(() => {
+      cancelled = true;
+    });
 
     const src = props.src;
     const attempt = retryTrigger();
     if (shouldLoad() && src && cacheReadyFor() !== src) {
       let retryTimer: ReturnType<typeof setTimeout> | undefined;
-      onCleanup(() => { if (retryTimer) clearTimeout(retryTimer); });
+      onCleanup(() => {
+        if (retryTimer) clearTimeout(retryTimer);
+      });
 
       const LOAD_TIMEOUT = 12_000;
       const loadWithTimeout = Promise.race([
         loadImage(src),
         new Promise<never>((_, reject) => {
-          const t = setTimeout(() => reject(new Error('loadImage timeout')), LOAD_TIMEOUT);
+          const t = setTimeout(() => reject(new Error("loadImage timeout")), LOAD_TIMEOUT);
           onCleanup(() => clearTimeout(t));
         }),
       ]);
 
-      loadWithTimeout.then(() => {
-        if (!cancelled && props.src === src) {
-          setCacheReadyFor(src);
-        }
-      }).catch(() => {
-        if (!cancelled && props.src === src) {
-          if (attempt < MAX_RETRIES) {
-            retryTimer = setTimeout(() => {
-              if (!cancelled) setRetryTrigger(attempt + 1);
-            }, RETRY_DELAY_MS);
-          } else {
-            // 所有重试均失败，仍标记就绪让 PixivImage 渲染，
-            // shouldInterceptRequest 通过 OkHttp 兜底下载
+      loadWithTimeout
+        .then(() => {
+          if (!cancelled && props.src === src) {
             setCacheReadyFor(src);
           }
-        }
-      });
+        })
+        .catch(() => {
+          if (!cancelled && props.src === src) {
+            if (attempt < MAX_RETRIES) {
+              retryTimer = setTimeout(() => {
+                if (!cancelled) setRetryTrigger(attempt + 1);
+              }, RETRY_DELAY_MS);
+            } else {
+              // 所有重试均失败，仍标记就绪让 PixivImage 渲染，
+              // shouldInterceptRequest 通过 OkHttp 兜底下载
+              setCacheReadyFor(src);
+            }
+          }
+        });
     }
   });
 
-  const canDisplayImage = createMemo(() => props.src && cacheReadyFor() === props.src && shouldLoad());
+  const canDisplayImage = createMemo(
+    () => props.src && cacheReadyFor() === props.src && shouldLoad(),
+  );
 
   return (
     <div
