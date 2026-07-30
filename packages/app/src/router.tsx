@@ -205,8 +205,6 @@ export const router = createRouter({
   routeTree,
   defaultPreload: "intent",
   defaultStaleTime: 0,
-  defaultPendingMs: 0,
-  defaultPendingMinMs: 0,
 });
 
 // 声明路由类型，供 TanStack 的 type-safe 钩子使用
