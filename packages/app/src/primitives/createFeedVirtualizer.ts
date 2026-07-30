@@ -212,6 +212,9 @@ export function createFeedVirtualizer<T>(config: FeedVirtualizerConfig<T>): Feed
     setTotalSize(instance.getTotalSize());
   });
 
+  // ── 数据就绪后的一次性滚动恢复重试（防止 onMount 时 count=0 导致 scrollTo 被 clamp） ──
+  let hasRetriedRestore = false;
+
   // Mount lifecycle
   onMount(() => {
     const cleanup = instance._didMount();
@@ -220,17 +223,24 @@ export function createFeedVirtualizer<T>(config: FeedVirtualizerConfig<T>): Feed
     setTotalSize(instance.getTotalSize());
     onCleanup(() => cleanup?.());
 
-    // Scroll restoration ready callback
-    config.suppressHeaderVisibility?.();
-    config.onReady?.();
-
-    // ★ 强制重新测量：scroll/resize 事件监听器在后续的 createEffect 中才注册（因 SolidJS
-    //   按注册顺序执行 effects/onMount），restoreScroll() 触发的 window.scrollTo 无法被
-    //   Virtualizer 感知。此处显式调用 measure()，使 Virtualizer 基于已修正的 scrollY
-    //   重新计算，消除详情页遗留 scrollY 值对虚拟滚动状态的污染。
+    // 初始测量
     instance.measure();
     setVirtualItems([...instance.getVirtualItems()] as VirtualItem[]);
     setTotalSize(instance.getTotalSize());
+  });
+
+  // 数据就绪后执行滚动恢复（仅首次数据到达时执行一次，onMount 时 count=0 导致 scrollTo 被 clamp 的问题由此修复）
+  createEffect(() => {
+    const count = config.items().length;
+    if (!hasRetriedRestore && count > 0) {
+      hasRetriedRestore = true;
+      config.suppressHeaderVisibility?.();
+      config.onReady?.();
+      // 恢复后再校准一次，使 Virtualizer 感知新的 scrollY
+      instance.measure();
+      setVirtualItems([...instance.getVirtualItems()] as VirtualItem[]);
+      setTotalSize(instance.getTotalSize());
+    }
   });
 
   // Scroll + resize listeners for window mode
