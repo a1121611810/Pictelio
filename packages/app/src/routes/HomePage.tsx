@@ -34,14 +34,17 @@ const HomePage: Component = () => {
     setLastAccess(currentTab(), Date.now());
   });
 
-  // ── 延迟激活：首次访问某 Tab 时激活对应 store 的查询 ──
+  // ── 延迟激活：仅当对应 Tab 首次被访问时才激活 store 的查询 ──
   createEffect(() => {
     const tab = currentTab();
-    followActivate();
-    bookmarkActivate();
-    novelFollowActivate();
-    novelBookmarkActivate();
-    void tab;
+    if (tab === "follow") {
+      followActivate();
+      novelFollowActivate();
+    }
+    if (tab === "bookmarks") {
+      bookmarkActivate();
+      novelBookmarkActivate();
+    }
   });
 
   const domActiveTabs = createMemo(() => {

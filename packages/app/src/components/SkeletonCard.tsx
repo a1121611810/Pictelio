@@ -16,7 +16,7 @@ const SkeletonCard: Component<Props> = (props) => {
   const aspectRatio = props.width && props.height ? `${props.width} / ${props.height}` : "1 / 1";
 
   return (
-    <div class="image-card break-inside-avoid mb-3">
+    <div class="image-card break-inside-avoid mb-3 border border-[var(--colorNeutralStroke2)] rounded-[var(--borderRadiusMedium)] overflow-hidden">
       {/* Thumbnail area — 使用正确比例避免 skeleton→image 切换时 reflow */}
       <SkeletonShimmer class="w-full" style={{ "aspect-ratio": aspectRatio }} />
       {/* Text lines matching ImageCard p-2.5 */}
