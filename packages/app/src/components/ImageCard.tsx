@@ -49,9 +49,9 @@ const ImageCard: Component<Props> = (props) => {
   return (
     <div class="image-card surface-card" onClick={() => props.onClick(props.illust.id)}>
       <div class="relative overflow-hidden rounded-[var(--borderRadiusMedium)]">
-        {/* Skeleton overlay — 图片结构已渲染但缩略图尚未加载成功时占位 */}
+        {/* Skeleton overlay — 缩略图加载完成后淡出 */}
         <SkeletonShimmer
-          class="absolute inset-0 z-0 pointer-events-none transition-opacity duration-[var(--durationUltraSlow)] ease-[var(--curveEasyEase)]"
+          class="absolute inset-0 z-0 pointer-events-none border border-[var(--colorNeutralStroke2)] rounded-[var(--borderRadiusMedium)] transition-opacity duration-[var(--durationUltraSlow)] ease-[var(--curveEasyEase)]"
           classList={{ "opacity-0": thumbLoaded() }}
         />
         {/* Blur-up thumbnail */}

@@ -206,11 +206,6 @@ const RootLayout: Component = () => {
         <Outlet />
       </ErrorBoundary>
 
-      {/* 启动加载覆盖层：由原生 Splash 承担加载指示，JS 侧不做重复覆盖 */}
-      <Show when={isLoading()}>
-        <div class="fixed inset-0 z-50" />
-      </Show>
-
       {/* Exit hint toast */}
       <Show when={showExitHint()}>
         <div class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke2)] rounded-[var(--borderRadius2XLarge)] shadow-[var(--elevation8)] px-5 py-2.5 text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] font-medium whitespace-nowrap pointer-events-none transition-all duration-[var(--durationGentle)]">
