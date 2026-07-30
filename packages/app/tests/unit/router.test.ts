@@ -57,7 +57,7 @@ describe("router", () => {
 
     const expected = [
       "/login",
-      "/recommended",
+      "/home",
       "/illust/$id",
       "/user/$id/illusts",
       "/age-confirmation",

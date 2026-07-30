@@ -217,7 +217,7 @@ const NovelDetail: Component = () => {
     if (typeof window !== "undefined" && window.history.length > 1) {
       router.history.back();
     } else {
-      void navigate({ to: "/recommended", resetScroll: false });
+      void navigate({ to: "/home", resetScroll: false });
     }
   }
 

@@ -20,7 +20,7 @@ export interface BackGestureContext {
   dispatchExitHint: () => void;
 }
 
-const rootPaths = new Set(["/recommended", "/following", "/bookmarks", "/login"]);
+const rootPaths = new Set(["/home", "/bookmarks", "/login"]);
 
 /** 根路径下两次返回间隔小于此值（毫秒）时退出应用。 */
 const EXIT_DOUBLE_TAP_MS = 2000;

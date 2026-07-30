@@ -25,8 +25,8 @@ const rightTabs: TabDef[] = [
 
 /** 路由路径映射 */
 const TAB_PATH: Record<NavTab, string> = {
-  recommended: "/recommended",
-  follow: "/following",
+  recommended: "/home",
+  follow: "/home",
   bookmarks: "/bookmarks",
   history: "/history",
 };
@@ -132,7 +132,16 @@ const NavBar: Component = () => {
   // ── Tab 导航 ──
   function handleTabClick(key: NavTab) {
     setCurrentTab(key);
-    void navigate({ to: TAB_PATH[key] });
+    // 推荐/关注：已在首页则同页 CSS 切换，否则导航到首页
+    if (key === "recommended" || key === "follow") {
+      if (window.location.pathname === "/home") {
+        window.history.replaceState(null, "", "/home");
+      } else {
+        void navigate({ to: "/home" });
+      }
+    } else {
+      void navigate({ to: TAB_PATH[key] });
+    }
   }
 
   return (

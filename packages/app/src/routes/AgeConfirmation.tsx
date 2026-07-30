@@ -27,12 +27,12 @@ const AgeConfirmation: Component = () => {
     await setAgeConfirmation(true, isAdult);
 
     if (isReconfirm()) {
-      void navigate({ to: "/recommended", replace: true });
+      void navigate({ to: "/home", replace: true });
     } else {
       const [authErr] = await tryAsync((async () => {
         await initializeAuth();
         if (isLoggedIn()) {
-          await navigate({ to: "/recommended", replace: true });
+          await navigate({ to: "/home", replace: true });
         } else {
           await navigate({ to: "/login", replace: true });
         }

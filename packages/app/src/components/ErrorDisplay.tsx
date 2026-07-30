@@ -105,7 +105,7 @@ const ErrorDisplay: Component<ErrorDisplayProps> = (props) => {
       return;
     }
     if (type() === ApiErrorType.FORBIDDEN) {
-      void navigate({ to: "/recommended", replace: true });
+      void navigate({ to: "/home", replace: true });
       return;
     }
     props.onRetry?.();

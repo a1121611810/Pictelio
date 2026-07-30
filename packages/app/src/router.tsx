@@ -18,7 +18,7 @@ import AgeConfirmation from "@/routes/AgeConfirmation";
 import IllustDetail from "@/routes/IllustDetail";
 import DebugImage from "@/routes/DebugImage";
 import Bookmarks from "@/routes/Bookmarks";
-import TabFeedPage from "@/routes/TabFeedPage";
+import HomePage from "@/routes/HomePage";
 import PersonalCenter from "@/routes/PersonalCenter";
 import UserIllusts from "@/routes/UserIllusts";
 import About from "@/routes/About";
@@ -34,17 +34,6 @@ import Settings from "@/routes/Settings";
 /** 将普通 Solid 组件断言为 TanStack RouteComponent，避免每处重复转换。 */
 function asRoute(component: Component): RouteComponent {
   return component as unknown as RouteComponent;
-}
-
-/** Feed 页签类型。 */
-type FeedTab = "recommended" | "follow";
-
-/** 构造 Feed 路由的 loader，仅设置 tab，组件内加载数据。 */
-function makeFeedLoader(tab: FeedTab) {
-  return () => {
-    setCurrentTab(tab);
-    return {};
-  };
 }
 
 /** 构造用户关注/粉丝列表路由的 loader，仅重置列表状态，组件内加载数据。 */
@@ -63,18 +52,14 @@ const loginRoute = createRoute({
   component: asRoute(Login),
 });
 
-const recommendedRoute = createRoute({
+const homeRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "recommended",
-  loader: makeFeedLoader("recommended"),
-  component: () => <TabFeedPage tab="recommended" />,
-});
-
-const followingRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "following",
-  loader: makeFeedLoader("follow"),
-  component: () => <TabFeedPage tab="follow" />,
+  path: "home",
+  loader: () => {
+    // uiStore 默认为 "recommended"（处理首次启动）；NavBar 负责切 tab
+    return {};
+  },
+  component: asRoute(HomePage),
 });
 
 const illustRoute = createRoute({
@@ -213,8 +198,7 @@ const catchAllRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   loginRoute,
-  recommendedRoute,
-  followingRoute,
+  homeRoute,
   illustRoute,
   debugRoute,
   novelRoute,

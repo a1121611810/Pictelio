@@ -138,7 +138,7 @@ const PersonalCenter: Component<Props> = (props) => {
               onClick={() =>
                 void navigate({
                   to: profileState.isCurrentUser()
-                    ? "/following"
+                    ? "/home"
                     : `/user/${profileState.targetUserId()}/following`,
                 })
               }
@@ -146,7 +146,7 @@ const PersonalCenter: Component<Props> = (props) => {
                 handleKeyDown(e, () =>
                   navigate({
                     to: profileState.isCurrentUser()
-                      ? "/following"
+                      ? "/home"
                       : `/user/${profileState.targetUserId()}/following`,
                   }),
                 )

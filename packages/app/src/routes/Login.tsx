@@ -24,7 +24,7 @@ const Login: Component = () => {
 
   onMount(() => {
     if (isLoggedIn()) {
-      void navigate({ to: "/recommended", replace: true });
+      void navigate({ to: "/home", replace: true });
     }
     // 登录页已渲染，通知原生关闭 Splash Screen
     markContentReady();
@@ -36,7 +36,7 @@ const Login: Component = () => {
     setError(null);
     const [loginErr] = await tryAsync((async () => {
       await loginWithToken(tokenInput().trim());
-      void navigate({ to: "/recommended", replace: true });
+      void navigate({ to: "/home", replace: true });
     })());
     setSubmitting(false);
     if (loginErr) {
@@ -61,7 +61,7 @@ const Login: Component = () => {
     setError(null);
     const [pkceLoginErr] = await tryAsync((async () => {
       await loginWithPKCE(code, codeVerifier());
-      void navigate({ to: "/recommended", replace: true });
+      void navigate({ to: "/home", replace: true });
     })());
     setSubmitting(false);
     setShowOAuth(false);

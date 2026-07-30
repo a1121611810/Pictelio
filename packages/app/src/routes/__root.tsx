@@ -153,8 +153,8 @@ const RootLayout: Component = () => {
 
       await initializeAuth();
       if (isLoggedIn()) {
-        if (location().pathname !== "/recommended" && location().pathname !== "/following") {
-          await navigate({ to: "/recommended", replace: true });
+        if (location().pathname !== "/home") {
+          await navigate({ to: "/home", replace: true });
         }
       } else {
         if (location().pathname !== "/login") {
@@ -166,7 +166,7 @@ const RootLayout: Component = () => {
     // 兜底关闭 Splash：非 Feed 页面（login / age-confirmation 等）
     // 由 Login.tsx 或 Feed.tsx 负责主动触发，此处兜底确保不会泄漏
     const currentPath = location().pathname;
-    if (currentPath !== "/recommended" && currentPath !== "/following") {
+    if (currentPath !== "/home") {
       markContentReady();
     }
     // 启动后延迟检查更新 — 确保页面渲染完成后再弹窗

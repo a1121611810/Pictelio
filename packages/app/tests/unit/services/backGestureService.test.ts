@@ -151,7 +151,7 @@ describe("backGestureService", () => {
 
     it("dispatches exitHint on first back at root path and exits app on second back within 2 seconds", async () => {
       const { addListener, exitApp } = mockCapacitorApp();
-      const ctx = createContext("/recommended");
+      const ctx = createContext("/home");
 
       const { registerBackGesture } = await loadService();
       const remove = await registerBackGesture(ctx);
