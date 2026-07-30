@@ -13,6 +13,7 @@ const store = createTQFeedStore<PixivIllust, "bookmarks", { userId: number }>({
   name: "bookmarks",
   currentTab: () => "bookmarks" as const,
   enabled: () => !!user()?.id,
+  lazy: true,
   getDeps: () => ({ userId: user()?.id ?? 0 }),
   staleTime: 30_000,
   gcTime: 5 * 60_000,
@@ -81,6 +82,8 @@ export function getBookmarkScrollY(): number {
 export const ensureLoaded = store.ensureLoaded;
 export const fetchMore = store.fetchMore;
 export const refresh = store.refresh;
+export const activate = store.activate;
+export const isActivated = store.isActivated;
 
 export function setRestrict(r: RestrictType) {
   if (restrict() === r) return;

@@ -27,6 +27,7 @@ const store = createTQFeedStore<PixivNovel, "bookmarks", NovelDeps>({
   name: "novel_bookmarks",
   currentTab: () => "bookmarks" as const,
   enabled: () => !!user(),
+  lazy: true,
   getDeps: () => ({ userId: user()?.id ?? 0, restrict: bookmarkRestrictState() }),
   staleTime: 30_000,
   gcTime: 5 * 60_000,
@@ -84,6 +85,9 @@ export async function refresh(): Promise<void> {
 export function fetchMore(_signal?: AbortSignal): Promise<unknown> | undefined {
   return store.fetchMore(_signal);
 }
+
+export const activate = store.activate;
+export const isActivated = store.isActivated;
 
 // ── Scroll restore ──
 

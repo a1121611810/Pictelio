@@ -88,7 +88,9 @@ function makeIllust(id: number): PixivIllust {
 
 async function loadStore() {
   vi.resetModules();
-  return import("@/stores/bookmarkStore");
+  const store = await import("@/stores/bookmarkStore");
+  store.activate();
+  return store;
 }
 
 describe("bookmarkStore", () => {

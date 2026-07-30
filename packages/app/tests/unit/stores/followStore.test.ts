@@ -163,7 +163,9 @@ function setQueryData(key: string, illusts: PixivIllust[], next_url: string | nu
 
 async function loadStore() {
   vi.resetModules();
-  return import("@/stores/followStore");
+  const store = await import("@/stores/followStore");
+  store.activate();
+  return store;
 }
 
 // ── Tests ──

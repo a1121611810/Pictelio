@@ -21,6 +21,7 @@ const store = createTQFeedStore<PixivNovel, "follow", undefined>({
   name: "novel_follow",
   currentTab: () => "follow" as const,
   enabled: () => true,
+  lazy: true,
   getDeps: () => undefined,
   staleTime: 30_000,
   gcTime: 5 * 60_000,
@@ -65,6 +66,8 @@ export function isNovelFollowCached(): boolean {
 
 export const ensureLoaded = store.ensureLoaded;
 export const refresh = store.refresh;
+export const activate = store.activate;
+export const isActivated = store.isActivated;
 
 export function fetchMore(_signal?: AbortSignal): Promise<unknown> | undefined {
   return store.fetchMore(_signal);

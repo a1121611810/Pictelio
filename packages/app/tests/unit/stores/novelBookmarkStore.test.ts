@@ -155,7 +155,9 @@ function setQueryData(key: string, novels: PixivNovel[], next_url: string | null
 
 async function loadStore() {
   vi.resetModules();
-  return import("@/stores/novelBookmarkStore");
+  const store = await import("@/stores/novelBookmarkStore");
+  store.activate();
+  return store;
 }
 
 describe("novelBookmarkStore", () => {

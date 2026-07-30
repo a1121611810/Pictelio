@@ -21,6 +21,7 @@ const store = createTQFeedStore<PixivIllust, "follow", undefined>({
   name: "follow",
   currentTab: () => "follow" as const,
   enabled: () => true,
+  lazy: true,
   getDeps: () => undefined,
   staleTime: 30_000,
   gcTime: 5 * 60_000,
@@ -67,6 +68,8 @@ export function isFollowCached(): boolean {
 
 export const ensureLoaded = store.ensureLoaded;
 export const refresh = store.refresh;
+export const activate = store.activate;
+export const isActivated = store.isActivated;
 
 /** 串行翻页 */
 export function fetchMore(_signal?: AbortSignal): Promise<unknown> | undefined {

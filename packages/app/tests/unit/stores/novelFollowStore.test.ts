@@ -152,7 +152,9 @@ function setQueryData(key: string, novels: PixivNovel[], next_url: string | null
 
 async function loadStore() {
   vi.resetModules();
-  return import("@/stores/novelFollowStore");
+  const store = await import("@/stores/novelFollowStore");
+  store.activate();
+  return store;
 }
 
 describe("novelFollowStore", () => {

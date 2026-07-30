@@ -3,6 +3,10 @@ import { currentTab, setContentType, contentType } from "../stores/uiStore";
 import { user, isLoggedIn } from "../stores/authStore";
 import { loading as recLoading } from "../stores/recommendedStore";
 import { loading as folLoading } from "../stores/followStore";
+import { activate as followActivate } from "../stores/followStore";
+import { activate as novelFollowActivate } from "../stores/novelFollowStore";
+import { activate as bookmarkActivate } from "../stores/bookmarkStore";
+import { activate as novelBookmarkActivate } from "../stores/novelBookmarkStore";
 import UserAvatar from "../components/UserAvatar";
 import RecommendedFeed from "../components/RecommendedFeed";
 import FollowFeed from "../components/FollowFeed";
@@ -30,6 +34,16 @@ const HomePage: Component = () => {
 
   createEffect(() => {
     setLastAccess(currentTab(), Date.now());
+  });
+
+  // ── 延迟激活：首次访问某 Tab 时激活对应 store 的查询 ──
+  createEffect(() => {
+    const tab = currentTab();
+    followActivate();
+    bookmarkActivate();
+    novelFollowActivate();
+    novelBookmarkActivate();
+    void tab;
   });
 
   const domActiveTabs = createMemo(() => {

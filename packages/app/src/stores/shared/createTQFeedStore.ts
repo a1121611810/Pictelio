@@ -98,6 +98,13 @@ export type TQFeedStoreConfig<
 
   /** 可选去重函数（feedStore merge 模式需要） */
   dedupFn?: (items: TItem[]) => TItem[];
+
+  /**
+   * 延迟激活：true 时查询延迟到 activate() 调用后才启用。
+   * 用于非默认 Tab 的 store，避免模块加载时立即发起请求。
+   * 默认 false（模块加载即激活）。
+   */
+  lazy?: boolean;
 };
 
 export type TQFeedStoreResult<TItem> = {
@@ -131,6 +138,12 @@ export type TQFeedStoreResult<TItem> = {
 
   /** 加载下一页（仅第一个活跃查询） */
   fetchMore: (_signal?: AbortSignal) => Promise<unknown> | undefined;
+
+  /** 手动激活查询（lazy:true 的 store 在被调用前查询处于 disabled 状态） */
+  activate: () => void;
+
+  /** 是否已激活 */
+  isActivated: Accessor<boolean>;
 };
 
 // ─── 通用算法 ───
@@ -201,6 +214,10 @@ export function createTQFeedStore<
     const configStaleTime = config.staleTime ?? 30_000;
     const configGcTime = config.gcTime ?? 30 * 60 * 1000;
     const configErrorStrategy: ErrorStrategy = config.errorStrategy ?? "priority";
+    const isLazy = config.lazy === true;
+
+    // ── 延迟激活门控 ──
+    const [activated, setActivated] = createSignal(!isLazy);
 
     // ── 1. 创建所有查询（在单个 createRoot 下） ──
 
@@ -240,11 +257,13 @@ export function createTQFeedStore<
 
                 /**
                  * 自动推导 enabled：
-                 * 1. 全局条件（登录态等）
-                 * 2. 仅当前 tab 的查询可运行
-                 * 3. subTab 匹配（"all" 模式下所有 sub-query 启用）
+                 * 1. 延迟激活门控（lazy:true 时需先调用 activate()）
+                 * 2. 全局条件（登录态等）
+                 * 3. 仅当前 tab 的查询可运行
+                 * 4. subTab 匹配（"all" 模式下所有 sub-query 启用）
                  */
                 enabled:
+                  activated() &&
                   config.enabled() &&
                   (() => {
                     const activeTab = config.currentTab();
@@ -440,6 +459,8 @@ export function createTQFeedStore<
       ensureLoaded,
       refresh,
       fetchMore,
+      activate: () => setActivated(true),
+      isActivated: activated,
     };
   });
 }
