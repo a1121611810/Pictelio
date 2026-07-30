@@ -1,5 +1,5 @@
 {
-  "version": "3.21.4",
-  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.21.4",
-  "changelog": "🐛 修复\n  fix(auth): 修复启动时 token 恢复竞态条件"
+  "version": "3.21.5",
+  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.21.5",
+  "changelog": "🐛 修复\n  fix(ui): 启动时品牌加载页消除登录页闪烁"
 }
