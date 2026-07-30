@@ -86,9 +86,87 @@ describe("authStore", () => {
       expect(mockSetOnUnauthorized).toHaveBeenCalled();
     });
 
+    it("两次调用等待同一操作，都正确完成", async () => {
+      mockSecureGetResult = "valid-refresh-token";
+      let resolveOAuth: (v: unknown) => void;
+      const oauthPromise = new Promise((r) => { resolveOAuth = r; });
+      mockRefreshToken.mockReturnValue(oauthPromise);
+
+      const { initializeAuth, isLoggedIn } = await loadStore();
+
+      // 模拟 main.tsx 的 void initializeAuth()（不 await）
+      const promise1 = initializeAuth();
+      // 模拟 __root.tsx 的 await initializeAuth()
+      const promise2 = initializeAuth();
+
+      // 两个 Promise 都还在 pending（OAuth 未返回）
+      // 如果它们共享同一个异步操作，两者都应 resolve
+      resolveOAuth!({
+        access_token: "new-access",
+        refresh_token: "new-refresh",
+        user: { id: 1, name: "Test", account: "test" },
+      });
+
+      await promise1;
+      await promise2;
+      expect(isLoggedIn()).toBe(true);
+    });
+
+    it("loginWithToken 重置 Promise 链", async () => {
+      mockSecureGetResult = "stale-token";
+      mockRefreshToken.mockResolvedValue({
+        access_token: "stale-access",
+        refresh_token: "stale-refresh",
+        user: { id: 9, name: "Stale", account: "st" },
+      });
+
+      const { initializeAuth, loginWithToken, isLoggedIn } = await loadStore();
+
+      // 先触发一次 initializeAuth（后台运行中）
+      const oldPromise = initializeAuth();
+
+      // 用户主动登录
+      mockRefreshToken.mockResolvedValue({
+        access_token: "fresh-access",
+        refresh_token: "fresh-refresh",
+        user: { id: 10, name: "Fresh", account: "fr" },
+      });
+      await loginWithToken("active-login-token");
+
+      expect(isLoggedIn()).toBe(true);
+
+      // 之后 initializeAuth 应使用新 Promise（不与旧 Promise 相同）
+      const newPromise = initializeAuth();
+      expect(newPromise).not.toBe(oldPromise);
+    });
+
+    it("loginWithPKCE 重置 Promise 链", async () => {
+      mockSecureGetResult = null; // 没有 token，避免 initializeAuth 启动 OAuth
+      mockExchangeCodeForToken.mockResolvedValue({
+        access_token: "pkce-access",
+        refresh_token: "pkce-refresh",
+        user: { id: 20, name: "PKCEUser", account: "pk" },
+      });
+
+      const { initializeAuth, loginWithPKCE, isLoggedIn } = await loadStore();
+
+      // 安全确认：initializeAuth 不会启动后台刷新（无 token）
+      const oldPromise = initializeAuth();
+
+      await loginWithPKCE("auth-code", "verifier-123");
+
+      expect(isLoggedIn()).toBe(true);
+
+      // 之后 initializeAuth 应使用新 Promise（不与旧 Promise 相同）
+      const newPromise = initializeAuth();
+      expect(newPromise).not.toBe(oldPromise);
+    });
+
     it("refresh fails: logs out", async () => {
       mockSecureGetResult = "expired-token";
-      mockRefreshToken.mockRejectedValue(new Error("invalid_grant"));
+      mockRefreshToken.mockRejectedValue(
+        new Error("OAuth 失败 (HTTP 400): {\"error\":{\"message\":\"invalid_grant\"}}"),
+      );
 
       const { initializeAuth, isLoading, isLoggedIn, user } = await loadStore();
       await initializeAuth();
@@ -97,6 +175,34 @@ describe("authStore", () => {
       expect(isLoggedIn()).toBe(false);
       expect(user()).toBeNull();
       expect(mockSecureRemove).toHaveBeenCalled();
+    });
+
+    it("OAuth 400（永久失效）：删除 token", async () => {
+      mockSecureGetResult = "oauth-expired-token";
+      mockRefreshToken.mockRejectedValue(
+        new Error("OAuth 失败 (HTTP 400): {\"error\":{\"message\":\"invalid_grant\"}}"),
+      );
+
+      const { initializeAuth, isLoading, isLoggedIn } = await loadStore();
+      await initializeAuth();
+
+      expect(isLoading()).toBe(true);
+      expect(isLoggedIn()).toBe(false);
+      // OAuth 400 → 永久失效 → logout → 删除 token
+      expect(mockSecureRemove).toHaveBeenCalled();
+    });
+
+    it("TypeError（网络超时）：保留 token", async () => {
+      mockSecureGetResult = "network-flaky-token";
+      mockRefreshToken.mockRejectedValue(new TypeError("Failed to fetch"));
+
+      const { initializeAuth, isLoading, isLoggedIn } = await loadStore();
+      await initializeAuth();
+
+      expect(isLoading()).toBe(true);
+      expect(isLoggedIn()).toBe(false);
+      // 网络错误 → 临时故障 → 不清除 token
+      expect(mockSecureRemove).not.toHaveBeenCalled();
     });
 
     it("migrates token from Preferences if secure storage is empty", async () => {

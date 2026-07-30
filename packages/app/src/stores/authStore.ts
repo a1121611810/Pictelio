@@ -53,29 +53,59 @@ async function setupUnauthorizedHandler() {
 }
 
 /** 防止 initializeAuth 被重复调用（startup 和 onMount 都可能触发） */
-let _authInitialized = false;
+let _authPromise: Promise<void> | null = null;
 
 export async function initializeAuth() {
-  if (_authInitialized) return;
-  _authInitialized = true;
-  let token = await getRefreshToken();
-  if (!token) {
-    token = await migrateRefreshTokenFromPreferences();
-  }
-  if (token) {
-    setRefreshTokenSig(token);
-    await setupUnauthorizedHandler();
-    // 设置 tokenReady barrier：在此 barrier resolve 之前所有 API 请求被阻塞在 client.ts 入口
-    let resolveTokenReady: () => void;
-    setTokenReadyPromise(new Promise((r) => { resolveTokenReady = r; }));
-    // 设置 refreshPromise，让并发请求在初始 token 刷新期间等待
-    const promise = performRefresh(token).finally(() => {
-      setRefreshPromise(null);
-      resolveTokenReady?.();
-    });
-    setRefreshPromise(promise);
-    await promise;
-  }
+  if (_authPromise) return _authPromise;
+  _authPromise = (async () => {
+    let token = await getRefreshToken();
+    if (!token) {
+      token = await migrateRefreshTokenFromPreferences();
+    }
+    if (token) {
+      setRefreshTokenSig(token);
+      await setupUnauthorizedHandler();
+      // 设置 tokenReady barrier：在此 barrier resolve 之前所有 API 请求被阻塞在 client.ts 入口
+      let resolveTokenReady: () => void;
+      setTokenReadyPromise(new Promise((r) => { resolveTokenReady = r; }));
+      // 设置 refreshPromise，让并发请求在初始 token 刷新期间等待
+      const promise = performRefresh(token).finally(() => {
+        setRefreshPromise(null);
+        resolveTokenReady?.();
+      });
+      setRefreshPromise(promise);
+      await promise;
+    }
+  })();
+  return _authPromise;
+}
+
+/** 清除内存中的认证状态，但不删除持久化的 refresh_token */
+function clearAuthState() {
+  appStateListener?.remove();
+  appStateListener = null;
+  setAuthPermanentFailure(true);
+  setTokenReadyPromise(Promise.resolve());
+  syncToken("");
+  setRefreshTokenSig(null);
+  setUser(null);
+  setIsLoggedIn(false);
+}
+
+/**
+ * 判断 OAuth 错误是否为永久性（token 已永久失效，不可恢复）。
+ *
+ * - TypeError：网络层错误（DNS、连接超时等），为临时故障
+ * - OAuth HTTP 400-409 错误（invalid_grant / invalid_request等）：token 已过期/被撤销，为永久失效
+ * - OAuth HTTP 429（请求过于频繁）被排除在外，为临时故障
+ */
+function isAuthErrorPermanent(err: unknown): boolean {
+  if (err instanceof TypeError) return false;
+  const msg =
+    typeof err === "object" && err !== null && "message" in err
+      ? String((err as { message: unknown }).message)
+      : String(err);
+  return msg.includes("OAuth 失败 (HTTP 40") || msg.includes("OAuth failed (HTTP 40");
 }
 
 async function performRefresh(token: string) {
@@ -89,10 +119,18 @@ async function performRefresh(token: string) {
       await setRefreshToken(resp.refresh_token);
     }),
   );
-  if (err) await logout();
+  if (err) {
+    if (isAuthErrorPermanent(err)) {
+      await logout();
+    } else {
+      // 临时故障（网络错误等）：只清内存状态，保留 token 供下次重试
+      clearAuthState();
+    }
+  }
 }
 
 export async function loginWithToken(token: string) {
+  _authPromise = null; // 主动登录重置 Promise 链
   const resp = await refreshToken(token);
   syncToken(resp.access_token);
   setRefreshTokenSig(resp.refresh_token);
@@ -100,6 +138,7 @@ export async function loginWithToken(token: string) {
   setIsLoggedIn(true);
   await setupUnauthorizedHandler();
   await setRefreshToken(resp.refresh_token);
+  _authPromise = Promise.resolve();
 }
 
 /**
@@ -109,6 +148,7 @@ export async function loginWithToken(token: string) {
  * @param codeVerifier PKCE code_verifier（生成 code_challenge 时保存的值）
  */
 export async function loginWithPKCE(code: string, codeVerifier: string) {
+  _authPromise = null; // 主动登录重置 Promise 链
   const resp = await exchangeCodeForToken(code, codeVerifier);
   syncToken(resp.access_token);
   setRefreshTokenSig(resp.refresh_token);
@@ -116,6 +156,7 @@ export async function loginWithPKCE(code: string, codeVerifier: string) {
   setIsLoggedIn(true);
   await setupUnauthorizedHandler();
   await setRefreshToken(resp.refresh_token);
+  _authPromise = Promise.resolve();
 }
 
 export async function logout() {

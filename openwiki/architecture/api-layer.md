@@ -72,9 +72,23 @@ For first-time login, Pictelio uses the PKCE authorization code flow:
 4. `exchangeCodeForToken()` calls `OAuthPlugin.exchangeCode()`, then sets the access_token on PixivApiPlugin via `PixivApi.setAccessToken()` (Java-side storage)
 5. `refresh_token` is persisted to `capacitor-secure-storage`
 
+### Auth Initialization Dedup (`authStore.ts`)
+
+`initializeAuth()` in `authStore.ts` uses a **promise-based dedup pattern**: instead of a simple boolean guard (`_authInitialized`), it stores the actual initialization promise in `_authPromise`. Concurrent callers (e.g. `main.tsx`'s `void initializeAuth()` and `RootLayout.onMount`'s `await initializeAuth()`) share the same async operation rather than racing.
+
+- First call stores the Promise in `_authPromise` and begins the refresh flow
+- Subsequent calls return the stored Promise — no duplicate refresh
+- `loginWithToken()` and `loginWithPKCE()` reset `_authPromise = null` before starting, then set it to `Promise.resolve()` after success, ensuring a fresh init on the next `initializeAuth()` call after a login flow
+
 ### OAuth Token Error Detection
 
 Pixiv returns HTTP 400 (not 401) for expired `refresh_token`. The function `isOAuthTokenErrorResponse()` in `client.ts` detects this specific case (`400` + error body containing "invalid_request").
+
+**Permanent vs transient error branching** (`authStore.ts`): When `performRefresh` catches an error, the auth store distinguishes:
+- **Permanent errors** (OAuth HTTP 400-409): The `refresh_token` is irrecoverably expired or revoked. `isAuthErrorPermanent()` matches `"HTTP 40"` in the error message (covering 400 through 409), triggering full `logout()` which deletes the persisted token.
+- **Transient errors** (TypeError/network timeout/HTTP 429 rate limiting): Temporary connectivity or throttling failure. `clearAuthState()` resets the in-memory signal state (`isLoggedIn`, `user`, `tokenReady`) but **preserves** the persisted `refresh_token` so the next `initializeAuth()` call (e.g. on app resume) can retry.
+
+This replaces the earlier unconditional `logout()` on any refresh failure — introducing resilience to network flakiness during startup auth.
 
 ## Request Flow (Native Production)
 
@@ -106,7 +120,11 @@ sequenceDiagram
             Client-->>Store: data
         else 400 OAuth error (refresh_token expired)
             Java-->>JS: error response
-            Client-->>Store: Force logout
+            Client-->>Store: authStore.performRefresh(err)
+            alt permanent (OAuth 400)
+                Client-->>Store: logout() — delete token
+            else transient (TypeError / network)
+                Client-->>Store: clearAuthState() — preserve token for retry
         else success
             Pixiv-->>Java: Success response
             Java-->>JS: JSON response
