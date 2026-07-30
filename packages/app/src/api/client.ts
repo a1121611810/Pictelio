@@ -266,6 +266,14 @@ async function nativeExecuteRequest<T>(
   // 等待首次 token 刷新完成
   await devAuth.tokenReady;
 
+  // Web 模式且无 access_token → 未登录，快速失败
+  if (!isNative && !devAccessToken) {
+    throw {
+      type: ApiErrorType.UNAUTHORIZED,
+      message: "未登录，请先登录",
+    };
+  }
+
   /** 实际执行请求（不包含重试逻辑） */
   async function exec(): Promise<T> {
     if (isNative) {

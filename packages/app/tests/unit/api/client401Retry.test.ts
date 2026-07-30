@@ -17,7 +17,9 @@ vi.mock("@/native/PixivApi", () => ({
 
 async function loadModule() {
   vi.resetModules();
-  return import("@/api/client");
+  const mod = await import("@/api/client");
+  mod.setAccessToken("test-token");
+  return mod;
 }
 
 describe("apiClient — PixivApi native mode", () => {

@@ -95,3 +95,29 @@ onMount(() => {
 1. `client.ts` — `devAuth` 新增 `tokenReady` 和 `authPermanentFailure`；`nativeExecuteRequest` 入口处添加检查和 await
 2. `authStore.ts` — `initializeAuth` 中设置 `tokenReady` barrier；`logout` 中设置 `authPermanentFailure` 并解锁 `tokenReady`
 3. `RecommendedFeed.tsx`、`FollowFeed.tsx`、`BookmarksFeed.tsx` — `onMount` 中 `ensureLoaded` 包一层 `requestAnimationFrame`
+
+## 决策 5（补充）：Web 模式 Token 存在性检查
+
+### 背景
+
+登录页（`/login`）刷新时，`tokenReady` barrier 只在存在 refresh_token 时设置。登录页没有 token，所以 barrier 保持 `Promise.resolve()`，不阻挡任何请求。`recommendedStore` 的 `createInfiniteQuery` 在模块加载时自动 fetch，到达 `nativeExecuteRequest` 后直接通过 barrier，发送 HTTP 请求后收到 400。
+
+### 决策
+
+在 `nativeExecuteRequest` 入口的第三道防线（`authPermanentFailure` → `tokenReady` → token existence check）：
+
+```ts
+// Web 模式且没有 access_token → 快速失败，不发送请求
+if (!isNative && !devAccessToken) {
+  const err: ApiError = { type: ApiErrorType.UNAUTHORIZED, message: "未登录" };
+  throw err;
+}
+```
+
+位置在 `authPermanentFailure` 检查之后、`tokenReady` await 之后。原因：`authPermanentFailure` 优先（永久失效覆盖一切），`tokenReady` 同步跨请求（就绪后统一放行），token 存在性检查是当前会话的准入条件。
+
+### 效果
+
+- 登录页刷新：零 API 请求（Token 存在性检查直接拒绝）
+- 已登录刷新：`tokenReady` 等待 token 就绪，token 就绪后 `devAccessToken` 有值，检查通过
+- 不影响 native 路径（`isNative` 为 true 时跳过此检查）

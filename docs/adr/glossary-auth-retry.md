@@ -17,11 +17,14 @@
 ```
 nativeExecuteRequest(path)
   │
-  ├── 1. 检查 authPermanentFailure → true → 立即 throw "认证已失效"
+  ├── 1. 检查 authPermanentFailure → true → 立即 throw Error
   │
   ├── 2. await tokenReady → 等待首次 token 刷新完成
   │
-  ├── 3. exec() → 发送真实 HTTP 请求
+  ├── 3. Web 模式 Token 存在性检查：
+  │     devAccessToken 为空 → 快速失败 throw UNAUTHORIZED（零网络请求）
+  │
+  ├── 4. exec() → 发送真实 HTTP 请求
   │
   └── 4. catch UNAUTHORIZED:
         ├── refreshPromise 已存在 → await 已有 promise（并发去重）
