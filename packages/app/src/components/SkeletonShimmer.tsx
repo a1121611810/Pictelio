@@ -14,7 +14,7 @@ const SkeletonShimmer: Component<Props> = (props) => (
     classList={props.classList}
     style={{
       background:
-        "linear-gradient(90deg, var(--colorNeutralStroke2) 25%, var(--colorNeutralBackground3) 50%, var(--colorNeutralStroke2) 75%)",
+        "linear-gradient(90deg, var(--colorNeutralBackground2) 25%, var(--colorNeutralBackground1) 50%, var(--colorNeutralBackground2) 75%)",
       "background-size": "200% 100%",
       animation: "fluent-shimmer var(--durationUltraSlow) var(--curveEasyEase) infinite",
       ...(typeof props.style === "object" ? props.style : {}),
