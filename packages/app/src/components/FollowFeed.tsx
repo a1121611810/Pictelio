@@ -38,9 +38,9 @@ const FollowFeed: Component<Props> = (props) => {
   // 初始化数据加载（延迟到下一帧，让骨架屏先渲染）
   onMount(() => {
     abortController = new AbortController();
-    requestAnimationFrame(() => {
+    setTimeout(() => {
       ensureLoaded(abortController!.signal);
-    });
+    }, 0);
   });
 
   // Save scroll + abort pending requests on unmount

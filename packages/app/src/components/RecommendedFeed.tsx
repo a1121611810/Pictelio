@@ -40,9 +40,10 @@ const RecommendedFeed: Component<Props> = (props) => {
   // 初始化数据加载（延迟到下一帧，让骨架屏先渲染）
   onMount(() => {
     abortController = new AbortController();
-    requestAnimationFrame(() => {
+    // 延迟到浏览器绘制完骨架屏后再加载数据
+    setTimeout(() => {
       ensureLoaded(abortController!.signal);
-    });
+    }, 0);
   });
 
   // Save scroll + abort pending requests on unmount
