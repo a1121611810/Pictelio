@@ -69,7 +69,10 @@ export function isOAuthTokenErrorResponse(status: number, body: unknown): boolea
   const err = d.error
   if (typeof err !== "object" || err === null) return false
   const msg = (err as Record<string, unknown>).message
-  return typeof msg === "string" && (msg.includes("OAuth") || msg.includes("invalid_request"))
+  return (
+    typeof msg === "string" &&
+    (msg.includes("OAuth") || msg.includes("invalid_request") || msg.includes("invalid_grant"))
+  )
 }
 
 export function classifyError(status: number, error: unknown, responseBody?: unknown): ApiError {
@@ -117,6 +120,16 @@ export function rewriteUrl(path: string): string {
   return `/pixiv-api${path}`
 }
 
+/**
+ * 决定是否给请求附加 Bearer access_token。
+ * 仅当重写后的 URL 是本地代理路径（/pixiv-*）时才携带——
+ * 外部绝对 URL（如服务端 next_url 指向非 Pixiv 域）不带 Authorization。
+ * 纯函数，可单测。
+ */
+export function shouldAttachAuth(path: string): boolean {
+  return rewriteUrl(path).startsWith("/pixiv-")
+}
+
 async function execute<T>(
   method: "GET" | "POST",
   path: string,
@@ -133,21 +146,22 @@ async function execute<T>(
     "User-Agent": PIXIV_USER_AGENT,
     Referer: PIXIV_REFERER,
   }
-  // 安全：access_token 仅附加到本地代理路径（/pixiv-*）。
-  // 若 path 是外部绝对 URL（如服务端返回的 next_url），不携带 Authorization，
-  // 防止 access_token 被带到非 Pixiv 域。
-  const isProxyPath = path.startsWith("/pixiv-")
-  if (isProxyPath && accessToken) headers["Authorization"] = `Bearer ${accessToken}`
+  // 先重写 URL，再基于结果决定是否附加 Bearer。
+  // rewriteUrl 仅把已知 Pixiv 主机映射为 /pixiv-* 代理路径；外部绝对 URL
+  // （如服务端返回的 next_url）原样返回且不带 /pixiv- 前缀 → 不携带
+  // Authorization，防止 access_token 被带到非 Pixiv 域。
+  const url = rewriteUrl(path)
+  if (shouldAttachAuth(path) && accessToken) headers["Authorization"] = `Bearer ${accessToken}`
 
   let res: Response
   try {
     if (method === "GET") {
       const params = data ? "?" + new URLSearchParams(data).toString() : ""
-      res = await requestFetch(rewriteUrl(path) + params, { method: "GET", headers, signal })
+      res = await requestFetch(url + params, { method: "GET", headers, signal })
     } else {
       headers["Content-Type"] = PIXIV_CONTENT_TYPE
       const bodyStr = body ? new URLSearchParams(body).toString() : ""
-      res = await requestFetch(rewriteUrl(path), { method: "POST", headers, body: bodyStr })
+      res = await requestFetch(url, { method: "POST", headers, body: bodyStr })
     }
   } catch (err) {
     // fetch 拒绝（网络中断/超时/CORS）→ 归类为 NETWORK，避免裸 TypeError 泄漏给 UI

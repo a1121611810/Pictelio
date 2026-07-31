@@ -1,7 +1,7 @@
 // ─── app-lynx 单元测试（Vitest，node 环境） ───
 import { describe, it, expect } from 'vitest'
 import { proxyImageUrl, thumbUrl } from '../src/utils/imageUrl'
-import { classifyError, isOAuthTokenErrorResponse, rewriteUrl } from '../src/api/client'
+import { classifyError, isOAuthTokenErrorResponse, rewriteUrl, shouldAttachAuth } from '../src/api/client'
 import { ApiErrorType } from '../src/api/types'
 import { extractNovelTextFromHtml } from '../src/api/novel'
 import { matchRoute } from '../src/routerCore'
@@ -56,6 +56,13 @@ describe('client.classifyError', () => {
     expect(e.type).toBe(ApiErrorType.UNAUTHORIZED)
   })
 
+  it('object 形式 {error:{message:"invalid_grant"}} → UNAUTHORIZED', () => {
+    const body = { error: { message: 'invalid_grant' } }
+    expect(isOAuthTokenErrorResponse(400, body)).toBe(true)
+    const e = classifyError(400, null, body)
+    expect(e.type).toBe(ApiErrorType.UNAUTHORIZED)
+  })
+
   it('proxy_error → PROXY', () => {
     const e = classifyError(502, null, { error: 'proxy_error', message: '代理失败' })
     expect(e.type).toBe(ApiErrorType.PROXY)
@@ -84,6 +91,25 @@ describe('client.rewriteUrl', () => {
 
   it('已代理路径原样', () => {
     expect(rewriteUrl('/pixiv-img/x.jpg')).toBe('/pixiv-img/x.jpg')
+  })
+})
+
+describe('client.shouldAttachAuth（Bearer 决策）', () => {
+  it('相对 API 路径（重写为 /pixiv-api）→ 附加 Bearer', () => {
+    expect(shouldAttachAuth('/v1/illust/recommended')).toBe(true)
+    expect(shouldAttachAuth('/v2/novel/detail')).toBe(true)
+  })
+
+  it('apiBaseUrl 绝对 URL（重写为 /pixiv-api）→ 附加 Bearer', () => {
+    expect(shouldAttachAuth('https://app-api.pixiv.net/v1/illust/detail')).toBe(true)
+  })
+
+  it('外部绝对 URL（next_url 指向非 Pixiv 域）→ 不附加 Bearer', () => {
+    expect(shouldAttachAuth('https://evil.example.com/steal')).toBe(false)
+  })
+
+  it('已代理路径 → 附加 Bearer', () => {
+    expect(shouldAttachAuth('/pixiv-api/v1/illust/recommended')).toBe(true)
   })
 })
 
