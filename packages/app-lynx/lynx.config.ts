@@ -12,9 +12,15 @@ const _root = dirname(fileURLToPath(import.meta.url))
 // 与 packages/app/vite.config.ts 同源，避免双份凭证漂移。
 const _credsPath = resolve(_root, '../app/credentials.json5')
 const credentials = JSON5.parse(readFileSync(_credsPath, 'utf-8'))
-// __CREDENTIALS__ 含 A 类机密（clientId/clientSecret/hashSecret），
-// 代码中仅在 __DEV__ 分支引用，生产构建由 minifier 整块消除。
-const __CREDENTIALS__ = JSON.stringify(credentials)
+
+// ─── 凭证注入决策（配置期 fail-closed） ───
+// __DEV__ 必须同时满足「非生产构建」AND「显式 PICTELIO_LYNX_DEV=1」。
+// __DEV__ 为 false 时，__CREDENTIALS__ 定义为占位符（不含任何机密）——
+// 不依赖 minifier DCE 来保证生产 bundle 无凭证。
+const _isDev = process.env.NODE_ENV !== 'production' && process.env.PICTELIO_LYNX_DEV === '1'
+const __CREDENTIALS__ = _isDev
+  ? JSON.stringify(credentials)
+  : JSON.stringify({ clientId: '', clientSecret: '', hashSecret: '', appOs: '', appOsVersion: '' })
 // __PUBLIC_CONFIG__ 仅 B–F 非敏感配置（端点/UA/Referer/超时），
 // 顶层常量可安全内联进生产 bundle。
 const { clientId: _a, clientSecret: _b, hashSecret: _c, ..._pub } = credentials
@@ -27,7 +33,20 @@ const proxyUrl =
   process.env.http_proxy ||
   process.env.HTTP_PROXY ||
   'http://127.0.0.1:10808'
-console.log(`[lynx] 🔧 使用代理: ${proxyUrl}`)
+// 脱敏：代理 URL 可能含 user:pass 凭据（含 scheme-less / protocol-relative 格式），
+// 日志只打印主机部分。逻辑与 src/utils/proxyRedact.ts 的 redactProxyUrl 一致（有单测覆盖）。
+const _redactProxyUrl = (url: string): string => {
+  try {
+    const normalized = url.includes('://') ? url : `http://${url}`
+    const u = new URL(normalized)
+    if (u.hostname) return `${u.protocol}//${u.host}`
+  } catch {
+    /* fallthrough */
+  }
+  const atIdx = url.lastIndexOf('@')
+  return atIdx !== -1 ? url.slice(atIdx + 1) : url
+}
+console.log(`[lynx] 🔧 使用代理: ${_redactProxyUrl(proxyUrl)}`)
 const proxyAgent = new HttpsProxyAgent(proxyUrl) as unknown
 
 export default defineConfig({
@@ -39,12 +58,7 @@ export default defineConfig({
     define: {
       __CREDENTIALS__,
       __PUBLIC_CONFIG__,
-      // 安全：__DEV__ 必须同时满足「非生产构建」AND「显式 PICTELIO_LYNX_DEV=1」。
-      // 仅在显式开启的本地开发构建中内联 OAuth 凭证；任何生产/CI 构建
-      // （即使 NODE_ENV 非 production）都不会把 clientId/secret 打进 bundle。
-      __DEV__: JSON.stringify(
-        process.env.NODE_ENV !== 'production' && process.env.PICTELIO_LYNX_DEV === '1',
-      ),
+      __DEV__: JSON.stringify(_isDev),
     },
   },
   server: {

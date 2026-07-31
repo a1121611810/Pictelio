@@ -5,6 +5,7 @@ import { classifyError, isOAuthTokenErrorResponse, rewriteUrl, shouldAttachAuth 
 import { ApiErrorType } from '../src/api/types'
 import { extractNovelTextFromHtml } from '../src/api/novel'
 import { matchRoute } from '../src/routerCore'
+import { redactProxyUrl } from '../src/utils/proxyRedact'
 
 describe('imageUrl.proxyImageUrl', () => {
   it('将 i.pximg.net URL 重写为本地代理路径', () => {
@@ -224,5 +225,43 @@ describe('authStore 安全：refresh_token 不持久化', () => {
     const lsSet = (globalThis.localStorage as { setItem: ReturnType<typeof vi.fn> }).setItem
     await loginWithToken('some-token')
     expect(lsSet).not.toHaveBeenCalled()
+  })
+})
+
+describe('proxyRedact.redactProxyUrl（代理凭据脱敏）', () => {
+  it('http://user:pass@host 去除 userinfo', () => {
+    expect(redactProxyUrl('http://user:secret@proxy.example.com:8080')).toBe(
+      'http://proxy.example.com:8080',
+    )
+  })
+
+  it('scheme-less user:pass@host:port 也能脱敏（防 WHATWG scheme 绕过）', () => {
+    expect(redactProxyUrl('user:secret@proxy.example.com:8080')).toBe(
+      'http://proxy.example.com:8080',
+    )
+  })
+
+  it('scheme-less 无凭据 host:port 正常', () => {
+    expect(redactProxyUrl('127.0.0.1:10808')).toBe('http://127.0.0.1:10808')
+  })
+
+  it('无凭据完整 URL 保留 protocol+host', () => {
+    expect(redactProxyUrl('http://127.0.0.1:10808')).toBe('http://127.0.0.1:10808')
+  })
+
+  it('输出中绝不含 userinfo 片段', () => {
+    const out = redactProxyUrl('user:secret@proxy.example.com:8080')
+    expect(out).not.toContain('user:secret')
+    expect(out).not.toContain('@')
+  })
+
+  it('protocol-relative //user:pass@host 也能脱敏（防空 hostname 绕过）', () => {
+    const out = redactProxyUrl('//user:secret@proxy.example.com:8080')
+    expect(out).not.toContain('user:secret')
+    expect(out).not.toContain('@')
+  })
+
+  it('不可解析输入（坏端口）保守剥离 @ 前缀', () => {
+    expect(redactProxyUrl('user:secret@host:badport')).toBe('host:badport')
   })
 })
