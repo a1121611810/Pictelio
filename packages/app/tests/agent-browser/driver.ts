@@ -141,6 +141,20 @@ export class AgentBrowserDriver {
       }
     }
 
+    // 5. evaluate 注入 el.click()：fluent-button 自定义元素的 CLI click 不可靠
+    try {
+      const js = `(() => {
+        const btn = [...document.querySelectorAll('button, fluent-button, [role="button"]')]
+          .find((el) => el.textContent && el.textContent.includes(${JSON.stringify(text)}));
+        if (btn) { btn.click(); return 'clicked'; }
+        return 'not-found';
+      })()`;
+      const result = await this.evaluate(js);
+      if (JSON.parse(result) === "clicked") return true;
+    } catch {
+      /* 继续 */
+    }
+
     return false;
   }
 

@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createLoggedInDriver } from "../fixtures";
 import { aiAssert } from "../../ai-shared/assertion";
-import type { AgentBrowserDriver } from "../driver";
+import { AgentBrowserDriver } from "../driver";
 
 const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -20,7 +20,7 @@ async function getState(d: AgentBrowserDriver): Promise<string> {
 
 // ─── 发现链路 ─────────────────────────────────────
 
-describe("agent-browser 发现链路", () => {
+describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 发现链路", () => {
   let driver: AgentBrowserDriver;
 
   beforeAll(async () => {
@@ -63,7 +63,7 @@ describe("agent-browser 发现链路", () => {
 
 // ─── 作品链路 ─────────────────────────────────────
 
-describe("agent-browser 作品链路", () => {
+describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 作品链路", () => {
   let driver: AgentBrowserDriver;
 
   beforeAll(async () => {
@@ -126,7 +126,7 @@ describe("agent-browser 作品链路", () => {
 
 // ─── 阅读链路 ─────────────────────────────────────
 
-describe("agent-browser 阅读链路", () => {
+describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 阅读链路", () => {
   let driver: AgentBrowserDriver;
 
   beforeAll(async () => {
@@ -167,7 +167,7 @@ describe("agent-browser 阅读链路", () => {
 
 // ─── 个人链路 ─────────────────────────────────────
 
-describe("agent-browser 个人链路", () => {
+describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 个人链路", () => {
   let driver: AgentBrowserDriver;
 
   beforeAll(async () => {
@@ -207,7 +207,7 @@ describe("agent-browser 个人链路", () => {
 // ─── 登录链路 ─────────────────────────────────────
 // 不依赖 createLoggedInDriver——从空白状态开始测试完整登录流程
 
-describe("agent-browser 登录流（有效 token）", () => {
+describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 登录流（有效 token）", () => {
   let driver: AgentBrowserDriver;
 
   beforeAll(async () => {
@@ -267,9 +267,13 @@ describe("agent-browser 登录流（无效 token）", () => {
     driver = new AgentBrowserDriver();
     await driver.launch();
     await SLEEP(2000);
-    // 通过年龄确认
-    await driver.clickReliable("已满", undefined, "@e2");
-    await SLEEP(3000);
+    // 通过年龄确认，重试直到登录页（fluent-textarea）渲染完成
+    for (let attempt = 0; attempt < 6; attempt++) {
+      await driver.clickReliable("已满", undefined, "@e2");
+      await SLEEP(2000);
+      const snap = await driver.snapshot();
+      if (snap.includes("登录") && snap.includes("refresh_token")) break;
+    }
   }, 60_000);
   afterAll(async () => {
     await driver?.close();
@@ -297,7 +301,7 @@ describe("agent-browser 登录流（无效 token）", () => {
 // ─── Feed 增强链路 ─────────────────────────────────
 // 覆盖 Playwright feed.e2e.ts 中 agent-browser 尚未测试的场景
 
-describe("agent-browser Feed 增强", () => {
+describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser Feed 增强", () => {
   let driver: AgentBrowserDriver;
 
   beforeAll(async () => {
@@ -349,7 +353,7 @@ describe("agent-browser Feed 增强", () => {
 // ─── 设置链路（图床代理）────────────────────────────
 // B 类场景：UI 组件行为验证
 
-describe("agent-browser 图床代理设置", () => {
+describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 图床代理设置", () => {
   let driver: AgentBrowserDriver;
 
   beforeAll(async () => {
@@ -444,7 +448,7 @@ describe("agent-browser 图床代理设置", () => {
 // ─── 小说详情增强链路 ──────────────────────────────
 // 覆盖 novel-detail.e2e.ts 的 header 标题滚动显隐行为
 
-describe("agent-browser 小说标题滚动", () => {
+describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 小说标题滚动", () => {
   let driver: AgentBrowserDriver;
 
   beforeAll(async () => {
@@ -502,7 +506,7 @@ describe("agent-browser 小说标题滚动", () => {
 // ─── 关注筛选链路 ──────────────────────────────────
 // 覆盖 extra-flows.e2e.ts 的 Following Feed Filters
 
-describe("agent-browser 关注筛选", () => {
+describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 关注筛选", () => {
   let driver: AgentBrowserDriver;
 
   beforeAll(async () => {
@@ -543,7 +547,7 @@ describe("agent-browser 关注筛选", () => {
 // ─── 设置链路（通用）────────────────────────────────
 // 覆盖 extra-flows.e2e.ts 的 About/Theme/Layout
 
-describe("agent-browser 关于页", () => {
+describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 关于页", () => {
   let driver: AgentBrowserDriver;
 
   beforeAll(async () => {
@@ -578,7 +582,7 @@ describe("agent-browser 关于页", () => {
   }, 60_000);
 });
 
-describe("agent-browser 主题与布局设置", () => {
+describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 主题与布局设置", () => {
   let driver: AgentBrowserDriver;
 
   beforeAll(async () => {
@@ -650,7 +654,7 @@ describe("agent-browser 主题与布局设置", () => {
 // 覆盖 child-route-navigation.e2e.ts：个人中心子路由跳转
 // user-bookmarks/user-profile 的其余场景已由「个人链路」覆盖
 
-describe("agent-browser 用户子路由", () => {
+describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 用户子路由", () => {
   let driver: AgentBrowserDriver;
 
   beforeAll(async () => {
@@ -730,7 +734,7 @@ describe("agent-browser 用户子路由", () => {
 // ─── 图片缓存设置 ──────────────────────────────────
 // 覆盖 image-cache-settings.e2e.ts
 
-describe("agent-browser 图片缓存设置", () => {
+describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 图片缓存设置", () => {
   let driver: AgentBrowserDriver;
 
   beforeAll(async () => {
@@ -757,7 +761,7 @@ describe("agent-browser 图片缓存设置", () => {
 // ─── 导航与路由 ────────────────────────────────────
 // 覆盖 navigation-settings.e2e.ts
 
-describe("agent-browser 导航与路由", () => {
+describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 导航与路由", () => {
   let driver: AgentBrowserDriver;
 
   beforeAll(async () => {
@@ -817,7 +821,7 @@ describe("agent-browser 导航与路由", () => {
 // ─── 作品详情增强（标签、系列、双击回顶）─────────────
 // 覆盖 IllustTags、SeriesSheet、IllustDetailDoubleClickTop 等 browser 测试
 
-describe("agent-browser 详情页增强", () => {
+describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 详情页增强", () => {
   let driver: AgentBrowserDriver;
 
   beforeAll(async () => {

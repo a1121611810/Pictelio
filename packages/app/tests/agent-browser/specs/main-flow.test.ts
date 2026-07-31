@@ -18,7 +18,7 @@ async function getPageState(d: AgentBrowserDriver): Promise<string> {
   return snap + "\n---页面文本---\n" + text;
 }
 
-describe("agent-browser 超长链", () => {
+describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 超长链", () => {
   let driver: AgentBrowserDriver;
 
   beforeAll(async () => {
