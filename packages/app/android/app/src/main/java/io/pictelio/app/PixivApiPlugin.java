@@ -36,7 +36,7 @@ import okhttp3.Response;
  *
  * 调用方式（JS 侧）：
  *   PixivApi.request({ method, path, params, body })
- *   PixivApi.setRefreshToken({ refreshToken })
+ *   PixivApi.syncToken({ token })  // token 为 null/空 时清除 Native 内存与历史残留
  *   PixivApi.prefetchImage({ url })
  */
 @CapacitorPlugin(name = "PixivApi")
@@ -165,26 +165,32 @@ public class PixivApiPlugin extends Plugin {
         }
     }
 
-    // ─── 插件方法：设置 Refresh Token ─────────────────────────
+    // ─── 插件方法：同步 Refresh Token（内存持有，不落盘） ─────────
 
+    /**
+     * 同步 refresh_token 到 Native 内存（供 401 静默刷新使用）。
+     *
+     * token 为 null/空时清除内存值——登出路径调用。
+     * 无论何种形态都幂等清理 PictelioPrefs.xml 中的历史明文残留
+     * （旧版本 setRefreshToken 曾明文写入，见 ADR-0003 / docs/research）。
+     *
+     * 安全约束：refresh_token 只允许存在于 Java 堆内存，禁止落盘。
+     */
     @PluginMethod
-    public void setRefreshToken(PluginCall call) {
-        String token = call.getString("refreshToken");
+    public void syncToken(PluginCall call) {
+        String token = call.getString("token");
+        refreshToken = (token == null || token.isEmpty()) ? null : token;
         if (token == null || token.isEmpty()) {
-            call.reject("refreshToken is required");
-            return;
+            // 登出：顺带清空 access token（纵深防御，authPermanentFailure 已挡请求）
+            accessToken = null;
         }
-
-        refreshToken = token;
 
         getActivity().getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
                 .edit()
-                .putString(KEY_REFRESH_TOKEN, token)
+                .remove(KEY_REFRESH_TOKEN)
                 .apply();
 
-        JSObject result = new JSObject();
-        result.put("success", true);
-        call.resolve(result);
+        call.resolve();
     }
 
     @PluginMethod
@@ -264,16 +270,15 @@ public class PixivApiPlugin extends Plugin {
     // ─── 内部：刷新 Access Token ──────────────────────────────
 
     /**
-     * 从 SharedPreferences 读取 refresh_token，调用 Pixiv OAuth 端点
-     * 刷新 access_token，成功后更新内存变量。
+     * 使用内存中的 refresh_token 调用 Pixiv OAuth 端点刷新 access_token，
+     * 成功后更新内存变量。token 由 JS 侧通过 syncToken 注入（tokenReady barrier
+     * 保证注入先于任何 API 请求，见 ADR-0041）。
      *
      * @return true 如果刷新成功
      */
     private boolean refreshAccessToken() {
         try {
-            String savedRefreshToken = getActivity()
-                    .getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
-                    .getString(KEY_REFRESH_TOKEN, null);
+            String savedRefreshToken = refreshToken;
 
             if (savedRefreshToken == null || savedRefreshToken.isEmpty()) {
                 return false;
@@ -325,14 +330,16 @@ public class PixivApiPlugin extends Plugin {
 
                 accessToken = newAccessToken;
 
-                // 如果服务端返回了新的 refresh_token，也更新
+                // 如果服务端返回了新的 refresh_token，也更新（仅内存，不落盘）
                 if (newRefreshToken != null && !newRefreshToken.isEmpty()) {
+                    boolean rotated = !newRefreshToken.equals(refreshToken);
                     refreshToken = newRefreshToken;
-                    getActivity()
-                            .getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
-                            .edit()
-                            .putString(KEY_REFRESH_TOKEN, newRefreshToken)
-                            .apply();
+                    if (rotated) {
+                        // token 轮换：通知 JS 侧持久化新值，避免重启后回退旧 token
+                        JSObject data = new JSObject();
+                        data.put("token", newRefreshToken);
+                        notifyListeners("refreshTokenRotated", data);
+                    }
                 }
 
                 return true;

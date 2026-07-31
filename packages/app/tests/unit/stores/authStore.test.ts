@@ -24,18 +24,31 @@ vi.mock("@/api/auth", () => ({
 let mockSecureGetResult: string | null = null;
 const mockSecureSet = vi.fn();
 const mockSecureRemove = vi.fn();
-let mockPrefToken: string | null = null;
 
 vi.mock("@/utils/secureStorage", () => ({
-  getRefreshToken: vi.fn(() => Promise.resolve(mockSecureGetResult)),
-  setRefreshToken: (...args: unknown[]) => mockSecureSet(...args),
-  removeRefreshToken: (...args: unknown[]) => mockSecureRemove(...args),
-  migrateRefreshTokenFromPreferences: vi.fn(() => Promise.resolve(mockPrefToken)),
+  restoreRefreshToken: vi.fn(() => Promise.resolve(mockSecureGetResult)),
+  saveRefreshToken: (...args: unknown[]) => mockSecureSet(...args),
+  clearRefreshToken: (...args: unknown[]) => mockSecureRemove(...args),
 }));
 
 vi.mock("@capacitor/app", () => ({
   App: {
     addListener: vi.fn(() => Promise.resolve({ remove: vi.fn() })),
+  },
+}));
+
+// ── Mock Native bridge（轮换监听） ──
+const mockRotationListener = { remove: vi.fn() };
+let mockRotationCallback: ((data: { token: string }) => void) | null = null;
+
+vi.mock("@/native/PixivApi", () => ({
+  PixivApi: {
+    addListener: vi.fn(
+      (_event: string, callback: (data: { token: string }) => void) => {
+        mockRotationCallback = callback;
+        return Promise.resolve(mockRotationListener);
+      },
+    ),
   },
 }));
 
@@ -47,7 +60,6 @@ async function loadStore() {
 describe("authStore", () => {
   beforeEach(() => {
     mockSecureGetResult = null;
-    mockPrefToken = null;
   });
 
   describe("initial state", () => {
@@ -205,9 +217,10 @@ describe("authStore", () => {
       expect(mockSecureRemove).not.toHaveBeenCalled();
     });
 
-    it("migrates token from Preferences if secure storage is empty", async () => {
-      mockSecureGetResult = null;
-      mockPrefToken = "migrated-token";
+    it("restores login from legacy token (restoreRefreshToken 已迁移旧 Preferences token)", async () => {
+      // 旧版 Preferences 迁移在 restoreRefreshToken 内部完成（secureStorage 层测试覆盖），
+      // 此处模拟 restore 返回迁移后的 token
+      mockSecureGetResult = "migrated-token";
       mockRefreshToken.mockResolvedValue({
         access_token: "migrated-access",
         refresh_token: "migrated-refresh",
@@ -272,6 +285,26 @@ describe("authStore", () => {
       expect(store.accessTokenSig()).toBe("");
       expect(store.refreshTokenSig()).toBeNull();
       expect(mockSecureRemove).toHaveBeenCalled();
+      expect(mockRotationListener.remove).toHaveBeenCalled();
+    });
+
+    it("Java 401 轮换事件 → 持久化新 token 并更新内存", async () => {
+      mockSecureGetResult = "valid-refresh-token";
+      mockRefreshToken.mockResolvedValue({
+        access_token: "acc",
+        refresh_token: "ref",
+        user: { id: 5, name: "U", account: "u" },
+      });
+
+      const store = await loadStore();
+      await store.initializeAuth();
+      expect(mockRotationCallback).not.toBeNull();
+
+      // 模拟 Java 401 静默刷新发现 token 被轮换
+      mockRotationCallback?.({ token: "rotated-token" });
+
+      expect(store.refreshTokenSig()).toBe("rotated-token");
+      expect(mockSecureSet).toHaveBeenCalledWith("rotated-token");
     });
   });
 });

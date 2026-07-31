@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// ── Mock SecureStorage ──
+// ── Mock SecureStorage 插件 ──
 const mockSecureStorage = {
   get: vi.fn(),
   set: vi.fn(),
@@ -15,51 +15,170 @@ vi.mock("@aparajita/capacitor-secure-storage", () => ({
   },
 }));
 
-import { checkBackupIntegrity } from "@/utils/secureStorage";
+// ── Mock Preferences（旧版迁移源） ──
+let mockPrefToken: string | null = null;
+const mockPrefRemove = vi.fn(() => Promise.resolve(undefined));
 
-describe("checkBackupIntegrity", () => {
+vi.mock("@capacitor/preferences", () => ({
+  Preferences: {
+    get: vi.fn(() => Promise.resolve({ value: mockPrefToken })),
+    remove: (...args: unknown[]) => mockPrefRemove(...args),
+  },
+}));
+
+// ── Mock Native bridge（syncToken） ──
+const mockSyncToken = vi.fn();
+
+vi.mock("@/native/PixivApi", () => ({
+  PixivApi: {
+    syncToken: (...args: unknown[]) => mockSyncToken(...args),
+  },
+}));
+
+import { restoreRefreshToken, saveRefreshToken, clearRefreshToken } from "@/utils/secureStorage";
+
+describe("restoreRefreshToken（启动恢复：完整性检查 + 读取/迁移 + Native 注入）", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrefToken = null;
+    mockSyncToken.mockResolvedValue(undefined);
+    // 默认成功返回（各用例按需覆盖 get；set/remove 保持 resolved 避免 tryAsync(undefined)）
+    mockSecureStorage.get.mockResolvedValue(null);
+    mockSecureStorage.set.mockResolvedValue(undefined);
+    mockSecureStorage.remove.mockResolvedValue(undefined);
   });
 
-  it("首次启动: marker 不存在 → 写入 marker → 返回 true", async () => {
-    mockSecureStorage.get.mockResolvedValue(null);
+  it("正常启动: marker 存在 + token 存在 → 返回 token 并注入 Native", async () => {
+    mockSecureStorage.get.mockImplementation(async (key: string) => {
+      if (key === "__pictelio_backup_marker") return "1";
+      if (key === "refresh_token") return "valid-refresh-token";
+      return null;
+    });
 
-    const result = await checkBackupIntegrity();
+    const token = await restoreRefreshToken();
 
-    expect(result).toBe(true);
-    expect(mockSecureStorage.get).toHaveBeenCalledWith("__pictelio_backup_marker");
+    expect(token).toBe("valid-refresh-token");
+    expect(mockSyncToken).toHaveBeenCalledWith({ token: "valid-refresh-token" });
+  });
+
+  it("首次启动: marker 不存在 → 写入 marker → 返回 token", async () => {
+    mockSecureStorage.get.mockImplementation(async (key: string) => {
+      if (key === "__pictelio_backup_marker") return null;
+      if (key === "refresh_token") return "valid-refresh-token";
+      return null;
+    });
+
+    const token = await restoreRefreshToken();
+
+    expect(token).toBe("valid-refresh-token");
     expect(mockSecureStorage.set).toHaveBeenCalledWith("__pictelio_backup_marker", "1");
   });
 
-  it("正常启动: marker 存在 → 返回 true", async () => {
-    mockSecureStorage.get.mockResolvedValue("1");
-
-    const result = await checkBackupIntegrity();
-
-    expect(result).toBe(true);
-    expect(mockSecureStorage.get).toHaveBeenCalledWith("__pictelio_backup_marker");
-    // Marker 已存在，不应再次写入
-    expect(mockSecureStorage.set).not.toHaveBeenCalled();
-  });
-
-  it("备份还原: SecureStorage 异常 → 清除 refresh_token → 返回 false", async () => {
+  it("备份还原: marker 读取异常 → 清除 token + Native → 返回 null（强制重新登录）", async () => {
     mockSecureStorage.get.mockRejectedValue(new Error("KeyStore unavailable"));
 
-    const result = await checkBackupIntegrity();
+    const token = await restoreRefreshToken();
 
-    expect(result).toBe(false);
-    // Token 应被清除
-    expect(mockSecureStorage.remove).toHaveBeenCalled();
+    expect(token).toBeNull();
+    expect(mockSecureStorage.remove).toHaveBeenCalledWith("refresh_token");
+    expect(mockSyncToken).toHaveBeenCalledWith({ token: null });
   });
 
-  it("SecureStorage.get 返回非字符串值 → 视为首次启动", async () => {
-    // SecureStorage.get 可能返回非 string 类型（如空对象）
-    mockSecureStorage.get.mockResolvedValue(undefined);
+  it("解密抛错路径: token 读取 reject（密钥失效重建后旧密文 GCM 认证失败）→ 清除 → 返回 null", async () => {
+    mockSecureStorage.get.mockImplementation(async (key: string) => {
+      if (key === "__pictelio_backup_marker") return "1";
+      throw new Error("AEADBadTagException wrapped reject");
+    });
 
-    const result = await checkBackupIntegrity();
+    const token = await restoreRefreshToken();
 
-    expect(result).toBe(true);
-    expect(mockSecureStorage.set).toHaveBeenCalledWith("__pictelio_backup_marker", "1");
+    expect(token).toBeNull();
+    expect(mockSecureStorage.remove).toHaveBeenCalledWith("refresh_token");
+    expect(mockSyncToken).toHaveBeenCalledWith({ token: null });
+  });
+
+  it("旧版迁移: 加密存储无 token 但 Preferences 有 → 迁移并注入 Native", async () => {
+    mockSecureStorage.get.mockImplementation(async (key: string) => {
+      if (key === "__pictelio_backup_marker") return "1";
+      return null;
+    });
+    mockPrefToken = "legacy-token";
+
+    const token = await restoreRefreshToken();
+
+    expect(token).toBe("legacy-token");
+    expect(mockSecureStorage.set).toHaveBeenCalledWith("refresh_token", "legacy-token");
+    expect(mockPrefRemove).toHaveBeenCalled();
+    expect(mockSyncToken).toHaveBeenCalledWith({ token: "legacy-token" });
+  });
+
+  it("迁移写入失败（主存储异常）→ 清除 → 返回 null", async () => {
+    mockSecureStorage.get.mockImplementation(async (key: string) => {
+      if (key === "__pictelio_backup_marker") return "1";
+      return null;
+    });
+    mockPrefToken = "legacy-token";
+    mockSecureStorage.set.mockRejectedValue(new Error("keystore write failed"));
+
+    const token = await restoreRefreshToken();
+
+    expect(token).toBeNull();
+    expect(mockSecureStorage.remove).toHaveBeenCalledWith("refresh_token");
+    expect(mockSyncToken).toHaveBeenCalledWith({ token: null });
+  });
+
+  it("无 token 且无迁移源 → 返回 null，不注入 Native", async () => {
+    mockSecureStorage.get.mockImplementation(async (key: string) => {
+      if (key === "__pictelio_backup_marker") return "1";
+      return null;
+    });
+
+    const token = await restoreRefreshToken();
+
+    expect(token).toBeNull();
+    expect(mockSyncToken).not.toHaveBeenCalled();
+  });
+});
+
+describe("saveRefreshToken / clearRefreshToken", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSyncToken.mockResolvedValue(undefined);
+    mockSecureStorage.set.mockResolvedValue(undefined);
+    mockSecureStorage.remove.mockResolvedValue(undefined);
+  });
+
+  it("save: 加密存储写入 + Native 注入", async () => {
+    mockSecureStorage.set.mockResolvedValue(undefined);
+
+    await saveRefreshToken("new-token");
+
+    expect(mockSecureStorage.set).toHaveBeenCalledWith("refresh_token", "new-token");
+    expect(mockSyncToken).toHaveBeenCalledWith({ token: "new-token" });
+  });
+
+  it("clear: 加密存储删除 + Native 清除（含历史明文残留）", async () => {
+    mockSecureStorage.remove.mockResolvedValue(undefined);
+
+    await clearRefreshToken();
+
+    expect(mockSecureStorage.remove).toHaveBeenCalledWith("refresh_token");
+    expect(mockSyncToken).toHaveBeenCalledWith({ token: null });
+  });
+
+  it("Native 注入失败（Web 环境）不破坏持久化主流程", async () => {
+    mockSecureStorage.set.mockResolvedValue(undefined);
+    mockSyncToken.mockRejectedValue(new Error("Plugin PixivApi does not exist"));
+
+    await expect(saveRefreshToken("new-token")).resolves.toBeUndefined();
+    expect(mockSecureStorage.set).toHaveBeenCalledWith("refresh_token", "new-token");
+  });
+
+  it("持久化失败（Keystore 写入异常）不阻断 Native 注入", async () => {
+    mockSecureStorage.set.mockRejectedValue(new Error("keystore write failed"));
+    mockSyncToken.mockResolvedValue(undefined);
+
+    await expect(saveRefreshToken("new-token")).resolves.toBeUndefined();
+    expect(mockSyncToken).toHaveBeenCalledWith({ token: "new-token" });
   });
 });

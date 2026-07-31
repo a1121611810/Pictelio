@@ -1,54 +1,91 @@
 import { Preferences } from "@capacitor/preferences";
 import { SecureStorage } from "@aparajita/capacitor-secure-storage";
+import { PixivApi } from "@/native/PixivApi";
+import { tryAsync } from "./tryAsync";
 
 const REFRESH_TOKEN_KEY = "refresh_token";
-
-export async function getRefreshToken(): Promise<string | null> {
-  const [err, value] = await tryAsync(SecureStorage.get(REFRESH_TOKEN_KEY));
-  if (err) {
-    console.error("[secureStorage] failed to get refresh_token", err);
-    return null;
-  }
-  return typeof value === "string" ? value : null;
-}
-
-export async function setRefreshToken(token: string): Promise<void> {
-  await SecureStorage.set(REFRESH_TOKEN_KEY, token);
-}
-
-export async function removeRefreshToken(): Promise<void> {
-  await SecureStorage.remove(REFRESH_TOKEN_KEY);
-}
-
 /** 备份完整性检查标记键 */
 const BACKUP_MARKER_KEY = "__pictelio_backup_marker";
 
 /**
- * 检查备份完整性。
- * - 首次启动：写入 backup_marker → 返回 true
- * - 正常启动：marker 存在 → 返回 true
- * - 备份还原后：SecureStorage 异常 → 清除 token → 返回 false
+ * token 持久化深模块 —— 对外唯一接口：restore / save / clear。
+ *
+ * 职责：加密存储（Android Keystore 密钥 + 密文落盘）、备份完整性检查、
+ * 旧 Preferences 一次性迁移、Native 内存同步。所有 token 状态变化都必须
+ * 经此三接口，保证「持久化与 Native 同步」不变量（登出/刷新不再遗漏同步）。
+ *
+ * 背景与实现核实：docs/research/android-token-storage.md
  */
-export async function checkBackupIntegrity(): Promise<boolean> {
-  const [err, marker] = await tryAsync(SecureStorage.get(BACKUP_MARKER_KEY));
+
+/**
+ * 向 Native 同步当前 refresh_token（供 Java 401 静默刷新使用）。
+ * Web/DEV 环境无 PixivApi 插件，调用 reject —— 静默跳过，不破坏持久化主流程。
+ */
+async function syncNativeToken(token: string | null): Promise<void> {
+  const [err] = await tryAsync(PixivApi.syncToken({ token }));
   if (err) {
-    // SecureStorage 访问失败（备份还原后 Keystore 不可用）
-    // 清除 refresh_token 防止泄露
-    await removeRefreshToken();
-    return false;
+    console.warn("[secureStorage] syncToken 失败（Web 环境可忽略）", err);
   }
-  if (marker === null || marker === undefined) {
-    await SecureStorage.set(BACKUP_MARKER_KEY, "1");
-  }
-  return true;
 }
 
-/** 从旧的 Preferences 迁移 refresh_token 到 SecureStorage（一次性） */
-export async function migrateRefreshTokenFromPreferences(): Promise<string | null> {
-  const { value } = await Preferences.get({ key: REFRESH_TOKEN_KEY });
-  if (value) {
-    await SecureStorage.set(REFRESH_TOKEN_KEY, value);
-    await Preferences.remove({ key: REFRESH_TOKEN_KEY });
+/**
+ * 启动时恢复 refresh_token：完整性检查 → 读取（含旧 Preferences 一次性迁移）→ Native 注入。
+ *
+ * 三态语义（统一处理存储异常，不再区分吞错/分错）：
+ * - 正常 / 首次启动 → 返回 token（首次写入 backup_marker）
+ * - 任何存储异常（备份还原、Keystore 密钥失效、解密抛错 AEADBadTag → reject）
+ *   → 清除 token 与 Native 内存 → 返回 null（强制重新登录）
+ */
+export async function restoreRefreshToken(): Promise<string | null> {
+  // 层③：备份完整性检查 —— marker 读取异常视为备份还原（Keystore 密钥不可用），清除 token 防泄露
+  const [markerErr, marker] = await tryAsync(SecureStorage.get(BACKUP_MARKER_KEY));
+  if (markerErr) {
+    await clearRefreshToken();
+    return null;
   }
-  return value ?? null;
+  if (marker === null || marker === undefined) {
+    await tryAsync(SecureStorage.set(BACKUP_MARKER_KEY, "1"));
+  }
+
+  let token: string | null = null;
+  const [tokenErr, value] = await tryAsync(SecureStorage.get(REFRESH_TOKEN_KEY));
+  if (tokenErr) {
+    // 解密抛错路径：密钥失效重建后旧密文解密失败（GCM 认证失败 → 插件 reject），同样清除
+    await clearRefreshToken();
+    return null;
+  }
+  token = typeof value === "string" ? value : null;
+
+  if (!token) {
+    // 旧版 @capacitor/preferences 明文迁移（一次性）
+    // 迁移源读取失败仅跳过迁移（主存储无 token，无需清除）；主存储写入失败按存储异常处理
+    const [prefErr, prefResult] = await tryAsync(Preferences.get({ key: REFRESH_TOKEN_KEY }));
+    if (!prefErr && prefResult?.value) {
+      const legacy = prefResult.value;
+      const [setErr] = await tryAsync(SecureStorage.set(REFRESH_TOKEN_KEY, legacy));
+      if (setErr) {
+        await clearRefreshToken();
+        return null;
+      }
+      await tryAsync(Preferences.remove({ key: REFRESH_TOKEN_KEY }));
+      token = legacy;
+    }
+  }
+
+  if (token) {
+    await syncNativeToken(token);
+  }
+  return token;
+}
+
+/** 保存 refresh_token（加密存储 + Native 内存同步；持久化失败不阻断 Native 注入） */
+export async function saveRefreshToken(token: string): Promise<void> {
+  await tryAsync(SecureStorage.set(REFRESH_TOKEN_KEY, token));
+  await syncNativeToken(token);
+}
+
+/** 清除 refresh_token（加密存储 + Native 内存与历史明文残留） */
+export async function clearRefreshToken(): Promise<void> {
+  await tryAsync(SecureStorage.remove(REFRESH_TOKEN_KEY));
+  await syncNativeToken(null);
 }

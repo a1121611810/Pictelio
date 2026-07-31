@@ -7,7 +7,7 @@ vi.mock("@capacitor/core", () => ({
 }));
 
 vi.mock("@/native/PixivApi", () => ({
-  PixivApi: { request: vi.fn(), setRefreshToken: vi.fn(), prefetchImage: vi.fn() },
+  PixivApi: { request: vi.fn(), syncToken: vi.fn(), prefetchImage: vi.fn() },
 }));
 
 async function loadModule() {

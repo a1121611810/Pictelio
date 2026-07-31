@@ -4,7 +4,7 @@ vi.mock("@/native/PixivApi", () => ({
   PixivApi: {
     prefetchImage: vi.fn(() => Promise.resolve({ cached: false })),
     request: vi.fn(),
-    setRefreshToken: vi.fn(),
+    syncToken: vi.fn(),
   },
 }));
 

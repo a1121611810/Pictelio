@@ -2,13 +2,14 @@ import { setAccessToken, setOnUnauthorized, setRefreshPromise, setTokenReadyProm
 import { refreshToken, exchangeCodeForToken } from "../api/auth";
 import type { PixivUser } from "../api/types";
 import {
-  getRefreshToken,
-  setRefreshToken,
-  removeRefreshToken,
-  migrateRefreshTokenFromPreferences,
+  restoreRefreshToken,
+  saveRefreshToken,
+  clearRefreshToken,
 } from "../utils/secureStorage";
 import { App } from "@capacitor/app";
 import { queryClient } from "../api/queryClient";
+import { PixivApi } from "@/native/PixivApi";
+import { tryAsync } from "@/utils/tryAsync";
 
 const [accessTokenSig, setAccessTokenSig] = createSignal<string | null>(null);
 const [refreshTokenSig, setRefreshTokenSig] = createSignal<string | null>(null);
@@ -30,6 +31,8 @@ function syncToken(token: string) {
 
 /** 安装 onUnauthorized 处理器 + 前台恢复预刷新监听 */
 let appStateListener: Awaited<ReturnType<typeof App.addListener>> | null = null;
+/** Java 401 静默刷新轮换 refresh_token 的监听（Web 环境无插件，注册失败则跳过） */
+let rotationListener: { remove: () => void } | null = null;
 
 async function setupUnauthorizedHandler() {
   setOnUnauthorized(async () => {
@@ -40,6 +43,20 @@ async function setupUnauthorizedHandler() {
       await logout();
     }
   });
+
+  // Java 侧 401 静默刷新若发现 refresh_token 被轮换，通知 JS 持久化新值
+  // （避免重启后从加密存储恢复旧 token，导致 Java 401 刷新持续失败）
+  const [err, handle] = await tryAsync(
+    PixivApi.addListener("refreshTokenRotated", ({ token }) => {
+      if (token) {
+        setRefreshTokenSig(token);
+        void saveRefreshToken(token);
+      }
+    }),
+  );
+  if (!err && handle) {
+    rotationListener = handle;
+  }
 
   // 前台恢复时预判性刷新：如果距离上次刷新超过阈值，提前 refresh
   appStateListener = await App.addListener("appStateChange", ({ isActive }) => {
@@ -58,10 +75,8 @@ let _authPromise: Promise<void> | null = null;
 export async function initializeAuth() {
   if (_authPromise) return _authPromise;
   _authPromise = (async () => {
-    let token = await getRefreshToken();
-    if (!token) {
-      token = await migrateRefreshTokenFromPreferences();
-    }
+    // restoreRefreshToken 内部完成：备份完整性检查（失效则清 token）→ 读取（含旧 Preferences 迁移）→ Native 注入
+    let token = await restoreRefreshToken();
     if (token) {
       setRefreshTokenSig(token);
       await setupUnauthorizedHandler();
@@ -116,7 +131,7 @@ async function performRefresh(token: string) {
       setUser(resp.user);
       setIsLoggedIn(true);
       lastRefreshTime = Date.now();
-      await setRefreshToken(resp.refresh_token);
+      await saveRefreshToken(resp.refresh_token);
     }),
   );
   if (err) {
@@ -137,7 +152,7 @@ export async function loginWithToken(token: string) {
   setUser(resp.user);
   setIsLoggedIn(true);
   await setupUnauthorizedHandler();
-  await setRefreshToken(resp.refresh_token);
+  await saveRefreshToken(resp.refresh_token);
   _authPromise = Promise.resolve();
 }
 
@@ -155,7 +170,7 @@ export async function loginWithPKCE(code: string, codeVerifier: string) {
   setUser(resp.user);
   setIsLoggedIn(true);
   await setupUnauthorizedHandler();
-  await setRefreshToken(resp.refresh_token);
+  await saveRefreshToken(resp.refresh_token);
   _authPromise = Promise.resolve();
 }
 
@@ -165,11 +180,14 @@ export async function logout() {
   setTokenReadyPromise(Promise.resolve());
   appStateListener?.remove();
   appStateListener = null;
+  rotationListener?.remove();
+  rotationListener = null;
   syncToken("");
   setRefreshTokenSig(null);
   setUser(null);
   setIsLoggedIn(false);
-  await removeRefreshToken();
+  // 清除持久化 token + Native 内存（含历史明文残留），一次调用全覆盖
+  await clearRefreshToken();
   // 清空所有 TQ 缓存，防止退出登录后数据泄漏
   queryClient.clear();
 }

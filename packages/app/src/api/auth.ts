@@ -23,7 +23,6 @@ const isNative = Capacitor.isNativePlatform();
  */
 export async function refreshToken(token: string): Promise<PixivAuthResponse> {
   if (isNative) {
-    await PixivApi.setRefreshToken({ refreshToken: token });
     const result = await AuthPlugin.refreshToken({ refreshToken: token });
     await PixivApi.setAccessToken({ accessToken: result.accessToken });
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition

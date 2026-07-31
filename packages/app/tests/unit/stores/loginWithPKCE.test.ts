@@ -21,13 +21,11 @@ vi.mock("@/api/auth", () => ({
 let mockSecureGetResult: string | null = null;
 const mockSecureSet = vi.fn();
 const mockSecureRemove = vi.fn();
-let mockPrefToken: string | null = null;
 
 vi.mock("@/utils/secureStorage", () => ({
-  getRefreshToken: vi.fn(() => Promise.resolve(mockSecureGetResult)),
-  setRefreshToken: (...args: unknown[]) => mockSecureSet(...args),
-  removeRefreshToken: (...args: unknown[]) => mockSecureRemove(...args),
-  migrateRefreshTokenFromPreferences: vi.fn(() => Promise.resolve(mockPrefToken)),
+  restoreRefreshToken: vi.fn(() => Promise.resolve(mockSecureGetResult)),
+  saveRefreshToken: (...args: unknown[]) => mockSecureSet(...args),
+  clearRefreshToken: (...args: unknown[]) => mockSecureRemove(...args),
 }));
 
 vi.mock("@capacitor/app", () => ({
@@ -45,7 +43,6 @@ describe("authStore loginWithPKCE", () => {
   beforeEach(() => {
     mockExchangeCodeForToken.mockReset();
     mockSecureGetResult = null;
-    mockPrefToken = null;
   });
 
   it("logs in with valid authorization code and verifier", async () => {
