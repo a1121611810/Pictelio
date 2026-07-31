@@ -267,6 +267,11 @@ describe("agent-browser 登录流（无效 token）", () => {
     driver = new AgentBrowserDriver();
     await driver.launch();
     await SLEEP(2000);
+    // 清理登录残留：Web 环境下 SecureStorage/Preferences 均存于 localStorage，
+    // 前置用例登录成功后 token 已持久化，不清理则 app 自动登录、无登录页可测
+    await driver.evaluate(`localStorage.clear(); 'cleared'`);
+    await driver.navigate("/");
+    await SLEEP(2000);
     // 通过年龄确认，重试直到登录页（fluent-textarea）渲染完成
     for (let attempt = 0; attempt < 6; attempt++) {
       await driver.clickReliable("已满", undefined, "@e2");
