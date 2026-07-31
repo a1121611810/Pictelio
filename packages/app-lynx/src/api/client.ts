@@ -113,8 +113,18 @@ export function classifyError(status: number, error: unknown, responseBody?: unk
 export function rewriteUrl(path: string): string {
   if (path.startsWith("/pixiv-")) return path
   if (path.startsWith("http")) {
-    if (path.startsWith(PIXIV_API_BASE)) return path.replace(PIXIV_API_BASE, "/pixiv-api")
-    if (path.startsWith(PIXIV_AUTH_BASE)) return "/pixiv-oauth/auth/token"
+    // 精确主机 + 路径前缀匹配（防止 app-api.pixiv.net.evil.com 这类
+    // 伪后缀域名被误判为 Pixiv 主机）
+    if (path.startsWith(PIXIV_API_BASE + "/") || path === PIXIV_API_BASE) {
+      return path.replace(PIXIV_API_BASE, "/pixiv-api")
+    }
+    if (path.startsWith(PIXIV_AUTH_BASE + "/") || path === PIXIV_AUTH_BASE) {
+      return "/pixiv-oauth/auth/token"
+    }
+    // auth 端点可能带 query string（如 ?grant_type=...）
+    if (path.startsWith(PIXIV_AUTH_BASE + "?")) {
+      return "/pixiv-oauth/auth/token"
+    }
     return path
   }
   return `/pixiv-api${path}`
@@ -122,12 +132,13 @@ export function rewriteUrl(path: string): string {
 
 /**
  * 决定是否给请求附加 Bearer access_token。
- * 仅当重写后的 URL 是本地代理路径（/pixiv-*）时才携带——
- * 外部绝对 URL（如服务端 next_url 指向非 Pixiv 域）不带 Authorization。
+ * 接收「已重写」的 URL：仅当是本地代理路径（/pixiv-*）时才携带——
+ * 外部绝对 URL（如服务端 next_url 指向非 Pixiv 域，或伪后缀域名）不带
+ * Authorization，防止 access_token 被带到非 Pixiv 域。
  * 纯函数，可单测。
  */
-export function shouldAttachAuth(path: string): boolean {
-  return rewriteUrl(path).startsWith("/pixiv-")
+export function shouldAttachAuth(rewrittenUrl: string): boolean {
+  return rewrittenUrl.startsWith("/pixiv-")
 }
 
 async function execute<T>(
@@ -148,10 +159,10 @@ async function execute<T>(
   }
   // 先重写 URL，再基于结果决定是否附加 Bearer。
   // rewriteUrl 仅把已知 Pixiv 主机映射为 /pixiv-* 代理路径；外部绝对 URL
-  // （如服务端返回的 next_url）原样返回且不带 /pixiv- 前缀 → 不携带
-  // Authorization，防止 access_token 被带到非 Pixiv 域。
+  // （如服务端返回的 next_url 或伪后缀域名）原样返回且不带 /pixiv- 前缀 →
+  // 不携带 Authorization，防止 access_token 被带到非 Pixiv 域。
   const url = rewriteUrl(path)
-  if (shouldAttachAuth(path) && accessToken) headers["Authorization"] = `Bearer ${accessToken}`
+  if (shouldAttachAuth(url) && accessToken) headers["Authorization"] = `Bearer ${accessToken}`
 
   let res: Response
   try {

@@ -95,21 +95,52 @@ describe('client.rewriteUrl', () => {
 })
 
 describe('client.shouldAttachAuth（Bearer 决策）', () => {
-  it('相对 API 路径（重写为 /pixiv-api）→ 附加 Bearer', () => {
-    expect(shouldAttachAuth('/v1/illust/recommended')).toBe(true)
-    expect(shouldAttachAuth('/v2/novel/detail')).toBe(true)
-  })
-
-  it('apiBaseUrl 绝对 URL（重写为 /pixiv-api）→ 附加 Bearer', () => {
-    expect(shouldAttachAuth('https://app-api.pixiv.net/v1/illust/detail')).toBe(true)
+  // 注：shouldAttachAuth 接收「已重写」的 URL（execute 内先 rewriteUrl 再决策）
+  it('重写后的代理路径 → 附加 Bearer', () => {
+    expect(shouldAttachAuth('/pixiv-api/v1/illust/recommended')).toBe(true)
+    expect(shouldAttachAuth('/pixiv-oauth/auth/token')).toBe(true)
   })
 
   it('外部绝对 URL（next_url 指向非 Pixiv 域）→ 不附加 Bearer', () => {
     expect(shouldAttachAuth('https://evil.example.com/steal')).toBe(false)
   })
 
-  it('已代理路径 → 附加 Bearer', () => {
-    expect(shouldAttachAuth('/pixiv-api/v1/illust/recommended')).toBe(true)
+  it('伪后缀域名（app-api.pixiv.net.evil.com）→ 不附加 Bearer', () => {
+    expect(shouldAttachAuth('https://app-api.pixiv.net.evil.com/x')).toBe(false)
+  })
+
+  it('非代理相对路径 → 不附加 Bearer', () => {
+    expect(shouldAttachAuth('/some-local-path')).toBe(false)
+  })
+})
+
+describe('client.rewriteUrl（主机边界匹配）', () => {
+  it('精确 Pixiv API 主机 → /pixiv-api', () => {
+    expect(rewriteUrl('https://app-api.pixiv.net/v1/illust/detail')).toBe(
+      '/pixiv-api/v1/illust/detail',
+    )
+  })
+
+  it('OAuth 主机 → /pixiv-oauth/auth/token', () => {
+    expect(rewriteUrl('https://oauth.secure.pixiv.net/auth/token')).toBe(
+      '/pixiv-oauth/auth/token',
+    )
+  })
+
+  it('OAuth 带 query string → /pixiv-oauth/auth/token', () => {
+    expect(rewriteUrl('https://oauth.secure.pixiv.net/auth/token?grant_type=x')).toBe(
+      '/pixiv-oauth/auth/token',
+    )
+  })
+
+  it('裸 Pixiv API 主机 → /pixiv-api', () => {
+    expect(rewriteUrl('https://app-api.pixiv.net')).toBe('/pixiv-api')
+  })
+
+  it('伪后缀域名不被误判（rewriteUrl 原样返回）', () => {
+    expect(rewriteUrl('https://app-api.pixiv.net.evil.com/v1/x')).toBe(
+      'https://app-api.pixiv.net.evil.com/v1/x',
+    )
   })
 })
 
