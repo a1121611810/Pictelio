@@ -34,6 +34,8 @@ export interface TranslateRequestPayload {
   temperature?: number;
   /** 单块输出上限，按块大小设置 */
   maxTokens?: number;
+  /** 取消信号（透传到 fetch / CapacitorHttp，中止在途请求） */
+  signal?: AbortSignal;
 }
 
 export interface TranslateResult {
@@ -73,16 +75,23 @@ export interface HttpResponseLike {
 
 export type Transport = (
   url: string,
-  init: { method: string; headers: Record<string, string>; body: string },
+  init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal },
 ) => Promise<HttpResponseLike>;
 
-/** Web 模式：fetch 直连（DEV 环境无 CORS 问题） */
+/** Web 模式：fetch 直连（DEV 环境无 CORS 问题；signal 中止在途请求） */
 const webTransport: Transport = async (url, init) => {
-  const res = await fetch(url, init);
+  const res = await fetch(url, {
+    method: init.method,
+    headers: init.headers,
+    body: init.body,
+    signal: init.signal,
+  });
   return { status: res.status, text: () => res.text() };
 };
 
-/** Native 模式：CapacitorHttp 直连（原生层无 CORS 限制） */
+/** Native 模式：CapacitorHttp 直连（原生层无 CORS 限制）。
+ * 注：@capacitor/core 的 HttpOptions 类型不支持 AbortSignal，Native 在途请求暂无法取消，
+ * 靠调用方 generation-gate 丢弃其落地结果；Web 分支已透传 signal 可真正中止。 */
 const nativeTransport: Transport = async (url, init) => {
   const res = await CapacitorHttp.request({
     method: init.method as "POST",
@@ -170,8 +179,13 @@ export async function requestTranslate(
         temperature: payload.temperature ?? 0.5,
         max_tokens: payload.maxTokens,
       }),
+      signal: payload.signal,
     });
-  } catch {
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      // 取消信号触发：原样上抛，不归类为 network（避免无谓退避重试）
+      throw err;
+    }
     throw new TranslateError("network", "网络不可用，请检查连接");
   }
 

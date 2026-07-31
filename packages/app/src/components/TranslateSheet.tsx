@@ -4,7 +4,12 @@
  * S6 扩展：档位选择 / 思考开关；S2 扩展：进度条。
  */
 import { type Component, Show } from "solid-js";
-import { dsApiKey, translating, translationError } from "@/stores/translationStore";
+import {
+  dsApiKey,
+  translating,
+  translationError,
+  translationProgress,
+} from "@/stores/translationStore";
 
 interface TranslateSheetProps {
   isOpen: boolean;
@@ -68,6 +73,28 @@ const TranslateSheet: Component<TranslateSheetProps> = (props) => {
                 {err().message}
               </p>
             )}
+          </Show>
+
+          {/* 分块翻译进度（S2） */}
+          <Show when={translating()}>
+            <Show when={translationProgress()}>
+              {(p) => (
+                <div class="mb-3">
+                  <div class="h-1.5 rounded-full bg-[var(--colorNeutralBackground2)] overflow-hidden">
+                    <div
+                      class="h-full bg-[var(--colorBrandBackground)] transition-all duration-[var(--durationNormal)] ease-[var(--curveEasyEase)]"
+                      style={{
+                        width: `${p().total > 0 ? Math.round((p().done / p().total) * 100) : 0}%`,
+                      }}
+                    />
+                  </div>
+                  <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground2)] mt-2">
+                    已翻译 {p().done} / {p().total} 块
+                    {p().done > 0 && p().done < p().total ? "，首屏内容已出，其余后台续翻中…" : ""}
+                  </p>
+                </div>
+              )}
+            </Show>
           </Show>
 
           <button

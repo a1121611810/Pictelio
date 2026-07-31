@@ -42,7 +42,7 @@ import { scrollToTop } from "../utils/scrollToTop";
 import { toApiError } from "../api/client";
 import { recordVisit } from "../stores/historyStore";
 import TranslateSheet from "../components/TranslateSheet";
-import { translateParagraphs } from "../primitives/createNovelTranslator";
+import { translateNovel } from "../primitives/createNovelTranslator";
 import { detectNovelLanguage } from "../utils/detectLanguage";
 import {
   dsApiKey,
@@ -54,6 +54,7 @@ import {
   translating,
   setTranslating,
   setTranslationError,
+  setTranslationProgress,
   resetTranslationState,
 } from "../stores/translationStore";
 import { TranslateError } from "../api/translate";
@@ -402,6 +403,8 @@ const NovelDetail: Component = () => {
 
   // 竞态防护 generation counter：必须声明在引用它的 createEffect 之前（TDZ）
   let translateVersion = 0;
+  /** 在途翻译的 AbortController（切章/离开中止，S2） */
+  let translateAbort: AbortController | null = null;
 
   // 挂载时恢复已保存的 API key（冷启动直接进详情页也能用已存 key）
   onMount(() => {
@@ -409,14 +412,17 @@ const NovelDetail: Component = () => {
   });
 
   // 切章 / URL 变化时重置翻译状态（防旧章译文串章污染）；
-  // 必须同时递增 translateVersion —— 在途翻译响应到达时版本不匹配 → 丢弃（竞态防护）
+  // 必须同时递增 translateVersion + abort —— 在途翻译响应到达时版本不匹配 → 丢弃（竞态防护）
   createEffect(() => {
     void currentNovelId();
     translateVersion++;
+    translateAbort?.abort();
+    translateAbort = null;
     resetTranslationState();
     onCleanup(() => {
       // 组件卸载后响应落地同样丢弃（store 是模块级全局，必须防写入）
       translateVersion++;
+      translateAbort?.abort();
     });
   });
 
@@ -437,32 +443,57 @@ const NovelDetail: Component = () => {
     if (texts.length === 0) {
       return;
     }
+    // 分块管线（S2）：AbortController 取消 + 渐进注入
+    translateAbort = new AbortController();
+    const controller = translateAbort;
     setTranslating(true);
     setTranslationError(null);
+    setTranslationProgress({ done: 0, total: 0 });
     try {
       const sourceLang = detectNovelLanguage(texts.join("\n"));
-      const translated = await translateParagraphs(texts, {
-        apiKey: key,
-        model: "deepseek-v4-flash", // S7 档位选择
-        sourceLang: sourceLang === "other" ? undefined : sourceLang,
-      });
+      const priorityParagraph = virtualLayout.currentCharIndex()?.paragraphIndex;
+      const map = await translateNovel(
+        texts,
+        {
+          apiKey: key,
+          model: "deepseek-v4-flash", // S7 档位选择
+          sourceLang: sourceLang === "other" ? undefined : sourceLang,
+          signal: controller.signal,
+          priorityParagraph,
+        },
+        (p) => {
+          if (version !== translateVersion) {
+            return;
+          }
+          setTranslationProgress({ done: p.done, total: p.total });
+          if (p.paragraphs.length === 0) {
+            return;
+          }
+          // 渐进注入：本块译文并入段落 map（首屏块完成即显示部分译文）
+          batch(() => {
+            setTranslatedParagraphs((prev) => {
+              const next = { ...prev };
+              for (const para of p.paragraphs) {
+                next[para.index] = para.text;
+              }
+              return next;
+            });
+          });
+          if (!showTranslation()) {
+            setShowTranslation(true);
+          }
+        },
+      );
       if (version !== translateVersion) {
         return;
       }
-      const map: Record<number, string> = {};
-      let i = 0;
-      for (const b of blocks()) {
-        if (b.type === "text") {
-          map[b.index] = translated[i] ?? b.text;
-          i++;
-        }
+      // 最终兜底合并（onProgress 已逐块写入，此处对齐完整结果）
+      if (Object.keys(map).length > 0) {
+        setTranslatedParagraphs((prev) => ({ ...prev, ...map }));
       }
-      batch(() => {
-        setTranslatedParagraphs(map);
-        setShowTranslation(true);
-      });
+      setShowTranslation(true);
     } catch (err) {
-      if (version !== translateVersion) {
+      if (version !== translateVersion || controller.signal.aborted) {
         return;
       }
       setTranslationError(
@@ -471,6 +502,7 @@ const NovelDetail: Component = () => {
     } finally {
       if (version === translateVersion) {
         setTranslating(false);
+        setTranslationProgress(null);
       }
     }
   }

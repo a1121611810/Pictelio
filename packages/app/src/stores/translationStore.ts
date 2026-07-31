@@ -69,9 +69,18 @@ export const [translating, setTranslating] = createSignal(false);
 /** 翻译错误（面板展示；S4 扩展失败块集合） */
 export const [translationError, setTranslationError] = createSignal<TranslateError | null>(null);
 
+/** 翻译进度（分块管线 S2：done/total；未翻译为 null） */
+export interface TranslationProgress {
+  done: number;
+  total: number;
+}
+export const [translationProgress, setTranslationProgress] =
+  createSignal<TranslationProgress | null>(null);
+
 /** 切换章节 / 离开详情页时重置翻译状态（防串章污染） */
 export function resetTranslationState(): void {
   setTranslatedParagraphs({});
   setShowTranslation(false);
   setTranslationError(null);
+  setTranslationProgress(null);
 }
