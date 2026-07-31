@@ -11,6 +11,7 @@ import PageTransition from "../components/PageTransition";
 import SettingsAppearance from "../components/settings/SettingsAppearance";
 import SettingsContent from "../components/settings/SettingsContent";
 import SettingsImage from "../components/settings/SettingsImage";
+import SettingsTranslate from "../components/settings/SettingsTranslate";
 import SettingsAccount from "../components/settings/SettingsAccount";
 import SettingsDialogs from "../components/settings/SettingsDialogs";
 
@@ -135,6 +136,10 @@ const Settings: Component = () => {
           <fluent-divider />
 
           <SettingsImage />
+
+          <fluent-divider />
+
+          <SettingsTranslate />
 
           <fluent-divider />
 

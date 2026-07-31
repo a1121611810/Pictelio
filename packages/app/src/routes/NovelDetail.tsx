@@ -41,6 +41,22 @@ import { pushOverlay, popOverlay } from "../stores/backGestureStore";
 import { scrollToTop } from "../utils/scrollToTop";
 import { toApiError } from "../api/client";
 import { recordVisit } from "../stores/historyStore";
+import TranslateSheet from "../components/TranslateSheet";
+import { translateParagraphs } from "../primitives/createNovelTranslator";
+import { detectNovelLanguage } from "../utils/detectLanguage";
+import {
+  dsApiKey,
+  loadDsApiKey,
+  translatedParagraphs,
+  setTranslatedParagraphs,
+  showTranslation,
+  setShowTranslation,
+  translating,
+  setTranslating,
+  setTranslationError,
+  resetTranslationState,
+} from "../stores/translationStore";
+import { TranslateError } from "../api/translate";
 
 // ── Scroll-driven hide/show constants ──
 const BOTTOM_THRESHOLD = 80;
@@ -363,8 +379,104 @@ const NovelDetail: Component = () => {
 
   const searchText = createMemo(() => buildSearchText(blocks()));
 
+  // ── AI 翻译（S1 最小闭环）──
+  // 译文注入：显示译文时替换 TextBlock.text（只改文本，绝不改写 novelHtml，见代码事实核查）
+  const displayBlocks = createMemo<NovelBlock[]>(() => {
+    const bs = blocks();
+    if (!showTranslation()) {
+      return bs;
+    }
+    const t = translatedParagraphs();
+    if (Object.keys(t).length === 0) {
+      return bs;
+    }
+    // oxlint-disable-next-line no-map-spread -- blocks are immutable; copy-on-write required to swap in translated text
+    return bs.map((b) =>
+      b.type === "text" && t[b.index] !== undefined ? { ...b, text: t[b.index] } : b,
+    );
+  });
+
+  // 源语言为中文时隐藏翻译入口（规格 US25）
+  const canTranslate = createMemo(() => detectNovelLanguage(searchText()) !== "zh");
+  const [translateOpen, setTranslateOpen] = createSignal(false);
+
+  // 竞态防护 generation counter：必须声明在引用它的 createEffect 之前（TDZ）
+  let translateVersion = 0;
+
+  // 挂载时恢复已保存的 API key（冷启动直接进详情页也能用已存 key）
+  onMount(() => {
+    void loadDsApiKey();
+  });
+
+  // 切章 / URL 变化时重置翻译状态（防旧章译文串章污染）；
+  // 必须同时递增 translateVersion —— 在途翻译响应到达时版本不匹配 → 丢弃（竞态防护）
+  createEffect(() => {
+    void currentNovelId();
+    translateVersion++;
+    resetTranslationState();
+    onCleanup(() => {
+      // 组件卸载后响应落地同样丢弃（store 是模块级全局，必须防写入）
+      translateVersion++;
+    });
+  });
+
+  async function startTranslate(): Promise<void> {
+    const key = dsApiKey();
+    if (!key) {
+      setTranslateOpen(false);
+      void navigate("/settings");
+      return;
+    }
+    if (translating()) {
+      return;
+    }
+    const version = ++translateVersion;
+    const texts = blocks()
+      .filter((b): b is TextBlock => b.type === "text")
+      .map((b) => b.text);
+    if (texts.length === 0) {
+      return;
+    }
+    setTranslating(true);
+    setTranslationError(null);
+    try {
+      const sourceLang = detectNovelLanguage(texts.join("\n"));
+      const translated = await translateParagraphs(texts, {
+        apiKey: key,
+        model: "deepseek-v4-flash", // S7 档位选择
+        sourceLang: sourceLang === "other" ? undefined : sourceLang,
+      });
+      if (version !== translateVersion) {
+        return;
+      }
+      const map: Record<number, string> = {};
+      let i = 0;
+      for (const b of blocks()) {
+        if (b.type === "text") {
+          map[b.index] = translated[i] ?? b.text;
+          i++;
+        }
+      }
+      batch(() => {
+        setTranslatedParagraphs(map);
+        setShowTranslation(true);
+      });
+    } catch (err) {
+      if (version !== translateVersion) {
+        return;
+      }
+      setTranslationError(
+        err instanceof TranslateError ? err : new TranslateError("unknown", "翻译失败，请重试"),
+      );
+    } finally {
+      if (version === translateVersion) {
+        setTranslating(false);
+      }
+    }
+  }
+
   const virtualLayout = createNovelVirtualLayout({
-    blocks,
+    blocks: displayBlocks,
     containerWidth: textContainerWidth,
     settings: () => ({
       fontSize: fontSize(),
@@ -378,6 +490,7 @@ const NovelDetail: Component = () => {
     containerRef: () => {},
     novelId,
     useWindowScroll: true,
+    translationVariant: () => (showTranslation() ? "translated" : undefined),
   });
 
   // 将 pretext 计算的段落高度注入 block 对象——数组引用变化后 <For> 自动重 render。
@@ -388,7 +501,7 @@ const NovelDetail: Component = () => {
       h[p.index] = p.height;
     }
     // oxlint-disable-next-line no-map-spread -- blocks are immutable; we need shallow copies to trigger <For> re-render
-    return blocks().map((b) => ({
+    return displayBlocks().map((b) => ({
       ...b,
       ph: b.type === "text" ? h[(b as TextBlock).index] : undefined,
     }));
@@ -761,9 +874,25 @@ const NovelDetail: Component = () => {
                 onNextChapter={(id) => switchNovel(id)}
                 onOpenSeries={() => setSeriesOpen(true)}
                 onOpenSettings={() => setSettingsOpen(true)}
+                showTranslateEntry={canTranslate()}
+                translated={Object.keys(translatedParagraphs()).length > 0}
+                showTranslation={showTranslation()}
+                onToggleTranslate={() => {
+                  if (Object.keys(translatedParagraphs()).length > 0) {
+                    setShowTranslation((v) => !v);
+                  } else {
+                    setTranslateOpen(true);
+                  }
+                }}
               />
 
               <ReaderSettingsSheet isOpen={settingsOpen()} onClose={() => setSettingsOpen(false)} />
+
+              <TranslateSheet
+                isOpen={translateOpen()}
+                onClose={() => setTranslateOpen(false)}
+                onStartTranslate={() => void startTranslate()}
+              />
 
               <Show when={novel().series?.id}>
                 <SeriesSheet

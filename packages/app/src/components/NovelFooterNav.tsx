@@ -12,6 +12,14 @@ interface NovelFooterNavProps {
   onNextChapter: (id: number) => void;
   onOpenSeries: () => void;
   onOpenSettings: () => void;
+  /** 是否已有译文（控制翻译按钮 / 原文译文切换按钮形态） */
+  translated: boolean;
+  /** 当前是否显示译文（toggle 状态） */
+  showTranslation: boolean;
+  /** 是否显示翻译入口（源语言为中文时隐藏） */
+  showTranslateEntry?: boolean;
+  /** 点击翻译 / 切换：未翻译时打开面板，已翻译时切换原文译文 */
+  onToggleTranslate: () => void;
 }
 
 const NovelFooterNav: Component<NovelFooterNavProps> = (props) => {
@@ -56,6 +64,26 @@ const NovelFooterNav: Component<NovelFooterNavProps> = (props) => {
           </span>
           显示设置
         </button>
+        <Show when={props.showTranslateEntry !== false}>
+          <button
+            class="flex-shrink-0 whitespace-nowrap px-3 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] font-medium hover:bg-[var(--colorNeutralBackground3)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer flex items-center gap-1"
+            classList={{
+              "bg-[var(--colorBrandBackground)] text-white hover:opacity-90":
+                props.translated && props.showTranslation,
+              "text-[var(--colorBrandForeground1)]": props.translated && !props.showTranslation,
+            }}
+            onClick={() => props.onToggleTranslate()}
+            aria-label={
+              props.translated
+                ? props.showTranslation
+                  ? "切换到原文"
+                  : "切换到译文"
+                : "打开翻译面板"
+            }
+          >
+            {props.translated ? (props.showTranslation ? "原文" : "译文") : "翻译"}
+          </button>
+        </Show>
         <Show when={props.novel.series?.id ? props.novelNav?.nextNovel : undefined}>
           {(next) => (
             <button

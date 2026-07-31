@@ -106,7 +106,32 @@ describe("buildCacheKey", () => {
         settings.fontWeight,
         settings.fontFamily,
         settings.lineHeight,
+        "",
       ].join(":"),
     );
+  });
+
+  it("includes the translation variant when provided", () => {
+    const settings = makeSettings();
+    expect(buildCacheKey(1, 400, settings, "translated")).toBe(
+      [
+        1,
+        400,
+        settings.fontSize,
+        settings.fontWeight,
+        settings.fontFamily,
+        settings.lineHeight,
+        "translated",
+      ].join(":"),
+    );
+  });
+
+  it("keeps original and translated layouts separate", () => {
+    clearNovelTextLayoutCache();
+    const cache = getNovelTextLayoutCache();
+    cache.set(1, 400, makeSettings(), makeResult(100), "translated");
+    expect(cache.get(1, 400, makeSettings(), "translated")?.totalHeight).toBe(100);
+    expect(cache.get(1, 400, makeSettings())).toBeUndefined();
+    expect(cache.get(1, 400, makeSettings(), "translated")?.totalHeight).toBe(100);
   });
 });

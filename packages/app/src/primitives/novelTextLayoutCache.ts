@@ -5,6 +5,8 @@ interface CacheEntry {
   novelId: number;
   containerWidth: number;
   settings: ReaderSettings;
+  /** 译文维度标识：原文为 ""，显示译文时为 "translated"（防止原文↔译文切换命中旧布局不重排） */
+  variant: string;
   result: NovelTextLayoutResult;
   lastAccessed: number;
 }
@@ -16,11 +18,12 @@ const WIDTH_TOLERANCE = 1;
 const cache: CacheEntry[] = [];
 
 export interface NovelTextLayoutCache {
-  /** 获取缓存的布局结果，若未命中或参数变化则返回 undefined */
+  /** 获取缓存的布局结果，若未命中或参数变化则返回 undefined；variant 区分原文/译文布局 */
   get(
     novelId: number,
     containerWidth: number,
     settings: ReaderSettings,
+    variant?: string,
   ): NovelTextLayoutResult | undefined;
   /** 写入缓存 */
   set(
@@ -28,6 +31,7 @@ export interface NovelTextLayoutCache {
     containerWidth: number,
     settings: ReaderSettings,
     result: NovelTextLayoutResult,
+    variant?: string,
   ): void;
 }
 
@@ -40,22 +44,29 @@ function settingsEqual(a: ReaderSettings, b: ReaderSettings): boolean {
   );
 }
 
-function findEntryIndex(novelId: number, containerWidth: number, settings: ReaderSettings): number {
+function findEntryIndex(
+  novelId: number,
+  containerWidth: number,
+  settings: ReaderSettings,
+  variant: string,
+): number {
   return cache.findIndex(
     (entry) =>
       entry.novelId === novelId &&
       Math.abs(entry.containerWidth - containerWidth) < WIDTH_TOLERANCE &&
-      settingsEqual(entry.settings, settings),
+      settingsEqual(entry.settings, settings) &&
+      entry.variant === variant,
   );
 }
 
 /**
- * 构造缓存 key。只包含影响布局结果的参数：novelId、容器宽度、字号、字重、字体、行高。
+ * 构造缓存 key。只包含影响布局结果的参数：novelId、容器宽度、字号、字重、字体、行高、译文维度。
  */
 export function buildCacheKey(
   novelId: number,
   containerWidth: number,
   settings: ReaderSettings,
+  variant = "",
 ): string {
   return [
     novelId,
@@ -64,13 +75,14 @@ export function buildCacheKey(
     settings.fontWeight,
     settings.fontFamily,
     settings.lineHeight,
+    variant,
   ].join(":");
 }
 
 function createCache(): NovelTextLayoutCache {
   return {
-    get(novelId, containerWidth, settings) {
-      const index = findEntryIndex(novelId, containerWidth, settings);
+    get(novelId, containerWidth, settings, variant = "") {
+      const index = findEntryIndex(novelId, containerWidth, settings, variant);
       if (index === -1) {
         return undefined;
       }
@@ -84,8 +96,8 @@ function createCache(): NovelTextLayoutCache {
       return entry.result;
     },
 
-    set(novelId, containerWidth, settings, result) {
-      const index = findEntryIndex(novelId, containerWidth, settings);
+    set(novelId, containerWidth, settings, result, variant = "") {
+      const index = findEntryIndex(novelId, containerWidth, settings, variant);
       if (index !== -1) {
         cache.splice(index, 1);
       }
@@ -94,6 +106,7 @@ function createCache(): NovelTextLayoutCache {
         novelId,
         containerWidth,
         settings,
+        variant,
         result,
         lastAccessed: Date.now(),
       });

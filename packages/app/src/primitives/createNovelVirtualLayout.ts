@@ -26,6 +26,8 @@ export interface CreateNovelVirtualLayoutOptions {
   overscan?: number;
   novelId: Accessor<number>;
   useWindowScroll?: boolean;
+  /** 译文维度标识（原文/译文布局分开缓存，防切换命中旧布局） */
+  translationVariant?: Accessor<string | undefined>;
 }
 
 export interface NovelVirtualLayoutResult {
@@ -132,7 +134,8 @@ export function createNovelVirtualLayout(
     }
 
     const cache = getNovelTextLayoutCache();
-    const cached = cache.get(id, width, settings);
+    const variant = options.translationVariant?.() ?? "";
+    const cached = cache.get(id, width, settings, variant);
     if (cached) {
       return cached;
     }
@@ -148,7 +151,7 @@ export function createNovelVirtualLayout(
       textIndent: settings.fontSize * 2,
     });
 
-    cache.set(id, width, settings, result);
+    cache.set(id, width, settings, result, variant);
     return result;
   });
 
