@@ -45,6 +45,12 @@ import TranslateSheet from "../components/TranslateSheet";
 import { translateNovel } from "../primitives/createNovelTranslator";
 import { detectNovelLanguage } from "../utils/detectLanguage";
 import {
+  getTranslation,
+  setTranslation,
+  DEFAULT_TARGET_LANG,
+  DEFAULT_MODEL,
+} from "../utils/translationCache";
+import {
   dsApiKey,
   loadDsApiKey,
   translatedParagraphs,
@@ -443,6 +449,32 @@ const NovelDetail: Component = () => {
     if (texts.length === 0) {
       return;
     }
+    const textIndexes = blocks()
+      .filter((b): b is TextBlock => b.type === "text")
+      .map((b) => b.index);
+
+    // 缓存命中（决策 #24）：原文 hash 未变 → 直接读译文，不发请求
+    const { default: SparkMD5 } = await import("spark-md5");
+    const sourceHash = SparkMD5.hash(texts.join("\n"));
+    const cached = await getTranslation(
+      novelId(),
+      DEFAULT_TARGET_LANG,
+      DEFAULT_MODEL,
+      sourceHash,
+    );
+    if (cached && cached.length > 0) {
+      const map: Record<number, string> = {};
+      for (let i = 0; i < cached.length && i < textIndexes.length; i++) {
+        map[textIndexes[i]] = cached[i];
+      }
+      batch(() => {
+        setTranslatedParagraphs(map);
+        setShowTranslation(true);
+        setTranslationError(null); // 清掉上次失败的错误提示
+      });
+      return;
+    }
+
     // 分块管线（S2）：AbortController 取消 + 渐进注入
     translateAbort = new AbortController();
     const controller = translateAbort;
@@ -452,6 +484,7 @@ const NovelDetail: Component = () => {
     try {
       const sourceLang = detectNovelLanguage(texts.join("\n"));
       const priorityParagraph = virtualLayout.currentCharIndex()?.paragraphIndex;
+      let failedBlocks = 0; // 失败块 + 回退原文块（阻止半成品固化进缓存）
       const map = await translateNovel(
         texts,
         {
@@ -464,6 +497,9 @@ const NovelDetail: Component = () => {
         (p) => {
           if (version !== translateVersion) {
             return;
+          }
+          if (p.paragraphs.length === 0 || p.fallback) {
+            failedBlocks++;
           }
           setTranslationProgress({ done: p.done, total: p.total });
           if (p.paragraphs.length === 0) {
@@ -492,6 +528,16 @@ const NovelDetail: Component = () => {
         setTranslatedParagraphs((prev) => ({ ...prev, ...map }));
       }
       setShowTranslation(true);
+      // 全部块成功且无回退段才写缓存（半成品不写，决策 #24；S4 断点续翻补充）
+      if (failedBlocks === 0 && Object.keys(map).length === texts.length) {
+        await setTranslation(
+          novelId(),
+          DEFAULT_TARGET_LANG,
+          DEFAULT_MODEL,
+          sourceHash,
+          texts.map((_, i) => map[i] ?? ""),
+        );
+      }
     } catch (err) {
       if (version !== translateVersion || controller.signal.aborted) {
         return;

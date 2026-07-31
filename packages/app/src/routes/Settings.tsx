@@ -3,6 +3,7 @@ import { Preferences } from "@capacitor/preferences";
 import { isLoggedIn, logout } from "../stores/authStore";
 import { clearImageCache } from "../utils/imageLoader";
 import { clearAll as clearNovelCache } from "../stores/novelCache";
+import { clearTranslationCache } from "../utils/translationCache";
 import { resetBlockedIds } from "../stores/blockStore";
 import { resetReportedIds } from "../stores/reportStore";
 import { resetSettingsStore as resetUiStore } from "../stores/settingsStore";
@@ -65,6 +66,7 @@ const Settings: Component = () => {
         await logout();
         clearImageCache();
         await clearNovelCache();
+        await clearTranslationCache();
         resetBlockedIds();
         resetReportedIds();
         await Preferences.clear();

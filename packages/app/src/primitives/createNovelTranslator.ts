@@ -47,6 +47,8 @@ export interface ChunkProgress {
   end: number;
   /** 本块已完成的段落译文（index = 全局段落 index；失败块为空数组） */
   paragraphs: Array<{ index: number; text: string }>;
+  /** 本块是否存在回退原文段（译文段数 < 原文，S3 用于阻止固化半成品缓存） */
+  fallback?: boolean;
 }
 
 export interface NovelTranslatorDeps {
@@ -178,24 +180,33 @@ export async function translateParagraphs(
  * - 译文段数 > 原文：截断多余段
  */
 export function alignParagraphs(translated: string, original: string[]): string[] {
+  return alignParagraphsWithMeta(translated, original).paragraphs;
+}
+
+/** 对齐 + 元信息（回退段数，供缓存完整性判断） */
+export function alignParagraphsWithMeta(
+  translated: string,
+  original: string[],
+): { paragraphs: string[]; fallbackCount: number } {
   const parts = translated
     .split(/\n\n+/u)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
-  if (parts.length < original.length) {
+  const fallbackCount = Math.max(0, original.length - parts.length);
+  if (fallbackCount > 0) {
     console.warn(
-      `[createNovelTranslator] 译文段落数(${parts.length}) < 原文(${original.length})，末 ${original.length - parts.length} 段回退原文`,
+      `[createNovelTranslator] 译文段落数(${parts.length}) < 原文(${original.length})，末 ${fallbackCount} 段回退原文`,
     );
   } else if (parts.length > original.length) {
     console.warn(
       `[createNovelTranslator] 译文段落数(${parts.length}) > 原文(${original.length})，已截断多余段落`,
     );
   }
-  const out: string[] = [];
+  const paragraphs: string[] = [];
   for (let i = 0; i < original.length; i++) {
-    out.push(i < parts.length ? parts[i] : original[i]);
+    paragraphs.push(i < parts.length ? parts[i] : original[i]);
   }
-  return out;
+  return { paragraphs, fallbackCount };
 }
 
 // ── 分块并发管线（S2）──
@@ -227,7 +238,7 @@ export async function translateNovel(
   const total = chunks.length;
   let done = 0;
 
-  async function fetchChunk(range: ChunkRange): Promise<string[]> {
+  async function fetchChunk(range: ChunkRange): Promise<{ text: string[]; fallback: boolean }> {
     const slice = paragraphs.slice(range.start, range.end);
     const joined = slice.join("\n\n");
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -250,7 +261,8 @@ export async function translateNovel(
           ],
           signal: options.signal,
         });
-        return alignParagraphs(res.content, slice);
+        const { paragraphs: text, fallbackCount } = alignParagraphsWithMeta(res.content, slice);
+        return { text, fallback: fallbackCount > 0 };
       } catch (err) {
         if (isAbortError(err)) {
           throw err;
@@ -278,13 +290,20 @@ export async function translateNovel(
       const chunkIndex = order[idx];
       const range = chunks[chunkIndex];
       try {
-        const translated = await fetchChunk(range);
+        const { text: translated, fallback } = await fetchChunk(range);
         const chunkParas: Array<{ index: number; text: string }> = [];
         for (let i = 0; i < translated.length; i++) {
           result[range.start + i] = translated[i];
           chunkParas.push({ index: range.start + i, text: translated[i] });
         }
-        onProgress({ done: done + 1, total, start: range.start, end: range.end, paragraphs: chunkParas });
+        onProgress({
+          done: done + 1,
+          total,
+          start: range.start,
+          end: range.end,
+          paragraphs: chunkParas,
+          fallback,
+        });
       } catch (err) {
         if (isAbortError(err) || options.signal?.aborted) {
           // 中止：静默退出（不当作失败 warn，不推进进度）

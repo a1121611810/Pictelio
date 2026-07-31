@@ -4,6 +4,7 @@
  */
 import { createSignal, onMount, Show, type Component } from "solid-js";
 import { dsApiKey, loadDsApiKey, saveDsApiKey, clearDsApiKey } from "@/stores/translationStore";
+import { clearTranslationCache } from "@/utils/translationCache";
 import { tryAsync } from "@/utils/tryAsync";
 import FluentIcon from "../ui/FluentIcon";
 
@@ -34,6 +35,12 @@ const SettingsTranslate: Component = () => {
     await clearDsApiKey();
     setInputKey("");
     setFeedback("已清除");
+    setTimeout(() => setFeedback(null), 2000);
+  }
+
+  async function handleClearCache() {
+    await clearTranslationCache();
+    setFeedback("已清除翻译缓存");
     setTimeout(() => setFeedback(null), 2000);
   }
 
@@ -98,6 +105,23 @@ const SettingsTranslate: Component = () => {
               </span>
             )}
           </Show>
+        </div>
+
+        {/* 译文缓存（S3）：LRU 200 章 / ~8MB + 手动清除（决策 #24） */}
+        <div class="py-2 mt-2">
+          <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug mb-1">
+            译文缓存
+          </p>
+          <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug mb-2">
+            LRU 200 章 / ~8MB 上限，作者修改正文后自动失效重翻。清除不影响已保存的 API Key。
+          </p>
+          <button
+            type="button"
+            class="px-4 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] font-medium hover:bg-[var(--colorNeutralBackground3)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer"
+            onClick={() => void handleClearCache()}
+          >
+            清除翻译缓存
+          </button>
         </div>
       </div>
     </div>

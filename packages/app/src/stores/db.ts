@@ -56,7 +56,8 @@ export function createMemoryStore(): IDBStore {
 // ─── IndexedDB implementation (production) ───
 
 const DB_NAME = "pictelio";
-const DB_VERSION = 1;
+/** 1→2：新增 translations store（译文 LRU 缓存，决策 #24）；升级必须补建 store，否则运行时 NotFoundError */
+const DB_VERSION = 2;
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -72,6 +73,9 @@ function openDB(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains("series")) {
         db.createObjectStore("series", { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains("translations")) {
+        db.createObjectStore("translations", { keyPath: "id" });
       }
     };
     req.onsuccess = () => resolve(req.result);
