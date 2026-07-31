@@ -1,5 +1,5 @@
 {
-  "version": "3.21.6",
-  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.21.6",
-  "changelog": "🐛 修复\n  fix(security): 修复 refresh_token 存储三层防护失效"
+  "version": "3.21.7",
+  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.21.7",
+  "changelog": "🐛 修复\n  fix(app): 修复更新弹窗前往下载无效（version.json url 字段解析回归）"
 }

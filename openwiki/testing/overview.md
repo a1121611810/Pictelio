@@ -48,6 +48,8 @@ Previously Pictelio had:
 
 Both `playwright` and `@vitest/browser-playwright` dependencies have been removed.
 
+> **Note (3.21.7 prep):** `@vitest/coverage-v8` (^4.1.10) was added to `packages/app/package.json` devDependencies (uncommitted alongside the 3.21.7 version bump), but no `coverage` npm script, `coverage` block in `vitest.config.ts`, or CI coverage step exists yet — the dependency is installed but not wired up.
+
 ## File Naming Conventions
 
 Per `TESTING.md`:
