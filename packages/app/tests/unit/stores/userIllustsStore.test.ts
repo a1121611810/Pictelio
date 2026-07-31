@@ -289,5 +289,4 @@ describe("userIllustsStore", () => {
       expect(store.contentType()).toBe("novel");
     });
   });
-
 });

@@ -71,4 +71,3 @@ export const isActivated = store.isActivated;
 export function fetchMore(_signal?: AbortSignal): Promise<unknown> | undefined {
   return store.fetchMore(_signal);
 }
-

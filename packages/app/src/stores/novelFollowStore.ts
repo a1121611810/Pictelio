@@ -5,7 +5,6 @@ import { filterNovels } from "../utils/r18Filter";
 import { contentType } from "./uiStore";
 import { adaptNovelResponse, dedupNovels } from "./shared/novelHelpers";
 
-
 // ── Sub-tab signal ──
 
 const [followTabState, setNovelFollowTab] = createSignal<"all" | "public" | "private">("all");
@@ -70,4 +69,3 @@ export const isActivated = store.isActivated;
 export function fetchMore(_signal?: AbortSignal): Promise<unknown> | undefined {
   return store.fetchMore(_signal);
 }
-

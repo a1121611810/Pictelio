@@ -85,10 +85,12 @@ const RecommendedFeed: Component = () => {
                   setIsSwitchingSubTab(true);
                   abortController?.abort();
                   abortController = new AbortController();
-                  const [tabErr] = await tryAsync((async () => {
-                    setRecommendSubTab(opt.key);
-                    await ensureLoaded(abortController.signal);
-                  })());
+                  const [tabErr] = await tryAsync(
+                    (async () => {
+                      setRecommendSubTab(opt.key);
+                      await ensureLoaded(abortController.signal);
+                    })(),
+                  );
                   setIsSwitchingSubTab(false);
                   if (tabErr) {
                     throw tabErr;
@@ -102,12 +104,7 @@ const RecommendedFeed: Component = () => {
         </div>
       </Show>
 
-      <Show
-        when={contentType() === "illust"}
-        fallback={
-          <NovelRecommendedFeed />
-        }
-      >
+      <Show when={contentType() === "illust"} fallback={<NovelRecommendedFeed />}>
         <VirtualFeed
           illusts={filteredIllusts()}
           loading={loading() || refreshing()}
@@ -116,7 +113,9 @@ const RecommendedFeed: Component = () => {
           onIllustClick={(id) => void navigate(`/illust/${id}`)}
           onAuthorClick={(id) => void navigate(`/user/${id}`)}
           onLoadMore={() => fetchMore(abortController?.signal)}
-          onRefresh={() => { refresh(abortController?.signal); }}
+          onRefresh={() => {
+            refresh(abortController?.signal);
+          }}
           onNavigateToSettings={() => void navigate("/settings")}
           skipAnimation={cached}
           layoutMode={layoutMode()}

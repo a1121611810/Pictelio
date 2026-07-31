@@ -46,7 +46,6 @@ const UserIllusts: Component = () => {
     load(userId(), type);
   }
 
-
   return (
     <>
       <PageTransition>

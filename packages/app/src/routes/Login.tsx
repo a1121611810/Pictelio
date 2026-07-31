@@ -28,7 +28,9 @@ const Login: Component = () => {
     }
     // 进入登录页时清除路由层的滚动缓存（避免 @solidjs/router 的
     // scrollRestoration 从 sessionStorage 恢复旧位置覆盖自定义恢复）
-    try { sessionStorage.removeItem("solid-router:scroll"); } catch {}
+    try {
+      sessionStorage.removeItem("solid-router:scroll");
+    } catch {}
     // 登录页已渲染，通知原生关闭 Splash Screen
     markContentReady();
   });
@@ -37,10 +39,12 @@ const Login: Component = () => {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
-    const [loginErr] = await tryAsync((async () => {
-      await loginWithToken(tokenInput().trim());
-      navigate("/home", { replace: true });
-    })());
+    const [loginErr] = await tryAsync(
+      (async () => {
+        await loginWithToken(tokenInput().trim());
+        navigate("/home", { replace: true });
+      })(),
+    );
     setSubmitting(false);
     if (loginErr) {
       setError(toApiError(loginErr, "登录失败"));
@@ -48,12 +52,14 @@ const Login: Component = () => {
   };
 
   const handleOAuthStart = async () => {
-    const [pkceErr] = await tryAsync((async () => {
-      const pkce = await generatePKCE();
-      setCodeVerifier(pkce.codeVerifier);
-      setCodeChallenge(pkce.codeChallenge);
-      setShowOAuth(true);
-    })());
+    const [pkceErr] = await tryAsync(
+      (async () => {
+        const pkce = await generatePKCE();
+        setCodeVerifier(pkce.codeVerifier);
+        setCodeChallenge(pkce.codeChallenge);
+        setShowOAuth(true);
+      })(),
+    );
     if (pkceErr) {
       setError(toApiError(pkceErr, "无法创建登录链接"));
     }
@@ -62,10 +68,12 @@ const Login: Component = () => {
   const handleOAuthSuccess = async (code: string) => {
     setSubmitting(true);
     setError(null);
-    const [pkceLoginErr] = await tryAsync((async () => {
-      await loginWithPKCE(code, codeVerifier());
-      navigate("/home", { replace: true });
-    })());
+    const [pkceLoginErr] = await tryAsync(
+      (async () => {
+        await loginWithPKCE(code, codeVerifier());
+        navigate("/home", { replace: true });
+      })(),
+    );
     setSubmitting(false);
     setShowOAuth(false);
     if (pkceLoginErr) {

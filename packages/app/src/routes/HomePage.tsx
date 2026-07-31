@@ -85,62 +85,55 @@ const HomePage: Component = () => {
 
             {/* ── Content type toggle (隐藏于历史 tab) ── */}
             <Show when={currentTab() !== "history"}>
-            <div class="flex items-center bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusSmall)] p-0.5 gap-0.5">
-              <button
-                class="px-2.5 py-1 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase100)] font-semibold transition-all active:scale-95 appearance-none border-none outline-none cursor-pointer"
-                classList={{
-                  "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
-                    contentType() === "illust",
-                  "bg-transparent text-[var(--colorNeutralForeground2)]":
-                    contentType() !== "illust",
-                }}
-                onClick={() => setContentType("illust")}
-              >
-                插画
-              </button>
-              <button
-                class="px-2.5 py-1 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase100)] font-semibold transition-all active:scale-95 appearance-none border-none outline-none cursor-pointer"
-                classList={{
-                  "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
-                    contentType() === "novel",
-                  "bg-transparent text-[var(--colorNeutralForeground2)]": contentType() !== "novel",
-                }}
-                onClick={() => setContentType("novel")}
-              >
-                小说
-              </button>
-            </div>
+              <div class="flex items-center bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusSmall)] p-0.5 gap-0.5">
+                <button
+                  class="px-2.5 py-1 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase100)] font-semibold transition-all active:scale-95 appearance-none border-none outline-none cursor-pointer"
+                  classList={{
+                    "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
+                      contentType() === "illust",
+                    "bg-transparent text-[var(--colorNeutralForeground2)]":
+                      contentType() !== "illust",
+                  }}
+                  onClick={() => setContentType("illust")}
+                >
+                  插画
+                </button>
+                <button
+                  class="px-2.5 py-1 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase100)] font-semibold transition-all active:scale-95 appearance-none border-none outline-none cursor-pointer"
+                  classList={{
+                    "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
+                      contentType() === "novel",
+                    "bg-transparent text-[var(--colorNeutralForeground2)]":
+                      contentType() !== "novel",
+                  }}
+                  onClick={() => setContentType("novel")}
+                >
+                  小说
+                </button>
+              </div>
             </Show>
           </header>
 
           {/* ── Tab content panels ── */}
           <Show when={isDomActive("recommended")}>
-          <div
-            style={{ display: currentTab() === "recommended" ? "block" : "none" }}
-          >
-            <RecommendedFeed />
-          </div>
+            <div style={{ display: currentTab() === "recommended" ? "block" : "none" }}>
+              <RecommendedFeed />
+            </div>
           </Show>
           <Show when={isDomActive("follow")}>
-          <div
-            style={{ display: currentTab() === "follow" ? "block" : "none" }}
-          >
-            <FollowFeed />
-          </div>
+            <div style={{ display: currentTab() === "follow" ? "block" : "none" }}>
+              <FollowFeed />
+            </div>
           </Show>
           <Show when={isDomActive("bookmarks")}>
-          <div
-            style={{ display: currentTab() === "bookmarks" ? "block" : "none" }}
-          >
-            <BookmarksFeed />
-          </div>
+            <div style={{ display: currentTab() === "bookmarks" ? "block" : "none" }}>
+              <BookmarksFeed />
+            </div>
           </Show>
           <Show when={isDomActive("history")}>
-          <div
-            style={{ display: currentTab() === "history" ? "block" : "none" }}
-          >
-            <HistoryFeed />
-          </div>
+            <div style={{ display: currentTab() === "history" ? "block" : "none" }}>
+              <HistoryFeed />
+            </div>
           </Show>
         </div>
       </PageTransition>

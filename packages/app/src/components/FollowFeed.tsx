@@ -69,8 +69,7 @@ const FollowFeed: Component = () => {
                 classList={{
                   "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
                     followTab() === opt.key,
-                  "bg-transparent text-[var(--colorNeutralForeground2)]":
-                    followTab() !== opt.key,
+                  "bg-transparent text-[var(--colorNeutralForeground2)]": followTab() !== opt.key,
                 }}
                 onClick={() => {
                   if (followTab() !== opt.key) {
@@ -85,12 +84,7 @@ const FollowFeed: Component = () => {
         </div>
       </Show>
 
-      <Show
-        when={contentType() === "illust"}
-        fallback={
-          <NovelFollowFeed />
-        }
-      >
+      <Show when={contentType() === "illust"} fallback={<NovelFollowFeed />}>
         <VirtualFeed
           illusts={filteredIllusts()}
           loading={loading() || refreshing()}
@@ -99,11 +93,12 @@ const FollowFeed: Component = () => {
           onIllustClick={(id) => void navigate(`/illust/${id}`)}
           onAuthorClick={(id) => void navigate(`/user/${id}`)}
           onLoadMore={() => fetchMore(abortController?.signal)}
-          onRefresh={() => { refresh(abortController?.signal); }}
+          onRefresh={() => {
+            refresh(abortController?.signal);
+          }}
           onNavigateToSettings={() => void navigate("/settings")}
           skipAnimation={cached}
           layoutMode={layoutMode()}
-
         />
       </Show>
     </>

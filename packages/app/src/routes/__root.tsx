@@ -68,21 +68,23 @@ const RootLayout: Component = (props: { children?: any }) => {
    */
   async function runStartupUpdateCheck(): Promise<void> {
     setIsCheckingUpdate(true);
-    const [updateErr] = await tryAsync((async () => {
-      const result = await checkForUpdate();
-      setHasUpdate(result.hasUpdate);
-      setLatestVersion(result.latestVersion);
-      setLatestReleaseUrl(result.latestReleaseUrl);
-      setLatestChangelog(result.latestChangelog);
+    const [updateErr] = await tryAsync(
+      (async () => {
+        const result = await checkForUpdate();
+        setHasUpdate(result.hasUpdate);
+        setLatestVersion(result.latestVersion);
+        setLatestReleaseUrl(result.latestReleaseUrl);
+        setLatestChangelog(result.latestChangelog);
 
-      if (
-        result.hasUpdate &&
-        result.latestVersion &&
-        result.latestVersion !== lastDismissedVersion()
-      ) {
-        setShowUpdateDialog(true);
-      }
-    })());
+        if (
+          result.hasUpdate &&
+          result.latestVersion &&
+          result.latestVersion !== lastDismissedVersion()
+        ) {
+          setShowUpdateDialog(true);
+        }
+      })(),
+    );
     setIsCheckingUpdate(false);
     setCheckCompleted(true);
     if (updateErr) {
@@ -140,24 +142,26 @@ const RootLayout: Component = (props: { children?: any }) => {
       dispatchExitHint: () => window.dispatchEvent(new CustomEvent("exitHint")),
     });
 
-    const [authErr] = await tryAsync((async () => {
-      // 如果尚未确认年龄，先导航到年龄确认页面，不进行登录判断
-      if (!ageConfirmed()) {
-        await navigate("/age-confirmation", { replace: true });
-        return;
-      }
+    const [authErr] = await tryAsync(
+      (async () => {
+        // 如果尚未确认年龄，先导航到年龄确认页面，不进行登录判断
+        if (!ageConfirmed()) {
+          await navigate("/age-confirmation", { replace: true });
+          return;
+        }
 
-      await initializeAuth();
-      if (isLoggedIn()) {
-        if (location.pathname !== "/home") {
-          await navigate("/home", { replace: true });
+        await initializeAuth();
+        if (isLoggedIn()) {
+          if (location.pathname !== "/home") {
+            await navigate("/home", { replace: true });
+          }
+        } else {
+          if (location.pathname !== "/login") {
+            await navigate("/login", { replace: true });
+          }
         }
-      } else {
-        if (location.pathname !== "/login") {
-          await navigate("/login", { replace: true });
-        }
-      }
-    })());
+      })(),
+    );
     setIsLoading(false);
     // 兜底关闭 Splash：非 Feed 页面（login / age-confirmation 等）
     // 由 Login.tsx 或 Feed.tsx 负责主动触发，此处兜底确保不会泄漏
@@ -188,26 +192,26 @@ const RootLayout: Component = (props: { children?: any }) => {
         }
       >
         <ErrorBoundary
-        fallback={(err, reset) => (
-          <div class="flex flex-col items-center justify-center min-h-screen gap-4 p-8">
-            <p class="text-[var(--colorStatusDangerForeground1)] text-lg font-semibold">
-              页面加载失败
-            </p>
-            <p class="text-[var(--colorNeutralForeground2)] text-sm text-center max-w-xs">
-              {err?.message ?? "未知错误"}
-            </p>
-            <button
-              class="px-4 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] text-sm font-medium"
-              onClick={reset}
-            >
-              重试
-            </button>
-          </div>
-        )}
-      >
-        {/* 子路由由 @solidjs/router 自动通过 props.children 传入 */}
-        {props.children}
-      </ErrorBoundary>
+          fallback={(err, reset) => (
+            <div class="flex flex-col items-center justify-center min-h-screen gap-4 p-8">
+              <p class="text-[var(--colorStatusDangerForeground1)] text-lg font-semibold">
+                页面加载失败
+              </p>
+              <p class="text-[var(--colorNeutralForeground2)] text-sm text-center max-w-xs">
+                {err?.message ?? "未知错误"}
+              </p>
+              <button
+                class="px-4 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] text-sm font-medium"
+                onClick={reset}
+              >
+                重试
+              </button>
+            </div>
+          )}
+        >
+          {/* 子路由由 @solidjs/router 自动通过 props.children 传入 */}
+          {props.children}
+        </ErrorBoundary>
       </Show>
 
       {/* Exit hint toast */}

@@ -18,7 +18,8 @@ function collectPaths(defs: any[]): string[] {
   const paths: string[] = [];
   for (const def of defs) {
     if (def.path) paths.push(def.path);
-    if (def.children) paths.push(...collectPaths(Array.isArray(def.children) ? def.children : [def.children]));
+    if (def.children)
+      paths.push(...collectPaths(Array.isArray(def.children) ? def.children : [def.children]));
   }
   return paths;
 }

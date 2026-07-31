@@ -120,7 +120,6 @@ vi.mock("@/utils/r18Filter", () => ({
   filterNovels: (novels: PixivNovel[]) => novels,
 }));
 
-
 function createNovel(id: number, createDate: string): PixivNovel {
   return {
     id,
@@ -228,5 +227,4 @@ describe("novelBookmarkStore", () => {
     const store = await loadStore();
     expect(store.isNovelBookmarkCached()).toBe(true);
   });
-
 });

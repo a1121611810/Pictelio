@@ -106,7 +106,6 @@ vi.mock("@/api/illust", () => ({
   loadRecommended: vi.fn(),
 }));
 
-
 // ── mock uiStore ──
 vi.mock("@/stores/uiStore", () => ({
   get currentTab() {
@@ -274,7 +273,6 @@ describe("recommendedStore — actions", () => {
     await store.refresh();
     expect(getQ("recommended_illust").refetch).toHaveBeenCalled();
   });
-
 });
 
 describe("recommendedStore — loading and error states", () => {
@@ -399,5 +397,3 @@ describe("recommendedStore — ensureLoaded", () => {
     expect(result).toBeInstanceOf(Promise);
   });
 });
-
-

@@ -106,7 +106,6 @@ vi.mock("@/api/illust", () => ({
   loadFollow: vi.fn(),
 }));
 
-
 // ── mock uiStore ──
 vi.mock("@/stores/uiStore", () => ({
   get currentTab() {
@@ -242,7 +241,6 @@ describe("followStore — actions", () => {
     await store.refresh();
     expect(getQ("follow_public").refetch).toHaveBeenCalled();
   });
-
 });
 
 describe("followStore — loading and error states", () => {
@@ -348,5 +346,3 @@ describe("followStore — ensureLoaded", () => {
     expect(result).toBeInstanceOf(Promise);
   });
 });
-
-

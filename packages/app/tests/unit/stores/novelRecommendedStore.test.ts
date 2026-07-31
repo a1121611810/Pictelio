@@ -211,6 +211,4 @@ describe("novelRecommendedStore", () => {
     expect(typeof store.ensureLoaded).toBe("function");
     expect(store.ensureLoaded()).toBeInstanceOf(Promise);
   });
-
-
 });

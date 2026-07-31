@@ -1,11 +1,13 @@
-import { setAccessToken, setOnUnauthorized, setRefreshPromise, setTokenReadyPromise, setAuthPermanentFailure } from "../api/client";
+import {
+  setAccessToken,
+  setOnUnauthorized,
+  setRefreshPromise,
+  setTokenReadyPromise,
+  setAuthPermanentFailure,
+} from "../api/client";
 import { refreshToken, exchangeCodeForToken } from "../api/auth";
 import type { PixivUser } from "../api/types";
-import {
-  restoreRefreshToken,
-  saveRefreshToken,
-  clearRefreshToken,
-} from "../utils/secureStorage";
+import { restoreRefreshToken, saveRefreshToken, clearRefreshToken } from "../utils/secureStorage";
 import { App } from "@capacitor/app";
 import { queryClient } from "../api/queryClient";
 import { PixivApi } from "@/native/PixivApi";
@@ -82,7 +84,11 @@ export async function initializeAuth() {
       await setupUnauthorizedHandler();
       // 设置 tokenReady barrier：在此 barrier resolve 之前所有 API 请求被阻塞在 client.ts 入口
       let resolveTokenReady: () => void;
-      setTokenReadyPromise(new Promise((r) => { resolveTokenReady = r; }));
+      setTokenReadyPromise(
+        new Promise((r) => {
+          resolveTokenReady = r;
+        }),
+      );
       // 设置 refreshPromise，让并发请求在初始 token 刷新期间等待
       const promise = performRefresh(token).finally(() => {
         setRefreshPromise(null);

@@ -163,7 +163,8 @@ function createMockConfig(overrides: Record<string, unknown> = {}) {
     getItemKey: (overrides.getItemKey as (i: number) => string | number) ?? ((i: number) => i),
     emptyText: (overrides.emptyText as string) ?? "暂无内容",
     onReady: (overrides.onReady as () => void) ?? vi.fn(),
-    suppressHeaderVisibility: (overrides.suppressHeaderVisibility as (d?: number) => void) ?? vi.fn(),
+    suppressHeaderVisibility:
+      (overrides.suppressHeaderVisibility as (d?: number) => void) ?? vi.fn(),
   };
 }
 
@@ -410,6 +411,4 @@ describe("createFeedVirtualizer", () => {
       expect(mockResizeObserverInstance.observe).toHaveBeenCalledWith(el);
     });
   });
-
-
 });

@@ -176,4 +176,3 @@ export async function loadMore() {
 export function switchType(type: ContentType) {
   setContentType(type);
 }
-

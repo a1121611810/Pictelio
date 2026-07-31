@@ -42,7 +42,6 @@ import { scrollToTop } from "../utils/scrollToTop";
 import { toApiError } from "../api/client";
 import { recordVisit } from "../stores/historyStore";
 
-
 // ── Scroll-driven hide/show constants ──
 const BOTTOM_THRESHOLD = 80;
 
@@ -274,17 +273,19 @@ const NovelDetail: Component = () => {
     }
     setDetailLoading(true);
     setDetailError(null);
-    const [novelErr] = await tryAsync((async () => {
-      const dbEntry = await getEntry(id);
-      if (dbEntry) {
+    const [novelErr] = await tryAsync(
+      (async () => {
+        const dbEntry = await getEntry(id);
+        if (dbEntry) {
+          if (loadGeneration !== generation) return;
+          applyEntry(dbEntry);
+          return;
+        }
+        const entry = await loadNovelEntry(id);
         if (loadGeneration !== generation) return;
-        applyEntry(dbEntry);
-        return;
-      }
-      const entry = await loadNovelEntry(id);
-      if (loadGeneration !== generation) return;
-      applyEntry(entry);
-    })());
+        applyEntry(entry);
+      })(),
+    );
     if (novelErr) {
       if (loadGeneration !== generation) return;
       setDetailError(toApiError(novelErr));

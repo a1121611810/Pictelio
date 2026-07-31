@@ -38,15 +38,11 @@ describe("路由即时渲染", () => {
     // 使用 evaluate（同步 JS）检查 DOM 结构，不等待 API 响应
 
     // 1. 主导航栏（floating-nav）必须存在 — 这是路由渲染的标记
-    const navBar = await driver.evaluate(
-      'document.querySelector(".floating-nav") !== null',
-    );
+    const navBar = await driver.evaluate('document.querySelector(".floating-nav") !== null');
     expect(navBar, "导航栏(.floating-nav)应在 API 响应前渲染").toBe("true");
 
     // 2. 页面 sticky header 必须存在
-    const header = await driver.evaluate(
-      'document.querySelector("header.sticky") !== null',
-    );
+    const header = await driver.evaluate('document.querySelector("header.sticky") !== null');
     expect(header, "页面 header 应在 API 响应前渲染").toBe("true");
 
     // 3. 至少有一个 Tab 内容面板可见（recommended 为默认面板）

@@ -43,12 +43,10 @@ let mockRotationCallback: ((data: { token: string }) => void) | null = null;
 
 vi.mock("@/native/PixivApi", () => ({
   PixivApi: {
-    addListener: vi.fn(
-      (_event: string, callback: (data: { token: string }) => void) => {
-        mockRotationCallback = callback;
-        return Promise.resolve(mockRotationListener);
-      },
-    ),
+    addListener: vi.fn((_event: string, callback: (data: { token: string }) => void) => {
+      mockRotationCallback = callback;
+      return Promise.resolve(mockRotationListener);
+    }),
   },
 }));
 
@@ -101,7 +99,9 @@ describe("authStore", () => {
     it("两次调用等待同一操作，都正确完成", async () => {
       mockSecureGetResult = "valid-refresh-token";
       let resolveOAuth: (v: unknown) => void;
-      const oauthPromise = new Promise((r) => { resolveOAuth = r; });
+      const oauthPromise = new Promise((r) => {
+        resolveOAuth = r;
+      });
       mockRefreshToken.mockReturnValue(oauthPromise);
 
       const { initializeAuth, isLoggedIn } = await loadStore();
@@ -177,7 +177,7 @@ describe("authStore", () => {
     it("refresh fails: logs out", async () => {
       mockSecureGetResult = "expired-token";
       mockRefreshToken.mockRejectedValue(
-        new Error("OAuth 失败 (HTTP 400): {\"error\":{\"message\":\"invalid_grant\"}}"),
+        new Error('OAuth 失败 (HTTP 400): {"error":{"message":"invalid_grant"}}'),
       );
 
       const { initializeAuth, isLoading, isLoggedIn, user } = await loadStore();
@@ -192,7 +192,7 @@ describe("authStore", () => {
     it("OAuth 400（永久失效）：删除 token", async () => {
       mockSecureGetResult = "oauth-expired-token";
       mockRefreshToken.mockRejectedValue(
-        new Error("OAuth 失败 (HTTP 400): {\"error\":{\"message\":\"invalid_grant\"}}"),
+        new Error('OAuth 失败 (HTTP 400): {"error":{"message":"invalid_grant"}}'),
       );
 
       const { initializeAuth, isLoading, isLoggedIn } = await loadStore();

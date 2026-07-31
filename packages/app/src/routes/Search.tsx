@@ -139,7 +139,6 @@ const Search: Component = () => {
     }
   });
 
-
   // ── Debounced search execution ──
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
   onCleanup(() => clearTimeout(debounceTimer));
@@ -358,7 +357,11 @@ const Search: Component = () => {
                 setTags(tagList);
                 store.setKeyword(word);
                 addToHistory(word);
-                const qs = new URLSearchParams({ word, scope: store.scope(), sort: store.toSorted() }).toString();
+                const qs = new URLSearchParams({
+                  word,
+                  scope: store.scope(),
+                  sort: store.toSorted(),
+                }).toString();
                 void navigate(`/search?${qs}`);
                 store.executeSearch();
               }}

@@ -26,7 +26,9 @@ const AgeConfirmation: Component = () => {
     await setAgeConfirmation(true, isAdult);
 
     // 进入确认页时清除路由层的滚动缓存
-    try { sessionStorage.removeItem("solid-router:scroll"); } catch {}
+    try {
+      sessionStorage.removeItem("solid-router:scroll");
+    } catch {}
 
     if (isReconfirm()) {
       navigate("/home", { replace: true });

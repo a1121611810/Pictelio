@@ -32,21 +32,27 @@ const NovelRecommendedFeed: Component<Props> = (props) => {
   function openSeriesSheet(seriesId: number) {
     const novel = novels().find((n) => n.series?.id === seriesId);
     if (!novel?.series) return;
-    setSheetSeries({ id: seriesId, title: novel.series.title, authorName: novel.user.name, authorId: novel.user.id });
+    setSheetSeries({
+      id: seriesId,
+      title: novel.series.title,
+      authorName: novel.user.name,
+      authorId: novel.user.id,
+    });
     setSheetOpen(true);
   }
 
   createEffect(() => {
     if (sheetOpen()) {
       pushOverlay("seriesSheet", () => setSheetOpen(false));
-      onCleanup(() => { popOverlay("seriesSheet"); });
+      onCleanup(() => {
+        popOverlay("seriesSheet");
+      });
     }
   });
 
   onMount(() => {
     void ensureLoaded();
   });
-
 
   return (
     <>
@@ -58,7 +64,9 @@ const NovelRecommendedFeed: Component<Props> = (props) => {
         onNovelClick={(id) => navigate(`/novel/${id}`)}
         onAuthorClick={(id) => navigate(`/user/${id}`)}
         onLoadMore={fetchMore}
-        onRefresh={() => { refresh(); }}
+        onRefresh={() => {
+          refresh();
+        }}
         onSeriesClick={openSeriesSheet}
         layoutMode={novelLayoutMode()}
         suppressHeaderVisibility={props.suppressHeaderVisibility}

@@ -5,10 +5,7 @@ import NovelBookmarks from "../routes/NovelBookmarks";
 
 const BookmarksFeed: Component = () => {
   return (
-    <Show
-      when={contentType() === "illust"}
-      fallback={<NovelBookmarks />}
-    >
+    <Show when={contentType() === "illust"} fallback={<NovelBookmarks />}>
       <IllustBookmarks />
     </Show>
   );
