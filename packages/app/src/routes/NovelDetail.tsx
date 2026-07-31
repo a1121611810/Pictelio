@@ -62,6 +62,12 @@ import {
   setTranslationError,
   setTranslationProgress,
   resetTranslationState,
+  decideTranslatePolicy,
+  translateR18,
+  translateR18G,
+  getR18Confirmed,
+  markR18Confirmed,
+  loadTranslateRestrictSettings,
 } from "../stores/translationStore";
 import { TranslateError } from "../api/translate";
 
@@ -411,24 +417,47 @@ const NovelDetail: Component = () => {
   let translateVersion = 0;
   /** 在途翻译的 AbortController（切章/离开中止，S2） */
   let translateAbort: AbortController | null = null;
+  /** 首次翻译 R18/R18G 的风险确认弹窗（promise 化，S5） */
+  const [restrictConfirm, setRestrictConfirm] = createSignal<{
+    xRestrict: number;
+    resolve: (ok: boolean) => void;
+  } | null>(null);
 
-  // 挂载时恢复已保存的 API key（冷启动直接进详情页也能用已存 key）
+  function confirmTranslateRestrict(xRestrict: number): Promise<boolean> {
+    return new Promise((resolve) => setRestrictConfirm({ xRestrict, resolve }));
+  }
+
+  function resolveRestrictConfirm(ok: boolean): void {
+    const c = restrictConfirm();
+    if (c) {
+      c.resolve(ok);
+      setRestrictConfirm(null);
+    }
+  }
+
+  // 挂载时恢复已保存的 API key 与 R18/R18G 分级开关（冷启动直接进详情页也能用已存配置，
+  // 避免 R18 开关已开却因内存默认 false 被误拦）
   onMount(() => {
     void loadDsApiKey();
+    void loadTranslateRestrictSettings();
   });
 
   // 切章 / URL 变化时重置翻译状态（防旧章译文串章污染）；
-  // 必须同时递增 translateVersion + abort —— 在途翻译响应到达时版本不匹配 → 丢弃（竞态防护）
+  // 必须同时递增 translateVersion + abort + 取消挂起确认弹窗 —— 在途翻译响应/挂起确认
+  // 到达时版本不匹配 → 丢弃（竞态防护，含 S5 确认期间切章绕过 R18G 拦截的封堵）
   createEffect(() => {
     void currentNovelId();
     translateVersion++;
     translateAbort?.abort();
     translateAbort = null;
+    resolveRestrictConfirm(false); // 挂起的 R18/R18G 确认直接取消（旧 resolve 不悬挂）
     resetTranslationState();
     onCleanup(() => {
-      // 组件卸载后响应落地同样丢弃（store 是模块级全局，必须防写入）
+      // 组件卸载后响应落地同样丢弃（store 是模块级全局，必须防写入）；
+      // 卸载时取消挂起的 R18/R18G 确认（旧 resolve 不悬挂）
       translateVersion++;
       translateAbort?.abort();
+      resolveRestrictConfirm(false);
     });
   });
 
@@ -442,7 +471,54 @@ const NovelDetail: Component = () => {
     if (translating()) {
       return;
     }
+    if (restrictConfirm()) {
+      // 确认弹窗挂起期间重复点击：忽略（避免覆盖旧 resolve 造成 Promise 悬挂）
+      return;
+    }
+    // version 提前递增：确认弹窗 await 期间切章 → version 不匹配 → 后续全部中止
     const version = ++translateVersion;
+
+    // 敏感内容分级（S5）：R18/R18G 未开开关 → 客户端拦截（不发送任何内容）
+    const xRestrict = novelData()?.x_restrict ?? 0;
+    const policy = decideTranslatePolicy(xRestrict, translateR18(), translateR18G());
+    if (policy === "block") {
+      setTranslateOpen(true);
+      setTranslationError(
+        new TranslateError(
+          "unknown",
+          xRestrict === 2
+            ? "未开启「翻译 R18G 内容」开关，已拦截（不发送任何内容）"
+            : "未开启「翻译 R18 内容」开关，已拦截",
+        ),
+      );
+      return;
+    }
+    // 首次翻译 R18/R18G 二次确认（#23：开开关 + 首次翻译各一次）
+    if ((xRestrict === 1 || xRestrict === 2) && !getR18Confirmed()) {
+      const ok = await confirmTranslateRestrict(xRestrict);
+      if (!ok) {
+        return;
+      }
+      await markR18Confirmed();
+      // 确认期间可能切章（version 已递增）或分级开关变化：重新校验，防止旧章校验结果
+      // 被新章（尤其 R18G）复用而绕过客户端拦截
+      if (version !== translateVersion) {
+        return;
+      }
+      const currentPolicy = decideTranslatePolicy(
+        novelData()?.x_restrict ?? 0,
+        translateR18(),
+        translateR18G(),
+      );
+      if (currentPolicy === "block") {
+        setTranslateOpen(true);
+        setTranslationError(
+          new TranslateError("unknown", "内容分级校验未通过，已拦截（不发送任何内容）"),
+        );
+        return;
+      }
+    }
+
     const texts = blocks()
       .filter((b): b is TextBlock => b.type === "text")
       .map((b) => b.text);
@@ -971,6 +1047,50 @@ const NovelDetail: Component = () => {
                 onClose={() => setTranslateOpen(false)}
                 onStartTranslate={() => void startTranslate()}
               />
+
+              {/* 首次翻译 R18/R18G 风险确认（S5，决策 #23） */}
+              <Show when={restrictConfirm()}>
+                {(c) => (
+                  <fluent-dialog
+                    open
+                    on:close={() => resolveRestrictConfirm(false)}
+                    aria-label={c().xRestrict === 2 ? "翻译 R18G 内容？" : "翻译 R18 内容？"}
+                  >
+                    <h3 slot="title">
+                      {c().xRestrict === 2 ? "翻译 R18G 内容？（法律红线）" : "翻译 R18 内容？"}
+                    </h3>
+                    <Show
+                      when={c().xRestrict === 2}
+                      fallback={
+                        <p>
+                          该作品包含 R18 内容。翻译需将正文发送至你选择的 AI 服务商，可能：①
+                          被内容审核拒绝（失败段落保留原文）；② 违反服务商使用条款，导致你的
+                          API 账号被警告、暂停或封禁；③ 内容可能被去标识化后用于模型训练。所有风险由你自行承担。
+                        </p>
+                      }
+                    >
+                      <p>
+                        该作品包含 R18G（极端）内容。除上述风险外，此类内容违反法律法规红线，可能导致你的
+                        API 账号被关闭，服务商可能向主管部门/执法机构报告。App 提供方不承担由此产生的任何责任。
+                      </p>
+                    </Show>
+                    <fluent-button
+                      slot="actions"
+                      appearance="secondary"
+                      on:click={() => resolveRestrictConfirm(false)}
+                    >
+                      取消
+                    </fluent-button>
+                    <fluent-button
+                      slot="actions"
+                      appearance="primary"
+                      on:click={() => resolveRestrictConfirm(true)}
+                    >
+                      我已了解并继续
+                    </fluent-button>
+                  </fluent-dialog>
+                )}
+              </Show>
 
               <Show when={novel().series?.id}>
                 <SeriesSheet

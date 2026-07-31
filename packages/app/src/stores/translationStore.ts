@@ -7,10 +7,14 @@
  */
 import { createSignal } from "solid-js";
 import { SecureStorage } from "@aparajita/capacitor-secure-storage";
+import { Preferences } from "@capacitor/preferences";
 import { tryAsync } from "@/utils/tryAsync";
 import type { TranslateError } from "@/api/translate";
 
 const DS_API_KEY = "ds_api_key";
+const PREF_R18 = "translation_r18";
+const PREF_R18G = "translation_r18g";
+const PREF_R18_CONFIRMED = "translation_r18_confirmed";
 
 // ── API key（BYOK）──
 
@@ -51,6 +55,85 @@ export async function clearDsApiKey(): Promise<void> {
     console.warn("[translationStore] 清除 API key 失败", err);
   }
   setDsApiKey(null);
+}
+
+// ── 敏感内容分级（决策 #23）──
+
+/**
+ * x_restrict 分级决策函数（纯函数可单测）：
+ * - 0（全年龄）→ allow 直通
+ * - 1（R18）→ 需「翻译 R18 内容」开关
+ * - 2（R18G）→ 需「翻译 R18G 内容」开关（客户端拦截，不发送任何内容）
+ */
+export type RestrictPolicy = "allow" | "block";
+
+export function decideTranslatePolicy(
+  xRestrict: number,
+  r18On: boolean,
+  r18gOn: boolean,
+): RestrictPolicy {
+  if (xRestrict === 1) {
+    return r18On ? "allow" : "block";
+  }
+  if (xRestrict === 2) {
+    return r18gOn ? "allow" : "block";
+  }
+  return "allow"; // 0 及未知等级直通（防御性放行）
+}
+
+const [translateR18, setTranslateR18State] = createSignal(false);
+const [translateR18G, setTranslateR18GState] = createSignal(false);
+/** 是否已确认过 R18 翻译风险（首次翻译 R18/R18G 时弹窗，确认后持久化不再打扰） */
+const [r18Confirmed, setR18Confirmed] = createSignal(false);
+
+export { translateR18, translateR18G };
+
+/** 恢复 R18/R18G 开关与确认标记（Preferences 持久化） */
+export async function loadTranslateRestrictSettings(): Promise<void> {
+  const [r18Err, r18Val] = await tryAsync(Preferences.get({ key: PREF_R18 }));
+  if (!r18Err && r18Val?.value !== undefined) {
+    setTranslateR18State(r18Val.value === "true");
+  }
+  const [r18gErr, r18gVal] = await tryAsync(Preferences.get({ key: PREF_R18G }));
+  if (!r18gErr && r18gVal?.value !== undefined) {
+    setTranslateR18GState(r18gVal.value === "true");
+  }
+  const [cfErr, cfVal] = await tryAsync(Preferences.get({ key: PREF_R18_CONFIRMED }));
+  if (!cfErr && cfVal?.value !== undefined) {
+    setR18Confirmed(cfVal.value === "true");
+  }
+}
+
+/** 设置「翻译 R18 内容」开关（失败仅 warn，不阻断） */
+export async function setTranslateR18(on: boolean): Promise<void> {
+  setTranslateR18State(on);
+  const [err] = await tryAsync(Preferences.set({ key: PREF_R18, value: String(on) }));
+  if (err) {
+    console.warn("[translationStore] 保存 R18 翻译开关失败", err);
+  }
+}
+
+/** 设置「翻译 R18G 内容」开关（失败仅 warn，不阻断） */
+export async function setTranslateR18G(on: boolean): Promise<void> {
+  setTranslateR18GState(on);
+  const [err] = await tryAsync(Preferences.set({ key: PREF_R18G, value: String(on) }));
+  if (err) {
+    console.warn("[translationStore] 保存 R18G 翻译开关失败", err);
+  }
+}
+
+/** 读取 R18 风险确认标记（true = 已确认过，翻译时不再弹窗） */
+export function getR18Confirmed(): boolean {
+  return r18Confirmed();
+}
+
+/** 标记 R18 风险已确认（持久化） */
+export async function markR18Confirmed(): Promise<void> {
+  setR18Confirmed(true);
+  const [err] = await tryAsync(Preferences.set({ key: PREF_R18_CONFIRMED, value: "true" }));
+  if (err) {
+    console.warn("[translationStore] 保存 R18 确认标记失败", err);
+  }
 }
 
 // ── 详情页翻译显示状态 ──

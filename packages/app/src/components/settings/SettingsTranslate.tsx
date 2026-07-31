@@ -3,7 +3,17 @@
  * S6 扩展：默认档位 / 思考开关 / R18 开关 / 清除翻译缓存入口。
  */
 import { createSignal, onMount, Show, type Component } from "solid-js";
-import { dsApiKey, loadDsApiKey, saveDsApiKey, clearDsApiKey } from "@/stores/translationStore";
+import {
+  dsApiKey,
+  loadDsApiKey,
+  saveDsApiKey,
+  clearDsApiKey,
+  translateR18,
+  translateR18G,
+  loadTranslateRestrictSettings,
+  setTranslateR18,
+  setTranslateR18G,
+} from "@/stores/translationStore";
 import { clearTranslationCache } from "@/utils/translationCache";
 import { tryAsync } from "@/utils/tryAsync";
 import FluentIcon from "../ui/FluentIcon";
@@ -16,6 +26,7 @@ const SettingsTranslate: Component = () => {
 
   onMount(() => {
     void loadDsApiKey().then(() => setInputKey(dsApiKey() ?? ""));
+    void loadTranslateRestrictSettings();
   });
 
   async function handleSave() {
@@ -44,7 +55,36 @@ const SettingsTranslate: Component = () => {
     setTimeout(() => setFeedback(null), 2000);
   }
 
+  // ── R18/R18G 开关：开启前二次确认（决策 #23 两级告知）──
+  const [restrictDialog, setRestrictDialog] = createSignal<"r18" | "r18g" | null>(null);
+
+  function onToggleR18() {
+    if (translateR18()) {
+      void setTranslateR18(false);
+      return;
+    }
+    setRestrictDialog("r18");
+  }
+
+  function onToggleR18G() {
+    if (translateR18G()) {
+      void setTranslateR18G(false);
+      return;
+    }
+    setRestrictDialog("r18g");
+  }
+
+  function confirmRestrictDialog() {
+    if (restrictDialog() === "r18") {
+      void setTranslateR18(true);
+    } else if (restrictDialog() === "r18g") {
+      void setTranslateR18G(true);
+    }
+    setRestrictDialog(null);
+  }
+
   return (
+    <>
     <div class="py-3 flex flex-col">
       <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground3)] uppercase tracking-wide mb-1">
         翻译设置
@@ -107,6 +147,45 @@ const SettingsTranslate: Component = () => {
           </Show>
         </div>
 
+        {/* 敏感内容翻译（S5）：R18/R18G 双开关，默认关（决策 #23） */}
+        <div class="py-2 mt-2">
+          <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug mb-1">
+            敏感内容翻译
+          </p>
+
+          <div class="flex items-center justify-between py-2">
+            <div>
+              <p class="[font-size:var(--fontSizeBase300)] font-medium text-[var(--colorNeutralForeground1)] leading-snug">
+                翻译 R18 内容
+              </p>
+              <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
+                默认关。开启需确认风险，正文将发送至 AI 服务商
+              </p>
+            </div>
+            <fluent-switch
+              checked={translateR18()}
+              on:change={() => onToggleR18()}
+              aria-label="翻译 R18 内容"
+            />
+          </div>
+
+          <div class="flex items-center justify-between py-2">
+            <div>
+              <p class="[font-size:var(--fontSizeBase300)] font-medium text-[var(--colorNeutralForeground1)] leading-snug">
+                翻译 R18G 内容
+              </p>
+              <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
+                默认关。法律红线，需更强警告与二次确认
+              </p>
+            </div>
+            <fluent-switch
+              checked={translateR18G()}
+              on:change={() => onToggleR18G()}
+              aria-label="翻译 R18G 内容"
+            />
+          </div>
+        </div>
+
         {/* 译文缓存（S3）：LRU 200 章 / ~8MB + 手动清除（决策 #24） */}
         <div class="py-2 mt-2">
           <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug mb-1">
@@ -125,6 +204,45 @@ const SettingsTranslate: Component = () => {
         </div>
       </div>
     </div>
+
+    {/* R18 开启确认（决策 #23：封号/训练风险） */}
+    <fluent-dialog
+      open={restrictDialog() === "r18"}
+      on:close={() => setRestrictDialog(null)}
+      aria-label="开启 R18 翻译？"
+    >
+      <h3 slot="title">开启「翻译 R18 内容」？</h3>
+      <p>
+        该作品包含 R18 内容。翻译需将正文发送至你选择的 AI 服务商，可能：① 被内容审核拒绝（失败段落保留原文）；②
+        违反服务商使用条款，导致你的 API 账号被警告、暂停或封禁；③ 内容可能被去标识化后用于模型训练。所有风险由你自行承担。
+      </p>
+      <fluent-button slot="actions" appearance="secondary" on:click={() => setRestrictDialog(null)}>
+        取消
+      </fluent-button>
+      <fluent-button slot="actions" appearance="primary" on:click={confirmRestrictDialog}>
+        我已了解并开启
+      </fluent-button>
+    </fluent-dialog>
+
+    {/* R18G 开启确认（更强警告：法律红线 + 上报执法机构） */}
+    <fluent-dialog
+      open={restrictDialog() === "r18g"}
+      on:close={() => setRestrictDialog(null)}
+      aria-label="开启 R18G 翻译？"
+    >
+      <h3 slot="title">开启「翻译 R18G 内容」？（法律红线）</h3>
+      <p>
+        该作品包含 R18G（极端）内容。除上述风险外，此类内容违反法律法规红线，可能导致你的 API 账号被关闭，服务商可能向主管部门/执法机构报告。App
+        提供方不承担由此产生的任何责任。
+      </p>
+      <fluent-button slot="actions" appearance="secondary" on:click={() => setRestrictDialog(null)}>
+        取消
+      </fluent-button>
+      <fluent-button slot="actions" appearance="primary" on:click={confirmRestrictDialog}>
+        我已了解并承担全部风险
+      </fluent-button>
+    </fluent-dialog>
+    </>
   );
 };
 
