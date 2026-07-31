@@ -222,7 +222,10 @@ describe("agent-browser 登录流（有效 token）", () => {
     await SLEEP(2000);
     // 1. 年龄确认弹窗
     let state = await getState(driver);
-    let result = await aiAssert("页面显示年龄确认弹窗，包含"已满 18 岁"和"未满 18 岁"按钮", state);
+    let result = await aiAssert(
+      "页面显示年龄确认弹窗，包含「已满 18 岁」和「未满 18 岁」按钮",
+      state,
+    );
     expect(result.passed, result.reason).toBe(true);
 
     // 2. 确认年龄
@@ -230,7 +233,10 @@ describe("agent-browser 登录流（有效 token）", () => {
     await SLEEP(3000);
 
     state = await getState(driver);
-    result = await aiAssert("年龄确认后跳转到登录页，页面包含 refresh_token 输入框（fluent-textarea）和"登录"按钮", state);
+    result = await aiAssert(
+      "年龄确认后跳转到登录页，页面包含 refresh_token 输入框（fluent-textarea）和「登录」按钮",
+      state,
+    );
     expect(result.passed, result.reason).toBe(true);
 
     // 3. 填入有效 token 并登录
@@ -246,7 +252,10 @@ describe("agent-browser 登录流（有效 token）", () => {
     await SLEEP(8000);
 
     state = await getState(driver);
-    result = await aiAssert("登录成功，跳转到推荐 Feed 页面（/recommended），展示插画/漫画卡片瀑布流", state);
+    result = await aiAssert(
+      "登录成功，跳转到推荐 Feed 页面（/recommended），展示插画/漫画卡片瀑布流",
+      state,
+    );
     expect(result.passed, result.reason).toBe(true);
   }, 120_000);
 });
@@ -277,7 +286,10 @@ describe("agent-browser 登录流（无效 token）", () => {
     await SLEEP(5000);
 
     const state = await getState(driver);
-    const result = await aiAssert("使用无效的 refresh_token 登录后，页面显示错误提示信息（如"失败"、"错误"、"invalid"、"error"等）", state);
+    const result = await aiAssert(
+      "使用无效的 refresh_token 登录后，页面显示错误提示信息（如「失败」「错误」「invalid」「error」等）",
+      state,
+    );
     expect(result.passed, result.reason).toBe(true);
   }, 60_000);
 });
@@ -326,7 +338,10 @@ describe("agent-browser Feed 增强", () => {
     await SLEEP(5000);
 
     const state = await getState(driver);
-    const result = await aiAssert("切换到"关注"Tab，URL 包含 /following，页面显示关注用户的投稿列表或空状态", state);
+    const result = await aiAssert(
+      "切换到「关注」Tab，URL 包含 /following，页面显示关注用户的投稿列表或空状态",
+      state,
+    );
     expect(result.passed, result.reason).toBe(true);
   }, 60_000);
 });
@@ -351,7 +366,10 @@ describe("agent-browser 图床代理设置", () => {
     await SLEEP(3000);
 
     const state = await getState(driver);
-    const result = await aiAssert("图床设置页面正常加载，标题包含"图床代理"或"图片托管"，页面展示主开关（fluent-switch）", state);
+    const result = await aiAssert(
+      "图床设置页面正常加载，标题包含「图床代理」或「图片托管」，页面展示主开关（fluent-switch）",
+      state,
+    );
     expect(result.passed, result.reason).toBe(true);
   }, 60_000);
 
@@ -372,7 +390,10 @@ describe("agent-browser 图床代理设置", () => {
     await SLEEP(1500);
 
     state = await getState(driver);
-    result = await aiAssert("点击开关后弹出确认对话框，标题为"开启图床代理？"，包含"取消"和"确认开启"按钮", state);
+    result = await aiAssert(
+      "点击开关后弹出确认对话框，标题为「开启图床代理？」，包含「取消」和「确认开启」按钮",
+      state,
+    );
     expect(result.passed, result.reason).toBe(true);
 
     // 点击"取消"
@@ -380,7 +401,10 @@ describe("agent-browser 图床代理设置", () => {
     await SLEEP(1500);
 
     state = await getState(driver);
-    result = await aiAssert("点击"取消"后确认对话框关闭，主开关恢复为关闭状态，页面回到正常设置页", state);
+    result = await aiAssert(
+      "点击「取消」后确认对话框关闭，主开关恢复为关闭状态，页面回到正常设置页",
+      state,
+    );
     expect(result.passed, result.reason).toBe(true);
   }, 60_000);
 
@@ -399,7 +423,10 @@ describe("agent-browser 图床代理设置", () => {
     await SLEEP(2000);
 
     let state = await getState(driver);
-    let result = await aiAssert("确认开启后对话框关闭，主开关处于打开状态，页面显示图床代理已启用", state);
+    let result = await aiAssert(
+      "确认开启后对话框关闭，主开关处于打开状态，页面显示图床代理已启用",
+      state,
+    );
     expect(result.passed, result.reason).toBe(true);
 
     // 复原：再次点击开关关闭（不会弹出确认）
@@ -456,7 +483,10 @@ describe("agent-browser 小说标题滚动", () => {
     await SLEEP(2000);
 
     state = await getState(driver);
-    result = await aiAssert("向下滚动后，小说标题栏从隐藏变为渐显，标题文字《》出现在页面顶部区域", state);
+    result = await aiAssert(
+      "向下滚动后，小说标题栏从隐藏变为渐显，标题文字《》出现在页面顶部区域",
+      state,
+    );
     expect(result.passed, result.reason).toBe(true);
 
     // 滚回顶部——标题栏应隐藏
@@ -493,7 +523,10 @@ describe("agent-browser 关注筛选", () => {
     await SLEEP(5000);
 
     let state = await getState(driver);
-    let result = await aiAssert("关注 Tab 页面正常加载，页面显示筛选按钮：全部、公开、非公开", state);
+    let result = await aiAssert(
+      "关注 Tab 页面正常加载，页面显示筛选按钮：全部、公开、非公开",
+      state,
+    );
     expect(result.passed, result.reason).toBe(true);
 
     // 尝试点击"公开"筛选
@@ -501,7 +534,7 @@ describe("agent-browser 关注筛选", () => {
     if (publicOk) {
       await SLEEP(3000);
       state = await getState(driver);
-      result = await aiAssert("点击"公开"筛选后，关注列表切换为公开作品内容，无加载错误", state);
+      result = await aiAssert("点击「公开」筛选后，关注列表切换为公开作品内容，无加载错误", state);
       expect(result.passed, result.reason).toBe(true);
     }
   }, 120_000);
@@ -523,7 +556,7 @@ describe("agent-browser 关于页", () => {
 
   it("关于页通过设置抽屉打开", async () => {
     // 点击顶部 appbar 区域打开设置抽屉
-    await driver.evaluate('document.querySelector(\'[class*="surface-appbar"] h1\')?.click()');
+    await driver.evaluate("document.querySelector('[class*=\"surface-appbar\"] h1')?.click()");
     await SLEEP(2000);
 
     // 尝试点击"关于"
@@ -537,7 +570,10 @@ describe("agent-browser 关于页", () => {
     }
 
     const state = await getState(driver);
-    const result = await aiAssert("关于页正常加载，页面标题包含"关于"或"Pictelio"，展示应用版本号、许可证等信息", state);
+    const result = await aiAssert(
+      "关于页正常加载，页面标题包含「关于」或「Pictelio」，展示应用版本号、许可证等信息",
+      state,
+    );
     expect(result.passed, result.reason).toBe(true);
   }, 60_000);
 });
@@ -555,7 +591,7 @@ describe("agent-browser 主题与布局设置", () => {
 
   it("主题可在设置中切换（深色/浅色）", async () => {
     // 打开设置抽屉
-    await driver.evaluate('document.querySelector(\'[class*="surface-appbar"] h1\')?.click()');
+    await driver.evaluate("document.querySelector('[class*=\"surface-appbar\"] h1')?.click()");
     await SLEEP(2000);
 
     // 尝试切换主题 — 先点击深色
@@ -587,7 +623,7 @@ describe("agent-browser 主题与布局设置", () => {
 
   it("布局模式可在设置中切换", async () => {
     // 打开设置抽屉
-    await driver.evaluate('document.querySelector(\'[class*="surface-appbar"] h1\')?.click()');
+    await driver.evaluate("document.querySelector('[class*=\"surface-appbar\"] h1')?.click()");
     await SLEEP(2000);
 
     // 尝试切换布局模式
@@ -598,7 +634,10 @@ describe("agent-browser 主题与布局设置", () => {
       await driver.navigate("/recommended");
       await SLEEP(3000);
       const state = await getState(driver);
-      const result = await aiAssert("推荐 Feed 页面正常加载，展示插画卡片，布局模式已切换（瀑布流/单列/网格）", state);
+      const result = await aiAssert(
+        "推荐 Feed 页面正常加载，展示插画卡片，布局模式已切换（瀑布流/单列/网格）",
+        state,
+      );
       expect(result.passed, result.reason).toBe(true);
     }
   }, 60_000);
@@ -627,7 +666,10 @@ describe("agent-browser 用户子路由", () => {
     await SLEEP(3000);
 
     let state = await getState(driver);
-    let result = await aiAssert("个人中心页面加载完成，显示用户头像、用户名，有'我的作品'入口", state);
+    let result = await aiAssert(
+      "个人中心页面加载完成，显示用户头像、用户名，有'我的作品'入口",
+      state,
+    );
     expect(result.passed, result.reason).toBe(true);
 
     // 点击"我的作品"
@@ -639,7 +681,10 @@ describe("agent-browser 用户子路由", () => {
     await SLEEP(5000);
 
     state = await getState(driver);
-    result = await aiAssert("已导航到用户作品页面，显示该用户的插画/漫画作品列表，URL 包含 /user/{id}/illusts", state);
+    result = await aiAssert(
+      "已导航到用户作品页面，显示该用户的插画/漫画作品列表，URL 包含 /user/{id}/illusts",
+      state,
+    );
     expect(result.passed, result.reason).toBe(true);
   }, 60_000);
 
@@ -655,7 +700,10 @@ describe("agent-browser 用户子路由", () => {
     await SLEEP(5000);
 
     const state = await getState(driver);
-    const result = await aiAssert("已导航到关注列表页面，显示用户关注的人列表，URL 包含 /user/{id}/following", state);
+    const result = await aiAssert(
+      "已导航到关注列表页面，显示用户关注的人列表，URL 包含 /user/{id}/following",
+      state,
+    );
     expect(result.passed, result.reason).toBe(true);
   }, 60_000);
 
@@ -671,7 +719,10 @@ describe("agent-browser 用户子路由", () => {
     await SLEEP(5000);
 
     const state = await getState(driver);
-    const result = await aiAssert("已导航到粉丝列表页面，显示用户的粉丝列表，URL 包含 /user/{id}/followers", state);
+    const result = await aiAssert(
+      "已导航到粉丝列表页面，显示用户的粉丝列表，URL 包含 /user/{id}/followers",
+      state,
+    );
     expect(result.passed, result.reason).toBe(true);
   }, 60_000);
 });
@@ -695,7 +746,10 @@ describe("agent-browser 图片缓存设置", () => {
     await SLEEP(3000);
 
     const state = await getState(driver);
-    const result = await aiAssert("图片缓存设置页面正常加载，页面标题包含'图片缓存'，展示三个功能开关：磁盘缓存、浏览器缓存、后台预取", state);
+    const result = await aiAssert(
+      "图片缓存设置页面正常加载，页面标题包含'图片缓存'，展示三个功能开关：磁盘缓存、浏览器缓存、后台预取",
+      state,
+    );
     expect(result.passed, result.reason).toBe(true);
   }, 60_000);
 });
@@ -717,7 +771,10 @@ describe("agent-browser 导航与路由", () => {
   it("导航栏标签可见并可点击切换", async () => {
     // 先确认在推荐页
     let state = await getState(driver);
-    let result = await aiAssert("底部导航栏显示'推荐'、'关注'、'收藏'三个标签，当前在推荐页", state);
+    let result = await aiAssert(
+      "底部导航栏显示'推荐'、'关注'、'收藏'三个标签，当前在推荐页",
+      state,
+    );
     expect(result.passed, result.reason).toBe(true);
 
     // 切换到收藏
@@ -749,7 +806,10 @@ describe("agent-browser 导航与路由", () => {
     await SLEEP(3000);
 
     const state = await getState(driver);
-    const result = await aiAssert("访问不存在的路由后，页面没有崩溃，显示 404 或 fallback 提示信息", state);
+    const result = await aiAssert(
+      "访问不存在的路由后，页面没有崩溃，显示 404 或 fallback 提示信息",
+      state,
+    );
     expect(result.passed, result.reason).toBe(true);
   }, 60_000);
 });
@@ -778,7 +838,10 @@ describe("agent-browser 详情页增强", () => {
     await SLEEP(5000);
 
     const state = await getState(driver);
-    const result = await aiAssert("作品详情页加载完成，展示标签列表（如标签按钮/链接），标签内容与作品相关", state);
+    const result = await aiAssert(
+      "作品详情页加载完成，展示标签列表（如标签按钮/链接），标签内容与作品相关",
+      state,
+    );
     expect(result.passed, result.reason).toBe(true);
   }, 60_000);
 
@@ -801,7 +864,10 @@ describe("agent-browser 详情页增强", () => {
     if (seriesOk) {
       await SLEEP(3000);
       const state = await getState(driver);
-      const result = await aiAssert("小说系列面板已打开，显示系列中各章节的列表，当前章节高亮标记", state);
+      const result = await aiAssert(
+        "小说系列面板已打开，显示系列中各章节的列表，当前章节高亮标记",
+        state,
+      );
       expect(result.passed, result.reason).toBe(true);
     }
   }, 120_000);

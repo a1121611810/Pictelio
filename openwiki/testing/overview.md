@@ -30,14 +30,21 @@ flowchart TD
 - **Runner:** Vitest (`vitest.agent-browser.config.ts`)
 - **Scope:** AI-driven user flow verification — covers core user flows, UI component behavior, page navigation, and settings
 - **Infrastructure:**
-  - **AgentBrowserDriver** (`driver.ts`) — spawns `agent-browser` CLI via `spawnSync` (migrated from `execSync`/`shell:true` for better error handling and security)
+  - **AgentBrowserDriver** (`driver.ts`) — spawns `agent-browser` CLI via `spawnSync` (migrated from `execSync`/`shell:true` for better error handling and security). Declared as `agent-browser ^0.31.1` devDependency with `pnpm-workspace.yaml` `allowBuilds: agent-browser: true`
+  - **`evaluate(js)`** — executes a raw JS expression via `ab("eval", js)`. **Contract:** pass the expression directly (no extra wrapping quotes — the CLI `JSON.stringify`s the result); injected JS must be a **single line** (the CLI does not support multi-line arguments); callers `JSON.parse` the returned string
+  - **`mockFetch(urlContains, responseJson)`** — page-level fetch mock: intercepts any `fetch` whose URL contains the given fragment and returns the fixed JSON; all other requests pass through to the real fetch. Used to construct states E2E cannot reach naturally (e.g., the update dialog). **Injection timing:** page navigation clears injected JS, so inject after the target page has loaded
+  - **`spyOnWindowOpen()` / `getWindowOpenCalls()`** — replaces `window.open` with a recorder so tests can assert a navigation "really happened" without opening tabs, then read back the recorded URLs (results come back JSON-encoded; `JSON.parse`)
   - **`clickFirst`** — targets clickable elements; `skipCount` parameter skips top UI elements (avatar, title) to land on content cards
   - **`clickReliable`** — fallback chain: `@e` ref → aria-label → direct text → CSS selector
-  - **`getAttribute`/`getComputedStyle`** — bridge methods for precise DOM property assertions via `evaluate()`
+  - **`getAttribute`/`getComputedStyle`** — bridge methods for precise DOM property assertions via `evaluate()`; results are JSON-encoded and parsed with `JSON.parse` (fallback to raw string)
   - **`aiAssert`** (`tests/ai-shared/assertion.ts`) — sends page state (accessibility tree + page text) to DeepSeek Flash for semantic validation
 - **File structure:**
   - `main-flow.test.ts` — single long-chain test covering end-to-end user journey
   - `sub-flows.test.ts` — medium-chain tests organized by feature (discovery, artwork, reading, personal, login, settings, navigation)
+  - `update-flow.test.ts` — regression spec for the v3.21.7 update-dialog fix: "check update → update dialog → go to download" using `mockFetch` + `spyOnWindowOpen` to simulate a newer remote version without a real release; guards `updateService.ts` `latestReleaseUrl` (parsed from version.json `url` field)
+  - `route-switch-instant.spec.ts` — asserts shell chrome (floating-nav, sticky header) renders before API data
+- **E2E state construction:** paths that depend on external state (e.g., the update dialog requiring a *newer* remote version) are covered by page-level injection rather than real networks — `driver.mockFetch()` for the version.json response and `driver.spyOnWindowOpen()`/`getWindowOpenCalls()` to assert the download navigation fires. Reference: `update-flow.test.ts`. Injection must happen **after** the target page navigates (navigation clears injected JS).
+- **Login-state E2E:** settings page and similar routes sit behind the login guard (`__root.tsx` startup navigation forces `/home`). These specs need `PIXIV_REFRESH_TOKEN` (already in `~/.zshrc`; CI must configure a secret) and skip via `describe.skipIf` when absent. Because direct `navigate` to a sub-route gets overridden by startup navigation, the spec must reach the route through the UI path (`/home` top user name → `/me` → "设置" row → `/settings`).
 - Runs via: `pnpm test:agent-browser`
 
 ### Migration History
@@ -48,7 +55,17 @@ Previously Pictelio had:
 
 Both `playwright` and `@vitest/browser-playwright` dependencies have been removed.
 
-> **Note (3.21.7 prep):** `@vitest/coverage-v8` (^4.1.10) was added to `packages/app/package.json` devDependencies (uncommitted alongside the 3.21.7 version bump), but no `coverage` npm script, `coverage` block in `vitest.config.ts`, or CI coverage step exists yet — the dependency is installed but not wired up.
+## Hard Constraints (enforced in AGENTS.md & TESTING.md)
+
+The testing conventions in `/packages/app/tests/TESTING.md` (mirrored in `AGENTS.md` "测试硬约束") treat violations as architecture violations:
+
+1. **IO-boundary coverage is mandatory** — every function that reads from an external source (fetch/HTTP, Preferences, native bridge, JSON parsing) must have both success-path and failure/degradation-path unit tests. Testing only pure functions is not enough; E2E cannot construct states that depend on external publishing or network timing, so function-level tests backstop those.
+2. **Contract tests must use real samples** — mocks for cross-file/cross-platform data contracts (JSON field names, storage keys, native bridge params) must come from real data sources (live files, plugin source constants, real response snapshots), never hand-written "self-consistent" mock fields. The `backupRulesConsistency.test.ts` pattern (extracting constants from plugin source) is the reference.
+3. **No silent degradation** — every fallback path (`?? ""`, `?? null`, catch → default value) must emit `console.warn` (with a module prefix) or explicitly expose an error state. A missing field is a contract break and must be visible.
+4. **Refactor behavior-unchanged constraint** — refactor commits that touch field names, constants, config values, or defaults must check whether a corresponding contract test exists (add one if missing) and note the behavior-change points in the commit message. "Tests pass" alone is not sufficient evidence of no regression.
+5. **E2E coverage principle** — user-reachable interaction paths should have E2E coverage; paths depending on external state are covered via `driver.mockFetch()` + `driver.spyOnWindowOpen()` state construction.
+
+> **Note:** `@vitest/coverage-v8` (4.1.10) appears in `pnpm-lock.yaml` only as a **transitive peer** of `vite-plus`/`vitest` — it is **not** a declared devDependency in `packages/app/package.json`, and there is no `coverage` npm script, `coverage` block in `vitest.config.ts`, or CI coverage step. Coverage reporting is not wired up.
 
 ## File Naming Conventions
 

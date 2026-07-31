@@ -513,6 +513,14 @@ Grill 澄清 → to-spec → to-tickets → implement
 - **E2E 测试**: 10 个 spec 覆盖 Feed、Login、Illust Detail、Novel Detail、Bookmarks、Cache 等关键路径
 - `passWithNoTests: true` — 允许空测试文件不报错
 
+### 测试硬约束（违反视为架构违规）
+
+1. **IO 边界测试强制覆盖**：任何从外部数据源读取数据的函数（fetch/HTTP、Preferences、原生桥、JSON 解析）必须同时具备成功路径与失败/降级路径的单元测试。禁止只测纯函数而不测 IO 边界；E2E 无法构造的状态（依赖外部发布、网络时序）由函数测试兜底。
+2. **契约测试必须使用真实样例**：跨文件/跨端共享数据契约（JSON 字段名、存储 key、原生桥参数）的测试 mock 必须来自真实数据源（线上文件、插件源码常量、真实响应快照），禁止手写"与实现自洽"的 mock 字段——实现错了 mock 也会全绿，是虚假信心。可参考 `backupRulesConsistency.test.ts` 的从源码提取常量比对模式。
+3. **禁止静默降级**：所有降级兜底路径（`?? ""`、`?? null`、catch 后返回默认值）必须输出 `console.warn`（带模块前缀）或显式向上层暴露错误状态。字段缺失 = 契约破坏，必须可见。
+4. **重构行为不变约束**：重构 commit 中凡涉及字段名、常量、配置值、默认值的改动，必须检查对应契约测试是否存在（缺失则本次补上），并在 commit message / PR 描述中标注行为变化点。"测试全绿"不构成重构无回归的充分证据。
+5. **E2E 覆盖原则**：用户可到达的交互路径应有 E2E 覆盖；依赖外部状态的路径（如更新弹窗需要远端版本更高）通过 `driver.mockFetch()`（页面级 fetch mock）+ `driver.spyOnWindowOpen()` 构造状态后覆盖。agent-browser driver 的 `evaluate` 直接执行 JS（不经 shell），注入脚本必须为单行。
+
 ## 部署
 
 - **Website**: GitHub Actions 自动部署 Astro 站点到 GitHub Pages（`.github/workflows/deploy.yml`）
@@ -538,6 +546,9 @@ Grill 澄清 → to-spec → to-tickets → implement
 - **文档查询优先性**：涉及库/框架/浏览器 API 查询时，是否遵循了「文档查询规范」的优先级链？（优先 Context7 或 MDN，降级见 `mcp-doc-query.md`）
 - **OpenWiki 查询优先性**：涉及架构概览、领域概念、集成、测试指南等主题时，是否先查阅了对应的 OpenWiki 页面再深入代码？
 - **OpenWiki 文档同步**：修改了 `src/` 或 `packages/` 中的代码后，是否执行了 `pnpm openwiki:update` 来同步文档？
+- **IO 边界测试**：本次改动涉及的 fetch/存储/桥接解析函数，成功与失败路径是否都有单元测试？
+- **真实样例**：新增/修改的测试 mock 是否来自真实数据结构，而非手写自洽字段？
+- **静默降级**：本次改动是否有降级兜底路径（`??`、catch 默认值）？是否打了 warn 或显式暴露错误？
 - **Conventional Commits 规范**：提交的 commit message 是否符合 Conventional Commits 格式（`type(scope): description`）？commitlint 会强制校验。
 
 ## Notes

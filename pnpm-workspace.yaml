@@ -27,6 +27,7 @@ blockExoticSubdeps: true
 # 管控 postinstall 脚本（当前项目无此类依赖
 # 以后新增包若有 install 脚本需手动加入白名单）
 allowBuilds:
+  agent-browser: true
   canvas: true
   esbuild: true
   # pnpm install 会自动列出待审批的包到这里

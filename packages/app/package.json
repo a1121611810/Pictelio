@@ -59,6 +59,7 @@
     "@resvg/resvg-js": "^2.6.2",
     "@solidjs/testing-library": "^0.8.10",
     "@types/node": "^26.1.1",
+    "agent-browser": "^0.31.1",
     "canvas": "^3.2.3",
     "happy-dom": "^20.11.1",
     "https-proxy-agent": "^9.1.0",

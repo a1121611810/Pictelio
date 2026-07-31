@@ -200,11 +200,64 @@ export class AgentBrowserDriver {
   }
 
   async evaluate(js: string): Promise<string> {
-    return ab("eval", `"${js.replace(/"/g, '\\"')}"`);
+    // agent-browser CLI 直接执行 js 表达式并 JSON.stringify 输出。
+    // 不能额外包引号——否则表达式变成字符串字面量，不会执行。
+    return ab("eval", js);
+  }
+
+  /**
+   * 注入页面级 fetch mock：拦截 URL 包含指定片段的请求，返回固定 JSON。
+   * 其他请求透传原生 fetch。用于构造 E2E 无法自然到达的状态（如更新弹窗）。
+   * 注意：页面导航（navigate/open）会清空注入，须在导航完成后注入；
+   * 注入 JS 必须为单行（agent-browser CLI 不支持多行参数）。
+   */
+  async mockFetch(urlContains: string, responseJson: string): Promise<void> {
+    const pattern = urlContains.replace(/'/g, "\\'");
+    const body = responseJson.replace(/'/g, "\\'");
+    const js =
+      `(() => { if (!window.__originalFetch) window.__originalFetch = window.fetch.bind(window); ` +
+      `const pattern = '${pattern}'; const body = '${body}'; ` +
+      `window.fetch = (input, init) => { ` +
+      `const url = typeof input === 'string' ? input : input.url; ` +
+      `if (url.indexOf(pattern) !== -1) { ` +
+      `return Promise.resolve(new Response(body, { status: 200, headers: { 'Content-Type': 'application/json' } })); } ` +
+      `return window.__originalFetch(input, init); }; return 'ok'; })()`;
+    await this.evaluate(js);
+  }
+
+  /**
+   * 注入 window.open spy：记录所有调用 URL，供断言"跳转是否真实发生"。
+   * 防止 window.open 真的打开新标签页干扰测试。
+   */
+  async spyOnWindowOpen(): Promise<void> {
+    const js =
+      `(() => { window.__openCalls = []; ` +
+      `window.__originalOpen = window.open.bind(window); ` +
+      `window.open = function () { window.__openCalls.push(String(arguments[0])); return null; }; ` +
+      `return 'ok'; })()`;
+    await this.evaluate(js);
+  }
+
+  /**
+   * 取回 window.open spy 记录的 URL 列表。
+   */
+  async getWindowOpenCalls(): Promise<string[]> {
+    // 表达式直接返回数组（CLI 会 JSON.stringify 输出），不要再包一层 JSON.stringify
+    const result = await this.evaluate("window.__openCalls || []");
+    try {
+      return JSON.parse(result) as string[];
+    } catch {
+      return [];
+    }
   }
 
   async pageText(): Promise<string> {
-    return ab("eval", '"document.body.innerText"');
+    const result = await this.evaluate("document.body.innerText");
+    try {
+      return JSON.parse(result) as string;
+    } catch {
+      return result;
+    }
   }
 
   /**
@@ -220,7 +273,12 @@ export class AgentBrowserDriver {
       return el ? el.getAttribute('${attr}') : null;
     })()`;
     const result = await this.evaluate(js);
-    return result === "null" ? null : result;
+    try {
+      const parsed = JSON.parse(result) as unknown;
+      return parsed === null ? null : String(parsed);
+    } catch {
+      return result;
+    }
   }
 
   /**
@@ -236,7 +294,12 @@ export class AgentBrowserDriver {
       return el ? getComputedStyle(el).getPropertyValue('${prop}') : null;
     })()`;
     const result = await this.evaluate(js);
-    return result === "null" ? null : result;
+    try {
+      const parsed = JSON.parse(result) as unknown;
+      return parsed === null ? null : String(parsed);
+    } catch {
+      return result;
+    }
   }
 
   async screenshot(path?: string): Promise<string> {
