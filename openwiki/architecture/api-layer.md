@@ -57,10 +57,10 @@ In development (`pnpm dev`) or PWA mode, the client uses standard `fetch` throug
 
 Primary auth flow uses a Pixiv `refresh_token`:
 
-1. **Production (Native):** `refreshToken()` calls `PixivApi.setRefreshToken()` to pass the token to Java, then `AuthPlugin.refreshToken()` for the OAuth exchange. `import.meta.env.DEV` gates ensure the returned `access_token` is only set in JS during dev. In production builds, `access_token` is returned as an empty string.
+1. **Production (Native):** `refreshToken()` passes the `refresh_token` to Java as a call argument to `AuthPlugin.refreshToken()` for the OAuth exchange, then pushes the new `access_token` into `PixivApi.setAccessToken()`. `import.meta.env.DEV` gates ensure the returned `access_token` is only set in JS during dev. In production builds, `access_token` is returned as an empty string. Durable storage and Java memory sync of the `refresh_token` happen through the [Token Persistence & Backup Integrity](#token-persistence--backup-integrity) module — the old `PixivApi.setRefreshToken()` call was removed in the v3.21.5 security hardening.
 2. **Dev mode:** Falls back to `_oauthFetch` using OAuth credentials from the Vite env.
 
-Key source: `auth.ts`, `PixivApi.ts`.
+Key source: `auth.ts`, `PixivApi.ts`, `secureStorage.ts`.
 
 ### PKCE Flow (pkceAuth.ts)
 
@@ -70,7 +70,7 @@ For first-time login, Pictelio uses the PKCE authorization code flow:
 2. User is directed to Pixiv OAuth page in a WebView (`OAuthWebView` component)
 3. The native `OAuthPlugin` intercepts the redirect and extracts the authorization code
 4. `exchangeCodeForToken()` calls `OAuthPlugin.exchangeCode()`, then sets the access_token on PixivApiPlugin via `PixivApi.setAccessToken()` (Java-side storage)
-5. `refresh_token` is persisted to `capacitor-secure-storage`
+5. `refresh_token` is persisted via `saveRefreshToken()` (encrypted `capacitor-secure-storage` + Java memory sync, see below)
 
 ### Auth Initialization Dedup (`authStore.ts`)
 
@@ -79,6 +79,35 @@ For first-time login, Pictelio uses the PKCE authorization code flow:
 - First call stores the Promise in `_authPromise` and begins the refresh flow
 - Subsequent calls return the stored Promise — no duplicate refresh
 - `loginWithToken()` and `loginWithPKCE()` reset `_authPromise = null` before starting, then set it to `Promise.resolve()` after success, ensuring a fresh init on the next `initializeAuth()` call after a login flow
+
+Token restoration is converged into a single call: `initializeAuth()` now invokes `restoreRefreshToken()` from [Token Persistence & Backup Integrity](#token-persistence--backup-integrity), which internally runs the backup integrity check → read (with one-time legacy `@capacitor/preferences` migration) → native injection. Any storage exception is handled uniformly as "clear token → return null" (forced re-login) instead of the old split get/migrate path.
+
+`setupUnauthorizedHandler()` additionally registers a **`refreshTokenRotated`** listener on `PixivApi` (skipped silently on Web, where the plugin is absent): if the Java-side 401 silent refresh receives a rotated `refresh_token`, Java updates its own memory and notifies JS, which updates the in-memory signal and calls `saveRefreshToken()` to persist the new value — preventing the app from restoring a stale token after restart. The listener is removed on `logout()`. (Defensive only: Pixiv does not currently rotate refresh tokens.)
+
+### Token Persistence & Backup Integrity (`secureStorage.ts`)
+
+Since v3.21.5 (security hardening, [ADR-0003](/docs/adr/0003-backup-security-three-layer-defense.md)), `/packages/app/src/utils/secureStorage.ts` is a deep module with a **single three-interface API**: `restoreRefreshToken()` / `saveRefreshToken()` / `clearRefreshToken()`. All token state changes must go through these three entry points, which together enforce the invariant "persisted state and native memory never drift". Implementation facts are grounded in [docs/research/android-token-storage.md](/docs/research/android-token-storage.md).
+
+- **`restoreRefreshToken()`** — startup restore, three phases: (1) backup integrity check via the `__pictelio_backup_marker` marker — a marker read error means the Keystore key is unavailable (e.g. restored backup onto a different device); (2) read the token from `@aparajita/capacitor-secure-storage`, with a one-time migration from the legacy plaintext `@capacitor/preferences` key; (3) inject the token into Java memory via `PixivApi.syncToken()`. Any storage exception (marker read failure or AES/GCM decryption error after Keystore key recreation) is handled uniformly as clear token + native memory → return `null` → forced re-login. First launch writes the marker.
+- **`saveRefreshToken()`** — writes the token to secure storage, then syncs it to Java memory (`syncToken`). Persistence failure does not block native injection.
+- **`clearRefreshToken()`** — removes the token from secure storage and calls `syncToken(null)`, which also wipes Java memory and the historical plaintext residue in `PictelioPrefs.xml`.
+
+The restore flow (the layer-③ defense):
+
+```mermaid
+flowchart TD
+    Init[initializeAuth] --> Restore[restoreRefreshToken]
+    Restore --> Check{SecureStorage.get backup_marker\nthrows?}
+    Check -- yes --> Clear[clearRefreshToken: wipe storage + native memory\nreturn null]
+    Check -- no --> Decrypt{SecureStorage.get refresh_token\nthrows?}
+    Decrypt -- yes --> Clear
+    Decrypt -- no --> Migrate[one-time legacy Preferences migration\nwhen secure store is empty]
+    Migrate --> Sync[syncToken into PixivApiPlugin Java memory]
+    Sync --> Done[return token / null]
+    Clear --> Relogin[forced re-login]
+```
+
+The Android backup-exclusion layers (① `data_extraction_rules.xml`, ② `backup_rules.xml`) and the native `syncToken` memory model are documented in [Android Native & Build — Backup Rules](/openwiki/integrations/android-native.md#backup-rules--token-storage-exclusions-adr-0003), and the anti-drift test guarding the XML file names in [Testing Strategy](/openwiki/testing/overview.md#config-consistency-anti-drift-tests).
 
 ### OAuth Token Error Detection
 
