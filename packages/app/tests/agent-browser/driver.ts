@@ -48,21 +48,6 @@ export function findRefByText(snapshot: string, text: string): string | null {
   return null;
 }
 
-/**
- * 从 snapshot 中获取第一个可点击元素的 ref。
- */
-/**
- * 从 snapshot 中获取第一个可点击元素的 ref。
- * 跳过第一个 ref（通常是用户头像 h1），取第二个作为卡片。
- */
-function firstClickableRef(snapshot: string): string | null {
-  const matches = [...snapshot.matchAll(/ref=(e\d+)/gu)];
-  if (matches.length === 0) return null;
-  if (matches.length === 1) return matches[0][1];
-  // 取第二个 ref，跳过用户头像/标题等顶部元素
-  return matches[1][1];
-}
-
 // ─── Driver 类 ──────────────────────────────────────
 
 export class AgentBrowserDriver {
