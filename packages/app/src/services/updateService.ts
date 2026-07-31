@@ -81,6 +81,7 @@ export async function checkForUpdate(): Promise<CheckResult> {
 
   const data = (await res.json()) as {
     version?: string;
+    url?: string;
     release_url?: string;
     changelog?: string;
   };
@@ -91,7 +92,9 @@ export async function checkForUpdate(): Promise<CheckResult> {
   return {
     hasUpdate,
     latestVersion: remoteVersion,
-    latestReleaseUrl: data.release_url ?? "",
+    // version.json 由 scripts/release.mjs 生成，字段名为 url（历史字段）；
+    // release_url 作为未来扩展的兼容项。
+    latestReleaseUrl: data.url ?? data.release_url ?? "",
     latestChangelog: data.changelog ?? "",
   };
 }

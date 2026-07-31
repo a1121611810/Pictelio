@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { isNewer } from "@/services/updateService";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { isNewer, checkForUpdate } from "@/services/updateService";
 
 describe("isNewer", () => {
   it("returns false when versions are equal", () => {
@@ -56,5 +56,45 @@ describe("isNewer", () => {
 
   it("handles mixed depth when local is newer", () => {
     expect(isNewer("1.2", "1.1.9")).toBe(false);
+  });
+});
+
+describe("checkForUpdate", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("解析 version.json 的 url 字段为 latestReleaseUrl", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          version: "9.9.9",
+          url: "https://github.com/a1121611810/pixivizer/releases/tag/v9.9.9",
+          changelog: "test",
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const result = await checkForUpdate();
+
+    expect(result.hasUpdate).toBe(true);
+    expect(result.latestReleaseUrl).toBe(
+      "https://github.com/a1121611810/pixivizer/releases/tag/v9.9.9",
+    );
+  });
+
+  it("fetch 失败时返回安全默认值", async () => {
+    const mockFetch = vi.fn().mockRejectedValue(new Error("network down"));
+    vi.stubGlobal("fetch", mockFetch);
+
+    const result = await checkForUpdate();
+
+    expect(result).toEqual({
+      hasUpdate: false,
+      latestVersion: "",
+      latestReleaseUrl: "",
+      latestChangelog: "",
+    });
   });
 });
