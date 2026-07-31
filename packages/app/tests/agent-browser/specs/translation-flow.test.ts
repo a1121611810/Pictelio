@@ -51,6 +51,32 @@ const MOCK_TRANSLATE_RESPONSE = JSON.stringify({
 const DEEPSEEK_PATTERN = "api.deepseek.com/chat/completions";
 const TRANSLATED_MARKER = "这是第一段的译文";
 
+/** 小说详情 mock（PixivNovelDetailResponse，最小必需字段） */
+const MOCK_NOVEL_DETAIL = JSON.stringify({
+  novel: {
+    id: 20814743,
+    title: "E2E 翻译测试小说",
+    user: {
+      id: 999999,
+      name: "E2E 作者",
+      account: "e2e-author",
+      profile_image_urls: {},
+    },
+    image_urls: { square_medium: "", medium: "", large: "" },
+    tags: [],
+    page_count: 1,
+    text_length: 60,
+    is_bookmarked: false,
+    total_bookmarks: 0,
+    x_restrict: 0,
+    create_date: "2026-01-01T00:00:00+09:00",
+  },
+});
+
+/** 小说正文 mock（/webview/v2/novel 返回 HTML，内含 "text" 字段，\n 分隔段落） */
+const MOCK_NOVEL_HTML =
+  'window.pixiv = { novel: { "text": "ある日のこと、図書館で本を読んでいた。\\n隣に座った少女が声をかけてきた。\\n二人は一緒に物語を読み始めた。" } }';
+
 /** 通过 evaluate 点击文本匹配的按钮（兼容原生 button 与 fluent-button） */
 async function clickButtonByText(driver: AgentBrowserDriver, text: string): Promise<boolean> {
   const js = `(() => {
@@ -82,47 +108,52 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 翻译流程", 
 
   beforeAll(async () => {
     driver = await createLoggedInDriver();
-    // 注入翻译请求 mock（页面级 fetch 拦截；SPA 导航不清空）
+    // 注入请求 mock（页面级 fetch 拦截；SPA 导航不清空）：
+    // 1) 翻译请求（DeepSeek，返回固定译文）
+    // 2) 小说详情 / 正文（不依赖账号小说推荐，完全自包含）
     await driver.mockFetch(DEEPSEEK_PATTERN, MOCK_TRANSLATE_RESPONSE);
+    await driver.mockFetch("novel/detail", MOCK_NOVEL_DETAIL);
+    await driver.mockFetch("webview/v2/novel", MOCK_NOVEL_HTML);
 
-    // ── 进入设置页配置 key（/home 顶部 h1 → /me → 设置行 → /settings） ──
-    for (let attempt = 0; attempt < 6; attempt++) {
-      const s = await driver.snapshot();
-      if (s.includes("翻译设置")) break;
-      if (s.includes("设置")) {
-        await clickButtonByText(driver, "设置");
-      } else {
-        await driver.evaluate(
-          `(() => { const h = document.querySelector('h1'); if (h) { h.click(); return 'clicked'; } return 'no-h1'; })()`,
-        );
+    // ── 进入设置页配置 key（SPA 导航直达 /settings，绕过启动导航覆盖） ──
+    await driver.navigateSpa("/settings");
+    await SLEEP(2000);
+
+    // 等待「翻译设置」分组出现
+    let onSettings = false;
+    for (let i = 0; i < 10; i++) {
+      if (await pageHasText(driver, "翻译设置")) {
+        onSettings = true;
+        break;
       }
-      await SLEEP(2500);
+      await SLEEP(1500);
     }
+    expect(onSettings, "应进入设置页并显示「翻译设置」分组").toBe(true);
 
-    // 填写 API key 并保存（evaluate 注入 input 值 + input 事件）
-    await driver.evaluate(
-      `(() => {
-        const inp = document.querySelector('input[placeholder="sk-..."]');
-        if (!inp) return 'no-input';
-        inp.value = 'sk-e2e-test';
-        inp.dispatchEvent(new Event('input', { bubbles: true }));
-        return 'filled';
-      })()`,
-    );
-    await SLEEP(800);
-    const saved = await clickButtonByText(driver, "保存");
-    expect(saved, "设置页应能找到「保存」按钮").toBe(true);
+    // 填写 API key 并保存（evaluate 注入 input 值 + input 事件；保存按钮轮询重试）
+    let keySaved = false;
+    for (let i = 0; i < 5 && !keySaved; i++) {
+      await driver.evaluate(
+        `(() => {
+          const inp = document.querySelector('input[placeholder="sk-..."]');
+          if (!inp) return 'no-input';
+          inp.value = 'sk-e2e-test';
+          inp.dispatchEvent(new Event('input', { bubbles: true }));
+          return 'filled';
+        })()`,
+      );
+      await SLEEP(800);
+      keySaved = await clickButtonByText(driver, "保存");
+      if (!keySaved) {
+        await SLEEP(1500);
+      }
+    }
+    expect(keySaved, "设置页应能找到「保存」按钮").toBe(true);
     await SLEEP(1500);
 
-    // ── 返回 /home 并进入小说详情 ──
-    await driver.navigateSpa("/home");
-    await SLEEP(3000);
-    await driver.evaluate(
-      '[...document.querySelectorAll("button")].find(b => b.textContent.includes("小说"))?.click()',
-    );
-    await SLEEP(3000);
-    await driver.clickFirst();
-    await SLEEP(5000);
+    // ── 进入 mock 小说详情页（SPA 导航，绕过启动导航覆盖） ──
+    await driver.navigateSpa("/novel/20814743");
+    await SLEEP(4000);
   }, 240_000);
 
   afterAll(async () => {
@@ -132,10 +163,27 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 翻译流程", 
   it("详情页翻译：译文注入正文并可切回原文", async () => {
     const path = await driver.evaluate(`location.pathname`);
     if (!path.includes("/novel/")) {
-      console.log("[翻译流程] 未进入小说详情（无小说卡片），跳过");
+      console.log("[翻译流程] 未进入小说详情，跳过");
       return;
     }
-
+    // 等待详情渲染（mock 标题出现）
+    let rendered = false;
+    for (let i = 0; i < 10; i++) {
+      if (await pageHasText(driver, "E2E 翻译测试小说")) {
+        rendered = true;
+        break;
+      }
+      await SLEEP(1500);
+    }
+    if (!rendered) {
+      const t = await driver
+        .evaluate(`document.body.innerText.slice(0, 600)`)
+        .catch(() => "(eval failed)");
+      console.log("[翻译流程] 详情页未渲染，页面文本:", JSON.stringify(t));
+      const p = await driver.evaluate(`location.pathname`).catch(() => "(?)");
+      console.log("[翻译流程] 当前路径:", p);
+    }
+    expect(rendered, "mock 小说详情应渲染（标题可见）").toBe(true);
     // 点击底部「翻译」按钮 → 面板弹出
     const opened = await clickButtonByText(driver, "翻译");
     expect(opened, "底部工具栏应能找到「翻译」按钮").toBe(true);

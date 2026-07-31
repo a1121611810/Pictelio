@@ -302,20 +302,25 @@ export class AgentBrowserDriver {
 
   /**
    * 注入页面级 fetch mock：拦截 URL 包含指定片段的请求，返回固定 JSON。
-   * 其他请求透传原生 fetch。用于构造 E2E 无法自然到达的状态（如更新弹窗）。
+   * 其他请求透传原生 fetch。多次调用会**累积**规则（每次调用不覆盖前一次的拦截）。
+   * 用于构造 E2E 无法自然到达的状态（如更新弹窗）。
    * 注意：页面导航（navigate/open）会清空注入，须在导航完成后注入；
    * 注入 JS 必须为单行（agent-browser CLI 不支持多行参数）。
    */
   async mockFetch(urlContains: string, responseJson: string): Promise<void> {
-    const pattern = urlContains.replace(/'/g, "\\'");
-    const body = responseJson.replace(/'/g, "\\'");
+    // 用 JSON.stringify 生成 JS 字符串字面量：正确处理反斜杠/引号/换行转义，
+    // 避免注入路径二次解释（如 JSON 里的 \n 被浏览器当成真实换行导致 JSON 非法）
+    const patternLiteral = JSON.stringify(urlContains);
+    const bodyLiteral = JSON.stringify(responseJson);
     const js =
       `(() => { if (!window.__originalFetch) window.__originalFetch = window.fetch.bind(window); ` +
-      `const pattern = '${pattern}'; const body = '${body}'; ` +
+      `window.__mockRules = window.__mockRules || []; ` +
+      `window.__mockRules.push({ pattern: ${patternLiteral}, body: ${bodyLiteral} }); ` +
       `window.fetch = (input, init) => { ` +
       `const url = typeof input === 'string' ? input : input.url; ` +
-      `if (url.indexOf(pattern) !== -1) { ` +
-      `return Promise.resolve(new Response(body, { status: 200, headers: { 'Content-Type': 'application/json' } })); } ` +
+      `const rule = window.__mockRules.find(r => url.indexOf(r.pattern) !== -1); ` +
+      `if (rule) { ` +
+      `return Promise.resolve(new Response(rule.body, { status: 200, headers: { 'Content-Type': 'application/json' } })); } ` +
       `return window.__originalFetch(input, init); }; return 'ok'; })()`;
     await this.evaluate(js);
   }
