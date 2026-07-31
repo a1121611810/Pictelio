@@ -6,6 +6,13 @@ import { resolveImageUrl, loadImage } from "@/utils/imageLoader";
 
 const isNative = Capacitor.isNativePlatform();
 
+/** 当前展示的用户（本人或浏览中的用户），模块级 store signal，无需在 hook 内重建 */
+const displayUser = (): ReturnType<typeof user> => viewedUser() || user();
+
+/** 作品总数，全部来自模块级 store signal */
+const totalWorks = (): number =>
+  (profile()?.total_illusts ?? 0) + (profile()?.total_manga ?? 0) + (profile()?.total_novels ?? 0);
+
 export interface UseUserProfileResult {
   targetUserId: Accessor<number>;
   displayUser: Accessor<ReturnType<typeof user>>;
@@ -28,19 +35,12 @@ export function useUserProfile(
     return Number(propsUserId || getParamsId() || user()?.id || 0);
   };
 
-  const displayUser = (): ReturnType<typeof user> => viewedUser() || user();
-
   const isCurrentUser = (): boolean => {
     if (getPathname() === "/me") return true;
     return targetUserId() === user()?.id;
   };
 
   const isRootUserPage = (): boolean => /^\/(?:me|user\/\d+)$/.test(getPathname());
-
-  const totalWorks = (): number =>
-    (profile()?.total_illusts ?? 0) +
-    (profile()?.total_manga ?? 0) +
-    (profile()?.total_novels ?? 0);
 
   //── 头像加载 ──
   const [avatarUrl, setAvatarUrl] = createSignal("");

@@ -38,6 +38,37 @@ const STARTUP_CHECK_DELAY_MS = 500;
 /** "再按一次退出应用" toast 的显示时长（ms） */
 const EXIT_HINT_DURATION_MS = 2000;
 
+/**
+ * 启动后检查更新（延迟执行，不阻塞首次渲染）。
+ * 在 onMount 中的启动流程完成后调用。
+ * 所有 setter 均为 settingsStore 模块级导出，无需在组件内定义。
+ */
+async function runStartupUpdateCheck(): Promise<void> {
+  setIsCheckingUpdate(true);
+  const [updateErr] = await tryAsync(
+    (async () => {
+      const result = await checkForUpdate();
+      setHasUpdate(result.hasUpdate);
+      setLatestVersion(result.latestVersion);
+      setLatestReleaseUrl(result.latestReleaseUrl);
+      setLatestChangelog(result.latestChangelog);
+
+      if (
+        result.hasUpdate &&
+        result.latestVersion &&
+        result.latestVersion !== lastDismissedVersion()
+      ) {
+        setShowUpdateDialog(true);
+      }
+    })(),
+  );
+  setIsCheckingUpdate(false);
+  setCheckCompleted(true);
+  if (updateErr) {
+    console.warn("[App] Startup update check failed", updateErr);
+  }
+}
+
 const RootLayout: Component = (props: { children?: any }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -66,32 +97,6 @@ const RootLayout: Component = (props: { children?: any }) => {
    * 启动后检查更新（延迟执行，不阻塞首次渲染）。
    * 在 onMount 中的启动流程完成后调用。
    */
-  async function runStartupUpdateCheck(): Promise<void> {
-    setIsCheckingUpdate(true);
-    const [updateErr] = await tryAsync(
-      (async () => {
-        const result = await checkForUpdate();
-        setHasUpdate(result.hasUpdate);
-        setLatestVersion(result.latestVersion);
-        setLatestReleaseUrl(result.latestReleaseUrl);
-        setLatestChangelog(result.latestChangelog);
-
-        if (
-          result.hasUpdate &&
-          result.latestVersion &&
-          result.latestVersion !== lastDismissedVersion()
-        ) {
-          setShowUpdateDialog(true);
-        }
-      })(),
-    );
-    setIsCheckingUpdate(false);
-    setCheckCompleted(true);
-    if (updateErr) {
-      console.warn("[App] Startup update check failed", updateErr);
-    }
-  }
-
   onMount(async () => {
     // 滚动恢复由 @solidjs/router 内置 scrollRestoration 管理，无需手动设置
 

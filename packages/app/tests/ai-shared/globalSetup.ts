@@ -3,7 +3,7 @@
  * Starts the Vite dev server before all tests.
  * Reuses the same logic as the Playwright globalSetup.
  */
-import { spawn, execSync, type ChildProcess } from "node:child_process";
+import { spawn, execSync } from "node:child_process";
 import { createServer } from "node:net";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve as pathResolve } from "node:path";

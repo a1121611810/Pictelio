@@ -90,11 +90,7 @@ describe("trySync", () => {
   });
 
   it("工厂函数惰性执行 — 不调用时不执行", () => {
-    let executed = false;
-    const fn = (() => {
-      executed = true;
-      return 42;
-    }) as () => number;
+    const fn = (() => 42) as () => number;
 
     // 只传引用，不调用
     const spy = vi.fn(fn);

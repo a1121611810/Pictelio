@@ -10,6 +10,9 @@ interface Props {
   onBack?: () => void;
 }
 
+/** 当前展示的用户（本人或浏览中的用户），模块级 store signal，无需在组件内重建 */
+const displayUser = () => user() || viewedUser();
+
 function AvatarFallback(props: { class?: string }) {
   return (
     <div
@@ -31,7 +34,6 @@ function AvatarFallback(props: { class?: string }) {
 
 const CollapsedHeader: Component<Props> = (props) => {
   const navigate = useNavigate();
-  const displayUser = () => user() || viewedUser();
   const isNative = Capacitor.isNativePlatform();
   const [avatarUrl, setAvatarUrl] = createSignal("");
   const [errored, setErrored] = createSignal(false);

@@ -276,8 +276,10 @@ async function fullNavigate(page, url) {
     try {
       await page.goto(url, { waitUntil: "load", timeout: 10_000 });
       log(`Retry navigation complete: ${page.url()}`);
-    } catch (error) {
-      warn(`Retry navigation to ${url} also failed: ${error.message}; current url: ${page.url()}`);
+    } catch (retryError) {
+      warn(
+        `Retry navigation to ${url} also failed: ${retryError.message}; current url: ${page.url()}`,
+      );
     }
   }
 }

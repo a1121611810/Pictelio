@@ -33,9 +33,9 @@ const UserIllusts: Component = () => {
     }
 
     const handler = () => {
-      const uid = userId();
-      if (uid) {
-        load(uid, contentType());
+      const currentUid = userId();
+      if (currentUid) {
+        load(currentUid, contentType());
       }
     };
     window.addEventListener("r18Changed", handler);

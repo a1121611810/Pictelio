@@ -286,6 +286,28 @@ export default defineConfig({
       "no-unassigned-vars": "off",
       // 允许 _ 前缀的未使用变量，保持解构/回调参数可读性
       "no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+      // 下划线命名豁免：tanstack-virtual 内部 API（_didMount/_willUpdate）、
+      // 构建注入常量（__CREDENTIALS__/__PUBLIC_CONFIG__）、模块私有命名约定（_root/_raw/_credsPath/_authPromise）
+      "no-underscore-dangle": [
+        "warn",
+        {
+          allow: [
+            "_didMount",
+            "_willUpdate",
+            "_root",
+            "_raw",
+            "_credsPath",
+            "_authPromise",
+            "__CREDENTIALS__",
+            "__PUBLIC_CONFIG__",
+          ],
+        },
+      ],
+      // 循环内串行 await 是有意写法（分页、重试、顺序依赖请求），并行化是行为变更
+      // （与测试文件 override 的既有豁免保持一致）
+      "no-await-in-loop": "off",
+      // IndexedDB 事务事件（onsuccess/onerror）与 img.onload 的一次性属性赋值是惯用法
+      "prefer-add-event-listener": "off",
     },
     overrides: [
       {

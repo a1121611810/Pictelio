@@ -12,14 +12,7 @@ vi.mock("@capacitor/preferences", () => ({
 }));
 
 // ── 被测试模块 ──
-import {
-  layoutMode,
-  setLayoutMode,
-  loadLayoutModePreference,
-  setNovelLayoutMode,
-  novelLayoutMode,
-  loadNovelLayoutModePreference,
-} from "@/stores/settingsStore";
+import { layoutMode, setLayoutMode, loadLayoutModePreference } from "@/stores/settingsStore";
 
 describe("settingsStore — setLayoutMode", () => {
   beforeEach(() => {

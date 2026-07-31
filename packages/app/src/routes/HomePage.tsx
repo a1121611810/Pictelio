@@ -46,7 +46,7 @@ const HomePage: Component = () => {
   const domActiveTabs = createMemo(() => {
     const entries = Object.entries(lastAccess)
       .filter(([, ts]) => ts > 0)
-      .sort(([, a], [, b]) => b - a);
+      .toSorted(([, a], [, b]) => b - a);
     return new Set(entries.slice(0, MAX_DOM_TABS).map(([key]) => key));
   });
 

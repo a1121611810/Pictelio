@@ -42,17 +42,6 @@ describe("429 重试 — 指数退避", () => {
     } as unknown as Response;
   }
 
-  function make200Response(data = {}) {
-    return {
-      ok: true,
-      status: 200,
-      headers: new Headers({ "content-type": "application/json" }),
-      json: () => Promise.resolve(data),
-      text: () => Promise.resolve(JSON.stringify(data)),
-      clone: () => make200Response(data),
-    } as unknown as Response;
-  }
-
   it("429 直接抛出，由 TanStack Query 处理重试", async () => {
     const { apiClient } = await loadModule();
 

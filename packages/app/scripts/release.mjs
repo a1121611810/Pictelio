@@ -496,17 +496,17 @@ async function main() {
     ];
     const total = buildSteps.length;
     for (let i = 0; i < total; i++) {
-      const [label, cmd, args, opts] = buildSteps[i];
+      const [label, cmd, stepArgs, opts] = buildSteps[i];
       const subLabel = `[${i + 1}/${total}] ${label}`;
       if (cmd === "./gradlew") {
         try {
-          await runWithSpinner(subLabel, cmd, args, opts);
+          await runWithSpinner(subLabel, cmd, stepArgs, opts);
         } catch {
           log("Gradle 构建失败，重试并输出详细堆栈...");
-          await runWithSpinner(`${subLabel}（详细堆栈）`, cmd, [...args, "--stacktrace"], opts);
+          await runWithSpinner(`${subLabel}（详细堆栈）`, cmd, [...stepArgs, "--stacktrace"], opts);
         }
       } else {
-        await runWithSpinner(subLabel, cmd, args, opts || {});
+        await runWithSpinner(subLabel, cmd, stepArgs, opts || {});
       }
     }
     const apkExists = await exists(apkPath);
@@ -552,14 +552,14 @@ async function main() {
       await writeFile(notesFile, changelog, "utf-8");
 
       // 预检：release 是否已存在
-      let exists = false;
+      let releaseExists = false;
       try {
         runOutput("gh", ["release", "view", tag, "--repo", repo]);
-        exists = true;
+        releaseExists = true;
       } catch {}
 
       // 第一步：创建 Release（不传 APK，只需 API 调用，~1s）
-      if (!exists) {
+      if (!releaseExists) {
         for (let attempt = 1; attempt <= 3; attempt++) {
           try {
             await runWithSpinner(`gh release create (第 ${attempt} 次)`, "gh", [

@@ -92,7 +92,7 @@ export function createNovelLoader(novelId: Accessor<number>): NovelLoaderResult 
         ]);
         if (signal.aborted) return;
 
-        const novelData = novelErr ? { text: "", navigation: {}, images: {} } : novelResult!;
+        const loadedNovel = novelErr ? { text: "", navigation: {}, images: {} } : novelResult!;
 
         if (detailErr) {
           setDetailError((detailErr as { message?: string }).message ?? "加载失败");
@@ -102,9 +102,9 @@ export function createNovelLoader(novelId: Accessor<number>): NovelLoaderResult 
 
         const networkEntry: CacheEntry = {
           detail: detail!.novel,
-          text: novelData.text,
-          nav: novelData.navigation,
-          images: novelData.images ?? {},
+          text: loadedNovel.text,
+          nav: loadedNovel.navigation,
+          images: loadedNovel.images ?? {},
         };
         applyEntry(networkEntry);
         if (networkEntry.text) {

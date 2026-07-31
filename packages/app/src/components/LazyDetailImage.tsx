@@ -60,7 +60,7 @@ const LazyDetailImage: Component<Props> = (props) => {
 
   // 1. src 变化时重置 cacheReadyFor 和 retryTrigger，确保跨插图导航时从骨架屏重新开始
   createEffect(() => {
-    props.src;
+    void props.src;
     setCacheReadyFor("");
     setRetryTrigger(0);
   });

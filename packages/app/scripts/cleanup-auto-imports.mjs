@@ -129,7 +129,7 @@ for (const absPath of files) {
     );
 
     if (importMatch) {
-      const [, prefix, bodyRaw, , pkg] = importMatch;
+      const [, , bodyRaw, , pkg] = importMatch;
       const allowList = PACKAGES.get(pkg);
 
       if (allowList) {
@@ -157,7 +157,7 @@ for (const absPath of files) {
       // 多行 import 检测：行以 "import {" 开头，但不包含 "} from"
       const multiStartMatch = trimmed.match(/^(import\s+(?:type\s+)?\{\s*)([\s\S]*)$/);
       if (multiStartMatch && !trimmed.includes("} from")) {
-        const [, prefix, firstBody] = multiStartMatch;
+        const [, , firstBody] = multiStartMatch;
         const bodyParts = [firstBody];
         let j = i + 1;
         let foundEnd = false;

@@ -3,7 +3,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, cleanup } from "@solidjs/testing-library";
 
 const mockNavigate = vi.fn();
-const mockBack = vi.fn();
 
 const loaderData = () => ({
   error: null,
