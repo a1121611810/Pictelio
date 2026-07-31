@@ -24,6 +24,9 @@
     "release:dry": "vp run --filter pictelio-app release:dry",
     "deploy": "node scripts/deploy.mjs",
     "deploy:dry": "node scripts/deploy.mjs --dry-run",
+    "dev:lynx": "pnpm --filter pictelio-app-lynx dev",
+    "build:lynx": "pnpm --filter pictelio-app-lynx build",
+    "check:lynx": "pnpm --filter pictelio-app-lynx check",
     "openwiki:update": "openwiki --update",
     "prepare": "husky"
   },

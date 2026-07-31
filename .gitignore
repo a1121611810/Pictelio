@@ -11,6 +11,9 @@ dist/
 .superpowers/
 .DS_Store
 
+# Lynx 构建产物
+*.tsbuildinfo
+
 # Superpowers generated plans/specs (kept locally, not in repo)
 docs/superpowers/
 

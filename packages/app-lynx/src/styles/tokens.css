@@ -1,0 +1,60 @@
+/* ─── Fluent Design 2 令牌（app-lynx / Lynx CSS 子集） ───
+ * 与现有 app 的 tokens.css 同源语义，但仅保留 Lynx 引擎支持的属性。
+ * Lynx CSS 变量默认被子孙继承；伪类/backdrop-filter 等在 Lynx 支持度有限，
+ * MVP 用纯色 + 简单过渡替代（原生 LynxView 阶段再对表补齐）。
+ */
+page {
+  /* 颜色（Fluent 2 Neutral + Brand） */
+  --colorNeutralBackground1: #ffffff;
+  --colorNeutralBackground2: #faf9f8;
+  --colorNeutralBackground3: #f3f2f1;
+  --colorNeutralForeground1: #1b1a19;
+  --colorNeutralForeground2: #605e5c;
+  --colorNeutralForeground3: #a19f9d;
+  --colorNeutralStroke1: #d1d0cf;
+  --colorNeutralStroke2: #e1dfdd;
+  --colorNeutralStroke3: #f0efee;
+  --colorBrandBackground: #0f6cbd;
+  --colorBrandBackgroundHover: #115ea3;
+  --colorBrandBackgroundPressed: #0f548c;
+  --colorBrandForeground1: #0f6cbd;
+  --colorBrandForeground2: #115ea3;
+  --colorBrandForegroundInverted: #ffffff;
+  --colorBrandStroke1: #0f6cbd;
+  --colorNeutralForegroundOnBrand: #ffffff;
+  --colorPaletteRedBackground3: #c50f1f;
+  --colorPaletteYellowBackground3: #f9bc15;
+  --colorPaletteGreenBackground3: #107c10;
+  --colorOverlayDark: rgba(0, 0, 0, 0.55);
+
+  /* 圆角 */
+  --borderRadiusSmall: 4px;
+  --borderRadiusMedium: 6px;
+  --borderRadiusLarge: 8px;
+  --borderRadiusXLarge: 12px;
+  --borderRadius2XLarge: 16px;
+
+  /* 间距 */
+  --spacingXs: 4px;
+  --spacingS: 8px;
+  --spacingM: 12px;
+  --spacingL: 16px;
+  --spacingXL: 24px;
+
+  /* 字号（Lynx 无 clamp/vw 流体，MVP 用固定 px） */
+  --fontSizeBase100: 20px;
+  --fontSizeBase200: 24px;
+  --fontSizeBase300: 28px;
+  --fontSizeBase400: 32px;
+  --fontSizeBase500: 40px;
+  --fontSizeHero800: 56px;
+
+  /* 阴影（Lynx 支持 box-shadow 子集） */
+  --elevation2: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --elevation4: 0 4px 16px rgba(0, 0, 0, 0.1);
+
+  /* 动画 */
+  --durationFast: 150ms;
+  --durationNormal: 200ms;
+  --durationGentle: 300ms;
+}
