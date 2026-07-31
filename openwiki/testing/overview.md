@@ -94,6 +94,16 @@ jest.mock("../stores/db", () => ({
 }));
 ```
 
+### Config Consistency Anti-Drift Tests
+
+`tests/unit/utils/backupRulesConsistency.test.ts` (added in v3.21.5) guards the [backup exclusion XML files](/openwiki/integrations/android-native.md#backup-rules--token-storage-exclusions-adr-0003) from silent drift. Because Android backup `exclude path` entries are exact filename matches, the rules previously pointed at a nonexistent `_capacitor_secure_storage.xml` while the plugin actually writes `WSSecureStorageSharedPreferences.xml` — ciphertext was exported with backups. The test:
+
+- Extracts the real SharedPreferences filename constant from the `@aparajita/capacitor-secure-storage` plugin source (`node_modules/.../SecureStorage.java`) instead of hardcoding it
+- Asserts `data_extraction_rules.xml` (`cloud-backup` + `device-transfer`) and `backup_rules.xml` (`full-backup-content`) all exclude `WSSecureStorageSharedPreferences.xml` + `PictelioPrefs.xml`
+- Asserts the three XML sections stay identical to each other
+
+This is a reusable pattern for config-vs-source consistency: parse the constant from source, compare against the config, fail loudly on drift.
+
 ### AI-Shared Test Utilities (`tests/ai-shared/`)
 
 Shared infrastructure for AI-driven E2E tests:
@@ -120,6 +130,7 @@ Shared infrastructure for AI-driven E2E tests:
 | Test helpers | `/packages/app/tests/helpers.ts` |
 | Manual fetch primitive | `/packages/app/src/primitives/createManualFetch.ts` |
 | Memory store | `/packages/app/src/stores/db.ts` |
+| Backup rules consistency test | `/packages/app/tests/unit/utils/backupRulesConsistency.test.ts` |
 | Unit tests | `/packages/app/tests/unit/` |
 | Unit component tests (migrated from browser/) | `/packages/app/tests/unit/components/` |
 | Agent-browser tests | `/packages/app/tests/agent-browser/` |

@@ -70,14 +70,16 @@ The largest native plugin, handling the PKCE authorization code flow:
 
 ### PixivApiPlugin (Gateway)
 
-**Java:** `/packages/app/android/app/src/main/java/io/pictelio/app/PixivApiPlugin.java` (9 KB)
+**Java:** `/packages/app/android/app/src/main/java/io/pictelio/app/PixivApiPlugin.java` (15 KB)
 **TypeScript:** `/packages/app/src/native/PixivApi.ts`
 
 Introduced in **v3.18.0** as the sole gateway for all Pixiv API communication (ADR-0037). Replaces the former PictelioHttpPlugin, which was deleted:
 
 - `request({ method, path, params, body })` — all Pixiv App-API requests go through this single plugin method
 - **access_token is never exposed to the JavaScript layer** — stored in a Java `volatile` field, injected into OkHttp requests internally
-- **401 auto-refresh** — Java side detects 401 responses, uses `synchronized` + `isRefreshing` flag to refresh the token internally, then retries once. No JS-side Promise queue needed in production.
+- **401 auto-refresh** — Java side detects 401 responses, uses `synchronized` + `isRefreshing` flag to refresh the token internally, then retries once. The `refresh_token` used for the exchange is read from Java memory (injected by JS) — no SharedPreferences disk read. No JS-side Promise queue needed in production.
+- **`syncToken({ token })`** (v3.21.5, replaces `setRefreshToken`) — syncs the `refresh_token` into Java memory only, never written to disk. A `null`/empty token clears the memory value (and, on logout, the `access_token` as defense-in-depth) and idempotently removes the historical plaintext residue in `PictelioPrefs.xml` left by the old native `setRefreshToken`.
+- **`refreshTokenRotated` event** — if the Java-side 401 silent refresh receives a rotated `refresh_token`, Java updates its own memory and notifies JS via this event so `authStore` persists the new value (`saveRefreshToken`) instead of restoring a stale token after restart. Pixiv does not currently rotate refresh tokens, so this is defensive (see [API Layer — Token Persistence](/openwiki/architecture/api-layer.md#token-persistence--backup-integrity)).
 - **`prefetchImage({ url })`** — downloads images directly to the Android disk cache directory, zero bytes enter the JS heap
 - **`getSharedClient()`** (static, package-private) — exposes the internal shared `OkHttpClient` so `MainActivity.interceptImage()` can reuse the same connection pool instead of creating per-request `HttpURLConnection` instances. Reduces connection setup overhead for image proxy requests.
 - Credentials and OAuth config live only in compiled Java bytecode
@@ -128,6 +130,20 @@ sequenceDiagram
 - `styles.xml`: `AppTheme.NoActionBarLaunch` inherits `Theme.SplashScreen` — splash background and icon defined in theme XML
 - `build.gradle`: retains `androidx.core:core-splashscreen` dependency
 - `variables.gradle`: retains `coreSplashScreenVersion = '1.2.0'`
+
+## Backup Rules & Token Storage Exclusions (ADR-0003)
+
+The `refresh_token` is stored in Android Keystore-backed encrypted storage (`@aparajita/capacitor-secure-storage` 8.x — self-implemented AES/GCM, ciphertext file `WSSecureStorageSharedPreferences.xml`). Because `android:allowBackup="true"`, backup is defended by three layers per [ADR-0003](/docs/adr/0003-backup-security-three-layer-defense.md) (grounded in [docs/research/android-token-storage.md](/docs/research/android-token-storage.md)):
+
+1. **Android 12+ (API 31+):** `res/xml/data_extraction_rules.xml` excludes `WSSecureStorageSharedPreferences.xml` and `PictelioPrefs.xml` from both the `cloud-backup` and `device-transfer` sections.
+2. **Android 11- (API 30-):** `res/xml/backup_rules.xml` applies the same `sharedpref` exclusions for full backups.
+3. **Runtime integrity check:** `secureStorage.restoreRefreshToken()` — a marker-read or token-decrypt failure (e.g. backup restored onto a device without the Keystore key) clears the token and forces re-login. This layer is documented with the [Token Persistence & Backup Integrity](/openwiki/architecture/api-layer.md#token-persistence--backup-integrity) module.
+
+`AndroidManifest.xml` wires the XML layers with `android:allowBackup="true"`, `android:dataExtractionRules="@xml/data_extraction_rules"` (Android 12+), and `android:fullBackupContent="@xml/backup_rules"` (Android 11-).
+
+**Why byte-exact file names matter:** backup `exclude path` is an exact filename match. The rules previously excluded a nonexistent `_capacitor_secure_storage.xml` while the plugin actually writes `WSSecureStorageSharedPreferences.xml`, so ciphertext was silently exported with backups. Since v3.21.5 the exclusions match the real constant, and [backupRulesConsistency.test.ts](/packages/app/tests/unit/utils/backupRulesConsistency.test.ts) extracts that constant from the plugin source to keep all three XML sections in sync (see [Testing Strategy — Config Consistency Anti-Drift Tests](/openwiki/testing/overview.md#config-consistency-anti-drift-tests)).
+
+**Native side (v3.21.5):** `PixivApiPlugin` never persists the `refresh_token` — `syncToken()` holds it in Java memory only, and `PictelioPrefs.xml` is historical plaintext residue that `syncToken(null)`/`syncToken("")` idempotently removes.
 
 ## Main Activity & Application
 
@@ -236,11 +252,14 @@ The full release process is documented in `/docs/release-checklist.md` (6.2 KB),
 | ImageCachePlugin (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/ImageCachePlugin.java` |
 | OAuthPlugin (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/OAuthPlugin.java` |
 | PixivApiPlugin (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PixivApiPlugin.java` |
+| Backup rules (Android 12+) | `/packages/app/android/app/src/main/res/xml/data_extraction_rules.xml` |
+| Backup rules (Android 11-) | `/packages/app/android/app/src/main/res/xml/backup_rules.xml` |
 | MainActivity (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/MainActivity.java` |
 | PictelioApp (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioApp.java` |
 | AuthPlugin TS bridge | `/packages/app/src/native/AuthPlugin.ts` |
 | ImageCache TS bridge | `/packages/app/src/native/ImageCache.ts` |
 | OAuthPlugin TS bridge | `/packages/app/src/native/OAuthPlugin.ts` |
+| PixivApi TS bridge | `/packages/app/src/native/PixivApi.ts` |
 | Splash Bridge | `/packages/app/src/native/splashBridge.ts` |
 | Capacitor config | `/packages/app/capacitor.config.ts` |
 | Dev Android script | `/packages/app/scripts/dev-android.mjs` |

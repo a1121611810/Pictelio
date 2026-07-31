@@ -84,7 +84,7 @@ Token restoration is converged into a single call: `initializeAuth()` now invoke
 
 `setupUnauthorizedHandler()` additionally registers a **`refreshTokenRotated`** listener on `PixivApi` (skipped silently on Web, where the plugin is absent): if the Java-side 401 silent refresh receives a rotated `refresh_token`, Java updates its own memory and notifies JS, which updates the in-memory signal and calls `saveRefreshToken()` to persist the new value — preventing the app from restoring a stale token after restart. The listener is removed on `logout()`. (Defensive only: Pixiv does not currently rotate refresh tokens.)
 
-### Token Persistence & Backup Integrity (`secureStorage.ts`)
+### Token Persistence & Backup Integrity
 
 Since v3.21.5 (security hardening, [ADR-0003](/docs/adr/0003-backup-security-three-layer-defense.md)), `/packages/app/src/utils/secureStorage.ts` is a deep module with a **single three-interface API**: `restoreRefreshToken()` / `saveRefreshToken()` / `clearRefreshToken()`. All token state changes must go through these three entry points, which together enforce the invariant "persisted state and native memory never drift". Implementation facts are grounded in [docs/research/android-token-storage.md](/docs/research/android-token-storage.md).
 
