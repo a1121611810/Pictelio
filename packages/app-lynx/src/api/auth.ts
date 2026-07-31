@@ -57,7 +57,7 @@ export async function oauthTokenRequest(
   if (!resp.ok) {
     const text = await resp.text().catch(() => "")
     // OAuth 400（refresh_token 失效/被撤销）→ 归类为 UNAUTHORIZED，
-    // 触发 authStore 的永久失效清理（清除持久化 token，强制重新登录）
+    // 触发 authStore 的永久失效清理（标记永久失败，强制重新登录）
     let parsedBody: unknown = null
     try {
       parsedBody = JSON.parse(text)
@@ -71,7 +71,8 @@ export async function oauthTokenRequest(
       err.type = "unauthorized"
       throw err
     }
-    throw new Error(`OAuth 失败 (HTTP ${resp.status}): ${text.slice(0, 300)}`)
+    // 安全：错误提示不携带原始响应体（可能含敏感信息），只保留状态码
+    throw new Error(`OAuth 失败 (HTTP ${resp.status})`)
   }
 
   const data = (await resp.json()) as PixivAuthResponse

@@ -1,12 +1,11 @@
 // ─── 认证状态（app-lynx MVP） ───
-// Web 模式：token 存内存 + localStorage 占位（原生安全存储见 T7）。
+// 安全：refresh_token 仅存内存（Web 模式不写入 localStorage —— 防 XSS 窃取）。
+// 原生生产环境由 T7 迁移到 Native Module 安全存储（Android Keystore）。
 import { ref, computed } from "vue"
 import { setAccessToken, setOnUnauthorized, setAuthPermanentFailure } from "../api/client"
 import { loginWithRefreshToken, loginWithPassword } from "../api/auth"
 import type { PixivUser } from "../api/types"
 import { toApiError } from "../utils/errors"
-
-const STORAGE_KEY = "pictelio_lynx_refresh_token"
 
 const _refreshToken = ref<string | null>(null)
 const _accessTokenReady = ref(false)
@@ -17,20 +16,17 @@ export const isLoggedIn = computed(() => _accessTokenReady.value && _user.value 
 export const currentUser = computed(() => _user.value)
 export const authError = computed(() => _authError.value)
 
-/** 尝试从本地存储恢复 refresh_token（Web 模式；原生模式由 T7 桥接安全存储） */
+/**
+ * 启动恢复：内存态无持久化 → 直接返回未登录。
+ * 原生模式（T7）将由 Native Module 从安全存储恢复 refresh_token 后调用 performRefresh。
+ */
 export async function restoreToken(): Promise<boolean> {
   if (_accessTokenReady.value) return true
-  let token: string | null = null
-  try {
-    token = globalThis.localStorage?.getItem(STORAGE_KEY) ?? null
-  } catch {
-    token = null
-  }
-  if (!token) return false
-  return await performRefresh(token)
+  // Web 模式：无持久化 token，需要用户重新登录（安全权衡：防 XSS 窃取 refresh_token）
+  return false
 }
 
-/** 用 refresh_token 登录：OAuth 交换 → 持久化 → 设置状态 */
+/** 用 refresh_token 登录：OAuth 交换 → 设置内存态 */
 export async function loginWithToken(token: string): Promise<void> {
   const trimmed = token.trim()
   if (!trimmed) {
@@ -38,13 +34,6 @@ export async function loginWithToken(token: string): Promise<void> {
     return
   }
   await performRefresh(trimmed)
-  if (_accessTokenReady.value) {
-    try {
-      globalThis.localStorage?.setItem(STORAGE_KEY, trimmed)
-    } catch {
-      /* 存储不可用不阻塞登录 */
-    }
-  }
 }
 
 /** 用用户名密码登录 */
@@ -53,11 +42,6 @@ export async function loginWithCredentials(username: string, password: string): 
   try {
     const resp = await loginWithPassword(username, password)
     applyAuthResponse(resp)
-    try {
-      globalThis.localStorage?.setItem(STORAGE_KEY, resp.refresh_token)
-    } catch {
-      /* ignore */
-    }
   } catch (err) {
     _authError.value = toApiError(err).message
     throw err
@@ -73,16 +57,12 @@ async function performRefresh(token: string): Promise<boolean> {
   } catch (err) {
     const apiErr = toApiError(err)
     _authError.value = apiErr.message
-    // 永久失效（OAuth 400）→ 清除持久化 token，强制重新登录
+    // 永久失效（OAuth 400）→ 标记永久失败，强制重新登录
     if (apiErr.type === "unauthorized") {
       setAuthPermanentFailure(true)
-      try {
-        globalThis.localStorage?.removeItem(STORAGE_KEY)
-      } catch {
-        /* ignore */
-      }
       _accessTokenReady.value = false
       _user.value = null
+      _refreshToken.value = null
     }
     return false
   }
@@ -106,11 +86,6 @@ export function logout() {
   _refreshToken.value = null
   _accessTokenReady.value = false
   _user.value = null
-  try {
-    globalThis.localStorage?.removeItem(STORAGE_KEY)
-  } catch {
-    /* ignore */
-  }
 }
 
 /** 注册 401 自动刷新处理器（客户端在请求失败时调用） */

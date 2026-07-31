@@ -51,7 +51,7 @@ src/
 
 ## 已知限制（MVP）
 
-- **token 持久化**：Web 模式用 localStorage 占位，但 vue-lynx worker 无 localStorage → 刷新需重新登录。原生安全存储见 ticket #41。
+- **token 持久化**：安全设计——refresh_token 仅存内存（Web 模式不写 localStorage，防 XSS 窃取）→ 刷新页面需重新登录。原生生产环境由 ticket #41 迁移到 Native Module 安全存储（Android Keystore）。
 - **列表回收**：vue-lynx #302 cell 回收 no-op，5k 条内安全（实测）。
 - **图片**：原生端需自研 ILynxImageService（Referer 注入），Web 端走代理已可用。
 - **登录页 PKCE**：MVP 仅 refresh_token / 密码登录；PKCE OAuth WebView 需原生集成。

@@ -1,5 +1,4 @@
 import { defineConfig } from '@lynx-js/rspeedy'
-import { pluginQRCode } from '@lynx-js/qrcode-rsbuild-plugin'
 import { pluginVueLynx } from 'vue-lynx/plugin'
 import { HttpsProxyAgent } from 'https-proxy-agent'
 import { readFileSync } from 'node:fs'
@@ -40,16 +39,17 @@ export default defineConfig({
     define: {
       __CREDENTIALS__,
       __PUBLIC_CONFIG__,
-      // __DEV__ 语义与 Vite 一致：非生产构建为 true。
-      // rspeedy build 默认 NODE_ENV=production 会把 OAuth 分支消除——但 dev server 与
-      // MVP web 调试需要登录能力。提供 PICTELIO_LYNX_DEV=1 显式开启（仅开发用）。
+      // 安全：__DEV__ 必须同时满足「非生产构建」AND「显式 PICTELIO_LYNX_DEV=1」。
+      // 仅在显式开启的本地开发构建中内联 OAuth 凭证；任何生产/CI 构建
+      // （即使 NODE_ENV 非 production）都不会把 clientId/secret 打进 bundle。
       __DEV__: JSON.stringify(
-        process.env.PICTELIO_LYNX_DEV === '1' || process.env.NODE_ENV !== 'production',
+        process.env.NODE_ENV !== 'production' && process.env.PICTELIO_LYNX_DEV === '1',
       ),
     },
   },
   server: {
-    host: '0.0.0.0',
+    // 安全：仅绑定本机回环，避免把含 OAuth 凭证的 dev bundle 暴露到局域网
+    host: '127.0.0.1',
     // rspeedy 的 proxy 仅支持数组形式（http-proxy-middleware ProxyOptions[]）
     proxy: [
       {
@@ -87,11 +87,6 @@ export default defineConfig({
     ],
   },
   plugins: [
-    pluginQRCode({
-      schema(url) {
-        return `${url}?fullscreen=true`
-      },
-    }),
     pluginVueLynx({
       optionsApi: false,
       enableCSSInlineVariables: true,

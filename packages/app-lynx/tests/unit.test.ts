@@ -1,5 +1,5 @@
 // ─── app-lynx 单元测试（Vitest，node 环境） ───
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { proxyImageUrl, thumbUrl } from '../src/utils/imageUrl'
 import { classifyError, isOAuthTokenErrorResponse, rewriteUrl, shouldAttachAuth } from '../src/api/client'
 import { ApiErrorType } from '../src/api/types'
@@ -183,5 +183,46 @@ describe('routerCore 路由匹配', () => {
 
   it('未知路径 → null', () => {
     expect(matchRoute(coreRoutes, '/nope')).toBeNull()
+  })
+})
+
+describe('authStore 安全：refresh_token 不持久化', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    })
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('restoreToken 不读 localStorage（无持久化 token → 未登录）', async () => {
+    const { restoreToken, isLoggedIn } = await import('../src/stores/authStore')
+    const ok = await restoreToken()
+    const lsGet = (globalThis.localStorage as { getItem: ReturnType<typeof vi.fn> }).getItem
+    expect(ok).toBe(false)
+    expect(isLoggedIn.value).toBe(false)
+    expect(lsGet).not.toHaveBeenCalled()
+  })
+
+  it('登录成功后不写 localStorage', async () => {
+    // mock 登录成功路径：OAuth 返回有效响应，验证成功后也绝不写存储
+    vi.mock('../src/api/auth', () => ({
+      loginWithRefreshToken: vi.fn(async () => ({
+        access_token: 'at',
+        refresh_token: 'rt',
+        expires_in: 3600,
+        token_type: 'bearer',
+        user: { id: 1, name: 'u', account: 'u', profile_image_urls: {} },
+      })),
+      loginWithPassword: vi.fn(),
+    }))
+    const { loginWithToken } = await import('../src/stores/authStore')
+    const lsSet = (globalThis.localStorage as { setItem: ReturnType<typeof vi.fn> }).setItem
+    await loginWithToken('some-token')
+    expect(lsSet).not.toHaveBeenCalled()
   })
 })

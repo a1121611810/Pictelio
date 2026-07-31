@@ -356,9 +356,6 @@ importers:
         specifier: ^4.5.0
         version: 4.6.4(vue@3.5.40(typescript@5.9.3))
     devDependencies:
-      '@lynx-js/qrcode-rsbuild-plugin':
-        specifier: ^0.4.6
-        version: 0.4.7
       '@lynx-js/rspeedy':
         specifier: ^0.13.6
         version: 0.13.6(@rspack/core@1.7.12(@swc/helpers@0.5.23))(esbuild@0.28.1)(typescript@5.9.3)(webpack@5.109.2(esbuild@0.28.1)(postcss@8.5.23))
@@ -1262,10 +1259,6 @@ packages:
 
   '@lynx-js/css-serializer@0.1.5':
     resolution: {integrity: sha512-eRVsGFQR0DjclwXjZF7f/SnYRHtS2H29H1iFlAo71Rdyrjbl4y8kIk4s0qD41YbmlXqRP+UnWtUIaXiivTJLQQ==}
-
-  '@lynx-js/qrcode-rsbuild-plugin@0.4.7':
-    resolution: {integrity: sha512-7Y4jK5I7lbmzbmmBhXPbbFw+4+mAWkwqzF1+PKLSzgY9BPsnwuEyu4EsrRo7RqyXpgcpunacZC7IgyB6BRDh+g==}
-    engines: {node: '>=18'}
 
   '@lynx-js/react@0.116.5':
     resolution: {integrity: sha512-qhh9mZv7d5hKMQOXoiAOYaWQe/My6MhJ8EcJAi/c9g1EH4TQQoR0Q1o/7dIWj/pZbIiXSt6bgXpTJNQpXr+Qyg==}
@@ -6793,8 +6786,6 @@ snapshots:
     dependencies:
       css-tree: 3.2.1
 
-  '@lynx-js/qrcode-rsbuild-plugin@0.4.7': {}
-
   '@lynx-js/react@0.116.5(@types/react@18.3.31)':
     dependencies:
       '@types/react': 18.3.31
@@ -11658,7 +11649,6 @@ time:
   '@commitlint/config-conventional@21.2.0': '2026-06-30T09:53:56.373Z'
   '@fluentui/tokens@1.0.0-alpha.23': '2026-01-22T17:02:10.707Z'
   '@fluentui/web-components@3.0.2': '2026-07-13T04:09:45.729Z'
-  '@lynx-js/qrcode-rsbuild-plugin@0.4.7': '2026-05-18T04:49:55.683Z'
   '@lynx-js/rspeedy@0.13.6': '2026-03-24T02:54:39.151Z'
   '@lynx-js/web-core@0.23.1': '2026-07-31T12:17:27.142Z'
   '@resvg/resvg-js@2.6.2': '2024-03-26T13:43:37.598Z'
