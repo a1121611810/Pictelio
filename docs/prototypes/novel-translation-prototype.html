@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>小说 AI 翻译 — UI 交互原型（#25）</title>
+<style>
+  /* ── Fluent 2 近似 tokens（原型用，实现时改用 tokens.css 变量） ── */
+  :root {
+    --bg: #f5f5f5; --surface: #ffffff; --stroke: #e0e0e0;
+    --fg1: #242424; --fg2: #616161; --brand: #0f6cbd; --brand-hover: #115ea3;
+    --danger: #c42b1c; --danger-bg: #fdf3f4;
+    --radius-s: 4px; --radius-m: 8px; --radius-l: 12px;
+    --dur: 200ms; --ease: cubic-bezier(0.33,0,0,1);
+    --shadow2: 0 2px 4px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.06);
+    --font: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--bg); color: var(--fg1); }
+  button { font-family: inherit; cursor: pointer; border: none; background: none; }
+
+  /* ── 顶部 appbar（模拟 NovelDetail header） ── */
+  .appbar { position: sticky; top: 0; z-index: 20; background: var(--surface);
+    height: 48px; display: flex; align-items: center; padding: 0 16px; gap: 8px;
+    border-bottom: 1px solid var(--stroke); }
+  .appbar .back { width: 32px; height: 32px; border-radius: var(--radius-s); display: flex;
+    align-items: center; justify-content: center; color: var(--fg1); }
+  .appbar .back:hover { background: var(--bg); }
+  .appbar h1 { font-size: 14px; font-weight: 600; flex: 1; min-width: 0; display: flex; gap: 6px; }
+  .appbar h1 .title { color: var(--fg2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .icon-btn { width: 32px; height: 32px; border-radius: var(--radius-s); display: flex;
+    align-items: center; justify-content: center; color: var(--fg1); }
+  .icon-btn:hover { background: var(--bg); }
+
+  /* ── 正文 ── */
+  .content { max-width: 640px; margin: 0 auto; padding: 24px 16px 80px; }
+  .content p.jp { margin-bottom: 18px; line-height: 1.9; color: #333; font-size: 15px; }
+  .content p.zh { margin-bottom: 18px; line-height: 1.9; color: #1a1a1a; font-size: 15px; display: none; }
+  .content p .unt { color: var(--danger); font-size: 12px; margin-left: 6px; opacity: .8; }
+  .content p.fresh { animation: fadeIn var(--dur) var(--ease); }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; } }
+  .content .placeholder { color: var(--fg2); font-size: 13px; margin: 8px 0; }
+
+  /* ── 底部工具栏（模拟 NovelFooterNav） ── */
+  .footernav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface);
+    border-top: 1px solid var(--stroke); padding: 8px 16px; z-index: 20;
+    transition: transform var(--dur) var(--ease); }
+  .footernav.hidden { transform: translateY(calc(100% + 8px)); }
+  .footernav .row { max-width: 640px; margin: 0 auto; display: flex; justify-content: center; gap: 4px; overflow-x: auto; }
+  .fn-btn { flex-shrink: 0; white-space: nowrap; padding: 8px 12px; border-radius: var(--radius-m);
+    background: var(--bg); color: var(--fg1); font-size: 13px; font-weight: 500;
+    display: flex; align-items: center; gap: 6px; }
+  .fn-btn:hover { background: #ebebeb; }
+  .fn-btn:active { transform: scale(.97); }
+  .fn-btn.primary { background: var(--brand); color: #fff; }
+  .fn-btn.primary:hover { background: var(--brand-hover); }
+  .fn-btn.toggling { color: var(--brand); }
+  .fn-btn.toggling.active { background: var(--brand); color: #fff; }
+
+  /* ── 翻译面板（底部 sheet） ── */
+  .sheet { position: fixed; inset: 0; z-index: 40; display: none; }
+  .sheet.open { display: block; }
+  .sheet .mask { position: absolute; inset: 0; background: rgba(0,0,0,.4); }
+  .sheet .panel { position: absolute; bottom: 0; left: 0; right: 0; background: var(--surface);
+    border-radius: var(--radius-l) var(--radius-l) 0 0; padding: 16px; max-width: 640px; margin: 0 auto;
+    box-shadow: var(--shadow2); animation: slideUp var(--dur) var(--ease); }
+  @keyframes slideUp { from { transform: translateY(40px); opacity: .4; } }
+  .sheet .grab { width: 36px; height: 4px; border-radius: 2px; background: #ccc; margin: 0 auto 12px; }
+  .sheet h3 { font-size: 16px; font-weight: 600; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+  .sheet .close { width: 32px; height: 32px; border-radius: var(--radius-s); color: var(--fg2); font-size: 18px; }
+  .sheet .close:hover { background: var(--bg); }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .field .hint { font-size: 12px; color: var(--fg2); margin-top: 4px; line-height: 1.5; }
+
+  /* 分段选择（档位） */
+  .seg { display: flex; background: var(--bg); border-radius: var(--radius-m); padding: 4px; gap: 4px; }
+  .seg button { flex: 1; padding: 8px 4px; border-radius: var(--radius-s); font-size: 13px; font-weight: 600; }
+  .seg button.on { background: var(--surface); box-shadow: var(--shadow2); }
+  .seg button small { display: block; font-weight: 400; color: var(--fg2); font-size: 11px; margin-top: 2px; }
+
+  /* 开关 */
+  .switch-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; }
+  .switch-row .sw-label { font-size: 13px; font-weight: 600; }
+  .switch-row .sw-label small { display: block; font-weight: 400; color: var(--fg2); margin-top: 2px; font-size: 11px; }
+  .switch { width: 40px; height: 20px; border-radius: 10px; background: #c7c7c7; position: relative; transition: background var(--dur); }
+  .switch.on { background: var(--brand); }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+    background: #fff; transition: transform var(--dur) var(--ease); }
+  .switch.on::after { transform: translateX(20px); }
+
+  /* 进度条 */
+  .progress { height: 6px; border-radius: 3px; background: var(--bg); overflow: hidden; }
+  .progress .bar { height: 100%; background: var(--brand); width: 0%; transition: width 300ms var(--ease); }
+  .progress-label { font-size: 12px; color: var(--fg2); margin-top: 6px; }
+  .status { font-size: 13px; color: var(--fg2); margin-top: 8px; line-height: 1.6; }
+  .status .fail { color: var(--danger); }
+
+  .warn-box { background: var(--danger-bg); border: 1px solid #f5c6c2; border-radius: var(--radius-m);
+    padding: 10px 12px; font-size: 12px; color: #8f2b1f; line-height: 1.7; margin-bottom: 12px; display: none; }
+  .warn-box.show { display: block; }
+
+  .btn-block { width: 100%; padding: 12px; border-radius: var(--radius-m); font-size: 14px; font-weight: 600; }
+  .btn-brand { background: var(--brand); color: #fff; }
+  .btn-brand:hover { background: var(--brand-hover); }
+  .btn-ghost { background: var(--bg); color: var(--fg1); }
+  .btn-ghost:hover { background: #ebebeb; }
+  .btn-danger-text { color: var(--danger); font-size: 13px; padding: 8px; }
+
+  /* ── 设置页翻译分组 ── */
+  .settings { max-width: 640px; margin: 0 auto; padding: 24px 16px; display: none; }
+  .settings.show { display: block; }
+  .settings .group-title { font-size: 12px; font-weight: 600; color: var(--fg2); text-transform: uppercase;
+    letter-spacing: .5px; margin-bottom: 8px; }
+  .settings .card { background: var(--surface); border-radius: var(--radius-l); padding: 16px; box-shadow: var(--shadow2); }
+  .settings .card + .card { margin-top: 12px; }
+  .input-row { display: flex; gap: 8px; margin-top: 8px; }
+  .input-row input { flex: 1; padding: 10px 12px; border: 1px solid var(--stroke); border-radius: var(--radius-m);
+    font-size: 14px; font-family: inherit; }
+  .input-row input:focus { outline: 2px solid var(--brand); outline-offset: -1px; }
+  .input-row .btn-ghost { padding: 10px 14px; font-size: 13px; }
+  .back-link { display: inline-flex; align-items: center; gap: 4px; color: var(--brand); font-size: 14px; margin-bottom: 16px; }
+
+  /* 状态条 */
+  .toast { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); background: #323232; color: #fff;
+    padding: 10px 16px; border-radius: var(--radius-m); font-size: 13px; z-index: 60; display: none; }
+  .toast.show { display: block; animation: fadeIn var(--dur); }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ 视图 A：小说详情页 ═══════════ -->
+<div id="view-detail">
+  <div class="appbar">
+    <button class="back" onclick="showToast('返回上一页（原型）')">←</button>
+    <h1><span>小说</span><span class="title">《暗夜の図書館》</span></h1>
+    <button class="icon-btn" onclick="showToast('搜索（原型）')">🔍</button>
+  </div>
+
+  <div class="content">
+    <div class="placeholder">── 封面区（作者 / 系列 / 评论入口，原型省略）──</div>
+    <p class="jp" data-i="0">図書館の奥、誰もいない書架の間で、彼女は古びた本を開いた。ページの端は黄ばみ、文字はかすかに滲んでいる。</p>
+    <p class="jp" data-i="1">「この本、読んでもいいですか」——声をかけたのは、昼間のあの司書だった。彼女は笑みを浮かべ、静かにうなずいた。</p>
+    <p class="jp" data-i="2">窓の外では雨が降り始めていた。雨音は図書館の静けさを一層深くするようだった。二人は並んで、古い物語のページをめくっていく。</p>
+    <p class="jp" data-i="3">物語は、遠い国の王子と魔女の話だった。魔女は王子を呪い、王子は旅に出る。そして最後に、王子は魔女の本当の気持ちを知るのだった。</p>
+    <p class="jp" data-i="4">「結末、知ってる？」彼女が訊いた。私は首を振る。彼女は少し間を置いて、「じゃあ、続きは明日にしよう」と言った。</p>
+    <!-- 译文段（默认隐藏，翻译后显示） -->
+    <p class="zh" data-i="0">在图书馆的深处，无人经过的书架之间，她打开了一本古老的书。书页边缘泛黄，文字微微晕开。</p>
+    <p class="zh" data-i="1">「这本书，我可以读吗？」——开口的是白天的那个图书管理员。她露出微笑，静静地点头。</p>
+    <p class="zh" data-i="2">窗外开始下起雨来。雨声仿佛让图书馆的寂静更深了一层。两人并肩翻阅着古老的故事。</p>
+    <p class="zh" data-i="3">故事讲的是一位远方国度的王子与魔女。魔女诅咒了王子，王子踏上了旅途。而最后，王子得知了魔女的真实心意。</p>
+    <p class="zh" data-i="4">「结局，你知道吗？」她问道。我摇了摇头。她稍作停顿，「那，续篇就留到明天吧」。</p>
+  </div>
+
+  <div class="footernav" id="footer">
+    <div class="row">
+      <button class="fn-btn" onclick="showToast('上一章（原型）')">◀ 上一章</button>
+      <button class="fn-btn" onclick="showToast('目录（原型）')">▤ 目录</button>
+      <button class="fn-btn" onclick="showToast('显示设置（原型）')"><b>Aa</b> 显示设置</button>
+      <button class="fn-btn" id="btn-translate" onclick="openTranslateSheet()">🌐 翻译</button>
+      <button class="fn-btn primary" onclick="showToast('下一章（原型）')">下一章 ▶</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 翻译面板（底部 sheet） ═══════════ -->
+<div class="sheet" id="translate-sheet">
+  <div class="mask" onclick="closeSheet()"></div>
+  <div class="panel">
+    <div class="grab"></div>
+    <h3>AI 翻译 <button class="close" onclick="closeSheet()">✕</button></h3>
+
+    <!-- 未配置 key 状态 -->
+    <div id="need-key" class="warn-box show">尚未配置 DeepSeek API Key。请先前往「设置 → 翻译设置」填写你的 API Key（BYOK，密钥仅存本机）。</div>
+
+    <!-- 档位 -->
+    <div class="field">
+      <label>翻译质量</label>
+      <div class="seg">
+        <button id="seg-flash" class="on" onclick="setTier('flash')">标准<small>deepseek-v4-flash · ¥1/2 每百万</small></button>
+        <button id="seg-pro" onclick="setTier('pro')">高质量<small>deepseek-v4-pro · ¥3/6 每百万</small></button>
+      </div>
+    </div>
+
+    <!-- 思考模式开关 -->
+    <div class="field">
+      <div class="switch-row">
+        <div class="sw-label">启用思考模式<small>翻译更慢、产生额外 reasoning token 计费；temperature 不生效</small></div>
+        <div class="switch" id="sw-thinking" onclick="toggleThinking()"></div>
+      </div>
+    </div>
+
+    <!-- 进度（翻译中显示） -->
+    <div id="progress-area" style="display:none">
+      <div class="progress"><div class="bar" id="progress-bar"></div></div>
+      <div class="progress-label" id="progress-label"></div>
+      <div class="status" id="status-text"></div>
+    </div>
+
+    <!-- 主按钮 -->
+    <button class="btn-block btn-brand" id="btn-sheet-main" onclick="mainAction()">开始翻译</button>
+  </div>
+</div>
+
+<!-- ═══════════ 视图 B：设置页翻译分组 ═══════════ -->
+<div class="settings" id="view-settings">
+  <a class="back-link" href="javascript:void(0)" onclick="showView('detail')">← 返回小说</a>
+  <div class="group-title">翻译设置</div>
+
+  <div class="card">
+    <div style="font-size:14px;font-weight:600">API Key（BYOK）</div>
+    <div class="hint" style="font-size:12px;color:#616161;margin-top:4px">填写你的 DeepSeek API Key，加密存储于本机，仅用于直连 DeepSeek 服务。请勿将 key 暴露给他人。</div>
+    <div class="input-row">
+      <input type="password" id="key-input" placeholder="sk-..." value="" />
+      <button class="btn-ghost" onclick="toggleKeyVisible()">显示</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="font-size:14px;font-weight:600">默认翻译质量</div>
+    <div class="seg" style="margin-top:10px">
+      <button class="on" onclick="setDefaultTier('flash')">标准</button>
+      <button onclick="setDefaultTier('pro')">高质量</button>
+    </div>
+    <div class="hint" style="font-size:12px;color:#616161;margin-top:6px">详情页翻译时可临时切换。</div>
+  </div>
+
+  <div class="card">
+    <div class="switch-row">
+      <div class="sw-label">启用思考模式<small>默认关。开启后翻译更慢、产生额外 reasoning token 计费、temperature 不生效</small></div>
+      <div class="switch" onclick="this.classList.toggle('on')"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="switch-row">
+      <div class="sw-label">翻译 R18 内容<small>默认关。开启后首次翻译 R18 作品将弹出风险告知</small></div>
+      <div class="switch" onclick="r18Toggle(this, 'r18')"></div>
+    </div>
+    <div class="warn-box" id="warn-r18">该作品包含 R18 内容。翻译需将正文发送至你选择的 AI 服务商，可能：① 被内容审核拒绝（失败段落保留原文）；② 违反服务商使用条款，导致你的 API 账号被警告、暂停或封禁；③ 内容可能被去标识化后用于模型训练。所有风险由你自行承担。［取消 / 我已了解并继续］</div>
+    <div class="switch-row">
+      <div class="sw-label">翻译 R18G 内容<small>默认关。法律红线，开启需二次确认</small></div>
+      <div class="switch" onclick="r18Toggle(this, 'r18g')"></div>
+    </div>
+    <div class="warn-box" id="warn-r18g">该作品包含 R18G（极端）内容。除上述风险外，此类内容违反法律法规红线，可能导致你的 API 账号被关闭，服务商可能向主管部门/执法机构报告。App 提供方不承担由此产生的任何责任。［取消 / 我已了解并承担全部风险并继续］</div>
+  </div>
+
+  <div class="card">
+    <div style="font-size:14px;font-weight:600">译文缓存</div>
+    <div class="hint" style="font-size:12px;color:#616161;margin-top:4px">LRU 200 章 / ~8MB，原文修改自动失效重翻。</div>
+    <button class="btn-block btn-ghost" style="margin-top:10px" onclick="showToast('已清除翻译缓存（原型）')">清除翻译缓存</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ── 状态 ──
+  let tier = "flash";
+  let thinking = false;
+  let translating = false;
+  let translated = 0;      // 已翻译块数
+  const TOTAL = 5;
+  let timer = null;
+  let r18Confirmed = { r18: false, r18g: false };
+
+  function showView(v) {
+    document.getElementById("view-detail").style.display = v === "detail" ? "" : "none";
+    document.getElementById("view-settings").style.display = v === "settings" ? "" : "none";
+  }
+
+  let toastTimer;
+  function showToast(msg) {
+    const t = document.getElementById("toast");
+    t.textContent = msg; t.classList.add("show");
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 1800);
+  }
+
+  // ── 翻译面板 ──
+  function openTranslateSheet() {
+    if (translating) return;
+    const sheet = document.getElementById("translate-sheet");
+    sheet.classList.add("open");
+    // 未填 key → 显示去设置提示
+    const hasKey = document.getElementById("key-input").value.trim().length > 0;
+    document.getElementById("need-key").style.display = hasKey ? "none" : "block";
+    if (!hasKey) {
+      document.getElementById("btn-sheet-main").textContent = "前往设置填写 Key";
+    } else {
+      document.getElementById("btn-sheet-main").textContent = "开始翻译";
+    }
+  }
+  function closeSheet() { document.getElementById("translate-sheet").classList.remove("open"); }
+
+  function setTier(t) {
+    tier = t;
+    document.getElementById("seg-flash").classList.toggle("on", t === "flash");
+    document.getElementById("seg-pro").classList.toggle("on", t === "pro");
+  }
+  function toggleThinking() {
+    thinking = !thinking;
+    document.getElementById("sw-thinking").classList.toggle("on", thinking);
+    if (thinking) showToast("思考模式：翻译将更慢并产生额外计费（原型）");
+  }
+
+  function mainAction() {
+    const hasKey = document.getElementById("key-input").value.trim().length > 0;
+    if (!hasKey) { closeSheet(); showView("settings"); return; }  // 跳设置
+    if (translated === TOTAL) { closeSheet(); return; }
+    // 开始 / 续翻
+    translating = true;
+    document.getElementById("progress-area").style.display = "block";
+    document.getElementById("btn-sheet-main").disabled = true;
+    document.getElementById("btn-sheet-main").textContent = "翻译中…";
+    // 模拟混合策略：前 2 块立即完成（首屏优先），其余后台推进
+    let done = translated;
+    const step = () => {
+      if (done >= TOTAL) { finishTranslate(); return; }
+      done++;
+      translated = done;
+      document.getElementById("progress-bar").style.width = (done / TOTAL * 100) + "%";
+      document.getElementById("progress-label").textContent = `已翻译 ${done} / ${TOTAL} 块`;
+      // 渐进注入：显示译文段
+      const zh = document.querySelector(`.zh[data-i="${done - 1}"]`);
+      if (zh) { zh.style.display = "block"; zh.classList.add("fresh"); }
+      const jp = document.querySelector(`.jp[data-i="${done - 1}"]`);
+      if (jp) jp.style.display = "none";
+      timer = setTimeout(step, done <= 2 ? 600 : 900);  // 首屏快、后台慢
+    };
+    step();
+  }
+
+  function finishTranslate() {
+    translating = false;
+    clearTimeout(timer);
+    document.getElementById("progress-label").textContent = "已完成（5 / 5）";
+    document.getElementById("status-text").textContent = "译文已缓存，可随时切换原文";
+    document.getElementById("btn-sheet-main").disabled = false;
+    document.getElementById("btn-sheet-main").textContent = "完成";
+    // 底部按钮变为原文/译文切换
+    const b = document.getElementById("btn-translate");
+    b.textContent = "译文"; b.classList.add("toggling", "active");
+    b.onclick = toggleViewMode;
+    setTimeout(closeSheet, 900);
+  }
+
+  function toggleViewMode() {
+    const b = document.getElementById("btn-translate");
+    const modeZh = b.textContent === "译文";
+    b.textContent = modeZh ? "原文" : "译文";
+    b.classList.toggle("active", !modeZh);
+    document.querySelectorAll(".zh").forEach(el => el.style.display = modeZh ? "none" : "block");
+    document.querySelectorAll(".jp").forEach(el => el.style.display = modeZh ? "block" : "none");
+  }
+
+  // ── 设置页 ──
+  function setDefaultTier(t) {
+    document.querySelectorAll("#view-settings .seg button").forEach((b, i) =>
+      b.classList.toggle("on", (t === "flash" && i === 0) || (t === "pro" && i === 1)));
+    showToast(`默认档位：${t === "flash" ? "标准" : "高质量"}（原型）`);
+  }
+  function toggleKeyVisible() {
+    const inp = document.getElementById("key-input");
+    inp.type = inp.type === "password" ? "text" : "password";
+  }
+  function r18Toggle(sw, which) {
+    if (sw.classList.contains("on")) { sw.classList.remove("on"); return; }
+    // 二次确认（原型：确认框代替正式弹窗）
+    const ok = confirm(which === "r18"
+      ? "开启后翻译 R18 内容：正文将发送至所选 AI 服务商，可能被审核拒绝、API 账号被警告/暂停/封禁，内容可能用于模型训练。风险自负。确认开启？"
+      : "R18G 为法律红线：可能账号被关闭、服务商上报主管部门/执法机构。App 不承担责任。确认开启？");
+    if (ok) { sw.classList.add("on"); document.getElementById(which === "r18" ? "warn-r18" : "warn-r18g").classList.add("show"); }
+  }
+</script>
+</body>
+</html>
