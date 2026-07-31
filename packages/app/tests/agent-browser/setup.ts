@@ -39,9 +39,21 @@ beforeAll(() => {
 });
 
 afterAll(() => {
-  // 强制杀掉当前 namespace 的 daemon 进程
+  // 精准杀当前 namespace 的 daemon（lsof 定位持有本 namespace socket 的进程）。
+  // 注意：不能用 pkill -f 'agent-browser.*daemon' ——
+  // ① 实际进程名是 agent-browser-darwin-arm64（不含 "daemon"），匹配不到；
+  // ② 无差别 pkill 会误杀并行运行的其他测试文件的 daemon。
   try {
-    execSync("pkill -f 'agent-browser.*daemon' 2>/dev/null", { timeout: 3000 });
+    const pid = execSync(`lsof -t "${DAEMON_SOCKET}" 2>/dev/null || true`, {
+      encoding: "utf-8",
+      timeout: 3000,
+    })
+      .trim()
+      .split("\n")[0];
+    if (pid) {
+      execSync(`kill -9 ${pid} 2>/dev/null || true`, { timeout: 3000 });
+      console.log(`[agent-browser] 已清理 namespace daemon (pid ${pid})`);
+    }
   } catch {
     /* ignore */
   }

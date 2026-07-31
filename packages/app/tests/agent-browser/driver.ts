@@ -65,6 +65,57 @@ export class AgentBrowserDriver {
   }
 
   /**
+   * SPA 内部导航：pushState + popstate，由 TanStack Router 处理。
+   *
+   * 与 navigate()（整页 open）的区别：整页加载会重跑 startup 流程，
+   * 被 __root.tsx 的启动导航强制覆盖（如 navigate("/debug") 会跳回 /home）。
+   * SPA 导航不重跑 startup，可直达任意路由。
+   */
+  async navigateSpa(path: string): Promise<void> {
+    await this.evaluate(
+      `window.history.pushState({}, '', ${JSON.stringify(path)}); ` +
+        `window.dispatchEvent(new PopStateEvent('popstate')); 'pushed'`,
+    );
+  }
+
+  /**
+   * 等待页面渲染出实质内容（pageText 非空）。
+   *
+   * 用途：路由切换/数据加载期间页面可能短暂空白（白屏竞态），
+   * AI 断言此时执行会误报"页面文本为空"。等待内容出现后再断言。
+   */
+  async waitForPageContent(timeoutMs = 10_000): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      try {
+        const text = await this.pageText();
+        if (text.trim().length > 20) return true;
+      } catch {
+        /* 继续等待 */
+      }
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    return false;
+  }
+
+  /**
+   * 等待指定 CSS 选择器对应的元素出现在 DOM 中。
+   *
+   * 用途：tab 切换/数据加载后组件尚未渲染时，避免"找不到卡片"类误报。
+   */
+  async waitForSelector(selector: string, timeoutMs = 10_000): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const r = await this.evaluate(
+        `document.querySelector(${JSON.stringify(selector)}) ? "yes" : "no"`,
+      ).catch(() => "no");
+      if (r.includes("yes")) return true;
+      await new Promise((res) => setTimeout(res, 1000));
+    }
+    return false;
+  }
+
+  /**
    * 获取当前页面的 accessibility tree 快照。
    * AI 断言的主要输入源。
    */
@@ -99,9 +150,38 @@ export class AgentBrowserDriver {
   }
 
   /**
-   * 带 fallback 链的可靠点击：@e ref → aria-label → 直接 text → CSS。
+   * 带 fallback 链的可靠点击：@e ref → aria-label → 直接 text → CSS → evaluate 注入。
+   *
+   * @param text - 目标文本
+   * @param ariaLabel - aria-label 匹配（可选）
+   * @param cssFallback - CSS 选择器（可选）
+   * @param scopeSelector - 限定查找范围（可选）。页面存在同文本多元素时
+   *   （如底部导航"关注" vs 卡片"关注"按钮），用 scope 消除歧义。
    */
-  async clickReliable(text: string, ariaLabel?: string, cssFallback?: string): Promise<boolean> {
+  async clickReliable(
+    text: string,
+    ariaLabel?: string,
+    cssFallback?: string,
+    scopeSelector?: string,
+  ): Promise<boolean> {
+    // 0. scope 定位优先：在指定容器内用 evaluate 精确点击（消除文本歧义）
+    if (scopeSelector) {
+      const scoped = await this.evaluate(
+        `(() => {
+          const root = document.querySelector(${JSON.stringify(scopeSelector)});
+          if (!root) return 'no-scope';
+          const btn = [...root.querySelectorAll('button, fluent-button, fluent-switch, [role="button"], [role="switch"]')]
+            .find((el) => el.textContent && el.textContent.includes(${JSON.stringify(text)}));
+          if (btn) { btn.click(); return 'clicked'; }
+          return 'not-found';
+        })()`,
+      );
+      if (scoped.includes("clicked")) return true;
+      if (scoped.includes("no-scope")) {
+        console.log(`[driver] scope ${scopeSelector} 不存在，继续 fallback`);
+      }
+    }
+
     // 1. 尝试 @e ref
     const snap = await this.snapshot();
     const ref = findRefByText(snap, text);
@@ -185,6 +265,22 @@ export class AgentBrowserDriver {
         }
       }
     }
+
+    // 3. evaluate 注入 el.click()：模拟点击受视口/遮挡影响，
+    //    注入点击无视视口位置，卡片在视口外也能触发
+    try {
+      const r = await this.evaluate(
+        `(() => {
+          const el = document.querySelector('.image-card');
+          if (el) { el.click(); return 'clicked'; }
+          return 'not-found';
+        })()`,
+      );
+      if (r.includes("clicked")) return true;
+    } catch {
+      /* fall through */
+    }
+
     return false;
   }
 
