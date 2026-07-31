@@ -76,7 +76,7 @@ Architecture Decision Records live in `/docs/adr/`. Notable ones:
 | 0001 | ProGuard keep strategy for native plugins |
 | 0002 | SSRF URL whitelist for WebView proxy |
 | 0003 | Image cache three-layer design |
-| 0003 (backup security) | refresh_token backup protection — three-layer defense; reuses ADR number 0003 (`0003-backup-security-three-layer-defense.md`, v3.21.5) |
+| 0003 (backup security) | refresh_token backup protection — three-layer defense; reuses ADR number 0003 (`0003-backup-security-three-layer-defense.md`, v3.21.6) |
 | 0004 | 401 concurrent retry with Promise queue |
 | 0006 | TanStack Query adoption |
 | 0007 | TanStack DB for browsing history |
@@ -167,7 +167,7 @@ The repository has been actively refactored through v3.17.x. Key themes in recen
 - **Immediate navigation (v3.20.0, ADR-0038):** Router loaders no longer await network I/O. Pages render chrome + skeleton screens instantly and load data in the component via `onMount`/`createEffect`. Six `*Skeleton` components match each data route's layout. Redundant loader→hydration indirection removed from IllustDetail and NovelDetail.
 - **Splash bridge refactor (v3.21.0):** Splash Screen dismiss migrated from direct AndroidX `core-splashscreen` API to JS-controlled via `AuthPlugin.hideSplash()` Capacitor bridge. `splashBridge.ts` calls the existing AuthPlugin (not `@capacitor/splash-screen`), which sets an `AtomicBoolean` in `MainActivity` to trigger `SplashScreen.setKeepOnScreenCondition`. See [Android Native & Build](/openwiki/integrations/android-native.md#splash-screen-js-bridge).
 - **Rolldown + Oxc minifier (v3.18.0):** Production bundler switched from Vite/terser to Rolldown with Rust-based Oxc minifier. Build comments updated across codebase.
-- **Token storage security hardening (v3.21.5, ADR-0003):** `secureStorage.ts` rewritten into a `restore/save/clear` deep module with backup-integrity marker + native memory sync; `PixivApiPlugin.setRefreshToken` → `syncToken` (memory-only, no disk writes); backup XML rules now exclude the real ciphertext file names (`WSSecureStorageSharedPreferences.xml` + `PictelioPrefs.xml`); new `backupRulesConsistency.test.ts` guards against drift. Grounded in `docs/research/android-token-storage.md` — see [API Layer & Authentication](/openwiki/architecture/api-layer.md#token-persistence--backup-integrity).
+- **Token storage security hardening (v3.21.6, ADR-0003):** `secureStorage.ts` rewritten into a `restore/save/clear` deep module with backup-integrity marker + native memory sync; `PixivApiPlugin.setRefreshToken` → `syncToken` (memory-only, no disk writes); backup XML rules now exclude the real ciphertext file names (`WSSecureStorageSharedPreferences.xml` + `PictelioPrefs.xml`); new `backupRulesConsistency.test.ts` guards against drift. Grounded in `docs/research/android-token-storage.md` — see [API Layer & Authentication](/openwiki/architecture/api-layer.md#token-persistence--backup-integrity).
 
 ## Backlog
 
