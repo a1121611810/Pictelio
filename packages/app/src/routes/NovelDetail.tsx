@@ -48,7 +48,6 @@ import {
   getTranslation,
   setTranslation,
   DEFAULT_TARGET_LANG,
-  DEFAULT_MODEL,
 } from "../utils/translationCache";
 import {
   dsApiKey,
@@ -68,6 +67,10 @@ import {
   getR18Confirmed,
   markR18Confirmed,
   loadTranslateRestrictSettings,
+  loadTierAndThinking,
+  defaultTier,
+  thinkingEnabled,
+  TIER_MODELS,
 } from "../stores/translationStore";
 import { TranslateError } from "../api/translate";
 
@@ -435,11 +438,12 @@ const NovelDetail: Component = () => {
     }
   }
 
-  // 挂载时恢复已保存的 API key 与 R18/R18G 分级开关（冷启动直接进详情页也能用已存配置，
-  // 避免 R18 开关已开却因内存默认 false 被误拦）
+  // 挂载时恢复已保存的 API key、R18/R18G 分级开关、档位与思考开关
+  // （冷启动直接进详情页也能用已存配置，避免 R18 开关已开却因内存默认 false 被误拦）
   onMount(() => {
     void loadDsApiKey();
     void loadTranslateRestrictSettings();
+    void loadTierAndThinking();
   });
 
   // 切章 / URL 变化时重置翻译状态（防旧章译文串章污染）；
@@ -529,15 +533,18 @@ const NovelDetail: Component = () => {
       .filter((b): b is TextBlock => b.type === "text")
       .map((b) => b.index);
 
-    // 缓存命中（决策 #24）：原文 hash 未变 → 直接读译文，不发请求
+    // 档位（S6）：缓存维度与请求 model 统一用实际档位
+    const model = TIER_MODELS[defaultTier()];
+    // 思考开启时跳过缓存读/写：思考与非思考译文语义不同（reasoning 影响质量），
+    // 共享同一缓存 key 会互相污染（review 发现），故思考翻译不查缓存、不写缓存
+    const skipCache = thinkingEnabled();
+
+    // 缓存命中（决策 #24）：原文 hash 未变 → 直接读译文，不发请求（思考模式除外）
     const { default: SparkMD5 } = await import("spark-md5");
     const sourceHash = SparkMD5.hash(texts.join("\n"));
-    const cached = await getTranslation(
-      novelId(),
-      DEFAULT_TARGET_LANG,
-      DEFAULT_MODEL,
-      sourceHash,
-    );
+    const cached = skipCache
+      ? undefined
+      : await getTranslation(novelId(), DEFAULT_TARGET_LANG, model, sourceHash);
     if (cached && cached.length > 0) {
       const map: Record<number, string> = {};
       for (let i = 0; i < cached.length && i < textIndexes.length; i++) {
@@ -565,10 +572,11 @@ const NovelDetail: Component = () => {
         texts,
         {
           apiKey: key,
-          model: "deepseek-v4-flash", // S7 档位选择
+          model,
           sourceLang: sourceLang === "other" ? undefined : sourceLang,
           signal: controller.signal,
           priorityParagraph,
+          thinking: thinkingEnabled(), // S6：思考开关（默认关）
         },
         (p) => {
           if (version !== translateVersion) {
@@ -604,15 +612,9 @@ const NovelDetail: Component = () => {
         setTranslatedParagraphs((prev) => ({ ...prev, ...map }));
       }
       setShowTranslation(true);
-      // 全部块成功且无回退段才写缓存（半成品不写，决策 #24；S4 断点续翻补充）
-      if (failedBlocks === 0 && Object.keys(map).length === texts.length) {
-        await setTranslation(
-          novelId(),
-          DEFAULT_TARGET_LANG,
-          DEFAULT_MODEL,
-          sourceHash,
-          texts.map((_, i) => map[i] ?? ""),
-        );
+      // 全部块成功且无回退段才写缓存（半成品不写，决策 #24；思考模式跳过，防语义污染）
+      if (!skipCache && failedBlocks === 0 && Object.keys(map).length === texts.length) {
+        await setTranslation(novelId(), DEFAULT_TARGET_LANG, model, sourceHash, texts.map((_, i) => map[i] ?? ""));
       }
     } catch (err) {
       if (version !== translateVersion || controller.signal.aborted) {

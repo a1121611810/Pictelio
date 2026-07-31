@@ -104,6 +104,19 @@ describe("requestTranslate (Web fetch 分支)", () => {
     expect(body.temperature).toBe(0.5);
   });
 
+  it("enables thinking mode when payload.thinking is true（思考开关，决策 #22）", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(fetchResponse(200, officialSample()));
+    await requestTranslate({
+      apiKey: "sk-test",
+      model: "deepseek-v4-flash",
+      messages: [{ role: "user", content: "原文" }],
+      thinking: true,
+    });
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(body.thinking).toEqual({ type: "enabled" });
+  });
+
   it("tolerates keep-alive blank lines before the JSON body", async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockResolvedValue(fetchResponse(200, `\n\n: keep-alive\n${officialSample()}\n\n`));

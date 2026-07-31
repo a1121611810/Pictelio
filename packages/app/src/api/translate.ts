@@ -36,6 +36,8 @@ export interface TranslateRequestPayload {
   maxTokens?: number;
   /** 取消信号（透传到 fetch / CapacitorHttp，中止在途请求） */
   signal?: AbortSignal;
+  /** 思考模式：默认 false（disabled，更快/无 reasoning token/temperature 生效）；true = enabled（决策 #22 可开开关） */
+  thinking?: boolean;
 }
 
 export interface TranslateResult {
@@ -175,7 +177,7 @@ export async function requestTranslate(
       body: JSON.stringify({
         model: payload.model,
         messages: payload.messages,
-        thinking: { type: "disabled" },
+        thinking: { type: payload.thinking ? "enabled" : "disabled" },
         temperature: payload.temperature ?? 0.5,
         max_tokens: payload.maxTokens,
       }),

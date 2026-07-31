@@ -28,6 +28,12 @@ import {
   markR18Confirmed,
   getR18Confirmed,
   loadTranslateRestrictSettings,
+  defaultTier,
+  thinkingEnabled,
+  setDefaultTier,
+  setThinkingEnabled,
+  loadTierAndThinking,
+  TIER_MODELS,
 } from "@/stores/translationStore";
 
 const secureGet = vi.mocked(SecureStorage.get);
@@ -177,5 +183,38 @@ describe("R18/R18G 开关持久化（默认关）", () => {
     expect(translateR18()).toBe(true);
     expect(translateR18G()).toBe(false);
     expect(getR18Confirmed()).toBe(true);
+  });
+});
+
+describe("翻译档位与思考开关（S6，决策 #22）", () => {
+  it("defaults to standard tier (flash) with thinking off", () => {
+    expect(defaultTier()).toBe("flash");
+    expect(thinkingEnabled()).toBe(false);
+  });
+
+  it("maps tiers to DeepSeek models", () => {
+    expect(TIER_MODELS.flash).toBe("deepseek-v4-flash");
+    expect(TIER_MODELS.pro).toBe("deepseek-v4-pro");
+  });
+
+  it("persists tier and thinking switches", async () => {
+    prefSet.mockResolvedValue();
+    await setDefaultTier("pro");
+    expect(defaultTier()).toBe("pro");
+    expect(prefSet).toHaveBeenCalledWith({ key: "translation_default_tier", value: "pro" });
+    await setThinkingEnabled(true);
+    expect(thinkingEnabled()).toBe(true);
+    expect(prefSet).toHaveBeenCalledWith({ key: "translation_thinking", value: "true" });
+  });
+
+  it("loads persisted tier and thinking", async () => {
+    prefGet.mockImplementation(async ({ key }: { key: string }) => {
+      if (key === "translation_default_tier") return { value: "pro" };
+      if (key === "translation_thinking") return { value: "true" };
+      return { value: null };
+    });
+    await loadTierAndThinking();
+    expect(defaultTier()).toBe("pro");
+    expect(thinkingEnabled()).toBe(true);
   });
 });

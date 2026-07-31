@@ -15,6 +15,8 @@ export interface TranslateNovelOptions {
   model: TranslateModel;
   sourceLang?: string;
   targetLang?: string;
+  /** 思考模式开关（默认关，决策 #22；true 时协议层传 thinking enabled） */
+  thinking?: boolean;
 }
 
 export interface TranslateChunkOptions extends TranslateNovelOptions {
@@ -169,6 +171,7 @@ export async function translateParagraphs(
       },
       { role: "user", content: buildTranslationUserPrompt(joined) },
     ],
+    thinking: options.thinking,
   });
   return alignParagraphs(result.content, paragraphs);
 }
@@ -260,6 +263,7 @@ export async function translateNovel(
             { role: "user", content: buildTranslationUserPrompt(joined) },
           ],
           signal: options.signal,
+          thinking: options.thinking,
         });
         const { paragraphs: text, fallbackCount } = alignParagraphsWithMeta(res.content, slice);
         return { text, fallback: fallbackCount > 0 };

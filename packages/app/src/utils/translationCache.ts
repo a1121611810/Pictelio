@@ -18,8 +18,6 @@ export const TRANSLATION_STORE = "translations";
 export const MAX_TRANSLATIONS = 200;
 /** 默认目标语言（决策 #22：MVP 日/英 → 简中） */
 export const DEFAULT_TARGET_LANG = "zh-Hans";
-/** 默认模型（决策 #22：标准档） */
-export const DEFAULT_MODEL = "deepseek-v4-flash";
 
 // ─── Types ───
 

@@ -15,6 +15,8 @@ const DS_API_KEY = "ds_api_key";
 const PREF_R18 = "translation_r18";
 const PREF_R18G = "translation_r18g";
 const PREF_R18_CONFIRMED = "translation_r18_confirmed";
+const PREF_TIER = "translation_default_tier";
+const PREF_THINKING = "translation_thinking";
 
 // ── API key（BYOK）──
 
@@ -133,6 +135,52 @@ export async function markR18Confirmed(): Promise<void> {
   const [err] = await tryAsync(Preferences.set({ key: PREF_R18_CONFIRMED, value: "true" }));
   if (err) {
     console.warn("[translationStore] 保存 R18 确认标记失败", err);
+  }
+}
+
+// ── 翻译质量档位与思考开关（决策 #22，S6）──
+
+/** 翻译档位：标准 = deepseek-v4-flash / 高质量 = deepseek-v4-pro */
+export type TranslateTier = "flash" | "pro";
+
+export const TIER_MODELS = {
+  flash: "deepseek-v4-flash",
+  pro: "deepseek-v4-pro",
+} as const;
+
+const [defaultTier, setDefaultTierState] = createSignal<TranslateTier>("flash");
+/** 思考模式：默认关（更快/无 reasoning token 计费/temperature 生效），可开（S6） */
+const [thinkingEnabled, setThinkingEnabledState] = createSignal(false);
+
+export { defaultTier, thinkingEnabled };
+
+/** 恢复档位与思考开关（Preferences 持久化） */
+export async function loadTierAndThinking(): Promise<void> {
+  const [tierErr, tierVal] = await tryAsync(Preferences.get({ key: PREF_TIER }));
+  if (!tierErr && (tierVal?.value === "flash" || tierVal?.value === "pro")) {
+    setDefaultTierState(tierVal.value);
+  }
+  const [thErr, thVal] = await tryAsync(Preferences.get({ key: PREF_THINKING }));
+  if (!thErr && thVal?.value !== undefined) {
+    setThinkingEnabledState(thVal.value === "true");
+  }
+}
+
+/** 设置默认档位（失败仅 warn，不阻断） */
+export async function setDefaultTier(tier: TranslateTier): Promise<void> {
+  setDefaultTierState(tier);
+  const [err] = await tryAsync(Preferences.set({ key: PREF_TIER, value: tier }));
+  if (err) {
+    console.warn("[translationStore] 保存默认档位失败", err);
+  }
+}
+
+/** 设置思考模式开关（失败仅 warn，不阻断） */
+export async function setThinkingEnabled(on: boolean): Promise<void> {
+  setThinkingEnabledState(on);
+  const [err] = await tryAsync(Preferences.set({ key: PREF_THINKING, value: String(on) }));
+  if (err) {
+    console.warn("[translationStore] 保存思考开关失败", err);
   }
 }
 

@@ -13,6 +13,11 @@ import {
   loadTranslateRestrictSettings,
   setTranslateR18,
   setTranslateR18G,
+  defaultTier,
+  thinkingEnabled,
+  setDefaultTier,
+  setThinkingEnabled,
+  loadTierAndThinking,
 } from "@/stores/translationStore";
 import { clearTranslationCache } from "@/utils/translationCache";
 import { tryAsync } from "@/utils/tryAsync";
@@ -27,6 +32,7 @@ const SettingsTranslate: Component = () => {
   onMount(() => {
     void loadDsApiKey().then(() => setInputKey(dsApiKey() ?? ""));
     void loadTranslateRestrictSettings();
+    void loadTierAndThinking();
   });
 
   async function handleSave() {
@@ -145,6 +151,65 @@ const SettingsTranslate: Component = () => {
               </span>
             )}
           </Show>
+        </div>
+
+        {/* 翻译质量与思考（S6，决策 #22）：默认档位 + 思考开关 */}
+        <div class="py-2 mt-2">
+          <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug mb-2">
+            翻译质量与思考
+          </p>
+
+          <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug mb-1">
+            默认翻译质量（档位切换入口后续版本提供）
+          </p>
+          <div class="flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-1.5 gap-1">
+            <button
+              type="button"
+              class="flex-1 py-2 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all active:scale-[0.98] appearance-none border-none outline-none cursor-pointer"
+              classList={{
+                "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
+                  defaultTier() === "flash",
+                "bg-transparent text-[var(--colorNeutralForeground2)]": defaultTier() !== "flash",
+              }}
+              onClick={() => void setDefaultTier("flash")}
+            >
+              标准
+              <small class="block font-normal [font-size:var(--fontSizeBase100)] text-[var(--colorNeutralForeground3)]">
+                v4-flash · ¥1/2 每百万
+              </small>
+            </button>
+            <button
+              type="button"
+              class="flex-1 py-2 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all active:scale-[0.98] appearance-none border-none outline-none cursor-pointer"
+              classList={{
+                "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
+                  defaultTier() === "pro",
+                "bg-transparent text-[var(--colorNeutralForeground2)]": defaultTier() !== "pro",
+              }}
+              onClick={() => void setDefaultTier("pro")}
+            >
+              高质量
+              <small class="block font-normal [font-size:var(--fontSizeBase100)] text-[var(--colorNeutralForeground3)]">
+                v4-pro · ¥3/6 每百万
+              </small>
+            </button>
+          </div>
+
+          <div class="flex items-center justify-between py-2 mt-1">
+            <div>
+              <p class="[font-size:var(--fontSizeBase300)] font-medium text-[var(--colorNeutralForeground1)] leading-snug">
+                启用思考模式
+              </p>
+              <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
+                默认关。开启后翻译更慢、产生额外 reasoning token 计费、temperature 不生效
+              </p>
+            </div>
+            <fluent-switch
+              checked={thinkingEnabled()}
+              on:change={() => void setThinkingEnabled(!thinkingEnabled())}
+              aria-label="启用思考模式"
+            />
+          </div>
         </div>
 
         {/* 敏感内容翻译（S5）：R18/R18G 双开关，默认关（决策 #23） */}
