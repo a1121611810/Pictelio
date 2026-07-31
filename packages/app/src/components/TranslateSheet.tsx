@@ -1,7 +1,7 @@
 /**
  * 详情页翻译面板（底部 sheet）。
  * 状态：未配 key 引导 / 待翻译（开始按钮）/ 翻译中（进度条）/ 失败（「未翻译」段 + 补翻按钮）。
- * S2 进度条；S4 失败信息 + 断点续翻；档位/思考开关在设置页（S6），详情页临时切换为 S7。
+ * S2 进度条；S4 失败信息 + 断点续翻；S7 详情页临时档位切换（不污染设置页全局默认）。
  */
 import { type Component, Show } from "solid-js";
 import {
@@ -10,6 +10,7 @@ import {
   translationError,
   translationProgress,
   failedParagraphs,
+  type TranslateTier,
 } from "@/stores/translationStore";
 
 interface TranslateSheetProps {
@@ -17,6 +18,12 @@ interface TranslateSheetProps {
   onClose: () => void;
   /** 开始翻译 / 补翻失败块（由 NovelDetail 提供，持有 blocks；retryFailed = 仅补翻失败段） */
   onStartTranslate: (retryFailed?: boolean) => void;
+  /** 详情页临时档位（S7）：null = 跟随全局默认 */
+  tier?: TranslateTier | null;
+  /** 设置页全局默认档位 */
+  defaultTier?: TranslateTier;
+  /** 选择临时档位（null = 恢复全局默认） */
+  onSelectTier?: (tier: TranslateTier | null) => void;
 }
 
 /** 主按钮文案（模块级：仅依赖 store 信号，避免组件内重复创建） */
@@ -80,6 +87,62 @@ const TranslateSheet: Component<TranslateSheetProps> = (props) => {
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground2)] leading-relaxed mb-3">
               将小说正文翻译为简体中文。内容将发送至 DeepSeek（你选择的模型），按量计费。
             </p>
+          </Show>
+
+          {/* 详情页临时档位（S7）：不污染设置页全局默认 */}
+          <Show when={props.onSelectTier && Boolean(dsApiKey())}>
+            <div class="mb-3">
+              <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug mb-1">
+                翻译质量（本页临时）
+              </p>
+              <div class="flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-1.5 gap-1">
+                <button
+                  type="button"
+                  class="flex-1 py-2 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all active:scale-[0.98] appearance-none border-none outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  classList={{
+                    "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
+                      (props.tier ?? props.defaultTier) === "flash",
+                    "bg-transparent text-[var(--colorNeutralForeground2)]":
+                      (props.tier ?? props.defaultTier) !== "flash",
+                  }}
+                  disabled={translating()}
+                  aria-pressed={(props.tier ?? props.defaultTier) === "flash"}
+                  onClick={() =>
+                    // 再次点击当前临时档位 → 恢复跟随全局默认（null）
+                    props.tier === "flash"
+                      ? props.onSelectTier?.(null)
+                      : props.onSelectTier?.("flash")
+                  }
+                >
+                  标准
+                  <small class="block font-normal [font-size:var(--fontSizeBase100)] text-[var(--colorNeutralForeground3)]">
+                    v4-flash · ¥1/2
+                  </small>
+                </button>
+                <button
+                  type="button"
+                  class="flex-1 py-2 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all active:scale-[0.98] appearance-none border-none outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  classList={{
+                    "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
+                      (props.tier ?? props.defaultTier) === "pro",
+                    "bg-transparent text-[var(--colorNeutralForeground2)]":
+                      (props.tier ?? props.defaultTier) !== "pro",
+                  }}
+                  disabled={translating()}
+                  aria-pressed={(props.tier ?? props.defaultTier) === "pro"}
+                  onClick={() =>
+                    props.tier === "pro"
+                      ? props.onSelectTier?.(null)
+                      : props.onSelectTier?.("pro")
+                  }
+                >
+                  高质量
+                  <small class="block font-normal [font-size:var(--fontSizeBase100)] text-[var(--colorNeutralForeground3)]">
+                    v4-pro · ¥3/6
+                  </small>
+                </button>
+              </div>
+            </div>
           </Show>
 
           <Show when={translationError()}>

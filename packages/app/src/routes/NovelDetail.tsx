@@ -75,6 +75,7 @@ import {
   setFailedParagraphs,
   translationUsedThinking,
   setTranslationUsedThinking,
+  type TranslateTier,
 } from "../stores/translationStore";
 import { TranslateError } from "../api/translate";
 
@@ -419,6 +420,14 @@ const NovelDetail: Component = () => {
   // 源语言为中文时隐藏翻译入口（规格 US25）
   const canTranslate = createMemo(() => detectNovelLanguage(searchText()) !== "zh");
   const [translateOpen, setTranslateOpen] = createSignal(false);
+  /** 详情页临时档位（S7）：null = 跟随设置页全局默认档；临时切换不污染全局 */
+  const [translateTier, setTranslateTier] = createSignal<TranslateTier | null>(null);
+
+  function handleSelectTier(tier: TranslateTier | null): void {
+    setTranslateTier(tier);
+    // 档位变化 → 旧档位译文不再适用，重置翻译状态（重新翻译；缓存按档位隔离）
+    resetTranslationState();
+  }
 
   // 竞态防护 generation counter：必须声明在引用它的 createEffect 之前（TDZ）
   let translateVersion = 0;
@@ -546,8 +555,8 @@ const NovelDetail: Component = () => {
     const texts = targets.map((t) => t.text);
     const baseIndexes = targets.map((t) => t.index);
 
-    // 档位（S6）：缓存维度与请求 model 统一用实际档位
-    const model = TIER_MODELS[defaultTier()];
+    // 档位（S6 全局默认 + S7 详情页临时切换）：缓存维度与请求 model 统一用实际档位
+    const model = TIER_MODELS[translateTier() ?? defaultTier()];
     // 缓存策略：思考模式读/写都跳过（语义污染）；补翻模式跳过读（失败块无缓存）但
     // 允许写（补翻全成功后固化完整译文，避免下次全量重翻重复计费——review 发现）
     const skipReadCache = thinkingEnabled() || retryFailed;
@@ -1109,6 +1118,9 @@ const NovelDetail: Component = () => {
                 isOpen={translateOpen()}
                 onClose={() => setTranslateOpen(false)}
                 onStartTranslate={(retryFailed) => void startTranslate(retryFailed ?? false)}
+                tier={translateTier()}
+                defaultTier={defaultTier()}
+                onSelectTier={handleSelectTier}
               />
 
               {/* 首次翻译 R18/R18G 风险确认（S5，决策 #23） */}
