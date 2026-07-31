@@ -20,6 +20,10 @@ import {
   showTranslation,
   setShowTranslation,
   resetTranslationState,
+  failedParagraphs,
+  setFailedParagraphs,
+  translationUsedThinking,
+  setTranslationUsedThinking,
   decideTranslatePolicy,
   translateR18,
   translateR18G,
@@ -119,6 +123,23 @@ describe("详情页翻译显示状态", () => {
     resetTranslationState();
     expect(translatedParagraphs()).toEqual({});
     expect(showTranslation()).toBe(false);
+  });
+
+  it("tracks failed paragraphs and clears them on reset (S4 断点续翻)", () => {
+    setFailedParagraphs(new Set([2, 5]));
+    expect(failedParagraphs().has(2)).toBe(true);
+    expect(failedParagraphs().has(5)).toBe(true);
+    expect(failedParagraphs().has(0)).toBe(false);
+    resetTranslationState();
+    expect(failedParagraphs().size).toBe(0);
+  });
+
+  it("tracks thinking usage and clears on reset (S4 防思考译文混入非思考缓存)", () => {
+    expect(translationUsedThinking()).toBe(false);
+    setTranslationUsedThinking(true);
+    expect(translationUsedThinking()).toBe(true);
+    resetTranslationState();
+    expect(translationUsedThinking()).toBe(false);
   });
 });
 

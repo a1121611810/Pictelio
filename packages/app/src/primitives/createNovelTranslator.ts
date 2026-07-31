@@ -51,6 +51,8 @@ export interface ChunkProgress {
   paragraphs: Array<{ index: number; text: string }>;
   /** 本块是否存在回退原文段（译文段数 < 原文，S3 用于阻止固化半成品缓存） */
   fallback?: boolean;
+  /** 本块回退原文段的相对索引（S4「未翻译」标记用） */
+  fallbackIndexes?: number[];
 }
 
 export interface NovelTranslatorDeps {
@@ -241,7 +243,9 @@ export async function translateNovel(
   const total = chunks.length;
   let done = 0;
 
-  async function fetchChunk(range: ChunkRange): Promise<{ text: string[]; fallback: boolean }> {
+  async function fetchChunk(
+    range: ChunkRange,
+  ): Promise<{ text: string[]; fallback: boolean; fallbackIndexes: number[] }> {
     const slice = paragraphs.slice(range.start, range.end);
     const joined = slice.join("\n\n");
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -266,7 +270,12 @@ export async function translateNovel(
           thinking: options.thinking,
         });
         const { paragraphs: text, fallbackCount } = alignParagraphsWithMeta(res.content, slice);
-        return { text, fallback: fallbackCount > 0 };
+        // 回退段 = 译文段数不足时末尾填充原文的段（相对索引）
+        const fallbackIndexes = Array.from(
+          { length: fallbackCount },
+          (_, i) => slice.length - fallbackCount + i,
+        );
+        return { text, fallback: fallbackCount > 0, fallbackIndexes };
       } catch (err) {
         if (isAbortError(err)) {
           throw err;
@@ -294,7 +303,7 @@ export async function translateNovel(
       const chunkIndex = order[idx];
       const range = chunks[chunkIndex];
       try {
-        const { text: translated, fallback } = await fetchChunk(range);
+        const { text: translated, fallback, fallbackIndexes } = await fetchChunk(range);
         const chunkParas: Array<{ index: number; text: string }> = [];
         for (let i = 0; i < translated.length; i++) {
           result[range.start + i] = translated[i];
@@ -307,6 +316,7 @@ export async function translateNovel(
           end: range.end,
           paragraphs: chunkParas,
           fallback,
+          fallbackIndexes,
         });
       } catch (err) {
         if (isAbortError(err) || options.signal?.aborted) {

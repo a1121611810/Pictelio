@@ -71,6 +71,10 @@ import {
   defaultTier,
   thinkingEnabled,
   TIER_MODELS,
+  failedParagraphs,
+  setFailedParagraphs,
+  translationUsedThinking,
+  setTranslationUsedThinking,
 } from "../stores/translationStore";
 import { TranslateError } from "../api/translate";
 
@@ -465,7 +469,7 @@ const NovelDetail: Component = () => {
     });
   });
 
-  async function startTranslate(): Promise<void> {
+  async function startTranslate(retryFailed = false): Promise<void> {
     const key = dsApiKey();
     if (!key) {
       setTranslateOpen(false);
@@ -523,32 +527,42 @@ const NovelDetail: Component = () => {
       }
     }
 
-    const texts = blocks()
+    // 目标段落：全量翻译或补翻失败段落（S4 断点续翻）
+    const allTexts = blocks()
       .filter((b): b is TextBlock => b.type === "text")
       .map((b) => b.text);
-    if (texts.length === 0) {
-      return;
-    }
-    const textIndexes = blocks()
+    const allIndexes = blocks()
       .filter((b): b is TextBlock => b.type === "text")
       .map((b) => b.index);
+    if (allTexts.length === 0) {
+      return;
+    }
+    const failedNow = new Set<number>(failedParagraphs());
+    const pairs = allTexts.map((text, i) => ({ index: allIndexes[i], text }));
+    const targets = retryFailed ? pairs.filter((p) => failedNow.has(p.index)) : pairs;
+    if (targets.length === 0) {
+      return; // 补翻模式但没有失败段落
+    }
+    const texts = targets.map((t) => t.text);
+    const baseIndexes = targets.map((t) => t.index);
 
     // 档位（S6）：缓存维度与请求 model 统一用实际档位
     const model = TIER_MODELS[defaultTier()];
-    // 思考开启时跳过缓存读/写：思考与非思考译文语义不同（reasoning 影响质量），
-    // 共享同一缓存 key 会互相污染（review 发现），故思考翻译不查缓存、不写缓存
-    const skipCache = thinkingEnabled();
+    // 缓存策略：思考模式读/写都跳过（语义污染）；补翻模式跳过读（失败块无缓存）但
+    // 允许写（补翻全成功后固化完整译文，避免下次全量重翻重复计费——review 发现）
+    const skipReadCache = thinkingEnabled() || retryFailed;
+    const skipWriteCache = thinkingEnabled();
 
-    // 缓存命中（决策 #24）：原文 hash 未变 → 直接读译文，不发请求（思考模式除外）
+    // 缓存命中（决策 #24）：原文 hash 未变 → 直接读译文，不发请求（思考/补翻模式除外）
     const { default: SparkMD5 } = await import("spark-md5");
-    const sourceHash = SparkMD5.hash(texts.join("\n"));
-    const cached = skipCache
+    const sourceHash = SparkMD5.hash(allTexts.join("\n"));
+    const cached = skipReadCache
       ? undefined
       : await getTranslation(novelId(), DEFAULT_TARGET_LANG, model, sourceHash);
     if (cached && cached.length > 0) {
       const map: Record<number, string> = {};
-      for (let i = 0; i < cached.length && i < textIndexes.length; i++) {
-        map[textIndexes[i]] = cached[i];
+      for (let i = 0; i < cached.length && i < allIndexes.length; i++) {
+        map[allIndexes[i]] = cached[i];
       }
       batch(() => {
         setTranslatedParagraphs(map);
@@ -564,11 +578,15 @@ const NovelDetail: Component = () => {
     setTranslating(true);
     setTranslationError(null);
     setTranslationProgress({ done: 0, total: 0 });
+    if (thinkingEnabled()) {
+      // 本章发生过思考翻译 → 后续任何写缓存都必须跳过（防思考译文混入非思考缓存）
+      setTranslationUsedThinking(true);
+    }
     try {
-      const sourceLang = detectNovelLanguage(texts.join("\n"));
+      const sourceLang = detectNovelLanguage(allTexts.join("\n"));
       const priorityParagraph = virtualLayout.currentCharIndex()?.paragraphIndex;
-      let failedBlocks = 0; // 失败块 + 回退原文块（阻止半成品固化进缓存）
-      const map = await translateNovel(
+      let fallbackBlocks = 0; // 回退原文块（段数不足，阻止缓存固化）
+      await translateNovel(
         texts,
         {
           apiKey: key,
@@ -582,19 +600,33 @@ const NovelDetail: Component = () => {
           if (version !== translateVersion) {
             return;
           }
-          if (p.paragraphs.length === 0 || p.fallback) {
-            failedBlocks++;
+          if (p.fallback) {
+            fallbackBlocks++;
           }
           setTranslationProgress({ done: p.done, total: p.total });
           if (p.paragraphs.length === 0) {
+            // 失败块：该区间段落标记「未翻译」（相对 index → 全局），供补翻
+            for (let i = p.start; i < p.end; i++) {
+              failedNow.add(baseIndexes[i]);
+            }
             return;
           }
-          // 渐进注入：本块译文并入段落 map（首屏块完成即显示部分译文）
+          // 回退原文段（段数不足）同样标记「未翻译」（相对 → 全局）
+          const fallbackRel = new Set(p.fallbackIndexes ?? []);
+          for (const rel of fallbackRel) {
+            failedNow.add(baseIndexes[rel]);
+          }
+          // 成功块：译文并入（相对 → 全局），并从失败集合移除（补翻成功；
+          // 注意：回退段需排除——它们的 text 是原文占位，不能被误判为补翻成功）
           batch(() => {
             setTranslatedParagraphs((prev) => {
               const next = { ...prev };
               for (const para of p.paragraphs) {
-                next[para.index] = para.text;
+                const global = baseIndexes[para.index];
+                next[global] = para.text;
+                if (!fallbackRel.has(para.index)) {
+                  failedNow.delete(global);
+                }
               }
               return next;
             });
@@ -607,14 +639,23 @@ const NovelDetail: Component = () => {
       if (version !== translateVersion) {
         return;
       }
-      // 最终兜底合并（onProgress 已逐块写入，此处对齐完整结果）
-      if (Object.keys(map).length > 0) {
-        setTranslatedParagraphs((prev) => ({ ...prev, ...map }));
-      }
+      setFailedParagraphs(new Set(failedNow));
       setShowTranslation(true);
-      // 全部块成功且无回退段才写缓存（半成品不写，决策 #24；思考模式跳过，防语义污染）
-      if (!skipCache && failedBlocks === 0 && Object.keys(map).length === texts.length) {
-        await setTranslation(novelId(), DEFAULT_TARGET_LANG, model, sourceHash, texts.map((_, i) => map[i] ?? ""));
+      // 全部目标块成功、无失败/回退 → 写全量缓存（半成品不写，决策 #24；
+      // 本章用过思考翻译 → 跳过（思考译文不得混入非思考缓存，review 决策））
+      const complete = failedNow.size === 0 && fallbackBlocks === 0;
+      if (!skipWriteCache && complete && !translationUsedThinking()) {
+        const fullMap = translatedParagraphs();
+        const allCovered = allIndexes.every((idx) => fullMap[idx] !== undefined);
+        if (allCovered) {
+          await setTranslation(
+            novelId(),
+            DEFAULT_TARGET_LANG,
+            model,
+            sourceHash,
+            allTexts.map((_, i) => fullMap[allIndexes[i]] ?? allTexts[i]),
+          );
+        }
       }
     } catch (err) {
       if (version !== translateVersion || controller.signal.aborted) {
@@ -701,6 +742,26 @@ const NovelDetail: Component = () => {
     }
 
     return <>{nodes}</>;
+  }
+
+  /**
+   * 渲染段落：包装高亮渲染，译文模式下失败段落追加「未翻译」标记（S4）。
+   * 失败段落 map 无译文 → text 为原文；标记引导用户知晓该段未翻译、可补翻。
+   */
+  function renderParagraph(paragraphIndex: number, text: string): JSX.Element {
+    const isFailed = showTranslation() && failedParagraphs().has(paragraphIndex);
+    const content = renderParagraphWithHighlights(paragraphIndex, text);
+    if (!isFailed) {
+      return content;
+    }
+    return (
+      <>
+        {content}
+        <span class="[font-size:var(--fontSizeBase100)] text-[var(--colorStatusDangerForeground1)] ml-1 align-super">
+          〔未翻译〕
+        </span>
+      </>
+    );
   }
 
   // ── 阅读进度持久化 ──
@@ -1002,7 +1063,7 @@ const NovelDetail: Component = () => {
                                     setImageViewerIndex(imageIndex);
                                     setImageViewerOpen(true);
                                   }}
-                                  renderParagraph={renderParagraphWithHighlights}
+                                  renderParagraph={renderParagraph}
                                 />
                               );
                             }}
@@ -1047,7 +1108,7 @@ const NovelDetail: Component = () => {
               <TranslateSheet
                 isOpen={translateOpen()}
                 onClose={() => setTranslateOpen(false)}
-                onStartTranslate={() => void startTranslate()}
+                onStartTranslate={(retryFailed) => void startTranslate(retryFailed ?? false)}
               />
 
               {/* 首次翻译 R18/R18G 风险确认（S5，决策 #23） */}

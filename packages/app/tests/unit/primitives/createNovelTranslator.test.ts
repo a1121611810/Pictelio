@@ -278,17 +278,19 @@ describe("translateNovel（分块并发管线）", () => {
   });
 
   it("flags fallback blocks (translated fewer paragraphs than input) via progress", async () => {
-    // 单块返回 1 段译文，输入 3 段 → 回退 2 段 → onProgress.fallback === true
+    // 单块返回 1 段译文，输入 3 段 → 回退 2 段 → onProgress.fallback === true + fallbackIndexes 指向末 2 段
     const requestTranslate = vi.fn().mockResolvedValue({ content: "只有一段译文", finishReason: "stop" });
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const progress: Array<{ fallback?: boolean }> = [];
+    const progress: Array<{ fallback?: boolean; fallbackIndexes?: number[] }> = [];
     await translateNovel(
       ["段一", "段二", "段三"],
       baseOpts(),
-      (p) => progress.push({ fallback: p.fallback }),
+      (p) => progress.push({ fallback: p.fallback, fallbackIndexes: p.fallbackIndexes }),
       makeDeps(requestTranslate),
     );
     expect(progress.some((p) => p.fallback === true)).toBe(true);
+    const fb = progress.find((p) => p.fallback === true);
+    expect(fb?.fallbackIndexes).toEqual([1, 2]); // 末 2 段回退原文
     warnSpy.mockRestore();
   });
 

@@ -1,7 +1,7 @@
 /**
- * 详情页翻译面板（底部 sheet）—— S1 最小版。
- * 状态：未配 key 引导 / 待翻译（开始按钮）/ 翻译中 / 错误。
- * S6 扩展：档位选择 / 思考开关；S2 扩展：进度条。
+ * 详情页翻译面板（底部 sheet）。
+ * 状态：未配 key 引导 / 待翻译（开始按钮）/ 翻译中（进度条）/ 失败（「未翻译」段 + 补翻按钮）。
+ * S2 进度条；S4 失败信息 + 断点续翻；档位/思考开关在设置页（S6），详情页临时切换为 S7。
  */
 import { type Component, Show } from "solid-js";
 import {
@@ -9,19 +9,34 @@ import {
   translating,
   translationError,
   translationProgress,
+  failedParagraphs,
 } from "@/stores/translationStore";
 
 interface TranslateSheetProps {
   isOpen: boolean;
   onClose: () => void;
-  /** 开始翻译（由 NovelDetail 提供，持有 blocks） */
-  onStartTranslate: () => void;
+  /** 开始翻译 / 补翻失败块（由 NovelDetail 提供，持有 blocks；retryFailed = 仅补翻失败段） */
+  onStartTranslate: (retryFailed?: boolean) => void;
+}
+
+/** 主按钮文案（模块级：仅依赖 store 信号，避免组件内重复创建） */
+function primaryLabel(): string {
+  if (!dsApiKey()) {
+    return "前往设置填写 Key";
+  }
+  if (translating()) {
+    return "翻译中…";
+  }
+  if (failedParagraphs().size > 0) {
+    return `补翻失败块（${failedParagraphs().size} 段）`;
+  }
+  return "开始翻译";
 }
 
 const TranslateSheet: Component<TranslateSheetProps> = (props) => {
   function handlePrimary() {
-    // 统一由父组件处理：未配 key → 跳设置页；已配 key → 执行翻译
-    props.onStartTranslate();
+    // 有失败段且非翻译中 → 补翻；否则首次翻译
+    props.onStartTranslate(failedParagraphs().size > 0 && !translating());
   }
 
   return (
@@ -97,6 +112,13 @@ const TranslateSheet: Component<TranslateSheetProps> = (props) => {
             </Show>
           </Show>
 
+          {/* 失败信息 + 补翻（S4）：翻译完成后有失败段 → 提示可补翻 */}
+          <Show when={!translating() && failedParagraphs().size > 0}>
+            <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorStatusDangerForeground1)] bg-[var(--colorStatusDangerBackground1)] rounded-[var(--borderRadiusMedium)] px-3 py-2 mb-3">
+              {failedParagraphs().size} 段翻译失败（正文中已标记「未翻译」）。可补翻失败块，成功段落不会重复计费。
+            </p>
+          </Show>
+
           <button
             type="button"
             class="w-full py-3 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase300)] font-semibold transition-all active:scale-[0.98] appearance-none border-none outline-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
@@ -109,7 +131,7 @@ const TranslateSheet: Component<TranslateSheetProps> = (props) => {
             disabled={translating()}
             onClick={handlePrimary}
           >
-            {!dsApiKey() ? "前往设置填写 Key" : translating() ? "翻译中…" : "开始翻译"}
+            {primaryLabel()}
           </button>
         </div>
       </div>

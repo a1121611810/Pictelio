@@ -208,10 +208,21 @@ export interface TranslationProgress {
 export const [translationProgress, setTranslationProgress] =
   createSignal<TranslationProgress | null>(null);
 
+/** 失败段落 index 集合（S4：「未翻译」标记 + 断点续翻；段落索引 = TextBlock.index） */
+export const [failedParagraphs, setFailedParagraphs] =
+  createSignal<ReadonlySet<number>>(new Set());
+
+/** 本章是否发生过思考模式翻译（S4 review：思考译文不得固化进非思考缓存） */
+const [translationUsedThinking, setTranslationUsedThinking] = createSignal(false);
+
+export { translationUsedThinking, setTranslationUsedThinking };
+
 /** 切换章节 / 离开详情页时重置翻译状态（防串章污染） */
 export function resetTranslationState(): void {
   setTranslatedParagraphs({});
   setShowTranslation(false);
   setTranslationError(null);
   setTranslationProgress(null);
+  setFailedParagraphs(new Set<number>());
+  setTranslationUsedThinking(false);
 }
