@@ -44,4 +44,6 @@
 
 **自动化视觉验证**（ADR-0047）：6 页面在默认浏览器（Vivaldi 持久 profile）+ 登录态真实数据下全部验证通过；探测必须穿透 lynx-view 内 iframe/shadow（详见"渲染位置"术语）。
 
-**推荐列表卡片布局修复**（ADR-0048，提交 `<待定>`）：`Recommended.vue` 瀑布流卡片禁用 `w-full`（宽度交 list 引擎约束为列宽）、方形缩略图用 `aspect-[1/1]` 方形容器 + `aspectFill`、卡片间距用 list 官方 `list-main-axis-gap`/`list-cross-axis-gap`（vue-lynx `:style` 对象绑定）。**Tailwind class 改动后 lynx 样式表不热更新，必须整页刷新验证**（HMR 只更新 DOM class，不更新 shadowRoot 内注入的编译 CSS）。
+**推荐列表卡片布局修复**（ADR-0048，提交 `a9274aa`）：`Recommended.vue` 瀑布流卡片禁用 `w-full`（宽度交 list 引擎约束为列宽）、方形缩略图用 `aspect-[1/1]` 方形容器 + `aspectFill`、卡片间距用 list 官方 `list-main-axis-gap`/`list-cross-axis-gap`（vue-lynx `:style` 对象绑定）。**Tailwind class 改动后 lynx 样式表不热更新，必须整页刷新验证**（HMR 只更新 DOM class，不更新 shadowRoot 内注入的编译 CSS）。
+
+**详情页大图修复 + 骨架屏**（提交 `d62d1e2`）：`IllustDetail.vue` 大图改用 API 宽高比动态 `aspect-ratio` + `aspectFill`（widthFix 不存在导致高度 0 的同类坑）；推荐列表与详情页补 shimmer 骨架屏（`App.vue` 全局 `@keyframes shimmer` + `linear-gradient`，web-core 实测支持，原生待 #41 验证）。

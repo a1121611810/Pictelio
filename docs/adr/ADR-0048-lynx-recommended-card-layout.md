@@ -34,6 +34,8 @@
 
 `min-h-[40vw]` 保底**保留**：防 `aspect-ratio` 在图片加载前/不支持时高度塌陷（scrolltolower 无限加载回归，见 ADR-0045）。
 
+**延伸应用——详情页大图**（`IllustDetail.vue`）：原用 `widthFix` mode（lynx 不存在 → 回退 fill → 高度 0 → 图片不可见）。改为 API 返回的 `illust.width / illust.height` 动态 `aspect-ratio` + `aspectFill`——容器按原图比例，竖图/横图均完整显示。与列表卡片同机制，仅比例来源不同（列表用方形固定 1/1，详情用真实宽高比）。
+
 ### 3. 卡片间距用 list 官方 gap 属性
 
 `list-item` 的 margin/padding **不参与瀑布流布局**（行列间距均不生效），且 **list-item 内部任何 `view` 包裹会导致引擎定位计算崩**（全部 item 重叠在起点——margin、padding、内部 view 三个方向实测均失败）。间距改用 `<list>` 官方属性：

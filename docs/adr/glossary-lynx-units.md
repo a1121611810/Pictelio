@@ -16,7 +16,7 @@
 | **--vw-unit / --vh-unit** | web-core 的 vw/vh 换算变量（`1cqw` / `1cqh`），同样基于容器查询。 |
 | **transformVW / transformVH / transformREM** | `lynx-view` 可选属性（默认关闭）。**关闭时 vw/vh/rem 不经过变量链，由浏览器原生解析**——这是 vw 在 web 预览可靠的原因。 |
 | **token_transformer.rs** | web-core 的样式单位转换器（Rust wasm），把 rpx/vw/vh/rem/ppx 统一转成 `calc(N * var(--xxx-unit))` 模板。 |
-| **auto-size** | `<image>` 组件的原生属性：不显式设宽高时按图片固有宽高比自适应。**web-core 下为 `display: contents`，不参与尺寸计算（失效）**。已不用于推荐页封面——方形缩略图改用 `aspect-ratio: 1/1` 方形容器（见 ADR-0048）。 |
+| **auto-size** | `<image>` 组件的原生属性：不显式设宽高时按图片固有宽高比自适应。**web-core 下为 `display: contents`，不参与尺寸计算（失效）**。已不用于封面/大图——方形缩略图用 `aspect-ratio: 1/1`、详情大图用 API 宽高比动态 `aspect-ratio`（见 ADR-0048）。 |
 | **web-core** | Lynx 的 Web 模拟渲染层（`@lynx-js/web-core`），运行在浏览器，是 web 预览（`__web_preview`）的实现。 |
 
 ## 换算速查（375 设计稿）
