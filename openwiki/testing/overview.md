@@ -9,6 +9,8 @@ tags: [testing, vitest, agent-browser, e2e, unit-tests]
 
 Pictelio uses two active testing tiers. Previously there were component-level browser tests (Vitest browser mode) and Playwright E2E — both have been fully migrated to agent-browser per [ADR-0034](/docs/adr/ADR-0034-migrate-playwright-e2e-to-agent-browser.md) and [ADR-0035](/docs/adr/ADR-0035-migrate-component-tests-to-e2e-and-unit.md). Tests live under `/packages/app/tests/`. The canonical conventions are documented in `/packages/app/tests/TESTING.md`.
 
+The `app-lynx` package has its own separate test suite at [`/packages/app-lynx/tests/unit.test.ts`](/packages/app-lynx/tests/unit.test.ts) — 19 unit test cases covering image URL rewriting, error classification, OAuth error recognition, URL rewriting, novel body extraction, and route matching (Vitest, run via `pnpm --filter pictelio-app-lynx test`).
+
 ```mermaid
 flowchart TD
     U["Unit Tests (vitest.config.ts)"] --> S["Pure logic: API, utils, stores, router"]

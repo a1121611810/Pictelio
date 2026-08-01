@@ -1,7 +1,7 @@
 ---
 type: Concept
 title: Architecture Overview
-description: High-level architecture of Pictelio — a SolidJS SPA with Capacitor Android native runtime. Covers monorepo layout, boot sequence, routing, build tooling, CSS architecture, and design system.
+description: High-level architecture of Pictelio — a SolidJS SPA with Capacitor Android native runtime, plus a parallel vue-lynx MVP client. Covers monorepo layout, boot sequence, routing, build tooling, CSS architecture, and design system.
 tags: [architecture, pictelio, solidjs, capacitor, monorepo]
 ---
 
@@ -15,6 +15,7 @@ tags: [architecture, pictelio, solidjs, capacitor, monorepo]
 |---------|----------|---------|
 | `pictelio-app` | `/packages/app/` | SolidJS SPA — the core application |
 | `pictelio-website` | `/packages/website/` | Astro landing page (GitHub Pages) |
+| `pictelio-app-lynx` | `/packages/app-lynx/` | vue-lynx MVP on ReactLynx runtime — parallel rendering client |
 
 Root `package.json` delegates all commands via `vp run --filter`. Build tooling uses **vite-plus** (`vp` CLI), which wraps Vite with oxlint, oxfmt, and vitest.
 
@@ -192,6 +193,44 @@ Font sizes use fluid `clamp(rem + vw)` via UnoCSS preflights, defined in `/packa
 **Credentials injection:** Pixiv API credentials are stored in `credentials.json5` (gitignored). `vite.config.ts` splits them into `__CREDENTIALS__` (full, for native plugins) and `__PUBLIC_CONFIG__` (non-sensitive, for module code). Sensitive fields are never inlined into the production JS bundle.
 
 **Proxy:** Web dev mode uses a Vite proxy for `/pixiv-img` to Pixiv's image CDN. Proxy URL is read from `https_proxy`/`HTTP_PROXY` env vars or defaults to `http://127.0.0.1:10808`.
+
+## app-lynx (vue-lynx Client)
+
+`packages/app-lynx/` is a **parallel rendering client** — a Vue 3 app running on the [ReactLynx](https://lynxjs.org/) runtime via `vue-lynx` (a Vue 3 custom renderer). It shares the same Pixiv backend credentials and API format as the main SolidJS app but targets Lynx's native rendering pipeline rather than a WebView. Status: **MVP pre-alpha** (feasibility validation).
+
+### Build & Styling
+
+- **Bundler:** [Rspeedy](https://github.com/lynx-family/rspeedy) (`@lynx-js/rspeedy`), a Lynx-optimized build tool
+- **CSS:** [Tailwind CSS v3](/packages/app-lynx/tailwind.config.ts) with `@lynx-js/tailwind-preset`, configured with `spacing` in `vw` and `fontSize` in `rpx` (see [ADR-0046](/docs/adr/ADR-0046-app-lynx-tailwind.md)). All 6 pages migrated from scoped CSS to Tailwind utilities (T2–T8).
+- **Design tokens:** Fluent 2 color palette adapted to Tailwind's semantic color scale
+- **Responsive strategy:** Width/spacing/padding use `vw` (viewport-relative), font sizes use `rpx` (Lynx responsive pixels). Rationale in [ADR-0044](/docs/adr/ADR-0044-lynx-responsive-units.md) and [glossary-lynx-units](/docs/adr/glossary-lynx-units.md).
+
+### Routing
+
+Uses a **hand-rolled in-memory router** (`/packages/app-lynx/src/router.ts`) rather than `vue-router`. Reason: `vue-router`'s `RouterView` renders empty in `vue-lynx` 0.5.1 + `web-core` 0.23.1 (verified empirically). Pattern matching logic is extracted to `/packages/app-lynx/src/routerCore.ts` for unit testability.
+
+Routes: `/login` → `/recommended` → `/illust/:id` → `/novel-list` → `/novel/:id` → `/me`.
+
+### Auth & Security
+
+- **Credential source:** `lynx.config.ts` reads from `../app/credentials.json5` (single source of truth with the main app)
+- **Token storage:** `refresh_token` is **memory-only** in the MVP (no `localStorage` in web mode, to prevent XSS exfiltration). Production native builds will use Android Keystore via Native Module.
+- **Login method:** `refresh_token` login only (username/password removed per commit `bf226e6`)
+- **Client switching:** `clientSwitchStore` (`/packages/app-lynx/src/stores/clientSwitchStore.ts`) lets users toggle between the vue-lynx client and the main app
+- **Security hardening:** Proxy URL log redaction ([`proxyRedact.ts`](/packages/app-lynx/src/utils/proxyRedact.ts)), `__DEV__` double-condition guards, host boundary tightening on `rewriteUrl`
+
+### API Client
+
+Located in `/packages/app-lynx/src/api/`. Mirrors the main app's Pixiv API surface (`auth.ts`, `client.ts`, `illust.ts`, `novel.ts`, `types.ts`) but uses `globalThis.fetch` via a [`fetchWrapper`](/packages/app-lynx/src/utils/fetchWrapper.ts) adapter (the Lynx worker runtime shadows bare `fetch`). Bearer token attachment is decided based on the `rewriteUrl`-transformed URL.
+
+### Known MVP Limitations
+
+- **No cell recycling:** `vue-lynx` #302 cell recycling is a no-op; safe up to ~5k list items (empirically verified)
+- **No canvas/measureText:** novel body renders as whole text blocks (Pretext library's line-level measurement cannot be ported)
+- **No PKCE OAuth:** login is `refresh_token`-only; WebView-based OAuth needs native integration
+- **Token not persisted:** page refresh requires re-login in web mode
+
+See [package README](/packages/app-lynx/README.md) for the full architecture map and quick start.
 
 ## Component Architecture
 

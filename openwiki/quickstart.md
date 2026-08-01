@@ -1,13 +1,16 @@
 ---
 type: Quickstart
 title: Pictelio — OpenWiki Quickstart
-description: Entrypoint for the Pictelio repository documentation. Pictelio is a third-party Pixiv illustration browser built with SolidJS, packaged as a native Android app with Capacitor.
-tags: [pictelio, pixiv, solidjs, capacitor, android]
+description: Entrypoint for the Pictelio repository documentation. Pictelio is a third-party Pixiv illustration browser with two rendering clients — a SolidJS SPA (Capacitor Android) and a vue-lynx MVP (ReactLynx runtime).
+tags: [pictelio, pixiv, solidjs, capacitor, android, vue-lynx]
 ---
 
 # Pictelio Documentation
 
-**Pictelio** (repo name `pixivizer`) is a third-party [Pixiv](https://www.pixiv.net) illustration browser built with [SolidJS](https://www.solidjs.com/) and packaged as a native Android app via [Capacitor](https://capacitorjs.com/).
+**Pictelio** (repo name `pixivizer`) is a third-party [Pixiv](https://www.pixiv.net) illustration browser with two rendering clients:
+
+- **[`pictelio-app`](/packages/app/)** — SolidJS SPA, packaged as a native Android app via [Capacitor](https://capacitorjs.com/) (primary client)
+- **[`pictelio-app-lynx`](/packages/app-lynx/)** — vue-lynx MVP on the [ReactLynx](https://lynxjs.org/) runtime (parallel client, pre-alpha)
 
 This wiki helps humans and agents understand the architecture, workflows, integrations, and test strategy.
 
@@ -24,13 +27,13 @@ This wiki helps humans and agents understand the architecture, workflows, integr
 | Local DB | @tanstack/solid-db 0.2 (IndexedDB) |
 | Mobile Runtime | Capacitor 8.4 (Android target) |
 | Package Manager | pnpm 11.9 |
-| Monorepo Packages | `pictelio-app` (SPA), `pictelio-website` (Astro landing page, GitHub Pages) |
+| Monorepo Packages | `pictelio-app` (SPA), `pictelio-website` (Astro landing page, GitHub Pages), `pictelio-app-lynx` (vue-lynx MVP) |
 
 ## Documentation Map
 
 ### Architecture
 
-- **[Architecture Overview](/openwiki/architecture/overview.md)** — Monorepo layout, build tooling, Fluent Design, CSS architecture, SolidJS + TanStack ecosystem, boot sequence
+- **[Architecture Overview](/openwiki/architecture/overview.md)** — Monorepo layout, build tooling, Fluent Design, CSS architecture, SolidJS + TanStack ecosystem, boot sequence, and [app-lynx client](/openwiki/architecture/overview.md#app-lynx-vue-lynx-client) (vue-lynx, Tailwind, hand-rolled router)
 - **[API Layer & Authentication](/openwiki/architecture/api-layer.md)** — Pixiv API client, dual-mode transport (Web fetch vs CapacitorHttp), OAuth flows, token storage, 401 retry with Promise queue, GET deduplication
 - **[Image Loading Pipeline](/openwiki/architecture/image-pipeline.md)** — Three-layer cache (LRU keys → browser cache → Android disk), image host selection (race/weighted/fastest-ip/single), WebView proxy interception, Web Worker measurement
 
@@ -98,6 +101,9 @@ Architecture Decision Records live in `/docs/adr/`. Notable ones:
 | 0041 | Token barrier — `tokenReady` Promise blocks API requests before auth init completes; `authPermanentFailure` prevents request avalanche on token failure |
 | 0042 | Demand query — `createTQFeedStore` default `enabled: false` defers all store queries to explicit `ensureLoaded` calls; skeleton renders before first fetch |
 | 0043 | Skeleton rendering guarantee — `setTimeout(0)` replaces `requestAnimationFrame` in feed `onMount` to ensure skeleton paints before data load |
+| 0044 | app-lynx responsive unit selection — fontSize uses `rpx`, width/spacing/padding uses `vw`; backed by [glossary-lynx-units](/docs/adr/glossary-lynx-units.md) |
+| 0045 | app-lynx scrolltolower infinite-loading fix — web-core mis-trigger, root-caused to `scrolltolower` event firing when list is empty/short |
+| 0046 | app-lynx Tailwind CSS migration — spacing=vw, fontSize=rpx, Fluent semantic color palette via `@lynx-js/tailwind-preset`; all 6 pages migrated (Login → Me, T2–T8) |
 
 ## Key Source Files
 
