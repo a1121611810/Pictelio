@@ -88,22 +88,22 @@ function pickClient(kind: ClientKind) {
   display: flex;
   flex-direction: row;
   align-items: center;
-  height: 88px;
-  padding: 0 16px;
+  height: 11.733vw;
+  padding: 0 4.267vw;
   background-color: var(--colorNeutralBackground1);
   border-bottom-width: 1px;
   border-bottom-color: var(--colorNeutralStroke2);
 }
 
 .Back {
-  font-size: 26px;
+  font-size: 26rpx;
   color: var(--colorBrandForeground1);
-  padding-right: 16px;
+  padding-right: 4.267vw;
 }
 
 .AppBarTitle {
   flex: 1;
-  font-size: 30px;
+  font-size: 30rpx;
   font-weight: 600;
   color: var(--colorNeutralForeground1);
 }
@@ -112,52 +112,52 @@ function pickClient(kind: ClientKind) {
   display: flex;
   flex-direction: row;
   align-items: center;
-  padding: 20px 16px;
+  padding: 5.333vw 4.267vw;
   background-color: var(--colorNeutralBackground1);
 }
 
 .Avatar {
-  width: 96px;
-  height: 96px;
-  border-radius: 48px;
+  width: 12.800vw;
+  height: 12.800vw;
+  border-radius: 6.400vw;
   background-color: var(--colorNeutralBackground3);
 }
 
 .ProfileInfo {
-  margin-left: 16px;
+  margin-left: 4.267vw;
   display: flex;
   flex-direction: column;
 }
 
 .Name {
-  font-size: 32px;
+  font-size: 32rpx;
   font-weight: 700;
   color: var(--colorNeutralForeground1);
 }
 
 .Account {
-  font-size: 22px;
+  font-size: 22rpx;
   color: var(--colorNeutralForeground3);
-  margin-top: 4px;
+  margin-top: 1.067vw;
 }
 
 .Section {
   background-color: var(--colorNeutralBackground1);
-  margin-top: 12px;
-  padding: 16px;
+  margin-top: 3.200vw;
+  padding: 4.267vw;
 }
 
 .SectionTitle {
-  font-size: 26px;
+  font-size: 26rpx;
   font-weight: 600;
   color: var(--colorNeutralForeground1);
 }
 
 .SectionDesc {
-  font-size: 20px;
+  font-size: 20rpx;
   color: var(--colorNeutralForeground3);
-  margin-top: 4px;
-  margin-bottom: 12px;
+  margin-top: 1.067vw;
+  margin-bottom: 3.200vw;
 }
 
 .OptionRow {
@@ -165,7 +165,7 @@ function pickClient(kind: ClientKind) {
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 0;
+  padding: 3.733vw 0;
   border-bottom-width: 1px;
   border-bottom-color: var(--colorNeutralStroke3);
 }
@@ -176,20 +176,20 @@ function pickClient(kind: ClientKind) {
 }
 
 .OptionLabel {
-  font-size: 26px;
+  font-size: 26rpx;
   color: var(--colorNeutralForeground1);
 }
 
 .OptionSub {
-  font-size: 20px;
+  font-size: 20rpx;
   color: var(--colorNeutralForeground3);
-  margin-top: 2px;
+  margin-top: 0.533vw;
 }
 
 .Radio {
-  width: 36px;
-  height: 36px;
-  border-radius: 18px;
+  width: 4.800vw;
+  height: 4.800vw;
+  border-radius: 2.400vw;
   border-width: 2px;
   border-color: var(--colorNeutralStroke1);
 }
@@ -200,17 +200,17 @@ function pickClient(kind: ClientKind) {
 }
 
 .Switching {
-  font-size: 22px;
+  font-size: 22rpx;
   color: var(--colorBrandForeground1);
-  margin-top: 12px;
+  margin-top: 3.200vw;
 }
 
 .DangerRow {
-  padding: 14px 0;
+  padding: 3.733vw 0;
 }
 
 .Danger {
-  font-size: 26px;
+  font-size: 26rpx;
   color: var(--colorPaletteRedBackground3);
 }
 </style>

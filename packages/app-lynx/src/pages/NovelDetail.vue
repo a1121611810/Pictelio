@@ -82,22 +82,22 @@ onMounted(async () => {
   display: flex;
   flex-direction: row;
   align-items: center;
-  height: 88px;
-  padding: 0 16px;
+  height: 11.733vw;
+  padding: 0 4.267vw;
   background-color: var(--colorNeutralBackground1);
   border-bottom-width: 1px;
   border-bottom-color: var(--colorNeutralStroke2);
 }
 
 .Back {
-  font-size: 26px;
+  font-size: 26rpx;
   color: var(--colorBrandForeground1);
-  padding-right: 16px;
+  padding-right: 4.267vw;
 }
 
 .AppBarTitle {
   flex: 1;
-  font-size: 30px;
+  font-size: 30rpx;
   font-weight: 600;
   color: var(--colorNeutralForeground1);
 }
@@ -111,14 +111,14 @@ onMounted(async () => {
 }
 
 .Loading {
-  font-size: 26px;
+  font-size: 26rpx;
   color: var(--colorNeutralForeground3);
 }
 
 .Error {
-  font-size: 24px;
+  font-size: 24rpx;
   color: var(--colorPaletteRedBackground3);
-  padding: 16px;
+  padding: 4.267vw;
 }
 
 .Body {
@@ -127,38 +127,38 @@ onMounted(async () => {
 }
 
 .Header {
-  padding: 20px 16px;
+  padding: 5.333vw 4.267vw;
   background-color: var(--colorNeutralBackground1);
-  margin-bottom: 12px;
+  margin-bottom: 3.200vw;
 }
 
 .Title {
-  font-size: 36px;
+  font-size: 36rpx;
   font-weight: 700;
   color: var(--colorNeutralForeground1);
 }
 
 .Author {
-  font-size: 24px;
+  font-size: 24rpx;
   color: var(--colorBrandForeground1);
-  margin-top: 8px;
+  margin-top: 2.133vw;
 }
 
 .Meta {
-  font-size: 20px;
+  font-size: 20rpx;
   color: var(--colorNeutralForeground3);
-  margin-top: 6px;
+  margin-top: 1.600vw;
 }
 
 .Content {
-  padding: 16px;
+  padding: 4.267vw;
 }
 
 .Paragraph {
-  font-size: 28px;
-  line-height: 44px;
+  font-size: 28rpx;
+  line-height: 44rpx;
   color: var(--colorNeutralForeground1);
-  margin-bottom: 16px;
+  margin-bottom: 4.267vw;
   display: block;
 }
 
@@ -166,11 +166,11 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 6.400vw;
 }
 
 .EndText {
-  font-size: 22px;
+  font-size: 22rpx;
   color: var(--colorNeutralForeground3);
 }
 </style>

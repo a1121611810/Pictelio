@@ -105,22 +105,22 @@ onMounted(fetchFirstPage)
   display: flex;
   flex-direction: row;
   align-items: center;
-  height: 88px;
-  padding: 0 16px;
+  height: 11.733vw;
+  padding: 0 4.267vw;
   background-color: var(--colorNeutralBackground1);
   border-bottom-width: 1px;
   border-bottom-color: var(--colorNeutralStroke2);
 }
 
 .Back {
-  font-size: 26px;
+  font-size: 26rpx;
   color: var(--colorBrandForeground1);
-  padding-right: 16px;
+  padding-right: 4.267vw;
 }
 
 .AppBarTitle {
   flex: 1;
-  font-size: 30px;
+  font-size: 30rpx;
   font-weight: 600;
   color: var(--colorNeutralForeground1);
 }
@@ -138,8 +138,8 @@ onMounted(fetchFirstPage)
   display: flex;
   flex-direction: row;
   align-items: flex-start;
-  margin: 6px 12px;
-  padding: 14px;
+  margin: 1.600vw 3.200vw;
+  padding: 3.733vw;
   background-color: var(--colorNeutralBackground1);
   border-radius: var(--borderRadiusXLarge);
 }
@@ -151,62 +151,62 @@ onMounted(fetchFirstPage)
 }
 
 .Title {
-  font-size: 28px;
+  font-size: 28rpx;
   font-weight: 600;
   color: var(--colorNeutralForeground1);
   max-line: 2;
 }
 
 .Author {
-  font-size: 22px;
+  font-size: 22rpx;
   color: var(--colorBrandForeground1);
-  margin-top: 6px;
+  margin-top: 1.600vw;
 }
 
 .MetaLine {
   display: flex;
   flex-direction: row;
-  margin-top: 6px;
+  margin-top: 1.600vw;
 }
 
 .Meta {
-  font-size: 20px;
+  font-size: 20rpx;
   color: var(--colorNeutralForeground3);
-  margin-right: 16px;
+  margin-right: 4.267vw;
 }
 
 .Tags {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
-  margin-top: 8px;
+  margin-top: 2.133vw;
 }
 
 .Tag {
-  font-size: 18px;
+  font-size: 18rpx;
   color: var(--colorBrandForeground1);
   background-color: var(--colorNeutralBackground3);
   border-radius: var(--borderRadiusMedium);
-  padding: 2px 8px;
-  margin: 2px;
+  padding: 0.533vw 2.133vw;
+  margin: 0.533vw;
 }
 
 .Footer {
   width: 100%;
-  height: 80px;
+  height: 10.667vw;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .FooterText {
-  font-size: 24px;
+  font-size: 24rpx;
   color: var(--colorNeutralForeground3);
 }
 
 .Error {
-  font-size: 22px;
+  font-size: 22rpx;
   color: var(--colorPaletteRedBackground3);
-  padding: 16px;
+  padding: 4.267vw;
 }
 </style>

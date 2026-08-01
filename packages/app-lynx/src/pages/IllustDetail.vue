@@ -97,22 +97,22 @@ onMounted(async () => {
   display: flex;
   flex-direction: row;
   align-items: center;
-  height: 88px;
-  padding: 0 16px;
+  height: 11.733vw;
+  padding: 0 4.267vw;
   background-color: var(--colorNeutralBackground1);
   border-bottom-width: 1px;
   border-bottom-color: var(--colorNeutralStroke2);
 }
 
 .Back {
-  font-size: 26px;
+  font-size: 26rpx;
   color: var(--colorBrandForeground1);
-  padding-right: 16px;
+  padding-right: 4.267vw;
 }
 
 .AppBarTitle {
   flex: 1;
-  font-size: 30px;
+  font-size: 30rpx;
   font-weight: 600;
   color: var(--colorNeutralForeground1);
 }
@@ -131,14 +131,14 @@ onMounted(async () => {
 }
 
 .Loading {
-  font-size: 26px;
+  font-size: 26rpx;
   color: var(--colorNeutralForeground3);
 }
 
 .Error {
-  font-size: 24px;
+  font-size: 24rpx;
   color: var(--colorPaletteRedBackground3);
-  padding: 16px;
+  padding: 4.267vw;
 }
 
 .Hero {
@@ -151,57 +151,57 @@ onMounted(async () => {
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  padding: 12px;
+  padding: 3.200vw;
 }
 
 .PageBtn {
-  font-size: 36px;
+  font-size: 36rpx;
   color: var(--colorBrandForeground1);
-  padding: 8px 24px;
+  padding: 2.133vw 6.400vw;
 }
 
 .PageIdx {
-  font-size: 24px;
+  font-size: 24rpx;
   color: var(--colorNeutralForeground2);
-  margin: 0 16px;
+  margin: 0 4.267vw;
 }
 
 .Info {
-  padding: 16px;
+  padding: 4.267vw;
   background-color: var(--colorNeutralBackground1);
 }
 
 .Title {
-  font-size: 32px;
+  font-size: 32rpx;
   font-weight: 700;
   color: var(--colorNeutralForeground1);
 }
 
 .Author {
-  font-size: 26px;
+  font-size: 26rpx;
   color: var(--colorBrandForeground1);
-  margin-top: 8px;
+  margin-top: 2.133vw;
 }
 
 .Meta {
-  font-size: 22px;
+  font-size: 22rpx;
   color: var(--colorNeutralForeground3);
-  margin-top: 6px;
+  margin-top: 1.600vw;
 }
 
 .Tags {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
-  margin-top: 12px;
+  margin-top: 3.200vw;
 }
 
 .Tag {
-  font-size: 20px;
+  font-size: 20rpx;
   color: var(--colorBrandForeground1);
   background-color: var(--colorNeutralBackground3);
   border-radius: var(--borderRadiusMedium);
-  padding: 4px 10px;
-  margin: 4px;
+  padding: 1.067vw 2.667vw;
+  margin: 1.067vw;
 }
 </style>

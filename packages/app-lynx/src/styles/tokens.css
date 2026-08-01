@@ -28,26 +28,27 @@ page {
   --colorOverlayDark: rgba(0, 0, 0, 0.55);
 
   /* 圆角 */
-  --borderRadiusSmall: 4px;
-  --borderRadiusMedium: 6px;
-  --borderRadiusLarge: 8px;
-  --borderRadiusXLarge: 12px;
-  --borderRadius2XLarge: 16px;
+  --borderRadiusSmall: 1.067vw;
+  --borderRadiusMedium: 1.600vw;
+  --borderRadiusLarge: 2.133vw;
+  --borderRadiusXLarge: 3.200vw;
+  --borderRadius2XLarge: 4.267vw;
 
   /* 间距 */
-  --spacingXs: 4px;
-  --spacingS: 8px;
-  --spacingM: 12px;
-  --spacingL: 16px;
-  --spacingXL: 24px;
+  --spacingXs: 1.067vw;
+  --spacingS: 2.133vw;
+  --spacingM: 3.200vw;
+  --spacingL: 4.267vw;
+  --spacingXL: 6.400vw;
 
-  /* 字号（Lynx 无 clamp/vw 流体，MVP 用固定 px） */
-  --fontSizeBase100: 20px;
-  --fontSizeBase200: 24px;
-  --fontSizeBase300: 28px;
-  --fontSizeBase400: 32px;
-  --fontSizeBase500: 40px;
-  --fontSizeHero800: 56px;
+  /* 字号：rpx 响应式（750 基准），对齐主应用 clamp 语义在 375 屏的档位。
+   * 注意：页面字号为硬编码 rpx，此令牌当前未被引用（历史遗留，清理时收敛） */
+  --fontSizeBase100: 20rpx;
+  --fontSizeBase200: 24rpx;
+  --fontSizeBase300: 28rpx;
+  --fontSizeBase400: 32rpx;
+  --fontSizeBase500: 40rpx;
+  --fontSizeHero800: 56rpx;
 
   /* 阴影（Lynx 支持 box-shadow 子集） */
   --elevation2: 0 2px 8px rgba(0, 0, 0, 0.08);

@@ -88,46 +88,46 @@ async function submit() {
   flex-direction: column;
   align-items: center;
   background-color: var(--colorNeutralBackground2);
-  padding-top: 120px;
+  padding-top: 32.000vw;
 }
 
 .Brand {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 40px;
+  margin-bottom: 10.667vw;
 }
 
 .BrandTitle {
-  font-size: 56px;
+  font-size: 56rpx;
   font-weight: 700;
   color: var(--colorBrandForeground1);
 }
 
 .BrandSub {
-  font-size: 24px;
+  font-size: 24rpx;
   color: var(--colorNeutralForeground3);
-  margin-top: 8px;
+  margin-top: 2.133vw;
 }
 
 .Card {
   width: 85%;
   background-color: var(--colorNeutralBackground1);
   border-radius: var(--borderRadius2XLarge);
-  padding: 24px;
+  padding: 6.400vw;
   box-shadow: var(--elevation4);
 }
 
 .Tabs {
   display: flex;
   flex-direction: row;
-  margin-bottom: 16px;
+  margin-bottom: 4.267vw;
 }
 
 .Tab {
-  font-size: 24px;
+  font-size: 24rpx;
   color: var(--colorNeutralForeground2);
-  padding: 8px 16px;
+  padding: 2.133vw 4.267vw;
   border-radius: var(--borderRadiusMedium);
 }
 
@@ -139,13 +139,13 @@ async function submit() {
 
 .Input {
   width: 100%;
-  height: 72px;
+  height: 9.600vw;
   background-color: var(--colorNeutralBackground3);
   border-radius: var(--borderRadiusLarge);
-  font-size: 24px;
+  font-size: 24rpx;
   color: var(--colorNeutralForeground1);
-  padding: 0 16px;
-  margin-bottom: 12px;
+  padding: 0 4.267vw;
+  margin-bottom: 3.200vw;
 }
 
 .PwdFields {
@@ -154,13 +154,13 @@ async function submit() {
 }
 
 .Error {
-  font-size: 22px;
+  font-size: 22rpx;
   color: var(--colorPaletteRedBackground3);
-  margin-bottom: 8px;
+  margin-bottom: 2.133vw;
 }
 
 .Submit {
-  height: 72px;
+  height: 9.600vw;
   background-color: var(--colorBrandBackground);
   border-radius: var(--borderRadiusLarge);
   display: flex;
@@ -169,14 +169,14 @@ async function submit() {
 }
 
 .SubmitText {
-  font-size: 28px;
+  font-size: 28rpx;
   font-weight: 600;
   color: var(--colorNeutralForegroundOnBrand);
 }
 
 .Hint {
-  font-size: 20px;
+  font-size: 20rpx;
   color: var(--colorNeutralForeground3);
-  margin-top: 24px;
+  margin-top: 6.400vw;
 }
 </style>
