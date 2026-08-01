@@ -88,6 +88,12 @@ dependencies {
     // Fresco 默认不传 customParam 为 header（403），自研 ILynxImageService（#54）
     implementation "org.lynxsdk.lynx:lynx-service-http:4.0.1"
     implementation "org.lynxsdk.lynx:lynx-service-log:4.0.1"
+    // XElement（官方扩展元件，#51 真机实测必需）：
+    // 基础 xelement 提供扩展 behaviors；xelement-input 提供 <input>/<textarea>
+    // （LynxError 990200 "No BehaviorController defined for class input"，
+    //  真机 2026-08-01 Login.vue 输入框渲染失败 → 补依赖 + LynxActivity addBehaviors）
+    implementation "org.lynxsdk.lynx:xelement:4.0.1"
+    implementation "org.lynxsdk.lynx:xelement-input:4.0.1"
     testImplementation "junit:junit:$junitVersion"
     testImplementation "org.robolectric:robolectric:4.14.1"
     testImplementation "androidx.test:core:1.6.1"

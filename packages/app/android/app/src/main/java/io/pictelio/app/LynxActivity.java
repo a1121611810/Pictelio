@@ -42,6 +42,8 @@ public class LynxActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         LynxViewBuilder builder = new LynxViewBuilder();
+        // XElement behaviors（#51 真机必需）：<input>/<textarea> 等扩展元件
+        builder.addBehaviors(new com.lynx.xelement.XElementBehaviors().create());
         builder.setTemplateProvider(new PictelioTemplateProvider(this));
         // per-view 注册（与 PictelioApp 全局注册并存；LynxEnv 全局优先）
         builder.registerModule("PictelioSecureStorage", PictelioSecureStorageModule.class);

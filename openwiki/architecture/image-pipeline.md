@@ -29,7 +29,7 @@ flowchart LR
 |-------|-------|----------|----------|
 | **L1** | LRU `Set<string>` (URL keys) | `imageLoader.ts` | Periodic GC with context-aware scoring (image width, file size, staleness) |
 | **L2** | Browser HTTP cache | `fetch` response cache | Standard HTTP caching |
-| **L3** | Android disk cache | `ImageCachePlugin.java` (native) | LRU with configurable max size |
+| **L3** | Android disk cache | `ImageCachePlugin.java` / `PixivImageLoader.java` (native) | LRU with configurable max size |
 
 ### L1 Cache (LRU Key Set)
 
