@@ -73,4 +73,4 @@ app-lynx 无设置页，Me 页（"我的"）为唯一合适入口。新增"内�
 
 - ADR-0050（IndexedDB KV 层来源、Worker 环境调查）
 - 主项目 `settingsStore.ts` / `utils/r18Filter.ts`（对齐来源）
-- 实施提交：`8d4c2b1`
+- 实施提交：`cf74212`
