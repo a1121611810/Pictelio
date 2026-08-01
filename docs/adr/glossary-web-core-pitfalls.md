@@ -15,6 +15,7 @@
 | **min-height 保底** | 给可能塌陷的元素设 `min-height`（用 vw！）保证内容高度下限。web 预览下兜底，原生下被真实布局覆盖。 |
 | **空页防护（empty-page guard）** | `loadMore` 返回 `fresh.length === 0` 时置 `nextUrl = null` 终止分页，防服务端返回空页但 next_url 仍存在时轮询空页。 |
 | **HMR 不可靠** | rspeedy dev 对 vue-lynx `<style scoped>` 样式与组件热更新支持不完整（错误如 `lynx.requireModuleAsync is not a function`、hot-update 404）。**样式改动后建议直接重启 dev server + 强刷**，不要依赖 HMR。 |
+| **百分比宽度基准异常** | web-core 下部分元素（实测 `<input>`）的 `width: %` 相对**根容器**而非父元素。嵌套百分比场景才暴露：父 `85%` + 子 `100%` → 子按视口宽度计算，右溢出。**防护：用 flex stretch 拉伸替代百分比**（flex item 按父实际布局宽度计算）。 |
 | **vw 原生解析** | `transformVW` 默认关闭时 vw 由浏览器 CSSOM 原生解析（不经 cqw 变量链）——web 预览下唯一可靠且响应式的长度单位（详见 ADR-0044）。 |
 
 ## 缺陷与防护对照
@@ -24,6 +25,7 @@
 | rpx 布局属性塌陷 | 间距/高度为 0，布局挤在一起 | 布局尺寸一律 vw/px，不用 rpx |
 | auto-size 失效 | 图片高度 0，卡片塌陷 | `min-height: NNvw` 保底 |
 | scrolltolower 误触发 | 无限分页请求 | 加载冷却 + 节流 + threshold 调小 + 空页防护 |
+| 百分比宽度基准异常 | 子元素按视口宽计算，右溢出 | flex stretch 拉伸替代百分比 |
 | HMR 不生效 | 改动不反映到页面 | 重启 dev server + 强刷 |
 
 ## 项目现状（2026-08）
