@@ -232,7 +232,18 @@ Page components must declare a `name` via `defineOptions({ name: 'xxx' })` for K
 
 ### API Client
 
-Located in `/packages/app-lynx/src/api/`. Mirrors the main app's Pixiv API surface (`auth.ts`, `client.ts`, `illust.ts`, `novel.ts`, `types.ts`) but uses `globalThis.fetch` via a [`fetchWrapper`](/packages/app-lynx/src/utils/fetchWrapper.ts) adapter (the Lynx worker runtime shadows bare `fetch`). Bearer token attachment is decided based on the `rewriteUrl`-transformed URL. The `illust.ts` module now includes [`addBookmark`](/packages/app-lynx/src/api/illust.ts) and `deleteBookmark` functions (POST `/v2/illust/bookmark/add` and `/v1/illust/bookmark/delete`, default `restrict: public`), [ADR-0052](/docs/adr/ADR-0052-lynx-illust-bookmark.md).
+Located in `/packages/app-lynx/src/api/`. Mirrors the main app's Pixiv API surface (`auth.ts`, `client.ts`, `illust.ts`, `novel.ts`, `types.ts`) but uses `globalThis.fetch` via a [`fetchWrapper`](/packages/app-lynx/src/utils/fetchWrapper.ts) adapter (the Lynx worker runtime shadows bare `fetch`).
+
+**Dual-mode URL rewriting (#53):** `client.ts` exports `isNativeMode()`, which detects the LynxView native environment by checking for the bare `NativeModules` global (not just `globalThis.NativeModules` — on real devices the Lynx runtime exposes it as a bare global). Based on this, `rewriteUrl()` and `shouldAttachAuth()` behave differently:
+
+| Mode | `rewriteUrl(path)` | OAuth URL | Bearer token |
+|------|--------------------|-----------|-------------|
+| **Web-core** (dev preview) | Rewrites to Vite proxy (`/pixiv-api/...`, `/pixiv-oauth/...`, `/pixiv-img/...`) | `/pixiv-oauth/auth/token` (proxied) | Attached to `/pixiv-` prefixed paths |
+| **Native LynxView** | Absolute Pixiv URLs (`https://app-api.pixiv.net/...`); `/pixiv-img/` paths pass through for native `PictelioImageService` | `PIXIV_AUTH_BASE` (direct `oauth.secure.pixiv.net`) | Attached to all `http`-prefixed URLs |
+
+In native mode, there is no Vite dev proxy — all API and OAuth requests use absolute URLs to Pixiv servers directly. Credentials and Bearer tokens remain in JS memory (MVP form — no native gateway equivalent to the main app's `PixivApiPlugin`).
+
+The `illust.ts` module includes [`addBookmark`](/packages/app-lynx/src/api/illust.ts) and `deleteBookmark` functions (POST `/v2/illust/bookmark/add` and `/v1/illust/bookmark/delete`, default `restrict: public`), [ADR-0052](/docs/adr/ADR-0052-lynx-illust-bookmark.md).
 
 ### Image Rendering & Loading States
 

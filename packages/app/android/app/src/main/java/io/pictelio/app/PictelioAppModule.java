@@ -52,7 +52,7 @@ public class PictelioAppModule extends LynxModule {
                     .edit()
                     .putString(CLIENT_KEY, kind)
                     .apply();
-            callback.invoke(null);
+            callback.invoke();
         } catch (Exception e) {
             Log.w(TAG, "setClientKind(" + kind + ") 失败", e);
             callback.invoke(String.valueOf(e.getMessage()));
@@ -65,10 +65,10 @@ public class PictelioAppModule extends LynxModule {
             String kind = appContext()
                     .getSharedPreferences(CLIENT_PREFS, Context.MODE_PRIVATE)
                     .getString(CLIENT_KEY, "webview");
-            callback.invoke(kind, null);
+            callback.invoke(kind);
         } catch (Exception e) {
             Log.w(TAG, "getClientKind 失败", e);
-            callback.invoke(null, String.valueOf(e.getMessage()));
+            callback.invoke(String.valueOf(e.getMessage()));
         }
     }
 
@@ -79,7 +79,7 @@ public class PictelioAppModule extends LynxModule {
             Intent intent = new Intent(ctx, MainActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             ctx.startActivity(intent);
-            callback.invoke(null);
+            callback.invoke();
             // 延迟杀进程：等 MainActivity 启动完成后结束当前进程，
             // 保证全新进程重新走 client 分发（避免 Lynx runtime 静态状态残留）
             new Handler(Looper.getMainLooper()).postDelayed(() -> {

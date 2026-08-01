@@ -8,6 +8,16 @@ import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.util.Log;
 
+import com.lynx.tasm.LynxEnv;
+import com.lynx.tasm.behavior.Behavior;
+import com.lynx.tasm.behavior.LynxContext;
+import com.lynx.tasm.behavior.shadow.ShadowNode;
+import com.lynx.tasm.behavior.ui.LynxFlattenUI;
+import com.lynx.tasm.behavior.ui.LynxUI;
+import com.lynx.tasm.behavior.ui.image.FlattenUIImage;
+import com.lynx.tasm.behavior.ui.image.InlineImageShadowNode;
+import com.lynx.tasm.behavior.ui.image.UIImage;
+import com.lynx.tasm.image.AutoSizeImage;
 import com.lynx.tasm.image.ImageContent;
 import com.lynx.tasm.image.model.AnimationListener;
 import com.lynx.tasm.image.model.ImageInfo;
@@ -17,6 +27,8 @@ import com.lynx.tasm.service.ILynxImageService;
 import com.lynx.tasm.service.IServiceProvider;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -52,7 +64,47 @@ public class PictelioImageService implements ILynxImageService {
         return INSTANCE;
     }
 
-    private PictelioImageService() {}
+    private PictelioImageService() {
+        registerImageBehaviors();
+    }
+
+    /**
+     * 注册 &lt;image&gt;/&lt;inline-image&gt; 元素 Behavior（对齐官方 LynxImageService 构造逻辑，
+     * 真机实测 #59：只实现 ILynxImageService 接口不够——不注册 behavior 则 lynx 引擎
+     * 无法创建 image UI，骨架屏永久显示、无任何图片日志）。
+     */
+    private void registerImageBehaviors() {
+        List<Behavior> behaviorList = new ArrayList<>();
+        behaviorList.add(new Behavior("image", true, true) {
+            @Override
+            public LynxUI createUI(LynxContext context) {
+                return new UIImage(context);
+            }
+
+            @Override
+            public LynxFlattenUI createFlattenUI(LynxContext context) {
+                return new FlattenUIImage(context);
+            }
+
+            @Override
+            public ShadowNode createShadowNode() {
+                return new AutoSizeImage();
+            }
+        });
+        behaviorList.add(new Behavior("inline-image", false, true) {
+            @Override
+            public ShadowNode createShadowNode() {
+                return new InlineImageShadowNode();
+            }
+        });
+        try {
+            LynxEnv.inst().addBehaviors(behaviorList);
+        } catch (Throwable t) {
+            // 防御：addBehaviors 依赖 gson（lynx 运行时传递依赖，生产 APK 存在）。
+            // 单测 classpath 缺 gson 时跳过注册（不崩构造）；生产缺失则记日志。
+            Log.w(TAG, "image behaviors 注册失败（生产环境图片将不可用）", t);
+        }
+    }
 
     @Override
     public Class<? extends IServiceProvider> getServiceClass() {

@@ -36,10 +36,11 @@ public class PictelioSecureStorageModule extends LynxModule {
     public void getItem(String key, Callback callback) {
         try {
             String value = new SecureStorageCompat(appContext()).getItem(key);
-            callback.invoke(value, null);
+            // 成功：单参传值（不传 null——CallbackImpl 对 null 参数崩，真机实测）
+            callback.invoke(value);
         } catch (Exception e) {
             Log.w(TAG, "getItem(" + key + ") 失败", e);
-            callback.invoke(null, String.valueOf(e.getMessage()));
+            callback.invoke(String.valueOf(e.getMessage()));
         }
     }
 
@@ -47,7 +48,8 @@ public class PictelioSecureStorageModule extends LynxModule {
     public void setItem(String key, String data, Callback callback) {
         try {
             new SecureStorageCompat(appContext()).setItem(key, data);
-            callback.invoke(null);
+            // 成功：无参回调（JS 侧 err=undefined → 成功路径）
+            callback.invoke();
         } catch (Exception e) {
             Log.w(TAG, "setItem(" + key + ") 失败", e);
             callback.invoke(String.valueOf(e.getMessage()));
@@ -58,7 +60,7 @@ public class PictelioSecureStorageModule extends LynxModule {
     public void removeItem(String key, Callback callback) {
         try {
             new SecureStorageCompat(appContext()).removeItem(key);
-            callback.invoke(null);
+            callback.invoke();
         } catch (Exception e) {
             Log.w(TAG, "removeItem(" + key + ") 失败", e);
             callback.invoke(String.valueOf(e.getMessage()));

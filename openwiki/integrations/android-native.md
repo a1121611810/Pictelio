@@ -143,9 +143,11 @@ Provides three callback-based methods exposed to Lynx JS via `NativeModules.Pict
 
 | Method | Contract |
 |--------|----------|
-| `getItem(key, cb)` | Success: `cb(value, null)`; failure: `cb(null, errMsg)` |
-| `setItem(key, data, cb)` | Success: `cb(null)`; failure: `cb(errMsg)` |
-| `removeItem(key, cb)` | Success: `cb(null)`; failure: `cb(errMsg)` |
+| `getItem(key, cb)` | Success: `cb(value)`; failure: `cb(errMsg)` |
+| `setItem(key, data, cb)` | Success: `cb()`; failure: `cb(errMsg)` |
+| `removeItem(key, cb)` | Success: `cb()`; failure: `cb(errMsg)` |
+
+> **Callback signature:** Lynx `CallbackImpl` crashes on `null` arguments on real devices. All success callbacks use single-arg (value only) or no-arg forms — never pass `null` as a placeholder.
 
 **Storage backend:** [`SecureStorageCompat`](#securestoragecompat) — a pure-Java AES/GCM utility byte-compatible with `@aparajita/capacitor-secure-storage` 8.x. Uses the same Keystore alias (`capacitor-storage_refresh_token`) and `WSSecureStorageSharedPreferences` ciphertext file as the main app's [token persistence](/openwiki/architecture/api-layer.md#token-persistence--backup-integrity). This means the lynx client and webview client share a single login state — logging in on one client makes the token available to the other.
 
@@ -162,6 +164,20 @@ A self-contained encryption utility that mirrors `@aparajita/capacitor-secure-st
 - **Ciphertext format:** `Base64(ciphertext) + "\u0010" + Base64(iv)` — NO_PADDING + NO_WRAP
 
 The `encryptString` / `decryptString` static methods are key-injected (accept a `SecretKey` parameter) so they can be unit-tested with Robolectric without AndroidKeyStore. `SecureStorageCompatTest` covers round-trip, Unicode, format contract validation, format errors, and wrong-key detection via GCM authentication failure (`AEADBadTagException`).
+
+### PictelioAppModule
+
+**Java:** `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioAppModule.java`
+
+A LynxModule for client-switching and native app control, used by the [app-lynx client](/openwiki/architecture/overview.md#app-lynx-vue-lynx-client)'s [`clientSwitchStore`](/packages/app-lynx/src/stores/clientSwitchStore.ts). Exposed to Lynx JS via `NativeModules.PictelioApp`:
+
+| Method | Contract |
+|--------|----------|
+| `setClientKind(kind, cb)` | Writes `pictelio_client_kind` to `SharedPreferences("CapacitorStorage")`. Success: `cb()`; failure: `cb(errMsg)`. |
+| `getClientKind(cb)` | Reads current client kind. Success: `cb(kind)`; failure: `cb(errMsg)`. |
+| `restartApp(cb)` | Launches `MainActivity` (clearing task stack) and kills the current process after a delay. Success: `cb()`. |
+
+Callback signatures follow the same null-free pattern as `PictelioSecureStorageModule` — `CallbackImpl` on real devices crashes on `null` arguments.
 
 ### Lynx SDK Dependency
 
@@ -239,6 +255,7 @@ Shared image loading core — the single source of truth for Pixiv image downloa
 Custom Lynx image service implementing `ILynxImageService` — the sole image loading backend for the vue-lynx client. Registered in `PictelioApp.initLynx()` via `LynxServiceCenter.inst().registerService()` before any `LynxView` is created.
 
 - **Backend:** Delegates all download and caching logic to [`PixivImageLoader`](#pixivimageloader) — no duplicated URL rewriting or HTTP logic
+- **Behavior registration (#59):** The constructor registers `<image>` and `<inline-image>` element behaviors via `LynxEnv.inst().addBehaviors()` — creating `UIImage`/`FlattenUIImage`/`AutoSizeImage` (for `image`) and `InlineImageShadowNode` (for `inline-image`). Without this, the Lynx engine cannot create image UI on real devices (skeleton remains visible, no image logs). This mirrors the official `LynxImageService` constructor logic and is required in addition to implementing `ILynxImageService`.
 - **`fetchImage()`:** Offloads download + bitmap decode to a `CachedThreadPool`, calls `ImageLoadListener.onSuccess(imageInfo, ImageContent(Bitmap))` on the Lynx image thread
 - **Static images only:** Animation callbacks (`canAnimate`, `startAnimation`, etc.) all return `false`/no-op — ugoira/GIF support is not planned for the Lynx MVP
 - **Singleton:** `getInstance()` returns the single `INSTANCE`; `onInitialize(context)` stores the Application context for lazy `PixivImageLoader` creation
