@@ -48,17 +48,17 @@ onMounted(fetchFirstPage)
 </script>
 
 <template>
-  <view class="Page">
-    <view class="AppBar">
-      <text class="Back" @tap="goBack">‹ 返回</text>
-      <text class="AppBarTitle">推荐小说</text>
+  <view class="w-full h-full bg-background-2">
+    <view class="flex flex-row items-center h-[11.733vw] px-4 bg-background border-b-[1px] border-b-stroke-2">
+      <text class="text-lg text-brand-foreground pr-4" @tap="goBack">‹ 返回</text>
+      <text class="flex-1 text-2xl font-semibold text-foreground">推荐小说</text>
     </view>
 
-    <text v-if="errorMsg && !loading" class="Error">{{ errorMsg }}</text>
+    <text v-if="errorMsg && !loading" class="text-sm text-danger p-4">{{ errorMsg }}</text>
 
     <list
       v-if="!loading || novels.length > 0"
-      class="Feed"
+      class="w-full h-full"
       list-type="single"
       scroll-orientation="vertical"
       :lower-threshold-item-count="5"
@@ -68,145 +68,34 @@ onMounted(fetchFirstPage)
         v-for="item in novels"
         :key="item.id"
         :item-key="item.id"
-        class="Row"
+        class="w-full"
         @tap="openDetail(item.id)"
       >
-        <view class="RowInner">
-          <view class="Info">
-            <text class="Title">{{ item.title }}</text>
-            <text class="Author">by {{ item.user.name }}</text>
-            <view class="MetaLine">
-              <text class="Meta">{{ item.text_length }} 字</text>
-              <text v-if="item.total_bookmarks > 0" class="Meta">♥ {{ item.total_bookmarks }}</text>
+        <view class="flex flex-row items-start m-1.5 mx-3 p-3.5 bg-background rounded-[var(--borderRadiusXLarge)]">
+          <view class="flex-1 flex flex-col">
+            <text class="text-xl font-semibold text-foreground [max-line:2]">{{ item.title }}</text>
+            <text class="text-sm text-brand-foreground mt-1.5">by {{ item.user.name }}</text>
+            <view class="flex flex-row mt-1.5">
+              <text class="text-xs text-foreground-3 mr-4">{{ item.text_length }} 字</text>
+              <text v-if="item.total_bookmarks > 0" class="text-xs text-foreground-3 mr-4">
+                ♥ {{ item.total_bookmarks }}
+              </text>
             </view>
-            <view class="Tags">
-              <text v-for="tag in item.tags.slice(0, 3)" :key="tag.name" class="Tag">
+            <view class="flex flex-row flex-wrap mt-2">
+              <text
+                v-for="tag in item.tags.slice(0, 3)"
+                :key="tag.name"
+                class="text-[18rpx] text-brand-foreground bg-background-3 rounded-[var(--borderRadiusMedium)] py-0.5 px-2 m-0.5"
+              >
                 #{{ tag.translated_name || tag.name }}
               </text>
             </view>
           </view>
         </view>
       </list-item>
-      <list-item v-if="loadingMore" :key="'footer'" item-key="footer" class="Footer" full-span>
-        <text class="FooterText">加载中…</text>
+      <list-item v-if="loadingMore" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
+        <text class="text-base text-foreground-3">加载中…</text>
       </list-item>
     </list>
   </view>
 </template>
-
-<style scoped>
-.Page {
-  width: 100%;
-  height: 100%;
-  background-color: var(--colorNeutralBackground2);
-}
-
-.AppBar {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  height: 11.733vw;
-  padding: 0 4.267vw;
-  background-color: var(--colorNeutralBackground1);
-  border-bottom-width: 1px;
-  border-bottom-color: var(--colorNeutralStroke2);
-}
-
-.Back {
-  font-size: 26rpx;
-  color: var(--colorBrandForeground1);
-  padding-right: 4.267vw;
-}
-
-.AppBarTitle {
-  flex: 1;
-  font-size: 30rpx;
-  font-weight: 600;
-  color: var(--colorNeutralForeground1);
-}
-
-.Feed {
-  width: 100%;
-  height: 100%;
-}
-
-.Row {
-  width: 100%;
-}
-
-.RowInner {
-  display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  margin: 1.600vw 3.200vw;
-  padding: 3.733vw;
-  background-color: var(--colorNeutralBackground1);
-  border-radius: var(--borderRadiusXLarge);
-}
-
-.Info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.Title {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: var(--colorNeutralForeground1);
-  max-line: 2;
-}
-
-.Author {
-  font-size: 22rpx;
-  color: var(--colorBrandForeground1);
-  margin-top: 1.600vw;
-}
-
-.MetaLine {
-  display: flex;
-  flex-direction: row;
-  margin-top: 1.600vw;
-}
-
-.Meta {
-  font-size: 20rpx;
-  color: var(--colorNeutralForeground3);
-  margin-right: 4.267vw;
-}
-
-.Tags {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  margin-top: 2.133vw;
-}
-
-.Tag {
-  font-size: 18rpx;
-  color: var(--colorBrandForeground1);
-  background-color: var(--colorNeutralBackground3);
-  border-radius: var(--borderRadiusMedium);
-  padding: 0.533vw 2.133vw;
-  margin: 0.533vw;
-}
-
-.Footer {
-  width: 100%;
-  height: 10.667vw;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.FooterText {
-  font-size: 24rpx;
-  color: var(--colorNeutralForeground3);
-}
-
-.Error {
-  font-size: 22rpx;
-  color: var(--colorPaletteRedBackground3);
-  padding: 4.267vw;
-}
-</style>
