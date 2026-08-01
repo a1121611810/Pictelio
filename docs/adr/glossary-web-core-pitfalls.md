@@ -6,6 +6,7 @@
 
 | 术语 | 定义 |
 |------|------|
+| **渲染位置（iframe/shadow）** | lynx web-core 把渲染内容放在 `lynx-view` 元素内的 **srcdoc iframe + shadow root** 中——`document.querySelectorAll('*')` 不穿透，会误判"页面空白"。**自动化探测必须递归遍历 `shadowRoot` 与 `IFRAME.contentDocument`**（详见 ADR-0047）。Tailwind utility 出现在 x-view/x-text 的 className 上，可据此验证样式。 |
 | **web-core** | Lynx 的 Web 模拟渲染层（`@lynx-js/web-core`），浏览器中运行，是 web 预览（`__web_preview`）的实现。**与原生 LynxView 行为存在差异，是多数 dev-only bug 的来源。** |
 | **rpx 布局属性塌陷** | web-core 把 rpx 布局属性（padding/height/margin 等）转成 `calc(N * var(--rpx-unit))`，而 `--rpx-unit` 基于 cqw 容器查询引用自身宽度 → 循环失效 → 属性塌成 0。**布局保底/尺寸必须用 vw 或 px，不能写 rpx**（详见 ADR-0044）。 |
 | **auto-size 失效** | `<image auto-size>`（按图片宽高比自适应）在 web-core 预览下不生效，图片高度为 0。**必须配 min-height 保底**，否则卡片塌陷。 |
@@ -35,3 +36,5 @@
 `Recommended.vue` 与 `NovelList.vue` 均已应用上述全部防护（提交 `4ce313e` / `a3f5b21`）。原生 LynxView 是否受同样缺陷影响待 #41 集成后验证（可能全部不需要这些防护）。
 
 **Tailwind 迁移后**（ADR-0046，提交 `062c7db` + `e210b48`–`1321330`）：6 页面全部改为 Tailwind utility；spacing=vw、fontSize=rpx、colors=Fluent 语义色板（引用 tokens.css 变量）；Tailwind 默认 rem 档经顶层替换排除；动态类用互斥全字符串（JIT 字面量扫描）。
+
+**自动化视觉验证**（ADR-0047）：6 页面在默认浏览器（Vivaldi 持久 profile）+ 登录态真实数据下全部验证通过；探测必须穿透 lynx-view 内 iframe/shadow（详见"渲染位置"术语）。
