@@ -5,6 +5,7 @@ import { loadDetail } from '../api/illust'
 import type { PixivIllust } from '../api/types'
 import { proxyImageUrl } from '../utils/imageUrl'
 import SkeletonImage from '../components/SkeletonImage.vue'
+import BookmarkButton from '../components/BookmarkButton.vue'
 
 const illust = ref<PixivIllust | null>(null)
 const loading = ref(true)
@@ -84,9 +85,13 @@ onMounted(async () => {
         <text class="text-3xl font-bold text-foreground">{{ illust.title }}</text>
         <text class="text-lg text-brand-foreground mt-2">by {{ illust.user.name }}</text>
         <text class="text-sm text-foreground-3 mt-1.5">{{ illust.width }} × {{ illust.height }}</text>
-        <text v-if="illust.total_bookmarks > 0" class="text-sm text-foreground-3 mt-1.5">
-          ♥ {{ illust.total_bookmarks }}
-        </text>
+        <view class="mt-2">
+          <BookmarkButton
+            :illust-id="illust.id"
+            :initial-bookmarked="illust.is_bookmarked"
+            :bookmark-count="illust.total_bookmarks"
+          />
+        </view>
         <view class="flex flex-row flex-wrap mt-3">
           <text
             v-for="tag in illust.tags.slice(0, 8)"

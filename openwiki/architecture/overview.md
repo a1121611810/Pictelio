@@ -232,7 +232,7 @@ Page components must declare a `name` via `defineOptions({ name: 'xxx' })` for K
 
 ### API Client
 
-Located in `/packages/app-lynx/src/api/`. Mirrors the main app's Pixiv API surface (`auth.ts`, `client.ts`, `illust.ts`, `novel.ts`, `types.ts`) but uses `globalThis.fetch` via a [`fetchWrapper`](/packages/app-lynx/src/utils/fetchWrapper.ts) adapter (the Lynx worker runtime shadows bare `fetch`). Bearer token attachment is decided based on the `rewriteUrl`-transformed URL.
+Located in `/packages/app-lynx/src/api/`. Mirrors the main app's Pixiv API surface (`auth.ts`, `client.ts`, `illust.ts`, `novel.ts`, `types.ts`) but uses `globalThis.fetch` via a [`fetchWrapper`](/packages/app-lynx/src/utils/fetchWrapper.ts) adapter (the Lynx worker runtime shadows bare `fetch`). Bearer token attachment is decided based on the `rewriteUrl`-transformed URL. The `illust.ts` module now includes [`addBookmark`](/packages/app-lynx/src/api/illust.ts) and `deleteBookmark` functions (POST `/v2/illust/bookmark/add` and `/v1/illust/bookmark/delete`, default `restrict: public`), [ADR-0052](/docs/adr/ADR-0052-lynx-illust-bookmark.md).
 
 ### Image Rendering & Loading States
 
@@ -243,6 +243,8 @@ The Lynx MVP has evolved specific patterns for image display and loading UX that
 - **Two-layer shimmer skeleton:** A global `.shimmer` CSS class with `@keyframes shimmer` animation is defined in `App.vue` (uses `linear-gradient` + `background-position` — confirmed working in web-core; native LynxView support pending [#41](https://github.com/user/pixivizer/issues/41)). The skeleton strategy has two layers:
   - **Data layer:** 8 [`SkeletonCard`](/packages/app-lynx/src/components/SkeletonCard.vue) components render as shimmer placeholders (square image + two text bars matching `ImageCard` layout) during initial API fetch in `Recommended.vue`; `IllustDetail.vue` shows a square shimmer image + three text bars inline. These hide when API data arrives.
   - **Image layer:** [`SkeletonImage.vue`](/packages/app-lynx/src/components/SkeletonImage.vue) wraps each `<image>` with its own shimmer overlay that hides on image `@load` (not API response). The `<image>` always renders to trigger loading; shimmer sits absolutely positioned on top until `loaded` is set. On `@error`, shimmer is replaced with a gray "图片加载失败" placeholder to avoid permanent shimmer. This eliminates the flicker where real content appears with broken/missing images while they load.
+
+- **Bookmark interaction:** The [`BookmarkButton.vue`](/packages/app-lynx/src/components/BookmarkButton.vue) component (ADR-0052) provides a reusable ♥ toggle shared between `IllustDetail.vue` and `Recommended.vue` feed cards. It maintains local `bookmarked`/`count` state, calls `addBookmark`/`deleteBookmark` from [`illust.ts`](/packages/app-lynx/src/api/illust.ts) (default `restrict: public`), and uses `@tap.stop` to prevent card-tap navigation when toggling. Optimistic count ±1 on success; failure displays "操作失败" inline.
 
 ### Known MVP Limitations
 

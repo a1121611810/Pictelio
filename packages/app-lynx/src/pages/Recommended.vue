@@ -8,6 +8,7 @@ import type { PixivIllust } from '../api/types'
 import { thumbUrl } from '../utils/imageUrl'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
+import BookmarkButton from '../components/BookmarkButton.vue'
 import { filterByRestrict } from '../stores/settingsStore'
 
 const illusts = ref<PixivIllust[]>([])
@@ -118,9 +119,13 @@ onMounted(() => {
         <SkeletonImage :src="thumbUrl(item.image_urls)" aspect-ratio="1 / 1" min-h="40vw" />
         <text class="text-lg font-semibold text-foreground mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
         <text class="text-sm text-foreground-2 mt-1 mx-2.5 [max-line:1]">{{ item.user.name }}</text>
-        <text v-if="item.total_bookmarks > 0" class="text-xs text-foreground-3 mt-1 mx-2.5 mb-2.5">
-          ♥ {{ item.total_bookmarks }}
-        </text>
+        <view class="mt-1 mx-2.5 mb-2.5">
+          <BookmarkButton
+            :illust-id="item.id"
+            :initial-bookmarked="item.is_bookmarked"
+            :bookmark-count="item.total_bookmarks"
+          />
+        </view>
       </list-item>
       <list-item v-if="loadingMore" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
         <text class="text-base text-foreground-3">加载中…</text>

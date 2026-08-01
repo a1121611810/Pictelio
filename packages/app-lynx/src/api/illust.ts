@@ -21,3 +21,17 @@ export function loadDetail(illustId: number, signal?: AbortSignal): Promise<Pixi
 export function loadNext(url: string, signal?: AbortSignal): Promise<PixivIllustListResponse> {
   return apiClient.get<PixivIllustListResponse>(url, undefined, signal)
 }
+
+// ─── 收藏（对齐主项目，默认收藏到 public） ───
+export function addBookmark(illustId: number): Promise<void> {
+  return apiClient.post("/v2/illust/bookmark/add", {
+    illust_id: String(illustId),
+    restrict: "public",
+  })
+}
+
+export function deleteBookmark(illustId: number): Promise<void> {
+  return apiClient.post("/v1/illust/bookmark/delete", {
+    illust_id: String(illustId),
+  })
+}
