@@ -65,4 +65,6 @@
 - `docs/research/lynx-migration-feasibility.md`、`vue-lynx-deep-dive.md`（五份可行性评估）
 - `packages/app-lynx/README.md`（架构与已知限制）
 - `glossary-lynx-units.md`（单位与换算机制术语表）
+- `glossary-web-core-pitfalls.md`（web-core 预览已知缺陷术语表）
+- `ADR-0045-lynx-scrolltolower-infinite-loading.md`（scrolltolower 误触发修复，含 rpx 塌陷的实战印证）
 - 实施提交：`1b63b21 feat(app-lynx): 宽高间距改用 vw 响应式，字号保持 rpx`
