@@ -79,7 +79,7 @@ Host health is tracked with success/failure counts and timeouts.
 1. **Signal-driven preload** — `preloaded()` memo uses windowed logic: pages within `visiblePage + PRELOAD_WINDOW` (currently `PRELOAD_WINDOW = 6`) trigger `loadImage()` prefetch to disk cache. The `visiblePage` prop is tracked by the parent `IllustDetail` component as the user scrolls between pages, ensuring the next several pages are loaded ahead of the viewport.
 2. **Local IntersectionObserver** — Always-active `createEverVisible` observer (removed `skipObserver` in v3.21.3). Elements entering the viewport independently trigger `loadImage()` regardless of `preloaded()`. This is the fallback path when `visiblePage` is undefined or the windowed preload is insufficient.
 
-**Native cache prefill (v3.21+):** A `createEffect` calls `loadImage(src)` from `imageLoader.ts`, which triggers native `PixivApiPlugin.prefetchImage()` (OkHttp + connection pool). This seeds the L3 Android disk cache before `PixivImage` renders, ensuring the WebView's `shouldInterceptRequest` can serve a cached `WebResourceResponse` rather than doing a synchronous network fetch on the UI thread. Starting in v3.21.2, `shouldInterceptRequest` itself uses the same shared `OkHttpClient` from `PixivApiPlugin.getSharedClient()`, so even cache-miss requests benefit from connection pooling.
+**Native cache prefill (v3.21+):** A `createEffect` calls `loadImage(src)` from `imageLoader.ts`, which triggers native `PixivApiPlugin.prefetchImage()` (OkHttp + connection pool). This seeds the L3 Android disk cache before `PixivImage` renders, ensuring the WebView's `shouldInterceptRequest` can serve a cached `WebResourceResponse` rather than doing a synchronous network fetch on the UI thread. The `shouldInterceptRequest` → `interceptImage()` path delegates to [`PixivImageLoader`](/openwiki/integrations/android-native.md#pixivimageloader) (shared singleton), which handles URL rewriting, disk cache read/write, and OkHttp download — reusing the connection pool from `PixivApiPlugin.getSharedClient()`. Per-URL locking prevents concurrent cache writes from multi-threaded WebView interception.
 
 **Race condition elimination (v3.21.1):** The initial implementation used a simple `cacheReady: boolean` signal. The current version uses `cacheReadyFor: Signal<string>` — keyed by the image URL string, not a boolean. A dedicated `createEffect` resets both `cacheReadyFor` to `""` and `retryTrigger` to `0` on `props.src` change (cross-illust navigation, v3.21.2 also resets the retry counter). The `loadImage().then()` success handler checks `if (props.src === src)` before marking the URL as ready, while the `.catch()` handler does not mark it — a stale-closure guard that prevents an in-flight async completion from incorrectly signaling a _different_ illust's image as ready, and ensures failures don't bypass the retry mechanism. The `canDisplayImage` memo returns true only when `cacheReadyFor() === props.src && shouldLoad()` (with an additional `props.src` truthiness guard). See the [detail image loading glossary](/docs/adr/glossary-detail-image-loading.md) for all related terminology.
 
@@ -87,7 +87,7 @@ Host health is tracked with success/failure counts and timeouts.
 
 **Prefetch retry on failure (v3.21.2+):** If `loadImage()` → `PixivApiPlugin.prefetchImage()` fails or exceeds a 12-second timeout, `LazyDetailImage`'s `createEffect` catches the failure and retries via a `retryTrigger` signal, up to `MAX_RETRIES = 3` attempts with `RETRY_DELAY_MS = 2000` between them. The 12s timeout (v3.21.3+) uses `Promise.race` against `loadImage()` and guards against OkHttp queue congestion when many concurrent image requests are queued — timing out allows the retry to land on a different connection slot. Cleanup via `onCleanup` cancels any pending retry or timeout timer on component unmount or `props.src` change.
 
-**Fallback on retry exhaustion (v3.21.4):** When all `MAX_RETRIES` attempts fail, the `.catch()` handler now falls through to `setCacheReadyFor(src)` instead of leaving the image in an unready state. This marks the image ready for `PixivImage` rendering, and `shouldInterceptRequest` performs a synchronous fallback download via the shared OkHttp client. The degraded performance (UI-thread fetch) is preferable to a permanently blank image area.
+**Fallback on retry exhaustion (v3.21.4):** When all `MAX_RETRIES` attempts fail, the `.catch()` handler now falls through to `setCacheReadyFor(src)` instead of leaving the image in an unready state. This marks the image ready for `PixivImage` rendering, and `shouldInterceptRequest` delegates to [`PixivImageLoader.loadBytes()`](/openwiki/integrations/android-native.md#pixivimageloader) (synchronous download + disk cache write) or `PixivImageLoader.download()` (when disk cache is off). The degraded performance (UI-thread fetch) is preferable to a permanently blank image area.
 
 ```mermaid
 sequenceDiagram
@@ -110,19 +110,22 @@ sequenceDiagram
         LDI->>LDI: Exhausted -> setCacheReadyFor(src) fallback
     end
     Note over WV: PixivImage renders with ready URL
-    WV->>DC: interceptImage() -> cache HIT
+    WV->>DC: interceptImage() -> PixivImageLoader -> cache HIT
     DC-->>WV: WebResourceResponse (instant)
-    Note over WV: Misses also use shared OkHttpClient pool
+    Note over WV: Misses delegate to PixivImageLoader.loadBytes() (shared OkHttpClient pool + write cache)
 ```
 
 ## WebView Proxy Interception
 
-On Android, `ImageCachePlugin.java` intercepts image requests via `shouldInterceptRequest()`:
+On Android, `MainActivity.java` intercepts image requests via `shouldInterceptRequest()`, delegating to a shared [`PixivImageLoader`](/openwiki/integrations/android-native.md#pixivimageloader) singleton:
 
-- Checks the L3 disk cache before making a network request
-- Returns cached response if available
-- Falls through to network if not cached
-- Implements SSRF protection via a URL whitelist (ADR-0002)
+- **URL rewriting:** `PixivImageLoader.rewriteUrl()` converts `/pixiv-img/…` paths to Pixiv CDN URLs
+- **Disk cache check:** `PixivImageLoader.cachedFile()` looks up the L3 disk cache (Base64 URL-safe filename) — hit returns a `WebResourceResponse` with `FileInputStream`
+- **Cache miss with disk enabled:** `PixivImageLoader.loadBytes()` downloads via shared OkHttp pool, writes to disk cache, returns `byte[]` wrapped as `WebResourceResponse`
+- **Cache miss with disk disabled:** `PixivImageLoader.download()` downloads without writing to disk
+- **Per-URL locking** (`ConcurrentHashMap`) prevents concurrent cache writes from multi-threaded WebView interception
+- SSRF protection via URL whitelist (ADR-0002)
+- Errors are logged via `android.util.Log` instead of `printStackTrace()`
 
 ## Web Worker Measurement
 

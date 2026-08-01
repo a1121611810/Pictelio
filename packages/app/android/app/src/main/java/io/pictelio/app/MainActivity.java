@@ -5,6 +5,7 @@ import io.pictelio.app.config.OAuthConfig;
 import android.content.pm.PackageInfo;
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
@@ -17,10 +18,7 @@ import androidx.core.splashscreen.SplashScreen;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
 
-import java.net.URI;
-
-import android.util.Base64;
-
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.HashMap;
@@ -32,8 +30,26 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class MainActivity extends BridgeActivity {
 
+    private static final String TAG = "MainActivity";
+
     /** SplashScreen 保持可见的标志位，由 AuthPlugin.hideSplash() 通过 dismissSplash() setter 控制 */
     private static final AtomicBoolean keepSplashVisible = new AtomicBoolean(true);
+
+    /** 共享图片加载器（#58）：单实例保证 per-URL 锁在并发拦截下生效（避免同 URL 双写缓存） */
+    private volatile PixivImageLoader imageLoader;
+
+    private PixivImageLoader imageLoader() {
+        PixivImageLoader l = imageLoader;
+        if (l == null) {
+            synchronized (this) {
+                if (imageLoader == null) {
+                    imageLoader = new PixivImageLoader(this);
+                }
+                l = imageLoader;
+            }
+        }
+        return l;
+    }
 
     /** 供同包下的 AuthPlugin 调用，通知 SplashScreen 可退出 */
     static void dismissSplash() {
@@ -160,56 +176,49 @@ public class MainActivity extends BridgeActivity {
         if (url == null || !url.contains("/pixiv-img/")) return null;
 
         try {
-            String path = url.substring(url.indexOf("/pixiv-img/") + "/pixiv-img/".length());
-            String pixivUrl = new URI(OAuthConfig.IMAGE_CDN_URL + "/" + path).normalize().toString();
+            // URL 重写 + 下载 + 磁盘缓存统一走 PixivImageLoader 公共核心（#57/#58，
+            // 与 Lynx PictelioImageService 同源；未命中时补全写盘——行为增强）
+            String pixivUrl = PixivImageLoader.rewriteUrl(url);
 
             // 读取 JS 侧持久化的缓存开关（Capacitor Preferences 存储在默认 SharedPreferences 中）
             android.content.SharedPreferences prefs = getApplicationContext().getSharedPreferences("CapacitorStorage", android.content.Context.MODE_PRIVATE);
             boolean diskCacheEnabled = "true".equals(prefs.getString("image_cache_disk", "true"));
             boolean browserCacheEnabled = "true".equals(prefs.getString("image_cache_browser", "true"));
 
-            // ── A: 磁盘缓存检查 ────────────────────────────────────
+            PixivImageLoader loader = imageLoader();
             if (diskCacheEnabled) {
-                String filename = Base64.encodeToString(pixivUrl.getBytes(), Base64.URL_SAFE | Base64.NO_PADDING | Base64.NO_WRAP);
-                File cacheFile = new File(getCacheDir() + "/" + OAuthConfig.CACHE_DIR + "/", filename);
-                if (cacheFile.exists()) {
-                    String mime = "image/jpeg";
-                    if (path.endsWith(".png")) mime = "image/png";
-                    else if (path.endsWith(".gif")) mime = "image/gif";
-                    else if (path.endsWith(".webp")) mime = "image/webp";
-                    return new WebResourceResponse(mime, null, 200, "OK", null, new FileInputStream(cacheFile));
+                // ── A: 磁盘缓存优先 ──
+                File cached = loader.cachedFile(pixivUrl);
+                if (cached != null) {
+                    return new WebResourceResponse(mimeFor(url), null, 200, "OK", null, new FileInputStream(cached));
                 }
+                // 未命中：下载 + 写盘（#57 补全缓存写入）
+                return bytesResponse(url, loader.loadBytes(pixivUrl), browserCacheEnabled);
             }
 
-            // ── B: OkHttp 下载（连接池共享，比 HttpURLConnection 稳定） ──
-            okhttp3.Request okRequest = new okhttp3.Request.Builder()
-                    .url(pixivUrl)
-                    .addHeader("Referer", OAuthConfig.REFERER)
-                    .addHeader("User-Agent", OAuthConfig.USER_AGENT)
-                    .build();
-
-            okhttp3.Response okResponse = PixivApiPlugin.getSharedClient().newCall(okRequest).execute();
-
-            String mime = okResponse.header("Content-Type");
-            if (mime == null) mime = "image/jpeg";
-
-            // ── C: Cache-Control immutable 头 ──
-            Map<String, String> headers = new HashMap<>();
-            if (browserCacheEnabled) {
-                headers.put("Cache-Control", "public, max-age=31536000, immutable");
-            }
-
-            return new WebResourceResponse(
-                    mime,
-                    okResponse.header("Content-Encoding"),
-                    200, "OK",
-                    headers,
-                    okResponse.body().byteStream()
-            );
+            // ── B: 磁盘缓存关闭 → 仅下载不写盘（Referer/UA 注入在核心内） ──
+            return bytesResponse(url, loader.download(pixivUrl), browserCacheEnabled);
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.w(TAG, "interceptImage 失败: " + url, e);
             return null;
         }
+    }
+
+    /** 按 URL 后缀推断图片 mime（webview 专属；下载响应不再依赖服务器 Content-Type） */
+    private static String mimeFor(String url) {
+        if (url.endsWith(".png")) return "image/png";
+        if (url.endsWith(".gif")) return "image/gif";
+        if (url.endsWith(".webp")) return "image/webp";
+        return "image/jpeg";
+    }
+
+    /** 字节 → WebResourceResponse（browserCacheEnabled 时加 immutable 头） */
+    private static WebResourceResponse bytesResponse(String url, byte[] bytes, boolean browserCacheEnabled) {
+        Map<String, String> headers = new HashMap<>();
+        if (browserCacheEnabled) {
+            headers.put("Cache-Control", "public, max-age=31536000, immutable");
+        }
+        return new WebResourceResponse(mimeFor(url), null, 200, "OK", headers, new ByteArrayInputStream(bytes));
     }
 
     // ── WebView 版本检测 ────────────────────────────────────────────

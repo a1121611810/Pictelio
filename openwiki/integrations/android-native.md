@@ -216,7 +216,7 @@ The Android entry point. Key responsibilities:
 - Initializes the image cache and auth plugin on startup
 - Handles Android lifecycle events
 - Intercepts `/pixiv-img/` WebView requests via `shouldInterceptRequest` for image caching (retained from previous architecture)
-- Image proxy via `shouldInterceptRequest` was upgraded from `HttpURLConnection` to the shared `OkHttpClient` from `PixivApiPlugin.getSharedClient()`, reusing the connection pool instead of creating a fresh connection per request
+- Image proxy via `shouldInterceptRequest` now delegates to a shared [`PixivImageLoader`](#pixivimageloader) singleton (double-checked locking), which centralizes URL rewriting, disk cache read/write, and OkHttp download — per-URL locking prevents concurrent cache writes from multi-threaded WebView interception. Previously used `HttpURLConnection` then direct `OkHttpClient` calls inline.
 
 > **v3.20.0–v3.21.0:** Splash Screen dismiss moved from Android-only `core-splashscreen` API to JS-controlled via `AuthPlugin.hideSplash()` bridge. `MainActivity` retains `SplashScreen.installSplashScreen(this)` but defers exit to `keepSplashVisible` AtomicBoolean controlled by the plugin (see [Splash Screen JS Bridge](#splash-screen-js-bridge)).
 
@@ -244,7 +244,7 @@ Shared image loading core — the single source of truth for Pixiv image downloa
 - **Per-URL locking:** `ConcurrentHashMap` prevents concurrent writes to the same cache file from multi-threaded callers (WebView interception is multi-threaded)
 
 **Consumers:**
-- **WebView path:** `MainActivity.interceptImage()` — reads cached bytes as `InputStream` for `WebResourceResponse`
+- **WebView path:** `MainActivity.interceptImage()` — calls `PixivImageLoader.cachedFile()` for disk cache hits, `loadBytes()` for cache-miss-with-write, or `download()` when disk cache is off; wraps results in `WebResourceResponse` via `bytesResponse()` and `mimeFor()` helpers
 - **Lynx path:** [`PictelioImageService`](#pictelioimageservice) — reads cached bytes, decodes to `Bitmap`, and delivers via `ImageLoadListener.onSuccess`
 
 ### PictelioImageService
@@ -289,8 +289,7 @@ The dedicated LynxView host Activity, launched by `MainActivity` when `pictelio_
 - **DOM Storage:** Enabled
 - **Mixed Content:** Allowed (Pixiv API uses both HTTP and HTTPS)
 - **User Agent:** Customized for Pixiv API compatibility
-- **Image interception:** `shouldInterceptRequest` in MainActivity intercepts `/pixiv-img/` requests and serves from the Android disk cache (ImageCachePlugin) or proxies to the Pixiv CDN via the shared OkHttpClient (from `PixivApiPlugin.getSharedClient()`) with proper Referer headers
-- **shouldInterceptRequest:** ImageCachePlugin intercepts image URLs
+- **Image interception:** `shouldInterceptRequest` in `MainActivity` intercepts `/pixiv-img/` requests, delegating to [`PixivImageLoader`](#pixivimageloader) for URL rewriting, disk cache lookup (L3), and proxied download with `Referer`/`User-Agent` headers
 - **SSRF Whitelist:** Only Pixiv domains and configured image hosts are accessible via WebView proxy (ADR-0002)
 
 ## Capacitor Configuration
