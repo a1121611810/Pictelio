@@ -224,8 +224,8 @@ Page components must declare a `name` via `defineOptions({ name: 'xxx' })` for K
 ### Auth & Security
 
 - **Credential source:** `lynx.config.ts` reads from `../app/credentials.json5` (single source of truth with the main app)
-- **Token storage:** `refresh_token` is **memory-only** in the MVP (no `localStorage` in web mode, to prevent XSS exfiltration). Production native builds will use Android Keystore via Native Module.
-- **Login method:** `refresh_token` login only (username/password removed per commit `bf226e6`)
+- **Token storage:** [ADR-0050](/docs/adr/ADR-0050-lynx-login-persistence.md) — **web-core** uses IndexedDB ([`tokenStorage.ts`](/packages/app-lynx/src/utils/tokenStorage.ts)) for `refresh_token` persistence (Worker environment lacks `localStorage`; IndexedDB XSS risk accepted as MVP tradeoff). **Native LynxView** (#41) will use a Lynx Native Module aligned with the main project's `@aparajita/capacitor-secure-storage` Keystore encryption for cross-client login sharing.
+- **Login method:** `refresh_token` login only (username/password removed per commit `bf226e6`). [`authStore.restoreToken()`](/packages/app-lynx/src/stores/authStore.ts) now actually restores from IndexedDB on startup; `saveRefreshToken`/`clearRefreshToken` keep the persisted token in sync.
 - **Client switching:** `clientSwitchStore` (`/packages/app-lynx/src/stores/clientSwitchStore.ts`) lets users toggle between the vue-lynx client and the main app
 - **Security hardening:** Proxy URL log redaction ([`proxyRedact.ts`](/packages/app-lynx/src/utils/proxyRedact.ts)), `__DEV__` double-condition guards, host boundary tightening on `rewriteUrl`
 
@@ -248,7 +248,7 @@ The Lynx MVP has evolved specific patterns for image display and loading UX that
 - **No cell recycling:** `vue-lynx` #302 cell recycling is a no-op; safe up to ~5k list items (empirically verified)
 - **No canvas/measureText:** novel body renders as whole text blocks (Pretext library's line-level measurement cannot be ported)
 - **No PKCE OAuth:** login is `refresh_token`-only; WebView-based OAuth needs native integration
-- **Token not persisted:** page refresh requires re-login in web mode
+- **Native token persistence pending:** web-core IndexedDB persistence works in browser; native LynxView Keystore storage (#41) not yet implemented
 
 See [package README](/packages/app-lynx/README.md) for the full architecture map and quick start.
 

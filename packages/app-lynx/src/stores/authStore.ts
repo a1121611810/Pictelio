@@ -1,11 +1,15 @@
-// ─── 认证状态（app-lynx MVP） ───
-// 安全：refresh_token 仅存内存（Web 模式不写入 localStorage —— 防 XSS 窃取）。
-// 原生生产环境由 T7 迁移到 Native Module 安全存储（Android Keystore）。
+// ─── 认证状态（app-lynx） ───
+// refresh_token 持久化策略（ADR-0050）：
+// - web-core（lynx-bg Worker，无 localStorage）：IndexedDB 持久化，
+//   重启恢复登录（XSS 风险与 localStorage 同级，MVP 接受；token 为个人资产）
+// - 原生 LynxView（#41）：Lynx Native Module 对齐主项目 @aparajita Keystore
+//   存储（同 key/同加密，登录态与 webview client 共享）
 import { ref, computed } from "vue"
 import { setAccessToken, setOnUnauthorized, setAuthPermanentFailure } from "../api/client"
 import { loginWithRefreshToken } from "../api/auth"
 import type { PixivUser } from "../api/types"
 import { toApiError } from "../utils/errors"
+import { saveRefreshToken, loadRefreshToken, clearRefreshToken } from "../utils/tokenStorage"
 
 const _refreshToken = ref<string | null>(null)
 const _accessTokenReady = ref(false)
@@ -17,13 +21,14 @@ export const currentUser = computed(() => _user.value)
 export const authError = computed(() => _authError.value)
 
 /**
- * 启动恢复：内存态无持久化 → 直接返回未登录。
- * 原生模式（T7）将由 Native Module 从安全存储恢复 refresh_token 后调用 performRefresh。
+ * 启动恢复（ADR-0050）：web-core 从 IndexedDB 读 refresh_token → 刷新 access_token 恢复登录态；
+ * 原生模式（#41）由 Native Module 从 Keystore 存储恢复。
  */
 export async function restoreToken(): Promise<boolean> {
   if (_accessTokenReady.value) return true
-  // Web 模式：无持久化 token，需要用户重新登录（安全权衡：防 XSS 窃取 refresh_token）
-  return false
+  const token = await loadRefreshToken()
+  if (!token) return false
+  return performRefresh(token)
 }
 
 /** 用 refresh_token 登录：OAuth 交换 → 设置内存态 */
@@ -66,6 +71,10 @@ function applyAuthResponse(resp: {
   _refreshToken.value = resp.refresh_token
   _user.value = resp.user
   _accessTokenReady.value = true
+  // ADR-0050：持久化最新 refresh_token（登录成功 / 401 刷新轮换都更新；IndexedDB 失败静默忽略）
+  void saveRefreshToken(resp.refresh_token).catch(() => {
+    /* IndexedDB 不可用则维持内存态 */
+  })
 }
 
 export function logout() {
@@ -74,6 +83,8 @@ export function logout() {
   _refreshToken.value = null
   _accessTokenReady.value = false
   _user.value = null
+  // ADR-0050：清除持久化 refresh_token
+  void clearRefreshToken()
 }
 
 /** 注册 401 自动刷新处理器（客户端在请求失败时调用） */

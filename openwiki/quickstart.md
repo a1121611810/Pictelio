@@ -107,6 +107,7 @@ Architecture Decision Records live in `/docs/adr/`. Notable ones:
 | 0047 | app-lynx automated visual verification — CDP + Vivaldi persistent profile; recursive shadowRoot/iframe traversal to penetrate lynx-view render boundary; `Input.insertText` for login (vue-lynx v-model unresponsive to native events); 6-page Tailwind utility verification matrix |
 | 0048 | app-lynx recommended card layout — `Recommended.vue` waterfall cards use `aspect-[1/1]` containers + `aspectFill` (not `widthFix`), list-engine column width (not `w-full`), list `gap` attributes (not margin); detail page `IllustDetail.vue` extends pattern with dynamic `aspect-ratio` from API `width/height`; shimmer skeleton screen for list and detail loading states (global `@keyframes shimmer` + `SkeletonCard.vue`) |
 | 0049 | app-lynx back without reload — `App.vue` `<KeepAlive>` caches list/static page instances (recommended/novels/me) so returning from detail doesn't remount or refetch; `router.ts` navigation history stack with replace semantics for login routes; component `defineOptions({ name })` for KeepAlive `include` matching |
+| 0050 | app-lynx login persistence — web-core uses IndexedDB for `refresh_token` persistence (Worker environment, no localStorage); `tokenStorage.ts` wrapper with save/load/clear; `authStore.restoreToken()` now actually restores from IndexedDB; native LynxView (#41) will use Lynx Native Module aligned with main project `@aparajita` Keystore storage for cross-client login sharing |
 
 ## Key Source Files
 
