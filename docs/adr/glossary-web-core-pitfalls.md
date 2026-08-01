@@ -46,4 +46,6 @@
 
 **推荐列表卡片布局修复**（ADR-0048，提交 `a9274aa`）：`Recommended.vue` 瀑布流卡片禁用 `w-full`（宽度交 list 引擎约束为列宽）、方形缩略图用 `aspect-[1/1]` 方形容器 + `aspectFill`、卡片间距用 list 官方 `list-main-axis-gap`/`list-cross-axis-gap`（vue-lynx `:style` 对象绑定）。**Tailwind class 改动后 lynx 样式表不热更新，必须整页刷新验证**（HMR 只更新 DOM class，不更新 shadowRoot 内注入的编译 CSS）。
 
-**详情页大图修复 + 骨架屏**（提交 `d62d1e2`）：`IllustDetail.vue` 大图改用 API 宽高比动态 `aspect-ratio` + `aspectFill`（widthFix 不存在导致高度 0 的同类坑）；推荐列表与详情页补 shimmer 骨架屏（`App.vue` 全局 `@keyframes shimmer` + `linear-gradient`，web-core 实测支持，原生待 #41 验证）。
+**详情页大图修复 + 骨架屏**（提交 `e73a78d`）：`IllustDetail.vue` 大图改用 API 宽高比动态 `aspect-ratio` + `aspectFill`（widthFix 不存在导致高度 0 的同类坑）；推荐列表与详情页补 shimmer 骨架屏（`App.vue` 全局 `@keyframes shimmer` + `linear-gradient`，web-core 实测支持，原生待 #41 验证）。
+
+**图片级骨架屏**（提交 `<待定>`）：`SkeletonImage.vue` 组件——骨架关闭时机从"API 数据加载完"改为**图片加载完成**（`<image @load>` → 隐藏 shimmer；`@error` → 灰底"图片加载失败"占位）。列表卡片（`aspect-ratio: 1/1` + `min-h: 40vw` 保底）与详情大图（API 宽高比）共用。数据层骨架屏（`SkeletonCard`/详情骨架）保留——数据未到显示页面骨架，数据到后切真实内容但图片区继续 shimmer 至 onLoad（双层）。
