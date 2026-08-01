@@ -4,6 +4,7 @@ import { currentParams, goBack } from '../router'
 import { loadDetail } from '../api/illust'
 import type { PixivIllust } from '../api/types'
 import { proxyImageUrl } from '../utils/imageUrl'
+import SkeletonImage from '../components/SkeletonImage.vue'
 
 const illust = ref<PixivIllust | null>(null)
 const loading = ref(true)
@@ -71,14 +72,9 @@ onMounted(async () => {
       <text class="text-base text-danger p-4">{{ errorMsg }}</text>
     </view>
     <scroll-view v-else-if="illust" class="w-full h-full" scroll-orientation="vertical">
-      <!-- [lynx:fix] 详情大图：widthFix 在 lynx 不存在（web-core 回退 fill 高度 0 → 图片不可见）。
-           改用 API 返回的 width/height 动态 aspect-ratio + aspectFill，容器按原图比例完整显示 -->
-      <image
-        class="w-full bg-background"
-        :style="{ aspectRatio: `${illust.width} / ${illust.height}` }"
-        :src="currentImage"
-        :mode="'aspectFill'"
-      />
+      <!-- [lynx:fix] 详情大图（SkeletonImage）：API 宽高比动态 aspect-ratio + aspectFill 完整显示；
+           图片 @load 后才隐藏 shimmer（widthFix 在 lynx 不存在须用 aspect-ratio，且骨架关闭时机 = 图片加载完成） -->
+      <SkeletonImage :src="currentImage" :aspect-ratio="`${illust.width} / ${illust.height}`" />
       <view v-if="pages.length > 1" class="flex flex-row items-center justify-center p-3">
         <text class="text-4xl text-brand-foreground py-2 px-6" @tap="prevPage">‹</text>
         <text class="text-base text-foreground-2 mx-4">{{ currentPage + 1 }} / {{ pages.length }}</text>

@@ -5,6 +5,7 @@ import { loadRecommended, loadNext } from '../api/illust'
 import type { PixivIllust } from '../api/types'
 import { thumbUrl } from '../utils/imageUrl'
 import SkeletonCard from '../components/SkeletonCard.vue'
+import SkeletonImage from '../components/SkeletonImage.vue'
 
 const illusts = ref<PixivIllust[]>([])
 const nextUrl = ref<string | null>(null)
@@ -107,18 +108,9 @@ onMounted(() => {
              都会导致 item 定位计算崩（全部重叠在起点）。间距用 list 官方属性
              list-main-axis-gap（行距）/ list-cross-axis-gap（列距），经 vue-lynx style 对象绑定
              （attribute 形式 web-core 不响应）。原生 LynxView 同样支持这两个属性（ADR-0048） -->
-        <!-- [lynx:fix] min-height 用 vw 保底：web-core 预览下 rpx 布局属性塌陷（--rpx-unit 失效）
-             且 aspect-ratio 在图片加载前不保证算出高度，卡片塌陷会导致 scrolltolower 无限触发；
-             原生 LynxView 下 aspect-ratio 按列宽计算真实高度覆盖此保底。40vw = 150px @375 -->
-        <!-- [lynx:fix] 禁止 w-full：web-core 下 percentage 宽度相对视口而非父容器（嵌套百分比暴露），
-             list-item / x-image 都会被拉成视口宽、超出列被 overflow-hidden 裁剪 → 图片显示不全；
-             宽度交给 waterfall 引擎约束为列宽，aspect-[1/1] 使容器成正方形，方形缩略图完整显示。
-             mode=aspectFill：web-core 映射 object-fit:cover 且原生支持（widthFix 仅原生支持、web-core 不认） -->
-        <image
-          class="bg-background-3 min-h-[40vw] aspect-[1/1]"
-          :src="thumbUrl(item.image_urls)"
-          :mode="'aspectFill'"
-        />
+        <!-- [lynx:fix] 图片级骨架（SkeletonImage）：容器 aspect-[1/1] 方形 + min-h 保底（ADR-0045），
+             图片 @load 后才隐藏 shimmer 显示图片（骨架关闭时机 = 图片加载完成，而非 API 数据返回） -->
+        <SkeletonImage :src="thumbUrl(item.image_urls)" aspect-ratio="1 / 1" min-h="40vw" />
         <text class="text-lg font-semibold text-foreground mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
         <text class="text-sm text-foreground-2 mt-1 mx-2.5 [max-line:1]">{{ item.user.name }}</text>
         <text v-if="item.total_bookmarks > 0" class="text-xs text-foreground-3 mt-1 mx-2.5 mb-2.5">
