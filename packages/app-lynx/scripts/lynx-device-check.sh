@@ -13,7 +13,7 @@ TOKEN=$(grep -oE '^PIXIV_REFRESH_TOKEN=.*' .env | head -1 | cut -d= -f2-)
 if [ -z "$TOKEN" ]; then echo "❌ .env 缺 PIXIV_REFRESH_TOKEN"; exit 1; fi
 adb get-state >/dev/null 2>&1 || { echo "❌ 无设备连接"; exit 1; }
 
-echo "── 1. 确保 client_kind=lynx ──"
+echo "── 1. 确保 client_kind=lynx + 清 refresh_token（消除启动恢复挂起干扰） ──"
 # 保留 CapacitorStorage.xml 其他键，仅设置 pictelio_client_kind
 adb shell "run-as $PKG sh -c '
   mkdir -p shared_prefs
@@ -22,6 +22,11 @@ adb shell "run-as $PKG sh -c '
     sed -i \"s|<string name=\\\"pictelio_client_kind\\\">[^<]*</string>|<string name=\\\"pictelio_client_kind\\\">lynx</string>|\" \$F
   else
     printf \"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\" standalone=\\\"yes\\\" ?>\n<map>\n    <string name=\\\"pictelio_client_kind\\\">lynx</string>\n</map>\n\" > \$F
+  fi
+  # 清 refresh_token：避免启动时 restoreToken → Native OAuth 交换挂起 → 登录页渲染异常/定位失败（#53 实测）
+  S=shared_prefs/WSSecureStorageSharedPreferences.xml
+  if [ -f \$S ]; then
+    sed -i \"\|<string name=\\\"capacitor-storage_refresh_token\\\">|d\" \$S
   fi'" 2>/dev/null
 adb shell "run-as $PKG cat shared_prefs/CapacitorStorage.xml" 2>/dev/null | grep -o "pictelio_client_kind[^<]*<" | head -1
 
@@ -64,9 +69,37 @@ elif [ "$STATE" = "login" ]; then
   fi
   echo "   输入框 y=$INPUT_Y, 按钮 y=$BTN_Y"
 
-  echo "── 4. 自动登录 ──"
-  adb shell input tap 540 "$INPUT_Y"; sleep 1
-  adb shell input text "$TOKEN"; sleep 1
+  echo "── 4. 自动登录（输入验证 + 重试） ──"
+  TYPED_OK=""
+  for attempt in 1 2 3; do
+    adb shell input tap 540 "$INPUT_Y"; sleep 1.2
+    adb shell input text "$TOKEN"; sleep 1.5
+    # 验证输入生效：输入框区域非白占比显著上升（token 文本出现）
+    adb exec-out screencap -p > /tmp/lynx_typed.png
+    TY=$(python3 - "$ANALYZE_PY" <<'PYEOF'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location('a', sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+w, h, rows = m.load_png('/tmp/lynx_typed.png')
+nw = 0; total = 0
+for y in range(0, h, 8):
+    for x in range(0, w, 12):
+        r, g, b = m.pixel(rows, y, x)
+        total += 1
+        if not m.is_whiteish(r, g, b): nw += 1
+print(round(nw / total, 3))
+PYEOF
+)
+    echo "   第${attempt}次输入：非白占比 $TY（未输入约 0.05，输入后应 >0.15）"
+    if python3 -c "exit(0 if float('$TY') > 0.15 else 1)"; then
+      TYPED_OK="yes"
+      break
+    fi
+    adb shell input keyevent 111; sleep 1  # 收键盘，重试前恢复布局
+  done
+  if [ -z "$TYPED_OK" ]; then
+    echo "❌ token 自动输入 3 次未生效（输入框定位或 IME 问题）"; exit 1
+  fi
   adb shell input keyevent 111; sleep 1   # 收键盘
   adb shell input tap 540 "$BTN_Y"
   echo "   已提交登录，等待跳转…"

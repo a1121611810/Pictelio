@@ -81,22 +81,27 @@ def saturated(r, g, b):
 
 
 def login_elements(w, h, rows):
-    """定位登录页输入框（中灰细条）与按钮（品牌蓝块）中心。"""
-    # 逐行统计中灰/品牌蓝，找密集段
-    gray_rows, blue_rows = {}, {}
+    """定位登录页输入框与按钮。
+
+    启发式（稳定性优先）：
+    1. 品牌蓝大块 = 登录按钮（最可靠特征）；
+    2. 输入框 = 按钮上方最近的灰细条（<150px 高）。
+    """
+    # 逐行统计品牌蓝/中灰密度
+    blue_rows, gray_rows = {}, {}
     for y in range(0, h, 4):
-        g_cnt = b_cnt = 0
+        b_cnt = g_cnt = 0
         for x in range(120, w - 120, 6):
             r, g, b = pixel(rows, y, x)
-            if is_gray(r, g, b):
-                g_cnt += 1
             if is_blue(r, g, b):
                 b_cnt += 1
-        if g_cnt > 8:
-            gray_rows[y] = g_cnt
+            if is_gray(r, g, b):
+                g_cnt += 1
         if b_cnt > 6:
             blue_rows[y] = b_cnt
-    # 聚合成段（连续 y）
+        if g_cnt > 8:
+            gray_rows[y] = g_cnt
+
     def segments(d):
         segs = []
         cur = None
@@ -111,19 +116,32 @@ def login_elements(w, h, rows):
             segs.append(cur)
         return segs
 
-    gray_segs = segments(gray_rows)
     blue_segs = segments(blue_rows)
+    gray_segs = segments(gray_rows)
+
     result = {"input": None, "button": None}
-    for y0, y1 in gray_segs:
-        # 输入框：细条（高度 < 150px）
-        if y1 - y0 < 150:
-            result["input"] = {"y": (y0 + y1) // 2}
+
+    # 按钮 = 品牌蓝最宽（密度最高）的段（标题也有蓝但字少、密度低）
+    button = None
     for y0, y1 in blue_segs:
-        if y1 - y0 > 40:  # 按钮/标题块
-            result["button"] = {"y": (y0 + y1) // 2}
-    for k in ("input", "button"):
-        if result[k]:
-            result[k]["x"] = w // 2
+        density = max(blue_rows[y] for y in range(y0, y1 + 1, 4))
+        if density > (button[2] if button else 0):
+            button = (y0, y1, density)
+    if button and button[1] - button[0] > 30:  # 高度 >30px 才算按钮（排除细文字）
+        result["button"] = {"y": (button[0] + button[1]) // 2, "x": w // 2}
+        btn_top = button[0]
+    else:
+        btn_top = h  # 无按钮 → 不约束输入框位置
+
+    # 输入框 = 按钮上方最近的灰细条（<150px 高）——取最靠近按钮的（按钮正上方是输入框）
+    best = None
+    for y0, y1 in gray_segs:
+        if y1 - y0 < 150 and y1 < btn_top:
+            if best is None or y1 > best[1]:
+                best = (y0, y1)
+    if best:
+        result["input"] = {"y": (best[0] + best[1]) // 2, "x": w // 2}
+
     return result
 
 
