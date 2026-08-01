@@ -52,32 +52,38 @@ onMounted(async () => {
 </script>
 
 <template>
-  <view class="Page">
-    <view class="AppBar">
-      <text class="Back" @tap="goBack">‹ 返回</text>
-      <text class="AppBarTitle">作品详情</text>
+  <view class="w-full h-full bg-background-2">
+    <view class="flex flex-row items-center h-[11.733vw] px-4 bg-background border-b-[1px] border-b-stroke-2">
+      <text class="text-lg text-brand-foreground pr-4" @tap="goBack">‹ 返回</text>
+      <text class="flex-1 text-2xl font-semibold text-foreground">作品详情</text>
     </view>
 
-    <view v-if="loading" class="Center">
-      <text class="Loading">加载中…</text>
+    <view v-if="loading" class="w-full h-full flex items-center justify-center">
+      <text class="text-lg text-foreground-3">加载中…</text>
     </view>
-    <view v-else-if="errorMsg" class="Center">
-      <text class="Error">{{ errorMsg }}</text>
+    <view v-else-if="errorMsg" class="w-full h-full flex items-center justify-center">
+      <text class="text-base text-danger p-4">{{ errorMsg }}</text>
     </view>
-    <scroll-view v-else-if="illust" class="Body" scroll-orientation="vertical">
-      <image class="Hero" :src="currentImage" :mode="'widthFix'" />
-      <view v-if="pages.length > 1" class="PageNav">
-        <text class="PageBtn" @tap="prevPage">‹</text>
-        <text class="PageIdx">{{ currentPage + 1 }} / {{ pages.length }}</text>
-        <text class="PageBtn" @tap="nextPage">›</text>
+    <scroll-view v-else-if="illust" class="w-full h-full" scroll-orientation="vertical">
+      <image class="w-full bg-background" :src="currentImage" :mode="'widthFix'" />
+      <view v-if="pages.length > 1" class="flex flex-row items-center justify-center p-3">
+        <text class="text-4xl text-brand-foreground py-2 px-6" @tap="prevPage">‹</text>
+        <text class="text-base text-foreground-2 mx-4">{{ currentPage + 1 }} / {{ pages.length }}</text>
+        <text class="text-4xl text-brand-foreground py-2 px-6" @tap="nextPage">›</text>
       </view>
-      <view class="Info">
-        <text class="Title">{{ illust.title }}</text>
-        <text class="Author">by {{ illust.user.name }}</text>
-        <text class="Meta">{{ illust.width }} × {{ illust.height }}</text>
-        <text v-if="illust.total_bookmarks > 0" class="Meta">♥ {{ illust.total_bookmarks }}</text>
-        <view class="Tags">
-          <text v-for="tag in illust.tags.slice(0, 8)" :key="tag.name" class="Tag">
+      <view class="p-4 bg-background">
+        <text class="text-3xl font-bold text-foreground">{{ illust.title }}</text>
+        <text class="text-lg text-brand-foreground mt-2">by {{ illust.user.name }}</text>
+        <text class="text-sm text-foreground-3 mt-1.5">{{ illust.width }} × {{ illust.height }}</text>
+        <text v-if="illust.total_bookmarks > 0" class="text-sm text-foreground-3 mt-1.5">
+          ♥ {{ illust.total_bookmarks }}
+        </text>
+        <view class="flex flex-row flex-wrap mt-3">
+          <text
+            v-for="tag in illust.tags.slice(0, 8)"
+            :key="tag.name"
+            class="text-xs text-brand-foreground bg-background-3 rounded-[var(--borderRadiusMedium)] px-2.5 py-1 m-1"
+          >
             #{{ tag.translated_name || tag.name }}
           </text>
         </view>
@@ -85,123 +91,3 @@ onMounted(async () => {
     </scroll-view>
   </view>
 </template>
-
-<style scoped>
-.Page {
-  width: 100%;
-  height: 100%;
-  background-color: var(--colorNeutralBackground2);
-}
-
-.AppBar {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  height: 11.733vw;
-  padding: 0 4.267vw;
-  background-color: var(--colorNeutralBackground1);
-  border-bottom-width: 1px;
-  border-bottom-color: var(--colorNeutralStroke2);
-}
-
-.Back {
-  font-size: 26rpx;
-  color: var(--colorBrandForeground1);
-  padding-right: 4.267vw;
-}
-
-.AppBarTitle {
-  flex: 1;
-  font-size: 30rpx;
-  font-weight: 600;
-  color: var(--colorNeutralForeground1);
-}
-
-.Body {
-  width: 100%;
-  height: 100%;
-}
-
-.Center {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.Loading {
-  font-size: 26rpx;
-  color: var(--colorNeutralForeground3);
-}
-
-.Error {
-  font-size: 24rpx;
-  color: var(--colorPaletteRedBackground3);
-  padding: 4.267vw;
-}
-
-.Hero {
-  width: 100%;
-  background-color: var(--colorNeutralBackground1);
-}
-
-.PageNav {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  padding: 3.200vw;
-}
-
-.PageBtn {
-  font-size: 36rpx;
-  color: var(--colorBrandForeground1);
-  padding: 2.133vw 6.400vw;
-}
-
-.PageIdx {
-  font-size: 24rpx;
-  color: var(--colorNeutralForeground2);
-  margin: 0 4.267vw;
-}
-
-.Info {
-  padding: 4.267vw;
-  background-color: var(--colorNeutralBackground1);
-}
-
-.Title {
-  font-size: 32rpx;
-  font-weight: 700;
-  color: var(--colorNeutralForeground1);
-}
-
-.Author {
-  font-size: 26rpx;
-  color: var(--colorBrandForeground1);
-  margin-top: 2.133vw;
-}
-
-.Meta {
-  font-size: 22rpx;
-  color: var(--colorNeutralForeground3);
-  margin-top: 1.600vw;
-}
-
-.Tags {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  margin-top: 3.200vw;
-}
-
-.Tag {
-  font-size: 20rpx;
-  color: var(--colorBrandForeground1);
-  background-color: var(--colorNeutralBackground3);
-  border-radius: var(--borderRadiusMedium);
-  padding: 1.067vw 2.667vw;
-  margin: 1.067vw;
-}
-</style>
