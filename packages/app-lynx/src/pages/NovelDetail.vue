@@ -38,139 +38,37 @@ onMounted(async () => {
 </script>
 
 <template>
-  <view class="Page">
-    <view class="AppBar">
-      <text class="Back" @tap="goBack">‹ 返回</text>
-      <text class="AppBarTitle">小说</text>
+  <view class="w-full h-full bg-background-2">
+    <view class="flex flex-row items-center h-[11.733vw] px-4 bg-background border-b-[1px] border-b-stroke-2">
+      <text class="text-lg text-brand-foreground pr-4" @tap="goBack">‹ 返回</text>
+      <text class="flex-1 text-2xl font-semibold text-foreground">小说</text>
     </view>
 
-    <view v-if="loading" class="Center">
-      <text class="Loading">加载中…</text>
+    <view v-if="loading" class="w-full h-full flex items-center justify-center">
+      <text class="text-lg text-foreground-3">加载中…</text>
     </view>
-    <view v-else-if="errorMsg" class="Center">
-      <text class="Error">{{ errorMsg }}</text>
+    <view v-else-if="errorMsg" class="w-full h-full flex items-center justify-center">
+      <text class="text-base text-danger p-4">{{ errorMsg }}</text>
     </view>
-    <scroll-view v-else class="Body" scroll-orientation="vertical">
-      <view class="Header">
-        <text class="Title">{{ novel?.title }}</text>
-        <text class="Author">by {{ novel?.user.name }}</text>
-        <text class="Meta">
+    <scroll-view v-else class="w-full h-full" scroll-orientation="vertical">
+      <view class="py-5 px-4 bg-background mb-3">
+        <text class="text-4xl font-bold text-foreground">{{ novel?.title }}</text>
+        <text class="text-base text-brand-foreground mt-2">by {{ novel?.user.name }}</text>
+        <text class="text-xs text-foreground-3 mt-1.5">
           {{ novel?.text_length }} 字
           <template v-if="novel?.total_bookmarks != null">
              · ♥ {{ novel?.total_bookmarks }}
           </template>
         </text>
       </view>
-      <view class="Content">
-        <text v-for="(p, idx) in paragraphs" :key="idx" class="Paragraph">{{ p }}</text>
+      <view class="p-4">
+        <text v-for="(p, idx) in paragraphs" :key="idx" class="text-xl leading-[44rpx] text-foreground mb-4 block">
+          {{ p }}
+        </text>
       </view>
-      <view class="EndMark">
-        <text class="EndText">— 完 —</text>
+      <view class="flex items-center justify-center p-6">
+        <text class="text-sm text-foreground-3">— 完 —</text>
       </view>
     </scroll-view>
   </view>
 </template>
-
-<style scoped>
-.Page {
-  width: 100%;
-  height: 100%;
-  background-color: var(--colorNeutralBackground2);
-}
-
-.AppBar {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  height: 11.733vw;
-  padding: 0 4.267vw;
-  background-color: var(--colorNeutralBackground1);
-  border-bottom-width: 1px;
-  border-bottom-color: var(--colorNeutralStroke2);
-}
-
-.Back {
-  font-size: 26rpx;
-  color: var(--colorBrandForeground1);
-  padding-right: 4.267vw;
-}
-
-.AppBarTitle {
-  flex: 1;
-  font-size: 30rpx;
-  font-weight: 600;
-  color: var(--colorNeutralForeground1);
-}
-
-.Center {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.Loading {
-  font-size: 26rpx;
-  color: var(--colorNeutralForeground3);
-}
-
-.Error {
-  font-size: 24rpx;
-  color: var(--colorPaletteRedBackground3);
-  padding: 4.267vw;
-}
-
-.Body {
-  width: 100%;
-  height: 100%;
-}
-
-.Header {
-  padding: 5.333vw 4.267vw;
-  background-color: var(--colorNeutralBackground1);
-  margin-bottom: 3.200vw;
-}
-
-.Title {
-  font-size: 36rpx;
-  font-weight: 700;
-  color: var(--colorNeutralForeground1);
-}
-
-.Author {
-  font-size: 24rpx;
-  color: var(--colorBrandForeground1);
-  margin-top: 2.133vw;
-}
-
-.Meta {
-  font-size: 20rpx;
-  color: var(--colorNeutralForeground3);
-  margin-top: 1.600vw;
-}
-
-.Content {
-  padding: 4.267vw;
-}
-
-.Paragraph {
-  font-size: 28rpx;
-  line-height: 44rpx;
-  color: var(--colorNeutralForeground1);
-  margin-bottom: 4.267vw;
-  display: block;
-}
-
-.EndMark {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6.400vw;
-}
-
-.EndText {
-  font-size: 22rpx;
-  color: var(--colorNeutralForeground3);
-}
-</style>
