@@ -9,6 +9,11 @@ const nextUrl = ref<string | null>(null)
 const loading = ref(false)
 const loadingMore = ref(false)
 const errorMsg = ref('')
+// [lynx:fix] loadMore 双重防抖（与 Recommended 同款，ADR-0045）：
+// 1) 时间节流 800ms：防 scrolltolower 高频触发
+// 2) 加载完成冷却 3s：防 web-core 的 list 在内容追加/首屏初始化后延迟误触发 scrolltolower（进入时自动多加载）
+let lastLoadMoreAt = 0
+let lastLoadEndedAt = 0
 
 async function fetchFirstPage() {
   loading.value = true
@@ -21,22 +26,30 @@ async function fetchFirstPage() {
     errorMsg.value = (err as { message?: string }).message ?? '加载失败'
   } finally {
     loading.value = false
+    // [lynx:fix] 第一页加载完成同样进入冷却
+    lastLoadEndedAt = Date.now()
   }
 }
 
 async function loadMore() {
+  const now = Date.now()
+  if (now - lastLoadEndedAt < 3000) return
+  if (now - lastLoadMoreAt < 800) return
   if (!nextUrl.value || loadingMore.value) return
+  lastLoadMoreAt = now
   loadingMore.value = true
   try {
     const res = await loadNovelNext(nextUrl.value)
     const seen = new Set(novels.value.map((n) => n.id))
     const fresh = res.novels.filter((n) => !seen.has(n.id))
     novels.value.push(...fresh)
-    nextUrl.value = res.next_url
+    // 空页防护：服务端返回空列表但 next_url 仍存在时终止分页，防 web-core 下轮询空页
+    nextUrl.value = fresh.length === 0 ? null : res.next_url
   } catch (err) {
     errorMsg.value = (err as { message?: string }).message ?? '加载更多失败'
   } finally {
     loadingMore.value = false
+    lastLoadEndedAt = Date.now()
   }
 }
 

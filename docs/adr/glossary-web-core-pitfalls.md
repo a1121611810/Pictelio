@@ -32,6 +32,6 @@
 
 ## 项目现状（2026-08）
 
-`Recommended.vue` 已应用上述全部防护（实施提交 `4ce313e`）；`NovelList.vue` 同样使用 `<list>` + `scrolltolower`，若出现同类问题可复用同一套模式。原生 LynxView 是否受同样缺陷影响待 #41 集成后验证（可能全部不需要这些防护）。
+`Recommended.vue` 与 `NovelList.vue` 均已应用上述全部防护（提交 `4ce313e` / `a3f5b21`）。原生 LynxView 是否受同样缺陷影响待 #41 集成后验证（可能全部不需要这些防护）。
 
 **Tailwind 迁移后**（ADR-0046，提交 `062c7db` + `e210b48`–`1321330`）：6 页面全部改为 Tailwind utility；spacing=vw、fontSize=rpx、colors=Fluent 语义色板（引用 tokens.css 变量）；Tailwind 默认 rem 档经顶层替换排除；动态类用互斥全字符串（JIT 字面量扫描）。
