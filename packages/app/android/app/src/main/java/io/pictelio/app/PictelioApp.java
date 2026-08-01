@@ -5,7 +5,10 @@ import android.content.SharedPreferences;
 import android.util.Log;
 import android.webkit.WebView;
 
+import com.lynx.service.http.LynxHttpService;
+import com.lynx.service.log.LynxLogService;
 import com.lynx.tasm.LynxEnv;
+import com.lynx.tasm.service.LynxServiceCenter;
 
 /**
  * Pictelio Application 入口。
@@ -40,6 +43,12 @@ public class PictelioApp extends Application {
     /** Lynx runtime 初始化（须早于任何 LynxView 创建）+ 全局 Native Modules 注册（#51） */
     private void initLynx() {
         try {
+            // Lynx Service 主动注入（官方集成要求，须在 LynxView 创建前）：
+            // - LynxHttpService：lynx.fetch 依赖（未注册则原生 fetch 不可用 → 登录/API 断）
+            // - LynxLogService：日志服务
+            // 图片服务（LynxImageService）由 #54 自研后在此注册（Fresco 不传 Referer → i.pximg.net 403）
+            LynxServiceCenter.inst().registerService(LynxHttpService.INSTANCE);
+            LynxServiceCenter.inst().registerService(LynxLogService.INSTANCE);
             // 参数与官方 demo 一致：Application、null（native loader）、null（provider）、null（behaviors）
             LynxEnv.inst().init(this, null, null, null);
             // 全局注册（LynxViewBuilder per-view 注册亦可；全局保证任何 LynxView 可用）

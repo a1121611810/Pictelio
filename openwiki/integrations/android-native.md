@@ -165,7 +165,11 @@ The `encryptString` / `decryptString` static methods are key-injected (accept a 
 
 ### Lynx SDK Dependency
 
-`build.gradle` now includes `org.lynxsdk.lynx:lynx:4.0.1` as a compile dependency — required for `PictelioSecureStorageModule` to extend `LynxModule` and use `@LynxMethod` / `Callback` / `LynxContext`.
+`build.gradle` now includes three Lynx SDK dependencies:
+- `org.lynxsdk.lynx:lynx:4.0.1` — core SDK, required for `PictelioSecureStorageModule` to extend `LynxModule` and use `@LynxMethod` / `Callback` / `LynxContext`
+- `org.lynxsdk.lynx:lynx-service-http:4.0.1` — native HTTP service; without this `lynx.fetch` is unavailable, breaking all API calls and OAuth token refresh
+- `org.lynxsdk.lynx:lynx-service-log:4.0.1` — official logging service baseline
+- `lynx-service-image` (Fresco) is **not** included — `i.pximg.net` requires `Referer` headers, which Fresco does not forward, causing 403 errors; a custom `ILynxImageService` is planned (#54)
 
 ## Backup Rules & Token Storage Exclusions (ADR-0003)
 
@@ -216,7 +220,7 @@ Previously duplicated across plugins; now centralized in a single utility class.
 
 Custom `Application` class for app-level initialization. **Conditional startup (#51):** reads `pictelio_client_kind` from `SharedPreferences("CapacitorStorage")` and branches:
 
-- **`"lynx"`** → `initLynx()`: Initializes `LynxEnv.inst().init(this, …)` and globally registers `PictelioSecureStorage` and `PictelioApp` LynxModules. Enables `LynxDebug` in debug builds. Skips WebView warmup entirely.
+- **`"lynx"`** → `initLynx()`: Registers two Lynx services via `LynxServiceCenter.inst().registerService()` (HTTP + Log, required before any `LynxView` is created), then initializes `LynxEnv.inst().init(this, …)`. Globally registers `PictelioSecureStorage` and `PictelioApp` LynxModules. Enables `LynxDebug` in debug builds. Skips WebView warmup entirely. Without `LynxHttpService` registration, `lynx.fetch` is unavailable — all API calls and OAuth flows would break.
 - **`"webview"` (default)** → `warmUpWebView()`: Pre-warms the WebView service process (unchanged behavior).
 
 Exception safety: Lynx init failure is caught and logged — the app does not crash, but the lynx client path will be unavailable.
