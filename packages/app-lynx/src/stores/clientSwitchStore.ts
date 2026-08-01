@@ -1,6 +1,9 @@
 // ─── Client 切换设置（webview / lynx） ───
-// MVP：Web 模式用 localStorage 占位；原生模式由 T7 桥接 SharedPreferences。
-// 保存后自动重启：Web 模式 location.reload()；原生模式预留 restart() 桥。
+// 双路径：
+// - 原生 LynxView（#51）：NativeModules.PictelioApp —— Native 落盘
+//   SharedPreferences("CapacitorStorage") 的 "pictelio_client_kind"（与
+//   @capacitor/preferences 同文件，webview 侧可读同一开关）+ restart 重启进程
+// - Web 模式：localStorage 占位 + location.reload()
 import { ref } from "vue"
 
 export type ClientKind = "webview" | "lynx"
@@ -12,7 +15,33 @@ const _selected = ref<ClientKind>(CURRENT)
 
 export const selectedClient = _selected
 
+/** 原生 App Module（#51：NativeModules.PictelioApp）——web-core 下不存在 → null */
+function nativeAppModule() {
+  const nm = (globalThis as { NativeModules?: { PictelioApp?: PictelioAppModule } }).NativeModules
+  return nm?.PictelioApp ?? null
+}
+
+/** PictelioAppModule JS 契约（Java 侧 PictelioAppModule.java） */
+interface PictelioAppModule {
+  setClientKind(kind: string, callback: (err: string | null) => void): void
+  getClientKind(callback: (kind: string | null, err: string | null) => void): void
+  restart(callback: (err: string | null) => void): void
+}
+
 export function initClientSetting(): void {
+  const mod = nativeAppModule()
+  if (mod) {
+    // 原生模式：从 Native 读当前开关（异步回调）
+    try {
+      mod.getClientKind((kind, err) => {
+        _selected.value = !err && (kind === "webview" || kind === "lynx") ? kind : CURRENT
+      })
+    } catch {
+      _selected.value = CURRENT
+    }
+    return
+  }
+  // Web 模式（现状）：localStorage 占位
   try {
     const raw = globalThis.localStorage?.getItem(STORAGE_KEY)
     _selected.value = raw === "webview" || raw === "lynx" ? raw : CURRENT
@@ -21,8 +50,29 @@ export function initClientSetting(): void {
   }
 }
 
-/** 保存选择并重启（MVP：reload；原生桥由 T7 提供） */
+/** 保存选择并重启：原生 Native 落盘 + 进程重启；Web reload（#51） */
 export function switchClient(kind: ClientKind): void {
+  const mod = nativeAppModule()
+  if (mod) {
+    try {
+      mod.setClientKind(kind, (err) => {
+        if (err) {
+          console.warn("[clientSwitchStore] setClientKind 失败", err)
+          return
+        }
+        mod.restart((err2) => {
+          if (err2) {
+            console.warn("[clientSwitchStore] restart 失败", err2)
+          }
+        })
+      })
+    } catch (e) {
+      console.warn("[clientSwitchStore] 原生切换失败", e)
+    }
+    _selected.value = kind
+    return
+  }
+  // Web 模式（现状）
   try {
     globalThis.localStorage?.setItem(STORAGE_KEY, kind)
   } catch {

@@ -31,6 +31,11 @@ declare global {
       setItem(key: string, data: string, callback: (err: string | null) => void): void
       removeItem(key: string, callback: (err: string | null) => void): void
     }
+    PictelioApp: {
+      setClientKind(kind: string, callback: (err: string | null) => void): void
+      getClientKind(callback: (kind: string | null, err: string | null) => void): void
+      restart(callback: (err: string | null) => void): void
+    }
   } | undefined
 }
 
