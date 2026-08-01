@@ -28,115 +28,32 @@ async function submit() {
 </script>
 
 <template>
-  <view class="Login">
-    <view class="Brand">
-      <text class="BrandTitle">Pictelio</text>
-      <text class="BrandSub">Lynx Client MVP</text>
+  <view class="w-full h-full flex flex-col items-center bg-background-2 pt-[32vw]">
+    <view class="flex flex-col items-center mb-10">
+      <text class="text-6xl font-bold text-brand-foreground">Pictelio</text>
+      <text class="text-base text-foreground-3 mt-2">Lynx Client MVP</text>
     </view>
 
-    <view class="Card">
+    <!-- [lynx:fix] Card 用 flex column：子元素靠 stretch 拉伸填充父宽，
+         规避 web-core 下 input 百分比宽度相对根容器（而非父）导致的右溢出 -->
+    <view class="w-[85%] bg-background rounded-[var(--borderRadius2XLarge)] p-6 shadow-[var(--elevation4)] flex flex-col">
+      <!-- [lynx:fix] input 显式 border-box + 去 UA 边框：
+           web-core 预览未复刻 Lynx 的 border-box 默认（UA 无 box-sizing 规则），
+           content-box 下 width:100% + padding 会溢出；原生 LynxView 默认 border-box 无副作用 -->
       <input
         v-model="tokenInput"
-        class="Input"
+        class="self-stretch h-[9.6vw] box-border border-0 bg-background-3 rounded-[var(--borderRadiusLarge)] text-base text-foreground px-4 mb-3"
         placeholder="粘贴 Pixiv refresh_token"
         placeholder-color="#a19f9d"
       />
 
-      <text v-if="errorMsg" class="Error">{{ errorMsg }}</text>
+      <text v-if="errorMsg" class="text-sm text-danger mb-2">{{ errorMsg }}</text>
 
-      <view class="Submit" @tap="submit">
-        <text class="SubmitText">{{ submitting ? '登录中…' : '登录' }}</text>
+      <view class="h-[9.6vw] bg-brand rounded-[var(--borderRadiusLarge)] flex items-center justify-center" @tap="submit">
+        <text class="text-xl font-semibold text-onBrand">{{ submitting ? '登录中…' : '登录' }}</text>
       </view>
     </view>
 
-    <text class="Hint">登录后进入推荐插画 / 小说 / 个人中心</text>
+    <text class="text-xs text-foreground-3 mt-6">登录后进入推荐插画 / 小说 / 个人中心</text>
   </view>
 </template>
-
-<style scoped>
-.Login {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  background-color: var(--colorNeutralBackground2);
-  padding-top: 32.000vw;
-}
-
-.Brand {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-bottom: 10.667vw;
-}
-
-.BrandTitle {
-  font-size: 56rpx;
-  font-weight: 700;
-  color: var(--colorBrandForeground1);
-}
-
-.BrandSub {
-  font-size: 24rpx;
-  color: var(--colorNeutralForeground3);
-  margin-top: 2.133vw;
-}
-
-.Card {
-  width: 85%;
-  background-color: var(--colorNeutralBackground1);
-  border-radius: var(--borderRadius2XLarge);
-  padding: 6.400vw;
-  box-shadow: var(--elevation4);
-  /* [lynx:fix] 转 flex column：子元素靠 stretch 拉伸填充父宽，
-     规避 web-core 下 input 百分比宽度相对根容器（而非父）导致的右溢出 */
-  display: flex;
-  flex-direction: column;
-}
-
-.Input {
-  /* 宽度靠 flex stretch 填充，不写 width:100%（web-core 百分比基准异常） */
-  align-self: stretch;
-  height: 9.600vw;
-  /* [lynx:fix] web-core 预览未复刻 Lynx 的 border-box 默认（UA 无 box-sizing 规则），
-     content-box 下 width:100% + padding 会溢出父容器；显式声明拉齐原生行为。
-     原生 LynxView 默认 border-box，此声明无副作用。 */
-  box-sizing: border-box;
-  /* 浏览器 UA 默认给 input 加边框，Lynx input 无——web 预览下显式清零 */
-  border-width: 0;
-  background-color: var(--colorNeutralBackground3);
-  border-radius: var(--borderRadiusLarge);
-  font-size: 24rpx;
-  color: var(--colorNeutralForeground1);
-  padding: 0 4.267vw;
-  margin-bottom: 3.200vw;
-}
-
-.Error {
-  font-size: 22rpx;
-  color: var(--colorPaletteRedBackground3);
-  margin-bottom: 2.133vw;
-}
-
-.Submit {
-  height: 9.600vw;
-  background-color: var(--colorBrandBackground);
-  border-radius: var(--borderRadiusLarge);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.SubmitText {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: var(--colorNeutralForegroundOnBrand);
-}
-
-.Hint {
-  font-size: 20rpx;
-  color: var(--colorNeutralForeground3);
-  margin-top: 6.400vw;
-}
-</style>
