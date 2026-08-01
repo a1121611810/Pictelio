@@ -4,6 +4,7 @@ import { navigate } from '../router'
 import { loadRecommended, loadNext } from '../api/illust'
 import type { PixivIllust } from '../api/types'
 import { thumbUrl } from '../utils/imageUrl'
+import SkeletonCard from '../components/SkeletonCard.vue'
 
 const illusts = ref<PixivIllust[]>([])
 const nextUrl = ref<string | null>(null)
@@ -79,8 +80,14 @@ onMounted(() => {
 
     <text v-if="errorMsg && !loading" class="text-sm text-danger p-4">{{ errorMsg }}</text>
 
+    <!-- [lynx:fix] 骨架屏：首屏加载（无数据）时显示 shimmer 卡片占位，数据就绪后切换 list。
+         8 个 ≈ 4 行两列，与真实卡片同比例（48.4vw 宽 + 方形图片）避免切换 reflow -->
+    <view v-if="loading && illusts.length === 0" class="w-full h-full flex flex-row flex-wrap content-start p-1.5">
+      <SkeletonCard v-for="n in 8" :key="n" />
+    </view>
+
     <list
-      v-if="!loading || illusts.length > 0"
+      v-else-if="!loading || illusts.length > 0"
       class="w-full h-full"
       list-type="waterfall"
       scroll-orientation="vertical"

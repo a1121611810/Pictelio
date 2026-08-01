@@ -58,14 +58,27 @@ onMounted(async () => {
       <text class="flex-1 text-2xl font-semibold text-foreground">作品详情</text>
     </view>
 
-    <view v-if="loading" class="w-full h-full flex items-center justify-center">
-      <text class="text-lg text-foreground-3">加载中…</text>
+    <!-- [lynx:fix] 骨架屏：加载中显示 shimmer 占位（图片区 1:1 + 文字条），数据就绪后切换 scroll-view -->
+    <view v-if="loading" class="w-full h-full bg-background-2">
+      <view class="shimmer aspect-[1/1] w-full" />
+      <view class="p-4">
+        <view class="shimmer h-[32rpx] rounded-[var(--borderRadiusSmall)] w-[75%]" />
+        <view class="shimmer h-[24rpx] rounded-[var(--borderRadiusSmall)] mt-2 w-[40%]" />
+        <view class="shimmer h-[24rpx] rounded-[var(--borderRadiusSmall)] mt-1.5 w-[60%]" />
+      </view>
     </view>
     <view v-else-if="errorMsg" class="w-full h-full flex items-center justify-center">
       <text class="text-base text-danger p-4">{{ errorMsg }}</text>
     </view>
     <scroll-view v-else-if="illust" class="w-full h-full" scroll-orientation="vertical">
-      <image class="w-full bg-background" :src="currentImage" :mode="'widthFix'" />
+      <!-- [lynx:fix] 详情大图：widthFix 在 lynx 不存在（web-core 回退 fill 高度 0 → 图片不可见）。
+           改用 API 返回的 width/height 动态 aspect-ratio + aspectFill，容器按原图比例完整显示 -->
+      <image
+        class="w-full bg-background"
+        :style="{ aspectRatio: `${illust.width} / ${illust.height}` }"
+        :src="currentImage"
+        :mode="'aspectFill'"
+      />
       <view v-if="pages.length > 1" class="flex flex-row items-center justify-center p-3">
         <text class="text-4xl text-brand-foreground py-2 px-6" @tap="prevPage">‹</text>
         <text class="text-base text-foreground-2 mx-4">{{ currentPage + 1 }} / {{ pages.length }}</text>

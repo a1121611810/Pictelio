@@ -223,6 +223,16 @@ Routes: `/login` → `/recommended` → `/illust/:id` → `/novel-list` → `/no
 
 Located in `/packages/app-lynx/src/api/`. Mirrors the main app's Pixiv API surface (`auth.ts`, `client.ts`, `illust.ts`, `novel.ts`, `types.ts`) but uses `globalThis.fetch` via a [`fetchWrapper`](/packages/app-lynx/src/utils/fetchWrapper.ts) adapter (the Lynx worker runtime shadows bare `fetch`). Bearer token attachment is decided based on the `rewriteUrl`-transformed URL.
 
+### Image Rendering & Loading States
+
+The Lynx MVP has evolved specific patterns for image display and loading UX that differ from the main SolidJS app due to web-core rendering quirks (see [ADR-0048](/docs/adr/ADR-0048-lynx-recommended-card-layout.md) and [glossary-web-core-pitfalls](/docs/adr/glossary-web-core-pitfalls.md)):
+
+- **Image display:** Lynx's `<image>` component does not support `widthFix` mode (silently falls back to `fill`, causing zero-height or stretched images). The app uses **`aspectFill` mode with explicit `aspect-ratio` containers** — `aspect-[1/1]` for square thumbnails in recommended/follow lists, and **dynamic `aspect-ratio` computed from API `width/height`** for detail page images (`IllustDetail.vue`). This avoids the `widthFix` → `fill` → 0-height pitfall documented in [glossary-web-core-pitfalls](/docs/adr/glossary-web-core-pitfalls.md).
+- **Waterfall card layout:** `Recommended.vue` list cards **must not use `w-full`** (web-core resolves percentage widths against the viewport, not the parent column). Width is left to the list engine's column constraint. Card spacing uses `<list>`'s `list-main-axis-gap` / `list-cross-axis-gap` attributes (not margin/padding on items, which do not participate in waterfall layout in web-core).
+- **Shimmer skeleton screen:** A global `.shimmer` CSS class with `@keyframes shimmer` animation is defined in `App.vue` (uses `linear-gradient` + `background-position` — confirmed working in web-core; native LynxView support pending [#41](https://github.com/user/pixivizer/issues/41)). Two loading states use this:
+  - **Recommended list:** 8 `SkeletonCard` components (`/packages/app-lynx/src/components/SkeletonCard.vue`) render as shimmer placeholders (square image + two text bars matching `ImageCard` layout) during the initial data fetch, eliminating the reflow when real cards replace a text "loading" message.
+  - **IllustDetail:** A full-width square shimmer image + three text bars replace the previous "加载中…" text during illust data loading.
+
 ### Known MVP Limitations
 
 - **No cell recycling:** `vue-lynx` #302 cell recycling is a no-op; safe up to ~5k list items (empirically verified)
