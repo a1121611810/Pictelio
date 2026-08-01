@@ -26,15 +26,15 @@ function pickClient(kind: ClientKind) {
 </script>
 
 <template>
-  <view class="Page">
-    <view class="AppBar">
-      <text class="Back" @tap="goBack">‹ 返回</text>
-      <text class="AppBarTitle">我的</text>
+  <view class="w-full h-full bg-background-2">
+    <view class="flex flex-row items-center h-[11.733vw] px-4 bg-background border-b-[1px] border-b-stroke-2">
+      <text class="text-lg text-brand-foreground pr-4" @tap="goBack">‹ 返回</text>
+      <text class="flex-1 text-2xl font-semibold text-foreground">我的</text>
     </view>
 
-    <view v-if="currentUser" class="Profile">
+    <view v-if="currentUser" class="flex flex-row items-center py-5 px-4 bg-background">
       <image
-        class="Avatar"
+        class="w-12 h-12 rounded-[6.4vw] bg-background-3"
         :src="
           proxyImageUrl(
             currentUser.profile_image_urls?.px_170x170 ||
@@ -43,174 +43,48 @@ function pickClient(kind: ClientKind) {
           )
         "
       />
-      <view class="ProfileInfo">
-        <text class="Name">{{ currentUser.name }}</text>
-        <text class="Account">@{{ currentUser.account }}</text>
+      <view class="ml-4 flex flex-col">
+        <text class="text-3xl font-bold text-foreground">{{ currentUser.name }}</text>
+        <text class="text-sm text-foreground-3 mt-1">@{{ currentUser.account }}</text>
       </view>
     </view>
 
-    <view class="Section">
-      <text class="SectionTitle">Client 切换</text>
-      <text class="SectionDesc">选择渲染引擎后保存并重启生效</text>
-      <view class="OptionRow" @tap="pickClient('webview')">
-        <view class="OptionText">
-          <text class="OptionLabel">WebView（现有）</text>
-          <text class="OptionSub">SolidJS + Capacitor</text>
+    <view class="bg-background mt-3 p-4">
+      <text class="text-lg font-semibold text-foreground">Client 切换</text>
+      <text class="text-xs text-foreground-3 mt-1 mb-3">选择渲染引擎后保存并重启生效</text>
+      <view
+        class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-stroke-3"
+        @tap="pickClient('webview')"
+      >
+        <view class="flex flex-col">
+          <text class="text-lg text-foreground">WebView（现有）</text>
+          <text class="text-xs text-foreground-3 mt-0.5">SolidJS + Capacitor</text>
         </view>
-        <view class="Radio" :class="{ Checked: selectedClient === 'webview' }" />
+        <view
+          class="w-[4.8vw] h-[4.8vw] rounded-[2.4vw] border-2"
+          :class="selectedClient === 'webview' ? 'border-brand-stroke bg-brand' : 'border-stroke'"
+        />
       </view>
-      <view class="OptionRow" @tap="pickClient('lynx')">
-        <view class="OptionText">
-          <text class="OptionLabel">Lynx（当前）</text>
-          <text class="OptionSub">vue-lynx 原生渲染</text>
+      <view
+        class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-stroke-3"
+        @tap="pickClient('lynx')"
+      >
+        <view class="flex flex-col">
+          <text class="text-lg text-foreground">Lynx（当前）</text>
+          <text class="text-xs text-foreground-3 mt-0.5">vue-lynx 原生渲染</text>
         </view>
-        <view class="Radio" :class="{ Checked: selectedClient === 'lynx' }" />
+        <view
+          class="w-[4.8vw] h-[4.8vw] rounded-[2.4vw] border-2"
+          :class="selectedClient === 'lynx' ? 'border-brand-stroke bg-brand' : 'border-stroke'"
+        />
       </view>
-      <text v-if="switching" class="Switching">正在重启切换…</text>
+      <text v-if="switching" class="text-sm text-brand-foreground mt-3">正在重启切换…</text>
     </view>
 
-    <view class="Section">
-      <view class="DangerRow" @tap="onLogout">
-        <text class="Danger">退出登录</text>
+    <view class="bg-background mt-3 p-4">
+      <view class="py-3.5" @tap="onLogout">
+        <text class="text-lg text-danger">退出登录</text>
       </view>
     </view>
   </view>
 </template>
-
-<style scoped>
-.Page {
-  width: 100%;
-  height: 100%;
-  background-color: var(--colorNeutralBackground2);
-}
-
-.AppBar {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  height: 11.733vw;
-  padding: 0 4.267vw;
-  background-color: var(--colorNeutralBackground1);
-  border-bottom-width: 1px;
-  border-bottom-color: var(--colorNeutralStroke2);
-}
-
-.Back {
-  font-size: 26rpx;
-  color: var(--colorBrandForeground1);
-  padding-right: 4.267vw;
-}
-
-.AppBarTitle {
-  flex: 1;
-  font-size: 30rpx;
-  font-weight: 600;
-  color: var(--colorNeutralForeground1);
-}
-
-.Profile {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  padding: 5.333vw 4.267vw;
-  background-color: var(--colorNeutralBackground1);
-}
-
-.Avatar {
-  width: 12.800vw;
-  height: 12.800vw;
-  border-radius: 6.400vw;
-  background-color: var(--colorNeutralBackground3);
-}
-
-.ProfileInfo {
-  margin-left: 4.267vw;
-  display: flex;
-  flex-direction: column;
-}
-
-.Name {
-  font-size: 32rpx;
-  font-weight: 700;
-  color: var(--colorNeutralForeground1);
-}
-
-.Account {
-  font-size: 22rpx;
-  color: var(--colorNeutralForeground3);
-  margin-top: 1.067vw;
-}
-
-.Section {
-  background-color: var(--colorNeutralBackground1);
-  margin-top: 3.200vw;
-  padding: 4.267vw;
-}
-
-.SectionTitle {
-  font-size: 26rpx;
-  font-weight: 600;
-  color: var(--colorNeutralForeground1);
-}
-
-.SectionDesc {
-  font-size: 20rpx;
-  color: var(--colorNeutralForeground3);
-  margin-top: 1.067vw;
-  margin-bottom: 3.200vw;
-}
-
-.OptionRow {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  padding: 3.733vw 0;
-  border-bottom-width: 1px;
-  border-bottom-color: var(--colorNeutralStroke3);
-}
-
-.OptionText {
-  display: flex;
-  flex-direction: column;
-}
-
-.OptionLabel {
-  font-size: 26rpx;
-  color: var(--colorNeutralForeground1);
-}
-
-.OptionSub {
-  font-size: 20rpx;
-  color: var(--colorNeutralForeground3);
-  margin-top: 0.533vw;
-}
-
-.Radio {
-  width: 4.800vw;
-  height: 4.800vw;
-  border-radius: 2.400vw;
-  border-width: 2px;
-  border-color: var(--colorNeutralStroke1);
-}
-
-.Radio.Checked {
-  border-color: var(--colorBrandStroke1);
-  background-color: var(--colorBrandBackground);
-}
-
-.Switching {
-  font-size: 22rpx;
-  color: var(--colorBrandForeground1);
-  margin-top: 3.200vw;
-}
-
-.DangerRow {
-  padding: 3.733vw 0;
-}
-
-.Danger {
-  font-size: 26rpx;
-  color: var(--colorPaletteRedBackground3);
-}
-</style>
