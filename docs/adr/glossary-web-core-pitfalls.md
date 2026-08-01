@@ -16,6 +16,8 @@
 | **空页防护（empty-page guard）** | `loadMore` 返回 `fresh.length === 0` 时置 `nextUrl = null` 终止分页，防服务端返回空页但 next_url 仍存在时轮询空页。 |
 | **HMR 不可靠** | rspeedy dev 对 vue-lynx `<style scoped>` 样式与组件热更新支持不完整（错误如 `lynx.requireModuleAsync is not a function`、hot-update 404）。**样式改动后建议直接重启 dev server + 强刷**，不要依赖 HMR。 |
 | **百分比宽度基准异常** | web-core 下部分元素（实测 `<input>`）的 `width: %` 相对**根容器**而非父元素。嵌套百分比场景才暴露：父 `85%` + 子 `100%` → 子按视口宽度计算，右溢出。**防护：用 flex stretch 拉伸替代百分比**（flex item 按父实际布局宽度计算）。 |
+| **rem 单位风险** | web-core 的 wasm 转换模板含 `calc(N * var(--rem-unit))` 引用，但 client.css 未定义 `--rem-unit`——理论会塌陷；**原型实测 Tailwind 默认 rem 档未塌陷**（当前 web-core 未实际启用该转换）。防护：配置层仍禁 rem（Tailwind spacing/fontSize 顶层替换为 vw/rpx），防 web-core 未来升级启用转换。 |
+| **Tailwind JIT 类名扫描** | Tailwind v3 JIT 只编译源码**字面量**类名——动态拼接类名不会生效。防护：动态类用互斥全字符串三元（如 `cond ? 'a-class' : 'b-class'`），且新类后需重启 dev server（HMR 不扫新类）。 |
 | **vw 原生解析** | `transformVW` 默认关闭时 vw 由浏览器 CSSOM 原生解析（不经 cqw 变量链）——web 预览下唯一可靠且响应式的长度单位（详见 ADR-0044）。 |
 
 ## 缺陷与防护对照
@@ -31,3 +33,5 @@
 ## 项目现状（2026-08）
 
 `Recommended.vue` 已应用上述全部防护（实施提交 `4ce313e`）；`NovelList.vue` 同样使用 `<list>` + `scrolltolower`，若出现同类问题可复用同一套模式。原生 LynxView 是否受同样缺陷影响待 #41 集成后验证（可能全部不需要这些防护）。
+
+**Tailwind 迁移后**（ADR-0046，提交 `062c7db` + `e210b48`–`1321330`）：6 页面全部改为 Tailwind utility；spacing=vw、fontSize=rpx、colors=Fluent 语义色板（引用 tokens.css 变量）；Tailwind 默认 rem 档经顶层替换排除；动态类用互斥全字符串（JIT 字面量扫描）。

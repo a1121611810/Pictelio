@@ -279,6 +279,8 @@ const tokensCss = readFileSync(resolve(rootDir, 'src/styles/tokens.css'), 'utf-8
 describe('tailwind.config 契约（Tailwind ↔ tokens.css）', () => {
   it('colors 映射引用的每个 CSS 变量都存在于 tokens.css', () => {
     // 提取 tailwind.config 里 colors 段引用的 var(--xxx)
+    // 注意：此分割依赖 colors 为 theme.extend 的最后一个键（且缩进 4 空格），
+    // 重构 tailwind.config 时若调整键序/缩进需同步此解析，否则会静默误测
     const colorsSection = tailwindConfigSrc.split('colors: {')[1].split('\n  }')[0]
     const referenced = [...new Set([...colorsSection.matchAll(/var\((--[a-zA-Z0-9]+)\)/g)].map((m) => m[1]))]
     expect(referenced.length).toBeGreaterThan(0)
