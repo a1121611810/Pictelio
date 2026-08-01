@@ -89,11 +89,22 @@ async function submit() {
   border-radius: var(--borderRadius2XLarge);
   padding: 6.400vw;
   box-shadow: var(--elevation4);
+  /* [lynx:fix] 转 flex column：子元素靠 stretch 拉伸填充父宽，
+     规避 web-core 下 input 百分比宽度相对根容器（而非父）导致的右溢出 */
+  display: flex;
+  flex-direction: column;
 }
 
 .Input {
-  width: 100%;
+  /* 宽度靠 flex stretch 填充，不写 width:100%（web-core 百分比基准异常） */
+  align-self: stretch;
   height: 9.600vw;
+  /* [lynx:fix] web-core 预览未复刻 Lynx 的 border-box 默认（UA 无 box-sizing 规则），
+     content-box 下 width:100% + padding 会溢出父容器；显式声明拉齐原生行为。
+     原生 LynxView 默认 border-box，此声明无副作用。 */
+  box-sizing: border-box;
+  /* 浏览器 UA 默认给 input 加边框，Lynx input 无——web 预览下显式清零 */
+  border-width: 0;
   background-color: var(--colorNeutralBackground3);
   border-radius: var(--borderRadiusLarge);
   font-size: 24rpx;
