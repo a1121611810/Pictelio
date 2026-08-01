@@ -68,7 +68,7 @@ onMounted(fetchFirstPage)
 <template>
   <view class="w-full h-full bg-background-2">
     <view class="flex flex-row items-center h-[11.733vw] px-4 bg-background border-b-[1px] border-b-stroke-2">
-      <text class="text-lg text-brand-foreground pr-4" @tap="goBack">‹ 返回</text>
+      <view class="py-1 pr-2" @tap="goBack"><text class="text-lg text-brand-foreground pr-4">‹ 返回</text></view>
       <text class="flex-1 text-2xl font-semibold text-foreground">推荐小说</text>
     </view>
 

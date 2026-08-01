@@ -4,7 +4,6 @@ import { currentParams, goBack } from '../router'
 import { loadDetail } from '../api/illust'
 import type { PixivIllust } from '../api/types'
 import { proxyImageUrl } from '../utils/imageUrl'
-import SkeletonImage from '../components/SkeletonImage.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 
 const illust = ref<PixivIllust | null>(null)
@@ -56,7 +55,7 @@ onMounted(async () => {
 <template>
   <view class="w-full h-full bg-background-2">
     <view class="flex flex-row items-center h-[11.733vw] px-4 bg-background border-b-[1px] border-b-stroke-2">
-      <text class="text-lg text-brand-foreground pr-4" @tap="goBack">‹ 返回</text>
+      <view class="py-1 pr-2" @tap="goBack"><text class="text-lg text-brand-foreground pr-4">‹ 返回</text></view>
       <text class="flex-1 text-2xl font-semibold text-foreground">作品详情</text>
     </view>
 
@@ -73,13 +72,16 @@ onMounted(async () => {
       <text class="text-base text-danger p-4">{{ errorMsg }}</text>
     </view>
     <scroll-view v-else-if="illust" class="w-full h-full" scroll-orientation="vertical">
-      <!-- [lynx:fix] 详情大图（SkeletonImage）：API 宽高比动态 aspect-ratio + aspectFill 完整显示；
-           图片 @load 后才隐藏 shimmer（widthFix 在 lynx 不存在须用 aspect-ratio，且骨架关闭时机 = 图片加载完成） -->
-      <SkeletonImage :src="currentImage" :aspect-ratio="`${illust.width} / ${illust.height}`" />
+      <!-- [lynx:fix] 详情大图：SkeletonImage 的 style aspectRatio/minHeight 在原生 scroll-view 内
+           失效 → 容器高度 0、大图空白（真机实测 2026-08-02）。改固定高度容器
+           （Tailwind h-[100vw]）+ 裸 image（aspectFill），不依赖 aspect-ratio style -->
+      <view class="relative w-full h-[100vw] bg-background-3 overflow-hidden">
+        <image v-if="currentImage" class="w-full h-full" :src="currentImage" :mode="'aspectFill'" />
+      </view>
       <view v-if="pages.length > 1" class="flex flex-row items-center justify-center p-3">
-        <text class="text-4xl text-brand-foreground py-2 px-6" @tap="prevPage">‹</text>
+        <view class="py-1 pr-2" @tap="prevPage"><text class="text-4xl text-brand-foreground py-2 px-6">‹</text></view>
         <text class="text-base text-foreground-2 mx-4">{{ currentPage + 1 }} / {{ pages.length }}</text>
-        <text class="text-4xl text-brand-foreground py-2 px-6" @tap="nextPage">›</text>
+        <view class="py-2 px-3" @tap="nextPage"><text class="text-4xl text-brand-foreground py-2 px-6">›</text></view>
       </view>
       <view class="p-4 bg-background">
         <text class="text-3xl font-bold text-foreground">{{ illust.title }}</text>

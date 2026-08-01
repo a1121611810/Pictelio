@@ -81,8 +81,13 @@ onMounted(() => {
   <view class="w-full h-full bg-background-2">
     <view class="flex flex-row items-center h-[11.733vw] px-4 bg-background border-b-[1px] border-b-stroke-2">
       <text class="flex-1 text-3xl font-bold text-foreground">推荐插画</text>
-      <text class="text-lg text-brand-foreground ml-6" @tap="openNovels">小说</text>
-      <text class="text-lg text-brand-foreground ml-6" @tap="openMe">我的</text>
+      <!-- [lynx:fix] 原生 text 元素 @tap 失效（真机实测）→ 外层 view 包 tap（view tap 已验证工作） -->
+      <view class="ml-6 px-1 py-1" @tap="openNovels">
+        <text class="text-lg text-brand-foreground">小说</text>
+      </view>
+      <view class="ml-6 px-1 py-1" @tap="openMe">
+        <text class="text-lg text-brand-foreground">我的</text>
+      </view>
     </view>
 
     <text v-if="errorMsg && !loading" class="text-sm text-danger p-4">{{ errorMsg }}</text>
@@ -108,8 +113,10 @@ onMounted(() => {
         :key="item.id"
         :item-key="String(item.id)"
         class="bg-background rounded-[var(--borderRadiusXLarge)] flex flex-col overflow-hidden"
-        @tap="openDetail(item.id)"
       >
+        <!-- [lynx:fix] 原生 list-item 根级 @tap 失效（fiber 不触发，真机实测 2026-08-02）；
+             把 openDetail 绑到内容 view（子元素 tap 已验证工作），♥ 的 @tap.stop 仍阻止冒泡 -->
+        <view class="w-full flex flex-col" @tap="openDetail(item.id)">
         <!-- [lynx:fix] 间距：web-core 瀑布流引擎忽略 list-item 的 margin/padding 且内部任何 view 包裹
              都会导致 item 定位计算崩（全部重叠在起点）。间距用 list 官方属性
              list-main-axis-gap（行距）/ list-cross-axis-gap（列距），经 vue-lynx style 对象绑定
@@ -125,6 +132,7 @@ onMounted(() => {
             :initial-bookmarked="item.is_bookmarked"
             :bookmark-count="item.total_bookmarks"
           />
+        </view>
         </view>
       </list-item>
       <list-item v-if="loadingMore" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
