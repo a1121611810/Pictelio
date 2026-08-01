@@ -85,6 +85,7 @@ onMounted(() => {
       list-type="waterfall"
       scroll-orientation="vertical"
       span-count="2"
+      :style="{ listMainAxisGap: '12px', listCrossAxisGap: '12px' }"
       :lower-threshold-item-count="2"
       @scrolltolower="loadMore"
     >
@@ -92,17 +93,24 @@ onMounted(() => {
         v-for="item in illusts"
         :key="item.id"
         :item-key="item.id"
-        class="w-full bg-background rounded-[var(--borderRadiusXLarge)] m-1.5 flex flex-col overflow-hidden"
+        class="bg-background rounded-[var(--borderRadiusXLarge)] flex flex-col overflow-hidden"
         @tap="openDetail(item.id)"
       >
+        <!-- [lynx:fix] 间距：web-core 瀑布流引擎忽略 list-item 的 margin/padding 且内部任何 view 包裹
+             都会导致 item 定位计算崩（全部重叠在起点）。间距用 list 官方属性
+             list-main-axis-gap（行距）/ list-cross-axis-gap（列距），经 vue-lynx style 对象绑定
+             （attribute 形式 web-core 不响应）。原生 LynxView 同样支持这两个属性（ADR-0048） -->
         <!-- [lynx:fix] min-height 用 vw 保底：web-core 预览下 rpx 布局属性塌陷（--rpx-unit 失效）
-             且 auto-size 不生效，卡片高度为 0 会导致 scrolltolower 无限触发；
-             原生 LynxView 下 auto-size 正常计算真实高度覆盖此保底。40vw = 150px @375 -->
+             且 aspect-ratio 在图片加载前不保证算出高度，卡片塌陷会导致 scrolltolower 无限触发；
+             原生 LynxView 下 aspect-ratio 按列宽计算真实高度覆盖此保底。40vw = 150px @375 -->
+        <!-- [lynx:fix] 禁止 w-full：web-core 下 percentage 宽度相对视口而非父容器（嵌套百分比暴露），
+             list-item / x-image 都会被拉成视口宽、超出列被 overflow-hidden 裁剪 → 图片显示不全；
+             宽度交给 waterfall 引擎约束为列宽，aspect-[1/1] 使容器成正方形，方形缩略图完整显示。
+             mode=aspectFill：web-core 映射 object-fit:cover 且原生支持（widthFix 仅原生支持、web-core 不认） -->
         <image
-          class="w-full bg-background-3 min-h-[40vw]"
+          class="bg-background-3 min-h-[40vw] aspect-[1/1]"
           :src="thumbUrl(item.image_urls)"
           :mode="'aspectFill'"
-          auto-size
         />
         <text class="text-lg font-semibold text-foreground mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
         <text class="text-sm text-foreground-2 mt-1 mx-2.5 [max-line:1]">{{ item.user.name }}</text>

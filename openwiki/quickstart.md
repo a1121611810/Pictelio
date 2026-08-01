@@ -104,6 +104,7 @@ Architecture Decision Records live in `/docs/adr/`. Notable ones:
 | 0044 | app-lynx responsive unit selection — fontSize uses `rpx`, width/spacing/padding uses `vw`; backed by [glossary-lynx-units](/docs/adr/glossary-lynx-units.md) |
 | 0045 | app-lynx scrolltolower infinite-loading fix — web-core mis-trigger, root-caused to `scrolltolower` event firing when list is empty/short |
 | 0046 | app-lynx Tailwind CSS migration — spacing=vw, fontSize=rpx, Fluent semantic color palette via `@lynx-js/tailwind-preset`; all 6 pages migrated (Login → Me, T2–T8) |
+| 0047 | app-lynx automated visual verification — CDP + Vivaldi persistent profile; recursive shadowRoot/iframe traversal to penetrate lynx-view render boundary; `Input.insertText` for login (vue-lynx v-model unresponsive to native events); 6-page Tailwind utility verification matrix |
 
 ## Key Source Files
 
