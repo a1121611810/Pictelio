@@ -55,6 +55,8 @@ public class PictelioApp extends Application {
             // 全局注册（LynxViewBuilder per-view 注册亦可；全局保证任何 LynxView 可用）
             LynxEnv.inst().registerModule("PictelioSecureStorage", PictelioSecureStorageModule.class);
             LynxEnv.inst().registerModule("PictelioApp", PictelioAppModule.class);
+            LynxEnv.inst().registerModule("PictelioAuth", PictelioAuthModule.class);
+            LynxEnv.inst().registerModule("PictelioApi", PictelioApiModule.class);
             LynxEnv.inst().enableLynxDebug(BuildConfig.DEBUG);
         } catch (Throwable t) {
             Log.w(TAG, "Lynx 初始化失败（lynx client 将不可用）", t);
