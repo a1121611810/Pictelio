@@ -179,6 +179,32 @@ A LynxModule for client-switching and native app control, used by the [app-lynx 
 
 Callback signatures follow the same null-free pattern as `PictelioSecureStorageModule` — `CallbackImpl` on real devices crashes on `null` arguments.
 
+### PictelioApiModule
+
+**Java:** `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioApiModule.java` (57 lines, new in #53)
+
+A LynxModule for Pixiv API forwarding, used by the [app-lynx client](/openwiki/architecture/overview.md#app-lynx-vue-lynx-client)'s [API layer](/openwiki/architecture/overview.md#api-client). Exposed to Lynx JS via `NativeModules.PictelioApi`. Wraps `PixivApiPlugin.executeRequest()` — the same package-private static method used by the Capacitor plugin path — so both webview and Lynx clients share a single OkHttp connection pool and 401 refresh logic.
+
+| Method | Contract |
+|--------|----------|
+| `request(method, path, body, cb)` | JS passes HTTP method, API path (may include query string), and body; Java constructs the full URL (`app-api.pixiv.net`), injects `Authorization: Bearer`, `Referer`, and `User-Agent` headers, and handles 401 → silent token refresh → retry internally. Callback receives `(status, data, rotatedRefreshToken)` — status is the HTTP code (0 on network/forwarding error), data is the response body JSON string, and the third param is a new `refresh_token` if rotation occurred (empty string otherwise). **access_token is never returned to JS.** |
+
+The rotated `refresh_token` callback (third parameter) allows the JS side to persist the new token via `saveRefreshToken()` → `PictelioSecureStorage`, preventing the client from restoring a stale token after restart.
+
+### PictelioAuthModule
+
+**Java:** `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioAuthModule.java` (87 lines, new in #53)
+
+A LynxModule for OAuth authentication, used by the [app-lynx client](/openwiki/architecture/overview.md#app-lynx-vue-lynx-client)'s [`authStore`](/packages/app-lynx/src/stores/authStore.ts). Exposed to Lynx JS via `NativeModules.PictelioAuth`. Wraps `PixivApiPlugin.oauthTokenExchange()` for the OAuth refresh_token exchange — same logic as the Capacitor `AuthPlugin`.
+
+| Method | Contract |
+|--------|----------|
+| `loginWithRefreshToken(token, cb)` | Performs the OAuth token exchange via `PixivApiPlugin.oauthTokenExchange()`. On success: writes `access_token` into `PixivApiPlugin.accessToken` (Java heap only, **never returned to JS**), writes rotated `refresh_token` (if any) into `PixivApiPlugin.refreshToken`, and calls back with `(userInfoJson, "")` — userInfoJson contains `userId`, `userName`, `userAccount`, `profileImageUrls`, and the `refreshToken` (for JS-side persistence). On failure: `("", errMsg)`. |
+| `setAccessToken(token)` | Fallback: pushes an access_token into Java heap (used when JS has a token from a web-mode OAuth flow). No callback. |
+| `clearTokens(cb)` | Logout: nullifies both `PixivApiPlugin.accessToken` and `PixivApiPlugin.refreshToken`. Callback: `("", "")`. |
+
+**Security model:** The `access_token` flows in only one direction — JS → Java (via `setAccessToken` or `loginWithRefreshToken`). It is never extracted back to JS. All API requests go through `PictelioApiModule.request()`, where Java injects the Bearer token internally. This mirrors the Capacitor `PixivApiPlugin` security model: the WebView and LynxView are both treated as untrusted JS environments.
+
 ### Lynx SDK Dependency
 
 `build.gradle` includes these Lynx SDK dependencies:
@@ -356,6 +382,8 @@ The full release process is documented in `/docs/release-checklist.md` (6.2 KB),
 | OAuthPlugin (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/OAuthPlugin.java` |
 | PixivApiPlugin (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PixivApiPlugin.java` |
 | PictelioSecureStorageModule (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioSecureStorageModule.java` |
+| PictelioApiModule (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioApiModule.java` |
+| PictelioAuthModule (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioAuthModule.java` |
 | SecureStorageCompat (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/SecureStorageCompat.java` |
 | SecureStorageCompatTest (Java) | `/packages/app/android/app/src/test/java/io/pictelio/app/SecureStorageCompatTest.java` |
 | Backup rules (Android 12+) | `/packages/app/android/app/src/main/res/xml/data_extraction_rules.xml` |

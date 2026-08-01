@@ -145,6 +145,115 @@ def login_elements(w, h, rows):
     return result
 
 
+def classify(w, h, rows):
+    """细粒度页面分类（完整流程自动化用）。
+
+    返回 {"page": recommended|detail|text|me|login|blank, "colored": 彩色占比,
+          "red": 红色像素数, "topbar": 顶部导航栏是否有内容}
+    """
+    colored = 0
+    total = 0
+    red = 0
+    topbar = 0
+    # 彩色行分布：判断"单大块"（详情图）vs"多块分散"（瀑布流）
+    col_bands = {}
+    for y in range(0, h, 6):
+        band = y // 60
+        for x in range(0, w, 12):
+            r, g, b = pixel(rows, y, x)
+            total += 1
+            if saturated(r, g, b):
+                colored += 1
+                col_bands[band] = col_bands.get(band, 0) + 1
+            if 60 <= y <= 220 and not is_whiteish(r, g, b):
+                topbar += 1
+            if r > 170 and g < 110 and b < 110:
+                red += 1
+    ratio = colored / total if total else 0
+    # 彩色集中度：最大连续彩色带（单大块 = 详情图）
+    bands = sorted(col_bands.items())
+    max_run = 0
+    run = 0
+    prev = -10
+    for b, _n in bands:
+        run = run + 1 if b - prev <= 2 else 1
+        max_run = max(max_run, run)
+        prev = b
+
+    # 顶部导航栏：y 80-210 的深色文字（登录页 pt-32vw 顶部空白，无导航文字）
+    topbar_text = 0
+    for y in range(80, 210, 4):
+        for x in range(0, w, 8):
+            r, g, b = pixel(rows, y, x)
+            if r < 120 and g < 120 and b < 120:
+                topbar_text += 1
+
+    # 登录页：品牌蓝大按钮（y 850-1150 密集蓝）+ 无顶部导航文字
+    blue_btn = 0
+    blue_total = 0
+    for y in range(850, 1150, 4):
+        for x in range(0, w, 8):
+            r, g, b = pixel(rows, y, x)
+            blue_total += 1
+            if is_blue(r, g, b):
+                blue_btn += 1
+    if blue_total > 0 and blue_btn * 100 // blue_total >= 2 and topbar_text < 30:
+        return {"page": "login", "colored": round(ratio, 3), "red": red}
+
+    has_topbar = topbar_text > 30
+
+    # 详情页：单一大块（max_run 连续彩色带 ≥8 = 480px+，大图）+ 中部非白密集
+    if has_topbar and max_run >= 8:
+        mid_nonwhite = 0
+        mid_total = 0
+        for y in range(220, min(h, 1400), 8):
+            for x in range(0, w, 16):
+                r, g, b = pixel(rows, y, x)
+                mid_total += 1
+                if not is_whiteish(r, g, b):
+                    mid_nonwhite += 1
+        mid_ratio = mid_nonwhite / mid_total if mid_total else 0
+        if mid_ratio > 0.4:
+            return {"page": "detail", "colored": round(ratio, 3), "red": red}
+
+    if has_topbar:
+        if ratio > 0.25 and max_run >= 8:
+            return {"page": "detail", "colored": round(ratio, 3), "red": red}
+        if ratio > 0.05:
+            return {"page": "recommended", "colored": round(ratio, 3), "red": red}
+        # 中部大块非白（浅色大图/文本页）→ 详情或文本：靠顶部栏+标题文字区分
+        mid_nonwhite = 0
+        mid_total = 0
+        for y in range(220, min(h, 1200), 8):
+            for x in range(0, w, 16):
+                r, g, b = pixel(rows, y, x)
+                mid_total += 1
+                if not is_whiteish(r, g, b):
+                    mid_nonwhite += 1
+        mid_ratio = mid_nonwhite / mid_total if mid_total else 0
+        if mid_ratio > 0.35 and ratio > 0.01:
+            # 顶部有标题文字（深色行）+ 中部大块 → 详情页（大图浅色时彩色低）
+            dark_top = 0
+            for y in range(220, 400, 4):
+                for x in range(60, 1020, 8):
+                    r, g, b = pixel(rows, y, x)
+                    if r < 120 and g < 120 and b < 120:
+                        dark_top += 1
+            if dark_top > 30:
+                return {"page": "detail", "colored": round(ratio, 3), "red": red}
+            return {"page": "text", "colored": round(ratio, 3), "red": red}
+        if ratio > 0.005:
+            return {"page": "text", "colored": round(ratio, 3), "red": red}
+        return {"page": "me", "colored": round(ratio, 3), "red": red}
+    # 无顶部栏：登录页（品牌蓝按钮）或空白
+    for y in range(850, 1150, 4):
+        for x in range(0, w, 8):
+            r, g, b = pixel(rows, y, x)
+            if is_blue(r, g, b):
+                return {"page": "login", "colored": round(ratio, 3), "red": red}
+    return {"page": "blank", "colored": round(ratio, 3), "red": red}
+
+
 def page_state(w, h, rows):
     """判断页面状态：login / blank / skeleton / images。"""
     blue_btn_area = 0  # 登录按钮区（y 900-1150）品牌蓝
@@ -175,6 +284,8 @@ def main():
         print(json.dumps(login_elements(w, h, rows)))
     elif mode == "page-state":
         print(json.dumps(page_state(w, h, rows)))
+    elif mode == "classify":
+        print(json.dumps(classify(w, h, rows)))
     else:
         print(json.dumps({"error": f"unknown mode {mode}"}))
 
