@@ -264,3 +264,38 @@ describe('proxyRedact.redactProxyUrl（代理凭据脱敏）', () => {
     expect(redactProxyUrl('user:secret@host:badport')).toBe('host:badport')
   })
 })
+
+// ─── Tailwind 配置契约测试（issue #43） ───
+// 契约：tailwind.config 颜色映射引用的每个 CSS 变量必须真实存在于 tokens.css。
+// 从源码文件提取比对（真实样例，非手写 mock——实现错了测试不会全绿）。
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const tailwindConfigSrc = readFileSync(resolve(rootDir, 'tailwind.config.ts'), 'utf-8')
+const tokensCss = readFileSync(resolve(rootDir, 'src/styles/tokens.css'), 'utf-8')
+
+describe('tailwind.config 契约（Tailwind ↔ tokens.css）', () => {
+  it('colors 映射引用的每个 CSS 变量都存在于 tokens.css', () => {
+    // 提取 tailwind.config 里 colors 段引用的 var(--xxx)
+    const colorsSection = tailwindConfigSrc.split('colors: {')[1].split('\n  }')[0]
+    const referenced = [...new Set([...colorsSection.matchAll(/var\((--[a-zA-Z0-9]+)\)/g)].map((m) => m[1]))]
+    expect(referenced.length).toBeGreaterThan(0)
+    for (const varName of referenced) {
+      expect(tokensCss, `tokens.css 缺少 ${varName}`).toContain(`${varName}:`)
+    }
+  })
+
+  it('spacing 映射全部使用 vw 单位（不引入 rem——web-core 已知坑）', () => {
+    const spacingSection = tailwindConfigSrc.split('spacing: {')[1].split('\n  }')[0]
+    expect(spacingSection).not.toMatch(/rem/)
+    expect(spacingSection).toMatch(/vw/)
+  })
+
+  it('fontSize 映射全部使用 rpx 单位（沿用现有字号语义）', () => {
+    const fontSizeSection = tailwindConfigSrc.split('fontSize: {')[1].split('\n  }')[0]
+    expect(fontSizeSection).not.toMatch(/rem/)
+    expect(fontSizeSection).toMatch(/rpx/)
+  })
+})

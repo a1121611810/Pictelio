@@ -1,5 +1,6 @@
 import { defineConfig } from '@lynx-js/rspeedy'
 import { pluginVueLynx } from 'vue-lynx/plugin'
+import { pluginTailwindCSS } from 'rsbuild-plugin-tailwindcss'
 import { HttpsProxyAgent } from 'https-proxy-agent'
 import { readFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
@@ -105,6 +106,10 @@ export default defineConfig({
       optionsApi: false,
       enableCSSInlineVariables: true,
       enableCSSInheritance: true,
+    }),
+    pluginTailwindCSS({
+      config: 'tailwind.config.ts',
+      exclude: [/[\\/]node_modules[\\/]/],
     }),
   ],
 })

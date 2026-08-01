@@ -15,6 +15,8 @@ onMounted(() => {
 
 <style>
 @import './styles/tokens.css';
+@tailwind base;
+@tailwind utilities;
 
 .Root {
   width: 100%;
