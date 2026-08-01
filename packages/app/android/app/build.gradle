@@ -79,6 +79,8 @@ dependencies {
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // Lynx SDK（#52 起引入：LynxModule 编译依赖；完整配置见 #51 原生 LynxView 壳）
+    implementation "org.lynxsdk.lynx:lynx:4.0.1"
     testImplementation "junit:junit:$junitVersion"
     testImplementation "org.robolectric:robolectric:4.14.1"
     testImplementation "androidx.test:core:1.6.1"
