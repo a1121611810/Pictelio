@@ -337,3 +337,142 @@ describe('tailwind.config 契约（Tailwind ↔ tokens.css）', () => {
     expect(fontSizeSection).toMatch(/rpx/)
   })
 })
+
+describe('client 原生模式 API 转发（#53：JS 零知 access_token）', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+  beforeEach(async () => {
+    // 清模块级状态（单例跨测试共享）：避免 401 触发前序测试注册的 onUnauthorizedHandler
+    const { setOnUnauthorized, setAccessToken, setAuthPermanentFailure } = await import('../src/api/client')
+    setOnUnauthorized(null)
+    setAccessToken('')
+    setAuthPermanentFailure(false)
+  })
+
+  it('apiClient.get 原生模式 → PictelioApi.request + 2xx 解析', async () => {
+    const requestMock = vi.fn((_m: string, _p: string, _b: string, cb: (s: number, d: string) => void) =>
+      cb(200, JSON.stringify({ ok: true })),
+    )
+    vi.stubGlobal('NativeModules', { PictelioApi: { request: requestMock } })
+    const { apiClient } = await import('../src/api/client')
+    const res = await apiClient.get('/v1/illust/detail', { id: '1' })
+    expect(res).toEqual({ ok: true })
+    expect(requestMock).toHaveBeenCalledWith('GET', '/v1/illust/detail?id=1', '', expect.any(Function))
+  })
+
+  it('apiClient.get 原生模式 4xx → reject ApiError（classifyError）', async () => {
+    vi.stubGlobal('NativeModules', {
+      PictelioApi: { request: (_m: string, _p: string, _b: string, cb: (s: number, d: string) => void) =>
+        cb(404, JSON.stringify({ error: { message: 'not found' } })) },
+    })
+    const { apiClient } = await import('../src/api/client')
+    await expect(apiClient.get('/v1/x')).rejects.toMatchObject({ status: 404 })
+  })
+
+  it('apiClient.get 原生模式 JS 无 access_token 不抛未登录（token 在 Java 堆）', async () => {
+    const requestMock = vi.fn((_m: string, _p: string, _b: string, cb: (s: number, d: string) => void) =>
+      cb(401, JSON.stringify({})),
+    )
+    vi.stubGlobal('NativeModules', { PictelioApi: { request: requestMock } })
+    const { apiClient, getAccessToken, setAccessToken } = await import('../src/api/client')
+    setAccessToken('') // 清模块级残留（模块单例跨测试共享）
+    await expect(apiClient.get('/v1/x')).rejects.toMatchObject({ status: 401 })
+    expect(requestMock).toHaveBeenCalled()
+    expect(getAccessToken()).toBe('') // JS 零知
+  })
+})
+
+describe('authStore 原生模式登录（#53：Native OAuth 交换，token 不进 JS）', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('登录成功 → user 设置 + 新 refresh_token 持久化（走 PictelioSecureStorage）', async () => {
+    const setItemMock = vi.fn((_k: string, _v: string, cb: () => void) => cb())
+    vi.stubGlobal('NativeModules', {
+      PictelioAuth: {
+        loginWithRefreshToken: (_t: string, cb: (info: string, err: string) => void) =>
+          cb(
+            JSON.stringify({
+              userId: 1,
+              userName: 'テスト',
+              userAccount: 'test',
+              profileImageUrls: { medium: 'https://x/avatar.png' },
+              refreshToken: 'new-token',
+            }),
+            '',
+          ),
+      },
+      PictelioSecureStorage: {
+        setItem: setItemMock,
+        getItem: (_k: string, cb: (v: string | null, e: string | null) => void) => cb(null, ''),
+        removeItem: (_k: string, cb: () => void) => cb(),
+      },
+    })
+    const { loginWithToken, isLoggedIn, currentUser } = await import('../src/stores/authStore')
+    await loginWithToken('old-token')
+    expect(isLoggedIn.value).toBe(true)
+    expect(currentUser.value?.name).toBe('テスト')
+    // access_token 不进 JS（getAccessToken 仍空）；refresh_token 经原生存储持久化
+    expect(setItemMock).toHaveBeenCalledWith('refresh_token', 'new-token', expect.any(Function))
+  })
+
+  it('登录失败 → authError + 永久失效（不登录）', async () => {
+    vi.stubGlobal('NativeModules', {
+      PictelioAuth: {
+        loginWithRefreshToken: (_t: string, cb: (info: string, err: string) => void) =>
+          cb('', '登录凭证无效或已失效'),
+      },
+    })
+    const { loginWithToken, isLoggedIn, authError } = await import('../src/stores/authStore')
+    await loginWithToken('bad-token')
+    expect(isLoggedIn.value).toBe(false)
+    expect(authError.value).toBe('登录凭证无效或已失效')
+  })
+})
+
+describe('authStore logout 原生模式（#53：清 Java 堆 token）', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('logout 原生模式 → PictelioAuth.clearTokens 被调用', async () => {
+    const clearTokensMock = vi.fn((cb: () => void) => cb())
+    vi.stubGlobal('NativeModules', {
+      PictelioAuth: { clearTokens: clearTokensMock },
+      PictelioSecureStorage: {
+        setItem: (_k: string, _v: string, cb: () => void) => cb(),
+        getItem: (_k: string, cb: (v: string | null) => void) => cb(null),
+        removeItem: (_k: string, cb: () => void) => cb(),
+      },
+    })
+    const { logout } = await import('../src/stores/authStore')
+    logout()
+    expect(clearTokensMock).toHaveBeenCalled()
+  })
+})
+
+describe('client 原生模式 401 轮换（#53：refresh_token 持久化到 Keystore）', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('request 回调携带 rotated → saveRefreshToken 写入原生存储', async () => {
+    const setItemMock = vi.fn((_k: string, _v: string, cb: () => void) => cb())
+    vi.stubGlobal('NativeModules', {
+      PictelioApi: {
+        request: (_m: string, _p: string, _b: string, cb: (s: number, d: string, r: string) => void) =>
+          cb(200, JSON.stringify({ ok: true }), 'rotated-new-token'),
+      },
+      PictelioSecureStorage: {
+        setItem: setItemMock,
+        getItem: (_k: string, cb: (v: string | null) => void) => cb(null),
+        removeItem: (_k: string, cb: () => void) => cb(),
+      },
+    })
+    const { apiClient } = await import('../src/api/client')
+    await apiClient.get('/v1/illust/detail')
+    expect(setItemMock).toHaveBeenCalledWith('refresh_token', 'rotated-new-token', expect.any(Function))
+  })
+})

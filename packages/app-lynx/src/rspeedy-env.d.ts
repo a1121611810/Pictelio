@@ -36,6 +36,19 @@ declare global {
       getClientKind(callback: (kind: string | null, err: string | null) => void): void
       restart(callback: (err: string | null) => void): void
     }
+    PictelioAuth: {
+      loginWithRefreshToken(token: string, callback: (userInfo: string, err: string) => void): void
+      setAccessToken(token: string): void
+      clearTokens(callback: (arg1: string, arg2: string) => void): void
+    }
+    PictelioApi: {
+      request(
+        method: string,
+        path: string,
+        body: string,
+        callback: (status: number, data: string, rotatedRefreshToken: string) => void,
+      ): void
+    }
   } | undefined
 }
 

@@ -5,7 +5,7 @@
 // - 原生 LynxView（#41）：Lynx Native Module 对齐主项目 @aparajita Keystore
 //   存储（同 key/同加密，登录态与 webview client 共享）
 import { ref, computed } from "vue"
-import { setAccessToken, setOnUnauthorized, setAuthPermanentFailure } from "../api/client"
+import { isNativeMode, getNativeModules, setAccessToken, setOnUnauthorized, setAuthPermanentFailure } from "../api/client"
 import { loginWithRefreshToken } from "../api/auth"
 import type { PixivUser } from "../api/types"
 import { toApiError } from "../utils/errors"
@@ -43,6 +43,62 @@ export async function loginWithToken(token: string): Promise<void> {
 
 async function performRefresh(token: string): Promise<boolean> {
   _authError.value = null
+
+  // #53 原生模式：Native OAuth 交换——access_token 只留 Java 堆，JS 零知
+  if (isNativeMode()) {
+    const auth = getNativeModules()?.PictelioAuth as {
+      loginWithRefreshToken: (token: string, callback: (userInfo: string, err: string) => void) => void
+      clearTokens: (callback: (arg1: string, arg2: string) => void) => void
+    } | undefined
+    if (!auth) {
+      _authError.value = "原生认证模块不可用"
+      return false
+    }
+    return new Promise((resolve) => {
+      auth.loginWithRefreshToken(token, (userInfoJson: string, err: string) => {
+        if (err) {
+          _authError.value = err
+          // 仅凭证类错误（OAuth 400）标记永久失效；网络/解析类错误允许重试
+          if (err.includes("凭证") || err.includes("invalid")) {
+            setAuthPermanentFailure(true)
+            _accessTokenReady.value = false
+            _user.value = null
+            _refreshToken.value = null
+          }
+          resolve(false)
+          return
+        }
+        try {
+          const info = JSON.parse(userInfoJson) as {
+            userId: number
+            userName: string
+            userAccount: string
+            profileImageUrls?: Record<string, string>
+            refreshToken?: string
+          }
+          _user.value = {
+            id: info.userId,
+            name: info.userName,
+            account: info.userAccount,
+            profile_image_urls: info.profileImageUrls ?? {},
+          } as PixivUser
+          const newToken = info.refreshToken || token
+          _refreshToken.value = newToken
+          _accessTokenReady.value = true
+          setAuthPermanentFailure(false)
+          // 原生模式 JS 零知 access_token——不调用 setAccessToken（API 请求走 Native 附加）
+          void saveRefreshToken(newToken).catch((e) => {
+            console.warn("[authStore] 持久化 refresh_token 失败（维持内存态）", e)
+          })
+          resolve(true)
+        } catch (e) {
+          _authError.value = "登录响应解析失败"
+          resolve(false)
+        }
+      })
+    })
+  }
+
   try {
     const resp = await loginWithRefreshToken(token)
     applyAuthResponse(resp)
@@ -78,6 +134,13 @@ function applyAuthResponse(resp: {
 }
 
 export function logout() {
+  // #53 原生模式：清 Java 堆 token（access_token/refresh_token），避免登出后 API 仍鉴权
+  if (isNativeMode()) {
+    const auth = getNativeModules()?.PictelioAuth as
+      | { clearTokens: (callback: (arg1: string, arg2: string) => void) => void }
+      | undefined
+    auth?.clearTokens(() => {})
+  }
   setAccessToken("")
   setAuthPermanentFailure(false)
   _refreshToken.value = null

@@ -4,6 +4,7 @@
 // 此处预留接口边界 —— fetch 抽象 + 401 刷新 Promise queue。
 import { ApiErrorType, type ApiError } from "./types"
 import { requestFetch } from "../utils/fetchWrapper"
+import { saveRefreshToken } from "../utils/tokenStorage"
 import { PIXIV_USER_AGENT, PIXIV_REFERER, PIXIV_CONTENT_TYPE, PIXIV_API_BASE, PIXIV_AUTH_BASE } from "./userAgent"
 
 export interface PixivApiClient {
@@ -119,6 +120,17 @@ export function isNativeMode(): boolean {
   return typeof NativeModules !== "undefined" || !!g.NativeModules
 }
 
+/** 统一取 NativeModules（bare ?? globalThis 双通道，与 isNativeMode 探测一致） */
+export function getNativeModules(): {
+  PictelioSecureStorage?: unknown
+  PictelioAuth?: unknown
+  PictelioApi?: unknown
+  PictelioApp?: unknown
+} | undefined {
+  return (typeof NativeModules !== "undefined" ? NativeModules : undefined) ??
+    (globalThis as { NativeModules?: unknown }).NativeModules as never
+}
+
 // ─── URL 重写：Pixiv 直连 URL → 本地代理路径 ───
 export function rewriteUrl(path: string): string {
   // 原生 LynxView（#53）：无 dev proxy。绝对 URL 直连（凭证/签名仍在 JS 内存，MVP 形态）；
@@ -171,6 +183,45 @@ async function execute<T>(
   signal?: AbortSignal,
 ): Promise<T> {
   if (authPermanentFailure) throw new Error("认证已失效，请重新登录")
+
+  // #53 原生模式：API 转发 Native（Java 附加 Bearer + 401 刷新），JS 零知 access_token
+  if (isNativeMode()) {
+    const api = getNativeModules()?.PictelioApi as {
+      request: (
+        method: string,
+        path: string,
+        body: string,
+        callback: (status: number, data: string, rotatedRefreshToken: string) => void,
+      ) => void
+    } | undefined
+    if (!api) {
+      throw { type: ApiErrorType.NETWORK, message: "原生 API 模块不可用" } as ApiError
+    }
+    const query = data ? "?" + new URLSearchParams(data).toString() : ""
+    const bodyStr = body ? new URLSearchParams(body).toString() : ""
+    return new Promise<T>((resolve, reject) => {
+      api.request(method, path + query, bodyStr, (status, dataStr, rotated) => {
+        // 401 刷新轮换了 refresh_token → 持久化（Keystore，供重启恢复），避免旧 token 硬失败
+        if (rotated) {
+          void saveRefreshToken(rotated).catch((e) => {
+            console.warn("[client] 持久化轮换 refresh_token 失败", e)
+          })
+        }
+        let parsed: unknown = null
+        try {
+          parsed = dataStr ? JSON.parse(dataStr) : null
+        } catch {
+          parsed = null
+        }
+        if (status >= 200 && status < 300) {
+          resolve(parsed as T)
+        } else {
+          reject(classifyError(status, null, parsed))
+        }
+      })
+    })
+  }
+
   if (method === "GET" && !accessToken) {
     throw { type: ApiErrorType.UNAUTHORIZED, message: "未登录，请先登录" } as ApiError
   }
@@ -246,7 +297,11 @@ function request<T>(
     const promise = execWithAuthRetry<T>(() => execute<T>(method, path, data, undefined, signal))
     if (!signal) {
       inflightGetRequests.set(key, promise)
-      void promise.finally(() => inflightGetRequests.delete(key))
+      // 双回调清理：单 finally 的派生 promise 在 reject 时无 handler → unhandled rejection（#53 测试暴露）
+      promise.then(
+        () => inflightGetRequests.delete(key),
+        () => inflightGetRequests.delete(key),
+      )
     }
     return promise
   }
