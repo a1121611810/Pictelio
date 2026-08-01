@@ -1,4 +1,5 @@
 import type { Component } from "solid-js";
+import { App } from "@capacitor/app";
 import { Preferences } from "@capacitor/preferences";
 import { isLoggedIn, logout } from "../stores/authStore";
 import { clearImageCache } from "../utils/imageLoader";
@@ -7,6 +8,7 @@ import { clearTranslationCache } from "../utils/translationCache";
 import { resetBlockedIds } from "../stores/blockStore";
 import { resetReportedIds } from "../stores/reportStore";
 import { resetSettingsStore as resetUiStore } from "../stores/settingsStore";
+import { setClientKind } from "../utils/clientSwitch";
 import FluentIcon from "../components/ui/FluentIcon";
 import PageTransition from "../components/PageTransition";
 import SettingsAppearance from "../components/settings/SettingsAppearance";
@@ -14,6 +16,7 @@ import SettingsContent from "../components/settings/SettingsContent";
 import SettingsImage from "../components/settings/SettingsImage";
 import SettingsTranslate from "../components/settings/SettingsTranslate";
 import SettingsAccount from "../components/settings/SettingsAccount";
+import SettingsClient from "../components/settings/SettingsClient";
 import SettingsDialogs from "../components/settings/SettingsDialogs";
 
 function openDeleteAccountPage() {
@@ -27,7 +30,7 @@ const Settings: Component = () => {
   const [showBlocklist, setShowBlocklist] = createSignal(false);
   const [actionToast, setActionToast] = createSignal<string | null>(null);
   const [dialogState, setDialogState] = createSignal<
-    { type: "clear" } | { type: "deleteAccount" } | null
+    { type: "clear" } | { type: "deleteAccount" } | { type: "switchClient" } | null
   >(null);
 
   // Auto-hide the age gate hint toast
@@ -79,6 +82,28 @@ const Settings: Component = () => {
     } else {
       setActionToast("本地数据已清除");
     }
+  }
+
+  /** 切换到 Lynx 客户端：写入开关 → 退出应用（重开后由 MainActivity 入口路由分发） */
+  async function handleSwitchClient() {
+    setDialogState(null);
+    try {
+      await setClientKind("lynx");
+    } catch (e) {
+      console.warn("[settings] 写入 client 开关失败", e);
+      setActionToast("切换失败，请重试");
+      return;
+    }
+    setActionToast("已切换到 Lynx，正在退出…");
+    // 短暂展示 toast 后退出；Web 环境无 exitApp，仅提示
+    setTimeout(() => {
+      void (async () => {
+        const [err] = await tryAsync(App.exitApp());
+        if (err) {
+          console.warn("[settings] App.exitApp 不可用（Web 环境）——请手动重启应用", err);
+        }
+      })();
+    }, 600);
   }
 
   return (
@@ -145,6 +170,10 @@ const Settings: Component = () => {
 
           <fluent-divider />
 
+          <SettingsClient onSwitchRequest={() => setDialogState({ type: "switchClient" })} />
+
+          <fluent-divider />
+
           {/* Logout — kept in Settings.tsx per design choice */}
           <Show when={isLoggedIn()}>
             <div
@@ -189,6 +218,7 @@ const Settings: Component = () => {
           dialogType={dialogState()?.type ?? null}
           onCloseDialog={() => setDialogState(null)}
           onConfirmClear={handleClearLocalData}
+          onConfirmSwitchClient={handleSwitchClient}
           onConfirmDelete={() => {
             setDialogState(null);
             openDeleteAccountPage();
