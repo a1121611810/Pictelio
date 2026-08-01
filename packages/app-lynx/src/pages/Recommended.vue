@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
+defineOptions({ name: 'recommended' })
 import { ref, onMounted } from 'vue'
 import { navigate } from '../router'
 import { loadRecommended, loadNext } from '../api/illust'

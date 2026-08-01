@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { navigate } from '../router'
+import { navigate, resetHistory } from '../router'
 import { loginWithToken, isLoggedIn } from '../stores/authStore'
 import { authError } from '../stores/authStore'
 
@@ -15,7 +15,9 @@ async function submit() {
   try {
     await loginWithToken(tokenInput.value)
     if (isLoggedIn.value) {
-      await navigate('/recommended')
+      // [lynx:fix] 登录成功 = 会话新起点：清历史栈 + replace 导航（ADR-0049）
+      resetHistory()
+      await navigate('/recommended', { replace: true })
     } else {
       errorMsg.value = authError.value ?? '登录失败'
     }

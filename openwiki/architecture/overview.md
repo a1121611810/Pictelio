@@ -211,6 +211,16 @@ Uses a **hand-rolled in-memory router** (`/packages/app-lynx/src/router.ts`) rat
 
 Routes: `/login` → `/recommended` → `/illust/:id` → `/novel-list` → `/novel/:id` → `/me`.
 
+### Page Instance Caching & Navigation History
+
+[ADR-0049](/docs/adr/ADR-0049-lynx-keepalive-page-cache.md) introduced two mechanisms to achieve "back without reload" (matching the main SolidJS app's feedStore caching + scroll restoration):
+
+**KeepAlive page caching** (`App.vue`): `<KeepAlive :include="['recommended', 'novels', 'me']">` wraps the dynamic `<component :is>`. When navigating away from and back to a cached page, the component instance is **preserved** — `onMounted` does not re-run, so data, list DOM, scroll position, and image loading state are all retained. Detail pages are **not cached** (excluded from the include list) because they load data by `:id` — caching an old id's instance would show incorrect content.
+
+**Navigation history stack** (`router.ts`): `navigate(path)` pushes the current path onto a history stack before switching. `goBack()` pops the previous path and navigates there; when the stack is empty (refresh/deep-link boundary), it falls back to `/recommended`. Login-related navigation (`/login`, login success → `/recommended`, `initRouter` first route) uses **replace semantics** (`{ replace: true }`) — these paths are not pushed onto the stack, so the login page is never reachable via back navigation. `resetHistory()` clears the stack on login/logout to start a fresh session.
+
+Page components must declare a `name` via `defineOptions({ name: 'xxx' })` for KeepAlive's `include` to match them.
+
 ### Auth & Security
 
 - **Credential source:** `lynx.config.ts` reads from `../app/credentials.json5` (single source of truth with the main app)

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
+defineOptions({ name: 'novels' })
 import { ref, onMounted } from 'vue'
 import { navigate, goBack } from '../router'
 import { loadRecommendedNovels, loadNovelNext } from '../api/novel'

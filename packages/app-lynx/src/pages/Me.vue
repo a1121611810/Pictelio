@@ -1,6 +1,8 @@
 <script setup lang="ts">
+// [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
+defineOptions({ name: 'me' })
 import { ref, onMounted } from 'vue'
-import { navigate, goBack, ensureAuth } from '../router'
+import { navigate, goBack, ensureAuth, resetHistory } from '../router'
 import { currentUser, logout, isLoggedIn } from '../stores/authStore'
 import { selectedClient, switchClient, type ClientKind } from '../stores/clientSwitchStore'
 import { proxyImageUrl } from '../utils/imageUrl'
@@ -14,7 +16,9 @@ onMounted(async () => {
 
 function onLogout() {
   logout()
-  void navigate('/login')
+  // [lynx:fix] 登出 = 会话结束：清历史栈 + replace 导航，登录页不应被"返回"（ADR-0049）
+  resetHistory()
+  void navigate('/login', { replace: true })
 }
 
 function pickClient(kind: ClientKind) {

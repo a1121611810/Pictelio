@@ -106,6 +106,7 @@ Architecture Decision Records live in `/docs/adr/`. Notable ones:
 | 0046 | app-lynx Tailwind CSS migration — spacing=vw, fontSize=rpx, Fluent semantic color palette via `@lynx-js/tailwind-preset`; all 6 pages migrated (Login → Me, T2–T8) |
 | 0047 | app-lynx automated visual verification — CDP + Vivaldi persistent profile; recursive shadowRoot/iframe traversal to penetrate lynx-view render boundary; `Input.insertText` for login (vue-lynx v-model unresponsive to native events); 6-page Tailwind utility verification matrix |
 | 0048 | app-lynx recommended card layout — `Recommended.vue` waterfall cards use `aspect-[1/1]` containers + `aspectFill` (not `widthFix`), list-engine column width (not `w-full`), list `gap` attributes (not margin); detail page `IllustDetail.vue` extends pattern with dynamic `aspect-ratio` from API `width/height`; shimmer skeleton screen for list and detail loading states (global `@keyframes shimmer` + `SkeletonCard.vue`) |
+| 0049 | app-lynx back without reload — `App.vue` `<KeepAlive>` caches list/static page instances (recommended/novels/me) so returning from detail doesn't remount or refetch; `router.ts` navigation history stack with replace semantics for login routes; component `defineOptions({ name })` for KeepAlive `include` matching |
 
 ## Key Source Files
 

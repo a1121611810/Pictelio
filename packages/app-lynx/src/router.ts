@@ -36,6 +36,10 @@ export const routes: RouteDef[] = [
 
 const _state = ref<RouteState>({ name: '', path: '/login', params: {} })
 
+// [lynx:fix] 极简历史栈（ADR-0049）：navigate 默认入栈，goBack 出栈回上一页；
+// 登录相关导航用 replace 语义（不入栈）——登录页不应被"返回"。
+const _history: string[] = []
+
 export const routeState = _state
 
 export const currentComponent = computed<Component | null>(() => {
@@ -45,33 +49,52 @@ export const currentComponent = computed<Component | null>(() => {
 
 export const currentParams = computed(() => _state.value.params)
 
-export async function navigate(path: string): Promise<void> {
+export interface NavigateOptions {
+  /** replace 语义：不入历史栈（登录/登出/首路由） */
+  replace?: boolean
+}
+
+export async function navigate(path: string, opts?: NavigateOptions): Promise<void> {
   const m = matchRoute(routes, path)
   if (!m) {
     _state.value = { name: '', path: '/login', params: {} }
     return
   }
+  if (!opts?.replace && _state.value.path !== path) {
+    _history.push(_state.value.path)
+  }
   _state.value = { name: m.route.name, path, params: m.params }
+}
+
+/** 清空历史栈（登录/登出后调用，会话新起点） */
+export function resetHistory(): void {
+  _history.length = 0
 }
 
 /** 未登录守卫：保证进入受保护页面前完成 token 恢复 */
 export async function ensureAuth(): Promise<boolean> {
   if (isLoggedIn.value) return true
   const ok = await restoreToken()
-  if (!ok) navigate('/login')
+  if (!ok) navigate('/login', { replace: true })
   return ok
 }
 
 export function goBack(): void {
-  // MVP：无历史栈，受保护页回退到推荐页
-  if (_state.value.path !== '/login') {
-    _state.value = { name: 'recommended', path: '/recommended', params: {} }
+  // [lynx:fix] 历史栈 pop 回上一页（ADR-0049）；栈空或目标无效时回退推荐页
+  const prev = _history.pop()
+  if (prev && prev !== _state.value.path) {
+    const m = matchRoute(routes, prev)
+    if (m) {
+      _state.value = { name: m.route.name, path: prev, params: m.params }
+      return
+    }
   }
+  _state.value = { name: 'recommended', path: '/recommended', params: {} }
 }
 
-/** 初始化（App 挂载时调用）：注册 401 刷新 + 首路由 */
+/** 初始化（App 挂载时调用）：注册 401 刷新 + 首路由（replace 不入栈） */
 export async function initRouter(): Promise<void> {
   registerUnauthorizedHandler()
   const ok = await restoreToken()
-  void navigate(ok ? '/recommended' : '/login')
+  void navigate(ok ? '/recommended' : '/login', { replace: true })
 }

@@ -9,7 +9,11 @@ onMounted(() => {
 
 <template>
   <page class="Root">
-    <component :is="currentComponent" />
+    <!-- [lynx:fix] KeepAlive 缓存列表/静态页实例（ADR-0049）：详情返回列表不重载。
+         详情页不在 include 白名单——按 :id 加载，缓存旧 id 实例会显示错误内容 -->
+    <KeepAlive :include="['recommended', 'novels', 'me']">
+      <component :is="currentComponent" />
+    </KeepAlive>
   </page>
 </template>
 
