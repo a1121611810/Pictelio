@@ -106,7 +106,7 @@ onMounted(() => {
       <list-item
         v-for="item in illusts"
         :key="item.id"
-        :item-key="item.id"
+        :item-key="String(item.id)"
         class="bg-background rounded-[var(--borderRadiusXLarge)] flex flex-col overflow-hidden"
         @tap="openDetail(item.id)"
       >

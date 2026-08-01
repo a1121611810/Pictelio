@@ -1,9 +1,9 @@
 // ─── OAuth 认证（app-lynx MVP） ───
 // Web 模式：spark-md5 签名 + fetch 走 /pixiv-oauth 代理（与现有 app _oauthFetch 同源）。
 // __CREDENTIALS__ 仅在 __DEV__ 分支引用 —— 生产构建整块消除，凭证不进 bundle。
-import { setAccessToken, isOAuthTokenErrorResponse } from "./client"
+import { setAccessToken, isOAuthTokenErrorResponse, isNativeMode } from "./client"
 import type { PixivAuthResponse } from "./types"
-import { PIXIV_USER_AGENT } from "./userAgent"
+import { PIXIV_USER_AGENT, PIXIV_AUTH_BASE } from "./userAgent"
 import { requestFetch } from "../utils/fetchWrapper"
 // 静态 import：vue-lynx web 环境的 background worker 对动态 import 的 chunk 路径处理
 // 有 bug（publicPath 缺 /__web_preview 前缀），改用静态 import。
@@ -47,7 +47,10 @@ export async function oauthTokenRequest(
     ...extraParams,
   }).toString()
 
-  const resp = await requestFetch("/pixiv-oauth/auth/token", {
+  // 原生 LynxView（#53）：无 dev proxy → 绝对 URL 直连 oauth.secure.pixiv.net；
+  // web-core 走 /pixiv-oauth 代理（与现有 app _oauthFetch 同源）
+  const oauthUrl = isNativeMode() ? PIXIV_AUTH_BASE : "/pixiv-oauth/auth/token"
+  const resp = await requestFetch(oauthUrl, {
     method: "POST",
     headers: { ...headers, "Content-Type": "application/x-www-form-urlencoded" },
     body: bodyStr,

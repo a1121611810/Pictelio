@@ -109,8 +109,26 @@ export function classifyError(status: number, error: unknown, responseBody?: unk
   }
 }
 
+// ─── 原生环境探测（#53：LynxView 下 NativeModules 存在） ───
+// web-core（dev 预览）无 NativeModules → 走 web 逻辑（相对代理路径）。
+// 注意：lynx runtime 的 NativeModules 是「全局内置对象」（官方文档 declare let
+// NativeModules 直接引用），可能不在 globalThis 上（真机实测 99900 证明
+// globalThis.NativeModules 为 undefined）→ 必须同时检查裸 NativeModules。
+export function isNativeMode(): boolean {
+  const g = globalThis as { NativeModules?: unknown }
+  return typeof NativeModules !== "undefined" || !!g.NativeModules
+}
+
 // ─── URL 重写：Pixiv 直连 URL → 本地代理路径 ───
 export function rewriteUrl(path: string): string {
+  // 原生 LynxView（#53）：无 dev proxy。绝对 URL 直连（凭证/签名仍在 JS 内存，MVP 形态）；
+  // /pixiv-img 相对路径交给 PictelioImageService 原生重写（不走 fetch）。
+  if (isNativeMode()) {
+    if (path.startsWith("http")) return path
+    if (path.startsWith("/pixiv-img")) return path
+    if (path.startsWith("/pixiv-oauth")) return PIXIV_AUTH_BASE
+    return PIXIV_API_BASE + (path.startsWith("/") ? path : `/${path}`)
+  }
   if (path.startsWith("/pixiv-")) return path
   if (path.startsWith("http")) {
     // 精确主机 + 路径前缀匹配（防止 app-api.pixiv.net.evil.com 这类
@@ -138,6 +156,10 @@ export function rewriteUrl(path: string): string {
  * 纯函数，可单测。
  */
 export function shouldAttachAuth(rewrittenUrl: string): boolean {
+  // 原生模式（#53）：rewriteUrl 仅生成 Pixiv 域绝对 URL，直接携带 Bearer
+  if (isNativeMode()) {
+    return rewrittenUrl.startsWith("http")
+  }
   return rewrittenUrl.startsWith("/pixiv-")
 }
 

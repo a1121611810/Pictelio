@@ -95,6 +95,42 @@ describe('client.rewriteUrl', () => {
   })
 })
 
+describe('client 原生模式（#53：NativeModules 存在 → 绝对 URL 直连）', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('rewriteUrl 相对 API 路径 → 绝对 apiBaseUrl', () => {
+    vi.stubGlobal('NativeModules', { PictelioApp: {} })
+    expect(rewriteUrl('/v1/illust/recommended')).toBe(
+      'https://app-api.pixiv.net/v1/illust/recommended',
+    )
+  })
+
+  it('rewriteUrl 绝对 URL 原样（不重写为代理路径）', () => {
+    vi.stubGlobal('NativeModules', { PictelioApp: {} })
+    expect(rewriteUrl('https://app-api.pixiv.net/v1/x')).toBe('https://app-api.pixiv.net/v1/x')
+    expect(rewriteUrl('https://oauth.secure.pixiv.net/auth/token')).toBe(
+      'https://oauth.secure.pixiv.net/auth/token',
+    )
+  })
+
+  it('rewriteUrl /pixiv-img 相对路径原样（交给原生 PictelioImageService）', () => {
+    vi.stubGlobal('NativeModules', { PictelioApp: {} })
+    expect(rewriteUrl('/pixiv-img/x.jpg')).toBe('/pixiv-img/x.jpg')
+  })
+
+  it('shouldAttachAuth 原生绝对 URL → 附加 Bearer', () => {
+    vi.stubGlobal('NativeModules', { PictelioApp: {} })
+    expect(shouldAttachAuth('https://app-api.pixiv.net/v1/x')).toBe(true)
+  })
+
+  it('web 模式行为不变（无 NativeModules）', () => {
+    expect(rewriteUrl('/v1/illust/recommended')).toBe('/pixiv-api/v1/illust/recommended')
+    expect(shouldAttachAuth('https://evil.example.com/steal')).toBe(false)
+  })
+})
+
 describe('client.shouldAttachAuth（Bearer 决策）', () => {
   // 注：shouldAttachAuth 接收「已重写」的 URL（execute 内先 rewriteUrl 再决策）
   it('重写后的代理路径 → 附加 Bearer', () => {

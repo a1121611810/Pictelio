@@ -17,7 +17,9 @@ export const selectedClient = _selected
 
 /** 原生 App Module（#51：NativeModules.PictelioApp）——web-core 下不存在 → null */
 function nativeAppModule() {
-  const nm = (globalThis as { NativeModules?: { PictelioApp?: PictelioAppModule } }).NativeModules
+  // 同时检查裸 NativeModules（lynx runtime 全局对象，真机实测不在 globalThis 上）
+  const nm = (typeof NativeModules !== "undefined" ? NativeModules : undefined) ??
+    (globalThis as { NativeModules?: { PictelioApp?: PictelioAppModule } }).NativeModules
   return nm?.PictelioApp ?? null
 }
 

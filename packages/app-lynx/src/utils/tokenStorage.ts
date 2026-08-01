@@ -17,9 +17,11 @@ interface NativeSecureStorageModule {
 
 /** 探测原生 Module（web-core 无 NativeModules → null，走 IndexedDB） */
 function nativeModule(): NativeSecureStorageModule | null {
-  const nm = (globalThis as {
-    NativeModules?: { PictelioSecureStorage?: NativeSecureStorageModule }
-  }).NativeModules
+  // 同时检查裸 NativeModules（lynx runtime 全局对象，真机实测不在 globalThis 上）
+  const nm = (typeof NativeModules !== "undefined" ? NativeModules : undefined) ??
+    (globalThis as {
+      NativeModules?: { PictelioSecureStorage?: NativeSecureStorageModule }
+    }).NativeModules
   return nm?.PictelioSecureStorage ?? null
 }
 
