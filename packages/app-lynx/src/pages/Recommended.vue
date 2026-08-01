@@ -70,18 +70,18 @@ onMounted(() => {
 </script>
 
 <template>
-  <view class="Page">
-    <view class="AppBar">
-      <text class="AppBarTitle">推荐插画</text>
-      <text class="AppBarNav" @tap="openNovels">小说</text>
-      <text class="AppBarNav" @tap="openMe">我的</text>
+  <view class="w-full h-full bg-background-2">
+    <view class="flex flex-row items-center h-[11.733vw] px-4 bg-background border-b-[1px] border-b-stroke-2">
+      <text class="flex-1 text-3xl font-bold text-foreground">推荐插画</text>
+      <text class="text-lg text-brand-foreground ml-6" @tap="openNovels">小说</text>
+      <text class="text-lg text-brand-foreground ml-6" @tap="openMe">我的</text>
     </view>
 
-    <text v-if="errorMsg && !loading" class="Error">{{ errorMsg }}</text>
+    <text v-if="errorMsg && !loading" class="text-sm text-danger p-4">{{ errorMsg }}</text>
 
     <list
       v-if="!loading || illusts.length > 0"
-      class="Feed"
+      class="w-full h-full"
       list-type="waterfall"
       scroll-orientation="vertical"
       span-count="2"
@@ -92,118 +92,27 @@ onMounted(() => {
         v-for="item in illusts"
         :key="item.id"
         :item-key="item.id"
-        class="Card"
+        class="w-full bg-background rounded-[var(--borderRadiusXLarge)] m-1.5 flex flex-col overflow-hidden"
         @tap="openDetail(item.id)"
       >
+        <!-- [lynx:fix] min-height 用 vw 保底：web-core 预览下 rpx 布局属性塌陷（--rpx-unit 失效）
+             且 auto-size 不生效，卡片高度为 0 会导致 scrolltolower 无限触发；
+             原生 LynxView 下 auto-size 正常计算真实高度覆盖此保底。40vw = 150px @375 -->
         <image
-          class="CardImage"
+          class="w-full bg-background-3 min-h-[40vw]"
           :src="thumbUrl(item.image_urls)"
           :mode="'aspectFill'"
           auto-size
         />
-        <text class="CardTitle">{{ item.title }}</text>
-        <text class="CardAuthor">{{ item.user.name }}</text>
-        <text v-if="item.total_bookmarks > 0" class="CardMeta">♥ {{ item.total_bookmarks }}</text>
+        <text class="text-lg font-semibold text-foreground mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
+        <text class="text-sm text-foreground-2 mt-1 mx-2.5 [max-line:1]">{{ item.user.name }}</text>
+        <text v-if="item.total_bookmarks > 0" class="text-xs text-foreground-3 mt-1 mx-2.5 mb-2.5">
+          ♥ {{ item.total_bookmarks }}
+        </text>
       </list-item>
-      <list-item v-if="loadingMore" :key="'footer'" item-key="footer" class="Footer" full-span>
-        <text class="FooterText">加载中…</text>
+      <list-item v-if="loadingMore" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
+        <text class="text-base text-foreground-3">加载中…</text>
       </list-item>
     </list>
   </view>
 </template>
-
-<style scoped>
-.Page {
-  width: 100%;
-  height: 100%;
-  background-color: var(--colorNeutralBackground2);
-}
-
-.AppBar {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  height: 11.733vw;
-  padding: 0 4.267vw;
-  background-color: var(--colorNeutralBackground1);
-  border-bottom-width: 1px;
-  border-bottom-color: var(--colorNeutralStroke2);
-}
-
-.AppBarTitle {
-  flex: 1;
-  font-size: 32rpx;
-  font-weight: 700;
-  color: var(--colorNeutralForeground1);
-}
-
-.AppBarNav {
-  font-size: 26rpx;
-  color: var(--colorBrandForeground1);
-  margin-left: 6.400vw;
-}
-
-.Feed {
-  width: 100%;
-  height: 100%;
-}
-
-.Card {
-  width: 100%;
-  background-color: var(--colorNeutralBackground1);
-  border-radius: var(--borderRadiusXLarge);
-  margin: 1.600vw;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.CardImage {
-  width: 100%;
-  background-color: var(--colorNeutralBackground3);
-  /* [lynx:fix] min-height 用 vw 保底：web-core 预览下 rpx 布局属性塌陷（--rpx-unit 失效）
-     且 auto-size 不生效，卡片高度为 0 会导致 scrolltolower 无限触发；
-     原生 LynxView 下 auto-size 正常计算真实高度覆盖此保底。40vw = 150px @375 */
-  min-height: 40vw;
-}
-
-.CardTitle {
-  font-size: 26rpx;
-  font-weight: 600;
-  color: var(--colorNeutralForeground1);
-  margin: 2.133vw 2.667vw 0 2.667vw;
-  max-line: 1;
-}
-
-.CardAuthor {
-  font-size: 22rpx;
-  color: var(--colorNeutralForeground2);
-  margin: 1.067vw 2.667vw 0 2.667vw;
-  max-line: 1;
-}
-
-.CardMeta {
-  font-size: 20rpx;
-  color: var(--colorNeutralForeground3);
-  margin: 1.067vw 2.667vw 2.667vw 2.667vw;
-}
-
-.Footer {
-  width: 100%;
-  height: 10.667vw;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.FooterText {
-  font-size: 24rpx;
-  color: var(--colorNeutralForeground3);
-}
-
-.Error {
-  font-size: 22rpx;
-  color: var(--colorPaletteRedBackground3);
-  padding: 4.267vw;
-}
-</style>
