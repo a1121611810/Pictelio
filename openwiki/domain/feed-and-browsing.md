@@ -128,6 +128,8 @@ flowchart LR
 
 User settings control visibility of each tier. An **AgeConfirmation** gate (`/packages/app/src/routes/AgeConfirmation.tsx`) appears on first launch, requiring the user to confirm they are 18+.
 
+**app-lynx equivalent:** [`settingsStore.ts`](/packages/app-lynx/src/stores/settingsStore.ts) provides `showR18`/`showR18G` switches (default `false`, persisted via IndexedDB KV) and `filterByRestrict<T>(items)` for client-side feed filtering, applied in `Recommended.vue` and `NovelList.vue`. Switches live on the Me page (no dedicated settings page yet). Details: [ADR-0051](/docs/adr/ADR-0051-lynx-r18-filter.md).
+
 ## Search
 
 `/packages/app/src/routes/Search.tsx` — Dedicated search page for illusts and novels with a back button in the search bar. Backed by:

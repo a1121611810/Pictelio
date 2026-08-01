@@ -8,6 +8,7 @@ import type { PixivIllust } from '../api/types'
 import { thumbUrl } from '../utils/imageUrl'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
+import { filterByRestrict } from '../stores/settingsStore'
 
 const illusts = ref<PixivIllust[]>([])
 const nextUrl = ref<string | null>(null)
@@ -25,7 +26,8 @@ async function fetchFirstPage() {
   errorMsg.value = ''
   try {
     const res = await loadRecommended()
-    illusts.value = res.illusts
+    // ADR-0051：应用 R18/R18G 开关过滤（默认隐藏）
+    illusts.value = filterByRestrict(res.illusts)
     nextUrl.value = res.next_url
   } catch (err) {
     errorMsg.value = (err as { message?: string }).message ?? '加载失败'
@@ -46,7 +48,8 @@ async function loadMore() {
   try {
     const res = await loadNext(nextUrl.value)
     const seen = new Set(illusts.value.map((i) => i.id))
-    const fresh = res.illusts.filter((i) => !seen.has(i.id))
+    // ADR-0051：分页同样应用 R18/R18G 过滤
+    const fresh = filterByRestrict(res.illusts).filter((i) => !seen.has(i.id))
     illusts.value.push(...fresh)
     // 空页防护：服务端返回空列表但 next_url 仍存在时终止分页，防 web-core 下轮询空页
     nextUrl.value = fresh.length === 0 ? null : res.next_url

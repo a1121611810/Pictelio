@@ -5,6 +5,7 @@ import { ref, onMounted } from 'vue'
 import { navigate, goBack, ensureAuth, resetHistory } from '../router'
 import { currentUser, logout, isLoggedIn } from '../stores/authStore'
 import { selectedClient, switchClient, type ClientKind } from '../stores/clientSwitchStore'
+import { showR18, showR18G, setShowR18, setShowR18G } from '../stores/settingsStore'
 import { proxyImageUrl } from '../utils/imageUrl'
 
 const switching = ref(false)
@@ -26,6 +27,14 @@ function pickClient(kind: ClientKind) {
   switching.value = true
   switchClient(kind)
   // switchClient 内部触发重启（原生桥或 reload），此处仅兜底
+}
+
+// ADR-0051：R18/R18G 开关（对齐主项目 settingsStore，默认隐藏，持久化 IndexedDB）
+function toggleR18() {
+  setShowR18(!showR18.value)
+}
+function toggleR18G() {
+  setShowR18G(!showR18G.value)
 }
 </script>
 
@@ -83,6 +92,35 @@ function pickClient(kind: ClientKind) {
         />
       </view>
       <text v-if="switching" class="text-sm text-brand-foreground mt-3">正在重启切换…</text>
+    </view>
+
+    <view class="bg-background mt-3 p-4">
+      <text class="text-lg font-semibold text-foreground">内容设置</text>
+      <text class="text-xs text-foreground-3 mt-1 mb-3">默认隐藏 R-18 / R-18G 内容</text>
+      <view
+        class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-stroke-3"
+        @tap="toggleR18"
+      >
+        <text class="text-lg text-foreground">显示 R-18 内容</text>
+        <view
+          class="w-[9.6vw] h-[5.33vw] rounded-full p-[0.53vw] flex flex-row transition-colors"
+          :class="showR18 ? 'bg-brand justify-end' : 'bg-background-3 justify-start'"
+        >
+          <view class="w-[4.27vw] h-[4.27vw] rounded-full bg-white shadow-[var(--elevation2)]" />
+        </view>
+      </view>
+      <view
+        class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-stroke-3"
+        @tap="toggleR18G"
+      >
+        <text class="text-lg text-foreground">显示 R-18G 内容</text>
+        <view
+          class="w-[9.6vw] h-[5.33vw] rounded-full p-[0.53vw] flex flex-row transition-colors"
+          :class="showR18G ? 'bg-brand justify-end' : 'bg-background-3 justify-start'"
+        >
+          <view class="w-[4.27vw] h-[4.27vw] rounded-full bg-white shadow-[var(--elevation2)]" />
+        </view>
+      </view>
     </view>
 
     <view class="bg-background mt-3 p-4">

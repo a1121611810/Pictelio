@@ -5,6 +5,7 @@
 import { ref, computed, markRaw, type Component } from 'vue'
 import { matchRoute, type RouteDefCore } from './routerCore'
 import { isLoggedIn, restoreToken, registerUnauthorizedHandler } from './stores/authStore'
+import { loadSettings } from './stores/settingsStore'
 
 export interface RouteDef extends RouteDefCore {
   component: Component
@@ -92,9 +93,10 @@ export function goBack(): void {
   _state.value = { name: 'recommended', path: '/recommended', params: {} }
 }
 
-/** 初始化（App 挂载时调用）：注册 401 刷新 + 首路由（replace 不入栈） */
+/** 初始化（App 挂载时调用）：注册 401 刷新 + 恢复设置 + 首路由（replace 不入栈） */
 export async function initRouter(): Promise<void> {
   registerUnauthorizedHandler()
+  void loadSettings()
   const ok = await restoreToken()
   void navigate(ok ? '/recommended' : '/login', { replace: true })
 }

@@ -5,6 +5,7 @@ import { ref, onMounted } from 'vue'
 import { navigate, goBack } from '../router'
 import { loadRecommendedNovels, loadNovelNext } from '../api/novel'
 import type { PixivNovel } from '../api/types'
+import { filterByRestrict } from '../stores/settingsStore'
 
 const novels = ref<PixivNovel[]>([])
 const nextUrl = ref<string | null>(null)
@@ -22,7 +23,8 @@ async function fetchFirstPage() {
   errorMsg.value = ''
   try {
     const res = await loadRecommendedNovels()
-    novels.value = res.novels
+    // ADR-0051：应用 R18/R18G 开关过滤（默认隐藏）
+    novels.value = filterByRestrict(res.novels)
     nextUrl.value = res.next_url
   } catch (err) {
     errorMsg.value = (err as { message?: string }).message ?? '加载失败'
@@ -43,7 +45,8 @@ async function loadMore() {
   try {
     const res = await loadNovelNext(nextUrl.value)
     const seen = new Set(novels.value.map((n) => n.id))
-    const fresh = res.novels.filter((n) => !seen.has(n.id))
+    // ADR-0051：分页同样应用 R18/R18G 过滤
+    const fresh = filterByRestrict(res.novels).filter((n) => !seen.has(n.id))
     novels.value.push(...fresh)
     // 空页防护：服务端返回空列表但 next_url 仍存在时终止分页，防 web-core 下轮询空页
     nextUrl.value = fresh.length === 0 ? null : res.next_url
