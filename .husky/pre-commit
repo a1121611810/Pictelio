@@ -3,10 +3,12 @@
 # 仅当 src/ 或 packages/ 或 AGENTS.md / CLAUDE.md 有 staged 变更时触发
 if git diff --cached --name-only | grep -qE '^src/|^packages/|^AGENTS\.md$|^CLAUDE\.md$'; then
   echo "📝 检测到源码变更，正在更新 OpenWiki 文档..."
-  if pnpm openwiki:update; then
+  # timeout 保护：openwiki 0.2.3 在部分仓库会卡死（见 docs/adr/ 相关记录），
+  # 超时视为失败降级为警告，避免阻塞 commit
+  if timeout 120 pnpm openwiki:update; then
     # 将 OpenWiki 变更纳入本次提交
     git add -A openwiki/
   else
-    echo "⚠️ openwiki update 执行失败（不阻塞 commit）"
+    echo "⚠️ openwiki update 超时或失败（不阻塞 commit；可稍后手动运行 pnpm openwiki:update）"
   fi
 fi
