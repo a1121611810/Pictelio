@@ -131,6 +131,42 @@ sequenceDiagram
 - `build.gradle`: retains `androidx.core:core-splashscreen` dependency
 - `variables.gradle`: retains `coreSplashScreenVersion = '1.2.0'`
 
+## Lynx Native Module: PictelioSecureStorage
+
+Introduced in #52 for the [app-lynx vue-lynx client](/openwiki/architecture/overview.md#app-lynx-vue-lynx-client). Unlike the four Capacitor plugins above, `PictelioSecureStorageModule` is a **LynxModule** — it extends `com.lynx.jsbridge.LynxModule` and is registered in the LynxView's module registry rather than via Capacitor's plugin system.
+
+**Java:** `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioSecureStorageModule.java`
+**Type declarations:** `/packages/app-lynx/src/rspeedy-env.d.ts` (under `globalThis.NativeModules`)
+**JS caller:** `/packages/app-lynx/src/utils/tokenStorage.ts` (`nativeModule()` probe)
+
+Provides three callback-based methods exposed to Lynx JS via `NativeModules.PictelioSecureStorage`:
+
+| Method | Contract |
+|--------|----------|
+| `getItem(key, cb)` | Success: `cb(value, null)`; failure: `cb(null, errMsg)` |
+| `setItem(key, data, cb)` | Success: `cb(null)`; failure: `cb(errMsg)` |
+| `removeItem(key, cb)` | Success: `cb(null)`; failure: `cb(errMsg)` |
+
+**Storage backend:** [`SecureStorageCompat`](#securestoragecompat) — a pure-Java AES/GCM utility byte-compatible with `@aparajita/capacitor-secure-storage` 8.x. Uses the same Keystore alias (`capacitor-storage_refresh_token`) and `WSSecureStorageSharedPreferences` ciphertext file as the main app's [token persistence](/openwiki/architecture/api-layer.md#token-persistence--backup-integrity). This means the lynx client and webview client share a single login state — logging in on one client makes the token available to the other.
+
+### SecureStorageCompat
+
+**Java:** `/packages/app/android/app/src/main/java/io/pictelio/app/SecureStorageCompat.java`
+**Tests:** `/packages/app/android/app/src/test/java/io/pictelio/app/SecureStorageCompatTest.java` (Robolectric)
+
+A self-contained encryption utility that mirrors `@aparajita/capacitor-secure-storage`'s ciphertext format field-for-field:
+
+- **Algorithm:** AES/GCM/NoPadding, AndroidKeyStore, one AES key per storage key (`PURPOSE_ENCRYPT|DECRYPT`, `BLOCK_MODE_GCM`, `ENCRYPTION_PADDING_NONE`)
+- **SharedPreferences:** `WSSecureStorageSharedPreferences` (MODE_PRIVATE) — same file as the Capacitor plugin
+- **Storage key:** `capacitor-storage_` + key (e.g., `capacitor-storage_refresh_token`)
+- **Ciphertext format:** `Base64(ciphertext) + "\u0010" + Base64(iv)` — NO_PADDING + NO_WRAP
+
+The `encryptString` / `decryptString` static methods are key-injected (accept a `SecretKey` parameter) so they can be unit-tested with Robolectric without AndroidKeyStore. `SecureStorageCompatTest` covers round-trip, Unicode, format contract validation, format errors, and wrong-key detection via GCM authentication failure (`AEADBadTagException`).
+
+### Lynx SDK Dependency
+
+`build.gradle` now includes `org.lynxsdk.lynx:lynx:4.0.1` as a compile dependency — required for `PictelioSecureStorageModule` to extend `LynxModule` and use `@LynxMethod` / `Callback` / `LynxContext`.
+
 ## Backup Rules & Token Storage Exclusions (ADR-0003)
 
 The `refresh_token` is stored in Android Keystore-backed encrypted storage (`@aparajita/capacitor-secure-storage` 8.x — self-implemented AES/GCM, ciphertext file `WSSecureStorageSharedPreferences.xml`). Because `android:allowBackup="true"`, backup is defended by three layers per [ADR-0003](/docs/adr/0003-backup-security-three-layer-defense.md) (grounded in [docs/research/android-token-storage.md](/docs/research/android-token-storage.md)):
@@ -252,6 +288,9 @@ The full release process is documented in `/docs/release-checklist.md` (6.2 KB),
 | ImageCachePlugin (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/ImageCachePlugin.java` |
 | OAuthPlugin (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/OAuthPlugin.java` |
 | PixivApiPlugin (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PixivApiPlugin.java` |
+| PictelioSecureStorageModule (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioSecureStorageModule.java` |
+| SecureStorageCompat (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/SecureStorageCompat.java` |
+| SecureStorageCompatTest (Java) | `/packages/app/android/app/src/test/java/io/pictelio/app/SecureStorageCompatTest.java` |
 | Backup rules (Android 12+) | `/packages/app/android/app/src/main/res/xml/data_extraction_rules.xml` |
 | Backup rules (Android 11-) | `/packages/app/android/app/src/main/res/xml/backup_rules.xml` |
 | MainActivity (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/MainActivity.java` |

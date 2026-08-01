@@ -71,9 +71,9 @@ function applyAuthResponse(resp: {
   _refreshToken.value = resp.refresh_token
   _user.value = resp.user
   _accessTokenReady.value = true
-  // ADR-0050：持久化最新 refresh_token（登录成功 / 401 刷新轮换都更新；IndexedDB 失败静默忽略）
-  void saveRefreshToken(resp.refresh_token).catch(() => {
-    /* IndexedDB 不可用则维持内存态 */
+  // ADR-0050：持久化最新 refresh_token（登录成功 / 401 刷新轮换都更新；失败维持内存态并告警）
+  void saveRefreshToken(resp.refresh_token).catch((err) => {
+    console.warn("[authStore] 持久化 refresh_token 失败（维持内存态）", err)
   })
 }
 

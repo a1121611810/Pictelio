@@ -21,6 +21,17 @@ declare global {
     imageCdnUrl: string
   }
   const __DEV__: boolean
+  /**
+   * Lynx runtime 内置全局对象 —— 原生 Native Modules 访问点（#52）。
+   * web-core 环境可能不存在或为空对象；引用前必须可选链探测。
+   */
+  const NativeModules: {
+    PictelioSecureStorage: {
+      getItem(key: string, callback: (value: string | null, err: string | null) => void): void
+      setItem(key: string, data: string, callback: (err: string | null) => void): void
+      removeItem(key: string, callback: (err: string | null) => void): void
+    }
+  } | undefined
 }
 
 declare module '@lynx-js/types' {
