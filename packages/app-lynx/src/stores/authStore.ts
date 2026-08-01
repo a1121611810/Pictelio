@@ -3,7 +3,7 @@
 // 原生生产环境由 T7 迁移到 Native Module 安全存储（Android Keystore）。
 import { ref, computed } from "vue"
 import { setAccessToken, setOnUnauthorized, setAuthPermanentFailure } from "../api/client"
-import { loginWithRefreshToken, loginWithPassword } from "../api/auth"
+import { loginWithRefreshToken } from "../api/auth"
 import type { PixivUser } from "../api/types"
 import { toApiError } from "../utils/errors"
 
@@ -34,18 +34,6 @@ export async function loginWithToken(token: string): Promise<void> {
     return
   }
   await performRefresh(trimmed)
-}
-
-/** 用用户名密码登录 */
-export async function loginWithCredentials(username: string, password: string): Promise<void> {
-  _authError.value = null
-  try {
-    const resp = await loginWithPassword(username, password)
-    applyAuthResponse(resp)
-  } catch (err) {
-    _authError.value = toApiError(err).message
-    throw err
-  }
 }
 
 async function performRefresh(token: string): Promise<boolean> {

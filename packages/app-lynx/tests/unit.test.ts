@@ -219,7 +219,6 @@ describe('authStore 安全：refresh_token 不持久化', () => {
         token_type: 'bearer',
         user: { id: 1, name: 'u', account: 'u', profile_image_urls: {} },
       })),
-      loginWithPassword: vi.fn(),
     }))
     const { loginWithToken } = await import('../src/stores/authStore')
     const lsSet = (globalThis.localStorage as { setItem: ReturnType<typeof vi.fn> }).setItem

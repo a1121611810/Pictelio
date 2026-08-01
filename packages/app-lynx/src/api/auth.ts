@@ -84,11 +84,3 @@ export async function oauthTokenRequest(
 export function loginWithRefreshToken(refreshToken: string): Promise<PixivAuthResponse> {
   return oauthTokenRequest("refresh_token", { refresh_token: refreshToken })
 }
-
-/** 使用用户名密码登录（Pixiv OAuth 密码模式：grant_type=password + username/password） */
-export function loginWithPassword(
-  username: string,
-  password: string,
-): Promise<PixivAuthResponse> {
-  return oauthTokenRequest("password", { username, password })
-}
