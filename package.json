@@ -27,6 +27,7 @@
     "dev:lynx": "pnpm --filter pictelio-app-lynx dev",
     "build:lynx": "pnpm --filter pictelio-app-lynx build",
     "check:lynx": "pnpm --filter pictelio-app-lynx check",
+    "sync:lynx-bundle": "node packages/app-lynx/scripts/sync-android-assets.mjs",
     "openwiki:update": "openwiki --update",
     "prepare": "husky"
   },

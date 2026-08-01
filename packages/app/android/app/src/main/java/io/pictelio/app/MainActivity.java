@@ -3,6 +3,7 @@ package io.pictelio.app;
 import io.pictelio.app.config.OAuthConfig;
 
 import android.content.pm.PackageInfo;
+import android.content.Intent;
 import android.os.Bundle;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
@@ -41,6 +42,18 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // ① lynx client 入口路由（#51）：在 Splash/WebView 检查之前分发。
+        // 读 SharedPreferences("CapacitorStorage") 的 pictelio_client_kind：
+        // "lynx" → 跳 LynxActivity（纯 LynxView，无 Capacitor bridge），本 Activity 不初始化。
+        // 研究结论：BridgeActivity.onCreate 无条件创建 WebView，不可同 Activity，故双 Activity 分发。
+        String clientKind = getSharedPreferences("CapacitorStorage", MODE_PRIVATE)
+                .getString("pictelio_client_kind", "webview");
+        if ("lynx".equals(clientKind)) {
+            startActivity(new Intent(this, LynxActivity.class));
+            finish();
+            return; // 不初始化 Capacitor bridge、不注册插件、不做 WebView 版本检查
+        }
+
         // 确保每次 Activity 重建时 Splash 可重新显示
         keepSplashVisible.set(true);
         SplashScreen splashScreen = SplashScreen.installSplashScreen(this);
