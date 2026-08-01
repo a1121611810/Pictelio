@@ -46,12 +46,15 @@ public class MainActivity extends BridgeActivity {
         // 读 SharedPreferences("CapacitorStorage") 的 pictelio_client_kind：
         // "lynx" → 跳 LynxActivity（纯 LynxView，无 Capacitor bridge），本 Activity 不初始化。
         // 研究结论：BridgeActivity.onCreate 无条件创建 WebView，不可同 Activity，故双 Activity 分发。
+        // 注意：Android 硬约束——onCreate 必须调用 super.onCreate（否则 SuperNotCalledException，
+        // 真机实测 2026-08-01），故 lynx 分支先 super 再跳转（bridge 初始化浪费可接受，立即 finish）。
         String clientKind = getSharedPreferences("CapacitorStorage", MODE_PRIVATE)
                 .getString("pictelio_client_kind", "webview");
         if ("lynx".equals(clientKind)) {
+            super.onCreate(savedInstanceState);
             startActivity(new Intent(this, LynxActivity.class));
             finish();
-            return; // 不初始化 Capacitor bridge、不注册插件、不做 WebView 版本检查
+            return; // 不注册插件、不做 WebView 版本检查
         }
 
         // 确保每次 Activity 重建时 Splash 可重新显示
