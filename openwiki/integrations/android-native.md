@@ -188,7 +188,8 @@ The `refresh_token` is stored in Android Keystore-backed encrypted storage (`@ap
 `/packages/app/android/app/src/main/java/io/pictelio/app/MainActivity.java` (11 KB)
 
 The Android entry point. Key responsibilities:
-- Registers all four custom plugins: **`ImageCachePlugin`**, **`AuthPlugin`**, **`OAuthPlugin`**, **`PixivApiPlugin`** (v3.18.0+, replaced PictelioHttpPlugin)
+- **Client routing gate (#51):** Before any Capacitor/WebView initialization, reads `SharedPreferences("CapacitorStorage")` key `pictelio_client_kind`. If `"lynx"`, starts [`LynxActivity`](#lynxactivity) and calls `finish()` — no Capacitor bridge, plugin registration, or WebView checks are performed. The dual-Activity approach was chosen because `BridgeActivity.onCreate` unconditionally creates a WebView (see [research](/docs/research/lynx-android-brownfield-integration.md)).
+- Registers all four custom plugins: **`ImageCachePlugin`**, **`AuthPlugin`**, **`OAuthPlugin`**, **`PixivApiPlugin`** (v3.18.0+, replaced PictelioHttpPlugin) — only when the webview path is taken
 - Configures WebView settings (JavaScript enabled, DOM storage, mixed content)
 - Sets up the back-gesture handler for predictive back navigation
 - Initializes the image cache and auth plugin on startup
@@ -211,9 +212,14 @@ Previously duplicated across plugins; now centralized in a single utility class.
 
 ### PictelioApp.java
 
-`/packages/app/android/app/src/main/java/io/pictelio/app/PictelioApp.java` (1.3 KB)
+`/packages/app/android/app/src/main/java/io/pictelio/app/PictelioApp.java`
 
-Custom `Application` class for app-level initialization.
+Custom `Application` class for app-level initialization. **Conditional startup (#51):** reads `pictelio_client_kind` from `SharedPreferences("CapacitorStorage")` and branches:
+
+- **`"lynx"`** → `initLynx()`: Initializes `LynxEnv.inst().init(this, …)` and globally registers `PictelioSecureStorage` and `PictelioApp` LynxModules. Enables `LynxDebug` in debug builds. Skips WebView warmup entirely.
+- **`"webview"` (default)** → `warmUpWebView()`: Pre-warms the WebView service process (unchanged behavior).
+
+Exception safety: Lynx init failure is caught and logged — the app does not crash, but the lynx client path will be unavailable.
 
 ## WebView Configuration
 

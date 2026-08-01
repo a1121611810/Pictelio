@@ -196,7 +196,7 @@ Font sizes use fluid `clamp(rem + vw)` via UnoCSS preflights, defined in `/packa
 
 ## app-lynx (vue-lynx Client)
 
-`packages/app-lynx/` is a **parallel rendering client** — a Vue 3 app running on the [ReactLynx](https://lynxjs.org/) runtime via `vue-lynx` (a Vue 3 custom renderer). It shares the same Pixiv backend credentials and API format as the main SolidJS app but targets Lynx's native rendering pipeline rather than a WebView. Status: **MVP pre-alpha** (feasibility validation).
+`packages/app-lynx/` is a **parallel rendering client** — a Vue 3 app running on the [ReactLynx](https://lynxjs.org/) runtime via `vue-lynx` (a Vue 3 custom renderer). It shares the same Pixiv backend credentials and API format as the main SolidJS app but targets Lynx's native rendering pipeline rather than a WebView. Status: **MVP pre-alpha**, now running inside the main Android app via [Lynx Brownfield Integration](/openwiki/integrations/android-native.md#lynx-brownfield-integration-51) with cross-client login sharing (same Keystore-backed token storage).
 
 ### Build & Styling
 
@@ -227,7 +227,7 @@ Page components must declare a `name` via `defineOptions({ name: 'xxx' })` for K
 - **Token storage:** [ADR-0050](/docs/adr/ADR-0050-lynx-login-persistence.md) — dual-path persistence in [`tokenStorage.ts`](/packages/app-lynx/src/utils/tokenStorage.ts): **web-core** (lynx-bg Worker, no `localStorage`) uses IndexedDB via the generic KV layer ([`idbKV.ts`](/packages/app-lynx/src/utils/idbKV.ts), DB `pictelio_lynx` v2); **native LynxView** (#52) uses `NativeModules.PictelioSecureStorage` — a [Lynx Native Module](/openwiki/integrations/android-native.md#lynx-native-module-picteliosecurestorage) backed by [`SecureStorageCompat`](/packages/app/android/app/src/main/java/io/pictelio/app/SecureStorageCompat.java), an AES/GCM encryption layer byte-compatible with the main project's `@aparajita/capacitor-secure-storage` (same Keystore alias + `WSSecureStorageSharedPreferences` ciphertext). This enables cross-client login sharing: the lynx client reads/writes the same encrypted `refresh_token` as the webview client.
 - **Login method:** `refresh_token` login only (username/password removed per commit `bf226e6`). [`authStore.restoreToken()`](/packages/app-lynx/src/stores/authStore.ts) now actually restores from IndexedDB on startup; `saveRefreshToken`/`clearRefreshToken` keep the persisted token in sync.
 - **Settings persistence & R18 filtering:** [ADR-0051](/docs/adr/ADR-0051-lynx-r18-filter.md) — [`settingsStore.ts`](/packages/app-lynx/src/stores/settingsStore.ts) manages `showR18`/`showR18G` switches (default `false`, persisted via the shared IndexedDB KV layer) and exposes `filterByRestrict<T>(items)` for client-side feed filtering. `initRouter()` calls `loadSettings()` on startup to restore settings. Two Fluent-style toggle switches on the Me page let users control visibility of R18/R18G content; both `Recommended.vue` and `NovelList.vue` apply `filterByRestrict` on first-page and paginated data.
-- **Client switching:** `clientSwitchStore` (`/packages/app-lynx/src/stores/clientSwitchStore.ts`) lets users toggle between the vue-lynx client and the main app
+- **Client switching:** `clientSwitchStore` (`/packages/app-lynx/src/stores/clientSwitchStore.ts`) lets users toggle between the vue-lynx client and the main app. In native LynxView mode, uses [`PictelioAppModule`](/openwiki/integrations/android-native.md#pictelioappmodule) to persist the choice to `SharedPreferences` and restart the process; in web mode, uses `localStorage` + `location.reload()`.
 - **Security hardening:** Proxy URL log redaction ([`proxyRedact.ts`](/packages/app-lynx/src/utils/proxyRedact.ts)), `__DEV__` double-condition guards, host boundary tightening on `rewriteUrl`
 
 ### API Client
@@ -251,7 +251,7 @@ The Lynx MVP has evolved specific patterns for image display and loading UX that
 - **No cell recycling:** `vue-lynx` #302 cell recycling is a no-op; safe up to ~5k list items (empirically verified)
 - **No canvas/measureText:** novel body renders as whole text blocks (Pretext library's line-level measurement cannot be ported)
 - **No PKCE OAuth:** login is `refresh_token`-only; WebView-based OAuth needs native integration
-- **Native token persistence pending:** web-core IndexedDB persistence works in browser; native LynxView Keystore storage (#41) not yet implemented
+- **Native token persistence:** Implemented via [PictelioSecureStorageModule](#auth--security) (LynxModule backed by [`SecureStorageCompat`](/openwiki/integrations/android-native.md#securestoragecompat), same Keystore alias + ciphertext as the webview client). Enables cross-client login sharing.
 
 See [package README](/packages/app-lynx/README.md) for the full architecture map and quick start.
 
