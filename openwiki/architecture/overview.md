@@ -237,9 +237,8 @@ if (err) { handle(err); return fallback; }
 
 ## Related Pages
 
-- [Source Map](/openwiki/source-map.md) — Complete directory layout
 - [API Layer & Authentication](/openwiki/architecture/api-layer.md) — Pixiv HTTP client, OAuth, request dedup
 - [Image Loading Pipeline](/openwiki/architecture/image-pipeline.md) — Three-layer cache, image host selection, WebView proxy
-- [Store Pattern & State Management](/openwiki/domain/store-pattern.md) — TanStack Query factory pattern
+- [Feed Store Factory](/openwiki/domain/feed-and-browsing.md#feed-store-factory) — TanStack Query factory pattern
 - [Android Native & Build](/openwiki/integrations/android-native.md) — Capacitor plugins, Gradle, signing
 - [Testing Strategy](/openwiki/testing/overview.md) — Four test layers

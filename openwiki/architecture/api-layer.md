@@ -121,7 +121,8 @@ This replaces the earlier unconditional `logout()` on any refresh failure — in
 
 ## Request Flow (Native Production)
 
-```mermaid
+<!-- openwiki: mermaid parse failed and this diagram was converted to a text fence so it does not break rendering. Fix the diagram source and restore the mermaid fence. Parser error: Parse error on line 40: ... end end Expecting 'SPACE', 'NEWLINE', 'INVALID', 'create', 'box', 'end', 'autonumber', 'activate', 'deactivate', 'title', 'legacy_title', 'acc_title', 'acc_descr', 'acc_descr_multiline_value', 'loop', 'rect', 'opt', 'alt', 'par', 'par_over', 'critical', 'break', 'else', 'participant', 'participant_actor', 'destroy', 'note', 'links', 'link', 'properties', 'details', 'ACT -->
+```text
 sequenceDiagram
     participant Store
     participant Client as client.ts
@@ -190,7 +191,7 @@ Each store that uses `createTQFeedStore` defines its own query keys internally.
 
 ## Related
 
-- [Store Pattern & State Management](/openwiki/domain/store-pattern.md) — How stores consume the API via TanStack Query
+- [Feed Store Factory](/openwiki/domain/feed-and-browsing.md#feed-store-factory) — How stores consume the API via TanStack Query
 - [Android Native & Build](/openwiki/integrations/android-native.md) — Native auth plugins (AuthPlugin, OAuthPlugin) and PictelioHttp
 - ADR-0004: 401 concurrent retry with Promise queue
 - ADR-0028: OAuth transport deduplication
