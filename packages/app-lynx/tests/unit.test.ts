@@ -1,7 +1,7 @@
 // ─── app-lynx 单元测试（Vitest，node 环境） ───
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { proxyImageUrl, thumbUrl } from '../src/utils/imageUrl'
-import { classifyError, isOAuthTokenErrorResponse, rewriteUrl, shouldAttachAuth } from '../src/api/client'
+import { classifyError, isNativeMode, isOAuthTokenErrorResponse, rewriteUrl, shouldAttachAuth } from '../src/api/client'
 import { ApiErrorType } from '../src/api/types'
 import { extractNovelTextFromHtml } from '../src/api/novel'
 import { matchRoute } from '../src/routerCore'
@@ -128,6 +128,25 @@ describe('client 原生模式（#53：NativeModules 存在 → 绝对 URL 直连
   it('web 模式行为不变（无 NativeModules）', () => {
     expect(rewriteUrl('/v1/illust/recommended')).toBe('/pixiv-api/v1/illust/recommended')
     expect(shouldAttachAuth('https://evil.example.com/steal')).toBe(false)
+  })
+
+  // #64 E2E 实测发现：web-core 预览在 worker 里注入空壳 NativeModules（无 Pictelio* 模块），
+  // isNativeMode 若按全局存在判定会误判原生模式 → 登录报「原生认证模块不可用」
+  it('isNativeMode：空壳 NativeModules（web-core 注入）→ 非原生模式', () => {
+    vi.stubGlobal('NativeModules', {})
+    expect(isNativeMode()).toBe(false)
+  })
+
+  it('isNativeMode：实际 Pictelio 模块存在 → 原生模式', () => {
+    vi.stubGlobal('NativeModules', { PictelioAuth: {}, PictelioApi: {} })
+    expect(isNativeMode()).toBe(true)
+    vi.stubGlobal('NativeModules', { PictelioSecureStorage: {} })
+    expect(isNativeMode()).toBe(true)
+  })
+
+  it('isNativeMode：无 NativeModules → 非原生模式', () => {
+    vi.stubGlobal('NativeModules', undefined)
+    expect(isNativeMode()).toBe(false)
   })
 })
 

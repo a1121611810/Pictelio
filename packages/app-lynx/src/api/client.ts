@@ -116,8 +116,11 @@ export function classifyError(status: number, error: unknown, responseBody?: unk
 // NativeModules 直接引用），可能不在 globalThis 上（真机实测 99900 证明
 // globalThis.NativeModules 为 undefined）→ 必须同时检查裸 NativeModules。
 export function isNativeMode(): boolean {
-  const g = globalThis as { NativeModules?: unknown }
-  return typeof NativeModules !== "undefined" || !!g.NativeModules
+  // 只在实际 Pictelio 原生模块存在时判定原生模式——web-core 预览在 worker 里
+  // 注入了空壳 NativeModules（无 Pictelio* 模块），按全局存在判定会误判导致
+  // 走原生分支而报「原生认证模块不可用」（E2E #64 实测发现）。
+  const nm = getNativeModules()
+  return !!(nm?.PictelioAuth || nm?.PictelioApi || nm?.PictelioSecureStorage || nm?.PictelioApp)
 }
 
 /** 统一取 NativeModules（bare ?? globalThis 双通道，与 isNativeMode 探测一致） */
