@@ -261,25 +261,38 @@ describe("translateNovel（分块并发管线）", () => {
     warnSpy.mockRestore();
   });
 
-  it("still converges progress to total when chunks fail", async () => {    const err = Object.assign(new Error("policy"), { code: "content_filter" });
-    const requestTranslate = vi.fn().mockImplementation(async ({ messages }: { messages: Array<{ content: string }> }) => {
-      if (messages[1].content.includes("段落0")) {
-        throw err;
-      }
-      const lines = messages[1].content.split(/\n\n+/u).filter((l) => l.length > 0);
-      return { content: lines.map((l) => `译:${l.slice(0, 4)}`).join("\n\n"), finishReason: "stop" };
-    });
+  it("still converges progress to total when chunks fail", async () => {
+    const err = Object.assign(new Error("policy"), { code: "content_filter" });
+    const requestTranslate = vi
+      .fn()
+      .mockImplementation(async ({ messages }: { messages: Array<{ content: string }> }) => {
+        if (messages[1].content.includes("段落0")) {
+          throw err;
+        }
+        const lines = messages[1].content.split(/\n\n+/u).filter((l) => l.length > 0);
+        return {
+          content: lines.map((l) => `译:${l.slice(0, 4)}`).join("\n\n"),
+          finishReason: "stop",
+        };
+      });
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const paragraphs = makeParagraphs(30, 100); // 2 块
     const progress: number[] = [];
-    await translateNovel(paragraphs, baseOpts(), (p) => progress.push(p.done), makeDeps(requestTranslate));
+    await translateNovel(
+      paragraphs,
+      baseOpts(),
+      (p) => progress.push(p.done),
+      makeDeps(requestTranslate),
+    );
     expect(progress[progress.length - 1]).toBe(2); // 失败块也推进进度
     warnSpy.mockRestore();
   });
 
   it("flags fallback blocks (translated fewer paragraphs than input) via progress", async () => {
     // 单块返回 1 段译文，输入 3 段 → 回退 2 段 → onProgress.fallback === true + fallbackIndexes 指向末 2 段
-    const requestTranslate = vi.fn().mockResolvedValue({ content: "只有一段译文", finishReason: "stop" });
+    const requestTranslate = vi
+      .fn()
+      .mockResolvedValue({ content: "只有一段译文", finishReason: "stop" });
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const progress: Array<{ fallback?: boolean; fallbackIndexes?: number[] }> = [];
     await translateNovel(
