@@ -220,3 +220,107 @@ describe("api/illust.ts", () => {
     );
   });
 });
+
+it("downloadAndExtractUgoira 用共享包 @pictelio/ugoira 解压（T2 fflate 替换 JSZip）", async () => {
+  mockGet.mockResolvedValue({
+    ugoira_metadata: {
+      zip_urls: {
+        medium: "https://i.pximg.net/img-zip-ugoira/img/2020/01/01/00/00/00/1_ugoira600x600.zip",
+      },
+      frames: [
+        { file: "frame_0.png", delay: 100 },
+        { file: "frame_1.png", delay: 120 },
+      ],
+    },
+  });
+  // 手工构造 store zip（Pixiv ugoira 真实格式：未压缩条目，独立于 fflate）
+  const zip = buildStoreZip([
+    { name: "frame_0.png", data: new Uint8Array([1, 2, 3]) },
+    { name: "frame_1.png", data: new Uint8Array([4, 5]) },
+  ]);
+  const zipResp = new Response(zip, {
+    status: 200,
+    headers: { "content-length": String(zip.length) },
+  });
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(zipResp));
+  // node 的 URL 无 createObjectURL——直接挂到全局类上（不替换整个 URL，保留 constructor）
+  const createObjectURL = vi.fn(() => "blob:mock-ugoira");
+  // @ts-expect-error node URL 无 createObjectURL
+  URL.createObjectURL = createObjectURL;
+  try {
+    const { downloadAndExtractUgoira } = await loadApi();
+    const { frames, blobUrls } = await downloadAndExtractUgoira(123);
+    expect(frames).toHaveLength(2);
+    expect(frames[0]!.delay).toBe(100);
+    expect(frames[1]!.delay).toBe(120);
+    expect(blobUrls).toHaveLength(2);
+    expect(createObjectURL).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.unstubAllGlobals();
+    // @ts-expect-error 清理
+    delete URL.createObjectURL;
+  }
+});
+
+// ─── store zip 构造 helper（T2 契约测试：Pixiv ugoira 未压缩条目格式） ───
+function u16(v: number, out: number[]): void {
+  out.push(v & 0xff, (v >> 8) & 0xff);
+}
+function u32(v: number, out: number[]): void {
+  out.push(v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff, (v >> 24) & 0xff);
+}
+function nameBytes(name: string, out: number[]): void {
+  for (let i = 0; i < name.length; i++) out.push(name.charCodeAt(i));
+}
+function buildStoreZip(frames: { name: string; data: Uint8Array }[]): Uint8Array {
+  const parts: number[] = [];
+  const localOffsets: number[] = [];
+  for (const f of frames) {
+    localOffsets.push(parts.length);
+    u32(0x04034b50, parts);
+    u16(20, parts);
+    u16(0, parts);
+    u16(0, parts);
+    u16(0, parts);
+    u16(0, parts);
+    u32(0, parts);
+    u32(f.data.length, parts);
+    u32(f.data.length, parts);
+    u16(f.name.length, parts);
+    u16(0, parts);
+    nameBytes(f.name, parts);
+    for (const b of f.data) parts.push(b);
+  }
+  const cdStart = parts.length;
+  for (let i = 0; i < frames.length; i++) {
+    const f = frames[i]!;
+    u32(0x02014b50, parts);
+    u16(20, parts);
+    u16(20, parts);
+    u16(0, parts);
+    u16(0, parts);
+    u16(0, parts);
+    u16(0, parts);
+    u32(0, parts);
+    u32(f.data.length, parts);
+    u32(f.data.length, parts);
+    u16(f.name.length, parts);
+    u16(0, parts);
+    u16(0, parts);
+    u16(0, parts);
+    u16(0, parts);
+    u32(0, parts);
+    u32(localOffsets[i]!, parts);
+    nameBytes(f.name, parts);
+  }
+  const cdSize = parts.length - cdStart;
+  u32(0x06054b50, parts);
+  u16(0, parts);
+  u16(0, parts);
+  u16(frames.length, parts);
+  u16(frames.length, parts);
+  u32(cdSize, parts);
+  u32(cdStart, parts);
+  u16(0, parts);
+  return new Uint8Array(parts);
+}

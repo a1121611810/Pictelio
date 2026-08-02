@@ -1,4 +1,5 @@
 import { apiClient } from "./client";
+import { unzipFrames } from "@pictelio/ugoira";
 import type {
   PixivIllustListResponse,
   PixivIllustDetailResponse,
@@ -116,22 +117,17 @@ export async function downloadAndExtractUgoira(
   const zipBlob = new Blob(chunks as BlobPart[]);
   onProgress?.(80);
 
-  // 3. 解压帧（80%-99%）
-  const { default: JSZip } = await import("jszip");
-  const zip = await JSZip.loadAsync(zipBlob);
+  // 3. 解压帧（80%-99%）：共享包 @pictelio/ugoira（fflate，替代 JSZip）
+  const zipBytes = new Uint8Array(await zipBlob.arrayBuffer());
+  const fileOrder = meta.frames.map((f) => f.file);
+  const frameBytes = unzipFrames(zipBytes, fileOrder);
   const extracted: UgoiraFrame[] = [];
   const blobUrls: string[] = [];
-  for (let fi = 0; fi < meta.frames.length; fi++) {
-    const frameMeta = meta.frames[fi];
-    // eslint-disable-next-line no-await-in-loop
-    const file = zip.file(frameMeta.file);
-    if (!file) continue;
-    // eslint-disable-next-line no-await-in-loop
-    const blob = await file.async("blob");
-    const url = URL.createObjectURL(blob);
+  for (let fi = 0; fi < frameBytes.length; fi++) {
+    const url = URL.createObjectURL(new Blob([frameBytes[fi]!]));
     blobUrls.push(url);
-    extracted.push({ url, delay: frameMeta.delay });
-    onProgress?.(80 + Math.round(((fi + 1) / meta.frames.length) * 19));
+    extracted.push({ url, delay: meta.frames[fi]!.delay });
+    onProgress?.(80 + Math.round(((fi + 1) / frameBytes.length) * 19));
   }
 
   if (extracted.length === 0) {
