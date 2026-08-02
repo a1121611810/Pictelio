@@ -347,7 +347,7 @@ async function main() {
     }
   }
 
-  console.log('\n[5/7] 场景 F：关注 Feed（P0-T4）')
+  console.log('\n[5/8] 场景 F：关注 Feed（P0-T4）')
   // 推荐页头部"关注"入口（x-view ml-6 px-1 py-1 含 关注 文本；精确匹配避免命中根容器）
   const followTap = await dispatchTap(
     cdp,
@@ -372,7 +372,7 @@ async function main() {
     }
   }
 
-  console.log('\n[6/7] 场景 G：收藏列表（P0-T6）')
+  console.log('\n[6/8] 场景 G：收藏列表（P0-T6）')
   // 推荐页点"我的"入口
   const meTap = await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('ml-6 px-1 py-1') && el.textContent && el.textContent.includes('我的')`)
   if (!meTap) {
@@ -407,7 +407,7 @@ async function main() {
     }
   }
 
-  console.log('\n[7/7] 场景 E：作者主页（P0-T1）')
+  console.log('\n[7/8] 场景 E：作者主页（P0-T1）')
   // 进详情页（复用 D 的卡片点击）
   const tappedE = await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('w-full flex flex-col')`)
   if (!tappedE) {
@@ -440,6 +440,28 @@ async function main() {
         return els.some((e) => e.tag === 'list-item') ? els : null
       }, { timeout: 45000, label: 'user works loaded (E)' })
       check('E3 作者主页作品列表加载', !!worksEls)
+    }
+  }
+
+  console.log('\n[8/8] 场景 H：关注/粉丝列表（P0-T2）')
+  // E 结束在作者主页：点"关注 N"入口（x-view py-1 px-3 含 关注 文本）
+  const followEntry = await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('py-1 px-3') && el.textContent && el.textContent.trim().startsWith('关注')`)
+  if (!followEntry) {
+    check('H1 进入关注列表', false, '未找到关注入口')
+  } else {
+    const listEls = await waitFor(cdp, async () => {
+      const els = await probe(cdp)
+      // 用户卡片（list-item）或空态
+      return els.some((e) => e.tag === 'list-item') || hasText(els, '暂无关注') ? els : null
+    }, { timeout: 45000, label: 'follow list loaded (H)' })
+    check('H1 进入关注列表并加载', !!listEls, listEls ? (listEls.some((e) => e.tag === 'list-item') ? '列表' : '空态') : '')
+    // 列表内关注按钮（独立 waitFor，不依赖 H1 快照时序）
+    if (listEls) {
+      const btnEls = await waitFor(cdp, async () => {
+        const els = await probe(cdp)
+        return els.some((e) => e.t === '关注' || e.t === '已关注') ? els : null
+      }, { timeout: 30000, label: 'follow button (H)' })
+      check('H2 列表内关注按钮渲染', !!btnEls)
     }
   }
 

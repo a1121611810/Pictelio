@@ -7,7 +7,7 @@ import { extractNovelTextFromHtml } from '../src/api/novel'
 import { matchRoute } from '../src/routerCore'
 import { redactProxyUrl } from '../src/utils/proxyRedact'
 import { apiClient } from '../src/api/client'
-import { getUserDetail } from '../src/api/user'
+import { getUserDetail, getUserFollowing, getUserFollowers, followUser, unfollowUser, loadUserListNext } from '../src/api/user'
 import { loadUserIllusts, loadFollow, loadBookmarks } from '../src/api/illust'
 import { loadUserNovels, loadBookmarks as loadNovelBookmarks } from '../src/api/novel'
 
@@ -596,5 +596,63 @@ describe('P0-T6 收藏列表 API 契约', () => {
   it('loadBookmarks(novel) 失败透传 reject', async () => {
     vi.spyOn(apiClient, 'get').mockRejectedValue(new Error('server 500'))
     await expect(loadNovelBookmarks(123)).rejects.toThrow('server 500')
+  })
+})
+
+// ─── P0-T2/T3：关注/粉丝列表 + 关注操作 API 契约（对齐主项目 api/user.ts|illust.ts） ───
+describe('P0-T2/T3 关注 API 契约', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('getUserFollowing 调 /v1/user/following 带 user_id + restrict，可带 offset', async () => {
+    const spy = vi.spyOn(apiClient, 'get').mockResolvedValue({ user_previews: [], next_url: null })
+    await getUserFollowing(5)
+    expect(spy).toHaveBeenCalledWith('/v1/user/following', { user_id: '5', restrict: 'public' })
+    await getUserFollowing(5, 10)
+    expect(spy).toHaveBeenCalledWith('/v1/user/following', { user_id: '5', restrict: 'public', offset: '10' })
+  })
+
+  it('getUserFollowers 调 /v1/user/follower 带 user_id', async () => {
+    const spy = vi.spyOn(apiClient, 'get').mockResolvedValue({ user_previews: [], next_url: null })
+    await getUserFollowers(5)
+    expect(spy).toHaveBeenCalledWith('/v1/user/follower', { user_id: '5' })
+  })
+
+  it('getUserFollowing 失败透传 reject', async () => {
+    vi.spyOn(apiClient, 'get').mockRejectedValue(new Error('403'))
+    await expect(getUserFollowing(5)).rejects.toThrow('403')
+  })
+
+  it('followUser POST /v1/user/follow/add 带 user_id + restrict', async () => {
+    const spy = vi.spyOn(apiClient, 'post').mockResolvedValue(undefined)
+    await followUser(5)
+    expect(spy).toHaveBeenCalledWith('/v1/user/follow/add', { user_id: '5', restrict: 'public' })
+    await followUser(5, 'private')
+    expect(spy).toHaveBeenCalledWith('/v1/user/follow/add', { user_id: '5', restrict: 'private' })
+  })
+
+  it('unfollowUser POST /v1/user/follow/delete 带 user_id', async () => {
+    const spy = vi.spyOn(apiClient, 'post').mockResolvedValue(undefined)
+    await unfollowUser(5)
+    expect(spy).toHaveBeenCalledWith('/v1/user/follow/delete', { user_id: '5' })
+  })
+
+  it('followUser 失败透传 reject', async () => {
+    vi.spyOn(apiClient, 'post').mockRejectedValue(new Error('rate limited'))
+    await expect(followUser(5)).rejects.toThrow('rate limited')
+  })
+})
+
+// ─── P0-T2：loadUserListNext 分页契约 ───
+describe('P0-T2 关注列表分页', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('loadUserListNext 透传 next_url 完整 URL（保留 query）', async () => {
+    const spy = vi.spyOn(apiClient, 'get').mockResolvedValue({ user_previews: [], next_url: null })
+    await loadUserListNext('/pixiv-api/v1/user/following?user_id=5&offset=10')
+    expect(spy).toHaveBeenCalledWith('/pixiv-api/v1/user/following?user_id=5&offset=10')
   })
 })

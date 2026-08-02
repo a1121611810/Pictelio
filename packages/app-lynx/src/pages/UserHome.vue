@@ -121,6 +121,12 @@ function openIllust(id: number) {
 function openNovel(id: number) {
   void navigate(`/novel/${id}`)
 }
+function openFollowing() {
+  void navigate(`/user/${userId}/following`)
+}
+function openFollowers() {
+  void navigate(`/user/${userId}/followers`)
+}
 
 onMounted(async () => {
   try {
@@ -156,9 +162,16 @@ onMounted(async () => {
       <view class="flex-1 flex flex-col ml-3.5">
         <text class="text-2xl font-bold text-foreground">{{ detail.user.name }}</text>
         <text class="text-sm text-foreground-3 mt-1">@{{ detail.user.account }}</text>
-        <text v-if="detail.profile.total_follow_users !== undefined" class="text-xs text-foreground-3 mt-1">
-          关注 {{ detail.profile.total_follow_users }}
-        </text>
+        <view class="flex flex-row mt-1.5">
+          <view class="py-1 px-3 bg-background-3 rounded-[var(--borderRadiusMedium)]" @tap="openFollowing">
+            <text class="text-xs text-foreground">
+              关注 {{ detail.profile.total_follow_users ?? '-' }}
+            </text>
+          </view>
+          <view class="py-1 px-3 ml-2 bg-background-3 rounded-[var(--borderRadiusMedium)]" @tap="openFollowers">
+            <text class="text-xs text-foreground">粉丝</text>
+          </view>
+        </view>
       </view>
     </view>
 
