@@ -1,0 +1,22 @@
+{
+  "name": "@pictelio/ugoira",
+  "version": "0.1.0",
+  "description": "Ugoira（Pixiv 动图）zip 帧处理纯函数库（fflate 解压 / store 模式 Range 切片）",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "check": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.10"
+  }
+}
