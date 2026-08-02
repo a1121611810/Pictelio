@@ -347,7 +347,32 @@ async function main() {
     }
   }
 
-  console.log('\n[5/5] 场景 E：作者主页（P0-T1）')
+  console.log('\n[5/6] 场景 F：关注 Feed（P0-T4）')
+  // 推荐页头部"关注"入口（x-view ml-6 px-1 py-1 含 关注 文本；精确匹配避免命中根容器）
+  const followTap = await dispatchTap(
+    cdp,
+    `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('ml-6 px-1 py-1') && el.textContent && el.textContent.includes('关注')`,
+  )
+  if (!followTap) {
+    check('F1 进入关注 Feed', false, '未找到关注入口')
+  } else {
+    const followEls = await waitFor(cdp, async () => {
+      const els = await probe(cdp)
+      // 列表或空态（新账号关注列表可能为空）都算进入成功
+      return els.some((e) => e.tag === 'list-item') || hasText(els, '暂无关注更新') ? els : null
+    }, { timeout: 45000, label: 'follow feed loaded (F)' })
+    check('F1 进入关注 Feed 并加载', !!followEls, followEls ? (followEls.some((e) => e.tag === 'list-item') ? '列表' : '空态') : '')
+    // 返回推荐页（供场景 E 使用）
+    const backF = await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('py-1 pr-2')`)
+    if (backF) {
+      await waitFor(cdp, async () => {
+        const els = await probe(cdp)
+        return hasText(els, '推荐插画') ? els : null
+      }, { timeout: 30000, label: 'back to recommended (F)' })
+    }
+  }
+
+  console.log('\n[6/6] 场景 E：作者主页（P0-T1）')
   // 进详情页（复用 D 的卡片点击）
   const tappedE = await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('w-full flex flex-col')`)
   if (!tappedE) {

@@ -8,7 +8,7 @@ import { matchRoute } from '../src/routerCore'
 import { redactProxyUrl } from '../src/utils/proxyRedact'
 import { apiClient } from '../src/api/client'
 import { getUserDetail } from '../src/api/user'
-import { loadUserIllusts } from '../src/api/illust'
+import { loadUserIllusts, loadFollow } from '../src/api/illust'
 import { loadUserNovels } from '../src/api/novel'
 
 describe('imageUrl.proxyImageUrl', () => {
@@ -545,5 +545,25 @@ describe('P0-T1 用户 API 契约', () => {
   it('loadUserNovels 失败透传 reject', async () => {
     vi.spyOn(apiClient, 'get').mockRejectedValue(new Error('server 500'))
     await expect(loadUserNovels(7)).rejects.toThrow('server 500')
+  })
+})
+
+// ─── P0-T4：关注 Feed API 契约（/v2/illust/follow，对齐主项目 api/illust.ts） ───
+describe('P0-T4 关注 Feed API 契约', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('loadFollow 默认 restrict=public，可传 private', async () => {
+    const spy = vi.spyOn(apiClient, 'get').mockResolvedValue({ illusts: [], next_url: null })
+    await loadFollow()
+    expect(spy).toHaveBeenCalledWith('/v2/illust/follow', { restrict: 'public' }, undefined)
+    await loadFollow('private')
+    expect(spy).toHaveBeenCalledWith('/v2/illust/follow', { restrict: 'private' }, undefined)
+  })
+
+  it('loadFollow 失败透传 reject', async () => {
+    vi.spyOn(apiClient, 'get').mockRejectedValue(new Error('403 forbidden'))
+    await expect(loadFollow()).rejects.toThrow('403 forbidden')
   })
 })

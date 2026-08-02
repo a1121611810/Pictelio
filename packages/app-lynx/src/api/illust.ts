@@ -10,6 +10,14 @@ export function loadRecommended(signal?: AbortSignal): Promise<PixivIllustListRe
   )
 }
 
+export function loadFollow(
+  restrict: "public" | "private" = "public",
+  signal?: AbortSignal,
+): Promise<PixivIllustListResponse> {
+  // 关注 Feed（P0-T4）：MVP 默认 public（对齐主项目默认）；「全部」视图过滤后置
+  return apiClient.get<PixivIllustListResponse>("/v2/illust/follow", { restrict }, signal)
+}
+
 export function loadDetail(illustId: number, signal?: AbortSignal): Promise<PixivIllustDetailResponse> {
   return apiClient.get<PixivIllustDetailResponse>(
     "/v1/illust/detail",

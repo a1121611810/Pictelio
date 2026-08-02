@@ -69,6 +69,9 @@ function openDetail(id: number) {
 function openNovels() {
   void navigate('/novels')
 }
+function openFollowing() {
+  void navigate('/following')
+}
 function openMe() {
   void navigate('/me')
 }
@@ -104,6 +107,9 @@ onActivated(() => {
     <view class="flex flex-row items-center h-[11.733vw] px-4 bg-background border-b-[1px] border-b-stroke-2">
       <text class="flex-1 text-3xl font-bold text-foreground">推荐插画</text>
       <!-- [lynx:fix] 原生 text 元素 @tap 失效（真机实测）→ 外层 view 包 tap（view tap 已验证工作） -->
+      <view class="ml-6 px-1 py-1" @tap="openFollowing">
+        <text class="text-lg text-brand-foreground">关注</text>
+      </view>
       <view class="ml-6 px-1 py-1" @tap="openNovels">
         <text class="text-lg text-brand-foreground">小说</text>
       </view>
