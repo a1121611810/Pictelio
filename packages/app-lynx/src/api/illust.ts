@@ -1,6 +1,6 @@
 // ─── 插画 API（复用现有 app 端点） ───
 import { apiClient } from "./client"
-import type { PixivIllustListResponse, PixivIllustDetailResponse } from "./types"
+import type { PixivIllustListResponse, PixivIllustDetailResponse, PixivUgoiraMetadata, PixivUgoiraMetadataResponse } from "./types"
 
 export function loadRecommended(signal?: AbortSignal): Promise<PixivIllustListResponse> {
   return apiClient.get<PixivIllustListResponse>(
@@ -37,6 +37,12 @@ export function loadDetail(illustId: number, signal?: AbortSignal): Promise<Pixi
     { illust_id: String(illustId) },
     signal,
   )
+}
+
+export function loadUgoiraMetadata(illustId: number): Promise<PixivUgoiraMetadata> {
+  return apiClient
+    .get<PixivUgoiraMetadataResponse>("/v1/ugoira/metadata", { illust_id: String(illustId) })
+    .then((r) => r.ugoira_metadata)
 }
 
 export function loadNext(url: string, signal?: AbortSignal): Promise<PixivIllustListResponse> {

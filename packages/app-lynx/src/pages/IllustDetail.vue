@@ -8,6 +8,7 @@ import type { PixivIllust } from '../api/types'
 import { proxyImageUrl } from '../utils/imageUrl'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
+import UgoiraViewer from '../components/UgoiraViewer.vue'
 
 const illust = ref<PixivIllust | null>(null)
 const loading = ref(true)
@@ -111,7 +112,9 @@ onMounted(async () => {
            失效 → 容器高度 0、大图空白（真机实测 2026-08-02）。改固定高度容器
            （Tailwind h-[100vw]）+ 裸 image（aspectFill），不依赖 aspect-ratio style -->
       <view class="relative w-full h-[100vw] bg-background-3 overflow-hidden">
-        <image v-if="currentImage" class="w-full h-full" :src="currentImage" :mode="'aspectFill'" />
+        <!-- T5：ugoira 动图用播放器；普通作品用静态大图 -->
+        <UgoiraViewer v-if="illust.type === 'ugoira'" :illust-id="illust.id" />
+        <image v-else-if="currentImage" class="w-full h-full" :src="currentImage" :mode="'aspectFill'" />
       </view>
       <view v-if="pages.length > 1" class="flex flex-row items-center justify-center p-3">
         <view class="py-1 pr-2" @tap="prevPage"><text class="text-4xl text-brand-foreground py-2 px-6">‹</text></view>

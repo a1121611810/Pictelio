@@ -10,6 +10,7 @@ import { apiClient } from '../src/api/client'
 import { getUserDetail, getUserFollowing, getUserFollowers, followUser, unfollowUser, loadUserListNext } from '../src/api/user'
 import { loadUserIllusts, loadFollow, loadBookmarks } from '../src/api/illust'
 import { loadUserNovels, loadBookmarks as loadNovelBookmarks, loadFollow as loadNovelFollow } from '../src/api/novel'
+import { bytesToDataUrl, downloadUgoiraFrames } from '../src/api/ugoira'
 
 describe('imageUrl.proxyImageUrl', () => {
   it('将 i.pximg.net URL 重写为本地代理路径', () => {
@@ -674,5 +675,90 @@ describe('P0-T5 小说关注 API 契约', () => {
   it('loadFollow(novel) 失败透传 reject', async () => {
     vi.spyOn(apiClient, 'get').mockRejectedValue(new Error('403'))
     await expect(loadNovelFollow()).rejects.toThrow('403')
+  })
+})
+
+// ─── T5：Ugoira 播放管线契约（bytesToDataUrl + downloadUgoiraFrames） ───
+function u16(v: number, out: number[]): void {
+  out.push(v & 0xff, (v >> 8) & 0xff)
+}
+function u32(v: number, out: number[]): void {
+  out.push(v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff, (v >> 24) & 0xff)
+}
+function nameBytes(name: string, out: number[]): void {
+  for (let i = 0; i < name.length; i++) out.push(name.charCodeAt(i))
+}
+function buildStoreZip(frames: { name: string; data: Uint8Array }[]): Uint8Array {
+  const parts: number[] = []
+  const localOffsets: number[] = []
+  for (const f of frames) {
+    localOffsets.push(parts.length)
+    u32(0x04034b50, parts)
+    u16(20, parts); u16(0, parts); u16(0, parts)
+    u16(0, parts); u16(0, parts); u32(0, parts)
+    u32(f.data.length, parts); u32(f.data.length, parts)
+    u16(f.name.length, parts); u16(0, parts)
+    nameBytes(f.name, parts)
+    for (const b of f.data) parts.push(b)
+  }
+  const cdStart = parts.length
+  for (let i = 0; i < frames.length; i++) {
+    const f = frames[i]!
+    u32(0x02014b50, parts)
+    u16(20, parts); u16(20, parts); u16(0, parts); u16(0, parts)
+    u16(0, parts); u16(0, parts); u32(0, parts)
+    u32(f.data.length, parts); u32(f.data.length, parts)
+    u16(f.name.length, parts); u16(0, parts); u16(0, parts)
+    u16(0, parts); u16(0, parts); u32(0, parts)
+    u32(localOffsets[i]!, parts)
+    nameBytes(f.name, parts)
+  }
+  const cdSize = parts.length - cdStart
+  u32(0x06054b50, parts)
+  u16(0, parts); u16(0, parts); u16(frames.length, parts); u16(frames.length, parts)
+  u32(cdSize, parts); u32(cdStart, parts); u16(0, parts)
+  return new Uint8Array(parts)
+}
+
+describe('T5 Ugoira 播放管线契约', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('bytesToDataUrl 转 base64 data URL（内容可解码回原字节）', () => {
+    const url = bytesToDataUrl(new Uint8Array([1, 2, 3]), 'image/png')
+    expect(url.startsWith('data:image/png;base64,')).toBe(true)
+    const bin = atob(url.split(',')[1]!)
+    expect([...bin].map((c) => c.charCodeAt(0))).toEqual([1, 2, 3])
+  })
+
+  it('downloadUgoiraFrames：metadata + zip 下载 + 共享包取帧 → data URL', async () => {
+    vi.spyOn(apiClient, 'get').mockResolvedValue({
+      ugoira_metadata: {
+        zip_urls: { medium: 'https://i.pximg.net/img-zip-ugoira/z.zip' },
+        frames: [
+          { file: 'frame_0.png', delay: 100 },
+          { file: 'frame_1.png', delay: 120 },
+        ],
+      },
+    })
+    const zip = buildStoreZip([
+      { name: 'frame_0.png', data: new Uint8Array([1, 2, 3]) },
+      { name: 'frame_1.png', data: new Uint8Array([4, 5]) },
+    ])
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(zip, { status: 200 })))
+    const frames = await downloadUgoiraFrames(123)
+    expect(frames).toHaveLength(2)
+    expect(frames[0]!.delay).toBe(100)
+    expect(frames[0]!.dataUrl.startsWith('data:image/png;base64,')).toBe(true)
+  })
+
+  it('downloadUgoiraFrames：zip 下载失败 → 抛错', async () => {
+    vi.spyOn(apiClient, 'get').mockResolvedValue({
+      ugoira_metadata: { zip_urls: { medium: 'https://i.pximg.net/z.zip' }, frames: [] },
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 500 })))
+    await expect(downloadUgoiraFrames(123)).rejects.toThrow('HTTP 500')
   })
 })

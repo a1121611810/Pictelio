@@ -92,6 +92,23 @@ export interface PixivNovelDetailResponse {
   novel: PixivNovel;
 }
 
+// ─── Ugoira（T5，字段与现有 app 同源） ───
+export interface PixivUgoiraFrame {
+  file: string;
+  delay: number;
+}
+
+export interface PixivUgoiraMetadata {
+  zip_urls: {
+    medium: string;
+  };
+  frames: PixivUgoiraFrame[];
+}
+
+export interface PixivUgoiraMetadataResponse {
+  ugoira_metadata: PixivUgoiraMetadata;
+}
+
 // ─── 用户详情（P0-T1，字段与现有 app 同源） ───
 export interface PixivProfile {
   webpage?: string;

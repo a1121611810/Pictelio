@@ -343,6 +343,9 @@ importers:
       '@lynx-js/web-core':
         specifier: ^0.23.1
         version: 0.23.1(@lynx-js/css-serializer@0.1.5)(tslib@2.8.1)
+      '@pictelio/ugoira':
+        specifier: workspace:*
+        version: link:../ugoira
       spark-md5:
         specifier: ^3.0.2
         version: 3.0.2
