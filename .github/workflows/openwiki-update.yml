@@ -15,11 +15,18 @@ jobs:
     steps:
       - name: Check required secret
         # 提前暴露缺失的 key，避免裸报错（openwiki 非交互模式必须有 OPENROUTER_API_KEY）
+        # 含脱敏诊断：仅输出长度/是否空白/首尾字节（不泄露 key 内容）
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
-          if [ -z "${{ secrets.OPENROUTER_API_KEY }}" ]; then
+          if [ -z "${OPENROUTER_API_KEY}" ]; then
             echo "::error::OPENROUTER_API_KEY is not configured. Add it in repo Settings → Secrets and variables → Actions, then re-run this workflow (or trigger it manually via workflow_dispatch)."
             exit 1
           fi
+          echo "key length=${#OPENROUTER_API_KEY}"
+          echo "key all-whitespace=$([ -z "$(printf '%s' "$OPENROUTER_API_KEY" | tr -d '[:space:]')" ] && echo yes || echo no)"
+          echo "key first byte=$(printf '%s' "$OPENROUTER_API_KEY" | head -c 1 | od -An -tx1 | tr -d ' ')"
+          echo "key last byte=$(printf '%s' "$OPENROUTER_API_KEY" | tail -c 1 | od -An -tx1 | tr -d ' ')"
 
       - name: Check out repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
