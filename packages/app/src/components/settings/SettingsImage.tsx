@@ -129,7 +129,7 @@ const SettingsImage: Component = () => {
         </fluent-button>
         <fluent-button
           slot="actions"
-          appearance="accent"
+          appearance="primary"
           on:click={() => {
             void setUgoiraMode("range");
             setShowUgoiraConfirm(false);

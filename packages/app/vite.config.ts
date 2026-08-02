@@ -32,7 +32,7 @@ const proxyUrl =
   "http://127.0.0.1:10808";
 // 脱敏：代理 URL 可能含 user:pass 凭据（含 scheme-less / protocol-relative 格式），
 // 日志只打印主机部分。逻辑与 app-lynx 的 src/utils/proxyRedact.ts 一致。
-const _redactProxyUrl = (url: string): string => {
+const redactProxyUrl = (url: string): string => {
   try {
     const normalized = url.includes("://") ? url : `http://${url}`;
     const u = new URL(normalized);
@@ -43,7 +43,7 @@ const _redactProxyUrl = (url: string): string => {
   const atIdx = url.lastIndexOf("@");
   return atIdx !== -1 ? url.slice(atIdx + 1) : url;
 };
-console.log(`[vite] 🔧 使用代理: ${_redactProxyUrl(proxyUrl)}`);
+console.log(`[vite] 🔧 使用代理: ${redactProxyUrl(proxyUrl)}`);
 // HttpsProxyAgent 的泛型类型极深，与 Vite+ 扩展后的 UserConfig 比较时会触发 TS 堆栈深度超限，
 // 因此将其断言为 unknown；运行时行为不变。
 const proxyAgent = new HttpsProxyAgent(proxyUrl) as unknown;

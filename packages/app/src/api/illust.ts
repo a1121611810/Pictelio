@@ -170,7 +170,7 @@ async function extractRange(
     }
     // store 直接切片；deflate 用 fflate inflateSync fallback
     const frameBytes = entry.compMethod === 0 ? bytes : deflateInflate(bytes);
-    const url = URL.createObjectURL(new Blob([frameBytes]));
+    const url = URL.createObjectURL(new Blob([new Uint8Array(frameBytes)]));
     blobUrls.push(url);
     extracted.push({ url, delay: meta.frames[i]!.delay });
     onProgress?.(20 + Math.round(((i + 1) / fileOrder.length) * 80));
@@ -233,7 +233,7 @@ export async function downloadAndExtractUgoira(
   const extracted: UgoiraFrame[] = [];
   const blobUrls: string[] = [];
   for (let fi = 0; fi < frameBytes.length; fi++) {
-    const url = URL.createObjectURL(new Blob([frameBytes[fi]!]));
+    const url = URL.createObjectURL(new Blob([new Uint8Array(frameBytes[fi]!)]));
     blobUrls.push(url);
     extracted.push({ url, delay: meta.frames[fi]!.delay });
     onProgress?.(80 + Math.round(((fi + 1) / frameBytes.length) * 19));

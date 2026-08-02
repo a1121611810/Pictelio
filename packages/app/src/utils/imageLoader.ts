@@ -19,7 +19,11 @@ const GC_INTERVAL_MS = 300_000;
 const GC_EVICT_RATIO = 0.2;
 
 // 模块加载时自动启动定时 GC（测试环境下不启动）
-if (typeof setInterval !== "undefined" && typeof process !== "object") {
+// 浏览器环境无 process 全局；用类型安全的 globalThis 探测（不依赖 @types/node 进入 tsc 程序）
+if (
+  typeof setInterval !== "undefined" &&
+  typeof (globalThis as { process?: unknown }).process !== "object"
+) {
   schedulePeriodicGC();
 }
 
