@@ -35,7 +35,14 @@ export const routes: RouteDef[] = [
   { path: '/me', name: 'me', component: Me },
 ]
 
-const _state = ref<RouteState>({ name: '', path: '/login', params: {} })
+// [首帧内容化]（#61/#63）：初始路由为推荐页——首帧直接渲染推荐页骨架屏，
+// 消除已登录用户启动时的登录页闪屏；未登录用户由 initRouter 登录守卫
+// replace 到 /login（不入栈，ADR-0049 语义不变）。
+// 登录态就绪前推荐页可能已挂载（首帧 fetch 会 401 失败），补拉机制见
+// Recommended.vue 的 watch(isLoggedIn) + onActivated。
+// 勿在未评估前开启 IFR（enableIFR）——app-lynx 真机 32 组实测否决，
+// 见 docs/research/vue-lynx-benchmark-ifr.md §6 与 issue #61。
+const _state = ref<RouteState>({ name: 'recommended', path: '/recommended', params: {} })
 
 // [lynx:fix] 极简历史栈（ADR-0049）：navigate 默认入栈，goBack 出栈回上一页；
 // 登录相关导航用 replace 语义（不入栈）——登录页不应被"返回"。

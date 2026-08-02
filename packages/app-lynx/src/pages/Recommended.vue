@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'recommended' })
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onActivated, watch } from 'vue'
 import { navigate } from '../router'
 import { loadRecommended, loadNext } from '../api/illust'
 import type { PixivIllust } from '../api/types'
@@ -10,6 +10,7 @@ import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import { filterByRestrict } from '../stores/settingsStore'
+import { isLoggedIn } from '../stores/authStore'
 
 const illusts = ref<PixivIllust[]>([])
 const nextUrl = ref<string | null>(null)
@@ -74,6 +75,27 @@ function openMe() {
 
 onMounted(() => {
   void fetchFirstPage()
+})
+
+// [首帧内容化]（#63）：初始路由为推荐页，组件可能在登录态就绪前被挂载
+// （含 KeepAlive 缓存实例）。首帧 fetch 在 token 恢复前会 401 失败，需补拉，
+// 两条路径均幂等（数据非空/加载中则跳过）：
+// 1) watch(isLoggedIn)：token 恢复完成 / 登录成功（false→true）后补拉
+// 2) onActivated：从 login replace 回 recommended 时复用 KeepAlive 缓存实例
+//    （onMounted 不重跑，仅有 onActivated 触发）
+watch(isLoggedIn, (loggedIn) => {
+  // 注意：不检查 loading——restoreToken 完成可能早于首帧 401 返回（loading=true 期间），
+  // 若此时跳过则无后续触发器（navigate replace 同路径不重挂、onActivated 不触发）。
+  // fetchFirstPage 覆盖赋值，并发最坏多一次幂等请求，不损坏数据。
+  if (loggedIn && illusts.value.length === 0) {
+    void fetchFirstPage()
+  }
+})
+
+onActivated(() => {
+  if (illusts.value.length === 0 && !loading.value && isLoggedIn.value) {
+    void fetchFirstPage()
+  }
 })
 </script>
 

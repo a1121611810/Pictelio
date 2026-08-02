@@ -209,7 +209,11 @@ Font sizes use fluid `clamp(rem + vw)` via UnoCSS preflights, defined in `/packa
 
 Uses a **hand-rolled in-memory router** (`/packages/app-lynx/src/router.ts`) rather than `vue-router`. Reason: `vue-router`'s `RouterView` renders empty in `vue-lynx` 0.5.1 + `web-core` 0.23.1 (verified empirically). Pattern matching logic is extracted to `/packages/app-lynx/src/routerCore.ts` for unit testability.
 
-Routes: `/login` → `/recommended` → `/illust/:id` → `/novel-list` → `/novel/:id` → `/me`.
+Routes: `/login`, `/recommended`, `/illust/:id`, `/novels`, `/novel/:id`, `/me`.
+
+**Initial route: `/recommended`** (first-frame content pattern, issues [#61](https://github.com/user/pixivizer/issues/61)/[#63](https://github.com/user/pixivizer/issues/63)). The default route was changed from `/login` to `/recommended` so that already-authenticated users see the recommended feed skeleton immediately on startup, eliminating the login-page flash. Unauthenticated users are redirected to `/login` by `initRouter`'s auth guard with replace semantics (no history push, preserving [ADR-0049](/docs/adr/ADR-0049-lynx-keepalive-page-cache.md) semantics).
+
+> **IFR note:** IFR (Instant First-Frame Rendering, `enableIFR: true`) was evaluated via 32 benchmark runs on real devices and **rejected** — it is an FCP lever, not an interaction lever, and carries a gzip ×2.2, TTI ×1.36 cost. See [`docs/research/vue-lynx-benchmark-ifr.md`](/docs/research/vue-lynx-benchmark-ifr.md).
 
 ### Page Instance Caching & Navigation History
 
@@ -220,6 +224,13 @@ Routes: `/login` → `/recommended` → `/illust/:id` → `/novel-list` → `/no
 **Navigation history stack** (`router.ts`): `navigate(path)` pushes the current path onto a history stack before switching. `goBack()` pops the previous path and navigates there; when the stack is empty (refresh/deep-link boundary), it falls back to `/recommended`. Login-related navigation (`/login`, login success → `/recommended`, `initRouter` first route) uses **replace semantics** (`{ replace: true }`) — these paths are not pushed onto the stack, so the login page is never reachable via back navigation. `resetHistory()` clears the stack on login/logout to start a fresh session.
 
 Page components must declare a `name` via `defineOptions({ name: 'xxx' })` for KeepAlive's `include` to match them.
+
+**First-frame content compensatory re-fetch** ([#63](https://github.com/user/pixivizer/issues/63)): Because the initial route is now `/recommended`, the `Recommended.vue` component may mount before `restoreToken()` completes — causing the initial fetch to 401. Two idempotent compensatory paths ensure data is fetched once auth is ready:
+
+1. **`watch(isLoggedIn)`** — when `isLoggedIn` transitions `false→true` and illust data is still empty, triggers `fetchFirstPage()`. Does not check `loading` state because `restoreToken` may resolve while the initial 401 fetch is still in-flight (no subsequent trigger would fire otherwise).
+2. **`onActivated`** — when returning from `/login` via a KeepAlive-cached instance (where `onMounted` does not re-run), re-fetches if data is empty, not loading, and logged in.
+
+Both paths are idempotent: if data is already present (successful first fetch), neither triggers a redundant request.
 
 ### Auth & Security
 
