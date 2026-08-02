@@ -4,6 +4,7 @@
 // 卸载竞态防护：下载完成时若已卸载则丢弃（disposed）+ AbortController 中断下载。
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { downloadUgoiraFrames, type UgoiraFrameData } from '../api/ugoira'
+import { ugoiraMode } from '../stores/settingsStore'
 
 const props = defineProps<{
   illustId: number
@@ -45,7 +46,7 @@ onMounted(async () => {
   errorMsg.value = ''
   abort = new AbortController()
   try {
-    frames = await downloadUgoiraFrames(props.illustId, abort.signal)
+    frames = await downloadUgoiraFrames(props.illustId, ugoiraMode.value, abort.signal)
     if (disposed) {
       frames = [] // 已卸载：丢弃帧数组（不启动播放，防 timer/frames 泄漏）
       return

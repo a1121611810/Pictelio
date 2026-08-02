@@ -11,6 +11,8 @@ import { getUserDetail, getUserFollowing, getUserFollowers, followUser, unfollow
 import { loadUserIllusts, loadFollow, loadBookmarks } from '../src/api/illust'
 import { loadUserNovels, loadBookmarks as loadNovelBookmarks, loadFollow as loadNovelFollow } from '../src/api/novel'
 import { bytesToDataUrl, downloadUgoiraFrames } from '../src/api/ugoira'
+import type { UgoiraExtractMode } from '../src/api/ugoira'
+import { ugoiraMode as lynxUgoiraMode, setUgoiraMode as lynxSetUgoiraMode } from '../src/stores/settingsStore'
 
 describe('imageUrl.proxyImageUrl', () => {
   it('将 i.pximg.net URL 重写为本地代理路径', () => {
@@ -760,5 +762,76 @@ describe('T5 Ugoira 播放管线契约', () => {
     })
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 500 })))
     await expect(downloadUgoiraFrames(123)).rejects.toThrow('HTTP 500')
+  })
+})
+
+// ─── T6：动图播放方案设置 + range 取帧契约 ───
+describe('T6 动图播放方案', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('settingsStore.ugoiraMode 默认 fflate，setUgoiraMode 更新', () => {
+    expect(lynxUgoiraMode.value).toBe('fflate')
+    lynxSetUgoiraMode('range')
+    expect(lynxUgoiraMode.value).toBe('range')
+  })
+
+  it('downloadUgoiraFrames range 模式：GET+Range 试探长度 → 尾部目录 → 取帧', async () => {
+    vi.spyOn(apiClient, 'get').mockResolvedValue({
+      ugoira_metadata: {
+        zip_urls: { medium: 'https://i.pximg.net/z.zip' },
+        frames: [
+          { file: 'frame_0.png', delay: 100 },
+          { file: 'frame_1.png', delay: 120 },
+        ],
+      },
+    })
+    const zip = buildStoreZip([
+      { name: 'frame_0.png', data: new Uint8Array([1, 2, 3]) },
+      { name: 'frame_1.png', data: new Uint8Array([4, 5]) },
+    ])
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      const range = (init?.headers as Record<string, string> | undefined)?.Range
+      // bytes=0-0 试探：返回 content-range 总长
+      if (range === 'bytes=0-0') {
+        return new Response(zip.slice(0, 1), {
+          status: 206,
+          headers: { 'content-range': `bytes 0-0/${zip.length}` },
+        })
+      }
+      const m = /bytes=(\d+)-(\d+)/.exec(range ?? '')
+      if (m) {
+        const s = parseInt(m[1]!, 10)
+        const e = parseInt(m[2]!, 10)
+        return new Response(zip.slice(s, e + 1), { status: 206 })
+      }
+      return new Response(zip, { status: 200 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const frames = await downloadUgoiraFrames(123, 'range')
+    expect(frames).toHaveLength(2)
+    expect(frames[0]!.delay).toBe(100)
+    expect(frames[0]!.dataUrl.startsWith('data:image/png;base64,')).toBe(true)
+    // 断言发过 bytes=0-0 试探（原生 HEAD 规避）
+    expect(fetchMock.mock.calls.some(([, i]) => (i?.headers as Record<string, string> | undefined)?.Range === 'bytes=0-0')).toBe(true)
+  })
+
+  it('downloadUgoiraFrames range 模式：非 206 → 降级 fflate（warn）', async () => {
+    vi.spyOn(apiClient, 'get').mockResolvedValue({
+      ugoira_metadata: {
+        zip_urls: { medium: 'https://i.pximg.net/z.zip' },
+        frames: [{ file: 'frame_0.png', delay: 100 }],
+      },
+    })
+    const zip = buildStoreZip([{ name: 'frame_0.png', data: new Uint8Array([1, 2, 3]) }])
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    // range 试探返回 200（非 206）→ range 失败 → 降级 fflate 全量下载
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(zip, { status: 200 })))
+    const frames = await downloadUgoiraFrames(123, 'range')
+    expect(frames).toHaveLength(1)
+    expect(frames[0]!.delay).toBe(100)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('降级 fflate'), expect.anything())
   })
 })

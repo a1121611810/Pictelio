@@ -1,5 +1,6 @@
 import type { Component } from "solid-js";
 import { downloadAndExtractUgoira, type UgoiraFrame } from "../api/illust";
+import { ugoiraMode } from "../stores/settingsStore";
 import PixivImage from "./PixivImage";
 
 interface Props {
@@ -35,7 +36,9 @@ const UgoiraViewer: Component<Props> = (props) => {
       return;
     }
 
-    const [err, result] = await tryAsync(downloadAndExtractUgoira(props.illustId));
+    const [err, result] = await tryAsync(
+      downloadAndExtractUgoira(props.illustId, undefined, ugoiraMode()),
+    );
     if (err) {
       console.error("[UgoiraViewer] Error:", err);
       setError((err as Error).message || "加载动图失败");

@@ -5,7 +5,7 @@ import { ref, onMounted } from 'vue'
 import { navigate, goBack, ensureAuth, resetHistory } from '../router'
 import { currentUser, logout, isLoggedIn } from '../stores/authStore'
 import { selectedClient, switchClient, type ClientKind } from '../stores/clientSwitchStore'
-import { showR18, showR18G, setShowR18, setShowR18G } from '../stores/settingsStore'
+import { showR18, showR18G, setShowR18, setShowR18G, ugoiraMode, setUgoiraMode } from '../stores/settingsStore'
 import { proxyImageUrl } from '../utils/imageUrl'
 
 const switching = ref(false)
@@ -34,6 +34,23 @@ function pickClient(kind: ClientKind) {
 }
 
 // ADR-0051：R18/R18G 开关（对齐主项目 settingsStore，默认隐藏，持久化 IndexedDB）
+// T6：动图播放方案——Range 需二次确认
+const ugoiraConfirm = ref(false)
+
+function pickUgoiraMode(m: 'fflate' | 'range') {
+  if (m === 'fflate') {
+    ugoiraConfirm.value = false
+    setUgoiraMode('fflate')
+  } else {
+    ugoiraConfirm.value = true // 显示二次确认（告知原生端限制）
+  }
+}
+
+function confirmUgoiraRange() {
+  setUgoiraMode('range')
+  ugoiraConfirm.value = false
+}
+
 function toggleR18() {
   setShowR18(!showR18.value)
 }
@@ -131,6 +148,43 @@ function toggleR18G() {
           :class="showR18G ? 'bg-brand justify-end' : 'bg-background-3 justify-start'"
         >
           <view class="w-[4.27vw] h-[4.27vw] rounded-full bg-white shadow-[var(--elevation2)]" />
+        </view>
+      </view>
+    </view>
+
+    <!-- T6：动图播放方案 -->
+    <view class="bg-background mt-3 p-4">
+      <text class="text-lg font-semibold text-foreground">动图播放方案</text>
+      <text class="text-xs text-foreground-3 mt-1 mb-3">Ugoira 动图取帧方式</text>
+      <view class="flex flex-row gap-2">
+        <view
+          class="flex-1 py-3 rounded-[var(--borderRadiusLarge)] flex items-center justify-center"
+          :class="ugoiraMode === 'fflate' ? 'bg-brand' : 'bg-background-3'"
+          @tap="pickUgoiraMode('fflate')"
+        >
+          <text class="text-base" :class="ugoiraMode === 'fflate' ? 'text-onBrand' : 'text-foreground'">fflate（默认）</text>
+        </view>
+        <view
+          class="flex-1 py-3 rounded-[var(--borderRadiusLarge)] flex items-center justify-center"
+          :class="ugoiraMode === 'range' ? 'bg-brand' : 'bg-background-3'"
+          @tap="pickUgoiraMode('range')"
+        >
+          <text class="text-base" :class="ugoiraMode === 'range' ? 'text-onBrand' : 'text-foreground'">Range 流式</text>
+        </view>
+      </view>
+      <text class="text-xs text-foreground-3 mt-2 leading-snug">
+        Range 流式按需取帧、内存更低；原生端依赖 Range 支持，个别网络环境可能更慢。
+      </text>
+      <!-- 二次确认（选择 Range 时） -->
+      <view v-if="ugoiraConfirm" class="mt-3 p-3 bg-background-3 rounded-[var(--borderRadiusLarge)]">
+        <text class="text-sm text-foreground">确认切换到 Range 流式？</text>
+        <view class="flex flex-row mt-2 gap-2">
+          <view class="flex-1 py-2 bg-brand rounded-[var(--borderRadiusMedium)] flex items-center justify-center" @tap="confirmUgoiraRange">
+            <text class="text-base text-onBrand">确认</text>
+          </view>
+          <view class="flex-1 py-2 bg-background rounded-[var(--borderRadiusMedium)] flex items-center justify-center" @tap="ugoiraConfirm = false">
+            <text class="text-base text-foreground">取消</text>
+          </view>
         </view>
       </view>
     </view>
