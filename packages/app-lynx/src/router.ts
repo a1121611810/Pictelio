@@ -25,6 +25,7 @@ import IllustDetail from './pages/IllustDetail.vue'
 import NovelList from './pages/NovelList.vue'
 import NovelDetail from './pages/NovelDetail.vue'
 import Me from './pages/Me.vue'
+import UserHome from './pages/UserHome.vue'
 
 export const routes: RouteDef[] = [
   { path: '/login', name: 'login', component: Login },
@@ -32,6 +33,7 @@ export const routes: RouteDef[] = [
   { path: '/illust/:id', name: 'illust-detail', component: IllustDetail },
   { path: '/novels', name: 'novels', component: NovelList },
   { path: '/novel/:id', name: 'novel-detail', component: NovelDetail },
+  { path: '/user/:id', name: 'user-home', component: UserHome },
   { path: '/me', name: 'me', component: Me },
 ]
 

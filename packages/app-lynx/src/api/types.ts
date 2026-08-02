@@ -92,6 +92,32 @@ export interface PixivNovelDetailResponse {
   novel: PixivNovel;
 }
 
+// ─── 用户详情（P0-T1，字段与现有 app 同源） ───
+export interface PixivProfile {
+  webpage?: string;
+  total_follow_users?: number;
+  total_mypixiv_users?: number;
+  // 其余字段（gender/birth/region 等）MVP 不消费，不声明
+}
+
+export interface PixivUserDetailResponse {
+  user: PixivUser;
+  profile: PixivProfile;
+  profile_publicity: Record<string, string>;
+  workspace: Record<string, string>;
+}
+
+export interface PixivUserPreview {
+  user: PixivUser;
+  illusts: PixivIllust[];
+  is_muted: boolean;
+}
+
+export interface PixivUserFollowingResponse {
+  user_previews: PixivUserPreview[];
+  next_url: string | null;
+}
+
 // ─── 错误类型 ───
 
 export enum ApiErrorType {

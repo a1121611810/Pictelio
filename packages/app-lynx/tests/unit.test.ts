@@ -6,6 +6,10 @@ import { ApiErrorType } from '../src/api/types'
 import { extractNovelTextFromHtml } from '../src/api/novel'
 import { matchRoute } from '../src/routerCore'
 import { redactProxyUrl } from '../src/utils/proxyRedact'
+import { apiClient } from '../src/api/client'
+import { getUserDetail } from '../src/api/user'
+import { loadUserIllusts } from '../src/api/illust'
+import { loadUserNovels } from '../src/api/novel'
 
 describe('imageUrl.proxyImageUrl', () => {
   it('将 i.pximg.net URL 重写为本地代理路径', () => {
@@ -493,5 +497,53 @@ describe('client 原生模式 401 轮换（#53：refresh_token 持久化到 Keys
     const { apiClient } = await import('../src/api/client')
     await apiClient.get('/v1/illust/detail')
     expect(setItemMock).toHaveBeenCalledWith('refresh_token', 'rotated-new-token', expect.any(Function))
+  })
+})
+
+// ─── P0-T1：用户 API 契约（端点路径/参数与主项目 api/user.ts|illust.ts|novel.ts 同源） ───
+describe('P0-T1 用户 API 契约', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('getUserDetail 调 /v1/user/detail 并带 user_id + filter=for_ios', async () => {
+    const spy = vi.spyOn(apiClient, 'get').mockResolvedValue({
+      user: { id: 123 },
+      profile: {},
+      profile_publicity: {},
+      workspace: {},
+    })
+    const res = await getUserDetail(123)
+    expect(spy).toHaveBeenCalledWith('/v1/user/detail', { user_id: '123', filter: 'for_ios' })
+    expect(res.user.id).toBe(123)
+  })
+
+  it('getUserDetail 网络失败透传 reject（IO 边界失败路径）', async () => {
+    vi.spyOn(apiClient, 'get').mockRejectedValue(new Error('network down'))
+    await expect(getUserDetail(1)).rejects.toThrow('network down')
+  })
+
+  it('loadUserIllusts 默认 type=illust，可传 manga', async () => {
+    const spy = vi.spyOn(apiClient, 'get').mockResolvedValue({ illusts: [], next_url: null })
+    await loadUserIllusts(7)
+    expect(spy).toHaveBeenCalledWith('/v1/user/illusts', { user_id: '7', type: 'illust' }, undefined)
+    await loadUserIllusts(7, 'manga')
+    expect(spy).toHaveBeenCalledWith('/v1/user/illusts', { user_id: '7', type: 'manga' }, undefined)
+  })
+
+  it('loadUserIllusts 失败透传 reject', async () => {
+    vi.spyOn(apiClient, 'get').mockRejectedValue(new Error('401'))
+    await expect(loadUserIllusts(7)).rejects.toThrow('401')
+  })
+
+  it('loadUserNovels 调 /v1/user/novels 带 user_id + filter=for_ios', async () => {
+    const spy = vi.spyOn(apiClient, 'get').mockResolvedValue({ novels: [], next_url: null })
+    await loadUserNovels(7)
+    expect(spy).toHaveBeenCalledWith('/v1/user/novels', { user_id: '7', filter: 'for_ios' }, undefined)
+  })
+
+  it('loadUserNovels 失败透传 reject', async () => {
+    vi.spyOn(apiClient, 'get').mockRejectedValue(new Error('server 500'))
+    await expect(loadUserNovels(7)).rejects.toThrow('server 500')
   })
 })

@@ -347,6 +347,42 @@ async function main() {
     }
   }
 
+  console.log('\n[5/5] 场景 E：作者主页（P0-T1）')
+  // 进详情页（复用 D 的卡片点击）
+  const tappedE = await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('w-full flex flex-col')`)
+  if (!tappedE) {
+    check('E1 进入详情页', false, '未找到卡片（列表未加载）')
+  } else {
+    const detailE = await waitFor(cdp, async () => {
+      const els = await probe(cdp)
+      return hasText(els, '‹ 返回') ? els : null
+    }, { timeout: 30000, label: 'detail page (E)' })
+    check('E1 进入详情页', !!detailE)
+    // 作者区在详情数据返回后才渲染——先等 'by ' 作者文本出现（骨架期点击无效）
+    const authorReady = await waitFor(cdp, async () => {
+      const els = await probe(cdp)
+      return els.some((e) => e.t.startsWith('by ')) ? els : null
+    }, { timeout: 45000, label: 'detail author loaded (E)' })
+    check('E1b 详情数据加载（作者区就绪）', !!authorReady)
+    // 点作者区（x-view: flex flex-row items-center mt-2，T1 新增的作者点击入口）
+    const authorTap = await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('flex flex-row items-center mt-2')`)
+    if (!authorTap) {
+      check('E2 进入作者主页', false, '未找到作者区')
+    } else {
+      const homeEls = await waitFor(cdp, async () => {
+        const els = await probe(cdp)
+        // 用户主页特征：插画/小说 tab 出现
+        return hasText(els, '插画') && hasText(els, '小说') ? els : null
+      }, { timeout: 30000, label: 'user home (E)' })
+      check('E2 进入作者主页（tab 渲染）', !!homeEls)
+      const worksEls = await waitFor(cdp, async () => {
+        const els = await probe(cdp)
+        return els.some((e) => e.tag === 'list-item') ? els : null
+      }, { timeout: 45000, label: 'user works loaded (E)' })
+      check('E3 作者主页作品列表加载', !!worksEls)
+    }
+  }
+
   } finally {
     cdp.close() // 异常路径也关闭 WebSocket，避免进程挂死
   }

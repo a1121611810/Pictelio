@@ -22,6 +22,18 @@ export function loadNext(url: string, signal?: AbortSignal): Promise<PixivIllust
   return apiClient.get<PixivIllustListResponse>(url, undefined, signal)
 }
 
+export function loadUserIllusts(
+  userId: number,
+  type: "illust" | "manga" = "illust",
+  signal?: AbortSignal,
+): Promise<PixivIllustListResponse> {
+  return apiClient.get<PixivIllustListResponse>(
+    "/v1/user/illusts",
+    { user_id: String(userId), type },
+    signal,
+  )
+}
+
 // ─── 收藏（对齐主项目，默认收藏到 public） ───
 export function addBookmark(illustId: number): Promise<void> {
   return apiClient.post("/v2/illust/bookmark/add", {

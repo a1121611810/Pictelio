@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { currentParams, goBack } from '../router'
+import { currentParams, navigate, goBack } from '../router'
 import { loadDetail } from '../api/illust'
 import type { PixivIllust } from '../api/types'
 import { proxyImageUrl } from '../utils/imageUrl'
 import BookmarkButton from '../components/BookmarkButton.vue'
+import SkeletonImage from '../components/SkeletonImage.vue'
 
 const illust = ref<PixivIllust | null>(null)
 const loading = ref(true)
@@ -32,6 +33,10 @@ const currentImage = computed(() => {
   const page = list[Math.min(currentPage.value, list.length - 1)]
   return proxyImageUrl(page.large || page.medium || '')
 })
+
+function openAuthor() {
+  void navigate(`/user/${illust.value.user.id}`)
+}
 
 function nextPage() {
   if (currentPage.value < pages.value.length - 1) currentPage.value += 1
@@ -85,7 +90,16 @@ onMounted(async () => {
       </view>
       <view class="p-4 bg-background">
         <text class="text-3xl font-bold text-foreground">{{ illust.title }}</text>
-        <text class="text-lg text-brand-foreground mt-2">by {{ illust.user.name }}</text>
+        <view class="flex flex-row items-center mt-2" @tap="openAuthor">
+          <SkeletonImage
+            v-if="illust.user.profile_image_urls"
+            :src="proxyImageUrl(illust.user.profile_image_urls.medium || illust.user.profile_image_urls.px_170x170 || '')"
+            aspect-ratio="1 / 1"
+            min-h="9vw"
+            class="w-[9vw] h-[9vw] rounded-[var(--borderRadiusLarge)]"
+          />
+          <text class="text-lg text-brand-foreground ml-2">by {{ illust.user.name }}</text>
+        </view>
         <text class="text-sm text-foreground-3 mt-1.5">{{ illust.width }} × {{ illust.height }}</text>
         <view class="mt-2">
           <BookmarkButton
