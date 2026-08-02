@@ -1,6 +1,6 @@
 # app-lynx 原生集成统一术语表
 
-> 范围：`packages/app-lynx` 在原生 LynxView 下的双 client 架构、NativeModule 契约、图片流水线、自动化验证基建的**统一术语**。配套 ADR：[ADR-0053](./ADR-0053-lynx-nativemodule-contract.md)、[ADR-0054](./ADR-0054-image-pipeline-unified-core.md)、[ADR-0055](./ADR-0055-lynx-native-render-compat.md)；web-core 预览差异见 `glossary-web-core-pitfalls.md`。
+> 范围：`packages/app-lynx` 在原生 LynxView 下的双 client 架构、NativeModule 契约、图片流水线、自动化验证基建的**统一术语**。配套 ADR：[ADR-0053](./ADR-0053-lynx-nativemodule-contract.md)、[ADR-0054](./ADR-0054-image-pipeline-unified-core.md)、[ADR-0055](./ADR-0055-lynx-native-render-compat.md)、[ADR-0056](./ADR-0056-lynx-list-number-prop-binding.md)；web-core 预览差异见 `glossary-web-core-pitfalls.md`。
 
 ## 核心术语
 
@@ -22,6 +22,7 @@
 | **原生 text tap 失效** | 原生 fiber 下 `<text>` 与 `<list-item>` 根级 `@tap` 不触发——交互绑定必须在外层 `<view>`。 |
 | **详情大图塌陷** | scroll-view 内 style `aspectRatio`/`minHeight` 失效 → 大图容器高度 0；防护：固定 `h-[100vw]` 容器 + 裸 image。 |
 | **item-key String** | `<list-item :item-key>` 必须字符串（数字 id 报 220201）。 |
+| **number 属性绑定契约** | list 的 number 类型属性（`span-count`、`lower-threshold-item-count`、`estimated-main-axis-size-px` 等）**必须 v-bind 数字绑定**（`:span-count="2"`）；静态字符串 attribute（`span-count="2"`）被原生布局引擎**静默拒绝** → 列数回退默认 1，无日志无报错。web-core 宽松解析字符串会掩盖此缺陷（dev 预览正常、真机单列）。列数属性名统一 `span-count`（`column-count` 是 radon 旧路径属性，fiber 内部 list 不消费，见 ADR-0056）。 |
 | **启动恢复挂起** | 原生启动 `restoreToken` → Native OAuth 交换挂起时登录页渲染异常、元素定位失败——**自动化脚本先清 refresh_token** 得干净登录页。 |
 | **`lynx-flow-check.sh`** | 真机完整流程自动化（登录→收藏→详情→小说→我的/R18），每步 API 日志 + 截图断言，失败即 exit（不降级手动）。 |
 | **`lynx-screen-analyze.py`** | 截图分析器：`classify`（页面粗分类：login/推荐/详情/文本/我的）、`login-elements`（按钮=品牌蓝大块，输入框=按钮上方灰细条）、输入生效验证（非白占比）。 |

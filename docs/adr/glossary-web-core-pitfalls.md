@@ -1,6 +1,6 @@
 # Web-core 预览已知缺陷与防护 — 术语表
 
-> 范围：`packages/app-lynx` 在 web 预览（`@lynx-js/web-core`）下渲染行为与真实原生 LynxView 的差异，以及为绕开这些缺陷建立的应用层防护。配套 ADR：[ADR-0044-lynx-responsive-units.md](./ADR-0044-lynx-responsive-units.md)、[ADR-0045-lynx-scrolltolower-infinite-loading.md](./ADR-0045-lynx-scrolltolower-infinite-loading.md)、[ADR-0048-lynx-recommended-card-layout.md](./ADR-0048-lynx-recommended-card-layout.md)。
+> 范围：`packages/app-lynx` 在 web 预览（`@lynx-js/web-core`）下渲染行为与真实原生 LynxView 的差异，以及为绕开这些缺陷建立的应用层防护。配套 ADR：[ADR-0044-lynx-responsive-units.md](./ADR-0044-lynx-responsive-units.md)、[ADR-0045-lynx-scrolltolower-infinite-loading.md](./ADR-0045-lynx-scrolltolower-infinite-loading.md)、[ADR-0048-lynx-recommended-card-layout.md](./ADR-0048-lynx-recommended-card-layout.md)、[ADR-0056-lynx-list-number-prop-binding.md](./ADR-0056-lynx-list-number-prop-binding.md)。
 
 ## 核心术语
 
@@ -23,6 +23,7 @@
 | **rem 单位风险** | web-core 的 wasm 转换模板含 `calc(N * var(--rem-unit))` 引用，但 client.css 未定义 `--rem-unit`——理论会塌陷；**原型实测 Tailwind 默认 rem 档未塌陷**（当前 web-core 未实际启用该转换）。防护：配置层仍禁 rem（Tailwind spacing/fontSize 顶层替换为 vw/rpx），防 web-core 未来升级启用转换。 |
 | **Tailwind JIT 类名扫描** | Tailwind v3 JIT 只编译源码**字面量**类名——动态拼接类名不会生效。防护：动态类用互斥全字符串三元（如 `cond ? 'a-class' : 'b-class'`），且新类后需重启 dev server（HMR 不扫新类）。 |
 | **vw 原生解析** | `transformVW` 默认关闭时 vw 由浏览器 CSSOM 原生解析（不经 cqw 变量链）——web 预览下唯一可靠且响应式的长度单位（详见 ADR-0044）。 |
+| **number 属性宽松解析** | web-core 对 list 的 number 类型属性（`span-count`/`column-count`）用 `parseFloat(getAttribute(...)) \|\| 1` **宽松解析字符串**——静态字符串 `span-count="2"` 在 web 预览正常两列，**掩盖了原生端"number 属性必须 v-bind 数字绑定"的契约**（字符串被原生布局引擎静默拒绝 → 单列）。dev 预览正常 ≠ 真机正常，多列布局改动必须真机回归（见 ADR-0056）。 |
 
 ## 缺陷与防护对照
 
