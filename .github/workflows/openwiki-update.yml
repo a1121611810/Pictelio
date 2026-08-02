@@ -14,12 +14,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check required secret
-        # 提前暴露缺失的 key，避免裸报错（openwiki 非交互模式必须有 OPENROUTER_API_KEY）
+        # 提前暴露缺失的 key，避免裸报错（DeepSeek 走 OpenAI 兼容端点，必须有 OPENAI_COMPATIBLE_API_KEY）
+        # 含脱敏诊断：仅输出长度/是否空白/首尾字节（不泄露 key 内容）
+        env:
+          OPENAI_COMPATIBLE_API_KEY: ${{ secrets.OPENAI_COMPATIBLE_API_KEY }}
         run: |
-          if [ -z "${{ secrets.OPENROUTER_API_KEY }}" ]; then
-            echo "::error::OPENROUTER_API_KEY is not configured. Add it in repo Settings → Secrets and variables → Actions, then re-run this workflow (or trigger it manually via workflow_dispatch)."
+          if [ -z "${OPENAI_COMPATIBLE_API_KEY}" ]; then
+            echo "::error::OPENAI_COMPATIBLE_API_KEY is not configured. Add it in repo Settings → Secrets and variables → Actions, then re-run this workflow (or trigger it manually via workflow_dispatch)."
             exit 1
           fi
+          echo "key length=${#OPENAI_COMPATIBLE_API_KEY}"
+          echo "key all-whitespace=$([ -z "$(printf '%s' "$OPENAI_COMPATIBLE_API_KEY" | tr -d '[:space:]')" ] && echo yes || echo no)"
+          echo "key first byte=$(printf '%s' "$OPENAI_COMPATIBLE_API_KEY" | head -c 1 | od -An -tx1 | tr -d ' ')"
+          echo "key last byte=$(printf '%s' "$OPENAI_COMPATIBLE_API_KEY" | tail -c 1 | od -An -tx1 | tr -d ' ')"
 
       - name: Check out repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -37,9 +44,11 @@ jobs:
       - name: Run OpenWiki
         run: openwiki code --update --print
         env:
-          OPENWIKI_PROVIDER: openrouter
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          OPENWIKI_MODEL_ID: z-ai/glm-5.2
+          # 与本地开发环境一致：DeepSeek 走 OpenAI 兼容端点（见 ~/.openwiki/.env）
+          OPENWIKI_PROVIDER: openai-compatible
+          OPENAI_COMPATIBLE_API_KEY: ${{ secrets.OPENAI_COMPATIBLE_API_KEY }}
+          OPENAI_COMPATIBLE_BASE_URL: https://api.deepseek.com/v1
+          OPENWIKI_MODEL_ID: deepseek-v4-pro
           # LangSmith tracing 仅配置了 key 才启用
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
           LANGCHAIN_PROJECT: openwiki
