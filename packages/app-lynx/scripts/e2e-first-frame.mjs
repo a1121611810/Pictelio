@@ -2,11 +2,17 @@
 // 驱动：Vivaldi 持久 profile + CDP（--remote-debugging-port=9223），裸 WebSocket（node ≥ 22 全局可用）。
 // 方法学：lynx web-core 渲染须递归穿透 lynx-view 内 srcdoc iframe + shadowRoot 才能读到 x-* 元素
 // （见项目 memory：lynx-automated-render-probe / lynx-login-verification-vivaldi）。
-// 用法：先起 rspeedy dev（web 预览 3001）与 Vivaldi CDP，再 `node scripts/e2e-first-frame.mjs`。
+// ─── 启动方式（用平常的浏览器，不要独立 profile / 不要覆盖现有标签页） ───
+// 先起 rspeedy dev（web 预览 3001，PICTELIO_LYNX_DEV=1）与 Vivaldi CDP：
+//   /Applications/Vivaldi.app/Contents/MacOS/Vivaldi \
+//     --remote-debugging-port=9223 --remote-allow-origins=* \
+// 注意：不带 --user-data-dir（用默认 profile = 日常浏览器环境，扩展/书签/历史都在）；
+// 不带 --new-window（让浏览器恢复日常会话窗口）。若 Vivaldi 已在运行，CDP 端口不生效，
+// 需先关闭再启动（Chromium 系设计：已运行的实例不接受新参数）。
+// 脚本默认新开一个标签页访问（不覆盖你现有的标签页），见 newPage()。
 // 依赖真实 Pixiv 网络（走代理 10808），token 读自 ../.env（gitignore，勿提交）。
 import { readFileSync } from 'node:fs'
 
-const PREVIEW_URL = 'http://127.0.0.1:3001/__web_preview?casename=main.web.bundle'
 const CDP_HTTP = 'http://127.0.0.1:9223'
 
 // ─── token（.env，PIXIV_REFRESH_TOKEN） ───
@@ -112,7 +118,36 @@ async function waitFor(cdp, fn, { timeout = 40000, interval = 300, label = 'cond
   throw new Error(`timeout waiting for ${label}; last=${String(last).slice(0, 300)}`)
 }
 
-// 找一个可用的 page target（Vivaldi 会冻结后台/僵尸 tab，CDP 无响应——逐个探测跳过）
+// 自动探测 web 预览端口（rspeedy dev 3000 被占时用 3001）
+async function findPreviewUrl() {
+  for (const port of [3000, 3001]) {
+    const url = `http://127.0.0.1:${port}/__web_preview?casename=main.web.bundle`
+    try {
+      const r = await fetch(url, { method: 'HEAD' })
+      if (r.ok) return url
+    } catch { /* 端口未监听 */ }
+  }
+  throw new Error('未找到 web 预览（先起 rspeedy dev）')
+}
+
+// 新开一个标签页访问（不覆盖用户现有 tab；--remote-allow-origins=* 下新建 tab 可用，
+// 且新建即激活，不会像后台 tab 那样被 Vivaldi 冻结）
+async function newPage() {
+  const url = await findPreviewUrl()
+  const r = await fetch(`${CDP_HTTP}/json/new?${encodeURIComponent(url)}`, { method: 'PUT' })
+  if (!r.ok) throw new Error(`json/new 失败: HTTP ${r.status}`)
+  const target = await r.json()
+  if (!target.webSocketDebuggerUrl) throw new Error('json/new 未返回 webSocketDebuggerUrl')
+  // 默认 profile 下新建 tab 是后台 tab，会被 Vivaldi 节能冻结（CDP 无响应）——
+  // 先 /json/activate 激活解冻（实测必要；激活失败则回退 findUsablePage）
+  try {
+    await fetch(`${CDP_HTTP}/json/activate/${target.id}`)
+    await new Promise((res) => setTimeout(res, 300))
+  } catch { /* 忽略，兜底路径处理 */ }
+  return target
+}
+
+// 兜底：newPage 失败时才复用现有 page target（Vivaldi 会冻结后台/僵尸 tab，逐个探测跳过）
 async function findUsablePage() {
   const list = await (await fetch(`${CDP_HTTP}/json/list`)).json()
   for (const t of list) {
@@ -131,18 +166,28 @@ async function findUsablePage() {
 
 // 真实鼠标点击（坐标命中元素中心，触发 lynx 触摸管线）
 // ─── 清理登录态（删除 IndexedDB 中的 refresh_token，reload 后 worker 重建） ───
+// worker 的 idbKV 连接可能占用 db 导致 deleteDatabase 排队（onblocked 不删除）——
+// 循环尝试 + 验证落在登录页，最多 3 轮
 async function clearAuth(cdp) {
-  await evalJS(
-    cdp,
-    `(async () => {
-      if (!indexedDB.databases) return 'no-api';
-      const dbs = await indexedDB.databases();
-      for (const db of dbs) indexedDB.deleteDatabase(db.name);
-      return 'deleted:' + dbs.map((d) => d.name).join(',');
-    })()`,
-  )
-  await cdp.send('Page.reload', { ignoreCache: true })
-  await waitFor(cdp, async () => (await probe(cdp)).length > 0, { timeout: 30000, label: 'render after clearAuth' })
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await evalJS(
+      cdp,
+      `(async () => {
+        if (!indexedDB.databases) return 'no-api';
+        const dbs = await indexedDB.databases();
+        await Promise.all(dbs.map((db) => new Promise((res) => {
+          const req = indexedDB.deleteDatabase(db.name);
+          req.onsuccess = req.onerror = req.onblocked = () => res();
+        })));
+        return 'deleted:' + dbs.map((d) => d.name).join(',');
+      })()`,
+    )
+    await cdp.send('Page.reload', { ignoreCache: true })
+    await waitFor(cdp, async () => (await probe(cdp)).length > 0, { timeout: 30000, label: 'render after clearAuth' })
+    const els = await probe(cdp)
+    if (hasText(els, 'Lynx Client MVP')) return // 已清除，落在登录页
+  }
+  throw new Error('clearAuth 失败：多次尝试后仍无法清除登录态')
 }
 
 // lynx 元素统一用 dispatchEvent('click') 触发 @tap（坐标点击不可靠，见 lynx-login-verification-vivaldi）
@@ -217,7 +262,13 @@ function check(name, ok, detail = '') {
 }
 
 async function main() {
-  const target = await findUsablePage()
+  let target
+  try {
+    target = await newPage() // 优先新开 tab（不覆盖用户现有标签页）
+  } catch (err) {
+    console.warn(`[e2e] 新开 tab 失败（${err.message}），回退复用现有 tab`)
+    target = await findUsablePage()
+  }
   console.log(`使用 target: ${target.url || '(about:blank)'}`)
   const cdp = new CDP(target.webSocketDebuggerUrl)
   await cdp.send('Page.enable')
@@ -225,7 +276,7 @@ async function main() {
   try {
 
   console.log('\n[1/4] 场景 A：未登录启动 → 登录页')
-  await cdp.send('Page.navigate', { url: PREVIEW_URL })
+  // newPage 已通过 /json/new?url 直接导航到预览页，等待渲染即可
   await waitFor(cdp, async () => (await probe(cdp)).length > 0, { timeout: 30000, label: 'initial render' })
   await clearAuth(cdp) // 保证未登录态
   const elsA = await probe(cdp)
