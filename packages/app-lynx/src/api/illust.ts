@@ -18,6 +18,19 @@ export function loadFollow(
   return apiClient.get<PixivIllustListResponse>("/v2/illust/follow", { restrict }, signal)
 }
 
+export function loadBookmarks(
+  userId: number,
+  restrict: "public" | "private" = "public",
+  signal?: AbortSignal,
+): Promise<PixivIllustListResponse> {
+  // 收藏列表（P0-T6）：MVP 默认 public（对齐主项目默认）；「非公开」tab 后置
+  return apiClient.get<PixivIllustListResponse>(
+    "/v1/user/bookmarks/illust",
+    { user_id: String(userId), restrict },
+    signal,
+  )
+}
+
 export function loadDetail(illustId: number, signal?: AbortSignal): Promise<PixivIllustDetailResponse> {
   return apiClient.get<PixivIllustDetailResponse>(
     "/v1/illust/detail",

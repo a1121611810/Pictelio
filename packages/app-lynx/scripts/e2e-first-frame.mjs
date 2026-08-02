@@ -347,7 +347,7 @@ async function main() {
     }
   }
 
-  console.log('\n[5/6] 场景 F：关注 Feed（P0-T4）')
+  console.log('\n[5/7] 场景 F：关注 Feed（P0-T4）')
   // 推荐页头部"关注"入口（x-view ml-6 px-1 py-1 含 关注 文本；精确匹配避免命中根容器）
   const followTap = await dispatchTap(
     cdp,
@@ -372,7 +372,42 @@ async function main() {
     }
   }
 
-  console.log('\n[6/6] 场景 E：作者主页（P0-T1）')
+  console.log('\n[6/7] 场景 G：收藏列表（P0-T6）')
+  // 推荐页点"我的"入口
+  const meTap = await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('ml-6 px-1 py-1') && el.textContent && el.textContent.includes('我的')`)
+  if (!meTap) {
+    check('G1 进入收藏页', false, '未找到我的入口')
+  } else {
+    const meEls = await waitFor(cdp, async () => {
+      const els = await probe(cdp)
+      return hasText(els, 'Client 切换') ? els : null
+    }, { timeout: 30000, label: 'me page (G)' })
+    check('G1a 进入我的页面', !!meEls)
+    const bmTap = await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('py-3.5') && el.textContent && el.textContent.trim().startsWith('我的收藏')`)
+    if (!bmTap) {
+      check('G1 进入收藏页', false, '未找到收藏入口')
+    } else {
+      const bmEls = await waitFor(cdp, async () => {
+        const els = await probe(cdp)
+        // 列表或空态（可能无收藏）都算进入成功
+        return els.some((e) => e.tag === 'list-item') || hasText(els, '暂无收藏') ? els : null
+      }, { timeout: 45000, label: 'bookmarks loaded (G)' })
+      check('G1 进入收藏页并加载', !!bmEls, bmEls ? (bmEls.some((e) => e.tag === 'list-item') ? '列表' : '空态') : '')
+      // 返回推荐页（收藏 → 我的 → 推荐，供场景 E 使用）
+      await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('py-1 pr-2')`)
+      await waitFor(cdp, async () => {
+        const els = await probe(cdp)
+        return hasText(els, 'Client 切换') ? els : null
+      }, { timeout: 30000, label: 'back to me (G)' }).catch(() => null)
+      await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('py-1 pr-2')`)
+      await waitFor(cdp, async () => {
+        const els = await probe(cdp)
+        return hasText(els, '推荐插画') ? els : null
+      }, { timeout: 30000, label: 'back to recommended (G)' }).catch(() => null)
+    }
+  }
+
+  console.log('\n[7/7] 场景 E：作者主页（P0-T1）')
   // 进详情页（复用 D 的卡片点击）
   const tappedE = await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('w-full flex flex-col')`)
   if (!tappedE) {

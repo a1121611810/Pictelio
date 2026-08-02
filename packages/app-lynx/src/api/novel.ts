@@ -30,6 +30,18 @@ export function loadUserNovels(userId: number, signal?: AbortSignal): Promise<Pi
   )
 }
 
+export function loadBookmarks(
+  userId: number,
+  restrict: "public" | "private" = "public",
+  signal?: AbortSignal,
+): Promise<PixivNovelListResponse> {
+  // 收藏列表（P0-T6）：MVP 默认 public（对齐主项目默认）；「非公开」tab 后置
+  return apiClient.get<PixivNovelListResponse>("/v1/user/bookmarks/novel", {
+    user_id: String(userId),
+    restrict,
+  }, signal)
+}
+
 /**
  * 从 /webview/v2/novel 返回的 HTML 中提取小说正文。
  * 正文数据藏在 <script> 标签的 window.pixiv.novel.text 中。

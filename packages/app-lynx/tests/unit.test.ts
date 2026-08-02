@@ -8,8 +8,8 @@ import { matchRoute } from '../src/routerCore'
 import { redactProxyUrl } from '../src/utils/proxyRedact'
 import { apiClient } from '../src/api/client'
 import { getUserDetail } from '../src/api/user'
-import { loadUserIllusts, loadFollow } from '../src/api/illust'
-import { loadUserNovels } from '../src/api/novel'
+import { loadUserIllusts, loadFollow, loadBookmarks } from '../src/api/illust'
+import { loadUserNovels, loadBookmarks as loadNovelBookmarks } from '../src/api/novel'
 
 describe('imageUrl.proxyImageUrl', () => {
   it('将 i.pximg.net URL 重写为本地代理路径', () => {
@@ -565,5 +565,36 @@ describe('P0-T4 关注 Feed API 契约', () => {
   it('loadFollow 失败透传 reject', async () => {
     vi.spyOn(apiClient, 'get').mockRejectedValue(new Error('403 forbidden'))
     await expect(loadFollow()).rejects.toThrow('403 forbidden')
+  })
+})
+
+// ─── P0-T6：收藏列表 API 契约（/v1/user/bookmarks/illust|novel，对齐主项目） ───
+describe('P0-T6 收藏列表 API 契约', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('loadBookmarks(illust) 调 /v1/user/bookmarks/illust 带 user_id + restrict', async () => {
+    const spy = vi.spyOn(apiClient, 'get').mockResolvedValue({ illusts: [], next_url: null })
+    await loadBookmarks(123)
+    expect(spy).toHaveBeenCalledWith('/v1/user/bookmarks/illust', { user_id: '123', restrict: 'public' }, undefined)
+    await loadBookmarks(123, 'private')
+    expect(spy).toHaveBeenCalledWith('/v1/user/bookmarks/illust', { user_id: '123', restrict: 'private' }, undefined)
+  })
+
+  it('loadBookmarks(illust) 失败透传 reject', async () => {
+    vi.spyOn(apiClient, 'get').mockRejectedValue(new Error('401'))
+    await expect(loadBookmarks(123)).rejects.toThrow('401')
+  })
+
+  it('loadBookmarks(novel) 调 /v1/user/bookmarks/novel 带 user_id + restrict', async () => {
+    const spy = vi.spyOn(apiClient, 'get').mockResolvedValue({ novels: [], next_url: null })
+    await loadNovelBookmarks(123)
+    expect(spy).toHaveBeenCalledWith('/v1/user/bookmarks/novel', { user_id: '123', restrict: 'public' }, undefined)
+  })
+
+  it('loadBookmarks(novel) 失败透传 reject', async () => {
+    vi.spyOn(apiClient, 'get').mockRejectedValue(new Error('server 500'))
+    await expect(loadNovelBookmarks(123)).rejects.toThrow('server 500')
   })
 })

@@ -27,6 +27,7 @@ import NovelDetail from './pages/NovelDetail.vue'
 import Me from './pages/Me.vue'
 import UserHome from './pages/UserHome.vue'
 import Following from './pages/Following.vue'
+import Bookmarks from './pages/Bookmarks.vue'
 
 export const routes: RouteDef[] = [
   { path: '/login', name: 'login', component: Login },
@@ -36,6 +37,7 @@ export const routes: RouteDef[] = [
   { path: '/novel/:id', name: 'novel-detail', component: NovelDetail },
   { path: '/user/:id', name: 'user-home', component: UserHome },
   { path: '/following', name: 'following', component: Following },
+  { path: '/bookmarks', name: 'bookmarks', component: Bookmarks },
   { path: '/me', name: 'me', component: Me },
 ]
 

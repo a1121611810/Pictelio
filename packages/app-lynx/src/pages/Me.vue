@@ -22,6 +22,10 @@ function onLogout() {
   void navigate('/login', { replace: true })
 }
 
+function openBookmarks() {
+  void navigate('/bookmarks')
+}
+
 function pickClient(kind: ClientKind) {
   if (selectedClient.value === kind || switching.value) return
   switching.value = true
@@ -59,6 +63,14 @@ function toggleR18G() {
       <view class="ml-4 flex flex-col">
         <text class="text-3xl font-bold text-foreground">{{ currentUser.name }}</text>
         <text class="text-sm text-foreground-3 mt-1">@{{ currentUser.account }}</text>
+      </view>
+    </view>
+
+    <!-- 个人中心入口（P0） -->
+    <view class="bg-background mt-3 p-4">
+      <view class="flex flex-row items-center justify-between py-3.5" @tap="openBookmarks">
+        <text class="text-lg text-foreground">我的收藏</text>
+        <text class="text-lg text-foreground-3">›</text>
       </view>
     </view>
 

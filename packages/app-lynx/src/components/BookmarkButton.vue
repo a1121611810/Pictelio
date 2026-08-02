@@ -17,6 +17,9 @@ const count = ref(props.bookmarkCount ?? 0)
 const busy = ref(false)
 const errorMsg = ref('')
 
+// change 事件：收藏状态切换后上抛（供收藏列表等宿主移除已取消收藏的项）
+const emit = defineEmits<{ change: [bookmarked: boolean] }>()
+
 async function toggle() {
   if (busy.value) return
   busy.value = true
@@ -31,6 +34,7 @@ async function toggle() {
       bookmarked.value = true
       count.value += 1
     }
+    emit('change', bookmarked.value)
   } catch {
     errorMsg.value = '操作失败'
   } finally {
