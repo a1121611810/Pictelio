@@ -347,7 +347,71 @@ async function main() {
     }
   }
 
-  console.log('\n[5/8] 场景 F：关注 Feed（P0-T4）')
+  console.log('\n[5/9] 场景 I：详情页关注作者（P0-T3）')
+  // D 结束在推荐页：点卡片进详情，验证作者区关注按钮并可切换
+  const tappedI = await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('w-full flex flex-col')`)
+  if (!tappedI) {
+    check('I1 进入详情页', false, '未找到卡片')
+  } else {
+    await waitFor(cdp, async () => {
+      const els = await probe(cdp)
+      return hasText(els, '‹ 返回') ? els : null
+    }, { timeout: 30000, label: 'detail page (I)' })
+    // 作者区就绪后，找关注按钮（x-view px-4 h-[8vw]，文本 关注/已关注）
+    const btnInfo = await waitFor(cdp, async () => {
+      const els = await probe(cdp)
+      const btn = els.find((e) => e.c.includes('px-4 h-[8vw]') && (e.t === '关注' || e.t === '已关注'))
+      return btn ? { btn, els } : null
+    }, { timeout: 45000, label: 'follow button (I)' })
+    if (!btnInfo) {
+      check('I1 详情页关注按钮渲染', false, '未找到按钮（可能作者是本人）')
+      // 失败路径也返回推荐页，避免连锁失败
+      await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('py-1 pr-2')`)
+      await waitFor(cdp, async () => {
+        const els = await probe(cdp)
+        return hasText(els, '推荐插画') ? els : null
+      }, { timeout: 30000, label: 'back to recommended (I-fail)' }).catch(() => null)
+    } else {
+      const before = btnInfo.btn.t
+      check('I1 详情页关注按钮渲染', true, `初始=${before}`)
+      // 点击切换 → 状态变化
+      await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('px-4 h-[8vw]')`)
+      const afterTap = await waitFor(cdp, async () => {
+        const els = await probe(cdp)
+        const b = els.find((e) => e.c.includes('px-4 h-[8vw]') && (e.t === '关注' || e.t === '已关注'))
+        return b && b.t !== before ? b.t : null
+      }, { timeout: 30000, label: 'follow toggled (I)' })
+      check('I2 点击切换关注状态', !!afterTap, `${before} → ${afterTap || '(未变化)'}`)
+      // 再点恢复原状态（E2E 不污染关注列表；网络抖动时重试一次）
+      if (afterTap) {
+        await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('px-4 h-[8vw]')`)
+        const restored = await waitFor(cdp, async () => {
+          const els = await probe(cdp)
+          const b = els.find((e) => e.c.includes('px-4 h-[8vw]') && (e.t === '关注' || e.t === '已关注'))
+          return b && b.t === before ? b.t : null
+        }, { timeout: 20000, label: 'follow restored (I)' }).catch(() => null)
+        if (!restored) {
+          // 重试一次（网络抖动/状态未同步）
+          await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('px-4 h-[8vw]')`)
+          await waitFor(cdp, async () => {
+            const els = await probe(cdp)
+            const b = els.find((e) => e.c.includes('px-4 h-[8vw]') && (e.t === '关注' || e.t === '已关注'))
+            return b && b.t === before ? b.t : null
+          }, { timeout: 20000, label: 'follow restored retry (I)' }).catch(() => null)
+        }
+        const finalBtn = (await probe(cdp)).find((e) => e.c.includes('px-4 h-[8vw]') && (e.t === '关注' || e.t === '已关注'))
+        check('I3 再点恢复原状态', finalBtn?.t === before, `${before} → ${finalBtn?.t || '(未找到)'}`)
+      }
+      // 返回推荐页（供场景 F）
+      await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('py-1 pr-2')`)
+      await waitFor(cdp, async () => {
+        const els = await probe(cdp)
+        return hasText(els, '推荐插画') ? els : null
+      }, { timeout: 30000, label: 'back to recommended (I)' }).catch(() => null)
+    }
+  }
+
+  console.log('\n[6/9] 场景 F：关注 Feed（P0-T4）')
   // 推荐页头部"关注"入口（x-view ml-6 px-1 py-1 含 关注 文本；精确匹配避免命中根容器）
   const followTap = await dispatchTap(
     cdp,
@@ -372,7 +436,7 @@ async function main() {
     }
   }
 
-  console.log('\n[6/8] 场景 G：收藏列表（P0-T6）')
+  console.log('\n[7/9] 场景 G：收藏列表（P0-T6）')
   // 推荐页点"我的"入口
   const meTap = await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('ml-6 px-1 py-1') && el.textContent && el.textContent.includes('我的')`)
   if (!meTap) {
@@ -407,7 +471,7 @@ async function main() {
     }
   }
 
-  console.log('\n[7/8] 场景 E：作者主页（P0-T1）')
+  console.log('\n[8/9] 场景 E：作者主页（P0-T1）')
   // 进详情页（复用 D 的卡片点击）
   const tappedE = await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('w-full flex flex-col')`)
   if (!tappedE) {
@@ -443,7 +507,7 @@ async function main() {
     }
   }
 
-  console.log('\n[8/8] 场景 H：关注/粉丝列表（P0-T2）')
+  console.log('\n[9/9] 场景 H：关注/粉丝列表（P0-T2）')
   // E 结束在作者主页：点"关注 N"入口（x-view py-1 px-3 含 关注 文本）
   const followEntry = await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('py-1 px-3') && el.textContent && el.textContent.trim().startsWith('关注')`)
   if (!followEntry) {

@@ -2,6 +2,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { currentParams, navigate, goBack } from '../router'
 import { loadDetail } from '../api/illust'
+import { followUser, unfollowUser } from '../api/user'
+import { currentUser } from '../stores/authStore'
 import type { PixivIllust } from '../api/types'
 import { proxyImageUrl } from '../utils/imageUrl'
 import BookmarkButton from '../components/BookmarkButton.vue'
@@ -11,6 +13,32 @@ const illust = ref<PixivIllust | null>(null)
 const loading = ref(true)
 const errorMsg = ref('')
 const currentPage = ref(0)
+
+// ─── 关注作者（P0-T3） ───
+const following = ref(false)
+const followBusy = ref(false)
+const followError = ref('') // 独立于 errorMsg——避免关注失败击穿已加载的详情页
+
+const isSelfAuthor = computed(() => currentUser.value?.id === illust.value?.user.id)
+
+async function toggleFollowAuthor() {
+  if (followBusy.value || !illust.value) return
+  followBusy.value = true
+  followError.value = ''
+  try {
+    if (following.value) {
+      await unfollowUser(illust.value.user.id)
+      following.value = false
+    } else {
+      await followUser(illust.value.user.id)
+      following.value = true
+    }
+  } catch {
+    followError.value = '操作失败'
+  } finally {
+    followBusy.value = false
+  }
+}
 
 const illustId = computed(() => Number(currentParams.value.id ?? 0))
 
@@ -49,6 +77,8 @@ onMounted(async () => {
   try {
     const res = await loadDetail(illustId.value)
     illust.value = res.illust
+    // P0-T3：同步作者关注状态（详情 API 可能不返回 is_followed，缺省 false）
+    following.value = !!res.illust.user.is_followed
   } catch (err) {
     errorMsg.value = (err as { message?: string }).message ?? '加载失败'
   } finally {
@@ -98,8 +128,20 @@ onMounted(async () => {
             min-h="9vw"
             class="w-[9vw] h-[9vw] rounded-[var(--borderRadiusLarge)]"
           />
-          <text class="text-lg text-brand-foreground ml-2">by {{ illust.user.name }}</text>
+          <text class="text-lg text-brand-foreground ml-2 flex-1">by {{ illust.user.name }}</text>
+          <!-- P0-T3：关注作者（非本人时显示） -->
+          <view
+            v-if="!isSelfAuthor"
+            class="px-4 h-[8vw] flex items-center justify-center rounded-[var(--borderRadiusLarge)]"
+            :class="following ? 'bg-background-3' : 'bg-brand'"
+            @tap.stop="toggleFollowAuthor"
+          >
+            <text class="text-base" :class="following ? 'text-foreground' : 'text-onBrand'">
+              {{ following ? '已关注' : '关注' }}
+            </text>
+          </view>
         </view>
+        <text v-if="followError" class="text-xs text-danger mt-1">{{ followError }}</text>
         <text class="text-sm text-foreground-3 mt-1.5">{{ illust.width }} × {{ illust.height }}</text>
         <view class="mt-2">
           <BookmarkButton
