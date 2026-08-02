@@ -1,16 +1,29 @@
-import { type Component } from "solid-js";
+import { type Component, createSignal } from "solid-js";
 import FluentIcon from "../ui/FluentIcon";
 import {
   listQuality,
   setListQuality,
   detailQuality,
   setDetailQuality,
+  ugoiraMode,
+  setUgoiraMode,
   type ImageQuality,
 } from "../../stores/settingsStore";
+import type { UgoiraExtractMode } from "../../api/illust";
 import { imageHostState, setMasterEnabled, modeLabel } from "../../stores/imageHostStore";
 
 const SettingsImage: Component = () => {
   const navigate = useNavigate();
+  // T3：动图播放方案——range 需二次确认（告知原生端限制）
+  const [showUgoiraConfirm, setShowUgoiraConfirm] = createSignal(false);
+
+  function onPickUgoiraMode(mode: UgoiraExtractMode) {
+    if (mode === "fflate") {
+      void setUgoiraMode("fflate");
+    } else {
+      setShowUgoiraConfirm(true); // 二次确认后 setUgoiraMode("range")
+    }
+  }
 
   return (
     <div class="py-3 flex flex-col">
@@ -67,6 +80,64 @@ const SettingsImage: Component = () => {
           ))}
         </div>
       </div>
+
+      {/* 动图播放方案（T3）：默认 fflate，可切 Range 流式（二次确认） */}
+      <div class="py-2">
+        <div class="flex items-center gap-2 mb-2">
+          <FluentIcon name="image" size={20} />
+          <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
+            动图播放方案
+          </p>
+        </div>
+        <div class="flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-1.5 gap-1">
+          {(["fflate", "range"] as UgoiraExtractMode[]).map((m) => (
+            <button
+              class="flex-1 py-[var(--spacingVerticalS)] px-[var(--spacingHorizontalM)] rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all ease-[var(--curveEasyEase)] active:scale-[0.98] appearance-none border-none outline-none cursor-pointer"
+              classList={{
+                "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
+                  ugoiraMode() === m,
+                "bg-transparent text-[var(--colorNeutralForeground2)]": ugoiraMode() !== m,
+              }}
+              onClick={() => onPickUgoiraMode(m)}
+            >
+              {m === "fflate" ? "fflate（默认）" : "Range 流式"}
+            </button>
+          ))}
+        </div>
+        <p class="mt-1 text-[var(--fontSizeBase100)] text-[var(--colorNeutralForeground3)] leading-snug">
+          Range 流式按需取帧、内存更低；原生端依赖 Range 支持，个别网络环境可能更慢。
+        </p>
+      </div>
+
+      {/* 二次确认弹窗（选择 Range 时） */}
+      <fluent-dialog open={showUgoiraConfirm()} on:close={() => setShowUgoiraConfirm(false)}>
+        <div slot="title">切换到 Range 流式？</div>
+        <div slot="content" class="flex flex-col gap-2">
+          <p class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)] leading-snug">
+            Range 流式按需取帧、内存占用更低，但依赖服务器与原生端对 Range 请求的支持。
+          </p>
+          <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
+            确认切换后，动图将使用 Range 流式方案播放。
+          </p>
+        </div>
+        <fluent-button
+          slot="actions"
+          appearance="secondary"
+          on:click={() => setShowUgoiraConfirm(false)}
+        >
+          取消
+        </fluent-button>
+        <fluent-button
+          slot="actions"
+          appearance="accent"
+          on:click={() => {
+            void setUgoiraMode("range");
+            setShowUgoiraConfirm(false);
+          }}
+        >
+          确认切换
+        </fluent-button>
+      </fluent-dialog>
 
       {/* Image cache management entry */}
       <div

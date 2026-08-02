@@ -1,4 +1,5 @@
 import { Preferences } from "@capacitor/preferences";
+import type { UgoiraExtractMode } from "../api/illust";
 
 // ── 类型定义 ──
 
@@ -43,6 +44,9 @@ const initialState = () => ({
   // 图片质量
   listQuality: "medium" as ImageQuality,
   detailQuality: "medium" as ImageQuality,
+
+  // 动图播放方案（T3）：fflate 默认 / range 流式取帧
+  ugoiraMode: "fflate" as UgoiraExtractMode,
 
   // 图片缓存三层开关（ADR-0003）
   // A: Java 磁盘缓存
@@ -262,6 +266,29 @@ export const setListQuality = (q: ImageQuality) => setState("listQuality", q);
 
 export const detailQuality = () => state.detailQuality;
 export const setDetailQuality = (q: ImageQuality) => setState("detailQuality", q);
+
+// ── 动图播放方案（T3） ──
+
+const PREF_KEY_UGOIRA_MODE = "settings_ugoira_mode";
+
+export const ugoiraMode = () => state.ugoiraMode;
+export const setUgoiraMode = async (mode: UgoiraExtractMode): Promise<void> => {
+  setState("ugoiraMode", mode);
+  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY_UGOIRA_MODE, value: mode }));
+  if (err) console.warn("[settingsStore] Failed to persist ugoiraMode", err);
+};
+
+export async function loadUgoiraModePreference(): Promise<void> {
+  const [err, result] = await tryAsync(Preferences.get({ key: PREF_KEY_UGOIRA_MODE }));
+  if (err) {
+    console.warn("[settingsStore] Failed to load ugoiraMode preference", err);
+    return;
+  }
+  const { value } = result!;
+  if (value === "fflate" || value === "range") {
+    setState("ugoiraMode", value as UgoiraExtractMode);
+  }
+}
 
 // ── 图片缓存三层开关（ADR-0003）──
 
