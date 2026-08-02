@@ -13,6 +13,14 @@ jobs:
   update:
     runs-on: ubuntu-latest
     steps:
+      - name: Check required secret
+        # 提前暴露缺失的 key，避免裸报错（openwiki 非交互模式必须有 OPENROUTER_API_KEY）
+        run: |
+          if [ -z "${{ secrets.OPENROUTER_API_KEY }}" ]; then
+            echo "::error::OPENROUTER_API_KEY is not configured. Add it in repo Settings → Secrets and variables → Actions, then re-run this workflow (or trigger it manually via workflow_dispatch)."
+            exit 1
+          fi
+
       - name: Check out repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -23,7 +31,8 @@ jobs:
 
       - name: Install OpenWiki
         # mermaid + jsdom are optional; they add high-fidelity validation of Mermaid diagrams. Remove if your wiki has none.
-        run: npm install --global openwiki@0.2.3 mermaid@11.16.0 jsdom@29.1.1
+        # 版本与本地开发一致（0.2.5），0.2.3 在部分仓库会卡死
+        run: npm install --global openwiki@0.2.5 mermaid@11.16.0 jsdom@29.1.1
 
       - name: Run OpenWiki
         run: openwiki code --update --print
@@ -31,9 +40,10 @@ jobs:
           OPENWIKI_PROVIDER: openrouter
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENWIKI_MODEL_ID: z-ai/glm-5.2
+          # LangSmith tracing 仅配置了 key 才启用
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
           LANGCHAIN_PROJECT: openwiki
-          LANGCHAIN_TRACING_V2: "true"
+          LANGCHAIN_TRACING_V2: ${{ secrets.LANGSMITH_API_KEY != '' }}
 
       - name: Create OpenWiki update pull request
         uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
