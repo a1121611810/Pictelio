@@ -273,6 +273,12 @@ async function main() {
   const cdp = new CDP(target.webSocketDebuggerUrl)
   await cdp.send('Page.enable')
   await cdp.send('Runtime.enable')
+  // 清浏览器缓存：web-core 的 worker bundle 会被 HTTP 缓存，导致加载旧编译产物
+  // （如 __DEV__ 失效的 bundle——实测 dev server 重启后 OAuth 报"仅支持开发/调试"）。
+  // /json/new 已用缓存加载过 → 清缓存后强制 reload 重新拉取。
+  await cdp.send('Network.enable')
+  await cdp.send('Network.clearBrowserCache')
+  await cdp.send('Page.reload', { ignoreCache: true })
   try {
 
   console.log('\n[1/4] 场景 A：未登录启动 → 登录页')
@@ -347,7 +353,7 @@ async function main() {
     }
   }
 
-  console.log('\n[5/9] 场景 I：详情页关注作者（P0-T3）')
+  console.log('\n[5/10] 场景 I：详情页关注作者（P0-T3）')
   // D 结束在推荐页：点卡片进详情，验证作者区关注按钮并可切换
   const tappedI = await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('w-full flex flex-col')`)
   if (!tappedI) {
@@ -411,7 +417,7 @@ async function main() {
     }
   }
 
-  console.log('\n[6/9] 场景 F：关注 Feed（P0-T4）')
+  console.log('\n[6/10] 场景 F：关注 Feed（P0-T4）')
   // 推荐页头部"关注"入口（x-view ml-6 px-1 py-1 含 关注 文本；精确匹配避免命中根容器）
   const followTap = await dispatchTap(
     cdp,
@@ -436,7 +442,38 @@ async function main() {
     }
   }
 
-  console.log('\n[7/9] 场景 G：收藏列表（P0-T6）')
+  console.log('\n[7/10] 场景 J：关注小说（P0-T5）')
+  // F 结束在推荐页：点"小说"入口
+  const novelEntry = await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('ml-6 px-1 py-1') && el.textContent && el.textContent.includes('小说')`)
+  if (!novelEntry) {
+    check('J1 进入小说页', false, '未找到小说入口')
+  } else {
+    const novelPage = await waitFor(cdp, async () => {
+      const els = await probe(cdp)
+      return hasText(els, '推荐') && hasText(els, '关注') ? els : null
+    }, { timeout: 30000, label: 'novel page (J)' })
+    check('J1 进入小说页（推荐/关注 tab）', !!novelPage)
+    // 点"关注"tab（x-view flex-1 py-2 含 关注 文本）
+    const followTab = await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('flex-1 py-2') && el.textContent && el.textContent.trim() === '关注'`)
+    if (!followTab) {
+      check('J2 切到关注小说', false, '未找到关注 tab')
+    } else {
+      const followList = await waitFor(cdp, async () => {
+        const els = await probe(cdp)
+        // 关注小说列表或空态
+        return els.some((e) => e.tag === 'list-item') || hasText(els, '暂无关注小说') ? els : null
+      }, { timeout: 45000, label: 'novel follow loaded (J)' })
+      check('J2 切到关注小说并加载', !!followList, followList ? (followList.some((e) => e.tag === 'list-item') ? '列表' : '空态') : '')
+      // 返回推荐页（供场景 G）
+      await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('py-1 pr-2')`)
+      await waitFor(cdp, async () => {
+        const els = await probe(cdp)
+        return hasText(els, '推荐插画') ? els : null
+      }, { timeout: 30000, label: 'back to recommended (J)' }).catch(() => null)
+    }
+  }
+
+  console.log('\n[8/10] 场景 G：收藏列表（P0-T6）')
   // 推荐页点"我的"入口
   const meTap = await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('ml-6 px-1 py-1') && el.textContent && el.textContent.includes('我的')`)
   if (!meTap) {
@@ -471,7 +508,7 @@ async function main() {
     }
   }
 
-  console.log('\n[8/9] 场景 E：作者主页（P0-T1）')
+  console.log('\n[9/10] 场景 E：作者主页（P0-T1）')
   // 进详情页（复用 D 的卡片点击）
   const tappedE = await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('w-full flex flex-col')`)
   if (!tappedE) {
@@ -507,7 +544,7 @@ async function main() {
     }
   }
 
-  console.log('\n[9/9] 场景 H：关注/粉丝列表（P0-T2）')
+  console.log('\n[10/10] 场景 H：关注/粉丝列表（P0-T2）')
   // E 结束在作者主页：点"关注 N"入口（x-view py-1 px-3 含 关注 文本）
   const followEntry = await dispatchTap(cdp, `el.tagName.toLowerCase() === 'x-view' && (el.getAttribute('class') || '').includes('py-1 px-3') && el.textContent && el.textContent.trim().startsWith('关注')`)
   if (!followEntry) {

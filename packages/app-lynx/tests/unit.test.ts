@@ -9,7 +9,7 @@ import { redactProxyUrl } from '../src/utils/proxyRedact'
 import { apiClient } from '../src/api/client'
 import { getUserDetail, getUserFollowing, getUserFollowers, followUser, unfollowUser, loadUserListNext } from '../src/api/user'
 import { loadUserIllusts, loadFollow, loadBookmarks } from '../src/api/illust'
-import { loadUserNovels, loadBookmarks as loadNovelBookmarks } from '../src/api/novel'
+import { loadUserNovels, loadBookmarks as loadNovelBookmarks, loadFollow as loadNovelFollow } from '../src/api/novel'
 
 describe('imageUrl.proxyImageUrl', () => {
   it('将 i.pximg.net URL 重写为本地代理路径', () => {
@@ -654,5 +654,25 @@ describe('P0-T2 关注列表分页', () => {
     const spy = vi.spyOn(apiClient, 'get').mockResolvedValue({ user_previews: [], next_url: null })
     await loadUserListNext('/pixiv-api/v1/user/following?user_id=5&offset=10')
     expect(spy).toHaveBeenCalledWith('/pixiv-api/v1/user/following?user_id=5&offset=10')
+  })
+})
+
+// ─── P0-T5：小说关注 API 契约（/v1/novel/follow，对齐主项目 api/novel.ts） ───
+describe('P0-T5 小说关注 API 契约', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('loadFollow(novel) 调 /v1/novel/follow 带 restrict', async () => {
+    const spy = vi.spyOn(apiClient, 'get').mockResolvedValue({ novels: [], next_url: null })
+    await loadNovelFollow()
+    expect(spy).toHaveBeenCalledWith('/v1/novel/follow', { restrict: 'public' })
+    await loadNovelFollow('private')
+    expect(spy).toHaveBeenCalledWith('/v1/novel/follow', { restrict: 'private' })
+  })
+
+  it('loadFollow(novel) 失败透传 reject', async () => {
+    vi.spyOn(apiClient, 'get').mockRejectedValue(new Error('403'))
+    await expect(loadNovelFollow()).rejects.toThrow('403')
   })
 })

@@ -12,6 +12,11 @@ export function loadRecommendedNovels(signal?: AbortSignal): Promise<PixivNovelL
   )
 }
 
+export function loadFollow(restrict: "public" | "private" = "public"): Promise<PixivNovelListResponse> {
+  // 关注小说（P0-T5）：MVP 默认 public（对齐主项目默认）
+  return apiClient.get<PixivNovelListResponse>("/v1/novel/follow", { restrict })
+}
+
 export function loadNovelDetail(novelId: number): Promise<PixivNovelDetailResponse> {
   return apiClient.get<PixivNovelDetailResponse>("/v2/novel/detail", {
     novel_id: String(novelId),
