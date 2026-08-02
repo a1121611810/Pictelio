@@ -124,7 +124,7 @@ def login_elements(w, h, rows):
     # 按钮 = 品牌蓝最宽（密度最高）的段（标题也有蓝但字少、密度低）
     button = None
     for y0, y1 in blue_segs:
-        density = max(blue_rows[y] for y in range(y0, y1 + 1, 4))
+        density = max(blue_rows.get(y, 0) for y in range(y0, y1 + 1, 4))
         if density > (button[2] if button else 0):
             button = (y0, y1, density)
     if button and button[1] - button[0] > 30:  # 高度 >30px 才算按钮（排除细文字）
@@ -188,10 +188,12 @@ def classify(w, h, rows):
             if r < 120 and g < 120 and b < 120:
                 topbar_text += 1
 
-    # 登录页：品牌蓝大按钮（y 850-1150 密集蓝）+ 无顶部导航文字
+    # 登录页：品牌蓝大按钮（屏幕中下部，随分辨率缩放——原硬编码 850-1150 是
+    # OPPO 2160p 真机区域，720p 模拟器下按钮位置不同导致误判 blank）+ 无顶部导航文字
     blue_btn = 0
     blue_total = 0
-    for y in range(850, 1150, 4):
+    btn_y0, btn_y1 = int(h * 0.39), int(h * 0.53)
+    for y in range(btn_y0, btn_y1, 4):
         for x in range(0, w, 8):
             r, g, b = pixel(rows, y, x)
             blue_total += 1
