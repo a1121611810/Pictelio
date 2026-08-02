@@ -324,3 +324,95 @@ function buildStoreZip(frames: { name: string; data: Uint8Array }[]): Uint8Array
   u16(0, parts);
   return new Uint8Array(parts);
 }
+
+it("downloadAndExtractUgoira range 模式：HEAD + 尾部目录 + 按帧 Range 取帧（T4）", async () => {
+  mockGet.mockResolvedValue({
+    ugoira_metadata: {
+      zip_urls: {
+        medium: "https://i.pximg.net/img-zip-ugoira/img/2020/01/01/00/00/00/1_ugoira600x600.zip",
+      },
+      frames: [
+        { file: "frame_0.png", delay: 100 },
+        { file: "frame_1.png", delay: 120 },
+      ],
+    },
+  });
+  const zip = buildStoreZip([
+    { name: "frame_0.png", data: new Uint8Array([1, 2, 3]) },
+    { name: "frame_1.png", data: new Uint8Array([4, 5]) },
+  ]);
+  const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+    if (init?.method === "HEAD") {
+      return new Response(null, { status: 200, headers: { "content-length": String(zip.length) } });
+    }
+    const range = (init?.headers as Record<string, string> | undefined)?.Range;
+    const m = /bytes=(\d+)-(\d+)/.exec(range ?? "");
+    if (m) {
+      const s = parseInt(m[1]!, 10);
+      const e = parseInt(m[2]!, 10);
+      const slice = zip.slice(s, e + 1);
+      return new Response(slice, {
+        status: 206,
+        headers: { "content-range": `bytes ${s}-${e}/${zip.length}` },
+      });
+    }
+    return new Response(zip, { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  const createObjectURL = vi.fn(() => "blob:mock-range");
+  // @ts-expect-error node URL 无 createObjectURL
+  URL.createObjectURL = createObjectURL;
+  try {
+    const { downloadAndExtractUgoira } = await loadApi();
+    const { frames, blobUrls } = await downloadAndExtractUgoira(123, undefined, "range");
+    expect(frames).toHaveLength(2);
+    expect(frames[0]!.delay).toBe(100);
+    expect(blobUrls).toHaveLength(2);
+    // 断言发过 HEAD 与 Range 请求（未全量下载）
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/pixiv-img/"), {
+      method: "HEAD",
+    });
+    expect(
+      fetchMock.mock.calls.some(
+        ([, i]) => (i?.headers as Record<string, string> | undefined)?.Range,
+      ),
+    ).toBe(true);
+    expect(fetchMock.mock.calls.some(([, i]) => i && !i.method && !i.headers)).toBe(false);
+  } finally {
+    vi.unstubAllGlobals();
+    // @ts-expect-error 清理
+    delete URL.createObjectURL;
+  }
+});
+
+it("downloadAndExtractUgoira range 模式：Range 返回长度不符 → 抛错（T4 防截断）", async () => {
+  mockGet.mockResolvedValue({
+    ugoira_metadata: {
+      zip_urls: { medium: "https://i.pximg.net/z.zip" },
+      frames: [{ file: "frame_0.png", delay: 100 }],
+    },
+  });
+  const zip = buildStoreZip([{ name: "frame_0.png", data: new Uint8Array([1, 2, 3]) }]);
+  const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+    if (init?.method === "HEAD") {
+      return new Response(null, { status: 200, headers: { "content-length": String(zip.length) } });
+    }
+    // 所有 Range 都返回截断（少 1 字节）
+    const m = /bytes=(\d+)-(\d+)/.exec(
+      (init?.headers as Record<string, string> | undefined)?.Range ?? "",
+    );
+    if (m) {
+      const s = parseInt(m[1]!, 10);
+      const e = parseInt(m[2]!, 10);
+      return new Response(zip.slice(s, e), { status: 206 }); // 截断
+    }
+    return new Response(zip, { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  try {
+    const { downloadAndExtractUgoira } = await loadApi();
+    await expect(downloadAndExtractUgoira(123, undefined, "range")).rejects.toThrow("长度不符");
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
