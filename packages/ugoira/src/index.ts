@@ -58,16 +58,23 @@ function assertRange(bytes: Uint8Array, off: number, len: number, what: string):
 /**
  * 从尾部字节中定位并解析 EOCD。
  * 从后向前扫描 EOCD 签名（0x06054b50），校验中央目录范围在文件内。
+ * @param bytes 尾部字节（Range 模式可只读尾部 30KB）
+ * @param opts.fileSize 文件总长（Range 片段场景必须传——EOCD 的 cdOffset 是
+ *   文件内绝对偏移，片段内无法校验；缺省用 bytes.length（全量场景））
  * @throws 未找到签名或字段非法
  */
-export function parseZipEocd(bytes: Uint8Array): ZipEocd {
+export function parseZipEocd(bytes: Uint8Array, opts?: { fileSize?: number }): ZipEocd {
+  const fileSize = opts?.fileSize ?? bytes.length;
   const scanStart = Math.max(0, bytes.length - EOCD_MAX_SCAN);
   for (let i = bytes.length - 22; i >= scanStart; i--) {
     if (readU32(bytes, i) !== EOCD_SIG) continue;
     const cdSize = readU32(bytes, i + 12);
     const cdOffset = readU32(bytes, i + 16);
     const entryCount = readU16(bytes, i + 10);
-    assertRange(bytes, cdOffset, cdSize, "EOCD 中央目录范围");
+    // 中央目录范围必须落在文件内（用文件总长而非片段长度校验）
+    if (cdOffset + cdSize > fileSize) {
+      throw new Error(`ugoira: EOCD 中央目录范围越界 (cdOffset=${cdOffset} cdSize=${cdSize} fileSize=${fileSize})`);
+    }
     return { cdOffset, cdSize, entryCount };
   }
   throw new Error("ugoira: 未找到 EOCD 签名（0x06054b50）");
@@ -128,6 +135,23 @@ export function computeFrameOffset(zipBytes: Uint8Array, entry: UgoiraZipEntry):
 }
 
 /**
+ * 从本地文件头片段（Range 模式单独取 30 字节）计算数据偏移。
+ * 返回相对本地文件头起始的偏移（30 + nameLen + extraLen），
+ * 调用方叠加 entry.offset 得到文件内绝对数据偏移。
+ */
+export function computeFrameOffsetFromLocal(localHeader: Uint8Array): number {
+  if (localHeader.length < 30) {
+    throw new Error(`ugoira: 本地文件头片段过短 (${localHeader.length})`);
+  }
+  if (readU32(localHeader, 0) !== LOCAL_SIG) {
+    throw new Error("ugoira: 本地文件头签名错误");
+  }
+  const nameLen = readU16(localHeader, 26);
+  const extraLen = readU16(localHeader, 28);
+  return 30 + nameLen + extraLen;
+}
+
+/**
  * 取单个条目帧字节。
  * store（compMethod=0）直接切片；deflate（8）用 fflate inflateSync 解压
  * （ZIP 条目是 raw deflate 流，非 zlib 格式——unzlibSync 会解错）。
@@ -180,4 +204,12 @@ export function unzipFrames(zipBytes: Uint8Array, fileOrder: string[]): Uint8Arr
     frames.push(data);
   }
   return frames;
+}
+
+/**
+ * 解压单个 raw deflate 条目字节（Range 模式 deflate fallback）。
+ * ZIP 条目为 raw deflate 流（inflateSync，非 zlib）。
+ */
+export function deflateInflate(bytes: Uint8Array): Uint8Array {
+  return inflateSync(bytes);
 }

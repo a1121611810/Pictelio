@@ -7,9 +7,11 @@ import {
   parseZipEocd,
   parseZipCentralDir,
   computeFrameOffset,
+  computeFrameOffsetFromLocal,
   sliceStoreFrame,
   sliceFrames,
   unzipFrames,
+  deflateInflate,
   type UgoiraZipEntry,
 } from '../src/index'
 
@@ -262,5 +264,50 @@ describe('deflate fallback', () => {
     expect(entries[0]!.compMethod).toBe(8) // deflate
     const frame = sliceStoreFrame(zip, entries[0]!)
     expect(Array.from(frame)).toEqual(Array.from(raw))
+  })
+})
+
+describe('parseZipEocd Range 片段场景（T4）', () => {
+  it('尾部片段 + fileSize：cdOffset 为文件绝对偏移，校验通过', () => {
+    const zip = buildStoreZip(THREE_FRAMES)
+    // 模拟只读尾部 30KB 的场景（zip 很小，尾部=整体）
+    const tail = zip
+    const eocd = parseZipEocd(tail, { fileSize: zip.length })
+    expect(eocd.entryCount).toBe(3)
+    expect(eocd.cdOffset + eocd.cdSize).toBe(zip.length - 22)
+  })
+
+  it('fileSize 过小（cdOffset 越界）→ 抛错', () => {
+    const zip = buildStoreZip(THREE_FRAMES)
+    expect(() => parseZipEocd(zip, { fileSize: 10 })).toThrow('越界')
+  })
+})
+
+describe('computeFrameOffsetFromLocal（T4 Range 本地头片段）', () => {
+  it('从 30 字节本地头片段计算数据偏移（30 + nameLen + extraLen）', () => {
+    const zip = buildStoreZip(THREE_FRAMES)
+    // 取第一条本地头 30 字节
+    const local = zip.subarray(0, 30)
+    const off = computeFrameOffsetFromLocal(local)
+    // frame_0.png 11 字符 + extra 0
+    expect(off).toBe(30 + 11)
+    // 与全量 computeFrameOffset 一致
+    const entry: UgoiraZipEntry = { name: 'frame_0.png', offset: 0, compMethod: 0, compSize: 5, uncompSize: 5 }
+    expect(off).toBe(computeFrameOffset(zip, entry))
+  })
+
+  it('片段过短或签名错误 → 抛错', () => {
+    expect(() => computeFrameOffsetFromLocal(new Uint8Array(10))).toThrow('过短')
+    const bad = new Uint8Array(30)
+    expect(() => computeFrameOffsetFromLocal(bad)).toThrow('签名')
+  })
+})
+
+describe('deflateInflate（T4 Range deflate fallback 导出）', () => {
+  it('解压 raw deflate 字节（deflateSync 构造）', () => {
+    const { deflateSync } = require('fflate') as typeof import('fflate')
+    const raw = new Uint8Array([1, 2, 3, 4, 5])
+    const compressed = deflateSync(raw)
+    expect(Array.from(deflateInflate(compressed))).toEqual(Array.from(raw))
   })
 })
