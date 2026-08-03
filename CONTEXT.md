@@ -63,6 +63,14 @@ scrollY 小于 header 高度（48px）时 header 恒显示，不参与隐藏。
 **滚动方向原语（createScrollDirection）**：
 `src/primitives/createScrollDirection.ts` — 滚动方向判定原语，输出 `direction: "up" | "down" | null` 与 `reset()`。支持方向阈值、同向累计（accumulate）、跳变忽略（jumpThreshold）。方向驱动的 UI 显隐（NavBar compact、Search compact header、NovelDetail footer）由站点 policy effect 组合它与 `createScrolledPast` 实现（见 `docs/adr/0013-scroll-primitives-unification.md`）。
 
+### 界面控件
+
+**Tab 控件（Tab Control）**：
+应用内所有 tab 类切换控件的总称：底部导航胶囊（NavBar：推荐/关注/收藏/历史）、顶栏内容类型切换（插画/小说）、Feed 子标签栏（综合/插画/漫画、公开/非公开）、用户作品分段切换（插画/漫画/小说）。全部 Tab 控件共享同一套「玻璃 Tab 视觉语言」，新增 tab 一律复用统一组件，不自绘样式。
+
+**玻璃 Tab 视觉语言（Glass Tab Visual Language）**：
+Tab 控件共享的统一视觉风格：磨砂玻璃容器 + 激活项浮起玻璃胶囊 + 受限动效（仅底部导航胶囊的指针跟随高光）。用于保证全局 tab 外观一致，并守住滚动 Feed 上的渲染性能边界。
+
 ### 错误处理
 
 **代理错误（Proxy Error）**：

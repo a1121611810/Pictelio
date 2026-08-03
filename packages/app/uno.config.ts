@@ -30,6 +30,13 @@ export default defineConfig({
     "floating-nav-item",
     "floating-nav-group",
     "scroll-top-anim",
+    "glass-tab-bar",
+    "glass-tab-bar-capsule",
+    "glass-tab-bar-segmented",
+    "glass-tab-bar-highlight",
+    "glass-tab-item",
+    "glass-tab-item-active",
+    "glass-tab-highlight",
   ],
 
   shortcuts: {
@@ -74,6 +81,21 @@ export default defineConfig({
       "segmented-item bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]",
     "segmented-item-inactive":
       "segmented-item bg-transparent text-[var(--colorNeutralForeground2)] hover:text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorNeutralBackground2)]",
+
+    // ── Glass Tab Bar (ADR-0044) ──
+    "glass-tab-bar":
+      "relative flex items-center gap-1 bg-[var(--colorNeutralBackgroundAlpha)] backdrop-blur-[var(--backdropBlurDefault)] backdrop-saturate-[var(--backdropSaturateDefault)] border border-[var(--colorNeutralStroke2)]",
+    "glass-tab-bar-capsule":
+      "glass-tab-bar rounded-[var(--borderRadiusCircular)] px-2 py-1.5 shadow-[var(--elevation8)]",
+    "glass-tab-bar-segmented": "glass-tab-bar rounded-[var(--borderRadiusMedium)] p-1",
+    "glass-tab-bar-highlight":
+      "pointer-events-none absolute inset-x-0 top-0 h-1/2 rounded-[inherit] [background:linear-gradient(180deg,var(--glassTopHighlight),transparent)]",
+    "glass-tab-item":
+      "relative z-10 flex flex-col items-center justify-center gap-[var(--spacingHorizontalXXS)] min-h-[44px] px-[var(--spacingHorizontalM)] rounded-[var(--borderRadiusLarge)] text-[var(--fontSizeBase200)] font-medium leading-none text-[var(--colorNeutralForeground3)] cursor-pointer select-none appearance-none border-none outline-none transition-colors duration-[var(--durationFast)] ease-[var(--curveEasyEase)] hover:text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground1Hover)] active:bg-[var(--colorNeutralBackground1Pressed)] active:scale-[0.96] focus-visible:[box-shadow:0_0_0_var(--strokeWidthThick)_var(--colorStrokeFocus2),0_0_0_calc(var(--strokeWidthThick)+var(--strokeWidthThin))_var(--colorStrokeFocus1)] disabled:opacity-50 disabled:cursor-not-allowed",
+    "glass-tab-item-active":
+      "glass-tab-item bg-[var(--colorNeutralBackgroundAlpha2)] backdrop-blur-[var(--backdropBlurDefault)] text-[var(--colorCompoundBrandForeground1)] shadow-[var(--elevation2),inset_0_1px_0_var(--glassTopHighlight)] font-semibold",
+    "glass-tab-highlight":
+      "pointer-events-none absolute inset-0 z-0 rounded-[inherit] [background:var(--glassHighlightGradient)] opacity-0 transition-opacity duration-[var(--durationSlow)] ease-[var(--curveEasyEase)]",
 
     // ── Floating Navigation Bar (Fluent 2 floating capsule) ──
     "floating-nav": "fixed bottom-6 left-0 right-0 z-30 flex justify-center pointer-events-none",

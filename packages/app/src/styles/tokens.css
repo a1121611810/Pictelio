@@ -159,6 +159,15 @@
   --backdropBlurDefault: 30px;
   --backdropSaturateDefault: 125%;
 
+  /* ── Glass Tab Bar (ADR-0044) ── */
+  --glassTopHighlight: rgba(255, 255, 255, 0.14);
+  --glassPointerHighlight: rgba(255, 255, 255, 0.18);
+  --glassHighlightGradient: radial-gradient(
+    220px circle at var(--glass-hx, 50%) var(--glass-hy, 50%),
+    var(--glassPointerHighlight),
+    transparent 62%
+  );
+
   /* ── Status colors ── */
   --colorStatusDangerBackground1: #c42b1c;
   --colorStatusDangerForeground1: #c42b1c;
@@ -233,6 +242,10 @@
   --colorNeutralBackgroundAlpha: rgba(42, 38, 34, 0.8);
   --colorNeutralBackgroundAlpha2: rgba(42, 38, 34, 0.6);
 
+  /* ── Glass Tab Bar (ADR-0044) — dark 下高光压低 ── */
+  --glassTopHighlight: rgba(255, 255, 255, 0.07);
+  --glassPointerHighlight: rgba(255, 255, 255, 0.1);
+
   --colorScrim: rgba(0, 0, 0, 0.6);
 
   --shadowAmbient: rgba(0, 0, 0, 0.24);
@@ -278,6 +291,11 @@ html.page-card {
   --colorNeutralBackground3: #f5f6f8;
   --colorNeutralBackgroundAlpha: rgba(245, 246, 248, 0.85);
   --colorNeutralBackgroundAlpha2: rgba(245, 246, 248, 0.6);
+
+  /* ── Glass Tab Bar (ADR-0044) ── */
+  --glassTopHighlight: rgba(255, 255, 255, 0.14);
+  --glassPointerHighlight: rgba(255, 255, 255, 0.18);
+
   --colorNeutralBackground1Hover: #f0f0f0;
   --colorNeutralBackground1Pressed: #e5e5e5;
   --colorNeutralBackground1Selected: #e5e5e5;
@@ -379,6 +397,11 @@ html.page-card.dark {
   --colorNeutralBackground3: #1e1c1a;
   --colorNeutralBackgroundAlpha: rgba(30, 28, 26, 0.85);
   --colorNeutralBackgroundAlpha2: rgba(30, 28, 26, 0.6);
+
+  /* ── Glass Tab Bar (ADR-0044) — dark 下高光压低 ── */
+  --glassTopHighlight: rgba(255, 255, 255, 0.07);
+  --glassPointerHighlight: rgba(255, 255, 255, 0.1);
+
   --colorNeutralBackground1Hover: #343230;
   --colorNeutralBackground1Pressed: #3e3c3a;
   --colorNeutralBackground1Selected: #3e3c3a;
