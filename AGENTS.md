@@ -115,28 +115,45 @@ OpenWiki 提供人工整理的高层次项目概览，与 CodeGraph（精确代�
 
 ## 命令
 
-所有命令在项目根目录执行，通过 pnpm workspace 委托给 `pictelio-app`。
+所有命令在项目根目录执行，通过 pnpm workspace 委托。**命令约定**（详见 `docs/adr/ADR-0059-root-script-convention.md`）：
 
-| 命令                          | 说明                                                              |
-| ----------------------------- | ----------------------------------------------------------------- |
-| `pnpm dev`                    | 启动 Vite 开发服务器（端口 5173）                                 |
-| `pnpm build`                  | TypeScript 检查 + Vite 构建到 `dist/`                             |
-| `pnpm check`                  | 仅 TypeScript 类型检查                                            |
-| `pnpm preview`                | 预览生产构建                                                      |
-| `pnpm test`                   | 运行 Vitest 测试                                                  |
-| `pnpm test:watch`             | Vitest watch 模式                                                 |
-| `pnpm lint`                   | oxlint 代码检查                                                   |
-| `pnpm fmt`                    | oxfmt 代码格式化                                                  |
-| `pnpm fmt:check`              | oxfmt 格式检查（不修改）                                          |
-| `pnpm build:android`          | 构建 Web + Capacitor 同步 + Gradle 编译 Debug APK                 |
-| `pnpm build:android:release`  | 构建签名 Release APK（需环境变量 `PICTELIO_KEYSTORE_PASSWORD` 和 `PICTELIO_KEY_PASSWORD`） |
-| `pnpm release:github`         | 构建 Release APK 并发布到 GitHub Releases（详见 `docs/github-release.md`） |
-| `pnpm release` / `release:dry`| 发布流程 / 演练（详见 `docs/release-checklist.md`）               |
-| `pnpm dev:android`            | 一键 Android 开发热重载流程                                       |
-| `pnpm cap:sync`               | 同步 Web 产物和 Capacitor 配置到 Android 项目                     |
-| `pnpm cap:copy`               | 仅复制 Web 产物到 Android（不更新 Capacitor 配置）                |
-| `pnpm cap:open:android`       | 在 Android Studio 中打开 `android/` 项目                          |
-| `pnpm deploy` / `deploy:dry`  | 本地预览部署 / 干跑（复制 landing 页面到 `_site/`）              |
+裸命令默认委托给 `pictelio-app`；`<命令>:<包目录名>` 委托给对应包（`app` / `app-lynx` / `website` / `ugoira`）；`<命令>:all` 并行执行所有拥有该脚本的包（无脚本的包自动跳过）。
+
+| 命令                                | 说明                                                              |
+| ----------------------------------- | ----------------------------------------------------------------- |
+| `pnpm dev`                          | 启动 app 的 Vite 开发服务器（端口 5173）                          |
+| `pnpm dev:app`                      | 同 `pnpm dev`（显式别名）                                         |
+| `pnpm dev:app-lynx`                 | 启动 app-lynx（vue-lynx）开发服务器                               |
+| `pnpm dev:website`                  | 启动落地页（Astro）开发服务器                                     |
+| `pnpm dev:all`                      | 并行启动所有 dev 服务器（app / app-lynx / website）               |
+| `pnpm dev:android`                  | 一键 Android 开发热重载流程                                       |
+| `pnpm build`                        | TypeScript 检查 + Vite 构建到 `dist/`（app）                      |
+| `pnpm build:app-lynx`               | 构建 app-lynx bundle                                              |
+| `pnpm build:website`                | 构建落地页                                                         |
+| `pnpm check`                        | 仅 TypeScript 类型检查（app）                                     |
+| `pnpm check:app-lynx`               | app-lynx 类型检查                                                 |
+| `pnpm check:ugoira`                 | ugoira 类型检查                                                   |
+| `pnpm check:all`                    | 并行类型检查 app / app-lynx / ugoira                              |
+| `pnpm preview`                      | 预览生产构建（app）                                               |
+| `pnpm test`                         | 运行 Vitest 测试（app）                                           |
+| `pnpm test:app`                     | 同 `pnpm test`（显式别名）                                        |
+| `pnpm test:app-lynx` / `test:ugoira`| 运行对应包的单测                                                  |
+| `pnpm test:all`                     | 并行运行所有包的单测                                              |
+| `pnpm test:app:all`                 | app 单测 + agent-browser E2E（原 `test:all` 组合语义）             |
+| `pnpm test:watch`                   | Vitest watch 模式（app）                                          |
+| `pnpm lint` / `pnpm fmt`            | oxlint 检查 / oxfmt 格式化（app）                                 |
+| `pnpm fmt:check`                    | oxfmt 格式检查（不修改）                                          |
+| `pnpm build:android`                | 构建 Web + Capacitor 同步 + Gradle 编译 Debug APK                 |
+| `pnpm build:android:release`        | 构建签名 Release APK（需环境变量 `PICTELIO_KEYSTORE_PASSWORD` 和 `PICTELIO_KEY_PASSWORD`） |
+| `pnpm release:github`               | 构建 Release APK 并发布到 GitHub Releases（详见 `docs/github-release.md`） |
+| `pnpm release` / `release:dry`      | 发布流程 / 演练（详见 `docs/release-checklist.md`）               |
+| `pnpm sync:app-lynx-bundle`         | 同步 app-lynx bundle 到 Android assets（原 `sync:lynx-bundle`）   |
+| `pnpm cap:sync`                     | 同步 Web 产物和 Capacitor 配置到 Android 项目                     |
+| `pnpm cap:copy`                     | 仅复制 Web 产物到 Android（不更新 Capacitor 配置）                |
+| `pnpm cap:open:android`             | 在 Android Studio 中打开 `android/` 项目                          |
+| `pnpm deploy` / `deploy:dry`        | 本地预览部署 / 干跑（复制 landing 页面到 `_site/`）              |
+
+其余 `<命令>:<包名>` 变体（如 `preview:website`、`lint:all`、`fmt:app-lynx` 等）按同一约定，完整清单见根目录 `package.json`。
 
 ## Monorepo 结构
 

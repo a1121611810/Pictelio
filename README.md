@@ -107,20 +107,32 @@ pixivizer/
 <details>
 <summary>Click to expand</summary>
 
+Command convention (see `docs/adr/ADR-0059-root-script-convention.md`): a bare command targets `pictelio-app` by default, `<command>:<package-dir>` targets the matching workspace package, and `<command>:all` runs every package that has that script, in parallel.
+
 | Command | Description |
 |:--------|:------------|
-| `pnpm dev` | Start Vite dev server |
-| `pnpm build` | TypeScript check + Vite build |
-| `pnpm check` | TypeScript type-check only |
-| `pnpm preview` | Preview production build |
-| `pnpm test` | Run Vitest tests |
+| `pnpm dev` | Start `pictelio-app` Vite dev server (localhost:5173) |
+| `pnpm dev:app-lynx` | Start `pictelio-app-lynx` dev server |
+| `pnpm dev:website` | Start landing page (Astro) dev server |
+| `pnpm dev:all` | Start all dev servers in parallel |
+| `pnpm build` | TypeScript check + Vite build (`pictelio-app`) |
+| `pnpm build:app-lynx` | Build `pictelio-app-lynx` |
+| `pnpm build:website` | Build landing page |
+| `pnpm check` | TypeScript type-check only (`pictelio-app`) |
+| `pnpm check:app-lynx` | Type-check `pictelio-app-lynx` |
+| `pnpm check:ugoira` | Type-check `@pictelio/ugoira` |
+| `pnpm check:all` | Type-check all packages in parallel |
+| `pnpm preview` | Preview production build (`pictelio-app`) |
+| `pnpm test` | Run Vitest unit tests (`pictelio-app`) |
+| `pnpm test:all` | Run all packages' unit tests in parallel |
+| `pnpm test:app:all` | Run `pictelio-app` unit tests + agent-browser E2E |
 | `pnpm test:agent-browser` | Run AI-driven E2E browser tests |
-| `pnpm test:all` | Run all tests |
-| `pnpm lint` | Run oxlint |
-| `pnpm fmt` | Run oxfmt formatter |
+| `pnpm lint` | Run oxlint (`pictelio-app`) |
+| `pnpm fmt` | Run oxfmt formatter (`pictelio-app`) |
 | `pnpm build:android` | Build Debug APK |
 | `pnpm build:android:release` | Build signed Release APK |
 | `pnpm dev:android` | Hot-reload Android development |
+| `pnpm sync:app-lynx-bundle` | Sync lynx bundle into Android assets |
 | `pnpm cap:*` | Capacitor sync / copy / open |
 | `pnpm release:github` | Publish APK to GitHub Releases |
 | `pnpm deploy` | Preview landing page to `_site/` |

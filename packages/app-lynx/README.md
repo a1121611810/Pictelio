@@ -16,11 +16,12 @@ pnpm install
 cd packages/app-lynx
 PICTELIO_LYNX_DEV=1 pnpm dev
 # 浏览器打开: http://localhost:3000/__web_preview?casename=main.web.bundle
+# 或在根目录：PICTELIO_LYNX_DEV=1 pnpm dev:app-lynx
 
 # 构建 / 类型检查 / 测试（根 workspace 委托）
-pnpm build:lynx
-pnpm check:lynx
-pnpm --filter pictelio-app-lynx test
+pnpm build:app-lynx
+pnpm check:app-lynx
+pnpm test:app-lynx
 ```
 
 ## 架构

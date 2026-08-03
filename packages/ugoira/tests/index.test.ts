@@ -305,7 +305,6 @@ describe('computeFrameOffsetFromLocal（T4 Range 本地头片段）', () => {
 
 describe('deflateInflate（T4 Range deflate fallback 导出）', () => {
   it('解压 raw deflate 字节（deflateSync 构造）', () => {
-    const { deflateSync } = require('fflate') as typeof import('fflate')
     const raw = new Uint8Array([1, 2, 3, 4, 5])
     const compressed = deflateSync(raw)
     expect(Array.from(deflateInflate(compressed))).toEqual(Array.from(raw))

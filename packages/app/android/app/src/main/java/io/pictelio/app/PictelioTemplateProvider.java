@@ -11,7 +11,7 @@ import java.io.InputStream;
 /**
  * Lynx bundle 模板提供器 —— 读取 assets/main.lynx.bundle（官方 demo DemoTemplateProvider 同款）。
  *
- * <p>bundle 产物由 {@code pnpm sync:lynx-bundle} 从 packages/app-lynx/dist/ 同步（#51）。
+ * <p>bundle 产物由 {@code pnpm sync:app-lynx-bundle} 从 packages/app-lynx/dist/ 同步（#51）。
  */
 public class PictelioTemplateProvider extends AbsTemplateProvider {
 
