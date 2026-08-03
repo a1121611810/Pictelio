@@ -608,3 +608,14 @@ The scheduled OpenWiki GitHub Actions workflow refreshes the repository wiki. Do
 - 如 `pnpm openwiki:update` 执行失败，不阻塞后续操作，但应在回复中提示用户。
 - **禁止手动编辑** `openwiki/` 目录下的生成文件。如需更新文档内容，应修改源码后通过 `pnpm openwiki:update` 重新生成。
 - 兜底机制：GitHub Actions 定时任务（`.github/workflows/openwiki-update.yml`）每天自动执行 `openwiki --update` 并生成 PR，无需手动触发，也不阻塞本地 commit（pre-commit 已不再执行 openwiki 更新）。
+
+<!-- CODEGRAPH_START -->
+## CodeGraph
+
+In repositories indexed by CodeGraph (a `.codegraph/` directory exists at the repo root), reach for it BEFORE grep/find or reading files when you need to understand or locate code:
+
+- **MCP tool** (when available): `codegraph_explore` answers most code questions in one call — the relevant symbols' verbatim source plus the call paths between them, including dynamic-dispatch hops grep can't follow. Name a file or symbol in the query to read its current line-numbered source. If it's listed but deferred, load it by name via tool search.
+- **Shell** (always works): `codegraph explore "<symbol names or question>"` prints the same output.
+
+If there is no `.codegraph/` directory, skip CodeGraph entirely — indexing is the user's decision.
+<!-- CODEGRAPH_END -->
