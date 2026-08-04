@@ -2,7 +2,7 @@
 
 ## 状态
 
-已采纳
+已被取代（Superseded）——过滤策略（§4 `filterByRestrict`）由 issue #91 遮罩方案取代：全量渲染 + 受限条目盖玻璃遮罩（`isRestricted` + `RestrictOverlay`），`filterByRestrict` 已删除。IndexedDB KV 层（§1）与 Me 页开关（§3）仍有效。
 
 ## 分类
 
@@ -41,6 +41,8 @@ app-lynx 无设置页，Me 页（"我的"）为唯一合适入口。新增"内�
 `Recommended.vue` / `NovelList.vue` 的**首屏与分页**均在 fetch 后应用 `filterByRestrict`（对齐主项目 `filterFeedIllusts`/`filterNovels` 的位置——主项目在 store 写入前过滤）。
 
 详情页不拦截（feed 已过滤，进入详情的仅可见内容；R18 遮罩方案后续）。
+
+> **已被取代（issue #91）**：实测推荐/关注小说 feed 的 `x_restrict` 全部为 1/2，过滤后白屏；且空页防护基于过滤后长度误杀分页。现改为全量渲染 + `isRestricted` 判定 + `RestrictOverlay` 遮罩（含详情页正文遮罩），分页空页防护回归服务端原始判空。
 
 ## 权衡
 

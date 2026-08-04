@@ -27,6 +27,14 @@ page {
   --colorPaletteGreenBackground3: #107c10;
   --colorOverlayDark: rgba(0, 0, 0, 0.55);
 
+  /* 玻璃遮罩（R18 受限条目盖，issue #91；参照 website base.css --glass-*）
+   * web-core：完整玻璃（backdrop-filter + 半透明底 + 细边）；
+   * 原生 LynxView 静默忽略 backdrop-filter，退化为高不透明度实色盖，功能无损。 */
+  --glassBg: rgba(255, 255, 255, 0.88);
+  --glassBlur: 24px;
+  --glassSaturate: 150%;
+  --glassBorder: rgba(0, 0, 0, 0.06);
+
   /* 圆角 */
   --borderRadiusSmall: 1.067vw;
   --borderRadiusMedium: 1.600vw;

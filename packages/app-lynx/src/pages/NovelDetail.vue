@@ -3,6 +3,9 @@ import { ref, computed, onMounted } from 'vue'
 import { currentParams, goBack } from '../router'
 import { loadNovelDetail, fetchNovelText } from '../api/novel'
 import type { PixivNovel } from '../api/types'
+import { isRestricted } from '../stores/settingsStore'
+import RestrictOverlay from '../components/RestrictOverlay.vue'
+import SkeletonNovel from '../components/SkeletonNovel.vue'
 
 const novel = ref<PixivNovel | null>(null)
 const text = ref('')
@@ -23,12 +26,12 @@ const paragraphs = computed(() => {
 
 onMounted(async () => {
   try {
-    const [detailRes, body] = await Promise.all([
-      loadNovelDetail(novelId.value),
-      fetchNovelText(novelId.value),
-    ])
+    // 先取详情判定受限态：受限小说不再拉正文（遮罩是内容不可达而非仅视觉遮挡）
+    const detailRes = await loadNovelDetail(novelId.value)
     novel.value = detailRes.novel
-    text.value = body
+    if (!isRestricted(detailRes.novel)) {
+      text.value = await fetchNovelText(novelId.value)
+    }
   } catch (err) {
     errorMsg.value = (err as { message?: string }).message ?? '加载失败'
   } finally {
@@ -44,9 +47,8 @@ onMounted(async () => {
       <text class="flex-1 text-2xl font-semibold text-foreground">小说</text>
     </view>
 
-    <view v-if="loading" class="w-full h-full flex items-center justify-center">
-      <text class="text-lg text-foreground-3">加载中…</text>
-    </view>
+    <!-- 加载期骨架（issue #91）：header 照常渲染，正文区骨架占位 -->
+    <SkeletonNovel v-if="loading" />
     <view v-else-if="errorMsg" class="w-full h-full flex items-center justify-center">
       <text class="text-base text-danger p-4">{{ errorMsg }}</text>
     </view>
@@ -61,10 +63,17 @@ onMounted(async () => {
           </template>
         </text>
       </view>
-      <view class="p-4">
-        <text v-for="(p, idx) in paragraphs" :key="idx" class="text-xl leading-[44rpx] text-foreground mb-4 block">
-          {{ p }}
-        </text>
+      <!-- 正文区：受限小说标题/作者/元信息可见，正文被遮罩挡住（issue #91） -->
+      <view class="relative p-4">
+        <template v-if="novel && isRestricted(novel)">
+          <view class="min-h-[60vw]" />
+          <RestrictOverlay :level="novel.x_restrict === 2 ? 2 : 1" />
+        </template>
+        <template v-else>
+          <text v-for="(p, idx) in paragraphs" :key="idx" class="text-xl leading-[44rpx] text-foreground mb-4 block">
+            {{ p }}
+          </text>
+        </template>
       </view>
       <view class="flex items-center justify-center p-6">
         <text class="text-sm text-foreground-3">— 完 —</text>

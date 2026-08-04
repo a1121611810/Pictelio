@@ -53,11 +53,12 @@ export function setUgoiraMode(mode: UgoiraExtractMode): void {
   })
 }
 
-/** 过滤列表：应用 R18/R18G 开关（对齐主项目 r18Filter.isRestricted） */
-export function filterByRestrict<T extends { x_restrict: number }>(items: T[]): T[] {
-  return items.filter((item) => {
-    if (!_showR18.value && item.x_restrict === 1) return false
-    if (!_showR18G.value && item.x_restrict === 2) return false
-    return true
-  })
+/**
+ * 遮罩判定：该条目是否因 R18/R18G 开关处于受限态（issue #91：过滤 → 遮罩）。
+ * 纯函数，读 ref —— 开关切换后所有依赖处即时重算，无需重新请求。
+ */
+export function isRestricted(item: { x_restrict: number }): boolean {
+  if (!_showR18.value && item.x_restrict === 1) return true
+  if (!_showR18G.value && item.x_restrict === 2) return true
+  return false
 }

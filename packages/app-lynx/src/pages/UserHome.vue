@@ -8,9 +8,10 @@ import { loadUserIllusts, loadNext } from '../api/illust'
 import { loadUserNovels, loadNovelNext } from '../api/novel'
 import type { PixivUserDetailResponse, PixivIllust, PixivNovel } from '../api/types'
 import { thumbUrl, proxyImageUrl } from '../utils/imageUrl'
-import { filterByRestrict } from '../stores/settingsStore'
+import { isRestricted } from '../stores/settingsStore'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
+import RestrictOverlay from '../components/RestrictOverlay.vue'
 
 const userId = Number(currentParams.value.id)
 
@@ -43,7 +44,8 @@ async function loadIllusts() {
   errorMsg.value = ''
   try {
     const res = await loadUserIllusts(userId)
-    illusts.value = filterByRestrict(res.illusts)
+    // issue #91：全量渲染，受限条目盖遮罩（不再过滤）
+    illusts.value = res.illusts
     illustNext.value = res.next_url
   } catch (err) {
     errorMsg.value = (err as { message?: string }).message ?? '作品加载失败'
@@ -58,7 +60,7 @@ async function loadNovels() {
   errorMsg.value = ''
   try {
     const res = await loadUserNovels(userId)
-    novels.value = filterByRestrict(res.novels)
+    novels.value = res.novels
     novelNext.value = res.next_url
   } catch (err) {
     errorMsg.value = (err as { message?: string }).message ?? '作品加载失败'
@@ -77,9 +79,10 @@ async function loadIllustMore() {
   try {
     const res = await loadNext(illustNext.value)
     const seen = new Set(illusts.value.map((i) => i.id))
-    const fresh = filterByRestrict(res.illusts).filter((i) => !seen.has(i.id))
+    const fresh = res.illusts.filter((i) => !seen.has(i.id))
     illusts.value.push(...fresh)
-    illustNext.value = fresh.length === 0 ? null : res.next_url
+    // 空页防护：基于服务端原始返回判空（issue #91）
+    illustNext.value = res.illusts.length === 0 ? null : res.next_url
   } catch (err) {
     errorMsg.value = (err as { message?: string }).message ?? '加载更多失败'
   } finally {
@@ -98,9 +101,10 @@ async function loadNovelMore() {
   try {
     const res = await loadNovelNext(novelNext.value)
     const seen = new Set(novels.value.map((n) => n.id))
-    const fresh = filterByRestrict(res.novels).filter((n) => !seen.has(n.id))
+    const fresh = res.novels.filter((n) => !seen.has(n.id))
     novels.value.push(...fresh)
-    novelNext.value = fresh.length === 0 ? null : res.next_url
+    // 空页防护：基于服务端原始返回判空（issue #91）
+    novelNext.value = res.novels.length === 0 ? null : res.next_url
   } catch (err) {
     errorMsg.value = (err as { message?: string }).message ?? '加载更多失败'
   } finally {
@@ -121,6 +125,9 @@ function openIllust(id: number) {
 function openNovel(id: number) {
   void navigate(`/novel/${id}`)
 }
+
+// 受限条目图片区：吞没 tap（遮罩点击无任何反应，issue #91）
+function swallowRestricted() {}
 function openFollowing() {
   void navigate(`/user/${userId}/following`)
 }
@@ -193,8 +200,8 @@ onMounted(async () => {
       </view>
     </view>
 
-    <!-- 插画空态 -->
-    <view v-if="activeTab === 'illust' && !illustLoading && illusts.length === 0" class="flex-1 flex items-center justify-center">
+    <!-- 插画空态（错误态下不显示，避免与错误文本同显） -->
+    <view v-if="activeTab === 'illust' && !illustLoading && !errorMsg && illusts.length === 0" class="flex-1 flex items-center justify-center">
       <text class="text-base text-foreground-3">暂无作品</text>
     </view>
 
@@ -216,7 +223,11 @@ onMounted(async () => {
         class="bg-background rounded-[var(--borderRadiusXLarge)] flex flex-col overflow-hidden"
       >
         <view class="w-full flex flex-col" @tap="openIllust(item.id)">
-          <SkeletonImage :src="thumbUrl(item.image_urls)" aspect-ratio="1 / 1" min-h="40vw" lazy-load />
+          <view class="relative" @tap.stop="swallowRestricted">
+            <SkeletonImage :src="thumbUrl(item.image_urls)" aspect-ratio="1 / 1" min-h="40vw" lazy-load />
+            <!-- 受限条目图片区遮罩（issue #91） -->
+            <RestrictOverlay v-if="isRestricted(item)" :level="item.x_restrict === 2 ? 2 : 1" />
+          </view>
           <text class="text-lg font-semibold text-foreground mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
           <view class="mt-1 mx-2.5 mb-2.5">
             <BookmarkButton :illust-id="item.id" :initial-bookmarked="item.is_bookmarked" :bookmark-count="item.total_bookmarks" />
@@ -248,7 +259,7 @@ onMounted(async () => {
         :item-key="String(item.id)"
         class="w-full"
       >
-        <view class="flex flex-row items-start m-1.5 mx-3 p-3.5 bg-background rounded-[var(--borderRadiusXLarge)]" @tap="openNovel(item.id)">
+        <view class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-background rounded-[var(--borderRadiusXLarge)]" @tap="openNovel(item.id)">
           <view class="flex-1 flex flex-col">
             <text class="text-xl font-semibold text-foreground [max-line:2]">{{ item.title }}</text>
             <view class="flex flex-row mt-1.5">
@@ -258,6 +269,8 @@ onMounted(async () => {
               </text>
             </view>
           </view>
+          <!-- 受限条目遮罩（issue #91） -->
+          <RestrictOverlay v-if="isRestricted(item)" :level="item.x_restrict === 2 ? 2 : 1" />
         </view>
       </list-item>
       <list-item v-if="novelLoadingMore" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>

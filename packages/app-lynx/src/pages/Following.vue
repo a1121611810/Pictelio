@@ -6,10 +6,11 @@ import { navigate, goBack } from '../router'
 import { loadFollow, loadNext } from '../api/illust'
 import type { PixivIllust } from '../api/types'
 import { thumbUrl } from '../utils/imageUrl'
-import { filterByRestrict } from '../stores/settingsStore'
+import { isRestricted } from '../stores/settingsStore'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
+import RestrictOverlay from '../components/RestrictOverlay.vue'
 
 const illusts = ref<PixivIllust[]>([])
 const nextUrl = ref<string | null>(null)
@@ -25,8 +26,8 @@ async function fetchFirstPage() {
   errorMsg.value = ''
   try {
     const res = await loadFollow()
-    // ADR-0051：应用 R18/R18G 开关过滤（默认隐藏）
-    illusts.value = filterByRestrict(res.illusts)
+    // issue #91：全量渲染，受限条目盖遮罩（不再过滤）
+    illusts.value = res.illusts
     nextUrl.value = res.next_url
   } catch (err) {
     errorMsg.value = (err as { message?: string }).message ?? '加载失败'
@@ -46,9 +47,10 @@ async function loadMore() {
   try {
     const res = await loadNext(nextUrl.value)
     const seen = new Set(illusts.value.map((i) => i.id))
-    const fresh = filterByRestrict(res.illusts).filter((i) => !seen.has(i.id))
+    const fresh = res.illusts.filter((i) => !seen.has(i.id))
     illusts.value.push(...fresh)
-    nextUrl.value = fresh.length === 0 ? null : res.next_url
+    // 空页防护：基于服务端原始返回判空（issue #91）
+    nextUrl.value = res.illusts.length === 0 ? null : res.next_url
   } catch (err) {
     errorMsg.value = (err as { message?: string }).message ?? '加载更多失败'
   } finally {
@@ -60,6 +62,9 @@ async function loadMore() {
 function openDetail(id: number) {
   void navigate(`/illust/${id}`)
 }
+
+// 受限条目图片区：吞没 tap（遮罩点击无任何反应，issue #91）
+function swallowRestricted() {}
 
 onMounted(fetchFirstPage)
 </script>
@@ -101,7 +106,11 @@ onMounted(fetchFirstPage)
       >
         <!-- [lynx:fix] 原生 list-item 根级 @tap 失效 → 内容 view 绑 tap（ADR-0055） -->
         <view class="w-full flex flex-col" @tap="openDetail(item.id)">
-          <SkeletonImage :src="thumbUrl(item.image_urls)" aspect-ratio="1 / 1" min-h="40vw" lazy-load />
+          <view class="relative" @tap.stop="swallowRestricted">
+            <SkeletonImage :src="thumbUrl(item.image_urls)" aspect-ratio="1 / 1" min-h="40vw" lazy-load />
+            <!-- 受限条目图片区遮罩（issue #91） -->
+            <RestrictOverlay v-if="isRestricted(item)" :level="item.x_restrict === 2 ? 2 : 1" />
+          </view>
           <text class="text-lg font-semibold text-foreground mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
           <text class="text-sm text-foreground-2 mt-1 mx-2.5 [max-line:1]">{{ item.user.name }}</text>
           <view class="mt-1 mx-2.5 mb-2.5">

@@ -9,8 +9,9 @@ import { thumbUrl } from '../utils/imageUrl'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
-import { filterByRestrict } from '../stores/settingsStore'
+import { isRestricted } from '../stores/settingsStore'
 import { isLoggedIn } from '../stores/authStore'
+import RestrictOverlay from '../components/RestrictOverlay.vue'
 
 const illusts = ref<PixivIllust[]>([])
 const nextUrl = ref<string | null>(null)
@@ -36,8 +37,8 @@ async function fetchFirstPage() {
   errorMsg.value = ''
   try {
     const res = await loadRecommended()
-    // ADR-0051：应用 R18/R18G 开关过滤（默认隐藏）
-    const all = filterByRestrict(res.illusts)
+    // issue #91：全量渲染，受限条目盖遮罩（不再过滤）
+    const all = res.illusts
     illusts.value = all.slice(0, PAGE_SIZE)
     pendingIllusts.value = all.slice(PAGE_SIZE)
     nextUrl.value = res.next_url
@@ -67,12 +68,11 @@ async function loadMore() {
     }
     const res = await loadNext(nextUrl.value!)
     const seen = new Set(illusts.value.map((i) => i.id))
-    // ADR-0051：分页同样应用 R18/R18G 过滤
-    const fresh = filterByRestrict(res.illusts).filter((i) => !seen.has(i.id))
+    const fresh = res.illusts.filter((i) => !seen.has(i.id))
     illusts.value.push(...fresh.slice(0, PAGE_SIZE))
     pendingIllusts.value = fresh.slice(PAGE_SIZE)
-    // 空页防护：服务端返回空列表但 next_url 仍存在时终止分页，防 web-core 下轮询空页
-    nextUrl.value = fresh.length === 0 ? null : res.next_url
+    // 空页防护：基于服务端原始返回判空（issue #91：不再用过滤后长度）
+    nextUrl.value = res.illusts.length === 0 ? null : res.next_url
   } catch (err) {
     errorMsg.value = (err as { message?: string }).message ?? '加载更多失败'
   } finally {
@@ -84,6 +84,9 @@ async function loadMore() {
 function openDetail(id: number) {
   void navigate(`/illust/${id}`)
 }
+
+// 受限条目图片区：吞没 tap（遮罩点击无任何反应，issue #91）
+function swallowRestricted() {}
 function openNovels() {
   void navigate('/novels')
 }
@@ -169,7 +172,11 @@ onActivated(() => {
              （attribute 形式 web-core 不响应）。原生 LynxView 同样支持这两个属性（ADR-0048） -->
         <!-- [lynx:fix] 图片级骨架（SkeletonImage）：容器 aspect-[1/1] 方形 + min-h 保底（ADR-0045），
              图片 @load 后才隐藏 shimmer 显示图片（骨架关闭时机 = 图片加载完成，而非 API 数据返回） -->
-        <SkeletonImage :src="thumbUrl(item.image_urls)" aspect-ratio="1 / 1" min-h="40vw" lazy-load />
+        <view class="relative" @tap.stop="swallowRestricted">
+          <SkeletonImage :src="thumbUrl(item.image_urls)" aspect-ratio="1 / 1" min-h="40vw" lazy-load />
+          <!-- 受限条目图片区遮罩（issue #91）：吞没 tap，不触发详情跳转 -->
+          <RestrictOverlay v-if="isRestricted(item)" :level="item.x_restrict === 2 ? 2 : 1" />
+        </view>
         <text class="text-lg font-semibold text-foreground mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
         <text class="text-sm text-foreground-2 mt-1 mx-2.5 [max-line:1]">{{ item.user.name }}</text>
         <view class="mt-1 mx-2.5 mb-2.5">
