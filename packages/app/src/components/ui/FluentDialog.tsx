@@ -49,17 +49,51 @@ const FluentDialog: Component<FluentDialogProps> = (props) => {
     host?.[method]?.();
   }
 
-  createEffect(() => {
-    const open = props.open;
+  let disposed = false;
+
+  /**
+   * 等宿主内部 <dialog>（shadow template 渲染产物）就绪后调 show()。
+   *
+   * 自定义元素升级后其 shadow template 渲染仍是异步的；元素刚挂载时
+   * show() 内部 this.dialog（f-ref）尚未绑定，调用会静默失败——这正是
+   * StartupUpdateDialog 注释记录的「动态创建时 open 不触发 showModal」
+   * 的真实根因（与 slot 无关）。用 rAF 轮询直到内部 <dialog> 出现再 show，
+   * 带帧数上限与卸载防护。
+   */
+  function showWhenReady(framesLeft = 120) {
+    if (disposed || !ref) return;
+    const inner = ref.shadowRoot?.querySelector("dialog");
+    if (inner) {
+      // 就绪帧可能晚到：同一宏任务内 open 已翻转为 false 时不得再 show，
+      // 否则用户关掉的弹窗会被重新弹开。判 props.open 既消除竞态也保证幂等。
+      if (props.open && !inner.open) callHost("show");
+      return;
+    }
+    if (framesLeft <= 0) {
+      console.warn("[FluentDialog] 内部 <dialog> 超时未就绪，show 放弃");
+      return;
+    }
+    requestAnimationFrame(() => showWhenReady(framesLeft - 1));
+  }
+
+  /** 把当前 open 状态同步到宿主 */
+  function syncOpenToHost() {
     if (!ref) return;
-    if (open) {
-      if (!isOpen()) callHost("show");
+    if (props.open) {
+      showWhenReady();
     } else if (isOpen()) {
       callHost("hide");
     }
+  }
+
+  createEffect(() => {
+    // 追踪 props.open 变化；ref 未就绪时跳过，由 onMount 兜底
+    void props.open;
+    syncOpenToHost();
   });
 
   onCleanup(() => {
+    disposed = true;
     // 组件卸载时若仍开着，确保关闭，避免遗留模态
     if (isOpen()) callHost("hide");
   });
@@ -89,6 +123,10 @@ const FluentDialog: Component<FluentDialogProps> = (props) => {
   // onMount 在整棵子树（含 children）挂载完成后触发，此时重映射才可靠。
   onMount(() => {
     if (bodyRef) remapSlots(bodyRef);
+    // 兜底：createEffect 首跑时 ref 可能因自定义元素异步升级未就绪，
+    // 当 open 恒定 true（不再变化）时 effect 不会重跑，show 会被跳过。
+    // onMount 时 ref 一定就绪，补一次状态同步，保证初始 open=true 必开。
+    syncOpenToHost();
   });
 
   return (

@@ -67,7 +67,7 @@
 
 ## 风险与反面
 
-- **v3 动态 show 坑可能残留**：`StartupUpdateDialog` 注释所述"动态创建不触发 showModal"若在新的 slot 契约下仍复现，需回退到"纯 CSS fixed 覆盖层"方案（该方案已在 `StartupUpdateDialog` 验证可行，是已知的备选退路）。
+- **v3 动态 show 坑已定位并修复**：`StartupUpdateDialog` 注释所述"动态创建不触发 showModal"的真实根因是——自定义元素升级后其 shadow template 渲染仍异步，元素刚挂载时 `show()` 内 `this.dialog`（f-ref）未绑定，调用静默失败（与 slot 无关）。已在 `FluentDialog` 封装内修复：`showWhenReady` 用 rAF 轮询等内部 `<dialog>` 就绪再 show（120 帧上限 + `disposed` 卸载防护 + 超时 `console.warn`），并就绪帧再判 `props.open` 消除"open true→false 快速翻转被晚到就绪帧重新弹开"的竞态。真实浏览器（CDP headless Chrome）验证：恒 open=true、dialogType 变化、open 快速翻转三场景均正确。**注**：该时序在 happy-dom 下无法复现（happy-dom 的 `<dialog>`/rAF/signal 批处理为同步或 mock 实现，rafCount=0、inner 同步就绪），相关竞态用例在 happy-dom seam 上给出假阴性，故竞态验证以真实浏览器为准，未沉淀为单测。若未来发现新异常，备选退路仍是纯 CSS fixed 覆盖层（`StartupUpdateDialog` 模式）。
 - **多调用点回归面**：`FluentDialog` 6+ 处复用，统一改封装后需逐一回归（clear / deleteAccount / switchClient / ugoira / R18 / R18G / NovelDetail / AgeGate / ImageHostSettings 的裸 `<fluent-dialog>`）。
 
 ## 相关
