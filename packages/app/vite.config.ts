@@ -50,7 +50,7 @@ const proxyAgent = new HttpsProxyAgent(proxyUrl) as unknown;
 
 // Vite+ 的 UserConfig 拼接了 Vite 全量类型 + Rolldown 类型 + lint/fmt/test 扩展，
 // 类型比对时 TS 递归深度超限。整体断言为 any 规避，运行时仍由 Vite/Vite+ 校验配置。
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   // 部署到 GitHub Pages (/pixivizer/) 时需设置 BASE_PATH=/pixivizer/
   // 本地开发 / Android 打包使用默认 "/"
   base: process.env.BASE_PATH || "/",
@@ -85,6 +85,9 @@ export default defineConfig({
     APP_VERSION: JSON.stringify(pkg.version),
     __CREDENTIALS__,
     __PUBLIC_CONFIG__,
+    // E2E 测试钩子开关：仅 --mode e2e 构建保留（tests/android-e2e 用），
+    // build:android（production）与 dev server 均不含，避免生产泄漏。
+    __E2E__: JSON.stringify(mode === "e2e"),
   },
 
   server: {
@@ -378,4 +381,4 @@ export default defineConfig({
       bracketSpacing: true,
     },
   },
-} as any);
+} as any));

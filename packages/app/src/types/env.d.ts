@@ -1,5 +1,7 @@
 // src/types/env.d.ts
 declare const APP_VERSION: string;
+/** E2E 测试钩子开关：仅 --mode e2e 构建为 true（vite.config define） */
+declare const __E2E__: boolean;
 
 interface CredentialsConfig {
   clientId: string;

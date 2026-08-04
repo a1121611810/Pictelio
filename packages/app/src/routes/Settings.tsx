@@ -106,6 +106,20 @@ const Settings: Component = () => {
     }, 600);
   }
 
+  // ── E2E 测试钩子（仅 --mode e2e 构建）──
+  // 动态 showModal 的 <dialog> 内按钮无法被 WebDriver/脚本点击（浏览器级限制，
+  // 真实用户触摸正常）。模拟器 E2E（tests/android-e2e）通过此全局钩子触发
+  // 确认逻辑，绕过对话框交互限制。
+  // __E2E__ 由 vite.config define 控制：仅 --mode e2e 构建为 true，
+  // build:android（production）被替换为 false 并整体消除，无生产泄漏。
+  if (__E2E__) {
+    (window as unknown as Record<string, unknown>).pictelioE2e = {
+      confirmSwitchClient: () => {
+        void handleSwitchClient();
+      },
+    };
+  }
+
   return (
     <PageTransition>
       <div class="min-h-screen pb-8">
