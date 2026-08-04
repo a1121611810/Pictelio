@@ -1,7 +1,15 @@
-import { Preferences } from "@capacitor/preferences";
+/**
+ * 持久化 Set 集合 —— 基于统一 Settings registry。
+ *
+ * 存储格式与旧 Preferences 数据兼容：数组 JSON（JSON.stringify([...])）。
+ * 旧 createPersistedSet（直接依赖 Preferences）已由 createPersistedSetSetting 取代。
+ */
+
+import { jsonCodec, settings } from "@/settings";
+import type { SettingDef } from "@/settings";
 
 interface PersistedSet<T> {
-  /** 响应式集合信号 */
+  /** 响应式集合 accessor（每次调用返回当前快照） */
   values: () => Set<T>;
   /** 添加元素并持久化。已存在时跳过。 */
   add: (value: T) => Promise<void>;
@@ -9,68 +17,39 @@ interface PersistedSet<T> {
   remove: (value: T) => Promise<void>;
   /** 判断元素是否在集合中 */
   has: (value: T) => boolean;
-  /** 从 Preferences 加载已持久化的集合 */
+  /** 从存储加载已持久化的集合 */
   load: () => Promise<void>;
-  /** 清空集合（不操作 Preferences） */
+  /** 清空集合并持久化空数组 */
   reset: () => void;
 }
 
 /**
- * 创建一个持久化的 Set 工厂，自动同步到 Capacitor Preferences。
+ * 创建一个基于 Settings registry 的持久化 Set。
  *
- * @param storageKey - Preferences 中存储的键名
- * @param logPrefix - console.warn 的前缀标签
+ * @param def - 设置定义（key / default / validate 等），存储值类型为 T[]（数组 JSON）。
  */
+export function createPersistedSetSetting<T>(def: SettingDef<T[]>): PersistedSet<T> {
+  const handle = settings.define<T[]>({
+    ...def,
+    codec: def.codec ?? jsonCodec,
+  });
 
-export function createPersistedSet<T>(storageKey: string, logPrefix: string): PersistedSet<T> {
-  const [values, setValues] = createSignal<Set<T>>(new Set());
-
-  async function load(): Promise<void> {
-    const [err, result] = await tryAsync(Preferences.get({ key: storageKey }));
-    if (err) {
-      console.warn(`[${logPrefix}] Failed to load ${storageKey}`, err);
-    } else {
-      const { value } = result!;
-      if (value) {
-        const items: T[] = JSON.parse(value);
-        setValues(new Set(items));
-      }
-    }
-  }
-
-  async function add(value: T): Promise<void> {
-    if (values().has(value)) return;
-    const next = new Set(values());
-    next.add(value);
-    setValues(next);
-    const [err] = await tryAsync(
-      Preferences.set({ key: storageKey, value: JSON.stringify([...next]) }),
-    );
-    if (err) {
-      console.warn(`[${logPrefix}] Failed to persist ${storageKey}`, err);
-    }
-  }
-
-  async function remove(value: T): Promise<void> {
-    if (!values().has(value)) return;
-    const next = new Set(values());
-    next.delete(value);
-    setValues(next);
-    const [err2] = await tryAsync(
-      Preferences.set({ key: storageKey, value: JSON.stringify([...next]) }),
-    );
-    if (err2) {
-      console.warn(`[${logPrefix}] Failed to persist ${storageKey}`, err2);
-    }
-  }
-
-  function has(value: T): boolean {
-    return values().has(value);
-  }
-
-  function reset(): void {
-    setValues(new Set<T>());
-  }
-
-  return { values, add, remove, has, load, reset };
+  return {
+    values: () => new Set(handle.value()),
+    async add(value) {
+      if (handle.value().includes(value)) return;
+      handle.set([...handle.value(), value]);
+    },
+    async remove(value) {
+      if (!handle.value().includes(value)) return;
+      handle.set(handle.value().filter((v) => v !== value));
+    },
+    has: (value) => handle.value().includes(value),
+    async load() {
+      await handle.hydrate();
+    },
+    reset() {
+      handle.set([]);
+    },
+  };
 }

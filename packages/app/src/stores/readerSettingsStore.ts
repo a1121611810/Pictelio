@@ -1,3 +1,5 @@
+import { settings, jsonCodec, type Codec } from "@/settings";
+
 // ── Types ──
 
 export interface ReaderSettings {
@@ -10,8 +12,6 @@ export interface ReaderSettings {
 }
 
 // ── Defaults ──
-
-const STORAGE_PREFIX = "novel_reader_";
 
 const DEFAULTS: ReaderSettings = {
   fontSize: 18,
@@ -45,24 +45,28 @@ const FONT_COLORS = ["#1a1a1a", "#5c3e24", "#3a3a3a", "#666666", "#999999"] as c
 
 const BG_COLORS = ["", "#f5e6c8", "#c7edcc", "#1a1a1a", "#f0f0f0", "#2b2b2b"] as const;
 
-// ── Storage ──
+// ── Settings registry 集成 ──
+//
+// 旧数据格式：localStorage["novel_reader_settings"] = JSON.stringify(ReaderSettings)。
+// 现改用统一 settings registry：localStorage 同步后端 + jsonCodec，default 为 DEFAULTS。
 
-function loadSettings(): ReaderSettings {
-  const [err, stored] = trySync(() => localStorage.getItem(STORAGE_PREFIX + "settings"));
-  if (!err && stored) {
-    const [parseErr, parsed] = trySync(() => JSON.parse(stored) as Partial<ReaderSettings>);
-    if (!parseErr) return { ...DEFAULTS, ...parsed };
-  }
-  return { ...DEFAULTS };
-}
+const readerSettings = settings.define<ReaderSettings>({
+  key: "novel_reader_settings",
+  storage: "localStorage",
+  codec: jsonCodec as Codec<ReaderSettings>,
+  default: DEFAULTS,
+  syncInit: true,
+});
 
-function saveSettings(settings: ReaderSettings): void {
-  trySync(() => localStorage.setItem(STORAGE_PREFIX + "settings", JSON.stringify(settings)));
-}
+// 模块加载时同步读（localStorage 同步后端），保证首屏 signal 初始值与持久化值一致。
+readerSettings.syncInit();
+// 打开 write gate（phase → warm），setter 的 handle.set 才会真正落盘。
+void settings.hydrateAll();
+
+// 旧数据可能是部分字段（缺省字段用 DEFAULTS 兜底）。
+const initial: ReaderSettings = { ...DEFAULTS, ...readerSettings.value() };
 
 // ── Signal-based store (module-level, shared by NovelDetail and ReaderSettingsSheet) ──
-
-const initial = loadSettings();
 
 export const [fontSize, setFontSize] = createSignal(initial.fontSize);
 export const [fontWeight, setFontWeight] = createSignal(initial.fontWeight);
@@ -72,7 +76,8 @@ export const [lineHeight, setLineHeight] = createSignal(initial.lineHeight);
 export const [bgColor, setBgColor] = createSignal(initial.bgColor);
 
 function persistAll(): void {
-  saveSettings({
+  readerSettings.set({
+    ...readerSettings.value(),
     fontSize: fontSize(),
     fontWeight: fontWeight(),
     fontFamily: fontFamily(),

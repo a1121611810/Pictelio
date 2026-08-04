@@ -1,19 +1,8 @@
 import type { Component } from "solid-js";
 import { isLoggedIn, isLoading, setIsLoading, initializeAuth } from "@/stores/authStore";
 import {
-  loadAutoHideNavBarPreference,
-  loadShowR18Preference,
-  loadShowR18GPreference,
-  loadLayoutModePreference,
-  loadUgoiraModePreference,
-  loadShowDetailStairsPreference,
-  loadAgePreference,
   ageConfirmed,
   autoCheckUpdate,
-  loadAutoCheckUpdatePreference,
-  loadImageCachePrefs,
-  loadNovelLayoutModePreference,
-  loadLastDismissedVersionPreference,
   setHasUpdate,
   setLatestVersion,
   setLatestReleaseUrl,
@@ -22,9 +11,9 @@ import {
   setIsCheckingUpdate,
   setCheckCompleted,
   lastDismissedVersion,
+  applyAgeRestriction,
 } from "@/stores/settingsStore";
-import { loadThemePreference, loadPageStyleThemePreference } from "@/stores/themeStore";
-import { loadContentTypePreference } from "@/stores/uiStore";
+import { settings } from "@/settings";
 import { checkForUpdate } from "@/services/updateService";
 import StartupUpdateDialog from "@/components/StartupUpdateDialog";
 import { clearOverlays, registerBackGesture } from "@/services/backGestureService";
@@ -117,26 +106,15 @@ const RootLayout: Component = (props: { children?: any }) => {
       unregisterBackGesture?.();
     });
 
-    // Load persisted preferences (async) — 并行加载
+    // Load persisted preferences (async) — 统一由 Settings registry 批量加载
     await Promise.all([
-      loadThemePreference(),
-      loadAutoHideNavBarPreference(),
-      loadShowR18Preference(),
-      loadShowR18GPreference(),
-      loadLayoutModePreference(),
-      loadUgoiraModePreference(),
-      loadShowDetailStairsPreference(),
-      loadAgePreference(),
-      loadAutoCheckUpdatePreference(),
-      loadLastDismissedVersionPreference(),
-      loadContentTypePreference(),
-      loadImageCachePrefs(),
-      loadNovelLayoutModePreference(),
-      loadPageStyleThemePreference(),
+      settings.hydrateAll(),
+      loadReportedIds(),
+      loadBlockedIds(),
+      loadImageHostPreference(),
     ]);
-
-    // Load user content moderation state — 并行加载
-    await Promise.all([loadReportedIds(), loadBlockedIds(), loadImageHostPreference()]);
+    // 年龄联动（串行）：非成人强制关闭 R18/R18G 并持久化（write gate 已开）
+    await applyAgeRestriction();
 
     // 后台预热 LRU 缓存（从 Android 文件系统读取最近图片，不阻塞启动流程）
     warmCacheFromDisk();

@@ -1,74 +1,68 @@
+// @vitest-environment happy-dom
+/**
+ * translationStore 单元测试 —— 注入式（memory adapter）+ SecureStorage mock。
+ *
+ * 设置类 5 项用 settings registry 托管；测试通过 getter mock + 每次 loadStore
+ * 重建 settings 实例。ds_api_key 走 SecureStorage 独立路径，用 hoisted mock。
+ */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Settings } from "@/settings/types";
+
+const secureStorageMock = vi.hoisted(() => ({
+  get: vi.fn(),
+  set: vi.fn(),
+  remove: vi.fn(),
+}));
 
 vi.mock("@aparajita/capacitor-secure-storage", () => ({
-  SecureStorage: { get: vi.fn(), set: vi.fn(), remove: vi.fn() },
+  SecureStorage: secureStorageMock,
 }));
 
-vi.mock("@capacitor/preferences", () => ({
-  Preferences: { get: vi.fn(), set: vi.fn(), remove: vi.fn() },
+const mockState = vi.hoisted(() => ({
+  current: null as Settings | null,
 }));
 
-import { SecureStorage } from "@aparajita/capacitor-secure-storage";
-import { Preferences } from "@capacitor/preferences";
-import {
-  dsApiKey,
-  loadDsApiKey,
-  saveDsApiKey,
-  clearDsApiKey,
-  translatedParagraphs,
-  setTranslatedParagraphs,
-  showTranslation,
-  setShowTranslation,
-  resetTranslationState,
-  failedParagraphs,
-  setFailedParagraphs,
-  translationUsedThinking,
-  setTranslationUsedThinking,
-  decideTranslatePolicy,
-  translateR18,
-  translateR18G,
-  setTranslateR18,
-  setTranslateR18G,
-  markR18Confirmed,
-  getR18Confirmed,
-  loadTranslateRestrictSettings,
-  defaultTier,
-  thinkingEnabled,
-  setDefaultTier,
-  setThinkingEnabled,
-  loadTierAndThinking,
-  TIER_MODELS,
-} from "@/stores/translationStore";
+vi.mock("@/settings", () => ({
+  get settings() {
+    return mockState.current;
+  },
+}));
 
-const secureGet = vi.mocked(SecureStorage.get);
-const secureSet = vi.mocked(SecureStorage.set);
-const secureRemove = vi.mocked(SecureStorage.remove);
-const prefGet = vi.mocked(Preferences.get);
-const prefSet = vi.mocked(Preferences.set);
-
-beforeEach(() => {
+async function loadStore(seed: Record<string, string> = {}) {
+  vi.resetModules();
   vi.clearAllMocks();
-});
+  const { createSettings } = await import("@/settings/registry");
+  const { createMemoryAdapter } = await import("@/settings/backends/memory");
+  const mem = createMemoryAdapter(seed);
+  const settings = createSettings({ storages: { preferences: mem } });
+  mockState.current = settings;
+  const store = await import("@/stores/translationStore");
+  await settings.hydrateAll();
+  return { store, mem };
+}
 
-describe("API key（BYOK）存储", () => {
+describe("API key（BYOK）存储（SecureStorage 独立路径）", () => {
   it("loads a saved key from secure storage", async () => {
-    secureGet.mockResolvedValue("sk-saved");
-    await loadDsApiKey();
-    expect(dsApiKey()).toBe("sk-saved");
-    expect(secureGet).toHaveBeenCalledWith("ds_api_key");
+    const { store } = await loadStore();
+    secureStorageMock.get.mockResolvedValue("sk-saved");
+    await store.loadDsApiKey();
+    expect(store.dsApiKey()).toBe("sk-saved");
+    expect(secureStorageMock.get).toHaveBeenCalledWith("ds_api_key");
   });
 
   it("sets null when storage returns empty", async () => {
-    secureGet.mockResolvedValue("");
-    await loadDsApiKey();
-    expect(dsApiKey()).toBeNull();
+    const { store } = await loadStore();
+    secureStorageMock.get.mockResolvedValue("");
+    await store.loadDsApiKey();
+    expect(store.dsApiKey()).toBeNull();
   });
 
   it("sets null and warns when storage read fails（静默降级必须 warn）", async () => {
+    const { store } = await loadStore();
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    secureGet.mockRejectedValue(new Error("Keystore unavailable"));
-    await loadDsApiKey();
-    expect(dsApiKey()).toBeNull();
+    secureStorageMock.get.mockRejectedValue(new Error("Keystore unavailable"));
+    await store.loadDsApiKey();
+    expect(store.dsApiKey()).toBeNull();
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining("[translationStore]"),
       expect.any(Error),
@@ -77,30 +71,34 @@ describe("API key（BYOK）存储", () => {
   });
 
   it("saves and trims the key", async () => {
-    secureSet.mockResolvedValue();
-    await saveDsApiKey("  sk-new  ");
-    expect(secureSet).toHaveBeenCalledWith("ds_api_key", "sk-new");
-    expect(dsApiKey()).toBe("sk-new");
+    const { store } = await loadStore();
+    secureStorageMock.set.mockResolvedValue();
+    await store.saveDsApiKey("  sk-new  ");
+    expect(secureStorageMock.set).toHaveBeenCalledWith("ds_api_key", "sk-new");
+    expect(store.dsApiKey()).toBe("sk-new");
   });
 
   it("clears the key when saving empty string", async () => {
-    secureRemove.mockResolvedValue();
-    await saveDsApiKey("   ");
-    expect(secureRemove).toHaveBeenCalledWith("ds_api_key");
-    expect(dsApiKey()).toBeNull();
+    const { store } = await loadStore();
+    secureStorageMock.remove.mockResolvedValue();
+    await store.saveDsApiKey("   ");
+    expect(secureStorageMock.remove).toHaveBeenCalledWith("ds_api_key");
+    expect(store.dsApiKey()).toBeNull();
   });
 
   it("clears the key", async () => {
-    secureRemove.mockResolvedValue();
-    await clearDsApiKey();
-    expect(secureRemove).toHaveBeenCalledWith("ds_api_key");
-    expect(dsApiKey()).toBeNull();
+    const { store } = await loadStore();
+    secureStorageMock.remove.mockResolvedValue();
+    await store.clearDsApiKey();
+    expect(secureStorageMock.remove).toHaveBeenCalledWith("ds_api_key");
+    expect(store.dsApiKey()).toBeNull();
   });
 
   it("warns and rethrows when save fails", async () => {
+    const { store } = await loadStore();
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    secureSet.mockRejectedValue(new Error("write fail"));
-    await expect(saveDsApiKey("sk-x")).rejects.toThrow("write fail");
+    secureStorageMock.set.mockRejectedValue(new Error("write fail"));
+    await expect(store.saveDsApiKey("sk-x")).rejects.toThrow("write fail");
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining("[translationStore]"),
       expect.any(Error),
@@ -110,132 +108,133 @@ describe("API key（BYOK）存储", () => {
 });
 
 describe("详情页翻译显示状态", () => {
-  it("tracks translated paragraphs and original/translated toggle", () => {
-    setTranslatedParagraphs({ 0: "译文一", 1: "译文二" });
-    expect(translatedParagraphs()).toEqual({ 0: "译文一", 1: "译文二" });
-    setShowTranslation(true);
-    expect(showTranslation()).toBe(true);
+  it("tracks translated paragraphs and original/translated toggle", async () => {
+    const { store } = await loadStore();
+    store.setTranslatedParagraphs({ 0: "译文一", 1: "译文二" });
+    expect(store.translatedParagraphs()).toEqual({ 0: "译文一", 1: "译文二" });
+    store.setShowTranslation(true);
+    expect(store.showTranslation()).toBe(true);
   });
 
-  it("resets translation state on chapter switch", () => {
-    setTranslatedParagraphs({ 0: "旧章译文" });
-    setShowTranslation(true);
-    resetTranslationState();
-    expect(translatedParagraphs()).toEqual({});
-    expect(showTranslation()).toBe(false);
+  it("resets translation state on chapter switch", async () => {
+    const { store } = await loadStore();
+    store.setTranslatedParagraphs({ 0: "旧章译文" });
+    store.setShowTranslation(true);
+    store.resetTranslationState();
+    expect(store.translatedParagraphs()).toEqual({});
+    expect(store.showTranslation()).toBe(false);
   });
 
-  it("tracks failed paragraphs and clears them on reset (S4 断点续翻)", () => {
-    setFailedParagraphs(new Set([2, 5]));
-    expect(failedParagraphs().has(2)).toBe(true);
-    expect(failedParagraphs().has(5)).toBe(true);
-    expect(failedParagraphs().has(0)).toBe(false);
-    resetTranslationState();
-    expect(failedParagraphs().size).toBe(0);
+  it("tracks failed paragraphs and clears them on reset (S4 断点续翻)", async () => {
+    const { store } = await loadStore();
+    store.setFailedParagraphs(new Set([2, 5]));
+    expect(store.failedParagraphs().has(2)).toBe(true);
+    expect(store.failedParagraphs().has(5)).toBe(true);
+    expect(store.failedParagraphs().has(0)).toBe(false);
+    store.resetTranslationState();
+    expect(store.failedParagraphs().size).toBe(0);
   });
 
-  it("tracks thinking usage and clears on reset (S4 防思考译文混入非思考缓存)", () => {
-    expect(translationUsedThinking()).toBe(false);
-    setTranslationUsedThinking(true);
-    expect(translationUsedThinking()).toBe(true);
-    resetTranslationState();
-    expect(translationUsedThinking()).toBe(false);
+  it("tracks thinking usage and clears on reset (S4 防思考译文混入非思考缓存)", async () => {
+    const { store } = await loadStore();
+    expect(store.translationUsedThinking()).toBe(false);
+    store.setTranslationUsedThinking(true);
+    expect(store.translationUsedThinking()).toBe(true);
+    store.resetTranslationState();
+    expect(store.translationUsedThinking()).toBe(false);
   });
 });
 
 describe("decideTranslatePolicy（x_restrict 分级决策函数全组合）", () => {
-  it("allows all-age content regardless of switches", () => {
-    expect(decideTranslatePolicy(0, false, false)).toBe("allow");
-    expect(decideTranslatePolicy(0, true, true)).toBe("allow");
+  it("allows all-age content regardless of switches", async () => {
+    const { store } = await loadStore();
+    expect(store.decideTranslatePolicy(0, false, false)).toBe("allow");
+    expect(store.decideTranslatePolicy(0, true, true)).toBe("allow");
   });
 
-  it("blocks R18 when the R18 switch is off, allows when on", () => {
-    expect(decideTranslatePolicy(1, false, false)).toBe("block");
-    expect(decideTranslatePolicy(1, false, true)).toBe("block"); // R18G 开关不影响 R18
-    expect(decideTranslatePolicy(1, true, false)).toBe("allow");
+  it("blocks R18 when the R18 switch is off, allows when on", async () => {
+    const { store } = await loadStore();
+    expect(store.decideTranslatePolicy(1, false, false)).toBe("block");
+    expect(store.decideTranslatePolicy(1, false, true)).toBe("block");
+    expect(store.decideTranslatePolicy(1, true, false)).toBe("allow");
   });
 
-  it("blocks R18G when the R18G switch is off, allows when on", () => {
-    expect(decideTranslatePolicy(2, true, false)).toBe("block"); // R18 开关不影响 R18G
-    expect(decideTranslatePolicy(2, false, false)).toBe("block");
-    expect(decideTranslatePolicy(2, false, true)).toBe("allow");
+  it("blocks R18G when the R18G switch is off, allows when on", async () => {
+    const { store } = await loadStore();
+    expect(store.decideTranslatePolicy(2, true, false)).toBe("block");
+    expect(store.decideTranslatePolicy(2, false, false)).toBe("block");
+    expect(store.decideTranslatePolicy(2, false, true)).toBe("allow");
   });
 
-  it("defensively allows unknown restrict levels", () => {
-    expect(decideTranslatePolicy(3, false, false)).toBe("allow");
+  it("defensively allows unknown restrict levels", async () => {
+    const { store } = await loadStore();
+    expect(store.decideTranslatePolicy(3, false, false)).toBe("allow");
   });
 });
 
 describe("R18/R18G 开关持久化（默认关）", () => {
-  it("defaults both switches to off", () => {
-    expect(translateR18()).toBe(false);
-    expect(translateR18G()).toBe(false);
+  it("defaults both switches to off", async () => {
+    const { store } = await loadStore();
+    expect(store.translateR18()).toBe(false);
+    expect(store.translateR18G()).toBe(false);
   });
 
-  it("persists switch state to Preferences", async () => {
-    prefSet.mockResolvedValue();
-    await setTranslateR18(true);
-    expect(translateR18()).toBe(true);
-    expect(prefSet).toHaveBeenCalledWith({ key: "translation_r18", value: "true" });
-    await setTranslateR18G(true);
-    expect(translateR18G()).toBe(true);
-    expect(prefSet).toHaveBeenCalledWith({ key: "translation_r18g", value: "true" });
+  it("persists switch state", async () => {
+    const { store, mem } = await loadStore();
+    await store.setTranslateR18(true);
+    expect(store.translateR18()).toBe(true);
+    await vi.waitFor(() => expect(mem.dump().get("translation_r18")).toBe("true"));
+    await store.setTranslateR18G(true);
+    expect(store.translateR18G()).toBe(true);
+    await vi.waitFor(() => expect(mem.dump().get("translation_r18g")).toBe("true"));
   });
 
   it("tracks R18 risk confirmation and persists it", async () => {
-    prefSet.mockResolvedValue();
-    expect(getR18Confirmed()).toBe(false);
-    await markR18Confirmed();
-    expect(getR18Confirmed()).toBe(true);
-    expect(prefSet).toHaveBeenCalledWith({
-      key: "translation_r18_confirmed",
-      value: "true",
-    });
+    const { store, mem } = await loadStore();
+    expect(store.getR18Confirmed()).toBe(false);
+    await store.markR18Confirmed();
+    expect(store.getR18Confirmed()).toBe(true);
+    await vi.waitFor(() => expect(mem.dump().get("translation_r18_confirmed")).toBe("true"));
   });
 
-  it("loads persisted switches and confirmation", async () => {
-    prefGet.mockImplementation(async ({ key }: { key: string }) => {
-      if (key === "translation_r18") return { value: "true" };
-      if (key === "translation_r18g") return { value: "false" };
-      if (key === "translation_r18_confirmed") return { value: "true" };
-      return { value: null };
+  it("hydrateAll 恢复持久化的开关与确认标记", async () => {
+    const { store } = await loadStore({
+      translation_r18: "true",
+      translation_r18g: "false",
+      translation_r18_confirmed: "true",
     });
-    await loadTranslateRestrictSettings();
-    expect(translateR18()).toBe(true);
-    expect(translateR18G()).toBe(false);
-    expect(getR18Confirmed()).toBe(true);
+    expect(store.translateR18()).toBe(true);
+    expect(store.translateR18G()).toBe(false);
+    expect(store.getR18Confirmed()).toBe(true);
   });
 });
 
 describe("翻译档位与思考开关（S6，决策 #22）", () => {
-  it("defaults to standard tier (flash) with thinking off", () => {
-    expect(defaultTier()).toBe("flash");
-    expect(thinkingEnabled()).toBe(false);
+  it("defaults to standard tier (flash) with thinking off", async () => {
+    const { store } = await loadStore();
+    expect(store.defaultTier()).toBe("flash");
+    expect(store.thinkingEnabled()).toBe(false);
   });
 
-  it("maps tiers to DeepSeek models", () => {
-    expect(TIER_MODELS.flash).toBe("deepseek-v4-flash");
-    expect(TIER_MODELS.pro).toBe("deepseek-v4-pro");
+  it("maps tiers to DeepSeek models", async () => {
+    const { store } = await loadStore();
+    expect(store.TIER_MODELS.flash).toBe("deepseek-v4-flash");
+    expect(store.TIER_MODELS.pro).toBe("deepseek-v4-pro");
   });
 
   it("persists tier and thinking switches", async () => {
-    prefSet.mockResolvedValue();
-    await setDefaultTier("pro");
-    expect(defaultTier()).toBe("pro");
-    expect(prefSet).toHaveBeenCalledWith({ key: "translation_default_tier", value: "pro" });
-    await setThinkingEnabled(true);
-    expect(thinkingEnabled()).toBe(true);
-    expect(prefSet).toHaveBeenCalledWith({ key: "translation_thinking", value: "true" });
+    const { store, mem } = await loadStore();
+    await store.setDefaultTier("pro");
+    expect(store.defaultTier()).toBe("pro");
+    await vi.waitFor(() => expect(mem.dump().get("translation_default_tier")).toBe("pro"));
+    await store.setThinkingEnabled(true);
+    expect(store.thinkingEnabled()).toBe(true);
+    await vi.waitFor(() => expect(mem.dump().get("translation_thinking")).toBe("true"));
   });
 
-  it("loads persisted tier and thinking", async () => {
-    prefGet.mockImplementation(async ({ key }: { key: string }) => {
-      if (key === "translation_default_tier") return { value: "pro" };
-      if (key === "translation_thinking") return { value: "true" };
-      return { value: null };
-    });
-    await loadTierAndThinking();
-    expect(defaultTier()).toBe("pro");
-    expect(thinkingEnabled()).toBe(true);
+  it("hydrateAll 恢复档位与思考", async () => {
+    const { store } = await loadStore({ translation_default_tier: "pro", translation_thinking: "true" });
+    expect(store.defaultTier()).toBe("pro");
+    expect(store.thinkingEnabled()).toBe(true);
   });
 });

@@ -1,4 +1,4 @@
-import { Preferences } from "@capacitor/preferences";
+import { jsonCodec, settings } from "@/settings";
 
 export type ImageHostMode = "race" | "weighted" | "fastest-ip" | "single";
 
@@ -122,55 +122,64 @@ function migrateLegacyState(raw: unknown): ImageHostState {
   };
 }
 
-const [state, setState] = createSignal<ImageHostState>(defaultState());
-
-export const imageHostState = state;
-
-async function persist(snapshot: ImageHostState): Promise<void> {
-  const [err] = await tryAsync(Preferences.set({ key: PREF_KEY, value: JSON.stringify(snapshot) }));
-  if (err) {
-    console.warn("[imageHostStore] Failed to persist state", err);
-  }
+/** 基础形状校验（decode → migrate 之后执行） */
+function isImageHostState(v: unknown): v is ImageHostState {
+  if (typeof v !== "object" || v === null) return false;
+  const s = v as Partial<ImageHostState>;
+  return (
+    typeof s.masterEnabled === "boolean" &&
+    (s.mode === "race" || s.mode === "weighted" || s.mode === "fastest-ip" || s.mode === "single") &&
+    (s.selectedHostId === null || typeof s.selectedHostId === "string") &&
+    Array.isArray(s.hosts) &&
+    Array.isArray(s.probeResults) &&
+    (s.fastestHostId === null || typeof s.fastestHostId === "string") &&
+    (s.fastestHostExpiresAt === null || typeof s.fastestHostExpiresAt === "number")
+  );
 }
 
+const imageHostSetting = settings.define<ImageHostState>({
+  key: PREF_KEY,
+  default: defaultState(),
+  codec: jsonCodec,
+  migrate: migrateLegacyState,
+  validate: isImageHostState,
+  onError: (err, phase) => console.warn(`[imageHostStore] ${phase} failed`, err),
+});
+
+export const imageHostState = imageHostSetting.value;
+
 export function setMasterEnabled(enabled: boolean): void {
-  const next = {
-    ...state(),
+  imageHostSetting.set({
+    ...imageHostState(),
     masterEnabled: enabled,
-  };
-  setState(next);
-  void persist(next);
+  });
 }
 
 export function setMode(mode: ImageHostMode): void {
-  const next = {
-    ...state(),
+  imageHostSetting.set({
+    ...imageHostState(),
     mode,
     fastestHostId: null,
     fastestHostExpiresAt: null,
     // "single" mode auto-selects first enabled host
     selectedHostId:
       mode === "single"
-        ? state().selectedHostId || getEnabledHosts()[0]?.id || null
-        : state().selectedHostId,
-  };
-  setState(next);
-  void persist(next);
+        ? imageHostState().selectedHostId || getEnabledHosts()[0]?.id || null
+        : imageHostState().selectedHostId,
+  });
 }
 
 export function setSelectedHostId(hostId: string | null): void {
-  const next = {
-    ...state(),
+  imageHostSetting.set({
+    ...imageHostState(),
     selectedHostId: hostId,
-  };
-  setState(next);
-  void persist(next);
+  });
 }
 
 export function updateHost(id: string, patch: Partial<Omit<ImageHost, "id" | "isBuiltIn">>): void {
   const next: ImageHostState = {
-    ...state(),
-    hosts: state().hosts.map((host) => {
+    ...imageHostState(),
+    hosts: imageHostState().hosts.map((host) => {
       if (host.id !== id) {
         return host;
       }
@@ -183,8 +192,7 @@ export function updateHost(id: string, patch: Partial<Omit<ImageHost, "id" | "is
       return Object.assign({}, host, patch, { edited });
     }),
   };
-  setState(next);
-  void persist(next);
+  imageHostSetting.set(next);
 }
 
 export function resetBuiltInHost(id: string): void {
@@ -193,33 +201,29 @@ export function resetBuiltInHost(id: string): void {
     return;
   }
 
-  const next: ImageHostState = {
-    ...state(),
-    hosts: state().hosts.map((host) => (host.id === id ? Object.assign({}, builtIn) : host)),
-  };
-  setState(next);
-  void persist(next);
+  imageHostSetting.set({
+    ...imageHostState(),
+    hosts: imageHostState().hosts.map((host) => (host.id === id ? Object.assign({}, builtIn) : host)),
+  });
 }
 
 export function resetAllBuiltInHosts(): void {
-  const custom = state().hosts.filter((h) => !h.isBuiltIn);
-  const next: ImageHostState = {
-    ...state(),
+  const custom = imageHostState().hosts.filter((h) => !h.isBuiltIn);
+  imageHostSetting.set({
+    ...imageHostState(),
     hosts: [...BUILT_IN_HOSTS.map((h) => Object.assign({}, h)), ...custom],
     probeResults: [],
     fastestHostId: null,
     fastestHostExpiresAt: null,
-  };
-  setState(next);
-  void persist(next);
+  });
 }
 
 export function addCustomHost(host: Omit<ImageHost, "id" | "isBuiltIn" | "edited">): void {
   const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const next: ImageHostState = {
-    ...state(),
+  imageHostSetting.set({
+    ...imageHostState(),
     hosts: [
-      ...state().hosts,
+      ...imageHostState().hosts,
       {
         ...host,
         id,
@@ -227,18 +231,14 @@ export function addCustomHost(host: Omit<ImageHost, "id" | "isBuiltIn" | "edited
         edited: true,
       },
     ],
-  };
-  setState(next);
-  void persist(next);
+  });
 }
 
 export function removeCustomHost(id: string): void {
-  const next: ImageHostState = {
-    ...state(),
-    hosts: state().hosts.filter((h) => h.id !== id),
-  };
-  setState(next);
-  void persist(next);
+  imageHostSetting.set({
+    ...imageHostState(),
+    hosts: imageHostState().hosts.filter((h) => h.id !== id),
+  });
 }
 
 export function setProbeResults(results: ProbeResult[]): void {
@@ -256,14 +256,12 @@ export function setProbeResults(results: ProbeResult[]): void {
   });
 
   const fastest = sorted.find((r) => r.reachable);
-  const next: ImageHostState = {
-    ...state(),
+  imageHostSetting.set({
+    ...imageHostState(),
     probeResults: sorted,
     fastestHostId: fastest?.hostId ?? null,
     fastestHostExpiresAt: fastest ? Date.now() + 30_000 : null,
-  };
-  setState(next);
-  void persist(next);
+  });
 }
 
 export function modeLabel(mode: ImageHostMode): string {
@@ -276,36 +274,27 @@ export function modeLabel(mode: ImageHostMode): string {
         : "单一图床";
 }
 
+/** 兼容存根：加载已持久化的图床设置（实际由 registry hydrate 管线处理） */
 export async function loadImageHostPreference(): Promise<void> {
-  const [err, result] = await tryAsync(Preferences.get({ key: PREF_KEY }));
-  if (err) {
-    console.warn("[imageHostStore] Failed to load preference", err);
-    setState(defaultState());
-  } else {
-    const { value } = result!;
-    if (value !== null) {
-      const parsed = JSON.parse(value);
-      setState(migrateLegacyState(parsed));
-    }
-  }
+  await imageHostSetting.hydrate();
 }
 
 export function isImageHostEnabled(): boolean {
-  return state().masterEnabled && state().hosts.some((h) => h.enabled);
+  return imageHostState().masterEnabled && imageHostState().hosts.some((h) => h.enabled);
 }
 
 /** 获取当前状态下用于图片加载的同步候选 URL（race/fastest-ip 模式可能回退到首个启用图床）。 */
 export function getEnabledHosts(): ImageHost[] {
-  return state().hosts.filter((h) => h.enabled);
+  return imageHostState().hosts.filter((h) => h.enabled);
 }
 
 export function getFastestHost(): ImageHost | undefined {
-  const { fastestHostId, fastestHostExpiresAt } = state();
+  const { fastestHostId, fastestHostExpiresAt } = imageHostState();
   if (!fastestHostId) {
     return undefined;
   }
   if (fastestHostExpiresAt && Date.now() > fastestHostExpiresAt) {
     return undefined;
   }
-  return state().hosts.find((h) => h.id === fastestHostId);
+  return imageHostState().hosts.find((h) => h.id === fastestHostId);
 }

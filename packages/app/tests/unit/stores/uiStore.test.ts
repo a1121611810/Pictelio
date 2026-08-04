@@ -1,14 +1,71 @@
 import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from "vitest";
-import { Capacitor } from "@capacitor/core";
-import { Preferences } from "@capacitor/preferences";
 
-vi.mock("@capacitor/core", () => ({
-  Capacitor: { getPlatform: vi.fn(), isNativePlatform: vi.fn(() => false) },
+// ── 注入式 Settings 实例 ──
+// uiStore（及依赖的 settingsStore / themeStore）使用模块级 settings 单例；
+// 测试通过 vi.resetModules() + vi.mock("@/settings")（返回用 createSettings +
+// createMemoryAdapter 构建的实例）隔离。断言方式从「Preferences.set 被调」改为
+// 「memory adapter dump 内容」。
+//
+// 时序约定：
+// - registry 的 write gate 初始为 cold，handle.set 只更新内存不落盘；
+//   warm()（hydrateAll）负责翻转 gate 并加载持久化值，等价 Phase 4 启动流程。
+// - 每次 setup(seed) 重建 settings 与 adapter（seed 用于预置持久化数据）。
+
+type TestAdapter = {
+  dump(): Map<string, string>;
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string): Promise<void>;
+  remove(key: string): Promise<void>;
+};
+
+const testState = vi.hoisted(() => ({
+  settings: undefined as { hydrateAll(): Promise<void> } | undefined,
+  primary: undefined as TestAdapter | undefined,
+  mirror: undefined as TestAdapter | undefined,
 }));
 
-vi.mock("@capacitor/preferences", () => ({
-  Preferences: { get: vi.fn(), set: vi.fn() },
-}));
+vi.mock("@/settings", async () => {
+  const { createSettings } = await import("@/settings/registry");
+  const { createMemoryAdapter } = await import("@/settings/backends/memory");
+  const { createMirroredAdapter } = await import("@/settings/backends/mirrored");
+  return {
+    get settings() {
+      return testState.settings;
+    },
+    __test: {
+      install(seed: Record<string, string> = {}) {
+        const primary = createMemoryAdapter(seed);
+        const mirror = createMemoryAdapter();
+        const settings = createSettings({
+          storages: {
+            preferences: primary,
+            localStorage: mirror,
+            mirrored: createMirroredAdapter(primary, mirror),
+          },
+          defaultStorage: "preferences",
+        });
+        testState.settings = settings;
+        testState.primary = primary;
+        testState.mirror = mirror;
+      },
+      get primary() {
+        return testState.primary;
+      },
+      get mirror() {
+        return testState.mirror;
+      },
+    },
+  };
+});
+
+type TestMod = {
+  settings: { hydrateAll(): Promise<void> };
+  __test: {
+    install(seed?: Record<string, string>): void;
+    readonly primary: TestAdapter;
+    readonly mirror: TestAdapter;
+  };
+};
 
 let originalDocument: unknown;
 
@@ -19,128 +76,76 @@ beforeAll(() => {
       classList: { add: vi.fn(), remove: vi.fn(), toggle: vi.fn() },
     },
   };
-  // Mock window.matchMedia for theme system
-  vi.stubGlobal("window", {
-    matchMedia: () => ({
-      matches: false,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    }),
-  });
-  // Mock localStorage for theme persistence dual-write
-  const store: Record<string, string> = {};
-  vi.stubGlobal("localStorage", {
-    getItem: vi.fn((key: string) => store[key] ?? null),
-    setItem: vi.fn((key: string, value: string) => {
-      store[key] = value;
-    }),
-    removeItem: vi.fn((key: string) => {
-      delete store[key];
-    }),
-    clear: vi.fn(() => {
-      Object.keys(store).forEach((k) => delete store[k]);
-    }),
-    get length() {
-      return Object.keys(store).length;
-    },
-    key: vi.fn((index: number) => Object.keys(store)[index] ?? null),
-  });
 });
 
 afterAll(() => {
   (globalThis as any).document = originalDocument;
 });
 
-/** 原 loadStore 已废弃 — settings 相关测试使用 loadSettingsStore，ui 相关使用 loadBothStores */
-
-async function loadSettingsStore() {
-  vi.resetModules();
-  const mod = await import("@/stores/settingsStore");
-  return mod;
-}
-
-async function loadBothStores() {
-  vi.resetModules();
+/** 重建模块并注入新 settings 实例（seed 预置持久化数据）；返回 uiStore + settingsStore 导出 */
+async function setup(seed: Record<string, string> = {}) {
+  const mod = (await import("@/settings")) as unknown as TestMod;
+  mod.__test.install(seed);
   const uiMod = await import("@/stores/uiStore");
   const settingsMod = await import("@/stores/settingsStore");
-  return { ...uiMod, ...settingsMod };
+  return { mod, ...uiMod, ...settingsMod };
 }
 
-describe("age preference", () => {
-  beforeEach(() => {
-    (globalThis as any).window = { dispatchEvent: vi.fn() };
-    (globalThis as any).CustomEvent = class CustomEvent {
-      constructor(public type: string) {}
-    };
-    vi.mocked(Preferences.set).mockResolvedValue(undefined);
-  });
+/** 打开 write gate 并加载持久化值（模拟 Phase 4 启动流程中的 hydrateAll 调用） */
+async function warm(mod: TestMod): Promise<void> {
+  await mod.settings.hydrateAll();
+}
 
+beforeEach(() => {
+  vi.resetModules();
+  (globalThis as any).window = {
+    dispatchEvent: vi.fn(),
+    matchMedia: () => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }),
+  };
+  (globalThis as any).CustomEvent = class CustomEvent {
+    constructor(public type: string) {}
+  };
+});
+
+describe("age preference", () => {
   it("defaults ageConfirmed and isAdult to false", async () => {
-    const { ageConfirmed, isAdult } = await loadSettingsStore();
+    const { ageConfirmed, isAdult } = await setup();
 
     expect(ageConfirmed()).toBe(false);
     expect(isAdult()).toBe(false);
   });
 
-  it("loading persisted minor state forces showR18 and showR18G to false", async () => {
-    vi.mocked(Preferences.get).mockImplementation(async ({ key }) => {
-      if (key === "age_confirmed") {
-        return { value: "true" };
-      }
-      if (key === "is_adult") {
-        return { value: "false" };
-      }
-      return { value: null };
+  it("hydrateAll 恢复 minor 状态时强制关 R18/R18G", async () => {
+    const { mod, showR18, showR18G } = await setup({
+      age_confirmed: "true",
+      is_adult: "false",
     });
-
-    const { loadAgePreference, setShowR18, setShowR18G, showR18, showR18G } =
-      await loadSettingsStore();
-    await setShowR18(true);
-    await setShowR18G(true);
-    await loadAgePreference();
+    await warm(mod);
 
     expect(showR18()).toBe(false);
     expect(showR18G()).toBe(false);
-    expect(Preferences.set).toHaveBeenCalledWith({
-      key: "show_r18",
-      value: "false",
-    });
-    expect(Preferences.set).toHaveBeenCalledWith({
-      key: "show_r18g",
-      value: "false",
-    });
   });
 
-  it("loading persisted adult state leaves showR18 and showR18G as persisted", async () => {
-    vi.mocked(Preferences.get).mockImplementation(async ({ key }) => {
-      if (key === "age_confirmed") {
-        return { value: "true" };
-      }
-      if (key === "is_adult") {
-        return { value: "true" };
-      }
-      if (key === "show_r18") {
-        return { value: "true" };
-      }
-      if (key === "show_r18g") {
-        return { value: "true" };
-      }
-      return { value: null };
+  it("hydrateAll 恢复 adult 状态时保留持久化的 R18/R18G", async () => {
+    const { mod, showR18, showR18G } = await setup({
+      age_confirmed: "true",
+      is_adult: "true",
+      show_r18: "true",
+      show_r18g: "true",
     });
-
-    const { loadAgePreference, loadShowR18Preference, loadShowR18GPreference, showR18, showR18G } =
-      await loadSettingsStore();
-    await loadShowR18Preference();
-    await loadShowR18GPreference();
-    await loadAgePreference();
+    await warm(mod);
 
     expect(showR18()).toBe(true);
     expect(showR18G()).toBe(true);
   });
 
   it("setAgeConfirmation(true, false) sets minor and disables adult content", async () => {
-    const { setAgeConfirmation, ageConfirmed, isAdult, showR18, showR18G } =
-      await loadSettingsStore();
+    const { mod, setAgeConfirmation, ageConfirmed, isAdult, showR18, showR18G } = await setup();
+    await warm(mod);
 
     await setAgeConfirmation(true, false);
 
@@ -148,54 +153,35 @@ describe("age preference", () => {
     expect(isAdult()).toBe(false);
     expect(showR18()).toBe(false);
     expect(showR18G()).toBe(false);
-    expect(Preferences.set).toHaveBeenCalledWith({
-      key: "age_confirmed",
-      value: "true",
-    });
-    expect(Preferences.set).toHaveBeenCalledWith({
-      key: "is_adult",
-      value: "false",
-    });
-    expect(Preferences.set).toHaveBeenCalledWith({
-      key: "show_r18",
-      value: "false",
-    });
-    expect(Preferences.set).toHaveBeenCalledWith({
-      key: "show_r18g",
-      value: "false",
+    await vi.waitFor(() => {
+      const dump = mod.__test.primary.dump();
+      expect(dump.get("age_confirmed")).toBe("true");
+      expect(dump.get("is_adult")).toBe("false");
+      expect(dump.get("show_r18")).toBe("false");
+      expect(dump.get("show_r18g")).toBe("false");
     });
   });
 
   it("setAgeConfirmation(true, true) sets adult", async () => {
-    const { setAgeConfirmation, ageConfirmed, isAdult } = await loadSettingsStore();
+    const { mod, setAgeConfirmation, ageConfirmed, isAdult } = await setup();
+    await warm(mod);
 
     await setAgeConfirmation(true, true);
 
     expect(ageConfirmed()).toBe(true);
     expect(isAdult()).toBe(true);
-    expect(Preferences.set).toHaveBeenCalledWith({
-      key: "age_confirmed",
-      value: "true",
-    });
-    expect(Preferences.set).toHaveBeenCalledWith({
-      key: "is_adult",
-      value: "true",
+    await vi.waitFor(() => {
+      const dump = mod.__test.primary.dump();
+      expect(dump.get("age_confirmed")).toBe("true");
+      expect(dump.get("is_adult")).toBe("true");
     });
   });
 });
 
 describe("resetUiStore", () => {
-  beforeEach(() => {
-    (globalThis as any).window = { dispatchEvent: vi.fn() };
-    (globalThis as any).CustomEvent = class CustomEvent {
-      constructor(public type: string) {}
-    };
-    vi.mocked(Capacitor.getPlatform).mockReturnValue("web");
-    vi.mocked(Preferences.set).mockResolvedValue(undefined);
-  });
-
   it("resets all ui signals to defaults and persists preferences", async () => {
     const {
+      mod,
       resetUiStore,
       setShowR18,
       setShowR18G,
@@ -213,7 +199,8 @@ describe("resetUiStore", () => {
       imageCacheDisk,
       imageCacheBrowser,
       imageCachePrefetch,
-    } = await loadBothStores();
+    } = await setup();
+    await warm(mod);
 
     await setShowR18(true);
     await setShowR18G(true);
@@ -234,68 +221,46 @@ describe("resetUiStore", () => {
     expect(imageCacheDisk()).toBe(true);
     expect(imageCacheBrowser()).toBe(true);
     expect(imageCachePrefetch()).toBe(true);
-    expect(Preferences.set).toHaveBeenCalledWith({
-      key: "show_r18",
-      value: "false",
-    });
-    expect(Preferences.set).toHaveBeenCalledWith({
-      key: "show_r18g",
-      value: "false",
-    });
-    expect(Preferences.set).toHaveBeenCalledWith({
-      key: "layout_mode",
-      value: "waterfall",
-    });
-    expect(Preferences.set).toHaveBeenCalledWith({
-      key: "auto_hide_nav_bar",
-      value: "true",
-    });
-    expect(Preferences.set).toHaveBeenCalledWith({
-      key: "show_detail_stairs",
-      value: "false",
-    });
-    expect(Preferences.set).toHaveBeenCalledWith({
-      key: "age_confirmed",
-      value: "false",
-    });
-    expect(Preferences.set).toHaveBeenCalledWith({
-      key: "is_adult",
-      value: "false",
+    await vi.waitFor(() => {
+      const dump = mod.__test.primary.dump();
+      expect(dump.get("show_r18")).toBe("false");
+      expect(dump.get("show_r18g")).toBe("false");
+      expect(dump.get("layout_mode")).toBe("waterfall");
+      expect(dump.get("auto_hide_nav_bar")).toBe("true");
+      expect(dump.get("show_detail_stairs")).toBe("false");
+      expect(dump.get("age_confirmed")).toBe("false");
+      expect(dump.get("is_adult")).toBe("false");
     });
   });
 
   describe("contentType", () => {
     it("defaults to illust", async () => {
-      const { contentType } = await loadBothStores();
+      const { contentType } = await setup();
       expect(contentType()).toBe("illust");
     });
 
     it("persists and updates on setContentType", async () => {
-      const { contentType, setContentType } = await loadBothStores();
+      const { mod, contentType, setContentType } = await setup();
+      await warm(mod);
       await setContentType("novel");
       expect(contentType()).toBe("novel");
-      expect(Preferences.set).toHaveBeenCalledWith({
-        key: "content_type",
-        value: "novel",
-      });
+      await vi.waitFor(() => expect(mod.__test.primary.dump().get("content_type")).toBe("novel"));
     });
 
-    it("loads persisted contentType via loadContentTypePreference", async () => {
-      vi.mocked(Preferences.get).mockResolvedValue({ value: "novel" });
-      const { contentType, loadContentTypePreference } = await loadBothStores();
-      await loadContentTypePreference();
+    it("hydrateAll 恢复持久化的 contentType", async () => {
+      const { mod, contentType } = await setup({ content_type: "novel" });
+      await warm(mod);
       expect(contentType()).toBe("novel");
     });
 
     it("ignores invalid persisted values", async () => {
-      vi.mocked(Preferences.get).mockResolvedValue({ value: "invalid" });
-      const { contentType, loadContentTypePreference } = await loadBothStores();
-      await loadContentTypePreference();
+      const { mod, contentType } = await setup({ content_type: "invalid" });
+      await warm(mod);
       expect(contentType()).toBe("illust"); // Default unchanged
     });
 
     it("dispatches contentTypeChanged event", async () => {
-      const { setContentType } = await loadBothStores();
+      const { setContentType } = await setup();
       const dispatchSpy = vi.fn();
       const origDispatch = window.dispatchEvent;
       window.dispatchEvent = dispatchSpy;
@@ -309,62 +274,53 @@ describe("resetUiStore", () => {
 });
 
 describe("lastDismissedVersion", () => {
-  beforeEach(() => {
-    vi.mocked(Preferences.set).mockResolvedValue(undefined);
-  });
-
   it("defaults to empty string", async () => {
-    const { lastDismissedVersion } = await loadSettingsStore();
+    const { lastDismissedVersion } = await setup();
     expect(lastDismissedVersion()).toBe("");
   });
 
   it("setLastDismissedVersion updates state and persists", async () => {
-    const { setLastDismissedVersion, lastDismissedVersion } = await loadSettingsStore();
+    const { mod, setLastDismissedVersion, lastDismissedVersion } = await setup();
+    await warm(mod);
     await setLastDismissedVersion("1.2.3");
     expect(lastDismissedVersion()).toBe("1.2.3");
-    expect(Preferences.set).toHaveBeenCalledWith({
-      key: "dismissed_update_version",
-      value: "1.2.3",
-    });
+    await vi.waitFor(() =>
+      expect(mod.__test.primary.dump().get("dismissed_update_version")).toBe("1.2.3"),
+    );
   });
 
-  it("loadLastDismissedVersionPreference restores persisted value", async () => {
-    vi.mocked(Preferences.get).mockResolvedValue({ value: "2.0.0" });
-    const { loadLastDismissedVersionPreference, lastDismissedVersion } = await loadSettingsStore();
-    await loadLastDismissedVersionPreference();
+  it("hydrateAll 恢复持久化值", async () => {
+    const { mod, lastDismissedVersion } = await setup({ dismissed_update_version: "2.0.0" });
+    await warm(mod);
     expect(lastDismissedVersion()).toBe("2.0.0");
-    expect(Preferences.get).toHaveBeenCalledWith({ key: "dismissed_update_version" });
   });
 
-  it("loadLastDismissedVersionPreference leaves default when no persisted value", async () => {
-    vi.mocked(Preferences.get).mockResolvedValue({ value: null });
-    const { loadLastDismissedVersionPreference, lastDismissedVersion } = await loadSettingsStore();
-    await loadLastDismissedVersionPreference();
+  it("hydrateAll leaves default when no persisted value", async () => {
+    const { mod, lastDismissedVersion } = await setup();
+    await warm(mod);
     expect(lastDismissedVersion()).toBe("");
   });
 
   it("resetUiStore clears lastDismissedVersion and persists", async () => {
-    vi.mocked(Capacitor.getPlatform).mockReturnValue("web");
-    vi.mocked(Preferences.set).mockResolvedValue(undefined);
-    const { setLastDismissedVersion, resetUiStore, lastDismissedVersion } = await loadBothStores();
+    const { mod, setLastDismissedVersion, resetUiStore, lastDismissedVersion } = await setup();
+    await warm(mod);
     await setLastDismissedVersion("1.0.0");
     await resetUiStore();
     expect(lastDismissedVersion()).toBe("");
-    expect(Preferences.set).toHaveBeenCalledWith({
-      key: "dismissed_update_version",
-      value: "",
-    });
+    await vi.waitFor(() =>
+      expect(mod.__test.primary.dump().get("dismissed_update_version")).toBe(""),
+    );
   });
 });
 
 describe("showUpdateDialog", () => {
   it("defaults to false", async () => {
-    const { showUpdateDialog } = await loadSettingsStore();
+    const { showUpdateDialog } = await setup();
     expect(showUpdateDialog()).toBe(false);
   });
 
   it("can be toggled via setShowUpdateDialog", async () => {
-    const { setShowUpdateDialog, showUpdateDialog } = await loadSettingsStore();
+    const { setShowUpdateDialog, showUpdateDialog } = await setup();
     setShowUpdateDialog(true);
     expect(showUpdateDialog()).toBe(true);
     setShowUpdateDialog(false);
@@ -373,42 +329,30 @@ describe("showUpdateDialog", () => {
 });
 
 describe("novelLayoutMode", () => {
-  beforeEach(() => {
-    vi.mocked(Capacitor.getPlatform).mockReturnValue("web");
-    vi.mocked(Preferences.set).mockResolvedValue(undefined);
-    vi.mocked(Preferences.get).mockResolvedValue({ value: null });
-    (globalThis as any).window = { dispatchEvent: vi.fn() };
-    (globalThis as any).CustomEvent = class CustomEvent {
-      constructor(public type: string) {}
-    };
-  });
-
   it("defaults to list", async () => {
-    const { novelLayoutMode } = await loadSettingsStore();
+    const { novelLayoutMode } = await setup();
     expect(novelLayoutMode()).toBe("list");
   });
 
   it("persists textList", async () => {
-    const { setNovelLayoutMode, novelLayoutMode } = await loadSettingsStore();
+    const { mod, setNovelLayoutMode, novelLayoutMode } = await setup();
+    await warm(mod);
     await setNovelLayoutMode("textList");
     expect(novelLayoutMode()).toBe("textList");
-    expect(Preferences.set).toHaveBeenCalledWith({
-      key: "novel_layout_mode",
-      value: "textList",
-    });
+    await vi.waitFor(() =>
+      expect(mod.__test.primary.dump().get("novel_layout_mode")).toBe("textList"),
+    );
   });
 
-  it("loads persisted textList", async () => {
-    vi.mocked(Preferences.get).mockResolvedValue({ value: "textList" });
-    const { loadNovelLayoutModePreference, novelLayoutMode } = await loadSettingsStore();
-    await loadNovelLayoutModePreference();
+  it("hydrateAll 恢复持久化的 textList", async () => {
+    const { mod, novelLayoutMode } = await setup({ novel_layout_mode: "textList" });
+    await warm(mod);
     expect(novelLayoutMode()).toBe("textList");
   });
 
   it("ignores invalid persisted values", async () => {
-    vi.mocked(Preferences.get).mockResolvedValue({ value: "invalid" });
-    const { loadNovelLayoutModePreference, novelLayoutMode } = await loadSettingsStore();
-    await loadNovelLayoutModePreference();
+    const { mod, novelLayoutMode } = await setup({ novel_layout_mode: "invalid" });
+    await warm(mod);
     expect(novelLayoutMode()).toBe("list");
   });
 });

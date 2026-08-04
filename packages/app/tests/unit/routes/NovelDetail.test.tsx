@@ -176,6 +176,20 @@ vi.mock("@/utils/novelImageDimensions", () => ({
   loadNovelImageDimensions: () => Promise.resolve({}),
 }));
 
+// 注入式 settings mock：进度存储走 memory adapter，避免依赖真实 Capacitor/localStorage 单例
+vi.mock("@/settings", async () => {
+  const { createSettings } = await import("@/settings/registry");
+  const { createMemoryAdapter } = await import("@/settings/backends/memory");
+  const { jsonCodec } = await import("@/settings/codecs");
+  const mem = createMemoryAdapter();
+  const settings = createSettings({
+    storages: { preferences: mem, localStorage: mem, mirrored: mem },
+    defaultStorage: "localStorage",
+  });
+  void settings.hydrateAll();
+  return { settings, jsonCodec };
+});
+
 globalThis.ResizeObserver = vi.fn(function ResizeObserver() {
   return {
     observe: vi.fn(),

@@ -1,19 +1,38 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { Preferences } from "@capacitor/preferences";
+import { describe, it, expect, vi } from "vitest";
+import type { Settings } from "@/settings/registry";
 
-vi.mock("@capacitor/preferences", () => ({
-  Preferences: { get: vi.fn(), set: vi.fn() },
+
+const mockState = vi.hoisted(() => ({
+  current: null as Settings | null,
 }));
 
-async function loadStore() {
+vi.mock("@/settings", () => ({
+  get settings() {
+    return mockState.current;
+  },
+  jsonCodec: {
+    encode: (v: unknown) => JSON.stringify(v),
+    decode: (raw: string) => JSON.parse(raw),
+  },
+}));
+
+async function loadStore(seed: Record<string, string> = {}) {
   vi.resetModules();
+  const { createSettings } = await import("@/settings/registry");
+  const { createMemoryAdapter } = await import("@/settings/backends/memory");
+  const mem = createMemoryAdapter(seed);
+  const settings = createSettings({
+    storages: { preferences: mem, memory: mem },
+    defaultStorage: "preferences",
+  });
+  mockState.current = settings;
   const mod = await import("@/stores/imageHostStore");
-  return mod;
+  await settings.hydrateAll();
+  return { ...mod, mem };
 }
 
 describe("imageHostStore defaults", () => {
   it("defaults to disabled with weighted mode and built-in hosts", async () => {
-    vi.mocked(Preferences.get).mockResolvedValue({ value: null });
     const {
       imageHostState,
       isImageHostEnabled,
@@ -33,8 +52,8 @@ describe("imageHostStore defaults", () => {
   });
 
   it("loads persisted state", async () => {
-    vi.mocked(Preferences.get).mockResolvedValue({
-      value: JSON.stringify({
+    const { imageHostState, loadImageHostPreference } = await loadStore({
+      image_host_settings: JSON.stringify({
         masterEnabled: true,
         mode: "race",
         hosts: [
@@ -53,8 +72,6 @@ describe("imageHostStore defaults", () => {
         fastestHostExpiresAt: null,
       }),
     });
-
-    const { imageHostState, loadImageHostPreference } = await loadStore();
     await loadImageHostPreference();
 
     expect(imageHostState().masterEnabled).toBe(true);
@@ -63,8 +80,8 @@ describe("imageHostStore defaults", () => {
   });
 
   it("migrates legacy state and restores missing built-in hosts", async () => {
-    vi.mocked(Preferences.get).mockResolvedValue({
-      value: JSON.stringify({
+    const { imageHostState, loadImageHostPreference, BUILT_IN_HOSTS } = await loadStore({
+      image_host_settings: JSON.stringify({
         masterEnabled: true,
         mode: "fastest-ip",
         hosts: [
@@ -80,26 +97,29 @@ describe("imageHostStore defaults", () => {
         fastestHostExpiresAt: Date.now() + 10_000,
       }),
     });
-
-    const { imageHostState, loadImageHostPreference, BUILT_IN_HOSTS } = await loadStore();
     await loadImageHostPreference();
 
     expect(imageHostState().hosts).toHaveLength(1 + BUILT_IN_HOSTS.length);
     expect(imageHostState().fastestHostId).toBe("custom-1");
   });
+
+  it("falls back to defaults on corrupt data", async () => {
+    const { imageHostState, BUILT_IN_HOSTS } = await loadStore({
+      image_host_settings: "not-json",
+    });
+
+    expect(imageHostState().masterEnabled).toBe(false);
+    expect(imageHostState().hosts).toHaveLength(BUILT_IN_HOSTS.length);
+  });
 });
 
 describe("imageHostStore mutations", () => {
-  beforeEach(() => {
-    vi.mocked(Preferences.get).mockResolvedValue({ value: null });
-    vi.mocked(Preferences.set).mockResolvedValue(undefined);
-  });
-
   it("setMasterEnabled toggles and persists", async () => {
-    const { setMasterEnabled, imageHostState } = await loadStore();
+    const { setMasterEnabled, imageHostState, mem } = await loadStore();
     setMasterEnabled(true);
     expect(imageHostState().masterEnabled).toBe(true);
-    expect(Preferences.set).toHaveBeenCalled();
+    const stored = JSON.parse(mem.dump().get("image_host_settings") ?? "{}");
+    expect(stored.masterEnabled).toBe(true);
   });
 
   it("setMode updates mode and clears fastest host cache", async () => {
@@ -180,11 +200,6 @@ describe("imageHostStore mutations", () => {
 });
 
 describe("imageHostStore probe results", () => {
-  beforeEach(() => {
-    vi.mocked(Preferences.get).mockResolvedValue({ value: null });
-    vi.mocked(Preferences.set).mockResolvedValue(undefined);
-  });
-
   it("setProbeResults sorts by reachability and latency", async () => {
     const { setProbeResults, imageHostState } = await loadStore();
     setProbeResults([

@@ -1,135 +1,157 @@
 // @vitest-environment happy-dom
+/**
+ * settingsStore 单元测试 —— 注入式（memory adapter）。
+ *
+ * settingsStore 使用模块级单例 settings（@/settings）；测试通过 getter mock
+ * （每次访问返回最新 mockState.current）+ 每次 loadStore 重建 settings 实例，
+ * 规避 vi.mock factory 只执行一次导致的 duplicate key。
+ */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Settings } from "@/settings/types";
+import type { createMemoryAdapter } from "@/settings/backends/memory";
 
-// ── Mock Preferences ──
-const mockGet = vi.fn<() => Promise<{ value: string | null }>>();
-const mockSet = vi.fn<() => Promise<void>>();
-vi.mock("@capacitor/preferences", () => ({
-  Preferences: {
-    get: (...args: unknown[]) => mockGet(...args),
-    set: (...args: unknown[]) => mockSet(...args),
+type MemoryAdapter = ReturnType<typeof createMemoryAdapter>;
+
+const mockState = vi.hoisted(() => ({
+  current: null as Settings | null,
+  failWrite: false,
+  failRead: false,
+}));
+
+vi.mock("@/settings", () => ({
+  get settings() {
+    return mockState.current;
   },
 }));
 
-// ── 被测试模块 ──
-import {
-  layoutMode,
-  setLayoutMode,
-  loadLayoutModePreference,
-  ugoiraMode,
-  setUgoiraMode,
-  loadUgoiraModePreference,
-} from "@/stores/settingsStore";
+async function loadStore(seed: Record<string, string> = {}) {
+  vi.resetModules();
+  mockState.failWrite = false;
+  mockState.failRead = false;
+  const { createSettings } = await import("@/settings/registry");
+  const { createMemoryAdapter } = await import("@/settings/backends/memory");
+  const base = createMemoryAdapter(seed);
+  const mem: MemoryAdapter = {
+    ...base,
+    async set(key, value) {
+      if (mockState.failWrite) throw new Error("storage full");
+      return base.set(key, value);
+    },
+    async get(key) {
+      if (mockState.failRead) throw new Error("corrupted storage");
+      return base.get(key);
+    },
+  };
+  const settings = createSettings({ storages: { preferences: mem } });
+  mockState.current = settings;
+  const store = await import("@/stores/settingsStore");
+  await settings.hydrateAll();
+  return { store, mem };
+}
 
 describe("settingsStore — setLayoutMode", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it("成功路径：更新 state + 持久化 + 派发事件", async () => {
-    mockSet.mockResolvedValue(undefined);
+    const { store, mem } = await loadStore();
     const events: string[] = [];
     const handler = (e: Event) => events.push(e.type);
     window.addEventListener("layoutModeChanged", handler);
 
-    await setLayoutMode("single");
+    await store.setLayoutMode("single");
 
-    expect(layoutMode()).toBe("single");
-    expect(mockSet).toHaveBeenCalledWith({ key: "layout_mode", value: "single" });
+    expect(store.layoutMode()).toBe("single");
+    await vi.waitFor(() => expect(mem.dump().get("layout_mode")).toBe("single"));
     expect(events).toContain("layoutModeChanged");
     window.removeEventListener("layoutModeChanged", handler);
   });
 
-  it("Preferences.set 失败 → state 已更新，不抛异常", async () => {
-    mockSet.mockRejectedValue(new Error("storage full"));
+  it("持久化失败 → state 已更新，不抛异常，仅 warn", async () => {
+    const { store } = await loadStore();
+    mockState.failWrite = true;
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    await expect(setLayoutMode("grid")).resolves.toBeUndefined();
-    expect(layoutMode()).toBe("grid");
-    expect(warnSpy).toHaveBeenCalledWith(
-      "[settingsStore] Failed to persist layoutMode",
-      expect.any(Error),
-    );
+    await expect(store.setLayoutMode("grid")).resolves.toBeUndefined();
+    expect(store.layoutMode()).toBe("grid");
+    await vi.waitFor(() => expect(warnSpy).toHaveBeenCalled());
 
     warnSpy.mockRestore();
   });
 });
 
-describe("settingsStore — loadLayoutModePreference", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+describe("settingsStore — hydrateAll 加载恢复", () => {
+  it("有效值 → 恢复 state", async () => {
+    const { store } = await loadStore({ layout_mode: "single" });
+    expect(store.layoutMode()).toBe("single");
   });
 
-  it("成功路径：加载有效值 → 更新 state", async () => {
-    mockGet.mockResolvedValue({ value: "waterfall" });
-
-    await loadLayoutModePreference();
-
-    expect(layoutMode()).toBe("waterfall");
+  it("无记录 → state 保持默认", async () => {
+    const { store } = await loadStore();
+    expect(store.layoutMode()).toBe("waterfall");
   });
 
-  it("Preferences 返回 null → state 保持默认", async () => {
-    mockGet.mockResolvedValue({ value: null });
-
-    await loadLayoutModePreference();
-
-    expect(layoutMode()).toBe("waterfall"); // 默认值
+  it("无效值 → state 保持默认", async () => {
+    const { store } = await loadStore({ layout_mode: "invalid-mode" });
+    expect(store.layoutMode()).toBe("waterfall");
   });
 
-  it("Preferences 返回无效值 → state 保持默认", async () => {
-    mockGet.mockResolvedValue({ value: "invalid-mode" });
-
-    await loadLayoutModePreference();
-
-    expect(layoutMode()).toBe("waterfall");
-  });
-
-  it("Preferences.get 失败 → state 保持默认，不抛异常", async () => {
-    mockGet.mockRejectedValue(new Error("corrupted storage"));
+  it("读取失败 → 保持当前值，仅 warn（读失败不清空内存）", async () => {
+    // 先正常加载（layout_mode=single），再让 get 失败后 hydrate（保持已恢复的值）
+    const { store } = await loadStore({ layout_mode: "single" });
+    mockState.failRead = true;
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await mockState.current!.get("layout_mode")!.hydrate();
 
-    await expect(loadLayoutModePreference()).resolves.toBeUndefined();
-    expect(layoutMode()).toBe("waterfall");
-    expect(warnSpy).toHaveBeenCalledWith(
-      "[settingsStore] Failed to load layoutMode preference",
-      expect.any(Error),
-    );
+    expect(store.layoutMode()).toBe("single");
+    await vi.waitFor(() => expect(warnSpy).toHaveBeenCalled());
 
     warnSpy.mockRestore();
   });
 });
 
-// ── T3：动图播放方案（ugoiraMode） ──
 describe("settingsStore — ugoiraMode", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("默认 fflate", () => {
-    expect(ugoiraMode()).toBe("fflate");
+  it("默认 fflate", async () => {
+    const { store } = await loadStore();
+    expect(store.ugoiraMode()).toBe("fflate");
   });
 
   it("setUgoiraMode 更新 state + 持久化", async () => {
-    mockSet.mockResolvedValue(undefined);
-    await setUgoiraMode("range");
-    expect(ugoiraMode()).toBe("range");
-    expect(mockSet).toHaveBeenCalledWith({
-      key: "settings_ugoira_mode",
-      value: "range",
+    const { store, mem } = await loadStore();
+    await store.setUgoiraMode("range");
+    expect(store.ugoiraMode()).toBe("range");
+    await vi.waitFor(() => expect(mem.dump().get("settings_ugoira_mode")).toBe("range"));
+  });
+
+  it("hydrateAll 恢复合法值", async () => {
+    const { store } = await loadStore({ settings_ugoira_mode: "range" });
+    expect(store.ugoiraMode()).toBe("range");
+  });
+
+  it("非法值忽略（保持默认）", async () => {
+    const { store } = await loadStore({ settings_ugoira_mode: "bogus" });
+    expect(store.ugoiraMode()).toBe("fflate");
+  });
+});
+
+describe("settingsStore — 年龄确认联动", () => {
+  it("setAgeConfirmation(true, false)：非成人强制关闭 R18/R18G 并持久化", async () => {
+    const { store, mem } = await loadStore();
+    await store.setAgeConfirmation(true, false);
+
+    expect(store.ageConfirmed()).toBe(true);
+    expect(store.isAdult()).toBe(false);
+    expect(store.showR18()).toBe(false);
+    expect(store.showR18G()).toBe(false);
+    await vi.waitFor(() => {
+      const dump = mem.dump();
+      expect(dump.get("age_confirmed")).toBe("true");
+      expect(dump.get("is_adult")).toBe("false");
+      expect(dump.get("show_r18")).toBe("false");
+      expect(dump.get("show_r18g")).toBe("false");
     });
   });
 
-  it("loadUgoiraModePreference：读取合法值恢复", async () => {
-    mockGet.mockResolvedValue({ value: "range" });
-    await loadUgoiraModePreference();
-    expect(ugoiraMode()).toBe("range");
-  });
-
-  it("loadUgoiraModePreference：非法值忽略（保持当前值）", async () => {
-    mockSet.mockResolvedValue(undefined);
-    await setUgoiraMode("fflate"); // 重置为默认（模块级 state 跨用例残留）
-    mockGet.mockResolvedValue({ value: "bogus" });
-    await loadUgoiraModePreference();
-    expect(ugoiraMode()).toBe("fflate");
+  it("hydrateAll 恢复 isAdult=false 时强制关闭 R18", async () => {
+    const { store } = await loadStore({ is_adult: "false" });
+    expect(store.isAdult()).toBe(false);
+    expect(store.showR18()).toBe(false);
   });
 });

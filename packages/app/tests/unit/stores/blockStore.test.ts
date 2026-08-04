@@ -1,34 +1,52 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { Preferences } from "@capacitor/preferences";
+import { describe, it, expect, vi } from "vitest";
+import type { Settings } from "@/settings/registry";
 
-vi.mock("@capacitor/preferences", () => ({
-  Preferences: { get: vi.fn(), set: vi.fn() },
+
+const mockState = vi.hoisted(() => ({
+  current: null as Settings | null,
 }));
 
-async function loadStore() {
+vi.mock("@/settings", () => ({
+  get settings() {
+    return mockState.current;
+  },
+  jsonCodec: {
+    encode: (v: unknown) => JSON.stringify(v),
+    decode: (raw: string) => JSON.parse(raw),
+  },
+}));
+
+async function loadStore(seed: Record<string, string> = {}) {
   vi.resetModules();
+  const { createSettings } = await import("@/settings/registry");
+  const { createMemoryAdapter } = await import("@/settings/backends/memory");
+  const mem = createMemoryAdapter(seed);
+  const settings = createSettings({
+    storages: { preferences: mem, memory: mem },
+    defaultStorage: "preferences",
+  });
+  mockState.current = settings;
   const mod = await import("@/stores/blockStore");
-  return mod;
+  await settings.hydrateAll();
+  return { ...mod, mem };
 }
 
 describe("blockStore", () => {
-  it("loads blocked ids from Preferences", async () => {
-    vi.mocked(Preferences.get).mockResolvedValue({
-      value: JSON.stringify([111, 222]),
+  it("loads blocked ids from storage", async () => {
+    const { loadBlockedIds, blockedIds, isBlocked } = await loadStore({
+      blocked_user_ids: JSON.stringify([111, 222]),
     });
-
-    const { loadBlockedIds, blockedIds, isBlocked } = await loadStore();
-    await loadBlockedIds();
 
     expect(isBlocked(111)).toBe(true);
     expect(isBlocked(222)).toBe(true);
     expect(isBlocked(333)).toBe(false);
     expect(blockedIds().size).toBe(2);
+
+    await loadBlockedIds();
+    expect(blockedIds().size).toBe(2);
   });
 
   it("handles missing preference gracefully", async () => {
-    vi.mocked(Preferences.get).mockResolvedValue({ value: null });
-
     const { loadBlockedIds, blockedIds, isBlocked } = await loadStore();
     await loadBlockedIds();
 
@@ -37,73 +55,59 @@ describe("blockStore", () => {
   });
 
   it("blocks a user and persists the id", async () => {
-    vi.mocked(Preferences.get).mockResolvedValue({ value: null });
-    vi.mocked(Preferences.set).mockResolvedValue(undefined);
-
-    const { loadBlockedIds, blockUser, isBlocked } = await loadStore();
-    await loadBlockedIds();
+    const { blockUser, isBlocked, mem } = await loadStore();
     await blockUser(111);
 
     expect(isBlocked(111)).toBe(true);
-    expect(Preferences.set).toHaveBeenCalledWith({
-      key: "blocked_user_ids",
-      value: JSON.stringify([111]),
-    });
+    expect(mem.dump().get("blocked_user_ids")).toBe(JSON.stringify([111]));
   });
 
   it("does not block the same user twice", async () => {
-    vi.mocked(Preferences.get).mockResolvedValue({ value: null });
-    vi.mocked(Preferences.set).mockResolvedValue(undefined);
-
-    const { loadBlockedIds, blockUser, blockedIds } = await loadStore();
-    await loadBlockedIds();
+    const { blockUser, blockedIds, mem } = await loadStore();
     await blockUser(111);
     await blockUser(111);
 
     expect(blockedIds().size).toBe(1);
-    expect(Preferences.set).toHaveBeenCalledTimes(1);
+    expect(mem.dump().get("blocked_user_ids")).toBe(JSON.stringify([111]));
   });
 
   it("unblocks a user and persists the change", async () => {
-    vi.mocked(Preferences.get).mockResolvedValue({
-      value: JSON.stringify([111, 222]),
+    const { unblockUser, isBlocked, mem } = await loadStore({
+      blocked_user_ids: JSON.stringify([111, 222]),
     });
-    vi.mocked(Preferences.set).mockResolvedValue(undefined);
-
-    const { loadBlockedIds, unblockUser, isBlocked } = await loadStore();
-    await loadBlockedIds();
     await unblockUser(111);
 
     expect(isBlocked(111)).toBe(false);
     expect(isBlocked(222)).toBe(true);
-    expect(Preferences.set).toHaveBeenCalledWith({
-      key: "blocked_user_ids",
-      value: JSON.stringify([222]),
-    });
+    expect(mem.dump().get("blocked_user_ids")).toBe(JSON.stringify([222]));
   });
 
   it("unblocking a non-blocked user is a no-op", async () => {
-    vi.mocked(Preferences.get).mockResolvedValue({ value: null });
-
-    const { loadBlockedIds, unblockUser, blockedIds } = await loadStore();
-    await loadBlockedIds();
+    const { unblockUser, blockedIds, mem } = await loadStore();
     await unblockUser(111);
 
     expect(blockedIds().size).toBe(0);
-    expect(Preferences.set).not.toHaveBeenCalled();
+    expect(mem.dump().has("blocked_user_ids")).toBe(false);
   });
 
   it("resets blocked ids to empty", async () => {
-    vi.mocked(Preferences.get).mockResolvedValue({
-      value: JSON.stringify([111, 222]),
+    const { loadBlockedIds, resetBlockedIds, blockedIds, isBlocked } = await loadStore({
+      blocked_user_ids: JSON.stringify([111, 222]),
     });
-
-    const { loadBlockedIds, resetBlockedIds, blockedIds, isBlocked } = await loadStore();
     await loadBlockedIds();
     resetBlockedIds();
 
     expect(blockedIds().size).toBe(0);
     expect(isBlocked(111)).toBe(false);
     expect(isBlocked(222)).toBe(false);
+  });
+
+  it("falls back to empty set on corrupt data", async () => {
+    const { blockedIds, isBlocked } = await loadStore({
+      blocked_user_ids: "not-json",
+    });
+
+    expect(blockedIds().size).toBe(0);
+    expect(isBlocked(111)).toBe(false);
   });
 });

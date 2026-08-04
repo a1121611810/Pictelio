@@ -1,26 +1,44 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { Preferences } from "@capacitor/preferences";
+import { describe, it, expect, vi } from "vitest";
+import type { Settings } from "@/settings/registry";
 
-vi.mock("@capacitor/preferences", () => ({
-  Preferences: { get: vi.fn(), set: vi.fn() },
+
+const mockState = vi.hoisted(() => ({
+  current: null as Settings | null,
 }));
 
-async function loadStore() {
+vi.mock("@/settings", () => ({
+  get settings() {
+    return mockState.current;
+  },
+  jsonCodec: {
+    encode: (v: unknown) => JSON.stringify(v),
+    decode: (raw: string) => JSON.parse(raw),
+  },
+}));
+
+async function loadStore(seed: Record<string, string> = {}) {
   vi.resetModules();
+  const { createSettings } = await import("@/settings/registry");
+  const { createMemoryAdapter } = await import("@/settings/backends/memory");
+  const mem = createMemoryAdapter(seed);
+  const settings = createSettings({
+    storages: { preferences: mem, memory: mem },
+    defaultStorage: "preferences",
+  });
+  mockState.current = settings;
   const mod = await import("@/stores/reportStore");
-  return mod;
+  await settings.hydrateAll();
+  return { ...mod, mem };
 }
 
 describe("reportStore", () => {
-  it("loads reported ids from Preferences", async () => {
-    vi.mocked(Preferences.get).mockResolvedValue({
-      value: JSON.stringify([
+  it("loads reported ids from storage", async () => {
+    const { loadReportedIds, reportedIds, hasReported } = await loadStore({
+      reported_ids: JSON.stringify([
         { id: 123, reason: "pornography" as const, reportedAt: 1 },
         { id: 456, reason: "spam" as const, reportedAt: 2 },
       ]),
     });
-
-    const { loadReportedIds, reportedIds, hasReported } = await loadStore();
     await loadReportedIds();
 
     expect(hasReported(123)).toBe(true);
@@ -30,8 +48,6 @@ describe("reportStore", () => {
   });
 
   it("handles missing preference gracefully", async () => {
-    vi.mocked(Preferences.get).mockResolvedValue({ value: null });
-
     const { loadReportedIds, reportedIds, hasReported } = await loadStore();
     await loadReportedIds();
 
@@ -40,51 +56,46 @@ describe("reportStore", () => {
   });
 
   it("reports an illust and persists it", async () => {
-    vi.mocked(Preferences.get).mockResolvedValue({ value: null });
-    vi.mocked(Preferences.set).mockResolvedValue(undefined);
-
-    const { loadReportedIds, reportIllust, hasReported } = await loadStore();
-    await loadReportedIds();
+    const { reportIllust, hasReported, mem } = await loadStore();
     await reportIllust(123, "infringement");
 
     expect(hasReported(123)).toBe(true);
-    expect(Preferences.set).toHaveBeenCalledWith({
-      key: "reported_ids",
-      value: expect.stringContaining("123"),
-    });
-    expect(Preferences.set).toHaveBeenCalledWith({
-      key: "reported_ids",
-      value: expect.stringContaining("infringement"),
-    });
+    const stored: unknown[] = JSON.parse(mem.dump().get("reported_ids") ?? "[]");
+    expect(stored).toHaveLength(1);
+    expect(stored[0]).toMatchObject({ id: 123, reason: "infringement" });
   });
 
   it("does not report the same illust twice", async () => {
-    vi.mocked(Preferences.get).mockResolvedValue({ value: null });
-    vi.mocked(Preferences.set).mockResolvedValue(undefined);
-
-    const { loadReportedIds, reportIllust, reportedIds } = await loadStore();
-    await loadReportedIds();
+    const { reportIllust, reportedIds, mem } = await loadStore();
     await reportIllust(123, "other");
     await reportIllust(123, "spam");
 
     expect(reportedIds().size).toBe(1);
-    expect(Preferences.set).toHaveBeenCalledTimes(1);
+    const stored: unknown[] = JSON.parse(mem.dump().get("reported_ids") ?? "[]");
+    expect(stored).toHaveLength(1);
   });
 
   it("resets reported ids and records", async () => {
-    vi.mocked(Preferences.get).mockResolvedValue({
-      value: JSON.stringify([
+    const { loadReportedIds, resetReportedIds, reportedIds, hasReported } = await loadStore({
+      reported_ids: JSON.stringify([
         { id: 123, reason: "pornography" as const, reportedAt: 1 },
         { id: 456, reason: "spam" as const, reportedAt: 2 },
       ]),
     });
-
-    const { loadReportedIds, resetReportedIds, reportedIds, hasReported } = await loadStore();
     await loadReportedIds();
     resetReportedIds();
 
     expect(reportedIds().size).toBe(0);
     expect(hasReported(123)).toBe(false);
     expect(hasReported(456)).toBe(false);
+  });
+
+  it("falls back to empty set on corrupt data", async () => {
+    const { reportedIds, hasReported } = await loadStore({
+      reported_ids: "not-json",
+    });
+
+    expect(reportedIds().size).toBe(0);
+    expect(hasReported(123)).toBe(false);
   });
 });

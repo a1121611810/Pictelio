@@ -7,16 +7,11 @@
  */
 import { createSignal } from "solid-js";
 import { SecureStorage } from "@aparajita/capacitor-secure-storage";
-import { Preferences } from "@capacitor/preferences";
+import { settings } from "@/settings";
 import { tryAsync } from "@/utils/tryAsync";
 import type { TranslateError } from "@/api/translate";
 
 const DS_API_KEY = "ds_api_key";
-const PREF_R18 = "translation_r18";
-const PREF_R18G = "translation_r18g";
-const PREF_R18_CONFIRMED = "translation_r18_confirmed";
-const PREF_TIER = "translation_default_tier";
-const PREF_THINKING = "translation_thinking";
 
 // ── API key（BYOK）──
 
@@ -83,59 +78,48 @@ export function decideTranslatePolicy(
   return "allow"; // 0 及未知等级直通（防御性放行）
 }
 
-const [translateR18, setTranslateR18State] = createSignal(false);
-const [translateR18G, setTranslateR18GState] = createSignal(false);
+// ── R18/R18G 开关与确认标记（统一 settings registry 管理）──
+// 旧存储 key 与格式（bool 存 "true"/"false"）兼容；set 为乐观更新，
+// 持久化失败由 registry 内部 onError 兜底 warn。
+
+const r18Handle = settings.define<boolean>({
+  key: "translation_r18",
+  default: false,
+});
+const r18gHandle = settings.define<boolean>({
+  key: "translation_r18g",
+  default: false,
+});
 /** 是否已确认过 R18 翻译风险（首次翻译 R18/R18G 时弹窗，确认后持久化不再打扰） */
-const [r18Confirmed, setR18Confirmed] = createSignal(false);
+const r18ConfirmedHandle = settings.define<boolean>({
+  key: "translation_r18_confirmed",
+  default: false,
+});
 
-export { translateR18, translateR18G };
+export const translateR18 = (): boolean => r18Handle.value();
+export const translateR18G = (): boolean => r18gHandle.value();
 
-/** 恢复 R18/R18G 开关与确认标记（Preferences 持久化） */
-export async function loadTranslateRestrictSettings(): Promise<void> {
-  const [r18Err, r18Val] = await tryAsync(Preferences.get({ key: PREF_R18 }));
-  if (!r18Err && r18Val?.value !== undefined) {
-    setTranslateR18State(r18Val.value === "true");
-  }
-  const [r18gErr, r18gVal] = await tryAsync(Preferences.get({ key: PREF_R18G }));
-  if (!r18gErr && r18gVal?.value !== undefined) {
-    setTranslateR18GState(r18gVal.value === "true");
-  }
-  const [cfErr, cfVal] = await tryAsync(Preferences.get({ key: PREF_R18_CONFIRMED }));
-  if (!cfErr && cfVal?.value !== undefined) {
-    setR18Confirmed(cfVal.value === "true");
-  }
-}
+/** 兼容存根：registry hydrateAll 已加载，Phase 4 移除 */
+export async function loadTranslateRestrictSettings(): Promise<void> {}
 
-/** 设置「翻译 R18 内容」开关（失败仅 warn，不阻断） */
+/** 设置「翻译 R18 内容」开关（乐观更新，持久化失败由 registry warn） */
 export async function setTranslateR18(on: boolean): Promise<void> {
-  setTranslateR18State(on);
-  const [err] = await tryAsync(Preferences.set({ key: PREF_R18, value: String(on) }));
-  if (err) {
-    console.warn("[translationStore] 保存 R18 翻译开关失败", err);
-  }
+  r18Handle.set(on);
 }
 
-/** 设置「翻译 R18G 内容」开关（失败仅 warn，不阻断） */
+/** 设置「翻译 R18G 内容」开关（乐观更新，持久化失败由 registry warn） */
 export async function setTranslateR18G(on: boolean): Promise<void> {
-  setTranslateR18GState(on);
-  const [err] = await tryAsync(Preferences.set({ key: PREF_R18G, value: String(on) }));
-  if (err) {
-    console.warn("[translationStore] 保存 R18G 翻译开关失败", err);
-  }
+  r18gHandle.set(on);
 }
 
 /** 读取 R18 风险确认标记（true = 已确认过，翻译时不再弹窗） */
 export function getR18Confirmed(): boolean {
-  return r18Confirmed();
+  return r18ConfirmedHandle.value();
 }
 
-/** 标记 R18 风险已确认（持久化） */
+/** 标记 R18 风险已确认（乐观更新，持久化失败由 registry warn） */
 export async function markR18Confirmed(): Promise<void> {
-  setR18Confirmed(true);
-  const [err] = await tryAsync(Preferences.set({ key: PREF_R18_CONFIRMED, value: "true" }));
-  if (err) {
-    console.warn("[translationStore] 保存 R18 确认标记失败", err);
-  }
+  r18ConfirmedHandle.set(true);
 }
 
 // ── 翻译质量档位与思考开关（决策 #22，S6）──
@@ -148,40 +132,31 @@ export const TIER_MODELS = {
   pro: "deepseek-v4-pro",
 } as const;
 
-const [defaultTier, setDefaultTierState] = createSignal<TranslateTier>("flash");
 /** 思考模式：默认关（更快/无 reasoning token 计费/temperature 生效），可开（S6） */
-const [thinkingEnabled, setThinkingEnabledState] = createSignal(false);
+const tierHandle = settings.define<TranslateTier>({
+  key: "translation_default_tier",
+  default: "flash",
+  validate: (v): v is TranslateTier => v === "flash" || v === "pro",
+});
+const thinkingHandle = settings.define<boolean>({
+  key: "translation_thinking",
+  default: false,
+});
 
-export { defaultTier, thinkingEnabled };
+export const defaultTier = (): TranslateTier => tierHandle.value();
+export const thinkingEnabled = (): boolean => thinkingHandle.value();
 
-/** 恢复档位与思考开关（Preferences 持久化） */
-export async function loadTierAndThinking(): Promise<void> {
-  const [tierErr, tierVal] = await tryAsync(Preferences.get({ key: PREF_TIER }));
-  if (!tierErr && (tierVal?.value === "flash" || tierVal?.value === "pro")) {
-    setDefaultTierState(tierVal.value);
-  }
-  const [thErr, thVal] = await tryAsync(Preferences.get({ key: PREF_THINKING }));
-  if (!thErr && thVal?.value !== undefined) {
-    setThinkingEnabledState(thVal.value === "true");
-  }
-}
+/** 兼容存根：registry hydrateAll 已加载，Phase 4 移除 */
+export async function loadTierAndThinking(): Promise<void> {}
 
-/** 设置默认档位（失败仅 warn，不阻断） */
+/** 设置默认档位（乐观更新，持久化失败由 registry warn） */
 export async function setDefaultTier(tier: TranslateTier): Promise<void> {
-  setDefaultTierState(tier);
-  const [err] = await tryAsync(Preferences.set({ key: PREF_TIER, value: tier }));
-  if (err) {
-    console.warn("[translationStore] 保存默认档位失败", err);
-  }
+  tierHandle.set(tier);
 }
 
-/** 设置思考模式开关（失败仅 warn，不阻断） */
+/** 设置思考模式开关（乐观更新，持久化失败由 registry warn） */
 export async function setThinkingEnabled(on: boolean): Promise<void> {
-  setThinkingEnabledState(on);
-  const [err] = await tryAsync(Preferences.set({ key: PREF_THINKING, value: String(on) }));
-  if (err) {
-    console.warn("[translationStore] 保存思考开关失败", err);
-  }
+  thinkingHandle.set(on);
 }
 
 // ── 详情页翻译显示状态 ──

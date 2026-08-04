@@ -74,6 +74,7 @@ import {
   type TranslateTier,
 } from "../stores/translationStore";
 import { TranslateError } from "../api/translate";
+import { settings, jsonCodec, type Codec } from "@/settings";
 
 // ── Scroll-driven hide/show constants ──
 const BOTTOM_THRESHOLD = 80;
@@ -83,6 +84,28 @@ interface NovelProgress {
   charIndex: number;
   progress: number;
 }
+
+// 小说阅读进度：动态 key（novel_progress_${id}），localStorage 同步后端，
+// 500ms 防抖落盘（registry debounceMs），旧数据为同一 key 的 JSON 字符串。
+// validate 保持原 parseProgress 的业务校验（integer 且非负），坏数据回退默认值。
+const novelProgressFactory = settings.defineFactory<NovelProgress>({
+  keyPrefix: "novel_progress",
+  default: { paragraphIndex: 0, charIndex: 0, progress: 0 },
+  storage: "localStorage",
+  debounceMs: 500,
+  codec: jsonCodec as Codec<NovelProgress>,
+  validate: (v): v is NovelProgress => {
+    if (typeof v !== "object" || v === null) return false;
+    const p = v as Record<string, unknown>;
+    return (
+      Number.isInteger(p.paragraphIndex) &&
+      Number.isInteger(p.charIndex) &&
+      (p.paragraphIndex as number) >= 0 &&
+      (p.charIndex as number) >= 0 &&
+      typeof p.progress === "number"
+    );
+  },
+});
 
 interface NovelImageBlockProps {
   block: ImageBlock;
@@ -160,34 +183,8 @@ const NovelImageBlock: Component<NovelImageBlockProps> = (props) => {
   );
 };
 
-function parseProgress(raw: string | null): NovelProgress | null {
-  if (!raw) {
-    return null;
-  }
-  const [parseErr, parsed] = trySync(() => JSON.parse(raw) as unknown);
-  if (!parseErr && typeof parsed === "object" && parsed !== null) {
-    const p = parsed as Record<string, unknown>;
-    if (
-      Number.isInteger(p.paragraphIndex) &&
-      Number.isInteger(p.charIndex) &&
-      (p.paragraphIndex as number) >= 0 &&
-      (p.charIndex as number) >= 0
-    ) {
-      return {
-        paragraphIndex: p.paragraphIndex as number,
-        charIndex: p.charIndex as number,
-        progress: typeof p.progress === "number" ? p.progress : 0,
-      };
-    }
-  }
-  return null;
-}
-
 function resetNovelProgress(id: number) {
-  localStorage.setItem(
-    `novel_progress_${id}`,
-    JSON.stringify({ paragraphIndex: 0, charIndex: 0, progress: 0 }),
-  );
+  novelProgressFactory.forId(id).set({ paragraphIndex: 0, charIndex: 0, progress: 0 });
 }
 
 function isTextBlock(block: NovelBlock): block is TextBlock {
@@ -770,6 +767,8 @@ const NovelDetail: Component = () => {
   }
 
   // ── 阅读进度持久化 ──
+  // 外层 setTimeout 防抖：effect 触发时只调度，不在响应式求值中同步读布局（避免自激循环）；
+  // 落盘侧的 500ms 合并由 settings registry 的 debounceMs 负责。
   let progressSaveTimer: ReturnType<typeof setTimeout> | undefined;
   function saveProgress() {
     if (progressSaveTimer) {
@@ -793,14 +792,11 @@ const NovelDetail: Component = () => {
             0,
           ) + current.charIndex;
       const progress = totalChars > 0 ? currentOffset / totalChars : 0;
-      localStorage.setItem(
-        `novel_progress_${novelId()}`,
-        JSON.stringify({
-          paragraphIndex: current.paragraphIndex,
-          charIndex: current.charIndex,
-          progress,
-        }),
-      );
+      novelProgressFactory.forId(novelId()).set({
+        paragraphIndex: current.paragraphIndex,
+        charIndex: current.charIndex,
+        progress,
+      });
     }, 500);
   }
 
@@ -809,8 +805,12 @@ const NovelDetail: Component = () => {
       skipRestoreProgress = false;
       return;
     }
-    const saved = parseProgress(localStorage.getItem(`novel_progress_${novelId()}`));
-    if (!saved) {
+    const progressHandle = novelProgressFactory.forId(novelId());
+    // 同步读已存进度（localStorage 同步后端；factory handle 懒创建，首次需手动读）
+    progressHandle.syncInit();
+    const saved = progressHandle.value();
+    // 默认值（无记录或初始进度）不恢复
+    if (saved.paragraphIndex === 0 && saved.charIndex === 0 && saved.progress === 0) {
       return;
     }
     const layout = virtualLayout.layoutResult();

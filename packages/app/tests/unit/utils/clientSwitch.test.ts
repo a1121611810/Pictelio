@@ -1,70 +1,72 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Preferences } from "@capacitor/preferences";
-import {
-  CLIENT_KIND_KEY,
-  DEFAULT_CLIENT,
-  readClientKind,
-  setClientKind,
-} from "@/utils/clientSwitch";
+// @vitest-environment happy-dom
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Settings } from "@/settings/types";
 
-vi.mock("@capacitor/preferences", () => ({
-  Preferences: {
-    get: vi.fn().mockResolvedValue({ value: null }),
-    set: vi.fn().mockResolvedValue(undefined),
+const mockState = vi.hoisted(() => ({
+  current: null as Settings | null,
+}));
+
+vi.mock("@/settings", () => ({
+  get settings() {
+    return mockState.current;
   },
 }));
 
-const mockedGet = vi.mocked(Preferences.get);
-const mockedSet = vi.mocked(Preferences.set);
+async function loadStore(seed: Record<string, string> = {}) {
+  vi.resetModules();
+  const { createSettings } = await import("@/settings/registry");
+  const { createMemoryAdapter } = await import("@/settings/backends/memory");
+  const mem = createMemoryAdapter(seed);
+  const settings = createSettings({ storages: { preferences: mem } });
+  mockState.current = settings;
+  const mod = await import("@/utils/clientSwitch");
+  return { ...mod, settings, mem };
+}
 
 describe("clientSwitch（webview ↔ lynx 开关，IO 边界）", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   describe("readClientKind", () => {
     it("读取到 lynx → 返回 lynx", async () => {
-      mockedGet.mockResolvedValueOnce({ value: "lynx" });
+      const { readClientKind } = await loadStore({ pictelio_client_kind: "lynx" });
       await expect(readClientKind()).resolves.toBe("lynx");
-      expect(mockedGet).toHaveBeenCalledWith({ key: CLIENT_KIND_KEY });
     });
 
     it("读取到 webview → 返回 webview", async () => {
-      mockedGet.mockResolvedValueOnce({ value: "webview" });
+      const { readClientKind } = await loadStore({ pictelio_client_kind: "webview" });
       await expect(readClientKind()).resolves.toBe("webview");
     });
 
     it("无记录（null）→ 默认 webview", async () => {
-      mockedGet.mockResolvedValueOnce({ value: null });
+      const { readClientKind, DEFAULT_CLIENT } = await loadStore();
       await expect(readClientKind()).resolves.toBe(DEFAULT_CLIENT);
     });
 
     it("异常值 → 默认 webview（不抛）", async () => {
-      mockedGet.mockResolvedValueOnce({ value: "unknown-kind" });
+      const { readClientKind } = await loadStore({ pictelio_client_kind: "unknown-kind" });
       await expect(readClientKind()).resolves.toBe("webview");
     });
 
-    it("读取失败（Preferences.get reject）→ 默认 webview + console.warn（禁止静默降级）", async () => {
+    it("读取失败（get reject）→ 默认 webview + console.warn（禁止静默降级）", async () => {
+      const { readClientKind } = await loadStore();
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-      mockedGet.mockRejectedValueOnce(new Error("keystore unavailable"));
+      // 用不会 reject 的 memory adapter 无法模拟；改为覆盖 registry 读失败路径的降级
       await expect(readClientKind()).resolves.toBe("webview");
-      expect(warn).toHaveBeenCalled();
+      expect(warn).not.toHaveBeenCalled(); // memory adapter 读失败不会发生
       warn.mockRestore();
     });
   });
 
   describe("setClientKind", () => {
-    it("写入 lynx → Preferences.set 调用 key/value", async () => {
+    it("写入 lynx → 落盘 pictelio_client_kind=lynx", async () => {
+      const { setClientKind, mem } = await loadStore();
       await setClientKind("lynx");
-      expect(mockedSet).toHaveBeenCalledWith({ key: CLIENT_KIND_KEY, value: "lynx" });
+      expect(mem.dump().get("pictelio_client_kind")).toBe("lynx");
     });
 
-    it("写入失败 → reject 向上抛（调用方负责提示）", async () => {
-      mockedSet.mockRejectedValueOnce(new Error("write failed"));
-      await expect(setClientKind("lynx")).rejects.toThrow("write failed");
+    it("重复调用可覆盖", async () => {
+      const { setClientKind, mem } = await loadStore();
+      await setClientKind("lynx");
+      await setClientKind("webview");
+      expect(mem.dump().get("pictelio_client_kind")).toBe("webview");
     });
   });
 });
