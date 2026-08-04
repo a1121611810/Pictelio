@@ -1,5 +1,5 @@
 {
-  "version": "4.0.0",
-  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v4.0.0",
-  "changelog": "Lynx 双端客户端正式版：P0 核心功能全量上线 + Android 原生深度集成（JS 零知 token），双端 Ugoira 动图播放，落地页磨砂玻璃视觉升级，并完成真机自动化验证闭环。"
+  "version": "4.1.0",
+  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v4.1.0",
+  "changelog": "📝 文档\n  docs: Android 模拟器 E2E 门禁文档（ADR/glossary/spec/gate）\n🔧 其他\n  build: E2E 门禁根脚本委托 + appium 依赖与构建白名单\n🧪 测试\n  test(app): Android 模拟器 E2E 门禁基建（#104-#108）\n✨ 新功能\n  feat(app): E2E 测试钩子 + __E2E__ 构建隔离\n  "
 }
