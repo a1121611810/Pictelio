@@ -11,6 +11,7 @@ import "@fluentui/web-components/badge.js";
 import "@fluentui/web-components/button.js";
 import "@fluentui/web-components/checkbox.js";
 import "@fluentui/web-components/dialog.js";
+import "@fluentui/web-components/dialog-body.js";
 import "@fluentui/web-components/divider.js";
 import "@fluentui/web-components/drawer.js";
 import "@fluentui/web-components/message-bar.js";
