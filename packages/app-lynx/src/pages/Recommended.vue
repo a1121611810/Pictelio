@@ -23,13 +23,23 @@ const errorMsg = ref('')
 let lastLoadMoreAt = 0
 let lastLoadEndedAt = 0
 
+// [lynx:fix] 数据分批渲染（ADR-0060）：
+// web-core 预览下 list 不做 item 回收，一次性渲染 90 条 = 90 张图全量加载（图片加载风暴）。
+// 解决：fetch 一次拿回全部数据，但只把前 PAGE_SIZE 条塞进 list（其余入 pendingIllusts 队列），
+// 滚动到底时先消费 pending（同步追加，无网络请求），pending 耗尽才真正请求 next_url。
+// 真机 LynxView 有引擎级 item 回收 + lazy-load，此机制无副作用（只影响 DOM 挂载数量）。
+const PAGE_SIZE = 20
+const pendingIllusts = ref<PixivIllust[]>([])
+
 async function fetchFirstPage() {
   loading.value = true
   errorMsg.value = ''
   try {
     const res = await loadRecommended()
     // ADR-0051：应用 R18/R18G 开关过滤（默认隐藏）
-    illusts.value = filterByRestrict(res.illusts)
+    const all = filterByRestrict(res.illusts)
+    illusts.value = all.slice(0, PAGE_SIZE)
+    pendingIllusts.value = all.slice(PAGE_SIZE)
     nextUrl.value = res.next_url
   } catch (err) {
     errorMsg.value = (err as { message?: string }).message ?? '加载失败'
@@ -44,15 +54,23 @@ async function loadMore() {
   const now = Date.now()
   if (now - lastLoadEndedAt < 3000) return
   if (now - lastLoadMoreAt < 800) return
-  if (!nextUrl.value || loadingMore.value) return
+  if (loadingMore.value) return
+  // pending 队列为空且无 next_url 时终止
+  if (pendingIllusts.value.length === 0 && !nextUrl.value) return
   lastLoadMoreAt = now
   loadingMore.value = true
   try {
-    const res = await loadNext(nextUrl.value)
+    // 优先消费本地 pending 数据（同步，无网络请求），pending 耗尽才翻页
+    if (pendingIllusts.value.length > 0) {
+      illusts.value.push(...pendingIllusts.value.splice(0, PAGE_SIZE))
+      return
+    }
+    const res = await loadNext(nextUrl.value!)
     const seen = new Set(illusts.value.map((i) => i.id))
     // ADR-0051：分页同样应用 R18/R18G 过滤
     const fresh = filterByRestrict(res.illusts).filter((i) => !seen.has(i.id))
-    illusts.value.push(...fresh)
+    illusts.value.push(...fresh.slice(0, PAGE_SIZE))
+    pendingIllusts.value = fresh.slice(PAGE_SIZE)
     // 空页防护：服务端返回空列表但 next_url 仍存在时终止分页，防 web-core 下轮询空页
     nextUrl.value = fresh.length === 0 ? null : res.next_url
   } catch (err) {
@@ -151,7 +169,7 @@ onActivated(() => {
              （attribute 形式 web-core 不响应）。原生 LynxView 同样支持这两个属性（ADR-0048） -->
         <!-- [lynx:fix] 图片级骨架（SkeletonImage）：容器 aspect-[1/1] 方形 + min-h 保底（ADR-0045），
              图片 @load 后才隐藏 shimmer 显示图片（骨架关闭时机 = 图片加载完成，而非 API 数据返回） -->
-        <SkeletonImage :src="thumbUrl(item.image_urls)" aspect-ratio="1 / 1" min-h="40vw" />
+        <SkeletonImage :src="thumbUrl(item.image_urls)" aspect-ratio="1 / 1" min-h="40vw" lazy-load />
         <text class="text-lg font-semibold text-foreground mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
         <text class="text-sm text-foreground-2 mt-1 mx-2.5 [max-line:1]">{{ item.user.name }}</text>
         <view class="mt-1 mx-2.5 mb-2.5">

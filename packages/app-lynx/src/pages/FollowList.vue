@@ -130,6 +130,7 @@ onMounted(fetchFirstPage)
               aspect-ratio="1 / 1"
               min-h="11vw"
               class="w-[11vw] h-[11vw] rounded-[var(--borderRadiusLarge)]"
+              lazy-load
             />
             <view class="flex flex-col ml-3.5 flex-1">
               <text class="text-lg font-semibold text-foreground [max-line:1]">{{ item.user.name }}</text>

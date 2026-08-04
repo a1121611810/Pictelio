@@ -187,7 +187,7 @@ onMounted(() => {
         class="bg-background rounded-[var(--borderRadiusXLarge)] flex flex-col overflow-hidden"
       >
         <view class="w-full flex flex-col" @tap="openIllust(item.id)">
-          <SkeletonImage :src="thumbUrl(item.image_urls)" aspect-ratio="1 / 1" min-h="40vw" />
+          <SkeletonImage :src="thumbUrl(item.image_urls)" aspect-ratio="1 / 1" min-h="40vw" lazy-load />
           <text class="text-lg font-semibold text-foreground mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
           <text class="text-sm text-foreground-2 mt-1 mx-2.5 [max-line:1]">{{ item.user.name }}</text>
           <view class="mt-1 mx-2.5 mb-2.5">
