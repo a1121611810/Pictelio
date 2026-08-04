@@ -9,26 +9,19 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import android.util.Base64;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
-import java.util.concurrent.TimeUnit;
 
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
 import okhttp3.Request;
-import okhttp3.RequestBody;
 import okhttp3.Response;
 
 /**
- * Pixiv API 请求插件 — 在 Native 层完成鉴权注入与图片预缓存。
+ * Pixiv API 请求插件 — Capacitor 薄壳（#114），网络引擎已提取至 PixivApiCore。
  *
  * 所有 Pixiv App-API 请求通过此插件转发，自动注入 Authorization、
  * Referer、User-Agent；遇到 401 时内部静默刷新 token 后重试一次。
@@ -42,46 +35,9 @@ import okhttp3.Response;
 @CapacitorPlugin(name = "PixivApi")
 public class PixivApiPlugin extends Plugin {
 
-    private static final String API_BASE = "https://app-api.pixiv.net";
     private static final String CACHE_DIR_NAME = "pictelio-images";
     private static final String PREFS_NAME = "PictelioPrefs";
     private static final String KEY_REFRESH_TOKEN = "refresh_token";
-
-    private static volatile OkHttpClient client;
-    /** #53：Lynx Native Module（PictelioAuth/PictelioApi）同包读写；access_token 只进不出 */
-    static String accessToken;
-    static String refreshToken;
-    /** 刷新 token 中的锁，防止并发 401 重复刷新 */
-    private static volatile boolean isRefreshing = false;
-
-    // ─── OkHttp 客户端（单例） ────────────────────────────────
-
-    private static OkHttpClient getClient() {
-        if (client != null) return client;
-        synchronized (PixivApiPlugin.class) {
-            if (client != null) return client;
-            client = new OkHttpClient.Builder()
-                    .connectTimeout(OAuthConfig.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
-                    .readTimeout(OAuthConfig.TIMEOUT_READ, TimeUnit.MILLISECONDS)
-                    .callTimeout(OAuthConfig.TIMEOUT_CONNECT + OAuthConfig.TIMEOUT_READ, TimeUnit.MILLISECONDS)
-                    .dispatcher(new okhttp3.Dispatcher(
-                            java.util.concurrent.Executors.newCachedThreadPool()
-                    ))
-                    .build();
-            // 提高每主机并发上限，避免大量多图请求时排队超时
-            client.dispatcher().setMaxRequestsPerHost(10);
-            client.dispatcher().setMaxRequests(20);
-        }
-        return client;
-    }
-
-    /**
-     * 对外暴露共享 OkHttp 客户端，供 MainActivity.interceptImage 复用连接池，
-     * 避免每次图片请求都创建新的 HttpURLConnection。
-     */
-    static OkHttpClient getSharedClient() {
-        return getClient();
-    }
 
     // ─── 插件方法：通用 API 请求 ─────────────────────────────
 
@@ -98,7 +54,7 @@ public class PixivApiPlugin extends Plugin {
         }
 
         // 构建 URL
-        StringBuilder urlBuilder = new StringBuilder(API_BASE);
+        StringBuilder urlBuilder = new StringBuilder(PixivApiCore.apiBase());
         if (!path.startsWith("/")) urlBuilder.append('/');
         urlBuilder.append(path);
 
@@ -111,76 +67,20 @@ public class PixivApiPlugin extends Plugin {
         String url = urlBuilder.toString();
 
         try {
-            JSObject result = executeRequest(method, url, body, false,
+            JSONObject coreResult = PixivApiCore.executeRequest(method, url, body, false,
                     token -> {
                         // token 轮换：通知 JS 侧持久化新值（webview 专属；Lynx 走 PictelioAuth）
                         JSObject data = new JSObject();
                         data.put("token", token);
                         notifyListeners("refreshTokenRotated", data);
                     });
+            // JSONObject → JSObject 桥接（#114：Core 去 Capacitor 化）
+            JSObject result = new JSObject();
+            result.put("status", coreResult.getInt("status"));
+            result.put("data", coreResult.getString("data"));
             call.resolve(result);
         } catch (Exception e) {
             call.reject("Request failed: " + e.getMessage());
-        }
-    }
-
-    /** #53：token 轮换回调（webview 用 notifyListeners；Lynx 传 null） */
-    interface RefreshTokenRotationListener {
-        void onRefreshTokenRotated(String newRefreshToken);
-    }
-
-    /**
-     * 执行 HTTP 请求，遇 401 自动刷新 token 后重试一次。
-     * #53：package-private static，供 PictelioApiModule（Lynx）同包转发。
-     *
-     * @param rotationListener 401 刷新且 refresh_token 轮换时回调（webview 通知 JS；Lynx 传 null）
-     */
-    static JSObject executeRequest(String method, String url, String body, boolean isRetry,
-            RefreshTokenRotationListener rotationListener)
-            throws IOException, JSONException {
-        Request.Builder builder = new Request.Builder()
-                .url(url)
-                .addHeader("Authorization", "Bearer " + (accessToken != null ? accessToken : ""))
-                .addHeader("Referer", OAuthConfig.REFERER)
-                .addHeader("User-Agent", OAuthConfig.USER_AGENT);
-
-        if ("POST".equalsIgnoreCase(method)) {
-            MediaType mediaType = MediaType.parse(OAuthConfig.CONTENT_TYPE);
-            RequestBody requestBody = body != null
-                    ? RequestBody.create(body, mediaType)
-                    : RequestBody.create("", null);
-            builder.post(requestBody);
-        }
-
-        try (Response response = getClient().newCall(builder.build()).execute()) {
-            int statusCode = response.code();
-            String responseBody = response.body() != null ? response.body().string() : "";
-
-            // 401 且未重试过 → 静默刷新 token 后重试
-            if (statusCode == 401 && !isRetry) {
-                String rotated = null;
-                synchronized (PixivApiPlugin.class) {
-                    if (!isRefreshing) {
-                        isRefreshing = true;
-                        try {
-                            rotated = refreshAccessTokenCore();
-                        } finally {
-                            isRefreshing = false;
-                        }
-                    }
-                }
-                if (rotated != null) {
-                    if (rotationListener != null && !rotated.isEmpty()) {
-                        rotationListener.onRefreshTokenRotated(rotated);
-                    }
-                    return executeRequest(method, url, body, true, rotationListener);
-                }
-            }
-
-            JSObject result = new JSObject();
-            result.put("status", statusCode);
-            result.put("data", responseBody);
-            return result;
         }
     }
 
@@ -198,10 +98,10 @@ public class PixivApiPlugin extends Plugin {
     @PluginMethod
     public void syncToken(PluginCall call) {
         String token = call.getString("token");
-        refreshToken = (token == null || token.isEmpty()) ? null : token;
+        PixivApiCore.refreshToken = (token == null || token.isEmpty()) ? null : token;
         if (token == null || token.isEmpty()) {
             // 登出：顺带清空 access token（纵深防御，authPermanentFailure 已挡请求）
-            accessToken = null;
+            PixivApiCore.accessToken = null;
         }
 
         getActivity().getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
@@ -219,7 +119,7 @@ public class PixivApiPlugin extends Plugin {
             call.reject("accessToken is required");
             return;
         }
-        accessToken = token;
+        PixivApiCore.accessToken = token;
         JSObject result = new JSObject();
         result.put("success", true);
         call.resolve(result);
@@ -242,8 +142,7 @@ public class PixivApiPlugin extends Plugin {
                 cacheDir.mkdirs();
             }
 
-            // 以 URL 的 MD5 作为文件名，保留扩展名
-            String ext = extractExtension(url);
+            // 以 URL 的 Base64 作为文件名
             String filename = Base64.encodeToString(url.getBytes(), Base64.URL_SAFE | Base64.NO_PADDING | Base64.NO_WRAP);
             File cacheFile = new File(cacheDir, filename);
 
@@ -263,7 +162,7 @@ public class PixivApiPlugin extends Plugin {
                     .addHeader("User-Agent", OAuthConfig.USER_AGENT)
                     .build();
 
-            try (Response response = getClient().newCall(request).execute()) {
+            try (Response response = PixivApiCore.getSharedClient().newCall(request).execute()) {
                 if (!response.isSuccessful()) {
                     call.reject("Download failed (HTTP " + response.code() + ")");
                     return;
@@ -286,106 +185,11 @@ public class PixivApiPlugin extends Plugin {
         }
     }
 
-    // ─── 内部：刷新 Access Token ──────────────────────────────
-
-    /**
-     * 使用内存中的 refresh_token 调用 Pixiv OAuth 端点刷新 access_token，
-     * 成功后更新内存变量。token 由 JS 侧通过 syncToken 注入（tokenReady barrier
-     * 保证注入先于任何 API 请求，见 ADR-0041）。
-     * #53：package-private static，供 PictelioAuthModule 401 刷新。
-     *
-     * @return true 如果刷新成功
-     */
-    /**
-     * 刷新核心（#53）：oauthTokenExchange 更新 Java 堆字段，无 notify——
-     * Lynx executeRequest/PictelioAuth 401 刷新用。
-     *
-     * @return 成功时返回新 refresh_token（可能为空串），失败返回 null
-     */
-    static String refreshAccessTokenCore() {
-        try {
-            String saved = refreshToken;
-            if (saved == null || saved.isEmpty()) {
-                return null;
-            }
-            org.json.JSONObject r = oauthTokenExchange(saved);
-            if (r == null) {
-                return null;
-            }
-            accessToken = r.optString("accessToken");
-            String newRefresh = r.optString("refreshToken");
-            if (!newRefresh.isEmpty()) {
-                refreshToken = newRefresh;
-            }
-            return newRefresh;
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    /**
-     * OAuth refresh_token 交换（#53，Lynx PictelioAuth 登录用）。
-     *
-     * 复用主项目 OAuth 请求（client_id/secret + spark-md5 签名），
-     * 返回完整结果：{accessToken, refreshToken, user}——access_token 只进
-     * Java 堆（调用方负责写入字段），user 供 JS 展示。失败返回 null。
-     */
-    static org.json.JSONObject oauthTokenExchange(String refreshToken)
-            throws IOException, JSONException {
-        String localTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME
-                .withZone(ZoneOffset.UTC)
-                .format(Instant.now())
-                .replace("Z", "+00:00");
-        String clientHash = OAuthUtils.md5Hex(localTime + OAuthConfig.HASH_SECRET);
-
-        String formBody = new OAuthUtils.URLSearchParams()
-                .add("client_id", OAuthConfig.CLIENT_ID)
-                .add("client_secret", OAuthConfig.CLIENT_SECRET)
-                .add("grant_type", "refresh_token")
-                .add("refresh_token", refreshToken)
-                .add("get_secure_url", "1")
-                .build();
-
-        Request request = new Request.Builder()
-                .url(OAuthConfig.AUTH_URL)
-                .addHeader("X-Client-Time", localTime)
-                .addHeader("X-Client-Hash", clientHash)
-                .addHeader("App-OS", OAuthConfig.APP_OS)
-                .addHeader("App-OS-Version", OAuthConfig.APP_OS_VERSION)
-                .addHeader("User-Agent", OAuthConfig.USER_AGENT)
-                .addHeader("Content-Type", OAuthConfig.CONTENT_TYPE)
-                .post(RequestBody.create(formBody, MediaType.parse(OAuthConfig.CONTENT_TYPE)))
-                .build();
-
-        try (Response response = getClient().newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                return null;
-            }
-            String responseBody = response.body() != null ? response.body().string() : "";
-            if (responseBody.isEmpty()) {
-                return null;
-            }
-            org.json.JSONObject json = new org.json.JSONObject(responseBody);
-            org.json.JSONObject resp = json.optJSONObject("response");
-            if (resp == null) {
-                resp = json;
-            }
-            if (!resp.has("access_token")) {
-                return null;
-            }
-            org.json.JSONObject result = new org.json.JSONObject();
-            result.put("accessToken", resp.optString("access_token"));
-            result.put("refreshToken", resp.optString("refresh_token", ""));
-            result.put("user", resp.optJSONObject("user"));
-            return result;
-        }
-    }
-
     // ─── 工具方法 ─────────────────────────────────────────────
 
     /**
      * 将 JSObject 转为 URL 查询字符串 (key=value&key2=value2)，跳过空 key。
-     * 对 key 和 value 做 URL 编码。
+     * 对 key 和 value 做 URL 编码。webview 专属（Lynx 侧不走 JSObject query）。
      */
     private static String jsObjectToQuery(JSObject obj) {
         if (obj == null || obj.keys() == null || !obj.keys().hasNext()) return null;
@@ -401,24 +205,4 @@ public class PixivApiPlugin extends Plugin {
         }
         return sb.length() > 0 ? sb.toString() : null;
     }
-
-    /**
-     * 从图片 URL 中提取文件扩展名（如 .jpg, .png）。
-     */
-    private static String extractExtension(String url) {
-        if (url == null) return "";
-        int queryIdx = url.indexOf('?');
-        String clean = queryIdx >= 0 ? url.substring(0, queryIdx) : url;
-        int dotIdx = clean.lastIndexOf('.');
-        if (dotIdx >= 0 && dotIdx < clean.length() - 1) {
-            String ext = clean.substring(dotIdx);
-            // 只保留常见图片扩展名
-            if (ext.matches("(?i)\\.(jpg|jpeg|png|gif|webp|bmp|svg|avif)")) {
-                return ext;
-            }
-        }
-        return "";
-    }
-
-
 }

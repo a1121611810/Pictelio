@@ -25,7 +25,7 @@ public class PictelioApiModule extends LynxModule {
 
     private static final String TAG = "PictelioApiModule";
 
-    private static final String API_BASE = "https://app-api.pixiv.net";
+    private static final String API_BASE = PixivApiCore.apiBase();
 
     public PictelioApiModule(Context context) {
         super(context);
@@ -46,7 +46,7 @@ public class PictelioApiModule extends LynxModule {
                 + (path == null ? "" : path);
         final String[] rotated = {""};
         try {
-            JSONObject result = PixivApiPlugin.executeRequest(method, url, body, false,
+            JSONObject result = PixivApiCore.executeRequest(method, url, body, false,
                     token -> rotated[0] = token);
             callback.invoke(result.optInt("status", 0), result.optString("data", ""), rotated[0]);
         } catch (Exception e) {

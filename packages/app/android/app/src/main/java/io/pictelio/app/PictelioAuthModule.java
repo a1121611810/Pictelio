@@ -37,21 +37,21 @@ public class PictelioAuthModule extends LynxModule {
 
     /**
      * Native OAuth refresh_token 交换（复用主项目 AuthPlugin 同款请求）。
-     * access_token 写入 Java 堆（PixivApiPlugin.accessToken），**不回调给 JS**。
+     * access_token 写入 Java 堆（PixivApiCore.accessToken），**不回调给 JS**。 
      */
     @LynxMethod
     public void loginWithRefreshToken(String refreshToken, Callback callback) {
         try {
-            JSONObject result = PixivApiPlugin.oauthTokenExchange(refreshToken);
+            JSONObject result = PixivApiCore.oauthTokenExchange(refreshToken);
             if (result == null) {
                 callback.invoke("", "登录凭证无效或已失效");
                 return;
             }
             // token 只进 Java 堆（JS 零知）
-            PixivApiPlugin.accessToken = result.optString("accessToken");
+            PixivApiCore.accessToken = result.optString("accessToken");
             String rotated = result.optString("refreshToken");
             if (!rotated.isEmpty()) {
-                PixivApiPlugin.refreshToken = rotated;
+                PixivApiCore.refreshToken = rotated;
             }
 
             // 回调 JS：用户信息 + 新 refresh_token（供持久化），不含 access_token
@@ -74,14 +74,14 @@ public class PictelioAuthModule extends LynxModule {
     /** 备用：JS 直登录（web 模式 OAuth 结果）后 push access_token 到 Java 堆 */
     @LynxMethod
     public void setAccessToken(String token) {
-        PixivApiPlugin.accessToken = token;
+        PixivApiCore.accessToken = token;
     }
 
     /** 登出：清 Java 堆 token（access_token 与 refresh_token） */
     @LynxMethod
     public void clearTokens(Callback callback) {
-        PixivApiPlugin.accessToken = null;
-        PixivApiPlugin.refreshToken = null;
+        PixivApiCore.accessToken = null;
+        PixivApiCore.refreshToken = null;
         callback.invoke("", "");
     }
 }

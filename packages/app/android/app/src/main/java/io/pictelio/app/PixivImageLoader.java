@@ -28,7 +28,7 @@ import okhttp3.Response;
  * <ul>
  *   <li>URL 重写：{@code /pixiv-img/{path}} → {@code OAuthConfig.IMAGE_CDN_URL + "/" + path}</li>
  *   <li>OkHttp 下载：注入 {@code Referer}/{@code User-Agent}（i.pximg.net 防盗链必需），
- *       复用 {@link PixivApiPlugin#getSharedClient()} 共享连接池</li>
+ *       复用 {@link PixivApiCore#getSharedClient()} 共享连接池</li>
  *   <li>磁盘缓存读写 + 淘汰：目录/文件名/上限沿用现有约定（{@code OAuthConfig.CACHE_DIR}、
  *       Base64 URL-safe no-padding 文件名、{@code CACHE_MAX_BYTES}），与
  *       {@code ImageCachePlugin}/{@code PixivApiPlugin.prefetchImage} 同规则 → 双 client 共享缓存</li>
@@ -50,7 +50,7 @@ public final class PixivImageLoader {
     private final ConcurrentHashMap<String, Object> urlLocks = new ConcurrentHashMap<>();
 
     public PixivImageLoader(Context context) {
-        this(context, PixivApiPlugin.getSharedClient(), OAuthConfig.CACHE_MAX_BYTES);
+        this(context, PixivApiCore.getSharedClient(), OAuthConfig.CACHE_MAX_BYTES);
     }
 
     /** 包可见注入构造（测试注入 mock 网络与可触发淘汰的小缓存上限） */
