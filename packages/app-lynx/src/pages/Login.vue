@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { navigate, resetHistory } from '../router'
 import { loginWithToken, isLoggedIn } from '../stores/authStore'
 import { authError } from '../stores/authStore'
+import { LOGIN_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 
 const tokenInput = ref('')
 const submitting = ref(false)
@@ -47,12 +48,22 @@ async function submit() {
         class="self-stretch h-[9.6vw] box-border border-0 bg-background-3 rounded-[var(--borderRadiusLarge)] text-base text-foreground px-4 mb-3"
         placeholder="粘贴 Pixiv refresh_token"
         placeholder-color="#a19f9d"
+        :accessibility-element="A11Y_ELEMENT_ENABLED"
+        :accessibility-label="LOGIN_A11Y_LABELS.tokenInput"
       />
 
       <text v-if="errorMsg" class="text-sm text-danger mb-2">{{ errorMsg }}</text>
 
-      <view class="h-[9.6vw] bg-brand rounded-[var(--borderRadiusLarge)] flex items-center justify-center" @tap="submit">
-        <text class="text-xl font-semibold text-onBrand">{{ submitting ? '登录中…' : '登录' }}</text>
+      <view
+        class="h-[9.6vw] bg-brand rounded-[var(--borderRadiusLarge)] flex items-center justify-center"
+        @tap="submit"
+      >
+        <text
+          class="text-xl font-semibold text-onBrand"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="LOGIN_A11Y_LABELS.submit"
+          >{{ submitting ? '登录中…' : '登录' }}</text
+        >
       </view>
     </view>
 

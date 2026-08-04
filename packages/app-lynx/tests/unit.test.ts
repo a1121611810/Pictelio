@@ -14,6 +14,7 @@ import { loadUserNovels, loadBookmarks as loadNovelBookmarks, loadFollow as load
 import { bytesToDataUrl, downloadUgoiraFrames } from '../src/api/ugoira'
 import type { UgoiraExtractMode } from '../src/api/ugoira'
 import { ugoiraMode as lynxUgoiraMode, setUgoiraMode as lynxSetUgoiraMode } from '../src/stores/settingsStore'
+import { ME_A11Y_LABELS, LOGIN_A11Y_LABELS, RECOMMENDED_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../src/utils/accessibility'
 
 describe('imageUrl.proxyImageUrl', () => {
   it('将 i.pximg.net URL 重写为本地代理路径', () => {
@@ -864,5 +865,75 @@ describe('auth.isOAuthCredsInjected（凭证注入门禁回归）', () => {
     expect(
       isOAuthCredsInjected({ clientId: 'c', clientSecret: 's', hashSecret: 'h', appOs: 'ios', appOsVersion: '18.5' }),
     ).toBe(true)
+  })
+})
+
+// ─── Me 页 accessibility 标注（issue #103 / ADR-0061） ───
+// Lynx 侧元素需 accessibility-element + accessibility-label 才能被 Appium 定位。
+// 单测约定（注册表完整性）：
+//   1. 注册表 label 必须非空且唯一（Appium 定位要求可区分）；
+//   2. Me.vue 模板必须消费全部注册表 label（漏标注 → 测试失败）。
+// 注意：vue-lynx 在 node 环境无法直接断言渲染产物属性（依赖 Lynx runtime op 队列），
+// 这里以「注册表 + 模板源码断言」作为最小可行验证，真实暴露行为由模拟器 E2E 兜底。
+describe('Me 页 accessibility 标注注册表（issue #103）', () => {
+  const meVueSource = readFileSync(fileURLToPath(new URL('../src/pages/Me.vue', import.meta.url)), 'utf8')
+
+  it('注册表 label 全部非空且唯一', () => {
+    const labels = Object.values(ME_A11Y_LABELS)
+    expect(labels.length).toBeGreaterThan(0)
+    for (const label of labels) expect(label.length).toBeGreaterThan(0)
+    expect(new Set(labels).size).toBe(labels.length)
+  })
+
+  it('accessibility-element 常量恒为 true（模板据此开启暴露）', () => {
+    expect(A11Y_ELEMENT_ENABLED).toBe(true)
+  })
+
+  it('注册表 label 全部被 Me.vue 模板消费（纯增量标注，漏一个即失败）', () => {
+    for (const key of Object.keys(ME_A11Y_LABELS)) {
+      expect(meVueSource).toContain(`:accessibility-label="ME_A11Y_LABELS.${key}"`)
+    }
+  })
+
+  it('每个 accessibility-label 都配套开启 accessibility-element（view 默认不进 a11y 树）', () => {
+    // 模板里每处 label 引用都必须伴随 element 开启，且数量与注册表严格一致，
+    // 防止「登记了 label 却漏开 element」或「绕过注册表硬编码 label」。
+    const labelCount = (meVueSource.match(/:accessibility-label="ME_A11Y_LABELS\.\w+"/g) ?? []).length
+    const elementCount = (meVueSource.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
+    expect(labelCount).toBe(Object.keys(ME_A11Y_LABELS).length)
+    expect(elementCount).toBe(labelCount)
+  })
+
+  it('「切回 WebView」入口与页面标题标注存在（模拟器 E2E 双向闭环锚点）', () => {
+    expect(ME_A11Y_LABELS.switchToWebview).toBe('切换客户端到WebView')
+    expect(ME_A11Y_LABELS.pageTitle).toBe('我的')
+  })
+})
+
+// ─── Login / Recommended 页 accessibility 标注（issue #107 双向闭环前置） ───
+// Lynx E2E 需要：Login 页注入 token + 提交、Recommended 页导航到 Me。
+// 与 Me 页同一套「注册表 + 模板源码断言」约定。
+describe('Login / Recommended 页 accessibility 标注（issue #107）', () => {
+  const loginVue = readFileSync(fileURLToPath(new URL('../src/pages/Login.vue', import.meta.url)), 'utf8')
+  const recommendedVue = readFileSync(fileURLToPath(new URL('../src/pages/Recommended.vue', import.meta.url)), 'utf8')
+
+  it('LOGIN_A11Y_LABELS 全部被 Login.vue 消费且配套 element', () => {
+    for (const key of Object.keys(LOGIN_A11Y_LABELS)) {
+      expect(loginVue).toContain(`:accessibility-label="LOGIN_A11Y_LABELS.${key}"`)
+    }
+    const labelCount = (loginVue.match(/:accessibility-label="LOGIN_A11Y_LABELS\.\w+"/g) ?? []).length
+    const elementCount = (loginVue.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
+    expect(labelCount).toBe(Object.keys(LOGIN_A11Y_LABELS).length)
+    expect(elementCount).toBe(labelCount)
+  })
+
+  it('RECOMMENDED_A11Y_LABELS 全部被 Recommended.vue 消费且配套 element', () => {
+    for (const key of Object.keys(RECOMMENDED_A11Y_LABELS)) {
+      expect(recommendedVue).toContain(`:accessibility-label="RECOMMENDED_A11Y_LABELS.${key}"`)
+    }
+    const labelCount = (recommendedVue.match(/:accessibility-label="RECOMMENDED_A11Y_LABELS\.\w+"/g) ?? []).length
+    const elementCount = (recommendedVue.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
+    expect(labelCount).toBe(Object.keys(RECOMMENDED_A11Y_LABELS).length)
+    expect(elementCount).toBe(labelCount)
   })
 })

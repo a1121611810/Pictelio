@@ -12,6 +12,7 @@ import BookmarkButton from '../components/BookmarkButton.vue'
 import { isRestricted } from '../stores/settingsStore'
 import { isLoggedIn } from '../stores/authStore'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
+import { RECOMMENDED_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 
 const illusts = ref<PixivIllust[]>([])
 const nextUrl = ref<string | null>(null)
@@ -134,7 +135,12 @@ onActivated(() => {
       <view class="ml-6 px-1 py-1" @tap="openNovels">
         <text class="text-lg text-brand-foreground">小说</text>
       </view>
-      <view class="ml-6 px-1 py-1" @tap="openMe">
+      <view
+        class="ml-6 px-1 py-1"
+        :accessibility-element="A11Y_ELEMENT_ENABLED"
+        :accessibility-label="RECOMMENDED_A11Y_LABELS.openMe"
+        @tap="openMe"
+      >
         <text class="text-lg text-brand-foreground">我的</text>
       </view>
     </view>

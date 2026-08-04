@@ -7,6 +7,7 @@ import { currentUser, logout, isLoggedIn } from '../stores/authStore'
 import { selectedClient, switchClient, type ClientKind } from '../stores/clientSwitchStore'
 import { showR18, showR18G, setShowR18, setShowR18G, ugoiraMode, setUgoiraMode } from '../stores/settingsStore'
 import { proxyImageUrl } from '../utils/imageUrl'
+import { ME_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import GlassCard from '../components/GlassCard.vue'
 
 const switching = ref(false)
@@ -60,13 +61,34 @@ function toggleR18G() {
 }
 </script>
 
+<!--
+  accessibility 标注约定（issue #103 / ADR-0061）：
+  关键交互元素（@tap 容器）与页面标识文本必须标注
+  accessibility-element（绑定 A11Y_ELEMENT_ENABLED 常量）+ accessibility-label
+  （label 取自 src/utils/accessibility.ts 的 ME_A11Y_LABELS 注册表），否则不进入
+  Android accessibility 树，Appium/UiAutomator 无法定位。新增关键交互元素前必须先
+  在注册表登记 label（单测会断言注册表全部被模板消费）。纯增量标注，不改变视觉与
+  交互行为。
+-->
 <template>
   <!-- [lynx:fix] 设置页滚动（issue #90）：header 固定在滚动容器外（与 Bookmarks/Recommended 同模式），
        内容由 scroll-view 承接溢出，web-core 与 native LynxView 行为一致 -->
   <view class="w-full h-full flex flex-col bg-background-2">
     <view class="flex flex-row items-center h-[11.733vw] px-4 bg-background border-b-[1px] border-b-stroke-2">
-      <view class="py-1 pr-2" @tap="goBack"><text class="text-lg text-brand-foreground pr-4">‹ 返回</text></view>
-      <text class="flex-1 text-2xl font-semibold text-foreground">我的</text>
+      <view
+        class="py-1 pr-2"
+        :accessibility-element="A11Y_ELEMENT_ENABLED"
+        :accessibility-label="ME_A11Y_LABELS.back"
+        @tap="goBack"
+      >
+        <text class="text-lg text-brand-foreground pr-4">‹ 返回</text>
+      </view>
+      <text
+        class="flex-1 text-2xl font-semibold text-foreground"
+        :accessibility-element="A11Y_ELEMENT_ENABLED"
+        :accessibility-label="ME_A11Y_LABELS.pageTitle"
+        >我的</text
+      >
     </view>
 
     <scroll-view scroll-orientation="vertical" class="w-full flex-1">
@@ -88,7 +110,12 @@ function toggleR18G() {
             <text class="text-sm text-foreground-3 mt-1">@{{ currentUser.account }}</text>
           </view>
         </view>
-        <view class="flex flex-row items-center justify-between py-3.5" @tap="openBookmarks">
+        <view
+          class="flex flex-row items-center justify-between py-3.5"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.bookmarks"
+          @tap="openBookmarks"
+        >
           <text class="text-lg text-foreground">我的收藏</text>
           <text class="text-lg text-foreground-3">›</text>
         </view>
@@ -96,14 +123,26 @@ function toggleR18G() {
 
       <!-- 客户端组 -->
       <view class="bg-background mt-3 p-4">
-        <text class="text-lg font-semibold text-foreground">客户端</text>
+        <text
+          class="text-lg font-semibold text-foreground"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.clientGroupTitle"
+          >客户端</text
+        >
         <text class="text-xs text-foreground-3 mt-1 mb-3">选择渲染引擎后保存并重启生效</text>
         <view
           class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-stroke-3"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.switchToWebview"
           @tap="pickClient('webview')"
         >
           <view class="flex flex-col">
-            <text class="text-lg text-foreground">WebView（现有）</text>
+            <text
+              class="text-lg text-foreground"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="ME_A11Y_LABELS.webviewOptionTitle"
+              >WebView（现有）</text
+            >
             <text class="text-xs text-foreground-3 mt-0.5">SolidJS + Capacitor</text>
           </view>
           <view
@@ -113,10 +152,17 @@ function toggleR18G() {
         </view>
         <view
           class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-stroke-3"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.switchToLynx"
           @tap="pickClient('lynx')"
         >
           <view class="flex flex-col">
-            <text class="text-lg text-foreground">Lynx（当前）</text>
+            <text
+              class="text-lg text-foreground"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="ME_A11Y_LABELS.lynxOptionTitle"
+              >Lynx（当前）</text
+            >
             <text class="text-xs text-foreground-3 mt-0.5">vue-lynx 原生渲染</text>
           </view>
           <view
@@ -133,6 +179,8 @@ function toggleR18G() {
         <text class="text-xs text-foreground-3 mt-1 mb-3">默认隐藏 R-18 / R-18G 内容</text>
         <view
           class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-stroke-3"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.r18Toggle"
           @tap="toggleR18"
         >
           <text class="text-lg text-foreground">显示 R-18 内容</text>
@@ -145,6 +193,8 @@ function toggleR18G() {
         </view>
         <view
           class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-stroke-3"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.r18gToggle"
           @tap="toggleR18G"
         >
           <text class="text-lg text-foreground">显示 R-18G 内容</text>
@@ -165,6 +215,8 @@ function toggleR18G() {
           <view
             class="flex-1 py-3 rounded-[var(--borderRadiusLarge)] flex items-center justify-center"
             :class="ugoiraMode === 'fflate' ? 'bg-brand' : 'bg-background-3'"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.ugoiraFflate"
             @tap="pickUgoiraMode('fflate')"
           >
             <text class="text-base" :class="ugoiraMode === 'fflate' ? 'text-onBrand' : 'text-foreground'">fflate（默认）</text>
@@ -172,6 +224,8 @@ function toggleR18G() {
           <view
             class="flex-1 py-3 rounded-[var(--borderRadiusLarge)] flex items-center justify-center"
             :class="ugoiraMode === 'range' ? 'bg-brand' : 'bg-background-3'"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.ugoiraRange"
             @tap="pickUgoiraMode('range')"
           >
             <text class="text-base" :class="ugoiraMode === 'range' ? 'text-onBrand' : 'text-foreground'">Range 流式</text>
@@ -184,10 +238,20 @@ function toggleR18G() {
         <view v-if="ugoiraConfirm" class="mt-3 p-3 bg-background-3 rounded-[var(--borderRadiusLarge)]">
           <text class="text-sm text-foreground">确认切换到 Range 流式？</text>
           <view class="flex flex-row mt-2 gap-2">
-            <view class="flex-1 py-2 bg-brand rounded-[var(--borderRadiusMedium)] flex items-center justify-center" @tap="confirmUgoiraRange">
+            <view
+              class="flex-1 py-2 bg-brand rounded-[var(--borderRadiusMedium)] flex items-center justify-center"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="ME_A11Y_LABELS.ugoiraConfirm"
+              @tap="confirmUgoiraRange"
+            >
               <text class="text-base text-onBrand">确认</text>
             </view>
-            <view class="flex-1 py-2 bg-background rounded-[var(--borderRadiusMedium)] flex items-center justify-center" @tap="ugoiraConfirm = false">
+            <view
+              class="flex-1 py-2 bg-background rounded-[var(--borderRadiusMedium)] flex items-center justify-center"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="ME_A11Y_LABELS.ugoiraCancel"
+              @tap="ugoiraConfirm = false"
+            >
               <text class="text-base text-foreground">取消</text>
             </view>
           </view>
@@ -196,7 +260,12 @@ function toggleR18G() {
 
       <!-- 退出登录（危险操作独立沉底） -->
       <view class="bg-background mt-3 p-4">
-        <view class="py-3.5" @tap="onLogout">
+        <view
+          class="py-3.5"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.logout"
+          @tap="onLogout"
+        >
           <text class="text-lg text-danger">退出登录</text>
         </view>
       </view>
