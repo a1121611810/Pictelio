@@ -5,17 +5,6 @@ android {
     compileSdk = rootProject.ext.compileSdkVersion
     buildToolsVersion = "36.1.0"
 
-    // #115：临时将 flavor 目录加入 main sourceSet，保证搬迁后编译通过。
-    // #116 将替换为正式的 flavor sourceSet 配置。
-    sourceSets {
-        main {
-            java {
-                srcDir 'src/webview/java'
-                srcDir 'src/lynx/java'
-                srcDir 'src/full/java'
-            }
-        }
-    }
     defaultConfig {
         applicationId "io.pictelio.app"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -29,6 +18,41 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+
+    // ── Product Flavors（#116：三分包）──────────────────────────
+    flavorDimensions "client"
+    productFlavors {
+        full {
+            dimension "client"
+            manifestPlaceholders = [launcherActivity: ".MainActivity", appClass: ".PictelioApp"]
+        }
+        webview {
+            dimension "client"
+            manifestPlaceholders = [launcherActivity: ".MainActivityWebview", appClass: ".PictelioAppWebview"]
+        }
+        lynx {
+            dimension "client"
+            manifestPlaceholders = [launcherActivity: ".LynxActivity", appClass: ".PictelioAppLynx"]
+        }
+    }
+
+    sourceSets {
+        // webview flavor：Capacitor 插件 + MainActivity + PictelioApp(webview)
+        webview {
+            java.srcDir 'src/webview/java'
+        }
+        // lynx flavor：Lynx Native Modules + LynxActivity + PictelioApp(lynx)
+        lynx {
+            java.srcDir 'src/lynx/java'
+        }
+        // full flavor：双 client 合并 + PictelioApp(full 条件分支)
+        full {
+            java.srcDir 'src/webview/java'
+            java.srcDir 'src/lynx/java'
+            java.srcDir 'src/full/java'
+        }
+    }
+
     buildFeatures {
         buildConfig = true
     }
@@ -74,7 +98,8 @@ def validateReleaseSigning() {
 }
 
 gradle.taskGraph.whenReady { graph ->
-    def releaseTasks = [':app:assembleRelease', ':app:packageRelease', ':app:bundleRelease', ':app:signReleaseApk', ':app:signReleaseBundle']
+    def releaseTasks = [':app:assembleRelease', ':app:packageRelease', ':app:bundleRelease', ':app:signReleaseApk', ':app:signReleaseBundle',
+                        ':app:assembleFullRelease', ':app:assembleWebviewRelease', ':app:assembleLynxRelease']
     if (graph.allTasks.any { it.path in releaseTasks }) {
         validateReleaseSigning()
     }
@@ -84,35 +109,53 @@ repositories {
 }
 
 dependencies {
+    // ── Shared（双端共用）──
     implementation fileTree(include: ['*.jar', '*.aar'], dir: 'libs')
-    implementation fileTree(include: ['*.jar', '*.aar'], dir: '../capacitor-cordova-android-plugins/src/main/libs')
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
-    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
-    implementation project(':capacitor-android')
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // ── WebView-only（Capacitor 系）──
+    webviewImplementation fileTree(include: ['*.jar', '*.aar'], dir: '../capacitor-cordova-android-plugins/src/main/libs')
+    webviewImplementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    webviewImplementation project(':capacitor-android')
+    webviewImplementation project(':capacitor-cordova-android-plugins')
+
+    // ── Lynx-only ──
     // Lynx SDK（#52 起引入：LynxModule 编译依赖；完整配置见 #51 原生 LynxView 壳）
-    implementation "org.lynxsdk.lynx:lynx:4.0.1"
+    lynxImplementation "org.lynxsdk.lynx:lynx:4.0.1"
     // Lynx Service（官方集成要求，#51 补充）：
     // - lynx-service-http：lynx.fetch 依赖（未注册则原生 fetch 不可用 → API/OAuth 断）
     // - lynx-service-log：日志服务（官方基线）
     // 图片服务（lynx-service-image/Fresco）不引入——i.pximg.net 需 Referer 头，
     // Fresco 默认不传 customParam 为 header（403），自研 ILynxImageService（#54）
-    implementation "org.lynxsdk.lynx:lynx-service-http:4.0.1"
-    implementation "org.lynxsdk.lynx:lynx-service-log:4.0.1"
+    lynxImplementation "org.lynxsdk.lynx:lynx-service-http:4.0.1"
+    lynxImplementation "org.lynxsdk.lynx:lynx-service-log:4.0.1"
     // XElement（官方扩展元件，#51 真机实测必需）：
     // 基础 xelement 提供扩展 behaviors；xelement-input 提供 <input>/<textarea>
     // （LynxError 990200 "No BehaviorController defined for class input"，
     //  真机 2026-08-01 Login.vue 输入框渲染失败 → 补依赖 + LynxActivity addBehaviors）
-    implementation "org.lynxsdk.lynx:xelement:4.0.1"
-    implementation "org.lynxsdk.lynx:xelement-input:4.0.1"
+    lynxImplementation "org.lynxsdk.lynx:xelement:4.0.1"
+    lynxImplementation "org.lynxsdk.lynx:xelement-input:4.0.1"
+
+    // ── Full = webview + lynx 并集 ──
+    fullImplementation fileTree(include: ['*.jar', '*.aar'], dir: '../capacitor-cordova-android-plugins/src/main/libs')
+    fullImplementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    fullImplementation project(':capacitor-android')
+    fullImplementation project(':capacitor-cordova-android-plugins')
+    fullImplementation "org.lynxsdk.lynx:lynx:4.0.1"
+    fullImplementation "org.lynxsdk.lynx:lynx-service-http:4.0.1"
+    fullImplementation "org.lynxsdk.lynx:lynx-service-log:4.0.1"
+    fullImplementation "org.lynxsdk.lynx:xelement:4.0.1"
+    fullImplementation "org.lynxsdk.lynx:xelement-input:4.0.1"
+
+    // ── Test ──
     testImplementation "junit:junit:$junitVersion"
     testImplementation "org.robolectric:robolectric:4.14.1"
     testImplementation "androidx.test:core:1.6.1"
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
-    implementation project(':capacitor-cordova-android-plugins')
 }
 
 apply from: 'capacitor.build.gradle'

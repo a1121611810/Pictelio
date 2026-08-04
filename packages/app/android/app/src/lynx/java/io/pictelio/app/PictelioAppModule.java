@@ -76,11 +76,17 @@ public class PictelioAppModule extends LynxModule {
     public void restart(Callback callback) {
         try {
             Context ctx = appContext();
-            Intent intent = new Intent(ctx, MainActivity.class);
+            // 通过 PackageManager 获取 LAUNCHER intent，避免硬编码 Activity 类
+            // （lynx flavor 无 MainActivity，full flavor LAUNCHER 是 MainActivity）
+            Intent intent = ctx.getPackageManager().getLaunchIntentForPackage(ctx.getPackageName());
+            if (intent == null) {
+                callback.invoke("无法获取 LAUNCHER intent");
+                return;
+            }
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             ctx.startActivity(intent);
             callback.invoke();
-            // 延迟杀进程：等 MainActivity 启动完成后结束当前进程，
+            // 延迟杀进程：等 LAUNCHER Activity 启动完成后结束当前进程，
             // 保证全新进程重新走 client 分发（避免 Lynx runtime 静态状态残留）
             new Handler(Looper.getMainLooper()).postDelayed(() -> {
                 Process.killProcess(Process.myPid());

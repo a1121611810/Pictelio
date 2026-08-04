@@ -164,7 +164,7 @@ public class AuthPlugin extends Plugin {
      */
     @PluginMethod
     public void hideSplash(PluginCall call) {
-        MainActivity.dismissSplash();
+        SplashController.dismiss();
         call.resolve();
     }
 

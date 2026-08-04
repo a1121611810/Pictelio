@@ -10,7 +10,7 @@ import android.app.Application;
  * 绘制之间的视觉空白；预热缩短 WebView 服务进程初始化耗时。异常安全：预热失败
  * 静默吞异常，app 正常启动，正式 WebView 回退冷初始化路径。
  */
-public class PictelioApp extends Application {
+public class PictelioAppWebview extends Application {
 
     @Override
     public void onCreate() {

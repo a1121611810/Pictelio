@@ -14,9 +14,9 @@ import com.lynx.tasm.service.LynxServiceCenter;
  * <p>无条件初始化 Lynx runtime + 全局 Native Modules 注册。
  * 须在早于任何 LynxView 创建时执行。
  */
-public class PictelioApp extends Application {
+public class PictelioAppLynx extends Application {
 
-    private static final String TAG = "PictelioApp";
+    private static final String TAG = "PictelioAppLynx";
 
     @Override
     public void onCreate() {

@@ -23,17 +23,15 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Pictelio Android 客户端 — 拦截 /pixiv-img/ 请求并代理到 i.pximg.net（注入 Referer 头）。
  */
-public class MainActivity extends BridgeActivity {
+public class MainActivityWebview extends BridgeActivity {
 
     private static final String TAG = "MainActivity";
 
-    /** SplashScreen 保持可见的标志位，由 AuthPlugin.hideSplash() 通过 dismissSplash() setter 控制 */
-    private static final AtomicBoolean keepSplashVisible = new AtomicBoolean(true);
+    /** SplashScreen 控制委托 SplashController（#116 shared），供 AuthPlugin.hideSplash() 跨 flavor 调用 */
 
     /** 共享图片加载器（#58）：单实例保证 per-URL 锁在并发拦截下生效（避免同 URL 双写缓存） */
     private volatile PixivImageLoader imageLoader;
@@ -53,30 +51,17 @@ public class MainActivity extends BridgeActivity {
 
     /** 供同包下的 AuthPlugin 调用，通知 SplashScreen 可退出 */
     static void dismissSplash() {
-        keepSplashVisible.set(false);
+        SplashController.dismiss();
     }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // ① lynx client 入口路由（#51）：在 Splash/WebView 检查之前分发。
-        // 读 SharedPreferences("CapacitorStorage") 的 pictelio_client_kind：
-        // "lynx" → 跳 LynxActivity（纯 LynxView，无 Capacitor bridge），本 Activity 不初始化。
-        // 研究结论：BridgeActivity.onCreate 无条件创建 WebView，不可同 Activity，故双 Activity 分发。
-        // 注意：Android 硬约束——onCreate 必须调用 super.onCreate（否则 SuperNotCalledException，
-        // 真机实测 2026-08-01），故 lynx 分支先 super 再跳转（bridge 初始化浪费可接受，立即 finish）。
-        String clientKind = getSharedPreferences("CapacitorStorage", MODE_PRIVATE)
-                .getString("pictelio_client_kind", "webview");
-        if ("lynx".equals(clientKind)) {
-            super.onCreate(savedInstanceState);
-            startActivity(new Intent(this, LynxActivity.class));
-            finish();
-            return; // 不注册插件、不做 WebView 版本检查
-        }
+        // webview flavor：无 lynx 入口路由（#116），直接初始化 WebView client。
 
         // 确保每次 Activity 重建时 Splash 可重新显示
-        keepSplashVisible.set(true);
+        SplashController.keepVisible();
         SplashScreen splashScreen = SplashScreen.installSplashScreen(this);
-        splashScreen.setKeepOnScreenCondition(() -> keepSplashVisible.get());
+        splashScreen.setKeepOnScreenCondition(() -> SplashController.shouldKeepVisible());
         splashScreen.setOnExitAnimationListener(splashScreenView -> {
             View icon = splashScreenView.getIconView();
             if (icon != null) {
@@ -96,7 +81,7 @@ public class MainActivity extends BridgeActivity {
             // 必须先 super.onCreate（Android 硬约束：跳过即 SuperNotCalledException 崩溃），
             // 且不初始化 Capacitor Bridge / 插件。
             super.onCreate(savedInstanceState);
-            keepSplashVisible.set(false);
+            SplashController.dismiss();
             showWebViewUpgradeError();
             return;
         }
