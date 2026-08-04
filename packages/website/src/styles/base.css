@@ -107,9 +107,6 @@ html {
   --glass-bg-strong: rgba(255, 255, 255, 0.08);
   --glass-border: rgba(255, 255, 255, 0.08);
   --glass-highlight: rgba(255, 255, 255, 0.08);
-  --glass-brand-bg: rgba(90, 159, 212, 0.14);
-  --glass-brand-bg-hover: rgba(90, 159, 212, 0.22);
-  --glass-brand-border: rgba(90, 159, 212, 0.28);
 }
 
 html:not(.dark) {
@@ -117,9 +114,6 @@ html:not(.dark) {
   --glass-bg-strong: rgba(255, 255, 255, 0.7);
   --glass-border: rgba(0, 0, 0, 0.06);
   --glass-highlight: rgba(255, 255, 255, 0.55);
-  --glass-brand-bg: rgba(43, 87, 154, 0.12);
-  --glass-brand-bg-hover: rgba(43, 87, 154, 0.18);
-  --glass-brand-border: rgba(43, 87, 154, 0.2);
 }
 
 /* ── Global cursor glow ── */
