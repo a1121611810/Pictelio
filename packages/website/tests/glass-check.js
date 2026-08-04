@@ -13,6 +13,8 @@ async (page) => {
     localStorage.setItem("pictelio-theme", "dark");
     document.documentElement.classList.add("dark");
   });
+  // 按钮 background 有 0.2s 过渡，等待样式稳定后再断言
+  await page.waitForTimeout(250);
 
   for (const sel of targets) {
     const el = page.locator(sel).first();
@@ -32,6 +34,12 @@ async (page) => {
     const color = await page.locator(sel).first().evaluate((el) => getComputedStyle(el).color);
     if (color !== "rgb(245, 245, 245)") {
       throw new Error(`[FAIL] 暗色 ${sel} 文字色应为 #f5f5f5（当前: ${color}）`);
+    }
+  }
+  for (const sel of [".vc-btn-primary", ".vc-btn-glow"]) {
+    const bg = await page.locator(sel).first().evaluate((el) => getComputedStyle(el).backgroundColor);
+    if (!bg.includes("90, 159, 212")) {
+      throw new Error(`[FAIL] 暗色 ${sel} 玻璃底色应为品牌蓝调 rgba(90,159,212,*)（当前: ${bg}）`);
     }
   }
 
@@ -56,6 +64,7 @@ async (page) => {
     localStorage.setItem("pictelio-theme", "light");
     document.documentElement.classList.remove("dark");
   });
+  await page.waitForTimeout(250);
   const light = await readVars();
   if (!light.blur || !light.saturate || !light.tint) {
     throw new Error(`[FAIL] 亮色 --glass-* 变量未解析: ${JSON.stringify(light)}`);
@@ -73,6 +82,12 @@ async (page) => {
     const color = await page.locator(sel).first().evaluate((el) => getComputedStyle(el).color);
     if (color !== "rgb(17, 17, 17)") {
       throw new Error(`[FAIL] 亮色 ${sel} 文字色应为 #111（当前: ${color}）`);
+    }
+  }
+  for (const sel of [".vc-btn-primary", ".vc-btn-glow"]) {
+    const bg = await page.locator(sel).first().evaluate((el) => getComputedStyle(el).backgroundColor);
+    if (!bg.includes("43, 87, 154")) {
+      throw new Error(`[FAIL] 亮色 ${sel} 玻璃底色应为品牌蓝调 rgba(43,87,154,*)（当前: ${bg}）`);
     }
   }
   await page.screenshot({ path: "/tmp/glass-light.png", fullPage: false });
