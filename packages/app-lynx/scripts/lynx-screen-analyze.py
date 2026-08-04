@@ -145,6 +145,45 @@ def login_elements(w, h, rows):
     return result
 
 
+def topbar_nav(w, h, rows):
+    """定位顶栏文字行：返回 {"y": 文字行中心, "blocks": [{x0,x1,cx}...]}。
+
+    用途：带系统状态栏的屏幕上，顶栏（11.733vw 高）位于状态栏下方，
+    固定坐标缩放不可靠（曾误点入卡片/状态栏）。动态检测深色文字行最稳。
+    约定：最右侧文字块 = "我的"tab（推荐页），最左侧 = 返回按钮（详情/设置页）。
+    """
+    pts = []
+    # 顶栏区域：跳过状态栏（灰色条，r≈g≈b 且整行都是会被误判为文字块），
+    # 从 h*4.5% 开始（模拟器状态栏 ≈ 48px/1280）到 h*11%（顶栏 11.733vw 结束附近）
+    for y in range(int(h * 0.045), int(h * 0.11), 2):
+        for x in range(0, w, 2):
+            r, g, b = pixel(rows, y, x)
+            # 顶栏 tab 文字是品牌蓝（b 高）或深色（foreground）；排除纯灰（状态栏 r≈g≈b）
+            is_dark = r < 140 and g < 140 and b < 140 and not (abs(r - g) < 20 and abs(g - b) < 20)
+            is_brand = b > 120 and b > r + 30 and b > g + 20
+            if is_dark or is_brand:
+                pts.append((x, y))
+    if not pts:
+        return {}
+    ys = [p[1] for p in pts]
+    yc = sum(ys) // len(ys)
+    xs = sorted(set(p[0] for p in pts))
+    blocks = []
+    cur = [xs[0]]
+    for x in xs[1:]:
+        if x - cur[-1] <= 24:
+            cur.append(x)
+        else:
+            blocks.append((min(cur), max(cur)))
+            cur = [x]
+    blocks.append((min(cur), max(cur)))
+    out = []
+    for x0, x1 in blocks:
+        if x1 - x0 >= 10:  # 过滤单点噪声
+            out.append({"x0": x0, "x1": x1, "cx": (x0 + x1) // 2})
+    return {"y": yc, "blocks": out}
+
+
 def classify(w, h, rows):
     """细粒度页面分类（完整流程自动化用）。
 
@@ -288,6 +327,8 @@ def main():
         print(json.dumps(page_state(w, h, rows)))
     elif mode == "classify":
         print(json.dumps(classify(w, h, rows)))
+    elif mode == "topbar-nav":
+        print(json.dumps(topbar_nav(w, h, rows)))
     else:
         print(json.dumps({"error": f"unknown mode {mode}"}))
 
