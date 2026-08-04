@@ -113,9 +113,9 @@ const screenshots = [
     const MAX_X = 5;
     let targetY = BASE_Y, targetX = 0;
     let currentY = BASE_Y, currentX = 0;
-    // h1 标题径向高光跟随：--gx/--gy 百分比（默认停在左侧白色区）
-    let targetGx = 20, targetGy = 50;
-    let currentGx = 20, currentGy = 50;
+    // h1 标题渐变位置跟随鼠标：--bgx/--bgy（background-position，可靠重绘）
+    let targetBx = 0, targetBy = 50;
+    let currentBx = 0, currentBy = 50;
     let rafId = null;
 
     function lerp(a, b, t) { return a + (b - a) * t; }
@@ -124,18 +124,18 @@ const screenshots = [
     function tick() {
       currentY = lerp(currentY, targetY, 0.1);
       currentX = lerp(currentX, targetX, 0.1);
-      currentGx = lerp(currentGx, targetGx, 0.08);
-      currentGy = lerp(currentGy, targetGy, 0.08);
+      currentBx = lerp(currentBx, targetBx, 0.08);
+      currentBy = lerp(currentBy, targetBy, 0.08);
       phone.style.transform = `perspective(800px) rotateX(${currentX}deg) rotateY(${currentY}deg)`;
       if (title && !prefersReduced) {
-        title.style.setProperty("--gx", `${currentGx}%`);
-        title.style.setProperty("--gy", `${currentGy}%`);
+        title.style.setProperty("--bgx", `${currentBx}%`);
+        title.style.setProperty("--bgy", `${currentBy}%`);
       }
       if (
         Math.abs(currentY - targetY) > 0.01 ||
         Math.abs(currentX - targetX) > 0.01 ||
-        Math.abs(currentGx - targetGx) > 0.01 ||
-        Math.abs(currentGy - targetGy) > 0.01
+        Math.abs(currentBx - targetBx) > 0.01 ||
+        Math.abs(currentBy - targetBy) > 0.01
       ) {
         rafId = requestAnimationFrame(tick);
       } else {
@@ -155,8 +155,8 @@ const screenshots = [
       targetY = BASE_Y + smooth(nx) * MAX_Y;
       targetX = smooth(ny) * MAX_X;
       if (!prefersReduced) {
-        targetGx = (x / rect.width) * 100;
-        targetGy = (y / rect.height) * 100;
+        targetBx = (x / rect.width) * 100;
+        targetBy = (y / rect.height) * 100;
       }
       kick();
     });
@@ -165,8 +165,8 @@ const screenshots = [
       targetY = BASE_Y;
       targetX = 0;
       if (!prefersReduced) {
-        targetGx = 20;
-        targetGy = 50;
+        targetBx = 0;
+        targetBy = 50;
       }
       kick();
     });

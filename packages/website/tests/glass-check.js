@@ -85,22 +85,22 @@ async (page) => {
   if ((await mini.getAttribute("class"))?.includes("visible")) {
     throw new Error("[FAIL] 回顶后迷你按钮应隐藏");
   }
-  // h1 标题渐变跟随鼠标：径向高光层存在；mousemove 后 --gx/--gy 被 JS 更新
+  // h1 标题渐变跟随鼠标：background-position 由 --bgx/--bgy 驱动；mousemove 后被 JS 更新
   const titleEl = page.locator(".vc-title");
   const titleBg = await titleEl.evaluate((el) => getComputedStyle(el).backgroundImage);
-  if (!titleBg.includes("radial-gradient")) {
-    throw new Error("[FAIL] .vc-title 应包含随鼠标移动的径向高光层");
+  if (!titleBg.includes("linear-gradient")) {
+    throw new Error(`[FAIL] .vc-title 应使用线性渐变（当前: ${titleBg}）`);
   }
-  const gxBefore = await titleEl.evaluate((el) => el.style.getPropertyValue("--gx") || "unset");
+  const bgxBefore = await titleEl.evaluate((el) => el.style.getPropertyValue("--bgx") || "unset");
   const heroBox = await page.locator(".vc-hero").boundingBox();
   await page.mouse.move(
     Math.round(heroBox.x + heroBox.width * 0.9),
     Math.round(heroBox.y + heroBox.height * 0.5),
   );
   await page.waitForTimeout(600);
-  const gxAfter = await titleEl.evaluate((el) => el.style.getPropertyValue("--gx"));
-  if (!gxAfter || gxAfter === gxBefore) {
-    throw new Error(`[FAIL] mousemove 后 --gx 应变化（before: ${gxBefore}, after: ${gxAfter}）`);
+  const bgxAfter = await titleEl.evaluate((el) => el.style.getPropertyValue("--bgx"));
+  if (!bgxAfter || bgxAfter === bgxBefore) {
+    throw new Error(`[FAIL] mousemove 后 --bgx 应变化（before: ${bgxBefore}, after: ${bgxAfter}）`);
   }
 
   const readVars = () =>
