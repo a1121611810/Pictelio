@@ -55,6 +55,10 @@
     "cap:sync": "vp run --filter pictelio-app cap:sync",
     "cap:open:android": "vp run --filter pictelio-app cap:open:android",
     "sync:app-lynx-bundle": "node packages/app-lynx/scripts/sync-android-assets.mjs",
+    "kill:app": "node scripts/kill-dev-server.mjs app --force",
+    "kill:app-lynx": "node scripts/kill-dev-server.mjs app-lynx --force",
+    "kill:website": "node scripts/kill-dev-server.mjs website --force",
+    "kill:all": "node scripts/kill-dev-server.mjs all --force",
     "openwiki:update": "openwiki --update",
     "prepare": "husky"
   },
