@@ -34,9 +34,12 @@ blockExoticSubdeps: true
 # 以后新增包若有 install 脚本需手动加入白名单）
 allowBuilds:
   agent-browser: true
+  appium: true
   canvas: true
   core-js: true
+  edgedriver: false
   esbuild: true
+  geckodriver: false
   # pnpm install 会自动列出待审批的包到这里
 
   # ── 依赖解析优化 ──
