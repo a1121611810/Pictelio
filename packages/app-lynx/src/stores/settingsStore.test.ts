@@ -84,8 +84,12 @@ describe("玻璃遮罩 token 契约（issue #91）", () => {
     const overlaySrc = readFileSync(resolve(here, "../components/RestrictOverlay.vue"), "utf-8")
     expect(overlaySrc).toContain("var(--glassBg)")
     expect(overlaySrc).toContain("var(--glassBlur)")
+    expect(overlaySrc).toContain("@supports")
     // 只约束玻璃样式块（徽章等 UI 允许合法用色）
     const styleBlock = overlaySrc.split(".restrict-overlay")[1] ?? ""
     expect(styleBlock).not.toMatch(/rgba?\(|#[0-9a-fA-F]{3,8}/)
+  })
+  it("tokens.css 定义玻璃降级 token --glassBgMuted", () => {
+    expect(tokensCss).toContain("--glassBgMuted:")
   })
 })

@@ -36,9 +36,20 @@ function swallow() {}
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--glassBg);
-  backdrop-filter: blur(var(--glassBlur)) saturate(var(--glassSaturate));
+  /* web-core 不支持声明式 backdrop-filter（源码核验：仅内部元素 blur-radius 属性），
+     静默忽略后剩 0.88 底 → 实心。降级：web-core 走低透明度实色盖（能看见下层内容轮廓），
+     宿主浏览器（web-core 运行于真实浏览器环境，backdrop-filter 生效）经 @supports 升级为真玻璃。 */
+  background-color: var(--glassBgMuted);
   border: 1px solid var(--glassBorder);
   border-radius: var(--borderRadiusXLarge);
+}
+
+/* Lynx CSS 引擎不认识的 @supports 整块丢弃，无害 */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .restrict-overlay {
+    background-color: var(--glassBg);
+    backdrop-filter: blur(var(--glassBlur)) saturate(var(--glassSaturate));
+    -webkit-backdrop-filter: blur(var(--glassBlur)) saturate(var(--glassSaturate));
+  }
 }
 </style>

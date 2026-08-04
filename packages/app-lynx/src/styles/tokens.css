@@ -28,9 +28,11 @@ page {
   --colorOverlayDark: rgba(0, 0, 0, 0.55);
 
   /* 玻璃遮罩（R18 受限条目盖，issue #91；参照 website base.css --glass-*）
-   * web-core：完整玻璃（backdrop-filter + 半透明底 + 细边）；
-   * 原生 LynxView 静默忽略 backdrop-filter，退化为高不透明度实色盖，功能无损。 */
-  --glassBg: rgba(255, 255, 255, 0.88);
+   * web-core 不支持声明式 backdrop-filter（web-elements.js 源码核验：仅内部元素 blur-radius 属性），
+   * 方案：web-core 走 --glassBgMuted 低透明实色；宿主浏览器经 @supports 升级为 --glassBg + blur 真玻璃；
+   * 原生 LynxView 同样静默忽略 backdrop-filter，退化为 --glassBgMuted 实色盖，功能无损。 */
+  --glassBg: rgba(255, 255, 255, 0.6);
+  --glassBgMuted: rgba(255, 255, 255, 0.55);
   --glassBlur: 24px;
   --glassSaturate: 150%;
   --glassBorder: rgba(0, 0, 0, 0.06);
