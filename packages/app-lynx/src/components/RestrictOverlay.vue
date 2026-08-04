@@ -21,7 +21,7 @@ function swallow() {}
         class="text-xs font-semibold text-onBrand px-2 py-0.5 rounded-[var(--borderRadiusSmall)]"
         :class="level === 2 ? 'bg-danger' : 'bg-warning'"
       >{{ badge }}</text>
-      <text class="text-xs text-foreground-2 mt-2">该内容已在设置中隐藏</text>
+      <text class="text-xs text-foreground-2 mt-2">受浏览限制，不予显示</text>
     </view>
   </view>
 </template>
