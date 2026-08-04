@@ -1,5 +1,6 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+import version from "../../version.json";
 
 const features = [
   {
@@ -45,10 +46,17 @@ const screenshots = [
           <h1 class="vc-title vc-reveal vc-reveal-delay-1">Pictelio</h1>
           <p class="vc-sub vc-reveal vc-reveal-delay-2">为 Android 打造的 Pixiv 浏览体验 — 插画、小说、收藏、发现，一切尽在掌握。</p>
           <div class="vc-actions vc-reveal vc-reveal-delay-3">
-            <a href="https://github.com/a1121611810/pixivizer/releases" class="vc-btn-primary" target="_blank" rel="noopener noreferrer">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              下载 APK
-            </a>
+            <div class="vc-actions-buttons">
+              <a href="https://github.com/a1121611810/pixivizer/releases" class="vc-btn-primary" target="_blank" rel="noopener noreferrer">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                下载 APK
+              </a>
+            </div>
+            <div class="vc-download-meta">
+              <span class="vc-version-pill">v{version.version}</span>
+              <span>Android 11+</span>
+              <a class="vc-meta-link" href={version.url} target="_blank" rel="noopener noreferrer">更新日志</a>
+            </div>
           </div>
         </div>
         <div class="vc-visual vc-reveal vc-reveal-delay-2">
@@ -79,16 +87,6 @@ const screenshots = [
         ))}
       </div>
     </section>
-
-    <!-- Download -->
-    <section class="vc-cta">
-      <h2 class="vc-cta-title vc-reveal">立即下载</h2>
-      <p class="vc-cta-sub vc-reveal vc-reveal-delay-1">开源 · 免费 · 无广告 · 无需第三方账户</p>
-      <a href="https://github.com/a1121611810/pixivizer/releases" class="vc-btn-glow vc-reveal vc-reveal-delay-2" target="_blank" rel="noopener noreferrer">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        从 GitHub Releases 下载
-      </a>
-    </section>
   </div>
 </BaseLayout>
 
@@ -107,12 +105,17 @@ const screenshots = [
   // ── Phone tilt + cursor glow ──
   const hero = document.querySelector(".vc-hero");
   const phone = document.querySelector(".vc-phone");
+  const title = document.querySelector(".vc-title");
+  const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (hero && phone) {
     const BASE_Y = -8;
     const MAX_Y = 10;
     const MAX_X = 5;
     let targetY = BASE_Y, targetX = 0;
     let currentY = BASE_Y, currentX = 0;
+    // h1 标题渐变位置跟随鼠标：--bgx/--bgy（background-position，可靠重绘）
+    let targetBx = 0, targetBy = 50;
+    let currentBx = 0, currentBy = 50;
     let rafId = null;
 
     function lerp(a, b, t) { return a + (b - a) * t; }
@@ -121,8 +124,19 @@ const screenshots = [
     function tick() {
       currentY = lerp(currentY, targetY, 0.1);
       currentX = lerp(currentX, targetX, 0.1);
+      currentBx = lerp(currentBx, targetBx, 0.08);
+      currentBy = lerp(currentBy, targetBy, 0.08);
       phone.style.transform = `perspective(800px) rotateX(${currentX}deg) rotateY(${currentY}deg)`;
-      if (Math.abs(currentY - targetY) > 0.01 || Math.abs(currentX - targetX) > 0.01) {
+      if (title && !prefersReduced) {
+        title.style.setProperty("--bgx", `${currentBx}%`);
+        title.style.setProperty("--bgy", `${currentBy}%`);
+      }
+      if (
+        Math.abs(currentY - targetY) > 0.01 ||
+        Math.abs(currentX - targetX) > 0.01 ||
+        Math.abs(currentBx - targetBx) > 0.01 ||
+        Math.abs(currentBy - targetBy) > 0.01
+      ) {
         rafId = requestAnimationFrame(tick);
       } else {
         rafId = null;
@@ -140,12 +154,20 @@ const screenshots = [
 
       targetY = BASE_Y + smooth(nx) * MAX_Y;
       targetX = smooth(ny) * MAX_X;
+      if (!prefersReduced) {
+        targetBx = (x / rect.width) * 100;
+        targetBy = (y / rect.height) * 100;
+      }
       kick();
     });
 
     hero.addEventListener("mouseleave", () => {
       targetY = BASE_Y;
       targetX = 0;
+      if (!prefersReduced) {
+        targetBx = 0;
+        targetBy = 50;
+      }
       kick();
     });
   }

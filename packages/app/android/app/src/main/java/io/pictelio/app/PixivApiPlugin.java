@@ -48,8 +48,9 @@ public class PixivApiPlugin extends Plugin {
     private static final String KEY_REFRESH_TOKEN = "refresh_token";
 
     private static volatile OkHttpClient client;
-    private static String accessToken;
-    private static String refreshToken;
+    /** #53：Lynx Native Module（PictelioAuth/PictelioApi）同包读写；access_token 只进不出 */
+    static String accessToken;
+    static String refreshToken;
     /** 刷新 token 中的锁，防止并发 401 重复刷新 */
     private static volatile boolean isRefreshing = false;
 
@@ -110,17 +111,32 @@ public class PixivApiPlugin extends Plugin {
         String url = urlBuilder.toString();
 
         try {
-            JSObject result = executeRequest(method, url, body, false);
+            JSObject result = executeRequest(method, url, body, false,
+                    token -> {
+                        // token 轮换：通知 JS 侧持久化新值（webview 专属；Lynx 走 PictelioAuth）
+                        JSObject data = new JSObject();
+                        data.put("token", token);
+                        notifyListeners("refreshTokenRotated", data);
+                    });
             call.resolve(result);
         } catch (Exception e) {
             call.reject("Request failed: " + e.getMessage());
         }
     }
 
+    /** #53：token 轮换回调（webview 用 notifyListeners；Lynx 传 null） */
+    interface RefreshTokenRotationListener {
+        void onRefreshTokenRotated(String newRefreshToken);
+    }
+
     /**
      * 执行 HTTP 请求，遇 401 自动刷新 token 后重试一次。
+     * #53：package-private static，供 PictelioApiModule（Lynx）同包转发。
+     *
+     * @param rotationListener 401 刷新且 refresh_token 轮换时回调（webview 通知 JS；Lynx 传 null）
      */
-    private JSObject executeRequest(String method, String url, String body, boolean isRetry)
+    static JSObject executeRequest(String method, String url, String body, boolean isRetry,
+            RefreshTokenRotationListener rotationListener)
             throws IOException, JSONException {
         Request.Builder builder = new Request.Builder()
                 .url(url)
@@ -142,19 +158,22 @@ public class PixivApiPlugin extends Plugin {
 
             // 401 且未重试过 → 静默刷新 token 后重试
             if (statusCode == 401 && !isRetry) {
-                boolean refreshed = false;
+                String rotated = null;
                 synchronized (PixivApiPlugin.class) {
                     if (!isRefreshing) {
                         isRefreshing = true;
                         try {
-                            refreshed = refreshAccessToken();
+                            rotated = refreshAccessTokenCore();
                         } finally {
                             isRefreshing = false;
                         }
                     }
                 }
-                if (refreshed) {
-                    return executeRequest(method, url, body, true);
+                if (rotated != null) {
+                    if (rotationListener != null && !rotated.isEmpty()) {
+                        rotationListener.onRefreshTokenRotated(rotated);
+                    }
+                    return executeRequest(method, url, body, true, rotationListener);
                 }
             }
 
@@ -273,79 +292,92 @@ public class PixivApiPlugin extends Plugin {
      * 使用内存中的 refresh_token 调用 Pixiv OAuth 端点刷新 access_token，
      * 成功后更新内存变量。token 由 JS 侧通过 syncToken 注入（tokenReady barrier
      * 保证注入先于任何 API 请求，见 ADR-0041）。
+     * #53：package-private static，供 PictelioAuthModule 401 刷新。
      *
      * @return true 如果刷新成功
      */
-    private boolean refreshAccessToken() {
+    /**
+     * 刷新核心（#53）：oauthTokenExchange 更新 Java 堆字段，无 notify——
+     * Lynx executeRequest/PictelioAuth 401 刷新用。
+     *
+     * @return 成功时返回新 refresh_token（可能为空串），失败返回 null
+     */
+    static String refreshAccessTokenCore() {
         try {
-            String savedRefreshToken = refreshToken;
-
-            if (savedRefreshToken == null || savedRefreshToken.isEmpty()) {
-                return false;
+            String saved = refreshToken;
+            if (saved == null || saved.isEmpty()) {
+                return null;
             }
-
-            String localTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME
-                    .withZone(ZoneOffset.UTC)
-                    .format(Instant.now())
-                    .replace("Z", "+00:00");
-
-            String clientHash = OAuthUtils.md5Hex(localTime + OAuthConfig.HASH_SECRET);
-
-            String formBody = new OAuthUtils.URLSearchParams()
-                    .add("client_id", OAuthConfig.CLIENT_ID)
-                    .add("client_secret", OAuthConfig.CLIENT_SECRET)
-                    .add("grant_type", "refresh_token")
-                    .add("refresh_token", savedRefreshToken)
-                    .add("get_secure_url", "1")
-                    .build();
-
-            Request request = new Request.Builder()
-                    .url(OAuthConfig.AUTH_URL)
-                    .addHeader("X-Client-Time", localTime)
-                    .addHeader("X-Client-Hash", clientHash)
-                    .addHeader("App-OS", OAuthConfig.APP_OS)
-                    .addHeader("App-OS-Version", OAuthConfig.APP_OS_VERSION)
-                    .addHeader("User-Agent", OAuthConfig.USER_AGENT)
-                    .addHeader("Content-Type", OAuthConfig.CONTENT_TYPE)
-                    .post(RequestBody.create(formBody, MediaType.parse(OAuthConfig.CONTENT_TYPE)))
-                    .build();
-
-            try (Response response = getClient().newCall(request).execute()) {
-                if (!response.isSuccessful()) {
-                    return false;
-                }
-                String responseBody = response.body() != null ? response.body().string() : "";
-                if (responseBody.isEmpty()) return false;
-
-                org.json.JSONObject json = new org.json.JSONObject(responseBody);
-                org.json.JSONObject resp = json.optJSONObject("response");
-                if (resp == null) resp = json;
-
-                String newAccessToken = resp.optString("access_token", null);
-                String newRefreshToken = resp.optString("refresh_token", null);
-
-                if (newAccessToken == null || newAccessToken.isEmpty()) {
-                    return false;
-                }
-
-                accessToken = newAccessToken;
-
-                // 如果服务端返回了新的 refresh_token，也更新（仅内存，不落盘）
-                if (newRefreshToken != null && !newRefreshToken.isEmpty()) {
-                    boolean rotated = !newRefreshToken.equals(refreshToken);
-                    refreshToken = newRefreshToken;
-                    if (rotated) {
-                        // token 轮换：通知 JS 侧持久化新值，避免重启后回退旧 token
-                        JSObject data = new JSObject();
-                        data.put("token", newRefreshToken);
-                        notifyListeners("refreshTokenRotated", data);
-                    }
-                }
-
-                return true;
+            org.json.JSONObject r = oauthTokenExchange(saved);
+            if (r == null) {
+                return null;
             }
+            accessToken = r.optString("accessToken");
+            String newRefresh = r.optString("refreshToken");
+            if (!newRefresh.isEmpty()) {
+                refreshToken = newRefresh;
+            }
+            return newRefresh;
         } catch (Exception e) {
-            return false;
+            return null;
+        }
+    }
+
+    /**
+     * OAuth refresh_token 交换（#53，Lynx PictelioAuth 登录用）。
+     *
+     * 复用主项目 OAuth 请求（client_id/secret + spark-md5 签名），
+     * 返回完整结果：{accessToken, refreshToken, user}——access_token 只进
+     * Java 堆（调用方负责写入字段），user 供 JS 展示。失败返回 null。
+     */
+    static org.json.JSONObject oauthTokenExchange(String refreshToken)
+            throws IOException, JSONException {
+        String localTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME
+                .withZone(ZoneOffset.UTC)
+                .format(Instant.now())
+                .replace("Z", "+00:00");
+        String clientHash = OAuthUtils.md5Hex(localTime + OAuthConfig.HASH_SECRET);
+
+        String formBody = new OAuthUtils.URLSearchParams()
+                .add("client_id", OAuthConfig.CLIENT_ID)
+                .add("client_secret", OAuthConfig.CLIENT_SECRET)
+                .add("grant_type", "refresh_token")
+                .add("refresh_token", refreshToken)
+                .add("get_secure_url", "1")
+                .build();
+
+        Request request = new Request.Builder()
+                .url(OAuthConfig.AUTH_URL)
+                .addHeader("X-Client-Time", localTime)
+                .addHeader("X-Client-Hash", clientHash)
+                .addHeader("App-OS", OAuthConfig.APP_OS)
+                .addHeader("App-OS-Version", OAuthConfig.APP_OS_VERSION)
+                .addHeader("User-Agent", OAuthConfig.USER_AGENT)
+                .addHeader("Content-Type", OAuthConfig.CONTENT_TYPE)
+                .post(RequestBody.create(formBody, MediaType.parse(OAuthConfig.CONTENT_TYPE)))
+                .build();
+
+        try (Response response = getClient().newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                return null;
+            }
+            String responseBody = response.body() != null ? response.body().string() : "";
+            if (responseBody.isEmpty()) {
+                return null;
+            }
+            org.json.JSONObject json = new org.json.JSONObject(responseBody);
+            org.json.JSONObject resp = json.optJSONObject("response");
+            if (resp == null) {
+                resp = json;
+            }
+            if (!resp.has("access_token")) {
+                return null;
+            }
+            org.json.JSONObject result = new org.json.JSONObject();
+            result.put("accessToken", resp.optString("access_token"));
+            result.put("refreshToken", resp.optString("refresh_token", ""));
+            result.put("user", resp.optJSONObject("user"));
+            return result;
         }
     }
 

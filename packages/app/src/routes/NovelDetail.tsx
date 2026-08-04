@@ -44,11 +44,7 @@ import { recordVisit } from "../stores/historyStore";
 import TranslateSheet from "../components/TranslateSheet";
 import { translateNovel } from "../primitives/createNovelTranslator";
 import { detectNovelLanguage } from "../utils/detectLanguage";
-import {
-  getTranslation,
-  setTranslation,
-  DEFAULT_TARGET_LANG,
-} from "../utils/translationCache";
+import { getTranslation, setTranslation, DEFAULT_TARGET_LANG } from "../utils/translationCache";
 import {
   dsApiKey,
   loadDsApiKey,
@@ -1139,14 +1135,17 @@ const NovelDetail: Component = () => {
                       fallback={
                         <p>
                           该作品包含 R18 内容。翻译需将正文发送至你选择的 AI 服务商，可能：①
-                          被内容审核拒绝（失败段落保留原文）；② 违反服务商使用条款，导致你的
-                          API 账号被警告、暂停或封禁；③ 内容可能被去标识化后用于模型训练。所有风险由你自行承担。
+                          被内容审核拒绝（失败段落保留原文）；② 违反服务商使用条款，导致你的 API
+                          账号被警告、暂停或封禁；③
+                          内容可能被去标识化后用于模型训练。所有风险由你自行承担。
                         </p>
                       }
                     >
                       <p>
-                        该作品包含 R18G（极端）内容。除上述风险外，此类内容违反法律法规红线，可能导致你的
-                        API 账号被关闭，服务商可能向主管部门/执法机构报告。App 提供方不承担由此产生的任何责任。
+                        该作品包含
+                        R18G（极端）内容。除上述风险外，此类内容违反法律法规红线，可能导致你的 API
+                        账号被关闭，服务商可能向主管部门/执法机构报告。App
+                        提供方不承担由此产生的任何责任。
                       </p>
                     </Show>
                     <fluent-button

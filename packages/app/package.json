@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vp dev",
     "build": "vp build",
-    "check": "vp check",
+    "check": "vp check && tsc --noEmit -p tsconfig.json",
     "preview": "vp preview",
     "test": "vp test",
     "test:watch": "vp test --watch",
@@ -41,6 +41,7 @@
     "@chenglou/pretext": "^0.0.8",
     "@fluentui/tokens": "1.0.0-alpha.23",
     "@fluentui/web-components": "3.0.2",
+    "@pictelio/ugoira": "workspace:*",
     "@solid-primitives/intersection-observer": "^2.2.5",
     "@solid-primitives/scheduled": "^1.5.3",
     "@solid-primitives/scroll": "^2.1.6",
@@ -49,7 +50,6 @@
     "@tanstack/solid-query": "^5.101.4",
     "@tanstack/solid-virtual": "^3.13.35",
     "comlink": "^4.4.2",
-    "jszip": "^3.10.1",
     "ora": "^9.4.1",
     "solid-js": "^1.9.14",
     "spark-md5": "^3.0.2"

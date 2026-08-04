@@ -128,6 +128,8 @@ flowchart LR
 
 User settings control visibility of each tier. An **AgeConfirmation** gate (`/packages/app/src/routes/AgeConfirmation.tsx`) appears on first launch, requiring the user to confirm they are 18+.
 
+**app-lynx equivalent:** [`settingsStore.ts`](/packages/app-lynx/src/stores/settingsStore.ts) provides `showR18`/`showR18G` switches (default `false`, persisted via IndexedDB KV) and `isRestricted(item)` — a pure reactive function that drives a glass overlay (`RestrictOverlay.vue`) instead of removing items from the list. All feed pages render the full list; restricted entries show an R-18 / R-18G badge with "该内容已在设置中隐藏" and no click-through. Toggling a switch in settings makes the overlay disappear instantly without re-fetching. `filterByRestrict` has been deleted. Also adds `SkeletonNovel.vue` for novel list/detail loading states. Switches live on the Me page. Spec: [app-lynx R18 overlay + skeleton](/docs/specs/app-lynx-r18-overlay-skeleton.md), originating from [ADR-0051](/docs/adr/ADR-0051-lynx-r18-filter.md).
+
 ## Search
 
 `/packages/app/src/routes/Search.tsx` — Dedicated search page for illusts and novels with a back button in the search bar. Backed by:

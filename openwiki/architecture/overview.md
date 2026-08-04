@@ -1,7 +1,7 @@
 ---
 type: Concept
 title: Architecture Overview
-description: High-level architecture of Pictelio — a SolidJS SPA with Capacitor Android native runtime. Covers monorepo layout, boot sequence, routing, build tooling, CSS architecture, and design system.
+description: High-level architecture of Pictelio — a SolidJS SPA with Capacitor Android native runtime, plus a parallel vue-lynx MVP client. Covers monorepo layout, boot sequence, routing, build tooling, CSS architecture, and design system.
 tags: [architecture, pictelio, solidjs, capacitor, monorepo]
 ---
 
@@ -15,6 +15,7 @@ tags: [architecture, pictelio, solidjs, capacitor, monorepo]
 |---------|----------|---------|
 | `pictelio-app` | `/packages/app/` | SolidJS SPA — the core application |
 | `pictelio-website` | `/packages/website/` | Astro landing page (GitHub Pages) |
+| `pictelio-app-lynx` | `/packages/app-lynx/` | vue-lynx MVP on ReactLynx runtime — parallel rendering client |
 
 Root `package.json` delegates all commands via `vp run --filter`. Build tooling uses **vite-plus** (`vp` CLI), which wraps Vite with oxlint, oxfmt, and vitest.
 
@@ -192,6 +193,93 @@ Font sizes use fluid `clamp(rem + vw)` via UnoCSS preflights, defined in `/packa
 **Credentials injection:** Pixiv API credentials are stored in `credentials.json5` (gitignored). `vite.config.ts` splits them into `__CREDENTIALS__` (full, for native plugins) and `__PUBLIC_CONFIG__` (non-sensitive, for module code). Sensitive fields are never inlined into the production JS bundle.
 
 **Proxy:** Web dev mode uses a Vite proxy for `/pixiv-img` to Pixiv's image CDN. Proxy URL is read from `https_proxy`/`HTTP_PROXY` env vars or defaults to `http://127.0.0.1:10808`.
+
+## app-lynx (vue-lynx Client)
+
+`packages/app-lynx/` is a **parallel rendering client** — a Vue 3 app running on the [ReactLynx](https://lynxjs.org/) runtime via `vue-lynx` (a Vue 3 custom renderer). It shares the same Pixiv backend credentials and API format as the main SolidJS app but targets Lynx's native rendering pipeline rather than a WebView. Status: **MVP pre-alpha**, now running inside the main Android app via [Lynx Brownfield Integration](/openwiki/integrations/android-native.md#lynx-brownfield-integration-51) with cross-client login sharing (same Keystore-backed token storage).
+
+### Build & Styling
+
+- **Bundler:** [Rspeedy](https://github.com/lynx-family/rspeedy) (`@lynx-js/rspeedy`), a Lynx-optimized build tool
+- **CSS:** [Tailwind CSS v3](/packages/app-lynx/tailwind.config.ts) with `@lynx-js/tailwind-preset`, configured with `spacing` in `vw` and `fontSize` in `rpx` (see [ADR-0046](/docs/adr/ADR-0046-app-lynx-tailwind.md)). All 6 pages migrated from scoped CSS to Tailwind utilities (T2–T8).
+- **Design tokens:** Fluent 2 color palette adapted to Tailwind's semantic color scale
+- **Responsive strategy:** Width/spacing/padding use `vw` (viewport-relative), font sizes use `rpx` (Lynx responsive pixels). Rationale in [ADR-0044](/docs/adr/ADR-0044-lynx-responsive-units.md) and [glossary-lynx-units](/docs/adr/glossary-lynx-units.md).
+
+### Routing
+
+Uses a **hand-rolled in-memory router** (`/packages/app-lynx/src/router.ts`) rather than `vue-router`. Reason: `vue-router`'s `RouterView` renders empty in `vue-lynx` 0.5.1 + `web-core` 0.23.1 (verified empirically). Pattern matching logic is extracted to `/packages/app-lynx/src/routerCore.ts` for unit testability.
+
+Routes: `/login`, `/recommended`, `/illust/:id`, `/novels`, `/novel/:id`, `/me`.
+
+**Initial route: `/recommended`** (first-frame content pattern, issues [#61](https://github.com/user/pixivizer/issues/61)/[#63](https://github.com/user/pixivizer/issues/63)). The default route was changed from `/login` to `/recommended` so that already-authenticated users see the recommended feed skeleton immediately on startup, eliminating the login-page flash. Unauthenticated users are redirected to `/login` by `initRouter`'s auth guard with replace semantics (no history push, preserving [ADR-0049](/docs/adr/ADR-0049-lynx-keepalive-page-cache.md) semantics).
+
+> **IFR note:** IFR (Instant First-Frame Rendering, `enableIFR: true`) was evaluated via 32 benchmark runs on real devices and **rejected** — it is an FCP lever, not an interaction lever, and carries a gzip ×2.2, TTI ×1.36 cost. See [`docs/research/vue-lynx-benchmark-ifr.md`](/docs/research/vue-lynx-benchmark-ifr.md).
+
+### Page Instance Caching & Navigation History
+
+[ADR-0049](/docs/adr/ADR-0049-lynx-keepalive-page-cache.md) introduced two mechanisms to achieve "back without reload" (matching the main SolidJS app's feedStore caching + scroll restoration):
+
+**KeepAlive page caching** (`App.vue`): `<KeepAlive :include="['recommended', 'novels', 'me']">` wraps the dynamic `<component :is>`. When navigating away from and back to a cached page, the component instance is **preserved** — `onMounted` does not re-run, so data, list DOM, scroll position, and image loading state are all retained. Detail pages are **not cached** (excluded from the include list) because they load data by `:id` — caching an old id's instance would show incorrect content.
+
+**Navigation history stack** (`router.ts`): `navigate(path)` pushes the current path onto a history stack before switching. `goBack()` pops the previous path and navigates there; when the stack is empty (refresh/deep-link boundary), it falls back to `/recommended`. Login-related navigation (`/login`, login success → `/recommended`, `initRouter` first route) uses **replace semantics** (`{ replace: true }`) — these paths are not pushed onto the stack, so the login page is never reachable via back navigation. `resetHistory()` clears the stack on login/logout to start a fresh session.
+
+Page components must declare a `name` via `defineOptions({ name: 'xxx' })` for KeepAlive's `include` to match them.
+
+**First-frame content compensatory re-fetch** ([#63](https://github.com/user/pixivizer/issues/63)): Because the initial route is now `/recommended`, the `Recommended.vue` component may mount before `restoreToken()` completes — causing the initial fetch to 401. Two idempotent compensatory paths ensure data is fetched once auth is ready:
+
+1. **`watch(isLoggedIn)`** — when `isLoggedIn` transitions `false→true` and illust data is still empty, triggers `fetchFirstPage()`. Does not check `loading` state because `restoreToken` may resolve while the initial 401 fetch is still in-flight (no subsequent trigger would fire otherwise).
+2. **`onActivated`** — when returning from `/login` via a KeepAlive-cached instance (where `onMounted` does not re-run), re-fetches if data is empty, not loading, and logged in.
+
+Both paths are idempotent: if data is already present (successful first fetch), neither triggers a redundant request.
+
+### Auth & Security
+
+- **Credential source:** `lynx.config.ts` reads from `../app/credentials.json5` (single source of truth with the main app)
+- **Token storage:** [ADR-0050](/docs/adr/ADR-0050-lynx-login-persistence.md) — dual-path persistence in [`tokenStorage.ts`](/packages/app-lynx/src/utils/tokenStorage.ts): **web-core** (lynx-bg Worker, no `localStorage`) uses IndexedDB via the generic KV layer ([`idbKV.ts`](/packages/app-lynx/src/utils/idbKV.ts), DB `pictelio_lynx` v2); **native LynxView** (#52) uses `NativeModules.PictelioSecureStorage` — a [Lynx Native Module](/openwiki/integrations/android-native.md#lynx-native-module-picteliosecurestorage) backed by [`SecureStorageCompat`](/packages/app/android/app/src/main/java/io/pictelio/app/SecureStorageCompat.java), an AES/GCM encryption layer byte-compatible with the main project's `@aparajita/capacitor-secure-storage` (same Keystore alias + `WSSecureStorageSharedPreferences` ciphertext). This enables cross-client login sharing: the lynx client reads/writes the same encrypted `refresh_token` as the webview client.
+- **Login method:** `refresh_token` login only (username/password removed per commit `bf226e6`). [`authStore.restoreToken()`](/packages/app-lynx/src/stores/authStore.ts) now actually restores from IndexedDB on startup; `saveRefreshToken`/`clearRefreshToken` keep the persisted token in sync.
+- **Settings persistence & R18 masking:** [ADR-0051](/docs/adr/ADR-0051-lynx-r18-filter.md) (superseded: filtering replaced by overlay masking per issue #91) — [`settingsStore.ts`](/packages/app-lynx/src/stores/settingsStore.ts) manages `showR18`/`showR18G` switches (default `false`, persisted via the shared IndexedDB KV layer) and exposes `isRestricted(item)` — a pure reactive function that drives `RestrictOverlay.vue` (pseudo-glass mask, issue #97) instead of filtering. All feed pages render the full list; restricted entries get an R-18/R-18G badge with no click-through. `filterByRestrict` has been deleted. `initRouter()` calls `loadSettings()` on startup to restore settings.
+- **Client switching:** Both clients can initiate the switch by writing `pictelio_client_kind` to `SharedPreferences("CapacitorStorage")` — the native `MainActivity` routing gate reads this on next launch (see [Main Activity & Application](/openwiki/integrations/android-native.md#main-activity--application)). The **Lynx side** uses `clientSwitchStore` (`/packages/app-lynx/src/stores/clientSwitchStore.ts`), which in native LynxView mode calls [`PictelioAppModule`](/openwiki/integrations/android-native.md#pictelioappmodule) to persist and restart, or `localStorage` + `location.reload()` in web mode. The **WebView side** mirrors this with [`clientSwitch.ts`](/packages/app/src/utils/clientSwitch.ts) (read/write the same preference via `@capacitor/preferences`) and a [`SettingsClient`](/packages/app/src/components/settings/SettingsClient.tsx) row ("切换渲染引擎") on the Settings page — confirming triggers `handleSwitchClient()` in [`Settings.tsx`](/packages/app/src/routes/Settings.tsx), which persists the switch and calls `App.exitApp()` for the native restart.
+- **Security hardening:** Proxy URL log redaction ([`proxyRedact.ts`](/packages/app-lynx/src/utils/proxyRedact.ts)), `__DEV__` double-condition guards, host boundary tightening on `rewriteUrl`
+
+### API Client
+
+Located in `/packages/app-lynx/src/api/`. Mirrors the main app's Pixiv API surface (`auth.ts`, `client.ts`, `illust.ts`, `novel.ts`, `types.ts`) but uses `globalThis.fetch` via a [`fetchWrapper`](/packages/app-lynx/src/utils/fetchWrapper.ts) adapter (the Lynx worker runtime shadows bare `fetch`).
+
+**Dual-mode transport (#53):** `client.ts` exports `isNativeMode()`, which detects the LynxView native environment by checking for actual Pictelio-specific Lynx Native Modules (`PictelioAuth`, `PictelioApi`, `PictelioSecureStorage`, `PictelioApp`) — not just `NativeModules` existence. This was tightened in #64 (E2E fix): web-core's worker environment injects an empty-shell `NativeModules` global, so checking bare-existence alone falsely detected native mode and caused "原生认证模块不可用" errors during login. In native mode, API requests and OAuth exchange are forwarded to Java-side Lynx Native Modules ([`PictelioApiModule`](/openwiki/integrations/android-native.md#pictelioapimodule) and [`PictelioAuthModule`](/openwiki/integrations/android-native.md#pictelioauthmodule)) — `access_token` stays in Java heap, JS is zero-knowledge. URL rewriting differs per mode:
+
+| Mode | `rewriteUrl(path)` | OAuth URL | Bearer token |
+|------|--------------------|-----------|-------------|
+| **Web-core** (dev preview) | Rewrites to Vite proxy (`/pixiv-api/...`, `/pixiv-oauth/...`, `/pixiv-img/...`) | `/pixiv-oauth/auth/token` (proxied) | Attached to `/pixiv-` prefixed paths |
+| **Native LynxView** | Absolute Pixiv URLs (`https://app-api.pixiv.net/...`); `/pixiv-img/` paths pass through for native `PictelioImageService` | `PIXIV_AUTH_BASE` (direct `oauth.secure.pixiv.net`) | Attached to all `http`-prefixed URLs |
+
+In native mode, `execute()` dispatches to `PictelioApi.request()` (Java-side Bearer injection + 401 refresh) instead of `fetch`. OAuth login flows through `PictelioAuth.loginWithRefreshToken()` — the returned `userInfo` JSON includes user profile data and a rotated `refresh_token`, but **no `access_token`**, which is written directly into `PixivApiPlugin.accessToken` in the Java heap. JS never sees or stores the access token in native mode.
+
+The `illust.ts` module includes [`addBookmark`](/packages/app-lynx/src/api/illust.ts) and `deleteBookmark` functions (POST `/v2/illust/bookmark/add` and `/v1/illust/bookmark/delete`, default `restrict: public`), [ADR-0052](/docs/adr/ADR-0052-lynx-illust-bookmark.md).
+
+### Image Rendering & Loading States
+
+The Lynx MVP has evolved specific patterns for image display and loading UX that differ from the main SolidJS app due to web-core rendering quirks (see [ADR-0048](/docs/adr/ADR-0048-lynx-recommended-card-layout.md) and [glossary-web-core-pitfalls](/docs/adr/glossary-web-core-pitfalls.md)):
+
+- **Image display:** Lynx's `<image>` component does not support `widthFix` mode (silently falls back to `fill`, causing zero-height or stretched images). Two approaches are used depending on context:
+  - **[`SkeletonImage`](/packages/app-lynx/src/components/SkeletonImage.vue)** — a wrapper that applies `aspectFill` mode with an explicit `aspect-ratio` container plus an optional `minH` vw fallback to prevent height collapse (ADR-0045). Used in `Recommended.vue` waterfall list cards. **Does not work inside `scroll-view`** on real LynxView devices (style-based `aspect-ratio`/`minHeight` collapses to 0), so `IllustDetail.vue` uses a fixed-height container instead.
+  - **Fixed-height container** (`IllustDetail.vue`): `<view class="h-[100vw]">` + bare `<image>` with `aspectFill` mode — avoids the scroll-view style resolution bug entirely. No shimmer skeleton for detail images in this mode; the shimmer overlay is omitted since the `aspect-ratio` container that enabled it doesn't render inside scroll-view.
+- **Waterfall card layout:** `Recommended.vue` list cards **must not use `w-full`** (web-core resolves percentage widths against the viewport, not the parent column). Width is left to the list engine's column constraint. Card spacing uses `<list>`'s `list-main-axis-gap` / `list-cross-axis-gap` attributes (not margin/padding on items, which do not participate in waterfall layout in web-core).
+- **Two-layer shimmer skeleton:** A global `.shimmer` CSS class with `@keyframes shimmer` animation is defined in `App.vue` (uses `linear-gradient` + `background-position` — confirmed working in web-core; native LynxView support pending [#41](https://github.com/user/pixivizer/issues/41)). The skeleton strategy has two layers:
+  - **Data layer:** 8 [`SkeletonCard`](/packages/app-lynx/src/components/SkeletonCard.vue) components render as shimmer placeholders (square image + two text bars matching `ImageCard` layout) during initial API fetch in `Recommended.vue`; `IllustDetail.vue` shows a square shimmer image + three text bars inline. These hide when API data arrives.
+  - **Image layer:** [`SkeletonImage.vue`](/packages/app-lynx/src/components/SkeletonImage.vue) wraps each `<image>` with its own shimmer overlay that hides on image `@load` (not API response). Used in `Recommended.vue` waterfall cards where the `aspect-ratio` container renders correctly. **Not used in `IllustDetail.vue`** — inside `scroll-view` on real devices, the style-based container collapses to 0 height, so detail images use a fixed-height container without shimmer (see [Image display](#image-rendering--loading-states)).
+
+- **Bookmark interaction:** The [`BookmarkButton.vue`](/packages/app-lynx/src/components/BookmarkButton.vue) component (ADR-0052) provides a reusable ♥ toggle shared between `IllustDetail.vue` and `Recommended.vue` feed cards. It maintains local `bookmarked`/`count` state, calls `addBookmark`/`deleteBookmark` from [`illust.ts`](/packages/app-lynx/src/api/illust.ts) (default `restrict: public`), and uses `@tap.stop` to prevent card-tap navigation when toggling. Optimistic count ±1 on success; failure displays "操作失败" inline.
+
+### Known MVP Limitations
+
+- **No cell recycling:** `vue-lynx` #302 cell recycling is a no-op; safe up to ~5k list items (empirically verified)
+- **No canvas/measureText:** novel body renders as whole text blocks (Pretext library's line-level measurement cannot be ported)
+- **No PKCE OAuth:** login is `refresh_token`-only; WebView-based OAuth needs native integration
+- **Native token persistence:** Implemented via [PictelioSecureStorageModule](#auth--security) (LynxModule backed by [`SecureStorageCompat`](/openwiki/integrations/android-native.md#securestoragecompat), same Keystore alias + ciphertext as the webview client). Enables cross-client login sharing.
+- **`@tap` on native `<text>` broken (real device):** On real LynxView devices, `@tap` handlers on native `<text>` elements do not fire. Workaround: wrap `<text>` in a `<view>` and bind `@tap` to the view (verified working on device). Applied to back buttons (`‹ 返回`) and navigation links across all pages.
+- **`@tap` on `<list-item>` root broken (fiber):** On real devices, `@tap` bound directly to `<list-item>` does not trigger (fiber event system). Workaround: wrap all item content in a `<view>` and bind `@tap` there instead. Applied to `Recommended.vue` feed cards. Inner elements like `BookmarkButton` use `@tap.stop` to prevent card navigation.
+
+See [package README](/packages/app-lynx/README.md) for the full architecture map and quick start.
 
 ## Component Architecture
 

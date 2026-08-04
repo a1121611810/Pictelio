@@ -12,7 +12,14 @@ vi.mock("@capacitor/preferences", () => ({
 }));
 
 // ── 被测试模块 ──
-import { layoutMode, setLayoutMode, loadLayoutModePreference } from "@/stores/settingsStore";
+import {
+  layoutMode,
+  setLayoutMode,
+  loadLayoutModePreference,
+  ugoiraMode,
+  setUgoiraMode,
+  loadUgoiraModePreference,
+} from "@/stores/settingsStore";
 
 describe("settingsStore — setLayoutMode", () => {
   beforeEach(() => {
@@ -89,5 +96,40 @@ describe("settingsStore — loadLayoutModePreference", () => {
     );
 
     warnSpy.mockRestore();
+  });
+});
+
+// ── T3：动图播放方案（ugoiraMode） ──
+describe("settingsStore — ugoiraMode", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("默认 fflate", () => {
+    expect(ugoiraMode()).toBe("fflate");
+  });
+
+  it("setUgoiraMode 更新 state + 持久化", async () => {
+    mockSet.mockResolvedValue(undefined);
+    await setUgoiraMode("range");
+    expect(ugoiraMode()).toBe("range");
+    expect(mockSet).toHaveBeenCalledWith({
+      key: "settings_ugoira_mode",
+      value: "range",
+    });
+  });
+
+  it("loadUgoiraModePreference：读取合法值恢复", async () => {
+    mockGet.mockResolvedValue({ value: "range" });
+    await loadUgoiraModePreference();
+    expect(ugoiraMode()).toBe("range");
+  });
+
+  it("loadUgoiraModePreference：非法值忽略（保持当前值）", async () => {
+    mockSet.mockResolvedValue(undefined);
+    await setUgoiraMode("fflate"); // 重置为默认（模块级 state 跨用例残留）
+    mockGet.mockResolvedValue({ value: "bogus" });
+    await loadUgoiraModePreference();
+    expect(ugoiraMode()).toBe("fflate");
   });
 });

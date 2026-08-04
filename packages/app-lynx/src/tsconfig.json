@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "composite": true,
+
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["vue-lynx/types", "node"],
+
+    "noEmit": true,
+
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "vueCompilerOptions": {
+    "plugins": ["vue-lynx/types/volar-plugin"]
+  },
+  "include": ["./**/*.ts", "./**/*.vue", "./**/*.d.ts"]
+}

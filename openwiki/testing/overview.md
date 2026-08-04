@@ -9,6 +9,14 @@ tags: [testing, vitest, agent-browser, e2e, unit-tests]
 
 Pictelio uses two active testing tiers. Previously there were component-level browser tests (Vitest browser mode) and Playwright E2E — both have been fully migrated to agent-browser per [ADR-0034](/docs/adr/ADR-0034-migrate-playwright-e2e-to-agent-browser.md) and [ADR-0035](/docs/adr/ADR-0035-migrate-component-tests-to-e2e-and-unit.md). Tests live under `/packages/app/tests/`. The canonical conventions are documented in `/packages/app/tests/TESTING.md`.
 
+The `app-lynx` package has its own separate test suite — 31 unit test cases covering image URL rewriting, error classification, OAuth error recognition, novel body extraction, route matching, and `isRestricted` R18/R18G mask logic (Vitest, run via `pnpm --filter pictelio-app-lynx test`). The `vitest.config.ts` `include` pattern covers both `tests/**/*.test.ts` and `src/**/*.test.ts` (extended in issue #91 for co-located store tests). Key test files:
+- [`lynx-device-check.sh`](/packages/app-lynx/scripts/lynx-device-check.sh) — automated login→recommended page→image ratio check via adb
+- [`lynx-flow-check.sh`](/packages/app-lynx/scripts/lynx-flow-check.sh) — comprehensive full-process device flow check: login → feed scroll → bookmark → illust detail → novel list/reader → Me/R18 toggle → settings page scroll (issue #90). Features resolution-adaptive coordinate scaling and `SETTINGS_ONLY=1` for targeted regression.
+- [`lynx-screen-analyze.py`](/packages/app-lynx/scripts/lynx-screen-analyze.py) — PNG screenshot analyzer with `classify` (page-state identification), `login-elements` (input/button detection), and `topbar-nav` (dynamic top-bar text block detection for resolution-independent tab targeting) modes
+- [`e2e-first-frame.mjs`](/packages/app-lynx/scripts/e2e-first-frame.mjs) — CDP + Vivaldi persistent-profile E2E regression for the first-frame content pattern (#64 — verifies `/recommended` renders immediately for authenticated users without login-page flash)
+- [`e2e-me-scroll.mjs`](/packages/app-lynx/scripts/e2e-me-scroll.mjs) — CDP + Vivaldi E2E regression for Me page scroll (issue #90 — verifies the settings page is scrollable, header stays fixed, and logout button is reachable)
+- [`settingsStore.test.ts`](/packages/app-lynx/src/stores/settingsStore.test.ts) — 12-case `isRestricted` matrix (x_restrict × showR18 × showR18G) + pseudo-glass token contract test against the real `tokens.css` source (issue #97); validates `--glassBgMuted`, `--glassHighlight`, `--glassEdge`, `--glassBorder` tokens and asserts no `backdrop-filter` or `@supports` in the `RestrictOverlay` style block
+
 ```mermaid
 flowchart TD
     U["Unit Tests (vitest.config.ts)"] --> S["Pure logic: API, utils, stores, router"]

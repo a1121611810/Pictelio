@@ -13,6 +13,12 @@ packages:
 # 防止攻击者利用刚发布的热门包恶意版本
 minimumReleaseAge: 1440
 
+# 豁免：@lynx-js 官方发布包（lynx-family），T1 决策锁定的 PoC 已验证版本
+# （vue-lynx 工具链依赖最新 web-core，官方渠道可信）
+minimumReleaseAgeExclude:
+  - "@lynx-js/web-core@0.23.1"
+  - "@lynx-js/web-worker-rpc@0.23.1"
+
 # 阻止信任降级：如果某包之前有来源证明/签名，
 # 新版本若缺少则会安装失败
 trustPolicy: no-downgrade
@@ -29,6 +35,7 @@ blockExoticSubdeps: true
 allowBuilds:
   agent-browser: true
   canvas: true
+  core-js: true
   esbuild: true
   # pnpm install 会自动列出待审批的包到这里
 

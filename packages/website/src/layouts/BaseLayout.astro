@@ -1,6 +1,7 @@
 ---
 import "../styles/base.css";
 import "../styles/components.css";
+import version from "../../version.json";
 
 export interface Props {
   title: string;
@@ -61,6 +62,7 @@ const { title, description } = Astro.props;
       document.addEventListener("DOMContentLoaded", () => {
         setupThemeToggle();
         setupCursorGlow();
+        setupNavDownload();
       });
 
       function setupThemeToggle() {
@@ -104,6 +106,22 @@ const { title, description } = Astro.props;
           timer = setTimeout(() => { glow.style.opacity = "0"; }, 100);
         });
       }
+
+      // ── 导航迷你下载按钮：hero 下载区完全离开视口时显示，回来看见时隐藏 ──
+      function setupNavDownload() {
+        const mini = document.getElementById("nav-download-mini");
+        const heroActions = document.querySelector(".vc-actions");
+        if (!mini || !heroActions || typeof IntersectionObserver === "undefined") {
+          return;
+        }
+        const io = new IntersectionObserver(
+          (entries) => {
+            mini.classList.toggle("visible", !entries[0].isIntersecting);
+          },
+          { threshold: 0 },
+        );
+        io.observe(heroActions);
+      }
     </script>
   </head>
   <body>
@@ -112,10 +130,16 @@ const { title, description } = Astro.props;
 
     <!-- Nav -->
     <nav class="nav" role="navigation">
-      <a href="/pixivizer/" class="nav-brand">
-        <img src="/pixivizer/logo.svg" alt="Pictelio" class="nav-brand-logo" />
-        Pictelio
-      </a>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <a href="/pixivizer/" class="nav-brand">
+          <img src="/pixivizer/logo.svg" alt="Pictelio" class="nav-brand-logo" />
+          Pictelio
+        </a>
+        <a id="nav-download-mini" class="nav-download-mini" href={version.url} target="_blank" rel="noopener noreferrer" aria-label="下载 Pictelio">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          下载
+        </a>
+      </div>
       <div style="display:flex;align-items:center;gap:4px;">
         <button data-theme-toggle class="theme-toggle" aria-label="切换主题">
           <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

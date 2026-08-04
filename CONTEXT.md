@@ -37,6 +37,15 @@ virtual 模式下，组件挂载后由代码主动执行 `window.scrollTo` 恢�
 **阅读进度（Reading progress）**：
 小说详情中用户当前的阅读位置，滚动停止后持久化。双击回顶后阅读进度同步为开头。
 
+**返回不重载（Back without reload）**：
+从详情页返回列表页时，列表不重新加载数据（无重复请求、无骨架屏闪烁、滚动位置保留）。app（SolidJS）通过 feedStore 数据缓存 + 滚动恢复实现；app-lynx（Lynx）通过页面实例缓存（KeepAlive）实现（见 ADR-0049）。
+
+**页面实例缓存（Page instance cache）**：
+app-lynx 用 `<KeepAlive>` 缓存已访问的页面组件实例，返回时**组件不重建**（`onMounted` 不重跑），数据、list DOM、滚动位置、图片加载状态全部保留。缓存列表/静态页（recommended/novels/me），**详情页不缓存**——详情按 `:id` 加载，缓存旧 id 实例会显示错误内容（见 ADR-0049）。
+
+**导航历史栈（Navigation history stack）**：
+app-lynx 内存路由维护的返回栈：`navigate(path)` 入栈、`goBack()` 出栈回上一页（栈空回 `/recommended`）。登录相关导航用 replace 语义（不入栈）——登录页不应被"返回"（见 ADR-0049）。
+
 ### 滚动驱动显隐
 
 **滚动驱动显隐（Scroll-driven visibility）**：

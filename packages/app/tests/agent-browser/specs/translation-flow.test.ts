@@ -208,6 +208,8 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 翻译流程", 
     const toggled = await clickButtonByText(driver, "原文");
     expect(toggled, "译文模式下底部应显示「原文」切换按钮").toBe(true);
     await SLEEP(1500);
-    expect(await pageHasText(driver, TRANSLATED_MARKER), "切回原文后译文 marker 应消失").toBe(false);
+    expect(await pageHasText(driver, TRANSLATED_MARKER), "切回原文后译文 marker 应消失").toBe(
+      false,
+    );
   }, 120_000);
 });

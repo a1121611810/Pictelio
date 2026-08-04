@@ -90,9 +90,7 @@ export async function getTranslation(
   sourceHash: string,
 ): Promise<string[] | undefined> {
   const id = buildTranslationKey(novelId, targetLang, modelId);
-  const [err, entry] = await tryAsync(
-    getStore().get<TranslationCacheEntry>(TRANSLATION_STORE, id),
-  );
+  const [err, entry] = await tryAsync(getStore().get<TranslationCacheEntry>(TRANSLATION_STORE, id));
   if (err) {
     console.warn("[translationCache] 读取失败", err);
     return undefined;

@@ -79,9 +79,25 @@ dependencies {
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // Lynx SDK（#52 起引入：LynxModule 编译依赖；完整配置见 #51 原生 LynxView 壳）
+    implementation "org.lynxsdk.lynx:lynx:4.0.1"
+    // Lynx Service（官方集成要求，#51 补充）：
+    // - lynx-service-http：lynx.fetch 依赖（未注册则原生 fetch 不可用 → API/OAuth 断）
+    // - lynx-service-log：日志服务（官方基线）
+    // 图片服务（lynx-service-image/Fresco）不引入——i.pximg.net 需 Referer 头，
+    // Fresco 默认不传 customParam 为 header（403），自研 ILynxImageService（#54）
+    implementation "org.lynxsdk.lynx:lynx-service-http:4.0.1"
+    implementation "org.lynxsdk.lynx:lynx-service-log:4.0.1"
+    // XElement（官方扩展元件，#51 真机实测必需）：
+    // 基础 xelement 提供扩展 behaviors；xelement-input 提供 <input>/<textarea>
+    // （LynxError 990200 "No BehaviorController defined for class input"，
+    //  真机 2026-08-01 Login.vue 输入框渲染失败 → 补依赖 + LynxActivity addBehaviors）
+    implementation "org.lynxsdk.lynx:xelement:4.0.1"
+    implementation "org.lynxsdk.lynx:xelement-input:4.0.1"
     testImplementation "junit:junit:$junitVersion"
     testImplementation "org.robolectric:robolectric:4.14.1"
     testImplementation "androidx.test:core:1.6.1"
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')

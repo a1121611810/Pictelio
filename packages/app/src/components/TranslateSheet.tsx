@@ -131,9 +131,7 @@ const TranslateSheet: Component<TranslateSheetProps> = (props) => {
                   disabled={translating()}
                   aria-pressed={(props.tier ?? props.defaultTier) === "pro"}
                   onClick={() =>
-                    props.tier === "pro"
-                      ? props.onSelectTier?.(null)
-                      : props.onSelectTier?.("pro")
+                    props.tier === "pro" ? props.onSelectTier?.(null) : props.onSelectTier?.("pro")
                   }
                 >
                   高质量
@@ -178,7 +176,8 @@ const TranslateSheet: Component<TranslateSheetProps> = (props) => {
           {/* 失败信息 + 补翻（S4）：翻译完成后有失败段 → 提示可补翻 */}
           <Show when={!translating() && failedParagraphs().size > 0}>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorStatusDangerForeground1)] bg-[var(--colorStatusDangerBackground1)] rounded-[var(--borderRadiusMedium)] px-3 py-2 mb-3">
-              {failedParagraphs().size} 段翻译失败（正文中已标记「未翻译」）。可补翻失败块，成功段落不会重复计费。
+              {failedParagraphs().size}{" "}
+              段翻译失败（正文中已标记「未翻译」）。可补翻失败块，成功段落不会重复计费。
             </p>
           </Show>
 

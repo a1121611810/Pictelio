@@ -19,7 +19,7 @@ import LazyDetailImage from "../components/LazyDetailImage";
 import PixivImage from "../components/PixivImage";
 import PageTransition from "../components/PageTransition";
 import HeartBurstEffect from "../components/HeartBurstEffect";
-import { detailQuality, showDetailStairs } from "../stores/settingsStore";
+import { ugoiraMode, detailQuality, showDetailStairs } from "../stores/settingsStore";
 import { blockUser, isBlocked } from "../stores/blockStore";
 import { recordVisit } from "../stores/historyStore";
 import { pushOverlay, popOverlay } from "../stores/backGestureStore";
@@ -156,7 +156,11 @@ const IllustDetail: Component = () => {
     const [ugoiraErr] = await tryAsync(
       (async () => {
         // 使用共享的下载+解压函数（自动跟踪进度）
-        const result = await downloadAndExtractUgoira(illustId, (pct) => setUgoiraProgress(pct));
+        const result = await downloadAndExtractUgoira(
+          illustId,
+          (pct) => setUgoiraProgress(pct),
+          ugoiraMode(),
+        );
         ugoiraBlobUrls = result.blobUrls;
         setUgoiraFrames(result.frames);
         setUgoiraReady(true);

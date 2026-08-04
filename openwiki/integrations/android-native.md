@@ -131,6 +131,89 @@ sequenceDiagram
 - `build.gradle`: retains `androidx.core:core-splashscreen` dependency
 - `variables.gradle`: retains `coreSplashScreenVersion = '1.2.0'`
 
+## Lynx Native Module: PictelioSecureStorage
+
+Introduced in #52 for the [app-lynx vue-lynx client](/openwiki/architecture/overview.md#app-lynx-vue-lynx-client). Unlike the four Capacitor plugins above, `PictelioSecureStorageModule` is a **LynxModule** — it extends `com.lynx.jsbridge.LynxModule` and is registered in the LynxView's module registry rather than via Capacitor's plugin system.
+
+**Java:** `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioSecureStorageModule.java`
+**Type declarations:** `/packages/app-lynx/src/rspeedy-env.d.ts` (under `globalThis.NativeModules`)
+**JS caller:** `/packages/app-lynx/src/utils/tokenStorage.ts` (`nativeModule()` probe)
+
+Provides three callback-based methods exposed to Lynx JS via `NativeModules.PictelioSecureStorage`:
+
+| Method | Contract |
+|--------|----------|
+| `getItem(key, cb)` | Success: `cb(value)`; failure: `cb(errMsg)` |
+| `setItem(key, data, cb)` | Success: `cb()`; failure: `cb(errMsg)` |
+| `removeItem(key, cb)` | Success: `cb()`; failure: `cb(errMsg)` |
+
+> **Callback signature:** Lynx `CallbackImpl` crashes on `null` arguments on real devices. All success callbacks use single-arg (value only) or no-arg forms — never pass `null` as a placeholder.
+
+**Storage backend:** [`SecureStorageCompat`](#securestoragecompat) — a pure-Java AES/GCM utility byte-compatible with `@aparajita/capacitor-secure-storage` 8.x. Uses the same Keystore alias (`capacitor-storage_refresh_token`) and `WSSecureStorageSharedPreferences` ciphertext file as the main app's [token persistence](/openwiki/architecture/api-layer.md#token-persistence--backup-integrity). This means the lynx client and webview client share a single login state — logging in on one client makes the token available to the other.
+
+### SecureStorageCompat
+
+**Java:** `/packages/app/android/app/src/main/java/io/pictelio/app/SecureStorageCompat.java`
+**Tests:** `/packages/app/android/app/src/test/java/io/pictelio/app/SecureStorageCompatTest.java` (Robolectric)
+
+A self-contained encryption utility that mirrors `@aparajita/capacitor-secure-storage`'s ciphertext format field-for-field:
+
+- **Algorithm:** AES/GCM/NoPadding, AndroidKeyStore, one AES key per storage key (`PURPOSE_ENCRYPT|DECRYPT`, `BLOCK_MODE_GCM`, `ENCRYPTION_PADDING_NONE`)
+- **SharedPreferences:** `WSSecureStorageSharedPreferences` (MODE_PRIVATE) — same file as the Capacitor plugin
+- **Storage key:** `capacitor-storage_` + key (e.g., `capacitor-storage_refresh_token`)
+- **Ciphertext format:** `Base64(ciphertext) + "\u0010" + Base64(iv)` — NO_PADDING + NO_WRAP
+
+The `encryptString` / `decryptString` static methods are key-injected (accept a `SecretKey` parameter) so they can be unit-tested with Robolectric without AndroidKeyStore. `SecureStorageCompatTest` covers round-trip, Unicode, format contract validation, format errors, and wrong-key detection via GCM authentication failure (`AEADBadTagException`).
+
+### PictelioAppModule
+
+**Java:** `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioAppModule.java`
+
+A LynxModule for client-switching and native app control, used by the [app-lynx client](/openwiki/architecture/overview.md#app-lynx-vue-lynx-client)'s [`clientSwitchStore`](/packages/app-lynx/src/stores/clientSwitchStore.ts). Exposed to Lynx JS via `NativeModules.PictelioApp`:
+
+| Method | Contract |
+|--------|----------|
+| `setClientKind(kind, cb)` | Writes `pictelio_client_kind` to `SharedPreferences("CapacitorStorage")`. Success: `cb()`; failure: `cb(errMsg)`. |
+| `getClientKind(cb)` | Reads current client kind. Success: `cb(kind)`; failure: `cb(errMsg)`. |
+| `restartApp(cb)` | Launches `MainActivity` (clearing task stack) and kills the current process after a delay. Success: `cb()`. |
+
+Callback signatures follow the same null-free pattern as `PictelioSecureStorageModule` — `CallbackImpl` on real devices crashes on `null` arguments.
+
+### PictelioApiModule
+
+**Java:** `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioApiModule.java` (57 lines, new in #53)
+
+A LynxModule for Pixiv API forwarding, used by the [app-lynx client](/openwiki/architecture/overview.md#app-lynx-vue-lynx-client)'s [API layer](/openwiki/architecture/overview.md#api-client). Exposed to Lynx JS via `NativeModules.PictelioApi`. Wraps `PixivApiPlugin.executeRequest()` — the same package-private static method used by the Capacitor plugin path — so both webview and Lynx clients share a single OkHttp connection pool and 401 refresh logic.
+
+| Method | Contract |
+|--------|----------|
+| `request(method, path, body, cb)` | JS passes HTTP method, API path (may include query string), and body; Java constructs the full URL (`app-api.pixiv.net`), injects `Authorization: Bearer`, `Referer`, and `User-Agent` headers, and handles 401 → silent token refresh → retry internally. Callback receives `(status, data, rotatedRefreshToken)` — status is the HTTP code (0 on network/forwarding error), data is the response body JSON string, and the third param is a new `refresh_token` if rotation occurred (empty string otherwise). **access_token is never returned to JS.** |
+
+The rotated `refresh_token` callback (third parameter) allows the JS side to persist the new token via `saveRefreshToken()` → `PictelioSecureStorage`, preventing the client from restoring a stale token after restart.
+
+### PictelioAuthModule
+
+**Java:** `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioAuthModule.java` (87 lines, new in #53)
+
+A LynxModule for OAuth authentication, used by the [app-lynx client](/openwiki/architecture/overview.md#app-lynx-vue-lynx-client)'s [`authStore`](/packages/app-lynx/src/stores/authStore.ts). Exposed to Lynx JS via `NativeModules.PictelioAuth`. Wraps `PixivApiPlugin.oauthTokenExchange()` for the OAuth refresh_token exchange — same logic as the Capacitor `AuthPlugin`.
+
+| Method | Contract |
+|--------|----------|
+| `loginWithRefreshToken(token, cb)` | Performs the OAuth token exchange via `PixivApiPlugin.oauthTokenExchange()`. On success: writes `access_token` into `PixivApiPlugin.accessToken` (Java heap only, **never returned to JS**), writes rotated `refresh_token` (if any) into `PixivApiPlugin.refreshToken`, and calls back with `(userInfoJson, "")` — userInfoJson contains `userId`, `userName`, `userAccount`, `profileImageUrls`, and the `refreshToken` (for JS-side persistence). On failure: `("", errMsg)`. |
+| `setAccessToken(token)` | Fallback: pushes an access_token into Java heap (used when JS has a token from a web-mode OAuth flow). No callback. |
+| `clearTokens(cb)` | Logout: nullifies both `PixivApiPlugin.accessToken` and `PixivApiPlugin.refreshToken`. Callback: `("", "")`. |
+
+**Security model:** The `access_token` flows in only one direction — JS → Java (via `setAccessToken` or `loginWithRefreshToken`). It is never extracted back to JS. All API requests go through `PictelioApiModule.request()`, where Java injects the Bearer token internally. This mirrors the Capacitor `PixivApiPlugin` security model: the WebView and LynxView are both treated as untrusted JS environments.
+
+### Lynx SDK Dependency
+
+`build.gradle` includes these Lynx SDK dependencies:
+- `org.lynxsdk.lynx:lynx:4.0.1` — core SDK, required for `PictelioSecureStorageModule` to extend `LynxModule` and use `@LynxMethod` / `Callback` / `LynxContext`
+- `org.lynxsdk.lynx:lynx-service-http:4.0.1` — native HTTP service; without this `lynx.fetch` is unavailable, breaking all API calls and OAuth token refresh
+- `org.lynxsdk.lynx:lynx-service-log:4.0.1` — official logging service baseline
+- `org.lynxsdk.lynx:xelement:4.0.1` + `org.lynxsdk.lynx:xelement-input:4.0.1` — XElement official extension components (#51, required on real devices): provides `<input>`/`<textarea>` behaviors. Without these, `LynxError 990200 "No BehaviorController defined for class input"` breaks login form rendering on real devices (2026-08-01, `Login.vue` input fields failed to render).
+- `lynx-service-image` (Fresco) is **not** included — `i.pximg.net` requires `Referer` headers, which Fresco does not forward, causing 403 errors; replaced by custom [`PictelioImageService`](#pictelioimageservice) (#59), which implements `ILynxImageService` on top of [`PixivImageLoader`](#pixivimageloader)
+
 ## Backup Rules & Token Storage Exclusions (ADR-0003)
 
 The `refresh_token` is stored in Android Keystore-backed encrypted storage (`@aparajita/capacitor-secure-storage` 8.x — self-implemented AES/GCM, ciphertext file `WSSecureStorageSharedPreferences.xml`). Because `android:allowBackup="true"`, backup is defended by three layers per [ADR-0003](/docs/adr/0003-backup-security-three-layer-defense.md) (grounded in [docs/research/android-token-storage.md](/docs/research/android-token-storage.md)):
@@ -152,13 +235,14 @@ The `refresh_token` is stored in Android Keystore-backed encrypted storage (`@ap
 `/packages/app/android/app/src/main/java/io/pictelio/app/MainActivity.java` (11 KB)
 
 The Android entry point. Key responsibilities:
-- Registers all four custom plugins: **`ImageCachePlugin`**, **`AuthPlugin`**, **`OAuthPlugin`**, **`PixivApiPlugin`** (v3.18.0+, replaced PictelioHttpPlugin)
+- **Client routing gate (#51):** Before any Capacitor/WebView initialization, reads `SharedPreferences("CapacitorStorage")` key `pictelio_client_kind`. If `"lynx"`, **must** call `super.onCreate(savedInstanceState)` first (Android hard constraint — `SuperNotCalledException` on real devices), then starts [`LynxActivity`](#lynxactivity) and calls `finish()` — no Capacitor bridge, plugin registration, or WebView checks are performed after `super.onCreate`. The dual-Activity approach was chosen because `BridgeActivity.onCreate` unconditionally creates a WebView (see [research](/docs/research/lynx-android-brownfield-integration.md)).
+- Registers all four custom plugins: **`ImageCachePlugin`**, **`AuthPlugin`**, **`OAuthPlugin`**, **`PixivApiPlugin`** (v3.18.0+, replaced PictelioHttpPlugin) — only when the webview path is taken
 - Configures WebView settings (JavaScript enabled, DOM storage, mixed content)
 - Sets up the back-gesture handler for predictive back navigation
 - Initializes the image cache and auth plugin on startup
 - Handles Android lifecycle events
 - Intercepts `/pixiv-img/` WebView requests via `shouldInterceptRequest` for image caching (retained from previous architecture)
-- Image proxy via `shouldInterceptRequest` was upgraded from `HttpURLConnection` to the shared `OkHttpClient` from `PixivApiPlugin.getSharedClient()`, reusing the connection pool instead of creating a fresh connection per request
+- Image proxy via `shouldInterceptRequest` now delegates to a shared [`PixivImageLoader`](#pixivimageloader) singleton (double-checked locking), which centralizes URL rewriting, disk cache read/write, and OkHttp download — per-URL locking prevents concurrent cache writes from multi-threaded WebView interception. Previously used `HttpURLConnection` then direct `OkHttpClient` calls inline.
 
 > **v3.20.0–v3.21.0:** Splash Screen dismiss moved from Android-only `core-splashscreen` API to JS-controlled via `AuthPlugin.hideSplash()` bridge. `MainActivity` retains `SplashScreen.installSplashScreen(this)` but defers exit to `keepSplashVisible` AtomicBoolean controlled by the plugin (see [Splash Screen JS Bridge](#splash-screen-js-bridge)).
 
@@ -173,11 +257,57 @@ Extracted shared utility class (v3.18.0) containing helper methods used by nativ
 
 Previously duplicated across plugins; now centralized in a single utility class.
 
+### PixivImageLoader
+
+**Java:** `/packages/app/android/app/src/main/java/io/pictelio/app/PixivImageLoader.java` (new in #57)
+**Test:** `/packages/app/android/app/src/test/java/io/pictelio/app/PixivImageLoaderTest.java`
+
+Shared image loading core — the single source of truth for Pixiv image download logic, consumed by both the WebView proxy path and the Lynx image service:
+
+- **URL rewriting:** `/pixiv-img/{path}` → `OAuthConfig.IMAGE_CDN_URL + "/" + path` with URI normalization
+- **OkHttp download:** Reuses `PixivApiPlugin.getSharedClient()` shared connection pool, injects `Referer` and `User-Agent` headers (required by `i.pximg.net` anti-hotlinking)
+- **Disk cache:** Read/write/evict using `OAuthConfig.CACHE_DIR` / `pictelio-images/`, Base64 URL-safe filename encoding, LRU eviction with configurable `maxCacheBytes` — same cache directory and naming conventions as `ImageCachePlugin` and `PixivApiPlugin.prefetchImage()`, so both clients share the same on-disk cache
+- **Per-URL locking:** `ConcurrentHashMap` prevents concurrent writes to the same cache file from multi-threaded callers (WebView interception is multi-threaded)
+
+**Consumers:**
+- **WebView path:** `MainActivity.interceptImage()` — calls `PixivImageLoader.cachedFile()` for disk cache hits, `loadBytes()` for cache-miss-with-write, or `download()` when disk cache is off; wraps results in `WebResourceResponse` via `bytesResponse()` and `mimeFor()` helpers
+- **Lynx path:** [`PictelioImageService`](#pictelioimageservice) — reads cached bytes, decodes to `Bitmap`, and delivers via `ImageLoadListener.onSuccess`
+
+### PictelioImageService
+
+**Java:** `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioImageService.java` (new in #59)
+**Test:** `/packages/app/android/app/src/test/java/io/pictelio/app/PictelioImageServiceTest.java`
+
+Custom Lynx image service implementing `ILynxImageService` — the sole image loading backend for the vue-lynx client. Registered in `PictelioApp.initLynx()` via `LynxServiceCenter.inst().registerService()` before any `LynxView` is created.
+
+- **Backend:** Delegates all download and caching logic to [`PixivImageLoader`](#pixivimageloader) — no duplicated URL rewriting or HTTP logic
+- **Behavior registration (#59):** The constructor registers `<image>` and `<inline-image>` element behaviors via `LynxEnv.inst().addBehaviors()` — creating `UIImage`/`FlattenUIImage`/`AutoSizeImage` (for `image`) and `InlineImageShadowNode` (for `inline-image`). Without this, the Lynx engine cannot create image UI on real devices (skeleton remains visible, no image logs). This mirrors the official `LynxImageService` constructor logic and is required in addition to implementing `ILynxImageService`.
+- **`fetchImage()`:** Offloads download + bitmap decode to a `CachedThreadPool`, calls `ImageLoadListener.onSuccess(imageInfo, ImageContent(Bitmap))` on the Lynx image thread
+- **Static images only:** Animation callbacks (`canAnimate`, `startAnimation`, etc.) all return `false`/no-op — ugoira/GIF support is not planned for the Lynx MVP
+- **Singleton:** `getInstance()` returns the single `INSTANCE`; `onInitialize(context)` stores the Application context for lazy `PixivImageLoader` creation
+
+This replaces the unviable Fresco `lynx-service-image` dependency (see [Lynx SDK Dependency](#lynx-sdk-dependency)), because Fresco cannot inject the `Referer` header required by `i.pximg.net`.
+
 ### PictelioApp.java
 
-`/packages/app/android/app/src/main/java/io/pictelio/app/PictelioApp.java` (1.3 KB)
+`/packages/app/android/app/src/main/java/io/pictelio/app/PictelioApp.java`
 
-Custom `Application` class for app-level initialization.
+Custom `Application` class for app-level initialization. **Conditional startup (#51):** reads `pictelio_client_kind` from `SharedPreferences("CapacitorStorage")` and branches:
+
+- **`"lynx"`** → `initLynx()`: Registers three Lynx services via `LynxServiceCenter.inst().registerService()` (`LynxHttpService`, `LynxLogService`, `PictelioImageService` — required before any `LynxView` is created), then initializes `LynxEnv.inst().init(this, …)`. Globally registers `PictelioSecureStorage` and `PictelioApp` LynxModules. Enables `LynxDebug` in debug builds. Skips WebView warmup entirely. Without these registrations, `lynx.fetch` would be unavailable and images would render as broken (no `ILynxImageService` → no image loading).
+- **`"webview"` (default)** → `warmUpWebView()`: Pre-warms the WebView service process (unchanged behavior).
+
+Exception safety: Lynx init failure is caught and logged — the app does not crash, but the lynx client path will be unavailable.
+
+### LynxActivity
+
+`/packages/app/android/app/src/main/java/io/pictelio/app/LynxActivity.java`
+
+The dedicated LynxView host Activity, launched by `MainActivity` when `pictelio_client_kind` is `"lynx"`. Extends `AppCompatActivity` directly (no Capacitor bridge), and:
+
+- **XElement behaviors (#51):** Sets `builder.addBehaviors(new XElementBehaviors().create())` on the `LynxViewBuilder` before view creation — required on real devices for `<input>`/`<textarea>` and other extension components. Without this, login input fields fail with `LynxError 990200`.
+- **Per-view module registration:** Registers `PictelioSecureStorage` and `PictelioApp` LynxModules (coexists with `PictelioApp` global registration; global `LynxEnv` takes priority).
+- **Template provider:** Uses `PictelioTemplateProvider` for loading the Lynx template bundle (`template.js`).
 
 ## WebView Configuration
 
@@ -185,8 +315,7 @@ Custom `Application` class for app-level initialization.
 - **DOM Storage:** Enabled
 - **Mixed Content:** Allowed (Pixiv API uses both HTTP and HTTPS)
 - **User Agent:** Customized for Pixiv API compatibility
-- **Image interception:** `shouldInterceptRequest` in MainActivity intercepts `/pixiv-img/` requests and serves from the Android disk cache (ImageCachePlugin) or proxies to the Pixiv CDN via the shared OkHttpClient (from `PixivApiPlugin.getSharedClient()`) with proper Referer headers
-- **shouldInterceptRequest:** ImageCachePlugin intercepts image URLs
+- **Image interception:** `shouldInterceptRequest` in `MainActivity` intercepts `/pixiv-img/` requests, delegating to [`PixivImageLoader`](#pixivimageloader) for URL rewriting, disk cache lookup (L3), and proxied download with `Referer`/`User-Agent` headers
 - **SSRF Whitelist:** Only Pixiv domains and configured image hosts are accessible via WebView proxy (ADR-0002)
 
 ## Capacitor Configuration
@@ -252,10 +381,20 @@ The full release process is documented in `/docs/release-checklist.md` (6.2 KB),
 | ImageCachePlugin (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/ImageCachePlugin.java` |
 | OAuthPlugin (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/OAuthPlugin.java` |
 | PixivApiPlugin (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PixivApiPlugin.java` |
+| PictelioSecureStorageModule (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioSecureStorageModule.java` |
+| PictelioApiModule (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioApiModule.java` |
+| PictelioAuthModule (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioAuthModule.java` |
+| SecureStorageCompat (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/SecureStorageCompat.java` |
+| SecureStorageCompatTest (Java) | `/packages/app/android/app/src/test/java/io/pictelio/app/SecureStorageCompatTest.java` |
 | Backup rules (Android 12+) | `/packages/app/android/app/src/main/res/xml/data_extraction_rules.xml` |
 | Backup rules (Android 11-) | `/packages/app/android/app/src/main/res/xml/backup_rules.xml` |
 | MainActivity (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/MainActivity.java` |
+| LynxActivity (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/LynxActivity.java` |
 | PictelioApp (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioApp.java` |
+| PixivImageLoader (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PixivImageLoader.java` |
+| PixivImageLoaderTest (Java) | `/packages/app/android/app/src/test/java/io/pictelio/app/PixivImageLoaderTest.java` |
+| PictelioImageService (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioImageService.java` |
+| PictelioImageServiceTest (Java) | `/packages/app/android/app/src/test/java/io/pictelio/app/PictelioImageServiceTest.java` |
 | AuthPlugin TS bridge | `/packages/app/src/native/AuthPlugin.ts` |
 | ImageCache TS bridge | `/packages/app/src/native/ImageCache.ts` |
 | OAuthPlugin TS bridge | `/packages/app/src/native/OAuthPlugin.ts` |
