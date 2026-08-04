@@ -4,6 +4,18 @@ android {
     namespace = "io.pictelio.app"
     compileSdk = rootProject.ext.compileSdkVersion
     buildToolsVersion = "36.1.0"
+
+    // #115：临时将 flavor 目录加入 main sourceSet，保证搬迁后编译通过。
+    // #116 将替换为正式的 flavor sourceSet 配置。
+    sourceSets {
+        main {
+            java {
+                srcDir 'src/webview/java'
+                srcDir 'src/lynx/java'
+                srcDir 'src/full/java'
+            }
+        }
+    }
     defaultConfig {
         applicationId "io.pictelio.app"
         minSdkVersion rootProject.ext.minSdkVersion
