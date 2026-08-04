@@ -27,14 +27,13 @@ page {
   --colorPaletteGreenBackground3: #107c10;
   --colorOverlayDark: rgba(0, 0, 0, 0.55);
 
-  /* 玻璃遮罩（R18 受限条目盖，issue #91；参照 website base.css --glass-*）
-   * web-core 不支持声明式 backdrop-filter（web-elements.js 源码核验：仅内部元素 blur-radius 属性），
-   * 方案：web-core 走 --glassBgMuted 低透明实色；宿主浏览器经 @supports 升级为 --glassBg + blur 真玻璃；
-   * 原生 LynxView 同样静默忽略 backdrop-filter，退化为 --glassBgMuted 实色盖，功能无损。 */
-  --glassBg: rgba(255, 255, 255, 0.6);
+  /* 伪玻璃遮罩（issue #97：Frosted Card，放弃 backdrop-filter——web-core/原生均不支持，
+     见 docs/research/liquid-glass-app-lynx-feasibility.md 方案 A）
+   * 三件套：半透底 + 顶部 linear-gradient 高光 + inset 内发光/外阴影，
+   * 全部 Lynx 确认支持，web-core 与原生 LynxView 观感一致。 */
   --glassBgMuted: rgba(255, 255, 255, 0.55);
-  --glassBlur: 24px;
-  --glassSaturate: 150%;
+  --glassHighlight: linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 30%);
+  --glassEdge: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 8px 32px rgba(0, 0, 0, 0.08);
   --glassBorder: rgba(0, 0, 0, 0.06);
 
   /* 圆角 */

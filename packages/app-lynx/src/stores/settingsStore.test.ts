@@ -71,25 +71,26 @@ describe("settingsStore.isRestricted", () => {
   })
 })
 
-// 契约断言：玻璃遮罩 token 必须真实存在于 tokens.css（真实样例硬约束，
+// 契约断言：伪玻璃 token 必须真实存在于 tokens.css（真实样例硬约束，
 // 参照 tests/unit.test.ts 的 tailwind↔tokens 契约模式，读真实源文件比对）
-describe("玻璃遮罩 token 契约（issue #91）", () => {
+describe("伪玻璃 token 契约（issue #97）", () => {
   const tokensCss = readFileSync(resolve(here, "../styles/tokens.css"), "utf-8")
-  for (const token of ["--glassBg", "--glassBlur", "--glassSaturate", "--glassBorder"]) {
+  for (const token of ["--glassBgMuted", "--glassHighlight", "--glassEdge", "--glassBorder"]) {
     it(`tokens.css 定义 ${token}`, () => {
       expect(tokensCss, `tokens.css 缺少 ${token}`).toContain(`${token}:`)
     })
   }
-  it("RestrictOverlay 玻璃样式块引用 token 而非字面色值", () => {
+  it("RestrictOverlay 伪玻璃三件套走 token 且样式块无 backdrop-filter 路线（issue #97）", () => {
     const overlaySrc = readFileSync(resolve(here, "../components/RestrictOverlay.vue"), "utf-8")
-    expect(overlaySrc).toContain("var(--glassBg)")
-    expect(overlaySrc).toContain("var(--glassBlur)")
-    expect(overlaySrc).toContain("@supports")
-    // 只约束玻璃样式块（徽章等 UI 允许合法用色）
-    const styleBlock = overlaySrc.split(".restrict-overlay")[1] ?? ""
-    expect(styleBlock).not.toMatch(/rgba?\(|#[0-9a-fA-F]{3,8}/)
-  })
-  it("tokens.css 定义玻璃降级 token --glassBgMuted", () => {
-    expect(tokensCss).toContain("--glassBgMuted:")
+    expect(overlaySrc).toContain("var(--glassBgMuted)")
+    expect(overlaySrc).toContain("var(--glassHighlight)")
+    expect(overlaySrc).toContain("var(--glassEdge)")
+    // backdrop-filter 路线已废弃（web-core/原生均不支持）——只约束样式块，注释允许提及
+    const styleBlock = overlaySrc.split("<style")[1] ?? ""
+    expect(styleBlock).not.toContain("backdrop-filter")
+    expect(styleBlock).not.toContain("@supports")
+    // 玻璃样式块无字面色值（徽章等 UI 允许合法用色）
+    const glassBlock = overlaySrc.split(".restrict-overlay")[1] ?? ""
+    expect(glassBlock).not.toMatch(/rgba?\(|#[0-9a-fA-F]{3,8}/)
   })
 })

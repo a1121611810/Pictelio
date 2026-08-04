@@ -1,9 +1,9 @@
 <script setup lang="ts">
-// R18/R18G 受限条目遮罩（issue #91：过滤 → 遮罩）。
+// R18/R18G 受限条目遮罩（issue #91：过滤 → 遮罩；issue #97：伪玻璃三件套）。
 // 绝对定位铺满父容器（调用方需给父容器加 relative）；无任何交互——
 // 不跳设置、无按钮、无提示，点击遮罩不响应也不应穿透到下层卡片的 tap。
-// 玻璃样式单源：web-core 完整玻璃；原生 LynxView 静默忽略 backdrop-filter，
-// --glassBg 的高不透明度自动退化为磨砂实色盖，功能无损。
+// 伪玻璃（Frosted Card）：半透底 + 顶部高光 + inset 内发光，全部 Lynx 确认支持，
+// web-core 与原生 LynxView 观感一致（放弃 backdrop-filter，见 liquid-glass 可行性报告）。
 const props = defineProps<{
   level: 1 | 2
 }>()
@@ -36,20 +36,12 @@ function swallow() {}
   display: flex;
   align-items: center;
   justify-content: center;
-  /* web-core 不支持声明式 backdrop-filter（源码核验：仅内部元素 blur-radius 属性），
-     静默忽略后剩 0.88 底 → 实心。降级：web-core 走低透明度实色盖（能看见下层内容轮廓），
-     宿主浏览器（web-core 运行于真实浏览器环境，backdrop-filter 生效）经 @supports 升级为真玻璃。 */
+  /* 伪玻璃三件套（issue #97 方案 A，全部 Lynx 确认支持，双端观感一致）：
+     半透底 + 顶部高光渐变 + inset 内发光/外阴影 */
   background-color: var(--glassBgMuted);
+  background-image: var(--glassHighlight);
+  box-shadow: var(--glassEdge);
   border: 1px solid var(--glassBorder);
   border-radius: var(--borderRadiusXLarge);
-}
-
-/* Lynx CSS 引擎不认识的 @supports 整块丢弃，无害 */
-@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-  .restrict-overlay {
-    background-color: var(--glassBg);
-    backdrop-filter: blur(var(--glassBlur)) saturate(var(--glassSaturate));
-    -webkit-backdrop-filter: blur(var(--glassBlur)) saturate(var(--glassSaturate));
-  }
 }
 </style>

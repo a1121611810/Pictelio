@@ -7,6 +7,7 @@ import { currentUser, logout, isLoggedIn } from '../stores/authStore'
 import { selectedClient, switchClient, type ClientKind } from '../stores/clientSwitchStore'
 import { showR18, showR18G, setShowR18, setShowR18G, ugoiraMode, setUgoiraMode } from '../stores/settingsStore'
 import { proxyImageUrl } from '../utils/imageUrl'
+import GlassCard from '../components/GlassCard.vue'
 
 const switching = ref(false)
 
@@ -69,8 +70,8 @@ function toggleR18G() {
     </view>
 
     <scroll-view scroll-orientation="vertical" class="w-full flex-1">
-      <!-- 账户组：用户信息 + 收藏入口 -->
-      <view class="bg-background mt-3 p-4">
+      <!-- 账户组：用户信息 + 收藏入口（GlassCard：伪玻璃首个消费方，issue #97） -->
+      <GlassCard class="mt-3 mx-3 p-4">
         <view v-if="currentUser" class="flex flex-row items-center pb-4 border-b-[1px] border-b-stroke-3">
           <image
             class="w-12 h-12 rounded-[6.4vw] bg-background-3"
@@ -91,7 +92,7 @@ function toggleR18G() {
           <text class="text-lg text-foreground">我的收藏</text>
           <text class="text-lg text-foreground-3">›</text>
         </view>
-      </view>
+      </GlassCard>
 
       <!-- 客户端组 -->
       <view class="bg-background mt-3 p-4">
