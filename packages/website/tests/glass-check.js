@@ -1,12 +1,12 @@
 // 渲染页玻璃验证（PRD #89 确认接缝）
 // 运行方式：cd 仓库根目录 && playwright-cli open http://localhost:4321/pixivizer/
 //           playwright-cli run-code --filename=packages/website/tests/glass-check.js
-// 断言：.nav/.vc-badge/.theme-toggle/.vc-card/.vc-btn-primary/.vc-btn-glow 六处
+// 断言：.nav/.vc-badge/.theme-toggle/.vc-card/.vc-btn-primary 五处玻璃表面
 //       backdrop-filter 含 blur+saturate；badge/按钮默认文字色与卡片一致（中性），
 //       hover 时变为品牌蓝（暗 #5a9fd4 / 亮 #2b579a）；
 //       --glass-* 变量亮/暗两套解析正确且有差异；输出亮/暗截图到 /tmp 供人工复核。
 async (page) => {
-  const targets = [".nav", ".vc-badge", ".theme-toggle", ".vc-card", ".vc-btn-primary", ".vc-btn-glow", ".vc-download-card"];
+  const targets = [".nav", ".vc-badge", ".theme-toggle", ".vc-card", ".vc-btn-primary"];
   const surfaces = {};
 
   // 建立确定的暗色基线：class 与 localStorage 同步，避免复用浏览器会话时的状态残留
@@ -31,19 +31,19 @@ async (page) => {
   if (!Object.values(surfaces).every((bf) => bf.includes("blur"))) {
     throw new Error(`[FAIL] 暗色下四处未全部生效: ${JSON.stringify(surfaces)}`);
   }
-  for (const sel of [".vc-badge", ".vc-btn-primary", ".vc-btn-glow"]) {
+  for (const sel of [".vc-badge", ".vc-btn-primary"]) {
     const color = await page.locator(sel).first().evaluate((el) => getComputedStyle(el).color);
     if (color !== "rgb(232, 232, 234)") {
       throw new Error(`[FAIL] 暗色 ${sel} 默认文字色应与卡片一致 var(--text) #e8e8ea（当前: ${color}）`);
     }
   }
-  for (const sel of [".vc-btn-primary", ".vc-btn-glow"]) {
+  for (const sel of [".vc-btn-primary"]) {
     const bg = await page.locator(sel).first().evaluate((el) => getComputedStyle(el).backgroundColor);
     if (!bg.includes("255, 255, 255")) {
       throw new Error(`[FAIL] 暗色 ${sel} 玻璃底色应为中性 rgba(255,255,255,*)（当前: ${bg}）`);
     }
   }
-  for (const sel of [".vc-badge", ".vc-btn-primary", ".vc-btn-glow"]) {
+  for (const sel of [".vc-badge", ".vc-btn-primary"]) {
     await page.locator(sel).first().hover();
     await page.waitForTimeout(600);
     const color = await page.locator(sel).first().evaluate((el) => getComputedStyle(el).color);
@@ -62,6 +62,28 @@ async (page) => {
   }
   if ((await page.locator("a.vc-meta-link, a.vc-changelog-link").count()) === 0) {
     throw new Error("[FAIL] 缺少更新日志链接");
+  }
+  // 导航迷你下载按钮：初始隐藏 → 滚动离开 hero 下载区后显示 → 回顶隐藏
+  const mini = page.locator(".nav-download-mini");
+  if ((await mini.count()) === 0) {
+    throw new Error("[FAIL] 缺少导航迷你下载按钮 .nav-download-mini");
+  }
+  if ((await mini.getAttribute("class"))?.includes("visible")) {
+    throw new Error("[FAIL] 迷你下载按钮初始应为隐藏态");
+  }
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await page.waitForTimeout(500);
+  if (!(await mini.getAttribute("class"))?.includes("visible")) {
+    throw new Error("[FAIL] 滚动离开 hero 下载区后迷你按钮应显示");
+  }
+  const miniOpacity = await mini.evaluate((el) => getComputedStyle(el).opacity);
+  if (miniOpacity === "0") {
+    throw new Error("[FAIL] 显示态迷你按钮 opacity 应为 1");
+  }
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(500);
+  if ((await mini.getAttribute("class"))?.includes("visible")) {
+    throw new Error("[FAIL] 回顶后迷你按钮应隐藏");
   }
 
   const readVars = () =>
@@ -99,19 +121,19 @@ async (page) => {
       throw new Error(`[FAIL] 亮色 ${sel} 无 blur（当前: ${bf}）`);
     }
   }
-  for (const sel of [".vc-badge", ".vc-btn-primary", ".vc-btn-glow"]) {
+  for (const sel of [".vc-badge", ".vc-btn-primary"]) {
     const color = await page.locator(sel).first().evaluate((el) => getComputedStyle(el).color);
     if (color !== "rgb(26, 26, 26)") {
       throw new Error(`[FAIL] 亮色 ${sel} 默认文字色应与卡片一致 #1a1a1a（当前: ${color}）`);
     }
   }
-  for (const sel of [".vc-btn-primary", ".vc-btn-glow"]) {
+  for (const sel of [".vc-btn-primary"]) {
     const bg = await page.locator(sel).first().evaluate((el) => getComputedStyle(el).backgroundColor);
     if (!bg.includes("255, 255, 255")) {
       throw new Error(`[FAIL] 亮色 ${sel} 玻璃底色应为中性 rgba(255,255,255,*)（当前: ${bg}）`);
     }
   }
-  for (const sel of [".vc-badge", ".vc-btn-primary", ".vc-btn-glow"]) {
+  for (const sel of [".vc-badge", ".vc-btn-primary"]) {
     await page.locator(sel).first().hover();
     await page.waitForTimeout(600);
     const color = await page.locator(sel).first().evaluate((el) => getComputedStyle(el).color);
