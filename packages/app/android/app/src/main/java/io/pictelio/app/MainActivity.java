@@ -92,7 +92,10 @@ public class MainActivity extends BridgeActivity {
             }
         });
         if (!isWebViewVersionOk()) {
-            // WebView 版本不足时立即关闭 Splash，显示升级提示页
+            // WebView 版本不足时立即关闭 Splash，显示升级提示页。
+            // 必须先 super.onCreate（Android 硬约束：跳过即 SuperNotCalledException 崩溃），
+            // 且不初始化 Capacitor Bridge / 插件。
+            super.onCreate(savedInstanceState);
             keepSplashVisible.set(false);
             showWebViewUpgradeError();
             return;
