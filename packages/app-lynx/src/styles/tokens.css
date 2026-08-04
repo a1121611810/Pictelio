@@ -31,7 +31,7 @@ page {
      见 docs/research/liquid-glass-app-lynx-feasibility.md 方案 A）
    * 三件套：半透底 + 顶部 linear-gradient 高光 + inset 内发光/外阴影，
    * 全部 Lynx 确认支持，web-core 与原生 LynxView 观感一致。 */
-  --glassBgMuted: rgba(255, 255, 255, 0.72);
+  --glassBgMuted: rgba(255, 255, 255, 0.9);
   --glassHighlight: linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 30%);
   --glassEdge: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 8px 32px rgba(0, 0, 0, 0.08);
   --glassBorder: rgba(0, 0, 0, 0.06);
