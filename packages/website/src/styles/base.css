@@ -99,6 +99,23 @@ html:not(.dark) a:hover {
   }
 }
 
+/* ── Glass (A 档磨砂玻璃，PRD #89) ── */
+html {
+  --glass-blur: 24px;
+  --glass-saturate: 150%;
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-bg-strong: rgba(255, 255, 255, 0.08);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-highlight: rgba(255, 255, 255, 0.08);
+}
+
+html:not(.dark) {
+  --glass-bg: rgba(255, 255, 255, 0.6);
+  --glass-bg-strong: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(0, 0, 0, 0.06);
+  --glass-highlight: rgba(255, 255, 255, 0.55);
+}
+
 /* ── Global cursor glow ── */
 .cursor-glow {
   position: fixed;
