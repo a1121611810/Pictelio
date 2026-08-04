@@ -22,6 +22,7 @@ import {
 import { clearTranslationCache } from "@/utils/translationCache";
 import { tryAsync } from "@/utils/tryAsync";
 import FluentIcon from "../ui/FluentIcon";
+import FluentDialog from "../ui/FluentDialog";
 
 const SettingsTranslate: Component = () => {
   const [inputKey, setInputKey] = createSignal(dsApiKey() ?? "");
@@ -271,9 +272,9 @@ const SettingsTranslate: Component = () => {
       </div>
 
       {/* R18 开启确认（决策 #23：封号/训练风险） */}
-      <fluent-dialog
+      <FluentDialog
         open={restrictDialog() === "r18"}
-        on:close={() => setRestrictDialog(null)}
+        onClose={() => setRestrictDialog(null)}
         aria-label="开启 R18 翻译？"
       >
         <h3 slot="title">开启「翻译 R18 内容」？</h3>
@@ -292,12 +293,12 @@ const SettingsTranslate: Component = () => {
         <fluent-button slot="actions" appearance="primary" on:click={confirmRestrictDialog}>
           我已了解并开启
         </fluent-button>
-      </fluent-dialog>
+      </FluentDialog>
 
       {/* R18G 开启确认（更强警告：法律红线 + 上报执法机构） */}
-      <fluent-dialog
+      <FluentDialog
         open={restrictDialog() === "r18g"}
-        on:close={() => setRestrictDialog(null)}
+        onClose={() => setRestrictDialog(null)}
         aria-label="开启 R18G 翻译？"
       >
         <h3 slot="title">开启「翻译 R18G 内容」？（法律红线）</h3>
@@ -315,7 +316,7 @@ const SettingsTranslate: Component = () => {
         <fluent-button slot="actions" appearance="primary" on:click={confirmRestrictDialog}>
           我已了解并承担全部风险
         </fluent-button>
-      </fluent-dialog>
+      </FluentDialog>
     </>
   );
 };

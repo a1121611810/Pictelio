@@ -4,6 +4,7 @@ import PixivImage from "../components/PixivImage";
 import ImageViewer from "@/components/ImageViewer";
 import NovelDetailSkeleton from "../components/skeletons/NovelDetailSkeleton";
 import FluentIcon from "../components/ui/FluentIcon";
+import FluentDialog from "../components/ui/FluentDialog";
 import NovelSearchBar from "../components/NovelSearchBar";
 import NovelCoverHeader from "../components/NovelCoverHeader";
 import NovelFooterNav from "../components/NovelFooterNav";
@@ -1122,9 +1123,9 @@ const NovelDetail: Component = () => {
               {/* 首次翻译 R18/R18G 风险确认（S5，决策 #23） */}
               <Show when={restrictConfirm()}>
                 {(c) => (
-                  <fluent-dialog
+                  <FluentDialog
                     open
-                    on:close={() => resolveRestrictConfirm(false)}
+                    onClose={() => resolveRestrictConfirm(false)}
                     aria-label={c().xRestrict === 2 ? "翻译 R18G 内容？" : "翻译 R18 内容？"}
                   >
                     <h3 slot="title">
@@ -1162,7 +1163,7 @@ const NovelDetail: Component = () => {
                     >
                       我已了解并继续
                     </fluent-button>
-                  </fluent-dialog>
+                  </FluentDialog>
                 )}
               </Show>
 

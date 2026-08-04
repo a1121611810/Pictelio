@@ -1,5 +1,6 @@
 import type { Component } from "solid-js";
 import BlocklistSheet from "../BlocklistSheet";
+import FluentDialog from "../ui/FluentDialog";
 
 interface SettingsDialogsProps {
   showBlocklist: boolean;
@@ -25,9 +26,9 @@ const SettingsDialogs: Component<SettingsDialogsProps> = (props) => {
       </Show>
 
       {/* Clear data dialog */}
-      <fluent-dialog
+      <FluentDialog
         open={props.dialogType === "clear"}
-        on:close={() => props.onCloseDialog()}
+        onClose={() => props.onCloseDialog()}
         aria-label="清除所有本地数据？"
       >
         <h3 slot="title">清除所有本地数据？</h3>
@@ -41,12 +42,12 @@ const SettingsDialogs: Component<SettingsDialogsProps> = (props) => {
         <fluent-button slot="actions" appearance="primary" on:click={() => props.onConfirmClear()}>
           确认清除
         </fluent-button>
-      </fluent-dialog>
+      </FluentDialog>
 
       {/* Delete account dialog */}
-      <fluent-dialog
+      <FluentDialog
         open={props.dialogType === "deleteAccount"}
-        on:close={() => props.onCloseDialog()}
+        onClose={() => props.onCloseDialog()}
         aria-label="删除 Pixiv 账号？"
       >
         <h3 slot="title">删除 Pixiv 账号？</h3>
@@ -66,11 +67,11 @@ const SettingsDialogs: Component<SettingsDialogsProps> = (props) => {
         >
           前往 Pixiv
         </fluent-button>
-      </fluent-dialog>
+      </FluentDialog>
       {/* Switch client dialog */}
-      <fluent-dialog
+      <FluentDialog
         open={props.dialogType === "switchClient"}
-        on:close={() => props.onCloseDialog()}
+        onClose={() => props.onCloseDialog()}
         aria-label="切换到 Lynx 客户端？"
       >
         <h3 slot="title">切换到 Lynx 客户端？</h3>
@@ -88,7 +89,7 @@ const SettingsDialogs: Component<SettingsDialogsProps> = (props) => {
         >
           确认切换
         </fluent-button>
-      </fluent-dialog>
+      </FluentDialog>
     </>
   );
 };

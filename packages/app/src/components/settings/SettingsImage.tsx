@@ -1,5 +1,6 @@
 import { type Component, createSignal } from "solid-js";
 import FluentIcon from "../ui/FluentIcon";
+import FluentDialog from "../ui/FluentDialog";
 import {
   listQuality,
   setListQuality,
@@ -110,7 +111,7 @@ const SettingsImage: Component = () => {
       </div>
 
       {/* 二次确认弹窗（选择 Range 时） */}
-      <fluent-dialog open={showUgoiraConfirm()} on:close={() => setShowUgoiraConfirm(false)}>
+      <FluentDialog open={showUgoiraConfirm()} onClose={() => setShowUgoiraConfirm(false)} aria-label="切换到 Range 流式？">
         <div slot="title">切换到 Range 流式？</div>
         <div slot="content" class="flex flex-col gap-2">
           <p class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)] leading-snug">
@@ -137,7 +138,7 @@ const SettingsImage: Component = () => {
         >
           确认切换
         </fluent-button>
-      </fluent-dialog>
+      </FluentDialog>
 
       {/* Image cache management entry */}
       <div
