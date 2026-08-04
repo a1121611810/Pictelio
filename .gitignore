@@ -5,6 +5,7 @@ dist/
 *.bak
 .scratch/
 .playwright-cli/*
+**/.playwright-cli/
 .reasonix/*
 .codegraph/*
 .worktrees/
