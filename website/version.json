@@ -1,5 +1,5 @@
 {
-  "version": "3.22.0",
-  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v3.22.0",
-  "changelog": "本次版本新增小说 AI 翻译功能：支持将日文/英文小说翻译为中文阅读。\n\n- 采用 BYOK 模式，用户填写自己的 DeepSeek API Key，无服务器成本\n- 混合翻译策略：首屏优先输出，后台续翻，等待时间短\n- 支持原文/译文切换、译文本地缓存（LRU 200 章）\n- 提供标准/高质量两档翻译质量选择\n- R18/R18G 内容默认不翻译，可自行开启，并有明确的风险提示\n- 翻译失败的"
+  "version": "4.0.0",
+  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v4.0.0",
+  "changelog": "Lynx 双端客户端正式版：P0 核心功能全量上线 + Android 原生深度集成（JS 零知 token），双端 Ugoira 动图播放，落地页磨砂玻璃视觉升级，并完成真机自动化验证闭环。"
 }
