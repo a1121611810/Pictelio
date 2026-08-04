@@ -15,6 +15,8 @@
 | **时间节流（throttle）** | 800ms 间隔检查，防 scrolltolower 高频触发。与冷却独立：冷却期内触发被忽略且不更新节流时间戳。 |
 | **min-height 保底** | 给可能塌陷的元素设 `min-height`（用 vw！）保证内容高度下限。web 预览下兜底，原生下被真实布局覆盖。 |
 | **空页防护（empty-page guard）** | `loadMore` 返回 `fresh.length === 0` 时置 `nextUrl = null` 终止分页，防服务端返回空页但 next_url 仍存在时轮询空页。 |
+| **item 全量渲染（no item recycling）** | web-core 的 `<list>` **不做 item 虚拟化**：`XListWaterfall.js` 遍历全部 children 布局，模板无 content-visibility，N 条数据 = N 个 list-item 全量挂载 DOM（真机原生 list 有引擎级 item 回收，只创建视口附近 item）。配合无懒加载的图片 → **图片加载风暴**（一次请求返回 90 条 → 91 张图同一毫秒全量加载，HAR 实测）。**防护：列表图片加 `lazy-load` 属性（真机生效）+ 推荐页数据分批渲染（PAGE_SIZE=20 + pending 队列，web-core 下 DOM 只挂载 20 个 item）**（见 ADR-0060、`glossary-feed-image-loading.md`）。 |
+| **lazy-load 属性失效** | web-core 的 `x-image` **不处理 `lazy-load` 属性**：`observedAttributes` 仅 `src`/`placeholder`/`blur-radius`/`crossorigin`/`referrerpolicy`，且 0.11.2 起主动移除默认 `loading="lazy"`（#2186）——`lazy-load` 只对真机 LynxView（引擎级）有效。组件层 `lynx.createIntersectionObserver` 也因 `IntersectionObserverModule` 未注入而不可用。**防护：web-core 下靠数据分批渲染控制 DOM 挂载数量**（见 ADR-0060）。 |
 | **HMR 不可靠** | rspeedy dev 对 vue-lynx `<style scoped>` 样式与组件热更新支持不完整（错误如 `lynx.requireModuleAsync is not a function`、hot-update 404）。**样式改动后建议直接重启 dev server + 强刷**，不要依赖 HMR。 |
 | **百分比宽度基准异常** | web-core 下元素的 `width: %` 相对**根容器（视口）**而非父元素（实测 `<input>`、`list-item`、`x-image`）。嵌套百分比场景才暴露：父 `85%` + 子 `100%` → 子按视口宽度计算；瀑布流 `list-item` 被拉成视口宽（超出列宽被 `overflow-hidden` 裁剪）。**防护：普通 flex 子元素用 flex stretch 拉伸替代百分比；瀑布流 `list-item` / `x-image` 禁用 `w-full`，宽度交给 list 引擎约束为列宽**（见 ADR-0048）。 |
 | **list-item margin 失效** | 瀑布流（waterfall）`<list-item>` 自身的 margin/padding **不参与布局**（相邻 item 零间隙，x/y/w/h 均不含 margin），卡片"粘在一起"；且 **list-item 内部任何 `view` 包裹会导致引擎定位计算崩**（所有 item 重叠在起点）。**防护：间距用 `<list>` 官方属性 `list-main-axis-gap`（行距）/ `list-cross-axis-gap`（列距），经 vue-lynx `:style` 对象绑定传入**（attribute 形式不响应，style 绑定生成 `--list-*-axis-gap` CSS 变量才生效，见 ADR-0048）。 |
@@ -36,6 +38,7 @@
 | list-item margin/padding 失效 + 内部 view 崩 | 卡片无间距；内部包裹 view 时所有 item 重叠 | list 官方 `list-main-axis-gap`/`list-cross-axis-gap`（style 对象绑定） |
 | widthFix 不存在 | mode 静默回退 fill，图片拉伸变形 | 方形图用 `aspect-ratio: 1/1` + `aspectFill` |
 | HMR 不生效 | 改动不反映到页面 | 重启 dev server + 强刷 |
+| item 全量渲染（list 不回收） | N 条数据 = N 个 item 全量挂载，配合无懒加载图片 → 图片加载风暴 | 列表图加 `lazy-load`（真机）+ 数据分批渲染（PAGE_SIZE=20 + pending，web-core 首屏 91→20 张） |
 
 ## 项目现状（2026-08）
 
