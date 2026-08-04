@@ -213,7 +213,9 @@ html:not(.dark) .footer {
   font-weight: 800;
   letter-spacing: -0.04em;
   line-height: 1.0;
-  background: linear-gradient(135deg, #ffffff 0%, #5a9fd4 50%, #7ab8e8 100%);
+  background:
+    radial-gradient(140% 140% at var(--gx, 20%) var(--gy, 50%), rgba(255,255,255,0.45) 0%, rgba(255,255,255,0) 55%),
+    linear-gradient(135deg, #ffffff 0%, #5a9fd4 50%, #7ab8e8 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -421,7 +423,9 @@ html:not(.dark) .variant-c .vc-hero::after {
   background: radial-gradient(circle, rgba(90,159,212,0.04) 0%, transparent 60%);
 }
 html:not(.dark) .variant-c .vc-title {
-  background: linear-gradient(135deg, #1a1a1a 0%, #2b579a 50%, #5a9fd4 100%);
+  background:
+    radial-gradient(140% 140% at var(--gx, 20%) var(--gy, 50%), rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 55%),
+    linear-gradient(135deg, #1a1a1a 0%, #2b579a 50%, #5a9fd4 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;

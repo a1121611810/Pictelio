@@ -105,12 +105,17 @@ const screenshots = [
   // ── Phone tilt + cursor glow ──
   const hero = document.querySelector(".vc-hero");
   const phone = document.querySelector(".vc-phone");
+  const title = document.querySelector(".vc-title");
+  const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (hero && phone) {
     const BASE_Y = -8;
     const MAX_Y = 10;
     const MAX_X = 5;
     let targetY = BASE_Y, targetX = 0;
     let currentY = BASE_Y, currentX = 0;
+    // h1 标题径向高光跟随：--gx/--gy 百分比（默认停在左侧白色区）
+    let targetGx = 20, targetGy = 50;
+    let currentGx = 20, currentGy = 50;
     let rafId = null;
 
     function lerp(a, b, t) { return a + (b - a) * t; }
@@ -119,8 +124,19 @@ const screenshots = [
     function tick() {
       currentY = lerp(currentY, targetY, 0.1);
       currentX = lerp(currentX, targetX, 0.1);
+      currentGx = lerp(currentGx, targetGx, 0.08);
+      currentGy = lerp(currentGy, targetGy, 0.08);
       phone.style.transform = `perspective(800px) rotateX(${currentX}deg) rotateY(${currentY}deg)`;
-      if (Math.abs(currentY - targetY) > 0.01 || Math.abs(currentX - targetX) > 0.01) {
+      if (title && !prefersReduced) {
+        title.style.setProperty("--gx", `${currentGx}%`);
+        title.style.setProperty("--gy", `${currentGy}%`);
+      }
+      if (
+        Math.abs(currentY - targetY) > 0.01 ||
+        Math.abs(currentX - targetX) > 0.01 ||
+        Math.abs(currentGx - targetGx) > 0.01 ||
+        Math.abs(currentGy - targetGy) > 0.01
+      ) {
         rafId = requestAnimationFrame(tick);
       } else {
         rafId = null;
@@ -138,12 +154,20 @@ const screenshots = [
 
       targetY = BASE_Y + smooth(nx) * MAX_Y;
       targetX = smooth(ny) * MAX_X;
+      if (!prefersReduced) {
+        targetGx = (x / rect.width) * 100;
+        targetGy = (y / rect.height) * 100;
+      }
       kick();
     });
 
     hero.addEventListener("mouseleave", () => {
       targetY = BASE_Y;
       targetX = 0;
+      if (!prefersReduced) {
+        targetGx = 20;
+        targetGy = 50;
+      }
       kick();
     });
   }
