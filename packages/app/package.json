@@ -12,6 +12,8 @@
     "test": "vp test",
     "test:watch": "vp test --watch",
     "test:agent-browser": "vitest run -c vitest.agent-browser.config.ts",
+    "test:android:e2e": "vitest run -c tests/android-e2e/vitest.config.ts",
+    "appium:setup": "APPIUM_HOME=$HOME/.appium appium driver install uiautomator2 && APPIUM_HOME=$HOME/.appium appium driver doctor uiautomator2",
     "test:all": "vp run test && vp run test:agent-browser",
     "lint": "vp lint",
     "fmt": "vp fmt --write",
@@ -24,6 +26,7 @@
     "sync:android-version": "node scripts/sync-android-version.mjs",
     "sync:credentials": "node scripts/sync-credentials.mjs",
     "build:android": "vp run sync:android-version && vp run sync:credentials && vp run build && vp run cap:sync && cd android && GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew assembleDebug",
+    "build:android:e2e": "vp run sync:android-version && vp run sync:credentials && vp build --mode e2e && vp run cap:sync && cd android && GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew assembleDebug",
     "build:android:release": "vp run sync:android-version && vp run sync:credentials && vp run build && vp run cap:sync && cd android && GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew assembleRelease",
     "release:github": "node scripts/release-github.mjs",
     "release": "node scripts/release.mjs",
@@ -60,6 +63,7 @@
     "@solidjs/testing-library": "^0.8.10",
     "@types/node": "^26.1.1",
     "agent-browser": "^0.31.1",
+    "appium": "^3.2.1",
     "canvas": "^3.2.3",
     "happy-dom": "^20.11.1",
     "https-proxy-agent": "^9.1.0",
@@ -72,6 +76,7 @@
     "vite": "^8.1.5",
     "vite-plugin-solid": "^2.11.13",
     "vite-plus": "^0.2.6",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "webdriverio": "^9.23.1"
   }
 }
