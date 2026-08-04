@@ -6,7 +6,7 @@
 //       hover 时变为品牌蓝（暗 #5a9fd4 / 亮 #2b579a）；
 //       --glass-* 变量亮/暗两套解析正确且有差异；输出亮/暗截图到 /tmp 供人工复核。
 async (page) => {
-  const targets = [".nav", ".vc-badge", ".theme-toggle", ".vc-card", ".vc-btn-primary", ".vc-btn-glow"];
+  const targets = [".nav", ".vc-badge", ".theme-toggle", ".vc-card", ".vc-btn-primary", ".vc-btn-glow", ".vc-download-card"];
   const surfaces = {};
 
   // 建立确定的暗色基线：class 与 localStorage 同步，避免复用浏览器会话时的状态残留
@@ -52,6 +52,16 @@ async (page) => {
     }
     await page.mouse.move(0, 0);
     await page.waitForTimeout(600);
+  }
+  // 结构断言：hero 版本信息行 + 下载卡版本 pill + 更新日志链接
+  if ((await page.locator(".vc-download-meta").count()) === 0) {
+    throw new Error("[FAIL] hero 下载区缺少版本信息行 .vc-download-meta");
+  }
+  if ((await page.locator(".vc-version-pill").count()) === 0) {
+    throw new Error("[FAIL] 缺少版本 pill .vc-version-pill");
+  }
+  if ((await page.locator("a.vc-meta-link, a.vc-changelog-link").count()) === 0) {
+    throw new Error("[FAIL] 缺少更新日志链接");
   }
 
   const readVars = () =>
