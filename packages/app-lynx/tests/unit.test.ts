@@ -7,6 +7,7 @@ import { extractNovelTextFromHtml } from '../src/api/novel'
 import { matchRoute } from '../src/routerCore'
 import { redactProxyUrl } from '../src/utils/proxyRedact'
 import { apiClient } from '../src/api/client'
+import { isOAuthCredsInjected } from '../src/api/auth'
 import { getUserDetail, getUserFollowing, getUserFollowers, followUser, unfollowUser, loadUserListNext } from '../src/api/user'
 import { loadUserIllusts, loadFollow, loadBookmarks } from '../src/api/illust'
 import { loadUserNovels, loadBookmarks as loadNovelBookmarks, loadFollow as loadNovelFollow } from '../src/api/novel'
@@ -273,15 +274,20 @@ describe('authStore 安全：refresh_token 不持久化', () => {
 
   it('登录成功后不写 localStorage', async () => {
     // mock 登录成功路径：OAuth 返回有效响应，验证成功后也绝不写存储
-    vi.mock('../src/api/auth', () => ({
-      loginWithRefreshToken: vi.fn(async () => ({
-        access_token: 'at',
-        refresh_token: 'rt',
-        expires_in: 3600,
-        token_type: 'bearer',
-        user: { id: 1, name: 'u', account: 'u', profile_image_urls: {} },
-      })),
-    }))
+    // 部分 mock：保留原模块其他导出（isOAuthCredsInjected 等），仅覆盖 loginWithRefreshToken
+    vi.mock('../src/api/auth', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('../src/api/auth')>()
+      return {
+        ...actual,
+        loginWithRefreshToken: vi.fn(async () => ({
+          access_token: 'at',
+          refresh_token: 'rt',
+          expires_in: 3600,
+          token_type: 'bearer',
+          user: { id: 1, name: 'u', account: 'u', profile_image_urls: {} },
+        })),
+      }
+    })
     const { loginWithToken } = await import('../src/stores/authStore')
     const lsSet = (globalThis.localStorage as { setItem: ReturnType<typeof vi.fn> }).setItem
     await loginWithToken('some-token')
@@ -833,5 +839,30 @@ describe('T6 动图播放方案', () => {
     expect(frames).toHaveLength(1)
     expect(frames[0]!.delay).toBe(100)
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('降级 fflate'), expect.anything())
+  })
+})
+
+// ─── 回归：OAuth 凭证注入 fail-closed 门禁 ───
+// 背景：6a3550a 把 __CREDENTIALS__ 改为条件注入（未设 PICTELIO_LYNX_DEV=1 时为空占位符），
+// 而 vue-lynx 插件覆盖 __DEV__ 为 dev 恒 true，导致 auth.ts 的 !__DEV__ 门禁失效，
+// 空凭证请求照常外发 → Pixiv 400 invalid_client。
+// 修复：oauthTokenRequest 内调用 isOAuthCredsInjected() 二次校验（双保险）。
+describe('auth.isOAuthCredsInjected（凭证注入门禁回归）', () => {
+  it('空占位符凭证（未设 PICTELIO_LYNX_DEV=1 的构建）→ false，拒绝外发', () => {
+    expect(
+      isOAuthCredsInjected({ clientId: '', clientSecret: '', hashSecret: '', appOs: '', appOsVersion: '' }),
+    ).toBe(false)
+  })
+
+  it('部分凭证缺失 → false（clientId 为空即拒绝）', () => {
+    expect(
+      isOAuthCredsInjected({ clientId: '', clientSecret: 'x', hashSecret: 'y', appOs: 'ios', appOsVersion: '18.5' }),
+    ).toBe(false)
+  })
+
+  it('完整凭证（真实 dev 注入形态）→ true', () => {
+    expect(
+      isOAuthCredsInjected({ clientId: 'c', clientSecret: 's', hashSecret: 'h', appOs: 'ios', appOsVersion: '18.5' }),
+    ).toBe(true)
   })
 })

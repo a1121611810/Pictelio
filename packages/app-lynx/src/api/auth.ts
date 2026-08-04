@@ -18,15 +18,32 @@ interface OAuthCreds {
   appOsVersion: string
 }
 
+/**
+ * 校验 OAuth 凭证已注入（fail-closed 双保险）。
+ * 抽成独立导出函数：__CREDENTIALS__ 为编译期注入常量（测试/构建无法改值），
+ * 单测通过此纯函数直接验证空凭证拦截逻辑。
+ */
+export function isOAuthCredsInjected(creds: OAuthCreds): boolean {
+  return Boolean(creds.clientId && creds.clientSecret && creds.hashSecret)
+}
+
 export async function oauthTokenRequest(
   grantType: string,
   extraParams: Record<string, string>,
 ): Promise<PixivAuthResponse> {
-  // __DEV__ 常量由 lynx.config.ts 编译期注入；生产构建为 false，整块消除
+  // __DEV__ 常量由 lynx.config.ts 编译期注入；生产构建为 false，整块消除。
+  // 注意：vue-lynx 插件会在 modifyRsbuildConfig 中用自己的 define 覆盖 __DEV__
+  // （dev 下恒为 true），因此 __DEV__ 门禁在 dev 下形同虚设——必须同时校验
+  // 凭证非空，避免空凭证请求外发（Pixiv 返回 400 invalid_client）。
   if (!__DEV__) {
     throw new Error("OAuth 仅支持开发/调试环境")
   }
   const creds = __CREDENTIALS__ as OAuthCreds
+  if (!isOAuthCredsInjected(creds)) {
+    // fail-closed 双保险：凭证为空说明构建未注入（未设 PICTELIO_LYNX_DEV=1
+    // 时 __CREDENTIALS__ 为占位符），直接拒绝，不发请求
+    throw new Error("OAuth 凭证未注入：请以 PICTELIO_LYNX_DEV=1 启动 dev server")
+  }
 
   const time = new Date().toISOString().replace(/Z$/u, "+00:00")
   const hash = SparkMD5.hash(time + creds.hashSecret)

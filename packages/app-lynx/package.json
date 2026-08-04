@@ -5,7 +5,7 @@
   "description": "Pictelio Lynx client - vue-lynx MVP (login / recommended illusts / novel / profile + client switch)",
   "type": "module",
   "scripts": {
-    "dev": "rspeedy dev",
+    "dev": "PICTELIO_LYNX_DEV=1 rspeedy dev",
     "build": "rspeedy build",
     "preview": "rspeedy preview",
     "check": "tsc --noEmit -p src/tsconfig.json",
@@ -15,11 +15,11 @@
   },
   "dependencies": {
     "@lynx-js/web-core": "^0.23.1",
+    "@pictelio/ugoira": "workspace:*",
     "spark-md5": "^3.0.2",
     "vue": "^3.5.13",
     "vue-lynx": "^0.5.1",
-    "vue-router": "^4.5.0",
-    "@pictelio/ugoira": "workspace:*"
+    "vue-router": "^4.5.0"
   },
   "devDependencies": {
     "@lynx-js/rspeedy": "^0.13.6",
