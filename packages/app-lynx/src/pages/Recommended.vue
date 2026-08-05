@@ -6,6 +6,7 @@ import { navigate } from '../router'
 import { loadRecommended, loadNext } from '../api/illust'
 import type { PixivIllust } from '../api/types'
 import { thumbUrl } from '../utils/imageUrl'
+import { withTimeout } from '../utils/withTimeout'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
@@ -37,7 +38,8 @@ async function fetchFirstPage() {
   loading.value = true
   errorMsg.value = ''
   try {
-    const res = await loadRecommended()
+    // 请求挂起 15s 兜底（issue #128）：超时 reject 走下方 catch 展示 errorMsg，避免骨架屏无限显示
+    const res = await withTimeout(loadRecommended(), 15000)
     // issue #91：全量渲染，受限条目盖遮罩（不再过滤）
     const all = res.illusts
     illusts.value = all.slice(0, PAGE_SIZE)
@@ -67,7 +69,8 @@ async function loadMore() {
       illusts.value.push(...pendingIllusts.value.splice(0, PAGE_SIZE))
       return
     }
-    const res = await loadNext(nextUrl.value!)
+    // 翻页请求同样加 15s 超时兜底（issue #128）
+    const res = await withTimeout(loadNext(nextUrl.value!), 15000)
     const seen = new Set(illusts.value.map((i) => i.id))
     const fresh = res.illusts.filter((i) => !seen.has(i.id))
     illusts.value.push(...fresh.slice(0, PAGE_SIZE))
@@ -125,7 +128,7 @@ onActivated(() => {
 </script>
 
 <template>
-  <view class="w-full h-full bg-background-2">
+  <view class="w-full h-full flex flex-col bg-background-2">
     <view class="flex flex-row items-center h-[11.733vw] px-4 bg-background border-b-[1px] border-b-stroke-2">
       <text class="flex-1 text-3xl font-bold text-foreground">推荐插画</text>
       <!-- [lynx:fix] 原生 text 元素 @tap 失效（真机实测）→ 外层 view 包 tap（view tap 已验证工作） -->
@@ -149,13 +152,15 @@ onActivated(() => {
 
     <!-- [lynx:fix] 骨架屏：首屏加载（无数据）时显示 shimmer 卡片占位，数据就绪后切换 list。
          8 个 ≈ 4 行两列，与真实卡片同比例（48.4vw 宽 + 方形图片）避免切换 reflow -->
-    <view v-if="loading && illusts.length === 0" class="w-full h-full flex flex-row flex-wrap content-start p-1.5">
+    <!-- [lynx:fix] 骨架屏不占满全屏高度（h-full 会溢出覆盖底部导航栏，拦截 tap，issue #129）：
+     改 flex-1 min-h-0 约束在导航栏下方的内容区内 -->
+    <view v-if="loading && illusts.length === 0" class="w-full flex-1 min-h-0 flex flex-row flex-wrap content-start p-1.5">
       <SkeletonCard v-for="n in 8" :key="n" />
     </view>
 
     <list
       v-else-if="!loading || illusts.length > 0"
-      class="w-full h-full"
+      class="w-full flex-1 min-h-0"
       list-type="waterfall"
       scroll-orientation="vertical"
       :span-count="2"

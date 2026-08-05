@@ -70,7 +70,7 @@ onMounted(fetchFirstPage)
 </script>
 
 <template>
-  <view class="w-full h-full bg-background-2">
+  <view class="w-full h-full flex flex-col bg-background-2">
     <view class="flex flex-row items-center h-[11.733vw] px-4 bg-background border-b-[1px] border-b-stroke-2">
       <view class="py-1 pr-2" @tap="goBack"><text class="text-lg text-brand-foreground pr-4">‹ 返回</text></view>
       <text class="flex-1 text-2xl font-semibold text-foreground">关注</text>
@@ -79,18 +79,19 @@ onMounted(fetchFirstPage)
     <text v-if="errorMsg && !loading" class="text-sm text-danger p-4">{{ errorMsg }}</text>
 
     <!-- 骨架屏：首屏加载时 shimmer 卡片占位（与真实卡片同比例，避免 reflow） -->
-    <view v-if="loading && illusts.length === 0" class="w-full h-full flex flex-row flex-wrap content-start p-1.5">
+    <!-- [lynx:fix] 骨架屏不占满全屏高度（h-full 会溢出覆盖底部导航栏，拦截 tap，issue #129） -->
+    <view v-if="loading && illusts.length === 0" class="w-full flex-1 min-h-0 flex flex-row flex-wrap content-start p-1.5">
       <SkeletonCard v-for="n in 8" :key="n" />
     </view>
 
     <!-- 空态（加载失败时由 errorMsg 显示错误，不显示空态） -->
-    <view v-else-if="!loading && !errorMsg && illusts.length === 0" class="w-full h-full flex items-center justify-center">
+    <view v-else-if="!loading && !errorMsg && illusts.length === 0" class="w-full flex-1 min-h-0 flex items-center justify-center">
       <text class="text-base text-foreground-3">暂无关注更新</text>
     </view>
 
     <list
       v-else
-      class="w-full h-full"
+      class="w-full flex-1 min-h-0"
       list-type="waterfall"
       scroll-orientation="vertical"
       :span-count="2"

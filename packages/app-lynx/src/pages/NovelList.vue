@@ -86,7 +86,7 @@ onMounted(fetchFirstPage)
 </script>
 
 <template>
-  <view class="w-full h-full bg-background-2">
+  <view class="w-full h-full flex flex-col bg-background-2">
     <view class="flex flex-row items-center h-[11.733vw] px-4 bg-background border-b-[1px] border-b-stroke-2">
       <view class="py-1 pr-2" @tap="goBack"><text class="text-lg text-brand-foreground pr-4">‹ 返回</text></view>
       <text class="flex-1 text-2xl font-semibold text-foreground">小说</text>
@@ -113,7 +113,8 @@ onMounted(fetchFirstPage)
     <text v-if="errorMsg && !loading" class="text-sm text-danger p-4">{{ errorMsg }}</text>
 
     <!-- 首屏骨架（issue #91）：4~6 条列表卡占位，切 tab 重载同样显示 -->
-    <view v-if="loading && novels.length === 0" class="w-full">
+    <!-- [lynx:fix] 骨架屏高度约束在导航栏下方内容区内（不占满全屏，issue #129） -->
+    <view v-if="loading && novels.length === 0" class="w-full flex-1 min-h-0">
       <view v-for="n in 5" :key="n" class="m-1.5 mx-3 p-3.5 bg-background rounded-[var(--borderRadiusXLarge)]">
         <view class="shimmer h-[32rpx] rounded-[var(--borderRadiusSmall)] w-[75%]" />
         <view class="shimmer h-[24rpx] rounded-[var(--borderRadiusSmall)] mt-1.5 w-[40%]" />
@@ -123,13 +124,13 @@ onMounted(fetchFirstPage)
     </view>
 
     <!-- 关注视图空态（P0-T5） -->
-    <view v-if="mode === 'follow' && !loading && !errorMsg && novels.length === 0" class="w-full h-full flex items-center justify-center">
+    <view v-if="mode === 'follow' && !loading && !errorMsg && novels.length === 0" class="w-full flex-1 min-h-0 flex items-center justify-center">
       <text class="text-base text-foreground-3">暂无关注小说</text>
     </view>
 
     <list
       v-if="novels.length > 0"
-      class="w-full h-full"
+      class="w-full flex-1 min-h-0"
       list-type="single"
       scroll-orientation="vertical"
       :lower-threshold-item-count="5"
