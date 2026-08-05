@@ -35,6 +35,26 @@ interface FluentDialogProps {
  *      - 其余无 slot 子元素      → body 默认 slot（正文）
  *    契约收敛在封装内，调用方零改动。
  */
+
+/**
+ * 把调用方传入的子元素按 fluent-dialog-body 真实 template 重映射 slot。
+ * 直接操作挂载后的 DOM 节点（SolidJS 的 JSX.Element 在浏览器/happy-dom
+ * 下是真实节点），仅改写 slot attribute，不移动节点位置。
+ */
+function remapSlots(body: HTMLElement) {
+  for (const el of [...body.children] as HTMLElement[]) {
+    const slot = el.getAttribute?.("slot");
+    if (slot === "actions") {
+      // 复数 actions 不存在 → 单数 action
+      el.setAttribute("slot", "action");
+    } else if (slot === "content") {
+      // content 不存在 → 剥除，落入 body 默认 slot（.content）
+      el.removeAttribute("slot");
+    }
+    // slot="title" 与无 slot 子元素无需处理
+  }
+}
+
 const FluentDialog: Component<FluentDialogProps> = (props) => {
   let ref: HTMLElement | undefined;
 
@@ -97,25 +117,6 @@ const FluentDialog: Component<FluentDialogProps> = (props) => {
     // 组件卸载时若仍开着，确保关闭，避免遗留模态
     if (isOpen()) callHost("hide");
   });
-
-  /**
-   * 把调用方传入的子元素按 fluent-dialog-body 真实 template 重映射 slot。
-   * 直接操作挂载后的 DOM 节点（SolidJS 的 JSX.Element 在浏览器/happy-dom
-   * 下是真实节点），仅改写 slot attribute，不移动节点位置。
-   */
-  function remapSlots(body: HTMLElement) {
-    for (const el of [...body.children] as HTMLElement[]) {
-      const slot = el.getAttribute?.("slot");
-      if (slot === "actions") {
-        // 复数 actions 不存在 → 单数 action
-        el.setAttribute("slot", "action");
-      } else if (slot === "content") {
-        // content 不存在 → 剥除，落入 body 默认 slot（.content）
-        el.removeAttribute("slot");
-      }
-      // slot="title" 与无 slot 子元素无需处理
-    }
-  }
 
   let bodyRef: HTMLElement | undefined;
 
