@@ -10,6 +10,8 @@ import { registerPlugin } from "@capacitor/core";
  */
 export interface ClientInfoPlugin {
   getClientKinds(): Promise<{ kinds: string[] }>;
+  /** Activity 级重启（进程保留）：切换引擎后新 Activity 由入口路由按开关分发 */
+  restart(): Promise<void>;
 }
 
 export const ClientInfo = registerPlugin<ClientInfoPlugin>("ClientInfo");

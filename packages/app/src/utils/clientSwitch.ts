@@ -1,8 +1,14 @@
 // ─── Client 切换（webview ↔ lynx） ───
-// 与 app-lynx 原生侧共用契约：SharedPreferences 文件 "CapacitorStorage"（@capacitor/preferences
-// 默认 group）的 key "pictelio_client_kind" —— MainActivity 入口路由与
-// PictelioAppModule（Lynx Native Module）读取同一 key 同一文件，两侧切换互通。
-import { settings, type SettingHandle } from "@/settings";
+// 深模块：小接口（readClientKind / switchClient / supportsClientSwitch）+ 内部编排
+//（in-flight 锁、5s 写入超时、单键直写、原生重启 fallback）。
+// 契约：SharedPreferences 文件 "CapacitorStorage"（@capacitor/preferences 默认 group）
+// 的 key "pictelio_client_kind" —— MainActivity 入口路由与 PictelioAppModule
+//（Lynx Native Module）读取同一 key 同一文件，两侧切换互通。
+// 读写均直对 @capacitor/preferences 单键，不依赖 settings 层（其 write gate 隐式契约
+// 会迫使调用方全量 hydrateAll 29 个 key —— 切换卡顿根因，见 issue #120 Further Notes）。
+import { Preferences } from "@capacitor/preferences";
+import { App } from "@capacitor/app";
+import { ClientInfo } from "@/native/ClientInfo";
 
 export type ClientKind = "webview" | "lynx";
 
@@ -10,24 +16,79 @@ export const CLIENT_KIND_KEY = "pictelio_client_kind";
 /** 主应用（pictelio-app）自身是 webview client */
 export const DEFAULT_CLIENT: ClientKind = "webview";
 
-const clientKindSetting: SettingHandle<ClientKind> = settings.define<ClientKind>({
-  key: CLIENT_KIND_KEY,
-  default: DEFAULT_CLIENT,
-  validate: (v): v is ClientKind => v === "lynx" || v === "webview",
-});
+/** 切换结果：error modes 显式声明（接口契约的一部分，UI 据此映射 toast） */
+export type SwitchOutcome =
+  | { ok: true }
+  | { ok: false; reason: "busy" | "write-failed" | "timeout" | "restart-failed" };
+
+/** 开关写入超时（ms）：切换是用户主动一次性操作，5s 未完成视为失败并给出反馈 */
+const WRITE_TIMEOUT_MS = 5_000;
 
 /** 读取当前 client（无记录/异常 → webview 默认） */
 export async function readClientKind(): Promise<ClientKind> {
-  // 显式 hydrate：从 Preferences 读权威值（此键不参与启动批量加载，按需读取）
-  await clientKindSetting.hydrate();
-  return clientKindSetting.value();
+  try {
+    const { value } = await Preferences.get({ key: CLIENT_KIND_KEY });
+    return value === "lynx" || value === "webview" ? value : DEFAULT_CLIENT;
+  } catch (e) {
+    console.warn("[clientSwitch] 读取 client kind 失败，默认 webview", e);
+    return DEFAULT_CLIENT;
+  }
 }
 
-/** 写入 client 开关（原生重启后 MainActivity 按此分发到 LynxActivity） */
-export async function setClientKind(kind: ClientKind): Promise<void> {
-  // 确保 write gate 已打开（若启动 hydrateAll 尚未执行，先加载一次以允许落盘）
-  await settings.hydrateAll();
-  clientKindSetting.set(kind);
+/** 内部：写入开关（读/写同路径，直对 Preferences 单键；进程切换后内存态无需同步） */
+async function writeClientKind(kind: ClientKind): Promise<void> {
+  await Preferences.set({ key: CLIENT_KIND_KEY, value: kind });
+}
+
+/** 写入失败（区别于超时，供 SwitchOutcome 区分 reason） */
+class WriteFailedError extends Error {}
+
+/** in-flight 锁：连点/并发只允许一个切换在途（防连点重复触发） */
+let switching = false;
+
+/**
+ * 切换渲染引擎（深模块唯一编排入口）。
+ * 时序：写开关（5s 超时）→ 原生 restart（Activity 级切换，进程保留）。
+ * Web 环境无原生插件 → fallback App.exitApp（仅提示）。
+ * 返回 SwitchOutcome；本模块不触碰 UI，调用方据此映射 toast。
+ */
+export async function switchClient(kind: ClientKind): Promise<SwitchOutcome> {
+  if (switching) return { ok: false, reason: "busy" };
+  switching = true;
+  try {
+    // 写开关（5s 超时；超时分支 clear timer 防残留）
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        writeClientKind(kind).catch(() => {
+          throw new WriteFailedError("write-failed");
+        }),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error("timeout")), WRITE_TIMEOUT_MS);
+        }),
+      ]);
+    } catch (e) {
+      return { ok: false, reason: e instanceof WriteFailedError ? "write-failed" : "timeout" };
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+    }
+    // 写入成功 → 原生重启（Activity 级切换）；锁保持到 restart 完成，防连点二次 restart。
+    // restart（CLEAR_TASK）后旧 JS 上下文销毁重建，switching 归零，无残留。
+    try {
+      await ClientInfo.restart();
+      return { ok: true };
+    } catch {
+      try {
+        await App.exitApp();
+        return { ok: true };
+      } catch (e) {
+        console.warn("[clientSwitch] 原生重启与 exitApp 均不可用（Web 环境）——请手动重启应用", e);
+        return { ok: false, reason: "restart-failed" };
+      }
+    }
+  } finally {
+    switching = false;
+  }
 }
 
 /**

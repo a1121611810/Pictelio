@@ -1,5 +1,4 @@
 import type { Component } from "solid-js";
-import { App } from "@capacitor/app";
 import { Preferences } from "@capacitor/preferences";
 import { isLoggedIn, logout } from "../stores/authStore";
 import { clearImageCache } from "../utils/imageLoader";
@@ -8,7 +7,7 @@ import { clearTranslationCache } from "../utils/translationCache";
 import { resetBlockedIds } from "../stores/blockStore";
 import { resetReportedIds } from "../stores/reportStore";
 import { resetSettingsStore as resetUiStore } from "../stores/settingsStore";
-import { setClientKind } from "../utils/clientSwitch";
+import { switchClient } from "../utils/clientSwitch";
 import FluentIcon from "../components/ui/FluentIcon";
 import PageTransition from "../components/PageTransition";
 import SettingsAppearance from "../components/settings/SettingsAppearance";
@@ -84,26 +83,19 @@ const Settings: Component = () => {
     }
   }
 
-  /** 切换到 Lynx 客户端：写入开关 → 退出应用（重开后由 MainActivity 入口路由分发） */
+  /** 切换到 Lynx 客户端：深模块 switchClient 完成写开关 + 原生重启编排 */
   async function handleSwitchClient() {
     setDialogState(null);
-    try {
-      await setClientKind("lynx");
-    } catch (e) {
-      console.warn("[settings] 写入 client 开关失败", e);
-      setActionToast("切换失败，请重试");
+    const result = await switchClient("lynx");
+    if (!result.ok) {
+      console.warn("[settings] 切换失败", result.reason);
+      // busy：已有切换在途，静默忽略（防连点）
+      if (result.reason !== "busy") {
+        setActionToast(result.reason === "timeout" ? "切换超时，请重试" : "切换失败，请重试");
+      }
       return;
     }
-    setActionToast("已切换到 Lynx，正在退出…");
-    // 短暂展示 toast 后退出；Web 环境无 exitApp，仅提示
-    setTimeout(() => {
-      void (async () => {
-        const [err] = await tryAsync(App.exitApp());
-        if (err) {
-          console.warn("[settings] App.exitApp 不可用（Web 环境）——请手动重启应用", err);
-        }
-      })();
-    }, 600);
+    setActionToast("已切换到 Lynx，正在重启…");
   }
 
   // ── E2E 测试钩子（仅 --mode e2e 构建）──
