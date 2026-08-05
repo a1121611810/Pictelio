@@ -146,7 +146,7 @@ OpenWiki 提供人工整理的高层次项目概览，与 CodeGraph（精确代�
 | `pnpm build:android`                | 构建 Web + Capacitor 同步 + Gradle 编译 Debug APK                 |
 | `pnpm build:android:release`        | 构建签名 Release APK（需环境变量 `PICTELIO_KEYSTORE_PASSWORD` 和 `PICTELIO_KEY_PASSWORD`） |
 | `pnpm release:github`               | 构建 Release APK 并发布到 GitHub Releases（详见 `docs/github-release.md`） |
-| `pnpm release` / `release:dry`      | 发布流程 / 演练（详见 `docs/release-checklist.md`）               |
+| `pnpm release`                      | 一键交互式发布（详见 `docs/release-checklist.md`）               |
 | `pnpm sync:app-lynx-bundle`         | 同步 app-lynx bundle 到 Android assets（原 `sync:lynx-bundle`）   |
 | `pnpm cap:sync`                     | 同步 Web 产物和 Capacitor 配置到 Android 项目                     |
 | `pnpm cap:copy`                     | 仅复制 Web 产物到 Android（不更新 Capacitor 配置）                |

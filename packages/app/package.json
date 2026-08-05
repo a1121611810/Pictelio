@@ -31,7 +31,6 @@
     "build:android:release:all": "vp run sync:android-version && vp run sync:credentials && vp run build && vp run cap:sync && cd android && GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew assembleFullRelease renameFullReleaseApk assembleWebviewRelease renameWebviewReleaseApk assembleLynxRelease renameLynxReleaseApk",
     "release:github": "node scripts/release-github.mjs",
     "release": "node scripts/release.mjs",
-    "release:dry": "node scripts/release.mjs --dry-run",
     "dev:android": "node scripts/dev-android.mjs",
     "generate:icons": "node scripts/generate-icons.mjs"
   },
