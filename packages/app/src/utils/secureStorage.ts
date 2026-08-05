@@ -18,6 +18,28 @@ const BACKUP_MARKER_KEY = "__pictelio_backup_marker";
  */
 
 /**
+ * 兼容双端存储格式（T1 修复，对齐 lynx tokenStorage.ts 的 unquoteNativeString）。
+ *
+ * 双端共享同一加密存储（SharedPreferences key `capacitor-storage_refresh_token`），
+ * 写入格式必须一致：lynx（SecureStorageCompat.setItem）与 webview（SecureStorage.setItem）
+ * 均存原始字符串。历史版本 webview 用 SecureStorage.set（JSON.stringify 包裹）写入，
+ * 读出的值形如 `"token"`；因此读取时对「形如 JSON 字符串（首尾双引号）」的值做一次
+ * 条件去引号还原（token 为 base64 字符集不含引号，安全）；非法 JSON 保持原样，避免误删。
+ */
+function unquoteTokenValue(value: string): string {
+  if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      return typeof parsed === "string" ? parsed : value;
+    } catch {
+      // 非 JSON 字符串（如损坏数据）→ 原样返回，交由上层判断
+      return value;
+    }
+  }
+  return value;
+}
+
+/**
  * 向 Native 同步当前 refresh_token（供 Java 401 静默刷新使用）。
  * Web/DEV 环境无 PixivApi 插件，调用 reject —— 静默跳过，不破坏持久化主流程。
  */
@@ -48,13 +70,17 @@ export async function restoreRefreshToken(): Promise<string | null> {
   }
 
   let token: string | null = null;
-  const [tokenErr, value] = await tryAsync(SecureStorage.get(REFRESH_TOKEN_KEY));
+  const [tokenErr, value] = await tryAsync(SecureStorage.getItem(REFRESH_TOKEN_KEY));
   if (tokenErr) {
     // 解密抛错路径：密钥失效重建后旧密文解密失败（GCM 认证失败 → 插件 reject），同样清除
+    console.warn(
+      "[secureStorage] refresh_token 读取失败（存储损坏/密钥失效）→ 清除并强制重新登录",
+      tokenErr,
+    );
     await clearRefreshToken();
     return null;
   }
-  token = typeof value === "string" ? value : null;
+  token = typeof value === "string" ? unquoteTokenValue(value) : null;
 
   if (!token) {
     // 旧版 @capacitor/preferences 明文迁移（一次性）
@@ -62,7 +88,7 @@ export async function restoreRefreshToken(): Promise<string | null> {
     const [prefErr, prefResult] = await tryAsync(Preferences.get({ key: REFRESH_TOKEN_KEY }));
     if (!prefErr && prefResult?.value) {
       const legacy = prefResult.value;
-      const [setErr] = await tryAsync(SecureStorage.set(REFRESH_TOKEN_KEY, legacy));
+      const [setErr] = await tryAsync(SecureStorage.setItem(REFRESH_TOKEN_KEY, legacy));
       if (setErr) {
         await clearRefreshToken();
         return null;
@@ -80,7 +106,8 @@ export async function restoreRefreshToken(): Promise<string | null> {
 
 /** 保存 refresh_token（加密存储 + Native 内存同步；持久化失败不阻断 Native 注入） */
 export async function saveRefreshToken(token: string): Promise<void> {
-  await tryAsync(SecureStorage.set(REFRESH_TOKEN_KEY, token));
+  // 用 setItem 写原始字符串（与 lynx SecureStorageCompat.setItem 存储格式一致，避免 JSON 包裹漂移）
+  await tryAsync(SecureStorage.setItem(REFRESH_TOKEN_KEY, token));
   await syncNativeToken(token);
 }
 
