@@ -10,11 +10,11 @@ import {
   type ImageHost,
 } from "../stores/imageHostStore";
 import { validateHostInput, hasDuplicateBaseUrl, probeHosts } from "../services/imageHostService";
+import FluentDialog from "../components/ui/FluentDialog";
 
 const ImageHostSettings: Component = () => {
   const navigate = useNavigate();
   const [showConfirmDialog, setShowConfirmDialog] = createSignal(false);
-  const [, setPendingEnable] = createSignal(false);
 
   const [editingHost, setEditingHost] = createSignal<ImageHost | null>(null);
   const [editName, setEditName] = createSignal("");
@@ -26,9 +26,7 @@ const ImageHostSettings: Component = () => {
   const [isProbing, setIsProbing] = createSignal(false);
   const [probeToast, setProbeToast] = createSignal<string | null>(null);
 
-  let confirmDialogRef: HTMLElement | undefined;
   let masterSwitchRef: HTMLElement | undefined;
-  let editDialogRef: HTMLElement | undefined;
   let radioGroupRef: HTMLElement | undefined;
 
   createEffect(() => {
@@ -42,60 +40,21 @@ const ImageHostSettings: Component = () => {
     }
   });
 
-  createEffect(() => {
-    const dialog = confirmDialogRef as unknown as
-      | { show?: () => void; hide?: () => void; open?: boolean }
-      | undefined;
-    if (showConfirmDialog()) {
-      if (!dialog?.open) {
-        dialog?.show?.();
-      }
-    } else if (dialog?.open) {
-      dialog?.hide?.();
-    }
-  });
-
-  createEffect(() => {
-    const dialog = editDialogRef as unknown as
-      | { show?: () => void; hide?: () => void; open?: boolean }
-      | undefined;
-    if (editingHost() !== null) {
-      if (!dialog?.open) {
-        dialog?.show?.();
-      }
-    } else if (dialog?.open) {
-      dialog?.hide?.();
-    }
-  });
-
   function handleToggle(enabled: boolean) {
     if (enabled) {
-      setPendingEnable(true);
       setShowConfirmDialog(true);
     } else {
       setMasterEnabled(false);
     }
   }
 
-  function hideConfirmDialog() {
-    (confirmDialogRef as unknown as { hide?: () => void })?.hide?.();
-  }
-
-  function hideEditDialog() {
-    (editDialogRef as unknown as { hide?: () => void })?.hide?.();
-  }
-
   function confirmEnable() {
     setMasterEnabled(true);
-    setPendingEnable(false);
     setShowConfirmDialog(false);
-    hideConfirmDialog();
   }
 
   function cancelEnable() {
-    setPendingEnable(false);
     setShowConfirmDialog(false);
-    hideConfirmDialog();
     // 同步 Fluent Switch 的视觉状态：用户点取消后，switch 不应保持开启的视觉状态
     if (masterSwitchRef) {
       (masterSwitchRef as unknown as { checked: boolean }).checked = false;
@@ -114,7 +73,6 @@ const ImageHostSettings: Component = () => {
   function closeEdit() {
     setEditingHost(null);
     setEditError(null);
-    hideEditDialog();
   }
 
   function saveEdit() {
@@ -143,7 +101,6 @@ const ImageHostSettings: Component = () => {
       enabled: editEnabled(),
       weight: editWeight(),
     });
-    hideEditDialog();
     closeEdit();
   }
 
@@ -489,101 +446,89 @@ const ImageHostSettings: Component = () => {
       </div>
 
       {/* Confirmation dialog */}
-      <fluent-dialog ref={confirmDialogRef} on:close={cancelEnable} aria-label="开启图床代理？">
-        <div class="p-5 flex flex-col gap-4">
-          <p class="[font-size:var(--fontSizeBase500)] font-semibold text-[var(--colorNeutralForeground1)]">
-            开启图床代理？
+      <FluentDialog open={showConfirmDialog()} onClose={cancelEnable} aria-label="开启图床代理？">
+        <h3 slot="title">开启图床代理？</h3>
+        <div class="flex flex-col gap-2">
+          <p class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)] leading-snug">
+            图片将通过你配置的第三方服务器加载。
           </p>
-          <div class="flex flex-col gap-2">
-            <p class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)] leading-snug">
-              图片将通过你配置的第三方服务器加载。
-            </p>
-            <p class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)] leading-snug">
-              这些服务器不受 Pictelio 控制，可用性、速度或隐私风险由对应服务承担。
-            </p>
-            <p class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)] leading-snug">
-              部分图床在部分地区可能无法访问，失败时会自动回退到默认代理。
-            </p>
-          </div>
-          <div class="flex justify-end gap-2 mt-2">
-            <fluent-button appearance="secondary" on:click={cancelEnable}>
-              取消
-            </fluent-button>
-            <fluent-button appearance="primary" on:click={confirmEnable}>
-              确认开启
-            </fluent-button>
-          </div>
+          <p class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)] leading-snug">
+            这些服务器不受 Pictelio 控制，可用性、速度或隐私风险由对应服务承担。
+          </p>
+          <p class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)] leading-snug">
+            部分图床在部分地区可能无法访问，失败时会自动回退到默认代理。
+          </p>
         </div>
-      </fluent-dialog>
+        <fluent-button slot="actions" appearance="secondary" on:click={cancelEnable}>
+          取消
+        </fluent-button>
+        <fluent-button slot="actions" appearance="primary" on:click={confirmEnable}>
+          确认开启
+        </fluent-button>
+      </FluentDialog>
 
       {/* Edit dialog */}
-      <fluent-dialog ref={editDialogRef} on:close={closeEdit} aria-label="编辑图床">
-        <div class="p-5 flex flex-col gap-4 min-w-[280px]">
-          <p class="[font-size:var(--fontSizeBase500)] font-semibold text-[var(--colorNeutralForeground1)]">
-            编辑图床
-          </p>
-          <Show when={editError()}>
-            <fluent-message-bar intent="error">{editError()}</fluent-message-bar>
-          </Show>
-          <div>
-            <label class="block [font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] mb-1">
-              名称
-            </label>
-            <input
-              type="text"
-              value={editName()}
-              onInput={(e) => setEditName(e.currentTarget.value)}
-              placeholder="例如 PixivCat"
-              class="w-full px-3 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase300)] outline-none focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
-            />
-          </div>
-          <div>
-            <label class="block [font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] mb-1">
-              代理 URL
-            </label>
-            <input
-              type="text"
-              value={editBaseUrl()}
-              onInput={(e) => setEditBaseUrl(e.currentTarget.value)}
-              placeholder="https://i.pixiv.re 或 https://example.com/image/{path}"
-              class="w-full px-3 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase300)] outline-none focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
-            />
-          </div>
-          <div class="flex items-center gap-2">
-            <fluent-checkbox
-              checked={editEnabled()}
-              on:change={() => setEditEnabled(!editEnabled())}
-            />
-            <span class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)]">
-              启用
-            </span>
-          </div>
-          <Show when={imageHostState().mode === "weighted"}>
-            <div>
-              <label class="block [font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] mb-1">
-                权重 {editWeight()}
-              </label>
-              <input
-                type="range"
-                min="1"
-                max="100"
-                value={editWeight()}
-                onInput={(e) => setEditWeight(Number(e.currentTarget.value))}
-                class="w-full h-1 rounded-[var(--borderRadiusCircular)] cursor-pointer"
-                style={{ "accent-color": "var(--colorCompoundBrandBackground)" }}
-              />
-            </div>
-          </Show>
-          <div class="flex justify-end gap-2 mt-2">
-            <fluent-button appearance="secondary" on:click={closeEdit}>
-              取消
-            </fluent-button>
-            <fluent-button appearance="primary" on:click={saveEdit}>
-              保存
-            </fluent-button>
-          </div>
+      <FluentDialog open={editingHost() !== null} onClose={closeEdit} aria-label="编辑图床">
+        <h3 slot="title">编辑图床</h3>
+        <Show when={editError()}>
+          <fluent-message-bar intent="error">{editError()}</fluent-message-bar>
+        </Show>
+        <div>
+          <label class="block [font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] mb-1">
+            名称
+          </label>
+          <input
+            type="text"
+            value={editName()}
+            onInput={(e) => setEditName(e.currentTarget.value)}
+            placeholder="例如 PixivCat"
+            class="w-full px-3 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase300)] outline-none focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
+          />
         </div>
-      </fluent-dialog>
+        <div>
+          <label class="block [font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] mb-1">
+            代理 URL
+          </label>
+          <input
+            type="text"
+            value={editBaseUrl()}
+            onInput={(e) => setEditBaseUrl(e.currentTarget.value)}
+            placeholder="https://i.pixiv.re 或 https://example.com/image/{path}"
+            class="w-full px-3 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase300)] outline-none focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
+          />
+        </div>
+        <div class="flex items-center gap-2">
+          <fluent-checkbox
+            checked={editEnabled()}
+            on:change={() => setEditEnabled(!editEnabled())}
+          />
+          <span class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)]">
+            启用
+          </span>
+        </div>
+        <Show when={imageHostState().mode === "weighted"}>
+          <div>
+            <label class="block [font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] mb-1">
+              权重 {editWeight()}
+            </label>
+            <input
+              type="range"
+              min="1"
+              max="100"
+              value={editWeight()}
+              onInput={(e) => setEditWeight(Number(e.currentTarget.value))}
+              class="w-full h-1 rounded-[var(--borderRadiusCircular)] cursor-pointer"
+              style={{ "accent-color": "var(--colorCompoundBrandBackground)" }}
+            />
+          </div>
+        </Show>
+        <fluent-button slot="actions" appearance="secondary" on:click={closeEdit}>
+          取消
+        </fluent-button>
+        <fluent-button slot="actions" appearance="primary" on:click={saveEdit}>
+          保存
+        </fluent-button>
+      </FluentDialog>
     </div>
   );
 };
