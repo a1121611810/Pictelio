@@ -11,7 +11,10 @@ import { numCodec } from "@/settings/codecs";
 
 function make() {
   const mem = createMemoryAdapter();
-  const settings = createSettings({ storages: { preferences: mem, memory: mem }, defaultStorage: "preferences" });
+  const settings = createSettings({
+    storages: { preferences: mem, memory: mem },
+    defaultStorage: "preferences",
+  });
   return { settings, mem };
 }
 
@@ -40,7 +43,7 @@ describe("Settings registry", () => {
 
   // ── parse 兼容通道（旧数据格式）──
 
-  it("旧 bool 字符串 \"true\" 兼容读取", async () => {
+  it('旧 bool 字符串 "true" 兼容读取', async () => {
     const { settings, mem } = make();
     mem.setSync("flag", "true");
     const s = settings.define({ key: "flag", default: false });
@@ -48,7 +51,7 @@ describe("Settings registry", () => {
     expect(s.value()).toBe(true);
   });
 
-  it("旧 number 字符串 \"300\" 兼容读取", async () => {
+  it('旧 number 字符串 "300" 兼容读取', async () => {
     const { settings, mem } = make();
     mem.setSync("size", "300");
     const s = settings.define({ key: "size", default: 50, codec: numCodec });
@@ -56,7 +59,7 @@ describe("Settings registry", () => {
     expect(s.value()).toBe(300);
   });
 
-  it("裸字符串 \"medium\" 兼容读取（default 为字符串枚举）", async () => {
+  it('裸字符串 "medium" 兼容读取（default 为字符串枚举）', async () => {
     const { settings, mem } = make();
     mem.setSync("quality", "medium");
     const s = settings.define({

@@ -87,7 +87,9 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("S2 单向链路：WebView →
 
     // 登录页：注入 refresh_token 并点击登录
     await driver.raw.waitUntil(
-      async () => (await driver.raw.$("fluent-textarea").isExisting()) && (await driver.raw.$("fluent-button=登录").isExisting()),
+      async () =>
+        (await driver.raw.$("fluent-textarea").isExisting()) &&
+        (await driver.raw.$("fluent-button=登录").isExisting()),
       { timeout: 30_000, timeoutMsg: "登录页未渲染", interval: 1_000 },
     );
     const token = process.env.PIXIV_REFRESH_TOKEN!;
@@ -116,10 +118,11 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("S2 单向链路：WebView →
     await clickByText(ctx, "登录");
 
     // 等待登录完成（离开 /login 进入主界面）
-    await driver.raw.waitUntil(
-      async () => !(await driver.raw.getUrl()).includes("/login"),
-      { timeout: 90_000, timeoutMsg: "登录失败（仍停留在 /login）", interval: 2_000 },
-    );
+    await driver.raw.waitUntil(async () => !(await driver.raw.getUrl()).includes("/login"), {
+      timeout: 90_000,
+      timeoutMsg: "登录失败（仍停留在 /login）",
+      interval: 2_000,
+    });
     console.log(`[S2] ✓ 登录成功，当前 URL: ${await driver.raw.getUrl()}`);
   }, 180_000);
 
@@ -127,9 +130,11 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("S2 单向链路：WebView →
     const { driver } = ctx;
     // 顺序导航（诊断验证）：/home → h1.click → /me → 设置行.click → /settings
     // 减少 getUrl 轮询频率（频繁 getUrl + SPA 切换会导致 Chromedriver DevTools 断开）
-    const url = async () => (await driver.raw.getUrl().catch(() => ""));
+    const url = async () => await driver.raw.getUrl().catch(() => "");
     const clickEl = (sel: string) =>
-      driver.raw.execute(`(() => { const el = document.querySelector("${sel}"); if (el) el.click(); })()`);
+      driver.raw.execute(
+        `(() => { const el = document.querySelector("${sel}"); if (el) el.click(); })()`,
+      );
 
     // 若在 /home 或 feed 页：点击 h1 进 /me
     const u1 = await url();
@@ -149,10 +154,11 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("S2 单向链路：WebView →
     }
 
     // 断言进入设置页（失败时带当前 URL 诊断）
-    await driver.raw.waitUntil(
-      async () => (await url()).includes("/settings"),
-      { timeout: 30_000, timeoutMsg: `未进入设置页（当前 URL: ${await url() || "(获取失败)"}）`, interval: 1_000 },
-    );
+    await driver.raw.waitUntil(async () => (await url()).includes("/settings"), {
+      timeout: 30_000,
+      timeoutMsg: `未进入设置页（当前 URL: ${(await url()) || "(获取失败)"}）`,
+      interval: 1_000,
+    });
     console.log(`[S2] ✓ 已进入设置页: ${await url()}`);
 
     // 找到「切换渲染引擎」行（aria-label）并点击

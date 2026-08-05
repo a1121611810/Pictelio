@@ -78,7 +78,14 @@ export function emulatorPath(): string {
 /** 剥离代理后的环境变量：adb/emulator 不需要代理，避免已知代理坑 */
 export function cleanEnv(): NodeJS.ProcessEnv {
   const env = { ...process.env };
-  for (const key of ["http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"]) {
+  for (const key of [
+    "http_proxy",
+    "https_proxy",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "all_proxy",
+    "ALL_PROXY",
+  ]) {
     delete env[key];
   }
   // 显式声明 loopback 不走代理（防御下游工具读取 NO_PROXY）
@@ -101,7 +108,14 @@ export function cleanEnv(): NodeJS.ProcessEnv {
 export function proxyEnv(): NodeJS.ProcessEnv {
   const env = cleanEnv();
   // 不剥离代理，原样保留 process.env 的代理变量
-  for (const key of ["http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"]) {
+  for (const key of [
+    "http_proxy",
+    "https_proxy",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "all_proxy",
+    "ALL_PROXY",
+  ]) {
     env[key] = process.env[key];
   }
   return env;
@@ -125,8 +139,13 @@ export function runCapture(cmd: string, args: string[], timeoutMs = TIMEOUTS.adb
   });
   if (r.error) {
     // 超时 / ENOENT 统一包装为带上下文的错误
-    const hint = (r.error as NodeJS.ErrnoException).code === "ENOENT" ? "命令不存在，请检查 SDK 路径" : "可能超时";
-    throw new Error(`[android-e2e] 执行失败: ${cmd} ${args.join(" ")}（${hint}）: ${r.error.message}`);
+    const hint =
+      (r.error as NodeJS.ErrnoException).code === "ENOENT"
+        ? "命令不存在，请检查 SDK 路径"
+        : "可能超时";
+    throw new Error(
+      `[android-e2e] 执行失败: ${cmd} ${args.join(" ")}（${hint}）: ${r.error.message}`,
+    );
   }
   return { code: r.status ?? -1, stdout: (r.stdout ?? "").trim(), stderr: (r.stderr ?? "").trim() };
 }

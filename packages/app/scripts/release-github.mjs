@@ -41,7 +41,10 @@ function resolveVariants() {
     throw new Error(`--variants 值无效（空列表）。可选：${DEFAULT_VARIANTS.join(", ")}`);
   }
   if (!raw) return [...DEFAULT_VARIANTS];
-  const list = raw.split(",").map((v) => v.trim()).filter(Boolean);
+  const list = raw
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
   if (list.length === 0) {
     throw new Error(`--variants 值无效（空列表）。可选：${DEFAULT_VARIANTS.join(", ")}`);
   }
@@ -313,7 +316,9 @@ async function main() {
 
   // 6. 验证 APK 存在
   const apkPaths = apkPathsFor(version, variants);
-  const apkStatus = await Promise.all(apkPaths.map(async (p) => ({ p, exists: await fileExists(p) })));
+  const apkStatus = await Promise.all(
+    apkPaths.map(async (p) => ({ p, exists: await fileExists(p) })),
+  );
   const missingApks = apkStatus.filter((s) => !s.exists);
   if (missingApks.length > 0) {
     if (dryRun) {

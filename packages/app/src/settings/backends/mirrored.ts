@@ -14,7 +14,9 @@ export function createMirroredAdapter(
   mirror: KVStorage,
   onMirrorError?: (key: string, e: unknown) => void,
 ): KVStorage {
-  const warn = onMirrorError ?? ((key: string, e: unknown) => console.warn("[settings] mirror write failed", key, e));
+  const warn =
+    onMirrorError ??
+    ((key: string, e: unknown) => console.warn("[settings] mirror write failed", key, e));
   return {
     sync: true,
     async get(key) {

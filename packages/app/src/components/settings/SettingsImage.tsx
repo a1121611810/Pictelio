@@ -111,7 +111,11 @@ const SettingsImage: Component = () => {
       </div>
 
       {/* 二次确认弹窗（选择 Range 时） */}
-      <FluentDialog open={showUgoiraConfirm()} onClose={() => setShowUgoiraConfirm(false)} aria-label="切换到 Range 流式？">
+      <FluentDialog
+        open={showUgoiraConfirm()}
+        onClose={() => setShowUgoiraConfirm(false)}
+        aria-label="切换到 Range 流式？"
+      >
         <div slot="title">切换到 Range 流式？</div>
         <div slot="content" class="flex flex-col gap-2">
           <p class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)] leading-snug">

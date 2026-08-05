@@ -52,12 +52,24 @@ export async function ensureAppiumServer(): Promise<AppiumHandle> {
   // Chromedriver 自动下载 feature（capability 已废弃）；feature 名须含 automationName
   // 前缀（`*` 通配所有 driver）+ 冒号。设备 WebView 主版本与 Chromedriver 必须匹配，
   // 自动下载否则会报 No Chromedriver found。
-  const proc: ChildProcess = spawn(process.execPath, [appiumBin(), "--address", APPIUM_HOST, "--port", String(APPIUM_PORT), "--allow-insecure", "*:chromedriver_autodownload"], {
-    cwd: APP_ROOT,
-    // proxyEnv：Chromedriver 自动下载走 googleapis，本机直连超时，必须走代理
-    env: proxyEnv(),
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  const proc: ChildProcess = spawn(
+    process.execPath,
+    [
+      appiumBin(),
+      "--address",
+      APPIUM_HOST,
+      "--port",
+      String(APPIUM_PORT),
+      "--allow-insecure",
+      "*:chromedriver_autodownload",
+    ],
+    {
+      cwd: APP_ROOT,
+      // proxyEnv：Chromedriver 自动下载走 googleapis，本机直连超时，必须走代理
+      env: proxyEnv(),
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
   let exitedEarly: number | null = null;
   proc.on("exit", (code) => {
     exitedEarly = code;

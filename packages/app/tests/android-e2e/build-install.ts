@@ -40,7 +40,9 @@ export async function buildDebugApk(): Promise<void> {
       const timer = setTimeout(() => {
         proc.kill("SIGKILL");
         rejectPromise(
-          new Error(`[android-e2e] 编译超时（${TIMEOUTS.build / 1000}s）。可先手动跑 pnpm build:android 后用 ANDROID_E2E_SKIP_BUILD=1 跳过`),
+          new Error(
+            `[android-e2e] 编译超时（${TIMEOUTS.build / 1000}s）。可先手动跑 pnpm build:android 后用 ANDROID_E2E_SKIP_BUILD=1 跳过`,
+          ),
         );
       }, TIMEOUTS.build);
       proc.stdout?.on("data", (d: Buffer) => process.stdout.write(`[build] ${d.toString()}`));
@@ -52,7 +54,10 @@ export async function buildDebugApk(): Promise<void> {
       proc.on("close", (code) => {
         clearTimeout(timer);
         if (code === 0) resolvePromise();
-        else rejectPromise(new Error(`[android-e2e] ${buildArgs.join(" ")} 退出码 ${code}，请先手动跑通该命令`));
+        else
+          rejectPromise(
+            new Error(`[android-e2e] ${buildArgs.join(" ")} 退出码 ${code}，请先手动跑通该命令`),
+          );
       });
     });
     console.log(`[android-e2e] ✓ APK 编译完成（${Math.round((Date.now() - startedAt) / 1000)}s）`);

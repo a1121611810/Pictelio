@@ -47,12 +47,12 @@ AVD 检测启动 → boot 等待 → chromedriver 预置 → 编译安装 APK �
 
 ### 环境变量
 
-| 变量 | 作用 |
-| ---- | ---- |
-| `ANDROID_E2E_AVD` | 指定 AVD（如 `pictelio_ui`），默认自动选择 |
+| 变量                       | 作用                                                    |
+| -------------------------- | ------------------------------------------------------- |
+| `ANDROID_E2E_AVD`          | 指定 AVD（如 `pictelio_ui`），默认自动选择              |
 | `ANDROID_E2E_SKIP_BUILD=1` | 跳过 `pnpm build:android`，直接使用既有 APK（快速迭代） |
-| `ANDROID_E2E_APPIUM_PORT` | Appium 端口，默认 4723 |
-| `CHROMEDRIVER_EXECUTABLE` | 手动指定 Chromedriver 路径（自动下载失败时的逃生通道） |
+| `ANDROID_E2E_APPIUM_PORT`  | Appium 端口，默认 4723                                  |
+| `CHROMEDRIVER_EXECUTABLE`  | 手动指定 Chromedriver 路径（自动下载失败时的逃生通道）  |
 
 ## 关键行为说明
 
@@ -70,8 +70,12 @@ AVD 检测启动 → boot 等待 → chromedriver 预置 → 编译安装 APK �
 import { setupAndroidE2e, type AndroidE2eContext } from "../setup";
 
 let ctx: AndroidE2eContext;
-beforeAll(async () => { ctx = await setupAndroidE2e(); });
-afterAll(async () => { await ctx?.teardown(); });
+beforeAll(async () => {
+  ctx = await setupAndroidE2e();
+});
+afterAll(async () => {
+  await ctx?.teardown();
+});
 ```
 
 WebView 侧：`await ctx.driver.switchToWebView()` 后用标准 CSS/XPath 选择器；

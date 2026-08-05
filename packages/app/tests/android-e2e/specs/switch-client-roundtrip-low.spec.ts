@@ -19,11 +19,25 @@ async function enableAccessibility(ctx: AndroidE2eContext): Promise<void> {
   const { execFileSync } = await import("node:child_process");
   const { adbPath } = await import("../env");
   execFileSync(adbPath(), [
-    "-s", ctx.serial, "shell", "settings", "put", "secure",
+    "-s",
+    ctx.serial,
+    "shell",
+    "settings",
+    "put",
+    "secure",
     "enabled_accessibility_services",
     "com.google.android.marvin.talkback/com.google.android.marvin.talkback.TalkBackService",
   ]);
-  execFileSync(adbPath(), ["-s", ctx.serial, "shell", "settings", "put", "secure", "accessibility_enabled", "1"]);
+  execFileSync(adbPath(), [
+    "-s",
+    ctx.serial,
+    "shell",
+    "settings",
+    "put",
+    "secure",
+    "accessibility_enabled",
+    "1",
+  ]);
 }
 
 describe("S2 降级：Lynx 可达 + 切回停升级页（pictelio_low）", () => {
@@ -40,20 +54,26 @@ describe("S2 降级：Lynx 可达 + 切回停升级页（pictelio_low）", () =>
 
   it("写入 lynx 后重启进入 LynxActivity（WebView 版本不影响 Lynx 方向）", async () => {
     const { driver } = ctx;
-    const { writeClientKind, forceStopApp, startMainActivity, currentTopActivity } = await import("../prefs");
+    const { writeClientKind, forceStopApp, startMainActivity, currentTopActivity } =
+      await import("../prefs");
     writeClientKind(ctx.serial, "lynx");
     forceStopApp(ctx.serial);
     startMainActivity(ctx.serial);
     await driver.raw.waitUntil(
       async () => currentTopActivity(ctx.serial) === "io.pictelio.app.LynxActivity",
-      { timeout: 60_000, timeoutMsg: "未进入 LynxActivity（pictelio_low 应可达 Lynx）", interval: 1_000 },
+      {
+        timeout: 60_000,
+        timeoutMsg: "未进入 LynxActivity（pictelio_low 应可达 Lynx）",
+        interval: 1_000,
+      },
     );
     await driver.switchToNative();
     // android-28 Lynx 引擎渲染慢（实测 40s 才稳定），用长等待
-    await driver.raw.waitUntil(
-      async () => await driver.raw.$("~输入refresh_token").isExisting(),
-      { timeout: 60_000, timeoutMsg: "Lynx 登录页 input 未出现（android-28 渲染慢）", interval: 1_000 },
-    );
+    await driver.raw.waitUntil(async () => await driver.raw.$("~输入refresh_token").isExisting(), {
+      timeout: 60_000,
+      timeoutMsg: "Lynx 登录页 input 未出现（android-28 渲染慢）",
+      interval: 1_000,
+    });
     const input = await driver.raw.$("~输入refresh_token");
     expect(await input.isExisting(), "Lynx 登录页 input 应可定位").toBe(true);
     console.log("[S2-low] ✓ LynxActivity 可达 + Lynx 登录页渲染（pictelio_low android-28）");
@@ -61,7 +81,8 @@ describe("S2 降级：Lynx 可达 + 切回停升级页（pictelio_low）", () =>
 
   it("切回 WebView（契约层）→ MainActivity 停升级页（版本防护）", async () => {
     const { driver } = ctx;
-    const { writeClientKind, forceStopApp, startMainActivity, currentTopActivity } = await import("../prefs");
+    const { writeClientKind, forceStopApp, startMainActivity, currentTopActivity } =
+      await import("../prefs");
     writeClientKind(ctx.serial, "webview");
     forceStopApp(ctx.serial);
     startMainActivity(ctx.serial);

@@ -25,7 +25,11 @@ import { buildDebugApk, installApk } from "../build-install";
 import { adbPath, APP_PACKAGE, runOrThrow, TIMEOUTS } from "../env";
 
 /** 等待前台 Activity 变为期望值（adb 轮询，不依赖 Appium） */
-async function waitForActivity(serial: string, expected: string, timeoutMs = 30_000): Promise<string> {
+async function waitForActivity(
+  serial: string,
+  expected: string,
+  timeoutMs = 30_000,
+): Promise<string> {
   const deadline = Date.now() + timeoutMs;
   let last: string | null = null;
   while (Date.now() < deadline) {

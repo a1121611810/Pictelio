@@ -8,14 +8,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { remote, type Browser } from "webdriverio";
-import {
-  adbPath,
-  APP_PACKAGE,
-  APP_ROOT,
-  MAIN_ACTIVITY,
-  runCapture,
-  TIMEOUTS,
-} from "./env";
+import { adbPath, APP_PACKAGE, APP_ROOT, MAIN_ACTIVITY, runCapture, TIMEOUTS } from "./env";
 import { APPIUM_HOST, APPIUM_PORT } from "./appium";
 import { webviewMajorVersion } from "./avd";
 
@@ -69,7 +62,9 @@ export class AndroidE2eDriver {
     if (webviewMajor !== null) {
       console.log(`[android-e2e] 设备 WebView 主版本: ${webviewMajor}（Chromedriver 将自动匹配）`);
     } else {
-      console.warn("[android-e2e] 未能探测设备 WebView 版本，Chromedriver 匹配失败时将无法给出版本提示");
+      console.warn(
+        "[android-e2e] 未能探测设备 WebView 版本，Chromedriver 匹配失败时将无法给出版本提示",
+      );
     }
 
     try {
@@ -113,14 +108,11 @@ export class AndroidE2eDriver {
 
   /** 显式等待当前 Activity 变为期望值（不用固定 sleep） */
   async waitForActivity(activity: string, timeoutMs = 60_000): Promise<void> {
-    await this.raw.waitUntil(
-      async () => (await this.currentActivity()) === activity,
-      {
-        timeout: timeoutMs,
-        timeoutMsg: `等待 Activity ${activity} 超时（${timeoutMs / 1000}s），当前 Activity: ${await this.currentActivity().catch(() => "(未知)")}`,
-        interval: 1_000,
-      },
-    );
+    await this.raw.waitUntil(async () => (await this.currentActivity()) === activity, {
+      timeout: timeoutMs,
+      timeoutMsg: `等待 Activity ${activity} 超时（${timeoutMs / 1000}s），当前 Activity: ${await this.currentActivity().catch(() => "(未知)")}`,
+      interval: 1_000,
+    });
   }
 
   /** 当前前台 Activity 短名（如 .MainActivity / .LynxActivity） */
@@ -210,10 +202,24 @@ export class AndroidE2eDriver {
       writeFileSync(resolve(dir, "screenshot.png"), Buffer.from(pngBase64, "base64"));
     } catch {
       try {
-        const r = runCapture(adbPath(), ["-s", this.serial, "shell", "screencap", "-p", "/sdcard/__e2e_shot.png"]);
+        const r = runCapture(adbPath(), [
+          "-s",
+          this.serial,
+          "shell",
+          "screencap",
+          "-p",
+          "/sdcard/__e2e_shot.png",
+        ]);
         if (r.code === 0) {
-          const pull = runCapture(adbPath(), ["-s", this.serial, "pull", "/sdcard/__e2e_shot.png", resolve(dir, "screenshot.png")]);
-          if (pull.code !== 0) console.warn(`[android-e2e] 证据-截屏 adb pull 失败: ${pull.stderr}`);
+          const pull = runCapture(adbPath(), [
+            "-s",
+            this.serial,
+            "pull",
+            "/sdcard/__e2e_shot.png",
+            resolve(dir, "screenshot.png"),
+          ]);
+          if (pull.code !== 0)
+            console.warn(`[android-e2e] 证据-截屏 adb pull 失败: ${pull.stderr}`);
         }
       } catch (e2) {
         console.warn(`[android-e2e] 证据-截屏失败: ${e2 instanceof Error ? e2.message : e2}`);
@@ -238,7 +244,9 @@ export class AndroidE2eDriver {
       try {
         await this.browser.deleteSession();
       } catch (e) {
-        console.warn(`[android-e2e] deleteSession 失败（忽略）: ${e instanceof Error ? e.message : e}`);
+        console.warn(
+          `[android-e2e] deleteSession 失败（忽略）: ${e instanceof Error ? e.message : e}`,
+        );
       }
       this.browser = null;
     }

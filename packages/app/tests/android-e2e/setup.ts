@@ -53,11 +53,7 @@ export async function setupAndroidE2e(avdName?: string): Promise<AndroidE2eConte
   // 冒烟基线：清掉 app 数据（含可能残留的 pictelio_client_kind=lynx，否则
   // MainActivity 入口路由会分发到 LynxActivity，冒烟断言 MainActivity 必失败）。
   // 后续 #105 S1 契约测试会在本步之后显式写入目标值。
-  runOrThrow(
-    adbPath(),
-    ["-s", serial, "shell", "pm", "clear", APP_PACKAGE],
-    TIMEOUTS.adb,
-  );
+  runOrThrow(adbPath(), ["-s", serial, "shell", "pm", "clear", APP_PACKAGE], TIMEOUTS.adb);
   console.log(`[android-e2e] ✓ 已清空 ${APP_PACKAGE} 数据（冒烟基线干净）`);
 
   const appium = await ensureAppiumServer();

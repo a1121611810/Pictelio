@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type { Settings } from "@/settings/registry";
 
-
 const mockState = vi.hoisted(() => ({
   current: null as Settings | null,
 }));

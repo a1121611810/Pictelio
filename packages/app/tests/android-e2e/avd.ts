@@ -21,7 +21,10 @@ import {
 /** emulator -list-avds 返回的全部 AVD 名 */
 export function listAvds(): string[] {
   const r = runCapture(emulatorPath(), ["-list-avds"]);
-  return r.stdout.split("\n").map((s) => s.trim()).filter(Boolean);
+  return r.stdout
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 /**
@@ -99,9 +102,14 @@ export async function ensureEmulator(avdName?: string): Promise<{ avd: AvdName; 
     try {
       // 实测不同 AVD 的属性名不同：pictelio_ui 在 ro.boot.qemu.avd_name，
       // pictelio_low 在 ro.kernel.qemu.avd_name——两个都尝试
-      const name = getProp(serial, "ro.boot.qemu.avd_name") || getProp(serial, "ro.kernel.qemu.avd_name");
+      const name =
+        getProp(serial, "ro.boot.qemu.avd_name") || getProp(serial, "ro.kernel.qemu.avd_name");
       if (name === avd) {
-        await waitFor(`模拟器 ${avd} (${serial}) boot 完成`, () => isBootCompleted(serial), TIMEOUTS.boot);
+        await waitFor(
+          `模拟器 ${avd} (${serial}) boot 完成`,
+          () => isBootCompleted(serial),
+          TIMEOUTS.boot,
+        );
         return { avd, serial };
       }
     } catch {
@@ -121,16 +129,21 @@ export async function ensureEmulator(avdName?: string): Promise<{ avd: AvdName; 
   console.log(`[android-e2e] 启动模拟器 ${avd}（端口 ${port}，无窗口模式）...`);
   // detached: 模拟器独立于测试进程存活（复用策略：测试结束不杀，下次直接复用）。
   // 否则 vitest 进程退出时子进程组被连带终止，每次都冷启动。
-  const proc = spawnLongLived("emulator", emulatorPath(), [
-    "-avd",
-    avd,
-    "-port",
-    String(port),
-    "-no-window",
-    "-no-audio",
-    "-no-boot-anim",
-    "-no-snapshot-save",
-  ], { detached: true });
+  const proc = spawnLongLived(
+    "emulator",
+    emulatorPath(),
+    [
+      "-avd",
+      avd,
+      "-port",
+      String(port),
+      "-no-window",
+      "-no-audio",
+      "-no-boot-anim",
+      "-no-snapshot-save",
+    ],
+    { detached: true },
+  );
   // 模拟器进程意外退出时给出清晰报错（而不是干等超时）
   let exitedEarly: number | null = null;
   proc.on("exit", (code) => {
@@ -138,7 +151,9 @@ export async function ensureEmulator(avdName?: string): Promise<{ avd: AvdName; 
   });
   const assertEmulatorAlive = (): void => {
     if (exitedEarly !== null) {
-      throw new Error(`emulator 进程提前退出（code ${exitedEarly}），请检查 AVD 配置 / HAXM / 磁盘空间`);
+      throw new Error(
+        `emulator 进程提前退出（code ${exitedEarly}），请检查 AVD 配置 / HAXM / 磁盘空间`,
+      );
     }
   };
 

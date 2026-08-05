@@ -29,10 +29,12 @@ export interface ClientPrefs {
  * 用 run-as 访问 app 私有目录（debug 包可读）。文件不存在 → clientKind=null。
  */
 export function readClientPrefs(serial: string): ClientPrefs {
-  const r = runCapture(
-    adbPath(),
-    ["-s", serial, "shell", `run-as ${APP_PACKAGE} cat ${PREFS_REL}`],
-  );
+  const r = runCapture(adbPath(), [
+    "-s",
+    serial,
+    "shell",
+    `run-as ${APP_PACKAGE} cat ${PREFS_REL}`,
+  ]);
   if (r.code !== 0 || r.stdout.trim() === "") {
     // 文件可能不存在（首次启动前）
     return { clientKind: null, fileExists: false, rawXml: r.stdout };
@@ -73,7 +75,10 @@ export function writeClientKind(serial: string, kind: "webview" | "lynx"): strin
       );
     if (!xml.includes("pictelio_client_kind")) {
       // 原文件没有该键，插入到 <map> 内
-      xml = xml.replace(/<map>/u, `<map>\n    <string name="pictelio_client_kind">${kind}</string>`);
+      xml = xml.replace(
+        /<map>/u,
+        `<map>\n    <string name="pictelio_client_kind">${kind}</string>`,
+      );
     }
   } else {
     xml = `<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\n<map>\n    <string name="pictelio_client_kind">${kind}</string>\n</map>\n`;
@@ -111,15 +116,7 @@ export function forceStopApp(serial: string): void {
 export function startMainActivity(serial: string): void {
   runOrThrow(
     adbPath(),
-    [
-      "-s",
-      serial,
-      "shell",
-      "am",
-      "start",
-      "-n",
-      "io.pictelio.app/io.pictelio.app.MainActivity",
-    ],
+    ["-s", serial, "shell", "am", "start", "-n", "io.pictelio.app/io.pictelio.app.MainActivity"],
     TIMEOUTS.adb,
   );
 }

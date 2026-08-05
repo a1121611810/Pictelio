@@ -128,7 +128,10 @@ function isImageHostState(v: unknown): v is ImageHostState {
   const s = v as Partial<ImageHostState>;
   return (
     typeof s.masterEnabled === "boolean" &&
-    (s.mode === "race" || s.mode === "weighted" || s.mode === "fastest-ip" || s.mode === "single") &&
+    (s.mode === "race" ||
+      s.mode === "weighted" ||
+      s.mode === "fastest-ip" ||
+      s.mode === "single") &&
     (s.selectedHostId === null || typeof s.selectedHostId === "string") &&
     Array.isArray(s.hosts) &&
     Array.isArray(s.probeResults) &&
@@ -203,7 +206,9 @@ export function resetBuiltInHost(id: string): void {
 
   imageHostSetting.set({
     ...imageHostState(),
-    hosts: imageHostState().hosts.map((host) => (host.id === id ? Object.assign({}, builtIn) : host)),
+    hosts: imageHostState().hosts.map((host) =>
+      host.id === id ? Object.assign({}, builtIn) : host,
+    ),
   });
 }
 

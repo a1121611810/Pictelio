@@ -233,7 +233,10 @@ describe("翻译档位与思考开关（S6，决策 #22）", () => {
   });
 
   it("hydrateAll 恢复档位与思考", async () => {
-    const { store } = await loadStore({ translation_default_tier: "pro", translation_thinking: "true" });
+    const { store } = await loadStore({
+      translation_default_tier: "pro",
+      translation_thinking: "true",
+    });
     expect(store.defaultTier()).toBe("pro");
     expect(store.thinkingEnabled()).toBe(true);
   });

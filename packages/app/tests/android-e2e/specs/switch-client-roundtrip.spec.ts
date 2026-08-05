@@ -28,15 +28,34 @@ async function enableAccessibility(ctx: AndroidE2eContext): Promise<void> {
   const { execFileSync } = await import("node:child_process");
   const { adbPath } = await import("../env");
   execFileSync(adbPath(), [
-    "-s", ctx.serial, "shell", "settings", "put", "secure",
+    "-s",
+    ctx.serial,
+    "shell",
+    "settings",
+    "put",
+    "secure",
     "enabled_accessibility_services",
     "com.google.android.marvin.talkback/com.google.android.marvin.talkback.TalkBackService",
   ]);
-  execFileSync(adbPath(), ["-s", ctx.serial, "shell", "settings", "put", "secure", "accessibility_enabled", "1"]);
+  execFileSync(adbPath(), [
+    "-s",
+    ctx.serial,
+    "shell",
+    "settings",
+    "put",
+    "secure",
+    "accessibility_enabled",
+    "1",
+  ]);
   // TalkBack 通知权限预授权（否则弹「允许通知」权限询问，阻塞 Activity 分发）
   execFileSync(adbPath(), [
-    "-s", ctx.serial, "shell", "pm", "grant",
-    "com.google.android.marvin.talkback", "android.permission.POST_NOTIFICATIONS",
+    "-s",
+    ctx.serial,
+    "shell",
+    "pm",
+    "grant",
+    "com.google.android.marvin.talkback",
+    "android.permission.POST_NOTIFICATIONS",
   ]);
   // 处理可能残留的通知权限弹窗（GrantPermissionsActivity）：点 Allow（屏幕中上部）
   try {
@@ -80,13 +99,16 @@ describe("S2 双向闭环：WebView → Lynx → 切回 WebView（pictelio_ui）
     }
 
     // 年龄确认
-    await driver.raw.waitUntil(async () => {
-      const url = await driver.raw.getUrl();
-      if (!url.includes("/age-confirmation")) return true;
-      const btn = await driver.raw.$("fluent-button=已满 18 岁");
-      if (await btn.isExisting()) await btn.click();
-      return false;
-    }, { timeout: 60_000, interval: 1_000 });
+    await driver.raw.waitUntil(
+      async () => {
+        const url = await driver.raw.getUrl();
+        if (!url.includes("/age-confirmation")) return true;
+        const btn = await driver.raw.$("fluent-button=已满 18 岁");
+        if (await btn.isExisting()) await btn.click();
+        return false;
+      },
+      { timeout: 60_000, interval: 1_000 },
+    );
 
     // 登录
     await driver.raw.waitUntil(
@@ -111,27 +133,35 @@ describe("S2 双向闭环：WebView → Lynx → 切回 WebView（pictelio_ui）
       { timeout: 10_000, timeoutMsg: "token 注入后登录按钮未启用", interval: 300 },
     );
     await driver.raw.$("fluent-button=登录").click();
-    await driver.raw.waitUntil(
-      async () => !(await driver.raw.getUrl()).includes("/login"),
-      { timeout: 90_000, timeoutMsg: "登录失败（仍停留在 /login）", interval: 2_000 },
-    );
+    await driver.raw.waitUntil(async () => !(await driver.raw.getUrl()).includes("/login"), {
+      timeout: 90_000,
+      timeoutMsg: "登录失败（仍停留在 /login）",
+      interval: 2_000,
+    });
     console.log(`[S2] ✓ WebView 登录成功: ${await driver.raw.getUrl()}`);
 
     // 导航到设置页
-    await driver.raw.execute(`(() => { const h = document.querySelector('h1'); if (h) h.click(); })()`);
-    await SLEEP(3_000);
-    await driver.raw.execute(`(() => { const el = document.querySelector("[aria-label='设置']"); if (el) el.click(); })()`);
-    await SLEEP(3_000);
-    await driver.raw.waitUntil(
-      async () => (await driver.raw.getUrl()).includes("/settings"),
-      { timeout: 30_000, timeoutMsg: "未进入设置页", interval: 1_000 },
+    await driver.raw.execute(
+      `(() => { const h = document.querySelector('h1'); if (h) h.click(); })()`,
     );
+    await SLEEP(3_000);
+    await driver.raw.execute(
+      `(() => { const el = document.querySelector("[aria-label='设置']"); if (el) el.click(); })()`,
+    );
+    await SLEEP(3_000);
+    await driver.raw.waitUntil(async () => (await driver.raw.getUrl()).includes("/settings"), {
+      timeout: 30_000,
+      timeoutMsg: "未进入设置页",
+      interval: 1_000,
+    });
     // 点切换 + E2E 钩子确认
     await driver.raw.waitUntil(
       async () => await driver.raw.$("[aria-label='切换渲染引擎']").isExisting(),
       { timeout: 10_000, interval: 500 },
     );
-    await driver.raw.execute(`(() => { const el = document.querySelector("[aria-label='切换渲染引擎']"); if (el) el.click(); })()`);
+    await driver.raw.execute(
+      `(() => { const el = document.querySelector("[aria-label='切换渲染引擎']"); if (el) el.click(); })()`,
+    );
     await SLEEP(1_000);
     await driver.raw.waitUntil(
       async () => await driver.raw.$("fluent-button=确认切换").isExisting(),
@@ -169,7 +199,8 @@ describe("S2 双向闭环：WebView → Lynx → 切回 WebView（pictelio_ui）
 
   it("反向切回（契约层）：写 webview → 重启 → WebView 主界面", async () => {
     const { driver } = ctx;
-    const { writeClientKind, forceStopApp, startMainActivity, currentTopActivity } = await import("../prefs");
+    const { writeClientKind, forceStopApp, startMainActivity, currentTopActivity } =
+      await import("../prefs");
     // Lynx 内「切换客户端到WebView」按钮的契约效果（SDK 限制无法 UI 点击，用契约层等价验证）
     writeClientKind(ctx.serial, "webview");
     forceStopApp(ctx.serial);

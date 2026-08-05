@@ -72,8 +72,15 @@ describe("imageCache A/B/C 开关", () => {
   });
 
   it("resetSettingsStore 将三个开关重置为 true", async () => {
-    const { setImageCacheDisk, setImageCacheBrowser, setImageCachePrefetch, resetSettingsStore, imageCacheDisk, imageCacheBrowser, imageCachePrefetch } =
-      await loadStore();
+    const {
+      setImageCacheDisk,
+      setImageCacheBrowser,
+      setImageCachePrefetch,
+      resetSettingsStore,
+      imageCacheDisk,
+      imageCacheBrowser,
+      imageCachePrefetch,
+    } = await loadStore();
     await setImageCacheDisk(false);
     await setImageCacheBrowser(false);
     await setImageCachePrefetch(false);
