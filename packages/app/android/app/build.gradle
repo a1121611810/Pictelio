@@ -82,6 +82,96 @@ android {
     }
 }
 
+// APK 输出按 flavor 重命名（#118）：pictelio-{versionName}-{flavor}.apk
+// webview flavor 同时排除 lynx bundle
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        def flavorName = variant.flavorName
+        if (flavorName == 'webview') {
+            variant.packaging.resources.excludes.add('main.lynx.bundle')
+        }
+    }
+}
+
+// ── APK 输出改名（#118）────────────────────────────────────
+// AGP 9：variant.outputs 的 outputFileName 只读，改用 variant.name 派生目录，
+// 并在 package 任务后复制/重命名。此处直接配置输出目录命名由 AGP 生成
+// app-{flavor}-{buildType}.apk，发布脚本按此模式定位即可——
+// 为保持 spec 约定的 pictelio-{version}-{flavor}.apk，用 task 重命名。
+def flavorNames = ['full', 'webview', 'lynx']
+def buildTypeList2 = ['debug', 'release']
+
+flavorNames.each { flavor ->
+    buildTypeList2.each { bt ->
+        def variantName = "${flavor}${bt.capitalize()}"
+        def assembleTaskName = "assemble${variantName.capitalize()}"
+        def renameTaskName = "rename${variantName.capitalize()}Apk"
+
+        def apkDirStr = "${project.layout.buildDirectory.get()}/outputs/apk/${flavor}/${bt}"
+        def versionName = android.defaultConfig.versionName
+        tasks.register(renameTaskName) {
+            dependsOn assembleTaskName
+            // 每次构建都重命名最新产物（覆盖旧的 pictelio-*.apk），避免发布旧包
+            outputs.upToDateWhen { false }
+            doLast {
+                def srcApk = new File("${apkDirStr}/app-${flavor}-${bt}.apk")
+                def destApk = new File("${apkDirStr}/pictelio-${versionName}-${flavor}.apk")
+                if (srcApk.exists()) {
+                    if (destApk.exists()) {
+                        destApk.delete()
+                    }
+                    if (!srcApk.renameTo(destApk)) {
+                        throw new GradleException("APK 重命名失败: ${srcApk.name} -> ${destApk.name}")
+                    }
+                    println "Renamed: ${srcApk.name} -> ${destApk.name}"
+                }
+            }
+        }
+    }
+}
+
+// ── Assets 裁剪（#118）──────────────────────────────────────
+// webview：从 assets 中排除 lynx bundle
+// lynx：从 assets 中排除 web public/ 和 capacitor 配置
+// 原理：clean task 删除 merge 输出中的多余文件 + 删除 compress 的整个输出目录
+//       （输出目录丢失 → Gradle 强制 compress 重跑 → 打包读取干净产物）
+def flavorList = ['webview', 'lynx']
+def buildTypeList = ['debug', 'release']
+
+flavorList.each { flavor ->
+    buildTypeList.each { bt ->
+        def variantName = "${flavor}${bt.capitalize()}"
+        def mergeTaskName = "merge${variantName.capitalize()}Assets"
+        def compressTaskName = "compress${variantName.capitalize()}Assets"
+        def cleanTaskName = "clean${variantName.capitalize()}Assets"
+        def assetsDir = "${layout.buildDirectory.get()}/intermediates/assets/${variantName}/${mergeTaskName}"
+        def compressedDir = "${layout.buildDirectory.get()}/intermediates/compressed_assets/${variantName}/${compressTaskName}/out"
+
+        tasks.register(cleanTaskName, Delete) {
+            // 清 merge 产物中的多余文件
+            if (flavor == 'webview') {
+                delete "${assetsDir}/main.lynx.bundle"
+            } else if (flavor == 'lynx') {
+                delete "${assetsDir}/public"
+                delete "${assetsDir}/capacitor.config.json"
+                delete "${assetsDir}/capacitor.plugins.json"
+            }
+            // 删 compress 整个输出目录 → 强制 compress 重跑
+            delete compressedDir
+        }
+
+        // clean 在 merge 之后、compress 之前执行
+        tasks.matching { it.name == mergeTaskName }.configureEach {
+            finalizedBy cleanTaskName
+        }
+        tasks.matching { it.name == compressTaskName }.configureEach {
+            mustRunAfter cleanTaskName
+            // 禁用 build cache：clean 删除了中间产物，compress 必须重跑读干净输入
+            outputs.cacheIf { false }
+        }
+    }
+}
+
 // 仅在执行 Release 构建时校验签名凭据，避免 Debug 构建需要环境变量
 def validateReleaseSigning() {
     def keystorePassword = System.getenv("PICTELIO_KEYSTORE_PASSWORD")
