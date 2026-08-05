@@ -59,7 +59,7 @@
 | 生产构建           | `pnpm build`                                        | ✅ 成功生成 `dist/`                                          |
 | Android Debug 构建 | `cd android && ./gradlew assembleDebug --no-daemon` | ✅ `BUILD SUCCESSFUL`（213 个任务，27 执行，186 up-to-date） |
 
-> 注：Android Debug 构建仅作冒烟测试；正式发布前仍需使用真实 keystore 执行 `pnpm build:android:release` 生成签名 APK。
+> 注：Android Debug 构建仅作冒烟测试；正式发布前仍需使用真实 keystore 执行 `pnpm build:android:release:all` 生成三个签名 APK（full / webview / lynx）。
 
 ---
 

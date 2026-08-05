@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- webview flavor：MainActivityWebview（LAUNCHER），无 LynxActivity -->
+        <!-- 主 manifest 的 ${launcherActivity} 已指向 .MainActivityWebview，无需额外声明 -->
+    </application>
+</manifest>

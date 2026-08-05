@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { currentComponent, initRouter } from './router'
+import { initClientSetting } from './stores/clientSwitchStore'
 
 onMounted(() => {
+  // ADR-0062：启动时查询当前包支持的 client 引擎列表（full/webview/lynx 各有不同）
+  initClientSetting()
   void initRouter()
 })
 </script>

@@ -7,7 +7,7 @@ tags: [testing, vitest, agent-browser, e2e, unit-tests]
 
 # Testing Strategy
 
-Pictelio uses two active testing tiers. Previously there were component-level browser tests (Vitest browser mode) and Playwright E2E — both have been fully migrated to agent-browser per [ADR-0034](/docs/adr/ADR-0034-migrate-playwright-e2e-to-agent-browser.md) and [ADR-0035](/docs/adr/ADR-0035-migrate-component-tests-to-e2e-and-unit.md). Tests live under `/packages/app/tests/`. The canonical conventions are documented in `/packages/app/tests/TESTING.md`.
+Pictelio uses three active testing tiers. Previously there were component-level browser tests (Vitest browser mode) and Playwright E2E — both have been fully migrated to agent-browser per [ADR-0034](/docs/adr/ADR-0034-migrate-playwright-e2e-to-agent-browser.md) and [ADR-0035](/docs/adr/ADR-0035-migrate-component-tests-to-e2e-and-unit.md). The third tier (Android emulator E2E) was introduced in v4.0.0 per [ADR-0061](/docs/adr/ADR-0061-android-emulator-e2e-gate.md). Tests live under `/packages/app/tests/`. The canonical conventions are documented in `/packages/app/tests/TESTING.md`.
 
 The `app-lynx` package has its own separate test suite — 31 unit test cases covering image URL rewriting, error classification, OAuth error recognition, novel body extraction, route matching, and `isRestricted` R18/R18G mask logic (Vitest, run via `pnpm --filter pictelio-app-lynx test`). The `vitest.config.ts` `include` pattern covers both `tests/**/*.test.ts` and `src/**/*.test.ts` (extended in issue #91 for co-located store tests). Key test files:
 - [`lynx-device-check.sh`](/packages/app-lynx/scripts/lynx-device-check.sh) — automated login→recommended page→image ratio check via adb
@@ -21,6 +21,7 @@ The `app-lynx` package has its own separate test suite — 31 unit test cases co
 flowchart TD
     U["Unit Tests (vitest.config.ts)"] --> S["Pure logic: API, utils, stores, router"]
     A["Agent-Browser Tests (vitest.agent-browser.config.ts)"] --> AI["AI-driven user flow verification"]
+    E["Android E2E Tests (vitest.config.ts)"] --> EMU["Appium + WebdriverIO on Android emulator"]
 ```
 
 ## Test Tiers
@@ -129,6 +130,50 @@ jest.mock("../stores/db", () => ({
 ### Config Consistency Anti-Drift Tests
 
 `tests/unit/utils/backupRulesConsistency.test.ts` (added in v3.21.6) guards the [backup exclusion XML files](/openwiki/integrations/android-native.md#backup-rules--token-storage-exclusions-adr-0003) from silent drift. Because Android backup `exclude path` entries are exact filename matches, the rules previously pointed at a nonexistent `_capacitor_secure_storage.xml` while the plugin actually writes `WSSecureStorageSharedPreferences.xml` — ciphertext was exported with backups. The test:
+
+- Extracts the real SharedPreferences filename constant from the `@aparajita/capacitor-secure-storage` plugin source (`node_modules/.../SecureStorage.java`) instead of hardcoding it
+- Asserts `data_extraction_rules.xml` (`cloud-backup` + `device-transfer`) and `backup_rules.xml` (`full-backup-content`) all exclude `WSSecureStorageSharedPreferences.xml` + `PictelioPrefs.xml`
+- Asserts the three XML sections stay identical to each other
+
+This is a reusable pattern for config-vs-source consistency: parse the constant from source, compare against the config, fail loudly on drift.
+
+### AI-Shared Test Utilities (`tests/ai-shared/`)
+
+Shared infrastructure for AI-driven E2E tests:
+- **`assertion.ts`** — The `aiAssert` function that sends the page accessibility tree + innerText to DeepSeek Flash (`DEEPSEEK_API_KEY` env var required) and returns a structured `{passed, reason}` result with automatic retries
+- **`globalSetup.ts`** — Loads `.env`, checks `PIXIV_REFRESH_TOKEN`, manages the agent-browser daemon socket, and starts/reuses the Vite dev server on port 5173
+- **`globalTeardown.ts`** — Kills the Vite dev server if started by globalSetup
+
+## Running Tests
+
+| Command | Tests |
+|---------|-------|
+| `pnpm test` | Unit tests (Vitest) |
+| `pnpm test:watch` | Unit tests in watch mode |
+| `pnpm test:agent-browser` | Agent-browser E2E tests |
+| `pnpm test:all` | Unit + agent-browser E2E combined |
+
+## Key Source Files
+
+| Purpose | Path |
+|---------|------|
+| Testing conventions doc | `/packages/app/tests/TESTING.md` |
+| Unit test config | `/packages/app/vitest.config.ts` |
+| Agent-browser test config | `/packages/app/vitest.agent-browser.config.ts` |
+| Test helpers | `/packages/app/tests/helpers.ts` |
+| Manual fetch primitive | `/packages/app/src/primitives/createManualFetch.ts` |
+| Memory store | `/packages/app/src/stores/db.ts` |
+| Backup rules consistency test | `/packages/app/tests/unit/utils/backupRulesConsistency.test.ts` |
+| Unit tests | `/packages/app/tests/unit/` |
+| Unit component tests (migrated from browser/) | `/packages/app/tests/unit/components/` |
+| Agent-browser tests | `/packages/app/tests/agent-browser/` |
+| Agent-browser conventions | `/packages/app/tests/agent-browser/TESTING.md` |
+| AI shared utilities | `/packages/app/tests/ai-shared/` |
+| Playwright→agent-browser ADR | `/docs/adr/ADR-0034-migrate-playwright-e2e-to-agent-browser.md` |
+| Component test→unit/E2E ADR | `/docs/adr/ADR-0035-migrate-component-tests-to-e2e-and-unit.md` |
+e-playwright-e2e-to-agent-browser.md` |
+| Component test→unit/E2E ADR | `/docs/adr/ADR-0035-migrate-component-tests-to-e2e-and-unit.md` |
+rules--token-storage-exclusions-adr-0003) from silent drift. Because Android backup `exclude path` entries are exact filename matches, the rules previously pointed at a nonexistent `_capacitor_secure_storage.xml` while the plugin actually writes `WSSecureStorageSharedPreferences.xml` — ciphertext was exported with backups. The test:
 
 - Extracts the real SharedPreferences filename constant from the `@aparajita/capacitor-secure-storage` plugin source (`node_modules/.../SecureStorage.java`) instead of hardcoding it
 - Asserts `data_extraction_rules.xml` (`cloud-backup` + `device-transfer`) and `backup_rules.xml` (`full-backup-content`) all exclude `WSSecureStorageSharedPreferences.xml` + `PictelioPrefs.xml`

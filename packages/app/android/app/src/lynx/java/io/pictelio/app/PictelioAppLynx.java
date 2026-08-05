@@ -1,0 +1,48 @@
+package io.pictelio.app;
+
+import android.app.Application;
+import android.util.Log;
+
+import com.lynx.service.http.LynxHttpService;
+import com.lynx.service.log.LynxLogService;
+import com.lynx.tasm.LynxEnv;
+import com.lynx.tasm.service.LynxServiceCenter;
+
+/**
+ * Pictelio Application 入口（lynx flavor）。
+ *
+ * <p>无条件初始化 Lynx runtime + 全局 Native Modules 注册。
+ * 须在早于任何 LynxView 创建时执行。
+ */
+public class PictelioAppLynx extends Application {
+
+    private static final String TAG = "PictelioAppLynx";
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        initLynx();
+    }
+
+    private void initLynx() {
+        try {
+            // Lynx Service 主动注入（官方集成要求，须在 LynxView 创建前）：
+            // - LynxHttpService：lynx.fetch 依赖（未注册则原生 fetch 不可用 → 登录/API 断）
+            // - LynxLogService：日志服务
+            // - PictelioImageService：自研图片服务（#59，Fresco 不传 Referer → i.pximg.net 403）
+            LynxServiceCenter.inst().registerService(LynxHttpService.INSTANCE);
+            LynxServiceCenter.inst().registerService(LynxLogService.INSTANCE);
+            LynxServiceCenter.inst().registerService(PictelioImageService.getInstance());
+            // 参数与官方 demo 一致：Application、null（native loader）、null（provider）、null（behaviors）
+            LynxEnv.inst().init(this, null, null, null);
+            // 全局注册（LynxViewBuilder per-view 注册亦可；全局保证任何 LynxView 可用）
+            LynxEnv.inst().registerModule("PictelioSecureStorage", PictelioSecureStorageModule.class);
+            LynxEnv.inst().registerModule("PictelioApp", PictelioAppModule.class);
+            LynxEnv.inst().registerModule("PictelioAuth", PictelioAuthModule.class);
+            LynxEnv.inst().registerModule("PictelioApi", PictelioApiModule.class);
+            LynxEnv.inst().enableLynxDebug(BuildConfig.DEBUG);
+        } catch (Throwable t) {
+            Log.w(TAG, "Lynx 初始化失败", t);
+        }
+    }
+}

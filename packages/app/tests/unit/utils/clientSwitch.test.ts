@@ -70,3 +70,33 @@ describe("clientSwitch（webview ↔ lynx 开关，IO 边界）", () => {
     });
   });
 });
+
+describe("supportsClientSwitch（ADR-0062 包能力）", () => {
+  it("full 包（webview+lynx）→ true", async () => {
+    const { supportsClientSwitch } = await import("@/utils/clientSwitch");
+    expect(supportsClientSwitch(["webview", "lynx"])).toBe(true);
+  });
+
+  it("webview-only → false", async () => {
+    const { supportsClientSwitch } = await import("@/utils/clientSwitch");
+    expect(supportsClientSwitch(["webview"])).toBe(false);
+  });
+
+  it("lynx-only → false", async () => {
+    const { supportsClientSwitch } = await import("@/utils/clientSwitch");
+    expect(supportsClientSwitch(["lynx"])).toBe(false);
+  });
+
+  it("null / undefined（未知）→ true（保守渲染）", async () => {
+    const { supportsClientSwitch } = await import("@/utils/clientSwitch");
+    expect(supportsClientSwitch(null)).toBe(true);
+    expect(supportsClientSwitch(undefined)).toBe(true);
+  });
+
+  it("空数组 / 非数组 → false（与 lynx 侧契约一致）", async () => {
+    const { supportsClientSwitch } = await import("@/utils/clientSwitch");
+    expect(supportsClientSwitch([])).toBe(false);
+    expect(supportsClientSwitch("webview")).toBe(false);
+    expect(supportsClientSwitch({ kinds: ["webview"] })).toBe(false);
+  });
+});

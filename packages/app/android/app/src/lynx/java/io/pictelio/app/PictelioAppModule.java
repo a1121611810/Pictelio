@@ -62,9 +62,12 @@ public class PictelioAppModule extends LynxModule {
     @LynxMethod
     public void getClientKind(Callback callback) {
         try {
-            String kind = appContext()
+            String stored = appContext()
                     .getSharedPreferences(CLIENT_PREFS, Context.MODE_PRIVATE)
                     .getString(CLIENT_KEY, "webview");
+            // ADR-0062：归一化——存储值不在当前包支持列表时回退到包默认引擎
+            // （如 full 包切到 lynx 后换装 lynx-only 包，残留 "webview" → 归一为 "lynx"）
+            String kind = containsKind(stored) ? stored : BuildConfig.CLIENT_KINDS[0];
             callback.invoke(kind);
         } catch (Exception e) {
             Log.w(TAG, "getClientKind 失败", e);
@@ -72,15 +75,43 @@ public class PictelioAppModule extends LynxModule {
         }
     }
 
+    /**
+     * 返回当前包支持的 client 引擎列表（ADR-0062）。
+     * full → ["webview","lynx"]；webview → ["webview"]；lynx → ["lynx"]。
+     * JS 侧据此决定是否渲染引擎切换入口。
+     */
+    @LynxMethod
+    public void getClientKinds(Callback callback) {
+        try {
+            callback.invoke(BuildConfig.CLIENT_KINDS);
+        } catch (Exception e) {
+            Log.w(TAG, "getClientKinds 失败", e);
+            callback.invoke(String.valueOf(e.getMessage()));
+        }
+    }
+
+    private static boolean containsKind(String kind) {
+        for (String k : BuildConfig.CLIENT_KINDS) {
+            if (k.equals(kind)) return true;
+        }
+        return false;
+    }
+
     @LynxMethod
     public void restart(Callback callback) {
         try {
             Context ctx = appContext();
-            Intent intent = new Intent(ctx, MainActivity.class);
+            // 通过 PackageManager 获取 LAUNCHER intent，避免硬编码 Activity 类
+            // （lynx flavor 无 MainActivity，full flavor LAUNCHER 是 MainActivity）
+            Intent intent = ctx.getPackageManager().getLaunchIntentForPackage(ctx.getPackageName());
+            if (intent == null) {
+                callback.invoke("无法获取 LAUNCHER intent");
+                return;
+            }
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             ctx.startActivity(intent);
             callback.invoke();
-            // 延迟杀进程：等 MainActivity 启动完成后结束当前进程，
+            // 延迟杀进程：等 LAUNCHER Activity 启动完成后结束当前进程，
             // 保证全新进程重新走 client 分发（避免 Lynx runtime 静态状态残留）
             new Handler(Looper.getMainLooper()).postDelayed(() -> {
                 Process.killProcess(Process.myPid());

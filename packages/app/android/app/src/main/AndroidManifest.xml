@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application
-        android:name=".PictelioApp"
+        android:name="${appClass}"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -15,9 +15,11 @@
         <!-- 启用 Android 16+ 预测性返回手势；运行时由 JS 层通过
              @capacitor/app.toggleBackButtonHandler() 控制是否交由系统处理。 -->
 
+        <!-- LAUNCHER Activity 按 flavor 注入（#116/#117）：
+             full/webview → MainActivity 系，lynx → LynxActivity -->
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
-            android:name=".MainActivity"
+            android:name="${launcherActivity}"
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
@@ -29,14 +31,6 @@
             </intent-filter>
 
         </activity>
-
-        <!-- Lynx client 宿主（#51）：由 MainActivity 入口路由分发，非 LAUNCHER -->
-        <activity
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
-            android:name=".LynxActivity"
-            android:label="@string/title_activity_main"
-            android:theme="@style/AppTheme.NoActionBarLaunch"
-            android:exported="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

@@ -1,17 +1,40 @@
 ---
 type: Concept
 title: Android Native & Build
-description: The Capacitor Android native runtime layer — four custom Java plugins (AuthPlugin, ImageCachePlugin, OAuthPlugin, PixivApiPlugin), TypeScript bridge files, Gradle build pipeline, release signing, and WebView configuration. Updated in v3.18.0 with PixivApiPlugin gateway replacing PictelioHttpPlugin.
+description: The Capacitor Android native runtime layer with three Gradle product flavors (full/webview/lynx) producing separate APKs since v4.0.0. Covers five Capacitor plugins (Auth, ImageCache, OAuth, PixivApi, ClientInfo), Lynx Native Modules, shared Java utilities, Gradle build pipeline, release signing, and WebView configuration.
 tags: [android, capacitor, native, gradle, build, plugins, pixiv-api-gateway]
 ---
 
 # Android Native & Build
 
-Pictelio packages the SolidJS SPA as a native Android app via Capacitor, with four custom native plugins and a comprehensive build pipeline.
+Pictelio packages the SolidJS SPA as a native Android app via Capacitor, with four custom native plugins, three Lynx Native Modules, and a comprehensive build pipeline.
+
+## Three-Flavor Architecture (v4.0.0+)
+
+Since v4.0.0 (issues #115–#119), the Android project uses **Gradle product flavors** to produce three separate APKs from a single codebase:
+
+| Flavor | Client engines | Launcher Activity | Application class |
+|--------|---------------|-------------------|-------------------|
+| **full** | WebView + Lynx | `MainActivity` | `PictelioApp` |
+| **webview** | WebView only | `MainActivityWebview` | `PictelioAppWebview` |
+| **lynx** | Lynx only | `LynxActivity` | `PictelioAppLynx` |
+
+Each flavor injects a `BuildConfig.CLIENT_KINDS` array (`{"webview", "lynx"}`, `{"webview"}`, or `{"lynx"}`) used by ADR-0062 to hide the client-switch UI in single-engine builds.
+
+Source files are split across flavor sourceSets:
+
+| SourceSet | Contains |
+|-----------|----------|
+| `src/main/` | Shared: `PixivApiCore`, `PixivImageLoader`, `SecureStorageCompat`, `OAuthUtils`, `SplashController`, `OAuthConfig`, resources |
+| `src/webview/` | Capacitor plugins: `AuthPlugin`, `ImageCachePlugin`, `OAuthPlugin`, `PixivApiPlugin`, `ClientInfoPlugin`; WebView-only entry: `MainActivityWebview`, `PictelioAppWebview` |
+| `src/lynx/` | Lynx Native Modules: `PictelioApiModule`, `PictelioAppModule`, `PictelioAuthModule`, `PictelioSecureStorageModule`, `PictelioImageService`, `PictelioTemplateProvider`; Lynx-only entry: `LynxActivity`, `PictelioAppLynx` |
+| `src/full/` | Full-flavor overlays: `MainActivity` (routing gate), `PictelioApp` (conditional init) — merges both `webview` + `lynx` sources |
+
+The `main/AndroidManifest.xml` uses `${launcherActivity}` and `${appClass}` manifest placeholders resolved per-flavor in `build.gradle`.
 
 ## Native Plugin Architecture
 
-Four custom Capacitor plugins bridge the TypeScript SPA to Android platform capabilities. Each has a Java implementation and a TypeScript wrapper:
+Four custom Capacitor plugins bridge the TypeScript SPA to Android platform capabilities. Each has a Java implementation and a TypeScript wrapper. Since v4.0.0 (flavor migration), the Capacitor plugin Java sources reside under `src/webview/java/`:
 
 ```mermaid
 flowchart LR
@@ -20,19 +43,21 @@ flowchart LR
         I[ImageCache.ts]
         O[OAuthPlugin.ts]
         P[PixivApi.ts]
+        C[ClientInfo.ts]
     end
-    subgraph Java[Android Java]
+    subgraph Java[Android Java — src/webview/]
         JA[AuthPlugin.java]
         JI[ImageCachePlugin.java]
         JO[OAuthPlugin.java]
         JP[PixivApiPlugin.java]
+        JC[ClientInfoPlugin.java]
     end
     TS -->|Capacitor bridge| Java
 ```
 
 ### AuthPlugin
 
-**Java:** `/packages/app/android/app/src/main/java/io/pictelio/app/AuthPlugin.java` (8.1 KB)
+**Java:** `/packages/app/android/app/src/webview/java/io/pictelio/app/AuthPlugin.java` (8.1 KB)
 **TypeScript:** `/packages/app/src/native/AuthPlugin.ts`
 
 Handles OAuth token refresh with Pixiv credentials **hidden from the JavaScript layer**, plus native splash screen control:
@@ -59,7 +84,7 @@ Android disk cache for Pixiv images, implementing **L3** of the [Image Loading P
 
 ### OAuthPlugin
 
-**Java:** `/packages/app/android/app/src/main/java/io/pictelio/app/OAuthPlugin.java` (15.4 KB)
+**Java:** `/packages/app/android/app/src/webview/java/io/pictelio/app/OAuthPlugin.java` (15.4 KB)
 **TypeScript:** `/packages/app/src/native/OAuthPlugin.ts`
 
 The largest native plugin, handling the PKCE authorization code flow:
@@ -131,7 +156,22 @@ sequenceDiagram
 - `build.gradle`: retains `androidx.core:core-splashscreen` dependency
 - `variables.gradle`: retains `coreSplashScreenVersion = '1.2.0'`
 
-## Lynx Native Module: PictelioSecureStorage
+### ClientInfoPlugin (ADR-0062)
+
+**Java:** `/packages/app/android/app/src/webview/java/io/pictelio/app/ClientInfoPlugin.java`
+**TypeScript:** `/packages/app/src/native/ClientInfo.ts`
+
+A Capacitor plugin (`@CapacitorPlugin(name = "ClientInfo")`) that exposes the current build flavor's client capabilities to the WebView JavaScript layer. Used by [ADR-0062](/docs/adr/ADR-0062-single-engine-client-switch-hiding.md) to hide the engine-switch UI in single-engine builds:
+
+- **`getClientKinds()`** — returns `{ kinds: ["webview", "lynx"] }` (full), `{ kinds: ["webview"] }` (webview), or `{ kinds: ["lynx"] }` (lynx). Reads from `BuildConfig.CLIENT_KINDS` injected per-flavor by Gradle.
+- Registered in both `MainActivity` (full) and `MainActivityWebview` (webview-only).
+- The lynx client reads the same information via `PictelioAppModule.getClientKinds()`.
+
+See [clientSwitch.ts](/packages/app/src/utils/clientSwitch.ts) for the frontend `supportsClientSwitch()` logic and [SettingsClient.tsx](/packages/app/src/components/settings/SettingsClient.tsx) for the UI hiding behavior.
+
+## Lynx Native Modules
+
+The following Lynx Native Modules reside under `src/lynx/java/` (lynx flavor) and are also merged into the full flavor. Unlike the Capacitor plugins above, these extend `com.lynx.jsbridge.LynxModule` and are registered in the LynxView's module registry.
 
 Introduced in #52 for the [app-lynx vue-lynx client](/openwiki/architecture/overview.md#app-lynx-vue-lynx-client). Unlike the four Capacitor plugins above, `PictelioSecureStorageModule` is a **LynxModule** — it extends `com.lynx.jsbridge.LynxModule` and is registered in the LynxView's module registry rather than via Capacitor's plugin system.
 
@@ -193,7 +233,7 @@ The rotated `refresh_token` callback (third parameter) allows the JS side to per
 
 ### PictelioAuthModule
 
-**Java:** `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioAuthModule.java` (87 lines, new in #53)
+**Java:** `/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioAuthModule.java` (87 lines, new in #53)
 
 A LynxModule for OAuth authentication, used by the [app-lynx client](/openwiki/architecture/overview.md#app-lynx-vue-lynx-client)'s [`authStore`](/packages/app-lynx/src/stores/authStore.ts). Exposed to Lynx JS via `NativeModules.PictelioAuth`. Wraps `PixivApiPlugin.oauthTokenExchange()` for the OAuth refresh_token exchange — same logic as the Capacitor `AuthPlugin`.
 
@@ -236,7 +276,7 @@ The `refresh_token` is stored in Android Keystore-backed encrypted storage (`@ap
 
 The Android entry point. Key responsibilities:
 - **Client routing gate (#51):** Before any Capacitor/WebView initialization, reads `SharedPreferences("CapacitorStorage")` key `pictelio_client_kind`. If `"lynx"`, **must** call `super.onCreate(savedInstanceState)` first (Android hard constraint — `SuperNotCalledException` on real devices), then starts [`LynxActivity`](#lynxactivity) and calls `finish()` — no Capacitor bridge, plugin registration, or WebView checks are performed after `super.onCreate`. The dual-Activity approach was chosen because `BridgeActivity.onCreate` unconditionally creates a WebView (see [research](/docs/research/lynx-android-brownfield-integration.md)).
-- Registers all four custom plugins: **`ImageCachePlugin`**, **`AuthPlugin`**, **`OAuthPlugin`**, **`PixivApiPlugin`** (v3.18.0+, replaced PictelioHttpPlugin) — only when the webview path is taken
+- Registers all five custom plugins: **`ImageCachePlugin`**, **`AuthPlugin`**, **`OAuthPlugin`**, **`PixivApiPlugin`** (v3.18.0+, replaced PictelioHttpPlugin), **`ClientInfoPlugin`** (ADR-0062) — only when the webview path is taken
 - Configures WebView settings (JavaScript enabled, DOM storage, mixed content)
 - Sets up the back-gesture handler for predictive back navigation
 - Initializes the image cache and auth plugin on startup
@@ -288,11 +328,11 @@ Custom Lynx image service implementing `ILynxImageService` — the sole image lo
 
 This replaces the unviable Fresco `lynx-service-image` dependency (see [Lynx SDK Dependency](#lynx-sdk-dependency)), because Fresco cannot inject the `Referer` header required by `i.pximg.net`.
 
-### PictelioApp.java
+### PictelioApp.java (full flavor)
 
-`/packages/app/android/app/src/main/java/io/pictelio/app/PictelioApp.java`
+`/packages/app/android/app/src/full/java/io/pictelio/app/PictelioApp.java`
 
-Custom `Application` class for app-level initialization. **Conditional startup (#51):** reads `pictelio_client_kind` from `SharedPreferences("CapacitorStorage")` and branches:
+Custom `Application` class for the full flavor. Since v4.0.0, each flavor has its own Application class: `PictelioApp` (full), `PictelioAppWebview` (`src/webview/`), `PictelioAppLynx` (`src/lynx/`). The full-flavor version conditionally initializes either the Lynx or WebView path based on `pictelio_client_kind`. reads `pictelio_client_kind` from `SharedPreferences("CapacitorStorage")` and branches:
 
 - **`"lynx"`** → `initLynx()`: Registers three Lynx services via `LynxServiceCenter.inst().registerService()` (`LynxHttpService`, `LynxLogService`, `PictelioImageService` — required before any `LynxView` is created), then initializes `LynxEnv.inst().init(this, …)`. Globally registers `PictelioSecureStorage` and `PictelioApp` LynxModules. Enables `LynxDebug` in debug builds. Skips WebView warmup entirely. Without these registrations, `lynx.fetch` would be unavailable and images would render as broken (no `ILynxImageService` → no image loading).
 - **`"webview"` (default)** → `warmUpWebView()`: Pre-warms the WebView service process (unchanged behavior).
@@ -375,30 +415,73 @@ The full release process is documented in `/docs/release-checklist.md` (6.2 KB),
 
 ## Key Source Files
 
+### Capacitor Plugins (webview flavor, also in full)
+
 | Purpose | Path |
 |---------|------|
-| AuthPlugin (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/AuthPlugin.java` |
-| ImageCachePlugin (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/ImageCachePlugin.java` |
-| OAuthPlugin (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/OAuthPlugin.java` |
-| PixivApiPlugin (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PixivApiPlugin.java` |
-| PictelioSecureStorageModule (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioSecureStorageModule.java` |
-| PictelioApiModule (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioApiModule.java` |
-| PictelioAuthModule (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioAuthModule.java` |
+| AuthPlugin (Java) | `/packages/app/android/app/src/webview/java/io/pictelio/app/AuthPlugin.java` |
+| ImageCachePlugin (Java) | `/packages/app/android/app/src/webview/java/io/pictelio/app/ImageCachePlugin.java` |
+| OAuthPlugin (Java) | `/packages/app/android/app/src/webview/java/io/pictelio/app/OAuthPlugin.java` |
+| PixivApiPlugin (Java) | `/packages/app/android/app/src/webview/java/io/pictelio/app/PixivApiPlugin.java` |
+| ClientInfoPlugin (Java, ADR-0062) | `/packages/app/android/app/src/webview/java/io/pictelio/app/ClientInfoPlugin.java` |
+| MainActivityWebview (Java) | `/packages/app/android/app/src/webview/java/io/pictelio/app/MainActivityWebview.java` |
+| PictelioAppWebview (Java) | `/packages/app/android/app/src/webview/java/io/pictelio/app/PictelioAppWebview.java` |
+
+### Lynx Native Modules (lynx flavor, also in full)
+
+| Purpose | Path |
+|---------|------|
+| LynxActivity (Java) | `/packages/app/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java` |
+| PictelioAppLynx (Java) | `/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioAppLynx.java` |
+| PictelioApiModule (Java) | `/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioApiModule.java` |
+| PictelioAppModule (Java) | `/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioAppModule.java` |
+| PictelioAuthModule (Java) | `/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioAuthModule.java` |
+| PictelioImageService (Java) | `/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioImageService.java` |
+| PictelioSecureStorageModule (Java) | `/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioSecureStorageModule.java` |
+| PictelioTemplateProvider (Java) | `/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioTemplateProvider.java` |
+
+### Shared (main sourceSet, all flavors)
+
+| Purpose | Path |
+|---------|------|
+| PixivApiCore (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PixivApiCore.java` |
+| PixivImageLoader (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PixivImageLoader.java` |
 | SecureStorageCompat (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/SecureStorageCompat.java` |
+| OAuthUtils (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/OAuthUtils.java` |
+| SplashController (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/SplashController.java` |
+| OAuthConfig (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/config/OAuthConfig.java` |
+
+### Full-flavor additions (full sourceSet)
+
+| Purpose | Path |
+|---------|------|
+| MainActivity (Java) | `/packages/app/android/app/src/full/java/io/pictelio/app/MainActivity.java` |
+| PictelioApp (Java) | `/packages/app/android/app/src/full/java/io/pictelio/app/PictelioApp.java` |
+
+### Tests
+
+| Purpose | Path |
+|---------|------|
 | SecureStorageCompatTest (Java) | `/packages/app/android/app/src/test/java/io/pictelio/app/SecureStorageCompatTest.java` |
+| PixivImageLoaderTest (Java) | `/packages/app/android/app/src/test/java/io/pictelio/app/PixivImageLoaderTest.java` |
+| PictelioImageServiceTest (Java) | `/packages/app/android/app/src/test/java/io/pictelio/app/PictelioImageServiceTest.java` |
+
+### Resources & Config
+
+| Purpose | Path |
+|---------|------|
 | Backup rules (Android 12+) | `/packages/app/android/app/src/main/res/xml/data_extraction_rules.xml` |
 | Backup rules (Android 11-) | `/packages/app/android/app/src/main/res/xml/backup_rules.xml` |
-| MainActivity (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/MainActivity.java` |
-| LynxActivity (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/LynxActivity.java` |
-| PictelioApp (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioApp.java` |
-| PixivImageLoader (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PixivImageLoader.java` |
-| PixivImageLoaderTest (Java) | `/packages/app/android/app/src/test/java/io/pictelio/app/PixivImageLoaderTest.java` |
-| PictelioImageService (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioImageService.java` |
-| PictelioImageServiceTest (Java) | `/packages/app/android/app/src/test/java/io/pictelio/app/PictelioImageServiceTest.java` |
+
+### TypeScript Bridges
+
+| Purpose | Path |
+|---------|------|
 | AuthPlugin TS bridge | `/packages/app/src/native/AuthPlugin.ts` |
 | ImageCache TS bridge | `/packages/app/src/native/ImageCache.ts` |
 | OAuthPlugin TS bridge | `/packages/app/src/native/OAuthPlugin.ts` |
 | PixivApi TS bridge | `/packages/app/src/native/PixivApi.ts` |
+| ClientInfo TS bridge (ADR-0062) | `/packages/app/src/native/ClientInfo.ts` |
 | Splash Bridge | `/packages/app/src/native/splashBridge.ts` |
 | Capacitor config | `/packages/app/capacitor.config.ts` |
 | Dev Android script | `/packages/app/scripts/dev-android.mjs` |
@@ -410,3 +493,15 @@ The full release process is documented in `/docs/release-checklist.md` (6.2 KB),
 | Release signing guide | `/docs/release-signing.md` |
 | Platform compat | `/docs/platform-compatibility.md` |
 | GitHub release docs | `/docs/github-release.md` |
+ checklist | `/docs/release-checklist.md` |
+| Release signing guide | `/docs/release-signing.md` |
+| Platform compat | `/docs/platform-compatibility.md` |
+| GitHub release docs | `/docs/github-release.md` |
+ease signing guide | `/docs/release-signing.md` |
+| Platform compat | `/docs/platform-compatibility.md` |
+| GitHub release docs | `/docs/github-release.md` |
+ checklist | `/docs/release-checklist.md` |
+| Release signing guide | `/docs/release-signing.md` |
+| Platform compat | `/docs/platform-compatibility.md` |
+| GitHub release docs | `/docs/github-release.md` |
+ease.md` |
