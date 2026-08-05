@@ -25,10 +25,10 @@
     "cap:open:android": "vp exec cap open android",
     "sync:android-version": "node scripts/sync-android-version.mjs",
     "sync:credentials": "node scripts/sync-credentials.mjs",
-    "build:android": "vp run sync:android-version && vp run sync:credentials && vp run build && vp run cap:sync && cd android && GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew assembleDebug",
+    "build:android": "vp run sync:android-version && vp run sync:credentials && vp run build && NODE_ENV=production pnpm --dir ../app-lynx run build && node ../app-lynx/scripts/sync-android-assets.mjs && vp run cap:sync && cd android && GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew assembleDebug",
     "build:android:e2e": "vp run sync:android-version && vp run sync:credentials && vp build --mode e2e && vp run cap:sync && cd android && GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew assembleDebug",
-    "build:android:release": "vp run sync:android-version && vp run sync:credentials && vp run build && vp run cap:sync && cd android && GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew assembleFullRelease renameFullReleaseApk",
-    "build:android:release:all": "vp run sync:android-version && vp run sync:credentials && vp run build && vp run cap:sync && cd android && GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew assembleFullRelease renameFullReleaseApk assembleWebviewRelease renameWebviewReleaseApk assembleLynxRelease renameLynxReleaseApk",
+    "build:android:release": "vp run sync:android-version && vp run sync:credentials && vp run build && NODE_ENV=production pnpm --dir ../app-lynx run build && node ../app-lynx/scripts/sync-android-assets.mjs && vp run cap:sync && cd android && GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew assembleFullRelease renameFullReleaseApk",
+    "build:android:release:all": "vp run sync:android-version && vp run sync:credentials && vp run build && NODE_ENV=production pnpm --dir ../app-lynx run build && node ../app-lynx/scripts/sync-android-assets.mjs && vp run cap:sync && cd android && GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew assembleFullRelease renameFullReleaseApk assembleWebviewRelease renameWebviewReleaseApk assembleLynxRelease renameLynxReleaseApk",
     "release": "node scripts/release.mjs",
     "dev:android": "node scripts/dev-android.mjs",
     "generate:icons": "node scripts/generate-icons.mjs"

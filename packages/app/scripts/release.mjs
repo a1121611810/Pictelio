@@ -647,6 +647,17 @@ async function main() {
     const buildSteps = [
       ["同步 OAuth 配置", "pnpm", ["run", "sync:credentials"]],
       ["构建 Web 产物", "pnpm", ["run", "build"]],
+      // #51 修复：Lynx bundle 必须先构建并同步进 android assets（src/main/assets/main.lynx.bundle），
+      // 否则 full/lynx 包 APK 无 main.lynx.bundle，切换引擎后 LynxActivity 加载失败 → 白屏。
+      // NODE_ENV=production 硬兜底：防止发布环境残留 PICTELIO_LYNX_DEV=1 时把真实 OAuth
+      // 凭证内联进生产 bundle（lynx.config.ts 的 __CREDENTIALS__ 仅在 dev 下注入真值）。
+      [
+        "构建 Lynx bundle",
+        "pnpm",
+        ["--dir", "../app-lynx", "run", "build"],
+        { env: { ...process.env, NODE_ENV: "production" } },
+      ],
+      ["同步 Lynx bundle 到 Android assets", "node", ["../app-lynx/scripts/sync-android-assets.mjs"]],
       ["同步 Capacitor 资源", "pnpm", ["run", "cap:sync"]],
       [
         "编译 Release APK",

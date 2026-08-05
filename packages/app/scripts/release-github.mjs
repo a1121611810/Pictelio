@@ -163,6 +163,11 @@ function execBuild(dry, variants) {
     "pnpm run sync:android-version",
     "pnpm run sync:credentials",
     "pnpm run build",
+    // #51 修复：Lynx bundle 必须先构建并同步进 android assets，否则 full/lynx 包 APK
+    // 无 main.lynx.bundle，切换引擎后 LynxActivity 加载失败 → 白屏。
+    // NODE_ENV=production 硬兜底：防止残留 PICTELIO_LYNX_DEV=1 时真实 OAuth 凭证内联进生产 bundle。
+    "NODE_ENV=production pnpm --dir ../app-lynx run build",
+    "node ../app-lynx/scripts/sync-android-assets.mjs",
     "pnpm run cap:sync",
     `cd android && GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew ${gradleTasks.join(" ")}`,
   ];

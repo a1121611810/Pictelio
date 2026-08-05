@@ -60,6 +60,8 @@
 | Android Debug 构建 | `cd android && ./gradlew assembleDebug --no-daemon` | ✅ `BUILD SUCCESSFUL`（213 个任务，27 执行，186 up-to-date） |
 
 > 注：Android Debug 构建仅作冒烟测试；正式发布前仍需使用真实 keystore 执行 `pnpm build:android:release:all` 生成三个签名 APK（full / webview / lynx）。
+>
+> 注（引擎切换）：`build:android*` 与 `release`/`release-github` 发布流水线已内置 Lynx bundle 构建与同步（`pnpm --dir ../app-lynx run build` → `node ../app-lynx/scripts/sync-android-assets.mjs`），无需手工执行 `pnpm sync:app-lynx-bundle`。若 full/lynx 包 APK 缺 `main.lynx.bundle`，切换渲染引擎后 LynxActivity 将加载失败（历史白屏问题，见 #51）；构建完成后可检查 `packages/app/android/app/src/main/assets/main.lynx.bundle` 是否存在。
 
 ---
 
