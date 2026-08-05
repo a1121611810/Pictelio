@@ -53,12 +53,31 @@ export function loadRefreshToken(): Promise<string | null> {
           console.warn("[tokenStorage] 原生存储读取失败（按未登录处理）", err)
           resolve(null)
         } else {
-          resolve(value)
+          resolve(unquoteNativeString(value))
         }
       })
     })
   }
   return idbGet(KEY)
+}
+
+/**
+ * lynx Callback.invoke(String)（native→JS）会把字符串参数 JSON 序列化——
+ * 实测 getItem 回调的 value 形如 `"LXa0TEPb..."`（首尾带 JSON 双引号），
+ * 直接当 token 传给 OAuth 会 400 invalid_grant（issue #120 登录态恢复失败根因）。
+ * 还原：仅当值符合 JSON 字符串形态（`"..."` 且 parse 后为 string）时去引号。
+ */
+export function unquoteNativeString(value: string | null): string | null {
+  if (typeof value === "string" && value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
+    try {
+      const parsed: unknown = JSON.parse(value)
+      return typeof parsed === "string" ? parsed : value
+    } catch {
+      // 非 JSON 字符串（如错误消息）→ 原样返回
+      return value
+    }
+  }
+  return value
 }
 
 /** 清除 refresh_token（登出） */
