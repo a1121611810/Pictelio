@@ -90,6 +90,7 @@ public class MainActivityWebview extends BridgeActivity {
         registerPlugin(AuthPlugin.class);
         registerPlugin(OAuthPlugin.class);
         registerPlugin(PixivApiPlugin.class);
+        registerPlugin(ClientInfoPlugin.class); // ADR-0062
         super.onCreate(savedInstanceState);
         // 调试模式 — debug 构建时启用
         if (BuildConfig.DEBUG) {

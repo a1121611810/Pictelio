@@ -29,3 +29,14 @@ export async function setClientKind(kind: ClientKind): Promise<void> {
   await settings.hydrateAll();
   clientKindSetting.set(kind);
 }
+
+/**
+ * ADR-0062：当前包是否支持引擎切换（同时含 webview 与 lynx）。
+ * null/undefined（未知）保守视为支持——web 开发环境无原生插件，保持 full 行为。
+ * 空数组/非法值 → 不支持（与 lynx 侧 normalizeKinds 契约一致）。
+ */
+export function supportsClientSwitch(kinds: unknown): boolean {
+  if (kinds === null || kinds === undefined) return true;
+  if (!Array.isArray(kinds)) return false;
+  return kinds.includes("webview") && kinds.includes("lynx");
+}

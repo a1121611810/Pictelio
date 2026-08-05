@@ -62,14 +62,39 @@ public class PictelioAppModule extends LynxModule {
     @LynxMethod
     public void getClientKind(Callback callback) {
         try {
-            String kind = appContext()
+            String stored = appContext()
                     .getSharedPreferences(CLIENT_PREFS, Context.MODE_PRIVATE)
                     .getString(CLIENT_KEY, "webview");
+            // ADR-0062：归一化——存储值不在当前包支持列表时回退到包默认引擎
+            // （如 full 包切到 lynx 后换装 lynx-only 包，残留 "webview" → 归一为 "lynx"）
+            String kind = containsKind(stored) ? stored : BuildConfig.CLIENT_KINDS[0];
             callback.invoke(kind);
         } catch (Exception e) {
             Log.w(TAG, "getClientKind 失败", e);
             callback.invoke(String.valueOf(e.getMessage()));
         }
+    }
+
+    /**
+     * 返回当前包支持的 client 引擎列表（ADR-0062）。
+     * full → ["webview","lynx"]；webview → ["webview"]；lynx → ["lynx"]。
+     * JS 侧据此决定是否渲染引擎切换入口。
+     */
+    @LynxMethod
+    public void getClientKinds(Callback callback) {
+        try {
+            callback.invoke(BuildConfig.CLIENT_KINDS);
+        } catch (Exception e) {
+            Log.w(TAG, "getClientKinds 失败", e);
+            callback.invoke(String.valueOf(e.getMessage()));
+        }
+    }
+
+    private static boolean containsKind(String kind) {
+        for (String k : BuildConfig.CLIENT_KINDS) {
+            if (k.equals(kind)) return true;
+        }
+        return false;
     }
 
     @LynxMethod

@@ -27,13 +27,38 @@ function nativeAppModule() {
 interface PictelioAppModule {
   setClientKind(kind: string, callback: (err: string | null) => void): void
   getClientKind(callback: (kind: string | null, err: string | null) => void): void
+  getClientKinds(callback: (kinds: string[], err: string | null) => void): void
   restart(callback: (err: string | null) => void): void
 }
 
+/** 当前包支持的 client 引擎列表（ADR-0062）；null = 未知（保守视为双引擎） */
+export const availableKinds = ref<ClientKind[] | null>(null)
+
+/** 过滤 Native 返回的 client 列表为合法 ClientKind（ADR-0062）；非法值剔除 */
+export function normalizeKinds(raw: unknown): ClientKind[] | null {
+  if (!Array.isArray(raw)) return null
+  const kinds = raw.filter((k): k is ClientKind => k === "webview" || k === "lynx")
+  return kinds.length > 0 ? kinds : null
+}
+
+/** 当前包是否支持引擎切换（同时含 webview 与 lynx；null=未知保守视为支持） */
+export function supportsClientSwitch(kinds: ClientKind[] | null): boolean {
+  return kinds === null || (kinds.includes("webview") && kinds.includes("lynx"))
+}
+
 export function initClientSetting(): void {
-  const mod = nativeAppModule()
+  const mod = nativeAppModule() as PictelioAppModule | null
   if (mod) {
-    // 原生模式：从 Native 读当前开关（异步回调）
+    // 原生模式：从 Native 读当前开关 + 包能力列表（异步回调）
+    try {
+      mod.getClientKinds((kinds, err) => {
+        if (!err) {
+          availableKinds.value = normalizeKinds(kinds)
+        }
+      })
+    } catch {
+      /* 忽略：能力查询失败按未知处理 */
+    }
     try {
       mod.getClientKind((kind, err) => {
         _selected.value = !err && (kind === "webview" || kind === "lynx") ? kind : CURRENT
@@ -54,7 +79,7 @@ export function initClientSetting(): void {
 
 /** 保存选择并重启：原生 Native 落盘 + 进程重启；Web reload（#51） */
 export function switchClient(kind: ClientKind): void {
-  const mod = nativeAppModule()
+  const mod = nativeAppModule() as PictelioAppModule | null
   if (mod) {
     try {
       mod.setClientKind(kind, (err) => {

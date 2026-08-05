@@ -4,7 +4,7 @@ defineOptions({ name: 'me' })
 import { ref, onMounted } from 'vue'
 import { navigate, goBack, ensureAuth, resetHistory } from '../router'
 import { currentUser, logout, isLoggedIn } from '../stores/authStore'
-import { selectedClient, switchClient, type ClientKind } from '../stores/clientSwitchStore'
+import { selectedClient, switchClient, availableKinds, supportsClientSwitch, type ClientKind } from '../stores/clientSwitchStore'
 import { showR18, showR18G, setShowR18, setShowR18G, ugoiraMode, setUgoiraMode } from '../stores/settingsStore'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { ME_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
@@ -121,8 +121,8 @@ function toggleR18G() {
         </view>
       </GlassCard>
 
-      <!-- 客户端组 -->
-      <view class="bg-background mt-3 p-4">
+      <!-- 客户端组（ADR-0062：仅 full 包同时含 webview+lynx 时渲染；独立包隐藏） -->
+      <view v-if="supportsClientSwitch(availableKinds)" class="bg-background mt-3 p-4">
         <text
           class="text-lg font-semibold text-foreground"
           :accessibility-element="A11Y_ELEMENT_ENABLED"

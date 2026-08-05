@@ -25,14 +25,18 @@ android {
         full {
             dimension "client"
             manifestPlaceholders = [launcherActivity: ".MainActivity", appClass: ".PictelioApp"]
+            // ADR-0062：包支持的 client 引擎列表（BuildConfig.CLIENT_KINDS）
+            buildConfigField "String[]", "CLIENT_KINDS", '{"webview", "lynx"}'
         }
         webview {
             dimension "client"
             manifestPlaceholders = [launcherActivity: ".MainActivityWebview", appClass: ".PictelioAppWebview"]
+            buildConfigField "String[]", "CLIENT_KINDS", '{"webview"}'
         }
         lynx {
             dimension "client"
             manifestPlaceholders = [launcherActivity: ".LynxActivity", appClass: ".PictelioAppLynx"]
+            buildConfigField "String[]", "CLIENT_KINDS", '{"lynx"}'
         }
     }
 
