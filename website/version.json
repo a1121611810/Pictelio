@@ -1,5 +1,0 @@
-{
-  "version": "4.2.0",
-  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v4.2.0",
-  "changelog": "🔧 其他\n  Merge branch 'reasonix/delivery-20260805-065741-789edc1428'\n📝 文档\n  docs: update docs for v4.0.0 android flavor and e2e tests\n  docs: add dialog element migration feasibility report\n🐛 修复\n  fi"
-}

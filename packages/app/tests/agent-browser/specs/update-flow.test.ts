@@ -21,12 +21,12 @@ const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // 用 99.0.0 保证 isNewer 判定为 true，且不会与真实发布版本/已忽略版本冲突
 const MOCK_VERSION_JSON = JSON.stringify({
   version: "99.0.0",
-  url: "https://github.com/a1121611810/pixivizer/releases/tag/v99.0.0",
+  url: "https://github.com/a1121611810/Pictelio/releases/tag/v99.0.0",
   changelog: "E2E mock version",
 });
 
 const UPDATE_URL_PATTERN =
-  "raw.githubusercontent.com/a1121611810/pixivizer/main/packages/website/version.json";
+  "raw.githubusercontent.com/a1121611810/Pictelio/main/packages/website/version.json";
 
 /** 通过 evaluate 点击文本匹配的按钮（fluent-button 自定义元素） */
 async function clickButtonByText(driver: AgentBrowserDriver, text: string): Promise<boolean> {

@@ -43,7 +43,6 @@ function releaseFilesFor(versionCode) {
     "packages/app/android/app/build.gradle",
     `packages/app/fastlane/metadata/android/en-US/changelogs/${versionCode}.txt`,
     "packages/website/version.json",
-    "website/version.json",
   ];
 }
 
@@ -78,6 +77,8 @@ let publishedVersion = null;
 // P4：记录本次发布的 tag 与 step 2 会修改的文件，供 catch 失败回滚使用
 let publishedTag = null;
 let rollbackFiles = [];
+// P6：记录 versionCode，供 catch 恢复指引定位 changelog 文件
+let publishedVersionCode = null;
 
 if (!process.stdin.isTTY) {
   console.error("[release] ❌ 发布脚本需要 TTY 终端中运行");
@@ -140,8 +141,11 @@ function runWithSpinner(label, cmd, argsArr, opts = {}) {
       stdio: ["pipe", "pipe", "pipe"],
       ...opts,
     });
+    let stderrBuf = "";
     child.stdout.on("data", (d) => process.stdout.write(d));
     child.stderr.on("data", (d) => {
+      // P5：累积 stderr，失败时附带在错误消息里，便于区分可重试/不可重试错误
+      stderrBuf += d.toString();
       spinner.stop();
       process.stderr.write(d);
       spinner.start();
@@ -159,7 +163,13 @@ function runWithSpinner(label, cmd, argsArr, opts = {}) {
         resolve(elapsed);
       } else {
         spinner.fail(`${label} 失败 (退出码 ${code}, ${elapsed}s)`);
-        reject(new Error(`"${cmd} ${argsArr.join(" ")}" 失败 (退出码 ${code}, 耗时 ${elapsed}s)`));
+        const stderrTail = stderrBuf.trim().slice(-500);
+        const err = new Error(
+          `"${cmd} ${argsArr.join(" ")}" 失败 (退出码 ${code}, 耗时 ${elapsed}s)` +
+            (stderrTail ? `\n${stderrTail}` : ""),
+        );
+        err.stderr = stderrBuf; // P5：完整 stderr，供调用方判断是否可重试
+        reject(err);
       }
     });
   });
@@ -253,6 +263,12 @@ function parseVersion(v) {
   if (parts.length !== 3 || parts.some(isNaN)) {
     throw new Error(`版本号格式无效: ${v}`);
   }
+  // P10：versionCode = major*10000 + minor*100 + patch，minor/patch ≥ 100 会与更高位进位冲突
+  if (parts[1] > 99 || parts[2] > 99) {
+    throw new Error(
+      `版本号 ${v} 超出 versionCode 表示范围（minor 和 patch 均需 < 100，当前 minor=${parts[1]}, patch=${parts[2]}）`,
+    );
+  }
   return { major: parts[0], minor: parts[1], patch: parts[2], str: v };
 }
 
@@ -266,6 +282,16 @@ function bump(v, part) {
     default:
       return `${p.major}.${p.minor}.${p.patch + 1}`;
   }
+}
+
+// P9：数值比较两版本号，candidate >= base 返回 true（3 段，缺省段按 0）
+function isVersionAtLeast(candidate, base) {
+  const c = parseVersion(candidate);
+  const b = parseVersion(base);
+  return (
+    c.major > b.major ||
+    (c.major === b.major && (c.minor > b.minor || (c.minor === b.minor && c.patch >= b.patch)))
+  );
 }
 
 function askQuestion(query) {
@@ -401,6 +427,11 @@ async function interactivePickVersion(currentVersion) {
         // eslint-disable-next-line no-await-in-loop
         const custom = await askQuestion("输入版本号 (格式 x.y.z): ");
         if (/^\d+\.\d+\.\d+$/u.test(custom)) {
+          // P9：禁止低于当前版本，避免 versionCode 倒退导致 Android 拒绝安装
+          if (!isVersionAtLeast(custom, currentVersion)) {
+            console.log(`  ⚠ 版本不能低于当前版本 ${currentVersion}，请重新输入`);
+            break;
+          }
           return { type: "custom", version: custom };
         }
         console.log("  ⚠ 格式错误，请输入 x.y.z 格式（如 2.0.0）");
@@ -474,6 +505,7 @@ async function main() {
   tag = `v${newVersion}`;
   title = `Pictelio v${newVersion}`;
   publishedTag = tag;
+  publishedVersionCode = versionCode;
 
   // P4：tag 预检——本地或远端已存在同名 tag 则拒绝发布，
   // 防止重复发布或上次失败残留的 tag 被覆盖。
@@ -549,7 +581,8 @@ async function main() {
       JSON.stringify(
         {
           version: newVersion,
-          url: `https://github.com/a1121611810/pixivizer/releases/tag/${tag}`,
+          // P7：repo 名动态取 git remote，避免硬编码旧 repo 名
+          url: `https://github.com/${getRepoSlug()}/releases/tag/${tag}`,
           changelog: changelog.slice(0, 200),
         },
         null,
@@ -559,8 +592,6 @@ async function main() {
       recursive: true,
     });
     await writeText("../../packages/website/version.json", verJson);
-    await mkdir(dirname(resolvePath(rootDir, "../../website/version.json")), { recursive: true });
-    await writeText("../../website/version.json", verJson);
   });
 
   await step(3, "构建 APK", async () => {
@@ -627,7 +658,9 @@ async function main() {
       );
     }
     await run("git", ["add", ...releaseFiles], { cwd: repoRoot });
-    await run("git", ["commit", "-m", `chore: bump version to ${newVersion}`, "-m", changelog], { cwd: repoRoot });
+    await run("git", ["commit", "-m", `chore: bump version to ${newVersion}`, "-m", changelog], {
+      cwd: repoRoot,
+    });
     await run("git", ["tag", "-a", tag, "-m", title], { cwd: repoRoot });
   });
 
@@ -671,6 +704,9 @@ async function main() {
 
       // 第一步：创建 Release（不传 APK，只需 API 调用，~1s）
       if (!releaseExists) {
+        // P5：不可重试错误模式（4xx / 认证 / tag 冲突等），命中则放弃重试
+        const NON_RETRYABLE =
+          /HTTP 4\d\d|already exists|not found|unauthorized|forbidden|bad credential/i;
         for (let attempt = 1; attempt <= 3; attempt++) {
           try {
             await runWithSpinner(`gh release create (第 ${attempt} 次)`, "gh", [
@@ -686,13 +722,16 @@ async function main() {
             ]);
             break;
           } catch (e) {
+            e.relTag = tag;
+            e.relTitle = title;
+            if (NON_RETRYABLE.test(e.stderr || "")) {
+              throw e; // 不可重试：直接失败，不白等重试
+            }
             if (attempt >= 3) {
-              e.relTag = tag;
-              e.relTitle = title;
               throw e;
             }
             const delay = Math.min(1000 * 2 ** (attempt - 1), 4000);
-            log(`gh release create 失败，${delay / 1000}s 后重试...`);
+            log(`gh release create 失败（${delay / 1000}s 后重试）...`);
             await new Promise((r) => setTimeout(r, delay));
           }
         }
@@ -764,11 +803,15 @@ main().catch(async (error) => {
         }
         const changelog = rollbackFiles.find((f) => f.endsWith(".txt"));
         if (changelog) await unlink(resolvePath(repoRoot, changelog)).catch(() => {});
-        console.error(`   ✅ 已回滚 package.json / build.gradle / changelog / version.json，工作区干净`);
+        console.error(
+          `   ✅ 已回滚 package.json / build.gradle / changelog / version.json，工作区干净`,
+        );
         console.error(`   可直接重跑发布`);
       } catch (rollbackErr) {
         console.error(`   ⚠ 自动回滚失败: ${rollbackErr.message}`);
-        console.error(`   请手动执行: git checkout -- ${rollbackFiles.filter((f) => !f.endsWith(".txt")).join(" ")}`);
+        console.error(
+          `   请手动执行: git checkout -- ${rollbackFiles.filter((f) => !f.endsWith(".txt")).join(" ")}`,
+        );
         const changelog = rollbackFiles.find((f) => f.endsWith(".txt"));
         if (changelog) console.error(`   并删除: ${changelog}`);
       }
@@ -790,14 +833,19 @@ main().catch(async (error) => {
       const apkRels = apkPathsFor(publishedVersion, resolveVariants())
         .map((p) => `packages/app/${p}`)
         .join(" ");
+      // P6：changelog 在 step 2 已写入 fastlane（未提交但文件在），直接指向文件
+      const notesFile = `packages/app/fastlane/metadata/android/en-US/changelogs/${publishedVersionCode}.txt`;
       console.error(`\n   已完成的步骤: 5/6`);
       console.error(`   git 已推送但 GitHub Release 创建/上传失败。手动恢复:`);
       console.error(`     1. 创建 Release:`);
       console.error(
-        `        gh release create ${relTag} --repo ${repoKey} --title "${error.relTitle || `Pictelio ${relTag}`}" --notes "见下方 changelog"`,
+        `        gh release create ${relTag} --repo ${repoKey} --title "${error.relTitle || `Pictelio ${relTag}`}" --notes-file ${notesFile}`,
       );
       console.error(`     2. 上传 APK（若 release 已存在可跳过第 1 步）:`);
       console.error(`        gh release upload ${relTag} --repo ${repoKey} --clobber ${apkRels}`);
+      console.error(
+        `     （若 ${notesFile} 不存在，可改为 --notes "Pictelio ${relTag}" 或手动粘贴 changelog）`,
+      );
     }
   } else {
     console.error(`   ${error.message}`);

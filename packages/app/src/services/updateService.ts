@@ -43,8 +43,9 @@ export function isNewer(local: string, remote: string): boolean {
 // ── Core fetch ──
 
 // 通过 raw.githubusercontent.com 获取版本信息（不被代理拦截）
+// P7：repo 曾用名 pixivizer，已重命名为 Pictelio；若 repo 迁移需同步此处
 const UPDATE_URL =
-  "https://raw.githubusercontent.com/a1121611810/pixivizer/main/packages/website/version.json";
+  "https://raw.githubusercontent.com/a1121611810/Pictelio/main/packages/website/version.json";
 
 /**
  * Fetch the latest stable release from GitHub and compare
