@@ -25,6 +25,7 @@ import { createInterface } from "node:readline";
 import ora from "ora";
 
 const rootDir = resolvePath(dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = resolvePath(rootDir, "../.."); // monorepo 根（git 仓库根）
 
 // #119：三 flavor 变体（full / webview / lynx），默认全量
 const DEFAULT_VARIANTS = ["full", "webview", "lynx"];
@@ -32,6 +33,18 @@ const APK_DIR = "android/app/build/outputs/apk";
 
 function apkPathsFor(version, variants) {
   return variants.map((flavor) => `${APK_DIR}/${flavor}/release/pictelio-${version}-${flavor}.apk`);
+}
+
+// P3/P4：发布流程会修改/新建的文件清单（相对 git 仓库根），
+// 供 step 4 定向 add、多余变更拦截和 step 2/3 失败自动回滚复用。
+function releaseFilesFor(versionCode) {
+  return [
+    "packages/app/package.json",
+    "packages/app/android/app/build.gradle",
+    `packages/app/fastlane/metadata/android/en-US/changelogs/${versionCode}.txt`,
+    "packages/website/version.json",
+    "website/version.json",
+  ];
 }
 
 // 解析 --variants / PICTELIO_RELEASE_VARIANTS，默认全量
@@ -62,6 +75,9 @@ const isCustom = args.includes("-c");
 
 // #119：模块级记录当前发布版本，供 catch 恢复指引使用（main() 作用域外访问）
 let publishedVersion = null;
+// P4：记录本次发布的 tag 与 step 2 会修改的文件，供 catch 失败回滚使用
+let publishedTag = null;
+let rollbackFiles = [];
 
 if (!process.stdin.isTTY) {
   console.error("[release] ❌ 发布脚本需要 TTY 终端中运行");
@@ -149,11 +165,12 @@ function runWithSpinner(label, cmd, argsArr, opts = {}) {
   });
 }
 
-function runOutput(cmd, argsArr) {
+function runOutput(cmd, argsArr, opts = {}) {
   return execFileSync(cmd, argsArr, {
     cwd: rootDir,
     encoding: "utf-8",
     stdio: ["pipe", "pipe", "ignore"],
+    ...opts,
   }).trim();
 }
 
@@ -161,6 +178,17 @@ function getRepoSlug() {
   return runOutput("git", ["remote", "get-url", "origin"])
     .replace(/.*github\.com[/u:]/u, "")
     .replace(/\.git$/u, "");
+}
+
+// P2：发布必须在 main 分支执行，避免 commit/tag 落在非 main 分支
+// 而 push 仍推 main，导致 tag 指向不在远端 main 上的 commit。
+function ensureOnMainBranch() {
+  const branch = runOutput("git", ["branch", "--show-current"]);
+  if (branch !== "main") {
+    throw new Error(
+      `发布必须在 main 分支执行（当前分支: ${branch || "(detached HEAD)"}）。请先 git checkout main 再重跑`,
+    );
+  }
 }
 
 // ── 核心流程 ──
@@ -388,6 +416,9 @@ async function main() {
   log("Pictelio 一键发布脚本");
   console.log("");
 
+  // P2：发布前强制校验 main 分支
+  ensureOnMainBranch();
+
   const pkg = JSON.parse(await readText("package.json"));
   const currentVersion = pkg.version;
   let newVersion;
@@ -442,6 +473,22 @@ async function main() {
   versionCode = mi * 10_000 + mn * 100 + pt;
   tag = `v${newVersion}`;
   title = `Pictelio v${newVersion}`;
+  publishedTag = tag;
+
+  // P4：tag 预检——本地或远端已存在同名 tag 则拒绝发布，
+  // 防止重复发布或上次失败残留的 tag 被覆盖。
+  const localTagExists = runOutput("git", ["tag", "-l", tag]) !== "";
+  let remoteTagExists = false;
+  try {
+    remoteTagExists = runOutput("git", ["ls-remote", "--tags", "origin", tag]) !== "";
+  } catch {
+    log("⚠ 无法检查远端 tag（网络异常），仅校验本地");
+  }
+  if (localTagExists || remoteTagExists) {
+    throw new Error(
+      `tag ${tag} 已存在（本地: ${localTagExists}, 远端: ${remoteTagExists}）。请删除冲突 tag 或更换版本号`,
+    );
+  }
 
   // ── 发布计划确认 ──
   console.log("─".repeat(40));
@@ -490,6 +537,8 @@ async function main() {
   });
 
   await step(2, "更新版本号", async () => {
+    // P4：记录本次会修改/新建的文件，供失败自动回滚
+    rollbackFiles = releaseFilesFor(versionCode);
     pkg.version = newVersion;
     await writeText("package.json", JSON.stringify(pkg, null, 2) + "\n");
     await run("node", ["scripts/sync-android-version.mjs"]);
@@ -563,9 +612,23 @@ async function main() {
   });
 
   await step(4, "Git 提交 + Tag", async () => {
-    await run("git", ["add", "-A"]);
-    await run("git", ["commit", "-m", `chore: bump version to ${newVersion}`, "-m", changelog]);
-    await run("git", ["tag", "-a", tag, "-m", title]);
+    // P3：只提交发布相关文件，并拦截清单之外的多余变更，
+    // 防止无关改动混入发布 commit 或发布产物漏提交。
+    const releaseFiles = releaseFilesFor(versionCode);
+    const status = runOutput("git", ["status", "--porcelain"], { cwd: repoRoot });
+    const extra = status
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => line.slice(3)) // "XY path" 格式，取路径部分
+      .filter((p) => !releaseFiles.includes(p));
+    if (extra.length > 0) {
+      throw new Error(
+        `工作区存在发布无关的变更: ${extra.join(", ")}。请先处理或 git stash 后再发布`,
+      );
+    }
+    await run("git", ["add", ...releaseFiles], { cwd: repoRoot });
+    await run("git", ["commit", "-m", `chore: bump version to ${newVersion}`, "-m", changelog], { cwd: repoRoot });
+    await run("git", ["tag", "-a", tag, "-m", title], { cwd: repoRoot });
   });
 
   await step(5, "推送到 GitHub", async () => {
@@ -684,14 +747,43 @@ async function main() {
   console.log("=".repeat(50));
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
   console.error(`\n[release] ❌ 发布流程失败`);
   if (error.stepName) {
     console.error(`   失败步骤: [${error.stepN}/6] ${error.stepName}`);
     console.error(`   错误: ${error.message}`);
-    if (error.stepN < 6) {
+    if (error.stepN === 2 || error.stepN === 3) {
+      // P4：版本号已写入但尚未 commit，自动回滚文件，避免重跑跳过该版本
       console.error(`\n   已完成的步骤: ${error.stepN - 1}/6`);
-      console.error(`   重试即可覆盖，git 尚未推送，无残留`);
+      console.error(`   正在自动回滚版本文件...`);
+      try {
+        // changelog 是新建文件（未跟踪），git checkout 无法恢复，需单独删除
+        const tracked = rollbackFiles.filter((f) => !f.endsWith(".txt"));
+        if (tracked.length > 0) {
+          await run("git", ["checkout", "--", ...tracked], { cwd: repoRoot });
+        }
+        const changelog = rollbackFiles.find((f) => f.endsWith(".txt"));
+        if (changelog) await unlink(resolvePath(repoRoot, changelog)).catch(() => {});
+        console.error(`   ✅ 已回滚 package.json / build.gradle / changelog / version.json，工作区干净`);
+        console.error(`   可直接重跑发布`);
+      } catch (rollbackErr) {
+        console.error(`   ⚠ 自动回滚失败: ${rollbackErr.message}`);
+        console.error(`   请手动执行: git checkout -- ${rollbackFiles.filter((f) => !f.endsWith(".txt")).join(" ")}`);
+        const changelog = rollbackFiles.find((f) => f.endsWith(".txt"));
+        if (changelog) console.error(`   并删除: ${changelog}`);
+      }
+    } else if (error.stepN === 4) {
+      // P4：commit/tag 已建立但 push 失败——本地已有提交，不能直接重跑
+      console.error(`\n   已完成的步骤: 3/6`);
+      console.error(`   commit/tag 已存在于本地，尚未推送。如需重新发布当前版本:`);
+      console.error(`     git reset --soft HEAD~1`);
+      console.error(`     git tag -d ${publishedTag}`);
+      console.error(`   然后重跑；或保留本地提交继续发布下一版本`);
+    } else if (error.stepN === 5) {
+      console.error(`\n   已完成的步骤: 4/6`);
+      console.error(`   git push 失败。可能已推送 tag 但未推送 main，或部分成功。检查远端:`);
+      console.error(`     git ls-remote origin ${publishedTag}`);
+      console.error(`   若 main 已推送而 tag 未推送，可重试: git push origin ${publishedTag}`);
     } else if (error.stepN === 6) {
       const repoKey = getRepoSlug();
       const relTag = error.relTag || "vX.Y.Z";
