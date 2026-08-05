@@ -27,3 +27,15 @@
 -dontwarn com.facebook.imagepipeline.**
 -dontwarn com.google.gson.**
 -dontwarn com.lynx.markdown.**
+
+# ── Lynx JNI 动态调用 keep（真机 release 实测崩溃，issue #120/#121）──
+# lynxbase.so 通过 JNI GetStaticMethodID 按方法名字符串动态查找这两个类的静态方法
+#（无 @CalledByNative 注解，R8 无法感知）。混淆后方法名被改写，ART 抛
+# "Failed to find staticlog(...)" 直接 SIGABRT（dropbox tombstone 实证，
+# 4.2.2 装后连崩 3 次；模拟器 debug 包无混淆故不复现）。
+-keep class com.lynx.base.LynxBaseTrace { *; }
+-keep class com.lynx.base.log.LynxLog { *; }
+# 防御性：PictelioImageService 经 LynxServiceCenter 按接口注册，R8 重命名类名
+#（dex 实测仍 implements ILynxImageService，按接口注册不受影响）；
+# 保留原名，防 lynx 侧按类名反射的潜在分支。
+-keep class io.pictelio.app.PictelioImageService { *; }
