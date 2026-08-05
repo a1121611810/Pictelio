@@ -47,6 +47,19 @@ public class LynxActivity extends AppCompatActivity {
         splashScreen.setKeepOnScreenCondition(() -> !bundleLoaded.get());
         super.onCreate(savedInstanceState);
 
+        // LynxEnv 兜底初始化（进程复用场景：Application.onCreate 未走 initLynx → LynxEnv
+        // 未初始化会报 error 102）。LynxEnv.init 幂等（hasInit），与 PictelioApp 共用
+        // LynxRuntimeInitializer 单点（issue #122），重复调用安全。
+        try {
+            LynxRuntimeInitializer.ensureInitialized(getApplication());
+        } catch (Throwable t) {
+            String safe = sanitizeError(String.valueOf(t.getMessage()));
+            Log.w(TAG, "LynxEnv 兜底初始化失败: " + safe);
+            bundleLoaded.set(true); // 退出 Splash，展示错误兜底
+            showErrorFallback("Lynx 环境初始化失败：" + safe);
+            return;
+        }
+
         LynxViewBuilder builder = new LynxViewBuilder();
         // XElement behaviors（#51 真机必需）：<input>/<textarea> 等扩展元件
         builder.addBehaviors(new com.lynx.xelement.XElementBehaviors().create());

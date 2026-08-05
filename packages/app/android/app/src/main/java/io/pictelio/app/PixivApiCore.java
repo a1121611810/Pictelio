@@ -11,6 +11,8 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.TimeUnit;
 
+import android.util.Log;
+
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -210,6 +212,8 @@ final class PixivApiCore {
 
         try (Response response = getClient().newCall(request).execute()) {
             if (!response.isSuccessful()) {
+                Log.w("PixivApiCore", "oauthTokenExchange HTTP " + response.code()
+                        + " 失败（refresh_token 无效或服务端拒绝）");
                 return null;
             }
             String responseBody = response.body() != null ? response.body().string() : "";

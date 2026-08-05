@@ -3,9 +3,6 @@ package io.pictelio.app;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.os.Handler;
-import android.os.Looper;
-import android.os.Process;
 import android.util.Log;
 
 import com.lynx.jsbridge.LynxMethod;
@@ -111,11 +108,12 @@ public class PictelioAppModule extends LynxModule {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             ctx.startActivity(intent);
             callback.invoke();
-            // 延迟杀进程：等 LAUNCHER Activity 启动完成后结束当前进程，
-            // 保证全新进程重新走 client 分发（避免 Lynx runtime 静态状态残留）
-            new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                Process.killProcess(Process.myPid());
-            }, 300L);
+            // 不 killProcess（issue #120/#124）：Activity 级切换，进程保留——
+            // token 内存态 / OkHttp 连接池 / 图片磁盘缓存延续；旧 Activity（LynxActivity）
+            // 被 CLEAR_TASK 销毁后 LynxView.destroy() 释放资源。与 webview 侧
+            // ClientInfoPlugin.restart 语义对齐（双向行为一致）。
+            // 降级分支：若实测 LynxView.destroy() 释放不净，可恢复 300ms 延迟
+            // killProcess（lynx 官方模式）——仅开关一个 flag，架构不变。
         } catch (Exception e) {
             Log.w(TAG, "restart 失败", e);
             callback.invoke(String.valueOf(e.getMessage()));

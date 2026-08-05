@@ -44,6 +44,7 @@ public class PictelioAuthModule extends LynxModule {
         try {
             JSONObject result = PixivApiCore.oauthTokenExchange(refreshToken);
             if (result == null) {
+                Log.w(TAG, "oauthTokenExchange 返回 null（HTTP 非 2xx / 空 body / 无 access_token）");
                 callback.invoke("", "登录凭证无效或已失效");
                 return;
             }
