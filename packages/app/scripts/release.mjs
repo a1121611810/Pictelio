@@ -35,14 +35,24 @@ function apkPathsFor(version, variants) {
   return variants.map((flavor) => `${APK_DIR}/${flavor}/release/pictelio-${version}-${flavor}.apk`);
 }
 
-// P3/P4：发布流程会修改/新建的文件清单（相对 git 仓库根），
-// 供 step 4 定向 add、多余变更拦截和 step 2/3 失败自动回滚复用。
-function releaseFilesFor(versionCode) {
+// P3：发布流程会提交到 git 的文件清单（相对 git 仓库根），
+// 供 step 4 定向 add 与多余变更拦截复用。
+// ⚠️ 注意：fastlane/ 整体被 .gitignore 忽略（自动生成），changelog 文件不进 git，
+// 不能出现在此清单中（git add 会失败）。
+function releaseFilesFor() {
   return [
     "packages/app/package.json",
     "packages/app/android/app/build.gradle",
-    `packages/app/fastlane/metadata/android/en-US/changelogs/${versionCode}.txt`,
     "packages/website/version.json",
+  ];
+}
+
+// P3-fix：step 2 实际会写入/新建的全部文件（含被 ignore 的 changelog），
+// 供失败回滚清理使用——changelog 未跟踪且被 ignore，需单独 unlink。
+function step2FilesFor(versionCode) {
+  return [
+    ...releaseFilesFor(),
+    `packages/app/fastlane/metadata/android/en-US/changelogs/${versionCode}.txt`,
   ];
 }
 
@@ -176,12 +186,16 @@ function runWithSpinner(label, cmd, argsArr, opts = {}) {
 }
 
 function runOutput(cmd, argsArr, opts = {}) {
-  return execFileSync(cmd, argsArr, {
+  const { trim = true, ...execOpts } = opts;
+  const out = execFileSync(cmd, argsArr, {
     cwd: rootDir,
     encoding: "utf-8",
     stdio: ["pipe", "pipe", "ignore"],
-    ...opts,
-  }).trim();
+    ...execOpts,
+  });
+  // P3-fix：trim 会吃掉多行输出的首行前导空格（git status 首行以 " M " 开头），
+  // 需要解析行格式时传 { trim: false }
+  return trim ? out.trim() : out;
 }
 
 // P12：结构化解析 origin URL（支持 https/git@/ssh:// 三种形态），
@@ -596,8 +610,8 @@ async function main() {
   });
 
   await step(2, "更新版本号", async () => {
-    // P4：记录本次会修改/新建的文件，供失败自动回滚
-    rollbackFiles = releaseFilesFor(versionCode);
+    // P4：记录本次会修改/新建的文件（含被 ignore 的 changelog），供失败自动回滚
+    rollbackFiles = step2FilesFor(versionCode);
     pkg.version = newVersion;
     await writeText("package.json", JSON.stringify(pkg, null, 2) + "\n");
     await run("node", ["scripts/sync-android-version.mjs"]);
@@ -679,12 +693,14 @@ async function main() {
   await step(4, "Git 提交 + Tag", async () => {
     // P3：只提交发布相关文件，并拦截清单之外的多余变更，
     // 防止无关改动混入发布 commit 或发布产物漏提交。
-    const releaseFiles = releaseFilesFor(versionCode);
-    const status = runOutput("git", ["status", "--porcelain"], { cwd: repoRoot });
+    const releaseFiles = releaseFilesFor();
+    // P3-fix：必须 trim:false——git status --porcelain 首行以 " M "（前导空格）开头，
+    // trim 会吃掉该空格导致路径解析错位。
+    const status = runOutput("git", ["status", "--porcelain"], { cwd: repoRoot, trim: false });
     const extra = status
       .split("\n")
       .filter(Boolean)
-      .map((line) => line.slice(3)) // "XY path" 格式，取路径部分
+      .map((line) => line.match(/^.. (.*)$/u)?.[1] ?? "") // "XY path" 格式，取路径
       .filter((p) => !releaseFiles.includes(p));
     if (extra.length > 0) {
       throw new Error(
@@ -855,12 +871,30 @@ main().catch(async (error) => {
         if (changelog) console.error(`   并删除: ${changelog}`);
       }
     } else if (error.stepN === 4) {
-      // P4：commit/tag 已建立但 push 失败——本地已有提交，不能直接重跑
+      // P4：step 4 失败点可能在校验/ add 之前（无 commit）或在 commit/tag 之后。
+      // 先检查本地是否真的创建了 commit 与 tag，再给对应指引。
       console.error(`\n   已完成的步骤: 3/6`);
-      console.error(`   commit/tag 已存在于本地，尚未推送。如需重新发布当前版本:`);
-      console.error(`     git reset --soft HEAD~1`);
-      console.error(`     git tag -d ${publishedTag}`);
-      console.error(`   然后重跑；或保留本地提交继续发布下一版本`);
+      const headMsg = runOutput("git", ["log", "-1", "--oneline"], { cwd: repoRoot });
+      const tagExists = (() => {
+        try {
+          return runOutput("git", ["tag", "-l", publishedTag], { cwd: repoRoot }) !== "";
+        } catch {
+          return false;
+        }
+      })();
+      if (headMsg.includes(`bump version to ${publishedVersion}`) || tagExists) {
+        console.error(`   已创建本地 commit/tag（${publishedTag}）。如需重新发布当前版本:`);
+        console.error(`     git reset --soft HEAD~1`);
+        console.error(`     git tag -d ${publishedTag}`);
+        console.error(`   然后重跑；或保留本地提交继续发布下一版本`);
+      } else {
+        console.error(`   尚未创建 commit/tag（失败在校验或 add 阶段），工作区残留版本文件:`);
+        console.error(`     git checkout -- ${releaseFilesFor().join(" ")}`);
+        console.error(
+          `     rm -f packages/app/fastlane/metadata/android/en-US/changelogs/${publishedVersionCode}.txt`,
+        );
+        console.error(`   清理后可直接重跑`);
+      }
     } else if (error.stepN === 5) {
       console.error(`\n   已完成的步骤: 4/6`);
       console.error(`   git push 失败。可能已推送 tag 但未推送 main，或部分成功。检查远端:`);
