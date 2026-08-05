@@ -1,5 +1,5 @@
 {
-  "version": "4.2.1",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.2.1",
-  "changelog": "🐛 修复\n  af6c8ca fix(release): fix scoped-add check false positive and ignored changelog\n  95d4a92 fix(release): improve failure visibility and version validation\n  26ad72d fix(release): enforce main b"
+  "version": "4.2.2",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.2.2",
+  "changelog": "🐛 修复\n  8d2d832 fix(lynx): 修复切换引擎后白屏（发布缺 Lynx bundle + 加载失败无兜底）\n  10bae98 fix(root): use pnpm vp for check:all and lint:all"
 }
