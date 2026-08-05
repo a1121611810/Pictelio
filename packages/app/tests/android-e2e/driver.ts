@@ -79,7 +79,9 @@ export class AndroidE2eDriver {
           platformName: "Android",
           "appium:automationName": "UiAutomator2",
           "appium:udid": this.serial,
-          "appium:avd": this.avd,
+          // 真机（avd="physical"，ANDROID_E2E_SERIAL）不传 appium:avd——
+          // Appium 会把该值当 AVD 名去启动模拟器（"Avd 'physical' is not available"）
+          ...(this.avd === "physical" ? {} : { "appium:avd": this.avd }),
           "appium:appPackage": APP_PACKAGE,
           "appium:appActivity": MAIN_ACTIVITY,
           // 测试前已通过 adb install 装好最新 APK，session 不重复安装
@@ -90,6 +92,9 @@ export class AndroidE2eDriver {
           // WebView 已开 setWebContentsDebuggingEnabled(true)，Chromedriver 自动匹配设备 WebView 主版本
           "appium:chromedriverAutodownload": true,
           "appium:recreateChromeDriverSessions": true,
+          // 真机（ColorOS/OPPO）：adb shell 无 WRITE_SECURE_SETTINGS，uiautomator2 初始化
+          // 清理 hidden_api_policy 会抛 SecurityException → 忽略该错误（仅 log，无副作用）
+          "appium:ignoreHiddenApiPolicyError": true,
         },
       };
       // 手动指定 Chromedriver（chromedriverAutodownload 下载失败时的逃生通道）

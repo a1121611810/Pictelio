@@ -93,7 +93,29 @@ export function isBootCompleted(serial: string): boolean {
  * 2. 已有在线模拟器但不是目标 AVD → 报错提示（不抢用，避免误测错设备）；
  * 3. 无在线模拟器 → spawn emulator 启动目标 AVD，轮询 serial 出现 + boot 完成。
  */
-export async function ensureEmulator(avdName?: string): Promise<{ avd: AvdName; serial: string }> {
+export async function ensureEmulator(
+  avdName?: string,
+): Promise<{ avd: AvdName | "physical"; serial: string }> {
+  // 真机直连（ADR-0061 扩展）：ANDROID_E2E_SERIAL 指定已连接真机（如 OPPO R11s），
+  // 跳过 AVD 启动——真机网络可达 Pixiv（模拟器被墙，S2 登录在真机可跑通）。
+  const physicalSerial = process.env.ANDROID_E2E_SERIAL;
+  if (physicalSerial) {
+    const devices = runCapture(adbPath(), ["devices"]).stdout;
+    if (!devices.includes(physicalSerial)) {
+      throw new Error(
+        `[android-e2e] ANDROID_E2E_SERIAL=${physicalSerial} 不在线。请检查 USB 连接（adb devices），` +
+          `或去掉该变量回退模拟器`,
+      );
+    }
+    await waitFor(
+      `真机 ${physicalSerial} 就绪`,
+      () => isBootCompleted(physicalSerial),
+      TIMEOUTS.boot,
+    );
+    console.log(`[android-e2e] 使用真机（ANDROID_E2E_SERIAL=${physicalSerial}）`);
+    return { avd: "physical", serial: physicalSerial };
+  }
+
   const avd = resolveAvd(avdName);
 
   // 通过 adb 查询每个在线模拟器的 AVD 名，精确匹配

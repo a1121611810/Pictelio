@@ -11,7 +11,7 @@ import { ensureAppiumServer, assertUiautomator2DriverInstalled } from "./appium"
 import { ensureEmulator, assertDeviceOnline } from "./avd";
 import { ensureChromedriver } from "./chromedriver";
 import { buildDebugApk, installApk } from "./build-install";
-import { adbPath, APP_PACKAGE, runOrThrow, sdkRoot, TIMEOUTS } from "./env";
+import { adbPath, APP_PACKAGE, runCapture, runOrThrow, sdkRoot, TIMEOUTS } from "./env";
 
 // uiautomator2 driver 的 session 创建在 vitest 进程内执行（remote()），
 // 用的是 process.env；本机可能未导出 ANDROID_HOME，启动即注入探测值。
@@ -48,13 +48,45 @@ export async function setupAndroidE2e(avdName?: string): Promise<AndroidE2eConte
   await ensureChromedriver(serial);
 
   await buildDebugApk();
-  await installApk(serial);
+  // 真机（ANDROID_E2E_SERIAL）：ColorOS 的「PC install attack」防护拦截 adb 安装通道
+  //（无论覆盖/全新，均 -99；手动安装走系统安装器可绕过）→ 跳过 installApk，
+  // 约定真机 APK 由外部预装（e2e 构建），基建仅负责 run-as 清数据基线。
+  if (!process.env.ANDROID_E2E_SERIAL) {
+    await installApk(serial);
+  } else {
+    // 真机：依赖外部预装的 e2e 构建 full-debug APK（adb install 被 ColorOS 拦截）。
+    // 校验包确实存在，避免基线不对齐（被测 APK 非本次构建产物）。
+    const installed = runCapture(adbPath(), ["-s", serial, "shell", "pm", "path", APP_PACKAGE]);
+    if (!installed.includes("package:")) {
+      throw new Error(`真机 ${serial} 未预装 ${APP_PACKAGE}（e2e full-debug APK）——请先手动安装`);
+    }
+    console.log(`[android-e2e] ✓ 真机 ${serial} 已预装 ${APP_PACKAGE}（外部预装约定）`);
+  }
 
   // 冒烟基线：清掉 app 数据（含可能残留的 pictelio_client_kind=lynx，否则
   // MainActivity 入口路由会分发到 LynxActivity，冒烟断言 MainActivity 必失败）。
   // 后续 #105 S1 契约测试会在本步之后显式写入目标值。
-  runOrThrow(adbPath(), ["-s", serial, "shell", "pm", "clear", APP_PACKAGE], TIMEOUTS.adb);
-  console.log(`[android-e2e] ✓ 已清空 ${APP_PACKAGE} 数据（冒烟基线干净）`);
+  // 真机（ANDROID_E2E_SERIAL）：部分 ROM（ColorOS）pm clear 无 CLEAR_APP_USER_DATA
+  // 权限、adb install 被「PC install attack」防护拦截 → 只用 run-as 清数据目录
+  //（debug 包可 run-as，幂等，无需卸载/重装）。
+  if (process.env.ANDROID_E2E_SERIAL) {
+    runOrThrow(adbPath(), ["-s", serial, "shell", "am", "force-stop", APP_PACKAGE], TIMEOUTS.adb);
+    // 单字符串命令：adb shell 会把整个字符串发给设备 shell 执行（数组参数会被拆散）
+    runOrThrow(
+      adbPath(),
+      [
+        "-s",
+        serial,
+        "shell",
+        `run-as ${APP_PACKAGE} sh -c 'rm -rf shared_prefs databases files cache code_cache'`,
+      ],
+      TIMEOUTS.adb,
+    );
+    console.log(`[android-e2e] ✓ 真机基线：覆盖安装 + run-as 清数据（替代 pm clear）`);
+  } else {
+    runOrThrow(adbPath(), ["-s", serial, "shell", "pm", "clear", APP_PACKAGE], TIMEOUTS.adb);
+    console.log(`[android-e2e] ✓ 已清空 ${APP_PACKAGE} 数据（冒烟基线干净）`);
+  }
 
   const appium = await ensureAppiumServer();
 

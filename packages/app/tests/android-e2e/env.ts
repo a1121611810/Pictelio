@@ -16,8 +16,11 @@ export const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "
 /** monorepo 根目录 */
 export const REPO_ROOT = resolve(APP_ROOT, "..", "..");
 
-/** debug APK 产物路径（pnpm build:android 输出） */
-export const APK_PATH = resolve(APP_ROOT, "android/app/build/outputs/apk/debug/app-debug.apk");
+/** debug APK 产物路径（pnpm build:android 输出；ADR-0062 flavor 拆分后为 full flavor） */
+export const APK_PATH = resolve(
+  APP_ROOT,
+  "android/app/build/outputs/apk/full/debug/app-full-debug.apk",
+);
 
 /** App 包名与主入口 Activity（冒烟测试断言目标） */
 export const APP_PACKAGE = "io.pictelio.app";

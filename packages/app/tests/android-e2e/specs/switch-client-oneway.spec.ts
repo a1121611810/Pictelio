@@ -196,9 +196,15 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("S2 单向链路：WebView →
 
   it("应用退出后 SharedPreferences 已写 lynx", async () => {
     const { serial } = ctx;
-    await SLEEP(2_000);
-    const prefs = readClientPrefs(serial);
-    expect(prefs.clientKind, "pictelio_client_kind 应为 lynx").toBe("lynx");
+    // 写入经 Capacitor 桥 + SharedPreferences.apply 异步落盘，实测 >2s（模拟器更慢）——
+    // 固定 sleep 2s 在慢环境下误报；改轮询（最长 15s），仍能检测真实写入失败（超时后断言失败）
+    let clientKind: string | null = null;
+    for (let i = 0; i < 15; i++) {
+      clientKind = readClientPrefs(serial).clientKind;
+      if (clientKind === "lynx") break;
+      await SLEEP(1_000);
+    }
+    expect(clientKind, "pictelio_client_kind 应为 lynx（轮询 15s 内写入）").toBe("lynx");
     console.log("[S2] ✓ 契约确认：pictelio_client_kind=lynx 已写入");
   }, 60_000);
 
