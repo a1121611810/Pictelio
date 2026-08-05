@@ -115,6 +115,8 @@ Architecture Decision Records live in `/docs/adr/`. Notable ones:
 | 0055 | vue-lynx native render compat — text/`list-item` root `@tap` fix (wrap in `<view>`), scroll-view `aspectRatio`/`minHeight` collapse fix (fixed-height container), XElement `<input>` behavior registration, `item-key` String enforcement, `super.onCreate` ordering |
 | 0056 | lynx list number prop binding — list number-type attributes (`span-count`, `lower-threshold-item-count`, etc.) must use v-bind number binding (`:span-count="2"`); static strings silently rejected by native layout engine (single-column fallback, no error). Web-core's `parseFloat` mask hides the issue in dev preview |
 | 0057 | Android emulator verification on macOS 26.5.2 — HVF acceleration broken in emulator 37.1.11; adopted android-34 google_apis image + 720p + 3GB RAM + Quickboot snapshots (<10s boot vs 45min for android-36.1 TCG); documented in [glossary-emulator-verification](/docs/adr/glossary-emulator-verification.md) |
+| 0061 | Android emulator E2E gate — Appium + WebdriverIO infrastructure for on-device testing on fixed AVDs (pictelio_ui/pictelio_low); covers APK build→install→Activity assertion→WebView context switch; accessibility-label contract for Lynx element targeting |
+| 0062 | Single-engine client switch hiding — webview/lynx-only APKs hide the engine-switch UI (dead function); full APK retains switch; new `ClientInfoPlugin` (Capacitor) + `PictelioAppModule.getClientKinds()` (Lynx) expose `BuildConfig.CLIENT_KINDS` per-flavor |
 | — | [glossary-app-lynx-native](/docs/adr/glossary-app-lynx-native.md) — Unified terminology for lynx native integration (dual client, NativeModule contract, image pipeline, render compat, automated verification) |
 
 ## Key Source Files
