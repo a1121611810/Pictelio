@@ -25,10 +25,40 @@ import { createInterface } from "node:readline";
 import ora from "ora";
 
 const rootDir = resolvePath(dirname(fileURLToPath(import.meta.url)), "..");
-const apkPath = "android/app/build/outputs/apk/release/app-release.apk";
+
+// #119：三 flavor 变体（full / webview / lynx），默认全量
+const DEFAULT_VARIANTS = ["full", "webview", "lynx"];
+const APK_DIR = "android/app/build/outputs/apk";
+
+function apkPathsFor(version, variants) {
+  return variants.map((flavor) => `${APK_DIR}/${flavor}/release/pictelio-${version}-${flavor}.apk`);
+}
+
+// 解析 --variants / PICTELIO_RELEASE_VARIANTS，默认全量
+function resolveVariants() {
+  const cliVariantsArg = args.find((a) => a.startsWith("--variants="))?.slice("--variants=".length);
+  const hasCliVariants = cliVariantsArg !== undefined;
+  const raw = hasCliVariants ? cliVariantsArg : process.env.PICTELIO_RELEASE_VARIANTS || "";
+  if (hasCliVariants && cliVariantsArg.trim() === "") {
+    throw new Error(`--variants 值无效（空列表）。可选：${DEFAULT_VARIANTS.join(", ")}`);
+  }
+  if (!raw) return [...DEFAULT_VARIANTS];
+  const list = raw.split(",").map((v) => v.trim()).filter(Boolean);
+  if (list.length === 0) {
+    throw new Error(`--variants 值无效（空列表）。可选：${DEFAULT_VARIANTS.join(", ")}`);
+  }
+  const invalid = list.filter((v) => !DEFAULT_VARIANTS.includes(v));
+  if (invalid.length > 0) {
+    throw new Error(`未知变体：${invalid.join(", ")}。可选：${DEFAULT_VARIANTS.join(", ")}`);
+  }
+  return [...new Set(list)];
+}
 
 const args = process.argv.slice(2);
 const isCustom = args.includes("-c");
+
+// #119：模块级记录当前发布版本，供 catch 恢复指引使用（main() 作用域外访问）
+let publishedVersion = null;
 
 if (!process.stdin.isTTY) {
   console.error("[release] ❌ 发布脚本需要 TTY 终端中运行");
@@ -381,6 +411,7 @@ async function main() {
 
     const versionPick = await interactivePickVersion(currentVersion);
     newVersion = versionPick.version;
+    publishedVersion = newVersion;
 
     log(`目标版本: ${newVersion}`);
     console.log("");
@@ -395,6 +426,7 @@ async function main() {
 
     const versionPick = await interactivePickVersion(currentVersion);
     newVersion = versionPick.version;
+    publishedVersion = newVersion;
 
     log(`目标版本: ${newVersion}`);
     console.log("");
@@ -480,6 +512,14 @@ async function main() {
   });
 
   await step(3, "构建 APK", async () => {
+    // #119：按变体解析 assemble/rename task
+    const variants = resolveVariants();
+    log(`构建变体：${variants.join(", ")}`);
+    const gradleTasks = variants.flatMap((flavor) => {
+      const cap = flavor.charAt(0).toUpperCase() + flavor.slice(1);
+      return [`assemble${cap}Release`, `rename${cap}ReleaseApk`];
+    });
+
     const buildSteps = [
       ["同步 OAuth 配置", "pnpm", ["run", "sync:credentials"]],
       ["构建 Web 产物", "pnpm", ["run", "build"]],
@@ -487,7 +527,7 @@ async function main() {
       [
         "编译 Release APK",
         "./gradlew",
-        ["assembleRelease"],
+        gradleTasks,
         {
           cwd: resolvePath(rootDir, "android"),
           env: { ...process.env, GRADLE_USER_HOME: resolvePath(rootDir, "android", ".gradle") },
@@ -509,9 +549,14 @@ async function main() {
         await runWithSpinner(subLabel, cmd, stepArgs, opts || {});
       }
     }
-    const apkExists = await exists(apkPath);
-    if (!apkExists) throw new Error(`APK 未生成: ${apkPath}`);
-    log(`APK 构建完成，产物: ${resolvePath(rootDir, apkPath)}`);
+    const apkPaths = apkPathsFor(newVersion, variants);
+    const missing = [];
+    for (const p of apkPaths) {
+      if (!(await exists(p))) missing.push(p);
+    }
+    if (missing.length > 0) throw new Error(`APK 未生成: ${missing.join(", ")}`);
+    log(`APK 构建完成，产物:`);
+    for (const p of apkPaths) log(`  ${resolvePath(rootDir, p)}`);
   });
 
   await step(4, "Git 提交 + Tag", async () => {
@@ -543,7 +588,7 @@ async function main() {
   });
 
   await step(6, "创建 GitHub Release", async () => {
-    const apkAbs = resolvePath(rootDir, apkPath);
+    const apkPaths = apkPathsFor(newVersion, resolveVariants());
     const repo = getRepoSlug();
     let notesFile, tmpDir;
     try {
@@ -587,19 +632,20 @@ async function main() {
         }
       }
 
-      // 第二步：上传 APK（单独步骤，慢但可重试）
+      // 第二步：上传 APK（单独步骤，慢但可重试；#119 循环多变体）
       let uploadErr;
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
-          await runWithSpinner(`上传 APK (第 ${attempt} 次)`, "gh", [
+          const uploadArgs = [
             "release",
             "upload",
             tag,
             "--repo",
             repo,
             "--clobber",
-            apkAbs,
-          ]);
+            ...apkPaths.map((p) => resolvePath(rootDir, p)),
+          ];
+          await runWithSpinner(`上传 APK (第 ${attempt} 次)`, "gh", uploadArgs);
           uploadErr = null;
           break;
         } catch (e) {
@@ -627,7 +673,10 @@ async function main() {
   console.log(`🎉 发布流程完成！`);
   console.log(`   版本: ${newVersion}`);
   console.log(`   标签: ${tag}`);
-  console.log(`   APK: ${resolvePath(rootDir, apkPath)}`);
+  console.log(`   APK（${resolveVariants().join(", ")}）:`);
+  for (const p of apkPathsFor(newVersion, resolveVariants())) {
+    console.log(`     ${resolvePath(rootDir, p)}`);
+  }
   console.log(`   地址: https://github.com/${getRepoSlug()}/releases/tag/${tag}`);
   console.log("=".repeat(50));
 }
@@ -643,7 +692,9 @@ main().catch((error) => {
     } else if (error.stepN === 6) {
       const repoKey = getRepoSlug();
       const relTag = error.relTag || "vX.Y.Z";
-      const apkRel = "packages/app/android/app/build/outputs/apk/release/app-release.apk";
+      const apkRels = apkPathsFor(publishedVersion, resolveVariants())
+        .map((p) => `packages/app/${p}`)
+        .join(" ");
       console.error(`\n   已完成的步骤: 5/6`);
       console.error(`   git 已推送但 GitHub Release 创建/上传失败。手动恢复:`);
       console.error(`     1. 创建 Release:`);
@@ -651,7 +702,7 @@ main().catch((error) => {
         `        gh release create ${relTag} --repo ${repoKey} --title "${error.relTitle || `Pictelio ${relTag}`}" --notes "见下方 changelog"`,
       );
       console.error(`     2. 上传 APK（若 release 已存在可跳过第 1 步）:`);
-      console.error(`        gh release upload ${relTag} --repo ${repoKey} --clobber ${apkRel}`);
+      console.error(`        gh release upload ${relTag} --repo ${repoKey} --clobber ${apkRels}`);
     }
   } else {
     console.error(`   ${error.message}`);

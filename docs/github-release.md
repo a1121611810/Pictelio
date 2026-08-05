@@ -29,7 +29,7 @@
      3. 当前 git remote origin 的解析结果
 
 4. **本地可正常构建 Release APK**
-   - 建议先确认 `pnpm run build:android:release` 能成功生成 APK。
+   - 建议先确认 `pnpm run build:android:release:all` 能成功生成三个 APK（full / webview / lynx）。
 
 ---
 
@@ -72,22 +72,40 @@ pnpm release:github
 1. 读取目标仓库、版本号、versionCode。
 2. 检查签名环境变量与 keystore 文件。
 3. 检查 `gh` CLI 是否安装并认证。
-4. 运行 `pnpm run build:android:release` 构建签名 APK。
+4. 构建三个签名 APK（full / webview / lynx），对应 Gradle task：
+   `assembleFullRelease` / `assembleWebviewRelease` / `assembleLynxRelease` + `rename*ReleaseApk`。
 5. 验证 APK 输出路径：
    ```text
-   android/app/build/outputs/apk/release/app-release.apk
+   android/app/build/outputs/apk/{flavor}/release/pictelio-{version}-{flavor}.apk
    ```
+   其中 `{flavor}` ∈ `full` / `webview` / `lynx`。
 6. 读取 fastlane changelog（如果存在）：
    ```text
    fastlane/metadata/android/en-US/changelogs/{versionCode}.txt
    ```
-7. 使用 `gh release create` 创建 Release，并上传 APK。
+7. 使用 `gh release create` 创建 Release，并上传全部 APK。
 
 创建的 Release 信息：
 
 - **Tag**：`v{version}`，例如 `v1.0.0`
 - **Title**：`Pictelio v{version}`
 - **Notes**：优先使用 `{versionCode}.txt` 中的内容；不存在时使用默认消息。
+
+---
+
+## 选择变体（可选）
+
+默认构建并上传全部三个变体（full / webview / lynx）。如需子集，使用 `--variants` 参数（逗号分隔）或环境变量 `PICTELIO_RELEASE_VARIANTS`：
+
+```bash
+# 仅构建上传 full
+pnpm exec node scripts/release-github.mjs --variants=full
+
+# 仅 webview + lynx
+PICTELIO_RELEASE_VARIANTS=webview,lynx pnpm release:github
+```
+
+可选值：`full`、`webview`、`lynx`。非法值会报错。
 
 ---
 
@@ -124,7 +142,11 @@ pnpm release:github --dry-run
 https://github.com/owner/repo/releases/tag/v{version}
 ```
 
-用户可从该页面下载 `app-release.apk`。
+用户可从该页面下载三个 APK：
+
+- `pictelio-{version}-full.apk` — 双 client 整合包（默认）
+- `pictelio-{version}-webview.apk` — 仅 WebView client
+- `pictelio-{version}-lynx.apk` — 仅 Lynx client
 
 ---
 

@@ -12,13 +12,45 @@ import { resolve as resolvePath } from "node:path";
 import process from "node:process";
 
 const repoArgPrefix = "--repo=";
+const variantsArgPrefix = "--variants=";
 const envVarName = "PICTELIO_GITHUB_REPO";
 const requiredKeystore = "android/app/pictelio-release.keystore";
-const apkPath = "android/app/build/outputs/apk/release/app-release.apk";
+
+// #118/#119：三 flavor 变体（full / webview / lynx），默认全量
+const DEFAULT_VARIANTS = ["full", "webview", "lynx"];
+const APK_DIR = "android/app/build/outputs/apk";
+
+// 各变体 APK 路径（rename task 产物：pictelio-{versionName}-{flavor}.apk）
+function apkPathsFor(version, variants) {
+  return variants.map((flavor) => `${APK_DIR}/${flavor}/release/pictelio-${version}-${flavor}.apk`);
+}
 
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
 const repoArg = args.find((arg) => arg.startsWith(repoArgPrefix))?.slice(repoArgPrefix.length);
+const variantsArg = args
+  .find((arg) => arg.startsWith(variantsArgPrefix))
+  ?.slice(variantsArgPrefix.length);
+const envVariants = process.env.PICTELIO_RELEASE_VARIANTS;
+
+// 解析 --variants / PICTELIO_RELEASE_VARIANTS，默认全量
+function resolveVariants() {
+  const hasCliVariants = variantsArg !== undefined;
+  const raw = hasCliVariants ? variantsArg : envVariants || "";
+  if (hasCliVariants && variantsArg.trim() === "") {
+    throw new Error(`--variants 值无效（空列表）。可选：${DEFAULT_VARIANTS.join(", ")}`);
+  }
+  if (!raw) return [...DEFAULT_VARIANTS];
+  const list = raw.split(",").map((v) => v.trim()).filter(Boolean);
+  if (list.length === 0) {
+    throw new Error(`--variants 值无效（空列表）。可选：${DEFAULT_VARIANTS.join(", ")}`);
+  }
+  const invalid = list.filter((v) => !DEFAULT_VARIANTS.includes(v));
+  if (invalid.length > 0) {
+    throw new Error(`未知变体：${invalid.join(", ")}。可选：${DEFAULT_VARIANTS.join(", ")}`);
+  }
+  return [...new Set(list)];
+}
 
 function readText(path) {
   return readFile(path, "utf-8");
@@ -114,25 +146,38 @@ function shellQuote(arg) {
   return `'${arg.replace(/'/gu, `'\\''`)}'`;
 }
 
-function execBuild(dry) {
+function execBuild(dry, variants) {
+  // #119：先跑同步流水线（版本号/凭证/Web 产物/cap），再按变体 assemble + rename
+  const gradleTasks = variants.flatMap((flavor) => {
+    const cap = flavor.charAt(0).toUpperCase() + flavor.slice(1);
+    return [`assemble${cap}Release`, `rename${cap}ReleaseApk`];
+  });
+  const pipeline = [
+    "pnpm run sync:android-version",
+    "pnpm run sync:credentials",
+    "pnpm run build",
+    "pnpm run cap:sync",
+    `cd android && GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew ${gradleTasks.join(" ")}`,
+  ];
+  const cmd = pipeline.join(" && ");
   if (dry) {
-    console.log("[dry-run] 将执行：pnpm run build:android:release");
+    console.log(`[dry-run] 将执行：${cmd}`);
     return Promise.resolve();
   }
   return new Promise((resolve, reject) => {
-    const child = execFile("pnpm", ["run", "build:android:release"], { stdio: "inherit" });
+    const child = execFile("sh", ["-c", cmd], { cwd: ".", stdio: "inherit" });
     child.on("error", reject);
     child.on("close", (code) => {
       if (code === 0) {
         resolve();
       } else {
-        reject(new Error(`build:android:release 退出码 ${code}`));
+        reject(new Error(`release 流水线退出码 ${code}`));
       }
     });
   });
 }
 
-function createGitHubRelease(repo, tag, title, notes, apk, dry) {
+function createGitHubRelease(repo, tag, title, notes, apks, dry) {
   const notesArg = notes ? `--notes-file=-` : "--generate-notes";
   const cmdParts = [
     "gh",
@@ -144,7 +189,7 @@ function createGitHubRelease(repo, tag, title, notes, apk, dry) {
     "--title",
     title,
     notesArg,
-    apk,
+    ...apks,
   ];
   if (dry) {
     console.log(`[dry-run] 将执行：${cmdParts.map(shellQuote).join(" ")}`);
@@ -203,6 +248,16 @@ async function main() {
   console.log(`标签：${tag}`);
   console.log(`标题：${title}`);
 
+  // 2.5 解析构建变体（#119）
+  let variants;
+  try {
+    variants = resolveVariants();
+  } catch (error) {
+    console.error(`错误：${error.message}`);
+    process.exit(1);
+  }
+  console.log(`变体：${variants.join(", ")}`);
+
   // 3. 检查签名环境
   const keystorePassword = process.env.PICTELIO_KEYSTORE_PASSWORD;
   const keyPassword = process.env.PICTELIO_KEY_PASSWORD;
@@ -254,21 +309,29 @@ async function main() {
   }
 
   // 5. 构建 APK
-  await execBuild(dryRun);
+  await execBuild(dryRun, variants);
 
   // 6. 验证 APK 存在
-  const apkExists = await fileExists(apkPath);
-  if (!apkExists) {
+  const apkPaths = apkPathsFor(version, variants);
+  const apkStatus = await Promise.all(apkPaths.map(async (p) => ({ p, exists: await fileExists(p) })));
+  const missingApks = apkStatus.filter((s) => !s.exists);
+  if (missingApks.length > 0) {
     if (dryRun) {
-      console.log(`[dry-run] 将验证 APK 是否存在：${apkPath}`);
+      console.log(`[dry-run] 将验证 APK 是否存在：${missingApks.map((s) => s.p).join(", ")}`);
     } else {
-      console.error(`错误：构建后未找到 APK 文件：${apkPath}`);
+      console.error(`错误：构建后未找到 APK 文件：${missingApks.map((s) => s.p).join(", ")}`);
       process.exit(1);
     }
   } else if (dryRun) {
-    console.log(`[dry-run] APK 文件已存在：${resolvePath(apkPath)}`);
+    console.log(`[dry-run] APK 文件将生成于：`);
+    for (const { p } of apkStatus) {
+      console.log(`  ${resolvePath(p)}`);
+    }
   } else {
-    console.log(`APK 已生成：${resolvePath(apkPath)}`);
+    console.log("APK 已生成：");
+    for (const { p } of apkStatus) {
+      console.log(`  ${resolvePath(p)}`);
+    }
   }
 
   // 7. 读取 changelog
@@ -284,7 +347,7 @@ async function main() {
   }
 
   // 8. 创建 GitHub release
-  await createGitHubRelease(repo, tag, title, notes, apkPath, dryRun);
+  await createGitHubRelease(repo, tag, title, notes, apkPaths, dryRun);
 
   if (dryRun) {
     console.log("");
@@ -296,7 +359,10 @@ async function main() {
   } else {
     console.log("");
     console.log(`✅ GitHub Release ${tag} 发布成功！`);
-    console.log(`APK 已上传：${resolvePath(apkPath)}`);
+    console.log("APK 已上传：");
+    for (const p of apkPaths) {
+      console.log(`  ${resolvePath(p)}`);
+    }
     console.log(`可在 https://github.com/${repo}/releases/tag/${tag} 查看`);
   }
 }
