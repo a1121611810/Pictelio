@@ -21,7 +21,7 @@ The `app-lynx` package has its own separate test suite — 31 unit test cases co
 flowchart TD
     U["Unit Tests (vitest.config.ts)"] --> S["Pure logic: API, utils, stores, router"]
     A["Agent-Browser Tests (vitest.agent-browser.config.ts)"] --> AI["AI-driven user flow verification"]
-    E["Android E2E Tests (vitest.config.ts)"] --> EMU["Appium + WebdriverIO on Android emulator"]
+    E["Android E2E Tests (vitest.config.ts)"] --> EMU["Appium + WebdriverIO on Android emulator / physical device"]
 ```
 
 ## Test Tiers
@@ -68,6 +68,20 @@ Previously Pictelio had:
 - **Vitest browser component tests** (29 files, `@vitest/browser-playwright`) — migrated to agent-browser E2E or removed per ADR-0035
 
 Both `playwright` and `@vitest/browser-playwright` dependencies have been removed.
+
+### 3. Android E2E Tests (`tests/android-e2e/`)
+
+- **Runner:** Vitest (`vitest.config.ts` via `pnpm --filter pictelio-app test -- --project android-e2e`)
+- **Scope:** On-device testing via Appium + WebdriverIO on Android emulator (or physical device), verifying APK build→install→Activity assertion→WebView context switch workflows
+- **Infrastructure:** [ADR-0061](/docs/adr/ADR-0061-android-emulator-e2e-gate.md), specs at `/docs/specs/android-emulator-e2e-gate.md`
+- **Key specs:**
+  - `smoke.spec.ts` — APK install + main Activity assertion
+  - `client-kind-contract.spec.ts` — Verifies `ClientInfoPlugin.getClientKinds()` per-flavor
+  - `switch-client-oneway.spec.ts` — WebView → Lynx one-way switch, verifying SharedPreferences write via polling
+  - `switch-client-roundtrip.spec.ts` / `switch-client-roundtrip-low.spec.ts` — Full round-trip switch
+- **APK path (v4.0.0+):** `android/app/build/outputs/apk/full/debug/app-full-debug.apk` — reflects the Gradle flavor split (previously `app-debug.apk` under `apk/debug/`)
+- **Physical device support (issue #120):** Set `ANDROID_E2E_SERIAL` to target a connected physical device (e.g., OPPO R11s) instead of an emulator. Physical devices can reach Pixiv's network (unlike emulators behind GFW), enabling login-dependent specs. On physical devices, APK install is skipped (ColorOS "PC install attack" blocks adb install), and `pm clear` is replaced with `run-as` data directory cleanup.
+- **Polling-based write verification (`switch-client-oneway.spec.ts`):** SharedPreferences write via Capacitor bridge is async (`apply`, not `commit`). A fixed 2s sleep was unreliable on slow emulators. Now uses a 15s polling loop (1s interval) to wait for `pictelio_client_kind=lynx` to appear.
 
 ## Hard Constraints (enforced in AGENTS.md & TESTING.md)
 

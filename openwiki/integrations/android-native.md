@@ -161,9 +161,10 @@ sequenceDiagram
 **Java:** `/packages/app/android/app/src/webview/java/io/pictelio/app/ClientInfoPlugin.java`
 **TypeScript:** `/packages/app/src/native/ClientInfo.ts`
 
-A Capacitor plugin (`@CapacitorPlugin(name = "ClientInfo")`) that exposes the current build flavor's client capabilities to the WebView JavaScript layer. Used by [ADR-0062](/docs/adr/ADR-0062-single-engine-client-switch-hiding.md) to hide the engine-switch UI in single-engine builds:
+A Capacitor plugin (`@CapacitorPlugin(name = "ClientInfo")`) that exposes the current build flavor's client capabilities to the WebView JavaScript layer, plus Activity-level restart for engine switching. Used by [ADR-0062](/docs/adr/ADR-0062-single-engine-client-switch-hiding.md) to hide the engine-switch UI in single-engine builds:
 
 - **`getClientKinds()`** — returns `{ kinds: ["webview", "lynx"] }` (full), `{ kinds: ["webview"] }` (webview), or `{ kinds: ["lynx"] }` (lynx). Reads from `BuildConfig.CLIENT_KINDS` injected per-flavor by Gradle.
+- **`restart()`** (issue #120) — Activity-level restart via `FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_CLEAR_TASK`. Keeps the process alive (preserving token memory state, OkHttp connection pool, and image disk cache); the old Activity is destroyed with its WebView. The new Activity's entry routing dispatches by `pictelio_client_kind` (written before restart by `clientSwitch.ts`). Aligned with the lynx-side `PictelioAppModule.restart` — both use the same restart mechanism (issue #124).
 - Registered in both `MainActivity` (full) and `MainActivityWebview` (webview-only).
 - The lynx client reads the same information via `PictelioAppModule.getClientKinds()`.
 
@@ -207,7 +208,7 @@ The `encryptString` / `decryptString` static methods are key-injected (accept a 
 
 ### PictelioAppModule
 
-**Java:** `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioAppModule.java`
+**Java:** `/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioAppModule.java`
 
 A LynxModule for client-switching and native app control, used by the [app-lynx client](/openwiki/architecture/overview.md#app-lynx-vue-lynx-client)'s [`clientSwitchStore`](/packages/app-lynx/src/stores/clientSwitchStore.ts). Exposed to Lynx JS via `NativeModules.PictelioApp`:
 
@@ -215,7 +216,8 @@ A LynxModule for client-switching and native app control, used by the [app-lynx 
 |--------|----------|
 | `setClientKind(kind, cb)` | Writes `pictelio_client_kind` to `SharedPreferences("CapacitorStorage")`. Success: `cb()`; failure: `cb(errMsg)`. |
 | `getClientKind(cb)` | Reads current client kind. Success: `cb(kind)`; failure: `cb(errMsg)`. |
-| `restartApp(cb)` | Launches `MainActivity` (clearing task stack) and kills the current process after a delay. Success: `cb()`. |
+| `getClientKinds(cb)` | Returns `BuildConfig.CLIENT_KINDS` array for ADR-0062 switch-UI hiding. Success: `cb(kinds[])`. |
+| `restart(cb)` | Activity-level restart via `FLAG_ACTIVITY_NEW_TASK \| FLAG_ACTIVITY_CLEAR_TASK`. Keeps the process alive (token memory state, OkHttp pool, disk cache preserved). The old `LynxActivity` is destroyed by `CLEAR_TASK`. Aligned with webview-side `ClientInfoPlugin.restart` (issue #120/#124). |
 
 Callback signatures follow the same null-free pattern as `PictelioSecureStorageModule` — `CallbackImpl` on real devices crashes on `null` arguments.
 
@@ -332,22 +334,37 @@ This replaces the unviable Fresco `lynx-service-image` dependency (see [Lynx SDK
 
 `/packages/app/android/app/src/full/java/io/pictelio/app/PictelioApp.java`
 
-Custom `Application` class for the full flavor. Since v4.0.0, each flavor has its own Application class: `PictelioApp` (full), `PictelioAppWebview` (`src/webview/`), `PictelioAppLynx` (`src/lynx/`). The full-flavor version conditionally initializes either the Lynx or WebView path based on `pictelio_client_kind`. reads `pictelio_client_kind` from `SharedPreferences("CapacitorStorage")` and branches:
+Custom `Application` class for the full flavor. Since v4.0.0, each flavor has its own Application class: `PictelioApp` (full), `PictelioAppWebview` (`src/webview/`), `PictelioAppLynx` (`src/lynx/`). The full-flavor version conditionally initializes either the Lynx or WebView path based on `pictelio_client_kind` from `SharedPreferences("CapacitorStorage")`:
 
-- **`"lynx"`** → `initLynx()`: Registers three Lynx services via `LynxServiceCenter.inst().registerService()` (`LynxHttpService`, `LynxLogService`, `PictelioImageService` — required before any `LynxView` is created), then initializes `LynxEnv.inst().init(this, …)`. Globally registers `PictelioSecureStorage` and `PictelioApp` LynxModules. Enables `LynxDebug` in debug builds. Skips WebView warmup entirely. Without these registrations, `lynx.fetch` would be unavailable and images would render as broken (no `ILynxImageService` → no image loading).
+- **`"lynx"`** → `initLynx()`: Delegates to [`LynxRuntimeInitializer.ensureInitialized(this)`](#lynxruntimeinitializer) — the shared, idempotent Lynx init point. Skips WebView warmup entirely.
 - **`"webview"` (default)** → `warmUpWebView()`: Pre-warms the WebView service process (unchanged behavior).
 
 Exception safety: Lynx init failure is caught and logged — the app does not crash, but the lynx client path will be unavailable.
 
 ### LynxActivity
 
-`/packages/app/android/app/src/main/java/io/pictelio/app/LynxActivity.java`
+`/packages/app/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java`
 
 The dedicated LynxView host Activity, launched by `MainActivity` when `pictelio_client_kind` is `"lynx"`. Extends `AppCompatActivity` directly (no Capacitor bridge), and:
 
+- **LynxEnv fallback init (issue #120/#122):** In `onCreate`, before creating the `LynxView`, calls `LynxRuntimeInitializer.ensureInitialized(getApplication())` as a defensive fallback. This covers the process-reuse scenario — when the user switches engines, `Application.onCreate` does not re-run (process is kept alive by the new Activity-level restart), so `LynxEnv` would be uninitialized. Without this fallback, the LynxView creation fails with error 102. `LynxEnv.init` is idempotent (internal `hasInit` guard), so calling it again is safe. On failure, exits splash and shows error fallback instead of crashing.
 - **XElement behaviors (#51):** Sets `builder.addBehaviors(new XElementBehaviors().create())` on the `LynxViewBuilder` before view creation — required on real devices for `<input>`/`<textarea>` and other extension components. Without this, login input fields fail with `LynxError 990200`.
 - **Per-view module registration:** Registers `PictelioSecureStorage` and `PictelioApp` LynxModules (coexists with `PictelioApp` global registration; global `LynxEnv` takes priority).
 - **Template provider:** Uses `PictelioTemplateProvider` for loading the Lynx template bundle (`template.js`).
+
+### LynxRuntimeInitializer
+
+**Java:** `/packages/app/android/app/src/lynx/java/io/pictelio/app/LynxRuntimeInitializer.java` (new, issue #120/#122)
+
+Shared, idempotent Lynx runtime initialization point. Extracted from `PictelioApp.initLynx()` so both cold-start and process-reuse paths share the same logic:
+
+- **`ensureInitialized(Application app)`** — Registers Lynx services (`LynxHttpService`, `LynxLogService`, `PictelioImageService`) via `LynxServiceCenter`, calls `LynxEnv.inst().init(app, …)` (idempotent — internal `hasInit` `AtomicBoolean`), globally registers four LynxModules (`PictelioSecureStorage`, `PictelioApp`, `PictelioAuth`, `PictelioApi`), and enables `LynxDebug` in debug builds. Must be called before any `LynxView` is created.
+
+**Callers:**
+| Caller | Scenario |
+|--------|----------|
+| `PictelioApp.initLynx()` | Process cold start (full flavor) |
+| `LynxActivity.onCreate()` | Process reuse after engine switch (error 102 fix) |
 
 ## WebView Configuration
 
@@ -407,6 +424,15 @@ The full release process is documented in `/docs/release-checklist.md` (6.2 KB),
 5. GitHub release creation
 6. Store listing updates
 
+### ProGuard / R8 Keep Rules
+
+`/packages/app/android/app/proguard-rules.pro` includes release-only keep rules critical for Lynx native integration:
+
+- **`LynxBaseTrace` / `LynxLog`** (issue #120/#121) — The native `lynxbase.so` library uses JNI `GetStaticMethodID` to locate static methods by name (no `@CalledByNative` annotation). R8 renames these methods during obfuscation, causing `"Failed to find staticlog(...)"` → `SIGABRT` crash on real devices in release builds. Debug builds are unaffected (no obfuscation).
+- **`PictelioImageService`** — Kept as defense-in-depth. Registered via `LynxServiceCenter` by interface (`ILynxImageService`), so R8 renaming is actually safe; the keep rule is precautionary against potential reflection-based lookups by the Lynx runtime.
+
+These rules are in addition to the base ProGuard rules from ADR-0001 (native plugin keep rules).
+
 ## Platform Compatibility
 
 - **Minimum Android:** 11.0 (API 30)
@@ -439,6 +465,7 @@ The full release process is documented in `/docs/release-checklist.md` (6.2 KB),
 | PictelioImageService (Java) | `/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioImageService.java` |
 | PictelioSecureStorageModule (Java) | `/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioSecureStorageModule.java` |
 | PictelioTemplateProvider (Java) | `/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioTemplateProvider.java` |
+| LynxRuntimeInitializer (Java) | `/packages/app/android/app/src/lynx/java/io/pictelio/app/LynxRuntimeInitializer.java` |
 
 ### Shared (main sourceSet, all flavors)
 
