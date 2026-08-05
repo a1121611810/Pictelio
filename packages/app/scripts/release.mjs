@@ -184,10 +184,16 @@ function runOutput(cmd, argsArr, opts = {}) {
   }).trim();
 }
 
+// P12：结构化解析 origin URL（支持 https/git@/ssh:// 三种形态），
+// 避免旧正则靠贪婪匹配猜前缀导致的解析错误。
 function getRepoSlug() {
-  return runOutput("git", ["remote", "get-url", "origin"])
-    .replace(/.*github\.com[/u:]/u, "")
-    .replace(/\.git$/u, "");
+  const url = runOutput("git", ["remote", "get-url", "origin"]);
+  // https://github.com/owner/repo.git | git@github.com:owner/repo.git | ssh://git@github.com/owner/repo.git
+  const m = url.match(/(?:github\.com[:/])([^/]+)\/([^/\s]+?)(?:\.git)?$/iu);
+  if (!m) {
+    throw new Error(`无法从 origin 解析 GitHub 仓库: ${url}`);
+  }
+  return `${m[1]}/${m[2]}`;
 }
 
 // P2：发布必须在 main 分支执行，避免 commit/tag 落在非 main 分支
@@ -230,6 +236,11 @@ const CATEGORY_ENTRIES = [
   { prefixes: ["test(", "test:"], emoji: "🧪", category: "🧪 测试" },
 ];
 
+// P15：去掉行首 commit hash（"f13e155c feat(settings): ..." → "feat(settings): ..."）
+function stripHash(line) {
+  return line.replace(/^[0-9a-f]+\s+/u, "");
+}
+
 function classifyCommit(msg) {
   const entry = CATEGORY_ENTRIES.find((e) => e.prefixes.some((p) => msg.startsWith(p)));
   return entry ? entry.category : "🔧 其他";
@@ -238,7 +249,8 @@ function classifyCommit(msg) {
 function formatChangelog(messages) {
   const groups = {};
   for (const msg of messages) {
-    const category = classifyCommit(msg);
+    // P15：分类基于去掉 hash 的消息；分组内保留完整行（含 hash，供 P16 生成链接）
+    const category = classifyCommit(stripHash(msg));
     if (!groups[category]) {
       groups[category] = [];
     }
@@ -256,6 +268,18 @@ function formatChangelog(messages) {
 
 function generateChangelogPreview(selected) {
   return formatChangelog(selected);
+}
+
+// P16：把 changelog 里 "hash message" 行转成 GitHub commit 链接（仅用于 Release notes）。
+// fastlane 文件 / git commit message 保持纯文本，不经过此函数。
+function addCommitLinks(changelog, repo) {
+  return changelog
+    .split("\n")
+    .map((line) => {
+      const m = line.match(/^(\s*)([0-9a-f]{7,40})\s+(.*)$/u);
+      return m ? `${m[1]}[${m[3]}](https://github.com/${repo}/commit/${m[2]})` : line;
+    })
+    .join("\n");
 }
 
 function parseVersion(v) {
@@ -329,12 +353,14 @@ async function interactivePickCommits(commits) {
   console.log("输入编号选择，支持格式: 1 3 5-8  (空格分隔, -表示范围)");
   console.log("  a = 全选  |  回车 = 空  |  q = 退出\n");
 
-  // Display numbered list
-  const items = commits.map((line) => line.replace(/^[0-9a-f]+\s+/u, ""));
+  // Display numbered list — P15：items 保留原始 "hash message" 行（供 changelog 溯源），
+  // 仅显示与分类时剥掉 hash
+  const items = commits;
   for (let i = 0; i < items.length; i++) {
-    const entry = CATEGORY_ENTRIES.find((e) => e.prefixes.some((p) => items[i].startsWith(p)));
+    const shown = stripHash(items[i]);
+    const entry = CATEGORY_ENTRIES.find((e) => e.prefixes.some((p) => shown.startsWith(p)));
     const cat = entry ? entry.emoji : "🔧";
-    console.log(`  ${(i + 1).toString().padStart(3)}  ${cat}  ${items[i]}`);
+    console.log(`  ${(i + 1).toString().padStart(3)}  ${cat}  ${shown}`);
   }
 
   // Loop until valid selection or exit
@@ -560,11 +586,12 @@ async function main() {
     if (!keyPassword) envErrors.push("缺少 PICTELIO_KEY_PASSWORD");
     if (!keystoreExists) envErrors.push("找不到 android/app/pictelio-release.keystore");
     if (envErrors.length > 0) {
-      console.error("[release] 环境错误：" + envErrors.join("；"));
-      console.error(
-        "[release] 请先在 ~/.zshrc 中设置 PICTELIO_KEYSTORE_PASSWORD 和 PICTELIO_KEY_PASSWORD",
+      // P14：用 throw 走统一 catch（输出失败步骤 + 恢复指引），而非直接 process.exit
+      throw new Error(
+        "环境错误：" +
+          envErrors.join("；") +
+          "（请先设置签名环境变量并放置 keystore，见 docs/release-signing.md）",
       );
-      process.exit(1);
     }
   });
 
@@ -624,8 +651,15 @@ async function main() {
       if (cmd === "./gradlew") {
         try {
           await runWithSpinner(subLabel, cmd, stepArgs, opts);
-        } catch {
-          log("Gradle 构建失败，重试并输出详细堆栈...");
+        } catch (e) {
+          const stderr = e.stderr || "";
+          // P13：不可重试错误（编译/R8 missing class 等代码问题，memory 坑 2）
+          // 直接失败，避免白跑一轮几分钟的 --stacktrace 重构建。
+          if (/Missing classes|Missing class|error: |FAILURE: Build failed/i.test(stderr)) {
+            throw e;
+          }
+          // 可重试错误（缓存 not-found / 依赖解析瞬时失败，memory 坑 1）
+          log("Gradle 构建失败（疑似缓存/依赖问题），重试并输出详细堆栈...");
           await runWithSpinner(`${subLabel}（详细堆栈）`, cmd, [...stepArgs, "--stacktrace"], opts);
         }
       } else {
@@ -693,7 +727,8 @@ async function main() {
     try {
       tmpDir = await mkdtemp(resolvePath(tmpdir(), "pictelio-release-"));
       notesFile = resolvePath(tmpDir, "release-notes.md");
-      await writeFile(notesFile, changelog, "utf-8");
+      // P16：Release notes 使用带 commit 链接的版本；fastlane/commit message 保持纯文本
+      await writeFile(notesFile, addCommitLinks(changelog, repo), "utf-8");
 
       // 预检：release 是否已存在
       let releaseExists = false;
@@ -791,7 +826,11 @@ main().catch(async (error) => {
   if (error.stepName) {
     console.error(`   失败步骤: [${error.stepN}/6] ${error.stepName}`);
     console.error(`   错误: ${error.message}`);
-    if (error.stepN === 2 || error.stepN === 3) {
+    if (error.stepN === 1) {
+      // P14：环境检查失败，无文件被修改，无需回滚
+      console.error(`\n   已完成的步骤: 0/6`);
+      console.error(`   签名环境未就绪，未发生任何写入，直接修复环境后重跑即可`);
+    } else if (error.stepN === 2 || error.stepN === 3) {
       // P4：版本号已写入但尚未 commit，自动回滚文件，避免重跑跳过该版本
       console.error(`\n   已完成的步骤: ${error.stepN - 1}/6`);
       console.error(`   正在自动回滚版本文件...`);

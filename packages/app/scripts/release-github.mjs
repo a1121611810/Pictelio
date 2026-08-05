@@ -1,6 +1,10 @@
 // GitHub Release automation script for Pictelio.
 // Builds the signed release APK and publishes it to a GitHub release.
 //
+// ⚠️ DEPRECATED (P11): 本项目实际发布流程统一使用 scripts/release.mjs（交互式一键发布）。
+// 本脚本保留仅防外部 CI/脚本引用断链，不再维护；新能力（分支校验、失败回滚、
+// stderr 透出、版本校验等）不会同步到此文件。请迁移到 release.mjs。
+//
 // Usage:
 //   Pnpm exec node scripts/release-github.mjs --repo=yourname/pictelio
 //   PICTELIO_GITHUB_REPO=yourname/pictelio pnpm exec node scripts/release-github.mjs

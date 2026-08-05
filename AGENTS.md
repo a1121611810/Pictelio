@@ -145,7 +145,6 @@ OpenWiki 提供人工整理的高层次项目概览，与 CodeGraph（精确代�
 | `pnpm fmt:check`                    | oxfmt 格式检查（不修改）                                          |
 | `pnpm build:android`                | 构建 Web + Capacitor 同步 + Gradle 编译 Debug APK                 |
 | `pnpm build:android:release`        | 构建签名 Release APK（需环境变量 `PICTELIO_KEYSTORE_PASSWORD` 和 `PICTELIO_KEY_PASSWORD`） |
-| `pnpm release:github`               | 构建 Release APK 并发布到 GitHub Releases（详见 `docs/github-release.md`） |
 | `pnpm release`                      | 一键交互式发布（详见 `docs/release-checklist.md`）               |
 | `pnpm sync:app-lynx-bundle`         | 同步 app-lynx bundle 到 Android assets（原 `sync:lynx-bundle`）   |
 | `pnpm cap:sync`                     | 同步 Web 产物和 Capacitor 配置到 Android 项目                     |
@@ -545,7 +544,7 @@ Grill 澄清 → to-spec → to-tickets → implement
   - 触发: push 到 `main` 分支且改动 `packages/website/**` 或 workflow 文件
   - 构建: `pnpm --filter pictelio-website build`
   - 复制 `version.json` 到构建产物
-- **Android APK**: 本地构建，可选通过 `pnpm release:github` 发布到 GitHub Releases
+- **Android APK**: 本地构建，可选通过 `pnpm release`（交互式一键发布）发布到 GitHub Releases
 - **本地预览**: `pnpm deploy` 从 `packages/website/` 复制 landing 页面到 `_site/`
 - **Release 流程**: 详见 `docs/release-checklist.md`，包含版本号更新、构建、签名、发布到 GitHub Releases 等步骤
 

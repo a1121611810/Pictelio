@@ -1,5 +1,9 @@
 # GitHub Release 发布指南
 
+> ⚠️ **DEPRECATED（P11）**：本流程对应的 `scripts/release-github.mjs` 已弃用，
+> 发布统一使用 `pnpm release`（`scripts/release.mjs`，交互式一键发布，见 `docs/release-checklist.md`）。
+> 本文档保留仅作历史参考，不再维护。
+
 本文档说明如何通过 `scripts/release-github.mjs` 自动构建 Pictelio 签名 APK，并发布到 GitHub Releases。
 
 ---

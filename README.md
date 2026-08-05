@@ -134,7 +134,7 @@ Command convention (see `docs/adr/ADR-0059-root-script-convention.md`): a bare c
 | `pnpm dev:android` | Hot-reload Android development |
 | `pnpm sync:app-lynx-bundle` | Sync lynx bundle into Android assets |
 | `pnpm cap:*` | Capacitor sync / copy / open |
-| `pnpm release:github` | Publish APK to GitHub Releases |
+| `pnpm release` | Interactive one-shot release (bump version → build → tag → GitHub Release) |
 | `pnpm deploy` | Preview landing page to `_site/` |
 | `pnpm openwiki:update` | Sync OpenWiki docs from source |
 

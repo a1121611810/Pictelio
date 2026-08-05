@@ -50,7 +50,6 @@
     "build:android:e2e": "vp run --filter pictelio-app build:android:e2e",
     "build:android:release": "vp run --filter pictelio-app build:android:release",
     "build:android:release:all": "vp run --filter pictelio-app build:android:release:all",
-    "release:github": "vp run --filter pictelio-app release:github",
     "release": "vp run --filter pictelio-app release",
     "deploy": "node scripts/deploy.mjs",
     "deploy:dry": "node scripts/deploy.mjs --dry-run",
