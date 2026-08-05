@@ -1,5 +1,5 @@
 {
-  "version": "4.2.0",
-  "url": "https://github.com/a1121611810/pixivizer/releases/tag/v4.2.0",
-  "changelog": "🔧 其他\n  Merge branch 'reasonix/delivery-20260805-065741-789edc1428'\n📝 文档\n  docs: update docs for v4.0.0 android flavor and e2e tests\n  docs: add dialog element migration feasibility report\n🐛 修复\n  fi"
+  "version": "4.2.1",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.2.1",
+  "changelog": "🐛 修复\n  af6c8ca fix(release): fix scoped-add check false positive and ignored changelog\n  95d4a92 fix(release): improve failure visibility and version validation\n  26ad72d fix(release): enforce main b"
 }
