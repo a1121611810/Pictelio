@@ -162,7 +162,7 @@ html:not(.dark) .footer {
   padding: 80px max(24px, 4vw);
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, #08080a 0%, #0c1420 40%, #0a0e14 70%, #08080a 100%);
+  background: linear-gradient(180deg, #0c1420 0%, #0a0e14 55%, #0a0a0a 100%);
 }
 .variant-c .vc-hero::before {
   content: "";
@@ -341,8 +341,6 @@ html:not(.dark) .footer {
   position: relative;
   overflow: hidden;
   padding: 100px max(24px, 4vw) 80px;
-  background: linear-gradient(180deg, rgba(10,14,20,0.4) 0%, transparent 80px),
-              transparent;
 }
 .variant-c .vc-features::before,
 .variant-c .vc-features::after {
@@ -414,7 +412,7 @@ html:not(.dark) .variant-c {
   --text-secondary: #5a5f6a;
 }
 html:not(.dark) .variant-c .vc-hero {
-  background: linear-gradient(135deg, #f0f4fa 0%, #e8eef5 40%, #f5f7fa 100%);
+  background: linear-gradient(180deg, #eef3fa 0%, #e9eff6 55%, #f8f8f8 100%);
 }
 html:not(.dark) .variant-c .vc-hero::before {
   background: radial-gradient(circle, rgba(43,87,154,0.06) 0%, transparent 60%);
@@ -444,9 +442,6 @@ html:not(.dark) .variant-c .vc-card {
 html:not(.dark) .variant-c .vc-card:hover {
   border-color: rgba(43,87,154,0.2);
   box-shadow: 0 8px 32px rgba(0,0,0,0.06);
-}
-html:not(.dark) .variant-c .vc-features {
-  background: linear-gradient(180deg, rgba(240,244,250,0.5) 0%, transparent 80px);
 }
 html:not(.dark) .variant-c .vc-features::before {
   background: radial-gradient(circle, rgba(43,87,154,0.08) 0%, transparent 60%);
