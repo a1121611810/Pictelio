@@ -1,5 +1,5 @@
 {
-  "version": "4.2.4",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.2.4",
-  "changelog": "♻️ 重构\n  6c71fda refactor(lynx): PictelioApiModule 请求异步化\n🐛 修复\n  3c0b87a fix(lynx): 骨架屏 15s 超时兜底 + list 布局溢出修复导航栏 tap\n  ac76c5b fix(app): refresh_token 存储格式双端兼容（原始字符串 + 历史 JSON 兼容）"
+  "version": "4.2.5",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.2.5",
+  "changelog": "🧪 测试\n  209ec8d test(e2e): 引擎切换 E2E spec 适配说明页流程\n✨ 新功能\n  d7f3429 feat(app): 切换引擎确认改为说明页 + 确认即时反馈\n  b7d0d0c feat(lynx): LynxActivity 渲染错误兜底页替代白屏\n🐛 修复\n  f866e7d fix(android): R8 keep Lynx PropsSetter/P"
 }
