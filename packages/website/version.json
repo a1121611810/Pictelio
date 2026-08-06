@@ -1,5 +1,5 @@
 {
-  "version": "4.2.5",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.2.5",
-  "changelog": "🧪 测试\n  209ec8d test(e2e): 引擎切换 E2E spec 适配说明页流程\n✨ 新功能\n  d7f3429 feat(app): 切换引擎确认改为说明页 + 确认即时反馈\n  b7d0d0c feat(lynx): LynxActivity 渲染错误兜底页替代白屏\n🐛 修复\n  f866e7d fix(android): R8 keep Lynx PropsSetter/P"
+  "version": "4.3.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.3.0",
+  "changelog": "🐛 修复\n  5740203 fix(app-lynx): 详情页 scroll-view 改为 flex-1 约束，避免溢出覆盖顶栏触摸层（#139）\n  88f3355 fix(app-lynx): 列表图片改用显式 height 容器，修复原生 LynxView 图片骨架屏永久显示（#137）\n  ff607d1 fix(app): 子标签空隙改用 transform 补偿（sticky "
 }
