@@ -1,11 +1,26 @@
 // isRestricted 单测：R18/R18G 遮罩判定（issue #91 方案：过滤 → 遮罩）
 // 用例矩阵：x_restrict ∈ {0,1,2} × showR18 × showR18G 共 12 例（纯函数无 IO）
 // 每个 it 内显式设定开关状态，避免依赖 describe 块的执行顺序
-import { describe, expect, it } from "vitest"
+// detailQuality 单测（issue #146 T1）：默认 medium + setter + idbKV 持久化恢复；
+// node 环境无 indexedDB，顶层 mock idbKV（既有 isRestricted 用例不受影响）
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import { readFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
-import { isRestricted, setShowR18, setShowR18G } from "./settingsStore"
+import {
+  detailQuality,
+  isRestricted,
+  loadSettings,
+  setDetailQuality,
+  setShowR18,
+  setShowR18G,
+} from "./settingsStore"
+import { idbGet, idbSet } from "../utils/idbKV"
+
+vi.mock("../utils/idbKV", () => ({
+  idbGet: vi.fn(),
+  idbSet: vi.fn(async () => {}),
+}))
 
 const here = dirname(fileURLToPath(import.meta.url))
 
@@ -68,6 +83,45 @@ describe("settingsStore.isRestricted", () => {
       setShowR18(true); setShowR18G(true)
       expect(isRestricted({ x_restrict: 2 })).toBe(false)
     })
+  })
+})
+
+// detailQuality 单测（issue #146 T1）：默认 medium + setDetailQuality + idbKV 持久化恢复
+describe("settingsStore.detailQuality（issue #146 T1）", () => {
+  beforeEach(() => {
+    vi.mocked(idbGet).mockReset().mockResolvedValue(null)
+    vi.mocked(idbSet).mockReset().mockResolvedValue(undefined)
+  })
+
+  it("默认 medium（对齐 webview client settingsStore.ts:230）", () => {
+    expect(detailQuality.value).toBe("medium")
+  })
+
+  it("setDetailQuality 更新 ref", () => {
+    setDetailQuality("large")
+    expect(detailQuality.value).toBe("large")
+  })
+
+  it("setDetailQuality 持久化到 idbKV", () => {
+    setDetailQuality("original")
+    expect(vi.mocked(idbSet)).toHaveBeenCalledWith("settings_detail_quality", "original")
+  })
+
+  it("loadSettings 从 idbKV 恢复持久化档位", async () => {
+    vi.mocked(idbGet).mockImplementation(async (key: string) =>
+      key === "settings_detail_quality" ? "large" : null,
+    )
+    await loadSettings()
+    expect(detailQuality.value).toBe("large")
+  })
+
+  it("loadSettings 恢复非法值时不覆盖当前值", async () => {
+    setDetailQuality("original")
+    vi.mocked(idbGet).mockImplementation(async (key: string) =>
+      key === "settings_detail_quality" ? "ultra" : null,
+    )
+    await loadSettings()
+    expect(detailQuality.value).toBe("original")
   })
 })
 
