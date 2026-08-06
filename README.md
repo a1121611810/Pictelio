@@ -70,7 +70,7 @@ pnpm dev          # Vite dev server at localhost:5173
 https_proxy=http://127.0.0.1:7890 pnpm dev
 ```
 
-**Build APK:** Requires Android Studio, JDK 21, Android SDK (minSdkLevel=30, WebView≥85).
+**Build APK:** Requires Android Studio, JDK 21, Android SDK (minSdkLevel=28, WebView≥85).
 
 ```bash
 pnpm build:android          # Debug APK
@@ -93,7 +93,9 @@ See [`docs/platform-compatibility.md`](docs/platform-compatibility.md) for platf
 ```
 pixivizer/
 ├── packages/
-│   ├── app/               # SolidJS SPA (src/ → api, components, routes, stores, styles, utils, native)
+│   ├── app/               # SolidJS SPA (src/ → api, components, routes, stores, styles, utils, native, primitives, services, settings, types)
+│   ├── app-lynx/          # vue-lynx MVP client (login / recommended / novel / profile / engine switch)
+│   ├── ugoira/            # @pictelio/ugoira — Ugoira frame-processing library
 │   └── website/           # Astro landing page (src/ → pages, layouts, styles)
 ├── docs/                  # Architecture docs, release guides, privacy policy
 ├── scripts/               # Deploy & utility scripts
@@ -127,6 +129,7 @@ Command convention (see `docs/adr/ADR-0059-root-script-convention.md`): a bare c
 | `pnpm test:all` | Run all packages' unit tests in parallel |
 | `pnpm test:app:all` | Run `pictelio-app` unit tests + agent-browser E2E |
 | `pnpm test:agent-browser` | Run AI-driven E2E browser tests |
+| `pnpm test:android:e2e` | Run Appium E2E tests on the Android emulator |
 | `pnpm lint` | Run oxlint (`pictelio-app`) |
 | `pnpm fmt` | Run oxfmt formatter (`pictelio-app`) |
 | `pnpm build:android` | Build Debug APK |
