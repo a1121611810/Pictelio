@@ -25,11 +25,13 @@ const features = [
   },
 ];
 
+// 使用 import.meta.env.BASE_URL（与 astro.config.mjs 的 base 保持一致），避免硬编码路径失配
+const base = import.meta.env.BASE_URL;
 const screenshots = [
-  { src: "/pixivizer/screenshots/01_feed.png", alt: "推荐 Feed 页面" },
-  { src: "/pixivizer/screenshots/02_detail.png", alt: "作品详情页面" },
-  { src: "/pixivizer/screenshots/03_settings.png", alt: "设置页面" },
-  { src: "/pixivizer/screenshots/04_login.png", alt: "登录页面" },
+  { src: `${base}screenshots/01_feed.png`, alt: "推荐 Feed 页面" },
+  { src: `${base}screenshots/02_detail.png`, alt: "作品详情页面" },
+  { src: `${base}screenshots/03_settings.png`, alt: "设置页面" },
+  { src: `${base}screenshots/04_login.png`, alt: "登录页面" },
 ];
 ---
 
@@ -47,7 +49,7 @@ const screenshots = [
           <p class="vc-sub vc-reveal vc-reveal-delay-2">为 Android 打造的 Pixiv 浏览体验 — 插画、小说、收藏、发现，一切尽在掌握。</p>
           <div class="vc-actions vc-reveal vc-reveal-delay-3">
             <div class="vc-actions-buttons">
-              <a href="https://github.com/a1121611810/pixivizer/releases" class="vc-btn-primary" target="_blank" rel="noopener noreferrer">
+              <a href="https://github.com/a1121611810/Pictelio/releases" class="vc-btn-primary" target="_blank" rel="noopener noreferrer">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 下载 APK
               </a>

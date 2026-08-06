@@ -9,6 +9,9 @@ export interface Props {
 }
 
 const { title, description } = Astro.props;
+
+// 站点规范 URL（site + base），用于 canonical / og:url，避免硬编码失配
+const siteUrl = new URL(import.meta.env.BASE_URL, Astro.site);
 ---
 
 <!DOCTYPE html>
@@ -21,13 +24,13 @@ const { title, description } = Astro.props;
       name="description"
       content={description ?? "第三方 Pixiv 客户端，为 Android 打造简洁浏览体验"}
     />
-    <link rel="canonical" href="https://a1121611810.github.io/pixivizer/" />
-    <link rel="icon" type="image/svg+xml" href="/pixivizer/logo.svg" />
+    <link rel="canonical" href={siteUrl} />
+    <link rel="icon" type="image/svg+xml" href={`${import.meta.env.BASE_URL}logo.svg`} />
 
     <!-- Open Graph -->
     <meta property="og:title" content={`${title} - 第三方 Pixiv 客户端`} />
     <meta property="og:description" content={description ?? "为 Android 打造的简洁 Pixiv 浏览体验。"} />
-    <meta property="og:url" content="https://a1121611810.github.io/pixivizer/" />
+    <meta property="og:url" content={siteUrl} />
     <meta property="og:type" content="website" />
 
     <!-- Font -->
@@ -131,8 +134,8 @@ const { title, description } = Astro.props;
     <!-- Nav -->
     <nav class="nav" role="navigation">
       <div style="display:flex;align-items:center;gap:12px;">
-        <a href="/pixivizer/" class="nav-brand">
-          <img src="/pixivizer/logo.svg" alt="Pictelio" class="nav-brand-logo" />
+        <a href={import.meta.env.BASE_URL} class="nav-brand">
+          <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="Pictelio" class="nav-brand-logo" />
           Pictelio
         </a>
         <a id="nav-download-mini" class="nav-download-mini" href={version.url} target="_blank" rel="noopener noreferrer" aria-label="下载 Pictelio">
@@ -161,7 +164,7 @@ const { title, description } = Astro.props;
     <footer class="footer">
       <p class="footer-text">
         © {new Date().getFullYear()} a1121611810 ·
-        <a href="https://github.com/a1121611810/pixivizer" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;text-underline-offset:2px;">GitHub</a>
+        <a href="https://github.com/a1121611810/Pictelio" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;text-underline-offset:2px;">GitHub</a>
         · 开源项目 · MIT License
       </p>
     </footer>
