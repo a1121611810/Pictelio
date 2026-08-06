@@ -141,6 +141,50 @@ export function runOutput(cmd, argsArr, opts = {}) {
   return trim ? out.trim() : out;
 }
 
+// runOutput 的异步版本：execFile 回调封装（Promise<trimmed stdout>）。
+// 同步 execFileSync 会阻塞事件循环，无法配合 spinner 动画，网络类只读探测
+// （git ls-remote / gh release view）必须使用本函数。
+export function runOutputAsync(cmd, argsArr, opts = {}) {
+  const { trim = true, ...execOpts } = opts;
+  return new Promise((resolve, reject) => {
+    execFile(
+      cmd,
+      argsArr,
+      { cwd: rootDir, encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"], ...execOpts },
+      (err, stdout) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(trim ? stdout.trim() : stdout);
+        }
+      },
+    );
+  });
+}
+
+// 等待动画帧（ASCII spinner，避免依赖 ora 的 interval 渲染——ora 在
+// Node 24 + PTY 下会疯狂重绘清行序列，实测单次探测产生 200MB+ ANSI 输出）
+const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+// 等待动画：执行 fn 期间在 stderr 单行显示 spinner 帧，结束（成功或失败）后清理。
+// 非 TTY（管道/CI）时降级为静态提示，不输出动画。
+export function withSpinner(label, fn) {
+  if (!process.stderr.isTTY) {
+    process.stderr.write(`${label}...\n`);
+    return fn();
+  }
+  let i = 0;
+  const timer = setInterval(() => {
+    process.stderr.write(`\r${SPINNER_FRAMES[i++ % SPINNER_FRAMES.length]} ${label}`);
+  }, 100);
+  return Promise.resolve()
+    .then(fn)
+    .finally(() => {
+      clearInterval(timer);
+      process.stderr.write("\r\x1b[K");
+    });
+}
+
 // P12：结构化解析 origin URL（支持 https/git@/ssh:// 三种形态），
 // 避免旧正则靠贪婪匹配猜前缀导致的解析错误。
 export function getRepoSlug() {

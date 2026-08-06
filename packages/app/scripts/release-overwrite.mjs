@@ -20,7 +20,40 @@
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { resolve as resolvePath } from "node:path";
 import { tmpdir } from "node:os";
-import { parseVersion, DEFAULT_VARIANTS } from "./lib/release-utils.mjs";
+import { parseVersion, DEFAULT_VARIANTS, runOutputAsync } from "./lib/release-utils.mjs";
+
+/**
+ * 远端状态探测（纯逻辑，run 依赖注入便于单测四分支）。
+ * git ls-remote（tag 存在性）与 gh release view（Release 状态）互不依赖，并行发起。
+ *
+ * @param {object} input
+ * @param {string} input.tag    远端 tag，如 "v4.2.4"
+ * @param {string} input.repo   GitHub 仓库，如 "a1121611810/pixivizer"
+ * @param {(cmd: string, args: string[]) => Promise<string>} [input.run] 进程调用（默认 runOutputAsync）
+ * @returns {Promise<{tag: string|null, release: {exists: boolean, draft: boolean, assets: string[]}|null}>}
+ * @throws 网络异常（ls-remote 失败）时抛出，与"tag 不存在"区分
+ */
+export async function probeRemote({ tag, repo, run = runOutputAsync }) {
+  const [refsResult, viewResult] = await Promise.allSettled([
+    run("git", ["ls-remote", "--tags", "origin", tag]),
+    run("gh", ["release", "view", tag, "--repo", repo, "--json", "isDraft,assets"]),
+  ]);
+  // ls-remote 失败 = 网络异常（显式中止，避免误判为版本问题）；gh view 失败 = Release 不存在
+  if (refsResult.status === "rejected") {
+    throw new Error("无法检查远端 tag（网络异常），已中止覆盖发布。请检查网络后重试");
+  }
+  if (!refsResult.value.includes(`refs/tags/${tag}`)) {
+    return { tag: null, release: null };
+  }
+  if (viewResult.status === "rejected") {
+    return { tag, release: null };
+  }
+  const view = JSON.parse(viewResult.value);
+  return {
+    tag,
+    release: { exists: true, draft: view.isDraft, assets: view.assets.map((a) => a.name) },
+  };
+}
 
 /**
  * 纯逻辑：输入 → 覆盖计划，零副作用。

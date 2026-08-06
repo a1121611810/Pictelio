@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import { planOverwrite, executeOverwrite } from "../../../scripts/release-overwrite.mjs";
+import {
+  planOverwrite,
+  executeOverwrite,
+  probeRemote,
+} from "../../../scripts/release-overwrite.mjs";
 
 // 真实样例契约（2026-08-05 实测远端 v4.2.4 状态）：
 // 远端 Release 仅含 webview APK，缺 full / lynx；本地三变体 APK 齐全
@@ -135,6 +139,49 @@ describe("planOverwrite", () => {
     expect(plan.buildRequired).toEqual([]);
     expect(plan.needsBackup).toBe(false);
     expect(plan.warnings.join("\n")).toContain("仅文案模式");
+  });
+});
+
+describe("probeRemote", () => {
+  const REFS_OK = "d311a4284945\trefs/tags/v4.2.4";
+  const VIEW_OK = JSON.stringify({
+    isDraft: false,
+    assets: [{ name: "pictelio-4.2.4-webview.apk" }],
+  });
+
+  it("tag 存在 + Release 已发布 → 完整 remote（git/gh 并行调用）", async () => {
+    const run = vi.fn(async (cmd) => (cmd === "git" ? REFS_OK : VIEW_OK));
+    const remote = await probeRemote({ tag: "v4.2.4", repo: REPO, run });
+    expect(remote.tag).toBe("v4.2.4");
+    expect(remote.release).toEqual({
+      exists: true,
+      draft: false,
+      assets: ["pictelio-4.2.4-webview.apk"],
+    });
+    expect(run).toHaveBeenCalledTimes(2);
+  });
+
+  it("tag 存在但 Release 不存在（gh view 失败）→ release null", async () => {
+    const run = vi.fn(async (cmd) => {
+      if (cmd === "git") return REFS_OK;
+      throw new Error("not found");
+    });
+    const remote = await probeRemote({ tag: "v4.2.4", repo: REPO, run });
+    expect(remote).toEqual({ tag: "v4.2.4", release: null });
+  });
+
+  it("tag 不存在（ls-remote 无该 ref）→ { tag: null, release: null }", async () => {
+    const run = vi.fn(async (cmd) => (cmd === "git" ? "" : VIEW_OK));
+    const remote = await probeRemote({ tag: "v4.2.4", repo: REPO, run });
+    expect(remote).toEqual({ tag: null, release: null });
+  });
+
+  it("网络异常（ls-remote 失败）→ throw，与 tag 不存在区分", async () => {
+    const run = vi.fn(async (cmd) => {
+      if (cmd === "git") throw new Error("network error");
+      return VIEW_OK;
+    });
+    await expect(probeRemote({ tag: "v4.2.4", repo: REPO, run })).rejects.toThrow(/网络异常/);
   });
 });
 

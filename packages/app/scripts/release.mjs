@@ -38,8 +38,9 @@ import {
   addCommitLinks,
   resolveVariants,
   apkPathsFor,
+  withSpinner,
 } from "./lib/release-utils.mjs";
-import { planOverwrite, executeOverwrite } from "./release-overwrite.mjs";
+import { planOverwrite, executeOverwrite, probeRemote } from "./release-overwrite.mjs";
 
 const rootDir = resolvePath(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolvePath(rootDir, "../.."); // monorepo 根（git 仓库根）
@@ -303,8 +304,12 @@ async function interactivePickVersion(currentVersion) {
 
 // ── 覆盖发布模式（-o / --overwrite）──
 // 对已存在且已发布的 GitHub Release 覆盖更新文案/资产，不 bump 版本号。
-// 流程编排：探测远端/本地 → 交互①范围 → 交互②复用/重建 → 准备文案 →
-//           planOverwrite（校验+计划）→ 展示+二次确认 → executeOverwrite。
+// 流程编排：远端探测（立即发起、带动画、与交互并行）→ 本地探测 →
+//           交互①范围 → 交互②复用/重建 →（可选重建，重建前预校验远端）→
+//           准备文案 → planOverwrite（校验+计划）→ 展示+二次确认 → executeOverwrite。
+// 说明：远端网络探测刻意与交互并行发起——`release -o` 启动即显示菜单（无网络等待），
+//       探测期间以 spinner 动画反馈，交互结束后取结果；重建前先校验远端，
+//       避免对未发布/草稿版本白跑完整构建。
 async function runOverwriteFlow() {
   const pkg = JSON.parse(await readText("package.json"));
   const version = pkg.version;
@@ -314,31 +319,11 @@ async function runOverwriteFlow() {
   const apkPaths = apkPathsFor(version, variants);
 
   try {
-    // ── 远端状态探测 ──
-    let remote = { tag: null, release: null };
-    try {
-      const refs = runOutput("git", ["ls-remote", "--tags", "origin", tag]);
-      if (refs.includes(`refs/tags/${tag}`)) remote.tag = tag;
-    } catch {
-      // 网络异常 ≠ tag 不存在：显式中止，避免被误判为"版本问题"
-      throw new Error("无法检查远端 tag（网络异常），已中止覆盖发布。请检查网络后重试");
-    }
-    if (remote.tag) {
-      try {
-        const view = JSON.parse(
-          runOutput("gh", ["release", "view", tag, "--repo", repo, "--json", "isDraft,assets"]),
-        );
-        remote.release = {
-          exists: true,
-          draft: view.isDraft,
-          assets: view.assets.map((a) => a.name),
-        };
-      } catch {
-        remote.release = null; // Release 不存在
-      }
-    }
+    // ── 远端状态探测：立即发起（带动画、并行），与交互并行执行，交互结束后 await。
+    // 避免 `release -o` 启动即卡在网络等待；菜单立即显示，等待期间有动画反馈。
+    const remotePromise = withSpinner("检查远端 Release 状态...", () => probeRemote({ tag, repo }));
 
-    // ── 本地 APK 探测 ──
+    // ── 本地 APK 探测（纯本地 stat，快）──
     const localApks = [];
     for (let i = 0; i < variants.length; i++) {
       localApks.push({
@@ -376,6 +361,18 @@ async function runOverwriteFlow() {
 
     // ── 重新构建（可选；dry-run 跳过实际构建，仅预览计划）──
     if (rebuild) {
+      // 重建前先取远端结果并预校验：tag 必须存在且 Release 已发布，
+      // 否则中止——避免对未发布/草稿版本白跑数分钟完整构建。
+      const remotePre = await remotePromise;
+      planOverwrite({
+        version,
+        variants,
+        repo,
+        localApks,
+        remote: remotePre,
+        notes: null,
+        includeAssets: false,
+      });
       if (dryRun) {
         log("[dry-run] 将重新构建（已跳过实际构建，计划按当前本地产物预览）");
       } else {
@@ -389,6 +386,9 @@ async function runOverwriteFlow() {
         };
       }
     }
+
+    // 取远端探测结果（重建分支已 await，此处幂等取值）
+    const remote = await remotePromise;
 
     // ── 文案准备 ──
     let notes = null;
@@ -447,12 +447,17 @@ async function runOverwriteFlow() {
     }
     for (const w of plan.warnings) console.log(`  ⚠ ${w}`);
     console.log("─".repeat(40));
-    if ((await askQuestion("\n确认覆盖发布? (Y/n): ")).toLowerCase() === "n") {
+    // 第一道确认默认取消：覆盖是破坏性操作（修改已发布 Release），必须显式输入 y；
+    // 第二道 tag 确认回车默认接受当前 tag（用户需求）。
+    if (
+      (await askQuestion("\n确认覆盖发布?（输入 y 确认，回车或其它取消）: ")).toLowerCase() !== "y"
+    ) {
       console.log("[release] 已取消");
       process.exit(0);
     }
-    const tagConfirm = await askQuestion(`请输入 tag 名确认（${plan.tag}）: `);
-    if (tagConfirm.trim() !== plan.tag) {
+    const tagConfirm = await askQuestion(`请输入 tag 名确认（直接回车 = 默认 ${plan.tag}）: `);
+    // 直接回车默认接受当前 tag；输入其他值（与 plan.tag 不符）则取消，双重防误覆盖
+    if (tagConfirm.trim() !== "" && tagConfirm.trim() !== plan.tag) {
       console.log("[release] tag 确认不匹配，已取消（未执行任何操作）");
       process.exit(0);
     }
