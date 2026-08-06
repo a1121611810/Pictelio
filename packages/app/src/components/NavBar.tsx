@@ -3,6 +3,7 @@ import { autoHideNavBar } from "../stores/settingsStore";
 import { currentTab, setCurrentTab } from "../stores/uiStore";
 import FluentIcon, { type FluentIconName } from "./ui/FluentIcon";
 import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior";
+import { usePointerHighlight } from "../primitives/usePointerHighlight";
 
 // ── Tab definitions ──
 type NavTab = "recommended" | "follow" | "bookmarks" | "history";
@@ -48,6 +49,9 @@ const NavBar: Component = () => {
 
   // ── 触摸滑动手势标志（防止点击触发）──
   let swiped = false;
+
+  // ── 指针跟随高光（glass-tab 视觉族，ADR-0044；hook 与 GlassTabBar 共享）──
+  const { reducedMotion, onPointerMove, onPointerLeave, highlightStyle } = usePointerHighlight();
 
   // ── Scroll-driven compact/expand ──
   const HIDE_THRESHOLD = 20;
@@ -134,7 +138,19 @@ const NavBar: Component = () => {
 
   return (
     <nav class="floating-nav" aria-label="主导航">
-      <div class="floating-nav-capsule" classList={{ "floating-nav-capsule-compact": compact() }}>
+      <div
+        class="floating-nav-capsule relative"
+        classList={{ "floating-nav-capsule-compact": compact() }}
+        onPointerMove={onPointerMove}
+        onPointerLeave={onPointerLeave}
+      >
+        {/* 指针跟随高光层（prefers-reduced-motion 下不渲染） */}
+        {!reducedMotion() && (
+          <span class="glass-tab-highlight" aria-hidden="true" style={highlightStyle()} />
+        )}
+        {/* 顶部内高光层（glass 容器统一高光） */}
+        <span class="glass-tab-bar-highlight" aria-hidden="true" />
+
         {/* 左侧按钮组：推荐 + 关注 */}
         <div
           class="floating-nav-group"
@@ -146,8 +162,8 @@ const NavBar: Component = () => {
         >
           {leftTabs.map((tab) => (
             <button
-              class="floating-nav-item"
-              classList={{ "floating-nav-item-active": activeTab() === tab.key }}
+              class="glass-tab-item min-w-14"
+              classList={{ "glass-tab-item-active": activeTab() === tab.key }}
               onClick={() => handleTabClick(tab.key)}
               aria-current={activeTab() === tab.key ? "page" : undefined}
               aria-label={tab.label}
@@ -182,8 +198,8 @@ const NavBar: Component = () => {
         >
           {rightTabs.map((tab) => (
             <button
-              class="floating-nav-item"
-              classList={{ "floating-nav-item-active": activeTab() === tab.key }}
+              class="glass-tab-item min-w-14"
+              classList={{ "glass-tab-item-active": activeTab() === tab.key }}
               onClick={() => handleTabClick(tab.key)}
               aria-current={activeTab() === tab.key ? "page" : undefined}
               aria-label={tab.label}
