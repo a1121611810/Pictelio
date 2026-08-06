@@ -39,3 +39,20 @@
 #（dex 实测仍 implements ILynxImageService，按接口注册不受影响）；
 # 保留原名，防 lynx 侧按类名反射的潜在分支。
 -keep class io.pictelio.app.PictelioImageService { *; }
+
+# ── Lynx $$PropsSetter / $$PropsHolder keep（真机 release 白屏 error 990200）──
+# 根因：Lynx SDK 4.0.1 AAR 内 38 个注解生成类（com.lynx.tasm.behavior.ui.* 与
+# shadow.* 下的 UIView$$PropsSetter、TextShadowNode$$PropsSetter 等）由运行时通过
+# 反射 Class.newInstance() 实例化，把 JS 侧更新的 UI 属性写入原生节点。
+# R8 优化阶段静态分析看不到反射调用链，会移除这些类的无参构造器；真机切换引擎后
+# 每帧抛 InstantiationException（lynx 错误码 990200）导致白屏。
+#
+# 为何 SDK 自带规则不够：
+# 1. SDK consumer 规则是 `-keep class * implements Settable / LynxUISetter`，
+#    但 $$PropsSetter 走纯继承链、不 implements 这两个接口，匹配不到；
+# 2. 即使能匹配到类，R8 语义下 `-keep class X` 只保留类名、不保留成员，
+#    无参构造器仍会被优化移除。
+# 故需用 -keepclasseswithmembers 连构造器带成员一并保留（未命中成员模式的类不受影响）。
+# 注意通配符：`**` 才匹配含包名的完整类名（`*` 不匹配 `.`，匹配不到 com.lynx.tasm 下的类）。
+-keepclasseswithmembers class **$$PropsSetter { <init>(); <methods>; }
+-keepclasseswithmembers class **$$PropsHolder { <init>(); <methods>; }
