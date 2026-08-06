@@ -12,6 +12,7 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.splashscreen.SplashScreen;
 
+import com.lynx.tasm.LynxError;
 import com.lynx.tasm.LynxView;
 import com.lynx.tasm.LynxViewBuilder;
 import com.lynx.tasm.LynxViewClient;
@@ -87,6 +88,21 @@ public class LynxActivity extends AppCompatActivity {
                 cancelLoadTimeout();
                 showErrorFallback("Lynx bundle 加载失败：" + safe);
             }
+
+            // ── 渲染期错误兜底（ADR-0064，issue #132/#135）──
+            // bundle 渲染阶段（非加载阶段）的错误走这里，而非 onLoadFailed。
+            // 实测根因（error 990200 InstantiationException：R8 移除 $$PropsSetter
+            // 无参构造器）即在此路径——若只挂钩 onLoadFailed 则白屏无出口。
+            // 双回调都挂（SDK 分类入口 + 统一入口），showErrorFallback 内部原子防重。
+            @Override
+            public void onReceivedNativeError(LynxError error) {
+                handleRenderError(error);
+            }
+
+            @Override
+            public void onReceivedError(LynxError error) {
+                handleRenderError(error);
+            }
         });
 
         setContentView(lynxView);
@@ -105,6 +121,29 @@ public class LynxActivity extends AppCompatActivity {
         if (msg == null) return "未知错误";
         String cleaned = msg.replaceAll("[\\r\\n\\t]+", " ").trim();
         return cleaned.length() > 120 ? cleaned.substring(0, 120) + "…" : cleaned;
+    }
+
+    /**
+     * 渲染期错误处理（ADR-0064）：仅致命渲染中断类错误弹兜底页，其余仅打日志。
+     * 致命信号：errorCode 9902（Lynx 渲染系统错误分类）或消息含
+     * InstantiationException（注解生成类反射失败，issue #132 白屏根因）。
+     * 避免对可恢复的轻量错误（如单个组件 props 异常）误伤整页。
+     */
+    private void handleRenderError(LynxError error) {
+        int code = error != null ? error.getErrorCode() : -1;
+        String msg = error != null ? error.getMsg() : null;
+        boolean fatal = error != null && error.isFatal();
+        boolean renderBroken =
+                code == 9902 || code == 990200
+                        || (msg != null && msg.contains("InstantiationException"));
+        if (renderBroken || fatal) {
+            Log.w(TAG, "Lynx 渲染致命错误（code=" + code + "）→ 展示错误兜底");
+            bundleLoaded.set(true); // 退出 Splash（若尚未退出）
+            cancelLoadTimeout();
+            showErrorFallback("Lynx 渲染失败：" + sanitizeError(msg));
+        } else {
+            Log.w(TAG, "Lynx 渲染错误（code=" + code + "）已忽略（非致命）：" + sanitizeError(msg));
+        }
     }
 
     private static final long LOAD_TIMEOUT_MS = 10_000L;
