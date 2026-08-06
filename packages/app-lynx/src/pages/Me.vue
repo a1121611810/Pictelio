@@ -5,7 +5,8 @@ import { ref, onMounted } from 'vue'
 import { navigate, goBack, ensureAuth, resetHistory } from '../router'
 import { currentUser, logout, isLoggedIn } from '../stores/authStore'
 import { selectedClient, switchClient, availableKinds, supportsClientSwitch, type ClientKind } from '../stores/clientSwitchStore'
-import { showR18, showR18G, setShowR18, setShowR18G, ugoiraMode, setUgoiraMode } from '../stores/settingsStore'
+import { showR18, showR18G, setShowR18, setShowR18G, ugoiraMode, setUgoiraMode, detailQuality, setDetailQuality } from '../stores/settingsStore'
+import type { ImageQuality } from '../utils/imageQuality'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { ME_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import GlassCard from '../components/GlassCard.vue'
@@ -51,6 +52,11 @@ function pickUgoiraMode(m: 'fflate' | 'range') {
 function confirmUgoiraRange() {
   setUgoiraMode('range')
   ugoiraConfirm.value = false
+}
+
+// issue #148 T2：详情画质档位（medium=标准 / large=高清 / original=原图）
+function pickDetailQuality(q: ImageQuality) {
+  setDetailQuality(q)
 }
 
 function toggleR18() {
@@ -254,6 +260,41 @@ function toggleR18G() {
             >
               <text class="text-base text-foreground">取消</text>
             </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- issue #148 T2：详情画质档位组（medium=标准 / large=高清 / original=原图） -->
+      <view class="bg-background mt-3 p-4">
+        <text class="text-lg font-semibold text-foreground">详情画质</text>
+        <text class="text-xs text-foreground-3 mt-1 mb-3">列表缩略图 / 详情大图清晰度</text>
+        <view class="flex flex-row gap-2">
+          <view
+            class="flex-1 py-3 rounded-[var(--borderRadiusLarge)] flex items-center justify-center"
+            :class="detailQuality === 'medium' ? 'bg-brand' : 'bg-background-3'"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.detailQualityMedium"
+            @tap="pickDetailQuality('medium')"
+          >
+            <text class="text-base" :class="detailQuality === 'medium' ? 'text-onBrand' : 'text-foreground'">标准</text>
+          </view>
+          <view
+            class="flex-1 py-3 rounded-[var(--borderRadiusLarge)] flex items-center justify-center"
+            :class="detailQuality === 'large' ? 'bg-brand' : 'bg-background-3'"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.detailQualityLarge"
+            @tap="pickDetailQuality('large')"
+          >
+            <text class="text-base" :class="detailQuality === 'large' ? 'text-onBrand' : 'text-foreground'">高清</text>
+          </view>
+          <view
+            class="flex-1 py-3 rounded-[var(--borderRadiusLarge)] flex items-center justify-center"
+            :class="detailQuality === 'original' ? 'bg-brand' : 'bg-background-3'"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.detailQualityOriginal"
+            @tap="pickDetailQuality('original')"
+          >
+            <text class="text-base" :class="detailQuality === 'original' ? 'text-onBrand' : 'text-foreground'">原图</text>
           </view>
         </view>
       </view>

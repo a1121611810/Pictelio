@@ -26,6 +26,9 @@ export const ME_A11Y_LABELS = {
   ugoiraRange: '动图播放选择Range流式取帧',
   ugoiraConfirm: '确认切换到Range流式',
   ugoiraCancel: '取消切换到Range流式',
+  detailQualityMedium: '详情画质选择标准',
+  detailQualityLarge: '详情画质选择高清',
+  detailQualityOriginal: '详情画质选择原图',
   logout: '退出登录',
 } as const
 

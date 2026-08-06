@@ -6,6 +6,8 @@ import { followUser, unfollowUser } from '../api/user'
 import { currentUser } from '../stores/authStore'
 import type { PixivIllust } from '../api/types'
 import { proxyImageUrl } from '../utils/imageUrl'
+import { resolveQualityUrl } from '../utils/imageQuality'
+import { detailQuality } from '../stores/settingsStore'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import UgoiraViewer from '../components/UgoiraViewer.vue'
@@ -44,23 +46,30 @@ async function toggleFollowAuthor() {
 const illustId = computed(() => Number(currentParams.value.id ?? 0))
 
 // 多页作品：meta_pages 或单页
+// [fix] 单页作品直接返回完整 image_urls（medium/large 正常档位）——
+// 此前把 original_image_url 塞进 large 导致 medium 档 fallback 到原图
+// （下载体积大 + 易超时，模拟器实测 img-original timeout）。original 档
+// 由 currentImage 的 originalImageUrl 参数单独兜底。
 const pages = computed(() => {
   if (!illust.value) return []
   if (illust.value.meta_pages?.length) {
     return illust.value.meta_pages.map((p) => p.image_urls)
   }
-  return [
-    illust.value.meta_single_page?.original_image_url
-      ? { large: illust.value.meta_single_page.original_image_url }
-      : illust.value.image_urls,
-  ]
+  return [illust.value.image_urls]
 })
 
 const currentImage = computed(() => {
   const list = pages.value
   if (!list.length) return ''
   const page = list[Math.min(currentPage.value, list.length - 1)]
-  return proxyImageUrl(page.large || page.medium || '')
+  // issue #148 T2：按档位解析（medium/large/original）。单页 original 场景下 page 可能只有
+  // large 字段，resolveQualityUrl 的 original 档由 meta_single_page.original_image_url 兜底。
+  const resolved = resolveQualityUrl(
+    page,
+    detailQuality.value,
+    illust.value?.meta_single_page?.original_image_url,
+  )
+  return proxyImageUrl(resolved)
 })
 
 function openAuthor() {

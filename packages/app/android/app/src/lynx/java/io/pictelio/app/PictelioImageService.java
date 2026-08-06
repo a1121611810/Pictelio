@@ -56,6 +56,9 @@ public class PictelioImageService implements ILynxImageService {
     /** 下载/解码线程池（fetchImage 为阻塞 IO + Bitmap 解码，不占 JS/主线程） */
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
+    /** 解码后 Bitmap 内存缓存（#147）：命中免磁盘读+解码；未命中走原链路后入缓存 */
+    private final ImageMemoryCache memoryCache = new ImageMemoryCache();
+
     /** onInitialize 注入的 Application context（loader 惰性初始化用；避免 decodeImage/prefetch 传 null） */
     private volatile Context appContext;
     private volatile PixivImageLoader loader;
@@ -143,7 +146,7 @@ public class PictelioImageService implements ILynxImageService {
         deliver(requestInfo != null ? requestInfo.getUrl() : null, requestInfo, loadListener, context);
     }
 
-    /** 下载（走 PixivImageLoader）→ 采样解码 Bitmap（防大图 OOM）→ onSuccess/onFailure；后台线程执行 */
+    /** 内存缓存命中在 executor 内交付副本；未命中下载+解码后入缓存再回调；后台线程执行 */
     private void deliver(final String url, final ImageRequestInfo requestInfo,
             final ImageLoadListener loadListener, final Context context) {
         if (url == null || url.isEmpty()) {
@@ -159,24 +162,63 @@ public class PictelioImageService implements ILynxImageService {
             return;
         }
         final PixivImageLoader effectiveLoader = l;
-        executor.execute(() -> {
-            try {
-                byte[] bytes = effectiveLoader.loadBytes(PixivImageLoader.rewriteUrl(url));
-                Bitmap bitmap = decodeSampled(bytes);
-                if (bitmap == null) {
-                    loadListener.onFailure(0, new IOException("Bitmap 解码失败: " + url));
-                    return;
+        // #147 内存缓存命中：跳过磁盘读 + 解码。交付 Bitmap **副本**（ARGB_8888 copy）——
+        // lynx 引擎管理所收 Bitmap 的生命周期（渲染后可能 recycle），复用原图实例会导致
+        // 二次显示空白/JS 异常（模拟器实测 2026-08-06）；副本交付后引擎可安全处理。
+        // #147 内存缓存命中：跳过磁盘读 + 解码（隔离实验已排除非缓存因素）
+        final Bitmap cached = memoryCache.get(url);
+        if (cached != null) {
+            executor.execute(() -> {
+                try {
+                    Bitmap copy = cached.copy(Bitmap.Config.ARGB_8888, false);
+                    if (copy == null) {
+                        // 原图已不可拷贝（被外部 recycle/OOM）→ 移除缓存条目并回退下载
+                        memoryCache.remove(url);
+                        loadAndDeliver(url, requestInfo, loadListener, effectiveLoader);
+                        return;
+                    }
+                    loadListener.onSuccess(
+                            new ImageContent(copy),
+                            requestInfo,
+                            new ImageInfo(copy.getWidth(), copy.getHeight(), false));
+                } catch (Throwable t) {
+                    Log.w(TAG, "内存缓存交付失败，回退下载: " + url, t);
+                    memoryCache.remove(url);
+                    loadAndDeliver(url, requestInfo, loadListener, effectiveLoader);
                 }
-                loadListener.onSuccess(
-                        new ImageContent(bitmap),
-                        requestInfo,
-                        new ImageInfo(bitmap.getWidth(), bitmap.getHeight(), false));
-            } catch (Throwable t) {
-                // fire-and-forget 路径：捕 Throwable（含 OOM），绝不把异常抛到 JS 线程
-                Log.w(TAG, "图片加载失败: " + url, t);
-                loadListener.onFailure(0, t instanceof Exception ? (Exception) t : new RuntimeException(t));
+            });
+            return;
+        }
+        executor.execute(() -> loadAndDeliver(url, requestInfo, loadListener, effectiveLoader));
+    }
+
+    /** executor 线程内执行：磁盘缓存/下载 → 采样解码 → 入内存缓存 → onSuccess（fire-and-forget） */
+    private void loadAndDeliver(final String url, final ImageRequestInfo requestInfo,
+            final ImageLoadListener loadListener, final PixivImageLoader l) {
+        try {
+            byte[] bytes = l.loadBytes(PixivImageLoader.rewriteUrl(url));
+            Bitmap bitmap = decodeSampled(bytes);
+            if (bitmap == null) {
+                loadListener.onFailure(0, new IOException("Bitmap 解码失败: " + url));
+                return;
             }
-        });
+            // #147 解码成功入内存缓存（缓存存原图）；交付**副本**——引擎管理所收 Bitmap 生命周期，
+            // 若交付原实例可能被 recycle 从而击穿后续缓存命中（review 修正）
+            memoryCache.put(url, bitmap);
+            Bitmap deliver = bitmap.copy(Bitmap.Config.ARGB_8888, false);
+            if (deliver == null) {
+                // copy 失败（OOM 兜底）：直接交付原实例（引擎处理失败走 onFailure，缓存条目已入）
+                deliver = bitmap;
+            }
+            loadListener.onSuccess(
+                    new ImageContent(deliver),
+                    requestInfo,
+                    new ImageInfo(deliver.getWidth(), deliver.getHeight(), false));
+        } catch (Throwable t) {
+            // fire-and-forget 路径：捕 Throwable（含 OOM），绝不把异常抛到 JS 线程
+            Log.w(TAG, "图片加载失败: " + url, t);
+            loadListener.onFailure(0, t instanceof Exception ? (Exception) t : new RuntimeException(t));
+        }
     }
 
     /** 大图采样上限（移动端合理内存；原图按需由 Lynx 端 resize 参数驱动，此处先防 OOM） */
