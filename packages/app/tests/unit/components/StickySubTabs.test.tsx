@@ -22,11 +22,11 @@ describe("StickySubTabs", () => {
     expect(el().classList.contains("top-0")).toBe(true);
   });
 
-  it("未传 headerVisible 时默认 top-12（保持原有停靠行为）", () => {
+  it("未传 headerVisible 时按 undefined 处理：停靠 top-0（header 不可见语义）", () => {
     const { container } = render(() => <StickySubTabs>子标签</StickySubTabs>);
     const el = container.firstElementChild as HTMLElement;
-    expect(el.classList.contains("top-12")).toBe(true);
-    expect(el.classList.contains("top-0")).toBe(false);
+    expect(el.classList.contains("top-0")).toBe(true);
+    expect(el.classList.contains("top-12")).toBe(false);
   });
 
   it("保留玻璃容器令牌与过渡动画类", () => {

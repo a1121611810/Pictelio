@@ -223,12 +223,27 @@ async function main() {
     else log("  ⚠ feed 未渲染，重试");
   }
   if (!loggedIn) log("⚠ 登录未能就绪，继续（截图可能不完整）");
-  await sleep(2500); // 图片加载
+
+  // ── 01: 推荐 Feed（等待视口内图片全部加载完成再截图）──
+  const feedImagesLoaded = await waitForEval(
+    `(() => { const vh=window.innerHeight; const imgs=[...document.querySelectorAll('.image-card img')].filter(i => { const r=i.getBoundingClientRect(); return r.top < vh && r.bottom > 0; }); return imgs.length > 0 && imgs.every(i => i.complete && i.naturalWidth > 0) ? 'loaded' : 'pending'; })()`,
+    "loaded",
+    40_000,
+    "feed images loaded",
+  );
+  if (!feedImagesLoaded) log("⚠ feed 图片未全部加载完成，按现状截图");
+  await sleep(800);
   await shot("01_feed.png");
 
-  // ── 02: 作品详情 ──
+  // ── 02: 作品详情（等待详情主图加载）──
   await clickCss(".image-card");
   await sleep(3500);
+  await waitForEval(
+    `(() => { const imgs=[...document.querySelectorAll('img')].filter(i => { const r=i.getBoundingClientRect(); return r.top < window.innerHeight && r.bottom > 0; }); return imgs.length > 0 && imgs.every(i => i.complete && i.naturalWidth > 0) ? 'loaded' : 'pending'; })()`,
+    "loaded",
+    30_000,
+    "detail images loaded",
+  );
   await shot("02_detail.png");
 
   // ── 03 + 04: 小说阅读器 + AI 翻译 ──
