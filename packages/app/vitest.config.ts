@@ -78,6 +78,7 @@ export default defineConfig({
       cacheMaxBytes: 314572800,
     }),
     APP_VERSION: JSON.stringify("3.21.2"),
+    __E2E__: "false", // 与 vite.config.ts 的 --mode e2e define 对齐；单测环境恒为 false
   },
   test: {
     include: ["tests/unit/**/*.test.{ts,tsx}"],

@@ -5,10 +5,9 @@ import FluentDialog from "../ui/FluentDialog";
 interface SettingsDialogsProps {
   showBlocklist: boolean;
   onCloseBlocklist: () => void;
-  dialogType: "clear" | "deleteAccount" | "switchClient" | null;
+  dialogType: "clear" | "deleteAccount" | null;
   onCloseDialog: () => void;
   onConfirmClear: () => void;
-  onConfirmSwitchClient: () => void;
   onConfirmDelete: () => void;
 }
 
@@ -66,28 +65,6 @@ const SettingsDialogs: Component<SettingsDialogsProps> = (props) => {
           }}
         >
           前往 Pixiv
-        </fluent-button>
-      </FluentDialog>
-      {/* Switch client dialog */}
-      <FluentDialog
-        open={props.dialogType === "switchClient"}
-        onClose={() => props.onCloseDialog()}
-        aria-label="切换到 Lynx 客户端？"
-      >
-        <h3 slot="title">切换到 Lynx 客户端？</h3>
-        <p>
-          应用将退出，重新打开后以 Lynx 渲染引擎启动（实验性）。Lynx
-          客户端仍在迭代中，部分功能可能不可用；可在其"个人中心"随时切回 WebView。
-        </p>
-        <fluent-button slot="actions" appearance="secondary" on:click={() => props.onCloseDialog()}>
-          取消
-        </fluent-button>
-        <fluent-button
-          slot="actions"
-          appearance="primary"
-          on:click={() => props.onConfirmSwitchClient()}
-        >
-          确认切换
         </fluent-button>
       </FluentDialog>
     </>

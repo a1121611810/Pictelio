@@ -16,6 +16,7 @@ import NovelDetail from "@/routes/NovelDetail";
 import Search from "@/routes/Search";
 import LayoutSettings from "@/routes/LayoutSettings";
 import Settings from "@/routes/Settings";
+import ClientSwitch from "@/routes/ClientSwitch";
 
 /** /user/:id/followers 和 /my/followers 共享的视图 */
 const FollowersPage = () => <FollowListPage mode="followers" />;
@@ -38,6 +39,7 @@ export const routes: RouteDefinition[] = [
       { path: "/image-cache", component: ImageCacheSettings },
       { path: "/layout-settings", component: LayoutSettings },
       { path: "/settings", component: Settings },
+      { path: "/client-switch", component: ClientSwitch },
       { path: "/age-confirmation", component: AgeConfirmation },
       { path: "/user/:id", component: PersonalCenter },
       { path: "/user/:id/illusts", component: UserIllusts },

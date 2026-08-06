@@ -7,7 +7,6 @@ import { clearTranslationCache } from "../utils/translationCache";
 import { resetBlockedIds } from "../stores/blockStore";
 import { resetReportedIds } from "../stores/reportStore";
 import { resetSettingsStore as resetUiStore } from "../stores/settingsStore";
-import { switchClient } from "../utils/clientSwitch";
 import FluentIcon from "../components/ui/FluentIcon";
 import PageTransition from "../components/PageTransition";
 import SettingsAppearance from "../components/settings/SettingsAppearance";
@@ -29,7 +28,7 @@ const Settings: Component = () => {
   const [showBlocklist, setShowBlocklist] = createSignal(false);
   const [actionToast, setActionToast] = createSignal<string | null>(null);
   const [dialogState, setDialogState] = createSignal<
-    { type: "clear" } | { type: "deleteAccount" } | { type: "switchClient" } | null
+    { type: "clear" } | { type: "deleteAccount" } | null
   >(null);
 
   // Auto-hide the age gate hint toast
@@ -83,34 +82,9 @@ const Settings: Component = () => {
     }
   }
 
-  /** 切换到 Lynx 客户端：深模块 switchClient 完成写开关 + 原生重启编排 */
-  async function handleSwitchClient() {
-    setDialogState(null);
-    const result = await switchClient("lynx");
-    if (!result.ok) {
-      console.warn("[settings] 切换失败", result.reason);
-      // busy：已有切换在途，静默忽略（防连点）
-      if (result.reason !== "busy") {
-        setActionToast(result.reason === "timeout" ? "切换超时，请重试" : "切换失败，请重试");
-      }
-      return;
-    }
-    setActionToast("已切换到 Lynx，正在重启…");
-  }
-
   // ── E2E 测试钩子（仅 --mode e2e 构建）──
-  // 动态 showModal 的 <dialog> 内按钮无法被 WebDriver/脚本点击（浏览器级限制，
-  // 真实用户触摸正常）。模拟器 E2E（tests/android-e2e）通过此全局钩子触发
-  // 确认逻辑，绕过对话框交互限制。
-  // __E2E__ 由 vite.config define 控制：仅 --mode e2e 构建为 true，
-  // build:android（production）被替换为 false 并整体消除，无生产泄漏。
-  if (__E2E__) {
-    (window as unknown as Record<string, unknown>).pictelioE2e = {
-      confirmSwitchClient: () => {
-        void handleSwitchClient();
-      },
-    };
-  }
+  // 已随 T2 迁移至 /client-switch 说明页（routes/ClientSwitch.tsx）：
+  // 设置页入口行现直接导航说明页，confirmSwitchClient 钩子由该页注册。
 
   return (
     <PageTransition>
@@ -176,7 +150,7 @@ const Settings: Component = () => {
 
           <fluent-divider />
 
-          <SettingsClient onSwitchRequest={() => setDialogState({ type: "switchClient" })} />
+          <SettingsClient />
 
           <fluent-divider />
 
@@ -224,7 +198,6 @@ const Settings: Component = () => {
           dialogType={dialogState()?.type ?? null}
           onCloseDialog={() => setDialogState(null)}
           onConfirmClear={handleClearLocalData}
-          onConfirmSwitchClient={handleSwitchClient}
           onConfirmDelete={() => {
             setDialogState(null);
             openDeleteAccountPage();
