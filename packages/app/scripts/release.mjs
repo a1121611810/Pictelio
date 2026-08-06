@@ -304,12 +304,12 @@ async function interactivePickVersion(currentVersion) {
 
 // ── 覆盖发布模式（-o / --overwrite）──
 // 对已存在且已发布的 GitHub Release 覆盖更新文案/资产，不 bump 版本号。
-// 流程编排：远端探测（立即发起、带动画、与交互并行）→ 本地探测 →
-//           交互①范围 → 交互②复用/重建 →（可选重建，重建前预校验远端）→
-//           准备文案 → planOverwrite（校验+计划）→ 展示+二次确认 → executeOverwrite。
-// 说明：远端网络探测刻意与交互并行发起——`release -o` 启动即显示菜单（无网络等待），
-//       探测期间以 spinner 动画反馈，交互结束后取结果；重建前先校验远端，
-//       避免对未发布/草稿版本白跑完整构建。
+// 流程编排：远端探测（先行、带动画）→ 本地探测 → 交互①范围 → 交互②复用/重建
+//           →（可选重建，重建前预校验远端）→ 准备文案 → planOverwrite（校验+计划）
+//           → 展示+二次确认 → executeOverwrite。
+// 说明：远端网络探测必须先行完成（异步 + spinner 动画，启动即有反馈）——若与交互
+//       并行，spinner 的 \r 单行刷新会覆盖用户输入行；检查完成 spinner 停止后再进入
+//       交互流程。重建前先校验远端，避免对未发布/草稿版本白跑完整构建。
 async function runOverwriteFlow() {
   const pkg = JSON.parse(await readText("package.json"));
   const version = pkg.version;
@@ -319,9 +319,9 @@ async function runOverwriteFlow() {
   const apkPaths = apkPathsFor(version, variants);
 
   try {
-    // ── 远端状态探测：立即发起（带动画、并行），与交互并行执行，交互结束后 await。
-    // 避免 `release -o` 启动即卡在网络等待；菜单立即显示，等待期间有动画反馈。
-    const remotePromise = withSpinner("检查远端 Release 状态...", () => probeRemote({ tag, repo }));
+    // ── 远端状态探测：先行完成（异步 + spinner 动画，启动即有反馈），
+    // 再进入交互流程——spinner 的 \r 刷新若与输入并行会覆盖输入行。
+    const remote = await withSpinner("检查远端 Release 状态...", () => probeRemote({ tag, repo }));
 
     // ── 本地 APK 探测（纯本地 stat，快）──
     const localApks = [];
@@ -361,15 +361,14 @@ async function runOverwriteFlow() {
 
     // ── 重新构建（可选；dry-run 跳过实际构建，仅预览计划）──
     if (rebuild) {
-      // 重建前先取远端结果并预校验：tag 必须存在且 Release 已发布，
-      // 否则中止——避免对未发布/草稿版本白跑数分钟完整构建。
-      const remotePre = await remotePromise;
+      // 重建前预校验：tag 必须存在且 Release 已发布，否则中止——
+      // 避免对未发布/草稿版本白跑数分钟完整构建。
       planOverwrite({
         version,
         variants,
         repo,
         localApks,
-        remote: remotePre,
+        remote,
         notes: null,
         includeAssets: false,
       });
@@ -386,9 +385,6 @@ async function runOverwriteFlow() {
         };
       }
     }
-
-    // 取远端探测结果（重建分支已 await，此处幂等取值）
-    const remote = await remotePromise;
 
     // ── 文案准备 ──
     let notes = null;
@@ -447,11 +443,12 @@ async function runOverwriteFlow() {
     }
     for (const w of plan.warnings) console.log(`  ⚠ ${w}`);
     console.log("─".repeat(40));
-    // 第一道确认默认取消：覆盖是破坏性操作（修改已发布 Release），必须显式输入 y；
-    // 第二道 tag 确认回车默认接受当前 tag（用户需求）。
-    if (
-      (await askQuestion("\n确认覆盖发布?（输入 y 确认，回车或其它取消）: ")).toLowerCase() !== "y"
-    ) {
+    // 第一道确认：y 或直接回车 = 确认（用户要求两者等价）；n 或其它 = 取消。
+    // 第二道 tag 确认：直接回车默认接受当前 tag。
+    const confirm = (await askQuestion("\n确认覆盖发布?（y 或回车 = 确认，n 或其它 = 取消）: "))
+      .trim()
+      .toLowerCase();
+    if (confirm !== "" && confirm !== "y") {
       console.log("[release] 已取消");
       process.exit(0);
     }
