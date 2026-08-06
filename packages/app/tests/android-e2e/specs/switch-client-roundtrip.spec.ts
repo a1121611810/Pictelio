@@ -7,9 +7,12 @@
  * 均无法被 Appium 定位。因此 Lynx 侧完整 UI 操作（登录→导航→点击切回）在
  * 当前 SDK 下不可自动化。
  *
- * 调整后的验证策略（覆盖切换链路全部五段，Lynx 侧 UI 操作受限部分用契约层兜底）：
+ * 调整后的验证策略（覆盖切换链路全部五段，Lynx 侧 UI 操作受限部分用日志/契约层兜底）：
  * 1. WebView 登录 → 设置页 → 点切换 → 写 lynx → 重启（真实 UI 点击，复用 #106）
- * 2. LynxActivity 可达 + Lynx 登录页渲染（input 的 accessibility 暴露，表单元素可定位）
+ * 2. LynxActivity 可达 + Lynx 渲染成功（logcat 断言：渲染日志存在 + 无致命错误）。
+ *    #126/#127 修复后 lynx 从 WSSecureStorage 恢复登录态渲染主界面（非登录页）；
+ *    Lynx 4.0.1 accessibility 树在本模拟器不暴露内容节点（实测 2026-08-06，
+ *    TalkBack 已绑定仍空树）——「登录页 input 可定位」为修复前行为，已过时。
  * 3. 反向切回用 S1 契约层：写 webview → 重启 → MainActivity → WebView 主界面
  *    （等价于 Lynx 内「切换客户端到WebView」按钮的契约效果）
  *
@@ -183,7 +186,7 @@ describe("S2 双向闭环：WebView → Lynx → 切回 WebView（pictelio_ui）
     expect(prefs.clientKind, "pictelio_client_kind 应为 lynx").toBe("lynx");
   }, 180_000);
 
-  it("LynxActivity 可达 + Lynx 登录页渲染（表单元素 accessibility 暴露）", async () => {
+  it("LynxActivity 可达 + Lynx 渲染成功（logcat 断言，无致命错误）", async () => {
     const { driver } = ctx;
     const { forceStopApp, startMainActivity, currentTopActivity } = await import("../prefs");
     // 应用已退出（exitApp），重启进入 LynxActivity
@@ -193,12 +196,35 @@ describe("S2 双向闭环：WebView → Lynx → 切回 WebView（pictelio_ui）
       async () => currentTopActivity(ctx.serial) === "io.pictelio.app.LynxActivity",
       { timeout: 60_000, timeoutMsg: "未进入 LynxActivity", interval: 1_000 },
     );
-    // native context：Lynx 登录页渲染断言（input 元素经 accessibility 暴露）
+    // Lynx 渲染断言：logcat 确认渲染发生 + 无致命错误。
+    // 实测（2026-08-06）：#126/#127 修复后 lynx 能从 WSSecureStorage 恢复登录态
+    // （PictelioAuth.loginWithRefreshToken 调用），渲染主界面而非登录页；且
+    // Lynx 4.0.1 accessibility 树在本模拟器不暴露内容节点（TalkBack 已绑定仍空树）
+    // ——故不再断言「登录页 input 可定位」（修复前行为，已过时），改用日志断言。
     await driver.switchToNative();
     await SLEEP(5_000);
-    const input = await driver.raw.$("~输入refresh_token");
-    expect(await input.isExisting(), "Lynx 登录页 input 应可定位（accessibility 暴露）").toBe(true);
-    console.log("[S2] ✓ LynxActivity 可达，Lynx 登录页渲染（input 可定位）");
+    const { execFileSync } = await import("node:child_process");
+    const { adbPath, APP_PACKAGE } = await import("../env");
+    const pid = execFileSync(adbPath(), ["-s", ctx.serial, "shell", "pidof", APP_PACKAGE])
+      .toString()
+      .trim();
+    const logs = execFileSync(adbPath(), [
+      "-s",
+      ctx.serial,
+      "shell",
+      "logcat",
+      "-d",
+      "--pid",
+      pid,
+    ]).toString();
+    expect(
+      /onPageChanged|OnPatchFinishForFiber/u.test(logs),
+      "Lynx 应有页面渲染日志（onPageChanged/OnPatchFinishForFiber）",
+    ).toBe(true);
+    const fatal =
+      logs.match(/990200|InstantiationException|Lynx 渲染失败|bundle 加载失败|Lynx 渲染致命错误/gu) ?? [];
+    expect(fatal, `Lynx 不应有致命渲染错误（实际: ${fatal.join("; ")}）`).toEqual([]);
+    console.log("[S2] ✓ LynxActivity 可达 + Lynx 渲染成功（日志确认，无致命错误）");
   }, 120_000);
 
   it("反向切回（契约层）：写 webview → 重启 → WebView 主界面", async () => {

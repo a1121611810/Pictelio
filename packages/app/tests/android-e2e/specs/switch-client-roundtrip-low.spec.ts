@@ -68,15 +68,31 @@ describe("S2 降级：Lynx 可达 + 切回停升级页（pictelio_low）", () =>
       },
     );
     await driver.switchToNative();
-    // android-28 Lynx 引擎渲染慢（实测 40s 才稳定），用长等待
-    await driver.raw.waitUntil(async () => await driver.raw.$("~输入refresh_token").isExisting(), {
-      timeout: 60_000,
-      timeoutMsg: "Lynx 登录页 input 未出现（android-28 渲染慢）",
-      interval: 1_000,
-    });
-    const input = await driver.raw.$("~输入refresh_token");
-    expect(await input.isExisting(), "Lynx 登录页 input 应可定位").toBe(true);
-    console.log("[S2-low] ✓ LynxActivity 可达 + Lynx 登录页渲染（pictelio_low android-28）");
+    // Lynx 渲染断言（logcat）：无 token 时 lynx 渲染登录页（实测 2026-08-06：
+    // accessibility 树空、元素定位不可靠，改用渲染日志 + 无致命错误断言）
+    await SLEEP(5_000);
+    const { execFileSync } = await import("node:child_process");
+    const { adbPath, APP_PACKAGE } = await import("../env");
+    const pid = execFileSync(adbPath(), ["-s", ctx.serial, "shell", "pidof", APP_PACKAGE])
+      .toString()
+      .trim();
+    const logs = execFileSync(adbPath(), [
+      "-s",
+      ctx.serial,
+      "shell",
+      "logcat",
+      "-d",
+      "--pid",
+      pid,
+    ]).toString();
+    expect(
+      /onPageChanged|OnPatchFinishForFiber/u.test(logs),
+      "Lynx 应有页面渲染日志（onPageChanged/OnPatchFinishForFiber）",
+    ).toBe(true);
+    const fatal =
+      logs.match(/990200|InstantiationException|Lynx 渲染失败|bundle 加载失败|Lynx 渲染致命错误/gu) ?? [];
+    expect(fatal, `Lynx 不应有致命渲染错误（实际: ${fatal.join("; ")}）`).toEqual([]);
+    console.log("[S2-low] ✓ LynxActivity 可达 + Lynx 渲染成功（pictelio_low android-28）");
   }, 120_000);
 
   it("切回 WebView（契约层）→ MainActivity 停升级页（版本防护）", async () => {
