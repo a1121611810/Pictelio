@@ -94,8 +94,15 @@ GitHub Release 已发布完成。
   - 覆盖发布**不 bump 版本号**（versionCode 不变）：已安装该版本的用户**无法通过系统覆盖安装**获得新 APK。代码功能修复请走正常发布（如 4.2.4 → 4.2.5）。
   - 目标必须为**已存在且已发布**（非 draft）的 Release；`package.json` 版本与远端 tag 不一致时拒绝执行。
   - 不移动 tag、不创建新 commit、不 force push；操作范围严格限定于 GitHub Release 页面。
-  - 正常发布与覆盖发布共用同一逐包上传编排（ADR-0065）；重跑只补失败包（`--clobber` 幂等）。
+  - 正常发布与覆盖发布共用同一逐包上传编排（ADR-0065/ADR-0067）；上传默认走 **Node 原生上传器**（直连，实测端到端吞吐约为 gh 的 2.1×），重跑只补失败包（`--clobber` 幂等）。可用环境变量 `PICTELIO_UPLOADER=gh` 回退到 gh 子进程。
 - **验证**：正式覆盖前先跑 `pnpm run release -o --dry-run` 预览计划与命令，确认无误后再实际执行。
+
+## 上传网络说明（2026-08 研究结论，详见 `docs/research/github-release-upload-acceleration.md` 与 ADR-0067）
+
+- `uploads.github.com` 慢的根因是**国际链路**（CNAME 到新加坡 Azure 20.205.243.161），与客户端选型无关；发布脚本会在上传前打印「本次将走直连/代理」。
+- Node 原生上传器默认**直连**（实测直连更快且无 api.github.com 走代理的间歇 403 风险）。
+- 若发布机 shell 配置了 `HTTPS_PROXY` 且需 gh 回退模式直连，固化 `NO_PROXY=api.github.com,uploads.github.com`（**不要写 `github.com`**，否则 uploads 也被带成直连——除非确实想全直连）。
+- 任何方案都建议发布前用一次小文件实测直连/代理吞吐（时段波动可达 5 倍，ADR-0065 实测 38–190KB/s）。
 
 ## 官网部署
 

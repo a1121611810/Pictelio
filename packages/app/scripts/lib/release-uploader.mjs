@@ -13,6 +13,7 @@
 import { spawn } from "node:child_process";
 import { stat } from "node:fs/promises";
 import { basename, resolve as resolvePath } from "node:path";
+import { createNodeUploader } from "./upload-release-assets.mjs";
 
 const MAX_ATTEMPTS = 3;
 const BACKOFF_MS = [1000, 2000, 4000];
@@ -64,7 +65,9 @@ async function uploadOne({ tag, repo, path, gh, render }) {
   render({ type: "started", name, size });
 
   let lastErr;
+  let attemptsMade = 0;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    attemptsMade = attempt;
     try {
       const { elapsedMs } = await gh([
         "release",
@@ -80,6 +83,8 @@ async function uploadOne({ tag, repo, path, gh, render }) {
       return { size, elapsedMs, avgMBps };
     } catch (e) {
       lastErr = e;
+      // 不可重试错误（如 Node 上传器的 4xx 业务错误）立即失败，不白等退避
+      if (e.permanent) break;
       if (attempt < MAX_ATTEMPTS) {
         const delayMs = BACKOFF_MS[attempt - 1];
         render({ type: "retry", name, attempt, delayMs });
@@ -88,8 +93,19 @@ async function uploadOne({ tag, repo, path, gh, render }) {
     }
   }
   const stderrTail = String(lastErr?.stderr ?? lastErr?.message ?? lastErr).slice(-MAX_STDERR);
-  render({ type: "failed", name, attempts: MAX_ATTEMPTS, stderrTail });
-  return Promise.reject({ attempts: MAX_ATTEMPTS, stderrTail });
+  render({ type: "failed", name, attempts: attemptsMade, stderrTail });
+  return Promise.reject({ attempts: attemptsMade, stderrTail });
+}
+
+// 上传器选择（研究：github-release-upload-acceleration.md 附录 B/C）
+//   - 默认 Node 原生上传器（直连，实测吞吐约为 gh 的 2.1×，缓存 upload_url 复用连接）
+//   - PICTELIO_UPLOADER=gh 回退到 gh 子进程（可维护性最高，0 行自维护代码）
+// 返回 { kind: "gh" | "node", fn }，fn 兼容 gh(args) seam。
+export function resolveUploader({ env = process.env } = {}) {
+  if (env.PICTELIO_UPLOADER === "gh") {
+    return { kind: "gh", fn: defaultGhUpload };
+  }
+  return { kind: "node", fn: createNodeUploader() };
 }
 
 export async function uploadReleaseAssets({

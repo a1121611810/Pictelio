@@ -41,7 +41,8 @@ import {
   withSpinner,
 } from "./lib/release-utils.mjs";
 import { planOverwrite, executeOverwrite, probeRemote } from "./release-overwrite.mjs";
-import { uploadReleaseAssets } from "./lib/release-uploader.mjs";
+import { uploadReleaseAssets, resolveUploader } from "./lib/release-uploader.mjs";
+import { probeProxyRouting } from "./lib/proxy-probe.mjs";
 import { createUploadPanel } from "./lib/release-panel.mjs";
 
 const rootDir = resolvePath(dirname(fileURLToPath(import.meta.url)), "..");
@@ -833,13 +834,32 @@ async function main() {
         }
       }
 
-      // 第二步：逐包上传 APK（ADR-0065：每包独立进程 + 面板 + 失败隔离；
+      // 第二步：逐包上传 APK（ADR-0065 编排 + Node 原生上传器；
       // 单包最多 3 次重试由深模块内部处理）
+      // 研究结论：uploads.github.com 慢的根因是国际链路；先探测直连/代理并提示，
+      // Node 上传器默认直连（实测更快且无 api.github.com 403 风险）。
+      const routing = probeProxyRouting("uploads.github.com");
+      log(
+        `GitHub 上传路径: ${routing.mode === "direct" ? `直连（${routing.reason}）` : `经代理 ${routing.proxyUrl}（${routing.reason}）`}`,
+      );
+      const { kind: uploaderKind, fn: uploaderFn } = resolveUploader();
+      if (routing.mode === "proxy") {
+        if (uploaderKind === "node") {
+          log(
+            `Node 原生上传器将绕过代理直连（实测直连更快且无 403 风险）；如需强制走代理请设 PICTELIO_UPLOADER=gh`,
+          );
+        } else {
+          log(
+            `gh 将经代理上传；若过慢建议固化 NO_PROXY=api.github.com,uploads.github.com 强制直连`,
+          );
+        }
+      }
       const panel = createUploadPanel();
       const report = await uploadReleaseAssets({
         tag,
         repo,
         paths: apkPaths.map((p) => resolvePath(rootDir, p)),
+        gh: uploaderFn,
         render: (e) => panel.onEvent(e),
       });
       panel.finish();

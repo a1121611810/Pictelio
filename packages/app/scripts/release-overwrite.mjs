@@ -21,7 +21,8 @@ import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { resolve as resolvePath } from "node:path";
 import { tmpdir } from "node:os";
 import { parseVersion, DEFAULT_VARIANTS, runOutputAsync } from "./lib/release-utils.mjs";
-import { uploadReleaseAssets } from "./lib/release-uploader.mjs";
+import { uploadReleaseAssets, resolveUploader } from "./lib/release-uploader.mjs";
+import { probeProxyRouting } from "./lib/proxy-probe.mjs";
 import { createUploadPanel } from "./lib/release-panel.mjs";
 
 /**
@@ -160,13 +161,31 @@ export function planOverwrite({
  * @param {boolean} [deps.dryRun] true = 只打印将执行的 gh 命令，零调用
  * @returns {Promise<{edited: boolean, uploaded: string[], restored: string[], dryRun: boolean}>}
  */
-// 默认上传实现：逐包上传深模块 + 上传面板（ADR-0065）。
+// 默认上传实现：逐包上传深模块 + 上传面板（ADR-0065）+ Node 原生上传器（默认直连）。
 // 注入 upload 端口便于单测：签名 ({ tag, repo, paths, panel }) → Promise<UploadReport>
 async function defaultUploadAssets({ tag, repo, paths, panel }) {
+  // 上传前探测直连/代理并提示（研究：github-release-upload-acceleration.md 附录 A）
+  const routing = probeProxyRouting("uploads.github.com");
+  console.log(
+    `[release] GitHub 上传路径: ${routing.mode === "direct" ? `直连（${routing.reason}）` : `经代理 ${routing.proxyUrl}（${routing.reason}）`}`,
+  );
+  const { kind: uploaderKind, fn: uploaderFn } = resolveUploader();
+  if (routing.mode === "proxy") {
+    if (uploaderKind === "node") {
+      console.log(
+        `[release] Node 原生上传器将绕过代理直连（实测直连更快且无 403 风险）；如需强制走代理请设 PICTELIO_UPLOADER=gh`,
+      );
+    } else {
+      console.log(
+        `[release] gh 将经代理上传；若过慢建议固化 NO_PROXY=api.github.com,uploads.github.com 强制直连`,
+      );
+    }
+  }
   const report = await uploadReleaseAssets({
     tag,
     repo,
     paths,
+    gh: uploaderFn,
     render: (e) => panel?.onEvent(e),
   });
   panel?.finish();
