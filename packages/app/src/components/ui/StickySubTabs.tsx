@@ -2,10 +2,10 @@ import type { Component, JSX } from "solid-js";
 
 interface StickySubTabsProps {
   /**
-   * 上方滚动 header 是否可见。
-   * - 可见：停靠其下（top-12，48px，header 高度）
-   * - 隐藏：占满顶部（top-0），消除 header 平移移出后留下的空隙
-   * 停靠点切换与 header 的 translate 动画同 duration/curve 令牌，无缝衔接。
+   * 上方滚动 header 是否可见（TS 层必填；运行时未传按 undefined 容错 = 不可见）。
+   * - 可见：子标签停靠 header 下方（sticky top-12，视觉 y=48px）
+   * - 隐藏：transform 上移 48px（-translate-y-12，与 header h-12 高度耦合），
+   *   视觉贴顶 y=0，与 header 的 translate 移出动画同机制同步，消除空隙
    */
   headerVisible: boolean;
   /** 额外类（内边距等）；sticky / 停靠点 / 动画由本组件统一管理 */
@@ -16,18 +16,22 @@ interface StickySubTabsProps {
 /**
  * 滚动 header 下方的 sticky 子标签容器（深模块，见 ADR-0044 配套约定）。
  *
- * 背景：HomePage 的 header 是 sticky + translate 向上移出（滚动驱动显隐），
- * 但 header 移出只是视觉位移，文档流占位不释放；若子标签停靠点写死 top-12，
- * header 消失后顶部会留 48px 空隙（"卡在半空"）。
- * 本组件把「停靠点随 header 显隐联动」收敛为单一接口：调用方只需告知
- * headerVisible，停靠点切换 + 过渡动画 + 玻璃容器令牌全部封装在实现内。
+ * 背景：HomePage 的 header 是 sticky top-0 + translate 向上移出（滚动驱动
+ * 显隐）。曾尝试「header 隐藏时把子标签停靠点切到 top-0」——失败，因为
+ * sticky 元素的 top 受流位置约束：header 的 sticky 占位永不释放，子标签
+ * 流位置下限是 48px（top-0 的锁定点低于流位置，sticky 永不锁定到 y=0，
+ * 顶部留 48px 空隙）；且移动 WebView 对 sticky 的 top 变化不走 transition。
+ *
+ * 正确做法：停靠点保持 top-12（可达），header 隐藏时用 transform 视觉上移
+ * 48px——transform 不受 sticky 流位置约束，且与 header 的 translate 同为
+ * 合成层动画（同 duration/curve 令牌），两段动画完全同步。
  */
 const StickySubTabs: Component<StickySubTabsProps> = (props) => (
   <div
-    class={`sticky z-10 surface-appbar transition-[top] duration-[var(--durationNormal)] ease-[var(--curveEasyEase)] ${props.class ?? ""}`}
+    class={`sticky top-12 z-10 surface-appbar transition-transform duration-[var(--durationNormal)] ease-[var(--curveEasyEase)] ${props.class ?? ""}`}
     classList={{
-      "top-0": !props.headerVisible,
-      "top-12": props.headerVisible,
+      "translate-y-0": props.headerVisible,
+      "-translate-y-12": !props.headerVisible,
     }}
   >
     {props.children}
