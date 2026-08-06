@@ -162,10 +162,14 @@ describe("S2 双向闭环：WebView → Lynx → 切回 WebView（pictelio_ui）
     await driver.raw.execute(
       `(() => { const el = document.querySelector("[aria-label='切换渲染引擎']"); if (el) el.click(); })()`,
     );
-    await SLEEP(1_000);
+    // T2 起：点击入口行 → 跳转说明页 /client-switch（不再是确认弹窗）
+    await driver.raw.waitUntil(
+      async () => (await driver.raw.getUrl().catch(() => "")).includes("/client-switch"),
+      { timeout: 10_000, timeoutMsg: "未跳转到 /client-switch 说明页", interval: 500 },
+    );
     await driver.raw.waitUntil(
       async () => await driver.raw.$("fluent-button=确认切换").isExisting(),
-      { timeout: 10_000, timeoutMsg: "确认切换对话框未出现", interval: 500 },
+      { timeout: 10_000, timeoutMsg: "说明页确认切换按钮未出现", interval: 500 },
     );
     await driver.raw.execute(
       `(() => { const e2e = (window).pictelioE2e; if (e2e && e2e.confirmSwitchClient) { e2e.confirmSwitchClient(); document.title = 'E2E-HOOK-CALLED'; } else { document.title = 'E2E-HOOK-MISSING'; } })()`,

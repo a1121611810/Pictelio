@@ -167,14 +167,17 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("S2 单向链路：WebView →
       { timeout: 10_000, timeoutMsg: "未找到切换渲染引擎行", interval: 500 },
     );
     await clickEl("[aria-label='切换渲染引擎']");
-    await SLEEP(1_000);
 
-    // 确认对话框出现后，通过 E2E 钩子触发确认（动态 showModal dialog 内按钮
-    // 无法被 WebDriver/脚本点击——浏览器级限制，真实用户触摸正常；钩子仅在
-    // DEV 构建存在，生产被消除）
+    // T2 起：点击入口行 → 跳转说明页 /client-switch（不再是确认弹窗）。
+    // 确认按钮与 E2E 钩子均由说明页渲染/注册（钩子仅在 DEV/e2e 构建存在）。
+    await driver.raw.waitUntil(async () => (await url()).includes("/client-switch"), {
+      timeout: 10_000,
+      timeoutMsg: "未跳转到 /client-switch 说明页",
+      interval: 500,
+    });
     await driver.raw.waitUntil(
       async () => await driver.raw.$("fluent-button=确认切换").isExisting(),
-      { timeout: 10_000, timeoutMsg: "确认切换对话框未出现", interval: 500 },
+      { timeout: 10_000, timeoutMsg: "说明页确认切换按钮未出现", interval: 500 },
     );
     await driver.raw.execute(
       `(() => {
