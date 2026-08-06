@@ -531,7 +531,7 @@ html:not(.dark) .variant-c .vc-dot.active {
 .variant-c .vc-engines {
   position: relative;
   overflow: hidden;
-  padding: 60px max(24px, 4vw) 40px;
+  padding: 60px max(24px, 4vw) 64px;
 }
 .variant-c .vc-engines::before {
   content: "";
@@ -612,11 +612,19 @@ html:not(.dark) .variant-c .vc-dot.active {
   margin-top: 28px;
 }
 
-/* ── 安全与隐私条带 ── */
+/* ── 安全与隐私条带（收在双引擎区块内）── */
 .variant-c .vc-security {
   position: relative;
-  overflow: hidden;
-  padding: 24px max(24px, 4vw) 80px;
+  padding: 36px 0 0;
+  margin-top: 36px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.variant-c .vc-security-head {
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: #999;
+  margin-bottom: 16px;
 }
 .variant-c .vc-security::before {
   content: "";
@@ -681,6 +689,12 @@ html:not(.dark) .variant-c .vc-engine-tag {
 html:not(.dark) .variant-c .vc-security-item {
   background: var(--glass-bg);
   border-color: var(--glass-border);
+}
+html:not(.dark) .variant-c .vc-security {
+  border-top-color: rgba(0, 0, 0, 0.06);
+}
+html:not(.dark) .variant-c .vc-security-head {
+  color: #5a5f6a;
 }
 html:not(.dark) .variant-c .vc-security-title {
   color: #2b579a;

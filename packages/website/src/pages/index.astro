@@ -11,12 +11,6 @@ const features = [
     highlight: true,
   },
   {
-    title: "双客户端引擎",
-    details:
-      "WebView（Fluent 2 设计系统）与 vue-lynx 原生渲染双引擎，设置内一键切换、即时生效，同一账号数据无缝迁移。",
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg>`,
-  },
-  {
     title: "双 Feed 内容浏览",
     details:
       "插画推荐/关注双 Tab，小说推荐/关注/收藏三 Feed。瀑布流/单列/网格三种布局自由切换，无限滚动加载，位置自动记忆。",
@@ -45,12 +39,6 @@ const features = [
     details:
       "即时导航秒开页面框架 + 骨架屏占位，数据随后到达；虚拟滚动低内存占用，二段下拉刷新，布局位置自动记忆。",
     icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
-  },
-  {
-    title: "安全与隐私",
-    details:
-      "access_token 零 JS 泄漏（原生网关持有），refresh_token Android Keystore 加密，图片三级缓存，R18 过滤/举报/屏蔽。",
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>`,
   },
 ];
 
@@ -143,24 +131,9 @@ const screenshots = [
       </div>
     </section>
 
-    <!-- Features -->
-    <section class="vc-features">
-      <h2 class="vc-features-title vc-reveal">功能亮点</h2>
-      <p class="vc-features-sub vc-reveal vc-reveal-delay-1">一个应用，畅享插画与小说的双重世界</p>
-      <div class="vc-grid">
-        {features.map((f, i) => (
-          <div class="vc-card vc-reveal" class:list={{ [`vc-reveal-delay-${Math.min(i + 1, 4)}`]: true, "vc-card-highlight": f.highlight }}>
-            <div class="vc-card-icon" set:html={f.icon} />
-            <h3 class="vc-card-title">{f.title}</h3>
-            <p class="vc-card-desc">{f.details}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-
-    <!-- Dual engine -->
+    <!-- Dual engine (架构差异化卖点，紧随 Hero) -->
     <section class="vc-engines">
-      <h2 class="vc-engines-title vc-reveal">双引擎架构</h2>
+      <h2 class="vc-engines-title vc-reveal">双引擎，随心切换</h2>
       <p class="vc-engines-sub vc-reveal vc-reveal-delay-1">同一应用，两种渲染内核，随你切换</p>
       <div class="vc-engine-grid">
         {engines.map((e, i) => (
@@ -177,15 +150,31 @@ const screenshots = [
       <p class="vc-engine-note vc-reveal">
         在设置中一键切换引擎，切换说明页会明确两种引擎的差异与注意事项，切换即时生效。
       </p>
+
+      <!-- Security（架构级安全设计，收在引擎区块内） -->
+      <div class="vc-security">
+        <h3 class="vc-security-head vc-reveal">安全设计</h3>
+        <div class="vc-security-grid">
+          {security.map((s, i) => (
+            <div class="vc-security-item vc-reveal" class:list={{ [`vc-reveal-delay-${Math.min(i + 1, 4)}`]: true }}>
+              <h4 class="vc-security-title">{s.title}</h4>
+              <p class="vc-security-desc">{s.details}</p>
+            </div>
+          ))}
+        </div>
+      </div>
     </section>
 
-    <!-- Security -->
-    <section class="vc-security">
-      <div class="vc-security-grid">
-        {security.map((s, i) => (
-          <div class="vc-security-item vc-reveal" class:list={{ [`vc-reveal-delay-${Math.min(i + 1, 4)}`]: true }}>
-            <h4 class="vc-security-title">{s.title}</h4>
-            <p class="vc-security-desc">{s.details}</p>
+    <!-- Features -->
+    <section class="vc-features">
+      <h2 class="vc-features-title vc-reveal">功能亮点</h2>
+      <p class="vc-features-sub vc-reveal vc-reveal-delay-1">一个应用，畅享插画与小说的双重世界</p>
+      <div class="vc-grid">
+        {features.map((f, i) => (
+          <div class="vc-card vc-reveal" class:list={{ [`vc-reveal-delay-${Math.min(i + 1, 4)}`]: true, "vc-card-highlight": f.highlight }}>
+            <div class="vc-card-icon" set:html={f.icon} />
+            <h3 class="vc-card-title">{f.title}</h3>
+            <p class="vc-card-desc">{f.details}</p>
           </div>
         ))}
       </div>
