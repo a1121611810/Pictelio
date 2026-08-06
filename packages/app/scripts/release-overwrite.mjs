@@ -21,6 +21,8 @@ import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { resolve as resolvePath } from "node:path";
 import { tmpdir } from "node:os";
 import { parseVersion, DEFAULT_VARIANTS, runOutputAsync } from "./lib/release-utils.mjs";
+import { uploadReleaseAssets } from "./lib/release-uploader.mjs";
+import { createUploadPanel } from "./lib/release-panel.mjs";
 
 /**
  * 远端状态探测（纯逻辑，run 依赖注入便于单测四分支）。
@@ -158,7 +160,23 @@ export function planOverwrite({
  * @param {boolean} [deps.dryRun] true = 只打印将执行的 gh 命令，零调用
  * @returns {Promise<{edited: boolean, uploaded: string[], restored: string[], dryRun: boolean}>}
  */
-export async function executeOverwrite(plan, { runGh, dryRun = false }) {
+// 默认上传实现：逐包上传深模块 + 上传面板（ADR-0065）。
+// 注入 upload 端口便于单测：签名 ({ tag, repo, paths, panel }) → Promise<UploadReport>
+async function defaultUploadAssets({ tag, repo, paths, panel }) {
+  const report = await uploadReleaseAssets({
+    tag,
+    repo,
+    paths,
+    render: (e) => panel?.onEvent(e),
+  });
+  panel?.finish();
+  return report;
+}
+
+export async function executeOverwrite(
+  plan,
+  { runGh, upload = defaultUploadAssets, dryRun = false } = {},
+) {
   const result = { edited: false, uploaded: [], restored: [], dryRun };
   const tmpDirs = [];
   let backupDir = null;
@@ -205,63 +223,56 @@ export async function executeOverwrite(plan, { runGh, dryRun = false }) {
       }
     }
 
-    // ── 3. 覆盖上传资产（3 次重试；失败从备份恢复被删资产） ──
+    // ── 3. 逐包上传资产（失败隔离 + 仅恢复失败资产；重试由深模块内部处理） ──
     if (plan.assetsToUpload.length > 0) {
-      const uploadArgs = [
-        "release",
-        "upload",
-        plan.tag,
-        "--repo",
-        plan.repo,
-        "--clobber",
-        ...plan.assetsToUpload,
-      ];
       if (dryRun) {
-        console.log(`[release] [dry-run] gh ${uploadArgs.join(" ")}`);
-      } else {
-        let lastErr;
-        for (let attempt = 1; attempt <= 3; attempt++) {
-          try {
-            await runGh(uploadArgs);
-            lastErr = null;
-            break;
-          } catch (e) {
-            lastErr = e;
-            if (attempt < 3) {
-              const delay = Math.min(1000 * 2 ** (attempt - 1), 4000);
-              console.log(`[release] APK 上传失败（第 ${attempt} 次），${delay / 1000}s 后重试...`);
-              await new Promise((r) => setTimeout(r, delay));
-            }
-          }
+        for (const p of plan.assetsToUpload) {
+          console.log(
+            `[release] [dry-run] gh release upload ${plan.tag} --repo ${plan.repo} --clobber ${p}`,
+          );
         }
-        if (lastErr) {
+      } else {
+        const panel = createUploadPanel();
+        const report = await upload({
+          tag: plan.tag,
+          repo: plan.repo,
+          paths: plan.assetsToUpload,
+          panel,
+        });
+        if (report.failed.length > 0) {
           keepBackup = true; // 失败路径保留备份，供自动恢复失败后人工处理
+          const failedNames = report.failed.map((f) => f.name);
           if (backupDir) {
-            for (const asset of plan.assetsToReplace) {
+            for (const name of failedNames) {
+              if (!plan.assetsToReplace.includes(name)) {
+                console.error(`[release] ⚠ ${name} 是新增资产，无备份可恢复（可重跑命令补传）`);
+                continue;
+              }
               try {
                 // 恢复同样使用 --clobber：若旧资产仍存在（主上传在删除前失败），
                 // 不带 --clobber 的上传会因同名资产已存在而失败，恢复将落空。
-                await runGh([
-                  "release",
-                  "upload",
-                  plan.tag,
-                  "--repo",
-                  plan.repo,
-                  "--clobber",
-                  resolvePath(backupDir, asset),
-                ]);
-                result.restored.push(asset);
+                await upload({
+                  tag: plan.tag,
+                  repo: plan.repo,
+                  paths: [resolvePath(backupDir, name)],
+                  panel: null,
+                });
+                result.restored.push(name);
               } catch (restoreErr) {
-                console.error(`[release] ⚠ 从备份恢复失败: ${asset}: ${restoreErr.message}`);
+                console.error(`[release] ⚠ 从备份恢复失败: ${name}: ${restoreErr.message}`);
               }
             }
           }
-          lastErr.message =
-            `${lastErr.message}\n已尝试从备份恢复被覆盖的资产: ${result.restored.join(", ") || "无"}。` +
-            (backupDir ? `\n备份目录已保留：${backupDir}` : "");
-          throw lastErr;
+          const err = new Error(
+            `资产上传失败: ${report.failed
+              .map((f) => `${f.name}（尝试 ${f.attempts} 次）`)
+              .join(", ")}。` +
+              `已尝试从备份恢复被覆盖的资产: ${result.restored.join(", ") || "无"}。` +
+              (backupDir ? `\n备份目录已保留：${backupDir}` : ""),
+          );
+          throw err;
         }
-        result.uploaded = plan.assetsToUpload.map((p) => p.split(/[\\/]/u).pop());
+        result.uploaded = report.succeeded.map((s) => s.name);
       }
     }
   } finally {

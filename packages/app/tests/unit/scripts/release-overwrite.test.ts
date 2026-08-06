@@ -186,28 +186,40 @@ describe("probeRemote", () => {
 });
 
 describe("executeOverwrite", () => {
+  function successUpload() {
+    return vi.fn(async ({ paths }) => ({
+      succeeded: paths.map((p) => ({ name: p.split("/").pop() })),
+      failed: [],
+      totalElapsedMs: 0,
+    }));
+  }
+
   it("dryRun=true 时不调用 runGh，返回未执行结果", async () => {
     const runGh = vi.fn();
+    const upload = vi.fn();
     const plan = makePlan();
-    const result = await executeOverwrite(plan, { runGh, dryRun: true });
+    const result = await executeOverwrite(plan, { runGh, upload, dryRun: true });
     expect(runGh).not.toHaveBeenCalled();
+    expect(upload).not.toHaveBeenCalled();
     expect(result).toEqual({ edited: false, uploaded: [], restored: [], dryRun: true });
   });
 
-  it("全流程调用顺序：download 备份 → edit 文案 → upload --clobber 资产", async () => {
+  it("全流程：download 备份 → edit 文案 → 逐包上传深模块（注入 upload 端口）", async () => {
     const calls = [];
     const runGh = vi.fn(async (args) => {
       calls.push(args);
     });
+    const upload = successUpload();
     const plan = makePlan();
-    const result = await executeOverwrite(plan, { runGh, dryRun: false });
+    const result = await executeOverwrite(plan, { runGh, upload, dryRun: false });
 
     expect(calls[0][1]).toBe("download"); // 第一步：备份
     expect(calls.some((c) => c[1] === "edit" && c.includes("--notes-file"))).toBe(true);
-    const uploadCall = calls.find((c) => c[1] === "upload" && c.includes("--clobber"));
-    expect(uploadCall).toBeDefined();
-    const uploadNames = uploadCall.filter((a) => a.endsWith(".apk")).map((p) => p.split("/").pop());
-    expect(uploadNames).toEqual(EXPECTED_ASSETS);
+    expect(upload).toHaveBeenCalledTimes(1);
+    const uploadInput = upload.mock.calls[0][0];
+    expect(uploadInput.tag).toBe("v4.2.4");
+    expect(uploadInput.repo).toBe(REPO);
+    expect(uploadInput.paths).toEqual(fullLocalApks.map((x) => x.path));
     expect(result.edited).toBe(true);
     expect(result.uploaded).toEqual(EXPECTED_ASSETS);
     expect(result.restored).toEqual([]);
@@ -218,10 +230,11 @@ describe("executeOverwrite", () => {
     const runGh = vi.fn(async (args) => {
       calls.push(args);
     });
+    const upload = successUpload();
     const plan = makePlan({ notes: null });
-    await executeOverwrite(plan, { runGh, dryRun: false });
+    await executeOverwrite(plan, { runGh, upload, dryRun: false });
     expect(calls.some((c) => c[1] === "edit")).toBe(false);
-    expect(calls.some((c) => c[1] === "upload" && c.includes("--clobber"))).toBe(true);
+    expect(upload).toHaveBeenCalledTimes(1);
   });
 
   it("includeAssets=false（仅文案模式）→ execute 不备份不上传，仅 edit", async () => {
@@ -229,10 +242,11 @@ describe("executeOverwrite", () => {
     const runGh = vi.fn(async (args) => {
       calls.push(args);
     });
+    const upload = vi.fn();
     const plan = makePlan({ includeAssets: false });
-    await executeOverwrite(plan, { runGh, dryRun: false });
+    await executeOverwrite(plan, { runGh, upload, dryRun: false });
     expect(calls.some((c) => c[1] === "download")).toBe(false);
-    expect(calls.some((c) => c[1] === "upload")).toBe(false);
+    expect(upload).not.toHaveBeenCalled();
     expect(calls.some((c) => c[1] === "edit")).toBe(true);
   });
 
@@ -241,6 +255,7 @@ describe("executeOverwrite", () => {
     const runGh = vi.fn(async (args) => {
       calls.push(args);
     });
+    const upload = vi.fn();
     // 本地全部缺失：不构建也不上传（仅文案模式），但远端有资产时仍备份——此处让 upload 清单为空
     const plan = makePlan({
       localApks: [
@@ -250,29 +265,37 @@ describe("executeOverwrite", () => {
       ],
     });
     expect(plan.assetsToUpload).toEqual([]);
-    await executeOverwrite(plan, { runGh, dryRun: false });
-    expect(calls.some((c) => c[1] === "upload")).toBe(false);
+    await executeOverwrite(plan, { runGh, upload, dryRun: false });
+    expect(upload).not.toHaveBeenCalled();
   });
 
-  it("upload 失败（重试耗尽）→ 从备份恢复被覆盖资产后抛出错误", async () => {
+  it("部分失败 → 仅恢复被覆盖资产（webview），新增资产（full/lynx）无备份跳过恢复", async () => {
+    const calls = [];
     const runGh = vi.fn(async (args) => {
-      // 仅主上传（多文件，>7 参数）抛错；恢复上传（单文件 --clobber，7 参数）成功
-      if (args[1] === "upload" && args.includes("--clobber") && args.length > 7) {
-        throw new Error("upload failed");
+      calls.push(args);
+    });
+    const upload = vi.fn(async ({ paths }) => {
+      const isFirst = upload.mock.calls.length === 1;
+      if (isFirst) {
+        return {
+          succeeded: [],
+          failed: paths.map((p) => ({ name: p.split("/").pop(), attempts: 3 })),
+          totalElapsedMs: 0,
+        };
       }
+      return { succeeded: [], failed: [], totalElapsedMs: 0 };
     });
     const plan = makePlan();
-    await expect(executeOverwrite(plan, { runGh, dryRun: false })).rejects.toThrow(/upload failed/);
+    const err = await executeOverwrite(plan, { runGh, upload, dryRun: false }).catch((e) => e);
+    expect(err.message).toMatch(/资产上传失败/);
+    expect(err.message).toMatch(/备份目录已保留/);
 
-    const clobberUploads = runGh.mock.calls.filter(
-      ([a]) => a[1] === "upload" && a.includes("--clobber"),
-    );
-    const mainUploads = clobberUploads.filter(([a]) => a.length > 7);
-    expect(mainUploads.length).toBe(3); // 主上传 3 次重试
-    const restoreCalls = clobberUploads.filter(([a]) => a.length === 7);
-    // 仅被覆盖的 webview 需要恢复；恢复同样带 --clobber（旧资产仍存在时可覆盖）
-    expect(restoreCalls.length).toBe(1);
-    expect(restoreCalls[0][0].includes("--clobber")).toBe(true);
-    expect(restoreCalls[0][0].at(-1)).toMatch(/pictelio-4\.2\.4-webview\.apk$/);
+    // 主上传 1 次 + 恢复 1 次（仅 webview，因为只有它在 assetsToReplace 里有备份）
+    expect(upload).toHaveBeenCalledTimes(2);
+    const mainInput = upload.mock.calls[0][0];
+    expect(mainInput.paths).toHaveLength(3);
+    const restoreInput = upload.mock.calls[1][0];
+    expect(restoreInput.paths).toHaveLength(1);
+    expect(restoreInput.paths[0].endsWith("pictelio-4.2.4-webview.apk")).toBe(true);
   });
 });

@@ -41,6 +41,8 @@ import {
   withSpinner,
 } from "./lib/release-utils.mjs";
 import { planOverwrite, executeOverwrite, probeRemote } from "./release-overwrite.mjs";
+import { uploadReleaseAssets } from "./lib/release-uploader.mjs";
+import { createUploadPanel } from "./lib/release-panel.mjs";
 
 const rootDir = resolvePath(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolvePath(rootDir, "../.."); // monorepo 根（git 仓库根）
@@ -831,34 +833,26 @@ async function main() {
         }
       }
 
-      // 第二步：上传 APK（单独步骤，慢但可重试；#119 循环多变体）
-      let uploadErr;
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-          const uploadArgs = [
-            "release",
-            "upload",
-            tag,
-            "--repo",
-            repo,
-            "--clobber",
-            ...apkPaths.map((p) => resolvePath(rootDir, p)),
-          ];
-          await runWithSpinner(`上传 APK (第 ${attempt} 次)`, "gh", uploadArgs);
-          uploadErr = null;
-          break;
-        } catch (e) {
-          uploadErr = e;
-          if (attempt < 3) {
-            const delay = Math.min(1000 * 2 ** (attempt - 1), 4000);
-            log(`APK 上传失败（第 ${attempt} 次），${delay / 1000}s 后重试...`);
-            await new Promise((r) => setTimeout(r, delay));
-          }
-        }
-      }
-      if (uploadErr) {
+      // 第二步：逐包上传 APK（ADR-0065：每包独立进程 + 面板 + 失败隔离；
+      // 单包最多 3 次重试由深模块内部处理）
+      const panel = createUploadPanel();
+      const report = await uploadReleaseAssets({
+        tag,
+        repo,
+        paths: apkPaths.map((p) => resolvePath(rootDir, p)),
+        render: (e) => panel.onEvent(e),
+      });
+      panel.finish();
+      if (report.failed.length > 0) {
+        const uploadErr = new Error(
+          `APK 上传失败（${report.failed.length}/${apkPaths.length} 个包）:\n` +
+            report.failed
+              .map((f) => `  - ${f.name}: 尝试 ${f.attempts} 次，${f.stderrTail}`)
+              .join("\n"),
+        );
         uploadErr.relTag = tag;
         uploadErr.relTitle = title;
+        uploadErr.failedAssets = report.failed.map((f) => f.name);
         throw uploadErr;
       }
     } finally {
@@ -946,9 +940,15 @@ main().catch(async (error) => {
     } else if (error.stepN === 6) {
       const repoKey = getRepoSlug();
       const relTag = error.relTag || "vX.Y.Z";
-      const apkRels = apkPathsFor(publishedVersion, resolveVariants())
-        .map((p) => `packages/app/${p}`)
-        .join(" ");
+      const apkRels = apkPathsFor(publishedVersion, resolveVariants()).map(
+        (p) => `packages/app/${p}`,
+      );
+      const failedAssets = error.failedAssets || [];
+      const targets =
+        failedAssets.length > 0
+          ? apkRels.filter((p) => failedAssets.includes(p.split("/").pop()))
+          : apkRels;
+      const uploadTargets = targets.length > 0 ? targets : apkRels;
       // P6：changelog 在 step 2 已写入 fastlane（未提交但文件在），直接指向文件
       const notesFile = `packages/app/fastlane/metadata/android/en-US/changelogs/${publishedVersionCode}.txt`;
       console.error(`\n   已完成的步骤: 5/6`);
@@ -957,8 +957,10 @@ main().catch(async (error) => {
       console.error(
         `        gh release create ${relTag} --repo ${repoKey} --title "${error.relTitle || `Pictelio ${relTag}`}" --notes-file ${notesFile}`,
       );
-      console.error(`     2. 上传 APK（若 release 已存在可跳过第 1 步）:`);
-      console.error(`        gh release upload ${relTag} --repo ${repoKey} --clobber ${apkRels}`);
+      console.error(`     2. 上传 APK（若 release 已存在可跳过第 1 步；仅列未成功包）:`);
+      for (const rel of uploadTargets) {
+        console.error(`        gh release upload ${relTag} --repo ${repoKey} --clobber ${rel}`);
+      }
       console.error(
         `     （若 ${notesFile} 不存在，可改为 --notes "Pictelio ${relTag}" 或手动粘贴 changelog）`,
       );

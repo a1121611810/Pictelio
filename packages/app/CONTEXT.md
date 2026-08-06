@@ -197,3 +197,16 @@ NavBar 胶囊中央的圆形按钮，是搜索页的主入口，仅存在于列�
 
 **搜索合流（Search Merge）**：
 客户端将 `search/illust` 和 `search/novel` 的响应合并为统一列表的过程。以 `create_date` 为主排序键，同类型内部保持 API 返回的相对顺序。合流后的每一项具有统一结构（`SearchResultItem`），包含类型标记、作品实体和排序时间戳。
+
+### 发布上传
+
+**变体 APK（Variant APK）**：
+full / webview / lynx 三个 flavor 对应的签名 APK，正常发布时全部上传到同一个 GitHub Release。路径与命名由 `apkPathsFor(version, variants)` 统一生成。
+_Avoid_: 包、安装包
+
+**逐包上传（Per-asset upload）**：
+发布脚本对每个变体 APK 独立启动一条 `gh release upload` 子进程、独立重试（最多 3 次）并互不阻塞的编排方式。_Avoid_ 用「并发上传」描述本特性——gh 单命令内部本来就并发（Concurrency=5），逐包上传的动机是逐包可见性与失败隔离。
+
+**上传面板（Upload panel）**：
+发布脚本 step 6 与覆盖发布模式在 TTY 下逐行渲染每个变体 APK 上传状态（变体、状态、文件大小、已耗时、重试次数）的展示形态；非 TTY 降级为逐事件文本行。
+_Avoid_: 进度条（gh 不提供逐文件字节级进度，面板显示的是耗时而非字节）
