@@ -125,8 +125,9 @@ public class LynxActivity extends AppCompatActivity {
 
     /**
      * 渲染期错误处理（ADR-0064）：仅致命渲染中断类错误弹兜底页，其余仅打日志。
-     * 致命信号：errorCode 9902（Lynx 渲染系统错误分类）或消息含
-     * InstantiationException（注解生成类反射失败，issue #132 白屏根因）。
+     * 致命信号：errorCode 9902/990200（Lynx 渲染系统错误分类码/完整码，SDK 版本
+     * 粒度不一故双匹配）或消息含 InstantiationException（注解生成类反射失败，
+     * issue #132 白屏根因），或 isFatal。
      * 避免对可恢复的轻量错误（如单个组件 props 异常）误伤整页。
      */
     private void handleRenderError(LynxError error) {
