@@ -6,9 +6,14 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { downloadUgoiraFrames, type UgoiraFrameData } from '../api/ugoira'
 import { ugoiraMode } from '../stores/settingsStore'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   illustId: number
-}>()
+  /** 容器显式高度（vw 字符串，如 "150vw"）：详情页按原图比例传入（spec：详情比例显示）；
+   *  默认 "100vw"（1:1 正方形）。原生 LynxView 下 aspect-ratio 容器不可靠，显式高度已验证（issue #138） */
+  heightVw?: string
+}>(), {
+  heightVw: '100vw',
+})
 
 const currentSrc = ref('')
 const loading = ref(true)
@@ -74,8 +79,8 @@ onBeforeUnmount(() => {
 
 <template>
   <view class="w-full flex flex-col items-center">
-    <view v-if="loading" class="shimmer w-full aspect-[1/1] rounded-[var(--borderRadiusLarge)]" />
-    <image v-else-if="currentSrc" class="w-full aspect-[1/1] rounded-[var(--borderRadiusLarge)]" :src="currentSrc" :mode="'aspectFit'" />
+    <view v-if="loading" class="shimmer w-full rounded-[var(--borderRadiusLarge)]" :style="{ height: heightVw }" />
+    <image v-else-if="currentSrc" class="w-full rounded-[var(--borderRadiusLarge)]" :style="{ height: heightVw }" :src="currentSrc" :mode="'aspectFit'" />
     <text v-if="errorMsg" class="text-sm text-danger p-4">{{ errorMsg }}</text>
   </view>
 </template>

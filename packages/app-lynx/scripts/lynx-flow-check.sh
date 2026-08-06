@@ -219,6 +219,26 @@ fi
 # 小说列表 = 有顶部栏的文本页（text/me；推荐瀑布流 recommended 表示未切过去）
 [ "$ST6" = "recommended" ] || [ "$ST6" = "login" ] || [ "$ST6" = "blank" ] || echo "   ✓ 进入小说列表（$ST6）"
 [ "$ST6" != "recommended" ] || { echo "❌ 未进入小说列表（仍在推荐页）"; exit 1; }
+# [spec] 小说列表内容非空断言：item-key 传数字 → lynx 220201 illegal item-key → 列表条目不渲染
+# （骨架屏消失后纯空白）。内容区（顶部栏下方）暗色文本像素占比过低视为空白。
+shot nv_content
+NVC=$(python3 - scripts/lynx-screen-analyze.py <<'PYEOF' || true
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location('a', sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+w, h, rows = m.load_png('/tmp/flow_nv_content.png')
+dark = 0; total = 0
+for y in range(int(h * 0.18), int(h * 0.8), 6):
+    for x in range(0, w, 12):
+        r, g, b = m.pixel(rows, y, x)
+        total += 1
+        if r < 200 and g < 200 and b < 200:
+            dark += 1
+print(round(dark / total, 4))
+PYEOF
+)
+echo "   小说列表内容区暗色像素占比: ${NVC:-0}"
+python3 -c "exit(0 if float('${NVC:-0}') > 0.003 else 1)" || { echo "❌ 小说列表空白（疑似 220201 item-key 回归）"; exit 1; }
 adb shell input tap $(sx 270) $(sy 330); sleep 6   # 列表第一条 → 小说正文
 shot nv2
 echo "   小说正文: $(classify nv2)"
@@ -317,5 +337,10 @@ echo "   滚回顶部后红色像素：$R_TOP2（应回落）"
 echo ""
 echo "════════ 完整流程结果 ════════"
 echo "✅ 全部通过：登录 → 推荐滚动 → 卡片收藏 → 插画详情 → 小说 → 我的/R18 → 设置页滚动"
-echo "（错误码：220201/99900 检查）"
-adb logcat -d 2>/dev/null | grep -cE "220201|99900|990200" || true
+# [spec] 错误码断言：220201（illegal item-key → 小说列表空白根因）必须为 0；
+# 99900/990200 仅打印作参考（可能来自其他瞬时场景，不设断言避免误伤）
+echo "（错误码检查：220201 断言为 0；99900/990200 仅参考）"
+N_220201=$(adb logcat -d 2>/dev/null | grep -c "220201" || true)
+echo "   220201 计数: $N_220201"
+[ "$N_220201" -eq 0 ] || { echo "❌ 发现 220201（list item-key 应为 String，见 ADR-0055 §4）"; exit 1; }
+echo "   99900/990200 计数: $(adb logcat -d 2>/dev/null | grep -cE "99900|990200" || true)（参考）"

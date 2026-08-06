@@ -63,8 +63,11 @@ function openDetail(id: number) {
   void navigate(`/illust/${id}`)
 }
 
-// 受限条目图片区：吞没 tap（遮罩点击无任何反应，issue #91）
-function swallowRestricted() {}
+// 图片区点击（spec：列表交互）：受限条目（R18/R18G 且开关关闭）不跳详情，其余进详情。
+// 外层 .stop 继续保证遮罩点击不穿透；RestrictOverlay 自身 @tap="swallow" 双保险。
+function onImageTap(item: PixivIllust) {
+  if (!isRestricted(item)) openDetail(item.id)
+}
 
 onMounted(fetchFirstPage)
 </script>
@@ -107,7 +110,7 @@ onMounted(fetchFirstPage)
       >
         <!-- [lynx:fix] 原生 list-item 根级 @tap 失效 → 内容 view 绑 tap（ADR-0055） -->
         <view class="w-full flex flex-col" @tap="openDetail(item.id)">
-          <view class="relative" @tap.stop="swallowRestricted">
+          <view class="relative" @tap.stop="onImageTap(item)">
             <SkeletonImage :src="thumbUrl(item.image_urls)" height="48.4vw" lazy-load />
             <!-- 受限条目图片区遮罩（issue #91） -->
             <RestrictOverlay v-if="isRestricted(item)" :level="item.x_restrict === 2 ? 2 : 1" />

@@ -22,6 +22,18 @@ declare global {
   }
   const __DEV__: boolean
   /**
+   * Lynx runtime 内置全局对象（ADR-0066 系统返回桥）。
+   * getJSModule('GlobalEventEmitter') 监听 native 侧 sendGlobalEvent 事件；
+   * web-core 预览环境可能不存在或 getJSModule 不可用，引用前必须可选链探测。
+   */
+  interface LynxGlobalEventEmitter {
+    addListener(event: string, handler: (...args: unknown[]) => void): void
+  }
+  interface LynxGlobal {
+    getJSModule(name: 'GlobalEventEmitter'): LynxGlobalEventEmitter | undefined
+  }
+  const lynx: LynxGlobal | undefined
+  /**
    * Lynx runtime 内置全局对象 —— 原生 Native Modules 访问点（#52）。
    * web-core 环境可能不存在或为空对象；引用前必须可选链探测。
    */
@@ -35,6 +47,8 @@ declare global {
       setClientKind(kind: string, callback: (err: string | null) => void): void
       getClientKind(callback: (kind: string | null, err: string | null) => void): void
       restart(callback: (err: string | null) => void): void
+      /** ADR-0066：根路由双击退出时关闭 Lynx 宿主 Activity */
+      exitApp(callback?: (err: string | null) => void): void
     }
     PictelioAuth: {
       loginWithRefreshToken(token: string, callback: (userInfo: string, err: string) => void): void

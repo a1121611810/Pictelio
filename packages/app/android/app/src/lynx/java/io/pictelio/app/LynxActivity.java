@@ -9,14 +9,17 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.splashscreen.SplashScreen;
 
+import com.lynx.react.bridge.JavaOnlyArray;
 import com.lynx.tasm.LynxError;
 import com.lynx.tasm.LynxView;
 import com.lynx.tasm.LynxViewBuilder;
 import com.lynx.tasm.LynxViewClient;
 
+import java.lang.ref.WeakReference;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -30,9 +33,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <p>生命周期：onResume/onPause/onDestroy 转发 LynxView
  * onEnterForeground/onEnterBackground/destroy()（LynxView 无自带生命周期）。
  *
- * <p>返回键（MVP）：默认 predictive back（manifest 已开
- * {@code enableOnBackInvokedCallback}）→ 退出 Activity；前端路由返回由
- * app-lynx 页面内返回按钮处理。前后端 back 事件消费链路列为实现期验证项。
+ * <p>返回键（ADR-0066）：系统返回（手势/按键）由 {@link OnBackPressedCallback} 拦截，
+ * bundle 就绪后经 {@code sendGlobalEvent("pictelioBack")} 转发 JS 决策——有路由历史返回
+ * 上一页、根路由提示 + 2s 双击退出（webview client 同语义）；bundle 未就绪时 JS 侧无
+ * 监听者，原生兜底 {@link #finish()}。页面内「‹ 返回」按钮由 app-lynx 前端路由处理，
+ * 与系统返回桥互不影响。
  */
 public class LynxActivity extends AppCompatActivity {
 
@@ -41,12 +46,21 @@ public class LynxActivity extends AppCompatActivity {
     private LynxView lynxView;
     private final AtomicBoolean bundleLoaded = new AtomicBoolean(false);
 
+    /** 当前 Activity 弱引用（PictelioAppModule.exitApp 使用，ADR-0066；onDestroy 清理） */
+    private static WeakReference<LynxActivity> sInstance;
+
+    /** exitApp 目标：当前 LynxActivity（可能为 null） */
+    static LynxActivity current() {
+        return sInstance != null ? sInstance.get() : null;
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         // SplashScreen.installSplashScreen 必须在 super.onCreate 之前（AndroidX 要求）
         SplashScreen splashScreen = SplashScreen.installSplashScreen(this);
         splashScreen.setKeepOnScreenCondition(() -> !bundleLoaded.get());
         super.onCreate(savedInstanceState);
+        sInstance = new WeakReference<>(this);
 
         // LynxEnv 兜底初始化（进程复用场景：Application.onCreate 未走 initLynx → LynxEnv
         // 未初始化会报 error 102）。LynxEnv.init 幂等（hasInit），与 PictelioApp 共用
@@ -106,6 +120,24 @@ public class LynxActivity extends AppCompatActivity {
         });
 
         setContentView(lynxView);
+        // ADR-0066：系统返回桥——拦截系统返回（手势/按键），bundle 就绪后仅转发 JS 决策
+        // （不自行退出）；bundle 未就绪时 JS 侧无监听者，原生兜底退出，避免卡死。
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                // 渲染/加载错误兜底页（showErrorFallback）没有 JS 消费方：直接退出，
+                // 避免返回键被吞导致用户卡死在错误页（lynx-only 包无「返回 WebView」按钮）。
+                if (errorShown.get()) {
+                    finish();
+                    return;
+                }
+                if (!bundleLoaded.get()) {
+                    finish();
+                    return;
+                }
+                lynxView.sendGlobalEvent("pictelioBack", new JavaOnlyArray());
+            }
+        });
         // renderTemplateUrl(url, initData)：initData 由 app-lynx 启动自恢复，无需注入
         lynxView.renderTemplateUrl("main.lynx.bundle", "");
 
@@ -263,6 +295,7 @@ public class LynxActivity extends AppCompatActivity {
     protected void onDestroy() {
         // 取消未触发的加载超时回调，避免 Activity 销毁后仍执行 setContentView
         cancelLoadTimeout();
+        sInstance = null; // ADR-0066：清理 exitApp 目标引用
         if (lynxView != null) {
             lynxView.destroy();
         }

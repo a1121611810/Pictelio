@@ -3,7 +3,8 @@
 // （Pre-Alpha 兼容问题，已实测）。MVP 用手写内存路由 + <component :is>，
 // 路由语义与 vue-router 一致（path/name/params），导航守卫由页面自行处理登录态。
 import { ref, computed, markRaw, type Component } from 'vue'
-import { matchRoute, type RouteDefCore } from './routerCore'
+import { matchRoute, evaluateSystemBack, type RouteDefCore } from './routerCore'
+import { isNativeMode, getNativeModules } from './api/client'
 import { isLoggedIn, restoreToken, registerUnauthorizedHandler } from './stores/authStore'
 import { loadSettings } from './stores/settingsStore'
 
@@ -109,10 +110,60 @@ export function goBack(): void {
   _state.value = { name: 'recommended', path: '/recommended', params: {} }
 }
 
+// ─── 系统返回桥（ADR-0066） ───
+// 原生 LynxActivity 拦截系统返回（手势/按键）后通过全局事件 pictelioBack 转发，
+// 返回行为由 JS 决策：有历史 → 返回上一页；根路由（推荐/登录）→ 提示 + 2s 双击退出。
+let backHandlerRegistered = false
+let lastBackAt = 0
+/** 根路由「再按一次退出应用」提示显隐（App.vue 消费） */
+export const exitHint = ref(false)
+let exitHintTimer: ReturnType<typeof setTimeout> | undefined
+/** 提示条显示时长（ms），与 webview client EXIT_HINT_DURATION_MS 对齐 */
+const EXIT_HINT_DURATION_MS = 2000
+
+function showExitHint(): void {
+  exitHint.value = true
+  if (exitHintTimer) clearTimeout(exitHintTimer)
+  exitHintTimer = setTimeout(() => {
+    exitHint.value = false
+  }, EXIT_HINT_DURATION_MS)
+}
+
+function handleSystemBack(): void {
+  const decision = evaluateSystemBack(_history.length, lastBackAt, Date.now())
+  if (decision === 'navigate') {
+    goBack()
+    return
+  }
+  if (decision === 'exit') {
+    const app = getNativeModules()?.PictelioApp as
+      | { exitApp?: (callback?: (err: string | null) => void) => void }
+      | undefined
+    app?.exitApp?.()
+    return
+  }
+  lastBackAt = Date.now()
+  showExitHint()
+}
+
+/** 注册系统返回监听（仅原生模式、仅一次；web-core 预览无 GlobalEventEmitter 则静默跳过） */
+function registerSystemBackHandler(): void {
+  if (backHandlerRegistered) return
+  backHandlerRegistered = true
+  const lynxGlobal = typeof lynx !== 'undefined' ? lynx : (globalThis as { lynx?: LynxGlobal }).lynx
+  const emitter = lynxGlobal?.getJSModule?.('GlobalEventEmitter')
+  if (!emitter || typeof emitter.addListener !== 'function') {
+    console.warn('[router] GlobalEventEmitter 不可用，系统返回桥未注册（web-core 预览属预期）')
+    return
+  }
+  emitter.addListener('pictelioBack', handleSystemBack)
+}
+
 /** 初始化（App 挂载时调用）：注册 401 刷新 + 恢复设置 + 首路由（replace 不入栈） */
 export async function initRouter(): Promise<void> {
   registerUnauthorizedHandler()
   void loadSettings()
+  if (isNativeMode()) registerSystemBackHandler()
   const ok = await restoreToken()
   void navigate(ok ? '/recommended' : '/login', { replace: true })
 }

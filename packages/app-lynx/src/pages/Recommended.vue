@@ -89,8 +89,11 @@ function openDetail(id: number) {
   void navigate(`/illust/${id}`)
 }
 
-// 受限条目图片区：吞没 tap（遮罩点击无任何反应，issue #91）
-function swallowRestricted() {}
+// 图片区点击（spec：列表交互）：受限条目（R18/R18G 且开关关闭）不跳详情，其余进详情。
+// 外层 .stop 继续保证遮罩点击不穿透；RestrictOverlay 自身 @tap="swallow" 双保险。
+function onImageTap(item: PixivIllust) {
+  if (!isRestricted(item)) openDetail(item.id)
+}
 function openNovels() {
   void navigate('/novels')
 }
@@ -184,7 +187,7 @@ onActivated(() => {
         <!-- [lynx:fix] 图片级骨架（SkeletonImage）：显式 height="48.4vw"（= 卡片宽 w-[48.4vw]，保持方形），
              原生 LynxView 下 aspect-ratio + min-h 组合解析为 0 导致图片不显示（issue #140）；
              图片 @load 后才隐藏 shimmer 显示图片（骨架关闭时机 = 图片加载完成，而非 API 数据返回） -->
-        <view class="relative" @tap.stop="swallowRestricted">
+        <view class="relative" @tap.stop="onImageTap(item)">
           <SkeletonImage :src="thumbUrl(item.image_urls)" height="48.4vw" lazy-load />
           <!-- 受限条目图片区遮罩（issue #91）：吞没 tap，不触发详情跳转 -->
           <RestrictOverlay v-if="isRestricted(item)" :level="item.x_restrict === 2 ? 2 : 1" />

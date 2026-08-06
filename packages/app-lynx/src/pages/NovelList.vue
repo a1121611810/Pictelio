@@ -5,6 +5,7 @@ import { ref, onMounted } from 'vue'
 import { navigate, goBack } from '../router'
 import { loadRecommendedNovels, loadFollow, loadNovelNext } from '../api/novel'
 import type { PixivNovel } from '../api/types'
+import { withTimeout } from '../utils/withTimeout'
 import { isRestricted } from '../stores/settingsStore'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
 
@@ -28,8 +29,16 @@ async function fetchFirstPage() {
   loading.value = true
   errorMsg.value = ''
   try {
-    const res = mode.value === 'recommend' ? await loadRecommendedNovels() : await loadFollow()
+    const req = mode.value === 'recommend' ? loadRecommendedNovels() : loadFollow()
+    // 请求挂起 15s 兜底（与 Recommended 的 issue #128 对齐）：超时 reject 走 catch 展示 errorMsg，
+    // 避免骨架屏无限显示
+    const res = await withTimeout(req, 15000)
     if (gen !== modeGen) return // 已切 tab，丢弃旧响应
+    // 响应形状防御：novels 缺失/非数组时置错误，避免后续 res.novels.length 崩溃或静默空白
+    if (!Array.isArray(res.novels)) {
+      errorMsg.value = '数据格式异常'
+      return
+    }
     // issue #91：全量渲染，受限条目盖遮罩（不再过滤）
     novels.value = res.novels
     nextUrl.value = res.next_url
@@ -127,6 +136,10 @@ onMounted(fetchFirstPage)
     <view v-if="mode === 'follow' && !loading && !errorMsg && novels.length === 0" class="w-full flex-1 min-h-0 flex items-center justify-center">
       <text class="text-base text-foreground-3">暂无关注小说</text>
     </view>
+    <!-- 推荐视图空态（spec 加固 3）：杜绝「无数据 → 纯空白」 -->
+    <view v-if="mode === 'recommend' && !loading && !errorMsg && novels.length === 0" class="w-full flex-1 min-h-0 flex items-center justify-center">
+      <text class="text-base text-foreground-3">暂无推荐小说</text>
+    </view>
 
     <list
       v-if="novels.length > 0"
@@ -139,7 +152,7 @@ onMounted(fetchFirstPage)
       <list-item
         v-for="item in novels"
         :key="item.id"
-        :item-key="item.id"
+        :item-key="String(item.id)"
         class="w-full"
         @tap="openDetail(item.id)"
       >

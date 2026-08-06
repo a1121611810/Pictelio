@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
-import { currentComponent, initRouter } from './router'
+import { currentComponent, initRouter, exitHint } from './router'
 import { initClientSetting } from './stores/clientSwitchStore'
 
 onMounted(() => {
@@ -17,6 +17,12 @@ onMounted(() => {
     <KeepAlive :include="['recommended', 'novels', 'me']">
       <component :is="currentComponent" />
     </KeepAlive>
+    <!-- 系统返回根路由提示（ADR-0066）：与 webview client 的 exitHint toast 语义一致 -->
+    <view v-if="exitHint" class="absolute left-0 right-0 bottom-[12vw] z-50 flex justify-center pointer-events-none">
+      <view class="bg-background border border-stroke-2 rounded-[var(--borderRadiusXLarge)] px-5 py-2.5">
+        <text class="text-base text-foreground">再按一次退出应用</text>
+      </view>
+    </view>
   </page>
 </template>
 

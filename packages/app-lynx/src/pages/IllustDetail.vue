@@ -7,6 +7,7 @@ import { currentUser } from '../stores/authStore'
 import type { PixivIllust } from '../api/types'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { resolveQualityUrl } from '../utils/imageQuality'
+import { detailImageHeightVw } from '../utils/imageLayout'
 import { detailQuality } from '../stores/settingsStore'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
@@ -57,6 +58,12 @@ const pages = computed(() => {
   }
   return [illust.value.image_urls]
 })
+
+// [spec] 详情比例显示：容器高度按原图宽高比换算的显式 vw（不封顶）；
+// 容器 / ugoira 占位 / 图片骨架三处共用同一高度，避免重复计算
+const detailImageHeight = computed(() =>
+  detailImageHeightVw(illust.value?.width, illust.value?.height),
+)
 
 const currentImage = computed(() => {
   const list = pages.value
@@ -119,13 +126,21 @@ onMounted(async () => {
       <text class="text-base text-danger p-4">{{ errorMsg }}</text>
     </view>
     <scroll-view v-else-if="illust" class="w-full flex-1 min-h-0" scroll-orientation="vertical">
-      <!-- [lynx:fix] 详情大图：SkeletonImage 的 style aspectRatio/minHeight 在原生 scroll-view 内
-           失效 → 容器高度 0、大图空白（真机实测 2026-08-02）。改固定高度容器
-           （Tailwind h-[100vw]）+ 裸 image（aspectFill），不依赖 aspect-ratio style -->
-      <view class="relative w-full h-[100vw] bg-background-3 overflow-hidden">
+      <!-- [spec] 详情大图：按原图宽高比撑开高度（显式 vw，不封顶，与 webview client 一致），
+           原生 LynxView 不支持动态 aspect-ratio style（ADR-0055 §2），显式高度已验证（issue #138）。
+           图片级骨架屏（SkeletonImage）：@load 前 shimmer、@error 显示「图片加载失败」，不启用 lazy-load -->
+      <view class="relative w-full bg-background-3 overflow-hidden" :style="{ height: detailImageHeight }">
         <!-- T5：ugoira 动图用播放器；普通作品用静态大图 -->
-        <UgoiraViewer v-if="illust.type === 'ugoira'" :illust-id="illust.id" />
-        <image v-else-if="currentImage" class="w-full h-full" :src="currentImage" :mode="'aspectFill'" />
+        <UgoiraViewer
+          v-if="illust.type === 'ugoira'"
+          :illust-id="illust.id"
+          :height-vw="detailImageHeight"
+        />
+        <SkeletonImage
+          v-else-if="currentImage"
+          :src="currentImage"
+          :height="detailImageHeight"
+        />
       </view>
       <view v-if="pages.length > 1" class="flex flex-row items-center justify-center p-3">
         <view class="py-1 pr-2" @tap="prevPage"><text class="text-4xl text-brand-foreground py-2 px-6">‹</text></view>

@@ -18,6 +18,7 @@ import com.lynx.tasm.behavior.LynxContext;
  *   <li>{@code setClientKind(kind, cb)}：成功 {@code cb(null)}；失败 {@code cb(errMsg)}</li>
  *   <li>{@code getClientKind(cb)}：成功 {@code cb(kind, null)}；失败 {@code cb(null, errMsg)}</li>
  *   <li>{@code restart(cb)}：成功 {@code cb(null)}；失败 {@code cb(errMsg)}</li>
+ *   <li>{@code exitApp(cb)}：成功 {@code cb(null)}；失败 {@code cb(errMsg)}（ADR-0066）</li>
  * </ul>
  *
  * <p>{@code setClientKind} 落盘文件必须是 {@code "CapacitorStorage"} ——
@@ -116,6 +117,25 @@ public class PictelioAppModule extends LynxModule {
             // killProcess（lynx 官方模式）——仅开关一个 flag，架构不变。
         } catch (Exception e) {
             Log.w(TAG, "restart 失败", e);
+            callback.invoke(String.valueOf(e.getMessage()));
+        }
+    }
+
+    /**
+     * 退出 Lynx 宿主 Activity（ADR-0066 系统返回桥：JS 根路由双击退出时调用）。
+     * 主线程执行 finish()；目标 Activity 由 LynxActivity 静态弱引用提供（onDestroy 清理），
+     * 未持有引用时静默成功（Activity 已不在前台，无需退出动作）。
+     */
+    @LynxMethod
+    public void exitApp(Callback callback) {
+        try {
+            LynxActivity activity = LynxActivity.current();
+            if (activity != null) {
+                activity.runOnUiThread(activity::finish);
+            }
+            callback.invoke();
+        } catch (Exception e) {
+            Log.w(TAG, "exitApp 失败", e);
             callback.invoke(String.valueOf(e.getMessage()));
         }
     }

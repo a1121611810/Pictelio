@@ -4,7 +4,7 @@ import { proxyImageUrl, thumbUrl } from '../src/utils/imageUrl'
 import { classifyError, isNativeMode, isOAuthTokenErrorResponse, rewriteUrl, shouldAttachAuth } from '../src/api/client'
 import { ApiErrorType } from '../src/api/types'
 import { extractNovelTextFromHtml } from '../src/api/novel'
-import { matchRoute } from '../src/routerCore'
+import { matchRoute, evaluateSystemBack, SYSTEM_BACK_EXIT_WINDOW_MS } from '../src/routerCore'
 import { redactProxyUrl } from '../src/utils/proxyRedact'
 import { apiClient } from '../src/api/client'
 import { isOAuthCredsInjected } from '../src/api/auth'
@@ -248,6 +248,29 @@ describe('routerCore 路由匹配', () => {
 
   it('未知路径 → null', () => {
     expect(matchRoute(coreRoutes, '/nope')).toBeNull()
+  })
+})
+
+describe('routerCore.evaluateSystemBack（ADR-0066 系统返回决策）', () => {
+  const now = 1_000_000
+
+  it('有历史 → navigate（返回上一页）', () => {
+    expect(evaluateSystemBack(1, 0, now)).toBe('navigate')
+    expect(evaluateSystemBack(3, now - 100, now)).toBe('navigate')
+  })
+
+  it('无历史且从未提示过 → hint', () => {
+    expect(evaluateSystemBack(0, 0, now)).toBe('hint')
+  })
+
+  it('无历史且 2s 窗口内第二次返回 → exit', () => {
+    expect(evaluateSystemBack(0, now - 100, now)).toBe('exit')
+    expect(evaluateSystemBack(0, now - (SYSTEM_BACK_EXIT_WINDOW_MS - 1), now)).toBe('exit')
+  })
+
+  it('无历史且超过 2s 窗口 → 重新计为 hint（不直接退出）', () => {
+    expect(evaluateSystemBack(0, now - SYSTEM_BACK_EXIT_WINDOW_MS, now)).toBe('hint')
+    expect(evaluateSystemBack(0, now - 5000, now)).toBe('hint')
   })
 })
 
