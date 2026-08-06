@@ -1,5 +1,5 @@
 {
-  "version": "4.3.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.3.0",
-  "changelog": "🐛 修复\n  5740203 fix(app-lynx): 详情页 scroll-view 改为 flex-1 约束，避免溢出覆盖顶栏触摸层（#139）\n  88f3355 fix(app-lynx): 列表图片改用显式 height 容器，修复原生 LynxView 图片骨架屏永久显示（#137）\n  ff607d1 fix(app): 子标签空隙改用 transform 补偿（sticky "
+  "version": "4.4.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.4.0",
+  "changelog": "⚡ 性能\n  39414ad perf(app-lynx): 原生 Bitmap LRU 内存缓存，二次渲染秒出（#145/#147）\n  dda82dd perf(app-lynx): 详情画质档位（默认 medium）+ 单页作品不再请求原图（#145/#146/#148）"
 }
