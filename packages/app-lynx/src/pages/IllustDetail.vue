@@ -89,14 +89,16 @@ onMounted(async () => {
 </script>
 
 <template>
-  <view class="w-full h-full bg-background-2">
+  <!-- [lynx:fix] 顶栏 tap 修复（issue #139）：外层显式 flex flex-col，scroll-view flex-1 min-h-0 约束在顶栏下方，
+       避免 w-full h-full 溢出覆盖顶栏触摸层（与 issue #129 同型） -->
+  <view class="w-full h-full flex flex-col bg-background-2">
     <view class="flex flex-row items-center h-[11.733vw] px-4 bg-background border-b-[1px] border-b-stroke-2">
       <view class="py-1 pr-2" @tap="goBack"><text class="text-lg text-brand-foreground pr-4">‹ 返回</text></view>
       <text class="flex-1 text-2xl font-semibold text-foreground">作品详情</text>
     </view>
 
     <!-- [lynx:fix] 骨架屏：加载中显示 shimmer 占位（图片区 1:1 + 文字条），数据就绪后切换 scroll-view -->
-    <view v-if="loading" class="w-full h-full bg-background-2">
+    <view v-if="loading" class="w-full flex-1 min-h-0 bg-background-2">
       <view class="shimmer aspect-[1/1] w-full" />
       <view class="p-4">
         <view class="shimmer h-[32rpx] rounded-[var(--borderRadiusSmall)] w-[75%]" />
@@ -104,10 +106,10 @@ onMounted(async () => {
         <view class="shimmer h-[24rpx] rounded-[var(--borderRadiusSmall)] mt-1.5 w-[60%]" />
       </view>
     </view>
-    <view v-else-if="errorMsg" class="w-full h-full flex items-center justify-center">
+    <view v-else-if="errorMsg" class="w-full flex-1 min-h-0 flex items-center justify-center">
       <text class="text-base text-danger p-4">{{ errorMsg }}</text>
     </view>
-    <scroll-view v-else-if="illust" class="w-full h-full" scroll-orientation="vertical">
+    <scroll-view v-else-if="illust" class="w-full flex-1 min-h-0" scroll-orientation="vertical">
       <!-- [lynx:fix] 详情大图：SkeletonImage 的 style aspectRatio/minHeight 在原生 scroll-view 内
            失效 → 容器高度 0、大图空白（真机实测 2026-08-02）。改固定高度容器
            （Tailwind h-[100vw]）+ 裸 image（aspectFill），不依赖 aspect-ratio style -->
