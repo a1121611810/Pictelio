@@ -108,7 +108,7 @@ onMounted(fetchFirstPage)
         <!-- [lynx:fix] 原生 list-item 根级 @tap 失效 → 内容 view 绑 tap（ADR-0055） -->
         <view class="w-full flex flex-col" @tap="openDetail(item.id)">
           <view class="relative" @tap.stop="swallowRestricted">
-            <SkeletonImage :src="thumbUrl(item.image_urls)" aspect-ratio="1 / 1" min-h="40vw" lazy-load />
+            <SkeletonImage :src="thumbUrl(item.image_urls)" height="48.4vw" lazy-load />
             <!-- 受限条目图片区遮罩（issue #91） -->
             <RestrictOverlay v-if="isRestricted(item)" :level="item.x_restrict === 2 ? 2 : 1" />
           </view>

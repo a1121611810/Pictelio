@@ -195,7 +195,7 @@ onMounted(() => {
       >
         <view class="w-full flex flex-col" @tap="openIllust(item.id)">
           <view class="relative" @tap.stop="swallowRestricted">
-            <SkeletonImage :src="thumbUrl(item.image_urls)" aspect-ratio="1 / 1" min-h="40vw" lazy-load />
+            <SkeletonImage :src="thumbUrl(item.image_urls)" height="48.4vw" lazy-load />
             <!-- 受限条目图片区遮罩（issue #91） -->
             <RestrictOverlay v-if="isRestricted(item)" :level="item.x_restrict === 2 ? 2 : 1" />
           </view>

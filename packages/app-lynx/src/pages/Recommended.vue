@@ -181,10 +181,11 @@ onActivated(() => {
              都会导致 item 定位计算崩（全部重叠在起点）。间距用 list 官方属性
              list-main-axis-gap（行距）/ list-cross-axis-gap（列距），经 vue-lynx style 对象绑定
              （attribute 形式 web-core 不响应）。原生 LynxView 同样支持这两个属性（ADR-0048） -->
-        <!-- [lynx:fix] 图片级骨架（SkeletonImage）：容器 aspect-[1/1] 方形 + min-h 保底（ADR-0045），
+        <!-- [lynx:fix] 图片级骨架（SkeletonImage）：显式 height="48.4vw"（= 卡片宽 w-[48.4vw]，保持方形），
+             原生 LynxView 下 aspect-ratio + min-h 组合解析为 0 导致图片不显示（issue #140）；
              图片 @load 后才隐藏 shimmer 显示图片（骨架关闭时机 = 图片加载完成，而非 API 数据返回） -->
         <view class="relative" @tap.stop="swallowRestricted">
-          <SkeletonImage :src="thumbUrl(item.image_urls)" aspect-ratio="1 / 1" min-h="40vw" lazy-load />
+          <SkeletonImage :src="thumbUrl(item.image_urls)" height="48.4vw" lazy-load />
           <!-- 受限条目图片区遮罩（issue #91）：吞没 tap，不触发详情跳转 -->
           <RestrictOverlay v-if="isRestricted(item)" :level="item.x_restrict === 2 ? 2 : 1" />
         </view>
