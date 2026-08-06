@@ -79,6 +79,23 @@
 
 GitHub Release 已发布完成。
 
+## 七、覆盖发布（`pnpm run release -o`）
+
+**场景**：已发布的版本（如 v4.2.4）漏发资产或文案有误，需要修正 GitHub Release 页面，而非发布新版本。
+
+- **命令**：`pnpm run release -o`（别名 `--overwrite`）；加 `--dry-run` 仅打印将执行的 gh 命令、不实际调用。
+- **交互流程**：
+  1. 选择覆盖范围：`1` 仅文案 / `2` 仅资产 / `3` 全部（默认）。
+  2. 本地已存在全部变体 APK 时询问「复用本地 APK 还是重新构建」；存在缺失变体则自动重新构建。
+  3. 文案默认读取 `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`，可确认（Y）或重新粘贴（e）；缺失时交互粘贴。
+  4. 展示覆盖计划（覆盖/新增资产清单 + 警告）→ 输入 `Y` 后再输入 tag 名（如 `v4.2.4`）双重确认。
+  5. 执行：下载备份旧资产 → `gh release edit` 更新文案 → `gh release upload --clobber` 覆盖/补齐资产；上传失败自动从备份恢复。
+- **硬约束**：
+  - 覆盖发布**不 bump 版本号**（versionCode 不变）：已安装该版本的用户**无法通过系统覆盖安装**获得新 APK。代码功能修复请走正常发布（如 4.2.4 → 4.2.5）。
+  - 目标必须为**已存在且已发布**（非 draft）的 Release；`package.json` 版本与远端 tag 不一致时拒绝执行。
+  - 不移动 tag、不创建新 commit、不 force push；操作范围严格限定于 GitHub Release 页面。
+- **验证**：正式覆盖前先跑 `pnpm run release -o --dry-run` 预览计划与命令，确认无误后再实际执行。
+
 ## 官网部署
 
 - ✅ `website/` 已推送到 `origin/gh-pages` 分支

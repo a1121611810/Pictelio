@@ -9,31 +9,40 @@
  *   pnpm run release         # 等价于 -i
  *   pnpm run release -i      # 交互模式：选择提交和版本
  *   pnpm run release -c      # 自定义模式：粘贴自己的发布文案
+ *   pnpm run release -o      # 覆盖发布模式：对已发布版本更新文案/资产，不 bump 版本号
+ *                             # （目标 Release 必须已存在且非 draft；不移动 tag/不建 commit）
+ *   pnpm run release -o --dry-run   # 覆盖模式 dry-run：打印将执行的 gh 命令，不实际调用
  *
  * 环境变量:
  *   PICTELIO_KEYSTORE_PASSWORD   - keystore 密码（必须）
  *   PICTELIO_KEY_PASSWORD        - key 密码（必须）
  */
 
-import { readFile, writeFile, stat, mkdir, mkdtemp, unlink, rmdir } from "node:fs/promises";
-import { execFile, execFileSync } from "node:child_process";
+import { writeFile, mkdir, mkdtemp, unlink, rmdir } from "node:fs/promises";
 import { resolve as resolvePath, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import process from "node:process";
-import { createInterface } from "node:readline";
-import ora from "ora";
+import {
+  readText,
+  writeText,
+  exists,
+  run,
+  runWithSpinner,
+  runOutput,
+  getRepoSlug,
+  parseVersion,
+  isVersionAtLeast,
+  askQuestion,
+  readCustomChangelog,
+  addCommitLinks,
+  resolveVariants,
+  apkPathsFor,
+} from "./lib/release-utils.mjs";
+import { planOverwrite, executeOverwrite } from "./release-overwrite.mjs";
 
 const rootDir = resolvePath(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolvePath(rootDir, "../.."); // monorepo 根（git 仓库根）
-
-// #119：三 flavor 变体（full / webview / lynx），默认全量
-const DEFAULT_VARIANTS = ["full", "webview", "lynx"];
-const APK_DIR = "android/app/build/outputs/apk";
-
-function apkPathsFor(version, variants) {
-  return variants.map((flavor) => `${APK_DIR}/${flavor}/release/pictelio-${version}-${flavor}.apk`);
-}
 
 // P3：发布流程会提交到 git 的文件清单（相对 git 仓库根），
 // 供 step 4 定向 add 与多余变更拦截复用。
@@ -56,31 +65,12 @@ function step2FilesFor(versionCode) {
   ];
 }
 
-// 解析 --variants / PICTELIO_RELEASE_VARIANTS，默认全量
-function resolveVariants() {
-  const cliVariantsArg = args.find((a) => a.startsWith("--variants="))?.slice("--variants=".length);
-  const hasCliVariants = cliVariantsArg !== undefined;
-  const raw = hasCliVariants ? cliVariantsArg : process.env.PICTELIO_RELEASE_VARIANTS || "";
-  if (hasCliVariants && cliVariantsArg.trim() === "") {
-    throw new Error(`--variants 值无效（空列表）。可选：${DEFAULT_VARIANTS.join(", ")}`);
-  }
-  if (!raw) return [...DEFAULT_VARIANTS];
-  const list = raw
-    .split(",")
-    .map((v) => v.trim())
-    .filter(Boolean);
-  if (list.length === 0) {
-    throw new Error(`--variants 值无效（空列表）。可选：${DEFAULT_VARIANTS.join(", ")}`);
-  }
-  const invalid = list.filter((v) => !DEFAULT_VARIANTS.includes(v));
-  if (invalid.length > 0) {
-    throw new Error(`未知变体：${invalid.join(", ")}。可选：${DEFAULT_VARIANTS.join(", ")}`);
-  }
-  return [...new Set(list)];
-}
-
-const args = process.argv.slice(2);
-const isCustom = args.includes("-c");
+const args = new Set(process.argv.slice(2));
+const isCustom = args.has("-c");
+// -o / --overwrite：覆盖发布模式（对已存在且已发布的 Release 更新文案/资产，不 bump 版本号）
+const isOverwrite = args.has("-o") || args.has("--overwrite");
+// --dry-run：打印将执行的 gh 命令，不实际调用（覆盖模式专用）
+const dryRun = args.has("--dry-run");
 
 // #119：模块级记录当前发布版本，供 catch 恢复指引使用（main() 作用域外访问）
 let publishedVersion = null;
@@ -102,112 +92,6 @@ function log(...m) {
 }
 function ok(...m) {
   console.log(`[release] ✅`, ...m);
-}
-
-function readText(path) {
-  return readFile(resolvePath(rootDir, path), "utf-8");
-}
-
-async function writeText(path, content) {
-  await writeFile(resolvePath(rootDir, path), content, "utf-8");
-}
-
-async function exists(path) {
-  try {
-    await stat(resolvePath(rootDir, path));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function run(cmd, argsArr, opts = {}) {
-  return new Promise((resolve, reject) => {
-    const start = Date.now();
-    const label = `${cmd} ${argsArr.join(" ")}`;
-    const child = execFile(cmd, argsArr, { cwd: rootDir, stdio: "inherit", ...opts });
-    child.on("error", reject);
-    child.on("close", (code) => {
-      const elapsed = ((Date.now() - start) / 1000).toFixed(1);
-      if (code === 0) {
-        resolve(elapsed);
-      } else {
-        reject(new Error(`"${label}" 失败 (退出码 ${code}, 耗时 ${elapsed}s)`));
-      }
-    });
-  });
-}
-
-function runWithSpinner(label, cmd, argsArr, opts = {}) {
-  const spinner = ora({ text: label, color: "cyan" }).start();
-  const start = Date.now();
-  const timer = setInterval(() => {
-    spinner.text = `${label} ⏱ ${((Date.now() - start) / 1000).toFixed(0)}s`;
-  }, 1000);
-
-  return new Promise((resolve, reject) => {
-    const child = execFile(cmd, argsArr, {
-      cwd: rootDir,
-      stdio: ["pipe", "pipe", "pipe"],
-      ...opts,
-    });
-    let stderrBuf = "";
-    child.stdout.on("data", (d) => process.stdout.write(d));
-    child.stderr.on("data", (d) => {
-      // P5：累积 stderr，失败时附带在错误消息里，便于区分可重试/不可重试错误
-      stderrBuf += d.toString();
-      spinner.stop();
-      process.stderr.write(d);
-      spinner.start();
-    });
-    child.on("error", (e) => {
-      clearInterval(timer);
-      spinner.stop();
-      reject(e);
-    });
-    child.on("close", (code) => {
-      clearInterval(timer);
-      const elapsed = ((Date.now() - start) / 1000).toFixed(1);
-      if (code === 0) {
-        spinner.succeed(`${label} (${elapsed}s)`);
-        resolve(elapsed);
-      } else {
-        spinner.fail(`${label} 失败 (退出码 ${code}, ${elapsed}s)`);
-        const stderrTail = stderrBuf.trim().slice(-500);
-        const err = new Error(
-          `"${cmd} ${argsArr.join(" ")}" 失败 (退出码 ${code}, 耗时 ${elapsed}s)` +
-            (stderrTail ? `\n${stderrTail}` : ""),
-        );
-        err.stderr = stderrBuf; // P5：完整 stderr，供调用方判断是否可重试
-        reject(err);
-      }
-    });
-  });
-}
-
-function runOutput(cmd, argsArr, opts = {}) {
-  const { trim = true, ...execOpts } = opts;
-  const out = execFileSync(cmd, argsArr, {
-    cwd: rootDir,
-    encoding: "utf-8",
-    stdio: ["pipe", "pipe", "ignore"],
-    ...execOpts,
-  });
-  // P3-fix：trim 会吃掉多行输出的首行前导空格（git status 首行以 " M " 开头），
-  // 需要解析行格式时传 { trim: false }
-  return trim ? out.trim() : out;
-}
-
-// P12：结构化解析 origin URL（支持 https/git@/ssh:// 三种形态），
-// 避免旧正则靠贪婪匹配猜前缀导致的解析错误。
-function getRepoSlug() {
-  const url = runOutput("git", ["remote", "get-url", "origin"]);
-  // https://github.com/owner/repo.git | git@github.com:owner/repo.git | ssh://git@github.com/owner/repo.git
-  const m = url.match(/(?:github\.com[:/])([^/]+)\/([^/\s]+?)(?:\.git)?$/iu);
-  if (!m) {
-    throw new Error(`无法从 origin 解析 GitHub 仓库: ${url}`);
-  }
-  return `${m[1]}/${m[2]}`;
 }
 
 // P2：发布必须在 main 分支执行，避免 commit/tag 落在非 main 分支
@@ -284,32 +168,6 @@ function generateChangelogPreview(selected) {
   return formatChangelog(selected);
 }
 
-// P16：把 changelog 里 "hash message" 行转成 GitHub commit 链接（仅用于 Release notes）。
-// fastlane 文件 / git commit message 保持纯文本，不经过此函数。
-function addCommitLinks(changelog, repo) {
-  return changelog
-    .split("\n")
-    .map((line) => {
-      const m = line.match(/^(\s*)([0-9a-f]{7,40})\s+(.*)$/u);
-      return m ? `${m[1]}[${m[3]}](https://github.com/${repo}/commit/${m[2]})` : line;
-    })
-    .join("\n");
-}
-
-function parseVersion(v) {
-  const parts = v.split(".").map(Number);
-  if (parts.length !== 3 || parts.some(isNaN)) {
-    throw new Error(`版本号格式无效: ${v}`);
-  }
-  // P10：versionCode = major*10000 + minor*100 + patch，minor/patch ≥ 100 会与更高位进位冲突
-  if (parts[1] > 99 || parts[2] > 99) {
-    throw new Error(
-      `版本号 ${v} 超出 versionCode 表示范围（minor 和 patch 均需 < 100，当前 minor=${parts[1]}, patch=${parts[2]}）`,
-    );
-  }
-  return { major: parts[0], minor: parts[1], patch: parts[2], str: v };
-}
-
 function bump(v, part) {
   const p = parseVersion(v);
   switch (part) {
@@ -320,46 +178,6 @@ function bump(v, part) {
     default:
       return `${p.major}.${p.minor}.${p.patch + 1}`;
   }
-}
-
-// P9：数值比较两版本号，candidate >= base 返回 true（3 段，缺省段按 0）
-function isVersionAtLeast(candidate, base) {
-  const c = parseVersion(candidate);
-  const b = parseVersion(base);
-  return (
-    c.major > b.major ||
-    (c.major === b.major && (c.minor > b.minor || (c.minor === b.minor && c.patch >= b.patch)))
-  );
-}
-
-function askQuestion(query) {
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise((resolve) => {
-    rl.question(query, (answer) => {
-      rl.close();
-      resolve(answer.trim());
-    });
-  });
-}
-
-async function readCustomChangelog() {
-  console.log("\n请粘贴你的自定义发布文案：");
-  console.log("输入完成后，在新行输入 EOF 结束\n");
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  const lines = [];
-  for await (const line of rl) {
-    if (line.trim() === "EOF") {
-      break;
-    }
-    lines.push(line);
-  }
-  rl.close();
-  const text = lines.join("\n").trim();
-  if (!text) {
-    console.log("  ⚠ 文案为空，请重新输入");
-    return readCustomChangelog();
-  }
-  return text;
 }
 
 async function interactivePickCommits(commits) {
@@ -483,12 +301,283 @@ async function interactivePickVersion(currentVersion) {
   }
 }
 
+// ── 覆盖发布模式（-o / --overwrite）──
+// 对已存在且已发布的 GitHub Release 覆盖更新文案/资产，不 bump 版本号。
+// 流程编排：探测远端/本地 → 交互①范围 → 交互②复用/重建 → 准备文案 →
+//           planOverwrite（校验+计划）→ 展示+二次确认 → executeOverwrite。
+async function runOverwriteFlow() {
+  const pkg = JSON.parse(await readText("package.json"));
+  const version = pkg.version;
+  const repo = getRepoSlug();
+  const variants = resolveVariants();
+  const tag = `v${version}`;
+  const apkPaths = apkPathsFor(version, variants);
+
+  try {
+    // ── 远端状态探测 ──
+    let remote = { tag: null, release: null };
+    try {
+      const refs = runOutput("git", ["ls-remote", "--tags", "origin", tag]);
+      if (refs.includes(`refs/tags/${tag}`)) remote.tag = tag;
+    } catch {
+      // 网络异常 ≠ tag 不存在：显式中止，避免被误判为"版本问题"
+      throw new Error("无法检查远端 tag（网络异常），已中止覆盖发布。请检查网络后重试");
+    }
+    if (remote.tag) {
+      try {
+        const view = JSON.parse(
+          runOutput("gh", ["release", "view", tag, "--repo", repo, "--json", "isDraft,assets"]),
+        );
+        remote.release = {
+          exists: true,
+          draft: view.isDraft,
+          assets: view.assets.map((a) => a.name),
+        };
+      } catch {
+        remote.release = null; // Release 不存在
+      }
+    }
+
+    // ── 本地 APK 探测 ──
+    const localApks = [];
+    for (let i = 0; i < variants.length; i++) {
+      localApks.push({
+        flavor: variants[i],
+        path: (await exists(apkPaths[i])) ? resolvePath(rootDir, apkPaths[i]) : null,
+      });
+    }
+
+    // ── 交互①：覆盖范围 ──
+    console.log(`\n覆盖发布目标：版本 ${version}（tag ${tag}）· 变体 ${variants.join(", ")}`);
+    console.log("要覆盖哪些内容？");
+    console.log("  1) 仅文案（title / notes）");
+    console.log("  2) 仅资产（APK）");
+    console.log("  3) 全部（默认）");
+    const scope = ((await askQuestion("选择 (1-3) [3]: ")) || "3").trim() || "3";
+    const updateMeta = scope === "1" || scope === "3";
+    const includeAssets = scope === "2" || scope === "3";
+
+    // ── 交互②：复用本地 APK 还是重新构建 ──
+    let rebuild = false;
+    if (includeAssets) {
+      const missing = localApks.filter((x) => !x.path);
+      if (missing.length === 0) {
+        console.log("\n本地已存在全部变体 APK：");
+        for (const x of localApks) console.log(`  ${x.flavor}: ${x.path}`);
+        const ans = ((await askQuestion("\n复用本地 APK (r) 还是重新构建 (b)？ [r]: ")) || "r")
+          .trim()
+          .toLowerCase();
+        rebuild = ans === "b";
+      } else {
+        console.log(`\n本地缺少变体 APK：${missing.map((x) => x.flavor).join(", ")}，将重新构建`);
+        rebuild = true;
+      }
+    }
+
+    // ── 重新构建（可选；dry-run 跳过实际构建，仅预览计划）──
+    if (rebuild) {
+      if (dryRun) {
+        log("[dry-run] 将重新构建（已跳过实际构建，计划按当前本地产物预览）");
+      } else {
+        log(`重新构建变体：${variants.join(", ")}（约数分钟）...`);
+        await buildReleaseApks(version, variants);
+      }
+      for (let i = 0; i < variants.length; i++) {
+        localApks[i] = {
+          flavor: variants[i],
+          path: (await exists(apkPaths[i])) ? resolvePath(rootDir, apkPaths[i]) : null,
+        };
+      }
+    }
+
+    // ── 文案准备 ──
+    let notes = null;
+    if (updateMeta) {
+      const parsed = parseVersion(version);
+      const versionCode = parsed.major * 10_000 + parsed.minor * 100 + parsed.patch;
+      const changelogPath = `fastlane/metadata/android/en-US/changelogs/${versionCode}.txt`;
+      if (await exists(changelogPath)) {
+        notes = addCommitLinks(await readText(changelogPath), repo);
+        console.log(`\n使用 fastlane changelog（${changelogPath}），更新后文案预览：`);
+      } else {
+        console.log(`\n未找到 ${changelogPath}，请粘贴新文案：`);
+        notes = await readCustomChangelog();
+      }
+      console.log("─".repeat(40));
+      console.log(notes);
+      console.log("─".repeat(40));
+      const noteChoice = ((await askQuestion("确认使用该文案? (Y/n/e=重新输入): ")) || "y")
+        .trim()
+        .toLowerCase();
+      if (noteChoice === "n") {
+        console.log("[release] 已取消");
+        process.exit(0);
+      } else if (noteChoice === "e") {
+        notes = addCommitLinks(await readCustomChangelog(), repo);
+      }
+    }
+
+    // ── 计划 + 展示 + 二次确认 ──
+    const plan = planOverwrite({
+      version,
+      variants,
+      repo,
+      localApks,
+      remote,
+      notes,
+      includeAssets,
+    });
+    console.log("─".repeat(40));
+    log("覆盖发布计划：");
+    console.log(`  Release : ${plan.title} (${plan.tag})`);
+    console.log(`  更新文案: ${plan.notes !== null ? "是" : "否"}`);
+    if (plan.assetsToUpload.length > 0) {
+      console.log(
+        `  上传资产: ${plan.assetsToUpload.map((p) => p.split(/[\\/]/u).pop()).join(", ")}`,
+      );
+    }
+    if (plan.assetsToReplace.length > 0) {
+      console.log(`  覆盖资产: ${plan.assetsToReplace.join(", ")}`);
+    }
+    if (plan.assetsMissing.length > 0) {
+      console.log(`  新增资产: ${plan.assetsMissing.join(", ")}`);
+    }
+    if (plan.buildRequired.length > 0) {
+      console.log(`  ⚠ 不包含变体: ${plan.buildRequired.join(", ")}`);
+    }
+    for (const w of plan.warnings) console.log(`  ⚠ ${w}`);
+    console.log("─".repeat(40));
+    if ((await askQuestion("\n确认覆盖发布? (Y/n): ")).toLowerCase() === "n") {
+      console.log("[release] 已取消");
+      process.exit(0);
+    }
+    const tagConfirm = await askQuestion(`请输入 tag 名确认（${plan.tag}）: `);
+    if (tagConfirm.trim() !== plan.tag) {
+      console.log("[release] tag 确认不匹配，已取消（未执行任何操作）");
+      process.exit(0);
+    }
+
+    // ── 执行 ──
+    const runGh = async (ghArgs) => {
+      await runWithSpinner(`gh ${ghArgs[0]} ${ghArgs[1]} ${plan.tag}`, "gh", ghArgs);
+    };
+    const result = await executeOverwrite(plan, { runGh, dryRun });
+
+    // 执行成功后同步 website version.json 的 changelog 字段（dry-run 不产生任何写入）。
+    // 本地文件同步失败仅告警：Release 已更新成功，不应因本地文件问题误报发布失败（幂等，重跑无害）。
+    if (!result.dryRun && plan.notes !== null) {
+      const verJsonPath = "../../packages/website/version.json";
+      try {
+        if (await exists(verJsonPath)) {
+          const verJson = JSON.parse(await readText(verJsonPath));
+          verJson.changelog = plan.notes.slice(0, 200);
+          await writeText(verJsonPath, JSON.stringify(verJson, null, 2) + "\n");
+          log(`已同步 ${verJsonPath} 的 changelog 字段`);
+        }
+      } catch (e) {
+        console.warn(`[release] ⚠ 同步 ${verJsonPath} 失败（不影响已完成的发布）: ${e.message}`);
+      }
+    }
+
+    console.log("");
+    console.log("=".repeat(50));
+    if (result.dryRun) {
+      console.log("🔎 覆盖发布 dry-run 完成（未执行任何操作）");
+    } else {
+      console.log("🎉 覆盖发布完成！");
+      if (result.edited) console.log(`   文案已更新`);
+      if (result.uploaded.length > 0) console.log(`   已上传资产: ${result.uploaded.join(", ")}`);
+      if (result.restored.length > 0) {
+        console.log(`   ⚠ 已从备份恢复被覆盖资产: ${result.restored.join(", ")}`);
+      }
+    }
+    console.log(`   版本: ${version} · tag: ${tag}`);
+    console.log(`   地址: https://github.com/${repo}/releases/tag/${tag}`);
+    console.log("=".repeat(50));
+  } catch (e) {
+    e.isOverwrite = true;
+    e.overwriteTag = tag;
+    throw e;
+  }
+}
+
+// 构建 Release APK（正常发布 step 3 与覆盖发布重建共用）
+async function buildReleaseApks(version, variants) {
+  // #119：按变体解析 assemble/rename task
+  const gradleTasks = variants.flatMap((flavor) => {
+    const cap = flavor.charAt(0).toUpperCase() + flavor.slice(1);
+    return [`assemble${cap}Release`, `rename${cap}ReleaseApk`];
+  });
+
+  const buildSteps = [
+    ["同步 OAuth 配置", "pnpm", ["run", "sync:credentials"]],
+    ["构建 Web 产物", "pnpm", ["run", "build"]],
+    // #51 修复：Lynx bundle 必须先构建并同步进 android assets（src/main/assets/main.lynx.bundle），
+    // 否则 full/lynx 包 APK 无 main.lynx.bundle，切换引擎后 LynxActivity 加载失败 → 白屏。
+    // NODE_ENV=production 硬兜底：防止发布环境残留 PICTELIO_LYNX_DEV=1 时把真实 OAuth
+    // 凭证内联进生产 bundle（lynx.config.ts 的 __CREDENTIALS__ 仅在 dev 下注入真值）。
+    [
+      "构建 Lynx bundle",
+      "pnpm",
+      ["--dir", "../app-lynx", "run", "build"],
+      { env: { ...process.env, NODE_ENV: "production" } },
+    ],
+    ["同步 Lynx bundle 到 Android assets", "node", ["../app-lynx/scripts/sync-android-assets.mjs"]],
+    ["同步 Capacitor 资源", "pnpm", ["run", "cap:sync"]],
+    [
+      "编译 Release APK",
+      "./gradlew",
+      gradleTasks,
+      {
+        cwd: resolvePath(rootDir, "android"),
+        env: { ...process.env, GRADLE_USER_HOME: resolvePath(rootDir, "android", ".gradle") },
+      },
+    ],
+  ];
+  const total = buildSteps.length;
+  for (let i = 0; i < total; i++) {
+    const [label, cmd, stepArgs, opts] = buildSteps[i];
+    const subLabel = `[${i + 1}/${total}] ${label}`;
+    if (cmd === "./gradlew") {
+      try {
+        await runWithSpinner(subLabel, cmd, stepArgs, opts);
+      } catch (e) {
+        const stderr = e.stderr || "";
+        // P13：不可重试错误（编译/R8 missing class 等代码问题，memory 坑 2）
+        // 直接失败，避免白跑一轮几分钟的 --stacktrace 重构建。
+        if (/Missing classes|Missing class|error: |FAILURE: Build failed/i.test(stderr)) {
+          throw e;
+        }
+        // 可重试错误（缓存 not-found / 依赖解析瞬时失败，memory 坑 1）
+        log("Gradle 构建失败（疑似缓存/依赖问题），重试并输出详细堆栈...");
+        await runWithSpinner(`${subLabel}（详细堆栈）`, cmd, [...stepArgs, "--stacktrace"], opts);
+      }
+    } else {
+      await runWithSpinner(subLabel, cmd, stepArgs, opts || {});
+    }
+  }
+  const apkPaths = apkPathsFor(version, variants);
+  const missing = [];
+  for (const p of apkPaths) {
+    if (!(await exists(p))) missing.push(p);
+  }
+  if (missing.length > 0) throw new Error(`APK 未生成: ${missing.join(", ")}`);
+  log(`APK 构建完成，产物:`);
+  for (const p of apkPaths) log(`  ${resolvePath(rootDir, p)}`);
+}
+
 async function main() {
   log("Pictelio 一键发布脚本");
   console.log("");
 
   // P2：发布前强制校验 main 分支
   ensureOnMainBranch();
+
+  // 覆盖发布模式：对已发布版本更新文案/资产，不 bump 版本号
+  if (isOverwrite) {
+    await runOverwriteFlow();
+    return;
+  }
 
   const pkg = JSON.parse(await readText("package.json"));
   const currentVersion = pkg.version;
@@ -639,66 +728,7 @@ async function main() {
     // #119：按变体解析 assemble/rename task
     const variants = resolveVariants();
     log(`构建变体：${variants.join(", ")}`);
-    const gradleTasks = variants.flatMap((flavor) => {
-      const cap = flavor.charAt(0).toUpperCase() + flavor.slice(1);
-      return [`assemble${cap}Release`, `rename${cap}ReleaseApk`];
-    });
-
-    const buildSteps = [
-      ["同步 OAuth 配置", "pnpm", ["run", "sync:credentials"]],
-      ["构建 Web 产物", "pnpm", ["run", "build"]],
-      // #51 修复：Lynx bundle 必须先构建并同步进 android assets（src/main/assets/main.lynx.bundle），
-      // 否则 full/lynx 包 APK 无 main.lynx.bundle，切换引擎后 LynxActivity 加载失败 → 白屏。
-      // NODE_ENV=production 硬兜底：防止发布环境残留 PICTELIO_LYNX_DEV=1 时把真实 OAuth
-      // 凭证内联进生产 bundle（lynx.config.ts 的 __CREDENTIALS__ 仅在 dev 下注入真值）。
-      [
-        "构建 Lynx bundle",
-        "pnpm",
-        ["--dir", "../app-lynx", "run", "build"],
-        { env: { ...process.env, NODE_ENV: "production" } },
-      ],
-      ["同步 Lynx bundle 到 Android assets", "node", ["../app-lynx/scripts/sync-android-assets.mjs"]],
-      ["同步 Capacitor 资源", "pnpm", ["run", "cap:sync"]],
-      [
-        "编译 Release APK",
-        "./gradlew",
-        gradleTasks,
-        {
-          cwd: resolvePath(rootDir, "android"),
-          env: { ...process.env, GRADLE_USER_HOME: resolvePath(rootDir, "android", ".gradle") },
-        },
-      ],
-    ];
-    const total = buildSteps.length;
-    for (let i = 0; i < total; i++) {
-      const [label, cmd, stepArgs, opts] = buildSteps[i];
-      const subLabel = `[${i + 1}/${total}] ${label}`;
-      if (cmd === "./gradlew") {
-        try {
-          await runWithSpinner(subLabel, cmd, stepArgs, opts);
-        } catch (e) {
-          const stderr = e.stderr || "";
-          // P13：不可重试错误（编译/R8 missing class 等代码问题，memory 坑 2）
-          // 直接失败，避免白跑一轮几分钟的 --stacktrace 重构建。
-          if (/Missing classes|Missing class|error: |FAILURE: Build failed/i.test(stderr)) {
-            throw e;
-          }
-          // 可重试错误（缓存 not-found / 依赖解析瞬时失败，memory 坑 1）
-          log("Gradle 构建失败（疑似缓存/依赖问题），重试并输出详细堆栈...");
-          await runWithSpinner(`${subLabel}（详细堆栈）`, cmd, [...stepArgs, "--stacktrace"], opts);
-        }
-      } else {
-        await runWithSpinner(subLabel, cmd, stepArgs, opts || {});
-      }
-    }
-    const apkPaths = apkPathsFor(newVersion, variants);
-    const missing = [];
-    for (const p of apkPaths) {
-      if (!(await exists(p))) missing.push(p);
-    }
-    if (missing.length > 0) throw new Error(`APK 未生成: ${missing.join(", ")}`);
-    log(`APK 构建完成，产物:`);
-    for (const p of apkPaths) log(`  ${resolvePath(rootDir, p)}`);
+    await buildReleaseApks(newVersion, variants);
   });
 
   await step(4, "Git 提交 + Tag", async () => {
@@ -931,6 +961,14 @@ main().catch(async (error) => {
         `     （若 ${notesFile} 不存在，可改为 --notes "Pictelio ${relTag}" 或手动粘贴 changelog）`,
       );
     }
+  } else if (error.isOverwrite) {
+    console.error(`\n[release] ❌ 覆盖发布失败`);
+    console.error(`   ${error.message}`);
+    console.error(`   覆盖范围仅限 GitHub Release 页面，tag/commit 未被改动。`);
+    console.error(`   若资产在上传中丢失，脚本已尝试从备份恢复；可重跑 pnpm run release -o 重试。`);
+    console.error(
+      `   检查远端: https://github.com/${getRepoSlug()}/releases/tag/${error.overwriteTag || "vX.Y.Z"}`,
+    );
   } else {
     console.error(`   ${error.message}`);
   }
