@@ -5,12 +5,12 @@
 ## 项目概览
 
 - **技术栈**: SolidJS 1.9 + TypeScript 6.0 (strict) + Vite 8.0 + UnoCSS 66.7 + Capacitor 8.4；小说正文布局使用 `@chenglou/pretext`
-- **Monorepo**: pnpm workspace，含两个子包：`pictelio-app`（SPA 主体）和 `pictelio-website`（VitePress 落地页）
-- **入口**: `packages/app/src/main.tsx` → `packages/app/src/startup.ts` → `packages/app/src/App.tsx` → `packages/app/src/router.tsx`（TanStack Router，路由定义与 App 分离）
-- **路由**: `/login` `/recommended` `/following` `/illust/$id` `/novel/$id` `/bookmarks` `/me` `/user/$id` `/user/$id/illusts` `/user/$id/following` `/user/$id/followers` `/history` `/about` `/image-host` `/image-cache` `/age-confirmation` `/debug`
+- **Monorepo**: pnpm workspace，含四个子包：`pictelio-app`（SolidJS SPA 主体）、`pictelio-app-lynx`（vue-lynx 客户端 MVP）、`@pictelio/ugoira`（Ugoira 动图帧处理库）和 `pictelio-website`（Astro 落地页）
+- **入口**: `packages/app/src/main.tsx`（bootstrap：settings 同步、Fluent 主题、渲染、auth 恢复）→ `packages/app/src/App.tsx` → `packages/app/src/router.tsx`（TanStack Router，路由定义与 App 分离；`src/startup.ts` 为预留启动钩子，当前为空实现）
+- **路由**: `/login` `/home` `/illust/$id` `/debug` `/novel/$id` `/search` `/me` `/about` `/image-host` `/image-cache` `/layout-settings` `/settings` `/age-confirmation` `/user/$id` `/user/$id/illusts` `/user/$id/following` `/user/$id/followers` `/my/followers`（其余路径 catch-all 到 `/home`）
 - **设计系统**: **强制** Microsoft Fluent Design System 2 — 所有视觉和交互决策基于 Fluent 令牌和规范（详见「Fluent Design 规范」章节）
-- **Pixiv API**: 自建 HTTP 客户端 (`src/api/client.ts` + `src/api/queryClient.ts`)，双模式（Web: fetch + Vite 代理 / Native: CapacitorHttp 直连 + `src/native/PictelioHttp.ts`），iOS OAuth 凭证策略（Android 已弃用），401 自动刷新 + 防死循环
-- **CSS 架构**: 分层加载 `reset.css` → `tokens.css` → `base.css` → `virtual:uno.css`；字号通过 UnoCSS preflights 以流体 `clamp(rem + vw)` 定义（见 `uno.config.ts`），无需构建期转换；Fluent Web Components 主题同步
+- **Pixiv API**: 自建 HTTP 客户端 (`src/api/client.ts` + `src/api/queryClient.ts`)，双模式（Web: fetch + Vite 代理，`devAccessToken` 编译期保护 / Native: Capacitor bridge → `PixivApiPlugin`，见 `src/native/PixivApi.ts`），iOS OAuth 凭证策略（Android 已弃用），401 自动刷新 + 防死循环
+- **CSS 架构**: 分层加载 `reset.css` → `tokens.css` → `base.css` → `virtual:uno.css` → `novel-reader.css`；字号通过 UnoCSS preflights 以流体 `clamp(rem + vw)` 定义（见 `uno.config.ts`），无需构建期转换；Fluent Web Components 主题同步
 - **构建工具**: 使用 `vite-plus`（内部封装 Vite + oxlint + oxfmt + vitest），通过 `vp` CLI 统一执行 dev/build/check/test/lint/fmt
 
 ## 代码智能规范（Code Intelligence）
@@ -141,6 +141,8 @@ OpenWiki 提供人工整理的高层次项目概览，与 CodeGraph（精确代�
 | `pnpm test:all`                     | 并行运行所有包的单测                                              |
 | `pnpm test:app:all`                 | app 单测 + agent-browser E2E（原 `test:all` 组合语义）             |
 | `pnpm test:watch`                   | Vitest watch 模式（app）                                          |
+| `pnpm test:agent-browser`            | agent-browser AI 驱动 E2E（app）                                  |
+| `pnpm test:android:e2e`              | Android 模拟器 Appium E2E（app）                                  |
 | `pnpm lint` / `pnpm fmt`            | oxlint 检查 / oxfmt 格式化（app）                                 |
 | `pnpm fmt:check`                    | oxfmt 格式检查（不修改）                                          |
 | `pnpm build:android`                | 构建 Web + Capacitor 同步 + Gradle 编译 Debug APK                 |
@@ -164,26 +166,46 @@ pixivizer/
 │   │   ├── android/             # Capacitor Android 原生项目（源码纳入版本控制）
 │   │   ├── scripts/             # 构建/发布/android-dev/截图脚本
 │   │   ├── assets/              # 静态资源（logo、favicon 等）
-│   │   ├── vite.config.ts       # Vite+ 配置（含 UnoCSS、PWA、代理、lint、fmt）
+│   │   ├── vite.config.ts       # Vite+ 配置（含 UnoCSS、代理、lint、fmt）
 │   │   ├── uno.config.ts        # UnoCSS shortcuts（Fluent 风格）
 │   │   ├── tsconfig.json        # TypeScript strict 配置
-│   │   ├── vitest.config.ts     # Vitest 配置
+│   │   ├── vitest.config.ts     # Vitest 配置（node 环境单测）
+│   │   ├── vitest.agent-browser.config.ts # agent-browser AI 驱动 E2E 配置
 │   │   └── capacitor.config.ts  # Capacitor 配置（appId: io.pictelio.app）
+│   ├── app-lynx/                # pictelio-app-lynx — vue-lynx 客户端 MVP（登录/推荐/小说/个人中心/引擎切换）
+│   │   ├── src/                 # vue-lynx 源码（样式见「app-lynx 样式」约定）
+│   │   ├── tests/               # lynx 单测
+│   │   ├── scripts/             # sync-android-assets.mjs 等
+│   │   ├── lynx.config.ts       # Lynx/Rspack 构建配置
+│   │   ├── tailwind.config.ts   # Tailwind（spacing=vw、fontSize=rpx、Fluent 色板）
+│   │   └── postcss.config.js
+│   ├── ugoira/                  # @pictelio/ugoira — Ugoira 动图 zip 帧处理纯函数库
+│   │   ├── src/                 # fflate 解压 / store 模式 Range 切片
+│   │   ├── tests/
+│   │   └── package.json
 │   └── website/                 # pictelio-website — Astro 落地页
-│       ├── src/                # Astro 页面源码
-│       │   └── pages/          # Astro 路由页面
+│       ├── src/                 # Astro 页面源码
+│       │   └── pages/           # Astro 路由页面
+│       ├── tests/               # 落地页测试
 │       ├── version.json         # 版本信息
 │       └── package.json
 ├── scripts/
-│   └── deploy.mjs               # GitHub Pages 本地预览脚本
+│   ├── deploy.mjs               # GitHub Pages 本地预览脚本
+│   └── kill-dev-server.mjs      # 开发服务器进程管理
 ├── docs/                        # 项目文档
+│   ├── adr/                     # ADR（含 ADR-0059 命令约定，最新到 ADR-0063）
+│   ├── agents/                  # Agent 工作流文档（issue-tracker、triage-labels、domain）
 │   ├── github-release.md
 │   ├── release-checklist.md
 │   ├── release-signing.md
+│   ├── platform-compatibility.md
 │   └── privacy-policy.md
 ├── dist/                        # Vite 构建输出
+├── openwiki/                    # OpenWiki 生成文档（禁止手改）
 ├── .github/workflows/
-│   └── deploy.yml               # GitHub Pages 自动部署
+│   ├── deploy.yml               # GitHub Pages 自动部署
+│   ├── openwiki-update.yml      # OpenWiki 每日自动更新
+│   └── ci.yml                   # CI 检查门禁
 ├── pnpm-workspace.yaml          # pnpm workspace 配置
 ├── reasonix.toml                # Reasonix/CodeGraph 插件配置
 └── package.json                 # 根 package.json（workspace 委托层）
@@ -195,55 +217,68 @@ pixivizer/
 packages/app/src/
 ├── api/                # Pixiv API 层
 │   ├── auth.ts         # OAuth 认证（iOS 凭证、spark-md5 哈希、password/refresh_token）
-│   ├── client.ts       # HTTP 客户端（PixivApiClient 接口、Web fetch / Native CapacitorHttp 双模式、URL 重写、401 自动刷新防死循环）
+│   ├── client.ts       # HTTP 客户端（PixivApiClient 接口、Web fetch / Native 双模式、URL 重写、401 自动刷新防死循环）
 │   ├── comment.ts      # 作品评论 API：获取、发送、删除
 │   ├── illust.ts       # 作品 API：推荐、关注、下一页、详情、收藏、ugoira 元数据、关注/取消关注用户
 │   ├── normalizeQueryError.ts # TanStack Query 错误归一化
 │   ├── novel.ts        # 小说 API：详情、系列、搜索
+│   ├── pkceAuth.ts     # PKCE 登录流程
 │   ├── queryClient.ts  # TanStack Query client 单例 & 默认配置
 │   ├── queryKeys.ts    # TanStack Query 查询键工厂
+│   ├── search.ts       # 作品/用户搜索 API
+│   ├── translate.ts    # 小说 AI 翻译 API
 │   ├── types.ts        # 类型定义（PixivIllust、PixivUser、ApiError、PixivAuthResponse 等）
 │   ├── user.ts         # 用户 API：详情、关注列表、粉丝列表
-│   └── userAgent.ts    # User-Agent 管理
+│   ├── userAgent.ts    # User-Agent 管理
+│   └── _oauthFetch.ts  # OAuth fetch 封装（详情页动态导入）
 ├── styles/             # CSS 分层（main.tsx 中按序导入）
 │   ├── reset.css       # modern-css-reset 定制
 │   ├── tokens.css      # Fluent Design System 2 设计令牌（颜色、间距、圆角、阴影、字体、动画曲线/时长）
-│   └── base.css        # 根样式、滚动条、选中色、动画关键帧、reduced-motion
-├── types/              # 环境类型声明（spark-md5、env）
+│   ├── base.css        # 根样式、滚动条、选中色、动画关键帧、reduced-motion
+│   └── novel-reader.css # 小说阅读器专属样式
+├── types/              # 环境类型声明（env、fluent、spark-md5、window）
 ├── stores/             # SolidJS 响应式状态（createSignal + createStore 导出）
 │   ├── authStore.ts    # 登录状态（isLoggedIn、user、token、自动恢复、onUnauthorized 处理器）
 │   ├── backGestureStore.ts # Android 返回手势状态管理
 │   ├── blockStore.ts   # 已屏蔽用户 ID 持久化
-│   ├── bookmarkStore.ts# 收藏状态管理
+│   ├── bookmarkStore.ts# 插画收藏状态管理
 │   ├── db.ts           # TanStack DB 本地数据库配置（浏览历史持久化）
-│   ├── feedStore.ts    # Feed 数据（illusts、分页、按 Tab 缓存、滚动位置）
 │   ├── followListStore.ts # 关注/粉丝列表状态
+│   ├── followStore.ts  # 关注作品 Feed 状态
 │   ├── historyStore.ts # 浏览历史状态（TanStack DB 查询封装）
 │   ├── imageHostStore.ts # 自定义图片托管配置状态
+│   ├── novelBookmarkStore.ts # 小说收藏状态
 │   ├── novelCache.ts   # 小说正文缓存（LRU）
-│   ├── novelStore.ts   # 小说 Feed 状态
+│   ├── novelFollowStore.ts # 关注小说 Feed 状态
+│   ├── novelRecommendedStore.ts # 推荐小说 Feed 状态
 │   ├── readerSettingsStore.ts # 小说阅读设置（字号、字重、字体、行高、颜色）
+│   ├── recommendedStore.ts # 推荐作品 Feed 状态
 │   ├── reportStore.ts  # 已举报作品 ID 持久化
+│   ├── searchStore.ts  # 搜索状态
+│   ├── settingsStore.ts # 设置系统状态
+│   ├── shared/         # 共享工厂（createTQFeedStore、createPersistedSet、feedHelpers、novelHelpers）
 │   ├── themeStore.ts   # 主题管理（亮/暗/跟随系统）
+│   ├── translationStore.ts # 翻译状态
 │   ├── uiStore.ts      # UI 状态（当前 Tab、布局模式、R18 开关、设置面板、自动检查更新等）
 │   ├── userIllustsStore.ts # 用户作品列表状态
 │   └── userStore.ts    # 用户状态
-├── routes/             # 页面组件（lazy loaded，路由定义在独立的 src/router.tsx）
-│   ├── __root.tsx              # 路由根布局（NavBar、页面过渡、全局监听）
-│   ├── Login.tsx               # 登录页（refresh_token / 用户名密码）
+├── routes/             # 页面组件（路由定义在独立的 src/router.tsx）
+│   ├── __root.tsx              # 路由根布局（NavBar、页面过渡、主题/年龄确认恢复、全局监听）
+│   ├── HomePage.tsx            # 首页（Tab 容器：推荐/关注 + 瀑布流）
+│   ├── Login.tsx               # 登录页（refresh_token / 用户名密码 / PKCE）
 │   ├── AgeConfirmation.tsx     # 年龄确认页
-│   ├── TabFeedPage.tsx         # Tab 容器（recommended / follow），委托 Feed 渲染
-│   ├── Feed.tsx                # 瀑布流内容（虚拟滚动、下拉刷新、无限加载、哨兵分页）
 │   ├── IllustDetail.tsx        # 作品详情（大图查看、多页、动图播放、楼梯式浏览）
 │   ├── NovelDetail.tsx         # 小说详情（正文虚拟化、搜索高亮、阅读进度）
-│   ├── NovelFeedPage.tsx       # 小说 Feed 页
+│   ├── NovelRecommendedFeed.tsx # 推荐小说 Feed 页
+│   ├── NovelFollowFeed.tsx     # 关注小说 Feed 页
 │   ├── NovelBookmarks.tsx      # 小说收藏页
 │   ├── IllustBookmarks.tsx     # 插画收藏页
-│   ├── Bookmarks.tsx           # 收藏总览页
-│   ├── HistoryPage.tsx         # 浏览历史页
-│   ├── FollowListPage.tsx      # 关注/粉丝列表页
+│   ├── Search.tsx              # 搜索页（作品/用户/小说）
+│   ├── FollowListPage.tsx      # 关注/粉丝列表页（mode=following/followers）
 │   ├── PersonalCenter.tsx      # 个人中心 / 用户主页（根据路由参数区分）
 │   ├── UserIllusts.tsx         # 用户作品列表页
+│   ├── Settings.tsx            # 设置页
+│   ├── LayoutSettings.tsx      # 布局设置页
 │   ├── ImageHostSettings.tsx   # 图片托管设置页
 │   ├── ImageCacheSettings.tsx  # 图片缓存设置页
 │   ├── About.tsx               # 关于页
@@ -251,11 +286,16 @@ packages/app/src/
 ├── components/         # 可复用 UI 组件
 │   ├── AgeGate.tsx              # 年龄门槛组件
 │   ├── BlocklistSheet.tsx       # 屏蔽列表面板
+│   ├── BookmarksFeed.tsx        # 收藏 Feed 渲染
+│   ├── CollapsedHeader.tsx      # 折叠头部
+│   ├── CommentInput.tsx / CommentList.tsx # 评论输入/列表
 │   ├── CommentOverlay.tsx       # 评论浮层组件
 │   ├── ErrorDisplay.tsx         # 统一错误展示组件（按 ApiErrorType 渲染操作指引）
-│   ├── FluentIcon.tsx           # Fluent 图标封装（components/ui/）
+│   ├── FollowFeed.tsx           # 关注 Feed 渲染
 │   ├── GridCard.tsx             # 网格模式卡片
 │   ├── HeartBurstEffect.tsx     # 收藏爱心爆发效果
+│   ├── HistoryFeed.tsx          # 浏览历史 Feed
+│   ├── IllustActionMenu.tsx     # 作品操作菜单
 │   ├── IllustTags.tsx           # 作品标签显示组件
 │   ├── ImageCard.tsx            # Feed 卡片（含收藏/关注操作、R18 模糊、R18G 遮罩）
 │   ├── ImageViewer.tsx          # 全屏图片查看器（缩放/拖拽/滑动翻页）
@@ -264,56 +304,86 @@ packages/app/src/
 │   ├── LoadingSpinner.tsx       # 加载动画
 │   ├── NavBar.tsx               # 顶部导航栏（自动隐藏）
 │   ├── NovelCard.tsx            # 小说卡片
+│   ├── NovelCoverHeader.tsx / NovelFooterNav.tsx # 小说封面头部/底部导航
 │   ├── NovelSearchBar.tsx       # 小说搜索栏
 │   ├── NovelTextListCard.tsx    # 小说文本列表卡片（纯渲染，无测量）
 │   ├── NovelVirtualFeed.tsx     # 小说虚拟滚动 Feed（textList / coverWall）
+│   ├── OAuthWebView.tsx         # OAuth 登录 WebView
 │   ├── PageTransition.tsx       # 页面过渡动画
+│   ├── PictelioIcon.tsx         # 应用图标
 │   ├── PixivImage.tsx           # 图片组件（CDN 代理 + 尺寸优化 + 渐进加载）
 │   ├── PullIndicator.tsx        # 下拉刷新指示器
 │   ├── ReaderSettingsSheet.tsx  # 阅读设置面板
+│   ├── RecommendedFeed.tsx      # 推荐 Feed 渲染
 │   ├── ReportSheet.tsx          # 举报面板
+│   ├── SearchResults.tsx / SearchableTag.tsx # 搜索结果/可点击标签
 │   ├── SeriesSheet.tsx          # 作品系列面板
 │   ├── SeriesSheetItem.tsx      # 系列面板条目组件
-│   ├── SettingsDrawer.tsx       # 设置抽屉面板
-│   ├── SkeletonCard.tsx         # 骨架屏占位卡片
+│   ├── SkeletonCard.tsx / SkeletonShimmer.tsx # 骨架屏卡片/微光
 │   ├── StartupUpdateDialog.tsx  # 启动时更新检查弹窗
 │   ├── ThemeSelector.tsx        # 主题选择器组件
-│   ├── UgoiraViewer.tsx         # 动图（Ugoira）播放器（JSZip 解压帧）
+│   ├── TranslateSheet.tsx       # 翻译面板
+│   ├── UgoiraViewer.tsx         # 动图（Ugoira）播放器（@pictelio/ugoira 解压帧）
 │   ├── UserAvatar.tsx           # 用户头像组件
 │   ├── UserWorksFeed.tsx        # 用户作品瀑布流
-│   └── VirtualFeed.tsx          # 虚拟滚动 Feed 容器
+│   ├── VirtualFeed.tsx          # 虚拟滚动 Feed 容器
+│   ├── settings/                # 设置页子组件（SettingsAccount/Appearance/Client/Content/Dialogs/Image/Translate）
+│   ├── skeletons/               # 骨架屏（Feed/Grid/IllustDetail/List/NovelDetail/Profile）
+│   └── ui/                      # 基础 UI（FluentDialog、FluentIcon、GlassTabBar、HeartIcon、TagInput）
 ├── primitives/         # 底层抽象（无 UI 的逻辑单元）
-│   ├── createComputedTextCard.ts # textList / coverWall 卡片信息区高度纯计算
+│   ├── createFeedVirtualizer.ts  # Feed 虚拟滚动窗口管理
 │   ├── createImageSizeWorker.ts  # 图片尺寸 Web Worker 通信封装
 │   ├── createManualFetch.ts      # 手动 fetch 封装（AbortController 管理）
 │   ├── createNovelLoader.ts      # 小说内容加载器
 │   ├── createNovelSearch.ts      # 小说正文搜索匹配（字符索引）
 │   ├── createNovelTextLayout.ts  # 小说正文纯文本布局（pretext）
+│   ├── createNovelTranslator.ts  # 小说 AI 翻译流程
 │   ├── createNovelVirtualLayout.ts # 小说正文虚拟化窗口管理
-│   ├── imageSize.worker.ts       # Web Worker 图片尺寸计算（替代旧的 masonryWorker）
+│   ├── createScrollDirection.ts / createScrollDrivenVisibility.ts / createScrolledPast.ts # 滚动方向/可见性原语
+│   ├── imageSize.worker.ts       # Web Worker 图片尺寸计算
 │   ├── isPretextSupported.ts     # pretext 运行环境检测
 │   ├── measureText.ts            # 文本测量工具
 │   ├── novelTextLayoutCache.ts   # 小说布局结果 LRU 缓存
-│   ├── types.ts                 # 布局类型定义
+│   ├── rootMargins.ts            # 虚拟化 rootMargin 常量
+│   ├── scroll/                   # 滚动行为（createScrollBehavior）
+│   ├── types.ts                  # 布局类型定义
+│   ├── useCardInteractions.ts    # 卡片交互原语
+│   ├── useComments.ts            # 评论数据原语
 │   ├── useContainerWidth.ts      # 容器宽度响应式 Hook
+│   ├── useDetailData.ts          # 详情数据原语
+│   ├── useUserProfile.ts         # 用户资料原语
 │   └── visibility/               # 可见性/哨兵原语
 │       ├── everVisible.ts        # 一次性可见性（基于 @solid-primitives/intersection-observer）
 │       ├── index.ts              # 导出
 │       └── sentinel.ts           # 哨兵分页原语（基于 @solid-primitives/intersection-observer）
+├── native/             # Android 原生桥接（仅原生构建生效，Web 开发环境不加载）
+│   ├── PixivApi.ts     # PixivApiPlugin 网关桥（request/syncToken/setAccessToken/prefetchImage）
+│   ├── AuthPlugin.ts   # 原生认证插件
+│   ├── OAuthPlugin.ts  # OAuth 登录插件
+│   ├── ImageCache.ts   # 原生图片缓存
+│   ├── ClientInfo.ts   # 客户端信息
+│   └── splashBridge.ts # 启动屏桥接
 ├── services/           # 服务封装
 │   ├── backGestureService.ts # Android 返回手势动画服务
 │   ├── imageHostService.ts # 自定义图片托管服务
 │   └── updateService.ts   # 应用更新检查服务
+├── settings/           # 设置系统（registry、codecs、types、backends/localStorage|memory|mirrored|preferences）
 └── utils/              # 工具函数
+    ├── clientSwitch.ts       # 客户端引擎切换
     ├── createDedupedRequest.ts # 去重请求工具
+    ├── detectLanguage.ts     # 语言检测
     ├── html.ts               # HTML 处理工具
     ├── imageLoader.ts        # 图片加载与缓存（L1 已加载标记集合、预加载、CDN URL 构建）
     ├── novelBlocks.ts        # 小说段落解析工具
     ├── novelImageDimensions.ts # 小说内嵌图片尺寸提取
+    ├── prompts.ts            # AI 翻译提示词
     ├── r18Filter.ts          # R18/R18G 内容过滤
     ├── scrollToTop.ts        # 回顶工具函数
+    ├── searchMerger.ts       # 搜索结果合并
     ├── secureStorage.ts      # refresh_token 安全存储（capacitor-secure-storage-plugin）
-    └── themeApplier.ts       # 主题应用工具（同步 Fluent tokens）
+    ├── themeApplier.ts       # 主题应用工具（同步 Fluent tokens）
+    ├── translationCache.ts   # 翻译结果缓存
+    └── tryAsync.ts           # async 错误元组封装（tryAsync/trySync）
 ```
 
 ## 关键设计决策
@@ -342,7 +412,7 @@ packages/app/src/
 
 - **返回键处理**: Android 返回键通过 `@capacitor/app` 的 `CapApp.addListener("backButton", ...)` 统一处理：关闭查看器/设置、非根路径执行 `navigate(-1)`、根路径双击退出应用。
 - **图片代理**: `MainActivity.java` 中 `shouldInterceptRequest` 拦截所有 `/pixiv-img/` 请求，代理到 `i.pximg.net` 并注入正确的 Referer 和 User-Agent 头。
-- **原生桥接**: `src/native/` 目录包含 Android 原生通信模块：`AuthPlugin.ts`（原生认证插件）、`ImageCache.ts`（原生图片缓存）、`PictelioHttp.ts`（原生 HTTP 客户端封装）。
+- **原生桥接**: `src/native/` 目录包含 Android 原生通信模块：`PixivApi.ts`（PixivApiPlugin 网关桥）、`AuthPlugin.ts`（原生认证插件）、`OAuthPlugin.ts`（OAuth 登录）、`ImageCache.ts`（原生图片缓存）。
 - **插件注册**: 自定义插件在 `MainActivity.java` 的 `onCreate` 中通过 `registerPlugin()` 注册，**必须在 `super.onCreate(savedInstanceState)` 之前**。
 
 ### 安全存储
@@ -354,7 +424,7 @@ packages/app/src/
 ### 虚拟滚动与布局
 
 - **Masonry 瀑布流**: 通过 `createImageSizeWorker.ts` + `imageSize.worker.ts`（Web Worker）异步计算图片尺寸，驱动瀑布流布局，避免阻塞主线程。
-- **虚拟滚动**: `createManualFetch.ts` + 虚拟滚动计算可见窗口（startIndex/endIndex），仅渲染视口内 + overscan 范围的卡片。
+- **虚拟滚动**: `createFeedVirtualizer.ts` 计算可见窗口（startIndex/endIndex），仅渲染视口内 + overscan 范围的卡片；`createManualFetch.ts` 管理分页数据请求。
 - **三种布局模式**: 瀑布流（2 列）、单列（1 列）、网格（3 列），可切换并持久化。
 
 ### 年龄限制与内容过滤
@@ -364,7 +434,7 @@ packages/app/src/
 - R18 内容在卡片上显示模糊遮罩；R18G 内容显示额外的显式内容警告遮罩。
 - `reportStore` 和 `blockStore` 管理用户举报和屏蔽列表，持久化到 `Preferences`。
 
-### 响铃检查
+### 更新检查
 
 - `updateService.ts` 通过 GitHub API 检查最新 release 版本。
 - 通过 `/github-api` 代理直连 GitHub（不经过 Pixiv 代理，避免被拦截）。
@@ -493,8 +563,8 @@ Grill 澄清 → to-spec → to-tickets → implement
   - 测试文件额外启用 vitest 插件，禁用 `no-console` 和 `require-mock-type-parameters`
 - **格式化**: 使用 `vite-plus` 内置 oxfmt，配置在 `vite.config.ts` 的 `fmt` 字段
 - **Android**：
-  - **平台要求**：`minSdkVersion = 30`（Android 11.0），WebView ≥ **85**（2020-08 Chrome/WebView）。详见 `docs/platform-compatibility.md`。
-  - `minSdkVersion = 30` 在 `variables.gradle` 中定义；低于 Android 11 的设备安装时由系统直接拒绝。
+  - **平台要求**：`minSdkVersion = 28`（Android 9.0），WebView ≥ **85**（2020-08 Chrome/WebView）。详见 `docs/platform-compatibility.md`。
+  - `minSdkVersion = 28` 在 `variables.gradle` 中定义（commit `d1ad95c` 自 30 下调）；低于 Android 9 的设备安装时由系统直接拒绝。
   - 启动时 `MainActivity` 通过 `WebView.getCurrentWebViewPackage()` 检测 WebView 主版本号，低于 85 则加载 `res/raw/upgrade.html` 提示用户升级 WebView，不初始化 Capacitor / JS 环境。
   - 项目位于 `packages/app/android/`，源码与关键配置纳入版本控制
   - `android/.gitignore` 负责忽略构建产物（`.gradle/`、`build/` 等）和 Capacitor 自动生成文件（`capacitor.config.json`、`capacitor.settings.gradle`、`app/capacitor.build.gradle`、复制的 `app/src/main/assets/public` 等）
@@ -506,7 +576,6 @@ Grill 澄清 → to-spec → to-tickets → implement
 - **Gradle 任务图校验**: `build.gradle` 通过 `gradle.taskGraph.whenReady` 仅在 Release 任务触发时检查签名凭据，Debug 构建不需要环境变量。
 - **代码探索**：使用 CodeGraph 作为默认代码理解工具，普通搜索工具仅作 fallback
 - **代理配置**：开发时自动读取 `https_proxy` / `HTTPS_PROXY` / `http_proxy` / `HTTP_PROXY` 环境变量，回退到 `http://127.0.0.1:10808`
-- **PWA**: 通过 `vite-plugin-pwa` 生成 Service Worker，缓存策略: Pixiv 图片 CacheFirst（30 天/500 条），其余默认 Precaching
 - **Node 版本**: 20.19+，包管理器 pnpm 11.9.0（`devEngines` 强制校验）
 
 ## 测试
@@ -517,17 +586,18 @@ Grill 澄清 → to-spec → to-tickets → implement
   - `tests/unit/**/*.test.{ts,tsx}` — 单元测试，按源目录结构组织
   - `tests/agent-browser/specs/**/*.test.ts` — AI 驱动 E2E 测试
   - `src/**/*.test.ts` — 辅助函数/内部模块的就近测试
-- **单元测试覆盖**:
-  - `api/` — 10 测试文件（auth、client、client401Retry、client429Retry、comment、illust、novel、ssrfWhitelistContract、user、userAgent）
-  - `components/` — ThemeSelector
-  - `primitives/` — 5 文件（createComputedTextCard、createManualFetch、createNovelSearch、createNovelTextLayout、novelTextLayoutCache）
+- **单元测试覆盖**（`tests/unit/`）:
+  - `api/` — 13 测试文件（auth、client、client401Retry、client429Retry、comment、illust、novel、pkceAuth、queryKeys、search、translate、user、userAgent）
+  - `components/` — 5 文件（FluentDialog、FluentDialogProbe、GlassTabBar、SettingsSwitchClient、ThemeSelector）
+  - `primitives/` — 9 文件（createFeedVirtualizer、createManualFetch、createNovelSearch、createNovelTextLayout、createNovelTranslator、novelTextLayoutCache、useCardInteractions、useComments、useDetailData）
   - `routes/` — NovelDetail
+  - `scripts/` — 2 文件（release-overwrite、release-utils）
   - `services/` — 3 文件（backGestureService、imageHostService、updateService）
-  - `stores/` — 16 文件（覆盖所有 store，含 imageCacheSettings）
-  - `utils/` — 8 文件（含 `.native.test.ts`）
-  - 根测试 — router.test.ts、startup.test.ts
-- **浏览器测试**: 22 个文件覆盖 IllustDetail、NovelCard、NovelDetail、SeriesSheet、VirtualFeed 等组件
-- **E2E 测试**: 10 个 spec 覆盖 Feed、Login、Illust Detail、Novel Detail、Bookmarks、Cache 等关键路径
+  - `settings/` — registry
+  - `stores/` — 24 文件（覆盖所有 store + shared）
+  - `utils/` — 14 文件（含 `.native.test.ts`）
+  - 根测试 — PersonalCenter、router、startup
+- **E2E 测试**: 10 个 spec —— agent-browser 5 个（main-flow、sub-flows、translation-flow、update-flow、route-switch-instant）+ android-e2e 5 个（smoke、client-kind-contract、switch-client 系列）
 - `passWithNoTests: true` — 允许空测试文件不报错
 
 ### 测试硬约束（违反视为架构违规）
@@ -575,7 +645,7 @@ Grill 澄清 → to-spec → to-tickets → implement
 - 代码中图片 CDN 通过 `/pixiv-img/` 代理路径访问 `i.pximg.net`，非直连
 - 不要在 HTML/CSS/JS 中硬编码 Pixiv CDN URL（`i.pximg.net`、`app-api.pixiv.net`），应使用代理路径
 - 路由定义在 `src/router.tsx` 中独立管理，与 `App.tsx` 分离
-- `src/startup.ts` 编排启动流程（年龄确认、主题初始化、auth 恢复），在 React 树渲染前执行
+- 启动编排在 `src/main.tsx`（settings 同步、Fluent 主题、渲染、auth 恢复）与 `routes/__root.tsx`（主题/年龄确认恢复、导航）中完成；`src/startup.ts` 为预留启动钩子（当前为空实现）
 - `src/native/` 目录下的原生桥接文件仅 Android 构建时生效，在 Web 开发环境中不加载
 - **Conventional Commits**：提交信息必须遵循 Conventional Commits 规范（`type(scope): description`），commit-msg hook 通过 commitlint 强制校验。允许的 type：`feat`、`fix`、`docs`、`style`、`refactor`、`perf`、`test`、`build`、`ci`、`chore`、`revert`
 
