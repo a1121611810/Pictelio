@@ -90,13 +90,16 @@ Tab 控件共享的统一视觉风格：磨砂玻璃容器 + 激活项浮起玻�
 
 **代理错误（Proxy Error）**：
 Vite 开发代理无法连接上游 Pixiv 服务器时产生的错误。代理层返回统一 JSON 载荷：
+
 ```json
 { "error": "proxy_error", "message": "代理连接失败，请检查网络或代理状态" }
 ```
+
 `client.ts` 将其分类为 `ApiErrorType.PROXY`。
 
 **ApiErrorType**：
 `api/types.ts` 中定义的错误分类枚举。当前值：
+
 - `NETWORK` — 网络不可用（`TypeError`：fetch 完全不可达）
 - `UNAUTHORIZED` — HTTP 401，登录过期
 - `FORBIDDEN` — HTTP 403，无权限
@@ -115,6 +118,7 @@ Pixiv OAuth 端点在 refresh_token 已过期/无效时返回 HTTP 400 而非 40
 
 **可操作错误指引（Actionable Error Guidance）**：
 错误 UI 中根据 `ApiError.type` 渲染的、告诉用户具体该做什么的提示文字和按钮组合。例如：
+
 - `PROXY` → "请检查本地代理 127.0.0.1:10808 是否运行"
 - `NETWORK` → "请检查网络连接"
 - `UNAUTHORIZED` → "请重新登录"
