@@ -101,7 +101,8 @@ Architecture Decision Records live in `/docs/adr/`. Notable ones:
 | 0041 | Token barrier — `tokenReady` Promise blocks API requests before auth init completes; `authPermanentFailure` prevents request avalanche on token failure |
 | 0042 | Demand query — `createTQFeedStore` default `enabled: false` defers all store queries to explicit `ensureLoaded` calls; skeleton renders before first fetch |
 | 0043 | Skeleton rendering guarantee — `setTimeout(0)` replaces `requestAnimationFrame` in feed `onMount` to ensure skeleton paints before data load |
-| 0044 | app-lynx responsive unit selection — fontSize uses `rpx`, width/spacing/padding uses `vw`; backed by [glossary-lynx-units](/docs/adr/glossary-lynx-units.md) |
+| 0044 | Glass Tab visual language — Liquid Glass A+ tier design for all tab controls (GlassTabBar, NavBar capsule, pointer-follow highlight); see [ADR-0044](/docs/adr/ADR-0044-glass-tab-visual-language.md) and [spec](/docs/specs/glass-tab-visual-language.md) |
+| 0044 (lynx units) | app-lynx responsive unit selection — fontSize uses `rpx`, width/spacing/padding uses `vw`; see [ADR-0044](/docs/adr/ADR-0044-lynx-responsive-units.md) and [glossary](/docs/adr/glossary-lynx-units.md) |
 | 0045 | app-lynx scrolltolower infinite-loading fix — web-core mis-trigger, root-caused to `scrolltolower` event firing when list is empty/short |
 | 0046 | app-lynx Tailwind CSS migration — spacing=vw, fontSize=rpx, Fluent semantic color palette via `@lynx-js/tailwind-preset`; all 6 pages migrated (Login → Me, T2–T8) |
 | 0047 | app-lynx automated visual verification — CDP + Vivaldi persistent profile; recursive shadowRoot/iframe traversal to penetrate lynx-view render boundary; `Input.insertText` for login (vue-lynx v-model unresponsive to native events); 6-page Tailwind utility verification matrix |
@@ -201,14 +202,6 @@ The following areas are either already well-documented in existing docs or too n
 
 - **Cross-platform migration research** — Nine new feasibility reports in `docs/research/` evaluating replacing the Capacitor WebView client: `lynx-migration-feasibility.md` (entrypoint) plus `lynx-pure-engine-analysis.md`, `vue-lynx-deep-dive.md`, `vue-lynx-production-readiness.md`, `vue-lynx-masonry-feasibility.md`, `vue-lynx-benchmark-ifr.md` (IFR benchmark analysis, 32-device runs, IFR rejected for app-lynx), `taro-migration-feasibility.md`, `tauri-migration-feasibility.md`, and `uniapp-x-migration-feasibility.md`. Research only — no code changes or framework decision yet; revisit when a migration is actually scheduled.
 - **Image loading pipeline deep-dive** — 40KB+ doc at `/docs/image-loading-pipeline.md` covers timing, diagrams, and optimization matrix. The [wiki page](/openwiki/architecture/image-pipeline.md) links there.
-- **Website package** (`/packages/website/`) — Astro 7 landing page with full redesign (migrated from VitePress in v3.18.0). Dark-first theme with light toggle, cursor glow effect, CSP headers, Open Graph metadata. Low project-specific complexity.
-- **Fluent Design token reference** — Covered in `AGENTS.md` and `/packages/app/src/styles/tokens.css`.
-- **Comment system design** — Documented at `/docs/comment-system-design.md`. Structurally simple and stable.
-- **Individual store deep-dives** — Stores are well-structured and self-documenting; document if refactoring is needed.
-- **ImageHostSettings page internals** — Large route page (23K+ lines); covered by image pipeline docs.
-- **Settings pages sub-components** — Covered by ADR-0018; straightforward settings to component mapping.
-- `/docs/superpowers/` — Superpowers documentation plugin system (plugin-specific, not core app logic).
-ipeline deep-dive** — 40KB+ doc at `/docs/image-loading-pipeline.md` covers timing, diagrams, and optimization matrix. The [wiki page](/openwiki/architecture/image-pipeline.md) links there.
 - **Website package** (`/packages/website/`) — Astro 7 landing page with full redesign (migrated from VitePress in v3.18.0). Dark-first theme with light toggle, cursor glow effect, CSP headers, Open Graph metadata. Low project-specific complexity.
 - **Fluent Design token reference** — Covered in `AGENTS.md` and `/packages/app/src/styles/tokens.css`.
 - **Comment system design** — Documented at `/docs/comment-system-design.md`. Structurally simple and stable.

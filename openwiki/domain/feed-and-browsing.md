@@ -91,6 +91,22 @@ flowchart LR
     VF --> CFV[createFeedVirtualizer]
 ```
 
+### Sub-Tab Navigation (GlassTabBar)
+
+Sub-tab selection across feeds uses the **GlassTabBar** component (`/packages/app/src/components/ui/GlassTabBar.tsx`), a frosted-glass segmented control with pointer-follow highlight and keyboard navigation ([ADR-0044](/docs/adr/ADR-0044-glass-tab-visual-language.md)). It replaces the earlier ad-hoc button-row implementations in all feed components:
+
+| Component | Route / Location | GlassTabBar Tabs | Purpose |
+|-----------|-----------------|------------------|---------|
+| `HomePage` | `/home` header | 插画 / 小说 | Content-type toggle (hidden on history tab) |
+| `RecommendedFeed` | `/home` (recommended tab) | 综合 / 插画 / 漫画 | Recommended illust sub-tab filter |
+| `FollowFeed` | `/home` (follow tab) | 全部 / 公开 / 非公开 | Follow illust visibility filter |
+| `NovelFollowFeed` | `/home` (follow tab, novel mode) | 全部 / 公开 / 非公开 | Follow novel visibility filter |
+| `UserIllusts` | `/user/:id/illusts` | 插画 / 漫画 / 小说 | User works segment switch |
+
+GlassTabBar supports two variants: **`segmented`** (all current usages — full-width equal segments) and **`capsule`** (default — pill-shaped with pointer-follow highlight). The pointer highlight effect is provided by the shared **`usePointerHighlight`** hook (`/packages/app/src/primitives/usePointerHighlight.ts`), which is also used by **NavBar** for its glass capsule visual. The hook tracks `pointermove`/`pointerleave` coordinates on the container and honors `prefers-reduced-motion: reduce` (no highlight layer when set).
+
+ARIA compliance: `role="tablist"` container with `role="tab"` buttons, `aria-selected` on the active tab, roving `tabindex` (only the active tab is focusable), and ArrowLeft/ArrowRight keyboard navigation that stops at endpoints (no wrap).
+
 ## Virtual Scrolling
 
 `/packages/app/src/primitives/createFeedVirtualizer.ts` — The core virtualizer for efficient rendering of large illust lists. It:
@@ -240,6 +256,4 @@ User profile data is loaded via `/packages/app/src/primitives/useUserProfile.ts`
 | Block/report store | `/packages/app/src/stores/blockStore.ts` |
 | User illusts | `/packages/app/src/routes/UserIllusts.tsx` |
 | Follow list page | `/packages/app/src/routes/FollowListPage.tsx` |
-| Personal center | `/packages/app/src/routes/PersonalCenter.tsx` |
-stPage.tsx` |
 | Personal center | `/packages/app/src/routes/PersonalCenter.tsx` |

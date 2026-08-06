@@ -4,24 +4,89 @@ import version from "../../version.json";
 
 const features = [
   {
+    title: "小说 AI 翻译",
+    details:
+      "BYOK 接入 DeepSeek，长文分块智能翻译、断点续翻不重复计费；原文/译文一键对照，R18 敏感内容本地门禁，结果本地缓存离线可读。",
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="M22 22l-5-10-5 10"/><path d="M14 18h6"/></svg>`,
+    highlight: true,
+  },
+  {
+    title: "双客户端引擎",
+    details:
+      "WebView（Fluent 2 设计系统）与 vue-lynx 原生渲染双引擎，设置内一键切换、即时生效，同一账号数据无缝迁移。",
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg>`,
+  },
+  {
     title: "双 Feed 内容浏览",
-    details: "插画推荐/关注双 Tab，支持插画/漫画子分类与关注页三层过滤。小说三 Feed（推荐/关注/收藏）。三种布局模式自由切换，无限滚动加载，位置自动记忆。",
+    details:
+      "插画推荐/关注双 Tab，小说推荐/关注/收藏三 Feed。瀑布流/单列/网格三种布局自由切换，无限滚动加载，位置自动记忆。",
     icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>`,
   },
   {
-    title: "沉浸查看 + 小说阅读",
-    details: "大图缩放、Ugoira 动图播放、多页楼梯导航、评论查看。小说虚拟化正文布局，支持字号/字重/字体/行高/配色自定义，正文搜索高亮与系列目录。",
+    title: "沉浸查看",
+    details:
+      "大图缩放、Ugoira 动图播放、多页楼梯式浏览、评论区直达。三级图片缓存 + 自定义托管竞速，加载快人一步。",
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`,
+  },
+  {
+    title: "小说阅读器",
+    details:
+      "虚拟化正文布局，长篇流畅阅读。阅读器配色/字号/字重/字体/行高全自定义，正文搜索高亮与系列目录一键直达。",
     icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
   },
   {
     title: "发现与社交",
-    details: "多维度搜索（插画/小说/全部 + 最新/最早/热门）。收藏管理双 Tab 公开/非公开。浏览历史日期时间线。用户主页/作品列表/关注粉丝管理。",
+    details:
+      "插画/小说/用户多维度搜索。收藏公开/非公开双管理，浏览历史日期时间线，用户主页/作品列表/关注粉丝管理。",
     icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>`,
   },
   {
-    title: "个性化与安全",
-    details: "三级图片缓存 + 自定义图片托管竞速/负载均衡/最快IP。亮暗主题 + 阅读器独立配色。年龄门、R-18/G 过滤、举报屏蔽。Pixiv 官方 OAuth 登录。",
+    title: "性能体验",
+    details:
+      "即时导航秒开页面框架 + 骨架屏占位，数据随后到达；虚拟滚动低内存占用，二段下拉刷新，布局位置自动记忆。",
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
+  },
+  {
+    title: "安全与隐私",
+    details:
+      "access_token 零 JS 泄漏（原生网关持有），refresh_token Android Keystore 加密，图片三级缓存，R18 过滤/举报/屏蔽。",
     icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>`,
+  },
+];
+
+const engines = [
+  {
+    name: "WebView 客户端",
+    tag: "功能全量",
+    details:
+      "SolidJS + Microsoft Fluent 2 设计系统，覆盖全部功能：搜索、小说阅读与 AI 翻译、收藏、历史、设置与自定义。",
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>`,
+  },
+  {
+    name: "vue-lynx 原生客户端",
+    tag: "更轻更快",
+    details:
+      "Lynx 原生渲染引擎，覆盖推荐/小说/个人中心核心路径，启动更快、滚动更顺滑，体验接近原生应用。",
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
+  },
+];
+
+const security = [
+  {
+    title: "令牌零泄漏",
+    details: "access_token 仅存于原生侧 Java 堆，JS 环境零感知，生产构建中凭证被编译期消除。",
+  },
+  {
+    title: "Keystore 加密",
+    details: "refresh_token 由 Android Keystore 硬件级加密存储，应用内无法明文读取。",
+  },
+  {
+    title: "备份三层防线",
+    details: "云端备份规则三层防护凭证文件，防止加密 token 随备份泄露。",
+  },
+  {
+    title: "图片零回传",
+    details: "图片下载、写盘、缓存全程原生侧完成，二进制内容零字节进入 JS 内存。",
   },
 ];
 
@@ -30,8 +95,11 @@ const base = import.meta.env.BASE_URL;
 const screenshots = [
   { src: `${base}screenshots/01_feed.png`, alt: "推荐 Feed 页面" },
   { src: `${base}screenshots/02_detail.png`, alt: "作品详情页面" },
-  { src: `${base}screenshots/03_settings.png`, alt: "设置页面" },
-  { src: `${base}screenshots/04_login.png`, alt: "登录页面" },
+  { src: `${base}screenshots/03_novel.png`, alt: "小说阅读器" },
+  { src: `${base}screenshots/04_translate.png`, alt: "小说 AI 翻译对照" },
+  { src: `${base}screenshots/05_client_switch.png`, alt: "引擎切换说明页" },
+  { src: `${base}screenshots/06_settings.png`, alt: "设置页面" },
+  { src: `${base}screenshots/07_login.png`, alt: "登录页面" },
 ];
 ---
 
@@ -46,7 +114,7 @@ const screenshots = [
             第三方客户端
           </div>
           <h1 class="vc-title vc-reveal vc-reveal-delay-1">Pictelio</h1>
-          <p class="vc-sub vc-reveal vc-reveal-delay-2">为 Android 打造的 Pixiv 浏览体验 — 插画、小说、收藏、发现，一切尽在掌握。</p>
+          <p class="vc-sub vc-reveal vc-reveal-delay-2">插画与小说的双世界，AI 翻译 + 双客户端引擎 — 为 Android 而生的 Pixiv 浏览体验。</p>
           <div class="vc-actions vc-reveal vc-reveal-delay-3">
             <div class="vc-actions-buttons">
               <a href="https://github.com/a1121611810/Pictelio/releases" class="vc-btn-primary" target="_blank" rel="noopener noreferrer">
@@ -56,7 +124,7 @@ const screenshots = [
             </div>
             <div class="vc-download-meta">
               <span class="vc-version-pill">v{version.version}</span>
-              <span>Android 11+</span>
+              <span>Android 9.0+</span>
               <a class="vc-meta-link" href={version.url} target="_blank" rel="noopener noreferrer">更新日志</a>
             </div>
           </div>
@@ -81,10 +149,43 @@ const screenshots = [
       <p class="vc-features-sub vc-reveal vc-reveal-delay-1">一个应用，畅享插画与小说的双重世界</p>
       <div class="vc-grid">
         {features.map((f, i) => (
-          <div class="vc-card vc-reveal" class:list={{ [`vc-reveal-delay-${i + 1}`]: true }}>
+          <div class="vc-card vc-reveal" class:list={{ [`vc-reveal-delay-${Math.min(i + 1, 4)}`]: true, "vc-card-highlight": f.highlight }}>
             <div class="vc-card-icon" set:html={f.icon} />
             <h3 class="vc-card-title">{f.title}</h3>
             <p class="vc-card-desc">{f.details}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <!-- Dual engine -->
+    <section class="vc-engines">
+      <h2 class="vc-engines-title vc-reveal">双引擎架构</h2>
+      <p class="vc-engines-sub vc-reveal vc-reveal-delay-1">同一应用，两种渲染内核，随你切换</p>
+      <div class="vc-engine-grid">
+        {engines.map((e, i) => (
+          <div class="vc-engine-card vc-reveal" class:list={{ [`vc-reveal-delay-${i + 1}`]: true }}>
+            <div class="vc-engine-card-head">
+              <div class="vc-card-icon" set:html={e.icon} />
+              <span class="vc-engine-tag">{e.tag}</span>
+            </div>
+            <h3 class="vc-engine-name">{e.name}</h3>
+            <p class="vc-engine-desc">{e.details}</p>
+          </div>
+        ))}
+      </div>
+      <p class="vc-engine-note vc-reveal">
+        在设置中一键切换引擎，切换说明页会明确两种引擎的差异与注意事项，切换即时生效。
+      </p>
+    </section>
+
+    <!-- Security -->
+    <section class="vc-security">
+      <div class="vc-security-grid">
+        {security.map((s, i) => (
+          <div class="vc-security-item vc-reveal" class:list={{ [`vc-reveal-delay-${Math.min(i + 1, 4)}`]: true }}>
+            <h4 class="vc-security-title">{s.title}</h4>
+            <p class="vc-security-desc">{s.details}</p>
           </div>
         ))}
       </div>

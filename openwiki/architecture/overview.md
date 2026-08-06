@@ -107,6 +107,7 @@ Key differences from TanStack Router:
 | `/about` | `About` | — |
 | `/age-confirmation` | `AgeConfirmation` | — |
 | `/debug` | `DebugImage` | — |
+| `/client-switch` | `ClientSwitch` | Engine-switch info page (engine diff, warnings, loading mask); triggers restart via `ClientInfoPlugin` |
 | `/settings` | `Settings` | — |
 | `/layout-settings` | `LayoutSettings` | — |
 | `/image-host` | `ImageHostSettings` | — |
