@@ -15,12 +15,18 @@ import {
 import type { PixivIllust } from "../api/types";
 import VirtualFeed from "./VirtualFeed";
 import NovelFollowFeed from "../routes/NovelFollowFeed";
+import StickySubTabs from "./ui/StickySubTabs";
 import { contentType } from "../stores/uiStore";
 import { layoutMode } from "../stores/settingsStore";
 
 const r18Handler = () => refresh();
 
-const FollowFeed: Component = () => {
+interface FollowFeedProps {
+  /** 上方滚动 header 是否可见（决定子标签 sticky 停靠点，见 StickySubTabs） */
+  headerVisible?: boolean;
+}
+
+const FollowFeed: Component<FollowFeedProps> = (props) => {
   const navigate = useNavigate();
   const cached = isFollowCached();
   let abortController: AbortController | null = null;
@@ -57,7 +63,7 @@ const FollowFeed: Component = () => {
     <>
       {/* ── 关注页三层过滤 ── */}
       <Show when={contentType() === "illust"}>
-        <div class="sticky top-12 z-10 surface-appbar px-4 pb-2">
+        <StickySubTabs headerVisible={props.headerVisible ?? true} class="px-4 pb-2">
           <div class="flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-1 gap-1">
             {[
               { key: "all" as const, label: "全部" },
@@ -81,7 +87,7 @@ const FollowFeed: Component = () => {
               </button>
             ))}
           </div>
-        </div>
+        </StickySubTabs>
       </Show>
 
       <Show when={contentType() === "illust"} fallback={<NovelFollowFeed />}>

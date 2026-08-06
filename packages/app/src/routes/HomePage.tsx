@@ -117,12 +117,12 @@ const HomePage: Component = () => {
           {/* ── Tab content panels ── */}
           <Show when={isDomActive("recommended")}>
             <div style={{ display: currentTab() === "recommended" ? "block" : "none" }}>
-              <RecommendedFeed />
+              <RecommendedFeed headerVisible={headerVisible()} />
             </div>
           </Show>
           <Show when={isDomActive("follow")}>
             <div style={{ display: currentTab() === "follow" ? "block" : "none" }}>
-              <FollowFeed />
+              <FollowFeed headerVisible={headerVisible()} />
             </div>
           </Show>
           <Show when={isDomActive("bookmarks")}>

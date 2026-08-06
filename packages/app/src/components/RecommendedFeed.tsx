@@ -16,12 +16,18 @@ import {
 import type { PixivIllust } from "../api/types";
 import VirtualFeed from "./VirtualFeed";
 import NovelRecommendedFeed from "../routes/NovelRecommendedFeed";
+import StickySubTabs from "./ui/StickySubTabs";
 import { contentType } from "../stores/uiStore";
 import { layoutMode } from "../stores/settingsStore";
 
 const r18Handler = () => refresh();
 
-const RecommendedFeed: Component = () => {
+interface RecommendedFeedProps {
+  /** 上方滚动 header 是否可见（决定子标签 sticky 停靠点，见 StickySubTabs） */
+  headerVisible?: boolean;
+}
+
+const RecommendedFeed: Component<RecommendedFeedProps> = (props) => {
   const navigate = useNavigate();
   const cached = isRecommendedCached();
   const [isSwitchingSubTab, setIsSwitchingSubTab] = createSignal(false);
@@ -59,7 +65,7 @@ const RecommendedFeed: Component = () => {
     <>
       {/* ── 推荐页子标签 ── */}
       <Show when={contentType() === "illust"}>
-        <div class="sticky top-12 z-10 surface-appbar px-4 pb-2">
+        <StickySubTabs headerVisible={props.headerVisible ?? true} class="px-4 pb-2">
           <div class="flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-1 gap-1">
             {[
               { key: "mixed" as RecommendSubTab, label: "综合" },
@@ -101,7 +107,7 @@ const RecommendedFeed: Component = () => {
               </button>
             ))}
           </div>
-        </div>
+        </StickySubTabs>
       </Show>
 
       <Show when={contentType() === "illust"} fallback={<NovelRecommendedFeed />}>
