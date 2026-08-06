@@ -14,7 +14,6 @@ import {
 } from "../stores/followStore";
 import type { PixivIllust } from "../api/types";
 import VirtualFeed from "./VirtualFeed";
-import GlassTabBar from "./ui/GlassTabBar";
 import NovelFollowFeed from "../routes/NovelFollowFeed";
 import { contentType } from "../stores/uiStore";
 import { layoutMode } from "../stores/settingsStore";
@@ -59,21 +58,29 @@ const FollowFeed: Component = () => {
       {/* ── 关注页三层过滤 ── */}
       <Show when={contentType() === "illust"}>
         <div class="sticky top-12 z-10 surface-appbar px-4 pb-2">
-          <GlassTabBar
-            variant="segmented"
-            items={[
-              { key: "all", label: "全部" },
-              { key: "public", label: "公开" },
-              { key: "private", label: "非公开" },
-            ]}
-            activeKey={followTab()}
-            onSelect={(key) => {
-              if (followTab() !== key) {
-                setFollowTab(key as "all" | "public" | "private");
-              }
-            }}
-            ariaLabel="关注分类"
-          />
+          <div class="flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-1 gap-1">
+            {[
+              { key: "all" as const, label: "全部" },
+              { key: "public" as const, label: "公开" },
+              { key: "private" as const, label: "非公开" },
+            ].map((opt) => (
+              <button
+                class="flex-1 py-[var(--spacingVerticalS)] px-[var(--spacingHorizontalM)] rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all active:scale-95 appearance-none border-none outline-none cursor-pointer"
+                classList={{
+                  "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
+                    followTab() === opt.key,
+                  "bg-transparent text-[var(--colorNeutralForeground2)]": followTab() !== opt.key,
+                }}
+                onClick={() => {
+                  if (followTab() !== opt.key) {
+                    setFollowTab(opt.key);
+                  }
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
       </Show>
 

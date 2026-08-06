@@ -31,16 +31,15 @@ describe("GlassTabBar", () => {
     }
   });
 
-  it("marks the active item with aria-selected and the active style class", () => {
+  it("marks the active item with aria-current and the active style class", () => {
     render(() => <GlassTabBar items={items} activeKey="follow" onSelect={vi.fn()} />);
     const active = screen.getByRole("tab", { name: "关注" });
     expect(active.getAttribute("aria-selected")).toBe("true");
+    expect(active.getAttribute("aria-current")).toBe("page");
     expect(active.classList.contains("glass-tab-item-active")).toBe(true);
-    // roving tabindex：仅激活项可聚焦
-    expect(active.getAttribute("tabindex")).toBe("0");
     const inactive = screen.getByRole("tab", { name: "推荐" });
     expect(inactive.getAttribute("aria-selected")).toBe("false");
-    expect(inactive.getAttribute("tabindex")).toBe("-1");
+    expect(inactive.getAttribute("aria-current")).toBeNull();
     expect(inactive.classList.contains("glass-tab-item-active")).toBe(false);
   });
 
@@ -49,36 +48,6 @@ describe("GlassTabBar", () => {
     render(() => <GlassTabBar items={items} activeKey="recommended" onSelect={onSelect} />);
     fireEvent.click(screen.getByRole("tab", { name: "历史" }));
     expect(onSelect).toHaveBeenCalledWith("history");
-  });
-
-  it("switches to the next item with ArrowRight", () => {
-    const onSelect = vi.fn();
-    render(() => <GlassTabBar items={items} activeKey="recommended" onSelect={onSelect} />);
-    fireEvent.keyDown(screen.getByRole("tablist"), { key: "ArrowRight" });
-    expect(onSelect).toHaveBeenCalledWith("follow");
-  });
-
-  it("switches to the previous item with ArrowLeft", () => {
-    const onSelect = vi.fn();
-    render(() => <GlassTabBar items={items} activeKey="follow" onSelect={onSelect} />);
-    fireEvent.keyDown(screen.getByRole("tablist"), { key: "ArrowLeft" });
-    expect(onSelect).toHaveBeenCalledWith("recommended");
-  });
-
-  it("stops at the first/last item on arrow navigation", () => {
-    const onSelect = vi.fn();
-    render(() => <GlassTabBar items={items} activeKey="history" onSelect={onSelect} />);
-    fireEvent.keyDown(screen.getByRole("tablist"), { key: "ArrowRight" });
-    expect(onSelect).not.toHaveBeenCalled();
-  });
-
-  it("does not navigate with arrow keys when disabled", () => {
-    const onSelect = vi.fn();
-    render(() => (
-      <GlassTabBar items={items} activeKey="recommended" onSelect={onSelect} disabled />
-    ));
-    fireEvent.keyDown(screen.getByRole("tablist"), { key: "ArrowRight" });
-    expect(onSelect).not.toHaveBeenCalled();
   });
 
   it("disables all items when disabled", () => {

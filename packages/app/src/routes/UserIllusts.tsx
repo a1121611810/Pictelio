@@ -18,7 +18,6 @@ import PageTransition from "../components/PageTransition";
 import { layoutMode } from "../stores/settingsStore";
 import { scrollToTop } from "../utils/scrollToTop";
 import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior";
-import GlassTabBar from "../components/ui/GlassTabBar";
 
 const UserIllusts: Component = () => {
   const navigate = useNavigate();
@@ -74,17 +73,35 @@ const UserIllusts: Component = () => {
 
           {/* Segmented: 插画 / 漫画 / 小说 */}
           <div class="px-4 py-3">
-            <GlassTabBar
-              variant="segmented"
-              items={[
-                { key: "illust", label: "插画" },
-                { key: "manga", label: "漫画" },
-                { key: "novel", label: "小说" },
-              ]}
-              activeKey={contentType()}
-              onSelect={(k) => handleTabSwitch(k as "illust" | "manga" | "novel")}
-              ariaLabel="作品类型切换"
-            />
+            <div class="flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-1.5 gap-1">
+              <button
+                classList={{
+                  "segmented-item-active": contentType() === "illust",
+                  "segmented-item-inactive": contentType() !== "illust",
+                }}
+                onClick={() => handleTabSwitch("illust")}
+              >
+                插画
+              </button>
+              <button
+                classList={{
+                  "segmented-item-active": contentType() === "manga",
+                  "segmented-item-inactive": contentType() !== "manga",
+                }}
+                onClick={() => handleTabSwitch("manga")}
+              >
+                漫画
+              </button>
+              <button
+                classList={{
+                  "segmented-item-active": contentType() === "novel",
+                  "segmented-item-inactive": contentType() !== "novel",
+                }}
+                onClick={() => handleTabSwitch("novel")}
+              >
+                小说
+              </button>
+            </div>
           </div>
 
           <UserWorksFeed

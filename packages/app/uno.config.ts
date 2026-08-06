@@ -71,6 +71,16 @@ export default defineConfig({
     label:
       "text-[var(--fontSizeBase200)] font-400 text-[var(--colorNeutralForeground2)] leading-[var(--lineHeightBase200)]",
 
+    // ── Segmented control (Fluent toggle buttons) ──
+    segmented:
+      "flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-1.5 gap-1",
+    "segmented-item":
+      "flex-1 flex flex-col items-center justify-center py-[var(--spacingVerticalS)] px-[var(--spacingHorizontalM)] rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all active:scale-95 select-none cursor-pointer",
+    "segmented-item-active":
+      "segmented-item bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]",
+    "segmented-item-inactive":
+      "segmented-item bg-transparent text-[var(--colorNeutralForeground2)] hover:text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorNeutralBackground2)]",
+
     // ── Glass Tab Bar (ADR-0044) ──
     "glass-tab-bar":
       "relative flex items-center gap-1 bg-[var(--colorNeutralBackgroundAlpha)] backdrop-blur-[var(--backdropBlurDefault)] backdrop-saturate-[var(--backdropSaturateDefault)] border border-[var(--colorNeutralStroke2)]",
