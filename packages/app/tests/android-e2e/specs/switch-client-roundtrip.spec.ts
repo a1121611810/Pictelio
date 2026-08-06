@@ -222,7 +222,9 @@ describe("S2 双向闭环：WebView → Lynx → 切回 WebView（pictelio_ui）
       "Lynx 应有页面渲染日志（onPageChanged/OnPatchFinishForFiber）",
     ).toBe(true);
     const fatal =
-      logs.match(/990200|InstantiationException|Lynx 渲染失败|bundle 加载失败|Lynx 渲染致命错误/gu) ?? [];
+      logs.match(
+        /990200|InstantiationException|Lynx 渲染失败|bundle 加载失败|Lynx 渲染致命错误/gu,
+      ) ?? [];
     expect(fatal, `Lynx 不应有致命渲染错误（实际: ${fatal.join("; ")}）`).toEqual([]);
     console.log("[S2] ✓ LynxActivity 可达 + Lynx 渲染成功（日志确认，无致命错误）");
   }, 120_000);

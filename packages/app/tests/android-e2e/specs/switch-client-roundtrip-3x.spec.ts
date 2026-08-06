@@ -104,14 +104,24 @@ async function assertLynxRenderedOk(serial: string): Promise<void> {
   const pid = execFileSync(adbPath(), ["-s", serial, "shell", "pidof", APP_PACKAGE])
     .toString()
     .trim();
-  const logs = execFileSync(adbPath(), ["-s", serial, "shell", "logcat", "-d", "--pid", pid]).toString();
+  const logs = execFileSync(adbPath(), [
+    "-s",
+    serial,
+    "shell",
+    "logcat",
+    "-d",
+    "--pid",
+    pid,
+  ]).toString();
   // 渲染实际发生（Lynx SDK 页面更新日志）
   expect(
     /onPageChanged|OnPatchFinishForFiber/u.test(logs),
     "Lynx 应有页面渲染日志（onPageChanged/OnPatchFinishForFiber）",
   ).toBe(true);
   // 无致命渲染错误（R8 PropsSetter 白屏根因 / 兜底页触发）
-  const fatal = logs.match(/990200|InstantiationException|Lynx 渲染失败|bundle 加载失败|Lynx 渲染致命错误/gu) ?? [];
+  const fatal =
+    logs.match(/990200|InstantiationException|Lynx 渲染失败|bundle 加载失败|Lynx 渲染致命错误/gu) ??
+    [];
   expect(fatal, `Lynx 不应有致命渲染错误（实际: ${fatal.join("; ")}）`).toEqual([]);
   console.log("[T4] ✓ Lynx 渲染成功（日志确认，无致命错误）");
 }
@@ -317,7 +327,11 @@ describe("T4 #131 引擎切换往返 3 次回归门（pictelio_ui）", () => {
           const url = await driver.raw.getUrl().catch(() => "");
           return url.includes("/home") || url.includes("/recommended");
         },
-        { timeout: 60_000, timeoutMsg: `第 ${round} 次切回后 WebView 主界面未渲染（登录态丢失?）`, interval: 1_000 },
+        {
+          timeout: 60_000,
+          timeoutMsg: `第 ${round} 次切回后 WebView 主界面未渲染（登录态丢失?）`,
+          interval: 1_000,
+        },
       );
       console.log(`[T4] ✓ 第 ${round} 次：切回 WebView 主界面（登录态恢复）`);
 
@@ -338,11 +352,11 @@ describe("T4 #131 引擎切换往返 3 次回归门（pictelio_ui）", () => {
       console.warn("[T4] logcat dump 失败，跳过误删日志断言");
       return;
     }
-    const badLines = logcat
-      .split("\n")
-      .filter((l) => /Invalid data|internalRemoveItem/u.test(l));
+    const badLines = logcat.split("\n").filter((l) => /Invalid data|internalRemoveItem/u.test(l));
     // 允许 SecureStorageCompat 自身源码注释/文档里的字样；这里只查运行时日志输出
     expect(badLines, "logcat 不应出现 Invalid data / internalRemoveItem 误删日志").toEqual([]);
-    console.log(`[T4] ✓ logcat 干净：无 Invalid data / internalRemoveItem（共 ${logcat.split("\n").length} 行日志）`);
+    console.log(
+      `[T4] ✓ logcat 干净：无 Invalid data / internalRemoveItem（共 ${logcat.split("\n").length} 行日志）`,
+    );
   }, 60_000);
 });
