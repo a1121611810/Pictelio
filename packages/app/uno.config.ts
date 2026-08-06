@@ -27,7 +27,6 @@ export default defineConfig({
     "floating-nav-capsule",
     "floating-nav-capsule-compact",
     "floating-nav-center",
-    "floating-nav-item",
     "floating-nav-group",
     "scroll-top-anim",
     "glass-tab-bar",
@@ -72,16 +71,6 @@ export default defineConfig({
     label:
       "text-[var(--fontSizeBase200)] font-400 text-[var(--colorNeutralForeground2)] leading-[var(--lineHeightBase200)]",
 
-    // ── Segmented control (Fluent toggle buttons) ──
-    segmented:
-      "flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-1.5 gap-1",
-    "segmented-item":
-      "flex-1 flex flex-col items-center justify-center py-[var(--spacingVerticalS)] px-[var(--spacingHorizontalM)] rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all active:scale-95 select-none cursor-pointer",
-    "segmented-item-active":
-      "segmented-item bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]",
-    "segmented-item-inactive":
-      "segmented-item bg-transparent text-[var(--colorNeutralForeground2)] hover:text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorNeutralBackground2)]",
-
     // ── Glass Tab Bar (ADR-0044) ──
     "glass-tab-bar":
       "relative flex items-center gap-1 bg-[var(--colorNeutralBackgroundAlpha)] backdrop-blur-[var(--backdropBlurDefault)] backdrop-saturate-[var(--backdropSaturateDefault)] border border-[var(--colorNeutralStroke2)]",
@@ -107,10 +96,6 @@ export default defineConfig({
     "floating-nav-group-hidden":
       "max-w-0! min-w-0! w-0! opacity-0! invisible! px-0! py-0! m-0! pointer-events-none overflow-hidden!",
     "floating-nav-group-visible": "max-w-40! opacity-100! visible!",
-    "floating-nav-item":
-      "flex flex-col items-center justify-center gap-[var(--spacingHorizontalXXS)] min-w-14 min-h-[44px] px-[var(--spacingHorizontalM)] rounded-[var(--borderRadiusLarge)] text-[var(--fontSizeBase200)] font-medium leading-none border-none outline-none appearance-none cursor-pointer select-none transition-colors duration-[var(--durationFast)] ease-[var(--curveEasyEase)] text-[var(--colorNeutralForeground3)] hover:text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground1Hover)] active:bg-[var(--colorNeutralBackground1Pressed)] active:scale-[0.96] focus-visible:[box-shadow:0_0_0_var(--strokeWidthThick)_var(--colorStrokeFocus2),0_0_0_calc(var(--strokeWidthThick)+var(--strokeWidthThin))_var(--colorStrokeFocus1)]",
-    "floating-nav-item-active":
-      "text-[var(--colorCompoundBrandForeground1)] font-semibold active:scale-[0.97]",
     "floating-nav-center":
       "min-w-[52px] min-h-[52px] flex items-center justify-center rounded-[var(--borderRadiusCircular)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke2)] shadow-[var(--elevation4)] cursor-pointer select-none [touch-action:manipulation] transition-[opacity,transform,box-shadow] duration-[var(--durationFast)] ease-[var(--curveEasyEase)] hover:shadow-[var(--elevation8)] hover:scale-[1.05] active:scale-[0.95] active:bg-[var(--colorNeutralBackground1Pressed)] focus-visible:[box-shadow:0_0_0_var(--strokeWidthThick)_var(--colorStrokeFocus2),0_0_0_calc(var(--strokeWidthThick)+var(--strokeWidthThin))_var(--colorStrokeFocus1)] z-10",
     "scroll-top-anim": "animate-[scroll-top-pulse_600ms_var(--curveEasyEase)]",
