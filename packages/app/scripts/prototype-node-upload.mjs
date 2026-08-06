@@ -78,7 +78,7 @@ class TunnelAgent extends https.Agent {
 // ---------------------------------------------------------------------------
 // 上传实现 1：Node 原生 https（直连 / CONNECT 隧道）
 // ---------------------------------------------------------------------------
-function uploadNodeHttps(uploadUrl, filePath, token, useProxy) {
+function uploadNodeHttps(uploadUrl, filePath, token, useProxy, sizeBytes) {
   return new Promise((resolve, reject) => {
     const u = new URL(uploadUrl);
     const agent = useProxy ? new TunnelAgent() : undefined;
@@ -93,7 +93,7 @@ function uploadNodeHttps(uploadUrl, filePath, token, useProxy) {
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
         "Content-Type": "application/octet-stream",
-        "Content-Length": SIZE_MB * 1024 * 1024,
+        "Content-Length": sizeBytes,
         "User-Agent": "prototype-node-upload",
       },
     });
@@ -134,10 +134,10 @@ async function uploadBunFetch(uploadUrl, filePath, token) {
 // ---------------------------------------------------------------------------
 // 上传实现 3：gh CLI（对照组，同流程同文件直接对比）
 // ---------------------------------------------------------------------------
-async function uploadGhCli(tag, filePath) {
+async function uploadGhCli(tag, files) {
   const t0 = performance.now();
   const { stderr } = await execFileP(
-    "gh", ["release", "upload", tag, "--repo", REPO, "--clobber", filePath],
+    "gh", ["release", "upload", tag, "--repo", REPO, "--clobber", ...files],
     { timeout: 600_000 },
   );
   return { status: 201, ms: performance.now() - t0, body: stderr.slice(0, 200) };
@@ -153,14 +153,26 @@ async function main() {
   const viaEnvProxy = !!process.env.HTTPS_PROXY && !process.argv.includes("--direct");
   const proxyLabel = useProxy || viaEnvProxy ? "代理" : "直连";
   const runtime = impl === "node-https" ? "node" : impl === "gh-cli" ? "gh" : "bun";
+  const parallelArg = process.argv.find((a) => a.startsWith("--parallel="));
+  const parallel = parallelArg ? Number(parallelArg.split("=")[1]) : 1;
+  const sizeArg = process.argv.find((a) => a.startsWith("--size-mb="));
+  const sizeMB = sizeArg ? Number(sizeArg.split("=")[1]) : SIZE_MB;
+  const skipGen = process.argv.includes("--skip-gen");
 
-  console.log(`PROTOTYPE：${runtime} ${impl} ｜ ${proxyLabel} ｜ 文件 ${SIZE_MB}MB`);
+  console.log(`PROTOTYPE：${runtime} ${impl} ｜ ${proxyLabel} ｜ ${parallel}×${sizeMB}MB${skipGen ? "（纯上传，跳过生成）" : ""}`);
   console.log(`代理判定：useProxy=${useProxy} viaEnv=${viaEnvProxy}`);
 
   // 1. 生成测试文件 + 建 draft release
   const tag = `prototype-node-${randomBytes(4).toString("hex")}`;
-  const file = `/tmp/pictelio-node-probe-${randomBytes(4).toString("hex")}.bin`;
-  await writeFile(file, randomBytes(SIZE_MB * 1024 * 1024));
+  const files = skipGen
+    ? ["/tmp/pictelio-mem.bin"]
+    : await Promise.all(
+        Array.from({ length: parallel }, async (_, i) => {
+          const f = `/tmp/pictelio-node-probe-${randomBytes(4).toString("hex")}-${i}.bin`;
+          await writeFile(f, randomBytes(sizeMB * 1024 * 1024));
+          return f;
+        }),
+      );
   const token = await gh(["auth", "token"]);
   // 用 gh api POST 创建 draft release 并一步拿 upload_url（GET /releases 列表端点不含 draft）
   const uploadUrl = (await gh([
@@ -175,34 +187,43 @@ async function main() {
     "{?name,label}",
     `?name=${encodeURIComponent(`probe-${tag}.bin`)}`,
   );
+  // upload_url 的 name 参数需按文件名替换：改为不带 name，上传时拼到 path 上
+  const uploadBase = uploadUrl.replace("{?name,label}", "");
+  const uploadUrlFor = (name) => `${uploadBase}?name=${encodeURIComponent(name)}`;
   console.log(`[状态] draft release ${tag} 已创建`);
-  console.log(`[状态] upload_url: ${uploadUrl.replace(/\/repos.*/, "/repos/…")}`);
+  console.log(`[状态] upload_url: ${uploadBase.replace(/\/repos.*/, "/repos/…")}`);
 
   try {
-    // 3. 上传（按实现）
-    let result;
+    // 3. 上传（按实现，parallel 个文件并发）
+    const t0 = performance.now();
+    let results;
     if (impl === "node-https") {
-      result = await uploadNodeHttps(uploadUrl, file, token, useProxy);
+      results = await Promise.all(files.map((f, i) =>
+        uploadNodeHttps(uploadUrlFor(`probe-${tag}-${i}.bin`), f, token, useProxy, sizeMB * 1024 * 1024),
+      ));
     } else if (impl === "gh-cli") {
-      result = await uploadGhCli(tag, file);
+      results = [await uploadGhCli(tag, files)];
     } else {
-      result = await uploadBunFetch(uploadUrl, file, token);
+      results = await Promise.all(files.map((f, i) =>
+        uploadBunFetch(uploadUrlFor(`probe-${tag}-${i}.bin`), f, token),
+      ));
     }
-    const mbps = result.status === 201 ? (SIZE_MB / (result.ms / 1000)).toFixed(2) : null;
-    console.log(
-      `  HTTP ${result.status} ｜ ${(result.ms / 1000).toFixed(1)}s ｜ ` +
-      (mbps ? `${mbps} MB/s` : `失败: ${result.body}`),
+    const elapsed = (performance.now() - t0) / 1000;
+    const totalMB = sizeMB * parallel;
+    const ok = results.filter((r) => r.status === 201).length;
+    results.forEach((r, i) =>
+      console.log(`  文件${i}: HTTP ${r.status} ｜ ${(r.ms / 1000).toFixed(1)}s`),
     );
-    if (result.status === 201) {
-      console.log(`[结论] ${runtime}/${impl}/${proxyLabel}: ${SIZE_MB}MB / ${(result.ms / 1000).toFixed(1)}s ≈ ${mbps} MB/s`);
-    } else {
-      console.log(`[结论] ${runtime}/${impl}/${proxyLabel}: 失败（HTTP ${result.status} ${result.body}）`);
-    }
+    console.log(
+      `  ── 合计：${ok}/${results.length} 成功 ｜ 总耗时 ${elapsed.toFixed(1)}s ｜ ` +
+      `端到端 ${(totalMB / elapsed).toFixed(2)} MB/s`,
+    );
+    console.log(`[结论] ${runtime}/${impl}/${proxyLabel} ${parallel} 并发: ${totalMB}MB / ${elapsed.toFixed(1)}s ≈ ${(totalMB / elapsed).toFixed(2)} MB/s`);
   } finally {
     // 4. 清理：删 release + 文件（零残留）
     await gh(["release", "delete", tag, "--repo", REPO, "--yes"]).catch(() => {});
-    await unlink(file).catch(() => {});
-    console.log(`[状态] 已清理 draft release ${tag} 与测试文件`);
+    await Promise.all(files.map((f) => unlink(f).catch(() => {})));
+    console.log(`[状态] 已清理 draft release ${tag} 与 ${files.length} 个测试文件`);
   }
 }
 
