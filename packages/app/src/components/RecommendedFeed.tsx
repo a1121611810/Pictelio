@@ -15,6 +15,7 @@ import {
 } from "../stores/recommendedStore";
 import type { PixivIllust } from "../api/types";
 import VirtualFeed from "./VirtualFeed";
+import GlassTabBar from "./ui/GlassTabBar";
 import NovelRecommendedFeed from "../routes/NovelRecommendedFeed";
 import { contentType } from "../stores/uiStore";
 import { layoutMode } from "../stores/settingsStore";
@@ -60,47 +61,35 @@ const RecommendedFeed: Component = () => {
       {/* ── 推荐页子标签 ── */}
       <Show when={contentType() === "illust"}>
         <div class="sticky top-12 z-10 surface-appbar px-4 pb-2">
-          <div class="flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-1 gap-1">
-            {[
-              { key: "mixed" as RecommendSubTab, label: "综合" },
-              { key: "illust" as RecommendSubTab, label: "插画" },
-              { key: "manga" as RecommendSubTab, label: "漫画" },
-            ].map((opt) => (
-              <button
-                role="tab"
-                aria-selected={recommendSubTab() === opt.key}
-                class="flex-1 py-[var(--spacingVerticalS)] px-[var(--spacingHorizontalM)] rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all active:scale-95 appearance-none border-none outline-none cursor-pointer"
-                classList={{
-                  "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
-                    recommendSubTab() === opt.key,
-                  "bg-transparent text-[var(--colorNeutralForeground2)]":
-                    recommendSubTab() !== opt.key,
-                  "opacity-50 cursor-not-allowed": isSwitchingSubTab(),
-                }}
-                disabled={isSwitchingSubTab()}
-                onClick={async () => {
-                  if (isSwitchingSubTab() || recommendSubTab() === opt.key) {
-                    return;
-                  }
-                  setIsSwitchingSubTab(true);
-                  abortController?.abort();
-                  abortController = new AbortController();
-                  const [tabErr] = await tryAsync(
-                    (async () => {
-                      setRecommendSubTab(opt.key);
-                      await ensureLoaded(abortController.signal);
-                    })(),
-                  );
-                  setIsSwitchingSubTab(false);
-                  if (tabErr) {
-                    throw tabErr;
-                  }
-                }}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
+          <GlassTabBar
+            variant="segmented"
+            items={[
+              { key: "mixed", label: "综合" },
+              { key: "illust", label: "插画" },
+              { key: "manga", label: "漫画" },
+            ]}
+            activeKey={recommendSubTab()}
+            onSelect={async (key) => {
+              if (isSwitchingSubTab() || recommendSubTab() === key) {
+                return;
+              }
+              setIsSwitchingSubTab(true);
+              abortController?.abort();
+              abortController = new AbortController();
+              const [tabErr] = await tryAsync(
+                (async () => {
+                  setRecommendSubTab(key as RecommendSubTab);
+                  await ensureLoaded(abortController.signal);
+                })(),
+              );
+              setIsSwitchingSubTab(false);
+              if (tabErr) {
+                throw tabErr;
+              }
+            }}
+            disabled={isSwitchingSubTab()}
+            ariaLabel="推荐分类"
+          />
         </div>
       </Show>
 

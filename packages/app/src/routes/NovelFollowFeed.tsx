@@ -13,6 +13,7 @@ import {
 } from "../stores/novelFollowStore";
 import { novelLayoutMode } from "../stores/settingsStore";
 import NovelVirtualFeed from "../components/NovelVirtualFeed";
+import GlassTabBar from "../components/ui/GlassTabBar";
 import SeriesSheet from "../components/SeriesSheet";
 import { pushOverlay, popOverlay } from "../stores/backGestureStore";
 
@@ -60,31 +61,22 @@ const NovelFollowFeed: Component<Props> = (props) => {
     <>
       {/* ── 关注页三层过滤 ── */}
       <div class="surface-appbar px-4 pb-2">
-        <div class="flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-1 gap-1">
-          {[
-            { key: "all" as const, label: "全部" },
-            { key: "public" as const, label: "公开" },
-            { key: "private" as const, label: "非公开" },
-          ].map((opt) => (
-            <button
-              class="flex-1 py-[var(--spacingVerticalS)] px-[var(--spacingHorizontalM)] rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all active:scale-95 appearance-none border-none outline-none cursor-pointer"
-              classList={{
-                "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
-                  novelFollowTab() === opt.key,
-                "bg-transparent text-[var(--colorNeutralForeground2)]":
-                  novelFollowTab() !== opt.key,
-              }}
-              onClick={() => {
-                if (novelFollowTab() !== opt.key) {
-                  setNovelFollowTab(opt.key);
-                  props.suppressHeaderVisibility?.();
-                }
-              }}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+        <GlassTabBar
+          variant="segmented"
+          items={[
+            { key: "all", label: "全部" },
+            { key: "public", label: "公开" },
+            { key: "private", label: "非公开" },
+          ]}
+          activeKey={novelFollowTab()}
+          onSelect={(key) => {
+            if (novelFollowTab() !== key) {
+              setNovelFollowTab(key as "all" | "public" | "private");
+              props.suppressHeaderVisibility?.();
+            }
+          }}
+          ariaLabel="小说关注分类"
+        />
       </div>
 
       <NovelVirtualFeed

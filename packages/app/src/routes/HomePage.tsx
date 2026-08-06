@@ -6,6 +6,7 @@ import { activate as novelFollowActivate } from "../stores/novelFollowStore";
 import { activate as bookmarkActivate } from "../stores/bookmarkStore";
 import { activate as novelBookmarkActivate } from "../stores/novelBookmarkStore";
 import UserAvatar from "../components/UserAvatar";
+import GlassTabBar from "../components/ui/GlassTabBar";
 import RecommendedFeed from "../components/RecommendedFeed";
 import FollowFeed from "../components/FollowFeed";
 import BookmarksFeed from "../components/BookmarksFeed";
@@ -85,32 +86,17 @@ const HomePage: Component = () => {
 
             {/* ── Content type toggle (隐藏于历史 tab) ── */}
             <Show when={currentTab() !== "history"}>
-              <div class="flex items-center bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusSmall)] p-0.5 gap-0.5">
-                <button
-                  class="px-2.5 py-1 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase100)] font-semibold transition-all active:scale-95 appearance-none border-none outline-none cursor-pointer"
-                  classList={{
-                    "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
-                      contentType() === "illust",
-                    "bg-transparent text-[var(--colorNeutralForeground2)]":
-                      contentType() !== "illust",
-                  }}
-                  onClick={() => setContentType("illust")}
-                >
-                  插画
-                </button>
-                <button
-                  class="px-2.5 py-1 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase100)] font-semibold transition-all active:scale-95 appearance-none border-none outline-none cursor-pointer"
-                  classList={{
-                    "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
-                      contentType() === "novel",
-                    "bg-transparent text-[var(--colorNeutralForeground2)]":
-                      contentType() !== "novel",
-                  }}
-                  onClick={() => setContentType("novel")}
-                >
-                  小说
-                </button>
-              </div>
+              <GlassTabBar
+                variant="segmented"
+                items={[
+                  { key: "illust", label: "插画" },
+                  { key: "novel", label: "小说" },
+                ]}
+                activeKey={contentType()}
+                onSelect={(k) => setContentType(k as "illust" | "novel")}
+                ariaLabel="内容类型切换"
+                class="[&_.glass-tab-item]:min-h-0! [&_.glass-tab-item]:px-2.5! [&_.glass-tab-item]:py-1! [&_.glass-tab-item]:text-[var(--fontSizeBase100)]!"
+              />
             </Show>
           </header>
 
