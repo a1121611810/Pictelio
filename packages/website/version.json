@@ -1,5 +1,5 @@
 {
-  "version": "4.4.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.4.0",
-  "changelog": "⚡ 性能\n  39414ad perf(app-lynx): 原生 Bitmap LRU 内存缓存，二次渲染秒出（#145/#147）\n  dda82dd perf(app-lynx): 详情画质档位（默认 medium）+ 单页作品不再请求原图（#145/#146/#148）"
+  "version": "4.4.1",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.4.1",
+  "changelog": "🐛 修复\n  737ad75 fix(app-lynx): 详情比例+骨架屏、列表图片点击、小说空白、系统返回桥\n✨ 新功能\n  f517b3c feat(release): APK 上传逐包化——面板 + 失败隔离 + 幂等重跑"
 }
