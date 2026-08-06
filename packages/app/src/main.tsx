@@ -43,7 +43,7 @@ async function bootstrap() {
     attributeFilter: ["class"],
   });
 
-  // 先渲染应用骨架屏，再在 React 树外并行初始化认证。
+  // 先渲染应用骨架屏，再在 Solid 组件树外并行初始化认证。
   // RootLayout.onMount 中等待 auth 恢复结果后执行导航。
   const root = document.getElementById("root");
   if (root) {
