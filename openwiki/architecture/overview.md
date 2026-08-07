@@ -112,6 +112,7 @@ Key differences from TanStack Router:
 | `/layout-settings` | `LayoutSettings` | — |
 | `/image-host` | `ImageHostSettings` | — |
 | `/image-cache` | `ImageCacheSettings` | — |
+| `/scroll-restoration-confirm` | `ScrollRestorationConfirm` | — (confirm/set → auto-navigate back) |
 | `/*all` | `HomePage` | Redirected to `/login` if unauthenticated via auth guard |
 
 > **v3.21.5+ (commit `9aba13f`):** All 17 route components were converted from `lazy(() => import(...))` to **top-level static imports**. In a local APK, lazy loading provides no network benefit — it only added 17 extra chunk requests. Routes are resolved synchronously from the single JS bundle. **v3.22.0:** With the migration to `@solidjs/router`, there are no route-level loaders or pending states at all — the framework is inherently synchronous.
