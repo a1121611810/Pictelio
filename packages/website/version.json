@@ -1,5 +1,5 @@
 {
-  "version": "4.4.1",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.4.1",
-  "changelog": "🐛 修复\n  737ad75 fix(app-lynx): 详情比例+骨架屏、列表图片点击、小说空白、系统返回桥\n✨ 新功能\n  f517b3c feat(release): APK 上传逐包化——面板 + 失败隔离 + 幂等重跑"
+  "version": "4.5.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.5.0",
+  "changelog": "✨ 新功能\n  645c0f0 feat(app-lynx): 评论区底部弹层（数据模块 + UI + 双入口 + 安全加固）\n  ca0e29c feat(release): Node 原生上传器（直连 2.1×）+ 代理路径提示"
 }
