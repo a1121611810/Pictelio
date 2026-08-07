@@ -19,6 +19,7 @@
 | **Feed 卡片 A2 化（Feed card A2）** | Feed 图片卡片（`ImageCard`，`image-card` shortcut：细边框 + 中圆角 + `--elevation2`）改为 A2 卡片视觉：**去边框 + 大圆角（`--borderRadius2XLarge`）+ 柔和阴影**，与设置页/me 卡片同族。注意 `ImageCard` 被所有列表页共用，A2 化影响面全局（ADR-0070）。 |
 | **顶部区域 A2 化（Header A2）** | 首页顶部栏（头像/名字 + 插画/小说切换器）从 `surface-appbar` 毛玻璃改为 A2 简洁风格（弱化边框、对齐 Neutral 表面与间距令牌）。 |
 | **A2 segmented 切换器** | 插画/小说等二元切换控件使用 A2 视觉：`--colorNeutralBackground2` 容器 + 激活项 `--colorNeutralBackground1` 浮起（`--elevation2`），延续现状 segmented 交互语义、视觉对齐 A2 语言。 |
+| **详情页 A2 化（Detail A2）** | 作品详情页（`/illust`、`/novel`）的顶部栏/图片展示区/信息区应用 A2 语言：顶部栏 A2 卡片式（同首页）、图片卡片化（大圆角 2XLarge 柔和阴影）、信息区卡片分组（作者/统计/收藏/标签）。浮层（查看器/评论）入口样式一并对齐（ADR-0071）。 |
 
 ## 相关链接
 

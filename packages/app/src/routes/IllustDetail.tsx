@@ -31,6 +31,9 @@ import CommentOverlay from "../components/CommentOverlay";
 import IllustActionMenu from "../components/IllustActionMenu";
 import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior";
 import IllustDetailSkeleton from "../components/skeletons/IllustDetailSkeleton";
+import DetailHeader from "../components/illust/DetailHeader";
+import DetailCard from "../components/illust/DetailCard";
+import BottomActionBar from "../components/illust/BottomActionBar";
 
 const IllustDetail: Component = () => {
   const params = useParams();
@@ -43,6 +46,36 @@ const IllustDetail: Component = () => {
   const showBackToTop = createScrollBehavior({ hideOnScrollDown: false }).scrolledPast(
     BACK_TO_TOP_THRESHOLD,
   );
+
+  // ── 底部操作条显隐（用户定稿）：信息区（作者/作品信息）进入视口即隐藏 ──
+  const [bottomBarVisible, setBottomBarVisible] = createSignal(true);
+  let infoSentinelEl: HTMLDivElement | undefined;
+  let infoObserver: IntersectionObserver | undefined;
+
+  function setInfoSentinel(el: HTMLDivElement | undefined) {
+    infoSentinelEl = el;
+    if (el) {
+      infoObserver?.observe(el);
+    } else {
+      infoObserver?.disconnect();
+    }
+  }
+
+  onMount(() => {
+    infoObserver = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry) {
+          setBottomBarVisible(!entry.isIntersecting);
+        }
+      },
+      { threshold: 0 },
+    );
+    if (infoSentinelEl) {
+      infoObserver.observe(infoSentinelEl);
+    }
+    onCleanup(() => infoObserver?.disconnect());
+  });
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<ApiError | null>(null);
   const [bookmarking, setBookmarking] = createSignal(false);
@@ -500,39 +533,21 @@ const IllustDetail: Component = () => {
 
         {illust() && !viewerOpen() && !isBlockedAuthor() && (
           <>
-            {/* App bar header */}
-            <header
-              class="relative flex items-center gap-3 px-4 py-3 surface-appbar sticky top-0 z-10"
-              onDblClick={scrollToTop}
-            >
-              <fluent-button
-                appearance="subtle"
-                aria-label="返回"
-                on:click={() => window.history.back()}
-                class="w-8 h-8 p-0 min-w-8"
-              >
-                ←
-              </fluent-button>
-              <h2 class="text-[var(--colorNeutralForeground1)] font-semibold truncate flex-1 [font-size:var(--fontSizeBase300)]">
-                {illust()!.title}
-              </h2>
-              <fluent-button
-                appearance="subtle"
-                on:click={() => setShowActionMenu((v) => !v)}
-                aria-label="更多"
-                aria-expanded={showActionMenu()}
-                class="w-8 h-8 p-0 min-w-8"
-              >
-                ⋮
-              </fluent-button>
+            {/* App bar header — A2 卡片式（ADR-0071） */}
+            <DetailHeader
+              title={illust()!.title}
+              onBack={() => window.history.back()}
+              onMore={() => setShowActionMenu((v) => !v)}
+            />
 
+            <div class="relative w-full">
               <IllustActionMenu
                 isOpen={showActionMenu()}
                 onReport={openReport}
                 onBlock={handleBlockAuthor}
                 onClose={() => setShowActionMenu(false)}
               />
-            </header>
+            </div>
 
             {/* Toast confirmation */}
             <Show when={toastMessage()}>
@@ -544,14 +559,15 @@ const IllustDetail: Component = () => {
               </fluent-message-bar>
             </Show>
 
-            {/* Images — multi-page: vertical stack; single: cover + tap */}
+            {/* Images — A2 卡片化（ADR-0071）：多图竖排卡片；单图封面卡片 */}
             {illust()!.page_count > 1 ? (
-              <div class="flex flex-col px-3" style={{ gap: "var(--spacingVerticalS)" }}>
+              <div class="px-4 mt-4 flex flex-col" style={{ gap: "var(--spacingVerticalL)" }}>
                 {illust()!.meta_pages.map((page, i) => {
                   const q = detailQuality();
                   const src = q === "medium" ? page.image_urls.medium : page.image_urls.large;
                   return (
                     <div
+                      class="rounded-[var(--borderRadius2XLarge)] overflow-hidden shadow-[var(--elevation2)] bg-[var(--colorNeutralBackground1)] cursor-pointer"
                       ref={(el) => {
                         setPageRefs((prev) => {
                           const next = new Map(prev);
@@ -684,7 +700,7 @@ const IllustDetail: Component = () => {
               </div>
             ) : (
               <div
-                class="flex justify-center bg-[var(--colorNeutralBackground2)] cursor-pointer border-b border-[var(--colorNeutralStroke2)]"
+                class="rounded-[var(--borderRadius2XLarge)] overflow-hidden shadow-[var(--elevation2)] bg-[var(--colorNeutralBackground1)] cursor-pointer"
                 onClick={() => openViewer(0)}
               >
                 <PixivImage
@@ -698,104 +714,108 @@ const IllustDetail: Component = () => {
               </div>
             )}
 
-            {/* Info section */}
-            <div class="px-4 py-4 space-y-4">
-              {/* User info */}
-              <div class="flex items-center gap-3">
-                <PixivImage
-                  src={illust()!.user.profile_image_urls.medium ?? ""}
-                  alt={illust()!.user.name}
-                  width={40}
-                  height={40}
-                  class="w-10 h-10 rounded-[var(--borderRadiusCircular)] object-cover ring-[var(--strokeWidthThin)] ring-[var(--colorNeutralStroke1)]"
-                />
-                <div>
-                  <p class="text-[var(--colorNeutralForeground1)] font-semibold [font-size:var(--fontSizeBase300)]">
-                    {illust()!.user.name}
-                  </p>
-                  <p class="text-[var(--colorNeutralForeground2)] [font-size:var(--fontSizeBase200)]">
-                    @{illust()!.user.account}
-                  </p>
-                </div>
-                <button
-                  class="inline-flex items-center justify-center gap-[var(--spacingHorizontalXS)] rounded-[var(--borderRadiusMedium)] font-semibold [font-size:var(--fontSizeBase200)] [line-height:var(--lineHeightBase200)] min-h-8 px-[var(--spacingHorizontalM)] border transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] active:scale-[0.97] select-none appearance-none outline-none cursor-pointer focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)] flex-shrink-0 ml-auto"
-                  classList={{
-                    "bg-[var(--colorBrandBackground)] text-white border-[var(--colorBrandBackground)] hover:bg-[var(--colorBrandBackgroundHover)] active:bg-[var(--colorBrandBackgroundPressed)]":
-                      !isFollowed(),
-                    "bg-transparent text-[var(--colorNeutralForeground2)] border-[var(--colorNeutralStroke2)] hover:text-[var(--colorStatusDangerForeground1)] hover:border-[var(--colorStatusDangerForeground1)]":
-                      isFollowed(),
-                  }}
-                  onClick={toggleFollow}
-                  disabled={following()}
-                  aria-label={isFollowed() ? "取消关注" : "关注"}
-                >
-                  {following() ? "…" : isFollowed() ? "已关注" : "关注"}
-                </button>
-              </div>
-
-              {/* Stats */}
-              <div class="flex gap-4 [font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground2)]">
-                <span class="flex items-center gap-1">
-                  <span>♡</span>
-                  <span>{illust()!.total_bookmarks}</span>
-                </span>
-                {illust()!.total_view !== undefined && (
-                  <span class="flex items-center gap-1">
-                    <span>👁</span>
-                    <span>{illust()!.total_view}</span>
-                  </span>
-                )}
-                {illust()!.total_comments !== undefined && (
-                  <span
-                    class="flex items-center gap-1 cursor-pointer hover:text-[var(--colorBrandForeground1)] transition-colors"
-                    onClick={() => setShowComments(true)}
+            {/* Info section — A2 分区多卡（ADR-0071）；sentinel 控制底部操作条显隐 */}
+            <div ref={setInfoSentinel} class="px-4 mt-4 space-y-3">
+              {/* 作者卡 */}
+              <DetailCard>
+                <div class="flex items-center gap-3">
+                  <PixivImage
+                    src={illust()!.user.profile_image_urls.medium ?? ""}
+                    alt={illust()!.user.name}
+                    width={40}
+                    height={40}
+                    class="w-10 h-10 rounded-[var(--borderRadiusCircular)] object-cover ring-[var(--strokeWidthThin)] ring-[var(--colorNeutralStroke1)]"
+                  />
+                  <div class="min-w-0">
+                    <p class="text-[var(--colorNeutralForeground1)] font-semibold [font-size:var(--fontSizeBase300)] truncate leading-snug">
+                      {illust()!.user.name}
+                    </p>
+                    <p class="text-[var(--colorNeutralForeground3)] [font-size:var(--fontSizeBase200)] truncate leading-snug">
+                      @{illust()!.user.account}
+                    </p>
+                  </div>
+                  <button
+                    class="inline-flex items-center justify-center gap-[var(--spacingHorizontalXS)] rounded-[var(--borderRadiusMedium)] font-semibold [font-size:var(--fontSizeBase200)] [line-height:var(--lineHeightBase200)] min-h-8 px-[var(--spacingHorizontalM)] border transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] active:scale-[0.97] select-none appearance-none outline-none cursor-pointer focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)] flex-shrink-0 ml-auto"
+                    classList={{
+                      "bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] border-[var(--colorBrandBackground)] hover:bg-[var(--colorBrandBackgroundHover)] active:bg-[var(--colorBrandBackgroundPressed)]":
+                        !isFollowed(),
+                      "bg-transparent text-[var(--colorNeutralForeground2)] border-[var(--colorNeutralStroke2)] hover:text-[var(--colorStatusDangerForeground1)] hover:border-[var(--colorStatusDangerForeground1)]":
+                        isFollowed(),
+                    }}
+                    onClick={toggleFollow}
+                    disabled={following()}
+                    aria-label={isFollowed() ? "取消关注" : "关注"}
                   >
-                    <span>💬</span>
-                    <span>{illust()!.total_comments}</span>
-                  </span>
+                    {following() ? "…" : isFollowed() ? "已关注" : "关注"}
+                  </button>
+                </div>
+              </DetailCard>
+
+              {/* 统计 + 收藏卡 */}
+              <DetailCard>
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex gap-4 [font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
+                    <span class="flex items-center gap-1">
+                      <span>♡</span>
+                      <span>{illust()!.total_bookmarks}</span>
+                    </span>
+                    {illust()!.total_view !== undefined && (
+                      <span class="flex items-center gap-1">
+                        <span>👁</span>
+                        <span>{illust()!.total_view}</span>
+                      </span>
+                    )}
+                    {illust()!.total_comments !== undefined && (
+                      <span
+                        class="flex items-center gap-1 cursor-pointer hover:text-[var(--colorBrandForeground1)] transition-colors"
+                        onClick={() => setShowComments(true)}
+                      >
+                        <span>💬</span>
+                        <span>{illust()!.total_comments}</span>
+                      </span>
+                    )}
+                    {illust()!.page_count > 1 && (
+                      <span class="flex items-center gap-1">
+                        <span>📄</span>
+                        <span>{illust()!.page_count}P</span>
+                      </span>
+                    )}
+                  </div>
+                  <div class="relative inline-flex flex-shrink-0">
+                    <button
+                      class={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--borderRadiusMedium)] text-[var(--fontSizeBase200)] font-medium transition-all active:scale-95 select-none ${
+                        illust()!.is_bookmarked
+                          ? "bg-[var(--colorStatusDangerBackground2)] text-[var(--colorStatusDangerForeground1)]"
+                          : "bg-[var(--colorBrandStroke2)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorBrandBackground)] hover:text-[var(--colorNeutralForegroundOnBrand)]"
+                      }`}
+                      onPointerDown={onBookmarkPointerDown}
+                      onPointerUp={onBookmarkPointerUp}
+                      onPointerLeave={() => {
+                        if (longPressTimer) {
+                          clearTimeout(longPressTimer);
+                          longPressTimer = 0 as any;
+                        }
+                      }}
+                      disabled={bookmarking()}
+                    >
+                      {illust()!.is_bookmarked ? "♥ 已收藏" : "♡ 收藏"}
+                    </button>
+                    <HeartBurstEffect trigger={bookmarkBurstTrigger} />
+                  </div>
+                </div>
+              </DetailCard>
+
+              {/* 标签 + 说明卡 */}
+              <DetailCard>
+                <IllustTags tags={illust()!.tags} size="medium" />
+                {illust()!.caption && (
+                  <p
+                    class="mt-3 [font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground2)] leading-relaxed whitespace-pre-wrap"
+                    innerHTML={sanitizeHtml(illust()!.caption ?? "")}
+                    onClick={handleCaptionClick}
+                  />
                 )}
-                {illust()!.page_count > 1 && (
-                  <span class="flex items-center gap-1">
-                    <span>📄</span>
-                    <span>{illust()!.page_count}P</span>
-                  </span>
-                )}
-              </div>
-
-              {/* Bookmark toggle */}
-              <div class="relative inline-flex">
-                <button
-                  class={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--borderRadiusMedium)] text-[var(--fontSizeBase200)] font-medium transition-all active:scale-95 select-none ${
-                    illust()!.is_bookmarked
-                      ? "bg-[var(--colorStatusDangerBackground2)] text-[var(--colorStatusDangerForeground1)]"
-                      : "bg-[var(--colorBrandStroke2)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorBrandBackground)] hover:text-white"
-                  }`}
-                  onPointerDown={onBookmarkPointerDown}
-                  onPointerUp={onBookmarkPointerUp}
-                  onPointerLeave={() => {
-                    if (longPressTimer) {
-                      clearTimeout(longPressTimer);
-                      longPressTimer = 0 as any;
-                    }
-                  }}
-                  disabled={bookmarking()}
-                >
-                  {illust()!.is_bookmarked ? "♥ 已收藏" : "♡ 收藏"}
-                </button>
-                <HeartBurstEffect trigger={bookmarkBurstTrigger} />
-              </div>
-
-              {/* Tags */}
-              <IllustTags tags={illust()!.tags} size="medium" />
-
-              {/* Caption */}
-              {illust()!.caption && (
-                <p
-                  class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground2)] leading-relaxed whitespace-pre-wrap"
-                  innerHTML={sanitizeHtml(illust()!.caption ?? "")}
-                  onClick={handleCaptionClick}
-                />
-              )}
+              </DetailCard>
             </div>
 
             {/* Viewer hint — only for single page non-ugoira */}
@@ -856,7 +876,8 @@ const IllustDetail: Component = () => {
                     classList={{
                       "bg-[var(--colorNeutralBackground1Selected)] text-[var(--colorNeutralForeground1)] font-semibold":
                         i === currentVisiblePage(),
-                      "text-white/85 hover:text-white": i !== currentVisiblePage(),
+                      "text-[var(--colorOverlayForeground)] opacity-[0.85] hover:opacity-100":
+                        i !== currentVisiblePage(),
                     }}
                     style={{
                       "text-shadow":
@@ -873,6 +894,20 @@ const IllustDetail: Component = () => {
             )}
           </>
         )}
+
+        {/* 底部固定操作条 — 信息区未进入视口时显示（用户定稿） */}
+        <Show when={illust() && !viewerOpen() && bottomBarVisible()}>
+          <BottomActionBar
+            name={illust()!.user.name}
+            avatarUrl={illust()!.user.profile_image_urls.medium ?? ""}
+            isBookmarked={illust()!.is_bookmarked}
+            bookmarking={bookmarking()}
+            onBookmarkPointerDown={onBookmarkPointerDown}
+            onBookmarkPointerUp={onBookmarkPointerUp}
+            onComments={() => setShowComments(true)}
+            totalComments={illust()!.total_comments}
+          />
+        </Show>
 
         {viewerOpen() && illust()!.type !== "ugoira" && (
           <ImageViewer
