@@ -34,6 +34,25 @@ const contentTypeHandle = settings.define<ContentType>({
   validate: (v): v is ContentType => v === "illust" || v === "novel",
 });
 
+// ── 滚动恢复持久化开关（统一 settings registry 管理）──
+// 控制"跨会话滚动恢复"：关闭（默认）时冷启动清除滚动持久化并回顶，
+// 且禁用 TanStack Virtual 的滚动锚定（图片加载不再把列表往下推，真机实测
+// scrollAdjustment 把列表从 0 推到 1275px）。会话内路由返回的位置保持
+// 不受此开关影响（@solidjs/router scrollRestoration 保持启用）。
+
+const PREF_KEY_PERSIST_SCROLL_RESTORATION = "persist_scroll_restoration";
+
+const persistScrollRestorationHandle = settings.define<boolean>({
+  key: PREF_KEY_PERSIST_SCROLL_RESTORATION,
+  default: false,
+  validate: (v): v is boolean => typeof v === "boolean",
+});
+
+export const persistScrollRestoration = () => persistScrollRestorationHandle.value();
+export function setPersistScrollRestoration(enabled: boolean): void {
+  persistScrollRestorationHandle.set(enabled);
+}
+
 // ── 向后兼容的导出包装函数 ──
 
 export const currentTab = () => state.currentTab;

@@ -14,6 +14,8 @@ import {
   applyAgeRestriction,
 } from "@/stores/settingsStore";
 import { settings } from "@/settings";
+import { persistScrollRestoration } from "@/stores/uiStore";
+import { scrollToTop } from "@/utils/scrollToTop";
 import { checkForUpdate } from "@/services/updateService";
 import StartupUpdateDialog from "@/components/StartupUpdateDialog";
 import { clearOverlays, registerBackGesture } from "@/services/backGestureService";
@@ -27,6 +29,19 @@ import { markContentReady } from "@/native/splashBridge";
 const STARTUP_CHECK_DELAY_MS = 500;
 /** "再按一次退出应用" toast 的显示时长（ms） */
 const EXIT_HINT_DURATION_MS = 2000;
+
+/**
+ * Chromium 浏览器级滚动恢复的一次性回顶（「持久化滚动恢复」开关关闭时挂载）。
+ * 该恢复不经 window.scrollTo 且不受 history.scrollRestoration="manual" 控制，
+ * 会在渲染早期把 scrollY 恢复为上次会话位置；检测到恢复特征滚动（scrollY>0）
+ * 立即回顶并自卸载。
+ */
+function onStartupRestoreScroll(): void {
+  if (window.scrollY > 0) {
+    scrollToTop();
+  }
+  window.removeEventListener("scroll", onStartupRestoreScroll);
+}
 
 /**
  * 启动后检查更新（延迟执行，不阻塞首次渲染）。
@@ -88,7 +103,24 @@ const RootLayout: Component = (props: { children?: any }) => {
    * 在 onMount 中的启动流程完成后调用。
    */
   onMount(async () => {
-    // 滚动恢复由 @solidjs/router 内置 scrollRestoration 管理，无需手动设置
+    // 滚动恢复由 @solidjs/router 内置 scrollRestoration 管理。
+    // 「持久化滚动恢复」开关关闭（默认）时：重新打开 app = 全新会话，
+    // 清除跨会话滚动持久化并强制回顶，冷启动始终从顶部开始。
+    if (!persistScrollRestoration()) {
+      try {
+        sessionStorage.removeItem("solid-router:scroll");
+      } catch {
+        // sessionStorage 不可用（隐私模式等）时忽略——没有持久化也就不需要清除
+      }
+      // Chromium 浏览器级滚动恢复（磁盘浏览数据）不经 window.scrollTo 且不受
+      // history.scrollRestoration="manual" 控制，会在渲染早期把 scrollY 恢复为
+      // 上次会话位置（真机实测 t≈3.5s 0→1306，触发 scroll 事件但 calls 无 scrollTo）。
+      // 监听启动窗口内的 scroll 事件：出现恢复特征滚动（scrollY>0）立即回顶，
+      // 一次性处理后移除；5 秒窗口过后移除，不影响用户后续滚动。
+      window.addEventListener("scroll", onStartupRestoreScroll, { passive: true });
+      window.setTimeout(() => window.removeEventListener("scroll", onStartupRestoreScroll), 5000);
+      scrollToTop();
+    }
 
     // Show "press again to exit" toast handler
     const onExitHint = () => {

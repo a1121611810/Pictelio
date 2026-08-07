@@ -8,6 +8,7 @@ import {
 import type { VirtualItem } from "@tanstack/solid-virtual";
 import type { ApiError } from "../api/types";
 import { createSentinel } from "@/primitives/visibility";
+import { persistScrollRestoration } from "@/stores/uiStore";
 import { VIRTUAL_SCROLL_MARGIN } from "./rootMargins";
 
 // ─── Constants ───
@@ -176,7 +177,12 @@ export function createFeedVirtualizer<T>(config: FeedVirtualizerConfig<T>): Feed
     observeElementOffset: observeWindowOffset,
     scrollToFn: windowScroll,
     laneAssignmentMode: laneMode,
-  });
+    // 滚动锚定：关闭"持久化滚动恢复"开关时禁用——图片异步加载触发 item
+    // resize 时，TanStack Virtual 的 applyScrollAdjustment 会把列表从顶部
+    // 一路往下推（真机实测 0→1275px，见 persistScrollRestoration 注释）。
+    // 注：virtual-core 运行时支持 scrollAdjustment，但 TS 类型未声明，需断言。
+    scrollAdjustment: persistScrollRestoration(),
+  } as any);
 
   // Sync options when items/count/lanes change
   createEffect(() => {
@@ -194,6 +200,7 @@ export function createFeedVirtualizer<T>(config: FeedVirtualizerConfig<T>): Feed
       observeElementOffset: observeWindowOffset,
       scrollToFn: windowScroll,
       laneAssignmentMode: laneMode,
+      scrollAdjustment: persistScrollRestoration(),
     } as any);
     instance.measure();
     setVirtualItems([...instance.getVirtualItems()] as VirtualItem[]);
