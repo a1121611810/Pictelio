@@ -31,6 +31,13 @@ import CommentOverlay from "../components/CommentOverlay";
 import IllustActionMenu from "../components/IllustActionMenu";
 import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior";
 import IllustDetailSkeleton from "../components/skeletons/IllustDetailSkeleton";
+import { lazy, Suspense } from "solid-js";
+
+// ── /illust 详情页 UI 原型（仅开发模式）：?variant=A|B|C 切换三版布局 ──
+// A A2 统一 / B 图片沉浸 / C 底部操作条。生产构建不加载本模块（独立 chunk）。
+const PrototypeIllust = import.meta.env.DEV
+  ? lazy(() => import("@/components/illust/prototype/PrototypeIllust"))
+  : null;
 
 const IllustDetail: Component = () => {
   const params = useParams();
@@ -498,381 +505,404 @@ const IllustDetail: Component = () => {
           </div>
         )}
 
-        {illust() && !viewerOpen() && !isBlockedAuthor() && (
-          <>
-            {/* App bar header */}
-            <header
-              class="relative flex items-center gap-3 px-4 py-3 surface-appbar sticky top-0 z-10"
-              onDblClick={scrollToTop}
-            >
-              <fluent-button
-                appearance="subtle"
-                aria-label="返回"
-                on:click={() => window.history.back()}
-                class="w-8 h-8 p-0 min-w-8"
-              >
-                ←
-              </fluent-button>
-              <h2 class="text-[var(--colorNeutralForeground1)] font-semibold truncate flex-1 [font-size:var(--fontSizeBase300)]">
-                {illust()!.title}
-              </h2>
-              <fluent-button
-                appearance="subtle"
-                on:click={() => setShowActionMenu((v) => !v)}
-                aria-label="更多"
-                aria-expanded={showActionMenu()}
-                class="w-8 h-8 p-0 min-w-8"
-              >
-                ⋮
-              </fluent-button>
-
-              <IllustActionMenu
-                isOpen={showActionMenu()}
-                onReport={openReport}
-                onBlock={handleBlockAuthor}
-                onClose={() => setShowActionMenu(false)}
+        {illust() &&
+          !viewerOpen() &&
+          !isBlockedAuthor() &&
+          (PrototypeIllust ? (
+            <Suspense fallback={null}>
+              <PrototypeIllust
+                illust={illust}
+                imageUrls={imageUrls}
+                coverUrl={coverUrl}
+                isUgoira={() => illust()?.type === "ugoira"}
+                isFollowed={isFollowed}
+                following={following}
+                bookmarking={bookmarking}
+                openViewer={openViewer}
+                toggleBookmark={toggleBookmark}
+                onBookmarkPointerDown={onBookmarkPointerDown}
+                onBookmarkPointerUp={onBookmarkPointerUp}
+                toggleFollow={toggleFollow}
+                setShowActionMenu={setShowActionMenu}
+                setShowComments={setShowComments}
+                handleCaptionClick={handleCaptionClick}
               />
-            </header>
-
-            {/* Toast confirmation */}
-            <Show when={toastMessage()}>
-              <fluent-message-bar
-                intent="success"
-                style="position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:60;pointer-events:none"
+            </Suspense>
+          ) : (
+            <>
+              {/* App bar header */}
+              <header
+                class="relative flex items-center gap-3 px-4 py-3 surface-appbar sticky top-0 z-10"
+                onDblClick={scrollToTop}
               >
-                {toastMessage()}
-              </fluent-message-bar>
-            </Show>
+                <fluent-button
+                  appearance="subtle"
+                  aria-label="返回"
+                  on:click={() => window.history.back()}
+                  class="w-8 h-8 p-0 min-w-8"
+                >
+                  ←
+                </fluent-button>
+                <h2 class="text-[var(--colorNeutralForeground1)] font-semibold truncate flex-1 [font-size:var(--fontSizeBase300)]">
+                  {illust()!.title}
+                </h2>
+                <fluent-button
+                  appearance="subtle"
+                  on:click={() => setShowActionMenu((v) => !v)}
+                  aria-label="更多"
+                  aria-expanded={showActionMenu()}
+                  class="w-8 h-8 p-0 min-w-8"
+                >
+                  ⋮
+                </fluent-button>
 
-            {/* Images — multi-page: vertical stack; single: cover + tap */}
-            {illust()!.page_count > 1 ? (
-              <div class="flex flex-col px-3" style={{ gap: "var(--spacingVerticalS)" }}>
-                {illust()!.meta_pages.map((page, i) => {
-                  const q = detailQuality();
-                  const src = q === "medium" ? page.image_urls.medium : page.image_urls.large;
-                  return (
+                <IllustActionMenu
+                  isOpen={showActionMenu()}
+                  onReport={openReport}
+                  onBlock={handleBlockAuthor}
+                  onClose={() => setShowActionMenu(false)}
+                />
+              </header>
+
+              {/* Toast confirmation */}
+              <Show when={toastMessage()}>
+                <fluent-message-bar
+                  intent="success"
+                  style="position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:60;pointer-events:none"
+                >
+                  {toastMessage()}
+                </fluent-message-bar>
+              </Show>
+
+              {/* Images — multi-page: vertical stack; single: cover + tap */}
+              {illust()!.page_count > 1 ? (
+                <div class="flex flex-col px-3" style={{ gap: "var(--spacingVerticalS)" }}>
+                  {illust()!.meta_pages.map((page, i) => {
+                    const q = detailQuality();
+                    const src = q === "medium" ? page.image_urls.medium : page.image_urls.large;
+                    return (
+                      <div
+                        ref={(el) => {
+                          setPageRefs((prev) => {
+                            const next = new Map(prev);
+                            if (el) {
+                              next.set(i, el);
+                            } else {
+                              next.delete(i);
+                            }
+                            return next;
+                          });
+                        }}
+                        data-page-index={i}
+                      >
+                        <LazyDetailImage
+                          src={src}
+                          pageIndex={i}
+                          totalPages={illust()!.page_count}
+                          onClick={() => openViewer(i)}
+                          visiblePage={currentVisiblePage()}
+                          width={illust()!.width}
+                          height={illust()!.height}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : illust()!.type === "ugoira" ? (
+                <div class="relative bg-[var(--colorNeutralBackground2)] border-b border-[var(--colorNeutralStroke2)] w-full">
+                  {!ugoiraReady() ? (
                     <div
-                      ref={(el) => {
-                        setPageRefs((prev) => {
-                          const next = new Map(prev);
-                          if (el) {
-                            next.set(i, el);
-                          } else {
-                            next.delete(i);
-                          }
-                          return next;
-                        });
+                      style={{
+                        "aspect-ratio": `${illust()!.width} / ${ugoiraCoverHeight() || illust()!.height}`,
                       }}
-                      data-page-index={i}
+                      class="overflow-hidden w-full"
                     >
-                      <LazyDetailImage
-                        src={src}
-                        pageIndex={i}
-                        totalPages={illust()!.page_count}
-                        onClick={() => openViewer(i)}
-                        visiblePage={currentVisiblePage()}
+                      <PixivImage
+                        src={coverUrl()}
+                        alt={illust()!.title}
                         width={illust()!.width}
                         height={illust()!.height}
+                        loading="eager"
+                        class="w-full h-full object-cover object-top"
+                        onLoad={measureCoverContent}
                       />
-                    </div>
-                  );
-                })}
-              </div>
-            ) : illust()!.type === "ugoira" ? (
-              <div class="relative bg-[var(--colorNeutralBackground2)] border-b border-[var(--colorNeutralStroke2)] w-full">
-                {!ugoiraReady() ? (
-                  <div
-                    style={{
-                      "aspect-ratio": `${illust()!.width} / ${ugoiraCoverHeight() || illust()!.height}`,
-                    }}
-                    class="overflow-hidden w-full"
-                  >
-                    <PixivImage
-                      src={coverUrl()}
-                      alt={illust()!.title}
-                      width={illust()!.width}
-                      height={illust()!.height}
-                      loading="eager"
-                      class="w-full h-full object-cover object-top"
-                      onLoad={measureCoverContent}
-                    />
 
-                    {/* 未开始 → 播放按钮 */}
-                    {ugoiraProgress() === -1 && (
-                      <div
-                        class="absolute inset-0 flex items-center justify-center transition-colors duration-[var(--durationFast)] bg-[var(--colorOverlayBackground)]/20 hover:bg-[var(--colorOverlayBackground)]/30"
-                        onClick={() => startUgoiraLoad(illust()!.id)}
-                      >
-                        <div class="w-16 h-16 rounded-full bg-[var(--colorNeutralBackground1)]/90 flex items-center justify-center shadow-[var(--elevation4)]">
-                          <svg
-                            width="28"
-                            height="28"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                          >
-                            <path
-                              d="M6.5 4.5L18.5 12L6.5 19.5V4.5Z"
-                              fill="currentColor"
-                              class="text-[var(--colorNeutralForeground1)]"
-                            />
-                          </svg>
+                      {/* 未开始 → 播放按钮 */}
+                      {ugoiraProgress() === -1 && (
+                        <div
+                          class="absolute inset-0 flex items-center justify-center transition-colors duration-[var(--durationFast)] bg-[var(--colorOverlayBackground)]/20 hover:bg-[var(--colorOverlayBackground)]/30"
+                          onClick={() => startUgoiraLoad(illust()!.id)}
+                        >
+                          <div class="w-16 h-16 rounded-full bg-[var(--colorNeutralBackground1)]/90 flex items-center justify-center shadow-[var(--elevation4)]">
+                            <svg
+                              width="28"
+                              height="28"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                d="M6.5 4.5L18.5 12L6.5 19.5V4.5Z"
+                                fill="currentColor"
+                                class="text-[var(--colorNeutralForeground1)]"
+                              />
+                            </svg>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* 加载中 → 百分比进度 */}
-                    {ugoiraProgress() >= 0 && !ugoiraReady() && (
-                      <div class="absolute inset-0 flex items-center justify-center bg-[var(--colorOverlayBackground)]/30 pointer-events-none">
-                        <div class="flex flex-col items-center gap-2">
-                          {/* 圆形进度环 */}
-                          <svg width="56" height="56" viewBox="0 0 56 56">
-                            <circle
-                              cx="28"
-                              cy="28"
-                              r="24"
-                              fill="none"
-                              stroke="var(--colorNeutralStroke2)"
-                              stroke-width="4"
-                            />
-                            <circle
-                              cx="28"
-                              cy="28"
-                              r="24"
-                              fill="none"
-                              stroke="var(--colorBrandForeground1)"
-                              stroke-width="4"
-                              stroke-linecap="round"
-                              stroke-dasharray={`${2 * Math.PI * 24}`}
-                              stroke-dashoffset={`${2 * Math.PI * 24 * (1 - Math.max(0, Math.min(ugoiraProgress(), 100)) / 100)}`}
-                              transform="rotate(-90 28 28)"
-                              style="transition: stroke-dashoffset var(--durationNormal) cubic-bezier(0.33,0,0.67,1)"
-                            />
-                          </svg>
-                          <span class="text-[var(--colorNeutralForeground1)] font-semibold [font-size:var(--fontSizeBase200)] bg-[var(--colorNeutralBackground1)]/80 px-2.5 py-0.5 rounded-[var(--borderRadiusCircular)]">
-                            {ugoiraProgress()}%
+                      {/* 加载中 → 百分比进度 */}
+                      {ugoiraProgress() >= 0 && !ugoiraReady() && (
+                        <div class="absolute inset-0 flex items-center justify-center bg-[var(--colorOverlayBackground)]/30 pointer-events-none">
+                          <div class="flex flex-col items-center gap-2">
+                            {/* 圆形进度环 */}
+                            <svg width="56" height="56" viewBox="0 0 56 56">
+                              <circle
+                                cx="28"
+                                cy="28"
+                                r="24"
+                                fill="none"
+                                stroke="var(--colorNeutralStroke2)"
+                                stroke-width="4"
+                              />
+                              <circle
+                                cx="28"
+                                cy="28"
+                                r="24"
+                                fill="none"
+                                stroke="var(--colorBrandForeground1)"
+                                stroke-width="4"
+                                stroke-linecap="round"
+                                stroke-dasharray={`${2 * Math.PI * 24}`}
+                                stroke-dashoffset={`${2 * Math.PI * 24 * (1 - Math.max(0, Math.min(ugoiraProgress(), 100)) / 100)}`}
+                                transform="rotate(-90 28 28)"
+                                style="transition: stroke-dashoffset var(--durationNormal) cubic-bezier(0.33,0,0.67,1)"
+                              />
+                            </svg>
+                            <span class="text-[var(--colorNeutralForeground1)] font-semibold [font-size:var(--fontSizeBase200)] bg-[var(--colorNeutralBackground1)]/80 px-2.5 py-0.5 rounded-[var(--borderRadiusCircular)]">
+                              {ugoiraProgress()}%
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 加载失败 → 重试按钮 */}
+                      {ugoiraProgress() === -2 && (
+                        <div
+                          class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[var(--colorOverlayBackground)]/30 cursor-pointer"
+                          onClick={() => startUgoiraLoad(illust()!.id)}
+                        >
+                          <span class="text-[var(--colorStatusDangerForeground1)] [font-size:var(--fontSizeBase300)]">
+                            加载失败
+                          </span>
+                          <span class="text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] underline">
+                            点击重试
                           </span>
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
+                  ) : (
+                    <UgoiraViewer
+                      illustId={illust()!.id}
+                      coverUrl={coverUrl()}
+                      aspectRatio={`${illust()!.width} / ${ugoiraCoverHeight() || illust()!.height}`}
+                      onClose={() => setUgoiraReady(false)}
+                      inline
+                      preloadedFrames={ugoiraFrames()}
+                    />
+                  )}
+                </div>
+              ) : (
+                <div
+                  class="flex justify-center bg-[var(--colorNeutralBackground2)] cursor-pointer border-b border-[var(--colorNeutralStroke2)]"
+                  onClick={() => openViewer(0)}
+                >
+                  <PixivImage
+                    src={coverUrl()}
+                    alt={illust()!.title}
+                    width={illust()!.width}
+                    height={illust()!.height}
+                    loading="eager"
+                    class="w-full object-contain cursor-pointer"
+                  />
+                </div>
+              )}
 
-                    {/* 加载失败 → 重试按钮 */}
-                    {ugoiraProgress() === -2 && (
-                      <div
-                        class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[var(--colorOverlayBackground)]/30 cursor-pointer"
-                        onClick={() => startUgoiraLoad(illust()!.id)}
-                      >
-                        <span class="text-[var(--colorStatusDangerForeground1)] [font-size:var(--fontSizeBase300)]">
-                          加载失败
-                        </span>
-                        <span class="text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] underline">
-                          点击重试
-                        </span>
-                      </div>
-                    )}
+              {/* Info section */}
+              <div class="px-4 py-4 space-y-4">
+                {/* User info */}
+                <div class="flex items-center gap-3">
+                  <PixivImage
+                    src={illust()!.user.profile_image_urls.medium ?? ""}
+                    alt={illust()!.user.name}
+                    width={40}
+                    height={40}
+                    class="w-10 h-10 rounded-[var(--borderRadiusCircular)] object-cover ring-[var(--strokeWidthThin)] ring-[var(--colorNeutralStroke1)]"
+                  />
+                  <div>
+                    <p class="text-[var(--colorNeutralForeground1)] font-semibold [font-size:var(--fontSizeBase300)]">
+                      {illust()!.user.name}
+                    </p>
+                    <p class="text-[var(--colorNeutralForeground2)] [font-size:var(--fontSizeBase200)]">
+                      @{illust()!.user.account}
+                    </p>
                   </div>
-                ) : (
-                  <UgoiraViewer
-                    illustId={illust()!.id}
-                    coverUrl={coverUrl()}
-                    aspectRatio={`${illust()!.width} / ${ugoiraCoverHeight() || illust()!.height}`}
-                    onClose={() => setUgoiraReady(false)}
-                    inline
-                    preloadedFrames={ugoiraFrames()}
+                  <button
+                    class="inline-flex items-center justify-center gap-[var(--spacingHorizontalXS)] rounded-[var(--borderRadiusMedium)] font-semibold [font-size:var(--fontSizeBase200)] [line-height:var(--lineHeightBase200)] min-h-8 px-[var(--spacingHorizontalM)] border transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] active:scale-[0.97] select-none appearance-none outline-none cursor-pointer focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)] flex-shrink-0 ml-auto"
+                    classList={{
+                      "bg-[var(--colorBrandBackground)] text-white border-[var(--colorBrandBackground)] hover:bg-[var(--colorBrandBackgroundHover)] active:bg-[var(--colorBrandBackgroundPressed)]":
+                        !isFollowed(),
+                      "bg-transparent text-[var(--colorNeutralForeground2)] border-[var(--colorNeutralStroke2)] hover:text-[var(--colorStatusDangerForeground1)] hover:border-[var(--colorStatusDangerForeground1)]":
+                        isFollowed(),
+                    }}
+                    onClick={toggleFollow}
+                    disabled={following()}
+                    aria-label={isFollowed() ? "取消关注" : "关注"}
+                  >
+                    {following() ? "…" : isFollowed() ? "已关注" : "关注"}
+                  </button>
+                </div>
+
+                {/* Stats */}
+                <div class="flex gap-4 [font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground2)]">
+                  <span class="flex items-center gap-1">
+                    <span>♡</span>
+                    <span>{illust()!.total_bookmarks}</span>
+                  </span>
+                  {illust()!.total_view !== undefined && (
+                    <span class="flex items-center gap-1">
+                      <span>👁</span>
+                      <span>{illust()!.total_view}</span>
+                    </span>
+                  )}
+                  {illust()!.total_comments !== undefined && (
+                    <span
+                      class="flex items-center gap-1 cursor-pointer hover:text-[var(--colorBrandForeground1)] transition-colors"
+                      onClick={() => setShowComments(true)}
+                    >
+                      <span>💬</span>
+                      <span>{illust()!.total_comments}</span>
+                    </span>
+                  )}
+                  {illust()!.page_count > 1 && (
+                    <span class="flex items-center gap-1">
+                      <span>📄</span>
+                      <span>{illust()!.page_count}P</span>
+                    </span>
+                  )}
+                </div>
+
+                {/* Bookmark toggle */}
+                <div class="relative inline-flex">
+                  <button
+                    class={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--borderRadiusMedium)] text-[var(--fontSizeBase200)] font-medium transition-all active:scale-95 select-none ${
+                      illust()!.is_bookmarked
+                        ? "bg-[var(--colorStatusDangerBackground2)] text-[var(--colorStatusDangerForeground1)]"
+                        : "bg-[var(--colorBrandStroke2)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorBrandBackground)] hover:text-white"
+                    }`}
+                    onPointerDown={onBookmarkPointerDown}
+                    onPointerUp={onBookmarkPointerUp}
+                    onPointerLeave={() => {
+                      if (longPressTimer) {
+                        clearTimeout(longPressTimer);
+                        longPressTimer = 0 as any;
+                      }
+                    }}
+                    disabled={bookmarking()}
+                  >
+                    {illust()!.is_bookmarked ? "♥ 已收藏" : "♡ 收藏"}
+                  </button>
+                  <HeartBurstEffect trigger={bookmarkBurstTrigger} />
+                </div>
+
+                {/* Tags */}
+                <IllustTags tags={illust()!.tags} size="medium" />
+
+                {/* Caption */}
+                {illust()!.caption && (
+                  <p
+                    class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground2)] leading-relaxed whitespace-pre-wrap"
+                    innerHTML={sanitizeHtml(illust()!.caption ?? "")}
+                    onClick={handleCaptionClick}
                   />
                 )}
               </div>
-            ) : (
-              <div
-                class="flex justify-center bg-[var(--colorNeutralBackground2)] cursor-pointer border-b border-[var(--colorNeutralStroke2)]"
-                onClick={() => openViewer(0)}
-              >
-                <PixivImage
-                  src={coverUrl()}
-                  alt={illust()!.title}
-                  width={illust()!.width}
-                  height={illust()!.height}
-                  loading="eager"
-                  class="w-full object-contain cursor-pointer"
-                />
-              </div>
-            )}
 
-            {/* Info section */}
-            <div class="px-4 py-4 space-y-4">
-              {/* User info */}
-              <div class="flex items-center gap-3">
-                <PixivImage
-                  src={illust()!.user.profile_image_urls.medium ?? ""}
-                  alt={illust()!.user.name}
-                  width={40}
-                  height={40}
-                  class="w-10 h-10 rounded-[var(--borderRadiusCircular)] object-cover ring-[var(--strokeWidthThin)] ring-[var(--colorNeutralStroke1)]"
-                />
-                <div>
-                  <p class="text-[var(--colorNeutralForeground1)] font-semibold [font-size:var(--fontSizeBase300)]">
-                    {illust()!.user.name}
-                  </p>
-                  <p class="text-[var(--colorNeutralForeground2)] [font-size:var(--fontSizeBase200)]">
-                    @{illust()!.user.account}
+              {/* Viewer hint — only for single page non-ugoira */}
+              {illust()!.page_count === 1 && illust()!.type !== "ugoira" && (
+                <div class="px-4 pb-8">
+                  <p class="text-center text-[var(--colorNeutralForeground3)] [font-size:var(--fontSizeBase200)]">
+                    点击图片查看原图 · 双指缩放 · 左右滑动翻页
                   </p>
                 </div>
-                <button
-                  class="inline-flex items-center justify-center gap-[var(--spacingHorizontalXS)] rounded-[var(--borderRadiusMedium)] font-semibold [font-size:var(--fontSizeBase200)] [line-height:var(--lineHeightBase200)] min-h-8 px-[var(--spacingHorizontalM)] border transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] active:scale-[0.97] select-none appearance-none outline-none cursor-pointer focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)] flex-shrink-0 ml-auto"
-                  classList={{
-                    "bg-[var(--colorBrandBackground)] text-white border-[var(--colorBrandBackground)] hover:bg-[var(--colorBrandBackgroundHover)] active:bg-[var(--colorBrandBackgroundPressed)]":
-                      !isFollowed(),
-                    "bg-transparent text-[var(--colorNeutralForeground2)] border-[var(--colorNeutralStroke2)] hover:text-[var(--colorStatusDangerForeground1)] hover:border-[var(--colorStatusDangerForeground1)]":
-                      isFollowed(),
-                  }}
-                  onClick={toggleFollow}
-                  disabled={following()}
-                  aria-label={isFollowed() ? "取消关注" : "关注"}
-                >
-                  {following() ? "…" : isFollowed() ? "已关注" : "关注"}
-                </button>
-              </div>
-
-              {/* Stats */}
-              <div class="flex gap-4 [font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground2)]">
-                <span class="flex items-center gap-1">
-                  <span>♡</span>
-                  <span>{illust()!.total_bookmarks}</span>
-                </span>
-                {illust()!.total_view !== undefined && (
-                  <span class="flex items-center gap-1">
-                    <span>👁</span>
-                    <span>{illust()!.total_view}</span>
-                  </span>
-                )}
-                {illust()!.total_comments !== undefined && (
-                  <span
-                    class="flex items-center gap-1 cursor-pointer hover:text-[var(--colorBrandForeground1)] transition-colors"
-                    onClick={() => setShowComments(true)}
-                  >
-                    <span>💬</span>
-                    <span>{illust()!.total_comments}</span>
-                  </span>
-                )}
-                {illust()!.page_count > 1 && (
-                  <span class="flex items-center gap-1">
-                    <span>📄</span>
-                    <span>{illust()!.page_count}P</span>
-                  </span>
-                )}
-              </div>
-
-              {/* Bookmark toggle */}
-              <div class="relative inline-flex">
-                <button
-                  class={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--borderRadiusMedium)] text-[var(--fontSizeBase200)] font-medium transition-all active:scale-95 select-none ${
-                    illust()!.is_bookmarked
-                      ? "bg-[var(--colorStatusDangerBackground2)] text-[var(--colorStatusDangerForeground1)]"
-                      : "bg-[var(--colorBrandStroke2)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorBrandBackground)] hover:text-white"
-                  }`}
-                  onPointerDown={onBookmarkPointerDown}
-                  onPointerUp={onBookmarkPointerUp}
-                  onPointerLeave={() => {
-                    if (longPressTimer) {
-                      clearTimeout(longPressTimer);
-                      longPressTimer = 0 as any;
-                    }
-                  }}
-                  disabled={bookmarking()}
-                >
-                  {illust()!.is_bookmarked ? "♥ 已收藏" : "♡ 收藏"}
-                </button>
-                <HeartBurstEffect trigger={bookmarkBurstTrigger} />
-              </div>
-
-              {/* Tags */}
-              <IllustTags tags={illust()!.tags} size="medium" />
-
-              {/* Caption */}
-              {illust()!.caption && (
-                <p
-                  class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground2)] leading-relaxed whitespace-pre-wrap"
-                  innerHTML={sanitizeHtml(illust()!.caption ?? "")}
-                  onClick={handleCaptionClick}
-                />
               )}
-            </div>
 
-            {/* Viewer hint — only for single page non-ugoira */}
-            {illust()!.page_count === 1 && illust()!.type !== "ugoira" && (
-              <div class="px-4 pb-8">
-                <p class="text-center text-[var(--colorNeutralForeground3)] [font-size:var(--fontSizeBase200)]">
-                  点击图片查看原图 · 双指缩放 · 左右滑动翻页
-                </p>
-              </div>
-            )}
+              {/* ── Multi-page: back-to-top FAB ── */}
+              {illust()!.page_count > 1 && (
+                <button
+                  class="rounded-[var(--borderRadiusCircular)] w-10 h-10 flex items-center justify-center text-[var(--colorOverlayForeground)] text-lg transition-all duration-[var(--durationFast)] bg-[var(--colorOverlaySurface)] backdrop-blur-[var(--backdropBlurDefault)] backdrop-saturate-[var(--backdropSaturateDefault)] border border-[var(--colorNeutralStroke2)] shadow-[var(--elevation4)] hover:bg-[var(--colorOverlaySurfaceHover)] active:bg-[var(--colorOverlaySurfaceHover)] active:scale-90 focus-visible:[box-shadow:0_0_0_var(--strokeWidthThick)_var(--colorStrokeFocus2),0_0_0_calc(var(--strokeWidthThick)+var(--strokeWidthThin))_var(--colorStrokeFocus1)]"
+                  style={{
+                    position: "fixed",
+                    bottom: "calc(var(--spacingVerticalXXL) + 64px)",
+                    right: "var(--spacingHorizontalL)",
+                    opacity: showBackToTop() ? 1 : 0,
+                    "pointer-events": showBackToTop() ? "auto" : "none",
+                    "z-index": "20",
+                  }}
+                  onClick={() => {
+                    setCurrentVisiblePage(0);
+                    ignorePageObserver = true;
+                    setTimeout(() => {
+                      ignorePageObserver = false;
+                    }, 600);
+                    scrollToTop();
+                  }}
+                  aria-label="回顶"
+                >
+                  ↑
+                </button>
+              )}
 
-            {/* ── Multi-page: back-to-top FAB ── */}
-            {illust()!.page_count > 1 && (
-              <button
-                class="rounded-[var(--borderRadiusCircular)] w-10 h-10 flex items-center justify-center text-[var(--colorOverlayForeground)] text-lg transition-all duration-[var(--durationFast)] bg-[var(--colorOverlaySurface)] backdrop-blur-[var(--backdropBlurDefault)] backdrop-saturate-[var(--backdropSaturateDefault)] border border-[var(--colorNeutralStroke2)] shadow-[var(--elevation4)] hover:bg-[var(--colorOverlaySurfaceHover)] active:bg-[var(--colorOverlaySurfaceHover)] active:scale-90 focus-visible:[box-shadow:0_0_0_var(--strokeWidthThick)_var(--colorStrokeFocus2),0_0_0_calc(var(--strokeWidthThick)+var(--strokeWidthThin))_var(--colorStrokeFocus1)]"
-                style={{
-                  position: "fixed",
-                  bottom: "calc(var(--spacingVerticalXXL) + 64px)",
-                  right: "var(--spacingHorizontalL)",
-                  opacity: showBackToTop() ? 1 : 0,
-                  "pointer-events": showBackToTop() ? "auto" : "none",
-                  "z-index": "20",
-                }}
-                onClick={() => {
-                  setCurrentVisiblePage(0);
-                  ignorePageObserver = true;
-                  setTimeout(() => {
-                    ignorePageObserver = false;
-                  }, 600);
-                  scrollToTop();
-                }}
-                aria-label="回顶"
-              >
-                ↑
-              </button>
-            )}
-
-            {/* ── Multi-page: staircase (right-side page strip) ── */}
-            {illust()!.page_count > 1 && showDetailStairs() && (
-              <nav
-                class="backdrop-blur-[var(--backdropBlurDefault)] backdrop-saturate-[var(--backdropSaturateDefault)] border border-[var(--colorNeutralStroke2)] shadow-[var(--elevation4)] rounded-[var(--borderRadiusXLarge)] flex flex-col items-center z-20"
-                style={{
-                  "background-color": "transparent",
-                  position: "fixed",
-                  top: "50%",
-                  right: "var(--spacingHorizontalS)",
-                  transform: "translateY(-50%)",
-                  gap: "var(--spacingVerticalXXS)",
-                  padding: "var(--spacingVerticalS) var(--spacingHorizontalXS)",
-                  "max-height": imageUrls().length > 20 ? "60vh" : "none",
-                  "overflow-y": imageUrls().length > 20 ? "auto" : "visible",
-                }}
-                aria-label="页面导航"
-              >
-                {imageUrls().map((_, i) => (
-                  <button
-                    class="flex items-center justify-center rounded-[var(--borderRadiusCircular)] [font-size:var(--fontSizeBase200)] font-medium transition-all duration-[var(--durationFast)] min-w-9 min-h-9"
-                    classList={{
-                      "bg-[var(--colorNeutralBackground1Selected)] text-[var(--colorNeutralForeground1)] font-semibold":
-                        i === currentVisiblePage(),
-                      "text-white/85 hover:text-white": i !== currentVisiblePage(),
-                    }}
-                    style={{
-                      "text-shadow":
-                        i !== currentVisiblePage() ? "var(--textShadowDefault)" : "none",
-                    }}
-                    onClick={() => scrollToPage(i)}
-                    aria-label={`第 ${i + 1} 页`}
-                    aria-current={i === currentVisiblePage() ? "true" : undefined}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
-              </nav>
-            )}
-          </>
-        )}
+              {/* ── Multi-page: staircase (right-side page strip) ── */}
+              {illust()!.page_count > 1 && showDetailStairs() && (
+                <nav
+                  class="backdrop-blur-[var(--backdropBlurDefault)] backdrop-saturate-[var(--backdropSaturateDefault)] border border-[var(--colorNeutralStroke2)] shadow-[var(--elevation4)] rounded-[var(--borderRadiusXLarge)] flex flex-col items-center z-20"
+                  style={{
+                    "background-color": "transparent",
+                    position: "fixed",
+                    top: "50%",
+                    right: "var(--spacingHorizontalS)",
+                    transform: "translateY(-50%)",
+                    gap: "var(--spacingVerticalXXS)",
+                    padding: "var(--spacingVerticalS) var(--spacingHorizontalXS)",
+                    "max-height": imageUrls().length > 20 ? "60vh" : "none",
+                    "overflow-y": imageUrls().length > 20 ? "auto" : "visible",
+                  }}
+                  aria-label="页面导航"
+                >
+                  {imageUrls().map((_, i) => (
+                    <button
+                      class="flex items-center justify-center rounded-[var(--borderRadiusCircular)] [font-size:var(--fontSizeBase200)] font-medium transition-all duration-[var(--durationFast)] min-w-9 min-h-9"
+                      classList={{
+                        "bg-[var(--colorNeutralBackground1Selected)] text-[var(--colorNeutralForeground1)] font-semibold":
+                          i === currentVisiblePage(),
+                        "text-white/85 hover:text-white": i !== currentVisiblePage(),
+                      }}
+                      style={{
+                        "text-shadow":
+                          i !== currentVisiblePage() ? "var(--textShadowDefault)" : "none",
+                      }}
+                      onClick={() => scrollToPage(i)}
+                      aria-label={`第 ${i + 1} 页`}
+                      aria-current={i === currentVisiblePage() ? "true" : undefined}
+                    >
+                      {i + 1}
+                    </button>
+                  ))}
+                </nav>
+              )}
+            </>
+          ))}
 
         {viewerOpen() && illust()!.type !== "ugoira" && (
           <ImageViewer
