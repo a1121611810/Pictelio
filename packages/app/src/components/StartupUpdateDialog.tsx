@@ -72,12 +72,12 @@ const StartupUpdateDialog: Component = () => {
       >
         {/* 弹窗卡片 */}
         <div
-          class="flex flex-col w-[min(85vw,360px)] rounded-[var(--borderRadius2XLarge)] shadow-[var(--elevation16)] overflow-hidden"
+          class="flex flex-col max-h-[85vh] w-[min(85vw,360px)] rounded-[var(--borderRadius2XLarge)] shadow-[var(--elevation16)] overflow-hidden"
           style="background-color: var(--colorNeutralBackground1); animation: fluent-scale-enter 200ms cubic-bezier(0.33, 0, 0, 1) both;"
           onClick={(e) => e.stopPropagation()}
         >
           {/* 顶部标题 */}
-          <div class="px-5 pt-5 pb-2">
+          <div class="px-5 pt-5 pb-2 flex-shrink-0">
             <h2 class="text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase500)] font-semibold leading-tight m-0">
               发现新版本
             </h2>
@@ -87,18 +87,18 @@ const StartupUpdateDialog: Component = () => {
           </div>
 
           {/* 正文内容 */}
-          <div class="px-5 py-2 text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase300)] leading-relaxed">
+          <div class="px-5 py-2 flex-shrink-0 text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase300)] leading-relaxed">
             <p class="m-0">
               Pictelio <span class="font-semibold">v{latestVersion()}</span> 已发布，当前版本为{" "}
               <span class="font-semibold">v{APP_VERSION}</span>。
             </p>
           </div>
 
-          {/* 更新日志 */}
+          {/* 更新日志 — flex-1 min-h-0 overflow-y-auto：占剩余空间并独立滚动（ADR-0068）*/}
           <Show when={latestChangelog()}>
-            <div class="px-5 pb-1">
+            <div class="px-5 pb-1 min-h-0 flex-1 flex flex-col">
               <div
-                class="rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)] px-3 py-2.5 [font-size:var(--fontSizeBase200)] whitespace-pre-wrap text-[var(--colorNeutralForeground2)] leading-relaxed max-h-[25vh] overflow-y-auto"
+                class="rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)] px-3 py-2.5 [font-size:var(--fontSizeBase200)] whitespace-pre-wrap text-[var(--colorNeutralForeground2)] leading-relaxed flex-1 min-h-0 overflow-y-auto"
                 style="scrollbar-width: thin;"
               >
                 {latestChangelog()}
@@ -107,7 +107,7 @@ const StartupUpdateDialog: Component = () => {
           </Show>
 
           {/* 操作按钮 */}
-          <div class="flex gap-2 px-5 pb-5 pt-3">
+          <div class="flex gap-2 px-5 pb-5 pt-3 flex-shrink-0">
             <fluent-button
               appearance="secondary"
               onClick={handleDismiss}
