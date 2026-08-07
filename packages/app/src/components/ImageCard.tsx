@@ -48,10 +48,10 @@ const ImageCard: Component<Props> = (props) => {
 
   return (
     <div class="image-card surface-card" onClick={() => props.onClick(props.illust.id)}>
-      <div class="relative overflow-hidden rounded-[var(--borderRadiusMedium)]">
+      <div class="relative overflow-hidden">
         {/* Skeleton overlay — 缩略图加载完成后淡出 */}
         <SkeletonShimmer
-          class="absolute inset-0 z-0 pointer-events-none border border-[var(--colorNeutralStroke2)] rounded-[var(--borderRadiusMedium)] transition-opacity duration-[var(--durationUltraSlow)] ease-[var(--curveEasyEase)]"
+          class="absolute inset-0 z-0 pointer-events-none rounded-[var(--borderRadiusMedium)] transition-opacity duration-[var(--durationUltraSlow)] ease-[var(--curveEasyEase)]"
           classList={{ "opacity-0": thumbLoaded() }}
         />
         {/* Blur-up thumbnail */}
@@ -136,15 +136,15 @@ const ImageCard: Component<Props> = (props) => {
           <HeartBurstEffect trigger={bookmarkBurstTrigger} size={80} particleCount={6} />
         </div>
         {privateHint() && (
-          <div class="absolute inset-0 flex items-center justify-center bg-black/60 rounded-[var(--borderRadiusMedium)] pointer-events-none z-10">
+          <div class="absolute inset-0 flex items-center justify-center bg-black/60 pointer-events-none z-10">
             <span class="text-white [font-size:var(--fontSizeBase200)] font-medium">
               已私密收藏
             </span>
           </div>
         )}
       </div>
-      {/* Info area */}
-      <div class="p-[var(--spacingHorizontalM)]">
+      {/* Info area — A2 宽松 padding（ADR-0070） */}
+      <div class="px-[var(--spacingHorizontalL)] py-[var(--spacingVerticalL)]">
         <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground1)] truncate">
           {props.illust.title}
         </p>
