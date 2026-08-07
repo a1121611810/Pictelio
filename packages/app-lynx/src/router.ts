@@ -31,6 +31,7 @@ import UserHome from './pages/UserHome.vue'
 import Following from './pages/Following.vue'
 import Bookmarks from './pages/Bookmarks.vue'
 import FollowList from './pages/FollowList.vue'
+import CommentPrototypeHost from './prototype/CommentPrototypeHost.vue'
 
 export const routes: RouteDef[] = [
   { path: '/login', name: 'login', component: Login },
@@ -45,6 +46,13 @@ export const routes: RouteDef[] = [
   { path: '/bookmarks', name: 'bookmarks', component: Bookmarks },
   { path: '/me', name: 'me', component: Me },
 ]
+
+// ─── PROTOTYPE（throwaway）：评论区 UI 形态验证 ───
+// 本分支为原型存档（prototype/comment-ui）：__DEV__ 下注册 /prototype/comments 路由。
+// 正式实现分支（feat/lynx-comments）不含本段与 src/prototype/ 目录。
+if (__DEV__) {
+  routes.push({ path: '/prototype/comments', name: 'prototype-comments', component: CommentPrototypeHost })
+}
 
 // [首帧内容化]（#61/#63）：初始路由为推荐页——首帧直接渲染推荐页骨架屏，
 // 消除已登录用户启动时的登录页闪屏；未登录用户由 initRouter 登录守卫
@@ -171,6 +179,11 @@ export async function initRouter(): Promise<void> {
   registerUnauthorizedHandler()
   void loadSettings()
   if (isNativeMode()) registerSystemBackHandler()
+  // PROTOTYPE（throwaway，本分支）：dev 预览直接进评论区原型（mock 数据，无需登录）。
+  if (__DEV__) {
+    void navigate('/prototype/comments', { replace: true })
+    return
+  }
   const ok = await restoreToken()
   void navigate(ok ? '/recommended' : '/login', { replace: true })
 }
