@@ -93,7 +93,16 @@ const SettingsAppearance: Component = () => {
         </div>
         <fluent-switch
           checked={persistScrollRestoration()}
-          on:change={() => setPersistScrollRestoration(!persistScrollRestoration())}
+          on:change={(e: Event) => {
+            const turningOn = (e.target as HTMLInputElement)?.checked;
+            if (turningOn) {
+              // 开启需要二次确认（说明影响）：跳确认页，确认后才真正开启并自动返回
+              void navigate("/scroll-restoration-confirm");
+            } else {
+              // 关闭直接生效（默认行为，无需确认）
+              setPersistScrollRestoration(false);
+            }
+          }}
           aria-label="持久化滚动恢复"
         />
       </div>
