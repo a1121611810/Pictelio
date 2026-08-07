@@ -40,6 +40,7 @@ import {
   apkPathsFor,
   withSpinner,
 } from "./lib/release-utils.mjs";
+import { truncateChangelog } from "./lib/changelog.mjs";
 import { planOverwrite, executeOverwrite, probeRemote } from "./release-overwrite.mjs";
 import { uploadReleaseAssets, resolveUploader } from "./lib/release-uploader.mjs";
 import { probeProxyRouting } from "./lib/proxy-probe.mjs";
@@ -475,7 +476,7 @@ async function runOverwriteFlow() {
       try {
         if (await exists(verJsonPath)) {
           const verJson = JSON.parse(await readText(verJsonPath));
-          verJson.changelog = plan.notes.slice(0, 200);
+          verJson.changelog = truncateChangelog(plan.notes);
           await writeText(verJsonPath, JSON.stringify(verJson, null, 2) + "\n");
           log(`已同步 ${verJsonPath} 的 changelog 字段`);
         }
@@ -718,7 +719,7 @@ async function main() {
           version: newVersion,
           // P7：repo 名动态取 git remote，避免硬编码旧 repo 名
           url: `https://github.com/${getRepoSlug()}/releases/tag/${tag}`,
-          changelog: changelog.slice(0, 200),
+          changelog: truncateChangelog(changelog),
         },
         null,
         2,
