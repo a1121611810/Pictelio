@@ -1,5 +1,5 @@
 {
-  "version": "4.6.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.6.0",
-  "changelog": "🐛 修复\n  6c0f030 fix(app): scrollToTop 守卫兼容无 document 环境（node 单测）\n  2e74abe fix(app): 修复小说详情正文空白与 contentType 切换不回顶\n  6f7c1bb fix(app): 修复个人中心返回后首页空白（currentTab 残留 me）\n  b9cce55 fix(app-lynx): 检查更新原生环境"
+  "version": "4.6.1",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.6.1",
+  "changelog": "🔧 其他\n  6971735 build: 发布脚本 changelog 截断上限 200→5000 字符（#174）\n✨ 新功能\n  b1629e4 feat(app): 更新弹窗最大 85vh + 更新内容区自适应滚动（#173）"
 }
