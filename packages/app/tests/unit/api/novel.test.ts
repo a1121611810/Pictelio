@@ -5,6 +5,17 @@ const mockGet = vi.fn();
 const mockPost = vi.fn();
 const mockGetAccessToken = vi.fn().mockReturnValue("token");
 const mockFetch = vi.fn();
+// Native 分支：PixivApi 网关 mock + isNative 开关（novel.ts 模块级常量，需 resetModules 重载）
+const mockPixivApiRequest = vi.fn();
+let mockIsNative = false;
+
+vi.mock("@capacitor/core", () => ({
+  Capacitor: { isNativePlatform: () => mockIsNative },
+}));
+
+vi.mock("@/native/PixivApi", () => ({
+  PixivApi: { request: (...args: unknown[]) => mockPixivApiRequest(...args) },
+}));
 
 vi.mock("@/api/client", () => ({
   apiClient: {
@@ -27,6 +38,8 @@ describe("api/novel.ts", () => {
     mockPost.mockReset();
     mockGetAccessToken.mockReturnValue("token");
     mockFetch.mockReset();
+    mockPixivApiRequest.mockReset();
+    mockIsNative = false;
   });
 
   it("loadDetail deduplicates concurrent requests for the same novel id", async () => {
@@ -352,5 +365,39 @@ describe("loadUserNovels", () => {
 
     expect(result).toEqual(expected);
     expect(result.novels).toHaveLength(1);
+  });
+});
+
+// ─── Native 分支：正文请求走 PixivApiPlugin 网关（bug 3 修复） ───
+// native 模式下 access_token 只在 Java 堆（ADR-0037），loadTextRaw 必须走
+// PixivApi.request 让 Java 侧注入 Authorization，不能 CapacitorHttp 直连。
+describe("loadText native 分支（PixivApi 网关）", () => {
+  it("native 模式走 PixivApi.request 网关并返回 HTML 正文", async () => {
+    mockIsNative = true;
+    mockPixivApiRequest.mockResolvedValue({
+      status: 200,
+      data: '<script>window.pixiv={novel:{"text":"hello"}};</script>',
+    });
+
+    const { loadText } = await loadApi();
+    const html = await loadText(42);
+
+    expect(mockPixivApiRequest).toHaveBeenCalledWith({
+      method: "GET",
+      path: "/webview/v2/novel",
+      params: { id: "42" },
+    });
+    expect(html).toBe('<script>window.pixiv={novel:{"text":"hello"}};</script>');
+  });
+
+  it("native 模式 HTTP 400 时抛错（正文失败不再静默）", async () => {
+    mockIsNative = true;
+    mockPixivApiRequest.mockResolvedValue({
+      status: 400,
+      data: '{"error":{"message":"invalid_request"}}',
+    });
+
+    const { loadText } = await loadApi();
+    await expect(loadText(42)).rejects.toThrow("小说正文加载失败 (HTTP 400)");
   });
 });

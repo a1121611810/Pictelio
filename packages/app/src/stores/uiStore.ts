@@ -1,4 +1,5 @@
 import { settings } from "@/settings";
+import { scrollToTop } from "@/utils/scrollToTop";
 
 type Tab = "recommended" | "follow" | "bookmarks" | "me" | "history";
 export type { Tab };
@@ -53,6 +54,15 @@ export async function setContentType(type: ContentType): Promise<void> {
   }
   contentTypeHandle.set(type);
   window.dispatchEvent(new CustomEvent("contentTypeChanged"));
+  // contentType 是页内状态切换（非路由导航），@solidjs/router 的 scrollRestoration
+  // 不介入；切换瞬间旧 feed 卸载 → 文档高度骤减 → 浏览器把 scrollY clamp 到中间值，
+  // 新 feed 数据到达后停在非顶部位置（模拟器实测，bug 1）。
+  // 注意必须等 Solid 响应式 DOM 切换完成后再回顶：setContentType 的同步代码在
+  // Solid 批处理更新（microtask）之前执行，立即 scrollToTop 只作用于旧文档，
+  // 切换后 scrollY 仍会被 clamp 到中间值。
+  if (typeof window !== "undefined") {
+    setTimeout(() => scrollToTop(), 0);
+  }
 }
 
 /** 兼容存根：registry hydrateAll 已加载，Phase 4 移除 */

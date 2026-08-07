@@ -1,5 +1,8 @@
 export function scrollToTop(): void {
-  window.scrollTo({ top: 0, behavior: "auto" });
+  if (typeof window === "undefined" || !document.documentElement) return;
+  window.scrollTo?.({ top: 0, behavior: "auto" });
   document.documentElement.scrollTop = 0;
-  document.body.scrollTop = 0;
+  if (document.body) {
+    document.body.scrollTop = 0;
+  }
 }

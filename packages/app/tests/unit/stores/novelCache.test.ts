@@ -1,8 +1,16 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { createMemoryStore, type IDBStore } from "@/stores/db";
 import * as novelCache from "@/stores/novelCache";
 import type { PixivNovel } from "@/api/types";
 import type { SeriesCacheEntry } from "@/stores/novelCache";
+
+// loadNovelEntry 依赖的 API 层 mock（其余测试不触达网络层）
+const mockLoadDetail = vi.fn();
+const mockFetchNovelData = vi.fn();
+vi.mock("@/api/novel", () => ({
+  loadDetail: (...args: unknown[]) => mockLoadDetail(...args),
+  fetchNovelData: (...args: unknown[]) => mockFetchNovelData(...args),
+}));
 
 function makeNovel(id: number): PixivNovel {
   return {
@@ -50,6 +58,8 @@ describe("novelCache", () => {
   beforeEach(() => {
     memStore = createMemoryStore();
     novelCache.setTestStore(memStore);
+    mockLoadDetail.mockReset();
+    mockFetchNovelData.mockReset();
     // Clear hot cache via clearAll
     return novelCache.clearAll();
   });
@@ -173,6 +183,41 @@ describe("novelCache", () => {
       }
       const count = await memStore.count("series");
       expect(count).toBeLessThanOrEqual(100);
+    });
+  });
+
+  describe("loadNovelEntry（正文加载失败不静默，bug 3 修复）", () => {
+    it("正文加载失败时 console.warn + 抛错（不再把 text 置空静默吞错）", async () => {
+      mockLoadDetail.mockResolvedValue({ novel: makeNovel(1) });
+      mockFetchNovelData.mockRejectedValue(new Error("小说正文加载失败 (HTTP 400)"));
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      try {
+        await expect(novelCache.loadNovelEntry(1)).rejects.toThrow("HTTP 400");
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining("[novelCache]"),
+          expect.any(Error),
+        );
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it("详情失败时抛详情错误（原有语义保持）", async () => {
+      mockLoadDetail.mockRejectedValue(new Error("detail failed"));
+      mockFetchNovelData.mockResolvedValue({ text: "hello", navigation: {}, images: {} });
+
+      await expect(novelCache.loadNovelEntry(1)).rejects.toThrow("detail failed");
+    });
+
+    it("成功时返回 entry 并写入热缓存", async () => {
+      mockLoadDetail.mockResolvedValue({ novel: makeNovel(1) });
+      mockFetchNovelData.mockResolvedValue({ text: "hello", navigation: {}, images: {} });
+
+      const entry = await novelCache.loadNovelEntry(1);
+      expect(entry.detail.id).toBe(1);
+      expect(entry.text).toBe("hello");
+      expect(novelCache.peekEntry(1)?.text).toBe("hello");
     });
   });
 });

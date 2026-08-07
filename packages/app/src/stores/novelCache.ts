@@ -229,15 +229,19 @@ export async function loadNovelEntry(id: number): Promise<NovelCacheEntry> {
   ]);
   const [detailErr, detail] = detailRes;
   const [novelDataErr, novelData] = novelDataRes;
-  const safeNovelData = novelDataErr
-    ? { text: "", navigation: {} as SeriesNavigation, images: {} as NovelImagesMap }
-    : novelData;
   if (detailErr) throw detailErr;
+  if (novelDataErr) {
+    // 正文加载失败不再静默吞错（禁止静默降级，AGENTS.md 测试硬约束 #3）：
+    // 原实现把 text 置 "" 导致详情页「标题可见、正文区纯空白且无任何提示」的假死
+    // 状态；改为 warn + 抛错，由上层透出 ErrorDisplay（含重试入口）。
+    console.warn(`[novelCache] 小说正文加载失败 novelId=${id}`, novelDataErr);
+    throw novelDataErr;
+  }
   const entry: NovelCacheEntry = {
     detail: detail.novel,
-    text: safeNovelData.text,
-    nav: safeNovelData.navigation,
-    images: safeNovelData.images ?? {},
+    text: novelData.text,
+    nav: novelData.navigation,
+    images: novelData.images ?? {},
   };
   if (entry.text) {
     await setEntry(id, entry);

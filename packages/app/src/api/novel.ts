@@ -1,7 +1,8 @@
-import { Capacitor, CapacitorHttp } from "@capacitor/core";
+import { Capacitor } from "@capacitor/core";
 import { apiClient, getAccessToken } from "./client";
 import { PIXIV_USER_AGENT } from "./userAgent";
 import { createDedupedRequest } from "@/utils/createDedupedRequest";
+import { PixivApi } from "@/native/PixivApi";
 import type {
   PixivNovelListResponse,
   PixivNovelDetailResponse,
@@ -181,19 +182,18 @@ export function loadDetail(novelId: number): Promise<PixivNovelDetailResponse> {
  * 参数名是 id（非 novel_id），返回 HTML 而非 JSON，因此手动实现。
  */
 async function loadTextRaw(novelId: number): Promise<string> {
-  const token = getAccessToken();
-  const headers: Record<string, string> = {
-    "User-Agent": PIXIV_USER_AGENT,
-    Referer: "https://app-api.pixiv.net/",
-  };
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-
   const params = new URLSearchParams({ id: String(novelId) });
 
   if (!isNative) {
     // Web 模式：走已有的 /pixiv-api 代理（已指向 app-api.pixiv.net）
+    const token = getAccessToken();
+    const headers: Record<string, string> = {
+      "User-Agent": PIXIV_USER_AGENT,
+      Referer: "https://app-api.pixiv.net/",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
     const res = await fetch(`/pixiv-api/webview/v2/novel?${params}`, { headers });
     if (!res.ok) {
       throw new Error(`小说正文加载失败 (HTTP ${res.status})`);
@@ -201,16 +201,19 @@ async function loadTextRaw(novelId: number): Promise<string> {
     return res.text();
   }
 
-  // Native 模式：CapacitorHttp 直连
-  const res = await CapacitorHttp.request({
+  // Native 模式：走 PixivApiPlugin 网关（access_token 仅在 Java 堆，JS 零知——
+  // 由 Java 侧注入 Authorization 并处理 401 自动刷新；不能再用 CapacitorHttp
+  // 直连：JS 拿不到 token，直连会被 Pixiv 400 invalid_request 拒绝，导致正文
+  // 静默空白。PixivApiCore.executeRequest 对非 JSON 响应直接返回原始 body 字符串）。
+  const res = await PixivApi.request({
     method: "GET",
-    url: `https://app-api.pixiv.net/webview/v2/novel?${params}`,
-    headers,
+    path: "/webview/v2/novel",
+    params: { id: String(novelId) },
   });
   if (res.status >= 400) {
     throw new Error(`小说正文加载失败 (HTTP ${res.status})`);
   }
-  return res.data as string;
+  return res.data;
 }
 
 const textDeduper = createDedupedRequest<number, string>((novelId) => loadTextRaw(novelId));
