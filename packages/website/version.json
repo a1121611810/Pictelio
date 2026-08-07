@@ -1,5 +1,5 @@
 {
-  "version": "4.5.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.5.0",
-  "changelog": "✨ 新功能\n  645c0f0 feat(app-lynx): 评论区底部弹层（数据模块 + UI + 双入口 + 安全加固）\n  ca0e29c feat(release): Node 原生上传器（直连 2.1×）+ 代理路径提示"
+  "version": "4.6.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.6.0",
+  "changelog": "🐛 修复\n  6c0f030 fix(app): scrollToTop 守卫兼容无 document 环境（node 单测）\n  2e74abe fix(app): 修复小说详情正文空白与 contentType 切换不回顶\n  6f7c1bb fix(app): 修复个人中心返回后首页空白（currentTab 残留 me）\n  b9cce55 fix(app-lynx): 检查更新原生环境"
 }
