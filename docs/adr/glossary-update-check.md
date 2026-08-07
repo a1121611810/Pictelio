@@ -8,13 +8,14 @@
 |------|------|
 | **检查更新（Update check）** | 拉取**版本清单**并与**本地版本号**比较，判定"是否有新版本"的过程。动作本身与展示策略无关，双端共用同一套检查逻辑。 |
 | **更新检查共享层（Update-check shared module）** | 双端共用的检查实现 `@pictelio/update-check`（monorepo 包）：导出 `isNewer`（版本比较）、`checkForUpdate(localVersion, fetchImpl?)`（拉取清单 + 比较 + 超时兜底）、`CheckResult`（含 `error` 字段）。是版本比较、清单 URL、超时策略、失败兜底的**单一事实来源**。 |
-| **版本清单（Version manifest）** | 机器可读的远端版本信息契约：`packages/website/version.json`，字段 `version`（远端版本号）/ `url`（GitHub release 页）/ `changelog`（更新内容，多行文本）。由 `scripts/release.mjs` 随发布生成，经 raw.githubusercontent.com 直连拉取（不走 Pixiv 代理）。 |
+| **版本清单（Version manifest）** | 机器可读的远端版本信息契约：`packages/website/version.json`，字段 `version`（远端版本号）/ `url`（GitHub release 页）/ `changelog`（更新内容，多行文本）。由 `scripts/release.mjs` 随发布生成，经 raw.githubusercontent.com 直连拉取（不走 Pixiv 代理）。**changelog 发布时完整保留（上限 5000 字符，原 200 字符截断已废弃，见 ADR-0068）**，保证长更新内容在**更新弹窗**与**强制更新页**都能完整展示。 |
 | **本地版本号（Local version）** | 当前安装的 APK 版本，单一事实来源为 **app 包（pictelio-app）的 version**。双端构建期注入为同名编译期常量：webview 侧 `APP_VERSION`（Vite define）、lynx 侧 `__APP_VERSION__`（rspeedy define）。**lynx 包自身版本（0.1.0）不参与比较**——APK 版本号由 `sync-android-version.mjs` 从 app 包同步，用 lynx 包版本会导致"永远提示有更新"。 |
 | **更新策略（Update policy）** | 检测到新版本后对用户的**处置策略**，双端各自实现：**强制更新**（无法返回，只能下载或退出）与**温和更新**（可关闭弹窗 + 可忽略版本记忆）。同属"检查更新"能力，策略不同不改变检查逻辑本身。 |
 | **强制更新（Forced update）** | lynx 采用的更新策略：进入**强制更新页**后无任何返回路径（页面无返回按钮、系统返回键 = 退出、历史栈清空、下载经系统浏览器打开后也无法返回 app 内），用户只能下载新版本或退出应用。 |
 | **温和更新（Soft update）** | webview 采用的更新策略：启动自动检查发现新版本后弹**更新弹窗**（可关闭），设置页另有手动检查入口；用户可忽略（`lastDismissedVersion` 记忆）继续使用旧版本。 |
 | **强制更新页（Forced update page）** | lynx 的更新展示页（路由 `/update`，声明 `backBehavior: 'exit'`）：展示新版本号 / 当前版本 / 更新内容，唯一主动作**下载新版本**（经 `openUrl` 打开系统浏览器），顶部原"返回"位置为**退出应用**（`exitApp`）。数据来自启动检查缓存的检查结果，不发新请求。 |
-| **更新弹窗（Update dialog）** | webview 的更新展示（`StartupUpdateDialog`）：启动自动检查命中后延迟弹出，含更新内容与"查看更新"动作，可关闭。 |
+| **更新弹窗（Update dialog）** | webview 的更新展示（`StartupUpdateDialog`）：启动自动检查命中后延迟弹出，含更新内容与"查看更新"动作，可关闭。**尺寸规范（ADR-0068）：最大高度为可视范围 85%（`max-height: 85vh`）、宽度 `min(85vw, 360px)`；标题/正文/按钮固定，**更新内容区**自适应剩余空间并独立滚动**——内容少时弹窗紧凑，内容多时最高 85vh 且长内容可滚动查看。 |
+| **更新内容区（Update content area）** | 更新弹窗内展示 changelog 的区域：`flex: 1` + `min-height: 0` 占标题/正文/按钮之外的剩余空间，`overflow-y: auto` 独立垂直滚动；滚动条用**系统默认**（Android WebView overlay 行为，滚动时短暂显示），不强设固定高度、不强制显示滚动条（ADR-0068）。 |
 | **更新检查编排（Update-check orchestration）** | 双端各自的启动时序与状态管理：webview 侧 `__root.tsx` 启动延迟检查 + `settingsStore` 持有检查状态；lynx 侧 `updateStore`（启动延迟检查 → 命中即 replace 导航强制更新页 + 清历史栈 + 下载/退出分发）。**不共用**——双端导航机制（TanStack Router vs 内存路由）与状态范式（SolidJS signal vs Vue ref）不同，强行共用收益低。 |
 | **网络 seam（fetchImpl）** | 检查更新的网络层注入点：`checkForUpdate(localVersion, fetchImpl?)` 的第二参。主 app 缺省用全局 fetch（webview 环境）；lynx 传 `createUpdateFetchImpl()`（原生模式走 **原生网络桥**，web-core 预览走 `requestFetch`）。是"检查逻辑与网络环境解耦"的关键 seam。 |
 | **原生网络桥（Native HTTP bridge / `httpGet`）** | `PictelioAppModule.httpGet(url, cb)`：lynx 原生 JS 运行时**无 fetch**（web-core 才注入），检查更新在原生环境必须经此桥走 OkHttp 真实网络。契约 `cb(status, body)`——2xx 成功 body 为响应文本，`status=0` 表示网络错误（body 为错误消息）。含 scheme 白名单（http/https）、callTimeout 10s、响应体 1MB 上限（防 OOM）。 |
