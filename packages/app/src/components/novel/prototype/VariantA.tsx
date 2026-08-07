@@ -1,0 +1,51 @@
+import type { Component } from "solid-js";
+import { Show } from "solid-js";
+import NovelFooterNav from "../../NovelFooterNav";
+import { NovelCard, NovelCoverCard, NovelTopBar, type NovelVariantProps } from "./shared";
+
+/**
+ * /novel 小说详情页 UI 原型 — 变体 A：A2 统一版
+ *
+ * 顶部栏 A2 卡片式；封面信息区 A2 卡片（hero：封面通边 + 标题叠封面）；
+ * 正文纯净（阅读区不套卡）；底部导航包 A2 卡片条。
+ */
+const VariantA: Component<NovelVariantProps> = (props) => {
+  return (
+    <div class="pb-10">
+      <NovelTopBar
+        title={props.novelData()?.title ?? ""}
+        showTitle={props.showHeaderTitle}
+        searchOpen={props.searchOpen}
+        onBack={props.onBack}
+        onOpenSearch={props.openSearch}
+        onCloseSearch={props.closeSearch}
+      />
+
+      <Show when={props.novelData()}>
+        <div class="px-4 mt-4">
+          <NovelCoverCard
+            novel={props.novelData()!}
+            onAuthorClick={props.onAuthorClick}
+            onSeriesClick={props.onSeriesClick}
+            onCommentsClick={props.onCommentsClick}
+            onTitleRef={props.setTitleEl}
+            layout="compact"
+            expandable
+          />
+        </div>
+
+        {/* 正文区 — 纯净（不套卡） */}
+        <div class="px-4 py-6 max-w-2xl mx-auto pb-[64px]">{props.renderBody()}</div>
+
+        {/* 底部导航 — A2 卡片条 */}
+        <div class="px-4 pb-4">
+          <NovelCard class="px-[var(--spacingHorizontalL)] py-[var(--spacingVerticalS)]">
+            <NovelFooterNav {...props.footerNav()} />
+          </NovelCard>
+        </div>
+      </Show>
+    </div>
+  );
+};
+
+export default VariantA;
