@@ -1,4 +1,6 @@
 import type { Component } from "solid-js";
+import { lazy, Suspense } from "solid-js";
+import { useNavigate } from "@solidjs/router";
 import { Preferences } from "@capacitor/preferences";
 import { isLoggedIn, logout } from "../stores/authStore";
 import { clearImageCache } from "../utils/imageLoader";
@@ -7,15 +9,15 @@ import { clearTranslationCache } from "../utils/translationCache";
 import { resetBlockedIds } from "../stores/blockStore";
 import { resetReportedIds } from "../stores/reportStore";
 import { resetSettingsStore as resetUiStore } from "../stores/settingsStore";
-import FluentIcon from "../components/ui/FluentIcon";
 import PageTransition from "../components/PageTransition";
-import SettingsAppearance from "../components/settings/SettingsAppearance";
-import SettingsContent from "../components/settings/SettingsContent";
-import SettingsImage from "../components/settings/SettingsImage";
-import SettingsTranslate from "../components/settings/SettingsTranslate";
-import SettingsAccount from "../components/settings/SettingsAccount";
-import SettingsClient from "../components/settings/SettingsClient";
 import SettingsDialogs from "../components/settings/SettingsDialogs";
+import SettingsLegacy from "../components/settings/SettingsLegacy";
+
+// ── UI 原型（仅开发模式）：?variant=A|B|C 在 /settings 上切换三版布局 ──
+// A 卡片化分组 / B 分类 Tab / C 搜索索引。生产构建不加载本模块（独立 chunk）。
+const PrototypeSettings = import.meta.env.DEV
+  ? lazy(() => import("../components/settings/prototype/PrototypeSettings"))
+  : null;
 
 function openDeleteAccountPage() {
   // TODO: Install @capacitor/browser and use Browser.open({ url }) for a native in-app/system browser experience.
@@ -129,67 +131,31 @@ const Settings: Component = () => {
           </h1>
         </header>
 
-        {/* Scrollable content */}
+        {/* Scrollable content — 开发模式按 ?variant= 渲染原型变体；生产保持现状布局 */}
         <div class="px-5 pb-8">
-          <SettingsAppearance />
-
-          <fluent-divider />
-
-          <SettingsContent
-            onOpenBlocklist={() => setShowBlocklist(true)}
-            setAgeGateMessage={setAgeGateMessage}
-          />
-
-          <fluent-divider />
-
-          <SettingsImage />
-
-          <fluent-divider />
-
-          <SettingsTranslate />
-
-          <fluent-divider />
-
-          <SettingsClient />
-
-          <fluent-divider />
-
-          {/* Logout — kept in Settings.tsx per design choice */}
-          <Show when={isLoggedIn()}>
-            <div
-              class="flex items-center justify-between py-3 cursor-pointer hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-[0.98] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-[var(--strokeWidthThick)] focus-visible:outline-[color:var(--colorStrokeFocus2)] rounded-[var(--borderRadiusMedium)] -mx-2 px-2"
-              onClick={handleLogout}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  handleLogout();
-                }
-              }}
-              role="button"
-              tabindex="0"
-              aria-label="退出登录"
-            >
-              <div class="flex items-center gap-3">
-                <div class="relative w-6 h-6 flex-shrink-0 text-[var(--colorNeutralForeground2)]">
-                  <FluentIcon name="signOut" size={24} />
-                </div>
-                <div>
-                  <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
-                    退出登录
-                  </p>
-                  <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-                    清除当前登录凭证，不会删除本地其他数据
-                  </p>
-                </div>
-              </div>
-            </div>
-          </Show>
-
-          <SettingsAccount
-            onClearData={() => setDialogState({ type: "clear" })}
-            onDeleteAccount={() => setDialogState({ type: "deleteAccount" })}
-            onActionToast={setActionToast}
-          />
+          {PrototypeSettings ? (
+            <Suspense fallback={null}>
+              <PrototypeSettings
+                isLoggedIn={isLoggedIn}
+                onLogout={handleLogout}
+                onOpenBlocklist={() => setShowBlocklist(true)}
+                setAgeGateMessage={setAgeGateMessage}
+                onClearData={() => setDialogState({ type: "clear" })}
+                onDeleteAccount={() => setDialogState({ type: "deleteAccount" })}
+                onActionToast={setActionToast}
+              />
+            </Suspense>
+          ) : (
+            <SettingsLegacy
+              isLoggedIn={isLoggedIn}
+              onLogout={handleLogout}
+              onOpenBlocklist={() => setShowBlocklist(true)}
+              setAgeGateMessage={setAgeGateMessage}
+              onClearData={() => setDialogState({ type: "clear" })}
+              onDeleteAccount={() => setDialogState({ type: "deleteAccount" })}
+              onActionToast={setActionToast}
+            />
+          )}
         </div>
 
         <SettingsDialogs
