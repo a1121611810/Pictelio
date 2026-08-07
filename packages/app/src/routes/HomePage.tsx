@@ -30,8 +30,16 @@ const HomePage: Component = () => {
     history: 0,
   });
 
+  // currentTab 可能残留在 "me"（PersonalCenter onMount 设置；卸载恢复前的窗口期，
+  // 或未来其他入口遗漏恢复）。HomePage 没有 me 面板——兜底映射到 recommended，
+  // 避免四个面板全不渲染的空白页（模拟器实测复现的 bug 2/4 兜底层）。
+  const effectiveTab = createMemo(() => {
+    const t = currentTab();
+    return t === "me" ? "recommended" : t;
+  });
+
   createEffect(() => {
-    const tab = currentTab();
+    const tab = effectiveTab();
     setLastAccess(tab, Date.now());
     if (tab === "follow") {
       followActivate();
@@ -116,22 +124,22 @@ const HomePage: Component = () => {
 
           {/* ── Tab content panels ── */}
           <Show when={isDomActive("recommended")}>
-            <div style={{ display: currentTab() === "recommended" ? "block" : "none" }}>
+            <div style={{ display: effectiveTab() === "recommended" ? "block" : "none" }}>
               <RecommendedFeed headerVisible={headerVisible()} />
             </div>
           </Show>
           <Show when={isDomActive("follow")}>
-            <div style={{ display: currentTab() === "follow" ? "block" : "none" }}>
+            <div style={{ display: effectiveTab() === "follow" ? "block" : "none" }}>
               <FollowFeed headerVisible={headerVisible()} />
             </div>
           </Show>
           <Show when={isDomActive("bookmarks")}>
-            <div style={{ display: currentTab() === "bookmarks" ? "block" : "none" }}>
+            <div style={{ display: effectiveTab() === "bookmarks" ? "block" : "none" }}>
               <BookmarksFeed />
             </div>
           </Show>
           <Show when={isDomActive("history")}>
-            <div style={{ display: currentTab() === "history" ? "block" : "none" }}>
+            <div style={{ display: effectiveTab() === "history" ? "block" : "none" }}>
               <HistoryFeed />
             </div>
           </Show>

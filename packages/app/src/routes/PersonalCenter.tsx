@@ -1,6 +1,6 @@
 import type { Component } from "solid-js";
 import { useNavigate, useParams, useLocation } from "@solidjs/router";
-import { setCurrentTab } from "@/stores/uiStore";
+import { setCurrentTab, currentTab, type Tab } from "@/stores/uiStore";
 import { profile, loadProfile } from "@/stores/userStore";
 import { useUserProfile } from "@/primitives/useUserProfile";
 import FluentIcon from "@/components/ui/FluentIcon";
@@ -18,6 +18,21 @@ function handleKeyDown(e: KeyboardEvent, action: () => void) {
   }
 }
 
+/**
+ * 个人中心卸载时恢复进入前 tab 的纯逻辑（可单测）。
+ * 仅当 currentTab 仍是 "me"（未被「我的收藏/我的关注」等导航改写）时恢复；
+ * prevTab 为 "me"（从 /me 嵌套进入）时兜底 recommended。
+ */
+export function restoreCurrentTabOnCleanup(
+  getCurrentTab: () => Tab,
+  setTab: (tab: Tab) => void,
+  prevTab: Tab,
+): void {
+  if (getCurrentTab() === "me") {
+    setTab(prevTab === "me" ? "recommended" : prevTab);
+  }
+}
+
 const PersonalCenter: Component<Props> = (props) => {
   const navigate = useNavigate();
   const params = useParams();
@@ -29,7 +44,15 @@ const PersonalCenter: Component<Props> = (props) => {
   );
 
   onMount(() => {
+    // 记录进入个人中心前的 tab：返回 /home 时恢复，避免 currentTab 残留在 "me"——
+    // HomePage 只渲染 recommended/follow/bookmarks/history 四个面板，currentTab 为
+    // "me" 时四个面板全不渲染，表现为「从列表点作者/点自己进个人中心再返回，列表空白」
+    // （模拟器实测复现的 bug 2/4）。
+    const prevTab = currentTab();
     setCurrentTab("me");
+    onCleanup(() => {
+      restoreCurrentTabOnCleanup(currentTab, setCurrentTab, prevTab);
+    });
     const uid = profileState.targetUserId();
     if (uid) {
       loadProfile(uid);
