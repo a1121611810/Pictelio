@@ -10,6 +10,7 @@ import { resolveQualityUrl } from '../utils/imageQuality'
 import { detailImageHeightVw } from '../utils/imageLayout'
 import { detailQuality } from '../stores/settingsStore'
 import BookmarkButton from '../components/BookmarkButton.vue'
+import CommentOverlay from '../components/CommentOverlay.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import UgoiraViewer from '../components/UgoiraViewer.vue'
 
@@ -17,6 +18,9 @@ const illust = ref<PixivIllust | null>(null)
 const loading = ref(true)
 const errorMsg = ref('')
 const currentPage = ref(0)
+
+// ─── 评论弹层（issue #164）：入口在收藏操作行；弹层挂根 view 内、scroll-view 之后 ───
+const showComments = ref(false)
 
 // ─── 关注作者（P0-T3） ───
 const following = ref(false)
@@ -107,7 +111,8 @@ onMounted(async () => {
 <template>
   <!-- [lynx:fix] 顶栏 tap 修复（issue #139）：外层显式 flex flex-col，scroll-view flex-1 min-h-0 约束在顶栏下方，
        避免 w-full h-full 溢出覆盖顶栏触摸层（与 issue #129 同型） -->
-  <view class="w-full h-full flex flex-col bg-background-2">
+  <!-- relative：为根 view 内 absolute 的评论弹层提供定位上下文（不改 flex 布局） -->
+  <view class="w-full h-full flex flex-col relative bg-background-2">
     <view class="flex flex-row items-center h-[11.733vw] px-4 bg-background border-b-[1px] border-b-stroke-2">
       <view class="py-1 pr-2" @tap="goBack"><text class="text-lg text-brand-foreground pr-4">‹ 返回</text></view>
       <text class="flex-1 text-2xl font-semibold text-foreground">作品详情</text>
@@ -172,12 +177,21 @@ onMounted(async () => {
         </view>
         <text v-if="followError" class="text-xs text-danger mt-1">{{ followError }}</text>
         <text class="text-sm text-foreground-3 mt-1.5">{{ illust.width }} × {{ illust.height }}</text>
-        <view class="mt-2">
+        <view class="mt-2 flex flex-row items-center">
           <BookmarkButton
             :illust-id="illust.id"
             :initial-bookmarked="illust.is_bookmarked"
             :bookmark-count="illust.total_bookmarks"
           />
+          <!-- 评论入口（issue #164）：样式对齐 webview 版（💬 + total_comments，字段缺失时不显示） -->
+          <view
+            v-if="illust.total_comments !== undefined"
+            class="ml-4 flex flex-row items-center"
+            @tap="showComments = true"
+          >
+            <text class="text-xl">💬</text>
+            <text class="text-xs text-foreground-3 ml-1">{{ illust.total_comments }}</text>
+          </view>
         </view>
         <view class="flex flex-row flex-wrap mt-3">
           <text
@@ -190,5 +204,11 @@ onMounted(async () => {
         </view>
       </view>
     </scroll-view>
+
+    <!-- 评论弹层（issue #164）：absolute 脱离 flex 流全屏覆盖；DOM 顺序在 scroll-view 之后
+         且不动其结构（issue #139/#129 修复保持）。覆盖层形态 → 弹层打开时页面滚动位置不丢失 -->
+    <view v-if="showComments" class="absolute inset-0">
+      <CommentOverlay type="illust" :target-id="illustId" @close="showComments = false" />
+    </view>
   </view>
 </template>

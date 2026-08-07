@@ -7,6 +7,7 @@ import { matchRoute, evaluateSystemBack, type RouteDefCore } from './routerCore'
 import { isNativeMode, getNativeModules } from './api/client'
 import { isLoggedIn, restoreToken, registerUnauthorizedHandler } from './stores/authStore'
 import { loadSettings } from './stores/settingsStore'
+import { hasOpenModal, closeTopModal } from './stores/modalStack'
 
 export interface RouteDef extends RouteDefCore {
   component: Component
@@ -130,6 +131,12 @@ function showExitHint(): void {
 }
 
 function handleSystemBack(): void {
+  // ADR-0066 扩展（issue #163）：有打开的 modal（如评论区弹层）时返回键优先
+  // 关闭最上层弹层，不触发页面返回 / 退出提示
+  if (hasOpenModal()) {
+    closeTopModal()
+    return
+  }
   const decision = evaluateSystemBack(_history.length, lastBackAt, Date.now())
   if (decision === 'navigate') {
     goBack()

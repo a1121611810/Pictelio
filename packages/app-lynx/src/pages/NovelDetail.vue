@@ -5,6 +5,7 @@ import { loadNovelDetail, fetchNovelText } from '../api/novel'
 import type { PixivNovel } from '../api/types'
 import { isRestricted } from '../stores/settingsStore'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
+import CommentOverlay from '../components/CommentOverlay.vue'
 import SkeletonNovel from '../components/SkeletonNovel.vue'
 
 const novel = ref<PixivNovel | null>(null)
@@ -13,6 +14,9 @@ const loading = ref(true)
 const errorMsg = ref('')
 
 const novelId = computed(() => Number(currentParams.value.id ?? 0))
+
+// ─── 评论弹层（issue #164）：入口在作者/元信息行附近；弹层挂根 view 内、scroll-view 之后 ───
+const showComments = ref(false)
 
 // MVP：整段渲染，不做行级虚拟化（无 canvas/measureText，pretext 不可迁移）。
 // 超长文本由 scroll-view 引擎滚动承接；后续原生集成阶段可换分段渲染。
@@ -62,6 +66,15 @@ onMounted(async () => {
              · ♥ {{ novel?.total_bookmarks }}
           </template>
         </text>
+        <!-- 评论入口（issue #164）：💬 + total_comments，字段缺失时不显示（对齐插画页惯例） -->
+        <view
+          v-if="novel?.total_comments !== undefined"
+          class="mt-2 flex flex-row items-center"
+          @tap="showComments = true"
+        >
+          <text class="text-xl">💬</text>
+          <text class="text-xs text-foreground-3 ml-1">{{ novel?.total_comments }}</text>
+        </view>
       </view>
       <!-- 正文区：受限小说标题/作者/元信息可见，正文被遮罩挡住（issue #91） -->
       <view class="relative p-4">
@@ -79,5 +92,8 @@ onMounted(async () => {
         <text class="text-sm text-foreground-3">— 完 —</text>
       </view>
     </scroll-view>
+
+    <!-- 评论弹层（issue #164）：根 view 内、scroll-view 之后的覆盖层 → 弹层打开时正文滚动位置不丢失 -->
+    <CommentOverlay v-if="showComments" type="novel" :target-id="novelId" @close="showComments = false" />
   </view>
 </template>

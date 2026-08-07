@@ -53,6 +53,7 @@ export interface PixivIllust {
   x_restrict: number;
   create_date: string;
   caption?: string;
+  total_comments?: number;
   meta_pages: PixivIllustMetaPage[];
   meta_single_page: { original_image_url?: string };
 }
@@ -81,6 +82,7 @@ export interface PixivNovel {
   x_restrict: number;
   create_date: string;
   caption?: string;
+  total_comments?: number;
 }
 
 export interface PixivNovelListResponse {
@@ -151,4 +153,51 @@ export interface ApiError {
   type: ApiErrorType;
   message: string;
   status?: number;
+}
+
+// ─── 评论（issue #162，字段与现有 app 同源） ───
+
+export interface PixivCommentUser {
+  id: number;
+  name: string;
+  account: string;
+  profile_image_urls?: {
+    medium?: string;
+    px_16x16?: string;
+    px_50x50?: string;
+    px_170x170?: string;
+  };
+}
+
+export interface PixivCommentStamp {
+  stamp_id: number;
+  stamp_url: string;
+}
+
+export interface PixivCommentParent {
+  id: number;
+  comment: string;
+  date: string;
+  user: PixivCommentUser;
+}
+
+export interface PixivComment {
+  id: number;
+  comment: string;
+  date: string;
+  user: PixivCommentUser;
+  has_replies: boolean;
+  reply_count?: number;
+  stamp?: PixivCommentStamp | null;
+  parent_comment?: PixivCommentParent | Record<string, never>;
+}
+
+export interface PixivCommentRootResponse {
+  comments: PixivComment[];
+  next_url: string | null;
+}
+
+export interface PixivCommentReplyResponse {
+  comments: PixivComment[];
+  next_url: string | null;
 }

@@ -171,11 +171,28 @@ export function rewriteUrl(path: string): string {
  * 纯函数，可单测。
  */
 export function shouldAttachAuth(rewrittenUrl: string): boolean {
-  // 原生模式（#53）：rewriteUrl 仅生成 Pixiv 域绝对 URL，直接携带 Bearer
+  // 原生模式（#53）：rewriteUrl 仅生成 Pixiv 域绝对 URL，直接携带 Bearer。
+  // security-review（评论功能 #165）：原生分支补主机白名单——next_url 等绝对 URL
+  // 若被篡改为非 Pixiv 域，不得附加 token（web 模式有精确前缀 + /pixiv- 双防护，
+  // 原生模式此前仅 startsWith("http")，任意 http URL 都会带 token）。
   if (isNativeMode()) {
-    return rewrittenUrl.startsWith("http")
+    return rewrittenUrl.startsWith("http") && isTrustedPixivHost(rewrittenUrl)
   }
   return rewrittenUrl.startsWith("/pixiv-")
+}
+
+/**
+ * Pixiv 受信主机白名单（从常量解析 hostname，禁止硬编码域名字符串——项目约束）。
+ * 精确 hostname 比对天然防伪后缀域（如 app-api.pixiv.net.evil.com 的 hostname 不等于白名单）。
+ * 纯函数，可单测。
+ */
+export function isTrustedPixivHost(url: string): boolean {
+  try {
+    const host = new URL(url).hostname
+    return host === new URL(PIXIV_API_BASE).hostname || host === new URL(PIXIV_AUTH_BASE).hostname
+  } catch {
+    return false
+  }
 }
 
 async function execute<T>(

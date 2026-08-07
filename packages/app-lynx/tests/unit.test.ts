@@ -39,6 +39,20 @@ describe('imageUrl.proxyImageUrl', () => {
   it('空 URL 安全返回空串', () => {
     expect(proxyImageUrl('')).toBe('')
   })
+
+  // security-review #165：非 Pixiv 域绝对 URL 拒绝加载（防外部/内网地址探测面）
+  it('非 Pixiv 域绝对 URL → 返回空串（拒绝加载）', () => {
+    expect(proxyImageUrl('https://evil.example.com/steal.jpg')).toBe('')
+    expect(proxyImageUrl('https://i.pximg.net.evil.com/x.jpg')).toBe('')
+    expect(proxyImageUrl('not-a-url')).toBe('')
+  })
+
+  it('pximg/pixiv 域绝对 URL 处理正确（代理化或原样）', () => {
+    // i.pximg.net → 既有 marker 代理化（不变）
+    expect(proxyImageUrl('https://i.pximg.net/medium.jpg')).toBe('/pixiv-img/medium.jpg')
+    // 其他 pximg/pixiv 域（无 marker）→ 白名单内原样返回
+    expect(proxyImageUrl('https://s.pximg.net/sm.jpg')).toBe('https://s.pximg.net/sm.jpg')
+  })
 })
 
 describe('client.classifyError', () => {
@@ -132,6 +146,15 @@ describe('client 原生模式（#53：NativeModules 存在 → 绝对 URL 直连
   it('shouldAttachAuth 原生绝对 URL → 附加 Bearer', () => {
     vi.stubGlobal('NativeModules', { PictelioApp: {} })
     expect(shouldAttachAuth('https://app-api.pixiv.net/v1/x')).toBe(true)
+    expect(shouldAttachAuth('https://oauth.secure.pixiv.net/auth/token')).toBe(true)
+  })
+
+  // security-review #165：原生分支补主机白名单——非 Pixiv 域绝对 URL 不得附加 Bearer
+  it('shouldAttachAuth 原生模式 + 非 Pixiv 域绝对 URL → 不附加 Bearer', () => {
+    vi.stubGlobal('NativeModules', { PictelioApp: {} })
+    expect(shouldAttachAuth('https://evil.example.com/steal')).toBe(false)
+    expect(shouldAttachAuth('https://app-api.pixiv.net.evil.com/x')).toBe(false)
+    expect(shouldAttachAuth('not-a-url')).toBe(false)
   })
 
   it('web 模式行为不变（无 NativeModules）', () => {

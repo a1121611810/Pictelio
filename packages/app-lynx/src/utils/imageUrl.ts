@@ -13,7 +13,23 @@ export function proxyImageUrl(url: string): string {
   }
   // 已是相对或本地路径
   if (url.startsWith("/")) return url
-  return url
+  // 非 Pixiv 域绝对 URL：拒绝加载（security-review #165：防外部/内网地址探测面；
+  // 本项目所有图片来源均为 Pixiv API，pximg/pixiv 域外无合法场景）
+  if (isTrustedImageHost(url)) return url
+  return ""
+}
+
+/**
+ * 图片主机白名单：*.pximg.net 与 *.pixiv.net（含根域）。
+ * 与既有 /i.pximg.net/ marker 同风格，禁止硬编码完整 CDN URL（项目约束）。
+ */
+function isTrustedImageHost(url: string): boolean {
+  try {
+    const host = new URL(url).hostname
+    return host === "pximg.net" || host.endsWith(".pximg.net") || host === "pixiv.net" || host.endsWith(".pixiv.net")
+  } catch {
+    return false
+  }
 }
 
 /** 生成代理后的缩略图 URL（square_medium 加速列表加载） */
