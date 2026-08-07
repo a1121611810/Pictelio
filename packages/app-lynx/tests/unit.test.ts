@@ -4,7 +4,7 @@ import { proxyImageUrl, thumbUrl } from '../src/utils/imageUrl'
 import { classifyError, isNativeMode, isOAuthTokenErrorResponse, rewriteUrl, shouldAttachAuth } from '../src/api/client'
 import { ApiErrorType } from '../src/api/types'
 import { extractNovelTextFromHtml } from '../src/api/novel'
-import { matchRoute, evaluateSystemBack, SYSTEM_BACK_EXIT_WINDOW_MS } from '../src/routerCore'
+import { matchRoute, evaluateSystemBack, evaluateBackWithBehavior, SYSTEM_BACK_EXIT_WINDOW_MS } from '../src/routerCore'
 import { redactProxyUrl } from '../src/utils/proxyRedact'
 import { apiClient } from '../src/api/client'
 import { isOAuthCredsInjected } from '../src/api/auth'
@@ -14,7 +14,7 @@ import { loadUserNovels, loadBookmarks as loadNovelBookmarks, loadFollow as load
 import { bytesToDataUrl, downloadUgoiraFrames } from '../src/api/ugoira'
 import type { UgoiraExtractMode } from '../src/api/ugoira'
 import { ugoiraMode as lynxUgoiraMode, setUgoiraMode as lynxSetUgoiraMode } from '../src/stores/settingsStore'
-import { ME_A11Y_LABELS, LOGIN_A11Y_LABELS, RECOMMENDED_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../src/utils/accessibility'
+import { ME_A11Y_LABELS, LOGIN_A11Y_LABELS, RECOMMENDED_A11Y_LABELS, UPDATE_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../src/utils/accessibility'
 
 describe('imageUrl.proxyImageUrl', () => {
   it('将 i.pximg.net URL 重写为本地代理路径', () => {
@@ -294,6 +294,23 @@ describe('routerCore.evaluateSystemBack（ADR-0066 系统返回决策）', () =>
   it('无历史且超过 2s 窗口 → 重新计为 hint（不直接退出）', () => {
     expect(evaluateSystemBack(0, now - SYSTEM_BACK_EXIT_WINDOW_MS, now)).toBe('hint')
     expect(evaluateSystemBack(0, now - 5000, now)).toBe('hint')
+  })
+})
+
+describe('routerCore.evaluateBackWithBehavior（更新页 backBehavior: exit）', () => {
+  const now = 1_000_000
+
+  it("backBehavior 'exit' 时恒返回 exit（跳过历史栈与双击窗口）", () => {
+    expect(evaluateBackWithBehavior('exit', 3, now - 100, now)).toBe('exit')
+    expect(evaluateBackWithBehavior('exit', 0, 0, now)).toBe('exit')
+    expect(evaluateBackWithBehavior('exit', 0, now - 5000, now)).toBe('exit')
+  })
+
+  it('未声明 backBehavior 时走既有 evaluateSystemBack 逻辑（不回归）', () => {
+    expect(evaluateBackWithBehavior(undefined, 1, 0, now)).toBe('navigate')
+    expect(evaluateBackWithBehavior(undefined, 0, 0, now)).toBe('hint')
+    expect(evaluateBackWithBehavior(undefined, 0, now - 100, now)).toBe('exit')
+    expect(evaluateBackWithBehavior(undefined, 0, now - 5000, now)).toBe('hint')
   })
 })
 
@@ -980,6 +997,22 @@ describe('Login / Recommended 页 accessibility 标注（issue #107）', () => {
     const labelCount = (recommendedVue.match(/:accessibility-label="RECOMMENDED_A11Y_LABELS\.\w+"/g) ?? []).length
     const elementCount = (recommendedVue.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
     expect(labelCount).toBe(Object.keys(RECOMMENDED_A11Y_LABELS).length)
+    expect(elementCount).toBe(labelCount)
+  })
+})
+
+// ─── Update 页 accessibility 标注（检查更新：强制更新页的退出/下载按钮） ───
+// 与页面级同一套「注册表 + 模板源码断言」约定。
+describe('Update 页 accessibility 标注（检查更新）', () => {
+  const updateVueSource = readFileSync(fileURLToPath(new URL('../src/pages/UpdatePage.vue', import.meta.url)), 'utf8')
+
+  it('UPDATE_A11Y_LABELS 全部被 UpdatePage.vue 消费且配套 element', () => {
+    for (const key of Object.keys(UPDATE_A11Y_LABELS)) {
+      expect(updateVueSource).toContain(`:accessibility-label="UPDATE_A11Y_LABELS.${key}"`)
+    }
+    const labelCount = (updateVueSource.match(/:accessibility-label="UPDATE_A11Y_LABELS\.\w+"/g) ?? []).length
+    const elementCount = (updateVueSource.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
+    expect(labelCount).toBe(Object.keys(UPDATE_A11Y_LABELS).length)
     expect(elementCount).toBe(labelCount)
   })
 })

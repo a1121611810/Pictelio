@@ -3,7 +3,7 @@
 // （Pre-Alpha 兼容问题，已实测）。MVP 用手写内存路由 + <component :is>，
 // 路由语义与 vue-router 一致（path/name/params），导航守卫由页面自行处理登录态。
 import { ref, computed, markRaw, type Component } from 'vue'
-import { matchRoute, evaluateSystemBack, type RouteDefCore } from './routerCore'
+import { matchRoute, evaluateBackWithBehavior, type RouteDefCore } from './routerCore'
 import { isNativeMode, getNativeModules } from './api/client'
 import { isLoggedIn, restoreToken, registerUnauthorizedHandler } from './stores/authStore'
 import { loadSettings } from './stores/settingsStore'
@@ -31,6 +31,7 @@ import UserHome from './pages/UserHome.vue'
 import Following from './pages/Following.vue'
 import Bookmarks from './pages/Bookmarks.vue'
 import FollowList from './pages/FollowList.vue'
+import UpdatePage from './pages/UpdatePage.vue'
 
 export const routes: RouteDef[] = [
   { path: '/login', name: 'login', component: Login },
@@ -44,6 +45,9 @@ export const routes: RouteDef[] = [
   { path: '/following', name: 'following', component: Following },
   { path: '/bookmarks', name: 'bookmarks', component: Bookmarks },
   { path: '/me', name: 'me', component: Me },
+  // 强制更新页（检查更新命中后 replace + 清历史栈进入）：
+  // backBehavior: 'exit' —— 返回键直接退出应用，无返回路径
+  { path: '/update', name: 'update', component: UpdatePage, backBehavior: 'exit' },
 ]
 
 // [首帧内容化]（#61/#63）：初始路由为推荐页——首帧直接渲染推荐页骨架屏，
@@ -137,7 +141,10 @@ function handleSystemBack(): void {
     closeTopModal()
     return
   }
-  const decision = evaluateSystemBack(_history.length, lastBackAt, Date.now())
+  // 强制更新页等路由声明 backBehavior: 'exit'（不可返回场景）：
+  // 返回键直接退出应用，跳过历史栈与双击窗口
+  const m = matchRoute(routes, _state.value.path)
+  const decision = evaluateBackWithBehavior(m?.route.backBehavior, _history.length, lastBackAt, Date.now())
   if (decision === 'navigate') {
     goBack()
     return

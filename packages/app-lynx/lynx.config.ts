@@ -14,6 +14,15 @@ const _root = dirname(fileURLToPath(import.meta.url))
 const _credsPath = resolve(_root, '../app/credentials.json5')
 const credentials = JSON5.parse(readFileSync(_credsPath, 'utf-8'))
 
+// ─── 版本号注入（检查更新用，与 APK 版本单一事实源一致） ───
+// 版本号不自己维护：直接读 app 包（pictelio-app）的 version——
+// APK versionCode/versionName 由 scripts/sync-android-version.mjs 从 app 包同步，
+// lynx bundle 属于同一 APK，必须与 app 包版本比较（用 lynx 自身 0.1.0 会永远提示有更新）。
+const _appPkg = JSON.parse(readFileSync(resolve(_root, '../app/package.json'), 'utf-8')) as {
+  version: string
+}
+const __APP_VERSION__ = JSON.stringify(_appPkg.version)
+
 // ─── 凭证注入决策（配置期 fail-closed） ───
 // __DEV__ 必须同时满足「非生产构建」AND「显式 PICTELIO_LYNX_DEV=1」。
 // __DEV__ 为 false 时，__CREDENTIALS__ 定义为占位符（不含任何机密）——
@@ -59,6 +68,7 @@ export default defineConfig({
     define: {
       __CREDENTIALS__,
       __PUBLIC_CONFIG__,
+      __APP_VERSION__,
       __DEV__: JSON.stringify(_isDev),
     },
   },

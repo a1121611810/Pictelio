@@ -1,0 +1,19 @@
+{
+  "name": "@pictelio/update-check",
+  "version": "0.1.0",
+  "description": "Pictelio 更新检查共享库（版本比较 / version.json 拉取 / 超时兜底），主 app 与 app-lynx 共用",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "check": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.10"
+  }
+}

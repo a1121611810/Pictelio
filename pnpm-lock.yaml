@@ -249,6 +249,9 @@ importers:
       '@pictelio/ugoira':
         specifier: workspace:*
         version: link:../ugoira
+      '@pictelio/update-check':
+        specifier: workspace:*
+        version: link:../update-check
       '@solid-primitives/intersection-observer':
         specifier: ^2.2.5
         version: 2.2.5(solid-js@1.9.14)
@@ -352,6 +355,9 @@ importers:
       '@pictelio/ugoira':
         specifier: workspace:*
         version: link:../ugoira
+      '@pictelio/update-check':
+        specifier: workspace:*
+        version: link:../update-check
       spark-md5:
         specifier: ^3.0.2
         version: 3.0.2
@@ -404,6 +410,15 @@ importers:
       fflate:
         specifier: ^0.8.3
         version: 0.8.3
+    devDependencies:
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@26.1.1)(@vitest/browser-preview@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.1)(jsdom@29.1.1(canvas@3.2.3))(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(yaml@2.9.0))
+
+  packages/update-check:
     devDependencies:
       typescript:
         specifier: ^5.7.0

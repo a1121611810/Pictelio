@@ -2,6 +2,11 @@
 export interface RouteDefCore {
   path: string
   name: string
+  /**
+   * 返回键行为（可选）：'exit' = 返回键直接退出应用。
+   * 用于强制更新页等不可返回场景——跳过历史栈与双击窗口逻辑（ADR-0066 扩展）。
+   */
+  backBehavior?: "exit"
 }
 
 /** 系统返回决策（ADR-0066）：JS 侧根据路由历史与双击窗口决定返回行为。 */
@@ -24,6 +29,21 @@ export function evaluateSystemBack(
   if (historyLength > 0) return "navigate"
   if (lastBackAt > 0 && now - lastBackAt < SYSTEM_BACK_EXIT_WINDOW_MS) return "exit"
   return "hint"
+}
+
+/**
+ * 扩展裁决（更新页等不可返回场景）：路由声明 `backBehavior: 'exit'` 时
+ * 返回键恒为 exit（退出应用），不依赖历史栈与双击窗口；
+ * 未声明时走既有 evaluateSystemBack 逻辑，行为不变。
+ */
+export function evaluateBackWithBehavior(
+  behavior: RouteDefCore["backBehavior"],
+  historyLength: number,
+  lastBackAt: number,
+  now: number,
+): SystemBackDecision {
+  if (behavior === "exit") return "exit"
+  return evaluateSystemBack(historyLength, lastBackAt, now)
 }
 
 /** 路径模板匹配：/illust/:id → params { id } */

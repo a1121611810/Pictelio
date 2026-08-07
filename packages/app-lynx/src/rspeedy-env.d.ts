@@ -20,6 +20,11 @@ declare global {
     redirectUri: string
     imageCdnUrl: string
   }
+  /**
+   * APK 版本号（lynx.config.ts 从 app 包 package.json 注入，检查更新用；
+   * 与 APK versionCode/versionName 单一事实源一致，不自己维护）
+   */
+  const __APP_VERSION__: string
   const __DEV__: boolean
   /**
    * Lynx runtime 内置全局对象（ADR-0066 系统返回桥）。
@@ -49,6 +54,8 @@ declare global {
       restart(callback: (err: string | null) => void): void
       /** ADR-0066：根路由双击退出时关闭 Lynx 宿主 Activity */
       exitApp(callback?: (err: string | null) => void): void
+      /** 检查更新：用系统浏览器强制打开 release 页（独立 task，无法返回 app 内） */
+      openUrl(url: string, callback?: (err: string | null) => void): void
     }
     PictelioAuth: {
       loginWithRefreshToken(token: string, callback: (userInfo: string, err: string) => void): void

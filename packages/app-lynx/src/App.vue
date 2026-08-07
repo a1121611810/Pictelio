@@ -2,11 +2,15 @@
 import { onMounted } from 'vue'
 import { currentComponent, initRouter, exitHint } from './router'
 import { initClientSetting } from './stores/clientSwitchStore'
+import { runStartupUpdateCheck } from './stores/updateStore'
 
 onMounted(() => {
   // ADR-0062：启动时查询当前包支持的 client 引擎列表（full/webview/lynx 各有不同）
   initClientSetting()
   void initRouter()
+  // 检查更新（仅自动检查，无手动入口）：启动延迟执行，发现新版本
+  // 直接打开强制更新页（无中间提示层）
+  runStartupUpdateCheck()
 })
 </script>
 

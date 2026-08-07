@@ -37,7 +37,7 @@ async function runStartupUpdateCheck(): Promise<void> {
   setIsCheckingUpdate(true);
   const [updateErr] = await tryAsync(
     (async () => {
-      const result = await checkForUpdate();
+      const result = await checkForUpdate(APP_VERSION);
       setHasUpdate(result.hasUpdate);
       setLatestVersion(result.latestVersion);
       setLatestReleaseUrl(result.latestReleaseUrl);

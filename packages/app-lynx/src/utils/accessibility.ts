@@ -38,6 +38,13 @@ export const LOGIN_A11Y_LABELS = {
   submit: '登录',
 } as const
 
+/** 更新页 accessibility 标注（检查更新：Lynx E2E / Appium 定位用） */
+export const UPDATE_A11Y_LABELS = {
+  pageTitle: '更新',
+  exit: '退出应用',
+  download: '下载新版本',
+} as const
+
 /** Recommended 页 accessibility 标注（Lynx E2E：导航到 Me 页入口） */
 export const RECOMMENDED_A11Y_LABELS = {
   openMe: '我的',

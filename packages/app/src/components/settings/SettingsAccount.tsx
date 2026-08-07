@@ -27,7 +27,7 @@ async function handleCheckUpdate() {
     return;
   }
   setIsCheckingUpdate(true);
-  const result = await checkForUpdate();
+  const result = await checkForUpdate(APP_VERSION);
   setHasUpdate(result.hasUpdate);
   setLatestVersion(result.latestVersion);
   setLatestReleaseUrl(result.latestReleaseUrl);

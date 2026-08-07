@@ -16,6 +16,7 @@
   "dependencies": {
     "@lynx-js/web-core": "^0.23.1",
     "@pictelio/ugoira": "workspace:*",
+    "@pictelio/update-check": "workspace:*",
     "spark-md5": "^3.0.2",
     "vue": "^3.5.13",
     "vue-lynx": "^0.5.1",

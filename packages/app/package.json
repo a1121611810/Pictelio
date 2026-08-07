@@ -44,6 +44,7 @@
     "@fluentui/tokens": "1.0.0-alpha.23",
     "@fluentui/web-components": "3.0.2",
     "@pictelio/ugoira": "workspace:*",
+    "@pictelio/update-check": "workspace:*",
     "@solid-primitives/intersection-observer": "^2.2.5",
     "@solid-primitives/scheduled": "^1.5.3",
     "@solid-primitives/scroll": "^2.1.6",

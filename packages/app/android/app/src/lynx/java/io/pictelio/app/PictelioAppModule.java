@@ -139,4 +139,37 @@ public class PictelioAppModule extends LynxModule {
             callback.invoke(String.valueOf(e.getMessage()));
         }
     }
+
+    /**
+     * 用系统浏览器强制打开外部 URL（检查更新跳 release 页）。
+     *
+     * <p>语义：外部浏览器为独立 task，app 退到后台——用户无法从浏览器"返回" app 内
+     * （符合检查更新需求：强制打开新页面，无法返回上一页）。回调契约：
+     * 成功 {@code cb(null)}；失败 {@code cb(errMsg)}。
+     *
+     * <p>安全：URL 来源为远端 version.json 字段，仅放行 http/https scheme，
+     * 拒绝 {@code intent://}、{@code file://} 等任意 scheme 注入；
+     * {@code resolveActivity} 为空（无浏览器）时回调错误，不抛 ActivityNotFoundException。
+     */
+    @LynxMethod
+    public void openUrl(String url, Callback callback) {
+        try {
+            if (url == null || !(url.startsWith("https://") || url.startsWith("http://"))) {
+                callback.invoke("不支持的 URL: " + url);
+                return;
+            }
+            Intent intent = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            Context ctx = appContext();
+            if (intent.resolveActivity(ctx.getPackageManager()) == null) {
+                callback.invoke("未找到可打开链接的应用");
+                return;
+            }
+            ctx.startActivity(intent);
+            callback.invoke();
+        } catch (Exception e) {
+            Log.w(TAG, "openUrl(" + url + ") 失败", e);
+            callback.invoke(String.valueOf(e.getMessage()));
+        }
+    }
 }
