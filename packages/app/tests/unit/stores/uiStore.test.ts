@@ -271,6 +271,39 @@ describe("resetUiStore", () => {
       window.dispatchEvent = origDispatch;
     });
   });
+
+  describe("persistScrollRestoration", () => {
+    it("defaults to false（关闭 = 冷启动回顶）", async () => {
+      const { persistScrollRestoration } = await setup();
+      expect(persistScrollRestoration()).toBe(false);
+    });
+
+    it("setPersistScrollRestoration(true) 持久化", async () => {
+      const { mod, persistScrollRestoration, setPersistScrollRestoration } = await setup();
+      await warm(mod);
+      setPersistScrollRestoration(true);
+      expect(persistScrollRestoration()).toBe(true);
+      await vi.waitFor(() =>
+        expect(mod.__test.primary.dump().get("persist_scroll_restoration")).toBe("true"),
+      );
+    });
+
+    it("hydrateAll 恢复持久化的开关值", async () => {
+      const { mod, persistScrollRestoration } = await setup({
+        persist_scroll_restoration: "true",
+      });
+      await warm(mod);
+      expect(persistScrollRestoration()).toBe(true);
+    });
+
+    it("忽略无效持久化值（非 boolean 回退默认 false）", async () => {
+      const { mod, persistScrollRestoration } = await setup({
+        persist_scroll_restoration: "not-a-boolean",
+      });
+      await warm(mod);
+      expect(persistScrollRestoration()).toBe(false);
+    });
+  });
 });
 
 describe("lastDismissedVersion", () => {
