@@ -151,9 +151,10 @@ function handleSystemBack(): void {
   }
   if (decision === 'exit') {
     const app = getNativeModules()?.PictelioApp as
-      | { exitApp?: (callback?: (err: string | null) => void) => void }
+      | { exitApp?: (callback: (err: string | null) => void) => void }
       | undefined
-    app?.exitApp?.()
+    // lynx NativeModule 约定 Callback 必传（模拟器实测），否则报参数数量错误
+    app?.exitApp?.(() => {})
     return
   }
   lastBackAt = Date.now()

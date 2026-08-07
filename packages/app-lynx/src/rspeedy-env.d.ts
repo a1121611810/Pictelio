@@ -52,10 +52,12 @@ declare global {
       setClientKind(kind: string, callback: (err: string | null) => void): void
       getClientKind(callback: (kind: string | null, err: string | null) => void): void
       restart(callback: (err: string | null) => void): void
-      /** ADR-0066：根路由双击退出时关闭 Lynx 宿主 Activity */
-      exitApp(callback?: (err: string | null) => void): void
+      /** 关闭 Lynx 宿主 Activity；lynx NativeModule 约定 Callback 必传（模拟器实测） */
+      exitApp(callback: (err: string | null) => void): void
       /** 检查更新：用系统浏览器强制打开 release 页（独立 task，无法返回 app 内） */
       openUrl(url: string, callback?: (err: string | null) => void): void
+      /** 检查更新：通用 HTTP GET（原生 lynx 无 fetch 时的网络桥；cb(status, body)，2xx 成功） */
+      httpGet(url: string, callback: (status: number, body: string) => void): void
     }
     PictelioAuth: {
       loginWithRefreshToken(token: string, callback: (userInfo: string, err: string) => void): void

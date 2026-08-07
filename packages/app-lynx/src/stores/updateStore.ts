@@ -4,10 +4,10 @@
 // 清空历史栈（无处可回），返回键由路由 backBehavior: 'exit' 兜底为退出应用。
 // 页面不直接接触原生桥与 URL 细节：下载/退出动作全部收敛在本模块。
 import { ref } from "vue"
-import { checkForUpdate, type CheckResult } from "@pictelio/update-check"
+import { checkForUpdate, type CheckResult, type FetchLike } from "@pictelio/update-check"
 import { requestFetch } from "../utils/fetchWrapper"
 import { navigate, resetHistory } from "../router"
-import { getNativeModules } from "../api/client"
+import { getNativeModules, isNativeMode } from "../api/client"
 
 /** 启动后检查更新的延迟（ms）：先让首帧渲染/交互就绪，与主 app STARTUP_CHECK_DELAY_MS 对齐 */
 const STARTUP_CHECK_DELAY_MS = 500
@@ -18,6 +18,53 @@ const _result = ref<CheckResult | null>(null)
 export const isCheckingUpdate = _isChecking
 export const updateResult = _result
 
+/**
+ * 检查更新的网络层适配（FetchLike seam）。
+ * 原生 Lynx JS 运行时无 fetch（fetchWrapper 实测仅 web-core 可用）——
+ * 原生模式经 PictelioApp.httpGet 走 Java OkHttp；web-core/测试走 requestFetch。
+ */
+export function createUpdateFetchImpl(): FetchLike {
+  if (!isNativeMode()) return requestFetch
+  return (input, init) =>
+    new Promise<Response>((resolve, reject) => {
+      const mod = getNativeModules()?.PictelioApp as
+        | { httpGet?: (url: string, cb: (status: number, body: string) => void) => void }
+        | undefined
+      if (!mod?.httpGet) {
+        reject(new Error("原生桥 httpGet 不可用（web-core 预览属预期）"))
+        return
+      }
+      let settled = false
+      const settle = (fn: () => void) => {
+        if (!settled) {
+          settled = true
+          fn()
+        }
+      }
+      // JS 侧 10s 超时兜底：Java 侧 callTimeout 同值，双保险
+      init?.signal?.addEventListener("abort", () => settle(() => reject(new Error("aborted"))))
+      mod.httpGet(String(input), (status, body) => {
+        if (status === 0) {
+          settle(() => reject(new Error(body)))
+          return
+        }
+        settle(() =>
+          resolve({
+            ok: status >= 200 && status < 300,
+            status,
+            json: () => {
+              try {
+                return Promise.resolve(JSON.parse(body))
+              } catch (err) {
+                return Promise.reject(err)
+              }
+            },
+          } as unknown as Response),
+        )
+      })
+    })
+}
+
 /** 启动自动检查（App.vue onMounted 调用；内部自带延迟，不阻塞首帧） */
 export function runStartupUpdateCheck(): void {
   if (_isChecking.value) return
@@ -26,9 +73,8 @@ export function runStartupUpdateCheck(): void {
     void (async () => {
       try {
         // 本地版本用 __APP_VERSION__（构建时从 app 包注入，与 APK 版本单一事实源一致）；
-        // fetchImpl 必须传 requestFetch——web-core 模块作用域内裸 fetch 为 undefined
-        // （fetchWrapper.ts 实测），原生 LynxView 走 Lynx Http Service。
-        const result = await checkForUpdate(__APP_VERSION__, requestFetch)
+        // fetchImpl 按环境适配：原生走 PictelioApp.httpGet，web-core 走 requestFetch
+        const result = await checkForUpdate(__APP_VERSION__, createUpdateFetchImpl())
         _result.value = result
         // 导航条件含 latestReleaseUrl：无 release 页时进更新页会把用户锁死在无出口页面
         if (result.hasUpdate && result.latestVersion && result.latestReleaseUrl) {
@@ -72,11 +118,13 @@ export function openReleasePage(): void {
 /** 「退出应用」（更新页顶部原"返回"位置 + 返回键兜底）：关闭 Lynx 宿主 Activity */
 export function exitUpdatePage(): void {
   const module = getNativeModules()?.PictelioApp as
-    | { exitApp?: (cb?: (err: string | null) => void) => void }
+    | { exitApp?: (cb: (err: string | null) => void) => void }
     | undefined
   if (!module?.exitApp) {
     console.warn("[updateStore] 原生桥 exitApp 不可用（web-core 预览属预期）")
     return
   }
-  module.exitApp()
+  // lynx NativeModule 约定 Callback 必传（模拟器实测：无参调用报
+  // "expected: 1, but got 0"）；回调参数可忽略
+  module.exitApp(() => {})
 }

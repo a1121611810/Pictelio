@@ -19,9 +19,11 @@ vi.mock("../router", () => ({
 }))
 vi.mock("../api/client", () => ({
   getNativeModules: mocks.getNativeModules,
+  // 与真实实现同语义：任一 Pictelio 原生模块存在即原生模式
+  isNativeMode: () => !!mocks.getNativeModules()?.PictelioApp,
 }))
 
-import { runStartupUpdateCheck, openReleasePage, exitUpdatePage, updateResult } from "./updateStore"
+import { runStartupUpdateCheck, openReleasePage, exitUpdatePage, updateResult, createUpdateFetchImpl } from "./updateStore"
 
 const baseResult = {
   hasUpdate: false,
@@ -176,6 +178,79 @@ describe("updateStore.exitUpdatePage", () => {
     exitUpdatePage()
 
     expect(warnSpy).toHaveBeenCalled()
+    warnSpy.mockRestore()
+  })
+})
+
+describe("updateStore.createUpdateFetchImpl（原生 httpGet 网络适配）", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it("原生模式 → httpGet 成功时包装 Response 并解析 JSON body", async () => {
+    const httpGet = vi.fn((url: string, cb: (status: number, body: string) => void) => {
+      cb(200, JSON.stringify({ version: "9.9.9", url: "https://github.com/x/releases/tag/v9.9.9" }))
+    })
+    mocks.getNativeModules.mockReturnValue({ PictelioApp: { httpGet } })
+
+    const res = await createUpdateFetchImpl()("http://10.0.2.2:8080/version.json" as unknown as URL)
+
+    expect(httpGet).toHaveBeenCalledWith("http://10.0.2.2:8080/version.json", expect.any(Function))
+    expect(res.ok).toBe(true)
+    expect(res.status).toBe(200)
+    await expect(res.json()).resolves.toEqual({
+      version: "9.9.9",
+      url: "https://github.com/x/releases/tag/v9.9.9",
+    })
+  })
+
+  it("原生模式 → status 0（网络错误）reject", async () => {
+    const httpGet = vi.fn((_url: string, cb: (status: number, body: string) => void) => {
+      cb(0, "network down")
+    })
+    mocks.getNativeModules.mockReturnValue({ PictelioApp: { httpGet } })
+
+    await expect(createUpdateFetchImpl()("http://x" as unknown as URL)).rejects.toThrow("network down")
+  })
+
+  it("原生模式 → 非 2xx 状态包装为 ok=false（由 checkForUpdate 判定失败）", async () => {
+    const httpGet = vi.fn((_url: string, cb: (status: number, body: string) => void) => {
+      cb(404, "")
+    })
+    mocks.getNativeModules.mockReturnValue({ PictelioApp: { httpGet } })
+
+    const res = await createUpdateFetchImpl()("http://x" as unknown as URL)
+
+    expect(res.ok).toBe(false)
+    expect(res.status).toBe(404)
+  })
+
+  it("原生模式 → 桥缺失 reject", async () => {
+    mocks.getNativeModules.mockReturnValue({ PictelioApp: {} })
+
+    await expect(createUpdateFetchImpl()("http://x" as unknown as URL)).rejects.toThrow(/httpGet/)
+  })
+
+  it("原生模式 → abort 信号触发时 reject（JS 侧超时兜底）", async () => {
+    const httpGet = vi.fn((_url: string, _cb: (status: number, body: string) => void) => {
+      /* 永不回调：模拟 Java 侧挂起 */
+    })
+    mocks.getNativeModules.mockReturnValue({ PictelioApp: { httpGet } })
+    const controller = new AbortController()
+
+    const p = createUpdateFetchImpl()("http://x" as unknown as URL, { signal: controller.signal })
+    controller.abort()
+
+    await expect(p).rejects.toThrow("aborted")
+  })
+
+  it("web 模式（无原生模块）→ 走 requestFetch（不抛桥缺失）", async () => {
+    mocks.getNativeModules.mockReturnValue(undefined)
+    // web 模式直接返回 requestFetch；测试环境有全局 fetch，调用应成功发起
+    const impl = createUpdateFetchImpl()
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    // requestFetch 指向 globalThis.fetch——不实际请求，仅验证返回的是 requestFetch 本身
+    expect(typeof impl).toBe("function")
     warnSpy.mockRestore()
   })
 })

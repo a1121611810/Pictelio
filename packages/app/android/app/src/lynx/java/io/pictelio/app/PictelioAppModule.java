@@ -34,6 +34,27 @@ public class PictelioAppModule extends LynxModule {
     /** client 开关 key（app-lynx clientSwitchStore 同名） */
     public static final String CLIENT_KEY = "pictelio_client_kind";
 
+    /** httpGet 线程池（阻塞 IO 不占 Lynx 调用线程；同 PictelioApiModule 模式） */
+    private static final java.util.concurrent.ExecutorService HTTP_EXECUTOR =
+            java.util.concurrent.Executors.newCachedThreadPool();
+
+    /** httpGet 响应体大小上限（version.json 极小；防异常端点导致 OOM） */
+    private static final int MAX_HTTP_BODY_BYTES = 1024 * 1024;
+
+    /** 受限读取响应体（超限抛 IOException → 走 cb(0, errMsg)） */
+    private static String readLimitedBody(okhttp3.ResponseBody body, int max) throws java.io.IOException {
+        okio.BufferedSource src = body.source();
+        byte[] buf = new byte[max + 1];
+        int read = 0;
+        while (read <= max) {
+            int n = src.read(buf, read, max + 1 - read);
+            if (n == -1) break;
+            read += n;
+            if (read > max) throw new java.io.IOException("响应体超过上限 " + max);
+        }
+        return new String(buf, 0, read, java.nio.charset.StandardCharsets.UTF_8);
+    }
+
     public PictelioAppModule(Context context) {
         super(context);
     }
@@ -170,6 +191,46 @@ public class PictelioAppModule extends LynxModule {
         } catch (Exception e) {
             Log.w(TAG, "openUrl(" + url + ") 失败", e);
             callback.invoke(String.valueOf(e.getMessage()));
+        }
+    }
+
+    /**
+     * 通用 HTTP GET（检查更新用）：返回 status + body。
+     *
+     * <p>背景：原生 Lynx JS 运行时无 fetch（fetchWrapper 仅 web-core 可用，实测），
+     * 检查更新在原生环境必须经此桥走 OkHttp 真实网络。回调契约（与 PictelioApi
+     * 对齐）：{@code cb(status, body)}——2xx 成功时 body 为响应文本；
+     * 网络/异常 {@code cb(0, errMsg)}。scheme 白名单 http/https（URL 来源为远端
+     * version.json 字段，防御 file:// 等 scheme 注入）；callTimeout 10s 与 JS 侧
+     * AbortController 同值兜底。线程池执行，不占 Lynx 调用线程（同 PictelioApiModule）。
+     */
+    @LynxMethod
+    public void httpGet(String url, Callback callback) {
+        try {
+            if (url == null || !(url.startsWith("https://") || url.startsWith("http://"))) {
+                callback.invoke(0, "不支持的 URL: " + url);
+                return;
+            }
+            HTTP_EXECUTOR.execute(() -> {
+                try {
+                    okhttp3.OkHttpClient shortClient = PixivApiCore.getSharedClient().newBuilder()
+                            .callTimeout(10_000, java.util.concurrent.TimeUnit.MILLISECONDS)
+                            .build();
+                    okhttp3.Request req = new okhttp3.Request.Builder().url(url).get().build();
+                    try (okhttp3.Response resp = shortClient.newCall(req).execute()) {
+                        okhttp3.ResponseBody rb = resp.body();
+                        String body = rb != null ? readLimitedBody(rb, MAX_HTTP_BODY_BYTES) : "";
+                        callback.invoke(resp.code(), body);
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "httpGet(" + url + ") 失败", e);
+                    String errMsg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+                    callback.invoke(0, errMsg);
+                }
+            });
+        } catch (Exception e) {
+            Log.w(TAG, "httpGet(" + url + ") 失败", e);
+            callback.invoke(0, String.valueOf(e.getMessage()));
         }
     }
 }
