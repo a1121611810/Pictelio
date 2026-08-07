@@ -61,6 +61,12 @@ export async function setContentType(type: ContentType): Promise<void> {
   // Solid 批处理更新（microtask）之前执行，立即 scrollToTop 只作用于旧文档，
   // 切换后 scrollY 仍会被 clamp 到中间值。
   if (typeof window !== "undefined") {
+    // 取消 @solidjs/router scrollRestoration 的 pending restore：从详情返回 /home
+    // 后，若 scrollY 恰好为 0，下方 scrollToTop 的 scrollTo(0,0) 不触发 scroll 事件，
+    // pending 未被其"用户接管"分支清除，路由 settle 后 restore() 会把 scrollY 设回
+    // 旧位置（真机实测：切 contentType 后列表从 849px 处显示）。派发一次 scroll
+    // 事件触发 scrollRestoration 的 pending=undefined 分支，阻止晚到的 restore 覆盖回顶。
+    window.dispatchEvent(new Event("scroll"));
     setTimeout(() => scrollToTop(), 0);
   }
 }
