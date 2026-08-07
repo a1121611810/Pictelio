@@ -19,7 +19,8 @@ import { markContentReady } from "@/native/splashBridge";
 const HomePage: Component = () => {
   console.log("[RENDER] HomePage rendering");
   const navigate = useNavigate();
-  const { visible: headerVisible } = createScrollBehavior();
+  // header 为 A2 卡片式（pt-3 + h-12 + pb-1 = 64px），topGuard 同步该高度
+  const { visible: headerVisible } = createScrollBehavior({ topGuard: 64 });
 
   // ── LRU Tab DOM 管理 + 延迟激活 ──
   const MAX_DOM_TABS = 2;
@@ -71,56 +72,58 @@ const HomePage: Component = () => {
     <>
       <PageTransition>
         <div class="pb-16">
-          {/* ── Shared Header ── */}
-          <header
-            class="sticky top-0 z-20 surface-appbar h-12 flex items-center justify-between px-4 transition-transform duration-[var(--durationNormal)] ease-[var(--curveEasyEase)]"
+          {/* ── Shared Header — A2 卡片式（ADR-0070）── */}
+          <div
+            class="sticky top-0 z-20 bg-[var(--colorNeutralBackground3)] px-4 pt-3 pb-1 transition-transform duration-[var(--durationNormal)] ease-[var(--curveEasyEase)]"
             classList={{
               "translate-y-0": headerVisible(),
               "-translate-y-full": !headerVisible(),
             }}
             onDblClick={scrollToTop}
           >
-            <h1
-              class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] tracking-tight leading-none flex items-center gap-2 min-w-0"
-              classList={{ "cursor-pointer": isLoggedIn() }}
-              onClick={() => isLoggedIn() && navigate("/me")}
-            >
-              <Show when={isLoggedIn() && user()} fallback={<>Pictelio</>}>
-                <UserAvatar />
-                <span class="truncate max-w-[120px]">{user()!.name}</span>
-              </Show>
-            </h1>
+            <div class="rounded-[var(--borderRadius2XLarge)] bg-[var(--colorNeutralBackground1)] shadow-[var(--elevation2)] px-[var(--spacingHorizontalL)] h-12 flex items-center justify-between gap-2">
+              <h1
+                class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] tracking-tight leading-none flex items-center gap-2 min-w-0"
+                classList={{ "cursor-pointer": isLoggedIn() }}
+                onClick={() => isLoggedIn() && navigate("/me")}
+              >
+                <Show when={isLoggedIn() && user()} fallback={<>Pictelio</>}>
+                  <UserAvatar />
+                  <span class="truncate max-w-[120px]">{user()!.name}</span>
+                </Show>
+              </h1>
 
-            {/* ── Content type toggle (隐藏于历史 tab) ── */}
-            <Show when={currentTab() !== "history"}>
-              <div class="flex items-center bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusSmall)] p-0.5 gap-0.5">
-                <button
-                  class="px-2.5 py-1 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase100)] font-semibold transition-all active:scale-95 appearance-none border-none outline-none cursor-pointer"
-                  classList={{
-                    "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
-                      contentType() === "illust",
-                    "bg-transparent text-[var(--colorNeutralForeground2)]":
-                      contentType() !== "illust",
-                  }}
-                  onClick={() => setContentType("illust")}
-                >
-                  插画
-                </button>
-                <button
-                  class="px-2.5 py-1 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase100)] font-semibold transition-all active:scale-95 appearance-none border-none outline-none cursor-pointer"
-                  classList={{
-                    "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
-                      contentType() === "novel",
-                    "bg-transparent text-[var(--colorNeutralForeground2)]":
-                      contentType() !== "novel",
-                  }}
-                  onClick={() => setContentType("novel")}
-                >
-                  小说
-                </button>
-              </div>
-            </Show>
-          </header>
+              {/* ── Content type toggle (隐藏于历史 tab) ── */}
+              <Show when={currentTab() !== "history"}>
+                <div class="flex items-center bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusSmall)] p-0.5 gap-0.5">
+                  <button
+                    class="px-2.5 py-1 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase100)] font-semibold transition-all active:scale-95 appearance-none border-none outline-none cursor-pointer"
+                    classList={{
+                      "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
+                        contentType() === "illust",
+                      "bg-transparent text-[var(--colorNeutralForeground2)]":
+                        contentType() !== "illust",
+                    }}
+                    onClick={() => setContentType("illust")}
+                  >
+                    插画
+                  </button>
+                  <button
+                    class="px-2.5 py-1 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase100)] font-semibold transition-all active:scale-95 appearance-none border-none outline-none cursor-pointer"
+                    classList={{
+                      "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
+                        contentType() === "novel",
+                      "bg-transparent text-[var(--colorNeutralForeground2)]":
+                        contentType() !== "novel",
+                    }}
+                    onClick={() => setContentType("novel")}
+                  >
+                    小说
+                  </button>
+                </div>
+              </Show>
+            </div>
+          </div>
 
           {/* ── Tab content panels ── */}
           <Show when={isDomActive("recommended")}>

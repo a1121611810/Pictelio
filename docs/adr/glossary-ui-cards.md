@@ -16,6 +16,9 @@
 | **原型容器（PrototypeSettings）** | 开发模式按 `?variant=` 分发变体的容器组件，通过 `import.meta.env.DEV ? lazy(import(...)) : null` 隔离，生产零残留。 |
 | **页卡令牌（pageCard token）** | 旧 `/me` 页面使用的 `--pageCard*` 令牌组（`--pageCardSurface/Radius/Shadow/Border/Bg` 等）。作为 A2 视觉语言落地的一部分，`/me` 迁移后不再使用 pageCard 令牌，改用 Fluent 令牌（`--colorNeutralBackground1`、`--borderRadius2XLarge`、`--elevation2`）。 |
 | **throwaway 分支（Prototype branch）** | UI 原型流程收尾时，完整原型集（全部变体 + 切换条 + 原型测试）归档的独立 git 分支（如 `prototype/settings-ui-cards`），不进交付分支，作为 primary source 留存。 |
+| **Feed 卡片 A2 化（Feed card A2）** | Feed 图片卡片（`ImageCard`，`image-card` shortcut：细边框 + 中圆角 + `--elevation2`）改为 A2 卡片视觉：**去边框 + 大圆角（`--borderRadius2XLarge`）+ 柔和阴影**，与设置页/me 卡片同族。注意 `ImageCard` 被所有列表页共用，A2 化影响面全局（ADR-0070）。 |
+| **顶部区域 A2 化（Header A2）** | 首页顶部栏（头像/名字 + 插画/小说切换器）从 `surface-appbar` 毛玻璃改为 A2 简洁风格（弱化边框、对齐 Neutral 表面与间距令牌）。 |
+| **A2 segmented 切换器** | 插画/小说等二元切换控件使用 A2 视觉：`--colorNeutralBackground2` 容器 + 激活项 `--colorNeutralBackground1` 浮起（`--elevation2`），延续现状 segmented 交互语义、视觉对齐 A2 语言。 |
 
 ## 相关链接
 

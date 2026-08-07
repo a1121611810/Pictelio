@@ -58,9 +58,9 @@ export default defineConfig({
     "surface-glass":
       "bg-[var(--colorNeutralBackgroundAlpha)] backdrop-blur-[30px] backdrop-saturate-[125%] border border-[var(--colorNeutralStroke2)] shadow-[var(--elevation4)]",
 
-    // ── Image card (feed thumbnail) ──
+    // ── Image card (feed thumbnail) — A2 视觉语言（ADR-0070）：去边框、大圆角 2XLarge ──
     "image-card":
-      "bg-[var(--colorNeutralBackground1)] rounded-[var(--borderRadiusMedium)] overflow-hidden shadow-[var(--elevation2)] border border-[var(--colorNeutralStroke2)] cursor-pointer transition-all active:scale-[0.98] select-none max-w-full",
+      "bg-[var(--colorNeutralBackground1)] rounded-[var(--borderRadius2XLarge)] overflow-hidden shadow-[var(--elevation2)] cursor-pointer transition-all active:scale-[0.98] select-none max-w-full",
 
     // ── Input fields (Fluent 2) ──
     input:

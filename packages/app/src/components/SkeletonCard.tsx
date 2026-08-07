@@ -16,11 +16,11 @@ const SkeletonCard: Component<Props> = (props) => {
   const aspectRatio = props.width && props.height ? `${props.width} / ${props.height}` : "1 / 1";
 
   return (
-    <div class="image-card break-inside-avoid mb-3 border border-[var(--colorNeutralStroke2)] rounded-[var(--borderRadiusMedium)] overflow-hidden">
+    <div class="image-card break-inside-avoid mb-3 overflow-hidden">
       {/* Thumbnail area — 使用正确比例避免 skeleton→image 切换时 reflow */}
       <SkeletonShimmer class="w-full" style={{ "aspect-ratio": aspectRatio }} />
-      {/* Text lines matching ImageCard p-2.5 */}
-      <div class="p-2.5 flex flex-col gap-1.5">
+      {/* Text lines — padding 与 ImageCard info 区对齐（A2 宽松 L，ADR-0070） */}
+      <div class="px-[var(--spacingHorizontalL)] py-[var(--spacingVerticalL)] flex flex-col gap-1.5">
         <SkeletonShimmer class="h-[var(--spacingVerticalM)] rounded-[var(--borderRadiusSmall)] w-3/4" />
         <SkeletonShimmer class="h-[var(--spacingVerticalXXL)] rounded-[var(--borderRadiusSmall)] w-1/2" />
       </div>
