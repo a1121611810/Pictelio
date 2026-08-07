@@ -62,12 +62,11 @@ const ScrollRestorationConfirm: Component = () => {
               开启持久化滚动恢复？
             </h1>
             <p class="text-[var(--fontSizeBase400)] text-[var(--colorNeutralForeground2)] leading-snug">
-              开启后列表将不再固定从顶部开始
+              开启后，列表将不再固定从顶部开始
             </p>
             <ul class="text-left text-[var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug max-w-[280px] flex flex-col gap-1">
-              <li>• 重新打开应用后，列表会恢复上次浏览的位置</li>
-              <li>• 浏览列表时，图片加载可能导致列表位置轻微跳动</li>
-              <li>• 从详情页返回列表时，保持离开时的位置</li>
+              <li>• 重新打开应用后，列表会停留在上次浏览的位置，不再从顶部开始</li>
+              <li>• 浏览列表时，图片加载可能导致列表位置出现跳动</li>
             </ul>
           </div>
 
