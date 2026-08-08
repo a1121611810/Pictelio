@@ -191,7 +191,6 @@ describe("followStore — sub-tab routing", () => {
   it("illusts() merges public+private when followTab is all", async () => {
     setQueryData("follow_public", [createIllust(1, "2026-07-01T12:00:00+09:00")], null);
     setQueryData("follow_private", [createIllust(2, "2026-07-01T10:00:00+09:00")], null);
-
     const store = await loadStore();
     store.setFollowTab("all");
     expect(store.illusts().map((i) => i.id)).toEqual([1, 2]);
@@ -344,5 +343,16 @@ describe("followStore — ensureLoaded", () => {
     expect(typeof store.ensureLoaded).toBe("function");
     const result = store.ensureLoaded();
     expect(result).toBeInstanceOf(Promise);
+  });
+
+  // 契约（ADR-0042 按需查询）：activate 只置订阅标志、不触发任何 fetch；
+  // 数据加载必须由 ensureLoaded 驱动（回归防护：首页收藏/关注 Tab 之前只 activate → 空）。
+  it("activate 不触发任何 fetch（数据加载需 ensureLoaded）", async () => {
+    vi.resetModules();
+    const { loadFollow } = await import("@/api/illust");
+    const store = await import("@/stores/followStore");
+    store.activate();
+    expect(loadFollow).not.toHaveBeenCalled();
+    expect(store.illusts()).toEqual([]);
   });
 });
