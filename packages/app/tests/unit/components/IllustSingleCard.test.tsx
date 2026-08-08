@@ -70,4 +70,20 @@ describe("IllustSingleCard", () => {
     fireEvent.keyDown(screen.getByRole("button"), { key: "Enter" });
     expect(onClick).toHaveBeenCalledTimes(1);
   });
+
+  it("封面按原图比例（aspect-ratio = width/height，非固定 16:10）", () => {
+    const illust = makeIllust({ width: 1200, height: 800 });
+    render(() => <IllustSingleCard illust={illust} onClick={vi.fn()} />);
+    const img = screen.getByAltText(illust.title) as HTMLImageElement;
+    const box = img.parentElement as HTMLElement;
+    expect(box.style.aspectRatio).toBe("1200 / 800");
+  });
+
+  it("宽高异常时回退 16:10", () => {
+    const illust = makeIllust({ width: 0, height: 0 });
+    render(() => <IllustSingleCard illust={illust} onClick={vi.fn()} />);
+    const img = screen.getByAltText(illust.title) as HTMLImageElement;
+    const box = img.parentElement as HTMLElement;
+    expect(box.style.aspectRatio).toBe("16 / 10");
+  });
 });
