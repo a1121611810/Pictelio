@@ -1,5 +1,5 @@
 {
-  "version": "4.7.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.7.0",
-  "changelog": "🧹 杂项\n  c27d5c0 chore: merge delivery-20260807-093119（首页 C 框架+L5 布局+A2 修正）\n  e086936 chore: merge delivery-20260807-093119（系列目录+阅读设置 A2 化+自动字号）\n  1b5dfaf chore: merge delivery-20260807-093119（/illust A2 化）\n  5ca4431 chore: merge delivery-20260807-093119（/home A2 化）\n  1c5cfb7 chore: merge delivery-20260807-093119\n  0b8c20e chore: merge delivery-20260807（持久化滚动恢复设置项 + 二次确认页变体 B + contentType 回顶竞态修复）\n🐛 修复\n  baa6490 fix(app): 插画单列大图按原图比例显示（非固定 16:10）\n  d5136ad fix(app): 修正持久化滚动恢复确认页文案（删除误导项）\n  ff049be fix(app): contentType 切换回顶被 scrollRestoration 竞态覆盖\n✨ 新功能\n  a5e2c27 feat(app): 首页 C 框架 + L5 固定布局折入（插画大图/小说行卡+滚动分页）\n  283707c feat(app): 系列目录弹窗 A2 化 + 阅读设置自动字号\n  1d37880 feat(app): /novel 小说详情页 A2 化落地（A 布局 + 可展开封面卡）\n  0011a95 feat(app): /illust 详情页 A2 化落地（A 布局 + 动态底部操作条）\n  baebb6d feat(app): /home 全页 A2 化落地（UI 原型选定 D 深度统一）\n  1fa47f3 feat(app): /me 页面重构为 A2 卡片化布局（UI 原型选定 A 统一版）\n  61556bd feat(app): 设置页布局重构为 A2 卡片化分组（UI 原型选定落地）\n  3031e9f feat(app): 二次确认页选型落地——底部操作栏布局（变体 B）\n  71de40b feat(app): 持久化滚动恢复开关开启需二次确认（说明影响 + 自动返回）\n  f0d6131 feat(app): 设置项「持久化滚动恢复」（默认关）——冷启动始终回顶\n💄 样式\n  fb85f40 style(app): A2 卡片按 Win11 规范修正（8px 圆角+1px 边框+去阴影）"
+  "version": "4.7.1",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.7.1",
+  "changelog": "🐛 修复\n  617e384 fix(app): 收藏/关注 Tab 内容不显示（activate 不触发数据加载）"
 }
