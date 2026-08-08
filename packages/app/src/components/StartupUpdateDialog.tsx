@@ -72,7 +72,7 @@ const StartupUpdateDialog: Component = () => {
       >
         {/* 弹窗卡片 */}
         <div
-          class="flex flex-col max-h-[85vh] w-[min(85vw,360px)] rounded-[var(--borderRadius2XLarge)] shadow-[var(--elevation16)] overflow-hidden"
+          class="flex flex-col max-h-[85vh] w-[min(85vw,360px)] rounded-[var(--borderRadiusXLarge)] shadow-[var(--elevation16)] overflow-hidden"
           style="background-color: var(--colorNeutralBackground1); animation: fluent-scale-enter 200ms cubic-bezier(0.33, 0, 0, 1) both;"
           onClick={(e) => e.stopPropagation()}
         >

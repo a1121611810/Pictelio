@@ -14,7 +14,6 @@ import ImageCacheSettings from "@/routes/ImageCacheSettings";
 import FollowListPage from "@/routes/FollowListPage";
 import NovelDetail from "@/routes/NovelDetail";
 import Search from "@/routes/Search";
-import LayoutSettings from "@/routes/LayoutSettings";
 import Settings from "@/routes/Settings";
 import ClientSwitch from "@/routes/ClientSwitch";
 import ScrollRestorationConfirm from "@/routes/ScrollRestorationConfirm";
@@ -38,7 +37,6 @@ export const routes: RouteDefinition[] = [
       { path: "/about", component: About },
       { path: "/image-host", component: ImageHostSettings },
       { path: "/image-cache", component: ImageCacheSettings },
-      { path: "/layout-settings", component: LayoutSettings },
       { path: "/settings", component: Settings },
       { path: "/client-switch", component: ClientSwitch },
       { path: "/age-confirmation", component: AgeConfirmation },

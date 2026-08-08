@@ -51,7 +51,6 @@ describe("router configuration", () => {
       "/about",
       "/image-host",
       "/image-cache",
-      "/layout-settings",
       "/settings",
       "/age-confirmation",
       "/debug",

@@ -49,6 +49,9 @@ async function loadStore(seed: Record<string, string> = {}) {
   return { store, mem };
 }
 
+// ADR-0075：设置页布局模式 UI 已移除（ticket #177），但 settingsStore 的 layoutMode
+// 字段与 setLayoutMode 保留（仍被 resetSettingsStore 及各 Feed 组件使用，默认 waterfall），
+// 以下断言继续验证 store 层可设置/持久化/事件语义（非设置 UI 行为）。
 describe("settingsStore — setLayoutMode", () => {
   it("成功路径：更新 state + 持久化 + 派发事件", async () => {
     const { store, mem } = await loadStore();

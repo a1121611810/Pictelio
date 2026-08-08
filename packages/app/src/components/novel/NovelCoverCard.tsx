@@ -76,7 +76,7 @@ const NovelCoverCard: Component<NovelCoverCardProps> = (props) => {
   // ── hero 形态（封面通边 + 下方完整信息区）──
   const heroForm = (
     <div>
-      <div class="relative w-full aspect-[16/9] rounded-t-[var(--borderRadius2XLarge)] overflow-hidden">
+      <div class="relative w-full aspect-[16/9] rounded-t-[var(--borderRadiusXLarge)] overflow-hidden">
         <PixivImage
           src={resolveImageUrl(n().image_urls.large)}
           alt={n().title}
@@ -127,7 +127,7 @@ const NovelCoverCard: Component<NovelCoverCardProps> = (props) => {
       <div>
         {/* 双行独立折叠：收起=compact 完整（hero 不可见）；展开=compact 折叠、hero 完整 */}
         <div
-          class="rounded-[var(--borderRadius2XLarge)] bg-[var(--colorNeutralBackground1)] shadow-[var(--elevation2)]"
+          class="rounded-[var(--borderRadiusXLarge)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)]"
           style={{ overflow: "visible" }}
         >
           <div

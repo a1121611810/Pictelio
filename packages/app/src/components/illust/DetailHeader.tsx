@@ -14,7 +14,7 @@ interface DetailHeaderProps {
 const DetailHeader: Component<DetailHeaderProps> = (props) => {
   return (
     <div class="sticky top-0 z-20 bg-[var(--colorNeutralBackground3)] px-4 pt-3 pb-1">
-      <div class="rounded-[var(--borderRadius2XLarge)] bg-[var(--colorNeutralBackground1)] shadow-[var(--elevation2)] px-[var(--spacingHorizontalL)] h-12 flex items-center gap-2">
+      <div class="rounded-[var(--borderRadiusXLarge)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] px-[var(--spacingHorizontalL)] h-12 flex items-center gap-2">
         <fluent-button
           appearance="subtle"
           aria-label="返回"

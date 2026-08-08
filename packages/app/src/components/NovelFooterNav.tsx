@@ -35,7 +35,7 @@ const NovelFooterNav: Component<NovelFooterNavProps> = (props) => {
       }}
     >
       {/* A2 卡片条（ADR-0072）：圆角 2XLarge + elevation8 + 细边框，悬浮页面底部居中 */}
-      <div class="pointer-events-auto w-full max-w-md rounded-[var(--borderRadius2XLarge)] bg-[var(--colorNeutralBackground1)] shadow-[var(--elevation8)] border border-[var(--colorNeutralStroke2)] px-[var(--spacingHorizontalL)] py-[var(--spacingVerticalS)]">
+      <div class="pointer-events-auto w-full max-w-md rounded-[var(--borderRadiusXLarge)] bg-[var(--colorNeutralBackground1)] shadow-[var(--elevation4)] border border-[var(--colorNeutralStroke2)] px-[var(--spacingHorizontalL)] py-[var(--spacingVerticalS)]">
         <div class="flex items-center justify-center gap-1 overflow-x-auto">
           <Show when={props.novel.series?.id ? props.novelNav?.prevNovel : undefined}>
             {(prev) => (
