@@ -567,7 +567,7 @@ const IllustDetail: Component = () => {
                   const src = q === "medium" ? page.image_urls.medium : page.image_urls.large;
                   return (
                     <div
-                      class="rounded-[var(--borderRadius2XLarge)] overflow-hidden shadow-[var(--elevation2)] bg-[var(--colorNeutralBackground1)] cursor-pointer"
+                      class="rounded-[var(--borderRadiusXLarge)] overflow-hidden border border-[var(--colorNeutralStroke1)] bg-[var(--colorNeutralBackground1)] cursor-pointer"
                       ref={(el) => {
                         setPageRefs((prev) => {
                           const next = new Map(prev);
@@ -700,7 +700,7 @@ const IllustDetail: Component = () => {
               </div>
             ) : (
               <div
-                class="rounded-[var(--borderRadius2XLarge)] overflow-hidden shadow-[var(--elevation2)] bg-[var(--colorNeutralBackground1)] cursor-pointer"
+                class="rounded-[var(--borderRadiusXLarge)] overflow-hidden border border-[var(--colorNeutralStroke1)] bg-[var(--colorNeutralBackground1)] cursor-pointer"
                 onClick={() => openViewer(0)}
               >
                 <PixivImage

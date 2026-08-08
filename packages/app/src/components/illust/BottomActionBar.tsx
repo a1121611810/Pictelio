@@ -25,7 +25,7 @@ interface BottomActionBarProps {
 const BottomActionBar: Component<BottomActionBarProps> = (props) => {
   return (
     <div class="fixed bottom-4 left-0 right-0 z-30 flex justify-center px-4 pointer-events-none">
-      <div class="pointer-events-auto w-full max-w-md rounded-[var(--borderRadius2XLarge)] bg-[var(--colorNeutralBackground1)] shadow-[var(--elevation8)] border border-[var(--colorNeutralStroke2)] px-[var(--spacingHorizontalL)] h-14 flex items-center gap-3">
+      <div class="pointer-events-auto w-full max-w-md rounded-[var(--borderRadiusXLarge)] bg-[var(--colorNeutralBackground1)] shadow-[var(--elevation4)] border border-[var(--colorNeutralStroke2)] px-[var(--spacingHorizontalL)] h-14 flex items-center gap-3">
         {/* 左：头像 + 名字（truncate） */}
         <div class="flex items-center gap-2.5 min-w-0 flex-shrink">
           <PixivImage

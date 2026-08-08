@@ -12,7 +12,7 @@ interface DetailCardProps {
  */
 const DetailCard: Component<DetailCardProps> = (props) => (
   <section
-    class={`rounded-[var(--borderRadius2XLarge)] bg-[var(--colorNeutralBackground1)] shadow-[var(--elevation2)] px-[var(--spacingHorizontalL)] py-[var(--spacingVerticalL)] ${props.class ?? ""}`}
+    class={`rounded-[var(--borderRadiusXLarge)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] px-[var(--spacingHorizontalL)] py-[var(--spacingVerticalL)] ${props.class ?? ""}`}
   >
     {props.children}
   </section>

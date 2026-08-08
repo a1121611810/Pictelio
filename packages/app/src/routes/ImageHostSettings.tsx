@@ -165,7 +165,7 @@ const ImageHostSettings: Component = () => {
         </p>
 
         {/* Master switch */}
-        <div class="rounded-[var(--borderRadius2XLarge)] bg-[var(--colorNeutralBackground1)] p-4 shadow-[var(--elevation2)]">
+        <div class="rounded-[var(--borderRadiusXLarge)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] p-4">
           <div class="flex items-center justify-between">
             <div>
               <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)]">
@@ -195,7 +195,7 @@ const ImageHostSettings: Component = () => {
         </Show>
 
         {/* Mode selector */}
-        <div class="rounded-[var(--borderRadius2XLarge)] bg-[var(--colorNeutralBackground1)] p-4 shadow-[var(--elevation2)]">
+        <div class="rounded-[var(--borderRadiusXLarge)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] p-4">
           <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] mb-3">
             运行模式
           </p>
@@ -319,7 +319,7 @@ const ImageHostSettings: Component = () => {
 
         {/* Host list */}
         <div
-          class="rounded-[var(--borderRadius2XLarge)] bg-[var(--colorNeutralBackground1)] p-4 shadow-[var(--elevation2)]"
+          class="rounded-[var(--borderRadiusXLarge)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] p-4"
           classList={{ "opacity-60": !imageHostState().masterEnabled }}
         >
           <div class="flex items-center justify-between mb-3">

@@ -134,7 +134,7 @@ const ClientSwitch: Component = () => {
         {/* Scrollable content */}
         <div class="px-5 py-4 flex flex-col gap-4">
           {/* 当前引擎 */}
-          <section class="rounded-[var(--borderRadius2XLarge)] bg-[var(--colorNeutralBackground1)] p-4 shadow-[var(--elevation2)]">
+          <section class="rounded-[var(--borderRadiusXLarge)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] p-4">
             <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground3)] uppercase tracking-wide mb-1">
               当前引擎
             </p>
@@ -149,7 +149,7 @@ const ClientSwitch: Component = () => {
           </section>
 
           {/* 当前包支持的引擎能力列表 */}
-          <section class="rounded-[var(--borderRadius2XLarge)] bg-[var(--colorNeutralBackground1)] p-4 shadow-[var(--elevation2)]">
+          <section class="rounded-[var(--borderRadiusXLarge)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] p-4">
             <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground3)] uppercase tracking-wide mb-2">
               当前包支持的引擎
             </p>
@@ -184,7 +184,7 @@ const ClientSwitch: Component = () => {
           </section>
 
           {/* 两引擎差异说明 */}
-          <section class="rounded-[var(--borderRadius2XLarge)] bg-[var(--colorNeutralBackground1)] p-4 shadow-[var(--elevation2)]">
+          <section class="rounded-[var(--borderRadiusXLarge)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] p-4">
             <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground3)] uppercase tracking-wide mb-2">
               两引擎差异
             </p>
@@ -214,7 +214,7 @@ const ClientSwitch: Component = () => {
           </fluent-message-bar>
 
           {/* 切回路径指引 */}
-          <section class="rounded-[var(--borderRadius2XLarge)] bg-[var(--colorNeutralBackground1)] p-4 shadow-[var(--elevation2)]">
+          <section class="rounded-[var(--borderRadiusXLarge)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] p-4">
             <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground3)] uppercase tracking-wide mb-1">
               如何切回 WebView
             </p>
