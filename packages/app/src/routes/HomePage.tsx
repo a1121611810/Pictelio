@@ -34,6 +34,7 @@ import {
   nextUrl as followIllustNextUrl,
   fetchMore as followIllustFetchMore,
   activate as followIllustActivate,
+  ensureLoaded as followIllustEnsure,
 } from "@/stores/followStore";
 import {
   illusts as bmkIllusts,
@@ -41,6 +42,7 @@ import {
   nextUrl as bmkIllustNextUrl,
   fetchMore as bmkIllustFetchMore,
   activate as bmkIllustActivate,
+  ensureLoaded as bmkIllustEnsure,
 } from "@/stores/bookmarkStore";
 // ── 小说数据源（推荐/关注/收藏）──
 import {
@@ -56,6 +58,7 @@ import {
   nextUrl as followNovelNextUrl,
   fetchMore as followNovelFetchMore,
   activate as followNovelActivate,
+  ensureLoaded as followNovelEnsure,
 } from "@/stores/novelFollowStore";
 import {
   novels as bmkNovels,
@@ -63,6 +66,7 @@ import {
   nextUrl as bmkNovelNextUrl,
   fetchMore as bmkNovelFetchMore,
   activate as bmkNovelActivate,
+  ensureLoaded as bmkNovelEnsure,
 } from "@/stores/novelBookmarkStore";
 
 /** renderPanel 实际调用的内容域 Tab（历史由 shell 内建，不进入面板）。 */
@@ -97,7 +101,7 @@ function illustSource(tab: FeedTab): FeedSource<PixivIllust> {
       nextUrl: followIllustNextUrl,
       fetchMore: followIllustFetchMore,
       activate: followIllustActivate,
-      ensure: null,
+      ensure: followIllustEnsure,
     };
   }
   return {
@@ -106,7 +110,7 @@ function illustSource(tab: FeedTab): FeedSource<PixivIllust> {
     nextUrl: bmkIllustNextUrl,
     fetchMore: bmkIllustFetchMore,
     activate: bmkIllustActivate,
-    ensure: null,
+    ensure: bmkIllustEnsure,
   };
 }
 
@@ -129,7 +133,7 @@ function novelSource(tab: FeedTab): FeedSource<PixivNovel> {
       nextUrl: followNovelNextUrl,
       fetchMore: followNovelFetchMore,
       activate: followNovelActivate,
-      ensure: null,
+      ensure: followNovelEnsure,
     };
   }
   return {
@@ -138,18 +142,19 @@ function novelSource(tab: FeedTab): FeedSource<PixivNovel> {
     nextUrl: bmkNovelNextUrl,
     fetchMore: bmkNovelFetchMore,
     activate: bmkNovelActivate,
-    ensure: null,
+    ensure: bmkNovelEnsure,
   };
 }
 
-/** 幂等激活当前数据源（activate 或 ensureLoaded），源切换时自动重跑。 */
+/** 幂等激活当前数据源：**ensureLoaded 是数据加载的唯一入口**（工厂 ADR-0042 按需查询，
+ * query enabled 恒为 false）；activate 仅置订阅标志、不触发 fetch。三个源统一 ensureLoaded
+ * （幂等，不重复请求）+ activate 保险（回归修复：收藏/关注 Tab 之前只 activate 不加载 → 空）。 */
 function useFeedActivation(src: () => FeedSource<PixivIllust> | FeedSource<PixivNovel>): void {
   createEffect(() => {
     const s = src();
+    void s.ensure?.();
     if (s.activate) {
       s.activate();
-    } else {
-      void s.ensure?.();
     }
   });
 }
