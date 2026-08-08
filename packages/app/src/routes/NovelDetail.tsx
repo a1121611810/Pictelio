@@ -3,10 +3,10 @@ import { useNavigate, useParams } from "@solidjs/router";
 import PixivImage from "../components/PixivImage";
 import ImageViewer from "@/components/ImageViewer";
 import NovelDetailSkeleton from "../components/skeletons/NovelDetailSkeleton";
-import FluentIcon from "../components/ui/FluentIcon";
 import FluentDialog from "../components/ui/FluentDialog";
 import NovelSearchBar from "../components/NovelSearchBar";
-import NovelCoverHeader from "../components/NovelCoverHeader";
+import NovelTopBar from "../components/novel/NovelTopBar";
+import NovelCoverCard from "../components/novel/NovelCoverCard";
 import NovelFooterNav from "../components/NovelFooterNav";
 import { NOVEL_INTERACTIVE_MARGIN } from "../primitives/rootMargins";
 import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior";
@@ -942,66 +942,117 @@ const NovelDetail: Component = () => {
   const imageBlockList = createMemo(() => getImageBlocks(blocks()));
   const imageViewerUrls = createMemo(() => imageBlockList().map((block) => block.urls.original));
 
+  // ── 正文渲染（虚拟化逻辑）──
+  const renderBody = () => (
+    <>
+      <Show when={novelHtml()}>
+        <div
+          class="novel-text"
+          ref={onTextContainerRef}
+          style={{
+            ...readerStyle(),
+          }}
+        >
+          {/* 虚拟滚动：只渲染视口 ±5 段内的块，上下用撑杆占位保持滚动条正确 */}
+          {(() => {
+            const all = blocksWithHeights();
+            const vis = virtualLayout.visibleBlocks();
+            if (vis.length === 0 || all.length === 0) {
+              return null;
+            }
+            const first = virtualLayout.getBlockLayout(vis[0]);
+            const last = virtualLayout.getBlockLayout(vis[vis.length - 1]);
+            const topH = first?.offset ?? 0;
+            const bottomH = last ? virtualLayout.totalHeight() - (last.offset + last.height) : 0;
+            return (
+              <>
+                <div style={{ height: `${Math.max(0, topH)}px` }} aria-hidden="true" />
+                <For each={vis}>
+                  {(idx) => {
+                    const block = all[idx];
+                    if (!block) {
+                      return null;
+                    }
+                    return (
+                      <NovelContentBlock
+                        block={() => block}
+                        imageBlockList={imageBlockList}
+                        imageDimensions={imageDimensions}
+                        containerWidth={textContainerWidth}
+                        fontSize={fontSize}
+                        paragraphHeight={block.ph}
+                        onImageClick={(imageIndex) => {
+                          setImageViewerIndex(imageIndex);
+                          setImageViewerOpen(true);
+                        }}
+                        renderParagraph={renderParagraph}
+                      />
+                    );
+                  }}
+                </For>
+                <div style={{ height: `${Math.max(0, bottomH)}px` }} aria-hidden="true" />
+              </>
+            );
+          })()}
+        </div>
+      </Show>
+      <Show when={detailLoading() && !novelHtml()}>
+        <div class="space-y-3 animate-pulse">
+          {Array.from({ length: 6 }).map(() => (
+            <div class="h-4 bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusSmall)]" />
+          ))}
+        </div>
+      </Show>
+    </>
+  );
+
+  // ── 底部导航 props ──
+  const footerNavProps = () => ({
+    novel: novelData()!,
+    novelNav: novelNav(),
+    footerHidden: footerHidden(),
+    onPrevChapter: (id: number) => switchNovel(id),
+    onNextChapter: (id: number) => switchNovel(id),
+    onOpenSeries: () => setSeriesOpen(true),
+    onOpenSettings: () => setSettingsOpen(true),
+    showTranslateEntry: canTranslate(),
+    translated: Object.keys(translatedParagraphs()).length > 0,
+    showTranslation: showTranslation(),
+    onToggleTranslate: () => {
+      if (Object.keys(translatedParagraphs()).length > 0) {
+        setShowTranslation((v) => !v);
+      } else {
+        setTranslateOpen(true);
+      }
+    },
+  });
+
   return (
     <PageTransition>
       <div class="min-h-screen bg-[var(--colorNeutralBackground2)]">
-        {/* ── Top navigation bar ── */}
-        <header
-          class="sticky top-0 z-20 surface-appbar h-12 flex items-center px-4 gap-2"
-          onDblClick={() => {
+        {/* ── 顶部栏 — A2 卡片式（ADR-0072）── */}
+        <NovelTopBar
+          title={novelData()?.title ?? ""}
+          showTitle={showHeaderTitle}
+          searchOpen={searchOpen}
+          onBack={handleBack}
+          onOpenSearch={openSearch}
+          onDoubleClick={() => {
             resetNovelProgress(novelId());
             scrollToTop();
           }}
-        >
-          <button
-            type="button"
-            aria-label="返回"
-            class="flex items-center justify-center rounded-[var(--borderRadiusSmall)] bg-transparent border-none cursor-pointer text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorNeutralBackground2)] active:scale-95 transition-all w-8 h-8 p-0 min-w-8"
-            on:click={() => handleBack()}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" fill="currentColor" />
-            </svg>
-          </button>
-          <Show
-            when={searchOpen()}
-            fallback={
-              <h1 class="[font-size:var(--fontSizeBase300)] font-semibold text-[var(--colorNeutralForeground1)] flex items-center gap-1 min-w-0 flex-1">
-                <span class="whitespace-nowrap flex-shrink-0">小说</span>
-                <span
-                  class="truncate text-[var(--colorNeutralForeground2)]"
-                  classList={{ "opacity-0": !showHeaderTitle(), "opacity-100": showHeaderTitle() }}
-                  style="transition:opacity var(--durationFast) var(--curveEasyEase)"
-                >
-                  《{novelData()?.title ?? ""}》
-                </span>
-              </h1>
-            }
-          >
-            <div onDblClick={(e) => e.stopPropagation()}>
-              <NovelSearchBar
-                query={search.query}
-                setQuery={search.setQuery}
-                matchCount={search.matchCount}
-                activeIndex={search.activeIndex}
-                onPrev={search.prevMatch}
-                onNext={search.nextMatch}
-                onClose={closeSearch}
-              />
-            </div>
-          </Show>
-          <Show when={!searchOpen() && !detailLoading()}>
-            <button
-              type="button"
-              class="w-8 h-8 flex items-center justify-center rounded-[var(--borderRadiusSmall)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorNeutralBackground2)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer"
-              onClick={openSearch}
-              aria-label="搜索"
-              title="搜索"
-            >
-              <FluentIcon name="search" size={20} />
-            </button>
-          </Show>
-        </header>
+          searchBar={
+            <NovelSearchBar
+              query={search.query}
+              setQuery={search.setQuery}
+              matchCount={search.matchCount}
+              activeIndex={search.activeIndex}
+              onPrev={search.prevMatch}
+              onNext={search.nextMatch}
+              onClose={closeSearch}
+            />
+          }
+        />
 
         {/* ── Loading state：全页骨架屏 ── */}
         <Show when={detailLoading() && !novelData()}>
@@ -1017,7 +1068,7 @@ const NovelDetail: Component = () => {
         <Show when={novelData()}>
           {(novel) => (
             <>
-              <NovelCoverHeader
+              <NovelCoverCard
                 novel={novel()}
                 onAuthorClick={() => void navigate(`/user/${novel().user.id}`)}
                 onSeriesClick={() => setSeriesOpen(true)}
@@ -1025,181 +1076,102 @@ const NovelDetail: Component = () => {
                 onTitleRef={setTitleEl}
               />
 
-              {/* ── Text content ── */}
-              <div class="px-4 py-6 max-w-2xl mx-auto pb-[64px]">
-                <Show when={novelHtml()}>
-                  <div
-                    class="novel-text"
-                    ref={onTextContainerRef}
-                    style={{
-                      ...readerStyle(),
-                    }}
-                  >
-                    {/* 虚拟滚动：只渲染视口 ±5 段内的块，上下用撑杆占位保持滚动条正确 */}
-                    {(() => {
-                      const all = blocksWithHeights();
-                      const vis = virtualLayout.visibleBlocks();
-                      if (vis.length === 0 || all.length === 0) {
-                        return null;
-                      }
-                      const first = virtualLayout.getBlockLayout(vis[0]);
-                      const last = virtualLayout.getBlockLayout(vis[vis.length - 1]);
-                      const topH = first?.offset ?? 0;
-                      const bottomH = last
-                        ? virtualLayout.totalHeight() - (last.offset + last.height)
-                        : 0;
-                      return (
-                        <>
-                          <div style={{ height: `${Math.max(0, topH)}px` }} aria-hidden="true" />
-                          <For each={vis}>
-                            {(idx) => {
-                              const block = all[idx];
-                              if (!block) {
-                                return null;
-                              }
-                              return (
-                                <NovelContentBlock
-                                  block={() => block}
-                                  imageBlockList={imageBlockList}
-                                  imageDimensions={imageDimensions}
-                                  containerWidth={textContainerWidth}
-                                  fontSize={fontSize}
-                                  paragraphHeight={block.ph}
-                                  onImageClick={(imageIndex) => {
-                                    setImageViewerIndex(imageIndex);
-                                    setImageViewerOpen(true);
-                                  }}
-                                  renderParagraph={renderParagraph}
-                                />
-                              );
-                            }}
-                          </For>
-                          <div style={{ height: `${Math.max(0, bottomH)}px` }} aria-hidden="true" />
-                        </>
-                      );
-                    })()}
-                  </div>
-                </Show>
-                <Show when={detailLoading() && !novelHtml()}>
-                  <div class="space-y-3 animate-pulse">
-                    {Array.from({ length: 6 }).map(() => (
-                      <div class="h-4 bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusSmall)]" />
-                    ))}
-                  </div>
-                </Show>
-              </div>
+              {/* ── Text content（renderBody）── */}
+              <div class="px-4 py-6 max-w-2xl mx-auto pb-[64px]">{renderBody()}</div>
 
-              <NovelFooterNav
-                novel={novel()}
-                novelNav={novelNav()}
-                footerHidden={footerHidden()}
-                onPrevChapter={(id) => switchNovel(id)}
-                onNextChapter={(id) => switchNovel(id)}
-                onOpenSeries={() => setSeriesOpen(true)}
-                onOpenSettings={() => setSettingsOpen(true)}
-                showTranslateEntry={canTranslate()}
-                translated={Object.keys(translatedParagraphs()).length > 0}
-                showTranslation={showTranslation()}
-                onToggleTranslate={() => {
-                  if (Object.keys(translatedParagraphs()).length > 0) {
-                    setShowTranslation((v) => !v);
-                  } else {
-                    setTranslateOpen(true);
-                  }
-                }}
-              />
-
-              <ReaderSettingsSheet isOpen={settingsOpen()} onClose={() => setSettingsOpen(false)} />
-
-              <TranslateSheet
-                isOpen={translateOpen()}
-                onClose={() => setTranslateOpen(false)}
-                onStartTranslate={(retryFailed) => void startTranslate(retryFailed ?? false)}
-                tier={translateTier()}
-                defaultTier={defaultTier()}
-                onSelectTier={handleSelectTier}
-              />
-
-              {/* 首次翻译 R18/R18G 风险确认（S5，决策 #23） */}
-              <Show when={restrictConfirm()}>
-                {(c) => (
-                  <FluentDialog
-                    open
-                    onClose={() => resolveRestrictConfirm(false)}
-                    aria-label={c().xRestrict === 2 ? "翻译 R18G 内容？" : "翻译 R18 内容？"}
-                  >
-                    <h3 slot="title">
-                      {c().xRestrict === 2 ? "翻译 R18G 内容？（法律红线）" : "翻译 R18 内容？"}
-                    </h3>
-                    <Show
-                      when={c().xRestrict === 2}
-                      fallback={
-                        <p>
-                          该作品包含 R18 内容。翻译需将正文发送至你选择的 AI 服务商，可能：①
-                          被内容审核拒绝（失败段落保留原文）；② 违反服务商使用条款，导致你的 API
-                          账号被警告、暂停或封禁；③
-                          内容可能被去标识化后用于模型训练。所有风险由你自行承担。
-                        </p>
-                      }
-                    >
-                      <p>
-                        该作品包含
-                        R18G（极端）内容。除上述风险外，此类内容违反法律法规红线，可能导致你的 API
-                        账号被关闭，服务商可能向主管部门/执法机构报告。App
-                        提供方不承担由此产生的任何责任。
-                      </p>
-                    </Show>
-                    <fluent-button
-                      slot="actions"
-                      appearance="secondary"
-                      on:click={() => resolveRestrictConfirm(false)}
-                    >
-                      取消
-                    </fluent-button>
-                    <fluent-button
-                      slot="actions"
-                      appearance="primary"
-                      on:click={() => resolveRestrictConfirm(true)}
-                    >
-                      我已了解并继续
-                    </fluent-button>
-                  </FluentDialog>
-                )}
-              </Show>
-
-              <Show when={novel().series?.id}>
-                <SeriesSheet
-                  seriesId={novel().series!.id}
-                  seriesTitle={novel().series!.title}
-                  authorName={novel().user.name}
-                  authorId={novel().user.id}
-                  isOpen={seriesOpen()}
-                  onClose={() => setSeriesOpen(false)}
-                  onNovelSelect={(id) => switchNovel(id)}
-                  onAuthorClick={() => void navigate(`/user/${novel().user.id}`)}
-                  activeNovelId={currentNovelId()}
-                />
-              </Show>
-
-              <Show when={imageViewerOpen() && imageViewerUrls().length > 0}>
-                <ImageViewer
-                  imageUrls={imageViewerUrls()}
-                  initialPage={imageViewerIndex()}
-                  onClose={() => setImageViewerOpen(false)}
-                />
-              </Show>
-
-              <CommentOverlay
-                type="novel"
-                targetId={novel().id}
-                isOpen={showComments()}
-                onClose={() => setShowComments(false)}
-              />
-
-              {/* ── Close the Show fragment ── */}
+              {/* 底部导航 — A2 卡片条（NovelFooterNav 自带，ADR-0072） */}
+              <NovelFooterNav {...footerNavProps()} />
             </>
           )}
         </Show>
+
+        {/* ── 浮层（页面级：阅读设置/翻译/系列/评论/查看器）── */}
+
+        <ReaderSettingsSheet isOpen={settingsOpen()} onClose={() => setSettingsOpen(false)} />
+
+        <TranslateSheet
+          isOpen={translateOpen()}
+          onClose={() => setTranslateOpen(false)}
+          onStartTranslate={(retryFailed) => void startTranslate(retryFailed ?? false)}
+          tier={translateTier()}
+          defaultTier={defaultTier()}
+          onSelectTier={handleSelectTier}
+        />
+
+        {/* 首次翻译 R18/R18G 风险确认（S5，决策 #23） */}
+        <Show when={restrictConfirm()}>
+          {(c) => (
+            <FluentDialog
+              open
+              onClose={() => resolveRestrictConfirm(false)}
+              aria-label={c().xRestrict === 2 ? "翻译 R18G 内容？" : "翻译 R18 内容？"}
+            >
+              <h3 slot="title">
+                {c().xRestrict === 2 ? "翻译 R18G 内容？（法律红线）" : "翻译 R18 内容？"}
+              </h3>
+              <Show
+                when={c().xRestrict === 2}
+                fallback={
+                  <p>
+                    该作品包含 R18 内容。翻译需将正文发送至你选择的 AI 服务商，可能：①
+                    被内容审核拒绝（失败段落保留原文）；② 违反服务商使用条款，导致你的 API
+                    账号被警告、暂停或封禁；③
+                    内容可能被去标识化后用于模型训练。所有风险由你自行承担。
+                  </p>
+                }
+              >
+                <p>
+                  该作品包含 R18G（极端）内容。除上述风险外，此类内容违反法律法规红线，可能导致你的
+                  API 账号被关闭，服务商可能向主管部门/执法机构报告。App
+                  提供方不承担由此产生的任何责任。
+                </p>
+              </Show>
+              <fluent-button
+                slot="actions"
+                appearance="secondary"
+                on:click={() => resolveRestrictConfirm(false)}
+              >
+                取消
+              </fluent-button>
+              <fluent-button
+                slot="actions"
+                appearance="primary"
+                on:click={() => resolveRestrictConfirm(true)}
+              >
+                我已了解并继续
+              </fluent-button>
+            </FluentDialog>
+          )}
+        </Show>
+
+        <Show when={novelData()?.series?.id}>
+          <SeriesSheet
+            seriesId={novelData()!.series!.id}
+            seriesTitle={novelData()!.series!.title}
+            authorName={novelData()!.user.name}
+            authorId={novelData()!.user.id}
+            isOpen={seriesOpen()}
+            onClose={() => setSeriesOpen(false)}
+            onNovelSelect={(id) => switchNovel(id)}
+            onAuthorClick={() => void navigate(`/user/${novelData()!.user.id}`)}
+            activeNovelId={currentNovelId()}
+          />
+        </Show>
+
+        <Show when={imageViewerOpen() && imageViewerUrls().length > 0}>
+          <ImageViewer
+            imageUrls={imageViewerUrls()}
+            initialPage={imageViewerIndex()}
+            onClose={() => setImageViewerOpen(false)}
+          />
+        </Show>
+
+        <CommentOverlay
+          type="novel"
+          targetId={novelData()!.id}
+          isOpen={showComments()}
+          onClose={() => setShowComments(false)}
+        />
       </div>
     </PageTransition>
   );
