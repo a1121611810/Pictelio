@@ -231,10 +231,10 @@ const SeriesSheet: Component<Props> = (props) => {
           onKeyDown={(e) => e.key === "Enter" && close()}
         />
 
-        {/* Sheet panel */}
+        {/* Sheet panel — A2 纯色卡片（ADR-0072：去毛玻璃，NeutralBackground1） */}
         <div
           ref={setScrollContainer}
-          class="absolute bottom-0 left-0 right-0 surface-appbar rounded-t-[var(--borderRadius4XLarge)] shadow-[var(--elevation28)]"
+          class="absolute bottom-0 left-0 right-0 bg-[var(--colorNeutralBackground1)] rounded-t-[var(--borderRadius4XLarge)] shadow-[var(--elevation28)]"
           style="max-height:80vh;overflow-y:auto;animation:fluent-slide-down var(--durationGentle) var(--curveDecelerateMid) both"
         >
           {/* Drag handle */}
@@ -248,7 +248,7 @@ const SeriesSheet: Component<Props> = (props) => {
               系列作品
             </h2>
             <button
-              class="w-10 h-10 flex items-center justify-center rounded-[var(--borderRadiusSmall)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorNeutralBackground2)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer"
+              class="w-10 h-10 flex items-center justify-center rounded-[var(--borderRadiusMedium)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorNeutralBackground2)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer"
               onClick={close}
               aria-label="关闭"
             >

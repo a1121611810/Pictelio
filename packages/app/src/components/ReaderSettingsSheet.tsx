@@ -1,7 +1,10 @@
 import type { Component } from "solid-js";
 import {
   fontSize,
+  autoFontSize,
+  effectiveFontSize,
   setReaderFontSize,
+  setReaderAutoFontSize,
   fontWeight,
   setReaderFontWeight,
   fontFamily,
@@ -34,7 +37,7 @@ function PillRow<T extends string | number>(props: {
     <div class="flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-0.5 gap-0.5">
       {props.options.map((opt) => (
         <button
-          class="flex-1 py-1.5 px-2 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase100)] font-medium transition-all active:scale-95 appearance-none border-none outline-none cursor-pointer text-center"
+          class="flex-1 py-1.5 px-2 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase100)] font-medium transition-all active:scale-95 appearance-none border-none outline-none cursor-pointer text-center"
           classList={{
             "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
               props.value() === opt.value,
@@ -60,9 +63,9 @@ const ReaderSettingsSheet: Component<Props> = (props) => {
         {/* Scrim */}
         <div class="absolute inset-0" style="background-color:var(--colorScrim)" onClick={close} />
 
-        {/* Sheet panel */}
+        {/* Sheet panel — A2 纯色卡片（ADR-0072：去毛玻璃，NeutralBackground1） */}
         <div
-          class="absolute bottom-0 left-0 right-0 surface-appbar rounded-t-[var(--borderRadius4XLarge)] shadow-[var(--elevation28)]"
+          class="absolute bottom-0 left-0 right-0 bg-[var(--colorNeutralBackground1)] rounded-t-[var(--borderRadius4XLarge)] shadow-[var(--elevation28)]"
           style="max-height:80vh;overflow-y:auto;animation:fluent-slide-down var(--durationGentle) var(--curveDecelerateMid) both"
         >
           {/* Drag handle */}
@@ -76,7 +79,7 @@ const ReaderSettingsSheet: Component<Props> = (props) => {
               阅读设置
             </h2>
             <button
-              class="w-8 h-8 flex items-center justify-center rounded-[var(--borderRadiusSmall)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorNeutralBackground2)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer"
+              class="w-8 h-8 flex items-center justify-center rounded-[var(--borderRadiusMedium)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorNeutralBackground2)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer"
               onClick={close}
               aria-label="关闭"
             >
@@ -92,50 +95,90 @@ const ReaderSettingsSheet: Component<Props> = (props) => {
           <fluent-divider style="margin-inline:var(--spacingHorizontalXL)"></fluent-divider>
 
           <div class="px-5 py-3 flex flex-col gap-5">
+            {/* ── 实时预览（按当前阅读设置渲染）── */}
+            <div
+              class="rounded-[var(--borderRadiusMedium)] px-4 py-4 transition-colors duration-[var(--durationFast)]"
+              style={{
+                background: bgColor() || "var(--colorNeutralBackground2)",
+                color: fontColor() || "var(--colorNeutralForeground1)",
+                "font-size": `${effectiveFontSize()}px`,
+                "font-weight": String(fontWeight()),
+                "font-family": fontFamily() || undefined,
+                "line-height": `${lineHeight()}`,
+              }}
+            >
+              <p class="leading-relaxed">夜色如墨，灯火阑珊。她推开窗，风裹着雨气扑面而来。</p>
+              <p class="mt-1 opacity-60 [font-size:var(--fontSizeBase100)]">阅读设置实时预览</p>
+            </div>
+
             {/* ── Font size ── */}
             <div>
               <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground1)] mb-2">
                 字号
+                <Show when={autoFontSize()}>
+                  <span class="ml-2 [font-size:var(--fontSizeBase100)] font-normal text-[var(--colorNeutralForeground3)]">
+                    自动 · {effectiveFontSize()}px
+                  </span>
+                </Show>
               </p>
               <div class="flex items-center gap-3">
                 <button
-                  class="w-8 h-8 flex items-center justify-center rounded-[var(--borderRadiusSmall)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorNeutralBackground2)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer disabled:opacity-30"
+                  class="w-8 h-8 flex items-center justify-center rounded-[var(--borderRadiusMedium)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorNeutralBackground2)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer disabled:opacity-30"
                   onClick={() => {
                     const idx = FONT_SIZES.indexOf(fontSize() as (typeof FONT_SIZES)[number]);
                     if (idx > 0) {
                       setReaderFontSize(FONT_SIZES[idx - 1] as (typeof FONT_SIZES)[number]);
                     }
                   }}
-                  disabled={fontSize() <= FONT_SIZES[0]}
+                  disabled={autoFontSize() || fontSize() <= FONT_SIZES[0]}
                   aria-label="减小字号"
                 >
                   A⁻
                 </button>
                 <div class="flex-1 flex items-center gap-1">
+                  {/* 自动按钮：按视口宽度实时计算（v3 公式，见 readerSettingsStore） */}
+                  <button
+                    class="flex-none px-1 py-1 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase100)] transition-all text-center appearance-none border-none outline-none cursor-pointer"
+                    classList={{
+                      "bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] font-semibold":
+                        autoFontSize(),
+                      "bg-[var(--colorNeutralBackground2)] text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground3)]":
+                        !autoFontSize(),
+                    }}
+                    onClick={() => setReaderAutoFontSize(true)}
+                    aria-label="自动字号"
+                  >
+                    自动
+                  </button>
                   {FONT_SIZES.map((s) => (
                     <button
-                      class="flex-1 py-1 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase100)] transition-all text-center appearance-none border-none outline-none cursor-pointer"
+                      class="flex-1 py-1 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase100)] transition-all text-center appearance-none border-none outline-none cursor-pointer"
                       classList={{
-                        "bg-[var(--colorBrandBackground)] text-white font-semibold":
-                          fontSize() === s,
+                        "bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] font-semibold":
+                          !autoFontSize() && fontSize() === s,
                         "bg-[var(--colorNeutralBackground2)] text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground3)]":
-                          fontSize() !== s,
+                          !autoFontSize() && fontSize() !== s,
+                        // 自动模式下档位置灰但可点（点击即退出自动并设为该档）
+                        "opacity-40 text-[var(--colorNeutralForeground2)]": autoFontSize(),
                       }}
-                      onClick={() => setReaderFontSize(s)}
+                      onClick={() => {
+                        setReaderAutoFontSize(false);
+                        setReaderFontSize(s);
+                      }}
                     >
                       {s}
                     </button>
                   ))}
                 </div>
                 <button
-                  class="w-8 h-8 flex items-center justify-center rounded-[var(--borderRadiusSmall)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorNeutralBackground2)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer disabled:opacity-30"
+                  class="w-8 h-8 flex items-center justify-center rounded-[var(--borderRadiusMedium)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorNeutralBackground2)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer disabled:opacity-30"
                   onClick={() => {
                     const idx = FONT_SIZES.indexOf(fontSize() as (typeof FONT_SIZES)[number]);
                     if (idx < FONT_SIZES.length - 1) {
                       setReaderFontSize(FONT_SIZES[idx + 1] as (typeof FONT_SIZES)[number]);
                     }
                   }}
-                  disabled={fontSize() >= FONT_SIZES[FONT_SIZES.length - 1]}
+                  disabled={autoFontSize() || fontSize() >= FONT_SIZES[FONT_SIZES.length - 1]}
                   aria-label="增大字号"
                 >
                   A⁺

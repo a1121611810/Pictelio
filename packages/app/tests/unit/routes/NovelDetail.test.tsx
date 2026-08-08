@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, cleanup } from "@solidjs/testing-library";
+import { fireEvent, render, screen, cleanup } from "@solidjs/testing-library";
 
 const mockNavigate = vi.fn();
 
@@ -221,12 +221,20 @@ describe("NovelDetail content rendering", () => {
   it("renders text paragraphs, embedded images and page breaks", async () => {
     render(() => <NovelDetail />);
 
-    await screen.findByText("Test Novel");
-
-    expect(screen.getByText("Test Novel")).toBeDefined();
+    await screen.findAllByText("Test Novel");
+    // 封面卡含 compact/hero 两个形态的标题（折叠形态 opacity 0 但 DOM 保留），取第一个
+    expect(screen.getAllByText("Test Novel")[0]).toBeDefined();
     expect(screen.getByText("第一段正文内容")).toBeDefined();
     expect(screen.getByText("第二段正文内容")).toBeDefined();
     expect(document.querySelectorAll("figure.novel-image-block").length).toBeGreaterThanOrEqual(0);
     expect(document.querySelectorAll("hr.novel-page-break").length).toBeGreaterThanOrEqual(0);
+
+    // 封面展开/收起交互：点击「展开封面」→ 按钮变为「收起封面」；再点回
+    const expandBtn = await screen.findByRole("button", { name: "展开封面" });
+    fireEvent.click(expandBtn);
+    await screen.findByRole("button", { name: "收起封面" });
+    const collapseBtn = screen.getByRole("button", { name: "收起封面" });
+    fireEvent.click(collapseBtn);
+    await screen.findByRole("button", { name: "展开封面" });
   });
 });
