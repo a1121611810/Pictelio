@@ -168,6 +168,7 @@ describe("readerSettingsStore", () => {
 
     it("returns CSS variable object with current settings", async () => {
       const { store } = await loadStore();
+      store.setReaderAutoFontSize(false); // 默认自动，手动场景显式关闭
       store.setReaderFontSize(20);
       store.setReaderLineHeight(2.0);
       const style = store.readerStyle();
@@ -217,6 +218,64 @@ describe("readerSettingsStore", () => {
       expect(store.fontSize()).toBe(24);
       expect(store.fontFamily()).toBe("sans-serif");
       expect(store.lineHeight()).toBe(1.8);
+    });
+  });
+
+  describe("auto font size", () => {
+    it("computeAutoFontSize maps viewport widths per v3 curve", async () => {
+      const { store } = await loadStore();
+      const f = store.computeAutoFontSize;
+      // v3: round(clamp(14, 14 + (vw - 320) * 0.038, 23))
+      expect(f(320)).toBe(14);
+      expect(f(360)).toBe(16);
+      expect(f(390)).toBe(17);
+      expect(f(412)).toBe(17);
+      expect(f(414)).toBe(18);
+      expect(f(428)).toBe(18);
+      expect(f(480)).toBe(20);
+      expect(f(600)).toBe(23);
+    });
+
+    it("computeAutoFontSize clamps to [14, 23] and handles NaN", async () => {
+      const { store } = await loadStore();
+      const f = store.computeAutoFontSize;
+      expect(f(100)).toBe(14);
+      expect(f(1000)).toBe(23);
+      expect(f(Number.NaN)).toBe(14);
+    });
+
+    it("autoFontSize defaults to true (自动)", async () => {
+      const { store } = await loadStore();
+      expect(store.autoFontSize()).toBe(true);
+    });
+
+    it("setReaderAutoFontSize updates signal and persists", async () => {
+      const { store, mem } = await loadStore();
+      store.setReaderAutoFontSize(true);
+      expect(store.autoFontSize()).toBe(true);
+      await vi.waitFor(() => {
+        const raw = mem.dump().get("novel_reader_settings");
+        expect(JSON.parse(raw!).autoFontSize).toBe(true);
+      });
+    });
+
+    it("effectiveFontSize follows computed value in auto mode and recomputes on viewport change", async () => {
+      const { store } = await loadStore();
+      store.setReaderAutoFontSize(false); // 先切手动验证档位值
+      store.setReaderFontSize(20);
+      expect(store.effectiveFontSize()).toBe(20); // 手动模式 = 档位值
+      store.setReaderAutoFontSize(true);
+      store.setViewportWidthForTest(390);
+      expect(store.effectiveFontSize()).toBe(17);
+      store.setViewportWidthForTest(428);
+      expect(store.effectiveFontSize()).toBe(18);
+    });
+
+    it("readerStyle uses effective font size in auto mode", async () => {
+      const { store } = await loadStore();
+      store.setReaderAutoFontSize(true);
+      store.setViewportWidthForTest(412);
+      expect(store.readerStyle()["--reader-font-size"]).toBe("17px");
     });
   });
 });

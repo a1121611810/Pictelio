@@ -4,6 +4,7 @@ import { settings, jsonCodec, type Codec } from "@/settings";
 
 export interface ReaderSettings {
   fontSize: number;
+  autoFontSize: boolean;
   fontWeight: number;
   fontFamily: string;
   fontColor: string;
@@ -15,6 +16,8 @@ export interface ReaderSettings {
 
 const DEFAULTS: ReaderSettings = {
   fontSize: 18,
+  // 默认即「自动」：按视口宽度自动计算最适字号（用户需求：不分屏高低一律 18）
+  autoFontSize: true,
   fontWeight: 400,
   fontFamily: "sans-serif",
   fontColor: "",
@@ -69,16 +72,52 @@ const initial: ReaderSettings = { ...DEFAULTS, ...readerSettings.value() };
 // ── Signal-based store (module-level, shared by NovelDetail and ReaderSettingsSheet) ──
 
 export const [fontSize, setFontSize] = createSignal(initial.fontSize);
+export const [autoFontSize, setAutoFontSizeSignal] = createSignal(initial.autoFontSize);
 export const [fontWeight, setFontWeight] = createSignal(initial.fontWeight);
 export const [fontFamily, setFontFamily] = createSignal(initial.fontFamily);
 export const [fontColor, setFontColor] = createSignal(initial.fontColor);
 export const [lineHeight, setLineHeight] = createSignal(initial.lineHeight);
 export const [bgColor, setBgColor] = createSignal(initial.bgColor);
 
+// ── 自动字号 ──
+//
+// v3 方案（用户确认，基于酷设计屏幕尺寸库真实设备 dp 分布）：
+//   computeAutoFontSize(vw) = round(clamp(14, 14 + (vw - 320) * 0.038, 23))
+// - dp（= CSS px，160dpi 基准）即物理宽度代理，PPI/DPR 不参与（CSS px 已自动折算）
+// - 系统字体缩放由 WebView textZoom 渲染级整体处理，本期不重复计算
+// - 设备对照（注意 round 取整，个别值与直觉档位差 1px）：
+//   320→14、360→16、390→17、412→17（14+92×0.038=17.496 四舍五入 17，非 18）、
+//   414~428→18、480→20、600+→23（封顶）
+
+export function computeAutoFontSize(viewportWidth: number): number {
+  const vw = Number.isFinite(viewportWidth) ? viewportWidth : 0;
+  const raw = 14 + (vw - 320) * 0.038;
+  return Math.round(Math.min(Math.max(raw, 14), 23));
+}
+
+// 视口宽度 signal：模块加载时初始化 + resize 实时重算（旋转/分屏/折叠）。
+// node 测试环境无 window，guard 后保持 0（computeAutoFontSize(0) → 14）。
+const [viewportWidth, setViewportWidthSignal] = createSignal(0);
+if (typeof window !== "undefined") {
+  setViewportWidthSignal(window.innerWidth);
+  window.addEventListener("resize", () => setViewportWidthSignal(window.innerWidth));
+}
+
+/** 仅供测试注入视口宽度。 */
+export function setViewportWidthForTest(vw: number): void {
+  setViewportWidthSignal(vw);
+}
+
+/** 实际生效字号：自动模式下用视口计算值，手动模式用档位值。 */
+export const effectiveFontSize = createMemo(() =>
+  autoFontSize() ? computeAutoFontSize(viewportWidth()) : fontSize(),
+);
+
 function persistAll(): void {
   readerSettings.set({
     ...readerSettings.value(),
     fontSize: fontSize(),
+    autoFontSize: autoFontSize(),
     fontWeight: fontWeight(),
     fontFamily: fontFamily(),
     fontColor: fontColor(),
@@ -89,6 +128,11 @@ function persistAll(): void {
 
 export function setReaderFontSize(v: number): void {
   setFontSize(v);
+  persistAll();
+}
+
+export function setReaderAutoFontSize(v: boolean): void {
+  setAutoFontSizeSignal(v);
   persistAll();
 }
 
@@ -121,7 +165,7 @@ export function setReaderBgColor(v: string): void {
 
 export function readerStyle(): Record<string, string> {
   return {
-    "--reader-font-size": `${fontSize()}px`,
+    "--reader-font-size": `${effectiveFontSize()}px`,
     "--reader-font-weight": String(fontWeight()),
     "--reader-font-family": fontFamily(),
     "--reader-line-height": String(lineHeight()),

@@ -19,7 +19,8 @@ import type { NovelImagesMap } from "@/api/novel";
 import { getEntry, peekEntry, loadNovelEntry, type NovelCacheEntry } from "@/stores/novelCache";
 import {
   readerStyle,
-  fontSize,
+  effectiveFontSize,
+  autoFontSize,
   fontWeight,
   fontFamily,
   lineHeight,
@@ -679,7 +680,8 @@ const NovelDetail: Component = () => {
     blocks: displayBlocks,
     containerWidth: textContainerWidth,
     settings: () => ({
-      fontSize: fontSize(),
+      fontSize: effectiveFontSize(),
+      autoFontSize: autoFontSize(),
       fontWeight: fontWeight(),
       fontFamily: fontFamily(),
       fontColor: "",
@@ -979,7 +981,7 @@ const NovelDetail: Component = () => {
                         imageBlockList={imageBlockList}
                         imageDimensions={imageDimensions}
                         containerWidth={textContainerWidth}
-                        fontSize={fontSize}
+                        fontSize={effectiveFontSize}
                         paragraphHeight={block.ph}
                         onImageClick={(imageIndex) => {
                           setImageViewerIndex(imageIndex);
