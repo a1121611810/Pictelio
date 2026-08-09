@@ -29,6 +29,9 @@
 | **下拉刷新（Pull-to-refresh）** | 首页 6 个 Feed 面板（推荐/关注/收藏 × 插画/小说）的下拉刷新手势（ADR-0076）：`touchstart`（scrollTop=0 时记录起点）→ `touchmove` 阻尼计算下拉距离 → 超阈值进入 ready → 松手触发 `store.refresh()`（refetch 第一页）。历史 Tab 不启用。 |
 | **下拉相位（Pull phase）** | 下拉手势状态机（`createPullToRefresh` 原语）：`idle → pulling → ready → refreshing`。`ready` = 下拉超过阈值（60px）待松手；`refreshing` = 松手后回弹并执行刷新，期间忽略重复下拉。 |
 | **刷新遮罩（Refresh overlay）** | A1 清空重载的 UI 实现（ADR-0076）：`refreshing` 期间 FeedPanel 渲染骨架列表**替换**旧列表（store 数据不清空、保留至新数据到达），实现"清空 → 骨架 → 新数据"的可见刷新过程。 |
+| **快速滚动条（FastScroller）** | 小说详情页右侧自绘 overlay 滚动条（ADR-0077）：仿 Android `FastScroller.java` 算法，thumb 高 = 视口²/内容高，**thumb 位移比例线性映射** `scrollingBy = (位移/轨道长) × (总可滚范围)` → 慢拖慢滚/快拖快滚天然成立。平时半透明淡显，按压/拖拽加宽变亮；`touch-action: none` 防与页面手势冲突。 |
+| **滚动条拖拽（Scrollbar scrubbing）** | 按住滚动条 thumb 拖动以快速定位内容的交互（浏览器 PDF 查看器/视频进度条同款）。区别于纯手势滚动：拖拽在滚动条上触发，位移映射为内容滚动。 |
+| **章节预览气泡（Chapter preview bubble）** | FastScroller 拖拽时页面中央显示当前章节名的气泡（仿微信读书"第N章"）：利用小说正文解析的 ChapterBlock + 虚拟布局块位置索引，`chapterAt(scrollTop)` 返回所在章节标题。 |
 | **A2 行卡（A2 row card）** | 列表型条目的卡片形态（历史条目、小说卡列表形态等）：无边框 + 大圆角 + `--elevation2`，内部保持「缩略图 + 标题 + 次要信息 + 行尾操作」的紧凑行布局。是 A2 视觉语言在列表条目上的延伸。 |
 
 ## 相关链接
