@@ -41,6 +41,7 @@ import { type ApiError } from "../api/types";
 import ErrorDisplay from "../components/ErrorDisplay";
 import { pushOverlay, popOverlay } from "../stores/backGestureStore";
 import { scrollToTop } from "../utils/scrollToTop";
+import { createFastScrollbar } from "../primitives/createFastScrollbar";
 import { toApiError } from "../api/client";
 import { recordVisit } from "../stores/historyStore";
 import TranslateSheet from "../components/TranslateSheet";
@@ -800,6 +801,55 @@ const NovelDetail: Component = () => {
 
   const search = createNovelSearch(searchText, { debounceMs: 150 });
 
+  // ── FastScroller（ADR-0077）：右侧可拖拽滚动条 + 章节预览气泡 ──
+  const [scrollTick, setScrollTick] = createSignal(0);
+  const scrollbar = createFastScrollbar({
+    getScrollTop: () => window.scrollY,
+    getViewportHeight: () => window.innerHeight,
+    getContentHeight: () =>
+      typeof document === "undefined" ? 0 : document.documentElement.scrollHeight,
+    onScrollTo: (top) => {
+      const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      window.scrollTo({ top: Math.min(max, Math.max(0, top)), behavior: "auto" });
+      setScrollTick((t) => t + 1);
+    },
+  });
+  // scroll/resize 驱动重算（thumb 位置/尺寸随滚动更新）
+  onMount(() => {
+    const onScroll = () => setScrollTick((t) => t + 1);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll, { passive: true });
+    onCleanup(() => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    });
+  });
+  /** 章节块位置表（chapter 块 → 虚拟布局 offset），供拖拽气泡显示章节名 */
+  const chapterPositions = createMemo(() => {
+    const bs = blocks();
+    const list: { offset: number; title: string }[] = [];
+    bs.forEach((b, i) => {
+      if (b.type === "chapter") {
+        const layout = virtualLayout.getBlockLayout(i);
+        if (layout) {
+          list.push({ offset: layout.offset, title: b.title });
+        }
+      }
+    });
+    return list;
+  });
+  /** 当前滚动位置所在章节标题（无章节块返回 null，不弹气泡） */
+  const chapterAtNow = createMemo(() => {
+    void scrollTick();
+    const top = window.scrollY;
+    let cur: string | null = null;
+    for (const c of chapterPositions()) {
+      if (c.offset <= top) cur = c.title;
+      else break;
+    }
+    return cur;
+  });
+
   function renderParagraphWithHighlights(
     paragraphIndex: number,
     text: string,
@@ -1272,6 +1322,42 @@ const NovelDetail: Component = () => {
           isOpen={showComments()}
           onClose={() => setShowComments(false)}
         />
+
+        {/* ── FastScroller（ADR-0077）：右侧可拖拽滚动条 + 章节预览气泡 ── */}
+        <Show when={scrollbar.visible()}>
+          <div
+            class="fixed top-0 right-0 z-50 flex h-screen w-[14px] justify-center"
+            onPointerDown={(e) => {
+              scrollbar.handlers.onPointerDown(e);
+              e.currentTarget.setPointerCapture(e.pointerId);
+            }}
+            onPointerMove={(e) => scrollbar.handlers.onPointerMove(e)}
+            onPointerUp={() => scrollbar.handlers.onPointerUp()}
+            onPointerCancel={() => scrollbar.handlers.onPointerUp()}
+          >
+            <div
+              class="absolute rounded-[var(--borderRadiusCircular)] transition-all duration-[var(--durationFast)]"
+              style={{
+                top: `${scrollbar.thumbOffset()}px`,
+                height: `${scrollbar.thumbHeight()}px`,
+                width: scrollbar.active() ? "8px" : "4px",
+                "background-color": "var(--colorNeutralStrokeAccessible)",
+                opacity: "0.6",
+                "touch-action": "none",
+              }}
+            />
+          </div>
+        </Show>
+        <Show when={scrollbar.active() && chapterAtNow()}>
+          {(c) => (
+            <div
+              class="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 rounded-[var(--borderRadiusMedium)] px-4 py-2 text-[var(--colorNeutralForegroundOnBrand)] shadow-[var(--elevation4)] [font-size:var(--fontSizeBase200)]"
+              style={{ "background-color": "var(--colorBrandBackground)" }}
+            >
+              {c()}
+            </div>
+          )}
+        </Show>
       </div>
     </PageTransition>
   );
