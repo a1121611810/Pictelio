@@ -1,5 +1,5 @@
 {
-  "version": "4.7.1",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.7.1",
-  "changelog": "🐛 修复\n  617e384 fix(app): 收藏/关注 Tab 内容不显示（activate 不触发数据加载）"
+  "version": "4.7.2",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.7.2",
+  "changelog": "✨ 新功能\n  124b367 feat(app): 首页 6 面板下拉刷新（createPullToRefresh 原语 + A1 遮罩）"
 }
