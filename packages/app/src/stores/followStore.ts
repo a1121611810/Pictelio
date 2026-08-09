@@ -52,6 +52,7 @@ export const illusts = store.items;
 export const nextUrl = store.nextUrl;
 export const loading = store.loading;
 export const refreshing = store.refreshing;
+export const loadingMore = store.loadingMore;
 export const error = store.error;
 
 // ── Cache helper ──

@@ -36,6 +36,7 @@ export const novels = store.items;
 export const nextUrl = store.nextUrl;
 export const loading = store.loading;
 export const refreshing = store.refreshing;
+export const loadingMore = store.loadingMore;
 export const error = store.error;
 
 export function isNovelRecommendedCached(): boolean {

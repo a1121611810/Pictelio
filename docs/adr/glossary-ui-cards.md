@@ -32,6 +32,8 @@
 | **快速滚动条（FastScroller）** | 小说详情页右侧自绘 overlay 滚动条（ADR-0077）：仿 Android `FastScroller.java` 算法，thumb 高 = 视口²/内容高，**thumb 位移比例线性映射** `scrollingBy = (位移/轨道长) × (总可滚范围)` → 慢拖慢滚/快拖快滚天然成立。平时半透明淡显，按压/拖拽加宽变亮；`touch-action: none` 防与页面手势冲突。 |
 | **滚动条拖拽（Scrollbar scrubbing）** | 按住滚动条 thumb 拖动以快速定位内容的交互（浏览器 PDF 查看器/视频进度条同款）。区别于纯手势滚动：拖拽在滚动条上触发，位移映射为内容滚动。 |
 | **章节预览气泡（Chapter preview bubble）** | FastScroller 拖拽时页面中央显示当前章节名的气泡（仿微信读书"第N章"）：利用小说正文解析的 ChapterBlock + 虚拟布局块位置索引，`chapterAt(scrollTop)` 返回所在章节标题。 |
+| **加载语义分离（Loading semantics）** | Feed 工厂（ADR-0078）三态分离：`loading` = 首载（isFetching）、`refreshing` = 下拉刷新 refetch（isRefetching）、`loadingMore` = 分页追加（isFetchingNextPage）。修复"分页加载被误判为下拉刷新 → 整个列表骨架屏"（loading/refreshing 原同源 isFetching）。 |
+| **FeedList 统一容器（FeedList container）** | 列表交互统一容器（ADR-0078，`components/home/FeedList.tsx`）：小接口（`source` 数据源 + 布局容器 + `refreshMode` + 渲染回调）背后收敛下拉刷新（createPullToRefresh + PullIndicator）、滚动分页（哨兵 + loadingMore 指示）、首载骨架/空态。`refreshMode="overlay"` = A1 骨架遮罩（首页），`"indicator"` = PullIndicator 指示器（列表页）。骨架遮罩仅在下拉松手后（pullPhase=refreshing）触发，分页加载绝不触发。 |
 | **A2 行卡（A2 row card）** | 列表型条目的卡片形态（历史条目、小说卡列表形态等）：无边框 + 大圆角 + `--elevation2`，内部保持「缩略图 + 标题 + 次要信息 + 行尾操作」的紧凑行布局。是 A2 视觉语言在列表条目上的延伸。 |
 
 ## 相关链接
