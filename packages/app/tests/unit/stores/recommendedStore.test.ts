@@ -296,13 +296,16 @@ describe("recommendedStore — loading and error states", () => {
     expect(store.loading()).toBe(false);
   });
 
-  it("refreshing reflects active query fetching state", async () => {
+  it("isFetching（含分页加载）不视为 refreshing（ADR-0078 语义分离）", async () => {
     getQ("recommended_illust").isFetching = true;
     setQueryData("recommended_illust", [createIllust(1, "2026-07-01T12:00:00+09:00")], null);
 
     const store = await loadStore();
     store.setRecommendSubTab("illust");
-    expect(store.refreshing()).toBe(true);
+    // loading 覆盖任意 fetch；refreshing 仅 refetch 第一页（分页/首载不算）
+    expect(store.loading()).toBe(true);
+    expect(store.refreshing()).toBe(false);
+    expect(store.loadingMore()).toBe(false);
   });
 
   it("error reflects active query error", async () => {

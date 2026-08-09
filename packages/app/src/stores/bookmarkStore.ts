@@ -75,6 +75,7 @@ export const ensureLoaded = store.ensureLoaded;
 export const fetchMore = store.fetchMore;
 export const refresh = store.refresh;
 export const refreshing = store.refreshing;
+export const loadingMore = store.loadingMore;
 export const activate = store.activate;
 export const isActivated = store.isActivated;
 

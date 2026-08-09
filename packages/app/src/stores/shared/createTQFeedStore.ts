@@ -112,9 +112,12 @@ export type TQFeedStoreResult<TItem> = {
   /** 当前 tab 的 next_url（用于分页检测） */
   nextUrl: Accessor<string | null>;
 
-  /** 当前活跃查询是否正在 fetch */
+  /** 当前活跃查询是否正在 fetch（首载） */
   loading: Accessor<boolean>;
+  /** 是否正在下拉刷新 refetch（仅 refetch 第一页，不含分页追加，ADR-0078） */
   refreshing: Accessor<boolean>;
+  /** 是否正在分页追加（fetchNextPage，ADR-0078） */
+  loadingMore: Accessor<boolean>;
 
   /** 当前最具体的错误（按优先级选择） */
   error: Accessor<ApiError | null>;
@@ -353,7 +356,12 @@ export function createTQFeedStore<
 
     const loading: Accessor<boolean> = () => activeQueries().some((q) => q.isFetching);
 
-    const refreshing: Accessor<boolean> = () => activeQueries().some((q) => q.isFetching);
+    // 语义分离（ADR-0078）：refreshing 仅指 refetch 第一页（下拉刷新）；
+    // 分页追加用 loadingMore（isFetchingNextPage）——避免分页加载被误判为下拉刷新
+    // （首页 A1 骨架遮罩曾因此把分页也渲染成清空重载）。
+    const refreshing: Accessor<boolean> = () => activeQueries().some((q) => q.isRefetching);
+
+    const loadingMore: Accessor<boolean> = () => activeQueries().some((q) => q.isFetchingNextPage);
 
     const error: Accessor<ApiError | null> = () => {
       if (configErrorStrategy === "allMustFail") {
@@ -413,6 +421,7 @@ export function createTQFeedStore<
       nextUrl,
       loading,
       refreshing,
+      loadingMore,
       error,
       isCached,
       ensureLoaded,

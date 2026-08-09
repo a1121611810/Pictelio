@@ -263,13 +263,16 @@ describe("followStore — loading and error states", () => {
     expect(store.loading()).toBe(false);
   });
 
-  it("refreshing reflects active query fetching state", async () => {
+  it("isFetching（含分页加载）不视为 refreshing（ADR-0078 语义分离）", async () => {
     getQ("follow_public").isFetching = true;
     setQueryData("follow_public", [createIllust(1, "2026-07-01T12:00:00+09:00")], null);
 
     const store = await loadStore();
     store.setFollowTab("public");
-    expect(store.refreshing()).toBe(true);
+    // loading 覆盖任意 fetch；refreshing 仅 refetch 第一页（分页/首载不算）
+    expect(store.loading()).toBe(true);
+    expect(store.refreshing()).toBe(false);
+    expect(store.loadingMore()).toBe(false);
   });
 
   it("error reflects active query error", async () => {
@@ -354,5 +357,14 @@ describe("followStore — ensureLoaded", () => {
     store.activate();
     expect(loadFollow).not.toHaveBeenCalled();
     expect(store.illusts()).toEqual([]);
+  });
+
+  // 契约（ADR-0078）：refreshing（下拉刷新 refetch）与 loadingMore（分页追加）语义分离；
+  // 无加载时均为 false——防止分页加载被误判为下拉刷新（首页 A1 骨架遮罩 bug）。
+  it("无加载时 refreshing / loadingMore 均为 false（语义分离）", async () => {
+    vi.resetModules();
+    const store = await import("@/stores/followStore");
+    expect(store.refreshing()).toBe(false);
+    expect(store.loadingMore()).toBe(false);
   });
 });

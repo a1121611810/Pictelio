@@ -10,17 +10,15 @@
  * 不再渲染底部 NavBar（首页导航由 SideNavShell 承担）。
  */
 import type { Component } from "solid-js";
-import { createEffect, For, onMount, Show } from "solid-js";
+import { createEffect, onMount } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import type { PixivIllust, PixivNovel } from "@/api/types";
 import PageTransition from "@/components/PageTransition";
-import PullIndicator from "@/components/PullIndicator";
-import { createPullToRefresh } from "@/primitives/createPullToRefresh";
+import { FeedList } from "@/components/home/FeedList";
 import { markContentReady } from "@/native/splashBridge";
 import SideNavShell, { type HomeTab } from "@/components/home/SideNavShell";
 import IllustSingleCard from "@/components/home/IllustSingleCard";
 import NovelRowCard from "@/components/home/NovelRowCard";
-import FeedPaginationSentinel from "@/components/home/FeedPaginationSentinel";
 import { contentType } from "@/stores/uiStore";
 // ── 插画数据源（推荐/关注/收藏）──
 import {
@@ -30,6 +28,7 @@ import {
   fetchMore as recIllustFetchMore,
   ensureLoaded as recIllustEnsure,
   refreshing as recIllustRefreshing,
+  loadingMore as recIllustLoadingMore,
   refresh as recIllustRefresh,
 } from "@/stores/recommendedStore";
 import {
@@ -40,6 +39,7 @@ import {
   activate as followIllustActivate,
   ensureLoaded as followIllustEnsure,
   refreshing as followIllustRefreshing,
+  loadingMore as followIllustLoadingMore,
   refresh as followIllustRefresh,
 } from "@/stores/followStore";
 import {
@@ -50,6 +50,7 @@ import {
   activate as bmkIllustActivate,
   ensureLoaded as bmkIllustEnsure,
   refreshing as bmkIllustRefreshing,
+  loadingMore as bmkIllustLoadingMore,
   refresh as bmkIllustRefresh,
 } from "@/stores/bookmarkStore";
 // ── 小说数据源（推荐/关注/收藏）──
@@ -60,6 +61,7 @@ import {
   fetchMore as recNovelFetchMore,
   ensureLoaded as recNovelEnsure,
   refreshing as recNovelRefreshing,
+  loadingMore as recNovelLoadingMore,
   refresh as recNovelRefresh,
 } from "@/stores/novelRecommendedStore";
 import {
@@ -70,6 +72,7 @@ import {
   activate as followNovelActivate,
   ensureLoaded as followNovelEnsure,
   refreshing as followNovelRefreshing,
+  loadingMore as followNovelLoadingMore,
   refresh as followNovelRefresh,
 } from "@/stores/novelFollowStore";
 import {
@@ -80,6 +83,7 @@ import {
   activate as bmkNovelActivate,
   ensureLoaded as bmkNovelEnsure,
   refreshing as bmkNovelRefreshing,
+  loadingMore as bmkNovelLoadingMore,
   refresh as bmkNovelRefresh,
 } from "@/stores/novelBookmarkStore";
 
@@ -96,6 +100,8 @@ interface FeedSource<T> {
   ensure: (() => Promise<void>) | null;
   /** 是否正在刷新（store.refreshing，refetch 进行中）——下拉刷新遮罩用 */
   refreshing: () => boolean;
+  /** 是否正在分页追加（store.loadingMore，fetchNextPage）——底部加载指示用 */
+  loadingMore: () => boolean;
   /** 触发刷新（refetch 第一页）——下拉刷新 onRefresh 用 */
   refresh: () => Promise<unknown> | void;
 }
@@ -111,6 +117,7 @@ function illustSource(tab: FeedTab): FeedSource<PixivIllust> {
       activate: null,
       ensure: recIllustEnsure,
       refreshing: recIllustRefreshing,
+      loadingMore: recIllustLoadingMore,
       refresh: recIllustRefresh,
     };
   }
@@ -123,6 +130,7 @@ function illustSource(tab: FeedTab): FeedSource<PixivIllust> {
       activate: followIllustActivate,
       ensure: followIllustEnsure,
       refreshing: followIllustRefreshing,
+      loadingMore: followIllustLoadingMore,
       refresh: followIllustRefresh,
     };
   }
@@ -134,6 +142,7 @@ function illustSource(tab: FeedTab): FeedSource<PixivIllust> {
     activate: bmkIllustActivate,
     ensure: bmkIllustEnsure,
     refreshing: bmkIllustRefreshing,
+    loadingMore: bmkIllustLoadingMore,
     refresh: bmkIllustRefresh,
   };
 }
@@ -149,6 +158,7 @@ function novelSource(tab: FeedTab): FeedSource<PixivNovel> {
       activate: null,
       ensure: recNovelEnsure,
       refreshing: recNovelRefreshing,
+      loadingMore: recNovelLoadingMore,
       refresh: recNovelRefresh,
     };
   }
@@ -161,6 +171,7 @@ function novelSource(tab: FeedTab): FeedSource<PixivNovel> {
       activate: followNovelActivate,
       ensure: followNovelEnsure,
       refreshing: followNovelRefreshing,
+      loadingMore: followNovelLoadingMore,
       refresh: followNovelRefresh,
     };
   }
@@ -172,6 +183,7 @@ function novelSource(tab: FeedTab): FeedSource<PixivNovel> {
     activate: bmkNovelActivate,
     ensure: bmkNovelEnsure,
     refreshing: bmkNovelRefreshing,
+    loadingMore: bmkNovelLoadingMore,
     refresh: bmkNovelRefresh,
   };
 }
@@ -229,122 +241,57 @@ const EmptyHint: Component = () => (
   </div>
 );
 
-/** 插画单列大图 Feed 面板（数据源激活 + 列表 + 骨架 + 滚动分页 + 下拉刷新，ADR-0076）。 */
+/** 插画单列大图 Feed 面板（数据源激活 + FeedList 统一交互：下拉刷新 A1 遮罩 + 滚动分页，ADR-0078）。 */
 const IllustFeedPanel: Component<{ tab: FeedTab }> = (props) => {
   const navigate = useNavigate();
   const src = () => illustSource(props.tab);
   useFeedActivation(src);
-  const items = () => src().items();
-  const loading = () => src().loading();
-  const refreshing = () => src().refreshing();
-
-  // 下拉刷新手势（A1：refreshing 期间骨架遮罩替换旧列表）
-  const pull = createPullToRefresh({
-    onRefresh: () => void src().refresh(),
-    isRefreshing: refreshing,
-  });
 
   return (
-    <Show
-      when={loading() && items().length === 0}
-      fallback={
-        <Show when={items().length > 0} fallback={<EmptyHint />}>
-          <div
-            class="flex flex-col"
-            onTouchStart={pull.touchHandlers.onTouchStart}
-            onTouchMove={pull.touchHandlers.onTouchMove}
-            onTouchEnd={pull.touchHandlers.onTouchEnd}
-          >
-            <PullIndicator
-              zone={pull.pullPhase()}
-              distance={pull.pullDistance()}
-              refreshThreshold={60}
-              settingsThreshold={60}
-            />
-            {refreshing() ? (
-              <IllustRowSkeleton />
-            ) : (
-              <>
-                <div class="flex flex-col gap-[var(--spacingVerticalM)] px-4 pt-3">
-                  <For each={items()}>
-                    {(il) => (
-                      <IllustSingleCard
-                        illust={il}
-                        onClick={() => void navigate(`/illust/${il.id}`)}
-                      />
-                    )}
-                  </For>
-                </div>
-                <FeedPaginationSentinel
-                  hasMore={() => !!src().nextUrl()}
-                  loadMore={() => void src().fetchMore()}
-                />
-              </>
-            )}
-          </div>
-        </Show>
-      }
-    >
-      <IllustRowSkeleton />
-    </Show>
+    <FeedList
+      source={{
+        items: () => src().items(),
+        loading: () => src().loading(),
+        refreshing: () => src().refreshing(),
+        loadingMore: () => src().loadingMore(),
+        nextUrl: () => src().nextUrl(),
+        fetchMore: () => src().fetchMore(),
+        refresh: () => src().refresh(),
+      }}
+      containerClass="flex flex-col gap-[var(--spacingVerticalM)] px-4 pt-3"
+      refreshMode="overlay"
+      skeleton={() => <IllustRowSkeleton />}
+      empty={() => <EmptyHint />}
+      renderItem={(il) => (
+        <IllustSingleCard illust={il} onClick={() => void navigate(`/illust/${il.id}`)} />
+      )}
+    />
   );
 };
 
-/** 小说单列行卡 Feed 面板（数据源激活 + 列表 + 骨架 + 滚动分页 + 下拉刷新，ADR-0076）。 */
+/** 小说单列行卡 Feed 面板（数据源激活 + FeedList 统一交互，ADR-0078）。 */
 const NovelFeedPanel: Component<{ tab: FeedTab }> = (props) => {
   const navigate = useNavigate();
   const src = () => novelSource(props.tab);
   useFeedActivation(src);
-  const items = () => src().items();
-  const loading = () => src().loading();
-  const refreshing = () => src().refreshing();
-
-  // 下拉刷新手势（A1：refreshing 期间骨架遮罩替换旧列表）
-  const pull = createPullToRefresh({
-    onRefresh: () => void src().refresh(),
-    isRefreshing: refreshing,
-  });
 
   return (
-    <Show
-      when={loading() && items().length === 0}
-      fallback={
-        <Show when={items().length > 0} fallback={<EmptyHint />}>
-          <div
-            class="flex flex-col"
-            onTouchStart={pull.touchHandlers.onTouchStart}
-            onTouchMove={pull.touchHandlers.onTouchMove}
-            onTouchEnd={pull.touchHandlers.onTouchEnd}
-          >
-            <PullIndicator
-              zone={pull.pullPhase()}
-              distance={pull.pullDistance()}
-              refreshThreshold={60}
-              settingsThreshold={60}
-            />
-            {refreshing() ? (
-              <NovelRowSkeleton />
-            ) : (
-              <>
-                <div class="flex flex-col gap-[var(--spacingVerticalM)] px-4 pt-3">
-                  <For each={items()}>
-                    {(n) => (
-                      <NovelRowCard novel={n} onClick={() => void navigate(`/novel/${n.id}`)} />
-                    )}
-                  </For>
-                </div>
-                <FeedPaginationSentinel
-                  hasMore={() => !!src().nextUrl()}
-                  loadMore={() => void src().fetchMore()}
-                />
-              </>
-            )}
-          </div>
-        </Show>
-      }
-    >
-      <NovelRowSkeleton />
-    </Show>
+    <FeedList
+      source={{
+        items: () => src().items(),
+        loading: () => src().loading(),
+        refreshing: () => src().refreshing(),
+        loadingMore: () => src().loadingMore(),
+        nextUrl: () => src().nextUrl(),
+        fetchMore: () => src().fetchMore(),
+        refresh: () => src().refresh(),
+      }}
+      containerClass="flex flex-col gap-[var(--spacingVerticalM)] px-4 pt-3"
+      refreshMode="overlay"
+      skeleton={() => <NovelRowSkeleton />}
+      empty={() => <EmptyHint />}
+      renderItem={(n) => <NovelRowCard novel={n} onClick={() => void navigate(`/novel/${n.id}`)} />}
+    />
   );
 };
 
