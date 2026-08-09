@@ -44,6 +44,10 @@ export interface NovelVirtualLayoutResult {
 const DEFAULT_OVERSCAN = 5;
 const IMAGE_FALLBACK_HEIGHT = 160;
 const PAGEBREAK_HEIGHT_RATIO = 3;
+/** 章节标题块高度（标题字号大、上下留白，约 4 倍段距） */
+const CHAPTER_HEIGHT_RATIO = 4;
+/** 跳转链接块高度（单行，约 2 倍段距） */
+const JUMP_HEIGHT_RATIO = 2;
 
 interface BlockLayout {
   index: number;
@@ -184,6 +188,10 @@ export function createNovelVirtualLayout(
         } else {
           height = IMAGE_FALLBACK_HEIGHT;
         }
+      } else if (block.type === "chapter") {
+        height = spacing * CHAPTER_HEIGHT_RATIO;
+      } else if (block.type === "jump") {
+        height = spacing * JUMP_HEIGHT_RATIO;
       } else {
         height = spacing * PAGEBREAK_HEIGHT_RATIO;
       }

@@ -31,7 +31,7 @@ import {
   getImageBlocks,
   selectInlineImageUrl,
 } from "../utils/novelBlocks";
-import type { NovelBlock, TextBlock, ImageBlock } from "../utils/novelBlocks";
+import type { NovelBlock, TextBlock, ImageBlock, JumpBlock, InlineRun } from "../utils/novelBlocks";
 import { loadNovelImageDimensions, type NovelImageDimensions } from "../utils/novelImageDimensions";
 import ReaderSettingsSheet from "../components/ReaderSettingsSheet";
 import SeriesSheet from "../components/SeriesSheet";
@@ -197,6 +197,62 @@ function isImageBlock(block: NovelBlock): block is ImageBlock {
   return block.type === "image";
 }
 
+/** jump 块显示文本（站内跳转显示类型 + ID，外部链接显示 URL） */
+function jumpLabel(block: JumpBlock): string {
+  if (block.kind === "illust") return `插画 #${block.target.replace(/^illust\//u, "")}`;
+  if (block.kind === "novel") return `小说 #${block.target.replace(/^novel\//u, "")}`;
+  if (block.kind === "user") return `用户 #${block.target.replace(/^user\//u, "")}`;
+  if (block.kind === "external") return block.target;
+  return block.target;
+}
+
+/** 跳转点击：站内 navigate 对应路由，外部链接新窗口打开 */
+function handleJumpClick(block: JumpBlock, navigate: (to: string) => void): void {
+  const id = block.target.replace(/^\w+\//u, "");
+  if (block.kind === "illust") navigate(`/illust/${id}`);
+  else if (block.kind === "novel") navigate(`/novel/${id}`);
+  else if (block.kind === "user") navigate(`/user/${id}`);
+  else if (block.kind === "external") window.open(block.target, "_blank", "noopener");
+}
+
+/**
+ * 按行内样式区间渲染文本（粗体/斜体/删除线/下划线）。
+ * 边界点分段：每段取覆盖它的全部 run 样式合并为一个 span。
+ */
+function renderTextWithRuns(text: string, runs: InlineRun[]): JSX.Element {
+  const points = new Set<number>([0, text.length]);
+  for (const r of runs) {
+    points.add(r.start);
+    points.add(r.end);
+  }
+  const sorted = [...points].toSorted((a, b) => a - b);
+  const nodes: JSX.Element[] = [];
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const start = sorted[i];
+    const end = sorted[i + 1];
+    if (start >= end) continue;
+    const seg = text.slice(start, end);
+    const styles = runs.filter((r) => r.start <= start && r.end >= end);
+    if (styles.length === 0) {
+      nodes.push(seg);
+      continue;
+    }
+    const cls = styles
+      .map((s) =>
+        s.tag === "bold"
+          ? "font-bold"
+          : s.tag === "italic"
+            ? "italic"
+            : s.tag === "strike"
+              ? "line-through"
+              : "underline",
+      )
+      .join(" ");
+    nodes.push(<span class={cls}>{seg}</span>);
+  }
+  return <>{nodes}</>;
+}
+
 interface NovelContentBlockProps {
   block: Accessor<NovelBlock>;
   imageBlockList: Accessor<ImageBlock[]>;
@@ -205,7 +261,8 @@ interface NovelContentBlockProps {
   fontSize: Accessor<number>;
   paragraphHeight: number | undefined;
   onImageClick: (index: number) => void;
-  renderParagraph: (paragraphIndex: number, text: string) => JSX.Element;
+  renderParagraph: (paragraphIndex: number, text: string, runs?: InlineRun[]) => JSX.Element;
+  onJumpClick: (block: JumpBlock) => void;
 }
 
 const NovelContentBlock: Component<NovelContentBlockProps> = (props) => {
@@ -221,8 +278,40 @@ const NovelContentBlock: Component<NovelContentBlockProps> = (props) => {
           ...(minH != null ? { "min-height": `${minH}px` } : {}),
         }}
       >
-        {props.renderParagraph(block.index, block.text)}
+        {props.renderParagraph(block.index, block.text, block.inlineRuns)}
       </p>
+    );
+  }
+
+  if (block.type === "chapter") {
+    // 章节标题：居中 + 加粗 + 大字号（Pixiv `[chapter:标题]` 标记）
+    return (
+      <h2
+        class="novel-chapter-title"
+        style={{
+          "font-size": "var(--fontSizeBase400)",
+          "font-weight": "600",
+          "text-align": "center",
+          "margin-top": "var(--spacingVerticalXL)",
+          "margin-bottom": "var(--spacingVerticalL)",
+          color: "var(--colorNeutralForeground1)",
+        }}
+      >
+        {block.title}
+      </h2>
+    );
+  }
+
+  if (block.type === "jump") {
+    return (
+      <div class="flex justify-center py-[var(--spacingVerticalS)]">
+        <button
+          class="appearance-none border-none bg-transparent cursor-pointer text-[var(--colorBrandForeground1)] underline [font-size:var(--fontSizeBase200)] hover:text-[var(--colorBrandForeground2)] active:scale-95 transition-transform duration-[var(--durationFast)]"
+          onClick={() => props.onJumpClick(block)}
+        >
+          {jumpLabel(block)}
+        </button>
+      </div>
     );
   }
 
@@ -711,7 +800,11 @@ const NovelDetail: Component = () => {
 
   const search = createNovelSearch(searchText, { debounceMs: 150 });
 
-  function renderParagraphWithHighlights(paragraphIndex: number, text: string): JSX.Element {
+  function renderParagraphWithHighlights(
+    paragraphIndex: number,
+    text: string,
+    runs?: InlineRun[],
+  ): JSX.Element {
     const matches = search.getMatchesForParagraph(paragraphIndex);
     const activeIndex = search.activeIndex();
     const allMatches = search.matches();
@@ -719,6 +812,10 @@ const NovelDetail: Component = () => {
       activeIndex >= 0 && activeIndex < allMatches.length ? allMatches[activeIndex] : null;
 
     if (matches.length === 0) {
+      // 无搜索高亮：按行内样式区间渲染（有 runs 时）
+      if (runs && runs.length > 0) {
+        return renderTextWithRuns(text, runs);
+      }
       return <>{text}</>;
     }
 
@@ -753,9 +850,9 @@ const NovelDetail: Component = () => {
    * 渲染段落：包装高亮渲染，译文模式下失败段落追加「未翻译」标记（S4）。
    * 失败段落 map 无译文 → text 为原文；标记引导用户知晓该段未翻译、可补翻。
    */
-  function renderParagraph(paragraphIndex: number, text: string): JSX.Element {
+  function renderParagraph(paragraphIndex: number, text: string, runs?: InlineRun[]): JSX.Element {
     const isFailed = showTranslation() && failedParagraphs().has(paragraphIndex);
-    const content = renderParagraphWithHighlights(paragraphIndex, text);
+    const content = renderParagraphWithHighlights(paragraphIndex, text, runs);
     if (!isFailed) {
       return content;
     }
@@ -988,6 +1085,7 @@ const NovelDetail: Component = () => {
                           setImageViewerOpen(true);
                         }}
                         renderParagraph={renderParagraph}
+                        onJumpClick={(jb) => handleJumpClick(jb, navigate)}
                       />
                     );
                   }}
