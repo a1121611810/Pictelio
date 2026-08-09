@@ -26,6 +26,9 @@
 | **首页 C 框架（Home C shell）** | 首页导航结构（ADR-0075 选定）：左侧固定 icon 导航列（搜索 + 推荐/关注/收藏/历史 + 底部设置/我的，选中项 BrandBackground2 圆角高亮块）+ 右侧内容区（页面大标题 + contentType 切换器）。Win11 设置式，替代底部 NavBar 在首页的导航角色（NavBar 保留于其他页面）。 |
 | **固定布局 L5（Fixed layout L5）** | 首页内容固定布局（用户选定组合）：插画=单列 16:10 大图卡（图片优先 + ★收藏）；小说=单列行卡（56px 封面 + 标题/作者/★统计）。两套均配滚动分页（IntersectionObserver 哨兵 → nextUrl/fetchMore）。不再由设置页 layoutMode 控制。 |
 | **滚动分页哨兵（Feed pagination sentinel）** | 列表底部 1px 高哨兵元素，IntersectionObserver（rootMargin 300px）进入视口且存在下一页时触发 `fetchMore` 自动加载更多。 |
+| **下拉刷新（Pull-to-refresh）** | 首页 6 个 Feed 面板（推荐/关注/收藏 × 插画/小说）的下拉刷新手势（ADR-0076）：`touchstart`（scrollTop=0 时记录起点）→ `touchmove` 阻尼计算下拉距离 → 超阈值进入 ready → 松手触发 `store.refresh()`（refetch 第一页）。历史 Tab 不启用。 |
+| **下拉相位（Pull phase）** | 下拉手势状态机（`createPullToRefresh` 原语）：`idle → pulling → ready → refreshing`。`ready` = 下拉超过阈值（60px）待松手；`refreshing` = 松手后回弹并执行刷新，期间忽略重复下拉。 |
+| **刷新遮罩（Refresh overlay）** | A1 清空重载的 UI 实现（ADR-0076）：`refreshing` 期间 FeedPanel 渲染骨架列表**替换**旧列表（store 数据不清空、保留至新数据到达），实现"清空 → 骨架 → 新数据"的可见刷新过程。 |
 | **A2 行卡（A2 row card）** | 列表型条目的卡片形态（历史条目、小说卡列表形态等）：无边框 + 大圆角 + `--elevation2`，内部保持「缩略图 + 标题 + 次要信息 + 行尾操作」的紧凑行布局。是 A2 视觉语言在列表条目上的延伸。 |
 
 ## 相关链接
