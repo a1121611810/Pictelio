@@ -1,5 +1,5 @@
 {
-  "version": "4.7.2",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.7.2",
-  "changelog": "✨ 新功能\n  124b367 feat(app): 首页 6 面板下拉刷新（createPullToRefresh 原语 + A1 遮罩）"
+  "version": "4.7.3",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.7.3",
+  "changelog": "✨ 新功能\n  78b1fc9 feat(app): 首页标签变体（?variant=A/B/C labelMode）\n  2230549 feat(app): 首页标签折入 A（full）——移除 B/C 变体与 PrototypeSwitcher\n🐛 修复\n  7b83687 fix(app): 标签行自适应——截断 chip 命令式 max-width + 240px E2E 回归\n♻️ 重构\n  82bb5d7 refactor(app): 小说卡标签布局折入 T1（移除 T2/T3 变体）"
 }
