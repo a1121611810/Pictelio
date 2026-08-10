@@ -113,7 +113,7 @@ onMounted(fetchFirstPage)
   <view class="w-full h-full flex flex-col bg-surface">
     <!-- M3 TopAppBar：顶层页，居中标题，无返回箭头 -->
     <view class="flex flex-row items-center justify-center h-[17.067vw] px-4 bg-surface">
-      <text class="text-title-large font-medium text-on-surface">小说</text>
+      <text class="text-title-large font-medium text-surface-on">小说</text>
     </view>
 
     <!-- 推荐/关注切换（M3 secondary tabs：选中 primary 文字 + 3px primary 指示器） -->
@@ -123,14 +123,14 @@ onMounted(fetchFirstPage)
         class="flex-1 py-2.5 flex flex-col items-center justify-center"
         @tap="switchMode('recommend')"
       >
-        <text class="text-title-small font-medium" :class="mode === 'recommend' ? 'text-primary' : 'text-on-surface-variant'">推荐</text>
+        <text class="text-title-small font-medium" :class="mode === 'recommend' ? 'text-primary' : 'text-surface-on-variant'">推荐</text>
         <view class="mt-1 h-[0.8vw] w-[40%] rounded-full" :class="mode === 'recommend' ? 'bg-primary' : 'bg-transparent'" />
       </view>
       <view
         class="flex-1 py-2.5 flex flex-col items-center justify-center"
         @tap="switchMode('follow')"
       >
-        <text class="text-title-small font-medium" :class="mode === 'follow' ? 'text-primary' : 'text-on-surface-variant'">关注</text>
+        <text class="text-title-small font-medium" :class="mode === 'follow' ? 'text-primary' : 'text-surface-on-variant'">关注</text>
         <view class="mt-1 h-[0.8vw] w-[40%] rounded-full" :class="mode === 'follow' ? 'bg-primary' : 'bg-transparent'" />
       </view>
     </view>
@@ -152,16 +152,16 @@ onMounted(fetchFirstPage)
     <view v-if="mode === 'follow' && !loading && !errorMsg && novels.length === 0" class="w-full flex-1 min-h-0 flex items-center justify-center">
       <view class="flex flex-col items-center">
         <text class="text-[10.667vw] leading-none text-outline-variant">✎</text>
-        <text class="text-body-large text-on-surface mt-3">暂无关注小说</text>
-        <text class="text-body-medium text-on-surface-variant mt-1.5">关注的小说作者发布新作品后会展示在这里</text>
+        <text class="text-body-large text-surface-on mt-3">暂无关注小说</text>
+        <text class="text-body-medium text-surface-on-variant mt-1.5">关注的小说作者发布新作品后会展示在这里</text>
       </view>
     </view>
     <!-- 推荐视图空态（spec 加固 3）：杜绝「无数据 → 纯空白」 -->
     <view v-if="mode === 'recommend' && !loading && !errorMsg && novels.length === 0" class="w-full flex-1 min-h-0 flex items-center justify-center">
       <view class="flex flex-col items-center">
         <text class="text-[10.667vw] leading-none text-outline-variant">✎</text>
-        <text class="text-body-large text-on-surface mt-3">暂无推荐小说</text>
-        <text class="text-body-medium text-on-surface-variant mt-1.5">稍后再来看看，会有新的推荐</text>
+        <text class="text-body-large text-surface-on mt-3">暂无推荐小说</text>
+        <text class="text-body-medium text-surface-on-variant mt-1.5">稍后再来看看，会有新的推荐</text>
       </view>
     </view>
 
@@ -182,11 +182,11 @@ onMounted(fetchFirstPage)
       >
         <view class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
           <view class="flex-1 flex flex-col">
-            <text class="text-title-medium font-medium text-on-surface [max-line:2]">{{ item.title }}</text>
-            <text class="text-body-medium text-on-surface-variant mt-1.5">by {{ item.user.name }}</text>
+            <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>
+            <text class="text-body-medium text-surface-on-variant mt-1.5">by {{ item.user.name }}</text>
             <view class="flex flex-row mt-1.5">
-              <text class="text-label-medium text-on-surface-variant mr-4">{{ item.text_length }} 字</text>
-              <text v-if="item.total_bookmarks > 0" class="text-label-medium text-on-surface-variant mr-4">
+              <text class="text-label-medium text-surface-on-variant mr-4">{{ item.text_length }} 字</text>
+              <text v-if="item.total_bookmarks > 0" class="text-label-medium text-surface-on-variant mr-4">
                 ♥ {{ item.total_bookmarks }}
               </text>
             </view>
@@ -194,7 +194,7 @@ onMounted(fetchFirstPage)
               <text
                 v-for="tag in item.tags.slice(0, 3)"
                 :key="tag.name"
-                class="h-[8.533vw] px-2 border border-outline-variant rounded-[var(--md-shape-small)] flex items-center justify-center m-0.5 text-label-large text-on-surface-variant"
+                class="h-[8.533vw] px-2 border border-outline-variant rounded-[var(--md-shape-small)] flex items-center justify-center m-0.5 text-label-large text-surface-on-variant"
               >
                 #{{ tag.translated_name || tag.name }}
               </text>

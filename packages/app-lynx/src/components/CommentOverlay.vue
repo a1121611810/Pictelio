@@ -84,9 +84,9 @@ onBeforeUnmount(() => {
       <!-- M3 bottom sheet 顶部：居中标题（title-large）+ 关闭按钮 -->
       <view class="flex flex-row items-center h-[11.733vw] px-4 flex-shrink-0">
         <view class="w-[8vw]" />
-        <text class="flex-1 text-center text-title-large font-medium text-on-surface">评论 ({{ state.comments.length }})</text>
+        <text class="flex-1 text-center text-title-large font-medium text-surface-on">评论 ({{ state.comments.length }})</text>
         <view class="w-[8vw] h-[8vw] flex items-center justify-center" @tap="onClose">
-          <text class="text-[6.4vw] leading-none text-on-surface-variant">×</text>
+          <text class="text-[6.4vw] leading-none text-surface-on-variant">×</text>
         </view>
       </view>
 
@@ -111,7 +111,7 @@ onBeforeUnmount(() => {
           class="mt-4 px-6 h-[10.667vw] bg-primary active:bg-state-pressedPrimary rounded-[var(--md-shape-full)] flex items-center justify-center"
           @tap="retry"
         >
-          <text class="text-label-large font-medium text-on-primary">重试</text>
+          <text class="text-label-large font-medium text-primary-on">重试</text>
         </view>
       </view>
 

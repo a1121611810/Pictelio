@@ -48,8 +48,8 @@ onMounted(async () => {
 <template>
   <view class="w-full h-full bg-surface">
     <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
-      <view class="py-1 pr-2" @tap="goBack"><text class="text-[6.4vw] leading-none text-on-surface">‹</text></view>
-      <text class="flex-1 text-title-large font-medium text-on-surface">小说</text>
+      <view class="py-1 pr-2" @tap="goBack"><text class="text-[6.4vw] leading-none text-surface-on">‹</text></view>
+      <text class="flex-1 text-title-large font-medium text-surface-on">小说</text>
     </view>
 
     <!-- 加载期骨架（issue #91）：header 照常渲染，正文区骨架占位 -->
@@ -59,8 +59,8 @@ onMounted(async () => {
     </view>
     <scroll-view v-else class="w-full h-full" scroll-orientation="vertical">
       <view class="py-5 px-4 bg-surface-container-lowest mb-3">
-        <text class="text-title-large font-bold text-on-surface">{{ novel?.title }}</text>
-        <text class="text-body-medium text-on-surface-variant mt-2">by {{ novel?.user.name }}</text>
+        <text class="text-title-large font-bold text-surface-on">{{ novel?.title }}</text>
+        <text class="text-body-medium text-surface-on-variant mt-2">by {{ novel?.user.name }}</text>
         <text class="text-label-medium text-outline mt-1.5">
           {{ novel?.text_length }} 字
           <template v-if="novel?.total_bookmarks != null">
@@ -84,7 +84,7 @@ onMounted(async () => {
           <RestrictOverlay :level="novel.x_restrict === 2 ? 2 : 1" />
         </template>
         <template v-else>
-          <text v-for="(p, idx) in paragraphs" :key="idx" class="text-body-large leading-[44rpx] text-on-surface mb-4 block">
+          <text v-for="(p, idx) in paragraphs" :key="idx" class="text-body-large leading-[44rpx] text-surface-on mb-4 block">
             {{ p }}
           </text>
         </template>

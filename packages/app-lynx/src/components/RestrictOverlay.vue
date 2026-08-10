@@ -18,7 +18,7 @@ function swallow() {}
     <view class="flex flex-col items-center">
       <text
         class="text-label-medium font-semibold px-2 py-0.5 rounded-[var(--md-shape-extra-small)]"
-        :class="level === 2 ? 'bg-error text-on-error' : 'bg-error-container text-on-error-container'"
+        :class="level === 2 ? 'bg-error text-error-on' : 'bg-error-container text-error-on-container'"
       >{{ badge }}</text>
       <text class="text-label-medium text-white mt-2" style="opacity: 0.8">受浏览限制，不予显示</text>
     </view>

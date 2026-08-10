@@ -100,8 +100,8 @@ onMounted(fetchFirstPage)
 <template>
   <view class="w-full h-full flex flex-col bg-surface">
     <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
-      <view class="py-1 pr-2" @tap="goBack"><text class="text-[6.4vw] leading-none text-on-surface">‹</text></view>
-      <text class="flex-1 text-title-large font-medium text-on-surface">{{ isFollowing ? '关注' : '粉丝' }}</text>
+      <view class="py-1 pr-2" @tap="goBack"><text class="text-[6.4vw] leading-none text-surface-on">‹</text></view>
+      <text class="flex-1 text-title-large font-medium text-surface-on">{{ isFollowing ? '关注' : '粉丝' }}</text>
     </view>
 
     <text v-if="errorMsg && !loading" class="text-body-small text-error p-4">{{ errorMsg }}</text>
@@ -109,8 +109,8 @@ onMounted(fetchFirstPage)
     <view v-if="!loading && !errorMsg && users.length === 0" class="w-full flex-1 min-h-0 flex items-center justify-center">
       <view class="flex flex-col items-center">
         <text class="text-[10.667vw] leading-none text-outline-variant">◎</text>
-        <text class="text-body-large text-on-surface mt-3">{{ isFollowing ? '暂无关注' : '暂无粉丝' }}</text>
-        <text class="text-body-medium text-on-surface-variant mt-1.5">{{ isFollowing ? '关注其他用户后这里会展示他们' : '被其他用户关注后会展示在这里' }}</text>
+        <text class="text-body-large text-surface-on mt-3">{{ isFollowing ? '暂无关注' : '暂无粉丝' }}</text>
+        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ isFollowing ? '关注其他用户后这里会展示他们' : '被其他用户关注后会展示在这里' }}</text>
       </view>
     </view>
 
@@ -138,7 +138,7 @@ onMounted(fetchFirstPage)
               lazy-load
             />
             <view class="flex flex-col ml-3.5 flex-1">
-              <text class="text-title-small font-medium text-on-surface [max-line:1]">{{ item.user.name }}</text>
+              <text class="text-title-small font-medium text-surface-on [max-line:1]">{{ item.user.name }}</text>
               <text class="text-label-medium text-outline mt-0.5">@{{ item.user.account }}</text>
             </view>
           </view>
@@ -147,7 +147,7 @@ onMounted(fetchFirstPage)
             :class="item.user.is_followed ? 'border border-outline-variant bg-transparent active:bg-state-pressedOnSurface' : 'bg-primary active:bg-state-pressedPrimary'"
             @tap="toggleFollow(item)"
           >
-            <text class="text-body-medium" :class="item.user.is_followed ? 'text-on-surface' : 'text-on-primary'">
+            <text class="text-body-medium" :class="item.user.is_followed ? 'text-surface-on' : 'text-primary-on'">
               {{ item.user.is_followed ? '已关注' : '关注' }}
             </text>
           </view>

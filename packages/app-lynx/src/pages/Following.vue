@@ -91,7 +91,7 @@ onMounted(fetchFirstPage)
   <view class="w-full h-full flex flex-col bg-surface">
     <!-- M3 TopAppBar：顶层页，居中标题，无返回箭头 -->
     <view class="flex flex-row items-center justify-center h-[17.067vw] px-4 bg-surface">
-      <text class="text-title-large font-medium text-on-surface">关注</text>
+      <text class="text-title-large font-medium text-surface-on">关注</text>
     </view>
 
     <text v-if="errorMsg && !loading" class="text-body-small text-error p-4">{{ errorMsg }}</text>
@@ -106,8 +106,8 @@ onMounted(fetchFirstPage)
     <view v-else-if="!loading && !errorMsg && illusts.length === 0" class="w-full flex-1 min-h-0 flex items-center justify-center">
       <view class="flex flex-col items-center">
           <text class="text-[10.667vw] leading-none text-outline-variant">♡</text>
-          <text class="text-body-large text-on-surface mt-3">暂无关注更新</text>
-          <text class="text-body-medium text-on-surface-variant mt-1.5">关注你喜欢的作者后，这里会展示他们的新作品</text>
+          <text class="text-body-large text-surface-on mt-3">暂无关注更新</text>
+          <text class="text-body-medium text-surface-on-variant mt-1.5">关注你喜欢的作者后，这里会展示他们的新作品</text>
         </view>
     </view>
 
@@ -134,8 +134,8 @@ onMounted(fetchFirstPage)
             <!-- 受限条目图片区遮罩（issue #91） -->
             <RestrictOverlay v-if="isRestricted(item)" :level="item.x_restrict === 2 ? 2 : 1" />
           </view>
-          <text class="text-title-small font-medium text-on-surface mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
-          <text class="text-body-small text-on-surface-variant mt-1 mx-2.5 [max-line:1]">{{ item.user.name }}</text>
+          <text class="text-title-small font-medium text-surface-on mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
+          <text class="text-body-small text-surface-on-variant mt-1 mx-2.5 [max-line:1]">{{ item.user.name }}</text>
           <view class="mt-1 mx-2.5 mb-2.5">
             <BookmarkButton
               :illust-id="item.id"

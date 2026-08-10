@@ -80,19 +80,19 @@ const isMine = computed(() => currentUser.value?.id === props.comment.user.id)
     <view class="flex-1 ml-3 min-w-0">
       <!-- 用户名 + 相对时间 -->
       <view class="flex flex-row items-center gap-2">
-        <text class="text-title-small font-medium text-on-surface">{{ comment.user.name }}</text>
+        <text class="text-title-small font-medium text-surface-on">{{ comment.user.name }}</text>
         <text class="text-label-medium text-outline">{{ formatDate(comment.date) }}</text>
       </view>
 
       <!-- 楼层引用块：回复 xxx：… -->
       <view v-if="parent" class="mt-1.5 px-2.5 py-1.5 bg-surface-container-highest rounded-[var(--md-shape-extra-small)]">
-        <text class="text-label-medium text-on-surface-variant line-clamp-1">
+        <text class="text-label-medium text-surface-on-variant line-clamp-1">
           回复 {{ parent.user.name }}：{{ parent.comment }}
         </text>
       </view>
 
       <!-- 评论正文 -->
-      <text class="text-body-medium text-on-surface mt-1.5 leading-[1.4]">{{ comment.comment }}</text>
+      <text class="text-body-medium text-surface-on mt-1.5 leading-[1.4]">{{ comment.comment }}</text>
 
       <!-- 操作行：回复 / 展开楼层（has_replies 时）/ 删除（本人时，删除中置灰） -->
       <view class="flex flex-row items-center gap-5 mt-2">

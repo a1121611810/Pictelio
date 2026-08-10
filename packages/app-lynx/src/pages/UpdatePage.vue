@@ -34,7 +34,7 @@ const changelogLines = () =>
         <text class="text-label-large text-error pr-4">退出应用</text>
       </view>
       <text
-        class="flex-1 text-title-large font-medium text-on-surface"
+        class="flex-1 text-title-large font-medium text-surface-on"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="UPDATE_A11Y_LABELS.pageTitle"
         >更新</text
@@ -45,18 +45,18 @@ const changelogLines = () =>
       <!-- 版本信息 -->
       <view class="mt-[8vw] flex flex-col items-center">
         <text class="text-body-medium text-outline">发现新版本</text>
-        <text class="text-headline-medium font-bold text-on-surface mt-2">v{{ updateResult?.latestVersion }}</text>
+        <text class="text-headline-medium font-bold text-surface-on mt-2">v{{ updateResult?.latestVersion }}</text>
         <text class="text-body-small text-outline mt-2">当前版本 v{{ appVersion }}</text>
       </view>
 
       <!-- 更新内容（changelog 多行） -->
       <view class="bg-surface-container-lowest mt-[6vw] p-4 rounded-[var(--md-shape-medium)]">
-        <text class="text-title-small font-medium text-on-surface">更新内容</text>
+        <text class="text-title-small font-medium text-surface-on">更新内容</text>
         <view v-if="changelogLines().length" class="mt-3 flex flex-col gap-1">
           <text
             v-for="(line, i) in changelogLines()"
             :key="i"
-            class="text-body-small text-on-surface-variant leading-snug"
+            class="text-body-small text-surface-on-variant leading-snug"
             >{{ line }}</text
           >
         </view>
@@ -70,7 +70,7 @@ const changelogLines = () =>
         :accessibility-label="UPDATE_A11Y_LABELS.download"
         @tap="openReleasePage"
       >
-        <text class="text-label-large text-on-primary font-medium">下载新版本</text>
+        <text class="text-label-large text-primary-on font-medium">下载新版本</text>
       </view>
 
       <!-- 底部留白 -->

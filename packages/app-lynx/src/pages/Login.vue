@@ -35,7 +35,7 @@ async function submit() {
   <view class="w-full h-full flex flex-col items-center bg-surface pt-[32vw]">
     <view class="flex flex-col items-center mb-10">
       <text class="text-headline-large font-bold text-primary">Pictelio</text>
-      <text class="text-body-medium text-on-surface-variant mt-2">Lynx Client MVP</text>
+      <text class="text-body-medium text-surface-on-variant mt-2">Lynx Client MVP</text>
     </view>
 
     <!-- [lynx:fix] Card 用 flex column：子元素靠 stretch 拉伸填充父宽，
@@ -47,7 +47,7 @@ async function submit() {
       <!-- M3 filled text field：surface-container-highest 底 + extra-small(4dp) 圆角 -->
       <input
         v-model="tokenInput"
-        class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-outline-variant text-body-medium text-on-surface px-4 mb-3"
+        class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-outline-variant text-body-medium text-surface-on px-4 mb-3"
         placeholder="粘贴 Pixiv refresh_token"
         placeholder-color="#49454f"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
@@ -62,7 +62,7 @@ async function submit() {
         @tap="submit"
       >
         <text
-          class="text-label-large font-medium text-on-primary"
+          class="text-label-large font-medium text-primary-on"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="LOGIN_A11Y_LABELS.submit"
           >{{ submitting ? '登录中…' : '登录' }}</text
@@ -70,6 +70,6 @@ async function submit() {
       </view>
     </view>
 
-    <text class="text-label-medium text-on-surface-variant mt-6">登录后进入推荐插画 / 小说 / 个人中心</text>
+    <text class="text-label-medium text-surface-on-variant mt-6">登录后进入推荐插画 / 小说 / 个人中心</text>
   </view>
 </template>

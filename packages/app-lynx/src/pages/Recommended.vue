@@ -142,7 +142,7 @@ onActivated(() => {
   <view class="w-full h-full flex flex-col bg-surface">
     <!-- M3 TopAppBar：surface 背景 + 居中标题（title-large），无导航图标（顶层页） -->
     <view class="flex flex-row items-center justify-center h-[17.067vw] px-4 bg-surface">
-      <text class="text-title-large font-medium text-on-surface">推荐插画</text>
+      <text class="text-title-large font-medium text-surface-on">推荐插画</text>
     </view>
 
     <text v-if="errorMsg && !loading" class="text-body-small text-error p-4">{{ errorMsg }}</text>
@@ -186,8 +186,8 @@ onActivated(() => {
           <!-- 受限条目图片区遮罩（issue #91）：吞没 tap，不触发详情跳转 -->
           <RestrictOverlay v-if="isRestricted(item)" :level="item.x_restrict === 2 ? 2 : 1" />
         </view>
-        <text class="text-title-small font-medium text-on-surface mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
-        <text class="text-body-small text-on-surface-variant mt-1 mx-2.5 [max-line:1]">{{ item.user.name }}</text>
+        <text class="text-title-small font-medium text-surface-on mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
+        <text class="text-body-small text-surface-on-variant mt-1 mx-2.5 [max-line:1]">{{ item.user.name }}</text>
         <view class="mt-1 mx-2.5 mb-2.5">
           <BookmarkButton
             :illust-id="item.id"

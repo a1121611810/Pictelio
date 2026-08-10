@@ -151,8 +151,8 @@ onMounted(() => {
 <template>
   <view class="w-full h-full flex flex-col bg-surface">
     <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
-      <view class="py-1 pr-2" @tap="goBack"><text class="text-[6.4vw] leading-none text-on-surface">‹</text></view>
-      <text class="flex-1 text-title-large font-medium text-on-surface">收藏</text>
+      <view class="py-1 pr-2" @tap="goBack"><text class="text-[6.4vw] leading-none text-surface-on">‹</text></view>
+      <text class="flex-1 text-title-large font-medium text-surface-on">收藏</text>
     </view>
 
     <text v-if="errorMsg" class="text-body-small text-error p-4">{{ errorMsg }}</text>
@@ -179,8 +179,8 @@ onMounted(() => {
     <view v-if="activeTab === 'illust' && !illustLoading && !errorMsg && illusts.length === 0" class="flex-1 flex items-center justify-center">
       <view class="flex flex-col items-center">
         <text class="text-[10.667vw] leading-none text-outline-variant">♡</text>
-        <text class="text-body-large text-on-surface mt-3">暂无收藏</text>
-        <text class="text-body-medium text-on-surface-variant mt-1.5">收藏喜欢的作品后会展示在这里</text>
+        <text class="text-body-large text-surface-on mt-3">暂无收藏</text>
+        <text class="text-body-medium text-surface-on-variant mt-1.5">收藏喜欢的作品后会展示在这里</text>
       </view>
     </view>
 
@@ -207,8 +207,8 @@ onMounted(() => {
             <!-- 受限条目图片区遮罩（issue #91） -->
             <RestrictOverlay v-if="isRestricted(item)" :level="item.x_restrict === 2 ? 2 : 1" />
           </view>
-          <text class="text-title-small font-medium text-on-surface mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
-          <text class="text-body-small text-on-surface-variant mt-1 mx-2.5 [max-line:1]">{{ item.user.name }}</text>
+          <text class="text-title-small font-medium text-surface-on mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
+          <text class="text-body-small text-surface-on-variant mt-1 mx-2.5 [max-line:1]">{{ item.user.name }}</text>
           <view class="mt-1 mx-2.5 mb-2.5">
             <BookmarkButton
               :illust-id="item.id"
@@ -228,8 +228,8 @@ onMounted(() => {
     <view v-if="activeTab === 'novel' && !novelLoading && !errorMsg && novels.length === 0" class="flex-1 flex items-center justify-center">
       <view class="flex flex-col items-center">
         <text class="text-[10.667vw] leading-none text-outline-variant">♡</text>
-        <text class="text-body-large text-on-surface mt-3">暂无收藏</text>
-        <text class="text-body-medium text-on-surface-variant mt-1.5">收藏喜欢的作品后会展示在这里</text>
+        <text class="text-body-large text-surface-on mt-3">暂无收藏</text>
+        <text class="text-body-medium text-surface-on-variant mt-1.5">收藏喜欢的作品后会展示在这里</text>
       </view>
     </view>
 
@@ -250,8 +250,8 @@ onMounted(() => {
       >
         <view class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]" @tap="openNovel(item.id)">
           <view class="flex-1 flex flex-col">
-            <text class="text-title-medium font-medium text-on-surface [max-line:2]">{{ item.title }}</text>
-            <text class="text-body-medium text-on-surface-variant mt-1.5">by {{ item.user.name }}</text>
+            <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>
+            <text class="text-body-medium text-surface-on-variant mt-1.5">by {{ item.user.name }}</text>
             <view class="flex flex-row mt-1.5">
               <text class="text-label-medium text-outline mr-4">{{ item.text_length }} 字</text>
               <text v-if="item.total_bookmarks > 0" class="text-label-medium text-outline mr-4">

@@ -152,8 +152,8 @@ onMounted(async () => {
 <template>
   <view class="w-full h-full flex flex-col bg-surface">
     <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
-      <view class="py-1 pr-2" @tap="goBack"><text class="text-[6.4vw] leading-none text-on-surface">‹</text></view>
-      <text class="flex-1 text-title-large font-medium text-on-surface [max-line:1]">
+      <view class="py-1 pr-2" @tap="goBack"><text class="text-[6.4vw] leading-none text-surface-on">‹</text></view>
+      <text class="flex-1 text-title-large font-medium text-surface-on [max-line:1]">
         {{ detail?.user.name || '用户主页' }}
       </text>
     </view>
@@ -171,16 +171,16 @@ onMounted(async () => {
         class="w-[17.067vw] h-[17.067vw] rounded-full"
       />
       <view class="flex-1 flex flex-col ml-3.5">
-        <text class="text-title-large font-bold text-on-surface">{{ detail.user.name }}</text>
+        <text class="text-title-large font-bold text-surface-on">{{ detail.user.name }}</text>
         <text class="text-body-small text-outline mt-1">@{{ detail.user.account }}</text>
         <view class="flex flex-row mt-1.5">
           <view class="h-[8.533vw] px-3 border border-outline-variant rounded-[var(--md-shape-small)] flex items-center justify-center" @tap="openFollowing">
-            <text class="text-label-medium text-on-surface">
+            <text class="text-label-medium text-surface-on">
               关注 {{ detail.profile.total_follow_users ?? '-' }}
             </text>
           </view>
           <view class="h-[8.533vw] px-3 ml-2 border border-outline-variant rounded-[var(--md-shape-small)] flex items-center justify-center" @tap="openFollowers">
-            <text class="text-label-medium text-on-surface">粉丝</text>
+            <text class="text-label-medium text-surface-on">粉丝</text>
           </view>
         </view>
       </view>
@@ -208,8 +208,8 @@ onMounted(async () => {
     <view v-if="activeTab === 'illust' && !illustLoading && !errorMsg && illusts.length === 0" class="flex-1 flex items-center justify-center">
       <view class="flex flex-col items-center">
         <text class="text-[10.667vw] leading-none text-outline-variant">▦</text>
-        <text class="text-body-large text-on-surface mt-3">暂无作品</text>
-        <text class="text-body-medium text-on-surface-variant mt-1.5">该用户还没有发布作品</text>
+        <text class="text-body-large text-surface-on mt-3">暂无作品</text>
+        <text class="text-body-medium text-surface-on-variant mt-1.5">该用户还没有发布作品</text>
       </view>
     </view>
 
@@ -236,7 +236,7 @@ onMounted(async () => {
             <!-- 受限条目图片区遮罩（issue #91） -->
             <RestrictOverlay v-if="isRestricted(item)" :level="item.x_restrict === 2 ? 2 : 1" />
           </view>
-          <text class="text-title-small font-medium text-on-surface mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
+          <text class="text-title-small font-medium text-surface-on mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
           <view class="mt-1 mx-2.5 mb-2.5">
             <BookmarkButton :illust-id="item.id" :initial-bookmarked="item.is_bookmarked" :bookmark-count="item.total_bookmarks" />
           </view>
@@ -251,8 +251,8 @@ onMounted(async () => {
     <view v-if="activeTab === 'novel' && !novelLoading && novels.length === 0" class="flex-1 flex items-center justify-center">
       <view class="flex flex-col items-center">
         <text class="text-[10.667vw] leading-none text-outline-variant">▦</text>
-        <text class="text-body-large text-on-surface mt-3">暂无作品</text>
-        <text class="text-body-medium text-on-surface-variant mt-1.5">该用户还没有发布作品</text>
+        <text class="text-body-large text-surface-on mt-3">暂无作品</text>
+        <text class="text-body-medium text-surface-on-variant mt-1.5">该用户还没有发布作品</text>
       </view>
     </view>
 
@@ -273,7 +273,7 @@ onMounted(async () => {
       >
         <view class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]" @tap="openNovel(item.id)">
           <view class="flex-1 flex flex-col">
-            <text class="text-title-medium font-medium text-on-surface [max-line:2]">{{ item.title }}</text>
+            <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>
             <view class="flex flex-row mt-1.5">
               <text class="text-label-medium text-outline mr-4">{{ item.text_length }} 字</text>
               <text v-if="item.total_bookmarks > 0" class="text-label-medium text-outline mr-4">

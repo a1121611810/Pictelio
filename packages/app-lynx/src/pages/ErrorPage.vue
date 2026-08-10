@@ -22,19 +22,19 @@ function backToLogin() {
   <view class="w-full h-full flex flex-col items-center justify-center bg-primary px-10">
     <!-- 品牌色满屏氛围 + 白色大标题（强终态：会话已死，请重来） -->
     <text
-      class="text-headline-small font-bold text-on-primary text-center"
+      class="text-headline-small font-bold text-primary-on text-center"
       :accessibility-element="A11Y_ELEMENT_ENABLED"
       :accessibility-label="ERROR_A11Y_LABELS.pageTitle"
     >
       {{ ERROR_A11Y_LABELS.pageTitle }}
     </text>
     <!-- 副文案：半透明白（presentError 分档文案，含 HTTP 状态码与 hint） -->
-    <text class="text-body-medium text-on-primary mt-4 text-center leading-relaxed" style="opacity: 0.8">
+    <text class="text-body-medium text-primary-on mt-4 text-center leading-relaxed" style="opacity: 0.8">
       {{ presentError(fatalError, '登录已过期') }}
     </text>
     <!-- M3 反色 filled 按钮：on-primary 底 + primary 字（全圆角 pill） -->
     <view
-      class="mt-12 px-12 h-[12.8vw] rounded-[var(--md-shape-full)] bg-on-primary flex items-center justify-center"
+      class="mt-12 px-12 h-[12.8vw] rounded-[var(--md-shape-full)] bg-primary-on flex items-center justify-center"
       :accessibility-element="A11Y_ELEMENT_ENABLED"
       :accessibility-label="ERROR_A11Y_LABELS.backToLogin"
       @tap="backToLogin"

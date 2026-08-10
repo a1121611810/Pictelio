@@ -115,8 +115,8 @@ onMounted(async () => {
   <!-- relative：为根 view 内 absolute 的评论弹层提供定位上下文（不改 flex 布局） -->
   <view class="w-full h-full flex flex-col relative bg-surface">
     <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
-      <view class="py-1 pr-2" @tap="goBack"><text class="text-[6.4vw] leading-none text-on-surface">‹</text></view>
-      <text class="flex-1 text-title-large font-medium text-on-surface">作品详情</text>
+      <view class="py-1 pr-2" @tap="goBack"><text class="text-[6.4vw] leading-none text-surface-on">‹</text></view>
+      <text class="flex-1 text-title-large font-medium text-surface-on">作品详情</text>
     </view>
 
     <!-- [lynx:fix] 骨架屏：加载中显示 shimmer 占位（图片区 1:1 + 文字条），数据就绪后切换 scroll-view -->
@@ -149,12 +149,12 @@ onMounted(async () => {
         />
       </view>
       <view v-if="pages.length > 1" class="flex flex-row items-center justify-center p-3">
-        <view class="py-1 pr-2" @tap="prevPage"><text class="text-[6.4vw] leading-none text-on-surface-variant py-2 px-6">‹</text></view>
-        <text class="text-body-medium text-on-surface-variant mx-4">{{ currentPage + 1 }} / {{ pages.length }}</text>
-        <view class="py-2 px-3" @tap="nextPage"><text class="text-[6.4vw] leading-none text-on-surface-variant py-2 px-6">›</text></view>
+        <view class="py-1 pr-2" @tap="prevPage"><text class="text-[6.4vw] leading-none text-surface-on-variant py-2 px-6">‹</text></view>
+        <text class="text-body-medium text-surface-on-variant mx-4">{{ currentPage + 1 }} / {{ pages.length }}</text>
+        <view class="py-2 px-3" @tap="nextPage"><text class="text-[6.4vw] leading-none text-surface-on-variant py-2 px-6">›</text></view>
       </view>
       <view class="p-4 bg-surface-container-lowest">
-        <text class="text-headline-small font-bold text-on-surface">{{ illust.title }}</text>
+        <text class="text-headline-small font-bold text-surface-on">{{ illust.title }}</text>
         <view class="flex flex-row items-center mt-2" @tap="openAuthor">
           <SkeletonImage
             v-if="illust.user.profile_image_urls"
@@ -163,7 +163,7 @@ onMounted(async () => {
             min-h="9vw"
             class="w-[10.667vw] h-[10.667vw] rounded-full"
           />
-          <text class="text-body-medium text-on-surface-variant ml-2 flex-1">by {{ illust.user.name }}</text>
+          <text class="text-body-medium text-surface-on-variant ml-2 flex-1">by {{ illust.user.name }}</text>
           <!-- P0-T3：关注作者（非本人时显示） -->
           <view
             v-if="!isSelfAuthor"
@@ -171,7 +171,7 @@ onMounted(async () => {
             :class="following ? 'border border-outline-variant bg-transparent active:bg-state-pressedOnSurface' : 'bg-primary active:bg-state-pressedPrimary'"
             @tap.stop="toggleFollowAuthor"
           >
-            <text class="text-body-medium" :class="following ? 'text-on-surface' : 'text-on-primary'">
+            <text class="text-body-medium" :class="following ? 'text-surface-on' : 'text-primary-on'">
               {{ following ? '已关注' : '关注' }}
             </text>
           </view>
@@ -198,7 +198,7 @@ onMounted(async () => {
           <text
             v-for="tag in illust.tags.slice(0, 8)"
             :key="tag.name"
-            class="h-[8.533vw] px-2.5 border border-outline-variant rounded-[var(--md-shape-small)] flex items-center justify-center m-1 text-label-large text-on-surface-variant"
+            class="h-[8.533vw] px-2.5 border border-outline-variant rounded-[var(--md-shape-small)] flex items-center justify-center m-1 text-label-large text-surface-on-variant"
           >
             #{{ tag.translated_name || tag.name }}
           </text>

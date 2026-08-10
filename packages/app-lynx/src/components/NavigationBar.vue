@@ -48,13 +48,13 @@ const emit = defineEmits<{
       >
         <text
           class="text-[6.4vw] leading-none"
-          :class="activeName === tab.name ? 'text-on-secondary-container' : 'text-on-surface-variant'"
+          :class="activeName === tab.name ? 'text-secondary-on-container' : 'text-surface-on-variant'"
         >{{ tab.icon }}</text>
       </view>
       <!-- label：12sp≈24rpx，active on-surface / 非 active on-surface-variant -->
       <text
         class="text-label-medium font-medium mt-1"
-        :class="activeName === tab.name ? 'text-on-surface' : 'text-on-surface-variant'"
+        :class="activeName === tab.name ? 'text-surface-on' : 'text-surface-on-variant'"
       >{{ tab.label }}</text>
     </view>
   </view>

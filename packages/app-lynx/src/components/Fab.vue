@@ -21,6 +21,6 @@ const props = withDefaults(
     :accessibility-element="true"
     :accessibility-label="props.a11yLabel"
   >
-    <text class="text-[6.4vw] leading-none text-on-primary-container">{{ props.icon }}</text>
+    <text class="text-[6.4vw] leading-none text-primary-on-container">{{ props.icon }}</text>
   </view>
 </template>
