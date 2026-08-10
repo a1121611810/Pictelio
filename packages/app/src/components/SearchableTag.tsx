@@ -3,8 +3,10 @@ import { type Component } from "solid-js";
 interface SearchableTagProps {
   /** 标签名（搜索关键词） */
   name: string;
-  /** 翻译后的标签名（显示文本） */
+  /** 翻译后的标签名（仅作 title 悬浮提示，不显示在 chip 内——避免 chip 宽度翻倍） */
   translatedName?: string;
+  /** 原生 title 提示（覆盖 translatedName 生成的提示） */
+  title?: string;
   /** 额外 CSS class — 视觉样式（bg、text、rounded、font-size、padding 等）由调用方传入 */
   class?: string;
 }
@@ -32,6 +34,7 @@ const SearchableTag: Component<SearchableTagProps> = (props) => {
 
   return (
     <span
+      title={props.title}
       class={`cursor-pointer inline-flex items-center active:scale-[0.98] transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--colorStrokeFocus2)] focus-visible:-outline-offset-2 ${props.class ?? ""}`}
       role="button"
       tabIndex={0}

@@ -290,7 +290,9 @@ const NovelFeedPanel: Component<{ tab: FeedTab }> = (props) => {
       refreshMode="overlay"
       skeleton={() => <NovelRowSkeleton />}
       empty={() => <EmptyHint />}
-      renderItem={(n) => <NovelRowCard novel={n} onClick={() => void navigate(`/novel/${n.id}`)} />}
+      renderItem={(n) => (
+        <NovelRowCard novel={n} onClick={() => void navigate(`/novel/${n.id}`)} />
+      )}
     />
   );
 };

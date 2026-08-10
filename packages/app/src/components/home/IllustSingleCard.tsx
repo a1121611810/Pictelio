@@ -6,10 +6,16 @@
  * A2 规范（ADR-0074）：XLarge 圆角、NeutralBackground1 底、1px NeutralStroke1 边框、
  * 无阴影、hover 背景高亮、active 轻微缩放。
  * 可访问性：role="button" + tabIndex=0 + Enter 键触发 onClick。
+ *
+ * 标签（A 已定稿，full）：图上 R-18/R-18G/AI/动图 badge + 文案 chip 动态显示
+ * （AdaptiveTags 能放几个放几个 +「+N」折叠，可点搜索）。
+ * 落选变体（B 一行截断 / C 仅分级 badge / none）已归档 throwaway，见 git 历史。
  */
 import type { Component } from "solid-js";
+import { Show } from "solid-js";
 import type { PixivIllust } from "@/api/types";
 import { resolveImageUrl } from "@/utils/imageLoader";
+import AdaptiveTags from "@/components/home/AdaptiveTags";
 
 interface IllustSingleCardProps {
   /** 插画数据 */
@@ -21,6 +27,9 @@ interface IllustSingleCardProps {
 const IllustSingleCard: Component<IllustSingleCardProps> = (props) => {
   // 封面 URL：优先大图，回退中图
   const cover = () => props.illust.image_urls.large ?? props.illust.image_urls.medium;
+  // 内容标签：过滤 R-18/R-18G（分级已由图上的 R-18 badge 表达，避免重复）
+  const contentTags = () =>
+    props.illust.tags.filter((t) => t.name !== "R-18" && t.name !== "R-18G");
   // 原图宽高比（width/height 可能异常，回退 16:10）
   const ratio = () => {
     const w = props.illust.width;
@@ -46,10 +55,34 @@ const IllustSingleCard: Component<IllustSingleCardProps> = (props) => {
           class="h-full w-full object-cover"
           loading="lazy"
         />
+        {/* 图上角标（A 定稿）：左上 R-18/R-18G/AI + 右上动图 */}
+        <div class="absolute left-[var(--spacingHorizontalXS)] top-[var(--spacingVerticalXS)] z-10 flex items-center gap-[var(--spacingHorizontalXXS)] pointer-events-none select-none">
+          {props.illust.x_restrict === 1 && (
+            <fluent-badge appearance="filled" color="danger">
+              R-18
+            </fluent-badge>
+          )}
+          {props.illust.x_restrict === 2 && (
+            <fluent-badge appearance="filled" color="warning">
+              R-18G
+            </fluent-badge>
+          )}
+          <Show when={props.illust.illust_ai_type != null && props.illust.illust_ai_type > 1}>
+            <fluent-badge appearance="filled">
+              {props.illust.illust_ai_type === 2 ? "AI" : "AI辅助"}
+            </fluent-badge>
+          </Show>
+        </div>
+        {/* 右上：动图 */}
+        <Show when={props.illust.type === "ugoira"}>
+          <div class="absolute right-[var(--spacingHorizontalXS)] top-[var(--spacingVerticalXS)] z-10 pointer-events-none select-none">
+            <fluent-badge appearance="filled">动图</fluent-badge>
+          </div>
+        </Show>
       </div>
 
-      {/* 信息行：标题 / 作者 + 收藏数 */}
-      <div class="flex items-center justify-between gap-[var(--spacingHorizontalM)] px-[var(--spacingHorizontalL)] py-[var(--spacingVerticalM)]">
+      {/* 信息行：标题 / 作者 + 收藏数（标签组单独一行，不嵌在左侧模块内） */}
+      <div class="flex items-center justify-between gap-[var(--spacingHorizontalM)] px-[var(--spacingHorizontalL)] pt-[var(--spacingVerticalM)]">
         <div class="min-w-0">
           <p class="truncate text-[var(--colorNeutralForeground1)] font-semibold leading-[var(--lineHeightBase300)] [font-size:var(--fontSizeBase300)]">
             {props.illust.title}
@@ -61,6 +94,11 @@ const IllustSingleCard: Component<IllustSingleCardProps> = (props) => {
         <p class="flex-none text-[var(--colorNeutralForeground3)] [font-size:var(--fontSizeBase200)]">
           ★{props.illust.total_bookmarks.toLocaleString()}
         </p>
+      </div>
+
+      {/* 标签组：单独一行通栏（A 定稿：AdaptiveTags 动态显示 +「+N」折叠） */}
+      <div class="px-[var(--spacingHorizontalL)] pb-[var(--spacingVerticalM)]">
+        <AdaptiveTags tags={contentTags()} onOverflowClick={props.onClick} />
       </div>
     </div>
   );
