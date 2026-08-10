@@ -1,14 +1,10 @@
 // ─── 错误页预览入口（仅 web 开发预览用） ───
 // 访问：http://127.0.0.1:<port>/__web_preview?casename=error-preview.web.bundle
-// 预填样例「会话失效」错误，渲染定稿后的错误页（方案 C：全屏品牌色块）。
+// 预填样例「会话失效」错误，渲染错误页（方案 C）内联样式预览版。
+// 说明：web-core 预览下 Fluent 令牌色（var()）不解析 → 正式 ErrorPage（令牌版）在预览
+// 会退化为白底；此处用内联色值版展示设计效果，生产 ErrorPage.vue 仍为令牌版（真机正常）。
 // 生产（lynx 环境）不构建此入口——仅 environments.web 配置了该 entry。
 import { createApp } from 'vue-lynx'
-// [lynx:fix] 先副作用导入 router：router.ts 的 routes 表静态 import 了全部页面组件，
-// 与页面组件（import router 的 navigate）构成循环依赖。主入口经 App.vue 先触达 router，
-// 顺序恰好安全；独立预览入口以页面组件为起点会反转求值顺序 → TDZ 崩溃
-// （Cannot access '__rspack_default_export' before initialization）。
-// 显式先求值 router，使其 import 链内的页面组件先完成初始化。
-import './router'
 import { defineComponent, h } from 'vue'
 import ErrorPagePreview from './errorPrototype/ErrorPagePreview.vue'
 import { fatalError } from './utils/errorPresentation'

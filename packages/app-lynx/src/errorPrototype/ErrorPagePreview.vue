@@ -1,7 +1,9 @@
 <script setup lang="ts">
-// ─── 错误页预览（定稿方案 C 的内联样式版，仅 web 预览入口使用） ───
-// web-core 预览下 Tailwind 类 / tokens 变量 / rpx 不生效（全局 CSS 未注入 shadowRoot），
-// 故预览用内联 style + 具体 Fluent 色值，与生产 ErrorPage.vue（Tailwind 类版）同一设计。
+// ─── 错误页预览（方案 C 内联样式版，仅 web 预览入口使用） ───
+// web-core 预览下 Fluent 令牌色（var(--colorXxx)）不解析（:root 变量未注入 shadowRoot，
+// 全局限制，现有页面的品牌色在 web 预览同样缺失，仅白底设计不明显）。
+// 错误页 C 为全屏品牌蓝，缺失时退化为白底 → 预览用内联具体色值展示效果；
+// 生产 ErrorPage.vue 用令牌版（真机 lynx 的 CSS 变量机制正常）。
 // 色值取自 tokens.css：brand=#0f6cbd、onBrand=#ffffff。
 import { ERROR_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import type { ApiError } from '../api/types'
