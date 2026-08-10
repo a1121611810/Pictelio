@@ -6,27 +6,23 @@
  * 无阴影、hover 背景高亮、active 轻微缩放。
  * 可访问性：role="button" + tabIndex=0 + Enter 键触发 onClick。
  *
- * 标签（已定稿 T1）：标签独占行卡底部通栏（AdaptiveTags 动态显示 +「+N」折叠，不被封面/徽标遮挡）。
- * 落选变体（T2 信息区截断 / T3 计数徽标）已归档 throwaway，见 git 历史。
+ * 标签（A 已定稿）：封面上 AI/R-18 badge + 底部通栏标签行（AdaptiveTags 动态显示 +「+N」折叠）。
+ * 落选变体（B/C/none 标签模式）已归档 throwaway，见 git 历史。
  */
 import type { Component } from "solid-js";
 import { Show } from "solid-js";
 import type { PixivNovel } from "@/api/types";
 import { resolveImageUrl } from "@/utils/imageLoader";
 import AdaptiveTags from "@/components/home/AdaptiveTags";
-import type { LabelMode } from "./labelMode";
 
 interface NovelRowCardProps {
   /** 小说数据 */
   novel: PixivNovel;
   /** 点击 / 回车回调 */
   onClick: () => void;
-  /** 标签显示模式（默认 none = 仅保留系列徽标） */
-  labelMode?: LabelMode;
 }
 
 const NovelRowCard: Component<NovelRowCardProps> = (props) => {
-  const mode = () => props.labelMode ?? "none";
   // 封面 URL：优先大图，依次回退中图、方形缩略图
   const cover = () =>
     props.novel.image_urls.large ??
@@ -55,14 +51,8 @@ const NovelRowCard: Component<NovelRowCardProps> = (props) => {
             class="h-full w-full object-cover"
             loading="lazy"
           />
-          {/* AI 生成 badge（左上；所有标签模式显示，对齐插画卡语义：novel_ai_type>1 才显示） */}
-          <Show
-            when={
-              mode() !== "none" &&
-              props.novel.novel_ai_type != null &&
-              props.novel.novel_ai_type > 1
-            }
-          >
+          {/* AI 生成 badge（左上；novel_ai_type>1 才显示） */}
+          <Show when={props.novel.novel_ai_type != null && props.novel.novel_ai_type > 1}>
             <span
               class="absolute left-[var(--strokeWidthThin)] top-[var(--strokeWidthThin)] rounded-[var(--borderRadiusSmall)] px-[var(--spacingHorizontalXXS)] font-bold [font-size:var(--fontSizeBase100)]"
               style={{
@@ -73,12 +63,8 @@ const NovelRowCard: Component<NovelRowCardProps> = (props) => {
               AI
             </span>
           </Show>
-          {/* R-18 分级 badge（labelMode 非 none 时显示，安全标识必需） */}
-          <Show
-            when={
-              mode() !== "none" && (props.novel.x_restrict === 1 || props.novel.x_restrict === 2)
-            }
-          >
+          {/* R-18 分级 badge（安全标识必需） */}
+          <Show when={props.novel.x_restrict === 1 || props.novel.x_restrict === 2}>
             <span
               class="absolute right-[var(--strokeWidthThin)] top-[var(--strokeWidthThin)] rounded-[var(--borderRadiusSmall)] px-[var(--spacingHorizontalXXS)] font-bold [font-size:var(--fontSizeBase100)]"
               style={{
@@ -123,8 +109,8 @@ const NovelRowCard: Component<NovelRowCardProps> = (props) => {
         </div>
       </div>
 
-      {/* 标签通栏（T1 已定稿）：独占行卡底部全宽，AdaptiveTags 动态显示 +「+N」折叠 */}
-      <Show when={mode() !== "none" && contentTags().length > 0}>
+      {/* 标签通栏（A 定稿）：独占行卡底部全宽，AdaptiveTags 动态显示 +「+N」折叠 */}
+      <Show when={contentTags().length > 0}>
         <AdaptiveTags tags={contentTags()} onOverflowClick={props.onClick} />
       </Show>
     </div>

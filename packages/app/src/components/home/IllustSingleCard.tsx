@@ -7,30 +7,24 @@
  * 无阴影、hover 背景高亮、active 轻微缩放。
  * 可访问性：role="button" + tabIndex=0 + Enter 键触发 onClick。
  *
- * 标签（labelMode，UI 原型 3 变体 v2）：
- * - full（A 信息全）：图上 R-18/AI/动图 badge + 文案 chip 动态显示（能放几个放几个 +「+N」折叠，可点搜索）
- * - minimal（B 克制）：图上 R-18/AI/动图 badge + 文案标签一行截断（纯提示）
- * - r18only（C 移动优先）：图上仅 R-18/AI 分级 badge（无动图、无文案标签）
- * - none：无标签（默认，正式版现状）
+ * 标签（A 已定稿，full）：图上 R-18/R-18G/AI/动图 badge + 文案 chip 动态显示
+ * （AdaptiveTags 能放几个放几个 +「+N」折叠，可点搜索）。
+ * 落选变体（B 一行截断 / C 仅分级 badge / none）已归档 throwaway，见 git 历史。
  */
 import type { Component } from "solid-js";
 import { Show } from "solid-js";
 import type { PixivIllust } from "@/api/types";
 import { resolveImageUrl } from "@/utils/imageLoader";
 import AdaptiveTags from "@/components/home/AdaptiveTags";
-import type { LabelMode } from "./labelMode";
 
 interface IllustSingleCardProps {
   /** 插画数据 */
   illust: PixivIllust;
   /** 点击 / 回车回调 */
   onClick: () => void;
-  /** 标签显示模式（默认 none = 不显示标签） */
-  labelMode?: LabelMode;
 }
 
 const IllustSingleCard: Component<IllustSingleCardProps> = (props) => {
-  const mode = () => props.labelMode ?? "none";
   // 封面 URL：优先大图，回退中图
   const cover = () => props.illust.image_urls.large ?? props.illust.image_urls.medium;
   // 内容标签：过滤 R-18/R-18G（分级已由图上的 R-18 badge 表达，避免重复）
@@ -61,34 +55,29 @@ const IllustSingleCard: Component<IllustSingleCardProps> = (props) => {
           class="h-full w-full object-cover"
           loading="lazy"
         />
-        {/* 图上角标（labelMode） */}
-        <Show when={mode() !== "none"}>
-          {/* 左上：R-18 / R-18G / AI（r18only 仅 R-18） */}
-          <div class="absolute left-[var(--spacingHorizontalXS)] top-[var(--spacingVerticalXS)] z-10 flex items-center gap-[var(--spacingHorizontalXXS)] pointer-events-none select-none">
-            {props.illust.x_restrict === 1 && (
-              <fluent-badge appearance="filled" color="danger">
-                R-18
-              </fluent-badge>
-            )}
-            {props.illust.x_restrict === 2 && (
-              <fluent-badge appearance="filled" color="warning">
-                R-18G
-              </fluent-badge>
-            )}
-            <Show when={props.illust.illust_ai_type != null && props.illust.illust_ai_type > 1}>
-              <fluent-badge appearance="filled">
-                {props.illust.illust_ai_type === 2 ? "AI" : "AI辅助"}
-              </fluent-badge>
-            </Show>
-          </div>
-          {/* 右上：动图（r18only 不显示） */}
-          <Show
-            when={(mode() === "full" || mode() === "minimal") && props.illust.type === "ugoira"}
-          >
-            <div class="absolute right-[var(--spacingHorizontalXS)] top-[var(--spacingVerticalXS)] z-10 pointer-events-none select-none">
-              <fluent-badge appearance="filled">动图</fluent-badge>
-            </div>
+        {/* 图上角标（A 定稿）：左上 R-18/R-18G/AI + 右上动图 */}
+        <div class="absolute left-[var(--spacingHorizontalXS)] top-[var(--spacingVerticalXS)] z-10 flex items-center gap-[var(--spacingHorizontalXXS)] pointer-events-none select-none">
+          {props.illust.x_restrict === 1 && (
+            <fluent-badge appearance="filled" color="danger">
+              R-18
+            </fluent-badge>
+          )}
+          {props.illust.x_restrict === 2 && (
+            <fluent-badge appearance="filled" color="warning">
+              R-18G
+            </fluent-badge>
+          )}
+          <Show when={props.illust.illust_ai_type != null && props.illust.illust_ai_type > 1}>
+            <fluent-badge appearance="filled">
+              {props.illust.illust_ai_type === 2 ? "AI" : "AI辅助"}
+            </fluent-badge>
           </Show>
+        </div>
+        {/* 右上：动图 */}
+        <Show when={props.illust.type === "ugoira"}>
+          <div class="absolute right-[var(--spacingHorizontalXS)] top-[var(--spacingVerticalXS)] z-10 pointer-events-none select-none">
+            <fluent-badge appearance="filled">动图</fluent-badge>
+          </div>
         </Show>
       </div>
 
@@ -107,21 +96,10 @@ const IllustSingleCard: Component<IllustSingleCardProps> = (props) => {
         </p>
       </div>
 
-      {/* 标签组：单独一行通栏（full = 自适应 chip 行；minimal = 一行截断文本；r18only/none 不显示） */}
-      <Show when={mode() === "full" || mode() === "minimal"}>
-        <div class="px-[var(--spacingHorizontalL)] pb-[var(--spacingVerticalM)]">
-          <Show when={mode() === "full"}>
-            <AdaptiveTags tags={contentTags()} onOverflowClick={props.onClick} />
-          </Show>
-          <Show when={mode() === "minimal"}>
-            <p class="mt-[var(--spacingVerticalXS)] truncate text-[var(--colorNeutralForeground3)] [font-size:var(--fontSizeBase100)]">
-              {contentTags()
-                .map((t) => t.name)
-                .join(" · ")}
-            </p>
-          </Show>
-        </div>
-      </Show>
+      {/* 标签组：单独一行通栏（A 定稿：AdaptiveTags 动态显示 +「+N」折叠） */}
+      <div class="px-[var(--spacingHorizontalL)] pb-[var(--spacingVerticalM)]">
+        <AdaptiveTags tags={contentTags()} onOverflowClick={props.onClick} />
+      </div>
     </div>
   );
 };

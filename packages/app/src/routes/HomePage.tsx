@@ -11,12 +11,10 @@
  */
 import type { Component } from "solid-js";
 import { createEffect, onMount } from "solid-js";
-import { useNavigate, useSearchParams } from "@solidjs/router";
+import { useNavigate } from "@solidjs/router";
 import type { PixivIllust, PixivNovel } from "@/api/types";
 import PageTransition from "@/components/PageTransition";
 import { FeedList } from "@/components/home/FeedList";
-import type { LabelMode } from "@/components/home/labelMode";
-import PrototypeSwitcher from "@/components/ui/PrototypeSwitcher";
 import { markContentReady } from "@/native/splashBridge";
 import SideNavShell, { type HomeTab } from "@/components/home/SideNavShell";
 import IllustSingleCard from "@/components/home/IllustSingleCard";
@@ -244,7 +242,7 @@ const EmptyHint: Component = () => (
 );
 
 /** 插画单列大图 Feed 面板（数据源激活 + FeedList 统一交互：下拉刷新 A1 遮罩 + 滚动分页，ADR-0078）。 */
-const IllustFeedPanel: Component<{ tab: FeedTab; labelMode: LabelMode }> = (props) => {
+const IllustFeedPanel: Component<{ tab: FeedTab }> = (props) => {
   const navigate = useNavigate();
   const src = () => illustSource(props.tab);
   useFeedActivation(src);
@@ -265,21 +263,14 @@ const IllustFeedPanel: Component<{ tab: FeedTab; labelMode: LabelMode }> = (prop
       skeleton={() => <IllustRowSkeleton />}
       empty={() => <EmptyHint />}
       renderItem={(il) => (
-        <IllustSingleCard
-          illust={il}
-          labelMode={props.labelMode}
-          onClick={() => void navigate(`/illust/${il.id}`)}
-        />
+        <IllustSingleCard illust={il} onClick={() => void navigate(`/illust/${il.id}`)} />
       )}
     />
   );
 };
 
 /** 小说单列行卡 Feed 面板（数据源激活 + FeedList 统一交互，ADR-0078）。 */
-const NovelFeedPanel: Component<{
-  tab: FeedTab;
-  labelMode: LabelMode;
-}> = (props) => {
+const NovelFeedPanel: Component<{ tab: FeedTab }> = (props) => {
   const navigate = useNavigate();
   const src = () => novelSource(props.tab);
   useFeedActivation(src);
@@ -300,29 +291,13 @@ const NovelFeedPanel: Component<{
       skeleton={() => <NovelRowSkeleton />}
       empty={() => <EmptyHint />}
       renderItem={(n) => (
-        <NovelRowCard
-          novel={n}
-          labelMode={props.labelMode}
-          onClick={() => void navigate(`/novel/${n.id}`)}
-        />
+        <NovelRowCard novel={n} onClick={() => void navigate(`/novel/${n.id}`)} />
       )}
     />
   );
 };
 
-/** 标签变体（UI 原型）：?variant=A/B/C → labelMode full/minimal/r18only；无参数 = none（正式版现状） */
-const LABEL_VARIANTS: { key: string; label: string; mode: LabelMode }[] = [
-  { key: "A", label: "标签全量", mode: "full" },
-  { key: "B", label: "标签克制", mode: "minimal" },
-  { key: "C", label: "移动优先", mode: "r18only" },
-];
-
 const HomePage: Component = () => {
-  const [searchParams] = useSearchParams();
-  const labelMode = (): LabelMode =>
-    LABEL_VARIANTS.find(
-      (v) => v.key === (searchParams as Record<string, string | undefined>).variant,
-    )?.mode ?? "none";
   onMount(() => {
     // 首页是登录后启动首屏：挂载后通知原生关闭 Splash Screen（幂等）
     markContentReady();
@@ -337,15 +312,11 @@ const HomePage: Component = () => {
             return <></>;
           }
           return contentType() === "illust" ? (
-            <IllustFeedPanel tab={tab} labelMode={labelMode()} />
+            <IllustFeedPanel tab={tab} />
           ) : (
-            <NovelFeedPanel tab={tab} labelMode={labelMode()} />
+            <NovelFeedPanel tab={tab} />
           );
         }}
-      />
-      <PrototypeSwitcher
-        variants={LABEL_VARIANTS.map(({ key, label }) => ({ key, label }))}
-        param="variant"
       />
     </PageTransition>
   );
