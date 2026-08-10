@@ -204,13 +204,13 @@ function toggleR18G() {
           @tap="toggleR18"
         >
           <text class="text-title-medium text-surface-on">显示 R-18 内容</text>
-          <!-- M3 switch：轨道 52×32dp + thumb 16dp 静态统一（开/关同尺寸；M3 规范中按压缩放 24dp
-            由交互状态驱动，Lynx 伪类支持有限暂不做，颜色区分开=on-primary/关=outline） -->
+          <!-- M3 switch（官方 token v0.192）：轨道 52×32dp、选中 thumb 24dp / 未选中 16dp、
+               未选中轨道 2dp outline 边框、按压 28dp（active: 变体，web-core 生效） -->
           <view
-            class="w-[13.867vw] h-[8.533vw] rounded-full p-[0.8vw] flex flex-row transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
-            :class="showR18 ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start'"
+            class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
+            :class="showR18 ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
           >
-            <view class="rounded-full shadow-[var(--md-elevation-1)]" :class="showR18 ? 'w-[4.267vw] h-[4.267vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
+            <view class="rounded-full shadow-[var(--md-elevation-1)] active:w-[7.467vw] active:h-[7.467vw]" :class="showR18 ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
           </view>
         </view>
         <view
@@ -221,10 +221,10 @@ function toggleR18G() {
         >
           <text class="text-title-medium text-surface-on">显示 R-18G 内容</text>
           <view
-            class="w-[13.867vw] h-[8.533vw] rounded-full p-[0.8vw] flex flex-row transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
-            :class="showR18G ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start'"
+            class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
+            :class="showR18G ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
           >
-            <view class="rounded-full shadow-[var(--md-elevation-1)]" :class="showR18G ? 'w-[4.267vw] h-[4.267vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
+            <view class="rounded-full shadow-[var(--md-elevation-1)] active:w-[7.467vw] active:h-[7.467vw]" :class="showR18G ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
           </view>
         </view>
       </view>
