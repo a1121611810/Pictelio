@@ -20,7 +20,7 @@ import PrototypeSwitcher from "@/components/ui/PrototypeSwitcher";
 import { markContentReady } from "@/native/splashBridge";
 import SideNavShell, { type HomeTab } from "@/components/home/SideNavShell";
 import IllustSingleCard from "@/components/home/IllustSingleCard";
-import NovelRowCard, { type NovelTagLayout } from "@/components/home/NovelRowCard";
+import NovelRowCard from "@/components/home/NovelRowCard";
 import { contentType } from "@/stores/uiStore";
 // ── 插画数据源（推荐/关注/收藏）──
 import {
@@ -279,7 +279,6 @@ const IllustFeedPanel: Component<{ tab: FeedTab; labelMode: LabelMode }> = (prop
 const NovelFeedPanel: Component<{
   tab: FeedTab;
   labelMode: LabelMode;
-  tagLayout: NovelTagLayout;
 }> = (props) => {
   const navigate = useNavigate();
   const src = () => novelSource(props.tab);
@@ -304,7 +303,6 @@ const NovelFeedPanel: Component<{
         <NovelRowCard
           novel={n}
           labelMode={props.labelMode}
-          tagLayout={props.tagLayout}
           onClick={() => void navigate(`/novel/${n.id}`)}
         />
       )}
@@ -319,23 +317,12 @@ const LABEL_VARIANTS: { key: string; label: string; mode: LabelMode }[] = [
   { key: "C", label: "移动优先", mode: "r18only" },
 ];
 
-/** 小说卡标签布局变体（UI 原型）：?novelTags=T1/T2/T3；无参数 = fullwidth（默认） */
-const NOVEL_TAG_VARIANTS: { key: string; label: string; layout: NovelTagLayout }[] = [
-  { key: "T1", label: "通栏标签行", layout: "fullwidth" },
-  { key: "T2", label: "信息区截断", layout: "truncate" },
-  { key: "T3", label: "计数徽标", layout: "count" },
-];
-
 const HomePage: Component = () => {
   const [searchParams] = useSearchParams();
   const labelMode = (): LabelMode =>
     LABEL_VARIANTS.find(
       (v) => v.key === (searchParams as Record<string, string | undefined>).variant,
     )?.mode ?? "none";
-  const novelTagLayout = (): NovelTagLayout =>
-    NOVEL_TAG_VARIANTS.find(
-      (v) => v.key === (searchParams as Record<string, string | undefined>).novelTags,
-    )?.layout ?? "fullwidth";
   onMount(() => {
     // 首页是登录后启动首屏：挂载后通知原生关闭 Splash Screen（幂等）
     markContentReady();
@@ -352,18 +339,13 @@ const HomePage: Component = () => {
           return contentType() === "illust" ? (
             <IllustFeedPanel tab={tab} labelMode={labelMode()} />
           ) : (
-            <NovelFeedPanel tab={tab} labelMode={labelMode()} tagLayout={novelTagLayout()} />
+            <NovelFeedPanel tab={tab} labelMode={labelMode()} />
           );
         }}
       />
       <PrototypeSwitcher
         variants={LABEL_VARIANTS.map(({ key, label }) => ({ key, label }))}
         param="variant"
-      />
-      <PrototypeSwitcher
-        variants={NOVEL_TAG_VARIANTS.map(({ key, label }) => ({ key, label }))}
-        param="novelTags"
-        stacked
       />
     </PageTransition>
   );

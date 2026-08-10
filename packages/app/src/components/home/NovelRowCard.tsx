@@ -6,10 +6,8 @@
  * 无阴影、hover 背景高亮、active 轻微缩放。
  * 可访问性：role="button" + tabIndex=0 + Enter 键触发 onClick。
  *
- * 标签布局变体（?novelTags=，UI 原型）：
- *  - fullwidth（默认，已选 T1）：标签独占行卡底部通栏（动态显示 +「+N」折叠，不被封面/徽标遮挡）
- *  - truncate：信息区内单行 CSS 截断（无渐变遮罩/徽标，尽量多显示标签文本）
- *  - count：封面右下「N tags」计数徽标，信息区不显示标签文本
+ * 标签（已定稿 T1）：标签独占行卡底部通栏（AdaptiveTags 动态显示 +「+N」折叠，不被封面/徽标遮挡）。
+ * 落选变体（T2 信息区截断 / T3 计数徽标）已归档 throwaway，见 git 历史。
  */
 import type { Component } from "solid-js";
 import { Show } from "solid-js";
@@ -25,16 +23,10 @@ interface NovelRowCardProps {
   onClick: () => void;
   /** 标签显示模式（默认 none = 仅保留系列徽标） */
   labelMode?: LabelMode;
-  /** 标签布局变体（默认 fullwidth） */
-  tagLayout?: "fullwidth" | "truncate" | "count";
 }
-
-/** 小说卡标签布局变体（?novelTags=） */
-export type NovelTagLayout = NonNullable<NovelRowCardProps["tagLayout"]>;
 
 const NovelRowCard: Component<NovelRowCardProps> = (props) => {
   const mode = () => props.labelMode ?? "none";
-  const layout = () => props.tagLayout ?? "fullwidth";
   // 封面 URL：优先大图，依次回退中图、方形缩略图
   const cover = () =>
     props.novel.image_urls.large ??
@@ -55,7 +47,7 @@ const NovelRowCard: Component<NovelRowCardProps> = (props) => {
     >
       {/* 第一行：封面缩略图 + 标题 / 作者 / 统计 */}
       <div class="flex items-center gap-[var(--spacingHorizontalM)]">
-        {/* 封面缩略图（AI 左上 + R-18 分级右上 + count 变体右下；系列徽标移到标题行，避免 56px 封面徽标重叠） */}
+        {/* 封面缩略图（AI 左上 + R-18 分级右上；系列徽标移到标题行，避免 56px 封面徽标重叠） */}
         <div class="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)]">
           <img
             src={resolveImageUrl(cover())}
@@ -100,21 +92,9 @@ const NovelRowCard: Component<NovelRowCardProps> = (props) => {
               {props.novel.x_restrict === 2 ? "R-18G" : "R-18"}
             </span>
           </Show>
-          {/* count 变体：封面右下「N tags」计数（信息区不再显示标签文本） */}
-          <Show when={mode() !== "none" && layout() === "count" && contentTags().length > 0}>
-            <span
-              class="absolute bottom-[var(--strokeWidthThin)] right-[var(--strokeWidthThin)] rounded-[var(--borderRadiusSmall)] px-[var(--spacingHorizontalXXS)] [font-size:var(--fontSizeBase100)]"
-              style={{
-                background: "color-mix(in srgb, var(--colorNeutralBackground1) 80%, transparent)",
-                color: "var(--colorNeutralForeground1)",
-              }}
-            >
-              {contentTags().length} tags
-            </span>
-          </Show>
         </div>
 
-        {/* 标题（系列徽标内联前置）/ 作者 / 统计（fullwidth 变体：标签行移到下方通栏） */}
+        {/* 标题（系列徽标内联前置）/ 作者 / 统计（标签行在卡片底部通栏） */}
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-[var(--spacingHorizontalXXS)]">
             {/* 系列徽标：56px 封面放不下两个徽标（会与 R-18 重叠），移到标题行 */}
@@ -140,19 +120,11 @@ const NovelRowCard: Component<NovelRowCardProps> = (props) => {
             ★{props.novel.total_bookmarks.toLocaleString()} ·{" "}
             {(props.novel.text_length / 1000).toFixed(1)}k 字
           </p>
-          {/* truncate 变体：信息区内单行截断（无遮罩/徽标，尽量多显示） */}
-          <Show when={mode() !== "none" && layout() === "truncate" && contentTags().length > 0}>
-            <p class="mt-[var(--spacingVerticalXS)] truncate text-[var(--colorNeutralForeground3)] [font-size:var(--fontSizeBase100)]">
-              {contentTags()
-                .map((t) => t.name)
-                .join(" · ")}
-            </p>
-          </Show>
         </div>
       </div>
 
-      {/* fullwidth 变体：标签独占行卡底部通栏（全宽自适应，不被封面/徽标遮挡） */}
-      <Show when={mode() !== "none" && layout() === "fullwidth" && contentTags().length > 0}>
+      {/* 标签通栏（T1 已定稿）：独占行卡底部全宽，AdaptiveTags 动态显示 +「+N」折叠 */}
+      <Show when={mode() !== "none" && contentTags().length > 0}>
         <AdaptiveTags tags={contentTags()} onOverflowClick={props.onClick} />
       </Show>
     </div>
