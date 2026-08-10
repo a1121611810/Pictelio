@@ -12,6 +12,7 @@ import {
 } from '../api/user'
 import type { PixivUserPreview } from '../api/types'
 import { proxyImageUrl } from '../utils/imageUrl'
+import { presentError } from '../utils/errorPresentation'
 import SkeletonImage from '../components/SkeletonImage.vue'
 
 const userId = Number(currentParams.value.id)
@@ -40,7 +41,7 @@ async function fetchFirstPage() {
     })
     nextUrl.value = res.next_url
   } catch (err) {
-    errorMsg.value = (err as { message?: string }).message ?? '加载失败'
+    errorMsg.value = presentError(err, '加载失败')
   } finally {
     loading.value = false
     lastLoadEndedAt = Date.now()
@@ -64,7 +65,7 @@ async function loadMore() {
     users.value.push(...fresh)
     nextUrl.value = fresh.length === 0 ? null : res.next_url
   } catch (err) {
-    errorMsg.value = (err as { message?: string }).message ?? '加载更多失败'
+    errorMsg.value = presentError(err, '加载更多失败')
   } finally {
     loadingMore.value = false
     lastLoadEndedAt = Date.now()

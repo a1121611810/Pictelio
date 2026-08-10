@@ -14,7 +14,7 @@ import { loadUserNovels, loadBookmarks as loadNovelBookmarks, loadFollow as load
 import { bytesToDataUrl, downloadUgoiraFrames } from '../src/api/ugoira'
 import type { UgoiraExtractMode } from '../src/api/ugoira'
 import { ugoiraMode as lynxUgoiraMode, setUgoiraMode as lynxSetUgoiraMode } from '../src/stores/settingsStore'
-import { ME_A11Y_LABELS, LOGIN_A11Y_LABELS, RECOMMENDED_A11Y_LABELS, UPDATE_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../src/utils/accessibility'
+import { ME_A11Y_LABELS, LOGIN_A11Y_LABELS, RECOMMENDED_A11Y_LABELS, UPDATE_A11Y_LABELS, ERROR_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../src/utils/accessibility'
 
 describe('imageUrl.proxyImageUrl', () => {
   it('将 i.pximg.net URL 重写为本地代理路径', () => {
@@ -1017,6 +1017,20 @@ describe('Update 页 accessibility 标注（检查更新）', () => {
   })
 })
 
+describe('会话失效错误页 accessibility 标注（候选 #2）', () => {
+  const errorVueSource = readFileSync(fileURLToPath(new URL('../src/pages/ErrorPage.vue', import.meta.url)), 'utf8')
+
+  it('ERROR_A11Y_LABELS 全部被 ErrorPage.vue 消费且配套 element', () => {
+    for (const key of Object.keys(ERROR_A11Y_LABELS)) {
+      expect(errorVueSource).toContain(`:accessibility-label="ERROR_A11Y_LABELS.${key}"`)
+    }
+    const labelCount = (errorVueSource.match(/:accessibility-label="ERROR_A11Y_LABELS\.\w+"/g) ?? []).length
+    const elementCount = (errorVueSource.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
+    expect(labelCount).toBe(Object.keys(ERROR_A11Y_LABELS).length)
+    expect(elementCount).toBe(labelCount)
+  })
+})
+
 const { normalizeKinds, supportsClientSwitch } = await import('../src/stores/clientSwitchStore')
 
 describe('clientSwitchStore.normalizeKinds / supportsClientSwitch（ADR-0062 包能力）', () => {
@@ -1108,5 +1122,107 @@ describe('clientSwitchStore.normalizeKinds / supportsClientSwitch（ADR-0062 包
       expect(mod.availableKinds.value).toEqual(['webview'])
       expect(mod.supportsClientSwitch(mod.availableKinds.value)).toBe(false)
     })
+  })
+})
+
+// ─── 会话失效触发错误页（候选 #2：reportSessionError 触发链） ───
+describe('authStore 会话失效触发错误页（候选 #2）', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    })
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('登录页输入错误 token 不触发 reportSessionError（内联错误是正确行为）', async () => {
+    // 非 hoisted mock：仅本测试生效，不影响其他 authStore describe
+    vi.doMock('../src/api/auth', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('../src/api/auth')>()
+      return {
+        ...actual,
+        loginWithRefreshToken: vi.fn(async () => {
+          const e = new Error('登录凭证已失效，请重新登录 (HTTP 400)') as Error & { type?: string }
+          e.type = 'unauthorized'
+          throw e
+        }),
+      }
+    })
+    const spy = vi
+      .spyOn(await import('../src/utils/errorPresentation'), 'reportSessionError')
+      .mockImplementation(() => {})
+    const { loginWithToken } = await import('../src/stores/authStore')
+    await loginWithToken('bad-token')
+    expect(spy).not.toHaveBeenCalled()
+    spy.mockRestore()
+  })
+
+  it('已登录会话 401 刷新失败（unauthorized）→ reportSessionError 被调用', async () => {
+    let failNext = false
+    vi.doMock('../src/api/auth', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('../src/api/auth')>()
+      return {
+        ...actual,
+        loginWithRefreshToken: vi.fn(async () => {
+          if (failNext) {
+            const e = new Error('登录凭证已失效，请重新登录 (HTTP 400)') as Error & { type?: string }
+            e.type = 'unauthorized'
+            throw e
+          }
+          return {
+            access_token: 'at',
+            refresh_token: 'rt',
+            expires_in: 3600,
+            token_type: 'bearer',
+            user: { id: 1, name: 'u', account: 'u', profile_image_urls: {} },
+          }
+        }),
+      }
+    })
+    // 捕获 client.setOnUnauthorized 注册的 401 刷新 handler
+    const clientMod = await import('../src/api/client')
+    let captured: ((() => Promise<void>) | null) = null
+    const setSpy = vi.spyOn(clientMod, 'setOnUnauthorized').mockImplementation((h) => {
+      captured = h as () => Promise<void>
+    })
+    const spy = vi
+      .spyOn(await import('../src/utils/errorPresentation'), 'reportSessionError')
+      .mockImplementation(() => {})
+    const { loginWithToken, registerUnauthorizedHandler } = await import('../src/stores/authStore')
+    // 先登录成功（会话就绪），再注册 401 刷新 handler
+    await loginWithToken('good-token')
+    registerUnauthorizedHandler()
+    expect(captured).not.toBeNull()
+    // 触发 401 刷新：此时刷新失败 → 会话失效 → 全屏错误页
+    failNext = true
+    await captured!()
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(spy.mock.calls[0]?.[0]).toMatchObject({ type: 'unauthorized' })
+    setSpy.mockRestore()
+    spy.mockRestore()
+  })
+
+  it('网络类错误（非 unauthorized）不触发 reportSessionError', async () => {
+    vi.doMock('../src/api/auth', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('../src/api/auth')>()
+      return {
+        ...actual,
+        loginWithRefreshToken: vi.fn(async () => {
+          throw new Error('网络不可用，请检查连接')
+        }),
+      }
+    })
+    const spy = vi
+      .spyOn(await import('../src/utils/errorPresentation'), 'reportSessionError')
+      .mockImplementation(() => {})
+    const { loginWithToken } = await import('../src/stores/authStore')
+    await loginWithToken('bad-token')
+    expect(spy).not.toHaveBeenCalled()
+    spy.mockRestore()
   })
 })

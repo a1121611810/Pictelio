@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { currentParams, goBack } from '../router'
 import { loadNovelDetail, fetchNovelText } from '../api/novel'
 import type { PixivNovel } from '../api/types'
+import { presentError } from '../utils/errorPresentation'
 import { isRestricted } from '../stores/settingsStore'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
 import CommentOverlay from '../components/CommentOverlay.vue'
@@ -37,7 +38,7 @@ onMounted(async () => {
       text.value = await fetchNovelText(novelId.value)
     }
   } catch (err) {
-    errorMsg.value = (err as { message?: string }).message ?? '加载失败'
+    errorMsg.value = presentError(err, '加载失败')
   } finally {
     loading.value = false
   }

@@ -50,5 +50,11 @@ export const RECOMMENDED_A11Y_LABELS = {
   openMe: '我的',
 } as const
 
+/** 会话失效错误页 accessibility 标注（候选 #2：全屏错误页 /error） */
+export const ERROR_A11Y_LABELS = {
+  pageTitle: '登录已过期',
+  backToLogin: '返回登录',
+} as const
+
 // Lynx 元素属性不支持 Vue 插值表达式，模板中用 :accessibility-element 绑定此常量
 export const A11Y_ELEMENT_ENABLED = true

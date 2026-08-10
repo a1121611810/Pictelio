@@ -8,7 +8,9 @@ import { ref, computed } from "vue"
 import { isNativeMode, getNativeModules, setAccessToken, setOnUnauthorized, setAuthPermanentFailure } from "../api/client"
 import { loginWithRefreshToken } from "../api/auth"
 import type { PixivUser } from "../api/types"
+import { ApiErrorType } from "../api/types"
 import { toApiError } from "../utils/errors"
+import { reportSessionError } from "../utils/errorPresentation"
 import { saveRefreshToken, loadRefreshToken, clearRefreshToken } from "../utils/tokenStorage"
 
 const _refreshToken = ref<string | null>(null)
@@ -154,7 +156,17 @@ export function logout() {
 export function registerUnauthorizedHandler() {
   setOnUnauthorized(async () => {
     const token = _refreshToken.value
-    if (!token) return
-    await performRefresh(token)
+    if (!token) {
+      console.warn("[authStore] 401 触发刷新但内存无 refresh_token（登录态已丢失），跳过刷新")
+      return
+    }
+    const ok = await performRefresh(token)
+    // 会话失效判定：仅「已登录会话的 401 刷新失败且进入永久失效清理态」触发全屏错误页。
+    // 登录页输错 token / 启动恢复失败也走 performRefresh，但不经过本 handler——
+    // 它们无会话可失效（Login 内联错误 / 静默回登录页是正确行为，不应跳错误页）。
+    // 判别：刷新失败 + accessToken 不再就绪（unauthorized 分支已清空状态；网络类错误保持就绪不触发）。
+    if (!ok && _accessTokenReady.value === false && _authError.value) {
+      reportSessionError({ type: ApiErrorType.UNAUTHORIZED, message: _authError.value })
+    }
   })
 }

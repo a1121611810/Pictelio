@@ -8,6 +8,7 @@ import type { PixivIllust } from '../api/types'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { resolveQualityUrl } from '../utils/imageQuality'
 import { detailImageHeightVw } from '../utils/imageLayout'
+import { presentError } from '../utils/errorPresentation'
 import { detailQuality } from '../stores/settingsStore'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import CommentOverlay from '../components/CommentOverlay.vue'
@@ -101,7 +102,7 @@ onMounted(async () => {
     // P0-T3：同步作者关注状态（详情 API 可能不返回 is_followed，缺省 false）
     following.value = !!res.illust.user.is_followed
   } catch (err) {
-    errorMsg.value = (err as { message?: string }).message ?? '加载失败'
+    errorMsg.value = presentError(err, '加载失败')
   } finally {
     loading.value = false
   }

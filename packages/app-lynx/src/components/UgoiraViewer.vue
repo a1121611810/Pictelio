@@ -5,6 +5,7 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { downloadUgoiraFrames, type UgoiraFrameData } from '../api/ugoira'
 import { ugoiraMode } from '../stores/settingsStore'
+import { presentError } from '../utils/errorPresentation'
 
 const props = withDefaults(defineProps<{
   illustId: number
@@ -63,7 +64,7 @@ onMounted(async () => {
     }
   } catch (err) {
     if (!disposed && !abort.signal.aborted) {
-      errorMsg.value = (err as { message?: string }).message ?? '动图加载失败'
+      errorMsg.value = presentError(err, '动图加载失败')
     }
   } finally {
     if (!disposed) loading.value = false

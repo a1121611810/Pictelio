@@ -4,6 +4,7 @@ import { navigate, resetHistory } from '../router'
 import { loginWithToken, isLoggedIn } from '../stores/authStore'
 import { authError } from '../stores/authStore'
 import { LOGIN_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import { presentError } from '../utils/errorPresentation'
 
 const tokenInput = ref('')
 const submitting = ref(false)
@@ -23,7 +24,7 @@ async function submit() {
       errorMsg.value = authError.value ?? '登录失败'
     }
   } catch (err) {
-    errorMsg.value = (err as { message?: string }).message ?? '登录失败'
+    errorMsg.value = presentError(err, '登录失败')
   } finally {
     submitting.value = false
   }

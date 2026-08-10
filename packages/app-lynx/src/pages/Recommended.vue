@@ -7,6 +7,7 @@ import { loadRecommended, loadNext } from '../api/illust'
 import type { PixivIllust } from '../api/types'
 import { thumbUrl } from '../utils/imageUrl'
 import { withTimeout } from '../utils/withTimeout'
+import { presentError } from '../utils/errorPresentation'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
@@ -46,7 +47,7 @@ async function fetchFirstPage() {
     pendingIllusts.value = all.slice(PAGE_SIZE)
     nextUrl.value = res.next_url
   } catch (err) {
-    errorMsg.value = (err as { message?: string }).message ?? '加载失败'
+    errorMsg.value = presentError(err, '加载失败')
   } finally {
     loading.value = false
     // [lynx:fix] 第一页加载完成同样进入冷却，防 web-core 延迟误触发 scrolltolower
@@ -78,7 +79,7 @@ async function loadMore() {
     // 空页防护：基于服务端原始返回判空（issue #91：不再用过滤后长度）
     nextUrl.value = res.illusts.length === 0 ? null : res.next_url
   } catch (err) {
-    errorMsg.value = (err as { message?: string }).message ?? '加载更多失败'
+    errorMsg.value = presentError(err, '加载更多失败')
   } finally {
     loadingMore.value = false
     lastLoadEndedAt = Date.now()

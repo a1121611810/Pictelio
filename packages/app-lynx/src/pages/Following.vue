@@ -6,6 +6,7 @@ import { navigate, goBack } from '../router'
 import { loadFollow, loadNext } from '../api/illust'
 import type { PixivIllust } from '../api/types'
 import { thumbUrl } from '../utils/imageUrl'
+import { presentError } from '../utils/errorPresentation'
 import { isRestricted } from '../stores/settingsStore'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
@@ -30,7 +31,7 @@ async function fetchFirstPage() {
     illusts.value = res.illusts
     nextUrl.value = res.next_url
   } catch (err) {
-    errorMsg.value = (err as { message?: string }).message ?? '加载失败'
+    errorMsg.value = presentError(err, '加载失败')
   } finally {
     loading.value = false
     lastLoadEndedAt = Date.now()
@@ -52,7 +53,7 @@ async function loadMore() {
     // 空页防护：基于服务端原始返回判空（issue #91）
     nextUrl.value = res.illusts.length === 0 ? null : res.next_url
   } catch (err) {
-    errorMsg.value = (err as { message?: string }).message ?? '加载更多失败'
+    errorMsg.value = presentError(err, '加载更多失败')
   } finally {
     loadingMore.value = false
     lastLoadEndedAt = Date.now()

@@ -5,6 +5,7 @@ import { ref, onMounted } from 'vue'
 import { navigate, goBack } from '../router'
 import { loadRecommendedNovels, loadFollow, loadNovelNext } from '../api/novel'
 import type { PixivNovel } from '../api/types'
+import { presentError } from '../utils/errorPresentation'
 import { withTimeout } from '../utils/withTimeout'
 import { isRestricted } from '../stores/settingsStore'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
@@ -44,7 +45,7 @@ async function fetchFirstPage() {
     nextUrl.value = res.next_url
   } catch (err) {
     if (gen !== modeGen) return
-    errorMsg.value = (err as { message?: string }).message ?? '加载失败'
+    errorMsg.value = presentError(err, '加载失败')
   } finally {
     if (gen === modeGen) {
       loading.value = false
@@ -80,7 +81,7 @@ async function loadMore() {
     // 空页防护：基于服务端原始返回判空（issue #91：不再用过滤后长度，否则全受限页误杀分页）
     nextUrl.value = res.novels.length === 0 ? null : res.next_url
   } catch (err) {
-    errorMsg.value = (err as { message?: string }).message ?? '加载更多失败'
+    errorMsg.value = presentError(err, '加载更多失败')
   } finally {
     loadingMore.value = false
     lastLoadEndedAt = Date.now()

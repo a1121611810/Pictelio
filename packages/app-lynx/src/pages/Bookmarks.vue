@@ -7,6 +7,7 @@ import { loadBookmarks as loadIllustBookmarks, loadNext } from '../api/illust'
 import { loadBookmarks as loadNovelBookmarks, loadNovelNext } from '../api/novel'
 import type { PixivIllust, PixivNovel } from '../api/types'
 import { currentUser } from '../stores/authStore'
+import { presentError } from '../utils/errorPresentation'
 import { thumbUrl } from '../utils/imageUrl'
 import { isRestricted } from '../stores/settingsStore'
 import SkeletonImage from '../components/SkeletonImage.vue'
@@ -50,7 +51,7 @@ async function loadIllusts() {
     illusts.value = res.illusts
     illustNext.value = res.next_url
   } catch (err) {
-    errorMsg.value = (err as { message?: string }).message ?? '收藏加载失败'
+    errorMsg.value = presentError(err, '收藏加载失败')
   } finally {
     illustLoading.value = false
   }
@@ -66,7 +67,7 @@ async function loadNovels() {
     novels.value = res.novels
     novelNext.value = res.next_url
   } catch (err) {
-    errorMsg.value = (err as { message?: string }).message ?? '收藏加载失败'
+    errorMsg.value = presentError(err, '收藏加载失败')
   } finally {
     novelLoading.value = false
   }
@@ -87,7 +88,7 @@ async function loadIllustMore() {
     // 空页防护：基于服务端原始返回判空（issue #91）
     illustNext.value = res.illusts.length === 0 ? null : res.next_url
   } catch (err) {
-    errorMsg.value = (err as { message?: string }).message ?? '加载更多失败'
+    errorMsg.value = presentError(err, '加载更多失败')
   } finally {
     illustLoadingMore.value = false
     lastIllustEndedAt = Date.now()
@@ -109,7 +110,7 @@ async function loadNovelMore() {
     // 空页防护：基于服务端原始返回判空（issue #91）
     novelNext.value = res.novels.length === 0 ? null : res.next_url
   } catch (err) {
-    errorMsg.value = (err as { message?: string }).message ?? '加载更多失败'
+    errorMsg.value = presentError(err, '加载更多失败')
   } finally {
     novelLoadingMore.value = false
     lastNovelEndedAt = Date.now()
