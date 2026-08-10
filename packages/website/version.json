@@ -1,5 +1,5 @@
 {
-  "version": "4.7.3",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.7.3",
-  "changelog": "✨ 新功能\n  78b1fc9 feat(app): 首页标签变体（?variant=A/B/C labelMode）\n  2230549 feat(app): 首页标签折入 A（full）——移除 B/C 变体与 PrototypeSwitcher\n🐛 修复\n  7b83687 fix(app): 标签行自适应——截断 chip 命令式 max-width + 240px E2E 回归\n♻️ 重构\n  82bb5d7 refactor(app): 小说卡标签布局折入 T1（移除 T2/T3 变体）"
+  "version": "4.8.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.8.0",
+  "changelog": "🧹 杂项\n  4fdfbdb chore: bump version to 4.7.3\n  15fc35d chore: merge delivery-20260807-093119（首页标签行自适应 + 标签变体 A 折入）\n  3afbbd3 chore: merge delivery-20260807-093119（分页不骨架 + FeedList 统一）\n  200b718 chore: merge delivery-20260807-093119（小说详情 FastScroller）\n  58387c1 chore: merge delivery-20260807-093119（小说正文标记渲染）\n✨ 新功能\n  2230549 feat(app): 首页标签折入 A（full）——移除 B/C 变体与 PrototypeSwitcher\n  78b1fc9 feat(app): 首页标签变体（?variant=A/B/C labelMode）\n  cb23ce8 feat(app): 小说详情 FastScroller——可拖拽滚动条 + 章节预览气泡（ADR-0077）\n♻️ 重构\n  82bb5d7 refactor(app): 小说卡标签布局折入 T1（移除 T2/T3 变体）\n🐛 修复\n  7b83687 fix(app): 标签行自适应——截断 chip 命令式 max-width + 240px E2E 回归\n  ea7580a fix(app): 分页加载不再触发骨架屏 + 列表交互统一（ADR-0078）\n  c39202b fix(app): 小说正文标记渲染——章节标题/jump 链接/行内装饰（C 方案）"
 }
