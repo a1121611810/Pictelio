@@ -40,22 +40,37 @@ const cardStyle = computed(() => ({
     : 'transform var(--durationNormal) cubic-bezier(0.33, 0, 0.67, 1)',
 }))
 
+interface BoundingRect {
+  left: number
+  top: number
+  width: number
+  height: number
+}
+
 function queryRect(): void {
-  // Lynx 官方布局查询（web-core/原生双端 API）
-  lynx
-    .createSelectorQuery()
-    .select(`#${cardId}`)
-    .boundingClientRect()
-    .exec((res: Array<{ left: number; top: number; width: number; height: number }>) => {
-      const r = res?.[0]
-      if (!r) return
-      cachedRect = { left: r.left, top: r.top, width: r.width, height: r.height }
-      // 矩形就绪：补上 touchstart 时被跳过的首个触点
-      if (pendingFirstPoint && touching.value) {
-        applyElastic(pendingFirstPoint)
-        pendingFirstPoint = null
-      }
+  // ── 布局矩形查询（Lynx 标准 API；修复 web-core 0.23.1 缺链式 boundingClientRect） ──
+  // 注意：vue-lynx 的 JS 运行在 web-core worker 里（无 document），
+  // 且 NodesRef 上不存在 .boundingClientRect() 链式方法（web-core 0.23.1 实测缺失）。
+  // 正确用法是 invoke({ method: 'boundingClientRect' })——web-core 主线程
+  // createInvokeUIMethod.js 显式处理该 method，原生 LynxView 同为标准 API。
+  const q = lynx?.createSelectorQuery?.()
+  if (!q) return
+  q.select(`#${cardId}`)
+    .invoke({
+      method: 'boundingClientRect',
+      params: {},
+      success: (data) => {
+        const r = data as Partial<BoundingRect> | null
+        if (!r) return
+        cachedRect = { left: r.left ?? 0, top: r.top ?? 0, width: r.width ?? 0, height: r.height ?? 0 }
+        // 矩形就绪：补上 touchstart 时被跳过的首个触点
+        if (pendingFirstPoint && touching.value) {
+          applyElastic(pendingFirstPoint)
+          pendingFirstPoint = null
+        }
+      },
     })
+  q.exec()
 }
 
 interface LynxTouch {

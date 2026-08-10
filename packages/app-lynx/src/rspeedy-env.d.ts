@@ -39,8 +39,24 @@ declare global {
   interface LynxGlobalEventEmitter {
     addListener(event: string, handler: (...args: unknown[]) => void): void
   }
+  /** SelectorQuery 的 NodesRef（布局查询；web-core 0.23.1 缺 boundingClientRect 方法，
+   *  原生 LynxView 用 invoke({ method: 'boundingClientRect' }) 标准 API，见 GlassCard.vue） */
+  interface LynxNodesRef {
+    invoke(options: {
+      method: string
+      params?: Record<string, unknown>
+      success?: (data: unknown) => void
+      fail?: (err: unknown) => void
+    }): LynxNodesRef
+  }
+  interface LynxSelectorQuery {
+    select(selector: string): LynxNodesRef
+    selectAll(selector: string): LynxNodesRef
+    exec(): void
+  }
   interface LynxGlobal {
     getJSModule(name: 'GlobalEventEmitter'): LynxGlobalEventEmitter | undefined
+    createSelectorQuery?(): LynxSelectorQuery
   }
   const lynx: LynxGlobal | undefined
   /**
