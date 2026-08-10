@@ -1,29 +1,33 @@
 <script setup lang="ts">
-// 错误页变体 A —— 居中极简（改良现状：加品牌徽标 + 全宽主按钮）
+// 错误页变体 A —— 居中极简（内联 style：web-core 预览下 Tailwind 类不生效，见 PrototypeShell 注释）
 import { ERROR_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 defineProps<{ detail: string }>()
 </script>
 
 <template>
-  <view class="w-full h-full flex flex-col items-center justify-center bg-background-2 px-10">
-    <!-- 品牌色徽标：会话失效语义 -->
-    <view class="w-[16vw] h-[16vw] rounded-full bg-brand flex items-center justify-center">
-      <text class="text-[7vw] text-onBrand font-bold">!</text>
+  <view
+    style="display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #faf9f8; padding: 40px; width: 100%; height: 100%;"
+  >
+    <!-- 品牌色徽标 -->
+    <view
+      style="width: 64px; height: 64px; border-radius: 32px; background-color: #0f6cbd; display: flex; align-items: center; justify-content: center;"
+    >
+      <text style="font-size: 28px; color: #ffffff; font-weight: 700;">!</text>
     </view>
     <text
-      class="text-2xl font-bold text-foreground mt-8 text-center"
+      style="font-size: 24px; font-weight: 700; color: #1b1a19; margin-top: 32px; text-align: center;"
       :accessibility-element="A11Y_ELEMENT_ENABLED"
       :accessibility-label="ERROR_A11Y_LABELS.pageTitle"
     >
       {{ ERROR_A11Y_LABELS.pageTitle }}
     </text>
-    <text class="text-base text-foreground-2 mt-3 text-center leading-relaxed">{{ detail }}</text>
+    <text style="font-size: 16px; color: #605e5c; margin-top: 12px; text-align: center; line-height: 24px;">{{ detail }}</text>
     <view
-      class="mt-12 w-full h-[12vw] rounded-[var(--borderRadiusXLarge)] bg-brand flex items-center justify-center"
+      style="margin-top: 48px; width: 100%; height: 48px; border-radius: 16px; background-color: #0f6cbd; display: flex; align-items: center; justify-content: center;"
       :accessibility-element="A11Y_ELEMENT_ENABLED"
       :accessibility-label="ERROR_A11Y_LABELS.backToLogin"
     >
-      <text class="text-base text-onBrand">返回登录</text>
+      <text style="font-size: 16px; color: #ffffff;">返回登录</text>
     </view>
   </view>
 </template>

@@ -1,8 +1,7 @@
 <script setup lang="ts">
 // ─── UI 原型切换条（仅 web 预览入口使用，生产 bundle 不包含） ───
 // 浮动底部居中：左箭头 / 当前变体标签 / 右箭头，点击循环切换。
-// lynx web-core 环境限制：worker 内读不到 URL query（__web_preview 只认 casename），
-// 也收不到 window 键盘事件 → 用内存 ref + 点击切换，URL 持久化与键盘 ←/→ 降级为注释说明。
+// lynx web-core 环境限制：worker 内读不到 URL query、收不到窗口键盘事件 → 内存 ref + 点击切换。
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 
 const props = defineProps<{
@@ -19,24 +18,23 @@ function cycle(dir: 1 | -1): void {
 </script>
 
 <template>
-  <!-- 高对比 pill（overlay 深底 + 反色文字），明显区别于被评审的页面设计 -->
+  <!-- 高对比 pill（深底 + 反色文字），明显区别于被评审的页面设计 -->
   <view
-    class="absolute bottom-[6vw] left-1/2 -translate-x-1/2 z-50 flex flex-row items-center gap-2 rounded-full px-3 py-2"
-    style="background-color: var(--colorOverlayDark)"
+    style="position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: row; align-items: center; gap: 8px; background-color: rgba(0, 0, 0, 0.75); border-radius: 999px; padding: 8px 16px; z-index: 50;"
   >
     <text
-      class="text-onBrand text-lg px-2 leading-none"
+      style="color: #ffffff; font-size: 18px; padding: 0 8px;"
       :accessibility-element="A11Y_ELEMENT_ENABLED"
       accessibility-label="上一个变体"
       @tap="cycle(-1)"
     >
       ‹
     </text>
-    <text class="text-onBrand text-xs whitespace-nowrap">
+    <text style="color: #ffffff; font-size: 12px;">
       {{ current }} — {{ variants.find((v) => v.key === current)?.name }}
     </text>
     <text
-      class="text-onBrand text-lg px-2 leading-none"
+      style="color: #ffffff; font-size: 18px; padding: 0 8px;"
       :accessibility-element="A11Y_ELEMENT_ENABLED"
       accessibility-label="下一个变体"
       @tap="cycle(1)"
