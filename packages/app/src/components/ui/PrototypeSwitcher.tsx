@@ -11,6 +11,8 @@ interface PrototypeSwitcherProps {
   variants: PrototypeVariant[];
   /** search 参数名，默认 "variant" */
   param?: string;
+  /** 叠放位置：true = 上移（供第二个切换条使用，避免与主切换条重叠） */
+  stacked?: boolean;
 }
 
 /**
@@ -66,7 +68,11 @@ const PrototypeSwitcher: Component<PrototypeSwitcherProps> = (props) => {
   const current = () => variants()[currentIndex()];
 
   return (
-    <div class="fixed bottom-4 left-0 right-0 z-50 flex justify-center pointer-events-none">
+    <div
+      class={`fixed left-0 right-0 z-50 flex justify-center pointer-events-none ${
+        props.stacked ? "bottom-16" : "bottom-4"
+      }`}
+    >
       <div
         class="pointer-events-auto flex items-center gap-0.5 rounded-[var(--borderRadiusCircular)] bg-[var(--colorCompoundBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] shadow-[var(--elevation16)] px-1 py-0.5 select-none"
         role="group"

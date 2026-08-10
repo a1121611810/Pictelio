@@ -11,14 +11,16 @@
  */
 import type { Component } from "solid-js";
 import { createEffect, onMount } from "solid-js";
-import { useNavigate } from "@solidjs/router";
+import { useNavigate, useSearchParams } from "@solidjs/router";
 import type { PixivIllust, PixivNovel } from "@/api/types";
 import PageTransition from "@/components/PageTransition";
 import { FeedList } from "@/components/home/FeedList";
+import type { LabelMode } from "@/components/home/labelMode";
+import PrototypeSwitcher from "@/components/ui/PrototypeSwitcher";
 import { markContentReady } from "@/native/splashBridge";
 import SideNavShell, { type HomeTab } from "@/components/home/SideNavShell";
 import IllustSingleCard from "@/components/home/IllustSingleCard";
-import NovelRowCard from "@/components/home/NovelRowCard";
+import NovelRowCard, { type NovelTagLayout } from "@/components/home/NovelRowCard";
 import { contentType } from "@/stores/uiStore";
 // ── 插画数据源（推荐/关注/收藏）──
 import {
@@ -242,7 +244,7 @@ const EmptyHint: Component = () => (
 );
 
 /** 插画单列大图 Feed 面板（数据源激活 + FeedList 统一交互：下拉刷新 A1 遮罩 + 滚动分页，ADR-0078）。 */
-const IllustFeedPanel: Component<{ tab: FeedTab }> = (props) => {
+const IllustFeedPanel: Component<{ tab: FeedTab; labelMode: LabelMode }> = (props) => {
   const navigate = useNavigate();
   const src = () => illustSource(props.tab);
   useFeedActivation(src);
@@ -263,14 +265,22 @@ const IllustFeedPanel: Component<{ tab: FeedTab }> = (props) => {
       skeleton={() => <IllustRowSkeleton />}
       empty={() => <EmptyHint />}
       renderItem={(il) => (
-        <IllustSingleCard illust={il} onClick={() => void navigate(`/illust/${il.id}`)} />
+        <IllustSingleCard
+          illust={il}
+          labelMode={props.labelMode}
+          onClick={() => void navigate(`/illust/${il.id}`)}
+        />
       )}
     />
   );
 };
 
 /** 小说单列行卡 Feed 面板（数据源激活 + FeedList 统一交互，ADR-0078）。 */
-const NovelFeedPanel: Component<{ tab: FeedTab }> = (props) => {
+const NovelFeedPanel: Component<{
+  tab: FeedTab;
+  labelMode: LabelMode;
+  tagLayout: NovelTagLayout;
+}> = (props) => {
   const navigate = useNavigate();
   const src = () => novelSource(props.tab);
   useFeedActivation(src);
@@ -290,12 +300,42 @@ const NovelFeedPanel: Component<{ tab: FeedTab }> = (props) => {
       refreshMode="overlay"
       skeleton={() => <NovelRowSkeleton />}
       empty={() => <EmptyHint />}
-      renderItem={(n) => <NovelRowCard novel={n} onClick={() => void navigate(`/novel/${n.id}`)} />}
+      renderItem={(n) => (
+        <NovelRowCard
+          novel={n}
+          labelMode={props.labelMode}
+          tagLayout={props.tagLayout}
+          onClick={() => void navigate(`/novel/${n.id}`)}
+        />
+      )}
     />
   );
 };
 
+/** 标签变体（UI 原型）：?variant=A/B/C → labelMode full/minimal/r18only；无参数 = none（正式版现状） */
+const LABEL_VARIANTS: { key: string; label: string; mode: LabelMode }[] = [
+  { key: "A", label: "标签全量", mode: "full" },
+  { key: "B", label: "标签克制", mode: "minimal" },
+  { key: "C", label: "移动优先", mode: "r18only" },
+];
+
+/** 小说卡标签布局变体（UI 原型）：?novelTags=T1/T2/T3；无参数 = fullwidth（默认） */
+const NOVEL_TAG_VARIANTS: { key: string; label: string; layout: NovelTagLayout }[] = [
+  { key: "T1", label: "通栏标签行", layout: "fullwidth" },
+  { key: "T2", label: "信息区截断", layout: "truncate" },
+  { key: "T3", label: "计数徽标", layout: "count" },
+];
+
 const HomePage: Component = () => {
+  const [searchParams] = useSearchParams();
+  const labelMode = (): LabelMode =>
+    LABEL_VARIANTS.find(
+      (v) => v.key === (searchParams as Record<string, string | undefined>).variant,
+    )?.mode ?? "none";
+  const novelTagLayout = (): NovelTagLayout =>
+    NOVEL_TAG_VARIANTS.find(
+      (v) => v.key === (searchParams as Record<string, string | undefined>).novelTags,
+    )?.layout ?? "fullwidth";
   onMount(() => {
     // 首页是登录后启动首屏：挂载后通知原生关闭 Splash Screen（幂等）
     markContentReady();
@@ -310,11 +350,20 @@ const HomePage: Component = () => {
             return <></>;
           }
           return contentType() === "illust" ? (
-            <IllustFeedPanel tab={tab} />
+            <IllustFeedPanel tab={tab} labelMode={labelMode()} />
           ) : (
-            <NovelFeedPanel tab={tab} />
+            <NovelFeedPanel tab={tab} labelMode={labelMode()} tagLayout={novelTagLayout()} />
           );
         }}
+      />
+      <PrototypeSwitcher
+        variants={LABEL_VARIANTS.map(({ key, label }) => ({ key, label }))}
+        param="variant"
+      />
+      <PrototypeSwitcher
+        variants={NOVEL_TAG_VARIANTS.map(({ key, label }) => ({ key, label }))}
+        param="novelTags"
+        stacked
       />
     </PageTransition>
   );
