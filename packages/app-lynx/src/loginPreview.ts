@@ -4,6 +4,8 @@
 // 生产（lynx 环境）不构建此入口——仅 environments.web 配置了该 entry。
 import { createApp } from 'vue-lynx'
 import { defineComponent, h } from 'vue'
+// [lynx:fix] 先副作用导入 router（同 errorPreview：循环依赖求值顺序，见该文件注释）
+import './router'
 import Login from './pages/Login.vue'
 
 const PreviewApp = defineComponent({
