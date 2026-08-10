@@ -56,56 +56,56 @@ const isMine = computed(() => currentUser.value?.id === props.comment.user.id)
 
 <template>
   <view
-    class="w-full px-4 py-3 flex flex-row items-start border-b border-b-stroke-2"
+    class="w-full px-4 py-3 flex flex-row items-start border-b border-b-outline-variant"
     :class="{ 'opacity-50': deleting }"
   >
     <!-- 头像：有图用 SkeletonImage（代理 URL + 懒加载），无图色块 + 首字兜底 -->
-    <view class="w-[8vw] h-[8vw] flex-shrink-0 overflow-hidden">
+    <view class="w-[10.667vw] h-[10.667vw] flex-shrink-0 overflow-hidden">
       <SkeletonImage
         v-if="avatarUrl"
         :src="avatarUrl"
         aspect-ratio="1 / 1"
         min-h="8vw"
-        class="w-[8vw] h-[8vw] rounded-[var(--borderRadiusCircular)]"
+        class="w-[10.667vw] h-[10.667vw] rounded-full"
         lazy-load
       />
       <view
         v-else
-        class="w-full h-full bg-background-3 border border-stroke-2 rounded-[var(--borderRadiusCircular)] flex items-center justify-center"
+        class="w-full h-full bg-surface-container-highest border border-outline-variant rounded-full flex items-center justify-center"
       >
-        <text class="text-base font-semibold text-brand-foreground">{{ comment.user.name.charAt(0) }}</text>
+        <text class="text-title-medium font-medium text-primary">{{ comment.user.name.charAt(0) }}</text>
       </view>
     </view>
 
     <view class="flex-1 ml-3 min-w-0">
       <!-- 用户名 + 相对时间 -->
       <view class="flex flex-row items-center gap-2">
-        <text class="text-sm font-semibold text-foreground">{{ comment.user.name }}</text>
-        <text class="text-xs text-foreground-3">{{ formatDate(comment.date) }}</text>
+        <text class="text-title-small font-medium text-on-surface">{{ comment.user.name }}</text>
+        <text class="text-label-medium text-outline">{{ formatDate(comment.date) }}</text>
       </view>
 
       <!-- 楼层引用块：回复 xxx：… -->
-      <view v-if="parent" class="mt-1.5 px-2.5 py-1.5 bg-background-3 rounded-[var(--borderRadiusSmall)]">
-        <text class="text-xs text-foreground-2 line-clamp-1">
+      <view v-if="parent" class="mt-1.5 px-2.5 py-1.5 bg-surface-container-highest rounded-[var(--md-shape-extra-small)]">
+        <text class="text-label-medium text-on-surface-variant line-clamp-1">
           回复 {{ parent.user.name }}：{{ parent.comment }}
         </text>
       </view>
 
       <!-- 评论正文 -->
-      <text class="text-base text-foreground mt-1.5 leading-[1.4]">{{ comment.comment }}</text>
+      <text class="text-body-medium text-on-surface mt-1.5 leading-[1.4]">{{ comment.comment }}</text>
 
       <!-- 操作行：回复 / 展开楼层（has_replies 时）/ 删除（本人时，删除中置灰） -->
       <view class="flex flex-row items-center gap-5 mt-2">
-        <text class="text-xs text-foreground-3" @tap="emit('reply')">回复</text>
+        <text class="text-label-medium text-outline" @tap="emit('reply')">回复</text>
         <text
           v-if="comment.has_replies && !hideThreadToggle"
-          class="text-xs text-brand-foreground underline"
+          class="text-label-medium text-primary underline"
           @tap="emit('toggleReplies')"
         >
           {{ expanded ? '收起回复' : `展开 ${comment.reply_count ?? 0} 条回复` }}
         </text>
-        <text v-if="isMine && !deleting" class="text-xs text-foreground-3" @tap="emit('delete')">删除</text>
-        <text v-if="isMine && deleting" class="text-xs text-danger">删除中…</text>
+        <text v-if="isMine && !deleting" class="text-label-medium text-outline" @tap="emit('delete')">删除</text>
+        <text v-if="isMine && deleting" class="text-label-medium text-error">删除中…</text>
       </view>
     </view>
   </view>

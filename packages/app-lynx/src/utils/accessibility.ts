@@ -16,7 +16,7 @@ export const ME_A11Y_LABELS = {
   webviewOptionTitle: 'WebView（现有）',
   lynxOptionTitle: 'Lynx（当前）',
   // ── 关键交互（@tap 容器：view 默认不进 accessibility 树，必须显式标注） ──
-  back: '返回',
+  // （M3 改造后 Me 为底部导航顶层页，无返回箭头；back 标注已移除）
   switchToWebview: '切换客户端到WebView', // 「切回 WebView」入口
   switchToLynx: '切换客户端到Lynx',
   bookmarks: '我的收藏',

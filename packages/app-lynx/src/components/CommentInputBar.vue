@@ -38,31 +38,31 @@ function send() {
 </script>
 
 <template>
-  <view class="w-full bg-background border-t border-t-stroke-2 px-3 py-2">
+  <view class="w-full bg-surface-container-lowest border-t border-t-outline-variant px-3 py-2">
     <!-- 回复态提示条：回复 xxx + 取消 -->
     <view v-if="replyingTo" class="flex flex-row items-center justify-between mb-2">
-      <text class="text-xs text-brand-foreground [max-line:1] flex-1">回复 {{ replyingTo.user.name }}</text>
-      <text class="text-xs text-foreground-3 underline ml-2" @tap="emit('cancelReply')">取消</text>
+      <text class="text-label-medium text-primary [max-line:1] flex-1">回复 {{ replyingTo.user.name }}</text>
+      <text class="text-label-medium text-outline underline ml-2" @tap="emit('cancelReply')">取消</text>
     </view>
 
     <!-- 操作类错误（发表失败等）：输入栏区域展示 -->
-    <text v-if="error" class="text-xs text-danger mb-2">{{ error }}</text>
+    <text v-if="error" class="text-label-medium text-error mb-2">{{ error }}</text>
 
     <view class="flex flex-row items-center gap-2">
       <!-- [lynx:fix] input 显式 border-box + 去 UA 边框（Login.vue 同款，ADR-0055） -->
       <input
         v-model="text"
-        class="flex-1 h-[8.5vw] box-border border-0 bg-background-3 rounded-[var(--borderRadiusLarge)] text-base text-foreground px-3"
+        class="flex-1 h-[10.667vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-outline-variant text-body-medium text-on-surface px-3"
         placeholder="写下评论…"
-        placeholder-color="#a19f9d"
+        placeholder-color="#49454f"
       />
       <!-- 发送按钮：空输入 / 超长 / 发送中禁用 -->
       <view
-        class="h-[8.5vw] px-5 flex items-center justify-center rounded-[var(--borderRadiusLarge)] flex-shrink-0"
-        :class="canSend ? 'bg-brand' : 'bg-background-3'"
+        class="h-[10.667vw] px-5 flex items-center justify-center rounded-[var(--md-shape-full)] flex-shrink-0"
+        :class="canSend ? 'bg-primary active:bg-state-pressedPrimary' : 'bg-surface-container-highest'"
         @tap="send"
       >
-        <text class="text-base font-semibold" :class="canSend ? 'text-onBrand' : 'text-foreground-3'">
+        <text class="text-label-large font-medium" :class="canSend ? 'text-on-primary' : 'text-outline'">
           {{ posting ? '发送中…' : '发送' }}
         </text>
       </view>

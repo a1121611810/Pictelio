@@ -150,63 +150,67 @@ onMounted(async () => {
 </script>
 
 <template>
-  <view class="w-full h-full flex flex-col bg-background-2">
-    <view class="flex flex-row items-center h-[11.733vw] px-4 bg-background border-b-[1px] border-b-stroke-2">
-      <view class="py-1 pr-2" @tap="goBack"><text class="text-lg text-brand-foreground pr-4">‹ 返回</text></view>
-      <text class="flex-1 text-2xl font-semibold text-foreground [max-line:1]">
+  <view class="w-full h-full flex flex-col bg-surface">
+    <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
+      <view class="py-1 pr-2" @tap="goBack"><text class="text-[6.4vw] leading-none text-on-surface">‹</text></view>
+      <text class="flex-1 text-title-large font-medium text-on-surface [max-line:1]">
         {{ detail?.user.name || '用户主页' }}
       </text>
     </view>
 
-    <text v-if="errorMsg" class="text-sm text-danger p-4">{{ errorMsg }}</text>
+    <text v-if="errorMsg" class="text-body-small text-error p-4">{{ errorMsg }}</text>
 
-    <text v-if="detailError" class="text-sm text-danger p-4">{{ detailError }}</text>
+    <text v-if="detailError" class="text-body-small text-error p-4">{{ detailError }}</text>
 
     <!-- 用户信息卡 -->
-    <view v-if="detail" class="flex flex-row items-center m-3 p-3.5 bg-background rounded-[var(--borderRadiusXLarge)]">
+    <view v-if="detail" class="flex flex-row items-center m-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]">
       <SkeletonImage
         :src="proxyImageUrl(detail.user.profile_image_urls.medium || detail.user.profile_image_urls.px_170x170 || '')"
         aspect-ratio="1 / 1"
         min-h="16vw"
-        class="w-[16vw] h-[16vw] rounded-[var(--borderRadiusLarge)]"
+        class="w-[17.067vw] h-[17.067vw] rounded-full"
       />
       <view class="flex-1 flex flex-col ml-3.5">
-        <text class="text-2xl font-bold text-foreground">{{ detail.user.name }}</text>
-        <text class="text-sm text-foreground-3 mt-1">@{{ detail.user.account }}</text>
+        <text class="text-title-large font-bold text-on-surface">{{ detail.user.name }}</text>
+        <text class="text-body-small text-outline mt-1">@{{ detail.user.account }}</text>
         <view class="flex flex-row mt-1.5">
-          <view class="py-1 px-3 bg-background-3 rounded-[var(--borderRadiusMedium)]" @tap="openFollowing">
-            <text class="text-xs text-foreground">
+          <view class="h-[8.533vw] px-3 border border-outline-variant rounded-[var(--md-shape-small)] flex items-center justify-center" @tap="openFollowing">
+            <text class="text-label-medium text-on-surface">
               关注 {{ detail.profile.total_follow_users ?? '-' }}
             </text>
           </view>
-          <view class="py-1 px-3 ml-2 bg-background-3 rounded-[var(--borderRadiusMedium)]" @tap="openFollowers">
-            <text class="text-xs text-foreground">粉丝</text>
+          <view class="h-[8.533vw] px-3 ml-2 border border-outline-variant rounded-[var(--md-shape-small)] flex items-center justify-center" @tap="openFollowers">
+            <text class="text-label-medium text-on-surface">粉丝</text>
           </view>
         </view>
       </view>
     </view>
 
     <!-- 作品 tab -->
-    <view class="flex flex-row border-b-[1px] border-b-stroke-2 bg-background">
+    <view class="flex flex-row border-b-[1px] border-b-outline-variant bg-surface-container-lowest">
       <view
         class="flex-1 py-2 flex items-center justify-center"
-        :class="activeTab === 'illust' ? 'text-brand-foreground border-b-2 border-b-[var(--colorBrandForeground1)]' : 'text-foreground-3'"
+        :class="activeTab === 'illust' ? 'text-primary border-b-2 border-b-primary' : 'text-outline'"
         @tap="switchTab('illust')"
       >
-        <text class="text-lg font-medium">插画</text>
+        <text class="text-title-small font-medium">插画</text>
       </view>
       <view
         class="flex-1 py-2 flex items-center justify-center"
-        :class="activeTab === 'novel' ? 'text-brand-foreground border-b-2 border-b-[var(--colorBrandForeground1)]' : 'text-foreground-3'"
+        :class="activeTab === 'novel' ? 'text-primary border-b-2 border-b-primary' : 'text-outline'"
         @tap="switchTab('novel')"
       >
-        <text class="text-lg font-medium">小说</text>
+        <text class="text-title-small font-medium">小说</text>
       </view>
     </view>
 
     <!-- 插画空态（错误态下不显示，避免与错误文本同显） -->
     <view v-if="activeTab === 'illust' && !illustLoading && !errorMsg && illusts.length === 0" class="flex-1 flex items-center justify-center">
-      <text class="text-base text-foreground-3">暂无作品</text>
+      <view class="flex flex-col items-center">
+        <text class="text-[10.667vw] leading-none text-outline-variant">▦</text>
+        <text class="text-body-large text-on-surface mt-3">暂无作品</text>
+        <text class="text-body-medium text-on-surface-variant mt-1.5">该用户还没有发布作品</text>
+      </view>
     </view>
 
     <!-- 插画 waterfall -->
@@ -224,7 +228,7 @@ onMounted(async () => {
         v-for="item in illusts"
         :key="item.id"
         :item-key="String(item.id)"
-        class="bg-background rounded-[var(--borderRadiusXLarge)] flex flex-col overflow-hidden"
+        class="bg-surface-container-lowest rounded-[var(--md-shape-medium)] flex flex-col overflow-hidden"
       >
         <view class="w-full flex flex-col" @tap="openIllust(item.id)">
           <view class="relative" @tap.stop="onImageTap(item)">
@@ -232,20 +236,24 @@ onMounted(async () => {
             <!-- 受限条目图片区遮罩（issue #91） -->
             <RestrictOverlay v-if="isRestricted(item)" :level="item.x_restrict === 2 ? 2 : 1" />
           </view>
-          <text class="text-lg font-semibold text-foreground mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
+          <text class="text-title-small font-medium text-on-surface mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
           <view class="mt-1 mx-2.5 mb-2.5">
             <BookmarkButton :illust-id="item.id" :initial-bookmarked="item.is_bookmarked" :bookmark-count="item.total_bookmarks" />
           </view>
         </view>
       </list-item>
       <list-item v-if="illustLoadingMore" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text class="text-base text-foreground-3">加载中…</text>
+        <text class="text-body-medium text-outline">加载中…</text>
       </list-item>
     </list>
 
     <!-- 小说空态 -->
     <view v-if="activeTab === 'novel' && !novelLoading && novels.length === 0" class="flex-1 flex items-center justify-center">
-      <text class="text-base text-foreground-3">暂无作品</text>
+      <view class="flex flex-col items-center">
+        <text class="text-[10.667vw] leading-none text-outline-variant">▦</text>
+        <text class="text-body-large text-on-surface mt-3">暂无作品</text>
+        <text class="text-body-medium text-on-surface-variant mt-1.5">该用户还没有发布作品</text>
+      </view>
     </view>
 
     <!-- 小说列表 -->
@@ -263,12 +271,12 @@ onMounted(async () => {
         :item-key="String(item.id)"
         class="w-full"
       >
-        <view class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-background rounded-[var(--borderRadiusXLarge)]" @tap="openNovel(item.id)">
+        <view class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]" @tap="openNovel(item.id)">
           <view class="flex-1 flex flex-col">
-            <text class="text-xl font-semibold text-foreground [max-line:2]">{{ item.title }}</text>
+            <text class="text-title-medium font-medium text-on-surface [max-line:2]">{{ item.title }}</text>
             <view class="flex flex-row mt-1.5">
-              <text class="text-xs text-foreground-3 mr-4">{{ item.text_length }} 字</text>
-              <text v-if="item.total_bookmarks > 0" class="text-xs text-foreground-3 mr-4">
+              <text class="text-label-medium text-outline mr-4">{{ item.text_length }} 字</text>
+              <text v-if="item.total_bookmarks > 0" class="text-label-medium text-outline mr-4">
                 ♥ {{ item.total_bookmarks }}
               </text>
             </view>
@@ -278,7 +286,7 @@ onMounted(async () => {
         </view>
       </list-item>
       <list-item v-if="novelLoadingMore" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text class="text-base text-foreground-3">加载中…</text>
+        <text class="text-body-medium text-outline">加载中…</text>
       </list-item>
     </list>
   </view>

@@ -80,8 +80,8 @@ onBeforeUnmount(() => {
 
 <template>
   <view class="w-full flex flex-col items-center">
-    <view v-if="loading" class="shimmer w-full rounded-[var(--borderRadiusLarge)]" :style="{ height: heightVw }" />
-    <image v-else-if="currentSrc" class="w-full rounded-[var(--borderRadiusLarge)]" :style="{ height: heightVw }" :src="currentSrc" :mode="'aspectFit'" />
-    <text v-if="errorMsg" class="text-sm text-danger p-4">{{ errorMsg }}</text>
+    <view v-if="loading" class="shimmer w-full rounded-[var(--md-shape-medium)]" :style="{ height: heightVw }" />
+    <image v-else-if="currentSrc" class="w-full rounded-[var(--md-shape-medium)]" :style="{ height: heightVw }" :src="currentSrc" :mode="'aspectFit'" />
+    <text v-if="errorMsg" class="text-body-small text-error p-4">{{ errorMsg }}</text>
   </view>
 </template>

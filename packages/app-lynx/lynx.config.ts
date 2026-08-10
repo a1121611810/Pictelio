@@ -43,6 +43,27 @@ const proxyUrl =
   process.env.http_proxy ||
   process.env.HTTP_PROXY ||
   'http://127.0.0.1:10808'
+
+// ─── 启动更新检查开关（.env PICTELIO_DISABLE_UPDATE_CHECK） ───
+// dev 调试用：true → 强制跳过启动更新检查（不走 checkForUpdate，不进强制更新页）。
+// false / 未设置 → 按原逻辑走。
+// 注意：rspeedy 先执行本配置文件（loadConfig）再 createRsbuild({ loadEnv })，即
+// .env 变量此时尚未写入 process.env——必须手动读取 .env（与下方 credentials.json5 同款）。
+const _envRaw = (() => {
+  try {
+    return readFileSync(resolve(_root, '.env'), 'utf-8')
+  } catch {
+    return ''
+  }
+})()
+const _envMap: Record<string, string> = {}
+for (const line of _envRaw.split('\n')) {
+  const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/u.exec(line)
+  if (m && !line.trim().startsWith('#')) _envMap[m[1]] = m[2]
+}
+const _disableUpdateCheck = ['true', '1', 'yes'].includes(
+  String(_envMap.PICTELIO_DISABLE_UPDATE_CHECK ?? '').trim().toLowerCase(),
+)
 // 脱敏：代理 URL 可能含 user:pass 凭据（含 scheme-less / protocol-relative 格式），
 // 日志只打印主机部分。逻辑与 src/utils/proxyRedact.ts 的 redactProxyUrl 一致（有单测覆盖）。
 const _redactProxyUrl = (url: string): string => {
@@ -83,6 +104,7 @@ export default defineConfig({
       __PUBLIC_CONFIG__,
       __APP_VERSION__,
       __DEV__: JSON.stringify(_isDev),
+      __DISABLE_UPDATE_CHECK__: JSON.stringify(_disableUpdateCheck),
     },
   },
   server: {
@@ -129,6 +151,10 @@ export default defineConfig({
       optionsApi: false,
       enableCSSInlineVariables: true,
       enableCSSInheritance: true,
+      // [lynx:fix] 启用 CSS 类选择器：web-core 预览下编译产物元素 l-css-id 恒为 0，
+      // 与 scoped 规则（[l-css-id="哈希"]...）不匹配 → 全部样式失效（只剩默认文本）。
+      // enableCSSSelector 让选择器保留原始类名（.cls），web-core 按类名匹配即可应用。
+      enableCSSSelector: true,
     }),
     pluginTailwindCSS({
       config: 'tailwind.config.ts',

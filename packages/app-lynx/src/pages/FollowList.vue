@@ -98,16 +98,20 @@ onMounted(fetchFirstPage)
 </script>
 
 <template>
-  <view class="w-full h-full flex flex-col bg-background-2">
-    <view class="flex flex-row items-center h-[11.733vw] px-4 bg-background border-b-[1px] border-b-stroke-2">
-      <view class="py-1 pr-2" @tap="goBack"><text class="text-lg text-brand-foreground pr-4">‹ 返回</text></view>
-      <text class="flex-1 text-2xl font-semibold text-foreground">{{ isFollowing ? '关注' : '粉丝' }}</text>
+  <view class="w-full h-full flex flex-col bg-surface">
+    <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
+      <view class="py-1 pr-2" @tap="goBack"><text class="text-[6.4vw] leading-none text-on-surface">‹</text></view>
+      <text class="flex-1 text-title-large font-medium text-on-surface">{{ isFollowing ? '关注' : '粉丝' }}</text>
     </view>
 
-    <text v-if="errorMsg && !loading" class="text-sm text-danger p-4">{{ errorMsg }}</text>
+    <text v-if="errorMsg && !loading" class="text-body-small text-error p-4">{{ errorMsg }}</text>
 
     <view v-if="!loading && !errorMsg && users.length === 0" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <text class="text-base text-foreground-3">{{ isFollowing ? '暂无关注' : '暂无粉丝' }}</text>
+      <view class="flex flex-col items-center">
+        <text class="text-[10.667vw] leading-none text-outline-variant">◎</text>
+        <text class="text-body-large text-on-surface mt-3">{{ isFollowing ? '暂无关注' : '暂无粉丝' }}</text>
+        <text class="text-body-medium text-on-surface-variant mt-1.5">{{ isFollowing ? '关注其他用户后这里会展示他们' : '被其他用户关注后会展示在这里' }}</text>
+      </view>
     </view>
 
     <list
@@ -124,33 +128,33 @@ onMounted(fetchFirstPage)
         :item-key="String(item.user.id)"
         class="w-full"
       >
-        <view class="flex flex-row items-center m-1.5 mx-3 p-3.5 bg-background rounded-[var(--borderRadiusXLarge)]">
+        <view class="flex flex-row items-center m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]">
           <view class="flex-1 flex flex-row items-center" @tap="openUser(item.user.id)">
             <SkeletonImage
               :src="proxyImageUrl(item.user.profile_image_urls?.medium || item.user.profile_image_urls?.px_170x170 || '')"
               aspect-ratio="1 / 1"
               min-h="11vw"
-              class="w-[11vw] h-[11vw] rounded-[var(--borderRadiusLarge)]"
+              class="w-[10.667vw] h-[10.667vw] rounded-full"
               lazy-load
             />
             <view class="flex flex-col ml-3.5 flex-1">
-              <text class="text-lg font-semibold text-foreground [max-line:1]">{{ item.user.name }}</text>
-              <text class="text-xs text-foreground-3 mt-0.5">@{{ item.user.account }}</text>
+              <text class="text-title-small font-medium text-on-surface [max-line:1]">{{ item.user.name }}</text>
+              <text class="text-label-medium text-outline mt-0.5">@{{ item.user.account }}</text>
             </view>
           </view>
           <view
-            class="ml-2 px-4 h-[9vw] flex items-center justify-center rounded-[var(--borderRadiusLarge)]"
-            :class="item.user.is_followed ? 'bg-background-3' : 'bg-brand'"
+            class="ml-2 px-4 h-[10.667vw] flex items-center justify-center rounded-[var(--md-shape-full)]"
+            :class="item.user.is_followed ? 'border border-outline-variant bg-transparent active:bg-state-pressedOnSurface' : 'bg-primary active:bg-state-pressedPrimary'"
             @tap="toggleFollow(item)"
           >
-            <text class="text-base" :class="item.user.is_followed ? 'text-foreground' : 'text-onBrand'">
+            <text class="text-body-medium" :class="item.user.is_followed ? 'text-on-surface' : 'text-on-primary'">
               {{ item.user.is_followed ? '已关注' : '关注' }}
             </text>
           </view>
         </view>
       </list-item>
       <list-item v-if="loadingMore" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text class="text-base text-foreground-3">加载中…</text>
+        <text class="text-body-medium text-outline">加载中…</text>
       </list-item>
     </list>
   </view>

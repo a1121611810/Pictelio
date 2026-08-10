@@ -4,9 +4,9 @@
 </script>
 
 <template>
-  <view class="w-[48.4vw] bg-background rounded-[var(--borderRadiusXLarge)] flex flex-col overflow-hidden">
+  <view class="w-[48.4vw] bg-surface-container-lowest rounded-[var(--md-shape-medium)] flex flex-col overflow-hidden">
     <view class="shimmer aspect-[1/1] w-full" />
-    <view class="shimmer h-[28rpx] rounded-[var(--borderRadiusSmall)] mx-2.5 mt-2 w-[80%]" />
-    <view class="shimmer h-[22rpx] rounded-[var(--borderRadiusSmall)] mx-2.5 mt-1 w-[55%] mb-2.5" />
+    <view class="shimmer h-[28rpx] rounded-[var(--md-shape-extra-small)] mx-2.5 mt-2 w-[80%]" />
+    <view class="shimmer h-[22rpx] rounded-[var(--md-shape-extra-small)] mx-2.5 mt-1 w-[55%] mb-2.5" />
   </view>
 </template>

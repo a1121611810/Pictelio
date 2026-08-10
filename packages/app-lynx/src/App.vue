@@ -21,10 +21,11 @@ onMounted(() => {
     <KeepAlive :include="['recommended', 'novels', 'me']">
       <component :is="currentComponent" />
     </KeepAlive>
-    <!-- 系统返回根路由提示（ADR-0066）：与 webview client 的 exitHint toast 语义一致 -->
+    <!-- 系统返回根路由提示（ADR-0066）：与 webview client 的 exitHint toast 语义一致。
+         M3 snackbar 形态：inverse-surface 底 + inverse-on-surface 文字 + 4dp 圆角 -->
     <view v-if="exitHint" class="absolute left-0 right-0 bottom-[12vw] z-50 flex justify-center pointer-events-none">
-      <view class="bg-background border border-stroke-2 rounded-[var(--borderRadiusXLarge)] px-5 py-2.5">
-        <text class="text-base text-foreground">再按一次退出应用</text>
+      <view class="bg-inverse-surface rounded-[var(--md-shape-extra-small)] px-5 py-2.5 shadow-[var(--md-elevation-3)]">
+        <text class="text-base text-inverse-on-surface">再按一次退出应用</text>
       </view>
     </view>
   </page>
@@ -32,13 +33,11 @@ onMounted(() => {
 
 <style>
 @import './styles/tokens.css';
-@tailwind base;
-@tailwind utilities;
 
 .Root {
   width: 100%;
   height: 100%;
-  background-color: var(--colorNeutralBackground2);
+  background-color: var(--md-surface);
 }
 
 /* ─── shimmer 骨架屏（数据加载前的占位动画） ───
@@ -56,9 +55,9 @@ onMounted(() => {
 .shimmer {
   background: linear-gradient(
     90deg,
-    var(--colorNeutralBackground3) 25%,
-    var(--colorNeutralBackground1) 50%,
-    var(--colorNeutralBackground3) 75%
+    var(--md-surface-container-high) 25%,
+    var(--md-surface-container-lowest) 50%,
+    var(--md-surface-container-high) 75%
   );
   background-size: 200% 100%;
   animation: shimmer 1.5s linear infinite;

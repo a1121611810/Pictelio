@@ -990,14 +990,19 @@ describe('Login / Recommended 页 accessibility 标注（issue #107）', () => {
     expect(elementCount).toBe(labelCount)
   })
 
-  it('RECOMMENDED_A11Y_LABELS 全部被 Recommended.vue 消费且配套 element', () => {
+  it('RECOMMENDED_A11Y_LABELS 经 navTabs 传入 NavigationBar（M3 底部导航）', () => {
+    // M3 改造后「我的」入口从顶栏文字链接移入底部导航：注册表 label 在 script 的
+    // navTabs 数组中消费（a11yLabel 字段），NavigationBar 组件内部对每个 tab 渲染
+    // accessibility-element + accessibility-label="tab.a11yLabel"（有独立组件级断言）。
     for (const key of Object.keys(RECOMMENDED_A11Y_LABELS)) {
-      expect(recommendedVue).toContain(`:accessibility-label="RECOMMENDED_A11Y_LABELS.${key}"`)
+      expect(recommendedVue).toContain(`RECOMMENDED_A11Y_LABELS.${key}`)
     }
-    const labelCount = (recommendedVue.match(/:accessibility-label="RECOMMENDED_A11Y_LABELS\.\w+"/g) ?? []).length
-    const elementCount = (recommendedVue.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
-    expect(labelCount).toBe(Object.keys(RECOMMENDED_A11Y_LABELS).length)
-    expect(elementCount).toBe(labelCount)
+    expect(recommendedVue).toContain('NavigationBar')
+    expect(recommendedVue).toContain(':tabs="navTabs"')
+    // NavigationBar 组件内部必须为每个 tab 开启 element + label
+    const navBarVue = readFileSync(fileURLToPath(new URL('../src/components/NavigationBar.vue', import.meta.url)), 'utf8')
+    expect(navBarVue).toContain(':accessibility-element="A11Y_ELEMENT_ENABLED"')
+    expect(navBarVue).toContain(':accessibility-label="tab.a11yLabel"')
   })
 })
 

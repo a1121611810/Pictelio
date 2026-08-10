@@ -32,35 +32,37 @@ async function submit() {
 </script>
 
 <template>
-  <view class="w-full h-full flex flex-col items-center bg-background-2 pt-[32vw]">
+  <view class="w-full h-full flex flex-col items-center bg-surface pt-[32vw]">
     <view class="flex flex-col items-center mb-10">
-      <text class="text-6xl font-bold text-brand-foreground">Pictelio</text>
-      <text class="text-base text-foreground-3 mt-2">Lynx Client MVP</text>
+      <text class="text-headline-large font-bold text-primary">Pictelio</text>
+      <text class="text-body-medium text-on-surface-variant mt-2">Lynx Client MVP</text>
     </view>
 
     <!-- [lynx:fix] Card 用 flex column：子元素靠 stretch 拉伸填充父宽，
          规避 web-core 下 input 百分比宽度相对根容器（而非父）导致的右溢出 -->
-    <view class="w-[85%] bg-background rounded-[var(--borderRadius2XLarge)] p-6 shadow-[var(--elevation4)] flex flex-col">
+    <view class="w-[85%] bg-surface-container-lowest rounded-[var(--md-shape-medium)] p-6 shadow-[var(--md-elevation-1)] flex flex-col">
       <!-- [lynx:fix] input 显式 border-box + 去 UA 边框：
            web-core 预览未复刻 Lynx 的 border-box 默认（UA 无 box-sizing 规则），
            content-box 下 width:100% + padding 会溢出；原生 LynxView 默认 border-box 无副作用 -->
+      <!-- M3 filled text field：surface-container-highest 底 + extra-small(4dp) 圆角 -->
       <input
         v-model="tokenInput"
-        class="self-stretch h-[9.6vw] box-border border-0 bg-background-3 rounded-[var(--borderRadiusLarge)] text-base text-foreground px-4 mb-3"
+        class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-outline-variant text-body-medium text-on-surface px-4 mb-3"
         placeholder="粘贴 Pixiv refresh_token"
-        placeholder-color="#a19f9d"
+        placeholder-color="#49454f"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="LOGIN_A11Y_LABELS.tokenInput"
       />
 
-      <text v-if="errorMsg" class="text-sm text-danger mb-2">{{ errorMsg }}</text>
+      <text v-if="errorMsg" class="text-body-small text-error mb-2">{{ errorMsg }}</text>
 
+      <!-- M3 filled button：primary 底 + 全圆角（pill） -->
       <view
-        class="h-[9.6vw] bg-brand rounded-[var(--borderRadiusLarge)] flex items-center justify-center"
+        class="h-[14.933vw] bg-primary active:bg-state-pressedPrimary rounded-[var(--md-shape-full)] flex items-center justify-center"
         @tap="submit"
       >
         <text
-          class="text-xl font-semibold text-onBrand"
+          class="text-label-large font-medium text-on-primary"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="LOGIN_A11Y_LABELS.submit"
           >{{ submitting ? '登录中…' : '登录' }}</text
@@ -68,6 +70,6 @@ async function submit() {
       </view>
     </view>
 
-    <text class="text-xs text-foreground-3 mt-6">登录后进入推荐插画 / 小说 / 个人中心</text>
+    <text class="text-label-medium text-on-surface-variant mt-6">登录后进入推荐插画 / 小说 / 个人中心</text>
   </view>
 </template>

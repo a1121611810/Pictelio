@@ -27,6 +27,11 @@ declare global {
   const __APP_VERSION__: string
   const __DEV__: boolean
   /**
+   * 启动更新检查开关（lynx.config.ts 从 .env PICTELIO_DISABLE_UPDATE_CHECK 注入）：
+   * true = 强制跳过启动更新检查（dev 调试，避免误进强制更新页）；false = 按原逻辑走。
+   */
+  const __DISABLE_UPDATE_CHECK__: boolean
+  /**
    * Lynx runtime 内置全局对象（ADR-0066 系统返回桥）。
    * getJSModule('GlobalEventEmitter') 监听 native 侧 sendGlobalEvent 事件；
    * web-core 预览环境可能不存在或 getJSModule 不可用，引用前必须可选链探测。

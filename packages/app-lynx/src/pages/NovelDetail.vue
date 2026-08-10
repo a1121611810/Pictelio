@@ -46,22 +46,22 @@ onMounted(async () => {
 </script>
 
 <template>
-  <view class="w-full h-full bg-background-2">
-    <view class="flex flex-row items-center h-[11.733vw] px-4 bg-background border-b-[1px] border-b-stroke-2">
-      <view class="py-1 pr-2" @tap="goBack"><text class="text-lg text-brand-foreground pr-4">‹ 返回</text></view>
-      <text class="flex-1 text-2xl font-semibold text-foreground">小说</text>
+  <view class="w-full h-full bg-surface">
+    <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
+      <view class="py-1 pr-2" @tap="goBack"><text class="text-[6.4vw] leading-none text-on-surface">‹</text></view>
+      <text class="flex-1 text-title-large font-medium text-on-surface">小说</text>
     </view>
 
     <!-- 加载期骨架（issue #91）：header 照常渲染，正文区骨架占位 -->
     <SkeletonNovel v-if="loading" />
     <view v-else-if="errorMsg" class="w-full h-full flex items-center justify-center">
-      <text class="text-base text-danger p-4">{{ errorMsg }}</text>
+      <text class="text-body-medium text-error p-4">{{ errorMsg }}</text>
     </view>
     <scroll-view v-else class="w-full h-full" scroll-orientation="vertical">
-      <view class="py-5 px-4 bg-background mb-3">
-        <text class="text-4xl font-bold text-foreground">{{ novel?.title }}</text>
-        <text class="text-base text-brand-foreground mt-2">by {{ novel?.user.name }}</text>
-        <text class="text-xs text-foreground-3 mt-1.5">
+      <view class="py-5 px-4 bg-surface-container-lowest mb-3">
+        <text class="text-title-large font-bold text-on-surface">{{ novel?.title }}</text>
+        <text class="text-body-medium text-on-surface-variant mt-2">by {{ novel?.user.name }}</text>
+        <text class="text-label-medium text-outline mt-1.5">
           {{ novel?.text_length }} 字
           <template v-if="novel?.total_bookmarks != null">
              · ♥ {{ novel?.total_bookmarks }}
@@ -73,8 +73,8 @@ onMounted(async () => {
           class="mt-2 flex flex-row items-center"
           @tap="showComments = true"
         >
-          <text class="text-xl">💬</text>
-          <text class="text-xs text-foreground-3 ml-1">{{ novel?.total_comments }}</text>
+          <text class="text-[6.4vw] leading-none">💬</text>
+          <text class="text-label-medium text-outline ml-1">{{ novel?.total_comments }}</text>
         </view>
       </view>
       <!-- 正文区：受限小说标题/作者/元信息可见，正文被遮罩挡住（issue #91） -->
@@ -84,13 +84,13 @@ onMounted(async () => {
           <RestrictOverlay :level="novel.x_restrict === 2 ? 2 : 1" />
         </template>
         <template v-else>
-          <text v-for="(p, idx) in paragraphs" :key="idx" class="text-xl leading-[44rpx] text-foreground mb-4 block">
+          <text v-for="(p, idx) in paragraphs" :key="idx" class="text-body-large leading-[44rpx] text-on-surface mb-4 block">
             {{ p }}
           </text>
         </template>
       </view>
       <view class="flex items-center justify-center p-6">
-        <text class="text-sm text-foreground-3">— 完 —</text>
+        <text class="text-body-small text-outline">— 完 —</text>
       </view>
     </scroll-view>
 

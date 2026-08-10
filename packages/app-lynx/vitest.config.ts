@@ -14,6 +14,8 @@ export default defineConfig({
   define: {
     __DEV__: 'true',
     __APP_VERSION__: JSON.stringify(_appPkg.version),
+    // 测试环境默认走原逻辑（开关 false）；开关 true 分支由单测显式断言
+    __DISABLE_UPDATE_CHECK__: 'false',
     __PUBLIC_CONFIG__: JSON.stringify({
       userAgent: 'PixivIOSApp/7.18.3 (iOS 18.5; iPhone15,4)',
       referer: 'https://app-api.pixiv.net/',
