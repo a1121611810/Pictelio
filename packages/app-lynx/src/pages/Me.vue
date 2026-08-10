@@ -204,12 +204,13 @@ function toggleR18G() {
           @tap="toggleR18"
         >
           <text class="text-title-medium text-surface-on">显示 R-18 内容</text>
-          <!-- M3 switch：轨道 52×32dp，开 = primary + on-primary thumb，关 = surface-container-highest + outline thumb -->
+          <!-- M3 switch：轨道 52×32dp + thumb 16dp 静态统一（开/关同尺寸；M3 规范中按压缩放 24dp
+            由交互状态驱动，Lynx 伪类支持有限暂不做，颜色区分开=on-primary/关=outline） -->
           <view
             class="w-[13.867vw] h-[8.533vw] rounded-full p-[0.8vw] flex flex-row transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
             :class="showR18 ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start'"
           >
-            <view class="rounded-full shadow-[var(--md-elevation-1)]" :class="showR18 ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
+            <view class="rounded-full shadow-[var(--md-elevation-1)]" :class="showR18 ? 'w-[4.267vw] h-[4.267vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
           </view>
         </view>
         <view
@@ -223,7 +224,7 @@ function toggleR18G() {
             class="w-[13.867vw] h-[8.533vw] rounded-full p-[0.8vw] flex flex-row transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
             :class="showR18G ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start'"
           >
-            <view class="rounded-full shadow-[var(--md-elevation-1)]" :class="showR18G ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
+            <view class="rounded-full shadow-[var(--md-elevation-1)]" :class="showR18G ? 'w-[4.267vw] h-[4.267vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
           </view>
         </view>
       </view>
