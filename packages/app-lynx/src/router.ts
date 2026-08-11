@@ -24,6 +24,7 @@ export interface RouteState {
 // MVP 用静态加载降低复杂度，bundle 体积可接受（实测 ~160KB）
 import Login from './pages/Login.vue'
 import Recommended from './pages/Recommended.vue'
+import IllustList from './pages/IllustList.vue'
 import IllustDetail from './pages/IllustDetail.vue'
 import NovelList from './pages/NovelList.vue'
 import NovelDetail from './pages/NovelDetail.vue'
@@ -38,6 +39,7 @@ import ErrorPage from './pages/ErrorPage.vue'
 export const routes: RouteDef[] = [
   { path: '/login', name: 'login', component: Login },
   { path: '/recommended', name: 'recommended', component: Recommended },
+  { path: '/illusts', name: 'illusts', component: IllustList },
   { path: '/illust/:id', name: 'illust-detail', component: IllustDetail },
   { path: '/novels', name: 'novels', component: NovelList },
   { path: '/novel/:id', name: 'novel-detail', component: NovelDetail },

@@ -18,7 +18,7 @@ onMounted(() => {
   <page class="Root">
     <!-- [lynx:fix] KeepAlive 缓存列表/静态页实例（ADR-0049）：详情返回列表不重载。
          详情页不在 include 白名单——按 :id 加载，缓存旧 id 实例会显示错误内容 -->
-    <KeepAlive :include="['recommended', 'novels', 'me']">
+    <KeepAlive :include="['recommended', 'illusts', 'novels', 'me']">
       <component :is="currentComponent" />
     </KeepAlive>
     <!-- 系统返回根路由提示（ADR-0066）：与 webview client 的 exitHint toast 语义一致。

@@ -10,18 +10,12 @@ import type { ImageQuality } from '../utils/imageQuality'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { ME_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import GlassCard from '../components/GlassCard.vue'
-import NavigationBar, { type NavTab } from '../components/NavigationBar.vue'
+import NavigationBar from '../components/NavigationBar.vue'
+import { NAV_TABS, type NavTab } from '../components/navTabs'
 
-// 底部导航 tabs：推荐/关注/小说/我的（本页）。M3 顶层页无返回箭头。
-// me tab 的 a11yLabel 用静态文本（顶栏标题已标注 ME_A11Y_LABELS.pageTitle，
+// 底部导航 tabs 取共享 NAV_TABS（推荐/插画/小说/我的（本页））。
+// 共享模块的 me tab a11yLabel 为静态「我的」（顶栏标题已标注 ME_A11Y_LABELS.pageTitle，
 // 避免 Appium description 重复；NavigationBar 内部对每个 tab 渲染 element+label）。
-const navTabs: NavTab[] = [
-  { name: 'recommended', path: '/recommended', icon: '⌂', label: '推荐', a11yLabel: '推荐' },
-  { name: 'following', path: '/following', icon: '♥', label: '关注', a11yLabel: '关注' },
-  { name: 'novels', path: '/novels', icon: '✎', label: '小说', a11yLabel: '小说' },
-  { name: 'me', path: '/me', icon: '◎', label: '我的', a11yLabel: '我的' },
-]
-
 function onNavSelect(tab: NavTab) {
   if (tab.name === 'me') return
   void navigate(tab.path, { replace: true })
@@ -346,6 +340,6 @@ function toggleR18G() {
     </view>
 
     <!-- M3 NavigationBar：底部四 tab -->
-    <NavigationBar :tabs="navTabs" :active-name="'me'" @select="onNavSelect" />
+    <NavigationBar :tabs="NAV_TABS" :active-name="'me'" @select="onNavSelect" />
   </view>
 </template>

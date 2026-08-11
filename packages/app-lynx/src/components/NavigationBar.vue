@@ -3,21 +3,9 @@
 // 形态：80dp 高 + surface-container 背景；active 项图标置于 64×32dp
 // secondary-container 胶囊指示器内（on-secondary-container 色），非 active
 // 用 on-surface-variant；label 12sp。图标用 unicode 文本符号（Lynx 无 icon 库）。
-// 顶层页（推荐/关注/小说/我的）接入；点击 navigate 到对应路由。
+// 顶层页（推荐/插画/小说/我的）接入；点击 navigate 到对应路由。
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
-
-export interface NavTab {
-  /** 路由名（router.ts routes[].name） */
-  name: string
-  /** 路由 path（navigate 目标） */
-  path: string
-  /** 图标 unicode 符号 */
-  icon: string
-  /** label 文本 */
-  label: string
-  /** accessibility-label（各页注册表传入，供 Appium 定位） */
-  a11yLabel: string
-}
+import type { NavTab } from './navTabs'
 
 const props = defineProps<{
   tabs: NavTab[]
