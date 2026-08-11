@@ -1,5 +1,5 @@
 {
-  "version": "4.9.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.9.0",
-  "changelog": "♻️ 重构\n  bf3c4fb refactor(app-lynx): 全面对齐 Material Design 3 规范\n✨ 新功能\n  3bf9b13 feat(app-lynx): 错误呈现模块——页内分档文案 + 会话失效全屏错误页（#180）"
+  "version": "4.10.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.10.0",
+  "changelog": "✨ 新功能\n  ab90063 feat(app-lynx): 全局 tab 改推荐/插画/小说/我的 + 新增插画分类页\n  67daa70 feat(app-lynx): 推荐页迁移 createMixFeed 混合 feed（插画 4:1 小说）\n🐛 修复\n  5ae81e0 fix(app-lynx): 列表受限条目改流内遮罩卡 + tabs 行式指示条\n  c633d9e fix(app-lynx): 小说正文走 requestRaw 原生网关（双模式收敛）"
 }
