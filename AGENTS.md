@@ -13,6 +13,36 @@
 - **CSS 架构**: 分层加载 `reset.css` → `tokens.css` → `base.css` → `virtual:uno.css` → `novel-reader.css`；字号通过 UnoCSS preflights 以流体 `clamp(rem + vw)` 定义（见 `uno.config.ts`），无需构建期转换；Fluent Web Components 主题同步
 - **构建工具**: 使用 `vite-plus`（内部封装 Vite + oxlint + oxfmt + vitest），通过 `vp` CLI 统一执行 dev/build/check/test/lint/fmt
 
+## 工具触发协议（任务开始第一步，违反视为架构违规）
+
+**任何任务开始后，第一步必须先完成工具路由判断，再动手读代码/搜索。**
+
+| 任务涉及 | 第一步必须 | 依据 |
+|----------|-----------|------|
+| 架构概览 / 领域概念 / 集成方式 / 测试指南（"为什么这样设计"） | 读取 `openwiki/` 对应页面 | 「OpenWiki 查询规范」决策链 |
+| 具体符号 / 调用链 / 影响分析（"代码在哪、怎么调用"） | 调用 CodeGraph（`mcp__codegraph__*`） | 「代码智能规范」速查表 |
+| 第三方库/框架文档 | Context7（`mcp__context7__*`） | 「文档查询规范」决策链 |
+| 浏览器标准 API | MDN（`mcp__mdn__*`） | 「文档查询规范」决策链 |
+| 理解一个功能（why + where 都涉及） | **先 OpenWiki 后 CodeGraph** | 「OpenWiki 查询规范」协作规则 |
+
+### 允许的降级（仅限以下场景，未命中则必须触发）
+
+- CodeGraph/OpenWiki 不可用（`.codegraph/` 未生成、返回空结果）
+- 已知路径的完整文件读取（任务明确要求读某个具体文件）
+- 非代码文本搜索（日志、配置、依赖版本、文档）
+- 简单文件列举（Glob 列明确模式）
+- 小范围精准定位（已知符号名且单文件，Grep 更快）
+- 中文语义搜索失败（CodeGraph 返回空/不相关时，降级找入口再切回）
+
+> 完整细节（参数、索引维护、结果解读）在全局 memory `mcp-codegraph-usage.md` / `mcp-doc-query.md`。
+
+### 持续反馈闭环（边用边发现问题）
+
+- **自检证据化**：任务完成前自检记录"路由判断 + 所用工具"（见「任务完成前自检」）。
+- **当场沉淀**：发现偏差（该用没用 / 用错工具 / 顺序反了），当场记一条 feedback memory（含场景 + 正确做法），下轮会话自动召回。
+- **用户反馈兜底**：发现模型没用对时随时告知，由 agent 沉淀成 memory 或修订本文档。
+- **定期回顾**：每次改动本文档相关章节时，回顾已沉淀的失败案例，把高频失败固化为规则。
+
 ## 代码智能规范（Code Intelligence）
 
 本项目使用 CodeGraph 作为默认代码理解工具（通过 `mcp__codegraph__*` MCP 前缀访问）。
@@ -22,7 +52,7 @@
 
 - **任何涉及"理解代码结构、定位符号、追踪调用链、分析影响范围"的任务，默认优先使用 CodeGraph 系列工具（`mcp__codegraph__*`）。**
 - CodeGraph 是默认工具，不是搜索失败后的兜底工具。
-- 仅当 CodeGraph 不可用、或场景明确属于下方「允许的降级」时，才使用 Grep/Glob/Read 等替代手段。
+- 仅当 CodeGraph 不可用、或场景明确属于「工具触发协议」中的「允许的降级」时，才使用 Grep/Glob/Read 等替代手段。
 
 ### 工具选择速查
 
@@ -103,11 +133,11 @@ OpenWiki 提供人工整理的高层次项目概览，与 CodeGraph（精确代�
 | Android 原生集成（Capacitor 插件、构建） | `openwiki/integrations/android-native.md` | 原生桥接与构建配置 |
 | 测试策略（单元测试、E2E 测试） | `openwiki/testing/overview.md` | 测试分层与工具链 |
 
-### 与 CodeGraph 的协作规则
+### 与 CodeGraph 的协作规则（强制路由，违反视为架构违规）
 
-- **架构概览 / 领域概念 / 集成 / 测试指南** → 先读 OpenWiki 获取高层次理解
-- **具体符号定义 / 调用链 / 影响分析** → 使用 CodeGraph 精确追踪
-- **理解一个功能时** → 先用 OpenWiki 了解"为什么这样做"，再用 CodeGraph 了解"代码在哪、怎么调用"
+- **架构概览 / 领域概念 / 集成 / 测试指南** → **必须**先读 OpenWiki 获取高层次理解
+- **具体符号定义 / 调用链 / 影响分析** → **必须**使用 CodeGraph 精确追踪
+- **理解一个功能时** → **必须**先用 OpenWiki 了解"为什么这样做"，再用 CodeGraph 了解"代码在哪、怎么调用"
 
 ### 禁止的默认行为
 
@@ -574,7 +604,6 @@ Grill 澄清 → to-spec → to-tickets → implement
   - AGP 9.2.1 + Gradle 9.6.1 + JDK 21 版本锁定决策：Gradle 9.6.1 官方测试覆盖 AGP 9.0~9.3.0-alpha06，AGP 9.2.1 在此范围内。JDK 21 完整支持。详见 `android/build.gradle` 顶部注释。
 - **Android 发布签名**：Release 构建使用 `android/app/pictelio-release.keystore`，密码通过环境变量 `PICTELIO_KEYSTORE_PASSWORD` 与 `PICTELIO_KEY_PASSWORD` 注入。Keystore 禁止提交到 git。详细步骤见 `docs/release-signing.md`。
 - **Gradle 任务图校验**: `build.gradle` 通过 `gradle.taskGraph.whenReady` 仅在 Release 任务触发时检查签名凭据，Debug 构建不需要环境变量。
-- **代码探索**：使用 CodeGraph 作为默认代码理解工具，普通搜索工具仅作 fallback
 - **代理配置**：开发时自动读取 `https_proxy` / `HTTPS_PROXY` / `http_proxy` / `HTTP_PROXY` 环境变量，回退到 `http://127.0.0.1:10808`
 - **Node 版本**: 20.19+，包管理器 pnpm 11.9.0（`devEngines` 强制校验）
 
@@ -620,13 +649,11 @@ Grill 澄清 → to-spec → to-tickets → implement
 
 ## 注意事项
 
-- **代码智能规范**：涉及代码理解、调用链追踪、影响分析时，默认优先使用 CodeGraph（工具选择见上方「代码智能规范」工具选择速查表），完整规范参考全局 memory `mcp-codegraph-usage.md`。
-- **文档查询规范**：查询第三方库/框架文档优先使用 Context7，浏览器标准 API 优先使用 MDN（优先级链见上方「文档查询规范」决策表），完整规范参考全局 memory `mcp-doc-query.md`。
-- **OpenWiki 查询规范**：涉及架构概览、领域概念、集成方式、测试指南等主题时，优先查阅 `openwiki/` 目录下对应的文档页面（详见上方「OpenWiki 查询规范」优先级决策链）。先获取高层次理解，再使用 CodeGraph 精确追踪代码细节。
 - **路由数据规则**：路由级异步数据统一通过 `@tanstack/solid-router` 的 `loader` 获取；组件内局部异步仍使用 `createSignal` + `createEffect` + 手动 fetch（带 AbortController）。`createResource` 不用于路由组件。
 
 ## 任务完成前自检
 
+- **工具使用证据**：本次涉及代码理解/架构/文档查询时，是否记录了路由判断与所用工具？（见「工具触发协议」；发现偏差当场沉淀 feedback memory）
 - **代码理解优先性**：涉及代码结构、调用链、影响范围分析时，是否优先使用了 CodeGraph？（工具选择见上方速查表）
 - **Fallback 合理性**：未用 CodeGraph 时，是否属于允许的例外？（不可用、已知路径读取、非代码搜索等，详见全局 memory `mcp-codegraph-usage.md`）
 - **索引健康**：CodeGraph 返回异常时，是否检查了 `codegraph_status` 并考虑重建索引？
