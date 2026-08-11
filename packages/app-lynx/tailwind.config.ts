@@ -120,6 +120,10 @@ const config: Config = {
           'pressed-on-surface': 'var(--md-state-pressed-on-surface)',
           'pressed-error': 'var(--md-state-pressed-error)',
           'pressed-surface': 'var(--md-state-pressed-surface)',
+          'layer-pressed-primary': 'var(--md-state-layer-pressed-primary)',
+          'layer-pressed-on-surface': 'var(--md-state-layer-pressed-on-surface)',
+          'disabled-container': 'var(--md-state-disabled-container)',
+          'disabled-on-surface': 'var(--md-state-disabled-on-surface)',
         },
         outline: {
           DEFAULT: 'var(--md-outline)',

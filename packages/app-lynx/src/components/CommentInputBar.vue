@@ -52,14 +52,14 @@ function send() {
       <!-- [lynx:fix] input 显式 border-box + 去 UA 边框（Login.vue 同款，ADR-0055） -->
       <input
         v-model="text"
-        class="flex-1 h-[10.667vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-outline-variant text-body-medium text-surface-on px-3"
+        class="flex-1 h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-outline-variant text-body-large text-surface-on px-3"
         placeholder="写下评论…"
         placeholder-color="#49454f"
       />
       <!-- 发送按钮：空输入 / 超长 / 发送中禁用 -->
       <view
         class="h-[10.667vw] px-5 flex items-center justify-center rounded-[var(--md-shape-full)] flex-shrink-0"
-        :class="canSend ? 'bg-primary active:bg-state-pressedPrimary' : 'bg-surface-container-highest'"
+        :class="canSend ? 'bg-primary active:bg-state-pressed-primary' : 'bg-surface-container-highest'"
         @tap="send"
       >
         <text class="text-label-large font-medium" :class="canSend ? 'text-primary-on' : 'text-outline'">

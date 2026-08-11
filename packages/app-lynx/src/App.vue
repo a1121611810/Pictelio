@@ -24,7 +24,7 @@ onMounted(() => {
     <!-- 系统返回根路由提示（ADR-0066）：与 webview client 的 exitHint toast 语义一致。
          M3 snackbar 形态：inverse-surface 底 + inverse-on-surface 文字 + 4dp 圆角 -->
     <view v-if="exitHint" class="absolute left-0 right-0 bottom-[12vw] z-50 flex justify-center pointer-events-none">
-      <view class="bg-inverse-surface rounded-[var(--md-shape-extra-small)] px-5 py-2.5 shadow-[var(--md-elevation-3)]">
+      <view class="h-[12.8vw] bg-inverse-surface rounded-[var(--md-shape-extra-small)] px-5 flex items-center shadow-[var(--md-elevation-3)]">
         <text class="text-base text-inverse-on-surface">再按一次退出应用</text>
       </view>
     </view>

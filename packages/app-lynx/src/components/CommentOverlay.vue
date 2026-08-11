@@ -108,7 +108,7 @@ onBeforeUnmount(() => {
       >
         <text class="text-body-small text-error px-8 text-center">{{ state.error ?? '加载失败，请重试' }}</text>
         <view
-          class="mt-4 px-6 h-[10.667vw] bg-primary active:bg-state-pressedPrimary rounded-[var(--md-shape-full)] flex items-center justify-center"
+          class="mt-4 px-6 h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
           @tap="retry"
         >
           <text class="text-label-large font-medium text-primary-on">重试</text>

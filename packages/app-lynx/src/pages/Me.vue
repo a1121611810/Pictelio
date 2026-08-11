@@ -137,7 +137,7 @@ function toggleR18G() {
       </GlassCard>
 
       <!-- 客户端组（ADR-0062：仅 full 包同时含 webview+lynx 时渲染；独立包隐藏） -->
-      <view v-if="supportsClientSwitch(availableKinds)" class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]">
+      <view v-if="supportsClientSwitch(availableKinds)" class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
         <text
           class="text-title-small font-medium text-surface-on"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
@@ -162,7 +162,7 @@ function toggleR18G() {
           </view>
           <!-- M3 radio button：选中 primary 实心 + on-primary 圆点，未选 outline 空心 -->
           <view
-            class="w-[5.333vw] h-[5.333vw] rounded-full flex items-center justify-center"
+            class="w-[5.333vw] h-[5.333vw] rounded-full flex items-center justify-center active:bg-layer-pressed-on-surface"
             :class="selectedClient === 'webview' ? 'bg-primary' : 'border-2 border-outline'"
           >
             <view v-if="selectedClient === 'webview'" class="w-[2.667vw] h-[2.667vw] rounded-full bg-primary-on" />
@@ -184,7 +184,7 @@ function toggleR18G() {
             <text class="text-label-medium text-surface-on-variant mt-0.5">vue-lynx 原生渲染</text>
           </view>
           <view
-            class="w-[5.333vw] h-[5.333vw] rounded-full flex items-center justify-center"
+            class="w-[5.333vw] h-[5.333vw] rounded-full flex items-center justify-center active:bg-layer-pressed-on-surface"
             :class="selectedClient === 'lynx' ? 'bg-primary' : 'border-2 border-outline'"
           >
             <view v-if="selectedClient === 'lynx'" class="w-[2.667vw] h-[2.667vw] rounded-full bg-primary-on" />
@@ -194,7 +194,7 @@ function toggleR18G() {
       </view>
 
       <!-- 内容组（ADR-0051：R18/R18G 开关） -->
-      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]">
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
         <text class="text-title-small font-medium text-surface-on">内容</text>
         <text class="text-label-medium text-surface-on-variant mt-1 mb-3">默认隐藏 R-18 / R-18G 内容</text>
         <view
@@ -237,28 +237,28 @@ function toggleR18G() {
       </view>
 
       <!-- T6：动图播放组 -->
-      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]">
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
         <text class="text-title-small font-medium text-surface-on">动图播放</text>
         <text class="text-label-medium text-surface-on-variant mt-1 mb-3">Ugoira 动图取帧方式</text>
-        <!-- M3 segmented button：容器 outline-variant 边框 + 全圆角，选中段 secondary-container -->
-        <view class="flex flex-row gap-0 rounded-[var(--md-shape-full)] border border-outline-variant overflow-hidden">
+        <!-- M3 segmented button：容器 outline 边框 + 全圆角，40dp 高，选中段 secondary-container -->
+        <view class="flex flex-row gap-0 rounded-[var(--md-shape-full)] border border-outline overflow-hidden">
           <view
-            class="flex-1 py-2.5 flex items-center justify-center"
+            class="flex-1 h-[10.667vw] flex items-center justify-center active:bg-layer-pressed-on-surface"
             :class="ugoiraMode === 'fflate' ? 'bg-secondary-container' : 'bg-surface-container-lowest'"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="ME_A11Y_LABELS.ugoiraFflate"
             @tap="pickUgoiraMode('fflate')"
           >
-            <text class="text-label-large" :class="ugoiraMode === 'fflate' ? 'text-secondary-on-container' : 'text-surface-on-variant'">fflate（默认）</text>
+            <text class="text-label-large" :class="ugoiraMode === 'fflate' ? 'text-secondary-on-container' : 'text-surface-on'">fflate（默认）</text>
           </view>
           <view
-            class="flex-1 py-2.5 flex items-center justify-center"
+            class="flex-1 h-[10.667vw] flex items-center justify-center border-l border-l-outline active:bg-layer-pressed-on-surface"
             :class="ugoiraMode === 'range' ? 'bg-secondary-container' : 'bg-surface-container-lowest'"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="ME_A11Y_LABELS.ugoiraRange"
             @tap="pickUgoiraMode('range')"
           >
-            <text class="text-label-large" :class="ugoiraMode === 'range' ? 'text-secondary-on-container' : 'text-surface-on-variant'">Range 流式</text>
+            <text class="text-label-large" :class="ugoiraMode === 'range' ? 'text-secondary-on-container' : 'text-surface-on'">Range 流式</text>
           </view>
         </view>
         <text class="text-label-medium text-surface-on-variant mt-2 leading-snug">
@@ -267,43 +267,43 @@ function toggleR18G() {
       </view>
 
       <!-- issue #148 T2：详情画质档位组（medium=标准 / large=高清 / original=原图） -->
-      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]">
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
         <text class="text-title-small font-medium text-surface-on">详情画质</text>
         <text class="text-label-medium text-surface-on-variant mt-1 mb-3">列表缩略图 / 详情大图清晰度</text>
-        <!-- M3 segmented button（三档）：容器 outline-variant 边框 + 全圆角，选中段 secondary-container -->
-        <view class="flex flex-row gap-0 rounded-[var(--md-shape-full)] border border-outline-variant overflow-hidden">
+        <!-- M3 segmented button（三档）：容器 outline 边框 + 全圆角，40dp 高，选中段 secondary-container -->
+        <view class="flex flex-row gap-0 rounded-[var(--md-shape-full)] border border-outline overflow-hidden">
           <view
-            class="flex-1 py-2.5 flex items-center justify-center"
+            class="flex-1 h-[10.667vw] flex items-center justify-center active:bg-layer-pressed-on-surface"
             :class="detailQuality === 'medium' ? 'bg-secondary-container' : 'bg-surface-container-lowest'"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="ME_A11Y_LABELS.detailQualityMedium"
             @tap="pickDetailQuality('medium')"
           >
-            <text class="text-label-large" :class="detailQuality === 'medium' ? 'text-secondary-on-container' : 'text-surface-on-variant'">标准</text>
+            <text class="text-label-large" :class="detailQuality === 'medium' ? 'text-secondary-on-container' : 'text-surface-on'">标准</text>
           </view>
           <view
-            class="flex-1 py-2.5 flex items-center justify-center"
+            class="flex-1 h-[10.667vw] flex items-center justify-center border-l border-l-outline active:bg-layer-pressed-on-surface"
             :class="detailQuality === 'large' ? 'bg-secondary-container' : 'bg-surface-container-lowest'"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="ME_A11Y_LABELS.detailQualityLarge"
             @tap="pickDetailQuality('large')"
           >
-            <text class="text-label-large" :class="detailQuality === 'large' ? 'text-secondary-on-container' : 'text-surface-on-variant'">高清</text>
+            <text class="text-label-large" :class="detailQuality === 'large' ? 'text-secondary-on-container' : 'text-surface-on'">高清</text>
           </view>
           <view
-            class="flex-1 py-2.5 flex items-center justify-center"
+            class="flex-1 h-[10.667vw] flex items-center justify-center border-l border-l-outline active:bg-layer-pressed-on-surface"
             :class="detailQuality === 'original' ? 'bg-secondary-container' : 'bg-surface-container-lowest'"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="ME_A11Y_LABELS.detailQualityOriginal"
             @tap="pickDetailQuality('original')"
           >
-            <text class="text-label-large" :class="detailQuality === 'original' ? 'text-secondary-on-container' : 'text-surface-on-variant'">原图</text>
+            <text class="text-label-large" :class="detailQuality === 'original' ? 'text-secondary-on-container' : 'text-surface-on'">原图</text>
           </view>
         </view>
       </view>
 
       <!-- 退出登录（危险操作独立沉底） -->
-      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)]">
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
         <view
           class="py-3.5"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
@@ -319,14 +319,14 @@ function toggleR18G() {
 
     <!-- M3 Dialog（二次确认，选择 Range 时）：fixed 全屏 scrim 遮罩 + 居中卡片 + 标题/内容/操作区 -->
     <view v-if="ugoiraConfirm" class="fixed inset-0 bg-scrim z-50 flex items-center justify-center">
-      <view class="w-[74.667vw] max-w-[74.667vw] bg-surface-container-lowest rounded-[var(--md-shape-extra-large)] px-6 pt-5 pb-3 shadow-[var(--md-elevation-3)]">
+      <view class="w-[74.667vw] max-w-[74.667vw] bg-surface-container-high rounded-[var(--md-shape-extra-large)] px-6 pt-5 pb-3 shadow-[var(--md-elevation-3)]">
         <text class="text-headline-small font-medium text-surface-on">切换到 Range 流式？</text>
-        <text class="text-body-medium text-surface-on-variant mt-2 leading-snug">
+        <text class="text-body-medium text-surface-on-variant mt-4 leading-snug">
           Range 流式按需取帧、内存更低；原生端依赖 Range 支持，个别网络环境可能更慢。
         </text>
-        <view class="flex flex-row justify-end mt-3 gap-2">
+        <view class="flex flex-row justify-end mt-6 gap-2">
           <view
-            class="h-[10.667vw] px-4 flex items-center justify-center"
+            class="h-[10.667vw] px-4 flex items-center justify-center active:bg-layer-pressed-primary"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="ME_A11Y_LABELS.ugoiraCancel"
             @tap="ugoiraConfirm = false"
@@ -334,7 +334,7 @@ function toggleR18G() {
             <text class="text-label-large font-medium text-primary">取消</text>
           </view>
           <view
-            class="h-[10.667vw] px-4 flex items-center justify-center"
+            class="h-[10.667vw] px-4 flex items-center justify-center active:bg-layer-pressed-primary"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="ME_A11Y_LABELS.ugoiraConfirm"
             @tap="confirmUgoiraRange"

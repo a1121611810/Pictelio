@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // ─── M3 浮动操作按钮（FAB，Material Design 3） ───
-// 形态：56dp 圆形、primary-container 背景 + on-primary-container 图标、
-// elevation-3 阴影。图标用 unicode 文本符号（Lynx 无 icon 库）。
+// 形态：56dp、16dp 圆角（shape-large，官方 FAB 为圆角方形）、primary-container 背景 +
+// on-primary-container 图标 24dp、elevation-3 阴影（按压降至 elevation-1）。
+// 图标用 unicode 文本符号（Lynx 无 icon 库）。
 // 放置：页面右下角（absolute 定位由调用方提供容器）。
 const props = withDefaults(
   defineProps<{
@@ -17,7 +18,7 @@ const props = withDefaults(
 <template>
   <!-- 56dp=14.933vw 圆形 FAB；tap 走外层绑定（本组件不消费具体行为） -->
   <view
-    class="w-[14.933vw] h-[14.933vw] rounded-full bg-primary-container flex items-center justify-center shadow-[var(--md-elevation-3)]"
+    class="w-[14.933vw] h-[14.933vw] rounded-[var(--md-shape-large)] bg-primary-container active:bg-layer-pressed-primary flex items-center justify-center shadow-[var(--md-elevation-3)] active:shadow-[var(--md-elevation-1)]"
     :accessibility-element="true"
     :accessibility-label="props.a11yLabel"
   >

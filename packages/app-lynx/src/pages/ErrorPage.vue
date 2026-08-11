@@ -34,7 +34,7 @@ function backToLogin() {
     </text>
     <!-- M3 反色 filled 按钮：on-primary 底 + primary 字（全圆角 pill） -->
     <view
-      class="mt-12 px-12 h-[12.8vw] rounded-[var(--md-shape-full)] bg-primary-on flex items-center justify-center"
+      class="mt-12 px-12 h-[10.667vw] rounded-[var(--md-shape-full)] bg-primary-on active:bg-layer-pressed-on-surface flex items-center justify-center"
       :accessibility-element="A11Y_ELEMENT_ENABLED"
       :accessibility-label="ERROR_A11Y_LABELS.backToLogin"
       @tap="backToLogin"

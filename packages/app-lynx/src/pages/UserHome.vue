@@ -163,7 +163,7 @@ onMounted(async () => {
     <text v-if="detailError" class="text-body-small text-error p-4">{{ detailError }}</text>
 
     <!-- 用户信息卡 -->
-    <view v-if="detail" class="flex flex-row items-center m-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]">
+    <view v-if="detail" class="flex flex-row items-center m-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
       <SkeletonImage
         :src="proxyImageUrl(detail.user.profile_image_urls.medium || detail.user.profile_image_urls.px_170x170 || '')"
         aspect-ratio="1 / 1"
@@ -174,13 +174,13 @@ onMounted(async () => {
         <text class="text-title-large font-bold text-surface-on">{{ detail.user.name }}</text>
         <text class="text-body-small text-outline mt-1">@{{ detail.user.account }}</text>
         <view class="flex flex-row mt-1.5">
-          <view class="h-[8.533vw] px-3 border border-outline-variant rounded-[var(--md-shape-small)] flex items-center justify-center" @tap="openFollowing">
-            <text class="text-label-medium text-surface-on">
+          <view class="h-[8.533vw] px-2 border border-outline rounded-[var(--md-shape-small)] flex items-center justify-center bg-surface" @tap="openFollowing">
+            <text class="text-label-medium text-surface-on-variant">
               关注 {{ detail.profile.total_follow_users ?? '-' }}
             </text>
           </view>
-          <view class="h-[8.533vw] px-3 ml-2 border border-outline-variant rounded-[var(--md-shape-small)] flex items-center justify-center" @tap="openFollowers">
-            <text class="text-label-medium text-surface-on">粉丝</text>
+          <view class="h-[8.533vw] px-2 ml-2 border border-outline rounded-[var(--md-shape-small)] flex items-center justify-center bg-surface" @tap="openFollowers">
+            <text class="text-label-medium text-surface-on-variant">粉丝</text>
           </view>
         </view>
       </view>
@@ -189,15 +189,15 @@ onMounted(async () => {
     <!-- 作品 tab -->
     <view class="flex flex-row border-b-[1px] border-b-outline-variant bg-surface-container-lowest">
       <view
-        class="flex-1 py-2 flex items-center justify-center"
-        :class="activeTab === 'illust' ? 'text-primary border-b-2 border-b-primary' : 'text-outline'"
+        class="flex-1 h-[12.8vw] flex items-center justify-center"
+        :class="activeTab === 'illust' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
         @tap="switchTab('illust')"
       >
         <text class="text-title-small font-medium">插画</text>
       </view>
       <view
-        class="flex-1 py-2 flex items-center justify-center"
-        :class="activeTab === 'novel' ? 'text-primary border-b-2 border-b-primary' : 'text-outline'"
+        class="flex-1 h-[12.8vw] flex items-center justify-center"
+        :class="activeTab === 'novel' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
         @tap="switchTab('novel')"
       >
         <text class="text-title-small font-medium">小说</text>
@@ -228,7 +228,7 @@ onMounted(async () => {
         v-for="item in illusts"
         :key="item.id"
         :item-key="String(item.id)"
-        class="bg-surface-container-lowest rounded-[var(--md-shape-medium)] flex flex-col overflow-hidden"
+        class="bg-surface-container-lowest rounded-[var(--md-shape-medium)] flex flex-col overflow-hidden shadow-[var(--md-elevation-1)]"
       >
         <view class="w-full flex flex-col" @tap="openIllust(item.id)">
           <view class="relative" @tap.stop="onImageTap(item)">
@@ -271,7 +271,7 @@ onMounted(async () => {
         :item-key="String(item.id)"
         class="w-full"
       >
-        <view class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]" @tap="openNovel(item.id)">
+        <view class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]" @tap="openNovel(item.id)">
           <view class="flex-1 flex flex-col">
             <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>
             <view class="flex flex-row mt-1.5">

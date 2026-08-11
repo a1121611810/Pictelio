@@ -120,14 +120,14 @@ onMounted(fetchFirstPage)
     <!-- M3 secondary tabs：容器 surface + 选中 primary 文字 + 3px primary 指示器 -->
     <view class="flex flex-row bg-surface">
       <view
-        class="flex-1 py-2.5 flex flex-col items-center justify-center"
+        class="flex-1 h-[12.8vw] flex flex-col items-center justify-center"
         @tap="switchMode('recommend')"
       >
         <text class="text-title-small font-medium" :class="mode === 'recommend' ? 'text-primary' : 'text-surface-on-variant'">推荐</text>
         <view class="mt-1 h-[0.8vw] w-[40%] rounded-full" :class="mode === 'recommend' ? 'bg-primary' : 'bg-transparent'" />
       </view>
       <view
-        class="flex-1 py-2.5 flex flex-col items-center justify-center"
+        class="flex-1 h-[12.8vw] flex flex-col items-center justify-center"
         @tap="switchMode('follow')"
       >
         <text class="text-title-small font-medium" :class="mode === 'follow' ? 'text-primary' : 'text-surface-on-variant'">关注</text>
@@ -194,7 +194,7 @@ onMounted(fetchFirstPage)
               <text
                 v-for="tag in item.tags.slice(0, 3)"
                 :key="tag.name"
-                class="h-[8.533vw] px-2 border border-outline-variant rounded-[var(--md-shape-small)] flex items-center justify-center m-0.5 text-label-large text-surface-on-variant"
+                class="h-[8.533vw] px-2 border border-outline rounded-[var(--md-shape-small)] flex items-center justify-center m-0.5 text-label-large text-surface-on-variant bg-surface"
               >
                 #{{ tag.translated_name || tag.name }}
               </text>

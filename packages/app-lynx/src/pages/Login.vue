@@ -47,7 +47,7 @@ async function submit() {
       <!-- M3 filled text field：surface-container-highest 底 + extra-small(4dp) 圆角 -->
       <input
         v-model="tokenInput"
-        class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-outline-variant text-body-medium text-surface-on px-4 mb-3"
+        class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-outline-variant text-body-large text-surface-on px-4 mb-3"
         placeholder="粘贴 Pixiv refresh_token"
         placeholder-color="#49454f"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
@@ -58,7 +58,7 @@ async function submit() {
 
       <!-- M3 filled button：primary 底 + 全圆角（pill） -->
       <view
-        class="h-[14.933vw] bg-primary active:bg-state-pressedPrimary rounded-[var(--md-shape-full)] flex items-center justify-center"
+        class="h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
         @tap="submit"
       >
         <text

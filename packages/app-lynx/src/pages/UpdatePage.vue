@@ -50,7 +50,7 @@ const changelogLines = () =>
       </view>
 
       <!-- 更新内容（changelog 多行） -->
-      <view class="bg-surface-container-lowest mt-[6vw] p-4 rounded-[var(--md-shape-medium)]">
+      <view class="bg-surface-container-lowest mt-[6vw] p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
         <text class="text-title-small font-medium text-surface-on">更新内容</text>
         <view v-if="changelogLines().length" class="mt-3 flex flex-col gap-1">
           <text
@@ -65,7 +65,7 @@ const changelogLines = () =>
 
       <!-- 下载新版本（页面唯一主动作） -->
       <view
-        class="mt-[8vw] h-[10.667vw] bg-primary active:bg-state-pressedPrimary rounded-[var(--md-shape-full)] flex items-center justify-center"
+        class="mt-[8vw] h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="UPDATE_A11Y_LABELS.download"
         @tap="openReleasePage"

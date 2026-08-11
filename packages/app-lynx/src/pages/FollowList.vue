@@ -128,7 +128,7 @@ onMounted(fetchFirstPage)
         :item-key="String(item.user.id)"
         class="w-full"
       >
-        <view class="flex flex-row items-center m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]">
+        <view class="flex flex-row items-center m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
           <view class="flex-1 flex flex-row items-center" @tap="openUser(item.user.id)">
             <SkeletonImage
               :src="proxyImageUrl(item.user.profile_image_urls?.medium || item.user.profile_image_urls?.px_170x170 || '')"
@@ -144,10 +144,10 @@ onMounted(fetchFirstPage)
           </view>
           <view
             class="ml-2 px-4 h-[10.667vw] flex items-center justify-center rounded-[var(--md-shape-full)]"
-            :class="item.user.is_followed ? 'border border-outline-variant bg-transparent active:bg-state-pressedOnSurface' : 'bg-primary active:bg-state-pressedPrimary'"
+            :class="item.user.is_followed ? 'border border-outline bg-transparent active:bg-layer-pressed-primary' : 'bg-primary active:bg-state-pressed-primary'"
             @tap="toggleFollow(item)"
           >
-            <text class="text-body-medium" :class="item.user.is_followed ? 'text-surface-on' : 'text-primary-on'">
+            <text class="text-body-medium" :class="item.user.is_followed ? 'text-primary' : 'text-primary-on'">
               {{ item.user.is_followed ? '已关注' : '关注' }}
             </text>
           </view>

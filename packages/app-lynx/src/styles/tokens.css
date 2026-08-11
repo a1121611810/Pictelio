@@ -72,6 +72,13 @@ page {
   --md-state-pressed-error: #9a1f1a; /* error + 12% black */
   --md-state-pressed-surface: #eceaf4; /* surface-container-lowest(#fff) + 12% primary(#6750a4) alpha 合成 */
 
+  /* ── M3 状态层（半透明叠加层，MD3 官方用 alpha 层而非预计算实色） ──
+   * 官方：pressed = 容器色 + 12% primary/on-surface 半透明层；disabled = on-surface 12%/38%。 */
+  --md-state-layer-pressed-primary: rgba(103, 80, 164, 0.12); /* 12% primary */
+  --md-state-layer-pressed-on-surface: rgba(29, 27, 32, 0.12); /* 12% on-surface */
+  --md-state-disabled-container: rgba(29, 27, 32, 0.12); /* on-surface 12% */
+  --md-state-disabled-on-surface: rgba(29, 27, 32, 0.38); /* on-surface 38% */
+
   /* ── 兼容别名：旧 Fluent 语义 → M3 令牌（存量引用不断） ── */
   --colorNeutralBackground1: var(--md-surface-container-lowest); /* 卡片/顶栏底 */
   --colorNeutralBackground2: var(--md-surface-container-low);    /* 页面底 */

@@ -160,15 +160,15 @@ onMounted(() => {
     <!-- 插画/小说 tab -->
     <view class="flex flex-row border-b-[1px] border-b-outline-variant bg-surface-container-lowest">
       <view
-        class="flex-1 py-2 flex items-center justify-center"
-        :class="activeTab === 'illust' ? 'text-primary border-b-2 border-b-primary' : 'text-outline'"
+        class="flex-1 h-[12.8vw] flex items-center justify-center"
+        :class="activeTab === 'illust' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
         @tap="switchTab('illust')"
       >
         <text class="text-title-small font-medium">插画</text>
       </view>
       <view
-        class="flex-1 py-2 flex items-center justify-center"
-        :class="activeTab === 'novel' ? 'text-primary border-b-2 border-b-primary' : 'text-outline'"
+        class="flex-1 h-[12.8vw] flex items-center justify-center"
+        :class="activeTab === 'novel' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
         @tap="switchTab('novel')"
       >
         <text class="text-title-small font-medium">小说</text>
@@ -199,7 +199,7 @@ onMounted(() => {
         v-for="item in illusts"
         :key="item.id"
         :item-key="String(item.id)"
-        class="bg-surface-container-lowest rounded-[var(--md-shape-medium)] flex flex-col overflow-hidden"
+        class="bg-surface-container-lowest rounded-[var(--md-shape-medium)] flex flex-col overflow-hidden shadow-[var(--md-elevation-1)]"
       >
         <view class="w-full flex flex-col" @tap="openIllust(item.id)">
           <view class="relative" @tap.stop="onImageTap(item)">
@@ -248,7 +248,7 @@ onMounted(() => {
         :item-key="String(item.id)"
         class="w-full"
       >
-        <view class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)]" @tap="openNovel(item.id)">
+        <view class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]" @tap="openNovel(item.id)">
           <view class="flex-1 flex flex-col">
             <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>
             <text class="text-body-medium text-surface-on-variant mt-1.5">by {{ item.user.name }}</text>

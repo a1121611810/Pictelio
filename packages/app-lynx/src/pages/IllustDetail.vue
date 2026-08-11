@@ -168,10 +168,10 @@ onMounted(async () => {
           <view
             v-if="!isSelfAuthor"
             class="px-4 h-[10.667vw] flex items-center justify-center rounded-[var(--md-shape-full)]"
-            :class="following ? 'border border-outline-variant bg-transparent active:bg-state-pressedOnSurface' : 'bg-primary active:bg-state-pressedPrimary'"
+            :class="following ? 'border border-outline bg-transparent active:bg-layer-pressed-primary' : 'bg-primary active:bg-state-pressed-primary'"
             @tap.stop="toggleFollowAuthor"
           >
-            <text class="text-body-medium" :class="following ? 'text-surface-on' : 'text-primary-on'">
+            <text class="text-body-medium" :class="following ? 'text-primary' : 'text-primary-on'">
               {{ following ? '已关注' : '关注' }}
             </text>
           </view>
@@ -198,7 +198,7 @@ onMounted(async () => {
           <text
             v-for="tag in illust.tags.slice(0, 8)"
             :key="tag.name"
-            class="h-[8.533vw] px-2.5 border border-outline-variant rounded-[var(--md-shape-small)] flex items-center justify-center m-1 text-label-large text-surface-on-variant"
+            class="h-[8.533vw] px-2 border border-outline rounded-[var(--md-shape-small)] flex items-center justify-center m-1 text-label-large text-surface-on-variant bg-surface"
           >
             #{{ tag.translated_name || tag.name }}
           </text>
