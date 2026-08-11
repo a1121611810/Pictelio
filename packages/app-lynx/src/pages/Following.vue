@@ -12,16 +12,12 @@ import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
-import NavigationBar, { type NavTab } from '../components/NavigationBar.vue'
+import NavigationBar from '../components/NavigationBar.vue'
+import { NAV_TABS, type NavTab } from '../components/navTabs'
 
-// 底部导航 tabs：推荐/关注（本页）/小说/我的
-const navTabs: NavTab[] = [
-  { name: 'recommended', path: '/recommended', icon: '⌂', label: '推荐', a11yLabel: '推荐' },
-  { name: 'following', path: '/following', icon: '♥', label: '关注', a11yLabel: '关注' },
-  { name: 'novels', path: '/novels', icon: '✎', label: '小说', a11yLabel: '小说' },
-  { name: 'me', path: '/me', icon: '◎', label: '我的', a11yLabel: '我的' },
-]
-
+// 底部导航 tabs 取共享 NAV_TABS（推荐/插画/小说/我的；已不含 following tab）。
+// /following 已不在导航可达：active-name='following' 无对应 tab 故无高亮（可接受），
+// 本页 tab 判断（if tab.name === 'following'）永不命中，点击任何 tab 正常 navigate。
 function onNavSelect(tab: NavTab) {
   if (tab.name === 'following') return
   void navigate(tab.path, { replace: true })
@@ -129,10 +125,14 @@ onMounted(fetchFirstPage)
       >
         <!-- [lynx:fix] 原生 list-item 根级 @tap 失效 → 内容 view 绑 tap（ADR-0055） -->
         <view class="w-full flex flex-col" @tap="openDetail(item.id)">
-          <view class="relative" @tap.stop="onImageTap(item)">
+          <view
+            v-if="isRestricted(item)" @tap.stop
+            class="w-full h-[48.4vw] flex items-center justify-center bg-[var(--md-scrim)] rounded-[var(--md-shape-medium)]"
+          >
+            <RestrictOverlay :overlay="false" :level="item.x_restrict === 2 ? 2 : 1" />
+          </view>
+          <view v-else class="relative" @tap.stop="onImageTap(item)">
             <SkeletonImage :src="thumbUrl(item.image_urls)" height="48.4vw" lazy-load />
-            <!-- 受限条目图片区遮罩（issue #91） -->
-            <RestrictOverlay v-if="isRestricted(item)" :level="item.x_restrict === 2 ? 2 : 1" />
           </view>
           <text class="text-title-small font-medium text-surface-on mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
           <text class="text-body-small text-surface-on-variant mt-1 mx-2.5 [max-line:1]">{{ item.user.name }}</text>
@@ -150,7 +150,7 @@ onMounted(fetchFirstPage)
       </list-item>
     </list>
 
-    <!-- M3 NavigationBar：底部四 tab -->
-    <NavigationBar :tabs="navTabs" :active-name="'following'" @select="onNavSelect" />
+    <!-- M3 NavigationBar：底部四 tab（NAV_TABS 共享；active-name 无匹配故无高亮，可接受） -->
+    <NavigationBar :tabs="NAV_TABS" :active-name="'following'" @select="onNavSelect" />
   </view>
 </template>

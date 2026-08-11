@@ -9,15 +9,8 @@ import { presentError } from '../utils/errorPresentation'
 import { withTimeout } from '../utils/withTimeout'
 import { isRestricted } from '../stores/settingsStore'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
-import NavigationBar, { type NavTab } from '../components/NavigationBar.vue'
-
-// 底部导航 tabs：推荐/关注/小说（本页）/我的
-const navTabs: NavTab[] = [
-  { name: 'recommended', path: '/recommended', icon: '⌂', label: '推荐', a11yLabel: '推荐' },
-  { name: 'following', path: '/following', icon: '♥', label: '关注', a11yLabel: '关注' },
-  { name: 'novels', path: '/novels', icon: '✎', label: '小说', a11yLabel: '小说' },
-  { name: 'me', path: '/me', icon: '◎', label: '我的', a11yLabel: '我的' },
-]
+import NavigationBar from '../components/NavigationBar.vue'
+import { NAV_TABS, type NavTab } from '../components/navTabs'
 
 function onNavSelect(tab: NavTab) {
   if (tab.name === 'novels') return
@@ -116,22 +109,23 @@ onMounted(fetchFirstPage)
       <text class="text-title-large font-medium text-surface-on">小说</text>
     </view>
 
-    <!-- 推荐/关注切换（M3 secondary tabs：选中 primary 文字 + 3px primary 指示器） -->
-    <!-- M3 secondary tabs：容器 surface + 选中 primary 文字 + 3px primary 指示器 -->
-    <view class="flex flex-row bg-surface">
+    <!-- 推荐/关注切换（M3 secondary tabs：选中 primary 文字 + 底部 0.8vw primary 指示条，
+         容器 border-b 分割线；Bookmarks.vue 已验证的可靠写法，修复 web-core 下 flex-col
+         内容 + 独立指示器横条导致的向上偏移） -->
+    <view class="flex flex-row border-b-[1px] border-b-outline-variant bg-surface-container-lowest">
       <view
-        class="flex-1 h-[12.8vw] flex flex-col items-center justify-center"
+        class="flex-1 h-[12.8vw] flex items-center justify-center"
+        :class="mode === 'recommend' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
         @tap="switchMode('recommend')"
       >
-        <text class="text-title-small font-medium" :class="mode === 'recommend' ? 'text-primary' : 'text-surface-on-variant'">推荐</text>
-        <view class="mt-1 h-[0.8vw] w-[40%] rounded-full" :class="mode === 'recommend' ? 'bg-primary' : 'bg-transparent'" />
+        <text class="text-title-small font-medium">推荐</text>
       </view>
       <view
-        class="flex-1 h-[12.8vw] flex flex-col items-center justify-center"
+        class="flex-1 h-[12.8vw] flex items-center justify-center"
+        :class="mode === 'follow' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
         @tap="switchMode('follow')"
       >
-        <text class="text-title-small font-medium" :class="mode === 'follow' ? 'text-primary' : 'text-surface-on-variant'">关注</text>
-        <view class="mt-1 h-[0.8vw] w-[40%] rounded-full" :class="mode === 'follow' ? 'bg-primary' : 'bg-transparent'" />
+        <text class="text-title-small font-medium">关注</text>
       </view>
     </view>
 
@@ -180,7 +174,12 @@ onMounted(fetchFirstPage)
         class="w-full"
         @tap="openDetail(item.id)"
       >
-        <view class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+        <!-- 受限条目：独立遮罩卡（流内，无 absolute——真机 Lynx 的 absolute 子元素会被
+             single list item 高度测量算进内容高度，导致整卡撑满内容区，实测 2026-08-11） -->
+        <view v-if="isRestricted(item)" @tap.stop class="flex flex-row items-center justify-center m-1.5 mx-3 p-3.5 bg-[var(--md-scrim)] rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+          <RestrictOverlay :overlay="false" :level="item.x_restrict === 2 ? 2 : 1" />
+        </view>
+        <view v-else class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
           <view class="flex-1 flex flex-col">
             <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>
             <text class="text-body-medium text-surface-on-variant mt-1.5">by {{ item.user.name }}</text>
@@ -200,8 +199,6 @@ onMounted(fetchFirstPage)
               </text>
             </view>
           </view>
-          <!-- 受限条目遮罩（issue #91）：点击不响应 -->
-          <RestrictOverlay v-if="isRestricted(item)" :level="item.x_restrict === 2 ? 2 : 1" />
         </view>
       </list-item>
       <list-item v-if="loadingMore" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
@@ -210,6 +207,6 @@ onMounted(fetchFirstPage)
     </list>
 
     <!-- M3 NavigationBar：底部四 tab -->
-    <NavigationBar :tabs="navTabs" :active-name="'novels'" @select="onNavSelect" />
+    <NavigationBar :tabs="NAV_TABS" :active-name="'novels'" @select="onNavSelect" />
   </view>
 </template>

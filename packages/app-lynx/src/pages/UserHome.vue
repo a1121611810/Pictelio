@@ -231,10 +231,14 @@ onMounted(async () => {
         class="bg-surface-container-lowest rounded-[var(--md-shape-medium)] flex flex-col overflow-hidden shadow-[var(--md-elevation-1)]"
       >
         <view class="w-full flex flex-col" @tap="openIllust(item.id)">
-          <view class="relative" @tap.stop="onImageTap(item)">
+          <view
+            v-if="isRestricted(item)" @tap.stop
+            class="w-full h-[48.4vw] flex items-center justify-center bg-[var(--md-scrim)] rounded-[var(--md-shape-medium)]"
+          >
+            <RestrictOverlay :overlay="false" :level="item.x_restrict === 2 ? 2 : 1" />
+          </view>
+          <view v-else class="relative" @tap.stop="onImageTap(item)">
             <SkeletonImage :src="thumbUrl(item.image_urls)" height="48.4vw" lazy-load />
-            <!-- 受限条目图片区遮罩（issue #91） -->
-            <RestrictOverlay v-if="isRestricted(item)" :level="item.x_restrict === 2 ? 2 : 1" />
           </view>
           <text class="text-title-small font-medium text-surface-on mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
           <view class="mt-1 mx-2.5 mb-2.5">
@@ -271,18 +275,19 @@ onMounted(async () => {
         :item-key="String(item.id)"
         class="w-full"
       >
-        <view class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]" @tap="openNovel(item.id)">
-          <view class="flex-1 flex flex-col">
-            <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>
-            <view class="flex flex-row mt-1.5">
-              <text class="text-label-medium text-outline mr-4">{{ item.text_length }} 字</text>
-              <text v-if="item.total_bookmarks > 0" class="text-label-medium text-outline mr-4">
-                ♥ {{ item.total_bookmarks }}
-              </text>
-            </view>
-          </view>
-          <!-- 受限条目遮罩（issue #91） -->
-          <RestrictOverlay v-if="isRestricted(item)" :level="item.x_restrict === 2 ? 2 : 1" />
+        <view v-if="isRestricted(item)" @tap.stop class="flex flex-row items-center justify-center m-1.5 mx-3 p-3.5 bg-[var(--md-scrim)] rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+          <RestrictOverlay :overlay="false" :level="item.x_restrict === 2 ? 2 : 1" />
+        </view>
+        <view v-else class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]" @tap="openNovel(item.id)"><view class="flex-1 flex flex-col">
+                    <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>
+                    <view class="flex flex-row mt-1.5">
+                      <text class="text-label-medium text-outline mr-4">{{ item.text_length }} 字</text>
+                      <text v-if="item.total_bookmarks > 0" class="text-label-medium text-outline mr-4">
+                        ♥ {{ item.total_bookmarks }}
+                      </text>
+                    </view>
+                  </view>
+        
         </view>
       </list-item>
       <list-item v-if="novelLoadingMore" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
