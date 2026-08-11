@@ -204,13 +204,17 @@ function toggleR18G() {
           @tap="toggleR18"
         >
           <text class="text-title-medium text-surface-on">显示 R-18 内容</text>
-          <!-- M3 switch（官方 token v0.192）：轨道 52×32dp、选中 thumb 24dp / 未选中 16dp、
-               未选中轨道 2dp outline 边框、按压 28dp（active: 变体，web-core 生效） -->
+          <!-- M3 switch（官方 token v0.192 + _handle.scss）：轨道 52×32dp；
+               thumb 外层 32×32 handle-container 居中定位（未选中 16dp→距左 8px，
+               选中 24dp→距右 4px，按压 28dp 居中不溢出）；未选中轨道 2dp outline 边框 -->
           <view
             class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
             :class="showR18 ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
           >
-            <view class="rounded-full shadow-[var(--md-elevation-1)] active:w-[7.467vw] active:h-[7.467vw]" :class="showR18 ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
+            <!-- handle-container：32×32 与轨道同高，thumb 居中 → 距边 8px/4px -->
+            <view class="w-[8.533vw] h-[8.533vw] flex items-center justify-center">
+              <view class="rounded-full active:w-[7.467vw] active:h-[7.467vw]" :class="showR18 ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
+            </view>
           </view>
         </view>
         <view
@@ -224,7 +228,10 @@ function toggleR18G() {
             class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
             :class="showR18G ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
           >
-            <view class="rounded-full shadow-[var(--md-elevation-1)] active:w-[7.467vw] active:h-[7.467vw]" :class="showR18G ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
+            <!-- handle-container：32×32 与轨道同高，thumb 居中 → 距边 8px/4px -->
+            <view class="w-[8.533vw] h-[8.533vw] flex items-center justify-center">
+              <view class="rounded-full active:w-[7.467vw] active:h-[7.467vw]" :class="showR18G ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
+            </view>
           </view>
         </view>
       </view>
