@@ -45,25 +45,29 @@ const proxyUrl =
   'http://127.0.0.1:10808'
 
 // ─── 启动更新检查开关（.env PICTELIO_DISABLE_UPDATE_CHECK） ───
-// dev 调试用：true → 强制跳过启动更新检查（不走 checkForUpdate，不进强制更新页）。
-// false / 未设置 → 按原逻辑走。
+// 仅 dev 调试生效：true → 强制跳过启动更新检查（不走 checkForUpdate，不进强制更新页）。
+// 生产构建（build）恒为 false——更新检查是生产 APK 的正常功能，不受 .env 开关影响。
 // 注意：rspeedy 先执行本配置文件（loadConfig）再 createRsbuild({ loadEnv })，即
 // .env 变量此时尚未写入 process.env——必须手动读取 .env（与下方 credentials.json5 同款）。
-const _envRaw = (() => {
-  try {
-    return readFileSync(resolve(_root, '.env'), 'utf-8')
-  } catch {
-    return ''
-  }
-})()
-const _envMap: Record<string, string> = {}
-for (const line of _envRaw.split('\n')) {
-  const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/u.exec(line)
-  if (m && !line.trim().startsWith('#')) _envMap[m[1]] = m[2]
-}
-const _disableUpdateCheck = ['true', '1', 'yes'].includes(
-  String(_envMap.PICTELIO_DISABLE_UPDATE_CHECK ?? '').trim().toLowerCase(),
-)
+const _disableUpdateCheck = _isDev
+  ? (() => {
+      const _envRaw = (() => {
+        try {
+          return readFileSync(resolve(_root, '.env'), 'utf-8')
+        } catch {
+          return ''
+        }
+      })()
+      const _envMap: Record<string, string> = {}
+      for (const line of _envRaw.split('\n')) {
+        const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/u.exec(line)
+        if (m && !line.trim().startsWith('#')) _envMap[m[1]] = m[2]
+      }
+      return ['true', '1', 'yes'].includes(
+        String(_envMap.PICTELIO_DISABLE_UPDATE_CHECK ?? '').trim().toLowerCase(),
+      )
+    })()
+  : false
 // 脱敏：代理 URL 可能含 user:pass 凭据（含 scheme-less / protocol-relative 格式），
 // 日志只打印主机部分。逻辑与 src/utils/proxyRedact.ts 的 redactProxyUrl 一致（有单测覆盖）。
 const _redactProxyUrl = (url: string): string => {
