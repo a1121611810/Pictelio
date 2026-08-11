@@ -28,6 +28,15 @@ _Avoid_: 等比缩放（有歧义）、自适应
 
 **受限条目（Restricted item）**：
 因 R18/R18G 设置开关处于隐藏态的条目；显示遮罩且点击无响应。
+_Avoid_: 受限内容（与「受限条目」混用）、被隐藏的条目
+
+**综合推荐（Mixed recommendation）**：
+「推荐」tab 的内容——插画推荐与小说推荐按比例（4:1）交替合并的单一 feed，数据层由 `createMixFeed` 承载。区别于单源 feed（仅插画或仅小说）。
+_Avoid_: 推荐插画（旧称，仅指插画单源）、混排（有歧义）
+
+**插画分类页（Illust category page）**：
+「插画」tab 的路由页（`/illusts`）——推荐/关注两个子 tab + waterfall 双列插画卡，同小说页（`/novels`）的子 tab 结构。
+_Avoid_: 插画页（与旧「推荐插画」混淆）、作品分类页
 
 ## 错误与登录
 
