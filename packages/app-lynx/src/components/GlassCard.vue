@@ -1,8 +1,8 @@
 <script setup lang="ts">
-// 伪玻璃通用卡片（issue #97：Frosted Card + 液态弹性）。
-// 伪玻璃三件套：半透底 + 顶部高光渐变 + inset 内发光/外阴影（全部 Lynx 确认支持，
-// web-core 与原生 LynxView 观感一致；backdrop-filter 双端均不支持，见 liquid-glass 可行性报告方案 A）。
-// 弹性交互（elastic=true）：触摸滑近时方向性拉伸 + 弹性位移，松手 200ms Fluent standard 曲线回弹。
+// M3 通用卡片（原 Fluent 伪玻璃卡 → Material Design 3 elevated card）。
+// 视觉：surface-container-lowest 底 + elevation-1 阴影 + shape-medium(12dp) 圆角，
+// 符合 M3「elevated card」规范（组件层级上浮的卡片）。
+// 弹性交互（elastic=true）保留：触摸滑近时方向性拉伸 + 弹性位移，松手 200ms 回弹。
 // 算法收敛在 primitives/createLiquidElastic（纯函数，唯一测试接缝）；本组件只做事件接线。
 import { computed, ref } from 'vue'
 import { createLiquidElastic, type ElasticRect, type ElasticPoint } from '../primitives/createLiquidElastic'
@@ -13,10 +13,10 @@ const props = withDefaults(
     elastic?: boolean
     /** 弹性系数（对齐 liquid-glass-react 默认 0.15） */
     elasticity?: number
-    /** 圆角 token 覆盖（默认 --borderRadiusXLarge） */
+    /** 圆角 token 覆盖（默认 M3 shape-large = 16px） */
     radius?: string
   }>(),
-  { elastic: true, elasticity: 0.15, radius: 'var(--borderRadiusXLarge)' },
+  { elastic: true, elasticity: 0.15, radius: 'var(--md-shape-medium)' },
 )
 
 // 卡片选择器 id（createSelectorQuery 布局查询用）
@@ -40,22 +40,37 @@ const cardStyle = computed(() => ({
     : 'transform var(--durationNormal) cubic-bezier(0.33, 0, 0.67, 1)',
 }))
 
+interface BoundingRect {
+  left: number
+  top: number
+  width: number
+  height: number
+}
+
 function queryRect(): void {
-  // Lynx 官方布局查询（web-core/原生双端 API）
-  lynx
-    .createSelectorQuery()
-    .select(`#${cardId}`)
-    .boundingClientRect()
-    .exec((res: Array<{ left: number; top: number; width: number; height: number }>) => {
-      const r = res?.[0]
-      if (!r) return
-      cachedRect = { left: r.left, top: r.top, width: r.width, height: r.height }
-      // 矩形就绪：补上 touchstart 时被跳过的首个触点
-      if (pendingFirstPoint && touching.value) {
-        applyElastic(pendingFirstPoint)
-        pendingFirstPoint = null
-      }
+  // ── 布局矩形查询（Lynx 标准 API；修复 web-core 0.23.1 缺链式 boundingClientRect） ──
+  // 注意：vue-lynx 的 JS 运行在 web-core worker 里（无 document），
+  // 且 NodesRef 上不存在 .boundingClientRect() 链式方法（web-core 0.23.1 实测缺失）。
+  // 正确用法是 invoke({ method: 'boundingClientRect' })——web-core 主线程
+  // createInvokeUIMethod.js 显式处理该 method，原生 LynxView 同为标准 API。
+  const q = lynx?.createSelectorQuery?.()
+  if (!q) return
+  q.select(`#${cardId}`)
+    .invoke({
+      method: 'boundingClientRect',
+      params: {},
+      success: (data) => {
+        const r = data as Partial<BoundingRect> | null
+        if (!r) return
+        cachedRect = { left: r.left ?? 0, top: r.top ?? 0, width: r.width ?? 0, height: r.height ?? 0 }
+        // 矩形就绪：补上 touchstart 时被跳过的首个触点
+        if (pendingFirstPoint && touching.value) {
+          applyElastic(pendingFirstPoint)
+          pendingFirstPoint = null
+        }
+      },
     })
+  q.exec()
 }
 
 interface LynxTouch {
@@ -139,9 +154,7 @@ function onTouchEnd(): void {
 
 <style scoped>
 .glass-card {
-  background-color: var(--glassBgMuted);
-  background-image: var(--glassHighlight);
-  box-shadow: var(--glassEdge);
-  border: 1px solid var(--glassBorder);
+  background-color: var(--md-surface-container-lowest);
+  box-shadow: var(--md-elevation-1);
 }
 </style>

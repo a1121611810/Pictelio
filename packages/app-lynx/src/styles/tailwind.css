@@ -1,0 +1,8 @@
+/* ─── Tailwind 指令入口（独立 CSS 文件） ───
+ * 必须独立成文件由 index.ts import：App.vue 的 <style> 内联 @tailwind 指令
+ * 不会经过 rsbuild 的 CSS 处理链（rsbuild-plugin-tailwindcss 基于模块图扫描），
+ * 导致 utility 类从未生成 → web-core 预览下所有 Tailwind 类样式失效。
+ * 指令放独立 CSS 文件后走标准 CSS 模块链路，生成的 utility 规则注入 bundle。
+ */
+@tailwind base;
+@tailwind utilities;

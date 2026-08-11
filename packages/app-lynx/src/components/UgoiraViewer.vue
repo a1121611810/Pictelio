@@ -5,6 +5,7 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { downloadUgoiraFrames, type UgoiraFrameData } from '../api/ugoira'
 import { ugoiraMode } from '../stores/settingsStore'
+import { presentError } from '../utils/errorPresentation'
 
 const props = withDefaults(defineProps<{
   illustId: number
@@ -63,7 +64,7 @@ onMounted(async () => {
     }
   } catch (err) {
     if (!disposed && !abort.signal.aborted) {
-      errorMsg.value = (err as { message?: string }).message ?? '动图加载失败'
+      errorMsg.value = presentError(err, '动图加载失败')
     }
   } finally {
     if (!disposed) loading.value = false
@@ -79,8 +80,8 @@ onBeforeUnmount(() => {
 
 <template>
   <view class="w-full flex flex-col items-center">
-    <view v-if="loading" class="shimmer w-full rounded-[var(--borderRadiusLarge)]" :style="{ height: heightVw }" />
-    <image v-else-if="currentSrc" class="w-full rounded-[var(--borderRadiusLarge)]" :style="{ height: heightVw }" :src="currentSrc" :mode="'aspectFit'" />
-    <text v-if="errorMsg" class="text-sm text-danger p-4">{{ errorMsg }}</text>
+    <view v-if="loading" class="shimmer w-full rounded-[var(--md-shape-medium)]" :style="{ height: heightVw }" />
+    <image v-else-if="currentSrc" class="w-full rounded-[var(--md-shape-medium)]" :style="{ height: heightVw }" :src="currentSrc" :mode="'aspectFit'" />
+    <text v-if="errorMsg" class="text-body-small text-error p-4">{{ errorMsg }}</text>
   </view>
 </template>

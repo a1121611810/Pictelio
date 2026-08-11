@@ -45,8 +45,8 @@ async function toggle() {
 
 <template>
   <view class="flex flex-row items-center" @tap.stop="toggle">
-    <text class="text-xl" :class="bookmarked ? 'text-danger' : 'text-foreground-3'">♥</text>
-    <text v-if="bookmarkCount !== undefined" class="text-xs text-foreground-3 ml-1">{{ count }}</text>
-    <text v-if="errorMsg" class="text-xs text-danger ml-1">{{ errorMsg }}</text>
+    <text class="text-[6.4vw] leading-none" :class="bookmarked ? 'text-error' : 'text-outline'">♥</text>
+    <text v-if="bookmarkCount !== undefined" class="text-label-medium text-outline ml-1">{{ count }}</text>
+    <text v-if="errorMsg" class="text-label-medium text-error ml-1">{{ errorMsg }}</text>
   </view>
 </template>

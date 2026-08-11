@@ -125,25 +125,23 @@ describe("settingsStore.detailQuality（issue #146 T1）", () => {
   })
 })
 
-// 契约断言：伪玻璃 token 必须真实存在于 tokens.css（真实样例硬约束，
+// 契约断言：M3 token 必须真实存在于 tokens.css（真实样例硬约束，
 // 参照 tests/unit.test.ts 的 tailwind↔tokens 契约模式，读真实源文件比对）
-describe("伪玻璃 token 契约（issue #97）", () => {
+describe("M3 token 契约（Material Design 3 改造）", () => {
   const tokensCss = readFileSync(resolve(here, "../styles/tokens.css"), "utf-8")
-  for (const token of ["--glassBgMuted", "--glassHighlight", "--glassEdge", "--glassBorder"]) {
+  for (const token of ["--md-scrim", "--md-error", "--md-error-container", "--md-shape-large"]) {
     it(`tokens.css 定义 ${token}`, () => {
       expect(tokensCss, `tokens.css 缺少 ${token}`).toContain(`${token}:`)
     })
   }
-  it("RestrictOverlay 伪玻璃三件套走 token 且样式块无 backdrop-filter 路线（issue #97）", () => {
+  it("RestrictOverlay M3 遮罩走 token 且样式块无 backdrop-filter 路线（issue #97）", () => {
     const overlaySrc = readFileSync(resolve(here, "../components/RestrictOverlay.vue"), "utf-8")
-    expect(overlaySrc).toContain("var(--glassBgMuted)")
-    expect(overlaySrc).toContain("var(--glassHighlight)")
-    expect(overlaySrc).toContain("var(--glassEdge)")
+    expect(overlaySrc).toContain("var(--md-scrim)")
     // backdrop-filter 路线已废弃（web-core/原生均不支持）——只约束样式块，注释允许提及
     const styleBlock = overlaySrc.split("<style")[1] ?? ""
     expect(styleBlock).not.toContain("backdrop-filter")
     expect(styleBlock).not.toContain("@supports")
-    // 玻璃样式块无字面色值（徽章等 UI 允许合法用色）
+    // 遮罩样式块无字面色值（徽章等 UI 允许合法用色）
     const glassBlock = overlaySrc.split(".restrict-overlay")[1] ?? ""
     expect(glassBlock).not.toMatch(/rgba?\(|#[0-9a-fA-F]{3,8}/)
   })

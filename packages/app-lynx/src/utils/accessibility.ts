@@ -16,7 +16,7 @@ export const ME_A11Y_LABELS = {
   webviewOptionTitle: 'WebView（现有）',
   lynxOptionTitle: 'Lynx（当前）',
   // ── 关键交互（@tap 容器：view 默认不进 accessibility 树，必须显式标注） ──
-  back: '返回',
+  // （M3 改造后 Me 为底部导航顶层页，无返回箭头；back 标注已移除）
   switchToWebview: '切换客户端到WebView', // 「切回 WebView」入口
   switchToLynx: '切换客户端到Lynx',
   bookmarks: '我的收藏',
@@ -48,6 +48,12 @@ export const UPDATE_A11Y_LABELS = {
 /** Recommended 页 accessibility 标注（Lynx E2E：导航到 Me 页入口） */
 export const RECOMMENDED_A11Y_LABELS = {
   openMe: '我的',
+} as const
+
+/** 会话失效错误页 accessibility 标注（候选 #2：全屏错误页 /error） */
+export const ERROR_A11Y_LABELS = {
+  pageTitle: '登录已过期',
+  backToLogin: '返回登录',
 } as const
 
 // Lynx 元素属性不支持 Vue 插值表达式，模板中用 :accessibility-element 绑定此常量

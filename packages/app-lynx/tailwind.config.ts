@@ -5,7 +5,9 @@ import lynxPreset from '@lynx-js/tailwind-preset'
 // 单位策略（经原型实测 + 决策）：
 // - spacing → vw 档位：间距随屏宽缩放（1 档 = 4px @375 设计稿，vw 值 = px/375×100）
 // - fontSize → rpx 档位：字号随屏宽缩放（沿用现有字号语义）
-// - colors → Fluent 语义色板：引用 tokens.css 现有 CSS 变量（单一事实源）
+// - colors → Material Design 3 语义色板：引用 tokens.css 的 M3 变量（单一事实源），
+//   旧 Fluent 语义名（background/foreground/brand/stroke…）保留为兼容别名，
+//   新代码优先用 M3 语义名（primary/secondary/surface/outline…）。
 // 注意：
 // - spacing/fontSize 用「顶层替换」而非 extend——extend 深合并会残留 Tailwind
 //   默认档位（72/80/96 等 rem 值），页面一旦用到就踩 web-core 的 rem 塌陷坑
@@ -40,21 +42,95 @@ const config: Config = {
       64: '68.267vw', // 256px
     },
     fontSize: {
-      // 沿用现有 rpx 字号档位（随屏宽缩放）
-      xs: '20rpx',
-      sm: '22rpx',
-      base: '24rpx',
-      lg: '26rpx',
-      xl: '28rpx',
-      '2xl': '30rpx',
-      '3xl': '32rpx',
-      '4xl': '36rpx',
-      '5xl': '40rpx',
-      '6xl': '56rpx',
+      // ── Material Design 3 type scale（sp → rpx @375：1sp = 2rpx） ──
+      // 语义档位（新代码优先使用）：
+      //   label-small 11sp=22rpx / label-medium 12sp=24rpx / body-small 12sp=24rpx /
+      //   label-large 14sp=28rpx / body-medium 14sp=28rpx / title-small 14sp=28rpx /
+      //   body-large 16sp=32rpx / title-medium 16sp=32rpx / title-large 22sp=44rpx /
+      //   headline-small 24sp=48rpx / headline-medium 28sp=56rpx / headline-large 32sp=64rpx
+      'label-small': '22rpx',
+      'label-medium': '24rpx',
+      'body-small': '24rpx',
+      'label-large': '28rpx',
+      'body-medium': '28rpx',
+      'title-small': '28rpx',
+      'body-large': '32rpx',
+      'title-medium': '32rpx',
+      'title-large': '44rpx',
+      'headline-small': '48rpx',
+      'headline-medium': '56rpx',
+      'headline-large': '64rpx',
+      // ── 旧档位兼容别名（值已对齐 M3 最接近档位，存量类名自动获得合法 M3 值） ──
+      xs: '22rpx', // 10sp → label-small 11sp
+      sm: '24rpx', // 11sp → label-medium 12sp
+      base: '28rpx', // 12sp → body-medium 14sp
+      lg: '28rpx', // 13sp → title-small/body-medium 14sp
+      xl: '28rpx', // 14sp → body-medium/label-large 14sp
+      '2xl': '32rpx', // 15sp → title-medium/body-large 16sp
+      '3xl': '44rpx', // 18sp → title-large 22sp
+      '4xl': '48rpx', // 旧档 18sp → headline-small 24sp
+      '5xl': '56rpx', // 20sp → headline-medium 28sp
+      '6xl': '56rpx', // 28sp → headline-medium 28sp
     },
     extend: {
       colors: {
-        // Fluent 语义色板：值引用 tokens.css 变量（单一事实源，改一处全生效）
+        // ── Material Design 3 语义色板（单一事实源 = tokens.css M3 变量） ──
+        primary: {
+          DEFAULT: 'var(--md-primary)',
+          on: 'var(--md-on-primary)',
+          container: 'var(--md-primary-container)',
+          'on-container': 'var(--md-on-primary-container)',
+        },
+        secondary: {
+          DEFAULT: 'var(--md-secondary)',
+          on: 'var(--md-on-secondary)',
+          container: 'var(--md-secondary-container)',
+          'on-container': 'var(--md-on-secondary-container)',
+        },
+        tertiary: {
+          DEFAULT: 'var(--md-tertiary)',
+          on: 'var(--md-on-tertiary)',
+          container: 'var(--md-tertiary-container)',
+          'on-container': 'var(--md-on-tertiary-container)',
+        },
+        error: {
+          DEFAULT: 'var(--md-error)',
+          on: 'var(--md-on-error)',
+          container: 'var(--md-error-container)',
+          'on-container': 'var(--md-on-error-container)',
+        },
+        surface: {
+          DEFAULT: 'var(--md-surface)',
+          on: 'var(--md-on-surface)',
+          variant: 'var(--md-surface-variant)',
+          'on-variant': 'var(--md-on-surface-variant)',
+          'container-lowest': 'var(--md-surface-container-lowest)',
+          'container-low': 'var(--md-surface-container-low)',
+          container: 'var(--md-surface-container)',
+          'container-high': 'var(--md-surface-container-high)',
+          'container-highest': 'var(--md-surface-container-highest)',
+        },
+        inverse: {
+          surface: 'var(--md-inverse-surface)',
+          'on-surface': 'var(--md-inverse-on-surface)',
+          primary: 'var(--md-inverse-primary)',
+        },
+        state: {
+          'pressed-primary': 'var(--md-state-pressed-primary)',
+          'pressed-on-surface': 'var(--md-state-pressed-on-surface)',
+          'pressed-error': 'var(--md-state-pressed-error)',
+          'pressed-surface': 'var(--md-state-pressed-surface)',
+          'layer-pressed-primary': 'var(--md-state-layer-pressed-primary)',
+          'layer-pressed-on-surface': 'var(--md-state-layer-pressed-on-surface)',
+          'disabled-container': 'var(--md-state-disabled-container)',
+          'disabled-on-surface': 'var(--md-state-disabled-on-surface)',
+        },
+        outline: {
+          DEFAULT: 'var(--md-outline)',
+          variant: 'var(--md-outline-variant)',
+        },
+        scrim: 'var(--md-scrim)',
+        // ── 兼容别名：旧 Fluent 语义名 → 同一 M3 令牌（存量引用不断） ──
         background: {
           DEFAULT: 'var(--colorNeutralBackground1)',
           2: 'var(--colorNeutralBackground2)',

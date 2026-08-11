@@ -207,7 +207,7 @@ pixivizer/
 │   │   ├── tests/               # lynx 单测
 │   │   ├── scripts/             # sync-android-assets.mjs 等
 │   │   ├── lynx.config.ts       # Lynx/Rspack 构建配置
-│   │   ├── tailwind.config.ts   # Tailwind（spacing=vw、fontSize=rpx、Fluent 色板）
+│   │   ├── tailwind.config.ts   # Tailwind（spacing=vw、fontSize=rpx、M3 色板）
 │   │   └── postcss.config.js
 │   ├── ugoira/                  # @pictelio/ugoira — Ugoira 动图 zip 帧处理纯函数库
 │   │   ├── src/                 # fflate 解压 / store 模式 Range 切片
@@ -583,7 +583,7 @@ Grill 澄清 → to-spec → to-tickets → implement
 - **状态管理**：`createSignal` / `createStore` 直接在 store 模块顶层定义并导出，不额外封装
 - **路径别名**：`@/` 映射到 `src/`（tsconfig paths + Vite alias）
 - **样式与交互**：见「Fluent Design 规范」章节，不得例外
-- **app-lynx 样式（Tailwind 硬性约定）**：`packages/app-lynx` 的页面/组件样式**默认优先使用 Tailwind CSS utility**（配置见 `tailwind.config.ts`：spacing=vw 档位、fontSize=rpx 档位、颜色=Fluent 语义色板引用 tokens.css 变量）。禁止新增手写 scoped CSS 实现新样式；现有特殊语义（如 `[lynx:fix]` 的 web-core 防护）用 arbitrary utility 表达（`min-h-[40vw]`、`[max-line:1]`、`leading-[44rpx]` 等）。web-core 预览下禁止使用 rem 单位（Tailwind 默认 rem 已通过顶层替换排除）
+- **app-lynx 样式（Tailwind 硬性约定）**：`packages/app-lynx` 的页面/组件样式**默认优先使用 Tailwind CSS utility**（配置见 `tailwind.config.ts`：spacing=vw 档位、fontSize=rpx 档位、颜色=Material Design 3 语义色板，主名 `primary/secondary/surface/outline/error…`，旧 Fluent 语义名保留为兼容别名，值统一引用 `tokens.css` 的 M3 变量）。禁止新增手写 scoped CSS 实现新样式；现有特殊语义（如 `[lynx:fix]` 的 web-core 防护）用 arbitrary utility 表达（`min-h-[40vw]`、`[max-line:1]`、`leading-[44rpx]` 等）。web-core 预览下禁止使用 rem 单位（Tailwind 默认 rem 已通过顶层替换排除）
 - **注释**：中文注释为主，API 层和类型定义处偏英文
 - **文件命名**：组件 PascalCase、工具/API/primitives camelCase
 - **Lint**: 使用 `vite-plus` 内置 oxlint，配置在 `vite.config.ts` 的 `lint` 字段

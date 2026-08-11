@@ -1,54 +1,145 @@
-/* ─── Fluent Design 2 令牌（app-lynx / Lynx CSS 子集） ───
- * 与现有 app 的 tokens.css 同源语义，但仅保留 Lynx 引擎支持的属性。
+/* ─── Material Design 3 令牌（app-lynx / Lynx CSS 子集） ───
+ * 色板 = M3 baseline（seed #6750A4，Material Theme Builder 官方导出）亮色。
+ * 变量名分两类：
+ *  - --md-*：M3 语义名（primary/secondary/tertiary/error/surface/outline 等），
+ *    新代码与共享组件（NavigationBar/Fab 等）优先使用；
+ *  - --color* / --borderRadius* / --elevation*：旧 Fluent 语义兼容别名，
+ *    值已映射到 M3 令牌，存量页面/组件引用不受影响（单一事实源 = M3）。
  * Lynx CSS 变量默认被子孙继承；伪类/backdrop-filter 等在 Lynx 支持度有限，
  * MVP 用纯色 + 简单过渡替代（原生 LynxView 阶段再对表补齐）。
  */
 page {
-  /* 颜色（Fluent 2 Neutral + Brand） */
-  --colorNeutralBackground1: #ffffff;
-  --colorNeutralBackground2: #faf9f8;
-  --colorNeutralBackground3: #f3f2f1;
-  --colorNeutralForeground1: #1b1a19;
-  --colorNeutralForeground2: #605e5c;
-  --colorNeutralForeground3: #a19f9d;
-  --colorNeutralStroke1: #d1d0cf;
-  --colorNeutralStroke2: #e1dfdd;
-  --colorNeutralStroke3: #f0efee;
-  --colorBrandBackground: #0f6cbd;
-  --colorBrandBackgroundHover: #115ea3;
-  --colorBrandBackgroundPressed: #0f548c;
-  --colorBrandForeground1: #0f6cbd;
-  --colorBrandForeground2: #115ea3;
-  --colorBrandForegroundInverted: #ffffff;
-  --colorBrandStroke1: #0f6cbd;
-  --colorNeutralForegroundOnBrand: #ffffff;
-  --colorPaletteRedBackground3: #c50f1f;
-  --colorPaletteYellowBackground3: #f9bc15;
-  --colorPaletteGreenBackground3: #107c10;
-  --colorOverlayDark: rgba(0, 0, 0, 0.55);
+  /* ── M3 核心色（baseline #6750A4） ── */
+  --md-primary: #6750a4;
+  --md-on-primary: #ffffff;
+  --md-primary-container: #eaddff;
+  --md-on-primary-container: #21005d;
+  --md-secondary: #625b71;
+  --md-on-secondary: #ffffff;
+  --md-secondary-container: #e8def8;
+  --md-on-secondary-container: #1d192b;
+  --md-tertiary: #7d5260;
+  --md-on-tertiary: #ffffff;
+  --md-tertiary-container: #ffd8e4;
+  --md-on-tertiary-container: #31111d;
+  --md-error: #b3261e;
+  --md-on-error: #ffffff;
+  --md-error-container: #f9dedc;
+  --md-on-error-container: #410e0b;
 
-  /* 伪玻璃遮罩（issue #97：Frosted Card，放弃 backdrop-filter——web-core/原生均不支持，
-     见 docs/research/liquid-glass-app-lynx-feasibility.md 方案 A）
-   * 三件套：半透底 + 顶部 linear-gradient 高光 + inset 内发光/外阴影，
-   * 全部 Lynx 确认支持，web-core 与原生 LynxView 观感一致。 */
-  --glassBgMuted: rgba(255, 255, 255, 0.9);
-  --glassHighlight: linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 30%);
-  --glassEdge: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 8px 32px rgba(0, 0, 0, 0.08);
-  --glassBorder: rgba(0, 0, 0, 0.06);
+  /* ── M3 表面 / 容器 ── */
+  --md-surface: #fef7ff;
+  --md-on-surface: #1d1b20;
+  --md-surface-variant: #e7e0ec;
+  --md-on-surface-variant: #49454f;
+  --md-outline: #79747e;
+  --md-outline-variant: #cac4d0;
+  --md-scrim: rgba(0, 0, 0, 0.5);
+  --md-surface-container-lowest: #ffffff;
+  --md-surface-container-low: #f7f2fa;
+  --md-surface-container: #f3edf7;
+  --md-surface-container-high: #ece6f0;
+  --md-surface-container-highest: #e6e0e9;
+  --md-inverse-surface: #322f35;
+  --md-inverse-on-surface: #f5eff7;
+  --md-inverse-primary: #d0bcff;
 
-  /* 圆角 */
-  --borderRadiusSmall: 1.067vw;
-  --borderRadiusMedium: 1.600vw;
-  --borderRadiusLarge: 2.133vw;
-  --borderRadiusXLarge: 3.200vw;
-  --borderRadius2XLarge: 4.267vw;
+  /* ── M3 补充表面 / 固定色（亮色 baseline，命名与官方 token 对齐） ── */
+  --md-surface-dim: #ded8e1;
+  --md-surface-bright: #fef7ff;
+  --md-primary-fixed: #eaddff;
+  --md-on-primary-fixed: #21005d;
+  --md-primary-fixed-dim: #d0bcff;
+  --md-on-primary-fixed-variant: #4f378b;
+  --md-secondary-fixed: #e8def8;
+  --md-on-secondary-fixed: #1d192b;
+  --md-secondary-fixed-dim: #cac4d0;
+  --md-on-secondary-fixed-variant: #4a4458;
+  --md-tertiary-fixed: #ffd8e4;
+  --md-on-tertiary-fixed: #31111d;
+  --md-tertiary-fixed-dim: #efb8c8;
+  --md-on-tertiary-fixed-variant: #633b48;
+  --md-surface-tint: #6750a4;
 
-  /* 阴影（Lynx 支持 box-shadow 子集） */
-  --elevation2: 0 2px 8px rgba(0, 0, 0, 0.08);
-  --elevation4: 0 4px 16px rgba(0, 0, 0, 0.1);
+  /* ── M3 状态层（state layers，覆盖在容器色之上） ──
+   * 交互反馈：hover 8% / pressed 12%。Lynx 伪类支持有限，MVP 用预计算
+   * 的 pressed 目标色（容器色 + 12% 黑/primary 叠加）配合 Tailwind active:
+   * 变体（web-core 预览生效；原生 LynxView 待真机验证）。
+   * 值说明：pressedOnSurface = primary 叠加在 surface 上 12%（直接取 primary，
+   * 视觉近似）；pressedSurface = surface-container-lowest + 12% primary 预计算。 */
+  --md-state-pressed-primary: #59408f; /* primary + 12% black */
+  --md-state-pressed-on-surface: #6750a4; /* primary 12% 叠加于 surface（近似） */
+  --md-state-pressed-error: #9a1f1a; /* error + 12% black */
+  --md-state-pressed-surface: #eceaf4; /* surface-container-lowest(#fff) + 12% primary(#6750a4) alpha 合成 */
 
-  /* 动画 */
+  /* ── M3 状态层（半透明叠加层，MD3 官方用 alpha 层而非预计算实色） ──
+   * 官方：pressed = 容器色 + 12% primary/on-surface 半透明层；disabled = on-surface 12%/38%。 */
+  --md-state-layer-pressed-primary: rgba(103, 80, 164, 0.12); /* 12% primary */
+  --md-state-layer-pressed-on-surface: rgba(29, 27, 32, 0.12); /* 12% on-surface */
+  --md-state-disabled-container: rgba(29, 27, 32, 0.12); /* on-surface 12% */
+  --md-state-disabled-on-surface: rgba(29, 27, 32, 0.38); /* on-surface 38% */
+
+  /* ── 兼容别名：旧 Fluent 语义 → M3 令牌（存量引用不断） ── */
+  --colorNeutralBackground1: var(--md-surface-container-lowest); /* 卡片/顶栏底 */
+  --colorNeutralBackground2: var(--md-surface-container-low);    /* 页面底 */
+  --colorNeutralBackground3: var(--md-surface-container-highest); /* 输入框/占位底 */
+  --colorNeutralForeground1: var(--md-on-surface);
+  --colorNeutralForeground2: var(--md-on-surface-variant);
+  --colorNeutralForeground3: var(--md-outline);
+  --colorNeutralStroke1: var(--md-outline-variant);
+  --colorNeutralStroke2: var(--md-surface-variant);
+  --colorNeutralStroke3: var(--md-surface-container-highest);
+  --colorBrandBackground: var(--md-primary);
+  --colorBrandBackgroundHover: #7758b4;
+  --colorBrandBackgroundPressed: #59408f;
+  --colorBrandForeground1: var(--md-primary);
+  --colorBrandForeground2: #59408f;
+  --colorBrandForegroundInverted: var(--md-on-primary);
+  --colorBrandStroke1: var(--md-primary);
+  --colorNeutralForegroundOnBrand: var(--md-on-primary);
+  --colorPaletteRedBackground3: var(--md-error);
+  --colorPaletteYellowBackground3: var(--md-tertiary-container);
+  --colorPaletteGreenBackground3: #2e7d32;
+  --colorOverlayDark: var(--md-scrim);
+
+  /* ── M3 形状（shape tokens，dp → vw @375 设计稿） ──
+   * extra-small 4dp=1.067vw / small 8dp=2.133vw / medium 12dp=3.2vw /
+   * large 16dp=4.267vw / extra-large 28dp=7.467vw / full=9999px */
+  --md-shape-extra-small: 1.067vw;
+  --md-shape-small: 2.133vw;
+  --md-shape-medium: 3.2vw;
+  --md-shape-large: 4.267vw;
+  --md-shape-extra-large: 7.467vw;
+  --md-shape-full: 9999px;
+
+  /* 兼容别名：旧圆角档位 → M3 shape（值随 M3 对齐，6px→8px、8px→12px、
+     12px→16px、16px→28px，存量 var() 引用自动获得 M3 圆角） */
+  --borderRadiusSmall: var(--md-shape-extra-small); /* 4px */
+  --borderRadiusMedium: var(--md-shape-small);      /* 8px */
+  --borderRadiusLarge: var(--md-shape-medium);      /* 12px */
+  --borderRadiusXLarge: var(--md-shape-large);      /* 16px */
+  --borderRadius2XLarge: var(--md-shape-extra-large); /* 28px */
+  --borderRadiusCircular: 50%;
+
+  /* ── M3 高度（elevation，Android tokens 简化版 box-shadow） ── */
+  --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
+  --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
+  --md-elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
+
+  /* 兼容别名（旧 --elevation2/4 引用） */
+  --elevation2: var(--md-elevation-1);
+  --elevation4: var(--md-elevation-2);
+
+  /* 动画（M3 motion：standard 200ms / emphasized 300ms / 微交互 150ms） */
   --durationFast: 150ms;
   --durationNormal: 200ms;
   --durationGentle: 300ms;
+
+  /* ── M3 运动曲线（motion easing） ──
+   * standard 线性强调进出、emphasized 更强的进出强调（material 3 motion tokens）。
+   * Lynx transition 属性支持有限，MVP 配合 duration 在支持处使用。 */
+  --motion-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --motion-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --motion-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
 }

@@ -8,6 +8,7 @@ import { isNativeMode, getNativeModules } from './api/client'
 import { isLoggedIn, restoreToken, registerUnauthorizedHandler } from './stores/authStore'
 import { loadSettings } from './stores/settingsStore'
 import { hasOpenModal, closeTopModal } from './stores/modalStack'
+import { registerSessionErrorHandler } from './utils/errorPresentation'
 
 export interface RouteDef extends RouteDefCore {
   component: Component
@@ -32,6 +33,7 @@ import Following from './pages/Following.vue'
 import Bookmarks from './pages/Bookmarks.vue'
 import FollowList from './pages/FollowList.vue'
 import UpdatePage from './pages/UpdatePage.vue'
+import ErrorPage from './pages/ErrorPage.vue'
 
 export const routes: RouteDef[] = [
   { path: '/login', name: 'login', component: Login },
@@ -48,6 +50,9 @@ export const routes: RouteDef[] = [
   // 强制更新页（检查更新命中后 replace + 清历史栈进入）：
   // backBehavior: 'exit' —— 返回键直接退出应用，无返回路径
   { path: '/update', name: 'update', component: UpdatePage, backBehavior: 'exit' },
+  // 会话失效错误页（候选 #2：401 刷新失败强制重定向）：
+  // backBehavior: 'exit' —— 清历史栈后进入，返回键直接退出应用，不可回退到已失效会话
+  { path: '/error', name: 'error', component: ErrorPage, backBehavior: 'exit' },
 ]
 
 // [首帧内容化]（#61/#63）：初始路由为推荐页——首帧直接渲染推荐页骨架屏，
@@ -177,6 +182,11 @@ function registerSystemBackHandler(): void {
 /** 初始化（App 挂载时调用）：注册 401 刷新 + 恢复设置 + 首路由（replace 不入栈） */
 export async function initRouter(): Promise<void> {
   registerUnauthorizedHandler()
+  // 会话失效（401 刷新失败）→ 全屏错误页：清历史栈 + replace 进入（不可回退，backBehavior: 'exit'）
+  registerSessionErrorHandler(() => {
+    resetHistory()
+    void navigate('/error', { replace: true })
+  })
   void loadSettings()
   if (isNativeMode()) registerSystemBackHandler()
   const ok = await restoreToken()

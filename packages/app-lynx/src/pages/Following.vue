@@ -1,16 +1,31 @@
 <script setup lang="ts">
 // 关注 Feed（P0-T4）：关注作者的插画时间线，waterfall 分页（复用推荐页模式）。
-// 不进 KeepAlive 白名单（按需进入，每次挂载重新加载）。
+// M3 NavigationBar 顶层 tab（推荐/关注/小说/我的）——无返回箭头。
 import { ref, onMounted } from 'vue'
-import { navigate, goBack } from '../router'
+import { navigate } from '../router'
 import { loadFollow, loadNext } from '../api/illust'
 import type { PixivIllust } from '../api/types'
 import { thumbUrl } from '../utils/imageUrl'
+import { presentError } from '../utils/errorPresentation'
 import { isRestricted } from '../stores/settingsStore'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
+import NavigationBar, { type NavTab } from '../components/NavigationBar.vue'
+
+// 底部导航 tabs：推荐/关注（本页）/小说/我的
+const navTabs: NavTab[] = [
+  { name: 'recommended', path: '/recommended', icon: '⌂', label: '推荐', a11yLabel: '推荐' },
+  { name: 'following', path: '/following', icon: '♥', label: '关注', a11yLabel: '关注' },
+  { name: 'novels', path: '/novels', icon: '✎', label: '小说', a11yLabel: '小说' },
+  { name: 'me', path: '/me', icon: '◎', label: '我的', a11yLabel: '我的' },
+]
+
+function onNavSelect(tab: NavTab) {
+  if (tab.name === 'following') return
+  void navigate(tab.path, { replace: true })
+}
 
 const illusts = ref<PixivIllust[]>([])
 const nextUrl = ref<string | null>(null)
@@ -30,7 +45,7 @@ async function fetchFirstPage() {
     illusts.value = res.illusts
     nextUrl.value = res.next_url
   } catch (err) {
-    errorMsg.value = (err as { message?: string }).message ?? '加载失败'
+    errorMsg.value = presentError(err, '加载失败')
   } finally {
     loading.value = false
     lastLoadEndedAt = Date.now()
@@ -52,7 +67,7 @@ async function loadMore() {
     // 空页防护：基于服务端原始返回判空（issue #91）
     nextUrl.value = res.illusts.length === 0 ? null : res.next_url
   } catch (err) {
-    errorMsg.value = (err as { message?: string }).message ?? '加载更多失败'
+    errorMsg.value = presentError(err, '加载更多失败')
   } finally {
     loadingMore.value = false
     lastLoadEndedAt = Date.now()
@@ -73,13 +88,13 @@ onMounted(fetchFirstPage)
 </script>
 
 <template>
-  <view class="w-full h-full flex flex-col bg-background-2">
-    <view class="flex flex-row items-center h-[11.733vw] px-4 bg-background border-b-[1px] border-b-stroke-2">
-      <view class="py-1 pr-2" @tap="goBack"><text class="text-lg text-brand-foreground pr-4">‹ 返回</text></view>
-      <text class="flex-1 text-2xl font-semibold text-foreground">关注</text>
+  <view class="w-full h-full flex flex-col bg-surface">
+    <!-- M3 TopAppBar：顶层页，居中标题，无返回箭头 -->
+    <view class="flex flex-row items-center justify-center h-[17.067vw] px-4 bg-surface">
+      <text class="text-title-large font-medium text-surface-on">关注</text>
     </view>
 
-    <text v-if="errorMsg && !loading" class="text-sm text-danger p-4">{{ errorMsg }}</text>
+    <text v-if="errorMsg && !loading" class="text-body-small text-error p-4">{{ errorMsg }}</text>
 
     <!-- 骨架屏：首屏加载时 shimmer 卡片占位（与真实卡片同比例，避免 reflow） -->
     <!-- [lynx:fix] 骨架屏不占满全屏高度（h-full 会溢出覆盖底部导航栏，拦截 tap，issue #129） -->
@@ -89,7 +104,11 @@ onMounted(fetchFirstPage)
 
     <!-- 空态（加载失败时由 errorMsg 显示错误，不显示空态） -->
     <view v-else-if="!loading && !errorMsg && illusts.length === 0" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <text class="text-base text-foreground-3">暂无关注更新</text>
+      <view class="flex flex-col items-center">
+          <text class="text-[10.667vw] leading-none text-outline-variant">♡</text>
+          <text class="text-body-large text-surface-on mt-3">暂无关注更新</text>
+          <text class="text-body-medium text-surface-on-variant mt-1.5">关注你喜欢的作者后，这里会展示他们的新作品</text>
+        </view>
     </view>
 
     <list
@@ -106,7 +125,7 @@ onMounted(fetchFirstPage)
         v-for="item in illusts"
         :key="item.id"
         :item-key="String(item.id)"
-        class="bg-background rounded-[var(--borderRadiusXLarge)] flex flex-col overflow-hidden"
+        class="bg-surface-container-lowest rounded-[var(--md-shape-medium)] flex flex-col overflow-hidden shadow-[var(--md-elevation-1)]"
       >
         <!-- [lynx:fix] 原生 list-item 根级 @tap 失效 → 内容 view 绑 tap（ADR-0055） -->
         <view class="w-full flex flex-col" @tap="openDetail(item.id)">
@@ -115,8 +134,8 @@ onMounted(fetchFirstPage)
             <!-- 受限条目图片区遮罩（issue #91） -->
             <RestrictOverlay v-if="isRestricted(item)" :level="item.x_restrict === 2 ? 2 : 1" />
           </view>
-          <text class="text-lg font-semibold text-foreground mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
-          <text class="text-sm text-foreground-2 mt-1 mx-2.5 [max-line:1]">{{ item.user.name }}</text>
+          <text class="text-title-small font-medium text-surface-on mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
+          <text class="text-body-small text-surface-on-variant mt-1 mx-2.5 [max-line:1]">{{ item.user.name }}</text>
           <view class="mt-1 mx-2.5 mb-2.5">
             <BookmarkButton
               :illust-id="item.id"
@@ -127,8 +146,11 @@ onMounted(fetchFirstPage)
         </view>
       </list-item>
       <list-item v-if="loadingMore" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text class="text-base text-foreground-3">加载中…</text>
+        <text class="text-body-medium text-outline">加载中…</text>
       </list-item>
     </list>
+
+    <!-- M3 NavigationBar：底部四 tab -->
+    <NavigationBar :tabs="navTabs" :active-name="'following'" @select="onNavSelect" />
   </view>
 </template>

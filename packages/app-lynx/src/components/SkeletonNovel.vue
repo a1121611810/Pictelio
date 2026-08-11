@@ -6,19 +6,19 @@
 
 <template>
   <scroll-view class="w-full h-full" scroll-orientation="vertical">
-    <!-- 头部信息卡骨架：对齐真实卡 py-5 px-4 bg-background mb-3 -->
-    <view class="py-5 px-4 bg-background mb-3">
-      <view class="shimmer h-[52rpx] rounded-[var(--borderRadiusSmall)] w-[70%]" />
-      <view class="shimmer h-[24rpx] rounded-[var(--borderRadiusSmall)] mt-2 w-[40%]" />
-      <view class="shimmer h-[20rpx] rounded-[var(--borderRadiusSmall)] mt-1.5 w-[30%]" />
+    <!-- 头部信息卡骨架：对齐真实卡 py-5 px-4 bg-surface-container-lowest mb-3 -->
+    <view class="py-5 px-4 bg-surface-container-lowest mb-3">
+      <view class="shimmer h-[52rpx] rounded-[var(--md-shape-extra-small)] w-[70%]" />
+      <view class="shimmer h-[24rpx] rounded-[var(--md-shape-extra-small)] mt-2 w-[40%]" />
+      <view class="shimmer h-[20rpx] rounded-[var(--md-shape-extra-small)] mt-1.5 w-[30%]" />
     </view>
     <!-- 正文条骨架：对齐真实正文 p-4 + leading-[44rpx] + mb-4 -->
     <view class="p-4">
-      <view class="shimmer h-[44rpx] rounded-[var(--borderRadiusSmall)] mb-4 w-full" />
-      <view class="shimmer h-[44rpx] rounded-[var(--borderRadiusSmall)] mb-4 w-full" />
-      <view class="shimmer h-[44rpx] rounded-[var(--borderRadiusSmall)] mb-4 w-[85%]" />
-      <view class="shimmer h-[44rpx] rounded-[var(--borderRadiusSmall)] mb-4 w-full" />
-      <view class="shimmer h-[44rpx] rounded-[var(--borderRadiusSmall)] mb-4 w-[60%]" />
+      <view class="shimmer h-[44rpx] rounded-[var(--md-shape-extra-small)] mb-4 w-full" />
+      <view class="shimmer h-[44rpx] rounded-[var(--md-shape-extra-small)] mb-4 w-full" />
+      <view class="shimmer h-[44rpx] rounded-[var(--md-shape-extra-small)] mb-4 w-[85%]" />
+      <view class="shimmer h-[44rpx] rounded-[var(--md-shape-extra-small)] mb-4 w-full" />
+      <view class="shimmer h-[44rpx] rounded-[var(--md-shape-extra-small)] mb-4 w-[60%]" />
     </view>
   </scroll-view>
 </template>

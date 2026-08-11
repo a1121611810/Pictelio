@@ -23,18 +23,18 @@ const changelogLines = () =>
   必须登记 UPDATE_A11Y_LABELS + accessibility-element（单测断言模板消费）。
 -->
 <template>
-  <view class="w-full h-full flex flex-col bg-background-2">
-    <view class="flex flex-row items-center h-[11.733vw] px-4 bg-background border-b-[1px] border-b-stroke-2">
+  <view class="w-full h-full flex flex-col bg-surface">
+    <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
       <view
         class="py-1 pr-2"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="UPDATE_A11Y_LABELS.exit"
         @tap="exitUpdatePage"
       >
-        <text class="text-lg text-danger pr-4">退出应用</text>
+        <text class="text-label-large text-error pr-4">退出应用</text>
       </view>
       <text
-        class="flex-1 text-2xl font-semibold text-foreground"
+        class="flex-1 text-title-large font-medium text-surface-on"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="UPDATE_A11Y_LABELS.pageTitle"
         >更新</text
@@ -44,33 +44,33 @@ const changelogLines = () =>
     <scroll-view scroll-orientation="vertical" class="w-full flex-1 px-4">
       <!-- 版本信息 -->
       <view class="mt-[8vw] flex flex-col items-center">
-        <text class="text-base text-foreground-3">发现新版本</text>
-        <text class="text-5xl font-bold text-foreground mt-2">v{{ updateResult?.latestVersion }}</text>
-        <text class="text-sm text-foreground-3 mt-2">当前版本 v{{ appVersion }}</text>
+        <text class="text-body-medium text-outline">发现新版本</text>
+        <text class="text-headline-medium font-bold text-surface-on mt-2">v{{ updateResult?.latestVersion }}</text>
+        <text class="text-body-small text-outline mt-2">当前版本 v{{ appVersion }}</text>
       </view>
 
       <!-- 更新内容（changelog 多行） -->
-      <view class="bg-background mt-[6vw] p-4 rounded-[var(--borderRadiusXLarge)]">
-        <text class="text-lg font-semibold text-foreground">更新内容</text>
+      <view class="bg-surface-container-lowest mt-[6vw] p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+        <text class="text-title-small font-medium text-surface-on">更新内容</text>
         <view v-if="changelogLines().length" class="mt-3 flex flex-col gap-1">
           <text
             v-for="(line, i) in changelogLines()"
             :key="i"
-            class="text-sm text-foreground-2 leading-snug"
+            class="text-body-small text-surface-on-variant leading-snug"
             >{{ line }}</text
           >
         </view>
-        <text v-else class="text-sm text-foreground-3 mt-3">暂无更新说明</text>
+        <text v-else class="text-body-small text-outline mt-3">暂无更新说明</text>
       </view>
 
       <!-- 下载新版本（页面唯一主动作） -->
       <view
-        class="mt-[8vw] py-4 bg-brand rounded-[var(--borderRadiusXLarge)] flex items-center justify-center"
+        class="mt-[8vw] h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="UPDATE_A11Y_LABELS.download"
         @tap="openReleasePage"
       >
-        <text class="text-xl text-onBrand font-semibold">下载新版本</text>
+        <text class="text-label-large text-primary-on font-medium">下载新版本</text>
       </view>
 
       <!-- 底部留白 -->

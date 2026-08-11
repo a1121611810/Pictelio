@@ -74,29 +74,29 @@ onBeforeUnmount(() => {
   <!-- 根 view：relative 提供 absolute 弹层的定位上下文；与宿主内容平级、DOM 顺序靠后 → 天然覆盖上层 -->
   <view class="w-full h-full relative">
     <!-- 遮罩：absolute inset-0，@tap 关闭（调 onClose） -->
-    <view class="absolute inset-0 bg-overlay" @tap="onClose" />
+    <view class="absolute inset-0 bg-scrim" @tap="onClose" />
 
     <!-- 底部面板：@tap.stop 防面板内点击穿透到遮罩 -->
     <view
-      class="absolute bottom-0 left-0 right-0 h-[80vh] bg-background rounded-t-[var(--borderRadiusXLarge)] flex flex-col"
+      class="absolute bottom-0 left-0 right-0 h-[80vh] bg-surface-container-lowest rounded-t-[var(--md-shape-extra-large)] flex flex-col"
       @tap.stop
     >
-      <!-- header：居中「评论 (N)」+ 右侧关闭 × -->
-      <view class="flex flex-row items-center h-[11.733vw] px-4 border-b-[1px] border-b-stroke-2 flex-shrink-0">
+      <!-- M3 bottom sheet 顶部：居中标题（title-large）+ 关闭按钮 -->
+      <view class="flex flex-row items-center h-[11.733vw] px-4 flex-shrink-0">
         <view class="w-[8vw]" />
-        <text class="flex-1 text-center text-2xl font-semibold text-foreground">评论 ({{ state.comments.length }})</text>
+        <text class="flex-1 text-center text-title-large font-medium text-surface-on">评论 ({{ state.comments.length }})</text>
         <view class="w-[8vw] h-[8vw] flex items-center justify-center" @tap="onClose">
-          <text class="text-3xl text-foreground-2">×</text>
+          <text class="text-[6.4vw] leading-none text-surface-on-variant">×</text>
         </view>
       </view>
 
       <!-- 首屏加载：骨架（复用 App.vue 全局 shimmer） -->
       <view v-if="state.status === 'loading'" class="w-full flex-1 min-h-0 px-4 pt-4">
         <view v-for="n in 4" :key="n" class="flex flex-row items-start mb-5">
-          <view class="shimmer w-[8vw] h-[8vw] rounded-[var(--borderRadiusCircular)] flex-shrink-0" />
+          <view class="shimmer w-[8vw] h-[8vw] rounded-full flex-shrink-0" />
           <view class="flex-1 ml-3">
-            <view class="shimmer h-[4vw] w-[24vw] rounded-[var(--borderRadiusSmall)]" />
-            <view class="shimmer h-[4vw] w-full mt-2 rounded-[var(--borderRadiusSmall)]" />
+            <view class="shimmer h-[4vw] w-[24vw] rounded-[var(--md-shape-extra-small)]" />
+            <view class="shimmer h-[4vw] w-full mt-2 rounded-[var(--md-shape-extra-small)]" />
           </view>
         </view>
       </view>
@@ -106,20 +106,20 @@ onBeforeUnmount(() => {
         v-else-if="state.status === 'error'"
         class="w-full flex-1 min-h-0 flex flex-col items-center justify-center"
       >
-        <text class="text-sm text-danger px-8 text-center">{{ state.error ?? '加载失败，请重试' }}</text>
+        <text class="text-body-small text-error px-8 text-center">{{ state.error ?? '加载失败，请重试' }}</text>
         <view
-          class="mt-4 px-6 h-[9vw] bg-brand rounded-[var(--borderRadiusLarge)] flex items-center justify-center"
+          class="mt-4 px-6 h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
           @tap="retry"
         >
-          <text class="text-base font-semibold text-onBrand">重试</text>
+          <text class="text-label-large font-medium text-primary-on">重试</text>
         </view>
       </view>
 
       <!-- 就绪：分页失败 banner（保留列表）+ 评论列表 / 空态 -->
       <template v-else>
         <!-- state.error 且 status ready（分页失败 / post 后刷新失败）：列表上方 banner -->
-        <view v-if="state.error" class="px-4 py-2 border-b border-b-stroke-2">
-          <text class="text-xs text-danger">{{ state.error }}</text>
+        <view v-if="state.error" class="px-4 py-2 border-b border-b-outline-variant">
+          <text class="text-label-medium text-error">{{ state.error }}</text>
         </view>
 
         <!-- 空列表 -->
@@ -127,7 +127,7 @@ onBeforeUnmount(() => {
           v-if="state.comments.length === 0"
           class="w-full flex-1 min-h-0 flex flex-col items-center justify-center"
         >
-          <text class="text-base text-foreground-3">还没有评论</text>
+          <text class="text-body-medium text-outline">还没有评论</text>
         </view>
 
         <!-- 评论列表：flex-1 min-h-0，独立垂直滚动；item-key 必须 String（ADR-0056） -->
@@ -149,7 +149,7 @@ onBeforeUnmount(() => {
               @toggle-replies="handleToggleReplies(comment.id)"
             />
             <!-- 楼层展开区：state.expandedIds 控制展开；内联渲染 replies[c.id]（缩进 + 左边框） -->
-            <view v-if="state.expandedIds.includes(comment.id)" class="ml-[12vw] pl-4 border-l border-l-stroke-2">
+            <view v-if="state.expandedIds.includes(comment.id)" class="ml-[12vw] pl-4 border-l border-l-outline-variant">
               <CommentItem
                 v-for="reply in state.replies[comment.id] ?? []"
                 :key="reply.id"
@@ -169,7 +169,7 @@ onBeforeUnmount(() => {
             full-span
             class="w-full h-10 flex items-center justify-center"
           >
-            <text class="text-xs text-foreground-3">没有更多了</text>
+            <text class="text-label-medium text-outline">没有更多了</text>
           </list-item>
         </list>
       </template>

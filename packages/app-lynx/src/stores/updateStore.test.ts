@@ -23,7 +23,14 @@ vi.mock("../api/client", () => ({
   isNativeMode: () => !!mocks.getNativeModules()?.PictelioApp,
 }))
 
-import { runStartupUpdateCheck, openReleasePage, exitUpdatePage, updateResult, createUpdateFetchImpl } from "./updateStore"
+import {
+  runStartupUpdateCheck,
+  openReleasePage,
+  exitUpdatePage,
+  updateResult,
+  createUpdateFetchImpl,
+  setUpdateCheckDisabledForTest,
+} from "./updateStore"
 
 const baseResult = {
   hasUpdate: false,
@@ -87,6 +94,24 @@ describe("updateStore.runStartupUpdateCheck", () => {
     await vi.advanceTimersByTimeAsync(500)
 
     expect(mocks.checkForUpdate).toHaveBeenCalledTimes(1)
+  })
+
+  it("PICTELIO_DISABLE_UPDATE_CHECK=true → 跳过检查（不调 checker / 不导航）", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    setUpdateCheckDisabledForTest(true)
+
+    runStartupUpdateCheck()
+    await vi.advanceTimersByTimeAsync(500)
+
+    // 开关开启：完全不走原本逻辑（checkForUpdate 不被调用、不导航 /update）
+    expect(mocks.checkForUpdate).not.toHaveBeenCalled()
+    expect(mocks.resetHistory).not.toHaveBeenCalled()
+    expect(mocks.navigate).not.toHaveBeenCalled()
+    // 显式 warn（禁止静默降级约定）
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("PICTELIO_DISABLE_UPDATE_CHECK=true"))
+
+    warnSpy.mockRestore()
+    setUpdateCheckDisabledForTest(false) // 复位，避免污染后续用例
   })
 })
 

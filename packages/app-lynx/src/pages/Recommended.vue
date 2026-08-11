@@ -7,13 +7,30 @@ import { loadRecommended, loadNext } from '../api/illust'
 import type { PixivIllust } from '../api/types'
 import { thumbUrl } from '../utils/imageUrl'
 import { withTimeout } from '../utils/withTimeout'
+import { presentError } from '../utils/errorPresentation'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
+import NavigationBar, { type NavTab } from '../components/NavigationBar.vue'
+import Fab from '../components/Fab.vue'
 import { isRestricted } from '../stores/settingsStore'
 import { isLoggedIn } from '../stores/authStore'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
-import { RECOMMENDED_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import { RECOMMENDED_A11Y_LABELS } from '../utils/accessibility'
+
+// 底部导航 tabs（M3 NavigationBar）：推荐（本页）/ 关注 / 小说 / 我的。
+// 推荐 tab 激活态由 activeName=routeState 判断，点击本页 tab 不导航。
+const navTabs: NavTab[] = [
+  { name: 'recommended', path: '/recommended', icon: '⌂', label: '推荐', a11yLabel: '推荐' },
+  { name: 'following', path: '/following', icon: '♥', label: '关注', a11yLabel: '关注' },
+  { name: 'novels', path: '/novels', icon: '✎', label: '小说', a11yLabel: '小说' },
+  { name: 'me', path: '/me', icon: '◎', label: '我的', a11yLabel: RECOMMENDED_A11Y_LABELS.openMe },
+]
+
+function onNavSelect(tab: NavTab) {
+  if (tab.name === 'recommended') return
+  void navigate(tab.path, { replace: true })
+}
 
 const illusts = ref<PixivIllust[]>([])
 const nextUrl = ref<string | null>(null)
@@ -46,7 +63,7 @@ async function fetchFirstPage() {
     pendingIllusts.value = all.slice(PAGE_SIZE)
     nextUrl.value = res.next_url
   } catch (err) {
-    errorMsg.value = (err as { message?: string }).message ?? '加载失败'
+    errorMsg.value = presentError(err, '加载失败')
   } finally {
     loading.value = false
     // [lynx:fix] 第一页加载完成同样进入冷却，防 web-core 延迟误触发 scrolltolower
@@ -78,7 +95,7 @@ async function loadMore() {
     // 空页防护：基于服务端原始返回判空（issue #91：不再用过滤后长度）
     nextUrl.value = res.illusts.length === 0 ? null : res.next_url
   } catch (err) {
-    errorMsg.value = (err as { message?: string }).message ?? '加载更多失败'
+    errorMsg.value = presentError(err, '加载更多失败')
   } finally {
     loadingMore.value = false
     lastLoadEndedAt = Date.now()
@@ -93,15 +110,6 @@ function openDetail(id: number) {
 // 外层 .stop 继续保证遮罩点击不穿透；RestrictOverlay 自身 @tap="swallow" 双保险。
 function onImageTap(item: PixivIllust) {
   if (!isRestricted(item)) openDetail(item.id)
-}
-function openNovels() {
-  void navigate('/novels')
-}
-function openFollowing() {
-  void navigate('/following')
-}
-function openMe() {
-  void navigate('/me')
 }
 
 onMounted(() => {
@@ -131,27 +139,13 @@ onActivated(() => {
 </script>
 
 <template>
-  <view class="w-full h-full flex flex-col bg-background-2">
-    <view class="flex flex-row items-center h-[11.733vw] px-4 bg-background border-b-[1px] border-b-stroke-2">
-      <text class="flex-1 text-3xl font-bold text-foreground">推荐插画</text>
-      <!-- [lynx:fix] 原生 text 元素 @tap 失效（真机实测）→ 外层 view 包 tap（view tap 已验证工作） -->
-      <view class="ml-6 px-1 py-1" @tap="openFollowing">
-        <text class="text-lg text-brand-foreground">关注</text>
-      </view>
-      <view class="ml-6 px-1 py-1" @tap="openNovels">
-        <text class="text-lg text-brand-foreground">小说</text>
-      </view>
-      <view
-        class="ml-6 px-1 py-1"
-        :accessibility-element="A11Y_ELEMENT_ENABLED"
-        :accessibility-label="RECOMMENDED_A11Y_LABELS.openMe"
-        @tap="openMe"
-      >
-        <text class="text-lg text-brand-foreground">我的</text>
-      </view>
+  <view class="w-full h-full flex flex-col bg-surface">
+    <!-- M3 TopAppBar：surface 背景 + 居中标题（title-large），无导航图标（顶层页） -->
+    <view class="flex flex-row items-center justify-center h-[17.067vw] px-4 bg-surface">
+      <text class="text-title-large font-medium text-surface-on">推荐插画</text>
     </view>
 
-    <text v-if="errorMsg && !loading" class="text-sm text-danger p-4">{{ errorMsg }}</text>
+    <text v-if="errorMsg && !loading" class="text-body-small text-error p-4">{{ errorMsg }}</text>
 
     <!-- [lynx:fix] 骨架屏：首屏加载（无数据）时显示 shimmer 卡片占位，数据就绪后切换 list。
          8 个 ≈ 4 行两列，与真实卡片同比例（48.4vw 宽 + 方形图片）避免切换 reflow -->
@@ -175,7 +169,7 @@ onActivated(() => {
         v-for="item in illusts"
         :key="item.id"
         :item-key="String(item.id)"
-        class="bg-background rounded-[var(--borderRadiusXLarge)] flex flex-col overflow-hidden"
+        class="bg-surface-container-lowest rounded-[var(--md-shape-medium)] flex flex-col overflow-hidden shadow-[var(--md-elevation-1)]"
       >
         <!-- [lynx:fix] 原生 list-item 根级 @tap 失效（fiber 不触发，真机实测 2026-08-02）；
              把 openDetail 绑到内容 view（子元素 tap 已验证工作），♥ 的 @tap.stop 仍阻止冒泡 -->
@@ -192,8 +186,8 @@ onActivated(() => {
           <!-- 受限条目图片区遮罩（issue #91）：吞没 tap，不触发详情跳转 -->
           <RestrictOverlay v-if="isRestricted(item)" :level="item.x_restrict === 2 ? 2 : 1" />
         </view>
-        <text class="text-lg font-semibold text-foreground mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
-        <text class="text-sm text-foreground-2 mt-1 mx-2.5 [max-line:1]">{{ item.user.name }}</text>
+        <text class="text-title-small font-medium text-surface-on mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
+        <text class="text-body-small text-surface-on-variant mt-1 mx-2.5 [max-line:1]">{{ item.user.name }}</text>
         <view class="mt-1 mx-2.5 mb-2.5">
           <BookmarkButton
             :illust-id="item.id"
@@ -204,8 +198,16 @@ onActivated(() => {
         </view>
       </list-item>
       <list-item v-if="loadingMore" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text class="text-base text-foreground-3">加载中…</text>
+        <text class="text-body-medium text-outline">加载中…</text>
       </list-item>
     </list>
+
+    <!-- M3 FAB：右下角悬浮刷新（重新拉第一页，展示 M3 浮动操作按钮形态） -->
+    <view v-if="!loading" class="absolute bottom-[24vw] right-4" @tap="fetchFirstPage">
+      <Fab icon="↻" a11y-label="刷新推荐" />
+    </view>
+
+    <!-- M3 NavigationBar：底部四 tab（推荐/关注/小说/我的） -->
+    <NavigationBar :tabs="navTabs" :active-name="'recommended'" @select="onNavSelect" />
   </view>
 </template>

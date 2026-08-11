@@ -2,12 +2,27 @@
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'novels' })
 import { ref, onMounted } from 'vue'
-import { navigate, goBack } from '../router'
+import { navigate } from '../router'
 import { loadRecommendedNovels, loadFollow, loadNovelNext } from '../api/novel'
 import type { PixivNovel } from '../api/types'
+import { presentError } from '../utils/errorPresentation'
 import { withTimeout } from '../utils/withTimeout'
 import { isRestricted } from '../stores/settingsStore'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
+import NavigationBar, { type NavTab } from '../components/NavigationBar.vue'
+
+// 底部导航 tabs：推荐/关注/小说（本页）/我的
+const navTabs: NavTab[] = [
+  { name: 'recommended', path: '/recommended', icon: '⌂', label: '推荐', a11yLabel: '推荐' },
+  { name: 'following', path: '/following', icon: '♥', label: '关注', a11yLabel: '关注' },
+  { name: 'novels', path: '/novels', icon: '✎', label: '小说', a11yLabel: '小说' },
+  { name: 'me', path: '/me', icon: '◎', label: '我的', a11yLabel: '我的' },
+]
+
+function onNavSelect(tab: NavTab) {
+  if (tab.name === 'novels') return
+  void navigate(tab.path, { replace: true })
+}
 
 const novels = ref<PixivNovel[]>([])
 const nextUrl = ref<string | null>(null)
@@ -44,7 +59,7 @@ async function fetchFirstPage() {
     nextUrl.value = res.next_url
   } catch (err) {
     if (gen !== modeGen) return
-    errorMsg.value = (err as { message?: string }).message ?? '加载失败'
+    errorMsg.value = presentError(err, '加载失败')
   } finally {
     if (gen === modeGen) {
       loading.value = false
@@ -80,7 +95,7 @@ async function loadMore() {
     // 空页防护：基于服务端原始返回判空（issue #91：不再用过滤后长度，否则全受限页误杀分页）
     nextUrl.value = res.novels.length === 0 ? null : res.next_url
   } catch (err) {
-    errorMsg.value = (err as { message?: string }).message ?? '加载更多失败'
+    errorMsg.value = presentError(err, '加载更多失败')
   } finally {
     loadingMore.value = false
     lastLoadEndedAt = Date.now()
@@ -95,50 +110,59 @@ onMounted(fetchFirstPage)
 </script>
 
 <template>
-  <view class="w-full h-full flex flex-col bg-background-2">
-    <view class="flex flex-row items-center h-[11.733vw] px-4 bg-background border-b-[1px] border-b-stroke-2">
-      <view class="py-1 pr-2" @tap="goBack"><text class="text-lg text-brand-foreground pr-4">‹ 返回</text></view>
-      <text class="flex-1 text-2xl font-semibold text-foreground">小说</text>
+  <view class="w-full h-full flex flex-col bg-surface">
+    <!-- M3 TopAppBar：顶层页，居中标题，无返回箭头 -->
+    <view class="flex flex-row items-center justify-center h-[17.067vw] px-4 bg-surface">
+      <text class="text-title-large font-medium text-surface-on">小说</text>
     </view>
 
-    <!-- 推荐/关注切换（P0-T5） -->
-    <view class="flex flex-row border-b-[1px] border-b-stroke-2 bg-background">
+    <!-- 推荐/关注切换（M3 secondary tabs：选中 primary 文字 + 3px primary 指示器） -->
+    <!-- M3 secondary tabs：容器 surface + 选中 primary 文字 + 3px primary 指示器 -->
+    <view class="flex flex-row bg-surface">
       <view
-        class="flex-1 py-2 flex items-center justify-center"
-        :class="mode === 'recommend' ? 'text-brand-foreground border-b-2 border-b-[var(--colorBrandForeground1)]' : 'text-foreground-3'"
+        class="flex-1 h-[12.8vw] flex flex-col items-center justify-center"
         @tap="switchMode('recommend')"
       >
-        <text class="text-lg font-medium">推荐</text>
+        <text class="text-title-small font-medium" :class="mode === 'recommend' ? 'text-primary' : 'text-surface-on-variant'">推荐</text>
+        <view class="mt-1 h-[0.8vw] w-[40%] rounded-full" :class="mode === 'recommend' ? 'bg-primary' : 'bg-transparent'" />
       </view>
       <view
-        class="flex-1 py-2 flex items-center justify-center"
-        :class="mode === 'follow' ? 'text-brand-foreground border-b-2 border-b-[var(--colorBrandForeground1)]' : 'text-foreground-3'"
+        class="flex-1 h-[12.8vw] flex flex-col items-center justify-center"
         @tap="switchMode('follow')"
       >
-        <text class="text-lg font-medium">关注</text>
+        <text class="text-title-small font-medium" :class="mode === 'follow' ? 'text-primary' : 'text-surface-on-variant'">关注</text>
+        <view class="mt-1 h-[0.8vw] w-[40%] rounded-full" :class="mode === 'follow' ? 'bg-primary' : 'bg-transparent'" />
       </view>
     </view>
 
-    <text v-if="errorMsg && !loading" class="text-sm text-danger p-4">{{ errorMsg }}</text>
+    <text v-if="errorMsg && !loading" class="text-body-small text-error p-4">{{ errorMsg }}</text>
 
     <!-- 首屏骨架（issue #91）：4~6 条列表卡占位，切 tab 重载同样显示 -->
     <!-- [lynx:fix] 骨架屏高度约束在导航栏下方内容区内（不占满全屏，issue #129） -->
     <view v-if="loading && novels.length === 0" class="w-full flex-1 min-h-0">
-      <view v-for="n in 5" :key="n" class="m-1.5 mx-3 p-3.5 bg-background rounded-[var(--borderRadiusXLarge)]">
-        <view class="shimmer h-[32rpx] rounded-[var(--borderRadiusSmall)] w-[75%]" />
-        <view class="shimmer h-[24rpx] rounded-[var(--borderRadiusSmall)] mt-1.5 w-[40%]" />
-        <view class="shimmer h-[20rpx] rounded-[var(--borderRadiusSmall)] mt-1.5 w-[30%]" />
-        <view class="shimmer h-[24rpx] rounded-[var(--borderRadiusSmall)] mt-2 w-[60%]" />
+      <view v-for="n in 5" :key="n" class="m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+        <view class="shimmer h-[32rpx] rounded-[var(--md-shape-extra-small)] w-[75%]" />
+        <view class="shimmer h-[24rpx] rounded-[var(--md-shape-extra-small)] mt-1.5 w-[40%]" />
+        <view class="shimmer h-[20rpx] rounded-[var(--md-shape-extra-small)] mt-1.5 w-[30%]" />
+        <view class="shimmer h-[24rpx] rounded-[var(--md-shape-extra-small)] mt-2 w-[60%]" />
       </view>
     </view>
 
     <!-- 关注视图空态（P0-T5） -->
     <view v-if="mode === 'follow' && !loading && !errorMsg && novels.length === 0" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <text class="text-base text-foreground-3">暂无关注小说</text>
+      <view class="flex flex-col items-center">
+        <text class="text-[10.667vw] leading-none text-outline-variant">✎</text>
+        <text class="text-body-large text-surface-on mt-3">暂无关注小说</text>
+        <text class="text-body-medium text-surface-on-variant mt-1.5">关注的小说作者发布新作品后会展示在这里</text>
+      </view>
     </view>
     <!-- 推荐视图空态（spec 加固 3）：杜绝「无数据 → 纯空白」 -->
     <view v-if="mode === 'recommend' && !loading && !errorMsg && novels.length === 0" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <text class="text-base text-foreground-3">暂无推荐小说</text>
+      <view class="flex flex-col items-center">
+        <text class="text-[10.667vw] leading-none text-outline-variant">✎</text>
+        <text class="text-body-large text-surface-on mt-3">暂无推荐小说</text>
+        <text class="text-body-medium text-surface-on-variant mt-1.5">稍后再来看看，会有新的推荐</text>
+      </view>
     </view>
 
     <list
@@ -156,13 +180,13 @@ onMounted(fetchFirstPage)
         class="w-full"
         @tap="openDetail(item.id)"
       >
-        <view class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-background rounded-[var(--borderRadiusXLarge)]">
+        <view class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
           <view class="flex-1 flex flex-col">
-            <text class="text-xl font-semibold text-foreground [max-line:2]">{{ item.title }}</text>
-            <text class="text-sm text-brand-foreground mt-1.5">by {{ item.user.name }}</text>
+            <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>
+            <text class="text-body-medium text-surface-on-variant mt-1.5">by {{ item.user.name }}</text>
             <view class="flex flex-row mt-1.5">
-              <text class="text-xs text-foreground-3 mr-4">{{ item.text_length }} 字</text>
-              <text v-if="item.total_bookmarks > 0" class="text-xs text-foreground-3 mr-4">
+              <text class="text-label-medium text-surface-on-variant mr-4">{{ item.text_length }} 字</text>
+              <text v-if="item.total_bookmarks > 0" class="text-label-medium text-surface-on-variant mr-4">
                 ♥ {{ item.total_bookmarks }}
               </text>
             </view>
@@ -170,7 +194,7 @@ onMounted(fetchFirstPage)
               <text
                 v-for="tag in item.tags.slice(0, 3)"
                 :key="tag.name"
-                class="text-[18rpx] text-brand-foreground bg-background-3 rounded-[var(--borderRadiusMedium)] py-0.5 px-2 m-0.5"
+                class="h-[8.533vw] px-2 border border-outline rounded-[var(--md-shape-small)] flex items-center justify-center m-0.5 text-label-large text-surface-on-variant bg-surface"
               >
                 #{{ tag.translated_name || tag.name }}
               </text>
@@ -181,8 +205,11 @@ onMounted(fetchFirstPage)
         </view>
       </list-item>
       <list-item v-if="loadingMore" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text class="text-base text-foreground-3">加载中…</text>
+        <text class="text-body-medium text-outline">加载中…</text>
       </list-item>
     </list>
+
+    <!-- M3 NavigationBar：底部四 tab -->
+    <NavigationBar :tabs="navTabs" :active-name="'novels'" @select="onNavSelect" />
   </view>
 </template>

@@ -18,6 +18,20 @@ const _result = ref<CheckResult | null>(null)
 export const isCheckingUpdate = _isChecking
 export const updateResult = _result
 
+// ─── 启动更新检查开关（.env PICTELIO_DISABLE_UPDATE_CHECK=true） ───
+// 编译期由 lynx.config.ts 注入默认值；模块级可变 + setter 便于单测断言 true 分支。
+let _updateCheckDisabled = __DISABLE_UPDATE_CHECK__
+
+/** 测试专用：覆盖开关状态（默认来自 .env 编译期注入；测试后需重置） */
+export function setUpdateCheckDisabledForTest(disabled: boolean): void {
+  _updateCheckDisabled = disabled
+}
+
+/** 当前开关状态：true = 强制跳过启动更新检查 */
+export function isUpdateCheckDisabled(): boolean {
+  return _updateCheckDisabled
+}
+
 /**
  * 检查更新的网络层适配（FetchLike seam）。
  * 原生 Lynx JS 运行时无 fetch（fetchWrapper 实测仅 web-core 可用）——
@@ -67,6 +81,13 @@ export function createUpdateFetchImpl(): FetchLike {
 
 /** 启动自动检查（App.vue onMounted 调用；内部自带延迟，不阻塞首帧） */
 export function runStartupUpdateCheck(): void {
+  // 开发调试开关（.env PICTELIO_DISABLE_UPDATE_CHECK=true）：强制跳过启动更新检查，
+  // 不走 checkForUpdate / 不进强制更新页。用于 dev 预览场景避免误锁死在更新页。
+  // 显式 warn 而非静默跳过（禁止静默降级约定）。
+  if (isUpdateCheckDisabled()) {
+    console.warn("[updateStore] PICTELIO_DISABLE_UPDATE_CHECK=true，已跳过启动更新检查（dev 调试）")
+    return
+  }
   if (_isChecking.value) return
   _isChecking.value = true
   setTimeout(() => {

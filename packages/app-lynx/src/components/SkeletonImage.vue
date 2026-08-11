@@ -31,7 +31,7 @@ function onError() {
 
 <template>
   <view
-    class="relative bg-background-3 overflow-hidden"
+    class="relative bg-surface-container-highest overflow-hidden"
     :style="resolveSkeletonStyle(props.height, props.aspectRatio, props.minH)"
   >
     <!-- 加载中：shimmer 覆盖在 image 上层（DOM 顺序靠后即在上层） -->
@@ -46,7 +46,7 @@ function onError() {
     />
     <!-- 加载失败：灰底 + 文字提示 -->
     <view v-if="failed" class="absolute top-0 left-0 w-full h-full flex items-center justify-center">
-      <text class="text-sm text-foreground-3">图片加载失败</text>
+      <text class="text-body-small text-outline">图片加载失败</text>
     </view>
   </view>
 </template>
