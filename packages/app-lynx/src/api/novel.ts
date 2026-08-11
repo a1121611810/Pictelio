@@ -1,8 +1,6 @@
 // ─── 小说 API（复用现有 app 端点 + 正文提取逻辑） ───
-import { apiClient, getAccessToken } from "./client"
+import { apiClient } from "./client"
 import type { PixivNovelListResponse, PixivNovelDetailResponse } from "./types"
-import { PIXIV_USER_AGENT, PIXIV_REFERER } from "./userAgent"
-import { requestFetch } from "../utils/fetchWrapper"
 
 export function loadRecommendedNovels(signal?: AbortSignal): Promise<PixivNovelListResponse> {
   return apiClient.get<PixivNovelListResponse>(
@@ -62,19 +60,15 @@ export function extractNovelTextFromHtml(html: string): string {
   }
 }
 
-/** 加载小说正文纯文本（走 /pixiv-api/webview/v2/novel 代理） */
+/**
+ * 加载小说正文纯文本（/webview/v2/novel 返回 HTML 而非 JSON）。
+ * 双模式由 apiClient.requestRaw 统一处理：
+ * - web 模式：rewriteUrl → /pixiv-api 代理路径 + Bearer 头（fetch 返回原始文本）；
+ * - 原生模式：NativeModules.PictelioApi.request 转发 Java（JS 零知 access_token，
+ *   PixivApiCore 对非 JSON 响应原样返回 data 字符串）。
+ */
 export async function fetchNovelText(novelId: number): Promise<string> {
-  const token = getAccessToken()
-  const headers: Record<string, string> = {
-    "User-Agent": PIXIV_USER_AGENT,
-    Referer: PIXIV_REFERER,
-  }
-  if (token) headers["Authorization"] = `Bearer ${token}`
-
-  const params = new URLSearchParams({ id: String(novelId) })
-  const res = await requestFetch(`/pixiv-api/webview/v2/novel?${params}`, { headers })
-  if (!res.ok) throw new Error(`小说正文加载失败 (HTTP ${res.status})`)
-  const html = await res.text()
+  const html = await apiClient.requestRaw('GET', '/webview/v2/novel', { id: String(novelId) })
   const text = extractNovelTextFromHtml(html)
   if (!text) throw new Error("小说正文提取失败")
   return text

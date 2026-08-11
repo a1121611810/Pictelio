@@ -10,6 +10,20 @@ import { PIXIV_USER_AGENT, PIXIV_REFERER, PIXIV_CONTENT_TYPE, PIXIV_API_BASE, PI
 export interface PixivApiClient {
   get<T>(path: string, params?: Record<string, string>, signal?: AbortSignal): Promise<T>
   post<T>(path: string, body: Record<string, string>): Promise<T>
+  /**
+   * 原始响应体文本请求（双模式，接口只新增这一个方法，不改现有 get/post）。
+   *
+   * 调用者须知：
+   * - 错误模式：HTTP >=400 一律抛 ApiError（复用 classifyError 归类，与 get/post 的
+   *   execute 行为一致）；401 经 execWithAuthRetry 自动刷新一次后重试；
+   *   原生模式模块缺失抛 { type: ApiErrorType.NETWORK, message: '原生 API 模块不可用' }。
+   * - 双模式差异：web 模式复用 rewriteUrl + shouldAttachAuth + getAccessToken 构造
+   *   headers（User-Agent/Referer/Bearer）后 fetch 并 res.text()；原生模式经
+   *   NativeModules.PictelioApi.request 转发 Java（JS 零知 access_token，原生侧附加
+   *   Authorization），回调 data 即原始字符串（PixivApiCore 对非 JSON 响应原样返回）。
+   * - 用途：/webview/v2/novel 等返回 HTML 而非 JSON 的端点（如 fetchNovelText）。
+   */
+  requestRaw(method: "GET" | "POST", path: string, params?: Record<string, string>): Promise<string>
 }
 
 // ─── access_token 管理（MVP：内存态；生产隔离见 T7） ───
@@ -278,6 +292,80 @@ async function execute<T>(
   return res.json() as Promise<T>
 }
 
+async function executeRaw(
+  method: "GET" | "POST",
+  path: string,
+  params?: Record<string, string>,
+): Promise<string> {
+  if (authPermanentFailure) throw new Error("认证已失效，请重新登录")
+
+  // #53 原生模式：API 转发 Native（Java 附加 Bearer + 401 刷新），JS 零知 access_token。
+  // 与 execute 的差异：回调 data 即原始响应体字符串（PixivApiCore 对非 JSON 响应原样
+  // 返回），resolve(data) 不做 JSON 解析；错误仍复用 classifyError 归类。
+  if (isNativeMode()) {
+    const api = getNativeModules()?.PictelioApi as {
+      request: (
+        method: string,
+        path: string,
+        body: string,
+        callback: (status: number, data: string, rotatedRefreshToken: string) => void,
+      ) => void
+    } | undefined
+    if (!api) {
+      throw { type: ApiErrorType.NETWORK, message: "原生 API 模块不可用" } as ApiError
+    }
+    const query = params ? "?" + new URLSearchParams(params).toString() : ""
+    return new Promise<string>((resolve, reject) => {
+      api.request(method, path + query, "", (status, dataStr, rotated) => {
+        // 401 刷新轮换了 refresh_token → 持久化（Keystore），与 execute 一致
+        if (rotated) {
+          void saveRefreshToken(rotated).catch((e) => {
+            console.warn("[client] 持久化轮换 refresh_token 失败", e)
+          })
+        }
+        let parsed: unknown = null
+        try {
+          parsed = dataStr ? JSON.parse(dataStr) : null
+        } catch {
+          parsed = null
+        }
+        if (status >= 200 && status < 300) {
+          resolve(dataStr)
+        } else {
+          reject(classifyError(status, null, parsed))
+        }
+      })
+    })
+  }
+
+  if (method === "GET" && !accessToken) {
+    throw { type: ApiErrorType.UNAUTHORIZED, message: "未登录，请先登录" } as ApiError
+  }
+
+  const headers: Record<string, string> = {
+    "User-Agent": PIXIV_USER_AGENT,
+    Referer: PIXIV_REFERER,
+  }
+  // 与 execute 一致：先重写 URL，再基于结果决定是否附加 Bearer——
+  // 外部绝对 URL / 非 Pixiv 域不带 Authorization，防止 access_token 泄漏。
+  const url = rewriteUrl(path)
+  if (shouldAttachAuth(url) && accessToken) headers["Authorization"] = `Bearer ${accessToken}`
+
+  let res: Response
+  try {
+    const paramsStr = params ? "?" + new URLSearchParams(params).toString() : ""
+    res = await requestFetch(url + paramsStr, { method, headers })
+  } catch (err) {
+    // fetch 拒绝（网络中断/超时/CORS）→ 归类为 NETWORK，避免裸 TypeError 泄漏给 UI
+    throw classifyError(0, err, null)
+  }
+
+  if (!res.ok) {
+    throw classifyError(res.status, null, await res.json().catch(() => null))
+  }
+  return res.text()
+}
+
 async function execWithAuthRetry<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn()
@@ -328,8 +416,22 @@ function request<T>(
   return execWithAuthRetry<T>(() => execute<T>(method, path, data, body, signal))
 }
 
+/**
+ * requestRaw 实现：返回原始响应体文本（web 模式 res.text() / 原生模式回调 data）。
+ * 401 自动刷新包装与 request 一致（execWithAuthRetry）；不参与 GET 去重——
+ * 原始文本响应按调用方语义直接返回，避免共享 promise 造成正文串扰。
+ */
+function requestRaw(
+  method: "GET" | "POST",
+  path: string,
+  params?: Record<string, string>,
+): Promise<string> {
+  return execWithAuthRetry<string>(() => executeRaw(method, path, params))
+}
+
 export const apiClient: PixivApiClient = {
   get: <T>(path: string, params?: Record<string, string>, signal?: AbortSignal) =>
     request<T>("GET", path, params, undefined, signal),
   post: <T>(path: string, body: Record<string, string>) => request<T>("POST", path, undefined, body),
+  requestRaw,
 }
