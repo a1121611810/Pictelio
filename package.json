@@ -67,7 +67,7 @@
   "packageManager": "pnpm@11.9.0",
   "devEngines": {
     "node": {
-      "version": ">=20.19",
+      "version": ">=22.22.2",
       "onFail": "error"
     },
     "packageManager": {

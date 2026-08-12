@@ -605,7 +605,7 @@ Grill 澄清 → to-spec → to-tickets → implement
 - **Android 发布签名**：Release 构建使用 `android/app/pictelio-release.keystore`，密码通过环境变量 `PICTELIO_KEYSTORE_PASSWORD` 与 `PICTELIO_KEY_PASSWORD` 注入。Keystore 禁止提交到 git。详细步骤见 `docs/release-signing.md`。
 - **Gradle 任务图校验**: `build.gradle` 通过 `gradle.taskGraph.whenReady` 仅在 Release 任务触发时检查签名凭据，Debug 构建不需要环境变量。
 - **代理配置**：开发时自动读取 `https_proxy` / `HTTPS_PROXY` / `http_proxy` / `HTTP_PROXY` 环境变量，回退到 `http://127.0.0.1:10808`
-- **Node 版本**: 20.19+，包管理器 pnpm 11.9.0（`devEngines` 强制校验）
+- **Node 版本**: 22.22.2+（2026-08 jsdom 30 升级后由 20.19 抬升，见 ADR-0080），包管理器 pnpm 11.9.0（`devEngines` 强制校验）
 
 ## 测试
 
