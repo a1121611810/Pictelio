@@ -16,6 +16,8 @@ tags: [architecture, pictelio, solidjs, capacitor, monorepo]
 | `pictelio-app` | `/packages/app/` | SolidJS SPA — the core application |
 | `pictelio-website` | `/packages/website/` | Astro landing page (GitHub Pages) |
 | `pictelio-app-lynx` | `/packages/app-lynx/` | vue-lynx MVP on ReactLynx runtime — parallel rendering client |
+| `@pictelio/ugoira` | `/packages/ugoira/` | Ugoira (Pixiv animation) zip frame processing library — fflate decompression, store-mode Range slicing |
+| `@pictelio/update-check` | `/packages/update-check/` | Shared update checker — version comparison, version.json fetching, timeout fallback; used by both app and app-lynx |
 
 Root `package.json` delegates all commands via `vp run --filter`. Build tooling uses **vite-plus** (`vp` CLI), which wraps Vite with oxlint, oxfmt, and vitest.
 

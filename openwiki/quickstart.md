@@ -27,7 +27,7 @@ This wiki helps humans and agents understand the architecture, workflows, integr
 | Local DB | @tanstack/solid-db 0.2 (IndexedDB) |
 | Mobile Runtime | Capacitor 8.4 (Android target) |
 | Package Manager | pnpm 11.9 |
-| Monorepo Packages | `pictelio-app` (SPA), `pictelio-website` (Astro landing page, GitHub Pages), `pictelio-app-lynx` (vue-lynx MVP) |
+| Monorepo Packages | `pictelio-app` (SPA), `pictelio-website` (Astro landing page, GitHub Pages), `pictelio-app-lynx` (vue-lynx MVP), `@pictelio/ugoira` (ugoira zip frame library), `@pictelio/update-check` (shared update checker) |
 
 ## Documentation Map
 
@@ -48,7 +48,7 @@ This wiki helps humans and agents understand the architecture, workflows, integr
 
 ### Testing & Operations
 
-- **[Testing Strategy](/openwiki/testing/overview.md)** — Two test tiers (unit + agent-browser E2E), Playwright/browser-component migration completed (ADR-0034, ADR-0035), file naming conventions, test helpers, CI workflows
+- **[Testing Strategy](/openwiki/testing/overview.md)** — Three test tiers (unit + agent-browser E2E + Android emulator E2E), Playwright/browser-component migration completed (ADR-0034, ADR-0035), file naming conventions, test helpers, CI workflows
 
 ## Development Quick Start
 

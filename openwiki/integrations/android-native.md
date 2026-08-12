@@ -7,7 +7,7 @@ tags: [android, capacitor, native, gradle, build, plugins, pixiv-api-gateway]
 
 # Android Native & Build
 
-Pictelio packages the SolidJS SPA as a native Android app via Capacitor, with four custom native plugins, three Lynx Native Modules, and a comprehensive build pipeline.
+Pictelio packages the SolidJS SPA as a native Android app via Capacitor, with five custom native plugins, six Lynx Native Modules, and a comprehensive build pipeline.
 
 ## Three-Flavor Architecture (v4.0.0+)
 
@@ -34,7 +34,7 @@ The `main/AndroidManifest.xml` uses `${launcherActivity}` and `${appClass}` mani
 
 ## Native Plugin Architecture
 
-Four custom Capacitor plugins bridge the TypeScript SPA to Android platform capabilities. Each has a Java implementation and a TypeScript wrapper. Since v4.0.0 (flavor migration), the Capacitor plugin Java sources reside under `src/webview/java/`:
+Five custom Capacitor plugins bridge the TypeScript SPA to Android platform capabilities. Each has a Java implementation and a TypeScript wrapper. Since v4.0.0 (flavor migration), the Capacitor plugin Java sources reside under `src/webview/java/`:
 
 ```mermaid
 flowchart LR
@@ -174,7 +174,7 @@ See [clientSwitch.ts](/packages/app/src/utils/clientSwitch.ts) for the frontend 
 
 The following Lynx Native Modules reside under `src/lynx/java/` (lynx flavor) and are also merged into the full flavor. Unlike the Capacitor plugins above, these extend `com.lynx.jsbridge.LynxModule` and are registered in the LynxView's module registry.
 
-Introduced in #52 for the [app-lynx vue-lynx client](/openwiki/architecture/overview.md#app-lynx-vue-lynx-client). Unlike the four Capacitor plugins above, `PictelioSecureStorageModule` is a **LynxModule** — it extends `com.lynx.jsbridge.LynxModule` and is registered in the LynxView's module registry rather than via Capacitor's plugin system.
+Introduced in #52 for the [app-lynx vue-lynx client](/openwiki/architecture/overview.md#app-lynx-vue-lynx-client). Unlike the five Capacitor plugins above, `PictelioSecureStorageModule` is a **LynxModule** — it extends `com.lynx.jsbridge.LynxModule` and is registered in the LynxView's module registry rather than via Capacitor's plugin system.
 
 **Java:** `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioSecureStorageModule.java`
 **Type declarations:** `/packages/app-lynx/src/rspeedy-env.d.ts` (under `globalThis.NativeModules`)
