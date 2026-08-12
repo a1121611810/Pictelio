@@ -371,6 +371,7 @@ export default defineConfig(
           ".playwright-cli/**",
           ".worktrees/**",
           "pnpm-lock.yaml",
+          "*.d.ts",
         ],
         options: {
           lineWidth: 100,
