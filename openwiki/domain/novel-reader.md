@@ -17,10 +17,12 @@ Pictelio includes a full-featured novel reader for Pixiv novels, with virtualize
 - **Data loading:** Component-level via `createEffect` reacting to `currentNovelId()` (not via router loader). Shows `NovelDetailSkeleton` while `detailLoading` is true. Cache-first: `peekEntry()` fills data synchronously on mount, avoiding the skeleton entirely when cached (ADR-0038).
 
 - **Content rendering:** Parses novel content into typed blocks (`TextBlock`, `ImageBlock`) via `parseNovelBlocks`
+- **Marked-up text rendering:** `novelBlocks.ts` parses chapter titles, `jump` links, and inline decorations into distinct block types rendered by `createNovelVirtualLayout` (C-scheme, commit `c39202b`)
 - **Virtual layout:** Only renders visible paragraphs using `createNovelVirtualLayout`
 - **In-text search:** `NovelSearchBar` component with highlighting
-- **Reader settings:** Overlay sheet (`ReaderSettingsSheet`) controlling font size, weight, family, line-height via CSS custom properties
-- **Series navigation:** `SeriesSheet` for navigating multi-chapter series
+- **Reader settings:** Overlay sheet (`ReaderSettingsSheet`) controlling font size (auto or manual), weight, family, line-height via CSS custom properties
+- **Series navigation:** `SeriesSheet` for navigating multi-chapter series (A2 cardized)
+- **FastScroller:** `createFastScrollbar` — a draggable overlay scrollbar with chapter-preview bubble (ADR-0077)
 - **Comments:** `CommentOverlay` for viewing novel comments
 - **Image handling:** Inline `NovelImageBlock` sub-component that memoizes aspect ratios
 - **Reading progress:** Scroll-position tracking with `createNovelLoader`
@@ -91,10 +93,12 @@ The project uses `@chenglou/pretext` for novel text layout. `isPretextSupported`
 ## Reader Settings
 
 `/packages/app/src/stores/readerSettingsStore.ts` — Persistent reader preferences stored as CSS custom properties on the novel container:
-- `--reader-font-size` (clamp-based)
+- `--reader-font-size` (clamp-based, with an **`autoFontSize`** mode — default `true` — that computes the best size from viewport width)
 - `--reader-font-weight`
 - `--reader-font-family` (Segoe UI, Georgia, serif, etc.)
 - `--reader-line-height` (1.5 — 2.0)
+
+**Auto font-size** reads [`viewportWidth`](/packages/app/src/primitives/viewportWidth.ts), a dedicated viewport-width signal extracted out of the store so the module no longer self-registers a `window` listener at import time (removes import-time IO side effects and enables non-browser/node test injection via `setViewportWidth`).
 
 `ReaderSettingsSheet` (`/packages/app/src/components/ReaderSettingsSheet.tsx`, ~12.7 KB) — The overlay sheet for adjusting these settings interactively.
 
@@ -181,7 +185,10 @@ When blocked, `startTranslate()` shows an in-sheet error and **sends nothing** (
 
 ## Novel Feed
 
-Three layout modes for the novel feed:
+The novel feed is rendered two ways:
+
+- **Home page** — `NovelRowCard` single-column row cards in the `NovelFeedPanel`, backed directly by `novelRecommendedStore` / `novelFollowStore` / `novelBookmarkStore` (see [Feed & Browsing](/openwiki/domain/feed-and-browsing.md)).
+- **Secondary routes** — `NovelRecommendedFeed`, `NovelFollowFeed`, `NovelBookmarks`, and `UserWorksFeed` still use `NovelVirtualFeed` with three layout modes:
 
 | Mode | Component | Description |
 |------|-----------|-------------|
@@ -191,13 +198,12 @@ Three layout modes for the novel feed:
 
 - `/packages/app/src/routes/NovelFeedPage.tsx` — Novel feed discovery page
 - `/packages/app/src/components/NovelVirtualFeed.tsx` — Virtualized novel feed renderer
-- `/packages/app/src/stores/novelStore.ts` — Legacy monolithic novel feed store (uses `createTQFeedStore` factory per ADR-0021)
-- `/packages/app/src/stores/novelRecommendedStore.ts` — New dedicated recommended store (unintegrated)
-- `/packages/app/src/stores/novelFollowStore.ts` — New dedicated follow store with `all`/`public`/`private` sub-tabs (unintegrated)
-- `/packages/app/src/stores/novelBookmarkStore.ts` — New dedicated bookmark store with `public`/`private` restrict (unintegrated)
-- `/packages/app/src/stores/shared/novelHelpers.ts` — Shared helpers (`adaptNovelResponse`, `dedupNovels`) extracted from `novelStore.ts`
+- `/packages/app/src/stores/novelRecommendedStore.ts` — Dedicated recommended store
+- `/packages/app/src/stores/novelFollowStore.ts` — Dedicated follow store with `all`/`public`/`private` sub-tabs
+- `/packages/app/src/stores/novelBookmarkStore.ts` — Dedicated bookmark store with `public`/`private` restrict
+- `/packages/app/src/stores/shared/novelHelpers.ts` — Shared helpers (`adaptNovelResponse`, `dedupNovels`) extracted from the deleted `novelStore.ts`
 
-> **Ongoing refactor:** The monolithic `novelStore.ts` is being split into dedicated per-tab stores, mirroring the illust `feedStore.ts` split. `novelRecommendedStore.ts`, `novelFollowStore.ts`, and `novelBookmarkStore.ts` are added as separate modules but not yet imported by routes.
+> The monolithic `novelStore.ts` was **deleted** — the split stores are now imported directly by route components (mirroring the illust `feedStore.ts` split).
 
 ## Key Source Files
 
@@ -205,10 +211,9 @@ Three layout modes for the novel feed:
 |---------|------|
 | Novel detail page | `/packages/app/src/routes/NovelDetail.tsx` |
 | Novel feed page | `/packages/app/src/routes/NovelFeedPage.tsx` |
-| Novel store (legacy) | `/packages/app/src/stores/novelStore.ts` |
-| Novel recommended store (new) | `/packages/app/src/stores/novelRecommendedStore.ts` |
-| Novel follow store (new) | `/packages/app/src/stores/novelFollowStore.ts` |
-| Novel bookmark store (new) | `/packages/app/src/stores/novelBookmarkStore.ts` |
+| Novel recommended store | `/packages/app/src/stores/novelRecommendedStore.ts` |
+| Novel follow store | `/packages/app/src/stores/novelFollowStore.ts` |
+| Novel bookmark store | `/packages/app/src/stores/novelBookmarkStore.ts` |
 | Novel feed helpers | `/packages/app/src/stores/shared/novelHelpers.ts` |
 | Novel cache | `/packages/app/src/stores/novelCache.ts` |
 | Novel loader primitive | `/packages/app/src/primitives/createNovelLoader.ts` |
@@ -232,7 +237,9 @@ Three layout modes for the novel feed:
 | Novel card | `/packages/app/src/components/NovelCard.tsx` |
 | Novel text list card | `/packages/app/src/components/NovelTextListCard.tsx` |
 | Novel virtual feed | `/packages/app/src/components/NovelVirtualFeed.tsx` |
-| Novel cover header | `/packages/app/src/components/NovelCoverHeader.tsx` |
+| Novel cover card | `/packages/app/src/components/novel/NovelCoverCard.tsx` |
+| Novel top bar | `/packages/app/src/components/novel/NovelTopBar.tsx` |
+| Fast scrollbar primitive | `/packages/app/src/primitives/createFastScrollbar.ts` |
 | Novel footer nav | `/packages/app/src/components/NovelFooterNav.tsx` |
 | Novel search bar | `/packages/app/src/components/NovelSearchBar.tsx` |
 | Novel blocks parser | `/packages/app/src/utils/novelBlocks.ts` |

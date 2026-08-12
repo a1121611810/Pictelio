@@ -218,6 +218,7 @@ A LynxModule for client-switching and native app control, used by the [app-lynx 
 | `getClientKind(cb)` | Reads current client kind. Success: `cb(kind)`; failure: `cb(errMsg)`. |
 | `getClientKinds(cb)` | Returns `BuildConfig.CLIENT_KINDS` array for ADR-0062 switch-UI hiding. Success: `cb(kinds[])`. |
 | `restart(cb)` | Activity-level restart via `FLAG_ACTIVITY_NEW_TASK \| FLAG_ACTIVITY_CLEAR_TASK`. Keeps the process alive (token memory state, OkHttp pool, disk cache preserved). The old `LynxActivity` is destroyed by `CLEAR_TASK`. Aligned with webview-side `ClientInfoPlugin.restart` (issue #120/#124). |
+| `httpGet(url, cb)` | Native HTTP GET for the lynx update-check (ADR-0065) — fetches `version.json` from a background thread pool with a response-body size cap (the lynx native runtime has no `fetch`). |
 
 Callback signatures follow the same null-free pattern as `PictelioSecureStorageModule` — `CallbackImpl` on real devices crashes on `null` arguments.
 
@@ -329,6 +330,13 @@ Custom Lynx image service implementing `ILynxImageService` — the sole image lo
 - **Singleton:** `getInstance()` returns the single `INSTANCE`; `onInitialize(context)` stores the Application context for lazy `PixivImageLoader` creation
 
 This replaces the unviable Fresco `lynx-service-image` dependency (see [Lynx SDK Dependency](#lynx-sdk-dependency)), because Fresco cannot inject the `Referer` header required by `i.pximg.net`.
+
+### Native Bitmap Memory Cache
+
+**Java:** [`ImageMemoryCache.java`](/packages/app/android/app/src/main/java/io/pictelio/app/ImageMemoryCache.java) + [`LruCache.java`](/packages/app/android/app/src/main/java/io/pictelio/app/LruCache.java) (new, #145/#147)
+**Tests:** `ImageMemoryCacheTest.java`, `LruCacheTest.java` (Robolectric)
+
+A native Bitmap LRU memory cache that accelerates second renders: decoded `Bitmap`s are cached in Java memory (LRU eviction) so re-visiting an image renders instantly instead of re-decoding from disk. Introduced alongside detail image quality tiers (default `medium`) that skip the original image for single-page works (#145/#146/#148).
 
 ### PictelioApp.java (full flavor)
 

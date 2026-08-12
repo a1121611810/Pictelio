@@ -21,13 +21,13 @@ This wiki helps humans and agents understand the architecture, workflows, integr
 | Framework | SolidJS 1.9 |
 | Language | TypeScript 6.0 (strict) |
 | Bundler | Rolldown (production) via vite-plus; Vite dev server |
-| Styling | UnoCSS 66.7 + Microsoft Fluent Design System 2 |
+| Styling | UnoCSS 66.7 + Microsoft Fluent Design System 2 + A2 cardization (Win11 correction, ADR-0074) |
 | Routing | @solidjs/router 1.0 |
 | Data Fetching | @tanstack/solid-query 5.101 |
 | Local DB | @tanstack/solid-db 0.2 (IndexedDB) |
-| Mobile Runtime | Capacitor 8.4 (Android target) |
+| Mobile Runtime | Capacitor 8.5 (Android target) |
 | Package Manager | pnpm 11.9 |
-| Monorepo Packages | `pictelio-app` (SPA), `pictelio-website` (Astro landing page, GitHub Pages), `pictelio-app-lynx` (vue-lynx MVP) |
+| Monorepo Packages | `pictelio-app` (SPA), `pictelio-website` (Astro landing page, GitHub Pages), `pictelio-app-lynx` (vue-lynx MVP), `@pictelio/update-check` (shared update-check logic), `@pictelio/ugoira` |
 
 ## Documentation Map
 
@@ -39,7 +39,7 @@ This wiki helps humans and agents understand the architecture, workflows, integr
 
 ### Domains & Workflows
 
-- **[Feed & Browsing](/openwiki/domain/feed-and-browsing.md)** — Recommended/following feeds, virtual scrolling with pull-to-refresh, masonry/column/grid layout modes, search, bookmarks, browsing history, R18 filtering (SolidJS) / overlay masking (app-lynx), age confirmation gate
+- **[Feed & Browsing](/openwiki/domain/feed-and-browsing.md)** — C-shell home page (`SideNavShell` + single-column L5 layout) backed by six feed stores, unified `FeedList` with pull-to-refresh + adaptive tags, secondary virtualized feeds, search, bookmarks, browsing history, R18 filtering (SolidJS) / overlay masking (app-lynx), age confirmation gate
 - **[Novel Reader](/openwiki/domain/novel-reader.md)** — Novel detail with virtualized text layout, in-text search with highlighting, reading progress, series sheet, novel feed with three layout modes, Pretext library integration, AI translation (BYOK DeepSeek, chunked pipeline + LRU cache + R18 grading)
 
 ### Integrations
@@ -119,7 +119,25 @@ Architecture Decision Records live in `/docs/adr/`. Notable ones:
 | 0061 | Android emulator E2E gate — Appium + WebdriverIO infrastructure for on-device testing on fixed AVDs (pictelio_ui/pictelio_low); covers APK build→install→Activity assertion→WebView context switch; accessibility-label contract for Lynx element targeting |
 | 0062 | Single-engine client switch hiding — webview/lynx-only APKs hide the engine-switch UI (dead function); full APK retains switch; new `ClientInfoPlugin` (Capacitor) + `PictelioAppModule.getClientKinds()` (Lynx) expose `BuildConfig.CLIENT_KINDS` per-flavor |
 | 0064 | Engine-switch experience fix — confirmation dialog replaced with info page (`/client-switch` route with engine diff, warnings, synchronous loading mask, and error-to-failure mapping); R8 `*$$PropsSetter`/`*$$PropsHolder` keep rules preventing release-build white-screen on Lynx launch (38 annotation-generated classes, `Class.newInstance()` reflection, error 990200); `LynxActivity` render-error fallback page with "Back to WebView" exit; build-time R8 mapping assertion; supported by [glossary-client-switch](/docs/adr/glossary-client-switch.md) |
+| 0064 (lynx feed tabs) | app-lynx feed tabs gateway — global tabs unified to 推荐/插画/小说/我的 (`navTabs.ts` single source of truth), new `/illusts` page + `IllustList.vue`, `createMixFeed` mixed feed (illust 4:1 novel), novel body via `requestRaw` native gateway, `RestrictOverlay` inline mask mode; see [glossary-app-lynx-feed-tabs-gateway](/docs/adr/glossary-app-lynx-feed-tabs-gateway.md) |
 | — | [glossary-app-lynx-native](/docs/adr/glossary-app-lynx-native.md) — Unified terminology for lynx native integration (dual client, NativeModule contract, image pipeline, render compat, automated verification) |
+| 0065 | Update-check architecture — shared `@pictelio/update-check` package + dual-client policy (webview soft update vs lynx forced update); version.json manifest; see [glossary-update-check](/docs/adr/glossary-update-check.md) |
+| 0065 (release upload) | Per-asset release upload — APK upload split per-package with panel, failure isolation, idempotent retry (`release-panel.mjs`/`release-uploader.mjs`) |
+| 0066 | app-lynx system back bridge — illust detail / back-navigation native bridge fixes |
+| 0067 | Node release uploader — native Node uploader (2.1× `gh` throughput) + proxy-path detection (`proxy-probe.mjs`, `upload-release-assets.mjs`) |
+| 0068 | Update dialog sizing — 85vh max + content-area adaptive scroll + full changelog (cap raised 200→5000 chars, #173/#174) |
+| 0069 | Cardized settings & personal center — A2 card grouping for `/settings` + `/me` |
+| 0070 | Home A2 cardization — `/home` top bar, feed cards, page background unified to A2 |
+| 0071 | Illust detail A2 — `/illust` top bar, image showcase, info cards |
+| 0072 | Novel detail A2 — `/novel` header + `NovelCoverCard` + bottom nav (body text deliberately not carded) |
+| 0073 | Home content A2 unification — radius/state unified across all 7 content domains |
+| 0074 | A2 Win11 correction — 8px radius + 1px border + no shadow (Fluent 2 spec) |
+| 0075 | Home C shell + L5 fixed layout — `SideNavShell` side nav + single-column illust 16:10 / novel row / history row cards; layout-mode setting removed |
+| 0076 | Home pull-to-refresh — `createPullToRefresh` primitive + A1 overlay for six feed panels |
+| 0077 | Novel FastScroller — draggable `createFastScrollbar` + chapter preview bubble |
+| 0078 | Feed list unification — `FeedList` container + `refreshing` vs `loadingMore` split (fixes pagination-triggered skeleton flash) |
+| 0079 | Tool trigger protocol — CodeGraph/OpenWiki forced routing for AI tool invocations (see [AGENTS.md](/AGENTS.md)); research in [codegraph-vs-openwiki](/docs/research/codegraph-vs-openwiki.md) |
+| 0080 | Dependency upgrade analysis — jsdom 30 (Node floor → ≥22.22.2), Capacitor 8.5, agent-browser 0.34, plus holds (TS 7, tailwind 4, lynx toolchain); see [glossary-dependency-upgrade](/docs/adr/glossary-dependency-upgrade.md) |
 
 ## Key Source Files
 
@@ -174,7 +192,7 @@ A scheduled **OpenWiki GitHub Actions workflow** (`.github/workflows/openwiki-up
 
 ## Repo Evolution (Recent History)
 
-The repository has been actively refactored through v3.17.x. Key themes in recent commits:
+The repository has been actively refactored through **v4.10.0**. Key themes in recent commits:
 
 - **Store migration:** All list stores migrated from hand-written `createStore` patterns to the `createTQFeedStore` factory wrapping TanStack Query's `createInfiniteQuery` (ADR-0016, ADR-0022). This eliminated 200-300 lines of boilerplate.
 - **Feed store split + legacy cleanup:** The monolithic `feedStore.ts` (illusts) and `novelStore.ts` (novels) have been split into dedicated per-tab stores using the same factory. `recommendedStore.ts` and `followStore.ts` power the new `RecommendedFeed` and `FollowFeed` components inside the consolidated `HomePage` at `/home`. `novelRecommendedStore.ts`, `novelFollowStore.ts`, and `novelBookmarkStore.ts` are now also **integrated** — `NovelRecommendedFeed` and `NovelFollowFeed` import directly from split stores. Both legacy monolithic stores and their tests have been **deleted** (commit `b30366f`). Shared helpers extracted to `feedHelpers.ts` and `novelHelpers.ts`.
@@ -194,7 +212,13 @@ The repository has been actively refactored through v3.17.x. Key themes in recen
 - **E2E suite stability (Issue #19, 19/42 → 42/42):** `createLoggedInDriver` rebuilt as a 4-phase looped login wait with 3 launch retries; `navigateSpa()` bypasses the startup-navigation override; white-screen guards (`waitForPageContent`/`waitForSelector`) and `clickReliable` `scopeSelector` added; daemon cleanup switched to lsof-based precise kill. See [Testing Strategy](/openwiki/testing/overview.md).
 - **Lynx native integration (ADR-0053, 0054, 0055, 0056):** App-lynx brownfield integration inside the main Android app (`MainActivity` routing gate → `LynxActivity`). NativeModule access_token isolation (ADR-0053) — `PictelioApi`/`PictelioAuth` LynxModules forward API/OAuth through Java, access_token stays in Java heap (JS zero-knowledge), callback no-null contract. Unified image pipeline (ADR-0054) — `PixivImageLoader` shared core with per-URL locking serves both webview proxy and Lynx `PictelioImageService`, dual client share `pictelio-images` cache directory. Native render compat (ADR-0055) — text/`list-item` tap wrapped in `<view>`, scroll-view aspectRatio patched with fixed-height containers, XElement behaviors registered, `item-key` String enforced, `super.onCreate` ordering fixed. Number prop binding contract (ADR-0056) — list number-type attributes must use v-bind (`:span-count="2"`); static strings silently rejected by native layout engine (single-column fallback), masked by web-core's loose `parseFloat`. Automated verification via [`lynx-flow-check.sh`](/packages/app-lynx/scripts/lynx-flow-check.sh) (full-process device flow with resolution-adaptive screenshot analysis) and [`e2e-me-scroll.mjs`](/packages/app-lynx/scripts/e2e-me-scroll.mjs) (CDP E2E regression). See [Architecture Overview > app-lynx](/openwiki/architecture/overview.md#app-lynx-vue-lynx-client) and [Android Native & Build](/openwiki/integrations/android-native.md).
 - **Me page scroll fix (issue #90):** The Me settings page was restructured from a flat `<view>` to a `flex flex-col` layout with fixed header + `<scroll-view>` for content overflow. Content sections were reorganized into semantic groups (account, client, content, animation playback, logout) with bottom padding. The `lynx-flow-check.sh` flow verification gained a step 8 for settings-page scroll regression and resolution-adaptive coordinate scaling (no longer hardcoded 1080x2400).
-- **app-lynx R18 overlay + skeleton (issue #91, uncommitted):** The `filterByRestrict` approach (ADR-0051) caused blank screens on novel feeds where all items were R18/R18G — replaced with full-list rendering + `RestrictOverlay` glass mask (`isRestricted()` in `settingsStore.ts`). New `RestrictOverlay.vue` (glass overlay with R-18/R-18G badge, no interactivity) applied across all 6 page components. New `SkeletonNovel.vue` replaces plain "loading…" text on the novel detail page with layout-matching shimmer. Pagination empty-page guards now use server-side raw returns instead of post-filter lengths. Glass tokens (`--glassBg`/`--glassBlur`/`--glassSaturate`/`--glassBorder`) added to `tokens.css`, fall back to opaque solid on native LynxView (no `backdrop-filter`). New `settingsStore.test.ts` (12-case `isRestricted` matrix + token contract test); vitest `include` extended to `src/**/*.test.ts`. Spec: `docs/specs/app-lynx-r18-overlay-skeleton.md`.
+- **app-lynx R18 overlay + skeleton (issue #91):** The `filterByRestrict` approach (ADR-0051) caused blank screens on novel feeds where all items were R18/R18G — replaced with full-list rendering + `RestrictOverlay` glass mask (`isRestricted()` in `settingsStore.ts`). Glass tokens (`--glassBg`/`--glassBlur`/`--glassSaturate`/`--glassBorder`) added to `tokens.css`. Spec: `docs/specs/app-lynx-r18-overlay-skeleton.md`.
+- **A2 cardization + C-shell home (ADR-0069 → ADR-0078):** The main app's settings, personal center, home, illust detail, and novel detail pages were unified under an "A2" card visual language, then corrected to the Win11/Fluent 2 spec (8px radius + 1px border + no shadow, ADR-0074). `/home` was rebuilt as a C shell — `SideNavShell` left icon rail + single-column fixed L5 layout (`IllustSingleCard` 16:10 big image / `NovelRowCard` 56px rows / `HistoryRowCard`) — with the bottom `NavBar` and masonry/grid layout-mode switcher removed from the home page. A unified `FeedList` (ADR-0078) adds pull-to-refresh (ADR-0076), infinite-scroll sentinel, and `AdaptiveTags` chip truncation. See [Feed & Browsing](/openwiki/domain/feed-and-browsing.md).
+- **Novel reader polish:** `createFastScrollbar` draggable overlay scrollbar with chapter-preview bubble (ADR-0077); novel text marker rendering (chapter titles / `jump` links / inline decoration, commit `c39202b`); reader settings auto font-size via the new [`viewportWidth`](/packages/app/src/primitives/viewportWidth.ts) primitive.
+- **Update check (ADR-0065):** A new shared [`@pictelio/update-check`](/packages/update-check/) package centralizes version comparison + `version.json` fetch, consumed by both clients with different policies — webview soft update (dismissible `StartupUpdateDialog`, 85vh max per ADR-0068) vs lynx forced update (`UpdatePage` with `backBehavior: 'exit'`). Native HTTP goes through `PictelioAppModule.httpGet`; the disable switch is dev-only.
+- **Release pipeline (ADR-0065-per-asset, ADR-0067):** Per-asset APK upload with failure isolation + idempotent retry; a native Node uploader (2.1× `gh` throughput) with `PICTELIO_UPLOADER=gh` fallback; proxy-path probe; changelog truncation cap raised 200→5000 chars.
+- **app-lynx feed tabs + M3 + error/comment/update (ADR-0064):** Global tabs refactored to 推荐/插画/小说/我的 (`navTabs.ts` single source of truth) with a new `/illusts` `IllustList` page; `Recommended.vue` migrated to a `createMixFeed` mixed feed (illust 4:1 novel); novel body switched to a `requestRaw` native gateway; a full error-presentation module + `/error` session-expiry page, a comment bottom-sheet module, and an M3 component alignment (FAB/chips/dialogs/switch) landed.
+- **Tool trigger protocol + dependency upgrade (ADR-0079, ADR-0080):** `AGENTS.md` now forces AI tool invocations through CodeGraph/OpenWiki routing; a dependency-upgrade analysis greenlights jsdom 30 (with a Node floor bump to ≥22.22.2) plus Capacitor 8.5 / agent-browser 0.34, while holding TypeScript 7, tailwindcss 4, and the lynx toolchain.
 
 ## Backlog
 
