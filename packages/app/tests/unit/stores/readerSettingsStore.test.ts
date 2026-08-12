@@ -38,8 +38,9 @@ async function loadStore(seed: Record<string, string> = {}) {
   // 透传 codec：store 从 "@/settings" 导入 jsonCodec，需一并提供
   void jsonCodec;
   const store = await import("@/stores/readerSettingsStore");
+  const viewport = await import("@/primitives/viewportWidth");
   await settings.hydrateAll();
-  return { store, mem };
+  return { store, mem, viewport };
 }
 
 describe("readerSettingsStore", () => {
@@ -260,21 +261,21 @@ describe("readerSettingsStore", () => {
     });
 
     it("effectiveFontSize follows computed value in auto mode and recomputes on viewport change", async () => {
-      const { store } = await loadStore();
+      const { store, viewport } = await loadStore();
       store.setReaderAutoFontSize(false); // 先切手动验证档位值
       store.setReaderFontSize(20);
       expect(store.effectiveFontSize()).toBe(20); // 手动模式 = 档位值
       store.setReaderAutoFontSize(true);
-      store.setViewportWidthForTest(390);
+      viewport.setViewportWidth(390);
       expect(store.effectiveFontSize()).toBe(17);
-      store.setViewportWidthForTest(428);
+      viewport.setViewportWidth(428);
       expect(store.effectiveFontSize()).toBe(18);
     });
 
     it("readerStyle uses effective font size in auto mode", async () => {
-      const { store } = await loadStore();
+      const { store, viewport } = await loadStore();
       store.setReaderAutoFontSize(true);
-      store.setViewportWidthForTest(412);
+      viewport.setViewportWidth(412);
       expect(store.readerStyle()["--reader-font-size"]).toBe("17px");
     });
   });

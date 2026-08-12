@@ -1,4 +1,5 @@
 import { settings, jsonCodec, type Codec } from "@/settings";
+import { viewportWidth } from "@/primitives/viewportWidth";
 
 // ── Types ──
 
@@ -89,29 +90,20 @@ export const [bgColor, setBgColor] = createSignal(initial.bgColor);
 //   320→14、360→16、390→17、412→17（14+92×0.038=17.496 四舍五入 17，非 18）、
 //   414~428→18、480→20、600+→23（封顶）
 
-export function computeAutoFontSize(viewportWidth: number): number {
-  const vw = Number.isFinite(viewportWidth) ? viewportWidth : 0;
+export function computeAutoFontSize(viewportWidthPx: number): number {
+  const vw = Number.isFinite(viewportWidthPx) ? viewportWidthPx : 0;
   const raw = 14 + (vw - 320) * 0.038;
   return Math.round(Math.min(Math.max(raw, 14), 23));
 }
 
-// 视口宽度 signal：模块加载时初始化 + resize 实时重算（旋转/分屏/折叠）。
-// node 测试环境无 window，guard 后保持 0（computeAutoFontSize(0) → 14）。
-const [viewportWidth, setViewportWidthSignal] = createSignal(0);
-if (typeof window !== "undefined") {
-  setViewportWidthSignal(window.innerWidth);
-  window.addEventListener("resize", () => setViewportWidthSignal(window.innerWidth));
+/** 实际生效字号：自动模式下用视口计算值，手动模式用档位值。
+ * 纯函数而非 memo：computeAutoFontSize 为 O(1) 算术无缓存收益；在 JSX/effect 内
+ * 调用时 Solid 按读取追踪依赖，响应式行为不变；同时避免模块级 createMemo 触发
+ * Solid「computation outside createRoot」开发警告。视口宽度来自独立模块
+ * @/primitives/viewportWidth（浏览器自动监听 resize，测试可注入）。 */
+export function effectiveFontSize(): number {
+  return autoFontSize() ? computeAutoFontSize(viewportWidth()) : fontSize();
 }
-
-/** 仅供测试注入视口宽度。 */
-export function setViewportWidthForTest(vw: number): void {
-  setViewportWidthSignal(vw);
-}
-
-/** 实际生效字号：自动模式下用视口计算值，手动模式用档位值。 */
-export const effectiveFontSize = createMemo(() =>
-  autoFontSize() ? computeAutoFontSize(viewportWidth()) : fontSize(),
-);
 
 function persistAll(): void {
   readerSettings.set({
