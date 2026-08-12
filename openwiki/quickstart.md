@@ -53,7 +53,7 @@ This wiki helps humans and agents understand the architecture, workflows, integr
 ## Development Quick Start
 
 ```bash
-# Prerequisites: Node.js 20.19+, pnpm 11.9, Android Studio, JDK 21, Android SDK
+# Prerequisites: Node.js ≥22.22.2, pnpm 11.9, Android Studio, JDK 21, Android SDK
 
 # Install dependencies
 pnpm install
