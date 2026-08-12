@@ -7,7 +7,7 @@ tags: [android, capacitor, native, gradle, build, plugins, pixiv-api-gateway]
 
 # Android Native & Build
 
-Pictelio packages the SolidJS SPA as a native Android app via Capacitor, with five custom native plugins, six Lynx Native Modules, and a comprehensive build pipeline.
+Pictelio packages the SolidJS SPA as a native Android app via Capacitor, with four custom native plugins, three Lynx Native Modules, and a comprehensive build pipeline.
 
 ## Three-Flavor Architecture (v4.0.0+)
 
@@ -34,7 +34,7 @@ The `main/AndroidManifest.xml` uses `${launcherActivity}` and `${appClass}` mani
 
 ## Native Plugin Architecture
 
-Five custom Capacitor plugins bridge the TypeScript SPA to Android platform capabilities. Each has a Java implementation and a TypeScript wrapper. Since v4.0.0 (flavor migration), the Capacitor plugin Java sources reside under `src/webview/java/`:
+Four custom Capacitor plugins bridge the TypeScript SPA to Android platform capabilities. Each has a Java implementation and a TypeScript wrapper. Since v4.0.0 (flavor migration), the Capacitor plugin Java sources reside under `src/webview/java/`:
 
 ```mermaid
 flowchart LR
@@ -174,7 +174,7 @@ See [clientSwitch.ts](/packages/app/src/utils/clientSwitch.ts) for the frontend 
 
 The following Lynx Native Modules reside under `src/lynx/java/` (lynx flavor) and are also merged into the full flavor. Unlike the Capacitor plugins above, these extend `com.lynx.jsbridge.LynxModule` and are registered in the LynxView's module registry.
 
-Introduced in #52 for the [app-lynx vue-lynx client](/openwiki/architecture/overview.md#app-lynx-vue-lynx-client). Unlike the five Capacitor plugins above, `PictelioSecureStorageModule` is a **LynxModule** — it extends `com.lynx.jsbridge.LynxModule` and is registered in the LynxView's module registry rather than via Capacitor's plugin system.
+Introduced in #52 for the [app-lynx vue-lynx client](/openwiki/architecture/overview.md#app-lynx-vue-lynx-client). Unlike the four Capacitor plugins above, `PictelioSecureStorageModule` is a **LynxModule** — it extends `com.lynx.jsbridge.LynxModule` and is registered in the LynxView's module registry rather than via Capacitor's plugin system.
 
 **Java:** `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioSecureStorageModule.java`
 **Type declarations:** `/packages/app-lynx/src/rspeedy-env.d.ts` (under `globalThis.NativeModules`)
@@ -218,6 +218,7 @@ A LynxModule for client-switching and native app control, used by the [app-lynx 
 | `getClientKind(cb)` | Reads current client kind. Success: `cb(kind)`; failure: `cb(errMsg)`. |
 | `getClientKinds(cb)` | Returns `BuildConfig.CLIENT_KINDS` array for ADR-0062 switch-UI hiding. Success: `cb(kinds[])`. |
 | `restart(cb)` | Activity-level restart via `FLAG_ACTIVITY_NEW_TASK \| FLAG_ACTIVITY_CLEAR_TASK`. Keeps the process alive (token memory state, OkHttp pool, disk cache preserved). The old `LynxActivity` is destroyed by `CLEAR_TASK`. Aligned with webview-side `ClientInfoPlugin.restart` (issue #120/#124). |
+| `httpGet(url, cb)` | Native HTTP GET for the lynx update-check (ADR-0065) — fetches `version.json` from a background thread pool with a response-body size cap (the lynx native runtime has no `fetch`). |
 
 Callback signatures follow the same null-free pattern as `PictelioSecureStorageModule` — `CallbackImpl` on real devices crashes on `null` arguments.
 
@@ -329,6 +330,13 @@ Custom Lynx image service implementing `ILynxImageService` — the sole image lo
 - **Singleton:** `getInstance()` returns the single `INSTANCE`; `onInitialize(context)` stores the Application context for lazy `PixivImageLoader` creation
 
 This replaces the unviable Fresco `lynx-service-image` dependency (see [Lynx SDK Dependency](#lynx-sdk-dependency)), because Fresco cannot inject the `Referer` header required by `i.pximg.net`.
+
+### Native Bitmap Memory Cache
+
+**Java:** [`ImageMemoryCache.java`](/packages/app/android/app/src/main/java/io/pictelio/app/ImageMemoryCache.java) + [`LruCache.java`](/packages/app/android/app/src/main/java/io/pictelio/app/LruCache.java) (new, #145/#147)
+**Tests:** `ImageMemoryCacheTest.java`, `LruCacheTest.java` (Robolectric)
+
+A native Bitmap LRU memory cache that accelerates second renders: decoded `Bitmap`s are cached in Java memory (LRU eviction) so re-visiting an image renders instantly instead of re-decoding from disk. Introduced alongside detail image quality tiers (default `medium`) that skip the original image for single-page works (#145/#146/#148).
 
 ### PictelioApp.java (full flavor)
 

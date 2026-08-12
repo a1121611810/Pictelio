@@ -16,8 +16,6 @@ tags: [architecture, pictelio, solidjs, capacitor, monorepo]
 | `pictelio-app` | `/packages/app/` | SolidJS SPA — the core application |
 | `pictelio-website` | `/packages/website/` | Astro landing page (GitHub Pages) |
 | `pictelio-app-lynx` | `/packages/app-lynx/` | vue-lynx MVP on ReactLynx runtime — parallel rendering client |
-| `@pictelio/ugoira` | `/packages/ugoira/` | Ugoira (Pixiv animation) zip frame processing library — fflate decompression, store-mode Range slicing |
-| `@pictelio/update-check` | `/packages/update-check/` | Shared update checker — version comparison, version.json fetching, timeout fallback; used by both app and app-lynx |
 
 Root `package.json` delegates all commands via `vp run --filter`. Build tooling uses **vite-plus** (`vp` CLI), which wraps Vite with oxlint, oxfmt, and vitest.
 
@@ -96,7 +94,7 @@ Key differences from TanStack Router:
 | Route | Component | Data Loading |
 |-------|-----------|-------------|
 | `/login` | `Login` | — |
-| `/home` | `HomePage` | All 4 tabs — recommended, follow, bookmarks, history — load data in `onMount` via `ensureLoaded` |
+| `/home` | `HomePage` | C-shell `SideNavShell` + 6 feed stores (recommended/follow/bookmarks × illust/novel); data loads via `ensureLoaded` in `useFeedActivation` |
 | `/illust/:id` | `IllustDetail` | `createEffect` on mount |
 | `/novel/:id` | `NovelDetail` | `createEffect` on mount |
 | `/me` | `PersonalCenter` | — |
@@ -111,7 +109,7 @@ Key differences from TanStack Router:
 | `/debug` | `DebugImage` | — |
 | `/client-switch` | `ClientSwitch` | Engine-switch info page (engine diff, warnings, loading mask); triggers restart via `ClientInfoPlugin` |
 | `/settings` | `Settings` | — |
-| `/layout-settings` | `LayoutSettings` | — |
+| `/scroll-restoration-confirm` | `ScrollRestorationConfirm` | Second-confirmation page before enabling persistent scroll restoration |
 | `/image-host` | `ImageHostSettings` | — |
 | `/image-cache` | `ImageCacheSettings` | — |
 | `/*all` | `HomePage` | Redirected to `/login` if unauthenticated via auth guard |
@@ -168,6 +166,22 @@ Pictelio enforces **Microsoft Fluent Design System 2**:
 - **Touch targets:** Minimum 40×40px
 - **Web Components:** Fluent badge, button, checkbox, dialog, divider, drawer, message-bar, radio, spinner, switch, textarea
 
+### A2 Cardization (ADR-0069 → ADR-0074)
+
+Since v4.x the app has rolled out a unified **"A2" card visual language** across the main client, then corrected it to the real Windows 11 / Fluent 2 spec (ADR-0074):
+
+| Dimension | Value (post-ADR-0074) |
+|-----------|-----------------------|
+| Card radius | 8px (`--borderRadiusXLarge`) |
+| Card border | 1px `--colorNeutralStroke1` |
+| Shadow | none (border + background layering instead) |
+| Card surface | `--colorNeutralBackground1` on `--colorNeutralBackground2` page |
+| Overlays/drawers | 16px (`--borderRadius3XLarge`) |
+
+The glass `NavBar` capsule remains a deliberately separate visual family (ADR-0044) and is **not** cardized. Canonical glossary: `docs/adr/glossary-ui-cards.md`.
+
+The parallel **app-lynx** client instead aligns to **Material Design 3** (M3) tokens/components (see [app-lynx](#app-lynx-vue-lynx-client)).
+
 Style is enforced via code review and documented in the CI linting pipeline.
 
 ## CSS Architecture
@@ -205,14 +219,16 @@ Font sizes use fluid `clamp(rem + vw)` via UnoCSS preflights, defined in `/packa
 
 - **Bundler:** [Rspeedy](https://github.com/lynx-family/rspeedy) (`@lynx-js/rspeedy`), a Lynx-optimized build tool
 - **CSS:** [Tailwind CSS v3](/packages/app-lynx/tailwind.config.ts) with `@lynx-js/tailwind-preset`, configured with `spacing` in `vw` and `fontSize` in `rpx` (see [ADR-0046](/docs/adr/ADR-0046-app-lynx-tailwind.md)). All 6 pages migrated from scoped CSS to Tailwind utilities (T2–T8).
-- **Design tokens:** Fluent 2 color palette adapted to Tailwind's semantic color scale
+- **Design tokens:** Color palette adapted to Tailwind's semantic color scale; components were systematically aligned to **Material Design 3** (M3) — FAB, chips, dialogs, snackbar, segmented buttons, pressed-state layers, and the official switch `handle-container` geometry (commit `bf3c4fb` and follow-ups)
 - **Responsive strategy:** Width/spacing/padding use `vw` (viewport-relative), font sizes use `rpx` (Lynx responsive pixels). Rationale in [ADR-0044](/docs/adr/ADR-0044-lynx-responsive-units.md) and [glossary-lynx-units](/docs/adr/glossary-lynx-units.md).
 
 ### Routing
 
 Uses a **hand-rolled in-memory router** (`/packages/app-lynx/src/router.ts`) rather than `vue-router`. Reason: `vue-router`'s `RouterView` renders empty in `vue-lynx` 0.5.1 + `web-core` 0.23.1 (verified empirically). Pattern matching logic is extracted to `/packages/app-lynx/src/routerCore.ts` for unit testability.
 
-Routes: `/login`, `/recommended`, `/illust/:id`, `/novels`, `/novel/:id`, `/me`.
+Routes: `/login`, `/recommended`, `/illusts`, `/illust/:id`, `/novels`, `/novel/:id`, `/user/:id`, `/user/:id/following`, `/user/:id/followers`, `/following`, `/bookmarks`, `/me`, `/update`, `/error`.
+
+The four global tabs (推荐 / 插画 / 小说 / 我的) are defined once in [`navTabs.ts`](/packages/app-lynx/src/components/navTabs.ts) and rendered by [`NavigationBar.vue`](/packages/app-lynx/src/components/NavigationBar.vue) (ADR-0064). The 插画 tab routes to the new `/illusts` page (`IllustList.vue`, recommended/following sub-tabs + waterfall). `/following` is retained as a route but is no longer reachable from the nav. `/update` (forced-update page) and `/error` (session-expiry page) both use `backBehavior: 'exit'` — the back key exits the app with no return path.
 
 **Initial route: `/recommended`** (first-frame content pattern, issues [#61](https://github.com/user/pixivizer/issues/61)/[#63](https://github.com/user/pixivizer/issues/63)). The default route was changed from `/login` to `/recommended` so that already-authenticated users see the recommended feed skeleton immediately on startup, eliminating the login-page flash. Unauthenticated users are redirected to `/login` by `initRouter`'s auth guard with replace semantics (no history push, preserving [ADR-0049](/docs/adr/ADR-0049-lynx-keepalive-page-cache.md) semantics).
 
@@ -258,6 +274,15 @@ Located in `/packages/app-lynx/src/api/`. Mirrors the main app's Pixiv API surfa
 In native mode, `execute()` dispatches to `PictelioApi.request()` (Java-side Bearer injection + 401 refresh) instead of `fetch`. OAuth login flows through `PictelioAuth.loginWithRefreshToken()` — the returned `userInfo` JSON includes user profile data and a rotated `refresh_token`, but **no `access_token`**, which is written directly into `PixivApiPlugin.accessToken` in the Java heap. JS never sees or stores the access token in native mode.
 
 The `illust.ts` module includes [`addBookmark`](/packages/app-lynx/src/api/illust.ts) and `deleteBookmark` functions (POST `/v2/illust/bookmark/add` and `/v1/illust/bookmark/delete`, default `restrict: public`), [ADR-0052](/docs/adr/ADR-0052-lynx-illust-bookmark.md).
+
+### Novel Body, Comments, Error & Update (v4.x)
+
+- **Mixed feed (`createMixFeed`):** [`createMixFeed.ts`](/packages/app-lynx/src/primitives/createMixFeed.ts) merges two remote paginated sources (illust 4:1 novel) into a single render stream with the same interface as single-source feeds; `Recommended.vue` migrated to it (ADR-0064).
+- **Novel body `requestRaw` gateway:** [`api/novel.ts`](/packages/app-lynx/src/api/novel.ts) fetches novel HTML through a new `apiClient.requestRaw` — web reuses `rewriteUrl`/Bearer logic, native routes through `PictelioApi` (Java attaches Bearer + 401 refresh), fixing build-mode failures where the JS heap has zero-knowledge `access_token` and relative proxy paths can't resolve.
+- **Comment module:** [`api/comment.ts`](/packages/app-lynx/src/api/comment.ts) + [`useComments.ts`](/packages/app-lynx/src/primitives/useComments.ts) + `CommentOverlay.vue`/`CommentInputBar.vue`/`CommentItem.vue` — a bottom-sheet comment UI with two entry points (illust + novel detail), backed by [`modalStack.ts`](/packages/app-lynx/src/stores/modalStack.ts) for modal stacking/close.
+- **Error presentation:** [`utils/errorPresentation.ts`](/packages/app-lynx/src/utils/errorPresentation.ts) provides in-page graded copy plus a full-screen session-expiry [`ErrorPage.vue`](/packages/app-lynx/src/pages/ErrorPage.vue) at `/error` (`backBehavior: 'exit'`).
+- **Update check:** [`stores/updateStore.ts`](/packages/app-lynx/src/stores/updateStore.ts) + [`UpdatePage.vue`](/packages/app-lynx/src/pages/UpdatePage.vue) implement the forced-update flow (shared `@pictelio/update-check` logic, native HTTP via `PictelioAppModule.httpGet`). The disable switch is dev-only — production builds always run the real check.
+- **Image quality & layout:** [`utils/imageQuality.ts`](/packages/app-lynx/src/utils/imageQuality.ts) (detail quality tiers, default `medium`) and [`utils/imageLayout.ts`](/packages/app-lynx/src/utils/imageLayout.ts) drive adaptive image sizing.
 
 ### Image Rendering & Loading States
 

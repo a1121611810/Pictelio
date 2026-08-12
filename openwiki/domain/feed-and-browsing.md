@@ -1,8 +1,8 @@
 ---
 type: Concept
 title: Feed & Browsing
-description: The illust and novel browsing system — recommended/following feeds with virtual scrolling, three layout modes, pull-to-refresh, R18 filtering, search, bookmarks, browsing history, and user profiles.
-tags: [feed, browsing, virtual-scroll, pixiv, masonry, waterfall]
+description: The illust and novel browsing system — a C-shell home page (SideNavShell side nav + single-column fixed L5 layout) backed by six TanStack Query feed stores, unified FeedList with pull-to-refresh and adaptive tag chips, plus secondary virtualized feeds, R18 filtering, search, bookmarks, browsing history, and user profiles.
+tags: [feed, browsing, virtual-scroll, pixiv, side-nav, a2-cardization]
 ---
 
 # Feed & Browsing
@@ -11,33 +11,35 @@ The feed and browsing system covers the primary user experience: discovering and
 
 ## Feed Architecture
 
-Two feed content types are rendered inside the consolidated **HomePage** (`/packages/app/src/routes/HomePage.tsx`) at the `/home` route. Navigation between all four tabs — recommended, follow, bookmarks, and history — is handled by **NavBar** (`/packages/app/src/components/NavBar.tsx`), which maps every tab to `/home` and uses in-page CSS display toggling via `currentTab()` (no router-level navigation between tabs). The standalone `/bookmarks` and `/history` routes were removed; bookmarks and history are now HomePage sub-components only.
+The home feed is rendered by **HomePage** (`/packages/app/src/routes/HomePage.tsx`) at `/home`, now structured as a **C shell + L5 fixed layout** (ADR-0075): a `SideNavShell` left icon rail drives navigation between the four content tabs (推荐/关注/收藏/历史), and a single-column content panel renders either illust or novel cards. The bottom `NavBar` is no longer rendered on the home page — navigation moved to `SideNavShell` — though `NavBar` remains in use on secondary pages (`UserIllusts`, `FollowListPage`).
 
-| Feed | Route | Component | Store(s) |
-|------|-------|-----------|----------|
-| Recommended (illusts) | `/home` (tab: recommended) | `RecommendedFeed` | `recommendedStore.ts` (new split store) |
-| Follow (illusts) | `/home` (tab: follow) | `FollowFeed` | `followStore.ts` (new split store) |
-| Bookmarks (illusts/novels) | `/home` (tab: bookmarks) | `BookmarksFeed` | `bookmarkStore.ts` (delegates to `IllustBookmarks`/`NovelBookmarks`) |
-| History | `/home` (tab: history) | `HistoryFeed` | `historyStore.ts` (TanStack DB, localStorage) |
-| Novel Feed (recommended) | `/home` (tab: recommended, novel mode) | `NovelFeedPage tab="recommended"` (embedded fallback) | `novelStore.ts` (legacy) |
-| Novel Feed (follow) | `/home` (tab: follow, novel mode) | `NovelFeedPage tab="follow"` (embedded fallback) | `novelStore.ts` (legacy) |
+Six feed stores back the six panel variants (3 tabs × illust/novel), all built on the shared `createTQFeedStore` factory:
 
-> **Illust stores — integrated (v3.21.x):** The illust feed split is now live. `RecommendedFeed` and `FollowFeed` import directly from the new split stores (`recommendedStore.ts` and `followStore.ts`). The legacy `feedStore.ts` remains in the codebase but is no longer imported by any route component. Shared helpers (`dedupIllusts`, `nextPageOrLoad`) live in `feedHelpers.ts`.
+| Tab | Illust store | Novel store | Card component |
+|-----|-------------|-------------|----------------|
+| recommended | `recommendedStore.ts` | `novelRecommendedStore.ts` | `IllustSingleCard` / `NovelRowCard` |
+| follow | `followStore.ts` | `novelFollowStore.ts` | `IllustSingleCard` / `NovelRowCard` |
+| bookmarks | `bookmarkStore.ts` | `novelBookmarkStore.ts` | `IllustSingleCard` / `NovelRowCard` |
+| history | (built into `SideNavShell`) | — | `HistoryRowCard` |
 
-> **Novel store split — integrated:** The monolithic `novelStore.ts` has been split and the split stores are now **imported by route components**. `NovelRecommendedFeed` and `NovelFollowFeed` import directly from `novelRecommendedStore.ts` and `novelFollowStore.ts`. `NovelBookmarks` imports from `novelBookmarkStore.ts`. The legacy `novelStore.ts` has been **deleted**. Shared helpers (`adaptNovelResponse`, `dedupNovels`) live in `novelHelpers.ts`.
+> **Data activation:** `ensureLoaded` is the single data-loading entry point (queries default `enabled: false` per ADR-0042). `activate` only sets a subscription flag — calling `activate` alone previously left the bookmarks/follow tabs empty (regression fixed by always running `ensureLoaded` + `activate` together in `useFeedActivation`).
+>
+> **FeedList unification (ADR-0078):** All six panels render through the shared `FeedList` container, which splits `refreshing` (pull-to-refresh) from `loadingMore` (pagination append). The skeleton overlay only triggers on `pullPhase === "refreshing"`, so pagination no longer flashes the skeleton.
+>
+> **Illust stores — integrated:** `recommendedStore.ts` and `followStore.ts` power the home illust panels; the legacy monolithic `feedStore.ts` was deleted. Shared helpers (`dedupIllusts`, `nextPageOrLoad`) live in `feedHelpers.ts`.
+>
+> **Novel store split — integrated:** `novelRecommendedStore.ts`, `novelFollowStore.ts`, and `novelBookmarkStore.ts` power the home novel panels; the legacy monolithic `novelStore.ts` was deleted. Shared helpers (`adaptNovelResponse`, `dedupNovels`) live in `novelHelpers.ts`.
 
-### HomePage (Consolidated Home)
+### HomePage (C Shell + L5)
 
-`/packages/app/src/routes/HomePage.tsx` — The single home page at `/home` replacing the old separate `/recommended`, `/following`, `/bookmarks`, and `/history` routes:
+`/packages/app/src/routes/HomePage.tsx` — the home page is now a thin shell delegating to `SideNavShell`:
 
-- **Shared sticky header** with user avatar, app title, and content-type toggle (illust / novel)
-- **Content type switching** toggles between illust feeds and novel feeds via `contentType()` from `uiStore` — **hidden on the history tab** (`currentTab() !== "history"`) since browsing history is text-based timeline
-- **Tab panels** use CSS `display` toggling (`currentTab() === "recommended" ? "block" : "none"`) — at most **2 feed components** are mounted at a time (LRU eviction via `isDomActive()`, commit `fcb2c6f`). When switching to a previously evicted tab, its component remounts and re-fetches data. Non-active tabs are unmounted to save memory.
-  - **Bookmarks tab:** Renders `BookmarksFeed` (`/packages/app/src/components/BookmarksFeed.tsx`), which delegates to `IllustBookmarks` (illust mode) or `NovelBookmarks` (novel mode) based on `contentType()`
-  - **History tab:** Renders `HistoryFeed` (`/packages/app/src/components/HistoryFeed.tsx`), a full browsing history timeline with inline search and date-range filtering, backed by `useLiveQuery` from TanStack DB
-- **Data loaded in `onMount`** (not via router loader): each feed component calls `ensureLoaded(signal)` with AbortController for cancel-on-unmount
-- **Splash dismiss:** Simple `onMount` → `markContentReady()`. The skeleton guarantee is now provided by **ADR-0042** (`createTQFeedStore` queries default `enabled: false`) and **ADR-0043** (`setTimeout(0)` defers data load to ensure skeleton paints before first fetch), rather than by delaying splash exit.
-- **No per-tab scroll preservation** — the custom scroll restoration system (`createScrollRestore`, `createVirtualScrollRestore`, `createFeedScrollStore`) has been deleted. Cross-navigation scroll restore is handled by `@solidjs/router`'s `<Router scrollRestoration>` prop, which uses sessionStorage keyed by history depth. Tab switches within `/home` do not restore scroll position.
+- **`SideNavShell`** (`/packages/app/src/components/home/SideNavShell.tsx`) provides a 56px sticky left icon rail (search entry + 推荐/关注/收藏/历史 tabs + settings/me avatar), a sticky page title + username subtitle, and the `ContentTypeToggle`. The history tab is built into the shell (`HistoryRowCard` list + clear button) rather than passed through `renderPanel`.
+- **Content panels** (`IllustFeedPanel` / `NovelFeedPanel`) map a tab to its feed store via `illustSource()` / `novelSource()`, then render a `FeedList` of `IllustSingleCard` (single-column large image) or `NovelRowCard` (56px row cards). `contentType()` from `uiStore` switches between illust and novel panels.
+- **Pagination** is driven by `nextUrl` + `fetchMore` through `FeedPaginationSentinel` (infinite-scroll sentinel), not a "Load more" button.
+- **Pull-to-refresh** (ADR-0076) is wired through `FeedList`'s `refreshMode="overlay"` → `store.refresh()` (refetch first page).
+- **Splash dismiss:** simple `onMount` → `markContentReady()`; skeleton guarantee via ADR-0042 (`enabled: false`) + ADR-0043 (`setTimeout(0)`).
+- **No per-tab scroll preservation** — cross-navigation scroll restore is handled by `@solidjs/router`'s `<Router scrollRestoration>` prop (sessionStorage keyed by history depth). Tab switches within `/home` do not restore scroll position.
 
 ### Feed Store Factory
 
@@ -76,64 +78,49 @@ Shared helpers migrated from `novelStore.ts` to `novelHelpers.ts`:
 
 ```mermaid
 flowchart LR
-    HP[HomePage /home] --> RF[RecommendedFeed]
-    HP --> FF[FollowFeed]
-    RF --> RS[recommendedStore]
-    FF --> FS[followStore]
+    HP[HomePage /home] --> SS[SideNavShell]
+    SS --> IP[IllustFeedPanel]
+    SS --> NP[NovelFeedPanel]
+    IP --> FL1[FeedList]
+    NP --> FL2[FeedList]
+    FL1 --> IC[IllustSingleCard]
+    FL2 --> NC[NovelRowCard]
+    IP --> RS[recommendedStore / followStore / bookmarkStore]
+    NP --> NS[novelRecommendedStore / novelFollowStore / novelBookmarkStore]
     RS --> TQ[createTQFeedStore]
-    FS --> TQ
+    NS --> TQ
     TQ --> QC[queryClient.ts]
     QC --> API[api/client.ts]
     API --> P[Pixiv API]
-    RF --> VF[VirtualFeed]
-    FF --> VF
-    VF --> IC[ImageCard / GridCard]
-    VF --> CFV[createFeedVirtualizer]
 ```
 
-### Sub-Tab Navigation (GlassTabBar)
+### Nav Components & Adaptive Tags
 
-Sub-tab selection across feeds uses the **GlassTabBar** component (`/packages/app/src/components/ui/GlassTabBar.tsx`), a frosted-glass segmented control with pointer-follow highlight and keyboard navigation ([ADR-0044](/docs/adr/ADR-0044-glass-tab-visual-language.md)). It replaces the earlier ad-hoc button-row implementations in all feed components:
+- **`SideNavShell`** — the home page's primary navigation (left icon rail). The selected tab highlights with a `BrandBackground2` rounded block. It reads/writes `currentTab` from `uiStore`, so entries from `PersonalCenter` ("我的收藏" → bookmarks) preset the initial tab.
+- **`ContentTypeToggle`** (`/packages/app/src/components/home/ContentTypeToggle.tsx`) — the 插画/小说 switch in the page header, hidden on the history tab.
+- **`NavBar`** (`/packages/app/src/components/NavBar.tsx`) — still used on secondary pages (`UserIllusts`, `FollowListPage`) but no longer on `/home`.
+- **`GlassTabBar`** (`/packages/app/src/components/ui/GlassTabBar.tsx`) and the standalone `RecommendedFeed`/`FollowFeed` components are no longer wired into the home page after the C-shell refactor (glass-tab adoption was rolled back to global nav only, #84).
+- **`AdaptiveTags`** (`/packages/app/src/components/home/AdaptiveTags.tsx`) + `adaptiveTagFit.ts` — renders an illust/novel's tag chips on a card and **imperatively truncates** them to one line: overflow chips collapse into a "+N" chip via a measured `max-width`. Built on `useContainerWidth` and the new [`viewportWidth`](/packages/app/src/primitives/viewportWidth.ts) primitive; the `adaptive-tags-240.test.ts` E2E regression guards narrow-viewport (240px) truncation.
 
-| Component | Route / Location | GlassTabBar Tabs | Purpose |
-|-----------|-----------------|------------------|---------|
-| `HomePage` | `/home` header | 插画 / 小说 | Content-type toggle (hidden on history tab) |
-| `RecommendedFeed` | `/home` (recommended tab) | 综合 / 插画 / 漫画 | Recommended illust sub-tab filter |
-| `FollowFeed` | `/home` (follow tab) | 全部 / 公开 / 非公开 | Follow illust visibility filter |
-| `NovelFollowFeed` | `/home` (follow tab, novel mode) | 全部 / 公开 / 非公开 | Follow novel visibility filter |
-| `UserIllusts` | `/user/:id/illusts` | 插画 / 漫画 / 小说 | User works segment switch |
+## Virtual Scrolling & Layout
 
-GlassTabBar supports two variants: **`segmented`** (all current usages — full-width equal segments) and **`capsule`** (default — pill-shaped with pointer-follow highlight). The pointer highlight effect is provided by the shared **`usePointerHighlight`** hook (`/packages/app/src/primitives/usePointerHighlight.ts`), which is also used by **NavBar** for its glass capsule visual. The hook tracks `pointermove`/`pointerleave` coordinates on the container and honors `prefers-reduced-motion: reduce` (no highlight layer when set).
+The home page renders **fixed single-column layouts** via `FeedList` (no masonry/grid mode switcher):
 
-ARIA compliance: `role="tablist"` container with `role="tab"` buttons, `aria-selected` on the active tab, roving `tabindex` (only the active tab is focusable), and ArrowLeft/ArrowRight keyboard navigation that stops at endpoints (no wrap).
+| Content type | Card | Layout |
+|--------------|------|--------|
+| Illust | `IllustSingleCard` | Single-column large image, original aspect ratio (corrected per ADR-0073) |
+| Novel | `NovelRowCard` | Single-column 56px row cards |
+| History | `HistoryRowCard` | Single-column A2 row card list |
 
-## Virtual Scrolling
+**`FeedList`** (`/packages/app/src/components/home/FeedList.tsx`, ADR-0078) is the unified home-feed container: it accepts a generic `FeedSource` (`items`/`loading`/`refreshing`/`loadingMore`/`nextUrl`/`fetchMore`/`refresh`), renders skeleton on refresh, an empty hint when done, a `FeedPaginationSentinel` for infinite scroll, and a pull-to-refresh overlay (`createPullToRefresh`).
 
-`/packages/app/src/primitives/createFeedVirtualizer.ts` — The core virtualizer for efficient rendering of large illust lists. It:
-- Manages a virtual window of visible items
-- Coordinates pull-to-refresh and infinite scroll
-- Supports three layout modes (waterfall, single, grid)
-- **Scroll restoration** is handled by `@solidjs/router`'s built-in `<Router scrollRestoration>` prop, backed by sessionStorage. The custom `createScrollRestore`, `createVirtualScrollRestore`, and `createFeedScrollStore` primitives have been **deleted** (working tree, commit `b30366f`). Scroll restoration is now automatic at the router level for cross-navigation — the virtualizer does not manage its own scroll position memory or retry logic. Per-tab scroll state within `/home` is no longer saved or restored. On login and age-confirmation, `sessionStorage.removeItem("solid-router:scroll")` clears the router's scroll cache to prevent stale position restoration after auth flow.
+**`createPullToRefresh`** (`/packages/app/src/primitives/createPullToRefresh.ts`, ADR-0076) provides the home page's six-panel pull-to-refresh with an A1 overlay mask; `createFastScrollbar` serves the novel detail page (see [Novel Reader](/openwiki/domain/novel-reader.md)).
 
-**`VirtualFeed`** (`/packages/app/src/components/VirtualFeed.tsx`) is the reusable component accepting props:
-- `illusts`, `loading`, `error`, `hasMore` — data state
-- `onIllustClick`, `onAuthorClick`, `onLoadMore`, `onRefresh` — callbacks
-- `layoutMode` — `waterfall` | `single` | `grid`
-- `emptyText`, `skipAnimation`, `onNavigateToSettings`
+**Secondary virtualized feeds** still use the older `VirtualFeed` + `createFeedVirtualizer` stack with three layout modes (waterfall/single/grid): `IllustBookmarks`, `UserWorksFeed`, and the novel `NovelRecommendedFeed`/`NovelFollowFeed`/`NovelBookmarks` routes (via `NovelVirtualFeed`). The home feed itself no longer uses `createFeedVirtualizer`.
 
-**Empty-state & skeleton fix (`loadAttempted`, v3.21.6+):** VirtualFeed tracks a component-level `loadAttempted` boolean that becomes `true` once `loading`, `error`, or `illusts.length > 0` is observed.
-- The "暂无新作品" empty-text message only renders when `loadAttempted` is `true` — preventing an empty-state flash before the first data load completes.
-- The skeleton `<div>` now renders when either `loading` is `true` **or** `loadAttempted` is `false` (commit `fa2015c`). This ensures the skeleton fills the viewport even in the brief window before TanStack Query begins its first fetch — when `loading` is still `false` and no data or error has been observed. Previously this gap could show a blank area.
+**`VirtualFeed`** (`/packages/app/src/components/VirtualFeed.tsx`) accepts `illusts`/`loading`/`error`/`hasMore` data state, `onIllustClick`/`onAuthorClick`/`onLoadMore`/`onRefresh` callbacks, a `layoutMode` (`waterfall` | `single` | `grid`), and `emptyText`/`skipAnimation`/`onNavigateToSettings`. It tracks a component-level `loadAttempted` flag: the "暂无新作品" empty message renders only when `loadAttempted` is `true`, and the skeleton renders while `loading` is `true` **or** `loadAttempted` is `false` (prevents an empty-state flash before the first fetch). Scroll restoration is handled by `@solidjs/router`'s `<Router scrollRestoration>` prop; the custom `createScrollRestore`/`createVirtualScrollRestore`/`createFeedScrollStore` primitives were deleted (commit `b30366f`).
 
-## Layout Modes
-
-| Mode | Columns | Card Component | Description |
-|------|---------|----------------|-------------|
-| `waterfall` | 2 | `ImageCard` | Masonry layout with variable-height cards |
-| `single` | 1 | `ImageCard` | Single-column scroll, largest thumbnails |
-| `grid` | 3 | `GridCard` | Uniform grid with compact cards |
-
-`ImageCard` (`/packages/app/src/components/ImageCard.tsx`) handles image loading with skeleton shimmer, author info, bookmark button, and follow/unfollow. `GridCard` is a compact variant.
+`ImageCard` (`/packages/app/src/components/ImageCard.tsx`) and `GridCard` (`GridCard.tsx`) remain the card components for these secondary virtualized feeds (image loading, skeleton shimmer, author info, bookmark button).
 
 ## R18 Filtering & Age Confirmation
 
@@ -158,13 +145,9 @@ User settings control visibility of each tier. An **AgeConfirmation** gate (`/pa
 
 ## Bookmarks
 
-Bookmarks is no longer a standalone route. The **bookmarks tab** inside `/home` renders `BookmarksFeed` (`/packages/app/src/components/BookmarksFeed.tsx`), which delegates to:
-- `/packages/app/src/routes/IllustBookmarks.tsx` — Illust bookmark list (when `contentType() === "illust"`)
-- `/packages/app/src/routes/NovelBookmarks.tsx` — Novel bookmark list (when `contentType() === "novel"`)
+Bookmarks is no longer a standalone route. The **bookmarks tab** inside `/home` renders `IllustSingleCard`/`NovelRowCard` lists backed directly by `bookmarkStore` / `novelBookmarkStore` (via the `IllustFeedPanel`/`NovelFeedPanel` mapping). The older `BookmarksFeed` component and the `IllustBookmarks`/`NovelBookmarks` route components still exist but are no longer embedded in the home page. The `PersonalCenter` "My Bookmarks" link navigates to `/home` with `setCurrentTab("bookmarks")`.
 
-These sub-pages are still full route components but are embedded inside `HomePage` rather than mounted at their own route. The `PersonalCenter` "My Bookmarks" link now navigates to `/home` with `setCurrentTab("bookmarks")`.
-
-Bookmark state is managed by `/packages/app/src/stores/bookmarkStore.ts`, which integrates with the Pixiv API and drive, also a `bookmarkStore` that toggles bookmarks with optimistic UI updates.
+Bookmark state is managed by `/packages/app/src/stores/bookmarkStore.ts` (illusts) and `novelBookmarkStore.ts` (novels), which integrate with the Pixiv API and toggle bookmarks with optimistic UI updates.
 
 ## Author Click Navigation
 
@@ -205,16 +188,9 @@ Route Page (navigate) → VirtualFeed (prop pass-through)
 - Lazy expiry: entries older than 30 days cleared on write
 - `historyVersion` signal acts as a non-reactive invalidation token
 
-**History tab:** The history tab inside `/home` renders `HistoryFeed` (`/packages/app/src/components/HistoryFeed.tsx`), a full browsing history timeline with:
-- **Timeline view:** Entries grouped by date headers, sorted oldest-first within each day
-- **Inline search:** Debounced 300ms search input with highlighted match `<mark>` elements
-- **Date-range filtering:** Start/end date inputs with memoized timestamp conversion
-- **Clear all:** Confirmation dialog before clearing all history
-- **Author click navigation:** Author names are clickable per [ADR-0032](/docs/adr/ADR-0032-author-click-navigation.md); old entries without `authorId` degrade gracefully to plain text
-- **R18/R18G filtering:** Respects user's adult content settings and filters out entries exceeding those thresholds
-- **Virtual scroll:** Offloaded to `useLiveQuery` with conditional `where` clauses — the content-type toggle is hidden on the history tab since browsing history is a single text-based timeline
+**History tab:** The history tab is now built into `SideNavShell` (`SideNavShell.tsx` `HistoryPanel`) rather than rendered via a separate `HistoryFeed` route component. It renders an A2 `HistoryRowCard` list (sorted by `visitedAt` descending) with a clear-all button and empty state, reading `historyCollection` filtered by `userId`. The older `HistoryFeed` component still exists but is no longer wired into `/home`. History entries retain author click navigation per [ADR-0032](/docs/adr/ADR-0032-author-click-navigation.md); old entries without `authorId` degrade gracefully to plain text.
 
-The `contentType()` toggle from `uiStore` is hidden on the history tab (`<Show when={currentTab() !== "history"}>` in `HomePage.tsx`) — history is displayed as a single unified timeline regardless of content type.
+The `contentType()` toggle from `uiStore` is hidden on the history tab — history is displayed as a single unified timeline regardless of content type.
 
 ## User Pages
 
@@ -231,20 +207,26 @@ User profile data is loaded via `/packages/app/src/primitives/useUserProfile.ts`
 
 | Purpose | Path |
 |---------|------|
-| Home page (consolidated) | `/packages/app/src/routes/HomePage.tsx` |
-| Recommended feed component | `/packages/app/src/components/RecommendedFeed.tsx` |
-| Follow feed component | `/packages/app/src/components/FollowFeed.tsx` |
+| Home page (C shell + L5) | `/packages/app/src/routes/HomePage.tsx` |
+| Side nav shell | `/packages/app/src/components/home/SideNavShell.tsx` |
+| Unified feed list | `/packages/app/src/components/home/FeedList.tsx` |
+| Illust single card | `/packages/app/src/components/home/IllustSingleCard.tsx` |
+| Novel row card | `/packages/app/src/components/home/NovelRowCard.tsx` |
+| History row card | `/packages/app/src/components/home/HistoryRowCard.tsx` |
+| Adaptive tags | `/packages/app/src/components/home/AdaptiveTags.tsx` |
+| Pagination sentinel | `/packages/app/src/components/home/FeedPaginationSentinel.tsx` |
+| Pull-to-refresh primitive | `/packages/app/src/primitives/createPullToRefresh.ts` |
 | Recommended store | `/packages/app/src/stores/recommendedStore.ts` |
 | Follow store | `/packages/app/src/stores/followStore.ts` |
 | TQ feed store factory | `/packages/app/src/stores/shared/createTQFeedStore.ts` |
 | Feed helpers | `/packages/app/src/stores/shared/feedHelpers.ts` |
-| Virtual feed component | `/packages/app/src/components/VirtualFeed.tsx` |
-| Feed virtualizer | `/packages/app/src/primitives/createFeedVirtualizer.ts` |
-| Image card | `/packages/app/src/components/ImageCard.tsx` |
-| Grid card | `/packages/app/src/components/GridCard.tsx` |
-| Nav bar (tab router) | `/packages/app/src/components/NavBar.tsx` |
-| Bookmarks feed component | `/packages/app/src/components/BookmarksFeed.tsx` |
-| History feed component | `/packages/app/src/components/HistoryFeed.tsx` |
+| Virtual feed component (secondary feeds) | `/packages/app/src/components/VirtualFeed.tsx` |
+| Feed virtualizer (secondary feeds) | `/packages/app/src/primitives/createFeedVirtualizer.ts` |
+| Image card (secondary feeds) | `/packages/app/src/components/ImageCard.tsx` |
+| Grid card (secondary feeds) | `/packages/app/src/components/GridCard.tsx` |
+| Nav bar (secondary pages) | `/packages/app/src/components/NavBar.tsx` |
+| Bookmarks feed component (legacy) | `/packages/app/src/components/BookmarksFeed.tsx` |
+| History feed component (legacy) | `/packages/app/src/components/HistoryFeed.tsx` |
 | Search page | `/packages/app/src/routes/Search.tsx` |
 | Search store | `/packages/app/src/stores/searchStore.ts` |
 | History store | `/packages/app/src/stores/historyStore.ts` |
