@@ -111,9 +111,9 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("AdaptiveTags 240px 窄容器�
       );
       console.log("TAG-ROWS:", data);
       const raw = (data ?? "").trim();
-      const rows = JSON.parse(
-        (raw.startsWith('"') ? JSON.parse(raw) : raw) as string,
-      ) as Array<Record<string, unknown>>;
+      const rows = JSON.parse((raw.startsWith('"') ? JSON.parse(raw) : raw) as string) as Array<
+        Record<string, unknown>
+      >;
       expect(rows.length).toBeGreaterThan(0);
 
       // 断言：无溢出 + 有 +N 的行 +N 在容器内（用户症状：第二个完整、+N 被撑出）
@@ -126,16 +126,12 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("AdaptiveTags 240px 窄容器�
       const partialRows = rows.filter((r) => r.partialMax != null);
       const ellipsisRows = partialRows.filter(
         (r) =>
-          typeof r.pScroll === "number" &&
-          typeof r.pClient === "number" &&
-          r.pScroll > r.pClient,
+          typeof r.pScroll === "number" && typeof r.pClient === "number" && r.pScroll > r.pClient,
       );
       console.log(
         `标签行 ${rows.length}，截断 chip ${partialRows.length} 行，省略号生效 ${ellipsisRows.length} 行`,
       );
-      expect(partialRows.length, "240px 下应有截断 chip（第二个标签点点点）").toBeGreaterThan(
-        0,
-      );
+      expect(partialRows.length, "240px 下应有截断 chip（第二个标签点点点）").toBeGreaterThan(0);
     } finally {
       await driver.close().catch(() => {});
     }

@@ -51,6 +51,17 @@ resolutionMode: time-based
 allowedDeprecatedVersions:
   request: "*"
 
+# ── 依赖覆盖 ──
+
+# 对齐 lynx 工具链 peer 声明（不触碰 T1 锁定的 web-core@0.23.1）：
+# - css-serializer@0.1.7 = web-core@0.23.1 的 devDep/peer 声明版本（上游测试矩阵）
+# - template-webpack-plugin@0.11.0 = css-extract-webpack-plugin@0.7.1 的 peer 声明版本
+# 消除 `pnpm peers check` 的两条警告（源自 template-webpack-plugin@0.10.9 发版时的
+# 上游 packaging 不一致，详见 ADR-0080）
+overrides:
+  "@lynx-js/css-serializer": "0.1.7"
+  "@lynx-js/template-webpack-plugin": "0.11.0"
+
 # ── 开发体验 ──
 
 # 跨平台 bash 模拟（Windows/Mac/Linux 脚本统一）
