@@ -13,8 +13,8 @@
     <img src="https://img.shields.io/badge/SolidJS-1.9.14-2c4f7c?logo=solid" alt="SolidJS">
     <img src="https://img.shields.io/badge/TypeScript-6.0.3-3178C6?logo=typescript" alt="TypeScript">
     <img src="https://img.shields.io/badge/UnoCSS-66.7.5-333333?logo=unocss" alt="UnoCSS">
-    <img src="https://img.shields.io/badge/Capacitor-8.4.2-119EFF?logo=capacitor" alt="Capacitor">
-    <img src="https://img.shields.io/badge/Vite-8.1.5-646CFF?logo=vite" alt="Vite">
+    <img src="https://img.shields.io/badge/Capacitor-8.5.0-119EFF?logo=capacitor" alt="Capacitor">
+    <img src="https://img.shields.io/badge/Vite-8.2.1-646CFF?logo=vite" alt="Vite">
     <br>
     <img src="https://img.shields.io/badge/PRs-welcome-brightgreen" alt="PRs Welcome">
   </p>
@@ -48,7 +48,7 @@
 - **Browse** — Recommended and Following feeds for both illustrations and novels
 - **Illust Detail** — Full-resolution images, multi-page support, Ugoira animated playback
 - **Novel Reader** — Virtualized text layout, keyword search, series navigation with reading progress
-- **Layout Modes** — Waterfall masonry, single column, or grid
+- **Layout Modes** — Waterfall masonry, single column, or grid on secondary feeds (the main feed is a fixed single-column L5 layout)
 - **Social** — Bookmark, comment, follow/unfollow artists
 - **Content Control** — Age gate on first launch, R18/R18G blurred filtering
 - **Theme** — Light, Dark, and System-follow themes
@@ -57,7 +57,7 @@
 
 ## Quick Start
 
-**Prerequisites:** Node.js 20.19+, pnpm 11.9.0
+**Prerequisites:** Node.js 22.22.2+, pnpm 11.9.0
 
 ```bash
 pnpm install
@@ -84,7 +84,7 @@ See [`docs/platform-compatibility.md`](docs/platform-compatibility.md) for platf
 
 ## Tech Stack
 
-**Framework** SolidJS · **Routing** TanStack Router · **Data** TanStack Query · **DB** TanStack DB · **Virtual** TanStack Virtual · **Build** Vite + vite-plus · **Style** UnoCSS + Fluent Design 2 · **Mobile** Capacitor · **Test** Vitest · **Type** TypeScript 6 (strict)
+**Framework** SolidJS · **Routing** SolidJS Router · **Data** TanStack Query · **DB** TanStack DB · **Virtual** TanStack Virtual · **Build** Vite + vite-plus · **Style** UnoCSS + Fluent Design 2 · **Mobile** Capacitor · **Test** Vitest · **Type** TypeScript 6 (strict)
 
 ---
 
@@ -96,6 +96,7 @@ pixivizer/
 │   ├── app/               # SolidJS SPA (src/ → api, components, routes, stores, styles, utils, native, primitives, services, settings, types)
 │   ├── app-lynx/          # vue-lynx MVP client (login / recommended / novel / profile / engine switch)
 │   ├── ugoira/            # @pictelio/ugoira — Ugoira frame-processing library
+│   ├── update-check/      # @pictelio/update-check — shared update-check library (webview + lynx)
 │   └── website/           # Astro landing page (src/ → pages, layouts, styles)
 ├── docs/                  # Architecture docs, release guides, privacy policy
 ├── scripts/               # Deploy & utility scripts

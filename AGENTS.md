@@ -4,10 +4,10 @@
 
 ## 项目概览
 
-- **技术栈**: SolidJS 1.9 + TypeScript 6.0 (strict) + Vite 8.0 + UnoCSS 66.7 + Capacitor 8.4；小说正文布局使用 `@chenglou/pretext`
-- **Monorepo**: pnpm workspace，含四个子包：`pictelio-app`（SolidJS SPA 主体）、`pictelio-app-lynx`（vue-lynx 客户端 MVP）、`@pictelio/ugoira`（Ugoira 动图帧处理库）和 `pictelio-website`（Astro 落地页）
-- **入口**: `packages/app/src/main.tsx`（bootstrap：settings 同步、Fluent 主题、渲染、auth 恢复）→ `packages/app/src/App.tsx` → `packages/app/src/router.tsx`（TanStack Router，路由定义与 App 分离；`src/startup.ts` 为预留启动钩子，当前为空实现）
-- **路由**: `/login` `/home` `/illust/$id` `/debug` `/novel/$id` `/search` `/me` `/about` `/image-host` `/image-cache` `/layout-settings` `/settings` `/age-confirmation` `/user/$id` `/user/$id/illusts` `/user/$id/following` `/user/$id/followers` `/my/followers`（其余路径 catch-all 到 `/home`）
+- **技术栈**: SolidJS 1.9 + TypeScript 6.0 (strict) + Vite 8.2 + UnoCSS 66.7 + Capacitor 8.5；小说正文布局使用 `@chenglou/pretext`
+- **Monorepo**: pnpm workspace，含五个子包：`pictelio-app`（SolidJS SPA 主体）、`pictelio-app-lynx`（vue-lynx 客户端 MVP）、`@pictelio/ugoira`（Ugoira 动图帧处理库）、`@pictelio/update-check`（更新检查共享库）和 `pictelio-website`（Astro 落地页）
+- **入口**: `packages/app/src/main.tsx`（bootstrap：settings 同步、Fluent 主题、渲染、auth 恢复）→ `packages/app/src/App.tsx` → `packages/app/src/router.tsx`（@solidjs/router，路由定义与 App 分离；`src/startup.ts` 为预留启动钩子，当前为空实现）
+- **路由**: `/login` `/home` `/illust/$id` `/debug` `/novel/$id` `/search` `/me` `/about` `/image-host` `/image-cache` `/settings` `/client-switch` `/age-confirmation` `/scroll-restoration-confirm` `/user/$id` `/user/$id/illusts` `/user/$id/following` `/user/$id/followers` `/my/followers`（其余路径 catch-all 直接渲染 `/home`）
 - **设计系统**: **强制** Microsoft Fluent Design System 2 — 所有视觉和交互决策基于 Fluent 令牌和规范（详见「Fluent Design 规范」章节）
 - **Pixiv API**: 自建 HTTP 客户端 (`src/api/client.ts` + `src/api/queryClient.ts`)，双模式（Web: fetch + Vite 代理，`devAccessToken` 编译期保护 / Native: Capacitor bridge → `PixivApiPlugin`，见 `src/native/PixivApi.ts`），iOS OAuth 凭证策略（Android 已弃用），401 自动刷新 + 防死循环
 - **CSS 架构**: 分层加载 `reset.css` → `tokens.css` → `base.css` → `virtual:uno.css` → `novel-reader.css`；字号通过 UnoCSS preflights 以流体 `clamp(rem + vw)` 定义（见 `uno.config.ts`），无需构建期转换；Fluent Web Components 主题同步
@@ -213,6 +213,10 @@ pixivizer/
 │   │   ├── src/                 # fflate 解压 / store 模式 Range 切片
 │   │   ├── tests/
 │   │   └── package.json
+│   ├── update-check/            # @pictelio/update-check — 更新检查共享库（版本比较/version.json 拉取/超时兜底，ADR-0065）
+│   │   ├── src/                 # index.ts（webview 与 lynx 双客户端共用）
+│   │   ├── tests/
+│   │   └── package.json
 │   └── website/                 # pictelio-website — Astro 落地页
 │       ├── src/                 # Astro 页面源码
 │       │   └── pages/           # Astro 路由页面
@@ -294,25 +298,24 @@ packages/app/src/
 │   └── userStore.ts    # 用户状态
 ├── routes/             # 页面组件（路由定义在独立的 src/router.tsx）
 │   ├── __root.tsx              # 路由根布局（NavBar、页面过渡、主题/年龄确认恢复、全局监听）
-│   ├── HomePage.tsx            # 首页（Tab 容器：推荐/关注 + 瀑布流）
+│   ├── HomePage.tsx            # 首页（C shell：SideNavShell + 六个 Feed 面板）
 │   ├── Login.tsx               # 登录页（refresh_token / 用户名密码 / PKCE）
 │   ├── AgeConfirmation.tsx     # 年龄确认页
 │   ├── IllustDetail.tsx        # 作品详情（大图查看、多页、动图播放、楼梯式浏览）
 │   ├── NovelDetail.tsx         # 小说详情（正文虚拟化、搜索高亮、阅读进度）
-│   ├── NovelRecommendedFeed.tsx # 推荐小说 Feed 页
-│   ├── NovelFollowFeed.tsx     # 关注小说 Feed 页
-│   ├── NovelBookmarks.tsx      # 小说收藏页
-│   ├── IllustBookmarks.tsx     # 插画收藏页
 │   ├── Search.tsx              # 搜索页（作品/用户/小说）
 │   ├── FollowListPage.tsx      # 关注/粉丝列表页（mode=following/followers）
 │   ├── PersonalCenter.tsx      # 个人中心 / 用户主页（根据路由参数区分）
 │   ├── UserIllusts.tsx         # 用户作品列表页
 │   ├── Settings.tsx            # 设置页
-│   ├── LayoutSettings.tsx      # 布局设置页
+│   ├── ClientSwitch.tsx        # 引擎切换信息页（ADR-0064）
+│   ├── ScrollRestorationConfirm.tsx # 滚动恢复二次确认
 │   ├── ImageHostSettings.tsx   # 图片托管设置页
 │   ├── ImageCacheSettings.tsx  # 图片缓存设置页
 │   ├── About.tsx               # 关于页
-│   └── DebugImage.tsx          # 图片调试页
+│   ├── DebugImage.tsx          # 图片调试页
+│   ├── NovelRecommendedFeed.tsx / NovelFollowFeed.tsx / NovelBookmarks.tsx / IllustBookmarks.tsx # 首页 Feed 面板（非独立路由，被 RecommendedFeed/FollowFeed/BookmarksFeed 引用）
+│   └── ...
 ├── components/         # 可复用 UI 组件
 │   ├── AgeGate.tsx              # 年龄门槛组件
 │   ├── BlocklistSheet.tsx       # 屏蔽列表面板
@@ -334,7 +337,7 @@ packages/app/src/
 │   ├── LoadingSpinner.tsx       # 加载动画
 │   ├── NavBar.tsx               # 顶部导航栏（自动隐藏）
 │   ├── NovelCard.tsx            # 小说卡片
-│   ├── NovelCoverHeader.tsx / NovelFooterNav.tsx # 小说封面头部/底部导航
+│   ├── NovelFooterNav.tsx       # 小说底部导航
 │   ├── NovelSearchBar.tsx       # 小说搜索栏
 │   ├── NovelTextListCard.tsx    # 小说文本列表卡片（纯渲染，无测量）
 │   ├── NovelVirtualFeed.tsx     # 小说虚拟滚动 Feed（textList / coverWall）
@@ -357,10 +360,15 @@ packages/app/src/
 │   ├── UserAvatar.tsx           # 用户头像组件
 │   ├── UserWorksFeed.tsx        # 用户作品瀑布流
 │   ├── VirtualFeed.tsx          # 虚拟滚动 Feed 容器
-│   ├── settings/                # 设置页子组件（SettingsAccount/Appearance/Client/Content/Dialogs/Image/Translate）
+│   ├── home/                    # C shell 专属（SideNavShell、FeedList、IllustSingleCard、NovelRowCard、AdaptiveTags、FeedPaginationSentinel 等）
+│   ├── illust/                  # 详情页专属（DetailHeader、DetailCard、BottomActionBar）
+│   ├── me/                      # 个人中心专属（Avatar、MenuRow）
+│   ├── novel/                   # 小说阅读器专属（NovelTopBar、NovelCoverCard）
+│   ├── settings/                # 设置页子组件（SettingsAccount/Appearance/Card/Client/Content/Dialogs/Image/Sections/Translate、LogoutRow）
 │   ├── skeletons/               # 骨架屏（Feed/Grid/IllustDetail/List/NovelDetail/Profile）
-│   └── ui/                      # 基础 UI（FluentDialog、FluentIcon、GlassTabBar、HeartIcon、TagInput）
+│   └── ui/                      # 基础 UI（FluentDialog、FluentIcon、GlassTabBar、HeartIcon、InlineRetryBar、StickySubTabs、TagInput）
 ├── primitives/         # 底层抽象（无 UI 的逻辑单元）
+│   ├── createFastScrollbar.ts    # 快速滚动条原语
 │   ├── createFeedVirtualizer.ts  # Feed 虚拟滚动窗口管理
 │   ├── createImageSizeWorker.ts  # 图片尺寸 Web Worker 通信封装
 │   ├── createManualFetch.ts      # 手动 fetch 封装（AbortController 管理）
@@ -369,6 +377,7 @@ packages/app/src/
 │   ├── createNovelTextLayout.ts  # 小说正文纯文本布局（pretext）
 │   ├── createNovelTranslator.ts  # 小说 AI 翻译流程
 │   ├── createNovelVirtualLayout.ts # 小说正文虚拟化窗口管理
+│   ├── createPullToRefresh.ts    # 下拉刷新原语（ADR-0076）
 │   ├── createScrollDirection.ts / createScrollDrivenVisibility.ts / createScrolledPast.ts # 滚动方向/可见性原语
 │   ├── imageSize.worker.ts       # Web Worker 图片尺寸计算
 │   ├── isPretextSupported.ts     # pretext 运行环境检测
@@ -381,7 +390,9 @@ packages/app/src/
 │   ├── useComments.ts            # 评论数据原语
 │   ├── useContainerWidth.ts      # 容器宽度响应式 Hook
 │   ├── useDetailData.ts          # 详情数据原语
+│   ├── usePointerHighlight.ts    # 指针高亮原语
 │   ├── useUserProfile.ts         # 用户资料原语
+│   ├── viewportWidth.ts          # 视口宽度原语（小说 autoFontSize）
 │   └── visibility/               # 可见性/哨兵原语
 │       ├── everVisible.ts        # 一次性可见性（基于 @solid-primitives/intersection-observer）
 │       ├── index.ts              # 导出
@@ -397,7 +408,7 @@ packages/app/src/
 │   ├── backGestureService.ts # Android 返回手势动画服务
 │   ├── imageHostService.ts # 自定义图片托管服务
 │   └── updateService.ts   # 应用更新检查服务
-├── settings/           # 设置系统（registry、codecs、types、backends/localStorage|memory|mirrored|preferences）
+├── settings/           # 设置系统（index、registry、codecs、types、backends/localStorage|memory|mirrored|preferences）
 └── utils/              # 工具函数
     ├── clientSwitch.ts       # 客户端引擎切换
     ├── createDedupedRequest.ts # 去重请求工具
@@ -455,7 +466,7 @@ packages/app/src/
 
 - **Masonry 瀑布流**: 通过 `createImageSizeWorker.ts` + `imageSize.worker.ts`（Web Worker）异步计算图片尺寸，驱动瀑布流布局，避免阻塞主线程。
 - **虚拟滚动**: `createFeedVirtualizer.ts` 计算可见窗口（startIndex/endIndex），仅渲染视口内 + overscan 范围的卡片；`createManualFetch.ts` 管理分页数据请求。
-- **三种布局模式**: 瀑布流（2 列）、单列（1 列）、网格（3 列），可切换并持久化。
+- **布局模式**: 主 Feed（首页）固定 L5 单列布局，布局模式切换器已移除（ADR-0075）；瀑布流（2 列）/单列（1 列）/网格（3 列）仅存于次级 Feed（收藏/用户作品/小说 Feed），可切换并持久化。
 
 ### 年龄限制与内容过滤
 
@@ -617,16 +628,16 @@ Grill 澄清 → to-spec → to-tickets → implement
   - `src/**/*.test.ts` — 辅助函数/内部模块的就近测试
 - **单元测试覆盖**（`tests/unit/`）:
   - `api/` — 13 测试文件（auth、client、client401Retry、client429Retry、comment、illust、novel、pkceAuth、queryKeys、search、translate、user、userAgent）
-  - `components/` — 5 文件（FluentDialog、FluentDialogProbe、GlassTabBar、SettingsSwitchClient、ThemeSelector）
-  - `primitives/` — 9 文件（createFeedVirtualizer、createManualFetch、createNovelSearch、createNovelTextLayout、createNovelTranslator、novelTextLayoutCache、useCardInteractions、useComments、useDetailData）
-  - `routes/` — NovelDetail
-  - `scripts/` — 2 文件（release-overwrite、release-utils）
-  - `services/` — 3 文件（backGestureService、imageHostService、updateService）
+  - `components/` — 13 文件（顶层 12 + `home/` 1；含 FluentDialog、SideNavShell、IllustSingleCard、ThemeSelector 等）
+  - `primitives/` — 11 文件（createFeedVirtualizer、createManualFetch、createNovelSearch、createNovelTranslator、novelTextLayoutCache、useCardInteractions、useComments、useDetailData、createFastScrollbar、createPullToRefresh 等）
+  - `routes/` — 2 文件（NovelDetail、ClientSwitch）
+  - `scripts/` — 7 文件（release-overwrite、release-utils、changelog、proxy-probe、release-panel、release-uploader、upload-release-assets）
+  - `services/` — 2 文件（backGestureService、imageHostService）
   - `settings/` — registry
   - `stores/` — 24 文件（覆盖所有 store + shared）
   - `utils/` — 14 文件（含 `.native.test.ts`）
   - 根测试 — PersonalCenter、router、startup
-- **E2E 测试**: 10 个 spec —— agent-browser 5 个（main-flow、sub-flows、translation-flow、update-flow、route-switch-instant）+ android-e2e 5 个（smoke、client-kind-contract、switch-client 系列）
+- **E2E 测试**: 12 个 spec —— agent-browser 6 个（main-flow、sub-flows、translation-flow、update-flow、route-switch-instant、adaptive-tags-240）+ android-e2e 6 个（smoke、client-kind-contract、switch-client-oneway/roundtrip/roundtrip-low/roundtrip-3x）
 - `passWithNoTests: true` — 允许空测试文件不报错
 
 ### 测试硬约束（违反视为架构违规）
@@ -649,7 +660,7 @@ Grill 澄清 → to-spec → to-tickets → implement
 
 ## 注意事项
 
-- **路由数据规则**：路由级异步数据统一通过 `@tanstack/solid-router` 的 `loader` 获取；组件内局部异步仍使用 `createSignal` + `createEffect` + 手动 fetch（带 AbortController）。`createResource` 不用于路由组件。
+- **路由数据规则**：`@solidjs/router` 无 loader/Suspense，路由级数据由路由组件内获取（`useParams`/`useLocation` + `createEffect` + 手动 fetch 或 TanStack Query 按需查询），不阻塞渲染（遵循「先渲染后加载」硬约束）；组件内局部异步仍使用 `createSignal` + `createEffect` + 手动 fetch（带 AbortController）。`createResource` 不用于路由组件。
 
 ## 任务完成前自检
 
