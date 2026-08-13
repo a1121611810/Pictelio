@@ -4,12 +4,14 @@ import { createSearchStore } from "@/stores/searchStore";
 
 const mockSearchIllust = vi.fn();
 const mockSearchNovel = vi.fn();
+const mockSearchIllustNext = vi.fn();
+const mockSearchNovelNext = vi.fn();
 
 vi.mock("@/api/search", () => ({
   searchIllust: (...args: unknown[]) => mockSearchIllust(...args),
   searchNovel: (...args: unknown[]) => mockSearchNovel(...args),
-  searchIllustNext: vi.fn(),
-  searchNovelNext: vi.fn(),
+  searchIllustNext: (...args: unknown[]) => mockSearchIllustNext(...args),
+  searchNovelNext: (...args: unknown[]) => mockSearchNovelNext(...args),
 }));
 
 describe("searchStore executeSearch", () => {
@@ -102,6 +104,39 @@ describe("searchStore executeSearch", () => {
       expect(store.results()).toHaveLength(1);
       expect(store.loading()).toBe(false);
       expect(store.hasMore()).toBe(true);
+
+      dispose();
+    });
+  });
+
+  it("marks loadMore failure as paginationError and keeps results", async () => {
+    mockSearchIllust.mockResolvedValue({
+      illusts: [{ id: 1, create_date: "2026-01-01T00:00:00+09:00" }],
+      next_url: "https://app-api.pixiv.net/v1/search/illust?word=test&offset=30",
+    });
+    await createRoot(async (dispose) => {
+      const store = createSearchStore();
+      store.setScope("illust");
+      store.setKeyword("pagination-error-check");
+      await store.executeSearch();
+      expect(store.results()).toHaveLength(1);
+      expect(store.paginationError()).toBe(false);
+
+      // 第二页失败 → paginationError=true，已加载结果保留
+      mockSearchIllustNext.mockRejectedValue(new Error("network down"));
+      await store.loadMore();
+      expect(store.error()).toBeTruthy();
+      expect(store.paginationError()).toBe(true);
+      expect(store.results()).toHaveLength(1);
+
+      // 重新搜索 → paginationError 复位
+      mockSearchIllust.mockResolvedValue({
+        illusts: [{ id: 2, create_date: "2026-01-02T00:00:00+09:00" }],
+        next_url: null,
+      });
+      await store.executeSearch();
+      expect(store.paginationError()).toBe(false);
+      expect(store.error()).toBeNull();
 
       dispose();
     });

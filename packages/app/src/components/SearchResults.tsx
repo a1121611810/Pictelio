@@ -5,6 +5,7 @@ import ImageCard from "@/components/ImageCard";
 import NovelCard from "@/components/NovelCard";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ErrorDisplay from "@/components/ErrorDisplay";
+import InlineRetryBar from "@/components/ui/InlineRetryBar";
 import FluentIcon from "@/components/ui/FluentIcon";
 import { createSentinel } from "@/primitives/visibility";
 
@@ -18,22 +19,32 @@ interface Props {
   onAuthorClick?: (userId: number) => void;
   onRefresh: () => Promise<void> | void;
   error?: ApiError | null;
+  /** 是否为分页（加载更多）失败。true 时保留已加载结果，仅显示内联重试条 */
+  paginationError?: boolean;
 }
 
 const SearchResults: Component<Props> = (props) => {
-  // 哨兵自动分页：滚动到底部时自动触发 onLoadMore
+  // 全量错误（首载失败）：无已加载结果时整体替换为 ErrorDisplay，整页重刷恢复
+  const isFullError = () =>
+    props.error != null && !(props.paginationError && props.results.length > 0);
+  // 分页错误（加载更多失败）：保留已加载结果，仅底部显示内联重试条
+  const isPaginationError = () =>
+    props.error != null && props.paginationError && props.results.length > 0;
+
+  // 哨兵自动分页：滚动到底部时自动触发 onLoadMore；分页错误时暂停，避免无退避自动重试
   const { attach: sentinelAttach } = createSentinel({
-    enabled: () => props.hasMore && !props.loading,
+    enabled: () => props.hasMore && !props.loading && !(props.error && props.paginationError),
     onTrigger: () => props.onLoadMore(),
   });
 
   return (
     <div>
-      <Show when={props.error}>
+      <Show when={isFullError()}>
         <ErrorDisplay error={props.error!} onRetry={props.onRefresh} />
       </Show>
 
-      <Show when={!props.error}>
+      {/* 非全量错误（无错误或分页错误）时渲染结果列表区块 */}
+      <Show when={!isFullError()}>
         {/* Results list */}
         <div class="flex flex-col gap-[var(--spacingVerticalM)]">
           <For each={props.results}>
@@ -65,6 +76,11 @@ const SearchResults: Component<Props> = (props) => {
           </div>
         </Show>
 
+        {/* 分页失败内联重试条：在列表之后、哨兵之前显示，只重试失败页 */}
+        <Show when={isPaginationError()}>
+          <InlineRetryBar message="加载更多失败" onRetry={props.onLoadMore} />
+        </Show>
+
         {/* Sentinel for auto-load more (IntersectionObserver) */}
         <Show when={props.hasMore && props.results.length > 0}>
           <div ref={sentinelAttach} class="h-1" />
@@ -81,7 +97,7 @@ const SearchResults: Component<Props> = (props) => {
           </div>
         </Show>
 
-        {/* Empty state */}
+        {/* Empty state — 仅首载失败时由 ErrorDisplay 承担错误展示，故仍需 !props.error */}
         <Show when={!props.loading && props.results.length === 0 && !props.hasMore && !props.error}>
           <div class="flex flex-col items-center gap-[var(--spacingVerticalL)] py-[var(--spacingVerticalXXL)] text-center mt-8">
             <span class="text-[var(--colorNeutralForeground4)]">

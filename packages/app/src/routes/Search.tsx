@@ -383,6 +383,7 @@ const Search: Component = () => {
                 onAuthorClick={(id) => void navigate(`/user/${id}`)}
                 onRefresh={() => store.executeSearch()}
                 error={store.error()}
+                paginationError={store.paginationError()}
               />
             </div>
           </Show>

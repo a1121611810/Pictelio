@@ -27,6 +27,8 @@ export interface SearchStoreState {
   loading: () => boolean;
   /** Error from the last search, if any */
   error: () => ApiError | null;
+  /** 当前错误是否来自分页（loadMore）而非首次搜索。分页失败时保留已加载结果 */
+  paginationError: () => boolean;
   /** Update the search keyword */
   setKeyword: (word: string) => void;
   /** Update the search scope */
@@ -120,6 +122,9 @@ export function createSearchStore(): SearchStoreState {
     }
   }
   const [error, setError] = createSignal<ApiError | null>(null);
+  // 分页错误标记：loadMore 失败置 true；executeSearch/loadMore 成功置 false。
+  // 组件据此决定「整页错误展示（首载失败）」还是「保留结果 + 底部内联重试（分页失败）」。
+  const [paginationError, setPaginationError] = createSignal(false);
   const [hasMoreIllust, setHasMoreIllust] = createSignal(false);
   const [hasMoreNovel, setHasMoreNovel] = createSignal(false);
   const [nextIllustUrl, setNextIllustUrl] = createSignal<string | null>(null);
@@ -157,6 +162,8 @@ export function createSearchStore(): SearchStoreState {
       abortPrevious();
       const signal = abortController!.signal;
       pendingRequests = 0;
+      // 新搜索开始 → 清除分页错误标记（本次失败属于首载失败）
+      setPaginationError(false);
 
       // Check internal cache first
       const cached = readSearchCache(kw, currentScope, currentSort);
@@ -249,6 +256,8 @@ export function createSearchStore(): SearchStoreState {
     if (!hasI && !hasN) return;
 
     setError(null);
+    // 分页开始 → 先清除分页错误标记（重试时复位）
+    setPaginationError(false);
 
     // Load illust next page
     const illustPromise = hasI
@@ -263,6 +272,8 @@ export function createSearchStore(): SearchStoreState {
           if (err) {
             if ((err as Error).name === "AbortError") return;
             setError(toApiError(err));
+            // 分页失败：保留已加载结果，标记为分页错误（组件显示底部内联重试）
+            setPaginationError(true);
           } else {
             setIllustResults((prev) => [...prev, ...res!.illusts]);
             setHasMoreIllust(res!.next_url != null);
@@ -284,6 +295,8 @@ export function createSearchStore(): SearchStoreState {
           if (err) {
             if ((err as Error).name === "AbortError") return;
             setError(toApiError(err));
+            // 分页失败：保留已加载结果，标记为分页错误（组件显示底部内联重试）
+            setPaginationError(true);
           } else {
             setNovelResults((prev) => [...prev, ...res!.novels]);
             setHasMoreNovel(res!.next_url != null);
@@ -304,6 +317,7 @@ export function createSearchStore(): SearchStoreState {
     hasMore,
     loading,
     error,
+    paginationError,
     setKeyword,
     setScope,
     setSort,
