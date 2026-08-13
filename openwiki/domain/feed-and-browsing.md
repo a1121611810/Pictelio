@@ -48,6 +48,7 @@ All feed stores use `createTQFeedStore` (`/packages/app/src/stores/shared/create
 - Illust deduplication (`dedupIllusts` by illust ID)
 - R18/R18G content filtering
 - Sub-tab adapter functions converting between feed-store and factory naming conventions
+- A `paginationError` accessor distinguishing pagination (`fetchNextPage`) failures from first-load/refresh failures (ADR-0082, see [Pagination Failure Inline Retry](#pagination-failure-inline-retry-adr-0082))
 
 **Concrete store instances (illusts):**
 
@@ -112,15 +113,46 @@ The home page renders **fixed single-column layouts** via `FeedList` (no masonry
 | Novel | `NovelRowCard` | Single-column 56px row cards |
 | History | `HistoryRowCard` | Single-column A2 row card list |
 
-**`FeedList`** (`/packages/app/src/components/home/FeedList.tsx`, ADR-0078) is the unified home-feed container: it accepts a generic `FeedSource` (`items`/`loading`/`refreshing`/`loadingMore`/`nextUrl`/`fetchMore`/`refresh`), renders skeleton on refresh, an empty hint when done, a `FeedPaginationSentinel` for infinite scroll, and a pull-to-refresh overlay (`createPullToRefresh`).
+**`FeedList`** (`/packages/app/src/components/home/FeedList.tsx`, ADR-0078) is the unified home-feed container: it accepts a generic `FeedSource` (`items`/`loading`/`refreshing`/`loadingMore`/`nextUrl`/`fetchMore`/`refresh`, plus optional `error`/`paginationError`), renders skeleton on refresh, an empty hint when done, a `FeedPaginationSentinel` for infinite scroll, and a pull-to-refresh overlay (`createPullToRefresh`). Since ADR-0082 it also renders a full-page `ErrorDisplay` on first-load failure (instead of misreporting an empty state) and a bottom `InlineRetryBar` on pagination failure — see [Pagination Failure Inline Retry](#pagination-failure-inline-retry-adr-0082).
 
 **`createPullToRefresh`** (`/packages/app/src/primitives/createPullToRefresh.ts`, ADR-0076) provides the home page's six-panel pull-to-refresh with an A1 overlay mask; `createFastScrollbar` serves the novel detail page (see [Novel Reader](/openwiki/domain/novel-reader.md)).
 
 **Secondary virtualized feeds** still use the older `VirtualFeed` + `createFeedVirtualizer` stack with three layout modes (waterfall/single/grid): `IllustBookmarks`, `UserWorksFeed`, and the novel `NovelRecommendedFeed`/`NovelFollowFeed`/`NovelBookmarks` routes (via `NovelVirtualFeed`). The home feed itself no longer uses `createFeedVirtualizer`.
 
-**`VirtualFeed`** (`/packages/app/src/components/VirtualFeed.tsx`) accepts `illusts`/`loading`/`error`/`hasMore` data state, `onIllustClick`/`onAuthorClick`/`onLoadMore`/`onRefresh` callbacks, a `layoutMode` (`waterfall` | `single` | `grid`), and `emptyText`/`skipAnimation`/`onNavigateToSettings`. It tracks a component-level `loadAttempted` flag: the "暂无新作品" empty message renders only when `loadAttempted` is `true`, and the skeleton renders while `loading` is `true` **or** `loadAttempted` is `false` (prevents an empty-state flash before the first fetch). Scroll restoration is handled by `@solidjs/router`'s `<Router scrollRestoration>` prop; the custom `createScrollRestore`/`createVirtualScrollRestore`/`createFeedScrollStore` primitives were deleted (commit `b30366f`).
+**`VirtualFeed`** (`/packages/app/src/components/VirtualFeed.tsx`) accepts `illusts`/`loading`/`error`/`paginationError`/`hasMore` data state, `onIllustClick`/`onAuthorClick`/`onLoadMore`/`onRefresh` callbacks, a `layoutMode` (`waterfall` | `single` | `grid`), and `emptyText`/`skipAnimation`/`onNavigateToSettings`. It tracks a component-level `loadAttempted` flag: the "暂无新作品" empty message renders only when `loadAttempted` is `true`, and the skeleton renders while `loading` is `true` **or** `loadAttempted` is `false` (prevents an empty-state flash before the first fetch). The `paginationError` prop (ADR-0082) switches pagination failure from the above-list `ErrorDisplay` to a bottom `InlineRetryBar`. Scroll restoration is handled by `@solidjs/router`'s `<Router scrollRestoration>` prop; the custom `createScrollRestore`/`createVirtualScrollRestore`/`createFeedScrollStore` primitives were deleted (commit `b30366f`).
 
 `ImageCard` (`/packages/app/src/components/ImageCard.tsx`) and `GridCard` (`GridCard.tsx`) remain the card components for these secondary virtualized feeds (image loading, skeleton shimmer, author info, bookmark button).
+
+## Pagination Failure Inline Retry (ADR-0082)
+
+Before ADR-0082, pagination ("load more") failures were conflated with first-load failures across every list surface: `SearchResults` hid all loaded results behind `ErrorDisplay`, `VirtualFeed`/`NovelVirtualFeed` showed `ErrorDisplay` above the list and bound retry to full-page `onRefresh`, and the home `FeedList` had no error UI (a first-load failure fell into the empty state, a pagination failure failed silently). [ADR-0082](/docs/adr/ADR-0082-feed-pagination-inline-retry.md) separates the two failure modes with a store-level `paginationError` signal and a bottom-of-list inline retry bar.
+
+- **`paginationError` signal:** `searchStore`, the `createTQFeedStore` factory, and `userIllustsStore` expose a `paginationError()` accessor that is `true` only when the most recent failure came from pagination (`fetchNextPage`/`loadMore`) and `false` for first-load/refresh failures. Pagination failure never clears already-loaded data; a successful pagination, refresh, or new search resets the flag.
+- **`InlineRetryBar`** (`/packages/app/src/components/ui/InlineRetryBar.tsx`): a bottom-of-list "加载更多失败" message + 重试 button. Retry re-requests only the failed page by calling `fetchMore`/`loadMore` (which reuses `next_url`) — never `onRefresh`, which would drop the already-loaded later pages.
+- **Full-page vs inline:** first-load/refresh failure (no results to preserve) still renders the full-page `ErrorDisplay` bound to `onRefresh`; pagination failure keeps the list and appends `InlineRetryBar`.
+- **Sentinel pause:** on pagination error the infinite-scroll sentinels stop firing to prevent a no-backoff retry loop — `SearchResults`'s `createSentinel` `enabled` gate, `createFeedVirtualizer`'s built-in sentinel, and `home/FeedPaginationSentinel`'s new `disabled` prop all incorporate the `paginationError` gate. A successful retry re-arms the sentinel.
+
+```mermaid
+flowchart TD
+    S["Sentinel triggers loadMore"] --> R{"Request succeeds?"}
+    R -->|yes| A["Append page and reset paginationError"] --> S
+    R -->|no| P["Set paginationError true"]
+    P --> K["Keep loaded results"]
+    P --> B["Render InlineRetryBar at bottom"]
+    P --> D["Pause sentinel"]
+    B --> U["User taps retry"]
+    U --> M["fetchMore reuses next_url"] --> R
+```
+
+Pagination failure keeps loaded results, shows an inline retry bar, and pauses the sentinel until a successful retry.
+
+The mechanism is wired into three surfaces, all threading the store's `paginationError` accessor into a `paginationError` prop/field:
+
+- **Home `FeedList`** (`home/FeedList.tsx`) — `FeedSource` gains `error`/`paginationError`; `FeedList` renders `ErrorDisplay` for first-load failure and `InlineRetryBar` for pagination failure, and passes `disabled` to `FeedPaginationSentinel`. The six home stores (`recommendedStore`, `followStore`, `bookmarkStore`, `novelRecommendedStore`, `novelFollowStore`, `novelBookmarkStore`) each re-export `paginationError = store.paginationError`, and `HomePage`'s `illustSource`/`novelSource` map them into the source.
+- **`VirtualFeed` / `NovelVirtualFeed`** — accept a `paginationError` prop (threaded through `RecommendedFeed`, `FollowFeed`, `UserWorksFeed`, `IllustBookmarks`, `NovelBookmarks`), swapping the above-list `ErrorDisplay` for a bottom `InlineRetryBar` when set.
+- **`SearchResults`** — derives `isFullError` (first-load) vs `isPaginationError` and swaps `ErrorDisplay` for `InlineRetryBar`; its `createSentinel` pauses while `paginationError` is set.
+
+Contract tests cover the new behavior: `tests/unit/components/SearchResults.test.tsx` asserts that pagination failure preserves loaded results and retries via `onLoadMore` (not `onRefresh`), and `tests/unit/stores/searchExecution.test.ts` covers the `paginationError` set/reset signals.
 
 ## R18 Filtering & Age Confirmation
 
@@ -143,7 +175,7 @@ User settings control visibility of each tier. An **AgeConfirmation** gate (`/pa
 
 **Re-entrancy guard:** `executeSearch()` skips a duplicate in-flight search carrying the same `keyword_scope_sort` key (the first request owns result writing). This prevents a race where the search-box submit navigates (changing the URL) and the URL-sync effect re-triggers `executeSearch()` — without the guard the second call would abort the first, leaving both to fail silently and clearing results. The guard is cleared in a `finally` block.
 
-**Auto-load via sentinel:** `SearchResults` (`/packages/app/src/components/SearchResults.tsx`) uses an IntersectionObserver sentinel (`createSentinel`) placed at the bottom of the results list. When the sentinel scrolls into view and `hasMore` is true, `onLoadMore` fires automatically — replacing the earlier manual "Load more" button UX. An end-of-results separator ("没有更多了") appears when `hasMore` becomes false.
+**Auto-load via sentinel:** `SearchResults` (`/packages/app/src/components/SearchResults.tsx`) uses an IntersectionObserver sentinel (`createSentinel`) placed at the bottom of the results list. When the sentinel scrolls into view and `hasMore` is true, `onLoadMore` fires automatically — replacing the earlier manual "Load more" button UX. An end-of-results separator ("没有更多了") appears when `hasMore` becomes false. Since ADR-0082 the sentinel's `enabled` gate also includes a `paginationError` pause, and pagination failure renders a bottom `InlineRetryBar` instead of replacing all results with `ErrorDisplay` — see [Pagination Failure Inline Retry](#pagination-failure-inline-retry-adr-0082).
 
 ## Bookmarks
 
@@ -217,6 +249,7 @@ User profile data is loaded via `/packages/app/src/primitives/useUserProfile.ts`
 | History row card | `/packages/app/src/components/home/HistoryRowCard.tsx` |
 | Adaptive tags | `/packages/app/src/components/home/AdaptiveTags.tsx` |
 | Pagination sentinel | `/packages/app/src/components/home/FeedPaginationSentinel.tsx` |
+| Inline pagination retry bar | `/packages/app/src/components/ui/InlineRetryBar.tsx` |
 | Pull-to-refresh primitive | `/packages/app/src/primitives/createPullToRefresh.ts` |
 | Recommended store | `/packages/app/src/stores/recommendedStore.ts` |
 | Follow store | `/packages/app/src/stores/followStore.ts` |

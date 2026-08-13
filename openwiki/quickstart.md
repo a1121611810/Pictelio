@@ -138,6 +138,8 @@ Architecture Decision Records live in `/docs/adr/`. Notable ones:
 | 0078 | Feed list unification — `FeedList` container + `refreshing` vs `loadingMore` split (fixes pagination-triggered skeleton flash) |
 | 0079 | Tool trigger protocol — CodeGraph/OpenWiki forced routing for AI tool invocations (see [AGENTS.md](/AGENTS.md)); research in [codegraph-vs-openwiki](/docs/research/codegraph-vs-openwiki.md) |
 | 0080 | Dependency upgrade analysis — jsdom 30 (Node floor → ≥22.22.2), Capacitor 8.5, agent-browser 0.34, plus holds (TS 7, tailwind 4, lynx toolchain); see [glossary-dependency-upgrade](/docs/adr/glossary-dependency-upgrade.md) |
+| 0081 | Search pagination native 4xx fix — `rewriteUrl` strips the Pixiv host from absolute `next_url` (double-domain URL → 404), fixing Android pagination for all feeds; `executeSearch` same-param re-entrancy guard fixes the first-search empty-result race; see [glossary-search-pagination](/docs/adr/glossary-search-pagination.md) |
+| 0082 | Feed pagination inline retry — store-level `paginationError` signal + `InlineRetryBar` separate pagination failure (keep results + bottom retry) from first-load failure (full-page `ErrorDisplay`); sentinel pause prevents no-backoff retry loops |
 
 ## Key Source Files
 
@@ -219,6 +221,7 @@ The repository has been actively refactored through **v4.10.0**. Key themes in r
 - **Release pipeline (ADR-0065-per-asset, ADR-0067):** Per-asset APK upload with failure isolation + idempotent retry; a native Node uploader (2.1× `gh` throughput) with `PICTELIO_UPLOADER=gh` fallback; proxy-path probe; changelog truncation cap raised 200→5000 chars.
 - **app-lynx feed tabs + M3 + error/comment/update (ADR-0064):** Global tabs refactored to 推荐/插画/小说/我的 (`navTabs.ts` single source of truth) with a new `/illusts` `IllustList` page; `Recommended.vue` migrated to a `createMixFeed` mixed feed (illust 4:1 novel); novel body switched to a `requestRaw` native gateway; a full error-presentation module + `/error` session-expiry page, a comment bottom-sheet module, and an M3 component alignment (FAB/chips/dialogs/switch) landed.
 - **Tool trigger protocol + dependency upgrade (ADR-0079, ADR-0080):** `AGENTS.md` now forces AI tool invocations through CodeGraph/OpenWiki routing; a dependency-upgrade analysis greenlights jsdom 30 (with a Node floor bump to ≥22.22.2) plus Capacitor 8.5 / agent-browser 0.34, while holding TypeScript 7, tailwindcss 4, and the lynx toolchain.
+- **Search & feed pagination reliability (ADR-0081, ADR-0082):** Android pagination 4xx was root-caused to `next_url` absolute-URL double-domain concatenation and fixed by `rewriteUrl` normalization in `client.ts` (one fix covering search/recommended/bookmarks/user-works/novel pagination), and first-search empty results to a same-param re-entrancy race fixed by an `executeSearch` guard. A follow-up (ADR-0082) separates pagination failure from first-load failure with a store-level `paginationError` signal and a bottom-of-list `InlineRetryBar`, and pauses infinite-scroll sentinels after a pagination error to prevent no-backoff retry loops. See [Feed & Browsing](/openwiki/domain/feed-and-browsing.md).
 
 ## Backlog
 
