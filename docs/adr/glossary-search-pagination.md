@@ -1,6 +1,6 @@
 # 搜索与分页 — 术语表
 
-搜索页（`/search`）与所有分页 Feed 共享的领域概念。相关决策见 [ADR-0081](./ADR-0081-search-pagination-native-4xx-fix.md)。
+搜索页（`/search`）与所有分页 Feed 共享的领域概念。相关决策见 [ADR-0081](./ADR-0081-search-pagination-native-4xx-fix.md) 与 [ADR-0082](./ADR-0082-feed-pagination-inline-retry.md)。
 
 ## 核心术语
 
@@ -16,6 +16,10 @@
 | **搜索范围（SearchScope）** | `all`（插画+小说合并）/ `illust` / `novel`。`all` 时首屏并行请求 `search/illust` 与 `search/novel`，结果按 `create_date` 降序合并。 |
 | **热门排序（popular_desc）** | 路由到独立端点 `/v1/search/popular-preview/{illust,novel}`（单页、无 `next_url`，不分页），其他排序走标准 `/v1/search/illust`、`/v1/search/novel`。 |
 | **搜索结果合并（mergeSearchResults）** | `utils/searchMerger.ts` — 按 `create_date` 降序合流 illust 与 novel 为单一时间线；同一日期内 illust 优先。 |
+| **paginationError（分页错误标记）** | store 暴露的 boolean，标记当前 error 是否来自分页（fetchNextPage/loadMore）而非首载/刷新。组件据此决定"整页错误展示（ErrorDisplay）"还是"保留结果 + 底部内联重试"。分页失败时不清理已加载 data。 |
+| **内联重试条（InlineRetryBar）** | 列表底部的一条失败提示 + 重试按钮（`components/ui/InlineRetryBar.tsx`）。重试只重新请求失败的那一页（沿用 `next_url`），不整页重刷。 |
+| **内联重试模式（inline retry）** | 分页失败时保留已加载结果、只在列表底部给重试入口的错误呈现模式。与 `ErrorDisplay` 整页错误展示（首载/刷新失败）相对。 |
+| **分页暂停（pagination pause）** | 分页错误时 sentinel/哨兵暂停触发（`SearchResults` 的 `createSentinel` `enabled` 门控、`createFeedVirtualizer` 内置 sentinel、首页 `FeedPaginationSentinel` 的 `disabled` prop），防止失败后无退避自动重试死循环。重试成功后恢复触发。 |
 
 ## 分页请求流
 
@@ -51,3 +55,22 @@ executeSearch / loadMore                    executeSearch / loadMore
 
 - **搜索结果 LRU 缓存（searchCache）**：`createSearchStore` 模块级 `Map`，key 为 `${word}_${scope}_${sort}`，上限 20 条。`loadMore` 不写缓存——重进同词搜索会恢复到首页分页状态。
 - **GET 请求去重（inflightGetRequests）**：`client.ts` 对相同 path+params 的并发 GET 合并为单个真实请求。搜索防重入与它互补：前者挡同参数重复 `executeSearch`，后者挡同 URL 并发 fetch。
+
+## 分页失败内联重试流程
+
+```
+滚入视口 → sentinel 触发 loadMore / fetchMore
+  ├─ 成功 → 追加新页，paginationError 复位，哨兵继续武装
+  └─ 失败 → paginationError = true
+        ├─ 已加载结果保留（不清空列表，不隐藏已有内容）
+        ├─ 列表底部渲染 InlineRetryBar（失败提示 + 重试按钮）
+        └─ sentinel 暂停（enabled / disabled 门控）→ 不再自动触发
+
+用户点击重试 → 重新请求失败的那一页（沿用 next_url）
+  ├─ 成功 → 追加新页，paginationError 复位，哨兵恢复触发
+  └─ 失败 → 保持内联重试状态，等待再次重试
+```
+
+- **分页失败 ≠ 首载/刷新失败**：只有 `paginationError = true` 时走内联重试模式；首载/刷新失败（无结果可保留）仍用 `ErrorDisplay` 整页展示。
+- 重试绑 `fetchMore` / `loadMore`（沿用 `next_url`），**不绑 `onRefresh`**——整页重刷会丢掉已加载的后续页。
+
