@@ -6,7 +6,7 @@ export interface GlassTabItem {
   label: string;
 }
 
-export type GlassTabVariant = "capsule" | "segmented";
+type GlassTabVariant = "capsule" | "segmented";
 
 interface GlassTabBarProps {
   items: GlassTabItem[];

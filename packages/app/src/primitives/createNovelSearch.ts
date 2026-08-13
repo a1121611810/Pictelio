@@ -6,7 +6,7 @@ export interface NovelSearchMatch {
   end: number;
 }
 
-export interface NovelSearchOptions {
+interface NovelSearchOptions {
   caseSensitive?: boolean;
   maxMatches?: number;
   debounceMs?: number;

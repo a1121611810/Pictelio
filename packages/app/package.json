@@ -38,7 +38,6 @@
     "@capacitor/android": "^8.5.0",
     "@capacitor/app": "^8.1.1",
     "@capacitor/core": "^8.5.0",
-    "@capacitor/device": "^8.0.3",
     "@capacitor/preferences": "^8.0.1",
     "@chenglou/pretext": "^0.0.8",
     "@fluentui/tokens": "1.0.0-alpha.23",

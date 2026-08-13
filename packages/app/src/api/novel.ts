@@ -16,11 +16,11 @@ const isNative = Capacitor.isNativePlatform();
 
 // ─── 小说内嵌图片类型 ───
 
-export type NovelImageSize = "240mw" | "480mw" | "1200x1200" | "128x128" | "original";
+type NovelImageSize = "240mw" | "480mw" | "1200x1200" | "128x128" | "original";
 
 export type NovelImageUrls = Record<NovelImageSize, string>;
 
-export interface NovelImageItem {
+interface NovelImageItem {
   novelImageId: string;
   sl: string;
   urls: NovelImageUrls;
@@ -93,19 +93,6 @@ export function extractNovelTextFromHtml(html: string): string {
     return match[1].replace(/\\n/gu, "\n").replace(/\\r/gu, "").replace(/\\t/gu, " ");
   }
   return parsed;
-}
-
-/**
- * 获取小说正文纯文本。
- * 内部调用 /webview/v2/novel 获取 HTML，再从中提取 text 字段。
- */
-export async function fetchNovelText(novelId: number): Promise<string> {
-  const html = await loadText(novelId);
-  const text = extractNovelTextFromHtml(html);
-  if (!text) {
-    throw new Error("小说正文提取失败");
-  }
-  return text;
 }
 
 /**

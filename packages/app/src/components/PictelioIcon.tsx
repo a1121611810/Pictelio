@@ -1,6 +1,6 @@
 import { type Component } from "solid-js";
 
-export interface PictelioIconProps {
+interface PictelioIconProps {
   size?: string | number;
   class?: string;
 }

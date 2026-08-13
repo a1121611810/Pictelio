@@ -8,7 +8,7 @@ import SettingsAccount from "./SettingsAccount";
 import SettingsCard from "./SettingsCard";
 import LogoutRow from "./LogoutRow";
 
-export interface SettingsSectionsProps {
+interface SettingsSectionsProps {
   isLoggedIn: () => boolean;
   onLogout: () => void;
   onOpenBlocklist: () => void;

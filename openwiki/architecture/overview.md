@@ -345,7 +345,7 @@ if (err) { handle(err); return fallback; }
   - **`@solidjs/router`** (useNavigate, useNavigate, Outlet, etc. — core APIs)
   - **`@/utils/tryAsync`** (`tryAsync`, `trySync` — from the error tuple pattern)
 - All auto-imported APIs are declared as `readonly` globals in `.oxlintrc.json`. The generated `auto-imports.d.ts` (written to `src/auto-imports.d.ts` by both `vite.config.ts` and `vitest.config.ts`) is **committed to git**, not gitignored — `pnpm check` runs `tsc --noEmit` over `src/`, so the file must exist in fresh CI checkouts (previously gitignored, which caused TS2304 failures).
-- A cleanup script at `scripts/cleanup-auto-imports.mjs` was provided for the one-time migration to scan all `.ts`/`.tsx` source files, remove redundant explicit imports now covered by auto-import, and rewrite multi-line import statements to single-line where applicable.
+- A cleanup script at `scripts/cleanup-auto-imports.mjs` was provided for the one-time migration to scan all `.ts`/`.tsx` source files, remove redundant explicit imports now covered by auto-import, and rewrite multi-line import statements to single-line where applicable. This script was **deleted** in the ADR-0083 dead-code cleanup (it was an unwired one-time migration tool).
 
 **Unified cleanup:** finally-block logic (`loading.set(false)`, `clearTimeout()`) moves after the `tryAsync` call and before the `err` check, written once instead of duplicated across try/catch/finally branches.
 

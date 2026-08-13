@@ -401,11 +401,9 @@ Pictelio uses an automated Android build pipeline with several scripts:
 | Script | Purpose |
 |--------|---------|
 | `/packages/app/scripts/release.mjs` | Full release: version bump → build → sign → GitHub release |
-| `/packages/app/scripts/release-github.mjs` | GitHub Releases upload |
 | `/packages/app/scripts/dev-android.mjs` | One-command dev: Vite → Capacitor sync → Gradle → install |
 | `/packages/app/scripts/sync-android-version.mjs` | Syncs version name from `package.json` to `build.gradle` |
 | `/packages/app/scripts/sync-credentials.mjs` | Injects Pixiv API credentials for CI builds |
-| `/packages/app/scripts/capture-screenshots.mjs` | Automated screenshot pipeline for store listings |
 
 ### Build Commands
 
@@ -521,22 +519,9 @@ These rules are in addition to the base ProGuard rules from ADR-0001 (native plu
 | Capacitor config | `/packages/app/capacitor.config.ts` |
 | Dev Android script | `/packages/app/scripts/dev-android.mjs` |
 | Release script | `/packages/app/scripts/release.mjs` |
-| GitHub release script | `/packages/app/scripts/release-github.mjs` |
 | Version sync script | `/packages/app/scripts/sync-android-version.mjs` |
 | Credentials sync script | `/packages/app/scripts/sync-credentials.mjs` |
 | Release checklist | `/docs/release-checklist.md` |
 | Release signing guide | `/docs/release-signing.md` |
 | Platform compat | `/docs/platform-compatibility.md` |
 | GitHub release docs | `/docs/github-release.md` |
- checklist | `/docs/release-checklist.md` |
-| Release signing guide | `/docs/release-signing.md` |
-| Platform compat | `/docs/platform-compatibility.md` |
-| GitHub release docs | `/docs/github-release.md` |
-ease signing guide | `/docs/release-signing.md` |
-| Platform compat | `/docs/platform-compatibility.md` |
-| GitHub release docs | `/docs/github-release.md` |
- checklist | `/docs/release-checklist.md` |
-| Release signing guide | `/docs/release-signing.md` |
-| Platform compat | `/docs/platform-compatibility.md` |
-| GitHub release docs | `/docs/github-release.md` |
-ease.md` |

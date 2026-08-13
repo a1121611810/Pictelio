@@ -100,7 +100,7 @@ flowchart LR
 - **`SideNavShell`** — the home page's primary navigation (left icon rail). The selected tab highlights with a `BrandBackground2` rounded block. It reads/writes `currentTab` from `uiStore`, so entries from `PersonalCenter` ("我的收藏" → bookmarks) preset the initial tab.
 - **`ContentTypeToggle`** (`/packages/app/src/components/home/ContentTypeToggle.tsx`) — the 插画/小说 switch in the page header, hidden on the history tab.
 - **`NavBar`** (`/packages/app/src/components/NavBar.tsx`) — still used on secondary pages (`UserIllusts`, `FollowListPage`) but no longer on `/home`.
-- **`GlassTabBar`** (`/packages/app/src/components/ui/GlassTabBar.tsx`) and the standalone `RecommendedFeed`/`FollowFeed` components are no longer wired into the home page after the C-shell refactor (glass-tab adoption was rolled back to global nav only, #84).
+- **`GlassTabBar`** (`/packages/app/src/components/ui/GlassTabBar.tsx`) is no longer wired into the home page after the C-shell refactor (glass-tab adoption was rolled back to global nav only, #84; it now survives only as a test-referenced component per ADR-0083). The standalone `RecommendedFeed`/`FollowFeed` components were **deleted** in the ADR-0083 dead-code cleanup.
 - **`AdaptiveTags`** (`/packages/app/src/components/home/AdaptiveTags.tsx`) + `adaptiveTagFit.ts` — renders an illust/novel's tag chips on a card and **imperatively truncates** them to one line: overflow chips collapse into a "+N" chip via a measured `max-width`. Built on `useContainerWidth` and the new [`viewportWidth`](/packages/app/src/primitives/viewportWidth.ts) primitive; the `adaptive-tags-240.test.ts` E2E regression guards narrow-viewport (240px) truncation.
 
 ## Virtual Scrolling & Layout
@@ -117,7 +117,7 @@ The home page renders **fixed single-column layouts** via `FeedList` (no masonry
 
 **`createPullToRefresh`** (`/packages/app/src/primitives/createPullToRefresh.ts`, ADR-0076) provides the home page's six-panel pull-to-refresh with an A1 overlay mask; `createFastScrollbar` serves the novel detail page (see [Novel Reader](/openwiki/domain/novel-reader.md)).
 
-**Secondary virtualized feeds** still use the older `VirtualFeed` + `createFeedVirtualizer` stack with three layout modes (waterfall/single/grid): `IllustBookmarks`, `UserWorksFeed`, and the novel `NovelRecommendedFeed`/`NovelFollowFeed`/`NovelBookmarks` routes (via `NovelVirtualFeed`). The home feed itself no longer uses `createFeedVirtualizer`.
+**Secondary virtualized feeds** still use the older `VirtualFeed` + `createFeedVirtualizer` stack with three layout modes (waterfall/single/grid): only `UserWorksFeed` (user illusts + user novels) remains, rendered via `VirtualFeed`/`NovelVirtualFeed`. The standalone `IllustBookmarks`/`NovelBookmarks`/`NovelRecommendedFeed`/`NovelFollowFeed` route panels were **deleted** in the ADR-0083 dead-code cleanup (they were already unwired — see [Bookmarks](#bookmarks)). The home feed itself no longer uses `createFeedVirtualizer`.
 
 **`VirtualFeed`** (`/packages/app/src/components/VirtualFeed.tsx`) accepts `illusts`/`loading`/`error`/`paginationError`/`hasMore` data state, `onIllustClick`/`onAuthorClick`/`onLoadMore`/`onRefresh` callbacks, a `layoutMode` (`waterfall` | `single` | `grid`), and `emptyText`/`skipAnimation`/`onNavigateToSettings`. It tracks a component-level `loadAttempted` flag: the "暂无新作品" empty message renders only when `loadAttempted` is `true`, and the skeleton renders while `loading` is `true` **or** `loadAttempted` is `false` (prevents an empty-state flash before the first fetch). The `paginationError` prop (ADR-0082) switches pagination failure from the above-list `ErrorDisplay` to a bottom `InlineRetryBar`. Scroll restoration is handled by `@solidjs/router`'s `<Router scrollRestoration>` prop; the custom `createScrollRestore`/`createVirtualScrollRestore`/`createFeedScrollStore` primitives were deleted (commit `b30366f`).
 
@@ -149,7 +149,7 @@ Pagination failure keeps loaded results, shows an inline retry bar, and pauses t
 The mechanism is wired into three surfaces, all threading the store's `paginationError` accessor into a `paginationError` prop/field:
 
 - **Home `FeedList`** (`home/FeedList.tsx`) — `FeedSource` gains `error`/`paginationError`; `FeedList` renders `ErrorDisplay` for first-load failure and `InlineRetryBar` for pagination failure, and passes `disabled` to `FeedPaginationSentinel`. The six home stores (`recommendedStore`, `followStore`, `bookmarkStore`, `novelRecommendedStore`, `novelFollowStore`, `novelBookmarkStore`) each re-export `paginationError = store.paginationError`, and `HomePage`'s `illustSource`/`novelSource` map them into the source.
-- **`VirtualFeed` / `NovelVirtualFeed`** — accept a `paginationError` prop (threaded through `RecommendedFeed`, `FollowFeed`, `UserWorksFeed`, `IllustBookmarks`, `NovelBookmarks`), swapping the above-list `ErrorDisplay` for a bottom `InlineRetryBar` when set.
+- **`VirtualFeed` / `NovelVirtualFeed`** — accept a `paginationError` prop (now threaded only through `UserWorksFeed`, the sole remaining secondary feed), swapping the above-list `ErrorDisplay` for a bottom `InlineRetryBar` when set.
 - **`SearchResults`** — derives `isFullError` (first-load) vs `isPaginationError` and swaps `ErrorDisplay` for `InlineRetryBar`; its `createSentinel` pauses while `paginationError` is set.
 
 Contract tests cover the new behavior: `tests/unit/components/SearchResults.test.tsx` asserts that pagination failure preserves loaded results and retries via `onLoadMore` (not `onRefresh`), and `tests/unit/stores/searchExecution.test.ts` covers the `paginationError` set/reset signals.
@@ -179,7 +179,7 @@ User settings control visibility of each tier. An **AgeConfirmation** gate (`/pa
 
 ## Bookmarks
 
-Bookmarks is no longer a standalone route. The **bookmarks tab** inside `/home` renders `IllustSingleCard`/`NovelRowCard` lists backed directly by `bookmarkStore` / `novelBookmarkStore` (via the `IllustFeedPanel`/`NovelFeedPanel` mapping). The older `BookmarksFeed` component and the `IllustBookmarks`/`NovelBookmarks` route components still exist but are no longer embedded in the home page. The `PersonalCenter` "My Bookmarks" link navigates to `/home` with `setCurrentTab("bookmarks")`.
+Bookmarks is no longer a standalone route. The **bookmarks tab** inside `/home` renders `IllustSingleCard`/`NovelRowCard` lists backed directly by `bookmarkStore` / `novelBookmarkStore` (via the `IllustFeedPanel`/`NovelFeedPanel` mapping). The legacy `BookmarksFeed` component and the `IllustBookmarks`/`NovelBookmarks` route components were **deleted** in the ADR-0083 dead-code cleanup (they were no longer embedded in the home page). The `PersonalCenter` "My Bookmarks" link navigates to `/home` with `setCurrentTab("bookmarks")`.
 
 Bookmark state is managed by `/packages/app/src/stores/bookmarkStore.ts` (illusts) and `novelBookmarkStore.ts` (novels), which integrate with the Pixiv API and toggle bookmarks with optimistic UI updates.
 
@@ -222,7 +222,7 @@ Route Page (navigate) → VirtualFeed (prop pass-through)
 - Lazy expiry: entries older than 30 days cleared on write
 - `historyVersion` signal acts as a non-reactive invalidation token
 
-**History tab:** The history tab is now built into `SideNavShell` (`SideNavShell.tsx` `HistoryPanel`) rather than rendered via a separate `HistoryFeed` route component. It renders an A2 `HistoryRowCard` list (sorted by `visitedAt` descending) with a clear-all button and empty state, reading `historyCollection` filtered by `userId`. The older `HistoryFeed` component still exists but is no longer wired into `/home`. History entries retain author click navigation per [ADR-0032](/docs/adr/ADR-0032-author-click-navigation.md); old entries without `authorId` degrade gracefully to plain text.
+**History tab:** The history tab is now built into `SideNavShell` (`SideNavShell.tsx` `HistoryPanel`) rather than rendered via a separate `HistoryFeed` route component. It renders an A2 `HistoryRowCard` list (sorted by `visitedAt` descending) with a clear-all button and empty state, reading `historyCollection` filtered by `userId`. The legacy `HistoryFeed` component was **deleted** in the ADR-0083 dead-code cleanup. History entries retain author click navigation per [ADR-0032](/docs/adr/ADR-0032-author-click-navigation.md); old entries without `authorId` degrade gracefully to plain text.
 
 The `contentType()` toggle from `uiStore` is hidden on the history tab — history is displayed as a single unified timeline regardless of content type.
 
@@ -260,13 +260,10 @@ User profile data is loaded via `/packages/app/src/primitives/useUserProfile.ts`
 | Image card (secondary feeds) | `/packages/app/src/components/ImageCard.tsx` |
 | Grid card (secondary feeds) | `/packages/app/src/components/GridCard.tsx` |
 | Nav bar (secondary pages) | `/packages/app/src/components/NavBar.tsx` |
-| Bookmarks feed component (legacy) | `/packages/app/src/components/BookmarksFeed.tsx` |
-| History feed component (legacy) | `/packages/app/src/components/HistoryFeed.tsx` |
+| User works feed (sole secondary feed) | `/packages/app/src/components/UserWorksFeed.tsx` |
 | Search page | `/packages/app/src/routes/Search.tsx` |
 | Search store | `/packages/app/src/stores/searchStore.ts` |
 | History store | `/packages/app/src/stores/historyStore.ts` |
-| Novel recommended feed component | `/packages/app/src/routes/NovelRecommendedFeed.tsx` |
-| Novel follow feed component | `/packages/app/src/routes/NovelFollowFeed.tsx` |
 | Bookmark store | `/packages/app/src/stores/bookmarkStore.ts` |
 | R18 filter utility | `/packages/app/src/utils/r18Filter.ts` |
 | Age confirmation | `/packages/app/src/routes/AgeConfirmation.tsx` |

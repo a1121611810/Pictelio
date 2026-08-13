@@ -1,6 +1,6 @@
 import { jsonCodec, settings } from "@/settings";
 
-export type ImageHostMode = "race" | "weighted" | "fastest-ip" | "single";
+type ImageHostMode = "race" | "weighted" | "fastest-ip" | "single";
 
 export interface ImageHost {
   id: string;

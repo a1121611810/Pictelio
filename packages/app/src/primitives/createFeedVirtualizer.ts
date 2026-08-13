@@ -21,7 +21,7 @@ const GAP = 12;
 
 export type PullPhase = "idle" | "pulling" | "refresh-ready" | "refreshing" | "settings-ready";
 
-export interface FeedVirtualizerConfig<T> {
+interface FeedVirtualizerConfig<T> {
   /** Reactive list of items to virtualize */
   items: Accessor<T[]>;
   /** Whether a load/refresh operation is in progress */
@@ -53,7 +53,7 @@ export interface FeedVirtualizerConfig<T> {
   laneAssignmentMode?: "measured" | "estimate";
 }
 
-export interface FeedVirtualizerResult {
+interface FeedVirtualizerResult {
   /** Ref callback for the outer container (handles ResizeObserver + touch events) */
   containerRef: (el: HTMLDivElement) => void;
   /** Ref callback for the sentinel element (triggers load-more) */

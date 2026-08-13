@@ -8,7 +8,7 @@ import { registerPlugin } from "@capacitor/core";
  *
  * webview 前端据此决定是否渲染"切换渲染引擎"入口。
  */
-export interface ClientInfoPlugin {
+interface ClientInfoPlugin {
   getClientKinds(): Promise<{ kinds: string[] }>;
   /** Activity 级重启（进程保留）：切换引擎后新 Activity 由入口路由按开关分发 */
   restart(): Promise<void>;

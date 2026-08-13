@@ -1,6 +1,6 @@
 import type { Component } from "solid-js";
 
-export interface HeartIconProps {
+interface HeartIconProps {
   filled: boolean;
   size?: number;
 }

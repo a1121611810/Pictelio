@@ -12,11 +12,11 @@
  */
 
 /** 间距：gap-[var(--spacingHorizontalXXS)] = 4px */
-export const CHIP_GAP = 4;
+const CHIP_GAP = 4;
 /** 截断 chip 的最小可读宽度（低于则不显示截断 chip，直接折叠 +N） */
-export const MIN_PARTIAL_WIDTH = 16;
+const MIN_PARTIAL_WIDTH = 16;
 
-export interface VisibleTags {
+interface VisibleTags {
   visible: number;
   remaining: number;
   /** 截断 chip 的宽度（px）；null = 不显示截断 chip */

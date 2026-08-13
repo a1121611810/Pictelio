@@ -3,7 +3,7 @@
  * 依据评估文档 6.3：假名占比 >1% → ja；拉丁占比 >10% → en；CJK 汉字占比 >30% → zh。
  * 用于：翻译入口显示（zh 源不显示）、prompt 措辞、目标语言预选。
  */
-export type DetectedLang = "ja" | "en" | "zh" | "other";
+type DetectedLang = "ja" | "en" | "zh" | "other";
 
 /** 检测文本语言（取前 500 字符样本，防长文开销） */
 export function detectNovelLanguage(text: string): DetectedLang {

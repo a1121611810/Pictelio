@@ -1,6 +1,6 @@
 import type { Component } from "solid-js";
 
-export type PullZone = "idle" | "pulling" | "refresh-ready" | "refreshing" | "settings-ready";
+type PullZone = "idle" | "pulling" | "refresh-ready" | "refreshing" | "settings-ready";
 
 interface Props {
   zone: PullZone;

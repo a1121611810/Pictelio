@@ -7,7 +7,7 @@ import {
   setProbeResults,
 } from "../stores/imageHostStore";
 
-export interface HostInput {
+interface HostInput {
   name: string;
   baseUrl: string;
 }
@@ -131,46 +131,6 @@ export function getEffectiveImageUrl(originalUrl: string): string {
   }
 
   if (state.mode === "weighted" || state.mode === "fastest-ip") {
-    const host = selectWeightedHost(enabled);
-    if (host) {
-      return transformUrl(originalUrl, host.baseUrl);
-    }
-  }
-
-  return transformUrl(originalUrl, enabled[0].baseUrl);
-}
-
-/**
- * 异步解析最终图片 URL。
- *
- * 对于 fastest-ip 模式，若缓存已过期，会触发一次后台探测；
- * 但 probe 不阻塞当前加载，直接回退到加权选择返回，避免首屏等待。
- */
-export async function getEffectiveImageUrlAsync(originalUrl: string): Promise<string> {
-  if (!isImageHostActive()) {
-    return originalUrl;
-  }
-
-  const state = imageHostState();
-  const enabled = getEnabledHosts();
-  if (enabled.length === 0) {
-    return originalUrl;
-  }
-
-  if (state.mode === "fastest-ip") {
-    const fastest = getFastestHost();
-    if (fastest) {
-      return transformUrl(originalUrl, fastest.baseUrl);
-    }
-    // 无缓存时后台触发一次探测，不阻塞当前加载
-    void probeHosts();
-    const host = selectWeightedHost(enabled);
-    if (host) {
-      return transformUrl(originalUrl, host.baseUrl);
-    }
-  }
-
-  if (state.mode === "weighted") {
     const host = selectWeightedHost(enabled);
     if (host) {
       return transformUrl(originalUrl, host.baseUrl);

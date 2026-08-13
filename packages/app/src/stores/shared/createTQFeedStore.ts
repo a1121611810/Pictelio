@@ -50,7 +50,7 @@ type TabQueriesDef<TItem, TDeps> = {
 };
 
 /** 错误策略：priority=始终选最高优先级；allMustFail=多源时仅全部失败才报错 */
-export type ErrorStrategy = "priority" | "allMustFail";
+type ErrorStrategy = "priority" | "allMustFail";
 
 // ─── 公开类型 ───
 

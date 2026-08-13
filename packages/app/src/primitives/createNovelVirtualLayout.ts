@@ -17,7 +17,7 @@ import {
 import { getNovelTextLayoutCache } from "./novelTextLayoutCache";
 import { isPretextSupported } from "./isPretextSupported";
 
-export interface CreateNovelVirtualLayoutOptions {
+interface CreateNovelVirtualLayoutOptions {
   blocks: Accessor<NovelBlock[]>;
   containerWidth: Accessor<number>;
   settings: Accessor<ReaderSettings>;
@@ -30,7 +30,7 @@ export interface CreateNovelVirtualLayoutOptions {
   translationVariant?: Accessor<string | undefined>;
 }
 
-export interface NovelVirtualLayoutResult {
+interface NovelVirtualLayoutResult {
   virtualizer: TVirtualizer<Window, HTMLElement>;
   totalHeight: Accessor<number>;
   visibleBlocks: Accessor<number[]>;

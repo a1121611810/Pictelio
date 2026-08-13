@@ -30,11 +30,9 @@ Pictelio includes a full-featured novel reader for Pixiv novels, with virtualize
 
 ```mermaid
 flowchart LR
-    ND[NovelDetail] --> NL[createNovelLoader]
-    NL --> NC[novelCache]
-    NL --> PN[parseNovelBlocks]
+    ND[NovelDetail] --> NC[novelCache]
+    ND --> PN[parseNovelBlocks]
     ND --> NV[createNovelVirtualLayout]
-    NV --> MT[measureText]
     NV --> NTC[novelTextLayoutCache]
     ND --> NS[createNovelSearch]
     ND --> RSS[ReaderSettingsSheet]
@@ -188,7 +186,7 @@ When blocked, `startTranslate()` shows an in-sheet error and **sends nothing** (
 The novel feed is rendered two ways:
 
 - **Home page** — `NovelRowCard` single-column row cards in the `NovelFeedPanel`, backed directly by `novelRecommendedStore` / `novelFollowStore` / `novelBookmarkStore` (see [Feed & Browsing](/openwiki/domain/feed-and-browsing.md)).
-- **Secondary routes** — `NovelRecommendedFeed`, `NovelFollowFeed`, `NovelBookmarks`, and `UserWorksFeed` still use `NovelVirtualFeed` with three layout modes:
+- **Secondary route** — only `UserWorksFeed` (user illusts + user novels, rendered by the `UserIllusts` route) still uses `NovelVirtualFeed` with three layout modes; the standalone `NovelRecommendedFeed`/`NovelFollowFeed`/`NovelBookmarks` route panels were **deleted** in the ADR-0083 dead-code cleanup:
 
 | Mode | Component | Description |
 |------|-----------|-------------|
@@ -243,6 +241,10 @@ The novel feed is rendered two ways:
 | Novel footer nav | `/packages/app/src/components/NovelFooterNav.tsx` |
 | Novel search bar | `/packages/app/src/components/NovelSearchBar.tsx` |
 | Novel blocks parser | `/packages/app/src/utils/novelBlocks.ts` |
+| Novel image dimensions | `/packages/app/src/utils/novelImageDimensions.ts` |
+| Pretext support check | `/packages/app/src/primitives/isPretextSupported.ts` |
+| Novels stylesheet | `/packages/app/src/styles/novel-reader.css` |
+l blocks parser | `/packages/app/src/utils/novelBlocks.ts` |
 | Novel image dimensions | `/packages/app/src/utils/novelImageDimensions.ts` |
 | Pretext support check | `/packages/app/src/primitives/isPretextSupported.ts` |
 | Novels stylesheet | `/packages/app/src/styles/novel-reader.css` |

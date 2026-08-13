@@ -13,7 +13,7 @@ const displayUser = (): ReturnType<typeof user> => viewedUser() || user();
 const totalWorks = (): number =>
   (profile()?.total_illusts ?? 0) + (profile()?.total_manga ?? 0) + (profile()?.total_novels ?? 0);
 
-export interface UseUserProfileResult {
+interface UseUserProfileResult {
   targetUserId: Accessor<number>;
   displayUser: Accessor<ReturnType<typeof user>>;
   isCurrentUser: Accessor<boolean>;

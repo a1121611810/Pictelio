@@ -21,7 +21,7 @@ export const DEFAULT_TARGET_LANG = "zh-Hans";
 
 // ─── Types ───
 
-export interface TranslationCacheEntry {
+interface TranslationCacheEntry {
   /** 复合 key hash（novelId + targetLang + modelId），FNV-1a 32bit */
   id: number;
   novelId: number;

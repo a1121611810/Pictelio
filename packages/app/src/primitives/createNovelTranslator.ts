@@ -10,7 +10,7 @@
 import { buildTranslationSystemPrompt, buildTranslationUserPrompt } from "@/utils/prompts";
 import { requestTranslate, type TranslateError, type TranslateModel } from "@/api/translate";
 
-export interface TranslateNovelOptions {
+interface TranslateNovelOptions {
   apiKey: string;
   model: TranslateModel;
   sourceLang?: string;
@@ -34,14 +34,14 @@ export interface TranslateChunkOptions extends TranslateNovelOptions {
   priorityParagraph?: number;
 }
 
-export interface ChunkRange {
+interface ChunkRange {
   /** 段落起始 index（含） */
   start: number;
   /** 段落结束 index（不含） */
   end: number;
 }
 
-export interface ChunkProgress {
+interface ChunkProgress {
   done: number;
   total: number;
   /** 本块覆盖的段落区间 */

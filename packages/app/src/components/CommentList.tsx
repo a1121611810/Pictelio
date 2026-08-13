@@ -120,7 +120,7 @@ const CommentItem: Component<CommentItemProps> = (props) => {
 
 // ─── CommentList ───
 
-export interface CommentListProps {
+interface CommentListProps {
   comments: PixivComment[];
   hasLoaded: boolean;
   deletingId: number | null;

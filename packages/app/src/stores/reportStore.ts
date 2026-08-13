@@ -15,7 +15,7 @@ export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
 };
 
 /** 已举报作品记录 */
-export interface ReportRecord {
+interface ReportRecord {
   id: number;
   reason: ReportReason;
   reportedAt: number;

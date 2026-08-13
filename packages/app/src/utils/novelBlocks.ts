@@ -26,7 +26,7 @@ export interface ImageBlock {
 }
 
 /** 分页标记块 */
-export interface PageBreakBlock {
+interface PageBreakBlock {
   type: "pageBreak";
 }
 

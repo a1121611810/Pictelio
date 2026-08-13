@@ -2,7 +2,7 @@ import type { Accessor } from "solid-js";
 import type { PixivIllust } from "../api/types";
 import { addBookmark, deleteBookmark, followUser, unfollowUser } from "../api/illust";
 
-export interface CardInteractions {
+interface CardInteractions {
   bookmarked: Accessor<boolean>;
   toggleBookmark: (e: MouseEvent, privateBookmark?: boolean) => Promise<void>;
   isFollowed: Accessor<boolean>;

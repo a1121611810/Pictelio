@@ -2,7 +2,7 @@ import { prepareWithSegments, layoutNextLine } from "@chenglou/pretext";
 import { ALLOWED_FONT_FAMILIES } from "@/stores/readerSettingsStore";
 
 /** 段落内的单行范围 */
-export interface LineRange {
+interface LineRange {
   /** 段落内字符起始索引 */
   start: number;
   /** 段落内字符结束索引（不包含） */
@@ -26,7 +26,7 @@ export interface ParagraphLayout {
 }
 
 /** 布局函数输入 */
-export interface NovelTextLayoutInput {
+interface NovelTextLayoutInput {
   /** 已净化的纯文本段落数组 */
   paragraphs: string[];
   /** 容器有效宽度 px（已去除 padding） */

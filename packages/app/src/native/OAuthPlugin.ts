@@ -3,7 +3,7 @@ import { registerPlugin } from "@capacitor/core";
 /**
  * OAuthPlugin.startOAuth 的请求参数。
  */
-export interface OAuthStartOptions {
+interface OAuthStartOptions {
   /** Pixiv OAuth 登录 URL（含 PKCE code_challenge）。提供时直接使用此 URL。 */
   loginUrl?: string;
   /** PKCE code_challenge。未提供 loginUrl 时，Native 层自动构建完整 URL。 */
@@ -13,7 +13,7 @@ export interface OAuthStartOptions {
 /**
  * OAuthPlugin.startOAuth 的响应结构。
  */
-export interface OAuthStartResult {
+interface OAuthStartResult {
   /** 从回调 URL 中提取的 authorization_code。 */
   code: string;
 }
@@ -21,7 +21,7 @@ export interface OAuthStartResult {
 /**
  * OAuthPlugin.exchangeCode 的请求参数。
  */
-export interface OAuthExchangeOptions {
+interface OAuthExchangeOptions {
   /** authorization_code。 */
   code: string;
   /** PKCE code_verifier。 */
@@ -31,7 +31,7 @@ export interface OAuthExchangeOptions {
 /**
  * OAuthPlugin.exchangeCode 的响应结构。
  */
-export interface OAuthExchangeResult {
+interface OAuthExchangeResult {
   /** 新的 access_token（Bearer token）。 */
   accessToken: string;
   /** 服务端返回的 refresh_token。 */

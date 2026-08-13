@@ -313,21 +313,15 @@ packages/app/src/
 │   ├── ImageHostSettings.tsx   # 图片托管设置页
 │   ├── ImageCacheSettings.tsx  # 图片缓存设置页
 │   ├── About.tsx               # 关于页
-│   ├── DebugImage.tsx          # 图片调试页
-│   ├── NovelRecommendedFeed.tsx / NovelFollowFeed.tsx / NovelBookmarks.tsx / IllustBookmarks.tsx # 首页 Feed 面板（非独立路由，被 RecommendedFeed/FollowFeed/BookmarksFeed 引用）
+│   ├── DebugImage.tsx          # 图片调试页（无应用内导航入口，E2E 可达，开发诊断用）
 │   └── ...
 ├── components/         # 可复用 UI 组件
-│   ├── AgeGate.tsx              # 年龄门槛组件
 │   ├── BlocklistSheet.tsx       # 屏蔽列表面板
-│   ├── BookmarksFeed.tsx        # 收藏 Feed 渲染
-│   ├── CollapsedHeader.tsx      # 折叠头部
 │   ├── CommentInput.tsx / CommentList.tsx # 评论输入/列表
 │   ├── CommentOverlay.tsx       # 评论浮层组件
 │   ├── ErrorDisplay.tsx         # 统一错误展示组件（按 ApiErrorType 渲染操作指引）
-│   ├── FollowFeed.tsx           # 关注 Feed 渲染
 │   ├── GridCard.tsx             # 网格模式卡片
 │   ├── HeartBurstEffect.tsx     # 收藏爱心爆发效果
-│   ├── HistoryFeed.tsx          # 浏览历史 Feed
 │   ├── IllustActionMenu.tsx     # 作品操作菜单
 │   ├── IllustTags.tsx           # 作品标签显示组件
 │   ├── ImageCard.tsx            # Feed 卡片（含收藏/关注操作、R18 模糊、R18G 遮罩）
@@ -347,7 +341,6 @@ packages/app/src/
 │   ├── PixivImage.tsx           # 图片组件（CDN 代理 + 尺寸优化 + 渐进加载）
 │   ├── PullIndicator.tsx        # 下拉刷新指示器
 │   ├── ReaderSettingsSheet.tsx  # 阅读设置面板
-│   ├── RecommendedFeed.tsx      # 推荐 Feed 渲染
 │   ├── ReportSheet.tsx          # 举报面板
 │   ├── SearchResults.tsx / SearchableTag.tsx # 搜索结果/可点击标签
 │   ├── SeriesSheet.tsx          # 作品系列面板
@@ -365,23 +358,20 @@ packages/app/src/
 │   ├── me/                      # 个人中心专属（Avatar、MenuRow）
 │   ├── novel/                   # 小说阅读器专属（NovelTopBar、NovelCoverCard）
 │   ├── settings/                # 设置页子组件（SettingsAccount/Appearance/Card/Client/Content/Dialogs/Image/Sections/Translate、LogoutRow）
-│   ├── skeletons/               # 骨架屏（Feed/Grid/IllustDetail/List/NovelDetail/Profile）
+│   ├── skeletons/               # 骨架屏（IllustDetail/NovelDetail）
 │   └── ui/                      # 基础 UI（FluentDialog、FluentIcon、GlassTabBar、HeartIcon、InlineRetryBar、StickySubTabs、TagInput）
 ├── primitives/         # 底层抽象（无 UI 的逻辑单元）
 │   ├── createFastScrollbar.ts    # 快速滚动条原语
 │   ├── createFeedVirtualizer.ts  # Feed 虚拟滚动窗口管理
 │   ├── createImageSizeWorker.ts  # 图片尺寸 Web Worker 通信封装
 │   ├── createManualFetch.ts      # 手动 fetch 封装（AbortController 管理）
-│   ├── createNovelLoader.ts      # 小说内容加载器
 │   ├── createNovelSearch.ts      # 小说正文搜索匹配（字符索引）
 │   ├── createNovelTextLayout.ts  # 小说正文纯文本布局（pretext）
 │   ├── createNovelTranslator.ts  # 小说 AI 翻译流程
 │   ├── createNovelVirtualLayout.ts # 小说正文虚拟化窗口管理
 │   ├── createPullToRefresh.ts    # 下拉刷新原语（ADR-0076）
-│   ├── createScrollDirection.ts / createScrollDrivenVisibility.ts / createScrolledPast.ts # 滚动方向/可见性原语
 │   ├── imageSize.worker.ts       # Web Worker 图片尺寸计算
 │   ├── isPretextSupported.ts     # pretext 运行环境检测
-│   ├── measureText.ts            # 文本测量工具
 │   ├── novelTextLayoutCache.ts   # 小说布局结果 LRU 缓存
 │   ├── rootMargins.ts            # 虚拟化 rootMargin 常量
 │   ├── scroll/                   # 滚动行为（createScrollBehavior）

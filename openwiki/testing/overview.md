@@ -13,8 +13,6 @@ The `app-lynx` package has its own separate test suite — ~260 unit test cases 
 - [`lynx-device-check.sh`](/packages/app-lynx/scripts/lynx-device-check.sh) — automated login→recommended page→image ratio check via adb
 - [`lynx-flow-check.sh`](/packages/app-lynx/scripts/lynx-flow-check.sh) — comprehensive full-process device flow check: login → feed scroll → bookmark → illust detail → novel list/reader → Me/R18 toggle → settings page scroll (issue #90). Features resolution-adaptive coordinate scaling and `SETTINGS_ONLY=1` for targeted regression.
 - [`lynx-screen-analyze.py`](/packages/app-lynx/scripts/lynx-screen-analyze.py) — PNG screenshot analyzer with `classify` (page-state identification), `login-elements` (input/button detection), and `topbar-nav` (dynamic top-bar text block detection for resolution-independent tab targeting) modes
-- [`e2e-first-frame.mjs`](/packages/app-lynx/scripts/e2e-first-frame.mjs) — CDP + Vivaldi persistent-profile E2E regression for the first-frame content pattern (#64 — verifies `/recommended` renders immediately for authenticated users without login-page flash)
-- [`e2e-me-scroll.mjs`](/packages/app-lynx/scripts/e2e-me-scroll.mjs) — CDP + Vivaldi E2E regression for Me page scroll (issue #90 — verifies the settings page is scrollable, header stays fixed, and logout button is reachable)
 - [`settingsStore.test.ts`](/packages/app-lynx/src/stores/settingsStore.test.ts) — 12-case `isRestricted` matrix (x_restrict × showR18 × showR18G) + pseudo-glass token contract test against the real `tokens.css` source (issue #97); validates `--glassBgMuted`, `--glassHighlight`, `--glassEdge`, `--glassBorder` tokens and asserts no `backdrop-filter` or `@supports` in the `RestrictOverlay` style block
 
 ```mermaid

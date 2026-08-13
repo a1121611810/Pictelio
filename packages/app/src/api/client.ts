@@ -130,29 +130,6 @@ export function toApiError(e: unknown, fallbackMsg = "加载失败"): ApiError {
   };
 }
 
-/** 错误类型优先级（索引越小越具体/重要） */
-const ERROR_TYPE_PRIORITY: ApiErrorType[] = [
-  ApiErrorType.PROXY,
-  ApiErrorType.NETWORK,
-  ApiErrorType.UNAUTHORIZED,
-  ApiErrorType.RATE_LIMIT,
-  ApiErrorType.SERVER,
-  ApiErrorType.UNKNOWN,
-];
-
-/**
- * 从一组 ApiError 中选出最具体的错误类型
- * 优先级：PROXY > NETWORK > UNAUTHORIZED > RATE_LIMIT > SERVER > UNKNOWN
- */
-export function pickBestErrorType(...errors: ApiError[]): ApiErrorType {
-  for (const t of ERROR_TYPE_PRIORITY) {
-    if (errors.some((e) => e.type === t)) {
-      return t;
-    }
-  }
-  return ApiErrorType.UNKNOWN;
-}
-
 export function classifyError(status: number, error: unknown, responseBody?: unknown): ApiError {
   // 检测代理错误：Vite 代理层返回 { error: "proxy_error", message: "..." }
   // 必须在状态码分类之前检测，因为 proxy_error 可能伴随任何 HTTP 状态码

@@ -6,7 +6,7 @@ import type { ApiError } from "../api/types";
 /**
  * OAuthWebView 组件的属性。
  */
-export interface OAuthWebViewProps {
+interface OAuthWebViewProps {
   /** 是否显示 OAuth 登录弹窗。 */
   open: boolean;
   /** Pixiv OAuth 登录 URL（Android Native 使用）。传入空字符串时使用 codeChallenge */

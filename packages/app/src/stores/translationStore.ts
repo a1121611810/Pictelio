@@ -62,7 +62,7 @@ export async function clearDsApiKey(): Promise<void> {
  * - 1（R18）→ 需「翻译 R18 内容」开关
  * - 2（R18G）→ 需「翻译 R18G 内容」开关（客户端拦截，不发送任何内容）
  */
-export type RestrictPolicy = "allow" | "block";
+type RestrictPolicy = "allow" | "block";
 
 export function decideTranslatePolicy(
   xRestrict: number,
@@ -176,7 +176,7 @@ export const [translating, setTranslating] = createSignal(false);
 export const [translationError, setTranslationError] = createSignal<TranslateError | null>(null);
 
 /** 翻译进度（分块管线 S2：done/total；未翻译为 null） */
-export interface TranslationProgress {
+interface TranslationProgress {
   done: number;
   total: number;
 }

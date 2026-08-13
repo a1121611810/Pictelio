@@ -1,7 +1,7 @@
 import type { Component } from "solid-js";
 import type { PixivComment } from "../api/types";
 
-export interface CommentInputProps {
+interface CommentInputProps {
   posting: boolean;
   postError: string | null;
   replyingTo: PixivComment | null;

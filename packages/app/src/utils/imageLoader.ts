@@ -84,62 +84,6 @@ export function schedulePeriodicGC(): void {
   }, GC_INTERVAL_MS);
 }
 
-/** 停止定时 GC */
-export function stopPeriodicGC(): void {
-  if (gcTimerId !== undefined) {
-    clearInterval(gcTimerId);
-    gcTimerId = undefined;
-  }
-}
-
-// ─── 上下文感知淘汰 ───
-
-/**
- * 清除满足过滤条件的缓存条目。
- * @param filter 返回 true 的 key 将被清除
- */
-export function clearCacheWithFilter(filter: (key: string) => boolean): void {
-  for (const key of loadedKeys.keys()) {
-    if (filter(key)) {
-      loadedKeys.delete(key);
-    }
-  }
-}
-
-/**
- * 清除指定前缀的所有缓存条目。
- * @param keyPrefix URL 前缀，例如 "/pixiv-img/12345"
- */
-export function clearCacheForPrefix(keyPrefix: string): void {
-  for (const key of loadedKeys.keys()) {
-    if (key.startsWith(keyPrefix)) {
-      loadedKeys.delete(key);
-    }
-  }
-}
-
-export interface CacheMemoryStats {
-  totalEntries: number;
-  maxEntries: number;
-  gcThreshold: number;
-  estimatedBytes: number;
-  gcRunning: boolean;
-}
-
-/**
- * 获取当前缓存状态统计。
- */
-export function getMemoryUsage(): CacheMemoryStats {
-  const estimatedBytes = [...loadedKeys.keys()].reduce((sum, key) => sum + key.length * 2, 0);
-  return {
-    totalEntries: loadedKeys.size,
-    maxEntries: MAX_CACHE_ENTRIES,
-    gcThreshold: GC_THRESHOLD,
-    estimatedBytes,
-    gcRunning: gcTimerId !== undefined,
-  };
-}
-
 /** 同步检查图片是否已加载过（不触发加载），命中时返回代理 URL 并刷新 LRU 位置。
  * 代理 URL 走浏览器 HTTP 缓存（0ms，不产生 blob: 条目），
  * 而 blob: URL 需 0.5ms 的 createObjectURL + 跨语言边界解码开销。 */
@@ -254,7 +198,7 @@ const inflightRequests = new Map<string, Promise<LoadedImage>>();
 
 // ─── 带缓存的图片加载 ───
 
-export interface LoadedImage {
+interface LoadedImage {
   url: string;
   cleanup: () => void;
 }
@@ -342,7 +286,7 @@ async function loadImageInner(originalUrl: string): Promise<LoadedImage> {
 
 // ─── 带进度回调的图片加载 ───
 
-export interface LoadProgress {
+interface LoadProgress {
   /** 已下载字节数 */
   loaded: number;
   /** 总字节数（Content-Length），为 null 表示未知 */
@@ -351,7 +295,7 @@ export interface LoadProgress {
   percent: number;
 }
 
-export interface LoadImageResultWithProgress {
+interface LoadImageResultWithProgress {
   url: string;
   cleanup: () => void;
   /** 下载耗时（毫秒） */

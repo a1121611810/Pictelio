@@ -235,9 +235,6 @@ importers:
       '@capacitor/core':
         specifier: ^8.5.0
         version: 8.5.0
-      '@capacitor/device':
-        specifier: ^8.0.3
-        version: 8.0.3(@capacitor/core@8.5.0)
       '@capacitor/preferences':
         specifier: ^8.0.1
         version: 8.0.1(@capacitor/core@8.5.0)
@@ -734,11 +731,6 @@ packages:
 
   '@capacitor/core@8.5.0':
     resolution: {integrity: sha512-Ca4krtqH1hothjtBIwf2J2TW7IhYq1ujp8QeItTiJohNsqij8ja2DYYH3DU0l8RmxCWaBAFTGA2TgOgOMCSNsQ==}
-
-  '@capacitor/device@8.0.3':
-    resolution: {integrity: sha512-rliPCCZwxtjU6200jJNDAsQhioyozV3fGgiP+NgRqtDOI7i+Jdz+DYNwEup+3MGZZ4NEmkuFaBeWLM3T01vJRg==}
-    peerDependencies:
-      '@capacitor/core': '>=8.0.0'
 
   '@capacitor/ios@8.4.2':
     resolution: {integrity: sha512-ClVzIjK++yRjsRPOpdEzhsZfbHfoEc0f4M6vD0v7sWh0qcoF6NkxNAeHpWTn4OPJpJfpGGoYsq+IfEHrYyBiWA==}
@@ -7907,10 +7899,6 @@ snapshots:
   '@capacitor/core@8.5.0':
     dependencies:
       tslib: 2.8.1
-
-  '@capacitor/device@8.0.3(@capacitor/core@8.5.0)':
-    dependencies:
-      '@capacitor/core': 8.5.0
 
   '@capacitor/ios@8.4.2(@capacitor/core@8.5.0)':
     dependencies:
@@ -15188,7 +15176,6 @@ time:
   '@capacitor/app@8.1.1': '2026-07-15T10:23:28.483Z'
   '@capacitor/cli@8.5.0': '2026-07-31T15:49:41.083Z'
   '@capacitor/core@8.5.0': '2026-07-31T15:49:56.237Z'
-  '@capacitor/device@8.0.3': '2026-07-15T10:23:28.310Z'
   '@capacitor/preferences@8.0.1': '2026-02-12T18:04:12.324Z'
   '@chenglou/pretext@0.0.8': '2026-06-12T07:17:05.585Z'
   '@commitlint/cli@21.2.1': '2026-07-08T07:48:07.331Z'

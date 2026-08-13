@@ -17,7 +17,7 @@ export const CLIENT_KIND_KEY = "pictelio_client_kind";
 export const DEFAULT_CLIENT: ClientKind = "webview";
 
 /** 切换结果：error modes 显式声明（接口契约的一部分，UI 据此映射 toast） */
-export type SwitchOutcome =
+type SwitchOutcome =
   | { ok: true }
   | { ok: false; reason: "busy" | "write-failed" | "timeout" | "restart-failed" };
 

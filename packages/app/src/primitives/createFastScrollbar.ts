@@ -13,12 +13,12 @@ import { createSignal } from "solid-js";
  * 便于单测构造假事件。scroll 位置由组件在 scroll 事件里驱动。
  */
 
-export interface PointerLike {
+interface PointerLike {
   clientY: number;
   preventDefault: () => void;
 }
 
-export interface FastScrollbar {
+interface FastScrollbar {
   /** thumb 高度 px（视口²/内容，clamp 24 ~ 轨道高） */
   thumbHeight: () => number;
   /** thumb 顶部偏移 px */
@@ -34,7 +34,7 @@ export interface FastScrollbar {
   };
 }
 
-export interface FastScrollbarOptions {
+interface FastScrollbarOptions {
   /** 当前滚动位置 px */
   getScrollTop: () => number;
   /** 视口高度 px */

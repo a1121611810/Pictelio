@@ -130,13 +130,3 @@ export function getNovelTextLayoutCache(): NovelTextLayoutCache {
 export function clearNovelTextLayoutCache(): void {
   cache.length = 0;
 }
-
-/** @deprecated 仅用于兼容旧命名，等价于 getNovelTextLayoutCache().set(...) */
-export function setNovelTextLayoutCache(
-  novelId: number,
-  containerWidth: number,
-  settings: ReaderSettings,
-  result: NovelTextLayoutResult,
-): void {
-  cacheInstance.set(novelId, containerWidth, settings, result);
-}

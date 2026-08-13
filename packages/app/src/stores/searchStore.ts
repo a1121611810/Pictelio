@@ -12,7 +12,7 @@ import { toApiError } from "@/api/client";
 import { ApiErrorType } from "@/api/types";
 import { mergeSearchResults } from "@/utils/searchMerger";
 
-export interface SearchStoreState {
+interface SearchStoreState {
   /** Current search keyword */
   keyword: () => string;
   /** Search scope (all / illust / novel) */
@@ -84,16 +84,6 @@ function writeSearchCache(
     if (!first.done) searchCache.delete(first.value);
   }
 }
-
-function clearSearchCache(word?: string, scope?: SearchScope, sort?: SearchSort): void {
-  if (word && scope && sort) {
-    searchCache.delete(getSearchCacheKey(word, scope, sort));
-  } else {
-    searchCache.clear();
-  }
-}
-
-export { clearSearchCache };
 
 export function createSearchStore(): SearchStoreState {
   const [keyword, setKeyword] = createSignal("");

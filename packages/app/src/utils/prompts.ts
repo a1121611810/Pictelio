@@ -7,7 +7,7 @@
  * - 输出约束为「空行分隔段落 + 段落数 = 输入段落数」，供管线保序重组
  */
 
-export interface TranslationPromptOptions {
+interface TranslationPromptOptions {
   /** 目标语言 code（默认 zh-Hans） */
   targetLang?: string;
   /** 检测到的源语言 code（ja / en / other，用于提示词措辞） */

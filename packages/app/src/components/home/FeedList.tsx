@@ -18,7 +18,7 @@ import type { ApiError } from "@/api/types";
  * loadingMore = 分页追加（fetchNextPage）——分页加载绝不触发骨架遮罩。
  */
 
-export interface FeedListSource<T> {
+interface FeedListSource<T> {
   items: () => T[];
   /** 首载中（items 空时显示骨架） */
   loading: () => boolean;
@@ -35,7 +35,7 @@ export interface FeedListSource<T> {
   paginationError?: () => boolean;
 }
 
-export interface FeedListProps<T> {
+interface FeedListProps<T> {
   source: FeedListSource<T>;
   /** 布局容器 class（single=单列大图 / rows=单列行卡，由调用方传容器样式） */
   containerClass: string;

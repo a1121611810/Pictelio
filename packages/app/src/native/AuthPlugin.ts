@@ -3,7 +3,7 @@ import { registerPlugin } from "@capacitor/core";
 /**
  * AuthPlugin.refreshToken 的响应结构。
  */
-export interface AuthRefreshResult {
+interface AuthRefreshResult {
   /** 新的 access_token（Bearer token）。 */
   accessToken: string;
   /** 服务端返回的 refresh_token（可能已轮换）。 */
@@ -21,7 +21,7 @@ export interface AuthRefreshResult {
 /**
  * AuthPlugin.refreshToken 的请求参数。
  */
-export interface AuthRefreshOptions {
+interface AuthRefreshOptions {
   /** 当前有效的 refresh_token。 */
   refreshToken: string;
 }

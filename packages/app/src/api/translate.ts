@@ -17,15 +17,15 @@ import { Capacitor, CapacitorHttp } from "@capacitor/core";
 export const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
 
 /** 翻译可用模型（决策 #22：标准 / 高质量两档，S7 完整档位选择） */
-export const TRANSLATE_MODELS = ["deepseek-v4-flash", "deepseek-v4-pro"] as const;
+const TRANSLATE_MODELS = ["deepseek-v4-flash", "deepseek-v4-pro"] as const;
 export type TranslateModel = (typeof TRANSLATE_MODELS)[number];
 
-export interface TranslateMessage {
+interface TranslateMessage {
   role: "system" | "user";
   content: string;
 }
 
-export interface TranslateRequestPayload {
+interface TranslateRequestPayload {
   /** 用户自填的 DeepSeek API key（BYOK） */
   apiKey: string;
   model: TranslateModel;
@@ -40,7 +40,7 @@ export interface TranslateRequestPayload {
   thinking?: boolean;
 }
 
-export interface TranslateResult {
+interface TranslateResult {
   /** 译文纯文本（模型输出，可能含 \n\n 段落分隔） */
   content: string;
   finishReason: string;
@@ -49,7 +49,7 @@ export interface TranslateResult {
   promptCacheMissTokens?: number;
 }
 
-export type TranslateErrorCode =
+type TranslateErrorCode =
   | "unauthorized" // 401：key 无效
   | "insufficient_balance" // 402：余额不足
   | "rate_limit" // 429
@@ -70,12 +70,12 @@ export class TranslateError extends Error {
   }
 }
 
-export interface HttpResponseLike {
+interface HttpResponseLike {
   status: number;
   text(): Promise<string>;
 }
 
-export type Transport = (
+type Transport = (
   url: string,
   init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal },
 ) => Promise<HttpResponseLike>;
@@ -106,7 +106,7 @@ const nativeTransport: Transport = async (url, init) => {
 };
 
 /** 默认传输层：Native 走 CapacitorHttp，其余走 fetch（可注入以便测试） */
-export function defaultTransport(): Transport {
+function defaultTransport(): Transport {
   return Capacitor.isNativePlatform() ? nativeTransport : webTransport;
 }
 

@@ -92,7 +92,7 @@ export interface PixivNovelDetailResponse {
 }
 
 // ─── 小说导航 ───
-export interface NovelNavItem {
+interface NovelNavItem {
   id: number;
   title: string;
   viewable?: boolean;

@@ -15,7 +15,7 @@ import { createSignal } from "solid-js";
  * 事件处理器接收 TouchEventLike（只读结构子集），既兼容原生 TouchEvent 也便于单测构造假事件。
  */
 
-export type PullPhase = "idle" | "pulling" | "refresh-ready" | "refreshing";
+type PullPhase = "idle" | "pulling" | "refresh-ready" | "refreshing";
 
 /** 触摸事件只读结构（原生 TouchEvent 的结构子集，可赋值兼容——TouchList 是 ArrayLike） */
 export interface TouchEventLike {
@@ -23,7 +23,7 @@ export interface TouchEventLike {
   preventDefault: () => void;
 }
 
-export interface PullToRefresh {
+interface PullToRefresh {
   /** 当前下拉距离（px，阻尼后）——供 PullIndicator 渲染 */
   pullDistance: () => number;
   /** 当前相位——供 PullIndicator zone 渲染 */
@@ -36,7 +36,7 @@ export interface PullToRefresh {
   };
 }
 
-export interface PullToRefreshOptions {
+interface PullToRefreshOptions {
   /** 触发刷新动作（store.refresh，refetch 第一页） */
   onRefresh: () => void | Promise<void>;
   /** 触发阈值 px（默认 60，沿用旧版 VirtualFeed refreshThreshold） */
