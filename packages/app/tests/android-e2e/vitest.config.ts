@@ -6,7 +6,8 @@ import { fileURLToPath } from "node:url";
  * Android 模拟器 E2E（Appium + WebdriverIO）独立 vitest 配置。
  *
  * 与 agent-browser E2E 相同的「driver 封装 + vitest 断言」模式，
- * 但无需 dev server / AI 断言，因此不带 ai-shared 的 globalSetup。
+ * 但无需 dev server / AI 断言，因此不带 ai-shared 的 globalSetup；
+ * 只挂轻量 globalSetup 把 packages/app/.env 注入 process.env（PIXIV_REFRESH_TOKEN 等）。
  * 配置文件位于 tests/android-e2e/ 下，root 显式指向本目录使 include 相对解析。
  */
 const configDir = dirname(fileURLToPath(import.meta.url));
@@ -17,6 +18,7 @@ export default defineConfig({
     name: "android-e2e",
     include: ["specs/**/*.spec.ts"],
     environment: "node",
+    globalSetup: ["./globalSetup.ts"],
     // 完整链路：编译 APK（分钟级）+ 模拟器 boot + session 创建，超时必须宽松
     testTimeout: 300_000,
     // 覆盖 beforeAll 里 setupAndroidE2e 的最坏耗时（编译 600s + boot 300s + install 180s + session 180s）；
