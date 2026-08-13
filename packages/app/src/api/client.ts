@@ -220,8 +220,11 @@ export function classifyError(status: number, error: unknown, responseBody?: unk
 }
 
 /**
- * Web 模式下，将 Pixiv 直连 URL 重写为 Vite 代理路径
- * 原生模式下保持原 URL（CapacitorHttp 可直接访问）
+ * 将请求 path 归一化为客户端实际请求的 URL。
+ *
+ * Web 模式：Pixiv 直连 URL 重写为 Vite 代理路径；
+ * 原生模式：绝对 next_url 剥离为相对路径——插件只接收相对路径
+ * （插件拼 apiBase + path，绝对 URL 会产生双域名导致 Pixiv 404）。
  */
 export function rewriteUrl(path: string): string {
   // 已经是本地代理路径，直接返回
@@ -237,14 +240,21 @@ export function rewriteUrl(path: string): string {
       if (path.startsWith(PIXIV_AUTH_URL)) {
         return "/pixiv-oauth/auth/token";
       }
+    } else {
+      // 原生：插件只接收相对路径（内部拼 apiBase）。绝对 next_url 剥离域名，
+      // 否则会产生双域名（apiBase + 绝对 URL）导致 Pixiv 404。
+      if (path.startsWith(PIXIV_API_BASE)) {
+        const rest = path.slice(PIXIV_API_BASE.length);
+        return rest.startsWith("/") ? rest : `/${rest}`;
+      }
     }
     return path;
   }
-  // 相对路径：web 走 Vite 代理，native 拼完整 URL
+  // 相对路径：web 走 Vite 代理；native 原样交给插件（插件拼 apiBase）
   if (!isNative) {
     return `/pixiv-api${path}`;
   }
-  return `${PIXIV_API_BASE}${path}`;
+  return path;
 }
 
 /**
@@ -281,7 +291,8 @@ async function nativeExecuteRequest<T>(
     if (isNative) {
       const result = await PixivApi.request({
         method,
-        path,
+        // rewriteUrl 归一化：绝对 next_url → 相对路径（防插件双域名 404）
+        path: rewriteUrl(path),
         params: data,
         body: body ? JSON.stringify(body) : undefined,
       });

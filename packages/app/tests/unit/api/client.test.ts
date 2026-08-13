@@ -3,7 +3,7 @@ import { ApiErrorType, type ApiError } from "@/api/types";
 
 vi.mock("@capacitor/core", () => ({
   Capacitor: {
-    isNativePlatform: () => false,
+    isNativePlatform: () => isNativeMock(),
   },
   registerPlugin: vi.fn(() => ({
     request: vi.fn(),
@@ -11,6 +11,8 @@ vi.mock("@capacitor/core", () => ({
     prefetchImage: vi.fn(),
   })),
 }));
+
+const { isNativeMock } = vi.hoisted(() => ({ isNativeMock: vi.fn(() => false) }));
 
 vi.mock("@/native/PixivApi", () => ({
   PixivApi: { request: vi.fn(), syncToken: vi.fn(), prefetchImage: vi.fn() },
@@ -243,6 +245,42 @@ describe("rewriteUrl", () => {
   it("returns http URLs as-is in web mode (non-pixiv)", async () => {
     const { rewriteUrl } = await loadModule();
     expect(rewriteUrl("https://example.com/image.jpg")).toBe("https://example.com/image.jpg");
+  });
+
+  it("strips Pixiv host from absolute next_url in native mode", async () => {
+    isNativeMock.mockReturnValue(true);
+    try {
+      const { rewriteUrl } = await loadModule();
+      // 原生插件只拼 apiBase + 相对路径；绝对 next_url 必须剥离域名，否则双域名 404
+      expect(rewriteUrl("https://app-api.pixiv.net/v1/search/illust?word=x&offset=30")).toBe(
+        "/v1/search/illust?word=x&offset=30",
+      );
+      expect(rewriteUrl("https://app-api.pixiv.net/v1/illust/recommended")).toBe(
+        "/v1/illust/recommended",
+      );
+    } finally {
+      isNativeMock.mockReturnValue(false);
+    }
+  });
+
+  it("keeps non-pixiv http URLs as-is in native mode", async () => {
+    isNativeMock.mockReturnValue(true);
+    try {
+      const { rewriteUrl } = await loadModule();
+      expect(rewriteUrl("https://example.com/image.jpg")).toBe("https://example.com/image.jpg");
+    } finally {
+      isNativeMock.mockReturnValue(false);
+    }
+  });
+
+  it("keeps relative paths as-is in native mode (plugin prepends apiBase)", async () => {
+    isNativeMock.mockReturnValue(true);
+    try {
+      const { rewriteUrl } = await loadModule();
+      expect(rewriteUrl("/v1/illust/detail")).toBe("/v1/illust/detail");
+    } finally {
+      isNativeMock.mockReturnValue(false);
+    }
   });
 });
 
