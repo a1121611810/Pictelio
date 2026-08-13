@@ -69,6 +69,7 @@ export const illusts = store.items;
 export const nextUrl = store.nextUrl;
 export const loading = store.loading;
 export const error = store.error;
+export const paginationError = store.paginationError;
 export { restrict };
 
 export const ensureLoaded = store.ensureLoaded;

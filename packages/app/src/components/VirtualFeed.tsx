@@ -5,6 +5,7 @@ import SkeletonCard from "./SkeletonCard";
 import GridCard from "./GridCard";
 import PullIndicator from "./PullIndicator";
 import ErrorDisplay from "./ErrorDisplay";
+import InlineRetryBar from "./ui/InlineRetryBar";
 import type { PixivIllust, ApiError } from "../api/types";
 import type { LayoutMode } from "../primitives/types";
 import { createFeedVirtualizer } from "../primitives/createFeedVirtualizer";
@@ -16,6 +17,8 @@ interface Props {
   illusts: PixivIllust[];
   loading: boolean;
   error: ApiError | null;
+  /** 当前错误是否来自分页（fetchNextPage）。为 true 时不显示上方 ErrorDisplay，改为列表底部内联重试条 */
+  paginationError?: boolean;
   hasMore: boolean;
   onIllustClick: (id: number) => void;
   onAuthorClick?: (userId: number) => void;
@@ -68,6 +71,7 @@ const VirtualFeed: Component<Props> = (props) => {
     items: () => props.illusts,
     loading: () => props.loading,
     error: () => props.error,
+    paginationError: () => props.paginationError === true,
     hasMore: () => props.hasMore,
     onLoadMore: () => props.onLoadMore(),
     onRefresh: () => Promise.resolve(props.onRefresh()),
@@ -136,7 +140,9 @@ const VirtualFeed: Component<Props> = (props) => {
         settingsThreshold={PULL_THRESHOLD_SETTINGS}
       />
 
-      {props.error && <ErrorDisplay error={props.error} onRetry={() => props.onRefresh()} />}
+      {props.error && !props.paginationError && (
+        <ErrorDisplay error={props.error} onRetry={() => props.onRefresh()} />
+      )}
 
       {(props.loading || !loadAttempted) &&
         props.illusts.length === 0 &&
@@ -219,6 +225,11 @@ const VirtualFeed: Component<Props> = (props) => {
           {props.emptyText ?? "暂无新作品"}
         </p>
       )}
+
+      {/* 分页失败：保留已加载结果，在列表底部显示内联重试条（只重试失败页） */}
+      <Show when={props.error && props.paginationError && props.illusts.length > 0}>
+        <InlineRetryBar message="加载更多失败" onRetry={props.onLoadMore} />
+      </Show>
 
       <div ref={sentinelAttach} class="h-1" />
     </div>

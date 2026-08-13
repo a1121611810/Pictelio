@@ -136,7 +136,10 @@ export const loading = () =>
 export const error = (): ApiError | null =>
   normalizeQueryError(contentType() === "novel" ? novelQuery.error : illustQuery.error);
 
-export { contentType };
+// ── 分页错误标记（fetchNextPage 失败置 true；load 新内容时复位） ──
+const [paginationError, setPaginationError] = createSignal(false);
+
+export { paginationError, contentType };
 
 // ── Actions ──
 
@@ -159,17 +162,17 @@ export function load(userId: number, type: ContentType = "illust", force = false
 }
 
 export async function loadMore() {
-  if (contentType() === "novel") {
-    if (!novelQuery.hasNextPage || novelQuery.isFetchingNextPage) {
-      return;
-    }
-    await novelQuery.fetchNextPage();
+  const q = contentType() === "novel" ? novelQuery : illustQuery;
+  if (!q.hasNextPage || q.isFetchingNextPage) {
     return;
   }
-  if (!illustQuery.hasNextPage || illustQuery.isFetchingNextPage) {
-    return;
+  // 分页开始先复位；settle 后由无错变有错 → 判定分页失败（保留已加载结果）
+  const hadError = q.isError;
+  setPaginationError(false);
+  await q.fetchNextPage();
+  if (q.isError && !hadError) {
+    setPaginationError(true);
   }
-  await illustQuery.fetchNextPage();
 }
 
 /** Switch content type. Does not trigger fetch by itself. */

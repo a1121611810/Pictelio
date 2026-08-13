@@ -3,6 +3,9 @@ import { For, Show } from "solid-js";
 import { createPullToRefresh } from "@/primitives/createPullToRefresh";
 import PullIndicator from "@/components/PullIndicator";
 import FeedPaginationSentinel from "@/components/home/FeedPaginationSentinel";
+import ErrorDisplay from "@/components/ErrorDisplay";
+import InlineRetryBar from "@/components/ui/InlineRetryBar";
+import type { ApiError } from "@/api/types";
 
 /**
  * 统一 Feed 列表容器（ADR-0078）——深模块：小接口（source + 布局 + 渲染回调）背后
@@ -26,6 +29,10 @@ export interface FeedListSource<T> {
   nextUrl: () => string | null;
   fetchMore: () => Promise<unknown> | undefined;
   refresh: () => Promise<unknown> | void;
+  /** 首载/分页错误（error 非空即失败；配合 paginationError 区分首载失败 vs 分页失败） */
+  error?: () => ApiError | null;
+  /** 分页失败标记：error 非空 + paginationError=true = 分页失败，保留列表、底部内联重试 */
+  paginationError?: () => boolean;
 }
 
 export interface FeedListProps<T> {
@@ -49,6 +56,9 @@ export function FeedList<T>(props: FeedListProps<T>): JSX.Element {
   });
 
   const items = () => props.source.items();
+  // 错误派生（source 可选字段统一归并）：error 非空 = 存在失败；paginationError = 是否为分页失败
+  const error = () => props.source.error?.() ?? null;
+  const paginationError = () => props.source.paginationError?.() ?? false;
 
   const list = () => (
     <>
@@ -71,9 +81,18 @@ export function FeedList<T>(props: FeedListProps<T>): JSX.Element {
             <For each={items()}>{(item) => props.renderItem(item)}</For>
           </div>
         )}
+        {/* 首载失败（items 空 + error 非空 + 非分页失败）：渲染错误提示而非空态，重试绑 refresh */}
+        <Show when={error() != null && !paginationError()}>
+          <ErrorDisplay error={error()!} onRetry={() => void props.source.refresh()} />
+        </Show>
+        {/* 分页失败（error 非空 + paginationError）：保留已加载列表，底部显示内联重试条（只重试失败页） */}
+        <Show when={error() != null && paginationError()}>
+          <InlineRetryBar message="加载更多失败" onRetry={() => void props.source.fetchMore()} />
+        </Show>
         <FeedPaginationSentinel
           hasMore={() => !!props.source.nextUrl()}
           loadMore={() => void props.source.fetchMore()}
+          disabled={() => !!(error() != null && paginationError())}
         />
         <Show when={props.source.loadingMore()}>
           <div class="flex justify-center py-[var(--spacingVerticalM)]">
@@ -91,7 +110,7 @@ export function FeedList<T>(props: FeedListProps<T>): JSX.Element {
       when={props.source.loading() && items().length === 0}
       fallback={
         <Show
-          when={items().length > 0 || pull.pullPhase() === "refreshing"}
+          when={items().length > 0 || pull.pullPhase() === "refreshing" || error() != null}
           fallback={props.empty?.() ?? null}
         >
           {list()}

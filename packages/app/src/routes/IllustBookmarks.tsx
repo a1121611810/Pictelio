@@ -4,6 +4,7 @@ import {
   nextUrl,
   loading,
   error,
+  paginationError,
   restrict,
   ensureLoaded,
   fetchMore,
@@ -77,6 +78,7 @@ const IllustBookmarks: Component = () => {
         illusts={illusts()}
         loading={loading()}
         error={error()}
+        paginationError={paginationError()}
         hasMore={nextUrl() !== null}
         onIllustClick={(id) => navigate(`/illust/${id}`)}
         onAuthorClick={(id) => navigate(`/user/${id}`)}

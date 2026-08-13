@@ -28,6 +28,8 @@ export interface FeedVirtualizerConfig<T> {
   loading: Accessor<boolean>;
   /** Current error, if any */
   error: Accessor<ApiError | null>;
+  /** 当前错误是否来自分页（fetchNextPage）。为 true 时暂停 sentinel，避免失败后无退避自动重试 */
+  paginationError?: Accessor<boolean>;
   /** Whether there are more items to load */
   hasMore: Accessor<boolean>;
   /** Called when the sentinel triggers (load more pages) */
@@ -139,7 +141,10 @@ export function createFeedVirtualizer<T>(config: FeedVirtualizerConfig<T>): Feed
   // ── Sentinel paginator ──
   const { attach: sentinelAttach } = createSentinel({
     rootMargin: VIRTUAL_SCROLL_MARGIN,
-    enabled: () => config.hasMore() && !config.loading(),
+    enabled: () =>
+      config.hasMore() &&
+      !config.loading() &&
+      !(config.error() != null && config.paginationError?.() === true),
     onTrigger: () => config.onLoadMore(),
   });
 

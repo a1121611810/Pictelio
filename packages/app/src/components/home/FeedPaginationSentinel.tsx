@@ -13,6 +13,8 @@ interface FeedPaginationSentinelProps {
   hasMore: () => boolean;
   /** 加载下一页回调 */
   loadMore: () => void;
+  /** 分页失败时禁用哨兵（内联重试模式，避免失败后无退避自动重试） */
+  disabled?: () => boolean;
 }
 
 const FeedPaginationSentinel: Component<FeedPaginationSentinelProps> = (props) => {
@@ -23,7 +25,9 @@ const FeedPaginationSentinel: Component<FeedPaginationSentinelProps> = (props) =
     if (!el) return;
     const io = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting && props.hasMore()) props.loadMore();
+        if (entries[0]?.isIntersecting && props.hasMore() && props.disabled?.() !== true) {
+          props.loadMore();
+        }
       },
       { rootMargin: "300px" },
     );

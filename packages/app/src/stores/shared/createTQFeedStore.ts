@@ -122,6 +122,9 @@ export type TQFeedStoreResult<TItem> = {
   /** 当前最具体的错误（按优先级选择） */
   error: Accessor<ApiError | null>;
 
+  /** 当前错误是否来自分页追加（fetchNextPage）而非首载/刷新。分页失败时保留已加载结果 */
+  paginationError: Accessor<boolean>;
+
   /** 判断当前 tab 是否有缓存数据 */
   isCached: () => boolean;
 
@@ -356,6 +359,11 @@ export function createTQFeedStore<
 
     const loading: Accessor<boolean> = () => activeQueries().some((q) => q.isFetching);
 
+    // ── 分页错误标记 ──
+    // fetchNextPage 失败时置 true（已加载结果保留，组件显示底部内联重试）；
+    // fetchNextPage/refetch 成功或首载时置 false。
+    const [paginationError, setPaginationError] = createSignal(false);
+
     // 语义分离（ADR-0078）：refreshing 仅指 refetch 第一页（下拉刷新）；
     // 分页追加用 loadingMore（isFetchingNextPage）——避免分页加载被误判为下拉刷新
     // （首页 A1 骨架遮罩曾因此把分页也渲染成清空重载）。
@@ -403,6 +411,8 @@ export function createTQFeedStore<
     };
 
     const refresh = async (_signal?: AbortSignal): Promise<unknown[]> => {
+      // 刷新成功 → 分页错误标记复位（q.error 被 TanStack 清除时 error() 自然归 null）
+      setPaginationError(false);
       return Promise.all(activeQueries().map((q) => q.refetch()));
     };
 
@@ -411,7 +421,18 @@ export function createTQFeedStore<
       if (!first || !first.hasNextPage || first.isFetchingNextPage) {
         return undefined;
       }
-      return first.fetchNextPage();
+      // 分页开始 → 先复位标记；settle 后若 query 由无错变为有错，判定为分页失败
+      const hadError = first.isError;
+      setPaginationError(false);
+      const p = first.fetchNextPage();
+      void tryAsync(
+        Promise.resolve(p).then(() => {
+          if (first.isError && !hadError) {
+            setPaginationError(true);
+          }
+        }),
+      );
+      return p;
     };
 
     // ── 7. 公开 API ──
@@ -423,6 +444,7 @@ export function createTQFeedStore<
       refreshing,
       loadingMore,
       error,
+      paginationError,
       isCached,
       ensureLoaded,
       refresh,

@@ -60,6 +60,9 @@ export const error = (): ApiError | null => {
   return fallbackError() ?? store.error();
 };
 
+/** 分页失败标记（fetchNextPage 失败置 true；刷新/首载成功时复位） */
+export const paginationError = store.paginationError;
+
 export function isNovelBookmarkCached(): boolean {
   return store.isCached();
 }

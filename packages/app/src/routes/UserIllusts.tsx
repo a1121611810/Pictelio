@@ -7,6 +7,7 @@ import {
   nextUrl,
   loading,
   error,
+  paginationError,
   contentType,
   load,
   loadMore,
@@ -110,6 +111,7 @@ const UserIllusts: Component = () => {
             novels={novels()}
             loading={loading()}
             error={error()}
+            paginationError={paginationError()}
             hasMore={nextUrl() !== null}
             onIllustClick={(id) => void navigate(`/illust/${id}`)}
             onNovelClick={(id) => void navigate(`/novel/${id}`)}

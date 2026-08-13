@@ -4,6 +4,7 @@ import {
   nextUrl,
   loading,
   error,
+  paginationError,
   bookmarkRestrict,
   ensureLoaded,
   fetchMore,
@@ -109,6 +110,7 @@ const NovelBookmarks: Component<Props> = (props) => {
         novels={novels()}
         loading={loading()}
         error={error()}
+        paginationError={paginationError()}
         hasMore={nextUrl() !== null}
         onNovelClick={(id) => navigate(`/novel/${id}`)}
         onAuthorClick={(id) => navigate(`/user/${id}`)}

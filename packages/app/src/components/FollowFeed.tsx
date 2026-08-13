@@ -5,6 +5,7 @@ import {
   loading,
   refreshing,
   error,
+  paginationError,
   ensureLoaded,
   fetchMore,
   refresh,
@@ -95,6 +96,7 @@ const FollowFeed: Component<FollowFeedProps> = (props) => {
           illusts={filteredIllusts()}
           loading={loading() || refreshing()}
           error={error()}
+          paginationError={paginationError()}
           hasMore={nextUrl() !== null}
           onIllustClick={(id) => void navigate(`/illust/${id}`)}
           onAuthorClick={(id) => void navigate(`/user/${id}`)}

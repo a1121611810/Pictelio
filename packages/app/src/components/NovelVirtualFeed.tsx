@@ -6,6 +6,7 @@ import SkeletonCard from "./SkeletonCard";
 import LoadingSpinner from "./LoadingSpinner";
 import ErrorDisplay from "./ErrorDisplay";
 import PullIndicator from "./PullIndicator";
+import InlineRetryBar from "./ui/InlineRetryBar";
 import type { PixivNovel, ApiError } from "../api/types";
 import type { NovelLayoutMode } from "../stores/settingsStore";
 
@@ -15,6 +16,8 @@ interface Props {
   novels: PixivNovel[];
   loading: boolean;
   error: ApiError | null;
+  /** 当前错误是否来自分页（fetchNextPage）。为 true 时不显示上方 ErrorDisplay，改为列表底部内联重试条 */
+  paginationError?: boolean;
   hasMore: boolean;
   onNovelClick: (id: number) => void;
   onLoadMore: () => void;
@@ -45,6 +48,7 @@ const NovelVirtualFeed: Component<Props> = (props) => {
     items: () => props.novels,
     loading: () => props.loading,
     error: () => props.error,
+    paginationError: () => props.paginationError === true,
     hasMore: () => props.hasMore,
     onLoadMore: () => props.onLoadMore(),
     onRefresh: () => Promise.resolve(props.onRefresh()),
@@ -79,7 +83,9 @@ const NovelVirtualFeed: Component<Props> = (props) => {
         settingsThreshold={120}
       />
 
-      {props.error && <ErrorDisplay error={props.error} onRetry={() => props.onRefresh()} />}
+      {props.error && !props.paginationError && (
+        <ErrorDisplay error={props.error} onRetry={() => props.onRefresh()} />
+      )}
 
       {props.loading &&
         props.novels.length === 0 &&
@@ -174,6 +180,11 @@ const NovelVirtualFeed: Component<Props> = (props) => {
           暂无小说
         </p>
       )}
+
+      {/* 分页失败：保留已加载结果，在列表底部显示内联重试条（textList / coverWall 通用插入点） */}
+      <Show when={props.error && props.paginationError && props.novels.length > 0}>
+        <InlineRetryBar message="加载更多失败" onRetry={props.onLoadMore} />
+      </Show>
 
       <div ref={sentinelAttach} class="h-1" />
     </div>

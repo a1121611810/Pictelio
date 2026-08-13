@@ -12,7 +12,7 @@
 import type { Component } from "solid-js";
 import { createEffect, onMount } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import type { PixivIllust, PixivNovel } from "@/api/types";
+import type { PixivIllust, PixivNovel, ApiError } from "@/api/types";
 import PageTransition from "@/components/PageTransition";
 import { FeedList } from "@/components/home/FeedList";
 import { markContentReady } from "@/native/splashBridge";
@@ -30,6 +30,8 @@ import {
   refreshing as recIllustRefreshing,
   loadingMore as recIllustLoadingMore,
   refresh as recIllustRefresh,
+  error as recIllustError,
+  paginationError as recIllustPaginationError,
 } from "@/stores/recommendedStore";
 import {
   illusts as followIllusts,
@@ -41,6 +43,8 @@ import {
   refreshing as followIllustRefreshing,
   loadingMore as followIllustLoadingMore,
   refresh as followIllustRefresh,
+  error as followIllustError,
+  paginationError as followIllustPaginationError,
 } from "@/stores/followStore";
 import {
   illusts as bmkIllusts,
@@ -52,6 +56,8 @@ import {
   refreshing as bmkIllustRefreshing,
   loadingMore as bmkIllustLoadingMore,
   refresh as bmkIllustRefresh,
+  error as bmkIllustError,
+  paginationError as bmkIllustPaginationError,
 } from "@/stores/bookmarkStore";
 // ── 小说数据源（推荐/关注/收藏）──
 import {
@@ -63,6 +69,8 @@ import {
   refreshing as recNovelRefreshing,
   loadingMore as recNovelLoadingMore,
   refresh as recNovelRefresh,
+  error as recNovelError,
+  paginationError as recNovelPaginationError,
 } from "@/stores/novelRecommendedStore";
 import {
   novels as followNovels,
@@ -74,6 +82,8 @@ import {
   refreshing as followNovelRefreshing,
   loadingMore as followNovelLoadingMore,
   refresh as followNovelRefresh,
+  error as followNovelError,
+  paginationError as followNovelPaginationError,
 } from "@/stores/novelFollowStore";
 import {
   novels as bmkNovels,
@@ -85,6 +95,8 @@ import {
   refreshing as bmkNovelRefreshing,
   loadingMore as bmkNovelLoadingMore,
   refresh as bmkNovelRefresh,
+  error as bmkNovelError,
+  paginationError as bmkNovelPaginationError,
 } from "@/stores/novelBookmarkStore";
 
 /** renderPanel 实际调用的内容域 Tab（历史由 shell 内建，不进入面板）。 */
@@ -104,6 +116,10 @@ interface FeedSource<T> {
   loadingMore: () => boolean;
   /** 触发刷新（refetch 第一页）——下拉刷新 onRefresh 用 */
   refresh: () => Promise<unknown> | void;
+  /** 首载/分页错误（error 非空即失败） */
+  error: () => ApiError | null;
+  /** 分页失败标记（error 非空 + paginationError=true = 分页失败，保留列表、底部内联重试） */
+  paginationError: () => boolean;
 }
 
 /** 插画数据源映射（Tab → store；recommended 无 activate，用 ensureLoaded）。 */
@@ -119,6 +135,8 @@ function illustSource(tab: FeedTab): FeedSource<PixivIllust> {
       refreshing: recIllustRefreshing,
       loadingMore: recIllustLoadingMore,
       refresh: recIllustRefresh,
+      error: recIllustError,
+      paginationError: recIllustPaginationError,
     };
   }
   if (tab === "follow") {
@@ -132,6 +150,8 @@ function illustSource(tab: FeedTab): FeedSource<PixivIllust> {
       refreshing: followIllustRefreshing,
       loadingMore: followIllustLoadingMore,
       refresh: followIllustRefresh,
+      error: followIllustError,
+      paginationError: followIllustPaginationError,
     };
   }
   return {
@@ -144,6 +164,8 @@ function illustSource(tab: FeedTab): FeedSource<PixivIllust> {
     refreshing: bmkIllustRefreshing,
     loadingMore: bmkIllustLoadingMore,
     refresh: bmkIllustRefresh,
+    error: bmkIllustError,
+    paginationError: bmkIllustPaginationError,
   };
 }
 
@@ -160,6 +182,8 @@ function novelSource(tab: FeedTab): FeedSource<PixivNovel> {
       refreshing: recNovelRefreshing,
       loadingMore: recNovelLoadingMore,
       refresh: recNovelRefresh,
+      error: recNovelError,
+      paginationError: recNovelPaginationError,
     };
   }
   if (tab === "follow") {
@@ -173,6 +197,8 @@ function novelSource(tab: FeedTab): FeedSource<PixivNovel> {
       refreshing: followNovelRefreshing,
       loadingMore: followNovelLoadingMore,
       refresh: followNovelRefresh,
+      error: followNovelError,
+      paginationError: followNovelPaginationError,
     };
   }
   return {
@@ -185,6 +211,8 @@ function novelSource(tab: FeedTab): FeedSource<PixivNovel> {
     refreshing: bmkNovelRefreshing,
     loadingMore: bmkNovelLoadingMore,
     refresh: bmkNovelRefresh,
+    error: bmkNovelError,
+    paginationError: bmkNovelPaginationError,
   };
 }
 
@@ -257,6 +285,8 @@ const IllustFeedPanel: Component<{ tab: FeedTab }> = (props) => {
         nextUrl: () => src().nextUrl(),
         fetchMore: () => src().fetchMore(),
         refresh: () => src().refresh(),
+        error: () => src().error(),
+        paginationError: () => src().paginationError(),
       }}
       containerClass="flex flex-col gap-[var(--spacingVerticalM)] px-4 pt-3"
       refreshMode="overlay"
@@ -285,6 +315,8 @@ const NovelFeedPanel: Component<{ tab: FeedTab }> = (props) => {
         nextUrl: () => src().nextUrl(),
         fetchMore: () => src().fetchMore(),
         refresh: () => src().refresh(),
+        error: () => src().error(),
+        paginationError: () => src().paginationError(),
       }}
       containerClass="flex flex-col gap-[var(--spacingVerticalM)] px-4 pt-3"
       refreshMode="overlay"

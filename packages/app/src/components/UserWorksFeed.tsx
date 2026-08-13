@@ -10,6 +10,8 @@ interface Props {
   novels: PixivNovel[];
   loading: boolean;
   error: ApiError | null;
+  /** 当前错误是否来自分页（fetchNextPage）。为 true 时不显示上方 ErrorDisplay，改为列表底部内联重试条 */
+  paginationError?: boolean;
   hasMore: boolean;
   onIllustClick: (id: number) => void;
   onNovelClick: (id: number) => void;
@@ -27,6 +29,7 @@ const UserWorksFeed: Component<Props> = (props) => {
           illusts={props.illusts}
           loading={props.loading}
           error={props.error}
+          paginationError={props.paginationError}
           hasMore={props.hasMore}
           onIllustClick={props.onIllustClick}
           onAuthorClick={props.onAuthorClick}
@@ -40,6 +43,7 @@ const UserWorksFeed: Component<Props> = (props) => {
           novels={props.novels}
           loading={props.loading}
           error={props.error}
+          paginationError={props.paginationError}
           hasMore={props.hasMore}
           onNovelClick={props.onNovelClick}
           onAuthorClick={props.onAuthorClick}
