@@ -78,4 +78,32 @@ describe("searchStore executeSearch", () => {
       dispose();
     });
   });
+
+  it("skips re-entrant executeSearch with the same params (abort race guard)", async () => {
+    let resolveIllust!: (v: unknown) => void;
+    const pending = new Promise((r) => (resolveIllust = r));
+    mockSearchIllust.mockReturnValue(pending);
+
+    await createRoot(async (dispose) => {
+      const store = createSearchStore();
+      store.setScope("illust");
+      store.setKeyword("reentrant-guard-check");
+
+      const p1 = store.executeSearch();
+      // 第二次同参数调用在飞行中直接跳过，不发起新请求、不 abort 第一个
+      const p2 = store.executeSearch();
+      expect(mockSearchIllust).toHaveBeenCalledTimes(1);
+
+      resolveIllust({
+        illusts: [{ id: 1, create_date: "2026-01-01T00:00:00+09:00" }],
+        next_url: "https://app-api.pixiv.net/v1/search/illust?word=test&offset=30",
+      });
+      await Promise.all([p1, p2]);
+      expect(store.results()).toHaveLength(1);
+      expect(store.loading()).toBe(false);
+      expect(store.hasMore()).toBe(true);
+
+      dispose();
+    });
+  });
 });

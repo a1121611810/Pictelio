@@ -137,96 +137,109 @@ export function createSearchStore(): SearchStoreState {
     abortController = new AbortController();
   }
 
+  // ── 防重入：同参数搜索在飞行时跳过 ──
+  // 场景：搜索框提交后 navigate 改变 URL → URL 同步 effect 再次调用 executeSearch。
+  // 若不跳过，第二次会 abort 第一次的请求，两者都静默失败，结果被清空。
+  let inFlightSearchKey: string | null = null;
+
   async function executeSearch() {
     const kw = keyword().trim();
     if (!kw) return;
 
-    abortPrevious();
-    const signal = abortController!.signal;
-    pendingRequests = 0;
-
     const currentScope = scope();
     const currentSort = sort();
+    const searchKey = `${kw}_${currentScope}_${currentSort}`;
+    // 相同参数搜索已在飞行 → 跳过（由第一个请求负责写入结果）
+    if (inFlightSearchKey === searchKey) return;
+    inFlightSearchKey = searchKey;
 
-    // Check internal cache first
-    const cached = readSearchCache(kw, currentScope, currentSort);
-    if (cached) {
-      setIllustResults(cached.illustResults);
-      setNovelResults(cached.novelResults);
-      setHasMoreIllust(cached.hasMoreIllust);
-      setHasMoreNovel(cached.hasMoreNovel);
-      setNextIllustUrl(cached.nextIllustUrl);
-      setNextNovelUrl(cached.nextNovelUrl);
+    try {
+      abortPrevious();
+      const signal = abortController!.signal;
+      pendingRequests = 0;
+
+      // Check internal cache first
+      const cached = readSearchCache(kw, currentScope, currentSort);
+      if (cached) {
+        setIllustResults(cached.illustResults);
+        setNovelResults(cached.novelResults);
+        setHasMoreIllust(cached.hasMoreIllust);
+        setHasMoreNovel(cached.hasMoreNovel);
+        setNextIllustUrl(cached.nextIllustUrl);
+        setNextNovelUrl(cached.nextNovelUrl);
+        setError(null);
+        setLoading(false);
+        return;
+      }
+
+      incPending();
       setError(null);
-      setLoading(false);
-      return;
-    }
+      // Clear previous results to avoid stale data on partial failure
+      setIllustResults([]);
+      setNovelResults([]);
+      setHasMoreIllust(false);
+      setHasMoreNovel(false);
+      setNextIllustUrl(null);
+      setNextNovelUrl(null);
 
-    incPending();
-    setError(null);
-    // Clear previous results to avoid stale data on partial failure
-    setIllustResults([]);
-    setNovelResults([]);
-    setHasMoreIllust(false);
-    setHasMoreNovel(false);
-    setNextIllustUrl(null);
-    setNextNovelUrl(null);
+      const [err] = await tryAsync(
+        (async () => {
+          const currentTarget = searchTarget();
+          let anySucceeded = false;
 
-    const [err] = await tryAsync(
-      (async () => {
-        const currentTarget = searchTarget();
-        let anySucceeded = false;
-
-        if (currentScope === "illust" || currentScope === "all") {
-          const [illustErr, illustRes] = await tryAsync(
-            searchIllust(kw, currentSort, currentTarget, signal),
-          );
-          if (illustErr) {
-            if ((illustErr as Error).name === "AbortError") throw illustErr;
-            if (currentScope === "illust") throw illustErr;
-          } else {
-            setIllustResults(illustRes!.illusts);
-            setHasMoreIllust(illustRes!.next_url != null);
-            setNextIllustUrl(illustRes!.next_url);
-            anySucceeded = true;
+          if (currentScope === "illust" || currentScope === "all") {
+            const [illustErr, illustRes] = await tryAsync(
+              searchIllust(kw, currentSort, currentTarget, signal),
+            );
+            if (illustErr) {
+              if ((illustErr as Error).name === "AbortError") throw illustErr;
+              if (currentScope === "illust") throw illustErr;
+            } else {
+              setIllustResults(illustRes!.illusts);
+              setHasMoreIllust(illustRes!.next_url != null);
+              setNextIllustUrl(illustRes!.next_url);
+              anySucceeded = true;
+            }
           }
-        }
 
-        if (currentScope === "novel" || currentScope === "all") {
-          const [novelErr, novelRes] = await tryAsync(
-            searchNovel(kw, currentSort, currentTarget, signal),
-          );
-          if (novelErr) {
-            if ((novelErr as Error).name === "AbortError") throw novelErr;
-            if (currentScope === "novel") throw novelErr;
-          } else {
-            setNovelResults(novelRes!.novels);
-            setHasMoreNovel(novelRes!.next_url != null);
-            setNextNovelUrl(novelRes!.next_url);
-            anySucceeded = true;
+          if (currentScope === "novel" || currentScope === "all") {
+            const [novelErr, novelRes] = await tryAsync(
+              searchNovel(kw, currentSort, currentTarget, signal),
+            );
+            if (novelErr) {
+              if ((novelErr as Error).name === "AbortError") throw novelErr;
+              if (currentScope === "novel") throw novelErr;
+            } else {
+              setNovelResults(novelRes!.novels);
+              setHasMoreNovel(novelRes!.next_url != null);
+              setNextNovelUrl(novelRes!.next_url);
+              anySucceeded = true;
+            }
           }
-        }
 
-        // scope=all: both failed, set error
-        if (currentScope === "all" && !anySucceeded) {
-          setError({ type: ApiErrorType.UNKNOWN, message: "搜索失败，请稍后重试" });
-        }
+          // scope=all: both failed, set error
+          if (currentScope === "all" && !anySucceeded) {
+            setError({ type: ApiErrorType.UNKNOWN, message: "搜索失败，请稍后重试" });
+          }
 
-        // 写入搜索结果缓存
-        writeSearchCache(kw, currentScope, currentSort, {
-          illustResults: illustResults(),
-          novelResults: novelResults(),
-          hasMoreIllust: hasMoreIllust(),
-          hasMoreNovel: hasMoreNovel(),
-          nextIllustUrl: nextIllustUrl(),
-          nextNovelUrl: nextNovelUrl(),
-        });
-      })(),
-    );
-    decPending();
-    if (err) {
-      if ((err as Error).name === "AbortError") return;
-      setError(toApiError(err));
+          // 写入搜索结果缓存
+          writeSearchCache(kw, currentScope, currentSort, {
+            illustResults: illustResults(),
+            novelResults: novelResults(),
+            hasMoreIllust: hasMoreIllust(),
+            hasMoreNovel: hasMoreNovel(),
+            nextIllustUrl: nextIllustUrl(),
+            nextNovelUrl: nextNovelUrl(),
+          });
+        })(),
+      );
+      decPending();
+      if (err) {
+        if ((err as Error).name === "AbortError") return;
+        setError(toApiError(err));
+      }
+    } finally {
+      inFlightSearchKey = null;
     }
   }
 
