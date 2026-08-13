@@ -1,5 +1,5 @@
 {
-  "version": "4.10.1",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.10.1",
-  "changelog": "🐛 修复\n  ecfbd22 fix(reader): effectiveFontSize 改纯函数并抽离视口源模块\n🧹 杂项\n  2625257 chore(deps): 按 ADR-0080 升级 14 项依赖并消解 lynx peer 警告"
+  "version": "4.10.2",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.10.2",
+  "changelog": "🐛 修复\n  db728d2 fix(search): 同参数搜索防重入，修复首次搜索空结果竞态\n  701b8e3 fix(api): 原生分页 next_url 归一化为相对路径，修复 Android 搜索翻页 4xx"
 }
