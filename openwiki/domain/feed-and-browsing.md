@@ -141,6 +141,8 @@ User settings control visibility of each tier. An **AgeConfirmation** gate (`/pa
 
 **Popular sort routing:** When `sort=popular_desc` is selected, the search API routes to Pixiv's `/v1/search/popular-preview/illust` or `/v1/search/popular-preview/novel` endpoints instead of the standard `/v1/search/illust` or `/v1/search/novel` endpoints. These popular-preview endpoints return a single un-paginated page of popular results in that category without the `sort` parameter — the `popular_desc` sort mode is implicit in the endpoint choice.
 
+**Re-entrancy guard:** `executeSearch()` skips a duplicate in-flight search carrying the same `keyword_scope_sort` key (the first request owns result writing). This prevents a race where the search-box submit navigates (changing the URL) and the URL-sync effect re-triggers `executeSearch()` — without the guard the second call would abort the first, leaving both to fail silently and clearing results. The guard is cleared in a `finally` block.
+
 **Auto-load via sentinel:** `SearchResults` (`/packages/app/src/components/SearchResults.tsx`) uses an IntersectionObserver sentinel (`createSentinel`) placed at the bottom of the results list. When the sentinel scrolls into view and `hasMore` is true, `onLoadMore` fires automatically — replacing the earlier manual "Load more" button UX. An end-of-results separator ("没有更多了") appears when `hasMore` becomes false.
 
 ## Bookmarks

@@ -41,6 +41,8 @@ All native Pixiv API requests route through the **PixivApiPlugin** Java Capacito
 4. Response JSON is returned to JS via JSBridge
 5. **access_token is never passed back to JavaScript**
 
+**Path normalization (`rewriteUrl`):** `nativeExecuteRequest` passes the request path through `rewriteUrl()` before the plugin call. The plugin accepts only a **relative** path (Java concatenates `apiBase + path`), so `rewriteUrl` strips the Pixiv host from absolute `next_url` values (e.g. `https://app-api.pixiv.net/v1/search/illust?...` → `/v1/search/illust?...`) and leaves relative paths untouched. Passing an absolute URL would produce a double-domain URL (`apiBase + https://app-api.pixiv.net/...`) and Pixiv returns 404.
+
 This replaces the previous architecture (three native paths: CapacitorHttp, PictelioHttp with DoH DNS, and fetch). The old `PictelioHttpPlugin.java` and `PictelioHttp.ts` were deleted.
 
 ### Web/Dev Transport
