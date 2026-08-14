@@ -41,6 +41,134 @@ function ab(...args: string[]): string {
   return (result.stdout ?? "").trim();
 }
 
+// ─── batch 调用（D 方向：合并多次 spawn，消除 per-command 进程启动开销） ───
+
+/**
+ * batch 单命令结果（逐命令恢复后的结构化形式）。
+ * 对应 CLI stdout JSON 数组元素：
+ * `{"command":[...],"error":null,"result":{"result":"...","snapshot":"..."},"success":true}`
+ */
+export interface BatchResult {
+  /** 原始命令 argv（如 `["eval","document.title"]` / `["snapshot","-i"]`） */
+  command: string[];
+  /** 该命令是否成功。batch 逐命令语义：整批 exit 1 ≠ 全部失败，必须看这个字段 */
+  success: boolean;
+  /**
+   * 命令输出：eval 命令为 JSON 编码的返回值（`result.result`），
+   * snapshot 命令为 a11y 树文本（`result.snapshot`），其余命令可能为 null。
+   */
+  output: string | null;
+  /** 失败时的错误消息；成功为 null */
+  error: string | null;
+}
+
+/** CLI `batch --json` 的原始输出结构（仅声明 driver 依赖的字段，其余忽略） */
+interface RawBatchEntry {
+  command?: unknown;
+  success?: unknown;
+  error?: unknown;
+  result?: {
+    result?: unknown;
+    snapshot?: unknown;
+  } | null;
+}
+
+// batch 内命令在同一已连接会话内顺序执行，总超时按命令数线性放大
+//（单命令沿用独立调用的 30s 上限；5 命令探测批 = 150s 兜底，正常实测 <1s）。
+const BATCH_TIMEOUT_PER_COMMAND = 30_000;
+
+// D 报告 3.5 节硬约束：spawnSync 默认 maxBuffer=1MB，实测 150 命令 batch 输出 4.38MB
+// 会被静默截断导致 JSON 解析失败。取 16MB（约为全量实测的 3.7 倍余量）。
+// 调用方仍须按输出体积分批：单批预算 ≤1MB（约 ≤15 个 snapshot 或 ≤100 个 eval）。
+const BATCH_MAX_BUFFER = 16 * 1024 * 1024;
+
+/**
+ * 一次进程调用顺序执行多条 agent-browser 命令（D 方向：消除 per-command spawn 开销，
+ * 实测纯 eval 序列 41.2ms/命令 → 1.7ms/命令）。
+ *
+ * 硬约束实现要点（D 报告第 3 节，违反即错误）：
+ * 1. **必须 stdin JSON 模式**（`batch --json` + stdin 传 JSON 数组）：参数模式会把命令
+ *    字符串二次解析，带引号的 JS（如 `document.querySelector('h1')`）被破坏成
+ *    `querySelector(h1)` 抛 ReferenceError；stdin JSON 模式引号/中文/换行全保真。
+ * 2. **maxBuffer 16MB**：默认 1MB 在大 batch 下被截断（见 BATCH_MAX_BUFFER 注释）。
+ * 3. **逐命令错误恢复**：任一命令失败 → CLI 整体 exit 1、stderr 为空、错误在 stdout
+ *    JSON 的 `error` 字段。因此**不能**复用 ab() 的 `status !== 0 即抛`——那会把整批
+ *    误判失败并丢失同批成功命令的结果。这里解析 stdout JSON、按 `success` 逐命令检查，
+ *    收集所有失败后抛出一条汇总 Error（保留"失败即抛"语义，失败绝不静默降级）。
+ *
+ * 表达能力限制（D 报告 4.2）：batch 是固定序列，**无法表达条件分支/轮询循环**，
+ * 调用方需自行做"探测→决策"两段式拆分。
+ *
+ * @param commands - 命令数组，每个元素是一条完整命令的 argv（如 `["eval", js]`、`["snapshot", "-i"]`）
+ * @returns 与 commands 等长、按序对应的结果数组
+ * @throws 任一命令失败（消息汇总全部失败命令），或进程级失败 / 输出缺失 / JSON 不可解析
+ */
+export function abBatch(commands: string[][]): BatchResult[] {
+  if (commands.length === 0) return [];
+  console.log(
+    `[agent-browser] agent-browser batch --json（stdin JSON，${commands.length} 条命令）`,
+  );
+  for (const cmd of commands) {
+    console.log(`[agent-browser]   ├ ${redactSecrets(cmd.join(" "))}`);
+  }
+  const result = spawnSync("agent-browser", ["batch", "--json"], {
+    input: JSON.stringify(commands),
+    encoding: "utf-8",
+    timeout: BATCH_TIMEOUT_PER_COMMAND * commands.length,
+    maxBuffer: BATCH_MAX_BUFFER,
+    shell: false,
+  });
+  if (result.error) throw result.error;
+  const stdout = (result.stdout ?? "").trim();
+  // 注意：status !== 0 只说明"至少一条命令失败"，不代表进程级失败。
+  // 进程级失败的判定 = stdout 为空或不可解析。
+  if (!stdout) {
+    throw new Error(
+      `agent-browser batch 无输出（exit ${result.status}）: ${redactSecrets((result.stderr ?? "").trim())}`,
+    );
+  }
+  let raw: unknown;
+  try {
+    raw = JSON.parse(stdout);
+  } catch (err) {
+    throw new Error(
+      `agent-browser batch 输出不是合法 JSON（exit ${result.status}）: ` +
+        `${err instanceof Error ? err.message : String(err)}; ` +
+        `stdout 前 200 字符: ${redactSecrets(stdout.slice(0, 200))}`,
+      { cause: err },
+    );
+  }
+  if (!Array.isArray(raw) || raw.length !== commands.length) {
+    throw new Error(
+      `agent-browser batch 输出条数与请求不符（期望 ${commands.length} 条）: ` +
+        redactSecrets(stdout.slice(0, 200)),
+    );
+  }
+  const results: BatchResult[] = (raw as RawBatchEntry[]).map((entry, i) => {
+    const command = Array.isArray(entry.command) ? entry.command.map(String) : commands[i];
+    const success = entry.success === true;
+    const error = typeof entry.error === "string" ? entry.error : null;
+    const evalOutput = typeof entry.result?.result === "string" ? entry.result.result : null;
+    const snapshotOutput =
+      typeof entry.result?.snapshot === "string" ? entry.result.snapshot : null;
+    return { command, success, output: evalOutput ?? snapshotOutput, error };
+  });
+  // 逐命令错误恢复：收集全部失败后一次抛出（等价 ab() 的"失败即抛"，且保留全部失败诊断）。
+  // 调用方需要容错时应自行 catch（如 clickReliable 探测失败回退串行路径，且必须打日志）。
+  const failures = results.filter((r) => !r.success);
+  if (failures.length > 0) {
+    const detail = failures
+      .map((f) => `[${f.command.join(" ")}] ${f.error ?? "未知错误"}`)
+      .join("；");
+    throw new Error(
+      redactSecrets(
+        `agent-browser batch ${failures.length}/${results.length} 条命令失败: ${detail}`,
+      ),
+    );
+  }
+  return results;
+}
+
 // ─── 工具函数（导出以便 fixture 使用） ─────────────
 
 /**
@@ -173,7 +301,12 @@ export class AgentBrowserDriver {
    * 等待 DOM 中匹配选择器的元素数量 ≥ count（分页加载、列表增长等）。
    * 例：await driver.waitForCount('[data-testid="illust-card"]', 2) 等第二张卡片。
    */
-  async waitForCount(selector: string, count: number, timeoutMs = 10_000, intervalMs = 500): Promise<boolean> {
+  async waitForCount(
+    selector: string,
+    count: number,
+    timeoutMs = 10_000,
+    intervalMs = 500,
+  ): Promise<boolean> {
     return this.waitForProbe(
       "document.querySelectorAll(" + JSON.stringify(selector) + ").length >= " + count,
       timeoutMs,
@@ -225,8 +358,55 @@ export class AgentBrowserDriver {
     return false;
   }
 
+  // ── clickReliable 注入 JS 构造器（探测路径与串行兜底路径共用，防止两处漂移） ──
+
+  /** 步骤 0：scope 容器内精确点击（探测+点击原子执行，消除同文本多元素歧义） */
+  private jsScopeClick(scopeSelector: string, text: string): string {
+    return `(() => {
+          const root = document.querySelector(${JSON.stringify(scopeSelector)});
+          if (!root) return 'no-scope';
+          const btn = [...root.querySelectorAll('button, fluent-button, fluent-switch, [role="button"], [role="switch"]')]
+            .find((el) => el.textContent && el.textContent.includes(${JSON.stringify(text)}));
+          if (btn) { btn.click(); return 'clicked'; }
+          return 'not-found';
+        })()`;
+  }
+
+  /** 步骤 2：aria-label 精确点击（选择器含双引号时 CLI click 参数会被破坏，用 evaluate） */
+  private jsAriaClick(label: string): string {
+    return `(() => {
+          const el = document.querySelector(${JSON.stringify(`[aria-label*="${label}"]`)});
+          if (el) { el.click(); return 'clicked'; }
+          return 'not-found';
+        })()`;
+  }
+
+  /** 步骤 4：CSS 选择器精确点击（选择器可能含双引号，evaluate 的 JSON.stringify 转义最可靠） */
+  private jsCssClick(cssSelector: string): string {
+    return `(() => {
+            const el = document.querySelector(${JSON.stringify(cssSelector)});
+            if (el) { el.click(); return 'clicked'; }
+            return 'not-found';
+          })()`;
+  }
+
+  /** 步骤 5：按文本查找按钮并注入 el.click()（fluent-button 自定义元素的 CLI click 不可靠） */
+  private jsTextClick(text: string): string {
+    return `(() => {
+        const btn = [...document.querySelectorAll('button, fluent-button, [role="button"]')]
+          .find((el) => el.textContent && el.textContent.includes(${JSON.stringify(text)}));
+        if (btn) { btn.click(); return 'clicked'; }
+        return 'not-found';
+      })()`;
+  }
+
   /**
    * 带 fallback 链的可靠点击：@e ref → aria-label → 直接 text → CSS → evaluate 注入。
+   *
+   * D 方向曾尝试"探测→决策两段式"（probeClickTargets + clickWithProbe），实测回归：
+   * @e ref 点击对 fluent-button 返回成功但页面无响应，且 textHit 探测结果过期会跳过
+   * 可靠的 evaluate 注入路径（登录按钮点击失效，全量 8 用例失败）。已回退为无条件
+   * 串行链（B 方向 45/45 通过时的行为），保留 js*Click 共享构造器与 abBatch 工具。
    *
    * @param text - 目标文本
    * @param ariaLabel - aria-label 匹配（可选）
@@ -242,16 +422,7 @@ export class AgentBrowserDriver {
   ): Promise<boolean> {
     // 0. scope 定位优先：在指定容器内用 evaluate 精确点击（消除文本歧义）
     if (scopeSelector) {
-      const scoped = await this.evaluate(
-        `(() => {
-          const root = document.querySelector(${JSON.stringify(scopeSelector)});
-          if (!root) return 'no-scope';
-          const btn = [...root.querySelectorAll('button, fluent-button, fluent-switch, [role="button"], [role="switch"]')]
-            .find((el) => el.textContent && el.textContent.includes(${JSON.stringify(text)}));
-          if (btn) { btn.click(); return 'clicked'; }
-          return 'not-found';
-        })()`,
-      );
+      const scoped = await this.evaluate(this.jsScopeClick(scopeSelector, text));
       if (scoped.includes("clicked")) return true;
       if (scoped.includes("no-scope")) {
         console.log(`[driver] scope ${scopeSelector} 不存在，继续 fallback`);
@@ -273,13 +444,7 @@ export class AgentBrowserDriver {
     // 2. 尝试 aria-label（用 evaluate 精确点击：选择器含双引号时 CLI click 参数会被破坏）
     const label = ariaLabel || text;
     try {
-      const r2 = await this.evaluate(
-        `(() => {
-          const el = document.querySelector(${JSON.stringify(`[aria-label*="${label}"]`)});
-          if (el) { el.click(); return 'clicked'; }
-          return 'not-found';
-        })()`,
-      );
+      const r2 = await this.evaluate(this.jsAriaClick(label));
       if (r2.includes("clicked")) return true;
     } catch {
       /* 继续 */
@@ -293,17 +458,10 @@ export class AgentBrowserDriver {
       /* 继续 */
     }
 
-    // 4. CSS fallback（用 evaluate 精确点击：CSS 选择器可能含双引号，
-    //    CLI click 对这类选择器参数会引号嵌套破坏，evaluate 的 JSON.stringify 转义最可靠）
+    // 4. CSS fallback（用 evaluate 精确点击：CSS 选择器可能含双引号）
     if (cssFallback) {
       try {
-        const r4 = await this.evaluate(
-          `(() => {
-            const el = document.querySelector(${JSON.stringify(cssFallback)});
-            if (el) { el.click(); return 'clicked'; }
-            return 'not-found';
-          })()`,
-        );
+        const r4 = await this.evaluate(this.jsCssClick(cssFallback));
         if (r4.includes("clicked")) return true;
       } catch {
         /* 继续 */
@@ -312,13 +470,7 @@ export class AgentBrowserDriver {
 
     // 5. evaluate 注入 el.click()：fluent-button 自定义元素的 CLI click 不可靠
     try {
-      const js = `(() => {
-        const btn = [...document.querySelectorAll('button, fluent-button, [role="button"]')]
-          .find((el) => el.textContent && el.textContent.includes(${JSON.stringify(text)}));
-        if (btn) { btn.click(); return 'clicked'; }
-        return 'not-found';
-      })()`;
-      const result = await this.evaluate(js);
+      const result = await this.evaluate(this.jsTextClick(text));
       if (JSON.parse(result) === "clicked") return true;
     } catch {
       /* 继续 */
