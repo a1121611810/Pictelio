@@ -45,17 +45,26 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 发现链路", 
     expect(result.passed, result.reason).toBe(true);
   }, 120_000);
 
-  it("子 Tab 切换 + 导航栏", async () => {
-    await driver.clickReliable("漫画");
+  it("内容类型切换 + 导航栏", async () => {
+    // 内容类型切换器（ContentTypeToggle）仅「插画/小说」两段，
+    // 「漫画/综合」子 Tab 已随 ADR-0075 移除，改用「小说」切换验证。
+    await driver.clickReliable("小说");
     await SLEEP(2000);
     let state = await getState(driver);
-    let result = await aiAssert("漫画子 Tab 内容加载", state);
+    let result = await aiAssert(
+      "切换到「小说」内容类型，小说 Feed 加载（小说卡片列表或空状态）",
+      state,
+    );
     expect(result.passed, result.reason).toBe(true);
 
-    await driver.clickReliable("综合");
+    await driver.clickReliable("插画");
     await SLEEP(2000);
 
-    await driver.clickReliable("关注", undefined, '[aria-label*="关注"]');
+    await driver.clickReliable(
+      "关注",
+      undefined,
+      'nav[aria-label="主导航"] button[aria-label="关注"]',
+    );
     await SLEEP(3000);
     state = await getState(driver);
     result = await aiAssert("关注 Tab 页面正常显示投稿或空状态", state);
@@ -78,7 +87,7 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 作品链路", 
   it("点卡片 → 详情页", async () => {
     await SLEEP(3000);
     // 等待卡片渲染（feed 加载可能较慢），再尝试点击
-    await driver.waitForSelector(".image-card", 10_000);
+    await driver.waitForSelector('[data-testid="illust-card"]', 10_000);
     const ok = await driver.clickFirst();
     if (!ok) throw new Error("找不到可点击的元素");
     await SLEEP(5000);
@@ -120,7 +129,8 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 作品链路", 
   }, 60_000);
 
   it("返回 Feed", async () => {
-    await driver.clickReliable("推荐");
+    // 详情页无导航外壳（C-shell 后 NavBar 不再全局挂载），直接 SPA 导航回 /home
+    await driver.navigateSpa("/home");
     await SLEEP(3000);
     const state = await getState(driver);
     const result = await aiAssert("返回推荐 Feed，页面正常展示", state);
@@ -191,8 +201,11 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 个人链路", 
   });
 
   it("个人中心 → 用户信息", async () => {
-    // 点击页面顶部用户名（client-side 路由跳转到 /me）
-    await driver.evaluate('document.querySelector("h1")?.click()');
+    // 点击侧边导航底部「我的」（UserAvatar 按钮，aria-label="我的"）跳转到 /me。
+    // C-shell（ADR-0075）后 /home 的 h1 是 Tab 标签，点击无导航。
+    await driver.evaluate(
+      `document.querySelector('nav[aria-label="主导航"] button[aria-label="我的"]')?.click()`,
+    );
     // 等待个人中心数据加载完成
     for (let i = 0; i < 10; i++) {
       await SLEEP(1000);
@@ -206,7 +219,7 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 个人链路", 
   }, 60_000);
 
   it("查看收藏夹", async () => {
-    // 在个人中心页面点击"我的收藏"（内容区域，非底部导航栏）
+    // 在个人中心页面点击"我的收藏"（内容区域菜单行，非侧边导航）
     const ok = await driver.clickReliable("我的收藏");
     if (ok) {
       await SLEEP(3000);
@@ -224,13 +237,19 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 登录流（有
   let driver: AgentBrowserDriver;
 
   beforeAll(async () => {
-    // launch 重试：agent-browser daemon 偶发白屏（页面加载不出），
-    // 与 createLoggedInDriver 的重试机制对齐
+    // launch 重试：agent-browser daemon 偶发白屏（页面加载不出）或 daemon 连接失败
+    // （并行运行时 socket 抖动），与 createLoggedInDriver 的重试机制对齐
     for (let attempt = 0; attempt < 3; attempt++) {
       driver = new AgentBrowserDriver();
-      await driver.launch();
-      if (await driver.waitForPageContent(20_000)) break;
-      console.warn(`[有效 token] 启动白屏（第 ${attempt + 1}/3 次），重新 launch`);
+      try {
+        await driver.launch();
+        if (await driver.waitForPageContent(20_000)) break;
+        console.warn(`[有效 token] 启动白屏（第 ${attempt + 1}/3 次），重新 launch`);
+      } catch (err) {
+        console.warn(
+          `[有效 token] launch 失败（第 ${attempt + 1}/3 次）: ${err instanceof Error ? err.message : String(err)}，重新 launch`,
+        );
+      }
       await driver.close().catch(() => {});
       await new Promise((r) => setTimeout(r, 2000));
     }
@@ -239,64 +258,91 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 登录流（有
     await driver?.close();
   });
 
-  it("年龄确认 → 登录页 → 有效 token 登录成功", async () => {
-    await SLEEP(2000);
-    // 等待页面渲染完成（daemon 冷启动可能白屏较久），再断言年龄确认弹窗
-    await driver.waitForPageContent(20_000);
-    // 1. 年龄确认弹窗
-    let state = await getState(driver);
-    let result = await aiAssert(
-      "页面显示年龄确认弹窗，包含「已满 18 岁」和「未满 18 岁」按钮",
-      state,
-    );
-    expect(result.passed, result.reason).toBe(true);
+  // retry: 0 —— 状态破坏性用例：首次执行会把 token 写进 localStorage 完成登录，
+  // retry 重跑时浏览器停留在登录态，年龄确认弹窗不再出现，必连坐失败（F 报告 2.2：
+  // retry 只重跑测试体，不重置 beforeAll 的 driver 会话）。
+  it(
+    "年龄确认 → 登录页 → 有效 token 登录成功",
+    { retry: 0 },
+    async () => {
+      await SLEEP(2000);
+      // 等待页面渲染完成（daemon 冷启动可能白屏较久），再断言年龄确认弹窗
+      await driver.waitForPageContent(20_000);
+      // 1. 年龄确认弹窗
+      let state = await getState(driver);
+      let result = await aiAssert(
+        "页面显示年龄确认弹窗，包含「已满 18 岁」和「未满 18 岁」按钮",
+        state,
+      );
+      expect(result.passed, result.reason).toBe(true);
 
-    // 2. 确认年龄
-    await driver.clickReliable("已满", undefined, "@e2");
-    await SLEEP(3000);
+      // 2. 确认年龄
+      await driver.clickReliable("已满", undefined, "@e2");
+      await SLEEP(3000);
 
-    state = await getState(driver);
-    result = await aiAssert(
-      "年龄确认后跳转到登录页，页面包含 refresh_token 输入框（fluent-textarea）和「登录」按钮",
-      state,
-    );
-    expect(result.passed, result.reason).toBe(true);
+      state = await getState(driver);
+      result = await aiAssert(
+        "年龄确认后跳转到登录页，页面包含 refresh_token 输入框（fluent-textarea）和「登录」按钮",
+        state,
+      );
+      expect(result.passed, result.reason).toBe(true);
 
-    // 3. 填入有效 token 并登录
-    const token = process.env.PIXIV_REFRESH_TOKEN;
-    if (!token) throw new Error("PIXIV_REFRESH_TOKEN 未设置");
-    const escapedToken = token.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-    await driver.evaluate(
-      `document.querySelector("fluent-textarea").value = '${escapedToken}'; ` +
-        `document.querySelector("fluent-textarea").dispatchEvent(new Event("input", { bubbles: true }));`,
-    );
-    await SLEEP(1000);
-    await driver.clickReliable("登录");
-    await SLEEP(8000);
+      // 3. 填入有效 token 并登录
+      const token = process.env.PIXIV_REFRESH_TOKEN;
+      if (!token) throw new Error("PIXIV_REFRESH_TOKEN 未设置");
+      const escapedToken = token.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+      await driver.evaluate(
+        `document.querySelector("fluent-textarea").value = '${escapedToken}'; ` +
+          `document.querySelector("fluent-textarea").dispatchEvent(new Event("input", { bubbles: true }));`,
+      );
+      await SLEEP(1000);
+      await driver.clickReliable("登录");
 
-    state = await getState(driver);
-    result = await aiAssert(
-      "登录成功，跳转到推荐 Feed 页面（/recommended），展示插画/漫画卡片瀑布流",
-      state,
-    );
-    expect(result.passed, result.reason).toBe(true);
-  }, 120_000);
+      // 条件等待登录完成（慢网络下 OAuth 请求可能超过固定 8s，用轮询替代固定 SLEEP）：
+      // pathname 变为 /home 即登录成功；20s 超时兜底避免悬挂。
+      let path = "";
+      const loginDeadline = Date.now() + 20_000;
+      while (Date.now() < loginDeadline) {
+        path = JSON.parse(await driver.evaluate(`location.pathname`)) as string;
+        if (path === "/home") break;
+        await new Promise((res) => setTimeout(res, 1000));
+      }
+
+      // 登录后落在 /home（router.tsx 无 /recommended 路由；evaluate 输出为 JSON 字符串）
+      expect(path, "登录成功后应落在 /home").toBe("/home");
+
+      // 条件等待推荐 Feed 卡片就绪（登录后 Feed API 请求在途，固定等待不足时
+      // 页面只有导航标题、无卡片，LLM 会误判"未展示插画卡片列表"）。
+      await driver.waitForSelector('[data-testid="illust-card"]', 20_000);
+
+      state = await getState(driver);
+      result = await aiAssert("登录成功，进入首页推荐 Feed，展示插画卡片列表", state);
+      expect(result.passed, result.reason).toBe(true);
+    },
+    120_000,
+  );
 });
 
 describe("agent-browser 登录流（无效 token）", () => {
   let driver: AgentBrowserDriver;
 
   beforeAll(async () => {
-    // launch 重试：agent-browser daemon 偶发白屏，与有效 token 用例对齐
+    // launch 重试：agent-browser daemon 偶发白屏或连接失败（并行运行时 socket 抖动），
+    // 与有效 token 用例对齐。重试循环成功后 driver 已就绪，无需再次 launch。
     for (let attempt = 0; attempt < 3; attempt++) {
       driver = new AgentBrowserDriver();
-      await driver.launch();
-      if (await driver.waitForPageContent(15_000)) break;
-      console.warn(`[无效 token] 启动白屏（第 ${attempt + 1}/3 次），重新 launch`);
+      try {
+        await driver.launch();
+        if (await driver.waitForPageContent(15_000)) break;
+        console.warn(`[无效 token] 启动白屏（第 ${attempt + 1}/3 次），重新 launch`);
+      } catch (err) {
+        console.warn(
+          `[无效 token] launch 失败（第 ${attempt + 1}/3 次）: ${err instanceof Error ? err.message : String(err)}，重新 launch`,
+        );
+      }
       await driver.close().catch(() => {});
       await new Promise((r) => setTimeout(r, 2000));
     }
-    await driver.launch();
     await SLEEP(2000);
     // 清理登录残留（精准删除 token keys，保留 ageConfirmed 等偏好设置）：
     // SecureStorage = capacitor-storage_ 前缀，Preferences = 裸 key / _cap_ 旧前缀。
@@ -344,23 +390,30 @@ describe("agent-browser 登录流（无效 token）", () => {
     await driver?.close();
   });
 
-  it("无效 refresh_token 显示错误提示", async () => {
-    // 填入无效 token
-    await driver.evaluate(
-      `document.querySelector("fluent-textarea").value = 'invalid-token-12345'; ` +
-        `document.querySelector("fluent-textarea").dispatchEvent(new Event("input", { bubbles: true }));`,
-    );
-    await SLEEP(1000);
-    await driver.clickReliable("登录");
-    await SLEEP(5000);
+  // retry: 0 —— 状态破坏性用例：beforeAll 已清理登录残留并导航到登录页，
+  // retry 重跑时页面状态已变（storage 清理过、可能已在登录页），连坐失败。
+  it(
+    "无效 refresh_token 显示错误提示",
+    { retry: 0 },
+    async () => {
+      // 填入无效 token
+      await driver.evaluate(
+        `document.querySelector("fluent-textarea").value = 'invalid-token-12345'; ` +
+          `document.querySelector("fluent-textarea").dispatchEvent(new Event("input", { bubbles: true }));`,
+      );
+      await SLEEP(1000);
+      await driver.clickReliable("登录");
+      await SLEEP(5000);
 
-    const state = await getState(driver);
-    const result = await aiAssert(
-      "使用无效的 refresh_token 登录后，页面显示错误提示信息（如「失败」「错误」「invalid」「error」等）",
-      state,
-    );
-    expect(result.passed, result.reason).toBe(true);
-  }, 60_000);
+      const state = await getState(driver);
+      const result = await aiAssert(
+        "使用无效的 refresh_token 登录后，页面显示错误提示信息（如「失败」「错误」「invalid」「error」等）",
+        state,
+      );
+      expect(result.passed, result.reason).toBe(true);
+    },
+    60_000,
+  );
 });
 
 // ─── Feed 增强链路 ─────────────────────────────────
@@ -399,18 +452,27 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser Feed 增强", (
   }, 120_000);
 
   it("切换到关注 Tab", async () => {
-    const ok = await driver.clickReliable("关注", undefined, '[aria-label*="关注"]');
+    const ok = await driver.clickReliable(
+      "关注",
+      undefined,
+      'nav[aria-label="主导航"] button[aria-label="关注"]',
+    );
     if (!ok) {
       console.log("[Feed 增强] 找不到关注按钮，跳过");
       return;
     }
     await SLEEP(5000);
 
-    const state = await getState(driver);
-    const result = await aiAssert(
-      "切换到「关注」Tab，URL 包含 /following，页面显示关注用户的投稿列表或空状态",
-      state,
+    // 关注是 /home 下 SideNavShell 面板（ADR-0075），URL 不变；
+    // 改断言侧边导航「关注」按钮 aria-current=page。
+    const ariaCurrent = await driver.getAttribute(
+      'nav[aria-label="主导航"] button[aria-label="关注"]',
+      "aria-current",
     );
+    expect(ariaCurrent, "侧边导航「关注」应为当前页").toBe("page");
+
+    const state = await getState(driver);
+    const result = await aiAssert("切换到「关注」Tab，页面显示关注用户的投稿列表或空状态", state);
     expect(result.passed, result.reason).toBe(true);
   }, 60_000);
 });
@@ -586,10 +648,11 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 小说标题滚
   }, 120_000);
 });
 
-// ─── 关注筛选链路 ──────────────────────────────────
-// 覆盖 extra-flows.e2e.ts 的 Following Feed Filters
+// ─── 关注 Feed 链路 ──────────────────────────────────
+// 原「关注筛选」用例已重写：FollowListPage 无「全部/公开/非公开」筛选按钮，
+// 关注 Feed 是 /home 下 SideNavShell 面板（ADR-0075），仅保留面板加载断言。
 
-describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 关注筛选", () => {
+describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 关注 Feed", () => {
   let driver: AgentBrowserDriver;
 
   beforeAll(async () => {
@@ -600,40 +663,37 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 关注筛选", 
     await driver?.close();
   });
 
-  it("关注页显示筛选按钮 → 切换筛选", async () => {
-    // 导航到关注页（scope 限定底部主导航，避免误点卡片上的"关注"按钮）
+  it("关注 Tab 面板正常加载", async () => {
+    // 侧边导航「关注」为纯图标按钮（仅 aria-label），精准定位避免误点卡片按钮
     const ok = await driver.clickReliable(
       "关注",
       undefined,
-      '[aria-label*="关注"]',
-      'nav[aria-label="主导航"]',
+      'nav[aria-label="主导航"] button[aria-label="关注"]',
     );
     if (!ok) {
-      console.log("[关注筛选] 找不到关注按钮，跳过");
+      console.log("[关注 Feed] 找不到关注按钮，跳过");
       return;
     }
     await SLEEP(5000);
 
-    let state = await getState(driver);
-    let result = await aiAssert(
-      "关注 Tab 页面正常加载，页面显示筛选按钮：全部、公开、非公开",
+    // URL 不变（/home 面板切换），断言导航选中态 + 面板内容
+    const ariaCurrent = await driver.getAttribute(
+      'nav[aria-label="主导航"] button[aria-label="关注"]',
+      "aria-current",
+    );
+    expect(ariaCurrent, "侧边导航「关注」应为当前页").toBe("page");
+
+    const state = await getState(driver);
+    const result = await aiAssert(
+      "关注 Tab 页面正常加载，显示关注用户的投稿列表或空状态，无加载错误",
       state,
     );
     expect(result.passed, result.reason).toBe(true);
-
-    // 尝试点击"公开"筛选
-    const publicOk = await driver.clickReliable("公开");
-    if (publicOk) {
-      await SLEEP(3000);
-      state = await getState(driver);
-      result = await aiAssert("点击「公开」筛选后，关注列表切换为公开作品内容，无加载错误", state);
-      expect(result.passed, result.reason).toBe(true);
-    }
   }, 120_000);
 });
 
 // ─── 设置链路（通用）────────────────────────────────
-// 覆盖 extra-flows.e2e.ts 的 About/Theme/Layout
+// 覆盖 extra-flows.e2e.ts 的 About/Theme（布局切换器已随 ADR-0075 移除，不再覆盖）
 
 describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 关于页", () => {
   let driver: AgentBrowserDriver;
@@ -646,13 +706,16 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 关于页", () 
     await driver?.close();
   });
 
-  it("关于页通过设置抽屉打开", async () => {
-    // 点击顶部 appbar 区域打开设置抽屉
-    await driver.evaluate("document.querySelector('[class*=\"surface-appbar\"] h1')?.click()");
+  it("关于页通过设置页打开", async () => {
+    // C-shell（ADR-0075）后设置不再是抽屉：侧边导航「设置」为纯图标按钮
+    // （仅 aria-label，textContent 为空），点击导航到 /settings。
+    await driver.evaluate(
+      `document.querySelector('nav[aria-label="主导航"] button[aria-label="设置"]')?.click()`,
+    );
     await SLEEP(2000);
 
-    // 尝试点击"关于"
-    const aboutOk = await driver.clickReliable("关于");
+    // 尝试点击设置页"关于"行（SettingsAccount，aria-label="关于"）
+    const aboutOk = await driver.clickReliable("关于", undefined, '[aria-label="关于"]');
     if (!aboutOk) {
       // fallback: 直接导航到 /about
       await driver.navigateSpa("/about");
@@ -670,7 +733,7 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 关于页", () 
   }, 60_000);
 });
 
-describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 主题与布局设置", () => {
+describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 主题设置", () => {
   let driver: AgentBrowserDriver;
 
   beforeAll(async () => {
@@ -682,8 +745,10 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 主题与布局
   });
 
   it("主题可在设置中切换（深色/浅色）", async () => {
-    // 打开设置抽屉
-    await driver.evaluate("document.querySelector('[class*=\"surface-appbar\"] h1')?.click()");
+    // 打开设置页（侧边导航「设置」纯图标按钮，仅 aria-label）
+    await driver.evaluate(
+      `document.querySelector('nav[aria-label="主导航"] button[aria-label="设置"]')?.click()`,
+    );
     await SLEEP(2000);
 
     // 尝试切换主题 — 先点击深色
@@ -710,27 +775,6 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 主题与布局
           console.log("[主题] aria-pressed 精确检查跳过:", (e as Error).message);
         }
       }
-    }
-  }, 60_000);
-
-  it("布局模式可在设置中切换", async () => {
-    // 打开设置抽屉
-    await driver.evaluate("document.querySelector('[class*=\"surface-appbar\"] h1')?.click()");
-    await SLEEP(2000);
-
-    // 尝试切换布局模式
-    const layoutOk = await driver.clickReliable("瀑布流");
-    if (layoutOk) {
-      await SLEEP(2000);
-      // 导航回推荐 Feed 验证布局变化生效
-      await driver.navigateSpa("/recommended");
-      await SLEEP(3000);
-      const state = await getState(driver);
-      const result = await aiAssert(
-        "推荐 Feed 页面正常加载，展示插画卡片，布局模式已切换（瀑布流/单列/网格）",
-        state,
-      );
-      expect(result.passed, result.reason).toBe(true);
     }
   }, 60_000);
 });
@@ -861,24 +905,53 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 导航与路由
   });
 
   it("导航栏标签可见并可点击切换", async () => {
-    // 先确认在推荐页
+    // 复位到推荐页（it 重试时页面可能停在上次切换的 Tab，避免首断言连坐失败）
+    await driver.clickReliable(
+      "推荐",
+      undefined,
+      'nav[aria-label="主导航"] button[aria-label="推荐"]',
+    );
+    await driver.waitForSelector('[data-testid="illust-card"]', 10_000);
+
+    // 先确认在推荐页（C-shell 侧边导航：推荐/关注/收藏/历史四个纯图标 Tab）
     let state = await getState(driver);
     let result = await aiAssert(
-      "底部导航栏显示'推荐'、'关注'、'收藏'三个标签，当前在推荐页",
+      "左侧侧边导航栏显示'推荐'、'关注'、'收藏'、'历史'四个图标标签，当前选中推荐页",
       state,
     );
     expect(result.passed, result.reason).toBe(true);
 
-    // 切换到收藏
-    await driver.clickReliable("收藏");
-    await SLEEP(3000);
+    // 切换到收藏（侧边导航 Tab 为纯图标按钮，用 aria-label 精准定位）。
+    // 等待收藏面板就绪（收藏卡片出现或「暂无内容」空态）而非固定 SLEEP：
+    // 固定 3s 在收藏 Feed 加载慢时不足，LLM 会把骨架态误判为"内容缺失"。
+    await driver.clickReliable(
+      "收藏",
+      undefined,
+      'nav[aria-label="主导航"] button[aria-label="收藏"]',
+    );
+    const bookmarksReady = await driver.waitForSelector(
+      '[data-testid="illust-card"], [data-testid="novel-card"]',
+      10_000,
+    );
+    if (!bookmarksReady) {
+      const empty = await driver.evaluate(
+        'document.body.innerText.includes("暂无内容") ? "yes" : "no"',
+      );
+      if (!empty.includes("yes")) {
+        throw new Error("收藏面板 10s 内未就绪（无卡片且无「暂无内容」空态）");
+      }
+    }
     state = await getState(driver);
     result = await aiAssert("点击'收藏'后切换到收藏页面，展示收藏的作品列表或空状态", state);
     expect(result.passed, result.reason).toBe(true);
 
     // 切换到推荐
-    await driver.clickReliable("推荐");
-    await SLEEP(3000);
+    await driver.clickReliable(
+      "推荐",
+      undefined,
+      'nav[aria-label="主导航"] button[aria-label="推荐"]',
+    );
+    await driver.waitForSelector('[data-testid="illust-card"]', 10_000);
     state = await getState(driver);
     result = await aiAssert("点击'推荐'后回到推荐 Feed 页面，展示插画卡片瀑布流", state);
     expect(result.passed, result.reason).toBe(true);

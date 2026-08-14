@@ -35,7 +35,7 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 超长链", () 
     await SLEEP(3000);
     const state = await getPageState(driver);
     const result = await aiAssert(
-      "已成功登录 Pictelio，当前在推荐 Feed 页面，显示插画/漫画卡片的瀑布流",
+      "已成功登录 Pictelio，当前在推荐 Feed 页面（/home），显示插画卡片列表",
       state,
     );
     expect(result.passed, result.reason).toBe(true);
@@ -55,26 +55,31 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 超长链", () 
     expect(result.passed, result.reason).toBe(true);
   }, 60_000);
 
-  it("[B4-B6] 子 Tab 切换（综合→漫画→综合）", async () => {
-    await driver.clickReliable("漫画");
+  it("[B4-B6] 内容类型切换（插画→小说→插画）", async () => {
+    // 内容类型切换器（ContentTypeToggle）仅「插画/小说」两段，
+    // 「漫画/综合」子 Tab 已随 ADR-0075 移除。
+    await driver.clickReliable("小说");
     await SLEEP(3000);
     let state = await getPageState(driver);
-    let result = await aiAssert("切换到'漫画'子 Tab，内容切换为漫画作品", state);
+    let result = await aiAssert(
+      "切换到「小说」内容类型，小说 Feed 加载（小说卡片列表或空状态）",
+      state,
+    );
     expect(result.passed, result.reason).toBe(true);
 
-    await driver.clickReliable("综合");
+    await driver.clickReliable("插画");
     await SLEEP(2000);
     state = await getPageState(driver);
-    result = await aiAssert("切换回'综合'Tab，恢复综合内容展示", state);
+    result = await aiAssert("切换回「插画」内容类型，恢复插画卡片 Feed 展示", state);
     expect(result.passed, result.reason).toBe(true);
   }, 60_000);
 
   it("[C1-C2] 点击插画卡片进入详情页", async () => {
-    await driver.clickReliable("综合");
+    await driver.clickReliable("插画");
     await SLEEP(3000);
 
     // 等待卡片渲染（tab 切换后 feed 重载可能较慢），再重试点击
-    await driver.waitForSelector(".image-card", 10_000);
+    await driver.waitForSelector('[data-testid="illust-card"]', 10_000);
     let cardClicked = false;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
@@ -86,7 +91,12 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 超长链", () 
     }
     if (!cardClicked) throw new Error("找不到可点击的卡片");
 
-    await SLEEP(5000);
+    // 条件等待详情页就绪：URL 进入 /illust/ 是路由变化的可靠信号，
+    // 再等页面内容非空（详情页 API 在慢网络下可能超过固定 5s，白屏即假失败）。
+    const detailReady = await driver.waitForUrl("/illust/", 15_000);
+    if (!detailReady) throw new Error("点击卡片后 15s 内未进入 /illust/ 详情页");
+    await driver.waitForPageContent(10_000);
+
     const state = await getPageState(driver);
     const result = await aiAssert(
       "点击卡片后跳转到作品详情页（URL 含 /illust/），展示大图、标题、作者、标签",
@@ -126,12 +136,18 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 超长链", () 
   }, 60_000);
 
   it("[D1-D4] 关注 Feed", async () => {
-    // scope 限定底部主导航，避免误点卡片上的"关注"按钮
+    // 前置用例停在详情页（C-shell 后详情页无导航外壳），先回 /home；
+    // 主导航已改为 SideNavShell 侧边栏（ADR-0075），Tab 为纯图标按钮，
+    // 用 aria-label 精准定位，避免误点卡片上的"关注"按钮。
+    const curPath = JSON.parse(await driver.evaluate(`location.pathname`)) as string;
+    if (!curPath.startsWith("/home")) {
+      await driver.navigateSpa("/home");
+      await SLEEP(3000);
+    }
     const ok = await driver.clickReliable(
       "关注",
       undefined,
-      '[aria-label*="关注"]',
-      'nav[aria-label="主导航"]',
+      'nav[aria-label="主导航"] button[aria-label="关注"]',
     );
     if (!ok) {
       console.log("[D] 找不到关注按钮，跳过");
@@ -146,8 +162,8 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 超长链", () 
   it("[E1-E4] 小说 Feed → 小说详情", async () => {
     // 前置用例可能在详情页（D1-D4 在详情页点不到导航 tab 会静默跳过），
     // 先确保回到 feed 页再切小说 tab
-    const curPath = await driver.evaluate(`location.pathname`);
-    if (!curPath.startsWith("/home") && !curPath.includes("following")) {
+    const curPath = JSON.parse(await driver.evaluate(`location.pathname`)) as string;
+    if (!curPath.startsWith("/home")) {
       console.log(`[E1-E4] 当前路径 ${curPath} 非 feed 页，先导航回 /home`);
       await driver.navigateSpa("/home");
       await SLEEP(3000);
@@ -190,9 +206,9 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 超长链", () 
   }, 30_000);
 
   it("[F1-F4] 个人中心 → 收藏夹", async () => {
-    // "我的"是页面顶部用户名区域，直接导航到 /me
-    // 点击页面顶部用户名（client-side 路由跳转到 /me）
-    await driver.evaluate('document.querySelector("h1")?.click()');
+    // 「我的」入口已改为侧边导航底部 UserAvatar 按钮（aria-label="我的"），
+    // 且前置用例可能停在小说详情页（无侧边导航），直接 SPA 导航到 /me 更稳。
+    await driver.navigateSpa("/me");
     // 等待个人中心数据加载
     for (let i = 0; i < 10; i++) {
       await SLEEP(1000);

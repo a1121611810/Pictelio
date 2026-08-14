@@ -80,20 +80,15 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 更新流程", 
     }
 
     // ── 进入设置页后再注入 mock/spy（页面导航会清空注入的 JS） ──
-    // 启动导航（__root.tsx）会强制跳 /home，直接 navigate 子路由无效，
-    // 必须走 UI 路径：/home 顶部用户名 → /me → "设置"行 → /settings
+    // 启动导航（__root.tsx）会强制跳 /home。C-shell（ADR-0075）后 /home 侧边导航
+    // 「设置」为纯图标按钮（仅 aria-label，textContent 为空，文本匹配不可靠），
+    // 用 aria-label 精准点击；未渲染完成时循环重试。
     for (let attempt = 0; attempt < 6; attempt++) {
       const s = await driver.snapshot();
       if (s.includes("检查更新") || s.includes("账户与数据")) break;
-      if (s.includes("设置")) {
-        // 已在个人中心：点击"设置"行
-        await clickButtonByText(driver, "设置");
-      } else {
-        // 在 /home：点击顶部用户名（h1）进入 /me
-        await driver.evaluate(
-          `(() => { const h = document.querySelector('h1'); if (h) { h.click(); return 'clicked'; } return 'no-h1'; })()`,
-        );
-      }
+      await driver.evaluate(
+        `(() => { const b = document.querySelector('nav[aria-label="主导航"] button[aria-label="设置"]'); if (b) { b.click(); return 'clicked'; } return 'not-found'; })()`,
+      );
       await SLEEP(2500);
     }
     await driver.mockFetch(UPDATE_URL_PATTERN, MOCK_VERSION_JSON);

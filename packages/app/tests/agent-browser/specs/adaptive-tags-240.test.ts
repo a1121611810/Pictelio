@@ -4,16 +4,18 @@
  * 背景：用户报告「360 宽度机型上标签行能显示的宽度只有 240」，期望
  * 「第一个标签完整、第二个结尾点点点、+N 不溢出」，实际「第二个完整、+N 被撑出」。
  *
- * 方法：真实登录（dev 5176）→ 打开 R18/R18G（注入 + UI 兜底，确保推荐有数据）→
- * 首页 variant=A 渲染标签行 → 强制标签行容器 240px（模拟窄机型）→ 等 ResizeObserver
- * 重算 → 读真实 DOM（容器宽/溢出/截断 chip 省略号/+N 是否在容器内）→ 断言。
+ * 方法：真实登录（dev 5173，复用 globalSetup 管理的 Vite server；此前硬编码 5176
+ * 依赖一个不被测试框架管理的外部 server，全量运行时必然连接失败）→ 打开 R18/R18G
+ * （注入 + UI 兜底，确保推荐有数据）→ 首页 variant=A 渲染标签行 → 强制标签行容器
+ * 240px（模拟窄机型）→ 等 ResizeObserver 重算 → 读真实 DOM（容器宽/溢出/截断 chip
+ * 省略号/+N 是否在容器内）→ 断言。
  */
 import { describe, it, expect } from "vitest";
 import { spawnSync } from "node:child_process";
 import { AgentBrowserDriver } from "../driver";
 
 const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const BASE = "http://localhost:5176";
+const BASE = "http://localhost:5173";
 
 /** 设置浏览器视口为 360 宽（真实 resize，RO 自然触发，复现 360 机型场景） */
 function setViewport(w: number, h: number): void {
