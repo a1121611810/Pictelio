@@ -16,8 +16,17 @@ const SPAWN_TIMEOUT = 30_000;
 
 // ─── 底层 CLI 调用 ─────────────────────────────────
 
+// 日志脱敏：refresh_token 等凭证是 ≥16 位的 [A-Za-z0-9_-] 长字符串。
+// fixtures 会把 PIXIV_REFRESH_TOKEN 内联进 evaluate JS，若日志打印完整参数会泄漏明文凭证，
+// 因此在输出前将所有符合该形态的长串替换为 "***"（仅影响日志，不影响实际执行的参数）。
+const SECRET_LIKE_PATTERN = /[A-Za-z0-9_-]{16,}/gu;
+
+function redactSecrets(text: string): string {
+  return text.replace(SECRET_LIKE_PATTERN, "***");
+}
+
 function ab(...args: string[]): string {
-  console.log(`[agent-browser] agent-browser ${args.join(" ")}`);
+  console.log(`[agent-browser] agent-browser ${redactSecrets(args.join(" "))}`);
   const result = spawnSync("agent-browser", args, {
     encoding: "utf-8",
     timeout: SPAWN_TIMEOUT,
@@ -116,6 +125,24 @@ export class AgentBrowserDriver {
   }
 
   /**
+   * 等待 URL 包含指定片段（路由变化的可靠信号）。
+   * 轮询 evaluate location.pathname，超时返回 false。
+   */
+  async waitForUrl(fragment: string, timeoutMs = 10_000): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      try {
+        const path = JSON.parse(await this.evaluate("location.pathname")) as string;
+        if (path.includes(fragment)) return true;
+      } catch {
+        /* 继续等待 */
+      }
+      await new Promise((res) => setTimeout(res, 500));
+    }
+    return false;
+  }
+
+  /**
    * 获取当前页面的 accessibility tree 快照。
    * AI 断言的主要输入源。
    */
@@ -127,7 +154,9 @@ export class AgentBrowserDriver {
    * 通过 @e ref 点击（最可靠的方式）。
    */
   async click(selector: string): Promise<void> {
-    ab("click", `"${selector}"`);
+    // 用 JSON.stringify 包裹：选择器可能含双引号（如 nav[aria-label="主导航"]），
+    // 模板字符串 `"${selector}"` 会产生引号嵌套破坏导致 CLI 参数非法。
+    ab("click", JSON.stringify(selector));
   }
 
   /**
@@ -194,11 +223,17 @@ export class AgentBrowserDriver {
       }
     }
 
-    // 2. 尝试 aria-label
+    // 2. 尝试 aria-label（用 evaluate 精确点击：选择器含双引号时 CLI click 参数会被破坏）
     const label = ariaLabel || text;
     try {
-      await this.click(`[aria-label*="${label}"]`);
-      return true;
+      const r2 = await this.evaluate(
+        `(() => {
+          const el = document.querySelector(${JSON.stringify(`[aria-label*="${label}"]`)});
+          if (el) { el.click(); return 'clicked'; }
+          return 'not-found';
+        })()`,
+      );
+      if (r2.includes("clicked")) return true;
     } catch {
       /* 继续 */
     }
@@ -211,11 +246,18 @@ export class AgentBrowserDriver {
       /* 继续 */
     }
 
-    // 4. CSS fallback
+    // 4. CSS fallback（用 evaluate 精确点击：CSS 选择器可能含双引号，
+    //    CLI click 对这类选择器参数会引号嵌套破坏，evaluate 的 JSON.stringify 转义最可靠）
     if (cssFallback) {
       try {
-        await this.click(cssFallback);
-        return true;
+        const r4 = await this.evaluate(
+          `(() => {
+            const el = document.querySelector(${JSON.stringify(cssFallback)});
+            if (el) { el.click(); return 'clicked'; }
+            return 'not-found';
+          })()`,
+        );
+        if (r4.includes("clicked")) return true;
       } catch {
         /* 继续 */
       }
@@ -242,9 +284,11 @@ export class AgentBrowserDriver {
    * 点击第一个可交互元素（用于点卡片等通用操作）。
    */
   async clickFirst(skipCount = 6): Promise<boolean> {
-    // 1. 尝试 CSS 选择器（不受 snapshot ref 过期影响）
+    // 1. 尝试 CSS 选择器（不受 snapshot ref 过期影响）。
+    //    主 Feed 为 L5 单列 IllustSingleCard（ADR-0075），无 .image-card class，
+    //    用 S4 补充的 data-testid="illust-card" 稳定定位（ImageCard 瀑布流同用）。
     try {
-      await this.click(".image-card");
+      await this.click('[data-testid="illust-card"]');
       return true;
     } catch {
       /* fall through */
@@ -271,7 +315,7 @@ export class AgentBrowserDriver {
     try {
       const r = await this.evaluate(
         `(() => {
-          const el = document.querySelector('.image-card');
+          const el = document.querySelector('[data-testid="illust-card"]');
           if (el) { el.click(); return 'clicked'; }
           return 'not-found';
         })()`,
