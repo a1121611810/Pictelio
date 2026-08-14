@@ -1,0 +1,47 @@
+#!/bin/sh
+# pre-push hook: E2E 锚点静态校验（秒级，不跑浏览器）
+#
+# 背景：agent-browser E2E 曾因"改了 UI 但没人跑 E2E"漂移无人发现。
+# 仅当本次 push 触碰 packages/app/src/ 或 packages/app/tests/agent-browser/ 时，
+# 运行 packages/app/scripts/check-e2e-anchors.mjs 校验 spec 引用的锚点
+# （data-testid / aria-label / 路由等）在 src/ 中是否仍存在；未触碰则零开销放行。
+# 详见 packages/app/tests/agent-browser/TESTING.md「pre-push 静态锚点校验」一节。
+
+zero="0000000000000000000000000000000000000000"
+touched=0
+
+# stdin 逐行：<local ref> <local sha> <remote ref> <remote sha>
+while read -r local_ref local_sha remote_ref remote_sha; do
+  # 删除远端分支：无新代码，无需校验
+  [ "$local_sha" = "$zero" ] && continue
+
+  if [ "$remote_sha" = "$zero" ]; then
+    # 新分支：与 origin/main 的 merge-base 比较；取不到时退化为仅看顶端提交。
+    # 注意：husky 以 sh -e 执行本脚本，命令替换失败必须 || true 兜底
+    base=$(git merge-base "$local_sha" origin/main 2>/dev/null || true)
+    if [ -n "$base" ]; then
+      files=$(git diff --name-only "$base..$local_sha")
+    else
+      files=$(git diff-tree --no-commit-id --name-only -r "$local_sha")
+    fi
+  else
+    files=$(git diff --name-only "$remote_sha..$local_sha")
+  fi
+
+  if printf '%s
+' "$files" | grep -qE '^packages/app/(src/|tests/agent-browser/)'; then
+    touched=1
+    break
+  fi
+done
+
+# 未触碰 UI / E2E 目录：零开销放行
+[ "$touched" -eq 0 ] && exit 0
+
+echo "pre-push: 检测到 packages/app/src 或 tests/agent-browser 改动，运行 E2E 锚点静态校验…"
+node packages/app/scripts/check-e2e-anchors.mjs || {
+  echo "pre-push: E2E 锚点校验失败，push 已阻止。"
+  echo "  - 修复失效锚点（同步 spec 或 src）后重试"
+  echo "  - 确认为误报时可用 git push --no-verify 绕过，并手动跑 pnpm test:agent-browser 兜底"
+  exit 1
+}
