@@ -17,6 +17,7 @@ const ContentTypeToggle: Component = () => (
   <div class="flex items-center gap-0.5 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)] p-0.5">
     {OPTIONS.map((opt) => (
       <button
+        data-testid={`content-type-${opt.key}`}
         class="flex-1 cursor-pointer appearance-none border-none px-3 py-1 font-semibold outline-none transition-all active:scale-95 [font-size:var(--fontSizeBase100)]"
         classList={{
           "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":

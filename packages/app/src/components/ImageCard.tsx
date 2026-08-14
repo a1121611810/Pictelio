@@ -47,7 +47,11 @@ const ImageCard: Component<Props> = (props) => {
   const [mainLoaded, setMainLoaded] = createSignal(false);
 
   return (
-    <div class="image-card surface-card" onClick={() => props.onClick(props.illust.id)}>
+    <div
+      data-testid="illust-card"
+      class="image-card surface-card"
+      onClick={() => props.onClick(props.illust.id)}
+    >
       <div class="relative overflow-hidden">
         {/* Skeleton overlay — 缩略图加载完成后淡出 */}
         <SkeletonShimmer
@@ -145,7 +149,10 @@ const ImageCard: Component<Props> = (props) => {
       </div>
       {/* Info area — A2 宽松 padding（ADR-0070） */}
       <div class="px-[var(--spacingHorizontalL)] py-[var(--spacingVerticalL)]">
-        <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground1)] truncate">
+        <p
+          data-testid="illust-title"
+          class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground1)] truncate"
+        >
           {props.illust.title}
         </p>
         <p class="[font-size:var(--fontSizeBase100)] text-[var(--colorNeutralForeground2)] truncate mt-[var(--spacingVerticalXXS)] flex items-baseline gap-[var(--spacingHorizontalXS)]">

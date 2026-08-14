@@ -64,6 +64,7 @@ const NovelCard: Component<Props> = (props) => {
 
   return (
     <div
+      data-testid="novel-card"
       class="surface-card cursor-pointer active:scale-[0.98]"
       onClick={() => props.onClick(props.novel.id)}
     >
@@ -234,6 +235,7 @@ export const NovelCoverCard: Component<Props> = (props) => {
 
   return (
     <div
+      data-testid="novel-card"
       class="relative surface-card cursor-pointer active:scale-[0.98] flex flex-col h-full"
       onClick={() => props.onClick(props.novel.id)}
     >

@@ -39,6 +39,7 @@ const IllustSingleCard: Component<IllustSingleCardProps> = (props) => {
 
   return (
     <div
+      data-testid="illust-card"
       class="cursor-pointer overflow-hidden rounded-[var(--borderRadiusXLarge)] border border-[var(--colorNeutralStroke1)] bg-[var(--colorNeutralBackground1)] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-98 focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThick)] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
       role="button"
       tabIndex={0}
@@ -84,7 +85,10 @@ const IllustSingleCard: Component<IllustSingleCardProps> = (props) => {
       {/* 信息行：标题 / 作者 + 收藏数（标签组单独一行，不嵌在左侧模块内） */}
       <div class="flex items-center justify-between gap-[var(--spacingHorizontalM)] px-[var(--spacingHorizontalL)] pt-[var(--spacingVerticalM)]">
         <div class="min-w-0">
-          <p class="truncate text-[var(--colorNeutralForeground1)] font-semibold leading-[var(--lineHeightBase300)] [font-size:var(--fontSizeBase300)]">
+          <p
+            data-testid="illust-title"
+            class="truncate text-[var(--colorNeutralForeground1)] font-semibold leading-[var(--lineHeightBase300)] [font-size:var(--fontSizeBase300)]"
+          >
             {props.illust.title}
           </p>
           <p class="mt-[var(--spacingVerticalXXS)] truncate text-[var(--colorNeutralForeground2)] [font-size:var(--fontSizeBase200)]">

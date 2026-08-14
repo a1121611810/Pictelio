@@ -33,6 +33,7 @@ const NovelRowCard: Component<NovelRowCardProps> = (props) => {
 
   return (
     <div
+      data-testid="novel-card"
       class="cursor-pointer rounded-[var(--borderRadiusLarge)] border border-[var(--colorNeutralStroke1)] bg-[var(--colorNeutralBackground1)] p-[var(--spacingHorizontalM)] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-98 focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThick)] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
       role="button"
       tabIndex={0}
@@ -95,7 +96,10 @@ const NovelRowCard: Component<NovelRowCardProps> = (props) => {
                 系列
               </span>
             </Show>
-            <p class="truncate text-[var(--colorNeutralForeground1)] font-semibold leading-[var(--lineHeightBase300)] [font-size:var(--fontSizeBase300)]">
+            <p
+              data-testid="novel-title"
+              class="truncate text-[var(--colorNeutralForeground1)] font-semibold leading-[var(--lineHeightBase300)] [font-size:var(--fontSizeBase300)]"
+            >
               {props.novel.title}
             </p>
           </div>
