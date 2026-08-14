@@ -175,7 +175,27 @@ for (const a of allAnchors) {
     case "data-testid":
     case "aria-label":
     case "placeholder":
-      if (!srcCorpus.includes(a.value)) failures.push(a);
+      // 豁免两类误报：① 含 ${ 的模板占位符（如 navTabActiveJs 的 ${label}，非真实锚点）；
+      // ② 动态模板生成的 testid（如 ContentTypeToggle 的 `content-type-${opt.key}` 实际
+      // 渲染 content-type-novel/illust，src 中是模板字符串，静态 includes 匹配不到）。
+      // 这类锚点由真实浏览器回归（pnpm test:agent-browser）验证，静态校验让位。
+      if (a.value.includes("${")) break;
+      // 动态 testid：src 中存在 data-testid={`<前缀>-...`} 模板（如 content-type-${opt.key}），
+      // spec 引用的 content-type-novel/illust 以该前缀开头视为合法（静态匹配不到模板字符串，
+      // 由真实浏览器回归验证）。
+      const dynMarker = "data-testid={`";
+      let dynIdx = srcCorpus.indexOf(dynMarker);
+      let isDynamic = false;
+      while (dynIdx !== -1) {
+        const after = srcCorpus.slice(dynIdx + dynMarker.length, dynIdx + dynMarker.length + 40);
+        const prefix = after.split("$")[0].replace(/[^a-zA-Z0-9_-]/g, "");
+        if (prefix && a.value.startsWith(prefix)) {
+          isDynamic = true;
+          break;
+        }
+        dynIdx = srcCorpus.indexOf(dynMarker, dynIdx + dynMarker.length);
+      }
+      if (!isDynamic && !srcCorpus.includes(a.value)) failures.push(a);
       break;
     case "route":
       if (routePatterns.some((p) => routeMatches(p, a.value))) break;
