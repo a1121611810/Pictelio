@@ -64,8 +64,9 @@ export default defineConfig({
     hookTimeout: 60_000,
     retry: 2,
     setupFiles: ["./tests/agent-browser/setup.ts"],
+    // globalTeardown 独立配置在 Vitest 4 中不生效（globalSetup/globalTeardown 进程隔离，
+    // 独立 teardown 文件实际不被加载）；dev server 回收逻辑已内联进 globalSetup 的返回函数。
     globalSetup: ["./tests/ai-shared/globalSetup.ts"],
-    globalTeardown: ["./tests/ai-shared/globalTeardown.ts"],
   },
   resolve: {
     alias: {

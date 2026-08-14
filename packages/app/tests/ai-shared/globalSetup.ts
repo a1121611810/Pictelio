@@ -67,7 +67,7 @@ async function waitForServer(url: string, timeoutMs = 30_000): Promise<void> {
   throw new Error(`Dev server did not start within ${timeoutMs}ms`);
 }
 
-export default async function globalSetup(): Promise<void> {
+export default async function globalSetup(): Promise<() => Promise<void>> {
   console.log("[AI-E2E] Starting global setup...");
   loadEnvFile();
 
@@ -90,7 +90,8 @@ export default async function globalSetup(): Promise<void> {
       const res = await fetch(`http://localhost:${DEV_SERVER_PORT}`);
       if (res.ok || res.status === 404) {
         console.log(`[AI-E2E] Existing Vite server found on port ${DEV_SERVER_PORT}, reusing`);
-        return;
+        // 复用外部 server：teardown 不回收（避免误杀开发者自己启动的服务器）
+        return async () => {};
       }
     } catch {
       console.log(`[AI-E2E] Port ${DEV_SERVER_PORT} in use but not responding, killing...`);
@@ -122,4 +123,49 @@ export default async function globalSetup(): Promise<void> {
 
   await waitForServer(`http://localhost:${DEV_SERVER_PORT}`);
   console.log("[AI-E2E] Dev server is ready");
+
+  // 返回 teardown 函数：Vitest 4 中独立 globalTeardown 配置项不生效
+  // （globalSetup 与 globalTeardown 运行在不同进程，globalThis 不共享，且实测
+  // 独立 globalTeardown 文件根本不被加载）。setup 返回的函数在测试结束后执行，
+  // 闭包直接持有 proc，无需跨进程传递。
+  // 进程树为 shell → pnpm → vite：仅 SIGTERM pnpm 时 vite 孙进程收不到信号
+  // （pnpm 不转发），会变成孤儿进程继续占用端口——必须按端口强制回收。
+  return async () => {
+    console.log("[AI-E2E] Shutting down dev server on port 5173...");
+    try {
+      proc.kill("SIGTERM");
+    } catch {
+      // pnpm 包装进程可能已自行退出（ESRCH），vite 孙进程按端口回收兜底
+    }
+    // 轮询等待端口真正释放（最多 5s）。每轮用单条组合命令回收全部监听进程
+    // （lsof -ti 可能同时列出 vite 主进程与子进程，逐个 kill 在进程树转换时
+    // 可能漏杀，组合命令 xargs 一次性全杀最鲁棒）。
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline) {
+      try {
+        execSync(`lsof -ti :${DEV_SERVER_PORT} | xargs -r kill -9`, {
+          encoding: "utf-8",
+          timeout: 3000,
+          stdio: "pipe",
+        });
+      } catch {
+        /* 端口无监听进程（lsof 无输出）或已全部杀掉 */
+      }
+      let leftover: string[] = [];
+      try {
+        const out = execSync(`lsof -ti :${DEV_SERVER_PORT}`, {
+          encoding: "utf-8",
+          timeout: 3000,
+        }).trim();
+        leftover = out.split("\n").filter(Boolean);
+      } catch {
+        /* 端口无监听进程 */
+      }
+      if (leftover.length === 0) {
+        console.log("[AI-E2E] Dev server port 5173 released");
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 300));
+    }
+  };
 }
