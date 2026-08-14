@@ -117,22 +117,24 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 翻译流程", 
 
     // ── 进入设置页配置 key（SPA 导航直达 /settings，绕过启动导航覆盖） ──
     await driver.navigateSpa("/settings");
-    await SLEEP(2000);
+    // D 类：原 SLEEP(2000) 删除——下方「翻译设置」轮询已覆盖导航等待
 
     // 等待「翻译设置」分组出现
+    // I 类：轮询间隔 1500ms → 500ms，次数 10 → 30，总超时上限保持 ~15s
     let onSettings = false;
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 30; i++) {
       if (await pageHasText(driver, "翻译设置")) {
         onSettings = true;
         break;
       }
-      await SLEEP(1500);
+      await SLEEP(500);
     }
     expect(onSettings, "应进入设置页并显示「翻译设置」分组").toBe(true);
 
     // 填写 API key 并保存（evaluate 注入 input 值 + input 事件；保存按钮轮询重试）
+    // I 类：重试次数 5 → 15（间隔缩短后保持总超时上限）
     let keySaved = false;
-    for (let i = 0; i < 5 && !keySaved; i++) {
+    for (let i = 0; i < 15 && !keySaved; i++) {
       await driver.evaluate(
         `(() => {
           const inp = document.querySelector('input[placeholder="sk-..."]');
@@ -142,18 +144,22 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 翻译流程", 
           return 'filled';
         })()`,
       );
-      await SLEEP(800);
+      // S 类：输入稳定（input 值注入后待响应式同步），缩至 300ms
+      await SLEEP(300);
       keySaved = await clickButtonByText(driver, "保存");
       if (!keySaved) {
-        await SLEEP(1500);
+        // I 类：重试退避间隔 1500ms → 500ms
+        await SLEEP(500);
       }
     }
     expect(keySaved, "设置页应能找到「保存」按钮").toBe(true);
-    await SLEEP(1500);
+    // S 类：保存反馈动效收敛，无稳定谓词，缩至 500ms
+    await SLEEP(500);
 
     // ── 进入 mock 小说详情页（SPA 导航，绕过启动导航覆盖） ──
     await driver.navigateSpa("/novel/20814743");
-    await SLEEP(4000);
+    // R 类：等 mock 小说详情渲染（标题文本出现）
+    await driver.waitForText("E2E 翻译测试小说", 10_000);
   }, 240_000);
 
   afterAll(async () => {
@@ -167,13 +173,14 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 翻译流程", 
       return;
     }
     // 等待详情渲染（mock 标题出现）
+    // I 类：轮询间隔 1500ms → 500ms，次数 10 → 30，总超时上限保持 ~15s
     let rendered = false;
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 30; i++) {
       if (await pageHasText(driver, "E2E 翻译测试小说")) {
         rendered = true;
         break;
       }
-      await SLEEP(1500);
+      await SLEEP(500);
     }
     if (!rendered) {
       const t = await driver
@@ -187,16 +194,18 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 翻译流程", 
     // 点击底部「翻译」按钮 → 面板弹出
     const opened = await clickButtonByText(driver, "翻译");
     expect(opened, "底部工具栏应能找到「翻译」按钮").toBe(true);
-    await SLEEP(1500);
+    // S 类：翻译面板弹出动效收敛（Fluent gentle 300ms），缩至 500ms
+    await SLEEP(500);
 
     // 点击「开始翻译」（mock 立即返回译文）
     const started = await clickButtonByText(driver, "开始翻译");
     expect(started, "翻译面板应能找到「开始翻译」按钮").toBe(true);
 
     // 等待译文注入（mock 响应 + 渐进注入）
+    // I 类：轮询间隔 2000ms → 500ms，次数 15 → 60，总超时上限保持 ~30s
     let injected = false;
-    for (let i = 0; i < 15; i++) {
-      await SLEEP(2000);
+    for (let i = 0; i < 60; i++) {
+      await SLEEP(500);
       if (await pageHasText(driver, TRANSLATED_MARKER)) {
         injected = true;
         break;
@@ -207,7 +216,8 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 翻译流程", 
     // 切回原文：底部按钮变为「原文」（译文模式下）
     const toggled = await clickButtonByText(driver, "原文");
     expect(toggled, "译文模式下底部应显示「原文」切换按钮").toBe(true);
-    await SLEEP(1500);
+    // S 类：原文/译文切换重排稳定，无稳定谓词，缩至 500ms
+    await SLEEP(500);
     expect(await pageHasText(driver, TRANSLATED_MARKER), "切回原文后译文 marker 应消失").toBe(
       false,
     );

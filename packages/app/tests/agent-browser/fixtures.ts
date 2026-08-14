@@ -13,8 +13,8 @@ import { AgentBrowserDriver } from "./driver";
 
 const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** 阶段重试上限（每次间隔 2s） */
-const MAX_ATTEMPTS = 15;
+/** 阶段重试上限（I 类：每次间隔 500ms，60 次 × 0.5s = 30s，总超时上限不变） */
+const MAX_ATTEMPTS = 60;
 
 /** 已进入主界面（登录后）的页面特征文本（注意：登录页品牌文案含"插画"，不能用作 marker） */
 const LOGGED_IN_MARKERS = ["推荐", "关注", "小说"] as const;
@@ -74,13 +74,15 @@ async function initLoggedInDriver(
   token: string,
 ): Promise<AgentBrowserDriver> {
   await driver.launch();
-  await SLEEP(2000);
+  // R 类：等首屏内容渲染（页面文本非空即就绪，替代固定 2s 等待）
+  await driver.waitForPageContent(10_000);
 
   // ─── 阶段 1：年龄确认（循环点击直到弹窗消失） ───
   for (let i = 0; i < MAX_ATTEMPTS; i++) {
     if (!(await snapshotHas(driver, "年龄确认"))) break;
     await driver.clickReliable("已满", undefined, "@e2");
-    await SLEEP(2000);
+    // S 类：年龄确认弹窗关闭过渡，无稳定谓词，缩至 500ms（循环结构不变）
+    await SLEEP(500);
   }
 
   // ─── 阶段 2：等待登录页就绪，或检测到自动登录（localStorage 残留 token） ───
@@ -97,7 +99,8 @@ async function initLoggedInDriver(
         return driver;
       }
     }
-    await SLEEP(2000);
+    // I 类：轮询间隔 2000ms → 500ms（MAX_ATTEMPTS 已同步调大，总上限保持 ~30s）
+    await SLEEP(500);
   }
 
   if (!onLoginPage) {
@@ -110,7 +113,8 @@ async function initLoggedInDriver(
     `document.querySelector("fluent-textarea").value = '${escapedToken}'; ` +
       `document.querySelector("fluent-textarea").dispatchEvent(new Event("input", { bubbles: true }));`,
   );
-  await SLEEP(1000);
+  // S 类：输入稳定（textarea 值注入后待响应式同步），缩至 300ms
+  await SLEEP(300);
   await driver.clickReliable("登录", undefined, "@e2");
 
   // ─── 阶段 4：等待登录完成（主界面出现） ───
@@ -121,7 +125,8 @@ async function initLoggedInDriver(
         return driver;
       }
     }
-    await SLEEP(2000);
+    // I 类：轮询间隔 2000ms → 500ms（MAX_ATTEMPTS 已同步调大，总上限保持 ~30s）
+    await SLEEP(500);
   }
 
   throw new Error("[fixture] 登录后未能进入主界面");

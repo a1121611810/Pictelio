@@ -93,7 +93,7 @@ export class AgentBrowserDriver {
    * 用途：路由切换/数据加载期间页面可能短暂空白（白屏竞态），
    * AI 断言此时执行会误报"页面文本为空"。等待内容出现后再断言。
    */
-  async waitForPageContent(timeoutMs = 10_000): Promise<boolean> {
+  async waitForPageContent(timeoutMs = 10_000, intervalMs = 500): Promise<boolean> {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       try {
@@ -102,7 +102,7 @@ export class AgentBrowserDriver {
       } catch {
         /* 继续等待 */
       }
-      await new Promise((r) => setTimeout(r, 1000));
+      await new Promise((r) => setTimeout(r, intervalMs));
     }
     return false;
   }
@@ -112,14 +112,35 @@ export class AgentBrowserDriver {
    *
    * 用途：tab 切换/数据加载后组件尚未渲染时，避免"找不到卡片"类误报。
    */
-  async waitForSelector(selector: string, timeoutMs = 10_000): Promise<boolean> {
+  async waitForSelector(selector: string, timeoutMs = 10_000, intervalMs = 500): Promise<boolean> {
+    return this.waitForProbe(
+      "document.querySelector(" + JSON.stringify(selector) + ") !== null",
+      timeoutMs,
+      intervalMs,
+    );
+  }
+
+  /**
+   * 条件等待核心：轮询 evaluate 返回的谓词值，直到命中或超时。
+   *
+   * B 方向（固定 SLEEP → 条件等待）的基础原语。轮询用 evaluate（~45ms/次、
+   * 返回 ~10B）而非 snapshot（~42ms/次、返回 ~100KB），负载差 3~4 个数量级
+   * （B 报告 S9 实测）。interval 默认 500ms（B 报告 S11：间隔只影响尾延迟上限，
+   * 条件已满足时 1 轮即返回；300ms 与 500ms 差异在噪声内）。
+   *
+   * @param probe - 返回浏览器内布尔/真值 JSON 的 JS 表达式（单行，agent-browser eval 约束）
+   * @param timeoutMs - 超时上限（兜底，条件永不满足时返回 false，不悬挂）
+   */
+  private async waitForProbe(probe: string, timeoutMs: number, intervalMs = 500): Promise<boolean> {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-      const r = await this.evaluate(
-        `document.querySelector(${JSON.stringify(selector)}) ? "yes" : "no"`,
-      ).catch(() => "no");
-      if (r.includes("yes")) return true;
-      await new Promise((res) => setTimeout(res, 1000));
+      try {
+        const result = await this.evaluate(probe);
+        if (result.includes("true") || result.includes("yes") || result.includes("1")) return true;
+      } catch {
+        /* 页面未就绪或 eval 失败，继续等待 */
+      }
+      await new Promise((res) => setTimeout(res, intervalMs));
     }
     return false;
   }
@@ -128,18 +149,44 @@ export class AgentBrowserDriver {
    * 等待 URL 包含指定片段（路由变化的可靠信号）。
    * 轮询 evaluate location.pathname，超时返回 false。
    */
-  async waitForUrl(fragment: string, timeoutMs = 10_000): Promise<boolean> {
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-      try {
-        const path = JSON.parse(await this.evaluate("location.pathname")) as string;
-        if (path.includes(fragment)) return true;
-      } catch {
-        /* 继续等待 */
-      }
-      await new Promise((res) => setTimeout(res, 500));
-    }
-    return false;
+  async waitForUrl(fragment: string, timeoutMs = 10_000, intervalMs = 500): Promise<boolean> {
+    return this.waitForProbe(
+      "location.pathname.includes(" + JSON.stringify(fragment) + ")",
+      timeoutMs,
+      intervalMs,
+    );
+  }
+
+  /**
+   * 等待页面文本包含指定内容（数据加载完成、弹窗出现等）。
+   * 例：await driver.waitForText("发现新版本") 等更新弹窗。
+   */
+  async waitForText(text: string, timeoutMs = 10_000, intervalMs = 500): Promise<boolean> {
+    return this.waitForProbe(
+      "document.body.innerText.includes(" + JSON.stringify(text) + ")",
+      timeoutMs,
+      intervalMs,
+    );
+  }
+
+  /**
+   * 等待 DOM 中匹配选择器的元素数量 ≥ count（分页加载、列表增长等）。
+   * 例：await driver.waitForCount('[data-testid="illust-card"]', 2) 等第二张卡片。
+   */
+  async waitForCount(selector: string, count: number, timeoutMs = 10_000, intervalMs = 500): Promise<boolean> {
+    return this.waitForProbe(
+      "document.querySelectorAll(" + JSON.stringify(selector) + ").length >= " + count,
+      timeoutMs,
+      intervalMs,
+    );
+  }
+
+  /**
+   * 等待自定义 JS 谓词为真（scrollY、aria-pressed 等无选择器可表达的语义）。
+   * 例：await driver.waitForJs("window.scrollY === 0") 等回顶完成。
+   */
+  async waitForJs(predicate: string, timeoutMs = 10_000, intervalMs = 500): Promise<boolean> {
+    return this.waitForProbe("(" + predicate + ")", timeoutMs, intervalMs);
   }
 
   /**

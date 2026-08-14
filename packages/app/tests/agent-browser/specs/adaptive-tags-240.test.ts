@@ -33,23 +33,30 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("AdaptiveTags 240px 窄容器�
       await driver.launch();
       // 真实 360 宽视口（移动机型模拟，RO 自然触发）
       setViewport(360, 800);
-      await SLEEP(2000);
+      // S 类：视口重排动画收敛，无稳定谓词，缩至 500ms（Fluent 最长动效 500ms）
+      await SLEEP(500);
       await driver.navigate(`${BASE}/home?variant=A`);
-      await SLEEP(6000);
+      // R 类：等页面加载出内容（未登录渲染登录页、已登录渲染首页，文本非空即就绪）
+      await driver.waitForPageContent(15_000);
 
       // 注入 localStorage（年龄确认 + 打开 R18/R18G）并刷新（settings backend 可能非 localStorage，UI 兜底）
       await driver.evaluate(
         `localStorage.setItem('age_confirmed','true'); localStorage.setItem('is_adult','true'); localStorage.setItem('show_r18','true'); localStorage.setItem('show_r18g','true'); location.reload(); 'ok'`,
       );
-      await SLEEP(7000);
+      // R 类：等 reload 后页面就绪——登录页（含"登录"）或主界面（含"推荐"）任一出现
+      await driver.waitForJs(
+        `document.body.innerText.includes('登录') || document.body.innerText.includes('推荐')`,
+        15_000,
+      );
 
       // 年龄确认（按钮兜底，不 reload 以免干扰登录态）
-      for (let i = 0; i < 10; i++) {
+      // I 类：轮询间隔 2500ms → 500ms，次数 10 → 50，总超时上限保持 ~25s
+      for (let i = 0; i < 50; i++) {
         const snap = await driver.snapshot().catch(() => "");
         if (snap.includes("年龄确认")) {
           console.log(`[age] 第 ${i + 1} 次点掉年龄确认`);
           await driver.clickReliable("已满").catch(() => {});
-          await SLEEP(2500);
+          await SLEEP(500);
         } else {
           break;
         }
@@ -66,19 +73,20 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("AdaptiveTags 240px 窄容器�
         await driver.evaluate(
           `document.querySelector("fluent-textarea").value = '${esc}'; document.querySelector("fluent-textarea").dispatchEvent(new Event("input", { bubbles: true }));`,
         );
-        await SLEEP(1500);
+        // S 类：输入稳定（textarea 值注入后待响应式同步），缩至 500ms
+        await SLEEP(500);
         await driver.clickReliable("登录").catch(() => {});
-        await SLEEP(8000);
+        // D 类：原 SLEEP(8000) 删除——下方主界面轮询已覆盖登录等待
       }
 
-      // 等待主界面
-      for (let i = 0; i < 25; i++) {
+      // 等待主界面（I 类：轮询间隔 3000ms → 500ms，次数 25 → 150，总超时上限保持 ~75s）
+      for (let i = 0; i < 150; i++) {
         const snap = await driver.snapshot().catch(() => "");
         if (snap.includes("推荐") && snap.includes("插画")) {
           console.log(`[home] 主界面就绪（第 ${i + 1} 次探测）`);
           break;
         }
-        await SLEEP(3000);
+        await SLEEP(500);
       }
 
       // 等待标签 chip；若没有，尝试 UI 打开 R18/R18G 后回到首页再等
@@ -86,11 +94,13 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("AdaptiveTags 240px 窄容器�
       if (!hasChips) {
         console.log("[r18] 无标签 chip，去设置页打开 R18/R18G");
         await driver.navigateSpa(`${BASE}/settings`);
-        await SLEEP(5000);
+        // R 类：等设置页 R18 开关渲染（aria-label 稳定锚点）
+        await driver.waitForSelector('fluent-switch[aria-label="显示 R18 内容"]', 15_000);
         await driver
           .clickReliable("显示 R18 内容", undefined, 'fluent-switch[aria-label="显示 R18 内容"]')
           .catch(() => {});
-        await SLEEP(1500);
+        // S 类：开关状态切换动效收敛，无稳定谓词，缩至 500ms
+        await SLEEP(500);
         await driver
           .clickReliable(
             "显示 R-18G 内容",
@@ -98,14 +108,16 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("AdaptiveTags 240px 窄容器�
             'fluent-switch[aria-label="显示 R-18G 内容"]',
           )
           .catch(() => {});
-        await SLEEP(2000);
+        // S 类：开关状态切换动效收敛，无稳定谓词，缩至 500ms
+        await SLEEP(500);
         await driver.navigateSpa(`${BASE}/home?variant=A`);
-        await SLEEP(8000);
+        // D 类：原 SLEEP(8000) 删除——下方 waitForSelector 已覆盖首页渲染等待
         hasChips = await driver.waitForSelector('[aria-label^="搜索标签："]', 20_000);
       }
       console.log(`[probe] 有标签 chip: ${hasChips}`);
       expect(hasChips, "打开 R18/R18G 后页面应有搜索标签 chip").toBe(true);
-      await SLEEP(4000);
+      // R 类：等 ResizeObserver 重算完成（[data-fit] 属性由 RO 回调写入标签行容器）
+      await driver.waitForJs(`document.querySelector('[data-fit]') !== null`, 10_000);
 
       // 360 视口下读标签行 DOM（容器已自然变窄，RO 已触发）
       const data = await driver.evaluate(

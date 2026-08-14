@@ -14,8 +14,6 @@ import { createLoggedInDriver } from "../fixtures";
 import { aiAssert } from "../../ai-shared/assertion";
 import type { AgentBrowserDriver } from "../driver";
 
-const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
 async function getPageState(d: AgentBrowserDriver): Promise<string> {
   const snap = await d.snapshot();
   const text = await d.pageText().catch(() => "");
@@ -65,7 +63,8 @@ describe("路由即时渲染", () => {
   }, 60_000);
 
   it("数据加载完成后内容完整展示", async () => {
-    await SLEEP(8000);
+    // 条件等待：推荐 Feed 插画卡片出现后再断言完整展示（保持 aiAssert 语义，替代固定 8s）
+    await driver.waitForSelector('[data-testid="illust-card"]', 15_000);
 
     const state = await getPageState(driver);
     const result = await aiAssert(

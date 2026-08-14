@@ -50,30 +50,35 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 更新流程", 
   beforeAll(async () => {
     driver = new AgentBrowserDriver();
     await driver.launch();
-    await SLEEP(2500);
+    // R 类：等首屏内容渲染（页面文本非空即就绪）
+    await driver.waitForPageContent(10_000);
 
     // ── 年龄确认（evaluate 驱动） ──
-    for (let attempt = 0; attempt < 5; attempt++) {
+    // I 类：轮询间隔 2000ms → 500ms，次数 5 → 20，总超时上限保持 ~10s
+    for (let attempt = 0; attempt < 20; attempt++) {
       const snap = await driver.snapshot();
       if (!snap.includes("年龄确认")) break;
       await clickButtonByText(driver, "已满 18 岁");
-      await SLEEP(2000);
+      await SLEEP(500);
     }
 
     // ── 登录（evaluate 注入 token + 点击） ──
     const token = process.env.PIXIV_REFRESH_TOKEN!;
-    await SLEEP(1500);
+    // S 类：年龄确认关闭后页面过渡稳定，无稳定谓词，缩至 500ms
+    await SLEEP(500);
     const snap = await driver.snapshot();
     if (snap.includes("登录") && !snap.includes("推荐")) {
       const escapedToken = token.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
       await driver.evaluate(
         `(() => { const ta = document.querySelector('fluent-textarea'); if (!ta) return 'no-textarea'; ta.value = '${escapedToken}'; ta.dispatchEvent(new Event('input', { bubbles: true })); return 'injected'; })()`,
       );
-      await SLEEP(1000);
+      // S 类：输入稳定（textarea 值注入后待响应式同步），缩至 300ms
+      await SLEEP(300);
       await clickButtonByText(driver, "登录");
       // 等待登录完成（登录按钮消失 / 进入主界面）
-      for (let attempt = 0; attempt < 10; attempt++) {
-        await SLEEP(3000);
+      // I 类：轮询间隔 3000ms → 500ms，次数 10 → 60，总超时上限保持 ~30s
+      for (let attempt = 0; attempt < 60; attempt++) {
+        await SLEEP(500);
         const s = await driver.snapshot();
         if (!s.includes("登录") || s.includes("推荐")) break;
       }
@@ -83,13 +88,14 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 更新流程", 
     // 启动导航（__root.tsx）会强制跳 /home。C-shell（ADR-0075）后 /home 侧边导航
     // 「设置」为纯图标按钮（仅 aria-label，textContent 为空，文本匹配不可靠），
     // 用 aria-label 精准点击；未渲染完成时循环重试。
-    for (let attempt = 0; attempt < 6; attempt++) {
+    // I 类：轮询间隔 2500ms → 500ms，次数 6 → 30，总超时上限保持 ~15s
+    for (let attempt = 0; attempt < 30; attempt++) {
       const s = await driver.snapshot();
       if (s.includes("检查更新") || s.includes("账户与数据")) break;
       await driver.evaluate(
         `(() => { const b = document.querySelector('nav[aria-label="主导航"] button[aria-label="设置"]'); if (b) { b.click(); return 'clicked'; } return 'not-found'; })()`,
       );
-      await SLEEP(2500);
+      await SLEEP(500);
     }
     await driver.mockFetch(UPDATE_URL_PATTERN, MOCK_VERSION_JSON);
     await driver.spyOnWindowOpen();
@@ -103,7 +109,8 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 更新流程", 
     // 点击"检查更新"
     const clicked = await clickButtonByText(driver, "检查更新");
     expect(clicked, "应能找到并点击「检查更新」按钮").toBe(true);
-    await SLEEP(4000);
+    // R 类：等更新弹窗出现（mock fetch 立即返回，弹窗文本出现即就绪）
+    await driver.waitForText("发现新版本", 10_000);
 
     // 弹窗应出现（含 mock 版本号；snapshot 为 -i 交互模式，纯文本需用 pageText）
     const snap = await driver.snapshot();
@@ -122,7 +129,8 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 更新流程", 
     // 点击"前往下载"
     const dlClicked = await clickButtonByText(driver, "前往下载");
     expect(dlClicked, "应能找到并点击「前往下载」按钮").toBe(true);
-    await SLEEP(2000);
+    // S 类：弹窗关闭过渡（Fluent gentle 300ms），无稳定谓词，缩至 500ms
+    await SLEEP(500);
 
     // 弹窗应关闭
     const snapAfter = await driver.snapshot();
