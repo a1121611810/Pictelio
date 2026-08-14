@@ -452,66 +452,72 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 共享会话", 
       expect(afterCancel, "取消后主开关应保持关闭").toBe(false);
     }, 60_000);
 
-    it("toggle 开关 → 确认 → 开关保持打开（自动复原）", async () => {
-      await driver.navigateSpa("/image-host");
-      // 等主开关渲染，替代固定 SLEEP
-      await driver.waitForSelector('fluent-switch[aria-label="启用图床代理"]', 15_000);
+    // F2：已知 flake（确认后对话框关闭动画时序，retry:0 下偶发失败）——per-test retry:1 兜底
+    it(
+      "toggle 开关 → 确认 → 开关保持打开（自动复原）",
+      { retry: 1 },
+      async () => {
+        await driver.navigateSpa("/image-host");
+        // 等主开关渲染，替代固定 SLEEP
+        await driver.waitForSelector('fluent-switch[aria-label="启用图床代理"]', 15_000);
 
-      // 点击开关弹出确认
-      const sw2 = await driver.evaluate(
-        `(() => {
+        // 点击开关弹出确认
+        const sw2 = await driver.evaluate(
+          `(() => {
         const el = document.querySelector('fluent-switch[aria-label="启用图床代理"]');
         if (el) { el.click(); return 'clicked'; }
         return 'not-found';
       })()`,
-      );
-      if (!sw2.includes("clicked")) console.warn("[图床设置] fluent-switch 未找到");
-      // 等确认对话框出现，替代固定 SLEEP
-      await driver.waitForText("开启图床代理？", 10_000);
+        );
+        if (!sw2.includes("clicked")) console.warn("[图床设置] fluent-switch 未找到");
+        // 等确认对话框出现，替代固定 SLEEP
+        await driver.waitForText("开启图床代理？", 10_000);
 
-      // 点击"确认开启"
-      await driver.clickReliable("确认开启");
-      // 等开关进入打开状态（确认生效 + 弹窗关闭），替代固定 SLEEP
-      await driver.waitForJs(
-        "document.querySelector('fluent-switch[aria-label=\"启用图床代理\"]')?.checked === true",
-        10_000,
-      );
+        // 点击"确认开启"
+        await driver.clickReliable("确认开启");
+        // 等开关进入打开状态（确认生效 + 弹窗关闭），替代固定 SLEEP
+        await driver.waitForJs(
+          "document.querySelector('fluent-switch[aria-label=\"启用图床代理\"]')?.checked === true",
+          10_000,
+        );
 
-      // C 方向：确定性断言替代 LLM —— 确认后开关打开（读 property）且弹窗关闭
-      const enabledChecked = JSON.parse(
-        await driver.evaluate(
-          "document.querySelector('[aria-label=\"启用图床代理\"]')?.checked ?? false",
-        ),
-      ) as boolean;
-      expect(enabledChecked, "确认开启后主开关应处于打开状态").toBe(true);
-      const dialogGone = await evalBool(
-        driver,
-        '!document.body.innerText.includes("开启图床代理？")',
-      );
-      expect(dialogGone, "确认后对话框应关闭").toBe(true);
+        // C 方向：确定性断言替代 LLM —— 确认后开关打开（读 property）且弹窗关闭
+        const enabledChecked = JSON.parse(
+          await driver.evaluate(
+            "document.querySelector('[aria-label=\"启用图床代理\"]')?.checked ?? false",
+          ),
+        ) as boolean;
+        expect(enabledChecked, "确认开启后主开关应处于打开状态").toBe(true);
+        const dialogGone = await evalBool(
+          driver,
+          '!document.body.innerText.includes("开启图床代理？")',
+        );
+        expect(dialogGone, "确认后对话框应关闭").toBe(true);
 
-      // 复原：再次点击开关关闭（不会弹出确认）
-      const sw3 = await driver.evaluate(
-        `(() => {
+        // 复原：再次点击开关关闭（不会弹出确认）
+        const sw3 = await driver.evaluate(
+          `(() => {
         const el = document.querySelector('fluent-switch[aria-label="启用图床代理"]');
         if (el) { el.click(); return 'clicked'; }
         return 'not-found';
       })()`,
-      );
-      if (!sw3.includes("clicked")) console.warn("[图床设置] fluent-switch 未找到");
-      // 等开关恢复关闭状态，替代固定 SLEEP
-      await driver.waitForJs(
-        "document.querySelector('fluent-switch[aria-label=\"启用图床代理\"]')?.checked === false",
-        10_000,
-      );
-      // C 方向：确定性断言替代 LLM —— 开关恢复关闭（读 property）
-      const restoredChecked = JSON.parse(
-        await driver.evaluate(
-          "document.querySelector('[aria-label=\"启用图床代理\"]')?.checked ?? false",
-        ),
-      ) as boolean;
-      expect(restoredChecked, "再次点击后主开关应恢复为关闭状态").toBe(false);
-    }, 60_000);
+        );
+        if (!sw3.includes("clicked")) console.warn("[图床设置] fluent-switch 未找到");
+        // 等开关恢复关闭状态，替代固定 SLEEP
+        await driver.waitForJs(
+          "document.querySelector('fluent-switch[aria-label=\"启用图床代理\"]')?.checked === false",
+          10_000,
+        );
+        // C 方向：确定性断言替代 LLM —— 开关恢复关闭（读 property）
+        const restoredChecked = JSON.parse(
+          await driver.evaluate(
+            "document.querySelector('[aria-label=\"启用图床代理\"]')?.checked ?? false",
+          ),
+        ) as boolean;
+        expect(restoredChecked, "再次点击后主开关应恢复为关闭状态").toBe(false);
+      },
+      60_000,
+    );
   });
 
   // ─── 小说详情增强链路 ──────────────────────────────

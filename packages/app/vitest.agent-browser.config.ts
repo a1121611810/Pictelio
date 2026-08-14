@@ -62,7 +62,10 @@ export default defineConfig({
     passWithNoTests: true,
     testTimeout: 120_000,
     hookTimeout: 60_000,
-    retry: 2,
+    // F2 方向：全局 retry 2→0（消除 flake 重试放大；确定性断言后套件已稳定）。
+    // 已知偶发 flake 用例用 it(name, { retry: 1 }, fn) 单独兜底（Vitest 4 正确签名，
+    // describe.retry 不存在）。登录流等状态破坏性用例已显式 retry: 0。
+    retry: 0,
     setupFiles: ["./tests/agent-browser/setup.ts"],
     // globalTeardown 独立配置在 Vitest 4 中不生效（globalSetup/globalTeardown 进程隔离，
     // 独立 teardown 文件实际不被加载）；dev server 回收逻辑已内联进 globalSetup 的返回函数。
