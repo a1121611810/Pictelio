@@ -141,6 +141,8 @@ Architecture Decision Records live in `/docs/adr/`. Notable ones:
 | 0081 | Search pagination native 4xx fix — `rewriteUrl` strips the Pixiv host from absolute `next_url` (double-domain URL → 404), fixing Android pagination for all feeds; `executeSearch` same-param re-entrancy guard fixes the first-search empty-result race; see [glossary-search-pagination](/docs/adr/glossary-search-pagination.md) |
 | 0082 | Feed pagination inline retry — store-level `paginationError` signal + `InlineRetryBar` separate pagination failure (keep results + bottom retry) from first-load failure (full-page `ErrorDisplay`); sentinel pause prevents no-backoff retry loops |
 | 0083 | Dead code cleanup — removes 20 dead files (legacy home feed components, 4 superseded skeletons, ADR-0023 scroll primitives, dead-route panels, unwired scripts), 9 unused exports, the `@capacitor/device` dependency, and 3 unused assets; ~50 export-only types/constants de-exported (symbols kept); see [glossary-dead-code-cleanup](/docs/adr/glossary-dead-code-cleanup.md) and [analysis](/docs/research/dead-code-analysis.md) |
+| 0084 | E2E testing localization & CI simplification — CI `test` job removed (CI keeps only `pnpm check:all` + `pnpm lint:all`); unit tests and agent-browser E2E run locally; `PIXIV_REFRESH_TOKEN` never in CI; E2E drift guarded by the `.husky/pre-push` static anchor validation ([`check-e2e-anchors.mjs`](/packages/app/scripts/check-e2e-anchors.mjs)) + manual browser runs |
+| 0085 | AI assertion repositioning — 63 of 64 broad `aiAssert` calls converted to deterministic `evaluate` + `expect` DOM assertions (LLM calls 64 → 1); `assertion.ts` retained for the single true semantic judgment (s48) |
 
 ## Key Source Files
 
