@@ -47,7 +47,7 @@ flowchart TD
   - **`navigateSpa(path)`** — SPA-internal navigation via `window.history.pushState` + a dispatched `popstate` event. Unlike full-page `navigate()`, it does not re-run the startup flow, so it bypasses the `__root.tsx` startup-navigation override that would force a sub-route back to `/home` (11 call sites migrated in 5aef5a7, Issue #19 T2)
   - **`waitForPageContent(timeoutMs)` / `waitForSelector(selector, timeoutMs)`** — poll until the page has substantive text / a CSS selector appears. Guards against white-screen races where an AI assertion would misreport "page text empty" during route/data loading (Issue #19 T3)
   - **`getAttribute`/`getComputedStyle`** — bridge methods for precise DOM property assertions via `evaluate()`; results are JSON-encoded and parsed with `JSON.parse` (fallback to raw string)
-  - **`aiAssert`** (`tests/ai-shared/assertion.ts`) — sends page state (accessibility tree + page text) to DeepSeek Flash for semantic validation
+  - **`aiAssert`** (`tests/ai-shared/assertion.ts`) — sends page state (accessibility tree + page text) to DeepSeek Flash for semantic validation. Since [ADR-0085](/docs/adr/ADR-0085-ai-assertion-reposition.md) it is used for only one true semantic assertion (s48); the other 63 broad assertions were converted to deterministic `evaluate` + `expect` DOM checks
 - **File structure:**
   - `main-flow.test.ts` — single long-chain test covering end-to-end user journey
   - `sub-flows.test.ts` — medium-chain tests organized by feature (discovery, artwork, reading, personal, login, settings, navigation)
@@ -55,7 +55,7 @@ flowchart TD
   - `translation-flow.test.ts` — E2E regression guard for the [AI translation](/openwiki/domain/novel-reader.md#ai-translation) chain (S1–S7): settings key config → mock novel detail → translate → mock DeepSeek response injected into the body → toggle back to 原文. Self-contained via `mockFetch` (DeepSeek `/chat/completions` + `novel/detail` + `webview/v2/novel`), so it needs no real `DEEPSEEK_API_KEY` and incurs no token cost
   - `route-switch-instant.spec.ts` — asserts shell chrome (floating-nav, sticky header) renders before API data
 - **E2E state construction:** paths that depend on external state (e.g., the update dialog requiring a *newer* remote version) are covered by page-level injection rather than real networks — `driver.mockFetch()` for the version.json response and `driver.spyOnWindowOpen()`/`getWindowOpenCalls()` to assert the download navigation fires. Reference: `update-flow.test.ts`. Injection must happen **after** the target page navigates (navigation clears injected JS).
-- **Login-state E2E:** settings page and similar routes sit behind the login guard (`__root.tsx` startup navigation forces `/home`). These specs need `PIXIV_REFRESH_TOKEN` (already in `~/.zshrc`; CI must configure a secret). Since 1edb316, **all 16 agent-browser describes** in `main-flow.test.ts` and `sub-flows.test.ts` (plus `update-flow.test.ts` and, since e9b8399, `translation-flow.test.ts`) are wrapped in `describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)` — previously only update-flow had the guard and the rest threw instead of skipping. Without a token, 42/43 cases skip (the remaining one fails only due to a missing `DEEPSEEK_API_KEY`, which is expected). The invalid-token login case also retries `clickReliable("已满")` until the login page (fluent-textarea) is ready in `beforeAll`. Because direct `navigate` to a sub-route gets overridden by startup navigation, the spec must reach the route through the UI path (`/home` top user name → `/me` → "设置" row → `/settings`).
+- **Login-state E2E:** settings page and similar routes sit behind the login guard (`__root.tsx` startup navigation forces `/home`). These specs need `PIXIV_REFRESH_TOKEN` (loaded from a local `.env`; per [ADR-0084](/docs/adr/ADR-0084-e2e-testing-localization.md) it never goes to CI). Since 1edb316, **all 16 agent-browser describes** in `main-flow.test.ts` and `sub-flows.test.ts` (plus `update-flow.test.ts` and, since e9b8399, `translation-flow.test.ts`) are wrapped in `describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)` — previously only update-flow had the guard and the rest threw instead of skipping. Without a token, 42/43 cases skip (the remaining one fails only due to a missing `DEEPSEEK_API_KEY`, which is expected). The invalid-token login case also retries `clickReliable("已满")` until the login page (fluent-textarea) is ready in `beforeAll`. Because direct `navigate` to a sub-route gets overridden by startup navigation, the spec must reach the route through the UI path (`/home` top user name → `/me` → "设置" row → `/settings`).
 - **Logged-in session setup (5aef5a7, Issue #19):** `createLoggedInDriver` in `fixtures.ts` was rebuilt as a **4-phase looped wait** — (1) age-confirmation popup dismissed in a loop, (2) wait for login page or auto-login via leftover token, (3) fill `PIXIV_REFRESH_TOKEN` into `fluent-textarea`, (4) wait for main UI markers — with **up to 3 launch retries** so one daemon hiccup cannot sink the suite. Login markers no longer include "插画" (the login page's brand copy contains that word and caused false already-logged-in detection). The invalid-token case cleans `localStorage` precisely (keeping `ageConfirmed`) and retries on `SecurityError`. Suite status after the fix: **42/42 passing** (was 19/42); the suite has since grown to 43 token-guarded cases with `translation-flow.test.ts` (latest full run: 40 passed / 3 skipped / 1 flaky — the sub-flows card-click flake passes on rerun).
 - Runs via: `pnpm test:agent-browser`
 
@@ -80,6 +80,27 @@ Both `playwright` and `@vitest/browser-playwright` dependencies have been remove
 - **APK path (v4.0.0+):** `android/app/build/outputs/apk/full/debug/app-full-debug.apk` — reflects the Gradle flavor split (previously `app-debug.apk` under `apk/debug/`)
 - **Physical device support (issue #120):** Set `ANDROID_E2E_SERIAL` to target a connected physical device (e.g., OPPO R11s) instead of an emulator. Physical devices can reach Pixiv's network (unlike emulators behind GFW), enabling login-dependent specs. On physical devices, APK install is skipped (ColorOS "PC install attack" blocks adb install), and `pm clear` is replaced with `run-as` data directory cleanup.
 - **Polling-based write verification (`switch-client-oneway.spec.ts`):** SharedPreferences write via Capacitor bridge is async (`apply`, not `commit`). A fixed 2s sleep was unreliable on slow emulators. Now uses a 15s polling loop (1s interval) to wait for `pictelio_client_kind=lynx` to appear.
+
+## CI & E2E Drift Prevention (ADR-0084, ADR-0085)
+
+Two adjacent ADRs (both 2026-08-14) reshaped the E2E posture after the suite drifted ~6 days unnoticed while the CI `test` job was silently skipping.
+
+### CI localization (ADR-0084)
+
+The CI `test` job was **removed** — [`.github/workflows/ci.yml`](/.github/workflows/ci.yml) now runs only `pnpm check:all` (type check) and `pnpm lint:all` (lint). Unit tests and agent-browser E2E run **locally only**: the E2E suite needs a real Pixiv network path plus `PIXIV_REFRESH_TOKEN`, which GitHub Runners cannot reproduce, so the old job was an empty shell (42/43 cases skipped via `skipIf`) that created false confidence. `PIXIV_REFRESH_TOKEN` is loaded only from a local `.env` and **never** enters GitHub Secrets or CI logs. Drift is instead caught by the fast [static anchor validation](#static-anchor-validation) plus manual `pnpm test:agent-browser` runs.
+
+### Assertion repositioning (ADR-0085)
+
+An audit ([`agent-browser-e2e-perf-direction-c-feasibility.md`](/docs/agent-browser-e2e-perf-direction-c-feasibility.md)) found 55 of 64 `aiAssert` calls were broad "is the page okay?" DOM checks and only one (s48) was a true semantic judgment. ADR-0085 converted the 63 broad/determinizable assertions to deterministic DOM assertions (`evaluate` + `expect`), cutting LLM calls 64 → 1 (−98.4%). `assertion.ts`/`aiAssert` survives as the semantic-judgment facility (used only by s48); the suite still requires a local `DEEPSEEK_API_KEY` for that one assertion.
+
+### Static anchor validation
+
+The `.husky/pre-push` hook runs [`check-e2e-anchors.mjs`](/packages/app/scripts/check-e2e-anchors.mjs) (sub-second, no browser) when a push touches `packages/app/src/` or `packages/app/tests/agent-browser/`. It extracts anchors referenced in the specs and verifies them against `src/`:
+
+- **Hard checks (failure blocks push):** `data-testid` references, `aria-label` / `placeholder` attribute selectors, route paths (segment-matched against `src/router.tsx`, with a `KNOWN_CATCH_ALL_PATHS` whitelist), and element tag selectors.
+- **Soft checks (warning only):** CSS class selectors (UnoCSS builds classes dynamically) and `clickReliable`/`clickButtonByText` key text.
+- **Dynamic-anchor exemptions:** template placeholders containing `${` (e.g. `navTabActiveJs`'s `${label}`) and dynamically generated `data-testid` values from `data-testid={`…`}` templates (e.g. `ContentTypeToggle`'s `content-type-${opt.key}` renders `content-type-novel`/`content-type-illust`) are exempt from the static match — they are verified by the real browser regression instead.
+- Manual run: `node packages/app/scripts/check-e2e-anchors.mjs`; false positives can be bypassed with `git push --no-verify`.
 
 ## Hard Constraints (enforced in AGENTS.md & TESTING.md)
 
@@ -183,49 +204,4 @@ Shared infrastructure for AI-driven E2E tests:
 | AI shared utilities | `/packages/app/tests/ai-shared/` |
 | Playwright→agent-browser ADR | `/docs/adr/ADR-0034-migrate-playwright-e2e-to-agent-browser.md` |
 | Component test→unit/E2E ADR | `/docs/adr/ADR-0035-migrate-component-tests-to-e2e-and-unit.md` |
-e-playwright-e2e-to-agent-browser.md` |
-| Component test→unit/E2E ADR | `/docs/adr/ADR-0035-migrate-component-tests-to-e2e-and-unit.md` |
-rules--token-storage-exclusions-adr-0003) from silent drift. Because Android backup `exclude path` entries are exact filename matches, the rules previously pointed at a nonexistent `_capacitor_secure_storage.xml` while the plugin actually writes `WSSecureStorageSharedPreferences.xml` — ciphertext was exported with backups. The test:
-
-- Extracts the real SharedPreferences filename constant from the `@aparajita/capacitor-secure-storage` plugin source (`node_modules/.../SecureStorage.java`) instead of hardcoding it
-- Asserts `data_extraction_rules.xml` (`cloud-backup` + `device-transfer`) and `backup_rules.xml` (`full-backup-content`) all exclude `WSSecureStorageSharedPreferences.xml` + `PictelioPrefs.xml`
-- Asserts the three XML sections stay identical to each other
-
-This is a reusable pattern for config-vs-source consistency: parse the constant from source, compare against the config, fail loudly on drift.
-
-### AI-Shared Test Utilities (`tests/ai-shared/`)
-
-Shared infrastructure for AI-driven E2E tests:
-- **`assertion.ts`** — The `aiAssert` function that sends the page accessibility tree + innerText to DeepSeek Flash (`DEEPSEEK_API_KEY` env var required) and returns a structured `{passed, reason}` result with automatic retries
-- **`globalSetup.ts`** — Loads `.env`, checks `PIXIV_REFRESH_TOKEN`, manages the agent-browser daemon socket, and starts/reuses the Vite dev server on port 5173
-- **`globalTeardown.ts`** — Kills the Vite dev server if started by globalSetup
-
-## Running Tests
-
-| Command | Tests |
-|---------|-------|
-| `pnpm test` | Unit tests (Vitest) |
-| `pnpm test:watch` | Unit tests in watch mode |
-| `pnpm test:agent-browser` | Agent-browser E2E tests |
-| `pnpm test:all` | Unit + agent-browser E2E combined |
-
-## Key Source Files
-
-| Purpose | Path |
-|---------|------|
-| Testing conventions doc | `/packages/app/tests/TESTING.md` |
-| Unit test config | `/packages/app/vitest.config.ts` |
-| Agent-browser test config | `/packages/app/vitest.agent-browser.config.ts` |
-| Test helpers | `/packages/app/tests/helpers.ts` |
-| Manual fetch primitive | `/packages/app/src/primitives/createManualFetch.ts` |
-| Memory store | `/packages/app/src/stores/db.ts` |
-| Backup rules consistency test | `/packages/app/tests/unit/utils/backupRulesConsistency.test.ts` |
-| Unit tests | `/packages/app/tests/unit/` |
-| Unit component tests (migrated from browser/) | `/packages/app/tests/unit/components/` |
-| Agent-browser tests | `/packages/app/tests/agent-browser/` |
-| Agent-browser conventions | `/packages/app/tests/agent-browser/TESTING.md` |
-| AI shared utilities | `/packages/app/tests/ai-shared/` |
-| Playwright→agent-browser ADR | `/docs/adr/ADR-0034-migrate-playwright-e2e-to-agent-browser.md` |
-| Component test→unit/E2E ADR | `/docs/adr/ADR-0035-migrate-component-tests-to-e2e-and-unit.md` |
-e-playwright-e2e-to-agent-browser.md` |
-| Component test→unit/E2E ADR | `/docs/adr/ADR-0035-migrate-component-tests-to-e2e-and-unit.md` |
+| Static anchor validation | `/packages/app/scripts/check-e2e-anchors.mjs` |
