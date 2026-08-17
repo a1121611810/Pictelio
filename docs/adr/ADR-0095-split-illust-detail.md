@@ -1,4 +1,4 @@
-# ADR 0008: 拆分 IllustDetail.tsx
+# ADR 0095: 拆分 IllustDetail.tsx
 
 ## 状态
 

@@ -228,7 +228,7 @@ pixivizer/
 │   ├── deploy.mjs               # GitHub Pages 本地预览脚本
 │   └── kill-dev-server.mjs      # 开发服务器进程管理
 ├── docs/                        # 项目文档
-│   ├── adr/                     # ADR（含 ADR-0059 命令约定，最新到 ADR-0085）
+│   ├── adr/                     # ADR（含 ADR-0059 命令约定，最新到 ADR-0096）
 │   ├── agents/                  # Agent 工作流文档（issue-tracker、triage-labels、domain）
 │   ├── release-checklist.md
 │   ├── release-signing.md
@@ -433,7 +433,7 @@ packages/app/src/
 
 ### 图片流水线（缓存、代理、CDN）
 
-- **三层缓存架构**（ADR-0003 → ADR-0037 修订）：
+- **三层缓存架构**（ADR-0090 → ADR-0037 修订）：
   - L1：JS 已加载标记集合（`Map<string, number>` LRU，仅 key）
   - L2：WebView / 磁盘缓存（`shouldInterceptRequest` + `ImageCachePlugin`）
   - L3：CDN（`i.pximg.net`，Java 注入 Referer）

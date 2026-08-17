@@ -1,4 +1,4 @@
-# ADR-005：自建虚拟滚动迁移到 TanStack Virtual
+# ADR 0096：自建虚拟滚动迁移到 TanStack Virtual
 
 **状态**：已批准  
 **日期**：2026-06  
@@ -101,4 +101,4 @@ estimateSize(index) ──→ createWindowVirtualizer ──→ getVirtualItems(
 
 ## 实施步骤
 
-见 `docs/adr/005-implementation-plan.md`。
+见 `docs/adr/plan-virtual-scroll-migration.md`。

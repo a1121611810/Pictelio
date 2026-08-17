@@ -84,7 +84,7 @@ Pictelio 的 JSBridge 数据（0.1-50KB JSON）远小于 Transferable 的适用�
 
 - 废弃 [ADR-0002](0002-ssrf-url-whitelist-strategy.md)（PictelioHttp 白名单不再需要）
 - 废弃 [ADR-0004](0004-401-concurrent-retry-promise-queue.md)（JS 侧 401 刷新移至 Java）
-- 废弃 `docs/adr/0003-image-cache-three-layer.md` 中 JS 侧下载→base64→写盘的路径
+- 废弃 `docs/adr/ADR-0090-image-cache-three-layer.md` 中 JS 侧下载→base64→写盘的路径
 - 保留 `docs/adr/0014-l1-image-cache-key-set.md`（L1 key set 仍用于 JS 侧加载标记
 
 ## 术语表

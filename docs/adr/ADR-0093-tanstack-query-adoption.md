@@ -1,4 +1,4 @@
-# ADR-0006: 采用 TanStack Query 管理服务端状态
+# ADR-0093: 采用 TanStack Query 管理服务端状态
 
 ## 状态
 

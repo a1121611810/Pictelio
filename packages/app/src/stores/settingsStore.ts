@@ -157,7 +157,7 @@ export async function setUgoiraMode(mode: UgoiraExtractMode): Promise<void> {
 }
 
 /** 兼容存根：registry hydrateAll 已加载，Phase 4 移除 */
-// ── 图片缓存三层开关（ADR-0003）──
+// ── 图片缓存三层开关（ADR-0090）──
 // A: Java 磁盘缓存 / B: 浏览器缓存头 / C: JS 预取，三项独立 define（key 各自持久化）。
 
 const imageCacheDiskHandle = settings.define<boolean>({

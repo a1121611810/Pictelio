@@ -1,4 +1,4 @@
-# ADR-0007: 采用 TanStack DB 实现本地浏览历史
+# ADR-0094: 采用 TanStack DB 实现本地浏览历史
 
 ## 状态
 

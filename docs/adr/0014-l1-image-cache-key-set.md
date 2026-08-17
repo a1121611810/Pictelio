@@ -2,7 +2,7 @@
 
 ## 状态
 
-已批准（修订 [ADR-0003](0003-image-cache-three-layer.md) 的层 C 实现）
+已批准（修订 [ADR-0090](ADR-0090-image-cache-three-layer.md) 的层 C 实现）
 
 ## 日期
 
@@ -10,7 +10,7 @@
 
 ## 背景
 
-ADR-0003 定义了图片缓存三层分离架构，其中层 C（JS 预取）的 L1 内存缓存实现为
+ADR-0090 定义了图片缓存三层分离架构，其中层 C（JS 预取）的 L1 内存缓存实现为
 `Map<string, CacheEntry{blob, blobUrl, lastAccess, byteSize}>`，上限 200MB。
 
 代码审计发现该实现存在四个问题：
@@ -62,7 +62,7 @@ L1 从"缓存图片数据"退化为"记录已加载 URL 的标记集合"：
 
 - 不保留 Blob 作为 L2 兜底：WebView HTTP 缓存由系统管理，被回收时
   `<img>` 重新走代理 URL 网络请求即可，无需 L1 冗余备份
-- 不引入 Service Worker：同 ADR-0003 结论（与 Capacitor 本地服务器机制冲突）
+- 不引入 Service Worker：同 ADR-0090 结论（与 Capacitor 本地服务器机制冲突）
 
 ## 影响
 

@@ -1,4 +1,4 @@
-# ADR 0005: 提取 createPersistedSet 工厂消除 store 重复
+# ADR 0092: 提取 createPersistedSet 工厂消除 store 重复
 
 ## 状态
 
