@@ -29,14 +29,24 @@
     <tr>
       <td align="center"><strong>Feed</strong></td>
       <td align="center"><strong>Detail</strong></td>
-      <td align="center"><strong>Settings</strong></td>
-      <td align="center"><strong>Login</strong></td>
+      <td align="center"><strong>Novel</strong></td>
+      <td align="center"><strong>Translate</strong></td>
     </tr>
     <tr>
       <td><img src="packages/website/public/screenshots/01_feed.png" width="180" alt="Feed"></td>
       <td><img src="packages/website/public/screenshots/02_detail.png" width="180" alt="Detail"></td>
-      <td><img src="packages/website/public/screenshots/03_settings.png" width="180" alt="Settings"></td>
-      <td><img src="packages/website/public/screenshots/04_login.png" width="180" alt="Login"></td>
+      <td><img src="packages/website/public/screenshots/03_novel.png" width="180" alt="Novel"></td>
+      <td><img src="packages/website/public/screenshots/04_translate.png" width="180" alt="Translate"></td>
+    </tr>
+    <tr>
+      <td align="center"><strong>Client Switch</strong></td>
+      <td align="center"><strong>Settings</strong></td>
+      <td align="center"><strong>Login</strong></td>
+    </tr>
+    <tr>
+      <td><img src="packages/website/public/screenshots/05_client_switch.png" width="180" alt="Client Switch"></td>
+      <td><img src="packages/website/public/screenshots/06_settings.png" width="180" alt="Settings"></td>
+      <td><img src="packages/website/public/screenshots/07_login.png" width="180" alt="Login"></td>
     </tr>
   </table>
 </div>
@@ -84,7 +94,7 @@ See [`docs/platform-compatibility.md`](docs/platform-compatibility.md) for platf
 
 ## Tech Stack
 
-**Framework** SolidJS · **Routing** SolidJS Router · **Data** TanStack Query · **DB** TanStack DB · **Virtual** TanStack Virtual · **Build** Vite + vite-plus · **Style** UnoCSS + Fluent Design 2 · **Mobile** Capacitor · **Test** Vitest · **Type** TypeScript 6 (strict)
+**Framework** SolidJS · **Routing** SolidJS Router · **Data** TanStack Query · **DB** TanStack DB · **Virtual** TanStack Virtual · **Build** Vite + vite-plus · **Style** UnoCSS + Fluent Design 2 (app) / Material 3 (app-lynx) · **Mobile** Capacitor · **Test** Vitest · **Type** TypeScript 6 (strict)
 
 ---
 
@@ -115,6 +125,7 @@ Command convention (see `docs/adr/ADR-0059-root-script-convention.md`): a bare c
 | Command | Description |
 |:--------|:------------|
 | `pnpm dev` | Start `pictelio-app` Vite dev server (localhost:5173) |
+| `pnpm dev:app` | Same as `pnpm dev` (explicit alias) |
 | `pnpm dev:app-lynx` | Start `pictelio-app-lynx` dev server |
 | `pnpm dev:website` | Start landing page (Astro) dev server |
 | `pnpm dev:all` | Start all dev servers in parallel |
