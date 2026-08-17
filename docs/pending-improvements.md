@@ -4,7 +4,7 @@
 
 ## 代理/网络错误反馈未闭环
 
-**状态**: 设计方案已确定，待实施  
+**状态**: 已实施（2026-08，ErrorDisplay 落地 + 全路径 proxy.on 覆盖）  
 **提出时间**: 2026-07-15  
 **相关文件**:
 - `packages/app/src/api/client.ts` — `classifyError`、`extractPixivErrorMessage`
@@ -97,6 +97,13 @@
 6. 接入 Bookmarks 页（`bookmarkStore.ts` + `Bookmarks.tsx`）
 7. 接入 Login 页（`Login.tsx`）
 8. 接入 IllustDetail、NovelDetail、PersonalCenter、UserIllusts 等剩余页面
+
+### 实施记录（2026-08）
+
+- `src/components/ErrorDisplay.tsx` 已落地，被 Login / IllustDetail / NovelDetail 等页面采用。
+- `ApiErrorType.PROXY` 枚举已实现（`api/types.ts`），`client.ts` 的 `classifyError` 已识别 `proxy_error` 载荷。
+- `vite.config.ts` 的 `/pixiv-oauth`、`/pixiv-img`、`/pixiv-re`、`/pixiv-nl` 四个路径均已补 `proxy.on("error")`，统一返回 `proxy_error` JSON。
+- 本文件保留为历史设计记录。
 
 ### 优先级判断
 

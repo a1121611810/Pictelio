@@ -4,7 +4,7 @@
 >
 > 任务：为已有 Capacitor 8 Android 应用（`io.pictelio.app`，MainActivity 继承 `BridgeActivity`）新增第二个 client（app-lynx / vue-lynx 前端，bundle = `packages/app-lynx/dist/main.lynx.bundle`），产出"精确到可写实现 ticket"的集成方案。
 >
-> 方法：官方文档优先（lynxjs.org/4.0 + GitHub 源码），每个结论标注 URL 或 file:line；本地代码亲自读过。与既有研究 `docs/research/lynx-migration-feasibility.md`（2026-07）结论互相印证，本文件补足**可写实现**层面的细节。
+> 方法：官方文档优先（lynxjs.org/4.0 + GitHub 源码），每个结论标注 URL 或 file:line；本地代码亲自读过。与既有研究 `lynx-migration-feasibility.md`（2026-07）结论互相印证，本文件补足**可写实现**层面的细节。
 
 ---
 
@@ -165,7 +165,7 @@ LynxEnv.inst().init(this, null, null, null);  // 必须早于任何 LynxView 创
 
 ### 3.3 注入 Referer/User-Agent 下载 i.pximg.net —— 必须自研，官方 Fresco 实现不带 header
 
-- 官方 `<image>` 元素**无 header 属性**；官方默认实现 `LynxImageService`（Fresco）的 `fetchImage → ImageUtils.getFrescoImageRequest(...)` **不把 customParam 作为 HTTP header 传给 Fresco**（既有研究已在 [lynx-migration-feasibility.md:96](docs/research/lynx-migration-feasibility.md) 与 [vue-lynx-masonry-feasibility.md:109](docs/research/vue-lynx-masonry-feasibility.md) 确认）。
+- 官方 `<image>` 元素**无 header 属性**；官方默认实现 `LynxImageService`（Fresco）的 `fetchImage → ImageUtils.getFrescoImageRequest(...)` **不把 customParam 作为 HTTP header 传给 Fresco**（既有研究已在 [lynx-migration-feasibility.md:96](lynx-migration-feasibility.md) 与 [vue-lynx-masonry-feasibility.md:109](vue-lynx-masonry-feasibility.md) 确认）。
 - 官方文档明示可自定义 image-service 并移除 Fresco："if the host APP needs to use other image libraries, you can customize the image-service and remove this dependency"（[Android 集成文档](https://raw.githubusercontent.com/lynx-family/lynx-website/main/docs/en/guide/start/fragments/android/integrating-lynx-with-existing-app-android.mdx)）。
 
 **推荐实现（`PictelioImageService implements ILynxImageService`）**：
@@ -385,6 +385,6 @@ public class LynxActivity extends AppCompatActivity {
 - Capacitor Preferences 存储文件 = "CapacitorStorage"：`packages/app/node_modules/@capacitor/preferences/android/src/main/java/com/capacitorjs/plugins/preferences/PreferencesConfiguration.java:9`、`Preferences.java:17`
 - app-lynx 侧：`packages/app-lynx/package.json`（vue-lynx 0.5.1 / rspeedy 0.13.6 / web-core 0.23.1）、`packages/app-lynx/src/stores/clientSwitchStore.ts:35-48`（__lynxRestartClient 预留）、`packages/app-lynx/src/utils/tokenStorage.ts`、`packages/app-lynx/src/utils/fetchWrapper.ts:5-15`（原生 fallback 预留）、`packages/app-lynx/dist/main.lynx.bundle`（≈973KB 原生 bundle 产物）
 - ADR-0050 登录存储规格契约：`docs/adr/ADR-0050-lynx-login-persistence.md:39-50`
-- 既有结论交叉印证：`docs/research/lynx-migration-feasibility.md:18,50-52,96-97`（aar 12.2MB、minSdk、Fresco 不传 header）、`docs/research/vue-lynx-deep-dive.md:148`（Engine 3.8.1+ 基线）
+- 既有结论交叉印证：`lynx-migration-feasibility.md:18,50-52,96-97`（aar 12.2MB、minSdk、Fresco 不传 header）、`docs/research/vue-lynx-deep-dive.md:148`（Engine 3.8.1+ 基线）
 
 **未获取（注明）**：`@aparajita/capacitor-secure-storage` 的 `SecureStorage.java` 本地未安装（`packages/app/node_modules` 下 glob 无匹配），ADR-0050 的规格表已作为契约；若实现时需逐行对齐源码，先从 `packages/app` 安装该依赖或取 GitHub 源码核对。
