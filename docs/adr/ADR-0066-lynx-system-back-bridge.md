@@ -2,7 +2,7 @@
 
 ## 背景
 
-app-lynx（Lynx 客户端）的 [LynxActivity.java](/Users/lilianda/develop/pixivizer/packages/app/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java:33) 未处理系统返回：manifest 开启 `enableOnBackInvokedCallback` 后，侧滑返回/返回键默认 predictive back → 直接 `finish()` 退出整个应用，而不是返回路由上一页。webview client 通过 Capacitor `backButton` 监听完成「关浮层 → 非根返回 → 根路由双击退出」的完整语义（[backGestureService.ts](/Users/lilianda/develop/pixivizer/packages/app/src/services/backGestureService.ts)），lynx 刻意不带 Capacitor bridge，该链路缺失。
+app-lynx（Lynx 客户端）的 [LynxActivity.java](../../packages/app/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java:33) 未处理系统返回：manifest 开启 `enableOnBackInvokedCallback` 后，侧滑返回/返回键默认 predictive back → 直接 `finish()` 退出整个应用，而不是返回路由上一页。webview client 通过 Capacitor `backButton` 监听完成「关浮层 → 非根返回 → 根路由双击退出」的完整语义（[backGestureService.ts](../../packages/app/src/services/backGestureService.ts)），lynx 刻意不带 Capacitor bridge，该链路缺失。
 
 ## 决定
 
@@ -10,7 +10,7 @@ app-lynx（Lynx 客户端）的 [LynxActivity.java](/Users/lilianda/develop/pixi
 
 - Native：`LynxActivity` 注册 `OnBackPressedDispatcher` callback（androidx，API 21+，33+ 预测性返回自动适配）。bundle 加载成功前 → 原生直接 `finish()`（JS 侧无监听者，无法消费）；加载成功后 → `lynxView.sendGlobalEvent("pictelioBack", ...)` 转发事件，不做任何退出决策。
 - JS：`router.ts` 监听 `pictelioBack` 全局事件（仅原生模式、注册一次）：路由历史栈非空 → `goBack()`；根路由（`recommended` / `login`）→ 显示「再按一次退出应用」提示，2 秒内第二次返回 → 调用新增的 `PictelioApp.exitApp()` 退出 Activity。
-- 根路由双击退出语义与 webview client 对齐（`EXIT_DOUBLE_TAP_MS = 2000` + exitHint toast，见 [backGestureService.ts](/Users/lilianda/develop/pixivizer/packages/app/src/services/backGestureService.ts)）。
+- 根路由双击退出语义与 webview client 对齐（`EXIT_DOUBLE_TAP_MS = 2000` + exitHint toast，见 [backGestureService.ts](../../packages/app/src/services/backGestureService.ts)）。
 
 ## Considered Options
 
@@ -26,4 +26,4 @@ app-lynx（Lynx 客户端）的 [LynxActivity.java](/Users/lilianda/develop/pixi
 - 返回行为语义与 webview client 对齐：非根返回上一页、根路由提示 + 双击退出。
 - 事件名 `pictelioBack` 为 native↔JS 契约；JS 侧仅在原生模式注册，web-core 预览不受影响。
 - bundle 未就绪时的返回仍由原生兜底退出，避免「事件无人消费」卡死。
-- 相关：[ADR-0005](/Users/lilianda/develop/pixivizer/docs/adr/0005-remove-predictive-back.md)（预览动画移除）、[ADR-0055](/Users/lilianda/develop/pixivizer/docs/adr/ADR-0055-lynx-native-render-compat.md)（原生渲染兼容）、[spec](/Users/lilianda/develop/pixivizer/docs/specs/app-lynx-illust-detail-and-system-back.md)
+- 相关：[ADR-0005](./0005-remove-predictive-back.md)（预览动画移除）、[ADR-0055](./ADR-0055-lynx-native-render-compat.md)（原生渲染兼容）、[spec](../specs/app-lynx-illust-detail-and-system-back.md)

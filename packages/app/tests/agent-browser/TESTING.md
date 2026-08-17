@@ -28,8 +28,12 @@ pnpm test:agent-browser
 ```
 tests/agent-browser/
 ├── specs/
-│   ├── main-flow.test.ts    # 超长链（25 步）
-│   └── sub-flows.test.ts    # 4 条中链
+│   ├── main-flow.test.ts              # 超长链（25 步）
+│   ├── sub-flows.test.ts              # 4 条中链
+│   ├── translation-flow.test.ts       # AI 翻译流
+│   ├── update-flow.test.ts            # 更新弹窗流（mockFetch 构造状态）
+│   ├── route-switch-instant.test.ts   # 路由切换即时性
+│   └── adaptive-tags-240.test.ts      # 自适应标签 240px
 ├── driver.ts                # AgentBrowserDriver 封装
 ├── fixtures.ts              # 测试 fixture（登录等）
 └── setup.ts                 # Vitest setup

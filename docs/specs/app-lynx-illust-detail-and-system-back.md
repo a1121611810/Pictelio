@@ -7,10 +7,10 @@
 
 app-lynx（Lynx 客户端）真机存在 4 组问题：
 
-1. **插画详情图片不按比例显示**：[IllustDetail.vue](/Users/lilianda/develop/pixivizer/packages/app-lynx/src/pages/IllustDetail.vue:125) 图片容器固定 `h-[100vw]`（正方形）+ `aspectFill` 裁切。根因：原生 LynxView 在 scroll-view 内不支持动态 `aspect-ratio` style（[ADR-0055 §2](/Users/lilianda/develop/pixivizer/docs/adr/ADR-0055-lynx-native-render-compat.md)），当时 workaround 是固定高度容器；且详情大图用裸 `<image>`，加载期无骨架屏。
-2. **插画列表图片区不可点击进详情**：4 个列表页（推荐/关注/收藏/用户作品）图片外层 `@tap.stop="swallowRestricted"` **无条件吞掉全部点击**（如 [Recommended.vue](/Users/lilianda/develop/pixivizer/packages/app-lynx/src/pages/Recommended.vue:187)）——本意是受限条目不跳转（issue #91），误伤所有正常图片；卡片文字区可点，仅图片区不可点。
-3. **小说列表骨架屏消失后空白**：[NovelList.vue](/Users/lilianda/develop/pixivizer/packages/app-lynx/src/pages/NovelList.vue:142) 是**全包唯一**一处 `:item-key="item.id"` 传数字的 list-item——违反 [ADR-0055 §4](/Users/lilianda/develop/pixivizer/docs/adr/ADR-0055-lynx-native-render-compat.md)（item-key 必须 String，数字 → lynx 报 220201 illegal item-key → 列表条目不渲染）。推荐/关注共用模板故两个 tab 均空白；`lynx-flow-check.sh` 仅 grep 220201 计数且不断言小说列表内容，故未拦截。
-4. **系统侧滑返回直接退出整个应用**：[LynxActivity.java](/Users/lilianda/develop/pixivizer/packages/app/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java:33) 无返回处理（注释自述 MVP 默认 predictive back → 退出 Activity）；webview client 走 Capacitor `backButton` 监听（[backGestureService.ts](/Users/lilianda/develop/pixivizer/packages/app/src/services/backGestureService.ts)），lynx 刻意不带 Capacitor，该链路缺失。
+1. **插画详情图片不按比例显示**：[IllustDetail.vue](../../packages/app-lynx/src/pages/IllustDetail.vue:125) 图片容器固定 `h-[100vw]`（正方形）+ `aspectFill` 裁切。根因：原生 LynxView 在 scroll-view 内不支持动态 `aspect-ratio` style（[ADR-0055 §2](../adr/ADR-0055-lynx-native-render-compat.md)），当时 workaround 是固定高度容器；且详情大图用裸 `<image>`，加载期无骨架屏。
+2. **插画列表图片区不可点击进详情**：4 个列表页（推荐/关注/收藏/用户作品）图片外层 `@tap.stop="swallowRestricted"` **无条件吞掉全部点击**（如 [Recommended.vue](../../packages/app-lynx/src/pages/Recommended.vue:187)）——本意是受限条目不跳转（issue #91），误伤所有正常图片；卡片文字区可点，仅图片区不可点。
+3. **小说列表骨架屏消失后空白**：[NovelList.vue](../../packages/app-lynx/src/pages/NovelList.vue:142) 是**全包唯一**一处 `:item-key="item.id"` 传数字的 list-item——违反 [ADR-0055 §4](../adr/ADR-0055-lynx-native-render-compat.md)（item-key 必须 String，数字 → lynx 报 220201 illegal item-key → 列表条目不渲染）。推荐/关注共用模板故两个 tab 均空白；`lynx-flow-check.sh` 仅 grep 220201 计数且不断言小说列表内容，故未拦截。
+4. **系统侧滑返回直接退出整个应用**：[LynxActivity.java](../../packages/app/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java:33) 无返回处理（注释自述 MVP 默认 predictive back → 退出 Activity）；webview client 走 Capacitor `backButton` 监听（[backGestureService.ts](../../packages/app/src/services/backGestureService.ts)），lynx 刻意不带 Capacitor，该链路缺失。
 
 ## Decisions（用户已逐项确认）
 

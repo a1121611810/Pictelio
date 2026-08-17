@@ -6,7 +6,7 @@
 | ------------ | -------------------------------- | ------------------------- | ----------------------------------- | ---- |
 | **单元测试** | `vitest.config.ts`               | `pnpm test`               | 纯逻辑：store、utils、API 参数验证  | 快   |
 | **E2E 测试** | `vitest.agent-browser.config.ts` | `pnpm test:agent-browser` | AI 驱动 E2E：用户流、页面渲染、交互 | 慢   |
-| **全量**     | —                                | `pnpm test:all`           | 单元 + E2E 全部测试                 | —    |
+| **全量**     | —                                | `pnpm test:app:all`       | app 单测 + agent-browser E2E（所有包单测并行用 `pnpm test:all`） | —    |
 
 ## 核心规则
 
