@@ -8,7 +8,7 @@
 - **Monorepo**: pnpm workspace，含五个子包：`pictelio-app`（SolidJS SPA 主体）、`pictelio-app-lynx`（vue-lynx 客户端 MVP）、`@pictelio/ugoira`（Ugoira 动图帧处理库）、`@pictelio/update-check`（更新检查共享库）和 `pictelio-website`（Astro 落地页）
 - **入口**: `packages/app/src/main.tsx`（bootstrap：settings 同步、Fluent 主题、渲染、auth 恢复）→ `packages/app/src/App.tsx` → `packages/app/src/router.tsx`（@solidjs/router，路由定义与 App 分离；`src/startup.ts` 为预留启动钩子，当前为空实现）
 - **路由**: `/login` `/home` `/illust/$id` `/debug` `/novel/$id` `/search` `/me` `/about` `/image-host` `/image-cache` `/settings` `/client-switch` `/age-confirmation` `/scroll-restoration-confirm` `/user/$id` `/user/$id/illusts` `/user/$id/following` `/user/$id/followers` `/my/followers`（其余路径 catch-all 直接渲染 `/home`）
-- **设计系统**: **强制** Microsoft Fluent Design System 2 — 所有视觉和交互决策基于 Fluent 令牌和规范（详见「Fluent Design 规范」章节）
+- **设计系统**: `pictelio-app` **强制**遵循 Microsoft Fluent Design System 2（所有视觉和交互决策基于 Fluent 令牌和规范，详见「Fluent Design 规范」）；`pictelio-app-lynx` 使用 Material Design 3（见「约定」章节 app-lynx 样式）
 - **Pixiv API**: 自建 HTTP 客户端 (`src/api/client.ts` + `src/api/queryClient.ts`)，双模式（Web: fetch + Vite 代理，`devAccessToken` 编译期保护 / Native: Capacitor bridge → `PixivApiPlugin`，见 `src/native/PixivApi.ts`），iOS OAuth 凭证策略（Android 已弃用），401 自动刷新 + 防死循环
 - **CSS 架构**: 分层加载 `reset.css` → `tokens.css` → `base.css` → `virtual:uno.css` → `novel-reader.css`；字号通过 UnoCSS preflights 以流体 `clamp(rem + vw)` 定义（见 `uno.config.ts`），无需构建期转换；Fluent Web Components 主题同步
 - **构建工具**: 使用 `vite-plus`（内部封装 Vite + oxlint + oxfmt + vitest），通过 `vp` CLI 统一执行 dev/build/check/test/lint/fmt
@@ -33,6 +33,7 @@
 - 简单文件列举（Glob 列明确模式）
 - 小范围精准定位（已知符号名且单文件，Grep 更快）
 - 中文语义搜索失败（CodeGraph 返回空/不相关时，降级找入口再切回）
+- 环境缺少上述 MCP 工具时，用能力等价的可用工具（grep/read、web 搜索等）代替，**不视为违规**
 
 > 完整细节（参数、索引维护、结果解读）在全局 memory `mcp-codegraph-usage.md` / `mcp-doc-query.md`。
 
@@ -695,10 +696,6 @@ The scheduled OpenWiki GitHub Actions workflow refreshes the repository wiki. Do
 - **禁止**在未查阅对应 OpenWiki 页面的情况下，直接使用 CodeGraph / Read 从零摸索架构层面问题。
 - 先通过 OpenWiki 获取高层次理解，再使用 CodeGraph 精确追踪代码细节。
 - 违规示例：直接读 `src/api/client.ts` 而不先读 `openwiki/architecture/api-layer.md`
-
-### 查询时使用
-- **当问题涉及架构概览、领域概念、集成方式、测试指南等主题时**，应优先读取 `openwiki/` 目录下对应的文档页面（详见上方「OpenWiki 查询规范」优先级决策链）。
-- 先通过 OpenWiki 获取高层次理解，再使用 CodeGraph 精确追踪代码细节。
 
 ### 更新维护
 - **AI Agent 在提交代码前**（尤其是修改了 `src/` 或 `packages/` 目录中的代码后），应主动执行 `pnpm openwiki:update` 更新文档。
