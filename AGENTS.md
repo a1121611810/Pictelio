@@ -230,7 +230,6 @@ pixivizer/
 ├── docs/                        # 项目文档
 │   ├── adr/                     # ADR（含 ADR-0059 命令约定，最新到 ADR-0085）
 │   ├── agents/                  # Agent 工作流文档（issue-tracker、triage-labels、domain）
-│   ├── github-release.md
 │   ├── release-checklist.md
 │   ├── release-signing.md
 │   ├── platform-compatibility.md

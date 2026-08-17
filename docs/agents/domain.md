@@ -21,7 +21,7 @@
     ├── app/
     │   ├── CONTEXT.md                 ← app 上下文（浏览导航、错误处理）
     │   └── docs/adr/                  ← 上下文级决策（暂无，按需创建）
-    ├── app-lynx/                      ← CONTEXT.md 尚未创建
+    ├── app-lynx/                      ← CONTEXT.md（导航与返回、图片与列表、错误与登录）
     ├── ugoira/                        ← CONTEXT.md 尚未创建
     └── website/                       ← CONTEXT.md 尚未创建
 ```
