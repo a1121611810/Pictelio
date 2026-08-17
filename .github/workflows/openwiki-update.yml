@@ -65,6 +65,10 @@ jobs:
           LANGCHAIN_PROJECT: openwiki
           LANGCHAIN_TRACING_V2: ${{ secrets.LANGSMITH_API_KEY != '' }}
 
+      - name: Remove deprecated CLAUDE.md
+        # CLAUDE.md 已废弃删除（AGENTS.md 为唯一 agent 指令载体）；openwiki 可能重建该文件，此处兜底清理
+        run: rm -f CLAUDE.md
+
       - name: Create OpenWiki update pull request
         uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
         with:
@@ -75,7 +79,6 @@ jobs:
           add-paths: |
             openwiki
             AGENTS.md
-            CLAUDE.md
             .github/workflows/openwiki-update.yml
           branch: openwiki/update
           commit-message: "docs: update OpenWiki"

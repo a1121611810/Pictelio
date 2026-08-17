@@ -227,7 +227,7 @@ pixivizer/
 │   ├── deploy.mjs               # GitHub Pages 本地预览脚本
 │   └── kill-dev-server.mjs      # 开发服务器进程管理
 ├── docs/                        # 项目文档
-│   ├── adr/                     # ADR（含 ADR-0059 命令约定，最新到 ADR-0063）
+│   ├── adr/                     # ADR（含 ADR-0059 命令约定，最新到 ADR-0085）
 │   ├── agents/                  # Agent 工作流文档（issue-tracker、triage-labels、domain）
 │   ├── github-release.md
 │   ├── release-checklist.md
@@ -705,6 +705,7 @@ The scheduled OpenWiki GitHub Actions workflow refreshes the repository wiki. Do
 - 如 `pnpm openwiki:update` 执行失败，不阻塞后续操作，但应在回复中提示用户。
 - **禁止手动编辑** `openwiki/` 目录下的生成文件。如需更新文档内容，应修改源码后通过 `pnpm openwiki:update` 重新生成。
 - 兜底机制：GitHub Actions 定时任务（`.github/workflows/openwiki-update.yml`）每天自动执行 `openwiki --update` 并生成 PR，无需手动触发，也不阻塞本地 commit（pre-commit 已不再执行 openwiki 更新）。
+- **CLAUDE.md 已废弃删除**：openwiki 本地更新可能重建该文件，**请勿提交**（CI 已自动清理）。
 
 <!-- CODEGRAPH_START -->
 ## CodeGraph
