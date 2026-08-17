@@ -1,4 +1,4 @@
-# ADR 0044: app-lynx 响应式单位选型——字号 rpx + 宽高间距 vw
+# ADR 0086: app-lynx 响应式单位选型——字号 rpx + 宽高间距 vw
 
 ## 状态
 

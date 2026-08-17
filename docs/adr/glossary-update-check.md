@@ -1,6 +1,6 @@
 # 检查更新（版本检查）— 术语表
 
-> 范围：`pictelio-app`（webview 客户端）与 `app-lynx`（Lynx 客户端）双端共有的检查更新机制、共享检查层、版本清单契约、更新策略与原生网络适配概念。配套 ADR：[ADR-0065-update-check-architecture.md](./ADR-0065-update-check-architecture.md)。
+> 范围：`pictelio-app`（webview 客户端）与 `app-lynx`（Lynx 客户端）双端共有的检查更新机制、共享检查层、版本清单契约、更新策略与原生网络适配概念。配套 ADR：[ADR-0089-update-check-architecture.md](./ADR-0089-update-check-architecture.md)。
 
 ## 核心术语
 

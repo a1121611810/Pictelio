@@ -51,7 +51,7 @@
 
 理由按权重排序：
 
-1. **与 webview 版一致，跨端体验统一**。本项目已有 `docs/comment-system-design.md` 明确采用「半屏覆盖层（Instagram 风格）」；lynx 版与 webview 版保持同形态是 ADR 体系一贯原则（如 ADR-0046 Tailwind、ADR-0044 单位体系都在对齐两端观感）。弹层形态本身已被 webview 版验证为产品既定方向。
+1. **与 webview 版一致，跨端体验统一**。本项目已有 `docs/comment-system-design.md` 明确采用「半屏覆盖层（Instagram 风格）」；lynx 版与 webview 版保持同形态是 ADR 体系一贯原则（如 ADR-0046 Tailwind、ADR-0086 单位体系都在对齐两端观感）。弹层形态本身已被 webview 版验证为产品既定方向。
 2. **业界主流心智**。Instagram / YouTube / TikTok / 抖音的评论都是底部弹层，用户无需学习；Material/Apple 规范均把「评论」归为次要任务类内容，适合 modal bottom sheet 而非全屏页。
 3. **保留上下文**。Pixiv 插画详情页内容长（多页大图 + 信息 + 关注/收藏操作，见 `IllustDetail.vue` 的 scroll-view 长内容）。弹层打开/关闭不丢详情页滚动位置、不打断「浏览作品」的主任务；页内区块则会让超长 scroll-view 更难管理滚动位置，并让评论与作品内容竞争注意力。
 4. **lynx 能力完全覆盖**（详见 §3）：absolute/fixed 定位官方支持，absolute 全屏覆盖层已有 `RestrictOverlay.vue` 真机先例；输入框有 `Login.vue` + ADR-0055（XElement `<input>`）先例；列表分页有 `FollowList.vue`/`Recommended.vue` + ADR-0045 先例。
@@ -121,7 +121,7 @@ lynx-ui（官方组件库，`lynx-family/lynx-ui`）提供两个直接对应的�
 | **输入框** | `packages/app-lynx/src/pages/Login.vue` + ADR-0055 §3 | `<input>` 是 XElement 扩展元件（需 `xelement`/`xelement-input` + `LynxViewBuilder.addBehaviors(new XElementBehaviors().create())`），真机 990200 已修。评论输入框复用该链路 |
 | **列表分页** | `packages/app-lynx/src/pages/FollowList.vue` + ADR-0045 | `<list>` + `@scrolltolower` + 加载冷却/节流/空页防护；评论分页（webview 版 30 条/页）可直接套用该模式。列表图加 `lazy-load`（ADR-0060） |
 | **独立路由先例（备选 B 所需）** | `packages/app-lynx/src/router.ts` + `FollowList.vue` | 极简路由支持 `navigate`/`goBack`/系统返回桥（ADR-0066），新增 `/illust/:id/comments` 路由成本可控，可作为弹层内深读的后续升级路径 |
-| **单位/属性契约** | ADR-0044（rpx 塌陷→用 vw/px）、ADR-0056（number 属性 v-bind 数字） | 弹层高度/偏移用 vw/px；scroll-view/list 的 number 属性用数字绑定 |
+| **单位/属性契约** | ADR-0086（rpx 塌陷→用 vw/px）、ADR-0056（number 属性 v-bind 数字） | 弹层高度/偏移用 vw/px；scroll-view/list 的 number 属性用数字绑定 |
 
 ### 3.4 弹层在 vue-lynx 的实现要点（给后续实施的备忘）
 
@@ -170,4 +170,4 @@ lynx-ui（官方组件库，`lynx-family/lynx-ui`）提供两个直接对应的�
 - `docs/comment-system-design.md` —— webview 版评论系统设计（半屏覆盖层形态、API、组件、分页策略）
 - `packages/app-lynx/src/components/RestrictOverlay.vue` —— absolute 覆盖层先例
 - `packages/app-lynx/src/pages/IllustDetail.vue` / `FollowList.vue` / `Login.vue` —— 根布局 / 分页 / 输入先例
-- `docs/adr/` ADR-0044 / 0045 / 0053 / 0055 / 0056 / 0060 / 0066 —— lynx 布局、输入、分页、路由相关契约
+- `docs/adr/` ADR-0086 / 0045 / 0053 / 0055 / 0056 / 0060 / 0066 —— lynx 布局、输入、分页、路由相关契约

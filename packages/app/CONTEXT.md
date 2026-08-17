@@ -84,7 +84,7 @@ Tab 控件共享的统一视觉风格：磨砂玻璃容器 + 激活项浮起玻�
 需要用户确认后才能继续的模态弹窗（清除数据、删除账号、切换渲染引擎、二次确认等）。app 内统一经 `src/components/ui/FluentDialog.tsx` 封装渲染，底层是 `@fluentui/web-components` 的 `<fluent-dialog>`。
 
 **fluent-dialog slot 契约（fluent-dialog slot contract）**：
-`@fluentui/web-components@3` 的 `<fluent-dialog>` shadow 内只有一个无名 `<slot>`，**命名 slot 全部在内部的 `<fluent-dialog-body>` 上**。正确用法：内容必须包在 `<fluent-dialog-body>` 中；标题用 `slot="title"`；正文**不写 slot**（进 body 默认 slot，即 `.content`）；按钮用 `slot="action"`（**单数**）。_Avoid_ 禁止 `slot="content"`（不存在）、`slot="actions"`（复数，不存在）、缺 `<fluent-dialog-body>` 包裹——这些错误写法会导致标题/正文/按钮不投影，弹窗退化为全宽横条、无遮罩、按钮不可见（见 ADR-0062）。
+`@fluentui/web-components@3` 的 `<fluent-dialog>` shadow 内只有一个无名 `<slot>`，**命名 slot 全部在内部的 `<fluent-dialog-body>` 上**。正确用法：内容必须包在 `<fluent-dialog-body>` 中；标题用 `slot="title"`；正文**不写 slot**（进 body 默认 slot，即 `.content`）；按钮用 `slot="action"`（**单数**）。_Avoid_ 禁止 `slot="content"`（不存在）、`slot="actions"`（复数，不存在）、缺 `<fluent-dialog-body>` 包裹——这些错误写法会导致标题/正文/按钮不投影，弹窗退化为全宽横条、无遮罩、按钮不可见（见 ADR-0087）。
 
 ### 错误处理
 

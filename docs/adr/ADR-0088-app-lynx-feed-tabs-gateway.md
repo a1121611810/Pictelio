@@ -1,4 +1,4 @@
-# ADR 0064: app-lynx 三问题修复——requestRaw 原生网关 / 流内遮罩卡 / 全局 tab 重构
+# ADR 0088: app-lynx 三问题修复——requestRaw 原生网关 / 流内遮罩卡 / 全局 tab 重构
 
 ## 状态
 

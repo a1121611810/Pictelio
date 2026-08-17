@@ -1,6 +1,6 @@
 # app-lynx Feed / Tab / 网关 — 术语表
 
-> 范围：`packages/app-lynx` 本次迭代引入的数据层、导航与渲染术语。配套 ADR：[ADR-0064-app-lynx-feed-tabs-gateway.md](./ADR-0064-app-lynx-feed-tabs-gateway.md)。
+> 范围：`packages/app-lynx` 本次迭代引入的数据层、导航与渲染术语。配套 ADR：[ADR-0088-app-lynx-feed-tabs-gateway.md](./ADR-0088-app-lynx-feed-tabs-gateway.md)。
 
 ## 核心术语
 

@@ -1,6 +1,6 @@
 # Lynx 单位与 web-core 换算机制 — 术语表
 
-> 范围：`packages/app-lynx` 响应式布局涉及的单位、换算关系与 web-core 渲染机制。配套 ADR：[ADR-0044-lynx-responsive-units.md](./ADR-0044-lynx-responsive-units.md)。
+> 范围：`packages/app-lynx` 响应式布局涉及的单位、换算关系与 web-core 渲染机制。配套 ADR：[ADR-0086-lynx-responsive-units.md](./ADR-0086-lynx-responsive-units.md)。
 
 ## 核心术语
 
@@ -12,7 +12,7 @@
 | **vw / vh** | 视口单位：1vw = 1% 视口宽，1vh = 1% 视口高。**vh 只适合 `100vh` 满屏场景**，手机高度差异大，不可用于间距/字号。 |
 | **cqw / cqh** | CSS 容器查询单位：1cqw = 1% 容器查询宽度。web-core 用它实现 vw/rpx 的换算基准。 |
 | **375 设计稿** | 以 375px（iPhone 逻辑宽）为设计基准的换算约定：`1px = 0.2667vw`、`1rpx = 0.5px`。 |
-| **--rpx-unit** | web-core 注入的 CSS 变量（`calc(1cqw / 7.5)`，定义在 `lynx-view`），rpx 经它换算。**引用自身容器宽度，预览环境循环失效**（见 ADR-0044）。 |
+| **--rpx-unit** | web-core 注入的 CSS 变量（`calc(1cqw / 7.5)`，定义在 `lynx-view`），rpx 经它换算。**引用自身容器宽度，预览环境循环失效**（见 ADR-0086）。 |
 | **--vw-unit / --vh-unit** | web-core 的 vw/vh 换算变量（`1cqw` / `1cqh`），同样基于容器查询。 |
 | **transformVW / transformVH / transformREM** | `lynx-view` 可选属性（默认关闭）。**关闭时 vw/vh/rem 不经过变量链，由浏览器原生解析**——这是 vw 在 web 预览可靠的原因。 |
 | **token_transformer.rs** | web-core 的样式单位转换器（Rust wasm），把 rpx/vw/vh/rem/ppx 统一转成 `calc(N * var(--xxx-unit))` 模板。 |
@@ -41,4 +41,4 @@ vw 值 = rpx 值 / 7.5
 
 ## 项目现状（2026-08）
 
-`packages/app-lynx` 按 ADR-0044 采用：**字号/行高 rpx、宽高/间距/圆角 vw、边框/阴影 px**。推荐页封面原用 auto-size（ADR-0044 时期的方案），ADR-0048 起改为 **`aspect-ratio: 1/1` 方形容器**（web-core 下 auto-size 失效）。tokens.css 的 `--fontSize*` / `--spacing*` 令牌当前零引用（页面硬编码），清理时收敛。
+`packages/app-lynx` 按 ADR-0086 采用：**字号/行高 rpx、宽高/间距/圆角 vw、边框/阴影 px**。推荐页封面原用 auto-size（ADR-0086 时期的方案），ADR-0048 起改为 **`aspect-ratio: 1/1` 方形容器**（web-core 下 auto-size 失效）。tokens.css 的 `--fontSize*` / `--spacing*` 令牌当前零引用（页面硬编码），清理时收敛。

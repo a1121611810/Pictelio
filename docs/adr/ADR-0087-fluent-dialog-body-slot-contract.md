@@ -1,4 +1,4 @@
-# ADR 0062: fluent-dialog 必须经 fluent-dialog-body 投影（slot 契约）
+# ADR 0087: fluent-dialog 必须经 fluent-dialog-body 投影（slot 契约）
 
 ## 状态
 

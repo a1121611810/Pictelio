@@ -214,7 +214,7 @@ pixivizer/
 │   │   ├── src/                 # fflate 解压 / store 模式 Range 切片
 │   │   ├── tests/
 │   │   └── package.json
-│   ├── update-check/            # @pictelio/update-check — 更新检查共享库（版本比较/version.json 拉取/超时兜底，ADR-0065）
+│   ├── update-check/            # @pictelio/update-check — 更新检查共享库（版本比较/version.json 拉取/超时兜底，ADR-0089）
 │   │   ├── src/                 # index.ts（webview 与 lynx 双客户端共用）
 │   │   ├── tests/
 │   │   └── package.json
@@ -308,7 +308,7 @@ packages/app/src/
 │   ├── PersonalCenter.tsx      # 个人中心 / 用户主页（根据路由参数区分）
 │   ├── UserIllusts.tsx         # 用户作品列表页
 │   ├── Settings.tsx            # 设置页
-│   ├── ClientSwitch.tsx        # 引擎切换信息页（ADR-0064）
+│   ├── ClientSwitch.tsx        # 引擎切换信息页（ADR-0064-engine-switch-experience-fix）
 │   ├── ScrollRestorationConfirm.tsx # 滚动恢复二次确认
 │   ├── ImageHostSettings.tsx   # 图片托管设置页
 │   ├── ImageCacheSettings.tsx  # 图片缓存设置页
