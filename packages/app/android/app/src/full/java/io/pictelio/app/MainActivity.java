@@ -67,6 +67,17 @@ public class MainActivity extends BridgeActivity {
                 .getString("pictelio_client_kind", "webview");
         if ("lynx".equals(clientKind)) {
             super.onCreate(savedInstanceState);
+            // 修复「缩小后点图标永远回推荐页」（ADR-0102，模拟器实证根因）：
+            // MainActivity 是 singleTask 路由壳，每次路由后 finish，永远没有存活实例可收
+            // launcher 重投递的 onNewIntent → 系统只能重建本 Activity 并压在旧 LynxActivity
+            // 之上 → 每次点图标都新开 LynxView（回推荐页 + task 无限堆叠，实测 2 次叠 3 层）。
+            // 判别：重建进来时本 Activity 不是 task 根（下面压着存活的旧 LynxActivity）→
+            // 直接 finish 退出，由系统恢复旧实例——页面/历史栈/滚动位置原样保留。
+            // 冷启动 / 客户端切换（restart 走 CLEAR_TASK）MainActivity 恒为 task 根，不受影响。
+            if (!isTaskRoot()) {
+                finish();
+                return;
+            }
             startActivity(new Intent(this, LynxActivity.class));
             finish();
             return; // 不注册插件、不做 WebView 版本检查
