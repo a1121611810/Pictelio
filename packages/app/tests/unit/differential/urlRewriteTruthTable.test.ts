@@ -1,6 +1,6 @@
 // app 侧 rewriteUrl（web 分支）差分测试：以共享差分契约表为 oracle。
 // 期望值来源 = 共享差分契约表（sharedUrlRewriteCases.ts；app ↔ app-lynx 同语义模块差分，
-// spec #187 决策 2 / ticket #194；契约差异分列记录，见表格 note）。
+// spec #187 决策 2 / ticket #194；app 已按 ADR-0100 对齐 lynx #165，8 行双端一致，无契约差异 note）。
 // web 模式 = Capacitor.isNativePlatform() 为 false：rewriteUrl 依赖模块级 isNative
 // （client.ts 顶层环境探测）——用 vi.mock("@capacitor/core") + vi.hoisted isNativeMock
 // 置 false，vi.resetModules() 后动态导入捕获（client.test.ts 的 loadModule 模式）；

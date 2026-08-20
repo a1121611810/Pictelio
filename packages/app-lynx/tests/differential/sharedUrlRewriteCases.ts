@@ -3,13 +3,10 @@
 // （rewriteUrl web 分支，app: Capacitor.isNativePlatform()=false / lynx: isNativeMode()=false）
 // 对同一输入的独立实现输出。每行含两端独立期望列，任一端的实际行为与契约不符即红灯
 // （AGENTS.md「期望值出处可追溯」：独立实现差分 oracle，非从单端实现反推）。
-// 记录的两处契约差异（分列记录，防"以为同构"的假象）：
-// - evil 伪后缀域（evil-suffix-app-api）：app 用无边界 startsWith(PIXIV_API_BASE)
-//   前缀匹配 → 误重写为 /pixiv-api.evil.com/...；lynx 用边界检查（base + "/" 或 ===）
-//   白名单（#165 security review 修复）→ 原样放行。
-// - auth URL 带 query（oauth-with-query）：两端输出一致（query 被剥离）；机制不同——
-//   app 无边界 startsWith(PIXIV_AUTH_URL) 顺带捕获 query 形态，lynx 的 "/" 分支带边界检查、
-//   另设显式 + "?" 分支。
+// 本表 8 行双端完全一致，无契约差异行：app 已按 ADR-0100 对齐 lynx #165（security review
+// 修复）——evil 伪后缀域（evil-suffix-app-api）app 原无边界 startsWith(PIXIV_API_BASE)
+// 前缀匹配误重写为 /pixiv-api.evil.com/...，现改严格边界（base + "/" 或 ===）+ auth 显式
+// "?" 分支后原样放行；oauth-with-query 两端机制亦收敛一致（query 被剥离）。
 // 本文件在 app（packages/app/tests/unit/differential/）与 app-lynx
 // （packages/app-lynx/tests/differential/）各存一份，内容须逐字节一致；
 // 一致性由 urlRewriteCasesConsistency.test.ts（readFileSync 比对）守护。
@@ -52,7 +49,6 @@ export const URL_REWRITE_CASES: UrlRewriteCase[] = [
     input: "https://oauth.secure.pixiv.net/auth/token?grant_type=refresh_token",
     expectedWebApp: "/pixiv-oauth/auth/token",
     expectedWebLynx: "/pixiv-oauth/auth/token",
-    note: "契约差异（机制）：两端输出一致（query 被剥离）；app 无边界 startsWith(PIXIV_AUTH_URL) 顺带捕获 query 形态，lynx 的 '/' 分支带边界检查、另设显式 + '?' 分支",
   },
   {
     id: "proxied-image",
@@ -69,9 +65,8 @@ export const URL_REWRITE_CASES: UrlRewriteCase[] = [
   {
     id: "evil-suffix-app-api",
     input: "https://app-api.pixiv.net.evil.com/v1/illust",
-    expectedWebApp: "/pixiv-api.evil.com/v1/illust",
+    expectedWebApp: "https://app-api.pixiv.net.evil.com/v1/illust",
     expectedWebLynx: "https://app-api.pixiv.net.evil.com/v1/illust",
-    note: "契约差异（行为）：app 无边界 startsWith(PIXIV_API_BASE) → 伪后缀域被误重写为 /pixiv-api.evil.com/...；lynx 边界检查白名单（base + '/' 或 ===，#165 security review 修复）→ 原样放行",
   },
   {
     id: "non-pixiv-absolute",

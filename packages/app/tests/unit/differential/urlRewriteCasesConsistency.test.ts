@@ -58,12 +58,13 @@ describe("sharedUrlRewriteCases 双端一致性（防漂移）", () => {
     }
   });
 
-  it("记录的契约差异行：evil 伪后缀域两端期望不同且带 note 说明", () => {
+  it("ADR-0100 修复后：evil 伪后缀域两端一致（原样放行），无契约差异 note", () => {
     const evil = URL_REWRITE_CASES.find((c) => c.id === "evil-suffix-app-api");
     expect(evil).toBeDefined();
     if (evil) {
-      expect(evil.expectedWebApp).not.toBe(evil.expectedWebLynx);
-      expect(evil.note).toBeTruthy();
+      expect(evil.expectedWebApp).toBe(evil.expectedWebLynx);
+      expect(evil.expectedWebApp).toBe("https://app-api.pixiv.net.evil.com/v1/illust");
+      expect(evil.note).toBeUndefined();
     }
   });
 });

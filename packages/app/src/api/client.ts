@@ -220,10 +220,17 @@ export function rewriteUrl(path: string): string {
   // 已经是 http(s) URL
   if (path.startsWith("http")) {
     if (!isNative) {
-      if (path.startsWith(PIXIV_API_BASE)) {
+      // 精确主机边界匹配（=== base 或 base + "/"），防伪后缀域
+      // （如 https://app-api.pixiv.net.evil.com）被误判为 Pixiv 主机（ADR-0100，对齐 lynx #165）
+      if (path === PIXIV_API_BASE || path.startsWith(PIXIV_API_BASE + "/")) {
         return path.replace(PIXIV_API_BASE, "/pixiv-api");
       }
-      if (path.startsWith(PIXIV_AUTH_URL)) {
+      // auth URL 同样严格边界，并显式覆盖带 query 的形态（query 被剥离）
+      if (
+        path === PIXIV_AUTH_URL ||
+        path.startsWith(PIXIV_AUTH_URL + "/") ||
+        path.startsWith(PIXIV_AUTH_URL + "?")
+      ) {
         return "/pixiv-oauth/auth/token";
       }
     } else {
@@ -241,6 +248,47 @@ export function rewriteUrl(path: string): string {
     return `/pixiv-api${path}`;
   }
   return path;
+}
+
+/** 受信 Pixiv 主机白名单：从 __PUBLIC_CONFIG__ 常量解析 hostname 组成（禁止硬编码域名字符串——项目约束） */
+const trustedPixivHosts: ReadonlySet<string> = (() => {
+  const hosts = new Set<string>();
+  for (const base of [PIXIV_API_BASE, PIXIV_AUTH_URL]) {
+    try {
+      hosts.add(new URL(base).hostname);
+    } catch {
+      // 常量非法时跳过（编译期注入，正常不会发生）——但不可静默：白名单缺失时 fail-closed（拒绝附 token），必须可见
+      console.warn("[client] PIXIV 受信主机常量解析失败:", base);
+    }
+  }
+  return hosts;
+})();
+
+/**
+ * Pixiv 受信主机白名单判定（纯函数，对齐 lynx #165 / ADR-0100）。
+ * 从 __PUBLIC_CONFIG__ 常量解析 hostname 组成白名单，对目标 URL 做精确 hostname 比对——
+ * 天然防伪后缀域（app-api.pixiv.net.evil.com 的 hostname 不等于白名单）。
+ */
+export function isTrustedPixivHost(url: string): boolean {
+  try {
+    return trustedPixivHosts.has(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 决定是否给请求附加 Bearer access_token（纯函数，对齐 lynx #165 / ADR-0100）。
+ * 接收「已重写」的 URL：
+ * - web 分支：仅本地代理路径（/pixiv- 前缀）携带 token；
+ * - native 分支：纵深防御——仅受信 Pixiv 主机的绝对 URL 携带
+ *   （实际 token 由 PixivApiPlugin Java 侧管理，JS 零知）。
+ */
+export function shouldAttachAuth(rewrittenUrl: string): boolean {
+  if (!isNative) {
+    return rewrittenUrl.startsWith("/pixiv-");
+  }
+  return rewrittenUrl.startsWith("http") && isTrustedPixivHost(rewrittenUrl);
 }
 
 /**
@@ -299,17 +347,23 @@ async function nativeExecuteRequest<T>(
       "User-Agent": PIXIV_USER_AGENT,
       Referer: __PUBLIC_CONFIG__.referer,
     };
+    // 先重写 URL，再基于重写结果裁决是否附加 Bearer（与 lynx #165 顺序一致）：
+    // rewriteUrl 仅把已知 Pixiv 主机映射为 /pixiv-* 代理路径；外部绝对 URL
+    // （伪后缀域 / 非 Pixiv 域）原样返回且不带 /pixiv- 前缀 → shouldAttachAuth 为 false，
+    // 不携带 Authorization，防止 devAccessToken 泄漏到非 Pixiv 域（ADR-0100）。
+    const url = rewriteUrl(path);
+    if (shouldAttachAuth(url) && devAccessToken) {
+      headers["Authorization"] = `Bearer ${devAccessToken}`;
+    }
     if (method === "GET") {
-      if (devAccessToken) headers["Authorization"] = `Bearer ${devAccessToken}`;
       const params = data ? "?" + new URLSearchParams(data).toString() : "";
-      const res = await fetch(rewriteUrl(path) + params, { method: "GET", headers, signal });
+      const res = await fetch(url + params, { method: "GET", headers, signal });
       if (!res.ok) throw classifyError(res.status, null, await res.json().catch(() => null));
       return res.json() as Promise<T>;
     } else {
-      if (devAccessToken) headers["Authorization"] = `Bearer ${devAccessToken}`;
       headers["Content-Type"] = __PUBLIC_CONFIG__.contentType;
       const bodyStr = data ? new URLSearchParams(data).toString() : "";
-      const res = await fetch(rewriteUrl(path), { method: "POST", headers, body: bodyStr });
+      const res = await fetch(url, { method: "POST", headers, body: bodyStr });
       if (!res.ok) throw classifyError(res.status, null, await res.json().catch(() => null));
       return res.json() as Promise<T>;
     }
