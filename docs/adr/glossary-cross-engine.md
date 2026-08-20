@@ -29,7 +29,7 @@ Pictelio 是两个引擎（webview 客户端 / lynx 客户端）共享同一 Pix
 | 内容遮罩 | 展示态徽标（R18/R18G badge、模糊/警告遮罩） | `RestrictOverlay`（M3 scrim + 徽章，遮罩 + 拦截点击） | **受限遮罩（RestrictOverlay / mask）** | app=展示态标记；lynx=受限态拦截 | 术语区分「展示态遮罩」「受限态遮罩」；等级统一 `level 1=R-18/2=R-18G` |
 | 内容过滤函数 | `filterFeedIllusts`/`filterNovels`/`filterUserPreviews`（捆绑屏蔽用户） | 无（全量渲染 + 遮罩） | **内容过滤（filter，app 特有管线）** | 过滤管线仅 app 存在 | 差分测试只比较谓词，不比较管线；屏蔽用户（blockStore）属 app 独有维度，测试须隔离 |
 | URL 重写 | `rewriteUrl`（web：剥域名→代理前缀；native：剥域名成相对路径） | `rewriteUrl`（native：保留/构造绝对 URL；web：精确主机匹配 + auth query 形态） | **`rewriteUrl`（URL 重写）** | native 分支输出形态相反（网关契约差异） | 按 (web/native)×输入拆分测试；「URL 规范化契约表」为 oracle |
-| 令牌附加守卫 | 无。web dev 有 token 即附 Authorization；native 由 Java 附加 | `shouldAttachAuth(rewrittenUrl)` + `isTrustedPixivHost(url)` | **令牌附加守卫（shouldAttachAuth）** | lynx 有防 token 泄漏白名单，app web 分支无 | 安全建议：app web 分支对齐（待确认）；差分断言「非受信 URL 不带 Bearer」 |
+| 令牌附加守卫 | 无。web dev 有 token 即附 Authorization；native 由 Java 附加 | `shouldAttachAuth(rewrittenUrl)` + `isTrustedPixivHost(url)` | **令牌附加守卫（shouldAttachAuth）** | 已由 ADR-0100 修复：app web 分支已补 `shouldAttachAuth` + `isTrustedPixivHost` 边界匹配（与 lynx 一致） | ADR-0100 已拍板 D2-A：app web 分支对齐 lynx（`shouldAttachAuth` + `isTrustedPixivHost`），保持双实现 + 差分兜底 |
 | 代理前缀（契约源） | `vite.config.ts` 定义 **7 个**：`/pixiv-img /pixiv-re /pixiv-nl /pixiv-api /pixiv-oauth /github-api /pixiv-www` | `lynx.config.ts` 定义 **3 个**：`/pixiv-img /pixiv-api /pixiv-oauth` | **代理前缀（proxy prefix）** | lynx 缺 `/pixiv-re /pixiv-nl /github-api /pixiv-www` | 前缀清单文档化为契约表；差分不得假设两引擎前缀面相同 |
 | 原生模式探测 | `Capacitor.isNativePlatform()`（模块级 `isNative`） | `isNativeMode()`：探测 `NativeModules.Pictelio*`（防 web-core 空壳误判） | **原生模式（native mode）** | 判定机制完全不同 | 测试分别 mock 两种机制；web/native 模式名统一 |
 | OAuth Token 400 错误 | `isOAuthTokenErrorResponse`（只认 error.message 含 OAuth/invalid_request） | 同名（**额外**认 `{error:"invalid_grant"}` 字符串 + invalid_grant 子串） | **OAuth Token 400 错误**（CONTEXT.md 已定义） | **行为分歧，已由真实证据裁决**（app 漏识别字符串形态） | 以 lynx 识别面为准统一（ADR 已拍板）；oracle 用真实错误体快照 |
@@ -60,10 +60,10 @@ Pictelio 是两个引擎（webview 客户端 / lynx 客户端）共享同一 Pix
 ### 专项 2：URL 重写 —— 契约相反
 
 - **native 分支**（方向相反）：app 绝对 URL **剥域名成相对 path**（`PixivApiPlugin` 只收相对路径）；lynx 相对 path **拼成绝对 URL**（`PictelioApi` 契约）。
-- **web 分支**（严格度不同）：app 前缀替换（理论可被伪后缀域误中）；lynx 精确主机匹配 + auth query 形态，注释明言防伪后缀域。
-- **token 附加**：app web dev 有 token 即附 Bearer（对任何重写结果）；lynx 经 `shouldAttachAuth` 才附。
+- **web 分支**：已由 ADR-0100 对齐为严格边界匹配（app 补齐与 lynx 一致的等号边界 / base+斜杠 / auth 问号 边界），伪后缀域不再误中，双端语义收敛一致。
+- **token 附加**：app web dev 有 token 即附 Bearer——已由 ADR-0100 修复：app web 分支已补 `shouldAttachAuth` + `isTrustedPixivHost` 边界匹配，非受信 URL 不再附 Bearer（与 lynx 一致）；lynx 经 `shouldAttachAuth` 才附。
 
-**影响**：rewriteUrl 输出形态不同，**不能直接函数级差分**，必须按 (web/native) 拆开。安全面不同：app web 对非 Pixiv 绝对 URL 也会附 token。
+**影响**：rewriteUrl 输出形态不同，**不能直接函数级差分**，必须按 (web/native) 拆开。安全面差异已消除：app web 已由 ADR-0100 修复——补 `shouldAttachAuth` + `isTrustedPixivHost` 受信主机边界匹配，非受信 URL 不再附 Bearer（与 lynx 一致，见「待确认项 5」）。
 
 **建议**：差分的 oracle 是统一的「URL 规范化契约表」（输入 × web/native → 重写输出 + 是否附 token），非让两引擎输出相同。
 
@@ -123,7 +123,7 @@ Pictelio 是两个引擎（webview 客户端 / lynx 客户端）共享同一 Pix
 2. **`ApiErrorType` 枚举值统一方向？**（大写对齐 app vs 小写对齐 lynx vs 共享枚举）→ 倾向大写对齐 app，需拍板。
 3. **OAuth 400 识别面**：**ADR 已拍板以 lynx 为准统一**（app 补 invalid_grant 识别），由真实证据支撑。
 4. **rewriteUrl native 分支差异**：长期保留契约差异，差分按模式拆分 + 契约表兜底。
-5. **app web 分支补令牌守卫？** 安全建议项，dev-only 面，可低优先级。
+5. **app web 分支补令牌守卫？** 已拍板 D2-A 落地（ADR-0100）：本次对 app 补 `shouldAttachAuth`/`isTrustedPixivHost`。
 6. **12 例 truth table 固化为共享 fixture？** → 见 ADR 专项决策。
 7. 本文档落盘 `docs/adr/glossary-cross-engine.md` ✓（本文件即落盘位置）。
 8. 术语语言惯例沿用 CONTEXT.md（中文定义 + 英文标识符）✓。
