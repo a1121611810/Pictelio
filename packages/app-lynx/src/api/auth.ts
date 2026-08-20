@@ -3,6 +3,7 @@
 // __CREDENTIALS__ 仅在 __DEV__ 分支引用 —— 生产构建整块消除，凭证不进 bundle。
 import { setAccessToken, isOAuthTokenErrorResponse, isNativeMode } from "./client"
 import type { PixivAuthResponse } from "./types"
+import { ApiErrorType } from "./types"
 import { PIXIV_USER_AGENT, PIXIV_AUTH_BASE } from "./userAgent"
 import { requestFetch } from "../utils/fetchWrapper"
 // 静态 import：vue-lynx web 环境的 background worker 对动态 import 的 chunk 路径处理
@@ -88,7 +89,7 @@ export async function oauthTokenRequest(
       const err = new Error(`登录凭证已失效，请重新登录 (HTTP ${resp.status})`) as Error & {
         type?: string
       }
-      err.type = "unauthorized"
+      err.type = ApiErrorType.UNAUTHORIZED
       throw err
     }
     // 安全：错误提示不携带原始响应体（可能含敏感信息），只保留状态码

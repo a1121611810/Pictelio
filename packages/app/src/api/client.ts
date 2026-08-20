@@ -102,8 +102,9 @@ export function extractPixivErrorMessage(data: unknown): string | null {
 
 /**
  * 检测是否为 OAuth token 失效错误（400 + 特定错误体）。
- * Pixiv OAuth 端点在 refresh_token 过期时返回 400 而非 401，
- * 响应体格式为 { error: { message: "...OAuth...invalid_request..." } }。
+ * Pixiv OAuth 端点在 refresh_token 过期时返回 400 而非 401，真实响应有两种形态：
+ * - 字符串形态：{ has_error: true, ..., error: "invalid_grant" }（error 为字符串，一手来源 pixivpy#374 / gallery-dl#9331）
+ * - 对象形态：{ error: { message: "...OAuth...invalid_request..." } }
  * 纯函数，O(1)，零分配。
  */
 export function isOAuthTokenErrorResponse(status: number, responseBody: unknown): boolean {
@@ -111,12 +112,20 @@ export function isOAuthTokenErrorResponse(status: number, responseBody: unknown)
     return false;
   }
   const d = responseBody as Record<string, unknown>;
+  // 字符串形态：真实 Pixiv 响应 { error: "invalid_grant" }（error 为字符串）
+  if (typeof d.error === "string" && d.error === "invalid_grant") {
+    return true;
+  }
+  // 对象形态：{ error: { message: "...OAuth...invalid_request..." } }
   const err = d.error;
   if (typeof err !== "object" || err === null) {
     return false;
   }
   const msg = (err as Record<string, unknown>).message;
-  return typeof msg === "string" && (msg.includes("OAuth") || msg.includes("invalid_request"));
+  return (
+    typeof msg === "string" &&
+    (msg.includes("OAuth") || msg.includes("invalid_request") || msg.includes("invalid_grant"))
+  );
 }
 
 /** 统一将任意错误值转换为 ApiError，已有 type 的保留原 type，否则创建 UNKNOWN */

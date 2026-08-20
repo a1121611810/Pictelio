@@ -64,6 +64,7 @@
     "agent-browser": "^0.34.0",
     "appium": "^3.2.1",
     "canvas": "^3.2.3",
+    "fast-check": "^4.9.0",
     "happy-dom": "^20.11.2",
     "https-proxy-agent": "^9.1.0",
     "jsdom": "^30.0.1",

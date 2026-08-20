@@ -1153,7 +1153,7 @@ describe('authStore 会话失效触发错误页（候选 #2）', () => {
         ...actual,
         loginWithRefreshToken: vi.fn(async () => {
           const e = new Error('登录凭证已失效，请重新登录 (HTTP 400)') as Error & { type?: string }
-          e.type = 'unauthorized'
+          e.type = ApiErrorType.UNAUTHORIZED
           throw e
         }),
       }
@@ -1176,7 +1176,7 @@ describe('authStore 会话失效触发错误页（候选 #2）', () => {
         loginWithRefreshToken: vi.fn(async () => {
           if (failNext) {
             const e = new Error('登录凭证已失效，请重新登录 (HTTP 400)') as Error & { type?: string }
-            e.type = 'unauthorized'
+            e.type = ApiErrorType.UNAUTHORIZED
             throw e
           }
           return {
@@ -1207,7 +1207,7 @@ describe('authStore 会话失效触发错误页（候选 #2）', () => {
     failNext = true
     await captured!()
     expect(spy).toHaveBeenCalledTimes(1)
-    expect(spy.mock.calls[0]?.[0]).toMatchObject({ type: 'unauthorized' })
+    expect(spy.mock.calls[0]?.[0]).toMatchObject({ type: ApiErrorType.UNAUTHORIZED })
     setSpy.mockRestore()
     spy.mockRestore()
   })

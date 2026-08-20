@@ -1,3 +1,6 @@
+// 契约 mock 来自真实 Pixiv 响应（pixivpy#374 / gallery-dl#9331）：
+// refresh_token 失效时 oauth.secure.pixiv.net/auth/token 返回 HTTP 400，
+// 响应体为 {"has_error":true,"errors":{"system":{"message":"Invalid refresh token","code":1508}},"error":"invalid_grant"}。
 import { describe, it, expect, expectTypeOf, vi, beforeEach, afterEach } from "vitest";
 import { ApiErrorType, type ApiError } from "@/api/types";
 
@@ -100,9 +103,18 @@ describe("isOAuthTokenErrorResponse", () => {
     ).toBe(false);
   });
 
-  it("returns false for 400 + string error field", async () => {
+  it("returns true for 400 + string error field (invalid_grant)", async () => {
     const { isOAuthTokenErrorResponse } = await loadModule();
-    expect(isOAuthTokenErrorResponse(400, { error: "invalid_grant" })).toBe(false);
+    expect(isOAuthTokenErrorResponse(400, { error: "invalid_grant" })).toBe(true);
+  });
+
+  it("returns true for 400 + object error message containing invalid_grant", async () => {
+    const { isOAuthTokenErrorResponse } = await loadModule();
+    expect(
+      isOAuthTokenErrorResponse(400, {
+        error: { message: "invalid_grant" },
+      }),
+    ).toBe(true);
   });
 
   it("returns false for non-400 status", async () => {
@@ -184,9 +196,10 @@ describe("classifyError", () => {
 
   it("does not confuse non-proxy error with error field as proxy", async () => {
     const { classifyError } = await loadModule();
-    // Pixiv API may return { error: "invalid_grant" } — must not match proxy_error
+    // Pixiv API 真实 OAuth 错误 { error: "invalid_grant" } — 不是 proxy_error，且归为 UNAUTHORIZED
     const err = classifyError(400, null, { error: "invalid_grant" });
     expect(err.type).not.toBe(ApiErrorType.PROXY);
+    expect(err.type).toBe(ApiErrorType.UNAUTHORIZED);
   });
 
   it("classifies 400 + OAuth token error as UNAUTHORIZED", async () => {
@@ -206,6 +219,14 @@ describe("classifyError", () => {
     expect(err.type).toBe(ApiErrorType.UNAUTHORIZED);
   });
 
+  it("classifies 400 + invalid_grant message as UNAUTHORIZED", async () => {
+    const { classifyError } = await loadModule();
+    const err = classifyError(400, null, {
+      error: { message: "invalid_grant" },
+    });
+    expect(err.type).toBe(ApiErrorType.UNAUTHORIZED);
+  });
+
   it("does not classify 400 + non-OAuth error body as UNAUTHORIZED", async () => {
     const { classifyError } = await loadModule();
     const err = classifyError(400, null, { error: { message: "not found" } });
@@ -216,6 +237,30 @@ describe("classifyError", () => {
     const { classifyError } = await loadModule();
     const err = classifyError(400, null);
     expect(err.type).not.toBe(ApiErrorType.UNAUTHORIZED);
+  });
+});
+
+describe("OAuth 400 契约测试（真实 Pixiv 响应快照）", () => {
+  // 契约 mock 来自真实 Pixiv 响应（pixivpy#374 / gallery-dl#9331）：
+  // refresh_token 失效时 oauth.secure.pixiv.net/auth/token 返回 HTTP 400，
+  // 原始字节与线上一致（oracle 溯源，直接 JSON.parse 原始字节，禁止手写自洽字段）：
+  // {"has_error":true,"errors":{"system":{"message":"Invalid refresh token","code":1508}},"error":"invalid_grant"}
+  const PIXIV_REFRESH_TOKEN_EXPIRED_400_RAW =
+    '{"has_error":true,"errors":{"system":{"message":"Invalid refresh token","code":1508}},"error":"invalid_grant"}';
+  const PIXIV_REFRESH_TOKEN_EXPIRED_400_SNAPSHOT = JSON.parse(
+    PIXIV_REFRESH_TOKEN_EXPIRED_400_RAW,
+  ) as unknown;
+
+  it("识别真实快照为 OAuth token 错误", async () => {
+    const { isOAuthTokenErrorResponse } = await loadModule();
+    expect(isOAuthTokenErrorResponse(400, PIXIV_REFRESH_TOKEN_EXPIRED_400_SNAPSHOT)).toBe(true);
+  });
+
+  it("将真实快照分类为 UNAUTHORIZED 且返回友好提示", async () => {
+    const { classifyError } = await loadModule();
+    const err = classifyError(400, null, PIXIV_REFRESH_TOKEN_EXPIRED_400_SNAPSHOT);
+    expect(err.type).toBe(ApiErrorType.UNAUTHORIZED);
+    expect(err.message).toBe("登录凭证已失效，请重新登录");
   });
 });
 

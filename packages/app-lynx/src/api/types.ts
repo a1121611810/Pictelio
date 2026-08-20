@@ -140,13 +140,13 @@ export interface PixivUserFollowingResponse {
 // ─── 错误类型 ───
 
 export enum ApiErrorType {
-  NETWORK = "network",
-  UNAUTHORIZED = "unauthorized",
-  FORBIDDEN = "forbidden",
-  RATE_LIMIT = "rate_limit",
-  SERVER = "server",
-  PROXY = "proxy",
-  UNKNOWN = "unknown",
+  NETWORK = "NETWORK",
+  UNAUTHORIZED = "UNAUTHORIZED",
+  FORBIDDEN = "FORBIDDEN",
+  RATE_LIMIT = "RATE_LIMIT",
+  SERVER = "SERVER",
+  PROXY = "PROXY",
+  UNKNOWN = "UNKNOWN",
 }
 
 export interface ApiError {

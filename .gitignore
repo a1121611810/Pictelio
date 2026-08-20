@@ -4,6 +4,7 @@ dist/
 *.local
 *.bak
 .scratch/
+viz/
 .playwright-cli/*
 **/.playwright-cli/
 .reasonix/*

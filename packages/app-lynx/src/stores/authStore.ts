@@ -109,7 +109,7 @@ async function performRefresh(token: string): Promise<boolean> {
     const apiErr = toApiError(err)
     _authError.value = apiErr.message
     // 永久失效（OAuth 400）→ 标记永久失败，强制重新登录
-    if (apiErr.type === "unauthorized") {
+    if (apiErr.type === ApiErrorType.UNAUTHORIZED) {
       setAuthPermanentFailure(true)
       _accessTokenReady.value = false
       _user.value = null

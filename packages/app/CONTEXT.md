@@ -110,11 +110,15 @@ Vite 开发代理无法连接上游 Pixiv 服务器时产生的错误。代理�
 
 **OAuth Token 400 错误（OAuth Token 400 Error）**：
 Pixiv OAuth 端点在 refresh_token 已过期/无效时返回 HTTP 400 而非 401，
-响应体格式为 `{ error: { message: "...OAuth...invalid_request..." } }`。
-`client.ts` 中 `isOAuthTokenErrorResponse()` 检测此模式，将其视为 token 失效错误，
-`classifyError()` 将其分类为 `ApiErrorType.UNAUTHORIZED` 并返回友好提示
-"登录凭证已失效，请重新登录"；`executeRequest()` 在抛出前先触发 `onUnauthorized()`
-清理流程（调用 `logout()` 清除 token 状态），确保用户被引导到登录页而非卡在重试循环中。
+真实响应存在两种形态（一手来源：pixivpy#374 <https://github.com/upbit/pixivpy/issues/374>、
+gallery-dl#9331 <https://github.com/mikf/gallery-dl/issues/9331>）：
+
+- 字符串形态：`{"has_error":true,"errors":{"system":{"message":"Invalid refresh token","code":1508}},"error":"invalid_grant"}`（`error` 为字符串）
+- 对象形态：`{ error: { message: "...OAuth...invalid_request..." } }`
+  `client.ts` 中 `isOAuthTokenErrorResponse()` 同时识别两种形态（含 message 中 `invalid_grant` 子串），
+  将其视为 token 失效错误，`classifyError()` 将其分类为 `ApiErrorType.UNAUTHORIZED` 并返回友好提示
+  "登录凭证已失效，请重新登录"；`executeRequest()` 在抛出前先触发 `onUnauthorized()`
+  清理流程（调用 `logout()` 清除 token 状态），确保用户被引导到登录页而非卡在重试循环中。
 
 **可操作错误指引（Actionable Error Guidance）**：
 错误 UI 中根据 `ApiError.type` 渲染的、告诉用户具体该做什么的提示文字和按钮组合。例如：
