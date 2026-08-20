@@ -400,6 +400,13 @@ describe("isTrustedPixivHost", () => {
     expect(isTrustedPixivHost("")).toBe(false);
   });
 
+  it("rejects Pixiv CDN hosts (whitelist is API/auth hosts only, not CDN)", async () => {
+    const { isTrustedPixivHost } = await loadModule();
+    // N5: 白名单精确面——i.pximg.net / s.pximg.net 是图片 CDN，非 API/auth 主机，不应被信任
+    expect(isTrustedPixivHost("https://i.pximg.net/img-master/img/2020/01/01/x.jpg")).toBe(false);
+    expect(isTrustedPixivHost("https://s.pximg.net/sm.jpg")).toBe(false);
+  });
+
   it("rejects plaintext http even on trusted host (https-only, fail-closed)", async () => {
     const { isTrustedPixivHost } = await loadModule();
     const whitelist = new Set([
