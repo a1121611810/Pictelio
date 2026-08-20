@@ -60,6 +60,7 @@ expect(pressed).toBe("true");
 2. **契约测试必须使用真实样例**：跨文件/跨端数据契约的测试 mock 必须来自真实数据源（线上文件、插件源码常量、真实响应快照），禁止手写"与实现自洽"的 mock 字段（实现错了 mock 也会全绿）。参考 `tests/unit/utils/backupRulesConsistency.test.ts` 模式。
 3. **禁止静默降级**：所有降级兜底路径（`?? ""`、`?? null`、catch 后返回默认值）必须输出 `console.warn`（带模块前缀）或显式暴露错误状态。
 4. **重构行为不变约束**：重构中涉及字段名、常量、默认值改动时，必须检查对应契约测试是否存在（缺失则补上），并在 commit message 标注行为变化点。
+5. **期望值出处可追溯（oracle 溯源，对应 AGENTS.md 硬约束 #6）**：测试断言的期望值必须能指向独立来源——规格/验收样例、真实数据/字面量、独立实现（差分测试）、性质/不变量；禁止从被测实现反推、自洽 mock 推导或同义反复重算。建议在测试文件头注释注明期望值来源。执行机制：仓库级 `.agents/skills/code-review/SKILL.md` 在 code-review 的 Spec 轴强制 Oracle check 与 Test strength（依据 `docs/research/ai-generated-test-quality.md`）。
 
 ### E2E 状态构造基建（driver）
 

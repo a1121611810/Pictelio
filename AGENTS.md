@@ -628,7 +628,7 @@ Grill 澄清 → to-spec → to-tickets → implement
   - `utils/` — 14 文件（含 `.native.test.ts`）
   - 根测试 — PersonalCenter、router、startup
 - **E2E 测试**: 12 个 spec —— agent-browser 6 个（main-flow、sub-flows、translation-flow、update-flow、route-switch-instant、adaptive-tags-240）+ android-e2e 6 个（smoke、client-kind-contract、switch-client-oneway/roundtrip/roundtrip-low/roundtrip-3x）
-- `passWithNoTests: true` — 允许空测试文件不报错
+- `passWithNoTests: false` — T0 门禁（ADR-0097）：禁止空测试文件，防空壳套件漂移（ADR-0084 教训）
 
 ### 测试硬约束（违反视为架构违规）
 
@@ -637,6 +637,7 @@ Grill 澄清 → to-spec → to-tickets → implement
 3. **禁止静默降级**：所有降级兜底路径（`?? ""`、`?? null`、catch 后返回默认值）必须输出 `console.warn`（带模块前缀）或显式向上层暴露错误状态。字段缺失 = 契约破坏，必须可见。
 4. **重构行为不变约束**：重构 commit 中凡涉及字段名、常量、配置值、默认值的改动，必须检查对应契约测试是否存在（缺失则本次补上），并在 commit message / PR 描述中标注行为变化点。"测试全绿"不构成重构无回归的充分证据。
 5. **E2E 覆盖原则**：用户可到达的交互路径应有 E2E 覆盖；依赖外部状态的路径（如更新弹窗需要远端版本更高）通过 `driver.mockFetch()`（页面级 fetch mock）+ `driver.spyOnWindowOpen()` 构造状态后覆盖。agent-browser driver 的 `evaluate` 直接执行 JS（不经 shell），注入脚本必须为单行。
+6. **期望值出处可追溯（oracle 溯源）**：测试断言的期望值必须能指向独立来源——规格/验收样例、真实数据/字面量、独立实现（差分测试，如 app 与 app-lynx 同语义模块）、性质/不变量；禁止从被测实现反推、自洽 mock 推导或同义反复（`expect(add(a,b)).toBe(a+b)` 式）重算。建议在测试文件头注释注明期望值来源（`backupRulesConsistency.test.ts` 模式），审阅时逐条核对。执行机制：仓库级 `.agents/skills/code-review/SKILL.md`（同名遮蔽全局 skill，加载优先级已验证）在 code-review 的 Spec 轴强制 Oracle check 与 Test strength；依据 `docs/research/ai-generated-test-quality.md`。注意：lint 的 `expect-expect` 只保证"测试有断言"，本条保证"断言值得信"，两者缺一不可。
 
 ## 部署
 

@@ -345,7 +345,8 @@ export default defineConfig(
               "no-underscore-dangle": "off",
               "consistent-function-scoping": "off",
               "no-await-in-loop": "off",
-              "expect-expect": "off",
+              // T0 门禁（ADR-0097）：测试必须有断言，防"无断言测试"（conformance 弱测试）
+              "expect-expect": "error",
               "no-conditional-expect": "off",
               "require-to-throw-message": "off",
               "no-standalone-expect": "off",

@@ -83,7 +83,8 @@ export default defineConfig({
   test: {
     include: ["tests/unit/**/*.test.{ts,tsx}"],
     environment: "node",
-    passWithNoTests: true,
+    // T0 门禁（ADR-0097）：禁止空测试文件，防空壳套件漂移（ADR-0084 教训）
+    passWithNoTests: false,
     clearMocks: true,
     restoreMocks: true,
   },

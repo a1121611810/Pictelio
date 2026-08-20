@@ -1,14 +1,19 @@
 #!/bin/sh
-# pre-push hook: E2E 锚点静态校验（秒级，不跑浏览器）
+# pre-push hook: 静态校验（秒级，不跑浏览器）
 #
-# 背景：agent-browser E2E 曾因"改了 UI 但没人跑 E2E"漂移无人发现。
-# 仅当本次 push 触碰 packages/app/src/ 或 packages/app/tests/agent-browser/ 时，
-# 运行 packages/app/scripts/check-e2e-anchors.mjs 校验 spec 引用的锚点
-# （data-testid / aria-label / 路由等）在 src/ 中是否仍存在；未触碰则零开销放行。
-# 详见 packages/app/tests/agent-browser/TESTING.md「pre-push 静态锚点校验」一节。
+# 1) E2E 锚点静态校验：
+#    背景：agent-browser E2E 曾因"改了 UI 但没人跑 E2E"漂移无人发现。
+#    仅当本次 push 触碰 packages/app/src/ 或 packages/app/tests/agent-browser/ 时，
+#    运行 packages/app/scripts/check-e2e-anchors.mjs 校验 spec 引用的锚点
+#    （data-testid / aria-label / 路由等）在 src/ 中是否仍存在。
+#    详见 packages/app/tests/agent-browser/TESTING.md「pre-push 静态锚点校验」一节。
+# 2) 仓库级 skill 校验（T0.5，ADR-0097）：
+#    仅当本次 push 触碰 .agents/ 时，运行 scripts/verify-agent-skills.mjs 校验
+#    .agents/skills/ 的 frontmatter / name 一致性 / 关键段落标记（防 oracle check 漂移）。
 
 zero="0000000000000000000000000000000000000000"
 touched=0
+skills_touched=0
 
 # stdin 逐行：<local ref> <local sha> <remote ref> <remote sha>
 while read -r local_ref local_sha remote_ref remote_sha; do
@@ -31,17 +36,32 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   if printf '%s
 ' "$files" | grep -qE '^packages/app/(src/|tests/agent-browser/)'; then
     touched=1
-    break
+  fi
+  if printf '%s
+' "$files" | grep -qE '^.agents/'; then
+    skills_touched=1
   fi
 done
 
-# 未触碰 UI / E2E 目录：零开销放行
-[ "$touched" -eq 0 ] && exit 0
+# 未触碰任何相关目录：零开销放行
+[ "$touched" -eq 0 ] && [ "$skills_touched" -eq 0 ] && exit 0
 
-echo "pre-push: 检测到 packages/app/src 或 tests/agent-browser 改动，运行 E2E 锚点静态校验…"
-node packages/app/scripts/check-e2e-anchors.mjs || {
-  echo "pre-push: E2E 锚点校验失败，push 已阻止。"
-  echo "  - 修复失效锚点（同步 spec 或 src）后重试"
-  echo "  - 确认为误报时可用 git push --no-verify 绕过，并手动跑 pnpm test:agent-browser 兜底"
-  exit 1
-}
+if [ "$touched" -eq 1 ]; then
+  echo "pre-push: 检测到 packages/app/src 或 tests/agent-browser 改动，运行 E2E 锚点静态校验…"
+  node packages/app/scripts/check-e2e-anchors.mjs || {
+    echo "pre-push: E2E 锚点校验失败，push 已阻止。"
+    echo "  - 修复失效锚点（同步 spec 或 src）后重试"
+    echo "  - 确认为误报时可用 git push --no-verify 绕过，并手动跑 pnpm test:agent-browser 兜底"
+    exit 1
+  }
+fi
+
+if [ "$skills_touched" -eq 1 ]; then
+  echo "pre-push: 检测到 .agents/ 改动，运行仓库级 skill 校验…"
+  node scripts/verify-agent-skills.mjs || {
+    echo "pre-push: 仓库级 skill 校验失败，push 已阻止。"
+    echo "  - 修复 .agents/skills/ 下 SKILL.md（frontmatter / name 一致性 / 关键段落标记）后重试"
+    echo "  - 确认为误报时可用 git push --no-verify 绕过"
+    exit 1
+  }
+fi
