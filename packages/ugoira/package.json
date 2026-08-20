@@ -10,12 +10,15 @@
   },
   "scripts": {
     "test": "vitest run",
-    "check": "tsc --noEmit -p tsconfig.json"
+    "check": "tsc --noEmit -p tsconfig.json",
+    "mutation": "stryker run"
   },
   "dependencies": {
     "fflate": "^0.8.3"
   },
   "devDependencies": {
+    "@stryker-mutator/core": "^10.0.0",
+    "@stryker-mutator/vitest-runner": "^10.0.0",
     "typescript": "^5.7.0",
     "vitest": "^4.1.10"
   }
