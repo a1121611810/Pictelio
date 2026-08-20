@@ -399,6 +399,17 @@ describe("isTrustedPixivHost", () => {
     expect(isTrustedPixivHost("not a url")).toBe(false);
     expect(isTrustedPixivHost("")).toBe(false);
   });
+
+  it("rejects plaintext http even on trusted host (https-only, fail-closed)", async () => {
+    const { isTrustedPixivHost } = await loadModule();
+    const whitelist = new Set([
+      new URL(__PUBLIC_CONFIG__.apiBaseUrl).hostname,
+      new URL(__PUBLIC_CONFIG__.authUrl).hostname,
+    ]);
+    for (const host of whitelist) {
+      expect(isTrustedPixivHost("http://" + host + "/v1/illust")).toBe(false);
+    }
+  });
 });
 
 describe("shouldAttachAuth", () => {
@@ -504,7 +515,8 @@ describe("apiClient.get — error classification", () => {
     );
 
     vi.stubGlobal("fetch", mockFetch);
-    const { apiClient } = await loadModule();
+    const { apiClient, setAccessToken } = await loadModule();
+    setAccessToken("test-token"); // N6: token 就位使 web fetch 路径真实执行
     globalThis.fetch = mockFetch;
 
     await expect(apiClient.get("/v1/illust/recommended")).rejects.toMatchObject({
@@ -523,7 +535,8 @@ describe("apiClient.get — error classification", () => {
     );
 
     vi.stubGlobal("fetch", mockFetch);
-    const { apiClient } = await loadModule();
+    const { apiClient, setAccessToken } = await loadModule();
+    setAccessToken("test-token"); // N6: token 就位使 web fetch 路径真实执行
     globalThis.fetch = mockFetch;
 
     await expect(apiClient.get("/v1/illust/recommended")).rejects.toMatchObject({

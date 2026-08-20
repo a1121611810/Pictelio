@@ -16,8 +16,8 @@ export function mergeSearchResults(
   items.sort((a, b) => {
     const dateCmp = b.date.localeCompare(a.date);
     if (dateCmp !== 0) return dateCmp;
-    // 同一日期时 illust 优先
-    return a.type === "illust" ? -1 : 1;
+    // 同一日期时 illust 优先（同类型返回 0，满足 sort 一致弱序反称性——修复前同类型对返回 1 违反弱序，依赖 V8 稳定排序）
+    return a.type === b.type ? 0 : a.type === "illust" ? -1 : 1;
   });
 
   return items;

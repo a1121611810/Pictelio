@@ -271,7 +271,10 @@ const trustedPixivHosts: ReadonlySet<string> = (() => {
  */
 export function isTrustedPixivHost(url: string): boolean {
   try {
-    return trustedPixivHosts.has(new URL(url).hostname);
+    const u = new URL(url);
+    // 仅接受 https 协议（防明文 http / 伪协议，fail-closed；ADR-0100 安全面增强，Standards W3）
+    if (u.protocol !== "https:") return false;
+    return trustedPixivHosts.has(u.hostname);
   } catch {
     return false;
   }
