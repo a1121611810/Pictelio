@@ -97,6 +97,8 @@ Pictelio 是两个引擎（webview 客户端 / lynx 客户端）共享同一 Pix
 | **URL 规范化契约表** | 输入类别 × web/native → 重写输出 + 是否附 token 的期望表 | 作为 rewriteUrl/shouldAttachAuth 的 oracle |
 | **引擎（engine）** | 客户端实现族：webview / lynx | 测试与文档「跨引擎」= 跨这两者 |
 | **单一事实源（single source of truth）** | 某概念只有一份权威实现/契约，其余为引用 | 既有先例：update-check、credentials.json5、app 包 version |
+| **mutation testing（变异测试）** | 对实现注入行为变异体（StrykerJS），存活变异体说明测试对目标行为不敏感（测试弱 / conformance 信号） | 本地灵敏度门禁（ADR-0101）；**非正确性证据**——与 oracle 溯源互补（前者抓弱测试，后者抓错期望） |
+| **mutation score（变异得分）** | 被杀死的变异体比例：存活率高 = 测试灵敏度低 = conformance 风险 | 仅作门禁阈值与人工判读，永不当正确性证据 |
 
 ## 证据节（oracle 一手来源）
 
