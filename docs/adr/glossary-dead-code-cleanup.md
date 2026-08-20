@@ -13,7 +13,7 @@
 | **死引用链（dead reference chain）** | 一组文件互相引用、但整体不可达的闭包。如 `RecommendedFeed` → `NovelRecommendedFeed`：组件被引用但引用者自身是死组件。删除时须整链处理，不能只删链尾。 |
 | **未接线脚本（unwired script）** | 存在于 `scripts/` 目录、但未被任何 package.json script / CI workflow 调用的脚本。部分可能因依赖缺失（如 playwright 不在任何 package.json）而无法运行。 |
 | **未使用依赖（unused dependency）** | 声明于 package.json、但 src/tests/scripts/原生代码全仓零引用的依赖。移除前须确认非 peer 依赖（如 vue-lynx 的 `@rsbuild/plugin-vue` 为必需 peer，移除会报 peer 缺失）。 |
-| **生成文档（generated docs）** | `openwiki/` 目录下由 `pnpm openwiki:update` 自动生成的内容（禁止手改）。删除死代码后运行该命令即可同步，无需手动编辑。 |
+| **生成文档（generated docs）** | `openwiki/` 目录下由 GitHub Actions 定时任务（openwiki-update.yml）每日自动生成的内容（禁止本地触发、禁止手改）。删除死代码后无需手动同步，CI 定时重生成。 |
 | **tree-shaking（摇树优化）** | Vite/Rollup 在生产构建时剔除未引用模块/导出的优化。死代码虽被消除、运行时影响为零，但**不构成保留理由**——维护负担与文档误导仍存在。 |
 | **测试即消费者（tests as consumers）** | 仓库规则：测试对符号的引用视为合法消费。仅被测试引用的代码不算死代码，删除前须人工权衡（连同测试一起删 vs 保留为公共 API 面）。 |
 

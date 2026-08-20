@@ -24,7 +24,7 @@ Pictelio 是双引擎 monorepo（webview 客户端 `packages/app` / lynx 客户�
 
 ## 决策
 
-1. **修复 app OAuth 400 识别（invalid_grant）**：app `isOAuthTokenErrorResponse` 增加字符串 `invalid_grant` 识别 + `invalid_grant` 子串（对齐 lynx），纳入真实体快照契约测试；同步修正 app `client.test.ts:103-106` 的错误断言（改指向真实体快照）；更新 `packages/app/CONTEXT.md` OAuth 错误契约描述为两种形态，标注一手来源，跑 `pnpm openwiki:update`。
+1. **修复 app OAuth 400 识别（invalid_grant）**：app `isOAuthTokenErrorResponse` 增加字符串 `invalid_grant` 识别 + `invalid_grant` 子串（对齐 lynx），纳入真实体快照契约测试；同步修正 app `client.test.ts:103-106` 的错误断言（改指向真实体快照）；更新 `packages/app/CONTEXT.md` OAuth 错误契约描述为两种形态并标注一手来源（openwiki/ 由 CI 定时任务重生成，本地不触发）。
 2. **差分测试基建（跨引擎一致性保障）**：新增跨引擎差分测试套件，对**同语义纯函数**（R18 判定谓词、URL 重写 web 分支、OAuth 400 错误识别与错误分类）喂同一输入断言**按契约表输出一致或差异符合已记录契约差异**。由于 app 无 vue / lynx 无 SolidJS 依赖隔离，差分测试不能把对端实现 import 进本端 vitest —— 采用「**共享测试数据（契约表/fixture）+ 双端各自测试分别断言**」或独立差分测试包的 seam 形态（见 spec/tickets）。
 3. **属性测试基建（fast-check）**：对纯函数模块（`isNewer`、`r18Filter` 谓词、`novelBlocks`、`searchMerger`）写不变量性质测试。fast-check 作为 devDependency。
 4. **12 例 truth table 固化为共享测试 fixture**（供 app/lynx 测试共同引用，避免两处拷贝漂移）。**选择：双实现保留 + truth-table 双份同源拷贝 + 字节一致性契约测试守护**（沿 backupRulesConsistency 模式）。理由见替代方案评估「isRestricted」行：差分测试的价值恰恰依赖双实现存在；抽共享实现会消灭差分对象；truth-table 作为跨引擎共享 oracle（期望值来自 x_restrict 契约语义，不来自任一实现）。双拷贝漂移风险由 restrictionTruthTableConsistency.test.ts（readFileSync 逐字节比对）机械消除，两端共同锚定同一 oracle 值

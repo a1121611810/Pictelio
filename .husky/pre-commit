@@ -2,4 +2,3 @@
 # pre-commit hook
 # OpenWiki 文档更新已移交 GitHub Actions 定时任务（.github/workflows/openwiki-update.yml），
 # 不再在 commit 关键路径上执行 LLM 生成，避免阻塞提交。
-# 需要立即同步文档时手动运行：pnpm openwiki:update

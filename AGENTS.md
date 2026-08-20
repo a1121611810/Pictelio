@@ -661,7 +661,7 @@ Grill 澄清 → to-spec → to-tickets → implement
 - **索引健康**：CodeGraph 返回异常时，是否检查了 `codegraph_status` 并考虑重建索引？
 - **文档查询优先性**：涉及库/框架/浏览器 API 查询时，是否遵循了「文档查询规范」的优先级链？（优先 Context7 或 MDN，降级见 `mcp-doc-query.md`）
 - **OpenWiki 查询优先性**：涉及架构概览、领域概念、集成、测试指南等主题时，是否先查阅了对应的 OpenWiki 页面再深入代码？
-- **OpenWiki 文档同步**：修改了 `src/` 或 `packages/` 中的代码后，是否执行了 `pnpm openwiki:update` 来同步文档？
+- **OpenWiki 文档同步**：修改了 `src/` 或 `packages/` 中的代码后，**不得**本地执行 `pnpm openwiki:update`（依赖 CI 定时任务每日重生成），且**不得**手改 `openwiki/` 生成文件？
 - **IO 边界测试**：本次改动涉及的 fetch/存储/桥接解析函数，成功与失败路径是否都有单元测试？
 - **真实样例**：新增/修改的测试 mock 是否来自真实数据结构，而非手写自洽字段？
 - **静默降级**：本次改动是否有降级兜底路径（`??`、catch 默认值）？是否打了 warn 或显式暴露错误？
@@ -698,11 +698,10 @@ The scheduled OpenWiki GitHub Actions workflow refreshes the repository wiki. Do
 - 违规示例：直接读 `src/api/client.ts` 而不先读 `openwiki/architecture/api-layer.md`
 
 ### 更新维护
-- **AI Agent 在提交代码前**（尤其是修改了 `src/` 或 `packages/` 目录中的代码后），应主动执行 `pnpm openwiki:update` 更新文档。
-- 如 `pnpm openwiki:update` 执行失败，不阻塞后续操作，但应在回复中提示用户。
-- **禁止手动编辑** `openwiki/` 目录下的生成文件。如需更新文档内容，应修改源码后通过 `pnpm openwiki:update` 重新生成。
-- 兜底机制：GitHub Actions 定时任务（`.github/workflows/openwiki-update.yml`）每天自动执行 `openwiki --update` 并生成 PR，无需手动触发，也不阻塞本地 commit（pre-commit 已不再执行 openwiki 更新）。
-- **CLAUDE.md 已废弃删除**：openwiki 本地更新可能重建该文件，**请勿提交**（CI 已自动清理）。
+- **禁止** AI Agent 本地执行 `pnpm openwiki:update`（含修改 `src/`/`packages/` 后）。openwiki/ 是生成文档，由 GitHub Actions 定时任务（`.github/workflows/openwiki-update.yml`）每日自动重生成并提交 PR，无需也不应本地触发。
+- **禁止手动编辑** `openwiki/` 目录下的任何生成文件。如需更新 OpenWiki 内容，只改源码/`CONTEXT.md`，交给 CI 定时重生成。
+- 兜底机制：openwiki 更新失败/未及时同步不影响本地开发或 commit，无需提示或干预，CI 定时任务会收敛。
+- **CLAUDE.md 已废弃删除**：CI 定时任务的 openwiki 更新可能重建该文件，**请勿提交**（CI 已自动清理）。
 
 <!-- CODEGRAPH_START -->
 ## CodeGraph

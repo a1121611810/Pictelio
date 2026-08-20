@@ -71,7 +71,7 @@
 ### 决策 4：文档同步
 
 - `AGENTS.md` 架构图：移除已删组件/原语条目，更新 `skeletons/` 描述；
-- `openwiki/` 由 `pnpm openwiki:update` 重新生成（禁止手改）；
+- `openwiki/` 由 CI 定时任务（openwiki-update.yml）每日重生成（本地不触发、禁止手改）；
 - 历史 ADR（ADR-0041/0043/0073/0082、glossary-ui-cards.md）保留原文，作为历史决策记录；
 - 新增本 ADR 与 `glossary-dead-code-cleanup.md`（死代码治理术语表）。
 

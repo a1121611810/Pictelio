@@ -151,7 +151,6 @@ Command convention (see `docs/adr/ADR-0059-root-script-convention.md`): a bare c
 | `pnpm cap:*` | Capacitor sync / copy / open |
 | `pnpm release` | Interactive one-shot release (bump version → build → tag → GitHub Release) |
 | `pnpm deploy` | Preview landing page to `_site/` |
-| `pnpm openwiki:update` | Sync OpenWiki docs from source |
 
 </details>
 
