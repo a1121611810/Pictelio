@@ -119,7 +119,7 @@ export function writePrefKey(serial: string, key: string, value: string): void {
     xml = hasKey
       ? cur.rawXml
           .replace(
-            new RegExp(`<string name="${key}">[^<]*<\/string>`, "u"),
+            new RegExp(`<string name="${key}">[^<]*</string>`, "u"),
             `<string name="${key}">${value}</string>`,
           )
           .replace(
