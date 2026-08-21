@@ -248,4 +248,22 @@ describe("Settings registry", () => {
     expect(s.value()).toBe("d");
     expect(mem.dump().get("r")).toBe("d");
   });
+
+  // ── remove（ADR-0103 孤儿键清理）──
+
+  it("remove 删除无 handle 的孤儿键（默认后端）", async () => {
+    const { settings, mem } = make();
+    await mem.set("age_confirmed", "true");
+    await settings.remove("age_confirmed");
+    expect(mem.dump().has("age_confirmed")).toBe(false);
+  });
+
+  it("remove 对已定义键同样生效，且不回写默认值", async () => {
+    const { settings, mem } = make();
+    const s = settings.define({ key: "foo", default: "a" });
+    await settings.hydrateAll();
+    s.set("b");
+    await settings.remove("foo");
+    expect(mem.dump().has("foo")).toBe(false);
+  });
 });

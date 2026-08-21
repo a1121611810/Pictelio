@@ -10,6 +10,7 @@ import {
   setIsCheckingUpdate,
   setCheckCompleted,
   lastDismissedVersion,
+  loadAccountR18,
 } from "@/stores/settingsStore";
 import { settings } from "@/settings";
 import { persistScrollRestoration } from "@/stores/uiStore";
@@ -158,6 +159,7 @@ const RootLayout: Component = (props: { children?: any }) => {
     const [authErr] = await tryAsync(
       (async () => {
         await initializeAuth();
+        await loadAccountR18();
         if (isLoggedIn()) {
           if (location.pathname !== "/home") {
             await navigate("/home", { replace: true });

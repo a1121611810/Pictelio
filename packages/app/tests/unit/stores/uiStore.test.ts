@@ -24,6 +24,12 @@ const testState = vi.hoisted(() => ({
   mirror: undefined as TestAdapter | undefined,
 }));
 
+/** 账号级 R18 测试用：可控制的 authStore.user（ADR-0103，uid 键控 show_r18_${uid}） */
+const mockUser = vi.hoisted(() => ({ current: null as { id: number } | null }));
+vi.mock("@/stores/authStore", () => ({
+  user: () => mockUser.current,
+}));
+
 vi.mock("@/settings", async () => {
   const { createSettings } = await import("@/settings/registry");
   const { createMemoryAdapter } = await import("@/settings/backends/memory");
@@ -132,6 +138,7 @@ describe("resetUiStore", () => {
     } = await setup();
     await warm(mod);
 
+    mockUser.current = { id: 42 }; // 账号级 R18：写入 show_r18_42（ADR-0103）
     await setShowR18(true);
     await setShowR18G(true);
     await setLayoutMode("grid");
@@ -150,8 +157,8 @@ describe("resetUiStore", () => {
     expect(imageCachePrefetch()).toBe(true);
     await vi.waitFor(() => {
       const dump = mod.__test.primary.dump();
-      expect(dump.get("show_r18")).toBe("false");
-      expect(dump.get("show_r18g")).toBe("false");
+      expect(dump.get("show_r18_42")).toBe("false");
+      expect(dump.get("show_r18g_42")).toBe("false");
       expect(dump.get("layout_mode")).toBe("waterfall");
       expect(dump.get("auto_hide_nav_bar")).toBe("true");
       expect(dump.get("show_detail_stairs")).toBe("false");

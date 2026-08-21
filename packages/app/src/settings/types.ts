@@ -112,6 +112,8 @@ export interface Settings {
   syncInitAll(): void;
   /** 全部项写回 default 并持久化 */
   resetAll(): Promise<void>;
+  /** 删除指定键的持久化值（孤儿键清理，ADR-0103；无 handle 亦可用，走默认后端） */
+  remove(key: string): Promise<void>;
   get<T = unknown>(key: string): SettingHandle<T> | undefined;
   snapshot(): Record<string, unknown>;
   onChange(cb: (key: string, value: unknown) => void): () => void;

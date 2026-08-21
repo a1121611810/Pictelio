@@ -340,6 +340,20 @@ export function createSettings(opts: SettingsOptions): Settings {
     return handles.get(key) as SettingHandle<T> | undefined;
   }
 
+  /**
+   * 删除指定键的持久化值（ADR-0103 孤儿键清理：无 handle 亦可，走默认后端）。幂等。
+   * 与 reset 的区别：不写回 default，只清存储。
+   */
+  async function remove(key: string): Promise<void> {
+    const def = defs.get(key);
+    const storage = def ? resolveStorage(def) : resolveStorage({} as SettingDef<unknown>);
+    try {
+      await storage.remove(key);
+    } catch (e) {
+      report(def ?? ({ key } as SettingDef<unknown>), "write", e);
+    }
+  }
+
   return {
     define,
     defineFactory,
@@ -347,6 +361,7 @@ export function createSettings(opts: SettingsOptions): Settings {
     syncInitAll,
     resetAll,
     get,
+    remove,
     snapshot() {
       const out: Record<string, unknown> = {};
       for (const [k, h] of handles) out[k] = h.value();

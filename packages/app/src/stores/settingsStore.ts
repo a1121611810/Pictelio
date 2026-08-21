@@ -1,5 +1,6 @@
 import { createSignal } from "solid-js";
 import { settings } from "@/settings";
+import { user } from "@/stores/authStore";
 import type { UgoiraExtractMode } from "../api/illust";
 
 // ── 类型定义 ──
@@ -68,30 +69,58 @@ export async function setAutoHideNavBar(enabled: boolean): Promise<void> {
   autoHideNavBarHandle.set(enabled);
 }
 
-/** 兼容存根：registry hydrateAll 已加载，Phase 4 移除 */
-// ── 内容过滤 ──
+// ── 内容过滤（ADR-0103：账号级设置，键 show_r18_${uid}，跨 client 共享存储）──
+// 键随登录账号：换号各自独立；登出后 uid 为 null → accessor 返回默认 false（不落盘）。
+// 迁移：老设备级键（PREF_KEY_SHOW_R18）经 registry legacyKeys 播种当前账号并删老键。
 
-const showR18Handle = settings.define<boolean>({
-  key: PREF_KEY_SHOW_R18,
+/** 当前登录账号 ID（未登录 null） */
+const uid = () => user()?.id ?? null;
+
+const r18Factory = settings.defineFactory<boolean>({
+  keyPrefix: PREF_KEY_SHOW_R18,
   default: false,
+  legacyKeys: [PREF_KEY_SHOW_R18],
 });
 
-export const showR18 = () => showR18Handle.value();
+export const showR18 = () => {
+  const id = uid();
+  return id !== null ? r18Factory.forId(id).value() : false;
+};
 export async function setShowR18(enabled: boolean): Promise<void> {
-  showR18Handle.set(enabled);
+  const id = uid();
+  if (id === null) return; // 未登录：不落盘（账号级语义）
+  r18Factory.forId(id).set(enabled);
   window.dispatchEvent(new CustomEvent("r18Changed"));
 }
 
-/** 兼容存根：registry hydrateAll 已加载，Phase 4 移除 */
-const showR18GHandle = settings.define<boolean>({
-  key: PREF_KEY_SHOW_R18G,
+const r18gFactory = settings.defineFactory<boolean>({
+  keyPrefix: PREF_KEY_SHOW_R18G,
   default: false,
+  legacyKeys: [PREF_KEY_SHOW_R18G],
 });
 
-export const showR18G = () => showR18GHandle.value();
+export const showR18G = () => {
+  const id = uid();
+  return id !== null ? r18gFactory.forId(id).value() : false;
+};
 export async function setShowR18G(enabled: boolean): Promise<void> {
-  showR18GHandle.set(enabled);
+  const id = uid();
+  if (id === null) return;
+  r18gFactory.forId(id).set(enabled);
   window.dispatchEvent(new CustomEvent("r18gChanged"));
+}
+
+/**
+ * 登录后加载当前账号的 R18/R18G（__root 在 initializeAuth 后 + 各登录成功分支调用）。
+ * 顺带一次性清理已移除年龄功能的孤儿键（幂等：键不存在 remove 为 no-op）。
+ */
+export async function loadAccountR18(): Promise<void> {
+  const id = uid();
+  if (id === null) return;
+  await Promise.all([r18Factory.forId(id).hydrate(), r18gFactory.forId(id).hydrate()]);
+  await Promise.all([settings.remove("age_confirmed"), settings.remove("is_adult")]).catch((e) =>
+    console.warn("[settingsStore] 孤儿键清理失败", e),
+  );
 }
 
 /** 兼容存根：registry hydrateAll 已加载，Phase 4 移除 */

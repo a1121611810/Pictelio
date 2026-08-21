@@ -7,6 +7,7 @@ import ErrorDisplay from "../components/ErrorDisplay";
 import OAuthWebView from "../components/OAuthWebView";
 import { generatePKCE } from "../api/pkceAuth";
 import { loginWithPKCE } from "../stores/authStore";
+import { loadAccountR18 } from "../stores/settingsStore";
 import { markContentReady } from "@/native/splashBridge";
 
 const isNative = Capacitor.isNativePlatform();
@@ -42,6 +43,7 @@ const Login: Component = () => {
     const [loginErr] = await tryAsync(
       (async () => {
         await loginWithToken(tokenInput().trim());
+        await loadAccountR18();
         navigate("/home", { replace: true });
       })(),
     );
@@ -71,6 +73,7 @@ const Login: Component = () => {
     const [pkceLoginErr] = await tryAsync(
       (async () => {
         await loginWithPKCE(code, codeVerifier());
+        await loadAccountR18();
         navigate("/home", { replace: true });
       })(),
     );

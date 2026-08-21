@@ -18,6 +18,12 @@ const mockState = vi.hoisted(() => ({
   failRead: false,
 }));
 
+/** 账号级 R18 测试用：可控制的 authStore.user（ADR-0103，uid 键控 show_r18_${uid}） */
+const mockUser = vi.hoisted(() => ({ current: null as { id: number } | null }));
+vi.mock("@/stores/authStore", () => ({
+  user: () => mockUser.current,
+}));
+
 vi.mock("@/settings", () => ({
   get settings() {
     return mockState.current;
@@ -131,5 +137,79 @@ describe("settingsStore — ugoiraMode", () => {
   it("非法值忽略（保持默认）", async () => {
     const { store } = await loadStore({ settings_ugoira_mode: "bogus" });
     expect(store.ugoiraMode()).toBe("fflate");
+  });
+});
+
+describe("settingsStore — 账号级 R18/R18G（ADR-0103）", () => {
+  beforeEach(() => {
+    mockUser.current = null;
+  });
+
+  it("未登录：showR18/showR18G 恒 false，set 不落盘", async () => {
+    const { store, mem } = await loadStore();
+    expect(store.showR18()).toBe(false);
+    await store.setShowR18(true);
+    expect(store.showR18()).toBe(false);
+    expect(mem.dump().has("show_r18")).toBe(false);
+  });
+
+  it("登录后 loadAccountR18 加载 show_r18_42 持久化值", async () => {
+    mockUser.current = { id: 42 };
+    const { store } = await loadStore({ show_r18_42: "true", show_r18g_42: "false" });
+    await store.loadAccountR18();
+    expect(store.showR18()).toBe(true);
+    expect(store.showR18G()).toBe(false);
+  });
+
+  it("setShowR18 写 show_r18_42（账号键）", async () => {
+    mockUser.current = { id: 42 };
+    const { store, mem } = await loadStore();
+    await store.setShowR18(true);
+    expect(store.showR18()).toBe(true);
+    await vi.waitFor(() => expect(mem.dump().get("show_r18_42")).toBe("true"));
+  });
+
+  it("登出后 accessor 回默认；换账号独立（互不污染）", async () => {
+    mockUser.current = { id: 42 };
+    const { store } = await loadStore();
+    await store.setShowR18(true);
+    mockUser.current = null;
+    expect(store.showR18()).toBe(false);
+    mockUser.current = { id: 7 };
+    expect(store.showR18()).toBe(false); // 新账号 handle 未 hydrate → 默认
+    await store.loadAccountR18();
+    expect(store.showR18()).toBe(false);
+  });
+
+  it("迁移：老键 show_r18 播种当前账号并删老键（先写后删）", async () => {
+    mockUser.current = { id: 42 };
+    const { store, mem } = await loadStore({ show_r18: "true" });
+    await store.loadAccountR18();
+    expect(store.showR18()).toBe(true);
+    await vi.waitFor(() => {
+      expect(mem.dump().get("show_r18_42")).toBe("true");
+      expect(mem.dump().has("show_r18")).toBe(false);
+    });
+  });
+
+  it("存储读失败 → warn + 默认值（静默降级规则）", async () => {
+    mockUser.current = { id: 42 };
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { store } = await loadStore();
+    mockState.failRead = true; // loadStore 会重置标志，须在之后开启
+    await store.loadAccountR18();
+    expect(store.showR18()).toBe(false);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it("孤儿键清理：loadAccountR18 删除 age_confirmed/is_adult", async () => {
+    mockUser.current = { id: 42 };
+    const { store, mem } = await loadStore({ age_confirmed: "true", is_adult: "true" });
+    await store.loadAccountR18();
+    await vi.waitFor(() => {
+      expect(mem.dump().has("age_confirmed")).toBe(false);
+      expect(mem.dump().has("is_adult")).toBe(false);
+    });
   });
 });
