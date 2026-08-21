@@ -1005,28 +1005,17 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 登录流（有
   });
 
   // retry: 0 —— 状态破坏性用例：首次执行会把 token 写进 localStorage 完成登录，
-  // retry 重跑时浏览器停留在登录态，年龄确认弹窗不再出现，必连坐失败（F 报告 2.2：
+  // retry 重跑时浏览器停留在登录态，登录页不再出现，必连坐失败（F 报告 2.2：
   // retry 只重跑测试体，不重置 beforeAll 的 driver 会话）。
   it(
-    "年龄确认 → 登录页 → 有效 token 登录成功",
+    "登录页 → 有效 token 登录成功（ADR-0103：年龄确认已移除，冷启动直达登录页）",
     { retry: 0 },
     async () => {
-      // 等待页面渲染完成（daemon 冷启动可能白屏较久），再断言年龄确认弹窗
+      // 等待页面渲染完成（daemon 冷启动可能白屏较久），再等登录页渲染
       await driver.waitForPageContent(20_000);
-      // 1. 年龄确认弹窗（C 方向：确定性断言替代 LLM —— 「已满 18 岁」按钮存在）
-      await driver.waitForSelector('[aria-label="已满 18 岁"], [aria-label="未满 18 岁"]', 10_000);
-      const ageDialog = await evalBool(
-        driver,
-        'document.body.innerText.includes("年龄确认") && document.body.innerText.includes("已满 18 岁")',
-      );
-      expect(ageDialog, "页面应显示年龄确认弹窗").toBe(true);
-
-      // 2. 确认年龄
-      await driver.clickReliable("已满", undefined, "@e2");
-      // 年龄确认后等登录页渲染（refresh_token 输入框出现），替代固定 SLEEP
+      // 登录页输入框出现（C 方向：确定性断言替代 LLM）
       const loginPage = await driver.waitForSelector("fluent-textarea", 15_000);
-      // C 方向：确定性断言替代 LLM —— 登录页输入框出现
-      expect(loginPage, "年龄确认后应跳转到登录页（refresh_token 输入框）").toBe(true);
+      expect(loginPage, "冷启动应直达登录页（refresh_token 输入框）").toBe(true);
 
       // 3. 填入有效 token 并登录
       const token = process.env.PIXIV_REFRESH_TOKEN;
@@ -1083,12 +1072,10 @@ describe("agent-browser 登录流（无效 token）", () => {
       await driver.close().catch(() => {});
       await new Promise((r) => setTimeout(r, 2000));
     }
-    // 清理登录残留（精准删除 token keys，保留 ageConfirmed 等偏好设置）：
+    // 精准删除 token keys，保留偏好设置（屏蔽列表等）：
     // SecureStorage = capacitor-storage_ 前缀，Preferences = 裸 key / _cap_ 旧前缀。
     // 注：_cap_ 是旧 Preferences 一次性迁移前缀（应用当前不调用 migrate，实际极少存在，
     //     保留匹配以防迁移启用时误判已登录）。
-    // 不清空整个 localStorage —— 全清会连带清掉年龄确认标志，
-    // 导致同文件后续 describe 重新被年龄确认弹窗拦截（Issue #19 T1）。
     // 页面未就绪时 localStorage 访问抛 SecurityError，重试直到清理成功。
     const CLEAR_JS = `(() => {
       try {
@@ -1119,12 +1106,8 @@ describe("agent-browser 登录流（无效 token）", () => {
     await driver.navigate("/");
     // 等首页渲染出内容，替代固定 SLEEP
     await driver.waitForPageContent(20_000);
-    // 通过年龄确认，重试直到登录页（fluent-textarea）渲染完成
-    for (let attempt = 0; attempt < 6; attempt++) {
-      await driver.clickReliable("已满", undefined, "@e2");
-      // 等登录页 textarea 出现（条件等待替代固定 SLEEP + snapshot 轮询）
-      if (await driver.waitForSelector("fluent-textarea", 2_000)) break;
-    }
+    // 等登录页（fluent-textarea）渲染完成（ADR-0103：年龄确认已移除，直达登录页）
+    await driver.waitForSelector("fluent-textarea", 15_000);
   }, 60_000);
   afterAll(async () => {
     await driver?.close();

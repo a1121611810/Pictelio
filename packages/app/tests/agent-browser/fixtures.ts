@@ -1,12 +1,11 @@
 /**
  * Agent-browser 测试 fixture
  *
- * 提供 createLoggedInDriver() — 自动完成年龄确认和登录。
+ * 提供 createLoggedInDriver() — 自动完成登录（ADR-0103：年龄确认已移除）。
  *
  * 阶段化等待设计（Issue #19 T1）：
  * 每个阶段都循环检测页面状态，避免"点击后固定 SLEEP 再盲判"的时序缺陷——
- * 该缺陷曾导致年龄确认弹窗未消失、登录页未就绪时误判已登录，
- * 后续用例在年龄确认页卡死。
+ * 该缺陷曾导致弹窗未消失、登录页未就绪时误判已登录，后续用例卡死。
  */
 
 import { AgentBrowserDriver } from "./driver";
@@ -40,7 +39,7 @@ async function isOnLoginPage(driver: AgentBrowserDriver): Promise<boolean> {
 /**
  * 创建并初始化一个已登录的 driver 会话。
  *
- * 流程：年龄确认（循环点掉）→ 等待登录页或自动登录 → 填 token 登录 → 等待主界面。
+ * 流程：等待登录页或自动登录 → 填 token 登录 → 等待主界面。
  * 任一步骤超过重试上限即抛错，避免静默返回未就绪的 driver。
  *
  * 内建重试：agent-browser daemon 连续运行后偶发 launch 白屏/页面加载失败，
@@ -77,15 +76,7 @@ async function initLoggedInDriver(
   // R 类：等首屏内容渲染（页面文本非空即就绪，替代固定 2s 等待）
   await driver.waitForPageContent(10_000);
 
-  // ─── 阶段 1：年龄确认（循环点击直到弹窗消失） ───
-  for (let i = 0; i < MAX_ATTEMPTS; i++) {
-    if (!(await snapshotHas(driver, "年龄确认"))) break;
-    await driver.clickReliable("已满", undefined, "@e2");
-    // S 类：年龄确认弹窗关闭过渡，无稳定谓词，缩至 500ms（循环结构不变）
-    await SLEEP(500);
-  }
-
-  // ─── 阶段 2：等待登录页就绪，或检测到自动登录（localStorage 残留 token） ───
+  // ─── 阶段 1：等待登录页就绪，或检测到自动登录（ADR-0103：年龄确认已移除，无拦截） ───
   let onLoginPage = false;
   for (let i = 0; i < MAX_ATTEMPTS; i++) {
     if (await isOnLoginPage(driver)) {
@@ -107,7 +98,7 @@ async function initLoggedInDriver(
     throw new Error("[fixture] 未能进入登录页，页面状态异常");
   }
 
-  // ─── 阶段 3：填入 token 并登录 ───
+  // ─── 阶段 2：填入 token 并登录 ───
   const escapedToken = token.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
   await driver.evaluate(
     `document.querySelector("fluent-textarea").value = '${escapedToken}'; ` +
@@ -117,7 +108,7 @@ async function initLoggedInDriver(
   await SLEEP(300);
   await driver.clickReliable("登录", undefined, "@e2");
 
-  // ─── 阶段 4：等待登录完成（主界面出现） ───
+  // ─── 阶段 3：等待登录完成（主界面出现） ───
   for (let i = 0; i < MAX_ATTEMPTS; i++) {
     for (const marker of LOGGED_IN_MARKERS) {
       if (await snapshotHas(driver, marker)) {

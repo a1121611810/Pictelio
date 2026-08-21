@@ -39,9 +39,10 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("AdaptiveTags 240px 窄容器�
       // R 类：等页面加载出内容（未登录渲染登录页、已登录渲染首页，文本非空即就绪）
       await driver.waitForPageContent(15_000);
 
-      // 注入 localStorage（年龄确认 + 打开 R18/R18G）并刷新（settings backend 可能非 localStorage，UI 兜底）
+      // 注入老设备级 R18/R18G 键（ADR-0103：登录后迁移播种为账号键 show_r18_${uid}，
+      // 真实升级路径；年龄确认已移除，不再注入）并刷新（settings backend 可能非 localStorage，UI 兜底）
       await driver.evaluate(
-        `localStorage.setItem('age_confirmed','true'); localStorage.setItem('is_adult','true'); localStorage.setItem('show_r18','true'); localStorage.setItem('show_r18g','true'); location.reload(); 'ok'`,
+        `localStorage.setItem('show_r18','true'); localStorage.setItem('show_r18g','true'); location.reload(); 'ok'`,
       );
       // R 类：等 reload 后页面就绪——登录页（含"登录"）或主界面（含"推荐"）任一出现
       await driver.waitForJs(
@@ -49,20 +50,7 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("AdaptiveTags 240px 窄容器�
         15_000,
       );
 
-      // 年龄确认（按钮兜底，不 reload 以免干扰登录态）
-      // I 类：轮询间隔 2500ms → 500ms，次数 10 → 50，总超时上限保持 ~25s
-      for (let i = 0; i < 50; i++) {
-        const snap = await driver.snapshot().catch(() => "");
-        if (snap.includes("年龄确认")) {
-          console.log(`[age] 第 ${i + 1} 次点掉年龄确认`);
-          await driver.clickReliable("已满").catch(() => {});
-          await SLEEP(500);
-        } else {
-          break;
-        }
-      }
-
-      // 登录（真实请求；dev 模式走 Vite 代理）
+      // 登录（真实请求；dev 模式走 Vite 代理；ADR-0103：年龄确认已移除，无拦截）
       const hasTa = await driver.evaluate(
         `document.querySelector("fluent-textarea") ? "yes" : "no"`,
       );

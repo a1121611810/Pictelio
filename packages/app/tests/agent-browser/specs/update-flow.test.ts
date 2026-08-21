@@ -53,18 +53,8 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 更新流程", 
     // R 类：等首屏内容渲染（页面文本非空即就绪）
     await driver.waitForPageContent(10_000);
 
-    // ── 年龄确认（evaluate 驱动） ──
-    // I 类：轮询间隔 2000ms → 500ms，次数 5 → 20，总超时上限保持 ~10s
-    for (let attempt = 0; attempt < 20; attempt++) {
-      const snap = await driver.snapshot();
-      if (!snap.includes("年龄确认")) break;
-      await clickButtonByText(driver, "已满 18 岁");
-      await SLEEP(500);
-    }
-
-    // ── 登录（evaluate 注入 token + 点击） ──
+    // ── 登录（evaluate 注入 token + 点击；ADR-0103：年龄确认已移除，冷启动直达登录页） ──
     const token = process.env.PIXIV_REFRESH_TOKEN!;
-    // S 类：年龄确认关闭后页面过渡稳定，无稳定谓词，缩至 500ms
     await SLEEP(500);
     const snap = await driver.snapshot();
     if (snap.includes("登录") && !snap.includes("推荐")) {
