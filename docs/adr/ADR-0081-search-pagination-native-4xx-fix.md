@@ -57,7 +57,7 @@
 
 - `rewriteUrl` 原生分支对非 Pixiv 域绝对 URL 保持原样（防御性兜底，正常流程由 `assertPixivUrl` 先行拦截）。
 - `loadMore` 不写搜索结果缓存：重进同词搜索恢复首页分页状态（既有行为，非本次引入）。
-- `app-lynx`（Lynx MVP）的 `rewriteUrl` 原生分支同样把绝对 URL 原样透传，存在相同双域名隐患——本次按范围未改动，待其分页功能落地时一并处理。
+- `app-lynx`（Lynx MVP）的 `rewriteUrl` 原生分支同样把绝对 URL 原样透传，存在相同双域名隐患——**已于 ADR-0104 修复**（rewriteUrl 原生分支剥离域名 + execute/requestRaw 原生分支改传归一化路径，client.test.ts 覆盖）。
 
 ### 测试
 
