@@ -105,6 +105,47 @@ export function writeClientKind(serial: string, kind: "webview" | "lynx"): strin
   return kind;
 }
 
+/**
+ * 覆写真实 CapacitorStorage.xml 的任意键值（ADR-0103 T5 契约测试：等价 app 内
+ * 经 @capacitor/preferences（webview）/ PictelioPrefsModule（lynx）写入的效果）。
+ * 文件不存在时新建 <map>；存在时替换同名 <string>；值域 string。
+ * 键/值来自测试字面量（show_r18_42 / true），无正则特殊字符风险。
+ */
+export function writePrefKey(serial: string, key: string, value: string): void {
+  const cur = readClientPrefs(serial);
+  let xml: string;
+  if (cur.fileExists) {
+    const hasKey = cur.rawXml.includes(`name="${key}"`);
+    xml = hasKey
+      ? cur.rawXml
+          .replace(
+            new RegExp(`<string name="${key}">[^<]*<\/string>`, "u"),
+            `<string name="${key}">${value}</string>`,
+          )
+          .replace(
+            new RegExp(`name="${key}"\\s+value="[^"]*"`, "u"),
+            `name="${key}" value="${value}"`,
+          )
+      : cur.rawXml.replace(/<map>/u, `<map>\n    <string name="${key}">${value}</string>`);
+  } else {
+    xml = `<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\n<map>\n    <string name="${key}">${value}</string>\n</map>\n`;
+  }
+  const b64 = Buffer.from(xml, "utf8").toString("base64");
+  const script = `mkdir -p shared_prefs && echo ${b64} | base64 -d > ${PREFS_REL} && chmod 660 ${PREFS_REL} && cat ${PREFS_REL}`;
+  const adbCmd = `run-as ${APP_PACKAGE} sh -c '${script}'`;
+  const r = runCapture(adbPath(), ["-s", serial, "shell", adbCmd]);
+  if (r.code !== 0) {
+    throw new Error(
+      `[android-e2e] 覆写 ${APP_PACKAGE} 的 ${key}=${value} 失败（code ${r.code}）。` +
+        `stderr: ${r.stderr}`,
+    );
+  }
+  const written = readClientPrefs(serial);
+  if (!written.rawXml.includes(`name="${key}"`)) {
+    throw new Error(`[android-e2e] 写入后校验失败：${key} 不在 ${written.rawXml}`);
+  }
+}
+
 /** 强制停止 app（清后台进程，重启时走 onCreate 入口路由）。
  *  注意：不等待 pidof 消失——force-stop 后 am start 会启动新进程读最新 prefs；
  *  等待反而可能因旧进程未死透被 am start 复用（读缓存 prefs）导致不分发。 */
