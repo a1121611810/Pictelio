@@ -133,28 +133,3 @@ describe("settingsStore — ugoiraMode", () => {
     expect(store.ugoiraMode()).toBe("fflate");
   });
 });
-
-describe("settingsStore — 年龄确认联动", () => {
-  it("setAgeConfirmation(true, false)：非成人强制关闭 R18/R18G 并持久化", async () => {
-    const { store, mem } = await loadStore();
-    await store.setAgeConfirmation(true, false);
-
-    expect(store.ageConfirmed()).toBe(true);
-    expect(store.isAdult()).toBe(false);
-    expect(store.showR18()).toBe(false);
-    expect(store.showR18G()).toBe(false);
-    await vi.waitFor(() => {
-      const dump = mem.dump();
-      expect(dump.get("age_confirmed")).toBe("true");
-      expect(dump.get("is_adult")).toBe("false");
-      expect(dump.get("show_r18")).toBe("false");
-      expect(dump.get("show_r18g")).toBe("false");
-    });
-  });
-
-  it("hydrateAll 恢复 isAdult=false 时强制关闭 R18", async () => {
-    const { store } = await loadStore({ is_adult: "false" });
-    expect(store.isAdult()).toBe(false);
-    expect(store.showR18()).toBe(false);
-  });
-});

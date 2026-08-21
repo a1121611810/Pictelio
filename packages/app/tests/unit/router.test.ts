@@ -52,7 +52,6 @@ describe("router configuration", () => {
       "/image-host",
       "/image-cache",
       "/settings",
-      "/age-confirmation",
       "/debug",
       "/user/:id",
       "/user/:id/illusts",

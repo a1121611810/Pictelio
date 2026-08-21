@@ -12,7 +12,6 @@ interface SettingsSectionsProps {
   isLoggedIn: () => boolean;
   onLogout: () => void;
   onOpenBlocklist: () => void;
-  setAgeGateMessage: (msg: string | null) => void;
   onClearData: () => void;
   onDeleteAccount: () => void;
   onActionToast: (msg: string) => void;
@@ -34,10 +33,7 @@ const SettingsSections: Component<SettingsSectionsProps> = (props) => {
       </SettingsCard>
 
       <SettingsCard tone="elevated">
-        <SettingsContent
-          onOpenBlocklist={props.onOpenBlocklist}
-          setAgeGateMessage={props.setAgeGateMessage}
-        />
+        <SettingsContent onOpenBlocklist={props.onOpenBlocklist} />
       </SettingsCard>
 
       <SettingsCard tone="elevated">

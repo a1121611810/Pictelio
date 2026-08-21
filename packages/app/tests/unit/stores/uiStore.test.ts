@@ -111,73 +111,6 @@ beforeEach(() => {
   };
 });
 
-describe("age preference", () => {
-  it("defaults ageConfirmed and isAdult to false", async () => {
-    const { ageConfirmed, isAdult } = await setup();
-
-    expect(ageConfirmed()).toBe(false);
-    expect(isAdult()).toBe(false);
-  });
-
-  it("hydrateAll 恢复 minor 状态时强制关 R18/R18G", async () => {
-    const { mod, showR18, showR18G } = await setup({
-      age_confirmed: "true",
-      is_adult: "false",
-    });
-    await warm(mod);
-
-    expect(showR18()).toBe(false);
-    expect(showR18G()).toBe(false);
-  });
-
-  it("hydrateAll 恢复 adult 状态时保留持久化的 R18/R18G", async () => {
-    const { mod, showR18, showR18G } = await setup({
-      age_confirmed: "true",
-      is_adult: "true",
-      show_r18: "true",
-      show_r18g: "true",
-    });
-    await warm(mod);
-
-    expect(showR18()).toBe(true);
-    expect(showR18G()).toBe(true);
-  });
-
-  it("setAgeConfirmation(true, false) sets minor and disables adult content", async () => {
-    const { mod, setAgeConfirmation, ageConfirmed, isAdult, showR18, showR18G } = await setup();
-    await warm(mod);
-
-    await setAgeConfirmation(true, false);
-
-    expect(ageConfirmed()).toBe(true);
-    expect(isAdult()).toBe(false);
-    expect(showR18()).toBe(false);
-    expect(showR18G()).toBe(false);
-    await vi.waitFor(() => {
-      const dump = mod.__test.primary.dump();
-      expect(dump.get("age_confirmed")).toBe("true");
-      expect(dump.get("is_adult")).toBe("false");
-      expect(dump.get("show_r18")).toBe("false");
-      expect(dump.get("show_r18g")).toBe("false");
-    });
-  });
-
-  it("setAgeConfirmation(true, true) sets adult", async () => {
-    const { mod, setAgeConfirmation, ageConfirmed, isAdult } = await setup();
-    await warm(mod);
-
-    await setAgeConfirmation(true, true);
-
-    expect(ageConfirmed()).toBe(true);
-    expect(isAdult()).toBe(true);
-    await vi.waitFor(() => {
-      const dump = mod.__test.primary.dump();
-      expect(dump.get("age_confirmed")).toBe("true");
-      expect(dump.get("is_adult")).toBe("true");
-    });
-  });
-});
-
 describe("resetUiStore", () => {
   it("resets all ui signals to defaults and persists preferences", async () => {
     const {
@@ -188,14 +121,11 @@ describe("resetUiStore", () => {
       setLayoutMode,
       setAutoHideNavBar,
       setShowDetailStairs,
-      setAgeConfirmation,
       showR18,
       showR18G,
       layoutMode,
       autoHideNavBar,
       showDetailStairs,
-      ageConfirmed,
-      isAdult,
       imageCacheDisk,
       imageCacheBrowser,
       imageCachePrefetch,
@@ -207,7 +137,6 @@ describe("resetUiStore", () => {
     await setLayoutMode("grid");
     await setAutoHideNavBar(false);
     await setShowDetailStairs(true);
-    await setAgeConfirmation(true, true);
 
     await resetUiStore();
 
@@ -216,8 +145,6 @@ describe("resetUiStore", () => {
     expect(layoutMode()).toBe("waterfall");
     expect(autoHideNavBar()).toBe(true);
     expect(showDetailStairs()).toBe(false);
-    expect(ageConfirmed()).toBe(false);
-    expect(isAdult()).toBe(false);
     expect(imageCacheDisk()).toBe(true);
     expect(imageCacheBrowser()).toBe(true);
     expect(imageCachePrefetch()).toBe(true);
@@ -228,8 +155,6 @@ describe("resetUiStore", () => {
       expect(dump.get("layout_mode")).toBe("waterfall");
       expect(dump.get("auto_hide_nav_bar")).toBe("true");
       expect(dump.get("show_detail_stairs")).toBe("false");
-      expect(dump.get("age_confirmed")).toBe("false");
-      expect(dump.get("is_adult")).toBe("false");
     });
   });
 

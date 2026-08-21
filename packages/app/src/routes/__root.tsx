@@ -1,7 +1,6 @@
 import type { Component } from "solid-js";
 import { isLoggedIn, isLoading, setIsLoading, initializeAuth } from "@/stores/authStore";
 import {
-  ageConfirmed,
   autoCheckUpdate,
   setHasUpdate,
   setLatestVersion,
@@ -11,7 +10,6 @@ import {
   setIsCheckingUpdate,
   setCheckCompleted,
   lastDismissedVersion,
-  applyAgeRestriction,
 } from "@/stores/settingsStore";
 import { settings } from "@/settings";
 import { persistScrollRestoration } from "@/stores/uiStore";
@@ -93,7 +91,7 @@ const RootLayout: Component = (props: { children?: any }) => {
     const path = location.pathname;
     // 跳过启动阶段（startup 代码在 onMount 中处理了初始导航）
     if (isLoading()) return;
-    if (!loggedIn && path !== "/login" && path !== "/age-confirmation") {
+    if (!loggedIn && path !== "/login") {
       navigate("/login", { replace: true });
     }
   });
@@ -145,8 +143,6 @@ const RootLayout: Component = (props: { children?: any }) => {
       loadBlockedIds(),
       loadImageHostPreference(),
     ]);
-    // 年龄联动（串行）：非成人强制关闭 R18/R18G 并持久化（write gate 已开）
-    await applyAgeRestriction();
 
     // 后台预热 LRU 缓存（从 Android 文件系统读取最近图片，不阻塞启动流程）
     warmCacheFromDisk();
@@ -161,12 +157,6 @@ const RootLayout: Component = (props: { children?: any }) => {
 
     const [authErr] = await tryAsync(
       (async () => {
-        // 如果尚未确认年龄，先导航到年龄确认页面，不进行登录判断
-        if (!ageConfirmed()) {
-          await navigate("/age-confirmation", { replace: true });
-          return;
-        }
-
         await initializeAuth();
         if (isLoggedIn()) {
           if (location.pathname !== "/home") {
@@ -180,7 +170,7 @@ const RootLayout: Component = (props: { children?: any }) => {
       })(),
     );
     setIsLoading(false);
-    // 兜底关闭 Splash：非 Feed 页面（login / age-confirmation 等）
+    // 兜底关闭 Splash：非 Feed 页面（login 等）
     // 由 Login.tsx 或 Feed.tsx 负责主动触发，此处兜底确保不会泄漏
     const currentPath = location.pathname;
     if (currentPath !== "/home") {

@@ -18,20 +18,11 @@ function openDeleteAccountPage() {
 
 const Settings: Component = () => {
   const navigate = useNavigate();
-  const [ageGateMessage, setAgeGateMessage] = createSignal<string | null>(null);
   const [showBlocklist, setShowBlocklist] = createSignal(false);
   const [actionToast, setActionToast] = createSignal<string | null>(null);
   const [dialogState, setDialogState] = createSignal<
     { type: "clear" } | { type: "deleteAccount" } | null
   >(null);
-
-  // Auto-hide the age gate hint toast
-  createEffect(() => {
-    if (ageGateMessage()) {
-      const timer = setTimeout(() => setAgeGateMessage(null), 2500);
-      onCleanup(() => clearTimeout(timer));
-    }
-  });
 
   // Auto-hide action toast
   createEffect(() => {
@@ -83,16 +74,6 @@ const Settings: Component = () => {
   return (
     <PageTransition>
       <div class="min-h-screen pb-8">
-        {/* Age gate hint toast */}
-        <Show when={ageGateMessage()}>
-          <fluent-message-bar
-            intent="warning"
-            style="position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:60;pointer-events:none"
-          >
-            {ageGateMessage()}
-          </fluent-message-bar>
-        </Show>
-
         {/* Action success toast */}
         <Show when={actionToast()}>
           <fluent-message-bar
@@ -129,7 +110,6 @@ const Settings: Component = () => {
             isLoggedIn={isLoggedIn}
             onLogout={handleLogout}
             onOpenBlocklist={() => setShowBlocklist(true)}
-            setAgeGateMessage={setAgeGateMessage}
             onClearData={() => setDialogState({ type: "clear" })}
             onDeleteAccount={() => setDialogState({ type: "deleteAccount" })}
             onActionToast={setActionToast}

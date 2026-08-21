@@ -1,35 +1,11 @@
 import type { Component } from "solid-js";
-import {
-  showR18,
-  setShowR18,
-  showR18G,
-  setShowR18G,
-  ageConfirmed,
-  isAdult,
-  setAgeConfirmation,
-} from "../../stores/settingsStore";
+import { showR18, setShowR18, showR18G, setShowR18G } from "../../stores/settingsStore";
 
 interface SettingsContentProps {
   onOpenBlocklist: () => void;
-  setAgeGateMessage: (msg: string | null) => void;
 }
 
 const SettingsContent: Component<SettingsContentProps> = (props) => {
-  const navigate = useNavigate();
-
-  function requireAdult(action: () => void) {
-    if (!isAdult()) {
-      props.setAgeGateMessage("请先确认已满 18 岁");
-      return;
-    }
-    action();
-  }
-
-  function reconfirmAge() {
-    setAgeConfirmation(false, false);
-    void navigate("/age-confirmation?reconfirm=true");
-  }
-
   return (
     <div class="py-3 flex flex-col">
       <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground3)] uppercase tracking-wide mb-1">
@@ -59,7 +35,7 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
 
         <fluent-switch
           checked={showR18()}
-          on:change={() => requireAdult(() => setShowR18(!showR18()))}
+          on:change={() => setShowR18(!showR18())}
           aria-label="显示 R18 内容"
         />
       </div>
@@ -87,38 +63,10 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
 
         <fluent-switch
           checked={showR18G()}
-          on:change={() => requireAdult(() => setShowR18G(!showR18G()))}
+          on:change={() => setShowR18G(!showR18G())}
           aria-label="显示 R-18G 内容"
         />
       </div>
-
-      {/* 重新确认年龄 */}
-      <Show when={ageConfirmed()}>
-        <div class="flex items-center justify-between py-2">
-          <div class="flex items-center gap-3">
-            <div class="relative w-6 h-6 flex-shrink-0 text-[var(--colorNeutralForeground2)]">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path
-                  d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 1.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zm0 4.5a.75.75 0 0 1 .75.75v4.19l2.47 2.47a.75.75 0 0 1-1.06 1.06l-2.72-2.72a.75.75 0 0 1-.22-.53V8.75a.75.75 0 0 1 .75-.75z"
-                  fill="currentColor"
-                />
-              </svg>
-            </div>
-            <div>
-              <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
-                重新确认年龄
-              </p>
-              <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-                点击后重新进入年龄确认页面
-              </p>
-            </div>
-          </div>
-
-          <fluent-button appearance="secondary" on:click={reconfirmAge}>
-            重新确认
-          </fluent-button>
-        </div>
-      </Show>
 
       {/* 管理屏蔽列表 */}
       <div

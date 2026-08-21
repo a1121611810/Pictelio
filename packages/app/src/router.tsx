@@ -2,7 +2,6 @@ import { type RouteDefinition } from "@solidjs/router";
 import RootLayout from "@/routes/__root";
 
 import Login from "@/routes/Login";
-import AgeConfirmation from "@/routes/AgeConfirmation";
 import IllustDetail from "@/routes/IllustDetail";
 import DebugImage from "@/routes/DebugImage";
 import HomePage from "@/routes/HomePage";
@@ -39,7 +38,6 @@ export const routes: RouteDefinition[] = [
       { path: "/image-cache", component: ImageCacheSettings },
       { path: "/settings", component: Settings },
       { path: "/client-switch", component: ClientSwitch },
-      { path: "/age-confirmation", component: AgeConfirmation },
       { path: "/scroll-restoration-confirm", component: ScrollRestorationConfirm },
       { path: "/user/:id", component: PersonalCenter },
       { path: "/user/:id/illusts", component: UserIllusts },
