@@ -195,6 +195,8 @@ The **CLAUDE.md** file at the repository root contains agent-specific instructio
 
 A scheduled **OpenWiki GitHub Actions workflow** (`.github/workflows/openwiki-update.yml`) refreshes the repository wiki on a recurring basis, as a fallback guard if the pre-commit hook is bypassed.
 
+A **CodeGraph MCP server** is registered in [`.mcp.json`](/.mcp.json) (`codegraph serve --mcp --path .`), exposing the static-analysis code graph (`.codegraph/codegraph.db`, SQLite) to AI tooling via `codegraph_explore` / `codegraph_trace` / `codegraph_impact` — the backend for the ADR-0079 tool trigger protocol. Transient CodeGraph data (database, daemon.pid, sockets, logs) is kept out of git by `.codegraph/.gitignore`.
+
 ## Repo Evolution (Recent History)
 
 The repository has been actively refactored through **v4.10.0**. Key themes in recent commits:
