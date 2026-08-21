@@ -84,6 +84,7 @@ public class LynxActivity extends AppCompatActivity {
         builder.registerModule("PictelioApp", PictelioAppModule.class);
         builder.registerModule("PictelioAuth", PictelioAuthModule.class);
         builder.registerModule("PictelioApi", PictelioApiModule.class);
+        builder.registerModule("PictelioPrefs", PictelioPrefsModule.class);
         lynxView = builder.build(this);
 
         // Splash 退出时机：bundle 渲染成功/失败（替代 webview 分支 AuthPlugin.hideSplash 桥）

@@ -93,6 +93,13 @@ declare global {
         callback: (status: number, data: string, rotatedRefreshToken: string) => void,
       ): void
     }
+    /** 共享设置 KV 桥（ADR-0103）：读写 CapacitorStorage（webview 侧 @capacitor/preferences 同文件） */
+    PictelioPrefs: {
+      /** 成功 cb(value)——键不存在返回空串（JS 侧映射为 null）；失败 cb(errMsg) */
+      prefsGet(key: string, callback: (value: string, err: string | null) => void): void
+      prefsSet(key: string, value: string, callback: (err: string | null) => void): void
+      prefsRemove(key: string, callback: (err: string | null) => void): void
+    }
   } | undefined
 }
 
