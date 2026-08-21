@@ -214,3 +214,13 @@ _Avoid_: 包、安装包
 **上传面板（Upload panel）**：
 发布脚本 step 6 与覆盖发布模式在 TTY 下逐行渲染每个变体 APK 上传状态（变体、状态、文件大小、已耗时、重试次数）的展示形态；非 TTY 降级为逐事件文本行。
 _Avoid_: 进度条（gh 不提供逐文件字节级进度，面板显示的是耗时而非字节）
+
+### 设置同步
+
+**账号级设置（Account-scoped setting）**：
+跟随登录账号、不随设备或客户端漂移的设置。存储键含 userId（如 `show_r18_${uid}`），webview 与 lynx 两 client 读写同一 SharedPreferences "CapacitorStorage" 文件，切换引擎后读到同一份值。
+_Avoid_: 设备级设置（键不含 userId 的旧模式）
+
+**共享设置存储（Shared settings storage）**：
+跨 client 设置契约的物理落点——SharedPreferences 文件 "CapacitorStorage"（@capacitor/preferences 默认 group）。webview 经 Capacitor 插件读写；lynx 原生经 `PictelioPrefsModule` 读写；lynx web-core dev 预览降级 IndexedDB（仅开发环境）。
+_Avoid_: 本地存储（localStorage，web-core Worker 环境不存在）
