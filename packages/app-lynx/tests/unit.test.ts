@@ -123,16 +123,14 @@ describe('client 原生模式（#53：NativeModules 存在 → 绝对 URL 直连
     vi.unstubAllGlobals()
   })
 
-  it('rewriteUrl 相对 API 路径 → 绝对 apiBaseUrl', () => {
+  it('rewriteUrl 相对 API 路径原样透传（插件内部拼 apiBase，ADR-0104）', () => {
     vi.stubGlobal('NativeModules', { PictelioApp: {} })
-    expect(rewriteUrl('/v1/illust/recommended')).toBe(
-      'https://app-api.pixiv.net/v1/illust/recommended',
-    )
+    expect(rewriteUrl('/v1/illust/recommended')).toBe('/v1/illust/recommended')
   })
 
-  it('rewriteUrl 绝对 URL 原样（不重写为代理路径）', () => {
+  it('rewriteUrl 绝对 Pixiv URL 剥离域名成相对路径；非 Pixiv 绝对 URL 原样（ADR-0104）', () => {
     vi.stubGlobal('NativeModules', { PictelioApp: {} })
-    expect(rewriteUrl('https://app-api.pixiv.net/v1/x')).toBe('https://app-api.pixiv.net/v1/x')
+    expect(rewriteUrl('https://app-api.pixiv.net/v1/x')).toBe('/v1/x')
     expect(rewriteUrl('https://oauth.secure.pixiv.net/auth/token')).toBe(
       'https://oauth.secure.pixiv.net/auth/token',
     )
@@ -736,12 +734,12 @@ describe('P0-T5 小说关注 API 契约', () => {
     vi.restoreAllMocks()
   })
 
-  it('loadFollow(novel) 调 /v1/novel/follow 带 restrict', async () => {
+  it('loadFollow(novel) 调 /v1/novel/follow 带 restrict（signal 可选参，ADR-0104）', async () => {
     const spy = vi.spyOn(apiClient, 'get').mockResolvedValue({ novels: [], next_url: null })
     await loadNovelFollow()
-    expect(spy).toHaveBeenCalledWith('/v1/novel/follow', { restrict: 'public' })
+    expect(spy).toHaveBeenCalledWith('/v1/novel/follow', { restrict: 'public' }, undefined)
     await loadNovelFollow('private')
-    expect(spy).toHaveBeenCalledWith('/v1/novel/follow', { restrict: 'private' })
+    expect(spy).toHaveBeenCalledWith('/v1/novel/follow', { restrict: 'private' }, undefined)
   })
 
   it('loadFollow(novel) 失败透传 reject', async () => {

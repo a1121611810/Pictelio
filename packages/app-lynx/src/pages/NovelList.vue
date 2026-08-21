@@ -4,11 +4,10 @@ defineOptions({ name: 'novels' })
 import { ref, onMounted } from 'vue'
 import { navigate } from '../router'
 import { loadRecommendedNovels, loadFollow, loadNovelNext } from '../api/novel'
-import type { PixivNovel } from '../api/types'
-import { presentError } from '../utils/errorPresentation'
-import { withTimeout } from '../utils/withTimeout'
+import type { PixivNovel, PixivNovelListResponse } from '../api/types'
+import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { isRestricted } from '../stores/settingsStore'
-import RestrictOverlay from '../components/RestrictOverlay.vue'
+import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
 import NavigationBar from '../components/NavigationBar.vue'
 import { NAV_TABS, type NavTab } from '../components/navTabs'
 
@@ -17,89 +16,86 @@ function onNavSelect(tab: NavTab) {
   void navigate(tab.path, { replace: true })
 }
 
+// ─── 分页收敛（ADR-0104）：迁移到 createMixFeed 深模块 ───
+// 双防抖（800ms 节流 + 3s 冷却）/ 竞态代 / 分批渲染 / 空页防护 / 15s 超时 /
+// 错误槽分流（error=首屏顶部、pageError=分页底部内联）全部由 createMixFeed 承载，
+// 页面只做 ref 快照桥接（sync）。
+// 推荐/关注切换（P0-T5）：关注视图用 /v1/novel/follow
+const mode = ref<'recommend' | 'follow'>('recommend')
+
+function mapNovels(r: PixivNovelListResponse): { items: MixFeedItem[]; nextUrl: string | null } {
+  return {
+    items: r.novels.map((n) => ({ kind: 'novel' as const, key: `n-${n.id}`, id: n.id, data: n })),
+    nextUrl: r.next_url,
+  }
+}
+
+function makeFeed(m: 'recommend' | 'follow') {
+  const first = m === 'recommend' ? loadRecommendedNovels : loadFollow
+  return createMixFeed({
+    // autoStart=false：构造不首载，由 refreshFeed 显式触发（mode 重建实例避免双请求浪费）
+    autoStart: false,
+    sources: [
+      {
+        name: 'novel',
+        fetchPage: (signal, nextUrl) =>
+          nextUrl ? loadNovelNext(nextUrl, signal).then(mapNovels) : first(signal).then(mapNovels),
+      },
+    ],
+  })
+}
+
+const feed = ref(makeFeed(mode.value))
 const novels = ref<PixivNovel[]>([])
-const nextUrl = ref<string | null>(null)
 const loading = ref(false)
 const loadingMore = ref(false)
 const errorMsg = ref('')
-// 推荐/关注切换（P0-T5）：关注视图用 /v1/novel/follow
-const mode = ref<'recommend' | 'follow'>('recommend')
-// 竞态防护：mode 切换后旧请求响应丢弃（generation gate）
-let modeGen = 0
-// [lynx:fix] loadMore 双重防抖（与 Recommended 同款，ADR-0045）：
-// 1) 时间节流 800ms：防 scrolltolower 高频触发
-// 2) 加载完成冷却 3s：防 web-core 的 list 在内容追加/首屏初始化后延迟误触发 scrolltolower（进入时自动多加载）
-let lastLoadMoreAt = 0
-let lastLoadEndedAt = 0
+const pageErrorMsg = ref('')
+const endOfFeed = ref(false)
 
-async function fetchFirstPage() {
-  const gen = ++modeGen
-  loading.value = true
-  errorMsg.value = ''
-  try {
-    const req = mode.value === 'recommend' ? loadRecommendedNovels() : loadFollow()
-    // 请求挂起 15s 兜底（与 Recommended 的 issue #128 对齐）：超时 reject 走 catch 展示 errorMsg，
-    // 避免骨架屏无限显示
-    const res = await withTimeout(req, 15000)
-    if (gen !== modeGen) return // 已切 tab，丢弃旧响应
-    // 响应形状防御：novels 缺失/非数组时置错误，避免后续 res.novels.length 崩溃或静默空白
-    if (!Array.isArray(res.novels)) {
-      errorMsg.value = '数据格式异常'
-      return
-    }
-    // issue #91：全量渲染，受限条目盖遮罩（不再过滤）
-    novels.value = res.novels
-    nextUrl.value = res.next_url
-  } catch (err) {
-    if (gen !== modeGen) return
-    errorMsg.value = presentError(err, '加载失败')
-  } finally {
-    if (gen === modeGen) {
-      loading.value = false
-      // [lynx:fix] 第一页加载完成同样进入冷却
-      lastLoadEndedAt = Date.now()
-    }
-  }
+function sync() {
+  novels.value = feed.value.items().map((i) => i.data as PixivNovel)
+  loading.value = feed.value.loading()
+  loadingMore.value = feed.value.loadingMore()
+  errorMsg.value = feed.value.error() ?? ''
+  pageErrorMsg.value = feed.value.pageError() ?? ''
+  // 到底态：所有源耗尽且列表非空（ADR-0104：footer「没有更多了」）
+  endOfFeed.value =
+    feed.value.nextUrl() === null &&
+    feed.value.items().length > 0 &&
+    !loading.value &&
+    !loadingMore.value
+}
+
+async function refreshFeed() {
+  await feed.value.refresh()
+  sync()
+}
+
+async function loadMore() {
+  await feed.value.fetchMore()
+  sync()
 }
 
 function switchMode(m: 'recommend' | 'follow') {
   if (mode.value === m) return
   mode.value = m
+  // 重建 feed 实例：新实例 generation 从 0 起，旧实例在途响应按竞态代被丢弃
+  feed.value = makeFeed(m)
   novels.value = []
-  nextUrl.value = null
-  // 重置分页节流（新 tab 立即支持 loadMore）
-  lastLoadMoreAt = 0
-  lastLoadEndedAt = 0
-  void fetchFirstPage()
-}
-
-async function loadMore() {
-  const now = Date.now()
-  if (now - lastLoadEndedAt < 3000) return
-  if (now - lastLoadMoreAt < 800) return
-  if (!nextUrl.value || loadingMore.value) return
-  lastLoadMoreAt = now
-  loadingMore.value = true
-  try {
-    const res = await loadNovelNext(nextUrl.value)
-    const seen = new Set(novels.value.map((n) => n.id))
-    const fresh = res.novels.filter((n) => !seen.has(n.id))
-    novels.value.push(...fresh)
-    // 空页防护：基于服务端原始返回判空（issue #91：不再用过滤后长度，否则全受限页误杀分页）
-    nextUrl.value = res.novels.length === 0 ? null : res.next_url
-  } catch (err) {
-    errorMsg.value = presentError(err, '加载更多失败')
-  } finally {
-    loadingMore.value = false
-    lastLoadEndedAt = Date.now()
-  }
+  errorMsg.value = ''
+  pageErrorMsg.value = ''
+  loading.value = true
+  void refreshFeed()
 }
 
 function openDetail(id: number) {
   void navigate(`/novel/${id}`)
 }
 
-onMounted(fetchFirstPage)
+onMounted(() => {
+  void refreshFeed()
+})
 </script>
 
 <template>
@@ -174,11 +170,10 @@ onMounted(fetchFirstPage)
         class="w-full"
         @tap="openDetail(item.id)"
       >
-        <!-- 受限条目：独立遮罩卡（流内，无 absolute——真机 Lynx 的 absolute 子元素会被
-             single list item 高度测量算进内容高度，导致整卡撑满内容区，实测 2026-08-11） -->
-        <view v-if="isRestricted(item)" @tap.stop class="flex flex-row items-center justify-center m-1.5 mx-3 p-3.5 bg-[var(--md-scrim)] rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
-          <RestrictOverlay :overlay="false" :level="item.x_restrict === 2 ? 2 : 1" />
-        </view>
+        <!-- 受限条目：等高占位卡（RestrictedNovelCard，ADR-0105；显式固定高度，
+             流内无 absolute——真机 Lynx 的 absolute 子元素会被 single list item
+             高度测量算进内容高度，导致整卡撑满内容区，实测 2026-08-11） -->
+        <RestrictedNovelCard v-if="isRestricted(item)" :item="item" />
         <view v-else class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
           <view class="flex-1 flex flex-col">
             <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>
@@ -201,8 +196,10 @@ onMounted(fetchFirstPage)
           </view>
         </view>
       </list-item>
-      <list-item v-if="loadingMore" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text class="text-body-medium text-outline">加载中…</text>
+      <list-item v-if="loadingMore || pageErrorMsg || endOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
+        <text v-if="loadingMore" class="text-body-medium text-outline">加载中…</text>
+        <text v-else-if="pageErrorMsg" class="text-body-medium text-error">{{ pageErrorMsg }}</text>
+        <text v-else class="text-body-medium text-outline">没有更多了</text>
       </list-item>
     </list>
 

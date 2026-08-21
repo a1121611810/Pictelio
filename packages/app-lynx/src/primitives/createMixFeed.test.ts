@@ -398,7 +398,7 @@ describe('createMixFeed', () => {
     expect(fetchB).toHaveBeenCalledTimes(1)
   })
 
-  it('翻页失败：置错误文案（加载更多失败）且不崩溃，原数据保留', async () => {
+  it('翻页失败：置分页错误文案（加载更多失败）且不崩溃，原数据保留', async () => {
     const fetchA = vi.fn<MixFeedSource['fetchPage']>(async () => ({ items: [mkIllust('a1', 1)], nextUrl: 'A2' }))
 
     const feed = createMixFeed({
@@ -413,9 +413,121 @@ describe('createMixFeed', () => {
       throw new Error('page-fail')
     })
     await expect(feed.fetchMore()).resolves.toBeUndefined() // 不 reject
-    expect(feed.error()).toBe('page-fail') // presentError(err, '加载更多失败')
+    // 槽位分离（ADR-0104）：分页失败置 pageError，首屏 error 槽不受影响
+    expect(feed.error()).toBeNull()
+    expect(feed.pageError()).toBe('page-fail') // presentError(err, '加载更多失败')
     expect(feed.items().map((i) => i.key)).toEqual(['a1']) // 原数据保留
     expect(feed.nextUrl()).toBe('A2') // 保留 nextUrl 供重试
+  })
+
+  it('pageError 生命周期：翻页失败置位、重试成功清空（首屏 error 槽全程不受影响）', async () => {
+    let page = 0
+    const fetchA = vi.fn<MixFeedSource['fetchPage']>(async () => {
+      page++
+      if (page === 1) return { items: [mkIllust('a1', 1)], nextUrl: 'A2' }
+      if (page === 2) throw new Error('page-fail')
+      return { items: [mkIllust(`a${page}`, page)], nextUrl: null }
+    })
+
+    const feed = createMixFeed({
+      sources: [source('illust', fetchA)],
+      pageSize: 100,
+      throttleMs: 0,
+      cooldownMs: 0,
+    })
+    await flush()
+    expect(feed.error()).toBeNull()
+
+    await feed.fetchMore() // 翻页失败
+    await flush()
+    expect(feed.pageError()).toBe('page-fail')
+    expect(feed.error()).toBeNull()
+
+    await feed.fetchMore() // 滚动重试成功 → 清 pageError
+    await flush()
+    expect(feed.pageError()).toBeNull()
+    expect(feed.items().map((i) => i.key)).toEqual(['a1', 'a3'])
+  })
+
+  it('refresh 清两槽：首屏错误与分页残留错误都被清空', async () => {
+    let page = 0
+    const fetchA = vi.fn<MixFeedSource['fetchPage']>(async () => {
+      page++
+      if (page === 1) return { items: [mkIllust('a1', 1)], nextUrl: 'A2' }
+      if (page === 2) throw new Error('page-fail')
+      return { items: [mkIllust('a1', 1)], nextUrl: null }
+    })
+
+    const feed = createMixFeed({
+      sources: [source('illust', fetchA)],
+      pageSize: 100,
+      throttleMs: 0,
+      cooldownMs: 0,
+    })
+    await flush()
+    await feed.fetchMore() // 翻页失败 → pageError 置位
+    await flush()
+    expect(feed.pageError()).toBe('page-fail')
+
+    await feed.refresh() // refresh 成功 → 两槽清
+    await flush()
+    expect(feed.error()).toBeNull()
+    expect(feed.pageError()).toBeNull()
+    expect(feed.items()).toHaveLength(1)
+  })
+
+  it('autoStart=false：构造不触发首载，refresh 才触发', async () => {
+    const fetchA = vi.fn<MixFeedSource['fetchPage']>(async () => ({ items: [mkIllust('a1', 1)], nextUrl: null }))
+
+    const feed = createMixFeed({
+      sources: [source('illust', fetchA)],
+      autoStart: false,
+      pageSize: 100,
+      throttleMs: 0,
+      cooldownMs: 0,
+    })
+    expect(fetchA).not.toHaveBeenCalled()
+    expect(feed.loading()).toBe(false)
+
+    await feed.refresh()
+    await flush()
+    expect(fetchA).toHaveBeenCalledTimes(1)
+    expect(feed.items()).toHaveLength(1)
+  })
+
+  it('翻页传 nextUrl：fetchMore 调用 fetchPage(signal, 该源当前 next_url)（offset 分页语义）', async () => {
+    const fetchA = vi.fn<MixFeedSource['fetchPage']>(async () => ({ items: [mkIllust('a1', 1)], nextUrl: 'A2' }))
+
+    const feed = createMixFeed({
+      sources: [source('illust', fetchA)],
+      pageSize: 100,
+      throttleMs: 0,
+      cooldownMs: 0,
+    })
+    await flush()
+
+    await feed.fetchMore()
+    await flush()
+    // 翻页：fetchPage(undefined, 'A2')——携带该源当前 next_url（offset 分页语义）
+    expect(fetchA).toHaveBeenNthCalledWith(2, undefined, 'A2')
+  })
+
+  it('畸形响应（items 非数组）→ 首载视为失败，error 置位不崩溃', async () => {
+    const fetchA = vi.fn<MixFeedSource['fetchPage']>(async () => ({
+      items: 'not-an-array' as never,
+      nextUrl: null,
+    }))
+
+    const feed = createMixFeed({
+      sources: [source('illust', fetchA)],
+      pageSize: 100,
+      throttleMs: 0,
+      cooldownMs: 0,
+    })
+    await flush()
+    expect(feed.error()).toBe('数据格式异常')
+    expect(feed.items()).toEqual([])
+    expect(feed.loading()).toBe(false)
   })
 
   it('fetchPage 15s 超时兜底（issue #128）：挂起请求超时后 error 置位', async () => {

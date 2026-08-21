@@ -66,12 +66,18 @@ const items = ref<MixFeedItem[]>(feed.items())
 const loading = ref(feed.loading())
 const loadingMore = ref(feed.loadingMore())
 const errorMsg = ref(feed.error() ?? '')
+const pageErrorMsg = ref('')
+const endOfFeed = ref(false)
 
 function sync() {
   items.value = feed.items()
   loading.value = feed.loading()
   loadingMore.value = feed.loadingMore()
   errorMsg.value = feed.error() ?? ''
+  pageErrorMsg.value = feed.pageError() ?? ''
+  // 到底态：所有源耗尽且列表非空（ADR-0104：footer「没有更多了」）
+  endOfFeed.value =
+    feed.nextUrl() === null && feed.items().length > 0 && !feed.loading() && !feed.loadingMore()
 }
 
 /** 刷新（FAB / 补拉）：feed.refresh() 幂等（generation++ 丢弃在途旧响应），完成后同步快照 */
@@ -200,8 +206,10 @@ onActivated(() => {
         </template>
         </view>
       </list-item>
-      <list-item v-if="loadingMore" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text class="text-body-medium text-outline">加载中…</text>
+      <list-item v-if="loadingMore || pageErrorMsg || endOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
+        <text v-if="loadingMore" class="text-body-medium text-outline">加载中…</text>
+        <text v-else-if="pageErrorMsg" class="text-body-medium text-error">{{ pageErrorMsg }}</text>
+        <text v-else class="text-body-medium text-outline">没有更多了</text>
       </list-item>
     </list>
 

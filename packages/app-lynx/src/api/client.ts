@@ -151,13 +151,22 @@ export function getNativeModules(): {
 
 // ─── URL 重写：Pixiv 直连 URL → 本地代理路径 ───
 export function rewriteUrl(path: string): string {
-  // 原生 LynxView（#53）：无 dev proxy。绝对 URL 直连（凭证/签名仍在 JS 内存，MVP 形态）；
-  // /pixiv-img 相对路径交给 PictelioImageService 原生重写（不走 fetch）。
+  // 原生 LynxView（#53）：无 dev proxy。插件（PictelioApiModule）只接收相对路径，内部拼 apiBase()。
+  // 绝对 next_url 必须剥离域名成相对路径，否则双域名 URL（apiBase + 绝对URL）→ Pixiv 404
+  // （ADR-0104 补齐 ADR-0081 的 lynx 遗留缺口）；相对路径原样透传。
   if (isNativeMode()) {
-    if (path.startsWith("http")) return path
+    if (path.startsWith("http")) {
+      // 精确主机边界匹配（=== base 或 base + "/"），防伪后缀域（app-api.pixiv.net.evil.com）误判
+      if (path === PIXIV_API_BASE || path.startsWith(PIXIV_API_BASE + "/")) {
+        const rest = path.slice(PIXIV_API_BASE.length)
+        return rest.startsWith("/") ? rest : `/${rest}`
+      }
+      // 非 Pixiv 绝对 URL 原样（防御性兜底，正常流程不出现）
+      return path
+    }
     if (path.startsWith("/pixiv-img")) return path
     if (path.startsWith("/pixiv-oauth")) return PIXIV_AUTH_BASE
-    return PIXIV_API_BASE + (path.startsWith("/") ? path : `/${path}`)
+    return path
   }
   if (path.startsWith("/pixiv-")) return path
   if (path.startsWith("http")) {
@@ -232,10 +241,11 @@ async function execute<T>(
     if (!api) {
       throw { type: ApiErrorType.NETWORK, message: "原生 API 模块不可用" } as ApiError
     }
+    // 归一化后传输：绝对 next_url 剥离域名成相对路径（ADR-0104，防双域名 404）
     const query = data ? "?" + new URLSearchParams(data).toString() : ""
     const bodyStr = body ? new URLSearchParams(body).toString() : ""
     return new Promise<T>((resolve, reject) => {
-      api.request(method, path + query, bodyStr, (status, dataStr, rotated) => {
+      api.request(method, rewriteUrl(path) + query, bodyStr, (status, dataStr, rotated) => {
         // 401 刷新轮换了 refresh_token → 持久化（Keystore，供重启恢复），避免旧 token 硬失败
         if (rotated) {
           void saveRefreshToken(rotated).catch((e) => {
@@ -315,9 +325,10 @@ async function executeRaw(
     if (!api) {
       throw { type: ApiErrorType.NETWORK, message: "原生 API 模块不可用" } as ApiError
     }
+    // 归一化后传输：绝对 next_url 剥离域名成相对路径（ADR-0104，防双域名 404）
     const query = params ? "?" + new URLSearchParams(params).toString() : ""
     return new Promise<string>((resolve, reject) => {
-      api.request(method, path + query, "", (status, dataStr, rotated) => {
+      api.request(method, rewriteUrl(path) + query, "", (status, dataStr, rotated) => {
         // 401 刷新轮换了 refresh_token → 持久化（Keystore），与 execute 一致
         if (rotated) {
           void saveRefreshToken(rotated).catch((e) => {

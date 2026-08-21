@@ -7,9 +7,9 @@
 // - 原生回调契约来自 PixivApiModule：(status, data, rotatedRefreshToken)，
 //   data 即原始响应字符串（PixivApiCore 对非 JSON 响应原样返回）。
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { apiClient, setAccessToken, setOnUnauthorized, setAuthPermanentFailure } from "./client"
+import { apiClient, setAccessToken, setOnUnauthorized, setAuthPermanentFailure, rewriteUrl } from "./client"
 import { ApiErrorType } from "./types"
-import { PIXIV_USER_AGENT, PIXIV_REFERER } from "./userAgent"
+import { PIXIV_USER_AGENT, PIXIV_REFERER, PIXIV_API_BASE } from "./userAgent"
 
 // 真实结构样例：/webview/v2/novel 返回的 HTML（含 window.pixiv.novel.text）
 const NOVEL_HTML = `<script>window.pixiv = { novel: { "text": "第一行\\n第二行" } }</script>`
@@ -173,6 +173,24 @@ describe("client.requestRaw 原生模式（PictelioApi.request 转发，JS 零�
     expect(requestMock).toHaveBeenCalled()
   })
 
+  it("原生模式绝对 next_url → 归一化剥离域名后传给原生模块（ADR-0104，防双域名 404）", async () => {
+    const requestMock = vi.fn(
+      (_m: string, _p: string, _b: string, cb: (s: number, d: string, r: string) => void) =>
+        cb(200, NOVEL_HTML, ""),
+    )
+    vi.stubGlobal("NativeModules", { PictelioApi: { request: requestMock } })
+    const absUrl = `${PIXIV_API_BASE}/webview/v2/novel`
+    const html = await apiClient.requestRaw("GET", absUrl, { id: "123" })
+    expect(html).toBe(NOVEL_HTML)
+    // 插件只收相对路径（内部拼 apiBase）；绝对 URL 剥离域名，否则双域名 → Pixiv 404
+    expect(requestMock).toHaveBeenCalledWith(
+      "GET",
+      "/webview/v2/novel?id=123",
+      "",
+      expect.any(Function),
+    )
+  })
+
   it("原生模块缺失（isNativeMode true 但无 PictelioApi）→ 抛 NETWORK「原生 API 模块不可用」", async () => {
     // 空壳/其他 Pictelio 模块存在使 isNativeMode()=true，但 PictelioApi 缺失 →
     // 原生分支内模块不可用（对齐 execute 现有写法）
@@ -183,5 +201,42 @@ describe("client.requestRaw 原生模式（PictelioApi.request 转发，JS 零�
       type: ApiErrorType.NETWORK,
       message: "原生 API 模块不可用",
     })
+  })
+})
+
+describe("rewriteUrl 原生分支（ADR-0104：绝对 next_url 归一化，防双域名 404）", () => {
+  beforeEach(() => {
+    // 原生模式探测：存在 Pictelio 模块即 isNativeMode true
+    vi.stubGlobal("NativeModules", { PictelioApi: {} })
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it("绝对 Pixiv URL → 剥离域名成相对路径（含 query）", () => {
+    const abs = `${PIXIV_API_BASE}/v1/illust/recommended?content_type=illust&offset=30`
+    expect(rewriteUrl(abs)).toBe("/v1/illust/recommended?content_type=illust&offset=30")
+  })
+
+  it("绝对 Pixiv URL 无 query 同样剥离", () => {
+    expect(rewriteUrl(`${PIXIV_API_BASE}/v1/novel/follow`)).toBe("/v1/novel/follow")
+  })
+
+  it("相对路径原样透传（插件内部拼 apiBase）", () => {
+    expect(rewriteUrl("/v1/illust/recommended")).toBe("/v1/illust/recommended")
+  })
+
+  it("非 Pixiv 绝对 URL 原样（防御性兜底，不剥离）", () => {
+    const evil = "https://evil.example.com/v1/x"
+    expect(rewriteUrl(evil)).toBe(evil)
+  })
+
+  it("精确主机边界：伪后缀域（app-api.pixiv.net.evil.com）不剥离", () => {
+    const fake = `${PIXIV_API_BASE}.evil.com/v1/x`
+    expect(rewriteUrl(fake)).toBe(fake)
+  })
+
+  it("/pixiv-img 相对路径原样（交给 PictelioImageService 原生重写）", () => {
+    expect(rewriteUrl("/pixiv-img/xxx.png")).toBe("/pixiv-img/xxx.png")
   })
 })

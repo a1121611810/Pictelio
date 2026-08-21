@@ -19,10 +19,16 @@ export type MixFeedItem =
   | { kind: 'illust'; key: string; id: number; data: PixivIllust }
   | { kind: 'novel'; key: string; id: number; data: PixivNovel }
 
-/** 一路远程分页源：fetchPage 返回一页数据 + 下一页 URL（null = 耗尽） */
+/** 一路远程分页源：fetchPage 拉取一页数据 + 下一页 URL（null = 耗尽）。
+ * 首载时 nextUrl 参数为 undefined；翻页时模块传入该源当前 next_url——
+ * 调用方在 nextUrl 非空时应请求该 URL（offset 分页语义），空时返回第一页
+ * （推荐类端点可忽略 nextUrl，每次调用返回新内容）。 */
 export interface MixFeedSource {
   name: string
-  fetchPage: (signal?: AbortSignal) => Promise<{ items: MixFeedItem[]; nextUrl: string | null }>
+  fetchPage: (
+    signal?: AbortSignal,
+    nextUrl?: string | null,
+  ) => Promise<{ items: MixFeedItem[]; nextUrl: string | null }>
 }
 
 export interface MixFeedOptions {
@@ -35,14 +41,21 @@ export interface MixFeedOptions {
   throttleMs?: number
   /** 加载完成冷却 ms，默认 3000（[lynx:fix] 同上） */
   cooldownMs?: number
+  /** 构造即触发首载（默认 true）；false 时由 refresh() 触发——
+   * 页面按 mode/tab 重建 feed 实例时用，避免「构造首载 + refresh 首载」双请求浪费 */
+  autoStart?: boolean
 }
 
 export interface MixFeed {
   items: () => MixFeedItem[]
   loading: () => boolean
   loadingMore: () => boolean
-  /** 已格式化错误文案（presentError(err, '加载失败'/'加载更多失败') 产出）；无错误 null */
+  /** 首屏/刷新失败错误文案（presentError('加载失败') 产出）；无错误 null。
+   * 与 pageError() 槽位分离（ADR-0104）：首屏失败 → 顶部整页提示 */
   error: () => string | null
+  /** 分页（fetchMore）失败错误文案（presentError('加载更多失败') 产出）；无错误 null。
+   * 翻页失败保留已加载内容，nextUrl 保留供滚动自动重试；翻页成功清空 */
+  pageError: () => string | null
   nextUrl: () => string | null
   fetchMore: () => Promise<void>
   refresh: () => Promise<void>
@@ -57,7 +70,14 @@ interface SourceState {
 }
 
 export function createMixFeed(opts: MixFeedOptions): MixFeed {
-  const { sources, ratio = [4, 1], pageSize = 20, throttleMs = 800, cooldownMs = 3000 } = opts
+  const {
+    sources,
+    ratio = [4, 1],
+    pageSize = 20,
+    throttleMs = 800,
+    cooldownMs = 3000,
+    autoStart = true,
+  } = opts
 
   // ─── 渲染流状态 ───
   /** 已暴露给渲染层的窗口（items() 返回）；首载只放前 pageSize 条，其余进内部队列 */
@@ -72,8 +92,10 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
   let firstLoadInFlight = false
   /** fetchMore 进行中标志 */
   let loadMoreInFlight = false
-  /** 格式化错误文案（presentError 产出） */
-  let errorText: string | null = null
+  /** 首屏/刷新失败错误文案（presentError 产出）；与分页错误槽位分离（ADR-0104） */
+  let firstErrorText: string | null = null
+  /** 分页（fetchMore）失败错误文案；翻页成功清空，nextUrl 保留供重试 */
+  let pageErrorText: string | null = null
 
   // [lynx:fix] 双重防抖：与 Recommended / NovelList 的 lastLoadMoreAt / lastLoadEndedAt 同语义
   let lastLoadMoreAt = 0
@@ -164,7 +186,9 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
   async function loadFirstPage(): Promise<void> {
     const g = ++generation
     firstLoadInFlight = true
-    errorText = null
+    // 新会话开始：清两槽错误（首屏 + 分页残留）
+    firstErrorText = null
+    pageErrorText = null
     // 新会话开始：丢弃在途 fetchMore 的残留状态，重建渲染流
     loadMoreInFlight = false
     rendered = []
@@ -195,6 +219,10 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
         if ('error' in res) {
           if (firstError === null) firstError = res.error
           sourceStates[i].nextUrl = null // 失败源标记耗尽
+        } else if (!Array.isArray(res.items)) {
+          // 畸形响应（items 非数组）：视为失败，避免后续 merge/dedupe 崩溃或静默空白
+          if (firstError === null) firstError = new Error('数据格式异常')
+          sourceStates[i].nextUrl = null
         } else {
           pages[i] = res.items
           sourceStates[i].nextUrl = res.nextUrl
@@ -203,8 +231,8 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
       })
 
       if (pages.every((p) => p === undefined)) {
-        // 全部失败：error 置为首个错误
-        errorText = presentError(firstError, '加载失败')
+        // 全部失败：error 置为首个错误（首屏槽）
+        firstErrorText = presentError(firstError, '加载失败')
       } else {
         const merged = dedupe(mergeByRatio(pages))
         rendered = merged.slice(0, pageSize)
@@ -241,18 +269,23 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
       const srcIdx = pickSourceToFetch()
       if (srcIdx < 0) return
       try {
-        const res = await withTimeout(sources[srcIdx].fetchPage(), TIMEOUT_MS)
+        // 翻页：传入该源当前 next_url（offset 分页语义；推荐类端点可忽略）
+        const res = await withTimeout(
+          sources[srcIdx].fetchPage(undefined, sourceStates[srcIdx].nextUrl),
+          TIMEOUT_MS,
+        )
         if (g !== generation) return // 竞态：refresh 已取代本次翻页，丢弃响应
+        if (!Array.isArray(res.items)) throw new Error('数据格式异常') // 畸形响应 → 进 catch 置 pageError
         sourceStates[srcIdx].nextUrl = res.nextUrl
         sourceStates[srcIdx].kind = res.items[0]?.kind ?? sourceStates[srcIdx].kind
         const fresh = dedupe(res.items)
         rendered.push(...fresh.slice(0, pageSize))
         pending.push(...fresh.slice(pageSize))
-        // 翻页成功：清除先前「加载更多失败」的残留错误（否则错误条永久挂顶直到 refresh）
-        errorText = null
+        // 翻页成功：清除「加载更多失败」的残留错误（分页槽），首屏槽不受影响
+        pageErrorText = null
       } catch (err) {
-        // 翻页失败不崩溃：置错误文案，保留 nextUrl 供后续重试
-        errorText = presentError(err, '加载更多失败')
+        // 翻页失败不崩溃：置分页错误文案（底部内联），保留 nextUrl 供后续滚动重试
+        pageErrorText = presentError(err, '加载更多失败')
       }
     } finally {
       loadMoreInFlight = false
@@ -265,14 +298,15 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
     await loadFirstPage()
   }
 
-  // 构造即触发首载（纯逻辑原语，无 DOM 依赖）
-  void loadFirstPage()
+  // 构造即触发首载（autoStart=false 时由调用方显式 refresh 触发，页面重建 feed 用）
+  if (autoStart) void loadFirstPage()
 
   return {
     items: () => rendered,
     loading: () => firstLoadInFlight && rendered.length === 0,
     loadingMore: () => loadMoreInFlight,
-    error: () => errorText,
+    error: () => firstErrorText,
+    pageError: () => pageErrorText,
     nextUrl: () => {
       for (const s of sourceStates) {
         if (s.nextUrl !== null) return s.nextUrl

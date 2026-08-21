@@ -5,10 +5,9 @@ defineOptions({ name: 'illusts' })
 import { ref, onMounted } from 'vue'
 import { navigate } from '../router'
 import { loadRecommended, loadFollow, loadNext } from '../api/illust'
-import type { PixivIllust } from '../api/types'
+import type { PixivIllust, PixivIllustListResponse } from '../api/types'
 import { thumbUrl } from '../utils/imageUrl'
-import { presentError } from '../utils/errorPresentation'
-import { withTimeout } from '../utils/withTimeout'
+import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { isRestricted } from '../stores/settingsStore'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
@@ -22,96 +21,76 @@ function onNavSelect(tab: NavTab) {
   void navigate(tab.path, { replace: true })
 }
 
+// ─── 分页收敛（ADR-0104）：迁移到 createMixFeed 深模块 ───
+// 双防抖 / 竞态代 / 分批渲染（pageSize=20，替代原 pendingIllusts 队列）/ 空页防护 /
+// 15s 超时 / 错误槽分流（error=首屏顶部、pageError=分页底部内联）全部由 createMixFeed 承载。
+// 推荐/关注切换：推荐 = /v1/illust/recommended，关注 = /v2/illust/follow
+const mode = ref<'recommend' | 'follow'>('recommend')
+
+function mapIllusts(r: PixivIllustListResponse): { items: MixFeedItem[]; nextUrl: string | null } {
+  return {
+    items: r.illusts.map((i) => ({ kind: 'illust' as const, key: `i-${i.id}`, id: i.id, data: i })),
+    nextUrl: r.next_url,
+  }
+}
+
+function makeFeed(m: 'recommend' | 'follow') {
+  const first = m === 'recommend' ? loadRecommended : loadFollow
+  return createMixFeed({
+    // autoStart=false：构造不首载，由 refreshFeed 显式触发（mode 重建实例避免双请求浪费）
+    autoStart: false,
+    sources: [
+      {
+        name: 'illust',
+        fetchPage: (signal, nextUrl) =>
+          nextUrl ? loadNext(nextUrl, signal).then(mapIllusts) : first(signal).then(mapIllusts),
+      },
+    ],
+  })
+}
+
+const feed = ref(makeFeed(mode.value))
 const illusts = ref<PixivIllust[]>([])
-const nextUrl = ref<string | null>(null)
 const loading = ref(false)
 const loadingMore = ref(false)
 const errorMsg = ref('')
-// 推荐/关注切换：推荐 = /v1/illust/recommended，关注 = /v2/illust/follow
-const mode = ref<'recommend' | 'follow'>('recommend')
-// 竞态防护：mode 切换后旧请求响应丢弃（generation gate）
-let modeGen = 0
-// [lynx:fix] loadMore 双重防抖（与 Recommended 同款，ADR-0045）：
-// 1) 时间节流 800ms：防 scrolltolower 高频触发
-// 2) 加载完成冷却 3s：防 web-core 的 list 在内容追加/首屏初始化后延迟误触发 scrolltolower（进入时自动多加载）
-let lastLoadMoreAt = 0
-let lastLoadEndedAt = 0
+const pageErrorMsg = ref('')
+const endOfFeed = ref(false)
 
-// [lynx:fix] 数据分批渲染（ADR-0060）：
-// web-core 预览下 list 不做 item 回收，一次性渲染 90 条 = 90 张图全量加载（图片加载风暴）。
-// 解决：fetch 一次拿回全部数据，但只把前 PAGE_SIZE 条塞进 list（其余入 pendingIllusts 队列），
-// 滚动到底时先消费 pending（同步追加，无网络请求），pending 耗尽才真正请求 next_url。
-// 真机 LynxView 有引擎级 item 回收 + lazy-load，此机制无副作用（只影响 DOM 挂载数量）。
-const PAGE_SIZE = 20
-const pendingIllusts = ref<PixivIllust[]>([])
+function sync() {
+  illusts.value = feed.value.items().map((i) => i.data as PixivIllust)
+  loading.value = feed.value.loading()
+  loadingMore.value = feed.value.loadingMore()
+  errorMsg.value = feed.value.error() ?? ''
+  pageErrorMsg.value = feed.value.pageError() ?? ''
+  // 到底态：所有源耗尽且列表非空（ADR-0104：footer「没有更多了」）
+  endOfFeed.value =
+    feed.value.nextUrl() === null &&
+    feed.value.items().length > 0 &&
+    !loading.value &&
+    !loadingMore.value
+}
 
-async function fetchFirstPage() {
-  const gen = ++modeGen
-  loading.value = true
-  errorMsg.value = ''
-  try {
-    const req = mode.value === 'recommend' ? loadRecommended() : loadFollow()
-    // 请求挂起 15s 兜底（issue #128）：超时 reject 走下方 catch 展示 errorMsg，避免骨架屏无限显示
-    const res = await withTimeout(req, 15000)
-    if (gen !== modeGen) return // 已切 tab，丢弃旧响应
-    // issue #91：全量渲染，受限条目盖遮罩（不再过滤）
-    const all = res.illusts
-    illusts.value = all.slice(0, PAGE_SIZE)
-    pendingIllusts.value = all.slice(PAGE_SIZE)
-    nextUrl.value = res.next_url
-  } catch (err) {
-    if (gen !== modeGen) return
-    errorMsg.value = presentError(err, '加载失败')
-  } finally {
-    if (gen === modeGen) {
-      loading.value = false
-      // [lynx:fix] 第一页加载完成同样进入冷却，防 web-core 延迟误触发 scrolltolower
-      lastLoadEndedAt = Date.now()
-    }
-  }
+async function refreshFeed() {
+  await feed.value.refresh()
+  sync()
+}
+
+async function loadMore() {
+  await feed.value.fetchMore()
+  sync()
 }
 
 function switchMode(m: 'recommend' | 'follow') {
   if (mode.value === m) return
   mode.value = m
+  // 重建 feed 实例：新实例 generation 从 0 起，旧实例在途响应按竞态代被丢弃
+  feed.value = makeFeed(m)
   illusts.value = []
-  pendingIllusts.value = []
-  nextUrl.value = null
-  // 重置分页节流（新 tab 立即支持 loadMore）
-  lastLoadMoreAt = 0
-  lastLoadEndedAt = 0
-  void fetchFirstPage()
-}
-
-async function loadMore() {
-  const now = Date.now()
-  if (now - lastLoadEndedAt < 3000) return
-  if (now - lastLoadMoreAt < 800) return
-  if (loadingMore.value) return
-  // pending 队列为空且无 next_url 时终止
-  if (pendingIllusts.value.length === 0 && !nextUrl.value) return
-  lastLoadMoreAt = now
-  loadingMore.value = true
-  try {
-    // 优先消费本地 pending 数据（同步，无网络请求），pending 耗尽才翻页
-    if (pendingIllusts.value.length > 0) {
-      illusts.value.push(...pendingIllusts.value.splice(0, PAGE_SIZE))
-      return
-    }
-    // 翻页请求同样加 15s 超时兜底（issue #128）
-    const res = await withTimeout(loadNext(nextUrl.value!), 15000)
-    const seen = new Set(illusts.value.map((i) => i.id))
-    const fresh = res.illusts.filter((i) => !seen.has(i.id))
-    illusts.value.push(...fresh.slice(0, PAGE_SIZE))
-    pendingIllusts.value = fresh.slice(PAGE_SIZE)
-    // 空页防护：基于服务端原始返回判空（issue #91：不再用过滤后长度）
-    nextUrl.value = res.illusts.length === 0 ? null : res.next_url
-  } catch (err) {
-    errorMsg.value = presentError(err, '加载更多失败')
-  } finally {
-    loadingMore.value = false
-    lastLoadEndedAt = Date.now()
-  }
+  errorMsg.value = ''
+  pageErrorMsg.value = ''
+  loading.value = true
+  void refreshFeed()
 }
 
 function openDetail(id: number) {
@@ -124,7 +103,9 @@ function onImageTap(item: PixivIllust) {
   if (!isRestricted(item)) openDetail(item.id)
 }
 
-onMounted(fetchFirstPage)
+onMounted(() => {
+  void refreshFeed()
+})
 </script>
 
 <template>
@@ -226,8 +207,10 @@ onMounted(fetchFirstPage)
         </view>
         </view>
       </list-item>
-      <list-item v-if="loadingMore" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text class="text-body-medium text-outline">加载中…</text>
+      <list-item v-if="loadingMore || pageErrorMsg || endOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
+        <text v-if="loadingMore" class="text-body-medium text-outline">加载中…</text>
+        <text v-else-if="pageErrorMsg" class="text-body-medium text-error">{{ pageErrorMsg }}</text>
+        <text v-else class="text-body-medium text-outline">没有更多了</text>
       </list-item>
     </list>
 

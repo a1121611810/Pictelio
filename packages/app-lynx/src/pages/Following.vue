@@ -4,9 +4,9 @@
 import { ref, onMounted } from 'vue'
 import { navigate } from '../router'
 import { loadFollow, loadNext } from '../api/illust'
-import type { PixivIllust } from '../api/types'
+import type { PixivIllust, PixivIllustListResponse } from '../api/types'
 import { thumbUrl } from '../utils/imageUrl'
-import { presentError } from '../utils/errorPresentation'
+import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { isRestricted } from '../stores/settingsStore'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
@@ -23,51 +23,58 @@ function onNavSelect(tab: NavTab) {
   void navigate(tab.path, { replace: true })
 }
 
-const illusts = ref<PixivIllust[]>([])
-const nextUrl = ref<string | null>(null)
-const loading = ref(false)
-const loadingMore = ref(false)
-const errorMsg = ref('')
-// [lynx:fix] loadMore 双重防抖（与 Recommended 同款，ADR-0045）
-let lastLoadMoreAt = 0
-let lastLoadEndedAt = 0
-
-async function fetchFirstPage() {
-  loading.value = true
-  errorMsg.value = ''
-  try {
-    const res = await loadFollow()
-    // issue #91：全量渲染，受限条目盖遮罩（不再过滤）
-    illusts.value = res.illusts
-    nextUrl.value = res.next_url
-  } catch (err) {
-    errorMsg.value = presentError(err, '加载失败')
-  } finally {
-    loading.value = false
-    lastLoadEndedAt = Date.now()
+// ─── 分页收敛（ADR-0104）：迁移到 createMixFeed 深模块 ───
+// 单源关注 feed（/v2/illust/follow，offset 分页）；双防抖/竞态/空页防护/15s 超时/
+// 错误槽分流（error=首屏顶部、pageError=分页底部内联）全部由 createMixFeed 承载。
+function mapIllusts(r: PixivIllustListResponse): { items: MixFeedItem[]; nextUrl: string | null } {
+  return {
+    items: r.illusts.map((i) => ({ kind: 'illust' as const, key: `i-${i.id}`, id: i.id, data: i })),
+    nextUrl: r.next_url,
   }
 }
 
+const feed = ref(
+  createMixFeed({
+    autoStart: false,
+    sources: [
+      {
+        name: 'illust',
+        fetchPage: (signal, nextUrl) =>
+          nextUrl ? loadNext(nextUrl, signal).then(mapIllusts) : loadFollow('public', signal).then(mapIllusts),
+      },
+    ],
+  }),
+)
+
+const illusts = ref<PixivIllust[]>([])
+const loading = ref(false)
+const loadingMore = ref(false)
+const errorMsg = ref('')
+const pageErrorMsg = ref('')
+const endOfFeed = ref(false)
+
+function sync() {
+  illusts.value = feed.value.items().map((i) => i.data as PixivIllust)
+  loading.value = feed.value.loading()
+  loadingMore.value = feed.value.loadingMore()
+  errorMsg.value = feed.value.error() ?? ''
+  pageErrorMsg.value = feed.value.pageError() ?? ''
+  // 到底态：所有源耗尽且列表非空（ADR-0104：footer「没有更多了」）
+  endOfFeed.value =
+    feed.value.nextUrl() === null &&
+    feed.value.items().length > 0 &&
+    !loading.value &&
+    !loadingMore.value
+}
+
+async function refreshFeed() {
+  await feed.value.refresh()
+  sync()
+}
+
 async function loadMore() {
-  const now = Date.now()
-  if (now - lastLoadEndedAt < 3000) return
-  if (now - lastLoadMoreAt < 800) return
-  if (!nextUrl.value || loadingMore.value) return
-  lastLoadMoreAt = now
-  loadingMore.value = true
-  try {
-    const res = await loadNext(nextUrl.value)
-    const seen = new Set(illusts.value.map((i) => i.id))
-    const fresh = res.illusts.filter((i) => !seen.has(i.id))
-    illusts.value.push(...fresh)
-    // 空页防护：基于服务端原始返回判空（issue #91）
-    nextUrl.value = res.illusts.length === 0 ? null : res.next_url
-  } catch (err) {
-    errorMsg.value = presentError(err, '加载更多失败')
-  } finally {
-    loadingMore.value = false
-    lastLoadEndedAt = Date.now()
-  }
+  await feed.value.fetchMore()
+  sync()
 }
 
 function openDetail(id: number) {
@@ -80,7 +87,9 @@ function onImageTap(item: PixivIllust) {
   if (!isRestricted(item)) openDetail(item.id)
 }
 
-onMounted(fetchFirstPage)
+onMounted(() => {
+  void refreshFeed()
+})
 </script>
 
 <template>
@@ -145,8 +154,10 @@ onMounted(fetchFirstPage)
           </view>
         </view>
       </list-item>
-      <list-item v-if="loadingMore" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text class="text-body-medium text-outline">加载中…</text>
+      <list-item v-if="loadingMore || pageErrorMsg || endOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
+        <text v-if="loadingMore" class="text-body-medium text-outline">加载中…</text>
+        <text v-else-if="pageErrorMsg" class="text-body-medium text-error">{{ pageErrorMsg }}</text>
+        <text v-else class="text-body-medium text-outline">没有更多了</text>
       </list-item>
     </list>
 

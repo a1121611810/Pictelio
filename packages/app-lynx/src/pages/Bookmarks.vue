@@ -1,18 +1,27 @@
 <script setup lang="ts">
 // 收藏列表（P0-T6）：当前登录用户的收藏，插画/小说 tab 切换，可取消收藏。
 // 不进 KeepAlive 白名单（每次进入重新挂载）。
-import { ref, onMounted } from 'vue'
+// 分页收敛（ADR-0104）：两区各自迁移到 createMixFeed 深模块；tab 切换保留各自 feed
+// 实例（切回已加载 tab 不重新请求，对齐原「按需加载一次」行为）；取消收藏用
+// removedIllustIds 隐藏集从渲染流移除（feed 内部状态不直接暴露给页面）。
+import { ref, computed, onMounted } from 'vue'
 import { navigate, goBack } from '../router'
 import { loadBookmarks as loadIllustBookmarks, loadNext } from '../api/illust'
 import { loadBookmarks as loadNovelBookmarks, loadNovelNext } from '../api/novel'
-import type { PixivIllust, PixivNovel } from '../api/types'
+import type {
+  PixivIllust,
+  PixivNovel,
+  PixivIllustListResponse,
+  PixivNovelListResponse,
+} from '../api/types'
 import { currentUser } from '../stores/authStore'
-import { presentError } from '../utils/errorPresentation'
 import { thumbUrl } from '../utils/imageUrl'
+import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { isRestricted } from '../stores/settingsStore'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
+import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
 
 const uid = currentUser.value?.id
 if (!uid) {
@@ -20,107 +29,130 @@ if (!uid) {
 }
 
 const activeTab = ref<'illust' | 'novel'>('illust')
-const errorMsg = ref('')
 
-// ─── 插画收藏（waterfall） ───
+// ─── 插画收藏 feed（waterfall） ───
+function mapIllusts(r: PixivIllustListResponse): { items: MixFeedItem[]; nextUrl: string | null } {
+  return {
+    items: r.illusts.map((i) => ({ kind: 'illust' as const, key: `i-${i.id}`, id: i.id, data: i })),
+    nextUrl: r.next_url,
+  }
+}
+const illustFeed = ref(
+  createMixFeed({
+    autoStart: false,
+    sources: [
+      {
+        name: 'illust',
+        fetchPage: (signal, nextUrl) =>
+          nextUrl
+            ? loadNext(nextUrl, signal).then(mapIllusts)
+            : loadIllustBookmarks(uid!, 'public', signal).then(mapIllusts),
+      },
+    ],
+  }),
+)
 const illusts = ref<PixivIllust[]>([])
-const illustNext = ref<string | null>(null)
 const illustLoading = ref(false)
 const illustLoadingMore = ref(false)
+const illustErrorMsg = ref('')
+const illustPageErrorMsg = ref('')
+const illustEndOfFeed = ref(false)
+// 取消收藏后从列表移除（BookmarkButton change 事件）：feed 内部状态不直接暴露 → 隐藏集过滤渲染
+const removedIllustIds = ref<Set<number>>(new Set())
+const visibleIllusts = computed(() => illusts.value.filter((i) => !removedIllustIds.value.has(i.id)))
 
-// ─── 小说收藏（single） ───
+function syncIllust() {
+  illusts.value = illustFeed.value.items().map((i) => i.data as PixivIllust)
+  illustLoading.value = illustFeed.value.loading()
+  illustLoadingMore.value = illustFeed.value.loadingMore()
+  illustErrorMsg.value = illustFeed.value.error() ?? ''
+  illustPageErrorMsg.value = illustFeed.value.pageError() ?? ''
+  // 到底态：所有源耗尽且列表非空（ADR-0104：footer「没有更多了」）
+  illustEndOfFeed.value =
+    illustFeed.value.nextUrl() === null &&
+    illustFeed.value.items().length > 0 &&
+    !illustLoading.value &&
+    !illustLoadingMore.value
+}
+
+async function refreshIllust() {
+  await illustFeed.value.refresh()
+  syncIllust()
+}
+async function loadIllustMore() {
+  await illustFeed.value.fetchMore()
+  syncIllust()
+}
+
+// ─── 小说收藏 feed（single） ───
+function mapNovels(r: PixivNovelListResponse): { items: MixFeedItem[]; nextUrl: string | null } {
+  return {
+    items: r.novels.map((n) => ({ kind: 'novel' as const, key: `n-${n.id}`, id: n.id, data: n })),
+    nextUrl: r.next_url,
+  }
+}
+const novelFeed = ref(
+  createMixFeed({
+    autoStart: false,
+    sources: [
+      {
+        name: 'novel',
+        fetchPage: (signal, nextUrl) =>
+          nextUrl
+            ? loadNovelNext(nextUrl, signal).then(mapNovels)
+            : loadNovelBookmarks(uid!, 'public', signal).then(mapNovels),
+      },
+    ],
+  }),
+)
 const novels = ref<PixivNovel[]>([])
-const novelNext = ref<string | null>(null)
 const novelLoading = ref(false)
 const novelLoadingMore = ref(false)
+const novelErrorMsg = ref('')
+const novelPageErrorMsg = ref('')
+const novelEndOfFeed = ref(false)
 
-// 插画/小说分页节流各自独立
-let lastIllustMoreAt = 0
-let lastIllustEndedAt = 0
-let lastNovelMoreAt = 0
-let lastNovelEndedAt = 0
-
-async function loadIllusts() {
-  if (!uid) return // 防御：未登录（正常链路从 Me 进入必有 uid）
-  if (illusts.value.length > 0 || illustLoading.value) return
-  illustLoading.value = true
-  errorMsg.value = ''
-  try {
-    const res = await loadIllustBookmarks(uid!)
-    // issue #91：全量渲染，受限条目盖遮罩（不再过滤）
-    illusts.value = res.illusts
-    illustNext.value = res.next_url
-  } catch (err) {
-    errorMsg.value = presentError(err, '收藏加载失败')
-  } finally {
-    illustLoading.value = false
-  }
+function syncNovel() {
+  novels.value = novelFeed.value.items().map((i) => i.data as PixivNovel)
+  novelLoading.value = novelFeed.value.loading()
+  novelLoadingMore.value = novelFeed.value.loadingMore()
+  novelErrorMsg.value = novelFeed.value.error() ?? ''
+  novelPageErrorMsg.value = novelFeed.value.pageError() ?? ''
+  novelEndOfFeed.value =
+    novelFeed.value.nextUrl() === null &&
+    novelFeed.value.items().length > 0 &&
+    !novelLoading.value &&
+    !novelLoadingMore.value
 }
 
-async function loadNovels() {
-  if (!uid) return
-  if (novels.value.length > 0 || novelLoading.value) return
-  novelLoading.value = true
-  errorMsg.value = ''
-  try {
-    const res = await loadNovelBookmarks(uid!)
-    novels.value = res.novels
-    novelNext.value = res.next_url
-  } catch (err) {
-    errorMsg.value = presentError(err, '收藏加载失败')
-  } finally {
-    novelLoading.value = false
-  }
+async function refreshNovel() {
+  await novelFeed.value.refresh()
+  syncNovel()
 }
-
-async function loadIllustMore() {
-  const now = Date.now()
-  if (now - lastIllustEndedAt < 3000) return
-  if (now - lastIllustMoreAt < 800) return
-  if (!illustNext.value || illustLoadingMore.value) return
-  lastIllustMoreAt = now
-  illustLoadingMore.value = true
-  try {
-    const res = await loadNext(illustNext.value)
-    const seen = new Set(illusts.value.map((i) => i.id))
-    const fresh = res.illusts.filter((i) => !seen.has(i.id))
-    illusts.value.push(...fresh)
-    // 空页防护：基于服务端原始返回判空（issue #91）
-    illustNext.value = res.illusts.length === 0 ? null : res.next_url
-  } catch (err) {
-    errorMsg.value = presentError(err, '加载更多失败')
-  } finally {
-    illustLoadingMore.value = false
-    lastIllustEndedAt = Date.now()
-  }
-}
-
 async function loadNovelMore() {
-  const now = Date.now()
-  if (now - lastNovelEndedAt < 3000) return
-  if (now - lastNovelMoreAt < 800) return
-  if (!novelNext.value || novelLoadingMore.value) return
-  lastNovelMoreAt = now
-  novelLoadingMore.value = true
-  try {
-    const res = await loadNovelNext(novelNext.value)
-    const seen = new Set(novels.value.map((n) => n.id))
-    const fresh = res.novels.filter((n) => !seen.has(n.id))
-    novels.value.push(...fresh)
-    // 空页防护：基于服务端原始返回判空（issue #91）
-    novelNext.value = res.novels.length === 0 ? null : res.next_url
-  } catch (err) {
-    errorMsg.value = presentError(err, '加载更多失败')
-  } finally {
-    novelLoadingMore.value = false
-    lastNovelEndedAt = Date.now()
-  }
+  await novelFeed.value.fetchMore()
+  syncNovel()
 }
 
+// 首屏错误（顶部整页提示）：随 activeTab 取当前区首屏错误（ADR-0104 槽位分离）
+const errorMsg = computed(() =>
+  activeTab.value === 'illust' ? illustErrorMsg.value : novelErrorMsg.value,
+)
+
+// tab 切换：保留各自 feed 实例（切回已加载 tab 不重新请求）；首次进入 tab 才首载
+let illustLoaded = false
+let novelLoaded = false
 function switchTab(tab: 'illust' | 'novel') {
   activeTab.value = tab
-  if (tab === 'illust') void loadIllusts()
-  else void loadNovels()
+  if (tab === 'illust') {
+    if (!illustLoaded) {
+      illustLoaded = true
+      void refreshIllust()
+    }
+  } else if (!novelLoaded) {
+    novelLoaded = true
+    void refreshNovel()
+  }
 }
 
 function openIllust(id: number) {
@@ -139,12 +171,13 @@ function onImageTap(item: PixivIllust) {
 // 取消收藏后从列表移除（BookmarkButton change 事件）
 function onBookmarkChange(item: PixivIllust, bookmarked: boolean) {
   if (!bookmarked) {
-    illusts.value = illusts.value.filter((i) => i.id !== item.id)
+    removedIllustIds.value = new Set(removedIllustIds.value).add(item.id)
   }
 }
 
 onMounted(() => {
-  void loadIllusts()
+  illustLoaded = true
+  void refreshIllust()
 })
 </script>
 
@@ -176,7 +209,7 @@ onMounted(() => {
     </view>
 
     <!-- 插画空态 -->
-    <view v-if="activeTab === 'illust' && !illustLoading && !errorMsg && illusts.length === 0" class="flex-1 flex items-center justify-center">
+    <view v-if="activeTab === 'illust' && !illustLoading && !errorMsg && visibleIllusts.length === 0" class="flex-1 flex items-center justify-center">
       <view class="flex flex-col items-center">
         <text class="text-[10.667vw] leading-none text-outline-variant">♡</text>
         <text class="text-body-large text-surface-on mt-3">暂无收藏</text>
@@ -186,7 +219,7 @@ onMounted(() => {
 
     <!-- 插画 waterfall -->
     <list
-      v-if="activeTab === 'illust' && (illustLoading || illusts.length > 0)"
+      v-if="activeTab === 'illust' && (illustLoading || visibleIllusts.length > 0)"
       class="w-full flex-1"
       list-type="waterfall"
       scroll-orientation="vertical"
@@ -196,7 +229,7 @@ onMounted(() => {
       @scrolltolower="loadIllustMore"
     >
       <list-item
-        v-for="item in illusts"
+        v-for="item in visibleIllusts"
         :key="item.id"
         :item-key="String(item.id)"
         class="bg-surface-container-lowest rounded-[var(--md-shape-medium)] flex flex-col overflow-hidden shadow-[var(--md-elevation-1)]"
@@ -223,8 +256,10 @@ onMounted(() => {
           </view>
         </view>
       </list-item>
-      <list-item v-if="illustLoadingMore" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text class="text-body-medium text-outline">加载中…</text>
+      <list-item v-if="illustLoadingMore || illustPageErrorMsg || illustEndOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
+        <text v-if="illustLoadingMore" class="text-body-medium text-outline">加载中…</text>
+        <text v-else-if="illustPageErrorMsg" class="text-body-medium text-error">{{ illustPageErrorMsg }}</text>
+        <text v-else class="text-body-medium text-outline">没有更多了</text>
       </list-item>
     </list>
 
@@ -252,9 +287,7 @@ onMounted(() => {
         :item-key="String(item.id)"
         class="w-full"
       >
-        <view v-if="isRestricted(item)" @tap.stop class="flex flex-row items-center justify-center m-1.5 mx-3 p-3.5 bg-[var(--md-scrim)] rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
-          <RestrictOverlay :overlay="false" :level="item.x_restrict === 2 ? 2 : 1" />
-        </view>
+        <RestrictedNovelCard v-if="isRestricted(item)" :item="item" />
         <view v-else class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]" @tap="openNovel(item.id)"><view class="flex-1 flex flex-col">
                     <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>
                     <text class="text-body-medium text-surface-on-variant mt-1.5">by {{ item.user.name }}</text>
@@ -265,11 +298,13 @@ onMounted(() => {
                       </text>
                     </view>
                   </view>
-        
+
         </view>
       </list-item>
-      <list-item v-if="novelLoadingMore" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text class="text-body-medium text-outline">加载中…</text>
+      <list-item v-if="novelLoadingMore || novelPageErrorMsg || novelEndOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
+        <text v-if="novelLoadingMore" class="text-body-medium text-outline">加载中…</text>
+        <text v-else-if="novelPageErrorMsg" class="text-body-medium text-error">{{ novelPageErrorMsg }}</text>
+        <text v-else class="text-body-medium text-outline">没有更多了</text>
       </list-item>
     </list>
   </view>
