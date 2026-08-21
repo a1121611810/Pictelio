@@ -1,5 +1,5 @@
 {
-  "version": "4.11.1",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.11.1",
-  "changelog": "🐛 修复\n  6ac8738 fix(app-lynx): 缩小后点图标回推荐页——isTaskRoot 守卫修复 task 恢复契约（ADR-0102）"
+  "version": "4.12.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.12.0",
+  "changelog": "📝 文档\n  27770fd docs(app-lynx): ADR-0104/0105 + CONTEXT 术语 + 功能规格 + ADR-0081 注记\n  510a9d6 docs(adr): ADR-0103 账号级内容设置跨 client 同步 + 移除年龄门（含 spec 与术语）\n✨ 新功能\n  9025df8 feat(app-lynx): 分页收敛到 createMixFeed 深模块 + 受限小说卡等高（ADR-0104/0105）\n  4bbf402 feat(app-lynx): R18/R18G 账号级设置 + PrefsStorage seam（ADR-0103）\n  60db564 feat(app): R18/R18G 账号级设置（ADR-0103，defineFactory + uid 键控 + 迁移 + 孤儿键清理）\n  ec085f0 feat(android): PictelioPrefsModule 共享设置 KV 桥（ADR-0103，跨 client 设置契约落点）\n🐛 修复\n  e8acb25 fix(test): 移除 agent-browser E2E 年龄确认交互（ADR-0103 连带）\n  8f855a0 fix(android-e2e): writePrefKey 正则多余转义清理（lint no-useless-escape）\n💄 样式\n  d020fb6 style(android-e2e): T5 spec 格式化（oxfmt）\n🧪 测试\n  e51376f test(android-e2e): T5 跨 client 设置同步契约 E2E（ADR-0103）\n♻️ 重构\n  84b2181 refactor(app): 移除年龄确认功能（ADR-0103，为账号级设置铺路）"
 }
