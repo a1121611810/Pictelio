@@ -143,6 +143,7 @@ export function getNativeModules(): {
   PictelioAuth?: unknown
   PictelioApi?: unknown
   PictelioApp?: unknown
+  PictelioPrefs?: unknown
 } | undefined {
   return (typeof NativeModules !== "undefined" ? NativeModules : undefined) ??
     (globalThis as { NativeModules?: unknown }).NativeModules as never

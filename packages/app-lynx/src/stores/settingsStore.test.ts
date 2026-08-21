@@ -14,13 +14,42 @@ import {
   setDetailQuality,
   setShowR18,
   setShowR18G,
+  showR18,
+  showR18G,
 } from "./settingsStore"
-import { idbGet, idbSet } from "../utils/idbKV"
+import { idbGet, idbSet, idbRemove } from "../utils/idbKV"
 
 vi.mock("../utils/idbKV", () => ({
   idbGet: vi.fn(),
   idbSet: vi.fn(async () => {}),
+  idbRemove: vi.fn(async () => {}),
 }))
+
+/** 账号级 R18 测试：可控制的 authStore.currentUser（ADR-0103，uid 键控 show_r18_${uid}）。
+ * 必须是真实 Vue ref（watch 依赖响应性）；vi.hoisted 不能 import，经 globalThis 暴露。 */
+vi.mock("./authStore", async () => {
+  const { ref } = await import("vue")
+  const currentUser = ref<{ id: number } | null>(null)
+  ;(globalThis as unknown as { __lynxMockUser?: typeof currentUser }).__lynxMockUser = currentUser
+  return { currentUser }
+})
+
+type UserRef = { value: { id: number } | null }
+const userRef = (): UserRef => (globalThis as unknown as { __lynxMockUser: UserRef }).__lynxMockUser
+
+/** 环境探测（PrefsStorage seam 选择）：native 模式与 NativeModules 内容 */
+const env = vi.hoisted(() => ({
+  native: false,
+  modules: {} as Record<string, unknown>,
+}))
+vi.mock("../api/client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../api/client")>()
+  return {
+    ...actual,
+    isNativeMode: vi.fn(() => env.native),
+    getNativeModules: vi.fn(() => env.modules),
+  }
+})
 
 const here = dirname(fileURLToPath(import.meta.url))
 
@@ -144,5 +173,110 @@ describe("M3 token 契约（Material Design 3 改造）", () => {
     // 遮罩样式块无字面色值（徽章等 UI 允许合法用色）
     const glassBlock = overlaySrc.split(".restrict-overlay")[1] ?? ""
     expect(glassBlock).not.toMatch(/rgba?\(|#[0-9a-fA-F]{3,8}/)
+  })
+})
+
+describe("settingsStore — 账号级 R18/R18G（ADR-0103）", () => {
+  beforeEach(() => {
+    userRef().value = null
+    env.native = false
+    env.modules = {}
+    vi.mocked(idbGet).mockReset().mockResolvedValue(null)
+    vi.mocked(idbSet).mockReset().mockResolvedValue(undefined)
+    vi.mocked(idbRemove).mockReset().mockResolvedValue(undefined)
+  })
+
+  it("原生模式：setShowR18 经 PictelioPrefs 写 show_r18_42", async () => {
+    env.native = true
+    const written: string[] = []
+    env.modules = {
+      PictelioPrefs: {
+        prefsGet: (_k: string, cb: (v: string, e: string | null) => void) => cb("", null),
+        prefsSet: (k: string, v: string, cb: (e: string | null) => void) => {
+          written.push(`${k}=${v}`)
+          cb(null)
+        },
+        prefsRemove: (k: string, cb: (e: string | null) => void) => {
+          written.push(`del:${k}`)
+          cb(null)
+        },
+      },
+    }
+    userRef().value = { id: 42 }
+    setShowR18(true)
+    await vi.waitFor(() => expect(written).toContain("show_r18_42=true"))
+  })
+
+  it("原生模式：loadSettings 读共享存储（unquote lynx Callback JSON 引号）", async () => {
+    env.native = true
+    env.modules = {
+      PictelioPrefs: {
+        prefsGet: (k: string, cb: (v: string, e: string | null) => void) =>
+          cb(k === "show_r18_42" ? '"true"' : "", null),
+        prefsSet: (_k: string, _v: string, cb: (e: string | null) => void) => cb(null),
+        prefsRemove: (_k: string, cb: (e: string | null) => void) => cb(null),
+      },
+    }
+    userRef().value = { id: 42 }
+    await loadSettings()
+    expect(showR18.value).toBe(true)
+  })
+
+  it("原生模式迁移：老键 show_r18 播种 show_r18_42 并删老键", async () => {
+    env.native = true
+    const store = new Map<string, string>([["show_r18", "true"]])
+    const ops: string[] = []
+    env.modules = {
+      PictelioPrefs: {
+        prefsGet: (k: string, cb: (v: string, e: string | null) => void) => cb(store.get(k) ?? "", null),
+        prefsSet: (k: string, v: string, cb: (e: string | null) => void) => {
+          store.set(k, v)
+          ops.push(`${k}=${v}`)
+          cb(null)
+        },
+        prefsRemove: (k: string, cb: (e: string | null) => void) => {
+          store.delete(k)
+          ops.push(`del:${k}`)
+          cb(null)
+        },
+      },
+    }
+    userRef().value = { id: 42 }
+    await loadSettings()
+    expect(showR18.value).toBe(true)
+    expect(ops).toContain("show_r18_42=true")
+    expect(ops).toContain("del:show_r18")
+  })
+
+  it("dev 模式：IndexedDB 迁移 settings_show_r18 → show_r18_42", async () => {
+    const store = new Map<string, string>([["settings_show_r18", "true"]])
+    vi.mocked(idbGet).mockImplementation(async (k: string) => store.get(k) ?? null)
+    vi.mocked(idbSet).mockImplementation(async (k: string, v: string) => {
+      store.set(k, v)
+    })
+    vi.mocked(idbRemove).mockImplementation(async (k: string) => {
+      store.delete(k)
+    })
+    userRef().value = { id: 42 }
+    await loadSettings()
+    expect(showR18.value).toBe(true)
+    expect(vi.mocked(idbSet)).toHaveBeenCalledWith("show_r18_42", "true")
+    expect(vi.mocked(idbRemove)).toHaveBeenCalledWith("settings_show_r18")
+    expect(store.has("settings_show_r18")).toBe(false)
+  })
+
+  it("未登录：loadSettings 保持默认且不写盘", async () => {
+    await loadSettings()
+    expect(showR18.value).toBe(false)
+    expect(vi.mocked(idbSet)).not.toHaveBeenCalled()
+  })
+
+  it("登出：watch currentUser → refs 重置默认（flush sync 即时）", () => {
+    userRef().value = { id: 42 }
+    setShowR18(true)
+    expect(showR18.value).toBe(true)
+    userRef().value = null
+    expect(showR18.value).toBe(false)
+    expect(showR18G.value).toBe(false)
   })
 })

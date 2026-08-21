@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { navigate, resetHistory } from '../router'
 import { loginWithToken, isLoggedIn } from '../stores/authStore'
 import { authError } from '../stores/authStore'
+import { loadSettings } from '../stores/settingsStore'
 import { LOGIN_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { presentError } from '../utils/errorPresentation'
 
@@ -17,6 +18,8 @@ async function submit() {
   try {
     await loginWithToken(tokenInput.value)
     if (isLoggedIn.value) {
+      // ADR-0103：登录后 uid 已知 → 加载账号级 R18/R18G（跨 client 共享存储）
+      await loadSettings()
       // [lynx:fix] 登录成功 = 会话新起点：清历史栈 + replace 导航（ADR-0049）
       resetHistory()
       await navigate('/recommended', { replace: true })

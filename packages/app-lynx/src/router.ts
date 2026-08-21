@@ -189,8 +189,9 @@ export async function initRouter(): Promise<void> {
     resetHistory()
     void navigate('/error', { replace: true })
   })
-  void loadSettings()
   if (isNativeMode()) registerSystemBackHandler()
   const ok = await restoreToken()
+  // ADR-0103：账号级设置需 uid 已知（restoreToken 之后）再加载
+  await loadSettings()
   void navigate(ok ? '/recommended' : '/login', { replace: true })
 }
