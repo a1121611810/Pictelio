@@ -164,7 +164,9 @@ describe("T5 跨 client 设置同步契约（ADR-0103）", () => {
     await loginToHome(ctx, serial);
 
     // 登录成功 → loadAccountR18 已跑（迁移播种 + 孤儿清理）→ 进设置页
-    await driver.raw.execute(`(() => { const h = document.querySelector('h1'); if (h) h.click(); })()`);
+    await driver.raw.execute(
+      `(() => { const h = document.querySelector('h1'); if (h) h.click(); })()`,
+    );
     await SLEEP(3_000);
     await driver.raw.execute(
       `(() => { const el = document.querySelector("[aria-label='设置']"); if (el) el.click(); })()`,
