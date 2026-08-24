@@ -31,23 +31,23 @@ _Avoid_: 到底后报错、静默空白
 分页（fetchMore）失败时在**列表底部**显示的错误提示，保留已加载内容，`nextUrl` 保留供滚动自动重试。与首屏错误（顶部整页提示）相对——两者槽位分离（createMixFeed 的 `error()` / `pageError()`）。
 _Avoid_: 分页错误显示在列表顶部、清空已加载内容
 
-### 列表刷新（List refresh）
+### 列表操作（List actions）
 
-**刷新 FAB（refresh FAB）**：
-列表页唯一的刷新入口：固定于列表容器右下角的浮动按钮（M3 FAB，56dp），双端（LynxView 原生 / web-core 预览）同构。点击触发页面刷新函数；刷新进行中按钮呈禁用态并忽略重复点击（防重入）。数据动作统一为既有 `feed.refresh()` / `fetchFirstPage()`（幂等 + generation 竞态防护），刷新入口不新增数据层语义。
-_Avoid_: 下拉刷新手势（已废弃，ADR-0107：原生 `<refresh>` XElement 路线在模拟器验收中判定不可行）、骨架遮罩刷新（webview 专属代偿）、滚动时隐藏按钮（v1 不做）
+**列表操作 FAB menu（list action FAB menu）**：
+列表页唯一的浮动操作入口（M3 FAB menu），固定于列表容器右下角。常态为一个刷新 FAB（56dp，primary-container）；点击后 FAB 变身为 close button（图标 ✕，同尺寸原位），浮出 scrim，并从 FAB top-trailing edge 展开两个 medium-button 规格菜单项：「刷新」「回顶」。执行任一操作后自动收起。双端同构（LynxView / web-core 同一实现与动画）。
+_Avoid_: 堆叠 FAB、speed dial、下拉刷新手势（已废弃，ADR-0107）、页面自持刷新态
 
 **刷新旋转（refresh spin）**：
-刷新 FAB 在刷新进行中的视觉反馈：↻ 图标持续旋转（1s/圈），与禁用态（opacity 0.6、防重入）共同构成「可见刷新过程」（ADR-0076 语义 A，ADR-0108）。刷新结束图标复位。双端同构（原生 LynxView 与 web-core 同一 CSS keyframes 机制）。
-_Avoid_: 无动画静默刷新（弱可见性）、JS 计时器驱动旋转（每帧 bridge，性能否决）、骨架遮罩（webview 专属代偿）
+刷新进行中的视觉反馈：↻ 图标在主 FAB（或菜单中的刷新项图标）持续旋转（1s/圈），与禁用态/忙碌态共同构成「可见刷新过程」（ADR-0108）。刷新结束图标复位。双端同构。
+_Avoid_: 无动画静默刷新、JS 计时器驱动旋转、骨架遮罩
 
-**回顶按钮（back-to-top button）**：
-列表页回顶入口：固定于列表容器右下角、刷新 FAB 上方的悬浮按钮（M3 small FAB 40dp），**常驻显示**（ADR-0110：`<list>` 不派发 per-frame scroll、无 JS 可触发滚动属性——按钮常驻 + **重建回顶**：点击触发页面 list `:key` 重建，新列表起始于顶部）。挂载入场动画。双端同构（原生 LynxView / web-core 同一实现与动画）。
-_Avoid_: 滚动阈值显示（JS 无滚动位置信号，ADR-0110 平台事实）、JS 逐帧驱动回顶（原生 SmoothScroller 仅 scroll-view 有，list 无此通道）、常驻轮询 timer
+**重建回顶（rebuild-to-top）**：
+`<list>` 不派发 per-frame scroll、无 JS 可触发滚动属性（ADR-0110 平台事实）时的回顶实现：点击「回顶」触发页面 list `:key` 重建，新列表起始于顶部。由 `RefreshableList` 的 `@back-to-top` 事件驱动。
+_Avoid_: 滚动阈值显示、JS 逐帧驱动回顶、常驻轮询 timer
 
 **RefreshableList**：
-列表刷新容器组件（深模块），本上下文唯一合法的列表刷新入口承载者。接口仅两件：`:refresh` 函数 prop（页面传入幂等刷新函数，组件内部持有刷新态并 `try/finally` 复位）、默认 slot（放现有 `<list>`）。防重入、FAB 定位/样式/a11y 全部收敛内部；**页面禁止自持刷新态**（无 refreshing ref、无 onRefresh 包装器）。9 个列表实例（Recommended / IllustList / NovelList / Following / Bookmarks×2 / UserHome×2 / FollowList）统一消费。
-_Avoid_: 页面直接渲染刷新按钮、复活独立 Fab 组件（Fab.vue 已删除；seam 无第二适配器）、下拉刷新手势（ADR-0107）、页面写 `<refresh>` 标签（web-core 无标签映射且原生路线已废弃）
+列表操作容器组件（深模块），本上下文唯一合法的列表刷新/回顶入口承载者。接口仅两件：`:refresh` 函数 prop（页面传入幂等刷新函数）与默认 slot（放现有 `<list>`）。内部持有刷新态、M3 FAB menu 展开态、互斥规则、旋转与展开动画、回顶防重入；**页面禁止自持刷新态**。9 个列表实例统一消费。
+_Avoid_: 页面直接渲染刷新按钮、复活独立 Fab 组件（Fab.vue 已删除）、下拉刷新手势、页面写 `<refresh>` 标签
 
 ### 客户端（Client）
 

@@ -1,7 +1,9 @@
 # app-lynx 列表刷新 FAB —— 功能规格
 
+> **注意**：ADR-0111 已将「刷新 FAB」与「回顶按钮」合并为 **M3 FAB menu**；本 spec 描述的历史实现细节（独立刷新 FAB、旋转动画）现已并入 `docs/specs/app-lynx-fab-menu.md`。保留本文档仅作决策演进参考。
+>
 > 来源：grill-with-docs 会话（ADR-0106 T4 验收判定原生 `<refresh>` 不可行，用户拍板改 FAB）；决策记录：ADR-0107；术语：`packages/app-lynx/CONTEXT.md`（刷新 FAB / RefreshableList）
-> 状态：ready-for-agent
+> 状态：superseded by ADR-0111
 > 取代：`docs/specs/app-lynx-pull-to-refresh.md`（superseded，保留作失败记录）
 
 ## Problem Statement

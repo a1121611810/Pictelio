@@ -56,13 +56,13 @@ export const ERROR_A11Y_LABELS = {
   backToLogin: '返回登录',
 } as const
 
-/** RefreshableList 刷新 FAB（ADR-0107：双端同构，原生/web-core 同一实现） */
-export const REFRESH_A11Y_LABELS = {
+/** RefreshableList 列表操作 FAB menu 标注（ADR-0111）
+ *  - toggleMenu：主 FAB / close button，描述将打开的菜单
+ *  - refreshList / backToTop：菜单项 label，与 UI 文本一致
+ */
+export const FAB_MENU_A11Y_LABELS = {
+  toggleMenu: '列表操作菜单',
   refreshList: '刷新列表',
-} as const
-
-/** RefreshableList 回顶按钮（ADR-0109：M3 small FAB，超阈值显示） */
-export const BACK_TO_TOP_A11Y_LABELS = {
   backToTop: '回到顶部',
 } as const
 

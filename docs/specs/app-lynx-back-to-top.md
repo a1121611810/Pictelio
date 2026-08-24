@@ -1,7 +1,9 @@
 # app-lynx 回顶按钮（常驻版） —— 功能规格
 
+> **注意**：ADR-0111 已将「刷新 FAB」与「回顶按钮」合并为 **M3 FAB menu**；本 spec 描述的历史实现细节（独立回顶按钮、常驻显示、重建回顶）现已并入 `docs/specs/app-lynx-fab-menu.md`。保留本文档仅作决策演进参考。
+>
 > 来源：grill-with-docs 会话（T1 T-spike 否决阈值感知，用户拍板常驻）；决策记录：ADR-0110（supersede ADR-0109）；术语：`packages/app-lynx/CONTEXT.md`（回顶按钮 / back-to-top button）
-> 状态：ready-for-agent
+> 状态：superseded by ADR-0111
 
 ## Problem Statement
 

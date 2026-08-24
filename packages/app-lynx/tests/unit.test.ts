@@ -14,7 +14,7 @@ import { loadUserNovels, loadBookmarks as loadNovelBookmarks, loadFollow as load
 import { bytesToDataUrl, downloadUgoiraFrames } from '../src/api/ugoira'
 import type { UgoiraExtractMode } from '../src/api/ugoira'
 import { ugoiraMode as lynxUgoiraMode, setUgoiraMode as lynxSetUgoiraMode } from '../src/stores/settingsStore'
-import { ME_A11Y_LABELS, LOGIN_A11Y_LABELS, RECOMMENDED_A11Y_LABELS, UPDATE_A11Y_LABELS, ERROR_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../src/utils/accessibility'
+import { ME_A11Y_LABELS, LOGIN_A11Y_LABELS, RECOMMENDED_A11Y_LABELS, UPDATE_A11Y_LABELS, ERROR_A11Y_LABELS, FAB_MENU_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../src/utils/accessibility'
 
 describe('imageUrl.proxyImageUrl', () => {
   it('将 i.pximg.net URL 重写为本地代理路径', () => {
@@ -1034,6 +1034,48 @@ describe('会话失效错误页 accessibility 标注（候选 #2）', () => {
   })
 })
 
+describe('RefreshableList 组件结构（ADR-0111 M3 FAB menu）', () => {
+  const refreshableListSource = readFileSync(fileURLToPath(new URL('../src/components/RefreshableList.vue', import.meta.url)), 'utf8')
+
+  it('FAB_MENU_A11Y_LABELS 全部被 RefreshableList.vue 消费且配套 element', () => {
+    for (const key of Object.keys(FAB_MENU_A11Y_LABELS)) {
+      expect(refreshableListSource).toContain(`:accessibility-label="FAB_MENU_A11Y_LABELS.${key}"`)
+    }
+    const labelCount = (refreshableListSource.match(/:accessibility-label="FAB_MENU_A11Y_LABELS\.\w+"/g) ?? []).length
+    const elementCount = (refreshableListSource.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
+    expect(labelCount).toBe(Object.keys(FAB_MENU_A11Y_LABELS).length)
+    expect(elementCount).toBe(labelCount)
+  })
+
+  it('已移除旧 REFRESH_A11Y_LABELS / BACK_TO_TOP_A11Y_LABELS 引用（ADR-0111 替换）', () => {
+    expect(refreshableListSource).not.toContain('REFRESH_A11Y_LABELS')
+    expect(refreshableListSource).not.toContain('BACK_TO_TOP_A11Y_LABELS')
+  })
+
+  it('模板包含 M3 FAB menu 关键结构：scrim、两项菜单、close button 图标切换', () => {
+    expect(refreshableListSource).toContain('v-if="menu.isOpen"')
+    expect(refreshableListSource).toContain('FAB_MENU_A11Y_LABELS.refreshList')
+    expect(refreshableListSource).toContain('FAB_MENU_A11Y_LABELS.backToTop')
+    expect(refreshableListSource).toContain('↻')
+    expect(refreshableListSource).toContain('↑')
+    expect(refreshableListSource).toContain('{{ menu.isOpen ? \'✕\' : \'↻\' }}')
+  })
+
+  it('回顶通过 emit(\'back-to-top\') 与页面契约连接', () => {
+    expect(refreshableListSource).toContain("emit('back-to-top')")
+  })
+
+  it('未复用已废弃的 <refresh> XElement（ADR-0107）', () => {
+    expect(refreshableListSource).not.toContain('<refresh')
+  })
+
+  it('FAB menu 状态机通过 createFabMenuState 接入，刷新逻辑仍保留 try/finally 复位', () => {
+    expect(refreshableListSource).toContain('createFabMenuState')
+    expect(refreshableListSource).toContain('finally')
+    expect(refreshableListSource).toContain('menu.endRefresh')
+  })
+})
+
 const { normalizeKinds, supportsClientSwitch } = await import('../src/stores/clientSwitchStore')
 
 describe('clientSwitchStore.normalizeKinds / supportsClientSwitch（ADR-0062 包能力）', () => {
@@ -1230,88 +1272,95 @@ describe('authStore 会话失效触发错误页（候选 #2）', () => {
   })
 })
 
-// ─── RefreshableList 刷新 FAB 容器（ADR-0107） ───
+// ─── RefreshableList 列表操作 FAB menu（ADR-0111，整合 ADR-0107/0108/0110） ───
 // 期望值出处（oracle）：
-//   - 接口形状（:refresh 函数 prop + slot、防重入、try/finally 复位）= ADR-0107 决策 1/2
-//   - FAB 样式令牌（14.933vw=56dp、md-shape-large、primary-container、md-elevation-3）
-//     = Material Design 3 规范（原 Fab.vue 注释已标；原生端已验证模式）
+//   - 接口形状（:refresh 函数 prop + slot、防重入、try/finally 复位）= ADR-0111 spec
+//   - FAB menu 视觉/行为 = M3 官方 components/fab-menu/* 四页规范
+//   - 状态机不变量 = createFabMenu.test.ts 纯逻辑单测
 //   - a11y label = src/utils/accessibility.ts 注册表常量（backupRulesConsistency 模式）
-//   - 负向断言清单 = ADR-0107 平台事实（SelectorQuery 对 XElement 静默不命中、
-//     原生 refresh XElement 包裹 patch 错位），防原生路线复活
-// 结构断言遵循本文件既有「模板源码断言」约定（node 环境无法渲染 Lynx 元素，模拟器 E2E 兜底）。
-describe('RefreshableList 刷新 FAB 容器（ADR-0107）', () => {
+//   - 负向断言 = ADR-0107/0110 平台事实（防原生路线/scroll 感知复活）
+describe('RefreshableList 列表操作 FAB menu（ADR-0111）', () => {
 const refreshableListVue = readFileSync(
   fileURLToPath(new URL('../src/components/RefreshableList.vue', import.meta.url)),
   'utf8',
 )
 
-it('接口：:refresh prop + @back-to-top 事件 + 默认 slot（ADR-0107/0110）', () => {
+it('接口保持：:refresh prop + @back-to-top 事件 + 默认 slot（9 页零改动）', () => {
   expect(refreshableListVue).toContain('refresh: () => Promise<void> | void')
   expect(refreshableListVue).toContain(`(e: 'back-to-top')`)
   expect(refreshableListVue).not.toContain('refreshing: boolean')
 })
 
 it('刷新状态机内收：防重入 guard + try/finally 复位 + 异常 warn 可见（硬约束 #3）', () => {
-  expect(refreshableListVue).toContain('if (refreshing.value) return')
+  expect(refreshableListVue).toContain('if (refreshing.value || menu.isBusy) return')
   expect(refreshableListVue).toContain('await props.refresh()')
-  expect(refreshableListVue).toMatch(/finally \{\s*refreshing\.value = false/)
+  expect(refreshableListVue).toContain('refreshing.value = false')
+  expect(refreshableListVue).toContain('menu.endRefresh')
   expect(refreshableListVue).toContain(`console.warn('[RefreshableList]`)
 })
 
-it('FAB 双端同构：M3 令牌样式 + 右下角定位 + a11y 注册表 label + 禁用态 opacity', () => {
+it('M3 FAB menu 视觉：主 FAB 56dp + 展开面板 pill 项 + scrim + 从右上角浮出动画', () => {
   expect(refreshableListVue).toContain('w-[14.933vw]')
   expect(refreshableListVue).toContain('rounded-[var(--md-shape-large)]')
   expect(refreshableListVue).toContain('bg-primary-container')
   expect(refreshableListVue).toContain('shadow-[var(--md-elevation-3)]')
-  expect(refreshableListVue).toContain('absolute bottom-6 right-4')
-  expect(refreshableListVue).toContain(':accessibility-label="REFRESH_A11Y_LABELS.refreshList"')
-  expect(refreshableListVue).toContain('opacity: 0.6')
-  expect(refreshableListVue).toContain('@tap="onTap"')
+  expect(refreshableListVue).toContain('bottom-4 right-4')
+  expect(refreshableListVue).toContain('z-30')
+  expect(refreshableListVue).toContain('bg-[var(--md-scrim)]')
+  expect(refreshableListVue).toContain('v-if="menu.isOpen"')
+  expect(refreshableListVue).toContain('menu.isOpen ? \'✕\' : \'↻\'')
+  expect(refreshableListVue).toContain('bg-[var(--md-scrim)]')
+  expect(refreshableListVue).toContain('rounded-full')
+  expect(refreshableListVue).toContain('@keyframes item-rise')
 })
 
-it('刷新中旋转动画：keyframes + refreshing 同源类绑定（ADR-0108 决策 1/2/3）', () => {
-  // oracle：ADR-0108 决策 1（1s/圈 linear infinite）、决策 2（承载 view + refreshing 驱动）、
-  // 决策 3（保留 opacity 0.6 双信号）
+it('主 FAB 变身为 close button：图标切换绑定在原位 56dp FAB 上（M3 官方规格）', () => {
+  expect(refreshableListVue).toContain("{{ menu.isOpen ? '✕' : '↻' }}")
+  // close button 与 FAB 同节点，尺寸不变
+  expect(refreshableListVue.match(/w-\[14\.933vw\]/g)?.length).toBeGreaterThanOrEqual(1)
+})
+
+it('菜单项：刷新 + 回顶，label 与图标成对，a11y 注册表完整消费', () => {
+  expect(refreshableListVue).toContain('FAB_MENU_A11Y_LABELS.refreshList')
+  expect(refreshableListVue).toContain('FAB_MENU_A11Y_LABELS.backToTop')
+  expect(refreshableListVue).toContain('FAB_MENU_A11Y_LABELS.toggleMenu')
+  expect(refreshableListVue).toContain('↻')
+  expect(refreshableListVue).toContain('↑')
+})
+
+it('刷新中旋转动画：主 FAB 图标在非展开态时旋转（ADR-0108）', () => {
   expect(refreshableListVue).toContain('@keyframes fab-spin')
   expect(refreshableListVue).toMatch(/animation: fab-spin 1s linear infinite/)
-  expect(refreshableListVue).toContain("refreshing ? 'fab-spin'")
+  expect(refreshableListVue).toContain('refreshing && !menu.isOpen ? \'fab-spin\'')
   expect(refreshableListVue).toContain('opacity: 0.6')
 })
 
-it('组件无 refreshEpoch：重建 workaround 必须在页面侧同 tick flush（ADR-0107 D4 实测）', () => {
-  // oracle：ADR-0107 决策 4——组件内 await 后 bump 的 flush 排在 items 替换之后，
-  // 旧 list 仍触发错误 patch（模拟器实测 15 条 RemoveNode）；页面侧同 tick 错误归零
-  expect(refreshableListVue).not.toContain('refreshEpoch')
-})
-
-it('回顶常驻：@back-to-top emit + 防重入 + 按钮/动画/a11y（ADR-0110）', () => {
-  // oracle：ADR-0110（修订）——actuation = emit 驱动页面 list :key 重建（list 无 JS 滚动通道）；
-  // 防重入窗口 1000ms；M3 small FAB 叠于刷新 FAB 上方；入场动画；a11y 注册表
+it('回顶通过 emit(@back-to-top) 触发页面重建；保留 1000ms 防重入 + onUnmounted 清理', () => {
   expect(refreshableListVue).toContain(`(e: 'back-to-top')`)
   expect(refreshableListVue).toContain("emit('back-to-top')")
   expect(refreshableListVue).toMatch(/BACK_TO_TOP_RESET_MS = 1000/)
   expect(refreshableListVue).toContain('if (backToTopPending.value) return')
-  expect(refreshableListVue).toContain('bottom-[25.6vw]')
-  expect(refreshableListVue).toContain('w-[10.667vw]')
-  expect(refreshableListVue).toContain('@keyframes back-to-top-in')
-  expect(refreshableListVue).toContain('BACK_TO_TOP_A11Y_LABELS.backToTop')
-  expect(refreshableListVue).toContain('onUnmounted(clearBackToTopReset)')
+  expect(refreshableListVue).toContain('onUnmounted')
 })
 
-it('负向断言：原生下拉路线零残留 + 感知/直绑通道已删（ADR-0107/0110 平台事实，防复活）', () => {
+it('组件无 refreshEpoch：重建 workaround 必须在页面侧同 tick flush（ADR-0107 D4 实测）', () => {
+  expect(refreshableListVue).not.toContain('refreshEpoch')
+})
+
+it('负向断言：原生下拉路线零残留 + 旧双 FAB 结构已删 + 感知/直绑通道已删（防复活）', () => {
   expect(refreshableListVue).not.toContain('<refresh')
   expect(refreshableListVue).not.toContain('refresh-header')
   expect(refreshableListVue).not.toContain('createSelectorQuery')
   expect(refreshableListVue).not.toContain('finishRefresh')
   expect(refreshableListVue).not.toContain('PictelioApp')
   expect(refreshableListVue).not.toContain('isNativeMode')
-  // ADR-0110：感知层（阈值状态机 / scroll 事件）与直绑触发（scroll-to-index /
-  // initial-scroll-index——list 不支持）整体删除
+  expect(refreshableListVue).not.toContain('REFRESH_A11Y_LABELS')
+  expect(refreshableListVue).not.toContain('BACK_TO_TOP_A11Y_LABELS')
+  expect(refreshableListVue).not.toContain('bottom-[25.6vw]')
+  expect(refreshableListVue).not.toContain('@keyframes back-to-top-in')
   expect(refreshableListVue).not.toContain('createBackToTopState')
   expect(refreshableListVue).not.toContain('scrollProps')
   expect(refreshableListVue).not.toContain('scroll-to-index')
-  // 红线修订（ADR-0110 D3）：禁 timer 驱动动画/常驻轮询；允许一次性触发复位 timer
-  // （BACK_TO_TOP_RESET_MS=1000 有界 + onUnmounted 清理，上一条断言覆盖）
 })
 })
 
