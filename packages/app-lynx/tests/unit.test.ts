@@ -398,7 +398,7 @@ describe('proxyRedact.redactProxyUrl（代理凭据脱敏）', () => {
 // ─── Tailwind 配置契约测试（issue #43） ───
 // 契约：tailwind.config 颜色映射引用的每个 CSS 变量必须真实存在于 tokens.css。
 // 从源码文件提取比对（真实样例，非手写 mock——实现错了测试不会全绿）。
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -1287,5 +1287,71 @@ it('实例 id 计数器在模块级 <script> 块（per-instance 会致双列表�
   // 且 setup 块内引用该模块级变量
   expect(refreshableListVue).toMatch(/<script lang="ts">[\s\S]*?let refreshableListSeq = 0[\s\S]*?<\/script>/)
   expect(refreshableListVue).toContain('`ptr-${++refreshableListSeq}`')
+})
+})
+
+// ─── 列表页 RefreshableList 接入（ADR-0106 T3） ───
+// 期望值出处：spec docs/specs/app-lynx-pull-to-refresh.md「页面改造」节（9 个列表实例、
+// try/finally 模式、Fab 删除）；结构断言遵循本文件既有约定。
+describe('列表页 RefreshableList 接入（ADR-0106）', () => {
+const PAGE_NAMES = [
+  'Recommended',
+  'IllustList',
+  'NovelList',
+  'Following',
+  'Bookmarks',
+  'UserHome',
+  'FollowList',
+] as const
+const pageSources = Object.fromEntries(
+  PAGE_NAMES.map((n) => [
+    n,
+    readFileSync(fileURLToPath(new URL(`../src/pages/${n}.vue`, import.meta.url)), 'utf8'),
+  ]),
+)
+
+it('7 个列表页全部经 RefreshableList 组件（红线：页面无裸 <refresh> 标签）', () => {
+  for (const n of PAGE_NAMES) {
+    const src = pageSources[n]
+    expect(src, n).toContain('<RefreshableList')
+    expect(src, n).toContain(`from '../components/RefreshableList.vue'`)
+    // 裸 <refresh 标签禁止出现在页面（web-core 无映射）；'<RefreshableList' 大小写不同不误伤
+    expect(src, n).not.toContain('<refresh')
+  }
+})
+
+it('每页 @refresh 处理器均 try/finally 驱动 refreshing（失败也收起 header）', () => {
+  for (const n of PAGE_NAMES) {
+    const src = pageSources[n]
+    expect(src, n).toContain('try {')
+    expect(src, n).toMatch(/finally \{\s*\w*[rR]efreshing\.value = false/)
+  }
+})
+
+it('Bookmarks / UserHome 双列表各自独立 refreshing（互不收对方 header）', () => {
+  for (const n of ['Bookmarks', 'UserHome'] as const) {
+    const src = pageSources[n]
+    expect(src, n).toContain('illustRefreshing')
+    expect(src, n).toContain('novelRefreshing')
+    expect(src, n).toContain(':refreshing="illustRefreshing"')
+    expect(src, n).toContain(':refreshing="novelRefreshing"')
+  }
+})
+
+it('推荐页独立 FAB 已删除，Fab.vue 组件文件已删除（ADR-0106 D4）', () => {
+  expect(pageSources.Recommended).not.toContain('Fab')
+  expect(pageSources.Recommended).not.toContain('刷新推荐')
+  expect(
+    existsSync(fileURLToPath(new URL('../src/components/Fab.vue', import.meta.url))),
+  ).toBe(false)
+})
+
+it('列表页计数：Bookmarks/UserHome 各 2 个 RefreshableList，其余各 1 个（共 9 实例）', () => {
+  const count = (s: string) => s.split('<RefreshableList').length - 1
+  expect(count(pageSources.Bookmarks)).toBe(2)
+  expect(count(pageSources.UserHome)).toBe(2)
+  for (const n of ['Recommended', 'IllustList', 'NovelList', 'Following', 'FollowList'] as const) {
+    expect(count(pageSources[n]), n).toBe(1)
+  }
 })
 })

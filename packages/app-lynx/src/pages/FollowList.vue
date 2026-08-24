@@ -14,6 +14,7 @@ import type { PixivUserPreview } from '../api/types'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { presentError } from '../utils/errorPresentation'
 import SkeletonImage from '../components/SkeletonImage.vue'
+import RefreshableList from '../components/RefreshableList.vue'
 
 const userId = Number(currentParams.value.id)
 const isFollowing = computed(() => routeState.value.name === 'user-following')
@@ -95,6 +96,18 @@ function openUser(id: number) {
 }
 
 onMounted(fetchFirstPage)
+
+// 下拉刷新入口（ADR-0106）：fetchFirstPage 幂等（重置 users/nextUrl/errorMsg）；
+// try/finally 保证失败也收起 header
+const refreshing = ref(false)
+async function onRefresh() {
+  refreshing.value = true
+  try {
+    await fetchFirstPage()
+  } finally {
+    refreshing.value = false
+  }
+}
 </script>
 
 <template>
@@ -114,8 +127,8 @@ onMounted(fetchFirstPage)
       </view>
     </view>
 
+    <RefreshableList v-if="!loading || users.length > 0" :refreshing="refreshing" @refresh="onRefresh">
     <list
-      v-if="!loading || users.length > 0"
       class="w-full flex-1 min-h-0"
       list-type="single"
       scroll-orientation="vertical"
@@ -157,5 +170,6 @@ onMounted(fetchFirstPage)
         <text class="text-body-medium text-outline">加载中…</text>
       </list-item>
     </list>
+    </RefreshableList>
   </view>
 </template>

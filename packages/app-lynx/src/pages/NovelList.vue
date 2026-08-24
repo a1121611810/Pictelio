@@ -9,6 +9,7 @@ import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { isRestricted } from '../stores/settingsStore'
 import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
 import NavigationBar from '../components/NavigationBar.vue'
+import RefreshableList from '../components/RefreshableList.vue'
 import { NAV_TABS, type NavTab } from '../components/navTabs'
 
 function onNavSelect(tab: NavTab) {
@@ -70,6 +71,17 @@ function sync() {
 async function refreshFeed() {
   await feed.value.refresh()
   sync()
+}
+
+// 下拉刷新入口（ADR-0106）：RefreshableList @refresh；try/finally 保证失败也收起 header
+const refreshing = ref(false)
+async function onRefresh() {
+  refreshing.value = true
+  try {
+    await refreshFeed()
+  } finally {
+    refreshing.value = false
+  }
 }
 
 async function loadMore() {
@@ -155,8 +167,8 @@ onMounted(() => {
       </view>
     </view>
 
+    <RefreshableList v-if="novels.length > 0" :refreshing="refreshing" @refresh="onRefresh">
     <list
-      v-if="novels.length > 0"
       class="w-full flex-1 min-h-0"
       list-type="single"
       scroll-orientation="vertical"
@@ -202,6 +214,7 @@ onMounted(() => {
         <text v-else class="text-body-medium text-outline">没有更多了</text>
       </list-item>
     </list>
+    </RefreshableList>
 
     <!-- M3 NavigationBar：底部四 tab -->
     <NavigationBar :tabs="NAV_TABS" :active-name="'novels'" @select="onNavSelect" />

@@ -19,7 +19,7 @@ import SkeletonImage from '../components/SkeletonImage.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
 import NavigationBar from '../components/NavigationBar.vue'
-import Fab from '../components/Fab.vue'
+import RefreshableList from '../components/RefreshableList.vue'
 import { NAV_TABS, type NavTab } from '../components/navTabs'
 import { RECOMMENDED_A11Y_LABELS } from '../utils/accessibility'
 
@@ -80,10 +80,21 @@ function sync() {
     feed.nextUrl() === null && feed.items().length > 0 && !feed.loading() && !feed.loadingMore()
 }
 
-/** 刷新（FAB / 补拉）：feed.refresh() 幂等（generation++ 丢弃在途旧响应），完成后同步快照 */
+/** 刷新（下拉 / 补拉）：feed.refresh() 幂等（generation++ 丢弃在途旧响应），完成后同步快照 */
 async function refreshFeed() {
   await feed.refresh()
   sync()
+}
+
+// 下拉刷新入口（ADR-0106）：RefreshableList @refresh；try/finally 保证失败也收起 header
+const refreshing = ref(false)
+async function onRefresh() {
+  refreshing.value = true
+  try {
+    await refreshFeed()
+  } finally {
+    refreshing.value = false
+  }
 }
 
 /** 加载更多（scrolltolower）：feed.fetchMore() 内置双防抖 + 翻页优先级，完成后同步快照 */
@@ -147,8 +158,12 @@ onActivated(() => {
       <SkeletonCard v-for="n in 8" :key="n" />
     </view>
 
-    <list
+    <RefreshableList
       v-else-if="!loading || items.length > 0"
+      :refreshing="refreshing"
+      @refresh="onRefresh"
+    >
+    <list
       class="w-full flex-1 min-h-0"
       list-type="waterfall"
       scroll-orientation="vertical"
@@ -212,11 +227,7 @@ onActivated(() => {
         <text v-else class="text-body-medium text-outline">没有更多了</text>
       </list-item>
     </list>
-
-    <!-- M3 FAB：右下角悬浮刷新（重新拉第一页，展示 M3 浮动操作按钮形态） -->
-    <view v-if="!loading" class="absolute bottom-[24vw] right-4" @tap="refreshFeed">
-      <Fab icon="↻" a11y-label="刷新推荐" />
-    </view>
+    </RefreshableList>
 
     <!-- M3 NavigationBar：底部四 tab（推荐/插画/小说/我的） -->
     <NavigationBar :tabs="navTabs" :active-name="'recommended'" @select="onNavSelect" />

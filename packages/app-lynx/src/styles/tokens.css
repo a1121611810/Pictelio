@@ -2,7 +2,7 @@
  * 色板 = M3 baseline（seed #6750A4，Material Theme Builder 官方导出）亮色。
  * 变量名分两类：
  *  - --md-*：M3 语义名（primary/secondary/tertiary/error/surface/outline 等），
- *    新代码与共享组件（NavigationBar/Fab 等）优先使用；
+ *    新代码与共享组件（NavigationBar/RefreshableList 等）优先使用；
  *  - --color* / --borderRadius* / --elevation*：旧 Fluent 语义兼容别名，
  *    值已映射到 M3 令牌，存量页面/组件引用不受影响（单一事实源 = M3）。
  * Lynx CSS 变量默认被子孙继承；伪类/backdrop-filter 等在 Lynx 支持度有限，

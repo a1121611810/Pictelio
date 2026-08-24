@@ -22,6 +22,7 @@ import SkeletonImage from '../components/SkeletonImage.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
 import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
+import RefreshableList from '../components/RefreshableList.vue'
 
 const uid = currentUser.value?.id
 if (!uid) {
@@ -79,6 +80,17 @@ async function refreshIllust() {
   await illustFeed.value.refresh()
   syncIllust()
 }
+
+// 下拉刷新入口（ADR-0106）：RefreshableList @refresh；try/finally 保证失败也收起 header
+const illustRefreshing = ref(false)
+async function onRefreshIllust() {
+  illustRefreshing.value = true
+  try {
+    await refreshIllust()
+  } finally {
+    illustRefreshing.value = false
+  }
+}
 async function loadIllustMore() {
   await illustFeed.value.fetchMore()
   syncIllust()
@@ -128,6 +140,16 @@ function syncNovel() {
 async function refreshNovel() {
   await novelFeed.value.refresh()
   syncNovel()
+}
+
+const novelRefreshing = ref(false)
+async function onRefreshNovel() {
+  novelRefreshing.value = true
+  try {
+    await refreshNovel()
+  } finally {
+    novelRefreshing.value = false
+  }
 }
 async function loadNovelMore() {
   await novelFeed.value.fetchMore()
@@ -218,8 +240,12 @@ onMounted(() => {
     </view>
 
     <!-- 插画 waterfall -->
-    <list
+    <RefreshableList
       v-if="activeTab === 'illust' && (illustLoading || visibleIllusts.length > 0)"
+      :refreshing="illustRefreshing"
+      @refresh="onRefreshIllust"
+    >
+    <list
       class="w-full flex-1"
       list-type="waterfall"
       scroll-orientation="vertical"
@@ -262,6 +288,7 @@ onMounted(() => {
         <text v-else class="text-body-medium text-outline">没有更多了</text>
       </list-item>
     </list>
+    </RefreshableList>
 
     <!-- 小说空态 -->
     <view v-if="activeTab === 'novel' && !novelLoading && !errorMsg && novels.length === 0" class="flex-1 flex items-center justify-center">
@@ -273,8 +300,12 @@ onMounted(() => {
     </view>
 
     <!-- 小说列表 -->
-    <list
+    <RefreshableList
       v-if="activeTab === 'novel' && (novelLoading || novels.length > 0)"
+      :refreshing="novelRefreshing"
+      @refresh="onRefreshNovel"
+    >
+    <list
       class="w-full flex-1"
       list-type="single"
       scroll-orientation="vertical"
@@ -307,5 +338,6 @@ onMounted(() => {
         <text v-else class="text-body-medium text-outline">没有更多了</text>
       </list-item>
     </list>
+    </RefreshableList>
   </view>
 </template>

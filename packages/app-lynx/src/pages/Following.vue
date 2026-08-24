@@ -13,6 +13,7 @@ import SkeletonImage from '../components/SkeletonImage.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
 import NavigationBar from '../components/NavigationBar.vue'
+import RefreshableList from '../components/RefreshableList.vue'
 import { NAV_TABS, type NavTab } from '../components/navTabs'
 
 // 底部导航 tabs 取共享 NAV_TABS（推荐/插画/小说/我的；已不含 following tab）。
@@ -72,6 +73,17 @@ async function refreshFeed() {
   sync()
 }
 
+// 下拉刷新入口（ADR-0106）：RefreshableList @refresh；try/finally 保证失败也收起 header
+const refreshing = ref(false)
+async function onRefresh() {
+  refreshing.value = true
+  try {
+    await refreshFeed()
+  } finally {
+    refreshing.value = false
+  }
+}
+
 async function loadMore() {
   await feed.value.fetchMore()
   sync()
@@ -116,8 +128,8 @@ onMounted(() => {
         </view>
     </view>
 
+    <RefreshableList v-else :refreshing="refreshing" @refresh="onRefresh">
     <list
-      v-else
       class="w-full flex-1 min-h-0"
       list-type="waterfall"
       scroll-orientation="vertical"
@@ -160,6 +172,7 @@ onMounted(() => {
         <text v-else class="text-body-medium text-outline">没有更多了</text>
       </list-item>
     </list>
+    </RefreshableList>
 
     <!-- M3 NavigationBar：底部四 tab（NAV_TABS 共享；active-name 无匹配故无高亮，可接受） -->
     <NavigationBar :tabs="NAV_TABS" :active-name="'following'" @select="onNavSelect" />
