@@ -92,11 +92,18 @@ FAB_MENU_A11Y_LABELS = {
 - 主 FAB 用 `toggleMenu` label（描述将打开的菜单）。
 - 菜单项 label 与 UI 文本一致。
 
-## 测试
+## 验收
 
-- `createFabMenu.test.ts`：纯逻辑互斥 / 状态转移。
-- `tests/unit.test.ts`：RefreshableList 结构 + a11y 注册表完整性。
-- 模拟器：展开/收起/刷新/回顶全链路 + 无 RemoveNode。
+- [x] `createFabMenuState` 行为单测（8/8）
+- [x] `tests/unit.test.ts` 结构断言（335/335）
+- [x] `tsc` 类型检查
+- [x] 模拟器 E2E 全链路（pictelio_ui/android-34，2026-08-24）：
+  - 常态单 FAB（↻，右下角）✓
+  - 点击展开（scrim + ✕ + 刷新/回顶两项 pill 按钮）✓
+  - 点「刷新」（数据替换 + FAB 回 ↻）✓
+  - 滚动后展开 → 点「回顶」（epoch 重建回顶 + FAB 回 ↻）✓
+  - 点 scrim 收起 ✓
+  - logcat 无 RemoveNode / 渲染错误 ✓
 
 ## 影响
 
