@@ -71,7 +71,13 @@ function sync() {
 async function refreshFeed() {
   await feed.value.refresh()
   sync()
+  // [lynx:fix] 数据整体替换触发 vue-lynx patch RemoveNode 索引错位（框架 bug，ADR-0107 D4）；
+  // epoch 与 sync() 同 tick flush（key 变化走整树替换，不发生子节点 patch）
+  refreshEpoch.value++
 }
+
+/** list 强制重建代（refresh 后 ++，驱动 :key 替换） */
+const refreshEpoch = ref(0)
 
 async function loadMore() {
   await feed.value.fetchMore()
@@ -119,6 +125,7 @@ onMounted(() => {
 
     <RefreshableList v-else :refresh="refreshFeed">
     <list
+      :key="refreshEpoch"
       class="w-full h-full"
       list-type="waterfall"
       scroll-orientation="vertical"

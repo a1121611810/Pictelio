@@ -15,7 +15,7 @@ app-lynx 的 9 个列表实例需要一个统一、双端可用的刷新入口�
 | D1 | 刷新入口形态 | RefreshableList 内建 FAB（右下角），双端同构；废弃 `<refresh>` 路线 |
 | D2 | 组件接口 | `:refresh` 函数 prop + 默认 slot；刷新状态机内收（防重入 + try/finally）；页面禁自持刷新态 |
 | D3 | 原生面 | 整体回滚 ADR-0106 前基线（-3 依赖、-1 @LynxMethod、-校验任务、-proguard keep）；rebase drop T1 |
-| D4 | refreshEpoch | 移除；模拟器验证裸 list 无 patch 错位，复现则仅该页恢复并上报 |
+| D4 | patch 错位 workaround | 页面侧同 tick epoch 重建：实测证明 ①与 `<refresh>` 无关（裸 list 整体替换即复现）②epoch 必须与 items 替换同一 flush（组件内 await 后 bump 仍有 15 条错误；页面侧 sync() 后同步 ++ 错误归零）。每页 3 行 |
 | D5 | FAB 行为 | refreshing 中防重入 + opacity 0.6；不做滚动隐藏；a11y 沿用 refreshList |
 | D6 | 范围 | 9 列表实例（沿用 ADR-0106 D5）；排除详情页/Me/ErrorPage |
 | D7 | 验收 | 单测（结构+负向+页面断言）+ 模拟器实测 V3-V9 |
@@ -82,25 +82,28 @@ async function refreshFeed() {
 
 1. 弃未提交改动：`git checkout -- packages/app/android/app/build.gradle packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioAppModule.java`
 2. rebase drop T1：`git rebase --onto 918f731^ 918f731`（918f731 未推送；T2/T3/docs 提交不触碰 build.gradle/proguard，预期零冲突）
-3. 回滚面清单（回退后以下均应不存在）：
+3. 回滚面清单（回滚后以下显式声明均应不存在）：
    - build.gradle：`xelement-refresh`（lynx/full 两行）、`viewpager2`（两行）、`verifyPinnedAars` 任务（66 行整段）
    - proguard-rules.pro：`com.lynx.xelement.refresh.**` / `com.scwang.smart.refresh.**` keep（8 行整段）
    - PictelioAppModule.java：`finishRefresh` @LynxMethod + `findRefreshingLayout` + SmartRefreshLayout import（未提交，54 行）
-4. 验证：`./gradlew :app:dependencies --configuration lynxDebugRuntimeClasspath` grep `scwang\|refresh\|viewpager2` 零输出；lynx debug 构建绿
+4. 验证：build.gradle/proguard-rules.pro grep 上述字面量零输出；lynx debug 构建绿。
+   **注意（ADR-0107 决策 3 修正）**：`xelement:4.0.1` POM 将 `xelement-refresh` 声明为 runtime 依赖，
+   依赖树中仍会出现 `xelement-refresh` / `refresh-layout-kernel`（origin/main 基线同款传递，非残留）；
+   判据是**显式声明零残留 + 树与基线一致**，且 `viewpager2` 在树中零出现。
 
 ## 页面改造（T3'，7 页 9 实例，模式同构）
 
-每页：`@refresh="onRefresh"` + `:refreshing="refreshing"` → `:refresh="<fn>"`；删 refreshing ref 与 onRefresh 包装器。绑定目标：
+每页：`@refresh="onRefresh"` + `:refreshing="refreshing"` → `:refresh="<fn>"`；删 refreshing ref 与 onRefresh 包装器。**patch workaround（每页 3 行）**：`refreshEpoch` ref + list `:key="refreshEpoch"` + 刷新函数内数据替换后同步 `refreshEpoch.value++`（必须与 sync 同一 flush，ADR-0107 D4）。绑定目标：
 
 | 页面 | 实例数 | `:refresh` 绑定 | 特殊处理 |
 |------|-------|----------------|---------|
-| Recommended.vue | 1 | `refreshFeed` | 额外删 `refreshEpoch` ref + list `:key="refreshEpoch"` |
+| Recommended.vue | 1 | `refreshFeed` | — |
 | IllustList.vue / NovelList.vue / Following.vue | 各 1 | 各自 `refreshFeed` | — |
-| Bookmarks.vue | 2 | `refreshIllusts` / `refreshNovels`（页面现有函数名为准） | 删 `illustRefreshing` / `novelRefreshing` 双 ref 及包装器 |
+| Bookmarks.vue | 2 | `refreshIllust` / `refreshNovel` | 双列表共享一个 refreshEpoch（tab v-if 互斥，隐藏列表切回时本就重建） |
 | UserHome.vue | 2 | 同上模式 | 同上 |
-| FollowList.vue | 1 | `fetchFirstPage`（幂等） | — |
+| FollowList.vue | 1 | `fetchFirstPage`（幂等） | epoch++ 在 `users.value` 替换同一 try 块内 |
 
-list 尺寸类：容器 `relative flex-1 min-h-0` 内 list 用 `w-full h-full`；原生不解析则备选容器 `flex-col` + list `flex-1 min-h-0`（V4 判定，改动 2 行）。
+list 尺寸类：RefreshableList 容器（`relative flex-1 min-h-0`）内 list 用 `w-full h-full`（V4 已验证原生解析正常）。
 
 ## 测试计划
 
@@ -108,6 +111,7 @@ list 尺寸类：容器 `relative flex-1 min-h-0` 内 list 用 `w-full h-full`�
 
 1. **组件结构断言**（oracle = ADR-0107 决策 1/2/5，文件头注释注明）：函数 prop 声明（`refresh`）、防重入 guard、`try/finally` 复位、FAB 令牌类（`14.933vw` / `md-shape-large` / `primary-container` / `md-elevation-3`，oracle = M3 规范，原 Fab.vue 注释已标）、a11y label 消费（oracle = `accessibility.ts` 注册表常量）
 2. **组件负向断言**（防原生方案复活）：源码无 `<refresh` / `refresh-header` / `createSelectorQuery` / `finishRefresh` / `PictelioApp` / `isNativeMode` / `setTimeout` 字面量
+2b. **patch workaround 断言**（ADR-0107 D4）：7 页 list 均 `:key="refreshEpoch"` 且页面刷新函数内含 `refreshEpoch.value++`（与数据替换同 tick）；组件无 `refreshEpoch`（组件内异步 bump 已实证无效）
 3. **页面断言**：7 页 9 实例均为 `:refresh="` 绑定；无 `refreshing` ref 残留（`:refreshing` / `Refreshing = ref` 字面量零命中）；Recommended 无 `refreshEpoch`；Fab.vue 文件不存在；无裸 `<refresh`（全 src 扫描）
 
 **模拟器实测清单**（AVD `pictelio_ui`，lynx debug 构建）：
@@ -117,7 +121,7 @@ list 尺寸类：容器 `relative flex-1 min-h-0` 内 list 用 `w-full h-full`�
 | V3 | 构建 | `pnpm build:app-lynx && pnpm sync:app-lynx-bundle && ./gradlew :app:assembleLynxDebug` 成功 |
 | V4 | 布局解析 | 推荐页列表非 0×0、双列间距与 T3 前基线一致（截图比对）；不通过 → 备选结构（2 行）重验 |
 | V5 | 刷新全链路 | `adb shell input tap` FAB 坐标 → logcat 见请求 → 数据替换 → FAB 恢复；期间 opacity 0.6 |
-| V6 | patch 错位回归 | V5 全程 logcat 无 `RemoveNode got wrong child index`；复现 → 仅该页恢复 `:key` 并上报 |
+| V6 | patch 错位回归 | V5 全程 logcat 无 `RemoveNode got wrong child index` 且列表渲染新数据（页面侧同 tick epoch 重建生效）；复现 → 停下回报（红线 4） |
 | V7 | 防重入 | 刷新中连点 FAB 3 次，请求计数 = 1 |
 | V8 | tab 互斥 | Bookmarks 刷新中切 tab → 切回，无卡死 FAB、可再次刷新 |
 | V9 | web-core 回归 | `pnpm dev:app-lynx` 浏览器预览：FAB 渲染 + 点击触发刷新 |

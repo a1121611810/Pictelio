@@ -85,7 +85,14 @@ function sync() {
 async function refreshFeed() {
   await feed.refresh()
   sync()
+  // [lynx:fix] vue-lynx patch 的 RemoveNode 索引错位是框架 bug：裸 list 数据整体替换即复现
+  // （列表全空白，模拟器实测 2026-08-24，ADR-0107 D4）。epoch 必须与 sync() 同一 tick
+  // flush（key 变化走整树替换，不发生子节点 patch）；异步 bump 仍会先触发错误 patch。
+  refreshEpoch.value++
 }
+
+/** list 强制重建代（refresh 后 ++，驱动 :key 替换） */
+const refreshEpoch = ref(0)
 
 /** 加载更多（scrolltolower）：feed.fetchMore() 内置双防抖 + 翻页优先级，完成后同步快照 */
 async function loadMore() {
@@ -153,6 +160,7 @@ onActivated(() => {
       :refresh="refreshFeed"
     >
     <list
+      :key="refreshEpoch"
       class="w-full h-full"
       list-type="waterfall"
       scroll-orientation="vertical"

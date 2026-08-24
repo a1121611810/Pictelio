@@ -76,6 +76,9 @@ function syncIllust() {
 async function refreshIllust() {
   await illustFeed.value.refresh()
   syncIllust()
+  // [lynx:fix] 数据整体替换触发 vue-lynx patch RemoveNode 索引错位（框架 bug，ADR-0107 D4）；
+  // epoch 与 sync 同 tick flush（key 变化走整树替换，不发生子节点 patch）；双列表共享一代
+  refreshEpoch.value++
 }
 
 async function loadIllustMore() {
@@ -127,7 +130,11 @@ function syncNovel() {
 async function refreshNovel() {
   await novelFeed.value.refresh()
   syncNovel()
+  refreshEpoch.value++ // [lynx:fix] 同上
 }
+
+/** list 强制重建代（refresh 后 ++，驱动 :key 替换；双列表共享） */
+const refreshEpoch = ref(0)
 
 async function loadNovelMore() {
   await novelFeed.value.fetchMore()
@@ -255,6 +262,7 @@ onMounted(async () => {
       :refresh="refreshIllust"
     >
     <list
+      :key="refreshEpoch"
       class="w-full h-full"
       list-type="waterfall"
       scroll-orientation="vertical"
@@ -308,6 +316,7 @@ onMounted(async () => {
       :refresh="refreshNovel"
     >
     <list
+      :key="refreshEpoch"
       class="w-full h-full"
       list-type="single"
       scroll-orientation="vertical"

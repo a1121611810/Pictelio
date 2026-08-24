@@ -1269,6 +1269,12 @@ it('FAB 双端同构：M3 令牌样式 + 右下角定位 + a11y 注册表 label 
   expect(refreshableListVue).toContain('@tap="onTap"')
 })
 
+it('组件无 refreshEpoch：重建 workaround 必须在页面侧同 tick flush（ADR-0107 D4 实测）', () => {
+  // oracle：ADR-0107 决策 4——组件内 await 后 bump 的 flush 排在 items 替换之后，
+  // 旧 list 仍触发错误 patch（模拟器实测 15 条 RemoveNode）；页面侧同 tick 错误归零
+  expect(refreshableListVue).not.toContain('refreshEpoch')
+})
+
 it('负向断言：原生下拉路线零残留（ADR-0107 平台事实，防复活）', () => {
   expect(refreshableListVue).not.toContain('<refresh')
   expect(refreshableListVue).not.toContain('refresh-header')
@@ -1318,7 +1324,7 @@ it('9 实例均为 :refresh 函数绑定（ADR-0107 D2）；FollowList 绑 fetch
   expect(pageSources.FollowList).toContain(':refresh="fetchFirstPage"')
 })
 
-it('页面零自持刷新态：无 refreshing prop/ref、onRefresh 包装器、refreshEpoch 残留', () => {
+it('页面零自持刷新态：无 refreshing prop/ref、onRefresh 包装器', () => {
   for (const n of PAGE_NAMES) {
     const src = pageSources[n]
     expect(src, n).not.toContain(':refreshing=')
@@ -1326,10 +1332,18 @@ it('页面零自持刷新态：无 refreshing prop/ref、onRefresh 包装器、r
     expect(src, n).not.toMatch(/[rR]efreshing\s*=\s*ref\(/)
     expect(src, n).not.toContain('onRefresh')
   }
-  expect(pageSources.Recommended).not.toContain('refreshEpoch')
   for (const n of ['Bookmarks', 'UserHome'] as const) {
     expect(pageSources[n], n).not.toContain('illustRefreshing')
     expect(pageSources[n], n).not.toContain('novelRefreshing')
+  }
+})
+
+it('patch workaround：7 页 list 均 :key 绑定且 epoch 在页面刷新函数内同步 ++（ADR-0107 D4）', () => {
+  for (const n of PAGE_NAMES) {
+    const src = pageSources[n]
+    expect(src, n).toContain(':key="refreshEpoch"')
+    expect(src, n).toContain('refreshEpoch = ref(0)')
+    expect(src, n).toContain('refreshEpoch.value++')
   }
 })
 

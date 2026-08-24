@@ -46,7 +46,9 @@ async function onTap() {
 <template>
   <!-- 容器 = 列表布局参与者（flex-1 min-h-0）+ FAB 定位上下文（relative）；
        容器底边 = 内容区底边（底部导航顶边），FAB 不遮导航。
-       布局契约：slot 内 list 用 w-full h-full（相对本容器解析，V4 模拟器验证） -->
+       布局契约：slot 内 list 用 w-full h-full（相对本容器解析，V4 模拟器已验证）；
+       patch 错位 workaround（list 强制重建 :key）在页面侧与数据替换同 tick——
+       组件内异步 bump 的 flush 排在 items 替换之后，仍会触发错误 patch（实测，ADR-0107 D4） -->
   <view class="w-full flex-1 min-h-0 relative">
     <slot />
     <!-- M3 FAB：56dp=14.933vw、shape-large、primary-container、elevation-3（按压降 1）。

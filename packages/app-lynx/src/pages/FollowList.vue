@@ -41,6 +41,9 @@ async function fetchFirstPage() {
       return u
     })
     nextUrl.value = res.next_url
+    // [lynx:fix] 数据整体替换触发 vue-lynx patch RemoveNode 索引错位（框架 bug，ADR-0107 D4）；
+    // epoch 与 users 替换同 tick flush（key 变化走整树替换，不发生子节点 patch）
+    refreshEpoch.value++
   } catch (err) {
     errorMsg.value = presentError(err, '加载失败')
   } finally {
@@ -98,6 +101,9 @@ function openUser(id: number) {
 onMounted(fetchFirstPage)
 // 刷新入口（ADR-0107）：fetchFirstPage 幂等（重置 users/nextUrl/errorMsg），
 // 直接绑定 RefreshableList :refresh；刷新状态机内收组件，页面零自持刷新态
+
+/** list 强制重建代（fetchFirstPage 成功后 ++，驱动 :key 替换） */
+const refreshEpoch = ref(0)
 </script>
 
 <template>
@@ -119,6 +125,7 @@ onMounted(fetchFirstPage)
 
     <RefreshableList v-if="!loading || users.length > 0" :refresh="fetchFirstPage">
     <list
+      :key="refreshEpoch"
       class="w-full h-full"
       list-type="single"
       scroll-orientation="vertical"
