@@ -31,15 +31,15 @@ _Avoid_: 到底后报错、静默空白
 分页（fetchMore）失败时在**列表底部**显示的错误提示，保留已加载内容，`nextUrl` 保留供滚动自动重试。与首屏错误（顶部整页提示）相对——两者槽位分离（createMixFeed 的 `error()` / `pageError()`）。
 _Avoid_: 分页错误显示在列表顶部、清空已加载内容
 
-### 下拉刷新（Pull-to-refresh）
+### 列表刷新（List refresh）
 
-**下拉刷新手势（pull-to-refresh gesture）**：
-列表页的刷新手势入口。原生 LynxView 由 `<refresh>` XElement（xelement-refresh，底层 SmartRefreshLayout）承载；web-core 预览无 `refresh` 标签映射，降级为组件内建刷新按钮。刷新语义对齐根 ADR-0076 语义 A（可见刷新过程）：原生侧由 `<refresh-header>` 停留 + spinner 实现，**不做**骨架遮罩替换（那是 webview 无原生 header 时的代偿）。数据动作统一为既有 `feed.refresh()` / `fetchFirstPage()`（幂等 + generation 竞态防护），下拉刷新不新增数据层语义。
-_Avoid_: 骨架遮罩刷新（webview 专属代偿）、页面自实现 touch 手势
+**刷新 FAB（refresh FAB）**：
+列表页唯一的刷新入口：固定于列表容器右下角的浮动按钮（M3 FAB，56dp），双端（LynxView 原生 / web-core 预览）同构。点击触发页面刷新函数；刷新进行中按钮呈禁用态并忽略重复点击（防重入）。数据动作统一为既有 `feed.refresh()` / `fetchFirstPage()`（幂等 + generation 竞态防护），刷新入口不新增数据层语义。
+_Avoid_: 下拉刷新手势（已废弃，ADR-0107：原生 `<refresh>` XElement 路线在模拟器验收中判定不可行）、骨架遮罩刷新（webview 专属代偿）、滚动时隐藏按钮（v1 不做）
 
 **RefreshableList**：
-下拉刷新容器组件（深模块），本上下文唯一合法的下拉刷新承载者。接口仅三件：`:refreshing` prop（外部驱动，`false` 时组件调 `finishRefresh()` 收起 header）、`@refresh` 事件（用户下拉过阈值触发）、默认 slot（放现有 `<list>`）。双端分支、header 双态（「下拉刷新」/「刷新中…」）、SelectorQuery 调用、15s 兜底全部收敛内部。9 个列表实例（Recommended / IllustList / NovelList / Following / Bookmarks×2 / UserHome×2 / FollowList）统一消费。
-_Avoid_: 页面内直接写 `<refresh>` 标签、FAB 刷新按钮（已废弃，Fab.vue 随之删除）
+列表刷新容器组件（深模块），本上下文唯一合法的列表刷新入口承载者。接口仅两件：`:refresh` 函数 prop（页面传入幂等刷新函数，组件内部持有刷新态并 `try/finally` 复位）、默认 slot（放现有 `<list>`）。防重入、FAB 定位/样式/a11y 全部收敛内部；**页面禁止自持刷新态**（无 refreshing ref、无 onRefresh 包装器）。9 个列表实例（Recommended / IllustList / NovelList / Following / Bookmarks×2 / UserHome×2 / FollowList）统一消费。
+_Avoid_: 页面直接渲染刷新按钮、复活独立 Fab 组件（Fab.vue 已删除；seam 无第二适配器）、下拉刷新手势（ADR-0107）、页面写 `<refresh>` 标签（web-core 无标签映射且原生路线已废弃）
 
 ### 客户端（Client）
 

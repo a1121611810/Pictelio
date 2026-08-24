@@ -1,6 +1,6 @@
 # ADR-0106: app-lynx 列表下拉刷新（Lynx Pull-to-Refresh）
 
-- 状态：accepted
+- 状态：superseded（2026-08-24，核心决策被 ADR-0107 取代：T4 模拟器验收判定原生 `<refresh>` 路线不可行，刷新入口改 FAB；范围决策 D5 与验收方法论沿用）
 - 日期：2026-08-24
 - 关联：ADR-0076（webview 首页下拉刷新，语义 A 来源）、ADR-0104（分页收敛 / createMixFeed）、#51（XElement input 集成模式）、`packages/app-lynx/CONTEXT.md`（术语）
 - 来源：grill-with-docs 会话，用户逐项拍板（D1-D7 见 spec `docs/specs/app-lynx-pull-to-refresh.md`）

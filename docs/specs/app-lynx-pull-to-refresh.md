@@ -1,7 +1,7 @@
 # app-lynx 列表下拉刷新 —— 功能规格
 
 > 来源：grill-with-docs 会话（用户逐项拍板 D1-D7）；决策记录：ADR-0106；术语：`packages/app-lynx/CONTEXT.md`（下拉刷新手势 / RefreshableList）
-> 状态：ready-for-agent
+> 状态：**superseded by `docs/specs/app-lynx-fab-refresh.md`（ADR-0107）**——原生 `<refresh>` 路线模拟器验收判定不可行，刷新入口改 FAB；本文档保留作失败记录与平台事实出处
 
 ## Problem Statement
 
