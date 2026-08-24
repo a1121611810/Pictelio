@@ -158,6 +158,7 @@ onActivated(() => {
     <RefreshableList
       v-else-if="!loading || items.length > 0"
       :refresh="refreshFeed"
+      @back-to-top="refreshEpoch++"
     >
     <list
       :key="refreshEpoch"

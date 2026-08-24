@@ -42,8 +42,8 @@ _Avoid_: 下拉刷新手势（已废弃，ADR-0107：原生 `<refresh>` XElement
 _Avoid_: 无动画静默刷新（弱可见性）、JS 计时器驱动旋转（每帧 bridge，性能否决）、骨架遮罩（webview 专属代偿）
 
 **回顶按钮（back-to-top button）**：
-列表页回顶入口：固定于列表容器右下角、刷新 FAB 上方的悬浮按钮（M3 small FAB 40dp），**常驻显示**（ADR-0110：`<list>` 不派发 per-frame scroll，滚动阈值感知在 JS 层不可行——按钮常驻，点击平滑回顶）。点击触发原生 scroll-to-index smooth 回顶；挂载入场动画。双端同构（原生 LynxView / web-core 同一实现与动画）。
-_Avoid_: 滚动阈值显示（JS 无滚动位置信号，ADR-0110 平台事实）、JS 逐帧驱动回顶（原生 SmoothScroller 是正道）
+列表页回顶入口：固定于列表容器右下角、刷新 FAB 上方的悬浮按钮（M3 small FAB 40dp），**常驻显示**（ADR-0110：`<list>` 不派发 per-frame scroll、无 JS 可触发滚动属性——按钮常驻 + **重建回顶**：点击触发页面 list `:key` 重建，新列表起始于顶部）。挂载入场动画。双端同构（原生 LynxView / web-core 同一实现与动画）。
+_Avoid_: 滚动阈值显示（JS 无滚动位置信号，ADR-0110 平台事实）、JS 逐帧驱动回顶（原生 SmoothScroller 仅 scroll-view 有，list 无此通道）、常驻轮询 timer
 
 **RefreshableList**：
 列表刷新容器组件（深模块），本上下文唯一合法的列表刷新入口承载者。接口仅两件：`:refresh` 函数 prop（页面传入幂等刷新函数，组件内部持有刷新态并 `try/finally` 复位）、默认 slot（放现有 `<list>`）。防重入、FAB 定位/样式/a11y 全部收敛内部；**页面禁止自持刷新态**（无 refreshing ref、无 onRefresh 包装器）。9 个列表实例（Recommended / IllustList / NovelList / Following / Bookmarks×2 / UserHome×2 / FollowList）统一消费。

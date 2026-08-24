@@ -162,7 +162,7 @@ onMounted(() => {
       </view>
     </view>
 
-    <RefreshableList v-if="novels.length > 0" :refresh="refreshFeed">
+    <RefreshableList v-if="novels.length > 0" :refresh="refreshFeed" @back-to-top="refreshEpoch++">
     <list
       :key="refreshEpoch"
       class="w-full h-full"

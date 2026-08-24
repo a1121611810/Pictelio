@@ -1245,9 +1245,9 @@ const refreshableListVue = readFileSync(
   'utf8',
 )
 
-it('接口仅 :refresh 函数 prop + 默认 slot（ADR-0107 决策 2：页面零自持刷新态）', () => {
+it('接口：:refresh prop + @back-to-top 事件 + 默认 slot（ADR-0107/0110）', () => {
   expect(refreshableListVue).toContain('refresh: () => Promise<void> | void')
-  expect(refreshableListVue).not.toContain('defineEmits')
+  expect(refreshableListVue).toContain(`(e: 'back-to-top')`)
   expect(refreshableListVue).not.toContain('refreshing: boolean')
 })
 
@@ -1284,14 +1284,34 @@ it('组件无 refreshEpoch：重建 workaround 必须在页面侧同 tick flush�
   expect(refreshableListVue).not.toContain('refreshEpoch')
 })
 
-it('负向断言：原生下拉路线零残留（ADR-0107 平台事实，防复活）', () => {
+it('回顶常驻：@back-to-top emit + 防重入 + 按钮/动画/a11y（ADR-0110）', () => {
+  // oracle：ADR-0110（修订）——actuation = emit 驱动页面 list :key 重建（list 无 JS 滚动通道）；
+  // 防重入窗口 1000ms；M3 small FAB 叠于刷新 FAB 上方；入场动画；a11y 注册表
+  expect(refreshableListVue).toContain(`(e: 'back-to-top')`)
+  expect(refreshableListVue).toContain("emit('back-to-top')")
+  expect(refreshableListVue).toMatch(/BACK_TO_TOP_RESET_MS = 1000/)
+  expect(refreshableListVue).toContain('if (backToTopPending.value) return')
+  expect(refreshableListVue).toContain('bottom-[25.6vw]')
+  expect(refreshableListVue).toContain('w-[10.667vw]')
+  expect(refreshableListVue).toContain('@keyframes back-to-top-in')
+  expect(refreshableListVue).toContain('BACK_TO_TOP_A11Y_LABELS.backToTop')
+  expect(refreshableListVue).toContain('onUnmounted(clearBackToTopReset)')
+})
+
+it('负向断言：原生下拉路线零残留 + 感知/直绑通道已删（ADR-0107/0110 平台事实，防复活）', () => {
   expect(refreshableListVue).not.toContain('<refresh')
   expect(refreshableListVue).not.toContain('refresh-header')
   expect(refreshableListVue).not.toContain('createSelectorQuery')
   expect(refreshableListVue).not.toContain('finishRefresh')
   expect(refreshableListVue).not.toContain('PictelioApp')
   expect(refreshableListVue).not.toContain('isNativeMode')
-  expect(refreshableListVue).not.toContain('setTimeout')
+  // ADR-0110：感知层（阈值状态机 / scroll 事件）与直绑触发（scroll-to-index /
+  // initial-scroll-index——list 不支持）整体删除
+  expect(refreshableListVue).not.toContain('createBackToTopState')
+  expect(refreshableListVue).not.toContain('scrollProps')
+  expect(refreshableListVue).not.toContain('scroll-to-index')
+  // 红线修订（ADR-0110 D3）：禁 timer 驱动动画/常驻轮询；允许一次性触发复位 timer
+  // （BACK_TO_TOP_RESET_MS=1000 有界 + onUnmounted 清理，上一条断言覆盖）
 })
 })
 
@@ -1353,6 +1373,13 @@ it('patch workaround：7 页 list 均 :key 绑定且 epoch 在页面刷新函数
     expect(src, n).toContain(':key="refreshEpoch"')
     expect(src, n).toContain('refreshEpoch = ref(0)')
     expect(src, n).toContain('refreshEpoch.value++')
+  }
+})
+
+it('回顶：7 页 9 实例均 @back-to-top="refreshEpoch++"（ADR-0110 修订：emit 驱动重建回顶）', () => {
+  for (const n of PAGE_NAMES) {
+    const src = pageSources[n]
+    expect(src, n).toContain('@back-to-top="refreshEpoch++"')
   }
 })
 

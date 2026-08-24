@@ -260,6 +260,7 @@ onMounted(async () => {
     <RefreshableList
       v-if="activeTab === 'illust' && (illustLoading || illusts.length > 0)"
       :refresh="refreshIllust"
+      @back-to-top="refreshEpoch++"
     >
     <list
       :key="refreshEpoch"
@@ -314,6 +315,7 @@ onMounted(async () => {
     <RefreshableList
       v-else-if="activeTab === 'novel' && (novelLoading || novels.length > 0)"
       :refresh="refreshNovel"
+      @back-to-top="refreshEpoch++"
     >
     <list
       :key="refreshEpoch"

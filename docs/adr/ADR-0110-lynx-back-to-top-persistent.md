@@ -16,9 +16,9 @@ ADR-0109 原设计：滚动超过阈值（800px）才显示回顶按钮，依赖
 ## 决策
 
 1. **按钮常驻**：右下角（刷新 FAB 上方，`right-4 bottom-[25.6vw]`）M3 small FAB 40dp，恒显示。无阈值、无显示/隐藏状态机、无滚动感知。顶部时点击为无害 no-op（list 已在前端）。
-2. **触发 = scroll-to-index + 一次性复位 timer**：tap 置 `backToTopPending` → `scrollProps` 的 `'scroll-to-index'` 变 `{ index: 0, smooth: true }`（对象形态 + isSmooth 已字节码实证）→ 原生平滑回顶。`scroll-to-index` 仅在**值变化**时触发——1000ms 一次性 timer 清 pending（值回 undefined，下次 tap 可再触发）；复位窗口内连点防重入。
+2. **触发 = emit 驱动重建回顶**：tap → `emit('back-to-top')` → 页面 `@back-to-top="refreshEpoch++"` → list `:key` 变化强制重建 → 新列表实例起始于顶部（与刷新 epoch 重建同机制，模拟器验证像素级回顶 diff=0.0）。`scroll-to-index`（scroll-view 专有）与 `initial-scroll-index`（仅初始化生效）在 `<list>` 上均不可用——模拟器实证（新增平台事实 ③）。防重入：1000ms 一次性 timer 窗口内连点只 emit 一次（不重复重建）。
 3. **红线修订**：原"禁止 setTimeout"（ADR-0109）改为——**禁止 timer 驱动动画 / 常驻轮询；允许一次性触发复位 timer（有界 1000ms、非动画驱动、onUnmounted 清理）**。负向单测相应放宽为断言复位 timer 有界 + 清理。
-4. **接口 = scoped slot 不透明句柄**（沿用 ADR-0109 D1，spike 已验证渲染正常）：`v-slot="{ scrollProps }"` + `<list v-bind="scrollProps">`。`scrollProps` 现仅含 `'scroll-to-index'`（无 onScroll）。页面每列表 +1 行。
+4. **接口 = `:refresh` prop + `@back-to-top` 事件 + slot**（2 接口元素）：actuation 由页面 list `:key` 重建承担（页面已具备 refreshEpoch 机制，仅需在组件上绑 `@back-to-top="refreshEpoch++"`）。删除了 scoped slot / scrollProps（原直绑通道不可用）。
 5. **动画**：挂载入场 keyframes（fade + 上滑 + 微缩放，200ms，ADR-0108 已验证机制）+ 按压反馈（`active:bg-layer-pressed-on-surface`）+ 回顶本身为原生平滑滚动。
 6. **删除**：`createBackToTopState` 原语（阈值状态机不再需要，无逻辑可收口——删除测试删除测试同删）；原 spec 的阈值/感知/边界表废弃。
 
@@ -34,4 +34,8 @@ ADR-0109 原设计：滚动超过阈值（800px）才显示回顶按钮，依赖
 
 - 正面：砍掉整个感知层（状态机/阈值/scroll 事件/探针），实现面大幅缩小；按钮常驻无感知依赖；复用已验证机制（keyframes 动画 ADR-0108、scroll-to-index 属性通道、scoped slot 渲染）；页面 9 处各 +1 行。
 - 负面：按钮在列表顶部/短列表时无实际作用（无害 no-op）；遮挡右下角内容（与刷新 FAB 垂直堆叠，56dp 见方区域，可接受）。
-- 待验证项（实现期模拟器闭环）：scroll-to-index 平滑回顶实际生效；1000ms 复位 timer 下重复点击再触发；入场动画表现；刷新 FAB 与回顶按钮互不干扰（位置/事件）。
+- 待验证项（实现期模拟器闭环，2026-08-24 完成）：
+  - ~~scroll-to-index 平滑回顶实际生效~~ **已证伪**（见决策 2 新增平台事实）；重建回顶生效（V2 像素级 0.0、V3 重复触发）。
+  - ~~入场动画表现~~ **已验证**（机制与 fab-spin 同源，ADR-0108；200ms 一次性帧难以 adb 捕获，单测断言 + 视觉确认按钮渲染正常）。
+  - ~~刷新 FAB 与回顶按钮互不干扰~~ **已验证**（V4：刷新数据替换 + RemoveNode 归零 + 按钮共存）。
+  - 实现期发现（已入组件注释）：空 view 无子元素不渲染；静态 `style="..."` 字符串在 Lynx 不生效（需 class / `:style` 对象）。

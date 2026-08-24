@@ -61,5 +61,10 @@ export const REFRESH_A11Y_LABELS = {
   refreshList: '刷新列表',
 } as const
 
+/** RefreshableList 回顶按钮（ADR-0109：M3 small FAB，超阈值显示） */
+export const BACK_TO_TOP_A11Y_LABELS = {
+  backToTop: '回到顶部',
+} as const
+
 // Lynx 元素属性不支持 Vue 插值表达式，模板中用 :accessibility-element 绑定此常量
 export const A11Y_ELEMENT_ENABLED = true

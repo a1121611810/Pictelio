@@ -123,7 +123,7 @@ onMounted(() => {
         </view>
     </view>
 
-    <RefreshableList v-else :refresh="refreshFeed">
+    <RefreshableList v-else :refresh="refreshFeed" @back-to-top="refreshEpoch++">
     <list
       :key="refreshEpoch"
       class="w-full h-full"

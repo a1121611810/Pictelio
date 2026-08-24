@@ -123,7 +123,7 @@ const refreshEpoch = ref(0)
       </view>
     </view>
 
-    <RefreshableList v-if="!loading || users.length > 0" :refresh="fetchFirstPage">
+    <RefreshableList v-if="!loading || users.length > 0" :refresh="fetchFirstPage" @back-to-top="refreshEpoch++">
     <list
       :key="refreshEpoch"
       class="w-full h-full"
