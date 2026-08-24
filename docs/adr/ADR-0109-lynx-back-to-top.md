@@ -1,6 +1,6 @@
 # ADR-0109: app-lynx 回顶按钮（scroll-to-index 通道 + scoped slot 接口）
 
-- 状态：accepted
+- 状态：superseded（2026-08-24，T1 T-spike 实证 `<list>` 不派发 per-frame scroll，阈值感知在 JS 层不可行；常驻版见 ADR-0110）
 - 日期：2026-08-24
 - 关联：ADR-0107（RefreshableList 深模块：FAB 刷新入口）、ADR-0108（原生 keyframes 动画实证）、ADR-0104（createMixFeed 分页）、`packages/app-lynx/CONTEXT.md`（回顶按钮 / back-to-top button）
 - 来源：grill-with-docs 会话，用户拍板：右下角回顶按钮、滚动超阈值才显示、带动画；本 ADR 按推荐定案
