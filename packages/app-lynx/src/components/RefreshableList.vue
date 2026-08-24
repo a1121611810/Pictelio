@@ -60,7 +60,28 @@ async function onTap() {
       :accessibility-label="REFRESH_A11Y_LABELS.refreshList"
       @tap="onTap"
     >
-      <text class="text-[6.4vw] leading-none text-primary-on-container">↻</text>
+      <!-- 旋转承载元素 = 包裹 view（text 元素 transform 支持性弱，ADR-0108 决策 2）；
+           动画类与 refreshing 同源，刷新结束移除复位 0° -->
+      <view :class="refreshing ? 'fab-spin' : ''">
+        <text class="text-[6.4vw] leading-none text-primary-on-container">↻</text>
+      </view>
     </view>
   </view>
 </template>
+
+<!-- 全局样式（与 App.vue shimmer 同机制，规避 scoped keyframes 在 Lynx 的未验证面，ADR-0108）；
+     类名 fab-spin 全仓唯一。原生支持由 LynxKeyframeAnimator+TransformProps 字节码实证，
+     行为待 T2'' 模拟器确认 -->
+<style>
+@keyframes fab-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+.fab-spin {
+  animation: fab-spin 1s linear infinite;
+}
+</style>

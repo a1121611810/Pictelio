@@ -1269,6 +1269,15 @@ it('FAB 双端同构：M3 令牌样式 + 右下角定位 + a11y 注册表 label 
   expect(refreshableListVue).toContain('@tap="onTap"')
 })
 
+it('刷新中旋转动画：keyframes + refreshing 同源类绑定（ADR-0108 决策 1/2/3）', () => {
+  // oracle：ADR-0108 决策 1（1s/圈 linear infinite）、决策 2（承载 view + refreshing 驱动）、
+  // 决策 3（保留 opacity 0.6 双信号）
+  expect(refreshableListVue).toContain('@keyframes fab-spin')
+  expect(refreshableListVue).toMatch(/animation: fab-spin 1s linear infinite/)
+  expect(refreshableListVue).toContain("refreshing ? 'fab-spin'")
+  expect(refreshableListVue).toContain('opacity: 0.6')
+})
+
 it('组件无 refreshEpoch：重建 workaround 必须在页面侧同 tick flush（ADR-0107 D4 实测）', () => {
   // oracle：ADR-0107 决策 4——组件内 await 后 bump 的 flush 排在 items 替换之后，
   // 旧 list 仍触发错误 patch（模拟器实测 15 条 RemoveNode）；页面侧同 tick 错误归零
