@@ -56,5 +56,10 @@ export const ERROR_A11Y_LABELS = {
   backToLogin: '返回登录',
 } as const
 
+/** RefreshableList 下拉刷新（ADR-0106）：web-only 刷新按钮（原生手势无可点元素，无需标注） */
+export const REFRESH_A11Y_LABELS = {
+  refreshList: '刷新列表',
+} as const
+
 // Lynx 元素属性不支持 Vue 插值表达式，模板中用 :accessibility-element 绑定此常量
 export const A11Y_ELEMENT_ENABLED = true

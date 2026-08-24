@@ -1229,3 +1229,63 @@ describe('authStore 会话失效触发错误页（候选 #2）', () => {
     spy.mockRestore()
   })
 })
+
+// ─── RefreshableList 下拉刷新容器（ADR-0106） ───
+// 期望值出处（oracle）：xelement-refresh-4.0.1.aar 字节码提取（javap/strings 实证）——
+//   事件名 refreshstatechange/startrefresh、属性 enable-refresh、方法 finishRefresh/autoStartRefresh、
+//   状态值 0=REFRESH_STATE_IDLE / 1=DRAG_RELEASE / 2=REFRESHING。
+// 结构断言遵循本文件既有「模板源码断言」约定（node 环境无法渲染 Lynx 元素，模拟器 E2E 兜底）。
+describe('RefreshableList 下拉刷新容器（ADR-0106）', () => {
+const refreshableListVue = readFileSync(
+  fileURLToPath(new URL('../src/components/RefreshableList.vue', import.meta.url)),
+  'utf8',
+)
+
+it('原生分支结构与字节码契约一致（事件/属性/方法名）', () => {
+  // <refresh> + <refresh-header> 结构
+  expect(refreshableListVue).toContain('<refresh')
+  expect(refreshableListVue).toContain('<refresh-header')
+  // 属性/事件/方法名 = 字节码常量（oracle 见文件头注释）
+  expect(refreshableListVue).toContain('enable-refresh')
+  expect(refreshableListVue).toContain('@startrefresh')
+  expect(refreshableListVue).toContain('@refreshstatechange')
+  expect(refreshableListVue).toContain('finishRefresh')
+  // 状态值契约：REFRESHING = 2（javap -constants 实证）
+  expect(refreshableListVue).toMatch(/REFRESH_STATE_REFRESHING\s*=\s*2/)
+})
+
+it('接口仅 prop refreshing + 事件 refresh（ADR-0106 D2）', () => {
+  expect(refreshableListVue).toContain('defineProps<{ refreshing: boolean }>')
+  expect(refreshableListVue).toContain(`(e: 'refresh')`)
+})
+
+it('web-core 分支：无 <refresh> 标签泄漏 + 内建刷新按钮走同一 @refresh 通道', () => {
+  // v-else 分支内禁止出现 <refresh（web-core 无标签映射，ADR-0106 红线 4）
+  const elseBranch = refreshableListVue.split('<template v-else>')[1] ?? ''
+  expect(elseBranch).not.toContain('<refresh')
+  // 内建 web-only 按钮（Fab.vue 删除后的样式承接，D4）；label 走注册表（issue #103 约定）
+  expect(elseBranch).toContain(':accessibility-label="REFRESH_A11Y_LABELS.refreshList"')
+  expect(elseBranch).toContain('@tap="onStartRefresh"')
+  // 样式直接内联（Fab.vue 已删，不接受回依赖）
+  expect(elseBranch).toContain('w-[14.933vw]')
+})
+
+it('卡死兜底：15s watchdog + warn 可见（禁止静默降级）+ unmount 清理', () => {
+  expect(refreshableListVue).toMatch(/WATCHDOG_MS\s*=\s*15000/)
+  expect(refreshableListVue).toContain('console.warn')
+  expect(refreshableListVue).toContain('onUnmounted(clearWatchdog)')
+})
+
+it('双端分支用 isNativeMode（api/client 现成导出），SelectorQuery 可选链防御', () => {
+  expect(refreshableListVue).toContain(`from '../api/client'`)
+  expect(refreshableListVue).toContain('isNativeMode()')
+  expect(refreshableListVue).toContain('lynx?.createSelectorQuery?.()')
+})
+
+it('实例 id 计数器在模块级 <script> 块（per-instance 会致双列表同 id 串台）', () => {
+  // 模块级计数器必须位于独立 <script lang="ts"> 块（每模块执行一次），
+  // 且 setup 块内引用该模块级变量
+  expect(refreshableListVue).toMatch(/<script lang="ts">[\s\S]*?let refreshableListSeq = 0[\s\S]*?<\/script>/)
+  expect(refreshableListVue).toContain('`ptr-${++refreshableListSeq}`')
+})
+})
