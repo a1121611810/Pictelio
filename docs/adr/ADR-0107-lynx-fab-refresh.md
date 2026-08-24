@@ -53,5 +53,5 @@ ADR-0106 选择官方 `<refresh>` XElement（底层 SmartRefreshLayout）承载�
   - 裸 view 容器（`relative flex-1 min-h-0`）内 list `h-full` 的原生解析（T4' 已验证通过：推荐页首屏双列/间距/FAB 定位正常）；
   - ~~裸 list 数据替换无 patch 错位~~ **已证伪**；页面侧同 tick epoch 重建后 RemoveNode 错误归零、列表渲染新数据（T4' 已验证通过，决策 4）；
   - 失败知识入档：决策 1/2 的两条平台事实（SelectorQuery-XElement 静默不命中、裸 list 整体替换 patch 错位）为本项目平台约束，禁止后来者重试 SelectorQuery 调 XElement 方法路径。
-  - ~~原生 CSS keyframes 旋转动画~~ **ADR-0108 闭环**：Lynx 原生 SDK 字节码实证含 LynxKeyframeAnimator + TransformProps（transform 旋转引擎存在），模拟器实测确认行为（T2''）。
+  - ~~原生 CSS keyframes 旋转动画~~ **ADR-0108 闭环（已验证，2026-08-24）**：Lynx 原生 SDK 字节码实证含 LynxKeyframeAnimator + TransformProps；模拟器截图连拍确认 FAB 图标原生旋转（像素差异 55.6，静态对照 0.0）。
   - 失败知识入档：决策 1/2 的两条平台事实（SelectorQuery-XElement 静默不命中、`<refresh>` 包裹 patch 错位）为本项目平台约束，禁止后来者重试 SelectorQuery 调 XElement 方法路径。

@@ -42,7 +42,9 @@ onMounted(() => {
 
 /* ─── shimmer 骨架屏（数据加载前的占位动画） ───
  * web-core 实测支持 linear-gradient + @keyframes（浏览器渲染）；
- * 原生 LynxView 的 gradient/animation 支持待 #41 集成后验证。
+ * 原生 LynxView：keyframes 动画已实证支持（ADR-0108：LynxKeyframeAnimator + TransformProps，
+ * FAB 旋转动画模拟器验证通过 2026-08-24）；linear-gradient 背景静态渲染已见（骨架屏原生显示），
+ * background-position 动画行为未单独实证。
  * 用法：元素加 class="shimmer"（配合尺寸类如 aspect-[1/1]、h-[28rpx]）。 */
 @keyframes shimmer {
   0% {

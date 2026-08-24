@@ -39,4 +39,6 @@ ADR-0107 的 FAB 刷新入口在刷新进行中仅有 `opacity: 0.6` 弱信号�
 
 - 正面：恢复「可见刷新过程」语义（ADR-0076 语义 A）；零新依赖/新原生面/新 bridge；动画由原生线程驱动（性能）；双端同构（同模板同 keyframes）；闭环两项挂账待验证项。
 - 负面：若模拟器实证原生 transform 旋转不生效（引擎存在 ≠ 行为保证），降级为 opacity 脉冲（引擎对 opacity 支持更基础）或 shimmer 同款 background-position 机制，接口不变、成本约 10 行。
-- 待验证项（T2'' 模拟器闭环）：原生 `transform: rotate` keyframes 实际帧动画；shimmer 在原生是否真动画（顺带确认，可回写 App.vue 注释）。
+- 待验证项（T2'' 模拟器闭环，2026-08-24 完成）：
+  - ~~原生 `transform: rotate` keyframes 实际帧动画~~ **已验证**：点击 FAB 后截图连拍（4 帧），FAB 图标区逐帧像素差异 55.6（旋转位移量级，静态对照区 0.0）——动画运行期间图标取向变化；logcat 零动画错误。
+  - shimmer 的 linear-gradient 背景**静态渲染**已见（骨架屏原生显示）；`background-position` 动画行为未单独实证（保守标注，App.vue 注释已更新）。
