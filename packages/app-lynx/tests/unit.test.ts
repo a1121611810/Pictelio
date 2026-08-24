@@ -1230,70 +1230,60 @@ describe('authStore 会话失效触发错误页（候选 #2）', () => {
   })
 })
 
-// ─── RefreshableList 下拉刷新容器（ADR-0106） ───
-// 期望值出处（oracle）：xelement-refresh-4.0.1.aar 字节码提取（javap/strings 实证）——
-//   事件名 refreshstatechange/startrefresh、属性 enable-refresh、方法 finishRefresh/autoStartRefresh、
-//   状态值 0=REFRESH_STATE_IDLE / 1=DRAG_RELEASE / 2=REFRESHING。
+// ─── RefreshableList 刷新 FAB 容器（ADR-0107） ───
+// 期望值出处（oracle）：
+//   - 接口形状（:refresh 函数 prop + slot、防重入、try/finally 复位）= ADR-0107 决策 1/2
+//   - FAB 样式令牌（14.933vw=56dp、md-shape-large、primary-container、md-elevation-3）
+//     = Material Design 3 规范（原 Fab.vue 注释已标；原生端已验证模式）
+//   - a11y label = src/utils/accessibility.ts 注册表常量（backupRulesConsistency 模式）
+//   - 负向断言清单 = ADR-0107 平台事实（SelectorQuery 对 XElement 静默不命中、
+//     原生 refresh XElement 包裹 patch 错位），防原生路线复活
 // 结构断言遵循本文件既有「模板源码断言」约定（node 环境无法渲染 Lynx 元素，模拟器 E2E 兜底）。
-describe('RefreshableList 下拉刷新容器（ADR-0106）', () => {
+describe('RefreshableList 刷新 FAB 容器（ADR-0107）', () => {
 const refreshableListVue = readFileSync(
   fileURLToPath(new URL('../src/components/RefreshableList.vue', import.meta.url)),
   'utf8',
 )
 
-it('原生分支结构与字节码契约一致（事件/属性/方法名）', () => {
-  // <refresh> + <refresh-header> 结构
-  expect(refreshableListVue).toContain('<refresh')
-  expect(refreshableListVue).toContain('<refresh-header')
-  // 属性/事件/方法名 = 字节码常量（oracle 见文件头注释）
-  expect(refreshableListVue).toContain('enable-refresh')
-  expect(refreshableListVue).toContain('@startrefresh')
-  expect(refreshableListVue).toContain('@refreshstatechange')
-  expect(refreshableListVue).toContain('finishRefresh')
-  // 状态值契约：REFRESHING = 2（javap -constants 实证）
-  expect(refreshableListVue).toMatch(/REFRESH_STATE_REFRESHING\s*=\s*2/)
+it('接口仅 :refresh 函数 prop + 默认 slot（ADR-0107 决策 2：页面零自持刷新态）', () => {
+  expect(refreshableListVue).toContain('refresh: () => Promise<void> | void')
+  expect(refreshableListVue).not.toContain('defineEmits')
+  expect(refreshableListVue).not.toContain('refreshing: boolean')
 })
 
-it('接口仅 prop refreshing + 事件 refresh（ADR-0106 D2）', () => {
-  expect(refreshableListVue).toContain('defineProps<{ refreshing: boolean }>')
-  expect(refreshableListVue).toContain(`(e: 'refresh')`)
+it('刷新状态机内收：防重入 guard + try/finally 复位 + 异常 warn 可见（硬约束 #3）', () => {
+  expect(refreshableListVue).toContain('if (refreshing.value) return')
+  expect(refreshableListVue).toContain('await props.refresh()')
+  expect(refreshableListVue).toMatch(/finally \{\s*refreshing\.value = false/)
+  expect(refreshableListVue).toContain(`console.warn('[RefreshableList]`)
 })
 
-it('web-core 分支：无 <refresh> 标签泄漏 + 内建刷新按钮走同一 @refresh 通道', () => {
-  // v-else 分支内禁止出现 <refresh（web-core 无标签映射，ADR-0106 红线 4）
-  const elseBranch = refreshableListVue.split('<template v-else>')[1] ?? ''
-  expect(elseBranch).not.toContain('<refresh')
-  // 内建 web-only 按钮（Fab.vue 删除后的样式承接，D4）；label 走注册表（issue #103 约定）
-  expect(elseBranch).toContain(':accessibility-label="REFRESH_A11Y_LABELS.refreshList"')
-  expect(elseBranch).toContain('@tap="onStartRefresh"')
-  // 样式直接内联（Fab.vue 已删，不接受回依赖）
-  expect(elseBranch).toContain('w-[14.933vw]')
+it('FAB 双端同构：M3 令牌样式 + 右下角定位 + a11y 注册表 label + 禁用态 opacity', () => {
+  expect(refreshableListVue).toContain('w-[14.933vw]')
+  expect(refreshableListVue).toContain('rounded-[var(--md-shape-large)]')
+  expect(refreshableListVue).toContain('bg-primary-container')
+  expect(refreshableListVue).toContain('shadow-[var(--md-elevation-3)]')
+  expect(refreshableListVue).toContain('absolute bottom-6 right-4')
+  expect(refreshableListVue).toContain(':accessibility-label="REFRESH_A11Y_LABELS.refreshList"')
+  expect(refreshableListVue).toContain('opacity: 0.6')
+  expect(refreshableListVue).toContain('@tap="onTap"')
 })
 
-it('卡死兜底：15s watchdog + warn 可见（禁止静默降级）+ unmount 清理', () => {
-  expect(refreshableListVue).toMatch(/WATCHDOG_MS\s*=\s*15000/)
-  expect(refreshableListVue).toContain('console.warn')
-  expect(refreshableListVue).toContain('onUnmounted(clearWatchdog)')
-})
-
-it('双端分支用 isNativeMode（api/client 现成导出），SelectorQuery 可选链防御', () => {
-  expect(refreshableListVue).toContain(`from '../api/client'`)
-  expect(refreshableListVue).toContain('isNativeMode()')
-  expect(refreshableListVue).toContain('lynx?.createSelectorQuery?.()')
-})
-
-it('实例 id 计数器在模块级 <script> 块（per-instance 会致双列表同 id 串台）', () => {
-  // 模块级计数器必须位于独立 <script lang="ts"> 块（每模块执行一次），
-  // 且 setup 块内引用该模块级变量
-  expect(refreshableListVue).toMatch(/<script lang="ts">[\s\S]*?let refreshableListSeq = 0[\s\S]*?<\/script>/)
-  expect(refreshableListVue).toContain('`ptr-${++refreshableListSeq}`')
+it('负向断言：原生下拉路线零残留（ADR-0107 平台事实，防复活）', () => {
+  expect(refreshableListVue).not.toContain('<refresh')
+  expect(refreshableListVue).not.toContain('refresh-header')
+  expect(refreshableListVue).not.toContain('createSelectorQuery')
+  expect(refreshableListVue).not.toContain('finishRefresh')
+  expect(refreshableListVue).not.toContain('PictelioApp')
+  expect(refreshableListVue).not.toContain('isNativeMode')
+  expect(refreshableListVue).not.toContain('setTimeout')
 })
 })
 
-// ─── 列表页 RefreshableList 接入（ADR-0106 T3） ───
-// 期望值出处：spec docs/specs/app-lynx-pull-to-refresh.md「页面改造」节（9 个列表实例、
-// try/finally 模式、Fab 删除）；结构断言遵循本文件既有约定。
-describe('列表页 RefreshableList 接入（ADR-0106）', () => {
+// ─── 列表页 RefreshableList 接入（ADR-0107 T3'） ───
+// 期望值出处：spec docs/specs/app-lynx-fab-refresh.md「页面改造」节（9 实例 :refresh 绑定表、
+// 页面禁自持刷新态红线）；结构断言遵循本文件既有约定。
+describe('列表页 RefreshableList 接入（ADR-0107）', () => {
 const PAGE_NAMES = [
   'Recommended',
   'IllustList',
@@ -1315,35 +1305,41 @@ it('7 个列表页全部经 RefreshableList 组件（红线：页面无裸 <refr
     const src = pageSources[n]
     expect(src, n).toContain('<RefreshableList')
     expect(src, n).toContain(`from '../components/RefreshableList.vue'`)
-    // 裸 <refresh 标签禁止出现在页面（web-core 无映射）；'<RefreshableList' 大小写不同不误伤
+    // 裸 <refresh 标签禁止出现在页面；'<RefreshableList' 大小写不同不误伤
     expect(src, n).not.toContain('<refresh')
   }
 })
 
-it('每页 @refresh 处理器均 try/finally 驱动 refreshing（失败也收起 header）', () => {
+it('9 实例均为 :refresh 函数绑定（ADR-0107 D2）；FollowList 绑 fetchFirstPage', () => {
+  for (const n of PAGE_NAMES) {
+    expect(pageSources[n], n).toContain(':refresh="')
+  }
+  // 异构数据层同构接入：fetchFirstPage 幂等（重置 users/nextUrl/errorMsg）
+  expect(pageSources.FollowList).toContain(':refresh="fetchFirstPage"')
+})
+
+it('页面零自持刷新态：无 refreshing prop/ref、onRefresh 包装器、refreshEpoch 残留', () => {
   for (const n of PAGE_NAMES) {
     const src = pageSources[n]
-    expect(src, n).toContain('try {')
-    expect(src, n).toMatch(/finally \{\s*\w*[rR]efreshing\.value = false/)
+    expect(src, n).not.toContain(':refreshing=')
+    expect(src, n).not.toContain('@refresh=')
+    expect(src, n).not.toMatch(/[rR]efreshing\s*=\s*ref\(/)
+    expect(src, n).not.toContain('onRefresh')
   }
-})
-
-it('Bookmarks / UserHome 双列表各自独立 refreshing（互不收对方 header）', () => {
+  expect(pageSources.Recommended).not.toContain('refreshEpoch')
   for (const n of ['Bookmarks', 'UserHome'] as const) {
-    const src = pageSources[n]
-    expect(src, n).toContain('illustRefreshing')
-    expect(src, n).toContain('novelRefreshing')
-    expect(src, n).toContain(':refreshing="illustRefreshing"')
-    expect(src, n).toContain(':refreshing="novelRefreshing"')
+    expect(pageSources[n], n).not.toContain('illustRefreshing')
+    expect(pageSources[n], n).not.toContain('novelRefreshing')
   }
 })
 
-it('推荐页独立 FAB 已删除，Fab.vue 组件文件已删除（ADR-0106 D4）', () => {
-  expect(pageSources.Recommended).not.toContain('Fab')
-  expect(pageSources.Recommended).not.toContain('刷新推荐')
+it('Fab.vue 组件文件不存在（seam 无第二适配器，FAB 内联 RefreshableList）', () => {
   expect(
     existsSync(fileURLToPath(new URL('../src/components/Fab.vue', import.meta.url))),
   ).toBe(false)
+  for (const n of PAGE_NAMES) {
+    expect(pageSources[n], n).not.toContain('Fab.vue')
+  }
 })
 
 it('列表页计数：Bookmarks/UserHome 各 2 个 RefreshableList，其余各 1 个（共 9 实例）', () => {

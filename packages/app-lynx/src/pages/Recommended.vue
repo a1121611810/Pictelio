@@ -80,21 +80,11 @@ function sync() {
     feed.nextUrl() === null && feed.items().length > 0 && !feed.loading() && !feed.loadingMore()
 }
 
-/** 刷新（下拉 / 补拉）：feed.refresh() 幂等（generation++ 丢弃在途旧响应），完成后同步快照 */
+/** 刷新（FAB / 补拉）：feed.refresh() 幂等（generation++ 丢弃在途旧响应），完成后同步快照。
+    直接绑定 RefreshableList :refresh（ADR-0107：刷新状态机内收组件，页面零自持刷新态） */
 async function refreshFeed() {
   await feed.refresh()
   sync()
-}
-
-// 下拉刷新入口（ADR-0106）：RefreshableList @refresh；try/finally 保证失败也收起 header
-const refreshing = ref(false)
-async function onRefresh() {
-  refreshing.value = true
-  try {
-    await refreshFeed()
-  } finally {
-    refreshing.value = false
-  }
 }
 
 /** 加载更多（scrolltolower）：feed.fetchMore() 内置双防抖 + 翻页优先级，完成后同步快照 */
@@ -160,11 +150,10 @@ onActivated(() => {
 
     <RefreshableList
       v-else-if="!loading || items.length > 0"
-      :refreshing="refreshing"
-      @refresh="onRefresh"
+      :refresh="refreshFeed"
     >
     <list
-      class="w-full flex-1 min-h-0"
+      class="w-full h-full"
       list-type="waterfall"
       scroll-orientation="vertical"
       :span-count="2"

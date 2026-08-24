@@ -78,16 +78,6 @@ async function refreshIllust() {
   syncIllust()
 }
 
-// 下拉刷新入口（ADR-0106）：RefreshableList @refresh；try/finally 保证失败也收起 header
-const illustRefreshing = ref(false)
-async function onRefreshIllust() {
-  illustRefreshing.value = true
-  try {
-    await refreshIllust()
-  } finally {
-    illustRefreshing.value = false
-  }
-}
 async function loadIllustMore() {
   await illustFeed.value.fetchMore()
   syncIllust()
@@ -139,15 +129,6 @@ async function refreshNovel() {
   syncNovel()
 }
 
-const novelRefreshing = ref(false)
-async function onRefreshNovel() {
-  novelRefreshing.value = true
-  try {
-    await refreshNovel()
-  } finally {
-    novelRefreshing.value = false
-  }
-}
 async function loadNovelMore() {
   await novelFeed.value.fetchMore()
   syncNovel()
@@ -271,11 +252,10 @@ onMounted(async () => {
     <!-- 插画 waterfall -->
     <RefreshableList
       v-if="activeTab === 'illust' && (illustLoading || illusts.length > 0)"
-      :refreshing="illustRefreshing"
-      @refresh="onRefreshIllust"
+      :refresh="refreshIllust"
     >
     <list
-      class="w-full flex-1"
+      class="w-full h-full"
       list-type="waterfall"
       scroll-orientation="vertical"
       :span-count="2"
@@ -325,11 +305,10 @@ onMounted(async () => {
     <!-- 小说列表 -->
     <RefreshableList
       v-else-if="activeTab === 'novel' && (novelLoading || novels.length > 0)"
-      :refreshing="novelRefreshing"
-      @refresh="onRefreshNovel"
+      :refresh="refreshNovel"
     >
     <list
-      class="w-full flex-1"
+      class="w-full h-full"
       list-type="single"
       scroll-orientation="vertical"
       :lower-threshold-item-count="5"

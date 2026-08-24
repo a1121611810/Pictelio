@@ -73,17 +73,6 @@ async function refreshFeed() {
   sync()
 }
 
-// 下拉刷新入口（ADR-0106）：RefreshableList @refresh；try/finally 保证失败也收起 header
-const refreshing = ref(false)
-async function onRefresh() {
-  refreshing.value = true
-  try {
-    await refreshFeed()
-  } finally {
-    refreshing.value = false
-  }
-}
-
 async function loadMore() {
   await feed.value.fetchMore()
   sync()
@@ -128,9 +117,9 @@ onMounted(() => {
         </view>
     </view>
 
-    <RefreshableList v-else :refreshing="refreshing" @refresh="onRefresh">
+    <RefreshableList v-else :refresh="refreshFeed">
     <list
-      class="w-full flex-1 min-h-0"
+      class="w-full h-full"
       list-type="waterfall"
       scroll-orientation="vertical"
       :span-count="2"

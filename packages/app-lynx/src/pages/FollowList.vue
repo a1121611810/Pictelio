@@ -96,18 +96,8 @@ function openUser(id: number) {
 }
 
 onMounted(fetchFirstPage)
-
-// 下拉刷新入口（ADR-0106）：fetchFirstPage 幂等（重置 users/nextUrl/errorMsg）；
-// try/finally 保证失败也收起 header
-const refreshing = ref(false)
-async function onRefresh() {
-  refreshing.value = true
-  try {
-    await fetchFirstPage()
-  } finally {
-    refreshing.value = false
-  }
-}
+// 刷新入口（ADR-0107）：fetchFirstPage 幂等（重置 users/nextUrl/errorMsg），
+// 直接绑定 RefreshableList :refresh；刷新状态机内收组件，页面零自持刷新态
 </script>
 
 <template>
@@ -127,9 +117,9 @@ async function onRefresh() {
       </view>
     </view>
 
-    <RefreshableList v-if="!loading || users.length > 0" :refreshing="refreshing" @refresh="onRefresh">
+    <RefreshableList v-if="!loading || users.length > 0" :refresh="fetchFirstPage">
     <list
-      class="w-full flex-1 min-h-0"
+      class="w-full h-full"
       list-type="single"
       scroll-orientation="vertical"
       :lower-threshold-item-count="5"
