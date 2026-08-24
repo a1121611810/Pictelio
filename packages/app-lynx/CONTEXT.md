@@ -37,6 +37,10 @@ _Avoid_: 分页错误显示在列表顶部、清空已加载内容
 列表页唯一的刷新入口：固定于列表容器右下角的浮动按钮（M3 FAB，56dp），双端（LynxView 原生 / web-core 预览）同构。点击触发页面刷新函数；刷新进行中按钮呈禁用态并忽略重复点击（防重入）。数据动作统一为既有 `feed.refresh()` / `fetchFirstPage()`（幂等 + generation 竞态防护），刷新入口不新增数据层语义。
 _Avoid_: 下拉刷新手势（已废弃，ADR-0107：原生 `<refresh>` XElement 路线在模拟器验收中判定不可行）、骨架遮罩刷新（webview 专属代偿）、滚动时隐藏按钮（v1 不做）
 
+**刷新旋转（refresh spin）**：
+刷新 FAB 在刷新进行中的视觉反馈：↻ 图标持续旋转（1s/圈），与禁用态（opacity 0.6、防重入）共同构成「可见刷新过程」（ADR-0076 语义 A，ADR-0108）。刷新结束图标复位。双端同构（原生 LynxView 与 web-core 同一 CSS keyframes 机制）。
+_Avoid_: 无动画静默刷新（弱可见性）、JS 计时器驱动旋转（每帧 bridge，性能否决）、骨架遮罩（webview 专属代偿）
+
 **RefreshableList**：
 列表刷新容器组件（深模块），本上下文唯一合法的列表刷新入口承载者。接口仅两件：`:refresh` 函数 prop（页面传入幂等刷新函数，组件内部持有刷新态并 `try/finally` 复位）、默认 slot（放现有 `<list>`）。防重入、FAB 定位/样式/a11y 全部收敛内部；**页面禁止自持刷新态**（无 refreshing ref、无 onRefresh 包装器）。9 个列表实例（Recommended / IllustList / NovelList / Following / Bookmarks×2 / UserHome×2 / FollowList）统一消费。
 _Avoid_: 页面直接渲染刷新按钮、复活独立 Fab 组件（Fab.vue 已删除；seam 无第二适配器）、下拉刷新手势（ADR-0107）、页面写 `<refresh>` 标签（web-core 无标签映射且原生路线已废弃）
