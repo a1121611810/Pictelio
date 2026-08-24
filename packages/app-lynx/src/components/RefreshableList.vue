@@ -15,8 +15,8 @@
 // 平台事实（ADR-0107，禁止回退原生手势路线）：
 //   ① SelectorQuery 对 XElement 节点静默不命中（含 boundingClientRect 探针，
 //      无 success/fail 回调）——完成信号链路在平台层断裂；
-//   ② 原生 refresh XElement 包裹下数据整体替换触发 vue-lynx patch
-//      RemoveNode 索引错位（列表空白）。两条均为模拟器实测 2026-08-24。
+//   ② 裸 list 数据整体替换即触发 vue-lynx patch RemoveNode 索引错位（列表空白，
+//      与包裹层无关；页面侧与数据替换同 tick 的 :key 重建可规避）。均为模拟器实测 2026-08-24。
 import { ref } from 'vue'
 import { REFRESH_A11Y_LABELS } from '../utils/accessibility'
 
