@@ -18,6 +18,7 @@ import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
+import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 import NavigationBar from '../components/NavigationBar.vue'
 import RefreshableList from '../components/RefreshableList.vue'
 import { NAV_TABS, type NavTab } from '../components/navTabs'
@@ -198,8 +199,10 @@ onActivated(() => {
           <SkeletonImage :src="thumbUrl(item.data.image_urls)" height="48.4vw" lazy-load />
         </view>
 
-        <!-- 插画卡：封面 + 标题 + 作者 + 收藏按钮 -->
+        <!-- 插画卡：封面 + 类型徽章行（动图/多图，ADR-0113）+ 标题 + 作者 + 收藏按钮 -->
         <template v-if="item.kind === 'illust'">
+          <!-- 类型徽章行：流内元素（禁 absolute），受限条目照常显示；普通单图零占位 -->
+          <IllustTypeBadgeRow :illust="item.data" />
           <text class="text-title-small font-medium text-surface-on mt-2 mx-2.5 [max-line:1]">{{ item.data.title }}</text>
           <text class="text-body-small text-surface-on-variant mt-1 mx-2.5 [max-line:1]">{{ item.data.user.name }}</text>
           <view class="mt-1 mx-2.5 mb-2.5">
