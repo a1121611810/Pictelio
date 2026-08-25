@@ -1451,6 +1451,36 @@ it('列表页计数：Bookmarks/UserHome 各 2 个 RefreshableList，其余各 1
 })
 })
 
+// ─── 类型徽章行接入（ADR-0113，spec: docs/specs/work-type-badges.md 决策 6） ───
+// oracle 溯源：五页面清单来自 ADR-0113 决策 5 / spec 决策 6（独立 oracle）；
+// import 配对断言的期望值来自原生失败实证——2026-08-25 模拟器实测 UserHome 缺 import 时
+// vue-lynx resolveComponent 落空，组件名作为原生自定义标签直达 Lynx，抛 990200
+// 「No BehaviorController defined for class IllustTypeBadgeRow」整客户端崩到错误页。
+// 该失败在 web-core/单测/tsc 全绿下不可见，仅此断言能防回归。
+describe('类型徽章行页面接入（ADR-0113）', () => {
+const BADGE_PAGES = ['Recommended', 'IllustList', 'Bookmarks', 'Following', 'UserHome'] as const
+const badgePageSources = Object.fromEntries(
+  BADGE_PAGES.map((n) => [
+    n,
+    readFileSync(fileURLToPath(new URL(`../src/pages/${n}.vue`, import.meta.url)), 'utf8'),
+  ]),
+)
+
+it('五个插画瀑布流页面均接入 <IllustTypeBadgeRow>（spec 决策 6 清单）', () => {
+  for (const n of BADGE_PAGES) {
+    expect(badgePageSources[n], n).toContain('<IllustTypeBadgeRow :illust=')
+  }
+})
+
+it('每个接入页面必须 import 组件（缺 import 原生崩溃 990200，2026-08-25 实测）', () => {
+  for (const n of BADGE_PAGES) {
+    expect(badgePageSources[n], n).toContain(
+      "import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'",
+    )
+  }
+})
+})
+
 // ─── BookmarkButton 收藏动效（ADR-0112，spec: docs/specs/app-lynx-bookmark-animation.md） ───
 // oracle 溯源：期望值来自 spec 决策表 D1–D6 / ADR-0112 / tokens.css 令牌定义，非从实现反推。
 describe('BookmarkButton 收藏动效（ADR-0112）', () => {

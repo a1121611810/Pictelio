@@ -24,6 +24,7 @@ import BookmarkButton from '../components/BookmarkButton.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
 import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
 import RefreshableList from '../components/RefreshableList.vue'
+import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 
 const userId = Number(currentParams.value.id)
 
