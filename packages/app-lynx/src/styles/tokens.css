@@ -134,6 +134,9 @@ page {
   --durationFast: 150ms;
   --durationNormal: 200ms;
   --durationGentle: 300ms;
+  /* M3 duration scale 补档（ADR-0112 收藏动效 state-layer 环）：medium1 250ms / medium3 350ms */
+  --durationMedium1: 250ms;
+  --durationMedium3: 350ms;
 
   /* ── M3 运动曲线（motion easing） ──
    * standard 线性强调进出、emphasized 更强的进出强调（material 3 motion tokens）。

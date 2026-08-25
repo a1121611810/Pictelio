@@ -1450,3 +1450,60 @@ it('列表页计数：Bookmarks/UserHome 各 2 个 RefreshableList，其余各 1
   }
 })
 })
+
+// ─── BookmarkButton 收藏动效（ADR-0112，spec: docs/specs/app-lynx-bookmark-animation.md） ───
+// oracle 溯源：期望值来自 spec 决策表 D1–D6 / ADR-0112 / tokens.css 令牌定义，非从实现反推。
+describe('BookmarkButton 收藏动效（ADR-0112）', () => {
+const bookmarkBtnVue = readFileSync(
+  fileURLToPath(new URL('../src/components/BookmarkButton.vue', import.meta.url)),
+  'utf8',
+)
+const bookmarksVue = readFileSync(
+  fileURLToPath(new URL('../src/pages/Bookmarks.vue', import.meta.url)),
+  'utf8',
+)
+
+it('含 4 条 keyframes（主心 pop 双向 + state-layer 环双向），类名全仓唯一前缀', () => {
+  for (const name of ['bookmark-pop-add', 'bookmark-pop-remove', 'bookmark-ring-out', 'bookmark-ring-in']) {
+    expect(bookmarkBtnVue).toContain(`@keyframes ${name}`)
+    expect(bookmarkBtnVue).toContain(`.${name} {`)
+  }
+})
+
+it('红线 1：缓动/时长一律引用 M3 令牌变量，无 bezier/ms 字面量', () => {
+  // 负向：禁止 cubic-bezier 字面量与 animation 中的 ms 字面量
+  expect(bookmarkBtnVue).not.toMatch(/cubic-bezier\(/)
+  expect(bookmarkBtnVue).not.toMatch(/animation:[^;]*\d+ms/)
+  // 正向：四条动画各自引用令牌（D2/D3：pop-add=Gentle+emphasized-decelerate，pop-remove=Normal+standard，
+  // ring-out=Medium3+emphasized-decelerate，ring-in=Medium1+emphasized-accelerate）
+  expect(bookmarkBtnVue).toContain('animation: bookmark-pop-add var(--durationGentle) var(--motion-emphasized-decelerate) both;')
+  expect(bookmarkBtnVue).toContain('animation: bookmark-pop-remove var(--durationNormal) var(--motion-standard) both;')
+  expect(bookmarkBtnVue).toContain('animation: bookmark-ring-out var(--durationMedium3) var(--motion-emphasized-decelerate) both;')
+  expect(bookmarkBtnVue).toContain('animation: bookmark-ring-in var(--durationMedium1) var(--motion-emphasized-accelerate) both;')
+})
+
+it('tokens.css 含 M3 duration scale 补档（--durationMedium1 250ms / --durationMedium3 350ms）', () => {
+  expect(tokensCss).toContain('--durationMedium1: 250ms')
+  expect(tokensCss).toContain('--durationMedium3: 350ms')
+})
+
+it('transform 承载用 view 不用 text（ADR-0108 决策 2），pop 类绑定 tap 时刻快照', () => {
+  // text 元素不直接挂动画类；动画类在包裹 view 上且绑定 lastTarget 快照（失败回滚不触发反向 pop）
+  expect(bookmarkBtnVue).toContain('lastTarget')
+  expect(bookmarkBtnVue).not.toMatch(/<text[^>]*bookmark-(pop|ring)/)
+})
+
+it('乐观化接缝：消费 createBookmarkToggle 状态机，change 延迟用 BOOKMARK_ANIMATION_MS 常量', () => {
+  expect(bookmarkBtnVue).toContain("from '../primitives/createBookmarkToggle'")
+  expect(bookmarkBtnVue).toContain('BOOKMARK_ANIMATION_MS')
+  expect(bookmarkBtnVue).toContain('createBookmarkToggle(')
+})
+
+it('Bookmarks 页：取消收藏后隐藏集过滤 + 同 tick refreshEpoch++ 整树重建（spec D6）', () => {
+  // 结构断言：onBookmarkChange 函数体内两者同现（同一同步函数 = 同一 reactive flush，ADR-0107 决策 4）
+  const m = /function onBookmarkChange[\s\S]*?\n\}/.exec(bookmarksVue)
+  expect(m).not.toBeNull()
+  expect(m![0]).toContain('removedIllustIds.value = new Set(removedIllustIds.value).add(item.id)')
+  expect(m![0]).toContain('refreshEpoch.value++')
+})
+})

@@ -13,7 +13,7 @@
 |---|------|------|
 | D1 | 动效形态 | 原型变体 E（M3 规范版）：**state-layer 环**（扩散/收拢）+ **主心 Expressive spring 弹心**。否决：A 粒子爆发 / B 纯弹跳 / C 纯波纹 / D 浮心（A/D 无 M3 规范锚点，B/C 情绪反馈不足或语义单一） |
 | D2 | 双向语义 | 收藏 = 环 emphasized-decelerate 扩散（350ms）+ 主心 spring pop（0.75→1.18→0.97→1，300ms）填红；取消 = 环 emphasized-accelerate 收拢（250ms）+ 主心 standard 下沉回稳（1→0.88→1，200ms）褪灰 |
-| D3 | 令牌合规 | 缓动/时长**必须**用 `tokens.css` 变量：`--motion-emphasized-decelerate` / `--motion-emphasized-accelerate` / `--motion-standard` / `--durationGentle`（300ms）/ `--durationNormal`（200ms）。原型中的字面量仅是 web-core 预览不解析 var() 的临时措施 |
+| D3 | 令牌合规 | 缓动/时长**必须**用 `tokens.css` 变量：`--motion-emphasized-decelerate` / `--motion-emphasized-accelerate` / `--motion-standard` / `--durationGentle`（300ms）/ `--durationNormal`（200ms）+ 新增 M3 duration scale 补档 `--durationMedium1`（250ms，环收拢）/ `--durationMedium3`（350ms，环扩散）。原型中的字面量仅是 web-core 预览不解析 var() 的临时措施 |
 | D4 | 触发时机 | **乐观**：tap 即播动效 + 翻转 bookmarked/count + 发 API；失败静息回滚（不播反向动画）+ `errorMsg` 提示。`busy` 锁保留（防连点并发提交）。对齐主 app `followListStore` optimistic toggle 先例 |
 | D5 | change 事件 | 延迟到**动画播完后**（`BOOKMARK_ANIMATION_MS = 350`，取双向最长动画）上抛。语义 = 「动画完成态」；唯一消费方 Bookmarks.vue 零改动接线 |
 | D6 | 收藏页移除 | Bookmarks.vue `onBookmarkChange` 收到取消后：`removedIllustIds.add()` + **同 tick `refreshEpoch++`** 整树重建（ADR-0107 决策 4 既有 workaround），消除单项移除的 patch 索引错位空位。**已确认接受滚动回顶代价**；不走网络刷新（页数坍缩 + 闪烁 + 每 toggle 一请求，已否决） |
@@ -65,13 +65,13 @@
   from { opacity: 0.4; transform: scale(0.6); }
   to { opacity: 0; transform: scale(2.1); }
 }
-.bookmark-ring-out { animation: bookmark-ring-out 350ms var(--motion-emphasized-decelerate) both; }
+.bookmark-ring-out { animation: bookmark-ring-out var(--durationMedium3) var(--motion-emphasized-decelerate) both; }
 
 @keyframes bookmark-ring-in {
   from { opacity: 0.35; transform: scale(1.8); }
   to { opacity: 0; transform: scale(0.6); }
 }
-.bookmark-ring-in { animation: bookmark-ring-in 250ms var(--motion-emphasized-accelerate) both; }
+.bookmark-ring-in { animation: bookmark-ring-in var(--durationMedium1) var(--motion-emphasized-accelerate) both; }
 ```
 
 ### Bookmarks.vue（仅插画 tab，一行接线）

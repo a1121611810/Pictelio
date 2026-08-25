@@ -179,10 +179,13 @@ function onImageTap(item: PixivIllust) {
   if (!isRestricted(item)) openIllust(item.id)
 }
 
-// 取消收藏后从列表移除（BookmarkButton change 事件）
+// 取消收藏后从列表移除（BookmarkButton change 事件，动画播完后才上抛——ADR-0112 决策 4）：
+// 隐藏集过滤 + 同 tick refreshEpoch++ 整树重建（ADR-0107 决策 4 workaround：单项移除会触发
+// vue-lynx patch RemoveNode 索引错位留空位；重建 = 滚动回顶，用户已确认接受，ADR-0112 决策 5）
 function onBookmarkChange(item: PixivIllust, bookmarked: boolean) {
   if (!bookmarked) {
     removedIllustIds.value = new Set(removedIllustIds.value).add(item.id)
+    refreshEpoch.value++
   }
 }
 

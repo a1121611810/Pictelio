@@ -21,7 +21,7 @@
 ## 决策
 
 1. **动效形态 = 原型变体 E（M3 规范版）**：state-layer 环 + 主心 Expressive spring 弹心。收藏 = 环 emphasized-decelerate 扩散（350ms）+ 主心 pop（scale 0.75→1.18→0.97→1，300ms）填红；取消 = 环 emphasized-accelerate 收拢（250ms）+ 主心 standard 下沉回稳（scale 1→0.88→1，200ms）褪灰。环是 M3 icon button state-layer ripple 语义的规范内延伸；overshoot 弹心属 M3 Expressive spring 体系（用户拍板口径 2）。
-2. **令牌合规**：缓动/时长一律引用 `tokens.css` 变量（`--motion-emphasized-decelerate` / `--motion-emphasized-accelerate` / `--motion-standard` / `--durationGentle` / `--durationNormal`），禁止 bezier/ms 字面量（原型字面量仅是 web-core 预览不解析 var() 的临时措施；生产 var() 原生解析已验证）。
+2. **令牌合规**：缓动/时长一律引用 `tokens.css` 变量（`--motion-emphasized-decelerate` / `--motion-emphasized-accelerate` / `--motion-standard` / `--durationGentle` / `--durationNormal`，另按 M3 duration scale 新增 `--durationMedium1`=250ms / `--durationMedium3`=350ms 两档承载环动画），禁止 bezier/ms 字面量（原型字面量仅是 web-core 预览不解析 var() 的临时措施；生产 var() 原生解析已验证）。
 3. **乐观触发**：tap 即播动效 + 翻转 `bookmarked`/`count` + 发 API；失败静息回滚（**不播**反向动画）+ `errorMsg`（既有错误槽）。`busy` 锁保留防连点并发。对齐主 app `followListStore` optimistic toggle 先例。否决悲观（等 API 再播）：网络延迟 300ms~2s 会废掉即时反馈这一 delight 动效的核心价值。
 4. **change 事件延迟到动画播完后上抛**（350ms，取双向最长动画）：语义 = 动画完成态。唯一消费方 Bookmarks.vue 零改动接线；取消动画不被「立即移除」截断。
 5. **收藏页移除 = 动画后隐藏集过滤 + 同 tick `refreshEpoch++` 整树重建**（决策 4 时序 + 决策 3 平台事实的既有 workaround 复用），消除单项移除的 patch 错位空位。**用户已确认接受滚动回顶代价**；否决网络 refresh（已加载页数坍缩 + 清空闪烁 + 每 toggle 一次请求）；否决「会话内不移除」（用户要求该项真正消失）。
