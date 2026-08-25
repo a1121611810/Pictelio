@@ -1499,6 +1499,11 @@ it('乐观化接缝：消费 createBookmarkToggle 状态机，change 延迟用 B
   expect(bookmarkBtnVue).toContain('createBookmarkToggle(')
 })
 
+it('心形用 ♥\uFE0E（VS15 强制 text presentation，防 Lynx 原生 emoji 化导致 CSS 变色失效）', () => {
+  // oracle = 平台事实（ADR-0112 待验证项回写：裸 U+2665 在原生渲染为彩色 emoji 固有色 #fa242f）
+  expect(bookmarkBtnVue).toContain('♥\uFE0E')
+})
+
 it('Bookmarks 页：取消收藏后隐藏集过滤 + 同 tick refreshEpoch++ 整树重建（spec D6）', () => {
   // 结构断言：onBookmarkChange 函数体内两者同现（同一同步函数 = 同一 reactive flush，ADR-0107 决策 4）
   const m = /function onBookmarkChange[\s\S]*?\n\}/.exec(bookmarksVue)

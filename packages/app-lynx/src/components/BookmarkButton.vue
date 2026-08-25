@@ -67,7 +67,9 @@ function onTap() {
       </view>
       <!-- 主心（transform 承载用 view 不用 text，ADR-0108 决策 2；:key 重挂载重播 pop） -->
       <view :key="animSeq" :class="animSeq > 0 ? (lastTarget ? 'bookmark-pop-add' : 'bookmark-pop-remove') : ''">
-        <text class="text-[6.4vw] leading-none" :class="bm.bookmarked ? 'text-error' : 'text-outline'">♥</text>
+        <!-- ♥\uFE0E：U+FE0E 强制 text presentation——裸 U+2665 在 Lynx 原生被解析为彩色 emoji
+             字形（固有色 #fa242f），CSS color 完全失效（心形恒红，真机实测 2026-08-25，ADR-0112） -->
+        <text class="text-[6.4vw] leading-none" :class="bm.bookmarked ? 'text-error' : 'text-outline'">♥︎</text>
       </view>
     </view>
     <text v-if="bookmarkCount !== undefined" class="text-label-medium text-outline ml-1">{{ bm.count }}</text>

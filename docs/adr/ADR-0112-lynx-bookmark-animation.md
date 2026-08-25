@@ -42,7 +42,8 @@
 
 - 正面：双向即时反馈且全链路 M3 令牌合规；零新依赖/新原生面/新 bridge；平台风险全部由既有 ADR 实证覆盖；6 处 BookmarkButton 消费点（Recommended/Bookmarks/Following/IllustList/UserHome/IllustDetail）自动获得动画，仅 Bookmarks 页 +1 行接线。
 - 负面：Bookmarks 页取消收藏后列表回顶（用户已接受）；乐观化引入失败回滚路径（由单测覆盖）；`setTimeout(350)` 承担节点清理 + change 延迟双重职责（仅清理/延迟，不驱动帧，沿用 fab-spin 红线精神）。
-- 待验证项（T3 模拟器闭环）：
-  - 环扩散/收拢 + spring pop 在原生 LynxView 实际帧动画（机制同 ADR-0108 已验证面，行为待确认）；
-  - 取消收藏后 epoch 重建空位消除、logcat 无 RemoveNode；
-  - 若动画异常 → 停下回报，不静默绕路（spec 红线 6）。
+- 待验证项（T3 模拟器闭环，2026-08-25 完成，AVD pictelio_ui / android-34，lynx debug）：
+  - ~~环扩散/收拢 + spring pop 在原生 LynxView 实际帧动画~~ **已验证**：logcat `Lynx Animation start/end` 实证 bookmark-pop-add（325ms ≈ 300ms 令牌）/ bookmark-pop-remove / bookmark-ring-out / bookmark-ring-in 全部原生运行；录屏逐帧捕获 ring 扩散帧与 pop overshoot 红色区域扩张（峰值 774px → 稳定 593px）。
+  - ~~取消收藏后 epoch 重建空位消除~~ **已验证**：收藏页取消首项后列表重建无空位、logcat 无 `RemoveNode got wrong child index`。
+  - ~~失败回滚~~ **已验证**：飞行模式下 tap → 动画照播 → errorMsg「操作失败」+ 心形/计数静息回滚。
+  - **新平台事实（实现期发现，实测留证）**：裸 `♥`（U+2665）在 Lynx 原生被解析为**彩色 emoji 字形**（固有色 #fa242f，实测像素值），CSS color 完全失效——心形恒红不变色。web-core 无此问题（浏览器遵循 text presentation）。**修复 = 追加 U+FE0E 变体选择器强制 text presentation**（`♥\uFE0E`），修复后 text-error #b3261e / text-outline 灰变色正常。任何依赖 CSS 变色的字符字形在 Lynx 原生都需 VS15；有结构断言防回归。
