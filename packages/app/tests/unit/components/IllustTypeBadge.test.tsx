@@ -29,6 +29,11 @@ describe("IllustTypeBadge", () => {
     expect(screen.getByText("3")).toBeTruthy();
   });
 
+  it("多图角标对屏幕阅读器暴露完整语义（aria-label=共 N 图）", () => {
+    render(() => <IllustTypeBadge illust={{ type: "manga", page_count: 3 }} />);
+    expect(screen.getByLabelText("共 3 图")).toBeTruthy();
+  });
+
   it("并存异常数据（ugoira, page_count=5）→ 两角标并排且动图在前", () => {
     render(() => <IllustTypeBadge illust={{ type: "ugoira", page_count: 5 }} />);
     const group = screen.getByTestId("illust-type-badges");

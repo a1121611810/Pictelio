@@ -33,6 +33,7 @@ const IllustTypeBadge: Component<Props> = (props) => {
         <For each={badges()}>
           {(badge) => (
             <span
+              aria-label={badge.kind === "ugoira" ? "动图" : `共 ${badge.pageCount} 图`}
               class="flex items-center gap-[var(--spacingHorizontalXXS)] rounded-[var(--borderRadiusMedium)] bg-[var(--colorOverlayBackground)] backdrop-blur-sm text-[var(--colorOverlayForeground)] font-semibold"
               classList={{
                 "px-[var(--spacingHorizontalXS)] py-[var(--spacingVerticalXXS)] [font-size:var(--fontSizeBase100)]":
