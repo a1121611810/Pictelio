@@ -39,3 +39,7 @@
 - 正面：两端全列表类型标识口径统一；判定纯函数可测；App 角标与 Fluent 2 令牌体系、Lynx 徽章与 M3 令牌体系各自合规；公共组件收敛后新增列表页面自动获得正确标识。
 - 负面：行为变化点——ImageCard 的「Np」、GridCard 的「📄 N」文字格式被图标 + 数字替换（需在 commit message 标注）；FluentIcon 图标集 +2；Lynx 瀑布流卡片在有标识时增高一行。
 - 术语已同步沉淀至两端 CONTEXT.md「作品标识」节。
+- 待验证项（2026-08-25 模拟器闭环，emulator-5554 / sdk_gphone64_arm64 android-14，full debug + lynx 引擎）：
+  - ~~Lynx 徽章行 unicode 字形与 chip 尺寸原生渲染~~ **已验证**：「⧉ N 图」（U+29C9）字体覆盖正常（非豆腐块）；「▶ 动图」（U+25B6+U+FE0E）VS15 生效——渲染为单色文本字形，像素采样 = on-secondary-container #1d192b（非彩色 emoji 固有色，ADR-0112 ♥ 同案修复路径成立）；chip 底 = secondary-container #e8def8，位置在图片下/标题上，普通单图零占位，受限插画条目徽章照常显示（⧉ 30/9/31 图实例），并存顺序未实测（ugoira 事实上 page_count=1，由差分 truth-table 覆盖）。验证方法：API 收藏一件已知 ugoira（148861562）使其必现于收藏页首项，验证后已撤回收藏。
+  - **实测发现的独立 bug（已修复）**：UserHome.vue / Following.vue 使用 `<IllustTypeBadgeRow>` 但缺 import——web-core 下静默降级为未知元素（徽章不渲染但页面不崩），原生 LynxView 下 vue-lynx resolveComponent 落空、组件名作为自定义标签直达原生，抛 990200「No BehaviorController defined for class IllustTypeBadgeRow」整客户端崩到错误页（detail → 点作者必现）。修复 = 两页补 import + unit.test.ts 新增「五页面 usage × import 配对」结构断言（此失败模式在单测/tsc/web-core 全绿下不可见）。
+  - **实测发现的其他既有问题（非本特性范围，另行跟踪）**：①Feed 分页偶发停滞 + logcat 220208「duplicated list item-key」（footer 键）；②ugoira 详情页大图加载失败（LynxFetchModule：/pixiv-img 相对路径无 scheme，普通插画详情大图正常 → ugoira 特有）。
