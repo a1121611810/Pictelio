@@ -36,6 +36,8 @@ packages/app/android/app/release/
 packages/app/.env
 packages/app-lynx/.env
 packages/app/test-results/
+# android-e2e 快照目录以 process.cwd() 定位，从仓库根误跑时会在根目录生成
+/test-results/
 packages/app/test/e2e/screenshots/
 
 # iOS — not targeted (Android-only)
