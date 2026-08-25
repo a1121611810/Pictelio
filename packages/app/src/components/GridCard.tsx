@@ -4,6 +4,7 @@ import { listQuality } from "../stores/settingsStore";
 import PixivImage from "./PixivImage";
 import HeartBurstEffect from "./HeartBurstEffect";
 import SkeletonShimmer from "./SkeletonShimmer";
+import IllustTypeBadge from "./IllustTypeBadge";
 import { resolveImageUrl } from "../utils/imageLoader";
 import { useCardInteractions } from "../primitives/useCardInteractions";
 
@@ -98,14 +99,8 @@ const GridCard: Component<Props> = (props) => {
             </fluent-badge>
           )}
         </div>
-        {/* Multi-page indicator */}
-        {props.illust.page_count > 1 && (
-          <div class="absolute bottom-1 left-1 z-10">
-            <fluent-badge appearance="subtle" style="font-size:var(--fontSizeBase100)">
-              📄 {props.illust.page_count}
-            </fluent-badge>
-          </div>
-        )}
+        {/* 右上：类型角标（动图/多图，ADR-0113 公共组件，网格卡用 compact 尺寸） */}
+        <IllustTypeBadge illust={props.illust} size="compact" />
         {/* Bookmark heart — bottom-right */}
         <div class="absolute bottom-1 right-1">
           <button

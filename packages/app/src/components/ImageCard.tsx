@@ -5,6 +5,7 @@ import PixivImage from "./PixivImage";
 import HeartBurstEffect from "./HeartBurstEffect";
 import HeartIcon from "./ui/HeartIcon";
 import IllustTags from "./IllustTags";
+import IllustTypeBadge from "./IllustTypeBadge";
 import SkeletonShimmer from "./SkeletonShimmer";
 import { resolveImageUrl } from "../utils/imageLoader";
 import { useCardInteractions } from "../primitives/useCardInteractions";
@@ -92,11 +93,8 @@ const ImageCard: Component<Props> = (props) => {
             hideLoadingPlaceholder
           />
         )}
-        {isUgoira() && (
-          <div class="absolute top-[var(--spacingVerticalXS)] right-[var(--spacingHorizontalXS)] z-10">
-            <fluent-badge appearance="filled">动图</fluent-badge>
-          </div>
-        )}
+        {/* 右上：类型角标（动图/多图，ADR-0113 公共组件） */}
+        <IllustTypeBadge illust={props.illust} />
         {/* Badge group — 左上角 */}
         <div class="absolute top-[var(--spacingVerticalXS)] left-[var(--spacingHorizontalXS)] flex items-center gap-[var(--spacingHorizontalXXS)] pointer-events-none select-none z-10">
           {props.illust.x_restrict === 1 && (
@@ -115,11 +113,6 @@ const ImageCard: Component<Props> = (props) => {
             </fluent-badge>
           )}
         </div>
-        {props.illust.page_count > 1 && (
-          <div class="absolute bottom-[var(--spacingVerticalXS)] left-[var(--spacingHorizontalXS)] z-10">
-            <fluent-badge appearance="subtle">{props.illust.page_count}p</fluent-badge>
-          </div>
-        )}
         {/* Bookmark heart — 右下角 */}
         <div class="absolute bottom-[var(--spacingVerticalXS)] right-[var(--spacingHorizontalXS)]">
           <button
