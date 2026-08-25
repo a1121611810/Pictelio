@@ -11,6 +11,7 @@ import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { isRestricted } from '../stores/settingsStore'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
+import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
 import NavigationBar from '../components/NavigationBar.vue'
@@ -208,6 +209,8 @@ onMounted(() => {
         <view v-else class="relative" @tap.stop="onImageTap(item)">
           <SkeletonImage :src="thumbUrl(item.image_urls)" height="48.4vw" lazy-load />
         </view>
+        <!-- 类型徽章行（动图/多图，ADR-0113）：流内元素，受限条目照常显示，普通单图零占位 -->
+        <IllustTypeBadgeRow :illust="item" />
         <text class="text-title-small font-medium text-surface-on mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
         <text class="text-body-small text-surface-on-variant mt-1 mx-2.5 [max-line:1]">{{ item.user.name }}</text>
         <view class="mt-1 mx-2.5 mb-2.5">
