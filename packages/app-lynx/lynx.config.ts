@@ -97,6 +97,8 @@ export default defineConfig({
               main: './src/index.ts',
               'error-preview': './src/errorPreview.ts',
               'login-preview': './src/loginPreview.ts',
+              // [PROTOTYPE 用完即弃] 收藏动效选型舞台；选型后删除此 entry 与对应文件
+              'bookmark-anim-preview': './src/bookmarkAnimPreview.ts',
             }
           : { main: './src/index.ts' },
       },
