@@ -72,6 +72,20 @@ scrollY 小于 header 高度（48px）时 header 恒显示，不参与隐藏。
 **滚动方向原语（createScrollDirection）**：
 `src/primitives/createScrollDirection.ts` — 滚动方向判定原语，输出 `direction: "up" | "down" | null` 与 `reset()`。支持方向阈值、同向累计（accumulate）、跳变忽略（jumpThreshold）。方向驱动的 UI 显隐（NavBar compact、Search compact header、NovelDetail footer）由站点 policy effect 组合它与 `createScrolledPast` 实现（见 `docs/adr/0013-scroll-primitives-unification.md`）。
 
+### 作品标识（Work indicators）
+
+**动图（Ugoira）**：
+Pixiv 动图作品，判定条件为 `illust.type === 'ugoira'`（zip 帧序列，`page_count` 事实上恒为 1，但不做契约性互斥假设）。
+_Avoid_: GIF（ Pixiv 源格式不是 GIF ）
+
+**多图（Multi-page）**：
+一个作品包含多张图片，判定条件为 `illust.page_count > 1`。与动图独立判定、允许并存（异常数据同时满足时两个标识都显示，动图在前）。
+_Avoid_: 多页（与小说分页语义混淆）
+
+**类型角标（Type badge）**：
+列表卡片上标识作品内容类型（动图/多图）的图标化角标，与分级标（R-18/R-18G/AI）相对：分级标固定左上，类型角标固定封面**右上角**。形态为磨砂半透明底圆角 chip：动图 = play 图标 +「动图」，多图 = imageMultiple 图标 + 页数数字。三种列表卡片（IllustSingleCard / ImageCard / GridCard）统一由公共组件 `IllustTypeBadge` 渲染。
+_Avoid_: 角标散写于各卡片、文字 fluent-badge 形态（已废弃）
+
 ### 界面控件
 
 **Tab 控件（Tab Control）**：

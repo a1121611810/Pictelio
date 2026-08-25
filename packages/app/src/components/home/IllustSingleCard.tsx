@@ -7,7 +7,7 @@
  * 无阴影、hover 背景高亮、active 轻微缩放。
  * 可访问性：role="button" + tabIndex=0 + Enter 键触发 onClick。
  *
- * 标签（A 已定稿，full）：图上 R-18/R-18G/AI/动图 badge + 文案 chip 动态显示
+ * 标签（A 已定稿，full）：图上 R-18/R-18G/AI 分级标 + 右上类型角标（动图/多图，ADR-0113）+ 文案 chip 动态显示
  * （AdaptiveTags 能放几个放几个 +「+N」折叠，可点搜索）。
  * 落选变体（B 一行截断 / C 仅分级 badge / none）已归档 throwaway，见 git 历史。
  */
@@ -16,6 +16,7 @@ import { Show } from "solid-js";
 import type { PixivIllust } from "@/api/types";
 import { resolveImageUrl } from "@/utils/imageLoader";
 import AdaptiveTags from "@/components/home/AdaptiveTags";
+import IllustTypeBadge from "@/components/IllustTypeBadge";
 
 interface IllustSingleCardProps {
   /** 插画数据 */
@@ -74,12 +75,8 @@ const IllustSingleCard: Component<IllustSingleCardProps> = (props) => {
             </fluent-badge>
           </Show>
         </div>
-        {/* 右上：动图 */}
-        <Show when={props.illust.type === "ugoira"}>
-          <div class="absolute right-[var(--spacingHorizontalXS)] top-[var(--spacingVerticalXS)] z-10 pointer-events-none select-none">
-            <fluent-badge appearance="filled">动图</fluent-badge>
-          </div>
-        </Show>
+        {/* 右上：类型角标（动图/多图，ADR-0113 公共组件） */}
+        <IllustTypeBadge illust={props.illust} />
       </div>
 
       {/* 信息行：标题 / 作者 + 收藏数（标签组单独一行，不嵌在左侧模块内） */}
