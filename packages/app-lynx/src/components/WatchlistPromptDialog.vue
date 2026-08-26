@@ -42,6 +42,12 @@ function onConfirm(): void {
   emit('confirm')
 }
 
+/** review P2-3：busy 期间「暂不」也禁用——防在飞 add 结果与 dismiss/返回竞争 */
+function onDecline(): void {
+  if (props.busy) return
+  emit('decline')
+}
+
 // 返回键拦截：open 翻转时注册/注销关闭回调（modalStack 后进先出）
 let unregisterModal: (() => void) | null = null
 
@@ -88,10 +94,11 @@ onBeforeUnmount(() => {
 
       <view class="flex flex-row justify-end mt-6 gap-2">
         <view
-          class="h-[10.667vw] px-4 flex items-center justify-center active:bg-layer-pressed-primary"
+          class="h-[10.667vw] px-4 flex items-center justify-center"
+          :class="busy ? 'opacity-40' : 'active:bg-layer-pressed-primary'"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="WATCHLIST_PROMPT_A11Y_LABELS.decline"
-          @tap="emit('decline')"
+          @tap="onDecline"
         >
           <text class="text-label-large font-medium text-primary">暂不</text>
         </view>

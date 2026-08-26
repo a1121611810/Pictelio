@@ -77,6 +77,8 @@ export function createWatchlistPrompt(
       .loadWatchState(seriesId)
       .then((added) => {
         if (gen !== generation) return
+        // review P2-2：confirm 已先行置 true 时，陈旧预取落地不得覆盖
+        if (watchAdded.value === true) return
         watchAdded.value = added
         deps.setWatchState(seriesId, added)
       })

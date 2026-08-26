@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'watchlist' })
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { navigate, goBack } from '../router'
+import { registerModal } from '../stores/modalStack'
 import {
   loadWatchlistNovels,
   loadWatchlistNovelsNext,
@@ -92,6 +93,14 @@ function cancelUnwatch() {
   unwatchTarget.value = null
   unwatchToggle.value = null
 }
+
+// review P2-1：取消确认弹窗接入 modalStack——打开期间系统返回优先关弹窗，
+// 而不是直接 pop /watchlist 页面（对齐 WatchlistPromptDialog 行为与 issue #163 语义）
+watch(unwatchTarget, (target, _prev, onCleanup) => {
+  if (!target) return
+  const unregister = registerModal(() => cancelUnwatch())
+  onCleanup(unregister)
+})
 
 function confirmUnwatch() {
   void unwatchToggle.value?.toggle()

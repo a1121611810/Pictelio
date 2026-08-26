@@ -29,8 +29,9 @@ const showComments = ref(false)
 // ─── 追更询问（issue #226 / spec §US4 接线半） ───
 // 页面保持薄：预取 + 触发判定 + 弹窗状态机全部在 createWatchlistPrompt；
 // 本页只做三件事——喂滚动事件、把 requestBack 接进返回守卫、按状态渲染弹窗。
-// novel-detail 不在 App.vue KeepAlive include 白名单（详情页按 :id 加载，不缓存），
-// 守卫/prompt 生命周期挂 onMounted/onUnmounted 即可，无需 onActivated/onDeactivated。
+// novel-detail 不在 App.vue KeepAlive include 白名单（详情页按 :id 加载，不缓存）；
+// 守卫在 setup 顶层注册（registerBackGuard）+ onUnmounted 注销，prompt 随详情落地创建——
+// 对非缓存组件 setup/onUnmounted 与 onMounted 等价，无需 onActivated/onDeactivated。
 let prompt: WatchlistPromptController | null = null
 
 /** 详情加载完成后创建 prompt（此时 novel.series 已知，预取才能发起） */

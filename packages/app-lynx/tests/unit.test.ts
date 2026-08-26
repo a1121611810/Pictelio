@@ -1731,8 +1731,8 @@ it('decline 与 cancel 是两个不同事件（spec §US5 语义差：decline �
 expect(dialogVueSource).toContain("emit('decline')")
 expect(dialogVueSource).toContain("emit('cancel')")
 expect(dialogVueSource).toContain("emit('confirm')")
-// 「暂不」按钮映射 decline，不是 cancel
-expect(dialogVueSource).toContain('@tap="emit(\'decline\')"')
+// 「暂不」按钮经 onDecline 映射 decline（含 busy 守卫，review P2-3），不是 cancel
+expect(dialogVueSource).toContain('@tap="onDecline"')
 })
 
 it('busy 禁用：tap 守卫 + 禁用态样式分支（防连点）', () => {
