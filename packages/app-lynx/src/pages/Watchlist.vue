@@ -171,37 +171,46 @@ onMounted(() => {
         :item-key="String(item.id)"
         class="w-full"
       >
-        <!-- mask 条目（被屏蔽/下架）：只读展示 mask_text，不可点、无取消按钮（spec §6-7） -->
-        <view v-if="isWatchlistSeriesMasked(item)" class="m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
-          <text class="text-body-medium text-outline">{{ item.mask_text }}</text>
-        </view>
-        <view
-          v-else
-          class="flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)] active:bg-layer-pressed-on-surface"
-          :accessibility-element="A11Y_ELEMENT_ENABLED"
-          :accessibility-label="WATCHLIST_A11Y_LABELS.openLatest"
-          @tap="openLatest(item)"
-        >
-          <image
-            v-if="item.url"
-            class="w-[21.333vw] h-[21.333vw] rounded-[var(--md-shape-small)] bg-surface-container-high"
-            :src="proxyImageUrl(item.url)"
-          />
-          <view class="flex-1 flex flex-col ml-3">
-            <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>
-            <text class="text-body-medium text-surface-on-variant mt-1.5">by {{ item.user.name }}</text>
-            <view class="flex flex-row mt-1.5">
-              <text class="text-label-medium text-surface-on-variant mr-4">共 {{ item.published_content_count }} 话</text>
-              <text v-if="item.latest_content_date" class="text-label-medium text-surface-on-variant">更新于 {{ item.latest_content_date.slice(0, 10) }}</text>
-            </view>
+        <!-- [lynx:fix] 单一稳定根 view（对齐 Following/UserHome 等已验证 list 结构）：
+             list-item 根不得在 v-if/v-else 间交替，否则真机 Lynx 对该 item 的
+             FlushActionsAsRoot 父级挂接/测量异常（实测 2026-08-27：mask 条目占位
+             但不渲染内容）；条件分支全部内收。 -->
+        <view class="w-full">
+          <!-- mask 条目（被屏蔽/下架）：只读展示 mask_text，不可点、无取消按钮（spec §6-7） -->
+          <view
+            v-if="isWatchlistSeriesMasked(item)"
+            class="m-1.5 mx-3 p-3.5 min-h-[13.333vw] flex items-center bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]"
+          >
+            <text class="text-body-medium text-outline">{{ item.mask_text }}</text>
           </view>
           <view
-            class="self-center h-[10.667vw] px-3 flex items-center justify-center border border-outline rounded-[var(--md-shape-full)]"
+            v-else
+            class="flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)] active:bg-layer-pressed-on-surface"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
-            :accessibility-label="WATCHLIST_A11Y_LABELS.unwatch"
-            @tap.stop="askUnwatch(item)"
+            :accessibility-label="WATCHLIST_A11Y_LABELS.openLatest"
+            @tap="openLatest(item)"
           >
-            <text class="text-label-large text-primary">取消追更</text>
+            <image
+              v-if="item.url"
+              class="w-[21.333vw] h-[21.333vw] rounded-[var(--md-shape-small)] bg-surface-container-high"
+              :src="proxyImageUrl(item.url)"
+            />
+            <view class="flex-1 flex flex-col ml-3">
+              <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>
+              <text class="text-body-medium text-surface-on-variant mt-1.5">by {{ item.user.name }}</text>
+              <view class="flex flex-row mt-1.5">
+                <text class="text-label-medium text-surface-on-variant mr-4">共 {{ item.published_content_count }} 话</text>
+                <text v-if="item.latest_content_date" class="text-label-medium text-surface-on-variant">更新于 {{ item.latest_content_date.slice(0, 10) }}</text>
+              </view>
+            </view>
+            <view
+              class="self-center h-[10.667vw] px-3 flex items-center justify-center border border-outline rounded-[var(--md-shape-full)]"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="WATCHLIST_A11Y_LABELS.unwatch"
+              @tap.stop="askUnwatch(item)"
+            >
+              <text class="text-label-large text-primary">取消追更</text>
+            </view>
           </view>
         </view>
       </list-item>
