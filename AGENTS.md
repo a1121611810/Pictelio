@@ -35,8 +35,6 @@
 - 中文语义搜索失败（CodeGraph 返回空/不相关时，降级找入口再切回）
 - 环境缺少上述 MCP 工具时，用能力等价的可用工具（grep/read、web 搜索等）代替，**不视为违规**
 
-> 完整细节（参数、索引维护、结果解读）在全局 memory `mcp-codegraph-usage.md` / `mcp-doc-query.md`。
-
 ### 持续反馈闭环（边用边发现问题）
 
 - **自检证据化**：任务完成前自检记录"路由判断 + 所用工具"（见「任务完成前自检」）。
@@ -100,8 +98,6 @@
 | 库/框架文档（SolidJS、TanStack、Capacitor、Vite 等） | `mcp__context7__*` | `web_fetch`（官网） |
 | 浏览器标准 API（`fetch`、`Headers`、`Promise`、CSS 属性等） | `mcp__mdn__*` | `web_fetch`（MDN 页面） |
 | 其他技术文档（非库/非浏览器标准） | `mcp__context7__*` 尝试 | `web_fetch`（官方文档） |
-
-完整规范（使用流程、降级策略、调用示例）保存在全局 memory `mcp-doc-query.md`。
 
 ### 禁止的默认行为
 
@@ -654,9 +650,9 @@ Grill 澄清 → to-spec → to-tickets → implement
 
 - **工具使用证据**：本次涉及代码理解/架构/文档查询时，是否记录了路由判断与所用工具？（见「工具触发协议」；发现偏差当场沉淀 feedback memory）
 - **代码理解优先性**：涉及代码结构、调用链、影响范围分析时，是否优先使用了 CodeGraph？（工具选择见上方速查表）
-- **Fallback 合理性**：未用 CodeGraph 时，是否属于允许的例外？（不可用、已知路径读取、非代码搜索等，详见全局 memory `mcp-codegraph-usage.md`）
+- **Fallback 合理性**：未用 CodeGraph 时，是否属于允许的例外？（不可用、已知路径读取、非代码搜索等）
 - **索引健康**：CodeGraph 返回异常时，是否运行 `codegraph status` 检查了节点/边计数（边数归零 = 腐化，提示用户重建）？
-- **文档查询优先性**：涉及库/框架/浏览器 API 查询时，是否遵循了「文档查询规范」的优先级链？（优先 Context7 或 MDN，降级见 `mcp-doc-query.md`）
+- **文档查询优先性**：涉及库/框架/浏览器 API 查询时，是否遵循了「文档查询规范」的优先级链？（优先 Context7 或 MDN）
 - **OpenWiki 查询优先性**：涉及架构概览、领域概念、集成、测试指南等主题时，是否先查阅了对应的 OpenWiki 页面再深入代码？
 - **OpenWiki 文档同步**：修改了 `src/` 或 `packages/` 中的代码后，**不得**本地执行 `pnpm openwiki:update`（依赖 CI 定时任务每日重生成），且**不得**手改 `openwiki/` 生成文件？
 - **IO 边界测试**：本次改动涉及的 fetch/存储/桥接解析函数，成功与失败路径是否都有单元测试？
