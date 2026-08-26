@@ -14,7 +14,7 @@ import { loadUserNovels, loadBookmarks as loadNovelBookmarks, loadFollow as load
 import { bytesToDataUrl, downloadUgoiraFrames } from '../src/api/ugoira'
 import type { UgoiraExtractMode } from '../src/api/ugoira'
 import { ugoiraMode as lynxUgoiraMode, setUgoiraMode as lynxSetUgoiraMode } from '../src/stores/settingsStore'
-import { ME_A11Y_LABELS, LOGIN_A11Y_LABELS, RECOMMENDED_A11Y_LABELS, UPDATE_A11Y_LABELS, ERROR_A11Y_LABELS, FAB_MENU_A11Y_LABELS, WATCHLIST_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../src/utils/accessibility'
+import { ME_A11Y_LABELS, LOGIN_A11Y_LABELS, RECOMMENDED_A11Y_LABELS, UPDATE_A11Y_LABELS, ERROR_A11Y_LABELS, FAB_MENU_A11Y_LABELS, WATCHLIST_A11Y_LABELS, WATCHLIST_PROMPT_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../src/utils/accessibility'
 
 describe('imageUrl.proxyImageUrl', () => {
   it('将 i.pximg.net URL 重写为本地代理路径', () => {
@@ -1696,5 +1696,66 @@ it('Bookmarks 页：取消收藏后隐藏集过滤 + 同 tick refreshEpoch++ 整
   expect(m).not.toBeNull()
   expect(m![0]).toContain('removedIllustIds.value = new Set(removedIllustIds.value).add(item.id)')
   expect(m![0]).toContain('refreshEpoch.value++')
+})
+})
+
+// ─── 追更询问弹窗（issue #224 / spec §US5） ───
+// 仓库无 .vue 组件渲染测试先例（node 环境，无 Lynx 渲染器），降为模板源码结构断言，
+// 与既有「注册表 + 模板源码断言」约定一致（对齐 Watchlist.vue / UpdatePage.vue 先例）。
+// emits 映射 / busy 禁用 / error 分支 / modalStack 注册均用源码锚点断言；
+// 弹窗状态机行为本身由 createWatchlistPrompt.test.ts 单测覆盖（T4 seam）。
+describe('追更询问弹窗 WatchlistPromptDialog（issue #224 / spec §US5）', () => {
+const dialogVueSource = readFileSync(
+fileURLToPath(new URL('../src/components/WatchlistPromptDialog.vue', import.meta.url)),
+'utf8',
+)
+
+it('注册表 label 全部非空且唯一', () => {
+const labels = Object.values(WATCHLIST_PROMPT_A11Y_LABELS)
+expect(labels.length).toBeGreaterThan(0)
+for (const label of labels) expect(label.length).toBeGreaterThan(0)
+expect(new Set(labels).size).toBe(labels.length)
+})
+
+it('WATCHLIST_PROMPT_A11Y_LABELS 全部被 WatchlistPromptDialog.vue 消费且配套 element', () => {
+for (const key of Object.keys(WATCHLIST_PROMPT_A11Y_LABELS)) {
+expect(dialogVueSource).toContain(`:accessibility-label="WATCHLIST_PROMPT_A11Y_LABELS.${key}"`)
+}
+const labelCount = (dialogVueSource.match(/:accessibility-label="WATCHLIST_PROMPT_A11Y_LABELS\.\w+"/g) ?? []).length
+const elementCount = (dialogVueSource.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
+expect(labelCount).toBe(Object.keys(WATCHLIST_PROMPT_A11Y_LABELS).length)
+expect(elementCount).toBe(labelCount)
+})
+
+it('decline 与 cancel 是两个不同事件（spec §US5 语义差：decline 继续返回 / cancel 留页）', () => {
+expect(dialogVueSource).toContain("emit('decline')")
+expect(dialogVueSource).toContain("emit('cancel')")
+expect(dialogVueSource).toContain("emit('confirm')")
+// 「暂不」按钮映射 decline，不是 cancel
+expect(dialogVueSource).toContain('@tap="emit(\'decline\')"')
+})
+
+it('busy 禁用：tap 守卫 + 禁用态样式分支（防连点）', () => {
+// onConfirm 函数体内 props.busy 守卫
+const m = /function onConfirm[\s\S]*?\n\}/.exec(dialogVueSource)
+expect(m).not.toBeNull()
+expect(m![0]).toContain('props.busy')
+// 模板 busy 分支禁用态（opacity + 去除 active 反馈）
+expect(dialogVueSource).toContain("busy ? 'opacity-40'")
+})
+
+it('errorMsg 非空显示错误条（M3 error token），且「追更」按钮不被移除（可重试）', () => {
+expect(dialogVueSource).toContain('v-if="errorMsg"')
+expect(dialogVueSource).toContain('bg-error-container')
+expect(dialogVueSource).toContain('text-error-on-container')
+})
+
+it('open 期间 registerModal 注册关闭回调 = cancel（返回键优先关弹窗），关闭/卸载注销', () => {
+expect(dialogVueSource).toContain("import { registerModal } from '../stores/modalStack'")
+expect(dialogVueSource).toContain("registerModal(() => emit('cancel'))")
+// watch open 翻转注册/注销 + onBeforeUnmount 注销兜底
+expect(dialogVueSource).toContain('() => props.open')
+expect(dialogVueSource).toContain('onBeforeUnmount')
+expect(dialogVueSource).toContain('unregisterModal?.()')
 })
 })

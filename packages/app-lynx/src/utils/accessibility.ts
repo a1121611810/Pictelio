@@ -77,5 +77,12 @@ export const WATCHLIST_A11Y_LABELS = {
   unwatchCancel: '保留追更',
 } as const
 
+/** 追更询问弹窗 accessibility 标注（issue #224：NovelDetail 返回拦截询问 Dialog） */
+export const WATCHLIST_PROMPT_A11Y_LABELS = {
+  dialog: '追更询问弹窗',
+  decline: '暂不追更',
+  confirm: '追更该系列',
+} as const
+
 // Lynx 元素属性不支持 Vue 插值表达式，模板中用 :accessibility-element 绑定此常量
 export const A11Y_ELEMENT_ENABLED = true
