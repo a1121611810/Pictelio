@@ -117,11 +117,13 @@ The home page renders **fixed single-column layouts** via `FeedList` (no masonry
 
 **`createPullToRefresh`** (`/packages/app/src/primitives/createPullToRefresh.ts`, ADR-0076) provides the home page's six-panel pull-to-refresh with an A1 overlay mask; `createFastScrollbar` serves the novel detail page (see [Novel Reader](/openwiki/domain/novel-reader.md)).
 
-**Secondary virtualized feeds** still use the older `VirtualFeed` + `createFeedVirtualizer` stack with three layout modes (waterfall/single/grid): only `UserWorksFeed` (user illusts + user novels) remains, rendered via `VirtualFeed`/`NovelVirtualFeed`. The standalone `IllustBookmarks`/`NovelBookmarks`/`NovelRecommendedFeed`/`NovelFollowFeed` route panels were **deleted** in the ADR-0083 dead-code cleanup (they were already unwired — see [Bookmarks](#bookmarks)). The home feed itself no longer uses `createFeedVirtualizer`.
+**Secondary virtualized feeds** use `VirtualFeed` + `createFeedVirtualizer` with three layout modes (waterfall/single/grid): only `UserWorksFeed` (user illusts + user novels) remains, rendered via `VirtualFeed`/`NovelVirtualFeed`. The standalone `IllustBookmarks`/`NovelBookmarks`/`NovelRecommendedFeed`/`NovelFollowFeed` route panels were **deleted** in the ADR-0083 dead-code cleanup (they were already unwired — see [Bookmarks](#bookmarks)). The home feed itself no longer uses `createFeedVirtualizer`.
+
+> **Virtualizer internals (ADR-0096):** the `createFeedVirtualizer` primitive still bears its original name but its core was **replaced by `@tanstack/solid-virtual` v3** — the self-built `createVirtualScroll`/`computeMasonryLayout`/`createMasonryWorker`/`masonryWorker`/`createScrollRestoration`/`createTextListLayout` files were deleted. Lane assignment now uses TanStack lanes with `estimateSize` (lazy, per-item), and scroll restoration uses `takeSnapshot` + `initialMeasurementsCache` instead of RAF polling.
 
 **`VirtualFeed`** (`/packages/app/src/components/VirtualFeed.tsx`) accepts `illusts`/`loading`/`error`/`paginationError`/`hasMore` data state, `onIllustClick`/`onAuthorClick`/`onLoadMore`/`onRefresh` callbacks, a `layoutMode` (`waterfall` | `single` | `grid`), and `emptyText`/`skipAnimation`/`onNavigateToSettings`. It tracks a component-level `loadAttempted` flag: the "暂无新作品" empty message renders only when `loadAttempted` is `true`, and the skeleton renders while `loading` is `true` **or** `loadAttempted` is `false` (prevents an empty-state flash before the first fetch). The `paginationError` prop (ADR-0082) switches pagination failure from the above-list `ErrorDisplay` to a bottom `InlineRetryBar`. Scroll restoration is handled by `@solidjs/router`'s `<Router scrollRestoration>` prop; the custom `createScrollRestore`/`createVirtualScrollRestore`/`createFeedScrollStore` primitives were deleted (commit `b30366f`).
 
-`ImageCard` (`/packages/app/src/components/ImageCard.tsx`) and `GridCard` (`GridCard.tsx`) remain the card components for these secondary virtualized feeds (image loading, skeleton shimmer, author info, bookmark button).
+`ImageCard` (`/packages/app/src/components/ImageCard.tsx`) and `GridCard` (`GridCard.tsx`) remain the card components for these secondary virtualized feeds (image loading, skeleton shimmer, author info, bookmark button). The like indicator was deduplicated into a shared [`HeartIcon`](/packages/app/src/components/ui/HeartIcon.tsx) (ADR-0091) — previously `ImageCard` and `NovelCard` each inlined an identical 28-line `HeartSvg`; `GridCard`'s Unicode `♥/♡` is intentionally left as-is.
 
 ## Pagination Failure Inline Retry (ADR-0082)
 
@@ -161,9 +163,9 @@ Contract tests cover the new behavior: `tests/unit/components/SearchResults.test
 - `xRestrict = 1` — R18 (adult content)
 - `xRestrict = 2` — R18G (extreme content)
 
-User settings control visibility of each tier. An **AgeConfirmation** gate (`/packages/app/src/routes/AgeConfirmation.tsx`) appears on first launch, requiring the user to confirm they are 18+.
+User settings control visibility of each tier. Per [ADR-0103](/docs/adr/ADR-0103-account-scoped-content-settings.md), these switches are now **account-scoped** (`show_r18_${uid}` / `show_r18g_${uid}` in shared `CapacitorStorage`) and the first-launch **age confirmation gate was removed**.
 
-**app-lynx equivalent:** [`settingsStore.ts`](/packages/app-lynx/src/stores/settingsStore.ts) provides `showR18`/`showR18G` switches (default `false`, persisted via IndexedDB KV) and `isRestricted(item)` — a pure reactive function that drives a glass overlay (`RestrictOverlay.vue`) instead of removing items from the list. All feed pages render the full list; restricted entries show an R-18 / R-18G badge with "该内容已在设置中隐藏" and no click-through. Toggling a switch in settings makes the overlay disappear instantly without re-fetching. `filterByRestrict` has been deleted. Also adds `SkeletonNovel.vue` for novel list/detail loading states. Switches live on the Me page. Spec: [app-lynx R18 overlay + skeleton](/docs/specs/app-lynx-r18-overlay-skeleton.md), originating from [ADR-0051](/docs/adr/ADR-0051-lynx-r18-filter.md).
+**app-lynx equivalent:** [`settingsStore.ts`](/packages/app-lynx/src/stores/settingsStore.ts) provides `showR18`/`showR18G` switches (default `false`, account-scoped `show_r18_${uid}` keys persisted in shared `CapacitorStorage` per ADR-0103) and `isRestricted(item)` — a pure reactive function that drives a glass overlay (`RestrictOverlay.vue`) instead of removing items from the list. All feed pages render the full list; restricted entries show an R-18 / R-18G badge with "该内容已在设置中隐藏" and no click-through. Toggling a switch in settings makes the overlay disappear instantly without re-fetching. `filterByRestrict` has been deleted. Also adds `SkeletonNovel.vue` for novel list/detail loading states. Switches live on the Me page. Spec: [app-lynx R18 overlay + skeleton](/docs/specs/app-lynx-r18-overlay-skeleton.md), originating from [ADR-0051](/docs/adr/ADR-0051-lynx-r18-filter.md).
 
 ## Search
 
@@ -255,6 +257,7 @@ User profile data is loaded via `/packages/app/src/primitives/useUserProfile.ts`
 | Follow store | `/packages/app/src/stores/followStore.ts` |
 | TQ feed store factory | `/packages/app/src/stores/shared/createTQFeedStore.ts` |
 | Feed helpers | `/packages/app/src/stores/shared/feedHelpers.ts` |
+| Persisted-set factory (ADR-0092) | `/packages/app/src/stores/shared/createPersistedSet.ts` |
 | Virtual feed component (secondary feeds) | `/packages/app/src/components/VirtualFeed.tsx` |
 | Feed virtualizer (secondary feeds) | `/packages/app/src/primitives/createFeedVirtualizer.ts` |
 | Image card (secondary feeds) | `/packages/app/src/components/ImageCard.tsx` |
@@ -266,7 +269,6 @@ User profile data is loaded via `/packages/app/src/primitives/useUserProfile.ts`
 | History store | `/packages/app/src/stores/historyStore.ts` |
 | Bookmark store | `/packages/app/src/stores/bookmarkStore.ts` |
 | R18 filter utility | `/packages/app/src/utils/r18Filter.ts` |
-| Age confirmation | `/packages/app/src/routes/AgeConfirmation.tsx` |
 | Block/report store | `/packages/app/src/stores/blockStore.ts` |
 | User illusts | `/packages/app/src/routes/UserIllusts.tsx` |
 | Follow list page | `/packages/app/src/routes/FollowListPage.tsx` |

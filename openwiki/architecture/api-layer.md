@@ -53,6 +53,18 @@ In development (`pnpm dev`) or PWA mode, the client uses standard `fetch` throug
 - 401 handling uses the older Promise queue pattern (`devAuth.onUnauthorized` / `devAuth.refreshPromise`)
 - URLs are rewritten through Vite proxy (`/pixiv-api` → Pixiv API, `/pixiv-oauth` → auth endpoint)
 
+### URL Rewrite Trusted Boundary & Token Guard (ADR-0100)
+
+`rewriteUrl()` normalizes request paths; the web branch rewrites Pixiv hosts to `/pixiv-*` proxy paths. Before ADR-0100 it used an unbounded `startsWith(PIXIV_API_BASE)`, so a **pseudo-suffix domain** (`https://app-api.pixiv.net.evil.com`) was mis-rewritten to `/pixiv-api.evil.com/...` — and `execute`'s web branch attached `devAccessToken` to the result unconditionally, leaking the bearer token to a non-Pixiv host.
+
+The fix (aligned with the lynx client's security review #165):
+
+- **Strict boundary:** `path === PIXIV_API_BASE || path.startsWith(PIXIV_API_BASE + "/")` (auth URL additionally covers `+ "?"` for query strings). Pseudo-suffix domains no longer match any branch and pass through un-rewritten.
+- **`isTrustedPixivHost(url)`** — a pure function that parses the hostname whitelist from `__PUBLIC_CONFIG__` constants (`PIXIV_API_BASE` / `PIXIV_AUTH_URL`, no hardcoded domain strings per project constraint) and requires `https:` (fail-closed).
+- **`shouldAttachAuth(rewrittenUrl)`** — decides bearer attachment on the **already-rewritten** URL: web mode returns `rewrittenUrl.startsWith("/pixiv-")`; native mode returns `http`-prefixed URL whose hostname is in the trusted whitelist (defense-in-depth — native tokens are actually managed Java-side). `execute` now rewrites first, then gates `Authorization` on `shouldAttachAuth(url) && devAccessToken`.
+
+Result: the bearer token only rides local `/pixiv-` proxy paths; external URLs (including pseudo-suffix domains) never receive `Authorization`.
+
 ## OAuth Authentication
 
 ### Token Refresh (auth.ts)
@@ -113,7 +125,12 @@ The Android backup-exclusion layers (① `data_extraction_rules.xml`, ② `backu
 
 ### OAuth Token Error Detection
 
-Pixiv returns HTTP 400 (not 401) for expired `refresh_token`. The function `isOAuthTokenErrorResponse()` in `client.ts` detects this specific case (`400` + error body containing "invalid_request").
+Pixiv returns HTTP 400 (not 401) for expired `refresh_token`. The function [`isOAuthTokenErrorResponse()`](/packages/app/src/api/client.ts) in `client.ts` recognizes **two real response shapes** (aligned across both clients per [ADR-0098](/docs/adr/ADR-0098-cross-engine-consistency.md)):
+
+- **String form:** `{ error: "invalid_grant" }` — the standard `refresh_token`-expired response (first-party sources pixivpy#374 / gallery-dl#9331). Previously the app **missed this form** (it only checked the object form), classifying it `UNKNOWN` ("请求失败") instead of `UNAUTHORIZED`; the lynx client already recognized it.
+- **Object form:** `{ error: { message: "...OAuth...invalid_request..." } }`.
+
+Both forms (plus the `invalid_grant` substring inside the object form's message) map to `ApiErrorType.UNAUTHORIZED` → the session-expiry flow.
 
 **Permanent vs transient error branching** (`authStore.ts`): When `performRefresh` catches an error, the auth store distinguishes:
 - **Permanent errors** (OAuth HTTP 400-409): The `refresh_token` is irrecoverably expired or revoked. `isAuthErrorPermanent()` first short-circuits on `err instanceof TypeError` (always transient), then checks for `"HTTP 40"` in the error message (covering 400 through 409). Errors that match neither (unknown types) default to transient. Triggers full `logout()` which deletes the persisted token.
@@ -172,18 +189,19 @@ sequenceDiagram
 
 ## Query Key System
 
-`queryKeys.ts` defines a create-key factory following the TanStack Query convention:
+[`queryKeys.ts`](/packages/app/src/api/queryKeys.ts) defines `as const` key factories following the TanStack Query convention — every key starts with its resource type (`illust` / `novel` / `user` / `search`), which enables prefix-level invalidation (`queryClient.invalidateQueries({ queryKey: ["illust"] })` clears all illust caches, e.g. on logout):
 
-```
-['illust', id]           — Single illust detail
-['illust', 'detail', id] — Detail with full info
-['feed', tab, subTab]    — Feed pages
-['novel', id]            — Single novel detail
-['user', id, type]       — User profile / illusts
-['search', query, type]  — Search results
-```
+| Factory | Key shape |
+|---------|-----------|
+| `queryKeys.bookmarks(userId, restrict)` | `["illust", "bookmarks", userId, restrict]` |
+| `queryKeys.userIllusts(userId, type)` | `["illust", "userWorks", userId, type]` |
+| `queryKeys.userNovels(userId)` | `["novel", "userWorks", userId]` |
+| `queryKeys.followList(mode, userId)` | `["user", "followList", mode, userId]` |
+| `queryKeys.searchIllust(word, sort, target)` | `["search", "illust", word, sort, target]` |
+| `queryKeys.searchNovel(word, sort, target)` | `["search", "novel", word, sort, target]` |
+| `queryKeys.searchAutocomplete(word)` | `["search", "autocomplete", word]` |
 
-Each store that uses `createTQFeedStore` defines its own query keys internally.
+`createTQFeedStore` also builds feed keys internally (`["illust", "feed", tab, subTab]` / `["novel", "feed", tab, subTab]`). The factory approach guarantees precise TypeScript key derivation (no manual string arrays) and is the Phase 1–3 surface of ADR-0093.
 
 ## Error Handling
 
