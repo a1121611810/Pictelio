@@ -102,6 +102,32 @@ The `.husky/pre-push` hook runs [`check-e2e-anchors.mjs`](/packages/app/scripts/
 - **Dynamic-anchor exemptions:** template placeholders containing `${` (e.g. `navTabActiveJs`'s `${label}`) and dynamically generated `data-testid` values from `data-testid={`…`}` templates (e.g. `ContentTypeToggle`'s `content-type-${opt.key}` renders `content-type-novel`/`content-type-illust`) are exempt from the static match — they are verified by the real browser regression instead.
 - Manual run: `node packages/app/scripts/check-e2e-anchors.mjs`; false positives can be bypassed with `git push --no-verify`.
 
+## AI-Generated Test Quality & Cross-Engine Consistency (ADR-0097, ADR-0098, ADR-0101)
+
+Three adjacent ADRs (2026-08) harden the test oracle and conformance dimensions.
+
+### Oracle provenance & repo-localized code-review skill (ADR-0097)
+
+AI-generated tests carry two systematic defects: **conformance** (expectations reverse-derived from the implementation — self-consistent mocks, tautological assertions) and **oracle error** (the expectation itself is wrong, so the red/green loop produces wrong software with high confidence). The pre-existing hard constraints lived only in `AGENTS.md` (prompt self-constraint — probabilistic execution), and code-review's Spec axis did not check expectation provenance. ADR-0097 adds an execution layer:
+
+- **Repo-localized `code-review` skill** at [`.agents/skills/code-review/SKILL.md`](/.agents/skills/code-review/SKILL.md) — project-level load shadows the global skill (verified by probe). Its Spec axis blocks on **Oracle check** (per-test expectation provenance: spec / acceptance sample / real data / property are legal; implementation-derived / self-consistent mock / tautology are suspect) and **Test strength** (assertions must observe behavior and name the intended regression).
+- **T0.5 format gate** — [`scripts/verify-agent-skills.mjs`](/scripts/verify-agent-skills.mjs) validates `.agents/skills/` frontmatter, name↔directory consistency, and key-section markers; wired into `.husky/pre-push` when a push touches `.agents/`.
+- **T0 mechanical gates** — `passWithNoTests: false` (rejects empty test files) and oxlint `expect-expect: error` (tests must contain assertions). The latter only guarantees "has assertions"; the Oracle check guarantees "assertions are trustworthy" — complementary.
+- **6th hard constraint** — expectation-source traceability (see [Hard Constraints](#hard-constraints-enforced-in-agentsmd--testingmd)).
+
+### Cross-engine differential & property testing (ADR-0098)
+
+Pictelio is a dual-engine monorepo (webview `packages/app` / lynx `packages/app-lynx`) sharing one Pixiv data source and OAuth credential system; several same-semantics dual implementations showed **real behavior divergence**. ADR-0098:
+
+- **Fixes the app OAuth 400 bug** — `isOAuthTokenErrorResponse` now recognizes the string form `{ error: "invalid_grant" }` (the standard refresh_token-expired response), aligning with lynx; the old app test that asserted `false` for this form was corrected to a real-body snapshot contract test.
+- **Differential test suites** where the two engines act as each other's oracle — shared contract tables / fixtures + per-side assertions (the peer implementation can't be imported into either vitest due to vue/solid isolation). Shared fixtures live in `tests/unit/differential/` (app) and `tests/differential/` (lynx): `sharedRestrictionTruthTable.ts`, `sharedUrlRewriteCases.ts`, `sharedOAuthErrorCases.ts`, `sharedIllustTypeBadgeCases.ts`. The 12-case R18 truth table is guarded by `restrictionTruthTableConsistency.test.ts` (byte-compares both copies to prevent drift).
+- **Property tests with fast-check** (devDep) over pure functions — `r18Filter.property.test.ts`, `novelBlocks.property.test.ts`, `searchMerger.property.test.ts`, and `@pictelio/update-check`'s `isNewer.property.test.ts` — asserting idempotence / round-trip / length-conservation invariants.
+- **`ApiErrorType` enum case unification** (lynx lowercase → uppercase, aligned with app) and a CI-gate gap fix (`test:all`/`check:all` now include `@pictelio/update-check`).
+
+### Mutation-testing pilot (ADR-0101)
+
+StrykerJS (with the official vitest runner) is a **local, non-CI** sensitivity gate over the two in-process pure packages (`@pictelio/ugoira`, `@pictelio/update-check`): injected mutants that tests fail to kill signal weak or absent assertions. `pnpm test:mutation` runs both packages; HTML/JSON reports land in gitignored local dirs. Mutation score is explicitly a **weak-assertion detector, never correctness evidence** — complementary to the Oracle check (which catches wrong expectations).
+
 ## Hard Constraints (enforced in AGENTS.md & TESTING.md)
 
 The testing conventions in `/packages/app/tests/TESTING.md` (mirrored in `AGENTS.md` "测试硬约束") treat violations as architecture violations:
@@ -111,6 +137,7 @@ The testing conventions in `/packages/app/tests/TESTING.md` (mirrored in `AGENTS
 3. **No silent degradation** — every fallback path (`?? ""`, `?? null`, catch → default value) must emit `console.warn` (with a module prefix) or explicitly expose an error state. A missing field is a contract break and must be visible.
 4. **Refactor behavior-unchanged constraint** — refactor commits that touch field names, constants, config values, or defaults must check whether a corresponding contract test exists (add one if missing) and note the behavior-change points in the commit message. "Tests pass" alone is not sufficient evidence of no regression.
 5. **E2E coverage principle** — user-reachable interaction paths should have E2E coverage; paths depending on external state are covered via `driver.mockFetch()` + `driver.spyOnWindowOpen()` state construction.
+6. **Expectation provenance (ADR-0097)** — every test expectation must trace to an independent source (spec / acceptance sample / real data snapshot / property invariant). Expectations reverse-derived from the implementation, self-consistent mocks, and tautological assertions are treated as suspect.
 
 > **Note:** `@vitest/coverage-v8` (4.1.10) appears in `pnpm-lock.yaml` only as a **transitive peer** of `vite-plus`/`vitest` — it is **not** a declared devDependency in `packages/app/package.json`, and there is no `coverage` npm script, `coverage` block in `vitest.config.ts`, or CI coverage step. Coverage reporting is not wired up.
 
@@ -185,6 +212,8 @@ Shared infrastructure for AI-driven E2E tests:
 | `pnpm test:watch` | Unit tests in watch mode |
 | `pnpm test:agent-browser` | Agent-browser E2E tests |
 | `pnpm test:all` | Unit + agent-browser E2E combined |
+| `pnpm test:update-check` | `@pictelio/update-check` unit tests |
+| `pnpm test:mutation` | Stryker mutation run for `@pictelio/ugoira` + `@pictelio/update-check` (local, non-CI) |
 
 ## Key Source Files
 
@@ -205,3 +234,7 @@ Shared infrastructure for AI-driven E2E tests:
 | Playwright→agent-browser ADR | `/docs/adr/ADR-0034-migrate-playwright-e2e-to-agent-browser.md` |
 | Component test→unit/E2E ADR | `/docs/adr/ADR-0035-migrate-component-tests-to-e2e-and-unit.md` |
 | Static anchor validation | `/packages/app/scripts/check-e2e-anchors.mjs` |
+| Differential test fixtures (app) | `/packages/app/tests/unit/differential/` |
+| Differential test fixtures (lynx) | `/packages/app-lynx/tests/differential/` |
+| Agent-skills format gate | `/scripts/verify-agent-skills.mjs` |
+| Repo-localized code-review skill | `/.agents/skills/code-review/SKILL.md` |

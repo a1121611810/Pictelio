@@ -41,6 +41,18 @@ The L1 cache stores only URL strings (not image blobs) in a `Set`. When a URL is
 
 Context-aware eviction (ADR-0030) prevents large, rarely-used images from crowding out frequently-viewed thumbnails.
 
+## User-Facing Cache Controls (ADR-0090)
+
+The three internal cache layers are exposed to users as three **independent switches** on a dedicated `/image-cache` settings route ([`ImageCacheSettings.tsx`](/packages/app/src/routes/ImageCacheSettings.tsx)), replacing the old "图片缓存限制" LRU-entry-count slider which had no measurable effect on render speed:
+
+| Switch | Layer | Mechanism | Default |
+|--------|-------|-----------|---------|
+| **A — 磁盘缓存** | L3 Android disk cache | `ImageCachePlugin.setDiskCacheEnabled()`; `MainActivity.interceptImage()` checks the flag + file existence | on |
+| **B — 浏览器缓存** | Browser HTTP cache | `interceptImage()` adds `Cache-Control: public, max-age=31536000, immutable` to `WebResourceResponse`; a hit never reaches `shouldInterceptRequest` | on |
+| **C — 后台预取** | JS prefetch (LRU + disk) | `VirtualFeed.tsx`'s prefetch `createEffect` gates on the `imageCachePrefetch` signal | on |
+
+A real **磁盘缓存上限** slider (50–1000 MB) now bounds the disk layer. `cacheSize` (the legacy entry-count state) is kept internally for `resetUiStore` compatibility but no longer exposed in the UI. Explicitly rejected: blob URLs (blob lifetime binds to LRU eviction → broken `<img>` refs) and Service Worker caching (Capacitor 8 has no SW by default and it would conflict with the local-server mechanism).
+
 ## Image Host Selection
 
 `imageHostStore.ts` and `imageHostService.ts` manage multiple Pixiv image CDN hosts:
@@ -190,9 +202,9 @@ For ugoira illusts in feed lists (virtual scroll):
 | Ugoira download + extraction | `/packages/app/src/api/illust.ts` (`downloadAndExtractUgoira()`) |
 | Ugoira playback component | `/packages/app/src/components/UgoiraViewer.tsx` |
 | Full pipeline documentation | `/docs/image-loading-pipeline.md` |
-| ADR: Three-layer cache design | `/docs/adr/0003-image-cache-three-layer.md` |
+| ADR: Three-layer cache design | `/docs/adr/ADR-0090-image-cache-three-layer.md` |
 | ADR: L1 key set migration | `/docs/adr/0014-l1-image-cache-key-set.md` |
-| ADR: Periodic GC | `/docs/adr/0030-image-cache-periodic-gc.md` |
+| ADR: Periodic GC | `/docs/adr/ADR-0030-image-cache-periodic-gc.md` |
 | ADR: SSRF whitelist | `/docs/adr/0002-ssrf-url-whitelist-strategy.md` |
 | ADR: Detail image cache-ready rendering | `/docs/adr/ADR-0039-detail-image-cache-ready.md` |
 | Glossary: Detail image loading | `/docs/adr/glossary-detail-image-loading.md` |

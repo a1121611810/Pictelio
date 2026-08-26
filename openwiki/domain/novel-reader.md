@@ -25,7 +25,7 @@ Pictelio includes a full-featured novel reader for Pixiv novels, with virtualize
 - **FastScroller:** `createFastScrollbar` — a draggable overlay scrollbar with chapter-preview bubble (ADR-0077)
 - **Comments:** `CommentOverlay` for viewing novel comments
 - **Image handling:** Inline `NovelImageBlock` sub-component that memoizes aspect ratios
-- **Reading progress:** Scroll-position tracking with `createNovelLoader`
+- **Reading progress:** Scroll-position tracking via `createNovelVirtualLayout`'s `currentCharIndex` (the standalone `createNovelLoader` primitive was deleted in the ADR-0083 dead-code cleanup)
 - **AI translation:** BYOK DeepSeek translation — `TranslateSheet` bottom panel, original/translation toggle in `NovelFooterNav`, translated text injected through the `displayBlocks` memo (see [AI Translation](#ai-translation))
 
 ```mermaid
@@ -63,9 +63,9 @@ The novel reader uses a chain of primitives for efficient text layout:
 - Calculates paragraph positions based on font metrics and container width
 - Returns an array of paragraph bounding boxes for virtual scrolling
 
-### `measureText` (`/packages/app/src/primitives/measureText.ts`)
-- Measures individual text blocks using Canvas 2D `measureText`
-- Accounts for line-height, font-size, and font-family from reader settings
+### `measureText` (deleted)
+
+The standalone `/packages/app/src/primitives/measureText.ts` was **deleted** (ADR-0083 dead-code cleanup). Canvas 2D `measureText` measurement now lives inside `createNovelTextLayout` (with +2px safety margin and a 3% container-width reduction to compensate Android WebView Canvas-vs-DOM font-metric differences).
 
 ### `novelTextLayoutCache` (`/packages/app/src/primitives/novelTextLayoutCache.ts`)
 - Cache for text layout measurements keyed by content hash + font settings
@@ -75,6 +75,7 @@ The novel reader uses a chain of primitives for efficient text layout:
 - Higher-level primitive combining text layout with scroll-based visibility
 - Produces the virtual item array for the feed component
 - Handles resize events and font setting changes
+- **Since ADR-0096 it wraps `@tanstack/solid-virtual`'s `Virtualizer`** (the self-built novel virtual scroll was deleted) — rendering switched from spacer-based to absolute + `translateY`, and scroll restoration uses TanStack's snapshot mechanism
 
 ### Pretext Library
 
@@ -194,7 +195,6 @@ The novel feed is rendered two ways:
 | `coverWall` | `NovelCard` | Cover image grid |
 | `textList` | `NovelTextListCard` | Compact text-only list |
 
-- `/packages/app/src/routes/NovelFeedPage.tsx` — Novel feed discovery page
 - `/packages/app/src/components/NovelVirtualFeed.tsx` — Virtualized novel feed renderer
 - `/packages/app/src/stores/novelRecommendedStore.ts` — Dedicated recommended store
 - `/packages/app/src/stores/novelFollowStore.ts` — Dedicated follow store with `all`/`public`/`private` sub-tabs
@@ -208,16 +208,13 @@ The novel feed is rendered two ways:
 | Purpose | Path |
 |---------|------|
 | Novel detail page | `/packages/app/src/routes/NovelDetail.tsx` |
-| Novel feed page | `/packages/app/src/routes/NovelFeedPage.tsx` |
 | Novel recommended store | `/packages/app/src/stores/novelRecommendedStore.ts` |
 | Novel follow store | `/packages/app/src/stores/novelFollowStore.ts` |
 | Novel bookmark store | `/packages/app/src/stores/novelBookmarkStore.ts` |
 | Novel feed helpers | `/packages/app/src/stores/shared/novelHelpers.ts` |
 | Novel cache | `/packages/app/src/stores/novelCache.ts` |
-| Novel loader primitive | `/packages/app/src/primitives/createNovelLoader.ts` |
 | Novel virtual layout | `/packages/app/src/primitives/createNovelVirtualLayout.ts` |
 | Novel text layout | `/packages/app/src/primitives/createNovelTextLayout.ts` |
-| Text measurement | `/packages/app/src/primitives/measureText.ts` |
 | Text layout cache | `/packages/app/src/primitives/novelTextLayoutCache.ts` |
 | Novel search | `/packages/app/src/primitives/createNovelSearch.ts` |
 | Reader settings store | `/packages/app/src/stores/readerSettingsStore.ts` |
@@ -241,10 +238,6 @@ The novel feed is rendered two ways:
 | Novel footer nav | `/packages/app/src/components/NovelFooterNav.tsx` |
 | Novel search bar | `/packages/app/src/components/NovelSearchBar.tsx` |
 | Novel blocks parser | `/packages/app/src/utils/novelBlocks.ts` |
-| Novel image dimensions | `/packages/app/src/utils/novelImageDimensions.ts` |
-| Pretext support check | `/packages/app/src/primitives/isPretextSupported.ts` |
-| Novels stylesheet | `/packages/app/src/styles/novel-reader.css` |
-l blocks parser | `/packages/app/src/utils/novelBlocks.ts` |
 | Novel image dimensions | `/packages/app/src/utils/novelImageDimensions.ts` |
 | Pretext support check | `/packages/app/src/primitives/isPretextSupported.ts` |
 | Novels stylesheet | `/packages/app/src/styles/novel-reader.css` |

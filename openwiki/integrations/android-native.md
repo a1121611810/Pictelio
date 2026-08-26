@@ -147,7 +147,7 @@ sequenceDiagram
 |----------|-------------|---------|
 | `Login.tsx` `onMount` | Login page renders | Closes splash when user needs to authenticate |
 | `HomePage.tsx` (`createEffect` + `onMount`) | `createEffect` watches `recLoading()`/`folLoading()` → 350ms delay → `markContentReady()`; 800ms fallback | Loading-triggered strategy ensures skeleton paints before splash closes. Exit animation (120ms scale+fade) reintroduced for visual polish. |
-| `__root.tsx` `onMount` | Auth init completes (fallback) | Closes splash for non-feed pages (age-confirmation, etc.) if Login/HomePage haven't already |
+| `__root.tsx` `onMount` | Auth init completes (fallback) | Closes splash for non-feed pages (about, settings, etc.) if Login/HomePage haven't already |
 
 **Android native:**
 - `MainActivity.java`: retains `SplashScreen.installSplashScreen(this)` + `setKeepOnScreenCondition(() -> keepSplashVisible.get())`. The private `keepSplashVisible` `AtomicBoolean` defaults to `true` and is set to `false` via the package-private `dismissSplash()` method, called by `AuthPlugin.hideSplash()`
@@ -218,7 +218,7 @@ A LynxModule for client-switching and native app control, used by the [app-lynx 
 | `getClientKind(cb)` | Reads current client kind. Success: `cb(kind)`; failure: `cb(errMsg)`. |
 | `getClientKinds(cb)` | Returns `BuildConfig.CLIENT_KINDS` array for ADR-0062 switch-UI hiding. Success: `cb(kinds[])`. |
 | `restart(cb)` | Activity-level restart via `FLAG_ACTIVITY_NEW_TASK \| FLAG_ACTIVITY_CLEAR_TASK`. Keeps the process alive (token memory state, OkHttp pool, disk cache preserved). The old `LynxActivity` is destroyed by `CLEAR_TASK`. Aligned with webview-side `ClientInfoPlugin.restart` (issue #120/#124). |
-| `httpGet(url, cb)` | Native HTTP GET for the lynx update-check (ADR-0065) — fetches `version.json` from a background thread pool with a response-body size cap (the lynx native runtime has no `fetch`). |
+| `httpGet(url, cb)` | Native HTTP GET for the lynx update-check — implements the `fetchImpl` seam of the shared `@pictelio/update-check` layer (ADR-0089, evolved from ADR-0065): fetches `version.json` from a background thread pool with an http/https scheme whitelist, 10s call timeout, and a response-body size cap (the lynx native runtime has no `fetch`). |
 
 Callback signatures follow the same null-free pattern as `PictelioSecureStorageModule` — `CallbackImpl` on real devices crashes on `null` arguments.
 
@@ -524,4 +524,3 @@ These rules are in addition to the base ProGuard rules from ADR-0001 (native plu
 | Release checklist | `/docs/release-checklist.md` |
 | Release signing guide | `/docs/release-signing.md` |
 | Platform compat | `/docs/platform-compatibility.md` |
-| GitHub release docs | `/docs/github-release.md` |
