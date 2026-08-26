@@ -39,6 +39,10 @@ function openBookmarks() {
   void navigate('/bookmarks')
 }
 
+function openWatchlist() {
+  void navigate('/watchlist')
+}
+
 function pickClient(kind: ClientKind) {
   if (selectedClient.value === kind || switching.value) return
   switching.value = true
@@ -126,6 +130,16 @@ function toggleR18G() {
           @tap="openBookmarks"
         >
           <text class="text-title-medium text-surface-on">我的收藏</text>
+          <text class="text-title-medium text-surface-on-variant">›</text>
+        </view>
+        <!-- 追更列表入口（issue #225 / spec §US7）：账户组第二行 -->
+        <view
+          class="flex flex-row items-center justify-between py-3.5"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.watchlist"
+          @tap="openWatchlist"
+        >
+          <text class="text-title-medium text-surface-on">追更列表</text>
           <text class="text-title-medium text-surface-on-variant">›</text>
         </view>
       </GlassCard>
