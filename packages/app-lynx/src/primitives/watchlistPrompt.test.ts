@@ -24,6 +24,13 @@ function baseInput(): WatchlistPromptInput {
 }
 
 describe("shouldPromptWatchlist", () => {
+  // Oracle 锚定（AGENTS.md 测试硬约束 §6）：阈值常量的字面值独立锚定 spec §2 D1，
+  // 防止常量被静默改动后整个判定矩阵靠常量推算仍假绿
+  it("阈值常量锚定 spec §2 D1 字面值：停留 10_000ms / 滚动 0.7", () => {
+    expect(WATCHLIST_PROMPT_MIN_DWELL_MS).toBe(10_000)
+    expect(WATCHLIST_PROMPT_SCROLL_THRESHOLD).toBe(0.7)
+  })
+
   it("全条件命中 → 弹", () => {
     expect(shouldPromptWatchlist(baseInput())).toBe(true)
   })

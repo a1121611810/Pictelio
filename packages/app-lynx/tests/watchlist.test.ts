@@ -145,7 +145,11 @@ describe('isWatchlistSeriesMasked（对齐 Shaft Models.kt isMasked）', () => {
     ).toBe(false)
   })
 
-  it('部分缺失不算 mask：标题空但 user.id 非 0 → false', () => {
+  it('边界：mask_text 为空串 → false（spec §3「非空=被屏蔽」，空串无文案不算占位）', () => {
+expect(isWatchlistSeriesMasked({ ...MASKED_ITEM, mask_text: '' })).toBe(false)
+})
+
+it('部分缺失不算 mask：标题空但 user.id 非 0 → false', () => {
     expect(
       isWatchlistSeriesMasked({
         ...MASKED_ITEM,

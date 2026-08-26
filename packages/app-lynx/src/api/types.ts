@@ -140,6 +140,8 @@ export interface WatchlistNovelListResponse {
 /**
  * mask（被屏蔽/下架）占位条目判定，对齐 Shaft Models.kt `WatchlistSeries.isMasked`：
  * 标题空 + 无封面 + 有 mask 文案 + user.id=0。T7 列表页据此只读展示 mask_text。
+ * 偏离说明：Shaft 原版只查 `mask_text != null`，此处额外排除空串——
+ * 对齐 spec §3「mask_text 非空 = 被屏蔽」语义（空串无文案可展示，不算占位）。
  */
 export function isWatchlistSeriesMasked(s: WatchlistSeries): boolean {
   return s.title === "" && s.url == null && s.mask_text != null && s.mask_text !== "" && s.user.id === 0;
