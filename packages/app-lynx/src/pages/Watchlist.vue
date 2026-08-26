@@ -76,8 +76,10 @@ function askUnwatch(item: WatchlistSeries) {
     remove: deleteNovelWatchlist,
     onChange: (added) => {
       if (added) return
-      // 取消成功：移除条目 + 写 watchlistStore（详情页系列行标记联动，spec §US6/US7）
-      series.value = series.value.filter((s) => s.id !== item.id)
+      // 取消成功：从 feed 内部 items 移除（防下次分页 sync 复活，review P1-2）
+      // + 快照桥接 + 写 watchlistStore（详情页系列行标记联动，spec §US6/US7）
+      feed.removeItem(item.id)
+      sync()
       setWatchState(item.id, false)
       unwatchTarget.value = null
       unwatchToggle.value = null

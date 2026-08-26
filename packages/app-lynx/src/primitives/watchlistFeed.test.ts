@@ -102,7 +102,9 @@ describe("createWatchlistFeed", () => {
     expect(fetchNext).not.toHaveBeenCalled()
   })
 
-  it("竞态代：在飞 refresh 被后到调用作废，慢响应落地不生效", async () => {
+  it("在飞锁：重复 refresh 被吞且不作废在飞响应（review P1-1 回归），在飞结果正常落地", async () => {
+    // oracle：review P1-1 正确行为定义——在飞响应相对页面状态不是陈旧的，
+    // 被吞的重复调用不得递增竞态代，否则在飞响应落地被丢弃 → 假空态
     let resolveSlow!: (v: WatchlistNovelListResponse) => void
     const slow = new Promise<WatchlistNovelListResponse>((res) => (resolveSlow = res))
     const fetchFirst = vi
@@ -111,11 +113,25 @@ describe("createWatchlistFeed", () => {
       .mockResolvedValueOnce(page([9], null))
     const feed = createWatchlistFeed({ fetchFirst, fetchNext: vi.fn() })
     const p1 = feed.refresh()
-    await feed.refresh() // 在飞锁吞掉，但竞态代递增 → p1 响应作废
+    await feed.refresh() // 在飞锁吞掉：不递增代、不发新请求
+    expect(fetchFirst).toHaveBeenCalledTimes(1)
     resolveSlow(page([1], null))
     await p1
-    expect(feed.items()).toEqual([])
-    await feed.refresh() // 第三次 refresh 正常拉取
+    expect(feed.items().map((s) => s.id)).toEqual([1])
+    expect(feed.loading()).toBe(false)
+    await feed.refresh() // 后续 refresh 正常拉取
     expect(feed.items().map((s) => s.id)).toEqual([9])
+  })
+
+  it("removeItem：取消追更后本地移除，fetchMore 后 sync 不复活已删条目（review P1-2 回归）", async () => {
+    // oracle：spec §US7 取消追更语义——取消成功的系列不得再出现在列表
+    const fetchFirst = vi.fn().mockResolvedValue(page([1, 2], "https://next"))
+    const fetchNext = vi.fn().mockResolvedValue(page([3], null))
+    const feed = createWatchlistFeed({ fetchFirst, fetchNext })
+    await feed.refresh()
+    feed.removeItem(2)
+    expect(feed.items().map((s) => s.id)).toEqual([1])
+    await feed.fetchMore()
+    expect(feed.items().map((s) => s.id)).toEqual([1, 3])
   })
 })

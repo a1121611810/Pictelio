@@ -40,6 +40,8 @@ export interface WatchlistFeed {
   /** 分页失败错误文案（保留已加载内容，nextUrl 保留供滚动重试）；无错误 null */
   pageError: () => string | null
   nextUrl: () => string | null
+  /** 本地移除条目（取消追更成功后调用，防下次分页 sync 后已删条目复活，review P1-2） */
+  removeItem: (seriesId: number) => void
   refresh: () => Promise<void>
   fetchMore: () => Promise<void>
 }
@@ -55,10 +57,10 @@ export function createWatchlistFeed(deps: WatchlistFeedDeps): WatchlistFeed {
   let generation = 0
 
   async function refresh(): Promise<void> {
-    // 竞态代必须先递增再防重入：后到的 refresh 即使被在飞锁吞掉，
-    // 也要作废在飞的旧响应（防陈旧首屏落地）
-    const gen = ++generation
+    // 在飞锁优先（review P1-1）：首屏在飞时的重复 refresh 直接吞掉、共享在飞结果；
+    // 不得先递增代——在飞响应相对页面状态不是陈旧的，作废它会落地假空态
     if (loading.value) return
+    const gen = ++generation
     loading.value = true
     error.value = null
     pageError.value = null
@@ -98,6 +100,10 @@ export function createWatchlistFeed(deps: WatchlistFeedDeps): WatchlistFeed {
     }
   }
 
+  function removeItem(seriesId: number): void {
+    items.value = items.value.filter((s) => s.id !== seriesId)
+  }
+
   return {
     items: () => items.value,
     loading: () => loading.value,
@@ -105,6 +111,7 @@ export function createWatchlistFeed(deps: WatchlistFeedDeps): WatchlistFeed {
     error: () => error.value,
     pageError: () => pageError.value,
     nextUrl: () => nextUrl.value,
+    removeItem,
     refresh,
     fetchMore,
   }

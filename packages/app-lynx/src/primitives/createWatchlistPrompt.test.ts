@@ -222,7 +222,8 @@ describe("createWatchlistPrompt · confirm", () => {
     p.notifyScroll(1, true)
     expect(p.requestBack()).toBe(true)
     await p.confirm()
-    expect(p.dialogError).toBe("追更失败，请重试")
+    // oracle = spec §US4 行为契约（dialogError 非空 + 弹窗保持可重试）；文案字面值非 spec 契约，不锁定
+    expect(p.dialogError).toBeTruthy()
     expect(p.dialogOpen).toBe(true)
     expect(warn.mock.calls[0]?.[0]).toContain("[watchlist]")
     // 追更失败不得翻转状态：watchStates 仅保留预取写入的 false

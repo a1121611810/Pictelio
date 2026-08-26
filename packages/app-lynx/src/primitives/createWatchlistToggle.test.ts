@@ -53,7 +53,8 @@ describe("createWatchlistToggle", () => {
     const t = createWatchlistToggle(9, true, { add: vi.fn(), remove, onChange })
     await t.toggle()
     expect(t.added).toBe(true) // 回滚
-    expect(t.errorMsg).toBe("操作失败")
+    // oracle = spec §US7 行为契约（error 槽非空 + 可重试 + 不静默）；文案字面值非 spec 契约，不锁定
+    expect(t.errorMsg).toBeTruthy()
     expect(onChange).not.toHaveBeenCalled()
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining("[createWatchlistToggle]"),
@@ -66,7 +67,7 @@ describe("createWatchlistToggle", () => {
     const remove = vi.fn().mockRejectedValueOnce(new Error("500")).mockResolvedValueOnce(undefined)
     const t = createWatchlistToggle(3, true, { add: vi.fn(), remove })
     await t.toggle()
-    expect(t.errorMsg).toBe("操作失败")
+    expect(t.errorMsg).toBeTruthy()
     await t.toggle()
     expect(remove).toHaveBeenCalledTimes(2)
     expect(t.added).toBe(false)

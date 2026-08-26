@@ -97,6 +97,8 @@ createWatchlistPrompt(deps: {
   isDismissed: (id: number) => boolean                   // ↓ 三者由 watchlistStore 满足（US6）
   markDismissed: (id: number) => void
   setWatchState: (id: number, added: boolean) => void
+  addWatchlist: (id: number) => Promise<void>  // 追更请求（review P2-3 修订补录：
+                                               // confirm 要发请求且保持 node 可测，必须注入）
   now?: () => number                                     // 测试注入时钟
 }): {
   notifyScroll(progress: number, reachedBottom: boolean): void
