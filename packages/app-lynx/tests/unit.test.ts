@@ -4,7 +4,7 @@ import { proxyImageUrl, thumbUrl } from '../src/utils/imageUrl'
 import { classifyError, isNativeMode, isOAuthTokenErrorResponse, rewriteUrl, shouldAttachAuth } from '../src/api/client'
 import { ApiErrorType } from '../src/api/types'
 import { extractNovelTextFromHtml } from '../src/api/novel'
-import { matchRoute, evaluateSystemBack, evaluateBackWithBehavior, SYSTEM_BACK_EXIT_WINDOW_MS } from '../src/routerCore'
+import { matchRoute, evaluateSystemBack, evaluateBackWithBehavior, SYSTEM_BACK_EXIT_WINDOW_MS, runBackGuards, createBackGuardRegistry, evaluateBackRoute, type BackGuard } from '../src/routerCore'
 import { redactProxyUrl } from '../src/utils/proxyRedact'
 import { apiClient } from '../src/api/client'
 import { isOAuthCredsInjected } from '../src/api/auth'
@@ -14,7 +14,7 @@ import { loadUserNovels, loadBookmarks as loadNovelBookmarks, loadFollow as load
 import { bytesToDataUrl, downloadUgoiraFrames } from '../src/api/ugoira'
 import type { UgoiraExtractMode } from '../src/api/ugoira'
 import { ugoiraMode as lynxUgoiraMode, setUgoiraMode as lynxSetUgoiraMode } from '../src/stores/settingsStore'
-import { ME_A11Y_LABELS, LOGIN_A11Y_LABELS, RECOMMENDED_A11Y_LABELS, UPDATE_A11Y_LABELS, ERROR_A11Y_LABELS, FAB_MENU_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../src/utils/accessibility'
+import { ME_A11Y_LABELS, LOGIN_A11Y_LABELS, RECOMMENDED_A11Y_LABELS, UPDATE_A11Y_LABELS, ERROR_A11Y_LABELS, FAB_MENU_A11Y_LABELS, WATCHLIST_A11Y_LABELS, WATCHLIST_PROMPT_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../src/utils/accessibility'
 
 describe('imageUrl.proxyImageUrl', () => {
   it('将 i.pximg.net URL 重写为本地代理路径', () => {
@@ -309,6 +309,131 @@ describe('routerCore.evaluateBackWithBehavior（更新页 backBehavior: exit）'
     expect(evaluateBackWithBehavior(undefined, 0, 0, now)).toBe('hint')
     expect(evaluateBackWithBehavior(undefined, 0, now - 100, now)).toBe('exit')
     expect(evaluateBackWithBehavior(undefined, 0, now - 5000, now)).toBe('hint')
+  })
+})
+
+// ─── 返回守卫（back-guard）——期望值来源：docs/specs/app-lynx-novel-series-watchlist.md §US3
+// 裁决顺序定义（modalStack → backGuard → backBehavior/history），issue #222 验收条件。
+describe('routerCore.runBackGuards（守卫短路执行）', () => {
+  it('空守卫列表 → 不拦截', () => {
+    expect(runBackGuards([])).toBe(false)
+  })
+
+  it('全部返回 false → 不拦截', () => {
+    expect(runBackGuards([() => false, () => false])).toBe(false)
+  })
+
+  it('任一守卫返回 true → 拦截', () => {
+    expect(runBackGuards([() => false, () => true])).toBe(true)
+  })
+
+  it('短路：首个 true 之后续守卫不再执行', () => {
+    const second = vi.fn(() => true)
+    expect(runBackGuards([() => true, second])).toBe(true)
+    expect(second).not.toHaveBeenCalled()
+  })
+
+  it('守卫抛错 → console.warn 记录并按未拦截处理（fail-open，不卡死返回键）', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const throwing: BackGuard = () => {
+      throw new Error('boom')
+    }
+    expect(runBackGuards([throwing, () => true])).toBe(true)
+    expect(warn).toHaveBeenCalledOnce()
+    expect(warn.mock.calls[0]?.[0]).toContain('[router]')
+    warn.mockRestore()
+  })
+
+  it('守卫抛错且无后续拦截守卫 → 整体不拦截', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(
+      runBackGuards([
+        () => {
+          throw new Error('boom')
+        },
+      ]),
+    ).toBe(false)
+    warn.mockRestore()
+  })
+})
+
+describe('routerCore.createBackGuardRegistry（注册/注销语义）', () => {
+  it('注册后守卫生效，注销函数移除守卫', () => {
+    const registry = createBackGuardRegistry()
+    const guard = vi.fn(() => true)
+    const unregister = registry.register(guard)
+    expect(runBackGuards(registry.guards())).toBe(true)
+    unregister()
+    expect(registry.guards()).toHaveLength(0)
+    expect(runBackGuards(registry.guards())).toBe(false)
+  })
+
+  it('重复注销安全（不报错、不误删同名守卫之外的内容）', () => {
+    const registry = createBackGuardRegistry()
+    const unregister = registry.register(() => true)
+    unregister()
+    expect(() => unregister()).not.toThrow()
+    expect(registry.guards()).toHaveLength(0)
+  })
+
+  it('多守卫按注册序执行，注销中间守卫不影响顺序', () => {
+    const registry = createBackGuardRegistry()
+    const calls: string[] = []
+    registry.register(() => {
+      calls.push('a')
+      return false
+    })
+    const unregB = registry.register(() => {
+      calls.push('b')
+      return true
+    })
+    registry.register(() => {
+      calls.push('c')
+      return false
+    })
+    expect(runBackGuards(registry.guards())).toBe(true)
+    expect(calls).toEqual(['a', 'b']) // c 被 b 短路
+    calls.length = 0
+    unregB()
+    expect(runBackGuards(registry.guards())).toBe(false)
+    expect(calls).toEqual(['a', 'c'])
+  })
+})
+
+describe('routerCore.evaluateBackRoute（系统返回完整裁决顺序）', () => {
+  const now = 1_000_000
+  const base = { behavior: undefined, historyLength: 1, lastBackAt: 0, now }
+
+  it('modalStack 有打开弹层 → close-modal，守卫不被执行（modal 优先于 guard）', () => {
+    const runGuards = vi.fn(() => true)
+    expect(evaluateBackRoute({ ...base, hasOpenModal: true, runGuards })).toBe('close-modal')
+    expect(runGuards).not.toHaveBeenCalled()
+  })
+
+  it('无弹层且守卫拦截 → intercepted（守卫消费，裁决不再进入历史栈分支）', () => {
+    // historyLength=1 时若守卫未拦截本应 navigate；intercepted 说明历史栈不会被 pop
+    expect(evaluateBackRoute({ ...base, hasOpenModal: false, runGuards: () => true })).toBe('intercepted')
+  })
+
+  it('无弹层且守卫放行 → 落到既有 ADR-0066 决策（navigate）', () => {
+    const runGuards = vi.fn(() => false)
+    expect(evaluateBackRoute({ ...base, hasOpenModal: false, runGuards })).toBe('navigate')
+    expect(runGuards).toHaveBeenCalledOnce()
+  })
+
+  it('回归：backBehavior exit 优先于历史栈与双击窗口（守卫放行时行为不变）', () => {
+    expect(
+      evaluateBackRoute({ hasOpenModal: false, runGuards: () => false, behavior: 'exit', historyLength: 3, lastBackAt: 0, now }),
+    ).toBe('exit')
+  })
+
+  it('回归：根路由双击退出窗口（守卫放行时行为不变）', () => {
+    expect(
+      evaluateBackRoute({ hasOpenModal: false, runGuards: () => false, behavior: undefined, historyLength: 0, lastBackAt: now - 100, now }),
+    ).toBe('exit')
+    expect(
+      evaluateBackRoute({ hasOpenModal: false, runGuards: () => false, behavior: undefined, historyLength: 0, lastBackAt: 0, now }),
+    ).toBe('hint')
   })
 })
 
@@ -1020,6 +1145,37 @@ describe('Update 页 accessibility 标注（检查更新）', () => {
   })
 })
 
+// ─── 追更列表页 accessibility 标注（issue #225） ───
+// 与 Me 页同一套「注册表 + 模板源码断言」约定：漏标注或绕过注册表硬编码均失败。
+describe('追更列表页 accessibility 标注（issue #225）', () => {
+  const watchlistVueSource = readFileSync(fileURLToPath(new URL('../src/pages/Watchlist.vue', import.meta.url)), 'utf8')
+
+  it('注册表 label 全部非空且唯一', () => {
+    const labels = Object.values(WATCHLIST_A11Y_LABELS)
+    expect(labels.length).toBeGreaterThan(0)
+    for (const label of labels) expect(label.length).toBeGreaterThan(0)
+    expect(new Set(labels).size).toBe(labels.length)
+  })
+
+  it('WATCHLIST_A11Y_LABELS 全部被 Watchlist.vue 消费且配套 element', () => {
+    for (const key of Object.keys(WATCHLIST_A11Y_LABELS)) {
+      expect(watchlistVueSource).toContain(`:accessibility-label="WATCHLIST_A11Y_LABELS.${key}"`)
+    }
+    const labelCount = (watchlistVueSource.match(/:accessibility-label="WATCHLIST_A11Y_LABELS\.\w+"/g) ?? []).length
+    const elementCount = (watchlistVueSource.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
+    expect(labelCount).toBe(Object.keys(WATCHLIST_A11Y_LABELS).length)
+    expect(elementCount).toBe(labelCount)
+  })
+
+  it('mask 条目分支存在且不可点（spec §6-7：只读展示 mask_text）', () => {
+    expect(watchlistVueSource).toContain('isWatchlistSeriesMasked(item)')
+    // mask 分支在 openLatest 绑定之前出现（v-if mask / v-else 正常条目）
+    expect(watchlistVueSource.indexOf('isWatchlistSeriesMasked(item')).toBeLessThan(
+      watchlistVueSource.indexOf('@tap="openLatest(item)"'),
+    )
+  })
+})
+
 describe('会话失效错误页 accessibility 标注（候选 #2）', () => {
   const errorVueSource = readFileSync(fileURLToPath(new URL('../src/pages/ErrorPage.vue', import.meta.url)), 'utf8')
 
@@ -1540,5 +1696,127 @@ it('Bookmarks 页：取消收藏后隐藏集过滤 + 同 tick refreshEpoch++ 整
   expect(m).not.toBeNull()
   expect(m![0]).toContain('removedIllustIds.value = new Set(removedIllustIds.value).add(item.id)')
   expect(m![0]).toContain('refreshEpoch.value++')
+})
+})
+
+// ─── 追更询问弹窗（issue #224 / spec §US5） ───
+// 仓库无 .vue 组件渲染测试先例（node 环境，无 Lynx 渲染器），降为模板源码结构断言，
+// 与既有「注册表 + 模板源码断言」约定一致（对齐 Watchlist.vue / UpdatePage.vue 先例）。
+// emits 映射 / busy 禁用 / error 分支 / modalStack 注册均用源码锚点断言；
+// 弹窗状态机行为本身由 createWatchlistPrompt.test.ts 单测覆盖（T4 seam）。
+describe('追更询问弹窗 WatchlistPromptDialog（issue #224 / spec §US5）', () => {
+const dialogVueSource = readFileSync(
+fileURLToPath(new URL('../src/components/WatchlistPromptDialog.vue', import.meta.url)),
+'utf8',
+)
+
+it('注册表 label 全部非空且唯一', () => {
+const labels = Object.values(WATCHLIST_PROMPT_A11Y_LABELS)
+expect(labels.length).toBeGreaterThan(0)
+for (const label of labels) expect(label.length).toBeGreaterThan(0)
+expect(new Set(labels).size).toBe(labels.length)
+})
+
+it('WATCHLIST_PROMPT_A11Y_LABELS 全部被 WatchlistPromptDialog.vue 消费且配套 element', () => {
+for (const key of Object.keys(WATCHLIST_PROMPT_A11Y_LABELS)) {
+expect(dialogVueSource).toContain(`:accessibility-label="WATCHLIST_PROMPT_A11Y_LABELS.${key}"`)
+}
+const labelCount = (dialogVueSource.match(/:accessibility-label="WATCHLIST_PROMPT_A11Y_LABELS\.\w+"/g) ?? []).length
+const elementCount = (dialogVueSource.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
+expect(labelCount).toBe(Object.keys(WATCHLIST_PROMPT_A11Y_LABELS).length)
+expect(elementCount).toBe(labelCount)
+})
+
+it('decline 与 cancel 是两个不同事件（spec §US5 语义差：decline 继续返回 / cancel 留页）', () => {
+expect(dialogVueSource).toContain("emit('decline')")
+expect(dialogVueSource).toContain("emit('cancel')")
+expect(dialogVueSource).toContain("emit('confirm')")
+// 「暂不」按钮经 onDecline 映射 decline（含 busy 守卫，review P2-3），不是 cancel
+expect(dialogVueSource).toContain('@tap="onDecline"')
+})
+
+it('busy 禁用：tap 守卫 + 禁用态样式分支（防连点）', () => {
+// onConfirm 函数体内 props.busy 守卫
+const m = /function onConfirm[\s\S]*?\n\}/.exec(dialogVueSource)
+expect(m).not.toBeNull()
+expect(m![0]).toContain('props.busy')
+// 模板 busy 分支禁用态（opacity + 去除 active 反馈）
+expect(dialogVueSource).toContain("busy ? 'opacity-40'")
+})
+
+it('errorMsg 非空显示错误条（M3 error token），且「追更」按钮不被移除（可重试）', () => {
+expect(dialogVueSource).toContain('v-if="errorMsg"')
+expect(dialogVueSource).toContain('bg-error-container')
+expect(dialogVueSource).toContain('text-error-on-container')
+})
+
+it('open 期间 registerModal 注册关闭回调 = cancel（返回键优先关弹窗），关闭/卸载注销', () => {
+expect(dialogVueSource).toContain("import { registerModal } from '../stores/modalStack'")
+expect(dialogVueSource).toContain("registerModal(() => emit('cancel'))")
+// watch open 翻转注册/注销 + onBeforeUnmount 注销兜底
+expect(dialogVueSource).toContain('() => props.open')
+expect(dialogVueSource).toContain('onBeforeUnmount')
+expect(dialogVueSource).toContain('unregisterModal?.()')
+})
+})
+
+// ─── T6：NovelDetail 追更询问接线（issue #226 / spec §US4 接线半） ───
+// 零渲染器环境下的模板源码结构断言（对齐上方 WatchlistPromptDialog 既有模式）；
+// 弹窗状态机行为本身由 createWatchlistPrompt.test.ts 覆盖（T4 seam）。
+describe('NovelDetail 追更询问接线（issue #226 / spec §US4/§US5）', () => {
+const detailVueSource = readFileSync(
+fileURLToPath(new URL('../src/pages/NovelDetail.vue', import.meta.url)),
+'utf8',
+)
+
+it('左上角返回走 requestBack（与系统返回同一守卫链），不再直调 goBack', () => {
+expect(detailVueSource).toContain('@tap="requestBack"')
+expect(detailVueSource).toContain('requestBack')
+expect(detailVueSource).not.toContain('@tap="goBack"')
+})
+
+it('registerBackGuard 注册 + onUnmounted 注销（detail 页不在 KeepAlive 白名单）', () => {
+expect(detailVueSource).toContain('registerBackGuard(')
+expect(detailVueSource).toContain('unregisterBackGuard()')
+expect(detailVueSource).toContain('onUnmounted(')
+})
+
+it('scroll-view 双路滚动跟踪：@scroll（进度）+ @scrolltolower（到达底部兑底）', () => {
+expect(detailVueSource).toContain('@scroll="onNovelScroll"')
+expect(detailVueSource).toContain('@scrolltolower="onNovelToBottom"')
+})
+
+it('弹窗挂载 + 三事件语义差：decline/confirm 继续返回，cancel 留页', () => {
+expect(detailVueSource).toContain('<WatchlistPromptDialog')
+expect(detailVueSource).toContain('@confirm="onWatchlistConfirm"')
+expect(detailVueSource).toContain('@decline="onWatchlistDecline"')
+expect(detailVueSource).toContain('@cancel="onWatchlistCancel"')
+// decline：decline() 后 goBack()
+const declineFn = /function onWatchlistDecline[\s\S]*?\n\}/.exec(detailVueSource)
+expect(declineFn).not.toBeNull()
+expect(declineFn![0]).toContain('prompt?.decline()')
+expect(declineFn![0]).toContain('goBack()')
+// confirm：await 后弹窗已关才 goBack（失败留页可重试）
+const confirmFn = /async function onWatchlistConfirm[\s\S]*?\n\}/.exec(detailVueSource)
+expect(confirmFn).not.toBeNull()
+expect(confirmFn![0]).toContain('await p.confirm()')
+expect(confirmFn![0]).toContain('!p.dialogOpen')
+// cancel：仅 cancel()，无 goBack（留页）
+const cancelFn = /function onWatchlistCancel[\s\S]*?\n\}/.exec(detailVueSource)
+expect(cancelFn).not.toBeNull()
+expect(cancelFn![0]).toContain('prompt?.cancel()')
+expect(cancelFn![0]).not.toContain('goBack')
+})
+
+it('系列信息行：《系列名》+ watchAdded=true 时「已追更」chip', () => {
+expect(detailVueSource).toContain('novel?.series')
+expect(detailVueSource).toContain('《{{ novel.series.title }}》')
+expect(detailVueSource).toContain("prompt?.watchAdded === true")
+expect(detailVueSource).toContain('已追更')
+})
+
+it('章节内跳转：watch novelId 重载（dispose + 重建，spec §6-2）', () => {
+expect(detailVueSource).toContain('watch(novelId')
+expect(detailVueSource).toContain('teardownPrompt()')
 })
 })

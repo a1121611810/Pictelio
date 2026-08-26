@@ -1,6 +1,11 @@
 // ─── 小说 API（复用现有 app 端点 + 正文提取逻辑） ───
 import { apiClient } from "./client"
-import type { PixivNovelListResponse, PixivNovelDetailResponse } from "./types"
+import type {
+  PixivNovelListResponse,
+  PixivNovelDetailResponse,
+  NovelSeriesDetailResponse,
+  WatchlistNovelListResponse,
+} from "./types"
 
 export function loadRecommendedNovels(signal?: AbortSignal): Promise<PixivNovelListResponse> {
   return apiClient.get<PixivNovelListResponse>(
@@ -46,6 +51,44 @@ export function loadBookmarks(
     user_id: String(userId),
     restrict,
   }, signal)
+}
+
+// ─── 小说系列追更（issue #220 / spec app-lynx-novel-series-watchlist §US1） ───
+// 端点与字段逐字对齐 Pixiv-Shaft：AppApi.kt（add/delete）+ loxia/API.kt（列表）+ Models.kt（字段）。
+
+/** 系列详情（含追更状态 watchlist_added、是否完结 is_concluded） */
+export function loadNovelSeries(
+  seriesId: number,
+  signal?: AbortSignal,
+): Promise<NovelSeriesDetailResponse> {
+  return apiClient.get<NovelSeriesDetailResponse>(
+    "/v2/novel/series",
+    { series_id: String(seriesId) },
+    signal,
+  )
+}
+
+/** 追更系列（POST form: series_id） */
+export function addNovelWatchlist(seriesId: number): Promise<void> {
+  return apiClient.post<void>("/v1/watchlist/novel/add", { series_id: String(seriesId) })
+}
+
+/** 取消追更（POST form: series_id） */
+export function deleteNovelWatchlist(seriesId: number): Promise<void> {
+  return apiClient.post<void>("/v1/watchlist/novel/delete", { series_id: String(seriesId) })
+}
+
+/** 追更列表首页（无 query 参数，对齐 Shaft getWatchlistNovel） */
+export function loadWatchlistNovels(signal?: AbortSignal): Promise<WatchlistNovelListResponse> {
+  return apiClient.get<WatchlistNovelListResponse>("/v1/watchlist/novel", undefined, signal)
+}
+
+/** 追更列表翻页：透传服务端 next_url（保留 query） */
+export function loadWatchlistNovelsNext(
+  url: string,
+  signal?: AbortSignal,
+): Promise<WatchlistNovelListResponse> {
+  return apiClient.get<WatchlistNovelListResponse>(url, undefined, signal)
 }
 
 /**

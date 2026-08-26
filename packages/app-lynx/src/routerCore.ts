@@ -70,3 +70,76 @@ export function matchRoute<T extends RouteDefCore>(
   }
   return null
 }
+
+// ─── 返回守卫（back-guard，spec app-lynx-novel-series-watchlist §US3，issue #222） ───
+// 页面级返回拦截：守卫返回 true = 本次返回已被页面消费（如打开追更询问弹窗），
+// 路由层不得再 pop 历史栈。裁决顺序：modalStack → backGuard → backBehavior/history。
+// 守卫注册表与裁决逻辑全部在本模块（纯逻辑、node 可单测）；router.ts 只做薄接线。
+
+/** 返回守卫：返回 true 表示已拦截本次返回（路由层放行给消费者自己处理） */
+export type BackGuard = () => boolean
+
+/**
+ * 顺序执行守卫，任一返回 true 即拦截（短路，后续守卫不再执行）。
+ * 守卫抛错不阻断返回：console.warn 记录并视为未拦截（fail-open，守卫 bug 不应卡死返回键）。
+ */
+export function runBackGuards(guards: readonly BackGuard[]): boolean {
+  for (const guard of guards) {
+    let intercepted = false
+    try {
+      intercepted = guard()
+    } catch (err) {
+      console.warn('[router] back-guard 执行抛错，按未拦截处理', err)
+    }
+    if (intercepted) return true
+  }
+  return false
+}
+
+/** 守卫注册表（createModalStack 同款形态：register 返回注销函数） */
+export interface BackGuardRegistry {
+  /** 注册守卫；返回注销函数（页面卸载/停用时调用，重复注销安全） */
+  register(guard: BackGuard): () => void
+  /** 当前生效守卫（注册序 = 执行序） */
+  guards(): readonly BackGuard[]
+}
+
+/** 创建守卫注册表（router.ts 持有模块级单例；测试各自 new 隔离实例） */
+export function createBackGuardRegistry(): BackGuardRegistry {
+  const guards: BackGuard[] = []
+  return {
+    register(guard) {
+      guards.push(guard)
+      return () => {
+        const idx = guards.indexOf(guard)
+        if (idx !== -1) guards.splice(idx, 1)
+      }
+    },
+    guards() {
+      return guards
+    },
+  }
+}
+
+/** 系统返回完整路由裁决（含弹层/守卫两级拦截）：ADR-0066 决策之上叠加 §US3 拦截层 */
+export type BackRouteAction = "close-modal" | "intercepted" | SystemBackDecision
+
+/**
+ * 纯函数：系统返回的完整裁决顺序——
+ * ① 有打开弹层（modalStack）→ close-modal（返回键优先关弹层，不动守卫/历史栈）；
+ * ② 否则跑 back-guard（懒执行：仅在本层才调用 runGuards）→ intercepted（守卫消费，不动历史栈）；
+ * ③ 否则走既有 evaluateBackWithBehavior（backBehavior/history/双击退出窗口）。
+ */
+export function evaluateBackRoute(opts: {
+  hasOpenModal: boolean
+  /** 守卫执行入口（惰性）：仅当无弹层时才应被调用 */
+  runGuards: () => boolean
+  behavior: RouteDefCore["backBehavior"] | undefined
+  historyLength: number
+  lastBackAt: number
+  now: number
+}): BackRouteAction {
+  if (opts.hasOpenModal) return "close-modal"
+  if (opts.runGuards()) return "intercepted"
+  return evaluateBackWithBehavior(opts.behavior, opts.historyLength, opts.lastBackAt, opts.now)
+}

@@ -1,8 +1,0 @@
-# 项目级 Reasonix 配置 — 覆盖全局 ~/.reasonix/config.toml
-# 解析优先级: flag > ./reasonix.toml > ~/.reasonix/config.toml > built-in defaults
-
-[[plugins]]
-name = "codegraph"
-type = "stdio"
-command = "codegraph"
-args = ["serve", "--mcp", "--path", "/Users/lilianda/develop/pixivizer"]

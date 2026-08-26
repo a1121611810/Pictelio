@@ -3,7 +3,7 @@
 // （Pre-Alpha 兼容问题，已实测）。MVP 用手写内存路由 + <component :is>，
 // 路由语义与 vue-router 一致（path/name/params），导航守卫由页面自行处理登录态。
 import { ref, computed, markRaw, type Component } from 'vue'
-import { matchRoute, evaluateBackWithBehavior, type RouteDefCore } from './routerCore'
+import { matchRoute, evaluateBackRoute, createBackGuardRegistry, runBackGuards, type BackGuard, type RouteDefCore } from './routerCore'
 import { isNativeMode, getNativeModules } from './api/client'
 import { isLoggedIn, restoreToken, registerUnauthorizedHandler } from './stores/authStore'
 import { loadSettings } from './stores/settingsStore'
@@ -35,6 +35,7 @@ import Bookmarks from './pages/Bookmarks.vue'
 import FollowList from './pages/FollowList.vue'
 import UpdatePage from './pages/UpdatePage.vue'
 import ErrorPage from './pages/ErrorPage.vue'
+import Watchlist from './pages/Watchlist.vue'
 
 export const routes: RouteDef[] = [
   { path: '/login', name: 'login', component: Login },
@@ -49,6 +50,7 @@ export const routes: RouteDef[] = [
   { path: '/following', name: 'following', component: Following },
   { path: '/bookmarks', name: 'bookmarks', component: Bookmarks },
   { path: '/me', name: 'me', component: Me },
+  { path: '/watchlist', name: 'watchlist', component: Watchlist },
   // 强制更新页（检查更新命中后 replace + 清历史栈进入）：
   // backBehavior: 'exit' —— 返回键直接退出应用，无返回路径
   { path: '/update', name: 'update', component: UpdatePage, backBehavior: 'exit' },
@@ -122,6 +124,25 @@ export function goBack(): void {
   _state.value = { name: 'recommended', path: '/recommended', params: {} }
 }
 
+// ─── 返回守卫（spec app-lynx-novel-series-watchlist §US3，issue #222） ───
+// 页面级返回拦截注册表：守卫（如小说详情页追更询问）返回 true = 本次返回已被消费，
+// 路由层不再 pop 历史栈。注册表与裁决纯逻辑在 routerCore（node 可单测），此处仅薄接线。
+const backGuardRegistry = createBackGuardRegistry()
+
+/** 注册返回守卫；返回注销函数（页面 onUnmounted/onDeactivated 时调用） */
+export function registerBackGuard(guard: BackGuard): () => void {
+  return backGuardRegistry.register(guard)
+}
+
+/**
+ * 页面内返回入口（如左上角返回按钮）：先跑守卫，未被拦截才 goBack()。
+ * 与系统返回（handleSystemBack）共用同一守卫链，两条返回路径行为一致。
+ */
+export function requestBack(): void {
+  if (runBackGuards(backGuardRegistry.guards())) return
+  goBack()
+}
+
 // ─── 系统返回桥（ADR-0066） ───
 // 原生 LynxActivity 拦截系统返回（手势/按键）后通过全局事件 pictelioBack 转发，
 // 返回行为由 JS 决策：有历史 → 返回上一页；根路由（推荐/登录）→ 提示 + 2s 双击退出。
@@ -142,21 +163,29 @@ function showExitHint(): void {
 }
 
 function handleSystemBack(): void {
-  // ADR-0066 扩展（issue #163）：有打开的 modal（如评论区弹层）时返回键优先
-  // 关闭最上层弹层，不触发页面返回 / 退出提示
-  if (hasOpenModal()) {
+  // 裁决顺序（纯函数 evaluateBackRoute，routerCore 单测覆盖）：
+  // ① modalStack 有打开弹层（issue #163）→ close-modal（返回键优先关弹层）
+  // ② back-guard 拦截（§US3）→ intercepted（守卫消费本次返回，不动历史栈）
+  // ③ 既有 ADR-0066 逻辑：backBehavior 'exit' / 历史栈 pop / 根路由双击退出
+  const m = matchRoute(routes, _state.value.path)
+  const action = evaluateBackRoute({
+    hasOpenModal: hasOpenModal(),
+    runGuards: () => runBackGuards(backGuardRegistry.guards()),
+    behavior: m?.route.backBehavior,
+    historyLength: _history.length,
+    lastBackAt,
+    now: Date.now(),
+  })
+  if (action === 'close-modal') {
     closeTopModal()
     return
   }
-  // 强制更新页等路由声明 backBehavior: 'exit'（不可返回场景）：
-  // 返回键直接退出应用，跳过历史栈与双击窗口
-  const m = matchRoute(routes, _state.value.path)
-  const decision = evaluateBackWithBehavior(m?.route.backBehavior, _history.length, lastBackAt, Date.now())
-  if (decision === 'navigate') {
+  if (action === 'intercepted') return
+  if (action === 'navigate') {
     goBack()
     return
   }
-  if (decision === 'exit') {
+  if (action === 'exit') {
     const app = getNativeModules()?.PictelioApp as
       | { exitApp?: (callback: (err: string | null) => void) => void }
       | undefined

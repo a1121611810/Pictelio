@@ -20,7 +20,7 @@
 | 任务涉及 | 第一步必须 | 依据 |
 |----------|-----------|------|
 | 架构概览 / 领域概念 / 集成方式 / 测试指南（"为什么这样设计"） | 读取 `openwiki/` 对应页面 | 「OpenWiki 查询规范」决策链 |
-| 具体符号 / 调用链 / 影响分析（"代码在哪、怎么调用"） | 调用 CodeGraph（`mcp__codegraph__*`） | 「代码智能规范」速查表 |
+| 具体符号 / 调用链 / 影响分析（"代码在哪、怎么调用"） | 调用 CodeGraph（pi 原生工具 `codegraph_explore` 或 bash `codegraph` CLI） | 「代码智能规范」速查表 |
 | 第三方库/框架文档 | Context7（`mcp__context7__*`） | 「文档查询规范」决策链 |
 | 浏览器标准 API | MDN（`mcp__mdn__*`） | 「文档查询规范」决策链 |
 | 理解一个功能（why + where 都涉及） | **先 OpenWiki 后 CodeGraph** | 「OpenWiki 查询规范」协作规则 |
@@ -35,8 +35,6 @@
 - 中文语义搜索失败（CodeGraph 返回空/不相关时，降级找入口再切回）
 - 环境缺少上述 MCP 工具时，用能力等价的可用工具（grep/read、web 搜索等）代替，**不视为违规**
 
-> 完整细节（参数、索引维护、结果解读）在全局 memory `mcp-codegraph-usage.md` / `mcp-doc-query.md`。
-
 ### 持续反馈闭环（边用边发现问题）
 
 - **自检证据化**：任务完成前自检记录"路由判断 + 所用工具"（见「任务完成前自检」）。
@@ -46,44 +44,42 @@
 
 ## 代码智能规范（Code Intelligence）
 
-本项目使用 CodeGraph 作为默认代码理解工具（通过 `mcp__codegraph__*` MCP 前缀访问）。
-项目已通过 `reasonix.toml` 配置 `--path`，调用 CodeGraph 工具时**不要**手动传 `projectPath`。
+本项目使用 CodeGraph 作为默认代码理解工具（本地索引，`.codegraph/` 目录）。接入方式（**无 MCP**，MCP 配置已随 `reasonix.toml` / `.mcp.json` 一并移除）：
+
+- **pi agent**：全局扩展 `~/.pi/agent/extensions/pi-codegraph.ts` 注册原生工具 `codegraph_explore`（spawn CLI，主 agent 与子代理均可用），并带 tool_call 守卫（见下）。
+- **其他 agent / 任意兜底**：bash 直接调 `codegraph` CLI（输出与原生工具逐字等价）。
 
 ### 默认原则
 
-- **任何涉及"理解代码结构、定位符号、追踪调用链、分析影响范围"的任务，默认优先使用 CodeGraph 系列工具（`mcp__codegraph__*`）。**
+- **任何涉及"理解代码结构、定位符号、追踪调用链、分析影响范围"的任务，默认优先使用 CodeGraph。**
 - CodeGraph 是默认工具，不是搜索失败后的兜底工具。
-- 仅当 CodeGraph 不可用、或场景明确属于「工具触发协议」中的「允许的降级」时，才使用 Grep/Glob/Read 等替代手段。
+- 仅当 CodeGraph 不可用、或场景明确属于「工具触发协议」中的「允许的降级」时，才使用 Grep/Read 等替代手段。
 
 ### 工具选择速查
 
-| 场景 | 首选工具 | 说明 |
-|------|----------|------|
-| 接到功能/Bug 任务，不确定入口 | `codegraph_context` | 任何"how does X work"问题首选，返回上下文与源码 |
-| 按名称快速定位符号 | `codegraph_search` | 搜索函数、组件、变量、路由等 |
-| 两个符号之间的调用路径 | `codegraph_trace` | 追踪 A→B 的调用链 |
-| 一次性获取多个相关符号源码 | `codegraph_explore` | 探索组件依赖的 store/service/子组件 |
-| 单个符号详情（含源码） | `codegraph_node` | 用 `includeCode=true` 获取完整体 |
-| 重构前影响分析 | `codegraph_impact` | 分析修改某符号会影响哪些文件 |
-| 索引健康检查 | `codegraph_status` | 检查索引是否就绪、节点/边数量 |
+| 场景 | 首选 | 说明 |
+|------|------|------|
+| 理解代码 / 定位符号 / 调用链 / 影响面（绝大多数问题） | `codegraph_explore` 工具或 bash `codegraph explore "<符号名...>"` | 一次返回符号源码（视同已 Read）+ 调用路径 + blast radius（含关联测试）。query 写精确符号名，空格分隔多个 |
+| 按名快速定位符号（只要位置不要源码） | bash `codegraph query <name>` | 比 explore 便宜 |
+| 重构前影响分析 | explore 的 blast radius 已内联；需独立报告用 bash `codegraph impact <symbol>` | |
+| 变更文件 → 受影响测试 | bash `git diff --name-only \| codegraph affected --stdin` | code-review / CI 场景 |
+| 索引健康检查 | bash `codegraph status`（`--json` 可解析） | 节点/边计数；边数归零 = 索引腐化，人工 `codegraph index --force` |
 
-完整规范（参数速查、调用示例、索引维护、结果解读、降级方案）保存在全局 memory `mcp-codegraph-usage.md`。
+### tool_call 守卫（pi 扩展行为）
 
-> 如果 `.codegraph/` 索引尚未生成，在项目根目录运行：`codegraph init`
+- 用 grep 做"标识符形态 pattern + 全项目/代码目录"的搜索会被 block 并引导到 `codegraph_explore`。
+- 放行场景：非代码文本（配置/文档/日志）、单文件内搜索、path 在索引根之外、正则/中文 pattern。
+- 逃逸阀：确认 codegraph 覆盖不了时，**原样重试同一调用即放行**（禁止换 bash 绕过——bash 搜索本就被 search-guard 拦截）。
+- bash 中直接调 `codegraph` CLI 不被拦截，计为有效使用。
 
 ### 禁止的默认行为
 
-- 未经 CodeGraph 尝试，直接用 Grep/Glob/Bash find 进行大规模代码探索。
-- 用 Grep 手动拼凑调用链（应使用 `codegraph_trace`）。
-- 用 Read 顺序打开多个文件来"摸索"架构（应先用 `codegraph_context` / `codegraph_explore`）。
+- 未经 CodeGraph 尝试，直接用 Grep/Read 进行大规模代码探索。
+- 用 Grep 手动拼凑调用链（应用 `codegraph_explore` 命名端点一次拿路径）。
+- 用 Read 顺序打开多个文件来"摸索"架构（应先用 `codegraph_explore`）。
+- 对 explore 已返回源码的文件再 Read 复验（输出是 re-read from disk 的逐字节当前源码）。
 
-### projectPath 说明
-
-CodeGraph MCP 服务器的 `projectPath` 参数用于指定要查询的项目。本项目已通过 `reasonix.toml` 在启动服务器时配置了 `--path`，因此：
-
-- **默认不传** `projectPath`：服务器已自带本项目路径，直接调用即可。
-- **报错时再传**：如果调用返回"找不到项目路径"之类的错误，将 `projectPath` 设为当前工作目录路径重试（由系统提示 `Current workspace` 字段可知）。
-- **跨项目查询**：如需分析其他项目，显式传入对应项目的根路径。
+> 如果 `.codegraph/` 索引尚未生成，在项目根目录运行：`codegraph init`（索引是用户决策，agent 不得擅自执行）
 
 ## 文档查询规范（Documentation Query）
 
@@ -102,8 +98,6 @@ CodeGraph MCP 服务器的 `projectPath` 参数用于指定要查询的项目。
 | 库/框架文档（SolidJS、TanStack、Capacitor、Vite 等） | `mcp__context7__*` | `web_fetch`（官网） |
 | 浏览器标准 API（`fetch`、`Headers`、`Promise`、CSS 属性等） | `mcp__mdn__*` | `web_fetch`（MDN 页面） |
 | 其他技术文档（非库/非浏览器标准） | `mcp__context7__*` 尝试 | `web_fetch`（官方文档） |
-
-完整规范（使用流程、降级策略、调用示例）保存在全局 memory `mcp-doc-query.md`。
 
 ### 禁止的默认行为
 
@@ -241,7 +235,6 @@ pixivizer/
 │   ├── openwiki-update.yml      # OpenWiki 每日自动更新
 │   └── ci.yml                   # CI 检查门禁
 ├── pnpm-workspace.yaml          # pnpm workspace 配置
-├── reasonix.toml                # Reasonix/CodeGraph 插件配置
 └── package.json                 # 根 package.json（workspace 委托层）
 ```
 
@@ -657,9 +650,9 @@ Grill 澄清 → to-spec → to-tickets → implement
 
 - **工具使用证据**：本次涉及代码理解/架构/文档查询时，是否记录了路由判断与所用工具？（见「工具触发协议」；发现偏差当场沉淀 feedback memory）
 - **代码理解优先性**：涉及代码结构、调用链、影响范围分析时，是否优先使用了 CodeGraph？（工具选择见上方速查表）
-- **Fallback 合理性**：未用 CodeGraph 时，是否属于允许的例外？（不可用、已知路径读取、非代码搜索等，详见全局 memory `mcp-codegraph-usage.md`）
-- **索引健康**：CodeGraph 返回异常时，是否检查了 `codegraph_status` 并考虑重建索引？
-- **文档查询优先性**：涉及库/框架/浏览器 API 查询时，是否遵循了「文档查询规范」的优先级链？（优先 Context7 或 MDN，降级见 `mcp-doc-query.md`）
+- **Fallback 合理性**：未用 CodeGraph 时，是否属于允许的例外？（不可用、已知路径读取、非代码搜索等）
+- **索引健康**：CodeGraph 返回异常时，是否运行 `codegraph status` 检查了节点/边计数（边数归零 = 腐化，提示用户重建）？
+- **文档查询优先性**：涉及库/框架/浏览器 API 查询时，是否遵循了「文档查询规范」的优先级链？（优先 Context7 或 MDN）
 - **OpenWiki 查询优先性**：涉及架构概览、领域概念、集成、测试指南等主题时，是否先查阅了对应的 OpenWiki 页面再深入代码？
 - **OpenWiki 文档同步**：修改了 `src/` 或 `packages/` 中的代码后，**不得**本地执行 `pnpm openwiki:update`（依赖 CI 定时任务每日重生成），且**不得**手改 `openwiki/` 生成文件？
 - **IO 边界测试**：本次改动涉及的 fetch/存储/桥接解析函数，成功与失败路径是否都有单元测试？
@@ -708,8 +701,8 @@ The scheduled OpenWiki GitHub Actions workflow refreshes the repository wiki. Do
 
 In repositories indexed by CodeGraph (a `.codegraph/` directory exists at the repo root), reach for it BEFORE grep/find or reading files when you need to understand or locate code:
 
-- **MCP tool** (when available): `codegraph_explore` answers most code questions in one call — the relevant symbols' verbatim source plus the call paths between them, including dynamic-dispatch hops grep can't follow. Name a file or symbol in the query to read its current line-numbered source. If it's listed but deferred, load it by name via tool search.
-- **Shell** (always works): `codegraph explore "<symbol names or question>"` prints the same output.
+- **pi agent**: use the native `codegraph_explore` tool (registered by the global pi-codegraph extension) — it answers most code questions in one call: the relevant symbols' verbatim source plus the call paths between them, including dynamic-dispatch hops grep can't follow. Name a file or symbol in the query to read its current line-numbered source.
+- **Shell** (always works): `codegraph explore "<symbol names or question>"` prints the same output. Other subcommands: `query` (locate symbols), `impact <symbol>` (blast radius), `affected --stdin` (changed files → affected tests), `status` (index health).
 
 If there is no `.codegraph/` directory, skip CodeGraph entirely — indexing is the user's decision.
 <!-- CODEGRAPH_END -->
