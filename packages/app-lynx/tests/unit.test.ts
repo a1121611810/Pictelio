@@ -4,7 +4,7 @@ import { proxyImageUrl, thumbUrl } from '../src/utils/imageUrl'
 import { classifyError, isNativeMode, isOAuthTokenErrorResponse, rewriteUrl, shouldAttachAuth } from '../src/api/client'
 import { ApiErrorType } from '../src/api/types'
 import { extractNovelTextFromHtml } from '../src/api/novel'
-import { matchRoute, evaluateSystemBack, evaluateBackWithBehavior, SYSTEM_BACK_EXIT_WINDOW_MS } from '../src/routerCore'
+import { matchRoute, evaluateSystemBack, evaluateBackWithBehavior, SYSTEM_BACK_EXIT_WINDOW_MS, runBackGuards, createBackGuardRegistry, evaluateBackRoute, type BackGuard } from '../src/routerCore'
 import { redactProxyUrl } from '../src/utils/proxyRedact'
 import { apiClient } from '../src/api/client'
 import { isOAuthCredsInjected } from '../src/api/auth'
@@ -309,6 +309,131 @@ describe('routerCore.evaluateBackWithBehavior（更新页 backBehavior: exit）'
     expect(evaluateBackWithBehavior(undefined, 0, 0, now)).toBe('hint')
     expect(evaluateBackWithBehavior(undefined, 0, now - 100, now)).toBe('exit')
     expect(evaluateBackWithBehavior(undefined, 0, now - 5000, now)).toBe('hint')
+  })
+})
+
+// ─── 返回守卫（back-guard）——期望值来源：docs/specs/app-lynx-novel-series-watchlist.md §US3
+// 裁决顺序定义（modalStack → backGuard → backBehavior/history），issue #222 验收条件。
+describe('routerCore.runBackGuards（守卫短路执行）', () => {
+  it('空守卫列表 → 不拦截', () => {
+    expect(runBackGuards([])).toBe(false)
+  })
+
+  it('全部返回 false → 不拦截', () => {
+    expect(runBackGuards([() => false, () => false])).toBe(false)
+  })
+
+  it('任一守卫返回 true → 拦截', () => {
+    expect(runBackGuards([() => false, () => true])).toBe(true)
+  })
+
+  it('短路：首个 true 之后续守卫不再执行', () => {
+    const second = vi.fn(() => true)
+    expect(runBackGuards([() => true, second])).toBe(true)
+    expect(second).not.toHaveBeenCalled()
+  })
+
+  it('守卫抛错 → console.warn 记录并按未拦截处理（fail-open，不卡死返回键）', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const throwing: BackGuard = () => {
+      throw new Error('boom')
+    }
+    expect(runBackGuards([throwing, () => true])).toBe(true)
+    expect(warn).toHaveBeenCalledOnce()
+    expect(warn.mock.calls[0]?.[0]).toContain('[router]')
+    warn.mockRestore()
+  })
+
+  it('守卫抛错且无后续拦截守卫 → 整体不拦截', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(
+      runBackGuards([
+        () => {
+          throw new Error('boom')
+        },
+      ]),
+    ).toBe(false)
+    warn.mockRestore()
+  })
+})
+
+describe('routerCore.createBackGuardRegistry（注册/注销语义）', () => {
+  it('注册后守卫生效，注销函数移除守卫', () => {
+    const registry = createBackGuardRegistry()
+    const guard = vi.fn(() => true)
+    const unregister = registry.register(guard)
+    expect(runBackGuards(registry.guards())).toBe(true)
+    unregister()
+    expect(registry.guards()).toHaveLength(0)
+    expect(runBackGuards(registry.guards())).toBe(false)
+  })
+
+  it('重复注销安全（不报错、不误删同名守卫之外的内容）', () => {
+    const registry = createBackGuardRegistry()
+    const unregister = registry.register(() => true)
+    unregister()
+    expect(() => unregister()).not.toThrow()
+    expect(registry.guards()).toHaveLength(0)
+  })
+
+  it('多守卫按注册序执行，注销中间守卫不影响顺序', () => {
+    const registry = createBackGuardRegistry()
+    const calls: string[] = []
+    registry.register(() => {
+      calls.push('a')
+      return false
+    })
+    const unregB = registry.register(() => {
+      calls.push('b')
+      return true
+    })
+    registry.register(() => {
+      calls.push('c')
+      return false
+    })
+    expect(runBackGuards(registry.guards())).toBe(true)
+    expect(calls).toEqual(['a', 'b']) // c 被 b 短路
+    calls.length = 0
+    unregB()
+    expect(runBackGuards(registry.guards())).toBe(false)
+    expect(calls).toEqual(['a', 'c'])
+  })
+})
+
+describe('routerCore.evaluateBackRoute（系统返回完整裁决顺序）', () => {
+  const now = 1_000_000
+  const base = { behavior: undefined, historyLength: 1, lastBackAt: 0, now }
+
+  it('modalStack 有打开弹层 → close-modal，守卫不被执行（modal 优先于 guard）', () => {
+    const runGuards = vi.fn(() => true)
+    expect(evaluateBackRoute({ ...base, hasOpenModal: true, runGuards })).toBe('close-modal')
+    expect(runGuards).not.toHaveBeenCalled()
+  })
+
+  it('无弹层且守卫拦截 → intercepted（守卫消费，裁决不再进入历史栈分支）', () => {
+    // historyLength=1 时若守卫未拦截本应 navigate；intercepted 说明历史栈不会被 pop
+    expect(evaluateBackRoute({ ...base, hasOpenModal: false, runGuards: () => true })).toBe('intercepted')
+  })
+
+  it('无弹层且守卫放行 → 落到既有 ADR-0066 决策（navigate）', () => {
+    const runGuards = vi.fn(() => false)
+    expect(evaluateBackRoute({ ...base, hasOpenModal: false, runGuards })).toBe('navigate')
+    expect(runGuards).toHaveBeenCalledOnce()
+  })
+
+  it('回归：backBehavior exit 优先于历史栈与双击窗口（守卫放行时行为不变）', () => {
+    expect(
+      evaluateBackRoute({ hasOpenModal: false, runGuards: () => false, behavior: 'exit', historyLength: 3, lastBackAt: 0, now }),
+    ).toBe('exit')
+  })
+
+  it('回归：根路由双击退出窗口（守卫放行时行为不变）', () => {
+    expect(
+      evaluateBackRoute({ hasOpenModal: false, runGuards: () => false, behavior: undefined, historyLength: 0, lastBackAt: now - 100, now }),
+    ).toBe('exit')
+    expect(
+      evaluateBackRoute({ hasOpenModal: false, runGuards: () => false, behavior: undefined, historyLength: 0, lastBackAt: 0, now }),
+    ).toBe('hint')
   })
 })
 
