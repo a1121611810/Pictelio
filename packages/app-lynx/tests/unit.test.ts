@@ -1759,3 +1759,64 @@ expect(dialogVueSource).toContain('onBeforeUnmount')
 expect(dialogVueSource).toContain('unregisterModal?.()')
 })
 })
+
+// ─── T6：NovelDetail 追更询问接线（issue #226 / spec §US4 接线半） ───
+// 零渲染器环境下的模板源码结构断言（对齐上方 WatchlistPromptDialog 既有模式）；
+// 弹窗状态机行为本身由 createWatchlistPrompt.test.ts 覆盖（T4 seam）。
+describe('NovelDetail 追更询问接线（issue #226 / spec §US4/§US5）', () => {
+const detailVueSource = readFileSync(
+fileURLToPath(new URL('../src/pages/NovelDetail.vue', import.meta.url)),
+'utf8',
+)
+
+it('左上角返回走 requestBack（与系统返回同一守卫链），不再直调 goBack', () => {
+expect(detailVueSource).toContain('@tap="requestBack"')
+expect(detailVueSource).toContain('requestBack')
+expect(detailVueSource).not.toContain('@tap="goBack"')
+})
+
+it('registerBackGuard 注册 + onUnmounted 注销（detail 页不在 KeepAlive 白名单）', () => {
+expect(detailVueSource).toContain('registerBackGuard(')
+expect(detailVueSource).toContain('unregisterBackGuard()')
+expect(detailVueSource).toContain('onUnmounted(')
+})
+
+it('scroll-view 双路滚动跟踪：@scroll（进度）+ @scrolltolower（到达底部兑底）', () => {
+expect(detailVueSource).toContain('@scroll="onNovelScroll"')
+expect(detailVueSource).toContain('@scrolltolower="onNovelToBottom"')
+})
+
+it('弹窗挂载 + 三事件语义差：decline/confirm 继续返回，cancel 留页', () => {
+expect(detailVueSource).toContain('<WatchlistPromptDialog')
+expect(detailVueSource).toContain('@confirm="onWatchlistConfirm"')
+expect(detailVueSource).toContain('@decline="onWatchlistDecline"')
+expect(detailVueSource).toContain('@cancel="onWatchlistCancel"')
+// decline：decline() 后 goBack()
+const declineFn = /function onWatchlistDecline[\s\S]*?\n\}/.exec(detailVueSource)
+expect(declineFn).not.toBeNull()
+expect(declineFn![0]).toContain('prompt?.decline()')
+expect(declineFn![0]).toContain('goBack()')
+// confirm：await 后弹窗已关才 goBack（失败留页可重试）
+const confirmFn = /async function onWatchlistConfirm[\s\S]*?\n\}/.exec(detailVueSource)
+expect(confirmFn).not.toBeNull()
+expect(confirmFn![0]).toContain('await p.confirm()')
+expect(confirmFn![0]).toContain('!p.dialogOpen')
+// cancel：仅 cancel()，无 goBack（留页）
+const cancelFn = /function onWatchlistCancel[\s\S]*?\n\}/.exec(detailVueSource)
+expect(cancelFn).not.toBeNull()
+expect(cancelFn![0]).toContain('prompt?.cancel()')
+expect(cancelFn![0]).not.toContain('goBack')
+})
+
+it('系列信息行：《系列名》+ watchAdded=true 时「已追更」chip', () => {
+expect(detailVueSource).toContain('novel?.series')
+expect(detailVueSource).toContain('《{{ novel.series.title }}》')
+expect(detailVueSource).toContain("prompt?.watchAdded === true")
+expect(detailVueSource).toContain('已追更')
+})
+
+it('章节内跳转：watch novelId 重载（dispose + 重建，spec §6-2）', () => {
+expect(detailVueSource).toContain('watch(novelId')
+expect(detailVueSource).toContain('teardownPrompt()')
+})
+})

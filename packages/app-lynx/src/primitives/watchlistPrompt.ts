@@ -36,3 +36,22 @@ export function shouldPromptWatchlist(input: WatchlistPromptInput): boolean {
   if (input.dwellMs < WATCHLIST_PROMPT_MIN_DWELL_MS) return false
   return input.scrollProgress >= WATCHLIST_PROMPT_SCROLL_THRESHOLD || input.reachedBottom
 }
+
+/**
+ * 阅读进度计算（spec §US4）：scrollTop / (scrollHeight - viewportHeight)，clamp 到 0~1。
+ * Lynx scroll-view 的 scroll 事件 payload 只有 scrollTop/scrollHeight（ADR-0109），
+ * 无 viewport 高度：viewportHeight 不可知（传 0）时退化为 scrollTop/scrollHeight 近似值
+ * ——阈值触发会偏晚，但「到达底部」始终由 scrolltolower 兑底，不会漏弹。
+ * 不可滚动（scrollHeight <= viewportHeight）时进度恒 0（仅靠到达底部触发）。
+ */
+export function computeReadProgress(
+  scrollTop: number,
+  scrollHeight: number,
+  viewportHeight: number,
+): number {
+  if (scrollHeight <= 0) return 0
+  const scrollable = scrollHeight - Math.max(0, viewportHeight)
+  const raw = scrollable > 0 ? scrollTop / scrollable : 0
+  if (!Number.isFinite(raw)) return 0
+  return Math.min(1, Math.max(0, raw))
+}

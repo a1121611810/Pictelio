@@ -6,6 +6,7 @@
 import { describe, it, expect } from "vitest"
 import {
   shouldPromptWatchlist,
+  computeReadProgress,
   WATCHLIST_PROMPT_MIN_DWELL_MS,
   WATCHLIST_PROMPT_SCROLL_THRESHOLD,
   type WatchlistPromptInput,
@@ -111,5 +112,31 @@ describe("shouldPromptWatchlist", () => {
     expect(shouldPromptWatchlist({ ...baseInput(), is_concluded: true } as WatchlistPromptInput)).toBe(
       true,
     )
+  })
+})
+
+describe("computeReadProgress", () => {
+  // oracle：spec §US4 公式 scrollTop / (scrollHeight - viewportHeight) + §7 降级语义
+  it("按可滚动距离计算：scrollTop / (scrollHeight - viewportHeight)", () => {
+    // scrollHeight 1000、viewport 200 → 可滚动 800；滚 560 → 0.7
+    expect(computeReadProgress(560, 1000, 200)).toBeCloseTo(0.7)
+  })
+
+  it("viewport 未知（0）时退化为 scrollTop / scrollHeight 近似", () => {
+    expect(computeReadProgress(700, 1000, 0)).toBeCloseTo(0.7)
+  })
+
+  it("不可滚动（scrollHeight <= viewportHeight）→ 0（仅靠到达底部触发）", () => {
+    expect(computeReadProgress(0, 800, 1000)).toBe(0)
+  })
+
+  it("clamp：超出范围截断到 0~1", () => {
+    expect(computeReadProgress(2000, 1000, 200)).toBe(1)
+    expect(computeReadProgress(-10, 1000, 200)).toBe(0)
+  })
+
+  it("退化输入（scrollHeight=0 / NaN）→ 0 不崩", () => {
+    expect(computeReadProgress(0, 0, 200)).toBe(0)
+    expect(computeReadProgress(Number.NaN, 1000, 200)).toBe(0)
   })
 })
