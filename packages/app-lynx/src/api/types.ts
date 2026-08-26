@@ -94,6 +94,57 @@ export interface PixivNovelDetailResponse {
   novel: PixivNovel;
 }
 
+// ─── 小说系列追更（watchlist，issue #220 / spec app-lynx-novel-series-watchlist §3） ───
+// 字段名逐字对齐 Pixiv-Shaft ceui/loxia/Models.kt（NovelSeriesDetail / WatchlistSeries /
+// WatchlistResponse），端点对齐 ceui/lisa/http/AppApi.kt 与 ceui/loxia/API.kt。
+
+/** 系列详情响应（GET /v2/novel/series）：追更状态与是否完结从这里取 */
+export interface NovelSeriesDetailResponse {
+  novel_series_detail: {
+    id: number;
+    title: string;
+    content_count: number;
+    /** 已完结（追更弹窗不据此过滤，D3：完结系列也弹） */
+    is_concluded: boolean;
+    /** 是否已加入追更列表 */
+    watchlist_added: boolean;
+  };
+}
+
+/**
+ * 追更列表的一个条目 —— 注意它是一个**系列**，不是单个作品：
+ * `GET /v1/watchlist/novel` 响应顶层字段就叫 `series`，[id] 是系列 id，
+ * 要开「最新一话」得用 [latest_content_id]（那才是作品 id）。
+ */
+export interface WatchlistSeries {
+  id: number;
+  title: string;
+  /** 系列封面。被屏蔽的条目为 null。 */
+  url: string | null;
+  /** 非空 = 被屏蔽/下架，此时只显示这句话。 */
+  mask_text?: string | null;
+  published_content_count: number;
+  /** 最新一话的作品 id（小说 id） */
+  latest_content_id: number;
+  /** ISO 时间串；卡片只显示前 10 位（日期部分）。 */
+  latest_content_date: string;
+  user: PixivUser;
+}
+
+export interface WatchlistNovelListResponse {
+  /** 服务端字段名就是 series —— 追更列表装的是系列。 */
+  series: WatchlistSeries[];
+  next_url: string | null;
+}
+
+/**
+ * mask（被屏蔽/下架）占位条目判定，对齐 Shaft Models.kt `WatchlistSeries.isMasked`：
+ * 标题空 + 无封面 + 有 mask 文案 + user.id=0。T7 列表页据此只读展示 mask_text。
+ */
+export function isWatchlistSeriesMasked(s: WatchlistSeries): boolean {
+  return s.title === "" && s.url == null && s.mask_text != null && s.mask_text !== "" && s.user.id === 0;
+}
+
 // ─── Ugoira（T5，字段与现有 app 同源） ───
 export interface PixivUgoiraFrame {
   file: string;
