@@ -35,6 +35,7 @@ import Bookmarks from './pages/Bookmarks.vue'
 import FollowList from './pages/FollowList.vue'
 import UpdatePage from './pages/UpdatePage.vue'
 import ErrorPage from './pages/ErrorPage.vue'
+import Watchlist from './pages/Watchlist.vue'
 
 export const routes: RouteDef[] = [
   { path: '/login', name: 'login', component: Login },
@@ -49,6 +50,7 @@ export const routes: RouteDef[] = [
   { path: '/following', name: 'following', component: Following },
   { path: '/bookmarks', name: 'bookmarks', component: Bookmarks },
   { path: '/me', name: 'me', component: Me },
+  { path: '/watchlist', name: 'watchlist', component: Watchlist },
   // 强制更新页（检查更新命中后 replace + 清历史栈进入）：
   // backBehavior: 'exit' —— 返回键直接退出应用，无返回路径
   { path: '/update', name: 'update', component: UpdatePage, backBehavior: 'exit' },

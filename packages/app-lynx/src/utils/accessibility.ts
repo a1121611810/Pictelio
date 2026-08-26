@@ -20,6 +20,7 @@ export const ME_A11Y_LABELS = {
   switchToWebview: '切换客户端到WebView', // 「切回 WebView」入口
   switchToLynx: '切换客户端到Lynx',
   bookmarks: '我的收藏',
+  watchlist: '追更列表',
   r18Toggle: '显示R18内容',
   r18gToggle: '显示R18G内容',
   ugoiraFflate: '动图播放选择fflate取帧',
@@ -64,6 +65,16 @@ export const FAB_MENU_A11Y_LABELS = {
   toggleMenu: '列表操作菜单',
   refreshList: '刷新列表',
   backToTop: '回到顶部',
+} as const
+
+/** 追更列表页 accessibility 标注（issue #225：/watchlist 页 + 取消追更二次确认 Dialog） */
+export const WATCHLIST_A11Y_LABELS = {
+  pageTitle: '追更列表',
+  back: '返回',
+  openLatest: '打开系列最新一话',
+  unwatch: '取消追更该系列',
+  unwatchConfirm: '确认取消追更',
+  unwatchCancel: '保留追更',
 } as const
 
 // Lynx 元素属性不支持 Vue 插值表达式，模板中用 :accessibility-element 绑定此常量

@@ -14,7 +14,7 @@ import { loadUserNovels, loadBookmarks as loadNovelBookmarks, loadFollow as load
 import { bytesToDataUrl, downloadUgoiraFrames } from '../src/api/ugoira'
 import type { UgoiraExtractMode } from '../src/api/ugoira'
 import { ugoiraMode as lynxUgoiraMode, setUgoiraMode as lynxSetUgoiraMode } from '../src/stores/settingsStore'
-import { ME_A11Y_LABELS, LOGIN_A11Y_LABELS, RECOMMENDED_A11Y_LABELS, UPDATE_A11Y_LABELS, ERROR_A11Y_LABELS, FAB_MENU_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../src/utils/accessibility'
+import { ME_A11Y_LABELS, LOGIN_A11Y_LABELS, RECOMMENDED_A11Y_LABELS, UPDATE_A11Y_LABELS, ERROR_A11Y_LABELS, FAB_MENU_A11Y_LABELS, WATCHLIST_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../src/utils/accessibility'
 
 describe('imageUrl.proxyImageUrl', () => {
   it('将 i.pximg.net URL 重写为本地代理路径', () => {
@@ -1142,6 +1142,37 @@ describe('Update 页 accessibility 标注（检查更新）', () => {
     const elementCount = (updateVueSource.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
     expect(labelCount).toBe(Object.keys(UPDATE_A11Y_LABELS).length)
     expect(elementCount).toBe(labelCount)
+  })
+})
+
+// ─── 追更列表页 accessibility 标注（issue #225） ───
+// 与 Me 页同一套「注册表 + 模板源码断言」约定：漏标注或绕过注册表硬编码均失败。
+describe('追更列表页 accessibility 标注（issue #225）', () => {
+  const watchlistVueSource = readFileSync(fileURLToPath(new URL('../src/pages/Watchlist.vue', import.meta.url)), 'utf8')
+
+  it('注册表 label 全部非空且唯一', () => {
+    const labels = Object.values(WATCHLIST_A11Y_LABELS)
+    expect(labels.length).toBeGreaterThan(0)
+    for (const label of labels) expect(label.length).toBeGreaterThan(0)
+    expect(new Set(labels).size).toBe(labels.length)
+  })
+
+  it('WATCHLIST_A11Y_LABELS 全部被 Watchlist.vue 消费且配套 element', () => {
+    for (const key of Object.keys(WATCHLIST_A11Y_LABELS)) {
+      expect(watchlistVueSource).toContain(`:accessibility-label="WATCHLIST_A11Y_LABELS.${key}"`)
+    }
+    const labelCount = (watchlistVueSource.match(/:accessibility-label="WATCHLIST_A11Y_LABELS\.\w+"/g) ?? []).length
+    const elementCount = (watchlistVueSource.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
+    expect(labelCount).toBe(Object.keys(WATCHLIST_A11Y_LABELS).length)
+    expect(elementCount).toBe(labelCount)
+  })
+
+  it('mask 条目分支存在且不可点（spec §6-7：只读展示 mask_text）', () => {
+    expect(watchlistVueSource).toContain('isWatchlistSeriesMasked(item)')
+    // mask 分支在 openLatest 绑定之前出现（v-if mask / v-else 正常条目）
+    expect(watchlistVueSource.indexOf('isWatchlistSeriesMasked(item')).toBeLessThan(
+      watchlistVueSource.indexOf('@tap="openLatest(item)"'),
+    )
   })
 })
 
