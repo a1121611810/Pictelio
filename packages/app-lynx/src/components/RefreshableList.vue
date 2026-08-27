@@ -4,11 +4,18 @@
 //
 // 接口（调用方需要知道的全部）：
 //   :refresh      页面传入的幂等刷新函数（feed.refresh()+sync 或 fetchFirstPage）
+//   :items        可选扩展菜单项（如「上一页/下一页」）：label/图标/visible 条件/回调，
+//                 组件只渲染与维护菜单状态机（busy 互斥），不感知业务（T4）
 //   @back-to-top  回顶项点击 → 页面应 bump 列表 :key 强制重建（重建即回顶，ADR-0110）
 //   默认 slot     恰好一个可滚动子元素（<list>）
 //
 // 页面用法（列表操作全部内收组件）：
-//   <RefreshableList :refresh="refreshFeed" @back-to-top="listKey++">
+//   <RefreshableList
+//     :refresh="refreshFeed"
+//     :items="[{ key: 'prev', icon: '‹', label: '上一页', accessibilityLabel: '上一页',
+//                visible: () => feed.hasPrev(), onTap: () => feed.prev() }]"
+//     @back-to-top="listKey++"
+//   >
 //     <list :key="listKey" …>…</list>
 //   </RefreshableList>
 //
@@ -25,12 +32,14 @@
 //   ③ <list> 无 JS 可触发的滚动属性 → 回顶 = 重建回顶。
 //   ④ Lynx 无 transitionend → FAB menu 退出动画 v1 瞬撤（ADR-0111）。
 import { ref, onUnmounted } from 'vue'
-import { createFabMenuState } from '../primitives/createFabMenu'
+import { createFabMenuState, type FabMenuExtraItem } from '../primitives/createFabMenu'
 import { FAB_MENU_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 
 const props = defineProps<{
   /** 幂等刷新函数（createMixFeed 的 refresh() 内置 generation 竞态防护 + 15s TIMEOUT 保证 settle） */
   refresh: () => Promise<void> | void
+  /** 可选扩展菜单项（T4）：组件只渲染 + busy 互斥，业务回调/显隐由页面提供 */
+  items?: FabMenuExtraItem[]
 }>()
 
 const emit = defineEmits<{ (e: 'back-to-top'): void }>()
@@ -87,6 +96,25 @@ function onBackToTopItemTap() {
   }, BACK_TO_TOP_RESET_MS)
   emit('back-to-top')
 }
+
+// ─── 扩展菜单项（T4）：点击后收起；返回 Promise 时复用 busy 维度（操作中禁展开/禁其他项，
+//      与「刷新中」同一互斥规则——menu.busy=true 时 toggle()/open() no-op）
+async function onExtraItemTap(item: FabMenuExtraItem) {
+  if (refreshing.value || menu.isBusy) return
+  menu.close()
+  const result = item.onTap()
+  if (result && typeof result.then === 'function') {
+    menu.startRefresh() // 复用 busy 维度：异步操作期间 FAB 禁用、其他项不可点
+    try {
+      await result
+    } catch (err) {
+      // 页面函数约定内部消化失败（feed 错误槽语义）；此处兜底防未处理 rejection
+      console.warn('[RefreshableList] 扩展菜单项执行异常', err)
+    } finally {
+      menu.endRefresh()
+    }
+  }
+}
 onUnmounted(() => {
   clearBackToTopReset()
   menu.reset()
@@ -132,6 +160,22 @@ onUnmounted(() => {
         <text class="text-[4.8vw] leading-none text-on-surface-variant">↑</text>
         <text class="text-[3.733vw] leading-none text-on-surface">回顶</text>
       </view>
+
+      <!-- 扩展项（T4）：页面按需配置（上一页/下一页等），visible 控制显隐；
+           item-rise-extra 共用浮出动画（120ms 延迟，排在刷新/回顶之后）。
+           用 template v-for 包裹（v-if 与 v-for 同元素是 Vue 3 反模式） -->
+      <template v-for="item in props.items" :key="item.key">
+        <view
+          v-if="item.visible()"
+          class="menu-item item-rise-extra flex items-center gap-[2.133vw] h-[10.667vw] pl-[4.267vw] pr-[6.4vw] rounded-full bg-surface-container-high shadow-[var(--md-elevation-2)] active:shadow-[var(--md-elevation-1)] active:bg-layer-pressed-on-surface"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="item.accessibilityLabel"
+          @tap="onExtraItemTap(item)"
+        >
+          <text class="text-[4.8vw] leading-none text-on-surface-variant">{{ item.icon }}</text>
+          <text class="text-[3.733vw] leading-none text-on-surface">{{ item.label }}</text>
+        </view>
+      </template>
     </view>
 
     <!-- 主 FAB / close button（ADR-0111）：常态刷新 FAB，展开时变身为 close button
@@ -193,5 +237,9 @@ onUnmounted(() => {
 }
 .item-rise-2 {
   animation: item-rise 250ms var(--motion-emphasized-decelerate) 60ms both;
+}
+/* 扩展菜单项浮出动画（T4）：排在刷新/回顶之后，延迟 120ms */
+.item-rise-extra {
+  animation: item-rise 250ms var(--motion-emphasized-decelerate) 120ms both;
 }
 </style>

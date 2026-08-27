@@ -1193,14 +1193,37 @@ describe('会话失效错误页 accessibility 标注（候选 #2）', () => {
 describe('RefreshableList 组件结构（ADR-0111 M3 FAB menu）', () => {
   const refreshableListSource = readFileSync(fileURLToPath(new URL('../src/components/RefreshableList.vue', import.meta.url)), 'utf8')
 
-  it('FAB_MENU_A11Y_LABELS 全部被 RefreshableList.vue 消费且配套 element', () => {
-    for (const key of Object.keys(FAB_MENU_A11Y_LABELS)) {
+  it('FAB_MENU_A11Y_LABELS 全部被消费且配套 element', () => {
+    // RefreshableList 静态消费三项（toggleMenu/refreshList/backToTop，ADR-0111）；
+    // 按钮分页扩展项（prevPage/nextPage，ADR-0114）由页面经 :items 传入，故在页面侧断言。
+    for (const key of ['toggleMenu', 'refreshList', 'backToTop'] as const) {
       expect(refreshableListSource).toContain(`:accessibility-label="FAB_MENU_A11Y_LABELS.${key}"`)
     }
+    // 页面侧消费注册表扩展键（Recommended.vue 的 fabMenuItems accessibilityLabel）
+    const recommendedVue = readFileSync(fileURLToPath(new URL('../src/pages/Recommended.vue', import.meta.url)), 'utf8')
+    expect(recommendedVue).toContain('FAB_MENU_A11Y_LABELS.prevPage')
+    expect(recommendedVue).toContain('FAB_MENU_A11Y_LABELS.nextPage')
     const labelCount = (refreshableListSource.match(/:accessibility-label="FAB_MENU_A11Y_LABELS\.\w+"/g) ?? []).length
+    // T4 扩展项（上一页/下一页）用动态 label（item.accessibilityLabel）同样配套 element：
+    // element 总数 = 固定 label 数 + 扩展项 v-for 内动态 label 数
+    const dynamicLabelCount = (refreshableListSource.match(/:accessibility-label="item\.accessibilityLabel"/g) ?? []).length
     const elementCount = (refreshableListSource.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
-    expect(labelCount).toBe(Object.keys(FAB_MENU_A11Y_LABELS).length)
-    expect(elementCount).toBe(labelCount)
+    expect(labelCount).toBe(3) // RefreshableList 静态消费三项（扩展键由页面消费）
+    expect(dynamicLabelCount).toBe(1)
+    expect(elementCount).toBe(labelCount + dynamicLabelCount)
+  })
+
+  it('T4 扩展菜单项：props.items 配置渲染（visible 显隐 + 回调 + busy 互斥）', () => {
+    expect(refreshableListSource).toContain('items?: FabMenuExtraItem[]')
+    expect(refreshableListSource).toContain('v-for="item in props.items"')
+    expect(refreshableListSource).toContain('v-if="item.visible()"')
+    expect(refreshableListSource).toContain('@tap="onExtraItemTap(item)"')
+    expect(refreshableListSource).toContain('onExtraItemTap(item: FabMenuExtraItem)')
+    expect(refreshableListSource).toContain('item-rise-extra')
+    // 异步回调复用 busy 维度（与刷新同互斥规则）：操作中禁展开/禁其他项
+    expect(refreshableListSource).toContain('menu.startRefresh()')
+    expect(refreshableListSource).toContain('menu.endRefresh()')
+    expect(refreshableListSource).toContain('refreshing.value || menu.isBusy')
   })
 
   it('已移除旧 REFRESH_A11Y_LABELS / BACK_TO_TOP_A11Y_LABELS 引用（ADR-0111 替换）', () => {

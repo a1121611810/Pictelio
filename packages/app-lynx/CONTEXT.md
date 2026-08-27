@@ -29,8 +29,20 @@ _Avoid_: 图上 absolute 角标（list-item 内 absolute 真机高度测量异�
 ### 分页（Pagination）
 
 **混合分页 feed（mixed pagination feed）**：
-`createMixFeed` 深模块——把多路远程分页源（插画/小说）按比例交替合并成单一渲染流，向调用方隐藏双防抖（throttle 800ms + cooldown 3s）、竞态代（generation）、去重、分批渲染（pageSize=20）、翻页优先级、15s 超时、空页防护。所有列表页统一经它分页，页面只做 ref 快照桥接（sync）。
+`createMixFeed` 深模块——把多路远程分页源（插画/小说）按比例交替合并成单一渲染流，向调用方隐藏双防抖（throttle 800ms + cooldown 3s）、竞态代（generation）、去重、分批渲染（pageSize=20）、翻页优先级、15s 超时、空页防护。**除推荐页外的列表页**（插画/小说/关注/收藏/用户主页）统一经它分页，页面只做 ref 快照桥接（sync）。推荐页已迁移到「按钮分页」（见下）。
 _Avoid_: 手写 loadMore、页面内双防抖/竞态/空页防护
+
+**按钮分页（button pagination / 翻书分页）**：
+推荐页的分页形态（ADR-0114）——列表**永远只显示当前页**，由 FAB menu 的「上一页 / 下一页」切页；切页 = 整树重建（epoch）+ 从页顶看，回顶成为翻页的自然语义。绕开 vue-lynx `<list>` 增量渲染失效的框架 bug（双端实证：items 数据增长但新条目不进布局）。与无限滚动相对。
+_Avoid_: 无限滚动、滚动自动翻页、增量拼接
+
+**页缓存（page cache）**：
+按钮分页下「上一页」的数据来源——Pixiv API 无 `prev_url`，已拉取的页面数据（含各源游标与合并结果）缓存于内存（上限 `maxCachedPages`，默认 5 页），「上一页」即时返回缓存页而不重新请求。
+_Avoid_: 重新请求上一页、游标回退重拉
+
+**时间交叉合并（time-merge）**：
+多路分页源（推荐页 = 插画 + 小说）按作品 `create_date` 降序交叉合并成一页的混合方式（app 端 `recommendedStore` 的 sortByDate + mergeAndSort 语义），替代固定比例交替（ratio 4:1）。页内全量展示各路之和（不截断——按时间排序后截断会丢数据）。
+_Avoid_: 固定比例交替、截断取前 N
 
 **分页到底态（end-of-feed）**：
 所有分页源耗尽（`nextUrl` 为 null）且列表非空时的状态。列表底部 footer 显示「没有更多了」，`scrolltolower` 不再触发请求。

@@ -67,6 +67,9 @@ export const FAB_MENU_A11Y_LABELS = {
   toggleMenu: '列表操作菜单',
   refreshList: '刷新列表',
   backToTop: '回到顶部',
+  // 按钮分页扩展项（ADR-0114）：由页面经 RefreshableList :items 传入，label 与 UI 文本一致
+  prevPage: '上一页',
+  nextPage: '下一页',
 } as const
 
 /** 追更列表页 accessibility 标注（issue #225：/watchlist 页 + 取消追更二次确认 Dialog） */

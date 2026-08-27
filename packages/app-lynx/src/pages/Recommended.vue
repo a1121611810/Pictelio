@@ -1,16 +1,20 @@
 <script setup lang="ts">
-// 综合推荐页（/recommended）：插画 + 小说混合 waterfall。
-// 数据层由 createMixFeed（../primitives/createMixFeed）承载：交替合并两路远程分页源
-// （插画推荐 4:1 小说推荐）、分批渲染（pageSize=20）、双防抖、翻页优先级、去重、
-// 竞态、15s 超时全部收敛在该深模块；页面只做状态桥接（feed 是纯函数式状态，无 Vue
-// 响应式，页面用本地 ref 快照 + sync() 同步）与渲染。
+// 综合推荐页（/recommended）：插画 + 小说混合 waterfall，按钮分页（替换式翻书，ADR-0114）。
+// 数据层由 createPagedFeed（../primitives/createPagedFeed）承载：页缓存（每页缓存两路游标 +
+// 合并结果，prev 零请求）+ 时间交叉合并（mergeByTime，按 create_date 降序，替代 4:1 固定比例）+
+// 竞态代 + 15s 超时全部收敛在该深模块；页面只做状态桥接（feed 是纯函数式状态，无 Vue
+// 响应式，页面用本地 ref 快照 + sync() 同步）与渲染。切页/刷新后 sync + 同 tick epoch 重建
+// （ADR-0107 D4：整树替换避开 vue-lynx patch 错位；重建 = 从页顶看新页，翻书语义）。
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'recommended' })
 import { ref, onMounted, onActivated, onUnmounted, watch } from 'vue'
 import { navigate } from '../router'
-import { loadRecommended } from '../api/illust'
-import { loadRecommendedNovels } from '../api/novel'
-import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
+import { loadRecommended, loadNext } from '../api/illust'
+import { loadRecommendedNovels, loadNovelNext } from '../api/novel'
+import type { PixivIllust, PixivNovel } from '../api/types'
+import { createPagedFeed, type PagedFeedSource } from '../primitives/createPagedFeed'
+import type { MixFeedItem } from '../primitives/createMixFeed'
+import type { FabMenuExtraItem } from '../primitives/createFabMenu'
 import { thumbUrl } from '../utils/imageUrl'
 import { isRestricted } from '../stores/settingsStore'
 import { isLoggedIn } from '../stores/authStore'
@@ -23,7 +27,7 @@ import NavigationBar from '../components/NavigationBar.vue'
 import RefreshableList from '../components/RefreshableList.vue'
 import { t0log } from '../debug/t0Diag' // [T0-DIAG]
 import { NAV_TABS, type NavTab } from '../components/navTabs'
-import { RECOMMENDED_A11Y_LABELS } from '../utils/accessibility'
+import { RECOMMENDED_A11Y_LABELS, FAB_MENU_A11Y_LABELS } from '../utils/accessibility'
 
 // 底部导航 tabs：数据源 = 共享 NAV_TABS（推荐/插画/小说/我的）。
 // 本页局部变量名保持 navTabs（既有模板绑定 + unit.test 源码断言），
@@ -38,76 +42,128 @@ function onNavSelect(tab: NavTab) {
   void navigate(tab.path, { replace: true })
 }
 
-// ─── 混合 feed（插画推荐 + 小说推荐） ───
-// sources 顺序即 ratio 优先级：illust 在前（默认 4:1 = 每 4 条插画插 1 条小说）。
-// key 前缀区分类型且全局唯一（i-<id> / n-<id>），跨源重复 id 由 feed 去重。
-const feed = createMixFeed({
+// ─── 按钮分页 feed（插画推荐 + 小说推荐，ADR-0114） ───
+// sources 顺序即 mergeByTime 同分 tie-break 优先级：illust 在前。
+// key 前缀区分类型且全局唯一（i-<id> / n-<id>），页内按 key 去重（跨页不去重，缓存一致性）。
+// 推荐端点：nextUrl 非空时请求该游标（loadNext/loadNovelNext），首载拉第一页（loadRecommended*）。
+function mapIllusts(r: {
+  illusts: PixivIllust[]
+  next_url: string | null
+}): { items: MixFeedItem[]; nextUrl: string | null } {
+  return {
+    items: r.illusts.map((i) => ({ kind: 'illust' as const, key: `i-${i.id}`, id: i.id, data: i })),
+    nextUrl: r.next_url,
+  }
+}
+
+function mapNovels(r: {
+  novels: PixivNovel[]
+  next_url: string | null
+}): { items: MixFeedItem[]; nextUrl: string | null } {
+  return {
+    items: r.novels.map((n) => ({ kind: 'novel' as const, key: `n-${n.id}`, id: n.id, data: n })),
+    nextUrl: r.next_url,
+  }
+}
+
+const pagedSources: PagedFeedSource[] = [
+  {
+    name: 'illust',
+    fetchPage: (signal, nextUrl) =>
+      nextUrl ? loadNext(nextUrl, signal).then(mapIllusts) : loadRecommended(signal).then(mapIllusts),
+  },
+  {
+    name: 'novel',
+    fetchPage: (signal, nextUrl) =>
+      nextUrl ? loadNovelNext(nextUrl, signal).then(mapNovels) : loadRecommendedNovels(signal).then(mapNovels),
+  },
+]
+
+const feed = createPagedFeed({
+  sources: pagedSources,
+  // 预留 onUpdate 契约（按钮模式无自动加载路径，当前不触发；未来预取/自动刷新复用）
   onUpdate: () => {
     sync()
-    t0log('[recommended]', 'onUpdate re-synced') // [T0-DIAG] P1 验证标记
+    t0log('[recommended]', 'onUpdate fired') // [T0-DIAG]
   },
-  sources: [
-    {
-      name: 'illust',
-      fetchPage: (signal) =>
-        loadRecommended(signal).then((r) => ({
-          items: r.illusts.map((i) => ({ kind: 'illust' as const, key: `i-${i.id}`, id: i.id, data: i })),
-          nextUrl: r.next_url,
-        })),
-    },
-    {
-      name: 'novel',
-      fetchPage: (signal) =>
-        loadRecommendedNovels(signal).then((r) => ({
-          items: r.novels.map((n) => ({ kind: 'novel' as const, key: `n-${n.id}`, id: n.id, data: n })),
-          nextUrl: r.next_url,
-        })),
-    },
-  ],
 })
 
 // ─── 响应式桥接：feed 是纯函数式状态，页面用本地 ref 快照渲染 ───
 // 每次 feed 状态可能变化后调用 sync() 重新快照（首载/翻页/刷新完成、以及初始 onMounted）。
 const items = ref<MixFeedItem[]>(feed.items())
 const loading = ref(feed.loading())
-const loadingMore = ref(feed.loadingMore())
 const errorMsg = ref(feed.error() ?? '')
-const pageErrorMsg = ref('')
-const endOfFeed = ref(false)
+/** 当前页号（1 起，用户视角） */
+const pageIndex = ref(1)
+const hasPrev = ref(false)
+const hasNext = ref(false)
 
 function sync() {
   items.value = feed.items()
   loading.value = feed.loading()
-  loadingMore.value = feed.loadingMore()
   errorMsg.value = feed.error() ?? ''
-  pageErrorMsg.value = feed.pageError() ?? ''
-  // 到底态：所有源耗尽且列表非空（ADR-0104：footer「没有更多了」）
-  endOfFeed.value =
-    feed.nextUrl() === null && feed.items().length > 0 && !feed.loading() && !feed.loadingMore()
+  pageIndex.value = feed.pageIndex() + 1
+  hasPrev.value = feed.hasPrev()
+  hasNext.value = feed.hasNext()
+  t0log('[recommended]', `sync page=${pageIndex.value} items=${items.value.length} hasPrev=${hasPrev.value} hasNext=${hasNext.value}`) // [T0-DIAG]
 }
 
-/** 刷新（FAB / 补拉）：feed.refresh() 幂等（generation++ 丢弃在途旧响应），完成后同步快照。
-    直接绑定 RefreshableList :refresh（ADR-0107：刷新状态机内收组件，页面零自持刷新态） */
-async function refreshFeed() {
-  await feed.refresh()
+/**
+ * 统一翻页/刷新入口（spec §3.2 flip）：先**同步启动** feed 动作（inflight++ 在动作同步段生效），
+ * 再快照——这样 loading=true 被捕获（首载骨架屏 / 切页「加载中…」footer 可见）；
+ * 完成后再次快照 + 同 tick epoch 重建（ADR-0107 D4：整树替换，重建 = 从页顶看新页）。
+ * 三路（refresh/next/prev）共用，消除同构重复（review minor-4）。
+ */
+async function flip(action: () => Promise<void>) {
+  const p = action() // 同步启动：inflight++ 已生效
   sync()
-  // [lynx:fix] vue-lynx patch 的 RemoveNode 索引错位是框架 bug：裸 list 数据整体替换即复现
-  // （列表全空白，模拟器实测 2026-08-24，ADR-0107 D4）。epoch 必须与 sync() 同一 tick
-  // flush（key 变化走整树替换，不发生子节点 patch）；异步 bump 仍会先触发错误 patch。
+  await p
+  sync()
   refreshEpoch.value++
 }
 
-/** list 强制重建代（refresh 后 ++，驱动 :key 替换） */
+/** 刷新（FAB / 补拉）：回第 1 页重拉（清缓存）。绑定 RefreshableList :refresh（返回 Promise） */
+function refreshFeed() {
+  t0log('[recommended]', 'refresh tapped') // [T0-DIAG]
+  return flip(() => feed.refresh())
+}
+
+/** 下一页（FAB）：拉两路下一页 → 时间合并 → 替换当前页（翻书：从页顶看新页） */
+function goNext() {
+  t0log('[recommended]', 'next tapped') // [T0-DIAG]
+  return flip(() => feed.next())
+}
+
+/** 上一页（FAB）：切回缓存页（零请求） */
+function goPrev() {
+  t0log('[recommended]', 'prev tapped') // [T0-DIAG]
+  return flip(() => feed.prev())
+}
+
+/** list 强制重建代（refresh/切页后 ++，驱动 :key 替换 = 从页顶看新页） */
 const refreshEpoch = ref(0)
 
-/** 加载更多（scrolltolower）：feed.fetchMore() 内置双防抖 + 翻页优先级，完成后同步快照 */
-async function loadMore() {
-  // [T0-DIAG] 临时诊断打点（复现翻页失效用，修复后移除）
-  t0log('[recommended]', 'scrolltolower fired')
-  await feed.fetchMore()
-  sync()
-  t0log('[recommended]', `synced items=${items.value.length}`)
-}
+/** FAB menu 扩展项（T4）：上一页/下一页，visible 按 hasPrev/hasNext 显隐（每次渲染求值）。
+    onTap 返回 Promise → RefreshableList 接管 busy（操作中禁展开/禁其他项）。
+    accessibilityLabel 走 FAB_MENU_A11Y_LABELS 注册表（review minor-3）。 */
+const fabMenuItems: FabMenuExtraItem[] = [
+  {
+    key: 'prev',
+    icon: '‹',
+    label: '上一页',
+    accessibilityLabel: FAB_MENU_A11Y_LABELS.prevPage,
+    visible: () => hasPrev.value,
+    onTap: () => goPrev(),
+  },
+  {
+    key: 'next',
+    icon: '›',
+    label: '下一页',
+    accessibilityLabel: FAB_MENU_A11Y_LABELS.nextPage,
+    visible: () => hasNext.value,
+    onTap: () => goNext(),
+  },
+]
 
 // 详情跳转：按 item.kind 决定插画 / 小说详情路由
 function openItem(item: MixFeedItem) {
@@ -159,7 +215,7 @@ onActivated(() => {
       <text class="text-title-large font-medium text-surface-on">推荐</text>
     </view>
 
-    <text v-if="errorMsg && !loading" class="text-body-small text-error p-4">{{ errorMsg }}</text>
+    <text v-if="errorMsg && items.length === 0" class="text-body-small text-error p-4">{{ errorMsg }}</text>
 
     <!-- [lynx:fix] 骨架屏：首屏加载（无数据）时显示 shimmer 卡片占位，数据就绪后切换 list。
          8 个 ≈ 4 行两列，与真实卡片同比例（48.4vw 宽 + 方形图片）避免切换 reflow -->
@@ -172,6 +228,7 @@ onActivated(() => {
     <RefreshableList
       v-else-if="!loading || items.length > 0"
       :refresh="refreshFeed"
+      :items="fabMenuItems"
       @back-to-top="refreshEpoch++"
     >
     <list
@@ -181,8 +238,6 @@ onActivated(() => {
       scroll-orientation="vertical"
       :span-count="2"
       :style="{ listMainAxisGap: '12px', listCrossAxisGap: '12px' }"
-      :lower-threshold-item-count="2"
-      @scrolltolower="loadMore"
     >
       <list-item
         v-for="item in items"
@@ -235,10 +290,15 @@ onActivated(() => {
         </template>
         </view>
       </list-item>
-      <list-item v-if="loadingMore || pageErrorMsg || endOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text v-if="loadingMore" class="text-body-medium text-outline">加载中…</text>
-        <text v-else-if="pageErrorMsg" class="text-body-medium text-error">{{ pageErrorMsg }}</text>
-        <text v-else class="text-body-medium text-outline">没有更多了</text>
+      <!-- footer：切页 loading / 当前页错误 / 页号 + 到底提示（按钮分页 ADR-0114） -->
+      <list-item v-if="loading" :key="'footer-loading'" item-key="footer-loading" class="w-full h-10 flex items-center justify-center" full-span>
+        <text class="text-body-medium text-outline">加载中…</text>
+      </list-item>
+      <list-item v-else-if="errorMsg" :key="'footer-error'" item-key="footer-error" class="w-full h-10 flex items-center justify-center" full-span>
+        <text class="text-body-medium text-error">{{ errorMsg }}</text>
+      </list-item>
+      <list-item v-else :key="'footer-page'" item-key="footer-page" class="w-full h-10 flex items-center justify-center" full-span>
+        <text class="text-body-medium text-outline">第 {{ pageIndex }} 页<template v-if="!hasNext"> · 没有更多了</template></text>
       </list-item>
     </list>
     </RefreshableList>
