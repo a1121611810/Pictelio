@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 关注 Feed（P0-T4）：关注作者的插画时间线，waterfall 分页（复用推荐页模式）。
 // M3 NavigationBar 顶层 tab（推荐/关注/小说/我的）——无返回箭头。
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { navigate } from '../router'
 import { loadFollow, loadNext } from '../api/illust'
 import type { PixivIllust, PixivIllustListResponse } from '../api/types'
@@ -38,6 +38,7 @@ function mapIllusts(r: PixivIllustListResponse): { items: MixFeedItem[]; nextUrl
 const feed = ref(
   createMixFeed({
     autoStart: false,
+    onUpdate: sync, // [T1] 防抖重试补发完成后页面重新快照（P1）
     sources: [
       {
         name: 'illust',
@@ -97,6 +98,11 @@ function onImageTap(item: PixivIllust) {
 
 onMounted(() => {
   void refreshFeed()
+})
+
+// 释放 feed：清挂起补触发 + 作废在途响应（spec §4 T1 dispose；非 KeepAlive 页卸载即触发）
+onUnmounted(() => {
+  feed.value?.dispose()
 })
 </script>
 

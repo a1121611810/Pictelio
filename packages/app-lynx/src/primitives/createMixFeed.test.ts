@@ -292,7 +292,7 @@ describe('createMixFeed', () => {
     expect(feed.loadingMore()).toBe(false)
   })
 
-  it('throttle：节流窗口内第二次 fetchMore 被跳过（不触发网络）', async () => {
+  it('throttle：节流窗口内第二次 fetchMore 被跳过，窗口结束自动补发（T1 重试）', async () => {
     vi.useFakeTimers()
     let page = 0
     const fetchA = vi.fn<MixFeedSource['fetchPage']>(async () => {
@@ -314,18 +314,18 @@ describe('createMixFeed', () => {
     await flush()
     expect(fetchA).toHaveBeenCalledTimes(2)
 
-    // 节流窗口内（时钟未推进）：第二次被跳过
+    // 节流窗口内（时钟未推进）：第二次被跳过，不立即触发网络
     await feed.fetchMore()
+    await flush()
     expect(fetchA).toHaveBeenCalledTimes(2)
 
-    // 推进 800ms 后恢复
+    // 窗口结束：挂起的补触发自动执行（无需再次 fetchMore）
     await vi.advanceTimersByTimeAsync(800)
-    await feed.fetchMore()
     await flush()
     expect(fetchA).toHaveBeenCalledTimes(3)
   })
 
-  it('cooldown：首载完成后的冷却窗口内 fetchMore 被跳过', async () => {
+  it('cooldown：首载完成后的冷却窗口内 fetchMore 被跳过，窗口结束自动补发（T1 重试）', async () => {
     vi.useFakeTimers()
     let page = 0
     const fetchA = vi.fn<MixFeedSource['fetchPage']>(async () => {
@@ -342,15 +342,188 @@ describe('createMixFeed', () => {
     await flush()
     expect(feed.items()).toHaveLength(1)
 
-    // 冷却窗口内：fetchMore 被跳过（首载完成后 3s 内）
-    await feed.fetchMore()
-    expect(fetchA).toHaveBeenCalledTimes(1)
-
-    // 推进 3000ms 后恢复
-    await vi.advanceTimersByTimeAsync(3000)
+    // 冷却窗口内：fetchMore 被跳过（不立即触发网络）
     await feed.fetchMore()
     await flush()
+    expect(fetchA).toHaveBeenCalledTimes(1)
+
+    // 窗口结束：自动补发一次（无需再次 fetchMore）
+    await vi.advanceTimersByTimeAsync(3000)
+    await flush()
     expect(fetchA).toHaveBeenCalledTimes(2)
+  })
+
+  it('T1 重试：冷却吞事件且有待渲染内容 → 窗口结束自动补触发一次，补发后调用 onUpdate（P1 页面快照契约）', async () => {
+    vi.useFakeTimers()
+    const onUpdate = vi.fn()
+    const fetchA = vi.fn<MixFeedSource['fetchPage']>(async () => ({
+      items: [mkIllust('a1', 1), mkIllust('a2', 2), mkIllust('a3', 3)],
+      nextUrl: 'p1',
+    }))
+    const feed = createMixFeed({
+      sources: [source('illust', fetchA)],
+      pageSize: 2,
+      cooldownMs: 3000,
+      throttleMs: 0,
+      onUpdate,
+    })
+    await flush()
+    expect(feed.items()).toHaveLength(2) // pageSize 分批：rendered=2, pending=1
+
+    // 冷却窗口内吞掉 → items 不变、不触发 onUpdate（页面直接调用路径由页面自己 sync）
+    await feed.fetchMore()
+    await flush()
+    expect(feed.items()).toHaveLength(2)
+    expect(onUpdate).not.toHaveBeenCalled()
+
+    // 窗口结束自动补触发 → 消费 pending（同步路径，无网络请求）→ 通知页面重新快照
+    await vi.advanceTimersByTimeAsync(3001)
+    await flush()
+    expect(feed.items()).toHaveLength(3)
+    expect(fetchA).toHaveBeenCalledTimes(1) // 仅首载
+    expect(onUpdate).toHaveBeenCalledTimes(1) // P1：重试路径页面无感知，必须回调
+  })
+
+  it('T1 重试：吞事件时全耗尽 → 不注册定时器', async () => {
+    vi.useFakeTimers()
+    const fetchA = vi.fn<MixFeedSource['fetchPage']>(async () => ({
+      items: [mkIllust('a1', 1)],
+      nextUrl: null,
+    }))
+    const feed = createMixFeed({
+      sources: [source('illust', fetchA)],
+      pageSize: 2,
+      cooldownMs: 3000,
+      throttleMs: 0,
+    })
+    await flush()
+    expect(feed.items()).toHaveLength(1)
+
+    await feed.fetchMore() // 耗尽 no-op
+    await flush()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('T1 重试：连续吞事件不叠加重试（最多一个挂起定时器）', async () => {
+    vi.useFakeTimers()
+    const fetchA = vi.fn<MixFeedSource['fetchPage']>(async () => ({
+      items: [mkIllust('a1', 1), mkIllust('a2', 2), mkIllust('a3', 3)],
+      nextUrl: 'p1',
+    }))
+    const feed = createMixFeed({
+      sources: [source('illust', fetchA)],
+      pageSize: 2,
+      cooldownMs: 3000,
+      throttleMs: 0,
+    })
+    await flush()
+
+    await feed.fetchMore()
+    await feed.fetchMore()
+    await feed.fetchMore()
+    await flush()
+    expect(vi.getTimerCount()).toBe(1)
+
+    await vi.advanceTimersByTimeAsync(3001)
+    await flush()
+    expect(feed.items()).toHaveLength(3)
+  })
+
+  it('T1 重试：一次性不自我续期（消费后无幽灵级联/无额外网络请求）', async () => {
+    vi.useFakeTimers()
+    const fetchA = vi.fn<MixFeedSource['fetchPage']>(async () => ({
+      items: [mkIllust('a1', 1), mkIllust('a2', 2), mkIllust('a3', 3), mkIllust('a4', 4), mkIllust('a5', 5)],
+      nextUrl: 'p1',
+    }))
+    const feed = createMixFeed({
+      sources: [source('illust', fetchA)],
+      pageSize: 2,
+      cooldownMs: 3000,
+      throttleMs: 0,
+    })
+    await flush()
+    expect(feed.items()).toHaveLength(2) // pending=3
+
+    await feed.fetchMore() // 吞 → 挂起 t=3000
+    await flush()
+
+    await vi.advanceTimersByTimeAsync(3001)
+    await flush()
+    expect(feed.items()).toHaveLength(4) // 消费 2 条
+    expect(fetchA).toHaveBeenCalledTimes(1) // 仅首载
+
+    expect(vi.getTimerCount()).toBe(0)
+    await vi.advanceTimersByTimeAsync(10_000)
+    await flush()
+    expect(feed.items()).toHaveLength(4)
+    expect(fetchA).toHaveBeenCalledTimes(1)
+  })
+
+  it('T1 重试：refresh 清除挂起的补触发，不幽灵翻页（spec §4 T1）', async () => {
+    vi.useFakeTimers()
+    let page = 0
+    const fetchA = vi.fn<MixFeedSource['fetchPage']>(async () => {
+      page++
+      return { items: [mkIllust(`a${page}`, page)], nextUrl: `p${page}` }
+    })
+
+    const feed = createMixFeed({
+      sources: [source('illust', fetchA)],
+      pageSize: 1,
+      throttleMs: 0,
+      cooldownMs: 3000,
+    })
+    await flush()
+    expect(feed.items()).toHaveLength(1)
+    expect(fetchA).toHaveBeenCalledTimes(1)
+
+    // 冷却窗口内吞掉 → 挂起补触发（t=3000）
+    await feed.fetchMore()
+    await flush()
+    expect(fetchA).toHaveBeenCalledTimes(1)
+    expect(vi.getTimerCount()).toBe(1)
+
+    // refresh 重建会话 → 挂起补触发被清除
+    await feed.refresh()
+    await flush()
+    expect(fetchA).toHaveBeenCalledTimes(2) // 首载 + refresh
+    expect(vi.getTimerCount()).toBe(0)
+
+    // 原窗口时间已过：无幽灵翻页
+    await vi.advanceTimersByTimeAsync(5000)
+    await flush()
+    expect(fetchA).toHaveBeenCalledTimes(2)
+  })
+
+  it('T1 重试：dispose 清除挂起的补触发并作废在途响应（spec §4 T1）', async () => {
+    vi.useFakeTimers()
+    let page = 0
+    const fetchA = vi.fn<MixFeedSource['fetchPage']>(async () => {
+      page++
+      return { items: [mkIllust(`a${page}`, page)], nextUrl: `p${page}` }
+    })
+
+    const feed = createMixFeed({
+      sources: [source('illust', fetchA)],
+      pageSize: 1,
+      throttleMs: 0,
+      cooldownMs: 3000,
+    })
+    await flush()
+
+    // 冷却窗口内吞掉 → 挂起补触发（t=3000）
+    await feed.fetchMore()
+    await flush()
+    expect(vi.getTimerCount()).toBe(1)
+
+    // dispose：挂起补触发被清、无残留定时器
+    feed.dispose()
+    expect(vi.getTimerCount()).toBe(0)
+
+    // 推进超过原窗口：无幽灵翻页
+    await vi.advanceTimersByTimeAsync(5000)
+    await flush()
+    expect(fetchA).toHaveBeenCalledTimes(1) // 仅首载
   })
 
   it('首载全部失败：error 置为首个错误，items 空', async () => {

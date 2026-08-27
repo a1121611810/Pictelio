@@ -10,6 +10,7 @@
 import type { PixivIllust, PixivNovel } from '../api/types'
 import { withTimeout } from '../utils/withTimeout'
 import { presentError } from '../utils/errorPresentation'
+import { t0log } from '../debug/t0Diag' // [T0-DIAG]
 
 /** 单页请求超时兜底（issue #128）：请求挂起 15s 即 reject，走错误分支避免 loading 无限期显示 */
 const TIMEOUT_MS = 15000
@@ -44,6 +45,10 @@ export interface MixFeedOptions {
   /** 构造即触发首载（默认 true）；false 时由 refresh() 触发——
    * 页面按 mode/tab 重建 feed 实例时用，避免「构造首载 + refresh 首载」双请求浪费 */
   autoStart?: boolean
+  /** 模块内部自动触发的加载（防抖重试补发，T1）完成后通知页面重新快照——
+   * 页面与模块之间是 ref 快照桥接（sync），重试路径不经页面 loadMore，
+   * 不回调则列表数据变了但页面不重渲染（P1 修复） */
+  onUpdate?: () => void
 }
 
 export interface MixFeed {
@@ -59,6 +64,8 @@ export interface MixFeed {
   nextUrl: () => string | null
   fetchMore: () => Promise<void>
   refresh: () => Promise<void>
+  /** 释放实例（页面卸载/重建 feed 时调用）：作废挂起补触发与在途响应（spec §4 T1） */
+  dispose: () => void
 }
 
 /** 每个源的运行态 */
@@ -77,6 +84,7 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
     throttleMs = 800,
     cooldownMs = 3000,
     autoStart = true,
+    onUpdate,
   } = opts
 
   // ─── 渲染流状态 ───
@@ -100,6 +108,30 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
   // [lynx:fix] 双重防抖：与 Recommended / NovelList 的 lastLoadMoreAt / lastLoadEndedAt 同语义
   let lastLoadMoreAt = 0
   let lastLoadEndedAt = 0
+
+  // [T1 修复] 防抖吞事件的一次性补触发（spec: app-lynx-feed-pagination-and-watchlist-prompt-fix）：
+  // 原生 <list> 的 scrolltolower 是低频单发事件（2026-08-29 模拟器实测），被防抖吞掉后
+  // 用户停在底部不会再有新事件——不重试即永久卡死。被吞且仍有可加载内容时，
+  // 注册一次性定时器在窗口结束后自动补一次 fetchMore；最多挂起一个，成功执行时取消。
+  // 补发完成后调用 onUpdate 通知页面重新快照（P1：重试路径不经页面 loadMore/sync）。
+  let retryTimer: ReturnType<typeof setTimeout> | null = null
+
+  function clearRetry(): void {
+    if (retryTimer !== null) {
+      clearTimeout(retryTimer)
+      retryTimer = null
+    }
+  }
+
+  /** 被防抖抑制但仍有可加载内容时挂一次性重试；耗尽/已挂起时不排 */
+  function scheduleRetry(afterMs: number): void {
+    if (retryTimer !== null) return // 不叠加
+    if (pending.length === 0 && !hasNext()) return // 耗尽不排
+    retryTimer = setTimeout(() => {
+      retryTimer = null
+      void fetchMore().finally(() => onUpdate?.()) // 补发完成后页面重新快照（P1）
+    }, Math.max(1, afterMs))
+  }
 
   /** 各源运行态（索引对齐 sources） */
   let sourceStates: SourceState[] = sources.map(() => ({ nextUrl: null, kind: null }))
@@ -185,6 +217,7 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
    */
   async function loadFirstPage(): Promise<void> {
     const g = ++generation
+    clearRetry() // refresh 重建会话：挂起的补触发随旧会话作废（spec §4 T1）
     firstLoadInFlight = true
     // 新会话开始：清两槽错误（首屏 + 分页残留）
     firstErrorText = null
@@ -237,6 +270,7 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
         const merged = dedupe(mergeByRatio(pages))
         rendered = merged.slice(0, pageSize)
         pending = merged.slice(pageSize)
+        t0log('[mixfeed]', `firstLoad done rendered=${rendered.length} pending=${pending.length} hasNext=${hasNext()}`) // [T0-DIAG]
       }
     } finally {
       firstLoadInFlight = false
@@ -250,13 +284,36 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
    */
   async function fetchMore(): Promise<void> {
     const now = Date.now()
+    // [T0-DIAG] 临时诊断打点（复现翻页失效用，修复后移除）
+    t0log('[mixfeed]', `enter pending=${pending.length} rendered=${rendered.length} hasNext=${hasNext()}`)
     // [lynx:fix] 双重防抖：冷却（内容追加后 cooldownMs）+ 节流（触发间隔 throttleMs）
-    if (now - lastLoadEndedAt < cooldownMs) return
-    if (now - lastLoadMoreAt < throttleMs) return
-    if (loadMoreInFlight) return
-    if (firstLoadInFlight) return
-    if (pending.length === 0 && !hasNext()) return // 全部耗尽 → no-op
+    // [T1] 吞事件不重试 = 原生单发事件永久丢失 → 各早退分支挂一次性补触发
+    if (now - lastLoadEndedAt < cooldownMs) {
+      t0log('[mixfeed]', `SWALLOW cooldown ${now - lastLoadEndedAt}ms<${cooldownMs}`) // [T0-DIAG]
+      scheduleRetry(cooldownMs - (now - lastLoadEndedAt))
+      return
+    }
+    if (now - lastLoadMoreAt < throttleMs) {
+      t0log('[mixfeed]', `SWALLOW throttle ${now - lastLoadMoreAt}ms<${throttleMs}`) // [T0-DIAG]
+      scheduleRetry(throttleMs - (now - lastLoadMoreAt))
+      return
+    }
+    if (loadMoreInFlight) {
+      t0log('[mixfeed]', 'SWALLOW inFlight') // [T0-DIAG]
+      scheduleRetry(throttleMs)
+      return
+    }
+    if (firstLoadInFlight) {
+      t0log('[mixfeed]', 'SWALLOW firstLoad') // [T0-DIAG]
+      scheduleRetry(throttleMs)
+      return
+    }
+    if (pending.length === 0 && !hasNext()) {
+      t0log('[mixfeed]', 'no-op exhausted') // [T0-DIAG]
+      return // 全部耗尽 → no-op
+    }
 
+    clearRetry() // 本次真实执行：取消挂起的补触发，防幽灵消费
     lastLoadMoreAt = now
     loadMoreInFlight = true
     const g = generation
@@ -264,16 +321,19 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
       // 优先同步消费内部队列（追加 pageSize 条，无网络请求）
       if (pending.length > 0) {
         rendered.push(...pending.splice(0, pageSize))
+        t0log('[mixfeed]', `consume pending → rendered=${rendered.length} pending=${pending.length}`) // [T0-DIAG]
         return
       }
       const srcIdx = pickSourceToFetch()
       if (srcIdx < 0) return
       try {
         // 翻页：传入该源当前 next_url（offset 分页语义；推荐类端点可忽略）
+        t0log('[mixfeed]', `fetch src=${sources[srcIdx].name}`) // [T0-DIAG]
         const res = await withTimeout(
           sources[srcIdx].fetchPage(undefined, sourceStates[srcIdx].nextUrl),
           TIMEOUT_MS,
         )
+        t0log('[mixfeed]', `fetched src=${sources[srcIdx].name} items=${res.items?.length}`) // [T0-DIAG]
         if (g !== generation) return // 竞态：refresh 已取代本次翻页，丢弃响应
         if (!Array.isArray(res.items)) throw new Error('数据格式异常') // 畸形响应 → 进 catch 置 pageError
         sourceStates[srcIdx].nextUrl = res.nextUrl
@@ -281,9 +341,11 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
         const fresh = dedupe(res.items)
         rendered.push(...fresh.slice(0, pageSize))
         pending.push(...fresh.slice(pageSize))
+        t0log('[mixfeed]', `append fresh=${fresh.length} → rendered=${rendered.length} pending=${pending.length}`) // [T0-DIAG]
         // 翻页成功：清除「加载更多失败」的残留错误（分页槽），首屏槽不受影响
         pageErrorText = null
       } catch (err) {
+        t0log('[mixfeed]', `fetch FAIL ${String(err).slice(0, 80)}`) // [T0-DIAG]
         // 翻页失败不崩溃：置分页错误文案（底部内联），保留 nextUrl 供后续滚动重试
         pageErrorText = presentError(err, '加载更多失败')
       }
@@ -296,6 +358,12 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
   /** 刷新：不受节流 / 冷却限制；generation++ 保证在途旧首载 / fetchMore 响应被丢弃 */
   async function refresh(): Promise<void> {
     await loadFirstPage()
+  }
+
+  /** 释放：清挂起补触发 + 代递增作废在途响应（页面卸载/mode 重建调用，防孤儿请求） */
+  function dispose(): void {
+    clearRetry()
+    generation++
   }
 
   // 构造即触发首载（autoStart=false 时由调用方显式 refresh 触发，页面重建 feed 用）
@@ -315,5 +383,6 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
     },
     fetchMore,
     refresh,
+    dispose,
   }
 }

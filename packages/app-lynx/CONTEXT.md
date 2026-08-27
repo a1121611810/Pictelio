@@ -40,9 +40,13 @@ _Avoid_: 到底后报错、静默空白
 分页（fetchMore）失败时在**列表底部**显示的错误提示，保留已加载内容，`nextUrl` 保留供滚动自动重试。与首屏错误（顶部整页提示）相对——两者槽位分离（createMixFeed 的 `error()` / `pageError()`）。
 _Avoid_: 分页错误显示在列表顶部、清空已加载内容
 
-### 列表操作（List actions）
+### 追更（Series watchlist）
 
-**列表操作 FAB menu（list action FAB menu）**：
+**追更询问（watchlist prompt）**：
+系列小说详情页的返回守卫询问。触发条件全部命中才弹：小说是系列作品、未追更、本会话未「暂不」、页面停留 ≥10s，且（滚动进度 ≥70% **或**到达底部）。弹出时机 = **按返回键时**（返回守卫拦截），不是到底自动弹（已否决的语义）。「追更」加入追更列表后继续返回；「暂不」继续返回且本会话不再询问；返回键关弹窗 = 留在详情页且本会话不再询问。系列追更状态预取失败（状态未知）时保守不弹。
+_Avoid_: 二次确认（口语别名，勿入代码与文档）、到底自动弹窗
+
+### 列表操作（List actions）
 列表页唯一的浮动操作入口（M3 FAB menu），固定于列表容器右下角。常态为一个刷新 FAB（56dp，primary-container）；点击后 FAB 变身为 close button（图标 ✕，同尺寸原位），浮出 scrim，并从 FAB top-trailing edge 展开两个 medium-button 规格菜单项：「刷新」「回顶」。执行任一操作后自动收起。双端同构（LynxView / web-core 同一实现与动画）。
 _Avoid_: 堆叠 FAB、speed dial、下拉刷新手势（已废弃，ADR-0107）、页面自持刷新态
 

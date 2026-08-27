@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'watchlist' })
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { navigate, goBack } from '../router'
 import { registerModal } from '../stores/modalStack'
 import {
@@ -27,6 +27,7 @@ import RefreshableList from '../components/RefreshableList.vue'
 const feed = createWatchlistFeed({
   fetchFirst: loadWatchlistNovels,
   fetchNext: loadWatchlistNovelsNext,
+  onUpdate: sync, // [T1] 防抖重试补发完成后页面重新快照（P1）
 })
 
 const series = ref<WatchlistSeries[]>([])
@@ -108,6 +109,11 @@ function confirmUnwatch() {
 
 onMounted(() => {
   void refreshFeed()
+})
+
+// 释放 feed（spec §4 T1 dispose）：非 KeepAlive 页卸载即触发，防孤儿补触发请求
+onUnmounted(() => {
+  feed.dispose()
 })
 </script>
 

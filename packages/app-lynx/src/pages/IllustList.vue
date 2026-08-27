@@ -2,7 +2,7 @@
 // 插画分类页（/illusts）：推荐/关注两个子 tab，waterfall 双列插画卡。
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'illusts' })
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { navigate } from '../router'
 import { loadRecommended, loadFollow, loadNext } from '../api/illust'
 import type { PixivIllust, PixivIllustListResponse } from '../api/types'
@@ -41,6 +41,7 @@ function makeFeed(m: 'recommend' | 'follow') {
   return createMixFeed({
     // autoStart=false：构造不首载，由 refreshFeed 显式触发（mode 重建实例避免双请求浪费）
     autoStart: false,
+    onUpdate: sync, // [T1] 防抖重试补发完成后页面重新快照（P1）
     sources: [
       {
         name: 'illust',
@@ -92,7 +93,8 @@ async function loadMore() {
 function switchMode(m: 'recommend' | 'follow') {
   if (mode.value === m) return
   mode.value = m
-  // 重建 feed 实例：新实例 generation 从 0 起，旧实例在途响应按竞态代被丢弃
+  // 重建 feed 实例：先释放旧实例（清挂起补触发 + 作废在途响应），新实例 generation 从 0 起
+  feed.value?.dispose()
   feed.value = makeFeed(m)
   illusts.value = []
   errorMsg.value = ''
@@ -113,6 +115,11 @@ function onImageTap(item: PixivIllust) {
 
 onMounted(() => {
   void refreshFeed()
+})
+
+// 释放 feed（spec §4 T1 dispose）：卸载与 mode 重建时均作废旧实例
+onUnmounted(() => {
+  feed.value?.dispose()
 })
 </script>
 

@@ -6,7 +6,7 @@
 // 响应式，页面用本地 ref 快照 + sync() 同步）与渲染。
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'recommended' })
-import { ref, onMounted, onActivated, watch } from 'vue'
+import { ref, onMounted, onActivated, onUnmounted, watch } from 'vue'
 import { navigate } from '../router'
 import { loadRecommended } from '../api/illust'
 import { loadRecommendedNovels } from '../api/novel'
@@ -21,6 +21,7 @@ import RestrictOverlay from '../components/RestrictOverlay.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 import NavigationBar from '../components/NavigationBar.vue'
 import RefreshableList from '../components/RefreshableList.vue'
+import { t0log } from '../debug/t0Diag' // [T0-DIAG]
 import { NAV_TABS, type NavTab } from '../components/navTabs'
 import { RECOMMENDED_A11Y_LABELS } from '../utils/accessibility'
 
@@ -41,6 +42,10 @@ function onNavSelect(tab: NavTab) {
 // sources 顺序即 ratio 优先级：illust 在前（默认 4:1 = 每 4 条插画插 1 条小说）。
 // key 前缀区分类型且全局唯一（i-<id> / n-<id>），跨源重复 id 由 feed 去重。
 const feed = createMixFeed({
+  onUpdate: () => {
+    sync()
+    t0log('[recommended]', 'onUpdate re-synced') // [T0-DIAG] P1 验证标记
+  },
   sources: [
     {
       name: 'illust',
@@ -97,8 +102,11 @@ const refreshEpoch = ref(0)
 
 /** 加载更多（scrolltolower）：feed.fetchMore() 内置双防抖 + 翻页优先级，完成后同步快照 */
 async function loadMore() {
+  // [T0-DIAG] 临时诊断打点（复现翻页失效用，修复后移除）
+  t0log('[recommended]', 'scrolltolower fired')
   await feed.fetchMore()
   sync()
+  t0log('[recommended]', `synced items=${items.value.length}`)
 }
 
 // 详情跳转：按 item.kind 决定插画 / 小说详情路由
@@ -115,6 +123,11 @@ function onImageTap(item: MixFeedItem) {
 
 onMounted(() => {
   void refreshFeed()
+})
+
+// 释放 feed：清挂起补触发 + 作废在途响应（spec §4 T1 dispose）
+onUnmounted(() => {
+  feed.dispose()
 })
 
 // [首帧内容化]（#63）：初始路由为推荐页，组件可能在登录态就绪前被挂载

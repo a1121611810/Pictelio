@@ -29,6 +29,8 @@ export function mergeWatchlistPage(
 export interface WatchlistFeedDeps {
   fetchFirst: (signal?: AbortSignal) => Promise<WatchlistNovelListResponse>
   fetchNext: (url: string, signal?: AbortSignal) => Promise<WatchlistNovelListResponse>
+  /** 模块内部自动触发的加载（防抖重试补发，T1）完成后通知页面重新快照（P1） */
+  onUpdate?: () => void
 }
 
 export interface WatchlistFeed {
@@ -44,9 +46,12 @@ export interface WatchlistFeed {
   removeItem: (seriesId: number) => void
   refresh: () => Promise<void>
   fetchMore: () => Promise<void>
+  /** 释放实例（页面卸载时调用）：作废挂起补触发与在途响应（spec §4 T1） */
+  dispose: () => void
 }
 
 export function createWatchlistFeed(deps: WatchlistFeedDeps): WatchlistFeed {
+  const { onUpdate } = deps
   const items = ref<WatchlistSeries[]>([])
   const loading = ref(false)
   const loadingMore = ref(false)
@@ -56,10 +61,34 @@ export function createWatchlistFeed(deps: WatchlistFeedDeps): WatchlistFeed {
   /** 竞态代：refresh 重建递增，在飞的旧响应落地即作废 */
   let generation = 0
 
+  // [T1] 在飞锁吞事件的一次性补触发（同 createMixFeed 修复，spec: app-lynx-feed-pagination-and-watchlist-prompt-fix）：
+  // 原生 scrolltolower 低频单发，落在在飞窗口被吞且无重试 = 永久卡死。
+  let retryTimer: ReturnType<typeof setTimeout> | null = null
+
+  function clearRetry(): void {
+    if (retryTimer !== null) {
+      clearTimeout(retryTimer)
+      retryTimer = null
+    }
+  }
+
+  /** 被在飞锁吞掉且还有下一页时挂一次性重试；最多挂起一个 */
+  function scheduleRetry(): void {
+    if (retryTimer !== null) return
+    if (!nextUrl.value) return // 耗尽不排
+    retryTimer = setTimeout(() => {
+      retryTimer = null
+      void fetchMore().finally(() => onUpdate?.()) // 补发完成后页面重新快照（P1）
+    }, 800)
+  }
+
   async function refresh(): Promise<void> {
     // 在飞锁优先（review P1-1）：首屏在飞时的重复 refresh 直接吞掉、共享在飞结果；
-    // 不得先递增代——在飞响应相对页面状态不是陈旧的，作废它会落地假空态
+    // 不得先递增代——在飞响应相对页面状态不是陈旧的，作废它会落地假空态。
+    // 注：clearRetry 放在锁后（仅真实 refresh 才清）——被吞的 refresh 不是真 refresh，
+    // 挂起的补发继续保留，在飞完成后自动恢复用户的「加载更多」意图（spec §4 T1）。
     if (loading.value) return
+    clearRetry() // 重建会话：挂起的补触发随旧会话作废
     const gen = ++generation
     loading.value = true
     error.value = null
@@ -82,7 +111,12 @@ export function createWatchlistFeed(deps: WatchlistFeedDeps): WatchlistFeed {
 
   async function fetchMore(): Promise<void> {
     const url = nextUrl.value
-    if (!url || loading.value || loadingMore.value) return
+    if (!url) return
+    if (loading.value || loadingMore.value) {
+      scheduleRetry() // [T1] 单发事件被在飞锁吞掉 → 窗口后自动补一次
+      return
+    }
+    clearRetry() // 本次真实执行：取消挂起的补触发
     const gen = generation
     loadingMore.value = true
     pageError.value = null
@@ -104,6 +138,12 @@ export function createWatchlistFeed(deps: WatchlistFeedDeps): WatchlistFeed {
     items.value = items.value.filter((s) => s.id !== seriesId)
   }
 
+  /** 释放：清挂起补触发 + 代递增作废在途响应（页面卸载调用，防孤儿请求） */
+  function dispose(): void {
+    clearRetry()
+    generation++
+  }
+
   return {
     items: () => items.value,
     loading: () => loading.value,
@@ -114,5 +154,6 @@ export function createWatchlistFeed(deps: WatchlistFeedDeps): WatchlistFeed {
     removeItem,
     refresh,
     fetchMore,
+    dispose,
   }
 }

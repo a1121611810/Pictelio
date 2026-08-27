@@ -9,6 +9,7 @@ import { isLoggedIn, restoreToken, registerUnauthorizedHandler } from './stores/
 import { loadSettings } from './stores/settingsStore'
 import { hasOpenModal, closeTopModal } from './stores/modalStack'
 import { registerSessionErrorHandler } from './utils/errorPresentation'
+import { t0log } from './debug/t0Diag' // [T0-DIAG]
 
 export interface RouteDef extends RouteDefCore {
   component: Component
@@ -139,7 +140,9 @@ export function registerBackGuard(guard: BackGuard): () => void {
  * 与系统返回（handleSystemBack）共用同一守卫链，两条返回路径行为一致。
  */
 export function requestBack(): void {
-  if (runBackGuards(backGuardRegistry.guards())) return
+  const intercepted = runBackGuards(backGuardRegistry.guards())
+  t0log('[router]', `requestBack intercepted=${intercepted}`) // [T0-DIAG]
+  if (intercepted) return
   goBack()
 }
 
@@ -180,8 +183,12 @@ function handleSystemBack(): void {
     closeTopModal()
     return
   }
-  if (action === 'intercepted') return
+  if (action === 'intercepted') {
+    t0log('[router]', 'systemBack → intercepted') // [T0-DIAG]
+    return
+  }
   if (action === 'navigate') {
+    t0log('[router]', 'systemBack → navigate') // [T0-DIAG]
     goBack()
     return
   }

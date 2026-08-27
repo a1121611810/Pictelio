@@ -3,7 +3,7 @@
 // 不在 App.vue KeepAlive include 白名单（按 :id 加载，每次进入重新 mount——ADR-0049 语义）。
 // 分页收敛（ADR-0104）：两区各自迁移到 createMixFeed 深模块；tab 切换保留各自 feed
 // 实例（切回已加载 tab 不重新请求，对齐原「按需加载一次」行为）。
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { currentParams, navigate, goBack } from '../router'
 import { getUserDetail } from '../api/user'
 import { loadUserIllusts, loadNext } from '../api/illust'
@@ -42,6 +42,7 @@ function mapIllusts(r: PixivIllustListResponse): { items: MixFeedItem[]; nextUrl
 const illustFeed = ref(
   createMixFeed({
     autoStart: false,
+    onUpdate: syncIllust, // [T1] 防抖重试补发完成后页面重新快照（P1）
     sources: [
       {
         name: 'illust',
@@ -97,6 +98,7 @@ function mapNovels(r: PixivNovelListResponse): { items: MixFeedItem[]; nextUrl: 
 const novelFeed = ref(
   createMixFeed({
     autoStart: false,
+    onUpdate: syncNovel, // [T1] 防抖重试补发完成后页面重新快照（P1）
     sources: [
       {
         name: 'novel',
@@ -190,6 +192,12 @@ onMounted(async () => {
   }
   illustLoaded = true
   void refreshIllust()
+})
+
+// 释放双 feed（spec §4 T1 dispose）：tab 切换保留实例，仅页面卸载时作废
+onUnmounted(() => {
+  illustFeed.value?.dispose()
+  novelFeed.value?.dispose()
 })
 </script>
 
