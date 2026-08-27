@@ -9,6 +9,8 @@ import { showR18, showR18G, setShowR18, setShowR18G, ugoiraMode, setUgoiraMode, 
 import type { ImageQuality } from '../utils/imageQuality'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { ME_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import { getNativeModules } from '../api/client'
+import { t0Export, t0HasLogs } from '../debug/t0Diag' // [T0-DIAG]
 import GlassCard from '../components/GlassCard.vue'
 import NavigationBar from '../components/NavigationBar.vue'
 import { NAV_TABS, type NavTab } from '../components/navTabs'
@@ -22,6 +24,28 @@ function onNavSelect(tab: NavTab) {
 }
 
 const switching = ref(false)
+
+// [T0-DIAG] 导出诊断日志：调原生 PictelioApp.exportDiagLog（写文件 + Android 分享面板）；
+// web-core（无原生模块）降级为控制台打印。真机取证主通道，T3 收尾时移除。
+function onExportDiag() {
+  if (!t0HasLogs()) {
+    console.warn('[T0] 无诊断日志可导出（先复现问题再回来导出）')
+    return
+  }
+  const text = t0Export()
+  const app = getNativeModules()?.PictelioApp as
+    | { exportDiagLog?: (text: string, cb: (err: string | null) => void) => void }
+    | undefined
+  if (app?.exportDiagLog) {
+    app.exportDiagLog(text, (err) => {
+      if (err) console.warn('[T0] 诊断日志导出失败:', err)
+    })
+  } else {
+    // web-core 预览：无分享面板，日志打印到控制台（devtools 可见）
+    console.warn('[T0] 原生导出不可用（web-core），日志仅打印到控制台')
+    console.log(text)
+  }
+}
 
 // 未登录守卫：跳登录页
 onMounted(async () => {
@@ -308,6 +332,19 @@ function toggleR18G() {
             <text class="text-label-large" :class="detailQuality === 'original' ? 'text-secondary-on-container' : 'text-surface-on'">原图</text>
           </view>
         </view>
+      </view>
+
+      <!-- [T0-DIAG] 诊断日志导出（真机取证入口，T3 收尾时移除） -->
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+        <view
+          class="py-3.5"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.exportDiag"
+          @tap="onExportDiag"
+        >
+          <text class="text-title-medium text-surface-on">导出诊断日志</text>
+        </view>
+        <text v-if="!t0HasLogs()" class="text-body-small text-outline mt-1">暂无日志（先复现问题再回来导出）</text>
       </view>
 
       <!-- 退出登录（危险操作独立沉底） -->

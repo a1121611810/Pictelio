@@ -38,6 +38,9 @@ public class PictelioAppModule extends LynxModule {
     private static final java.util.concurrent.ExecutorService HTTP_EXECUTOR =
             java.util.concurrent.Executors.newCachedThreadPool();
 
+    /** 诊断日志导出目录（app 外部私有目录，无需权限；adb 可 pull） */
+    private static final String DIAG_DIR = "diag";
+
     /** httpGet 响应体大小上限（version.json 极小；防异常端点导致 OOM） */
     private static final int MAX_HTTP_BODY_BYTES = 1024 * 1024;
 
@@ -231,6 +234,42 @@ public class PictelioAppModule extends LynxModule {
         } catch (Exception e) {
             Log.w(TAG, "httpGet(" + url + ") 失败", e);
             callback.invoke(0, String.valueOf(e.getMessage()));
+        }
+    }
+
+    /**
+     * 导出诊断日志（T0-DIAG 临时通道，真机取证）：把 JS 侧日志文本写入
+     * 外部私有目录（adb 可 pull），并弹出 Android 分享面板（微信/邮件/保存文件）。
+     * 回调契约：成功 {@code cb(null)}；失败 {@code cb(errMsg)}。
+     * 分享面板无可用应用时仍成功（文件已落盘，错误信息返回给 JS 提示）。
+     */
+    @LynxMethod
+    public void exportDiagLog(String text, Callback callback) {
+        try {
+            Context ctx = appContext();
+            java.io.File dir = new java.io.File(ctx.getExternalFilesDir(null), DIAG_DIR);
+            if (!dir.exists() && !dir.mkdirs()) {
+                throw new java.io.IOException("无法创建诊断目录: " + dir);
+            }
+            java.io.File file = new java.io.File(dir, "diag-" + System.currentTimeMillis() + ".txt");
+            java.nio.file.Files.write(
+                    file.toPath(),
+                    text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+            Intent share = new Intent(Intent.ACTION_SEND);
+            share.setType("text/plain");
+            share.putExtra(Intent.EXTRA_SUBJECT, "Pictelio lynx 诊断日志");
+            share.putExtra(Intent.EXTRA_TEXT, text);
+            share.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            if (share.resolveActivity(ctx.getPackageManager()) == null) {
+                callback.invoke("无可用分享应用（日志已写入 " + file.getAbsolutePath() + "）");
+                return;
+            }
+            ctx.startActivity(Intent.createChooser(share, "导出诊断日志"));
+            callback.invoke();
+        } catch (Exception e) {
+            Log.w(TAG, "exportDiagLog 失败", e);
+            callback.invoke(String.valueOf(e.getMessage()));
         }
     }
 }

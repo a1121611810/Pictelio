@@ -31,6 +31,8 @@ export const ME_A11Y_LABELS = {
   detailQualityLarge: '详情画质选择高清',
   detailQualityOriginal: '详情画质选择原图',
   logout: '退出登录',
+  // [T0-DIAG] 诊断日志导出（真机取证入口，T3 收尾时移除）
+  exportDiag: '导出诊断日志',
 } as const
 
 /** Login 页 accessibility 标注（Lynx E2E：登录页注入 token 后提交） */

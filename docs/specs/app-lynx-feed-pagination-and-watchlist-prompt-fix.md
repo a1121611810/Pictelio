@@ -66,11 +66,16 @@
 
 ### T2 · 真机探针（事实钉死）
 
-复用 ADR-0110 四色探针方法论，在临时探针页对双端实测并记录：
+**取证通道（已实现并模拟器验证，2026-08-29）**：不再用截图读横幅——改「日志记录 + 我的页一键导出」：
+- `src/debug/t0Diag.ts`：历史环形缓冲（带时间戳，最近 500 条）+ `t0Export()`
+- 「我的」页新增「导出诊断日志」入口 → 原生 `PictelioApp.exportDiagLog`（写 app 外部私有目录 `files/diag/diag-<ts>.txt`，adb 可 pull）+ Android 分享面板（微信/邮件/复制，真机最省事）
+- 用户操作流：复现问题（滑动/读小说）→ 去「我的」→ 导出 → 分享发回
 
-- `<list>`（waterfall）：`scrolltolower` 是否派发、频次（单发/连发）、`lower-threshold-item-count` 行为。
-- `<scroll-view>`：`@scroll` 是否派发、payload 字段、`@scrolltolower` 是否派发。
-- 产出：新平台事实写入 ADR（修订 ADR-0110 事实②的适用范围或新增 ADR），探针页随 T3 收尾移除或保留在 debug 路由。
+**真机实测内容**（T0 打点已覆盖）：
+- `<list>`（waterfall）：`scrolltolower` 是否派发、频次、阈值行为
+- `<scroll-view>`：`@scroll` 是否派发、payload 字段、`@scrolltolower` 是否派发
+- 追更询问链路：`[novel] loaded hasSeries` / `[watchlist] prefetch` / `[novel] progress` / `[novel] TOBOTTOM` / `[watchlist] reqBack hit=?` / `[router] systemBack`
+- 产出：新平台事实写入 ADR（修订 ADR-0110 事实②适用范围或新增 ADR），探针随 T3 收尾移除
 
 ### T3 · 修复落地 + 验证闭环
 
