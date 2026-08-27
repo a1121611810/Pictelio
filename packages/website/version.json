@@ -1,5 +1,5 @@
 {
-  "version": "4.15.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.15.0",
-  "changelog": "🐛 修复\n  969c41f fix(app-lynx): 追更列表 mask 条目真机不渲染（list-item 根改单一稳定 view）\n  381dcfd fix(app-lynx): 终审 P2 全清（预取守卫/弹窗 busy/取消确认 modalStack/注释）\n  00741c6 fix(app-lynx): 追更 feed 在飞锁顺序修正 + 取消条目本地移除防复活（review P1-1/P1-2/P2）\n✨ 新功能\n  32d0984 feat(app-lynx): NovelDetail 追更询问接线（返回守卫 + 滚动跟踪 + 系列状态行 + 弹窗挂载）\n  ef3bc10 feat(app-lynx): WatchlistPromptDialog 追更询问弹窗 + a11y 登记（T5）\n  6102c11 feat(app-lynx): 合并追更 Wave 2（#223 prompt 状态机 + #225 追更列表页）\n  9fd3e74 feat(app-lynx): 追更列表页 + Me 入口 + 取消追更二次确认（T7）\n  8b78698 feat(app-lynx): createWatchlistPrompt 追更询问编排 primitive（预取竞态门 + 弹窗状态机）\n  012d95b feat(app-lynx): 合并追更 Wave 1（#220 API 层 + #221 store/纯判定 + #222 返回守卫）\n  387219b feat(app-lynx): 返回守卫机制 back-guard 与 requestBack\n  3e5e5e9 feat(app-lynx): 小说系列追更 API 层 + 类型 + 契约测试（T1）\n  10d312e feat(app-lynx): 追更 T2 watchlistStore + shouldPromptWatchlist 纯判定\n🔧 其他\n  9167d5f Merge commit 'ef3bc10' into feat/app-lynx-watchlist\n🧹 杂项\n  897c5ca chore(reasonix): remove .reasonix state dir and stale config references\n  19f5c54 chore(codegraph): replace MCP integration with pi extension + CLI\n🧪 测试\n  f76d82a test(app-lynx): 追更阈值常量字面值锚定 + mask_text 空串边界（review P1/P2）\n📝 文档\n  a78a662 docs(specs): app-lynx 小说系列追更功能规格（#220-#226）"
+  "version": "4.15.1",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.15.1",
+  "changelog": "📝 文档\n  f12a228 docs(app-lynx): 翻页+追更询问修复 spec（T0 平台事实/T1 契约/验证闭环）\n🐛 修复\n  e3d3a49 fix(android-e2e): prefs 契约层兼容空 prefs 的自闭合 <map />（新装 app 实测）\n  7823e4d fix(app-lynx): 列表翻页防抖吞事件补触发重试（原生低频 scrolltolower 适配）"
 }
