@@ -1,5 +1,5 @@
 {
-  "version": "4.15.2",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.15.2",
-  "changelog": "🧹 杂项\n  27618a6 chore(app-lynx): 我的页诊断日志导出通道（T0 真机取证，T3 移除）"
+  "version": "4.16.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.16.0",
+  "changelog": "📝 文档\n  ecedf43 docs(app-lynx): ADR-0114 按钮分页决策 + 分页按钮 spec（状态机/测试矩阵/ticket 拆解）\n✨ 新功能\n  2c5c480 feat(app-lynx): 推荐页按钮分页（替换式翻书，ADR-0114）"
 }
