@@ -74,11 +74,17 @@ export function writeClientKind(serial: string, kind: "webview" | "lynx"): strin
         `name="pictelio_client_kind" value="${kind}"`,
       );
     if (!xml.includes("pictelio_client_kind")) {
-      // 原文件没有该键，插入到 <map> 内
-      xml = xml.replace(
-        /<map>/u,
-        `<map>\n    <string name="pictelio_client_kind">${kind}</string>`,
-      );
+      // 原文件没有该键，插入到 <map> 内；空 map 是自闭合 <map /> 需单独处理
+      // （新装 app 的 CapacitorStorage.xml 实测为 <map />，2026-08-29 T0 踩中）
+      xml = /<map\s*\/>/u.test(xml)
+        ? xml.replace(
+            /<map\s*\/>/u,
+            `<map>\n    <string name="pictelio_client_kind">${kind}</string>\n</map>`,
+          )
+        : xml.replace(
+            /<map>/u,
+            `<map>\n    <string name="pictelio_client_kind">${kind}</string>`,
+          );
     }
   } else {
     xml = `<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\n<map>\n    <string name="pictelio_client_kind">${kind}</string>\n</map>\n`;
@@ -126,7 +132,13 @@ export function writePrefKey(serial: string, key: string, value: string): void {
             new RegExp(`name="${key}"\\s+value="[^"]*"`, "u"),
             `name="${key}" value="${value}"`,
           )
-      : cur.rawXml.replace(/<map>/u, `<map>\n    <string name="${key}">${value}</string>`);
+      : // 空 map 自闭合 <map /> 兼容（同 writeClientKind，2026-08-29 T0 踩中）
+        /<map\s*\/>/u.test(cur.rawXml)
+        ? cur.rawXml.replace(
+            /<map\s*\/>/u,
+            `<map>\n    <string name="${key}">${value}</string>\n</map>`,
+          )
+        : cur.rawXml.replace(/<map>/u, `<map>\n    <string name="${key}">${value}</string>`);
   } else {
     xml = `<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\n<map>\n    <string name="${key}">${value}</string>\n</map>\n`;
   }
