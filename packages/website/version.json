@@ -1,5 +1,5 @@
 {
-  "version": "4.15.1",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.15.1",
-  "changelog": "📝 文档\n  f12a228 docs(app-lynx): 翻页+追更询问修复 spec（T0 平台事实/T1 契约/验证闭环）\n🐛 修复\n  e3d3a49 fix(android-e2e): prefs 契约层兼容空 prefs 的自闭合 <map />（新装 app 实测）\n  7823e4d fix(app-lynx): 列表翻页防抖吞事件补触发重试（原生低频 scrolltolower 适配）"
+  "version": "4.15.2",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.15.2",
+  "changelog": "🧹 杂项\n  27618a6 chore(app-lynx): 我的页诊断日志导出通道（T0 真机取证，T3 移除）"
 }
