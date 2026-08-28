@@ -35,8 +35,8 @@ const fabIcon = computed(() => {
 // ── 几何（vw）：FAB 固定 right-4/bottom-4(4.267vw)，外/内环半径随屏宽缩放 ──
 const FAB_RIGHT_VW = 4.267
 const FAB_SIZE_VW = 14.933
-const R_OUTER_VW = 25.6 // 96px @375
-const R_INNER_VW = 13.87 // 52px @375
+const R_OUTER_VW = 31 // 外环半径（vw；放大以容纳放大后的导航圆，避免重叠）
+const R_INNER_VW = 20 // 内环半径（vw；动作圆与 FAB/外环拉开，避免重叠）
 
 declare const SystemInfo: { pixelWidth: number; pixelHeight?: number; pixelRatio: number }
 
@@ -63,10 +63,10 @@ function spread(start: number, end: number, count: number): number[] {
   return Array.from({ length: count }, (_, i) => start + ((end - start) * i) / (count - 1))
 }
 
-const OUTER_START = -12
-const OUTER_END = -90
+const OUTER_START = -8
+const OUTER_END = -100
 const INNER_START = -14
-const INNER_END = -88
+const INNER_END = -80
 
 const outerPair = computed(() => {
   const angles = spread(OUTER_START, OUTER_END, view.value.outer.length)
@@ -119,11 +119,11 @@ function dispatchInner(item: { kind: 'refresh' | 'back-to-top' | 'extra'; key: s
       @tap="dispatchClose"
     />
 
-    <!-- 外环：导航 tab（当前高亮 secondary-container） -->
+    <!-- 外环：导航 tab（当前高亮 secondary-container）——固定圆形尺寸（vw 缩放，≥40px 触控目标） -->
     <view
       v-for="e in outerPair"
       :key="e.tab.name"
-      class="absolute flex flex-col items-center justify-center rounded-full shadow-[var(--md-elevation-2)]"
+      class="absolute flex flex-col items-center justify-center w-[12.8vw] h-[12.8vw] rounded-full shadow-[var(--md-elevation-2)]"
       :class="e.tab.name === view.active ? 'bg-secondary-container' : 'bg-surface-container-high'"
       :style="ringStyle(e.x, e.y, e.i)"
       :accessibility-element="A11Y_ELEMENT_ENABLED"
@@ -133,25 +133,26 @@ function dispatchInner(item: { kind: 'refresh' | 'back-to-top' | 'extra'; key: s
       <text
         class="leading-none"
         :class="e.tab.name === view.active ? 'text-secondary-on-container' : 'text-surface-on-variant'"
+        style="font-size: 5.33vw"
       >{{ e.tab.icon }}</text>
       <text
-        class="leading-none mt-[2px]"
+        class="leading-none mt-[1px]"
         :class="e.tab.name === view.active ? 'text-secondary-on-container' : 'text-surface-on-variant'"
-        style="font-size: 9px"
+        style="font-size: 2.93vw"
       >{{ e.tab.label }}</text>
     </view>
 
-    <!-- 内环：页面动作项（刷新/回顶/扩展） -->
+    <!-- 内环：页面动作项（刷新/回顶/扩展）——固定圆形尺寸（vw 缩放） -->
     <view
       v-for="e in innerPair"
       :key="e.item.key"
-      class="absolute flex items-center justify-center rounded-full bg-primary-container shadow-[var(--md-elevation-2)]"
+      class="absolute flex items-center justify-center w-[10.67vw] h-[10.67vw] rounded-full bg-primary-container shadow-[var(--md-elevation-2)]"
       :style="ringStyle(e.x, e.y, e.i)"
       :accessibility-element="A11Y_ELEMENT_ENABLED"
       :accessibility-label="e.item.a11yLabel"
       @tap="dispatchInner(e.item)"
     >
-      <text class="leading-none text-primary-on-container" style="font-size: 16px">{{ e.item.icon }}</text>
+      <text class="leading-none text-primary-on-container" style="font-size: 4.27vw">{{ e.item.icon }}</text>
     </view>
 
     <!-- 主 FAB（M3 primary-container 56dp）：展开成 close，收起为当前 tab 图标；busy 时转圈/禁用 -->
