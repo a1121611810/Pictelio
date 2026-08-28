@@ -26,6 +26,10 @@ _Avoid_: 遮罩卡（与遮罩的 absolute 覆盖模式语义不同）
 列表卡片上标识动图/多图的流内徽章行，位于图片下方、标题上方，仅在有标识时渲染。M3 assist-chip 形态：unicode 图标 + 文字（`▶ 动图` / `⧉ N 图`）、`bg-secondary-container`、`text-label-medium`、`md-shape-small` 圆角。图标沿用 NavigationBar 的 unicode 符号约定（Lynx 无图标库）。统一由公共组件 `IllustTypeBadgeRow` 渲染，各瀑布流页面接入。
 _Avoid_: 图上 absolute 角标（list-item 内 absolute 真机高度测量异常，见「遮罩」词条）、各页面散写徽章
 
+**标签胶囊行（tag chip row）**：
+推荐轮播滑页 scrim 区的标签行（ADR-0118）——M3 assist-chip 形态（同「类型徽章行」：`bg-secondary-container` / `text-label-medium` / `md-shape-small` 圆角），文本 `translated_name || name` 带 `#` 前缀；**最多 3 个，超出折叠为「+N」**，单行不换行；插画与小说统一展示；**纯展示不可点**（app-lynx 无搜索路由）。
+_Avoid_: 全量标签堆叠、可点击标签（无搜索页）、省略号截断
+
 ### 分页（Pagination）
 
 **混合分页 feed（mixed pagination feed）**：
@@ -71,6 +75,18 @@ _Avoid_: 原生 `<swiper>`、`main-thread-*` 绑定（本仓库原生不可用�
 **单刷新 FAB（single refresh FAB）**：
 推荐轮的刷新入口（ADR-0115）——一个 M3 刷新 FAB（56dp、primary-container、icon `⟳`），从列表的「FAB menu（刷新/回顶/上一页/下一页）」退化为**单按钮**（仅推荐页）。其余列表页仍用 FAB menu（见「列表操作」）。
 _Avoid_: 推荐页保留 prev/next/回顶菜单项、下拉刷新手势
+
+**封面比例显示（cover proportional display）**：
+推荐轮播滑页封面的显示规则（ADR-0118）——图片**贴顶、宽度占满滑页、高度按原图比例**（不裁切、不变形）；显示高度用作品元数据预计算（插画 `width/height`、小说方形封面按 1:1），不等图加载。**超高图**（按比例高度 ≥ 滑页可视区高）回退 `aspectFill` 裁切（不溢出、无页内滚动）。小说封面同规则。底部渐变 scrim 信息区保持在屏幕底部（图短时图与 scrim 之间露出 surface 背景）。
+_Avoid_: 全 bleed `aspectFill` 铺满整屏（图被裁）、`widthFix` 式底部裁切、页内滚动
+
+**轮播吸附阈值（snap threshold）**：
+推荐轮播松手翻页判定（ADR-0118，替代 ADR-0115「吸附最近页 round 50%」语义）——拖过 **1/3 屏宽**松手即翻页、未过回弹；叠加 **fling 甩动判定**：快速滑动（位移短但速度超阈值）即使未到 1/3 也沿速度方向翻页，慢拖仍按阈值。上一张/下一张对称生效，吸附动画保留。
+_Avoid_: 50% 阈值（旧语义）、纯位置判定无 fling、位移放大跟手
+
+**沉浸骨架（immersive skeleton）**：
+推荐轮播首载骨架（ADR-0118）——按滑页布局的骨架：上部全宽 shimmer 图区 + 底部 scrim 区域文字条（标题/作者/徽章位），取代「加载中…」文字。触发 = **渲染流为空即显**（不依赖 loading 标志，冷启动请求前立即出现）；已有数据时刷新不闪骨架；失败换整页错误提示。与「图片三态」的图级骨架（CoverImage 内 shimmer）不同层：本词条是**页级首载占位**。
+_Avoid_: 纯文字加载态、依赖 loading 标志的显隐时机、刷新时闪骨架
 
 ### 追更（Series watchlist）
 
