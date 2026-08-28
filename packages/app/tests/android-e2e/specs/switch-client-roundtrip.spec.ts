@@ -155,7 +155,7 @@ describe("S2 双向闭环：WebView → Lynx → 切回 WebView（pictelio_ui）
     await driver.raw.waitUntil(async () => (await driver.raw.getUrl()).includes("/settings"), {
       timeout: 30_000,
       timeoutMsg: "未进入设置页",
-      interval: 1_000,
+      interval: 2_000,
     });
     // 点切换 + E2E 钩子确认
     await driver.raw.waitUntil(
@@ -168,7 +168,7 @@ describe("S2 双向闭环：WebView → Lynx → 切回 WebView（pictelio_ui）
     // T2 起：点击入口行 → 跳转说明页 /client-switch（不再是确认弹窗）
     await driver.raw.waitUntil(
       async () => (await driver.raw.getUrl().catch(() => "")).includes("/client-switch"),
-      { timeout: 10_000, timeoutMsg: "未跳转到 /client-switch 说明页", interval: 500 },
+      { timeout: 10_000, timeoutMsg: "未跳转到 /client-switch 说明页", interval: 1_000 },
     );
     await driver.raw.waitUntil(
       async () => await driver.raw.$("fluent-button=确认切换").isExisting(),

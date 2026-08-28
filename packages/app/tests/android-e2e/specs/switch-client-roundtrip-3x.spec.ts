@@ -239,10 +239,12 @@ describe("T4 #131 引擎切换往返 3 次回归门（pictelio_ui）", () => {
       await clickEl("[aria-label='设置']");
       await SLEEP(3_000);
     }
+    // SPA 路由切换 + getUrl 轮询会触发 Chromedriver DevTools 断连（#131 实测）。
+    // 降低 DevTools 空转：getUrl 等待用更粗的 interval，减少单位时间内会话往返。
     await driver.raw.waitUntil(async () => (await url()).includes("/settings"), {
       timeout: 30_000,
       timeoutMsg: "未进入设置页",
-      interval: 1_000,
+      interval: 2_000,
     });
 
     await driver.raw.waitUntil(
@@ -254,7 +256,7 @@ describe("T4 #131 引擎切换往返 3 次回归门（pictelio_ui）", () => {
     await driver.raw.waitUntil(async () => (await url()).includes("/client-switch"), {
       timeout: 10_000,
       timeoutMsg: "未跳转到 /client-switch 说明页",
-      interval: 500,
+      interval: 1_000,
     });
     await driver.raw.waitUntil(
       async () => await driver.raw.$("fluent-button=确认切换").isExisting(),
@@ -321,6 +323,7 @@ describe("T4 #131 引擎切换往返 3 次回归门（pictelio_ui）", () => {
       );
 
       // WebView 登录态恢复：进入 /home 或 /recommended（未登录会停在 /login）
+      await SLEEP(2_000);
       await driver.switchToWebView(30_000);
       await driver.raw.waitUntil(
         async () => {
@@ -330,7 +333,7 @@ describe("T4 #131 引擎切换往返 3 次回归门（pictelio_ui）", () => {
         {
           timeout: 60_000,
           timeoutMsg: `第 ${round} 次切回后 WebView 主界面未渲染（登录态丢失?）`,
-          interval: 1_000,
+          interval: 2_000,
         },
       );
       console.log(`[T4] ✓ 第 ${round} 次：切回 WebView 主界面（登录态恢复）`);
