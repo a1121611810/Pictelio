@@ -88,6 +88,10 @@ _Avoid_: 50% 阈值（旧语义）、纯位置判定无 fling、位移放大跟�
 推荐轮播首载骨架（ADR-0118）——按滑页布局的骨架：上部全宽 shimmer 图区 + 底部 scrim 区域文字条（标题/作者/徽章位），取代「加载中…」文字。触发 = **渲染流为空即显**（不依赖 loading 标志，冷启动请求前立即出现）；已有数据时刷新不闪骨架；失败换整页错误提示。与「图片三态」的图级骨架（CoverImage 内 shimmer）不同层：本词条是**页级首载占位**。
 _Avoid_: 纯文字加载态、依赖 loading 标志的显隐时机、刷新时闪骨架
 
+**轮播 scrim 流内化（carousel scrim flow layout）**：
+推荐轮播滑页的 scrim 采用**流内布局**（slide 根 `flex-col` + `flex-1` 弹性占位把 scrim 推到容器底部），而非 `absolute bottom-0`——原生于被 `translateX` 平移的 flex-row **非首 slide** 内，`absolute` 子元素的**文本渲染缺失**（真机复现：滑到非首页 scrim 文案不见；web-core 正常）。改流内后各页 scrim 文案正常渲染。超高图（`cover` 回退）时图片为 `absolute inset-0` 铺满、scrim 流内叠其底，视觉不变。
+_Avoid_: 在轮播 slide 内对承载文案的容器用 `absolute bottom-0`（原生非首 slide 渲染缺失，并见「遮罩」词条）
+
 ### 追更（Series watchlist）
 
 **追更询问（watchlist prompt）**：
