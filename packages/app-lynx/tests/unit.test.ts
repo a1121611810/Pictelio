@@ -1199,10 +1199,9 @@ describe('RefreshableList 组件结构（ADR-0111 M3 FAB menu）', () => {
     for (const key of ['toggleMenu', 'refreshList', 'backToTop'] as const) {
       expect(refreshableListSource).toContain(`:accessibility-label="FAB_MENU_A11Y_LABELS.${key}"`)
     }
-    // 页面侧消费注册表扩展键（Recommended.vue 的 fabMenuItems accessibilityLabel）
+    // 页面侧消费注册表扩展键：推荐页已改单卡轮播（ADR-0115），用单刷新 FAB 的 label
     const recommendedVue = readFileSync(fileURLToPath(new URL('../src/pages/Recommended.vue', import.meta.url)), 'utf8')
-    expect(recommendedVue).toContain('FAB_MENU_A11Y_LABELS.prevPage')
-    expect(recommendedVue).toContain('FAB_MENU_A11Y_LABELS.nextPage')
+    expect(recommendedVue).toContain('RECOMMENDED_A11Y_LABELS.refresh')
     const labelCount = (refreshableListSource.match(/:accessibility-label="FAB_MENU_A11Y_LABELS\.\w+"/g) ?? []).length
     // T4 扩展项（上一页/下一页）用动态 label（item.accessibilityLabel）同样配套 element：
     // element 总数 = 固定 label 数 + 扩展项 v-for 内动态 label 数
@@ -1548,13 +1547,15 @@ it('负向断言：原生下拉路线零残留 + 旧双 FAB 结构已删 + 感�
 // 页面禁自持刷新态红线）；结构断言遵循本文件既有约定。
 describe('列表页 RefreshableList 接入（ADR-0107）', () => {
 const PAGE_NAMES = [
-  'Recommended',
+  // 推荐页已改单卡轮播（ADR-0115），不再经 RefreshableList 瀑布流接入，故不含在内；
+  // spec §5「其余 7 个列表页（插画/小说/关注/收藏×2/用户主页/追更）行为不变」→ 含追更 Watchlist
   'IllustList',
   'NovelList',
   'Following',
   'Bookmarks',
   'UserHome',
   'FollowList',
+  'Watchlist',
 ] as const
 const pageSources = Object.fromEntries(
   PAGE_NAMES.map((n) => [
@@ -1563,7 +1564,7 @@ const pageSources = Object.fromEntries(
   ]),
 )
 
-it('7 个列表页全部经 RefreshableList 组件（红线：页面无裸 <refresh> 标签）', () => {
+it('7 个列表页全部经 RefreshableList 组件（红线：页面无裸 <refresh> 标签；推荐页已改轮播）', () => {
   for (const n of PAGE_NAMES) {
     const src = pageSources[n]
     expect(src, n).toContain('<RefreshableList')
@@ -1573,7 +1574,7 @@ it('7 个列表页全部经 RefreshableList 组件（红线：页面无裸 <refr
   }
 })
 
-it('9 实例均为 :refresh 函数绑定（ADR-0107 D2）；FollowList 绑 fetchFirstPage', () => {
+it('各列表页均为 :refresh 函数绑定（ADR-0107 D2）；FollowList 绑 fetchFirstPage', () => {
   for (const n of PAGE_NAMES) {
     expect(pageSources[n], n).toContain(':refresh="')
   }
@@ -1595,7 +1596,7 @@ it('页面零自持刷新态：无 refreshing prop/ref、onRefresh 包装器', (
   }
 })
 
-it('patch workaround：7 页 list 均 :key 绑定且 epoch 在页面刷新函数内同步 ++（ADR-0107 D4）', () => {
+it('patch workaround：各页 list 均 :key 绑定且 epoch 在页面刷新函数内同步 ++（ADR-0107 D4）', () => {
   for (const n of PAGE_NAMES) {
     const src = pageSources[n]
     expect(src, n).toContain(':key="refreshEpoch"')
@@ -1604,7 +1605,7 @@ it('patch workaround：7 页 list 均 :key 绑定且 epoch 在页面刷新函数
   }
 })
 
-it('回顶：7 页 9 实例均 @back-to-top="refreshEpoch++"（ADR-0110 修订：emit 驱动重建回顶）', () => {
+it('回顶：各列表页均 @back-to-top="refreshEpoch++"（ADR-0110 修订：emit 驱动重建回顶）', () => {
   for (const n of PAGE_NAMES) {
     const src = pageSources[n]
     expect(src, n).toContain('@back-to-top="refreshEpoch++"')
@@ -1620,11 +1621,11 @@ it('Fab.vue 组件文件不存在（seam 无第二适配器，FAB 内联 Refresh
   }
 })
 
-it('列表页计数：Bookmarks/UserHome 各 2 个 RefreshableList，其余各 1 个（共 9 实例）', () => {
+it('列表页计数：Bookmarks/UserHome 各 2 个 RefreshableList，其余各 1 个（共 9 实例；推荐页已改轮播 ADR-0115）', () => {
   const count = (s: string) => s.split('<RefreshableList').length - 1
   expect(count(pageSources.Bookmarks)).toBe(2)
   expect(count(pageSources.UserHome)).toBe(2)
-  for (const n of ['Recommended', 'IllustList', 'NovelList', 'Following', 'FollowList'] as const) {
+  for (const n of ['IllustList', 'NovelList', 'Following', 'FollowList', 'Watchlist'] as const) {
     expect(count(pageSources[n]), n).toBe(1)
   }
 })
@@ -1645,9 +1646,10 @@ const badgePageSources = Object.fromEntries(
   ]),
 )
 
-it('五个插画瀑布流页面均接入 <IllustTypeBadgeRow>（spec 决策 6 清单）', () => {
+it('五个页面均接入 <IllustTypeBadgeRow> 并绑定 :illust=（spec 决策 6 清单；推荐页改轮播后每滑页仍挂徽章）', () => {
   for (const n of BADGE_PAGES) {
-    expect(badgePageSources[n], n).toContain('<IllustTypeBadgeRow :illust=')
+    expect(badgePageSources[n], n).toContain('<IllustTypeBadgeRow')
+    expect(badgePageSources[n], n).toContain(':illust=')
   }
 })
 

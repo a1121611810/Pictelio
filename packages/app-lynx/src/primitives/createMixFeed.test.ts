@@ -719,3 +719,179 @@ describe('createMixFeed', () => {
     expect(feed.loading()).toBe(false)
   })
 })
+
+// ─── time-merge 模式（merge:'time-merge'，ADR-0115 推荐页） ───
+// oracle = app 端 createTQFeedStore 的 sortByDate + mergeAndSort（按 create_date 降序跨源交叉合并）。
+describe('createMixFeed time-merge', () => {
+  it('首载：merge=time-merge 按 create_date 降序跨源排序', async () => {
+    const a1 = mkIllust('a1', 1); a1.data.create_date = '2024-01-03T00:00:00+00:00'
+    const a2 = mkIllust('a2', 2); a2.data.create_date = '2024-01-01T00:00:00+00:00'
+    const b1 = mkNovel('b1', 10); b1.data.create_date = '2024-01-02T00:00:00+00:00'
+    const fetchA = vi.fn<MixFeedSource['fetchPage']>(async () => ({ items: [a1, a2], nextUrl: null }))
+    const fetchB = vi.fn<MixFeedSource['fetchPage']>(async () => ({ items: [b1], nextUrl: null }))
+    const feed = createMixFeed({
+      sources: [source('illust', fetchA), source('novel', fetchB)],
+      merge: 'time-merge',
+      pageSize: 100,
+      throttleMs: 0,
+      cooldownMs: 0,
+    })
+    await flush()
+    // 跨源按 create_date 降序：a1(01-03) > b1(01-02) > a2(01-01)
+    expect(feed.items().map((i) => i.key)).toEqual(['a1', 'b1', 'a2'])
+  })
+
+  it('fetchMore time-merge：并行拉所有非耗尽源 next 页，mergeByTime 追加（携带各源 nextUrl）', async () => {
+    const a1 = mkIllust('a1', 1); a1.data.create_date = '2024-01-05T00:00:00+00:00'
+    const b1 = mkNovel('b1', 10); b1.data.create_date = '2024-01-04T00:00:00+00:00'
+    const fetchA = vi.fn<MixFeedSource['fetchPage']>(async () => ({ items: [a1], nextUrl: 'A2' }))
+    const fetchB = vi.fn<MixFeedSource['fetchPage']>(async () => ({ items: [b1], nextUrl: 'B2' }))
+    const feed = createMixFeed({
+      sources: [source('illust', fetchA), source('novel', fetchB)],
+      merge: 'time-merge',
+      pageSize: 100,
+      throttleMs: 0,
+      cooldownMs: 0,
+    })
+    await flush()
+    expect(feed.items().map((i) => i.key)).toEqual(['a1', 'b1'])
+
+    const a2 = mkIllust('a2', 2); a2.data.create_date = '2024-01-02T00:00:00+00:00'
+    const b2 = mkNovel('b2', 11); b2.data.create_date = '2024-01-03T00:00:00+00:00'
+    fetchA.mockImplementationOnce(async () => ({ items: [a2], nextUrl: null }))
+    fetchB.mockImplementationOnce(async () => ({ items: [b2], nextUrl: null }))
+    await feed.fetchMore()
+    await flush()
+    // 追加按时间合并（老条目在后）：a1,b1,b2,a2
+    expect(feed.items().map((i) => i.key)).toEqual(['a1', 'b1', 'b2', 'a2'])
+    expect(feed.nextUrl()).toBeNull()
+    // 两源都携带了各自的 next_url
+    expect(fetchA).toHaveBeenNthCalledWith(2, undefined, 'A2')
+    expect(fetchB).toHaveBeenNthCalledWith(2, undefined, 'B2')
+  })
+
+  it('fetchMore time-merge 部分失败：成功源并入、失败源跳过、不置全局 pageError', async () => {
+    const a1 = mkIllust('a1', 1); a1.data.create_date = '2024-01-05T00:00:00+00:00'
+    const b1 = mkNovel('b1', 10); b1.data.create_date = '2024-01-04T00:00:00+00:00'
+    const fetchA = vi.fn<MixFeedSource['fetchPage']>(async () => ({ items: [a1], nextUrl: 'A2' }))
+    const fetchB = vi.fn<MixFeedSource['fetchPage']>(async () => ({ items: [b1], nextUrl: 'B2' }))
+    const feed = createMixFeed({
+      sources: [source('illust', fetchA), source('novel', fetchB)],
+      merge: 'time-merge',
+      pageSize: 100,
+      throttleMs: 0,
+      cooldownMs: 0,
+    })
+    await flush()
+
+    const a2 = mkIllust('a2', 2); a2.data.create_date = '2024-01-02T00:00:00+00:00'
+    fetchA.mockImplementationOnce(async () => ({ items: [a2], nextUrl: null }))
+    fetchB.mockImplementationOnce(async () => {
+      throw new Error('B-fail')
+    })
+    await feed.fetchMore()
+    await flush()
+    // 逐源独立（app createTQFeedStore oracle）：成功源 a2 并入、失败源跳过，不置全局 pageError
+    expect(feed.pageError()).toBeNull()
+    expect(feed.error()).toBeNull()
+    // 成功源并入后流仍全局降序（01-05 a1 > 01-04 b1 > 01-02 a2）
+    expect(feed.items().map((i) => i.key)).toEqual(['a1', 'b1', 'a2'])
+    // 失败源 B 的 nextUrl 保留（下轮 fetchMore 可重试），成功源 A 已耗尽（nextUrl=null）
+    expect(feed.nextUrl()).toBe('B2')
+  })
+
+  it('fetchMore time-merge 全部失败：不追加、置 pageError、原数据保留', async () => {
+    const a1 = mkIllust('a1', 1); a1.data.create_date = '2024-01-05T00:00:00+00:00'
+    const b1 = mkNovel('b1', 10); b1.data.create_date = '2024-01-04T00:00:00+00:00'
+    const fetchA = vi.fn<MixFeedSource['fetchPage']>(async () => ({ items: [a1], nextUrl: 'A2' }))
+    const fetchB = vi.fn<MixFeedSource['fetchPage']>(async () => ({ items: [b1], nextUrl: 'B2' }))
+    const feed = createMixFeed({
+      sources: [source('illust', fetchA), source('novel', fetchB)],
+      merge: 'time-merge',
+      pageSize: 100,
+      throttleMs: 0,
+      cooldownMs: 0,
+    })
+    await flush()
+
+    fetchA.mockImplementationOnce(async () => {
+      throw new Error('A-fail')
+    })
+    fetchB.mockImplementationOnce(async () => {
+      throw new Error('B-fail')
+    })
+    await feed.fetchMore()
+    await flush()
+    expect(feed.pageError()).toBe('A-fail') // presentError(首个失败,'加载更多失败')；两源均失败
+    expect(feed.error()).toBeNull()
+    // 全部失败：不追加，保留已加载内容
+    expect(feed.items().map((i) => i.key)).toEqual(['a1', 'b1'])
+  })
+
+  it('time-merge：create_date 缺失沉底 + console.warn（非静默降级）', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const a1 = mkIllust('a1', 1); a1.data.create_date = '2024-01-02T00:00:00+00:00'
+    const aNoDate = mkIllust('a2', 2); aNoDate.data.create_date = ''
+    const b1 = mkNovel('b1', 10); b1.data.create_date = '2024-01-01T00:00:00+00:00'
+    const feed = createMixFeed({
+      sources: [
+        source('illust', vi.fn<MixFeedSource['fetchPage']>(async () => ({ items: [aNoDate, a1], nextUrl: null }))),
+        source('novel', vi.fn<MixFeedSource['fetchPage']>(async () => ({ items: [b1], nextUrl: null }))),
+      ],
+      merge: 'time-merge',
+      pageSize: 100,
+      throttleMs: 0,
+      cooldownMs: 0,
+    })
+    await flush()
+    // aNoDate 无日期 → 沉底（排在最后），其余按时间
+    expect(feed.items().map((i) => i.key)).toEqual(['a1', 'b1', 'a2'])
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('time-merge 去重：同 key 跨源仅保留一条（先出现者）', async () => {
+    const dupA = mkIllust('dup', 1); dupA.data.create_date = '2024-01-05T00:00:00+00:00'
+    const a3 = mkIllust('a3', 3); a3.data.create_date = '2024-01-01T00:00:00+00:00'
+    const dupNovel = mkNovel('dup', 10); dupNovel.data.create_date = '2024-01-03T00:00:00+00:00'
+    const fetchA = vi.fn<MixFeedSource['fetchPage']>(async () => ({ items: [dupA, a3], nextUrl: null }))
+    const fetchB = vi.fn<MixFeedSource['fetchPage']>(async () => ({ items: [dupNovel], nextUrl: null }))
+    const feed = createMixFeed({
+      sources: [source('illust', fetchA), source('novel', fetchB)],
+      merge: 'time-merge',
+      pageSize: 100,
+      throttleMs: 0,
+      cooldownMs: 0,
+    })
+    await flush()
+    // merged 按时间：dupA(01-05)、dupNovel(01-03)、a3(01-01)；dedupe 按 key：'dup' 保留先出现者
+    expect(feed.items().map((i) => i.key)).toEqual(['dup', 'a3'])
+    expect(feed.items().filter((i) => i.key === 'dup')).toHaveLength(1)
+  })
+
+  it('fetchMore time-merge 跨源时间错位：新批更“新”的条目插入正确位置（全局降序，app 端 items() 语义）', async () => {
+    const a1 = mkIllust('a1', 1); a1.data.create_date = '2024-01-01T00:00:00+00:00'
+    const b1 = mkNovel('b1', 10); b1.data.create_date = '2024-01-02T00:00:00+00:00'
+    const fetchA = vi.fn<MixFeedSource['fetchPage']>(async () => ({ items: [a1], nextUrl: 'A2' }))
+    const fetchB = vi.fn<MixFeedSource['fetchPage']>(async () => ({ items: [b1], nextUrl: 'B2' }))
+    const feed = createMixFeed({
+      sources: [source('illust', fetchA), source('novel', fetchB)],
+      merge: 'time-merge',
+      pageSize: 100,
+      throttleMs: 0,
+      cooldownMs: 0,
+    })
+    await flush()
+    expect(feed.items().map((i) => i.key)).toEqual(['b1', 'a1']) // b1(01-02) > a1(01-01)
+
+    // 后续翻页：A2 拉到比已渲染的 b1(01-02) 更新（01-03）的条目、B2 耗尽
+    const a2 = mkIllust('a2', 2); a2.data.create_date = '2024-01-03T00:00:00+00:00'
+    fetchA.mockImplementationOnce(async () => ({ items: [a2], nextUrl: null }))
+    fetchB.mockImplementationOnce(async () => ({ items: [], nextUrl: null }))
+    await feed.fetchMore()
+    await flush()
+    // 全局降序：a2(01-03) 应插到 b1(01-02) 之前，而非 append 末尾（append-only 会得到 ['b1','a1','a2'] 错序）
+    expect(feed.items().map((i) => i.key)).toEqual(['a2', 'b1', 'a1'])
+    expect(feed.nextUrl()).toBeNull()
+  })
+})

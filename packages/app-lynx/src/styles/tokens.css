@@ -35,6 +35,8 @@ page {
   --md-outline: #79747e;
   --md-outline-variant: #cac4d0;
   --md-scrim: rgba(0, 0, 0, 0.5);
+  /* 沉浸卡底部文字可读性 scrim 渐变（标题/作者叠于 full-bleed 图上）：自 M3 scrim 引申，多档不透明度渐变无单一 M3 令牌 */
+  --md-scrim-overlay: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.2) 45%, rgba(0, 0, 0, 0));
   --md-surface-container-lowest: #ffffff;
   --md-surface-container-low: #f7f2fa;
   --md-surface-container: #f3edf7;

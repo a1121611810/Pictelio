@@ -10,7 +10,7 @@
 import type { PixivIllust, PixivNovel } from '../api/types'
 import { withTimeout } from '../utils/withTimeout'
 import { presentError } from '../utils/errorPresentation'
-import { t0log } from '../debug/t0Diag' // [T0-DIAG]
+import { mergeByTime } from './mergeByTime'
 
 /** 单页请求超时兜底（issue #128）：请求挂起 15s 即 reject，走错误分支避免 loading 无限期显示 */
 const TIMEOUT_MS = 15000
@@ -36,6 +36,8 @@ export interface MixFeedOptions {
   sources: MixFeedSource[]
   /** 交替比例，默认 [4, 1]：每 4 条 illust 插 1 条 novel */
   ratio?: number[]
+  /** 合并模式：默认 'ratio'（按 ratio 交替，其余列表页）；推荐页传 'time-merge'（时间交叉合并，ADR-0115） */
+  merge?: 'ratio' | 'time-merge'
   /** 每批渲染窗口大小，默认 20（web-core 图片风暴规避，ADR-0060） */
   pageSize?: number
   /** fetchMore 节流 ms，默认 800（[lynx:fix] 防 web-core list 高频 scrolltolower） */
@@ -80,6 +82,7 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
   const {
     sources,
     ratio = [4, 1],
+    merge = 'ratio',
     pageSize = 20,
     throttleMs = 800,
     cooldownMs = 3000,
@@ -267,10 +270,11 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
         // 全部失败：error 置为首个错误（首屏槽）
         firstErrorText = presentError(firstError, '加载失败')
       } else {
-        const merged = dedupe(mergeByRatio(pages))
+        const merged = merge === 'time-merge'
+          ? dedupe(mergeByTime(pages.filter((p): p is MixFeedItem[] => p !== undefined), (it) => it.data.create_date))
+          : dedupe(mergeByRatio(pages))
         rendered = merged.slice(0, pageSize)
         pending = merged.slice(pageSize)
-        t0log('[mixfeed]', `firstLoad done rendered=${rendered.length} pending=${pending.length} hasNext=${hasNext()}`) // [T0-DIAG]
       }
     } finally {
       firstLoadInFlight = false
@@ -284,32 +288,25 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
    */
   async function fetchMore(): Promise<void> {
     const now = Date.now()
-    // [T0-DIAG] 临时诊断打点（复现翻页失效用，修复后移除）
-    t0log('[mixfeed]', `enter pending=${pending.length} rendered=${rendered.length} hasNext=${hasNext()}`)
     // [lynx:fix] 双重防抖：冷却（内容追加后 cooldownMs）+ 节流（触发间隔 throttleMs）
     // [T1] 吞事件不重试 = 原生单发事件永久丢失 → 各早退分支挂一次性补触发
     if (now - lastLoadEndedAt < cooldownMs) {
-      t0log('[mixfeed]', `SWALLOW cooldown ${now - lastLoadEndedAt}ms<${cooldownMs}`) // [T0-DIAG]
       scheduleRetry(cooldownMs - (now - lastLoadEndedAt))
       return
     }
     if (now - lastLoadMoreAt < throttleMs) {
-      t0log('[mixfeed]', `SWALLOW throttle ${now - lastLoadMoreAt}ms<${throttleMs}`) // [T0-DIAG]
       scheduleRetry(throttleMs - (now - lastLoadMoreAt))
       return
     }
     if (loadMoreInFlight) {
-      t0log('[mixfeed]', 'SWALLOW inFlight') // [T0-DIAG]
       scheduleRetry(throttleMs)
       return
     }
     if (firstLoadInFlight) {
-      t0log('[mixfeed]', 'SWALLOW firstLoad') // [T0-DIAG]
       scheduleRetry(throttleMs)
       return
     }
     if (pending.length === 0 && !hasNext()) {
-      t0log('[mixfeed]', 'no-op exhausted') // [T0-DIAG]
       return // 全部耗尽 → no-op
     }
 
@@ -321,33 +318,84 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
       // 优先同步消费内部队列（追加 pageSize 条，无网络请求）
       if (pending.length > 0) {
         rendered.push(...pending.splice(0, pageSize))
-        t0log('[mixfeed]', `consume pending → rendered=${rendered.length} pending=${pending.length}`) // [T0-DIAG]
         return
       }
-      const srcIdx = pickSourceToFetch()
-      if (srcIdx < 0) return
-      try {
-        // 翻页：传入该源当前 next_url（offset 分页语义；推荐类端点可忽略）
-        t0log('[mixfeed]', `fetch src=${sources[srcIdx].name}`) // [T0-DIAG]
-        const res = await withTimeout(
-          sources[srcIdx].fetchPage(undefined, sourceStates[srcIdx].nextUrl),
-          TIMEOUT_MS,
+      if (merge === 'time-merge') {
+        // 时间合并翻页：并行拉所有非耗尽源 next 页 → mergeByTime → 去重 → 追加。
+        // [oracle 对齐 app 逐源独立] 用 Promise.allSettled：每个源独立 settle，成功源并入、失败源
+        //   跳过该批但不停掉整条流（对照 packages/app/src/stores/shared/createTQFeedStore.ts 的
+        //   items() = mergeAndSort(逐源已加载页.filter(非空)) —— 部分成功仍并入）。若不如此，某源持续
+        //   失败会停掉整条「无限滑流」，与 app 行为相悖（ADR-0115 研究/Spec 复核结论）。
+        const indexes = sourceStates
+          .map((s, i) => (s.nextUrl !== null ? i : -1))
+          .filter((i) => i >= 0)
+        if (indexes.length === 0) return
+        const settled = await Promise.allSettled(
+          indexes.map((i) =>
+            withTimeout(sources[i].fetchPage(undefined, sourceStates[i].nextUrl), TIMEOUT_MS),
+          ),
         )
-        t0log('[mixfeed]', `fetched src=${sources[srcIdx].name} items=${res.items?.length}`) // [T0-DIAG]
         if (g !== generation) return // 竞态：refresh 已取代本次翻页，丢弃响应
-        if (!Array.isArray(res.items)) throw new Error('数据格式异常') // 畸形响应 → 进 catch 置 pageError
-        sourceStates[srcIdx].nextUrl = res.nextUrl
-        sourceStates[srcIdx].kind = res.items[0]?.kind ?? sourceStates[srcIdx].kind
-        const fresh = dedupe(res.items)
-        rendered.push(...fresh.slice(0, pageSize))
-        pending.push(...fresh.slice(pageSize))
-        t0log('[mixfeed]', `append fresh=${fresh.length} → rendered=${rendered.length} pending=${pending.length}`) // [T0-DIAG]
-        // 翻页成功：清除「加载更多失败」的残留错误（分页槽），首屏槽不受影响
+        const okResults: { i: number; items: MixFeedItem[]; nextUrl: string | null }[] = []
+        const failed: { i: number; err: unknown }[] = []
+        settled.forEach((res, idx) => {
+          const i = indexes[idx]
+          if (res.status === 'fulfilled') {
+            const r = res.value
+            if (Array.isArray(r.items)) {
+              okResults.push({ i, items: r.items, nextUrl: r.nextUrl })
+            } else {
+              failed.push({ i, err: new Error('数据格式异常') })
+            }
+          } else {
+            failed.push({ i, err: res.reason })
+          }
+        })
+        // 成功源回写游标；失败源保留 nextUrl（下轮 fetchMore 重试，但不阻塞健康源）
+        for (const r of okResults) {
+          sourceStates[r.i].nextUrl = r.nextUrl
+          sourceStates[r.i].kind = r.items[0]?.kind ?? sourceStates[r.i].kind
+        }
+        if (okResults.length === 0) {
+          // 全部失败：置分页错误文案（保留已加载内容，nextUrl 供后续重试）
+          const firstErr = failed[0]?.err ?? new Error('加载更多失败')
+          console.warn('[mixfeed] 时间合并翻页全部失败，不追加', firstErr)
+          pageErrorText = presentError(firstErr, '加载更多失败')
+          return
+        }
+        if (failed.length > 0) {
+          console.warn('[mixfeed] 时间合并翻页部分源失败，跳过其批次（其它源已并入）', failed.length)
+        }
+        // 全局时间序（app 端 items() 语义）：把成功源新批与既有 rendered/pending 一起重新按 create_date
+        // 交叉合并，保证跨源时间错位时流仍是全局降序（否则 append 末尾会破坏 app oracle 的全局排序）。
+        const fresh = dedupe(mergeByTime(okResults.map((r) => r.items), (it) => it.data.create_date))
+        const combined = mergeByTime([rendered, pending, fresh], (it) => it.data.create_date)
+        rendered = combined.slice(0, pageSize)
+        pending = combined.slice(pageSize)
+        // 部分成功也视作翻页成功：清除「加载更多失败」残留错误（分页槽），首屏槽不受影响
         pageErrorText = null
-      } catch (err) {
-        t0log('[mixfeed]', `fetch FAIL ${String(err).slice(0, 80)}`) // [T0-DIAG]
-        // 翻页失败不崩溃：置分页错误文案（底部内联），保留 nextUrl 供后续滚动重试
-        pageErrorText = presentError(err, '加载更多失败')
+      } else {
+        const srcIdx = pickSourceToFetch()
+        if (srcIdx < 0) return
+        try {
+          // 翻页：传入该源当前 next_url（offset 分页语义；推荐类端点可忽略）
+          const res = await withTimeout(
+            sources[srcIdx].fetchPage(undefined, sourceStates[srcIdx].nextUrl),
+            TIMEOUT_MS,
+          )
+          if (g !== generation) return // 竞态：refresh 已取代本次翻页，丢弃响应
+          if (!Array.isArray(res.items)) throw new Error('数据格式异常') // 畸形响应 → 进 catch 置 pageError
+          sourceStates[srcIdx].nextUrl = res.nextUrl
+          sourceStates[srcIdx].kind = res.items[0]?.kind ?? sourceStates[srcIdx].kind
+          const fresh = dedupe(res.items)
+          rendered.push(...fresh.slice(0, pageSize))
+          pending.push(...fresh.slice(pageSize))
+          // 翻页成功：清除「加载更多失败」的残留错误（分页槽），首屏槽不受影响
+          pageErrorText = null
+        } catch (err) {
+          // 翻页失败不崩溃：置分页错误文案（底部内联），保留 nextUrl 供后续滚动重试
+          pageErrorText = presentError(err, '加载更多失败')
+        }
       }
     } finally {
       loadMoreInFlight = false
