@@ -226,7 +226,7 @@ onActivated(() => {
         :on-reach-end="onReachEnd"
       >
         <template #slide="{ item }">
-          <view class="w-full h-full relative bg-surface-container-lowest" @tap="onSlideTap(item)">
+          <view class="w-full h-full relative flex flex-col bg-surface-container-lowest" @tap="onSlideTap(item)">
             <!-- 封面图（ADR-0118 宽满高按比例：fit/ratio 经 deriveCoverDisplay 推导，超高图回退 aspectFill；
                  三态骨架/图片/失败+重试仍由 CoverImage 承载） -->
             <RecommendedCover
@@ -234,9 +234,14 @@ onActivated(() => {
               :fit="coverDisplayOf(item).fit"
               :ratio="coverDisplayOf(item).ratio"
             />
+            <!-- [fix] 弹性占位把 scrim 推到容器底部：改用流内布局（非 absolute），规避原生 LynxView
+                 对「被 translateX 平移的 flex-row 非首 slide 内 absolute 子元素」的渲染缺失
+                 （scrim 文本在非首 slide 不见，真机复现）。cover 回退模式图片为 absolute inset-0
+                 铺满、scrim 流内叠其底部，视觉效果不变。 -->
+            <view class="flex-1 min-h-0" />
             <!-- 底部渐变 scrim：承载标题/作者/类型徽章/收藏（用 M3 scrim-overlay 令牌，勿内联 rgba） -->
             <view
-              class="absolute bottom-0 left-0 right-0 px-6 pt-[24vw] pb-[10vw]"
+              class="px-6 pt-[24vw] pb-[10vw]"
               style="background: var(--md-scrim-overlay)"
             >
               <IllustTypeBadgeRow v-if="item.kind === 'illust'" :illust="item.data" />
