@@ -15,7 +15,7 @@ import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
 import RefreshableList from '../components/RefreshableList.vue'
-import { globalFab } from '../stores/globalFab'
+import { getGlobalFab } from '../stores/globalFab'
 
 // ─── 分页收敛（ADR-0104）：迁移到 createMixFeed 深模块 ───
 // 双防抖 / 竞态代 / 分批渲染（pageSize=20，替代原 pendingIllusts 队列）/ 空页防护 /
@@ -110,7 +110,7 @@ function onImageTap(item: PixivIllust) {
 // ─── 全局放射 FAB 桥（ADR-0120）：注册本页动作到 globalFab，卸载时注销 ───
 let unreg: (() => void) | undefined
 onMounted(() => {
-  unreg = globalFab.usePage('illusts', {
+  unreg = getGlobalFab().usePage('illusts', {
     refresh: refreshFeed,
     backToTop: () => {
       refreshEpoch.value++

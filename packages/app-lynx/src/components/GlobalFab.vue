@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { globalFab } from '../stores/globalFab'
+import { getGlobalFab } from '../stores/globalFab'
 import { A11Y_ELEMENT_ENABLED, GLOBAL_FAB_A11Y_LABELS } from '../utils/accessibility'
 
 // ─── 放射导航薄渲染适配器（ADR-0120）───
@@ -8,7 +8,8 @@ import { A11Y_ELEMENT_ENABLED, GLOBAL_FAB_A11Y_LABELS } from '../utils/accessibi
 // 不含业务逻辑。挂载于 App.vue（KeepAlive 之外），view.visible 决定显隐。
 // 术语见 glossary-app-lynx-radial-nav-fab.md。
 
-const view = globalFab.view
+const fab = getGlobalFab()
+const view = fab.view
 
 /** reduced-motion：禁止飞出/stagger/旋转动画（Lynx 的 matchMedia 不可用时默认 false）。 */
 const reducedMotion = ref(false)
@@ -99,13 +100,13 @@ const fabWrapStyle = computed<Record<string, string>>(() => ({
   transform: view.value.isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
 }))
 
-function dispatchToggle(): void { void globalFab.dispatch({ type: 'toggle' }) }
-function dispatchClose(): void { void globalFab.dispatch({ type: 'close' }) }
-function dispatchSelect(name: string): void { void globalFab.dispatch({ type: 'select', name }) }
+function dispatchToggle(): void { void fab.dispatch({ type: 'toggle' }) }
+function dispatchClose(): void { void fab.dispatch({ type: 'close' }) }
+function dispatchSelect(name: string): void { void fab.dispatch({ type: 'select', name }) }
 function dispatchInner(item: { kind: 'refresh' | 'back-to-top' | 'extra'; key: string }): void {
-  if (item.kind === 'refresh') void globalFab.dispatch({ type: 'refresh' })
-  else if (item.kind === 'back-to-top') void globalFab.dispatch({ type: 'back-to-top' })
-  else void globalFab.dispatch({ type: 'extra', key: item.key })
+  if (item.kind === 'refresh') void fab.dispatch({ type: 'refresh' })
+  else if (item.kind === 'back-to-top') void fab.dispatch({ type: 'back-to-top' })
+  else void fab.dispatch({ type: 'extra', key: item.key })
 }
 </script>
 

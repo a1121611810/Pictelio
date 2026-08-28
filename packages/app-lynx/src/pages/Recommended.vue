@@ -22,7 +22,7 @@ import { proxyImageUrl } from '../utils/imageUrl'
 import { deriveCoverDisplay } from '../utils/coverDisplay'
 import { isRestricted } from '../stores/settingsStore'
 import { isLoggedIn } from '../stores/authStore'
-import { globalFab } from '../stores/globalFab'
+import { getGlobalFab } from '../stores/globalFab'
 import CarouselSwiper from '../components/CarouselSwiper.vue'
 import RecommendedCover from '../components/RecommendedCover.vue'
 import CarouselSkeleton from '../components/CarouselSkeleton.vue'
@@ -168,7 +168,7 @@ function coverSrc(data: PixivIllust | PixivNovel): string {
 // ─── 全局放射 FAB 桥（ADR-0120）：注册本页动作到 globalFab，卸载时注销 ───
 let unreg: (() => void) | undefined
 onMounted(() => {
-  unreg = globalFab.usePage('recommended', {
+  unreg = getGlobalFab().usePage('recommended', {
     refresh: refreshFeed,
     backToTop: () => {
       refreshEpoch.value++

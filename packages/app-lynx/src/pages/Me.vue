@@ -3,7 +3,7 @@
 defineOptions({ name: 'me' })
 import { ref, onMounted, onUnmounted } from 'vue'
 import { navigate, ensureAuth } from '../router'
-import { globalFab } from '../stores/globalFab'
+import { getGlobalFab } from '../stores/globalFab'
 import { currentUser, logout, isLoggedIn } from '../stores/authStore'
 import { selectedClient, switchClient, availableKinds, supportsClientSwitch, type ClientKind } from '../stores/clientSwitchStore'
 import { showR18, showR18G, setShowR18, setShowR18G, ugoiraMode, setUgoiraMode, detailQuality, setDetailQuality } from '../stores/settingsStore'
@@ -17,7 +17,7 @@ const switching = ref(false)
 // ─── 全局放射 FAB 桥（ADR-0120）：注册空动作（内环空 = 仅外环导航），卸载时注销 ───
 let unreg: (() => void) | undefined
 onMounted(async () => {
-  unreg = globalFab.usePage('me', {})
+  unreg = getGlobalFab().usePage('me', {})
   await ensureAuth()
 })
 
