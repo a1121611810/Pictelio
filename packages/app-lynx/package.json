@@ -11,7 +11,8 @@
     "check": "tsc --noEmit -p src/tsconfig.json",
     "test": "vitest run",
     "lint": "echo 'oxlint via rspeedy build (MVP)'",
-    "fmt": "echo 'oxfmt not wired for lynx MVP'"
+    "fmt": "echo 'oxfmt not wired for lynx MVP'",
+    "test:lynx-web": "bash scripts/test-lynx-web.sh"
   },
   "dependencies": {
     "@lynx-js/web-core": "^0.23.1",
