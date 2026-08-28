@@ -100,6 +100,20 @@ _Avoid_: 页面直接渲染刷新按钮、复活独立 Fab 组件（Fab.vue 已�
 BookmarkButton 切换收藏的双向即时视觉反馈（M3 规范内形态）：收藏 = state-layer 环向外扩散 + 心形 spring 弹入填红；取消收藏 = 环向内收拢（「收回」语义）+ 心形下沉回稳褪灰。乐观触发（点按即播，失败静息回滚），change 事件在动画播完后才上抛（动画完成态）。详见 ADR-0112。
 _Avoid_: 等 API 成功再播动画、粒子爆发、失败时播反向动画
 
+### 图片三态（Image states）
+
+**图片三态（image state）** / **沉浸封面（CoverImage）**：
+图片加载的骨架（skeleton） / 图片（image） / 失败+重试（failed）三态；由深模块 `CoverImage` 统一承载（小接口 `src`、`layout: 'full' | 'box'`、`retry?`、`lazyLoad?`）。`RecommendedCover`（全 bleed，`layout="full"`）与 `SkeletonImage`（盒适配，`layout="box"` 的便捷封装）均经它渲染，避免各组件再抄三态。三态推导纯逻辑（`deriveCoverState` / `withRetryQuery` / `deriveRetryState`）保留在 `src/utils/coverImage.ts`（node 单测可测）。
+_Avoid_: 各组件自写图片三态状态机/模板
+
+**骨架（skeleton / shimmer）**：
+「图片三态」中的加载中态——`<image>` 未触发 `@load` 时叠于图上层的 shimmer 微光占位（`shimmer` 类、`bg-surface-container-high`），避免空白等待；`deriveCoverState(loaded=false, failed=false)` 推导。进入「图片」态（`@load`）后隐藏。
+_Avoid_: 加载中纯空白、固定灰块而无微光
+
+**失败重试（failed + retry）**：
+「图片三态」中的失败态——`<image>` `@error`（或空 `src` 直接判定，避免 `<image src="">` 不触发 `@error` 而无限骨架）后显示「图片加载失败」+ 重试按钮；点击经 `deriveRetryState` 从**干净 base src** 重建（附加一次性 `retry=<ts>` cache-bust，防 `&retry` 累积）并复位回「骨架」，仅重载该图，不整页刷新。失败态优先于其他态（`deriveCoverState` 互斥规则）。
+_Avoid_: 失败后永久 shimmer、重试用已带 retry 的 `imageSrc`（累积 `&retry`）、失败态无「重试」入口
+
 ### 客户端（Client）
 
 **双域名 URL（double-host URL）**：
