@@ -1,5 +1,5 @@
 {
-  "version": "4.17.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.17.0",
-  "changelog": "✨ 新功能\n  a4d07f0 feat(app-lynx): 推荐页改单卡 swipe 轮播（createMixFeed time-merge + 后台线程轮播）\n♻️ 重构\n  8e17fb3 refactor(app-lynx): 整条移除 T0-DIAG 临时诊断通道 + 删除 createPagedFeed\n📝 文档\n  1c60464 docs(app-lynx): 推荐页单卡轮播术语表 + ADR-0115 + spec + 官方教程研究\n🐛 修复\n  32a60c1 fix(app-lynx): 移除 <script setup> 非法 export 修复 rspeedy 构建失败"
+  "version": "4.18.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.18.0",
+  "changelog": "📝 文档\n  5a1ff67 docs(app-lynx): 图片三态术语表 + ADR-0117 深 CoverImage 决策 + spec\n  37a43b0 docs(app-lynx): 推荐轮播图片三态 + FAB 图标/动画细化 spec\n✨ 新功能\n  2d93780 feat(app-lynx): 深 CoverImage 模块统一图片三态（RecommendedCover/SkeletonImage 收敛）\n  bbff4d6 feat(app-lynx): 推荐轮播图片三态（骨架/失败+重试）+ FAB 刷新图标/动画细化"
 }
