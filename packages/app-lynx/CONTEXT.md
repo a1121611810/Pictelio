@@ -29,19 +29,19 @@ _Avoid_: 图上 absolute 角标（list-item 内 absolute 真机高度测量异�
 ### 分页（Pagination）
 
 **混合分页 feed（mixed pagination feed）**：
-`createMixFeed` 深模块——把多路远程分页源（插画/小说）按比例交替合并成单一渲染流，向调用方隐藏双防抖（throttle 800ms + cooldown 3s）、竞态代（generation）、去重、分批渲染（pageSize=20）、翻页优先级、15s 超时、空页防护。**除推荐页外的列表页**（插画/小说/关注/收藏/用户主页）统一经它分页，页面只做 ref 快照桥接（sync）。推荐页已迁移到「按钮分页」（见下）。
+`createMixFeed` 深模块——把多路远程分页源（插画/小说）交替合并成单一渲染流，向调用方隐藏双防抖（throttle 800ms + cooldown 3s）、竞态代（generation）、去重、分批渲染（pageSize=20）、翻页优先级、15s 超时、空页防护。**所有列表页**（推荐/插画/小说/关注/收藏/用户主页/追更）统一经它分页，页面只做 ref 快照桥接（sync）。合并模式：`merge` 选项——默认 `'ratio'`（固定比例交替，其余列表页），推荐页传 `'time-merge'`（时间交叉合并，ADR-0115）。
 _Avoid_: 手写 loadMore、页面内双防抖/竞态/空页防护
 
-**按钮分页（button pagination / 翻书分页）**：
-推荐页的分页形态（ADR-0114）——列表**永远只显示当前页**，由 FAB menu 的「上一页 / 下一页」切页；切页 = 整树重建（epoch）+ 从页顶看，回顶成为翻页的自然语义。绕开 vue-lynx `<list>` 增量渲染失效的框架 bug（双端实证：items 数据增长但新条目不进布局）。与无限滚动相对。
-_Avoid_: 无限滚动、滚动自动翻页、增量拼接
+**按钮分页（button pagination / 翻书分页）**【废弃 2026-08-30，ADR-0115】：
+推荐页**曾用**的分页形态（ADR-0114）——列表**永远只显示当前页**，由 FAB menu 的「上一页 / 下一页」切页；切页 = 整树重建（epoch）+ 从页顶看，回顶成为翻页的自然语义。绕开 vue-lynx `<list>` 增量渲染失效的框架 bug。推荐页改单卡轮播（ADR-0115）后弃用，改「无限滑流」。
+_Avoid_: 在推荐页再次使用（历史语义，勿引入代码与文档）
 
-**页缓存（page cache）**：
-按钮分页下「上一页」的数据来源——Pixiv API 无 `prev_url`，已拉取的页面数据（含各源游标与合并结果）缓存于内存（上限 `maxCachedPages`，默认 5 页），「上一页」即时返回缓存页而不重新请求。
-_Avoid_: 重新请求上一页、游标回退重拉
+**页缓存（page cache）**【废弃 2026-08-30，ADR-0115】：
+按钮分页（已废弃）下「上一页」的数据来源——Pixiv API 无 `prev_url`，已拉取页面数据缓存于内存，「上一页」即时返回缓存页而不重新请求。推荐页弃用按钮分页后该词条为历史语义（`createPagedFeed` 亦随 ADR-0115 删除）。
+_Avoid_: 在推荐页再次引入「上一页」缓存语义
 
 **时间交叉合并（time-merge）**：
-多路分页源（推荐页 = 插画 + 小说）按作品 `create_date` 降序交叉合并成一页的混合方式（app 端 `recommendedStore` 的 sortByDate + mergeAndSort 语义），替代固定比例交替（ratio 4:1）。页内全量展示各路之和（不截断——按时间排序后截断会丢数据）。
+多路分页源（推荐页 = 插画 + 小说）按作品 `create_date` 降序交叉合并的混合方式（app 端 `recommendedStore` 的 sortByDate + mergeAndSort 语义），替代固定比例交替（ratio 4:1）。推荐页经 `createMixFeed(merge: 'time-merge')` 使用（ADR-0115），其余列表页保持默认 ratio。页内全量展示各路之和（不截断——按时间排序后截断会丢数据）。
 _Avoid_: 固定比例交替、截断取前 N
 
 **分页到底态（end-of-feed）**：
@@ -51,6 +51,26 @@ _Avoid_: 到底后报错、静默空白
 **内联分页错误（inline pagination error）**：
 分页（fetchMore）失败时在**列表底部**显示的错误提示，保留已加载内容，`nextUrl` 保留供滚动自动重试。与首屏错误（顶部整页提示）相对——两者槽位分离（createMixFeed 的 `error()` / `pageError()`）。
 _Avoid_: 分页错误显示在列表顶部、清空已加载内容
+
+**推荐轮播（recommended carousel）**：
+推荐页的形态（ADR-0115）——不再是列表，而是**单卡轮播**（卡片浏览器）：一滑页 = 一个作品（插画或小说），沉浸式全 bleed 大图卡，信息叠底部渐变 scrim（标题 / 作者 / 类型徽章 / 收藏按钮 / 字数）。点卡进详情（按 kind 前缀 `/illust/` | `/novel/`）。作品类型 = 插画 + 小说混合，统一封面卡模板。
+_Avoid_: 原瀑布流列表、整页轮播（一滑页 = 一页多卡）
+
+**无限滑流（infinite slide stream）**：
+推荐轮播的加载方式（ADR-0115）——滑近末尾自动 `fetchMore` 下一批，可一直往下滑，**无「上一页/下一页」按钮**（取代按钮分页）。与列表的「无限滚动」是不同渲染形态：此处的滑动由触摸+translateX 驱动，不依赖 `<list>` 增量渲染。
+_Avoid_: 按钮分页、自动轮播（不自动播）
+
+**受限跳过（skip restricted）**：
+推荐轮播对受限条目的处理（ADR-0115，与列表的「受限卡」不同）——受限条目**不在可视滑页流中占位**（渲染层把 `isRestricted` 条目过滤掉）；数据层仍加载。开关切换时因数据仍在 feed 里，重算过滤即可显示/隐藏，**无需重请求**。
+_Avoid_: 受限卡（列表形态）、列表渲染策略（全量渲染受限条目）
+
+**swipe 轮播 / 自研轮播（hand-rolled swipe carousel）**：
+推荐轮播的实现技术（ADR-0115，参照 vue.lynxjs.org/zh/guide/tutorial-swiper.md）——**非原生 `<swiper>` 元素**，而是手写。**⚠️ 2026-08-30 T5 真机验证修订**：官方教程的「主线程脚本」（`'main thread'` 指令 + `useMainThreadRef` + `:main-thread-bindtouch*`）在 Android 原生 LynxView 上会致组件整块渲染空白（判定不可用），故实现改用**后台线程**方案：触摸 `@touchstart`/`@touchmove`/`@touchend`（后台线程）+ Vue 响应式 `:style` 绑定 translateX（不直接 DOM 访问），slide 宽/吸附/位移全程 px（`SystemInfo.pixelWidth/pixelRatio`），松手 `requestAnimationFrame` 吸附翻页。详见 ADR-0115「T5 验证修订」与 `docs/research/vue-lynx-swiper-tutorial.md`。
+_Avoid_: 原生 `<swiper>`、`main-thread-*` 绑定（本仓库原生不可用）、硬编码 vw 宽（应 px）、依赖 tsc/vitest 验证构建合法（见「script-setup 禁 export」）
+
+**单刷新 FAB（single refresh FAB）**：
+推荐轮的刷新入口（ADR-0115）——一个 M3 刷新 FAB（56dp、primary-container、icon `⟳`），从列表的「FAB menu（刷新/回顶/上一页/下一页）」退化为**单按钮**（仅推荐页）。其余列表页仍用 FAB menu（见「列表操作」）。
+_Avoid_: 推荐页保留 prev/next/回顶菜单项、下拉刷新手势
 
 ### 追更（Series watchlist）
 
