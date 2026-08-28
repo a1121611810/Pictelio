@@ -25,14 +25,23 @@ export function withRetryQuery(src: string): string {
 }
 
 /**
+ * 该 src 是否「不可加载」→ 直接判失败（spec §2.1：空 src 避免 `<image src="">` 不触发 @error 而无限骨架）。
+ * 非静默降级（测试硬约束 #3）：空 src 显式失败态而非永久 shimmer。
+ */
+export function isUnloadableSrc(src: string): boolean {
+  return !src
+}
+
+/**
  * 「重试」整组状态：从**干净 base src** 重建 imageSrc（带新 retry 参数），并把 loaded/failed 复位回骨架。
  * ⚠️ 关键不变量：必须用 baseSrc（props.src，本轮无 retry）而非已带 retry 的 imageSrc 重建，否则 `&retry` 会累积。
+ * 空 baseSrc（isUnloadableSrc）→ 保持 failed（重试不能把失败拉回骨架——空 src 永不触发 @error，拉回会无限 shimmer，违背非静默降级）。
  * spec §2.1/§3.1：重试仅重载该图（cache-bust），回到骨架，不整页刷新。
  */
 export function deriveRetryState(baseSrc: string): {
   imageSrc: string
   loaded: false
-  failed: false
+  failed: boolean
 } {
-  return { imageSrc: withRetryQuery(baseSrc), loaded: false, failed: false }
+  return { imageSrc: withRetryQuery(baseSrc), loaded: false, failed: isUnloadableSrc(baseSrc) }
 }

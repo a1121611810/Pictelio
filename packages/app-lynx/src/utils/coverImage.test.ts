@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { deriveCoverState, deriveRetryState, withRetryQuery } from './coverImage'
+import { deriveCoverState, deriveRetryState, isUnloadableSrc, withRetryQuery } from './coverImage'
 
 // oracle = spec: app-lynx-recommended-carousel-image-fab-polish §2.1 / §3.1 的三态语义 + URL 语义。
 // 纯函数、无 DOM；组件渲染行为归 web-core/真机（§4 验证闭环）——此处只锁纯逻辑，避免 oracle gap。
@@ -51,10 +51,19 @@ describe('deriveRetryState（重试整组状态）', () => {
     expect(s.failed).toBe(false)
     expect(s.imageSrc).toMatch(/^https:\/\/a\/b\.jpg\?retry=\d+$/)
   })
-  it('空 baseSrc：imageSrc 为空 + 复位（避免重试后仍 sattle 在 failed）', () => {
+  it('空 baseSrc：imageSrc 为空且保持 failed（重试不能把失败拉回骨架——空 src 永不触发 @error，拉回会无限 shimmer，非静默降级）', () => {
     const s = deriveRetryState('')
     expect(s.imageSrc).toBe('')
     expect(s.loaded).toBe(false)
-    expect(s.failed).toBe(false)
+    expect(s.failed).toBe(true)
+  })
+})
+
+describe('isUnloadableSrc（空/无效 src → 直接判失败，非静默降级）', () => {
+  it('空串视为不可加载', () => {
+    expect(isUnloadableSrc('')).toBe(true)
+  })
+  it('非空视为可加载', () => {
+    expect(isUnloadableSrc('https://a/b.jpg')).toBe(false)
   })
 })
