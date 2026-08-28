@@ -161,7 +161,7 @@ function handleTouchEnd() {
 <style>
 /* 教程布局：display: linear 是 Lynx 专用高性能水平布局（原生渲染优于 flex）；
    但本项目原生测试 linear 与 flex 均可渲染（空白根因是 main-thread 绑定，非布局）。
-   此处用 flex（已真机验证可渲染），后续如需再评测 linear 的性能收益。 */
+   此处用 flex（已真机验证可渲染）。[真机修复 H-linear 已否决] 改 linear 反而连首屏 <text> 也不渲染。 */
 .swiper-wrapper {
   flex: 1;
   width: 100%;

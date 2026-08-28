@@ -88,9 +88,9 @@ _Avoid_: 50% 阈值（旧语义）、纯位置判定无 fling、位移放大跟�
 推荐轮播首载骨架（ADR-0118）——按滑页布局的骨架：上部全宽 shimmer 图区 + 底部 scrim 区域文字条（标题/作者/徽章位），取代「加载中…」文字。触发 = **渲染流为空即显**（不依赖 loading 标志，冷启动请求前立即出现）；已有数据时刷新不闪骨架；失败换整页错误提示。与「图片三态」的图级骨架（CoverImage 内 shimmer）不同层：本词条是**页级首载占位**。
 _Avoid_: 纯文字加载态、依赖 loading 标志的显隐时机、刷新时闪骨架
 
-**轮播 scrim 流内化（carousel scrim flow layout）**：
-推荐轮播滑页的 scrim 采用**流内布局**（slide 根 `flex-col` + `flex-1` 弹性占位把 scrim 推到容器底部），而非 `absolute bottom-0`——原生于被 `translateX` 平移的 flex-row **非首 slide** 内，`absolute` 子元素的**文本渲染缺失**（真机复现：滑到非首页 scrim 文案不见；web-core 正常）。改流内后各页 scrim 文案正常渲染。超高图（`cover` 回退）时图片为 `absolute inset-0` 铺满、scrim 流内叠其底，视觉不变。
-_Avoid_: 在轮播 slide 内对承载文案的容器用 `absolute bottom-0`（原生非首 slide 渲染缺失，并见「遮罩」词条）
+**轮播 scrim 页面级遮罩（carousel page-level scrim overlay）**：
+推荐轮播的 scrim 是**页面级固定遮罩**（`absolute bottom-0`，位于 CarouselSwiper 之后、按当前页 index 显示当前条目的标签/标题/作者/收藏），**而非**每 slide 内各渲染一份——真机 LynxView 对被 `translateX` 平移的 flex-row **非首 slide** 内的 `<text>` **永不渲染**（仅图片/`<view>` 正常；重挂载换 key、改 `display:linear`、改绝对→流内布局均无效；绿像素检测证实第 2+ 页 title 全屏无渲染；web-core 正常）。抽为页面级遮罩后文字不再落入被平移的 flex-row，各页均可渲染、随 index 更新。**权衡**：遮罩覆盖底部，底部 scrim 区不响应滑动（真机 `pointer-events` 对触摸不生效），滑动需从上部图片区发起；点卡进详情由遮罩 `@tap` 承担（收藏按钮 `@tap.stop`）。
+_Avoid_: 在轮播 slide 内渲染 `<text>` 承载的 scrim（真机非首 slide 文字不渲染）、依赖 `pointer-events` 让遮罩穿透滑动（真机无效）
 
 ### 追更（Series watchlist）
 

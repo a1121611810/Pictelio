@@ -162,6 +162,9 @@ function onIndexChange(index: number) {
   currentIndex.value = index
 }
 
+// [真机修复] scrim 抽到页面级遮罩：按当前页索引取当前条目作为遮罩内容（文字不进被平移的 flex-row）
+const currentItem = computed(() => visibleItems.value[currentIndex.value] as MixFeedItem | undefined)
+
 // 详情跳转：按 kind 前缀；受限条目（理论上已被过滤）再加一道守卫
 function openItem(item: MixFeedItem) {
   const prefix = item.kind === 'illust' ? '/illust/' : '/novel/'
@@ -228,39 +231,49 @@ onActivated(() => {
         <template #slide="{ item }">
           <view class="w-full h-full relative flex flex-col bg-surface-container-lowest" @tap="onSlideTap(item)">
             <!-- 封面图（ADR-0118 宽满高按比例：fit/ratio 经 deriveCoverDisplay 推导，超高图回退 aspectFill；
-                 三态骨架/图片/失败+重试仍由 CoverImage 承载） -->
+                 三态骨架/图片/失败+重试仍由 CoverImage 承载）
+                 [真机修复] scrim 不再内嵌于 slide：<text> 在真机 LynxView 的「非首 flex-row 子元素」内不渲染，
+                 抽到页面级遮罩（下方），slide 只承载图片。 -->
             <RecommendedCover
               :src="coverSrc(item.data)"
               :fit="coverDisplayOf(item).fit"
               :ratio="coverDisplayOf(item).ratio"
             />
-            <!-- [fix] 弹性占位把 scrim 推到容器底部：改用流内布局（非 absolute），规避原生 LynxView
-                 对「被 translateX 平移的 flex-row 非首 slide 内 absolute 子元素」的渲染缺失
-                 （scrim 文本在非首 slide 不见，真机复现）。cover 回退模式图片为 absolute inset-0
-                 铺满、scrim 流内叠其底部，视觉效果不变。 -->
-            <view class="flex-1 min-h-0" />
-            <!-- 底部渐变 scrim：承载标题/作者/类型徽章/收藏（用 M3 scrim-overlay 令牌，勿内联 rgba） -->
-            <view
-              class="px-6 pt-[24vw] pb-[10vw]"
-              style="background: var(--md-scrim-overlay)"
-            >
-              <IllustTypeBadgeRow v-if="item.kind === 'illust'" :illust="item.data" />
-              <!-- 标签胶囊行（ADR-0118：3+N、translated_name||name、# 前缀、纯展示；位置 = 类型徽章下方、标题上方） -->
-              <TagChipRow :tags="item.data.tags" class="mt-2" />
-              <text class="text-title-large font-semibold text-white leading-[1.3] [max-line:2]">{{ item.data.title }}</text>
-              <text class="text-body-medium text-white/85 mt-2">{{ item.data.user.name }}</text>
-              <view v-if="item.kind === 'illust'" class="mt-5">
-                <BookmarkButton
-                  :illust-id="item.data.id"
-                  :initial-bookmarked="item.data.is_bookmarked"
-                  :bookmark-count="item.data.total_bookmarks"
-                />
-              </view>
-              <text v-else class="text-label-medium text-white/70 mt-3">{{ item.data.text_length }} 字</text>
-            </view>
           </view>
         </template>
       </CarouselSwiper>
+
+      <!-- 页面级 scrim 遮罩（真机修复：文字不进 translate 的 flex-row）
+           真机 LynxView 对 flex-row「非首个子元素」内的 <text> 不渲染（仅图片/<view> 正常，且重挂载/换 linear 均无效，
+           绿像素检测证实第 2+ 页 title 全屏无渲染）。scrim 本就在屏幕底部（ADR-0118），故抽为页面级固定遮罩、
+           按当前页 index 更新内容，从根本上规避 <text> 落入被平移的 flex-row 子元素。
+           [权衡] 遮罩为固定覆盖层，底部 scrim 区不响应滑动（真机 LynxView 的 pointer-events 对触摸事件不生效）；
+           滑动需从图片区（上部）发起；点卡进详情由本遮罩 @tap 承担（收藏按钮 @tap.stop 不冒泡）。 -->
+      <view
+        class="absolute bottom-0 left-0 right-0 px-6 pt-[24vw] pb-[10vw]"
+        style="background: var(--md-scrim-overlay)"
+        @tap="currentItem && onSlideTap(currentItem)"
+      >
+        <IllustTypeBadgeRow v-if="currentItem && currentItem.kind === 'illust'" :illust="currentItem.data" />
+        <!-- 标签胶囊行（ADR-0118：3+N、translated_name||name、# 前缀、纯展示；位置 = 类型徽章下方、标题上方） -->
+        <TagChipRow v-if="currentItem" :tags="currentItem.data.tags" class="mt-2" />
+        <text
+          v-if="currentItem"
+          class="text-title-large font-semibold text-white leading-[1.3] [max-line:2]"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="currentItem.data.title"
+          >{{ currentItem.data.title }}</text
+        >
+        <text v-if="currentItem" class="text-body-medium text-white/85 mt-2">{{ currentItem.data.user.name }}</text>
+        <view v-if="currentItem && currentItem.kind === 'illust'" class="mt-5">
+          <BookmarkButton
+            :illust-id="currentItem.data.id"
+            :initial-bookmarked="currentItem.data.is_bookmarked"
+            :bookmark-count="currentItem.data.total_bookmarks"
+          />
+        </view>
+        <text v-else-if="currentItem" class="text-label-medium text-white/70 mt-3">{{ currentItem.data.text_length }} 字</text>
+      </view>
 
       <!-- 分页加载失败（fetchMore）内联提示：保留当前滑页，可重试 -->
       <view v-if="pageError" class="absolute bottom-[16vw] left-0 right-0 flex justify-center px-4">
