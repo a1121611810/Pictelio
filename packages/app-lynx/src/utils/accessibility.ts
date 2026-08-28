@@ -31,8 +31,6 @@ export const ME_A11Y_LABELS = {
   detailQualityLarge: '详情画质选择高清',
   detailQualityOriginal: '详情画质选择原图',
   logout: '退出登录',
-  // [T0-DIAG] 诊断日志导出（真机取证入口，T3 收尾时移除）
-  exportDiag: '导出诊断日志',
 } as const
 
 /** Login 页 accessibility 标注（Lynx E2E：登录页注入 token 后提交） */
@@ -51,6 +49,8 @@ export const UPDATE_A11Y_LABELS = {
 /** Recommended 页 accessibility 标注（Lynx E2E：导航到 Me 页入口） */
 export const RECOMMENDED_A11Y_LABELS = {
   openMe: '我的',
+  // 推荐页单刷新 FAB（ADR-0115）：推荐轮播的刷新按钮 a11y 标注
+  refresh: '刷新推荐',
 } as const
 
 /** 会话失效错误页 accessibility 标注（候选 #2：全屏错误页 /error） */

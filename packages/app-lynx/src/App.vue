@@ -3,7 +3,6 @@ import { onMounted } from 'vue'
 import { currentComponent, initRouter, exitHint } from './router'
 import { initClientSetting } from './stores/clientSwitchStore'
 import { runStartupUpdateCheck } from './stores/updateStore'
-import { t0Lines } from './debug/t0Diag' // [T0-DIAG]
 
 onMounted(() => {
   // ADR-0062：启动时查询当前包支持的 client 引擎列表（full/webview/lynx 各有不同）
@@ -17,10 +16,6 @@ onMounted(() => {
 
 <template>
   <page class="Root">
-    <!-- [T0-DIAG] 临时诊断横幅（修复验证后删除）：顶部展示最近 6 条 t0log，截图取证 -->
-    <view v-if="t0Lines.length > 0" class="absolute left-0 right-0 top-[11vw] z-50 px-1 bg-[#000000B3] pointer-events-none">
-      <text v-for="(l, i) in t0Lines" :key="i" class="text-[2.6vw] leading-[3.4vw] text-[#7CFC00] block">{{ l }}</text>
-    </view>
     <!-- [lynx:fix] KeepAlive 缓存列表/静态页实例（ADR-0049）：详情返回列表不重载。
          详情页不在 include 白名单——按 :id 加载，缓存旧 id 实例会显示错误内容 -->
     <KeepAlive :include="['recommended', 'illusts', 'novels', 'me']">

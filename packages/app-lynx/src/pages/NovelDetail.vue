@@ -15,7 +15,6 @@ import RestrictOverlay from '../components/RestrictOverlay.vue'
 import CommentOverlay from '../components/CommentOverlay.vue'
 import SkeletonNovel from '../components/SkeletonNovel.vue'
 import WatchlistPromptDialog from '../components/WatchlistPromptDialog.vue'
-import { t0log } from '../debug/t0Diag' // [T0-DIAG]
 
 const novel = ref<PixivNovel | null>(null)
 const text = ref('')
@@ -73,9 +72,6 @@ function getViewportHeight(): number {
     : 0
 }
 
-// [T0-DIAG] 进度分桶状态
-let lastProgressBucket = -1
-
 function onNovelScroll(e: { detail?: { scrollTop?: number; scrollHeight?: number } }): void {
   const detail = e?.detail
   if (!detail) return
@@ -84,17 +80,10 @@ function onNovelScroll(e: { detail?: { scrollTop?: number; scrollHeight?: number
     Number(detail.scrollHeight ?? 0),
     getViewportHeight(),
   )
-  // [T0-DIAG] 临时诊断打点：progress 跨 0.1 桶时记一条（防刷屏），修复后移除
-  const bucket = Math.floor(progress * 10)
-  if (bucket !== lastProgressBucket) {
-    lastProgressBucket = bucket
-    t0log('[novel]', `progress=${progress.toFixed(2)} top=${detail.scrollTop} h=${detail.scrollHeight}`)
-  }
   prompt?.notifyScroll(progress, reachedBottom.value)
 }
 
 function onNovelToBottom(): void {
-  t0log('[novel]', 'scrollview TOBOTTOM') // [T0-DIAG]
   reachedBottom.value = true
   prompt?.notifyScroll(1, true)
 }
@@ -125,8 +114,6 @@ async function loadNovel(): Promise<void> {
     const detailRes = await loadNovelDetail(novelId.value)
     if (gen !== loadGeneration) return
     novel.value = detailRes.novel
-    // [T0-DIAG] 系列信息打点（hasSeries 是追更询问第一判定条件），修复后移除
-    t0log('[novel]', `loaded id=${novelId.value} hasSeries=${detailRes.novel.series != null} sid=${detailRes.novel.series?.id ?? 'none'}`,)
     // prompt 在详情落地后创建：getSeries 此时已知，系列预取才能发起；
     // 停留计时（dwellMs）从详情就绪起算，语义上更贴近「实质阅读时长」
     setupPrompt()

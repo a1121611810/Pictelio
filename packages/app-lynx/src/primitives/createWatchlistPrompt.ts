@@ -12,7 +12,6 @@
 //   （decline 继续返回 / cancel 留在详情页），primitive 只暴露两个不同方法名。
 import { ref } from "vue"
 import { shouldPromptWatchlist } from "./watchlistPrompt"
-import { t0log } from "../debug/t0Diag" // [T0-DIAG]
 
 export interface WatchlistPromptDeps {
   /** 页面提供当前小说的系列信息；null = 非系列小说（守卫恒放行，零开销） */
@@ -78,7 +77,6 @@ export function createWatchlistPrompt(
       .loadWatchState(seriesId)
       .then((added) => {
         if (gen !== generation) return
-        t0log("[watchlist]", `prefetch sid=${seriesId} added=${added}`) // [T0-DIAG]
         // review P2-2：confirm 已先行置 true 时，陈旧预取落地不得覆盖
         if (watchAdded.value === true) return
         watchAdded.value = added
@@ -88,7 +86,6 @@ export function createWatchlistPrompt(
         if (gen !== generation) return
         // 预取失败 → watchAdded 保持 null（shouldPromptWatchlist 保守不弹）
         console.warn("[watchlist] 追更状态预取失败，本次不弹询问", err)
-        t0log("[watchlist]", `prefetch FAIL sid=${seriesId} ${String(err).slice(0, 60)}`) // [T0-DIAG]
       })
   }
 
@@ -109,8 +106,6 @@ export function createWatchlistPrompt(
       dwellMs: now() - createdAt,
     }
     const hit = shouldPromptWatchlist(input)
-    // [T0-DIAG] 判定输入与结论打点（复现不弹问题用，修复后移除）
-    t0log("[watchlist]", `reqBack s=${input.hasSeries} wa=${input.watchlistAdded} d=${input.dismissedThisSession} p=${input.scrollProgress.toFixed(2)} b=${input.reachedBottom} dwell=${Math.round(input.dwellMs / 1000)}s → hit=${hit}`,)
     if (!hit) return false
     dialogError.value = ""
     dialogOpen.value = true
