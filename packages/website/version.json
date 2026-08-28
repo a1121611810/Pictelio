@@ -1,5 +1,5 @@
 {
-  "version": "4.19.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.18.0",
-  "changelog": "📝 文档\n  5a1ff67 docs(app-lynx): 图片三态术语表 + ADR-0117 深 CoverImage 决策 + spec\n  37a43b0 docs(app-lynx): 推荐轮播图片三态 + FAB 图标/动画细化 spec\n✨ 新功能\n  2d93780 feat(app-lynx): 深 CoverImage 模块统一图片三态（RecommendedCover/SkeletonImage 收敛）\n  bbff4d6 feat(app-lynx): 推荐轮播图片三态（骨架/失败+重试）+ FAB 刷新图标/动画细化"
+  "version": "4.20.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.20.0",
+  "changelog": "🐛 修复\n  b0f4cf8 fix(app-lynx): 轮播吸附基于手势起点判定，修复跨 50% 中点误回弹\n✨ 新功能\n  0ed2a0a feat(app-lynx): 推荐轮播打磨 R2（封面比例显示/吸附阈值+fling/沉浸骨架/标签胶囊行）"
 }
