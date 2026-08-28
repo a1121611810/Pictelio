@@ -6,6 +6,9 @@
 // 因官方「主线程脚本」在本项目原生 LynxView 整块空白、判定不可用，ADR-0115 T5 修订）——一滑页一个
 // 作品，沉浸式全 bleed 大图卡，信息叠底部渐变 scrim。受限条目经 visibleItems 过滤（数据层仍加载，
 // 开关切换时 computed 重算即可，无需重请求）。刷新 = 单个 FAB（icon ⟳，animate-spin 旋转）。
+// [ADR-0118 打磨 R2] 封面「宽满高按比例」（deriveCoverDisplay + SystemInfo 视口派生，超高图回退
+//   aspectFill）；首载渲染流为空即显沉浸骨架（CarouselSkeleton，不依赖 loading）；滑页 scrim 区
+//   展示标签胶囊行（TagChipRow，3+N）。吸附阈值 + fling 在 CarouselSwiper 内部（swiperMath）。
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'recommended' })
 import { ref, computed, onMounted, onActivated, onUnmounted, watch } from 'vue'
@@ -15,10 +18,13 @@ import { loadRecommendedNovels, loadNovelNext } from '../api/novel'
 import type { PixivIllust, PixivNovel } from '../api/types'
 import { createMixFeed, type MixFeedItem, type MixFeedSource } from '../primitives/createMixFeed'
 import { proxyImageUrl } from '../utils/imageUrl'
+import { deriveCoverDisplay } from '../utils/coverDisplay'
 import { isRestricted } from '../stores/settingsStore'
 import { isLoggedIn } from '../stores/authStore'
 import CarouselSwiper from '../components/CarouselSwiper.vue'
 import RecommendedCover from '../components/RecommendedCover.vue'
+import CarouselSkeleton from '../components/CarouselSkeleton.vue'
+import TagChipRow from '../components/TagChipRow.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 import NavigationBar from '../components/NavigationBar.vue'
@@ -80,16 +86,44 @@ const feed = createMixFeed({
 })
 
 // ─── 响应式桥接：feed 是纯函数式状态，页面用本地 ref 快照渲染 ───
+// [ADR-0118] 首载骨架「渲染流为空即显」（不依赖 loading）：loading 标志不再参与显隐，移除本地镜像。
 const items = ref<MixFeedItem[]>(feed.items())
-const loading = ref(feed.loading())
 const errorMsg = ref(feed.error() ?? '')
 const pageError = ref(feed.pageError() ?? '')
 
 function sync() {
   items.value = feed.items()
-  loading.value = feed.loading()
   errorMsg.value = feed.error() ?? ''
   pageError.value = feed.pageError() ?? ''
+}
+
+// ─── 封面比例显示（ADR-0118 / spec §2.1、§3.2）：可视区尺寸由 SystemInfo 派生 ───
+// 可视区 = 屏幕逻辑尺寸 - TopAppBar(17.067vw) - NavigationBar(21.333vw)（vw 折算为 px）。
+// pixelHeight 缺失时按 16:9 宽高比估算（防御；低估可用高度 → 略偏向 aspectFill 回退，安全侧）。
+declare const SystemInfo: { pixelWidth: number; pixelHeight?: number; pixelRatio: number }
+function slideViewport(): { width: number; height: number } {
+  if (typeof SystemInfo === 'undefined') return { width: 375, height: 667 } // web-core 兜底（iPhone 逻辑尺寸近似）
+  const w = SystemInfo.pixelWidth / SystemInfo.pixelRatio
+  const screenH = SystemInfo.pixelHeight ? SystemInfo.pixelHeight / SystemInfo.pixelRatio : w * 1.78
+  const bars = (0.17067 + 0.21333) * w
+  return { width: w, height: Math.max(1, screenH - bars) }
+}
+const SLIDE_VIEWPORT = slideViewport()
+
+/** 每张滑页的封面显示参数（fit/ratio，喂 RecommendedCover）：插画用 API width/height，
+ *  小说无尺寸字段 → 1:1 方形契约（deriveCoverDisplay 内部处理，非静默降级见下）。 */
+function coverDisplayOf(item: MixFeedItem): { fit: 'cover' | 'width-fill'; ratio: string } {
+  const isIllust = item.kind === 'illust'
+  if (isIllust && (!item.data.width || !item.data.height)) {
+    console.warn('[recommended] 插画缺少尺寸元数据，按 1:1 方形封面显示', item.id)
+  }
+  const { fit, ratio } = deriveCoverDisplay({
+    imgWidth: isIllust ? item.data.width : undefined,
+    imgHeight: isIllust ? item.data.height : undefined,
+    viewportWidth: SLIDE_VIEWPORT.width,
+    viewportHeight: SLIDE_VIEWPORT.height,
+  })
+  return { fit, ratio }
 }
 
 /** 刷新代：每次刷新递增，作为 CarouselSwiper 的 :key 触发其重挂载（重置 offset/索引回到第一张）。
@@ -103,7 +137,7 @@ async function refreshFeed() {
   if (refreshing.value) return
   refreshing.value = true
   refreshEpoch.value++ // 触发 CarouselSwiper 重挂载（回第一张）
-  sync() // 捕获 loading=true（首载骨架屏）
+  sync() // 捕获渲染流清空（items=[] → 若仍在首载则显示沉浸骨架）
   try {
     await feed.refresh()
   } catch (err) {
@@ -173,9 +207,9 @@ onActivated(() => {
       <text class="text-title-large font-medium text-surface-on">推荐</text>
     </view>
 
-    <!-- 首载骨架 / 整页错误 -->
-    <view v-if="loading && items.length === 0" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <text class="text-body-medium text-outline">加载中…</text>
+    <!-- 首载沉浸骨架 / 整页错误（ADR-0118：渲染流为空即显骨架，不依赖 loading——冷启动请求前立即出现） -->
+    <view v-if="items.length === 0 && !errorMsg" class="w-full flex-1 min-h-0">
+      <CarouselSkeleton />
     </view>
     <view v-else-if="errorMsg && items.length === 0" class="w-full flex-1 min-h-0 flex items-center justify-center">
       <text class="text-body-medium text-error">{{ errorMsg }}</text>
@@ -193,14 +227,21 @@ onActivated(() => {
       >
         <template #slide="{ item }">
           <view class="w-full h-full relative bg-surface-container-lowest" @tap="onSlideTap(item)">
-            <!-- 封面图（全 bleed 三态：骨架/图片/失败+重试；Lynx mode=aspectFill 等比不变形） -->
-            <RecommendedCover :src="coverSrc(item.data)" />
+            <!-- 封面图（ADR-0118 宽满高按比例：fit/ratio 经 deriveCoverDisplay 推导，超高图回退 aspectFill；
+                 三态骨架/图片/失败+重试仍由 CoverImage 承载） -->
+            <RecommendedCover
+              :src="coverSrc(item.data)"
+              :fit="coverDisplayOf(item).fit"
+              :ratio="coverDisplayOf(item).ratio"
+            />
             <!-- 底部渐变 scrim：承载标题/作者/类型徽章/收藏（用 M3 scrim-overlay 令牌，勿内联 rgba） -->
             <view
               class="absolute bottom-0 left-0 right-0 px-6 pt-[24vw] pb-[10vw]"
               style="background: var(--md-scrim-overlay)"
             >
               <IllustTypeBadgeRow v-if="item.kind === 'illust'" :illust="item.data" />
+              <!-- 标签胶囊行（ADR-0118：3+N、translated_name||name、# 前缀、纯展示；位置 = 类型徽章下方、标题上方） -->
+              <TagChipRow :tags="item.data.tags" class="mt-2" />
               <text class="text-title-large font-semibold text-white leading-[1.3] [max-line:2]">{{ item.data.title }}</text>
               <text class="text-body-medium text-white/85 mt-2">{{ item.data.user.name }}</text>
               <view v-if="item.kind === 'illust'" class="mt-5">

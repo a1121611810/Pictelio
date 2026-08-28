@@ -5,11 +5,16 @@
 // 三态机（deriveCoverState）+ watch(src) 复位 + 空 src→failed + retry（deriveRetryState 干净 src 重建，
 // 防 &retry 累积）+ <image mode="aspectFill">（原生等比不变形，替换 CSS object-fit）+ shimmer 骨架 +
 // 失败 overlay（+可选重试按钮）+ 容器（full-bleed absolute inset-0 vs resolveSkeletonStyle 盒）。
+// T2 扩展（ADR-0118 决策 1 / spec §3.2）：full 布局新增可选 fit='width-fill' + ratio——容器改
+// relative w-full + 显式高度（heightVw = 100×高/宽，经 ratioToHeightVw 纯函数），盒内宽高比与图一致 →
+// 不裁切不变形；三态 absolute inset-0 层级保留。默认 fit='cover'（现状，无 blast radius）；
+// fit='width-fill' 但 ratio 缺失/非法 → 防御性回退 cover 渲染。
 // [复用] RecommendedCover（layout="full" retry）与 SkeletonImage（layout="box" 薄盒适配器）均经它渲染，
 // 避免各组件再各自抄三态（S2 修复）。
 import { ref, computed, watch } from 'vue'
 import { resolveSkeletonStyle } from './skeletonStyle'
 import { deriveCoverState, deriveRetryState, isUnloadableSrc } from '../utils/coverImage'
+import { ratioToHeightVw } from '../utils/coverDisplay'
 
 const props = withDefaults(
   defineProps<{
@@ -27,8 +32,12 @@ const props = withDefaults(
     aspectRatio?: string
     /** box 模式：min-height 兜底（vw） */
     minH?: string
+    /** 显示方式（仅 full 布局生效）：'cover' 全 bleed aspectFill 裁切（默认=现状）；'width-fill' 贴顶宽满按原图比例（配 ratio） */
+    fit?: 'cover' | 'width-fill'
+    /** width-fill 用：宽:高最简整数比字符串（如 "4 / 5"）；容器高度 = ratioToHeightVw(ratio)（100×高/宽 vw） */
+    ratio?: string
   }>(),
-  { retry: false, lazyLoad: false },
+  { retry: false, lazyLoad: false, fit: 'cover' },
 )
 
 const imageSrc = ref(props.src)
@@ -44,6 +53,33 @@ watch(
     failed.value = isUnloadableSrc(s)
   },
 )
+
+/** width-fill 容器高度（vw）：仅 full 布局 + fit='width-fill' + ratio 合法时有效；否则 undefined（回退 cover 渲染，防御）。
+ *  非静默降级（AGENTS 测试硬约束 #3）：fit='width-fill' 但 ratio 缺失/非法 = 契约破坏，显式 warn 后回退。 */
+const widthFillHeightVw = computed(() => {
+  if (props.fit !== 'width-fill' || props.layout !== 'full') return undefined
+  const h = ratioToHeightVw(props.ratio ?? '')
+  if (!(Number.isFinite(h) && h > 0)) {
+    console.warn('[coverImage] fit="width-fill" 但 ratio 缺失/非法，回退 cover 渲染', props.ratio)
+    return undefined
+  }
+  return h
+})
+
+/** 是否进入 width-fill 渲染（贴顶宽满按比例） */
+const isWidthFill = computed(() => widthFillHeightVw.value !== undefined)
+
+const containerClass = computed(() => {
+  if (props.layout === 'box') return 'relative bg-surface-container-highest'
+  if (isWidthFill.value) return 'relative w-full bg-surface-container-high'
+  return 'absolute inset-0 bg-surface-container-high'
+})
+
+const containerStyle = computed(() => {
+  if (props.layout === 'box') return resolveSkeletonStyle(props.height, props.aspectRatio, props.minH)
+  if (isWidthFill.value) return { height: `${widthFillHeightVw.value}vw` }
+  return undefined
+})
 
 function onLoad() {
   loaded.value = true
@@ -65,11 +101,7 @@ const state = computed(() => deriveCoverState(loaded.value, failed.value))
 </script>
 
 <template>
-  <view
-    class="overflow-hidden"
-    :class="layout === 'full' ? 'absolute inset-0 bg-surface-container-high' : 'relative bg-surface-container-highest'"
-    :style="layout === 'box' ? resolveSkeletonStyle(height, aspectRatio, minH) : undefined"
-  >
+  <view class="overflow-hidden" :class="containerClass" :style="containerStyle">
     <!-- 图片（Lynx mode=aspectFill；失败时不渲染，避免空 image 覆盖占位） -->
     <image
       v-if="state !== 'failed'"

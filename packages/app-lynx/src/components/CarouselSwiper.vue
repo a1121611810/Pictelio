@@ -1,5 +1,6 @@
 <script setup lang="ts">
-// ─── 自研单卡 swipe 轮播（ADR-0115 / spec: app-lynx-recommended-carousel §3.1）───
+// ─── 自研单卡 swipe 轮播（ADR-0115 / spec: app-lynx-recommended-carousel §3.1；
+// 吸附阈值 + fling = ADR-0118 / spec: app-lynx-recommended-carousel-polish-r2 §2.2）───
 // 非原生 <swiper> 元素：按 vue-lynx 官方教程《商品详情页图片轮播》手写。
 // [方案偏离 ADR-0115] 教程的「主线程脚本」（'main thread' + :main-thread-bindtouch*）在
 //   本项目原生 LynxView 上会导致组件整块渲染空白（真机验证：加回 main-thread-* 绑定 → 空白，
@@ -7,11 +8,13 @@
 //   触摸用 @touchstart/@touchmove/@touchend（后台线程），translateX 经 Vue 响应式 :style 绑定。
 //   代价：拖拽非零延迟（主线程方案的本意），但可正常渲染与滑动。见 ADR-0115「待验证项」与
 //   docs/research/vue-lynx-swiper-tutorial.md。
+// [ADR-0118] 松手吸附改用 calcSnapTarget（1/3 屏宽阈值 + fling 甩动）：touchend 前用最后一段
+//   移动计算瞬时速度（px/ms），位移未过 1/3 时若速度超阈值也沿速度方向翻页（快甩短距离也翻页）。
 // [单位] slide 宽度 / 吸附 / translateX 全程 px（SystemInfo.pixelWidth/pixelRatio，官方一致）。
 declare const SystemInfo: { pixelWidth: number; pixelRatio: number }
 
 import { ref } from 'vue'
-import { calcNearestPage, clampOffset } from '../primitives/swiperMath'
+import { calcSnapTarget, clampOffset } from '../primitives/swiperMath'
 
 const props = withDefaults(
   defineProps<{
@@ -42,6 +45,13 @@ const touchStartOffset = ref(0)
 const currentIndex = ref(0)
 const lastReachEndIndex = ref(0)
 let rafId: number | null = null
+
+// ─── fling 速度采样（ADR-0118：模块级 let，不走响应式 ref 避免高频 churn）───
+let lastMoveX = 0
+let lastMoveAt = 0
+let gestureStartAt = 0
+let moveCount = 0
+let lastVelocityPxPerMs = 0
 
 function cancelAnimate() {
   if (rafId != null) cancelAnimationFrame(rafId)
@@ -90,14 +100,37 @@ function handleTouchStart(e: { touches: Array<{ clientX: number }> }) {
   cancelAnimate()
   touchStartX.value = e.touches[0]?.clientX ?? 0
   touchStartOffset.value = containerOffset.value
+  lastMoveX = touchStartX.value
+  lastMoveAt = Date.now()
+  gestureStartAt = lastMoveAt
+  moveCount = 0
+  lastVelocityPxPerMs = 0
 }
 function handleTouchMove(e: { touches: Array<{ clientX: number }> }) {
+  const x = e.touches[0]?.clientX ?? lastMoveX
   const startX = touchStartX.value
-  const dx = (e.touches[0]?.clientX ?? startX) - startX
+  const dx = x - startX
   updateOffset(touchStartOffset.value + dx)
+  // 瞬时速度 = 最后一段移动（位移/间隔，px/ms）；间隔 0 时保持上一段值
+  const now = Date.now()
+  const dt = now - lastMoveAt
+  if (dt > 0) {
+    lastVelocityPxPerMs = (x - lastMoveX) / dt
+    lastMoveX = x
+    lastMoveAt = now
+  }
+  moveCount++
 }
 function handleTouchEnd() {
-  animateTo(calcNearestPage(containerOffset.value, props.itemWidth))
+  // 速度：>=2 次 move 用瞬时（最后一段）；仅 1 次（或没有）用全程平均（分母 0 → 0 速度）
+  let velocity = lastVelocityPxPerMs
+  if (moveCount <= 1) {
+    const dt = Date.now() - gestureStartAt
+    velocity = dt > 0 ? (lastMoveX - touchStartX.value) / dt : 0
+  }
+  lastVelocityPxPerMs = 0
+  // ADR-0118：1/3 阈值 + fling 甩动；animateTo 内部 updateOffset 会 clamp 边界
+  animateTo(calcSnapTarget(containerOffset.value, props.itemWidth, { velocityPxPerMs: velocity }))
 }
 </script>
 
