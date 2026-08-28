@@ -88,3 +88,9 @@ _Avoid_: 把绝对 next_url 原样传给原生模块
 
 **受限条目 level 派生（restrict level derivation）**：
 `x_restrict === 2 ? 2 : 1` 的徽章级别映射，收敛在 `RestrictedNovelCard` 组件内部（接口只收 `item`），调用方不重复该表达式。
+
+### 构建约定（Build conventions）
+
+**script-setup 禁 export（SFC no-export）**：
+app-lynx 的 `<script setup>` 块**禁止使用 ES module `export`**（含命名导出与 `export default`）——vue-lynx 的 `<script setup>` SFC 编译器不识别该构造，会使 `rspack-vue-loader` 的 `resolveScript` 返回 null，导致 `rspeedy build` / `pnpm build` 失败。注意：`tsc`（`pnpm check`）与 `vitest` 都只按纯 TS 处理 `<script setup>` 内容，**不会**拦截此错误，因此"测试全绿"不代表能构建。组件需把子模块能力对外提供时，直接引用底层纯函数模块（如 `primitives/swiperMath.ts`），不要经组件 re-export。详见 ADR-0116。
+_Avoid_: 在 `<script setup>` 里写 `export { ... }` / `export default`；依赖 tsc/vitest 校验构建合法
