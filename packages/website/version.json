@@ -1,5 +1,5 @@
 {
-  "version": "4.16.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.16.0",
-  "changelog": "📝 文档\n  ecedf43 docs(app-lynx): ADR-0114 按钮分页决策 + 分页按钮 spec（状态机/测试矩阵/ticket 拆解）\n✨ 新功能\n  2c5c480 feat(app-lynx): 推荐页按钮分页（替换式翻书，ADR-0114）"
+  "version": "4.17.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.17.0",
+  "changelog": "✨ 新功能\n  a4d07f0 feat(app-lynx): 推荐页改单卡 swipe 轮播（createMixFeed time-merge + 后台线程轮播）\n♻️ 重构\n  8e17fb3 refactor(app-lynx): 整条移除 T0-DIAG 临时诊断通道 + 删除 createPagedFeed\n📝 文档\n  1c60464 docs(app-lynx): 推荐页单卡轮播术语表 + ADR-0115 + spec + 官方教程研究\n🐛 修复\n  32a60c1 fix(app-lynx): 移除 <script setup> 非法 export 修复 rspeedy 构建失败"
 }

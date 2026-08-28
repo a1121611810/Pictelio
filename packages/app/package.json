@@ -1,6 +1,6 @@
 {
   "name": "pictelio-app",
-  "version": "4.16.0",
+  "version": "4.17.0",
   "private": true,
   "description": "Pictelio SPA - Pixiv illustration browser built with SolidJS + Capacitor",
   "type": "module",
