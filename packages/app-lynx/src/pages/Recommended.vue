@@ -18,6 +18,7 @@ import { proxyImageUrl } from '../utils/imageUrl'
 import { isRestricted } from '../stores/settingsStore'
 import { isLoggedIn } from '../stores/authStore'
 import CarouselSwiper from '../components/CarouselSwiper.vue'
+import RecommendedCover from '../components/RecommendedCover.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 import NavigationBar from '../components/NavigationBar.vue'
@@ -192,8 +193,8 @@ onActivated(() => {
       >
         <template #slide="{ item }">
           <view class="w-full h-full relative bg-surface-container-lowest" @tap="onSlideTap(item)">
-            <!-- 封面图（全 bleed，aspectFill 裁切） -->
-            <image class="absolute inset-0 w-full h-full object-cover" :src="coverSrc(item.data)" />
+            <!-- 封面图（全 bleed 三态：骨架/图片/失败+重试；Lynx mode=aspectFill 等比不变形） -->
+            <RecommendedCover :src="coverSrc(item.data)" />
             <!-- 底部渐变 scrim：承载标题/作者/类型徽章/收藏（用 M3 scrim-overlay 令牌，勿内联 rgba） -->
             <view
               class="absolute bottom-0 left-0 right-0 px-6 pt-[24vw] pb-[10vw]"
@@ -228,8 +229,18 @@ onActivated(() => {
         :accessibility-label="RECOMMENDED_A11Y_LABELS.refresh"
         @tap="refreshFeed"
       >
-        <view :class="refreshing ? 'animate-spin' : ''">
-          <text class="text-[6.4vw] leading-none text-primary-on-container">⟳</text>
+        <!-- 刷新图标（unicode ↻）+ 圆环：refreshing 时图标淡出、M3 圆环转起（C 动画）。
+             [P5 发现] SVG data-URI 在原生 LynxView 不渲染、透明 PNG 难生成，故回退 unicode ↻
+             （Lynx 无图标字体，unicode 字形为可靠面；ADR-0115 已记录该取舍）。 -->
+        <view class="relative w-[6.4vw] h-[6.4vw] flex items-center justify-center">
+          <text
+            class="text-[6.4vw] leading-none text-primary-on-container transition-opacity duration-[var(--durationFast)] ease-[var(--motion-standard)]"
+            :class="refreshing ? 'opacity-0' : 'opacity-100'"
+          >↻</text>
+          <view
+            class="absolute inset-0 w-[6.4vw] h-[6.4vw] rounded-full border-[3px] border-[var(--md-outline-variant)] border-t-[var(--md-on-primary-container)] transition-opacity duration-[var(--durationFast)] ease-[var(--motion-standard)]"
+            :class="refreshing ? 'animate-spin opacity-100' : 'opacity-0'"
+          />
         </view>
       </view>
     </view>
