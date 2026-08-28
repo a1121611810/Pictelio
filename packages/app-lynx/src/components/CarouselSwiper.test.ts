@@ -57,6 +57,20 @@ describe('calcSnapTarget（1/3 阈值 + fling，ADR-0118 决策 2）', () => {
     expect(calcSnapTarget(-34, W, { velocityPxPerMs: 0.8 })).toBe(-100)
   })
 
+  it('回归：位移跨过 50% 中点（offset -0.6×W，起点 0）→ 翻页 -W（frac 符号不得反转）', () => {
+    // 旧实现：round(-0.6) = -1 → frac = +0.4 → sign(+)=+1 → 目标 0（错误回弹）。
+    // 修复：以手势起点 startOffset 计算 dragFrac（-0.6），|−0.6| ≥ 1/3 → -1 页。
+    expect(calcSnapTarget(-60, W, { startOffset: 0 })).toBe(-100)
+  })
+
+  it('回归：跨多页长拖（起点 -3W、再拖 -0.5W → offset -3.5W）→ 目标 -4W（相对起点翻一页）', () => {
+    expect(calcSnapTarget(-350, W, { startOffset: -300 })).toBe(-400)
+  })
+
+  it('回归：起点非 0 时慢拖未过阈值 → 回起点（起点 -3W、拖 -0.2W → -3W）', () => {
+    expect(calcSnapTarget(-320, W, { startOffset: -300 })).toBe(-300)
+  })
+
   it('非法输入返回 0（防 NaN 污染 transform，沿用 calcNearestPage 惯例）', () => {
     expect(calcSnapTarget(NaN, W)).toBe(0)
     expect(calcSnapTarget(-100, 0)).toBe(0)

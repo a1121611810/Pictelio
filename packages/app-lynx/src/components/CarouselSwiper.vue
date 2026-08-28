@@ -129,8 +129,14 @@ function handleTouchEnd() {
     velocity = dt > 0 ? (lastMoveX - touchStartX.value) / dt : 0
   }
   lastVelocityPxPerMs = 0
-  // ADR-0118：1/3 阈值 + fling 甩动；animateTo 内部 updateOffset 会 clamp 边界
-  animateTo(calcSnapTarget(containerOffset.value, props.itemWidth, { velocityPxPerMs: velocity }))
+  // ADR-0118：1/3 阈值 + fling 甩动（**基于手势起点** touchStartOffset 判定，跨 50% 中点不误回弹）；
+  // animateTo 内部 updateOffset 会 clamp 边界
+  animateTo(
+    calcSnapTarget(containerOffset.value, props.itemWidth, {
+      velocityPxPerMs: velocity,
+      startOffset: touchStartOffset.value,
+    }),
+  )
 }
 </script>
 
