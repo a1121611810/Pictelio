@@ -148,3 +148,20 @@ _Avoid_: 把绝对 next_url 原样传给原生模块
 **script-setup 禁 export（SFC no-export）**：
 app-lynx 的 `<script setup>` 块**禁止使用 ES module `export`**（含命名导出与 `export default`）——vue-lynx 的 `<script setup>` SFC 编译器不识别该构造，会使 `rspack-vue-loader` 的 `resolveScript` 返回 null，导致 `rspeedy build` / `pnpm build` 失败。注意：`tsc`（`pnpm check`）与 `vitest` 都只按纯 TS 处理 `<script setup>` 内容，**不会**拦截此错误，因此"测试全绿"不代表能构建。组件需把子模块能力对外提供时，直接引用底层纯函数模块（如 `primitives/swiperMath.ts`），不要经组件 re-export。详见 ADR-0116。
 _Avoid_: 在 `<script setup>` 里写 `export { ... }` / `export default`；依赖 tsc/vitest 校验构建合法
+
+### 放射导航（Radial navigation）
+
+**放射导航 FAB（radial nav FAB）**：
+全局唯一的右下角悬浮 FAB，是导航中枢；点按展开成「双层环」放射菜单，替代底部 M3 `NavigationBar`（4 tab）与各顶层 tab 页自己的刷新 FAB。仅在 4 个顶层 tab 页（推荐/插画/小说/我的）显示。详见 ADR-0120、`docs/adr/glossary-app-lynx-radial-nav-fab.md`。
+_Avoid_: 底部导航栏、浮动按钮、feed 分页 FAB（见下）
+
+**双层环（double ring）**：
+放射菜单几何结构——**外环**=4 导航 tab（`NAV_TABS` 事实源，当前 tab 高亮）、**内环**=页面动作项（刷新/回顶/翻页），同角度双半径锚定在 FAB 右下。B 方案定稿形态（A 单弧扇出、C 混合均否决）。
+_Avoid_: 单弧扇出 8 项（手机屏拥挤）
+
+**页面动作桥（page action bridge）**：
+顶层页以 `usePage(routeName, actions)` 把 `{refresh?, backToTop?, extras?}` 注册进放射 FAB（按路由名作键，KeepAlive 安全）；模块读**激活页**那份进内环。非 tab 页不注册，保留各自 `RefreshableList` 的 FAB。
+_Avoid_: 全局事件总线
+
+**feed 分页 FAB（button-pagination FAB）**：
+与放射导航 FAB 区分——`RefreshableList` 内为分页/回顶提供的 FAB 菜单（`FabMenuExtraItem`：上一页/下一页/刷新/回顶），仅**非 tab 页**保留；tab 页切换 `:fab="false"` 关闭它，动作经页面动作桥上抛到放射 FAB。

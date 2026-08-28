@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'me' })
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { navigate, ensureAuth } from '../router'
+import { globalFab } from '../stores/globalFab'
 import { currentUser, logout, isLoggedIn } from '../stores/authStore'
 import { selectedClient, switchClient, availableKinds, supportsClientSwitch, type ClientKind } from '../stores/clientSwitchStore'
 import { showR18, showR18G, setShowR18, setShowR18G, ugoiraMode, setUgoiraMode, detailQuality, setDetailQuality } from '../stores/settingsStore'
@@ -10,22 +11,18 @@ import type { ImageQuality } from '../utils/imageQuality'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { ME_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import GlassCard from '../components/GlassCard.vue'
-import NavigationBar from '../components/NavigationBar.vue'
-import { NAV_TABS, type NavTab } from '../components/navTabs'
-
-// 底部导航 tabs 取共享 NAV_TABS（推荐/插画/小说/我的（本页））。
-// 共享模块的 me tab a11yLabel 为静态「我的」（顶栏标题已标注 ME_A11Y_LABELS.pageTitle，
-// 避免 Appium description 重复；NavigationBar 内部对每个 tab 渲染 element+label）。
-function onNavSelect(tab: NavTab) {
-  if (tab.name === 'me') return
-  void navigate(tab.path, { replace: true })
-}
 
 const switching = ref(false)
 
-// 未登录守卫：跳登录页
+// ─── 全局放射 FAB 桥（ADR-0120）：注册空动作（内环空 = 仅外环导航），卸载时注销 ───
+let unreg: (() => void) | undefined
 onMounted(async () => {
+  unreg = globalFab.usePage('me', {})
   await ensureAuth()
+})
+
+onUnmounted(() => {
+  unreg?.()
 })
 
 function onLogout() {
@@ -352,8 +349,5 @@ function toggleR18G() {
         </view>
       </view>
     </view>
-
-    <!-- M3 NavigationBar：底部四 tab -->
-    <NavigationBar :tabs="NAV_TABS" :active-name="'me'" @select="onNavSelect" />
   </view>
 </template>

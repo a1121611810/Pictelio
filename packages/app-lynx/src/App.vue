@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { currentComponent, initRouter, exitHint } from './router'
+import GlobalFab from './components/GlobalFab.vue'
 import { initClientSetting } from './stores/clientSwitchStore'
 import { runStartupUpdateCheck } from './stores/updateStore'
 
@@ -21,6 +22,8 @@ onMounted(() => {
     <KeepAlive :include="['recommended', 'illusts', 'novels', 'me']">
       <component :is="currentComponent" />
     </KeepAlive>
+    <!-- 放射导航悬浮 FAB（ADR-0120）：全局单 FAB，外层=4 tab、内层=页动作；替换各页 NavigationBar 与自身 FAB -->
+    <GlobalFab />
     <!-- 系统返回根路由提示（ADR-0066）：与 webview client 的 exitHint toast 语义一致。
          M3 snackbar 形态：inverse-surface 底 + inverse-on-surface 文字 + 4dp 圆角 -->
     <view v-if="exitHint" class="absolute left-0 right-0 bottom-[12vw] z-50 flex justify-center pointer-events-none">

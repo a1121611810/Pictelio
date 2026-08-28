@@ -5,7 +5,8 @@
 // 渲染层 = CarouselSwiper（自研 swipe，**后台线程**触摸 + Vue 响应式 :style 绑定 translateX + px 吸附，
 // 因官方「主线程脚本」在本项目原生 LynxView 整块空白、判定不可用，ADR-0115 T5 修订）——一滑页一个
 // 作品，沉浸式全 bleed 大图卡，信息叠底部渐变 scrim。受限条目经 visibleItems 过滤（数据层仍加载，
-// 开关切换时 computed 重算即可，无需重请求）。刷新 = 单个 FAB（icon ⟳，animate-spin 旋转）。
+// 开关切换时 computed 重算即可，无需重请求）。刷新/回顶经全局放射 FAB（globalFab 桥接，
+// view.isBusy 驱动旋转）；本页不再渲染自持 FAB。
 // [ADR-0118 打磨 R2] 封面「宽满高按比例」（deriveCoverDisplay + SystemInfo 视口派生，超高图回退
 //   aspectFill）；首载渲染流为空即显沉浸骨架（CarouselSkeleton，不依赖 loading）；滑页 scrim 区
 //   展示标签胶囊行（TagChipRow，3+N）。吸附阈值 + fling 在 CarouselSwiper 内部（swiperMath）。
@@ -21,26 +22,14 @@ import { proxyImageUrl } from '../utils/imageUrl'
 import { deriveCoverDisplay } from '../utils/coverDisplay'
 import { isRestricted } from '../stores/settingsStore'
 import { isLoggedIn } from '../stores/authStore'
+import { globalFab } from '../stores/globalFab'
 import CarouselSwiper from '../components/CarouselSwiper.vue'
 import RecommendedCover from '../components/RecommendedCover.vue'
 import CarouselSkeleton from '../components/CarouselSkeleton.vue'
 import TagChipRow from '../components/TagChipRow.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
-import NavigationBar from '../components/NavigationBar.vue'
-import { NAV_TABS, type NavTab } from '../components/navTabs'
-import { RECOMMENDED_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
-
-// 底部导航 tabs：数据源 = 共享 NAV_TABS（推荐/插画/小说/我的）。
-// me tab 的 a11yLabel 用 RECOMMENDED_A11Y_LABELS.openMe（=「我的」，与共享值一致）。
-const navTabs: NavTab[] = NAV_TABS.map((t) =>
-  t.name === 'me' ? { ...t, a11yLabel: RECOMMENDED_A11Y_LABELS.openMe } : t,
-)
-
-function onNavSelect(tab: NavTab) {
-  if (tab.name === 'recommended') return
-  void navigate(tab.path, { replace: true })
-}
+import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 
 // ─── 时间合并 feed（插画 + 小说，ADR-0115） ───
 // sources 顺序即 mergeByTime 同分 tie-break 优先级：illust 在前。
@@ -98,14 +87,14 @@ function sync() {
 }
 
 // ─── 封面比例显示（ADR-0118 / spec §2.1、§3.2）：可视区尺寸由 SystemInfo 派生 ───
-// 可视区 = 屏幕逻辑尺寸 - TopAppBar(17.067vw) - NavigationBar(21.333vw)（vw 折算为 px）。
+// 可视区 = 屏幕逻辑尺寸 - TopAppBar(17.067vw)（vw 折算为 px；底部导航已由全局放射 FAB 取代，不再预留）。
 // pixelHeight 缺失时按 16:9 宽高比估算（防御；低估可用高度 → 略偏向 aspectFill 回退，安全侧）。
 declare const SystemInfo: { pixelWidth: number; pixelHeight?: number; pixelRatio: number }
 function slideViewport(): { width: number; height: number } {
   if (typeof SystemInfo === 'undefined') return { width: 375, height: 667 } // web-core 兜底（iPhone 逻辑尺寸近似）
   const w = SystemInfo.pixelWidth / SystemInfo.pixelRatio
   const screenH = SystemInfo.pixelHeight ? SystemInfo.pixelHeight / SystemInfo.pixelRatio : w * 1.78
-  const bars = (0.17067 + 0.21333) * w
+  const bars = 0.17067 * w
   return { width: w, height: Math.max(1, screenH - bars) }
 }
 const SLIDE_VIEWPORT = slideViewport()
@@ -131,11 +120,8 @@ function coverDisplayOf(item: MixFeedItem): { fit: 'cover' | 'width-fill'; ratio
  *  不随 feed 刷新自动复位，故用 epoch 重挂载实现回到第一张（对照 IllustList 的 `:key="refreshEpoch"`）。 */
 const refreshEpoch = ref(0)
 
-/** 刷新中：FAB 旋转动画 + 防重入 */
-const refreshing = ref(false)
+/** 刷新：bump refreshEpoch（回第一张）+ 清流重载；busy 维度由 globalFab view.isBusy 驱动 */
 async function refreshFeed() {
-  if (refreshing.value) return
-  refreshing.value = true
   refreshEpoch.value++ // 触发 CarouselSwiper 重挂载（回第一张）
   sync() // 捕获渲染流清空（items=[] → 若仍在首载则显示沉浸骨架）
   try {
@@ -144,7 +130,6 @@ async function refreshFeed() {
     console.warn('[recommended] 刷新失败', err)
   } finally {
     sync()
-    refreshing.value = false
   }
 }
 
@@ -180,11 +165,20 @@ function coverSrc(data: PixivIllust | PixivNovel): string {
   return proxyImageUrl(u.large || u.medium || u.square_medium || '')
 }
 
+// ─── 全局放射 FAB 桥（ADR-0120）：注册本页动作到 globalFab，卸载时注销 ───
+let unreg: (() => void) | undefined
 onMounted(() => {
+  unreg = globalFab.usePage('recommended', {
+    refresh: refreshFeed,
+    backToTop: () => {
+      refreshEpoch.value++
+    },
+  })
   void refreshFeed()
 })
 
 onUnmounted(() => {
+  unreg?.()
   feed.dispose()
 })
 
@@ -280,31 +274,6 @@ onActivated(() => {
         <text class="text-body-small text-error bg-surface-container-high px-3 py-1 rounded-[var(--md-shape-small)] shadow-[var(--md-elevation-1)]">{{ pageError }}</text>
       </view>
 
-      <!-- 单刷新 FAB（M3：primary-container、56dp、icon ⟳、旋转动画） -->
-      <view
-        v-if="visibleItems.length > 0"
-        class="absolute bottom-4 right-4 w-[14.933vw] h-[14.933vw] rounded-[var(--md-shape-large)] bg-primary-container active:bg-layer-pressed-primary flex items-center justify-center shadow-[var(--md-elevation-3)] active:shadow-[var(--md-elevation-1)]"
-        :accessibility-element="A11Y_ELEMENT_ENABLED"
-        :accessibility-label="RECOMMENDED_A11Y_LABELS.refresh"
-        @tap="refreshFeed"
-      >
-        <!-- 刷新图标（unicode ↻）+ 圆环：refreshing 时图标淡出、M3 圆环转起（C 动画）。
-             [P5 发现] SVG data-URI 在原生 LynxView 不渲染、透明 PNG 难生成，故回退 unicode ↻
-             （Lynx 无图标字体，unicode 字形为可靠面；ADR-0115 已记录该取舍）。 -->
-        <view class="relative w-[6.4vw] h-[6.4vw] flex items-center justify-center">
-          <text
-            class="text-[6.4vw] leading-none text-primary-on-container transition-opacity duration-[var(--durationFast)] ease-[var(--motion-standard)]"
-            :class="refreshing ? 'opacity-0' : 'opacity-100'"
-          >↻</text>
-          <view
-            class="absolute inset-0 w-[6.4vw] h-[6.4vw] rounded-full border-[3px] border-[var(--md-outline-variant)] border-t-[var(--md-on-primary-container)] transition-opacity duration-[var(--durationFast)] ease-[var(--motion-standard)]"
-            :class="refreshing ? 'animate-spin opacity-100' : 'opacity-0'"
-          />
-        </view>
-      </view>
     </view>
-
-    <!-- M3 NavigationBar：底部四 tab（推荐/插画/小说/我的） -->
-    <NavigationBar :tabs="navTabs" :active-name="'recommended'" @select="onNavSelect" />
   </view>
 </template>

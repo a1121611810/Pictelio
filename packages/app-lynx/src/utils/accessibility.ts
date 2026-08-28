@@ -46,13 +46,6 @@ export const UPDATE_A11Y_LABELS = {
   download: '下载新版本',
 } as const
 
-/** Recommended 页 accessibility 标注（Lynx E2E：导航到 Me 页入口） */
-export const RECOMMENDED_A11Y_LABELS = {
-  openMe: '我的',
-  // 推荐页单刷新 FAB（ADR-0115）：推荐轮播的刷新按钮 a11y 标注
-  refresh: '刷新推荐',
-} as const
-
 /** 会话失效错误页 accessibility 标注（候选 #2：全屏错误页 /error） */
 export const ERROR_A11Y_LABELS = {
   pageTitle: '登录已过期',
@@ -70,6 +63,15 @@ export const FAB_MENU_A11Y_LABELS = {
   // 按钮分页扩展项（ADR-0114）：由页面经 RefreshableList :items 传入，label 与 UI 文本一致
   prevPage: '上一页',
   nextPage: '下一页',
+} as const
+
+/** 放射导航悬浮 FAB 标注（ADR-0120）：全局导航中枢的开/关语义。
+ *  - open / close：主 FAB 描述（展开/收起菜单）
+ *  内环「刷新/回顶/扩展」复用 FAB_MENU_A11Y_LABELS（refreshList/backToTop/prevPage/nextPage）。
+ */
+export const GLOBAL_FAB_A11Y_LABELS = {
+  open: '打开菜单',
+  close: '关闭菜单',
 } as const
 
 /** 追更列表页 accessibility 标注（issue #225：/watchlist 页 + 取消追更二次确认 Dialog） */

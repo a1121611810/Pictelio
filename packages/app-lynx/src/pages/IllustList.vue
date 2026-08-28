@@ -14,14 +14,8 @@ import SkeletonImage from '../components/SkeletonImage.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
-import NavigationBar from '../components/NavigationBar.vue'
 import RefreshableList from '../components/RefreshableList.vue'
-import { NAV_TABS, type NavTab } from '../components/navTabs'
-
-function onNavSelect(tab: NavTab) {
-  if (tab.name === 'illusts') return
-  void navigate(tab.path, { replace: true })
-}
+import { globalFab } from '../stores/globalFab'
 
 // ─── 分页收敛（ADR-0104）：迁移到 createMixFeed 深模块 ───
 // 双防抖 / 竞态代 / 分批渲染（pageSize=20，替代原 pendingIllusts 队列）/ 空页防护 /
@@ -113,12 +107,21 @@ function onImageTap(item: PixivIllust) {
   if (!isRestricted(item)) openDetail(item.id)
 }
 
+// ─── 全局放射 FAB 桥（ADR-0120）：注册本页动作到 globalFab，卸载时注销 ───
+let unreg: (() => void) | undefined
 onMounted(() => {
+  unreg = globalFab.usePage('illusts', {
+    refresh: refreshFeed,
+    backToTop: () => {
+      refreshEpoch.value++
+    },
+  })
   void refreshFeed()
 })
 
 // 释放 feed（spec §4 T1 dispose）：卸载与 mode 重建时均作废旧实例
 onUnmounted(() => {
+  unreg?.()
   feed.value?.dispose()
 })
 </script>
@@ -179,6 +182,7 @@ onUnmounted(() => {
     <RefreshableList
       v-else-if="!loading || illusts.length > 0"
       :refresh="refreshFeed"
+      :fab="false"
       @back-to-top="refreshEpoch++"
     >
     <list
@@ -236,8 +240,5 @@ onUnmounted(() => {
       </list-item>
     </list>
     </RefreshableList>
-
-    <!-- M3 NavigationBar：底部四 tab（推荐/插画/小说/我的） -->
-    <NavigationBar :tabs="NAV_TABS" :active-name="'illusts'" @select="onNavSelect" />
   </view>
 </template>

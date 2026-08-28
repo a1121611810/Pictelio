@@ -40,6 +40,8 @@ const props = defineProps<{
   refresh: () => Promise<void> | void
   /** 可选扩展菜单项（T4）：组件只渲染 + busy 互斥，业务回调/显隐由页面提供 */
   items?: FabMenuExtraItem[]
+  /** 是否渲染本组件自带 FAB menu（ADR-0120）。tab 页关掉（false）由全局放射 FAB 承接；非 tab 页默认 true */
+  fab?: boolean
 }>()
 
 const emit = defineEmits<{ (e: 'back-to-top'): void }>()
@@ -129,14 +131,14 @@ onUnmounted(() => {
 
     <!-- scrim：展开时覆盖列表，点空白收起 -->
     <view
-      v-if="menu.isOpen"
+      v-if="menu.isOpen && props.fab !== false"
       class="absolute inset-0 z-10 bg-[var(--md-scrim)] scrim-in"
       @tap="onCloseMenu"
     />
 
     <!-- FAB menu 面板：两项 pill 形 medium button（M3 官方规格） -->
     <view
-      v-if="menu.isOpen"
+      v-if="menu.isOpen && props.fab !== false"
       class="absolute z-20 right-4 bottom-[20.267vw] flex flex-col items-end gap-[1.067vw]"
     >
       <!-- 刷新项：图标 ↻ + label -->
@@ -181,6 +183,7 @@ onUnmounted(() => {
     <!-- 主 FAB / close button（ADR-0111）：常态刷新 FAB，展开时变身为 close button
          56dp、primary-container、原位不动；busy 时禁用态 opacity 0.6 -->
     <view
+      v-if="props.fab !== false"
       class="absolute z-30 bottom-4 right-4 w-[14.933vw] h-[14.933vw] rounded-[var(--md-shape-large)] bg-primary-container active:bg-layer-pressed-primary flex items-center justify-center shadow-[var(--md-elevation-3)] active:shadow-[var(--md-elevation-1)]"
       :style="(refreshing || menu.isBusy) ? { opacity: 0.6 } : {}"
       :accessibility-element="A11Y_ELEMENT_ENABLED"

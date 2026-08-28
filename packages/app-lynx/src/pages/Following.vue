@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // 关注 Feed（P0-T4）：关注作者的插画时间线，waterfall 分页（复用推荐页模式）。
-// M3 NavigationBar 顶层 tab（推荐/关注/小说/我的）——无返回箭头。
+// 顶部栏含返回箭头（ADR-0120 移除底部导航栏后补）；本页非 tab 页，放射 FAB 不显示。
 import { ref, onMounted, onUnmounted } from 'vue'
-import { navigate } from '../router'
+import { navigate, requestBack } from '../router'
 import { loadFollow, loadNext } from '../api/illust'
 import type { PixivIllust, PixivIllustListResponse } from '../api/types'
 import { thumbUrl } from '../utils/imageUrl'
@@ -13,17 +13,8 @@ import SkeletonImage from '../components/SkeletonImage.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
-import NavigationBar from '../components/NavigationBar.vue'
 import RefreshableList from '../components/RefreshableList.vue'
-import { NAV_TABS, type NavTab } from '../components/navTabs'
-
-// 底部导航 tabs 取共享 NAV_TABS（推荐/插画/小说/我的；已不含 following tab）。
-// /following 已不在导航可达：active-name='following' 无对应 tab 故无高亮（可接受），
-// 本页 tab 判断（if tab.name === 'following'）永不命中，点击任何 tab 正常 navigate。
-function onNavSelect(tab: NavTab) {
-  if (tab.name === 'following') return
-  void navigate(tab.path, { replace: true })
-}
+import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 
 // ─── 分页收敛（ADR-0104）：迁移到 createMixFeed 深模块 ───
 // 单源关注 feed（/v2/illust/follow，offset 分页）；双防抖/竞态/空页防护/15s 超时/
@@ -108,9 +99,17 @@ onUnmounted(() => {
 
 <template>
   <view class="w-full h-full flex flex-col bg-surface">
-    <!-- M3 TopAppBar：顶层页，居中标题，无返回箭头 -->
-    <view class="flex flex-row items-center justify-center h-[17.067vw] px-4 bg-surface">
-      <text class="text-title-large font-medium text-surface-on">关注</text>
+    <!-- M3 TopAppBar：顶层页，居中标题；移除底部导航栏后补返回箭头（ADR-0120） -->
+    <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
+      <view
+        class="py-1 pr-2"
+        :accessibility-element="A11Y_ELEMENT_ENABLED"
+        accessibility-label="返回"
+        @tap="requestBack"
+      >
+        <text class="text-[6.4vw] leading-none text-surface-on">‹</text>
+      </view>
+      <text class="flex-1 text-center text-title-large font-medium text-surface-on">关注</text>
     </view>
 
     <text v-if="errorMsg && !loading" class="text-body-small text-error p-4">{{ errorMsg }}</text>
@@ -178,8 +177,5 @@ onUnmounted(() => {
       </list-item>
     </list>
     </RefreshableList>
-
-    <!-- M3 NavigationBar：底部四 tab（NAV_TABS 共享；active-name 无匹配故无高亮，可接受） -->
-    <NavigationBar :tabs="NAV_TABS" :active-name="'following'" @select="onNavSelect" />
   </view>
 </template>

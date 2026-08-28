@@ -8,14 +8,8 @@ import type { PixivNovel, PixivNovelListResponse } from '../api/types'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { isRestricted } from '../stores/settingsStore'
 import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
-import NavigationBar from '../components/NavigationBar.vue'
 import RefreshableList from '../components/RefreshableList.vue'
-import { NAV_TABS, type NavTab } from '../components/navTabs'
-
-function onNavSelect(tab: NavTab) {
-  if (tab.name === 'novels') return
-  void navigate(tab.path, { replace: true })
-}
+import { globalFab } from '../stores/globalFab'
 
 // ─── 分页收敛（ADR-0104）：迁移到 createMixFeed 深模块 ───
 // 双防抖（800ms 节流 + 3s 冷却）/ 竞态代 / 分批渲染 / 空页防护 / 15s 超时 /
@@ -102,12 +96,21 @@ function openDetail(id: number) {
   void navigate(`/novel/${id}`)
 }
 
+// ─── 全局放射 FAB 桥（ADR-0120）：注册本页动作到 globalFab，卸载时注销 ───
+let unreg: (() => void) | undefined
 onMounted(() => {
+  unreg = globalFab.usePage('novels', {
+    refresh: refreshFeed,
+    backToTop: () => {
+      refreshEpoch.value++
+    },
+  })
   void refreshFeed()
 })
 
 // 释放 feed（spec §4 T1 dispose）：卸载与 mode 重建时均作废旧实例
 onUnmounted(() => {
+  unreg?.()
   feed.value?.dispose()
 })
 </script>
@@ -169,7 +172,7 @@ onUnmounted(() => {
       </view>
     </view>
 
-    <RefreshableList v-if="novels.length > 0" :refresh="refreshFeed" @back-to-top="refreshEpoch++">
+    <RefreshableList v-if="novels.length > 0" :refresh="refreshFeed" :fab="false" @back-to-top="refreshEpoch++">
     <list
       :key="refreshEpoch"
       class="w-full h-full"
@@ -218,8 +221,5 @@ onUnmounted(() => {
       </list-item>
     </list>
     </RefreshableList>
-
-    <!-- M3 NavigationBar：底部四 tab -->
-    <NavigationBar :tabs="NAV_TABS" :active-name="'novels'" @select="onNavSelect" />
   </view>
 </template>
