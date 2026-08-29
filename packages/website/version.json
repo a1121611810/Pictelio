@@ -1,5 +1,5 @@
 {
-  "version": "4.20.1",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.20.1",
-  "changelog": "📝 文档\n  da7f99e docs(app-lynx): 轮播 scrim 流内化术语表 + ADR-0119 决策\n🐛 修复\n  c923ae7 fix(app-lynx): 轮播 scrim 改流内布局，修复原生非首 slide 文案不渲染"
+  "version": "4.21.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.21.0",
+  "changelog": "✨ 新功能\n  199c67e feat(app-lynx): 放射导航 FAB 展开项按 M3 尺寸重定（B 方案 56dp 圆）+ 层叠/扫角修复\n  71b2ee5 feat(app-lynx): 全局导航改为放射双层环悬浮 FAB（ADR-0120）\n🐛 修复\n  4b975b1 fix(app-lynx): 放射导航菜单项放大并拉开间距（修复'内容太小'）\n  9848947 fix(app-lynx): 放射导航单例改惰性初始化，修复路由循环依赖白屏\n  9008f8b fix(app-lynx): 轮播 scrim 改页面级遮罩，修复真机非首 slide 文案不渲染\n🧪 测试\n  834b177 test(android-e2e): 降低 switch-client 往返 spec 的 Chromedriver DevTools 空转\n  8360303 test(app-lynx): 新增 web-core 启动回归 test:lynx-web（白屏 web 层接缝）\n  f8a5460 test(android-e2e): 新增 lynx 客户端启动即渲染回归（白屏）"
 }
