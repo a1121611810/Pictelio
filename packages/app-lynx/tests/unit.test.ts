@@ -1126,6 +1126,43 @@ describe('Login / Recommended 页 accessibility 标注（issue #107）', () => {
   })
 })
 
+// ─── 放射导航 FAB（ADR-0120）展开态几何与层叠（ADR-0121） ───
+// 几何/尺寸全部内联在 GlobalFab.vue 薄适配器（深模块 createGlobalFab 无几何）。
+// 本测试用「源码结构断言」锁定 M3 尺寸（B 方案 56dp 圆：1vw=3.75px ⇒ 56dp=14.93vw、
+// 24dp=6.4vw、12sp=3.2vw）与层叠序（scrim z-10 < 菜单项 z-20 < FAB z-30）与扫角 -88°，
+// 期望值来自 ADR-0121 决策表/图片换算，非从实现反推。
+describe('GlobalFab.vue 展开态几何与层叠（ADR-0121）', () => {
+  const globalFabVue = readFileSync(fileURLToPath(new URL('../src/components/GlobalFab.vue', import.meta.url)), 'utf8')
+
+  it('层叠序：scrim(z-10) < 菜单项(z-20) < 主 FAB(z-30)，容器 z-40', () => {
+    // 菜单项（外环/内环）须显式置于遮罩之上，否则被半透明遮罩压住且点不到
+    expect(globalFabVue).toContain('absolute inset-0 z-40 pointer-events-none')
+    expect(globalFabVue).toContain('absolute inset-0 z-10 bg-scrim pointer-events-auto')
+    // 菜单项 z-20（外环 z-20 + 内环 z-20 都需浮于遮罩上）——按元素精确锁定，避免裸 z-20 误匹配
+    expect(globalFabVue).toContain('absolute z-20 flex flex-col items-center justify-center w-[14.93vw]')
+    expect(globalFabVue).toContain('absolute z-20 flex items-center justify-center w-[10.67vw]')
+    // FAB 保持最上层 z-30
+    expect(globalFabVue).toContain('absolute z-30 pointer-events-auto')
+  })
+
+  it('外环导航项 56dp 圆 + 24dp 图标 + 12sp 文字（vw=375dp 基准）', () => {
+    // 外环圆 14.93vw（=56dp）
+    expect(globalFabVue).toContain('w-[14.93vw] h-[14.93vw]')
+    // 24dp 图标须出现在外环、内环、FAB 三处（=6.4vw ×3），防止仅外环图标回退到 5.33vw
+    expect(globalFabVue.match(/font-size: 6\.4vw/g)?.length).toBe(3)
+    expect(globalFabVue).toContain('font-size: 3.2vw') // 12sp 文字
+  })
+
+  it('几何常量：外环半径 R_OUTER_VW=35、扫角 OUTER_END=-88（末端项不探出屏幕底边）', () => {
+    expect(globalFabVue).toContain('const R_OUTER_VW = 35')
+    expect(globalFabVue).toContain('const OUTER_END = -88')
+  })
+
+  it('FAB 图标不再硬编码 22px，改为 M3 24dp（6.4vw）', () => {
+    expect(globalFabVue).not.toContain('font-size: 22px')
+  })
+})
+
 // ─── Update 页 accessibility 标注（检查更新：强制更新页的退出/下载按钮） ───
 // 与页面级同一套「注册表 + 模板源码断言」约定。
 describe('Update 页 accessibility 标注（检查更新）', () => {

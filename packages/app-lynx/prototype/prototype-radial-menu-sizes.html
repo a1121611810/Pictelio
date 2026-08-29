@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PROTOTYPE — 放射导航 FAB 外环尺寸三变体（A/B/C）</title>
+<style>
+  :root {
+    --primary-container: #d8e2ff;
+    --on-primary-container: #001b3f;
+    --surface-container: #f3edf7;
+    --surface-container-high: #ece6f0;
+    --on-surface: #1b1b1f;
+    --on-surface-variant: #46464f;
+    --secondary-container: #dae2f9;
+    --on-secondary-container: #001a41;
+    --scrim: rgba(0, 0, 0, 0.32);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { background: #20232a; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+
+  .banner { color: #cfd6e4; font-size: 13px; text-align: center; max-width: 560px; }
+  .banner b { color: #ffffff; }
+
+  /* 手机画布：375×812，等价一份 375dp 视口（1vw = 3.75px） */
+  .phone {
+    position: relative; width: 375px; height: 812px; flex: none; flex-shrink: 0;
+    border-radius: 28px; overflow: hidden; background: #cfd3da;
+    box-shadow: 0 18px 50px rgba(0,0,0,.5); border: 3px solid #2a2d33;
+  }
+
+  /* 假内容（被遮罩压暗的推荐卡背景） */
+  .content { position: absolute; inset: 0; display: flex; flex-direction: column; }
+  .content .cover {
+    width: 100%; height: 640px; flex: none;
+    background:
+      radial-gradient(circle at 30% 35%, #f7b8c8 0%, transparent 45%),
+      radial-gradient(circle at 68% 60%, #c9b6e8 0%, transparent 50%),
+      linear-gradient(160deg, #eadbe8 0%, #cdb8d6 60%, #b9a3c9 100%);
+    position: relative;
+  }
+  .content .cover::after { content: "推荐"; position: absolute; top: 18px; left: 0; right: 0; text-align: center; color: #5a3f4d; font-weight: 600; font-size: 16px; }
+  .content .meta { padding: 14px 16px; flex: auto; background: #fff; }
+  .content .meta .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .content .meta .tags span { background: #e9e5ee; color: #574e60; border-radius: 14px; padding: 4px 10px; font-size: 11px; }
+  .content .meta h3 { margin: 12px 0 4px; font-size: 15px; color: #201a24; }
+  .content .meta p { margin: 0; font-size: 12px; color: #7a7284; }
+
+  /* 遮罩 */
+  .scrim { position: absolute; inset: 0; background: var(--scrim); z-index: 40; opacity: 0; pointer-events: none; transition: opacity 200ms; }
+  .phone.open .scrim { opacity: 1; pointer-events: auto; }
+
+  /* 放射菜单项：浮在遮罩之上（正确层叠：遮罩40 < 菜单项50 < FAB60） */
+  .ring-item {
+    position: absolute; z-index: 50;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0;
+    transition: transform 300ms cubic-bezier(.05,.7,.1,1), opacity 300ms cubic-bezier(.05,.7,.1,1);
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,.18);
+  }
+  .phone.open .ring-item { transform: translate(-50%, -50%) scale(1); opacity: 1; pointer-events: auto; }
+
+  .outer-item { flex-direction: column; gap: 2px; }
+  .outer-item .ic { line-height: 1; }
+  .outer-item .lb {
+    color: var(--on-surface-variant); line-height: 1; font-weight: 500; white-space: nowrap;
+  }
+  .outer-item.active { background: var(--secondary-container); }
+  .outer-item.active .ic, .outer-item.active .lb { color: var(--on-secondary-container); }
+  .outer-item.normal { background: var(--surface-container-high); }
+
+  .inner-item { background: var(--primary-container); }
+  .inner-item .ic { color: var(--on-primary-container); line-height: 1; }
+
+  /* 主 FAB */
+  .fab {
+    position: absolute; z-index: 60;
+    right: 16px; bottom: 16px; width: 56px; height: 56px;
+    border-radius: 16px; background: var(--primary-container); color: var(--on-primary-container);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,.25);
+    cursor: pointer; user-select: none;
+  }
+  .fab .box { transition: transform 200ms cubic-bezier(.05,.7,.1,1); font-size: 24px; line-height: 1; }
+  .phone.open .fab .box { transform: rotate(90deg); }
+
+  /* 底部悬停说明 */
+  .hint { color: #9aa4b5; font-size: 12px; margin-top: 2px; text-align: center; max-width: 560px; line-height: 1.5; }
+
+  /* 变体切换浮动条 */
+  .switcher {
+    position: relative; bottom: 0; z-index: 60;
+    display: flex; align-items: center; gap: 10px;
+    background: #16181d; color: #fff; border-radius: 999px;
+    padding: 8px 12px; box-shadow: 0 8px 28px rgba(0,0,0,.45);
+    font-size: 13px;
+  }
+  .switcher button {
+    width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer;
+    background: #2a2d34; color: #fff; font-size: 16px; line-height: 1;
+  }
+  .switcher button:hover { background: #3a3e47; }
+  .switcher .label { min-width: 360px; text-align: center; font-weight: 600; }
+  .switcher .label small { color: #9aa4b5; font-weight: 400; margin-left: 6px; }
+  .switcher .open-btn {
+    width: auto; border-radius: 999px; padding: 0 14px; font-size: 13px; font-weight: 600;
+    background: #4f6aed;
+  }
+</style>
+</head>
+<body>
+  <div class="banner">
+    <b>PROTOTYPE（一次性）</b> — 放射导航 FAB 展开后「外环导航项」三变体。<br/>
+    用 <b>← / →</b> 或底部条切换；点右下角 <b>FAB</b> 展开/收起。几何与 GlobalFab.vue 一致（375dp 基准，1vw=3.75px），
+    并已修正两处 bug：层叠（菜单项浮于遮罩上）+ 外环扫角 -100°→-88°（防止末端项掉出屏幕）。
+  </div>
+
+  <div class="phone open" id="phone">
+    <div class="content">
+      <div class="cover"></div>
+      <div class="meta">
+        <div class="tags">
+          <span>#碧蓝档案</span><span>#Takanashi Hoshino</span><span>#ブルアカ</span><span>+3</span>
+        </div>
+        <h3>小鳥遊ホシノ</h3>
+        <p>シュヴィ · ★2.1万</p>
+      </div>
+    </div>
+    <div class="scrim" id="scrim"></div>
+    <div id="ring"></div>
+    <div class="fab" id="fab"><div class="box" id="fabIcon">⌂</div></div>
+  </div>
+
+  <div class="hint">
+    内环（↻刷新 / ↑回顶）三变体一致。本原型只对比<b>外环导航项</b>的三种容纳方式，用于定外环尺寸。
+  </div>
+
+  <div class="switcher">
+    <button id="prev" aria-label="上一变体">‹</button>
+    <div class="label" id="label">A</div>
+    <button id="next" aria-label="下一变体">›</button>
+    <button class="open-btn" id="openBtn">收起</button>
+  </div>
+
+<script>
+  // ── 几何（与 GlobalFab.vue 一致，375dp 基准，1vw = 3.75px）──
+  const FAB_RIGHT = 16;           // 4.267vw * 3.75
+  const FAB_SIZE = 56;            // 14.933vw
+  const FAB_CX = 375 - FAB_RIGHT - FAB_SIZE / 2;
+  const FAB_CY = 812 - FAB_RIGHT - FAB_SIZE / 2;
+
+  const OUTER_START = -8, OUTER_END = -88;
+  const INNER_START = -14, INNER_END = -80;
+
+  const NAV_TABS = [
+    { name: 'home',      label: '推荐', icon: '⌂' },
+    { name: 'illusts',   label: '插画', icon: '🖼' },
+    { name: 'novels',    label: '小说', icon: '📖' },
+    { name: 'me',        label: '我的', icon: '👤' },
+  ];
+  const INNER = [
+    { key: 'refresh', icon: '↻' },
+    { key: 'back-to-top', icon: '↑' },
+  ];
+
+  function polar(deg, r) {
+    const a = deg * Math.PI / 180;
+    return { x: FAB_CX + Math.sin(a) * r, y: FAB_CY - Math.cos(a) * r };
+  }
+  function spread(start, end, count) {
+    if (count <= 0) return [];
+    if (count === 1) return [start + (end - start) / 2];
+    return Array.from({ length: count }, (_, i) => start + ((end - start) * i) / (count - 1));
+  }
+
+  // ── 三变体（只影响外环导航项的结构与半径）──
+  const VARIANTS = {
+    A: {
+      name: 'A — 去文字：图标圆(48dp) + 圆外小字',
+      outerSize: 48,          // 圆 48dp
+      innerSize: 40,
+      radiusOuter: 116.25,    // 31vw
+      radiusInner: 75,        // 20vw
+      iconPx: 24,
+      label: null,            // 圆内无文字
+      labelBelow: 10,         // 圆下方 10sp 小字
+      labelStyle: 'below',    // 文字放圆外
+    },
+    B: {
+      name: 'B — 大圆 56dp：圆内 24dp 图标 + 12sp 文字',
+      outerSize: 56,          // 圆 56dp
+      innerSize: 40,
+      radiusOuter: 131.25,    // 35vw（56dp 大圆需更大半径防重叠）
+      radiusInner: 75,        // 20vw
+      iconPx: 24,
+      label: 12,              // 圆内 12sp
+      labelBelow: 0,
+      labelStyle: 'inside',
+    },
+    C: {
+      name: 'C — 保 48dp 圆：24dp 图标 + 紧凑 10sp 文字',
+      outerSize: 48,          // 圆 48dp
+      innerSize: 40,
+      radiusOuter: 116.25,    // 31vw
+      radiusInner: 75,        // 20vw
+      iconPx: 24,
+      label: 10,              // 圆内 10sp（紧凑）
+      labelBelow: 0,
+      labelStyle: 'inside',
+    },
+  };
+
+  const phone = document.getElementById('phone');
+  const ringEl = document.getElementById('ring');
+  const fabIcon = document.getElementById('fabIcon');
+  const labelEl = document.getElementById('label');
+
+  let variantKey = new URLSearchParams(location.search).get('variant') || 'A';
+  if (!VARIANTS[variantKey]) variantKey = 'A';
+
+  function render() {
+    const V = VARIANTS[variantKey];
+    ringEl.innerHTML = '';
+
+    // 外环
+    const outerAngles = spread(OUTER_START, OUTER_END, NAV_TABS.length);
+    NAV_TABS.forEach((tab, i) => {
+      const p = polar(outerAngles[i], V.radiusOuter);
+      const el = document.createElement('div');
+      el.className = 'ring-item outer-item ' + (tab.name === 'home' ? 'active' : 'normal');
+      el.style.width = V.outerSize + 'px';
+      el.style.height = V.outerSize + 'px';
+      el.style.left = p.x + 'px';
+      el.style.top = p.y + 'px';
+      el.style.transitionDelay = (i * 30) + 'ms';
+      el.style.padding = '4px';
+
+      let html = `<span class="ic" style="font-size:${V.iconPx}px">${tab.icon}</span>`;
+      if (V.labelStyle === 'inside') {
+        html += `<span class="lb" style="font-size:${V.label}px">${tab.label}</span>`;
+      }
+      el.innerHTML = html;
+
+      // 圆外文字（A 变体）：在圆下方追加一行小字
+      if (V.labelStyle === 'below') {
+        const lb = document.createElement('div');
+        lb.style.cssText = `position:absolute; top:calc(100% + 2px); left:50%; transform:translateX(-50%); font-size:${V.labelBelow}px; color:var(--on-surface-variant); white-space:nowrap; font-weight:500;`;
+        lb.textContent = tab.label;
+        el.appendChild(lb);
+      }
+      ringEl.appendChild(el);
+    });
+
+    // 内环
+    const innerAngles = spread(INNER_START, INNER_END, INNER.length);
+    INNER.forEach((item, i) => {
+      const p = polar(innerAngles[i], V.radiusInner);
+      const el = document.createElement('div');
+      el.className = 'ring-item inner-item';
+      el.style.width = V.innerSize + 'px';
+      el.style.height = V.innerSize + 'px';
+      el.style.left = p.x + 'px';
+      el.style.top = p.y + 'px';
+      el.style.transitionDelay = (i * 30) + 'ms';
+      el.innerHTML = `<span class="ic" style="font-size:24px">${item.icon}</span>`;
+      ringEl.appendChild(el);
+    });
+
+    // FAB 图标 = 当前 tab 图标
+    fabIcon.textContent = '⌂';
+    labelEl.innerHTML = `${variantKey} <small>${VARIANTS[variantKey].name}</small>`;
+    history.replaceState(null, '', '?variant=' + variantKey);
+  }
+
+  function setVariant(k) {
+    if (!VARIANTS[k]) return;
+    variantKey = k;
+    render();
+  }
+  function nextV() {
+    const keys = Object.keys(VARIANTS);
+    setVariant(keys[(keys.indexOf(variantKey) + 1) % keys.length]);
+  }
+  function prevV() {
+    const keys = Object.keys(VARIANTS);
+    setVariant(keys[(keys.indexOf(variantKey) - 1 + keys.length) % keys.length]);
+  }
+
+  document.getElementById('next').addEventListener('click', nextV);
+  document.getElementById('prev').addEventListener('click', prevV);
+  document.getElementById('openBtn').addEventListener('click', () => {
+    phone.classList.toggle('open');
+    openBtn.textContent = phone.classList.contains('open') ? '收起' : '展开';
+  });
+  document.getElementById('scrim').addEventListener('click', () => {
+    phone.classList.remove('open');
+    openBtn.textContent = '展开';
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.target.closest('input,textarea,[contenteditable]')) return;
+    if (e.key === 'ArrowRight') nextV();
+    else if (e.key === 'ArrowLeft') prevV();
+  });
+
+  render();
+</script>
+</body>
+</html>
