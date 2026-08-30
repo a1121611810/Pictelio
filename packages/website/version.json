@@ -1,9 +1,9 @@
 {
-  "version": "4.22.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.22.0",
-  "changelog": "🐛 修复\n  3933d35 fix(app): release 签名门禁改用 resolveOtaPrivateKeyPath 兼容 legacy 命名\n  84fe2bf fix(app-lynx): GlobalFab 展开层条件渲染 + (0,0) 锚点定位，修复全屏容器吞触摸\n  5ed68e0 fix(update-check): null body 防御 + 脏数据可见性（#247 review 修复）\n📝 文档\n  09ee693 docs(lynx): ADR-0123/spec 同步 E2E 探针（Me 页『我的收藏』行导航，评审复检 P2）\n  a3cb634 docs(lynx): ADR-0123 定位锚点实测修订 + 术语表/spec 同步\n  9b4451a docs(lynx): ADR-0123 + 命中测试术语表 + spec（FAB 全屏容器吞触摸修复）\n  cf09d55 docs(ota): OTA web-bundle 实施规格 + ADR-0122 自研选型 + 更新分发烧术语（#246）\n  ebab3c5 docs(ota): 五份 OTA 调研报告入库（#240 地图产物，防 git clean 丢失）\n🧪 测试\n  35818c4 test(app-lynx): android-e2e 页面点击恢复回归 spec（ADR-0123）\n  0565d77 test(app-lynx): GlobalFab 模板结构断言更新 + ADR-0123 回归负向断言\n  3bd5280 test(ota): Wycheproof ed25519 边界向量补齐（#248 review P2-1）\n  82e9af7 test(update-check): review P3 加固（undefined-floor 直测 + 缺失态无 warn 断言）\n🧹 杂项\n  a5a7814 chore(ota): 合并 web bundle OTA 全链路回 main（#240 地图毕业）\n💄 样式\n  c02049e style(ota): lint 清理（bench/release-bundle 未用变量与 catch 参数）\n  ad95ee9 style(app): android-e2e 两个测试文件 oxfmt 格式对齐（无行为变更）\n✨ 新功能\n  b43f4aa feat(ota): web-only 发布模式（--web-only 双坐标发布）（#255）\n  7067df0 feat(ota): 设备四场景 bench + 生产回归修复（#256）\n  ad226b2 feat(ota): 发布链三件套（release-bundle + release.mjs 挂载 + checklist）（#250）\n  31eb724 feat(ota): OTA 门槛 E2E（agent-browser 四场景）+ 弹窗信号收敛（#256）\n  794e53a feat(ota): WorkManager 慢通道（快慢双通道成形）（#252）\n  a6f96b5 feat(ota): 用户开关与 OTA 状态展示（#254）\n  b44216d feat(ota): 强制门槛全屏过渡面（合并 T1/T2 单面三态 + T3 转弹窗）（#253）\n  865b33c feat(ota): JS OTA 调度与 T0 静默生效（otaService + 启动编排接线）（#251）\n  47f8f61 feat(ota): OtaPlugin 机制核心接线（原型硬化 + 四坑内建 + 生产增量）（#249）\n  18af727 feat(ota): Ed25519 验签纯函数类 + bcprov 依赖 + JVM 单测（#248）\n  6193ebd feat(update-check): minWebVersion/webBundle 双坐标 + isBelowMin",
+  "version": "4.22.1",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.22.1",
+  "changelog": "🐛 修复\n  8895ef1 fix(app): R8 keep 规则保住 Room 生成类构造器，修复 v4.22.0 Release 启动闪退",
   "webBundle": {
-    "version": "4.22.0",
-    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.22.0/pictelio-4.22.0"
+    "version": "4.22.1",
+    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.22.1/pictelio-4.22.1"
   }
 }
