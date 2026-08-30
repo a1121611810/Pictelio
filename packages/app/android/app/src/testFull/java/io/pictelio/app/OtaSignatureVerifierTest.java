@@ -72,6 +72,50 @@ public class OtaSignatureVerifierTest {
         assertFalse("签名为 null", OtaSignatureVerifier.verify(RFC1_MSG, null, pk));
     }
 
+    // ── Wycheproof ed25519 边界向量（C2SP/wycheproof testvectors_v1/ed25519_test.json） ──
+    // RFC 8032 §7.1 不覆盖 malleable S / small-order 点 / 全零签名等安全边界；
+    // 以下为 Wycheproof 官方 invalid 向量（结果 = 拒绝），PK 为 group 公钥原文。
+    // Valid 向量（空消息）验证正向路径与已知良好签名。
+    private static final String WP_PK =
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa";
+
+    @Test
+    public void wycheproof_validEmptyMessageAccepted() {
+        assertTrue(OtaSignatureVerifier.verify(
+                new byte[0],
+                hex("d4fbdb52bfa726b44d1786a8c0d171c3e62ca83c9e5bbe63de0bb2483f8fd6cc"
+                        + "1429ab72cafc41ab56af02ff8fcc43b99bfe4c7ae940f60f38ebaa9d311c4007"),
+                hex(WP_PK)));
+    }
+
+    @Test
+    public void wycheproof_allZeroSignatureRejected() {
+        assertFalse(OtaSignatureVerifier.verify(
+                new byte[] { 0x3f },
+                new byte[64], // 全零签名（InvalidSignature 边界）
+                hex(WP_PK)));
+    }
+
+    @Test
+    public void wycheproof_smallOrderPublicKeyRejected() {
+        // SmallOrderPk：小阶点公钥（InvalidEncoding 边界）——must reject
+        assertFalse(OtaSignatureVerifier.verify(
+                hex("313233343030"),
+                hex("647c1492402ab5ce03e2c3a7f0384d051b9cf3570f1207fc78c1bcc98c281c2b"
+                        + "b1d125e5538f38afbcc1c84e489521083041d24bc6240767029da063271a1ff0c"),
+                hex("7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa")));
+    }
+
+    @Test
+    public void wycheproof_malleableSignatureRejected() {
+        // SignatureMalleability：S 高位可加 2^255 的变体——must reject
+        assertFalse(OtaSignatureVerifier.verify(
+                hex("54657374"),
+                hex("7c38e026f29e14aabd059a0f2db8b0cd783040609a8be684db12f82a27774ab"
+                        + "067654bce3832c2d76f8f6f5dafc08d9339d4eef676573336a5c51eb6f946b31d"),
+                hex(WP_PK)));
+    }
+
     // ── Node 侧差分 fixture（项目真实 OTA key，node:crypto 生成） ──
 
     /** 项目 OTA 公钥（raw 32B base64，= BuildConfig.OTA_ED25519_PUBLIC_KEY_B64 注入值） */

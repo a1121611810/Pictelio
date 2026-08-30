@@ -8,7 +8,8 @@ import org.bouncycastle.crypto.signers.Ed25519Signer;
 
 /**
  * OTA web bundle 验签纯函数（#248）：无 Android 依赖，JVM 单测可跑
- * （oracle = RFC 8032 §7.1 / Wycheproof 官方向量 + Node 侧 node:crypto 差分互验）。
+ * （oracle = RFC 8032 §7.1 官方向量 + Wycheproof ed25519 边界向量 + Node 侧
+ * node:crypto 差分互验——见 OtaSignatureVerifierTest）。
  *
  * 签名方案（docs/specs/ota-web-bundle.md「选型与架构」，#242 裁决）：
  * signature = PureEdDSA_Ed25519(DOMAIN_PREFIX || SHA-256(manifest 字节))
