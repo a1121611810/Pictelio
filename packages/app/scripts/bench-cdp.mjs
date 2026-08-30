@@ -19,7 +19,7 @@ const SLEEP = (ms) => new Promise((r) => setTimeout(r, ms));
 function sh(cmd) {
   try {
     return execSync(cmd, { encoding: "utf8" }).trim();
-  } catch (e) {
+  } catch {
     return "";
   }
 }
@@ -104,7 +104,7 @@ async function injectAndTrigger(ws, minWebVersion) {
 }
 
 /** 观察 logcat 中 OtaPlugin 标记，返回匹配行 */
-function logcat(filter) {
+function logcat() {
   return adb("logcat", "-d", "-s", "OtaPlugin", "OtaInstaller", "OtaWorker").split("\n");
 }
 

@@ -31,7 +31,6 @@
 import { readFile } from "node:fs/promises";
 import process from "node:process";
 import {
-  DEFAULT_OTA_PRIVATE_KEY_PATH,
   resolveOtaPrivateKeyPath,
   executeReleaseBundle,
   planReleaseBundle,
