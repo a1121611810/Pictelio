@@ -16,7 +16,7 @@ tags: [architecture, pictelio, solidjs, capacitor, monorepo]
 | `pictelio-app` | `/packages/app/` | SolidJS SPA — the core application |
 | `pictelio-website` | `/packages/website/` | Astro landing page (GitHub Pages) |
 | `pictelio-app-lynx` | `/packages/app-lynx/` | vue-lynx MVP on ReactLynx runtime — parallel rendering client |
-| `@pictelio/update-check` | `/packages/update-check/` | Shared update-check logic (`isNewer` / `checkForUpdate`) consumed by both clients (ADR-0089) |
+| `@pictelio/update-check` | `/packages/update-check/` | Shared update-check logic (`isNewer` / `isBelowMin` / `checkForUpdate`) consumed by both clients (ADR-0089), extended with OTA `minWebVersion`/`webBundle` dual-coordinate fields (ADR-0122) |
 | `@pictelio/ugoira` | `/packages/ugoira/` | Ugoira (animated illust) shared package |
 
 Root `package.json` delegates all commands via `vp run --filter`. Build tooling uses **vite-plus** (`vp` CLI), which wraps Vite with oxlint, oxfmt, and vitest.
@@ -250,7 +250,7 @@ Uses a **hand-rolled in-memory router** (`/packages/app-lynx/src/router.ts`) rat
 
 Routes: `/login`, `/recommended`, `/illusts`, `/illust/:id`, `/novels`, `/novel/:id`, `/user/:id`, `/user/:id/following`, `/user/:id/followers`, `/following`, `/bookmarks`, `/me`, `/update`, `/error`.
 
-The four global tabs (推荐 / 插画 / 小说 / 我的) are defined once in [`navTabs.ts`](/packages/app-lynx/src/components/navTabs.ts) and rendered by [`NavigationBar.vue`](/packages/app-lynx/src/components/NavigationBar.vue) (ADR-0088). The 插画 tab routes to the new `/illusts` page (`IllustList.vue`, recommended/following sub-tabs + waterfall). `/following` is retained as a route but is no longer reachable from the nav. `/update` (forced-update page) and `/error` (session-expiry page) both use `backBehavior: 'exit'` — the back key exits the app with no return path.
+The four global tabs (推荐 / 插画 / 小说 / 我的) are defined once in [`navTabs.ts`](/packages/app-lynx/src/components/navTabs.ts). Since [ADR-0120](/docs/adr/ADR-0120-app-lynx-radial-nav-fab.md) they are rendered by a radial double-ring FAB ([`GlobalFab.vue`](/packages/app-lynx/src/components/GlobalFab.vue) + the [`createGlobalFab`](/packages/app-lynx/src/primitives/createGlobalFab.ts) deep module) that replaced the old [`NavigationBar.vue`](/packages/app-lynx/src/components/NavigationBar.vue) and per-page FABs — outer ring = 4 navigation tabs, inner ring = page actions (refresh / back-to-top). The 插画 tab routes to the new `/illusts` page (`IllustList.vue`, recommended/following sub-tabs + waterfall). `/following` is retained as a route but is no longer reachable from the nav. `/update` (forced-update page) and `/error` (session-expiry page) both use `backBehavior: 'exit'` — the back key exits the app with no return path.
 
 **Initial route: `/recommended`** (first-frame content pattern, issues [#61](https://github.com/user/pixivizer/issues/61)/[#63](https://github.com/user/pixivizer/issues/63)). The default route was changed from `/login` to `/recommended` so that already-authenticated users see the recommended feed skeleton immediately on startup, eliminating the login-page flash. Unauthenticated users are redirected to `/login` by `initRouter`'s auth guard with replace semantics (no history push, preserving [ADR-0049](/docs/adr/ADR-0049-lynx-keepalive-page-cache.md) semantics).
 
@@ -299,7 +299,7 @@ The `illust.ts` module includes [`addBookmark`](/packages/app-lynx/src/api/illus
 
 ### Novel Body, Comments, Error & Update (v4.x)
 
-- **Mixed feed (`createMixFeed`):** [`createMixFeed.ts`](/packages/app-lynx/src/primitives/createMixFeed.ts) merges two remote paginated sources (illust 4:1 novel) into a single render stream with the same interface as single-source feeds; `Recommended.vue` migrated to it (ADR-0088).
+- **Mixed feed (`createMixFeed`):** [`createMixFeed.ts`](/packages/app-lynx/src/primitives/createMixFeed.ts) merges two remote paginated sources (illust 4:1 novel) into a single render stream with the same interface as single-source feeds. `Recommended.vue` no longer consumes it (the recommended page became a carousel in ADR-0115), but `createMixFeed` still serves the remaining list pages (插画 / 小说 / 关注 / 收藏 / user home / watchlist).
 - **Novel body `requestRaw` gateway:** [`api/novel.ts`](/packages/app-lynx/src/api/novel.ts) fetches novel HTML through a new `apiClient.requestRaw` — web reuses `rewriteUrl`/Bearer logic, native routes through `PictelioApi` (Java attaches Bearer + 401 refresh), fixing build-mode failures where the JS heap has zero-knowledge `access_token` and relative proxy paths can't resolve.
 - **Comment module:** [`api/comment.ts`](/packages/app-lynx/src/api/comment.ts) + [`useComments.ts`](/packages/app-lynx/src/primitives/useComments.ts) + `CommentOverlay.vue`/`CommentInputBar.vue`/`CommentItem.vue` — a bottom-sheet comment UI with two entry points (illust + novel detail), backed by [`modalStack.ts`](/packages/app-lynx/src/stores/modalStack.ts) for modal stacking/close.
 - **Error presentation:** [`utils/errorPresentation.ts`](/packages/app-lynx/src/utils/errorPresentation.ts) provides in-page graded copy plus a full-screen session-expiry [`ErrorPage.vue`](/packages/app-lynx/src/pages/ErrorPage.vue) at `/error` (`backBehavior: 'exit'`).
@@ -311,14 +311,14 @@ The `illust.ts` module includes [`addBookmark`](/packages/app-lynx/src/api/illus
 The Lynx MVP has evolved specific patterns for image display and loading UX that differ from the main SolidJS app due to web-core rendering quirks (see [ADR-0048](/docs/adr/ADR-0048-lynx-recommended-card-layout.md) and [glossary-web-core-pitfalls](/docs/adr/glossary-web-core-pitfalls.md)):
 
 - **Image display:** Lynx's `<image>` component does not support `widthFix` mode (silently falls back to `fill`, causing zero-height or stretched images). Two approaches are used depending on context:
-  - **[`SkeletonImage`](/packages/app-lynx/src/components/SkeletonImage.vue)** — a wrapper that applies `aspectFill` mode with an explicit `aspect-ratio` container plus an optional `minH` vw fallback to prevent height collapse (ADR-0045). Used in `Recommended.vue` waterfall list cards. **Does not work inside `scroll-view`** on real LynxView devices (style-based `aspect-ratio`/`minHeight` collapses to 0), so `IllustDetail.vue` uses a fixed-height container instead.
+  - **[`SkeletonImage`](/packages/app-lynx/src/components/SkeletonImage.vue)** — a wrapper that applies `aspectFill` mode with an explicit `aspect-ratio` container plus an optional `minH` vw fallback to prevent height collapse (ADR-0045). Since ADR-0117 it is a thin `layout="box"` adapter over the [`CoverImage`](/packages/app-lynx/src/components/CoverImage.vue) deep module, used in list-page cards. **Does not work inside `scroll-view`** on real LynxView devices (style-based `aspect-ratio`/`minHeight` collapses to 0), so `IllustDetail.vue` uses a fixed-height container instead.
   - **Fixed-height container** (`IllustDetail.vue`): `<view class="h-[100vw]">` + bare `<image>` with `aspectFill` mode — avoids the scroll-view style resolution bug entirely. No shimmer skeleton for detail images in this mode; the shimmer overlay is omitted since the `aspect-ratio` container that enabled it doesn't render inside scroll-view.
-- **Waterfall card layout:** `Recommended.vue` list cards **must not use `w-full`** (web-core resolves percentage widths against the viewport, not the parent column). Width is left to the list engine's column constraint. Card spacing uses `<list>`'s `list-main-axis-gap` / `list-cross-axis-gap` attributes (not margin/padding on items, which do not participate in waterfall layout in web-core).
+- **Waterfall card layout:** Waterfall list cards (e.g. `IllustList.vue`) **must not use `w-full`** (web-core resolves percentage widths against the viewport, not the parent column). Width is left to the list engine's column constraint. Card spacing uses `<list>`'s `list-main-axis-gap` / `list-cross-axis-gap` attributes (not margin/padding on items, which do not participate in waterfall layout in web-core).
 - **Two-layer shimmer skeleton:** A global `.shimmer` CSS class with `@keyframes shimmer` animation is defined in `App.vue` (uses `linear-gradient` + `background-position` — confirmed working in web-core; native LynxView support pending [#41](https://github.com/user/pixivizer/issues/41)). The skeleton strategy has two layers:
-  - **Data layer:** 8 [`SkeletonCard`](/packages/app-lynx/src/components/SkeletonCard.vue) components render as shimmer placeholders (square image + two text bars matching `ImageCard` layout) during initial API fetch in `Recommended.vue`; `IllustDetail.vue` shows a square shimmer image + three text bars inline. These hide when API data arrives.
-  - **Image layer:** [`SkeletonImage.vue`](/packages/app-lynx/src/components/SkeletonImage.vue) wraps each `<image>` with its own shimmer overlay that hides on image `@load` (not API response). Used in `Recommended.vue` waterfall cards where the `aspect-ratio` container renders correctly. **Not used in `IllustDetail.vue`** — inside `scroll-view` on real devices, the style-based container collapses to 0 height, so detail images use a fixed-height container without shimmer (see [Image display](#image-rendering--loading-states)).
+  - **Data layer:** 8 [`SkeletonCard`](/packages/app-lynx/src/components/SkeletonCard.vue) components render as shimmer placeholders (square image + two text bars matching `ImageCard` layout) during initial API fetch in list pages — the carousel `Recommended.vue` instead shows a single immersive-card skeleton (ADR-0118); `IllustDetail.vue` shows a square shimmer image + three text bars inline. These hide when API data arrives.
+  - **Image layer:** [`SkeletonImage.vue`](/packages/app-lynx/src/components/SkeletonImage.vue) wraps each `<image>` with its own shimmer overlay that hides on image `@load` (not API response). Used in list-page cards where the `aspect-ratio` container renders correctly. **Not used in `IllustDetail.vue`** — inside `scroll-view` on real devices, the style-based container collapses to 0 height, so detail images use a fixed-height container without shimmer (see [Image display](#image-rendering--loading-states)).
 
-- **Bookmark interaction:** The [`BookmarkButton.vue`](/packages/app-lynx/src/components/BookmarkButton.vue) component (ADR-0052) provides a reusable ♥ toggle shared between `IllustDetail.vue` and `Recommended.vue` feed cards. It maintains local `bookmarked`/`count` state, calls `addBookmark`/`deleteBookmark` from [`illust.ts`](/packages/app-lynx/src/api/illust.ts) (default `restrict: public`), and uses `@tap.stop` to prevent card-tap navigation when toggling. Optimistic count ±1 on success; failure displays "操作失败" inline.
+- **Bookmark interaction:** The [`BookmarkButton.vue`](/packages/app-lynx/src/components/BookmarkButton.vue) component (ADR-0052) provides a reusable ♥ toggle shared between `IllustDetail.vue` and the `Recommended.vue` carousel (its page-level scrim bookmark). It maintains local `bookmarked`/`count` state, calls `addBookmark`/`deleteBookmark` from [`illust.ts`](/packages/app-lynx/src/api/illust.ts) (default `restrict: public`), and uses `@tap.stop` to prevent card-tap navigation when toggling. Optimistic count ±1 on success; failure displays "操作失败" inline.
 
 ### Known MVP Limitations
 
@@ -327,9 +327,51 @@ The Lynx MVP has evolved specific patterns for image display and loading UX that
 - **No PKCE OAuth:** login is `refresh_token`-only; WebView-based OAuth needs native integration
 - **Native token persistence:** Implemented via [PictelioSecureStorageModule](#auth--security) (LynxModule backed by [`SecureStorageCompat`](/openwiki/integrations/android-native.md#securestoragecompat), same Keystore alias + ciphertext as the webview client). Enables cross-client login sharing.
 - **`@tap` on native `<text>` broken (real device):** On real LynxView devices, `@tap` handlers on native `<text>` elements do not fire. Workaround: wrap `<text>` in a `<view>` and bind `@tap` to the view (verified working on device). Applied to back buttons (`‹ 返回`) and navigation links across all pages.
-- **`@tap` on `<list-item>` root broken (fiber):** On real devices, `@tap` bound directly to `<list-item>` does not trigger (fiber event system). Workaround: wrap all item content in a `<view>` and bind `@tap` there instead. Applied to `Recommended.vue` feed cards. Inner elements like `BookmarkButton` use `@tap.stop` to prevent card navigation.
+- **`@tap` on `<list-item>` root broken (fiber):** On real devices, `@tap` bound directly to `<list-item>` does not trigger (fiber event system). Workaround: wrap all item content in a `<view>` and bind `@tap` there instead. Applied to list-page cards (e.g. `IllustList.vue`). Inner elements like `BookmarkButton` use `@tap.stop` to prevent card navigation.
 
 See [package README](/packages/app-lynx/README.md) for the full architecture map and quick start.
+
+## Over-The-Air (OTA) Web Bundle Updates
+
+Since v4.22.0 ([ADR-0122](/docs/adr/ADR-0122-ota-self-built-switching.md), [spec](/docs/specs/ota-web-bundle.md)), web-layer fixes are decoupled from the APK via **L1 web-bundle OTA**: the web build is zipped, Ed25519-signed, and distributed through GitHub Releases, checked at startup and applied on the next launch. The mechanism is self-built on Capacitor's official `setServerBasePath`/`setServerAssetPath` primitives (rather than `@capgo/capacitor-updater`), with a layered update model:
+
+- **L1 web bundle OTA** (high-frequency, silent): startup check → silent download → verify → unzip → `pending` pointer → applied on next launch → `notifyReady` health handshake with 10s timeout rollback.
+- **L2 APK full update** (low-frequency, explicit): the existing `updateService` + dismissible `StartupUpdateDialog` is unchanged.
+- **G1 forced floor** (`minWebVersion`): below-floor bundles self-heal via a full-screen transition page, or fall back to a block state with retry/download exits.
+
+**Shared layer** ([`@pictelio/update-check`](/packages/update-check/)): `CheckResult` gained `minWebVersion?` / `webBundle?` fields plus the `isBelowMin(local, floor?)` pure function (fail-open when the floor is absent). `packages/website/version.json` is the single fact source with a **dual-coordinate** schema — `version` (APK coordinate, drives the update dialog) vs `webBundle.version` (bundle coordinate, drives OTA + floor comparison); `checksum`/`minApkVersion` live only in the signed `manifest`, never in the unsigned version.json.
+
+**JS orchestration** ([`otaService.ts`](/packages/app/src/services/otaService.ts)): `runOtaCheck()` issues a **single `checkForUpdate()` fetch that is triple-consumed** — APK dialog signals (via `settingsStore`), `minWebVersion` floor evaluation, and OTA metadata — preserving the existing 500ms cold-start check timing. It also drives the `notifyWebBundleReady()` first-frame hook, ≥4h foreground-resume throttled re-check, and exponential backoff. The `autoCheckUpdate` switch gates only the APK dialog; a separate "auto-download web bundle" switch gates the T0 prewarm, while the floor gate + self-heal are never switch-suppressed. The `GateOverlay.tsx` full-screen transition page is driven by `gateActive`/`gateHealing`/`gateError` signals.
+
+```mermaid
+sequenceDiagram
+    participant R as __root startup
+    participant S as otaService
+    participant O as OtaPlugin native
+    participant W as OtaWorker
+
+    R->>S: runOtaCheck()
+    S->>S: checkForUpdate + floor evaluation
+    alt below minWebVersion floor
+        S->>O: install (foreground self-heal)
+        O-->>S: installed
+        S->>O: applyNow
+        O-->>S: reload into new bundle
+    else newer bundle available
+        S->>O: prewarm (silent)
+        O->>W: enqueue download
+        W-->>O: pending written
+    end
+    Note over S: first frame rendered
+    S->>O: notifyReady(APP_VERSION)
+    O-->>S: ok or rollback to lastGood
+```
+
+*Cold-start OTA check: one fetch drives the APK dialog, the floor gate (self-heal), and the silent prewarm; `notifyReady` later confirms health or rolls back.*
+
+**Native side** ([`OtaPlugin`](/packages/app/android/app/src/webview/java/io/pictelio/app/OtaPlugin.java), [TS wrapper](/packages/app/src/native/Ota.ts)): `install` (foreground, G1 self-heal fast path) and `prewarm` (WorkManager slow channel via `OtaWorker`/`OtaInstaller`, `CONNECTED` + backoff + unique work) share one `OtaInstaller` pipeline; `applyNow` + `status` + `notifyReady` round out the surface. Immutable version directories + three pointers (`current`/`lastGood`/`pending`) in SharedPreferences give atomic switch; APK upgrade resets OTA state (`resetWhenUpdate` semantics). See [Android Native & Build](/openwiki/integrations/android-native.md#otaplugin).
+
+**Release pipeline** ([`release-bundle.mjs`](/packages/app/scripts/release-bundle.mjs)): bundles + signs the zip (root = `index.html`), and a `pnpm release --web-only` mode ships a web-only hotfix in minutes without building/signing an APK (version.json keeps the APK `version` field pinned to the last published APK and only advances `webBundle`).
 
 ## Component Architecture
 

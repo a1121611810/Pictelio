@@ -1,13 +1,13 @@
 ---
 type: Concept
 title: Android Native & Build
-description: The Capacitor Android native runtime layer with three Gradle product flavors (full/webview/lynx) producing separate APKs since v4.0.0. Covers five Capacitor plugins (Auth, ImageCache, OAuth, PixivApi, ClientInfo), Lynx Native Modules, shared Java utilities, Gradle build pipeline, release signing, and WebView configuration.
+description: The Capacitor Android native runtime layer with three Gradle product flavors (full/webview/lynx) producing separate APKs since v4.0.0. Covers six Capacitor plugins (Auth, ImageCache, OAuth, PixivApi, ClientInfo, Ota), Lynx Native Modules, shared Java utilities, Gradle build pipeline, release signing, and WebView configuration.
 tags: [android, capacitor, native, gradle, build, plugins, pixiv-api-gateway]
 ---
 
 # Android Native & Build
 
-Pictelio packages the SolidJS SPA as a native Android app via Capacitor, with four custom native plugins, three Lynx Native Modules, and a comprehensive build pipeline.
+Pictelio packages the SolidJS SPA as a native Android app via Capacitor, with six custom native plugins, three Lynx Native Modules, and a comprehensive build pipeline.
 
 ## Three-Flavor Architecture (v4.0.0+)
 
@@ -26,7 +26,7 @@ Source files are split across flavor sourceSets:
 | SourceSet | Contains |
 |-----------|----------|
 | `src/main/` | Shared: `PixivApiCore`, `PixivImageLoader`, `SecureStorageCompat`, `OAuthUtils`, `SplashController`, `OAuthConfig`, resources |
-| `src/webview/` | Capacitor plugins: `AuthPlugin`, `ImageCachePlugin`, `OAuthPlugin`, `PixivApiPlugin`, `ClientInfoPlugin`; WebView-only entry: `MainActivityWebview`, `PictelioAppWebview` |
+| `src/webview/` | Capacitor plugins: `AuthPlugin`, `ImageCachePlugin`, `OAuthPlugin`, `PixivApiPlugin`, `ClientInfoPlugin`, `OtaPlugin` (+ `OtaInstaller`, `OtaWorker`); WebView-only entry: `MainActivityWebview`, `PictelioAppWebview` |
 | `src/lynx/` | Lynx Native Modules: `PictelioApiModule`, `PictelioAppModule`, `PictelioAuthModule`, `PictelioSecureStorageModule`, `PictelioImageService`, `PictelioTemplateProvider`; Lynx-only entry: `LynxActivity`, `PictelioAppLynx` |
 | `src/full/` | Full-flavor overlays: `MainActivity` (routing gate), `PictelioApp` (conditional init) — merges both `webview` + `lynx` sources |
 
@@ -34,7 +34,7 @@ The `main/AndroidManifest.xml` uses `${launcherActivity}` and `${appClass}` mani
 
 ## Native Plugin Architecture
 
-Four custom Capacitor plugins bridge the TypeScript SPA to Android platform capabilities. Each has a Java implementation and a TypeScript wrapper. Since v4.0.0 (flavor migration), the Capacitor plugin Java sources reside under `src/webview/java/`:
+Six custom Capacitor plugins bridge the TypeScript SPA to Android platform capabilities. Each has a Java implementation and a TypeScript wrapper. Since v4.0.0 (flavor migration), the Capacitor plugin Java sources reside under `src/webview/java/`:
 
 ```mermaid
 flowchart LR
@@ -44,6 +44,7 @@ flowchart LR
         O[OAuthPlugin.ts]
         P[PixivApi.ts]
         C[ClientInfo.ts]
+        OT[Ota.ts]
     end
     subgraph Java[Android Java — src/webview/]
         JA[AuthPlugin.java]
@@ -51,6 +52,7 @@ flowchart LR
         JO[OAuthPlugin.java]
         JP[PixivApiPlugin.java]
         JC[ClientInfoPlugin.java]
+        JOt[OtaPlugin.java]
     end
     TS -->|Capacitor bridge| Java
 ```
@@ -170,11 +172,28 @@ A Capacitor plugin (`@CapacitorPlugin(name = "ClientInfo")`) that exposes the cu
 
 See [clientSwitch.ts](/packages/app/src/utils/clientSwitch.ts) for the frontend `supportsClientSwitch()` logic and [SettingsClient.tsx](/packages/app/src/components/settings/SettingsClient.tsx) for the UI hiding behavior.
 
+### OtaPlugin
+
+**Java:** `/packages/app/android/app/src/webview/java/io/pictelio/app/OtaPlugin.java` (+ `OtaInstaller.java`, `OtaWorker.java`)
+**TypeScript:** `/packages/app/src/native/Ota.ts`
+
+The OTA web-bundle Capacitor plugin ([ADR-0122](/docs/adr/ADR-0122-ota-self-built-switching.md), [spec](/docs/specs/ota-web-bundle.md)) implements self-built web-bundle switching on Capacitor's `setServerBasePath`/`setServerAssetPath` primitives. Immutable version directories plus three SharedPreferences pointers (`current`/`lastGood`/`pending`) give atomic next-launch switching with a `notifyReady` health-handshake rollback. It bakes in the four production pitfalls surfaced by the #245 prototype — no-store cache wrapping, notifyReady version handshake, WebView first-navigation race delay, and rollback pending-clear + idempotent reinstall.
+
+| Method | Contract |
+|--------|----------|
+| `status()` | Returns `{ current, lastGood, pending, publicKeyFingerprint }` (fingerprint = SHA-256 of the built-in Ed25519 public key) |
+| `install({ urlBase })` | Foreground download → Ed25519 verify → `minApkVersion` gate → checksum → unzip → write `pending`; rejects with a machine-readable reason (`bad-signature` / `apk-too-old` / `checksum` / `size-mismatch` / `unzip-missing-index` / `error:*`) |
+| `prewarm({ urlBase })` | WorkManager slow channel (T0 prewarm): `CONNECTED` constraint + exponential backoff + unique `KEEP` work; writes `pending` for next launch |
+| `notifyReady({ version })` | Health handshake — the reported version must match the `current` pointer to count as healthy |
+| `applyNow()` | Adopt pending → switch root → reload (G1 self-heal fast path) |
+
+Download/verify/unzip runs entirely in native code (zip bytes never enter the JS heap, matching the image-pipeline zero-bytes-into-JS principle); JS (`otaService.ts`) only schedules and reads metadata. `OtaWorker`/`OtaInstaller` are the WorkManager + install pipeline; Ed25519 verification uses the `bcprov-jdk18on` lightweight API with the public key injected via `buildConfigField` (the private key stays on the publisher's machine). See [Architecture Overview](/openwiki/architecture/overview.md#over-the-air-ota-web-bundle-updates).
+
 ## Lynx Native Modules
 
 The following Lynx Native Modules reside under `src/lynx/java/` (lynx flavor) and are also merged into the full flavor. Unlike the Capacitor plugins above, these extend `com.lynx.jsbridge.LynxModule` and are registered in the LynxView's module registry.
 
-Introduced in #52 for the [app-lynx vue-lynx client](/openwiki/architecture/overview.md#app-lynx-vue-lynx-client). Unlike the four Capacitor plugins above, `PictelioSecureStorageModule` is a **LynxModule** — it extends `com.lynx.jsbridge.LynxModule` and is registered in the LynxView's module registry rather than via Capacitor's plugin system.
+Introduced in #52 for the [app-lynx vue-lynx client](/openwiki/architecture/overview.md#app-lynx-vue-lynx-client). Unlike the six Capacitor plugins above, `PictelioSecureStorageModule` is a **LynxModule** — it extends `com.lynx.jsbridge.LynxModule` and is registered in the LynxView's module registry rather than via Capacitor's plugin system.
 
 **Java:** `/packages/app/android/app/src/main/java/io/pictelio/app/PictelioSecureStorageModule.java`
 **Type declarations:** `/packages/app-lynx/src/rspeedy-env.d.ts` (under `globalThis.NativeModules`)
@@ -401,6 +420,7 @@ Pictelio uses an automated Android build pipeline with several scripts:
 | Script | Purpose |
 |--------|---------|
 | `/packages/app/scripts/release.mjs` | Full release: version bump → build → sign → GitHub release |
+| `/packages/app/scripts/release-bundle.mjs` | OTA web-bundle packaging + Ed25519 signing (zip root = `index.html`), produces the manifest/zip/sig three-piece set (ADR-0122); also run standalone for local round-trip verification |
 | `/packages/app/scripts/dev-android.mjs` | One-command dev: Vite → Capacitor sync → Gradle → install |
 | `/packages/app/scripts/sync-android-version.mjs` | Syncs version name from `package.json` to `build.gradle` |
 | `/packages/app/scripts/sync-credentials.mjs` | Injects Pixiv API credentials for CI builds |
