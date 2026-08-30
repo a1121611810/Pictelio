@@ -15,7 +15,11 @@ import {
 import { settings } from "@/settings";
 import { persistScrollRestoration } from "@/stores/uiStore";
 import { scrollToTop } from "@/utils/scrollToTop";
-import { checkForUpdate } from "@/services/updateService";
+import {
+  notifyWebBundleReady,
+  registerOtaResumeListener,
+  runOtaCheck,
+} from "@/services/otaService";
 import StartupUpdateDialog from "@/components/StartupUpdateDialog";
 import { clearOverlays, registerBackGesture } from "@/services/backGestureService";
 import { warmCacheFromDisk } from "@/utils/imageLoader";
@@ -51,18 +55,23 @@ async function runStartupUpdateCheck(): Promise<void> {
   setIsCheckingUpdate(true);
   const [updateErr] = await tryAsync(
     (async () => {
-      const result = await checkForUpdate(APP_VERSION);
-      setHasUpdate(result.hasUpdate);
-      setLatestVersion(result.latestVersion);
-      setLatestReleaseUrl(result.latestReleaseUrl);
-      setLatestChangelog(result.latestChangelog);
+      // 单 fetch 三重消费（#251）：OTA floor 评估/静默安装/自愈触发在 otaService 内完成，
+      // 这里消费同一份结果驱动 APK 弹窗（autoCheckUpdate 只关弹窗打扰，不关门槛检查）
+      const result = await runOtaCheck();
+      if (result) {
+        setHasUpdate(result.hasUpdate);
+        setLatestVersion(result.latestVersion);
+        setLatestReleaseUrl(result.latestReleaseUrl);
+        setLatestChangelog(result.latestChangelog);
 
-      if (
-        result.hasUpdate &&
-        result.latestVersion &&
-        result.latestVersion !== lastDismissedVersion()
-      ) {
-        setShowUpdateDialog(true);
+        if (
+          autoCheckUpdate() &&
+          result.hasUpdate &&
+          result.latestVersion &&
+          result.latestVersion !== lastDismissedVersion()
+        ) {
+          setShowUpdateDialog(true);
+        }
       }
     })(),
   );
@@ -178,12 +187,14 @@ const RootLayout: Component = (props: { children?: any }) => {
     if (currentPath !== "/home") {
       markContentReady();
     }
-    // 启动后延迟检查更新 — 确保页面渲染完成后再弹窗
-    if (autoCheckUpdate()) {
-      setTimeout(() => {
-        runStartupUpdateCheck();
-      }, STARTUP_CHECK_DELAY_MS);
-    }
+    // 健康上报（notifyReady 首帧挂点，#251）+ 回前台节流补查监听（均 native-only）
+    notifyWebBundleReady();
+    registerOtaResumeListener();
+    // 启动后延迟检查更新 — 确保页面渲染完成后再弹窗；不再被 autoCheckUpdate 关断
+    // （单 fetch 同时服务 OTA 门槛检查，门槛不受弹窗开关抑制，规格「检查与调度」）
+    setTimeout(() => {
+      void runStartupUpdateCheck();
+    }, STARTUP_CHECK_DELAY_MS);
     if (authErr) {
       console.error("[App] Auth initialization failed", authErr);
       navigate("/login", { replace: true });
