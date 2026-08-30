@@ -51,6 +51,29 @@ function screenHeightVw(): number {
 const fabCx = 100 - FAB_RIGHT_VW - FAB_SIZE_VW / 2
 const fabCy = screenHeightVw() - FAB_RIGHT_VW - FAB_SIZE_VW / 2
 
+// ── 定位（ADR-0123）：子元素一律 left/top vw（vw=视口基准），锚点=外层 (0,0) 零尺寸盒 ──
+// [lynx:fix] 原生 LynxView 把「最近的 view 祖先」当作 absolute 子元素的定位锚点
+//（即使该祖先未设 position，与 Web 回退到视口的语义不同，实测偏离）。若用 right/bottom
+// 且父盒非全屏，元素会按父盒边缘解析而跑出屏幕（FAB 消失，模拟器实测）。故：
+// 外层 absolute 钉在 (0,0) + 零尺寸盒（只作锚点、不参与命中），子元素全部 vw 定位。
+
+/** 遮罩：显式 vw 全屏尺寸（铺满屏幕的交互面，点空白收起）。 */
+const scrimStyle: Record<string, string> = {
+  left: '0',
+  top: '0',
+  width: '100vw',
+  height: `${screenHeightVw()}vw`,
+}
+
+/** 主 FAB：left/top vw + translate 居中（相对 (0,0) 锚点 = 视口坐标，恒在右下角）。 */
+const fabStyle: Record<string, string> = {
+  left: `${fabCx}vw`,
+  top: `${fabCy}vw`,
+  width: `${FAB_SIZE_VW}vw`,
+  height: `${FAB_SIZE_VW}vw`,
+  transform: 'translate(-50%,-50%)',
+}
+
 /** 极角→直角坐标（vw；0°=正上方，顺时针为负往左）。 */
 function polar(angleDeg: number, r: number): { x: number; y: number } {
   const a = (angleDeg * Math.PI) / 180
@@ -78,19 +101,16 @@ const innerPair = computed(() => {
   return view.value.inner.map((item, i) => ({ item, i, ...polar(angles[i], R_INNER_VW) }))
 })
 
-/** 环项样式：绝对定位 + 居中；开时 scale(1)、关时 scale(0)（弹出/收起动画，带 stagger）。 */
+/** 环项样式：绝对定位 + 居中；弹出动画用 keyframes（v-if 挂载态 transition 不触发，ADR-0123），带 stagger。 */
 function ringStyle(x: number, y: number, i: number): Record<string, string> {
-  const s = view.value.isOpen ? 1 : 0
-  const delay = view.value.isOpen ? i * 30 : 0
-  const transition = reducedMotion.value ? 'none' : `transform 300ms cubic-bezier(.05,.7,.1,1), opacity 300ms cubic-bezier(.05,.7,.1,1)`
+  const delay = reducedMotion.value ? 0 : i * 30
   return {
     left: `${x}vw`,
     top: `${y}vw`,
-    transform: `translate(-50%,-50%) scale(${s})`,
-    opacity: s ? '1' : '0',
-    transition,
-    'transition-delay': `${delay}ms`,
-    'pointer-events': s ? 'auto' : 'none',
+    transform: 'translate(-50%,-50%)',
+    animation: reducedMotion.value
+      ? 'none'
+      : `fab-ring-in 300ms cubic-bezier(.05,.7,.1,1) ${delay}ms both`,
   }
 }
 
@@ -111,55 +131,63 @@ function dispatchInner(item: { kind: 'refresh' | 'back-to-top' | 'extra'; key: s
 </script>
 
 <template>
-  <view v-if="view.visible" class="absolute inset-0 z-40 pointer-events-none">
-    <!-- 遮罩：展开时覆盖，点空白收起 -->
+  <!-- 外层：z-40 定位容器，钉在 (0,0) 零尺寸盒——既是子元素的定位锚点（left/top vw 从 (0,0) 起算），
+       自身又不参与命中测试。
+       [lynx:fix] 原生 LynxView hit-testing 不识别 pointer-events（ADR-0123）：
+       全屏元素在关闭态必须从渲染树移除（v-if），否则吞掉页面全部点击。 -->
+  <view v-if="view.visible" class="absolute z-40" style="top: 0; left: 0">
+    <!-- 遮罩：展开时覆盖全屏（显式 vw 尺寸），点空白收起（全屏交互面，@tap 必须） -->
     <view
       v-if="view.isOpen"
-      class="absolute inset-0 z-10 bg-scrim pointer-events-auto"
+      class="absolute z-10 bg-scrim scrim-in"
+      :style="scrimStyle"
       @tap="dispatchClose"
     />
 
-    <!-- 外环：导航 tab（当前高亮 secondary-container）——固定圆形尺寸（vw 缩放，≥40px 触控目标） -->
-    <view
-      v-for="e in outerPair"
-      :key="e.tab.name"
-      class="absolute z-20 flex flex-col items-center justify-center w-[14.93vw] h-[14.93vw] rounded-full shadow-[var(--md-elevation-2)]"
-      :class="e.tab.name === view.active ? 'bg-secondary-container' : 'bg-surface-container-high'"
-      :style="ringStyle(e.x, e.y, e.i)"
-      :accessibility-element="A11Y_ELEMENT_ENABLED"
-      :accessibility-label="e.tab.a11yLabel"
-      @tap="dispatchSelect(e.tab.name)"
-    >
-      <text
-        class="leading-none"
-        :class="e.tab.name === view.active ? 'text-secondary-on-container' : 'text-surface-on-variant'"
-        style="font-size: 6.4vw"
-      >{{ e.tab.icon }}</text>
-      <text
-        class="leading-none mt-[1px]"
-        :class="e.tab.name === view.active ? 'text-secondary-on-container' : 'text-surface-on-variant'"
-        style="font-size: 3.2vw"
-      >{{ e.tab.label }}</text>
+    <!-- 环层：外环 + 内环，仅菜单展开时渲染（零尺寸盒，只承载环项） -->
+    <view v-if="view.isOpen" class="absolute z-20">
+      <!-- 外环：导航 tab（当前高亮 secondary-container）——固定圆形尺寸（vw 缩放，≥40px 触控目标） -->
+      <view
+        v-for="e in outerPair"
+        :key="e.tab.name"
+        class="absolute z-20 flex flex-col items-center justify-center w-[14.93vw] h-[14.93vw] rounded-full shadow-[var(--md-elevation-2)]"
+        :class="e.tab.name === view.active ? 'bg-secondary-container' : 'bg-surface-container-high'"
+        :style="ringStyle(e.x, e.y, e.i)"
+        :accessibility-element="A11Y_ELEMENT_ENABLED"
+        :accessibility-label="e.tab.a11yLabel"
+        @tap="dispatchSelect(e.tab.name)"
+      >
+        <text
+          class="leading-none"
+          :class="e.tab.name === view.active ? 'text-secondary-on-container' : 'text-surface-on-variant'"
+          style="font-size: 6.4vw"
+        >{{ e.tab.icon }}</text>
+        <text
+          class="leading-none mt-[1px]"
+          :class="e.tab.name === view.active ? 'text-secondary-on-container' : 'text-surface-on-variant'"
+          style="font-size: 3.2vw"
+        >{{ e.tab.label }}</text>
+      </view>
+
+      <!-- 内环：页面动作项（刷新/回顶/扩展）——固定圆形尺寸（vw 缩放） -->
+      <view
+        v-for="e in innerPair"
+        :key="e.item.key"
+        class="absolute z-20 flex items-center justify-center w-[10.67vw] h-[10.67vw] rounded-full bg-primary-container shadow-[var(--md-elevation-2)]"
+        :style="ringStyle(e.x, e.y, e.i)"
+        :accessibility-element="A11Y_ELEMENT_ENABLED"
+        :accessibility-label="e.item.a11yLabel"
+        @tap="dispatchInner(e.item)"
+      >
+        <text class="leading-none text-primary-on-container" style="font-size: 6.4vw">{{ e.item.icon }}</text>
+      </view>
     </view>
 
-    <!-- 内环：页面动作项（刷新/回顶/扩展）——固定圆形尺寸（vw 缩放） -->
+    <!-- 主 FAB：展开成 close，收起为当前 tab 图标；busy 时转圈/禁用 -->
     <view
-      v-for="e in innerPair"
-      :key="e.item.key"
-      class="absolute z-20 flex items-center justify-center w-[10.67vw] h-[10.67vw] rounded-full bg-primary-container shadow-[var(--md-elevation-2)]"
-      :style="ringStyle(e.x, e.y, e.i)"
-      :accessibility-element="A11Y_ELEMENT_ENABLED"
-      :accessibility-label="e.item.a11yLabel"
-      @tap="dispatchInner(e.item)"
-    >
-      <text class="leading-none text-primary-on-container" style="font-size: 6.4vw">{{ e.item.icon }}</text>
-    </view>
-
-    <!-- 主 FAB（M3 primary-container 56dp）：展开成 close，收起为当前 tab 图标；busy 时转圈/禁用 -->
-    <view
-      class="absolute z-30 pointer-events-auto flex items-center justify-center rounded-[var(--md-shape-large)] bg-primary-container shadow-[var(--md-elevation-3)] active:shadow-[var(--md-elevation-1)]"
+      class="absolute z-30 flex items-center justify-center rounded-[var(--md-shape-large)] bg-primary-container shadow-[var(--md-elevation-3)] active:shadow-[var(--md-elevation-1)]"
       :class="view.isBusy ? 'opacity-60' : ''"
-      style="right: 4.267vw; bottom: 4.267vw; width: 14.933vw; height: 14.933vw"
+      :style="fabStyle"
       :accessibility-element="A11Y_ELEMENT_ENABLED"
       :accessibility-label="view.isOpen ? GLOBAL_FAB_A11Y_LABELS.close : GLOBAL_FAB_A11Y_LABELS.open"
       @tap="dispatchToggle"
@@ -176,6 +204,12 @@ function dispatchInner(item: { kind: 'refresh' | 'back-to-top' | 'extra'; key: s
 </template>
 
 <style>
+/* 放射环项弹出动画（ADR-0123）：环项随展开层 v-if 挂载，transition 不触发（状态无变化），
+   改用 keyframes + both fill + 逐项 stagger（对齐 ADR-0111 的 item-rise 弹出习语）。 */
+@keyframes fab-ring-in {
+  from { transform: translate(-50%,-50%) scale(0); opacity: 0; }
+  to   { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+}
 /* 放射 FAB 刷新旋转动画（ADR-0108：Lynx keyframe + TransformProps 已验证）。
    类名 fab-ring-spin 全仓唯一（RefreshableList 的 fab-spin 已被其占用，避免冲突）。 */
 @keyframes fab-ring-spin {

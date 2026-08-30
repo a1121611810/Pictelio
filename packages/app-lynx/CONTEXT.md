@@ -17,6 +17,17 @@ _Avoid_: 遮罩卡（与遮罩的 absolute 覆盖模式语义不同）
 **遮罩（overlay）**：
 `RestrictOverlay` 组件的 absolute 覆盖模式（铺满父容器），用于详情页正文等「内容仍渲染、遮罩盖其上」的场景。列表卡一律用流内受限卡模式，**禁止**在 list-item 内使用 absolute 遮罩（真机高度测量异常，会撑满内容区）。
 
+### 覆盖层与命中测试（Overlay & hit-testing）
+
+**平台约束（ADR-0123，不可变）**：
+原生 LynxView（lynx `4.0.1`）的 hit-testing **不识别 `pointer-events` CSS 属性**（官方 3.5 才引入、4.0.1 实机仍不生效；2026-08-30 真机/模拟器双重实证）。`pointer-events: none` 的全屏透明层依旧命中触摸，会**吞掉其下页面全部点击**。web-core（浏览器）行为正常——**双端行为不一致，穿透/遮挡改动必须以原生验证为准**。术语详见 `docs/adr/glossary-app-lynx-hit-testing.md`。
+
+**全屏层规则（full-screen layer rule）**：
+渲染树中的**全屏元素必须是交互面（带 `@tap` 句柄）**，否则必须从命中测试移除——实现手段只有两种：**`v-if` 条件渲染**（关闭态不渲染，最常用）或**零尺寸盒**（`absolute` 钉在 (0,0) 无尺寸，只作定位锚点，子元素 vw 定位仍正常渲染）。_Avoid_: 全屏/全宽元素 + `pointer-events-none` 指望穿透（原生不生效 → 吞点击）。对照正确模式：`RefreshableList` 的 scrim（`v-if="menu.isOpen"` + `@tap`）、`CommentOverlay`/弹窗 backdrop（均带 `@tap`）。
+
+**定位锚点（positioning anchor）**：
+原生 LynxView 把「最近的 view 祖先」当作 absolute 子元素的定位锚点（即使该祖先未设 position，与 Web 回退到视口的语义不同，模拟器实测偏离）。因此覆盖层元素的绝对定位一律用 **left/top vw + translate 居中**（vw 为视口基准，从锚点 (0,0) 起算恒等于视口坐标）；**禁止**在非全屏父盒内用 `right/bottom`（按父盒边缘解析 → 元素跑出屏幕，实测 FAB 消失）。
+
 ### 作品标识（Work indicators）
 
 **动图（Ugoira）/ 多图（Multi-page）**：
@@ -173,7 +184,7 @@ _Avoid_: 全局事件总线
 外环导航项为 **56dp 圆形**（`14.93vw`），圆内 24dp 图标（`6.4vw`）+ 12sp 文字（`3.2vw`）；内环动作项保持 **40dp 圆**（`10.67vw`）+ 24dp 图标。B 方案（大圆）为原型三变体定稿形态。_Avoid_: 48dp 圆（圆内文字被裁/贴底）。
 
 **展开层叠序（expanded stacking order）**：
-FAB 展开后菜单项须**浮于遮罩之上**：`遮罩(z-10) < 菜单项(z-20) < 主 FAB(z-30)`（同一 z-40 容器内）。修复前菜单项无 z-index 被遮罩压住且点不到。
+FAB 展开后菜单项须**浮于遮罩之上**：`遮罩(z-10) < 菜单项(z-20) < 主 FAB(z-30)`（同一 **z-40 外层**内）。ADR-0123 起外层为**钉在 (0,0) 的零尺寸盒**（只作定位锚点、不参与命中测试），遮罩与菜单项整层 `v-if="view.isOpen"` 条件渲染（关闭态渲染树无全屏元素 → 页面点击不被吞）；主 FAB 常显于其内。修复前（ADR-0123 之前）菜单项无 z-index 被遮罩压住且点不到；ADR-0121 时期外层为常显全屏容器，ADR-0123 改为零尺寸盒 + 条件渲染。
 
 **外环扫角约束（outer sweep bound）**：
 外环导航项扫角**不过 FAB 水平线**（`OUTER_END` 收在约 `-88°`）。修复前 `-100°` 使末端项越过 -90°（cos 变负）往屏幕下方走，在贴底 FAB 上探出屏幕底边。
