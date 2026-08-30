@@ -161,6 +161,20 @@ describe("checkForUpdate", () => {
     expect(warnSpy).toHaveBeenCalled()
   })
 
+  it("合法 JSON 但 body 为字面量 null / 数组 → 按检查失败处理（不崩溃，调用方无需 try/catch）", async () => {
+    for (const body of ["null", "[]"]) {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+      const mockFetch = vi.fn().mockResolvedValue(new Response(body, { status: 200 }))
+
+      const result = await checkForUpdate("4.5.0", mockFetch)
+
+      expect(result.hasUpdate, `body=${body}`).toBe(false)
+      expect(result.error, `body=${body}`).toBeTruthy()
+      expect(warnSpy, `body=${body}`).toHaveBeenCalled()
+      warnSpy.mockRestore()
+    }
+  })
+
   it("环境无全局 fetch 且未注入 fetchImpl → 安全默认值 + error（不崩溃）", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
     // 模拟 web-core 等无全局 fetch 的环境（fetchWrapper.ts 实测场景）
@@ -308,7 +322,7 @@ describe("checkForUpdate 双坐标（minWebVersion / webBundle）", () => {
     expect(result.error).toBeUndefined()
   })
 
-  it("webBundle 残缺（缺 url / 字段非字符串 / 非对象）→ 整体视为不存在（防御脏数据不崩溃）", async () => {
+  it("webBundle 残缺（缺 url / 字段非字符串 / 非对象）→ 视为不存在 + warn（契约破坏可见，禁静默）", async () => {
     const cases = [
       { webBundle: { version: "4.21.0" } }, // 缺 url
       { webBundle: { url: "https://example.com" } }, // 缺 version
@@ -316,13 +330,32 @@ describe("checkForUpdate 双坐标（minWebVersion / webBundle）", () => {
       { webBundle: "not-an-object" }, // 非对象
     ]
     for (const payload of cases) {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
       const mockFetch = vi.fn().mockResolvedValue(
         new Response(JSON.stringify({ version: "4.21.0", ...payload }), { status: 200 }),
       )
       const result = await checkForUpdate("4.20.0", mockFetch)
       expect(result.webBundle, JSON.stringify(payload)).toBeUndefined()
-      expect(result.error).toBeUndefined()
+      expect(result.error, JSON.stringify(payload)).toBeUndefined()
+      expect(warnSpy, `脏 webBundle 必须 warn: ${JSON.stringify(payload)}`).toHaveBeenCalled()
+      warnSpy.mockRestore()
     }
+  })
+
+  it("webBundle 携带未知扩展字段 → 正常采信（schema 加字段永远兼容）", async () => {
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          version: "4.21.0",
+          webBundle: { version: "4.21.0", url: "https://example.com/prefix", build: 7 },
+        }),
+        { status: 200 },
+      ),
+    )
+
+    const result = await checkForUpdate("4.20.0", mockFetch)
+
+    expect(result.webBundle).toEqual({ version: "4.21.0", url: "https://example.com/prefix" })
   })
 
   it("version 非字符串（脏数据）→ hasUpdate=false 且不崩溃", async () => {
@@ -337,14 +370,30 @@ describe("checkForUpdate 双坐标（minWebVersion / webBundle）", () => {
     expect(result.error).toBeUndefined()
   })
 
-  it("minWebVersion 非字符串（数字/对象）→ undefined（防御脏数据不崩溃）", async () => {
+  it("minWebVersion 纯空白 → undefined + warn（与缺失区分，契约破坏可见）", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ version: "4.21.0", minWebVersion: "   " }), { status: 200 }),
+    )
+
+    const result = await checkForUpdate("4.20.0", mockFetch)
+
+    expect(result.minWebVersion).toBeUndefined()
+    expect(result.error).toBeUndefined()
+    expect(warnSpy).toHaveBeenCalled()
+  })
+
+  it("minWebVersion 非字符串（数字/对象）→ undefined + warn（防御脏数据不崩溃）", async () => {
     for (const bad of [123, { v: "4.21.0" }]) {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
       const mockFetch = vi.fn().mockResolvedValue(
         new Response(JSON.stringify({ version: "4.21.0", minWebVersion: bad }), { status: 200 }),
       )
       const result = await checkForUpdate("4.20.0", mockFetch)
       expect(result.minWebVersion, JSON.stringify(bad)).toBeUndefined()
-      expect(result.error).toBeUndefined()
+      expect(result.error, JSON.stringify(bad)).toBeUndefined()
+      expect(warnSpy, `脏 minWebVersion 必须 warn: ${JSON.stringify(bad)}`).toHaveBeenCalled()
+      warnSpy.mockRestore()
     }
   })
 })

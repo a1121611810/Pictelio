@@ -71,26 +71,43 @@ export function isNewer(local: string, remote: string): boolean {
 
 /**
  * 强制门槛判定（OTA web bundle）：local 低于 floor 返回 true。
- * 语义 = isNewer(local, floor)（floor 较新 ⟺ local 未达标）；空 floor → false（fail-open，
- * 不设门槛）。差异分断言见 tests（oracle：docs/specs/ota-web-bundle.md「版本与数据源」）。
+ * 语义 = isNewer(local, floor)（floor 较新 ⟺ local 未达标）；floor 缺失/空 → false
+ * （fail-open，不设门槛）。签名接受 undefined：消费端可直接透传
+ * CheckResult.minWebVersion（string | undefined）。差分断言见 tests
+ * （oracle：docs/specs/ota-web-bundle.md「版本与数据源」）。
  */
-export function isBelowMin(local: string, floor: string): boolean {
-  if (!floor.trim()) return false
+export function isBelowMin(local: string, floor?: string): boolean {
+  if (!floor?.trim()) return false
   return isNewer(local, floor)
 }
 
-/** webBundle 脏数据防御：仅当 version/url 均为非空字符串时采信，否则整体视为不存在 */
+/**
+ * webBundle 脏数据防御：字段缺失（undefined/null）= 未发布 OTA，静默视为不存在；
+ * 字段存在但非法 = 契约破坏，必须 warn 可见（禁静默降级），同样按不存在处理。
+ */
 function parseWebBundle(raw: unknown): WebBundleMeta | undefined {
-  if (typeof raw !== "object" || raw === null) return undefined
+  if (raw === undefined || raw === null) return undefined
+  if (typeof raw !== "object") {
+    console.warn("[update-check] webBundle 字段存在但非法（非对象），按无 bundle 更新处理")
+    return undefined
+  }
   const { version, url } = raw as { version?: unknown; url?: unknown }
-  if (typeof version !== "string" || !version.trim()) return undefined
-  if (typeof url !== "string" || !url.trim()) return undefined
+  if (typeof version !== "string" || !version.trim() || typeof url !== "string" || !url.trim()) {
+    console.warn("[update-check] webBundle 字段残缺（version/url 缺失或非法），按无 bundle 更新处理")
+    return undefined
+  }
   return { version: version.trim(), url: url.trim() }
 }
 
-/** minWebVersion 脏数据防御：仅接受非空字符串 */
+/** minWebVersion 脏数据防御：缺失静默视为未设门槛；存在但非法 → warn（契约破坏可见） */
 function parseMinWebVersion(raw: unknown): string | undefined {
-  if (typeof raw !== "string" || !raw.trim()) return undefined
+  if (raw === undefined || raw === null) return undefined
+  if (typeof raw !== "string" || !raw.trim()) {
+    console.warn(
+      `[update-check] minWebVersion 字段存在但非法（${JSON.stringify(raw)}），按未设门槛处理`,
+    )
+    return undefined
+  }
   return raw.trim()
 }
 
@@ -139,7 +156,21 @@ export async function checkForUpdate(
     return { ...EMPTY_RESULT, error: `HTTP ${res.status}` }
   }
 
-  let data: {
+  let parsed: unknown
+  try {
+    parsed = await res.json()
+  } catch (err) {
+    // 200 但响应体非 JSON（如网关错误页）：解析失败同样按检查失败处理
+    console.warn("[update-check] 解析 version.json 失败:", err)
+    return { ...EMPTY_RESULT, error: err instanceof Error ? err.message : String(err) }
+  }
+  // res.json() 对「合法 JSON 但非对象」的 body（字面量 null / 数组 / 字符串）原样返回，
+  // 同样按检查失败处理——「调用方无需 try/catch」的契约不能被脏 body 击穿
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    console.warn("[update-check] version.json 响应体非对象，按检查失败处理")
+    return { ...EMPTY_RESULT, error: "invalid body: not an object" }
+  }
+  const data = parsed as {
     version?: unknown
     url?: unknown
     release_url?: unknown
@@ -147,17 +178,12 @@ export async function checkForUpdate(
     minWebVersion?: unknown
     webBundle?: unknown
   }
-  try {
-    data = (await res.json()) as typeof data
-  } catch (err) {
-    // 200 但响应体非 JSON（如网关错误页）：解析失败同样按检查失败处理
-    console.warn("[update-check] 解析 version.json 失败:", err)
-    return { ...EMPTY_RESULT, error: err instanceof Error ? err.message : String(err) }
-  }
 
   const remoteVersion = typeof data.version === "string" ? data.version : ""
   const hasUpdate = remoteVersion ? isNewer(localVersion, remoteVersion) : false
 
+  // trim 口径：新字段（minWebVersion/webBundle）入库前 trim；存量字段保持原样透传
+  // （isNewer 内部自带 trim，行为不变——避免对既有消费方的语义漂移）
   return {
     hasUpdate,
     latestVersion: remoteVersion,
