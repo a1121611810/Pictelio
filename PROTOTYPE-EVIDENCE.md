@@ -48,7 +48,21 @@ Release（R8 全优化）下，work-runtime 2.10.0 通过 `androidx.startup.Init
 - **已复制**：`/tmp/proto-c-full.apk`
 - **build.gradle 的临时改动已在取证后回退**（`git status` 已无 build.gradle 变更），不进入提交。
 
-> 说明：`packageFullRelease` 按任务指令（无签名环境变量）**无法**产出可安装已签名 APK；本原型以「未签名 APK + 真实 R8/D8 中间产物」完成取证。未签名 APK 不可安装，但 manifest 与 dex 字节码与正式签名包完全一致，取证结论有效。
+> 说明：`packageFullRelease` 按任务指令（无签名环境变量）**无法**产出已签名 APK；本原型以「未签名 APK + 真实 R8/D8 中间产物」完成取证。未签名 APK 不可安装，但 manifest 与 dex 字节码与正式签名包完全一致，取证结论有效。
+
+### 3.3 最终签名 APK（设置占位签名 env，构建成功）
+
+按提示为一次性假 keystore（`app/pictelio-release.keystore`，gitignore 的 `*.keystore`，勿提交/勿外传）设置占位密码后重跑：
+
+```bash
+PICTELIO_KEYSTORE_PASSWORD=protopass PICTELIO_KEY_PASSWORD=protopass \
+  ./gradlew :app:packageFullRelease --console=plain
+```
+
+- 结果：**`BUILD SUCCESSFUL in 9s`**，产出 **`app-full-release.apk`（45,815,311 B）**。
+- `apksigner verify`：**Verifies**，v2 APK Signature Scheme = true，signers=1（用假 keystore 签名）。
+- **已复制**：`/tmp/proto-c-full.apk`（已用签名版覆盖此前未签名拷贝）。
+- 说明：真正的阻塞只是 `release` signingConfig 缺 `storePassword`（来自 env）；`validateReleaseSigning()` 的 `whenReady` 门禁 `releaseTasks` 名单不含 `packageFullRelease`，故设置 env 后即可直接签名打包，不触发该门禁。
 
 ## 4. provider 是否移除 —— **是（已移除）**
 
@@ -95,8 +109,8 @@ Virtual methods   -          ← 仅 R8 重命名的 Room 抽象方法覆写（c
 
 | 项 | 值 |
 | --- | --- |
-| APK | `/tmp/proto-c-full.apk`（未签名拷贝，45.8 MB） |
-| 构建产物原路径 | `packages/app/android/app/build/outputs/apk/full/release/app-full-release-unsigned.apk` |
+| APK | `/tmp/proto-c-full.apk`（签名版，45,815,311 B） |
+| 构建产物原路径 | `packages/app/android/app/build/outputs/apk/full/release/app-full-release.apk`（v2 签名） |
 | provider 移除 | ✅ 已移除（aapt2 校验产物 manifest） |
 | `WorkDatabase_Impl` 无参 `<init>` | ❌ 不存在（dexdump 校验产物 dex） |
-| 构建状态 | 任务指令命令：`packageFullRelease` 在签名阶段失败（缺 `storePassword`）；临时移除 signingConfig 后 `BUILD SUCCESSFUL` 产出未签名 APK |
+| 构建状态 | 无 env 时 `packageFullRelease` 在签名阶段失败（缺 `storePassword`）；设置占位 env（`PICTELIO_KEYSTORE_PASSWORD=protopass` / `PICTELIO_KEY_PASSWORD=protopass`）后 `BUILD SUCCESSFUL` 产出签名 APK |
