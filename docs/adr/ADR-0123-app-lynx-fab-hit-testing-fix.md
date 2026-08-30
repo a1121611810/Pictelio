@@ -39,7 +39,7 @@ app-lynx（lynx `4.0.1`，原生 LynxView）在 tab 页上出现**全页面点�
 3. **`App.vue` exitHint**：取消全宽盒（`left-0 right-0`）并移除 `pointer-events-none`，改为**胶囊居中定位**（`left: 50vw; bottom: 12vw` + `transform: translate(-50%,0)`）。命中面只剩提示条自身：原生侧不再吞底部整条点击（其 z-50 高于 FAB 的 z-40 层，原先会盖住 FAB 区域），web-core 侧行为一致（原 `pointer-events-none` 在原生无效、在 web 才生效，双端本就分叉）。
 4. **回归接缝**：
    - 单测（既有模板结构断言模式，`tests/unit.test.ts`）：更新 GlobalFab 结构断言到新结构，并新增**负向断言**——模板不得再含全屏 `pointer-events-none` 元素、展开层必须 `v-if="view.isOpen"` 条件渲染。
-   - E2E（android-e2e，adb 驱动仿 `lynx-boot-renders.spec.ts`）：登录后经 FAB 进「我的」页，点「显示 R-18 内容」开关行，断言 switch 翻转（离线可点、确定性）。修复前该点击 0 变化（红）、修复后翻转（绿）。
+   - E2E（android-e2e，adb 驱动仿 `lynx-boot-renders.spec.ts`）：登录后经 FAB 进「我的」页，点账户卡「我的收藏」行，断言导航到 /bookmarks（全屏像素 diff；离线可点、确定性）。修复前该点击被全屏容器吞掉 0 变化（红）、修复后导航（绿）。
 5. **文档同步**：新建 `glossary-app-lynx-hit-testing.md`；更新 `glossary-app-lynx-radial-nav-fab.md`「展开层叠序」、`packages/app-lynx/CONTEXT.md`（平台约束固化 + 展开层叠序措辞）。
 
 ## 被考虑的方案
@@ -68,7 +68,7 @@ app-lynx（lynx `4.0.1`，原生 LynxView）在 tab 页上出现**全页面点�
 - [ ] 展开态遮罩点空白收起；主 FAB 恒在遮罩与菜单项之上。
 - [ ] `GlobalFab.vue` 渲染树在菜单关闭态**无任何全屏元素**（模板结构断言：负向断言 `pointer-events-none` 全屏容器不存在 + 展开层 `v-if="view.isOpen"`）。
 - [ ] `tests/unit.test.ts` GlobalFab 结构断言更新并通过；`createGlobalFab.test.ts` 行为单测全绿（深模块无改动）。
-- [ ] E2E（android-e2e 新增 spec）：修复前红（R18 开关点击 0 变化）、修复后绿（switch 翻转）。
+- [ ] E2E（android-e2e 新增 spec）：修复前红（Me 页「我的收藏」行点击 0 变化）、修复后绿（导航到 /bookmarks）。
 - [ ] `App.vue` exitHint 无全宽盒、无 `pointer-events-none`（胶囊居中定位，命中面=提示条自身）。
 - [ ] `pnpm check:app-lynx` 类型检查通过；`pnpm test:app-lynx` 单测全绿。
 - [ ] CONTEXT.md / 术语表同步。

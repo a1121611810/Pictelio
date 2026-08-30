@@ -29,7 +29,7 @@
 6. 作为 app-lynx 用户，我希望**FAB 刷新 busy 状态（旋转 spinner、禁用）行为不变**，以便刷新语义不回归。
 7. 作为 app-lynx 维护者，我希望**深模块 `createGlobalFab`（view/dispatch/usePage）零改动**，以便修复局限在薄渲染适配器、行为单测不受影响。
 8. 作为 app-lynx 维护者，我希望**模板结构断言更新到新结构并新增负向断言**（不得再出现全屏 `pointer-events-none` 元素、展开层必须条件渲染），以便该平台约束有回归兜底。
-9. 作为 app-lynx 维护者，我希望**新增 android-e2e 回归**（离线可点的确定性目标：Me 页 R18 开关），以便修复前后有红/绿闭环。
+9. 作为 app-lynx 维护者，我希望**新增 android-e2e 回归**（离线可点的确定性目标：Me 页「我的收藏」行导航），以便修复前后有红/绿闭环。
 10. 作为 app-lynx 维护者，我希望**平台约束固化进术语表与 CONTEXT.md**，以便未来覆盖层组件不再踩 `pointer-events` 的坑（含 exitHint 同类清理）。
 
 ## Implementation Decisions
@@ -55,7 +55,7 @@
   - 更新现有「层叠序」断言到新结构（外层 `v-if="view.visible"` + `absolute z-40` + (0,0) 锚点、遮罩 `v-if` + `z-10 bg-scrim scrim-in` + `@tap`、环层 `v-if` + `z-20`、主 FAB `z-30`）。
   - **新增负向断言（本 bug 回归）**：模板不含 `pointer-events-none` / `pointer-events-auto`；遮罩与环层必须 `v-if="view.isOpen"` 条件渲染。
   - 深模块 `createGlobalFab.test.ts` 不动、全绿。
-- **E2E**（android-e2e，adb 驱动，仿 `lynx-boot-renders.spec.ts` 轻量模式）：登录 → FAB 切「我的」→ 点「显示 R-18 内容」开关行 → 断言 switch 视觉翻转（截图像素 diff）。离线可点、确定性；修复前红、修复后绿。
+- **E2E**（android-e2e，adb 驱动，仿 `lynx-boot-renders.spec.ts` 轻量模式）：登录 → FAB 控制组 → FAB 切「我的」→ 点账户卡「我的收藏」行 → 断言导航到 /bookmarks（全屏像素 diff > 阈值）。离线可点、确定性；修复前红（0 变化）、修复后绿。
 - **手动验证回路**（模拟器原生）：沿用 diagnosing-bugs 已建回路——菜单关闭态点页面 scrim/菜单行有反应（像素变化 > 阈值），点 FAB 展开/收起正常。
 
 ## Out of Scope
