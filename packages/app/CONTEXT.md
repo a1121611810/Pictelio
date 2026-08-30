@@ -229,6 +229,34 @@ _Avoid_: 包、安装包
 发布脚本 step 6 与覆盖发布模式在 TTY 下逐行渲染每个变体 APK 上传状态（变体、状态、文件大小、已耗时、重试次数）的展示形态；非 TTY 降级为逐事件文本行。
 _Avoid_: 进度条（gh 不提供逐文件字节级进度，面板显示的是耗时而非字节）
 
+### 更新分发
+
+**Web Bundle（web 更新包）**：
+主 app web 层的可独立分发更新单元：构建产物全量 zip（根即 index.html）+ Ed25519 签名 manifest 三件套，经 GitHub Releases 分发。与 APK 整包（L2）构成分层更新（L1 bundle OTA 高频静默 / L2 APK 低频显式），见 `docs/specs/ota-web-bundle.md`。
+_Avoid_: 安装包、热更包（"热"暗示立即生效——本方案静默下次启动生效）
+
+**版本目录（Version directory）**：
+原生侧 `files/ota/versions/<版本号>/` 的不可变目录，每个已安装 bundle 一份、含完整 index.html 与 assets。安装 = 解压到新目录后 rename，永不原地改写。
+
+**Bundle 指针（Bundle pointer）**：
+三指针状态机（持久化于 SharedPreferences）：`current`（当前加载版本，"public" = APK 内置）、`pending`（已装待生效）、`lastGood`（最近一次通过健康握手的版本，回滚目标）。原子切换 = 指针 commit + 整页重载，磁盘上不存在半新半旧混合。
+
+**健康握手（notifyReady handshake）**：
+JS 侧首帧渲染完成后向原生上报 bundle 版本；版本与 current 指针一致才计健康并刷新 lastGood。10s 未收到 → 自动回滚 lastGood（仍失败回内置）。防陈旧缓存文档误报健康（版本不符即拒）。
+
+**强制门槛（minWebVersion / floor）**：
+维护者设定的 web 层最低可用版本。当前 bundle 低于 floor → 先 OTA 自愈（全屏过渡面），失败转阻断页。fail-open：floor 缺失/检查失败 = 不设门槛（显式 warn，禁静默）。门槛不受任何用户开关抑制。
+_Avoid_: 强制更新（未分层的笼统说法——L2 APK 弹窗是温和通道，门槛特指 web 层 floor）
+
+**逆向门槛（minApkVersion）**：
+bundle 声明的最低宿主 APK 版本（进签名覆盖）。本机 APK 过低 → 拒装该 bundle，转入 APK 温和弹窗通道。防"新 bundle 调用宿主没有的新桥 API"。
+
+**快慢双通道（Dual download lanes）**：
+bundle 下载的两条执行通道：T0 常规预热走 WorkManager 后台（结果写 pending 下次启动生效）；G1 门槛自愈走前台直连（用户正在过渡面等待）。共用同一 install 逻辑。
+
+**三重消费（Triple consumption）**：
+冷启单次更新检查 fetch 同时服务三个消费方：APK 弹窗比较（version 字段）、floor 评估（minWebVersion）、OTA 元数据（webBundle）。不加第二次请求。
+
 ### 设置同步
 
 **账号级设置（Account-scoped setting）**：
