@@ -135,7 +135,17 @@ node scripts/release-bundle.mjs --version=<version>   # dist 默认 dist/，产�
 
 - `PICTELIO_RELEASE_SKIP_OTA=1`：显式跳过三件套的打包与上传（step 1 打 warn）。缺省（不设）时私钥缺失直接 fail——三件套缺失 = 该版本 OTA 通道断裂，禁止静默降级。
 - `minWebVersion`（version.json 字段，web 层最低可用版本/floor）：release 默认**继承旧值**（覆写前读旧文件）；仅当要主动抬门槛时用 `--min-web=x.y.z` 覆写。旧文件缺失/解析失败只 warn 不阻断（不设门槛）。紧急提门槛也允许手改 version.json 单独 commit。
-- 覆盖发布（`-o`）不 bump 版本号 → App 端 `isNewer()` 判「无更新」→ 热修静默失效，**OTA 热修禁止走 `-o`**，必须走正常发布（或后续的 web-only 模式）bump patch；`-o` 对三件套仅限同内容重传（重跑 `release-bundle.mjs` 同输入产物字节一致）。
+- 覆盖发布（`-o`）不 bump 版本号 → App 端 `isNewer()` 判「无更新」→ 热修静默失效，**OTA 热修禁止走 `-o`**，必须走正常发布（或 web-only 模式）bump patch；`-o` 对三件套仅限同内容重传（重跑 `release-bundle.mjs` 同输入产物字节一致）。
+
+### web-only 发布模式（`--web-only`，#255）
+
+**何时用**：只改 web 层（UI/逻辑/内容适配）的热修——不构建 APK、不需要 keystore 密码，分钟级完成一次 OTA 发布；已装用户的 app 静默吸收（下次启动生效），无需重装 APK。含原生变更（Java/Kotlin、Capacitor 插件、桥方法、Lynx bundle）的发布一律走正常发布。
+
+- **命令**：`pnpm run release --web-only`（交互流程与正常发布一致：选 commit → 选版本 → 确认发布；版本建议 bump patch，符合热修语义）。
+- **流程差异**（相对正常发布）：step 1 只查 OTA 私钥（跳过 keystore 密码/文件检查）；step 3 只跑 credentials 同步 + web 构建 + `release-bundle.mjs`（跳过 gradle assemble / Lynx / cap:sync）；step 4/5 照常 commit + tag + push；step 6 `gh release create --prerelease`（GitHub "Latest" 徽章仍指向最后完整 APK 版本），**只上传三件套不传 APK**。
+- **双坐标行为**：`version.json` 的 `version` 字段（APK 坐标，APK 弹窗比较对象）**保持上一已发布 APK 版本不动**（从旧 version.json 继承；旧文件缺失/解析失败 = 硬错误，禁止静默降级）；`webBundle.version`（bundle 坐标）前进到本次版本；`url` 仍指向本次新 tag 的 Release 页。`minWebVersion` 同正常发布（`--min-web=x.y.z` 覆写 / 缺省继承旧值）。下次正常发布时一次 commit 原子翻转全部坐标。
+- **与 `-o` 的边界**：`--web-only` 与 `-o` 互斥（脚本拒绝）——OTA 热修一律走 web-only bump patch；`PICTELIO_RELEASE_SKIP_OTA=1` 与 `--web-only` 也互斥（web-only 的唯一交付物就是三件套，跳过打包 = version.json 指向不存在的资产）。
+- **中途失败**：与正常发布共用自动回滚（step 2/3 失败回滚 package.json / build.gradle / changelog / version.json），可安全重跑。
 
 ## 上传网络说明（2026-08 研究结论，详见 `docs/research/github-release-upload-acceleration.md` 与 ADR-0067）
 
