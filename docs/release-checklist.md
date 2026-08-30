@@ -97,6 +97,46 @@ GitHub Release 已发布完成。
   - 正常发布与覆盖发布共用同一逐包上传编排（ADR-0065/ADR-0067）；上传默认走 **Node 原生上传器**（直连，实测端到端吞吐约为 gh 的 2.1×），重跑只补失败包（`--clobber` 幂等）。可用环境变量 `PICTELIO_UPLOADER=gh` 回退到 gh 子进程。
 - **验证**：正式覆盖前先跑 `pnpm run release -o --dry-run` 预览计划与命令，确认无误后再实际执行。
 
+## 八、web bundle OTA 产物（#250）
+
+正常发布（`pnpm run release`）会在构建 APK 的同时产出 web bundle OTA 三件套并与 APK 上传到同一个 GitHub Release；web 修复也可以不经 APK 重装、由 app 静默 OTA 吸收（机制见 `docs/specs/ota-web-bundle.md`）。
+
+### 产物定义
+
+三件套落在 `packages/app/ota/`（已加入根 `.gitignore`——release step 4 的「发布无关变更拦截」对未跟踪文件同样生效，不 ignore 则发布必炸）：
+
+| 文件 | 内容 |
+| --- | --- |
+| `pictelio-<version>-web-bundle.zip` | `dist/` 全量打包，zip 根直接是 `index.html`（对齐原生侧 `versions/<id>/index.html` 布局） |
+| `pictelio-<version>-manifest.json` | `{ version, minApkVersion?, size, sha256 }`（sha256 = zip 摘要；`minApkVersion` 缺省 = 不设兼容下限，App 端 fail-open） |
+| `pictelio-<version>-manifest.json.sig` | manifest 字节的 Ed25519 签名（base64）：`PureEdDSA(DOMAIN_PREFIX || SHA-256(manifest))`，域分隔前缀 `Pictelio-OTA-bundle-v1\n` 与 Android 侧 `OtaSignatureVerifier` 逐字一致 |
+
+发布脚本挂载点：step 1 探测 OTA 私钥 → step 2 `version.json` 追加 `minWebVersion` / `webBundle` 字段 → step 3 打包签名 → step 6 随 APK 上传；step 6 失败的恢复指引已包含三件套的 `gh release upload --clobber` 命令。
+
+### 发布前 round-trip 验签自检
+
+`release-bundle.mjs` 在打包流程内已完成 round-trip 自验（打包 → 签名 → Node 验签 → 落盘），独立运行即可复验既有三件套，无需走完整 release：
+
+```bash
+node scripts/release-bundle.mjs --version=<version>   # dist 默认 dist/，产物默认 ota/
+```
+
+另比对公钥指纹：`~/.pictelio-keys/ota-ed25519-private.pem` 对应公钥的 SHA-256(raw 32B) 指纹须与 `docs/research/ota-ed25519-android.md` §4.2 记录值一致（生成命令同节）。私钥缺失时 step 1 直接 fail；OTA 签名密钥与 APK release keystore 严格分离（不共钥、不共密码、不共备份介质）。
+
+### 桥 API 演进约定
+
+新增原生桥方法（`MainActivity` 注册的自定义插件）时必须同步三件事：
+
+1. 同步 `src/native/*.ts` 的 TS 声明；
+2. 补/改桥接口一致性契约测试（Java 插件方法名 ↔ TS 声明比对）；
+3. **评估是否提升 `minApkVersion`**：若 bundle 会调用新桥方法，旧 APK 宿主上将得到 promise reject（不崩溃但功能缺失）——此时设 `PICTELIO_OTA_MIN_APK=x.y.z` 再发布，让 manifest 声明最低宿主版本（进签名覆盖范围，不可事后篡改）。bundle 内对新桥能力一律先能力检测（先例：`ClientInfo.getClientKinds()`）。
+
+### 跳过与门槛语义
+
+- `PICTELIO_RELEASE_SKIP_OTA=1`：显式跳过三件套的打包与上传（step 1 打 warn）。缺省（不设）时私钥缺失直接 fail——三件套缺失 = 该版本 OTA 通道断裂，禁止静默降级。
+- `minWebVersion`（version.json 字段，web 层最低可用版本/floor）：release 默认**继承旧值**（覆写前读旧文件）；仅当要主动抬门槛时用 `--min-web=x.y.z` 覆写。旧文件缺失/解析失败只 warn 不阻断（不设门槛）。紧急提门槛也允许手改 version.json 单独 commit。
+- 覆盖发布（`-o`）不 bump 版本号 → App 端 `isNewer()` 判「无更新」→ 热修静默失效，**OTA 热修禁止走 `-o`**，必须走正常发布（或后续的 web-only 模式）bump patch；`-o` 对三件套仅限同内容重传（重跑 `release-bundle.mjs` 同输入产物字节一致）。
+
 ## 上传网络说明（2026-08 研究结论，详见 `docs/research/github-release-upload-acceleration.md` 与 ADR-0067）
 
 - `uploads.github.com` 慢的根因是**国际链路**（CNAME 到新加坡 Azure 20.205.243.161），与客户端选型无关；发布脚本会在上传前打印「本次将走直连/代理」。
