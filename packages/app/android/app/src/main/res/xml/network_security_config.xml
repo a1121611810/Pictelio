@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- OTA bench 本地服务器（adb reverse http://127.0.0.1:8899）仅需回环 cleartext；
+     生产分发走 HTTPS（GitHub Releases），无需放宽。debug overlay 引用本配置 -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

@@ -20,6 +20,7 @@
 
 import { createHash, createPrivateKey, createPublicKey, sign, verify } from "node:crypto";
 import { crc32, deflateRawSync } from "node:zlib";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve as resolvePath } from "node:path";
@@ -34,6 +35,18 @@ export const DEFAULT_OTA_PRIVATE_KEY_PATH = resolvePath(
   ".pictelio-keys",
   "ota-ed25519-private.pem",
 );
+
+/**
+ * 私钥实际文件解析：优先标准名（连字符），兼容既有沙盒下划线命名
+ * （ota_ed25519_private.pem，原型会话产物）——两名称都认，缺失时返回标准路径
+ * 由调用方报错。
+ */
+export function resolveOtaPrivateKeyPath(home = homedir()) {
+  const dir = resolvePath(home, ".pictelio-keys");
+  const standard = resolvePath(dir, "ota-ed25519-private.pem");
+  const legacy = resolvePath(dir, "ota_ed25519_private.pem");
+  return existsSync(legacy) && !existsSync(standard) ? legacy : standard;
+}
 
 /**
  * 域分隔前缀：把签名唯一绑定到本 OTA 体系，防跨协议签名重用。

@@ -32,6 +32,7 @@ import { readFile } from "node:fs/promises";
 import process from "node:process";
 import {
   DEFAULT_OTA_PRIVATE_KEY_PATH,
+  resolveOtaPrivateKeyPath,
   executeReleaseBundle,
   planReleaseBundle,
 } from "./lib/release-bundle-core.mjs";
@@ -73,7 +74,7 @@ async function main() {
   // arg > env（对齐 resolveVariants 的解析顺序）；空串视为未设置
   const minApkVersion =
     argValue("min-apk") ?? ((process.env.PICTELIO_OTA_MIN_APK || "").trim() || null);
-  const privateKeyPath = argValue("key") || DEFAULT_OTA_PRIVATE_KEY_PATH;
+  const privateKeyPath = argValue("key") || resolveOtaPrivateKeyPath();
 
   // 先探测私钥再打包：fail-fast + 明确指引，避免打完包才发现签不了名
   let pem;

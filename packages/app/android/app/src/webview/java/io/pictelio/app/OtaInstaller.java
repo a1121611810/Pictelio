@@ -55,10 +55,14 @@ public final class OtaInstaller {
      */
     public static InstallResult installBundle(Context context, String urlBase) throws OtaInstallException {
         long t0 = System.currentTimeMillis();
+        // 资产前缀 URL 规范化：去掉尾斜杠再拼后缀（root 形态 http://host:port/ 与
+        // 前缀形态 .../pictelio-4.21.0 统一；不规范化则带尾斜杠时拼出坏 URL——设备实测
+        // "http://127.0.0.1:8899-manifest.json" 端口解析炸，#256 bench 抓到）
+        String base = urlBase.replaceAll("/+$", "");
         try {
-            byte[] manifest = httpGet(urlBase + "-manifest.json");
+            byte[] manifest = httpGet(base + "-manifest.json");
             byte[] sig = Base64.decode(
-                    new String(httpGet(urlBase + "-manifest.json.sig"), StandardCharsets.UTF_8).trim(),
+                    new String(httpGet(base + "-manifest.json.sig"), StandardCharsets.UTF_8).trim(),
                     Base64.DEFAULT);
             if (!OtaSignatureVerifier.verifyManifest(manifest, sig, BuildConfig.OTA_ED25519_PUBLIC_KEY_B64)) {
                 Log.w(TAG, "[ota] install-rejected bad-signature");
@@ -78,7 +82,7 @@ public final class OtaInstaller {
                         + " minApkVersion=" + minApkVersion);
                 throw new OtaInstallException("apk-too-old");
             }
-            byte[] zip = httpGet(urlBase + "-web-bundle.zip");
+            byte[] zip = httpGet(base + "-web-bundle.zip");
             long declaredSize = m.optLong("size", -1);
             if (declaredSize >= 0 && zip.length != declaredSize) {
                 Log.w(TAG, "[ota] install-rejected size-mismatch " + zip.length + " != " + declaredSize);

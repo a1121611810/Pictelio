@@ -221,7 +221,7 @@ async function maybeSilentInstall(result: CheckResult): Promise<void> {
 // define 替换为 false → 死代码消除）。mockFetch 的 window 注入不跨页面 reload，无法在
 // 启动检查（500ms）之前就位——暴露 runOtaCheck 让 E2E 在 mock 注入后确定性驱动门槛
 // 状态机（单 fetch 三重消费与真实路径完全同代码）。
-if (import.meta.env.DEV && typeof window !== "undefined") {
+if ((import.meta.env.DEV || __E2E__) && typeof window !== "undefined") {
   (window as unknown as Record<string, unknown>).pictelioOtaDev = {
     runOtaCheck,
     debug: () => ({
