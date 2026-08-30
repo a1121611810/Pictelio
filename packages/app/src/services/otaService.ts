@@ -14,8 +14,14 @@ import {
 } from "@pictelio/update-check";
 import { Ota } from "@/native/Ota";
 import {
+  autoCheckUpdate,
+  lastDismissedVersion,
   otaAutoDownload,
   otaLastKnownFloor,
+  setHasUpdate,
+  setLatestChangelog,
+  setLatestReleaseUrl,
+  setLatestVersion,
   setOtaLastKnownFloor,
   setShowUpdateDialog,
 } from "@/stores/settingsStore";
@@ -90,7 +96,21 @@ export async function runOtaCheck(
     void maybeSilentInstall(result);
   }
   if (silent) {
-    return null; // 回前台补查：不喂弹窗
+    return null; // 回前台补查：全程静默，不喂弹窗
+  }
+  // 三重消费之 APK 弹窗面（autoCheckUpdate 只关弹窗打扰，不关门槛检查）：
+  // 「前往下载」按钮依赖 latestReleaseUrl，故信号填充与门槛评估同源同处
+  setHasUpdate(result.hasUpdate);
+  setLatestVersion(result.latestVersion);
+  setLatestReleaseUrl(result.latestReleaseUrl);
+  setLatestChangelog(result.latestChangelog);
+  if (
+    autoCheckUpdate() &&
+    result.hasUpdate &&
+    result.latestVersion &&
+    result.latestVersion !== lastDismissedVersion()
+  ) {
+    setShowUpdateDialog(true);
   }
   return result;
 }
@@ -193,6 +213,24 @@ async function maybeSilentInstall(result: CheckResult): Promise<void> {
   } catch (e) {
     console.warn("[ota] 预热入队失败（下次检查再试）:", e);
   }
+}
+
+// ── E2E 测试钩子 ──
+
+// agent-browser E2E 专用（#256）：仅 dev server 构建（import.meta.env.DEV 在生产构建被
+// define 替换为 false → 死代码消除）。mockFetch 的 window 注入不跨页面 reload，无法在
+// 启动检查（500ms）之前就位——暴露 runOtaCheck 让 E2E 在 mock 注入后确定性驱动门槛
+// 状态机（单 fetch 三重消费与真实路径完全同代码）。
+if (import.meta.env.DEV && typeof window !== "undefined") {
+  (window as unknown as Record<string, unknown>).pictelioOtaDev = {
+    runOtaCheck,
+    debug: () => ({
+      floor: gateFloor(),
+      active: gateActive(),
+      err: gateError(),
+      cached: otaLastKnownFloor(),
+    }),
+  };
 }
 
 // ── 回前台节流补查 ──

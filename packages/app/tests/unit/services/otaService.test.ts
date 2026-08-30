@@ -27,6 +27,13 @@ const mockSettings = vi.hoisted(() => {
     },
     setShowUpdateDialog: vi.fn(),
     otaAutoDownload: () => mockState.autoDownload,
+    // APK 弹窗面信号（runOtaCheck 非静默路径填充，#256 重构后与门槛评估同源）
+    setHasUpdate: vi.fn(),
+    setLatestVersion: vi.fn(),
+    setLatestReleaseUrl: vi.fn(),
+    setLatestChangelog: vi.fn(),
+    autoCheckUpdate: () => true,
+    lastDismissedVersion: () => "",
   };
 });
 const mockState = vi.hoisted(() => ({ autoDownload: true }));
@@ -39,6 +46,12 @@ vi.mock("@/stores/settingsStore", () => ({
   setOtaLastKnownFloor: mockSettings.setOtaLastKnownFloor,
   setShowUpdateDialog: mockSettings.setShowUpdateDialog,
   otaAutoDownload: mockSettings.otaAutoDownload,
+  setHasUpdate: mockSettings.setHasUpdate,
+  setLatestVersion: mockSettings.setLatestVersion,
+  setLatestReleaseUrl: mockSettings.setLatestReleaseUrl,
+  setLatestChangelog: mockSettings.setLatestChangelog,
+  autoCheckUpdate: mockSettings.autoCheckUpdate,
+  lastDismissedVersion: mockSettings.lastDismissedVersion,
 }));
 
 import {

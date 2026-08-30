@@ -1,17 +1,6 @@
 import type { Component } from "solid-js";
 import { isLoggedIn, isLoading, setIsLoading, initializeAuth } from "@/stores/authStore";
-import {
-  autoCheckUpdate,
-  setHasUpdate,
-  setLatestVersion,
-  setLatestReleaseUrl,
-  setLatestChangelog,
-  setShowUpdateDialog,
-  setIsCheckingUpdate,
-  setCheckCompleted,
-  lastDismissedVersion,
-  loadAccountR18,
-} from "@/stores/settingsStore";
+import { setIsCheckingUpdate, setCheckCompleted, loadAccountR18 } from "@/stores/settingsStore";
 import { settings } from "@/settings";
 import { persistScrollRestoration } from "@/stores/uiStore";
 import { scrollToTop } from "@/utils/scrollToTop";
@@ -57,24 +46,9 @@ async function runStartupUpdateCheck(): Promise<void> {
   setIsCheckingUpdate(true);
   const [updateErr] = await tryAsync(
     (async () => {
-      // 单 fetch 三重消费（#251）：OTA floor 评估/静默安装/自愈触发在 otaService 内完成，
-      // 这里消费同一份结果驱动 APK 弹窗（autoCheckUpdate 只关弹窗打扰，不关门槛检查）
-      const result = await runOtaCheck();
-      if (result) {
-        setHasUpdate(result.hasUpdate);
-        setLatestVersion(result.latestVersion);
-        setLatestReleaseUrl(result.latestReleaseUrl);
-        setLatestChangelog(result.latestChangelog);
-
-        if (
-          autoCheckUpdate() &&
-          result.hasUpdate &&
-          result.latestVersion &&
-          result.latestVersion !== lastDismissedVersion()
-        ) {
-          setShowUpdateDialog(true);
-        }
-      }
+      // 单 fetch 三重消费（#251/#256）：OTA 侧（floor/自愈/T0 预热）与 APK 弹窗信号
+      // 填充全部收敛在 otaService.runOtaCheck；autoCheckUpdate 只关弹窗打扰
+      await runOtaCheck();
     })(),
   );
   setIsCheckingUpdate(false);
