@@ -5,6 +5,8 @@ import android.content.SharedPreferences;
 import android.util.Log;
 import android.webkit.WebView;
 
+import androidx.work.Configuration;
+
 /**
  * Pictelio Application 入口。
  *
@@ -19,9 +21,18 @@ import android.webkit.WebView;
  * 绘制之间的视觉空白；预热缩短 WebView 服务进程初始化耗时。异常安全：预热失败
  * 静默吞异常，app 正常启动，正式 WebView 回退冷初始化路径。
  */
-public class PictelioApp extends Application {
+public class PictelioApp extends Application implements Configuration.Provider {
 
     private static final String TAG = "PictelioApp";
+
+    // PROTOTYPE（throwaway，#252 OTA R8 修复验证 方案 C）：
+    // 手动/惰性初始化 WorkManager。不从 Application.onCreate 主动调用
+    // WorkManager.initialize，交由首次 WorkManager.getInstance() 时按
+    // Configuration.Provider 提供配置懒加载。
+    @Override
+    public Configuration getWorkManagerConfiguration() {
+        return new Configuration.Builder().build();
+    }
 
     @Override
     public void onCreate() {

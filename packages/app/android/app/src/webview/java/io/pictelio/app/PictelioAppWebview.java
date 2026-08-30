@@ -2,6 +2,8 @@ package io.pictelio.app;
 
 import android.app.Application;
 
+import androidx.work.Configuration;
+
 /**
  * Pictelio Application 入口（webview flavor）。
  *
@@ -10,7 +12,13 @@ import android.app.Application;
  * 绘制之间的视觉空白；预热缩短 WebView 服务进程初始化耗时。异常安全：预热失败
  * 静默吞异常，app 正常启动，正式 WebView 回退冷初始化路径。
  */
-public class PictelioAppWebview extends Application {
+public class PictelioAppWebview extends Application implements Configuration.Provider {
+
+    // PROTOTYPE（throwaway，#252 OTA R8 修复验证 方案 C）：见 PictelioApp.java。
+    @Override
+    public Configuration getWorkManagerConfiguration() {
+        return new Configuration.Builder().build();
+    }
 
     @Override
     public void onCreate() {

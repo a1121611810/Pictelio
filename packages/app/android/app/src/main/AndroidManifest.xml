@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Android 11+ 包可见性（API 30+）：openUrl 打开外部浏览器需要显式声明
          VIEW http/https intent，否则 resolveActivity 对系统浏览器返回 null
@@ -55,6 +56,15 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <!-- PROTOTYPE（throwaway，#252 OTA R8 修复验证 方案 C）：
+             从合并 manifest 移除 work-runtime 2.10.0 带入的 androidx.startup
+             InitializationProvider（其 WorkManagerInitializer 在进程启动即
+             WorkManager.getInstance() → Room 打开 → Class.forName 反射无参构造器
+             失败而崩）。改为 Application 实现 Configuration.Provider 手动/惰性初始化。 -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            tools:node="remove" />
     </application>
 
     <!-- Permissions -->
