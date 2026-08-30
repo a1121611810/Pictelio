@@ -48,7 +48,7 @@ import {
   withSpinner,
 } from "./lib/release-utils.mjs";
 import { truncateChangelog } from "./lib/changelog.mjs";
-import { bundlePathsFor, DEFAULT_OTA_PRIVATE_KEY_PATH } from "./lib/release-bundle-core.mjs";
+import { bundlePathsFor, resolveOtaPrivateKeyPath } from "./lib/release-bundle-core.mjs";
 import { parseWebOnlyArgs, buildVersionJson } from "./lib/release-webonly.mjs";
 import { planOverwrite, executeOverwrite, probeRemote } from "./release-overwrite.mjs";
 import { uploadReleaseAssets, resolveUploader } from "./lib/release-uploader.mjs";
@@ -804,9 +804,9 @@ async function main() {
         "[release] ⚠ PICTELIO_RELEASE_SKIP_OTA=1：本次发布跳过 web bundle 三件套的打包与上传，" +
           "该版本 OTA 通道不更新（用户仍可用当前已装 bundle）",
       );
-    } else if (!(await exists(DEFAULT_OTA_PRIVATE_KEY_PATH))) {
+    } else if (!(await exists(resolveOtaPrivateKeyPath()))) {
       envErrors.push(
-        `找不到 OTA 签名私钥 ${DEFAULT_OTA_PRIVATE_KEY_PATH}` +
+        `找不到 OTA 签名私钥 ${resolveOtaPrivateKeyPath()}` +
           `（生成见 docs/research/ota-ed25519-android.md §4.2；确需跳过 web bundle 可设 PICTELIO_RELEASE_SKIP_OTA=1）`,
       );
     }

@@ -29,6 +29,7 @@ import {
   createZip,
   executeReleaseBundle,
   planReleaseBundle,
+  resolveOtaPrivateKeyPath,
   serializeManifest,
   signManifest,
   verifyTrio,
@@ -621,6 +622,46 @@ describe("executeReleaseBundle（落盘三件套）", () => {
         PUBLIC_PEM,
       ),
     ).not.toThrow();
+  });
+});
+
+// ── resolveOtaPrivateKeyPath ──
+//
+// 场景来源（oracle）：release 门禁与打包层共用该解析。2026-08-30 事故——本机只有原型
+// 会话产物 ota_ed25519_private.pem（下划线），release.mjs step 1 曾直查标准连字符名
+// 导致发布误判失败；legacy 兼容分支即为此回归修复，必测。
+
+describe("resolveOtaPrivateKeyPath（标准连字符名优先，legacy 下划线名兼容）", () => {
+  const keyDir = (home: string) => join(home, ".pictelio-keys");
+  const standardPath = (home: string) => join(keyDir(home), "ota-ed25519-private.pem");
+  const legacyPath = (home: string) => join(keyDir(home), "ota_ed25519_private.pem");
+
+  it("标准名存在 → 返回标准路径", () => {
+    const home = makeTempRoot();
+    mkdirSync(keyDir(home), { recursive: true });
+    writeFileSync(standardPath(home), "x");
+    expect(resolveOtaPrivateKeyPath(home)).toBe(standardPath(home));
+  });
+
+  it("仅 legacy 下划线名存在 → 返回 legacy 路径（回归：release 门禁兼容原型产物）", () => {
+    const home = makeTempRoot();
+    mkdirSync(keyDir(home), { recursive: true });
+    writeFileSync(legacyPath(home), "x");
+    expect(resolveOtaPrivateKeyPath(home)).toBe(legacyPath(home));
+  });
+
+  it("两名称都存在 → 标准名优先", () => {
+    const home = makeTempRoot();
+    mkdirSync(keyDir(home), { recursive: true });
+    writeFileSync(standardPath(home), "s");
+    writeFileSync(legacyPath(home), "l");
+    expect(resolveOtaPrivateKeyPath(home)).toBe(standardPath(home));
+  });
+
+  it("都不存在 → 返回标准路径（由调用方报错）", () => {
+    const home = makeTempRoot();
+    mkdirSync(keyDir(home), { recursive: true });
+    expect(resolveOtaPrivateKeyPath(home)).toBe(standardPath(home));
   });
 });
 
