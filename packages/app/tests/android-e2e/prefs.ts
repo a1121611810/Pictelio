@@ -81,10 +81,7 @@ export function writeClientKind(serial: string, kind: "webview" | "lynx"): strin
             /<map\s*\/>/u,
             `<map>\n    <string name="pictelio_client_kind">${kind}</string>\n</map>`,
           )
-        : xml.replace(
-            /<map>/u,
-            `<map>\n    <string name="pictelio_client_kind">${kind}</string>`,
-          );
+        : xml.replace(/<map>/u, `<map>\n    <string name="pictelio_client_kind">${kind}</string>`);
     }
   } else {
     xml = `<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\n<map>\n    <string name="pictelio_client_kind">${kind}</string>\n</map>\n`;
