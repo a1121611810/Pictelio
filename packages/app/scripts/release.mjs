@@ -12,10 +12,17 @@
  *   pnpm run release -o      # 覆盖发布模式：对已发布版本更新文案/资产，不 bump 版本号
  *                             # （目标 Release 必须已存在且非 draft；不移动 tag/不建 commit）
  *   pnpm run release -o --dry-run   # 覆盖模式 dry-run：打印将执行的 gh 命令，不实际调用
+ *   pnpm run release --web-only     # web-only 发布模式：只构建/上传 web bundle 三件套，不构建 APK
+ *                                     # （无需 keystore 密码；gh release create --prerelease；
+ *                                     #  version.json.version 继承旧 APK 版本不前进，webBundle.version 前进）
+ *   pnpm run release --min-web=x.y.z # 覆写 version.json 的 minWebVersion（缺省继承旧值）
  *
  * 环境变量:
- *   PICTELIO_KEYSTORE_PASSWORD   - keystore 密码（必须）
- *   PICTELIO_KEY_PASSWORD        - key 密码（必须）
+ *   PICTELIO_KEYSTORE_PASSWORD   - keystore 密码（正常发布必须；web-only 不检查）
+ *   PICTELIO_RELEASE_SKIP_OTA    - 置 1 显式跳过 web bundle 三件套的打包与上传（打 warn；
+ *                                   与 --web-only 互斥）
+ *   PICTELIO_OTA_MIN_APK         - bundle 的最低宿主 APK 版本（透传 release-bundle.mjs，缺省不设下限）
+ *   PICTELIO_KEY_PASSWORD        - key 密码（正常发布必须；web-only 不检查）
  */
 
 import { writeFile, mkdir, mkdtemp, unlink, rmdir } from "node:fs/promises";
@@ -41,6 +48,8 @@ import {
   withSpinner,
 } from "./lib/release-utils.mjs";
 import { truncateChangelog } from "./lib/changelog.mjs";
+import { bundlePathsFor, DEFAULT_OTA_PRIVATE_KEY_PATH } from "./lib/release-bundle-core.mjs";
+import { parseWebOnlyArgs, buildVersionJson } from "./lib/release-webonly.mjs";
 import { planOverwrite, executeOverwrite, probeRemote } from "./release-overwrite.mjs";
 import { uploadReleaseAssets, resolveUploader } from "./lib/release-uploader.mjs";
 import { probeProxyRouting } from "./lib/proxy-probe.mjs";
@@ -76,6 +85,39 @@ const isCustom = args.has("-c");
 const isOverwrite = args.has("-o") || args.has("--overwrite");
 // --dry-run：打印将执行的 gh 命令，不实际调用（覆盖模式专用）
 const dryRun = args.has("--dry-run");
+
+// #255：web-only 发布模式（不构建 APK 的分钟级热修通道）与 --min-web 覆写值的参数解析，
+// 逻辑在 lib/release-webonly.mjs（纯函数，单测覆盖；解析风格对齐 --variants=）。
+// minWeb 缺省 = 继承旧 version.json 的 minWebVersion（step 2 覆写前读取）；旧文件无该字段 = 不设门槛。
+const { isWebOnly, minWeb: minWebArg, error: flagsError } = parseWebOnlyArgs(process.argv.slice(2));
+if (flagsError) {
+  console.error(`[release] ❌ ${flagsError}`);
+  process.exit(1);
+}
+
+// #255：--web-only 与 -o/--overwrite 互斥——覆盖发布不 bump 版本号，App 端 isNewer 判
+// 无更新 → 热修静默失效；OTA 热修一律走 --web-only bump patch（规格「覆盖发布 -o 语义」）
+if (isOverwrite && isWebOnly) {
+  console.error(
+    "[release] ❌ --web-only 与 -o/--overwrite 互斥：OTA 热修一律走 --web-only bump patch，" +
+      "覆盖发布不 bump 版本号（App 端判无更新，热修静默失效）",
+  );
+  process.exit(1);
+}
+
+// #250：OTA web bundle 三件套跳过开关。缺省 = 打包 + 签名 + 上传（私钥缺失在 step 1 fail）；
+// 置 1 = 显式跳过（step 1 打 warn，step 3 不打包、step 6 不上传、catch 指引不含三件套）。
+const otaSkipped = process.env.PICTELIO_RELEASE_SKIP_OTA === "1";
+
+// #255：web-only 的唯一交付物就是 web bundle 三件套——跳过 OTA 打包 = version.json 的
+// webBundle 指向不存在的资产（静默破坏 OTA 通道），与 --web-only 互斥
+if (isWebOnly && otaSkipped) {
+  console.error(
+    "[release] ❌ --web-only 与 PICTELIO_RELEASE_SKIP_OTA=1 互斥：" +
+      "web-only 的唯一交付物是 web bundle 三件套，不允许跳过 OTA 打包上传",
+  );
+  process.exit(1);
+}
 
 // #119：模块级记录当前发布版本，供 catch 恢复指引使用（main() 作用域外访问）
 let publishedVersion = null;
@@ -507,39 +549,11 @@ async function runOverwriteFlow() {
   }
 }
 
-// 构建 Release APK（正常发布 step 3 与覆盖发布重建共用）
-async function buildReleaseApks(version, variants) {
-  // #119：按变体解析 assemble/rename task
-  const gradleTasks = variants.flatMap((flavor) => {
-    const cap = flavor.charAt(0).toUpperCase() + flavor.slice(1);
-    return [`assemble${cap}Release`, `rename${cap}ReleaseApk`];
-  });
-
-  const buildSteps = [
-    ["同步 OAuth 配置", "pnpm", ["run", "sync:credentials"]],
-    ["构建 Web 产物", "pnpm", ["run", "build"]],
-    // #51 修复：Lynx bundle 必须先构建并同步进 android assets（src/main/assets/main.lynx.bundle），
-    // 否则 full/lynx 包 APK 无 main.lynx.bundle，切换引擎后 LynxActivity 加载失败 → 白屏。
-    // NODE_ENV=production 硬兜底：防止发布环境残留 PICTELIO_LYNX_DEV=1 时把真实 OAuth
-    // 凭证内联进生产 bundle（lynx.config.ts 的 __CREDENTIALS__ 仅在 dev 下注入真值）。
-    [
-      "构建 Lynx bundle",
-      "pnpm",
-      ["--dir", "../app-lynx", "run", "build"],
-      { env: { ...process.env, NODE_ENV: "production" } },
-    ],
-    ["同步 Lynx bundle 到 Android assets", "node", ["../app-lynx/scripts/sync-android-assets.mjs"]],
-    ["同步 Capacitor 资源", "pnpm", ["run", "cap:sync"]],
-    [
-      "编译 Release APK",
-      "./gradlew",
-      gradleTasks,
-      {
-        cwd: resolvePath(rootDir, "android"),
-        env: { ...process.env, GRADLE_USER_HOME: resolvePath(rootDir, "android", ".gradle") },
-      },
-    ],
-  ];
+// 顺序执行构建步骤（gradlew 带 P13 可重试性区分：编译/R8 missing class 等代码问题直接
+// 失败，避免白跑一轮几分钟的 --stacktrace 重构建；缓存/依赖瞬时问题带 --stacktrace
+// 重试一次；其余命令失败即抛）。正常发布（buildReleaseApks）与 web-only
+// （buildWebOnlyRelease）共用。
+async function runBuildSteps(buildSteps) {
   const total = buildSteps.length;
   for (let i = 0; i < total; i++) {
     const [label, cmd, stepArgs, opts] = buildSteps[i];
@@ -562,14 +576,94 @@ async function buildReleaseApks(version, variants) {
       await runWithSpinner(subLabel, cmd, stepArgs, opts || {});
     }
   }
+}
+
+// 构建 Release APK（正常发布 step 3 与覆盖发布重建共用）
+async function buildReleaseApks(version, variants) {
+  // #119：按变体解析 assemble/rename task
+  const gradleTasks = variants.flatMap((flavor) => {
+    const cap = flavor.charAt(0).toUpperCase() + flavor.slice(1);
+    return [`assemble${cap}Release`, `rename${cap}ReleaseApk`];
+  });
+
+  const buildSteps = [
+    ["同步 OAuth 配置", "pnpm", ["run", "sync:credentials"]],
+    ["构建 Web 产物", "pnpm", ["run", "build"]],
+    // #250：OTA web bundle 三件套（打包 + 签名 + round-trip 自验，独立脚本 release-bundle.mjs）。
+    // 位置紧随「构建 Web 产物」：此后无任何步骤再触碰 dist/（cap:sync 是 copy 不 move）。
+    // 正常发布与 -o 重建两条路径共用本函数，本步自动生效；失败落在 step 3 的自动回滚窗口内。
+    // PICTELIO_RELEASE_SKIP_OTA=1 时整步省略（step 1 已打 warn）；
+    // minApkVersion 由脚本内读 PICTELIO_OTA_MIN_APK 决定（新增桥方法需提升时设置）。
+    ...(otaSkipped
+      ? []
+      : [["打包并签名 web bundle", "node", ["scripts/release-bundle.mjs", "--version", version]]]),
+    // #51 修复：Lynx bundle 必须先构建并同步进 android assets（src/main/assets/main.lynx.bundle），
+    // 否则 full/lynx 包 APK 无 main.lynx.bundle，切换引擎后 LynxActivity 加载失败 → 白屏。
+    // NODE_ENV=production 硬兜底：防止发布环境残留 PICTELIO_LYNX_DEV=1 时把真实 OAuth
+    // 凭证内联进生产 bundle（lynx.config.ts 的 __CREDENTIALS__ 仅在 dev 下注入真值）。
+    [
+      "构建 Lynx bundle",
+      "pnpm",
+      ["--dir", "../app-lynx", "run", "build"],
+      { env: { ...process.env, NODE_ENV: "production" } },
+    ],
+    ["同步 Lynx bundle 到 Android assets", "node", ["../app-lynx/scripts/sync-android-assets.mjs"]],
+    ["同步 Capacitor 资源", "pnpm", ["run", "cap:sync"]],
+    [
+      "编译 Release APK",
+      "./gradlew",
+      gradleTasks,
+      {
+        cwd: resolvePath(rootDir, "android"),
+        env: { ...process.env, GRADLE_USER_HOME: resolvePath(rootDir, "android", ".gradle") },
+      },
+    ],
+  ];
+  await runBuildSteps(buildSteps);
   const apkPaths = apkPathsFor(version, variants);
   const missing = [];
   for (const p of apkPaths) {
     if (!(await exists(p))) missing.push(p);
   }
   if (missing.length > 0) throw new Error(`APK 未生成: ${missing.join(", ")}`);
+  // #250：web bundle 三件套产物核验（打包步刚执行完，缺失即失败，防止 step 6 上传时才发现）
+  const bundlePaths = otaSkipped ? [] : Object.values(bundlePathsFor(version));
+  const missingBundles = [];
+  for (const p of bundlePaths) {
+    if (!(await exists(p))) missingBundles.push(p);
+  }
+  if (missingBundles.length > 0) {
+    throw new Error(`web bundle 三件套未生成: ${missingBundles.join(", ")}`);
+  }
   log(`APK 构建完成，产物:`);
   for (const p of apkPaths) log(`  ${resolvePath(rootDir, p)}`);
+  if (bundlePaths.length > 0) {
+    log(`web bundle 三件套:`);
+    for (const p of bundlePaths) log(`  ${resolvePath(rootDir, p)}`);
+  }
+}
+
+// #255：web-only 构建路径——只跑 credentials 同步 + web 构建 + release-bundle.mjs，
+// 跳过 gradle assemble / Lynx / cap:sync（不产 APK，分钟级热修通道）。
+// 三件套是唯一产物，失败同样落在 step 3 的自动回滚窗口内。
+async function buildWebOnlyRelease(version) {
+  const buildSteps = [
+    ["同步 OAuth 配置", "pnpm", ["run", "sync:credentials"]],
+    ["构建 Web 产物", "pnpm", ["run", "build"]],
+    ["打包并签名 web bundle", "node", ["scripts/release-bundle.mjs", "--version", version]],
+  ];
+  await runBuildSteps(buildSteps);
+  // 产物核验（打包步刚执行完，缺失即失败，防止 step 6 上传时才发现）
+  const bundlePaths = Object.values(bundlePathsFor(version));
+  const missingBundles = [];
+  for (const p of bundlePaths) {
+    if (!(await exists(p))) missingBundles.push(p);
+  }
+  if (missingBundles.length > 0) {
+    throw new Error(`web bundle 三件套未生成: ${missingBundles.join(", ")}`);
+  }
+  log(`web-only 构建完成，web bundle 三件套:`);
+  for (const p of bundlePaths) log(`  ${resolvePath(rootDir, p)}`);
 }
 
 async function main() {
@@ -662,7 +756,12 @@ async function main() {
   log("即将执行以下发布操作：");
   console.log(`  版本: ${currentVersion} → ${newVersion} (versionCode: ${versionCode})`);
   console.log(`  标签: ${tag}`);
-  console.log(`  步骤: 更新版本 → 构建 APK → git commit/tag → git push → GitHub Release`);
+  // #255：web-only 的步骤文案与 prerelease 语义对齐实际执行内容
+  console.log(
+    isWebOnly
+      ? `  步骤: 更新版本 → 构建 web bundle 三件套（web-only，不构建 APK）→ git commit/tag → git push → GitHub Release（prerelease）`
+      : `  步骤: 更新版本 → 构建 APK 与 web bundle 三件套 → git commit/tag → git push → GitHub Release`,
+  );
   console.log("─".repeat(40));
   const confirmRelease = await askQuestion("\n确认发布? (Y/n): ");
   if (confirmRelease.toLowerCase() === "n") {
@@ -691,15 +790,34 @@ async function main() {
     const keyPassword = process.env.PICTELIO_KEY_PASSWORD;
     const keystoreExists = await exists("android/app/pictelio-release.keystore");
     const envErrors = [];
-    if (!keystorePassword) envErrors.push("缺少 PICTELIO_KEYSTORE_PASSWORD");
-    if (!keyPassword) envErrors.push("缺少 PICTELIO_KEY_PASSWORD");
-    if (!keystoreExists) envErrors.push("找不到 android/app/pictelio-release.keystore");
+    // #255：web-only 不构建 APK → 跳过 keystore 密码/文件检查（只需 OTA 私钥）
+    if (!isWebOnly) {
+      if (!keystorePassword) envErrors.push("缺少 PICTELIO_KEYSTORE_PASSWORD");
+      if (!keyPassword) envErrors.push("缺少 PICTELIO_KEY_PASSWORD");
+      if (!keystoreExists) envErrors.push("找不到 android/app/pictelio-release.keystore");
+    }
+    // #250：OTA 签名私钥探测——缺失默认 fail（三件套缺失 = 该版本 OTA 通道断裂，
+    // 静默降级违反仓库「禁止静默降级」约束）；PICTELIO_RELEASE_SKIP_OTA=1 是唯一
+    // 显式跳过出口，必须打 warn 保持破坏可见（web-only 与 SKIP_OTA 已互斥，见顶层守卫）。
+    if (otaSkipped) {
+      console.warn(
+        "[release] ⚠ PICTELIO_RELEASE_SKIP_OTA=1：本次发布跳过 web bundle 三件套的打包与上传，" +
+          "该版本 OTA 通道不更新（用户仍可用当前已装 bundle）",
+      );
+    } else if (!(await exists(DEFAULT_OTA_PRIVATE_KEY_PATH))) {
+      envErrors.push(
+        `找不到 OTA 签名私钥 ${DEFAULT_OTA_PRIVATE_KEY_PATH}` +
+          `（生成见 docs/research/ota-ed25519-android.md §4.2；确需跳过 web bundle 可设 PICTELIO_RELEASE_SKIP_OTA=1）`,
+      );
+    }
     if (envErrors.length > 0) {
       // P14：用 throw 走统一 catch（输出失败步骤 + 恢复指引），而非直接 process.exit
       throw new Error(
         "环境错误：" +
           envErrors.join("；") +
-          "（请先设置签名环境变量并放置 keystore，见 docs/release-signing.md）",
+          (isWebOnly
+            ? "（web-only 只需 OTA 签名私钥，生成见 docs/research/ota-ed25519-android.md §4.2）"
+            : "（请先设置签名环境变量并放置 keystore，见 docs/release-signing.md）"),
       );
     }
   });
@@ -713,24 +831,75 @@ async function main() {
     const changelogPath = `fastlane/metadata/android/en-US/changelogs/${versionCode}.txt`;
     await mkdir(dirname(resolvePath(rootDir, changelogPath)), { recursive: true });
     await writeText(changelogPath, changelog);
-    const verJson =
-      JSON.stringify(
-        {
-          version: newVersion,
-          // P7：repo 名动态取 git remote，避免硬编码旧 repo 名
-          url: `https://github.com/${getRepoSlug()}/releases/tag/${tag}`,
-          changelog: truncateChangelog(changelog),
-        },
-        null,
-        2,
-      ) + "\n";
+    const repo = getRepoSlug();
+    // #250：minWebVersion 默认继承旧 version.json（门槛是稀有、显式动作，覆写前必须先读旧文件）；
+    // --min-web=x.y.z 优先覆写；旧文件缺失/解析失败仅 warn 不阻断（fail-open 且显式，禁静默降级）
+    // #255：web-only 双坐标——version.json 的 version 字段（APK 坐标）保持上一已发布 APK 版本
+    // 不动（从旧 version.json 继承，web-only 的 APK 坐标不前进、APK 弹窗不响）；旧文件缺失/
+    // 解析失败对 web-only 是硬错误（无法继承则双坐标语义无从保证，禁止静默降级）。
+    let minWebVersion = minWebArg?.trim();
+    let prevVerJson = null;
+    if (isWebOnly || minWebVersion === undefined) {
+      try {
+        prevVerJson = JSON.parse(await readText("../../packages/website/version.json"));
+        if (minWebVersion === undefined && typeof prevVerJson.minWebVersion === "string") {
+          minWebVersion = prevVerJson.minWebVersion;
+          log(`minWebVersion 继承旧 version.json 值: ${minWebVersion}`);
+        }
+      } catch (e) {
+        if (isWebOnly) {
+          throw new Error(
+            `web-only 发布必须继承旧 version.json 的 version 字段（APK 坐标不前进），读取失败: ${e.message}`,
+            { cause: e },
+          );
+        }
+        console.warn(
+          `[release] ⚠ 读取旧 version.json 失败，无法继承 minWebVersion（本次不设门槛）: ${e.message}`,
+        );
+      }
+    }
+    if (minWebArg !== undefined) {
+      log(`minWebVersion 由 --min-web 覆写为: ${minWebVersion}`);
+    }
+    // #255：web-only 的 APK 坐标 = 继承的旧版本；正常发布的 APK 坐标 = newVersion
+    let apkVersion = newVersion;
+    if (isWebOnly) {
+      if (
+        prevVerJson === null ||
+        typeof prevVerJson.version !== "string" ||
+        !/^\d+\.\d+\.\d+$/u.test(prevVerJson.version)
+      ) {
+        throw new Error(
+          `web-only 发布必须继承旧 version.json 的 version 字段（APK 坐标不前进），` +
+            `旧文件缺失或 version 字段缺失/格式无效`,
+        );
+      }
+      apkVersion = prevVerJson.version;
+      log(
+        `web-only 双坐标：version.json.version 继承旧 APK 版本 ${apkVersion}（不前进），` +
+          `webBundle.version = ${newVersion}（前进）`,
+      );
+    }
+    const verJson = buildVersionJson({
+      newVersion,
+      apkVersion,
+      repo,
+      tag,
+      changelog: truncateChangelog(changelog),
+      minWebVersion,
+    });
     await mkdir(dirname(resolvePath(rootDir, "../../packages/website/version.json")), {
       recursive: true,
     });
     await writeText("../../packages/website/version.json", verJson);
   });
 
-  await step(3, "构建 APK", async () => {
+  await step(3, isWebOnly ? "构建 Web 产物并打包签名" : "构建 APK", async () => {
+    if (isWebOnly) {
+      // #255：web-only 只构建 web 产物并打包签名（跳过 gradle assemble / Lynx / cap:sync）
+      await buildWebOnlyRelease(newVersion);
+      return;
+    }
     // #119：按变体解析 assemble/rename task
     const variants = resolveVariants();
     log(`构建变体：${variants.join(", ")}`);
@@ -784,7 +953,13 @@ async function main() {
   });
 
   await step(6, "创建 GitHub Release", async () => {
-    const apkPaths = apkPathsFor(newVersion, resolveVariants());
+    // #250：上传清单追加 web bundle 三件套（basename 与 APK 互异，满足上传器契约；
+    // 复用逐包重试/上传面板/失败隔离，上传器对资产类型零耦合）。
+    // PICTELIO_RELEASE_SKIP_OTA=1 时不包含三件套（step 3 未打包，文件不存在）。
+    // #255：web-only 只上传三件套不传 APK（APK 资产留在上个完整 APK 发布的 Release）
+    const bundlePaths = otaSkipped ? [] : Object.values(bundlePathsFor(newVersion));
+    const apkPaths = isWebOnly ? [] : apkPathsFor(newVersion, resolveVariants());
+    const uploadPaths = [...apkPaths, ...bundlePaths].map((p) => resolvePath(rootDir, p));
     const repo = getRepoSlug();
     let notesFile, tmpDir;
     try {
@@ -817,6 +992,8 @@ async function main() {
               title,
               "--notes-file",
               notesFile,
+              // #255：web-only 标记 prerelease——GitHub "Latest" 徽章仍指向最后完整 APK 版本
+              ...(isWebOnly ? ["--prerelease"] : []),
             ]);
             break;
           } catch (e) {
@@ -835,7 +1012,7 @@ async function main() {
         }
       }
 
-      // 第二步：逐包上传 APK（ADR-0065 编排 + Node 原生上传器；
+      // 第二步：逐包上传资产（ADR-0065 编排 + Node 原生上传器；web-only 时仅三件套；
       // 单包最多 3 次重试由深模块内部处理）
       // 研究结论：uploads.github.com 慢的根因是国际链路；先探测直连/代理并提示，
       // Node 上传器默认直连（实测更快且无 api.github.com 403 风险）。
@@ -859,14 +1036,14 @@ async function main() {
       const report = await uploadReleaseAssets({
         tag,
         repo,
-        paths: apkPaths.map((p) => resolvePath(rootDir, p)),
+        paths: uploadPaths,
         gh: uploaderFn,
         render: (e) => panel.onEvent(e),
       });
       panel.finish();
       if (report.failed.length > 0) {
         const uploadErr = new Error(
-          `APK 上传失败（${report.failed.length}/${apkPaths.length} 个包）:\n` +
+          `资产上传失败（${report.failed.length}/${uploadPaths.length} 个资产，含 web bundle 三件套）:\n` +
             report.failed
               .map((f) => `  - ${f.name}: 尝试 ${f.attempts} 次，${f.stderrTail}`)
               .join("\n"),
@@ -887,9 +1064,23 @@ async function main() {
   console.log(`🎉 发布流程完成！`);
   console.log(`   版本: ${newVersion}`);
   console.log(`   标签: ${tag}`);
-  console.log(`   APK（${resolveVariants().join(", ")}）:`);
-  for (const p of apkPathsFor(newVersion, resolveVariants())) {
-    console.log(`     ${resolvePath(rootDir, p)}`);
+  // #255：web-only 不产 APK，横幅不列 APK 路径，显式标注模式
+  console.log(
+    `   模式: ${isWebOnly ? "web-only（未构建/上传 APK）" : "正常（APK + web bundle 三件套）"}`,
+  );
+  if (!isWebOnly) {
+    console.log(`   APK（${resolveVariants().join(", ")}）:`);
+    for (const p of apkPathsFor(newVersion, resolveVariants())) {
+      console.log(`     ${resolvePath(rootDir, p)}`);
+    }
+  }
+  // #250：成功横幅列出三件套（与 APK 同 Release 上传）
+  const bundlePaths = otaSkipped ? [] : Object.values(bundlePathsFor(newVersion));
+  if (bundlePaths.length > 0) {
+    console.log(`   web bundle 三件套:`);
+    for (const p of bundlePaths) {
+      console.log(`     ${resolvePath(rootDir, p)}`);
+    }
   }
   console.log(`   地址: https://github.com/${getRepoSlug()}/releases/tag/${tag}`);
   console.log("=".repeat(50));
@@ -961,24 +1152,32 @@ main().catch(async (error) => {
     } else if (error.stepN === 6) {
       const repoKey = getRepoSlug();
       const relTag = error.relTag || "vX.Y.Z";
-      const apkRels = apkPathsFor(publishedVersion, resolveVariants()).map(
-        (p) => `packages/app/${p}`,
-      );
+      // #255：web-only 未构建/上传 APK，恢复指引只含三件套
+      const apkRels = isWebOnly
+        ? []
+        : apkPathsFor(publishedVersion, resolveVariants()).map((p) => `packages/app/${p}`);
+      // #250：恢复指引覆盖全部资产（含 web bundle 三件套；跳过开关置位时三件套本就未上传）
+      const bundleRels = otaSkipped
+        ? []
+        : Object.values(bundlePathsFor(publishedVersion)).map((p) => `packages/app/${p}`);
+      const assetRels = [...apkRels, ...bundleRels];
       const failedAssets = error.failedAssets || [];
       const targets =
         failedAssets.length > 0
-          ? apkRels.filter((p) => failedAssets.includes(p.split("/").pop()))
-          : apkRels;
-      const uploadTargets = targets.length > 0 ? targets : apkRels;
+          ? assetRels.filter((p) => failedAssets.includes(p.split("/").pop()))
+          : assetRels;
+      const uploadTargets = targets.length > 0 ? targets : assetRels;
       // P6：changelog 在 step 2 已写入 fastlane（未提交但文件在），直接指向文件
       const notesFile = `packages/app/fastlane/metadata/android/en-US/changelogs/${publishedVersionCode}.txt`;
       console.error(`\n   已完成的步骤: 5/6`);
       console.error(`   git 已推送但 GitHub Release 创建/上传失败。手动恢复:`);
       console.error(`     1. 创建 Release:`);
       console.error(
-        `        gh release create ${relTag} --repo ${repoKey} --title "${error.relTitle || `Pictelio ${relTag}`}" --notes-file ${notesFile}`,
+        `        gh release create ${relTag} --repo ${repoKey} --title "${error.relTitle || `Pictelio ${relTag}`}" --notes-file ${notesFile}${isWebOnly ? " --prerelease" : ""}`,
       );
-      console.error(`     2. 上传 APK（若 release 已存在可跳过第 1 步；仅列未成功包）:`);
+      console.error(
+        `     2. 上传资产（${isWebOnly ? "web bundle 三件套" : "APK 与 web bundle 三件套"}；若 release 已存在可跳过第 1 步；仅列未成功包）:`,
+      );
       for (const rel of uploadTargets) {
         console.error(`        gh release upload ${relTag} --repo ${repoKey} --clobber ${rel}`);
       }

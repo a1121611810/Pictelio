@@ -18,6 +18,8 @@ export interface BackGestureContext {
   navigateBack: () => void;
   /** 触发“再按一次退出”提示。 */
   dispatchExitHint: () => void;
+  /** OTA 强制门槛过渡面激活期间返回键 = 退出应用（#253，对齐 lynx /update 语义）；可选注入避免服务耦合 */
+  shouldExitOnBack?: () => boolean;
 }
 
 const rootPaths = new Set(["/home", "/login"]);
@@ -28,6 +30,11 @@ const EXIT_DOUBLE_TAP_MS = 2000;
 export async function registerBackGesture(ctx: BackGestureContext): Promise<() => void> {
   let lastBackTime = 0;
   const listener = await CapApp.addListener("backButton", () => {
+    // 门槛过渡面激活期间（#253）：一次返回即退出应用，不可关闭过渡面
+    if (ctx.shouldExitOnBack?.()) {
+      void CapApp.exitApp();
+      return;
+    }
     if (closeTopOverlay()) {
       return;
     }

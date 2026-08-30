@@ -1,22 +1,17 @@
 import type { Component } from "solid-js";
 import { isLoggedIn, isLoading, setIsLoading, initializeAuth } from "@/stores/authStore";
-import {
-  autoCheckUpdate,
-  setHasUpdate,
-  setLatestVersion,
-  setLatestReleaseUrl,
-  setLatestChangelog,
-  setShowUpdateDialog,
-  setIsCheckingUpdate,
-  setCheckCompleted,
-  lastDismissedVersion,
-  loadAccountR18,
-} from "@/stores/settingsStore";
+import { setIsCheckingUpdate, setCheckCompleted, loadAccountR18 } from "@/stores/settingsStore";
 import { settings } from "@/settings";
 import { persistScrollRestoration } from "@/stores/uiStore";
 import { scrollToTop } from "@/utils/scrollToTop";
-import { checkForUpdate } from "@/services/updateService";
+import {
+  gateActive,
+  notifyWebBundleReady,
+  registerOtaResumeListener,
+  runOtaCheck,
+} from "@/services/otaService";
 import StartupUpdateDialog from "@/components/StartupUpdateDialog";
+import GateOverlay from "@/components/GateOverlay";
 import { clearOverlays, registerBackGesture } from "@/services/backGestureService";
 import { warmCacheFromDisk } from "@/utils/imageLoader";
 import { loadReportedIds } from "@/stores/reportStore";
@@ -51,19 +46,9 @@ async function runStartupUpdateCheck(): Promise<void> {
   setIsCheckingUpdate(true);
   const [updateErr] = await tryAsync(
     (async () => {
-      const result = await checkForUpdate(APP_VERSION);
-      setHasUpdate(result.hasUpdate);
-      setLatestVersion(result.latestVersion);
-      setLatestReleaseUrl(result.latestReleaseUrl);
-      setLatestChangelog(result.latestChangelog);
-
-      if (
-        result.hasUpdate &&
-        result.latestVersion &&
-        result.latestVersion !== lastDismissedVersion()
-      ) {
-        setShowUpdateDialog(true);
-      }
+      // 单 fetch 三重消费（#251/#256）：OTA 侧（floor/自愈/T0 预热）与 APK 弹窗信号
+      // 填充全部收敛在 otaService.runOtaCheck；autoCheckUpdate 只关弹窗打扰
+      await runOtaCheck();
     })(),
   );
   setIsCheckingUpdate(false);
@@ -154,6 +139,8 @@ const RootLayout: Component = (props: { children?: any }) => {
       getPathname: () => location.pathname,
       navigateBack: () => navigate(-1),
       dispatchExitHint: () => window.dispatchEvent(new CustomEvent("exitHint")),
+      // OTA 门槛过渡面激活期间返回键 = 退出应用（#253，对齐 lynx /update 语义）
+      shouldExitOnBack: () => gateActive(),
     });
 
     const [authErr] = await tryAsync(
@@ -178,12 +165,14 @@ const RootLayout: Component = (props: { children?: any }) => {
     if (currentPath !== "/home") {
       markContentReady();
     }
-    // 启动后延迟检查更新 — 确保页面渲染完成后再弹窗
-    if (autoCheckUpdate()) {
-      setTimeout(() => {
-        runStartupUpdateCheck();
-      }, STARTUP_CHECK_DELAY_MS);
-    }
+    // 健康上报（notifyReady 首帧挂点，#251）+ 回前台节流补查监听（均 native-only）
+    notifyWebBundleReady();
+    registerOtaResumeListener();
+    // 启动后延迟检查更新 — 确保页面渲染完成后再弹窗；不再被 autoCheckUpdate 关断
+    // （单 fetch 同时服务 OTA 门槛检查，门槛不受弹窗开关抑制，规格「检查与调度」）
+    setTimeout(() => {
+      void runStartupUpdateCheck();
+    }, STARTUP_CHECK_DELAY_MS);
     if (authErr) {
       console.error("[App] Auth initialization failed", authErr);
       navigate("/login", { replace: true });
@@ -231,6 +220,7 @@ const RootLayout: Component = (props: { children?: any }) => {
       </Show>
 
       <StartupUpdateDialog />
+      <GateOverlay />
     </div>
   );
 };

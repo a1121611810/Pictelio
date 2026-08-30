@@ -23,6 +23,8 @@ const PREF_KEY_IMAGE_CACHE_BROWSER = "image_cache_browser";
 const PREF_KEY_IMAGE_CACHE_PREFETCH = "image_cache_prefetch";
 const PREF_KEY_IMAGE_CACHE_DISK_SIZE = "image_cache_disk_size";
 const PREF_KEY_DISMISSED_UPDATE_VERSION = "dismissed_update_version";
+const PREF_KEY_OTA_LAST_KNOWN_FLOOR = "ota_last_known_floor";
+const PREF_KEY_OTA_AUTO_DOWNLOAD = "ota_auto_download";
 const PREF_KEY_UGOIRA_MODE = "settings_ugoira_mode";
 
 // ── 持久化设置（统一 settings registry 管理）──
@@ -213,6 +215,29 @@ const lastDismissedVersionHandle = settings.define<string>({
 export const lastDismissedVersion = () => lastDismissedVersionHandle.value();
 export async function setLastDismissedVersion(v: string): Promise<void> {
   lastDismissedVersionHandle.set(v);
+}
+
+/** OTA floor 缓存（#251）：最近一次成功检查到的 minWebVersion，供检查失败/离线时零延迟判定 */
+const otaLastKnownFloorHandle = settings.define<string>({
+  key: PREF_KEY_OTA_LAST_KNOWN_FLOOR,
+  default: "",
+});
+
+export const otaLastKnownFloor = () => otaLastKnownFloorHandle.value();
+export async function setOtaLastKnownFloor(v: string): Promise<void> {
+  otaLastKnownFloorHandle.set(v);
+}
+
+/** OTA 自动下载开关（#254，默认开）：关闭后 T0 静默预热不下载（启动仍报告可用版本）；
+ * 强制门槛的自愈与阻断不受此开关抑制（完整性机制，规格「检查与调度：开关边界」） */
+const otaAutoDownloadHandle = settings.define<boolean>({
+  key: PREF_KEY_OTA_AUTO_DOWNLOAD,
+  default: true,
+});
+
+export const otaAutoDownload = () => otaAutoDownloadHandle.value();
+export async function setOtaAutoDownload(enabled: boolean): Promise<void> {
+  otaAutoDownloadHandle.set(enabled);
 }
 
 /** 兼容存根：registry hydrateAll 已加载，Phase 4 移除 */

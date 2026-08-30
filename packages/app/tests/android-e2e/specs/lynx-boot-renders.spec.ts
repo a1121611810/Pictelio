@@ -11,16 +11,25 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ensureEmulator } from "../avd";
-import { assertDebugApkInstalled, forceStopApp, startMainActivity, writeClientKind } from "../prefs";
+import {
+  assertDebugApkInstalled,
+  forceStopApp,
+  startMainActivity,
+  writeClientKind,
+} from "../prefs";
 import { buildDebugApk, installApk } from "../build-install";
 import { adbPath, APP_PACKAGE, runCapture, runOrThrow } from "../env";
 
 const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** 等待前台 Activity 变为期望值（adb 轮询）。 */
-async function waitForActivity(serial: string, expected: string, timeoutMs = 30_000): Promise<string> {
+async function waitForActivity(
+  serial: string,
+  expected: string,
+  timeoutMs = 30_000,
+): Promise<string> {
   const deadline = Date.now() + timeoutMs;
-  let last = ""
+  let last = "";
   while (Date.now() < deadline) {
     const d = runCapture(adbPath(), ["-s", serial, "shell", "dumpsys", "activity", "activities"]);
     last = /ResumedActivity:\s*ActivityRecord\{[^}]*u0\s+([^\s]+)/u.exec(d.stdout)?.[1] ?? "";
@@ -65,6 +74,8 @@ describe("Lynx 客户端启动即渲染（白屏回归）", () => {
     // 正向：lynx 运行时已初始化（渲染非白屏的充要信号之一；空 logcat 也算失败）
     expect(log).toMatch(/LynxEnv start init|Loading native libraries succeeded/);
     // 白屏签名：ES module TDZ / lynx loadCard 失败。出现即回归（bundle 加载即崩→白屏）。
-    expect(log).not.toMatch(/Cannot access 'routeState'|loadCard failed|ReferenceError: Cannot access/);
+    expect(log).not.toMatch(
+      /Cannot access 'routeState'|loadCard failed|ReferenceError: Cannot access/,
+    );
   }, 60_000);
 });

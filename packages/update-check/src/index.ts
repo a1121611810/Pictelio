@@ -3,7 +3,9 @@
 // 版本比较 / 拉取 URL / 超时 / 错误兜底 一处维护（单一事实源）。
 //
 // 契约：packages/website/version.json，字段 version / url / release_url / changelog
-// （url 为 scripts/release.mjs 生成的历史字段，release_url 为未来扩展兼容项）。
+// （url 为 scripts/release.mjs 生成的历史字段，release_url 为未来扩展兼容项）；
+// OTA 扩展字段 minWebVersion / webBundle（docs/specs/ota-web-bundle.md「版本与数据源」，
+// 旧客户端未知字段忽略，缺失 = 显式 undefined 交由消费端 fail-open，不在本层伪造默认值）。
 //
 // 设计要点：
 // - checkForUpdate(localVersion, fetchImpl?)：本地版本显式传入（不依赖全局常量），
@@ -16,8 +18,18 @@ export interface CheckResult {
   latestVersion: string
   latestReleaseUrl: string
   latestChangelog: string
+  /** web 层强制门槛 floor（OTA web bundle）：undefined = 未设门槛（fail-open 判定由消费端做） */
+  minWebVersion?: string
+  /** OTA bundle 元数据：version + 三件套资产前缀 URL（拼 -manifest.json / .sig / -web-bundle.zip） */
+  webBundle?: WebBundleMeta
   /** 检查失败原因（undefined = 检查成功且已解析远端数据） */
   error?: string
+}
+
+/** version.json 的 webBundle 子对象（checksum/minApkVersion 只存在于签名的 manifest，不进本契约） */
+export interface WebBundleMeta {
+  version: string
+  url: string
 }
 
 /** 可注入的 fetch 依赖（标准 DOM 类型；缺省用全局 fetch，app-lynx 传 requestFetch） */
@@ -56,6 +68,48 @@ export function isNewer(local: string, remote: string): boolean {
 }
 
 // ── 核心 fetch ──
+
+/**
+ * 强制门槛判定（OTA web bundle）：local 低于 floor 返回 true。
+ * 语义 = isNewer(local, floor)（floor 较新 ⟺ local 未达标）；floor 缺失/空 → false
+ * （fail-open，不设门槛）。签名接受 undefined：消费端可直接透传
+ * CheckResult.minWebVersion（string | undefined）。差分断言见 tests
+ * （oracle：docs/specs/ota-web-bundle.md「版本与数据源」）。
+ */
+export function isBelowMin(local: string, floor?: string): boolean {
+  if (!floor?.trim()) return false
+  return isNewer(local, floor)
+}
+
+/**
+ * webBundle 脏数据防御：字段缺失（undefined/null）= 未发布 OTA，静默视为不存在；
+ * 字段存在但非法 = 契约破坏，必须 warn 可见（禁静默降级），同样按不存在处理。
+ */
+function parseWebBundle(raw: unknown): WebBundleMeta | undefined {
+  if (raw === undefined || raw === null) return undefined
+  if (typeof raw !== "object") {
+    console.warn("[update-check] webBundle 字段存在但非法（非对象），按无 bundle 更新处理")
+    return undefined
+  }
+  const { version, url } = raw as { version?: unknown; url?: unknown }
+  if (typeof version !== "string" || !version.trim() || typeof url !== "string" || !url.trim()) {
+    console.warn("[update-check] webBundle 字段残缺（version/url 缺失或非法），按无 bundle 更新处理")
+    return undefined
+  }
+  return { version: version.trim(), url: url.trim() }
+}
+
+/** minWebVersion 脏数据防御：缺失静默视为未设门槛；存在但非法 → warn（契约破坏可见） */
+function parseMinWebVersion(raw: unknown): string | undefined {
+  if (raw === undefined || raw === null) return undefined
+  if (typeof raw !== "string" || !raw.trim()) {
+    console.warn(
+      `[update-check] minWebVersion 字段存在但非法（${JSON.stringify(raw)}），按未设门槛处理`,
+    )
+    return undefined
+  }
+  return raw.trim()
+}
 
 // 通过 raw.githubusercontent.com 获取版本信息（直连，不被 Pixiv 代理拦截）；
 // repo 曾用名 pixivizer，已重命名为 Pictelio；若 repo 迁移需同步此处。
@@ -102,22 +156,41 @@ export async function checkForUpdate(
     return { ...EMPTY_RESULT, error: `HTTP ${res.status}` }
   }
 
-  let data: { version?: string; url?: string; release_url?: string; changelog?: string }
+  let parsed: unknown
   try {
-    data = (await res.json()) as { version?: string; url?: string; release_url?: string; changelog?: string }
+    parsed = await res.json()
   } catch (err) {
     // 200 但响应体非 JSON（如网关错误页）：解析失败同样按检查失败处理
     console.warn("[update-check] 解析 version.json 失败:", err)
     return { ...EMPTY_RESULT, error: err instanceof Error ? err.message : String(err) }
   }
+  // res.json() 对「合法 JSON 但非对象」的 body（字面量 null / 数组 / 字符串）原样返回，
+  // 同样按检查失败处理——「调用方无需 try/catch」的契约不能被脏 body 击穿
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    console.warn("[update-check] version.json 响应体非对象，按检查失败处理")
+    return { ...EMPTY_RESULT, error: "invalid body: not an object" }
+  }
+  const data = parsed as {
+    version?: unknown
+    url?: unknown
+    release_url?: unknown
+    changelog?: unknown
+    minWebVersion?: unknown
+    webBundle?: unknown
+  }
 
-  const remoteVersion = data.version ?? ""
+  const remoteVersion = typeof data.version === "string" ? data.version : ""
   const hasUpdate = remoteVersion ? isNewer(localVersion, remoteVersion) : false
 
+  // trim 口径：新字段（minWebVersion/webBundle）入库前 trim；存量字段保持原样透传
+  // （isNewer 内部自带 trim，行为不变——避免对既有消费方的语义漂移）
   return {
     hasUpdate,
     latestVersion: remoteVersion,
-    latestReleaseUrl: data.url ?? data.release_url ?? "",
-    latestChangelog: data.changelog ?? "",
+    latestReleaseUrl:
+      typeof data.url === "string" ? data.url : typeof data.release_url === "string" ? data.release_url : "",
+    latestChangelog: typeof data.changelog === "string" ? data.changelog : "",
+    minWebVersion: parseMinWebVersion(data.minWebVersion),
+    webBundle: parseWebBundle(data.webBundle),
   }
 }

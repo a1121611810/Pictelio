@@ -18,11 +18,18 @@ import { AgentBrowserDriver } from "../driver";
 
 const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// 用 99.0.0 保证 isNewer 判定为 true，且不会与真实发布版本/已忽略版本冲突
+// 用 99.0.0 保证 isNewer 判定为 true，且不会与真实发布版本/已忽略版本冲突；
+// minWebVersion/webBundle 为 OTA 双坐标契约字段（docs/specs/ota-web-bundle.md「版本与数据源」），
+// mock 保持与生产 schema 同形（契约测试锚点）
 const MOCK_VERSION_JSON = JSON.stringify({
   version: "99.0.0",
   url: "https://github.com/a1121611810/Pictelio/releases/tag/v99.0.0",
   changelog: "E2E mock version",
+  minWebVersion: "1.0.0",
+  webBundle: {
+    version: "99.0.0",
+    url: "https://github.com/a1121611810/Pictelio/releases/download/v99.0.0/pictelio-99.0.0",
+  },
 });
 
 const UPDATE_URL_PATTERN =

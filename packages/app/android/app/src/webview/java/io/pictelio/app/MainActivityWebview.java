@@ -91,6 +91,7 @@ public class MainActivityWebview extends BridgeActivity {
         registerPlugin(OAuthPlugin.class);
         registerPlugin(PixivApiPlugin.class);
         registerPlugin(ClientInfoPlugin.class); // ADR-0062
+        registerPlugin(OtaPlugin.class); // OTA web bundle（#249）
         super.onCreate(savedInstanceState);
         // 调试模式 — debug 构建时启用
         if (BuildConfig.DEBUG) {
@@ -105,7 +106,9 @@ public class MainActivityWebview extends BridgeActivity {
         final WebView webView = bridge.getWebView();
         if (webView == null) return;
 
-        // 保留 Capacitor 原有的 WebViewClient，用包装类代理非图片请求
+        // 保留 Capacitor 原有的 WebViewClient，用包装类代理非图片请求；
+        // 出口统一过 OtaPlugin.ensureNoStore（OTA 坑①：本地服务器响应缺 Cache-Control
+        // 导致 Chromium 缓存旧文档，切换后旧 JS 复活误调 notifyReady）
         final WebViewClient originalClient = webView.getWebViewClient();
         webView.setWebViewClient(new WebViewClient() {
             @Override
@@ -115,23 +118,29 @@ public class MainActivityWebview extends BridgeActivity {
             ) {
                 String url = request.getUrl().toString();
                 WebResourceResponse custom = interceptImage(url);
-                if (custom != null) return custom;
+                if (custom != null) return OtaPlugin.ensureNoStore(custom);
+                WebResourceResponse upstream;
                 if (originalClient != null) {
-                    return originalClient.shouldInterceptRequest(view, request);
+                    upstream = originalClient.shouldInterceptRequest(view, request);
+                } else {
+                    upstream = super.shouldInterceptRequest(view, request);
                 }
-                return super.shouldInterceptRequest(view, request);
+                return OtaPlugin.ensureNoStore(upstream);
             }
 
             @SuppressWarnings("deprecation")
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, String url) {
                 WebResourceResponse custom = interceptImage(url);
-                if (custom != null) return custom;
+                if (custom != null) return OtaPlugin.ensureNoStore(custom);
                 // 弃用重载无法获取请求头，让原始 WebViewClient 处理
+                WebResourceResponse upstream;
                 if (originalClient != null) {
-                    return originalClient.shouldInterceptRequest(view, url);
+                    upstream = originalClient.shouldInterceptRequest(view, url);
+                } else {
+                    upstream = super.shouldInterceptRequest(view, url);
                 }
-                return super.shouldInterceptRequest(view, url);
+                return OtaPlugin.ensureNoStore(upstream);
             }
 
             @Override

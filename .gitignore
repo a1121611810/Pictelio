@@ -39,6 +39,10 @@ packages/app/test-results/
 /test-results/
 packages/app/test/e2e/screenshots/
 
+# OTA web bundle 三件套（release-bundle.mjs 本地产物；必须 ignore——
+# release.mjs step 4 的「发布无关变更拦截」对未跟踪文件同样生效，不 ignore 则发布必炸）
+packages/app/ota/
+
 # iOS — not targeted (Android-only)
 packages/app/ios/
 

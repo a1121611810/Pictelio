@@ -1,5 +1,13 @@
 apply plugin: 'com.android.application'
 
+// OTA web bundle 验签公钥（#248/#249）：raw 32B 的 base64，与 ~/.pictelio-keys/ota-ed25519
+// 私钥同对（指纹记录见 docs/research/ota-ed25519-android.md §4.2）。公开物可入库；
+// 构建期长度校验防手滑截断（签名失败在运行期才暴露就晚了）。
+def otaPublicKeyB64 = "ST/sQxNxrrZXOWwiuKdqqp79p3njn6MvIMWwJQTXWQY="
+if (java.util.Base64.getDecoder().decode(otaPublicKeyB64).length != 32) {
+    throw new GradleException("OTA_ED25519_PUBLIC_KEY_B64 must decode to exactly 32 raw bytes")
+}
+
 android {
     namespace = "io.pictelio.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -11,6 +19,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 42100
         versionName "4.21.0"
+        buildConfigField "String", "OTA_ED25519_PUBLIC_KEY_B64", "\"${otaPublicKeyB64}\""
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -94,6 +103,9 @@ androidComponents {
         if (flavorName == 'webview') {
             variant.packaging.resources.excludes.add('main.lynx.bundle')
         }
+        // bcprov multi-release jar 的 META-INF/versions/9 对 Android 运行时无效
+        // （#248：AGP 对 MRJAR 重复路径冲突的预案，docs/research/ota-ed25519-android.md §3.1）
+        variant.packaging.resources.excludes.add('META-INF/versions/9/**')
     }
 }
 
@@ -214,6 +226,12 @@ dependencies {
     webviewImplementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     webviewImplementation project(':capacitor-android')
     webviewImplementation project(':capacitor-cordova-android-plugins')
+    // OTA web bundle Ed25519 验签（#248）：bcprov lightweight API（不注册 JCA provider，
+    // 绕开 Android 内置裁剪版 BC 冲突与 API 33+ 文档陷阱，docs/research/ota-ed25519-android.md）。
+    // full flavor 编译 src/webview/java 源集 → 两个 flavor 都要挂。
+    webviewImplementation "org.bouncycastle:bcprov-jdk18on:1.85.2"
+    // WorkManager（#252 OTA 慢通道）
+    webviewImplementation "androidx.work:work-runtime:2.10.0"
 
     // ── Lynx-only ──
     // Lynx SDK（#52 起引入：LynxModule 编译依赖；完整配置见 #51 原生 LynxView 壳）
@@ -242,6 +260,8 @@ dependencies {
     fullImplementation "org.lynxsdk.lynx:lynx-service-log:4.0.1"
     fullImplementation "org.lynxsdk.lynx:xelement:4.0.1"
     fullImplementation "org.lynxsdk.lynx:xelement-input:4.0.1"
+    fullImplementation "org.bouncycastle:bcprov-jdk18on:1.85.2"
+    fullImplementation "androidx.work:work-runtime:2.10.0"
 
     // ── Test ──
     testImplementation "junit:junit:$junitVersion"

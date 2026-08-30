@@ -1,6 +1,8 @@
 import type { Component } from "solid-js";
 import {
   autoCheckUpdate,
+  otaAutoDownload,
+  setOtaAutoDownload,
   setAutoCheckUpdate,
   hasUpdate,
   isCheckingUpdate,
@@ -194,6 +196,33 @@ const SettingsAccount: Component<Props> = (props) => {
           checked={autoCheckUpdate()}
           on:change={() => setAutoCheckUpdate(!autoCheckUpdate())}
           aria-label="启动时检查更新"
+        />
+      </div>
+
+      {/* 自动下载 Web 更新包 — toggle row（#254；门槛自愈/阻断不受此开关抑制） */}
+      <div class="flex items-center justify-between py-3">
+        <div class="flex items-center gap-3 min-w-0 flex-1">
+          <div class="relative w-6 h-6 flex-shrink-0 text-[var(--colorNeutralForeground2)] flex items-center justify-center">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M12 3.25a8.75 8.75 0 1 0 0 17.5 8.75 8.75 0 0 0 0-17.5zM2.75 12a9.25 9.25 0 1 1 18.5 0 9.25 9.25 0 0 1-18.5 0zM12 7.75c.41 0 .75.34.75.75v5.19l1.97-1.97a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0l-3.25-3.25a.75.75 0 1 1 1.06-1.06l1.97 1.97V8.5c0-.41.34-.75.75-.75z"
+                fill="currentColor"
+              />
+            </svg>
+          </div>
+          <div class="min-w-0">
+            <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
+              自动下载 Web 更新包
+            </p>
+            <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
+              静默下载并在下次启动生效；强制更新门槛不受此开关影响
+            </p>
+          </div>
+        </div>
+        <fluent-switch
+          checked={otaAutoDownload()}
+          on:change={() => setOtaAutoDownload(!otaAutoDownload())}
+          aria-label="自动下载 Web 更新包"
         />
       </div>
 
