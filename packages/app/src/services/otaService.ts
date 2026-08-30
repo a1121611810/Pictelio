@@ -14,6 +14,7 @@ import {
 } from "@pictelio/update-check";
 import { Ota } from "@/native/Ota";
 import {
+  otaAutoDownload,
   otaLastKnownFloor,
   setOtaLastKnownFloor,
   setShowUpdateDialog,
@@ -179,6 +180,13 @@ export async function selfHeal(): Promise<boolean> {
  */
 async function maybeSilentInstall(result: CheckResult): Promise<void> {
   if (!nativeOrWarn("silent install")) return;
+  if (!otaAutoDownload()) {
+    // 用户关闭自动下载（#254）：仅报告可用版本，不写 pending（门槛自愈路径不受此开关影响）
+    console.info(
+      `[ota] 自动下载已关闭，报告可用 bundle ${result.webBundle?.version ?? "（无）"}，不预热`,
+    );
+    return;
+  }
   const bundle = result.webBundle;
   if (!bundle || !bundle.version) return;
   if (!isNewer(currentBundleVersion(), bundle.version)) return;

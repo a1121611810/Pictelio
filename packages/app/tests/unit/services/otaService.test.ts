@@ -25,8 +25,10 @@ const mockSettings = vi.hoisted(() => {
       store.set("floor", v);
     },
     setShowUpdateDialog: vi.fn(),
+    otaAutoDownload: () => mockState.autoDownload,
   };
 });
+const mockState = vi.hoisted(() => ({ autoDownload: true }));
 
 vi.mock("@capacitor/core", () => ({ Capacitor: mockCap }));
 vi.mock("@capacitor/app", () => ({ App: mockApp }));
@@ -35,6 +37,7 @@ vi.mock("@/stores/settingsStore", () => ({
   otaLastKnownFloor: mockSettings.otaLastKnownFloor,
   setOtaLastKnownFloor: mockSettings.setOtaLastKnownFloor,
   setShowUpdateDialog: mockSettings.setShowUpdateDialog,
+  otaAutoDownload: mockSettings.otaAutoDownload,
 }));
 
 import {
@@ -64,6 +67,7 @@ beforeEach(() => {
   mockOta.notifyReady.mockReset().mockResolvedValue(undefined);
   mockOta.applyNow.mockReset().mockResolvedValue(undefined);
   mockSettings.store.clear();
+  mockState.autoDownload = true;
   vi.stubGlobal("location", { reload: vi.fn() });
 });
 
@@ -232,6 +236,36 @@ describe("otaService T0 静默安装（下次启动生效）", () => {
     );
     await flush();
     expect(mockOta.install).not.toHaveBeenCalled();
+  });
+
+  it("开关关闭（#254）→ 不预热下载，仅报告可用版本（门槛自愈路径不受影响）", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    mockState.autoDownload = false;
+    mockOta.install.mockResolvedValue({ ok: true, version: "3.22.0" });
+
+    await runOtaCheck(
+      fetchOk({
+        version: "3.22.0",
+        webBundle: { version: "3.22.0", url: "https://example.com/prefix" },
+      }),
+    );
+    await flush();
+
+    expect(mockOta.install).not.toHaveBeenCalled();
+    expect(info).toHaveBeenCalledWith(expect.stringContaining("自动下载已关闭"));
+
+    // 门槛路径不受开关抑制：floor 命中时自愈仍触发
+    mockState.autoDownload = true;
+    mockOta.install.mockRejectedValue(new Error("HTTP 404"));
+    await runOtaCheck(
+      fetchOk({
+        version: "3.22.0",
+        minWebVersion: "3.22.0",
+        webBundle: { version: "3.22.0", url: "https://example.com/prefix" },
+      }),
+    );
+    await flush();
+    expect(mockOta.install).toHaveBeenCalledTimes(1);
   });
 
   it("安装失败 → 指数退避，同会话内不再立即重试", async () => {

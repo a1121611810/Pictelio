@@ -1,6 +1,8 @@
-import { type Component } from "solid-js";
+import { type Component, createSignal, onMount, Show } from "solid-js";
+import { Capacitor } from "@capacitor/core";
 import PageTransition from "../components/PageTransition";
 import FluentIcon from "../components/ui/FluentIcon";
+import { Ota, type OtaStatus } from "@/native/Ota";
 
 // ── Data model ──
 interface AboutRow {
@@ -91,6 +93,63 @@ const sections: AboutSection[] = [
   // 后续扩展只需在此数组 push 新 section 或 row
 ];
 
+/**
+ * OTA web bundle 状态动态行（#254）：四要素 = current / lastGood / pending / 公钥指纹。
+ * 仅原生环境渲染（web/dev 无原生桥）；status 不可达时优雅降级为一行提示（禁静默吞错）。
+ */
+function formatOtaValue(status: OtaStatus, field: "current" | "lastGood" | "pending"): string {
+  if (field === "pending") return status.pending || "无";
+  const v = status[field]; // 收窄后为 string（current/lastGood）
+  if (v === "public") return "APK 内置";
+  return v;
+}
+
+const OtaStatusRows: Component = () => {
+  const [status, setStatus] = createSignal<OtaStatus | null>(null);
+  const [failed, setFailed] = createSignal(false);
+  onMount(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    Ota.status()
+      .then(setStatus)
+      .catch((e) => {
+        console.warn("[about] OTA 状态获取失败:", e);
+        setFailed(true);
+      });
+  });
+  return (
+    <Show
+      when={!failed()}
+      fallback={<div class="ota-row text-[var(--colorNeutralForeground3)]">OTA 状态不可用</div>}
+    >
+      <Show
+        when={status()}
+        fallback={<div class="ota-row text-[var(--colorNeutralForeground3)]">加载中…</div>}
+      >
+        {(st) => (
+          <>
+            <div class="ota-row">
+              <span class="ota-label">Web 包（当前）</span>
+              <span>{formatOtaValue(st(), "current")}</span>
+            </div>
+            <div class="ota-row">
+              <span class="ota-label">Web 包（上次健康）</span>
+              <span>{formatOtaValue(st(), "lastGood")}</span>
+            </div>
+            <div class="ota-row">
+              <span class="ota-label">待生效</span>
+              <span>{formatOtaValue(st(), "pending")}</span>
+            </div>
+            <div class="ota-row flex-wrap">
+              <span class="ota-label">验签公钥指纹</span>
+              <span class="break-all">{st().publicKeyFingerprint || "—"}</span>
+            </div>
+          </>
+        )}
+      </Show>
+    </Show>
+  );
+};
+
 // ── Component ──
 const About: Component = () => {
   const navigate = useNavigate();
@@ -136,6 +195,20 @@ const About: Component = () => {
             </p>
           </div>
         </div>
+
+        {/* ── OTA 状态（#254：四要素，仅原生环境） ── */}
+        <section class="mb-1">
+          <p class="px-5 py-2 [font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground2)] uppercase tracking-wide">
+            Web 更新包状态
+          </p>
+          <div class="mx-4 surface-card px-4 py-1 [font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)]">
+            <style>{`
+              .ota-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; min-height: 44px; padding: 8px 0; }
+              .ota-label { color: var(--colorNeutralForeground2); flex-shrink: 0; }
+            `}</style>
+            <OtaStatusRows />
+          </div>
+        </section>
 
         {/* ── Info sections ── */}
         {sections.map((section) => (
