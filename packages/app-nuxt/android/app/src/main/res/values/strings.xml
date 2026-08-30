@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">NuxtProto</string>
+    <string name="title_activity_main">NuxtProto</string>
+    <string name="package_name">io.pictelio.nuxtproto</string>
+    <string name="custom_url_scheme">io.pictelio.nuxtproto</string>
+</resources>

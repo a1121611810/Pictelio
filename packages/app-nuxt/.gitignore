@@ -1,0 +1,9 @@
+.nuxt
+.output
+node_modules
+ota-dist
+*.log
+.gradle
+app/build
+app/src/main/assets/public
+capacitor-cordova-android-plugins
