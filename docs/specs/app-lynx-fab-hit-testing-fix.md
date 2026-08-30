@@ -14,7 +14,7 @@
 
 移除 `GlobalFab.vue` 中**菜单关闭态仍存在的全屏透明容器**（`absolute inset-0 z-40 pointer-events-none`），改为**展开层条件渲染**：菜单关闭时渲染树中不存在任何全屏元素，页面点击自然穿透；菜单展开时遮罩（交互面）才出现。
 
-- **渲染结构**（单根容器，保留 ADR-0121 层叠相对次序）：外层（无尺寸）→ 展开层 `v-if="view.isOpen"`（遮罩 z-10 + 内外环 z-20）+ 主 FAB 独立常显层 z-50。
+- **渲染结构**（单根容器，保留 ADR-0121 层叠相对次序与 z 值）：外层（z-40，(0,0) 零尺寸盒锚点）→ 遮罩 `v-if="view.isOpen"`（z-10，显式 vw 全屏）+ 环层 `v-if="view.isOpen"`（z-20）+ 主 FAB（z-30，常显，`left/top vw + translate` 定位）。
 - **平台约束固化**：原生 LynxView hit-testing 不识别 `pointer-events`；全屏元素必须是交互面（带 `@tap`）或不存在。此约束入术语表 + CONTEXT.md，作为 app-lynx 覆盖层的不可变规则。
 - **同款清理**：`App.vue` exitHint 提示条移除 `pointer-events-none`。
 - **动画迁移**：环项弹出动画从 `transition`（依赖 isOpen 状态变化）改为 **keyframes**（`both` + 逐项 stagger），对齐 ADR-0111 的 `item-rise` 弹出习语。
@@ -36,15 +36,15 @@
 
 - **改动面**：全部在薄渲染适配器 `GlobalFab.vue`（模板结构 + ringStyle + keyframes）+ `App.vue`（exitHint 一行）+ 测试/文档。深模块 `createGlobalFab.ts` **零改动**。
 - **GlobalFab.vue 模板结构**（单根容器，多子节点）：
-  - 外层：`v-if="view.visible"`，无定位无尺寸（不参与命中测试）。
-  - 展开层：`v-if="view.isOpen"`，`absolute inset-0 z-40`（全屏层仅展开态存在）。
-    - 遮罩：`absolute inset-0 z-10 bg-scrim` + `@tap="dispatchClose"`（交互面；可加 `scrim-in` 200ms 淡入，复用 ADR-0111 全局 keyframes）。
-    - 外环/内环：`v-for`，`absolute z-20`，`left/top` vw + `translate(-50%,-50%)`，`animation: fab-ring-in 300ms cubic-bezier(.05,.7,.1,1) <i*30>ms both`。
-  - 主 FAB：`v-if="view.visible"` 独立层，`absolute z-50`，`right/bottom` vw 定位不变，`@tap="dispatchToggle"`。
+  - 外层：`v-if="view.visible"`，`absolute z-40` + `style="top:0;left:0"`——(0,0) 零尺寸盒，只作定位锚点、不参与命中测试。
+  - 遮罩：`v-if="view.isOpen"`，`absolute z-10 bg-scrim scrim-in`，`scrimStyle`（显式 `left:0;top:0;width:100vw;height:<屏高vw>`）`@tap="dispatchClose"`（交互面）。
+  - 环层：`v-if="view.isOpen"`，`absolute z-20` 零尺寸盒，只承载环项；环项 `absolute z-20` + `left/top` vw + `translate(-50%,-50%)` + `fab-ring-in` keyframes。
+  - 主 FAB：常显，`absolute z-30`，`fabStyle`（`left/top` vw + `translate(-50%,-50%)` + 尺寸 vw）`@tap="dispatchToggle"`。
+- **定位锚点（原生平台事实）**：原生 LynxView 把「最近的 view 祖先」当作 absolute 子元素的定位锚点（即使祖先未设 position，与 Web 回退视口不同）；故覆盖层一律 `left/top` vw + translate，**禁止**在非全屏父盒内用 `right/bottom`。
 - **ringStyle 改造**：删除 `pointer-events: s ? auto : none` 动态样式与 transition；返回 `left/top` vw + 静态 `transform: translate(-50%,-50%)` + `fab-ring-in` 动画（reduced-motion 时 `animation: none`）。
 - **keyframes**：新增 `fab-ring-in`（`from translate(-50%,-50%) scale(0) opacity 0 → to translate(-50%,-50%) scale(1) opacity 1`），300ms `cubic-bezier(.05,.7,.1,1)`，`both` fill；stagger 沿用 `i*30ms`。
-- **层叠序**：`遮罩(z-10) < 菜单项(z-20) < 主 FAB(z-50)`；遮罩与菜单项同处 z-40 展开层，主 FAB 为展开层外独立层（相对次序与 ADR-0121 一致，仅 FAB 移出容器、z-30→z-50）。
-- **exitHint**（App.vue）：移除 `pointer-events-none`（装饰条，非交互面）。
+- **层叠序**：`遮罩(z-10) < 菜单项(z-20) < 主 FAB(z-30)`，同一 z-40 外层内（与 ADR-0121 z 值一致；外层由常显全屏容器改为 (0,0) 零尺寸盒锚点）。
+- **exitHint**（App.vue）：取消全宽盒（`left-0 right-0`）+ 移除 `pointer-events-none`，胶囊居中定位（`left: 50vw; bottom: 12vw` + `translate(-50%,0)`）；命中面=提示条自身，双端一致、不盖 FAB 区域。
 - **无障碍标注不变**：`GLOBAL_FAB_A11Y_LABELS` / `FAB_MENU_A11Y_LABELS` 与各 `accessibility-element` 均不动。
 - **关闭动画代价**：环项收起瞬时（v-if 卸载）；主 FAB 旋转动画保留。与 `RefreshableList`（ADR-0111）一致，可接受。
 
@@ -52,8 +52,8 @@
 
 - **测试哲学**：只测外部行为与结构不变量，不测实现细节；平台约束（命中测试）以原生模拟器验证为准，web-core 全绿不构成证据。
 - **单测**（既有接缝：`tests/unit.test.ts` 对 `GlobalFab.vue` 模板源码的结构断言，ADR-0121 先例）：
-  - 更新现有「层叠序」断言到新结构（展开层 `v-if="view.isOpen"` + `absolute inset-0 z-40`、遮罩 `z-10 bg-scrim` + `@tap`、环项 `z-20`、主 FAB `z-50`）。
-  - **新增负向断言（本 bug 回归）**：模板不含 `absolute inset-0 z-40 pointer-events-none`；展开层必须 `v-if="view.isOpen"` 条件渲染。
+  - 更新现有「层叠序」断言到新结构（外层 `v-if="view.visible"` + `absolute z-40` + (0,0) 锚点、遮罩 `v-if` + `z-10 bg-scrim scrim-in` + `@tap`、环层 `v-if` + `z-20`、主 FAB `z-30`）。
+  - **新增负向断言（本 bug 回归）**：模板不含 `pointer-events-none` / `pointer-events-auto`；遮罩与环层必须 `v-if="view.isOpen"` 条件渲染。
   - 深模块 `createGlobalFab.test.ts` 不动、全绿。
 - **E2E**（android-e2e，adb 驱动，仿 `lynx-boot-renders.spec.ts` 轻量模式）：登录 → FAB 切「我的」→ 点「显示 R-18 内容」开关行 → 断言 switch 视觉翻转（截图像素 diff）。离线可点、确定性；修复前红、修复后绿。
 - **手动验证回路**（模拟器原生）：沿用 diagnosing-bugs 已建回路——菜单关闭态点页面 scrim/菜单行有反应（像素变化 > 阈值），点 FAB 展开/收起正常。

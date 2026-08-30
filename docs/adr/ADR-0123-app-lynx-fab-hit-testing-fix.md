@@ -22,20 +22,21 @@ app-lynx（lynx `4.0.1`，原生 LynxView）在 tab 页上出现**全页面点�
 2. **`GlobalFab.vue` 改单根容器结构**（保留 ADR-0121 层叠相对次序、几何、动效语义）：
 
    ```
-   外层    v-if="view.visible"                  （无定位无尺寸，不参与命中）
-   ├─ 展开层 v-if="view.isOpen"  absolute inset-0 z-40
-   │   ├─ 遮罩   absolute inset-0 z-10 bg-scrim  @tap=dispatchClose   （交互面 ✓）
+   外层    v-if="view.visible"  absolute z-40  style="top:0;left:0"  （(0,0) 零尺寸盒锚点，不参与命中）
+   ├─ 遮罩   v-if="view.isOpen"  absolute z-10 bg-scrim  scrimStyle=显式 vw 全屏  @tap=dispatchClose  （交互面 ✓）
+   ├─ 环层   v-if="view.isOpen"  absolute z-20  （零尺寸盒，只承载环项）
    │   ├─ 外环   v-for  absolute z-20  left/top vw + translate(-50%,-50%) + fab-ring-in keyframes
    │   └─ 内环   v-for  absolute z-20  （同上）
-   └─ 主 FAB  absolute z-50  right/bottom vw  @tap=dispatchToggle      （独立常显层）
+   └─ 主 FAB  absolute z-30  fabStyle=left/top vw + translate 居中  @tap=dispatchToggle  （常显）
    ```
 
-   - **关闭态**：展开层整层不渲染 → 渲染树只有主 FAB → 页面点击穿透（与 `RefreshableList` 同语义）。
-   - **展开态**：遮罩全屏 `@tap` 收起；菜单项 `z-20` 浮于遮罩之上；主 FAB `z-50` 恒在。
-   - 主 FAB 从容器内 `z-30` 移出为**独立常显层** `z-50`（容器已改条件渲染，FAB 必须常显）；层叠相对次序不变。
-   - **动画改 keyframes**：环项 `transition`（依赖 isOpen 状态变化）在 `v-if` 挂载下不触发，改 `fab-ring-in` keyframes（`both` + 逐项 stagger `i*30ms`，300ms `cubic-bezier(.05,.7,.1,1)`，对齐 ADR-0111 的 `item-rise` 弹出习语）；`ringStyle` 中原 `pointer-events` 动态样式删除（双端皆不再需要）。遮罩可复用全局 `scrim-in` 淡入（200ms，ADR-0111 已有）。
+   - **关闭态**：遮罩与环层整层不渲染 → 渲染树只有主 FAB → 页面点击穿透（与 `RefreshableList` 同语义）。
+   - **展开态**：遮罩全屏（显式 vw 尺寸）`@tap` 收起；菜单项 `z-20` 浮于遮罩之上；主 FAB `z-30` 恒在。
+   - **定位锚点（模拟器实测修订）**：原生 LynxView 把「最近的 view 祖先」当作 absolute 子元素的定位锚点（即使祖先未设 position，与 Web 回退视口不同）。首版实现曾让主 FAB 用 `right/bottom` vw + 独立层、外层零尺寸——FAB 按父盒边缘解析直接跑出屏幕（模拟器实测消失）。**修订**：外层钉在 (0,0)（绝对定位 + `top/left:0` + 零尺寸盒，只作锚点、不参与命中），遮罩/FAB 一律 `left/top` vw + `translate(-50%,-50%)`（vw 视口基准，从 (0,0) 起算恒等于视口坐标）。
+   - **层叠序**：`遮罩(z-10) < 菜单项(z-20) < 主 FAB(z-30)`，同一 z-40 外层内——与 ADR-0121 的 z 相对次序**逐字一致**（外层由「常显全屏容器」改为「(0,0) 零尺寸盒锚点」+ 遮罩/环层条件渲染）。
+   - **动画改 keyframes**：环项 `transition`（依赖 isOpen 状态变化）在 `v-if` 挂载下不触发，改 `fab-ring-in` keyframes（`both` + 逐项 stagger `i*30ms`，300ms `cubic-bezier(.05,.7,.1,1)`，对齐 ADR-0111 的 `item-rise` 弹出习语）；`ringStyle` 中原 `pointer-events` 动态样式删除（双端皆不再需要）。遮罩复用全局 `scrim-in` 淡入（200ms，ADR-0111 已有）。
    - **代价**：菜单关闭动画从 staggered 收起变为瞬时消失（主 FAB 旋转动画保留）。可接受——`RefreshableList` 同为 v-if 瞬时收起。
-3. **`App.vue` exitHint**：移除 `pointer-events-none`（纯装饰条，非交互面，无需接收触摸也不该依赖该属性）。
+3. **`App.vue` exitHint**：取消全宽盒（`left-0 right-0`）并移除 `pointer-events-none`，改为**胶囊居中定位**（`left: 50vw; bottom: 12vw` + `transform: translate(-50%,0)`）。命中面只剩提示条自身：原生侧不再吞底部整条点击（其 z-50 高于 FAB 的 z-40 层，原先会盖住 FAB 区域），web-core 侧行为一致（原 `pointer-events-none` 在原生无效、在 web 才生效，双端本就分叉）。
 4. **回归接缝**：
    - 单测（既有模板结构断言模式，`tests/unit.test.ts`）：更新 GlobalFab 结构断言到新结构，并新增**负向断言**——模板不得再含全屏 `pointer-events-none` 元素、展开层必须 `v-if="view.isOpen"` 条件渲染。
    - E2E（android-e2e，adb 驱动仿 `lynx-boot-renders.spec.ts`）：登录后经 FAB 进「我的」页，点「显示 R-18 内容」开关行，断言 switch 翻转（离线可点、确定性）。修复前该点击 0 变化（红）、修复后翻转（绿）。
@@ -45,7 +46,7 @@ app-lynx（lynx `4.0.1`，原生 LynxView）在 tab 页上出现**全页面点�
 
 - **保留全屏容器 + 用 Lynx 官方命中开关/属性**：Lynx 3.5 才引入 `pointer-events`，4.0.1 实机不生效（双重复现）；无其它可用命中测试开关（文档未检索到）。否决。
 - **主 FAB 移出为兄弟根节点（fragment 多根模板）**：需依赖 vue-lynx 多根 fragment 支持，未验证。否决（单根容器无此风险）。
-- **容器在关闭态收缩为 0 尺寸 + FAB 改用 `left/top vw + translate` 定位**：可规避 fragment 问题，但改变主 FAB 定位方式（right/bottom → left/top+translate），引入额外几何变更。否决（保持 FAB 定位现状，用独立层即可）。
+- **容器在关闭态收缩为 0 尺寸 + FAB 保留 `right/bottom`**：首版按此思路实现（外层零尺寸盒 + FAB 独立层 right/bottom vw），模拟器实测 **FAB 跑出屏幕**——原生 LynxView 把最近 view 祖先当定位锚点（即使未设 position），`right/bottom` 按父盒（0×0）边缘解析为负值。否决并修订：外层钉 (0,0) 作锚点，子元素一律 `left/top` vw + translate（见决策 2）。
 - **在 web-core 验证通过即视为修复**：web-core 浏览器语义下 `pointer-events` 正常，bug 不出现；真机/模拟器才复现。必须原生验证，web-core 全绿不构成证据。否决。
 - **单测提取渲染结构为纯函数以测命中语义**：模板就是实现，提取是假接缝。否决（沿用既有模板结构断言 + E2E）。
 
@@ -57,7 +58,7 @@ app-lynx（lynx `4.0.1`，原生 LynxView）在 tab 页上出现**全页面点�
 - 与 `RefreshableList`（ADR-0111）的既有正确模式统一（展开层条件渲染 + 交互面遮罩 + keyframes 弹出习语）。
 
 **负面/风险**：
-- 主 FAB 层叠从容器内 `z-30` 变为独立 `z-50`，需确认展开态菜单项（`z-20`）不被 FAB 覆盖（层叠相对次序不变，FAB 恒在菜单之上，同现状）。
+- 主 FAB 定位从 `right/bottom` 改为 `left/top vw + translate`（原生锚点语义修订，见决策 2）：需真机/模拟器回归确认右下角位置与命中（已模拟器验证通过）。
 - 菜单关闭动画瞬时（无 staggered 收起）；可接受，与 RefreshableList 一致。
 - 模板结构断言更新：原断言 `absolute inset-0 z-40 pointer-events-none` 等需同步改写（断言编码了 buggy 结构，必须随修复更新，否则测试全绿是虚假信心）。
 
@@ -68,7 +69,7 @@ app-lynx（lynx `4.0.1`，原生 LynxView）在 tab 页上出现**全页面点�
 - [ ] `GlobalFab.vue` 渲染树在菜单关闭态**无任何全屏元素**（模板结构断言：负向断言 `pointer-events-none` 全屏容器不存在 + 展开层 `v-if="view.isOpen"`）。
 - [ ] `tests/unit.test.ts` GlobalFab 结构断言更新并通过；`createGlobalFab.test.ts` 行为单测全绿（深模块无改动）。
 - [ ] E2E（android-e2e 新增 spec）：修复前红（R18 开关点击 0 变化）、修复后绿（switch 翻转）。
-- [ ] `App.vue` exitHint 移除 `pointer-events-none`。
+- [ ] `App.vue` exitHint 无全宽盒、无 `pointer-events-none`（胶囊居中定位，命中面=提示条自身）。
 - [ ] `pnpm check:app-lynx` 类型检查通过；`pnpm test:app-lynx` 单测全绿。
 - [ ] CONTEXT.md / 术语表同步。
 
