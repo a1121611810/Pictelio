@@ -245,6 +245,10 @@ describe("isBelowMin（OTA 强制门槛判定）", () => {
     expect(isBelowMin("4.21.0", "")).toBe(false)
   })
 
+  it("undefined floor（CheckResult.minWebVersion 直传形态）→ false（fail-open）", () => {
+    expect(isBelowMin("4.21.0", undefined)).toBe(false)
+  })
+
   it("v 前缀 / 空白 / 混合深度与 isNewer 同语义", () => {
     expect(isBelowMin("4.21.0", "v4.22.0")).toBe(true)
     expect(isBelowMin(" v4.21.0 ", "4.22.0")).toBe(true)
@@ -307,6 +311,9 @@ describe("checkForUpdate 双坐标（minWebVersion / webBundle）", () => {
   })
 
   it("新字段缺失时显式暴露 undefined（不伪造默认值，fail-open 判定留给消费端）", async () => {
+    // 「缺失 → 静默」边界锁定：absent 是未发布 OTA 的常态，不得刷 warn
+    // （若 parse 层误把 undefined 当非法，此断言报警）
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
     const mockFetch = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({ version: "9.9.9", url: "https://example.com/release" }),
@@ -320,6 +327,7 @@ describe("checkForUpdate 双坐标（minWebVersion / webBundle）", () => {
     expect(result.minWebVersion).toBeUndefined()
     expect(result.webBundle).toBeUndefined()
     expect(result.error).toBeUndefined()
+    expect(warnSpy).not.toHaveBeenCalled()
   })
 
   it("webBundle 残缺（缺 url / 字段非字符串 / 非对象）→ 视为不存在 + warn（契约破坏可见，禁静默）", async () => {
