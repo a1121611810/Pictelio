@@ -16,11 +16,13 @@ import { settings } from "@/settings";
 import { persistScrollRestoration } from "@/stores/uiStore";
 import { scrollToTop } from "@/utils/scrollToTop";
 import {
+  gateActive,
   notifyWebBundleReady,
   registerOtaResumeListener,
   runOtaCheck,
 } from "@/services/otaService";
 import StartupUpdateDialog from "@/components/StartupUpdateDialog";
+import GateOverlay from "@/components/GateOverlay";
 import { clearOverlays, registerBackGesture } from "@/services/backGestureService";
 import { warmCacheFromDisk } from "@/utils/imageLoader";
 import { loadReportedIds } from "@/stores/reportStore";
@@ -163,6 +165,8 @@ const RootLayout: Component = (props: { children?: any }) => {
       getPathname: () => location.pathname,
       navigateBack: () => navigate(-1),
       dispatchExitHint: () => window.dispatchEvent(new CustomEvent("exitHint")),
+      // OTA 门槛过渡面激活期间返回键 = 退出应用（#253，对齐 lynx /update 语义）
+      shouldExitOnBack: () => gateActive(),
     });
 
     const [authErr] = await tryAsync(
@@ -242,6 +246,7 @@ const RootLayout: Component = (props: { children?: any }) => {
       </Show>
 
       <StartupUpdateDialog />
+      <GateOverlay />
     </div>
   );
 };

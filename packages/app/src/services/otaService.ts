@@ -13,7 +13,11 @@ import {
   type FetchLike,
 } from "@pictelio/update-check";
 import { Ota } from "@/native/Ota";
-import { otaLastKnownFloor, setOtaLastKnownFloor } from "@/stores/settingsStore";
+import {
+  otaLastKnownFloor,
+  setOtaLastKnownFloor,
+  setShowUpdateDialog,
+} from "@/stores/settingsStore";
 
 declare const APP_VERSION: string;
 
@@ -152,6 +156,16 @@ export async function selfHeal(): Promise<boolean> {
     return true;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    // T3 逆向门槛：最新 bundle 声明的 minApkVersion > 本机 → 拒装转 L2 温和弹窗通道
+    // （不阻断使用旧 bundle，规格「门槛 UX」T3 行）；其余失败转同屏阻断态（T2）
+    if (msg.includes("apk-too-old")) {
+      console.warn("[ota] T3：bundle 要求更新宿主 APK，撤销门槛转 APK 弹窗通道");
+      setGateActive(false);
+      setGateError("");
+      setGateHealing(false);
+      void setShowUpdateDialog(true);
+      return false;
+    }
     console.warn("[ota] 自愈失败，转阻断态:", msg);
     setGateError(msg);
     setGateHealing(false);

@@ -149,6 +149,36 @@ describe("backGestureService", () => {
       expect(exitApp).not.toHaveBeenCalled();
     });
 
+    it("shouldExitOnBack 激活期间 → 一次返回即退出应用（门槛过渡面，#253）", async () => {
+      const { addListener, exitApp } = mockCapacitorApp();
+      const ctx = createContext("/home");
+      ctx.shouldExitOnBack = vi.fn().mockReturnValue(true);
+      const { registerBackGesture } = await loadService();
+      const remove = await registerBackGesture(ctx);
+      const handler = getHandler(addListener);
+
+      handler();
+
+      expect(exitApp).toHaveBeenCalledTimes(1);
+      expect(ctx.navigateBack).not.toHaveBeenCalled();
+      expect(ctx.dispatchExitHint).not.toHaveBeenCalled();
+      remove();
+    });
+
+    it("shouldExitOnBack 未激活 → 不影响原有流程（关闭 overlay 优先）", async () => {
+      const { addListener, exitApp } = mockCapacitorApp();
+      const ctx = createContext("/home");
+      ctx.shouldExitOnBack = vi.fn().mockReturnValue(false);
+      const { registerBackGesture } = await loadService();
+      const remove = await registerBackGesture(ctx);
+      const handler = getHandler(addListener);
+
+      handler();
+      expect(exitApp).not.toHaveBeenCalled();
+      expect(ctx.dispatchExitHint).toHaveBeenCalledTimes(1);
+      remove();
+    });
+
     it("dispatches exitHint on first back at root path and exits app on second back within 2 seconds", async () => {
       const { addListener, exitApp } = mockCapacitorApp();
       const ctx = createContext("/home");

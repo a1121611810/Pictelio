@@ -24,6 +24,7 @@ const mockSettings = vi.hoisted(() => {
     setOtaLastKnownFloor: async (v: string) => {
       store.set("floor", v);
     },
+    setShowUpdateDialog: vi.fn(),
   };
 });
 
@@ -33,6 +34,7 @@ vi.mock("@/native/Ota", () => ({ Ota: mockOta }));
 vi.mock("@/stores/settingsStore", () => ({
   otaLastKnownFloor: mockSettings.otaLastKnownFloor,
   setOtaLastKnownFloor: mockSettings.setOtaLastKnownFloor,
+  setShowUpdateDialog: mockSettings.setShowUpdateDialog,
 }));
 
 import {
@@ -165,6 +167,24 @@ describe("otaService G1 自愈（前台直连快路径）", () => {
     expect(gateActive()).toBe(true);
     expect(gateError()).toContain("无可用更新包");
     expect(warn).toHaveBeenCalled();
+  });
+
+  it("T3：install 拒绝 apk-too-old → 撤销门槛转 APK 弹窗通道（不阻断）", async () => {
+    mockOta.install.mockRejectedValue(new Error("apk-too-old"));
+
+    await runOtaCheck(
+      fetchOk({
+        version: "3.22.0",
+        minWebVersion: "3.22.0",
+        webBundle: { version: "3.22.0", url: "https://example.com/prefix" },
+      }),
+    );
+    await flush();
+
+    expect(gateActive()).toBe(false);
+    expect(gateError()).toBe("");
+    expect(mockSettings.setShowUpdateDialog).toHaveBeenCalledWith(true);
+    expect(location.reload).not.toHaveBeenCalled();
   });
 
   it("手动重试：selfHeal 可被 UI 重复触发", async () => {
