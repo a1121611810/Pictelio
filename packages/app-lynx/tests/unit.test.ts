@@ -1131,18 +1131,33 @@ describe('Login / Recommended 页 accessibility 标注（issue #107）', () => {
 // 本测试用「源码结构断言」锁定 M3 尺寸（B 方案 56dp 圆：1vw=3.75px ⇒ 56dp=14.93vw、
 // 24dp=6.4vw、12sp=3.2vw）与层叠序（scrim z-10 < 菜单项 z-20 < FAB z-30）与扫角 -88°，
 // 期望值来自 ADR-0121 决策表/图片换算，非从实现反推。
-describe('GlobalFab.vue 展开态几何与层叠（ADR-0121）', () => {
+describe('GlobalFab.vue 展开态几何与层叠（ADR-0121/0123）', () => {
   const globalFabVue = readFileSync(fileURLToPath(new URL('../src/components/GlobalFab.vue', import.meta.url)), 'utf8')
 
-  it('层叠序：scrim(z-10) < 菜单项(z-20) < 主 FAB(z-30)，容器 z-40', () => {
+  it('层叠序：scrim(z-10) < 菜单项(z-20) < 主 FAB(z-30)，同处 z-40 外层（ADR-0121/0123）', () => {
     // 菜单项（外环/内环）须显式置于遮罩之上，否则被半透明遮罩压住且点不到
-    expect(globalFabVue).toContain('absolute inset-0 z-40 pointer-events-none')
-    expect(globalFabVue).toContain('absolute inset-0 z-10 bg-scrim pointer-events-auto')
+    expect(globalFabVue).toMatch(/v-if="view\.isOpen"\s+class="absolute z-10 bg-scrim scrim-in"/)
+    expect(globalFabVue).toContain('v-if="view.isOpen" class="absolute z-20"')
     // 菜单项 z-20（外环 z-20 + 内环 z-20 都需浮于遮罩上）——按元素精确锁定，避免裸 z-20 误匹配
     expect(globalFabVue).toContain('absolute z-20 flex flex-col items-center justify-center w-[14.93vw]')
     expect(globalFabVue).toContain('absolute z-20 flex items-center justify-center w-[10.67vw]')
-    // FAB 保持最上层 z-30
-    expect(globalFabVue).toContain('absolute z-30 pointer-events-auto')
+    // 主 FAB 保持最上层 z-30（与遮罩/菜单同处 z-40 外层）
+    expect(globalFabVue).toContain('absolute z-30 flex items-center justify-center rounded-[var(--md-shape-large)]')
+  })
+
+  it('ADR-0123 回归：渲染树不得有全屏 pointer-events 元素；遮罩/环层必须 v-if 条件渲染', () => {
+    // 原生 LynxView hit-testing 不识别 pointer-events（ADR-0123，术语表「pointer-events 平台约束」）：
+    // 全屏容器只要存在就会命中触摸、吞掉页面点击。负向断言防回归——
+    // 期望值来源：模拟器原生复现（菜单关闭态点页面 0 像素变化）+ 全仓模式对照（RefreshableList 展开层 v-if）。
+    expect(globalFabVue).not.toContain('pointer-events-none')
+    expect(globalFabVue).not.toContain('pointer-events-auto')
+    // 外层必须是零尺寸盒锚点：不得是全屏容器（回归为 `absolute inset-0` 无 pointer-events 也会吞点击）
+    expect(globalFabVue).not.toMatch(/<view v-if="view\.visible"[^>]*inset-0/u)
+    // 遮罩（全屏交互面）与环层整层 v-if="view.isOpen" 条件渲染——关闭态渲染树无全屏元素。
+    // 外层为 z-40 零尺寸盒（钉在 (0,0) 作定位锚点，不参与命中），FAB 常显于其内。
+    expect(globalFabVue).toContain('<view v-if="view.visible" class="absolute z-40" style="top: 0; left: 0">')
+    expect(globalFabVue).toMatch(/v-if="view\.isOpen"\s+class="absolute z-10 bg-scrim scrim-in"/)
+    expect(globalFabVue).toMatch(/v-if="view\.isOpen" class="absolute z-20"/)
   })
 
   it('外环导航项 56dp 圆 + 24dp 图标 + 12sp 文字（vw=375dp 基准）', () => {
