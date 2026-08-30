@@ -1,5 +1,13 @@
 apply plugin: 'com.android.application'
 
+// OTA web bundle 验签公钥（#248/#249）：raw 32B 的 base64，与 ~/.pictelio-keys/ota-ed25519
+// 私钥同对（指纹记录见 docs/research/ota-ed25519-android.md §4.2）。公开物可入库；
+// 构建期长度校验防手滑截断（签名失败在运行期才暴露就晚了）。
+def otaPublicKeyB64 = "ST/sQxNxrrZXOWwiuKdqqp79p3njn6MvIMWwJQTXWQY="
+if (java.util.Base64.getDecoder().decode(otaPublicKeyB64).length != 32) {
+    throw new GradleException("OTA_ED25519_PUBLIC_KEY_B64 must decode to exactly 32 raw bytes")
+}
+
 android {
     namespace = "io.pictelio.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -11,6 +19,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 42100
         versionName "4.21.0"
+        buildConfigField "String", "OTA_ED25519_PUBLIC_KEY_B64", "\"${otaPublicKeyB64}\""
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
