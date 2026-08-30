@@ -26,8 +26,6 @@ declare const APP_VERSION: string;
 export const RESUME_CHECK_MIN_INTERVAL_MS = 4 * 60 * 60 * 1000;
 /** notifyReady 延迟（ms）：等路由首帧渲染完成（含骨架屏）后再上报健康 */
 export const NOTIFY_READY_DELAY_MS = 500;
-/** 安装失败退避上限（4h，与 resume 节流同量级） */
-const INSTALL_BACKOFF_CAP_MS = 4 * 60 * 60 * 1000;
 
 // ── 门槛状态机（G1：全屏过渡面的数据源，UI 呈现在 #253） ──
 
@@ -41,8 +39,6 @@ export { gateActive, gateHealing, gateError, gateFloor };
 // ── 模块内状态 ──
 
 let lastSuccessfulCheckAt = 0;
-let installFailures = 0;
-let nextInstallAllowedAt = 0;
 let lastGateResult: CheckResult | null = null;
 
 /** 当前运行的 web bundle 版本 = 构建期内联的 APP_VERSION（bundle.version 与构建时
@@ -175,8 +171,9 @@ export async function selfHeal(): Promise<boolean> {
 }
 
 /**
- * T0 静默安装（下次启动生效）：webBundle 较新且非门槛态时触发。
- * 失败指数退避（1min 起步翻倍，上限 4h）——避免门槛/网络异常变成高频打 GitHub 的循环。
+ * T0 常规预热（下次启动生效，#252 慢通道）：webBundle 较新且非门槛态时入队 WorkManager
+ * 后台下载（unique KEEP 防堆叠；瞬态失败由 Worker 指数退避重试，上限 5 次转 failure）。
+ * 门槛自愈（G1 快路径）不走此处——selfHeal 用前台直连 install。
  */
 async function maybeSilentInstall(result: CheckResult): Promise<void> {
   if (!nativeOrWarn("silent install")) return;
@@ -190,23 +187,11 @@ async function maybeSilentInstall(result: CheckResult): Promise<void> {
   const bundle = result.webBundle;
   if (!bundle || !bundle.version) return;
   if (!isNewer(currentBundleVersion(), bundle.version)) return;
-  if (Date.now() < nextInstallAllowedAt) {
-    console.info("[ota] 安装退避中，跳过本次（下次检查再试）");
-    return;
-  }
   try {
-    const r = await Ota.install({ urlBase: bundle.url });
-    installFailures = 0;
-    nextInstallAllowedAt = 0;
-    console.info(`[ota] 静默安装成功 version=${r.version} → pending（下次启动生效）`);
+    await Ota.prewarm({ urlBase: bundle.url });
+    console.info(`[ota] 预热已入队 version=${bundle.version} → WorkManager 后台下载，下次启动生效`);
   } catch (e) {
-    installFailures += 1;
-    const delay = Math.min(60_000 * 2 ** installFailures, INSTALL_BACKOFF_CAP_MS);
-    nextInstallAllowedAt = Date.now() + delay;
-    console.warn(
-      `[ota] 静默安装失败（第 ${installFailures} 次），退避 ${Math.round(delay / 1000)}s 后重试:`,
-      e,
-    );
+    console.warn("[ota] 预热入队失败（下次检查再试）:", e);
   }
 }
 
@@ -229,8 +214,6 @@ export function registerOtaResumeListener(): void {
 /** 测试专用：重置模块内状态（backoff/时间戳） */
 export function resetOtaStateForTest(): void {
   lastSuccessfulCheckAt = 0;
-  installFailures = 0;
-  nextInstallAllowedAt = 0;
   lastGateResult = null;
   setGateActive(false);
   setGateHealing(false);

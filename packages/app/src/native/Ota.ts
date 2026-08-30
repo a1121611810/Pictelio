@@ -24,7 +24,10 @@ export interface OtaStatus {
 
 interface OtaPlugin {
   status(): Promise<OtaStatus>;
+  /** 前台直连安装（G1 门槛自愈快路径；与 prewarm 共用 OtaInstaller 流水线） */
   install(opts: { urlBase: string }): Promise<{ ok: true; version: string }>;
+  /** 慢通道预热（#252）：WorkManager 后台下载写 pending（CONNECTED + 退避 + unique KEEP） */
+  prewarm(opts: { urlBase: string }): Promise<{ queued: true }>;
   notifyReady(opts: { version: string }): Promise<void>;
   applyNow(): Promise<void>;
 }

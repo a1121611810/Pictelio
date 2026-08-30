@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 const mockOta = vi.hoisted(() => ({
   status: vi.fn(),
   install: vi.fn(),
+  prewarm: vi.fn(),
   notifyReady: vi.fn(),
   applyNow: vi.fn(),
 }));
@@ -64,6 +65,7 @@ beforeEach(() => {
   resetOtaStateForTest();
   mockCap.isNativePlatform.mockReturnValue(true);
   mockOta.install.mockReset();
+  mockOta.prewarm.mockReset().mockResolvedValue({ queued: true });
   mockOta.notifyReady.mockReset().mockResolvedValue(undefined);
   mockOta.applyNow.mockReset().mockResolvedValue(undefined);
   mockSettings.store.clear();
@@ -211,10 +213,8 @@ describe("otaService G1 自愈（前台直连快路径）", () => {
   });
 });
 
-describe("otaService T0 静默安装（下次启动生效）", () => {
-  it("webBundle 较新 → 静默 install 写 pending", async () => {
-    mockOta.install.mockResolvedValue({ ok: true, version: "3.22.0" });
-
+describe("otaService T0 静默安装（#252 慢通道：prewarm 写 pending）", () => {
+  it("webBundle 较新 → prewarm 入队（WorkManager 后台下载）", async () => {
     await runOtaCheck(
       fetchOk({
         version: "3.22.0",
@@ -224,7 +224,8 @@ describe("otaService T0 静默安装（下次启动生效）", () => {
     await flush();
 
     expect(gateActive()).toBe(false);
-    expect(mockOta.install).toHaveBeenCalledWith({ urlBase: "https://example.com/prefix" });
+    expect(mockOta.prewarm).toHaveBeenCalledWith({ urlBase: "https://example.com/prefix" });
+    expect(mockOta.install).not.toHaveBeenCalled(); // 快路径只留给门槛自愈
   });
 
   it("webBundle 未变新 → 不安装", async () => {
@@ -241,7 +242,6 @@ describe("otaService T0 静默安装（下次启动生效）", () => {
   it("开关关闭（#254）→ 不预热下载，仅报告可用版本（门槛自愈路径不受影响）", async () => {
     const info = vi.spyOn(console, "info").mockImplementation(() => {});
     mockState.autoDownload = false;
-    mockOta.install.mockResolvedValue({ ok: true, version: "3.22.0" });
 
     await runOtaCheck(
       fetchOk({
@@ -251,7 +251,7 @@ describe("otaService T0 静默安装（下次启动生效）", () => {
     );
     await flush();
 
-    expect(mockOta.install).not.toHaveBeenCalled();
+    expect(mockOta.prewarm).not.toHaveBeenCalled();
     expect(info).toHaveBeenCalledWith(expect.stringContaining("自动下载已关闭"));
 
     // 门槛路径不受开关抑制：floor 命中时自愈仍触发
@@ -268,9 +268,7 @@ describe("otaService T0 静默安装（下次启动生效）", () => {
     expect(mockOta.install).toHaveBeenCalledTimes(1);
   });
 
-  it("安装失败 → 指数退避，同会话内不再立即重试", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    mockOta.install.mockRejectedValue(new Error("HTTP 500"));
+  it("重复检查重复入队（JS 不去重；防堆叠由 native unique KEEP 兜底，#252）", async () => {
     const payload = {
       version: "3.22.0",
       webBundle: { version: "3.22.0", url: "https://example.com/prefix" },
@@ -281,8 +279,8 @@ describe("otaService T0 静默安装（下次启动生效）", () => {
     await runOtaCheck(fetchOk(payload));
     await flush();
 
-    expect(mockOta.install).toHaveBeenCalledTimes(1); // 第二次被退避拦下
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining("退避"), expect.anything());
+    // JS 侧每次检查都入队（幂等性由 native ExistingWorkPolicy.KEEP 保证）
+    expect(mockOta.prewarm).toHaveBeenCalledTimes(2);
   });
 });
 

@@ -6,8 +6,18 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
+const JAVA_ROOT = "../../../android/app/src/webview/java/io/pictelio/app/";
 const OTA_PLUGIN_JAVA = readFileSync(
-  new URL("../../../android/app/src/webview/java/io/pictelio/app/OtaPlugin.java", import.meta.url),
+  new URL(`${JAVA_ROOT}OtaPlugin.java`, import.meta.url),
+  "utf-8",
+);
+// #252 重构后安装流水线拆至 OtaInstaller（插件与 Worker 共用），契约面 = 两文件并集
+const OTA_INSTALLER_JAVA = readFileSync(
+  new URL(`${JAVA_ROOT}OtaInstaller.java`, import.meta.url),
+  "utf-8",
+);
+const OTA_WORKER_JAVA = readFileSync(
+  new URL(`${JAVA_ROOT}OtaWorker.java`, import.meta.url),
   "utf-8",
 );
 const OTA_TS = readFileSync(new URL("../../../src/native/Ota.ts", import.meta.url), "utf-8");
@@ -42,12 +52,12 @@ describe("Ota 桥接口一致性（Java @PluginMethod ↔ TS 声明）", () => {
     const ts = extractTsInterfaceMethods(OTA_TS);
     expect(
       java.length,
-      "Java 侧应至少有 status/install/notifyReady/applyNow",
-    ).toBeGreaterThanOrEqual(4);
+      "Java 侧应至少有 status/install/notifyReady/applyNow/prewarm",
+    ).toBeGreaterThanOrEqual(5);
     expect(ts.toSorted()).toEqual(java.toSorted());
   });
 
-  it("install 的 reject 原因机器可读（规格「选型与架构」失败语义）", () => {
+  it("install 的 reject 原因机器可读（规格「选型与架构」失败语义，实现在 OtaInstaller）", () => {
     for (const reason of [
       "bad-signature",
       "apk-too-old",
@@ -55,12 +65,20 @@ describe("Ota 桥接口一致性（Java @PluginMethod ↔ TS 声明）", () => {
       "size-mismatch",
       "unzip-missing-index",
     ]) {
-      expect(OTA_PLUGIN_JAVA, `缺少 reject("${reason}")`).toContain(`"${reason}"`);
+      expect(OTA_INSTALLER_JAVA, `缺少 OtaInstallException("${reason}")`).toContain(`"${reason}"`);
     }
   });
 
   it("签名走 OtaSignatureVerifier（不重复实现验签逻辑）", () => {
-    expect(OTA_PLUGIN_JAVA).toContain("OtaSignatureVerifier.verifyManifest");
-    expect(OTA_PLUGIN_JAVA).toContain("BuildConfig.OTA_ED25519_PUBLIC_KEY_B64");
+    expect(OTA_INSTALLER_JAVA).toContain("OtaSignatureVerifier.verifyManifest");
+    expect(OTA_INSTALLER_JAVA).toContain("BuildConfig.OTA_ED25519_PUBLIC_KEY_B64");
+  });
+
+  it("快慢双通道共用 OtaInstaller（#252：插件与 Worker 不得各自实现流水线）", () => {
+    expect(OTA_PLUGIN_JAVA).toContain("OtaInstaller.installBundle");
+    expect(OTA_WORKER_JAVA).toContain("OtaInstaller.installBundle");
+    // JS 侧契约：T0 走 prewarm（慢通道），门槛自愈走 install（前台快路径）
+    expect(OTA_TS).toContain("prewarm(opts");
+    expect(OTA_TS).toContain("install(opts");
   });
 });

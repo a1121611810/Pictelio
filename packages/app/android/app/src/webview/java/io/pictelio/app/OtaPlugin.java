@@ -8,28 +8,29 @@ import android.util.Base64;
 import android.util.Log;
 import android.webkit.WebResourceResponse;
 
+import androidx.work.BackoffPolicy;
+import androidx.work.Constraints;
+import androidx.work.Data;
+import androidx.work.ExistingWorkPolicy;
+import androidx.work.NetworkType;
+import androidx.work.OneTimeWorkRequest;
+import androidx.work.WorkManager;
+
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
-import org.json.JSONObject;
-
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.util.regex.Pattern;
-
+import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import java.util.regex.Pattern;
 
 /**
- * OTA web bundle 原生插件（#249，规格 docs/specs/ota-web-bundle.md；ADR-0122 自研切换原语）。
+ * OTA web bundle 原生插件（#249/#252，规格 docs/specs/ota-web-bundle.md；ADR-0122 自研切换原语）。
  *
  * 机制语义（#245 原型验证 + 四个生产必修坑内建）：
  *  - 版本目录不可变（files/ota/versions/<version>/）+ 三指针（current/lastGood/pending，
@@ -40,9 +41,12 @@ import java.util.zip.ZipInputStream;
  *  - 坑③：adopt pending 后延迟 {@link #APPLY_DELAY_MS} 再切根 + 导航（避让 WebView 首导航竞态）；
  *  - 坑④：回滚必须清 pending；同版本重装先删旧目录再 rename（幂等）。
  *
+ * 快慢双通道下载（#252）：T0 常规预热 = {@link #prewarm}（WorkManager 后台，CONNECTED
+ * 约束 + 指数退避 + unique KEEP 防堆叠，只写 pending 下次启动生效）；G1 门槛自愈 =
+ * {@link #install}（前台直连，用户正在过渡面等待）。两通道共用 {@link OtaInstaller} 流水线。
+ *
  * 生产增量：APK 升级自动清 OTA（resetWhenUpdate 同构）；健康确认后磁盘保留
- * current+lastGood 两版；tmp 孤儿目录启动清扫；manifest.minApkVersion 拒装（G2）；
- * 公钥走 BuildConfig 注入（构建期长度校验）。
+ * current+lastGood 两版；tmp 孤儿目录启动清扫；公钥走 BuildConfig 注入（构建期长度校验）。
  */
 @CapacitorPlugin(name = "Ota")
 public class OtaPlugin extends Plugin {
@@ -64,7 +68,7 @@ public class OtaPlugin extends Plugin {
     /** 单文件下载上限（防失控响应） */
     static final long MAX_DOWNLOAD_BYTES = 64L * 1024 * 1024;
     /** 版本目录名的合法形态（防路径穿越；签名 manifest 之外的纵深防御） */
-    private static final Pattern VERSION_NAME_PATTERN = Pattern.compile("[A-Za-z0-9.+-]+");
+    static final Pattern VERSION_NAME_PATTERN = Pattern.compile("[A-Za-z0-9.+-]+");
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private volatile boolean readyAcked = false;
@@ -113,7 +117,7 @@ public class OtaPlugin extends Plugin {
         int now = BuildConfig.VERSION_CODE;
         if (stored != 0 && stored != now) {
             Log.w(TAG, "[ota] native-upgrade reset: " + stored + " → " + now + "，清空 OTA 回内置");
-            deleteR(versionsRoot());
+            deleteR(versionsRoot(getContext()));
             p.edit()
                     .putString(KEY_CURRENT, BUILTIN_POINTER)
                     .putString(KEY_LAST_GOOD, BUILTIN_POINTER)
@@ -231,7 +235,7 @@ public class OtaPlugin extends Plugin {
         call.resolve();
     }
 
-    /** 立即应用 pending 并重载（门槛自愈 G1 路径用；常规 T0 走"下次启动"） */
+    /** 立即应用 pending 并重载（门槛自愈 G1 快路径；常规 T0 走 prewarm 后台 + 下次启动） */
     @PluginMethod
     public void applyNow(PluginCall call) {
         String pending = prefs().getString(KEY_PENDING, null);
@@ -247,12 +251,8 @@ public class OtaPlugin extends Plugin {
     }
 
     /**
-     * 下载安装（快慢双通道共用：前台直连与 WorkManager 走同一实现）：
-     * manifest → 验签（OtaSignatureVerifier）→ minApkVersion 拒装守卫（G2）→ zip 下载 →
-     * checksum 快检 → 解压版本目录（zip-slip 防护 + 幂等重装坑④）→ 写 pending（下次启动生效，
-     * 或由 applyNow 立即应用）。
-     *
-     * @param urlBase 三件套资产前缀 URL（拼 -manifest.json / -manifest.json.sig / -web-bundle.zip）
+     * 前台直连安装（G1 门槛自愈快路径）：与 {@link OtaWorker} 共用 {@link OtaInstaller}
+     * 流水线，成功即由 JS 侧 applyNow + reload（用户正在全屏过渡面等待）。
      */
     @PluginMethod
     public void install(PluginCall call) {
@@ -263,64 +263,43 @@ public class OtaPlugin extends Plugin {
         }
         final String base = urlBase;
         new Thread(() -> {
-            long t0 = System.currentTimeMillis();
             try {
-                byte[] manifest = httpGet(base + "-manifest.json");
-                byte[] sig = Base64.decode(
-                        new String(httpGet(base + "-manifest.json.sig"), StandardCharsets.UTF_8).trim(),
-                        Base64.DEFAULT);
-                if (!OtaSignatureVerifier.verifyManifest(manifest, sig, BuildConfig.OTA_ED25519_PUBLIC_KEY_B64)) {
-                    Log.w(TAG, "[ota] install-rejected bad-signature");
-                    call.reject("bad-signature");
-                    return;
-                }
-                JSONObject m = new JSONObject(new String(manifest, StandardCharsets.UTF_8));
-                String version = m.getString("version");
-                if (!VERSION_NAME_PATTERN.matcher(version).matches()) {
-                    Log.w(TAG, "[ota] install-rejected bad-version-name: " + version);
-                    call.reject("bad-version-name");
-                    return;
-                }
-                // G2 逆向门槛：bundle 要求的宿主 APK 下限（进签名覆盖，发布端无法事后篡改）
-                String minApkVersion = m.optString("minApkVersion", "");
-                if (!minApkVersion.isEmpty()
-                        && !OtaSignatureVerifier.isApkVersionAtLeast(BuildConfig.VERSION_NAME, minApkVersion)) {
-                    Log.w(TAG, "[ota] install-rejected apk-too-old host=" + BuildConfig.VERSION_NAME
-                            + " minApkVersion=" + minApkVersion);
-                    call.reject("apk-too-old");
-                    return;
-                }
-                byte[] zip = httpGet(base + "-web-bundle.zip");
-                long declaredSize = m.optLong("size", -1);
-                if (declaredSize >= 0 && zip.length != declaredSize) {
-                    Log.w(TAG, "[ota] install-rejected size-mismatch " + zip.length + " != " + declaredSize);
-                    call.reject("size-mismatch");
-                    return;
-                }
-                String sha256 = OtaSignatureVerifier.sha256Hex(zip);
-                if (!sha256.equals(m.getString("sha256"))) {
-                    Log.w(TAG, "[ota] install-rejected checksum");
-                    call.reject("checksum");
-                    return;
-                }
-                File dir = unpack(zip, version);
-                if (dir == null) {
-                    Log.w(TAG, "[ota] install-rejected unzip-missing-index");
-                    call.reject("unzip-missing-index");
-                    return;
-                }
-                prefs().edit().putString(KEY_PENDING, version).commit();
-                Log.i(TAG, "[ota] install-ok version=" + version + " 耗时=" + (System.currentTimeMillis() - t0)
-                        + "ms → pending（下次启动生效）");
-                JSObject r = new JSObject();
-                r.put("ok", true);
-                r.put("version", version);
-                call.resolve(r);
-            } catch (Exception e) {
-                Log.w(TAG, "[ota] install-failed " + e, e);
-                call.reject("error: " + e.getMessage());
+                OtaInstaller.InstallResult r = OtaInstaller.installBundle(getContext(), base);
+                JSObject ro = new JSObject();
+                ro.put("ok", true);
+                ro.put("version", r.version);
+                call.resolve(ro);
+            } catch (OtaInstaller.OtaInstallException e) {
+                call.reject(e.reason);
             }
         }, "ota-install").start();
+    }
+
+    /**
+     * 慢通道预热（#252）：入队 WorkManager 后台下载——CONNECTED 网络约束（含计费网络）、
+     * 指数退避、unique KEEP 防重复堆叠；无网时任务挂起、有网自动续。只写 pending，
+     * 下次启动生效（指针应用在 load()，Worker 无桥不触碰 WebView）。
+     */
+    @PluginMethod
+    public void prewarm(PluginCall call) {
+        String urlBase = call.getString("urlBase");
+        if (urlBase == null || urlBase.isEmpty()) {
+            call.reject("urlBase required");
+            return;
+        }
+        OneTimeWorkRequest request = new OneTimeWorkRequest.Builder(OtaWorker.class)
+                .setInputData(new Data.Builder().putString(OtaWorker.KEY_URL_BASE, urlBase).build())
+                .setConstraints(new Constraints.Builder()
+                        .setRequiredNetworkType(NetworkType.CONNECTED)
+                        .build())
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+                .build();
+        WorkManager.getInstance(getContext())
+                .enqueueUniqueWork(OtaWorker.UNIQUE_NAME, ExistingWorkPolicy.KEEP, request);
+        Log.i(TAG, "[ota] prewarm enqueued（unique KEEP，CONNECTED）");
+        JSObject r = new JSObject();
+        r.put("queued", true);
+        call.resolve(r);
     }
 
     // ── 内部工具 ────────────────────────────────────────────────
@@ -338,7 +317,7 @@ public class OtaPlugin extends Plugin {
 
     /** 磁盘清理：健康确认后仅保留 current + lastGood 两版 */
     private void cleanupOldVersions(String current) {
-        File root = versionsRoot();
+        File root = versionsRoot(getContext());
         File[] dirs = root.listFiles();
         if (dirs == null) {
             return;
@@ -355,7 +334,7 @@ public class OtaPlugin extends Plugin {
 
     /** 启动清扫：解压中断遗留的 tmp 目录（孤儿） */
     private void sweepTmpOrphans() {
-        File root = versionsRoot();
+        File root = versionsRoot(getContext());
         File[] kids = root.listFiles();
         if (kids == null) {
             return;
@@ -368,21 +347,22 @@ public class OtaPlugin extends Plugin {
         }
     }
 
-    private File versionsRoot() {
-        return new File(getContext().getFilesDir(), "ota/versions");
+    static File versionsRoot(Context context) {
+        return new File(context.getFilesDir(), "ota/versions");
     }
 
     private File versionDir(String version) {
-        return new File(versionsRoot(), version);
+        return new File(versionsRoot(getContext()), version);
     }
 
     /**
      * 解压到 versions/<version>/：zip-slip 防护（canonical path 越界拒绝）；要求解压后存在
      * index.html；同版本重装先删旧目录再 rename（幂等，坑④——否则 renameTo 必败）。
+     * static 供 {@link OtaInstaller}（Worker 无桥上下文）共用。
      */
-    private File unpack(byte[] zip, String version) throws Exception {
-        File dir = versionDir(version);
-        File tmp = new File(getContext().getFilesDir(), "ota/versions/tmp-" + System.currentTimeMillis());
+    static File unpackTo(Context context, byte[] zip, String version) throws Exception {
+        File dir = new File(versionsRoot(context), version);
+        File tmp = new File(versionsRoot(context), "tmp-" + System.currentTimeMillis());
         if (!tmp.mkdirs()) {
             Log.w(TAG, "[ota] unpack tmp mkdirs failed: " + tmp);
             return null;
@@ -446,31 +426,6 @@ public class OtaPlugin extends Plugin {
             }
         }
         f.delete();
-    }
-
-    private static byte[] httpGet(String url) throws Exception {
-        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-        c.setConnectTimeout(10_000);
-        c.setReadTimeout(15_000);
-        c.setInstanceFollowRedirects(true);
-        int code = c.getResponseCode();
-        if (code != 200) {
-            throw new IllegalStateException("HTTP " + code + " for " + url);
-        }
-        InputStream in = c.getInputStream();
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        byte[] buf = new byte[8192];
-        long total = 0;
-        int n;
-        while ((n = in.read(buf)) > 0) {
-            total += n;
-            if (total > MAX_DOWNLOAD_BYTES) {
-                throw new IllegalStateException("download exceeds cap: " + url);
-            }
-            out.write(buf, 0, n);
-        }
-        in.close();
-        return out.toByteArray();
     }
 
     // ── MainActivity 共用：坑① 的缓存注入 ─────────────────────

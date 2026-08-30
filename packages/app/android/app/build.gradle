@@ -230,6 +230,8 @@ dependencies {
     // 绕开 Android 内置裁剪版 BC 冲突与 API 33+ 文档陷阱，docs/research/ota-ed25519-android.md）。
     // full flavor 编译 src/webview/java 源集 → 两个 flavor 都要挂。
     webviewImplementation "org.bouncycastle:bcprov-jdk18on:1.85.2"
+    // WorkManager（#252 OTA 慢通道）
+    webviewImplementation "androidx.work:work-runtime:2.10.0"
 
     // ── Lynx-only ──
     // Lynx SDK（#52 起引入：LynxModule 编译依赖；完整配置见 #51 原生 LynxView 壳）
@@ -259,6 +261,7 @@ dependencies {
     fullImplementation "org.lynxsdk.lynx:xelement:4.0.1"
     fullImplementation "org.lynxsdk.lynx:xelement-input:4.0.1"
     fullImplementation "org.bouncycastle:bcprov-jdk18on:1.85.2"
+    fullImplementation "androidx.work:work-runtime:2.10.0"
 
     // ── Test ──
     testImplementation "junit:junit:$junitVersion"
