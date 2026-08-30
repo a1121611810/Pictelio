@@ -60,26 +60,45 @@ public class OtaPlugin extends Plugin {
     @Override
     public void load() {
         String pending = prefs().getString(KEY_PENDING, null);
+        boolean adopted = false;
         if (pending != null) {
             prefs().edit().putString(KEY_CURRENT, pending).remove(KEY_PENDING).commit();
             Log.i(TAG, "[OTAPROTO] adopt-pending current=" + pending);
+            adopted = true;
         }
-        applyPointer();
+        if (adopted) {
+            // 切换延迟到 WebView 必然就绪的时点：plugin.load() 时立即 setServerBasePath/
+            // hostFiles 会与 WebView 首次导航赛跑（实测两种时机都会输）—— adopt+500ms 再
+            // 切根 + 版本化 query 导航，旧文档闪一帧但被 notifyReady 版本握手挡住误报
+            final String cur = prefs().getString(KEY_CURRENT, "public");
+            handler.postDelayed(() -> {
+                applyPointer();
+                WebView wv = bridge.getWebView();
+                if (wv == null) {
+                    Log.w(TAG, "[OTAPROTO] versioned-nav skipped: webview null");
+                    return;
+                }
+                wv.loadUrl("https://localhost/index.html?otav=" + cur);
+                wv.clearHistory();
+            }, 500);
+        }
         armRollbackIfNeeded();
     }
 
     private void applyPointer() {
         String current = prefs().getString(KEY_CURRENT, "public");
         try {
+            // 官方高层原语（#1228 背书）：setServerBasePath/setServerAssetPath 内部做 hostFiles + 重载处理；
+            // 裸调 getLocalServer().hostFiles() 在 plugin.load() 时机实测不生效（原型踩坑记录）
             if ("public".equals(current)) {
-                bridge.getLocalServer().hostAssets("public");
+                bridge.setServerAssetPath("public");
             } else {
                 File dir = versionDir(current);
                 if (new File(dir, "index.html").exists()) {
-                    bridge.getLocalServer().hostFiles(dir.getAbsolutePath());
+                    bridge.setServerBasePath(dir.getAbsolutePath());
                 } else {
                     Log.w(TAG, "version dir 缺 index.html，回退内置");
-                    bridge.getLocalServer().hostAssets("public");
+                    bridge.setServerAssetPath("public");
                 }
             }
             Log.i(TAG, "[OTAPROTO] applyPointer → " + current);
@@ -97,7 +116,7 @@ public class OtaPlugin extends Plugin {
             if (readyAcked) return;
             String lastGood = prefs().getString(KEY_LAST_GOOD, "public");
             Log.w(TAG, "[OTAPROTO] rollback-timeout current=" + current + " → 回滚到 " + lastGood);
-            prefs().edit().putString(KEY_CURRENT, lastGood).commit();
+            prefs().edit().putString(KEY_CURRENT, lastGood).remove(KEY_PENDING).commit();
             applyPointer();
             reload();
         };
@@ -107,8 +126,10 @@ public class OtaPlugin extends Plugin {
     private void reload() {
         final WebView wv = bridge.getWebView();
         if (wv == null) return;
+        // 双保险 2：版本化 query 破 index.html 的导航缓存（子资源为 hash 文件名，天然无此问题）
+        String current = prefs().getString(KEY_CURRENT, "public");
         wv.post(() -> {
-            wv.loadUrl("https://localhost/index.html");
+            wv.loadUrl("https://localhost/index.html?otav=" + current);
             wv.clearHistory();
         });
     }
@@ -122,14 +143,25 @@ public class OtaPlugin extends Plugin {
         call.resolve(o);
     }
 
-    /** 健康上报：broken bundle 走不到这里 → 10s 超时自动回滚 */
+    /**
+     * 健康上报（带版本握手）：broken bundle 走不到这里 → 10s 超时自动回滚；
+     * 陈旧缓存文档（切换前旧 bundle 的 JS）也会调 notifyReady——版本不符即拒绝计数，
+     * 否则坏 bundle 会被旧文档误标为健康（#245 实测发现的缓存陷阱）。
+     */
     @PluginMethod
     public void notifyReady(PluginCall call) {
+        String reported = call.getString("version");
+        String current = prefs().getString(KEY_CURRENT, "public");
+        if (reported == null || (!"public".equals(current) && !reported.equals(current))) {
+            Log.w(TAG, "[OTAPROTO] notifyReady-ignored reported=" + reported + " current=" + current
+                    + "（陈旧文档，不计健康）");
+            call.resolve();
+            return;
+        }
         readyAcked = true;
         if (rollbackRunnable != null) handler.removeCallbacks(rollbackRunnable);
-        String current = prefs().getString(KEY_CURRENT, "public");
         prefs().edit().putString(KEY_LAST_GOOD, current).commit();
-        Log.i(TAG, "[OTAPROTO] notifyReady → lastGood=" + current);
+        Log.i(TAG, "[OTAPROTO] notifyReady-ok version=" + current + " → lastGood=" + current);
         call.resolve();
     }
 
@@ -267,10 +299,14 @@ public class OtaPlugin extends Plugin {
         tmp.mkdirs();
         String tmpRoot = tmp.getCanonicalPath() + File.separator;
         boolean hasIndex = false;
+        int count = 0;
+        StringBuilder names = new StringBuilder();
         ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(zip));
         ZipEntry entry;
         byte[] buf = new byte[8192];
         while ((entry = zis.getNextEntry()) != null) {
+            if (count < 5) names.append(entry.getName()).append(" | ");
+            count++;
             if (entry.isDirectory()) continue;
             File out = new File(tmp, entry.getName());
             if (!out.getCanonicalPath().startsWith(tmpRoot)) {
@@ -284,12 +320,16 @@ public class OtaPlugin extends Plugin {
             if (entry.getName().equals("index.html")) hasIndex = true;
         }
         zis.close();
+        Log.i(TAG, "[OTAPROTO] unpack entries=" + count + " hasIndex=" + hasIndex + " first=" + names);
         if (!hasIndex) {
             deleteR(tmp);
             return null;
         }
         File parent = dir.getParentFile();
-        if (parent == null || !tmp.renameTo(dir)) {
+        if (dir.exists()) deleteR(dir); // 幂等重装：同版本目录已存在则先删（否则 renameTo 必败）
+        boolean parentOk = parent != null && (parent.isDirectory() || parent.mkdirs());
+        if (!parentOk || !tmp.renameTo(dir)) {
+            Log.w(TAG, "[OTAPROTO] rename failed tmp=" + tmp + " dir=" + dir + " parentOk=" + parentOk);
             deleteR(tmp);
             return null;
         }

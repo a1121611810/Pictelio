@@ -21,7 +21,7 @@ import { registerPlugin } from "@capacitor/core";
 interface OtaPluginInterface {
   status(): Promise<{ current: string; lastGood: string; pending: string | null }>;
   install(opts: { urlBase: string }): Promise<{ ok: boolean; version: string }>;
-  notifyReady(): Promise<void>;
+  notifyReady(opts: { version: string }): Promise<void>;
   applyNow(): Promise<void>;
   fetchGate(opts: { url: string }): Promise<{ minWebVersion: string }>;
 }
@@ -67,7 +67,7 @@ onMounted(async () => {
     log("status failed: " + e);
   }
   // 健康上报：页面可交互即 ready（broken bundle 永远走不到这里 → 超时回滚）
-  setTimeout(() => Ota.notifyReady().catch(() => {}), 800);
+  setTimeout(() => Ota.notifyReady({ version: otaVersion }).catch(() => {}), 800);
   // 强制门槛检查（#243 语义）：floor > 当前版本 → 先尝试 OTA 自愈，失败才阻断
   try {
     const v = await Ota.fetchGate({ url: `${otaBase}/version.json` });
@@ -75,23 +75,30 @@ onMounted(async () => {
     if (isNewer(v.minWebVersion, otaVersion)) {
       log(`gate-triggered floor=${v.minWebVersion} > current=${otaVersion} → 先尝试 OTA 自愈`);
       gateBlocked.value = true;
-      try {
-        const r = await Ota.install({ urlBase: otaBase });
-        log(`gate self-heal ok version=${r.version} → applyNow + reload`);
-        await Ota.applyNow();
-        location.reload();
-        return;
-      } catch (e) {
-        log(`gate self-heal failed: ${e} → 阻断`);
-        gateError.value = String(e);
-      }
-    } else {
-      log(`gate-ok floor=${v.minWebVersion} ≤ current=${otaVersion}`);
+      await selfHeal();
+      return;
     }
+    log(`gate-ok floor=${v.minWebVersion} ≤ current=${otaVersion}`);
   } catch (e) {
     log("gate skip（floor 不可达，fail-open）: " + e);
   }
+  // 启动即检查更新（updateService 语义）：静默安装到 pending，下次启动生效
+  await runInstall();
 });
+
+async function selfHeal() {
+  try {
+    const r = await Ota.install({ urlBase: otaBase });
+    log(`gate self-heal ok version=${r.version} → applyNow + reload`);
+    await Ota.applyNow();
+    location.reload();
+    return true;
+  } catch (e) {
+    log(`gate self-heal failed: ${e} → 阻断`);
+    gateError.value = String(e);
+    return false;
+  }
+}
 </script>
 
 <style>
