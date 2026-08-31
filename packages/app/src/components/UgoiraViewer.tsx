@@ -16,6 +16,15 @@ interface Props {
   height?: number;
   /** 预加载的帧数据（由父组件提供时跳过内部加载流程） */
   preloadedFrames?: UgoiraFrame[];
+  /**
+   * ADR-0127 渐进模式：父组件持有响应式帧列表（首帧就绪即挂载，后续帧就绪追加）。
+   * frames() 返回当前全部已就绪帧；done() 表示流式取帧已结束（列表不再增长）。
+   * 提供本 prop 时跳过内部加载流程，播放器到列表尾部等待新帧（不停止不报错）。
+   */
+  streaming?: {
+    frames: () => UgoiraFrame[];
+    done: () => boolean;
+  };
 }
 
 const UgoiraViewer: Component<Props> = (props) => {
@@ -27,12 +36,22 @@ const UgoiraViewer: Component<Props> = (props) => {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let blobUrls: string[] = [];
 
+  /** 当前帧列表：渐进模式读父组件响应式列表；静态模式读内部/预加载列表 */
+  const frameList = (): UgoiraFrame[] =>
+    props.streaming ? props.streaming.frames() : (props.preloadedFrames ?? frames());
+
   onMount(async () => {
+    // 渐进模式：数据由父组件流式提供，直接开始播放（首帧就绪时已挂载）
+    if (props.streaming) {
+      setStatus("playing");
+      scheduleNext(0);
+      return;
+    }
     // 如果父组件已预加载帧数据，跳过加载流程
     if (props.preloadedFrames && props.preloadedFrames.length > 0) {
       setFrames(props.preloadedFrames);
       setStatus("playing");
-      scheduleNext(0, props.preloadedFrames);
+      scheduleNext(0);
       return;
     }
 
@@ -47,21 +66,43 @@ const UgoiraViewer: Component<Props> = (props) => {
       blobUrls = result.blobUrls;
       setFrames(result.frames);
       setStatus("playing");
-      scheduleNext(0, result.frames);
+      scheduleNext(0);
     }
   });
 
-  function scheduleNext(index: number, frameList: UgoiraFrame[]) {
+  /**
+   * 播放调度：播 index 帧 → 按 delay 调度下一帧。
+   * 渐进模式：到达当前列表尾部且流式未结束 → 50ms 轮询等待新帧（不停止不报错）；
+   * 流式结束/静态模式 → 回到 0 循环。
+   */
+  function scheduleNext(index: number) {
     if (timer) {
       clearTimeout(timer);
     }
-    const frame = frameList[index];
+    const list = frameList();
+    const frame = list[index];
     if (!frame) {
+      if (props.streaming && !props.streaming.done()) {
+        // 尾部等待新帧
+        timer = setTimeout(() => scheduleNext(index), 50);
+      } else if (props.streaming && list.length > 0) {
+        // 流式已结束：从 0 循环（列表非空）
+        timer = setTimeout(() => scheduleNext(0), 50);
+      }
       return;
     }
     setCurrentFrame(index);
-    const nextIndex = (index + 1) % frameList.length;
-    timer = setTimeout(() => scheduleNext(nextIndex, frameList), frame.delay);
+    const nextIndex = index + 1;
+    if (nextIndex >= list.length) {
+      if (props.streaming && !props.streaming.done()) {
+        // 尾部等待新帧（当前帧保持显示）
+        timer = setTimeout(() => scheduleNext(nextIndex), 50);
+        return;
+      }
+      timer = setTimeout(() => scheduleNext(0), frame.delay);
+      return;
+    }
+    timer = setTimeout(() => scheduleNext(nextIndex), frame.delay);
   }
 
   function togglePause() {
@@ -71,9 +112,9 @@ const UgoiraViewer: Component<Props> = (props) => {
       }
       timer = null;
       setStatus("paused");
-    } else if (status() === "paused" && frames().length > 0) {
+    } else if (status() === "paused" && frameList().length > 0) {
       setStatus("playing");
-      scheduleNext(currentFrame(), frames());
+      scheduleNext(currentFrame());
     }
   }
 
@@ -88,8 +129,8 @@ const UgoiraViewer: Component<Props> = (props) => {
 
   // 帧加载完成后，测量第一帧的实际宽高比，更新容器
   createEffect(() => {
-    if (status() === "playing" && frames().length > 0) {
-      const url = frames()[0].url;
+    if (status() === "playing" && frameList().length > 0) {
+      const url = frameList()[0].url;
       const img = new Image();
       let alive = true;
       img.onload = () => {
@@ -213,9 +254,9 @@ const UgoiraViewer: Component<Props> = (props) => {
       )}
 
       {/* Frame playback */}
-      {status() !== "loading" && !error() && frames().length > 0 && (
+      {status() !== "loading" && !error() && frameList().length > 0 && (
         <img
-          src={frames()[currentFrame()].url}
+          src={frameList()[currentFrame()]!.url}
           alt={`frame ${currentFrame() + 1}`}
           classList={{
             "max-w-full max-h-full object-contain object-top": !props.inline,
