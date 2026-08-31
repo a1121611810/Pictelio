@@ -66,9 +66,6 @@ public class PictelioApiModule extends LynxModule {
      * （与 PictelioImageService 同款模式），空闲线程自动回收。 */
     private static final ExecutorService API_EXECUTOR = Executors.newCachedThreadPool();
 
-    /** ugoira 帧缓存目录名（与 PictelioImageService.UGOIRA_CACHE_DIR 契约一致） */
-    private static final String UGOIRA_CACHE_DIR = "ugoira";
-
     /** ugoira 缓存清理：文件数上限——超过则按 lastModified 删除最旧帧 */
     private static final long UGOIRA_MAX_COUNT = 300;
 
@@ -126,7 +123,7 @@ public class PictelioApiModule extends LynxModule {
      * <p>回调：{@code cb(0, jsonUrls)} 成功；{@code cb(1, errMsg)} 失败（errMsg 可读：
      * HTTP 码 / zip 损坏 / 缺帧 / IO 错误；为空时降级异常类名）。异步执行于 {@link #API_EXECUTOR}。
      *
-     * @param zipUrl     绝对 https URL（ugioira zip）
+     * @param zipUrl     绝对 https URL（ugoira zip）
      * @param framesJson {@code meta.frames} JSON 数组字符串（服务端时序），
      *                   如 {@code [{"file":"a.png","delay":125},...]}
      */
@@ -141,35 +138,12 @@ public class PictelioApiModule extends LynxModule {
             try {
                 // 1) 下载 zip（注入 Referer/UA）；非 2xx → 抛 "HTTP xxx"
                 byte[] zipBytes = downloadZip(zipUrl);
-                // 2) 解析帧列表（服务端 meta.frames 时序）；解析失败 → "帧列表解析失败"
-                JSONArray frames = parseFrames(framesJson);
-                // 3) 准备缓存目录 + 写盘前清理旧作品残留（清理失败仅 Log.w，不中断主流程）
                 Context ctx = appContext();
                 if (ctx == null) {
                     throw new IOException("上下文不可用");
                 }
-                File dir = new File(ctx.getCacheDir(), UGOIRA_CACHE_DIR);
-                if (!dir.exists() && !dir.mkdirs()) {
-                    throw new IOException("无法创建 ugoira 缓存目录");
-                }
-                cleanupOldFrames(dir);
-                // 4) 单次解压扫描：条目名 → 帧字节（避免每个帧重新创建 ZipInputStream 全量扫描）
-                Map<String, byte[]> entries = scanZip(zipBytes);
-                // 5) 按 framesJson 时序逐帧输出（帧名须与 zip 条目名匹配，否则视为缺帧）
-                JSONArray urls = new JSONArray();
-                for (int i = 0; i < frames.length(); i++) {
-                    JSONObject frame = frames.getJSONObject(i);
-                    String name = frame.getString("file");
-                    byte[] data = entries.get(name);
-                    if (data == null) {
-                        throw new IOException("zip 缺少帧文件 " + name);
-                    }
-                    String ext = name.toLowerCase(Locale.ROOT).endsWith(".png") ? ".png" : ".jpg";
-                    File out = new File(dir, "frame_" + i + ext);
-                    writeFile(out, data);
-                    // file:// + 绝对路径（与 PictelioImageService.file:// 白名单一致）
-                    urls.put("file://" + out.getAbsolutePath());
-                }
+                // 2) 核心：解析帧列表 → 清理 → 单次解压 → 按时序写盘 → 帧 URL 列表
+                JSONArray urls = ugoiraExtractCore(zipBytes, framesJson, new File(ctx.getCacheDir(), PictelioImageService.UGOIRA_CACHE_DIR));
                 callback.invoke(0, urls.toString());
             } catch (Throwable e) {
                 Log.w(TAG, "ugoiraExtract 失败: " + zipUrl, e);
@@ -178,6 +152,49 @@ public class PictelioApiModule extends LynxModule {
                 callback.invoke(1, errMsg);
             }
         });
+    }
+
+    /**
+     * ugoira 解压写盘核心（package-private 静态，可测核心——与 PictelioPrefsModule
+     * 「可测核心 + 薄模块包装」同模式）：解析帧列表 → 写盘前清理 → 单次扫描解压 →
+     * 按 framesJson 时序逐帧写盘 → 返回帧 file:// URL 列表。
+     *
+     * @param zipBytes   zip 原始字节（已下载）
+     * @param framesJson {@code meta.frames} JSON 数组字符串（服务端时序）
+     * @param dir        缓存目录（调用方已选好；不存在则创建）
+     * @return 帧 file:// URL 的 JSONArray（按 framesJson 顺序）
+     * @throws IOException 帧列表解析失败 / zip 损坏 / 缺帧 / 写盘失败
+     */
+    static JSONArray ugoiraExtractCore(byte[] zipBytes, String framesJson, File dir) throws IOException {
+        // 帧列表解析（服务端 meta.frames 时序）；解析失败 → "帧列表解析失败"
+        JSONArray frames = parseFrames(framesJson);
+        if (!dir.exists() && !dir.mkdirs()) {
+            throw new IOException("无法创建 ugoira 缓存目录");
+        }
+        cleanupOldFrames(dir);
+        // 单次解压扫描：条目名 → 帧字节（避免每个帧重新创建 ZipInputStream 全量扫描）
+        Map<String, byte[]> entries = scanZip(zipBytes);
+        // 按 framesJson 时序逐帧输出（帧名须与 zip 条目名匹配，否则视为缺帧）
+        JSONArray urls = new JSONArray();
+        for (int i = 0; i < frames.length(); i++) {
+            try {
+                JSONObject frame = frames.getJSONObject(i);
+                String name = frame.getString("file");
+                byte[] data = entries.get(name);
+                if (data == null) {
+                    throw new IOException("zip 缺少帧文件 " + name);
+                }
+                String ext = name.toLowerCase(Locale.ROOT).endsWith(".png") ? ".png" : ".jpg";
+                File out = new File(dir, "frame_" + i + ext);
+                writeFile(out, data);
+                // file:// + 绝对路径（与 PictelioImageService.file:// 白名单一致）
+                urls.put("file://" + out.getAbsolutePath());
+            } catch (org.json.JSONException e) {
+                // 条目缺 file 字段 / 帧元素非对象 → 视为帧列表契约破坏（可读错误）
+                throw new IOException("帧列表解析失败", e);
+            }
+        }
+        return urls;
     }
 
     /** OkHttp 下载 zip 字节；注入 Referer + User-Agent。非 2xx 抛 "HTTP xxx"。 */

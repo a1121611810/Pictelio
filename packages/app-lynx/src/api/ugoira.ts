@@ -140,10 +140,10 @@ export async function downloadUgoiraFrames(
 
 // ─── 原生模式解压写盘管线（ADR-0125） ───
 
-/** ugoira 帧文件（原生模式：file:// URL + delay，帧二进制不进 JS 堆） */
-export interface UgoiraFrameFile {
-  url: string
-  delay: number
+/** ugoira 原生模式帧包（file:// URL 列表 + 按序 delay；帧二进制不进 JS 堆） */
+export interface UgoiraFrameBundle {
+  urls: string[]
+  delays: number[]
 }
 
 /** PictelioApi 原生模块的 ugoiraExtract 签名（与 Java 侧契约一致） */
@@ -157,13 +157,13 @@ interface PictelioApiUgoiraExtract {
  * 仅原生模式调用；web 模式走 downloadUgoiraFrames（fflate/range + base64）。
  * @param illustId 作品 ID
  * @param signal 中止信号（组件卸载时中断——注：Java 侧下载不可中断，JS 侧丢弃结果）
- * @returns 帧 file:// URL + delay（调用方负责调度播放）
- * @throws 回调 status=1 时抛可读错误（禁止静默降级）
+ * @returns 帧 file:// URL 列表 + 按序 delay（调用方负责调度播放）
+ * @throws 回调 status=1 或响应非法时抛可读错误（禁止静默降级）
  */
 export async function ugoiraExtractFrames(
   illustId: number,
   signal?: AbortSignal,
-): Promise<UgoiraFrameFile[]> {
+): Promise<UgoiraFrameBundle> {
   const meta = await loadUgoiraMetadata(illustId)
   const zipUrl = meta.zip_urls.medium // 原生模式必须是绝对 CDN URL（issue #218：相对路径被拒）
   const framesJson = JSON.stringify(meta.frames)
@@ -181,9 +181,14 @@ export async function ugoiraExtractFrames(
   if (signal?.aborted) {
     throw new Error("ugoira: 已取消")
   }
-  const urls: string[] = JSON.parse(urlsJson)
-  if (urls.length !== meta.frames.length) {
+  let urls: string[]
+  try {
+    urls = JSON.parse(urlsJson) as string[]
+  } catch {
+    throw new Error("ugoira: 帧 URL 列表解析失败")
+  }
+  if (!Array.isArray(urls) || urls.length !== meta.frames.length) {
     throw new Error(`ugoira: 帧数据缺失（期望 ${meta.frames.length}，实际 ${urls.length}）`)
   }
-  return urls.map((url, i) => ({ url, delay: meta.frames[i]!.delay }))
+  return { urls, delays: meta.frames.map((f) => f.delay) }
 }

@@ -984,21 +984,28 @@ describe('T7 ugoiraExtractFrames（原生解压写盘）', () => {
         ],
       },
     })
+    // 扩展名契约（spec「帧 URL 形态」+ Java 已测）：.png 条目 → frame_N.png；非 .png → .jpg
     const calls: { url: string; json: string }[] = []
     stubNativeExtract((url, json, cb) => {
       calls.push({ url, json })
-      cb(0, JSON.stringify(['file:///data/user/0/io.pictelio.app/cache/ugoira/frame_0.jpg', 'file:///data/user/0/io.pictelio.app/cache/ugoira/frame_1.jpg']))
+      cb(0, JSON.stringify([
+        'file:///data/user/0/io.pictelio.app/cache/ugoira/frame_0.png',
+        'file:///data/user/0/io.pictelio.app/cache/ugoira/frame_1.jpg',
+      ]))
     })
-    const frames = await ugoiraExtractFrames(123)
+    const bundle = await ugoiraExtractFrames(123)
     expect(calls[0]!.url).toBe('https://i.pximg.net/img-zip-ugoira/z.zip') // 原样绝对 URL（issue #218 修复）
     expect(JSON.parse(calls[0]!.json)).toEqual([
       { file: 'frame_0.png', delay: 100 },
       { file: 'frame_1.png', delay: 120 },
     ])
-    expect(frames).toEqual([
-      { url: 'file:///data/user/0/io.pictelio.app/cache/ugoira/frame_0.jpg', delay: 100 },
-      { url: 'file:///data/user/0/io.pictelio.app/cache/ugoira/frame_1.jpg', delay: 120 },
-    ])
+    expect(bundle).toEqual({
+      urls: [
+        'file:///data/user/0/io.pictelio.app/cache/ugoira/frame_0.png',
+        'file:///data/user/0/io.pictelio.app/cache/ugoira/frame_1.jpg',
+      ],
+      delays: [100, 120],
+    })
   })
 
   it('失败：回调 status=1 → 抛可读错误（不静默降级）', async () => {
@@ -1029,6 +1036,14 @@ describe('T7 ugoiraExtractFrames（原生解压写盘）', () => {
     })
     vi.stubGlobal('NativeModules', {})
     await expect(ugoiraExtractFrames(123)).rejects.toThrow('PictelioApi.ugoiraExtract 不可用')
+  })
+
+  it('失败：回调 status=0 但 payload 非法 JSON → 抛可读错误（禁止裸 SyntaxError）', async () => {
+    vi.spyOn(apiClient, 'get').mockResolvedValue({
+      ugoira_metadata: { zip_urls: { medium: 'https://i.pximg.net/z.zip' }, frames: [] },
+    })
+    stubNativeExtract((_url, _json, cb) => cb(0, 'not-json'))
+    await expect(ugoiraExtractFrames(123)).rejects.toThrow('ugoira: 帧 URL 列表解析失败')
   })
 })
 

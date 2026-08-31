@@ -5,7 +5,7 @@
 //   - 原生模式：ugoiraExtractFrames（Java 解压写盘 + file:// 帧 URL，二进制零进 JS 堆）
 // 卸载竞态防护：下载完成时若已卸载则丢弃（disposed）+ AbortController 中断下载。
 import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { downloadUgoiraFrames, ugoiraExtractFrames, type UgoiraFrameData, type UgoiraFrameFile } from '../api/ugoira'
+import { downloadUgoiraFrames, ugoiraExtractFrames, type UgoiraFrameData } from '../api/ugoira'
 import { isNativeMode } from '../api/client'
 import { ugoiraMode } from '../stores/settingsStore'
 import { presentError } from '../utils/errorPresentation'
@@ -35,10 +35,6 @@ let timer: ReturnType<typeof setTimeout> | null = null
 let disposed = false
 let abort: AbortController | null = null
 
-function toFrameLike(list: UgoiraFrameData[] | UgoiraFrameFile[]): FrameLike[] {
-  return list.map((f) => ('dataUrl' in f ? { src: (f as UgoiraFrameData).dataUrl, delay: f.delay } : { src: (f as UgoiraFrameFile).url, delay: f.delay }))
-}
-
 function playFrom(index: number) {
   if (disposed) return
   frameCursor = index
@@ -67,14 +63,22 @@ onMounted(async () => {
   try {
     // 原生模式走 Java 解压写盘管线（ADR-0125）；web 模式走 fflate/range + base64。
     // ugoiraMode 设置（fflate/range）仅对 web 模式生效（原生管线与其无关）。
-    const raw = isNativeMode()
-      ? await ugoiraExtractFrames(props.illustId, abort.signal)
-      : await downloadUgoiraFrames(props.illustId, ugoiraMode.value, abort.signal)
-    if (disposed) {
-      frames = [] // 已卸载：丢弃帧数组（不启动播放，防 timer/frames 泄漏）
-      return
+    // 原生模式：ugoiraExtractFrames → { urls, delays }（file:// 帧，二进制零进 JS 堆）
+    // web 模式：downloadUgoiraFrames → dataUrl 列表（fflate/range + base64）
+    if (isNativeMode()) {
+      const bundle = await ugoiraExtractFrames(props.illustId, abort.signal)
+      if (disposed) {
+        return
+      }
+      frames = bundle.urls.map((url, i) => ({ src: url, delay: bundle.delays[i]! }))
+    } else {
+      const dataFrames = await downloadUgoiraFrames(props.illustId, ugoiraMode.value, abort.signal)
+      if (disposed) {
+        frames = []
+        return
+      }
+      frames = dataFrames.map((f) => ({ src: f.dataUrl, delay: f.delay }))
     }
-    frames = toFrameLike(raw)
     if (frames.length === 0) {
       errorMsg.value = '动图无帧数据'
     } else {

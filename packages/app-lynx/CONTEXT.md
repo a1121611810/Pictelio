@@ -148,8 +148,8 @@ _Avoid_: 失败后永久 shimmer、重试用已带 retry 的 `imageSrc`（累积
 ### 客户端（Client）
 
 **动图播放管线（ugoira playback pipeline）【2026-08-31 新增】**
-ugоira（Pixiv 动图）在 lynx 客户端从「元数据 → 帧数据 → 帧渲染 → 帧调度」的完整链路。**原生 LynxView 模式**（`isNativeMode()` 真）与 **web 模式**（Vite 代理 fetch）管线形态不同：
-- **原生模式 = Java 解压写盘管线（unpacked pipeline）**：JS 只调 `PictelioApi.ugoiraExtract(url, delays, cb)` 拿「帧 file:// URL 列表」；zip 下载、解压、写盘全在 Java 侧（`cache/ugoira/`），帧二进制零进 JS 堆（ADR-0037 语义）。渲染复用 `<image>` + `PictelioImageService`（`canParseUrl`/`loadAndDeliver` 放行 `file://` 帧）。
+ugoira（Pixiv 动图）在 lynx 客户端从「元数据 → 帧数据 → 帧渲染 → 帧调度」的完整链路。**原生 LynxView 模式**（`isNativeMode()` 真）与 **web 模式**（Vite 代理 fetch）管线形态不同：
+- **原生模式 = Java 解压写盘管线（unpacked pipeline）**：JS 只调 `PictelioApi.ugoiraExtract(zipUrl, framesJson, cb)` 拿「帧 file:// URL 列表」；zip 下载、解压、写盘全在 Java 侧（`cache/ugoira/`），帧二进制零进 JS 堆（ADR-0037 语义）。渲染复用 `<image>` + `PictelioImageService`（`canParseUrl`/`loadAndDeliver` 放行 `file://` 帧）。
 - **web 模式 = JS 解压管线（zip pipeline）**：fflate 全量解压或 Range 流式取帧（`/pixiv-img` 代理 + Range 头），帧转 base64 data URL（`bytesToDataUrl`），`<image>` 按 `meta.delay` 切换。
 _Avoid_：「双端同一管线」——实测（原型报告 `docs/research/ugoira-native-pipeline-proto.md`）证明 data URL 在自研 ImageService 架构下原生模式不可用（OkHttp 拒绝 `data:` scheme），双端管线分叉是架构事实，不是实现分歧。
 
@@ -166,7 +166,6 @@ _Avoid_：base64 data URL 用于原生模式（实测不可用，见上）
 **代理路径与原生 fetch（proxy path vs native fetch）【2026-08-31 新增】**：
 `/pixiv-img/` 相对路径在原生 LynxView 模式下**不是合法 fetch 目标**（LynxFetchModule 拒绝无 scheme URL，issue #218）；原生模式的图片/文件下载 URL 必须是绝对 CDN URL（`https://i.pximg.net/...`）且**必须带 `Referer: https://app-api.pixiv.net/` 头**（无 Referer → 403，原型 A 方案实测）。
 
-### 客户端（Client）
 
 **双域名 URL（double-host URL）**：
 原生模式下绝对 `next_url` 未归一化产生的错误 URL：`apiBase + 绝对URL`，Pixiv 返回 404。`rewriteUrl` 原生分支负责把绝对 Pixiv URL 剥离域名成相对路径（含 query）。跨上下文共享概念，详见根 `docs/adr/glossary-search-pagination.md`。
