@@ -6,7 +6,7 @@ import { followUser, unfollowUser } from '../api/user'
 import { currentUser } from '../stores/authStore'
 import type { PixivIllust } from '../api/types'
 import { proxyImageUrl } from '../utils/imageUrl'
-import { resolveQualityUrl } from '../utils/imageQuality'
+import { resolvePageSrcs } from '../utils/imageQuality'
 import { detailImageHeightVw } from '../utils/imageLayout'
 import { presentError } from '../utils/errorPresentation'
 import { detailQuality } from '../stores/settingsStore'
@@ -18,7 +18,6 @@ import UgoiraViewer from '../components/UgoiraViewer.vue'
 const illust = ref<PixivIllust | null>(null)
 const loading = ref(true)
 const errorMsg = ref('')
-const currentPage = ref(0)
 
 // ─── 评论弹层（issue #164）：入口在收藏操作行；弹层挂根 view 内、scroll-view 之后 ───
 const showComments = ref(false)
@@ -55,7 +54,7 @@ const illustId = computed(() => Number(currentParams.value.id ?? 0))
 // [fix] 单页作品直接返回完整 image_urls（medium/large 正常档位）——
 // 此前把 original_image_url 塞进 large 导致 medium 档 fallback 到原图
 // （下载体积大 + 易超时，模拟器实测 img-original timeout）。original 档
-// 由 currentImage 的 originalImageUrl 参数单独兜底。
+// 由 resolvePageSrcs 的 singleOriginalUrl 参数单独兜底（单页场景）。
 const pages = computed(() => {
   if (!illust.value) return []
   if (illust.value.meta_pages?.length) {
@@ -65,34 +64,22 @@ const pages = computed(() => {
 })
 
 // [spec] 详情比例显示：容器高度按原图宽高比换算的显式 vw（不封顶）；
-// 容器 / ugoira 占位 / 图片骨架三处共用同一高度，避免重复计算
+// 容器 / ugoira 占位 / 图片骨架三处共用同一高度，避免重复计算。
+// 多图列表（ADR-0129）：该高度仅作**占位**（首图比例），各图 @load 后按自身比例修正（CoverImage correctHeightOnLoad）。
 const detailImageHeight = computed(() =>
   detailImageHeightVw(illust.value?.width, illust.value?.height),
 )
 
-const currentImage = computed(() => {
-  const list = pages.value
-  if (!list.length) return ''
-  const page = list[Math.min(currentPage.value, list.length - 1)]
-  // issue #148 T2：按档位解析（medium/large/original）。单页 original 场景下 page 可能只有
-  // large 字段，resolveQualityUrl 的 original 档由 meta_single_page.original_image_url 兜底。
-  const resolved = resolveQualityUrl(
-    page,
-    detailQuality.value,
-    illust.value?.meta_single_page?.original_image_url,
-  )
-  return proxyImageUrl(resolved)
-})
+// ─── 多图列表（ADR-0129 / spec §3 数据流）：逐页按档位解析 + 代理 ───
+// 替换旧「详情翻页」的 currentImage（单页）语义：整体解析为数组，页面 v-for 渲染；
+// 单图作品（meta_pages 空）走 [illust.image_urls] 单元素（现状语义不变）。
+// 解析组合下移为纯函数 resolvePageSrcs（深模块可测，oracle = resolveQualityUrl + proxyImageUrl 各自语义）。
+const slideSrcs = computed(() =>
+  resolvePageSrcs(pages.value, detailQuality.value, illust.value?.meta_single_page?.original_image_url),
+)
 
 function openAuthor() {
   void navigate(`/user/${illust.value.user.id}`)
-}
-
-function nextPage() {
-  if (currentPage.value < pages.value.length - 1) currentPage.value += 1
-}
-function prevPage() {
-  if (currentPage.value > 0) currentPage.value -= 1
 }
 
 onMounted(async () => {
@@ -134,24 +121,48 @@ onMounted(async () => {
     <scroll-view v-else-if="illust" class="w-full flex-1 min-h-0" scroll-orientation="vertical">
       <!-- [spec] 详情大图：按原图宽高比撑开高度（显式 vw，不封顶，与 webview client 一致），
            原生 LynxView 不支持动态 aspect-ratio style（ADR-0055 §2），显式高度已验证（issue #138）。
-           图片级骨架屏（SkeletonImage）：@load 前 shimmer、@error 显示「图片加载失败」，不启用 lazy-load -->
-      <view class="relative w-full bg-surface-container-highest overflow-hidden" :style="{ height: detailImageHeight }">
-        <!-- T5：ugoira 动图用播放器；普通作品用静态大图 -->
-        <UgoiraViewer
-          v-if="illust.type === 'ugoira'"
-          :illust-id="illust.id"
-          :height-vw="detailImageHeight"
-        />
-        <SkeletonImage
-          v-else-if="currentImage"
-          :src="currentImage"
-          :height="detailImageHeight"
-        />
+           图片级骨架屏（SkeletonImage）：@load 前 shimmer、@error 显示「图片加载失败」。
+           ADR-0129 多图列表：多页作品改**通栏连续大图列表**（全量渲染 + 首图 eager/其余 lazy-load），
+           每图宽度盛满、高度按自身比例（占位=首图比例 detailImageHeight，@load 后 CoverImage correctHeightOnLoad 修正），
+           右上角「n / N」页角标（对齐 webview LazyDetailImage）；单页/ugoira 分支保持现状。 -->
+      <!-- ugoira 动图：播放器分支（多图列表不适用，page_count=1 语义保持） -->
+      <view
+        v-if="illust.type === 'ugoira'"
+        class="relative w-full bg-surface-container-highest overflow-hidden"
+        :style="{ height: detailImageHeight }"
+      >
+        <UgoiraViewer :illust-id="illust.id" :height-vw="detailImageHeight" />
       </view>
-      <view v-if="pages.length > 1" class="flex flex-row items-center justify-center p-3">
-        <view class="py-1 pr-2" @tap="prevPage"><text class="text-[6.4vw] leading-none text-surface-on-variant py-2 px-6">‹</text></view>
-        <text class="text-body-medium text-surface-on-variant mx-4">{{ currentPage + 1 }} / {{ pages.length }}</text>
-        <view class="py-2 px-3" @tap="nextPage"><text class="text-[6.4vw] leading-none text-surface-on-variant py-2 px-6">›</text></view>
+      <!-- 多图列表：每页一张，通栏连续大图（页间留间距）。
+           外层**不定高**（占位高度由 SkeletonImage 的 height prop 承担；correctHeightOnLoad 修正的是内层
+           CoverImage 容器高度——外层定高会裁掉修正后更高的图）；外层仅作 relative 定位上下文（角标）。 -->
+      <template v-else-if="slideSrcs.length > 1">
+        <view
+          v-for="(src, i) in slideSrcs"
+          :key="i"
+          class="relative w-full bg-surface-container-highest overflow-hidden mb-2"
+        >
+          <SkeletonImage :src="src" :height="detailImageHeight" :lazy-load="i > 0" correct-height-on-load />
+          <!-- 「n / N」页角标：absolute 悬浮右上角。
+               [定位锚点约定（ADR-0123）] 原生 LynxView 把最近 view 祖先当 absolute 锚点，非全屏父盒内
+               禁止 right/bottom（按父盒边缘解析→跑出屏幕）。故角标用「left:0 + w-full + flex 右对齐」：
+               只依赖 left/top 正向解析，右侧位置由 flex 布局得出，规避 right/bottom 的锚点语义。 -->
+          <view class="absolute top-2 left-0 w-full flex flex-row justify-end pr-2">
+            <view
+              class="px-2 h-[6.4vw] min-w-[9.6vw] rounded-[var(--md-shape-small)] bg-scrim flex items-center justify-center"
+            >
+              <text class="text-label-medium text-white">{{ i + 1 }} / {{ slideSrcs.length }}</text>
+            </view>
+          </view>
+        </view>
+      </template>
+      <!-- 单图作品：现状语义（无角标、无 correctHeightOnLoad、不带 lazy-load） -->
+      <view
+        v-else
+        class="relative w-full bg-surface-container-highest overflow-hidden"
+        :style="{ height: detailImageHeight }"
+      >
+        <SkeletonImage v-if="slideSrcs[0]" :src="slideSrcs[0]" :height="detailImageHeight" />
       </view>
       <view class="p-4 bg-surface-container-lowest">
         <text class="text-headline-small font-bold text-surface-on">{{ illust.title }}</text>

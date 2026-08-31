@@ -20,3 +20,23 @@ export function detailImageHeightVw(
   }
   return `${(height / width) * 100}vw`
 }
+
+/**
+ * 「load 后按比例修正」高度换算（spec: app-lynx-detail-multi-image-list §2.3 / ADR-0129）：
+ * 多图详情列表用——图片 `@load`（LoadEvent 携带原始 width/height）后按**该图实际比例**
+ * 计算容器高度（vw 字符串，`(height / width) * 100`，同 detailImageHeightVw 公式）。
+ * 与 detailImageHeightVw 的差异：load 尺寸缺失、非正数、非有限值时返回 **null**
+ * （修正不可用 → 调用方保持占位高度），而非回退默认值——避免把「无法修正」误判为
+ * 「按 1:1 显示」造成布局跳变。
+ */
+export function pageHeightVw(
+  width: number | undefined | null,
+  height: number | undefined | null,
+): string | null {
+  const valid = (n: number | undefined | null): n is number =>
+    typeof n === 'number' && Number.isFinite(n) && n > 0
+  if (!valid(width) || !valid(height)) {
+    return null
+  }
+  return `${(height / width) * 100}vw`
+}

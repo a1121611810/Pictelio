@@ -145,6 +145,20 @@ _Avoid_: 加载中纯空白、固定灰块而无微光
 「图片三态」中的失败态——`<image>` `@error`（或空 `src` 直接判定，避免 `<image src="">` 不触发 `@error` 而无限骨架）后显示「图片加载失败」+ 重试按钮；点击经 `deriveRetryState` 从**干净 base src** 重建（附加一次性 `retry=<ts>` cache-bust，防 `&retry` 累积）并复位回「骨架」，仅重载该图，不整页刷新。失败态优先于其他态（`deriveCoverState` 互斥规则）。
 _Avoid_: 失败后永久 shimmer、重试用已带 retry 的 `imageSrc`（累积 `&retry`）、失败态无「重试」入口
 
+### 多图详情（Multi-image detail）
+
+**多图详情列表（multi-image detail list）【2026-08-31 新增】**
+详情页多页作品（`meta_pages.length > 1`）的展示形态（ADR-0129）——不是轮播、不是按钮翻页，而是**通栏连续大图列表**：所有页在 `scroll-view` 内纵向排列（页间留间距），每张图宽度盛满、高度按**自身**宽高比换算（占位用首图比例、`@load` 后按实际比例修正，见下）；每张图右上角悬浮「n / N」页码角标（对齐 webview 端 `LazyDetailImage`）。单图作品与 Ugoira 不走此形态。
+_Avoid_: 轮播（推荐页形态）、`‹ 1/N ›` 按钮翻页（旧语义，本词条取代）、所有页统一首图比例 `aspectFill` 裁切
+
+**详情翻页（detail button paging）**【废弃 2026-08-31，ADR-0129】：
+详情页多图**曾用**的形态——单张图 + `‹` / `›` 按钮 + `1 / N` 文本逐页切换（`currentPage` / `nextPage` / `prevPage`）。内容多时无位置感、无整图浏览流。ADR-0129 改为「多图详情列表」后弃用；实现上删除该三件套（`currentPage` 等信号与翻页行）。
+_Avoid_: 在详情页再次引入（历史语义）；「按钮分页」词条专指列表页 feed 分页，勿混用
+
+**逐页比例修正（per-page ratio correction）【2026-08-31 新增】**
+多图列表每张图「高度按自身宽高比」的落地机制：Pixiv API 的 `meta_pages` 元素**仅含 `image_urls`，无每页 width/height**（类型 `PixivIllustMetaPage` 实证；首图 `illust.width/height` 不能代表其余页），故无法预计算逐页高度。实现 = 每张图容器高度先用**首图比例**占位（布局稳定），图片 `@load`（`LoadEvent`/`ImageLoadEvent`，**携带原始 width/height**，Android/iOS/Clay 均支持；web-core 的 `x-image` load 事件 `detail` 同样携带 naturalWidth/naturalHeight——已查 web-core 0.23.1 产物源码实证）后按该图实际比例**修正**容器高度。承载于「图片三态」深模块 `CoverImage` 的扩展能力（默认行为不变，详情页薄调用）。
+_Avoid_: `auto-size` 属性（Lynx 原生 2.6+ 支持，但 web-core 0.23.1 **未实现**——产物源码 0 匹配，仅真机可用，与「双环境一致」惯例冲突）；预请求全部页拿尺寸（API 无此字段）
+
 ### 客户端（Client）
 
 **动图播放管线（ugoira playback pipeline）【2026-08-31 新增】**

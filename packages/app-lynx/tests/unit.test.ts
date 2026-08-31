@@ -2077,3 +2077,36 @@ describe('T8 ugoiraExtractStreamFrames（原生流式渐进）', () => {
     await expect(ugoiraExtractStreamFrames(123, () => {})).rejects.toThrow('ugoiraExtractStream 不可用')
   })
 })
+
+// ─── 红线：多图详情列表化（ADR-0129）结构断言 ───
+// 审计一防线判定（code-review Skpec 轴 minor：correctHeightOnLoad 默认 false 无机器防线）：
+// 用模板/源码结构断言封死「默认不变 + 仅详情页启用 + 翻页三件套已删」三个不变量。
+// oracle = ADR-0129 决策 1/3 + spec §2.1/§2.3/§2.5（按钮翻页删除、每图按自身比例、默认行为不变）。
+
+describe('多图详情列表化（ADR-0129）结构红线', () => {
+  const coverSource = readFileSync(fileURLToPath(new URL('../src/components/CoverImage.vue', import.meta.url)), 'utf8')
+  const detailSource = readFileSync(fileURLToPath(new URL('../src/pages/IllustDetail.vue', import.meta.url)), 'utf8')
+
+  it('CoverImage correctHeightOnLoad 默认 false（默认行为不变，现有调用方零影响）', () => {
+    expect(coverSource).toContain("correctHeightOnLoad: false")
+  })
+
+  it('SkeletonImage 透传 correct-height-on-load（详情页薄调用链路闭合）', () => {
+    const skeletonSource = readFileSync(fileURLToPath(new URL('../src/components/SkeletonImage.vue', import.meta.url)), 'utf8')
+    expect(skeletonSource).toContain("correctHeightOnLoad?: boolean")
+    expect(skeletonSource).toContain(':correct-height-on-load="correctHeightOnLoad"')
+  })
+
+  it('IllustDetail 翻页三件套已删除（currentPage/nextPage/prevPage 脚本符号不存在）', () => {
+    expect(detailSource).not.toContain('const currentPage')
+    expect(detailSource).not.toContain('function nextPage')
+    expect(detailSource).not.toContain('function prevPage')
+    // 模板翻页行（‹ 1/N ›）已删
+    expect(detailSource).not.toContain('{{ currentPage + 1 }}')
+  })
+
+  it('IllustDetail 多图分支启用 correct-height-on-load + n/N 角标（每图按自身比例，不进 translate 容器）', () => {
+    expect(detailSource).toContain('correct-height-on-load')
+    expect(detailSource).toContain('{{ i + 1 }} / {{ slideSrcs.length }}')
+  })
+})

@@ -11,10 +11,15 @@
 // fit='width-fill' 但 ratio 缺失/非法 → 防御性回退 cover 渲染。
 // [复用] RecommendedCover（layout="full" retry）与 SkeletonImage（layout="box" 薄盒适配器）均经它渲染，
 // 避免各组件再各自抄三态（S2 修复）。
+// T3 扩展（ADR-0129 决策 3 / spec §2.3）：box 布局新增可选 correctHeightOnLoad——「load 后按比例修正」：
+// 初始容器高度 = 调用方占位（height prop，详情页传首图比例），图片 @load（LoadEvent 携带原始
+// width/height）后按**该图实际比例**修正容器高度（pageHeightVw 纯函数）。默认 false → 现状不变，
+// 现有调用方零 blast radius。仅 box 布局生效（full 布局是全 bleed 铺满，无需修正）。
 import { ref, computed, watch } from 'vue'
 import { resolveSkeletonStyle } from './skeletonStyle'
 import { deriveCoverState, deriveRetryState, isUnloadableSrc } from '../utils/coverImage'
 import { ratioToHeightVw } from '../utils/coverDisplay'
+import { pageHeightVw } from '../utils/imageLayout'
 
 const props = withDefaults(
   defineProps<{
@@ -26,7 +31,7 @@ const props = withDefaults(
     retry?: boolean
     /** 懒加载（默认关闭）：列表盒图传 true；详情大图/hero（首屏即需）可不传=非懒加载 */
     lazyLoad?: boolean
-    /** box 模式：显式容器高度（vw，如 "48.4vw"） */
+    /** box 模式：显式容器高度（vw，如 "48.4vw"）；correctHeightOnLoad 时作为 @load 前的占位高度 */
     height?: string
     /** box 模式：容器宽高比（如 "1 / 1"） */
     aspectRatio?: string
@@ -36,13 +41,17 @@ const props = withDefaults(
     fit?: 'cover' | 'width-fill'
     /** width-fill 用：宽:高最简整数比字符串（如 "4 / 5"）；容器高度 = ratioToHeightVw(ratio)（100×高/宽 vw） */
     ratio?: string
+    /** box 模式：@load 后按图片实际比例修正容器高度（占位 height → 实际比例，ADR-0129）。默认 false = 现状不变 */
+    correctHeightOnLoad?: boolean
   }>(),
-  { retry: false, lazyLoad: false, fit: 'cover' },
+  { retry: false, lazyLoad: false, fit: 'cover', correctHeightOnLoad: false },
 )
 
 const imageSrc = ref(props.src)
 const loaded = ref(false)
 const failed = ref(isUnloadableSrc(props.src))
+/** correctHeightOnLoad 修正结果（vw 字符串）：@load 携带有效尺寸后非 null，覆盖占位高度 */
+const correctedHeightVw = ref<string | null>(null)
 
 /** props.src 变化复位（列表复用组件换图时避免残留旧态） */
 watch(
@@ -51,6 +60,7 @@ watch(
     imageSrc.value = s
     loaded.value = false
     failed.value = isUnloadableSrc(s)
+    correctedHeightVw.value = null
   },
 )
 
@@ -76,14 +86,36 @@ const containerClass = computed(() => {
 })
 
 const containerStyle = computed(() => {
-  if (props.layout === 'box') return resolveSkeletonStyle(props.height, props.aspectRatio, props.minH)
+  if (props.layout === 'box') {
+    const base = resolveSkeletonStyle(props.height, props.aspectRatio, props.minH)
+    if (props.correctHeightOnLoad && correctedHeightVw.value !== null) return { height: correctedHeightVw.value }
+    return base
+  }
   if (isWidthFill.value) return { height: `${widthFillHeightVw.value}vw` }
   return undefined
 })
 
-function onLoad() {
+/** @load 事件载荷：原生 Lynx LoadEvent 顶层 width/height（@lynx-js/types BaseImageLoadEvent），
+ *  web-core CustomEvent 经 detail{width,height}（web-core 0.23.1 产物源码实证）——两形态兼容。 */
+interface ImageLoadEventLike {
+  detail?: { width?: number; height?: number }
+  width?: number
+  height?: number
+}
+
+function onLoad(e?: ImageLoadEventLike) {
   loaded.value = true
   failed.value = false
+  // correctHeightOnLoad：@load 后按实际比例修正容器高度（ADR-0129）。load 尺寸缺失/非法 →
+  // 保持占位高度（pageHeightVw 返回 null），非静默降级：契约破坏显式 warn。
+  if (props.correctHeightOnLoad && props.layout === 'box') {
+    const vw = pageHeightVw(e?.detail?.width ?? e?.width, e?.detail?.height ?? e?.height)
+    if (vw !== null) {
+      correctedHeightVw.value = vw
+    } else {
+      console.warn('[coverImage] correctHeightOnLoad @load 未携带有效尺寸，保持占位高度', e)
+    }
+  }
 }
 function onError() {
   loaded.value = false
@@ -95,6 +127,8 @@ function onRetry() {
   imageSrc.value = r.imageSrc
   loaded.value = r.loaded
   failed.value = r.failed
+  // correctHeightOnLoad：重试是新一次加载，容器高度复位回占位（props.src 未变，watch 不触发）
+  correctedHeightVw.value = null
 }
 
 const state = computed(() => deriveCoverState(loaded.value, failed.value))
