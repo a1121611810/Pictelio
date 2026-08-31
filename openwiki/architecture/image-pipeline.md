@@ -1,7 +1,7 @@
 ---
 type: Concept
 title: Image Loading Pipeline
-description: The complete path from Pixiv API response to screen rendering — three-layer image cache, multi-host selection, WebView proxy interception, Web Worker measurement, and periodic GC.
+description: The complete path from Pixiv API response to screen rendering — three-layer image cache, multi-host selection, WebView proxy interception, Web Worker measurement, periodic GC, and ugoira streaming playback across the WebView and lynx clients.
 tags: [images, caching, performance, webview, android]
 ---
 
@@ -159,9 +159,27 @@ Introduced in v3.17.4-3.17.5, the ugoira experience was rewritten to support **i
 2. **Progress indicator** — an SVG ring progress bar with numeric percentage (0-100%) displays during ZIP download and frame extraction
 3. **Seamless transition** — once all frames are decoded, the cover is replaced by `UgoiraViewer` with zero visual gap
 
-### `downloadAndExtractUgoira()`
+### Streaming Playback (v4.23.0, ADR-0127 / ADR-0128)
 
-Shared function in `/packages/app/src/api/illust.ts` that consolidates the ZIP download + per-frame extraction logic:
+Since v4.23.0, both clients play ugoira **progressively** instead of "download the whole ZIP, then play":
+
+- **App (WebView) — `streamUgoiraFrames` (ADR-0127):** `packages/app/src/api/illust.ts` feeds the ZIP body reader into the shared [`@pictelio/ugoira`](/packages/ugoira/) `createStreamFrameSource`, which emits each frame as soon as its data is complete (fflate `ondata(final)` semantics), buffering out-of-order entries. The viewer creates a blob URL per frame and starts playback at the first frame — **first frame ≈2% download** (was 100%, ~8s for a 12.9MB/406-frame illust).
+- **Lynx native — Java streaming (ADR-0128):** `UgoiraStreamEngine` + `ugoiraExtractStream`/`ugoiraExtractStreamPoll`/`ugoiraExtractStreamCancel` in [`PictelioApiModule.java`](/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioApiModule.java) stream the zip in Java (`ZipInputStream`, local-header-driven, no central directory), write frames to disk in batches, and deliver frame-URL batches through a pull-mode state machine (Lynx `Callback` is one-shot). First batch arrives at ~4.5–8.6% download.
+
+Both paths keep frame bytes off the JS heap (ADR-0037); lynx native delivers only `file://` URL lists. The shared stream semantics (`createStreamFrameSource`) are pure-TS and covered by increment/out-of-order/corrupt tests; the Java batch core is pure-JVM and unit-tested.
+
+### Native Extract-to-Disk (lynx, ADR-0125)
+
+In native LynxView, the WebView `shouldInterceptRequest` proxy never runs, so relative `/pixiv-img/...` URLs are rejected by `LynxFetchModule` (no scheme). `PictelioApi.ugoiraExtract(zipUrl, framesJson, cb)` downloads the zip via OkHttp (with `Referer`/UA), decompresses with `ZipInputStream`, writes `cache/ugoira/<illustId>/frame_N.{png|jpg}`, and returns a `file://` URL list. [`PictelioImageService`](/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioImageService.java) gained a `file://` branch (`canParseUrl` + `loadAndDeliver` read-from-disk). On repeat playback, an integrity check (frame count matches `framesJson` and non-empty) skips the download entirely (ADR-0126).
+
+### Playback Fixes (ADR-0126)
+
+- **Lynx flicker:** `UgoiraViewer.vue` added `defer-src-invalidation` on `<image>` — the default clears the displayed frame before the next load, causing blank flashes at 20–80ms frame intervals. The attribute keeps the old frame until the new one loads.
+- **App `range` mode:** the interceptor destroys 206 semantics (`Content-Length` invisible to fetch; `bytes=…` responses truncated or `ERR_FAILED`), so the official streaming scheme cannot work through `shouldInterceptRequest`. `extractRange` now degrades to the fflate full path with a `console.warn` (no silent fallback).
+
+### `downloadAndExtractUgoira()` (legacy full path)
+
+Shared function in `/packages/app/src/api/illust.ts` that consolidates the ZIP download + per-frame extraction logic (now the **full-download path**, still used by `range` mode and preloaded compatibility):
 - Stream-downloads the ugoira ZIP from Pixiv
 - Decompresses each frame in sequence
 - Supports a progress callback for the UI progress indicator
@@ -179,7 +197,7 @@ Shared function in `/packages/app/src/api/illust.ts` that consolidates the ZIP d
 | `aspectRatio` | `string` | Container aspect ratio for inline mode |
 | `preloadedFrames` | `UgoiraFrame[]` | Optional pre-loaded frames (skips internal fetch) |
 
-The `preloadedFrames` prop allows the parent (`IllustDetail`) to preload frames using `downloadAndExtractUgoira()` and pass them directly, enabling the progress indicator display on the parent's cover image before `UgoiraViewer` mounts.
+The `preloadedFrames` prop allows the parent (`IllustDetail`) to preload frames and pass them directly, enabling the progress indicator display on the parent's cover image before `UgoiraViewer` mounts. The streaming path appends ready frames incrementally and the player waits at the tail for new frames (ADR-0127).
 
 ### List Card Aspect Ratio
 
@@ -199,8 +217,12 @@ For ugoira illusts in feed lists (virtual scroll):
 | LazyDetailImage lazy-loading wrapper | `/packages/app/src/components/LazyDetailImage.tsx` |
 | Image cache native plugin | `/packages/app/src/native/ImageCache.ts` |
 | Web Worker for size measurement | `/packages/app/src/primitives/createImageSizeWorker.ts` |
-| Ugoira download + extraction | `/packages/app/src/api/illust.ts` (`downloadAndExtractUgoira()`) |
-| Ugoira playback component | `/packages/app/src/components/UgoiraViewer.tsx` |
+| Ugoira download + extraction | `/packages/app/src/api/illust.ts` (`downloadAndExtractUgoira()`, `streamUgoiraFrames()`) |
+| Ugoira streaming frame source (shared) | `/packages/ugoira/src/stream.ts` (`createStreamFrameSource`) |
+| Ugoira playback component (app) | `/packages/app/src/components/UgoiraViewer.tsx` |
+| Ugoira playback component (lynx) | `/packages/app-lynx/src/components/UgoiraViewer.vue` |
+| Ugoira native extract + streaming | `/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioApiModule.java`, `UgoiraStreamEngine.java` |
+| Ugoira `file://` frame service | `/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioImageService.java` |
 | Full pipeline documentation | `/docs/image-loading-pipeline.md` |
 | ADR: Three-layer cache design | `/docs/adr/ADR-0090-image-cache-three-layer.md` |
 | ADR: L1 key set migration | `/docs/adr/0014-l1-image-cache-key-set.md` |
@@ -213,4 +235,4 @@ For ugoira illusts in feed lists (virtual scroll):
 
 - [Architecture Overview](/openwiki/architecture/overview.md)
 - [Android Native & Build](/openwiki/integrations/android-native.md)
-- ADR-0003, ADR-0014, ADR-0030, ADR-0039
+- ADR-0003, ADR-0014, ADR-0030, ADR-0039, ADR-0125, ADR-0126, ADR-0127, ADR-0128
