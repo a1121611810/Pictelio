@@ -192,3 +192,120 @@ export async function ugoiraExtractFrames(
   }
   return { urls, delays: meta.frames.map((f) => f.delay) }
 }
+
+// ─── 原生模式流式渐进（ADR-0128） ───
+
+/** PictelioApi 原生模块的流式契约（与 Java 侧一致：拉模式 start/poll/cancel） */
+interface PictelioApiUgoiraStream {
+  ugoiraExtractStream: (zipUrl: string, framesJson: string, illustId: string, batchSize: string, cb: (status: number, data: string) => void) => void
+  ugoiraExtractStreamPoll: (cb: (status: number, data: string) => void) => void
+  ugoiraExtractStreamCancel: (cb: (status: number, data: string) => void) => void
+}
+
+/** poll 响应形态（与 Java 侧 JSON 契约一致） */
+interface StreamPollPayload {
+  delivered: number
+  urls: string[]
+  done: boolean
+  error?: string
+}
+
+/**
+ * 原生模式流式渐进取帧（ADR-0128）：start → 循环 poll → 每批就绪回调（帧 {src, delay} 增量交付）。
+ * 帧二进制零进 JS 堆（file:// URL 交付，ADR-0037 保持）。
+ * @param illustId 作品 ID
+ * @param onBatch 批次就绪回调（按帧序；首批到达即应开始播放）
+ * @param signal 中止信号（卸载时 → cancel，Java 侧中断下载；已写盘帧保留）
+ * @returns 全部帧 {src, delay}（调用方如需完整列表）
+ * @throws 启动失败 / poll error（下载中断、zip 损坏、帧序不一致）→ 可读错误（调用方降级全量）
+ */
+export async function ugoiraExtractStreamFrames(
+  illustId: number,
+  onBatch: (frames: UgoiraFrameData[]) => void,
+  signal?: AbortSignal,
+): Promise<UgoiraFrameData[]> {
+  const meta = await loadUgoiraMetadata(illustId)
+  const zipUrl = meta.zip_urls.medium
+  const framesJson = JSON.stringify(meta.frames)
+  const nm = getNativeModules() as { PictelioApi?: PictelioApiUgoiraStream } | undefined
+  const api = nm?.PictelioApi
+  if (!api?.ugoiraExtractStream) {
+    throw new Error("ugoira: ugoiraExtractStream 不可用（原生模块未注册或非原生模式）")
+  }
+  const onAbort = () => api.ugoiraExtractStreamCancel(() => {})
+  signal?.addEventListener('abort', onAbort, { once: true })
+  /** poll 等待：abort 时立即 reject（避免挂起） */
+  const waitPoll = () =>
+    new Promise<StreamPollPayload>((resolve, reject) => {
+      let settled = false
+      const onAbortPoll = () => {
+        if (settled) return
+        settled = true
+        reject(new Error('ugoira: 已取消'))
+      }
+      signal?.addEventListener('abort', onAbortPoll, { once: true })
+      api.ugoiraExtractStreamPoll((status, data) => {
+        if (settled) return
+        settled = true
+        signal?.removeEventListener('abort', onAbortPoll)
+        if (status !== 0) {
+          reject(new Error(`ugoira: ${data}`))
+          return
+        }
+        try {
+          resolve(JSON.parse(data) as StreamPollPayload)
+        } catch {
+          reject(new Error('ugoira: poll 响应解析失败'))
+        }
+      })
+    })
+  /** 节流等待：abort 时立即放行（下一轮 poll 立即 reject） */
+  const waitThrottle = () =>
+    new Promise<void>((resolve) => {
+      const t = setTimeout(resolve, 30)
+      signal?.addEventListener('abort', () => {
+        clearTimeout(t)
+        resolve()
+      }, { once: true })
+    })
+  try {
+    await new Promise<void>((resolve, reject) => {
+      api.ugoiraExtractStream(zipUrl, framesJson, String(illustId), '5', (status, data) => {
+        if (status === 0) resolve()
+        else reject(new Error(`ugoira: ${data}`))
+      })
+    })
+    if (signal?.aborted) throw new Error('ugoira: 已取消')
+
+    const all: UgoiraFrameData[] = []
+    let delivered = 0
+    while (true) {
+      const payload = await waitPoll()
+      if (payload.error) {
+        throw new Error(`ugoira: ${payload.error}`)
+      }
+      if (payload.urls.length > 0) {
+        const batch: UgoiraFrameData[] = payload.urls.map((url, i) => ({
+          dataUrl: url,
+          delay: meta.frames[delivered + i]!.delay,
+        }))
+        all.push(...batch)
+        delivered += batch.length
+        onBatch(batch)
+      }
+      if (payload.done) {
+        break
+      }
+      if (payload.delivered === 0) {
+        // 节流：无新帧时避免忙轮询（Java 侧 poll 快速返回）
+        await waitThrottle()
+      }
+    }
+    if (delivered !== meta.frames.length) {
+      throw new Error(`ugoira: 帧数据缺失（期望 ${meta.frames.length}，实际 ${delivered}）`)
+    }
+    return all
+  } finally {
+    signal?.removeEventListener('abort', onAbort)
+  }
+}

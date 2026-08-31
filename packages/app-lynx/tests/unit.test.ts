@@ -11,7 +11,7 @@ import { isOAuthCredsInjected } from '../src/api/auth'
 import { getUserDetail, getUserFollowing, getUserFollowers, followUser, unfollowUser, loadUserListNext } from '../src/api/user'
 import { loadUserIllusts, loadFollow, loadBookmarks } from '../src/api/illust'
 import { loadUserNovels, loadBookmarks as loadNovelBookmarks, loadFollow as loadNovelFollow } from '../src/api/novel'
-import { bytesToDataUrl, downloadUgoiraFrames, ugoiraExtractFrames } from '../src/api/ugoira'
+import { bytesToDataUrl, downloadUgoiraFrames, ugoiraExtractFrames, ugoiraExtractStreamFrames } from '../src/api/ugoira'
 import type { UgoiraExtractMode } from '../src/api/ugoira'
 import { ugoiraMode as lynxUgoiraMode, setUgoiraMode as lynxSetUgoiraMode } from '../src/stores/settingsStore'
 import { ME_A11Y_LABELS, LOGIN_A11Y_LABELS, UPDATE_A11Y_LABELS, ERROR_A11Y_LABELS, FAB_MENU_A11Y_LABELS, GLOBAL_FAB_A11Y_LABELS, WATCHLIST_A11Y_LABELS, WATCHLIST_PROMPT_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../src/utils/accessibility'
@@ -1984,4 +1984,96 @@ it('章节内跳转：watch novelId 重载（dispose + 重建，spec §6-2）', 
 expect(detailVueSource).toContain('watch(novelId')
 expect(detailVueSource).toContain('teardownPrompt()')
 })
+})
+
+// ─── T8（ADR-0128）：ugoiraExtractStreamFrames 流式渐进封装契约 ───
+// oracle：ADR-0128 拉模式契约（start/poll/cancel；poll payload 形态）+ Java 侧契约测试同源
+describe('T8 ugoiraExtractStreamFrames（原生流式渐进）', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  function stubNativeStream(impl: {
+    start?: (zipUrl: string, framesJson: string, illustId: string, batchSize: string, cb: (s: number, d: string) => void) => void
+    poll?: (cb: (s: number, d: string) => void) => void
+    cancel?: (cb: (s: number, d: string) => void) => void
+  }) {
+    vi.stubGlobal('NativeModules', {
+      PictelioApi: {
+        ugoiraExtractStream: impl.start ?? (() => {}),
+        ugoiraExtractStreamPoll: impl.poll ?? (() => {}),
+        ugoiraExtractStreamCancel: impl.cancel ?? (() => {}),
+      },
+    } as never)
+  }
+
+  const meta = {
+    ugoira_metadata: {
+      zip_urls: { medium: 'https://i.pximg.net/img-zip-ugoira/z.zip' },
+      frames: [
+        { file: '000000.jpg', delay: 100 },
+        { file: '000001.jpg', delay: 120 },
+        { file: '000002.jpg', delay: 140 },
+      ],
+    },
+  }
+
+  it('成功：start → 两批 poll → onBatch 按帧序（delay 映射 meta.frames）→ 返回全量', async () => {
+    vi.spyOn(apiClient, 'get').mockResolvedValue(meta)
+    const polls = [
+      { delivered: 2, urls: ['file:///f0', 'file:///f1'], done: false },
+      { delivered: 1, urls: ['file:///f2'], done: true },
+    ]
+    stubNativeStream({
+      start: (_zip, _json, illustId, batchSize, cb) => {
+        expect(illustId).toBe('123')
+        expect(batchSize).toBe('5')
+        cb(0, '{"started":true}')
+      },
+      poll: (cb) => {
+        const p = polls.shift()!
+        cb(0, JSON.stringify(p))
+      },
+    })
+    const batches: string[][] = []
+    const all = await ugoiraExtractStreamFrames(123, (b) => batches.push(b.map((f) => f.dataUrl)))
+    expect(batches).toEqual([['file:///f0', 'file:///f1'], ['file:///f2']])
+    expect(all.map((f) => f.dataUrl)).toEqual(['file:///f0', 'file:///f1', 'file:///f2'])
+    expect(all.map((f) => f.delay)).toEqual([100, 120, 140]) // delay 按 meta.frames 映射
+  })
+
+  it('失败：poll error → 抛可读错误（不静默降级）', async () => {
+    vi.spyOn(apiClient, 'get').mockResolvedValue(meta)
+    stubNativeStream({
+      start: (_z, _j, _i, _b, cb) => cb(0, '{"started":true}'),
+      poll: (cb) => cb(0, JSON.stringify({ delivered: 0, urls: [], done: true, error: 'ugoira: zip 条目序与帧列表不一致（x ≠ y）' })),
+    })
+    await expect(ugoiraExtractStreamFrames(123, () => {})).rejects.toThrow('ugoira: zip 条目序与帧列表不一致')
+  })
+
+  it('失败：start status=1 → 抛可读错误', async () => {
+    vi.spyOn(apiClient, 'get').mockResolvedValue(meta)
+    stubNativeStream({ start: (_z, _j, _i, _b, cb) => cb(1, 'HTTP 403') })
+    await expect(ugoiraExtractStreamFrames(123, () => {})).rejects.toThrow('ugoira: HTTP 403')
+  })
+
+  it('取消：signal abort → 调 ugoiraExtractStreamCancel', async () => {
+    vi.spyOn(apiClient, 'get').mockResolvedValue(meta)
+    const cancelSpy = vi.fn((cb: (s: number, d: string) => void) => cb(0, '{}'))
+    stubNativeStream({ cancel: cancelSpy })
+    const ac = new AbortController()
+    // poll 挂起不返回（模拟下载中）→ abort 触发 cancel
+    stubNativeStream({ cancel: cancelSpy, start: (_z, _j, _i, _b, cb) => cb(0, '{"started":true}') })
+    const p = ugoiraExtractStreamFrames(123, () => {}, ac.signal)
+    setTimeout(() => ac.abort(), 5)
+    await expect(p).rejects.toThrow('ugoira: 已取消')
+    expect(cancelSpy).toHaveBeenCalled()
+  })
+
+  it('模块不可用：明确报错（防止误用为 web 模式）', async () => {
+    vi.spyOn(apiClient, 'get').mockResolvedValue(meta)
+    vi.stubGlobal('NativeModules', {})
+    await expect(ugoiraExtractStreamFrames(123, () => {})).rejects.toThrow('ugoiraExtractStream 不可用')
+  })
 })
