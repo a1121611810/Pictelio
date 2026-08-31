@@ -5,6 +5,7 @@ import { loadUgoiraMetadata } from "./illust"
 import { unzipFrames, parseZipEocd, parseZipCentralDir, computeFrameOffsetFromLocal, deflateInflate, type UgoiraZipEntry } from "@pictelio/ugoira"
 import { proxyImageUrl } from "../utils/imageUrl"
 import { requestFetch } from "../utils/fetchWrapper"
+import { getNativeModules } from "./client"
 
 export interface UgoiraFrameData {
   dataUrl: string
@@ -135,4 +136,54 @@ export async function downloadUgoiraFrames(
     const mime = file.toLowerCase().endsWith(".png") ? "image/png" : "image/jpeg"
     return { dataUrl: bytesToDataUrl(bytes, mime), delay: meta.frames[i]!.delay }
   })
+}
+
+// ─── 原生模式解压写盘管线（ADR-0125） ───
+
+/** ugoira 帧文件（原生模式：file:// URL + delay，帧二进制不进 JS 堆） */
+export interface UgoiraFrameFile {
+  url: string
+  delay: number
+}
+
+/** PictelioApi 原生模块的 ugoiraExtract 签名（与 Java 侧契约一致） */
+interface PictelioApiUgoiraExtract {
+  ugoiraExtract: (zipUrl: string, framesJson: string, cb: (status: number, data: string) => void) => void
+}
+
+/**
+ * 原生模式取帧：调 PictelioApi.ugoiraExtract（Java 下载 zip → 解压 → 写盘 →
+ * 回调帧 file:// URL 列表），帧二进制零进 JS 堆（ADR-0037/ADR-0125）。
+ * 仅原生模式调用；web 模式走 downloadUgoiraFrames（fflate/range + base64）。
+ * @param illustId 作品 ID
+ * @param signal 中止信号（组件卸载时中断——注：Java 侧下载不可中断，JS 侧丢弃结果）
+ * @returns 帧 file:// URL + delay（调用方负责调度播放）
+ * @throws 回调 status=1 时抛可读错误（禁止静默降级）
+ */
+export async function ugoiraExtractFrames(
+  illustId: number,
+  signal?: AbortSignal,
+): Promise<UgoiraFrameFile[]> {
+  const meta = await loadUgoiraMetadata(illustId)
+  const zipUrl = meta.zip_urls.medium // 原生模式必须是绝对 CDN URL（issue #218：相对路径被拒）
+  const framesJson = JSON.stringify(meta.frames)
+  const nm = getNativeModules() as { PictelioApi?: PictelioApiUgoiraExtract } | undefined
+  const api = nm?.PictelioApi
+  if (!api?.ugoiraExtract) {
+    throw new Error("ugoira: PictelioApi.ugoiraExtract 不可用（原生模块未注册或非原生模式）")
+  }
+  const urlsJson = await new Promise<string>((resolve, reject) => {
+    api.ugoiraExtract(zipUrl, framesJson, (status, data) => {
+      if (status === 0) resolve(data)
+      else reject(new Error(`ugoira: ${data}`))
+    })
+  })
+  if (signal?.aborted) {
+    throw new Error("ugoira: 已取消")
+  }
+  const urls: string[] = JSON.parse(urlsJson)
+  if (urls.length !== meta.frames.length) {
+    throw new Error(`ugoira: 帧数据缺失（期望 ${meta.frames.length}，实际 ${urls.length}）`)
+  }
+  return urls.map((url, i) => ({ url, delay: meta.frames[i]!.delay }))
 }

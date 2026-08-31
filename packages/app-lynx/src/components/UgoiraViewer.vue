@@ -1,9 +1,12 @@
 <script setup lang="ts">
-// Ugoira 播放器（T5）：帧 data URL 按 meta.delay setTimeout 循环切换。
-// 原生 LynxView + web-core 预览双环境（base64 data URL 是 <image> 官方支持格式）。
+// Ugoira 播放器（T5）：帧按 meta.delay setTimeout 循环切换。
+// 双管线（ADR-0125）：
+//   - web 模式：downloadUgoiraFrames（fflate/range + base64 data URL）
+//   - 原生模式：ugoiraExtractFrames（Java 解压写盘 + file:// 帧 URL，二进制零进 JS 堆）
 // 卸载竞态防护：下载完成时若已卸载则丢弃（disposed）+ AbortController 中断下载。
 import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { downloadUgoiraFrames, type UgoiraFrameData } from '../api/ugoira'
+import { downloadUgoiraFrames, ugoiraExtractFrames, type UgoiraFrameData, type UgoiraFrameFile } from '../api/ugoira'
+import { isNativeMode } from '../api/client'
 import { ugoiraMode } from '../stores/settingsStore'
 import { presentError } from '../utils/errorPresentation'
 
@@ -20,11 +23,21 @@ const currentSrc = ref('')
 const loading = ref(true)
 const errorMsg = ref('')
 
-let frames: UgoiraFrameData[] = []
+// 帧源统一抽象：web 用 dataUrl，原生用 url（file://）
+interface FrameLike {
+  src: string
+  delay: number
+}
+
+let frames: FrameLike[] = []
 let frameCursor = 0
 let timer: ReturnType<typeof setTimeout> | null = null
 let disposed = false
 let abort: AbortController | null = null
+
+function toFrameLike(list: UgoiraFrameData[] | UgoiraFrameFile[]): FrameLike[] {
+  return list.map((f) => ('dataUrl' in f ? { src: (f as UgoiraFrameData).dataUrl, delay: f.delay } : { src: (f as UgoiraFrameFile).url, delay: f.delay }))
+}
 
 function playFrom(index: number) {
   if (disposed) return
@@ -33,7 +46,7 @@ function playFrom(index: number) {
   const tick = () => {
     if (disposed || frames.length === 0) return
     const f = frames[frameCursor]!
-    currentSrc.value = f.dataUrl
+    currentSrc.value = f.src
     frameCursor = (frameCursor + 1) % frames.length
     timer = setTimeout(tick, f.delay)
   }
@@ -52,11 +65,16 @@ onMounted(async () => {
   errorMsg.value = ''
   abort = new AbortController()
   try {
-    frames = await downloadUgoiraFrames(props.illustId, ugoiraMode.value, abort.signal)
+    // 原生模式走 Java 解压写盘管线（ADR-0125）；web 模式走 fflate/range + base64。
+    // ugoiraMode 设置（fflate/range）仅对 web 模式生效（原生管线与其无关）。
+    const raw = isNativeMode()
+      ? await ugoiraExtractFrames(props.illustId, abort.signal)
+      : await downloadUgoiraFrames(props.illustId, ugoiraMode.value, abort.signal)
     if (disposed) {
       frames = [] // 已卸载：丢弃帧数组（不启动播放，防 timer/frames 泄漏）
       return
     }
+    frames = toFrameLike(raw)
     if (frames.length === 0) {
       errorMsg.value = '动图无帧数据'
     } else {

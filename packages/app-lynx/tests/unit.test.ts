@@ -11,7 +11,7 @@ import { isOAuthCredsInjected } from '../src/api/auth'
 import { getUserDetail, getUserFollowing, getUserFollowers, followUser, unfollowUser, loadUserListNext } from '../src/api/user'
 import { loadUserIllusts, loadFollow, loadBookmarks } from '../src/api/illust'
 import { loadUserNovels, loadBookmarks as loadNovelBookmarks, loadFollow as loadNovelFollow } from '../src/api/novel'
-import { bytesToDataUrl, downloadUgoiraFrames } from '../src/api/ugoira'
+import { bytesToDataUrl, downloadUgoiraFrames, ugoiraExtractFrames } from '../src/api/ugoira'
 import type { UgoiraExtractMode } from '../src/api/ugoira'
 import { ugoiraMode as lynxUgoiraMode, setUgoiraMode as lynxSetUgoiraMode } from '../src/stores/settingsStore'
 import { ME_A11Y_LABELS, LOGIN_A11Y_LABELS, UPDATE_A11Y_LABELS, ERROR_A11Y_LABELS, FAB_MENU_A11Y_LABELS, GLOBAL_FAB_A11Y_LABELS, WATCHLIST_A11Y_LABELS, WATCHLIST_PROMPT_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../src/utils/accessibility'
@@ -955,6 +955,80 @@ describe('T5 Ugoira 播放管线契约', () => {
     })
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 500 })))
     await expect(downloadUgoiraFrames(123)).rejects.toThrow('HTTP 500')
+  })
+})
+
+// ─── T7：原生解压写盘管线契约（ugoiraExtractFrames，ADR-0125） ───
+// 期望值来源：原型实测（docs/research/ugoira-native-pipeline-proto.md）——
+// ugoiraExtract 回调 JSON 为 52 帧 file:// URL 列表（4099 字符），
+// 单测用缩微样例（2 帧）验证契约形状，不重算被测逻辑。
+describe('T7 ugoiraExtractFrames（原生解压写盘）', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  function stubNativeExtract(impl: (zipUrl: string, framesJson: string, cb: (s: number, d: string) => void) => void) {
+    vi.stubGlobal('NativeModules', {
+      PictelioApi: { ugoiraExtract: impl },
+    } as never)
+  }
+
+  it('成功：调 ugoiraExtract 且绝对 CDN URL 直传（不经 proxyImageUrl），帧 URL+delay 按序映射', async () => {
+    vi.spyOn(apiClient, 'get').mockResolvedValue({
+      ugoira_metadata: {
+        zip_urls: { medium: 'https://i.pximg.net/img-zip-ugoira/z.zip' },
+        frames: [
+          { file: 'frame_0.png', delay: 100 },
+          { file: 'frame_1.png', delay: 120 },
+        ],
+      },
+    })
+    const calls: { url: string; json: string }[] = []
+    stubNativeExtract((url, json, cb) => {
+      calls.push({ url, json })
+      cb(0, JSON.stringify(['file:///data/user/0/io.pictelio.app/cache/ugoira/frame_0.jpg', 'file:///data/user/0/io.pictelio.app/cache/ugoira/frame_1.jpg']))
+    })
+    const frames = await ugoiraExtractFrames(123)
+    expect(calls[0]!.url).toBe('https://i.pximg.net/img-zip-ugoira/z.zip') // 原样绝对 URL（issue #218 修复）
+    expect(JSON.parse(calls[0]!.json)).toEqual([
+      { file: 'frame_0.png', delay: 100 },
+      { file: 'frame_1.png', delay: 120 },
+    ])
+    expect(frames).toEqual([
+      { url: 'file:///data/user/0/io.pictelio.app/cache/ugoira/frame_0.jpg', delay: 100 },
+      { url: 'file:///data/user/0/io.pictelio.app/cache/ugoira/frame_1.jpg', delay: 120 },
+    ])
+  })
+
+  it('失败：回调 status=1 → 抛可读错误（不静默降级）', async () => {
+    vi.spyOn(apiClient, 'get').mockResolvedValue({
+      ugoira_metadata: { zip_urls: { medium: 'https://i.pximg.net/z.zip' }, frames: [] },
+    })
+    stubNativeExtract((_url, _json, cb) => cb(1, 'HTTP 403'))
+    await expect(ugoiraExtractFrames(123)).rejects.toThrow('ugoira: HTTP 403')
+  })
+
+  it('失败：帧数不匹配 → 抛错（契约破坏必须可见）', async () => {
+    vi.spyOn(apiClient, 'get').mockResolvedValue({
+      ugoira_metadata: {
+        zip_urls: { medium: 'https://i.pximg.net/z.zip' },
+        frames: [
+          { file: 'frame_0.png', delay: 100 },
+          { file: 'frame_1.png', delay: 120 },
+        ],
+      },
+    })
+    stubNativeExtract((_url, _json, cb) => cb(0, JSON.stringify(['file:///x/frame_0.jpg'])))
+    await expect(ugoiraExtractFrames(123)).rejects.toThrow('ugoira: 帧数据缺失（期望 2，实际 1）')
+  })
+
+  it('失败：原生模块未注册 → 明确报错（防止误用为 web 模式）', async () => {
+    vi.spyOn(apiClient, 'get').mockResolvedValue({
+      ugoira_metadata: { zip_urls: { medium: 'https://i.pximg.net/z.zip' }, frames: [] },
+    })
+    vi.stubGlobal('NativeModules', {})
+    await expect(ugoiraExtractFrames(123)).rejects.toThrow('PictelioApi.ugoiraExtract 不可用')
   })
 })
 

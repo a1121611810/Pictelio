@@ -26,6 +26,7 @@ import com.lynx.tasm.image.model.ImageRequestInfo;
 import com.lynx.tasm.service.ILynxImageService;
 import com.lynx.tasm.service.IServiceProvider;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -196,7 +197,18 @@ public class PictelioImageService implements ILynxImageService {
     private void loadAndDeliver(final String url, final ImageRequestInfo requestInfo,
             final ImageLoadListener loadListener, final PixivImageLoader l) {
         try {
-            byte[] bytes = l.loadBytes(PixivImageLoader.rewriteUrl(url));
+            byte[] bytes;
+            if (url.startsWith("file://")) {
+                // 解压写盘管线（ADR-0125）：file:// 帧直接读盘，不走 OkHttp（file scheme 会被拒）。
+                // 白名单已由 canParseUrl 前置校验，此处防御性二次检查。
+                File f = new File(Uri.parse(url).getPath());
+                if (!isInUgoiraCacheDir(f)) {
+                    throw new IOException("file:// 路径不在 ugoira 缓存白名单内: " + url);
+                }
+                bytes = java.nio.file.Files.readAllBytes(f.toPath());
+            } else {
+                bytes = l.loadBytes(PixivImageLoader.rewriteUrl(url));
+            }
             Bitmap bitmap = decodeSampled(bytes);
             if (bitmap == null) {
                 loadListener.onFailure(0, new IOException("Bitmap 解码失败: " + url));
@@ -311,8 +323,34 @@ public class PictelioImageService implements ILynxImageService {
 
     @Override
     public boolean canParseUrl(String url) {
-        // 只接管 http(s) 与 /pixiv-img/ 代理路径；data:/file:/asset: 等交给其他通道/直接失败
-        return url != null && (url.startsWith("http") || url.contains("/pixiv-img/"));
+        // 只接管 http(s) 与 /pixiv-img/ 代理路径；data:/asset: 等交给其他通道/直接失败。
+        // file:// 仅放行 ugoira 缓存白名单（ADR-0125 解压写盘管线帧）。
+        if (url == null) return false;
+        if (url.startsWith("file://")) {
+            return isInUgoiraCacheDir(new File(Uri.parse(url).getPath()));
+        }
+        return url.startsWith("http") || url.contains("/pixiv-img/");
+    }
+
+    /** ugoira 帧缓存目录名（与 PictelioApiModule.ugoiraExtract 写盘路径契约一致） */
+    static final String UGOIRA_CACHE_DIR = "ugoira";
+
+    /**
+     * file:// 白名单：目标文件必须位于「应用缓存目录/ugoira/」内（防任意文件读取）。
+     * 校验规范化绝对路径前缀；cacheDir 未初始化时保守拒绝（canParseUrl 返回 false）。
+     */
+    private boolean isInUgoiraCacheDir(File f) {
+        if (f == null) return false;
+        try {
+            Context ctx = appContext;
+            if (ctx == null) return false;
+            File allowedDir = new File(ctx.getCacheDir(), UGOIRA_CACHE_DIR);
+            String allowed = allowedDir.getCanonicalPath();
+            String target = f.getCanonicalPath();
+            return target.startsWith(allowed + File.separator);
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     // ── Fresco 专用 API（不引 Fresco，空实现保持接口完整） ─────
