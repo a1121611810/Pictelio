@@ -433,6 +433,62 @@ it("downloadAndExtractUgoira range 模式：Range 返回长度不符 → 降级 
   }
 });
 
+it("downloadAndExtractUgoira range 模式：中帧失败释放已建 blob URL 再降级（code-review S1）", async () => {
+  mockGet.mockResolvedValue({
+    ugoira_metadata: {
+      zip_urls: { medium: "https://i.pximg.net/z.zip" },
+      frames: [
+        { file: "frame_0.png", delay: 100 },
+        { file: "frame_1.png", delay: 120 },
+      ],
+    },
+  });
+  // zip 缺 frame_1：range 路径在 i=1 抛错（此时 frame_0 的 blob 已建）→ 必须 revoke
+  const zip = buildStoreZip([{ name: "frame_0.png", data: new Uint8Array([1, 2, 3]) }]);
+  const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  const revokeSpy = vi.fn();
+  const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+    const range = (init?.headers as Record<string, string> | undefined)?.Range;
+    const m = /bytes=(\d+)-(\d+)/.exec(range ?? "");
+    if (m) {
+      const s = parseInt(m[1]!, 10);
+      const e = parseInt(m[2]!, 10);
+      if (s === 0 && e === 0) {
+        return new Response(new Uint8Array([zip[0]!]), {
+          status: 206,
+          headers: { "content-range": `bytes 0-0/${zip.length}` },
+        });
+      }
+      return new Response(zip.slice(s, e + 1), { status: 206 });
+    }
+    return new Response(zip, { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  const createObjectURL = vi.fn(() => "blob:leak-test");
+  // @ts-expect-error node URL 无 createObjectURL
+  URL.createObjectURL = createObjectURL;
+  // @ts-expect-error node URL 无 revokeObjectURL
+  URL.revokeObjectURL = revokeSpy;
+  try {
+    const { downloadAndExtractUgoira } = await loadApi();
+    // 降级后 fflate 对同一残缺 zip 也失败（缺帧 = zip 损坏，错误态正确）→ reject
+    await expect(downloadAndExtractUgoira(123, undefined, "range")).rejects.toThrow("缺少帧文件");
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[ugoira] range 取帧失败，降级 fflate:",
+      expect.stringContaining("缺少帧文件"),
+    );
+    // 已建帧 blob 必须释放（防降级路径泄漏）
+    expect(revokeSpy).toHaveBeenCalledWith("blob:leak-test");
+  } finally {
+    warnSpy.mockRestore();
+    vi.unstubAllGlobals();
+    // @ts-expect-error 清理
+    delete URL.createObjectURL;
+    // @ts-expect-error 清理
+    delete URL.revokeObjectURL;
+  }
+});
+
 it("downloadAndExtractUgoira range 模式：探测非 206 → 降级 fflate（ADR-0126）", async () => {
   mockGet.mockResolvedValue({
     ugoira_metadata: {

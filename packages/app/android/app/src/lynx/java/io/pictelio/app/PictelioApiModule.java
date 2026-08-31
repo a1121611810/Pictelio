@@ -356,7 +356,11 @@ public class PictelioApiModule extends LynxModule {
             return;
         }
         for (File f : children) {
-            if (f.isDirectory() && (f.listFiles() == null || f.listFiles().length == 0)) {
+            if (!f.isDirectory()) {
+                continue;
+            }
+            File[] inside = f.listFiles();
+            if (inside == null || inside.length == 0) {
                 f.delete();
             }
         }

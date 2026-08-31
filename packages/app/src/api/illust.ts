@@ -145,41 +145,49 @@ async function extractRange(
   const byName = new Map<string, UgoiraZipEntry>(entries.map((e) => [e.name, e]));
 
   // 4. 逐帧取（每帧 2 次小 Range：本地头 → 数据；load-ahead 预取下一帧本地头）
+  // 失败（含降级路径）时释放已创建的帧 blob URL，防泄漏（code-review S1 发现）
   const fileOrder = meta.frames.map((f) => f.file);
   const extracted: UgoiraFrame[] = [];
   const blobUrls: string[] = [];
   let nextLocal: Promise<{ entry: UgoiraZipEntry; local: Uint8Array }> | null = null;
-  for (let i = 0; i < fileOrder.length; i++) {
-    const entry = byName.get(fileOrder[i]!);
-    if (!entry) throw new Error(`ugoira: zip 缺少帧文件 ${fileOrder[i]}`);
-    // 本地头（load-ahead 已预取则直接用）
-    const local = nextLocal
-      ? (await nextLocal).local
-      : await fetchRange(zipUrl, entry.offset, entry.offset + 29);
-    const dataOff = computeFrameOffsetFromLocal(local);
-    const dataPromise = fetchRange(
-      zipUrl,
-      entry.offset + dataOff,
-      entry.offset + dataOff + entry.compSize - 1,
-    );
-    // 预取下一帧本地头（与当前帧数据请求并行）
-    const nextEntry = i + 1 < fileOrder.length ? byName.get(fileOrder[i + 1]!) : undefined;
-    nextLocal = nextEntry
-      ? (async () => ({
-          entry: nextEntry,
-          local: await fetchRange(zipUrl, nextEntry.offset, nextEntry.offset + 29),
-        }))()
-      : null;
-    const bytes = await dataPromise;
-    if (bytes.length !== entry.compSize) {
-      throw new Error(`ugoira: Range 帧数据长度不符 (${bytes.length}/${entry.compSize})`);
+  try {
+    for (let i = 0; i < fileOrder.length; i++) {
+      const entry = byName.get(fileOrder[i]!);
+      if (!entry) throw new Error(`ugoira: zip 缺少帧文件 ${fileOrder[i]}`);
+      // 本地头（load-ahead 已预取则直接用）
+      const local = nextLocal
+        ? (await nextLocal).local
+        : await fetchRange(zipUrl, entry.offset, entry.offset + 29);
+      const dataOff = computeFrameOffsetFromLocal(local);
+      const dataPromise = fetchRange(
+        zipUrl,
+        entry.offset + dataOff,
+        entry.offset + dataOff + entry.compSize - 1,
+      );
+      // 预取下一帧本地头（与当前帧数据请求并行）
+      const nextEntry = i + 1 < fileOrder.length ? byName.get(fileOrder[i + 1]!) : undefined;
+      nextLocal = nextEntry
+        ? (async () => ({
+            entry: nextEntry,
+            local: await fetchRange(zipUrl, nextEntry.offset, nextEntry.offset + 29),
+          }))()
+        : null;
+      const bytes = await dataPromise;
+      if (bytes.length !== entry.compSize) {
+        throw new Error(`ugoira: Range 帧数据长度不符 (${bytes.length}/${entry.compSize})`);
+      }
+      // store 直接切片；deflate 用 fflate inflateSync fallback
+      const frameBytes = entry.compMethod === 0 ? bytes : deflateInflate(bytes);
+      const url = URL.createObjectURL(new Blob([new Uint8Array(frameBytes)]));
+      blobUrls.push(url);
+      extracted.push({ url, delay: meta.frames[i]!.delay });
+      onProgress?.(20 + Math.round(((i + 1) / fileOrder.length) * 80));
     }
-    // store 直接切片；deflate 用 fflate inflateSync fallback
-    const frameBytes = entry.compMethod === 0 ? bytes : deflateInflate(bytes);
-    const url = URL.createObjectURL(new Blob([new Uint8Array(frameBytes)]));
-    blobUrls.push(url);
-    extracted.push({ url, delay: meta.frames[i]!.delay });
-    onProgress?.(20 + Math.round(((i + 1) / fileOrder.length) * 80));
+  } catch (err) {
+    for (const url of blobUrls) {
+      URL.revokeObjectURL(url);
+    }
+    throw err;
   }
   if (extracted.length === 0) {
     throw new Error("No frames found in ZIP");
