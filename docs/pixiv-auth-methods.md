@@ -447,16 +447,17 @@ The `HASH_SECRET` value is: `28c1fdd170a5204386cb1313c7077b34f83e4aaf4aa829ce78c
 |---|---|---|
 | `password` | ❌ | Not implemented |
 | `refresh_token` | ✅ **Primary** | `refreshToken()` in `packages/app/src/api/auth.ts`, also native Android via `AuthPlugin.java` |
-| `authorization_code` | ❌ | Not implemented (users paste refresh_token directly in login UI) |
+| `authorization_code` | ✅ | PKCE web login via `OAuthPlugin.java` (native Android WebView) + `pkceAuth.ts` — "通过 Pixiv 登录" button in `Login.tsx` |
 
 #### Key files:
 - `packages/app/src/api/auth.ts` — `refreshToken()` with web dev fallback
 - `packages/app/android/app/src/main/java/io/pictelio/app/AuthPlugin.java` — Native Android refresh
 - `packages/app/src/stores/authStore.ts` — Auth state management
-- `packages/app/src/routes/Login.tsx` — Login UI (single refresh_token input)
+- `packages/app/src/routes/Login.tsx` — Login UI (refresh_token input + "通过 Pixiv 登录" PKCE button)
+- `packages/app/android/app/src/webview/java/io/pictelio/app/OAuthPlugin.java` — Native PKCE WebView login + code exchange
 
 #### Notable implementation details:
-- **No initial token acquisition flow** — users must obtain their own refresh_token externally (via gppt, browser dev tools, or another tool).
+- **Initial token acquisition:** PKCE web login via in-app WebView (OAuthPlugin) — user logs in on pixiv account page. Refresh_token can also be pasted directly (advanced mode).
 - **Dual refresh implementation:** Native Capacitor plugin on Android, JS fetch via Vite proxy in web dev mode.
 - **Shared retry mechanism:** All concurrent 401 errors share a single `refreshPromise` to avoid duplicate token refreshes.
 - **Secure storage:** Tokens stored in Android Keystore via `@aparajita/capacitor-secure-storage`.
@@ -470,11 +471,11 @@ The `HASH_SECRET` value is: `28c1fdd170a5204386cb1313c7077b34f83e4aaf4aa829ce78c
 | **Language** | Python | Python | Dart/Flutter | Python | TypeScript |
 | **Password grant** | ❌ (README says no) | ❌ (raises LoginError) | ⚠️ (code present) | ❌ | ❌ |
 | **Refresh token grant** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Auth code + PKCE** | ❌ (manual) | ✅ (manual code input) | ✅ (in-app WebView) | ✅ (Playwright) | ❌ |
+| **Auth code + PKCE** | ❌ (manual) | ✅ (manual code input) | ✅ (in-app WebView) | ✅ (Playwright) | ✅ (in-app WebView) |
 | **X-Client-Time/Hash** | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Auto-refresh on 401** | ❌ | ❌ | ✅ (interceptor) | ❌ | ✅ |
 | **Platform-specific UA** | iOS hardcoded | Android hardcoded | Android dynamic | iOS hardcoded | iOS hardcoded |
-| **Initial token flow** | External tool | URL + code prompt | WebView login | Playwright auto | External tool |
+| **Initial token flow** | External tool | URL + code prompt | WebView login | Playwright auto | WebView login |
 | **Cloudflare bypass** | cloudscraper | aiohttp | Rhttp custom | None needed (Playwright) | None (native) |
 | **Secures token storage** | No | No | SQLite/SharedPrefs | N/A (one-shot) | ✅ Android Keystore |
 
@@ -502,9 +503,7 @@ The `HASH_SECRET` value is: `28c1fdd170a5204386cb1313c7077b34f83e4aaf4aa829ce78c
 
 ### What the pixivizer project is missing
 
-1. **No authorization_code PKCE flow** — Users must obtain a refresh_token through external means.
-2. **No in-app browser-based login** — No WebView or system browser integration for one-click login.
-3. **No password fallback** — This is by design and appropriate given Pixiv's restrictions.
+1. **No password fallback** — This is by design and appropriate given Pixiv's restrictions.
 
 ### Recommendations for improving auth
 

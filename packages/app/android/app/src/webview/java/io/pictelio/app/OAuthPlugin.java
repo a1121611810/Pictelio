@@ -85,13 +85,9 @@ public class OAuthPlugin extends Plugin {
         String loginUrl = call.getString("loginUrl");
         String codeChallenge = call.getString("codeChallenge");
 
-        // 若提供了 codeChallenge 但无 loginUrl，从 OAuthConfig 构建完整 URL
+        // 若提供了 codeChallenge 但无 loginUrl，从 OAuthConfig 构建完整 URL（见纯函数 buildLoginUrl）
         if ((loginUrl == null || loginUrl.isEmpty()) && codeChallenge != null && !codeChallenge.isEmpty()) {
-            loginUrl = OAuthConfig.LOGIN_URL
-                + "?client_id=" + OAuthConfig.CLIENT_ID
-                + "&code_challenge=" + codeChallenge
-                + "&code_challenge_method=S256&response_type=code&redirect_uri="
-                + OAuthConfig.REDIRECT_URI;
+            loginUrl = buildLoginUrl(codeChallenge);
         }
 
         if (loginUrl == null || loginUrl.isEmpty()) {
@@ -322,6 +318,36 @@ public class OAuthPlugin extends Plugin {
     }
 
     // ── 工具方法 ──
+
+    /** Pixiv web PKCE 登录规范（2024+）固定参数，勿改动（改即被服务器 400）。 */
+    private static final String WEB_LOGIN_CLIENT = "pixiv-android";
+    private static final String WEB_LOGIN_CHALLENGE_METHOD = "S256";
+
+    /**
+     * 构建 Pixiv web PKCE 登录 URL（纯函数，便于 JVM 单测）。
+     *
+     * Pixiv web 登录规范（2024+）：app-api.pixiv.net/web/v1/login 仅接受
+     * code_challenge + code_challenge_method=S256 + client=pixiv-android 三个参数。
+     * 服务器对合法请求 302 → accounts.pixiv.net 登录页，登录完成后按上游实现预期
+     * （Gallery-dl OAuthPixiv）回调落在 OAuthConfig.REDIRECT_URI，携带 code= 参数
+     * 与 extractCode 的拦截逻辑匹配。
+     * 旧规范（client_id + response_type + redirect_uri）已被服务器 400
+     * 「不正なリクエストです」拒绝（模拟器实测 2026-08-31，溯源 Gallery-dl OAuthPixiv
+     * 与 pixez-flutter 现行实现）。
+     *
+     * @param codeChallenge PKCE code_challenge，调用方保证非空
+     * @return 完整登录 URL
+     * @throws IllegalArgumentException codeChallenge 为 null/空（防御性校验，调用方已保证不可达）
+     */
+    static String buildLoginUrl(String codeChallenge) {
+        if (codeChallenge == null || codeChallenge.isEmpty()) {
+            throw new IllegalArgumentException("codeChallenge must not be empty");
+        }
+        return OAuthConfig.LOGIN_URL
+                + "?code_challenge=" + codeChallenge
+                + "&code_challenge_method=" + WEB_LOGIN_CHALLENGE_METHOD
+                + "&client=" + WEB_LOGIN_CLIENT;
+    }
 
     /**
      * 从回调 URL 中提取 authorization_code。
