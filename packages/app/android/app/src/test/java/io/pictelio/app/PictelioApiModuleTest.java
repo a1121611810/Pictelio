@@ -1,6 +1,8 @@
 package io.pictelio.app;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -151,5 +153,61 @@ public class PictelioApiModuleTest {
         // 清理后帧数应回落（≥ 当前作品的 1 帧 + 最近保留）
         int remaining = dir.listFiles().length;
         assertTrue("清理后应显著减少（当前 " + remaining + "）", remaining <= 301);
+    }
+
+    // ── ADR-0126：缓存命中（零下载）+ per-illust 目录 ──
+
+    @Test
+    public void cached_hit_returnsUrlsWithoutDownload() throws Exception {
+        File dir = tmp.newFolder("cache", "ugoira", "123456");
+        writeFrame(dir, "frame_0.png", "X");
+        writeFrame(dir, "frame_1.png", "Y");
+        JSONArray urls = PictelioApiModule.ugoiraExtractCached(dir, framesJson("frame_0.png", "frame_1.png"));
+        assertNotNull("帧完整应命中", urls);
+        assertEquals(2, urls.length());
+        assertTrue(urls.getString(0).endsWith("frame_0.png"));
+        assertTrue(urls.getString(0).startsWith("file://"));
+        // 命中路径不写盘不清理：文件内容不变（零 IO 语义）
+        assertEquals("X", new String(java.nio.file.Files.readAllBytes(
+                new File(dir, "frame_0.png").toPath()), StandardCharsets.UTF_8));
+    }
+
+    @Test
+    public void cached_partialFrames_miss() throws Exception {
+        File dir = tmp.newFolder("cache", "ugoira", "123456");
+        writeFrame(dir, "frame_0.png", "X");
+        // 少一帧 → 未命中（需重解压写盘）
+        assertNull(PictelioApiModule.ugoiraExtractCached(dir, framesJson("frame_0.png", "frame_1.png")));
+    }
+
+    @Test
+    public void cached_emptyFrame_miss() throws Exception {
+        File dir = tmp.newFolder("cache", "ugoira", "123456");
+        writeFrame(dir, "frame_0.png", "X");
+        writeFrame(dir, "frame_1.png", ""); // 空文件 → 视为损坏帧 → 未命中
+        assertNull(PictelioApiModule.ugoiraExtractCached(dir, framesJson("frame_0.png", "frame_1.png")));
+    }
+
+    @Test
+    public void cached_dirAbsent_miss() throws Exception {
+        File dir = new File(tmp.getRoot(), "never-created");
+        assertNull(PictelioApiModule.ugoiraExtractCached(dir, framesJson("frame_0.png")));
+    }
+
+    @Test
+    public void cached_invalidFramesJson_throws() throws Exception {
+        File dir = tmp.newFolder("cache", "ugoira", "123456");
+        try {
+            PictelioApiModule.ugoiraExtractCached(dir, "{not-json");
+            fail("应抛帧列表解析失败");
+        } catch (IOException e) {
+            assertEquals("帧列表解析失败", e.getMessage());
+        }
+    }
+
+    private static void writeFrame(File dir, String name, String content) throws IOException {
+        try (FileOutputStream fos = new FileOutputStream(new File(dir, name))) {
+            fos.write(content.getBytes(StandardCharsets.UTF_8));
+        }
     }
 }
