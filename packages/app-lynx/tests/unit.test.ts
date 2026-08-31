@@ -968,7 +968,7 @@ describe('T7 ugoiraExtractFrames（原生解压写盘）', () => {
     vi.unstubAllGlobals()
   })
 
-  function stubNativeExtract(impl: (zipUrl: string, framesJson: string, cb: (s: number, d: string) => void) => void) {
+  function stubNativeExtract(impl: (zipUrl: string, framesJson: string, illustId: string, cb: (s: number, d: string) => void) => void) {
     vi.stubGlobal('NativeModules', {
       PictelioApi: { ugoiraExtract: impl },
     } as never)
@@ -985,9 +985,9 @@ describe('T7 ugoiraExtractFrames（原生解压写盘）', () => {
       },
     })
     // 扩展名契约（spec「帧 URL 形态」+ Java 已测）：.png 条目 → frame_N.png；非 .png → .jpg
-    const calls: { url: string; json: string }[] = []
-    stubNativeExtract((url, json, cb) => {
-      calls.push({ url, json })
+    const calls: { url: string; json: string; illustId: string }[] = []
+    stubNativeExtract((url, json, illustId, cb) => {
+      calls.push({ url, json, illustId })
       cb(0, JSON.stringify([
         'file:///data/user/0/io.pictelio.app/cache/ugoira/frame_0.png',
         'file:///data/user/0/io.pictelio.app/cache/ugoira/frame_1.jpg',
@@ -995,6 +995,7 @@ describe('T7 ugoiraExtractFrames（原生解压写盘）', () => {
     })
     const bundle = await ugoiraExtractFrames(123)
     expect(calls[0]!.url).toBe('https://i.pximg.net/img-zip-ugoira/z.zip') // 原样绝对 URL（issue #218 修复）
+    expect(calls[0]!.illustId).toBe('123') // ADR-0126：缓存目录命名空间
     expect(JSON.parse(calls[0]!.json)).toEqual([
       { file: 'frame_0.png', delay: 100 },
       { file: 'frame_1.png', delay: 120 },
@@ -1012,7 +1013,7 @@ describe('T7 ugoiraExtractFrames（原生解压写盘）', () => {
     vi.spyOn(apiClient, 'get').mockResolvedValue({
       ugoira_metadata: { zip_urls: { medium: 'https://i.pximg.net/z.zip' }, frames: [] },
     })
-    stubNativeExtract((_url, _json, cb) => cb(1, 'HTTP 403'))
+    stubNativeExtract((_url, _json, _illustId, cb) => cb(1, 'HTTP 403'))
     await expect(ugoiraExtractFrames(123)).rejects.toThrow('ugoira: HTTP 403')
   })
 
@@ -1026,7 +1027,7 @@ describe('T7 ugoiraExtractFrames（原生解压写盘）', () => {
         ],
       },
     })
-    stubNativeExtract((_url, _json, cb) => cb(0, JSON.stringify(['file:///x/frame_0.jpg'])))
+    stubNativeExtract((_url, _json, _illustId, cb) => cb(0, JSON.stringify(['file:///x/frame_0.jpg'])))
     await expect(ugoiraExtractFrames(123)).rejects.toThrow('ugoira: 帧数据缺失（期望 2，实际 1）')
   })
 
@@ -1042,7 +1043,7 @@ describe('T7 ugoiraExtractFrames（原生解压写盘）', () => {
     vi.spyOn(apiClient, 'get').mockResolvedValue({
       ugoira_metadata: { zip_urls: { medium: 'https://i.pximg.net/z.zip' }, frames: [] },
     })
-    stubNativeExtract((_url, _json, cb) => cb(0, 'not-json'))
+    stubNativeExtract((_url, _json, _illustId, cb) => cb(0, 'not-json'))
     await expect(ugoiraExtractFrames(123)).rejects.toThrow('ugoira: 帧 URL 列表解析失败')
   })
 })

@@ -106,7 +106,7 @@ const SettingsImage: Component = () => {
           ))}
         </div>
         <p class="mt-1 text-[var(--fontSizeBase100)] text-[var(--colorNeutralForeground3)] leading-snug">
-          Range 流式按需取帧、内存更低；原生端依赖 Range 支持，个别网络环境可能更慢。
+          Range 流式按需取帧、内存更低；原生端（WebView）自动降级为全量，失败不中断播放。
         </p>
       </div>
 

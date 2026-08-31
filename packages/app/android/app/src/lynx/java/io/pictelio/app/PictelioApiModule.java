@@ -107,43 +107,49 @@ public class PictelioApiModule extends LynxModule {
     }
 
     /**
-     * ugoira 解压写盘（ADR-0125，正式实现，替代原型 ProtoExtractUgoira）：Java 下载 zip →
-     * 单次扫描解压 → 按 framesJson 时序写帧到 {@code cache/ugoira/frame_N.{png|jpg}} →
-     * 回传帧 file:// URL 列表。
-     *
-     * <p>与原型差异（硬化点）：
-     * <ul>
-     *   <li>zip 条目只全量扫描<b>一次</b>（原型每个帧重新创建 ZipInputStream 全量扫描 52 次，
-     *       低效）；扫描结果按「条目名 → 帧字节」缓存，再按 framesJson 顺序逐帧输出</li>
-     *   <li>{@code https://} 白名单（防 file:// 等 scheme 注入）</li>
-     *   <li>写盘前 LRU 式缓存清理（数 < 300 / 大小 &lt; 50MB）</li>
-     *   <li>帧文件名与 zip 条目名匹配，扩展名由条目名后缀判定（.png 否则 .jpg）</li>
-     * </ul>
+     * ugoira 解压写盘（ADR-0125 + ADR-0126 缓存命中）：Java 下载 zip → 单次扫描解压 →
+     * 按 framesJson 时序写帧到 {@code cache/ugoira/<illustId>/frame_N.{png|jpg}} →
+     * 回传帧 file:// URL 列表。**帧文件完整（数与帧列表一致且非空）时零下载直回 URL 列表**
+     * （兑现 ADR-0125「二次播放零下载」；目录按 illustId 隔离，跨作品帧不串）。
      *
      * <p>回调：{@code cb(0, jsonUrls)} 成功；{@code cb(1, errMsg)} 失败（errMsg 可读：
      * HTTP 码 / zip 损坏 / 缺帧 / IO 错误；为空时降级异常类名）。异步执行于 {@link #API_EXECUTOR}。
      *
-     * @param zipUrl     绝对 https URL（ugoira zip）
+     * @param zipUrl     绝对 https URL（ugoira zip；仅接受 https，防 scheme 注入）
      * @param framesJson {@code meta.frames} JSON 数组字符串（服务端时序），
      *                   如 {@code [{"file":"a.png","delay":125},...]}
+     * @param illustId   ugoira 作品 ID（纯数字；缓存目录命名空间，防路径注入）
      */
     @LynxMethod
-    public void ugoiraExtract(String zipUrl, String framesJson, Callback callback) {
+    public void ugoiraExtract(String zipUrl, String framesJson, String illustId, Callback callback) {
         // 白名单防御：zip 只接受绝对 https URL（防 file://、相对路径等 scheme 注入）。
         if (zipUrl == null || !zipUrl.startsWith("https://")) {
             callback.invoke(1, "非法 zip URL（仅接受 https:// 绝对地址）");
             return;
         }
+        if (illustId == null || !illustId.matches("\\d+")) {
+            callback.invoke(1, "非法 illustId（仅接受数字）");
+            return;
+        }
         API_EXECUTOR.execute(() -> {
             try {
-                // 1) 下载 zip（注入 Referer/UA）；非 2xx → 抛 "HTTP xxx"
-                byte[] zipBytes = downloadZip(zipUrl);
                 Context ctx = appContext();
                 if (ctx == null) {
                     throw new IOException("上下文不可用");
                 }
-                // 2) 核心：解析帧列表 → 清理 → 单次解压 → 按时序写盘 → 帧 URL 列表
-                JSONArray urls = ugoiraExtractCore(zipBytes, framesJson, new File(ctx.getCacheDir(), PictelioImageService.UGOIRA_CACHE_DIR));
+                File dir = new File(new File(ctx.getCacheDir(), PictelioImageService.UGOIRA_CACHE_DIR), illustId);
+                // 1) 缓存命中（帧完整）→ 零下载直回 URL 列表
+                JSONArray cached = ugoiraExtractCached(dir, framesJson);
+                if (cached != null) {
+                    Log.i(TAG, "ugoiraExtract 缓存命中: " + illustId + " (" + cached.length() + " 帧)");
+                    callback.invoke(0, cached.toString());
+                    return;
+                }
+                // 2) 未命中：下载 zip（注入 Referer/UA）；非 2xx → 抛 "HTTP xxx"
+                Log.i(TAG, "ugoiraExtract 下载解压: " + illustId);
+                byte[] zipBytes = downloadZip(zipUrl);
+                // 3) 核心：解析帧列表 → 清理 → 单次解压 → 按时序写盘 → 帧 URL 列表
+                JSONArray urls = ugoiraExtractCore(zipBytes, framesJson, dir);
                 callback.invoke(0, urls.toString());
             } catch (Throwable e) {
                 Log.w(TAG, "ugoiraExtract 失败: " + zipUrl, e);
@@ -152,6 +158,44 @@ public class PictelioApiModule extends LynxModule {
                 callback.invoke(1, errMsg);
             }
         });
+    }
+
+    /**
+     * ugoira 缓存命中判定（package-private 静态，可测核心）：目录内帧文件与帧列表
+     * 逐位匹配（数量一致、全部存在且非空）→ 返回帧 file:// URL 列表；否则返回 null（调用方走下载）。
+     *
+     * @param dir        作品缓存目录 {@code cache/ugoira/<illustId>}
+     * @param framesJson {@code meta.frames} JSON 数组字符串
+     * @return 命中：帧 URL JSONArray（与 framesJson 同序）；未命中：null
+     * @throws IOException 帧列表解析失败
+     */
+    static JSONArray ugoiraExtractCached(File dir, String framesJson) throws IOException {
+        JSONArray frames = parseFrames(framesJson);
+        if (!dir.isDirectory()) {
+            return null;
+        }
+        JSONArray urls = new JSONArray();
+        for (int i = 0; i < frames.length(); i++) {
+            try {
+                JSONObject frame = frames.getJSONObject(i);
+                String name = frame.getString("file");
+                File f = new File(dir, frameFileName(i, name));
+                if (!f.isFile() || f.length() == 0) {
+                    return null;
+                }
+                urls.put("file://" + f.getAbsolutePath());
+            } catch (org.json.JSONException e) {
+                // 条目缺 file 字段 / 帧元素非对象 → 视为帧列表契约破坏（可读错误）
+                throw new IOException("帧列表解析失败", e);
+            }
+        }
+        return urls;
+    }
+
+    /** 帧文件名（目录内平铺）：{@code frame_N.{png|jpg}}，扩展名由 zip 条目名后缀判定 */
+    private static String frameFileName(int i, String entryName) {
+        String ext = entryName.toLowerCase(Locale.ROOT).endsWith(".png") ? ".png" : ".jpg";
+        return "frame_" + i + ext;
     }
 
     /**
@@ -171,7 +215,11 @@ public class PictelioApiModule extends LynxModule {
         if (!dir.exists() && !dir.mkdirs()) {
             throw new IOException("无法创建 ugoira 缓存目录");
         }
-        cleanupOldFrames(dir);
+        // 清理按外层根目录统计（per-illust 子目录递归），避免误删当前作品帧
+        File root = dir.getParentFile();
+        if (root != null) {
+            cleanupOldFrames(root);
+        }
         // 单次解压扫描：条目名 → 帧字节（避免每个帧重新创建 ZipInputStream 全量扫描）
         Map<String, byte[]> entries = scanZip(zipBytes);
         // 按 framesJson 时序逐帧输出（帧名须与 zip 条目名匹配，否则视为缺帧）
@@ -184,8 +232,7 @@ public class PictelioApiModule extends LynxModule {
                 if (data == null) {
                     throw new IOException("zip 缺少帧文件 " + name);
                 }
-                String ext = name.toLowerCase(Locale.ROOT).endsWith(".png") ? ".png" : ".jpg";
-                File out = new File(dir, "frame_" + i + ext);
+                File out = new File(dir, frameFileName(i, name));
                 writeFile(out, data);
                 // file:// + 绝对路径（与 PictelioImageService.file:// 白名单一致）
                 urls.put("file://" + out.getAbsolutePath());
@@ -258,11 +305,10 @@ public class PictelioApiModule extends LynxModule {
      */
     private static void cleanupOldFrames(File dir) {
         try {
-            File[] files = dir.listFiles();
-            if (files == null) {
-                return;
-            }
-            long count = files.length;
+            // 递归收集帧文件（per-illust 子目录结构，ADR-0126）：子目录本身不计入大小
+            java.util.List<File> files = new java.util.ArrayList<>();
+            collectFrameFiles(dir, files);
+            long count = files.size();
             long total = 0;
             for (File f : files) {
                 total += f.length();
@@ -270,7 +316,7 @@ public class PictelioApiModule extends LynxModule {
             if (count <= UGOIRA_MAX_COUNT && total <= UGOIRA_MAX_BYTES) {
                 return;
             }
-            Arrays.sort(files, Comparator.comparingLong(File::lastModified));
+            files.sort(Comparator.comparingLong(File::lastModified));
             for (File f : files) {
                 if (count <= UGOIRA_MAX_COUNT && total <= UGOIRA_MAX_BYTES) {
                     break;
@@ -281,8 +327,42 @@ public class PictelioApiModule extends LynxModule {
                     total -= len;
                 }
             }
+            // 空作品目录一并清掉（避免目录堆积）
+            deleteEmptySubdirs(dir);
         } catch (Throwable t) {
             Log.w(TAG, "ugoira 缓存清理失败（不影响播放）", t);
+        }
+    }
+
+    /** 递归收集目录下全部文件（帧；跳过子目录本身） */
+    private static void collectFrameFiles(File dir, java.util.List<File> out) {
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File f : children) {
+            if (f.isDirectory()) {
+                collectFrameFiles(f, out);
+            } else {
+                out.add(f);
+            }
+        }
+    }
+
+    /** 删除空的 per-illust 子目录（其内帧文件已被清理） */
+    private static void deleteEmptySubdirs(File root) {
+        File[] children = root.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File f : children) {
+            if (!f.isDirectory()) {
+                continue;
+            }
+            File[] inside = f.listFiles();
+            if (inside == null || inside.length == 0) {
+                f.delete();
+            }
         }
     }
 
