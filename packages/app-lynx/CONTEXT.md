@@ -167,6 +167,7 @@ _Avoid_: 换双 `<image>` 层叠/onLoad 门控（实测引入隐藏层首载停�
 
 **帧提取模式（frame extract mode）**：
 `ugoiraMode` 设置项的两个取值：`fflate`（默认，JS 全量解压）与 `range`（Range 流式取帧）。**当前仅 web 模式生效**——原生模式走解压写盘管线，`ugoiraMode` 对其无意义；设置项保留用于 web 模式（Me 页切换）。web 模式 range 失败（非 206 / 长度不符 / 网络错）自动**降级 fflate** 并 `console.warn`（禁止静默降级，2026-08-31 与 app 侧对齐）。
+_Avoid_: 混淆「流式取帧」与「Range 流式取帧」——共享包 `createStreamFrameSource`（ADR-0127，走全量 200 通道增量解压）本端暂不消费（原生走 Java 解压写盘、web 保持全量），语义见 `packages/app/CONTEXT.md`
 
 **代理路径与原生 fetch（proxy path vs native fetch）【2026-08-31 新增】**：
 `/pixiv-img/` 相对路径在原生 LynxView 模式下**不是合法 fetch 目标**（LynxFetchModule 拒绝无 scheme URL，issue #218）；原生模式的图片/文件下载 URL 必须是绝对 CDN URL（`https://i.pximg.net/...`）且**必须带 `Referer: https://app-api.pixiv.net/` 头**（无 Referer → 403，原型 A 方案实测）。

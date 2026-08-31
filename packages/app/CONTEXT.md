@@ -93,6 +93,17 @@ _Avoid_: 把「换帧闪烁」归因于帧调度器或数据层（根因是 Lynx
 `extractRange`（官方 zip_player 语义：探测总长 → 尾部目录 → 按帧 Range）失败（非 206 / 长度不符 / 网络错）时降级 `fflate` 全量并 `console.warn`（禁止静默降级），与 lynx 侧 `downloadUgoiraFrames` 对称。**背景**：Web dev（Vite 代理）Range 全真流式；Android WebView 的 `shouldInterceptRequest` 对拦截响应做 `206` 透传时损坏（2026-08-31 CDP 实测：start>0 响应截断为 1 字节或 `net::ERR_FAILED`），range 无法经 `/pixiv-img/` 拦截器流式工作——降级是原生端 range 的既定语义（详见 ADR-0126）。
 _Avoid_: 在 Android 端把 range 当作真实流式（需要它的人应改 Vite 代理/服务端类方案，非本项目范围）
 
+**流式取帧（stream frame extraction）【2026-08-31，跨上下文，共享数据层】**
+`@pictelio/ugoira` 的流式取帧器（`createStreamFrameSource`，ADR-0127）：zip 字节**分片喂入**（`push(chunk, final)`）即增量产出帧（`onFrame(name, bytes)`），**不需要 zip 全量**；帧按 `fileOrder` 顺序回调（乱序条目内部缓冲、非帧条目丢弃）；zip 损坏时 `push` 抛可读错误（调用方回退全量路径）。原型实测（148861562）：帧 0 在下载 1.9% 时即可用，与 unzipSync 全量路径逐字节一致。app 侧 fflate 模式基于它实现渐进播放；lynx 侧暂不消费（原生走 Java 解压写盘，web 模式保持全量）。
+_Avoid_: 把「流式取帧」与「Range 流式取帧」混用——前者走全量 200 通道在下载中解压（Android 可用），后者依赖 206（Android 拦截层不可用，见上）
+
+**渐进播放（progressive playback）【2026-08-31】**
+动图播放模式：**首帧就绪即开始播放，后续帧就绪追加**到播放帧列表，播放器到列表尾部时等待新帧（不停止不报错）。与「全帧就绪才播」相对（后者是现状/`preloadedFrames` 静态路径）。仅 app（webview）侧 fflate 模式使用（ADR-0127）。
+_Avoid_: 把渐进播放当作 Range 按需取帧（传输仍是全量下载一次，只是解压与播放提前）
+
+**帧就绪（frame ready）【2026-08-31】**
+帧字节完整、可渲染的时刻（流式取帧的 `ondata(final)` 语义；与 fflate `onfile`「本地头到齐」区分——播放器只消费帧就绪事件）。
+
 **多图（Multi-page）**：
 一个作品包含多张图片，判定条件为 `illust.page_count > 1`。与动图独立判定、允许并存（异常数据同时满足时两个标识都显示，动图在前）。
 _Avoid_: 多页（与小说分页语义混淆）
