@@ -119,10 +119,11 @@ const SettingsImage: Component = () => {
         <div slot="title">切换到 Range 流式？</div>
         <div slot="content" class="flex flex-col gap-2">
           <p class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)] leading-snug">
-            Range 流式按需取帧、内存占用更低，但依赖服务器与原生端对 Range 请求的支持。
+            Range 流式按需取帧、内存占用更低；若 Range 请求失败将自动切换为 fflate
+            全量播放（原生端/WebView 恒走自动切换），不中断播放。
           </p>
           <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-            确认切换后，动图将使用 Range 流式方案播放。
+            确认切换后，动图将优先使用 Range 流式方案。
           </p>
         </div>
         <fluent-button

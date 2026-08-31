@@ -267,7 +267,7 @@ function toggleR18G() {
           </view>
         </view>
         <text class="text-label-medium text-surface-on-variant mt-2 leading-snug">
-          Range 流式按需取帧、内存更低；原生端依赖 Range 支持，个别网络环境可能更慢。
+          Range 流式按需取帧、内存更低；若 Range 请求失败将自动切换为 fflate 全量播放（网页端），不中断。原生模式不受本设置影响。
         </text>
       </view>
 
