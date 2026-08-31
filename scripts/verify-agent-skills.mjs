@@ -15,7 +15,13 @@ const skillsRoot = join(root, ".agents", "skills");
 
 // 目录名 → 必须出现的子串（维护：新增关键检查段落时在此登记）
 const REQUIRED_MARKERS = {
-  "code-review": ["Oracle check", "Test strength", "期望值"],
+  "code-review": [
+    "Oracle check",
+    "Test strength",
+    "期望值",
+    "调用点完备性",
+    "机器防线",
+  ],
 };
 
 function parseFrontmatter(text) {
