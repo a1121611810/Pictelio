@@ -72,6 +72,15 @@ public class PictelioApiModule extends LynxModule {
     /** ugoira 缓存清理：总大小上限（50MB）——超过则按 lastModified 删除最旧帧 */
     private static final long UGOIRA_MAX_BYTES = 50L * 1024 * 1024;
 
+    /** ADR-0128：流式渐进引擎（薄包装见 ugoiraExtractStream/Poll/Cancel；可测核心见 UgoiraStreamEngine） */
+    private final UgoiraStreamEngine streamEngine = new UgoiraStreamEngine(API_EXECUTOR, framesJson -> {
+        try {
+            return parseFrames(framesJson).length();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    });
+
     public PictelioApiModule(Context context) {
         super(context);
     }
@@ -160,6 +169,81 @@ public class PictelioApiModule extends LynxModule {
         });
     }
 
+    // ── ADR-0128：流式渐进（拉模式状态机薄包装；核心见 UgoiraStreamEngine） ──
+
+    /**
+     * 启动流式渐进（ADR-0128）：Java 流式下载 → 边解压边写盘 → 按批交付帧 URL。
+     * 拉模式契约（Lynx Callback 一次性语义）：
+     * <ul>
+     *   <li>{@code ugoiraExtractStream(zipUrl, framesJson, illustId, batchSize, cb)}：
+     *       cb(0, {"started":true})；缓存命中（帧完整）→ 不启动网络流，后续一次 poll 全量交付</li>
+     *   <li>{@code ugoiraExtractStreamPoll(cb)}：cb(0, {delivered, urls[], done, error})</li>
+     *   <li>{@code ugoiraExtractStreamCancel(cb)}：cb(0, {})；取消后 poll 见 done=true</li>
+     * </ul>
+     * 错误（下载中断/zip 损坏/帧序不一致）→ poll 的 error 可读；帧序不一致场景 JS 端降级全量路径。
+     */
+    @LynxMethod
+    public void ugoiraExtractStream(String zipUrl, String framesJson, String illustId, String batchSizeStr, Callback callback) {
+        if (zipUrl == null || !zipUrl.startsWith("https://")) {
+            callback.invoke(1, "非法 zip URL（仅接受 https:// 绝对地址）");
+            return;
+        }
+        if (illustId == null || !illustId.matches("\\d+")) {
+            callback.invoke(1, "非法 illustId（仅接受数字）");
+            return;
+        }
+        int batchSize = 5;
+        try {
+            batchSize = Integer.parseInt(batchSizeStr);
+        } catch (Exception ignored) {
+            // 默认 5
+        }
+        try {
+            Context ctx = appContext();
+            if (ctx == null) {
+                throw new IOException("上下文不可用");
+            }
+            File dir = new File(new File(ctx.getCacheDir(), PictelioImageService.UGOIRA_CACHE_DIR), illustId);
+            streamEngine.start(() -> streamDownloadZip(zipUrl), framesJson, dir, batchSize);
+            callback.invoke(0, "{\"started\":true}");
+        } catch (Throwable e) {
+            String errMsg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            callback.invoke(1, errMsg);
+        }
+    }
+
+    /** 拉取自上次 poll 以来新交付的帧 URL 批次（契约见 ugoiraExtractStream 注释） */
+    @LynxMethod
+    public void ugoiraExtractStreamPoll(Callback callback) {
+        callback.invoke(0, streamEngine.poll().toString());
+    }
+
+    /** 取消活动流（已写盘帧保留 → 下次缓存命中） */
+    @LynxMethod
+    public void ugoiraExtractStreamCancel(Callback callback) {
+        streamEngine.cancel();
+        callback.invoke(0, "{}");
+    }
+
+    /** 流式下载：OkHttp 执行后返回响应体字节流（不驻留；取消时关闭流即中断读取） */
+    private InputStream streamDownloadZip(String zipUrl) throws IOException {
+        Request request = new Request.Builder()
+                .url(zipUrl)
+                .addHeader("Referer", OAuthConfig.REFERER)
+                .addHeader("User-Agent", OAuthConfig.USER_AGENT)
+                .build();
+        Response response = PixivApiCore.getSharedClient().newCall(request).execute();
+        if (!response.isSuccessful()) {
+            response.close();
+            throw new IOException("HTTP " + response.code());
+        }
+        if (response.body() == null) {
+            response.close();
+            throw new IOException("HTTP 响应体为空");
+        }
+        return response.body().byteStream();
+    }
+
     /**
      * ugoira 缓存命中判定（package-private 静态，可测核心）：目录内帧文件与帧列表
      * 逐位匹配（数量一致、全部存在且非空）→ 返回帧 file:// URL 列表；否则返回 null（调用方走下载）。
@@ -196,6 +280,121 @@ public class PictelioApiModule extends LynxModule {
     private static String frameFileName(int i, String entryName) {
         String ext = entryName.toLowerCase(Locale.ROOT).endsWith(".png") ? ".png" : ".jpg";
         return "frame_" + i + ext;
+    }
+
+    // ── ADR-0128：流式渐进（可测核心，被 UgoiraStreamEngine 调用） ──
+
+    /** 流式批次事件：本批帧 URL + 已读字节水位（原型取证形态，oracle = ugoira-native-streaming-proto.md） */
+    static final class StreamBatch {
+        final JSONArray urls;
+        final long bytesRead;
+
+        StreamBatch(JSONArray urls, long bytesRead) {
+            this.urls = urls;
+            this.bytesRead = bytesRead;
+        }
+    }
+
+    /** 底层已消费字节计数（含 ZipInputStream 缓冲预读——真实网络缓冲行为） */
+    private static final class CountingInputStream extends InputStream {
+        private final InputStream in;
+        private long read;
+
+        CountingInputStream(InputStream in) {
+            this.in = in;
+        }
+
+        @Override
+        public int read() throws IOException {
+            int b = in.read();
+            if (b >= 0) {
+                read++;
+            }
+            return b;
+        }
+
+        @Override
+        public int read(byte[] buf, int off, int len) throws IOException {
+            int n = in.read(buf, off, len);
+            if (n > 0) {
+                read += n;
+            }
+            return n;
+        }
+    }
+
+    /**
+     * 流式解压写盘核心（ADR-0128）：zip 流 → ZipInputStream 顺序解压（local header 驱动，
+     * 不依赖中央目录）→ 逐帧写盘 → 每写满 batchSize 帧交付一批（帧 URL + 已读字节水位）。
+     *
+     * <p><b>顺序断言</b>：要求 zip 条目物理序 == framesJson 序（原型实测真实 Pixiv zip 成立）；
+     * 不一致立即抛可读错误（调用方/JS 端降级全量路径，绝不产生错帧）。
+     *
+     * @param zipIn     zip 字节流（调用方提供；流式读完即弃，不驻留）
+     * @param framesJson {@code meta.frames} JSON 数组字符串（服务端时序）
+     * @param dir       作品缓存目录 {@code cache/ugoira/<illustId>}
+     * @param batchSize 每批帧数（<1 视为 5）
+     * @param onBatch   批次回调（同步调用；帧 URL 列表 + 已读字节水位）
+     * @return 交付总帧数
+     * @throws IOException 帧列表解析失败 / zip 损坏 / 帧序不一致 / 缺帧 / 写盘失败
+     */
+    static int ugoiraStreamCore(InputStream zipIn, String framesJson, File dir, int batchSize,
+            java.util.function.Consumer<StreamBatch> onBatch) throws IOException {
+        JSONArray frames = parseFrames(framesJson);
+        if (batchSize < 1) {
+            batchSize = 5;
+        }
+        if (!dir.exists() && !dir.mkdirs()) {
+            throw new IOException("无法创建 ugoira 缓存目录");
+        }
+        File root = dir.getParentFile();
+        if (root != null) {
+            cleanupOldFrames(root);
+        }
+        CountingInputStream counting = new CountingInputStream(zipIn);
+        JSONArray batchUrls = new JSONArray();
+        int frameIdx = 0;
+        byte[] buf = new byte[16 * 1024];
+        try (ZipInputStream zis = new ZipInputStream(counting)) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                if (entry.isDirectory()) {
+                    continue;
+                }
+                final int idx = frameIdx;
+                String expected;
+                try {
+                    expected = frames.getJSONObject(idx).getString("file");
+                } catch (JSONException e) {
+                    throw new IOException("帧列表解析失败", e);
+                }
+                if (!expected.equals(entry.getName())) {
+                    throw new IOException("ugoira: zip 条目序与帧列表不一致（" + entry.getName() + " ≠ " + expected + "）");
+                }
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                int n;
+                while ((n = zis.read(buf)) != -1) {
+                    out.write(buf, 0, n);
+                }
+                File outFile = new File(dir, frameFileName(idx, expected));
+                writeFile(outFile, out.toByteArray());
+                batchUrls.put("file://" + outFile.getAbsolutePath());
+                frameIdx++;
+                if (frameIdx % batchSize == 0) {
+                    Log.i(TAG, "ugoiraStream 批次交付: frame=" + (frameIdx - batchSize) + "-" + (frameIdx - 1)
+                            + " 已读=" + counting.read + "B");
+                    onBatch.accept(new StreamBatch(batchUrls, counting.read));
+                    batchUrls = new JSONArray();
+                }
+            }
+        }
+        if (frameIdx != frames.length()) {
+            throw new IOException("ugoira: zip 缺帧（流式解析到末尾仍有 " + (frames.length() - frameIdx) + " 帧未到）");
+        }
+        if (batchUrls.length() > 0) {
+            onBatch.accept(new StreamBatch(batchUrls, counting.read));
+        }
+        return frameIdx;
     }
 
     /**

@@ -161,6 +161,15 @@ _Avoid_：base64 data URL 用于原生模式（实测不可用，见上）
 `UgoiraViewer` 内按 `meta.delay` 驱动的 `setTimeout` 循环切换（`playFrom`/`stop`），帧数据驻留内存（web 模式）或逐个 `<image>` 加载（原生模式）。卸载竞态防护：AbortController + `disposed` 标志，卸载后丢弃帧数组与定时器（issue #138 同款）。
 _Avoid_: 调度器中混入帧渲染时序（渲染层问题见「动图帧呈现」）
 
+**原生流式渐进（native streaming playback）【2026-08-31，ADR-0128】**
+原生模式首次播放的渐进形态：Java 侧「流式下载 → ZipInputStream 边读边解压边写盘 → 按批交付
+帧 URL 列表」，JS 经拉模式状态机（`ugoiraExtractStream` 启动 → `ugoiraExtractStreamPoll` 拉批 →
+`ugoiraExtractStreamCancel` 中止）增量拿帧，播放器到列表尾部**等待新帧**（done 后循环）。
+与全量路径（`ugoiraExtract`）并存：缓存命中（帧完整）时流式启动一次 poll 全量交付；失败/中断
+保留已写盘帧（下次命中）。与 app 侧「流式取帧/渐进播放」（ADR-0127）语义对齐：都是「首批帧
+就绪即播」，区别在本端数据源为 Java 流式写盘（file:// 帧，二进制零进 JS 堆，ADR-0037 保持）。
+_Avoid_: 用共享包 `createStreamFrameSource` 做原生渐进（LynxFetchModule 无流式 body + 渲染要求 file:// 落盘，JS 拿不到流）
+
 **动图帧呈现（frame presentation）【2026-08-31，跨上下文】**
 帧切换时「把当前帧画到屏幕」的渲染层行为。Lynx `<image>` 默认在**新一次加载发起前清除已展示的图片资源**——帧切换快于解码（ugoira delay 20~80ms）时画面在「图↔空白」间高频交替（播放闪烁）；官方属性 `defer-src-invalidation`（default false）改为**新加载成功后才清除旧图**，即官方给出的闪烁解法（lynxjs.org `<image>` 文档原文；2026-08-31 原型实测：基线 325 帧中 4 次空白过渡，加属性后 374 帧 0 空白，证据见 `docs/research/ugoira-playback-flicker-range-proto.md`）。
 _Avoid_: 换双 `<image>` 层叠/onLoad 门控（实测引入隐藏层首载停滞 + 帧间隔膨胀 25%，收益与属性相同）；用 `v-if` 换帧重建元素（放大重载开销）
