@@ -107,23 +107,30 @@ async function fetchRange(url: string, start: number, end: number): Promise<Uint
 
 /**
  * Range 流式取帧（方案 A，官方 zip_player 做法）：
- * HEAD 拿长度 → 尾部 30KB 解析 EOCD → 中央目录 → 按帧偏移逐帧 Range 取字节（load-ahead）。
+ * 探测总长 → 尾部 30KB 解析 EOCD → 中央目录 → 按帧偏移逐帧 Range 取字节（load-ahead）。
  * store 条目直接切片；deflate 条目由 sliceStoreFrame fallback（inflateSync）。
+ *
+ * [PROTOTYPE] 总长探测从 HEAD 改为 GET+Range bytes=0-0 + Content-Range 解析：
+ * 实测 WebView 拦截栈对 HEAD 响应不透明（interceptImage 的 Content-Length 头丢给
+ * fetch 时不可见，见 2026-08-31 原型取证），与 lynx 侧 §7.1「HEAD 拒绝」同源——
+ * 官方规避路径（研究文档 §7.1/§5）。
  */
 async function extractRange(
   zipUrl: string,
   meta: { frames: { file: string; delay: number }[] },
   onProgress?: (pct: number) => void,
 ): Promise<{ frames: UgoiraFrame[]; blobUrls: string[] }> {
-  // 1. HEAD 拿 Content-Length（Vite 代理已验证 200 + accept-ranges）
+  // 1. GET + Range bytes=0-0 探测总长（Content-Range "bytes 0-0/TOTAL" 解析）
   onProgress?.(5);
-  const head = await fetch(zipUrl, { method: "HEAD" });
-  if (!head.ok) {
-    throw new Error(`ugoira: HEAD 失败 HTTP ${head.status}`);
+  const probe = await fetch(zipUrl, { headers: { Range: "bytes=0-0" } });
+  if (probe.status !== 206) {
+    throw new Error(`ugoira: Range 探测失败 HTTP ${probe.status}`);
   }
-  const total = parseInt(head.headers.get("content-length") ?? "", 10);
+  const contentRange = probe.headers.get("content-range") ?? "";
+  const totalMatch = /\/\s*(\d+)\s*$/.exec(contentRange);
+  const total = totalMatch ? parseInt(totalMatch[1]!, 10) : 0;
   if (!total) {
-    throw new Error("ugoira: HEAD 拿不到 zip 长度（Range 模式需要）");
+    throw new Error("ugoira: 拿不到 zip 长度（Range 模式需要）");
   }
 
   // 2. 尾部 30KB → EOCD（cdOffset 为文件绝对偏移，用 fileSize 校验）

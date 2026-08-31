@@ -142,7 +142,7 @@ public class MainActivity extends BridgeActivity {
                     WebResourceRequest request
             ) {
                 String url = request.getUrl().toString();
-                WebResourceResponse custom = interceptImage(url);
+                WebResourceResponse custom = interceptImage(url, request.getMethod(), request.getRequestHeaders());
                 if (custom != null) return OtaPlugin.ensureNoStore(custom);
                 WebResourceResponse upstream;
                 if (originalClient != null) {
@@ -196,7 +196,26 @@ public class MainActivity extends BridgeActivity {
     }
 
     private WebResourceResponse interceptImage(String url) {
+        // 弃用重载（String url）无法获取请求头 → 按无 Range/HEAD 语义处理
+        return interceptImage(url, null, null);
+    }
+
+    /**
+     * /pixiv-img/ 代理拦截（webview 形态）。
+     *
+     * <p>扩展（prototype 验证 / research 文档 §5 既定路径）：
+     * <ul>
+     *   <li>HEAD → 200 + Content-Length + Accept-Ranges（磁盘缓存命中免网络）；
+     *       拿不到长度时返回无 Content-Length 的 200（JS 侧会报可读错误，属预期降级）</li>
+     *   <li>Range（单段）→ 206 Partial Content + Content-Range/Content-Length；
+     *       磁盘缓存命中直接切片，未命中走 {@link PixivImageLoader#downloadRange}（不写盘）；
+     *       非单段/畸形 Range → 返回 null 走原路径</li>
+     *   <li>其余 → 既有全量 200 逻辑不变</li>
+     * </ul>
+     */
+    private WebResourceResponse interceptImage(String url, String method, Map<String, String> requestHeaders) {
         if (url == null || !url.contains("/pixiv-img/")) return null;
+        Log.i(TAG, "[PROTO] interceptImage url=" + url + " method=" + method + " range=" + findHeader(requestHeaders, "Range"));
 
         try {
             // URL 重写 + 下载 + 磁盘缓存统一走 PixivImageLoader 公共核心（#57/#58，
@@ -209,6 +228,58 @@ public class MainActivity extends BridgeActivity {
             boolean browserCacheEnabled = "true".equals(prefs.getString("image_cache_browser", "true"));
 
             PixivImageLoader loader = imageLoader();
+
+            // ── HEAD：返回资源总长（ugoira range 取帧第一步；缓存命中免网络） ──
+            if ("HEAD".equalsIgnoreCase(method)) {
+                Map<String, String> headers = new HashMap<>();
+                headers.put("Accept-Ranges", "bytes");
+                long len = -1;
+                if (diskCacheEnabled) {
+                    File cached = loader.cachedFile(pixivUrl);
+                    if (cached != null) len = cached.length();
+                }
+                if (len < 0) len = loader.downloadHeadLength(pixivUrl);
+                if (len >= 0) headers.put("Content-Length", String.valueOf(len));
+                return new WebResourceResponse(mimeFor(url), null, 200, "OK", headers, new ByteArrayInputStream(new byte[0]));
+            }
+
+            // ── Range：206 分片（ugoira range 流式取帧；缓存命中切片免网络） ──
+            String range = findHeader(requestHeaders, "Range");
+            if (range != null && range.startsWith("bytes=")) {
+                long[] bounds = PixivImageLoader.parseRangeHeader(range);
+                if (bounds == null) return null; // 非单段/畸形 → 走原路径
+                long start = bounds[0];
+                long end = bounds[1];
+                long total = -1;
+                byte[] bytes;
+                if (diskCacheEnabled) {
+                    File cached = loader.cachedFile(pixivUrl);
+                    if (cached != null) {
+                        total = cached.length();
+                        if (end < 0) end = total - 1;
+                        bytes = PixivImageLoader.sliceFile(cached, start, end);
+                    } else if (end < 0) {
+                        return null; // 开放区间且未命中缓存：需总长，交给原路径（JS 报可读错误）
+                    } else {
+                        PixivImageLoader.RangeResult r = loader.downloadRange(pixivUrl, start, end);
+                        bytes = r.bytes;
+                        total = r.total;
+                    }
+                } else if (end < 0) {
+                    return null;
+                } else {
+                    PixivImageLoader.RangeResult r = loader.downloadRange(pixivUrl, start, end);
+                    bytes = r.bytes;
+                    total = r.total;
+                }
+                Map<String, String> headers = new HashMap<>();
+                headers.put("Accept-Ranges", "bytes");
+                headers.put("Content-Length", String.valueOf(bytes.length));
+                headers.put("Content-Range", "bytes " + start + "-" + end + "/" + (total >= 0 ? total : "*"));
+                Log.i(TAG, "[PROTO] range served start=" + start + " end=" + end + " total=" + total + " len=" + bytes.length);
+                return new WebResourceResponse(mimeFor(url), null, 206, "Partial Content", headers, new ByteArrayInputStream(bytes));
+            }
+
             if (diskCacheEnabled) {
                 // ── A: 磁盘缓存优先 ──
                 File cached = loader.cachedFile(pixivUrl);
@@ -225,6 +296,15 @@ public class MainActivity extends BridgeActivity {
             Log.w(TAG, "interceptImage 失败: " + url, e);
             return null;
         }
+    }
+
+    /** 大小写不敏感请求头查找（WebResourceRequest.getRequestHeaders 键大小写依实现而异） */
+    private static String findHeader(Map<String, String> headers, String name) {
+        if (headers == null) return null;
+        for (Map.Entry<String, String> e : headers.entrySet()) {
+            if (name.equalsIgnoreCase(e.getKey())) return e.getValue();
+        }
+        return null;
     }
 
     /** 按 URL 后缀推断图片 mime（webview 专属；下载响应不再依赖服务器 Content-Type） */

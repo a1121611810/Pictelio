@@ -11,6 +11,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
@@ -197,6 +198,134 @@ public final class PixivImageLoader {
             if (!f.delete()) {
                 Log.w(TAG, "淘汰缓存文件失败: " + f.getName());
             }
+        }
+    }
+
+    // ── Range/HEAD（ugoira range 流式取帧支撑，research 文档 §5 既定路径） ──
+
+    /** Range 请求结果：字节 + 服务端总长（Content-Range "/总长" 解析；未知为 -1） */
+    public static final class RangeResult {
+        public final byte[] bytes;
+        public final long total;
+
+        RangeResult(byte[] bytes, long total) {
+            this.bytes = bytes;
+            this.total = total;
+        }
+    }
+
+    /** HEAD 获取资源总长（Content-Length）；非 2xx / 无长度返回 -1（调用方降级） */
+    public long downloadHeadLength(String url) throws IOException {
+        Request request = new Request.Builder()
+                .url(url)
+                .head()
+                .addHeader("Referer", OAuthConfig.REFERER)
+                .addHeader("User-Agent", OAuthConfig.USER_AGENT)
+                .build();
+        try (Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                return -1;
+            }
+            return parseContentLength(response.header("Content-Length"));
+        }
+    }
+
+    /** Content-Length 头解析；缺失/非数字返回 -1（可测纯函数） */
+    static long parseContentLength(String len) {
+        if (len == null) {
+            return -1;
+        }
+        try {
+            return Long.parseLong(len);
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+    /** GET + Range 头取闭区间 [start, end] 字节；要求 206 且字节数与请求一致；不写磁盘缓存 */
+    public RangeResult downloadRange(String url, long start, long end) throws IOException {
+        if (start < 0 || end < start) {
+            throw new IOException("非法 Range 参数: " + start + "-" + end);
+        }
+        Request request = new Request.Builder()
+                .url(url)
+                .addHeader("Referer", OAuthConfig.REFERER)
+                .addHeader("User-Agent", OAuthConfig.USER_AGENT)
+                .addHeader("Range", "bytes=" + start + "-" + end)
+                .build();
+        try (Response response = client.newCall(request).execute()) {
+            if (response.code() != 206) {
+                throw new IOException("Range 请求失败 (HTTP " + response.code() + "): " + url);
+            }
+            if (response.body() == null) {
+                throw new IOException("Range 响应无 body: " + url);
+            }
+            byte[] bytes = response.body().bytes();
+            long expected = end - start + 1;
+            if (bytes.length != expected) {
+                throw new IOException("Range 字节数不符 (" + bytes.length + "/" + expected + "): " + url);
+            }
+            return new RangeResult(bytes, parseContentRangeTotal(response.header("Content-Range")));
+        }
+    }
+
+    /** 解析 Content-Range "bytes s-e/总长" 的 / 总长；未知返回 -1 */
+    private static long parseContentRangeTotal(String contentRange) {
+        if (contentRange == null) {
+            return -1;
+        }
+        int slash = contentRange.lastIndexOf('/');
+        if (slash < 0) {
+            return -1;
+        }
+        try {
+            return Long.parseLong(contentRange.substring(slash + 1).trim());
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+    /** 缓存文件闭区间 [start, end] 切片（Range 命中磁盘缓存用）；越界抛 IOException */
+    public static byte[] sliceFile(File file, long start, long end) throws IOException {
+        long len = file.length();
+        if (start < 0 || end < start || end >= len) {
+            throw new IOException("切片越界: " + start + "-" + end + " (len=" + len + ")");
+        }
+        long size = end - start + 1;
+        if (size > Integer.MAX_VALUE) {
+            throw new IOException("切片过大: " + size);
+        }
+        byte[] buf = new byte[(int) size];
+        try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
+            raf.seek(start);
+            raf.readFully(buf);
+        }
+        return buf;
+    }
+
+    /** 解析 Range 头单段 "bytes=start-end" / "bytes=start-"；非单段/畸形/负偏移返回 null */
+    public static long[] parseRangeHeader(String range) {
+        if (range == null || !range.startsWith("bytes=")) {
+            return null;
+        }
+        try {
+            String spec = range.substring("bytes=".length());
+            if (spec.contains(",")) {
+                return null;
+            }
+            int dash = spec.indexOf('-');
+            if (dash < 0) {
+                return null;
+            }
+            long start = Long.parseLong(spec.substring(0, dash).trim());
+            if (start < 0) {
+                return null;
+            }
+            String endStr = spec.substring(dash + 1).trim();
+            long end = endStr.isEmpty() ? -1 : Long.parseLong(endStr);
+            return new long[] { start, end };
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
 

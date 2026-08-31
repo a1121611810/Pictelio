@@ -6,6 +6,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import android.content.Context;
 import android.util.Base64;
@@ -245,5 +246,121 @@ public class PixivImageLoaderTest {
         RecordedRequest req = server.takeRequest();
         assertEquals("https://app-api.pixiv.net/", req.getHeader("Referer"));
         assertTrue(req.getHeader("User-Agent") != null && !req.getHeader("User-Agent").isEmpty());
+    }
+
+    // ── Range/HEAD（ugoira range 流式取帧支撑；prototype 新增方法） ──
+
+    @Test
+    public void downloadRange_206_returnsExactBytesAndTotal() throws Exception {
+        byte[] body = new byte[10];
+        for (int i = 0; i < 10; i++) body[i] = (byte) (100 + i);
+        server.enqueue(new MockResponse()
+                .setResponseCode(206)
+                .setHeader("Content-Range", "bytes 0-9/3481")
+                .setBody(new okio.Buffer().write(body)));
+        PixivImageLoader.RangeResult r = loader.downloadRange(server.url("/pixiv-img/z.zip").toString(), 0, 9);
+        assertEquals(10, r.bytes.length);
+        assertEquals(100, r.bytes[0]);
+        assertEquals(109, r.bytes[9]);
+        assertEquals("bytes 0-9/3481 总长解析", 3481, r.total);
+        RecordedRequest req = server.takeRequest();
+        assertEquals("Range 头契约", "bytes=0-9", req.getHeader("Range"));
+        assertEquals("https://app-api.pixiv.net/", req.getHeader("Referer"));
+    }
+
+    @Test
+    public void downloadRange_non206_throws() {
+        server.enqueue(new MockResponse().setResponseCode(200).setBody(new okio.Buffer().write(new byte[5])));
+        IOException ex = assertThrows(IOException.class, () -> loader.downloadRange(server.url("/pixiv-img/z.zip").toString(), 0, 4));
+        assertTrue("非 206 必须报错", ex.getMessage().contains("HTTP 200"));
+    }
+
+    @Test
+    public void downloadRange_lengthMismatch_throws() {
+        // 206 但返回字节数与请求不符（防截断 206 静默损坏）
+        server.enqueue(new MockResponse().setResponseCode(206).setBody(new okio.Buffer().write(new byte[3])));
+        assertThrows(IOException.class, () -> loader.downloadRange(server.url("/pixiv-img/z.zip").toString(), 0, 9));
+    }
+
+    @Test
+    public void downloadRange_negativeStart_throwsWithoutRequest() {
+        IOException ex = assertThrows(IOException.class, () -> loader.downloadRange(server.url("/pixiv-img/z.zip").toString(), -1, 5));
+        assertTrue(ex.getMessage().contains("非法 Range"));
+        assertEquals("非法参数不得发网络请求", 0, server.getRequestCount());
+    }
+
+    @Test
+    public void downloadHeadLength_parsesContentLength() throws Exception {
+        // oracle：响应体 3481B → 服务器 Content-Length=3481（HEAD 响应无 body 但头含长度）
+        server.enqueue(new MockResponse().setResponseCode(200)
+                .setBody(new okio.Buffer().write(new byte[3481])));
+        assertEquals(3481, loader.downloadHeadLength(server.url("/pixiv-img/z.zip").toString()));
+        RecordedRequest req = server.takeRequest();
+        assertEquals("HEAD 方法契约", "HEAD", req.getMethod());
+    }
+
+    @Test
+    public void downloadHeadLength_failure_returnsMinusOne() {
+        server.enqueue(new MockResponse().setResponseCode(404));
+        try {
+            assertEquals(-1, loader.downloadHeadLength(server.url("/missing.zip").toString()));
+        } catch (IOException e) {
+            fail("失败路径约定返回 -1 而非抛错，实际抛: " + e.getMessage());
+        }
+    }
+
+    @Test
+    public void parseContentLength_validInvalidAndMissing() {
+        // oracle：Content-Length 语义（HTTP 规范）——数字→该值；缺失/非数字→-1（调用方降级）
+        assertEquals(3481, PixivImageLoader.parseContentLength("3481"));
+        assertEquals(-1, PixivImageLoader.parseContentLength(null));
+        assertEquals(-1, PixivImageLoader.parseContentLength("not-a-number"));
+        assertEquals(-1, PixivImageLoader.parseContentLength("12.5"));
+    }
+
+    @Test
+    public void sliceFile_returnsExactRange() throws Exception {
+        File f = File.createTempFile("slice", ".bin");
+        try {
+            byte[] all = new byte[100];
+            for (int i = 0; i < 100; i++) all[i] = (byte) i;
+            java.nio.file.Files.write(f.toPath(), all);
+            byte[] mid = PixivImageLoader.sliceFile(f, 10, 19);
+            assertEquals(10, mid.length);
+            assertEquals(10, mid[0]);
+            assertEquals(19, mid[9]);
+        } finally {
+            f.delete();
+        }
+    }
+
+    @Test
+    public void sliceFile_outOfRange_throws() throws Exception {
+        File f = File.createTempFile("slice", ".bin");
+        try {
+            java.nio.file.Files.write(f.toPath(), new byte[10]);
+            assertThrows(IOException.class, () -> PixivImageLoader.sliceFile(f, 0, 10));
+            assertThrows(IOException.class, () -> PixivImageLoader.sliceFile(f, -1, 5));
+            assertThrows(IOException.class, () -> PixivImageLoader.sliceFile(f, 6, 5));
+        } finally {
+            f.delete();
+        }
+    }
+
+    @Test
+    public void parseRangeHeader_closedOpenAndMalformed() {
+        long[] closed = PixivImageLoader.parseRangeHeader("bytes=0-9");
+        assertNotNull(closed);
+        assertEquals(0, closed[0]);
+        assertEquals(9, closed[1]);
+        long[] open = PixivImageLoader.parseRangeHeader("bytes=5-");
+        assertNotNull(open);
+        assertEquals(5, open[0]);
+        assertEquals(-1, open[1]);
+        assertNull("多段范围不支持", PixivImageLoader.parseRangeHeader("bytes=0-9,20-29"));
+        assertNull("负数偏移不支持", PixivImageLoader.parseRangeHeader("bytes=-5"));
+        assertNull("畸形", PixivImageLoader.parseRangeHeader("bytes=abc"));
+        assertNull("非 bytes 单位", PixivImageLoader.parseRangeHeader("items=0-9"));
+        assertNull("null", PixivImageLoader.parseRangeHeader(null));
     }
 }

@@ -325,7 +325,7 @@ function buildStoreZip(frames: { name: string; data: Uint8Array }[]): Uint8Array
   return new Uint8Array(parts);
 }
 
-it("downloadAndExtractUgoira range 模式：HEAD + 尾部目录 + 按帧 Range 取帧（T4）", async () => {
+it("downloadAndExtractUgoira range 模式：GET 探测 + 尾部目录 + 按帧 Range 取帧（T4）", async () => {
   mockGet.mockResolvedValue({
     ugoira_metadata: {
       zip_urls: {
@@ -342,9 +342,6 @@ it("downloadAndExtractUgoira range 模式：HEAD + 尾部目录 + 按帧 Range �
     { name: "frame_1.png", data: new Uint8Array([4, 5]) },
   ]);
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
-    if (init?.method === "HEAD") {
-      return new Response(null, { status: 200, headers: { "content-length": String(zip.length) } });
-    }
     const range = (init?.headers as Record<string, string> | undefined)?.Range;
     const m = /bytes=(\d+)-(\d+)/.exec(range ?? "");
     if (m) {
@@ -368,10 +365,12 @@ it("downloadAndExtractUgoira range 模式：HEAD + 尾部目录 + 按帧 Range �
     expect(frames).toHaveLength(2);
     expect(frames[0]!.delay).toBe(100);
     expect(blobUrls).toHaveLength(2);
-    // 断言发过 HEAD 与 Range 请求（未全量下载）
-    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/pixiv-img/"), {
-      method: "HEAD",
-    });
+    // 断言发过 bytes=0-0 探测与 Range 请求（未全量下载）
+    expect(
+      fetchMock.mock.calls.some(
+        ([, i]) => (i?.headers as Record<string, string> | undefined)?.Range === "bytes=0-0",
+      ),
+    ).toBe(true);
     expect(
       fetchMock.mock.calls.some(
         ([, i]) => (i?.headers as Record<string, string> | undefined)?.Range,
@@ -394,16 +393,18 @@ it("downloadAndExtractUgoira range 模式：Range 返回长度不符 → 抛错�
   });
   const zip = buildStoreZip([{ name: "frame_0.png", data: new Uint8Array([1, 2, 3]) }]);
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
-    if (init?.method === "HEAD") {
-      return new Response(null, { status: 200, headers: { "content-length": String(zip.length) } });
-    }
-    // 所有 Range 都返回截断（少 1 字节）
-    const m = /bytes=(\d+)-(\d+)/.exec(
-      (init?.headers as Record<string, string> | undefined)?.Range ?? "",
-    );
+    // 探测（bytes=0-0）返回正常（否则在探测步就抛错，测不到本用例目标）
+    const range = (init?.headers as Record<string, string> | undefined)?.Range;
+    const m = /bytes=(\d+)-(\d+)/.exec(range ?? "");
     if (m) {
       const s = parseInt(m[1]!, 10);
       const e = parseInt(m[2]!, 10);
+      if (s === 0 && e === 0) {
+        return new Response(new Uint8Array([zip[0]!]), {
+          status: 206,
+          headers: { "content-range": `bytes 0-0/${zip.length}` },
+        });
+      }
       return new Response(zip.slice(s, e), { status: 206 }); // 截断
     }
     return new Response(zip, { status: 200 });

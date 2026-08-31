@@ -36,6 +36,8 @@ import FollowList from './pages/FollowList.vue'
 import UpdatePage from './pages/UpdatePage.vue'
 import ErrorPage from './pages/ErrorPage.vue'
 import Watchlist from './pages/Watchlist.vue'
+// [PROTOTYPE] throwaway：闪烁验证页（验证后随原型分支丢弃）
+import ProtoUgoiraPlay from './pages/ProtoUgoiraPlay.vue'
 
 export const routes: RouteDef[] = [
   { path: '/login', name: 'login', component: Login },
@@ -57,6 +59,8 @@ export const routes: RouteDef[] = [
   // 会话失效错误页（候选 #2：401 刷新失败强制重定向）：
   // backBehavior: 'exit' —— 清历史栈后进入，返回键直接退出应用，不可回退到已失效会话
   { path: '/error', name: 'error', component: ErrorPage, backBehavior: 'exit' },
+  // [PROTOTYPE] throwaway：闪烁验证页（验证后随原型分支丢弃）
+  { path: '/proto-ugoira-play', name: 'proto-ugoira-play', component: ProtoUgoiraPlay },
 ]
 
 // [首帧内容化]（#61/#63）：初始路由为推荐页——首帧直接渲染推荐页骨架屏，
@@ -226,4 +230,6 @@ export async function initRouter(): Promise<void> {
   // ADR-0103：账号级设置需 uid 已知（restoreToken 之后）再加载
   await loadSettings()
   void navigate(ok ? '/recommended' : '/login', { replace: true })
+  // [PROTOTYPE] throwaway：原型验证临时首路由（验证后随原型分支丢弃）
+  void navigate('/proto-ugoira-play', { replace: true })
 }
