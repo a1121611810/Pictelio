@@ -157,11 +157,16 @@ _Avoid_：「双端同一管线」——实测（原型报告 `docs/research/ugo
 解压写盘管线产出的帧引用形态：`file:///data/user/0/io.pictelio.app/cache/ugoira/frame_N.{png|jpg}`。仅原生模式存在；`<image>` 经 `PictelioImageService` 的 file:// 分支直接读盘渲染，不经过 OkHttp。
 _Avoid_：base64 data URL 用于原生模式（实测不可用，见上）
 
-**帧提取模式（frame extract mode）**：
-`ugoiraMode` 设置项的两个取值：`fflate`（默认，JS 全量解压）与 `range`（Range 流式取帧）。**当前仅 web 模式生效**——原生模式走解压写盘管线，`ugoiraMode` 对其无意义；设置项保留用于 web 模式（Me 页切换）。
-
 **动图帧调度（frame scheduler）【2026-08-31 修订】**
 `UgoiraViewer` 内按 `meta.delay` 驱动的 `setTimeout` 循环切换（`playFrom`/`stop`），帧数据驻留内存（web 模式）或逐个 `<image>` 加载（原生模式）。卸载竞态防护：AbortController + `disposed` 标志，卸载后丢弃帧数组与定时器（issue #138 同款）。
+_Avoid_: 调度器中混入帧渲染时序（渲染层问题见「动图帧呈现」）
+
+**动图帧呈现（frame presentation）【2026-08-31，跨上下文】**
+帧切换时「把当前帧画到屏幕」的渲染层行为。Lynx `<image>` 默认在**新一次加载发起前清除已展示的图片资源**——帧切换快于解码（ugoira delay 20~80ms）时画面在「图↔空白」间高频交替（播放闪烁）；官方属性 `defer-src-invalidation`（default false）改为**新加载成功后才清除旧图**，即官方给出的闪烁解法（lynxjs.org `<image>` 文档原文；2026-08-31 原型实测：基线 325 帧中 4 次空白过渡，加属性后 374 帧 0 空白，证据见 `docs/research/ugoira-playback-flicker-range-proto.md`）。
+_Avoid_: 换双 `<image>` 层叠/onLoad 门控（实测引入隐藏层首载停滞 + 帧间隔膨胀 25%，收益与属性相同）；用 `v-if` 换帧重建元素（放大重载开销）
+
+**帧提取模式（frame extract mode）**：
+`ugoiraMode` 设置项的两个取值：`fflate`（默认，JS 全量解压）与 `range`（Range 流式取帧）。**当前仅 web 模式生效**——原生模式走解压写盘管线，`ugoiraMode` 对其无意义；设置项保留用于 web 模式（Me 页切换）。web 模式 range 失败（非 206 / 长度不符 / 网络错）自动**降级 fflate** 并 `console.warn`（禁止静默降级，2026-08-31 与 app 侧对齐）。
 
 **代理路径与原生 fetch（proxy path vs native fetch）【2026-08-31 新增】**：
 `/pixiv-img/` 相对路径在原生 LynxView 模式下**不是合法 fetch 目标**（LynxFetchModule 拒绝无 scheme URL，issue #218）；原生模式的图片/文件下载 URL 必须是绝对 CDN URL（`https://i.pximg.net/...`）且**必须带 `Referer: https://app-api.pixiv.net/` 头**（无 Referer → 403，原型 A 方案实测）。

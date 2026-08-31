@@ -80,9 +80,18 @@ _Avoid_: GIF（ Pixiv 源格式不是 GIF ）
 
 **动图播放管线（ugoira playback pipeline）【2026-08-31，跨上下文】**
 与 app-lynx **共享「取帧数据层」**（`@pictelio/ugoira` 纯函数包：zip 解析 + fflate/Range 取帧；`downloadAndExtractUgoira`/`downloadUgoiraFrames` 同构），**渲染层各端独立**：
+
 - **app（webview）**：`fflate`/`range` 解压 → 帧 blob URL → `<img>` 按 delay 切换（`UgoiraViewer.tsx`）。改动的数据层与 lynx 共享，但渲染层不受 lynx 修复影响（2026-08-31 模拟器实测：webview 模式 ugoira 播放正常，持续帧切换）。
 - **app-lynx（原生）**：Java 解压写盘 + `file://` 帧（ADR-0125），详见 `packages/app-lynx/CONTEXT.md`「动图播放管线」。
-_Avoid_: 断言「双端共用同一播放实现」——共享的是数据层（zip→帧），渲染层（blob vs file://）与播放调度是独立实现。
+  _Avoid_: 断言「双端共用同一播放实现」——共享的是数据层（zip→帧），渲染层（blob vs file://）与播放调度是独立实现。
+
+**动图帧呈现（frame presentation）【2026-08-31，跨上下文】**
+帧切换时「把当前帧画到屏幕」的渲染层行为，与「动图帧调度」（何时切帧）正交。**app 端 `<img>`（blob URL）无清图问题**（浏览器保留旧帧直至新帧解码完成），问题与解法集中在 lynx 端，见 `packages/app-lynx/CONTEXT.md`「动图帧呈现」。
+_Avoid_: 把「换帧闪烁」归因于帧调度器或数据层（根因是 Lynx `<image>` 的清除时序，调度器/取帧层未变）
+
+**range 取帧降级（range streaming fallback）【2026-08-31】**
+`extractRange`（官方 zip_player 语义：探测总长 → 尾部目录 → 按帧 Range）失败（非 206 / 长度不符 / 网络错）时降级 `fflate` 全量并 `console.warn`（禁止静默降级），与 lynx 侧 `downloadUgoiraFrames` 对称。**背景**：Web dev（Vite 代理）Range 全真流式；Android WebView 的 `shouldInterceptRequest` 对拦截响应做 `206` 透传时损坏（2026-08-31 CDP 实测：start>0 响应截断为 1 字节或 `net::ERR_FAILED`），range 无法经 `/pixiv-img/` 拦截器流式工作——降级是原生端 range 的既定语义（详见 ADR-0126）。
+_Avoid_: 在 Android 端把 range 当作真实流式（需要它的人应改 Vite 代理/服务端类方案，非本项目范围）
 
 **多图（Multi-page）**：
 一个作品包含多张图片，判定条件为 `illust.page_count > 1`。与动图独立判定、允许并存（异常数据同时满足时两个标识都显示，动图在前）。
