@@ -222,7 +222,7 @@ async function onExportDiag() {
 </script>
 
 <template>
-  <view class="w-full flex flex-col items-center">
+  <view class="relative w-full flex flex-col items-center">
     <view v-if="loading" class="shimmer w-full rounded-[var(--md-shape-medium)]" :style="{ height: heightVw }" />
     <!-- ADR-0126：defer-src-invalidation 防换帧闪烁（官方语义：新加载成功后才清除已展示图片；
          原型实测 374/374 帧零空白，见 docs/research/ugoira-playback-flicker-range-proto.md）。
@@ -239,17 +239,20 @@ async function onExportDiag() {
       @error="onFrameError"
     />
     <text v-if="errorMsg" class="text-body-small text-error p-4">{{ errorMsg }}</text>
-    <!-- T0-DIAG 临时诊断（真机取证，验证后移除）：日志导出按钮（仅原生模式显示） -->
+    <!-- T0-DIAG 临时诊断（真机取证，验证后移除）：日志导出按钮。
+         ⚠️ 必须 absolute 悬浮在图片区域内——IllustDetail 将本组件包在
+         定高 + overflow-hidden 容器（detailImageHeight）里，按钮放在图片下方
+         会被裁剪不可见（2026-08-31 真机取证发现）；悬浮于右上角同时更易发现。 -->
     <view
       v-if="isNativeMode() && (currentSrc || errorMsg)"
-      class="mt-2 rounded-[var(--md-shape-small)] bg-secondary-container px-4 py-2.5 active:bg-layer-pressed-on-surface"
+      class="absolute top-[2.133vw] right-[2.133vw] rounded-full bg-secondary-container px-4 py-2.5 active:bg-layer-pressed-on-surface"
       @tap="onExportDiag"
     >
       <text class="text-label-large text-secondary-on-container">导出诊断日志</text>
     </view>
     <text
       v-if="diagHint"
-      class="text-body-small mt-1"
+      class="absolute top-[12vw] right-[2.133vw] rounded-[var(--md-shape-small)] bg-surface-container-highest px-3 py-1.5 text-body-small"
       :class="diagHint.startsWith('导出失败') ? 'text-error' : 'text-surface-on-variant'"
     >{{ diagHint }}</text>
   </view>
