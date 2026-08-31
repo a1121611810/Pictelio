@@ -521,3 +521,126 @@ it("downloadAndExtractUgoira range 模式：探测非 206 → 降级 fflate（AD
     delete URL.createObjectURL;
   }
 });
+
+// ─── T2（ADR-0127）：streamUgoiraFrames 流式渐进取帧 ───
+// oracle：ADR-0127 接口事实（帧就绪序/错误模式/进度语义）+ 原型报告
+// docs/research/ugoira-stream-frames-proto.md（与 unzipSync 逐字节一致已由共享包单测覆盖，
+// 此处验证 app 接线：事件序/delay/进度/abort/损坏）
+
+it("streamUgoiraFrames：分片喂入 → onFrame 按序回调 + 进度单调至 100", async () => {
+  mockGet.mockResolvedValue({
+    ugoira_metadata: {
+      zip_urls: { medium: "https://i.pximg.net/img-zip-ugoira/z.zip" },
+      frames: [
+        { file: "frame_0.png", delay: 100 },
+        { file: "frame_1.png", delay: 120 },
+      ],
+    },
+  });
+  const zip = buildStoreZip([
+    { name: "frame_0.png", data: new Uint8Array([1, 2, 3]) },
+    { name: "frame_1.png", data: new Uint8Array([4, 5]) },
+  ]);
+  const fetchMock = vi.fn(async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(zip.slice(0, 2));
+        controller.enqueue(zip.slice(2, 5));
+        controller.enqueue(zip.slice(5));
+        controller.close();
+      },
+    });
+    return new Response(stream, {
+      status: 200,
+      headers: { "content-length": String(zip.length) },
+    });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  const createObjectURL = vi.fn(() => "blob:stream-test");
+  // @ts-expect-error node URL 无 createObjectURL
+  URL.createObjectURL = createObjectURL;
+  try {
+    const { streamUgoiraFrames } = await loadApi();
+    const frames: { delay: number; index: number; total: number }[] = [];
+    const progress: number[] = [];
+    await streamUgoiraFrames(
+      123,
+      (url, delay, index, total) => {
+        expect(url).toBe("blob:stream-test");
+        frames.push({ delay, index, total });
+      },
+      (p) => progress.push(p),
+    );
+    // 事件序与 delay（metadata 契约）与 index/total
+    expect(frames.map((f) => f.delay)).toEqual([100, 120]);
+    expect(frames[0]!.index).toBe(0);
+    expect(frames[1]!.index).toBe(1);
+    expect(frames[1]!.total).toBe(2);
+    // 进度单调递增且收于 100
+    expect(progress[progress.length - 1]).toBe(100);
+    expect(progress.every((p, i) => i === 0 || p >= progress[i - 1]!)).toBe(true);
+  } finally {
+    vi.unstubAllGlobals();
+    // @ts-expect-error 清理
+    delete URL.createObjectURL;
+  }
+});
+
+it("streamUgoiraFrames：损坏 zip → rejects ugoira: 可读错误", async () => {
+  mockGet.mockResolvedValue({
+    ugoira_metadata: {
+      zip_urls: { medium: "https://i.pximg.net/z.zip" },
+      frames: [{ file: "frame_0.png", delay: 100 }],
+    },
+  });
+  const garbage = new Uint8Array([1, 2, 3, 4, 5]);
+  const fetchMock = vi.fn(async () => {
+    return new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(garbage);
+          controller.close();
+        },
+      }),
+      { status: 200 },
+    );
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  try {
+    const { streamUgoiraFrames } = await loadApi();
+    await expect(streamUgoiraFrames(123, () => {})).rejects.toThrow(/ugoira: zip/);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it("streamUgoiraFrames：abort → rejects（AbortError 语义，reader 中断）", async () => {
+  mockGet.mockResolvedValue({
+    ugoira_metadata: {
+      zip_urls: { medium: "https://i.pximg.net/z.zip" },
+      frames: [{ file: "frame_0.png", delay: 100 }],
+    },
+  });
+  const ac = new AbortController();
+  const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+    return new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          init?.signal?.addEventListener("abort", () => {
+            controller.error(new DOMException("Aborted", "AbortError"));
+          });
+        },
+      }),
+      { status: 200 },
+    );
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  try {
+    const { streamUgoiraFrames } = await loadApi();
+    const p = streamUgoiraFrames(123, () => {}, undefined, ac.signal);
+    setTimeout(() => ac.abort(), 10);
+    await expect(p).rejects.toThrow(/abort/i);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

@@ -213,3 +213,5 @@ export function unzipFrames(zipBytes: Uint8Array, fileOrder: string[]): Uint8Arr
 export function deflateInflate(bytes: Uint8Array): Uint8Array {
   return inflateSync(bytes);
 }
+
+export * from "./stream.js";

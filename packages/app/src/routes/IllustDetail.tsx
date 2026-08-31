@@ -7,6 +7,7 @@ import {
   followUser,
   unfollowUser,
   downloadAndExtractUgoira,
+  streamUgoiraFrames,
   loadDetail,
   type UgoiraFrame,
 } from "../api/illust";
@@ -81,10 +82,13 @@ const IllustDetail: Component = () => {
   const [bookmarking, setBookmarking] = createSignal(false);
   const [bookmarkBurstTrigger, setBookmarkBurstTrigger] = createSignal(0);
   const [ugoiraCoverHeight, setUgoiraCoverHeight] = createSignal(0);
-  const [ugoiraProgress, setUgoiraProgress] = createSignal(-1); // -1=未开始, 0-100=进度, 100=已就绪
+  const [ugoiraProgress, setUgoiraProgress] = createSignal(-1); // -1=未开始, 0-100=进度, 100=已就绪, -2=失败
   const [ugoiraFrames, setUgoiraFrames] = createSignal<UgoiraFrame[]>([]);
   const [ugoiraReady, setUgoiraReady] = createSignal(false);
+  /** ADR-0127 渐进模式：流式取帧是否已结束（列表不再增长） */
+  const [ugoiraStreamingDone, setUgoiraStreamingDone] = createSignal(false);
   let ugoiraBlobUrls: string[] = [];
+  let ugoiraAbort: AbortController | null = null;
   const [isFollowed, setIsFollowed] = createSignal(false);
   const [following, setFollowing] = createSignal(false);
   const [showReportSheet, setShowReportSheet] = createSignal(false);
@@ -180,33 +184,65 @@ const IllustDetail: Component = () => {
     setUgoiraProgress(0);
     setUgoiraReady(false);
     setUgoiraFrames([]);
-    // 清理旧 blob URL
+    setUgoiraStreamingDone(false);
+    // 清理旧 blob URL 与旧下载
     for (const url of ugoiraBlobUrls) {
       URL.revokeObjectURL(url);
     }
     ugoiraBlobUrls = [];
+    ugoiraAbort?.abort();
+    ugoiraAbort = new AbortController();
 
     const [ugoiraErr] = await tryAsync(
       (async () => {
-        // 使用共享的下载+解压函数（自动跟踪进度）
-        const result = await downloadAndExtractUgoira(
-          illustId,
-          (pct) => setUgoiraProgress(pct),
-          ugoiraMode(),
-        );
-        ugoiraBlobUrls = result.blobUrls;
-        setUgoiraFrames(result.frames);
-        setUgoiraReady(true);
-        setUgoiraProgress(100);
+        if (ugoiraMode() === "fflate") {
+          // ADR-0127：渐进播放——首帧就绪即播（ugoiraReady），后续帧就绪追加；
+          // 进度环仍显示下载字节 %（streamUgoiraFrames 内部按 content-length 折算）
+          await streamUgoiraFrames(
+            illustId,
+            (url, delay, index, total) => {
+              ugoiraBlobUrls.push(url);
+              setUgoiraFrames((prev) => [...prev, { url, delay }]);
+              if (index === 0) {
+                setUgoiraReady(true);
+              }
+              if (index === total - 1) {
+                setUgoiraStreamingDone(true);
+              }
+            },
+            (pct) => setUgoiraProgress(pct),
+            ugoiraAbort!.signal,
+          );
+          setUgoiraProgress(100);
+        } else {
+          // range 模式（含 ADR-0126 降级 fflate 全量）：全帧就绪才播（现状语义）
+          const result = await downloadAndExtractUgoira(
+            illustId,
+            (pct) => setUgoiraProgress(pct),
+            "range",
+          );
+          ugoiraBlobUrls = result.blobUrls;
+          setUgoiraFrames(result.frames);
+          setUgoiraReady(true);
+          setUgoiraProgress(100);
+        }
       })(),
     );
     if (ugoiraErr) {
       console.error("[IllustDetail] Ugoira load failed:", ugoiraErr);
+      // 渐进模式错误路径：已就绪帧 blob 一并释放（回到封面 + 错误态）
+      for (const url of ugoiraBlobUrls) {
+        URL.revokeObjectURL(url);
+      }
+      ugoiraBlobUrls = [];
+      setUgoiraFrames([]);
+      setUgoiraReady(false);
       setUgoiraProgress(-2);
     }
   }
 
   onCleanup(() => {
+    ugoiraAbort?.abort();
     for (const url of ugoiraBlobUrls) {
       URL.revokeObjectURL(url);
     }
@@ -695,6 +731,14 @@ const IllustDetail: Component = () => {
                     onClose={() => setUgoiraReady(false)}
                     inline
                     preloadedFrames={ugoiraFrames()}
+                    streaming={
+                      ugoiraMode() === "fflate"
+                        ? {
+                            frames: () => ugoiraFrames(),
+                            done: () => ugoiraStreamingDone(),
+                          }
+                        : undefined
+                    }
                   />
                 )}
               </div>
