@@ -5,6 +5,7 @@ import {
   parseZipCentralDir,
   computeFrameOffsetFromLocal,
   deflateInflate,
+  createStreamFrameSource,
   type UgoiraZipEntry,
 } from "@pictelio/ugoira";
 import type {
@@ -265,6 +266,58 @@ export async function downloadAndExtractUgoira(
 
   onProgress?.(100);
   return { frames: extracted, blobUrls };
+}
+
+/**
+ * 流式渐进取帧（ADR-0127）：fflate 全量下载路径的流式形态——
+ * fetch body reader 边读边 push 到共享包流式取帧器（createStreamFrameSource），
+ * 每帧「帧就绪」（ondata final）即 onFrame 回调；blob URL 由调用方创建并管理（错误路径统一释放）。
+ *
+ * @param illustId 作品 ID
+ * @param onFrame 帧就绪回调 (url, delay, index, total)——url 为调用方按 bytes 创建的 blob URL
+ * @param onProgress 下载进度回调 (0-100)，仅 content-length 可用时触发（进度环 UI 与现状一致）
+ * @param signal  中止信号（reader 中断；调用方负责清理已创建 blob URL）
+ * @throws zip 损坏/缺帧 → `ugoira:` 可读错误（调用方回退全量路径或展示错误态）
+ */
+export async function streamUgoiraFrames(
+  illustId: number,
+  onFrame: (url: string, delay: number, index: number, total: number) => void,
+  onProgress?: (pct: number) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const meta = await loadUgoiraMetadata(illustId, signal);
+  const zipUrl = `/pixiv-img/${meta.zip_urls.medium.split("/").slice(3).join("/")}`;
+  const zipResp = await fetch(zipUrl, { signal });
+  if (!zipResp.ok) {
+    throw new Error(`ZIP download failed: HTTP ${zipResp.status}`);
+  }
+  const contentLength = zipResp.headers.get("content-length");
+  const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
+  const reader = zipResp.body!.getReader();
+  const source = createStreamFrameSource(meta.frames.map((f) => f.file));
+  let index = 0;
+  let loaded = 0;
+  source.onFrame = (_name, bytes) => {
+    // 拷贝为 ArrayBuffer-backed Uint8Array（fflate 流式块的 ArrayBufferLike 泛型不能直接进 BlobPart）
+    const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)]));
+    onFrame(url, meta.frames[index]!.delay, index, meta.frames.length);
+    index++;
+  };
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      source.push(value);
+      loaded += value.length;
+      if (totalBytes > 0) {
+        onProgress?.(Math.min(99, Math.round((loaded / totalBytes) * 100)));
+      }
+    }
+    source.push(new Uint8Array(0), true);
+    onProgress?.(100);
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 export function addBookmark(illustId: number, restrict: RestrictType = "public"): Promise<void> {
