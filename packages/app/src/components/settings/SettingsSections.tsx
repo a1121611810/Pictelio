@@ -4,6 +4,7 @@ import SettingsContent from "./SettingsContent";
 import SettingsImage from "./SettingsImage";
 import SettingsTranslate from "./SettingsTranslate";
 import SettingsClient from "./SettingsClient";
+import SettingsUpdate from "./SettingsUpdate";
 import SettingsAccount from "./SettingsAccount";
 import SettingsCard from "./SettingsCard";
 import LogoutRow from "./LogoutRow";
@@ -18,7 +19,7 @@ interface SettingsSectionsProps {
 }
 
 /**
- * 设置页分区布局（A2 精修版，UI 原型用户选定后折入）。
+ * 设置页分区布局（A2 精修版，UI 原型用户选定后折入；2026-09 按功能域整编 8 卡）。
  *
  * 卡片化分组：每个设置区块浮起为圆角卡片（无边框、单级柔和阴影
  * --elevation2、圆角 --borderRadiusXLarge（ADR-0074）），卡片间大间距
@@ -37,7 +38,7 @@ const SettingsSections: Component<SettingsSectionsProps> = (props) => {
       </SettingsCard>
 
       <SettingsCard tone="elevated">
-        <SettingsImage />
+        <SettingsImage onActionToast={props.onActionToast} />
       </SettingsCard>
 
       <SettingsCard tone="elevated">
@@ -49,11 +50,11 @@ const SettingsSections: Component<SettingsSectionsProps> = (props) => {
       </SettingsCard>
 
       <SettingsCard tone="elevated">
-        <SettingsAccount
-          onClearData={props.onClearData}
-          onDeleteAccount={props.onDeleteAccount}
-          onActionToast={props.onActionToast}
-        />
+        <SettingsUpdate />
+      </SettingsCard>
+
+      <SettingsCard tone="elevated">
+        <SettingsAccount onClearData={props.onClearData} onDeleteAccount={props.onDeleteAccount} />
       </SettingsCard>
 
       {/* 退出登录 — 独立危险卡片 */}

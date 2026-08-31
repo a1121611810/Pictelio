@@ -12,11 +12,21 @@ import {
 } from "../../stores/settingsStore";
 import type { UgoiraExtractMode } from "../../api/illust";
 import { imageHostState, setMasterEnabled, modeLabel } from "../../stores/imageHostStore";
+import { clearImageCache } from "../../utils/imageLoader";
 
-const SettingsImage: Component = () => {
+interface SettingsImageProps {
+  onActionToast: (msg: string) => void;
+}
+
+const SettingsImage: Component<SettingsImageProps> = (props) => {
   const navigate = useNavigate();
   // T3：动图播放方案——range 需二次确认（告知原生端限制）
   const [showUgoiraConfirm, setShowUgoiraConfirm] = createSignal(false);
+
+  function handleClearImageCache() {
+    const [err] = trySync(() => clearImageCache());
+    props.onActionToast(err ? "清除图片缓存失败" : "图片缓存已清除");
+  }
 
   function onPickUgoiraMode(mode: UgoiraExtractMode) {
     if (mode === "fflate") {
@@ -145,7 +155,7 @@ const SettingsImage: Component = () => {
         </fluent-button>
       </FluentDialog>
 
-      {/* Image cache management entry */}
+      {/* 图片缓存管理入口 */}
       <div
         class="flex items-center justify-between py-3 cursor-pointer hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-[0.98] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-[var(--strokeWidthThick)] focus-visible:outline-[color:var(--colorStrokeFocus2)] rounded-[var(--borderRadiusMedium)] -mx-2 px-2"
         onClick={() => {
@@ -170,6 +180,40 @@ const SettingsImage: Component = () => {
           </p>
         </div>
         <span class="text-[var(--colorNeutralForeground3)] ml-2">→</span>
+      </div>
+
+      {/* 清除图片缓存 */}
+      <div
+        class="flex items-center justify-between py-3 cursor-pointer hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-[0.98] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-[var(--strokeWidthThick)] focus-visible:outline-[color:var(--colorStrokeFocus2)] rounded-[var(--borderRadiusMedium)] -mx-2 px-2"
+        onClick={handleClearImageCache}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            handleClearImageCache();
+          }
+        }}
+        role="button"
+        tabindex="0"
+        aria-label="清除图片缓存"
+      >
+        <div class="flex items-center gap-3">
+          <div class="relative w-6 h-6 flex-shrink-0 text-[var(--colorNeutralForeground2)]">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm5.66 5.66a1 1 0 0 1 0 1.41L13.41 12l4.25 4.25a1 1 0 0 1-1.41 1.41L12 13.41l-4.25 4.25a1 1 0 0 1-1.41-1.41L10.59 12 6.34 7.75a1 1 0 0 1 1.41-1.41L12 10.59l4.25-4.25a1 1 0 0 1 1.41 0z"
+                fill="currentColor"
+              />
+            </svg>
+          </div>
+          <div>
+            <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
+              清除图片缓存
+            </p>
+            <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
+              清理已下载的插画和小说封面缓存
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* 图床代理入口 */}

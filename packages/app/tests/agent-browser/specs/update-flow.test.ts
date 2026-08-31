@@ -88,7 +88,7 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 更新流程", 
     // I 类：轮询间隔 2500ms → 500ms，次数 6 → 30，总超时上限保持 ~15s
     for (let attempt = 0; attempt < 30; attempt++) {
       const s = await driver.snapshot();
-      if (s.includes("检查更新") || s.includes("账户与数据")) break;
+      if (s.includes("检查更新") || s.includes("更新与关于")) break;
       await driver.evaluate(
         `(() => { const b = document.querySelector('nav[aria-label="主导航"] button[aria-label="设置"]'); if (b) { b.click(); return 'clicked'; } return 'not-found'; })()`,
       );

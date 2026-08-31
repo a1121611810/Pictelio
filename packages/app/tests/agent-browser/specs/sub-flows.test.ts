@@ -633,7 +633,7 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 共享会话", 
       // 等设置页「关于」行渲染，替代固定 SLEEP
       await driver.waitForSelector('[aria-label="关于"]', 10_000);
 
-      // 尝试点击设置页"关于"行（SettingsAccount，aria-label="关于"）
+      // 尝试点击设置页"关于"行（SettingsUpdate，aria-label="关于"）
       const aboutOk = await driver.clickReliable("关于", undefined, '[aria-label="关于"]');
       if (!aboutOk) {
         // fallback: 直接导航到 /about
