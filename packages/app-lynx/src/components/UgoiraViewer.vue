@@ -103,7 +103,9 @@ onBeforeUnmount(() => {
 <template>
   <view class="w-full flex flex-col items-center">
     <view v-if="loading" class="shimmer w-full rounded-[var(--md-shape-medium)]" :style="{ height: heightVw }" />
-    <image v-else-if="currentSrc" class="w-full rounded-[var(--md-shape-medium)]" :style="{ height: heightVw }" :src="currentSrc" :mode="'aspectFit'" />
+    <!-- ADR-0126：defer-src-invalidation 防换帧闪烁（官方语义：新加载成功后才清除已展示图片；
+         原型实测 374/374 帧零空白，见 docs/research/ugoira-playback-flicker-range-proto.md） -->
+    <image v-else-if="currentSrc" defer-src-invalidation class="w-full rounded-[var(--md-shape-medium)]" :style="{ height: heightVw }" :src="currentSrc" :mode="'aspectFit'" />
     <text v-if="errorMsg" class="text-body-small text-error p-4">{{ errorMsg }}</text>
   </view>
 </template>
