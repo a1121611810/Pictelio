@@ -1,9 +1,9 @@
 {
-  "version": "4.23.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.23.0",
-  "changelog": "🧹 杂项\n  e5b859c chore: merge ugoira native streaming (ADR-0128)\n  2d9891e chore: merge ugoira streaming playback (ADR-0127)\n  21482ea chore: merge ugoira fixes (ADR-0126)\n📝 文档\n  34212ec docs: ADR-0128 E2E 证据 + 批次诊断日志；lynx 流式渐进收尾（T3 设备验证：首帧 2.5s vs 全量 35s）\n  cc9a7c6 docs: ADR-0127 + 原型取证报告 + 双端术语文档（流式取帧/渐进播放/帧就绪）\n  ff01c21 docs: 替代方案调研合并深化（fflate 源码/Capacitor 契约/Pixiv API 类型）\n  84179cf docs: ugoira 替代方案调研（流式 fflate 渐进播放为推荐路径）\n  158f32d docs: 官方 zip_player range 方案对照调研 + ADR-0126 背景补注\n  f87dd11 docs(settings): 统一 ugoira 设置文案——明确 Range 失败自动切换 fflate 全量\n  4e939b3 docs: ugoira 双端术语文档 + ADR-0126（闪烁/range 降级/缓存命中）+ 原型取证报告\n✨ 新功能\n  8ac1eea feat(lynx): ugoira 原生流式渐进 JS 接线（封装 + 播放器尾部等待，ADR-0128 T2）\n  6d26ccc feat(lynx): ugoira 原生流式渐进核心 + 拉模式状态机（ADR-0128，T1）\n  e5a8910 feat(app): 详情页 ugoira 渐进播放接线（首帧即播+增量追加+尾部等待，ADR-0127 T3）\n  8f3dd2d feat(app): streamUgoiraFrames 流式渐进取帧接线（ADR-0127，T2）\n  6922f4d feat(ugoira): createStreamFrameSource 流式取帧器（ADR-0127，T1）\n  9689707 feat(lynx): ugoiraExtract per-illust 目录 + 帧完整性缓存命中，二次播放零下载（#274）\n🐛 修复\n  0be11ea fix(app): extractRange 失败释放已建 blob URL（code-review S1）\n  79876ab fix(app): ugoira range 取帧失败自动降级 fflate + warn（#273）\n  01e32ee fix(lynx): UgoiraViewer 加 defer-src-invalidation 消除换帧闪烁（#272）\n🧪 测试\n  baf4dc2 test: ugoira 修复配套契约测试（range 降级路径/缓存命中/呈现回归）",
+  "version": "4.24.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.24.0",
+  "changelog": "📝 文档\n  0af6da9 docs(lynx): 多图详情列表 spec §6 验证清单——模拟器实测通过（T3 #289）\n  037b499 docs(adr): ADR-0097 追加统一双审计治理记录\n  9a3335c docs: update OpenWiki (#285)\n✨ 新功能\n  4dda78e feat(lynx): 多图详情改通栏连续大图列表（ADR-0129 #286 #287 #288）\n🧹 杂项\n  a639e33 chore(lynx): 移除 ugoira T0-DIAG 诊断代码（真机验证闭环完成）\n  5b552b7 chore(agents): code-review skill 统一双审计（审计一调用点完备性 + 共享强制机制 + 8 维度卡点）\n🐛 修复\n  72afd04 fix(lynx): UgoiraViewer 诊断导出按钮改为图上悬浮——外层定高 overflow-hidden 容器裁剪\n  2e44a32 fix(lynx): ugoira 换帧闪烁真机回归——defer-src-invalidation 布尔绑定 + T0-DIAG 诊断通道",
   "webBundle": {
-    "version": "4.23.0",
-    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.23.0/pictelio-4.23.0"
+    "version": "4.24.0",
+    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.24.0/pictelio-4.24.0"
   }
 }
