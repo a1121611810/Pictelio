@@ -9,6 +9,14 @@
 1. **lynx**：动图能显示，但加载结束后播放**持续闪烁**，无论哪种播放方案（fflate/range、原生/web 管线都闪）。
 2. **app（webview）**：选择 range 流式取帧方案 → **提示加载失败**。
 
+用户追问「range 是官方方案，为何会失效」——官方 `pixiv/zip_player` 与我们的实现「形似神不似」：
+官方在普通浏览器直连 CDN 透传真实 206，且自带「Range 不支持 → 完整加载」兜底
+（zip_player.js `_load()` status==200 → "Range disabled or unsupported, complete load"）；
+我们的 Android 端经 `shouldInterceptRequest` + `WebResourceResponse` 重建响应，206 语义被
+Chromium/WebView 破坏（详见 `docs/research/ugoira-range-official-scheme-research.md`；§4
+指出官方第一个 Range 请求（尾部 trailer，offset=len-30000）必然非 0 偏移，按实测非 0 偏移
+拦截 206 必坏——故官方方案原样接入拦截层同样会崩，差异在传输层（透传 vs 重建）不在方案本身）。
+
 ## 根因（均有实证）
 
 1. **Lynx 闪烁**：`UgoiraViewer.vue` 逐帧换 `<image :src>`，而 Lynx `<image>` 默认
