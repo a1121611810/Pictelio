@@ -107,23 +107,29 @@ async function fetchRange(url: string, start: number, end: number): Promise<Uint
 
 /**
  * Range 流式取帧（方案 A，官方 zip_player 做法）：
- * HEAD 拿长度 → 尾部 30KB 解析 EOCD → 中央目录 → 按帧偏移逐帧 Range 取字节（load-ahead）。
- * store 条目直接切片；deflate 条目由 sliceStoreFrame fallback（inflateSync）。
+ * 探测总长 → 尾部 30KB 解析 EOCD → 中央目录 → 按帧偏移逐帧 Range 取字节（load-ahead）。
+ * store 条目直接切片；deflate 条目由 deflateInflate fallback。
+ *
+ * 总长探测用 GET + Range bytes=0-0 + Content-Range 解析（ADR-0126）：
+ * Android WebView 拦截器对 HEAD 响应头不透明（Content-Length 对 fetch 不可见），
+ * 与 lynx 侧 §7.1「HEAD 拒绝」同源——官方规避路径。
  */
 async function extractRange(
   zipUrl: string,
   meta: { frames: { file: string; delay: number }[] },
   onProgress?: (pct: number) => void,
 ): Promise<{ frames: UgoiraFrame[]; blobUrls: string[] }> {
-  // 1. HEAD 拿 Content-Length（Vite 代理已验证 200 + accept-ranges）
+  // 1. GET + Range bytes=0-0 探测总长（Content-Range "bytes 0-0/TOTAL" 解析）
   onProgress?.(5);
-  const head = await fetch(zipUrl, { method: "HEAD" });
-  if (!head.ok) {
-    throw new Error(`ugoira: HEAD 失败 HTTP ${head.status}`);
+  const probe = await fetch(zipUrl, { headers: { Range: "bytes=0-0" } });
+  if (probe.status !== 206) {
+    throw new Error(`ugoira: Range 探测失败 HTTP ${probe.status}`);
   }
-  const total = parseInt(head.headers.get("content-length") ?? "", 10);
+  const contentRange = probe.headers.get("content-range") ?? "";
+  const totalMatch = /\/\s*(\d+)\s*$/.exec(contentRange);
+  const total = totalMatch ? parseInt(totalMatch[1]!, 10) : 0;
   if (!total) {
-    throw new Error("ugoira: HEAD 拿不到 zip 长度（Range 模式需要）");
+    throw new Error("ugoira: 拿不到 zip 长度（Range 模式需要）");
   }
 
   // 2. 尾部 30KB → EOCD（cdOffset 为文件绝对偏移，用 fileSize 校验）
@@ -198,9 +204,15 @@ export async function downloadAndExtractUgoira(
   const meta = await loadUgoiraMetadata(illustId);
   const zipUrl = `/pixiv-img/${meta.zip_urls.medium.split("/").slice(3).join("/")}`;
 
-  // range 模式：HEAD + 尾部目录 + 按帧偏移取字节（不走全量下载）
+  // range 模式：探测总长 + 尾部目录 + 按帧偏移取字节（不走全量下载）
+  // ADR-0126：失败（非 206 / 长度不符 / 网络错 / 拦截层截断）→ warn + 降级 fflate 全量，
+  // 与 lynx 侧 downloadUgoiraFrames 语义对称（禁止静默降级：warn 是契约）。
   if (mode === "range") {
-    return extractRange(zipUrl, meta, onProgress);
+    try {
+      return await extractRange(zipUrl, meta, onProgress);
+    } catch (err) {
+      console.warn("[ugoira] range 取帧失败，降级 fflate:", (err as Error).message);
+    }
   }
 
   // 2. 流式下载 ZIP（5%-80%）
