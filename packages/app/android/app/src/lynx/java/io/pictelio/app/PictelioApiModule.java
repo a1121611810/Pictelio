@@ -50,6 +50,116 @@ public class PictelioApiModule extends LynxModule {
     }
 
     /**
+     * 【PROTOTYPE 方案 C】Java 解压写盘（zoomed: 原型验证，非生产路径）：
+     * 下载 zip → ZipInputStream 解压 → 写 cache/ugoira-proto/frame_N.{ext} →
+     * 回调帧 file:// URL 列表（JSON 数组字符串）。
+     * 回调契约：cb(0, JSON) 成功；cb(1, errMsg) 失败。
+     */
+    @LynxMethod
+    public void protoExtractUgoira(String zipUrl, String namesJson, Callback callback) {
+        API_EXECUTOR.execute(() -> {
+            try {
+                okhttp3.Request req = new okhttp3.Request.Builder()
+                        .url(zipUrl)
+                        .addHeader("Referer", io.pictelio.app.config.OAuthConfig.REFERER)
+                        .addHeader("User-Agent", io.pictelio.app.config.OAuthConfig.USER_AGENT)
+                        .get()
+                        .build();
+                byte[] zipBytes;
+                try (okhttp3.Response resp = PixivApiCore.getSharedClient().newCall(req).execute()) {
+                    if (!resp.isSuccessful()) {
+                        callback.invoke(1, "HTTP " + resp.code());
+                        return;
+                    }
+                    try (okhttp3.ResponseBody rb = resp.body()) {
+                        zipBytes = rb != null ? rb.bytes() : new byte[0];
+                    }
+                }
+                java.io.File dir = new java.io.File(appContext().getCacheDir(), "ugoira-proto");
+                if (!dir.exists() && !dir.mkdirs()) {
+                    callback.invoke(1, "无法创建缓存目录");
+                    return;
+                }
+                // namesJson：帧文件名顺序 ["a.png","b.jpg",...]（与 meta.frames 同序）
+                org.json.JSONArray names = new org.json.JSONArray(namesJson);
+                java.util.Map<String, java.util.zip.ZipEntry> entries =
+                        new java.util.HashMap<>();
+                java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(
+                        new java.io.ByteArrayInputStream(zipBytes));
+                java.util.zip.ZipEntry entry;
+                while ((entry = zis.getNextEntry()) != null) {
+                    if (!entry.isDirectory()) entries.put(entry.getName(), entry);
+                }
+                zis.close();
+                org.json.JSONArray urls = new org.json.JSONArray();
+                for (int i = 0; i < names.length(); i++) {
+                    String name = names.getString(i);
+                    java.util.zip.ZipEntry ze = entries.get(name);
+                    if (ze == null) {
+                        callback.invoke(1, "zip 缺少帧文件: " + name);
+                        return;
+                    }
+                    String ext = name.toLowerCase().endsWith(".png") ? "png" : "jpg";
+                    java.io.File out = new java.io.File(dir, "frame_" + i + "." + ext);
+                    try (java.util.zip.ZipInputStream zis2 = new java.util.zip.ZipInputStream(
+                            new java.io.ByteArrayInputStream(zipBytes))) {
+                        java.util.zip.ZipEntry cur;
+                        byte[] buf = new byte[65536];
+                        int n;
+                        try (java.io.FileOutputStream fos = new java.io.FileOutputStream(out)) {
+                            while ((cur = zis2.getNextEntry()) != null) {
+                                if (!cur.getName().equals(name)) continue;
+                                while ((n = zis2.read(buf)) > 0) fos.write(buf, 0, n);
+                                break;
+                            }
+                        }
+                    }
+                    urls.put("file://" + out.getAbsolutePath());
+                }
+                Log.i(TAG, "[proto] extractUgoira 帧写盘完成: " + urls.length() + " 帧 → callback.invoke");
+                callback.invoke(0, urls.toString());
+                Log.i(TAG, "[proto] extractUgoira callback.invoke 已返回");
+            } catch (Throwable e) {
+                Log.w(TAG, "[proto] extractUgoira 失败: " + zipUrl, e);
+                callback.invoke(1, e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+            }
+        });
+    }
+
+    /**
+     * 【PROTOTYPE 方案 B】Java 网关下载：JS 传绝对 URL，Java 侧 OkHttp 下载
+     * 字节（注入 Referer/UA），base64 回传 JS（原型验证用，非生产路径）。
+     * 回调契约：cb(0, base64) 成功；cb(1, errMsg) 失败。
+     */
+    @LynxMethod
+    public void protoDownloadFile(String url, Callback callback) {
+        API_EXECUTOR.execute(() -> {
+            try {
+                okhttp3.Request req = new okhttp3.Request.Builder()
+                        .url(url)
+                        .addHeader("Referer", io.pictelio.app.config.OAuthConfig.REFERER)
+                        .addHeader("User-Agent", io.pictelio.app.config.OAuthConfig.USER_AGENT)
+                        .get()
+                        .build();
+                try (okhttp3.Response resp = PixivApiCore.getSharedClient().newCall(req).execute()) {
+                    if (!resp.isSuccessful()) {
+                        callback.invoke(1, "HTTP " + resp.code());
+                        return;
+                    }
+                    byte[] bytes;
+                    try (okhttp3.ResponseBody rb = resp.body()) {
+                        bytes = rb != null ? rb.bytes() : new byte[0];
+                    }
+                    callback.invoke(0, android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP));
+                }
+            } catch (Throwable e) {
+                Log.w(TAG, "[proto] downloadFile 失败: " + url, e);
+                callback.invoke(1, e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+            }
+        });
+    }
+
+    /**
      * API 转发：JS 传 method + path（可含 query 字符串）+ body；
      * Java 侧拼完整 URL、附加 Bearer/Referer/UA，401 自动刷新重试一次。
      * 回调第三参为 401 刷新轮换后的 refresh_token（未轮换为空串），供 JS 持久化。

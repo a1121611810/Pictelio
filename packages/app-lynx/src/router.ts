@@ -36,6 +36,8 @@ import FollowList from './pages/FollowList.vue'
 import UpdatePage from './pages/UpdatePage.vue'
 import ErrorPage from './pages/ErrorPage.vue'
 import Watchlist from './pages/Watchlist.vue'
+// [PROTOTYPE] ugoira 三方案对比页（throwaway，验证后删除）
+import ProtoUgoira from './pages/ProtoUgoira.vue'
 
 export const routes: RouteDef[] = [
   { path: '/login', name: 'login', component: Login },
@@ -57,6 +59,8 @@ export const routes: RouteDef[] = [
   // 会话失效错误页（候选 #2：401 刷新失败强制重定向）：
   // backBehavior: 'exit' —— 清历史栈后进入，返回键直接退出应用，不可回退到已失效会话
   { path: '/error', name: 'error', component: ErrorPage, backBehavior: 'exit' },
+  // [PROTOTYPE] ugoira 三方案对比页（throwaway，验证后删除）
+  { path: '/proto-ugoira', name: 'proto-ugoira', component: ProtoUgoira },
 ]
 
 // [首帧内容化]（#61/#63）：初始路由为推荐页——首帧直接渲染推荐页骨架屏，
@@ -225,5 +229,6 @@ export async function initRouter(): Promise<void> {
   const ok = await restoreToken()
   // ADR-0103：账号级设置需 uid 已知（restoreToken 之后）再加载
   await loadSettings()
-  void navigate(ok ? '/recommended' : '/login', { replace: true })
+  // [PROTOTYPE] 临时首路由到 ugoira 原型页（throwaway，验证后恢复）
+  void navigate(ok ? '/proto-ugoira' : '/login', { replace: true })
 }

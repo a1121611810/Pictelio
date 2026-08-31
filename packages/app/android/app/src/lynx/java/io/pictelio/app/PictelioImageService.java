@@ -196,7 +196,15 @@ public class PictelioImageService implements ILynxImageService {
     private void loadAndDeliver(final String url, final ImageRequestInfo requestInfo,
             final ImageLoadListener loadListener, final PixivImageLoader l) {
         try {
-            byte[] bytes = l.loadBytes(PixivImageLoader.rewriteUrl(url));
+            byte[] bytes;
+            if (url.startsWith("file://")) {
+                // 【PROTOTYPE 方案 C】file:// 帧：直接读盘（Java 解压写盘产物），
+                // 不走 OkHttp（file scheme 会被拒）。原型验证路径。
+                java.io.File f = new java.io.File(android.net.Uri.parse(url).getPath());
+                bytes = java.nio.file.Files.readAllBytes(f.toPath());
+            } else {
+                bytes = l.loadBytes(PixivImageLoader.rewriteUrl(url));
+            }
             Bitmap bitmap = decodeSampled(bytes);
             if (bitmap == null) {
                 loadListener.onFailure(0, new IOException("Bitmap 解码失败: " + url));
@@ -311,8 +319,9 @@ public class PictelioImageService implements ILynxImageService {
 
     @Override
     public boolean canParseUrl(String url) {
-        // 只接管 http(s) 与 /pixiv-img/ 代理路径；data:/file:/asset: 等交给其他通道/直接失败
-        return url != null && (url.startsWith("http") || url.contains("/pixiv-img/"));
+        // 只接管 http(s) 与 /pixiv-img/ 代理路径；data:/asset: 等交给其他通道/直接失败。
+        // 【PROTOTYPE 方案 C】file:// 帧（Java 解压写盘产物）也接管。
+        return url != null && (url.startsWith("http") || url.startsWith("file://") || url.contains("/pixiv-img/"));
     }
 
     // ── Fresco 专用 API（不引 Fresco，空实现保持接口完整） ─────
