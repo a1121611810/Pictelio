@@ -78,6 +78,12 @@ scrollY 小于 header 高度（48px）时 header 恒显示，不参与隐藏。
 Pixiv 动图作品，判定条件为 `illust.type === 'ugoira'`（zip 帧序列，`page_count` 事实上恒为 1，但不做契约性互斥假设）。
 _Avoid_: GIF（ Pixiv 源格式不是 GIF ）
 
+**动图播放管线（ugoira playback pipeline）【2026-08-31，跨上下文】**
+与 app-lynx **共享「取帧数据层」**（`@pictelio/ugoira` 纯函数包：zip 解析 + fflate/Range 取帧；`downloadAndExtractUgoira`/`downloadUgoiraFrames` 同构），**渲染层各端独立**：
+- **app（webview）**：`fflate`/`range` 解压 → 帧 blob URL → `<img>` 按 delay 切换（`UgoiraViewer.tsx`）。改动的数据层与 lynx 共享，但渲染层不受 lynx 修复影响（2026-08-31 模拟器实测：webview 模式 ugoira 播放正常，持续帧切换）。
+- **app-lynx（原生）**：Java 解压写盘 + `file://` 帧（ADR-0125），详见 `packages/app-lynx/CONTEXT.md`「动图播放管线」。
+_Avoid_: 断言「双端共用同一播放实现」——共享的是数据层（zip→帧），渲染层（blob vs file://）与播放调度是独立实现。
+
 **多图（Multi-page）**：
 一个作品包含多张图片，判定条件为 `illust.page_count > 1`。与动图独立判定、允许并存（异常数据同时满足时两个标识都显示，动图在前）。
 _Avoid_: 多页（与小说分页语义混淆）

@@ -99,3 +99,20 @@ A2/B 取帧成功 + 生成 `data:image/png;base64,...` 后，`<image>` 把 data 
 - `packages/app-lynx/src/router.ts` — 注册 `/proto-ugoira` 路由 + 临时首路由（第 234 行 `[PROTOTYPE]`）
 - `packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioApiModule.java` — `protoExtractUgoira` / `protoDownloadFile`（@LynxMethod，原型专用）
 - `packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioImageService.java` — `loadAndDeliver` file:// 分支 + `canParseUrl` 放行 file://（改造点 F5，正式实现应保留此改造语义）
+
+## 九、app（webview 客户端）侧回归验证（2026-08-31 追加）
+
+**疑问**：app 与 lynx 共用 ugoira（`@pictelio/ugoira` 共享包），lynx 改动是否影响 app？
+
+**静态结论（diff 证据）**：本次改动（a60ad1e..2c970c1）仅触及：
+- `packages/app-lynx/`（api/ugoira.ts、UgoiraViewer.vue、tests）
+- `packages/app/android/app/src/lynx/java/`（PictelioApiModule、PictelioImageService）
+`packages/app/src/`、`packages/ugoira/`、`packages/app/android/app/src/main/`、`packages/app/android/app/src/webview/` **零改动**。
+
+**模拟器实测（pictelio_ui，webview 客户端模式）**：
+1. 切回 `pictelio_client_kind=webview`，启动 app → 推荐页正常
+2. 搜索「ugoira」→ 点开带「▶ 动图」角标的作品详情
+3. 点播放按钮 → **三次截图哈希全部不同（e73c... → 1fc1... → 2ab3...）→ 动图持续播放** ✓
+4. 详情页元数据（标题/作者/标签/收藏数/角标）渲染正常，无异常文本
+
+**结论**：共享的是「取帧数据层」（纯函数 zip 解析），渲染层（app=blob URL + `<img>`；lynx=file:// + `<image>`）与播放调度独立。app 侧零风险，与 ADR-0125 的「双端管线分叉是架构事实」一致。
