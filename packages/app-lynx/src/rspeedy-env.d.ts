@@ -79,9 +79,6 @@ declare global {
       openUrl(url: string, callback?: (err: string | null) => void): void
       /** 检查更新：通用 HTTP GET（原生 lynx 无 fetch 时的网络桥；cb(status, body)，2xx 成功） */
       httpGet(url: string, callback: (status: number, body: string) => void): void
-      /** T0-DIAG 临时诊断：导出日志文本（Java 预置通道：写外部私有目录 + Android 分享面板；
-       *  成功 err=null；失败 err=可读消息。验证后移除时一并删除本声明） */
-      exportDiagLog(text: string, callback: (err: string | null) => void): void
     }
     PictelioAuth: {
       loginWithRefreshToken(token: string, callback: (userInfo: string, err: string) => void): void

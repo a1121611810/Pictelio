@@ -172,7 +172,8 @@ _Avoid_: 用共享包 `createStreamFrameSource` 做原生渐进（LynxFetchModul
 
 **动图帧呈现（frame presentation）【2026-08-31，跨上下文】**
 帧切换时「把当前帧画到屏幕」的渲染层行为。Lynx `<image>` 默认在**新一次加载发起前清除已展示的图片资源**——帧切换快于解码（ugoira delay 20~80ms）时画面在「图↔空白」间高频交替（播放闪烁）；官方属性 `defer-src-invalidation`（default false）改为**新加载成功后才清除旧图**，即官方给出的闪烁解法（lynxjs.org `<image>` 文档原文；2026-08-31 原型实测：基线 325 帧中 4 次空白过渡，加属性后 374 帧 0 空白，证据见 `docs/research/ugoira-playback-flicker-range-proto.md`）。
-_Avoid_: 换双 `<image>` 层叠/onLoad 门控（实测引入隐藏层首载停滞 + 帧间隔膨胀 25%，收益与属性相同）；用 `v-if` 换帧重建元素（放大重载开销）
+**⚠️ 必须 `:defer-src-invalidation="true"` 布尔绑定**：裸属性 `defer-src-invalidation` 被 vue-lynx 模板编译器产出为 `""`（空字符串），原生 `<image>` 按 truthy 判断不生效（真机回归实测：首次合入裸属性写法后真机仍「图↔空白」闪烁，改布尔绑定后 116 帧全部 dt<delay 零空白，commit `a1e9c00`；编译产物断言由 `src/components/ugoiraViewerTemplate.test.ts` 机器防线把守）。
+_Avoid_: 换双 `<image>` 层叠/onLoad 门控（实测引入隐藏层首载停滞 + 帧间隔膨胀 25%，收益与属性相同）；用 `v-if` 换帧重建元素（放大重载开销）；写裸属性 `defer-src-invalidation`（编译为 ""，真机不生效）
 
 **帧提取模式（frame extract mode）**：
 `ugoiraMode` 设置项的两个取值：`fflate`（默认，JS 全量解压）与 `range`（Range 流式取帧）。**当前仅 web 模式生效**——原生模式走解压写盘管线，`ugoiraMode` 对其无意义；设置项保留用于 web 模式（Me 页切换）。web 模式 range 失败（非 206 / 长度不符 / 网络错）自动**降级 fflate** 并 `console.warn`（禁止静默降级，2026-08-31 与 app 侧对齐）。
