@@ -4,9 +4,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.fail;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -14,6 +16,7 @@ import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -21,6 +24,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 /**
@@ -210,4 +214,194 @@ public class PictelioApiModuleTest {
             fos.write(content.getBytes(StandardCharsets.UTF_8));
         }
     }
+    // ── ADR-0128：流式渐进（ugoiraStreamCore + UgoiraStreamEngine） ──
+    // oracle：docs/research/ugoira-native-streaming-proto.md（首批水位/批次序列/字节一致）
+
+    /** 全量解压对照（测试内实现：ZipInputStream 顺序读入 map） */
+    private static java.util.Map<String, byte[]> fullMapExtract(byte[] zip) throws IOException {
+        java.util.Map<String, byte[]> map = new java.util.HashMap<>();
+        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(zip))) {
+            ZipEntry entry;
+            byte[] buf = new byte[16 * 1024];
+            while ((entry = zis.getNextEntry()) != null) {
+                if (entry.isDirectory()) continue;
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                int n;
+                while ((n = zis.read(buf)) != -1) out.write(buf, 0, n);
+                map.put(entry.getName(), out.toByteArray());
+            }
+        }
+        return map;
+    }
+
+    @Test
+    public void streamCore_batchTimeline_andByteConsistency() throws Exception {
+        int frameCount = 200;
+        String[] names = new String[frameCount];
+        String[][] frames = new String[frameCount][];
+        for (int i = 0; i < frameCount; i++) {
+            names[i] = String.format("%06d.jpg", i);
+            int size = 2048 + (i % 7) * 512;
+            StringBuilder sb = new StringBuilder(size);
+            for (int k = 0; k < size; k++) sb.append((char) ('a' + (k + i) % 26));
+            frames[i] = new String[]{names[i], sb.toString()};
+        }
+        byte[] zip = buildStoreZip(frames);
+        File dir = tmp.newFolder("stream");
+        int[] batchCount = {0};
+        long[] firstBytes = {0};
+        java.util.List<String> allUrls = new java.util.ArrayList<>();
+        int delivered = PictelioApiModule.ugoiraStreamCore(
+                new ByteArrayInputStream(zip), framesJson(names), dir, 10, batch -> {
+                    batchCount[0]++;
+                    if (batchCount[0] == 1) firstBytes[0] = batch.bytesRead;
+                    try {
+                        for (int i = 0; i < batch.urls.length(); i++) {
+                            allUrls.add(batch.urls.getString(i));
+                        }
+                    } catch (JSONException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+        assertEquals(frameCount, delivered);
+        assertEquals(frameCount / 10, batchCount[0]);
+        // 首批水位远小于全量（oracle：原型报告首批 4.5%）
+        assertTrue("首批水位应远小于全量: " + firstBytes[0] + "/" + zip.length,
+                firstBytes[0] * 10 < zip.length);
+        // 字节一致：流式写盘（frame_N.jpg 命名规则）vs 全量解压
+        java.util.Map<String, byte[]> reference = fullMapExtract(zip);
+        for (int i = 0; i < names.length; i++) {
+            String name = names[i];
+            byte[] written = java.nio.file.Files.readAllBytes(new File(dir, "frame_" + i + ".jpg").toPath());
+            assertTrue("帧字节一致: " + name, java.util.Arrays.equals(reference.get(name), written));
+        }
+        assertEquals("交付顺序 == 帧序", frameCount, allUrls.size());
+    }
+
+    @Test
+    public void streamCore_reorderedZip_throwsReadableOrderError() throws Exception {
+        // 物理序倒置：顺序断言必须抛可读错误（JS 端降级全量路径，绝不产生错帧）
+        String[] names = {"000000.jpg", "000001.jpg"};
+        byte[] zip = buildStoreZip(new String[][]{
+                {"000001.jpg", "SECOND"},
+                {"000000.jpg", "FIRST"},
+        });
+        File dir = tmp.newFolder("reorder");
+        try {
+            PictelioApiModule.ugoiraStreamCore(new ByteArrayInputStream(zip), framesJson(names), dir, 5, b -> {});
+            fail("应抛帧序不一致错误");
+        } catch (IOException e) {
+            assertTrue(e.getMessage().contains("条目序与帧列表不一致"));
+        }
+    }
+
+    @Test
+    public void streamCore_missingFrame_throws() throws Exception {
+        byte[] zip = buildStoreZip(new String[][]{{"000000.jpg", "X"}});
+        File dir = tmp.newFolder("missing");
+        try {
+            PictelioApiModule.ugoiraStreamCore(new ByteArrayInputStream(zip),
+                    framesJson("000000.jpg", "000001.jpg"), dir, 5, b -> {});
+            fail("应抛缺帧错误");
+        } catch (IOException e) {
+            assertTrue(e.getMessage().contains("zip 缺帧"));
+        }
+    }
+
+    // ── UgoiraStreamEngine 状态机（拉模式） ──
+
+    private UgoiraStreamEngine newEngine() {
+        return new UgoiraStreamEngine(java.util.concurrent.Executors.newSingleThreadExecutor(), json -> {
+            try {
+                return new JSONArray(json).length();
+            } catch (JSONException e) {
+                throw new IOException("帧列表解析失败", e);
+            }
+        });
+    }
+
+    /** 轮询直到 done（超时 3s），返回最终 payload */
+    private org.json.JSONObject pollUntilDone(UgoiraStreamEngine engine) throws Exception {
+        long deadline = System.currentTimeMillis() + 3000;
+        org.json.JSONObject last = null;
+        while (System.currentTimeMillis() < deadline) {
+            last = engine.poll();
+            if (last.optBoolean("done")) return last;
+            Thread.sleep(10);
+        }
+        return last;
+    }
+
+    @Test
+    public void engine_streamDeliversAllBatches() throws Exception {
+        String[] names = {"000000.jpg", "000001.jpg", "000002.jpg"};
+        byte[] zip = buildStoreZip(new String[][]{
+                {"000000.jpg", "AAA"},
+                {"000001.jpg", "BBB"},
+                {"000002.jpg", "CCC"},
+        });
+        File dir = tmp.newFolder("engine");
+        UgoiraStreamEngine engine = newEngine();
+        engine.start(() -> new ByteArrayInputStream(zip), framesJson(names), dir, 1);
+        org.json.JSONObject payload = pollUntilDone(engine);
+        assertTrue(payload.optBoolean("done"));
+        assertFalse(payload.has("error"));
+        assertEquals(3, payload.optJSONArray("urls").length());
+        assertTrue(payload.optJSONArray("urls").getString(0).startsWith("file://"));
+        assertTrue(payload.optJSONArray("urls").getString(0).endsWith("frame_0.jpg"));
+    }
+
+    @Test
+    public void engine_cacheHit_deliversAllWithoutSource() throws Exception {
+        File dir = tmp.newFolder("engine-cache");
+        writeFrame(dir, "frame_0.png", "X");
+        writeFrame(dir, "frame_1.png", "Y");
+        UgoiraStreamEngine engine = newEngine();
+        boolean[] sourceCalled = {false};
+        engine.start(() -> {
+            sourceCalled[0] = true;
+            return new ByteArrayInputStream(new byte[0]);
+        }, framesJson("frame_0.png", "frame_1.png"), dir, 5);
+        org.json.JSONObject payload = pollUntilDone(engine);
+        assertTrue(payload.optBoolean("done"));
+        assertEquals(2, payload.optJSONArray("urls").length());
+        assertFalse("缓存命中不得打开网络流", sourceCalled[0]);
+    }
+
+    @Test
+    public void engine_sourceError_exposesReadableError() throws Exception {
+        File dir = tmp.newFolder("engine-err");
+        UgoiraStreamEngine engine = newEngine();
+        engine.start(() -> {
+            throw new IOException("HTTP 403");
+        }, framesJson("000000.jpg"), dir, 5);
+        org.json.JSONObject payload = pollUntilDone(engine);
+        assertTrue(payload.optBoolean("done"));
+        assertEquals("HTTP 403", payload.optString("error"));
+    }
+
+    @Test
+    public void engine_cancel_marksDoneWithoutError() throws Exception {
+        File dir = tmp.newFolder("engine-cancel");
+        UgoiraStreamEngine engine = newEngine();
+        engine.start(() -> new ByteArrayInputStream(new byte[]{1, 2, 3}), framesJson("000000.jpg"), dir, 5);
+        engine.cancel();
+        org.json.JSONObject payload = engine.poll();
+        assertTrue(payload.optBoolean("done"));
+        assertFalse("取消不是错误", payload.has("error"));
+    }
+
+    @Test
+    public void engine_restart_replacesPreviousStream() throws Exception {
+        File dir = tmp.newFolder("engine-restart");
+        UgoiraStreamEngine engine = newEngine();
+        engine.start(() -> new ByteArrayInputStream(new byte[]{1, 2, 3}), framesJson("000000.jpg"), dir, 5);
+        // 第二次 start（不同帧列表）→ 旧流被取消
+        String[] names = {"000000.jpg", "000001.jpg"};
+        byte[] zip = buildStoreZip(new String[][]{{"000000.jpg", "A"}, {"000001.jpg", "B"}});
+        engine.start(() -> new ByteArrayInputStream(zip), framesJson(names), dir, 1);
+        org.json.JSONObject payload = pollUntilDone(engine);
+        assertTrue(payload.optBoolean("done"));
+        assertEquals(2, payload.optJSONArray("urls").length());
+     }
 }
