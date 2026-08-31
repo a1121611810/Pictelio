@@ -84,6 +84,7 @@ final class UgoiraStreamEngine {
                 } catch (org.json.JSONException e) {
                     throw new IOException("缓存帧列表解析失败", e);
                 }
+                android.util.Log.i("PictelioApiModule", "ugoiraStream 缓存命中: " + cached.length() + " 帧");
                 s.done = true;
                 state = s;
                 return;

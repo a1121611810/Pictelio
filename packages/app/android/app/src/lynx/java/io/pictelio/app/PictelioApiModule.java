@@ -381,6 +381,8 @@ public class PictelioApiModule extends LynxModule {
                 batchUrls.put("file://" + outFile.getAbsolutePath());
                 frameIdx++;
                 if (frameIdx % batchSize == 0) {
+                    Log.i(TAG, "ugoiraStream 批次交付: frame=" + (frameIdx - batchSize) + "-" + (frameIdx - 1)
+                            + " 已读=" + counting.read + "B");
                     onBatch.accept(new StreamBatch(batchUrls, counting.read));
                     batchUrls = new JSONArray();
                 }
