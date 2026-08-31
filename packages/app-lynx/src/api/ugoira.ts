@@ -146,9 +146,9 @@ export interface UgoiraFrameBundle {
   delays: number[]
 }
 
-/** PictelioApi 原生模块的 ugoiraExtract 签名（与 Java 侧契约一致） */
+/** PictelioApi 原生模块的 ugoiraExtract 签名（与 Java 侧契约一致；illustId 为帧缓存目录命名空间，ADR-0126） */
 interface PictelioApiUgoiraExtract {
-  ugoiraExtract: (zipUrl: string, framesJson: string, cb: (status: number, data: string) => void) => void
+  ugoiraExtract: (zipUrl: string, framesJson: string, illustId: string, cb: (status: number, data: string) => void) => void
 }
 
 /**
@@ -173,7 +173,7 @@ export async function ugoiraExtractFrames(
     throw new Error("ugoira: PictelioApi.ugoiraExtract 不可用（原生模块未注册或非原生模式）")
   }
   const urlsJson = await new Promise<string>((resolve, reject) => {
-    api.ugoiraExtract(zipUrl, framesJson, (status, data) => {
+    api.ugoiraExtract(zipUrl, framesJson, String(illustId), (status, data) => {
       if (status === 0) resolve(data)
       else reject(new Error(`ugoira: ${data}`))
     })
