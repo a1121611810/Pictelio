@@ -1,9 +1,9 @@
 {
-  "version": "4.22.1",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.22.1",
-  "changelog": "🐛 修复\n  8895ef1 fix(app): R8 keep 规则保住 Room 生成类构造器，修复 v4.22.0 Release 启动闪退",
+  "version": "4.22.2",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.22.2",
+  "changelog": "📝 文档\n  14d2036 docs: app(webview) 侧 ugoira 回归验证证据 + 双端共享边界术语\n  df33045 docs(lynx): ugoira 原生播放管线术语文档 + ADR-0125（Java 解压写盘选型）\n🐛 修复\n  2c970c1 fix(lynx): code-review 闭环修复（ugoira 管线 8 项 findings）\n✨ 新功能\n  3b7c36b feat(lynx): ugoira 原生模式解压写盘管线（修复 issue #218）",
   "webBundle": {
-    "version": "4.22.1",
-    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.22.1/pictelio-4.22.1"
+    "version": "4.22.2",
+    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.22.2/pictelio-4.22.2"
   }
 }
