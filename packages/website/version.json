@@ -1,9 +1,9 @@
 {
-  "version": "4.22.2",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.22.2",
-  "changelog": "📝 文档\n  14d2036 docs: app(webview) 侧 ugoira 回归验证证据 + 双端共享边界术语\n  df33045 docs(lynx): ugoira 原生播放管线术语文档 + ADR-0125（Java 解压写盘选型）\n🐛 修复\n  2c970c1 fix(lynx): code-review 闭环修复（ugoira 管线 8 项 findings）\n✨ 新功能\n  3b7c36b feat(lynx): ugoira 原生模式解压写盘管线（修复 issue #218）",
+  "version": "4.23.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.23.0",
+  "changelog": "🧹 杂项\n  e5b859c chore: merge ugoira native streaming (ADR-0128)\n  2d9891e chore: merge ugoira streaming playback (ADR-0127)\n  21482ea chore: merge ugoira fixes (ADR-0126)\n📝 文档\n  34212ec docs: ADR-0128 E2E 证据 + 批次诊断日志；lynx 流式渐进收尾（T3 设备验证：首帧 2.5s vs 全量 35s）\n  cc9a7c6 docs: ADR-0127 + 原型取证报告 + 双端术语文档（流式取帧/渐进播放/帧就绪）\n  ff01c21 docs: 替代方案调研合并深化（fflate 源码/Capacitor 契约/Pixiv API 类型）\n  84179cf docs: ugoira 替代方案调研（流式 fflate 渐进播放为推荐路径）\n  158f32d docs: 官方 zip_player range 方案对照调研 + ADR-0126 背景补注\n  f87dd11 docs(settings): 统一 ugoira 设置文案——明确 Range 失败自动切换 fflate 全量\n  4e939b3 docs: ugoira 双端术语文档 + ADR-0126（闪烁/range 降级/缓存命中）+ 原型取证报告\n✨ 新功能\n  8ac1eea feat(lynx): ugoira 原生流式渐进 JS 接线（封装 + 播放器尾部等待，ADR-0128 T2）\n  6d26ccc feat(lynx): ugoira 原生流式渐进核心 + 拉模式状态机（ADR-0128，T1）\n  e5a8910 feat(app): 详情页 ugoira 渐进播放接线（首帧即播+增量追加+尾部等待，ADR-0127 T3）\n  8f3dd2d feat(app): streamUgoiraFrames 流式渐进取帧接线（ADR-0127，T2）\n  6922f4d feat(ugoira): createStreamFrameSource 流式取帧器（ADR-0127，T1）\n  9689707 feat(lynx): ugoiraExtract per-illust 目录 + 帧完整性缓存命中，二次播放零下载（#274）\n🐛 修复\n  0be11ea fix(app): extractRange 失败释放已建 blob URL（code-review S1）\n  79876ab fix(app): ugoira range 取帧失败自动降级 fflate + warn（#273）\n  01e32ee fix(lynx): UgoiraViewer 加 defer-src-invalidation 消除换帧闪烁（#272）\n🧪 测试\n  baf4dc2 test: ugoira 修复配套契约测试（range 降级路径/缓存命中/呈现回归）",
   "webBundle": {
-    "version": "4.22.2",
-    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.22.2/pictelio-4.22.2"
+    "version": "4.23.0",
+    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.23.0/pictelio-4.23.0"
   }
 }
