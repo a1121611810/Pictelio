@@ -238,6 +238,7 @@ A LynxModule for client-switching and native app control, used by the [app-lynx 
 | `getClientKinds(cb)` | Returns `BuildConfig.CLIENT_KINDS` array for ADR-0062 switch-UI hiding. Success: `cb(kinds[])`. |
 | `restart(cb)` | Activity-level restart via `FLAG_ACTIVITY_NEW_TASK \| FLAG_ACTIVITY_CLEAR_TASK`. Keeps the process alive (token memory state, OkHttp pool, disk cache preserved). The old `LynxActivity` is destroyed by `CLEAR_TASK`. Aligned with webview-side `ClientInfoPlugin.restart` (issue #120/#124). |
 | `httpGet(url, cb)` | Native HTTP GET for the lynx update-check — implements the `fetchImpl` seam of the shared `@pictelio/update-check` layer (ADR-0089, evolved from ADR-0065): fetches `version.json` from a background thread pool with an http/https scheme whitelist, 10s call timeout, and a response-body size cap (the lynx native runtime has no `fetch`). |
+| `getViewportSize(cb)` | Returns the LynxView **content-area** size `(w, h)` in px, recorded by `LynxActivity`'s `OnLayoutChangeListener` (ADR-0131). Before layout completes it calls back `(-1, -1)` so the JS side can fall back to `SystemInfo`. Used by `GlobalFab.vue` to derive bottom geometry from the actual render area rather than full-screen dimensions — fixing radial-FAB clipping under gesture-nav insets (Android 14 emulator content area is 96px shorter than the screen). |
 
 Callback signatures follow the same null-free pattern as `PictelioSecureStorageModule` — `CallbackImpl` on real devices crashes on `null` arguments.
 
@@ -378,6 +379,7 @@ The dedicated LynxView host Activity, launched by `MainActivity` when `pictelio_
 - **XElement behaviors (#51):** Sets `builder.addBehaviors(new XElementBehaviors().create())` on the `LynxViewBuilder` before view creation — required on real devices for `<input>`/`<textarea>` and other extension components. Without this, login input fields fail with `LynxError 990200`.
 - **Per-view module registration:** Registers `PictelioSecureStorage` and `PictelioApp` LynxModules (coexists with `PictelioApp` global registration; global `LynxEnv` takes priority).
 - **Template provider:** Uses `PictelioTemplateProvider` for loading the Lynx template bundle (`template.js`).
+- **Content-area viewport contract (ADR-0131):** Registers an `OnLayoutChangeListener` on the `LynxView` that records the actual render-area size (`w`, `h` in px) for `PictelioAppModule.getViewportSize(cb)`. The first layout fires before the bundle renders, so `getViewportSize` almost always returns a valid value; the JS side still falls back to `SystemInfo` on `(-1, -1)`. This fixes the radial FAB's bottom geometry, which was computed from full-screen `SystemInfo` and clipped under gesture-nav insets.
 
 ### LynxRuntimeInitializer
 
