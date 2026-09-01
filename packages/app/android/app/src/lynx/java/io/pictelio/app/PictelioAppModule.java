@@ -148,6 +148,32 @@ public class PictelioAppModule extends LynxModule {
     }
 
     /**
+     * 返回 LynxView 内容区尺寸（px，ADR-0131）。
+     *
+     * <p>背景：SystemInfo（pixelWidth/pixelHeight）返回的是全屏物理尺寸，而 LynxView
+     * 内容区撇除系统导航条 inset（手势条/3 键导航），放射导航 FAB 按全屏高定位导致
+     * 底部被裁。本方法把内容区实际尺寸回传 JS，订正底部几何。
+     *
+     * <p>回调契约：{@code cb(w, h)}——未布局完成时 {@code cb(-1, -1)}，JS 侧回退
+     * SystemInfo 计算；异常同样 {@code cb(-1, -1)}（不抛）。单位：物理 px，
+     * 与 {@code SystemInfo.pixelWidth} 同基准。
+     */
+    @LynxMethod
+    public void getViewportSize(Callback callback) {
+        try {
+            int[] size = LynxActivity.contentSize();
+            if (size == null) {
+                callback.invoke(-1, -1);
+                return;
+            }
+            callback.invoke(size[0], size[1]);
+        } catch (Exception e) {
+            Log.w(TAG, "getViewportSize 失败", e);
+            callback.invoke(-1, -1);
+        }
+    }
+
+    /**
      * 退出 Lynx 宿主 Activity（ADR-0066 系统返回桥：JS 根路由双击退出时调用）。
      * 主线程执行 finish()；目标 Activity 由 LynxActivity 静态弱引用提供（onDestroy 清理），
      * 未持有引用时静默成功（Activity 已不在前台，无需退出动作）。

@@ -49,6 +49,17 @@ public class LynxActivity extends AppCompatActivity {
     /** 当前 Activity 弱引用（PictelioAppModule.exitApp 使用，ADR-0066；onDestroy 清理） */
     private static WeakReference<LynxActivity> sInstance;
 
+    // ADR-0131：LynxView 内容区尺寸（px；首次布局后更新；-1 = 未布局）。
+    // SystemInfo 是全屏物理尺寸，内容区撇除系统导航条 inset（FAB 底部被裁根因），
+    // 故以实际内容区为准，经 PictelioAppModule.getViewportSize 回传 JS 订正底部几何。
+    private static volatile int sContentW = -1;
+    private static volatile int sContentH = -1;
+
+    /** 内容区尺寸 [w, h]（px）；未布局返回 null。 */
+    static int[] contentSize() {
+        return (sContentW > 0 && sContentH > 0) ? new int[] { sContentW, sContentH } : null;
+    }
+
     /** exitApp 目标：当前 LynxActivity（可能为 null） */
     static LynxActivity current() {
         return sInstance != null ? sInstance.get() : null;
@@ -121,6 +132,16 @@ public class LynxActivity extends AppCompatActivity {
         });
 
         setContentView(lynxView);
+        // ADR-0131：内容区尺寸契约——记录 LynxView 实际内容区（撇除系统导航条等 inset），
+        // 供 PictelioAppModule.getViewportSize 回传 JS 订正底部几何（放射 FAB 定位）。
+        // 首次布局即触发，早于 bundle 渲染，getViewportSize 几乎必然命中有效值。
+        // 生命周期：lambda 仅写静态字段、不捕获 this，随 lynxView destroy() 释放，无泄漏。
+        lynxView.addOnLayoutChangeListener((v, left, top, right, bottom, ol, ot, or, ob) -> {
+            if (right - left > 0 && bottom - top > 0) {
+                sContentW = right - left;
+                sContentH = bottom - top;
+            }
+        });
         // ADR-0066：系统返回桥——拦截系统返回（手势/按键），bundle 就绪后仅转发 JS 决策
         // （不自行退出）；bundle 未就绪时 JS 侧无监听者，原生兜底退出，避免卡死。
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
@@ -297,6 +318,10 @@ public class LynxActivity extends AppCompatActivity {
         // 取消未触发的加载超时回调，避免 Activity 销毁后仍执行 setContentView
         cancelLoadTimeout();
         sInstance = null; // ADR-0066：清理 exitApp 目标引用
+        // ADR-0131：复位内容区尺寸（静态字段跨实例复用）——销毁后回到「未布局」哨兵，
+        // 保证新实例首次查询（若先于布局）命中「cb(-1,-1) → JS 回退 SystemInfo」契约语义。
+        sContentW = -1;
+        sContentH = -1;
         if (lynxView != null) {
             lynxView.destroy();
         }
