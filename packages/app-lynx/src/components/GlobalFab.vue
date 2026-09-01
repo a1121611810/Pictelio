@@ -4,6 +4,7 @@ import { getGlobalFab } from '../stores/globalFab'
 import { A11Y_ELEMENT_ENABLED, GLOBAL_FAB_A11Y_LABELS } from '../utils/accessibility'
 import { screenHeightVw as deriveScreenHeightVw, type ViewportContentSize, type ViewportSystemInfo } from '../utils/viewportGeometry'
 import { subscribeViewportSize } from '../utils/viewportSizeBridge'
+import { GLOBAL_SEARCH_A11Y_LABEL } from '../primitives/createGlobalFab'
 
 // ─── 放射导航薄渲染适配器（ADR-0120）───
 // 读 globalFab.view、调 globalFab.dispatch；双层环几何与动效在此适配器，
@@ -39,6 +40,20 @@ const FAB_RIGHT_VW = 4.267
 const FAB_SIZE_VW = 14.933
 const R_OUTER_VW = 35 // 外环半径（vw；56dp 大圆需更大半径防重叠，ADR-0121）
 const R_INNER_VW = 20 // 内环半径（vw；动作圆与 FAB/外环拉开，避免重叠）
+// tailwind spacing 1 档 = 1.067vw（375dp 基准：4px / 3.75px，与 RefreshableList bottom-4 同口径）
+const SPACING_UNIT_VW = 1.067
+// search 模式堆叠偏移（ADR-0132 决策 2「双 FAB 竖排堆叠」——几何推导，P1-1 修复）：
+// 非 tab 列表页与 RefreshableList 的 feed 分页 FAB（bottom-4 right-4 56dp）同角竖排。
+// 分页 FAB 竖向占用（自屏幕底边起算）：[bottom-4=4.267vw, 4.267+14.933=19.2vw]，
+// 分页**菜单**自浮层槽位 bottom-[20.267vw] 向上展开（RefreshableList.vue:142）——
+// 菜单面板 = 2 pill（刷新/回顶，各 10.667vw）+ 1.067vw 间隙 = 22.4vw，面板顶 = 42.667vw；
+// 搜索 FAB 若停在 20.267vw 槽位，菜单展开时「刷新」项会被搜索 FAB 遮挡并吞点击
+// （GlobalFab z-40 > 菜单 z-20）。故搜索 FAB 底边 = 面板顶 42.667 + 1.067 间隙 = 43.734vw。
+// 注意：当前非 tab 列表页均无 `:items`（菜单恒 2 项）；若未来传入 extras（菜单增项），
+// 须同步更新 FAB_MENU_PANEL_HEIGHT_VW（或改用菜单状态联动方案）。
+const FAB_MENU_PANEL_HEIGHT_VW = 10.667 * 2 + SPACING_UNIT_VW
+const FAB_BOTTOM_MARGIN_SEARCH_VW =
+  FAB_RIGHT_VW + FAB_SIZE_VW + SPACING_UNIT_VW + FAB_MENU_PANEL_HEIGHT_VW + SPACING_UNIT_VW
 
 declare const SystemInfo: ViewportSystemInfo
 
@@ -67,7 +82,10 @@ function screenHeightVw(): number {
 }
 
 const fabCx = 100 - FAB_RIGHT_VW - FAB_SIZE_VW / 2
+// menu 模式：底边 = bottom-4（4.267vw 尾随边距）→ 中心坐标 = H - 4.267 - 14.933/2
 const fabCy = computed(() => screenHeightVw() - FAB_RIGHT_VW - FAB_SIZE_VW / 2)
+// search 模式：底边 = 43.734vw（分页菜单面板顶 + 间隙，见上方注释）→ 中心 = H - 43.734 - 14.933/2
+const fabCySearch = computed(() => screenHeightVw() - FAB_BOTTOM_MARGIN_SEARCH_VW - FAB_SIZE_VW / 2)
 
 // ── 定位（ADR-0123）：子元素一律 left/top vw（vw=视口基准），锚点=外层 (0,0) 零尺寸盒 ──
 // [lynx:fix] 原生 LynxView 把「最近的 view 祖先」当作 absolute 子元素的定位锚点
@@ -83,10 +101,11 @@ const scrimStyle = computed<Record<string, string>>(() => ({
   height: `${screenHeightVw()}vw`,
 }))
 
-/** 主 FAB：left/top vw + translate 居中（相对 (0,0) 锚点 = 视口坐标，恒在右下角）。 */
+/** 主 FAB：left/top vw + translate 居中（相对 (0,0) 锚点 = 视口坐标，恒在右下角）。
+ *  search 模式（ADR-0132 全局搜索）较 menu 模式上移一档：feed 分页 FAB 同角竖排堆叠不遮挡。 */
 const fabStyle = computed<Record<string, string>>(() => ({
   left: `${fabCx}vw`,
-  top: `${fabCy.value}vw`,
+  top: `${view.value.mode === 'search' ? fabCySearch.value : fabCy.value}vw`,
   width: `${FAB_SIZE_VW}vw`,
   height: `${FAB_SIZE_VW}vw`,
   transform: 'translate(-50%,-50%)',
@@ -143,10 +162,33 @@ const fabWrapStyle = computed<Record<string, string>>(() => ({
 function dispatchToggle(): void { void fab.dispatch({ type: 'toggle' }) }
 function dispatchClose(): void { void fab.dispatch({ type: 'close' }) }
 function dispatchSelect(name: string): void { void fab.dispatch({ type: 'select', name }) }
-function dispatchInner(item: { kind: 'refresh' | 'back-to-top' | 'extra'; key: string }): void {
+function dispatchSearch(): void { void fab.dispatch({ type: 'search' }) }
+function dispatchInner(item: { kind: 'search' | 'refresh' | 'back-to-top' | 'extra'; key: string }): void {
   if (item.kind === 'refresh') void fab.dispatch({ type: 'refresh' })
   else if (item.kind === 'back-to-top') void fab.dispatch({ type: 'back-to-top' })
+  else if (item.kind === 'search') dispatchSearch()
   else void fab.dispatch({ type: 'extra', key: item.key })
+}
+
+/** 主 FAB 图标：menu 模式 = 当前 tab 图标（展开为 ✕ / busy 旋转）；search 模式 = 搜索按钮 🔍。 */
+const fabIconText = computed(() => {
+  if (view.value.mode === 'search') return '🔍'
+  return view.value.isOpen ? '✕' : fabIcon.value
+})
+
+/** 主 FAB 标注：search 模式 = 打开搜索；menu 模式 = 开/关菜单（GLOBAL_FAB_A11Y_LABELS）。 */
+const fabA11yLabel = computed(() => {
+  if (view.value.mode === 'search') return GLOBAL_SEARCH_A11Y_LABEL
+  return view.value.isOpen ? GLOBAL_FAB_A11Y_LABELS.close : GLOBAL_FAB_A11Y_LABELS.open
+})
+
+/** 主 FAB tap：search 模式 = 直达搜索（不发 toggle、不展开放射菜单，ADR-0132 决策 2）。 */
+function onFabTap(): void {
+  if (view.value.mode === 'search') {
+    dispatchSearch()
+    return
+  }
+  dispatchToggle()
 }
 </script>
 
@@ -189,7 +231,7 @@ function dispatchInner(item: { kind: 'refresh' | 'back-to-top' | 'extra'; key: s
         >{{ e.tab.label }}</text>
       </view>
 
-      <!-- 内环：页面动作项（刷新/回顶/扩展）——固定圆形尺寸（vw 缩放） -->
+      <!-- 内环：全局搜索项（首位）+ 页面动作项（刷新/回顶/扩展）——固定圆形尺寸（vw 缩放） -->
       <view
         v-for="e in innerPair"
         :key="e.item.key"
@@ -203,21 +245,24 @@ function dispatchInner(item: { kind: 'refresh' | 'back-to-top' | 'extra'; key: s
       </view>
     </view>
 
-    <!-- 主 FAB：展开成 close，收起为当前 tab 图标；busy 时转圈/禁用 -->
+    <!-- 主 FAB：menu 模式展开成 close、收起为当前 tab 图标（busy 时转圈/禁用）；
+         search 模式（ADR-0132 直达模式）FAB 本体即搜索按钮（🔍），点按 dispatch('search')，
+         上移一档与 feed 分页 FAB 竖排堆叠；遮罩/环层 v-if="view.isOpen"（非 tab 路由恒 false，
+         关闭态渲染树无全屏元素——ADR-0123 约束）。 -->
     <view
       class="absolute z-30 flex items-center justify-center rounded-[var(--md-shape-large)] bg-primary-container shadow-[var(--md-elevation-3)] active:shadow-[var(--md-elevation-1)]"
       :class="view.isBusy ? 'opacity-60' : ''"
       :style="fabStyle"
       :accessibility-element="A11Y_ELEMENT_ENABLED"
-      :accessibility-label="view.isOpen ? GLOBAL_FAB_A11Y_LABELS.close : GLOBAL_FAB_A11Y_LABELS.open"
-      @tap="dispatchToggle"
+      :accessibility-label="fabA11yLabel"
+      @tap="onFabTap"
     >
       <view :style="fabWrapStyle">
         <text
           class="leading-none text-primary-on-container"
           :class="{ 'fab-ring-spin': view.isBusy && !view.isOpen }"
           style="font-size: 6.4vw"
-        >{{ view.isOpen ? '✕' : fabIcon }}</text>
+        >{{ fabIconText }}</text>
       </view>
     </view>
   </view>

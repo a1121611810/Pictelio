@@ -14,7 +14,7 @@ import { loadUserNovels, loadBookmarks as loadNovelBookmarks, loadFollow as load
 import { bytesToDataUrl, downloadUgoiraFrames, ugoiraExtractFrames, ugoiraExtractStreamFrames } from '../src/api/ugoira'
 import type { UgoiraExtractMode } from '../src/api/ugoira'
 import { ugoiraMode as lynxUgoiraMode, setUgoiraMode as lynxSetUgoiraMode } from '../src/stores/settingsStore'
-import { ME_A11Y_LABELS, LOGIN_A11Y_LABELS, UPDATE_A11Y_LABELS, ERROR_A11Y_LABELS, FAB_MENU_A11Y_LABELS, GLOBAL_FAB_A11Y_LABELS, WATCHLIST_A11Y_LABELS, WATCHLIST_PROMPT_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../src/utils/accessibility'
+import { ME_A11Y_LABELS, LOGIN_A11Y_LABELS, UPDATE_A11Y_LABELS, ERROR_A11Y_LABELS, FAB_MENU_A11Y_LABELS, GLOBAL_FAB_A11Y_LABELS, WATCHLIST_A11Y_LABELS, WATCHLIST_PROMPT_A11Y_LABELS, SEARCH_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../src/utils/accessibility'
 
 describe('imageUrl.proxyImageUrl', () => {
   it('将 i.pximg.net URL 重写为本地代理路径', () => {
@@ -1268,6 +1268,51 @@ describe('GlobalFab.vue 展开态几何与层叠（ADR-0121/0123）', () => {
   })
 })
 
+// ─── 全局搜索 FAB 双形态渲染标记（ADR-0131 / spec #290 T4） ───
+// 沿用「模板源码断言」约定。T4 在 ADR-0121/0123 既有结构断言之外，
+// 增加 search 模式（直达模式）渲染分支的源码断言。期望值来源：ADR-0131 决策 2
+//（非 tab 内容页 FAB 本体即搜索按钮）+ 堆叠几何推导（分页 FAB 槽位 20.267vw），非从实现反推。
+describe('GlobalFab.vue search 模式渲染标记（ADR-0131）', () => {
+  const globalFabVue = readFileSync(fileURLToPath(new URL('../src/components/GlobalFab.vue', import.meta.url)), 'utf8')
+
+  it('search 模式主 FAB：🔍 图标 + 点按 dispatch("search") + a11y 标注', () => {
+    expect(globalFabVue).toContain("if (view.value.mode === 'search') return '🔍'")
+    expect(globalFabVue).toContain("fab.dispatch({ type: 'search' })")
+    expect(globalFabVue).toContain(':accessibility-label="fabA11yLabel"')
+    expect(globalFabVue).toContain('GLOBAL_SEARCH_A11Y_LABEL')
+    expect(globalFabVue).toContain('@tap="onFabTap"')
+  })
+
+  it('主 FAB tap 分支：search 模式直达搜索（不发 toggle、不展开放射菜单）；menu 模式不变', () => {
+    expect(globalFabVue).toContain("if (view.value.mode === 'search') {")
+    expect(globalFabVue).toContain('dispatchToggle()') // menu 模式 tap 仍走 toggle
+  })
+
+  it('内环全局搜索项路由到 search 命令（dispatchInner kind=search 分支）', () => {
+    expect(globalFabVue).toContain("item.kind === 'search'")
+    expect(globalFabVue).toContain("kind: 'search' | 'refresh' | 'back-to-top' | 'extra'")
+  })
+
+  it('几何：search 模式抬至分页菜单面板之上（双 FAB 堆叠 + 菜单高度，review P1-1）', () => {
+    // 分页 FAB 底边 4.267 + 高 14.933 + 间隙 1.067 = 20.267vw（RefreshableList 浮层槽位）
+    // + 菜单面板（2 pill 各 10.667 + 间隙 1.067 = 22.4vw，面板顶 42.667）+ 间隙 1.067 = 43.734vw
+    expect(globalFabVue).toContain('const FAB_MENU_PANEL_HEIGHT_VW = 10.667 * 2 + SPACING_UNIT_VW')
+    expect(globalFabVue).toContain(
+      'const FAB_BOTTOM_MARGIN_SEARCH_VW =\n  FAB_RIGHT_VW + FAB_SIZE_VW + SPACING_UNIT_VW + FAB_MENU_PANEL_HEIGHT_VW + SPACING_UNIT_VW',
+    )
+    // 内容区契约（ADR-0131）使几何依赖异步回调 → fabCySearch 为 computed（值经 screenHeightVw() 派生）
+    expect(globalFabVue).toContain('const fabCySearch = computed(() => screenHeightVw() - FAB_BOTTOM_MARGIN_SEARCH_VW - FAB_SIZE_VW / 2)')
+    expect(globalFabVue).toContain("top: `${view.value.mode === 'search' ? fabCySearch.value : fabCy.value}vw`")
+  })
+
+  it('search 模式不渲染遮罩/环层：外层仍 v-if="view.visible"（search 也渲染 FAB），遮罩/环层仍 v-if="view.isOpen"（ADR-0123）', () => {
+    // 深模块保证非 tab 路由 isOpen 恒 false → search 模式渲染树只有主 FAB
+    expect(globalFabVue).toContain('<view v-if="view.visible" class="absolute z-40" style="top: 0; left: 0">')
+    expect(globalFabVue).toMatch(/v-if="view\.isOpen"\s+class="absolute z-10 bg-scrim scrim-in"/)
+    expect(globalFabVue).toContain('v-if="view.isOpen" class="absolute z-20"')
+  })
+})
+
 // ─── Update 页 accessibility 标注（检查更新：强制更新页的退出/下载按钮） ───
 // 与页面级同一套「注册表 + 模板源码断言」约定。
 describe('Update 页 accessibility 标注（检查更新）', () => {
@@ -1281,6 +1326,39 @@ describe('Update 页 accessibility 标注（检查更新）', () => {
     const elementCount = (updateVueSource.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
     expect(labelCount).toBe(Object.keys(UPDATE_A11Y_LABELS).length)
     expect(elementCount).toBe(labelCount)
+  })
+})
+
+// ─── 全局搜索弹层 accessibility 标注（issue #295 / ADR-0131） ───
+// 弹层全局单例挂载于 App.vue，E2E（Appium/agent-browser）需定位输入框（聚焦+注入
+// 关键词）与关闭按钮。沿用「注册表 + 模板源码断言」约定（Me/Watchlist 同款）；
+// 弹层行为由 SearchSheet.test.ts 模板契约测试 + 各 store/primitive 单测兜底。
+describe('全局搜索弹层 accessibility 标注（issue #295）', () => {
+  const searchSheetVueSource = readFileSync(fileURLToPath(new URL('../src/components/SearchSheet.vue', import.meta.url)), 'utf8')
+
+  it('注册表 label 全部非空且唯一', () => {
+    const labels = Object.values(SEARCH_A11Y_LABELS)
+    expect(labels.length).toBeGreaterThan(0)
+    for (const label of labels) expect(label.length).toBeGreaterThan(0)
+    expect(new Set(labels).size).toBe(labels.length)
+  })
+
+  it('SEARCH_A11Y_LABELS 全部被 SearchSheet.vue 模板消费', () => {
+    for (const key of Object.keys(SEARCH_A11Y_LABELS)) {
+      expect(searchSheetVueSource).toContain(`:accessibility-label="SEARCH_A11Y_LABELS.${key}"`)
+    }
+  })
+
+  it('每个 accessibility-label 都配套开启 accessibility-element（view 默认不进 a11y 树）', () => {
+    const labelCount = (searchSheetVueSource.match(/:accessibility-label="SEARCH_A11Y_LABELS\.\w+"/g) ?? []).length
+    const elementCount = (searchSheetVueSource.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
+    expect(labelCount).toBe(Object.keys(SEARCH_A11Y_LABELS).length + 1) // retry 出现两处（首载错误 + 分页内联）
+    expect(elementCount).toBe(labelCount)
+  })
+
+  it('输入框 / 关闭按钮标注存在（模拟器 E2E 闭环锚点）', () => {
+    expect(SEARCH_A11Y_LABELS.input).toBe('搜索输入框')
+    expect(SEARCH_A11Y_LABELS.close).toBe('关闭搜索')
   })
 })
 

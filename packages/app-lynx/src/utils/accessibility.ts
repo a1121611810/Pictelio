@@ -72,6 +72,25 @@ export const FAB_MENU_A11Y_LABELS = {
 export const GLOBAL_FAB_A11Y_LABELS = {
   open: '打开菜单',
   close: '关闭菜单',
+  // 全局搜索入口标注（ADR-0132）：内环「搜索」项 + search 模式主 FAB 共用
+  search: '搜索',
+} as const
+
+/** 全局搜索弹层 accessibility 标注（issue #295 / ADR-0132 / spec D5）：
+ * 弹层全局单例挂载于 App.vue（搜索入口唯一），Appium/模拟器 E2E 需
+ * 定位输入框（聚焦 + 注入关键词）与关闭按钮。 */
+export const SEARCH_A11Y_LABELS = {
+  input: '搜索输入框',
+  close: '关闭搜索',
+  clear: '清空搜索输入',
+  clearHistory: '清空搜索历史',
+  retry: '重试搜索',
+  scopeAll: '搜索范围全部',
+  scopeIllust: '搜索范围插画',
+  scopeNovel: '搜索范围小说',
+  sortNewest: '排序最新',
+  sortOldest: '排序最早',
+  sortPopular: '排序热门',
 } as const
 
 /** 追更列表页 accessibility 标注（issue #225：/watchlist 页 + 取消追更二次确认 Dialog） */

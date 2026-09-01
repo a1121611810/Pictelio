@@ -51,8 +51,6 @@ export const routes: RouteDef[] = [
   { path: '/bookmarks', name: 'bookmarks', component: Bookmarks },
   { path: '/me', name: 'me', component: Me },
   { path: '/watchlist', name: 'watchlist', component: Watchlist },
-  // PROTOTYPE — 全局搜索形态探索（throwaway 路由）
-  { path: '/prototype/search', name: 'prototype-search', component: PrototypeSearch },
   // 强制更新页（检查更新命中后 replace + 清历史栈进入）：
   // backBehavior: 'exit' —— 返回键直接退出应用，无返回路径
   { path: '/update', name: 'update', component: UpdatePage, backBehavior: 'exit' },
