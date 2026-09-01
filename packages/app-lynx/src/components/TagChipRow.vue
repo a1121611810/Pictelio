@@ -7,9 +7,10 @@
 // 组件保持纯展示性质（不发 do、不 import store）：点击 → emit('tag-tap', 原始 name)，
 // 由页面层决定行为（openSearch），本组件可独立渲染/测试。+N 折叠芯片**不可点**
 // （是计数不是标签，无搜索语义）。
-// [lynx:fix] 命中区：chip 视觉高度 8.5vw < M3 最小触控目标 40dp——用 -m-1 p-1 负 margin
-// 扩命中面（视觉不变）；tap 事件挂在 view 上（原生 LynxView hit-testing 不接受
-// pointer-events CSS，ADR-0123 教训）。@tap.stop 防冒泡：轮播卡片父级 @tap = 进详情。
+// [lynx:fix] 居中修复：布局（flex 居中/圆角/padding）由 view 承载、text 只放文本——
+// lynx 的 text 是纯文本节点，flex 对 text 无效（此前 items-center 不生效，文案偏上）；
+// text 内层**不得**加 leading-none（line-height:1 把字形顶到行框顶，实测确认反而更偏上）。
+// @tap.stop 防冒泡：轮播卡片父级 @tap = 进详情（ADR-0133 风险表验证点）。
 // 折叠/`#` 前缀逻辑收敛在 ../utils/tagChips 纯函数（node 可测），本组件只做渲染；
 // chips 为空时不渲染任何东西（v-if），普通卡片零占位。
 import { computed } from 'vue'
@@ -39,20 +40,24 @@ const result = computed(() => resolveTagChips(props.tags, props.max))
     <!-- key 用原始 name（text 可能因翻译名折叠出相同文本，文本 key 会冲突）。
          点击 → emit('tag-tap', 原始 name)（ADR-0133 决策 1/6）；
          @tap.stop 防冒泡：轮播卡片父级 @tap = 进详情（ADR-0133 风险表验证点，模拟器确认）。
-         命中区 = 视觉尺寸（~32px 高，M3 40dp 为目标：Lynx 原生布局对负 margin 未实证 + flex
-         数学会把视觉位置外移 → 不做 -m/p 扩展，与 CommentInputBar「取消」/SearchSheet ×
-         同规格「视觉即命中」，40dp 列为后续增强）。跳步不改视觉布局。 -->
-    <text
+         [居中修复] 视觉外观（bg/圆角/padding）由 view 承载、text 只放文本——lynx 的
+         text 是纯文本节点，flex 对 text 无效；text 内层**不得**加 leading-none
+         （line-height:1 把字形顶到行框顶，实测确认反而更偏上）。 -->
+    <view
       v-for="chip in result.chips"
       :key="chip.name"
-      class="text-label-medium font-medium text-secondary-on-container bg-secondary-container rounded-[var(--md-shape-small)] px-2 py-0.5"
+      class="flex items-center justify-center bg-secondary-container rounded-[var(--md-shape-small)] px-2 py-0.5"
       @tap.stop="emit('tag-tap', chip.name)"
-      >{{ chip.text }}</text
     >
-    <text
+      <text class="text-label-medium font-medium text-secondary-on-container">{{ chip.text }}</text>
+    </view>
+    <view
       v-if="result.overflow > 0"
-      class="text-label-medium font-medium text-secondary-on-container bg-secondary-container rounded-[var(--md-shape-small)] px-2 py-0.5"
-      >+{{ result.overflow }}</text
+      class="flex items-center justify-center bg-secondary-container rounded-[var(--md-shape-small)] px-2 py-0.5"
     >
+      <text class="text-label-medium font-medium text-secondary-on-container"
+        >+{{ result.overflow }}</text
+      >
+    </view>
   </view>
 </template>

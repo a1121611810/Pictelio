@@ -210,16 +210,21 @@ onMounted(async () => {
           <!-- 标签行（ADR-0133 可点化）：点击 → 全局搜索弹层预填该标签（原始 tag.name，
                显示仍 translated_name 优先）——与 webview SearchableTag 语义一致。
                @tap.stop 统一防冒泡（详情页父级暂无 tap，为嵌套安全保留）。
-               命中区 = 视觉尺寸（h-[8.533vw] ≈ 32px，M3 40dp 为目标的不足先例
-               ——CommentInputBar「取消」同规格「视觉即命中」，避免负 margin 布局风险）。 -->
-          <text
+               [居中修复] 布局（固定高/flex 居中/边框/圆角）由 view 承载——lynx 的 text
+               是纯文本节点，flex 对 text 无效（此前 items-center 不生效导致文案偏上，
+               实测放大切片确认）；text 内层**不得**加 leading-none——lynx text 的
+               line-height:1 会把字形顶到行框顶（flex 居中行框而非字形，反而更偏上，
+               实测对比确认），默认行高 + view items-center 即对称居中。 -->
+          <view
             v-for="tag in illust.tags.slice(0, 8)"
             :key="tag.name"
-            class="h-[8.533vw] px-2 m-1 border border-outline rounded-[var(--md-shape-small)] flex items-center justify-center text-label-large text-surface-on-variant bg-surface"
+            class="h-[8.533vw] px-2 m-1 border border-outline rounded-[var(--md-shape-small)] flex items-center justify-center bg-surface"
             @tap.stop="openSearch(tag.name)"
           >
-            #{{ tag.translated_name || tag.name }}
-          </text>
+            <text class="text-label-large text-surface-on-variant">
+              #{{ tag.translated_name || tag.name }}
+            </text>
+          </view>
         </view>
       </view>
     </scroll-view>
