@@ -49,6 +49,17 @@ public class LynxActivity extends AppCompatActivity {
     /** 当前 Activity 弱引用（PictelioAppModule.exitApp 使用，ADR-0066；onDestroy 清理） */
     private static WeakReference<LynxActivity> sInstance;
 
+    // [FAB-GEO 原型验证] LynxView 内容区尺寸（px；layout 后更新；-1 = 未布局）。
+    // 用途：SystemInfo 是全屏物理尺寸，内容区撇除系统导航条 inset（FAB 底部被裁根因）。
+    // LynxView 自身 in/out 传回 JS（PictelioAppModule.getViewportSize）。
+    private static volatile int sContentW = -1;
+    private static volatile int sContentH = -1;
+
+    /** 内容区尺寸 [w, h]（px）；未布局返回 null。 */
+    static int[] contentSize() {
+        return (sContentW > 0 && sContentH > 0) ? new int[] { sContentW, sContentH } : null;
+    }
+
     /** exitApp 目标：当前 LynxActivity（可能为 null） */
     static LynxActivity current() {
         return sInstance != null ? sInstance.get() : null;
@@ -121,6 +132,13 @@ public class LynxActivity extends AppCompatActivity {
         });
 
         setContentView(lynxView);
+        // [FAB-GEO 原型验证] 记录 LynxView 实际内容区尺寸（撇除系统导航条等 inset）
+        lynxView.addOnLayoutChangeListener((v, left, top, right, bottom, ol, ot, or, ob) -> {
+            if (right - left > 0 && bottom - top > 0) {
+                sContentW = right - left;
+                sContentH = bottom - top;
+            }
+        });
         // ADR-0066：系统返回桥——拦截系统返回（手势/按键），bundle 就绪后仅转发 JS 决策
         // （不自行退出）；bundle 未就绪时 JS 侧无监听者，原生兜底退出，避免卡死。
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {

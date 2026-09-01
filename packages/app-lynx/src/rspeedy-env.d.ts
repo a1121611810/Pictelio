@@ -79,6 +79,8 @@ declare global {
       openUrl(url: string, callback?: (err: string | null) => void): void
       /** 检查更新：通用 HTTP GET（原生 lynx 无 fetch 时的网络桥；cb(status, body)，2xx 成功） */
       httpGet(url: string, callback: (status: number, body: string) => void): void
+      /** [FAB-GEO] LynxView 内容区尺寸（px，撇除系统导航条 inset；未布局 cb(-1,-1)） */
+      getViewportSize(callback: (w: number, h: number) => void): void
     }
     PictelioAuth: {
       loginWithRefreshToken(token: string, callback: (userInfo: string, err: string) => void): void

@@ -40,8 +40,25 @@ const R_INNER_VW = 20 // 内环半径（vw；动作圆与 FAB/外环拉开，避
 
 declare const SystemInfo: { pixelWidth: number; pixelHeight?: number; pixelRatio: number }
 
+// [FAB-GEO 原型验证] 挂载后向原生查询 LynxView 内容区尺寸（回调后 computed 几何自动订正）
+onMounted(() => {
+  if (typeof NativeModules === 'undefined' || !NativeModules.PictelioApp?.getViewportSize) return
+  NativeModules.PictelioApp.getViewportSize((w: number, h: number) => {
+    if (w > 0 && h > 0) viewportSize.value = { w, h }
+  })
+})
+
 /** 逻辑屏高（vw 单位：100vw 为屏宽；屏高以 vw 折算）。web-core 兜底按 390×844 估。 */
+// [FAB-GEO 原型验证] 内容区尺寸（px，原生 getViewportSize 异步回传）——优先级高于 SystemInfo：
+// SystemInfo 是全屏物理尺寸，内容区撇除系统导航条 inset（FAB 底部被裁根因）。
+const viewportSize = ref<{ w: number; h: number } | null>(null)
+
 function screenHeightVw(): number {
+  const vp = viewportSize.value
+  if (vp) {
+    console.log(`[FAB-GEO2] content=${vp.w}x${vp.h} vw=${(vp.h / vp.w) * 100}`)
+    return (vp.h / vp.w) * 100
+  }
   if (typeof SystemInfo === 'undefined') return 216.4
   const w = SystemInfo.pixelWidth / SystemInfo.pixelRatio
   const h = SystemInfo.pixelHeight ? SystemInfo.pixelHeight / SystemInfo.pixelRatio : (w * 844) / 390
@@ -49,7 +66,7 @@ function screenHeightVw(): number {
 }
 
 const fabCx = 100 - FAB_RIGHT_VW - FAB_SIZE_VW / 2
-const fabCy = screenHeightVw() - FAB_RIGHT_VW - FAB_SIZE_VW / 2
+const fabCy = computed(() => screenHeightVw() - FAB_RIGHT_VW - FAB_SIZE_VW / 2)
 
 // ── 定位（ADR-0123）：子元素一律 left/top vw（vw=视口基准），锚点=外层 (0,0) 零尺寸盒 ──
 // [lynx:fix] 原生 LynxView 把「最近的 view 祖先」当作 absolute 子元素的定位锚点
@@ -58,26 +75,26 @@ const fabCy = screenHeightVw() - FAB_RIGHT_VW - FAB_SIZE_VW / 2
 // 外层 absolute 钉在 (0,0) + 零尺寸盒（只作锚点、不参与命中），子元素全部 vw 定位。
 
 /** 遮罩：显式 vw 全屏尺寸（铺满屏幕的交互面，点空白收起）。 */
-const scrimStyle: Record<string, string> = {
+const scrimStyle = computed<Record<string, string>>(() => ({
   left: '0',
   top: '0',
   width: '100vw',
   height: `${screenHeightVw()}vw`,
-}
+}))
 
 /** 主 FAB：left/top vw + translate 居中（相对 (0,0) 锚点 = 视口坐标，恒在右下角）。 */
-const fabStyle: Record<string, string> = {
+const fabStyle = computed<Record<string, string>>(() => ({
   left: `${fabCx}vw`,
-  top: `${fabCy}vw`,
+  top: `${fabCy.value}vw`,
   width: `${FAB_SIZE_VW}vw`,
   height: `${FAB_SIZE_VW}vw`,
   transform: 'translate(-50%,-50%)',
-}
+}))
 
 /** 极角→直角坐标（vw；0°=正上方，顺时针为负往左）。 */
-function polar(angleDeg: number, r: number): { x: number; y: number } {
+function polar(angleDeg: number, r: number, cy: number): { x: number; y: number } {
   const a = (angleDeg * Math.PI) / 180
-  return { x: fabCx + Math.sin(a) * r, y: fabCy - Math.cos(a) * r }
+  return { x: fabCx + Math.sin(a) * r, y: cy - Math.cos(a) * r }
 }
 
 function spread(start: number, end: number, count: number): number[] {
@@ -93,12 +110,14 @@ const INNER_END = -80
 
 const outerPair = computed(() => {
   const angles = spread(OUTER_START, OUTER_END, view.value.outer.length)
-  return view.value.outer.map((tab, i) => ({ tab, i, ...polar(angles[i], R_OUTER_VW) }))
+  const cy = fabCy.value
+  return view.value.outer.map((tab, i) => ({ tab, i, ...polar(angles[i], R_OUTER_VW, cy) }))
 })
 
 const innerPair = computed(() => {
   const angles = spread(INNER_START, INNER_END, view.value.inner.length)
-  return view.value.inner.map((item, i) => ({ item, i, ...polar(angles[i], R_INNER_VW) }))
+  const cy = fabCy.value
+  return view.value.inner.map((item, i) => ({ item, i, ...polar(angles[i], R_INNER_VW, cy) }))
 })
 
 /** 环项样式：绝对定位 + 居中；弹出动画用 keyframes（v-if 挂载态 transition 不触发，ADR-0123），带 stagger。 */
