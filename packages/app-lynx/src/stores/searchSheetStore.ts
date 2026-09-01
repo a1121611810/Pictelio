@@ -12,15 +12,33 @@ const _isOpen = ref(false)
 
 export const isOpen = _isOpen
 
+// ─── 预填词（ADR-0133 决策 2：openSearch(keyword?) 外部注入初始关键词） ───
+// 写入：openSearch(initialKeyword)（无参 = FAB 普通打开，不清不写）；
+// 消费：SearchSheet onMounted 调 consumePrefillKeyword()（一次性：读取并清空）；
+// 兜底：closeSearch 再清——弹层 v-if 卸载=关闭，防「关闭未消费」残留串到下次打开。
+const _prefillKeyword = ref("")
+
+export const prefillKeyword = _prefillKeyword
+
+/** 读取并清空预填词（SearchSheet 挂载时消费；为空 = 无预填） */
+export function consumePrefillKeyword(): string {
+  const word = _prefillKeyword.value
+  _prefillKeyword.value = ""
+  return word
+}
+
 /** registerModal 返回的注销函数：打开时保存，关闭时调用并置空 */
 let unregisterModal: (() => void) | null = null
 
 /**
  * 打开搜索弹层（幂等：已打开时不重复注册）。
- * 输入框聚焦 / loadHistory 由 SearchSheet 组件负责（store 不做，见 spec D4）。
+ * initialKeyword 传入时写入预填词（搜索弹层挂载后消费）；无参 = 普通打开（FAB 入口，行为不变）。
  */
-export function openSearch(): void {
+export function openSearch(initialKeyword?: string): void {
   if (_isOpen.value) return
+  if (initialKeyword !== undefined) {
+    _prefillKeyword.value = initialKeyword
+  }
   _isOpen.value = true
   unregisterModal = registerModal(closeSearch)
 }
@@ -32,6 +50,7 @@ export function openSearch(): void {
  */
 export function closeSearch(): void {
   _isOpen.value = false
+  _prefillKeyword.value = ""
   unregisterModal?.()
   unregisterModal = null
 }

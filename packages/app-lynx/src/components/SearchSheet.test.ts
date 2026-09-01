@@ -48,6 +48,18 @@ describe('SearchSheet 弹层结构（spec D5 / 原型变体 A）', () => {
     expect(source).toContain('>最早</text>')
     expect(source).toContain('>热门</text>')
   })
+
+  it('预填词（ADR-0133 决策 2）：onMounted 一次性消费并走 controller.search（不写历史）', () => {
+    // 消费入口：consumePrefillKeyword 读取即清（store 单测覆盖消费语义）
+    expect(source).toContain('consumePrefillKeyword()')
+    const onMountedFn = /onMounted\(\(\) => \{[\s\S]*?\n\}\)/.exec(source)
+    expect(onMountedFn).not.toBeNull()
+    expect(onMountedFn![0]).toContain('consumePrefillKeyword()')
+    expect(onMountedFn![0]).toContain('controller.search(prefill)')
+    // 预填路径不写历史：消费分支内不得出现 addHistory（提交点仅三处，glossary「搜索提交点」）
+    const prefillBranch = onMountedFn![0].slice(onMountedFn![0].indexOf('prefill'))
+    expect(prefillBranch).not.toContain('addHistory')
+  })
 })
 
 describe('SearchSheet 五态渲染分支（spec D5 / US14-US17）', () => {

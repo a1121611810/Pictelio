@@ -9,7 +9,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest"
 import type { MockInstance } from "vitest"
 import * as modalStack from "./modalStack"
-import { closeSearch, isOpen, openSearch } from "./searchSheetStore"
+import { closeSearch, consumePrefillKeyword, isOpen, openSearch, prefillKeyword } from "./searchSheetStore"
 
 let registerSpy: MockInstance<typeof modalStack.registerModal>
 
@@ -76,5 +76,46 @@ describe("searchSheetStore — 开合语义（spec D4）", () => {
     expect(registerSpy).toHaveBeenCalledTimes(2)
     expect(isOpen.value).toBe(true)
     expect(modalStack.hasOpenModal()).toBe(true)
+  })
+})
+
+describe("searchSheetStore — 预填词（ADR-0133 决策 2）", () => {
+  it("openSearch 带词：prefillKeyword 可读（组件 onMounted 消费入口）", () => {
+    openSearch("初音ミク")
+    expect(prefillKeyword.value).toBe("初音ミク")
+  })
+
+  it("openSearch 无参：prefillKeyword 为空（FAB 入口不带词，行为不变）", () => {
+    openSearch()
+    expect(prefillKeyword.value).toBe("")
+  })
+
+  it("consumePrefillKeyword 读取并清空（一次性消费：防弹层卸载重挂后残留旧词）", () => {
+    openSearch("風景")
+    expect(consumePrefillKeyword()).toBe("風景")
+    expect(prefillKeyword.value).toBe("")
+    // 再消费 → 空串（幂等）
+    expect(consumePrefillKeyword()).toBe("")
+  })
+
+  it("closeSearch 清空预填词（双保险：未消费即关闭不留残渣）", () => {
+    openSearch("うみ")
+    closeSearch()
+    expect(prefillKeyword.value).toBe("")
+  })
+
+  it("closeSearch 时不调用 consumePrefillKeyword 也不会残留（关闭即清）", () => {
+    openSearch("星")
+    closeSearch()
+    openSearch()
+    expect(prefillKeyword.value).toBe("")
+    expect(consumePrefillKeyword()).toBe("")
+  })
+
+  it("幂等开合下预填词不串：close → 再 open 带新词 → 消费为新词", () => {
+    openSearch("旧词")
+    closeSearch()
+    openSearch("新词")
+    expect(consumePrefillKeyword()).toBe("新词")
   })
 })

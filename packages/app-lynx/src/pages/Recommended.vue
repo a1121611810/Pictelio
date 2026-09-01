@@ -30,6 +30,7 @@ import TagChipRow from '../components/TagChipRow.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import { openSearch } from '../stores/searchSheetStore'
 
 // ─── 时间合并 feed（插画 + 小说，ADR-0115） ───
 // sources 顺序即 mergeByTime 同分 tie-break 优先级：illust 在前。
@@ -159,6 +160,12 @@ function onSlideTap(item: MixFeedItem) {
   if (!isRestricted(item.data)) openItem(item)
 }
 
+// 点击标签 → 全局搜索弹层（ADR-0133）：TagChipRow 只发原始 tag.name（纯展示组件不依赖 store），
+// 页面层接线 openSearch——与 webview SearchableTag「点击即搜」语义一致（预填 + 自动搜索）。
+function onTagTap(name: string) {
+  openSearch(name)
+}
+
 // 沉浸式封面图（全 bleed 用大图，退化 medium/square_medium）
 function coverSrc(data: PixivIllust | PixivNovel): string {
   const u = data.image_urls
@@ -250,7 +257,7 @@ onActivated(() => {
       >
         <IllustTypeBadgeRow v-if="currentItem && currentItem.kind === 'illust'" :illust="currentItem.data" />
         <!-- 标签胶囊行（ADR-0118：3+N、translated_name||name、# 前缀、纯展示；位置 = 类型徽章下方、标题上方） -->
-        <TagChipRow v-if="currentItem" :tags="currentItem.data.tags" class="mt-2" />
+        <TagChipRow v-if="currentItem" :tags="currentItem.data.tags" class="mt-2" @tag-tap="onTagTap" />
         <text
           v-if="currentItem"
           class="text-title-large font-semibold text-white leading-[1.3] [max-line:2]"

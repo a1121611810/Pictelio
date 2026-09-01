@@ -14,6 +14,7 @@ import BookmarkButton from '../components/BookmarkButton.vue'
 import CommentOverlay from '../components/CommentOverlay.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import UgoiraViewer from '../components/UgoiraViewer.vue'
+import { openSearch } from '../stores/searchSheetStore'
 
 const illust = ref<PixivIllust | null>(null)
 const loading = ref(true)
@@ -206,10 +207,16 @@ onMounted(async () => {
           </view>
         </view>
         <view class="flex flex-row flex-wrap mt-3">
+          <!-- 标签行（ADR-0133 可点化）：点击 → 全局搜索弹层预填该标签（原始 tag.name，
+               显示仍 translated_name 优先）——与 webview SearchableTag 语义一致。
+               @tap.stop 统一防冒泡（详情页父级暂无 tap，为嵌套安全保留）。
+               命中区 = 视觉尺寸（h-[8.533vw] ≈ 32px，M3 40dp 为目标的不足先例
+               ——CommentInputBar「取消」同规格「视觉即命中」，避免负 margin 布局风险）。 -->
           <text
             v-for="tag in illust.tags.slice(0, 8)"
             :key="tag.name"
-            class="h-[8.533vw] px-2 border border-outline rounded-[var(--md-shape-small)] flex items-center justify-center m-1 text-label-large text-surface-on-variant bg-surface"
+            class="h-[8.533vw] px-2 m-1 border border-outline rounded-[var(--md-shape-small)] flex items-center justify-center text-label-large text-surface-on-variant bg-surface"
+            @tap.stop="openSearch(tag.name)"
           >
             #{{ tag.translated_name || tag.name }}
           </text>

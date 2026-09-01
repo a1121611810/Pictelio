@@ -21,7 +21,7 @@ import { navigate } from '../router'
 import type { SearchState, SearchResultItem } from '../primitives/useSearch'
 import { useSearch } from '../primitives/useSearch'
 import { history, loadHistory, addHistory, removeHistory, clearHistory } from '../stores/searchHistoryStore'
-import { closeSearch } from '../stores/searchSheetStore'
+import { closeSearch, consumePrefillKeyword } from '../stores/searchSheetStore'
 import { isRestricted } from '../stores/settingsStore'
 import { thumbUrl } from '../utils/imageUrl'
 import { SEARCH_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
@@ -147,6 +147,14 @@ function onClose(): void {
 onMounted(() => {
   // 打开即拉历史（D3：首拉持久化历史；chips 展示）
   void loadHistory()
+  // 预填词（ADR-0133 决策 2/5）：标签点击进入——一次性消费（读取即清），
+  // 词入 keyword 后走同一 controller.search 链（即输即搜），且**不写搜索历史**
+  // （程序化唤起 ≠ 提交点；对齐 webview SearchableTag 的 hydration 路径行为）。
+  const prefill = consumePrefillKeyword()
+  if (prefill) {
+    keyword.value = prefill
+    controller.search(prefill)
+  }
   // 自动聚焦（spec US6 / ADR-0132 风险表「输入框自动聚焦」验证点）：
   // 弹层挂载后延迟一帧 focus，避免原生 input 尚未完成挂载
   focusTimer = setTimeout(() => inputRef.value?.focus?.(), 50)
