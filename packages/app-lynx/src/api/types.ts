@@ -254,3 +254,11 @@ export interface PixivCommentReplyResponse {
   comments: PixivComment[];
   next_url: string | null;
 }
+
+// ─── 搜索（issue #291 / spec app-lynx-global-search；字段与现有 app 同源，SearchSort/SearchTarget 逐字对齐 webview api/types.ts） ───
+
+export type SearchSort = "date_desc" | "date_asc" | "popular_desc";
+
+export type SearchTarget = "partial_match_for_tags" | "exact_match_for_tags" | "title_and_caption";
+
+export type SearchScope = "all" | "illust" | "novel";
