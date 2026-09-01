@@ -306,6 +306,34 @@ The `illust.ts` module includes [`addBookmark`](/packages/app-lynx/src/api/illus
 - **Update check:** [`stores/updateStore.ts`](/packages/app-lynx/src/stores/updateStore.ts) + [`UpdatePage.vue`](/packages/app-lynx/src/pages/UpdatePage.vue) implement the forced-update flow (shared `@pictelio/update-check` logic, native HTTP via `PictelioAppModule.httpGet`). The disable switch is dev-only — production builds always run the real check.
 - **Image quality & layout:** [`utils/imageQuality.ts`](/packages/app-lynx/src/utils/imageQuality.ts) (detail quality tiers, default `medium`) and [`utils/imageLayout.ts`](/packages/app-lynx/src/utils/imageLayout.ts) drive adaptive image sizing.
 
+### Global Search & Multi-Image Detail (ADR-0129 → ADR-0133, v4.27.0)
+
+- **Global search (ADR-0132):** [`SearchSheet.vue`](/packages/app-lynx/src/components/SearchSheet.vue) is a **bottom-sheet command palette** (mask + 80vh panel) rather than a `/search` route — it closes issue #60 gap #1, the largest remaining webview/lynx feature gap. It reuses the comment bottom-sheet paradigm (`CommentOverlay.vue` + `modalStack.ts` for back-key close) and is mounted once in `App.vue`. Entry is a **FAB dual-form**: on the 4 top-level tab pages the radial FAB (ADR-0120) gains a built-in search item (inner-ring first slot); on all other content pages the FAB's default form *is* the search button. Search is **type-to-search** (300ms debounce) with `AbortController` rotation for in-flight cancellation (the `useComments` paradigm). Backing modules: [`api/search.ts`](/packages/app-lynx/src/api/search.ts) (`searchIllust`/`searchNovel` + `searchIllustNext`/`searchNovelNext`, with `next_url` Pixiv-domain validation mirroring the webview SSRF guard), [`useSearch.ts`](/packages/app-lynx/src/primitives/useSearch.ts) (state primitive with an injectable `SearchTransport` seam + five-state machine), [`searchHistoryStore.ts`](/packages/app-lynx/src/stores/searchHistoryStore.ts) (device-level idbKV, 10-item dedup), and [`searchSheetStore.ts`](/packages/app-lynx/src/stores/searchSheetStore.ts) (global single-instance open/close). API contract is identical to the webview `search.ts` (scope all/illust/novel, sort latest/oldest/popular, `popular_desc` → `popular-preview` endpoints). See [Feed & Browsing > Search](/openwiki/domain/feed-and-browsing.md#search).
+
+```mermaid
+sequenceDiagram
+    participant User as User
+    participant Sheet as SearchSheet.vue
+    participant Prim as useSearch primitive
+    participant Api as api/search.ts
+    participant Pixiv as Pixiv API
+    User->>Sheet: open (FAB or tag tap)
+    Sheet->>Prim: search(keyword)
+    Prim->>Prim: debounce 300ms
+    Prim->>Api: searchIllust / searchNovel
+    Api->>Pixiv: fetch (Bearer via fetchWrapper / PictelioApi)
+    Pixiv-->>Api: results
+    Api-->>Prim: results
+    Prim-->>Sheet: render result rows
+    User->>Sheet: type again
+    Prim->>Prim: abort prior in-flight request
+```
+
+*Global search type-to-search flow — a 300ms debounce gate plus AbortController rotation cancel the previous request on every keystroke.*
+- **Tag tap search (ADR-0133):** Tapping a tag chip (recommended-carousel `TagChipRow.vue` or `IllustDetail.vue` tag row) opens the search sheet prefilled with the raw `tag.name` and auto-searches — the `openSearch(initialKeyword?)` extension of `searchSheetStore`, consumed in `onMounted` and cleared after. `resolveTagChips` was upgraded to return `{ text, name }` (display text vs raw tag), aligning the webview `SearchableTag` click-to-search semantics without a `/search` route.
+- **Multi-image detail list (ADR-0129):** `IllustDetail.vue` multi-image works (`meta_pages.length > 1`) moved from button paging (`currentPage`/`nextPage`/`prevPage`) to a **full-width continuous vertical list** — all pages stacked in the `scroll-view`, each sized to its own aspect ratio, with a floating `n / N` corner badge per image. Per-page ratio correction uses the `<image>` `@load` event's width/height (available across Android/iOS/Clay and web-core), because Pixiv `meta_pages` carries no per-page dimensions and `auto-size` is unimplemented in web-core 0.23.1. The correction is folded into the [`CoverImage`](/packages/app-lynx/src/components/CoverImage.vue) deep module as an opt-in capability (first-image ratio placeholder, then per-page height fix on load), keeping existing callers unchanged.
+- **Viewport-size contract (ADR-0131):** The radial FAB previously computed bottom geometry from full-screen `SystemInfo`, which ignored gesture-nav insets — on an Android 14 gesture-nav emulator the content area was 96px shorter than the screen, clipping the FAB. [`LynxActivity`](/openwiki/integrations/android-native.md#lynxactivity) now records the LynxView content-area size via `OnLayoutChangeListener` and exposes it through `PictelioAppModule.getViewportSize(cb)`; [`GlobalFab.vue`](/packages/app-lynx/src/components/GlobalFab.vue) reads it on mount and re-derives geometry via a pure `screenHeightVw` helper (content-area > `SystemInfo` > web-core fallback). See [Android Native & Build > PictelioAppModule](/openwiki/integrations/android-native.md#pictelioappmodule).
+
 ### Image Rendering & Loading States
 
 The Lynx MVP has evolved specific patterns for image display and loading UX that differ from the main SolidJS app due to web-core rendering quirks (see [ADR-0048](/docs/adr/ADR-0048-lynx-recommended-card-layout.md) and [glossary-web-core-pitfalls](/docs/adr/glossary-web-core-pitfalls.md)):
