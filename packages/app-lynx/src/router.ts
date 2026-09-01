@@ -36,6 +36,8 @@ import FollowList from './pages/FollowList.vue'
 import UpdatePage from './pages/UpdatePage.vue'
 import ErrorPage from './pages/ErrorPage.vue'
 import Watchlist from './pages/Watchlist.vue'
+// PROTOTYPE — 全局搜索形态探索（throwaway，验证后移出 main，见 PrototypeSearch.vue 头注释）
+import PrototypeSearch from './pages/PrototypeSearch.vue'
 
 export const routes: RouteDef[] = [
   { path: '/login', name: 'login', component: Login },
@@ -51,6 +53,8 @@ export const routes: RouteDef[] = [
   { path: '/bookmarks', name: 'bookmarks', component: Bookmarks },
   { path: '/me', name: 'me', component: Me },
   { path: '/watchlist', name: 'watchlist', component: Watchlist },
+  // PROTOTYPE — 全局搜索形态探索（throwaway 路由）
+  { path: '/prototype/search', name: 'prototype-search', component: PrototypeSearch },
   // 强制更新页（检查更新命中后 replace + 清历史栈进入）：
   // backBehavior: 'exit' —— 返回键直接退出应用，无返回路径
   { path: '/update', name: 'update', component: UpdatePage, backBehavior: 'exit' },
@@ -225,5 +229,7 @@ export async function initRouter(): Promise<void> {
   const ok = await restoreToken()
   // ADR-0103：账号级设置需 uid 已知（restoreToken 之后）再加载
   await loadSettings()
-  void navigate(ok ? '/recommended' : '/login', { replace: true })
+  // PROTOTYPE：全局搜索形态探索期间临时直投原型页（免登录直达，验证后恢复下方正式首路由）
+  void navigate('/prototype/search', { replace: true })
+  // void navigate(ok ? '/recommended' : '/login', { replace: true })
 }
