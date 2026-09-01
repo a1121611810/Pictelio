@@ -160,10 +160,11 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <!-- 根 view：relative 提供 absolute 弹层的定位上下文；App.vue 内 DOM 顺序在
-       GlobalFab 之后（同层 z-40 时后序胜出）+ z-40 盖过页面内 z-30 分页 FAB
-       （RefreshableList，列表页弹层打开的 P1-1 修复）——不能只依赖 DOM 顺序。 -->
-  <view class="w-full h-full relative z-40">
+  <!-- 根 view：absolute inset-0 锚在 page 根（与 exitHint/GlobalFab 同为离流定位——
+       App.vue 内流内兄弟会排在 100% 高的页面组件之后、被顶出视口（实测 10:44 弹层
+       在屏幕外挂载）；z-40 vs GlobalFab 同层时 DOM 后序胜出（App.vue 先 GlobalFab
+       后 SearchSheet），也盖过页面内 z-30 分页 FAB（RefreshableList，review P1-1）。 -->
+  <view class="absolute inset-0 z-40">
     <!-- 遮罩：absolute inset-0，@tap 关闭（关闭即重置：App.vue v-if 卸载） -->
     <view class="absolute inset-0 bg-scrim" @tap="onClose" />
 

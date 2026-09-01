@@ -17,8 +17,8 @@ import { fileURLToPath } from 'node:url'
 const source = readFileSync(fileURLToPath(new URL('./SearchSheet.vue', import.meta.url)), 'utf8')
 
 describe('SearchSheet 弹层结构（spec D5 / 原型变体 A）', () => {
-  it('整体：遮罩 @tap 关闭 + 80vh 面板 @tap.stop + 根 view z-40（盖 GlobalFab/页面 z-30 分页 FAB，review P1-1）', () => {
-    expect(source).toContain('class="w-full h-full relative z-40"')
+  it('整体：遮罩 @tap 关闭 + 80vh 面板 @tap.stop + 根 view absolute inset-0 z-40（离流锚 page 根；盖 GlobalFab/页面 z-30 分页 FAB，review P1-1）', () => {
+    expect(source).toContain('class="absolute inset-0 z-40"')
     expect(source).toContain('class="absolute inset-0 bg-scrim" @tap="onClose"')
     expect(source).toContain('h-[80vh]')
     expect(source).toContain('@tap.stop')
