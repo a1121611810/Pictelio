@@ -229,7 +229,5 @@ export async function initRouter(): Promise<void> {
   const ok = await restoreToken()
   // ADR-0103：账号级设置需 uid 已知（restoreToken 之后）再加载
   await loadSettings()
-  // PROTOTYPE：全局搜索形态探索期间临时直投原型页（免登录直达，验证后恢复下方正式首路由）
-  void navigate('/prototype/search', { replace: true })
-  // void navigate(ok ? '/recommended' : '/login', { replace: true })
+  void navigate(ok ? '/recommended' : '/login', { replace: true })
 }
