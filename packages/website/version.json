@@ -1,9 +1,9 @@
 {
-  "version": "4.26.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.26.0",
-  "changelog": "✨ 新功能\n  e39d913 feat(app-lynx): 合并全局搜索正式实现（底部弹层 SearchSheet + FAB 双形态，ADR-0132）\n  3d7fd7b feat(app-lynx): SearchSheet 全局搜索弹层 + FAB 双形态接线\n  0076cb7 feat(app-lynx): useSearch 搜索状态原语（即输即搜 + 竞态防护 + 分页）\n  7f86926 feat(app-lynx): 放射 FAB 双形态（内环搜索项 + 非 tab 页直达模式）\n  9b57270 feat(app-lynx): 全局搜索历史与弹层开合 store\n  3bf3047 feat(app-lynx): 全局搜索 api/search 模块（SearchTransport + SSRF 校验）\n♻️ 重构\n  b4aa44b refactor(app-lynx): 移除 throwaway 搜索原型页（正式实现仍保留在分支，调研文档保留）\n🐛 修复\n  9eae4ab fix(app-lynx): SearchSheet 根 view 改 absolute 离流定位（流内被顶出视口）\n📝 文档\n  4b0a0b1 docs: 放射导航术语表同步 ADR-0131 双形态语义\n  f52ddde docs(spec): app-lynx 全局搜索功能规格（#60 差距 #1）\n  f1a603c docs(adr): 新增 ADR-0131 app-lynx 全局搜索（底部弹层 + FAB 双形态入口）与术语表",
+  "version": "4.27.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.27.0",
+  "changelog": "🐛 修复\n  ccdb675 fix(app-lynx): 标签 chip 文案垂直居中（view 承载布局）\n✨ 新功能\n  b0c863b feat(app-lynx): 点击标签触发全局搜索（预填关键词，ADR-0133）\n📝 文档\n  3744107 docs(adr): app-lynx 点击标签触发全局搜索（ADR-0133 + glossary 词条）",
   "webBundle": {
-    "version": "4.26.0",
-    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.26.0/pictelio-4.26.0"
+    "version": "4.27.0",
+    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.27.0/pictelio-4.27.0"
   }
 }
