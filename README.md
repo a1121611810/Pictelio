@@ -104,7 +104,7 @@ See [`docs/platform-compatibility.md`](docs/platform-compatibility.md) for platf
 pixivizer/
 ├── packages/
 │   ├── app/               # SolidJS SPA (src/ → api, components, routes, stores, styles, utils, native, primitives, services, settings, types)
-│   ├── app-lynx/          # vue-lynx MVP client (login / recommended / novel / profile / engine switch)
+│   ├── app-lynx/          # vue-lynx client (login / recommended / novel / profile / engine switch)
 │   ├── ugoira/            # @pictelio/ugoira — Ugoira frame-processing library
 │   ├── update-check/      # @pictelio/update-check — shared update-check library (webview + lynx)
 │   └── website/           # Astro landing page (src/ → pages, layouts, styles)

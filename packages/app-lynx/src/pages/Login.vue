@@ -38,7 +38,7 @@ async function submit() {
   <view class="w-full h-full flex flex-col items-center bg-surface pt-[32vw]">
     <view class="flex flex-col items-center mb-10">
       <text class="text-headline-large font-bold text-primary">Pictelio</text>
-      <text class="text-body-medium text-surface-on-variant mt-2">Lynx Client MVP</text>
+      <text class="text-body-medium text-surface-on-variant mt-2">Lynx Client</text>
     </view>
 
     <!-- [lynx:fix] Card 用 flex column：子元素靠 stretch 拉伸填充父宽，

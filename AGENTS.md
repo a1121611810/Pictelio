@@ -5,7 +5,7 @@
 ## 项目概览
 
 - **技术栈**: SolidJS 1.9 + TypeScript 6.0 (strict) + Vite 8.2 + UnoCSS 66.7 + Capacitor 8.5；小说正文布局使用 `@chenglou/pretext`
-- **Monorepo**: pnpm workspace，含五个子包：`pictelio-app`（SolidJS SPA 主体）、`pictelio-app-lynx`（vue-lynx 客户端 MVP）、`@pictelio/ugoira`（Ugoira 动图帧处理库）、`@pictelio/update-check`（更新检查共享库）和 `pictelio-website`（Astro 落地页）
+- **Monorepo**: pnpm workspace，含五个子包：`pictelio-app`（SolidJS SPA 主体）、`pictelio-app-lynx`（vue-lynx 客户端）、`@pictelio/ugoira`（Ugoira 动图帧处理库）、`@pictelio/update-check`（更新检查共享库）和 `pictelio-website`（Astro 落地页）
 - **入口**: `packages/app/src/main.tsx`（bootstrap：settings 同步、Fluent 主题、渲染、auth 恢复）→ `packages/app/src/App.tsx` → `packages/app/src/router.tsx`（@solidjs/router，路由定义与 App 分离；`src/startup.ts` 为预留启动钩子，当前为空实现）
 - **路由**: `/login` `/home` `/illust/$id` `/debug` `/novel/$id` `/search` `/me` `/about` `/image-host` `/image-cache` `/settings` `/client-switch` `/age-confirmation` `/scroll-restoration-confirm` `/user/$id` `/user/$id/illusts` `/user/$id/following` `/user/$id/followers` `/my/followers`（其余路径 catch-all 直接渲染 `/home`）
 - **设计系统**: `pictelio-app` **强制**遵循 Microsoft Fluent Design System 2（所有视觉和交互决策基于 Fluent 令牌和规范，详见「Fluent Design 规范」）；`pictelio-app-lynx` 使用 Material Design 3（见「约定」章节 app-lynx 样式）
@@ -197,7 +197,7 @@ pixivizer/
 │   │   ├── vitest.config.ts     # Vitest 配置（node 环境单测）
 │   │   ├── vitest.agent-browser.config.ts # agent-browser AI 驱动 E2E 配置
 │   │   └── capacitor.config.ts  # Capacitor 配置（appId: io.pictelio.app）
-│   ├── app-lynx/                # pictelio-app-lynx — vue-lynx 客户端 MVP（登录/推荐/小说/个人中心/引擎切换）
+│   ├── app-lynx/                # pictelio-app-lynx — vue-lynx 客户端（登录/推荐/插画/小说/收藏/评论/搜索/追更/多图/个人中心等，与 webview 双引擎）
 │   │   ├── src/                 # vue-lynx 源码（样式见「app-lynx 样式」约定）
 │   │   ├── tests/               # lynx 单测
 │   │   ├── scripts/             # sync-android-assets.mjs 等
