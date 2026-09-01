@@ -36,8 +36,6 @@ import FollowList from './pages/FollowList.vue'
 import UpdatePage from './pages/UpdatePage.vue'
 import ErrorPage from './pages/ErrorPage.vue'
 import Watchlist from './pages/Watchlist.vue'
-// PROTOTYPE — 全局搜索形态探索（throwaway，验证后移出 main，见 PrototypeSearch.vue 头注释）
-import PrototypeSearch from './pages/PrototypeSearch.vue'
 
 export const routes: RouteDef[] = [
   { path: '/login', name: 'login', component: Login },
