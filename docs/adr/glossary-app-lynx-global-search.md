@@ -22,6 +22,8 @@
 | **搜索五态（search states）** | 弹层结果区的状态机：**待输入**（词条区：历史）→ **搜索中**（保留旧结果 + 轻量指示）→ **结果**（行列表 + 分页）→ **无结果**（换词提示）→ **错误**（保留关键词 + 重试）。不合并「未搜索」与「无结果」。 |
 | **弹层全局单例（sheet global singleton）** | 搜索弹层只在 **App.vue 挂载一份**（与 GlobalFab 同层、全局 FAB 兄弟节点），开合状态经全局 store 控制——各页面**不**各自 v-if 弹层（区别于 CommentOverlay 的页面内 v-if，因为搜索弹层是全页面级别的全局入口）。 |
 | **搜索词内容范围（R18 内容）** | 结果行按既有 `isRestricted()`（settingsStore）判定 R18/R18G 受限态 → 行内遮罩，不预过滤——与列表页（IllustList/FollowList 等）卡片遮罩策略一致。 |
+| **标签点击搜索（tag-tap search）** | 点击标签 chip（推荐页轮播 TagChipRow / 插画详情页标签行）→ 打开搜索弹层 + **预填该标签原始 `tag.name`** + 自动搜索（[ADR-0133](./ADR-0133-app-lynx-tag-tap-search.md)）。**不是**路由跳转（webview 的 `/search?word=` 深链形态）——弹层无 URL 语义；搜索词用原始 name（显示仍 translated_name 优先），预填路径**不写搜索历史**（程序化唤起 ≠ 提交点）。 |
+| **预填词（prefill keyword）** | 弹层打开时外部注入的初始关键词：经 `openSearch(keyword?)` 写入 store 的字段，SearchSheet `onMounted` 一次性消费并清空——组件挂载后 keyword 即普通用户输入态，无「预填中」特殊标记。关闭（关闭即卸载）时 store 侧再清，双保险防跨打开残留。 |
 
 ## 边界约定
 
