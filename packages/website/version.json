@@ -1,9 +1,9 @@
 {
-  "version": "4.24.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.24.0",
-  "changelog": "📝 文档\n  0af6da9 docs(lynx): 多图详情列表 spec §6 验证清单——模拟器实测通过（T3 #289）\n  037b499 docs(adr): ADR-0097 追加统一双审计治理记录\n  9a3335c docs: update OpenWiki (#285)\n✨ 新功能\n  4dda78e feat(lynx): 多图详情改通栏连续大图列表（ADR-0129 #286 #287 #288）\n🧹 杂项\n  a639e33 chore(lynx): 移除 ugoira T0-DIAG 诊断代码（真机验证闭环完成）\n  5b552b7 chore(agents): code-review skill 统一双审计（审计一调用点完备性 + 共享强制机制 + 8 维度卡点）\n🐛 修复\n  72afd04 fix(lynx): UgoiraViewer 诊断导出按钮改为图上悬浮——外层定高 overflow-hidden 容器裁剪\n  2e44a32 fix(lynx): ugoira 换帧闪烁真机回归——defer-src-invalidation 布尔绑定 + T0-DIAG 诊断通道",
+  "version": "4.25.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.25.0",
+  "changelog": "✨ 新功能\n  5a4c31a feat(app-lynx): 放射 FAB 底部定位改用内容区尺寸契约（ADR-0131，#297-#301）\n  f07f3fd feat(app-lynx): 全局搜索形态 UI 原型 + 联网调研（throwaway 分支）\n♻️ 重构\n  f3ee0cb refactor(app-lynx): 原型并入后恢复 initRouter 正式首路由（保留 /prototype/search 路由）\n  6e15e6c refactor(settings): 设置页按功能域重组为 8 卡分类\n📝 文档\n  84c49bc docs(adr): 新增 ADR-0130 设置页 8 卡分组决策\n🐛 修复\n  144494c fix(android): 修复「通过 Pixiv 登录」按钮 WebView 报 Invalid request",
   "webBundle": {
-    "version": "4.24.0",
-    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.24.0/pictelio-4.24.0"
+    "version": "4.25.0",
+    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.25.0/pictelio-4.25.0"
   }
 }
