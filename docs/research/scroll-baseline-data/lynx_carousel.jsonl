@@ -1,0 +1,4 @@
+{"engine":"lynx","scenario":"carousel","group":0,"idx":0,"kind":"swipe-left","w":720,"h":1280,"wallMs":2244,"frames":0,"jankRate":0,"totalP50":0,"totalP90":0,"totalP99":0,"unknownDelayP50":0,"unknownDelayP90":0,"deadlineMs":0,"framesDump":0}
+{"engine":"lynx","scenario":"carousel","group":0,"idx":1,"kind":"swipe-left","w":720,"h":1280,"wallMs":2231,"frames":0,"jankRate":0,"totalP50":0,"totalP90":0,"totalP99":0,"unknownDelayP50":0,"unknownDelayP90":0,"deadlineMs":0,"framesDump":0}
+{"engine":"lynx","scenario":"carousel","group":0,"idx":2,"kind":"swipe-left","w":720,"h":1280,"wallMs":2254,"frames":0,"jankRate":0,"totalP50":0,"totalP90":0,"totalP99":0,"unknownDelayP50":0,"unknownDelayP90":0,"deadlineMs":0,"framesDump":0}
+{"engine":"lynx","scenario":"carousel","group":0,"idx":3,"kind":"swipe-left","w":720,"h":1280,"wallMs":2238,"frames":0,"jankRate":0,"totalP50":0,"totalP90":0,"totalP99":0,"unknownDelayP50":0,"unknownDelayP90":0,"deadlineMs":0,"framesDump":0}

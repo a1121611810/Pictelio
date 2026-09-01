@@ -1,0 +1,51 @@
+{
+  "lynx/carousel": {
+    "gestures": 4,
+    "jankRateMean": 0,
+    "totalP50ofP50": 0,
+    "totalP90ofP50": 0,
+    "unknownDelayP90": 0
+  },
+  "lynx/illust-waterfall": {
+    "gestures": 30,
+    "jankRateMean": 0.0322,
+    "totalP50ofP50": 17.31,
+    "totalP90ofP50": 19.94,
+    "unknownDelayP90": 4.08
+  },
+  "lynx/novel-detail": {
+    "gestures": 30,
+    "jankRateMean": 0.0439,
+    "totalP50ofP50": 17.33,
+    "totalP90ofP50": 17.57,
+    "unknownDelayP90": 3.89
+  },
+  "lynx/novel-single": {
+    "gestures": 30,
+    "jankRateMean": 0.044,
+    "totalP50ofP50": 17.28,
+    "totalP90ofP50": 17.46,
+    "unknownDelayP90": 3.46
+  },
+  "webview/illust-waterfall": {
+    "gestures": 30,
+    "jankRateMean": 0.0274,
+    "totalP50ofP50": 17.36,
+    "totalP90ofP50": 17.76,
+    "unknownDelayP90": 4.45
+  },
+  "webview/novel-detail": {
+    "gestures": 30,
+    "jankRateMean": 0.0285,
+    "totalP50ofP50": 17.23,
+    "totalP90ofP50": 17.37,
+    "unknownDelayP90": 2.37
+  },
+  "webview/novel-single": {
+    "gestures": 30,
+    "jankRateMean": 0.0316,
+    "totalP50ofP50": 17.27,
+    "totalP90ofP50": 17.67,
+    "unknownDelayP90": 3.68
+  }
+}
