@@ -2,8 +2,10 @@
 import { onMounted } from 'vue'
 import { currentComponent, initRouter, exitHint } from './router'
 import GlobalFab from './components/GlobalFab.vue'
+import SearchSheet from './components/SearchSheet.vue'
 import { initClientSetting } from './stores/clientSwitchStore'
 import { runStartupUpdateCheck } from './stores/updateStore'
+import { isOpen as searchSheetOpen } from './stores/searchSheetStore'
 
 onMounted(() => {
   // ADR-0062：启动时查询当前包支持的 client 引擎列表（full/webview/lynx 各有不同）
@@ -24,6 +26,13 @@ onMounted(() => {
     </KeepAlive>
     <!-- 放射导航悬浮 FAB（ADR-0120）：全局单 FAB，外层=4 tab、内层=页动作；替换各页 NavigationBar 与自身 FAB -->
     <GlobalFab />
+    <!-- 全局搜索弹层（ADR-0131 / glossary「弹层全局单例」）：全 App 只挂一份——
+         开合经 searchSheetStore 全局单例（openSearch/closeSearch），各入口（FAB / 内环搜索项）
+         打开的都是同一弹层，各页不各自 v-if；DOM 顺序在 GlobalFab 之后（同层 z-40 后序胜出）
+         + 弹层根 view z-40 盖过页面内 z-30 分页 FAB（RefreshableList，review P1-1）；
+         v-if 卸载 = 关闭即重置（keyword/结果清空，历史保留）。
+         返回键：openSearch 时 store 已 registerModal(closeSearch)（ADR-0066 后进先出）。 -->
+    <SearchSheet v-if="searchSheetOpen" />
     <!-- 系统返回根路由提示（ADR-0066）：与 webview client 的 exitHint toast 语义一致。
          M3 snackbar 形态：inverse-surface 底 + inverse-on-surface 文字 + 4dp 圆角。
          [lynx:fix] 无全宽盒（ADR-0123）：原生 LynxView hit-testing 不识别 pointer-events，

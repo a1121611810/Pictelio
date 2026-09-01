@@ -21,7 +21,7 @@ const CONTENT_ROUTE_NAMES = [
   'bookmarks', 'watchlist',
 ]
 
-function setup(initialName = 'recommended', opts: { openSearch?: () => void } = {}) {
+function setup(initialName = 'recommended', opts: { openSearch?: () => void; hasOpenModal?: () => boolean } = {}) {
   const routeState = ref<RouteState>({ name: initialName, path: `/${initialName}`, params: {} })
   // 模拟真实 router：navigate 推进 routeState（这样选中其他 tab 后激活页随之切换）
   const navigate = vi.fn((path: string) => {
@@ -80,6 +80,39 @@ describe('createGlobalFab — mode 显示门三态（ADR-0131 决策 2）', () =
     await nextTick()
     expect(fab.view.value.mode).toBe('hidden')
     expect(fab.view.value.visible).toBe(false)
+  })
+
+  it('hasOpenModal=true → mode=hidden，覆盖 menu（tab 页）与 search（内容页，issue #295 互斥）', async () => {
+    // 期望值来源：issue #295 验收「FAB 与弹层互斥」+ 实测场景（T4 遗留：modal 打开时
+    // FAB z-40 悬浮于弹层之上、可点击并误开搜索）——任一弹层打开时 FAB 必须隐藏。
+    const { fab, routeState } = setup('recommended', { hasOpenModal: () => true })
+    // 覆盖 menu：4 tab 页
+    for (const tab of NAV_TABS) {
+      routeState.value = { name: tab.name, path: tab.path, params: {} }
+      await nextTick()
+      expect(fab.view.value.mode).toBe('hidden')
+      expect(fab.view.value.visible).toBe(false)
+    }
+    // 覆盖 search：内容页（含搜索弹层自身打开后的场景，弹层打开后 FAB 无需在场）
+    for (const name of CONTENT_ROUTE_NAMES) {
+      routeState.value = { name, path: `/${name}`, params: {} }
+      await nextTick()
+      expect(fab.view.value.mode).toBe('hidden')
+      expect(fab.view.value.visible).toBe(false)
+    }
+  })
+
+  it('hasOpenModal 从 true 翻回 false → mode 恢复派生（menu/search 回归，弹层关闭后 FAB 回来）', async () => {
+    // 桩用 ref（非普通变量）：模式派生实现在 computed 内读取 deps.hasOpenModal() 的返回值，
+    // 响应式依赖 = 桩内 ref 的 .value 访问（真实接线 stores/globalFab.ts 的 () => hasOpenModal()
+    // 是普通函数，穿透到 modalStack 内部 ref 的同一机制——computed 内 .value 读取即建立依赖）
+    const modalOpen = ref(true)
+    const { fab } = setup('recommended', { hasOpenModal: () => modalOpen.value })
+    await nextTick()
+    expect(fab.view.value.mode).toBe('hidden')
+    modalOpen.value = false
+    await nextTick()
+    expect(fab.view.value.mode).toBe('menu')
   })
 
   it('非 tab 路由下 FAB 应被强制收起（search 模式 isOpen 恒 false → 关闭态无遮罩/环层）', async () => {

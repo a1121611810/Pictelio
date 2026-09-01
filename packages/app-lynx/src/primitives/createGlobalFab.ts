@@ -100,6 +100,10 @@ export interface CreateGlobalFabDeps {
   /** 搜索弹层打开回调（ADR-0131 决策 2/3；缺省 no-op + warn，T5 由 stores/globalFab 接线）
    *  注：不 port 化（in-process 依赖注入，ADR-0120 端口取舍同款） */
   openSearch?: () => void
+  /** 是否有打开的 modal（modalStack.hasOpenModal，T5 注入；缺省=无弹层）。
+   *  FAB 与弹层互斥（issue #295 / ADR-0131）：任一弹层打开时 FAB 隐藏——
+   *  否则 FAB（z-40）悬浮在弹层之上可点击、会误开搜索（T4 遗留集成缺陷）。 */
+  hasOpenModal?: () => boolean
   /** 内部接缝：open/busy 状态机工厂（默认 createFabMenuState）；仅模块自身测试用 */
   menuState?: () => FabMenuState
 }
@@ -162,8 +166,11 @@ export function createGlobalFab(deps: CreateGlobalFabDeps): GlobalFab {
     return items
   })
 
-  /** 显示门三态派生（ADR-0131 决策 2）：tab → menu；内容页 → search；非内容页 → hidden。 */
+  /** 显示门三态派生（ADR-0131 决策 2）：tab → menu；内容页 → search；非内容页 → hidden。
+   *  互斥覆盖（issue #295 / ADR-0131 第 8 条）：弹层（评论/搜索等 modal）打开时恒 hidden——
+   *  优先于 menu/search（含搜索弹层自身：弹层打开后 FAB 无需在场，且 z-40 悬浮会误开搜索）。 */
   const mode = computed<FabMode>(() => {
+    if (deps.hasOpenModal?.() === true) return 'hidden'
     const name = deps.routeState.value?.name
     if (!name) return 'hidden'
     if (deps.navTabs.some((t) => t.name === name)) return 'menu'
@@ -189,6 +196,13 @@ export function createGlobalFab(deps: CreateGlobalFabDeps): GlobalFab {
 
   // 路由变化 → 收起菜单（防止 KeepAlive 页面切换时残留打开的内环）。
   watch(() => deps.routeState.value?.name, () => menu.close())
+
+  // 防御（review P2-4）：弹层打开 → mode 转 hidden 时一并收起菜单。当前实际不可达
+  //（弹层打开的唯一 FAB 路径 dispatch('search') 已先 menu.close()，且菜单遮罩拦截页面点击），
+  // 但若未来 tab 页出现 modal 注册者，此守卫保证弹层关闭后菜单不会以「已展开」状态回弹。
+  watch(() => mode.value, (m) => {
+    if (m === 'hidden') menu.close()
+  })
 
   // ── 回顶 1s 防重入 ──
   const backToTopPending = ref(false)

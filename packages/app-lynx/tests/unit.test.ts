@@ -14,7 +14,7 @@ import { loadUserNovels, loadBookmarks as loadNovelBookmarks, loadFollow as load
 import { bytesToDataUrl, downloadUgoiraFrames, ugoiraExtractFrames, ugoiraExtractStreamFrames } from '../src/api/ugoira'
 import type { UgoiraExtractMode } from '../src/api/ugoira'
 import { ugoiraMode as lynxUgoiraMode, setUgoiraMode as lynxSetUgoiraMode } from '../src/stores/settingsStore'
-import { ME_A11Y_LABELS, LOGIN_A11Y_LABELS, UPDATE_A11Y_LABELS, ERROR_A11Y_LABELS, FAB_MENU_A11Y_LABELS, GLOBAL_FAB_A11Y_LABELS, WATCHLIST_A11Y_LABELS, WATCHLIST_PROMPT_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../src/utils/accessibility'
+import { ME_A11Y_LABELS, LOGIN_A11Y_LABELS, UPDATE_A11Y_LABELS, ERROR_A11Y_LABELS, FAB_MENU_A11Y_LABELS, GLOBAL_FAB_A11Y_LABELS, WATCHLIST_A11Y_LABELS, WATCHLIST_PROMPT_A11Y_LABELS, SEARCH_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../src/utils/accessibility'
 
 describe('imageUrl.proxyImageUrl', () => {
   it('将 i.pximg.net URL 重写为本地代理路径', () => {
@@ -1325,6 +1325,39 @@ describe('Update 页 accessibility 标注（检查更新）', () => {
     const elementCount = (updateVueSource.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
     expect(labelCount).toBe(Object.keys(UPDATE_A11Y_LABELS).length)
     expect(elementCount).toBe(labelCount)
+  })
+})
+
+// ─── 全局搜索弹层 accessibility 标注（issue #295 / ADR-0131） ───
+// 弹层全局单例挂载于 App.vue，E2E（Appium/agent-browser）需定位输入框（聚焦+注入
+// 关键词）与关闭按钮。沿用「注册表 + 模板源码断言」约定（Me/Watchlist 同款）；
+// 弹层行为由 SearchSheet.test.ts 模板契约测试 + 各 store/primitive 单测兜底。
+describe('全局搜索弹层 accessibility 标注（issue #295）', () => {
+  const searchSheetVueSource = readFileSync(fileURLToPath(new URL('../src/components/SearchSheet.vue', import.meta.url)), 'utf8')
+
+  it('注册表 label 全部非空且唯一', () => {
+    const labels = Object.values(SEARCH_A11Y_LABELS)
+    expect(labels.length).toBeGreaterThan(0)
+    for (const label of labels) expect(label.length).toBeGreaterThan(0)
+    expect(new Set(labels).size).toBe(labels.length)
+  })
+
+  it('SEARCH_A11Y_LABELS 全部被 SearchSheet.vue 模板消费', () => {
+    for (const key of Object.keys(SEARCH_A11Y_LABELS)) {
+      expect(searchSheetVueSource).toContain(`:accessibility-label="SEARCH_A11Y_LABELS.${key}"`)
+    }
+  })
+
+  it('每个 accessibility-label 都配套开启 accessibility-element（view 默认不进 a11y 树）', () => {
+    const labelCount = (searchSheetVueSource.match(/:accessibility-label="SEARCH_A11Y_LABELS\.\w+"/g) ?? []).length
+    const elementCount = (searchSheetVueSource.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
+    expect(labelCount).toBe(Object.keys(SEARCH_A11Y_LABELS).length + 1) // retry 出现两处（首载错误 + 分页内联）
+    expect(elementCount).toBe(labelCount)
+  })
+
+  it('输入框 / 关闭按钮标注存在（模拟器 E2E 闭环锚点）', () => {
+    expect(SEARCH_A11Y_LABELS.input).toBe('搜索输入框')
+    expect(SEARCH_A11Y_LABELS.close).toBe('关闭搜索')
   })
 })
 
