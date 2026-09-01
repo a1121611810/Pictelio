@@ -1268,6 +1268,50 @@ describe('GlobalFab.vue 展开态几何与层叠（ADR-0121/0123）', () => {
   })
 })
 
+// ─── 全局搜索 FAB 双形态渲染标记（ADR-0131 / spec #290 T4） ───
+// 沿用「模板源码断言」约定。T4 在 ADR-0121/0123 既有结构断言之外，
+// 增加 search 模式（直达模式）渲染分支的源码断言。期望值来源：ADR-0131 决策 2
+//（非 tab 内容页 FAB 本体即搜索按钮）+ 堆叠几何推导（分页 FAB 槽位 20.267vw），非从实现反推。
+describe('GlobalFab.vue search 模式渲染标记（ADR-0131）', () => {
+  const globalFabVue = readFileSync(fileURLToPath(new URL('../src/components/GlobalFab.vue', import.meta.url)), 'utf8')
+
+  it('search 模式主 FAB：🔍 图标 + 点按 dispatch("search") + a11y 标注', () => {
+    expect(globalFabVue).toContain("if (view.value.mode === 'search') return '🔍'")
+    expect(globalFabVue).toContain("fab.dispatch({ type: 'search' })")
+    expect(globalFabVue).toContain(':accessibility-label="fabA11yLabel"')
+    expect(globalFabVue).toContain('GLOBAL_SEARCH_A11Y_LABEL')
+    expect(globalFabVue).toContain('@tap="onFabTap"')
+  })
+
+  it('主 FAB tap 分支：search 模式直达搜索（不发 toggle、不展开放射菜单）；menu 模式不变', () => {
+    expect(globalFabVue).toContain("if (view.value.mode === 'search') {")
+    expect(globalFabVue).toContain('dispatchToggle()') // menu 模式 tap 仍走 toggle
+  })
+
+  it('内环全局搜索项路由到 search 命令（dispatchInner kind=search 分支）', () => {
+    expect(globalFabVue).toContain("item.kind === 'search'")
+    expect(globalFabVue).toContain("kind: 'search' | 'refresh' | 'back-to-top' | 'extra'")
+  })
+
+  it('几何：search 模式抬至分页菜单面板之上（双 FAB 堆叠 + 菜单高度，review P1-1）', () => {
+    // 分页 FAB 底边 4.267 + 高 14.933 + 间隙 1.067 = 20.267vw（RefreshableList 浮层槽位）
+    // + 菜单面板（2 pill 各 10.667 + 间隙 1.067 = 22.4vw，面板顶 42.667）+ 间隙 1.067 = 43.734vw
+    expect(globalFabVue).toContain('const FAB_MENU_PANEL_HEIGHT_VW = 10.667 * 2 + SPACING_UNIT_VW')
+    expect(globalFabVue).toContain(
+      'const FAB_BOTTOM_MARGIN_SEARCH_VW =\n  FAB_RIGHT_VW + FAB_SIZE_VW + SPACING_UNIT_VW + FAB_MENU_PANEL_HEIGHT_VW + SPACING_UNIT_VW',
+    )
+    expect(globalFabVue).toContain('const fabCySearch = screenHeightVw() - FAB_BOTTOM_MARGIN_SEARCH_VW - FAB_SIZE_VW / 2')
+    expect(globalFabVue).toContain("top: `${view.value.mode === 'search' ? fabCySearch : fabCy}vw`")
+  })
+
+  it('search 模式不渲染遮罩/环层：外层仍 v-if="view.visible"（search 也渲染 FAB），遮罩/环层仍 v-if="view.isOpen"（ADR-0123）', () => {
+    // 深模块保证非 tab 路由 isOpen 恒 false → search 模式渲染树只有主 FAB
+    expect(globalFabVue).toContain('<view v-if="view.visible" class="absolute z-40" style="top: 0; left: 0">')
+    expect(globalFabVue).toMatch(/v-if="view\.isOpen"\s+class="absolute z-10 bg-scrim scrim-in"/)
+    expect(globalFabVue).toContain('v-if="view.isOpen" class="absolute z-20"')
+  })
+})
+
 // ─── Update 页 accessibility 标注（检查更新：强制更新页的退出/下载按钮） ───
 // 与页面级同一套「注册表 + 模板源码断言」约定。
 describe('Update 页 accessibility 标注（检查更新）', () => {

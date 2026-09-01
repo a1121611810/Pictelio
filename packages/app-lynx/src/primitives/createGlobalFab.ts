@@ -3,7 +3,7 @@ import { computed, readonly, ref, shallowRef, watch } from 'vue'
 import type { NavTab } from '../components/navTabs'
 import type { FabMenuExtraItem, FabMenuState } from './createFabMenu'
 import { createFabMenuState } from './createFabMenu'
-import { FAB_MENU_A11Y_LABELS } from '../utils/accessibility'
+import { FAB_MENU_A11Y_LABELS, GLOBAL_FAB_A11Y_LABELS } from '../utils/accessibility'
 import type { RouteState } from '../router'
 
 // ─── 放射导航深模块（ADR-0120）───
@@ -26,16 +26,25 @@ export interface PageFabActions {
 /** 内环渲染描述子（组件绑定用）；visible() 在渲染时求值以保持页面响应式显隐。 */
 export interface FabInnerItem {
   key: string
-  kind: 'refresh' | 'back-to-top' | 'extra'
+  kind: 'search' | 'refresh' | 'back-to-top' | 'extra'
   icon: string
   label: string
   a11yLabel: string
   visible: () => boolean
 }
 
+/** FAB 显示门三态（ADR-0131 决策 2，扩展自 ADR-0120 的可见性门）：
+ *  - 'menu'：4 顶层 tab 页 → 放射双层环；
+ *  - 'search'：内容页（除 /login、/update、/error 外全部路由）→ FAB 本体即搜索按钮（直达模式）；
+ *  - 'hidden'：非内容页（会话/系统页）→ 不显示。
+ */
+export type FabMode = 'menu' | 'search' | 'hidden'
+
 /** 组件读取的单一读模型。 */
 export interface FabView {
-  /** ⟺ 当前路由为 4 个顶层 tab 页之一（放射 FAB 整体显隐） */
+  /** 显示门三态（mode 派生见 view computed，规则源自 ADR-0131 决策 2） */
+  mode: FabMode
+  /** 兼容别名：mode !== 'hidden'（放射 FAB 是否渲染；原 ADR-0120 布尔门） */
   visible: boolean
   /** 当前 tab 名；非 tab 路由为 null */
   active: string | null
@@ -43,9 +52,27 @@ export interface FabView {
   isBusy: boolean
   /** 外环：4 个导航 tab（NAV_TABS 事实源） */
   outer: readonly NavTab[]
-  /** 内环：由激活页注册动作装配 */
+  /** 内环：全局搜索项（固定首位）+ 激活页注册动作 */
   inner: readonly FabInnerItem[]
 }
+
+/** 全局搜索项标注（ADR-0131）：内环「搜索」项与 search 模式主 FAB 共用的
+ * 读音/定位 label——单源 = utils/accessibility.ts 注册表（issue #103 / ADR-0061
+ * 起的关键交互标注登记惯例；unit.test.ts 对注册表做存在断言）。 */
+export const GLOBAL_SEARCH_A11Y_LABEL = GLOBAL_FAB_A11Y_LABELS.search
+
+/** 全局内置搜索内环项（ADR-0131 决策 2）：所有 tab 页内环固定首位，页面动作项顺延。 */
+const GLOBAL_SEARCH_INNER_ITEM: FabInnerItem = {
+  key: 'search',
+  kind: 'search',
+  icon: '🔍',
+  label: '搜索',
+  a11yLabel: GLOBAL_SEARCH_A11Y_LABEL,
+  visible: () => true,
+}
+
+/** 非内容页路由名（router.ts routes[]，ADR-0131 决策 2：会话/系统页不提供搜索入口） */
+const NON_CONTENT_ROUTE_NAMES = new Set(['login', 'update', 'error'])
 
 /** 单一命令通道：组件点按的全部语义入口。 */
 export type FabCommand =
@@ -55,6 +82,7 @@ export type FabCommand =
   | { type: 'refresh' } // 内环刷新
   | { type: 'back-to-top' } // 内环回顶
   | { type: 'extra'; key: string } // 内环扩展项
+  | { type: 'search' } // 全局搜索入口（内环搜索项 / search 模式主 FAB）：收起菜单 + 打开搜索弹层
 
 export interface GlobalFab {
   readonly view: Readonly<Ref<FabView>>
@@ -69,6 +97,9 @@ export interface CreateGlobalFabDeps {
   navigate: (path: string, opts?: { replace?: boolean }) => void
   /** 导航 tab 事实源（=NAV_TABS；测试可注入 stub） */
   navTabs: NavTab[]
+  /** 搜索弹层打开回调（ADR-0131 决策 2/3；缺省 no-op + warn，T5 由 stores/globalFab 接线）
+   *  注：不 port 化（in-process 依赖注入，ADR-0120 端口取舍同款） */
+  openSearch?: () => void
   /** 内部接缝：open/busy 状态机工厂（默认 createFabMenuState）；仅模块自身测试用 */
   menuState?: () => FabMenuState
 }
@@ -91,11 +122,11 @@ export function createGlobalFab(deps: CreateGlobalFabDeps): GlobalFab {
     return tab ? registry.value[tab.name] : undefined
   })
 
-  /** 内环：由激活页动作装配（刷新/回顶内置 + extras）。 */
+  /** 内环：全局内置搜索项（固定首位）+ 激活页动作装配（刷新/回顶内置 + extras）。 */
   const inner = computed<FabInnerItem[]>(() => {
+    const items: FabInnerItem[] = [GLOBAL_SEARCH_INNER_ITEM]
     const page = activePage.value
-    if (!page) return []
-    const items: FabInnerItem[] = []
+    if (!page) return items
     if (page.refresh) {
       items.push({
         key: 'refresh',
@@ -131,12 +162,24 @@ export function createGlobalFab(deps: CreateGlobalFabDeps): GlobalFab {
     return items
   })
 
+  /** 显示门三态派生（ADR-0131 决策 2）：tab → menu；内容页 → search；非内容页 → hidden。 */
+  const mode = computed<FabMode>(() => {
+    const name = deps.routeState.value?.name
+    if (!name) return 'hidden'
+    if (deps.navTabs.some((t) => t.name === name)) return 'menu'
+    if (NON_CONTENT_ROUTE_NAMES.has(name)) return 'hidden'
+    return 'search'
+  })
+
   const view = computed<FabView>(() => {
     const tab = activeTab.value
     return {
-      visible: tab !== null,
+      mode: mode.value,
+      // 兼容别名：原 ADR-0120 布尔门（visible ⟺ 4 tab 名）；扩展后 = mode !== 'hidden'
+      visible: mode.value !== 'hidden',
       active: tab?.name ?? null,
-      // 可见性门：非 tab 路由强制 isOpen=false（即使菜单被误开也报告关闭）
+      // 可见性门：非 tab 路由强制 isOpen=false（即使菜单被误开也报告关闭）→
+      // search 模式渲染树无遮罩/环层（ADR-0123：关闭态无全屏元素）
       isOpen: tab !== null && menu.isOpen,
       isBusy: menu.isBusy,
       outer: deps.navTabs,
@@ -230,6 +273,16 @@ export function createGlobalFab(deps: CreateGlobalFabDeps): GlobalFab {
         return
       case 'extra':
         await runExtra(cmd.key)
+        return
+      case 'search':
+        // 全局搜索入口（ADR-0131 决策 2）：收起菜单 + 打开搜索弹层。
+        // 与 select/close 同属「正交收合」类：不设 busy（搜索入口打开不触发 busy 互斥）。
+        menu.close()
+        if (deps.openSearch) {
+          deps.openSearch()
+        } else {
+          console.warn('[globalFab] openSearch 未注入')
+        }
         return
     }
   }

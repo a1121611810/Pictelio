@@ -72,6 +72,8 @@ export const FAB_MENU_A11Y_LABELS = {
 export const GLOBAL_FAB_A11Y_LABELS = {
   open: '打开菜单',
   close: '关闭菜单',
+  // 全局搜索入口标注（ADR-0131）：内环「搜索」项 + search 模式主 FAB 共用
+  search: '搜索',
 } as const
 
 /** 追更列表页 accessibility 标注（issue #225：/watchlist 页 + 取消追更二次确认 Dialog） */
