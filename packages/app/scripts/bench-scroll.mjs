@@ -225,7 +225,8 @@ async function navLynx(scenario, w, h) {
   };
   if (scenario === "carousel") { await assertPage("carousel", ["recommended", "detail"], scenario); return; }
   const nav = resolve(process.cwd(), "scripts/lynx-bench-nav.sh");
-  sh(`"${nav}" ${map[scenario] ?? scenario}`);
+  const profile = process.env.BENCH_PROFILE ?? (SERIAL === "emulator-5554" ? "emu" : "oppo");
+  sh(`BENCH_PROFILE=${profile} "${nav}" ${map[scenario] ?? scenario} ${SERIAL}`);
   const n = await framesProbe();
   if (n < 30) throw new Error(`导航后 framesProbe=${n}，页面不可滚动（网络/受限卡异常）`);
   console.log(`  [nav:${scenario}] 到达可滚动页（framesProbe=${n}）`);
