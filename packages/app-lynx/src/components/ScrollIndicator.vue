@@ -21,7 +21,7 @@ defineProps<{
       height: `${heightPx}px`,
       width: '2.4px',
       borderRadius: '2px',
-      backgroundColor: 'rgba(0,0,0,0.35)',
+      backgroundColor: 'rgba(73,69,79,0.35)',
       opacity: visible ? 1 : 0,
     }"
   />

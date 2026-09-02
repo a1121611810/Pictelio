@@ -249,9 +249,9 @@ onUnmounted(() => {
     </list>
     <!-- 滚动指示条（ADR-0135）：@scroll 信号面驱动，RefreshableList（relative）内右缘 -->
     <ScrollIndicator
-      :top-px="scrollIndicator.topPx"
-      :height-px="scrollIndicator.heightPx"
-      :visible="scrollIndicator.visible"
+      :top-px="scrollIndicator.topPx.value"
+      :height-px="scrollIndicator.heightPx.value"
+      :visible="scrollIndicator.visible.value"
     />
     </RefreshableList>
   </view>

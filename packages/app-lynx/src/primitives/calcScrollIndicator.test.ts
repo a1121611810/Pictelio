@@ -22,8 +22,10 @@ import {
 } from './calcScrollIndicator'
 
 // ─── 真机捕获形状 ───
-// mock payload 字段来自真机捕获形状：scrollTop / scrollHeight / listHeight 三字段（ScrollPayload）。
-// 值为真机量级（feed 列表：可视区 ~580px，长内容 ~5000px）。
+// mock payload 字段来自真机捕获形状（2026-09-02 探针日志 PROBE_BT_SCROLL，
+// prototype/scroll-probe 分支 IllustList @scroll 实测）：scrollTop / scrollHeight /
+// listHeight 三字段（ScrollPayload）。实测值量级：scrollTop 递增 0→中百、
+// scrollHeight ≈4680-5030、listHeight ≈584.7。
 const REAL_DEVICE_PAYLOAD: ScrollPayload = {
   scrollTop: 100,
   scrollHeight: 5000,

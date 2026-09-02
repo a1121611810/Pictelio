@@ -25,10 +25,10 @@
 //   - FAB menu（ADR-0111）：常态一个刷新 FAB；点击展开 scrim + 两项（刷新/回顶）；
 //     主 FAB 变身为 close button；busy 时禁止展开。
 //
-// 平台事实（模拟器实测 2026-08-24，禁止回退）：
+// 平台事实（模拟器实测 2026-08-24，禁止回退；② 已于 2026-09-02 勘误，见 ADR-0110/ADR-0135）：
 //   ① SelectorQuery 对 XElement 节点静默不命中（ADR-0107）；
-//   ② <list> 不派发 per-frame scroll——@scroll/@scrollend/@scrollstatechange/
-//      scroll-event-throttle 四路全零（ADR-0110）；
+//   ② <list> 在 scroll-event-throttle="100" 时零派发（ADR-0110）；throttle="0"
+//      时 @scroll 每帧 ~60Hz 派发（2026-09-02 真机实证，ADR-0135 滚动信号面）；
 //   ③ <list> 无 JS 可触发的滚动属性 → 回顶 = 重建回顶。
 //   ④ Lynx 无 transitionend → FAB menu 退出动画 v1 瞬撤（ADR-0111）。
 import { ref, onUnmounted } from 'vue'
