@@ -2030,6 +2030,22 @@ expect(detailVueSource).toContain(':main-thread-bindscroll="onNovelScrollMT"')
 expect(detailVueSource).toContain('@scrolltolower="onNovelToBottom"')
 })
 
+it('list 虚拟化结构：meta/p-<idx>/end 三段 item 且 key 双份一致（ADR-0134）', () => {
+expect(detailVueSource).toContain(":key=\"'meta'\"")
+expect(detailVueSource).toContain(":key=\"`p-${idx}`\"")
+expect(detailVueSource).toContain(":item-key=\"'meta'\"")
+expect(detailVueSource).toContain(":item-key=\"`p-${idx}`\"")
+expect(detailVueSource).toContain(":item-key=\"'end'\"")
+expect(detailVueSource).toContain(':estimated-main-axis-size-px="estimatedHeightPx"')
+})
+
+it('受限小说分支保留系列信息行 + 评论入口（spec 回归项，P1-1）', () => {
+// 受限分支为 v-else（isRestricted 不走 list）；meta 卡内系列行/评论入口不因分支丢失
+expect(detailVueSource).toContain('《{{ novel.series.title }}》')
+expect(detailVueSource).toContain('@tap="showComments = true"')
+expect(detailVueSource).toContain('RestrictOverlay')
+})
+
 it('弹窗挂载 + 三事件语义差：decline/confirm 继续返回，cancel 留页', () => {
 expect(detailVueSource).toContain('<WatchlistPromptDialog')
 expect(detailVueSource).toContain('@confirm="onWatchlistConfirm"')
