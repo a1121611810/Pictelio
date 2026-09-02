@@ -228,10 +228,15 @@ function registerBenchNavHandler(): void {
     pictelioBenchNavIllust: '/illusts',
     pictelioBenchNavNovel: '/novels',
     pictelioBenchNavFollowing: '/following',
+    pictelioBenchNavNovelFollow: '/novels',
+    pictelioBenchNavIllustFollow: '/illusts',
   }
   for (const [eventName, target] of Object.entries(TARGETS)) {
     // 原生发送两次（1.5s/3s）防 JS 挂载竞态；replace 幂等，重复到达无副作用
     emitter.addListener(eventName, () => {
+      if (eventName === 'pictelioBenchNavNovelFollow') {
+        ;(globalThis as { __benchNovelFollow?: boolean }).__benchNovelFollow = true
+      }
       void navigate(target, { replace: true })
     })
   }

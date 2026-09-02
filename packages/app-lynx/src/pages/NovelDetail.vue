@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useMainThreadRef } from 'vue-lynx'
+import { useMainThreadRef, runOnBackground } from 'vue-lynx'
 import { novelAverageParagraphHeightPx } from '../primitives/novelParagraphEstimate'
 import { currentParams, goBack, requestBack, registerBackGuard } from '../router'
 import { loadNovelDetail, fetchNovelText, loadNovelSeries, addNovelWatchlist } from '../api/novel'
@@ -57,7 +57,7 @@ function teardownPrompt(): void {
 // prompt 未创建（加载期/非系列）时放行，与左上角 requestBack() 共用同一守卫链
 const unregisterBackGuard = registerBackGuard(() => prompt?.requestBack() ?? false)
 
-// ─── 滚动跟踪（T0 平台结论） ───
+// ─── 滚动跟踪（ADR-0134：MT 信号；BT @scroll 不派发） ───
 // [prototype→spike] 滚动信号面：官方 list 只有边界事件（scrolltolower/scrolltoupper）；
 // 到「底部」由 @scrolltolower 权威触发（reachBottom 供追更询问），上端进度信号见 MT 实验。
 const reachedBottom = ref(false)
@@ -69,18 +69,36 @@ function getViewportHeight(): number {
     : 0
 }
 
-// 主线程滚动信号（ADR-0134）：<list> 经 :main-thread-bindscroll 接收 scrollTop（BT @scroll 不派发），
-// 供追更「≥70% 进度」双路判定（T2 接入 notifyScroll；此处仅维护值）。
-const mtScrollTop = useMainThreadRef(0)
-function onNovelScrollMT(e: { detail?: { scrollTop?: number } }): void {
+// 主线程滚动信号（ADR-0134）：<list> 经 :main-thread-bindscroll 接收 scrollTop（BT @scroll 不派发）。
+// MT→BT 传递用 runOnBackground 官方桥（BT 读 .value 的跨线程同步不可靠——真机实证）；节流：
+// 上次上报后滚动增量 <8% 高度不重复上报（防每帧跨线程消息风暴）。
+const mtReportedTop = useMainThreadRef(-1)
+const mtReportedHeight = useMainThreadRef(0)
+function onNovelScrollMT(e: { detail?: { scrollTop?: number; scrollHeight?: number } }): void {
   'main thread'
-  mtScrollTop.current = Number(e?.detail?.scrollTop ?? 0)
+  const top = Number(e?.detail?.scrollTop ?? 0)
+  const height = Number(e?.detail?.scrollHeight ?? 0)
+  if (height <= 0) return // 高度未知无从计算（不喂，守护只靠到达底部）
+  if (mtReportedTop.current >= 0 && Math.abs(top - mtReportedTop.current) < height * 0.08) return
+  mtReportedTop.current = top
+  mtReportedHeight.current = height
+  // 保守口径（viewport=0）：progress = top/height（低估，触发偏严不偏松）
+  const progress = Math.min(1, Math.max(0, top / height))
+  void runOnBackground((p: number) => {
+    // 在背景线程执行：live 读 reachedBottom（被捕获的仅数字/布尔快照）
+    reportNovelProgress(p)
+  })(progress)
 }
 
 
 function onNovelToBottom(): void {
   reachedBottom.value = true
   prompt?.notifyScroll(1, true)
+}
+
+/** MT→BT 桥回调（runOnBackground）：向追更 prompt 喂最新进度（≥70% 双路判定输入） */
+function reportNovelProgress(progress: number): void {
+  prompt?.notifyScroll(progress, reachedBottom.value)
 }
 
 // MVP：整段渲染，不做行级虚拟化（无 canvas/measureText，pretext 不可迁移）。
@@ -187,6 +205,7 @@ function onWatchlistCancel(): void {
       list-type="single"
       scroll-orientation="vertical"
       :estimated-main-axis-size-px="estimatedHeightPx"
+      :lower-threshold-item-count="5"
       :main-thread-bindscroll="onNovelScrollMT"
       @scrolltolower="onNovelToBottom"
     >
