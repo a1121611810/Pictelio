@@ -43,3 +43,18 @@
 3. 跟手性差距的现实归因 = H5 双线程地板（48ms，SDK 层无解）+ H1（SDK 层无解，
    #302 上游跟踪）→ 本项目在 SDK 边界内已无可动杠杆，差距维持，等 #307 的 5 条重估触发。
 4. H6 单测无 jank 收益（novel-single 本身已反超 webview），无证据支持动参数——关闭。
+
+## 增补（2026-09-02 官方参照复测）
+
+- **官方 gallery 探针**（prototype/scroll-probe 分支）：`<list>` + `@scroll` + `scroll-event-throttle="0"`
+  真机派发实测 = 89 条/6.4s、中位间隔 18ms（~60Hz 每帧），payload 完整
+  （scrollTop/scrollHeight/listWidth/listHeight/deltaY/eventSource=2）。
+  **ADR-0110「list 零派发」的根因是 throttle=100（四路全零）而非 list 无事件**——
+  官方 BT 版滚动条整个靠 @scroll 驱动；官方 MTS 版
+  （:main-thread-bindscroll + 'main thread' 指令 + useMainThreadRef + runOnBackground）本轮复测仍 0 次
+  （与 NovelDetail 2026-09-02 结论一致，MTS 保留待上游）。
+- **waterfall estimated 补测**（prototype/scroll-estimated 分支）：卡高恒定 ≈270px
+  （48.4vw 方图+固定文本区），官方公式退化为常量。同窗口 ABBA：A=0.1990 vs estimated=0.2471
+  （+4.8pp）→ 无改善，与 H6 结论一致（estimated 只影响滚动条/布局提示，不改变原生物化路径）。
+- **actionable 结论**：@scroll(throttle=0) 是可用杠杆（速度感知降载/滚动态 UI/滚动条），
+  必须以 throttle=0 + BT 侧节流消费（每帧事件的 BT 成本实打实）；优先级高于已被止损的 B1/B2/H6。
