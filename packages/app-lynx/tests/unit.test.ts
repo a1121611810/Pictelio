@@ -2024,8 +2024,9 @@ expect(detailVueSource).toContain('unregisterBackGuard()')
 expect(detailVueSource).toContain('onUnmounted(')
 })
 
-it('scroll-view 双路滚动跟踪：@scroll（进度）+ @scrolltolower（到达底部兑底）', () => {
-expect(detailVueSource).toContain('@scroll="onNovelScroll"')
+it('list 虚拟化双路滚动跟踪：:main-thread-bindscroll（进度，ADR-0134）+ @scrolltolower（到达底部兑底）', () => {
+expect(detailVueSource).toContain('list-type="single"')
+expect(detailVueSource).toContain(':main-thread-bindscroll="onNovelScrollMT"')
 expect(detailVueSource).toContain('@scrolltolower="onNovelToBottom"')
 })
 
