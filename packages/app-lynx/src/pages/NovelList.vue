@@ -49,8 +49,21 @@ const errorMsg = ref('')
 const pageErrorMsg = ref('')
 const endOfFeed = ref(false)
 
+// [prototype H3-B1] 增量渲染：sync 只把新增条目 push 到渲染数组（尾部追加，
+// Vue keyed diff 走前缀复用路径，不触发已有条目 vnode 重建/O(N) 全量重 diff）。
+// -1 = 未初始化/重建态：强制走全量替换（首载、refresh、mode 切换、长度回退均落入此分支）。
+let renderedCount = -1
+
 function sync() {
-  novels.value = feed.value.items().map((i) => i.data as PixivNovel)
+  const items = feed.value.items()
+  if (renderedCount >= 0 && items.length > renderedCount) {
+    // 增量：仅追加新进入的条目（i.data 为稳定引用，已有条目零 patch）
+    novels.value.push(...items.slice(renderedCount).map((i) => i.data as PixivNovel))
+  } else {
+    // 全量替换：首载 / refresh（refreshEpoch++ 已走整树重建）/ 长度不增（含相等）时
+    novels.value = items.map((i) => i.data as PixivNovel)
+  }
+  renderedCount = items.length
   loading.value = feed.value.loading()
   loadingMore.value = feed.value.loadingMore()
   errorMsg.value = feed.value.error() ?? ''
@@ -65,6 +78,9 @@ function sync() {
 
 async function refreshFeed() {
   await feed.value.refresh()
+  // [prototype H3-B1] refresh 后 rendered 整体重建（长度可能仍增长）：
+  // 增量计数必须重置，强制 sync 走全量替换（refreshEpoch 同 tick 触发整树重建）
+  renderedCount = -1
   sync()
   // [lynx:fix] 数据整体替换触发 vue-lynx patch RemoveNode 索引错位（框架 bug，ADR-0107 D4）；
   // epoch 与 sync() 同 tick flush（key 变化走整树替换，不发生子节点 patch）
@@ -86,6 +102,8 @@ function switchMode(m: 'recommend' | 'follow') {
   feed.value?.dispose()
   feed.value = makeFeed(m)
   novels.value = []
+  // [prototype H3-B1] 新 feed 渲染流从零开始，重置增量计数
+  renderedCount = -1
   errorMsg.value = ''
   pageErrorMsg.value = ''
   loading.value = true
@@ -190,12 +208,14 @@ onUnmounted(() => {
       list-type="single"
       scroll-orientation="vertical"
       :lower-threshold-item-count="5"
+      :preload-buffer-count="10"
       @scrolltolower="loadMore"
     >
       <list-item
         v-for="item in novels"
         :key="item.id"
         :item-key="String(item.id)"
+        :estimated-main-axis-size-px="230"
         class="w-full"
         @tap="openDetail(item.id)"
       >
