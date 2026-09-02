@@ -54,6 +54,33 @@ const errorMsg = ref('')
 const pageErrorMsg = ref('')
 const endOfFeed = ref(false)
 
+// ─── [prototype 候选③] 滚动态滚动指示条（官方 gallery BT 版同款，tutorial-gallery）───
+// @scroll(scroll-event-throttle="0") 驱动：滚动中显示指示条（高度=视口/内容比例，
+// top=位置比例），滚动停止 500ms 后淡出。纯视觉指示，不参与数据统计。
+const scrollbarTopPx = ref(0)
+const scrollbarHeightPx = ref(0)
+const scrollbarVisible = ref(false)
+let scrollbarHideTimer: ReturnType<typeof setTimeout> | null = null
+// UI 节流：指示条更新不必 60Hz（每帧事件的是 BT 成本），取 ~30Hz（2 帧 1 次）足够平滑
+let scrollbarLastUpdateAt = 0
+
+function onScrollbarScroll(e: { detail?: { scrollTop?: number; scrollHeight?: number; listHeight?: number } }): void {
+  const d = e?.detail
+  if (!d || !d.scrollHeight) return
+  const now = Date.now()
+  if (now - scrollbarLastUpdateAt < 33) return
+  scrollbarLastUpdateAt = now
+  const listH = d.listHeight ?? 580
+  scrollbarHeightPx.value = Math.max(24, listH * (listH / d.scrollHeight))
+  scrollbarTopPx.value = listH * (d.scrollTop / d.scrollHeight)
+  scrollbarVisible.value = true
+  if (scrollbarHideTimer !== null) clearTimeout(scrollbarHideTimer)
+  scrollbarHideTimer = setTimeout(() => {
+    scrollbarHideTimer = null
+    scrollbarVisible.value = false
+  }, 500)
+}
+
 function sync() {
   illusts.value = feed.value.items().map((i) => i.data as PixivIllust)
   loading.value = feed.value.loading()
@@ -133,6 +160,7 @@ onMounted(() => {
 onUnmounted(() => {
   unreg?.()
   benchOffFn?.()
+  if (scrollbarHideTimer !== null) clearTimeout(scrollbarHideTimer)
   feed.value?.dispose()
 })
 </script>
@@ -204,7 +232,9 @@ onUnmounted(() => {
       :span-count="2"
       :style="{ listMainAxisGap: '12px', listCrossAxisGap: '12px' }"
       :lower-threshold-item-count="2"
+      :scroll-event-throttle="0"
       @scrolltolower="loadMore"
+      @scroll="onScrollbarScroll"
     >
       <list-item
         v-for="item in illusts"
@@ -250,6 +280,19 @@ onUnmounted(() => {
         <text v-else class="text-body-medium text-outline">没有更多了</text>
       </list-item>
     </list>
+    <!-- [prototype 候选③] 滚动指示条：@scroll 驱动，滚动中显示、停止 500ms 淡出。
+         右缘 2.4px 宽圆角条，处于 RefreshableList 容器（relative）内，z-40 覆盖列表 -->
+    <view
+      :style="{
+        top: scrollbarTopPx + 'px',
+        height: scrollbarHeightPx + 'px',
+        width: '2.4px',
+        borderRadius: '2px',
+        backgroundColor: 'rgba(0,0,0,0.35)',
+        opacity: scrollbarVisible ? 1 : 0,
+      }"
+      class="absolute z-40 right-1"
+    />
     </RefreshableList>
   </view>
 </template>
