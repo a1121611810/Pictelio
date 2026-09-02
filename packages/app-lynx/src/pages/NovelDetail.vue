@@ -81,6 +81,28 @@ function onNovelScroll(e: { detail?: { scrollTop?: number; scrollHeight?: number
     getViewportHeight(),
   )
   prompt?.notifyScroll(progress, reachedBottom.value)
+  benchScrollMark(Number(detail.scrollTop ?? 0))
+}
+
+// bench 插桩（wayfinder #306/#312）：跨线程事件派发延迟——touchstart 到达 JS 时刻 →
+// 首次 touchmove 到达 JS 时刻（真实 60Hz 真机实证 scroll-view @scroll 不派发（2026-09-02），
+// 无法直接观测内容位移；本段 = H5（跨线程派发）核心）。节流：每次拖动一条。
+let benchT0: number | null = null
+let benchFirstMoveAt: number | null = null
+function benchTouchStart(): void {
+  benchT0 = Date.now()
+  benchFirstMoveAt = null
+}
+function benchTouchMove(): void {
+  if (benchT0 === null) return
+  if (benchFirstMoveAt === null) {
+    benchFirstMoveAt = Date.now()
+    console.log(`[BENCH_T1] stage t0=${benchT0} t1=${benchFirstMoveAt} latency=${benchFirstMoveAt - benchT0}`)
+    benchT0 = null
+  }
+}
+function benchScrollMark(top: number): void {
+  // 真机实证 @scroll 不派发（仅 scrolltolower 兜底）；保留为 web-core 参考通道，不参与统计
 }
 
 function onNovelToBottom(): void {
@@ -131,6 +153,7 @@ async function loadNovel(): Promise<void> {
 }
 
 onMounted(() => {
+  if (typeof console !== "undefined") console.log(`[BENCH_T1] mount id=${(globalThis as { __benchNovelId?: unknown }).__benchNovelId ?? ""}`)
   void loadNovel()
 })
 
@@ -168,7 +191,7 @@ function onWatchlistCancel(): void {
 </script>
 
 <template>
-  <view class="w-full h-full bg-surface">
+  <view class="w-full h-full bg-surface" @touchstart="benchTouchStart" @touchmove="benchTouchMove">
     <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
       <!-- 左上角返回改走 requestBack：与系统返回共用同一守卫链（spec §US3） -->
       <view class="py-1 pr-2" @tap="requestBack"><text class="text-[6.4vw] leading-none text-surface-on">‹</text></view>

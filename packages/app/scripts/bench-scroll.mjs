@@ -271,8 +271,9 @@ async function navLynx(scenario, w, h) {
     if (n < 30) throw new Error(`导航后 framesProbe=${n}，页面不可滚动（网络/受限卡异常）`);
   }
   if (detail) {
-    // 落地 tab 列表后，点首张可点卡进详情（受限卡容错重试）
-    sh(`BENCH_PROFILE=${profile} BENCH_CARD_ONLY=1 "${nav}" ${map[scenario] ?? scenario} ${SERIAL}`);
+    // 落地 tab 列表后，点首张可点卡进详情（受限卡容错重试）——bash 段 3 以原始场景名触发
+    const r = sh(`BENCH_PROFILE=${profile} BENCH_CARD_ONLY=1 "${nav}" ${scenario} ${SERIAL}`);
+    if (!r.includes("✅")) throw new Error(`点卡进详情失败: ${r.slice(0, 160)}`);
     n = await framesProbe();
     if (n < 30) throw new Error(`点卡进详情失败 framesProbe=${n}`);
   }
@@ -353,8 +354,184 @@ async function navWebview(scenario) {
   }
 }
 
+// ─── T1：UiAutomation 注入 + framestats 对齐（触摸→首帧时延；模拟器 Android 12+ 精测） ───
+// 每手势：gfxinfo reset → logcat -c → am instrument 注入（BENCH_INPUT 落 down/up ns）
+// → dump framestats → 对齐：latencyMs = 首个 FrameCompleted≥downNs 的 (FrameCompleted-downNs)；
+// handleMs = 首个 HandleInputStart≥downNs 的 (HandleInputStart-downNs)（仅新格式可算）。
+// 真机（Android 9 老格式无帧时间戳列）走 video 判读（bench t1-video）。
+let t1Running = false;
+async function t1InjectOne(w, h, idx) {
+  adbShell(`dumpsys gfxinfo ${PKG} reset`); await SLEEP(300);
+  adb("logcat", "-c");
+  // 注入（instrument 预热 1.2s + 手势 ~0.5s + 300ms）
+  const x = Math.round(w / 2), y1 = Math.round(h * 0.78), y2 = Math.round(h * 0.31);
+  const out = sh(`"${ADB}" -s ${SERIAL} shell am instrument -w -e kind drag -e x ${x} -e y1 ${y1} -e y2 ${y2} -e steps 10 -e stepMs 16 ${PKG}.test/androidx.test.runner.AndroidJUnitRunner -e class io.pictelio.app.BenchInputInjectorTest`);
+  const src = adb("logcat", "-d", "-s", "BenchInput");
+  const m = /down=(\d+).*up=(\d+)/.exec(src);
+  if (!m) throw new Error(`t1: 未见 BENCH_INPUT（instrument: ${out.slice(-200)}）`);
+  const downNs = Number(m[1]), upNs = Number(m[2]);
+  await SLEEP(800);
+  const dump = adbShell(`dumpsys gfxinfo ${PKG} framestats`);
+  let latencyMs = NaN, handleMs = NaN;
+  for (const line of dump.split("\n")) {
+    if (!/^\d+,\d+,/.test(line)) continue;
+    const c = line.split(",").map((s) => (s === "" ? NaN : Number(s)));
+    if (c.length < 21) continue;
+    const intendedVsync = c[2], frameCompleted = c[15], handleInputStart = c[5];
+    if (frameCompleted >= downNs) {
+      latencyMs = (frameCompleted - downNs) / 1e6;
+      break;
+    }
+    if (handleInputStart >= downNs && !Number.isFinite(handleMs)) handleMs = (handleInputStart - downNs) / 1e6;
+  }
+  const rec = { engine: ENGINE, scenario: SCENARIO, idx, downNs, latencyMs: +latencyMs.toFixed(1), handleMs: Number.isFinite(handleMs) ? +handleMs.toFixed(1) : null };
+  appendFileSync(resolve(OUT, `t1_${ENGINE}_${SCENARIO}.jsonl`), JSON.stringify(rec) + "\n");
+  return rec;
+}
+
+async function t1Cmd() {
+  if (!ENGINE || !SCENARIO) throw new Error("t1 需要 --engine 与 --scenario");
+  mkdirSync(OUT, { recursive: true });
+  const { w, h } = screenSize();
+  console.log(`[t1] engine=${ENGINE} scenario=${SCENARIO} serial=${SERIAL}`);
+  if (ENGINE === "webview") await navWebview(SCENARIO); else await navLynx(SCENARIO, w, h);
+  console.log("[t1] 预热（2 次 input swipe 回顶）…");
+  for (let i = 0; i < 2; i++) { await gesture("drag", w, h); await SLEEP(800); await gesture("back-top", w, h); await SLEEP(800); }
+  for (let i = 0; i < Number(opt("per", "8")); i++) {
+    const rec = await t1InjectOne(w, h, i);
+    console.log(`  #${i} latency=${rec.latencyMs}ms handle=${rec.handleMs ?? "-"}ms`);
+    await gesture("back-top", w, h); await SLEEP(700);
+  }
+  console.log(`[t1] 完成 → ${OUT}/t1_${ENGINE}_${SCENARIO}.jsonl`);
+}
+
+// ─── T1（JS 插桩法）：touchstart → 内容位移首变的 JS 视角时延（双端同定义，Date.now()） ───
+// webview：CDP 注入 hook（window touchstart + rAF 轮询 scrollTop 首变 → console.log BENCH_T1 →
+//           chromium tag 进 logcat）；lynx：NovelDetail.vue 的 benchTouchStart/benchScrollMark 插桩
+//           （BENCH_T1 前缀 → lynx tag 进 logcat）。测量段 = 输入→(跨线程)→JS 感知内容变化（H5 核心）。
+async function t1JsCmd() {
+  if (!SCENARIO) throw new Error("t1 需要 --scenario");
+  mkdirSync(OUT, { recursive: true });
+  const { w, h } = screenSize();
+  const per = Number(opt("per", "8"));
+  console.log(`[t1] engine=${ENGINE} scenario=${SCENARIO} serial=${SERIAL}`);
+  if (ENGINE === "webview") {
+    await navWebview(SCENARIO);
+    // 一次性注入 hook（与 lynx 同语义：touchstart→首 touchmove 回调到达 JS 的跨线程派发延迟）
+    const injected = await cdpEvaluate(`(() => {
+      if (window.__benchT1) return "already";
+      let t0 = null;
+      document.addEventListener("touchstart", () => { t0 = Date.now(); }, { passive: true });
+      document.addEventListener("touchmove", () => {
+        if (t0 !== null) {
+          console.log("[BENCH_T1] stage t0=" + t0 + " t1=" + Date.now() + " latency=" + (Date.now() - t0));
+          t0 = null;
+        }
+      }, { passive: true });
+      window.__benchT1 = true;
+      return "ok";
+    })()`);
+    // 预热 2 次
+    for (let i = 0; i < 2; i++) { await gesture("drag", w, h); await SLEEP(700); await gesture("back-top", w, h); await SLEEP(700); }
+    const outFile = resolve(OUT, `t1_webview_${SCENARIO}.jsonl`);
+    writeFileSync(outFile, "");
+    for (let i = 0; i < per; i++) {
+      adb("logcat", "-c"); await SLEEP(200);
+      await gesture("drag", w, h);
+      await SLEEP(300);
+      const src = adb("logcat", "-d", "-s", "Capacitor/Console");
+      const m = /\[BENCH_T1\][^\n]*latency=(\d+)/.exec(src);
+      const rec = { engine: "webview", scenario: SCENARIO, idx: i, latencyMs: m ? Number(m[1]) : null };
+      appendFileSync(outFile, JSON.stringify(rec) + "\n");
+      console.log(`  #${i} latency=${rec.latencyMs ?? "-"}ms`);
+      await gesture("back-top", w, h); await SLEEP(700);
+    }
+    console.log(`[t1] 完成 → ${outFile}`);
+  } else {
+    // lynx：导航到小说详情（NovelDetail 有插桩）
+    await navLynx("novel-detail", w, h);
+    const outFile = resolve(OUT, `t1_lynx_${SCENARIO}.jsonl`);
+    writeFileSync(outFile, "");
+    for (let i = 0; i < per; i++) {
+      adb("logcat", "-c"); await SLEEP(200);
+      await gesture("drag", w, h);
+      await SLEEP(400);
+      const src = adb("logcat", "-d");
+      const m = /BENCH_T1[^\n]*latency=(\d+)/.exec(src);
+      const rec = { engine: "lynx", scenario: SCENARIO, idx: i, latencyMs: m ? Number(m[1]) : null };
+      appendFileSync(outFile, JSON.stringify(rec) + "\n");
+      console.log(`  #${i} latency=${rec.latencyMs ?? "-"}ms`);
+      await gesture("back-top", w, h); await SLEEP(700);
+    }
+    console.log(`[t1] 完成 → ${outFile}`);
+  }
+}
+
+// ─── T1-video：screenrecord + Show taps 视频判读（参考通道；模拟器录屏产物无效） ───
+async function t1VideoCmd() {
+  if (!SCENARIO) throw new Error("t1-video 需要 --scenario");
+  mkdirSync(OUT, { recursive: true });
+  const { w, h } = screenSize();
+  const per = Number(opt("per", "8"));
+  console.log(`[t1-video] engine=${ENGINE} scenario=${SCENARIO} serial=${SERIAL} screen=${w}x${h}`);
+  adbShell("settings put system show_touches 1"); // 显示点按（白点锚点）
+  if (ENGINE === "webview") await navWebview(SCENARIO); else await navLynx(SCENARIO, w, h);
+  console.log("[t1-video] 预热…");
+  for (let i = 0; i < 2; i++) { await gesture("drag", w, h); await SLEEP(700); await gesture("back-top", w, h); await SLEEP(700); }
+  const x = Math.round(w / 2), y1 = Math.round(h * 0.78), y2 = Math.round(h * 0.31);
+  const outFile = resolve(OUT, `t1video_${ENGINE}_${SCENARIO}.jsonl`);
+  writeFileSync(outFile, "");
+  const { spawn } = await import("node:child_process");
+  for (let i = 0; i < per; i++) {
+    const name = `t1v_${ENGINE}_${i}`;
+    // 录屏：spawn 异步（execSync 后台 & 会被 SIGHUP 杀掉）
+    const rec = spawn(ADB, ["-s", SERIAL, "shell", `screenrecord --time-limit 4 /sdcard/${name}.mp4`], { stdio: "ignore" });
+    await SLEEP(800);
+    await gesture("drag", w, h); // 测量手势（白点锚点 = down 时刻）
+    await SLEEP(1500);
+    await adbShell(`input swipe ${x} ${y2} ${x} ${y1} 400`); // 回顶（非测量）
+    await new Promise((r) => { rec.on("exit", r); setTimeout(r, 6000); });
+    await SLEEP(400);
+    adbShell(`rm -f /sdcard/${name}.done.mp4`);
+    adbShell(`mv /sdcard/${name}.mp4 /sdcard/${name}.done.mp4`);
+    await SLEEP(300);
+    // 拉回且删除
+    try {
+      await sh(`"${ADB}" -s ${SERIAL} pull /sdcard/${name}.done.mp4 ${OUT}/${name}.mp4`);
+      adbShell(`rm /sdcard/${name}.done.mp4`);
+    } catch {
+      console.log(`  #${i} 录屏拉取失败，跳过`);
+      continue;
+    }
+    const r = sh(`python3 "${resolve(process.cwd(), "scripts/t1-video.py")}" "${OUT}/${name}.mp4" ${x} ${y1} 2>/dev/null`);
+    try {
+      const j = JSON.parse(r || "{}");
+      if (j.latencyMs !== undefined) {
+        const rec = { engine: ENGINE, scenario: SCENARIO, idx: i, latencyMs: j.latencyMs, tapFrame: j.tapFrame, moveFrame: j.moveFrame, fps: j.fps };
+        appendFileSync(outFile, JSON.stringify(rec) + "\n");
+        console.log(`  #${i} latency=${j.latencyMs}ms (Δframes=${j.deltaFrames} @${j.fps}fps)`);
+      } else {
+        console.log(`  #${i} 判读失败: ${r.slice(0, 160)}`);
+      }
+    } catch (e) {
+      console.log(`  #${i} 解析异常: ${e.message?.slice(0, 80)}`);
+    }
+    await SLEEP(400);
+  }
+  adbShell("settings put system show_touches 0");
+  console.log(`[t1-video] 完成 → ${outFile}`);
+}
+
 // ─── 命令 ───
 async function main() {
+  if (cmd === "t1-video") {
+    await t1VideoCmd();
+    return;
+  }
+  if (cmd === "t1") {
+    await t1JsCmd();
+    return;
+  }
   if (cmd === "probe") {
     const { w, h } = screenSize();
     adbShell(`dumpsys gfxinfo ${PKG} reset`); await SLEEP(300);
