@@ -24,6 +24,7 @@ import { isRestricted } from '../stores/settingsStore'
 import { isLoggedIn } from '../stores/authStore'
 import { getGlobalFab } from '../stores/globalFab'
 import CarouselSwiper from '../components/CarouselSwiper.vue'
+import MtsDemo from '../components/MtsDemo.vue'
 import RecommendedCover from '../components/RecommendedCover.vue'
 import CarouselSkeleton from '../components/CarouselSkeleton.vue'
 import TagChipRow from '../components/TagChipRow.vue'
@@ -281,6 +282,8 @@ onActivated(() => {
         <text class="text-body-small text-error bg-surface-container-high px-3 py-1 rounded-[var(--md-shape-small)] shadow-[var(--md-elevation-1)]">{{ pageError }}</text>
       </view>
 
+    <!-- [prototype] MTS 复核拖条（#313）：置于最上层（后渲染），验证后移除 -->
+    <MtsDemo />
     </view>
   </view>
 </template>
