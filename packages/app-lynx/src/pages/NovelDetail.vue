@@ -68,6 +68,9 @@ const reachedBottom = ref(false)
 // 上次上报后滚动增量 <8% 高度不重复上报（防每帧跨线程消息风暴）。
 const mtReportedTop = useMainThreadRef(-1)
 const mtHeightWarned = useMainThreadRef(false)
+// ⚠️ 已知（2026-09-02 真机复测）：main-thread-bindscroll 事件在本构建未确认派发
+//（原型同日同设备曾实证一次；当前构建复测无事件）。桥接保留：派发恢复即生效（≥70% 复活），
+// 未派发期间追更询问回落「仅到底」兜底（与用户确认语义 4a 一致，非静默降级——warn 兜底）。
 function onNovelScrollMT(e: { detail?: { scrollTop?: number; scrollHeight?: number } }): void {
   'main thread'
   const top = Number(e?.detail?.scrollTop ?? 0)
