@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useMainThreadRef } from 'vue-lynx'
+import { novelAverageParagraphHeightPx } from '../primitives/novelParagraphEstimate'
 import { currentParams, goBack, requestBack, registerBackGuard } from '../router'
 import { loadNovelDetail, fetchNovelText, loadNovelSeries, addNovelWatchlist } from '../api/novel'
 import type { PixivNovel } from '../api/types'
@@ -10,7 +12,6 @@ import {
   createWatchlistPrompt,
   type WatchlistPromptController,
 } from '../primitives/createWatchlistPrompt'
-import { computeReadProgress } from '../primitives/watchlistPrompt'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
 import CommentOverlay from '../components/CommentOverlay.vue'
 import SkeletonNovel from '../components/SkeletonNovel.vue'
@@ -57,12 +58,8 @@ function teardownPrompt(): void {
 const unregisterBackGuard = registerBackGuard(() => prompt?.requestBack() ?? false)
 
 // ─── 滚动跟踪（T0 平台结论） ───
-// Lynx scroll-view 的 @scroll 是 per-frame 特性（ADR-0109：LynxScrollEvent payload
-// 含 scrollTop/scrollHeight；ADR-0110 平台事实②只裁剪了 <list>，未裁剪 scroll-view）。
-// payload 无 viewport 高度：web-core 用 window.innerHeight，原生端退化为
-// scrollTop/scrollHeight 近似（computeReadProgress 注释）；到达底部由
-// @scrolltolower 权威兜底（多页面已实证），两路并进——即使原生 @scroll 不派发，
-// 底部触发仍然成立（spec §7 降级预案天然内建于双路设计）。
+// [prototype→spike] 滚动信号面：官方 list 只有边界事件（scrolltolower/scrolltoupper）；
+// 到「底部」由 @scrolltolower 权威触发（reachBottom 供追更询问），上端进度信号见 MT 实验。
 const reachedBottom = ref(false)
 
 function getViewportHeight(): number {
@@ -72,16 +69,14 @@ function getViewportHeight(): number {
     : 0
 }
 
-function onNovelScroll(e: { detail?: { scrollTop?: number; scrollHeight?: number } }): void {
-  const detail = e?.detail
-  if (!detail) return
-  const progress = computeReadProgress(
-    Number(detail.scrollTop ?? 0),
-    Number(detail.scrollHeight ?? 0),
-    getViewportHeight(),
-  )
-  prompt?.notifyScroll(progress, reachedBottom.value)
+// 主线程滚动信号（ADR-0134）：<list> 经 :main-thread-bindscroll 接收 scrollTop（BT @scroll 不派发），
+// 供追更「≥70% 进度」双路判定（T2 接入 notifyScroll；此处仅维护值）。
+const mtScrollTop = useMainThreadRef(0)
+function onNovelScrollMT(e: { detail?: { scrollTop?: number } }): void {
+  'main thread'
+  mtScrollTop.current = Number(e?.detail?.scrollTop ?? 0)
 }
+
 
 function onNovelToBottom(): void {
   reachedBottom.value = true
@@ -97,6 +92,9 @@ const paragraphs = computed(() => {
     .map((p) => p.trim())
     .filter(Boolean)
 })
+
+/** 列表 estimated 高度：正文段落中位高度（估算纯函数，见 primitives/novelParagraphEstimate） */
+const estimatedHeightPx = computed(() => novelAverageParagraphHeightPx(paragraphs.value))
 
 // generation-gate：章节内跳转（watch novelId 触发重载）后旧响应不得覆盖新数据
 let loadGeneration = 0
@@ -180,14 +178,20 @@ function onWatchlistCancel(): void {
     <view v-else-if="errorMsg" class="w-full h-full flex items-center justify-center">
       <text class="text-body-medium text-error p-4">{{ errorMsg }}</text>
     </view>
-    <scroll-view
-      v-else
+    <!-- [prototype→spike] 正文改 <list single> 引擎虚拟化（官方指南：超三屏用 list）。
+         红线：Vue :key 与 Lynx :item-key 双份一致 + 稳定 id；estimated 估算滚动条。
+         附带实验：:main-thread-bindscroll 真机派发（BT @scroll 实证不派发）。 -->
+    <list
+      v-else-if="novel && !isRestricted(novel)"
       class="w-full h-full"
+      list-type="single"
       scroll-orientation="vertical"
-      @scroll="onNovelScroll"
+      :estimated-main-axis-size-px="estimatedHeightPx"
+      :main-thread-bindscroll="onNovelScrollMT"
       @scrolltolower="onNovelToBottom"
     >
-      <view class="py-5 px-4 bg-surface-container-lowest mb-3">
+      <list-item :key="'meta'" :item-key="'meta'" class="w-full">
+        <view class="py-5 px-4 bg-surface-container-lowest mb-3">
         <text class="text-title-large font-bold text-surface-on">{{ novel?.title }}</text>
         <text class="text-body-medium text-surface-on-variant mt-2">by {{ novel?.user.name }}</text>
         <text class="text-label-medium text-outline mt-1.5">
@@ -216,22 +220,38 @@ function onWatchlistCancel(): void {
           <text class="text-label-medium text-outline ml-1">{{ novel?.total_comments }}</text>
         </view>
       </view>
-      <!-- 正文区：受限小说标题/作者/元信息可见，正文被遮罩挡住（issue #91） -->
+      </list-item>
+      <list-item
+        v-for="(p, idx) in paragraphs"
+        :key="`p-${idx}`"
+        :item-key="`p-${idx}`"
+        class="w-full px-4 mb-4"
+      >
+        <text class="text-body-large leading-[44rpx] text-surface-on">{{ p }}</text>
+      </list-item>
+      <list-item :key="'end'" :item-key="'end'" class="w-full">
+        <view class="flex items-center justify-center p-6">
+          <text class="text-body-small text-outline">— 完 —</text>
+        </view>
+      </list-item>
+    </list>
+    <!-- 受限小说：列表结构性改动不涉及（不拉正文），保留原头部+遮罩形态 -->
+    <view v-else class="w-full h-full p-4 relative">
+      <view class="py-5 px-4 bg-surface-container-lowest mb-3">
+        <text class="text-title-large font-bold text-surface-on">{{ novel?.title }}</text>
+        <text class="text-body-medium text-surface-on-variant mt-2">by {{ novel?.user.name }}</text>
+        <text class="text-label-medium text-outline mt-1.5">
+          {{ novel?.text_length }} 字
+          <template v-if="novel?.total_bookmarks != null">
+             · ♥ {{ novel?.total_bookmarks }}
+          </template>
+        </text>
+      </view>
       <view class="relative p-4">
-        <template v-if="novel && isRestricted(novel)">
-          <view class="min-h-[60vw]" />
-          <RestrictOverlay :level="novel.x_restrict === 2 ? 2 : 1" />
-        </template>
-        <template v-else>
-          <text v-for="(p, idx) in paragraphs" :key="idx" class="text-body-large leading-[44rpx] text-surface-on mb-4 block">
-            {{ p }}
-          </text>
-        </template>
+        <view class="min-h-[60vw]" />
+        <RestrictOverlay :level="novel && novel.x_restrict === 2 ? 2 : 1" />
       </view>
-      <view class="flex items-center justify-center p-6">
-        <text class="text-body-small text-outline">— 完 —</text>
-      </view>
-    </scroll-view>
+    </view>
 
     <!-- 评论弹层（issue #164）：根 view 内、scroll-view 之后的覆盖层 → 弹层打开时正文滚动位置不丢失 -->
     <CommentOverlay v-if="showComments" type="novel" :target-id="novelId" @close="showComments = false" />
