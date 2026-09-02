@@ -259,6 +259,14 @@ _Avoid_: JS 侧按设备型号/导航模式估 inset 经验常数
 触摸位移 → 内容位移的逐帧跟随质量，分解为三轴：**触摸响应延迟**（手指移动到内容开始移动的时延）、**帧跟随一致性**（掉帧导致的滞后/跳跃）、**惯性曲线自然度**（fling 减速与滚动距离体感）。对照基准 = webview 客户端在**同设备、同内容**下的同指标；验收双轨 = 量化基线（帧指标采集）+ 真机主观验收。当前决策范围 = RefreshableList 系列表（插画/小说 tab 为代表）与小说详情正文滚动两个场景。
 _Avoid_: 跟手（口语别名，勿入文档正式表述）、流畅/丝滑（未定义测量对象）
 
+**滚动信号面（scroll signal surface）**【2026-09-02 新增，ADR-0110 勘误】：
+`<list>` 在 `scroll-event-throttle="0"` 时经 `@scroll` 事件向 JS 层派发的 **per-frame 滚动位置信号**（~60Hz，payload 含 `scrollTop/scrollHeight/listWidth/listHeight/deltaX/deltaY/eventSource`）。**ADR-0110「list 零派发」的根因是 throttle=100**；throttle=0 为可用信号面，消费端必须节流（每帧事件的 BT 成本实打实）。官方 gallery 滚动条（tutorial-gallery）即靠此信号驱动。**注意与「MT 滚动信号」词条区分**：MT 绑定（`:main-thread-bindscroll`）为另一通道（原生派发、worklet 消费），BT `@scroll` 为 JS 侧每帧信号，二者不互替。
+_Avoid_: 「list 无滚动信号」（旧结论，已被 2026-09-02 真机实证推翻）、信号面当免费无限量用（必须节流）
+
+**滚动指示条（scroll indicator / scrolling scrollbar）**【2026-09-02 新增】：
+由**滚动信号面**驱动的**滚动中可见指示条**（右缘竖条，高度=视口/内容比例、top=位置比例，滚动停止 ~500ms 后淡出）。表示「当前位置」体感杠杆——webview 侧原生有滚动条、lynx 之前没有，视觉差是跟手性主观轴的一部分。实现要点：指示条节点必须位于 `RefreshableList` 的 `relative` 容器内（定位锚点语义，ADR-0131）；显隐用 opacity 而非 v-if（v-if 每帧 flip 视图重建）；颜色内联 rgba（Tailwind 透明度语法在原生 Lynx 不生效）。
+_Avoid_: 无信号裸滚动条、每帧重建指示条视图
+
 ### 正文渲染与滚动信号（Novel rendering & scroll signals）
 
 **正文段落虚拟化（novel paragraph virtualization）**【2026-09-02 新增】：
