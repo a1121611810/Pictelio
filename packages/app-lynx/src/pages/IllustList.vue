@@ -4,6 +4,7 @@
 defineOptions({ name: 'illusts' })
 import { ref, onMounted, onUnmounted } from 'vue'
 import { navigate } from '../router'
+import { useMainThreadRef, runOnBackground } from 'vue-lynx'
 import { loadRecommended, loadFollow, loadNext } from '../api/illust'
 import type { PixivIllust, PixivIllustListResponse } from '../api/types'
 import { thumbUrl } from '../utils/imageUrl'
@@ -53,6 +54,32 @@ const loadingMore = ref(false)
 const errorMsg = ref('')
 const pageErrorMsg = ref('')
 const endOfFeed = ref(false)
+
+// ─── [prototype 探针] 官方 gallery 用法验证（tutorial-gallery）───
+// 假设：官方 <list> 用 @scroll + scroll-event-throttle="0" 拿到滚动位置（BT 版滚动条），
+// MTS 版绑定 :main-thread-bindscroll。我们 ADR-0110 实证 throttle="100" 零派发，
+// 若 throttle=0 时派发 → H2 信号盲区结论被推翻（速度感知降载/滚动条解锁）。
+// 探针不参与统计，仅 logcat 计数；真机滚动后 dumpsys logcat 数 counts。
+// MT 探针沿用 NovelDetail 已验证模式（useMainThreadRef + runOnBackground 官方桥）。
+let probeBtCount = 0
+let probeBtWarned = false
+const probeMtCount = useMainThreadRef(0)
+
+function onProbeScroll(e: unknown): void {
+  probeBtCount++
+  console.warn(`[PROBE_BT_SCROLL] 派发! n=${probeBtCount} detail=${JSON.stringify(e)}`)
+}
+
+function onProbeScrollMT(e: unknown): void {
+  'main thread'
+  const next = probeMtCount.current + 1
+  probeMtCount.current = next
+  if (next <= 3) {
+    void runOnBackground((n: number) => {
+      console.warn(`[PROBE_MT_SCROLL] 派发! n=${n} detail=${JSON.stringify(e)}`)
+    })(next)
+  }
+}
 
 function sync() {
   illusts.value = feed.value.items().map((i) => i.data as PixivIllust)
@@ -204,7 +231,10 @@ onUnmounted(() => {
       :span-count="2"
       :style="{ listMainAxisGap: '12px', listCrossAxisGap: '12px' }"
       :lower-threshold-item-count="2"
+      :scroll-event-throttle="0"
       @scrolltolower="loadMore"
+      @scroll="onProbeScroll"
+      :main-thread-bindscroll="onProbeScrollMT"
     >
       <list-item
         v-for="item in illusts"
