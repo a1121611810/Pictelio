@@ -54,6 +54,21 @@ const adbShell = (s) => sh(`"${ADB}" -s ${SERIAL} shell ${s}`);
 //   6 AnimationStart 7 PerformTraversalsStart 8 DrawStart 9 FrameDeadline 10 SyncQueued
 //   11 SyncStart 12 IssueDrawCommandsStart 13 SwapBuffers 14 FrameCompleted 15 GpuCompleted
 //   16 SwapBuffersCompleted
+/** gfxinfo 聚合摘要（老设备 framestats 列语义不稳时兜底；任何版本都含） */
+function parseSummary(dump) {
+  const g = (re) => {
+    const m = re.exec(dump);
+    return m ? Number(m[1]) : NaN;
+  };
+  const total = g(/Total frames rendered: (\d+)/);
+  const jankPct = g(/Janky frames: \d+ \((\d+(?:\.\d+)?)%\)/);
+  const p50 = g(/50th percentile: (\d+)ms/);
+  const p90 = g(/90th percentile: (\d+)ms/);
+  const p99 = g(/99th percentile: (\d+)ms/);
+  if (!total) return null;
+  return { frames: total, jankRate: (jankPct ?? 0) / 100, totalP50: p50, totalP90: p90, totalP99: p99 };
+}
+
 function parseFramestats(dump) {
   const frames = [];
   for (const line of dump.split("\n")) {
@@ -73,21 +88,10 @@ function parseFramestats(dump) {
         jank: frameCompleted - intendedVsync > frameDeadline - intendedVsync,
         presentMs: displayPresentTime > 0 ? (displayPresentTime - gpuCompleted) / 1e6 : null,
       });
-    } else if (c.length === 17) {
-      const [flags, frameId, intendedVsync, vsync, inputEventId, handleInputStart, , , , frameDeadline, , , , , frameCompleted, gpuCompleted] = c;
-      if (!frameCompleted || frameCompleted <= intendedVsync) continue;
-      frames.push({
-        flags, vsyncId: frameId, intendedVsync,
-        vsyncMissMs: (vsync - intendedVsync) / 1e6,
-        unknownDelayMs: (handleInputStart - intendedVsync) / 1e6,
-        totalMs: (frameCompleted - intendedVsync) / 1e6,
-        deadlineMs: (frameDeadline - intendedVsync) / 1e6,
-        jank: frameCompleted - intendedVsync > frameDeadline - intendedVsync,
-        presentMs: null,
-      });
     }
+    // 旧式（17 列）列语义不稳（Android 9 实测尾列为时长），不用行映射，走聚合摘要
   }
-  return frames;
+  return { frames, summary: frames.length > 0 ? null : parseSummary(dump) };
 }
 
 function percentile(sorted, p) {
@@ -136,8 +140,15 @@ async function sampleOnce(outFile, meta) {
   await gesture(meta.kind, meta.w, meta.h);
   await SLEEP(1800); // 惯性帧收尾 + ring buffer 窗口内
   const dump = adbShell(`dumpsys gfxinfo ${PKG} framestats`);
-  const frames = parseFramestats(dump);
-  const rec = { ...meta, wallMs: Date.now() - t0, ...summarize(frames), framesDump: frames.length };
+  const { frames, summary } = parseFramestats(dump);
+  const base = summary ?? summarize(frames);
+  const rec = {
+    ...meta, wallMs: Date.now() - t0,
+    framesDump: summary ? summary.frames : frames.length,
+    jankRate: base.jankRate, totalP50: base.totalP50, totalP90: base.totalP90,
+    totalP99: base.totalP99, unknownDelayP50: base.unknownDelayP50 ?? 0,
+    unknownDelayP90: base.unknownDelayP90 ?? 0, deadlineMs: base.deadlineMs ?? 0,
+  };
   appendFileSync(outFile, JSON.stringify(rec) + "\n");
   return rec;
 }
@@ -190,8 +201,8 @@ async function framesProbe() {
   adbShell(`dumpsys gfxinfo ${PKG} reset`); await SLEEP(250);
   const { w, h } = screenSize();
   await gesture("drag", w, h); await SLEEP(1600);
-  const frames = parseFramestats(adbShell(`dumpsys gfxinfo ${PKG} framestats`));
-  return frames.length;
+  const { frames, summary } = parseFramestats(adbShell(`dumpsys gfxinfo ${PKG} framestats`));
+  return summary ? summary.frames : frames.length;
 }
 async function restartApp(activity) {
   adbShell(`am force-stop ${PKG}`); await SLEEP(1200);
@@ -247,8 +258,9 @@ async function navLynx(scenario, w, h) {
   const nav = resolve(process.cwd(), "scripts/lynx-bench-nav.sh");
   const profile = process.env.BENCH_PROFILE ?? (SERIAL === "emulator-5554" ? "emu" : "oppo");
   adbShell(`am force-stop ${PKG}`); await SLEEP(1200);
-  adbShell(`am start -n ${PKG}/.LynxActivity --es benchNav ${map[scenario] ?? scenario}`); await SLEEP(12000);
+  adbShell(`am start -n ${PKG}/.LynxActivity --es benchNav ${map[scenario] ?? scenario}`); await SLEEP(16000);
   let n = await framesProbe();
+  if (n < 30) { await SLEEP(3500); n = await framesProbe(); } // 冷启动漂移：再次等待后重探
   if (n < 30) {
     // 旧版本 bundle 无 benchNav 钩子时回退 FAB 路径（模拟器可用，真机环项失效则报错暴露）
     console.log(`  [nav:${scenario}] intent 深链 framesProbe=${n}，回退 bash FAB 导航`);
@@ -321,8 +333,9 @@ async function main() {
     const { w, h } = screenSize();
     adbShell(`dumpsys gfxinfo ${PKG} reset`); await SLEEP(300);
     await gesture("drag", w, h); await SLEEP(1800);
-    const frames = parseFramestats(adbShell(`dumpsys gfxinfo ${PKG} framestats`));
-    console.log(JSON.stringify({ ok: frames.length > 0, frames: frames.length, ...summarize(frames) }, null, 2));
+    const { frames, summary } = parseFramestats(adbShell(`dumpsys gfxinfo ${PKG} framestats`));
+    const base = summary ?? summarize(frames);
+    console.log(JSON.stringify({ ok: (summary ? summary.frames : frames.length) > 0, frames: summary ? summary.frames : frames.length, ...base }, null, 2));
     return;
   }
   if (cmd === "run") {

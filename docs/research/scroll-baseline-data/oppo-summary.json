@@ -1,0 +1,44 @@
+{
+  "lynx/illust-waterfall": {
+    "gestures": 30,
+    "jankRateMean": 0.1929,
+    "totalP50ofP50": 11,
+    "totalP90ofP50": 13,
+    "unknownDelayP90": 0
+  },
+  "lynx/novel-detail": {
+    "gestures": 30,
+    "jankRateMean": 0.1155,
+    "totalP50ofP50": 10,
+    "totalP90ofP50": 13,
+    "unknownDelayP90": 0
+  },
+  "lynx/novel-single": {
+    "gestures": 30,
+    "jankRateMean": 0.0817,
+    "totalP50ofP50": 11,
+    "totalP90ofP50": 13,
+    "unknownDelayP90": 0
+  },
+  "webview/illust-waterfall": {
+    "gestures": 30,
+    "jankRateMean": 0.0865,
+    "totalP50ofP50": 11,
+    "totalP90ofP50": 14,
+    "unknownDelayP90": 0
+  },
+  "webview/novel-detail": {
+    "gestures": 30,
+    "jankRateMean": 0.033,
+    "totalP50ofP50": 11,
+    "totalP90ofP50": 11,
+    "unknownDelayP90": 0
+  },
+  "webview/novel-single": {
+    "gestures": 30,
+    "jankRateMean": 0.2087,
+    "totalP50ofP50": 14,
+    "totalP90ofP50": 15,
+    "unknownDelayP90": 0
+  }
+}
