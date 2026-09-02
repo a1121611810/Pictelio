@@ -1873,6 +1873,15 @@ describe('滚动指示条公共层（spec #325）', () => {
       expect(src, n).not.toContain('scrollIndicator')
     }
   })
+
+  it('7 列表页正向接线（scoped slot 消费 onScroll + throttle=0 信号面，防丢绑定）', () => {
+    for (const n of PAGES) {
+      const src = pageSrc(n)
+      expect(src, n).toContain('<template #default="{ onScroll }">')
+      expect(src, n).toContain('@scroll="onScroll"')
+      expect(src, n).toContain(':scroll-event-throttle="0"')
+    }
+  })
 })
 
 // ─── 类型徽章行接入（ADR-0113，spec: docs/specs/work-type-badges.md 决策 6） ───

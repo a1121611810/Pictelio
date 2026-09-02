@@ -271,6 +271,7 @@ onUnmounted(() => {
       :refresh="refreshIllust"
       @back-to-top="refreshEpoch++"
     >
+    <template #default="{ onScroll }">
     <list
       :key="refreshEpoch"
       class="w-full h-full"
@@ -279,7 +280,9 @@ onUnmounted(() => {
       :span-count="2"
       :style="{ listMainAxisGap: '12px', listCrossAxisGap: '12px' }"
       :lower-threshold-item-count="2"
+      :scroll-event-throttle="0"
       @scrolltolower="loadIllustMore"
+      @scroll="onScroll"
     >
       <list-item
         v-for="item in illusts"
@@ -311,6 +314,7 @@ onUnmounted(() => {
         <text v-else class="text-body-medium text-outline">没有更多了</text>
       </list-item>
     </list>
+    </template>
     </RefreshableList>
 
     <!-- 小说空态 -->
@@ -328,13 +332,16 @@ onUnmounted(() => {
       :refresh="refreshNovel"
       @back-to-top="refreshEpoch++"
     >
+    <template #default="{ onScroll }">
     <list
       :key="refreshEpoch"
       class="w-full h-full"
       list-type="single"
       scroll-orientation="vertical"
       :lower-threshold-item-count="5"
+      :scroll-event-throttle="0"
       @scrolltolower="loadNovelMore"
+      @scroll="onScroll"
     >
       <list-item
         v-for="item in novels"
@@ -361,6 +368,7 @@ onUnmounted(() => {
         <text v-else class="text-body-medium text-outline">没有更多了</text>
       </list-item>
     </list>
+    </template>
     </RefreshableList>
   </view>
 </template>

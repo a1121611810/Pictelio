@@ -163,13 +163,16 @@ onUnmounted(() => {
     </view>
 
     <RefreshableList v-if="series.length > 0" :refresh="refreshFeed" @back-to-top="refreshEpoch++">
+    <template #default="{ onScroll }">
     <list
       :key="refreshEpoch"
       class="w-full h-full"
       list-type="single"
       scroll-orientation="vertical"
       :lower-threshold-item-count="5"
+      :scroll-event-throttle="0"
       @scrolltolower="loadMore"
+      @scroll="onScroll"
     >
       <list-item
         v-for="item in series"
@@ -226,6 +229,7 @@ onUnmounted(() => {
         <text v-else class="text-body-medium text-outline">没有更多了</text>
       </list-item>
     </list>
+    </template>
     </RefreshableList>
 
     <!-- M3 Dialog（取消追更二次确认）：结构对齐 Me.vue ugoiraConfirm -->

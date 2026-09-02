@@ -124,13 +124,16 @@ const refreshEpoch = ref(0)
     </view>
 
     <RefreshableList v-if="!loading || users.length > 0" :refresh="fetchFirstPage" @back-to-top="refreshEpoch++">
+    <template #default="{ onScroll }">
     <list
       :key="refreshEpoch"
       class="w-full h-full"
       list-type="single"
       scroll-orientation="vertical"
       :lower-threshold-item-count="5"
+      :scroll-event-throttle="0"
       @scrolltolower="loadMore"
+      @scroll="onScroll"
     >
       <list-item
         v-for="item in users"
@@ -167,6 +170,7 @@ const refreshEpoch = ref(0)
         <text class="text-body-medium text-outline">加载中…</text>
       </list-item>
     </list>
+    </template>
     </RefreshableList>
   </view>
 </template>
