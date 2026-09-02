@@ -210,6 +210,7 @@ onUnmounted(() => {
         v-for="item in illusts"
         :key="item.id"
         :item-key="String(item.id)"
+        :estimated-main-axis-size-px="270"
         class="bg-surface-container-lowest rounded-[var(--md-shape-medium)] flex flex-col overflow-hidden shadow-[var(--md-elevation-1)]"
       >
         <!-- [lynx:fix] 原生 list-item 根级 @tap 失效（fiber 不触发，真机实测 2026-08-02）；
