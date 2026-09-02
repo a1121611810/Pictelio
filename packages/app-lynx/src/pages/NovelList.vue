@@ -189,7 +189,7 @@ onUnmounted(() => {
       class="w-full h-full"
       list-type="single"
       scroll-orientation="vertical"
-      :lower-threshold-item-count="5"
+      :lower-threshold-item-count="10"
       @scrolltolower="loadMore"
     >
       <list-item

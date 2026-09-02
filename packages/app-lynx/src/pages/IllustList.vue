@@ -203,7 +203,7 @@ onUnmounted(() => {
       scroll-orientation="vertical"
       :span-count="2"
       :style="{ listMainAxisGap: '12px', listCrossAxisGap: '12px' }"
-      :lower-threshold-item-count="2"
+      :lower-threshold-item-count="6"
       @scrolltolower="loadMore"
     >
       <list-item
