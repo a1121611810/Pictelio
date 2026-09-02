@@ -227,6 +227,7 @@ function registerBenchNavHandler(): void {
     pictelioBenchNavCarousel: '/recommended',
     pictelioBenchNavIllust: '/illusts',
     pictelioBenchNavNovel: '/novels',
+    pictelioBenchNavFollowing: '/following',
   }
   for (const [eventName, target] of Object.entries(TARGETS)) {
     // 原生发送两次（1.5s/3s）防 JS 挂载竞态；replace 幂等，重复到达无副作用

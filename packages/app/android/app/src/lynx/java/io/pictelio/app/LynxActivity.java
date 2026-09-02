@@ -114,6 +114,7 @@ public class LynxActivity extends AppCompatActivity {
                         case "carousel" -> "pictelioBenchNavCarousel";
                         case "illust" -> "pictelioBenchNavIllust";
                         case "novel" -> "pictelioBenchNavNovel";
+                        case "following" -> "pictelioBenchNavFollowing";
                         default -> "";
                     };
                     for (long delay : new long[]{1500, 3000}) {

@@ -323,6 +323,30 @@ async function navWebview(scenario) {
       console.log(`  [nav:novel-detail] 已进入小说详情 novel id=${m[1]}`);
       break;
     }
+    case "following-illust": {
+      await spa("/home");
+      await ev(`(() => { const el=document.querySelector('[aria-label="关注"]'); if(!el) return "no"; el.click(); return "ok"; })()`);
+      await SLEEP(6000);
+      await ev(`(() => { const el=[...document.querySelectorAll("button")].find(b=>b.textContent.trim()==="插画"); if(!el) return "no"; el.click(); return "ok"; })()`);
+      await SLEEP(7000);
+      const t = await bodyText();
+      const ok = /\u2605/.test(t) && !/系列/.test(t?.split("关注")[1]?.slice(0, 8) ?? ""); // 插画卡（星标行）而非小说卡（系列徽章
+      console.log(`  [nav:following-illust] ${ok ? "✓" : "✗"} 关注插画 feed: ${t.slice(0, 80)}`);
+      if (!ok) throw new Error("webview 关注插画面板验证失败");
+      break;
+    }
+    case "following-novel": {
+      await spa("/home");
+      await ev(`(() => { const el=document.querySelector('[aria-label="关注"]'); if(!el) return "no"; el.click(); return "ok"; })()`);
+      await SLEEP(6000);
+      await ev(`(() => { const el=[...document.querySelectorAll("button")].find(b=>b.textContent.trim()==="小说"); if(!el) return "no"; el.click(); return "ok"; })()`);
+      await SLEEP(7000);
+      const t = await bodyText();
+      const ok = /字/.test(t) && /R-18|R-18G/.test(t); // 关注小说：完整小说卡（字数行）＋R18 徽章
+      console.log(`  [nav:following-novel] ${ok ? "✓" : "✗"} 关注小说 feed: ${t.slice(0, 80)}`);
+      if (!ok) throw new Error("webview 关注小说面板无完整卡（开关未生效/无关注内容）");
+      break;
+    }
     default: throw new Error(`webview 场景 ${scenario} 未实现`);
   }
 }
