@@ -258,3 +258,25 @@ _Avoid_: JS 侧按设备型号/导航模式估 inset 经验常数
 **滚动跟手性（scroll responsiveness）**【2026-09-01 新增】：
 触摸位移 → 内容位移的逐帧跟随质量，分解为三轴：**触摸响应延迟**（手指移动到内容开始移动的时延）、**帧跟随一致性**（掉帧导致的滞后/跳跃）、**惯性曲线自然度**（fling 减速与滚动距离体感）。对照基准 = webview 客户端在**同设备、同内容**下的同指标；验收双轨 = 量化基线（帧指标采集）+ 真机主观验收。当前决策范围 = RefreshableList 系列表（插画/小说 tab 为代表）与小说详情正文滚动两个场景。
 _Avoid_: 跟手（口语别名，勿入文档正式表述）、流畅/丝滑（未定义测量对象）
+
+### 正文渲染与滚动信号（Novel rendering & scroll signals）
+
+**正文段落虚拟化（novel paragraph virtualization）**【2026-09-02 新增】：
+小说正文以 **`<list list-type="single">` 引擎虚拟化**承载、段落为 `<list-item>`（`item-key`/`:key` 双份一致 + 稳定 id、`estimated-main-axis-size-px` 估算滚动条）的渲染形态（官方 scroll-view-vs-list 指南：「内容超过约三屏优先用 list」；Pixiv 长文必超三屏）。spike 真机 A/B（同文同深度）：jank 22.6%→**8.2%**、内存 288→167MB（-42%）、无白屏——「正文虚拟化（B 路径）」选型定稿（#311/#313）。头部信息卡/「— 完 —」为独立 item（`meta`/`end`），受限小说不经 list（独立分支）。
+_Avoid_: 全文一次性 `<scroll-view>`（现状，深滚 jank 递增劣化）、段落窗口化（A 路径——信号源缺失已作废）
+
+**主线程滚动信号（MT scroll signal）**【2026-09-02 新增】：
+`<list>` 上 `:main-thread-bindscroll` 在原生 LynxView 4.0.1 真机**正常派发**（scrollTop 递增实测，MT JS 可达）——**BT `@scroll` 对全部滚动容器（list 与 scroll-view）真机均不派发**（2026-09-02 实证，修订 ADR-0110 早期「仅裁剪 list」的推断），MT 绑定打开信号盲区：追更询问「≥70% 进度」**可复活**、滚动感知类优化信号源恢复。
+_Avoid_: 依赖 BT `@scroll` 实现进度/窗口化（不派发）；per-frame bridge 兜底（ADR-0106 否决先例）
+
+**输入派发地板（input dispatch floor）**【2026-09-02 新增】：
+触摸→Lynx JS 的固有派发延迟（真机实测 48–50ms，主线程/后台线程相同）——属 SDK 输入管线，应用层（含 MTS/Vapor 类方案）无法消除；*修正*此前 H5「双线程跨线程往返地板」表述（跨线程往返是可消的叠加项）。原生滚动路径（UI 线程直接位移）不受此地板影响。
+_Avoid_: 期望应用层优化消除该地板；把 H5 归因为跨线程往返（已修正）
+
+**主线程脚本（MTS / main-thread script）**【2026-09-02 新增】：
+vue-lynx 官方主线程事件处理机制（`main-thread-bind*` 绑定 + `'main thread'` 指令 + `useMainThreadRef` + 单数 `setStyleProperty`，从 `vue-lynx` 根入口导入）——**0.5.1 完整可用且原生 4.0.1 真机验证通过**（官方 swiper 姿势；ADR-0115「不可用」判定需修订——当年空白另有原因）。收益面 = JS 驱动交互（轮播/拖拽）消除「JS 处理后跨线程渲染」补帧跳；不消除「输入派发地板」。
+_Avoid_: 用 React 命名空间式 `main-thread:` 语法（vue-lynx 用 `main-thread-bind*` 前缀式）；把 MTS 视为消除全部触摸延迟的手段（地板仍在）
+
+**首屏直出（IFR / instant first render）**【2026-09-02 新增】：
+vue-lynx `pluginVueLynx({ enableIFR: true })` 的主线程同步首屏渲染（双线程白屏消除）；**收益 = 首屏视觉（FCP）**，非交互杠杆（真机 T0/T1 无滚动跟手改善；2026-09-02 用户拍板保留启用，视觉改善确认）。代价 = bundle ×~2.2、TTI 上界 ×1.36（既有调研）。
+_Avoid_: 将 IFR 作为滚动跟手/交互性能手段；关掉它换取 bundle 体积（已拍板保留）
