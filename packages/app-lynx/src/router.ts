@@ -106,6 +106,7 @@ export function resetHistory(): void {
 /** 未登录守卫：保证进入受保护页面前完成 token 恢复 */
 export async function ensureAuth(): Promise<boolean> {
   if (isLoggedIn.value) return true
+  if (isNativeMode()) registerBenchNavHandler()
   const ok = await restoreToken()
   if (!ok) navigate('/login', { replace: true })
   return ok
@@ -212,6 +213,35 @@ function registerSystemBackHandler(): void {
   }
   emitter.addListener('pictelioBack', handleSystemBack)
 }
+
+/** bench 导航钩子（wayfinder #306）：原生 `am start --es benchNav <scenario>` 直达目标页。
+ *  真机 input tap 对放射 FAB 环项 hit-test 失效（Oppo R11s 实测），经 GlobalEventEmitter 绕过。
+ *  生产无此 intent（LynxActivity 仅 bench extra 存在时发送事件），零影响。 */
+let benchNavRegistered = false
+function registerBenchNavHandler(): void {
+  if (benchNavRegistered) return
+  benchNavRegistered = true
+  const lynxGlobal = typeof lynx !== 'undefined' ? lynx : (globalThis as { lynx?: LynxGlobal }).lynx
+  const emitter = lynxGlobal?.getJSModule?.('GlobalEventEmitter')
+  if (!emitter || typeof emitter.addListener !== 'function') return
+  const TARGETS: Record<string, string> = {
+    pictelioBenchNavCarousel: '/recommended',
+    pictelioBenchNavIllust: '/illusts',
+    pictelioBenchNavNovel: '/novels',
+    pictelioBenchNavFollowing: '/following',
+  }
+  for (const [eventName, target] of Object.entries(TARGETS)) {
+    // 原生发送两次（1.5s/3s）防 JS 挂载竞态；replace 幂等，重复到达无副作用
+    emitter.addListener(eventName, () => {
+      void navigate(target, { replace: true })
+    })
+  }
+}
+// 模块加载即注册（先于 initRouter 的网络恢复；initRouter 中重复调用幂等）——
+// 否则广播窗口（onLoadSuccess+1.5/3s）落在 restoreToken 之后时事件被丢弃。
+if (isNativeMode()) registerBenchNavHandler()
+
+
 
 /** 初始化（App 挂载时调用）：注册 401 刷新 + 恢复设置 + 首路由（replace 不入栈） */
 export async function initRouter(): Promise<void> {
