@@ -159,6 +159,8 @@ export default defineConfig({
       // 与 scoped 规则（[l-css-id="哈希"]...）不匹配 → 全部样式失效（只剩默认文本）。
       // enableCSSSelector 让选择器保留原始类名（.cls），web-core 按类名匹配即可应用。
       enableCSSSelector: true,
+      // 首屏直出（ADR-0134 定稿：用户拍板保留——首屏视觉收益；非交互杠杆）
+      enableIFR: true,
     }),
     pluginTailwindCSS({
       config: 'tailwind.config.ts',

@@ -104,33 +104,6 @@ public class LynxActivity extends AppCompatActivity {
             public void onLoadSuccess() {
                 bundleLoaded.set(true);
                 cancelLoadTimeout();
-                // bench 导航钩子（wayfinder #306）：adb `am start --es benchNav <scenario>` 直达目标页。
-                // 真机 input tap 对放射 FAB 环项 hit-test 失效（事件送达但不导航，Oppo R11s 实测），
-                // 经 GlobalEventEmitter 深链绕过；生产无此 extra，零影响。
-                String benchNav = getIntent().getStringExtra("benchNav");
-                if (benchNav != null && !benchNav.isEmpty()) {
-                    // 事件名编码路由（lynx 4.0.1 无 JavaOnlyString，故不用载荷；空数组）。
-                    // novel-follow 为两组事件：先路由到 /novels，页面挂载后再切「关注」子 tab。
-                    final String[] events = switch (benchNav) {
-                        case "carousel" -> new String[]{"pictelioBenchNavCarousel"};
-                        case "illust" -> new String[]{"pictelioBenchNavIllust"};
-                        case "novel" -> new String[]{"pictelioBenchNavNovel"};
-                        case "following" -> new String[]{"pictelioBenchNavFollowing"};
-                        case "illust-follow" -> new String[]{"pictelioBenchNavIllust", "pictelioBenchNavIllustFollow"};
-                        case "novel-follow" -> new String[]{"pictelioBenchNavNovel", "pictelioBenchNavNovelFollow"};
-                        default -> new String[0];
-                    };
-                    // 四次广播（1.5/3/4.5/6s）：页面级监听（如 NovelList 子 tab）可能晚于路由监听，
-                    // 扩大窗口防「App 挂载/页面挂载」竞态；重复到达幂等或无害
-                    for (long delay : new long[]{1500, 3000, 4500, 6000}) {
-                        for (String event : events) {
-                            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                                if (!isFinishing() && !event.isEmpty())
-                                    lynxView.sendGlobalEvent(event, new JavaOnlyArray());
-                            }, delay);
-                        }
-                    }
-                }
             }
 
             @Override

@@ -198,9 +198,8 @@ function onWatchlistCancel(): void {
     <view v-else-if="errorMsg" class="w-full h-full flex items-center justify-center">
       <text class="text-body-medium text-error p-4">{{ errorMsg }}</text>
     </view>
-    <!-- [prototype→spike] 正文改 <list single> 引擎虚拟化（官方指南：超三屏用 list）。
-         红线：Vue :key 与 Lynx :item-key 双份一致 + 稳定 id；estimated 估算滚动条。
-         附带实验：:main-thread-bindscroll 真机派发（BT @scroll 实证不派发）。 -->
+    <!-- 正文列表虚拟化（ADR-0134）：官方指南「超三屏用 list」；红线 = Vue :key 与 Lynx
+         :item-key 双份一致 + 稳定 id；estimated 按段落估算滚动条。 -->
     <list
       v-else-if="novel && !isRestricted(novel)"
       class="w-full h-full"
