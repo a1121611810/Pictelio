@@ -9,7 +9,9 @@
 
 ADR-0109 原设计：滚动超过阈值（800px）才显示回顶按钮，依赖 `<list>` 的 per-frame `scroll` 事件做位置感知。T1 T-spike 模拟器实测（四色探针，2026-08-24）**否决该前提**：
 
-**平台事实（实证）：`<list>` 对 JS 派发的滚动事件仅 `load` / `scrolltolower` / `scrolltoupper`（边界事件）。** `@scroll` / `@scrollend` / `@scrollstatechange` 直接绑定 + `scroll-event-throttle="100"` 四路全测，JS 端零派发。字节码佐证：`LynxListEvent.EVENT_SCROLL` 常量存在但派发受 `mEnableScrollEvent` 门控；per-frame scroll 是 scroll-view 的特性，list 事件面被裁剪。因此"滚动超过一定距离显示"在 JS 层**无信号源**（原生桥/每帧 bridge 违背 ADR-0106 性能原则；worklet 本工具链无支持证据）。
+**平台事实（实证，2026-08-24 模拟器 T-spike）：使用 `scroll-event-throttle="100"` 时，`<list>` 的 `@scroll` / `@scrollend` / `@scrollstatechange` 四路零派发。** 字节码佐证：`LynxListEvent.EVENT_SCROLL` 常量存在但派发受 `mEnableScrollEvent` 门控；per-frame scroll 是 scroll-view 的特性，list 事件面被裁剪。因此"滚动超过一定距离显示"在 JS 层**无信号源**（原生桥/每帧 bridge 违背 ADR-0106 性能原则；worklet 本工具链无支持证据）。
+
+> **⚠️ 事实勘误（2026-09-02 真机复测，官方 demo 参照）**：零派发的根因是 **`scroll-event-throttle="100"`，而非 `<list>` 无 scroll 事件**。官方用法为 `scroll-event-throttle="0"`，真机实证 `@scroll` 以 ~60Hz（中位间隔 18ms）派发，payload 含 `scrollTop/scrollHeight/listWidth/listHeight/deltaY/eventSource`（89 条/6.4s，3 次手势）。故「无信号源」结论仅对 throttle≥100 成立；throttle=0 为可用信号面，消费端须节流。**本 ADR 的常驻按钮决策不变**（用户已拍板，且阈值感知方案仍非主要目标），但刷新的决策 3「滚动阈值感知（ADR-0109 原设计）：assert 无信号源」的否决理由应更新为「信号面可用但本决策未采用」。
 
 用户拍板：**按钮常驻**——彻底砍掉感知层。
 
@@ -24,7 +26,7 @@ ADR-0109 原设计：滚动超过阈值（800px）才显示回顶按钮，依赖
 
 ## 被考虑的方案
 
-- **滚动阈值感知**（ADR-0109 原设计）：`<list>` 无 per-frame scroll，JS 无信号源。否决。
+- **滚动阈值感知**（ADR-0109 原设计）：当时实测定性为「`<list>` 无 per-frame scroll，JS 无信号源」，故否决；**2026-09-02 更正**——`scroll-event-throttle="0"` 时 per-frame 信号可用，否决理由不成立（但本决策已拍板常驻，且阈值感知本身非跟手性主战场；可复用信号面见新决策票「速度感知降载」）。
 - **原生桥暴露 scrollTop**：违背"零新原生面" + per-frame bridge 性能反模式（ADR-0106 否决项）。否决。
 - **main-thread worklet（scroll-monitor-tag）**：本工具链（rspeedy 4.0.1 / vue-lynx）无 worklet 支持证据，spike 成本高、成功概率低。否决。
 - **list-item appear 事件推算位置**：瀑布流高度不定，脆弱。否决。
