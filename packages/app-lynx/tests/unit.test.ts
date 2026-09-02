@@ -1849,6 +1849,32 @@ it('列表页计数：Bookmarks/UserHome 各 2 个 RefreshableList，其余各 1
 })
 })
 
+// ─── 滚动指示条公共层（spec: docs/specs/app-lynx-scroll-indicator-common-layer.md #325） ───
+// oracle 溯源：spec §Implementation Decisions「RefreshableList 唯一持有 useScrollIndicator + 渲染
+// ScrollIndicator」与「页面零接线（禁止在页面再实例化/渲染）」——红线防复活（页面接线回归 / 公共层回退）。
+describe('滚动指示条公共层（spec #325）', () => {
+  const PAGES = ['IllustList', 'NovelList', 'Following', 'Bookmarks', 'UserHome', 'FollowList', 'Watchlist'] as const
+  const pageSrc = (n: string) => readFileSync(fileURLToPath(new URL(`../src/pages/${n}.vue`, import.meta.url)), 'utf8')
+
+  it('RefreshableList 唯一持有指示条（useScrollIndicator + ScrollIndicator + scoped slot 透出 onScroll）', () => {
+    const src = readFileSync(fileURLToPath(new URL('../src/components/RefreshableList.vue', import.meta.url)), 'utf8')
+    expect(src).toContain('useScrollIndicator()')
+    expect(src).toContain("from '../primitives/useScrollIndicator'")
+    expect(src).toContain("from './ScrollIndicator.vue'")
+    expect(src).toContain('<slot :on-scroll="indicator.onScroll" />')
+    expect(src).toContain('<ScrollIndicator')
+  })
+
+  it('7 列表页零指示条接线（防复活：页面禁 useScrollIndicator / ScrollIndicator / scrollIndicator）', () => {
+    for (const n of PAGES) {
+      const src = pageSrc(n)
+      expect(src, n).not.toContain('useScrollIndicator')
+      expect(src, n).not.toContain('ScrollIndicator')
+      expect(src, n).not.toContain('scrollIndicator')
+    }
+  })
+})
+
 // ─── 类型徽章行接入（ADR-0113，spec: docs/specs/work-type-badges.md 决策 6） ───
 // oracle 溯源：五页面清单来自 ADR-0113 决策 5 / spec 决策 6（独立 oracle）；
 // import 配对断言的期望值来自原生失败实证——2026-08-25 模拟器实测 UserHome 缺 import 时

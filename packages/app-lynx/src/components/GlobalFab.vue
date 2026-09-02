@@ -45,7 +45,7 @@ const SPACING_UNIT_VW = 1.067
 // search 模式堆叠偏移（ADR-0132 决策 2「双 FAB 竖排堆叠」——几何推导，P1-1 修复）：
 // 非 tab 列表页与 RefreshableList 的 feed 分页 FAB（bottom-4 right-4 56dp）同角竖排。
 // 分页 FAB 竖向占用（自屏幕底边起算）：[bottom-4=4.267vw, 4.267+14.933=19.2vw]，
-// 分页**菜单**自浮层槽位 bottom-[20.267vw] 向上展开（RefreshableList.vue:142）——
+// 分页**菜单**自浮层槽位 bottom-[20.267vw] 向上展开（RefreshableList.vue:166）——
 // 菜单面板 = 2 pill（刷新/回顶，各 10.667vw）+ 1.067vw 间隙 = 22.4vw，面板顶 = 42.667vw；
 // 搜索 FAB 若停在 20.267vw 槽位，菜单展开时「刷新」项会被搜索 FAB 遮挡并吞点击
 // （GlobalFab z-40 > 菜单 z-20）。故搜索 FAB 底边 = 面板顶 42.667 + 1.067 间隙 = 43.734vw。

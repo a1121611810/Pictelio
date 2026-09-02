@@ -1,7 +1,8 @@
-// ─── 列表滚动指示条状态原语（spec #319 / ticket #321 T2） ───
-// 页面（IllustList T3）把 list 的 @scroll 事件喂给 onScroll（scroll-event-throttle="0"，~60Hz
-// 派发），本原语负责：33ms 节流（~30Hz UI 更新）→ calcScrollIndicator（T1，几何纯函数）→
+// ─── 列表滚动指示条状态原语（spec #319 / ticket #321 T2；公共层持有者 = RefreshableList，spec #325） ───
+// RefreshableList（公共层，spec #325）把 <list> 的 @scroll 喂给 onScroll（scroll-event-throttle="0"，
+// ~60Hz 派发），本原语负责：33ms 节流（~30Hz UI 更新）→ calcScrollIndicator（T1，几何纯函数）→
 // 写 top/height refs → visible=true → 重置 500ms 淡出 timer。
+// （页面零接线——指示条状态/渲染内收公共组件，页面经 scoped slot 消费 onScroll。）
 //
 // 契约（T1 → 本原语）：
 // - calcScrollIndicator 返回 null = 无有效信号（scrollHeight<=0 / 缺失）：onScroll 直接 return，

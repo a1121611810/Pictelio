@@ -49,8 +49,6 @@ function makeFeed(m: 'recommend' | 'follow') {
 const feed = ref(makeFeed(mode.value))
 const illusts = ref<PixivIllust[]>([])
 
-// 滚动指示条（ADR-0135 公共层，spec: app-lynx-scroll-indicator-common-layer）：
-// 信号面 @scroll(throttle=0) → RefreshableList scoped slot onScroll；本页不再持有指示条
 const loading = ref(false)
 const loadingMore = ref(false)
 const errorMsg = ref('')
