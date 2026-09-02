@@ -214,11 +214,14 @@ function registerSystemBackHandler(): void {
   emitter.addListener('pictelioBack', handleSystemBack)
 }
 
-/** bench 导航钩子（wayfinder #306）：原生 `am start --es benchNav <scenario>` 直达目标页。
+/** bench 导航钩子（wayfinder #306，ADR-0136）：原生 `am start --es benchNav <scenario>` 直达目标页。
  *  真机 input tap 对放射 FAB 环项 hit-test 失效（Oppo R11s 实测），经 GlobalEventEmitter 绕过。
- *  生产无此 intent（LynxActivity 仅 bench extra 存在时发送事件），零影响。 */
+ *  __DEV__ 编译期门禁（lynx.config.ts define，生产为 false 整块消除）——与原生
+ *  BuildConfig.DEBUG 双保险；注意 vue-lynx 插件会在 dev 恒覆盖 __DEV__=true（auth.ts 同注）,
+ *  故 __DEV__ 仅在「非生产 + 显式 PICTELIO_LYNX_DEV=1」为 false 时可靠（生产构建）。 */
 let benchNavRegistered = false
 function registerBenchNavHandler(): void {
+  if (!__DEV__) return // 生产构建整块消除（auth.ts 同范式）
   if (benchNavRegistered) return
   benchNavRegistered = true
   const lynxGlobal = typeof lynx !== 'undefined' ? lynx : (globalThis as { lynx?: LynxGlobal }).lynx

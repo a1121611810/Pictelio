@@ -29,7 +29,7 @@ _Avoid_: 遮罩卡（与遮罩的 absolute 覆盖模式语义不同）
 原生 LynxView 把「最近的 view 祖先」当作 absolute 子元素的定位锚点（即使该祖先未设 position，与 Web 回退到视口的语义不同，模拟器实测偏离）。因此覆盖层元素的绝对定位一律用 **left/top vw + translate 居中**（vw 为视口基准，从锚点 (0,0) 起算恒等于视口坐标）；**禁止**在非全屏父盒内用 `right/bottom`（按父盒边缘解析 → 元素跑出屏幕，实测 FAB 消失）。
 
 **真机导航钩子（benchNav intent deep-link）**【2026-09-02 新增，ADR-0136】：
-原生 adb `am start --es benchNav <scenario>` 直达目标页的**测试导航通道**（深链绕过真机 `@tap` 失效——见「平台约束」）。形成三层：原生 `LynxActivity.onLoadSuccess` 读 extra → 事件名编码 → 4 次广播（1.5/3/4.5/6s 防挂载竞态）；`router.ts` 监听 → `/illusts`、`/novels`、`/recommended` 等；页面层监听 → 切「关注」子tab。**仅 debug 构建带钩子**（`if (BuildConfig.DEBUG)` 包裹，release 由 R8 剔除、生产包不含钩子）。**任何真机验证的导航第一选择——不要退回模拟点击**（放射 FAB 环项/子 tab 已实证失效）。_Avoid_: 用注入 tap 导航（仅登录页等部分命中路径可行）、在 main 上验证时怀疑「钩子不存在」（已入 main，debug 可用）。
+原生 adb `am start --es benchNav <scenario>` 直达目标页的**测试导航通道**（深链绕过真机 `@tap` 失效——见「平台约束」）。形成三层：原生 `LynxActivity.onLoadSuccess` 读 extra → 事件名编码 → 4 次广播（1.5/3/4.5/6s 防挂载竞态）；`router.ts` 监听 → `/illusts`、`/novels`、`/recommended` 等；页面层监听 → 切「关注」子tab。**生产双重消除**：原生 `if (BuildConfig.DEBUG)`（release R8 剔除）+ 前端 `if (__DEV__)`（生产构建死代码消除，同 auth.ts 凭证范式）——**仅 debug 构建带钩子**。**任何真机验证的导航第一选择——不要退回模拟点击**（放射 FAB 环项/子 tab 已实证失效）。_Avoid_: 用注入 tap 导航（仅登录页等部分命中路径可行）、在 main 上验证时怀疑「钩子不存在」（已入 main，debug 可用）。
 
 ### 作品标识（Work indicators）
 

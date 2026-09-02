@@ -16,7 +16,7 @@
 ## 决策
 
 1. **钩子代码进 main（生产不打包）**：`LynxActivity.onLoadSuccess` 的 benchNav 处理段用 `if (BuildConfig.DEBUG)` 包裹——debug 构建含钩子（真机验证直接可用，不再需要切分支）；release 构建（minifyEnabled true + R8）下 `BuildConfig.DEBUG` 恒 false → 死代码消除 → **生产 APK 不含任何钩子代码**。**已验证**：release APK dex 无 `benchNav` 字符串。
-2. **JS 侧不打包条件**（router.ts / IllustList.vue / NovelList.vue 的事件监听）：原生侧 debug 才广播，JS 监听器为「无事件永不触发」的无害存在——**零影响由原生侧保证**（release 无 broadcast 源）；不引入 `import.meta.env.DEV`（rspeedy 环境未验证、app-lynx 无先例）。
+2. **JS 侧也加判断（双保险）**：router.ts / IllustList.vue / NovelList.vue 的监听器包在 `if (__DEV__)` 内（`__DEV__` 为项目既有编译期宏，lynx.config.ts `source.define` 注入，auth.ts 已有同范式）。**已核实 vue-lynx 插件覆盖语义**（plugin/dist/index.js:20798 `__DEV__: 'process.env.NODE_ENV !== "production"'`）：生产构建恒 false（监听器随死代码消除）；dev 构建恒 true（钩子可用）。与原生 `BuildConfig.DEBUG` 互补：**生产 = 原生(DEBUG false) + JS(__DEV__ false) 双重消除；dev = 双 true 可用**。
 3. **钩子三层结构**（迁移后保留，全部进 main）：
    - **原生层**（LynxActivity.java，`onLoadSuccess`）：读 `getIntent().getStringExtra("benchNav")` → `switch` 编码场景→事件名数组 → 4 次广播（1.5/3/4.5/6s）——防「App 挂载/页面挂载」竞态；事件名编码路由（lynx 4.0.1 无 JavaOnlyString，故不用载荷）。
    - **路由层**（router.ts）：`registerBenchNavHandler()` 模块加载即注册，`pictelioBenchNavIllust`→`/illusts`、`Carousel`→`/recommended` 等；`replace` 幂等。
@@ -26,8 +26,8 @@
 ## 被考虑的方案
 
 - **保持钩子只在 bench 分支**（原约定）：每次真机验证都要切分支——main 上验证时会退回 tap 而失效。否决（本次实际踩坑）。
-- **BuildConfig 而非 import.meta.env.DEV**（JS 侧）：rspeedy 无已验证的 DEV 注入；且 production 源（原生广播）已由 DEBUG 兜住，JS 侧无需双保险。驳回。
-- **JS 侧也加环境判断**：引入未经验证的构建变量，增加复杂度无收益（release 下广播源不存在，监听器悬空零影响）。驳回。
+- **JS 侧不判断（仅原生 DEBUG 包裹）**：曾认为「release 无广播源，监听器悬空零影响」。**被推翻**——项目已有 `__DEV__` 编译期宏（auth.ts 同范式），JS 侧判断零成本且生产消除更彻底；「零影响」论断不构成不做判断的理由。
+- **import.meta.env.DEV**（JS 侧）：rspeedy 无已验证的 DEV 注入；项目已有更规范的 `__DEV__`（lynx.config define）。驳回。
 
 ## 后果
 

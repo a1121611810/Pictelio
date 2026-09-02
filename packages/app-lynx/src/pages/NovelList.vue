@@ -99,7 +99,7 @@ function openDetail(id: number) {
 // ─── 全局放射 FAB 桥（ADR-0120）：注册本页动作到 globalFab，卸载时注销 ───
 let unreg: (() => void) | undefined
 // bench 导航钩子（wayfinder #306，ADR-0136）：真机 input tap 对 <view @tap> 失效，经
-// GlobalEventEmitter 事件切「关注」子 tab；原生侧 BuildConfig.DEBUG 包裹，生产无广播零影响
+// GlobalEventEmitter 事件切「关注」子 tab；__DEV__ 门禁（生产编译消除，同原生 DEBUG 双保险）
 const benchOnFollow = () => void switchMode('follow')
 let benchOffFn: (() => void) | undefined
 onMounted(() => {
@@ -109,11 +109,13 @@ onMounted(() => {
       refreshEpoch.value++
     },
   })
-  const lynxGlobal = typeof lynx !== 'undefined' ? lynx : (globalThis as { lynx?: { getJSModule?: (n: string) => { addListener?: (e: string, fn: () => void) => void; removeListener?: (e: string, fn: () => void) => void } } }).lynx
-  const emitter = lynxGlobal?.getJSModule?.('GlobalEventEmitter')
-  if (emitter && typeof emitter.addListener === 'function') {
-    emitter.addListener('pictelioBenchNavNovelFollow', benchOnFollow)
-    benchOffFn = () => emitter.removeListener?.('pictelioBenchNavNovelFollow', benchOnFollow)
+  if (__DEV__) {
+    const lynxGlobal = typeof lynx !== 'undefined' ? lynx : (globalThis as { lynx?: { getJSModule?: (n: string) => { addListener?: (e: string, fn: () => void) => void; removeListener?: (e: string, fn: () => void) => void } } }).lynx
+    const emitter = lynxGlobal?.getJSModule?.('GlobalEventEmitter')
+    if (emitter && typeof emitter.addListener === 'function') {
+      emitter.addListener('pictelioBenchNavNovelFollow', benchOnFollow)
+      benchOffFn = () => emitter.removeListener?.('pictelioBenchNavNovelFollow', benchOnFollow)
+    }
   }
   void refreshFeed()
 })
