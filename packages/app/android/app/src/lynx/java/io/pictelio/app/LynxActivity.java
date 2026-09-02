@@ -14,7 +14,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.splashscreen.SplashScreen;
 
 import com.lynx.react.bridge.JavaOnlyArray;
-import com.lynx.react.bridge.JavaOnlyString;
 import com.lynx.tasm.LynxError;
 import com.lynx.tasm.LynxView;
 import com.lynx.tasm.LynxViewBuilder;
@@ -110,13 +109,19 @@ public class LynxActivity extends AppCompatActivity {
                 // 经 GlobalEventEmitter 深链绕过；生产无此 extra，零影响。
                 String benchNav = getIntent().getStringExtra("benchNav");
                 if (benchNav != null && !benchNav.isEmpty()) {
-                    final String target = benchNav;
-                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                        if (!isFinishing()) lynxView.sendGlobalEvent("pictelioBenchNav", new JavaOnlyString(target));
-                    }, 1500);
-                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                        if (!isFinishing()) lynxView.sendGlobalEvent("pictelioBenchNav", new JavaOnlyString(target));
-                    }, 3000);
+                    // 事件名编码路由（lynx 4.0.1 无 JavaOnlyString，故不用载荷；空数组）
+                    final String event = switch (benchNav) {
+                        case "carousel" -> "pictelioBenchNavCarousel";
+                        case "illust" -> "pictelioBenchNavIllust";
+                        case "novel" -> "pictelioBenchNavNovel";
+                        default -> "";
+                    };
+                    for (long delay : new long[]{1500, 3000}) {
+                        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                            if (!isFinishing() && !event.isEmpty())
+                                lynxView.sendGlobalEvent(event, new JavaOnlyArray());
+                        }, delay);
+                    }
                 }
             }
 

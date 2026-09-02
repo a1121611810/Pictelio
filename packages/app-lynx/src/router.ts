@@ -224,19 +224,16 @@ function registerBenchNavHandler(): void {
   const emitter = lynxGlobal?.getJSModule?.('GlobalEventEmitter')
   if (!emitter || typeof emitter.addListener !== 'function') return
   const TARGETS: Record<string, string> = {
-    carousel: '/recommended',
-    illust: '/illusts',
-    novel: '/novels',
+    pictelioBenchNavCarousel: '/recommended',
+    pictelioBenchNavIllust: '/illusts',
+    pictelioBenchNavNovel: '/novels',
   }
-  emitter.addListener('pictelioBenchNav', (payload: unknown) => {
+  for (const [eventName, target] of Object.entries(TARGETS)) {
     // 原生发送两次（1.5s/3s）防 JS 挂载竞态；replace 幂等，重复到达无副作用
-    const target = TARGETS[String(payload ?? '')]
-    if (!target) {
-      console.warn('[router] benchNav 未知目标:', payload)
-      return
-    }
-    void navigate(target, { replace: true })
-  })
+    emitter.addListener(eventName, () => {
+      void navigate(target, { replace: true })
+    })
+  }
 }
 
 /** 初始化（App 挂载时调用）：注册 401 刷新 + 恢复设置 + 首路由（replace 不入栈） */
