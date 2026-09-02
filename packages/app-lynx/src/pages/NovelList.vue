@@ -105,13 +105,6 @@ onMounted(() => {
       refreshEpoch.value++
     },
   })
-  // bench 导航（wayfinder #306/#306 改善）：路由级事件设挂载标记 → 切「关注」子 tab
-  //（页级 GlobalEventEmitter 监听会被广播窗口反超，已改为 router 设置标记由本页读取）
-  const g = globalThis as { __benchNovelFollow?: boolean }
-  if (g.__benchNovelFollow) {
-    g.__benchNovelFollow = false
-    switchMode('follow')
-  }
   void refreshFeed()
 })
 
