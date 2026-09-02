@@ -2040,10 +2040,11 @@ expect(detailVueSource).toContain(':estimated-main-axis-size-px="estimatedHeight
 })
 
 it('受限小说分支保留系列信息行 + 评论入口（spec 回归项，P1-1）', () => {
-// 受限分支为 v-else（isRestricted 不走 list）；meta 卡内系列行/评论入口不因分支丢失
-expect(detailVueSource).toContain('《{{ novel.series.title }}》')
-expect(detailVueSource).toContain('@tap="showComments = true"')
-expect(detailVueSource).toContain('RestrictOverlay')
+// 断言须落在受限分支段内（以注释锚点分段；list meta 卡同样含这两串——全局断言为弱断言）
+const restricted = detailVueSource.split('<!-- 受限小说')[1] ?? ''
+expect(detailVueSource.split('RestrictOverlay').length).toBeGreaterThanOrEqual(2)
+expect(restricted).toContain('《{{ novel.series.title }}》')
+expect(restricted).toContain('@tap="showComments = true"')
 })
 
 it('弹窗挂载 + 三事件语义差：decline/confirm 继续返回，cancel 留页', () => {
