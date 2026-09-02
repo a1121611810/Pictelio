@@ -5,7 +5,7 @@
 import { ref, computed, markRaw, type Component } from 'vue'
 import { matchRoute, evaluateBackRoute, createBackGuardRegistry, runBackGuards, type BackGuard, type RouteDefCore } from './routerCore'
 import { isNativeMode, getNativeModules } from './api/client'
-import { isLoggedIn, restoreToken, registerUnauthorizedHandler } from './stores/authStore'
+import { isLoggedIn, restoreToken, registerUnauthorizedHandler, currentUser } from './stores/authStore'
 import { loadSettings } from './stores/settingsStore'
 import { hasOpenModal, closeTopModal } from './stores/modalStack'
 import { registerSessionErrorHandler } from './utils/errorPresentation'
@@ -232,10 +232,30 @@ function registerBenchNavHandler(): void {
     pictelioBenchNavIllust: '/illusts',
     pictelioBenchNavNovel: '/novels',
     pictelioBenchNavFollowing: '/following',
+    // T3（#328）扩展：收藏/追更/用户页直达（含用户系页面需真实 id——自账 id 运行时解析）
+    pictelioBenchNavBookmarks: '/bookmarks',
+    pictelioBenchNavWatchlist: '/watchlist',
   }
   for (const [eventName, target] of Object.entries(TARGETS)) {
     // 原生发送两次（1.5s/3s）防 JS 挂载竞态；replace 幂等，重复到达无副作用
     emitter.addListener(eventName, () => {
+      void navigate(target, { replace: true })
+    })
+  }
+  // 用户系页面（UserHome / FollowList）：需真实 user id，自账 id 从 authStore 运行时解析；
+  // 未登录时显式 warn（非静默降级，测试钩子可快速定位）
+  const DYNAMIC_TARGETS: Record<string, () => string | null> = {
+    pictelioBenchNavUser: () => (currentUser.value?.id != null ? `/user/${currentUser.value.id}` : null),
+    pictelioBenchNavUserfollowing: () =>
+      currentUser.value?.id != null ? `/user/${currentUser.value.id}/following` : null,
+  }
+  for (const [eventName, resolve] of Object.entries(DYNAMIC_TARGETS)) {
+    emitter.addListener(eventName, () => {
+      const target = resolve()
+      if (target === null) {
+        console.warn('[router] benchNav 用户页直达失败：未登录（currentUser 为空）')
+        return
+      }
       void navigate(target, { replace: true })
     })
   }

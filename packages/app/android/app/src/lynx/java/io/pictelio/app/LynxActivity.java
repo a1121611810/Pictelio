@@ -123,6 +123,11 @@ public class LynxActivity extends AppCompatActivity {
                             case "following" -> new String[]{"pictelioBenchNavFollowing"};
                             case "illust-follow" -> new String[]{"pictelioBenchNavIllust", "pictelioBenchNavIllustFollow"};
                             case "novel-follow" -> new String[]{"pictelioBenchNavNovel", "pictelioBenchNavNovelFollow"};
+                            // T3（#328）扩展：收藏/追更/用户页直达（用户页 id 由 JS 侧从 authStore 解析）
+                            case "bookmarks" -> new String[]{"pictelioBenchNavBookmarks"};
+                            case "watchlist" -> new String[]{"pictelioBenchNavWatchlist"};
+                            case "user" -> new String[]{"pictelioBenchNavUser"};
+                            case "userfollowing" -> new String[]{"pictelioBenchNavUserfollowing"};
                             default -> new String[0];
                         };
                         // 四次广播（1.5/3/4.5/6s）：页面级监听（如 NovelList 子 tab）可能晚于路由监听，
