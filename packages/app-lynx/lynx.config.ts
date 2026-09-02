@@ -109,6 +109,10 @@ export default defineConfig({
       __APP_VERSION__,
       __DEV__: JSON.stringify(_isDev),
       __DISABLE_UPDATE_CHECK__: JSON.stringify(_disableUpdateCheck),
+      // bench 导航钩子（ADR-0136）：显式 BENCH_NAV=1 才注入 true——与 __DEV__ 不同：
+      // debug APK 构建是 NODE_ENV=production，__DEV__ 恒 false 会误杀钩子；
+      // 原生侧 BuildConfig.DEBUG 是 debug/release 的真实开关，双保险由它+本宏构成。
+      __BENCH_NAV__: JSON.stringify(process.env.BENCH_NAV === '1'),
     },
   },
   server: {

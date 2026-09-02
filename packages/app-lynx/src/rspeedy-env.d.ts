@@ -27,6 +27,13 @@ declare global {
   const __APP_VERSION__: string
   const __DEV__: boolean
   /**
+   * bench 导航钩子开关（lynx.config.ts 按 BENCH_NAV=1 注入，ADR-0136）：
+   * true = JS 侧注册 benchNav 监听器（调试构建用）；false = 不注册（生产消除）。
+   * 注意与 __DEV__ 区分：__DEV__ 在 NODE_ENV=production 恒 false（debug APK 亦然）；
+   * 本宏只随显式 BENCH_NAV=1 构建为 true。
+   */
+  const __BENCH_NAV__: boolean
+  /**
    * 启动更新检查开关（lynx.config.ts 从 .env PICTELIO_DISABLE_UPDATE_CHECK 注入）：
    * true = 强制跳过启动更新检查（dev 调试，避免误进强制更新页）；false = 按原逻辑走。
    */
