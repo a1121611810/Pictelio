@@ -7,7 +7,10 @@
 //   :items        可选扩展菜单项（如「上一页/下一页」）：label/图标/visible 条件/回调，
 //                 组件只渲染与维护菜单状态机（busy 互斥），不感知业务（T4）
 //   @back-to-top  回顶项点击 → 页面应 bump 列表 :key 强制重建（重建即回顶，ADR-0110）
-//   默认 slot     恰好一个可滚动子元素（<list>）
+//   默认 slot     恰好一个可滚动子元素（<list>）；slot 暴露 scoped prop onScroll（已节流
+//                 滚动信号回调，ADR-0135）：<template #default="{ onScroll }">
+//                 <list :scroll-event-throttle="0" @scroll="onScroll" …>（throttle 必写 0，
+//                 默认/100 零派发——ADR-0110 勘误）
 //
 // 页面用法（列表操作全部内收组件）：
 //   <RefreshableList
@@ -16,7 +19,9 @@
 //                visible: () => feed.hasPrev(), onTap: () => feed.prev() }]"
 //     @back-to-top="listKey++"
 //   >
-//     <list :key="listKey" …>…</list>
+//     <template #default="{ onScroll }">
+//       <list :key="listKey" :scroll-event-throttle="0" @scroll="onScroll" …>…</list>
+//     </template>
 //   </RefreshableList>
 //
 // 内部隐藏（页面零感知，禁止在页面重写）：
@@ -24,6 +29,10 @@
 //   - 回顶（ADR-0110）：点击「回顶」菜单项 → emit('back-to-top') → 页面 list :key 重建
 //   - FAB menu（ADR-0111）：常态一个刷新 FAB；点击展开 scrim + 两项（刷新/回顶）；
 //     主 FAB 变身为 close button；busy 时禁止展开。
+//   - 滚动指示条（ADR-0135，公共层）：本组件唯一持有 useScrollIndicator + 渲染
+//     ScrollIndicator（右缘竖条，锚点=本容器 relative——组件注释「位置锚点=父容器」）；
+//     页面只消费 scoped prop onScroll，**禁止**在页面再实例化/渲染（spec：公共层上移）。
+//     提示：普通父组件（未用 scoped prop）不受影响（slot props 可忽略，向后兼容）。
 //
 // 平台事实（模拟器实测 2026-08-24，禁止回退；② 已于 2026-09-02 勘误，见 ADR-0110/ADR-0135）：
 //   ① SelectorQuery 对 XElement 节点静默不命中（ADR-0107）；
@@ -33,7 +42,9 @@
 //   ④ Lynx 无 transitionend → FAB menu 退出动画 v1 瞬撤（ADR-0111）。
 import { ref, onUnmounted } from 'vue'
 import { createFabMenuState, type FabMenuExtraItem } from '../primitives/createFabMenu'
+import { useScrollIndicator } from '../primitives/useScrollIndicator'
 import { FAB_MENU_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import ScrollIndicator from './ScrollIndicator.vue'
 
 const props = defineProps<{
   /** 幂等刷新函数（createMixFeed 的 refresh() 内置 generation 竞态防护 + 15s TIMEOUT 保证 settle） */
@@ -48,6 +59,12 @@ const emit = defineEmits<{ (e: 'back-to-top'): void }>()
 
 // ─── FAB menu 状态机（ADR-0111）：open + busy 互斥，纯逻辑 seam
 const menu = createFabMenuState()
+
+// ─── 滚动指示条（ADR-0135 / spec #325 公共层）：本组件唯一持有者 ───
+// 状态（top/height/visible）与 33ms 节流 / 500ms 淡出 timer 全部内收；
+// scoped prop onScroll 透出给 slot 内 <list> 绑定（事件不冒泡、slot 父作用域编译——
+// 公共层只能是「透出回调」而非「直接监听」，规范见组件头注释）。
+const indicator = useScrollIndicator()
 
 /** 刷新中：主 FAB 禁用态/旋转 + 防重入；与 menu.busy 同步 */
 const refreshing = ref(false)
@@ -127,7 +144,14 @@ onUnmounted(() => {
   <!-- 容器 = 列表布局参与者（flex-1 min-h-0）+ FAB 定位上下文（relative）
        布局契约：slot 内 list 用 w-full h-full（相对本容器解析，V4 模拟器已验证） -->
   <view class="w-full flex-1 min-h-0 relative">
-    <slot />
+    <slot :on-scroll="indicator.onScroll" />
+
+    <!-- 滚动指示条（ADR-0135，公共层）：右缘竖条，锚点=本容器 relative；opacity 显隐（禁 v-if） -->
+    <ScrollIndicator
+      :top-px="indicator.topPx.value"
+      :height-px="indicator.heightPx.value"
+      :visible="indicator.visible.value"
+    />
 
     <!-- scrim：展开时覆盖列表，点空白收起 -->
     <view

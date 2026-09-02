@@ -6,11 +6,9 @@ import { navigate } from '../router'
 import { loadRecommendedNovels, loadFollow, loadNovelNext } from '../api/novel'
 import type { PixivNovel, PixivNovelListResponse } from '../api/types'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
-import { useScrollIndicator } from '../primitives/useScrollIndicator'
 import { isRestricted } from '../stores/settingsStore'
 import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
 import RefreshableList from '../components/RefreshableList.vue'
-import ScrollIndicator from '../components/ScrollIndicator.vue'
 import { getGlobalFab } from '../stores/globalFab'
 
 // ─── 分页收敛（ADR-0104）：迁移到 createMixFeed 深模块 ───
@@ -46,8 +44,8 @@ function makeFeed(m: 'recommend' | 'follow') {
 const feed = ref(makeFeed(mode.value))
 const novels = ref<PixivNovel[]>([])
 
-// 滚动指示条（ADR-0135 / spec #323）：@scroll(throttle=0) 信号面驱动，右缘位置指示
-const scrollIndicator = useScrollIndicator()
+// 滚动指示条（ADR-0135 公共层，spec: app-lynx-scroll-indicator-common-layer）：
+// 信号面 @scroll(throttle=0) → RefreshableList scoped slot onScroll；本页不再持有指示条
 const loading = ref(false)
 const loadingMore = ref(false)
 const errorMsg = ref('')
@@ -129,7 +127,6 @@ onMounted(() => {
 onUnmounted(() => {
   unreg?.()
   benchOffFn?.()
-  scrollIndicator.dispose()
   feed.value?.dispose()
 })
 </script>
@@ -192,6 +189,7 @@ onUnmounted(() => {
     </view>
 
     <RefreshableList v-if="novels.length > 0" :refresh="refreshFeed" :fab="false" @back-to-top="refreshEpoch++">
+    <template #default="{ onScroll }">
     <list
       :key="refreshEpoch"
       class="w-full h-full"
@@ -200,7 +198,7 @@ onUnmounted(() => {
       :lower-threshold-item-count="5"
       :scroll-event-throttle="0"
       @scrolltolower="loadMore"
-      @scroll="scrollIndicator.onScroll"
+      @scroll="onScroll"
     >
       <list-item
         v-for="item in novels"
@@ -241,12 +239,7 @@ onUnmounted(() => {
         <text v-else class="text-body-medium text-outline">没有更多了</text>
       </list-item>
     </list>
-    <!-- 滚动指示条（ADR-0135）：@scroll 信号面驱动，RefreshableList（relative）内右缘 -->
-    <ScrollIndicator
-      :top-px="scrollIndicator.topPx.value"
-      :height-px="scrollIndicator.heightPx.value"
-      :visible="scrollIndicator.visible.value"
-    />
+    </template>
     </RefreshableList>
   </view>
 </template>

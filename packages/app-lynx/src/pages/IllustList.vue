@@ -8,7 +8,6 @@ import { loadRecommended, loadFollow, loadNext } from '../api/illust'
 import type { PixivIllust, PixivIllustListResponse } from '../api/types'
 import { thumbUrl } from '../utils/imageUrl'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
-import { useScrollIndicator } from '../primitives/useScrollIndicator'
 import { isRestricted } from '../stores/settingsStore'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
@@ -16,7 +15,6 @@ import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
 import RefreshableList from '../components/RefreshableList.vue'
-import ScrollIndicator from '../components/ScrollIndicator.vue'
 import { getGlobalFab } from '../stores/globalFab'
 
 // ─── 分页收敛（ADR-0104）：迁移到 createMixFeed 深模块 ───
@@ -51,8 +49,8 @@ function makeFeed(m: 'recommend' | 'follow') {
 const feed = ref(makeFeed(mode.value))
 const illusts = ref<PixivIllust[]>([])
 
-// 滚动指示条（ADR-0135 / spec #319）：@scroll(throttle=0) 信号面驱动，右缘位置指示
-const scrollIndicator = useScrollIndicator()
+// 滚动指示条（ADR-0135 公共层，spec: app-lynx-scroll-indicator-common-layer）：
+// 信号面 @scroll(throttle=0) → RefreshableList scoped slot onScroll；本页不再持有指示条
 const loading = ref(false)
 const loadingMore = ref(false)
 const errorMsg = ref('')
@@ -140,7 +138,6 @@ onMounted(() => {
 onUnmounted(() => {
   unreg?.()
   benchOffFn?.()
-  scrollIndicator.dispose()
   feed.value?.dispose()
 })
 </script>
@@ -204,6 +201,7 @@ onUnmounted(() => {
       :fab="false"
       @back-to-top="refreshEpoch++"
     >
+    <template #default="{ onScroll }">
     <list
       :key="refreshEpoch"
       class="w-full h-full"
@@ -214,7 +212,7 @@ onUnmounted(() => {
       :lower-threshold-item-count="2"
       :scroll-event-throttle="0"
       @scrolltolower="loadMore"
-      @scroll="scrollIndicator.onScroll"
+      @scroll="onScroll"
     >
       <list-item
         v-for="item in illusts"
@@ -260,12 +258,7 @@ onUnmounted(() => {
         <text v-else class="text-body-medium text-outline">没有更多了</text>
       </list-item>
     </list>
-    <!-- 滚动指示条（ADR-0135）：@scroll 信号面驱动，RefreshableList（relative）内右缘 -->
-    <ScrollIndicator
-      :top-px="scrollIndicator.topPx.value"
-      :height-px="scrollIndicator.heightPx.value"
-      :visible="scrollIndicator.visible.value"
-    />
+    </template>
     </RefreshableList>
   </view>
 </template>
