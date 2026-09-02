@@ -50,6 +50,16 @@ const props = withDefaults(
 const imageSrc = ref(props.src)
 const loaded = ref(false)
 const failed = ref(isUnloadableSrc(props.src))
+// ─── PROBE H4（#318 候选① 证据收集，throwaway：合入基准后移除）───
+// bind/load/err 时间戳（JS 单域），与 IllustList 滚动流 + 原生 fetch/decode 打点配对分析
+function probeTs(): number {
+  const p = globalThis.performance
+  return p && typeof p.now === 'function' ? Math.round(p.now() * 10) / 10 : Date.now()
+}
+function probeImgId(s: string): string {
+  return s.replace(/^.*\//, '').slice(0, 24)
+}
+console.warn('[PROBE_H4][bind]', probeTs(), probeImgId(props.src))
 /** correctHeightOnLoad 修正结果（vw 字符串）：@load 携带有效尺寸后非 null，覆盖占位高度 */
 const correctedHeightVw = ref<string | null>(null)
 
@@ -61,6 +71,7 @@ watch(
     loaded.value = false
     failed.value = isUnloadableSrc(s)
     correctedHeightVw.value = null
+    console.warn('[PROBE_H4][bind]', probeTs(), probeImgId(s))
   },
 )
 
@@ -106,6 +117,7 @@ interface ImageLoadEventLike {
 function onLoad(e?: ImageLoadEventLike) {
   loaded.value = true
   failed.value = false
+  console.warn('[PROBE_H4][load]', probeTs(), probeImgId(imageSrc.value))
   // correctHeightOnLoad：@load 后按实际比例修正容器高度（ADR-0129）。load 尺寸缺失/非法 →
   // 保持占位高度（pageHeightVw 返回 null），非静默降级：契约破坏显式 warn。
   if (props.correctHeightOnLoad && props.layout === 'box') {
@@ -120,6 +132,7 @@ function onLoad(e?: ImageLoadEventLike) {
 function onError() {
   loaded.value = false
   failed.value = true
+  console.warn('[PROBE_H4][err]', probeTs(), probeImgId(imageSrc.value))
 }
 /** 「重试」：从干净 base src 重建（带新 retry 参数，防 &retry 累积），复位回骨架。仅重载该图。 */
 function onRetry() {

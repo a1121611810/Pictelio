@@ -53,6 +53,31 @@ const illusts = ref<PixivIllust[]>([])
 
 // 滚动指示条（ADR-0135 / spec #319）：@scroll(throttle=0) 信号面驱动，右缘位置指示
 const scrollIndicator = useScrollIndicator()
+
+// ─── PROBE H4（#318 候选① 证据收集，throwaway：合入基准后移除）───
+// 观测：#318 探针（A 判据）——@scroll 速度原始流 + rAF 帧间隙（JS 单域），
+// 配 CoverImage bind/load 与原生 fetch/decode 打点（logcat PROBE_H4）。
+let probeRafActive = false
+function probeTs(): number {
+  const p = globalThis.performance
+  return p && typeof p.now === 'function' ? Math.round(p.now() * 10) / 10 : Date.now()
+}
+function probeScrollH4(e: unknown) {
+  if (!probeRafActive) return
+  const d = (e as { detail?: Record<string, unknown> }).detail ?? {}
+  console.warn(
+    '[PROBE_H4][scroll]',
+    probeTs(),
+    'deltaY=' + String(d.deltaY),
+    'top=' + String(d.scrollTop),
+    'evSrc=' + String(d.eventSource),
+  )
+}
+function probeRafTickH4() {
+  if (!probeRafActive) return
+  console.warn('[PROBE_H4][raf]', probeTs())
+  requestAnimationFrame(probeRafTickH4)
+}
 const loading = ref(false)
 const loadingMore = ref(false)
 const errorMsg = ref('')
@@ -119,6 +144,14 @@ let unreg: (() => void) | undefined
 const benchOnFollow = () => void switchMode('follow')
 let benchOffFn: (() => void) | undefined
 onMounted(() => {
+  // PROBE H4：开启 rAF 帧间隙采集；rAF 不可用则记录一次并关闭（判据自动降轨，非静默）
+  probeRafActive = true
+  try {
+    requestAnimationFrame(probeRafTickH4)
+  } catch (err) {
+    probeRafActive = false
+    console.warn('[PROBE_H4][raf] UNAVAILABLE', String(err))
+  }
   unreg = getGlobalFab().usePage('illusts', {
     refresh: refreshFeed,
     backToTop: () => {
@@ -138,6 +171,7 @@ onMounted(() => {
 
 // 释放 feed（spec §4 T1 dispose）：卸载与 mode 重建时均作废旧实例
 onUnmounted(() => {
+  probeRafActive = false
   unreg?.()
   benchOffFn?.()
   scrollIndicator.dispose()
@@ -214,7 +248,7 @@ onUnmounted(() => {
       :lower-threshold-item-count="2"
       :scroll-event-throttle="0"
       @scrolltolower="loadMore"
-      @scroll="scrollIndicator.onScroll"
+      @scroll="($e) => { scrollIndicator.onScroll($e); probeScrollH4($e) }"
     >
       <list-item
         v-for="item in illusts"

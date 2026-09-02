@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
+import android.os.SystemClock;
 import android.util.Log;
 
 import com.lynx.tasm.LynxEnv;
@@ -33,6 +34,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 自研 Lynx 图片服务（#59）——Lynx client 图片加载的唯一出口。
@@ -51,6 +54,11 @@ import java.util.concurrent.Executors;
 public class PictelioImageService implements ILynxImageService {
 
     private static final String TAG = "PictelioImageService";
+
+    /** PROBE H4（#318 候选① 证据收集，throwaway）：fetch/decode 打点（logcat 过滤 PROBE_H4） */
+    private static final String PROBE_TAG = "PROBE_H4";
+    private final AtomicInteger decodeActive = new AtomicInteger();
+    private final AtomicLong fetchSeq = new AtomicLong();
 
     private static final PictelioImageService INSTANCE = new PictelioImageService();
 
@@ -154,6 +162,8 @@ public class PictelioImageService implements ILynxImageService {
             loadListener.onFailure(0, new IllegalArgumentException("image url is null"));
             return;
         }
+        // PROBE H4：每次引擎发起的图片请求打点（logcat wall clock，与 JS 侧同时间轴可粗对齐）
+        Log.d(PROBE_TAG, "fetch-start " + fetchSeq.incrementAndGet() + " " + url);
         PixivImageLoader l = loader();
         if (l == null && context != null) {
             l = new PixivImageLoader(context);
@@ -169,6 +179,7 @@ public class PictelioImageService implements ILynxImageService {
         // #147 内存缓存命中：跳过磁盘读 + 解码（隔离实验已排除非缓存因素）
         final Bitmap cached = memoryCache.get(url);
         if (cached != null) {
+            Log.d(PROBE_TAG, "cache-hit " + url); // PROBE H4：冷/热差分（轨 3）的关键标记
             executor.execute(() -> {
                 try {
                     Bitmap copy = cached.copy(Bitmap.Config.ARGB_8888, false);
@@ -197,6 +208,8 @@ public class PictelioImageService implements ILynxImageService {
     private void loadAndDeliver(final String url, final ImageRequestInfo requestInfo,
             final ImageLoadListener loadListener, final PixivImageLoader l) {
         try {
+            // PROBE H4：fetch 与 decode 分段计时 + 解码并发（判别 H4 段 D 峰值用）
+            long tStart = SystemClock.elapsedRealtime();
             byte[] bytes;
             if (url.startsWith("file://")) {
                 // 解压写盘管线（ADR-0125）：file:// 帧直接读盘，不走 OkHttp（file scheme 会被拒）。
@@ -209,7 +222,13 @@ public class PictelioImageService implements ILynxImageService {
             } else {
                 bytes = l.loadBytes(PixivImageLoader.rewriteUrl(url));
             }
+            long tFetchEnd = SystemClock.elapsedRealtime();
+            int inflight = decodeActive.incrementAndGet();
             Bitmap bitmap = decodeSampled(bytes);
+            long tDecodeEnd = SystemClock.elapsedRealtime();
+            decodeActive.decrementAndGet();
+            Log.d(PROBE_TAG, "img " + url + " fetchMs=" + (tFetchEnd - tStart) + " decodeMs="
+                    + (tDecodeEnd - tFetchEnd) + " inflight=" + inflight);
             if (bitmap == null) {
                 loadListener.onFailure(0, new IOException("Bitmap 解码失败: " + url));
                 return;
