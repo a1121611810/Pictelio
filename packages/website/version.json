@@ -1,9 +1,9 @@
 {
-  "version": "4.27.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.27.0",
-  "changelog": "🐛 修复\n  ccdb675 fix(app-lynx): 标签 chip 文案垂直居中（view 承载布局）\n✨ 新功能\n  b0c863b feat(app-lynx): 点击标签触发全局搜索（预填关键词，ADR-0133）\n📝 文档\n  3744107 docs(adr): app-lynx 点击标签触发全局搜索（ADR-0133 + glossary 词条）",
+  "version": "4.28.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.28.0",
+  "changelog": "✨ 新功能\n  56c1040e feat(app-lynx): benchNav 直达扩展 bookmarks/watchlist/user（#328，T3 验证钩子）\n  bbf2139a feat(app-lynx): 5 页滚动指示条接线 + 公共层正向断言（#327，T2）\n  a48e0105 feat(app-lynx): 滚动指示条上移 RefreshableList 公共层（#326，T1）\n  e0117435 feat(app-lynx): NovelList 滚动指示条接线（#324）\n  f1438afd feat(app-lynx): NovelList 滚动指示条接线（#324）\n  1c3c5805 feat(app-lynx): 真机导航钩子入 main（BuildConfig.DEBUG 包裹）+ ADR-0136 沉淀\n  cc6fdc70 feat(app-lynx): T3 IllustList 滚动指示条接线（#322）\n  f3cb6fdd feat(app-lynx): T2 ScrollIndicator 组件 + useScrollIndicator 原语（#321）\n  5e35b29b feat(app-lynx): T1 calcScrollIndicator 指示条计算纯函数（#320）\n  e11fded8 feat(app-lynx): 主线程滚动信号接线追更 ≥70% 双路（T2 #316，ADR-0134）\n  e83d963a feat(app-lynx): 小说正文列表虚拟化（T1 #315，ADR-0134）\n🐛 修复\n  cc53e497 fix(app-lynx): 公共层红线测试注释引文修正（#326）\n  8b0b5de0 fix(app-lynx): code-review 修复——孤儿注释清理/原语注释同步/行号引用 + 公共层防线测试（#326）\n  5644e3d3 fix(app-lynx): benchNav JS 侧加 __DEV__ 门禁（与原生 DEBUG 双保险）\n  d0866050 fix(app-lynx): code-review P1 修复 — 模板 ref 解包 + 指示条色 token 换算（#319）\n  db98b95a fix(app-lynx): P1-4 ReferenceError + P2 残余（复审关）\n  52b9843f fix(app-lynx): code-review P1/P2 修复（T3 前置）\n📝 文档\n  1404da17 docs(app-lynx): spec 滚动指示条上移 RefreshableList 公共层（#325，to-spec）\n  b16aa8bc docs(app-lynx): ADR-0137 滚动中采样测试方法 + 术语词条\n  e8eefc95 docs(research): 滚动态 UI 测试方法勘误（滚动中采样非滚动后截图）\n  947e5523 docs(app-lynx): spec NovelList 滚动指示条（#319 扩展）\n  ea849288 docs(app-lynx): spec 滚动指示条（#319，ADR-0135 落地）\n  d8b06aba docs(app-lynx): ADR-0135 滚动指示条 + 信号面/指示条词条\n  0bce24e9 docs(app-lynx): ADR-0110 事实勘误 + H3/H6 A/B 实测结论归档\n  be830978 docs(app-lynx): 记录 MT 绑定真机复测结论（未确认派发，桥接保留待上游）\n  7fb8194b docs(app-lynx): 小说正文列表虚拟化 spec（to-spec，实施交接）\n  c894ed9a docs(app-lynx): 正文列表虚拟化术语 + ADR-0134（实施交接 Phase 0）\n  1cb1b65a docs(app-lynx): 新增「滚动跟手性」术语（性能章节，wayfinder #304）\n  36177ef3 docs: update OpenWiki (#303)\n🧹 杂项\n  4fda6c8f chore(app-lynx): 剥离 bench 工具链 + 启用 IFR（合入 main 前置）",
   "webBundle": {
-    "version": "4.27.0",
-    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.27.0/pictelio-4.27.0"
+    "version": "4.28.0",
+    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.28.0/pictelio-4.28.0"
   }
 }
