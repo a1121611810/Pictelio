@@ -236,6 +236,9 @@ function registerBenchNavHandler(): void {
     })
   }
 }
+// 模块加载即注册（先于 initRouter 的网络恢复；initRouter 中重复调用幂等）——
+// 否则广播窗口（onLoadSuccess+1.5/3s）落在 restoreToken 之后时事件被丢弃。
+if (isNativeMode()) registerBenchNavHandler()
 
 /** 初始化（App 挂载时调用）：注册 401 刷新 + 恢复设置 + 首路由（replace 不入栈） */
 export async function initRouter(): Promise<void> {
@@ -247,8 +250,7 @@ export async function initRouter(): Promise<void> {
   })
   if (isNativeMode()) registerSystemBackHandler()
   if (isNativeMode()) registerBenchNavHandler()
-  const ok = await restoreToken()
-  // ADR-0103：账号级设置需 uid 已知（restoreToken 之后）再加载
+  const ok = await restoreToken()  // ADR-0103：账号级设置需 uid 已知（restoreToken 之后）再加载
   await loadSettings()
   void navigate(ok ? '/recommended' : '/login', { replace: true })
 }

@@ -98,6 +98,10 @@ function openDetail(id: number) {
 
 // ─── 全局放射 FAB 桥（ADR-0120）：注册本页动作到 globalFab，卸载时注销 ───
 let unreg: (() => void) | undefined
+// bench 钩子（wayfinder #306）：真机 input tap 对 <view @tap> 失效（放射环项/子 tab 同因，
+// R11s 实测），经 GlobalEventEmitter 事件切「关注」子 tab；生产无此 intent，零影响
+const benchOnFollow = () => void switchMode('follow')
+let benchOffFn: (() => void) | undefined
 onMounted(() => {
   unreg = getGlobalFab().usePage('novels', {
     refresh: refreshFeed,
@@ -105,12 +109,19 @@ onMounted(() => {
       refreshEpoch.value++
     },
   })
+  const lynxGlobal = typeof lynx !== 'undefined' ? lynx : (globalThis as { lynx?: { getJSModule?: (n: string) => { addListener?: (e: string, fn: () => void) => void; removeListener?: (e: string, fn: () => void) => void } } }).lynx
+  const emitter = lynxGlobal?.getJSModule?.('GlobalEventEmitter')
+  if (emitter && typeof emitter.addListener === 'function') {
+    emitter.addListener('pictelioBenchNavNovelFollow', benchOnFollow)
+    benchOffFn = () => emitter.removeListener?.('pictelioBenchNavNovelFollow', benchOnFollow)
+  }
   void refreshFeed()
 })
 
 // 释放 feed（spec §4 T1 dispose）：卸载与 mode 重建时均作废旧实例
 onUnmounted(() => {
   unreg?.()
+  benchOffFn?.()
   feed.value?.dispose()
 })
 </script>

@@ -253,6 +253,8 @@ async function navLynx(scenario, w, h) {
     "novel-single": "novel",
     "novel-detail": "novel",
     multiimage: "illust",
+    "following-illust": "illust-follow",
+    "following-novel": "novel-follow",
   };
   const detail = scenario === "novel-detail" || scenario === "multiimage";
   const nav = resolve(process.cwd(), "scripts/lynx-bench-nav.sh");
