@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useMainThreadRef, runOnBackground } from 'vue-lynx'
+import { computeReadProgress } from '../primitives/watchlistPrompt'
 import { novelAverageParagraphHeightPx } from '../primitives/novelParagraphEstimate'
 import { currentParams, goBack, requestBack, registerBackGuard } from '../router'
 import { loadNovelDetail, fetchNovelText, loadNovelSeries, addNovelWatchlist } from '../api/novel'
@@ -73,21 +74,23 @@ function getViewportHeight(): number {
 // MT→BT 传递用 runOnBackground 官方桥（BT 读 .value 的跨线程同步不可靠——真机实证）；节流：
 // 上次上报后滚动增量 <8% 高度不重复上报（防每帧跨线程消息风暴）。
 const mtReportedTop = useMainThreadRef(-1)
-const mtReportedHeight = useMainThreadRef(0)
 function onNovelScrollMT(e: { detail?: { scrollTop?: number; scrollHeight?: number } }): void {
   'main thread'
   const top = Number(e?.detail?.scrollTop ?? 0)
   const height = Number(e?.detail?.scrollHeight ?? 0)
-  if (height <= 0) return // 高度未知无从计算（不喂，守护只靠到达底部）
+  if (height <= 0) {
+    // 禁止静默降级：MT payload 缺 scrollHeight 时 ≥70% 信号失效（只剩到底兜底）——显式 warn 一次
+    console.warn('[novel-detail] MT scroll payload 缺 scrollHeight，≥70% 信号不可用')
+    return
+  }
   if (mtReportedTop.current >= 0 && Math.abs(top - mtReportedTop.current) < height * 0.08) return
   mtReportedTop.current = top
   mtReportedHeight.current = height
-  // 保守口径（viewport=0）：progress = top/height（低估，触发偏严不偏松）
-  const progress = Math.min(1, Math.max(0, top / height))
-  void runOnBackground((p: number) => {
-    // 在背景线程执行：live 读 reachedBottom（被捕获的仅数字/布尔快照）
-    reportNovelProgress(p)
-  })(progress)
+  void runOnBackground((t: number, h: number) => {
+    // 在背景线程执行：live 读 prompt/reachedBottom；进度纯函数复用 computeReadProgress
+    //（viewport=0 保守口径，单测已覆盖 watchlistPrompt.test.ts）
+    reportNovelProgress(computeReadProgress(t, h, 0))
+  })(top, height)
 }
 
 
@@ -101,8 +104,8 @@ function reportNovelProgress(progress: number): void {
   prompt?.notifyScroll(progress, reachedBottom.value)
 }
 
-// MVP：整段渲染，不做行级虚拟化（无 canvas/measureText，pretext 不可迁移）。
-// 超长文本由 scroll-view 引擎滚动承接；后续原生集成阶段可换分段渲染。
+// 正文列表虚拟化（ADR-0134）：段落为 list-item，引擎按需挂载；各 item 共用估算高度。
+// 超长文本不再一次性渲染（原型实测深滚 jank 22.6%→8.2%、内存 -42%）。
 const paragraphs = computed(() => {
   if (!text.value) return []
   return text.value
@@ -204,12 +207,11 @@ function onWatchlistCancel(): void {
       class="w-full h-full"
       list-type="single"
       scroll-orientation="vertical"
-      :estimated-main-axis-size-px="estimatedHeightPx"
       :lower-threshold-item-count="5"
       :main-thread-bindscroll="onNovelScrollMT"
       @scrolltolower="onNovelToBottom"
     >
-      <list-item :key="'meta'" :item-key="'meta'" class="w-full">
+      <list-item :key="'meta'" :item-key="'meta'" :estimated-main-axis-size-px="estimatedHeightPx" class="w-full">
         <view class="py-5 px-4 bg-surface-container-lowest mb-3">
         <text class="text-title-large font-bold text-surface-on">{{ novel?.title }}</text>
         <text class="text-body-medium text-surface-on-variant mt-2">by {{ novel?.user.name }}</text>
@@ -244,6 +246,7 @@ function onWatchlistCancel(): void {
         v-for="(p, idx) in paragraphs"
         :key="`p-${idx}`"
         :item-key="`p-${idx}`"
+        :estimated-main-axis-size-px="estimatedHeightPx"
         class="w-full px-4 mb-4"
       >
         <text class="text-body-large leading-[44rpx] text-surface-on">{{ p }}</text>
@@ -265,6 +268,25 @@ function onWatchlistCancel(): void {
              · ♥ {{ novel?.total_bookmarks }}
           </template>
         </text>
+        <!-- 系列信息行（与 meta 卡一致；受限小说保留，spec 回归项） -->
+        <view v-if="novel?.series" class="mt-1.5 flex flex-row items-center">
+          <text class="text-label-medium text-outline">《{{ novel.series.title }}》</text>
+          <view
+            v-if="prompt?.watchAdded === true"
+            class="ml-2 px-2 py-0.5 rounded-[var(--md-shape-full)] bg-secondary-container"
+          >
+            <text class="text-label-small text-secondary-on-container">已追更</text>
+          </view>
+        </view>
+        <!-- 评论入口（与 meta 卡一致） -->
+        <view
+          v-if="novel?.total_comments !== undefined"
+          class="mt-2 flex flex-row items-center"
+          @tap="showComments = true"
+        >
+          <text class="text-[6.4vw] leading-none">💬</text>
+          <text class="text-label-medium text-outline ml-1">{{ novel?.total_comments }}</text>
+        </view>
       </view>
       <view class="relative p-4">
         <view class="min-h-[60vw]" />
@@ -272,7 +294,7 @@ function onWatchlistCancel(): void {
       </view>
     </view>
 
-    <!-- 评论弹层（issue #164）：根 view 内、scroll-view 之后的覆盖层 → 弹层打开时正文滚动位置不丢失 -->
+    <!-- 评论弹层（issue #164）：根 view 内、正文列表之后的覆盖层 → 弹层打开时滚动位置不丢失 -->
     <CommentOverlay v-if="showComments" type="novel" :target-id="novelId" @close="showComments = false" />
 
     <!-- 追更询问弹窗（issue #226 / spec §US5）：open 期间自行注册 modalStack，

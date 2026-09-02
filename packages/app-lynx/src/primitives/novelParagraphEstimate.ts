@@ -8,12 +8,12 @@
  */
 
 export const NOVEL_ESTIMATE = {
-  /** 行高（rpx→px 视觉近似；44rpx 行高、视口宽 375dp 基准下 ≈ 1rpx ≈ 0.75px） */
-  lineHeightPx: 33,
+  /** 行高 px（@375 基准换算：leading-[44rpx]，1rpx=0.5px → 22px；随屏宽由 vw 体系缩放，估算取 375 基准） */
+  lineHeightPx: 22,
   /** 每行最大字数（正文近似：CJK 为主、宽松取整） */
   charsPerLine: 22,
-  /** 段间距（mb-4 = 16rpx ≈ 12px） */
-  paragraphGapPx: 12,
+  /** 段间距 px（@375 基准：mb-4 = spacing 4 档 = 16px） */
+  paragraphGapPx: 16,
 } as const
 
 /**

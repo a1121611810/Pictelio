@@ -5,8 +5,9 @@ import {
   novelParagraphHeightPx,
 } from './novelParagraphEstimate'
 
-// 期望值来源：估算模型定义（NOVEL_ESTIMATE 常量）——不变量 = 结构公式
-// （行数×行高+间距）、单调性、空段最小占位；数值按模型手算（非自洽回算）。
+// oracle：NOVEL_ESTIMATE 模型公式（行数×行高+间距）+ 结构不变量（单调/空段占位）；
+// 聚合测试独立重算（中位口径按实现重算——聚合逻辑属独立重算）；高度值按模型公式手算。
+// 注：常量为精调项（ADR-0134 §实施注意），换算依据见 NOVEL_ESTIMATE 注释。
 
 describe('novelParagraphHeightPx', () => {
   it('空段返回最小占位高度（1 行 + 间距）', () => {
