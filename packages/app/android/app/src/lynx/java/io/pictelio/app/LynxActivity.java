@@ -14,6 +14,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.splashscreen.SplashScreen;
 
 import com.lynx.react.bridge.JavaOnlyArray;
+import com.lynx.react.bridge.JavaOnlyString;
 import com.lynx.tasm.LynxError;
 import com.lynx.tasm.LynxView;
 import com.lynx.tasm.LynxViewBuilder;
@@ -104,6 +105,19 @@ public class LynxActivity extends AppCompatActivity {
             public void onLoadSuccess() {
                 bundleLoaded.set(true);
                 cancelLoadTimeout();
+                // bench 导航钩子（wayfinder #306）：adb `am start --es benchNav <scenario>` 直达目标页。
+                // 真机 input tap 对放射 FAB 环项 hit-test 失效（事件送达但不导航，Oppo R11s 实测），
+                // 经 GlobalEventEmitter 深链绕过；生产无此 extra，零影响。
+                String benchNav = getIntent().getStringExtra("benchNav");
+                if (benchNav != null && !benchNav.isEmpty()) {
+                    final String target = benchNav;
+                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                        if (!isFinishing()) lynxView.sendGlobalEvent("pictelioBenchNav", new JavaOnlyString(target));
+                    }, 1500);
+                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                        if (!isFinishing()) lynxView.sendGlobalEvent("pictelioBenchNav", new JavaOnlyString(target));
+                    }, 3000);
+                }
             }
 
             @Override

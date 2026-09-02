@@ -16,12 +16,14 @@ case "$PROFILE" in
     FAB_X=635; FAB_Y=1150
     RING_ILLUST_X=492; RING_ILLUST_Y=942
     RING_NOVEL_X=415; RING_NOVEL_Y=1028
-    CARD_X=180; TAP_Y0=400; TAP_STEP=170 ;;
+    CARD_X=180; TAP_Y0=400; TAP_STEP=170
+    SWIPE="360 998 360 397" ;;
   oppo)
     FAB_X=953; FAB_Y=2027
     RING_ILLUST_X=732; RING_ILLUST_Y=1408
     RING_NOVEL_X=615; RING_NOVEL_Y=1530
-    CARD_X=270; TAP_Y0=680; TAP_STEP=240 ;;
+    CARD_X=270; TAP_Y0=680; TAP_STEP=240
+    SWIPE="540 1650 540 650" ;;
   *) echo "未知 profile $PROFILE"; exit 1 ;;
 esac
 
@@ -35,34 +37,37 @@ if [ "$SC" = "carousel" ]; then
   echo "carousel: 起始页即推荐轮播，无需导航"; exit 0
 fi
 
-# 1) 冷启动 + 就绪（9s 基线 + 轮询内容非 blank）
-adb shell am force-stop $PKG; sleep 1.2
-adb shell am start -n $PKG/.LynxActivity >/dev/null
-sleep 9
+CARD_ONLY="${BENCH_CARD_ONLY:-0}"
+if [ "$CARD_ONLY" != "1" ]; then
+  # 1) 冷启动 + 就绪（9s 基线 + 轮询内容非 blank）
+  adb shell am force-stop $PKG; sleep 1.2
+  adb shell am start -n $PKG/.LynxActivity >/dev/null
+  sleep 9
 
-# 2) FAB → 环项（3 次尝试，diff 校验）
-for attempt in 1 2 3; do
-  shot bef
-  adb shell input tap $FAB_X $FAB_Y; sleep 3.5
-  shot menu
-  case "$SC" in
-    illust|multiimage) adb shell input tap $RING_ILLUST_X $RING_ILLUST_Y ;;
-    novel|novel-detail) adb shell input tap $RING_NOVEL_X $RING_NOVEL_Y ;;
-  esac
-  sleep 5
-  shot aft
-  if changed aft bef; then
-    echo "nav[$SC] 第 $attempt 次尝试：屏幕已变化"
-    RES=$((attempt)); break
-  fi
-  echo "nav[$SC] 第 $attempt 次尝试：屏幕未变化，重试"
-  RES=0
-done
-[ "$RES" != "0" ] || { echo "❌ nav[$SC] 三次尝试均失败"; exit 1; }
+  # 2) FAB → 环项（3 次尝试，diff 校验）
+  for attempt in 1 2 3; do
+    shot bef
+    adb shell input tap $FAB_X $FAB_Y; sleep 3.5
+    shot menu
+    case "$SC" in
+      illust|multiimage) adb shell input tap $RING_ILLUST_X $RING_ILLUST_Y ;;
+      novel|novel-detail) adb shell input tap $RING_NOVEL_X $RING_NOVEL_Y ;;
+    esac
+    sleep 5
+    shot aft
+    if changed aft bef; then
+      echo "nav[$SC] 第 $attempt 次尝试：屏幕已变化"
+      RES=$((attempt)); break
+    fi
+    echo "nav[$SC] 第 $attempt 次尝试：屏幕未变化，重试"
+    RES=0
+  done
+  [ "$RES" != "0" ] || { echo "❌ nav[$SC] 三次尝试均失败"; exit 1; }
+fi
 
 # 3) 详情场景：点击可点卡进详情（受限卡不可点 → 滚动后逐点重试，用截图 diff 判进详情）
 if [ "$SC" = "novel-detail" ] || [ "$SC" = "multiimage" ]; then
-  adb shell input swipe 540 1650 540 650 600; sleep 1.5
+  adb shell input swipe $SWIPE 600; sleep 1.5
   for i in 1 2 3 4 5; do
     y=$((TAP_Y0 + (i - 1) * TAP_STEP))
     shot pre

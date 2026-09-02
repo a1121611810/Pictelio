@@ -48,26 +48,44 @@ const adbShell = (s) => sh(`"${ADB}" -s ${SERIAL} shell ${s}`);
 
 // ─── framestats 解析 ───
 // 返回帧对象数组；过滤无效行（FrameInterval 非法/时间戳倒挂）
+// 双格式：Android 12+ 新式 21+ 列（含 FrameInterval/DisplayPresentTime，index 11/18/20）；
+// Android 9（SDK 28，OPPO R11s 实测）旧式 17 列，无 FrameInterval/DisplayPresentTime：
+//   0 Flags 1 FrameId 2 IntendedVsync 3 Vsync 4 InputEventId 5 HandleInputStart
+//   6 AnimationStart 7 PerformTraversalsStart 8 DrawStart 9 FrameDeadline 10 SyncQueued
+//   11 SyncStart 12 IssueDrawCommandsStart 13 SwapBuffers 14 FrameCompleted 15 GpuCompleted
+//   16 SwapBuffersCompleted
 function parseFramestats(dump) {
   const frames = [];
   for (const line of dump.split("\n")) {
     if (!/^\d+,\d+,/.test(line)) continue;
     const c = line.split(",").map((s) => (s === "" ? NaN : Number(s)));
-    if (c.length < 21) continue;
-    // 实测列序（Android 14 校验：FrameInterval=16666666 锚定在 index 11）：
-    // 9 FrameDeadline 10 SyncQueued 11 FrameInterval 15 FrameCompleted 18 GpuCompleted 20 DisplayPresentTime
-    const [flags, vsyncId, intendedVsync, vsync, inputEventId, handleInputStart, , , , frameDeadline, , frameInterval, , , , , frameCompleted, , , gpuCompleted, , displayPresentTime] = c;
-    if (!frameInterval || frameInterval < 1e6 || frameInterval > 1e9) continue; // 刷新周期 1ms~1s
-    if (!frameCompleted || frameCompleted <= intendedVsync) continue;
-    frames.push({
-      flags, vsyncId, intendedVsync,
-      vsyncMissMs: (vsync - intendedVsync) / 1e6,              // vsync 错过量
-      unknownDelayMs: (handleInputStart - intendedVsync) / 1e6, // UNKNOWN_DELAY：输入排队（UI 线程忙）
-      totalMs: (frameCompleted - intendedVsync) / 1e6,          // TOTAL_DURATION
-      deadlineMs: (frameDeadline - intendedVsync) / 1e6,        // DEADLINE
-      jank: frameCompleted - intendedVsync > frameDeadline - intendedVsync,
-      presentMs: displayPresentTime > 0 ? (displayPresentTime - gpuCompleted) / 1e6 : null,
-    });
+    if (c.length >= 21) {
+      // 新式（Android 12+）：FrameInterval 锚定 index 11
+      const [flags, vsyncId, intendedVsync, vsync, inputEventId, handleInputStart, , , , frameDeadline, , frameInterval, , , , , frameCompleted, , , gpuCompleted, , displayPresentTime] = c;
+      if (!frameInterval || frameInterval < 1e6 || frameInterval > 1e9) continue; // 刷新周期 1ms~1s
+      if (!frameCompleted || frameCompleted <= intendedVsync) continue;
+      frames.push({
+        flags, vsyncId, intendedVsync,
+        vsyncMissMs: (vsync - intendedVsync) / 1e6,              // vsync 错过量
+        unknownDelayMs: (handleInputStart - intendedVsync) / 1e6, // UNKNOWN_DELAY：输入排队（UI 线程忙）
+        totalMs: (frameCompleted - intendedVsync) / 1e6,          // TOTAL_DURATION
+        deadlineMs: (frameDeadline - intendedVsync) / 1e6,        // DEADLINE
+        jank: frameCompleted - intendedVsync > frameDeadline - intendedVsync,
+        presentMs: displayPresentTime > 0 ? (displayPresentTime - gpuCompleted) / 1e6 : null,
+      });
+    } else if (c.length === 17) {
+      const [flags, frameId, intendedVsync, vsync, inputEventId, handleInputStart, , , , frameDeadline, , , , , frameCompleted, gpuCompleted] = c;
+      if (!frameCompleted || frameCompleted <= intendedVsync) continue;
+      frames.push({
+        flags, vsyncId: frameId, intendedVsync,
+        vsyncMissMs: (vsync - intendedVsync) / 1e6,
+        unknownDelayMs: (handleInputStart - intendedVsync) / 1e6,
+        totalMs: (frameCompleted - intendedVsync) / 1e6,
+        deadlineMs: (frameDeadline - intendedVsync) / 1e6,
+        jank: frameCompleted - intendedVsync > frameDeadline - intendedVsync,
+        presentMs: null,
+      });
+    }
   }
   return frames;
 }
@@ -216,19 +234,34 @@ async function tapNavWithRetry(ringX, ringY, w, h, label) {
 }
 // 外层再兜一层：整段导航（含 FAB→环项）完成后校验，失败整体重试开关
 async function navLynx(scenario, w, h) {
-  // 导航交给 bash 序列（node 内 input tap 偶发触发轮播换页且冻结，bash 实测稳定，见 lynx-bench-nav.sh）
+  if (scenario === "carousel") { await assertPage("carousel", ["recommended", "detail"], scenario); return; }
+  // 首选 intent 深链（benchNav 钩子：LynxActivity --es benchNav → GlobalEventEmitter → 路由直达）。
+  // 真机 input tap 对放射 FAB 环项 hit-test 失效（事件送达但不导航，R11s 实测），钩子绕过。
   const map = {
     "illust-waterfall": "illust",
     "novel-single": "novel",
-    "novel-detail": "novel-detail",
-    multiimage: "multiimage",
+    "novel-detail": "novel",
+    multiimage: "illust",
   };
-  if (scenario === "carousel") { await assertPage("carousel", ["recommended", "detail"], scenario); return; }
+  const detail = scenario === "novel-detail" || scenario === "multiimage";
   const nav = resolve(process.cwd(), "scripts/lynx-bench-nav.sh");
   const profile = process.env.BENCH_PROFILE ?? (SERIAL === "emulator-5554" ? "emu" : "oppo");
-  sh(`BENCH_PROFILE=${profile} "${nav}" ${map[scenario] ?? scenario} ${SERIAL}`);
-  const n = await framesProbe();
-  if (n < 30) throw new Error(`导航后 framesProbe=${n}，页面不可滚动（网络/受限卡异常）`);
+  adbShell(`am force-stop ${PKG}`); await SLEEP(1200);
+  adbShell(`am start -n ${PKG}/.LynxActivity --es benchNav ${map[scenario] ?? scenario}`); await SLEEP(12000);
+  let n = await framesProbe();
+  if (n < 30) {
+    // 旧版本 bundle 无 benchNav 钩子时回退 FAB 路径（模拟器可用，真机环项失效则报错暴露）
+    console.log(`  [nav:${scenario}] intent 深链 framesProbe=${n}，回退 bash FAB 导航`);
+    sh(`BENCH_PROFILE=${profile} "${nav}" ${map[scenario] ?? scenario} ${SERIAL}`);
+    n = await framesProbe();
+    if (n < 30) throw new Error(`导航后 framesProbe=${n}，页面不可滚动（网络/受限卡异常）`);
+  }
+  if (detail) {
+    // 落地 tab 列表后，点首张可点卡进详情（受限卡容错重试）
+    sh(`BENCH_PROFILE=${profile} BENCH_CARD_ONLY=1 "${nav}" ${map[scenario] ?? scenario} ${SERIAL}`);
+    n = await framesProbe();
+    if (n < 30) throw new Error(`点卡进详情失败 framesProbe=${n}`);
+  }
   console.log(`  [nav:${scenario}] 到达可滚动页（framesProbe=${n}）`);
 }
 async function navWebview(scenario) {
