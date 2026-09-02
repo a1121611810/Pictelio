@@ -9,6 +9,8 @@ import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { isRestricted } from '../stores/settingsStore'
 import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
 import RefreshableList from '../components/RefreshableList.vue'
+import ScrollIndicator from '../components/ScrollIndicator.vue'
+import { useScrollIndicator } from '../primitives/useScrollIndicator'
 import { getGlobalFab } from '../stores/globalFab'
 
 // ─── 分页收敛（ADR-0104）：迁移到 createMixFeed 深模块 ───
@@ -43,6 +45,9 @@ function makeFeed(m: 'recommend' | 'follow') {
 
 const feed = ref(makeFeed(mode.value))
 const novels = ref<PixivNovel[]>([])
+
+// 滚动指示条（ADR-0135 / spec #323）：@scroll(throttle=0) 信号面驱动，右缘位置指示
+const scrollIndicator = useScrollIndicator()
 const loading = ref(false)
 const loadingMore = ref(false)
 const errorMsg = ref('')
@@ -124,6 +129,7 @@ onMounted(() => {
 onUnmounted(() => {
   unreg?.()
   benchOffFn?.()
+  scrollIndicator.dispose()
   feed.value?.dispose()
 })
 </script>
@@ -192,7 +198,9 @@ onUnmounted(() => {
       list-type="single"
       scroll-orientation="vertical"
       :lower-threshold-item-count="5"
+      :scroll-event-throttle="0"
       @scrolltolower="loadMore"
+      @scroll="scrollIndicator.onScroll"
     >
       <list-item
         v-for="item in novels"
@@ -233,6 +241,12 @@ onUnmounted(() => {
         <text v-else class="text-body-medium text-outline">没有更多了</text>
       </list-item>
     </list>
+    <!-- 滚动指示条（ADR-0135）：@scroll 信号面驱动，RefreshableList（relative）内右缘 -->
+    <ScrollIndicator
+      :top-px="scrollIndicator.topPx.value"
+      :height-px="scrollIndicator.heightPx.value"
+      :visible="scrollIndicator.visible.value"
+    />
     </RefreshableList>
   </view>
 </template>
