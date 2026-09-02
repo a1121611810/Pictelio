@@ -63,29 +63,25 @@ const unregisterBackGuard = registerBackGuard(() => prompt?.requestBack() ?? fal
 // 到「底部」由 @scrolltolower 权威触发（reachBottom 供追更询问），上端进度信号见 MT 实验。
 const reachedBottom = ref(false)
 
-function getViewportHeight(): number {
-  // 原生 LynxView 背景线程无 window；web-core 预览有 innerHeight
-  return typeof window !== 'undefined' && typeof window.innerHeight === 'number'
-    ? window.innerHeight
-    : 0
-}
-
 // 主线程滚动信号（ADR-0134）：<list> 经 :main-thread-bindscroll 接收 scrollTop（BT @scroll 不派发）。
 // MT→BT 传递用 runOnBackground 官方桥（BT 读 .value 的跨线程同步不可靠——真机实证）；节流：
 // 上次上报后滚动增量 <8% 高度不重复上报（防每帧跨线程消息风暴）。
 const mtReportedTop = useMainThreadRef(-1)
+const mtHeightWarned = useMainThreadRef(false)
 function onNovelScrollMT(e: { detail?: { scrollTop?: number; scrollHeight?: number } }): void {
   'main thread'
   const top = Number(e?.detail?.scrollTop ?? 0)
   const height = Number(e?.detail?.scrollHeight ?? 0)
   if (height <= 0) {
-    // 禁止静默降级：MT payload 缺 scrollHeight 时 ≥70% 信号失效（只剩到底兜底）——显式 warn 一次
-    console.warn('[novel-detail] MT scroll payload 缺 scrollHeight，≥70% 信号不可用')
+    // 禁止静默降级：MT payload 缺 scrollHeight 时 ≥70% 信号失效（只剩到底兜底）——仅 warn 一次
+    if (!mtHeightWarned.current) {
+      mtHeightWarned.current = true
+      console.warn('[novel-detail] MT scroll payload 缺 scrollHeight，≥70% 信号不可用')
+    }
     return
   }
   if (mtReportedTop.current >= 0 && Math.abs(top - mtReportedTop.current) < height * 0.08) return
   mtReportedTop.current = top
-  mtReportedHeight.current = height
   void runOnBackground((t: number, h: number) => {
     // 在背景线程执行：live 读 prompt/reachedBottom；进度纯函数复用 computeReadProgress
     //（viewport=0 保守口径，单测已覆盖 watchlistPrompt.test.ts）
