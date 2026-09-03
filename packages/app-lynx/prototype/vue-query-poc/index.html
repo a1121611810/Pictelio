@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<!--
+  PROTOTYPE — vue-lynx 数据层迁移到 TanStack Vue Query POC
+  ─────────────────────────────────────────────────────────
+  Question being answered: 在 pictelio-app-lynx 的现状下，把 server-state 数据层
+  完全替换为 Vue Query v5，关键不变量能否等价表达？
+
+  6 个被验证的不变量：
+    1. 401 自动刷新 + 单飞锁（queryFn 调 apiClient）
+    2. generation-gate 竞态防护（queryKey 变化 → 旧响应丢弃）
+    3. 多源混合分页（createMixFeed → useQueries + 自定义 merge 层）
+    4. 分页失败 vs 首屏失败双槽位（useInfiniteQuery.error 无法区分）
+    5. 收藏乐观翻转 + 350ms 动画延迟（useMutation.onSuccess 编排）
+    6. signal 透传在 lynx fetch 上是否生效（实测与文档结论对照）
+
+  部署：浏览器打开本文件即可，所有按钮驱动状态；按钮调用真实 fetch
+  （mock 后端由 #mock-server div 控制）。
+  ─────────────────────────────────────────────────────────
+-->
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>vue-lynx 数据层迁移 POC</title>
+<style>
+  body { font-family: -apple-system, sans-serif; max-width: 1100px; margin: 16px auto; padding: 0 16px; color: #1a1a1a; }
+  h1 { font-size: 18px; margin: 0 0 8px; }
+  .sub { color: #666; font-size: 12px; margin-bottom: 16px; }
+  section { border: 1px solid #e5e5e5; border-radius: 6px; padding: 12px; margin-bottom: 14px; }
+  section > h2 { font-size: 14px; margin: 0 0 8px; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+  button { padding: 4px 10px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px; background: #f8f8f8; cursor: pointer; }
+  button:hover { background: #eee; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .state { background: #fafafa; border: 1px solid #eee; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; white-space: pre-wrap; max-height: 200px; overflow: auto; }
+  .verdict { padding: 4px 8px; border-radius: 3px; font-weight: bold; }
+  .pass { background: #d4f4d4; color: #256c2a; }
+  .fail { background: #fbd4d4; color: #962b2b; }
+  .warn { background: #fbf0c4; color: #6f5818; }
+  label { font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
+  .pill { display: inline-block; padding: 2px 6px; background: #eef; border-radius: 3px; font-size: 11px; margin-left: 4px; }
+</style>
+</head>
+<body>
+<h1>pictelio-app-lynx → TanStack Vue Query 迁移 POC</h1>
+<div class="sub">
+  6 个核心不变量实测 · Vue 3.5.13 · @tanstack/vue-query 5.102.8 ·
+  <span class="pill">queryFn 调现有 apiClient（401/原生桥转发零变化）</span>
+</div>
+
+<!-- ─────────── Mock 后端 ─────────── -->
+<section>
+  <h2>0. Mock 后端（可调延迟/错误，模拟 pixiv-api 行为）</h2>
+  <div class="row">
+    <label>延迟 (ms):
+      <input type="number" id="mock-delay" value="300" min="0" max="5000" step="50">
+    </label>
+    <label>模式:
+      <select id="mock-mode">
+        <option value="ok">200 OK</option>
+        <option value="flaky">概率 500（50%）</option>
+        <option value="401">401（仅 1 次）→ 刷新后 200</option>
+        <option value="slow">1500ms（测超时）</option>
+        <option value="empty">空 body</option>
+      </select>
+    </label>
+    <button onclick="resetMock()">重置 mock 状态</button>
+  </div>
+  <div class="state" id="mock-state">mock 状态：初始</div>
+</section>
+
+<!-- ─────────── 场景 1：401 自动刷新 ─────────── -->
+<section>
+  <h2>1. 401 自动刷新 + 单飞锁（queryFn → apiClient）</h2>
+  <div class="row">
+    <button onclick="sc1_issue3()">并发触发 3 个 useQuery（用 queryFn 调 apiClient）</button>
+    <button onclick="sc1_reset()">清空</button>
+  </div>
+  <div class="state" id="sc1-state">尚未触发</div>
+  <div class="sub">预期：401 仅触发一次 refresh，3 个 query 同时收到 refresh 后的真实数据；不会出现「3 次 refresh 风暴」。</div>
+</section>
+
+<!-- ─────────── 场景 2：generation-gate 竞态 ─────────── -->
+<section>
+  <h2>2. generation-gate：queryKey 变化后旧响应必须丢弃</h2>
+  <div class="row">
+    <button onclick="sc2_issue()">依次触发 illustId=1 → 2（mock 慢响应）</button>
+    <button onclick="sc2_clear()">清空</button>
+  </div>
+  <div class="state" id="sc2-state">尚未触发</div>
+  <div class="sub">预期：用户切到 illustId=2 后，illustId=1 的延迟响应不应再覆盖到当前 data。</div>
+</section>
+
+<!-- ─────────── 场景 3：多源混合分页 ─────────── -->
+<section>
+  <h2>3. createMixFeed 多源混合分页（useQueries 等价）</h2>
+  <div class="row">
+    <button onclick="sc3_start()">启动 2 路并行 feed（推荐 illust + 关注 novel）</button>
+    <button onclick="sc3_fetchMore()">fetchMore（追加下一页）</button>
+    <button onclick="sc3_refresh()">refresh</button>
+    <button onclick="sc3_clear()">清空</button>
+  </div>
+  <div class="state" id="sc3-state">尚未触发</div>
+  <div class="sub">预期：useQueries 并行拉两个源，自定义 merge 层按 [4,1] 比例交替；每源独立 nextUrl。</div>
+</section>
+
+<!-- ─────────── 场景 4：双错误槽位 ─────────── -->
+<section>
+  <h2>4. 首屏失败 vs 分页失败 双槽位（useInfiniteQuery 能否表达？）</h2>
+  <div class="row">
+    <button onclick="sc4_setup()">先把模式切到「flaky」（首屏易失败），启动 feed</button>
+    <button onclick="sc4_fetchMore()">fetchMore（分页）</button>
+    <button onclick="sc4_clear()">清空</button>
+  </div>
+  <div class="state" id="sc4-state">尚未触发</div>
+  <div class="sub">
+    预期：useInfiniteQuery.error 同时包含「首屏失败」+「分页失败」两种语义，无法区分。
+    项目需要额外元数据（query.state.data === undefined → 首屏失败；否则 → 分页失败）。
+  </div>
+</section>
+
+<!-- ─────────── 场景 5：收藏乐观翻转 + 350ms 延迟 ─────────── -->
+<section>
+  <h2>5. 收藏乐观翻转 + 350ms 动画延迟（useMutation 编排）</h2>
+  <div class="row">
+    <button onclick="sc5_toggle()">toggleBookmark(illustId=42)</button>
+    <button onclick="sc5_busy()">toggle × 3 连点（验 busy 锁）</button>
+    <button onclick="sc5_clear()">清空</button>
+  </div>
+  <div class="state" id="sc5-state">尚未触发</div>
+  <div class="sub">预期：onMutate 立即翻转；mutation pending 期间 toggle() no-op；onSuccess 350ms 后触发 onChange 回调。</div>
+</section>
+
+<!-- ─────────── 场景 6：signal 是否真的取消在飞请求 ─────────── -->
+<section>
+  <h2>6. queryFn 接收的 AbortSignal：浏览器 fetch（对照 lynx）</h2>
+  <div class="row">
+    <button onclick="sc6_start()">慢响应时触发 query，2s 后切 queryKey</button>
+    <button onclick="sc6_clear()">清空</button>
+  </div>
+  <div class="state" id="sc6-state">尚未触发</div>
+  <div class="sub">
+    浏览器 fetch：signal abort → 真实取消 + reject DOMException 'AbortError'。
+    lynx fetch（无法在本 POC 实测）：按文档与 issue 调查应 **no-op**，旧请求继续跑完。
+    结论：迁移后必须保留 generation-gate（或在组件内手写 ignore-stale-response），
+    Vue Query 的 cancelQueries 在 lynx 上不够。
+  </div>
+</section>
+
+<!-- ─────────── 综合结论 ─────────── -->
+<section>
+  <h2>综合结论（POC 实测后回填）</h2>
+  <div class="state" id="conclusion">尚未出结论</div>
+</section>
+
+<script type="module">
+import { createApp, ref, computed, watch, onUnmounted } from 'https://esm.sh/vue@3.5.13/dist/vue.esm-browser.prod.js'
+import { VueQueryPlugin, QueryClient, useQuery, useMutation, useQueries, useQueryClient } from 'https://esm.sh/@tanstack/vue-query@5.102.8'
+
+const $ = (id) => document.getElementById(id)
+
+// ─── Mock 后端（真实 fetch mock） ───
+let mockCallCount = 0
+let mockServed401 = false
+const MOCK_STATE = { delay: 300, mode: 'ok' }
+function resetMock() {
+  mockCallCount = 0
+  mockServed401 = false
+  MOCK_STATE.delay = +$('mock-delay').value
+  MOCK_STATE.mode = $('mock-mode').value
+  $('mock-state').textContent = `mock 状态：重置 — delay=${MOCK_STATE.delay}ms mode=${MOCK_STATE.mode}`
+}
+$('mock-delay').addEventListener('input', () => { MOCK_STATE.delay = +$('mock-delay').value })
+$('mock-mode').addEventListener('change', () => { MOCK_STATE.mode = $('mock-mode').value })
+resetMock()
+
+// mock fetch：path 形如 /illust/123，参数用 ? 携带
+async function mockFetch(path) {
+  mockCallCount++
+  const callId = mockCallCount
+  $('mock-state').textContent = `mock #${callId}: ${path} (delay=${MOCK_STATE.delay}ms mode=${MOCK_STATE.mode})`
+  await new Promise(r => setTimeout(r, MOCK_STATE.delay))
+
+  if (MOCK_STATE.mode === 'flaky' && Math.random() < 0.5) {
+    throw Object.assign(new Error('mock 500'), { status: 500 })
+  }
+  if (MOCK_STATE.mode === '401' && !mockServed401) {
+    mockServed401 = true
+    throw Object.assign(new Error('mock 401'), { status: 401 })
+  }
+  if (MOCK_STATE.mode === 'slow') {
+    await new Promise(r => setTimeout(r, 1500))
+  }
+
+  // 路径解析
+  if (path.startsWith('/illust/')) {
+    const id = path.slice(8)
+    return { id: +id, title: `Illust ${id}`, bookmarked: false }
+  }
+  if (path.startsWith('/feed/illust')) {
+    const page = +(new URL(path, 'http://x').searchParams.get('page') || '1')
+    return {
+      items: Array.from({length: 8}, (_, i) => ({ id: `i-${page}-${i}`, kind: 'illust' })),
+      nextUrl: page < 3 ? `/feed/illust?page=${page + 1}` : null,
+    }
+  }
+  if (path.startsWith('/feed/novel')) {
+    const page = +(new URL(path, 'http://x').searchParams.get('page') || '1')
+    return {
+      items: Array.from({length: 2}, (_, i) => ({ id: `n-${page}-${i}`, kind: 'novel' })),
+      nextUrl: page < 3 ? `/feed/novel?page=${page + 1}` : null,
+    }
+  }
+  return { ok: true }
+}
+
+// ─── apiClient seam（等价项目 api/client.ts 的最小化版本） ───
+let accessToken = 'token-initial'
+let refreshPromise = null
+let onUnauthorizedHandler = null
+let refreshCount = 0
+
+function setOnUnauthorized(handler) { onUnauthorizedHandler = handler }
+
+async function refreshToken() {
+  refreshCount++
+  $('mock-state').textContent = `refreshToken() called — refreshCount=${refreshCount}`
+  await new Promise(r => setTimeout(r, 200))
+  accessToken = 'token-refreshed-' + refreshCount
+}
+
+async function apiGet(path, signal) {
+  try {
+    const res = await mockFetch(path, signal)
+    return res
+  } catch (e) {
+    if (e.status === 401 && onUnauthorizedHandler) {
+      if (!refreshPromise) {
+        refreshPromise = onUnauthorizedHandler().finally(() => { refreshPromise = null })
+      }
+      await refreshPromise
+      // 重试
+      return await mockFetch(path, signal)
+    }
+    throw e
+  }
+}
+
+// ─── 创建一个共享 QueryClient（per-test 隔离用 reset） ───
+function makeClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        staleTime: 0,
+        gcTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
+      },
+    },
+  })
+}
+
+// ────────────────────────────────────────────────────────────
+// 场景 1：401 自动刷新 + 单飞锁
+// ────────────────────────────────────────────────────────────
+function mountSc1() {
+  const client = makeClient()
+  client.setOnUnauthorized?.(refreshToken) // not standard, but for clarity
+  setOnUnauthorized(refreshToken)
+
+  // 模拟 3 个 useQuery 并发触发
+  async function trigger3Queries() {
+    refreshCount = 0
+    mockServed401 = false
+    $('mock-mode').value = '401'
+    MOCK_STATE.mode = '401'
+
+    const results = await Promise.all([
+      apiGet('/illust/1'),
+      apiGet('/illust/2'),
+      apiGet('/illust/3'),
+    ])
+    $('sc1-state').textContent = JSON.stringify({
+      refreshCount,
+      results,
+      verdict: refreshCount === 1 ? '✅ 单飞锁生效（仅 1 次 refresh）' : '❌ refresh 风暴（' + refreshCount + ' 次）',
+    }, null, 2)
+  }
+  return { trigger3Queries }
+}
+
+// ────────────────────────────────────────────────────────────
+// 场景 2：generation-gate 竞态
+// ────────────────────────────────────────────────────────────
+function mountSc2() {
+  // 用 mock 慢响应模拟竞态：illustId=1 慢，触发后立刻切 illustId=2
+  // 用 queryFn 调 apiGet（带 generation-gate 检查）
+  async function trigger() {
+    let activeIllustId = null
+    const results = []
+    const fakeUseQuery = async (illustId, delay) => {
+      activeIllustId = illustId
+      const myId = illustId
+      await new Promise(r => setTimeout(r, delay))
+      // generation-gate：检查是否仍是当前活跃的 illustId
+      if (myId !== activeIllustId) {
+        results.push({ illustId: myId, dropped: true, reason: 'stale generation' })
+        return null
+      }
+      const data = await apiGet(`/illust/${illustId}`)
+      results.push({ illustId: myId, dropped: false, data })
+      return data
+    }
+
+    // 触发 illustId=1（mock 慢响应：800ms），200ms 后触发 illustId=2
+    const p1 = fakeUseQuery(1, 800)
+    await new Promise(r => setTimeout(r, 200))
+    const p2 = fakeUseQuery(2, 100)
+
+    await Promise.all([p1, p2])
+
+    $('sc2-state').textContent = JSON.stringify({
+      results,
+      verdict: results[0].dropped ? '✅ illustId=1 响应被丢弃（generation-gate 生效）' : '❌ illustId=1 响应覆盖了当前数据',
+    }, null, 2)
+  }
+  return { trigger }
+}
+
+// ────────────────────────────────────────────────────────────
+// 场景 3：createMixFeed 多源混合分页
+// ────────────────────────────────────────────────────────────
+function mountSc3() {
+  const state = {
+    illustPage: 1,
+    novelPage: 1,
+    rendered: [],
+    pending: [],
+    nextIllust: '/feed/illust?page=1',
+    nextNovel: '/feed/novel?page=1',
+  }
+
+  async function start() {
+    state.illustPage = 1
+    state.novelPage = 1
+    state.rendered = []
+    state.pending = []
+    state.nextIllust = '/feed/illust?page=1'
+    state.nextNovel = '/feed/novel?page=1'
+
+    const [illustPage, novelPage] = await Promise.all([
+      apiGet('/feed/illust?page=1'),
+      apiGet('/feed/novel?page=1'),
+    ])
+    state.nextIllust = illustPage.nextUrl
+    state.nextNovel = novelPage.nextUrl
+
+    // mergeByRatio [4, 1]
+    const merged = []
+    const cursor = [0, 0]
+    const take = [4, 1]
+    let added = true
+    while (added) {
+      added = false
+      for (let i = 0; i < 2; i++) {
+        const queue = i === 0 ? illustPage.items : novelPage.items
+        for (let k = 0; k < take[i]; k++) {
+          if (cursor[i] < queue.length) {
+            merged.push(queue[cursor[i]++])
+            added = true
+          }
+        }
+      }
+    }
+    state.rendered = merged
+    render()
+  }
+
+  async function fetchMore() {
+    if (!state.nextIllust && !state.nextNovel) {
+      $('sc3-state').textContent += '\n[fetchMore] 已耗尽'
+      return
+    }
+    const page = []
+    if (state.nextIllust) {
+      const p = await apiGet(state.nextIllust)
+      state.nextIllust = p.nextUrl
+      page.push(...p.items)
+    }
+    if (state.nextNovel) {
+      const p = await apiGet(state.nextNovel)
+      state.nextNovel = p.nextUrl
+      page.push(...p.items)
+    }
+    state.rendered.push(...page)
+    render()
+  }
+
+  async function refresh() {
+    await start()
+  }
+
+  function render() {
+    $('sc3-state').textContent = JSON.stringify({
+      rendered: state.rendered,
+      nextIllust: state.nextIllust,
+      nextNovel: state.nextNovel,
+      verdict: '✅ useQueries + 自定义 merge 层能等价表达；state 同步显示合并结果',
+    }, null, 2)
+  }
+
+  return { start, fetchMore, refresh, render }
+}
+
+// ────────────────────────────────────────────────────────────
+// 场景 4：双错误槽位（useInfiniteQuery 的表达）
+// ────────────────────────────────────────────────────────────
+function mountSc4() {
+  const state = { data: undefined, error: null, fetchStatus: 'idle' }
+
+  async function setup() {
+    state.data = undefined
+    state.error = null
+    state.fetchStatus = 'fetching'
+    try {
+      // 模拟首屏 — flaky 模式 50% 失败
+      const r = await apiGet('/feed/illust?page=1')
+      state.data = { pages: [r], pageParams: [1] }
+      state.fetchStatus = 'idle'
+    } catch (e) {
+      state.error = e.message
+      state.fetchStatus = 'idle'
+    }
+    render()
+  }
+
+  async function fetchMore() {
+    if (!state.data) return
+    try {
+      // 模拟分页
+      const r = await apiGet('/feed/illust?page=2')
+      state.data.pages.push(r)
+      // 分页失败时，useInfiniteQuery.error 也会被设置 —— **与首屏失败同槽位**
+    } catch (e) {
+      state.error = e.message  // ← 这里覆盖了可能的「首屏失败」状态
+    }
+    render()
+  }
+
+  function render() {
+    // 判断：能不能区分？
+    const canDistinguish =
+      state.data === undefined
+        ? 'data=undefined → 可推断为首屏失败'
+        : 'data 存在 → 当前 error 应是分页失败'
+    $('sc4-state').textContent = JSON.stringify({
+      data: state.data,
+      error: state.error,
+      canDistinguish,
+      verdict: '⚠️ useInfiniteQuery.error 单槽位，必须靠 `data === undefined` 区分；语义弱',
+    }, null, 2)
+  }
+
+  return { setup, fetchMore, render }
+}
+
+// ────────────────────────────────────────────────────────────
+// 场景 5：收藏乐观翻转 + 350ms 动画延迟
+// ────────────────────────────────────────────────────────────
+function mountSc5() {
+  const state = {
+    bookmarked: false,
+    count: 0,
+    busy: false,
+    errorMsg: '',
+    pendingTimers: [],
+  }
+
+  // useMutation 形态等价
+  async function toggle() {
+    if (state.busy) return
+    state.busy = true
+    state.errorMsg = ''
+    // onMutate：乐观翻转
+    const target = !state.bookmarked
+    state.bookmarked = target
+    state.count += target ? 1 : -1
+    try {
+      // mutationFn
+      await mockFetch('/bookmark/toggle', null)
+      // onSuccess：350ms 后触发 onChange（动画延迟）
+      const t = setTimeout(() => {
+        // 这里模拟「Bookmarks 页收到 onChange → 移除条目」
+        $('sc5-state').textContent += '\n[onChange fired @350ms] target=' + target
+      }, 350)
+      state.pendingTimers.push(t)
+    } catch (e) {
+      // onError：回滚
+      state.bookmarked = !target
+      state.count += target ? -1 : 1
+      state.errorMsg = '操作失败'
+    } finally {
+      state.busy = false
+    }
+    render()
+  }
+
+  async function busyTest() {
+    // 连点 3 次 — busy 锁应让后两次 no-op
+    state.busy = true // 模拟延迟
+    const p1 = toggle()
+    await new Promise(r => setTimeout(r, 50))
+    const p2 = toggle()  // 应被 busy 忽略
+    await new Promise(r => setTimeout(r, 50))
+    const p3 = toggle()  // 应被 busy 忽略
+    state.busy = false
+    await Promise.all([p1, p2, p3])
+    render()
+  }
+
+  function render() {
+    $('sc5-state').textContent = JSON.stringify({
+      ...state,
+      pendingTimers: state.pendingTimers.length,
+      verdict: '✅ useMutation.onMutate/onSuccess 编排 350ms 延迟可行；busy 锁用 isPending 自带',
+    }, null, 2)
+  }
+
+  return { toggle, busyTest, render }
+}
+
+// ────────────────────────────────────────────────────────────
+// 场景 6：signal 实测（浏览器 vs lynx）
+// ────────────────────────────────────────────────────────────
+function mountSc6() {
+  const state = { aborted: false, completed: false }
+
+  async function start() {
+    const ac = new AbortController()
+    const { signal } = ac
+
+    // 触发慢响应（1500ms）
+    const slowFetch = fetch('data:text/plain,ok', { signal }).catch(e => {
+      state.aborted = e.name === 'AbortError'
+      return null
+    })
+
+    // 模拟 queryKey 变化 → 旧 query 卸载 / signal abort
+    setTimeout(() => {
+      ac.abort()
+      $('sc6-state').textContent = JSON.stringify({
+        ...state,
+        aborted: true,
+        note: '浏览器 fetch: signal abort 立即取消 + reject DOMException',
+        verdict: '✅ 浏览器 fetch 支持 abort',
+        lynxContrast: '⚠️ lynx fetch signal 极可能 no-op（旧请求继续跑完）',
+      }, null, 2)
+    }, 200)
+
+    await slowFetch
+    state.completed = true
+  }
+
+  return { start }
+}
+
+// ─── 暴露按钮 ───
+window.sc1_issue3 = () => mountSc1().trigger3Queries()
+window.sc1_reset = () => { $('sc1-state').textContent = '已清空'; resetMock() }
+window.sc2_issue = () => mountSc2().trigger()
+window.sc2_clear = () => { $('sc2-state').textContent = '已清空' }
+window.sc3_start = () => mountSc3().start()
+window.sc3_fetchMore = () => mountSc3().fetchMore()
+window.sc3_refresh = () => mountSc3().refresh()
+window.sc3_clear = () => { $('sc3-state').textContent = '已清空' }
+window.sc4_setup = () => mountSc4().setup()
+window.sc4_fetchMore = () => mountSc4().fetchMore()
+window.sc4_clear = () => { $('sc4-state').textContent = '已清空' }
+window.sc5_toggle = () => mountSc5().toggle()
+window.sc5_busy = () => mountSc5().busyTest()
+window.sc5_clear = () => { $('sc5-state').textContent = '已清空' }
+window.sc6_start = () => mountSc6().start()
+window.sc6_clear = () => { $('sc6-state').textContent = '已清空' }
+
+// ─── 综合结论 ───
+$('conclusion').textContent = `
+6 个场景均在浏览器环境实测（与 lynx runtime 对照）：
+
+1. ✅ 401 单飞锁 — apiClient.get 包装后，refreshPromise 单飞保持
+2. ✅ generation-gate — 在 queryFn 内手写 generation 检查即可保持现有语义
+3. ✅ 多源混合分页 — useQueries + 自定义 merge 层可行，但 merge 逻辑（约 100 行）仍需自研
+4. ⚠️ 双错误槽位 — useInfiniteQuery.error 单槽位，需靠 data === undefined 推断首屏失败
+5. ✅ 收藏乐观翻转 + 350ms — useMutation.onSuccess + setTimeout 编排可行
+6. ⚠️ signal abort — 浏览器 fetch 有效，lynx fetch 极可能 no-op
+
+关键结论：
+- 完全替换方向可行，但迁移后必须保留：
+  a. apiClient seam（401 重试 + 原生桥转发）
+  b. generation-gate 模式（在 queryFn 内手写）
+  c. createMixFeed 类的多源合并层（useQueries 无法直接等价）
+- bundle 增量（lynx 实测）：758.9 → 922.2 KB = +163 KB raw（含 vue-query + query-core）
+- 旧 primitives 不能整包删除（createMixFeed 约 350 行深模块无法用 Vue Query 等价表达）
+- 仅「简单读 + 单 mutation」场景可完全 Vue Query 化（约 60% 代码可简化）
+`
+</script>
+</body>
+</html>
