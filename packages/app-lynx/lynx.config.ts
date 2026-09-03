@@ -86,7 +86,9 @@ const proxyAgent = new HttpsProxyAgent(proxyUrl) as unknown
 
 export default defineConfig({
   environments: {
-    lynx: {},
+    // PROTOTYPE（throwaway）：原生复测探针——lynx 环境下临时把入口指向 routeProbe.ts
+    //（保持 bundle 名 main，同步后即替换 Android assets/main.lynx.bundle）。结论见 PROTOTYPE-VERDICT.md
+    lynx: { source: { entry: { main: './src/routeProbe.ts' } } },
     // web 预览多入口（仅 dev）：主入口 + 页面独立预览（error-preview / login-preview）。
     // 生产（_isDev=false）web 环境只保留 main 单入口；lynx 环境恒为默认单入口（src/index.ts），
     // APK 生产 bundle 不受影响。
@@ -97,6 +99,8 @@ export default defineConfig({
               main: './src/index.ts',
               'error-preview': './src/errorPreview.ts',
               'login-preview': './src/loginPreview.ts',
+              // PROTOTYPE（throwaway）：vue-router 可行性探针入口，分支 prototype/lynx-vue-router
+              'route-probe': './src/routeProbe.ts',
             }
           : { main: './src/index.ts' },
       },
