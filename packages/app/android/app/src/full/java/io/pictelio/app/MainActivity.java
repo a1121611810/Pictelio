@@ -78,7 +78,12 @@ public class MainActivity extends BridgeActivity {
                 finish();
                 return;
             }
-            startActivity(new Intent(this, LynxActivity.class));
+            // benchNav 深链参数转发（spec app-lynx-benchnav-meta-exit-hooks）：MainActivity 是
+            // launcher 路由壳，`am start --es benchNav xxx` 的 extras 落本 intent，须转给 LynxActivity
+            //（getIntent 读取，ADR-0136）；无 extras 时 putExtras 为空，零影响
+            Intent lynxIntent = new Intent(this, LynxActivity.class);
+            lynxIntent.putExtras(getIntent());
+            startActivity(lynxIntent);
             finish();
             return; // 不注册插件、不做 WebView 版本检查
         }
