@@ -6,12 +6,13 @@
 // 结论见本目录 PROTOTYPE-VERDICT.md（docs/research/vue-router-migration-feasibility.md）。
 import { ref, onMounted } from 'vue'
 import { RouterView } from 'vue-router'
-import { router } from './probeNav'
+import { router, isCleared } from './probeNav'
 
-// ─── 系统返回桥（第四轮：纯官方 API 形态） ───
+// ─── 系统返回桥（纯官方 API 形态 + 会话 epoch 判定） ───
 // 「能否返回」检测 = history.go(delta, triggerListeners=false) + history.location
-//（两者均为官方 RouterHistory 接口成员：go 的 triggerListeners 参数官方文档化为
+// （两者均为官方 RouterHistory 接口成员：go 的 triggerListeners 参数官方文档化为
 //  "whether this should trigger listeners attached to the history"）。
+// 登出后（isCleared）：canBack 恒 false——等价「清栈」语义（返回键只走提示/双击退出）。
 // 同步原子：JS 单线程内无 await 间隙，不触发监听/守卫；移动后立即还原。
 const exitHint = ref(false)
 let lastBackAt = 0
@@ -38,8 +39,8 @@ function finishApp(): void {
 }
 
 function handleSystemBack(): void {
-  const canBack = hasBackEntry()
-  console.warn('[routeProbe] pictelioBack 到达（纯 API 形态），hasBackEntry =', canBack)
+  const canBack = hasBackEntry() && !isCleared()
+  console.warn('[routeProbe] pictelioBack 到达（守卫形态），canBack =', canBack, 'cleared =', isCleared())
   if (canBack) {
     void router.back()
     return

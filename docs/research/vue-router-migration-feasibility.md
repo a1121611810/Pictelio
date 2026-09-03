@@ -92,6 +92,25 @@ handleSystemBack():
 
 ## 官方 API 深度分析（第四轮，对应 https://router.vuejs.org/api/functions/createMemoryHistory.html）
 
+## 守卫鉴权拦截实证（第五轮，Q3——用户拍板"若 vue-router 全局守卫可行则采用"）
+
+探针在 `'/`（等同生产首路由 /recommended）` 与 `/protected` 加 `meta.requiresAuth`，`beforeEach` 全局守卫挂上后实证：
+
+| # | 场景 | web-core | 原生模拟器 |
+|---|------|----------|-----------|
+| 18 | 未登录访问受保护页 → 守卫重定向 `/login`（`return { path: '/login', replace: true }`，replace 语义生效无报错） | ✅ snapshot PROBE-LOGIN | ✅ logcat `guard: 未登录访问受保护页 → 重定向 /login` |
+| 19 | 已登录访问受保护页 → 守卫放行 | ✅ PROBE-PROTECTED | ✅（同链路守卫在跑） |
+| 20 | 登出（会话清除）后访问业务页 → 守卫拦截重定向 /login | ✅ 登出后 goto-protected → PROBE-LOGIN | 同链路（web-core 已验证组合） |
+| 21 | **首帧时序**：守卫在 bootstrap 期（restoreToken 未完成）**放行** → 首帧即时渲染（t=1.2s 快照已有内容，无空白；console `guard: bootstrap 放行`） | ✅ | ✅ 首帧 PROBE-HOME |
+| 22 | **守卫 await 网络的代价**：bootstrap 完成后守卫内 800ms await → 该次受保护导航延迟 800ms 后重定向 /login（非首帧场景，可接受；**同理可证：若守卫在首帧 await 网络 → RouterView 将空白至守卫结束——生产禁用该形态**） | ✅ | — |
+
+**Q3 定论**：vue-router 全局守卫（`beforeEach` + `meta.requiresAuth`）在 vue-lynx 双端可行，鉴权拦截采用全局守卫；配套设计规则：
+1. **守卫必须同步判断、不 await 网络**：bootstrap 期（`restoreToken` 未完成）直接放行（首帧内容化 + 先渲染后加载不破坏；鉴权失败由页面 401 兜底 + `initRouter` 收敛，沿用现状）；
+2. **会话清除（登出/会话失效）双层拦截**：forward（任何业务页导航）由守卫重定向 `/login`（replace）；back（系统返回）由 `canBack = hasBackEntry() && !cleared` 判定（`!cleared` 时提示/双击退出，等价"清栈"语义）；
+3. `cleared` 的清除点 = 登录成功（beginSession 语义，生产映射到 authStore 登录成功回调）；置位点 = 登出/会话失效（resetHistory 等价点）。
+
+## 官方 API 深度分析（第四轮，对应 https://router.vuejs.org/api/functions/createMemoryHistory.html）
+
 **`createMemoryHistory` 官方页**：创建基于内存的 history（"Creates an in-memory based history"）、用途是 SSR（"to handle SSR"）、初始位置是"nowhere"特殊位置、**必须由用户自行 `router.push`/`router.replace` 指定起点**（"It's up to the user to replace that location with the starter location"）——**官方明确的特殊性只有这两点（无 URL 环境 + 手动定起点）**，其余无任何限制说明。
 
 **官方 `RouterHistory` 接口**（API 文档页由 JSDoc 生成；本仓安装版 `vue-router@4.6.4` 的 `.d.mts` 逐字核实）：
