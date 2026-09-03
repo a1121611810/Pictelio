@@ -1,9 +1,9 @@
 {
-  "version": "4.29.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.29.0",
-  "changelog": "✨ 新功能\n  2fc45e69 feat(app-lynx): 合并 benchNav 钩子扩展（/update、/error，S6 meta-exit 启用）\n  d317666b feat(app-lynx): 合并 vue-router 路由迁移",
+  "version": "4.30.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.30.0",
+  "changelog": "♻️ 重构\n  330ea616 refactor(app-lynx): globalFab 后置 Pinia 迁移（ADR-0140）\n  b70bf82b refactor(app-lynx): Pinia 迁移 code-review 双轴门禁修复\n  d23b87f0 refactor(app-lynx): 状态管理迁移到 Pinia setup store\n🔧 其他\n  f47b915f build(app-lynx): 引入 pinia@^4.0.3 与 @vue/devtools-api@^8.2.1（pinia peer）\n📝 文档\n  e99a5c25 docs(app-lynx): spec/ADR/glossary — app-lynx 状态管理迁移到 Pinia",
   "webBundle": {
-    "version": "4.29.0",
-    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.29.0/pictelio-4.29.0"
+    "version": "4.30.0",
+    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.30.0/pictelio-4.30.0"
   }
 }
