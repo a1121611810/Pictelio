@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
-import { useQuery } from '@tanstack/vue-query'
 import { RouterView } from 'vue-router'
 import { initRouter, exitHint } from './router'
 import GlobalFab from './components/GlobalFab.vue'
@@ -10,25 +9,29 @@ import { useUpdateStore } from './stores/updateStore'
 import { useSearchSheetStore } from './stores/searchSheetStore'
 import { apiClient } from './api/client'
 import { queryKeys } from './api/queryKeys'
+import { useApiQuery } from './primitives/useApiQuery'
 
 const searchSheet = useSearchSheetStore()
 
-// T1 spike 验证（ADR-0141）：最小 useQuery 健康检查 —
-// 启动时探一下 Pixiv /v2/illust/recommended?limit=1 验证 vue-query 在 lynx runtime 可工作。
-// 失败不阻塞启动（query isLoading → isError 自动收尾，UI 无影响）。
-// T2 完成后由 useApiInfiniteQuery / useApiQuery 替代。
-const health = useQuery({
+// T3 启动健康检查（ADR-0141 / T3 ticket）：
+// - 替代 T1 spike 的裸 useQuery（用 T2 实施的 useApiQuery helper 包装）
+// - 仅 dev 模式触发（__DEV__ 编译期门禁）
+// - 验证 useApiQuery helper 在真实业务代码路径工作（generation-gate + signal 透传）
+// - 失败不阻塞启动（query isLoading → isError 自动收尾，UI 无影响）
+const health = useApiQuery<{ illusts: unknown[] }>({
   queryKey: queryKeys.illusts.recommended(),
-  queryFn: async ({ signal }) => {
-    return apiClient.get<{ illusts: unknown[] }>('/v2/illust/recommended', { limit: '1' }, signal)
-  },
-  enabled: __DEV__ && searchSheet.isOpen === false, // 仅 dev 模式触发，避免生产 bundle 多一次启动请求
+  queryFn: ({ signal }) => apiClient.get<{ illusts: unknown[] }>(
+    '/v2/illust/recommended',
+    { limit: '1' },
+    signal,
+  ),
+  enabled: __DEV__ && searchSheet.isOpen === false,
   staleTime: 60 * 1000,
   retry: false,
 })
 onMounted(() => {
   console.log(
-    `[T1 spike] useQuery health: status=${health.status.value} isLoading=${health.isLoading.value} data=${health.data.value ? 'ok' : 'null'}`,
+    `[T3 useApiQuery] health: status=${health.status.value} isLoading=${health.isLoading.value} data=${health.data.value ? 'ok' : 'null'}`,
   )
 })
 
