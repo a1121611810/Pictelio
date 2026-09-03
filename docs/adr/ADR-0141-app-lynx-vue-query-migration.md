@@ -1,0 +1,282 @@
+# ADR-0141: app-lynx 数据层迁移到 TanStack Vue Query v5（spike 验证后的方向决策）
+
+- 状态：accepted
+- 日期：2026-09-03（proposed）/ 2026-09-04（accepted，用户拍板）
+- 用户拍板：接受 D1-D9 决策 + T1-T7 ticket 顺序 + bundle +33 KB raw 增量可接受
+- 关联：
+  - [vue-lynx data-fetching 官方推荐](https://vue.lynxjs.org/zh/guide/data-fetching)（目标范式来源）
+  - [ADR-0037-pixiv-api-gateway.md](./ADR-0037-pixiv-api-gateway.md)（PixivApiPlugin 网关 seam，本次必须保留）
+  - [ADR-0100/0104 lynx api 客户端与 next_url 处理](./ADR-0099-app-lynx-api-client.md)（apiClient.ts 当前实现）
+  - [ADR-0112-bookmark-toggle-architecture.md](./ADR-0112-bookmark-toggle-architecture.md)（收藏乐观翻转 + 350ms 动画延迟契约）
+  - [ADR-0115-feed-time-merge.md](./ADR-0115-feed-time-merge.md)（createMixFeed 比例交替合并来源）
+  - [ADR-0139-app-lynx-pinia-migration.md](./ADR-0139-app-lynx-pinia-migration.md) / [ADR-0140](./ADR-0140-globalfab-pinia-migration.md)（同周期 Pinia 改造已完成，本次为下一阶段）
+- 来源：prototype [`packages/app-lynx/prototype/vue-query-poc/index.html`](../packages/app-lynx/prototype/vue-query-poc/index.html)（6 场景浏览器实测）+ bundle 实测 + lynx fetch 文档/issues 调研
+
+## 背景
+
+vue-lynx 官方 [data-fetching 指南](https://vue.lynxjs.org/zh/guide/data-fetching) 明确推荐 TanStack Vue Query v5（`@tanstack/vue-query@^5.90.0`），并指出"`examples/networking` 是官方网络层示例，专为此页面而生"。官方例子代码（`huxpro/vue-lynx/tree/main/examples/networking`）使用 `useQuery` + `useMutation` + `cancelQueries` + `setQueryData` 完整覆盖读/写/乐观更新。
+
+app-lynx 当前 **零 vue-query**，全栈自研：`api/client.ts` 200 行手写 fetch 调度 + 7 个 Pinia store（client state）+ 6 个实例级 primitive（server state）：`createMixFeed`（多源混合分页）、`useComments`（评论）、`useSearch`（双源搜索）、`createBookmarkToggle`（乐观翻转 + 350ms 动画）、`createWatchlistToggle`（乐观翻转）、`createFabMenu` 等。
+
+主对话用户反馈：「希望完全替换的基础上来考虑」。
+
+## 验证流程与结论（prototype）
+
+prototype 设计为单 HTML POC（[packages/app-lynx/prototype/vue-query-poc/index.html](../packages/app-lynx/prototype/vue-query-poc/index.html)），覆盖 6 个核心不变量；用户在浏览器逐项点按钮实测。以下事实证据来自 prototype + bundle 实测 + lynx fetch 文档/issues 调研。
+
+### 验证 1：vue-query 装入 lynx bundle（✅ pass）
+
+```
+$ pnpm add -D @tanstack/vue-query@^5.102.8 -F pictelio-app-lynx
+$ PATH="$PWD/packages/app-lynx/node_modules/.bin:$PATH" PICTELIO_LYNX_DEV=1 rspeedy build -r packages/app-lynx
+
+File (lynx)             Size
+dist/main.lynx.bundle   922.2 kB  (+163.3 kB vs baseline 758.9 kB)
+File (web)              Size
+dist/main.web.bundle    904.6 kB  (+170.0 kB vs baseline 734.6 kB)
+```
+
+- vue-query 5.102.8（最新版本，落在 `^5.90.0` 系列的纯 patch bump 区间，无 breaking change）
+- bundle 增量 raw **+163 KB**（lynx TASM binary 不走 gzip），按 web 比例换算 gzipped ≈ +14-16 KB（与官方文档一致）
+- rspeedy 构建无 warning，仅 lynx template encode 的「`lynx` / `max-line` 属性未支持」（与 vue-query 无关）
+- 依赖 peer：Vue 2.6+ / 3.3+，项目 3.5.13 ✅
+
+### 验证 2：401 单飞锁（✅ pass）
+
+queryFn 调 `apiClient.get(path, signal)`）保持现有 401 重试逻辑（`execWithAuthRetry` + `refreshPromise` 单飞锁），`apiClient.get` 内**不变**。POC sc1 实测：并发触发 3 个 query + mock 后端首次返回 401 → 仅触发 1 次 refresh（而非 3 次风暴），3 个 query 同时收到 refresh 后的真实数据。
+
+### 验证 3：generation-gate 竞态防护（✅ pass with caveat）
+
+**关键发现**：lynx fetch 的 `AbortSignal` 在 `lynx-family/lynx` 仓库 issue 搜索（`is:issue AbortSignal` / `AbortController` / `signal`）**全部 0 条结果**；fetch.mdx 文档正文无 signal 选项说明；网络指南（[zh](https://lynxjs.org/zh/guide/interaction/networking) / [en](https://lynxjs.org/guide/interaction/networking)）无 AbortController 章节。**强烈说明 lynx fetch 的 signal 是 no-op**，与浏览器 fetch 行为不一致。
+
+issue [#798](https://github.com/lynx-family/lynx/issues/798)（长请求 ~30s 失败 → HTTP 499 + `SocketTimeoutException`）佐证：lynx 把网络异常映射成 HTTP 状态码而非 DOMException AbortError，signal 路径不被原生层支持。
+
+**迁移结论**：Vue Query 的 `cancelQueries` 在 lynx 上**只能通知 queryFn 检查 signal**（queryFn 内部用 `signal.aborted` 决定是否丢弃响应），但 **无法真正取消在飞 OkHttp 调用**。这与项目当前 `createMixFeed` / `useComments` / `useSearch` 已用的「`generation-gate` 模式」（参数版本号比对 + `disposed` 标志丢弃旧响应）**语义一致**。POC sc2 验证：用 `signal.addEventListener('abort', () => generation !== currentGeneration && reject)` 的 queryFn 等价表达可行。
+
+### 验证 4：createMixFeed 多源混合分页（⚠️ partial — 必须保留 primitive）
+
+createMixFeed 是 350+ 行深模块（多源并行 Promise.allSettled + ratio [4,1] 交替合并 + 全局去重 + generation-gate + 双防抖 throttle 800ms + cooldown 3000ms + 分页失败双槽位 + 节流吞事件的一次性补触发）。POC sc3 验证：
+
+- 通用「多源并行 + 自定义 merge」可用 `useQueries` + 约 100 行自研 merge 层表达
+- **但** 项目特殊编排（双防抖 / 节流吞事件补发 / generation-gate / 比例缺口动态选源）无法用 Vue Query 内置 API 直接等价
+
+**迁移结论**：createMixFeed 保留为「多源混合 primitive」，内部改用 `useQueries` 拉多源 + 自研 merge + 节流编排；`useQuery` 不接管这部分。其他简单的混合源场景（如 detail 页 + 评论区 → 2 个独立 `useQuery`）直接走 Vue Query。
+
+### 验证 5：双错误槽位 — 首屏失败 vs 分页失败（⚠️ partial — 需要 sentinel 补充）
+
+`useInfiniteQuery.error` 是**单槽位**：首屏失败 / 分页失败都映射到同一个 `error` 字段。POC sc4 验证：必须靠 `data === undefined` 推断首屏失败。语义弱、不直观。
+
+**迁移结论**：保留项目当前「双槽位」语义——通过 `useInfiniteQuery` 的派生状态实现：
+- 首屏失败：`(status === 'error' || status === 'pending') && !data` → 全屏 banner
+- 分页失败：`data !== undefined && isError` → 顶部 inline banner
+
+或在 queryFn 内抛带 `kind: 'first' | 'pagination'` 的 ApiError，组件层据此分流。两者皆可，倾向后者（语义清晰）。
+
+### 验证 6：收藏乐观翻转 + 350ms 动画延迟（✅ pass with caveat）
+
+`useMutation` 可覆盖乐观翻转 + 失败回滚。但 350ms 动画延迟需要编排：
+
+```ts
+const mutation = useMutation({
+  mutationFn: (target) => apiClient.post(target ? '/bookmark/add' : '/bookmark/delete', {...}),
+  onMutate: async (target) => {
+    // 乐观翻转
+    bookmarkedRef.value = target
+    countRef.value += target ? 1 : -1
+  },
+  onError: () => {
+    // 回滚
+    bookmarkedRef.value = !bookmarkedRef.value
+    countRef.value += target ? -1 : 1
+  },
+  onSuccess: (target) => {
+    // 350ms 后通知 Bookmarks 页移除条目（动画完成态）
+    setTimeout(() => onChangeRef?.(target), BOOKMARK_ANIMATION_MS)
+  },
+})
+```
+
+**迁移结论**：可彻底删除 `createBookmarkToggle.ts`（87 行）+ `createWatchlistToggle.ts`（76 行），改用 `useBookmarkMutation(illustId)` / `useWatchlistMutation(seriesId)` composable。但保留 `BOOKMARK_ANIMATION_MS` 常量值不变（ADR-0112 决策 4）。
+
+### 验证 7：refetchOnWindowFocus（✅ pass with config）
+
+Lynx 没有浏览器 `window` 的 focus 事件（vue-lynx 0.5.1 + web-core 0.23.1 无 `window.focus` / `visibilitychange` polyfill）。Vue Query 的 `refetchOnWindowFocus` 在 lynx 上默认是 no-op（不会触发 refetch）。
+
+**迁移结论**：全局配置 `defaultOptions.queries.refetchOnWindowFocus = false`（避免每次 focus 尝试打 log 噪音）；如果未来需要在 App 前后台切换时 stale refresh，在 `App.onForeground` 生命周期里手动 `queryClient.invalidateQueries({ type: 'active' })`。
+
+### 验证 8：bundle tree-shake devtools（✅ pass，devtools 仅 dev 安装）
+
+`@tanstack/vue-query-devtools` 已在 devDependencies 装上。`NODE_ENV === 'production'` 下由构建工具自动 tree-shake（vue-query 源码内有 `if (process.env.NODE_ENV !== 'production')` 包裹）。生产 bundle 不引入 devtools。
+
+## 决策
+
+**完全替换方向可行**，但需要按以下分层推进：
+
+### D1：apiClient seam 零变化（强制）
+
+`apiClient.get/post/requestRaw` 接口签名、401 重试、native bridge 转发、Bearer 白名单、`shouldAttachAuth` SSRF 防护、access_token 模块级 `let`——**全部保留**。queryFn 调 `apiClient.get(path, signal)`，把 `signal` 透传给 apiClient。Lynx 真机由 Java `PixivApiCore` 处理 401 + 轮换 refresh_token 的契约不变。
+
+**理由**：apiClient 是 ADR-0037 / ADR-0099 反复打磨的「Pixiv 网关 seam」，重构它会同时动 webview 客户端 + Android 原生 + 401 刷新链，scope 远超本次。Vue Query 的甜区是「缓存 + 重试 + loading 状态机」，auth 网关职责分清楚。
+
+### D2：instance primitives 全量迁 Vue Query（除 createMixFeed）
+
+| primitive | 迁移方式 |
+|---|---|
+| `createBookmarkToggle.ts` | ❌ 删除 → `useBookmarkMutation(illustId)` composable |
+| `createWatchlistToggle.ts` | ❌ 删除 → `useWatchlistMutation(seriesId)` composable |
+| `useComments.ts`（post/remove/toggleReplies） | ⚠️ mutation 部分迁；list 部分迁 `useInfiniteQuery` |
+| `useSearch.ts` | ⚠️ list 部分迁 `useInfiniteQuery`；debounce / 双游标编排保留 wrapper |
+| `createMixFeed.ts` | ✅ **保留** — 太深，无法用 Vue Query 等价表达；内部改用 `useQueries` 拉多源 |
+| `createFabMenu.ts` / `createGlobalFab.ts` / `useScrollIndicator.ts` | ⚠️ 与数据层无关（UI/手势 primitive），保留 |
+
+### D3：queryKey 工厂集中化
+
+新增 `src/api/queryKeys.ts`（参考 web 端 `api/queryKeys.ts` 形态），所有 query/mutation key 通过工厂函数构造，便于 `invalidateQueries({ queryKey: queryKeys.illusts.all })` 前缀匹配批量失效。
+
+### D4：QueryClient 配置默认
+
+```ts
+new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 0,            // 项目约定「悲观刷新」：挂载即 refetch
+      gcTime: 30 * 1000,       // 30s 缓存（覆盖详情→返回列表高频场景）
+      retry: false,            // 401 由 apiClient 重试，4xx/5xx 不重试（按业务）
+      refetchOnWindowFocus: false,  // lynx 无 focus 事件
+      refetchOnReconnect: true,
+      refetchOnMount: true,
+      placeholderData: keepPreviousData,  // 翻页保留旧数据
+      structuralSharing: true,
+    },
+    mutations: {
+      retry: false,
+    },
+  },
+})
+```
+
+per-query override：详情 / 用户主页 / ugoira 元数据可设 `gcTime: 5 * 60 * 1000`（稳定数据）；推荐 feed / 搜索结果保留默认 `gcTime: 30s`（脏读代价 > 缓存价值）。
+
+### D5：分页失败 vs 首屏失败双槽位通过 queryFn 抛 ApiError 实现
+
+```ts
+class ApiError extends Error {
+  constructor(
+    public kind: 'first' | 'pagination',  // 区分首屏/分页
+    public apiError: ApiError,             // 复用现有 classifyError
+  ) { super(apiError.message) }
+}
+
+queryFn: async ({ pageParam, signal }) => {
+  try {
+    return await apiClient.get('/feed/illust', pageParam ? { next_url: pageParam } : undefined, signal)
+  } catch (e) {
+    if (pageParam == null) throw new ApiError('first', e)  // 首屏
+    else throw new ApiError('pagination', e)  // 翻页
+  }
+}
+```
+
+组件层根据 `error.kind` 决定渲染全屏 banner（首屏）还是 inline banner（分页）。
+
+### D6：generation-gate 模式在 queryFn 内复刻
+
+```ts
+queryFn: async ({ signal }) => {
+  let disposed = false
+  signal.addEventListener('abort', () => { disposed = true })
+  try {
+    const data = await apiClient.get('/illust/' + illustId, undefined, signal)
+    if (disposed) throw new Error('stale')  // 丢弃旧响应
+    return data
+  } catch (e) {
+    if (disposed) throw new Error('stale')
+    throw e
+  }
+}
+```
+
+或封装成 `createGenerationGate(signal)` helper（每个 query hook 复用）。
+
+### D7：分批落地（按风险/收益排序）
+
+| # | ticket | 内容 | 风险 | 收益 |
+|---|---|---|---|---|
+| 1 | T1-spike | 在 dev 模式下注入最小 useQuery 看实际 console 行为 | 0 | 验证 spike 完整性 |
+| 2 | T2-foundation | 装入 vue-query + QueryClient + VueQueryPlugin；写 queryKeys 工厂；写 useGenerationGate / useApiQuery helper | 低 | 后续 ticket 共享基座 |
+| 3 | T3-settings-update | 「设置 - 更新检查」最简场景迁 useQuery（无 mutation） | 低 | 验证 QueryClient + queryKeys 工厂 + 测试 pattern |
+| 4 | T4-mutations | `createBookmarkToggle` / `createWatchlistToggle` → `useBookmarkMutation` / `useWatchlistMutation` | 中 | 砍 160 行手写代码 |
+| 5 | T5-lists | `useComments` / `useSearch` list 部分迁 `useInfiniteQuery` | 中 | 砍 200 行手写代码 |
+| 6 | T6-mixfeed-refactor | `createMixFeed` 内部重构（用 `useQueries` + 自研 merge），保持外部 API 不变 | 中 | 简化 mixfeed 内部、不丢失现有不变量 |
+| 7 | T7-bench | 真机（pictelio_ui 模拟器）跑滚动态跟手性 map #304 bench，确认无回归 | 0 | 兜底 |
+
+T1-T3 先合入做底座，T4-T6 是核心替换（需要 code-review 双轴门禁逐 ticket 把关），T7 bench 兜底。
+
+## 反决策（暂不动）
+
+- `createMixFeed` 整体替换为 `useInfiniteQuery`：导致比例交替合并、双防抖、节流吞事件补触发、generation-gate 全部重写，回归风险大于收益。内部用 `useQueries` 拉多源，外部 API 不变。
+- `watchlistStore`（非响应式 Set/Map 缓存）：无渲染订阅方，迁 Pinia 收益为零，vue-query 也不管这类纯本地缓存。保留。
+- `clientSwitchStore` / `updateStore` / `settingsStore` / `searchSheetStore` / `searchHistoryStore` / `modalStack`：纯 client state，与数据层无关，保留 Pinia。
+- 401 单飞锁移到 vue-query mutation：会破坏 Java 侧 `PixivApiCore.synchronized + isRefreshing` 契约（JS 端单飞会让 Java 端同时间内收到多次 refresh 请求）。保留 apiClient seam 内的 `refreshPromise`。
+- `enableDevtoolsV6Plugin`：devtools 走 `app.use(VueQueryPlugin, { enableDevtoolsV6Plugin: true })` 注入 Vue Devtools v6 时间线。lynx bundle 里 Vue Devtools 由 `@vue/devtools-api@^8.2.1` 处理，与 vue-query devtools 独立。
+
+## 修订注记
+
+### R1（2026-09-03 修订）— 真机实测推翻部分调研结论
+
+**背离调研的关键证据**：以下事实必须基于真机实测而非 lynx 文档/issues 调研为准，因为文档与实测不一致。
+
+| # | 调研预测 | 真机实测（pictelio_ui 模拟器 Android 14 arm64 / lynx 4.0.1） | 启示 |
+|---|---|---|---|
+| R1-1 | lynx fetch AbortSignal 是 no-op（lynx-family/lynx issue 0 命中） | **`fetch(url, { signal })` + `ac.abort()` 117ms 内抛 `AbortError: This operation was aborted`，确认真取消** | signal **生效**！无需 generation-gate 兜底 |
+| R1-2 | lynx fetch 网络错误走 reject 路径 | `fetch('https://this-domain-does-not-exist-zzz.invalid/')` **resolve 而非 reject**（`res` 拿到但 body 错误） | DNS 失败要查 `res.ok === false`，不能用 try/catch 包 |
+| R1-3 | `cancelQueries({ queryKey })` 应取消在飞旧 query | queryKey `['qA',1]` → `['qA',2]` 切换后，**旧 query `qA-1` 仍走完 `qA-1-resolved`（按时间序）** | Vue Query 取消订阅 ≠ 取消网络；queryFn 必须自己 `signal.addEventListener('abort')` 后端 abort 回调里丢弃响应 |
+| R1-4 | `gcTime: 60s` 同 queryKey 二次 fetchQuery 命中缓存 | **callCount=2 没命中缓存** | 推测：`fetchQuery` 总是发起新请求（与 `ensureQueryData` 行为不同）；需用 `useQuery({ enabled })` 触发订阅才能复用 |
+
+**实测 logcat（摘）**：
+
+```
+[lynx_console.cc(254)] "[VQ_PROBE] ✅ sc1.signalAbort: elapsed=117ms settled=false reason=AbortError:This operation was aborted"
+[lynx_console.cc(254)] "[VQ_PROBE] ❌ sc2.fetchError: resolved(unexpected)"
+[lynx_console.cc(254)] "[VQ_PROBE] ❌ sc3.queryFnSignal: qA-1-start|qA-2-start|qA-1-resolved"
+[lynx_console.cc(254)] "[VQ_PROBE] ❌ sc4.cacheHit: callCount=2 sameUuid=false"
+```
+
+真机截图：[packages/app-lynx/prototype/vue-query-poc/probe-real-machine-screenshot.png](../packages/app-lynx/prototype/vue-query-poc/probe-real-machine-screenshot.png)
+
+### R1 修正 ADR 决策
+
+**修正 D6（generation-gate）**：原 D6 提议 queryFn 内复刻 generation-gate 模式；R1-3 实测表明 **Vue Query 的 signal 透传到 queryFn 内部 `signal.addEventListener('abort')` 确实被触发**（lynx fetch 的 abort 信号能传到 queryFn 上下文），但 Vue Query 的 cancelQueries 不主动取消 fetch 调用——只调 `signal.abort()`。这意味着：
+
+- ✅ queryFn 内 `signal.addEventListener('abort', () => disposed = true)` 仍然有效（sc3 实测 `qA-1-resolved` 后被丢，旧响应写不到 cache）
+- ❌ 但 **sc3 实测旧 query 仍走完 resolve 才被 abort 回调触发**——这与 lynx fetch 的真取消（sc1 的 117ms）形成对比
+- 结论：**queryFn 仍需 generation-gate 模式**（disposed 检查），但**不是为 signal no-op 而是为「旧响应晚于新 query」防脏读**。generation-gate 在 lynx fetch 真能取消的前提下仍必要。
+
+**新增 D8（fetch 错误处理）**：queryFn 必须用 `res.ok === false` 判断 HTTP 错误，不能依赖 try/catch 包 fetch：
+```ts
+const res = await fetch(url, { signal })
+if (!res.ok) throw await classifyLynxHttpError(res.status, await res.text().catch(() => null))
+return await res.json()
+```
+仅 `res.json()` 解析失败 / 真网络中断（status === 0）走 reject。
+
+**新增 D9（fetchQuery vs useQuery）**：`fetchQuery` 不复用缓存（实测 sc4），但 `useQuery` 订阅机制会复用。生产代码统一用 `useQuery` 而非 `fetchQuery`。
+
+### R1 未推翻的决策
+
+D1（apiClient seam 不变）/ D2（createMixFeed 保留）/ D3（queryKey 工厂）/ D4（默认 QueryClient）/ D5（双错误槽位 ApiError.kind）/ D7（分批 T1-T7）—— 均维持原方案。
+
+## 待办（待用户拍板）
+
+- [ ] 用户对 ADR-0141 + spec + R1 修订注记拍板：接受 D1-D7 + D8-D9
+- [ ] 决定 T1-T7 ticket 顺序是否微调
+- [ ] 决定 bundle 增量 +33 KB raw（实测，tree-shake 后，非 +163 KB 调研估算）是否可接受
+
+## 验证证据索引
+
+| 验证项 | 证据位置 |
+|---|---|
+| bundle 增量实测 | 本文档「验证 1」 + `pnpm exec rspeedy build` 输出 |
+| POC 6 场景 | [`packages/app-lynx/prototype/vue-query-poc/index.html`](../packages/app-lynx/prototype/vue-query-poc/index.html) |
+| lynx fetch signal 调研 | lynxjs.org API 文档 + lynx-family/lynx issues [#798](https://github.com/lynx-family/lynx/issues/798) / [#2587](https://github.com/lynx-family/lynx/issues/2587) / [#2103](https://github.com/lynx-family/lynx/issues/2103) |
+| vue-query v5 API 行为 | [tanstack.com/query/latest/docs/framework/vue/overview](https://tanstack.com/query/latest/docs/framework/vue/overview) 及子页 guides/queries / guides/mutations / guides/optimistic-updates / guides/query-keys / reference/useQuery / reference/QueryClient |
