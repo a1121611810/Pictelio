@@ -6,16 +6,26 @@
 // 结论见本目录 PROTOTYPE-VERDICT.md（docs/research/vue-router-migration-feasibility.md）。
 import { ref, onMounted } from 'vue'
 import { RouterView } from 'vue-router'
-import { probeHasHistory, probeBack, probeStackLength } from './probeNav'
+import { router } from './probeNav'
 
-// ─── 系统返回桥（复刻生产 handleSystemBack 语义） ───
-// 生产：evaluateSystemBack(historyLength>0 → return; lastBackAt 2s 窗口 → exit; else hint)
-// vue-router 映射：memory history 无公开栈查询 API（history.state 恒 {}，4.6.4 源码实证），
-// 「能否返回」由 probeNav 自跟踪栈提供（生产迁移 shim 沿用本仓自研 _history 形态）。
+// ─── 系统返回桥（第四轮：纯官方 API 形态） ───
+// 「能否返回」检测 = history.go(delta, triggerListeners=false) + history.location
+//（两者均为官方 RouterHistory 接口成员：go 的 triggerListeners 参数官方文档化为
+//  "whether this should trigger listeners attached to the history"）。
+// 同步原子：JS 单线程内无 await 间隙，不触发监听/守卫；移动后立即还原。
 const exitHint = ref(false)
 let lastBackAt = 0
 let hintTimer: ReturnType<typeof setTimeout> | undefined
 const EXIT_WINDOW_MS = 2000
+
+function hasBackEntry(): boolean {
+  const h = router.options.history
+  const before = h.location
+  h.go(-1, false)
+  const moved = h.location !== before
+  if (moved) h.go(1, false)
+  return moved
+}
 
 function finishApp(): void {
   const nm =
@@ -28,13 +38,10 @@ function finishApp(): void {
 }
 
 function handleSystemBack(): void {
-  // 完整形态（实证全绿）：返回触发本身用 vue-router API（router.back()），
-  // 「当前是否可返回」由自跟踪栈判定（memory history 无公开栈查询 API）。
-  // 「直调形态」（不判历史一律 router.back()）实测：非根页面正常回退；根路由 no-op——
-  // 丢失"再按一次退出应用"本地语义（无提示也无法经返回键退出），见结论文档 14-15 行。
-  console.warn('[routeProbe] pictelioBack 到达，stackLen =', probeStackLength())
-  if (probeHasHistory()) {
-    probeBack()
+  const canBack = hasBackEntry()
+  console.warn('[routeProbe] pictelioBack 到达（纯 API 形态），hasBackEntry =', canBack)
+  if (canBack) {
+    void router.back()
     return
   }
   const now = Date.now()

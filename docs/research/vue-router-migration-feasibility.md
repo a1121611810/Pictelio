@@ -11,7 +11,12 @@
 
 `src/router.ts` 注释声称的「RouterView 渲染为空」**根因不是 vue-router 不兼容，而是 kebab-case `<router-view>` 标签被 vue-lynx 编译器当作原生自定义元素**（`v-slot` 时编译报 `VueCompilerError: v-slot can only be used on components`；无 slot 时静默渲染为空——已复现纯白屏）。官方示例与探针均使用 PascalCase。
 
-**本轮新增的关键发现**：vue-router 4.6.4 的 memory history **没有公开的「能否返回」查询 API**——`history.state` 恒为 `{}`（dist 源码：`state: {}`，栈在闭包私有 `queue`/`position`，仅 `go()` 可操作）。**但这不影响"触发返回"本身**：系统拦截后调用 `router.back()` 就是官方 API 且实测正常（详情页返回键/侧滑手势均回退成功，第 10-14 行）。需要自跟踪栈的仅是**「当前是否可返回」这一个判定输入**——它是为承接本项目自有语义（根路由"再按一次退出应用"、`backBehavior:'exit'`、栈空回退推荐页）所必需的：vue-router 在根路由上 `back()` 是 **no-op**（第 14-15 行实测），框架不提供"有无前一页"的查询（web 的 `history.state.back` 字段在 memory history 中不存在，恒 `{}`——探针第一版误用即失效实证）。
+**本轮新增（第四轮：官方 API 深度分析修正）**：vue-router 官方文档明确 memory history 只是"初始位置 nowhere、需手动 push/replace"这两个特殊性（`createMemoryHistory` API 页原文），其余能力与普通 history 一致。**"能否返回"检测不需要自跟踪栈**——官方 `RouterHistory` 接口本身就有解：
+
+- `go(delta, triggerListeners?)`——**`triggerListeners` 是官方文档化参数**（JSDoc: "whether this should trigger listeners attached to the history"）
+- `location`——官方文档化的 "Current History location"（只读 live getter）
+
+两者组合即可原子探测"有没有上一页"（见下 `hasBackEntry()`），已实测四场景全绿（16-17 行）。`state` 的语义也修正：它是**每条历史条目可携带的数据**（`push(to, data?)`/`replace(to, data?)` 官方文档化的第二参数，读取即"当前条目的 state"，默认 `{}`）——**不是**浏览器 `history.state` 的 `{back, current, forward}` 结构（那是 `createWebHistory` 用 `replaceState` 维护的浏览器态，memory 没有）。
 
 ## 实证矩阵
 
@@ -38,7 +43,9 @@
 | 12 | **双击退出** | 2s 窗口内再按 → logcat `exitApp(), PictelioApp 存在: true` → `mCurrentFocus` 切到 NexusLauncher |
 | 13 | **侧滑手势返回** | gesture nav 下左缘 `swipe 2,640→720,640`（250ms）→ 原生 `LynxView sendGlobalEvent pictelioBack` → `stackLen=1` → PROBE-HOME |
 | 14 | **"直调 API"形态（第三轮，用户挑战验证）**：系统拦截后**不判历史、一律 `router.back()`** | 详情页返回键 → **正常回 PROBE-HOME**（vue-router API 触发返回完全可行）；根路由返回键 → **no-op**（页面保持 home 原样，无白屏无崩溃——预期"回到 START 匹配空路由白屏"未发生，vue-router 将无匹配导航中止并保持 currentRoute） |
-| 15 | **根路由直调形态的副作用** | 根路由按返回键**无任何反应**（无"再按一次退出应用"提示、无法经返回键退出应用）——本地根路由语义丢失；此为框架行为（memory history 根=START 合成位置、无栈查询 API），非回归性 bug |
+| 15 | **根路由直调形态的副作用** | 根路由按返回键**无任何反应**（无"再按一次退出应用"提示、无法经返回键退出应用）——本地根路由语义丢失；此为框架行为（根=START 合成位置），非回归性 bug |
+| 16 | **纯官方 API 形态（第四轮，深入官方文档后验证）**：`hasBackEntry()` = `history.go(-1, false)` 静默移动指针 + `location` 比对还原 | 四场景全绿：详情返回键 `hasBackEntry=true`→home；根返回键 `false`→"再按一次退出应用"提示；2s 内再按→exitApp→桌面；侧滑手势→home（logcat 逐条取证） |
+| 17 | 纯 API 形态的检测原理 | `go`/`location` 均为官方 `RouterHistory` 成员；`go(-1, false)` 同步原子（无 await 间隙），移动后 `go(1, false)` 立即还原，不触发监听/守卫，无副作用 |
 
 注：模拟器首轮验证曾被「Process system isn't responding」ANR 弹窗干扰（模拟器系统进程挂起，非 app 问题），`adb reboot` 后全绿——印证「模拟器卡死先 reboot，别怀疑代码」既有经验。侧滑与返回键共用 `LynxActivity` 的 `OnBackPressedDispatcher`（Java 侧 `handleOnBackPressed`，已读源码确认：错误页/未加载时直接 finish，否则 `sendGlobalEvent("pictelioBack", ...)`），JS 侧裁决后行为四项均正确。
 
@@ -64,23 +71,40 @@ vue-lynx（vue-lynx/plugin 的模板编译链）把所有**带连字符的标签
 |---|---|
 | `_state` ref + `routeState`/`currentParams`/`currentComponent` computed | `router.currentRoute`（`params`/`fullPath`/`name` 直接读）；页面如需 `useRoute()` 亦可 |
 | `navigate(path, opts?)`（push/replace 语义） | `router.push(path)` / `router.replace(path)` |
-| `goBack()`：历史栈 pop + 栈空/无效回退 `/recommended` | **自跟踪栈 + `router.back()`**：`_history` 镜像（push 入栈/replace 不出栈/back 出栈），栈空或目标无效时 `router.replace('/recommended')` 兜底。（vue-router `back()` 栈空是 no-op，兜底语义需自实现） |
-| `_history: string[]` + `historyLength` | **自跟踪栈（必须）**：memory history 无公开栈查询 API——`history.state` 恒为 `{}`（4.6.4 源码：`state: {}`，栈在闭包私有 `queue`/`position`）。⚠️ 探针实证：用 `state.back` 判定 → 系统返回键失效；自跟踪栈 → 全绿 |
+| `goBack()`：历史栈 pop + 栈空/无效回退 `/recommended` | 自跟踪栈 + `router.back()` 或纯 API 探测 + `router.back()`（两者任选，见下）；栈空或目标无效时 `router.replace('/recommended')` 兜底。（vue-router `back()` 栈空是 no-op，兜底需自实现） |
+| `_history: string[]` + `historyLength` | **二选一**：① **纯官方 API**（推荐，第四轮实测）：`hasBackEntry()` = `history.go(-1, false)` 静默探测 + `location` 比对 + 还原——同步原子、无状态、不要求导航全走 shim；② 自跟踪栈（与现有 `_history` 同构，导航必须全走包装）。（注：`history.state` 非栈查询——它是**每条目可携带的数据**，`push(to, data?)` 官方文档化，默认 `{}`，不含 `{back,current,forward}`——那是 web history 的浏览器态） |
 | `resetHistory()`（登出/会话失效清栈） | 无官方 API——`/error` 是 `backBehavior:'exit'`（裁决直接 exit，不依赖栈）；「真的清栈」需重建 router 或改自跟踪栈（后者推荐：清镜像即够，vue-router 侧 replace 到目标即可） |
 | 首帧内容化（初始即 `/recommended`） | 模块顶层同步 `router.replace('/recommended')`（memory history 不主动触发初始导航，官方示例在 `app.mount()` 前 `router.push('/')`——已按官方顺序实证可行） |
 | `App.vue`：`<component :is>` + KeepAlive | `<RouterView v-slot="{ Component }"><KeepAlive :include="['recommended','illusts','novels','me']"><component :is="Component" /></KeepAlive></RouterView>`（**必须 PascalCase**） |
 | KeepAlive 白名单 | 组件 `defineOptions({ name })` = 路由 name（生产页面已有此惯例，1:1 兼容） |
 
-**系统返回裁决伪码**（探针已按此完整实证）：
+**系统返回裁决伪码**（探针已按"纯官方 API 形态"完整实证，第 16 行）：
 
 ```
 handleSystemBack():
   ① modalStack 有弹层 → close（不动）
   ② back-guard 拦截 → 返回（不动）
   ③ meta.backBehavior === 'exit' → exitApp（不动，裁决层读 currentRoute.meta）
-  ④ 自跟踪栈非空 → pop + router.back()      ← 实证 ✓（返回键/侧滑）
-  ⑤ 栈空 → 提示 + 2s 窗口内再按 → exitApp    ← 实证 ✓（提示条 + 桌面退出）
+  ④ hasBackEntry()（官方 API：history.go(-1,false)+location 比对，原子无副作用）
+     → true: router.back()                        ← 实证 ✓（返回键/侧滑）
+     → false: 提示 + 2s 窗口内再按 → exitApp       ← 实证 ✓（提示条 + 桌面退出）
 ```
+
+## 官方 API 深度分析（第四轮，对应 https://router.vuejs.org/api/functions/createMemoryHistory.html）
+
+**`createMemoryHistory` 官方页**：创建基于内存的 history（"Creates an in-memory based history"）、用途是 SSR（"to handle SSR"）、初始位置是"nowhere"特殊位置、**必须由用户自行 `router.push`/`router.replace` 指定起点**（"It's up to the user to replace that location with the starter location"）——**官方明确的特殊性只有这两点（无 URL 环境 + 手动定起点）**，其余无任何限制说明。
+
+**官方 `RouterHistory` 接口**（API 文档页由 JSDoc 生成；本仓安装版 `vue-router@4.6.4` 的 `.d.mts` 逐字核实）：
+
+| 成员 | 官方签名/JSDoc 要点 |
+|---|---|
+| `location` | `readonly location: HistoryLocation` — "Current History location"（live getter，实测随栈条目切换） |
+| `state` | `readonly state: HistoryState` — "Current History state"（**当前条目的数据**；`push(to, data?)` 第二参数官方文档化："optional HistoryState to be associated with the navigation entry"；默认 `{}`） |
+| `go` | `go(delta, triggerListeners?)` — "Traverses history in a given direction"；**`triggerListeners` 官方文档化**："whether this should trigger listeners attached to the history"——这就是纯 API 探测"能否返回"的关键 |
+| `push`/`replace` | 第一参数 location、第二参数 `data?`（HistoryState） |
+| `listen` | 外部导航（浏览器前进/后退）或 `go(..., true)` 时触发，返回取消函数 |
+
+**结论（与首轮调研对照）**：用户的判断成立——除"无 URL/无深链接/需手动定起点/`state` 语义是条目数据而非浏览器 `{back,current,forward}`"这几点**个别特殊性**外，vue-router 的能力在 memory history 下全部可用，包括系统返回所需的**触发（`router.back()`）与检测（`go+location`）**；不迁移的根本理由（当时认为 RouterView 兼容性不可用）已被第一轮证伪。
 
 ## 官方示例（docs 托管，可逐文件访问）
 
