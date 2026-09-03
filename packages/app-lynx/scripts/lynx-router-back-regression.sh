@@ -340,9 +340,14 @@ relaunch() {
 }
 
 # bundle 是否含 benchNav 钩子标记（__BENCH_NAV__ 注入时才存在字符串字面量）
+# [lynx:fix×2] ①TASM 二进制用长度前缀编码（非 NUL 结尾）——strings 扫不出该串（实测恒 0），
+#   必须 grep -a 二进制直扫；②set -o pipefail 下 grep -q 命中即退 → unzip 收 SIGPIPE(141) →
+#   管道恒失败（实测：q 版恒 SKIP，c 版正常）——必须用 grep -c 消费全量再判计数
 bundle_has_benchnav() {
   [ -f "$APK_PATH" ] || return 1
-  unzip -p "$APK_PATH" assets/main.lynx.bundle 2>/dev/null | strings 2>/dev/null | grep -q "pictelioBenchNav"
+  local hit
+  hit=$(unzip -p "$APK_PATH" assets/main.lynx.bundle 2>/dev/null | grep -a -c "pictelioBenchNav" || true)
+  [ "${hit:-0}" -gt 0 ]
 }
 
 # 等待内容页真正有内容（classify colored>0.02），避免骨架屏/加载期点击落空
@@ -580,25 +585,36 @@ run_s6() {
     return 2
   fi
   # 前置满足才执行（产品侧补钩子后即生效）：benchNav 直达 → 校验页面 → 返回键 → 焦点 launcher
-  say "   …benchNav update（需产品侧已补目标）"
-  adb shell am start --es benchNav update -n "$APP_ID/.MainActivity" >/dev/null 2>&1 || true
-  sleep 8
-  local shot_path chev p focus
-  shot_path=$(shot s6_page)
-  chev=$(chevron_dark "$shot_path")
-  p=$(page_classify "$shot_path")
-  if ! page_ready "$p" || [ "${chev:-999}" -ge 0 ] && [ "$chev" -ge 30 ]; then
-    ng "未识别到 /update、/error 页面（chevron=$chev page=$p）——或产品侧尚未补 benchNav 目标"
-    return 1
-  fi
-  adb shell input keyevent 4
-  sleep 3
-  focus=$(adb shell dumpsys window 2>/dev/null | grep mCurrentFocus || true)
-  if echo "$focus" | grep -qi launcher; then
-    ok "meta-exit 生效：返回键直接退出（焦点 = launcher）"
-    return 0
-  fi
-  ng "meta-exit 未生效（焦点仍为：$focus）"
+  # [lynx:fix] 必须冷启动：LynxActivity 已运行时 am start 只恢复旧实例，onLoadSuccess 不再触发，
+  #    benchNav 广播不发出（实测直达失败停在登录页 → 返回键走根路由语义 → 本场景假 FAIL）
+  local tgt label failed=0
+  for tgt in update error; do
+    [ "$tgt" = "update" ] && label="update（强制更新页）" || label="error（会话失效页）"
+    say "   …benchNav $label"
+    adb shell am force-stop "$APP_ID" || true
+    sleep 1.5
+    adb shell am start --es benchNav "$tgt" -n "$APP_ID/.MainActivity" >/dev/null 2>&1 || true
+    sleep 8
+    local shot_path chev p focus
+    shot_path=$(shot "s6_${tgt}_page")
+    chev=$(chevron_dark "$shot_path")
+    p=$(page_classify "$shot_path")
+    if ! page_ready "$p" || [ "${chev:-999}" -ge 0 ] && [ "$chev" -ge 30 ]; then
+      ng "未识别到 /$tgt 页面（chevron=$chev page=$p）——或产品侧尚未补 benchNav 目标"
+      failed=1
+      continue
+    fi
+    adb shell input keyevent 4
+    sleep 3
+    focus=$(adb shell dumpsys window 2>/dev/null | grep mCurrentFocus || true)
+    if echo "$focus" | grep -qi launcher; then
+      ok "meta-exit 生效（/$tgt）：返回键直接退出（焦点 = launcher）"
+    else
+      ng "meta-exit 未生效（/$tgt）：焦点仍为：$focus"
+      failed=1
+    fi
+  done
+  [ "$failed" -eq 0 ] && return 0
   return 1
 }
 

@@ -324,6 +324,9 @@ function registerBenchNavHandler(): void {
     // T3（#328）扩展：收藏/追更/用户页直达（含用户系页面需真实 id——自账 id 运行时解析）
     pictelioBenchNavBookmarks: '/bookmarks',
     pictelioBenchNavWatchlist: '/watchlist',
+    // T4（spec app-lynx-benchnav-meta-exit-hooks）：/update、/error 直达（meta-exit 回归 S6 触发通道）
+    pictelioBenchNavUpdate: '/update',
+    pictelioBenchNavError: '/error',
   }
   for (const [eventName, target] of Object.entries(TARGETS)) {
     // 原生发送两次（1.5s/3s）防 JS 挂载竞态；replace 幂等，重复到达无副作用

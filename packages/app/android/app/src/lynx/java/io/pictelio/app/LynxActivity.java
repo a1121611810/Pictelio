@@ -128,6 +128,10 @@ public class LynxActivity extends AppCompatActivity {
                             case "watchlist" -> new String[]{"pictelioBenchNavWatchlist"};
                             case "user" -> new String[]{"pictelioBenchNavUser"};
                             case "userfollowing" -> new String[]{"pictelioBenchNavUserfollowing"};
+                            // T4（spec app-lynx-benchnav-meta-exit-hooks）：/update、/error 直达——
+                            // meta-exit 回归（S6）触发通道（版本检查/401 链无法在测试中伪造）
+                            case "update" -> new String[]{"pictelioBenchNavUpdate"};
+                            case "error" -> new String[]{"pictelioBenchNavError"};
                             default -> new String[0];
                         };
                         // 四次广播（1.5/3/4.5/6s）：页面级监听（如 NovelList 子 tab）可能晚于路由监听，
