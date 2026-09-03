@@ -11,7 +11,7 @@
 
 `src/router.ts` 注释声称的「RouterView 渲染为空」**根因不是 vue-router 不兼容，而是 kebab-case `<router-view>` 标签被 vue-lynx 编译器当作原生自定义元素**（`v-slot` 时编译报 `VueCompilerError: v-slot can only be used on components`；无 slot 时静默渲染为空——已复现纯白屏）。官方示例与探针均使用 PascalCase。
 
-**本轮新增的关键发现**：vue-router 4.6.4 的 memory history **没有公开的「能否返回」查询 API**——`history.state` 恒为 `{}`（dist 源码：`state: {}`，栈在闭包私有 `queue`/`position`，仅 `go()` 可操作）。迁移时"返回键/侧滑手势"的历史判定**必须自跟踪栈**（与现有 `_history: string[]` 同构），不能依赖 `history.state.back`——探针第一版用 `state.back` 判定时系统返回键**完全失效**（页面停在详情页），改成自跟踪栈后四项全绿。
+**本轮新增的关键发现**：vue-router 4.6.4 的 memory history **没有公开的「能否返回」查询 API**——`history.state` 恒为 `{}`（dist 源码：`state: {}`，栈在闭包私有 `queue`/`position`，仅 `go()` 可操作）。**但这不影响"触发返回"本身**：系统拦截后调用 `router.back()` 就是官方 API 且实测正常（详情页返回键/侧滑手势均回退成功，第 10-14 行）。需要自跟踪栈的仅是**「当前是否可返回」这一个判定输入**——它是为承接本项目自有语义（根路由"再按一次退出应用"、`backBehavior:'exit'`、栈空回退推荐页）所必需的：vue-router 在根路由上 `back()` 是 **no-op**（第 14-15 行实测），框架不提供"有无前一页"的查询（web 的 `history.state.back` 字段在 memory history 中不存在，恒 `{}`——探针第一版误用即失效实证）。
 
 ## 实证矩阵
 
@@ -37,6 +37,8 @@
 | 11 | **根路由返回提示** | 首页 `keyevent 4` → logcat `stackLen=0` → 截图可见「再按一次退出应用」提示条 |
 | 12 | **双击退出** | 2s 窗口内再按 → logcat `exitApp(), PictelioApp 存在: true` → `mCurrentFocus` 切到 NexusLauncher |
 | 13 | **侧滑手势返回** | gesture nav 下左缘 `swipe 2,640→720,640`（250ms）→ 原生 `LynxView sendGlobalEvent pictelioBack` → `stackLen=1` → PROBE-HOME |
+| 14 | **"直调 API"形态（第三轮，用户挑战验证）**：系统拦截后**不判历史、一律 `router.back()`** | 详情页返回键 → **正常回 PROBE-HOME**（vue-router API 触发返回完全可行）；根路由返回键 → **no-op**（页面保持 home 原样，无白屏无崩溃——预期"回到 START 匹配空路由白屏"未发生，vue-router 将无匹配导航中止并保持 currentRoute） |
+| 15 | **根路由直调形态的副作用** | 根路由按返回键**无任何反应**（无"再按一次退出应用"提示、无法经返回键退出应用）——本地根路由语义丢失；此为框架行为（memory history 根=START 合成位置、无栈查询 API），非回归性 bug |
 
 注：模拟器首轮验证曾被「Process system isn't responding」ANR 弹窗干扰（模拟器系统进程挂起，非 app 问题），`adb reboot` 后全绿——印证「模拟器卡死先 reboot，别怀疑代码」既有经验。侧滑与返回键共用 `LynxActivity` 的 `OnBackPressedDispatcher`（Java 侧 `handleOnBackPressed`，已读源码确认：错误页/未加载时直接 finish，否则 `sendGlobalEvent("pictelioBack", ...)`），JS 侧裁决后行为四项均正确。
 

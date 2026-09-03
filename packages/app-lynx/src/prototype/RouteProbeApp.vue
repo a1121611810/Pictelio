@@ -28,6 +28,10 @@ function finishApp(): void {
 }
 
 function handleSystemBack(): void {
+  // 完整形态（实证全绿）：返回触发本身用 vue-router API（router.back()），
+  // 「当前是否可返回」由自跟踪栈判定（memory history 无公开栈查询 API）。
+  // 「直调形态」（不判历史一律 router.back()）实测：非根页面正常回退；根路由 no-op——
+  // 丢失"再按一次退出应用"本地语义（无提示也无法经返回键退出），见结论文档 14-15 行。
   console.warn('[routeProbe] pictelioBack 到达，stackLen =', probeStackLength())
   if (probeHasHistory()) {
     probeBack()
