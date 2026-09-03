@@ -40,6 +40,7 @@ allowBuilds:
   edgedriver: false
   esbuild: true
   geckodriver: false
+  vue-demi: true
   # pnpm install 会自动列出待审批的包到这里
 
   # ── 依赖解析优化 ──
