@@ -1,8 +1,8 @@
 import { routeState, navigate } from '../router'
 import { NAV_TABS } from '../components/navTabs'
 import { createGlobalFab, type GlobalFab } from '../primitives/createGlobalFab'
-import { openSearch } from './searchSheetStore'
-import { hasOpenModal } from './modalStack'
+import { useSearchSheetStore } from './searchSheetStore'
+import { useModalStack } from './modalStack'
 
 // ─── 放射导航单例接线（ADR-0120）───
 // 用惰性初始化：router.ts 经页面（Recommended.vue 等）静态 import 反向依赖本模块
@@ -22,8 +22,8 @@ export function getGlobalFab(): GlobalFab {
       routeState,
       navigate,
       navTabs: NAV_TABS,
-      openSearch: () => openSearch(),
-      hasOpenModal: () => hasOpenModal(),
+      openSearch: () => useSearchSheetStore().openSearch(),
+      hasOpenModal: () => useModalStack().hasOpenModal(),
     })
   }
   return _fab

@@ -6,7 +6,9 @@ import { navigate } from '../router'
 import { loadRecommendedNovels, loadFollow, loadNovelNext } from '../api/novel'
 import type { PixivNovel, PixivNovelListResponse } from '../api/types'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
-import { isRestricted } from '../stores/settingsStore'
+import { useSettingsStore } from '../stores/settingsStore'
+
+const isRestricted = useSettingsStore().isRestricted
 import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
 import RefreshableList from '../components/RefreshableList.vue'
 import { getGlobalFab } from '../stores/globalFab'

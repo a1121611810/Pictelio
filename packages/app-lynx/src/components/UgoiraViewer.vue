@@ -8,7 +8,9 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { downloadUgoiraFrames, ugoiraExtractFrames, ugoiraExtractStreamFrames, type UgoiraFrameData } from '../api/ugoira'
 import { isNativeMode } from '../api/client'
-import { ugoiraMode } from '../stores/settingsStore'
+import { useSettingsStore } from '../stores/settingsStore'
+
+const ugoiraMode = useSettingsStore().ugoiraMode
 import { presentError } from '../utils/errorPresentation'
 
 const props = withDefaults(defineProps<{

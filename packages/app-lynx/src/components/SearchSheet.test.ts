@@ -185,7 +185,7 @@ describe('SearchSheet 数据流与生命周期', () => {
 
   it('onMounted → loadHistory（历史 chips）+ 自动聚焦；onBeforeUnmount → controller.dispose()', () => {
     expect(source).toContain('onMounted(() => {')
-    expect(source).toContain('void loadHistory()')
+    expect(source).toContain('void searchHistory.loadHistory()')
     expect(source).toContain('inputRef.value?.focus?.()')
     expect(source).toContain('onBeforeUnmount(() => {')
     expect(source).toContain('controller.dispose()')

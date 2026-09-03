@@ -3,7 +3,7 @@
 defineOptions({ name: 'watchlist' })
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { navigate, goBack } from '../router'
-import { registerModal } from '../stores/modalStack'
+import { useModalStack } from '../stores/modalStack'
 import {
   loadWatchlistNovels,
   loadWatchlistNovelsNext,
@@ -99,7 +99,7 @@ function cancelUnwatch() {
 // 而不是直接 pop /watchlist 页面（对齐 WatchlistPromptDialog 行为与 issue #163 语义）
 watch(unwatchTarget, (target, _prev, onCleanup) => {
   if (!target) return
-  const unregister = registerModal(() => cancelUnwatch())
+  const unregister = useModalStack().registerModal(() => cancelUnwatch())
   onCleanup(unregister)
 })
 

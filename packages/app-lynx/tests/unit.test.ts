@@ -1,5 +1,7 @@
 // ─── app-lynx 单元测试（Vitest，node 环境） ───
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { setActivePinia, createPinia } from 'pinia'
+import { useAuthStore } from '../src/stores/authStore'
 import { proxyImageUrl, thumbUrl } from '../src/utils/imageUrl'
 import { classifyError, isNativeMode, isOAuthTokenErrorResponse, rewriteUrl, shouldAttachAuth } from '../src/api/client'
 import { ApiErrorType } from '../src/api/types'
@@ -13,7 +15,7 @@ import { loadUserIllusts, loadFollow, loadBookmarks } from '../src/api/illust'
 import { loadUserNovels, loadBookmarks as loadNovelBookmarks, loadFollow as loadNovelFollow } from '../src/api/novel'
 import { bytesToDataUrl, downloadUgoiraFrames, ugoiraExtractFrames, ugoiraExtractStreamFrames } from '../src/api/ugoira'
 import type { UgoiraExtractMode } from '../src/api/ugoira'
-import { ugoiraMode as lynxUgoiraMode, setUgoiraMode as lynxSetUgoiraMode } from '../src/stores/settingsStore'
+import { useSettingsStore } from '../src/stores/settingsStore'
 import { ME_A11Y_LABELS, LOGIN_A11Y_LABELS, UPDATE_A11Y_LABELS, ERROR_A11Y_LABELS, FAB_MENU_A11Y_LABELS, GLOBAL_FAB_A11Y_LABELS, WATCHLIST_A11Y_LABELS, WATCHLIST_PROMPT_A11Y_LABELS, SEARCH_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../src/utils/accessibility'
 
 describe('imageUrl.proxyImageUrl', () => {
@@ -439,6 +441,7 @@ describe('routerCore.evaluateBackRoute（系统返回完整裁决顺序）', () 
 
 describe('authStore 安全：refresh_token 不持久化', () => {
   beforeEach(() => {
+    setActivePinia(createPinia())
     vi.resetModules()
     vi.stubGlobal('localStorage', {
       getItem: vi.fn(() => null),
@@ -451,11 +454,11 @@ describe('authStore 安全：refresh_token 不持久化', () => {
   })
 
   it('restoreToken 不读 localStorage（无持久化 token → 未登录）', async () => {
-    const { restoreToken, isLoggedIn } = await import('../src/stores/authStore')
-    const ok = await restoreToken()
+    const store = useAuthStore()
+    const ok = await store.restoreToken()
     const lsGet = (globalThis.localStorage as { getItem: ReturnType<typeof vi.fn> }).getItem
     expect(ok).toBe(false)
-    expect(isLoggedIn.value).toBe(false)
+    expect(store.isLoggedIn).toBe(false)
     expect(lsGet).not.toHaveBeenCalled()
   })
 
@@ -475,9 +478,9 @@ describe('authStore 安全：refresh_token 不持久化', () => {
         })),
       }
     })
-    const { loginWithToken } = await import('../src/stores/authStore')
+    const store = useAuthStore()
     const lsSet = (globalThis.localStorage as { setItem: ReturnType<typeof vi.fn> }).setItem
-    await loginWithToken('some-token')
+    await store.loginWithToken('some-token')
     expect(lsSet).not.toHaveBeenCalled()
   })
 })
@@ -603,6 +606,9 @@ describe('client 原生模式 API 转发（#53：JS 零知 access_token）', () 
 })
 
 describe('authStore 原生模式登录（#53：Native OAuth 交换，token 不进 JS）', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
   afterEach(() => {
     vi.unstubAllGlobals()
   })
@@ -629,10 +635,10 @@ describe('authStore 原生模式登录（#53：Native OAuth 交换，token 不�
         removeItem: (_k: string, cb: () => void) => cb(),
       },
     })
-    const { loginWithToken, isLoggedIn, currentUser } = await import('../src/stores/authStore')
-    await loginWithToken('old-token')
-    expect(isLoggedIn.value).toBe(true)
-    expect(currentUser.value?.name).toBe('テスト')
+    const store = useAuthStore()
+    await store.loginWithToken('old-token')
+    expect(store.isLoggedIn).toBe(true)
+    expect(store.currentUser?.name).toBe('テスト')
     // access_token 不进 JS（getAccessToken 仍空）；refresh_token 经原生存储持久化
     expect(setItemMock).toHaveBeenCalledWith('refresh_token', 'new-token', expect.any(Function))
   })
@@ -644,14 +650,17 @@ describe('authStore 原生模式登录（#53：Native OAuth 交换，token 不�
           cb('', '登录凭证无效或已失效'),
       },
     })
-    const { loginWithToken, isLoggedIn, authError } = await import('../src/stores/authStore')
-    await loginWithToken('bad-token')
-    expect(isLoggedIn.value).toBe(false)
-    expect(authError.value).toBe('登录凭证无效或已失效')
+    const store = useAuthStore()
+    await store.loginWithToken('bad-token')
+    expect(store.isLoggedIn).toBe(false)
+    expect(store.authError).toBe('登录凭证无效或已失效')
   })
 })
 
 describe('authStore logout 原生模式（#53：清 Java 堆 token）', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
   afterEach(() => {
     vi.unstubAllGlobals()
   })
@@ -666,8 +675,8 @@ describe('authStore logout 原生模式（#53：清 Java 堆 token）', () => {
         removeItem: (_k: string, cb: () => void) => cb(),
       },
     })
-    const { logout } = await import('../src/stores/authStore')
-    logout()
+    const store = useAuthStore()
+    store.logout()
     expect(clearTokensMock).toHaveBeenCalled()
   })
 })
@@ -1056,9 +1065,10 @@ describe('T6 动图播放方案', () => {
   })
 
   it('settingsStore.ugoiraMode 默认 fflate，setUgoiraMode 更新', () => {
-    expect(lynxUgoiraMode.value).toBe('fflate')
-    lynxSetUgoiraMode('range')
-    expect(lynxUgoiraMode.value).toBe('range')
+    const store = useSettingsStore()
+    expect(store.ugoiraMode).toBe('fflate')
+    store.setUgoiraMode('range')
+    expect(store.ugoiraMode).toBe('range')
   })
 
   it('downloadUgoiraFrames range 模式：GET+Range 试探长度 → 尾部目录 → 取帧', async () => {
@@ -1472,7 +1482,7 @@ describe('RefreshableList 组件结构（ADR-0111 M3 FAB menu）', () => {
   })
 })
 
-const { normalizeKinds, supportsClientSwitch } = await import('../src/stores/clientSwitchStore')
+const { normalizeKinds, supportsClientSwitch, useClientSwitchStore } = await import('../src/stores/clientSwitchStore')
 
 describe('clientSwitchStore.normalizeKinds / supportsClientSwitch（ADR-0062 包能力）', () => {
 
@@ -1529,11 +1539,13 @@ describe('clientSwitchStore.normalizeKinds / supportsClientSwitch（ADR-0062 包
           getClientKind: (cb: (kind: string, err: string | null) => void) => cb('webview', null),
         },
       })
+      setActivePinia(createPinia())
       const mod = await import('../src/stores/clientSwitchStore')
-      mod.initClientSetting()
+      const store = mod.useClientSwitchStore()
+      store.initClientSetting()
       await new Promise((r) => setTimeout(r, 0))
-      expect(mod.availableKinds.value).toEqual(['webview', 'lynx'])
-      expect(mod.supportsClientSwitch(mod.availableKinds.value)).toBe(true)
+      expect(store.availableKinds).toEqual(['webview', 'lynx'])
+      expect(mod.supportsClientSwitch(store.availableKinds)).toBe(true)
     })
 
     it('lynx-only 包：getClientKinds 返回 [lynx] → availableKinds=[lynx]，切换不支持', async () => {
@@ -1543,11 +1555,13 @@ describe('clientSwitchStore.normalizeKinds / supportsClientSwitch（ADR-0062 包
           getClientKind: (cb: (kind: string, err: string | null) => void) => cb('lynx', null),
         },
       })
+      setActivePinia(createPinia())
       const mod = await import('../src/stores/clientSwitchStore')
-      mod.initClientSetting()
+      const store = mod.useClientSwitchStore()
+      store.initClientSetting()
       await new Promise((r) => setTimeout(r, 0))
-      expect(mod.availableKinds.value).toEqual(['lynx'])
-      expect(mod.supportsClientSwitch(mod.availableKinds.value)).toBe(false)
+      expect(store.availableKinds).toEqual(['lynx'])
+      expect(mod.supportsClientSwitch(store.availableKinds)).toBe(false)
     })
 
     it('webview-only 包：getClientKinds 返回 [webview] → 切换不支持', async () => {
@@ -1557,11 +1571,13 @@ describe('clientSwitchStore.normalizeKinds / supportsClientSwitch（ADR-0062 包
           getClientKind: (cb: (kind: string, err: string | null) => void) => cb('webview', null),
         },
       })
+      setActivePinia(createPinia())
       const mod = await import('../src/stores/clientSwitchStore')
-      mod.initClientSetting()
+      const store = mod.useClientSwitchStore()
+      store.initClientSetting()
       await new Promise((r) => setTimeout(r, 0))
-      expect(mod.availableKinds.value).toEqual(['webview'])
-      expect(mod.supportsClientSwitch(mod.availableKinds.value)).toBe(false)
+      expect(store.availableKinds).toEqual(['webview'])
+      expect(mod.supportsClientSwitch(store.availableKinds)).toBe(false)
     })
   })
 })
@@ -1569,6 +1585,7 @@ describe('clientSwitchStore.normalizeKinds / supportsClientSwitch（ADR-0062 包
 // ─── 会话失效触发错误页（候选 #2：reportSessionError 触发链） ───
 describe('authStore 会话失效触发错误页（候选 #2）', () => {
   beforeEach(() => {
+    setActivePinia(createPinia())
     vi.resetModules()
     vi.stubGlobal('localStorage', {
       getItem: vi.fn(() => null),
@@ -1597,8 +1614,8 @@ describe('authStore 会话失效触发错误页（候选 #2）', () => {
     const spy = vi
       .spyOn(await import('../src/utils/errorPresentation'), 'reportSessionError')
       .mockImplementation(() => {})
-    const { loginWithToken } = await import('../src/stores/authStore')
-    await loginWithToken('bad-token')
+    const store = useAuthStore()
+    await store.loginWithToken('bad-token')
     expect(spy).not.toHaveBeenCalled()
     spy.mockRestore()
   })
@@ -1634,10 +1651,12 @@ describe('authStore 会话失效触发错误页（候选 #2）', () => {
     const spy = vi
       .spyOn(await import('../src/utils/errorPresentation'), 'reportSessionError')
       .mockImplementation(() => {})
-    const { loginWithToken, registerUnauthorizedHandler } = await import('../src/stores/authStore')
+    // 重新导入 authStore 以拿到 resetModules + doMock 后的新鲜模块（其 setup 闭包引用本次 spy 的 client 模块）
+    const freshAuth = await import('../src/stores/authStore')
+    const store = freshAuth.useAuthStore()
     // 先登录成功（会话就绪），再注册 401 刷新 handler
-    await loginWithToken('good-token')
-    registerUnauthorizedHandler()
+    await store.loginWithToken('good-token')
+    store.registerUnauthorizedHandler()
     expect(captured).not.toBeNull()
     // 触发 401 刷新：此时刷新失败 → 会话失效 → 全屏错误页
     failNext = true
@@ -1661,8 +1680,8 @@ describe('authStore 会话失效触发错误页（候选 #2）', () => {
     const spy = vi
       .spyOn(await import('../src/utils/errorPresentation'), 'reportSessionError')
       .mockImplementation(() => {})
-    const { loginWithToken } = await import('../src/stores/authStore')
-    await loginWithToken('bad-token')
+    const store = useAuthStore()
+    await store.loginWithToken('bad-token')
     expect(spy).not.toHaveBeenCalled()
     spy.mockRestore()
   })
@@ -2029,12 +2048,13 @@ expect(dialogVueSource).toContain('text-error-on-container')
 })
 
 it('open 期间 registerModal 注册关闭回调 = cancel（返回键优先关弹窗），关闭/卸载注销', () => {
-expect(dialogVueSource).toContain("import { registerModal } from '../stores/modalStack'")
-expect(dialogVueSource).toContain("registerModal(() => emit('cancel'))")
-// watch open 翻转注册/注销 + onBeforeUnmount 注销兜底
-expect(dialogVueSource).toContain('() => props.open')
-expect(dialogVueSource).toContain('onBeforeUnmount')
-expect(dialogVueSource).toContain('unregisterModal?.()')
+  // Pinia 化（ADR-0139 T2）：registerModal 经 useModalStack() 入口；行为不变。
+  expect(dialogVueSource).toContain("import { useModalStack } from '../stores/modalStack'")
+  expect(dialogVueSource).toContain("useModalStack().registerModal(() => emit('cancel'))")
+  // watch open 翻转注册/注销 + onBeforeUnmount 注销兜底
+  expect(dialogVueSource).toContain('() => props.open')
+  expect(dialogVueSource).toContain('onBeforeUnmount')
+  expect(dialogVueSource).toContain('unregisterModal?.()')
 })
 })
 

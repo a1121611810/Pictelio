@@ -12,7 +12,7 @@
 // router.handleSystemBack 的 modalStack 优先于页面返回（ADR-0066 扩展）；
 // 关闭/卸载时注销。closeTopModal pop 后调用 → 本组件 emit('cancel')。
 import { watch, onBeforeUnmount } from 'vue'
-import { registerModal } from '../stores/modalStack'
+import { useModalStack } from '../stores/modalStack'
 import { WATCHLIST_PROMPT_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 
 const props = defineProps<{
@@ -55,7 +55,7 @@ watch(
   () => props.open,
   (open) => {
     if (open && !unregisterModal) {
-      unregisterModal = registerModal(() => emit('cancel'))
+      unregisterModal = useModalStack().registerModal(() => emit('cancel'))
     } else if (!open && unregisterModal) {
       unregisterModal()
       unregisterModal = null

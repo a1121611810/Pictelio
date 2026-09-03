@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { navigate, markSessionEstablished } from '../router'
-import { loginWithToken, isLoggedIn } from '../stores/authStore'
-import { authError } from '../stores/authStore'
-import { loadSettings } from '../stores/settingsStore'
+import { useAuthStore } from '../stores/authStore'
+import { useSettingsStore } from '../stores/settingsStore'
 import { LOGIN_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { presentError } from '../utils/errorPresentation'
 
+const auth = useAuthStore()
+const settings = useSettingsStore()
 const tokenInput = ref('')
 const submitting = ref(false)
 const errorMsg = ref('')
@@ -16,16 +17,16 @@ async function submit() {
   submitting.value = true
   errorMsg.value = ''
   try {
-    await loginWithToken(tokenInput.value)
-    if (isLoggedIn.value) {
+    await auth.loginWithToken(tokenInput.value)
+    if (auth.isLoggedIn) {
       // ADR-0103：登录后 uid 已知 → 加载账号级 R18/R18G（跨 client 共享存储）
-      await loadSettings()
+      await settings.loadSettings()
       // [lynx:fix] 登录成功 = 会话新起点（ADR-0049）：先清除会话标记（beginSession 语义，
       //  否则守卫会把随后的 replace 导航拦截回 /login）再 replace 导航入站
       markSessionEstablished()
       await navigate('/recommended', { replace: true })
     } else {
-      errorMsg.value = authError.value ?? '登录失败'
+      errorMsg.value = auth.authError ?? '登录失败'
     }
   } catch (err) {
     errorMsg.value = presentError(err, '登录失败')

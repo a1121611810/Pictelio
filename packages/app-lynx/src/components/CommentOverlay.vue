@@ -10,7 +10,7 @@ import type { CommentContentType } from '../api/comment'
 import type { PixivComment } from '../api/types'
 import type { CommentsState } from '../primitives/useComments'
 import { useComments } from '../primitives/useComments'
-import { registerModal } from '../stores/modalStack'
+import { useModalStack } from '../stores/modalStack'
 import CommentItem from './CommentItem.vue'
 import CommentInputBar from './CommentInputBar.vue'
 
@@ -60,7 +60,7 @@ let unregisterModal: (() => void) | null = null
 
 onMounted(() => {
   void controller.open()
-  unregisterModal = registerModal(onClose)
+  unregisterModal = useModalStack().registerModal(onClose)
 })
 
 onBeforeUnmount(() => {

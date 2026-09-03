@@ -1,14 +1,16 @@
 <script setup lang="ts">
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'update' })
-import { updateResult, openReleasePage, exitUpdatePage } from '../stores/updateStore'
+import { useUpdateStore } from '../stores/updateStore'
 import { UPDATE_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+
+const update = useUpdateStore()
 
 // __APP_VERSION__：构建时从 app 包注入的 APK 版本号（与版本单一事实源一致）
 const appVersion = __APP_VERSION__
 
 const changelogLines = () =>
-  (updateResult.value?.latestChangelog ?? '')
+  (update.updateResult?.latestChangelog ?? '')
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean)
@@ -29,7 +31,7 @@ const changelogLines = () =>
         class="py-1 pr-2"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="UPDATE_A11Y_LABELS.exit"
-        @tap="exitUpdatePage"
+        @tap="update.exitUpdatePage"
       >
         <text class="text-label-large text-error pr-4">退出应用</text>
       </view>
@@ -45,7 +47,7 @@ const changelogLines = () =>
       <!-- 版本信息 -->
       <view class="mt-[8vw] flex flex-col items-center">
         <text class="text-body-medium text-outline">发现新版本</text>
-        <text class="text-headline-medium font-bold text-surface-on mt-2">v{{ updateResult?.latestVersion }}</text>
+        <text class="text-headline-medium font-bold text-surface-on mt-2">v{{ update.updateResult?.latestVersion }}</text>
         <text class="text-body-small text-outline mt-2">当前版本 v{{ appVersion }}</text>
       </view>
 
@@ -68,7 +70,7 @@ const changelogLines = () =>
         class="mt-[8vw] h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="UPDATE_A11Y_LABELS.download"
-        @tap="openReleasePage"
+        @tap="update.openReleasePage"
       >
         <text class="text-label-large text-primary-on font-medium">下载新版本</text>
       </view>

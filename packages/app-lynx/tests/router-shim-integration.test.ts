@@ -19,15 +19,26 @@ vi.mock('../src/api/client', () => ({
   getNativeModules: () => undefined,
 }))
 vi.mock('../src/stores/authStore', () => ({
-  isLoggedIn: env.auth.loggedIn,
-  restoreToken: env.auth.restoreToken,
-  registerUnauthorizedHandler: () => {},
-  currentUser: { value: null },
+  useAuthStore: () => ({
+    isLoggedIn: env.auth.loggedIn.value,
+    restoreToken: env.auth.restoreToken,
+    registerUnauthorizedHandler: () => {},
+    currentUser: null,
+    logout: () => {},
+  }),
 }))
 vi.mock('../src/stores/settingsStore', () => ({
-  loadSettings: async () => {},
+  useSettingsStore: () => ({
+    loadSettings: async () => {},
+  }),
 }))
 vi.mock('../src/stores/modalStack', () => ({
+  useModalStack: () => ({
+    hasOpenModal: () => false,
+    closeTopModal: () => {},
+    registerModal: () => () => {},
+  }),
+  // 迁移期 seam：模块顶层 wrapper（router.ts 等非组件上下文仍用旧 API）
   hasOpenModal: () => false,
   closeTopModal: () => {},
 }))

@@ -4,17 +4,19 @@ import { RouterView } from 'vue-router'
 import { initRouter, exitHint } from './router'
 import GlobalFab from './components/GlobalFab.vue'
 import SearchSheet from './components/SearchSheet.vue'
-import { initClientSetting } from './stores/clientSwitchStore'
-import { runStartupUpdateCheck } from './stores/updateStore'
-import { isOpen as searchSheetOpen } from './stores/searchSheetStore'
+import { useClientSwitchStore } from './stores/clientSwitchStore'
+import { useUpdateStore } from './stores/updateStore'
+import { useSearchSheetStore } from './stores/searchSheetStore'
+
+const searchSheet = useSearchSheetStore()
 
 onMounted(() => {
   // ADR-0062：启动时查询当前包支持的 client 引擎列表（full/webview/lynx 各有不同）
-  initClientSetting()
+  useClientSwitchStore().initClientSetting()
   void initRouter()
   // 检查更新（仅自动检查，无手动入口）：启动延迟执行，发现新版本
   // 直接打开强制更新页（无中间提示层）
-  runStartupUpdateCheck()
+  useUpdateStore().runStartupUpdateCheck()
 })
 </script>
 
@@ -37,7 +39,7 @@ onMounted(() => {
          + 弹层根 view z-40 盖过页面内 z-30 分页 FAB（RefreshableList，review P1-1）；
          v-if 卸载 = 关闭即重置（keyword/结果清空，历史保留）。
          返回键：openSearch 时 store 已 registerModal(closeSearch)（ADR-0066 后进先出）。 -->
-    <SearchSheet v-if="searchSheetOpen" />
+    <SearchSheet v-if="searchSheet.isOpen" />
     <!-- 系统返回根路由提示（ADR-0066）：与 webview client 的 exitHint toast 语义一致。
          M3 snackbar 形态：inverse-surface 底 + inverse-on-surface 文字 + 4dp 圆角。
          [lynx:fix] 无全宽盒（ADR-0123）：原生 LynxView hit-testing 不识别 pointer-events，

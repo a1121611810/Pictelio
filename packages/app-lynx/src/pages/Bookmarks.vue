@@ -14,10 +14,12 @@ import type {
   PixivIllustListResponse,
   PixivNovelListResponse,
 } from '../api/types'
-import { currentUser } from '../stores/authStore'
+import { useAuthStore } from '../stores/authStore'
 import { thumbUrl } from '../utils/imageUrl'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
-import { isRestricted } from '../stores/settingsStore'
+import { useSettingsStore } from '../stores/settingsStore'
+
+const isRestricted = useSettingsStore().isRestricted
 import SkeletonImage from '../components/SkeletonImage.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
@@ -25,7 +27,7 @@ import RestrictOverlay from '../components/RestrictOverlay.vue'
 import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
 import RefreshableList from '../components/RefreshableList.vue'
 
-const uid = currentUser.value?.id
+const uid = useAuthStore().currentUser?.id
 if (!uid) {
   void navigate('/login', { replace: true })
 }

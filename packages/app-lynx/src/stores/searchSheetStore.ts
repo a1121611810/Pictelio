@@ -5,52 +5,54 @@
 // 返回键联动（ADR-0066 扩展）：open 时 registerModal(closeSearch)（后进先出，
 // 弹层优先于页面返回），close 时调用注销函数（registerModal 的返回值必须
 // 保存并在关闭时调用）。重复 open 幂等：单例共用同一关闭回调，不重复入栈。
+// Pinia 化（ADR-0139 / spec #337）：setup store——state/actions 移入 defineStore
+// 闭包，逻辑逐字不变（纯重构约束）。注销句柄 unregisterModal 非响应式状态，
+// 保持模块级（per-spec，setup 内 action 仍引用此模块级 let）。
 import { ref } from "vue"
-import { registerModal } from "./modalStack"
+import { defineStore } from "pinia"
+import { useModalStack } from "./modalStack"
 
-const _isOpen = ref(false)
+export const useSearchSheetStore = defineStore("searchSheet", () => {
+  const _isOpen = ref(false)
+  const _prefillKeyword = ref("")
 
-export const isOpen = _isOpen
-
-// ─── 预填词（ADR-0133 决策 2：openSearch(keyword?) 外部注入初始关键词） ───
-// 写入：openSearch(initialKeyword)（无参 = FAB 普通打开，不清不写）；
-// 消费：SearchSheet onMounted 调 consumePrefillKeyword()（一次性：读取并清空）；
-// 兜底：closeSearch 再清——弹层 v-if 卸载=关闭，防「关闭未消费」残留串到下次打开。
-const _prefillKeyword = ref("")
-
-export const prefillKeyword = _prefillKeyword
-
-/** 读取并清空预填词（SearchSheet 挂载时消费；为空 = 无预填） */
-export function consumePrefillKeyword(): string {
-  const word = _prefillKeyword.value
-  _prefillKeyword.value = ""
-  return word
-}
-
-/** registerModal 返回的注销函数：打开时保存，关闭时调用并置空 */
-let unregisterModal: (() => void) | null = null
-
-/**
- * 打开搜索弹层（幂等：已打开时不重复注册）。
- * initialKeyword 传入时写入预填词（搜索弹层挂载后消费）；无参 = 普通打开（FAB 入口，行为不变）。
- */
-export function openSearch(initialKeyword?: string): void {
-  if (_isOpen.value) return
-  if (initialKeyword !== undefined) {
-    _prefillKeyword.value = initialKeyword
+  /**
+   * 打开搜索弹层（幂等：已打开时不重复注册）。
+   * initialKeyword 传入时写入预填词（搜索弹层挂载后消费）；无参 = 普通打开（FAB 入口，行为不变）。
+   */
+  function openSearch(initialKeyword?: string): void {
+    if (_isOpen.value) return
+    if (initialKeyword !== undefined) {
+      _prefillKeyword.value = initialKeyword
+    }
+    _isOpen.value = true
+    unregisterModal = useModalStack().registerModal(closeSearch)
   }
-  _isOpen.value = true
-  unregisterModal = registerModal(closeSearch)
-}
 
-/**
- * 关闭搜索弹层（幂等：已关闭时 no-op）。
- * 所有关闭路径收敛于此：遮罩 @tap / 面板 × / 点结果行跳详情 /
- * 返回键（modalStack 回调，closeTopModal 弹出后调用）。
- */
-export function closeSearch(): void {
-  _isOpen.value = false
-  _prefillKeyword.value = ""
-  unregisterModal?.()
-  unregisterModal = null
-}
+  /**
+   * 关闭搜索弹层（幂等：已关闭时 no-op）。
+   * 所有关闭路径收敛于此：遮罩 @tap / 面板 × / 点结果行跳详情 /
+   * 返回键（modalStack 回调，closeTopModal 弹出后调用）。
+   */
+  function closeSearch(): void {
+    _isOpen.value = false
+    _prefillKeyword.value = ""
+    unregisterModal?.()
+    unregisterModal = null
+  }
+
+  /** 读取并清空预填词（SearchSheet 挂载时消费；为空 = 无预填） */
+  function consumePrefillKeyword(): string {
+    const word = _prefillKeyword.value
+    _prefillKeyword.value = ""
+    return word
+  }
+
+  return { isOpen: _isOpen, prefillKeyword: _prefillKeyword, openSearch, closeSearch, consumePrefillKeyword }
+})
+
+// ─── 非响应式状态：注销句柄（per-spec，保留模块级）───
+// registerModal 返回的注销函数：打开时保存，关闭时调用并置空。
+// 不放进 setup 闭包——它是「最近一次 registerModal 的产物」，跨调用持有同一引用；
+// setup 内每次 useSearchSheetStore() 是单例返回，模块级 let 与之等价（per-instance）。
+let unregisterModal: (() => void) | null = null

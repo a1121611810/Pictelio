@@ -7,7 +7,9 @@ import { currentParams, goBack, requestBack, registerBackGuard } from '../router
 import { loadNovelDetail, fetchNovelText, loadNovelSeries, addNovelWatchlist } from '../api/novel'
 import type { PixivNovel } from '../api/types'
 import { presentError } from '../utils/errorPresentation'
-import { isRestricted } from '../stores/settingsStore'
+import { useSettingsStore } from '../stores/settingsStore'
+
+const isRestricted = useSettingsStore().isRestricted
 import { isDismissed, markDismissed, setWatchState } from '../stores/watchlistStore'
 import {
   createWatchlistPrompt,

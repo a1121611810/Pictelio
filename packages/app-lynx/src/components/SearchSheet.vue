@@ -20,13 +20,18 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { navigate } from '../router'
 import type { SearchState, SearchResultItem } from '../primitives/useSearch'
 import { useSearch } from '../primitives/useSearch'
-import { history, loadHistory, addHistory, removeHistory, clearHistory } from '../stores/searchHistoryStore'
-import { closeSearch, consumePrefillKeyword } from '../stores/searchSheetStore'
-import { isRestricted } from '../stores/settingsStore'
+import { useSearchHistoryStore } from '../stores/searchHistoryStore'
+import { useSearchSheetStore } from '../stores/searchSheetStore'
+import { useSettingsStore } from '../stores/settingsStore'
+
+const isRestricted = useSettingsStore().isRestricted
 import { thumbUrl } from '../utils/imageUrl'
 import { SEARCH_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import SkeletonImage from './SkeletonImage.vue'
 import type { SearchScope, SearchSort } from '../api/types'
+
+const searchHistory = useSearchHistoryStore()
+const searchSheet = useSearchSheetStore()
 
 const controller = useSearch()
 // state 是 getter 返回的只读快照 → 用 computed 包裹保持响应式（模板自动解包）
@@ -94,29 +99,29 @@ function onInput(data: LynxInputEvent): void {
 // ── 搜索历史提交点（glossary「搜索提交点」：仅三处写入，输入中间态不写） ──
 /** 提交点① 回车确认（soft keyboard confirm / 硬件 Enter → lynx confirm 事件） */
 function onConfirm(): void {
-  addHistory(keyword.value)
+  searchHistory.addHistory(keyword.value)
 }
 
 /** 提交点② 点击历史词条：设词 + 写历史 + 立即搜（不 debounce，搜索点 = 点选即搜） */
 function onHistoryTap(word: string): void {
   keyword.value = word
-  addHistory(word)
+  searchHistory.addHistory(word)
   controller.search(word)
 }
 
 /** 提交点③ 点击结果行：写历史 + 关层 + 跳详情（回原页位置感由导航历史保持） */
 function onResultTap(row: SearchResultItem): void {
-  addHistory(keyword.value)
-  closeSearch()
+  searchHistory.addHistory(keyword.value)
+  searchSheet.closeSearch()
   void navigate(row.type === 'novel' ? `/novel/${row.entity.id}` : `/illust/${row.entity.id}`)
 }
 
 function onHistoryRemove(word: string): void {
-  removeHistory(word)
+  searchHistory.removeHistory(word)
 }
 
 function onClearHistory(): void {
-  clearHistory()
+  searchHistory.clearHistory()
 }
 
 // 输入清除 ×：keyword 清空 → controller.search('') 立即清空回 idle（spec US8）
@@ -141,16 +146,16 @@ function onRetry(): void {
 
 // 统一关闭路径：遮罩 / × 都走 closeSearch()（返回键由 modalStack 回调同一函数）
 function onClose(): void {
-  closeSearch()
+  searchSheet.closeSearch()
 }
 
 onMounted(() => {
   // 打开即拉历史（D3：首拉持久化历史；chips 展示）
-  void loadHistory()
+  void searchHistory.loadHistory()
   // 预填词（ADR-0133 决策 2/5）：标签点击进入——一次性消费（读取即清），
   // 词入 keyword 后走同一 controller.search 链（即输即搜），且**不写搜索历史**
   // （程序化唤起 ≠ 提交点；对齐 webview SearchableTag 的 hydration 路径行为）。
-  const prefill = consumePrefillKeyword()
+  const prefill = searchSheet.consumePrefillKeyword()
   if (prefill) {
     keyword.value = prefill
     controller.search(prefill)
@@ -226,16 +231,16 @@ onBeforeUnmount(() => {
         <view class="flex flex-row items-center justify-between">
           <text class="text-label-large text-surface-on">搜索历史</text>
           <text
-            v-if="history.length > 0"
+            v-if="searchHistory.history.length > 0"
             class="text-label-medium text-primary"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="SEARCH_A11Y_LABELS.clearHistory"
             @tap="onClearHistory"
           >清空</text>
         </view>
-        <view v-if="history.length > 0" class="flex flex-row flex-wrap gap-2 mt-2">
+        <view v-if="searchHistory.history.length > 0" class="flex flex-row flex-wrap gap-2 mt-2">
           <view
-            v-for="w in history"
+            v-for="w in searchHistory.history"
             :key="w"
             class="h-[10.667vw] px-4 bg-surface-container-high rounded-[var(--md-shape-full)] flex items-center"
             @tap="onHistoryTap(w)"

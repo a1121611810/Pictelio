@@ -1,7 +1,12 @@
 // ─── 更新编排层单测（updateStore） ───
 // seam：runStartupUpdateCheck 的导航决策（注入 fake checker + fake timers）、
 // openReleasePage / exitUpdatePage 的原生桥分发（mock getNativeModules）。
+// Pinia 化（ADR-0139/T2）：setActivePinia(createPinia()) 每用例隔离（替代模块级 ref
+// 残留）；断言语义不变，仅取用方式变换（updateResult.value → store.updateResult）。
+// _updateCheckDisabled / setUpdateCheckDisabledForTest / isUpdateCheckDisabled
+// 仍保留为模块级导出（spec 明示：测试钩子不属于响应式状态）。
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { setActivePinia, createPinia } from "pinia"
 
 const mocks = vi.hoisted(() => ({
   checkForUpdate: vi.fn(),
@@ -23,14 +28,7 @@ vi.mock("../api/client", () => ({
   isNativeMode: () => !!mocks.getNativeModules()?.PictelioApp,
 }))
 
-import {
-  runStartupUpdateCheck,
-  openReleasePage,
-  exitUpdatePage,
-  updateResult,
-  createUpdateFetchImpl,
-  setUpdateCheckDisabledForTest,
-} from "./updateStore"
+import { useUpdateStore, setUpdateCheckDisabledForTest } from "./updateStore"
 
 const baseResult = {
   hasUpdate: false,
@@ -43,6 +41,7 @@ describe("updateStore.runStartupUpdateCheck", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.useFakeTimers()
+    setActivePinia(createPinia())
   })
 
   afterEach(() => {
@@ -57,7 +56,7 @@ describe("updateStore.runStartupUpdateCheck", () => {
       latestReleaseUrl: "https://github.com/a1121611810/Pictelio/releases/tag/v9.9.9",
     })
 
-    runStartupUpdateCheck()
+    useUpdateStore().runStartupUpdateCheck()
     await vi.advanceTimersByTimeAsync(500)
 
     expect(mocks.checkForUpdate).toHaveBeenCalledTimes(1)
@@ -68,7 +67,7 @@ describe("updateStore.runStartupUpdateCheck", () => {
   it("无更新 → 不导航、不清历史栈", async () => {
     mocks.checkForUpdate.mockResolvedValue({ ...baseResult, latestVersion: "4.5.0" })
 
-    runStartupUpdateCheck()
+    useUpdateStore().runStartupUpdateCheck()
     await vi.advanceTimersByTimeAsync(500)
 
     expect(mocks.navigate).not.toHaveBeenCalled()
@@ -79,7 +78,7 @@ describe("updateStore.runStartupUpdateCheck", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
     mocks.checkForUpdate.mockResolvedValue({ ...baseResult, error: "HTTP 404" })
 
-    runStartupUpdateCheck()
+    useUpdateStore().runStartupUpdateCheck()
     await vi.advanceTimersByTimeAsync(500)
 
     expect(mocks.navigate).not.toHaveBeenCalled()
@@ -89,8 +88,9 @@ describe("updateStore.runStartupUpdateCheck", () => {
   it("重复调用只触发一次检查（isChecking 防抖）", async () => {
     mocks.checkForUpdate.mockResolvedValue({ ...baseResult })
 
-    runStartupUpdateCheck()
-    runStartupUpdateCheck()
+    const store = useUpdateStore()
+    store.runStartupUpdateCheck()
+    store.runStartupUpdateCheck()
     await vi.advanceTimersByTimeAsync(500)
 
     expect(mocks.checkForUpdate).toHaveBeenCalledTimes(1)
@@ -100,7 +100,7 @@ describe("updateStore.runStartupUpdateCheck", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
     setUpdateCheckDisabledForTest(true)
 
-    runStartupUpdateCheck()
+    useUpdateStore().runStartupUpdateCheck()
     await vi.advanceTimersByTimeAsync(500)
 
     // 开关开启：完全不走原本逻辑（checkForUpdate 不被调用、不导航 /update）
@@ -118,8 +118,7 @@ describe("updateStore.runStartupUpdateCheck", () => {
 describe("updateStore.openReleasePage", () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    // 模块级 ref 跨用例残留：清空上次检查结果（否则 openReleasePage 读到旧 URL）
-    updateResult.value = null
+    setActivePinia(createPinia())
   })
 
   afterEach(() => {
@@ -138,10 +137,10 @@ describe("updateStore.openReleasePage", () => {
     vi.useFakeTimers()
 
     // 先跑一次启动检查填充 updateResult（openReleasePage 消费它）
-    runStartupUpdateCheck()
+    useUpdateStore().runStartupUpdateCheck()
     await vi.advanceTimersByTimeAsync(500)
 
-    openReleasePage()
+    useUpdateStore().openReleasePage()
 
     expect(openUrl).toHaveBeenCalledWith(
       "https://github.com/a1121611810/Pictelio/releases/tag/v9.9.9",
@@ -154,7 +153,7 @@ describe("updateStore.openReleasePage", () => {
     const openUrl = vi.fn()
     mocks.getNativeModules.mockReturnValue({ PictelioApp: { openUrl } })
 
-    openReleasePage()
+    useUpdateStore().openReleasePage()
 
     expect(openUrl).not.toHaveBeenCalled()
     expect(warnSpy).toHaveBeenCalled()
@@ -172,10 +171,10 @@ describe("updateStore.openReleasePage", () => {
     })
     vi.useFakeTimers()
 
-    runStartupUpdateCheck()
+    useUpdateStore().runStartupUpdateCheck()
     await vi.advanceTimersByTimeAsync(500)
 
-    openReleasePage()
+    useUpdateStore().openReleasePage()
 
     expect(warnSpy).toHaveBeenCalled()
     warnSpy.mockRestore()
@@ -185,13 +184,14 @@ describe("updateStore.openReleasePage", () => {
 describe("updateStore.exitUpdatePage", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setActivePinia(createPinia())
   })
 
   it("原生桥存在 → 调用 exitApp", () => {
     const exitApp = vi.fn()
     mocks.getNativeModules.mockReturnValue({ PictelioApp: { exitApp } })
 
-    exitUpdatePage()
+    useUpdateStore().exitUpdatePage()
 
     expect(exitApp).toHaveBeenCalled()
   })
@@ -200,7 +200,7 @@ describe("updateStore.exitUpdatePage", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
     mocks.getNativeModules.mockReturnValue(undefined)
 
-    exitUpdatePage()
+    useUpdateStore().exitUpdatePage()
 
     expect(warnSpy).toHaveBeenCalled()
     warnSpy.mockRestore()
@@ -210,6 +210,7 @@ describe("updateStore.exitUpdatePage", () => {
 describe("updateStore.createUpdateFetchImpl（原生 httpGet 网络适配）", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setActivePinia(createPinia())
   })
 
   it("原生模式 → httpGet 成功时包装 Response 并解析 JSON body", async () => {
@@ -218,7 +219,9 @@ describe("updateStore.createUpdateFetchImpl（原生 httpGet 网络适配）", (
     })
     mocks.getNativeModules.mockReturnValue({ PictelioApp: { httpGet } })
 
-    const res = await createUpdateFetchImpl()("http://10.0.2.2:8080/version.json" as unknown as URL)
+    const res = await useUpdateStore().createUpdateFetchImpl()(
+      "http://10.0.2.2:8080/version.json" as unknown as URL,
+    )
 
     expect(httpGet).toHaveBeenCalledWith("http://10.0.2.2:8080/version.json", expect.any(Function))
     expect(res.ok).toBe(true)
@@ -235,7 +238,9 @@ describe("updateStore.createUpdateFetchImpl（原生 httpGet 网络适配）", (
     })
     mocks.getNativeModules.mockReturnValue({ PictelioApp: { httpGet } })
 
-    await expect(createUpdateFetchImpl()("http://x" as unknown as URL)).rejects.toThrow("network down")
+    await expect(useUpdateStore().createUpdateFetchImpl()("http://x" as unknown as URL)).rejects.toThrow(
+      "network down",
+    )
   })
 
   it("原生模式 → 非 2xx 状态包装为 ok=false（由 checkForUpdate 判定失败）", async () => {
@@ -244,7 +249,7 @@ describe("updateStore.createUpdateFetchImpl（原生 httpGet 网络适配）", (
     })
     mocks.getNativeModules.mockReturnValue({ PictelioApp: { httpGet } })
 
-    const res = await createUpdateFetchImpl()("http://x" as unknown as URL)
+    const res = await useUpdateStore().createUpdateFetchImpl()("http://x" as unknown as URL)
 
     expect(res.ok).toBe(false)
     expect(res.status).toBe(404)
@@ -253,7 +258,9 @@ describe("updateStore.createUpdateFetchImpl（原生 httpGet 网络适配）", (
   it("原生模式 → 桥缺失 reject", async () => {
     mocks.getNativeModules.mockReturnValue({ PictelioApp: {} })
 
-    await expect(createUpdateFetchImpl()("http://x" as unknown as URL)).rejects.toThrow(/httpGet/)
+    await expect(useUpdateStore().createUpdateFetchImpl()("http://x" as unknown as URL)).rejects.toThrow(
+      /httpGet/,
+    )
   })
 
   it("原生模式 → abort 信号触发时 reject（JS 侧超时兜底）", async () => {
@@ -263,7 +270,7 @@ describe("updateStore.createUpdateFetchImpl（原生 httpGet 网络适配）", (
     mocks.getNativeModules.mockReturnValue({ PictelioApp: { httpGet } })
     const controller = new AbortController()
 
-    const p = createUpdateFetchImpl()("http://x" as unknown as URL, { signal: controller.signal })
+    const p = useUpdateStore().createUpdateFetchImpl()("http://x" as unknown as URL, { signal: controller.signal })
     controller.abort()
 
     await expect(p).rejects.toThrow("aborted")
@@ -272,7 +279,7 @@ describe("updateStore.createUpdateFetchImpl（原生 httpGet 网络适配）", (
   it("web 模式（无原生模块）→ 走 requestFetch（不抛桥缺失）", async () => {
     mocks.getNativeModules.mockReturnValue(undefined)
     // web 模式直接返回 requestFetch；测试环境有全局 fetch，调用应成功发起
-    const impl = createUpdateFetchImpl()
+    const impl = useUpdateStore().createUpdateFetchImpl()
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
     // requestFetch 指向 globalThis.fetch——不实际请求，仅验证返回的是 requestFetch 本身
     expect(typeof impl).toBe("function")

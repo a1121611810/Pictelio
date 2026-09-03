@@ -20,8 +20,10 @@ import type { PixivIllust, PixivNovel } from '../api/types'
 import { createMixFeed, type MixFeedItem, type MixFeedSource } from '../primitives/createMixFeed'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { deriveCoverDisplay } from '../utils/coverDisplay'
-import { isRestricted } from '../stores/settingsStore'
-import { isLoggedIn } from '../stores/authStore'
+import { useSettingsStore } from '../stores/settingsStore'
+
+const isRestricted = useSettingsStore().isRestricted
+import { useAuthStore } from '../stores/authStore'
 import { getGlobalFab } from '../stores/globalFab'
 import CarouselSwiper from '../components/CarouselSwiper.vue'
 import RecommendedCover from '../components/RecommendedCover.vue'
@@ -30,7 +32,7 @@ import TagChipRow from '../components/TagChipRow.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
-import { openSearch } from '../stores/searchSheetStore'
+import { useSearchSheetStore } from '../stores/searchSheetStore'
 
 // ─── 时间合并 feed（插画 + 小说，ADR-0115） ───
 // sources 顺序即 mergeByTime 同分 tie-break 优先级：illust 在前。
@@ -163,7 +165,7 @@ function onSlideTap(item: MixFeedItem) {
 // 点击标签 → 全局搜索弹层（ADR-0133）：TagChipRow 只发原始 tag.name（纯展示组件不依赖 store），
 // 页面层接线 openSearch——与 webview SearchableTag「点击即搜」语义一致（预填 + 自动搜索）。
 function onTagTap(name: string) {
-  openSearch(name)
+  useSearchSheetStore().openSearch(name)
 }
 
 // 沉浸式封面图（全 bleed 用大图，退化 medium/square_medium）
@@ -191,14 +193,14 @@ onUnmounted(() => {
 
 // [首帧内容化]（#63）：初始路由为推荐页，组件可能在登录态就绪前被挂载。
 // 首帧 fetch 在 token 恢复前会 401 失败，需补拉（幂等：数据非空/加载中则跳过）。
-watch(isLoggedIn, (loggedIn) => {
+watch(() => useAuthStore().isLoggedIn, (loggedIn) => {
   if (loggedIn && feed.items().length === 0) {
     void refreshFeed()
   }
 })
 
 onActivated(() => {
-  if (feed.items().length === 0 && !feed.loading() && isLoggedIn.value) {
+  if (feed.items().length === 0 && !feed.loading() && useAuthStore().isLoggedIn) {
     void refreshFeed()
   }
 })

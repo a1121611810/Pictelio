@@ -3,18 +3,20 @@ import { ref, computed, onMounted } from 'vue'
 import { currentParams, navigate, goBack } from '../router'
 import { loadDetail } from '../api/illust'
 import { followUser, unfollowUser } from '../api/user'
-import { currentUser } from '../stores/authStore'
+import { useAuthStore } from '../stores/authStore'
 import type { PixivIllust } from '../api/types'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { resolvePageSrcs } from '../utils/imageQuality'
 import { detailImageHeightVw } from '../utils/imageLayout'
 import { presentError } from '../utils/errorPresentation'
-import { detailQuality } from '../stores/settingsStore'
+import { useSettingsStore } from '../stores/settingsStore'
+
+const detailQuality = useSettingsStore().detailQuality
 import BookmarkButton from '../components/BookmarkButton.vue'
 import CommentOverlay from '../components/CommentOverlay.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import UgoiraViewer from '../components/UgoiraViewer.vue'
-import { openSearch } from '../stores/searchSheetStore'
+import { useSearchSheetStore } from '../stores/searchSheetStore'
 
 const illust = ref<PixivIllust | null>(null)
 const loading = ref(true)
@@ -28,7 +30,7 @@ const following = ref(false)
 const followBusy = ref(false)
 const followError = ref('') // 独立于 errorMsg——避免关注失败击穿已加载的详情页
 
-const isSelfAuthor = computed(() => currentUser.value?.id === illust.value?.user.id)
+const isSelfAuthor = computed(() => useAuthStore().currentUser?.id === illust.value?.user.id)
 
 async function toggleFollowAuthor() {
   if (followBusy.value || !illust.value) return
@@ -219,7 +221,7 @@ onMounted(async () => {
             v-for="tag in illust.tags.slice(0, 8)"
             :key="tag.name"
             class="h-[8.533vw] px-2 m-1 border border-outline rounded-[var(--md-shape-small)] flex items-center justify-center bg-surface"
-            @tap.stop="openSearch(tag.name)"
+            @tap.stop="useSearchSheetStore().openSearch(tag.name)"
           >
             <text class="text-label-large text-surface-on-variant">
               #{{ tag.translated_name || tag.name }}

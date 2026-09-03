@@ -18,7 +18,9 @@ import type {
 import { thumbUrl, proxyImageUrl } from '../utils/imageUrl'
 import { presentError } from '../utils/errorPresentation'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
-import { isRestricted } from '../stores/settingsStore'
+import { useSettingsStore } from '../stores/settingsStore'
+
+const isRestricted = useSettingsStore().isRestricted
 import SkeletonImage from '../components/SkeletonImage.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'

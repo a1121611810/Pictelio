@@ -4,15 +4,22 @@ defineOptions({ name: 'me' })
 import { ref, onMounted, onUnmounted } from 'vue'
 import { navigate, resetHistory, ensureAuth } from '../router'
 import { getGlobalFab } from '../stores/globalFab'
-import { currentUser, logout, isLoggedIn } from '../stores/authStore'
-import { selectedClient, switchClient, availableKinds, supportsClientSwitch, type ClientKind } from '../stores/clientSwitchStore'
-import { showR18, showR18G, setShowR18, setShowR18G, ugoiraMode, setUgoiraMode, detailQuality, setDetailQuality } from '../stores/settingsStore'
+import { useAuthStore } from '../stores/authStore'
+import { useClientSwitchStore, supportsClientSwitch, type ClientKind } from '../stores/clientSwitchStore'
+import { useSettingsStore } from '../stores/settingsStore'
 import type { ImageQuality } from '../utils/imageQuality'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { ME_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import GlassCard from '../components/GlassCard.vue'
 
+const auth = useAuthStore()
+const settings = useSettingsStore()
+const showR18 = settings.showR18
+const showR18G = settings.showR18G
+const ugoiraMode = settings.ugoiraMode
+const detailQuality = settings.detailQuality
 const switching = ref(false)
+const clientSwitch = useClientSwitchStore()
 
 // ─── 全局放射 FAB 桥（ADR-0120）：注册空动作（内环空 = 仅外环导航），卸载时注销 ───
 let unreg: (() => void) | undefined
@@ -26,7 +33,7 @@ onUnmounted(() => {
 })
 
 function onLogout() {
-  logout()
+  auth.logout()
   // [lynx:fix] 登出 = 会话结束：清历史栈 + replace 导航，登录页不应被"返回"（ADR-0049）
   resetHistory()
   void navigate('/login', { replace: true })
@@ -41,9 +48,9 @@ function openWatchlist() {
 }
 
 function pickClient(kind: ClientKind) {
-  if (selectedClient.value === kind || switching.value) return
+  if (clientSwitch.selectedClient === kind || switching.value) return
   switching.value = true
-  switchClient(kind)
+  clientSwitch.switchClient(kind)
   // switchClient 内部触发重启（原生桥或 reload），此处仅兜底
 }
 
@@ -54,27 +61,27 @@ const ugoiraConfirm = ref(false)
 function pickUgoiraMode(m: 'fflate' | 'range') {
   if (m === 'fflate') {
     ugoiraConfirm.value = false
-    setUgoiraMode('fflate')
+    settings.setUgoiraMode('fflate')
   } else {
     ugoiraConfirm.value = true // 显示二次确认（告知原生端限制）
   }
 }
 
 function confirmUgoiraRange() {
-  setUgoiraMode('range')
+  settings.setUgoiraMode('range')
   ugoiraConfirm.value = false
 }
 
 // issue #148 T2：详情画质档位（medium=标准 / large=高清 / original=原图）
 function pickDetailQuality(q: ImageQuality) {
-  setDetailQuality(q)
+  settings.setDetailQuality(q)
 }
 
 function toggleR18() {
-  setShowR18(!showR18.value)
+  settings.setShowR18(!showR18.value)
 }
 function toggleR18G() {
-  setShowR18G(!showR18G.value)
+  settings.setShowR18G(!showR18G.value)
 }
 </script>
 
@@ -104,20 +111,20 @@ function toggleR18G() {
     <scroll-view scroll-orientation="vertical" class="w-full flex-1">
       <!-- 账户组：用户信息 + 收藏入口（GlassCard = M3 elevated card） -->
       <GlassCard class="mt-3 mx-3 p-4">
-        <view v-if="currentUser" class="flex flex-row items-center pb-4 border-b-[1px] border-b-outline-variant">
+        <view v-if="auth.currentUser" class="flex flex-row items-center pb-4 border-b-[1px] border-b-outline-variant">
           <image
             class="w-[14.933vw] h-[14.933vw] rounded-full bg-surface-container-high"
             :src="
               proxyImageUrl(
-                currentUser.profile_image_urls?.px_170x170 ||
-                  currentUser.profile_image_urls?.medium ||
+                auth.currentUser.profile_image_urls?.px_170x170 ||
+                  auth.currentUser.profile_image_urls?.medium ||
                   '',
               )
             "
           />
           <view class="ml-4 flex flex-col">
-            <text class="text-headline-small font-bold text-surface-on">{{ currentUser.name }}</text>
-            <text class="text-body-small text-surface-on-variant mt-1">@{{ currentUser.account }}</text>
+            <text class="text-headline-small font-bold text-surface-on">{{ auth.currentUser.name }}</text>
+            <text class="text-body-small text-surface-on-variant mt-1">@{{ auth.currentUser.account }}</text>
           </view>
         </view>
         <view
@@ -142,7 +149,7 @@ function toggleR18G() {
       </GlassCard>
 
       <!-- 客户端组（ADR-0062：仅 full 包同时含 webview+lynx 时渲染；独立包隐藏） -->
-      <view v-if="supportsClientSwitch(availableKinds)" class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+      <view v-if="supportsClientSwitch(clientSwitch.availableKinds)" class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
         <text
           class="text-title-small font-medium text-surface-on"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
@@ -168,9 +175,9 @@ function toggleR18G() {
           <!-- M3 radio button：选中 primary 实心 + on-primary 圆点，未选 outline 空心 -->
           <view
             class="w-[5.333vw] h-[5.333vw] rounded-full flex items-center justify-center active:bg-layer-pressed-on-surface"
-            :class="selectedClient === 'webview' ? 'bg-primary' : 'border-2 border-outline'"
+            :class="clientSwitch.selectedClient === 'webview' ? 'bg-primary' : 'border-2 border-outline'"
           >
-            <view v-if="selectedClient === 'webview'" class="w-[2.667vw] h-[2.667vw] rounded-full bg-primary-on" />
+            <view v-if="clientSwitch.selectedClient === 'webview'" class="w-[2.667vw] h-[2.667vw] rounded-full bg-primary-on" />
           </view>
         </view>
         <view
@@ -190,9 +197,9 @@ function toggleR18G() {
           </view>
           <view
             class="w-[5.333vw] h-[5.333vw] rounded-full flex items-center justify-center active:bg-layer-pressed-on-surface"
-            :class="selectedClient === 'lynx' ? 'bg-primary' : 'border-2 border-outline'"
+            :class="clientSwitch.selectedClient === 'lynx' ? 'bg-primary' : 'border-2 border-outline'"
           >
-            <view v-if="selectedClient === 'lynx'" class="w-[2.667vw] h-[2.667vw] rounded-full bg-primary-on" />
+            <view v-if="clientSwitch.selectedClient === 'lynx'" class="w-[2.667vw] h-[2.667vw] rounded-full bg-primary-on" />
           </view>
         </view>
         <text v-if="switching" class="text-body-small text-primary mt-3">正在重启切换…</text>

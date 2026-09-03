@@ -4,16 +4,16 @@
 //   SharedPreferences("CapacitorStorage") 的 "pictelio_client_kind"（与
 //   @capacitor/preferences 同文件，webview 侧可读同一开关）+ restart 重启进程
 // - Web 模式：localStorage 占位 + location.reload()
+// Pinia 化（ADR-0139 / spec #337）：setup store——state/actions 移入 defineStore
+// 闭包，逻辑逐字不变（纯重构约束）。normalizeKinds / supportsClientSwitch
+// 无状态、不占 store，保留为模块级导出（消费方模板仍在用 supportsClientSwitch）。
 import { ref } from "vue"
+import { defineStore } from "pinia"
 
 export type ClientKind = "webview" | "lynx"
 
 const STORAGE_KEY = "pictelio_client_kind"
 const CURRENT: ClientKind = "lynx" // app-lynx 自身是 lynx client
-
-const _selected = ref<ClientKind>(CURRENT)
-
-export const selectedClient = _selected
 
 /** 原生 App Module（#51：NativeModules.PictelioApp）——web-core 下不存在 → null */
 function nativeAppModule() {
@@ -31,9 +31,6 @@ interface PictelioAppModule {
   restart(callback: (err: string | null) => void): void
 }
 
-/** 当前包支持的 client 引擎列表（ADR-0062）；null = 未知（保守视为双引擎） */
-export const availableKinds = ref<ClientKind[] | null>(null)
-
 /** 过滤 Native 返回的 client 列表为合法 ClientKind（ADR-0062）；非法值剔除 */
 export function normalizeKinds(raw: unknown): ClientKind[] | null {
   if (!Array.isArray(raw)) return null
@@ -46,80 +43,96 @@ export function supportsClientSwitch(kinds: ClientKind[] | null): boolean {
   return kinds === null || (kinds.includes("webview") && kinds.includes("lynx"))
 }
 
-export function initClientSetting(): void {
-  const mod = nativeAppModule() as PictelioAppModule | null
-  if (mod) {
-    // 原生模式：从 Native 读当前开关 + 包能力列表（异步回调）
-    try {
-      mod.getClientKinds((kinds, err) => {
-        if (!err) {
-          availableKinds.value = normalizeKinds(kinds)
-        }
-      })
-    } catch {
-      /* 忽略：能力查询失败按未知处理 */
+export const useClientSwitchStore = defineStore("clientSwitch", () => {
+  // state（私有 ref，不暴露给消费者直接写——通过 actions 改）
+  const _selected = ref<ClientKind>(CURRENT)
+  const _availableKinds = ref<ClientKind[] | null>(null)
+
+  function initClientSetting(): void {
+    const mod = nativeAppModule() as PictelioAppModule | null
+    if (mod) {
+      // 原生模式：从 Native 读当前开关 + 包能力列表（异步回调）
+      try {
+        mod.getClientKinds((kinds, err) => {
+          if (!err) {
+            _availableKinds.value = normalizeKinds(kinds)
+          }
+        })
+      } catch {
+        /* 忽略：能力查询失败按未知处理 */
+      }
+      try {
+        mod.getClientKind((kind, err) => {
+          _selected.value = !err && (kind === "webview" || kind === "lynx") ? kind : CURRENT
+        })
+      } catch {
+        _selected.value = CURRENT
+      }
+      return
     }
+    // Web 模式（现状）：localStorage 占位
     try {
-      mod.getClientKind((kind, err) => {
-        _selected.value = !err && (kind === "webview" || kind === "lynx") ? kind : CURRENT
-      })
+      const raw = globalThis.localStorage?.getItem(STORAGE_KEY)
+      _selected.value = raw === "webview" || raw === "lynx" ? raw : CURRENT
     } catch {
       _selected.value = CURRENT
     }
-    return
   }
-  // Web 模式（现状）：localStorage 占位
-  try {
-    const raw = globalThis.localStorage?.getItem(STORAGE_KEY)
-    _selected.value = raw === "webview" || raw === "lynx" ? raw : CURRENT
-  } catch {
-    _selected.value = CURRENT
-  }
-}
 
-/** 保存选择并重启：原生 Native 落盘 + 进程重启；Web reload（#51） */
-export function switchClient(kind: ClientKind): void {
-  const mod = nativeAppModule() as PictelioAppModule | null
-  if (mod) {
-    try {
-      mod.setClientKind(kind, (err) => {
-        if (err) {
-          console.warn("[clientSwitchStore] setClientKind 失败", err)
-          return
-        }
-        mod.restart((err2) => {
-          if (err2) {
-            console.warn("[clientSwitchStore] restart 失败", err2)
+  /** 保存选择并重启：原生 Native 落盘 + 进程重启；Web reload（#51） */
+  function switchClient(kind: ClientKind): void {
+    const mod = nativeAppModule() as PictelioAppModule | null
+    if (mod) {
+      try {
+        mod.setClientKind(kind, (err) => {
+          if (err) {
+            console.warn("[clientSwitchStore] setClientKind 失败", err)
+            return
           }
+          mod.restart((err2) => {
+            if (err2) {
+              console.warn("[clientSwitchStore] restart 失败", err2)
+            }
+          })
         })
-      })
-    } catch (e) {
-      console.warn("[clientSwitchStore] 原生切换失败", e)
+      } catch (e) {
+        console.warn("[clientSwitchStore] 原生切换失败", e)
+      }
+      _selected.value = kind
+      return
+    }
+    // Web 模式（现状）
+    try {
+      globalThis.localStorage?.setItem(STORAGE_KEY, kind)
+    } catch {
+      /* ignore */
     }
     _selected.value = kind
-    return
+    restartClient()
   }
-  // Web 模式（现状）
-  try {
-    globalThis.localStorage?.setItem(STORAGE_KEY, kind)
-  } catch {
-    /* ignore */
-  }
-  _selected.value = kind
-  restartClient()
-}
 
-export function restartClient(): void {
-  // 原生模式：T7 通过 Native Module 调用 App.restart()
-  const nativeRestart = (globalThis as Record<string, unknown>).__lynxRestartClient
-  if (typeof nativeRestart === "function") {
-    ;(nativeRestart as () => void)()
-    return
+  function restartClient(): void {
+    // 原生模式：T7 通过 Native Module 调用 App.restart()
+    const nativeRestart = (globalThis as Record<string, unknown>).__lynxRestartClient
+    if (typeof nativeRestart === "function") {
+      ;(nativeRestart as () => void)()
+      return
+    }
+    // Web 模式（Lynx for Web）：重载当前页面，宿主启动逻辑按设置分发
+    try {
+      globalThis.location?.reload()
+    } catch {
+      /* ignore */
+    }
   }
-  // Web 模式（Lynx for Web）：重载当前页面，宿主启动逻辑按设置分发
-  try {
-    globalThis.location?.reload()
-  } catch {
-    /* ignore */
+
+  return {
+    // getters（公开 ref，模板仍可 .value 解包）
+    selectedClient: _selected,
+    availableKinds: _availableKinds,
+    // actions
+    initClientSetting,
+    switchClient,
+    restartClient,
   }
-}
+})

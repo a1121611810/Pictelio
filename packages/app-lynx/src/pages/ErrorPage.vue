@@ -2,7 +2,7 @@
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）；错误页不在 include 白名单，每次进入全新
 defineOptions({ name: 'error' })
 import { navigate, resetHistory } from '../router'
-import { logout } from '../stores/authStore'
+import { useAuthStore } from '../stores/authStore'
 import { fatalError, presentError } from '../utils/errorPresentation'
 import { ERROR_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 
@@ -11,7 +11,7 @@ import { ERROR_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 //   backBehavior: 'exit' 直接退出应用（ADR-0066，与强制更新页一致），不可回退到已失效的会话页面。
 // - 按钮回登录：logout + 清历史栈 + replace（登录页不应被"返回"，ADR-0049）+ 清理 fatalError 残留
 function backToLogin() {
-  logout()
+  useAuthStore().logout()
   resetHistory()
   fatalError.value = null
   void navigate('/login', { replace: true })

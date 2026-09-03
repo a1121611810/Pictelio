@@ -5,7 +5,7 @@
 // 删除权限在渲染层判定：currentUser.id === comment.user.id 时显示删除（删除中置灰 + 「删除中…」）。
 import { computed } from 'vue'
 import type { PixivComment, PixivCommentParent } from '../api/types'
-import { currentUser } from '../stores/authStore'
+import { useAuthStore } from '../stores/authStore'
 import { proxyImageUrl } from '../utils/imageUrl'
 import SkeletonImage from './SkeletonImage.vue'
 
@@ -51,7 +51,7 @@ const parent = computed<PixivCommentParent | null>(() => {
 const avatarUrl = computed(() => proxyImageUrl(props.comment.user.profile_image_urls?.medium || ''))
 
 // 删除权限：仅本人可见（渲染层判定；currentUser 可能为 null）
-const isMine = computed(() => currentUser.value?.id === props.comment.user.id)
+const isMine = computed(() => useAuthStore().currentUser?.id === props.comment.user.id)
 </script>
 
 <template>

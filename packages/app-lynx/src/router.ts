@@ -16,9 +16,9 @@ import {
 } from 'vue-router'
 import { evaluateBackRoute, createBackGuardRegistry, runBackGuards, hasBackEntryIn, decideRequiresAuth, type BackGuard } from './routerCore'
 import { isNativeMode, getNativeModules } from './api/client'
-import { isLoggedIn, restoreToken, registerUnauthorizedHandler, currentUser } from './stores/authStore'
-import { loadSettings } from './stores/settingsStore'
-import { hasOpenModal, closeTopModal } from './stores/modalStack'
+import { useAuthStore } from './stores/authStore'
+import { useSettingsStore } from './stores/settingsStore'
+import { useModalStack } from './stores/modalStack'
 import { registerSessionErrorHandler } from './utils/errorPresentation'
 
 /** 首帧/栈空回退目标（ADR-0049）：初始路由 = 推荐页（首帧内容化） */
@@ -104,7 +104,7 @@ export function markBootstrapDone(): void {
 }
 
 router.beforeEach((to) => {
-  const decision = decideRequiresAuth(Boolean(to.meta.requiresAuth), _bootstrapping, _sessionCleared, isLoggedIn.value)
+  const decision = decideRequiresAuth(Boolean(to.meta.requiresAuth), _bootstrapping, _sessionCleared, useAuthStore().isLoggedIn)
   if (decision === true) return true
   return decision
 })
@@ -183,9 +183,10 @@ export function markSessionEstablished(): void {
 
 /** 未登录守卫：保证进入受保护页面前完成 token 恢复（页面自理登录态，守卫兜底收敛） */
 export async function ensureAuth(): Promise<boolean> {
-  if (isLoggedIn.value) return true
+  const auth = useAuthStore()
+  if (auth.isLoggedIn) return true
   if (isNativeMode()) registerBenchNavHandler()
-  const ok = await restoreToken()
+  const ok = await auth.restoreToken()
   if (!ok) navigate('/login', { replace: true })
   return ok
 }
@@ -257,7 +258,7 @@ function handleSystemBack(): void {
   // ② back-guard 拦截（§US3）→ intercepted（守卫消费本次返回，不动历史栈）
   // ③ 既有 ADR-0066 逻辑：backBehavior 'exit' / 历史栈 pop / 根路由双击退出
   const action = evaluateBackRoute({
-    hasOpenModal: hasOpenModal(),
+    hasOpenModal: useModalStack().hasOpenModal(),
     runGuards: () => runBackGuards(backGuardRegistry.guards()),
     behavior: router.currentRoute.value.meta.backBehavior,
     // 「能否返回」= 镜像栈 ∧ 队列探测（见 hasBackEntry；登出后=提示/双击退出）
@@ -268,7 +269,7 @@ function handleSystemBack(): void {
     now: Date.now(),
   })
   if (action === 'close-modal') {
-    closeTopModal()
+    useModalStack().closeTopModal()
     return
   }
   if (action === 'intercepted') {
@@ -337,9 +338,9 @@ function registerBenchNavHandler(): void {
   // 用户系页面（UserHome / FollowList）：需真实 user id，自账 id 从 authStore 运行时解析；
   // 未登录时显式 warn（非静默降级，测试钩子可快速定位）
   const DYNAMIC_TARGETS: Record<string, () => string | null> = {
-    pictelioBenchNavUser: () => (currentUser.value?.id != null ? `/user/${currentUser.value.id}` : null),
+    pictelioBenchNavUser: () => (useAuthStore().currentUser?.id != null ? `/user/${useAuthStore().currentUser!.id}` : null),
     pictelioBenchNavUserfollowing: () =>
-      currentUser.value?.id != null ? `/user/${currentUser.value.id}/following` : null,
+      useAuthStore().currentUser?.id != null ? `/user/${useAuthStore().currentUser!.id}/following` : null,
   }
   for (const [eventName, resolve] of Object.entries(DYNAMIC_TARGETS)) {
     emitter.addListener(eventName, () => {
@@ -360,16 +361,17 @@ if (isNativeMode()) registerBenchNavHandler()
 
 /** 初始化（App 挂载时调用）：注册 401 刷新 + 恢复设置 + 首路由（replace 不入栈） */
 export async function initRouter(): Promise<void> {
-  registerUnauthorizedHandler()
+  const auth = useAuthStore()
+  auth.registerUnauthorizedHandler()
   // 会话失效（401 刷新失败）→ 全屏错误页：清历史栈 + replace 进入（不可回退，meta.backBehavior: 'exit'）
   registerSessionErrorHandler(() => {
     resetHistory()
     void navigate('/error', { replace: true })
   })
   if (isNativeMode()) registerSystemBackHandler()
-  const ok = await restoreToken()
+  const ok = await auth.restoreToken()
   // ADR-0103：账号级设置需 uid 已知（restoreToken 之后）再加载
-  await loadSettings()
+  await useSettingsStore().loadSettings()
   await navigate(ok ? RECOMMENDED_PATH : '/login', { replace: true })
   // 登录态恢复已定局：守卫开始执行鉴权拦截（bootstrap 期放行至此结束）
   markBootstrapDone()

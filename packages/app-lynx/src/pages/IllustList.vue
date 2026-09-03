@@ -8,7 +8,10 @@ import { loadRecommended, loadFollow, loadNext } from '../api/illust'
 import type { PixivIllust, PixivIllustListResponse } from '../api/types'
 import { thumbUrl } from '../utils/imageUrl'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
-import { isRestricted } from '../stores/settingsStore'
+import { useSettingsStore } from '../stores/settingsStore'
+
+const settings = useSettingsStore()
+const isRestricted = settings.isRestricted
 import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
