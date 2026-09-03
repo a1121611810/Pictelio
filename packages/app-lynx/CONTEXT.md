@@ -295,3 +295,29 @@ _Avoid_: 用 React 命名空间式 `main-thread:` 语法（vue-lynx 用 `main-th
 **首屏直出（IFR / instant first render）**【2026-09-02 新增】：
 vue-lynx `pluginVueLynx({ enableIFR: true })` 的主线程同步首屏渲染（双线程白屏消除）；**收益 = 首屏视觉（FCP）**，非交互杠杆（真机 T0/T1 无滚动跟手改善；2026-09-02 用户拍板保留启用，视觉改善确认）。代价 = bundle ×~2.2、TTI 上界 ×1.36（既有调研）。
 _Avoid_: 将 IFR 作为滚动跟手/交互性能手段；关掉它换取 bundle 体积（已拍板保留）
+
+### 路由层（vue-router 迁移）
+
+**内存路由 / 官方 memory history**【2026-09-03 新增，vue-router 迁移】：
+app-lynx 现状的**自研内存路由**（`src/router.ts` `_state` + `_history` + `<component :is>`，路由语义与 vue-router 对齐、无 URL 环境）将迁移为**官方 vue-router `createMemoryHistory()`**（ADR-0066/ADR-0049 语义保持；迁移可行性双端实证见 `docs/research/vue-router-migration-feasibility.md`）。官方特殊性仅两点：初始位置为 nowhere（须手动指定**首启动点**）+ 无 URL 环境；memory 下 `history.state` 是**每条目可携带的数据**（`push(to, data?)` 第二参数），不是浏览器 `{back, current, forward}` 结构。_Avoid_: 继续维护自研路由、把 RouterView 空白归因 vue-router 兼容性（根因 = kebab-case 陷阱，见下）
+
+**首帧内容化（first-frame content）**【2026-09-03 新增，vue-router 迁移】：
+启动首帧直接渲染推荐页（骨架屏）、不等登录态恢复（#61/#63）；未登录由 initRouter 收敛 replace 到 /login（不入栈）。迁移后 = 模块顶层同步 `router.replace('/recommended')`（memory history 无自动初始导航，此即**首启动点**）。_Avoid_: 首帧前 await restoreToken（登录页闪屏回归）、用 push 定起点（登录页被返回可达）
+
+**返回裁决链（back decision chain）**【2026-09-03 新增】：
+系统返回的逐级裁决：**modalStack 弹层 → 返回守卫 → `meta.backBehavior:'exit'` → `hasBackEntry()` 有历史则 `router.back()` → 无历史提示「再按一次退出应用」+ 2s 窗口 exit**。入口 = 系统返回桥（原生 `LynxActivity` `OnBackPressedDispatcher`，返回键/侧滑同路径 → 全局事件 `pictelioBack` → JS `handleSystemBack`；ADR-0066，迁移原生侧不动）。旧等价物 `evaluateBackRoute`（routerCore 纯函数）顺序不变，仅③④实现来源换 vue-router 等价物。_Avoid_: 重排裁决顺序（modalStack 最前；exit 页不允许回退到已失效会话）
+
+**返回守卫（back-guard）**【2026-09-03 新增，§US3 语义保持】：
+页面级返回拦截注册表：`registerBackGuard(guard)`，guard 返回 true = 本次返回已被页面消费（路由层不再回退）——如小说详情页追更询问。`requestBack()`（页内返回按钮）与系统返回共用同一守卫链；守卫抛错 fail-open（按未拦截处理，不卡死返回键）。迁移后 API 原样保留（shim 页面调用面）。_Avoid_: 把询问弹窗当 modalStack 弹层（弹层先于守卫关闭，语义不同）
+
+**hasBackEntry()**【2026-09-03 新增，同日 code-review P1-2 修订】：
+「能否返回」= **会话镜像栈非空 ∧ 队列探测（`hasBackEntryIn`：`history.go(-1, false)` 静默移动指针 + `location` 比对 + `go(1, false)` 还原；`triggerListeners=false` 不触发监听/守卫，无副作用）**。镜像栈（`_sessionStack`，会话级）为决策主源——`resetHistory`/`markSessionEstablished` 物理清空（承载「清栈」语义：登出→重登录后旧队列条目不可经返回键进入）；队列探测为镜像漂移看门狗。_Avoid_: 用 `history.state` 探测、直调 `router.back()` 不判历史（根路由 no-op，「再按一次退出」语义丢失）、纯官方 API 探测当唯一判据（重登录后误判旧会话条目，P1-2）
+
+**会话清除（session clear / canBack）**【2026-09-03 新增，同日 P1-2 修订】：
+登出/会话失效后「业务页不可达」的语义等价物：**forward** 由全局守卫重定向 /login（replace）；**back** 由 `canBack = hasBackEntry()（镜像栈非空 ∧ 队列探测）&& !cleared` 判定（false 时只走提示/双击退出）。**清栈语义 = 镜像栈物理清空**（非纯标记：重登录后 cleared 复位，若无物理清空则旧会话条目可经返回键进入——P1-2）。`cleared` 置位点 = 登出/会话失效（`resetHistory()`）、清除点 = 登录成功（beginSession 语义）。/update、/error 不可回退由 `meta.backBehavior:'exit'` 承载。_Avoid_: 登出后 back 仍可达业务页（会话泄漏）、期望 replace /login「清空」历史（replace 只覆盖当前条目）、纯 cleared 标记当清栈（重登录后旧条目泄漏）
+
+**全局守卫鉴权（global auth guard / bootstrap 放行）**【2026-09-03 新增】：
+`router.beforeEach` + `meta.requiresAuth` 的路由级鉴权拦截（未登录 → `/login` replace；Q3 定论采用）。**守卫必须同步判断、不 await 网络**（await → RouterView 空白至守卫结束，违背先渲染后加载）；bootstrap 期（restoreToken 未完成）**直接放行**——首帧先渲染，鉴权由页面 401 兜底 + `initRouter` 收敛。对照旧自研：无路由级守卫，靠页面 `ensureAuth()`。_Avoid_: 守卫 await restoreToken、用守卫替代页面 401 兜底（拦截层与兑现层并存）
+
+**kebab-case 陷阱**【2026-09-03 新增】：
+vue-lynx 模板编译器把**带连字符的标签**当原生自定义元素：`<router-view>`（kebab-case）编译为自定义元素 → Vue 不渲染（带 `v-slot` 时报 `v-slot can only be used on components`；无 slot 时静默渲染为空——历史「RouterView 为空」断言的真正根因）。模板必须 **PascalCase `<RouterView />`**；其余带连字符组件同理。_Avoid_: kebab-case `<router-view>`/`<router-link>`、把 RouterView 空白归因 vue-router 兼容性

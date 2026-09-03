@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
-import { currentComponent, initRouter, exitHint } from './router'
+import { RouterView } from 'vue-router'
+import { initRouter, exitHint } from './router'
 import GlobalFab from './components/GlobalFab.vue'
 import SearchSheet from './components/SearchSheet.vue'
 import { initClientSetting } from './stores/clientSwitchStore'
@@ -19,11 +20,15 @@ onMounted(() => {
 
 <template>
   <page class="Root">
-    <!-- [lynx:fix] KeepAlive 缓存列表/静态页实例（ADR-0049）：详情返回列表不重载。
+    <!-- [lynx:fix] 模板必须 PascalCase <RouterView>（kebab-case <router-view> 被
+         vue-lynx 编译器当原生标签 → 空渲染/编译报错；ADR-0138 决策 8）。
+         KeepAlive 缓存列表/静态页实例（ADR-0049）：详情返回列表不重载。
          详情页不在 include 白名单——按 :id 加载，缓存旧 id 实例会显示错误内容 -->
-    <KeepAlive :include="['recommended', 'illusts', 'novels', 'me']">
-      <component :is="currentComponent" />
-    </KeepAlive>
+    <RouterView v-slot="{ Component }">
+      <KeepAlive :include="['recommended', 'illusts', 'novels', 'me']">
+        <component :is="Component" />
+      </KeepAlive>
+    </RouterView>
     <!-- 放射导航悬浮 FAB（ADR-0120）：全局单 FAB，外层=4 tab、内层=页动作；替换各页 NavigationBar 与自身 FAB -->
     <GlobalFab />
     <!-- 全局搜索弹层（ADR-0132 / glossary「弹层全局单例」）：全 App 只挂一份——

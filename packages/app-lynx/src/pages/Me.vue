@@ -2,7 +2,7 @@
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'me' })
 import { ref, onMounted, onUnmounted } from 'vue'
-import { navigate, ensureAuth } from '../router'
+import { navigate, resetHistory, ensureAuth } from '../router'
 import { getGlobalFab } from '../stores/globalFab'
 import { currentUser, logout, isLoggedIn } from '../stores/authStore'
 import { selectedClient, switchClient, availableKinds, supportsClientSwitch, type ClientKind } from '../stores/clientSwitchStore'
