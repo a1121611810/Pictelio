@@ -13,6 +13,7 @@
 // 注意：401 单飞锁不放进 queryClient（破坏 Java 侧 PixivApiCore.synchronized 契约），
 // queryFn 调 apiClient.get/post 即可。
 import { QueryClient, keepPreviousData } from '@tanstack/vue-query'
+import { queryKeys } from './queryKeys'
 
 export function createAppQueryClient(): QueryClient {
   return new QueryClient({
@@ -36,3 +37,49 @@ export function createAppQueryClient(): QueryClient {
 
 /** 全局默认单例（每个 app 启动周期共用一个） */
 export const queryClient: QueryClient = createAppQueryClient()
+
+// ─── per-query override（ADR-0141 D4）───
+//
+// 详情 / 用户主页 / ugoira 元数据属于「稳定数据」——5 分钟内不需要重新 fetch。
+// setQueryDefaults 命中 queryKey 前缀匹配，避免在每个 useQuery call 重复声明。
+//
+// ⚠️ 注意 setQueryDefaults 注册顺序：通用前缀（illusts）必须先注册，
+// 特定前缀（illusts.detail）后注册以正确合并。
+// （query-core 内部按从宽到窄顺序匹配 + 后注册覆盖前注册。）
+
+// 1) 详情类稳定数据：gcTime 5min（默认 30s 太短）
+queryClient.setQueryDefaults(
+  queryKeys.illusts.all, // 前缀 ['pictelio', 'illusts']
+  { gcTime: 5 * 60 * 1000 },
+)
+// 2) 用户主页稳定数据
+queryClient.setQueryDefaults(
+  queryKeys.users.all, // 前缀 ['pictelio', 'users']
+  { gcTime: 5 * 60 * 1000 },
+)
+// 3) 小说详情 / 小说系列：stable content
+queryClient.setQueryDefaults(
+  queryKeys.novels.all,
+  { gcTime: 5 * 60 * 1000 },
+)
+// 4) 推荐 / 关注 / 搜索 / 追更：低 gcTime（避免脏读，参考项目「悲观刷新」约定）
+queryClient.setQueryDefaults(
+  queryKeys.illusts.recommended(),
+  { gcTime: 0 },
+)
+queryClient.setQueryDefaults(
+  queryKeys.illusts.follow('public'),
+  { gcTime: 0 },
+)
+queryClient.setQueryDefaults(
+  queryKeys.novels.recommended(),
+  { gcTime: 0 },
+)
+queryClient.setQueryDefaults(
+  queryKeys.novels.follow('public'),
+  { gcTime: 0 },
+)
+queryClient.setQueryDefaults(
+  queryKeys.search.all,
+  { gcTime: 0 }, // 搜索结果时效性高
+)
