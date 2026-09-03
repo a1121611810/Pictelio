@@ -18,11 +18,11 @@ import { useAuthStore } from '../stores/authStore'
 import { thumbUrl } from '../utils/imageUrl'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { useSettingsStore } from '../stores/settingsStore'
-
-const isRestricted = useSettingsStore().isRestricted
 import SkeletonImage from '../components/SkeletonImage.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
+
+const isRestricted = useSettingsStore().isRestricted
 import RestrictOverlay from '../components/RestrictOverlay.vue'
 import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
 import RefreshableList from '../components/RefreshableList.vue'

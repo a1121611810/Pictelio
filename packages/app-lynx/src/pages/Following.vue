@@ -8,13 +8,13 @@ import type { PixivIllust, PixivIllustListResponse } from '../api/types'
 import { thumbUrl } from '../utils/imageUrl'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { useSettingsStore } from '../stores/settingsStore'
-
-const isRestricted = useSettingsStore().isRestricted
 import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
+
+const isRestricted = useSettingsStore().isRestricted
 import RefreshableList from '../components/RefreshableList.vue'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 

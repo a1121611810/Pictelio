@@ -2,6 +2,7 @@
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'me' })
 import { ref, onMounted, onUnmounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import { navigate, resetHistory, ensureAuth } from '../router'
 import { getGlobalFab } from '../stores/globalFab'
 import { useAuthStore } from '../stores/authStore'
@@ -14,12 +15,9 @@ import GlassCard from '../components/GlassCard.vue'
 
 const auth = useAuthStore()
 const settings = useSettingsStore()
-const showR18 = settings.showR18
-const showR18G = settings.showR18G
-const ugoiraMode = settings.ugoiraMode
-const detailQuality = settings.detailQuality
-const switching = ref(false)
 const clientSwitch = useClientSwitchStore()
+const { showR18, showR18G, ugoiraMode, detailQuality } = storeToRefs(settings)
+const switching = ref(false)
 
 // ─── 全局放射 FAB 桥（ADR-0120）：注册空动作（内环空 = 仅外环导航），卸载时注销 ───
 let unreg: (() => void) | undefined

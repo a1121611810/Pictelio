@@ -10,13 +10,13 @@ import { resolvePageSrcs } from '../utils/imageQuality'
 import { detailImageHeightVw } from '../utils/imageLayout'
 import { presentError } from '../utils/errorPresentation'
 import { useSettingsStore } from '../stores/settingsStore'
-
-const detailQuality = useSettingsStore().detailQuality
 import BookmarkButton from '../components/BookmarkButton.vue'
 import CommentOverlay from '../components/CommentOverlay.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import UgoiraViewer from '../components/UgoiraViewer.vue'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
+
+const detailQuality = useSettingsStore().detailQuality
 
 const illust = ref<PixivIllust | null>(null)
 const loading = ref(true)

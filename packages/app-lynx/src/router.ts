@@ -338,9 +338,14 @@ function registerBenchNavHandler(): void {
   // 用户系页面（UserHome / FollowList）：需真实 user id，自账 id 从 authStore 运行时解析；
   // 未登录时显式 warn（非静默降级，测试钩子可快速定位）
   const DYNAMIC_TARGETS: Record<string, () => string | null> = {
-    pictelioBenchNavUser: () => (useAuthStore().currentUser?.id != null ? `/user/${useAuthStore().currentUser!.id}` : null),
-    pictelioBenchNavUserfollowing: () =>
-      useAuthStore().currentUser?.id != null ? `/user/${useAuthStore().currentUser!.id}/following` : null,
+    pictelioBenchNavUser: () => {
+      const uid = useAuthStore().currentUser?.id
+      return uid != null ? `/user/${uid}` : null
+    },
+    pictelioBenchNavUserfollowing: () => {
+      const uid = useAuthStore().currentUser?.id
+      return uid != null ? `/user/${uid}/following` : null
+    },
   }
   for (const [eventName, resolve] of Object.entries(DYNAMIC_TARGETS)) {
     emitter.addListener(eventName, () => {

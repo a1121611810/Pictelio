@@ -23,8 +23,6 @@ import { useSearch } from '../primitives/useSearch'
 import { useSearchHistoryStore } from '../stores/searchHistoryStore'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
 import { useSettingsStore } from '../stores/settingsStore'
-
-const isRestricted = useSettingsStore().isRestricted
 import { thumbUrl } from '../utils/imageUrl'
 import { SEARCH_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import SkeletonImage from './SkeletonImage.vue'
@@ -32,6 +30,7 @@ import type { SearchScope, SearchSort } from '../api/types'
 
 const searchHistory = useSearchHistoryStore()
 const searchSheet = useSearchSheetStore()
+const isRestricted = useSettingsStore().isRestricted
 
 const controller = useSearch()
 // state 是 getter 返回的只读快照 → 用 computed 包裹保持响应式（模板自动解包）

@@ -9,9 +9,6 @@ import type { PixivIllust, PixivIllustListResponse } from '../api/types'
 import { thumbUrl } from '../utils/imageUrl'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { useSettingsStore } from '../stores/settingsStore'
-
-const settings = useSettingsStore()
-const isRestricted = settings.isRestricted
 import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
@@ -19,6 +16,8 @@ import BookmarkButton from '../components/BookmarkButton.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
 import RefreshableList from '../components/RefreshableList.vue'
 import { getGlobalFab } from '../stores/globalFab'
+
+const isRestricted = useSettingsStore().isRestricted
 
 // ─── 分页收敛（ADR-0104）：迁移到 createMixFeed 深模块 ───
 // 双防抖 / 竞态代 / 分批渲染（pageSize=20，替代原 pendingIllusts 队列）/ 空页防护 /

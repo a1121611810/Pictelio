@@ -7,11 +7,11 @@ import { loadRecommendedNovels, loadFollow, loadNovelNext } from '../api/novel'
 import type { PixivNovel, PixivNovelListResponse } from '../api/types'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { useSettingsStore } from '../stores/settingsStore'
-
-const isRestricted = useSettingsStore().isRestricted
 import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
 import RefreshableList from '../components/RefreshableList.vue'
 import { getGlobalFab } from '../stores/globalFab'
+
+const isRestricted = useSettingsStore().isRestricted
 
 // ─── 分页收敛（ADR-0104）：迁移到 createMixFeed 深模块 ───
 // 双防抖（800ms 节流 + 3s 冷却）/ 竞态代 / 分批渲染 / 空页防护 / 15s 超时 /

@@ -38,9 +38,6 @@ vi.mock('../src/stores/modalStack', () => ({
     closeTopModal: () => {},
     registerModal: () => () => {},
   }),
-  // 迁移期 seam：模块顶层 wrapper（router.ts 等非组件上下文仍用旧 API）
-  hasOpenModal: () => false,
-  closeTopModal: () => {},
 }))
 vi.mock('../src/utils/errorPresentation', () => ({
   registerSessionErrorHandler: (cb: () => void) => {

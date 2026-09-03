@@ -8,14 +8,14 @@ import { loadNovelDetail, fetchNovelText, loadNovelSeries, addNovelWatchlist } f
 import type { PixivNovel } from '../api/types'
 import { presentError } from '../utils/errorPresentation'
 import { useSettingsStore } from '../stores/settingsStore'
-
-const isRestricted = useSettingsStore().isRestricted
 import { isDismissed, markDismissed, setWatchState } from '../stores/watchlistStore'
 import {
   createWatchlistPrompt,
   type WatchlistPromptController,
 } from '../primitives/createWatchlistPrompt'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
+
+const isRestricted = useSettingsStore().isRestricted
 import CommentOverlay from '../components/CommentOverlay.vue'
 import SkeletonNovel from '../components/SkeletonNovel.vue'
 import WatchlistPromptDialog from '../components/WatchlistPromptDialog.vue'

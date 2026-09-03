@@ -21,8 +21,6 @@ import { createMixFeed, type MixFeedItem, type MixFeedSource } from '../primitiv
 import { proxyImageUrl } from '../utils/imageUrl'
 import { deriveCoverDisplay } from '../utils/coverDisplay'
 import { useSettingsStore } from '../stores/settingsStore'
-
-const isRestricted = useSettingsStore().isRestricted
 import { useAuthStore } from '../stores/authStore'
 import { getGlobalFab } from '../stores/globalFab'
 import CarouselSwiper from '../components/CarouselSwiper.vue'
@@ -33,6 +31,8 @@ import BookmarkButton from '../components/BookmarkButton.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
+
+const isRestricted = useSettingsStore().isRestricted
 
 // ─── 时间合并 feed（插画 + 小说，ADR-0115） ───
 // sources 顺序即 mergeByTime 同分 tie-break 优先级：illust 在前。
