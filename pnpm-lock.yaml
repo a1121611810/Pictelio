@@ -362,6 +362,9 @@ importers:
       '@pictelio/update-check':
         specifier: workspace:*
         version: link:../update-check
+      '@tanstack/vue-query':
+        specifier: ^5.102.8
+        version: 5.102.8(vue@3.5.40(typescript@5.9.3))
       '@vue/devtools-api':
         specifier: ^8.2.1
         version: 8.2.1
@@ -2840,12 +2843,19 @@ packages:
     peerDependencies:
       typescript: '>=4.7'
 
+  '@tanstack/match-sorter-utils@8.19.4':
+    resolution: {integrity: sha512-Wo1iKt2b9OT7d+YGhvEPD3DXvPv2etTusIMhMUoG7fbhmxcXCtIjJDEygy91Y2JFlwGyjqiBPRozme7UD8hoqg==}
+    engines: {node: '>=12'}
+
   '@tanstack/pacer-lite@0.2.2':
     resolution: {integrity: sha512-eQ1MyLKCHyXiH7NbdmB80W77OhiMgGBUb+qDx/8WMGbwg5Lf/NlfD0TfNYAqY77i8V3AxoDoYdICrQE5ADw4Yw==}
     engines: {node: '>=18'}
 
   '@tanstack/query-core@5.101.4':
     resolution: {integrity: sha512-gNwcvOJcRbLWPOLG/2OBm+zM+Yv+MKsXKEOWC57USuZDEsI71hEErQsiEGx5wX9rzWWkfwM0fVSPoiIFSsxfiw==}
+
+  '@tanstack/query-core@5.102.8':
+    resolution: {integrity: sha512-ZNjkJ33CqvPNec/6lZBnHqLc3EVGPZ9ySLhYahU9TcuRFdmwXewuj0c4hwSWcGHqEUwcSrKeZ+oGcvPBqXcQcg==}
 
   '@tanstack/solid-db@0.2.31':
     resolution: {integrity: sha512-gK3A60DfsAHq8pusgbhX8UhblpvM+cjNNrSiycTdkYTS82x0OJ3QPBylRKjvYxx2WHv1Q5S9ojGwzm4EQSMXrA==}
@@ -2864,6 +2874,15 @@ packages:
 
   '@tanstack/virtual-core@3.17.7':
     resolution: {integrity: sha512-bp+v10y65sp2H7WpWfIMyxTNfl8ZVfxFTLRjPIFRryi6FV/J33z4IS53WO4pTk36KlvJ4iLiQz+oaydDC1xbcA==}
+
+  '@tanstack/vue-query@5.102.8':
+    resolution: {integrity: sha512-W3Q6Od3FbdttACuavgbICKMFgYCPobvuMiO8tIpqMP073QnREVSaO4ZPqrFqosIbFKikiQTmZhEEbYR9bPsWLA==}
+    peerDependencies:
+      '@vue/composition-api': ^1.1.2
+      vue: ^2.6.0 || ^3.3.0
+    peerDependenciesMeta:
+      '@vue/composition-api':
+        optional: true
 
   '@testing-library/dom@10.4.1':
     resolution: {integrity: sha512-o4PXJQidqJl82ckFaXUeoAW+XysPLauYI43Abki5hABd853iMhitooc6znOnczgbTYmEP6U6/y1ZyKAIsvMKGg==}
@@ -6591,6 +6610,9 @@ packages:
     resolution: {integrity: sha512-dYqgNSZbDwkaJ2ceRd9ojCGjBq+mOm9LmtXnAnEGyHhN/5R7iDW2TRw3h+o/jCFxus3P2LfWIIiwowAjANm7IA==}
     engines: {node: '>= 0.4'}
 
+  remove-accents@0.5.0:
+    resolution: {integrity: sha512-8g3/Otx1eJaVD12e31UbJj1YzdtVvzH85HV7t+9MJYk/u3XmkOUJ5Ys9wQrf9PCPK8+xn4ymzqYCiZl6QWKn+A==}
+
   require-directory@2.1.1:
     resolution: {integrity: sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q==}
     engines: {node: '>=0.10.0'}
@@ -7736,6 +7758,17 @@ packages:
       happy-dom:
         optional: true
       jsdom:
+        optional: true
+
+  vue-demi@0.14.10:
+    resolution: {integrity: sha512-nMZBOwuzabUO0nLgIcc6rycZEebF6eeUfaiQx9+WSk8e29IbLvPU9feI6tqW4kTo3hvoYAJkMh8n8D0fuISphg==}
+    engines: {node: '>=12'}
+    hasBin: true
+    peerDependencies:
+      '@vue/composition-api': ^1.0.0-rc.1
+      vue: ^3.0.0-0 || ^2.6.0
+    peerDependenciesMeta:
+      '@vue/composition-api':
         optional: true
 
   vue-lynx@0.5.1:
@@ -10311,9 +10344,15 @@ snapshots:
       '@tanstack/pacer-lite': 0.2.2
       typescript: 6.0.3
 
+  '@tanstack/match-sorter-utils@8.19.4':
+    dependencies:
+      remove-accents: 0.5.0
+
   '@tanstack/pacer-lite@0.2.2': {}
 
   '@tanstack/query-core@5.101.4': {}
+
+  '@tanstack/query-core@5.102.8': {}
 
   '@tanstack/solid-db@0.2.31(solid-js@1.9.14)(typescript@6.0.3)':
     dependencies:
@@ -10334,6 +10373,14 @@ snapshots:
       solid-js: 1.9.14
 
   '@tanstack/virtual-core@3.17.7': {}
+
+  '@tanstack/vue-query@5.102.8(vue@3.5.40(typescript@5.9.3))':
+    dependencies:
+      '@tanstack/match-sorter-utils': 8.19.4
+      '@tanstack/query-core': 5.102.8
+      '@vue/devtools-api': 6.6.4
+      vue: 3.5.40(typescript@5.9.3)
+      vue-demi: 0.14.10(vue@3.5.40(typescript@5.9.3))
 
   '@testing-library/dom@10.4.1':
     dependencies:
@@ -14472,6 +14519,8 @@ snapshots:
       gopd: 1.2.0
       set-function-name: 2.0.2
 
+  remove-accents@0.5.0: {}
+
   require-directory@2.1.1: {}
 
   require-from-string@2.0.2: {}
@@ -15818,6 +15867,10 @@ snapshots:
     transitivePeerDependencies:
       - msw
 
+  vue-demi@0.14.10(vue@3.5.40(typescript@5.9.3)):
+    dependencies:
+      vue: 3.5.40(typescript@5.9.3)
+
   vue-lynx@0.5.1(@rsbuild/core@1.7.3)(@rsbuild/plugin-vue@1.2.9(@rsbuild/core@1.7.3)(@rspack/core@1.7.12(@swc/helpers@0.5.23))(vue@3.5.40(typescript@5.9.3)))(@types/react@18.3.31)(tslib@2.8.1)(webpack@5.109.2(esbuild@0.28.1)(postcss@8.5.23)):
     dependencies:
       '@lynx-js/css-extract-webpack-plugin': 0.7.1(@lynx-js/template-webpack-plugin@0.11.0(tslib@2.8.1))(webpack@5.109.2(esbuild@0.28.1)(postcss@8.5.23))
@@ -16280,6 +16333,7 @@ time:
   '@tanstack/solid-db@0.2.31': '2026-07-24T21:36:00.605Z'
   '@tanstack/solid-query@5.101.4': '2026-07-21T13:04:07.909Z'
   '@tanstack/solid-virtual@3.13.36': '2026-07-28T20:28:47.026Z'
+  '@tanstack/vue-query@5.102.8': '2026-08-27T16:06:06.633Z'
   '@types/node@26.2.0': '2026-08-07T17:52:06.875Z'
   '@types/spark-md5@3.0.5': '2024-10-29T11:32:16.089Z'
   '@vue/devtools-api@8.2.1': '2026-07-25T07:46:45.228Z'

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import { useQuery } from '@tanstack/vue-query'
 import { RouterView } from 'vue-router'
 import { initRouter, exitHint } from './router'
 import GlobalFab from './components/GlobalFab.vue'
@@ -7,8 +8,29 @@ import SearchSheet from './components/SearchSheet.vue'
 import { useClientSwitchStore } from './stores/clientSwitchStore'
 import { useUpdateStore } from './stores/updateStore'
 import { useSearchSheetStore } from './stores/searchSheetStore'
+import { apiClient } from './api/client'
+import { queryKeys } from './api/queryKeys'
 
 const searchSheet = useSearchSheetStore()
+
+// T1 spike 验证（ADR-0141）：最小 useQuery 健康检查 —
+// 启动时探一下 Pixiv /v2/illust/recommended?limit=1 验证 vue-query 在 lynx runtime 可工作。
+// 失败不阻塞启动（query isLoading → isError 自动收尾，UI 无影响）。
+// T2 完成后由 useApiInfiniteQuery / useApiQuery 替代。
+const health = useQuery({
+  queryKey: queryKeys.illusts.recommended(),
+  queryFn: async ({ signal }) => {
+    return apiClient.get<{ illusts: unknown[] }>('/v2/illust/recommended', { limit: '1' }, signal)
+  },
+  enabled: __DEV__ && searchSheet.isOpen === false, // 仅 dev 模式触发，避免生产 bundle 多一次启动请求
+  staleTime: 60 * 1000,
+  retry: false,
+})
+onMounted(() => {
+  console.log(
+    `[T1 spike] useQuery health: status=${health.status.value} isLoading=${health.isLoading.value} data=${health.data.value ? 'ok' : 'null'}`,
+  )
+})
 
 onMounted(() => {
   // ADR-0062：启动时查询当前包支持的 client 引擎列表（full/webview/lynx 各有不同）

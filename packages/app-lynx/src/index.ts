@@ -1,6 +1,8 @@
 import { createApp } from 'vue-lynx'
+import { VueQueryPlugin } from '@tanstack/vue-query'
 import { router } from './router'
 import { pinia } from './stores/pinia'
+import { queryClient } from './api/queryClient'
 
 // Tailwind 指令必须从独立 CSS 入口加载（见 styles/tailwind.css 注释）：
 // .vue <style> 内联 @tailwind 指令不经过 rsbuild CSS 链，utility 类不会生成。
@@ -11,6 +13,9 @@ const app = createApp(App)
 // Pinia 单例 seam（ADR-0139 决策 3）：与 router 守卫/测试共用同一实例——
 // 双实例 = 双 store 空间，状态互不同步；必须用 stores/pinia.ts 的导出。
 app.use(pinia)
+// Vue Query 5 全局插件挂载（ADR-0141 D1/D4）：queryClient 单例在 api/queryClient.ts；
+// useApiQuery helper 走 apiClient seam 持 401/原生桥转发契约不变。
+app.use(VueQueryPlugin, { queryClient })
 // vue-router 插件安装（ADR-0138）：RouterView 依赖 app.use(router) 注入——
 // 漏装会出现 "injection Symbol(router view location) not found"（App 挂载但路由区空白）
 app.use(router)

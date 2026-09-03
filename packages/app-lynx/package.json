@@ -18,6 +18,7 @@
     "@lynx-js/web-core": "^0.23.1",
     "@pictelio/ugoira": "workspace:*",
     "@pictelio/update-check": "workspace:*",
+    "@tanstack/vue-query": "^5.102.8",
     "@vue/devtools-api": "^8.2.1",
     "pinia": "^4.0.3",
     "spark-md5": "^3.0.2",
