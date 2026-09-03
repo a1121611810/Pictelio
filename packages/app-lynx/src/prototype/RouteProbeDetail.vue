@@ -1,9 +1,9 @@
 <script setup lang="ts">
-// PROTOTYPE（throwaway，勿入生产）：探针详情页——验证 useRoute().params 段级参数 + router.back() 回退。
-import { useRoute, useRouter } from 'vue-router'
+// PROTOTYPE（throwaway，勿入生产）：探针详情页——验证 useRoute().params 段级参数 + 返回（页面内按钮经 probeBack，与系统返回同裁决链）。
+import { useRoute } from 'vue-router'
+import { probeBack } from './probeNav'
 
 const route = useRoute()
-const router = useRouter()
 </script>
 
 <template>
@@ -12,7 +12,7 @@ const router = useRouter()
       <text class="title">PROBE-DETAIL</text>
       <text class="line">id={{ route.params.id }}</text>
       <text class="line">fullPath={{ route.fullPath }}</text>
-      <text class="btn" @tap="router.back()">back</text>
+      <text class="btn" @tap="probeBack()">back</text>
     </view>
   </view>
 </template>
