@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { navigate, resetHistory } from '../router'
+import { navigate, markSessionEstablished } from '../router'
 import { loginWithToken, isLoggedIn } from '../stores/authStore'
 import { authError } from '../stores/authStore'
 import { loadSettings } from '../stores/settingsStore'
@@ -20,8 +20,9 @@ async function submit() {
     if (isLoggedIn.value) {
       // ADR-0103：登录后 uid 已知 → 加载账号级 R18/R18G（跨 client 共享存储）
       await loadSettings()
-      // [lynx:fix] 登录成功 = 会话新起点：清历史栈 + replace 导航（ADR-0049）
-      resetHistory()
+      // [lynx:fix] 登录成功 = 会话新起点（ADR-0049）：先清除会话标记（beginSession 语义，
+      //  否则守卫会把随后的 replace 导航拦截回 /login）再 replace 导航入站
+      markSessionEstablished()
       await navigate('/recommended', { replace: true })
     } else {
       errorMsg.value = authError.value ?? '登录失败'

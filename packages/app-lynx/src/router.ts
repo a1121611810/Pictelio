@@ -1,23 +1,38 @@
-// ─── 极简内存路由（app-lynx MVP） ───
-// vue-router 的 RouterView 在 vue-lynx 0.5.1 + web-core 0.23.1 组合下渲染为空
-// （Pre-Alpha 兼容问题，已实测）。MVP 用手写内存路由 + <component :is>，
-// 路由语义与 vue-router 一致（path/name/params），导航守卫由页面自行处理登录态。
-import { ref, computed, markRaw, type Component } from 'vue'
-import { matchRoute, evaluateBackRoute, createBackGuardRegistry, runBackGuards, type BackGuard, type RouteDefCore } from './routerCore'
+// ─── 路由 shim：官方 vue-router（createMemoryHistory）+ 页面调用面不变 ───
+// ADR-0138（spec #329 / tickets #330-）：自研内存路由迁移到官方 vue-router。
+// 模板注意事项（实证）：vue-lynx 模板编译器把带连字符的标签当作原生元素——
+// kebab-case <router-view> 会空渲染（无 slot）或编译报错（v-slot）；模板必须用
+// PascalCase <RouterView />。历史根因「RouterView 渲染为空（已实测）」即此陷阱
+// 所致，非兼容性问题（证据：prototype/lynx-vue-router 五轮双端实证）。
+// code-review 修正（2026-09-03）：「能否返回」决策 = 会话镜像栈（可物理清空）∧
+// 队列探测 hasBackEntryIn（看门狗）——纯官方 API 探测在「登出→重登录」后无法
+// 识别旧会话残留条目，镜像栈承载物理清栈语义（ADR-0138 决策 5 修订，P1-2）。
+import { ref, computed } from 'vue'
+import {
+  createRouter,
+  createMemoryHistory,
+  type RouteRecordRaw,
+  type Router,
+} from 'vue-router'
+import { evaluateBackRoute, createBackGuardRegistry, runBackGuards, hasBackEntryIn, decideRequiresAuth, type BackGuard } from './routerCore'
 import { isNativeMode, getNativeModules } from './api/client'
 import { isLoggedIn, restoreToken, registerUnauthorizedHandler, currentUser } from './stores/authStore'
 import { loadSettings } from './stores/settingsStore'
 import { hasOpenModal, closeTopModal } from './stores/modalStack'
 import { registerSessionErrorHandler } from './utils/errorPresentation'
 
-export interface RouteDef extends RouteDefCore {
-  component: Component
-}
+/** 首帧/栈空回退目标（ADR-0049）：初始路由 = 推荐页（首帧内容化） */
+export const RECOMMENDED_PATH = '/recommended'
 
-export interface RouteState {
-  name: string
-  path: string
-  params: Record<string, string>
+// route meta 类型（vue-router RouteMeta 增强）：requiresAuth（守卫鉴权）、
+// backBehavior（返回键行为，原路由声明的 backBehavior 迁入 meta——ADR-0138 决策 6）
+declare module 'vue-router' {
+  interface RouteMeta {
+    /** 业务页标记：全局守卫鉴权拦截（ADR-0138 决策 4） */
+    requiresAuth?: boolean
+    /** 'exit' = 返回键直接退出应用（/update、/error） */
+    backBehavior?: 'exit'
+  }
 }
 
 // 静态 import（非 lazy）——vue-lynx 的 defineAsyncComponent 需要 lazy-bundle runtime，
@@ -37,49 +52,96 @@ import UpdatePage from './pages/UpdatePage.vue'
 import ErrorPage from './pages/ErrorPage.vue'
 import Watchlist from './pages/Watchlist.vue'
 
-export const routes: RouteDef[] = [
+/**
+ * 路由表（vue-router 1:1 迁移，ADR-0138 决策 3）：
+ * path/name/component 与迁移前一致；backBehavior:'exit' 迁入 meta；业务页标 requiresAuth。
+ * /update、/error 为「无会话/强制态」系统页：**不标 requiresAuth**（code-review P0-1——
+ * 两者恰在会话清除后经 cleared 路径进入，标了会被守卫自身重定向回 /login，
+ * 强制更新/会话错误页不可达）；不可回退由 backBehavior:'exit' 保证（ADR-0066 扩展）。
+ * 登录页同样不标（未登录态入口）。
+ */
+export const routes: RouteRecordRaw[] = [
   { path: '/login', name: 'login', component: Login },
-  { path: '/recommended', name: 'recommended', component: Recommended },
-  { path: '/illusts', name: 'illusts', component: IllustList },
-  { path: '/illust/:id', name: 'illust-detail', component: IllustDetail },
-  { path: '/novels', name: 'novels', component: NovelList },
-  { path: '/novel/:id', name: 'novel-detail', component: NovelDetail },
-  { path: '/user/:id', name: 'user-home', component: UserHome },
-  { path: '/user/:id/following', name: 'user-following', component: FollowList },
-  { path: '/user/:id/followers', name: 'user-followers', component: FollowList },
-  { path: '/following', name: 'following', component: Following },
-  { path: '/bookmarks', name: 'bookmarks', component: Bookmarks },
-  { path: '/me', name: 'me', component: Me },
-  { path: '/watchlist', name: 'watchlist', component: Watchlist },
-  // 强制更新页（检查更新命中后 replace + 清历史栈进入）：
-  // backBehavior: 'exit' —— 返回键直接退出应用，无返回路径
-  { path: '/update', name: 'update', component: UpdatePage, backBehavior: 'exit' },
-  // 会话失效错误页（候选 #2：401 刷新失败强制重定向）：
-  // backBehavior: 'exit' —— 清历史栈后进入，返回键直接退出应用，不可回退到已失效会话
-  { path: '/error', name: 'error', component: ErrorPage, backBehavior: 'exit' },
+  { path: RECOMMENDED_PATH, name: 'recommended', component: Recommended, meta: { requiresAuth: true } },
+  { path: '/illusts', name: 'illusts', component: IllustList, meta: { requiresAuth: true } },
+  { path: '/illust/:id', name: 'illust-detail', component: IllustDetail, meta: { requiresAuth: true } },
+  { path: '/novels', name: 'novels', component: NovelList, meta: { requiresAuth: true } },
+  { path: '/novel/:id', name: 'novel-detail', component: NovelDetail, meta: { requiresAuth: true } },
+  { path: '/user/:id', name: 'user-home', component: UserHome, meta: { requiresAuth: true } },
+  { path: '/user/:id/following', name: 'user-following', component: FollowList, meta: { requiresAuth: true } },
+  { path: '/user/:id/followers', name: 'user-followers', component: FollowList, meta: { requiresAuth: true } },
+  { path: '/following', name: 'following', component: Following, meta: { requiresAuth: true } },
+  { path: '/bookmarks', name: 'bookmarks', component: Bookmarks, meta: { requiresAuth: true } },
+  { path: '/me', name: 'me', component: Me, meta: { requiresAuth: true } },
+  { path: '/watchlist', name: 'watchlist', component: Watchlist, meta: { requiresAuth: true } },
+  { path: '/update', name: 'update', component: UpdatePage, meta: { backBehavior: 'exit' } },
+  { path: '/error', name: 'error', component: ErrorPage, meta: { backBehavior: 'exit' } },
 ]
+
+export const router: Router = createRouter({
+  history: createMemoryHistory(),
+  routes,
+})
+
+// ─── 会话状态（ADR-0138 决策 4/5；code-review 修订版） ───
+// 已提前置顶：全局守卫需在首次导航前就位。
+// cleared：登出/会话失效后业务页不可达（forward 守卫拦截）。
+// _sessionStack：会话镜像栈——真实「能否返回」的决策主源（物理可清空；
+//   memory history 队列不可清空，登出→重登录后旧会话条目仍在其中——
+//   纯官方 API 探测无法识别，P1-2 因此引入镜像栈承载原「清历史栈」语义）。
+// 置位点：resetHistory（登出/会话失效调用点）；清除点：markSessionEstablished（登录成功）。
+let _sessionCleared = false
+const _sessionStack: string[] = []
+
+// 全局守卫鉴权（ADR-0138 决策 4；Q3 探针实证：web-core + 原生双端）。
+// bootstrap 期（restoreToken 未完成）同步放行——守卫不 await 网络（await 期间
+// RouterView 空白，违「先渲染后加载」；鉴权失败由页面 401 兜底 + initRouter 收敛）
+let _bootstrapping = true
+
+/** bootstrap 完成（initRouter 在登录态恢复定局后调用）：守卫开始执行鉴权拦截 */
+export function markBootstrapDone(): void {
+  _bootstrapping = false
+}
+
+router.beforeEach((to) => {
+  const decision = decideRequiresAuth(Boolean(to.meta.requiresAuth), _bootstrapping, _sessionCleared, isLoggedIn.value)
+  if (decision === true) return true
+  return decision
+})
 
 // [首帧内容化]（#61/#63）：初始路由为推荐页——首帧直接渲染推荐页骨架屏，
 // 消除已登录用户启动时的登录页闪屏；未登录用户由 initRouter 登录守卫
 // replace 到 /login（不入栈，ADR-0049 语义不变）。
-// 登录态就绪前推荐页可能已挂载（首帧 fetch 会 401 失败），补拉机制见
-// Recommended.vue 的 watch(isLoggedIn) + onActivated。
-// 勿在未评估前开启 IFR（enableIFR）——app-lynx 真机 32 组实测否决，
-// 见 docs/research/vue-lynx-benchmark-ifr.md §6 与 issue #61。
-const _state = ref<RouteState>({ name: 'recommended', path: '/recommended', params: {} })
+// memory history 初始位置是 "nowhere"（官方 API 文档确认），必须显式定起点
+//（官方示例在 app.mount() 前 push）；此处用 replace——与 initRouter 收敛语义一致
+// 且不入历史栈。若该导航失败（守卫/依赖错误）→ RouterView 无匹配渲染空白，
+// 属于「先渲染后加载」的显式前提（code-review P3）。
+void router.replace(RECOMMENDED_PATH)
 
-// [lynx:fix] 极简历史栈（ADR-0049）：navigate 默认入栈，goBack 出栈回上一页；
-// 登录相关导航用 replace 语义（不入栈）——登录页不应被"返回"。
-const _history: string[] = []
+export interface RouteState {
+  name: string
+  path: string
+  params: Record<string, string>
+}
 
-export const routeState = _state
-
-export const currentComponent = computed<Component | null>(() => {
-  const m = matchRoute(routes, _state.value.path)
-  return m ? markRaw(m.route.component) : null
+/** 路由状态（兼容导出，原 _state ref）：以 router.currentRoute 为准 */
+export const routeState = ref<RouteState>({
+  name: 'recommended',
+  path: RECOMMENDED_PATH,
+  params: {},
 })
 
-export const currentParams = computed(() => _state.value.params)
+// currentRoute → routeState 同步（页面取 currentParams / FAB 取 name 均经此）
+router.afterEach((to) => {
+  routeState.value = {
+    name: typeof to.name === 'string' ? to.name : '',
+    path: to.path,
+    params: to.params as Record<string, string>,
+  }
+})
+
+/** 当前路由参数（兼容导出；页面取参方式不变） */
+export const currentParams = computed(() => routeState.value.params)
 
 export interface NavigateOptions {
   /** replace 语义：不入历史栈（登录/登出/首路由） */
@@ -87,23 +149,39 @@ export interface NavigateOptions {
 }
 
 export async function navigate(path: string, opts?: NavigateOptions): Promise<void> {
-  const m = matchRoute(routes, path)
-  if (!m) {
-    _state.value = { name: '', path: '/login', params: {} }
+  // [行为等价，P2-1] 旧实现无匹配路径强制落 /login：vue-router resolve 无匹配 →
+  // matched 为空 → RouterView 渲染空白；显式兜底保持旧语义。
+  // 统一 replace（P3-2）：登录页不被返回（ADR-0049），与 opts.replace 无关
+  if (router.resolve(path, router.currentRoute.value).matched.length === 0) {
+    await router.replace('/login')
     return
   }
-  if (!opts?.replace && _state.value.path !== path) {
-    _history.push(_state.value.path)
+  if (opts?.replace) {
+    await router.replace(path)
+    return
   }
-  _state.value = { name: m.route.name, path, params: m.params }
+  const cur = router.currentRoute.value.fullPath
+  // 镜像在导航确认后入栈（P3-1）：守卫重定向/被取消的 push 不入栈
+  //（重定向后 currentRoute 已是 /login ≠ path，以最终落点为准防垃圾镜像条目）
+  await router.push(path)
+  if (router.currentRoute.value.fullPath === path && cur !== path) {
+    _sessionStack.push(cur)
+  }
 }
 
-/** 清空历史栈（登录/登出后调用，会话新起点） */
+/** 清空历史栈（登录/登出后调用，会话新起点）：置位会话清除标记 + 物理清镜像栈（ADR-0138 决策 5 修订） */
 export function resetHistory(): void {
-  _history.length = 0
+  _sessionCleared = true
+  _sessionStack.length = 0
 }
 
-/** 未登录守卫：保证进入受保护页面前完成 token 恢复 */
+/** 登录成功（beginSession 语义）：清除会话标记 + 清空旧会话镜像（P1-2：防重登录后返回旧会话条目） */
+export function markSessionEstablished(): void {
+  _sessionCleared = false
+  _sessionStack.length = 0
+}
+
+/** 未登录守卫：保证进入受保护页面前完成 token 恢复（页面自理登录态，守卫兜底收敛） */
 export async function ensureAuth(): Promise<boolean> {
   if (isLoggedIn.value) return true
   if (isNativeMode()) registerBenchNavHandler()
@@ -112,17 +190,26 @@ export async function ensureAuth(): Promise<boolean> {
   return ok
 }
 
+/**
+ * 「能否返回」= 会话镜像栈非空（会话主源，物理清空承载清栈语义）
+ *   ∧ hasBackEntryIn（队列探测看门狗：防镜像漂移——若有导航路径绕过 mirror，
+ *   镜像与真实队列不一致时返回 false 保底）
+ * （code-review P1-2 修正：纯官方 API 探测在重登录后无法识别旧会话残留条目）
+ */
+export function hasBackEntry(): boolean {
+  return _sessionStack.length > 0 && hasBackEntryIn(router.options.history)
+}
+
 export function goBack(): void {
-  // [lynx:fix] 历史栈 pop 回上一页（ADR-0049）；栈空或目标无效时回退推荐页
-  const prev = _history.pop()
-  if (prev && prev !== _state.value.path) {
-    const m = matchRoute(routes, prev)
-    if (m) {
-      _state.value = { name: m.route.name, path: prev, params: m.params }
-      return
-    }
+  // 镜像弹栈先行：镜像有上一页 → 队列探测确认（看门狗防漂移）→ 官方 API 回退（ADR-0049）；
+  // 镜像与队列不一致（有导航绕过镜像漂移）→ 清镜像降级为回推荐页
+  if (_sessionStack.length > 0 && hasBackEntryIn(router.options.history)) {
+    _sessionStack.pop()
+    void router.back()
+    return
   }
-  _state.value = { name: 'recommended', path: '/recommended', params: {} }
+  _sessionStack.length = 0
+  void router.replace(RECOMMENDED_PATH)
 }
 
 // ─── 返回守卫（spec app-lynx-novel-series-watchlist §US3，issue #222） ───
@@ -169,12 +256,14 @@ function handleSystemBack(): void {
   // ① modalStack 有打开弹层（issue #163）→ close-modal（返回键优先关弹层）
   // ② back-guard 拦截（§US3）→ intercepted（守卫消费本次返回，不动历史栈）
   // ③ 既有 ADR-0066 逻辑：backBehavior 'exit' / 历史栈 pop / 根路由双击退出
-  const m = matchRoute(routes, _state.value.path)
   const action = evaluateBackRoute({
     hasOpenModal: hasOpenModal(),
     runGuards: () => runBackGuards(backGuardRegistry.guards()),
-    behavior: m?.route.backBehavior,
-    historyLength: _history.length,
+    behavior: router.currentRoute.value.meta.backBehavior,
+    // 「能否返回」= 镜像栈 ∧ 队列探测（见 hasBackEntry；登出后=提示/双击退出）
+    // !_sessionCleared 为冗余防御（resetHistory 同步清镜像，hasBackEntry 已 false；
+    // 保留防未来镜像清空逻辑被误改——P3-4）
+    historyLength: hasBackEntry() && !_sessionCleared ? 1 : 0,
     lastBackAt,
     now: Date.now(),
   })
@@ -228,7 +317,7 @@ function registerBenchNavHandler(): void {
   const emitter = lynxGlobal?.getJSModule?.('GlobalEventEmitter')
   if (!emitter || typeof emitter.addListener !== 'function') return
   const TARGETS: Record<string, string> = {
-    pictelioBenchNavCarousel: '/recommended',
+    pictelioBenchNavCarousel: RECOMMENDED_PATH,
     pictelioBenchNavIllust: '/illusts',
     pictelioBenchNavNovel: '/novels',
     pictelioBenchNavFollowing: '/following',
@@ -269,7 +358,7 @@ if (isNativeMode()) registerBenchNavHandler()
 /** 初始化（App 挂载时调用）：注册 401 刷新 + 恢复设置 + 首路由（replace 不入栈） */
 export async function initRouter(): Promise<void> {
   registerUnauthorizedHandler()
-  // 会话失效（401 刷新失败）→ 全屏错误页：清历史栈 + replace 进入（不可回退，backBehavior: 'exit'）
+  // 会话失效（401 刷新失败）→ 全屏错误页：清历史栈 + replace 进入（不可回退，meta.backBehavior: 'exit'）
   registerSessionErrorHandler(() => {
     resetHistory()
     void navigate('/error', { replace: true })
@@ -278,5 +367,7 @@ export async function initRouter(): Promise<void> {
   const ok = await restoreToken()
   // ADR-0103：账号级设置需 uid 已知（restoreToken 之后）再加载
   await loadSettings()
-  void navigate(ok ? '/recommended' : '/login', { replace: true })
+  await navigate(ok ? RECOMMENDED_PATH : '/login', { replace: true })
+  // 登录态恢复已定局：守卫开始执行鉴权拦截（bootstrap 期放行至此结束）
+  markBootstrapDone()
 }

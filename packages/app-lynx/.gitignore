@@ -1,3 +1,6 @@
 
 # test:lynx-web 运行产物
 .tmp-lynx-web-e2e/
+
+# 系统返回回归脚本产物（wipe me）
+.tmp-back-regression/

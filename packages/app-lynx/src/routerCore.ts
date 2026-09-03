@@ -1,4 +1,5 @@
 // ─── 路由匹配纯逻辑（无组件依赖，可单测） ───
+import type { RouterHistory } from 'vue-router'
 export interface RouteDefCore {
   path: string
   name: string
@@ -102,6 +103,44 @@ export interface BackGuardRegistry {
   register(guard: BackGuard): () => void
   /** 当前生效守卫（注册序 = 执行序） */
   guards(): readonly BackGuard[]
+}
+
+// ─── vue-router 迁移新增纯逻辑（ADR-0138；node 可单测，真 RouterHistory 驱动） ───
+
+/**
+ * 「能否返回」纯官方 API 探测（ADR-0138 决策 3；prototype 第 16 行实证）。
+ * memory history 无公开栈查询 API（history.state 是条目数据而非 {back,current,forward}）；
+ * RouterHistory.go 的 triggerListeners 参数（官方文档化）+ location（Current History location）
+ * 可静默探测：go(-1,false) 移动指针 → location 变化 = 有上一页 → go(1,false) 还原。
+ * 同步原子（无 await 间隙）、不触发监听/守卫、无状态维护。
+ */
+export function hasBackEntryIn(history: RouterHistory): boolean {
+  const before = history.location
+  history.go(-1, false)
+  const moved = history.location !== before
+  if (moved) history.go(1, false)
+  return moved
+}
+
+/**
+ * 全局守卫鉴权裁决（ADR-0138 决策 4；Q3 探针实证的规则三态）：
+ * - 非业务页（requiresAuth=false）→ 放行；
+ * - bootstrap 期（restoreToken 未完成）→ 放行（守卫不 await 网络；首帧先渲染，
+ *   鉴权失败由页面 401 兜底 + initRouter 收敛——违反此规则会空白首帧）；
+ * - bootstrap 完成后：会话清除（登出）或未登录 → 重定向 /login（replace 语义）。
+ *   注意：/update、/error 等系统页不标 requiresAuth（P0-1——cleared 语义下它们
+ *   正是目的页，标了会被自身重定向）。
+ */
+export function decideRequiresAuth(
+  requiresAuth: boolean,
+  bootstrapping: boolean,
+  cleared: boolean,
+  loggedIn: boolean,
+): true | { path: '/login'; replace: true } {
+  if (!requiresAuth) return true
+  if (bootstrapping) return true
+  if (cleared || !loggedIn) return { path: '/login', replace: true }
+  return true
 }
 
 /** 创建守卫注册表（router.ts 持有模块级单例；测试各自 new 隔离实例） */
