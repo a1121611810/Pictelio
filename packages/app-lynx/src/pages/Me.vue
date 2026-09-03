@@ -4,7 +4,7 @@ defineOptions({ name: 'me' })
 import { ref, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { navigate, resetHistory, ensureAuth } from '../router'
-import { getGlobalFab } from '../stores/globalFab'
+import { useGlobalFabStore } from '../stores/globalFab'
 import { useAuthStore } from '../stores/authStore'
 import { useClientSwitchStore, supportsClientSwitch, type ClientKind } from '../stores/clientSwitchStore'
 import { useSettingsStore } from '../stores/settingsStore'
@@ -22,7 +22,7 @@ const switching = ref(false)
 // ─── 全局放射 FAB 桥（ADR-0120）：注册空动作（内环空 = 仅外环导航），卸载时注销 ───
 let unreg: (() => void) | undefined
 onMounted(async () => {
-  unreg = getGlobalFab().usePage('me', {})
+  unreg = useGlobalFabStore().usePage('me', {})
   await ensureAuth()
 })
 

@@ -9,7 +9,7 @@ import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { useSettingsStore } from '../stores/settingsStore'
 import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
 import RefreshableList from '../components/RefreshableList.vue'
-import { getGlobalFab } from '../stores/globalFab'
+import { useGlobalFabStore } from '../stores/globalFab'
 
 const isRestricted = useSettingsStore().isRestricted
 
@@ -106,7 +106,7 @@ let unreg: (() => void) | undefined
 const benchOnFollow = () => void switchMode('follow')
 let benchOffFn: (() => void) | undefined
 onMounted(() => {
-  unreg = getGlobalFab().usePage('novels', {
+  unreg = useGlobalFabStore().usePage('novels', {
     refresh: refreshFeed,
     backToTop: () => {
       refreshEpoch.value++

@@ -15,7 +15,7 @@ import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
 import RefreshableList from '../components/RefreshableList.vue'
-import { getGlobalFab } from '../stores/globalFab'
+import { useGlobalFabStore } from '../stores/globalFab'
 
 const isRestricted = useSettingsStore().isRestricted
 
@@ -117,7 +117,7 @@ let unreg: (() => void) | undefined
 const benchOnFollow = () => void switchMode('follow')
 let benchOffFn: (() => void) | undefined
 onMounted(() => {
-  unreg = getGlobalFab().usePage('illusts', {
+  unreg = useGlobalFabStore().usePage('illusts', {
     refresh: refreshFeed,
     backToTop: () => {
       refreshEpoch.value++

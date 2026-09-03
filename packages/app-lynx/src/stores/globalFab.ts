@@ -1,30 +1,33 @@
+// ─── 放射导航单例接线（ADR-0120 + ADR-0140）───
+// Pinia 化：原 `let _fab` 闭包单例 + `getGlobalFab()` getter 改为
+// `defineStore('globalFab', () => { ... })` setup store——wiring 与 instance 解耦。
+// `createGlobalFab` primitive（`src/primitives/createGlobalFab.ts`）保持不动。
+// Pinia store id 'globalFab' 保证 active pinia 范围内单例——factory body 仅在首次
+// `useGlobalFabStore()` 时执行一次（每个 `setActivePinia` 周期内），无需模块级
+// `_fabCache` 缓存（spike 期间为防御性冗余留下，全量迁移时清理：保留会破坏测试
+// 隔离，跨用例复用旧 `createGlobalFab` 实例 + 旧 `routeState` ref）。
+// 跨 store 引用以箭头函数闭包形式持有（openSearch / hasOpenModal），不立即调用——
+// pinia 在 `app.use(pinia)` 时就绪后这些箭头才被实际触发。
+// 关联：ADR-0120（FAB 设计）、ADR-0132（全局搜索/FAB search 模式）、
+//       ADR-0123（LynxView hit-testing）、ADR-0139（前序 Pinia 全量引入）。
+import { defineStore } from "pinia"
 import { routeState, navigate } from '../router'
 import { NAV_TABS } from '../components/navTabs'
-import { createGlobalFab, type GlobalFab } from '../primitives/createGlobalFab'
+import { createGlobalFab } from '../primitives/createGlobalFab'
 import { useSearchSheetStore } from './searchSheetStore'
 import { useModalStack } from './modalStack'
 
-// ─── 放射导航单例接线（ADR-0120）───
-// 用惰性初始化：router.ts 经页面（Recommended.vue 等）静态 import 反向依赖本模块
-// （router → 页面 → globalFab → router），若在模块顶层立即 createGlobalFab 并读取
-// routeState，会因 ES module 的 TDZ 报 "Cannot access 'routeState' before initialization"
-// （web/dev 白屏）。改为「首次访问才创建」——此时 router 已完整求值，routeState 可用。
-// 测试不引本文件，直接调 createGlobalFab（注入 fake routeState/navigate）。
-// T5 接线（ADR-0132/issue #295）：
-// - openSearch：搜索弹层入口回调（FAB search 命令 / 内环搜索项 → searchSheetStore.openSearch）；
-// - hasOpenModal：FAB 与弹层互斥——任一弹层（评论/搜索等）打开时 FAB 隐藏（mode=hidden），
-//   防 T4 遗留缺陷：modal 打开时 FAB（z-40）悬浮于弹层之上可点、误开搜索。
-let _fab: GlobalFab | undefined
-
-export function getGlobalFab(): GlobalFab {
-  if (!_fab) {
-    _fab = createGlobalFab({
-      routeState,
-      navigate,
-      navTabs: NAV_TABS,
-      openSearch: () => useSearchSheetStore().openSearch(),
-      hasOpenModal: () => useModalStack().hasOpenModal(),
-    })
+export const useGlobalFabStore = defineStore('globalFab', () => {
+  const fab = createGlobalFab({
+    routeState,
+    navigate,
+    navTabs: NAV_TABS,
+    openSearch: () => useSearchSheetStore().openSearch(),
+    hasOpenModal: () => useModalStack().hasOpenModal(),
+  })
+  return {
+    view: fab.view,
+    dispatch: fab.dispatch,
+    usePage: fab.usePage,
   }
-  return _fab
-}
+})

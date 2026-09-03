@@ -207,6 +207,16 @@ _Avoid_: 把绝对 next_url 原样传给原生模块
 **受限条目 level 派生（restrict level derivation）**：
 `x_restrict === 2 ? 2 : 1` 的徽章级别映射，收敛在 `RestrictedNovelCard` 组件内部（接口只收 `item`），调用方不重复该表达式。
 
+### 状态管理（State management）
+
+**Pinia setup store**【2026-09-03 新增，ADR-0139 + ADR-0140】：
+app-lynx 状态管理以 Pinia setup store 为单一模式（`stores/` 目录 9 个 store，7 个全局单例 + globalFab wiring + watchlist 非响应式 Set/Map）。`defineStore(name, factory)` 的 **factory body 在模块加载期不执行**（仅在首次 `useXStore()` 时执行）——这与 `let _x` 闭包懒求值同语义，是打破"router ↔ pages ↔ store"循环依赖的关键。消费方两种风格：① 组件 setup 内 `const { x } = storeToRefs(store)`（保留 `x.value.X` 写法）② 模板内 `store.x` 自动解包直读属性。跨 store 组合在 setup 内 `const other = useYStore()` 显式组合；跨 store 引用在 factory body 内以**箭头函数闭包**形式持有（`openSearch: () => useSearchSheetStore().openSearch()`），不立即调用，pinia 在 `app.use(pinia)` 时就绪后这些箭头才被实际触发。
+_Avoid_: 模块顶层 `useXStore()`（pinia 未就绪前调用会抛 "getActivePinia() was called with no active Pinia"）、`storeToRefs` 之外的解构（丢响应性）、将 `watchlistStore` 改造为响应式（Set/Map 非渲染订阅，迁移无收益）
+
+**globalFab wiring**【2026-09-03 新增，ADR-0140】：
+放射导航 FAB 的单例接线。`stores/globalFab.ts` 是"工厂访问器"——内部用 Pinia `defineStore('globalFab', () => { ... })` 包装 `createGlobalFab` primitive（`primitives/createGlobalFab.ts`，保持不动）；`getGlobalFab()` 旧 API 在 spike 阶段保留作 A/B 对照，全量迁移时（commit `9188af8f`）已删除——唯一 export 是 `useGlobalFabStore`。**wiring 与 instance 严格解耦**：`createGlobalFab` 内部状态机（view / dispatch / usePage）由 primitive 拥有，Pinia store 仅暴露三个对外方法。消费方在 5 个调用点：`GlobalFab.vue` 组件 setup（用 `storeToRefs` 解包 view）+ 4 个页面的 `onMounted` 钩子（注册页面动作项 `usePage(name, actions)`）。`hasOpenModal` 路径在弹层栈变化时正确反映（`useModalStack()` 闭包跨 store 调用）。
+_Avoid_: 把 `createGlobalFab` 内部状态机（view / dispatch）拆进 Pinia state（违反 wiring/instance 解耦）、在 factory body 内**同步**调用 `useSearchSheetStore().openSearch()`（会立即触发跨 store 求值，破坏弹层 lazy 语义）、给 Pinia 加持久化 plugin（超范围，primitive 自身不依赖持久化）
+
 ### 构建约定（Build conventions）
 
 **script-setup 禁 export（SFC no-export）**：

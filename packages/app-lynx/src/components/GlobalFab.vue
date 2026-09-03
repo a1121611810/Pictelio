@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { getGlobalFab } from '../stores/globalFab'
+import { storeToRefs } from 'pinia'
+import { useGlobalFabStore } from '../stores/globalFab'
 import { A11Y_ELEMENT_ENABLED, GLOBAL_FAB_A11Y_LABELS } from '../utils/accessibility'
 import { screenHeightVw as deriveScreenHeightVw, type ViewportContentSize, type ViewportSystemInfo } from '../utils/viewportGeometry'
 import { subscribeViewportSize } from '../utils/viewportSizeBridge'
@@ -11,8 +12,8 @@ import { GLOBAL_SEARCH_A11Y_LABEL } from '../primitives/createGlobalFab'
 // 不含业务逻辑。挂载于 App.vue（KeepAlive 之外），view.visible 决定显隐。
 // 术语见 glossary-app-lynx-radial-nav-fab.md。
 
-const fab = getGlobalFab()
-const view = fab.view
+const fab = useGlobalFabStore()
+const { view } = storeToRefs(fab)
 
 /** reduced-motion：禁止飞出/stagger/旋转动画（Lynx 的 matchMedia 不可用时默认 false）。 */
 const reducedMotion = ref(false)
