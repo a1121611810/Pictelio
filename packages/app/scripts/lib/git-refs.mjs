@@ -72,9 +72,7 @@ export async function resolveRef(ref, cwd) {
 export async function diffNames(fromRef, toRef, cwd) {
   const r = await runGit(["diff", "--name-only", `${fromRef}..${toRef}`], cwd);
   if (r.code !== 0) {
-    throw new Error(
-      `${MODULE} git diff --name-only ${fromRef}..${toRef} 失败: ${r.stderr.trim()}`,
-    );
+    throw new Error(`${MODULE} git diff --name-only ${fromRef}..${toRef} 失败: ${r.stderr.trim()}`);
   }
   return r.stdout.split("\n").filter(Boolean);
 }

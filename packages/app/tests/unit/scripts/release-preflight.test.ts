@@ -62,7 +62,11 @@ describe("assertMainNotDiverged", () => {
     await commitFile(f.local, "c.txt", "C", "commit C"); // 本地领先 1 个提交
     const logs = [];
     const warns = [];
-    await assertMainNotDiverged({ cwd: f.local, log: (m) => logs.push(m), warn: (m) => warns.push(m) });
+    await assertMainNotDiverged({
+      cwd: f.local,
+      log: (m) => logs.push(m),
+      warn: (m) => warns.push(m),
+    });
     expect(logs.join("\n")).toContain("预检通过");
     expect(warns).toEqual([]);
   });
