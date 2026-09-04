@@ -1,80 +1,8 @@
 #!/bin/sh
-# pre-push hook: 静态校验（秒级，不跑浏览器）
-#
-# 1) E2E 锚点静态校验（app）：
-#    仅当本次 push 触碰 packages/app/src/ 或 packages/app/tests/agent-browser/ 时，
-#    运行 packages/app/scripts/check-e2e-anchors.mjs 校验 spec 引用的锚点
-#    （data-testid / aria-label / 路由等）在 src/ 中是否仍存在。
-# 2) 单测锚点校验（app-lynx）：code-review Round 2 S5 修复
-#    仅当本次 push 触碰 packages/app-lynx/(src/|tests/) 时，
-#    运行 packages/app-lynx/scripts/check-app-lynx-anchors.mjs 跑 pnpm test 兜底
-#    （防止 commit 304d5f07 / 2ce8bb25 类「commit message 失实」问题再次无声推上 main）。
-# 3) 仓库级 skill 校验（T0.5，ADR-0097）：
-#    仅当本次 push 触碰 .agents/ 时，运行 scripts/verify-agent-skills.mjs 校验
-#    .agents/skills/ 的 frontmatter / name 一致性 / 关键段落标记（防 oracle check 漂移）。
-
-zero="0000000000000000000000000000000000000000"
-touched=0
-lynx_touched=0
-skills_touched=0
-
-# stdin 逐行：<local ref> <local sha> <remote ref> <remote sha>
-while read -r local_ref local_sha remote_ref remote_sha; do
-  # 删除远端分支：无新代码，无需校验
-  [ "$local_sha" = "$zero" ] && continue
-
-  if [ "$remote_sha" = "$zero" ]; then
-    # 新分支：与 origin/main 的 merge-base 比较；取不到时退化为仅看顶端提交
-    base=$(git merge-base "$local_sha" origin/main 2>/dev/null || true)
-    if [ -n "$base" ]; then
-      files=$(git diff --name-only "$base..$local_sha")
-    else
-      files=$(git diff-tree --no-commit-id --name-only -r "$local_sha")
-    fi
-  else
-    files=$(git diff --name-only "$remote_sha..$local_sha")
-  fi
-
-  if printf '%s\n' "$files" | grep -qE '^packages/app/(src/|tests/agent-browser/)'; then
-    touched=1
-  fi
-  if printf '%s\n' "$files" | grep -qE '^packages/app-lynx/(src/|tests/)'; then
-    lynx_touched=1
-  fi
-  if printf '%s\n' "$files" | grep -qE '^.agents/'; then
-    skills_touched=1
-  fi
-done
-
-# 未触碰任何相关目录：零开销放行
-[ "$touched" -eq 0 ] && [ "$lynx_touched" -eq 0 ] && [ "$skills_touched" -eq 0 ] && exit 0
-
-if [ "$touched" -eq 1 ]; then
-  echo "pre-push: 检测到 packages/app/src 或 tests/agent-browser 改动，运行 E2E 锚点静态校验…"
-  node packages/app/scripts/check-e2e-anchors.mjs || {
-    echo "❌ E2E 锚点静态校验失败"
-    echo "  - 修复失效锚点（同步 spec 或 src）后重试"
-    echo "  - 确认为误报时可用 git push --no-verify 绕过"
-    exit 1
-  }
-fi
-
-if [ "$lynx_touched" -eq 1 ]; then
-  echo "pre-push: 检测到 packages/app-lynx 改动，跑 app-lynx 单测…"
-  node packages/app-lynx/scripts/check-app-lynx-anchors.mjs || {
-    echo "❌ app-lynx 单测失败"
-    echo "  - 修复失败的单测后重试"
-    echo "  - 确认为误报时可用 git push --no-verify 绕过"
-    exit 1
-  }
-fi
-
-if [ "$skills_touched" -eq 1 ]; then
-  echo "pre-push: 检测到 .agents/ 改动，运行仓库级 skill 校验…"
-  node scripts/verify-agent-skills.mjs || {
-    echo "❌ 仓库级 skill 校验失败"
-    echo "  - 修复 .agents/skills/ 下 SKILL.md（frontmatter / name 一致性）后重试"
-    echo "  - 确认为误报时可用 git push --no-verify 绕过"
-    exit 1
-  }
-fi
+# pre-push hook: 静态校验薄壳（ADR-0142）
+# 全部逻辑在 scripts/check-push-refs.mjs（本钩子仅透传 stdin 的 pre-push 协议）：
+#   1) 三域触碰校验：packages/app/(src|tests/agent-browser) → E2E 锚点静态校验；
+#      packages/app-lynx/(src|tests) → app-lynx 单测；.agents/ → 仓库级 skill 校验
+#   2) remote_sha 本地缺失 → 精准 fetch 重试；fetch 失败 → warn + fail-open 放行
+#   3) 真分叉（远端含本地没有的提交）→ 人话报错（git fetch origin && git rebase origin/main）
+exec node "$(dirname "$0")/../scripts/check-push-refs.mjs"

@@ -67,3 +67,31 @@ export async function resolveRef(ref, cwd) {
   }
   return r.stdout.trim();
 }
+
+// 两点 diff 的文件名列表（from..to）。
+export async function diffNames(fromRef, toRef, cwd) {
+  const r = await runGit(["diff", "--name-only", `${fromRef}..${toRef}`], cwd);
+  if (r.code !== 0) {
+    throw new Error(
+      `${MODULE} git diff --name-only ${fromRef}..${toRef} 失败: ${r.stderr.trim()}`,
+    );
+  }
+  return r.stdout.split("\n").filter(Boolean);
+}
+
+// merge-base；无共同祖先（或引用不可解析）返回 null——调用方退化为 diffTreeNames
+//（与原 .husky/pre-push 新分支路径的 `|| true` 退化语义一致）。
+export async function mergeBase(a, b, cwd) {
+  const r = await runGit(["merge-base", a, b], cwd);
+  return r.code === 0 ? r.stdout.trim() : null;
+}
+
+// 单提交的根 diff 文件名列表（新分支且取不到 merge-base 时的退化路径）。
+// --root：根提交对空树 diff（原 shell 钩子缺此 flag，orphan 分支根提交会漏检为 0 文件）。
+export async function diffTreeNames(sha, cwd) {
+  const r = await runGit(["diff-tree", "--root", "--no-commit-id", "--name-only", "-r", sha], cwd);
+  if (r.code !== 0) {
+    throw new Error(`${MODULE} git diff-tree ${sha} 失败: ${r.stderr.trim()}`);
+  }
+  return r.stdout.split("\n").filter(Boolean);
+}

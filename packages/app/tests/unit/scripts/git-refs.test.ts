@@ -13,6 +13,9 @@ import {
   isAncestor,
   resolveRef,
   trackingRefFor,
+  diffNames,
+  mergeBase,
+  diffTreeNames,
 } from "../../../scripts/lib/git-refs.mjs";
 
 function git(args, cwd) {
@@ -159,5 +162,30 @@ describe("trackingRefFor（纯函数映射）", () => {
 
   it("非分支引用（tag 等）原样保留", () => {
     expect(trackingRefFor("refs/tags/v1.0.0")).toBe("refs/tags/v1.0.0");
+  });
+});
+
+describe("diffNames / mergeBase / diffTreeNames（编排器 diff 原语）", () => {
+  it("diffNames 返回两点间变更文件名列表", async () => {
+    const f = await makeFixture();
+    await mkdir(join(f.local, "packages/app/src"), { recursive: true });
+    const shaC = await commitFile(f.local, "packages/app/src/x.ts", "x", "touch app src");
+    expect(await diffNames(f.shaA, shaC, f.local)).toEqual(["packages/app/src/x.ts"]);
+  });
+
+  it("mergeBase 命中共同祖先返回 sha；无共同祖先返回 null（退化信号）", async () => {
+    const f = await makeFixture();
+    const shaC = await commitFile(f.local, "c.txt", "C", "commit C");
+    expect(await mergeBase(f.shaA, shaC, f.local)).toBe(f.shaA);
+    // 无共同祖先： orphan 分支
+    await git(["checkout", "--orphan", "orphan1"], f.local);
+    await git(["rm", "-rf", "."], f.local);
+    const shaO = await commitFile(f.local, "o.txt", "O", "orphan commit");
+    expect(await mergeBase(shaO, shaC, f.local)).toBeNull();
+  });
+
+  it("diffTreeNames 返回单提交的根 diff 文件名（新分支退化路径）", async () => {
+    const f = await makeFixture();
+    expect(await diffTreeNames(f.shaA, f.local)).toEqual(["a.txt"]);
   });
 });
