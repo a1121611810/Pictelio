@@ -65,7 +65,7 @@ type QueryFn<T> = (context: QueryFunctionContext<QueryKey>) => T | Promise<T>
 type MaybeRefOrGetter<T> = import('vue').MaybeRefOrGetter<T>
 
 /**
- * generation-gate 包装：监听 signal.abort，disposed=true 时 queryFn 抛 'stale'。
+ * generation-gate 包装（共享 helper，useApiQuery + useApiInfiniteQuery 复用）。
  *
  * 设计要点：
  * 1. disposed 标志在 queryFn 闭包内（每次 queryFn 调用独立）
@@ -77,9 +77,16 @@ type MaybeRefOrGetter<T> = import('vue').MaybeRefOrGetter<T>
  * 实测验证（ADR-0141 R1-3）：
  * - lynx 真机：signal.abort 117ms 内触发 → 旧 query 走完 resolve 后被丢
  * - 浏览器：signal.abort 立即 reject + 立即丢
+ *
+ * code-review Round 2 S7 finding：原 wrapWithGenerationGate 与 useApiInfiniteQuery
+ * 内部 wrapWithKindAndGate 80% 重复模板 → 抽公共 withGenerationGate helper，
+ * 两个 wrapper 各调一次即可（用 onError 回调做 kind 包装）。
  */
-export function wrapWithGenerationGate<TData>(queryFn: QueryFn<TData>) {
-  return (context: QueryFunctionContext<QueryKey>): Promise<TData> => {
+export function withGenerationGate<T>(
+  queryFn: (context: { signal: AbortSignal }) => T | Promise<T>,
+  onError?: (err: unknown) => never,
+): (context: { signal: AbortSignal }) => Promise<T> {
+  return (context) => {
     let disposed = false
     const onAbort = () => { disposed = true }
     context.signal.addEventListener('abort', onAbort, { once: true })
@@ -101,12 +108,20 @@ export function wrapWithGenerationGate<TData>(queryFn: QueryFn<TData>) {
         if (disposed) {
           throw new ApiQueryStaleError()
         }
+        if (onError) onError(err)
         throw err
       })
       .finally(() => {
         context.signal.removeEventListener('abort', onAbort)
       })
   }
+}
+
+/** 兼容旧 API：useApiQuery 内部使用 */
+export function wrapWithGenerationGate<TData>(queryFn: QueryFn<TData>) {
+  return withGenerationGate(queryFn as (ctx: { signal: AbortSignal }) => TData | Promise<TData>) as (
+  context: QueryFunctionContext<QueryKey>,
+) => Promise<TData>
 }
 
 /**

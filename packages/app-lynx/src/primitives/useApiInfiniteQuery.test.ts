@@ -73,7 +73,8 @@ describe('useApiInfiniteQuery / kind 双错误槽位', () => {
     }
   })
 
-  it('non-ApiError (fetch reject) → wraps as generic with correct kind', async () => {
+  it('non-ApiError (fetch reject) → wraps as generic with correct kind + console.warn 契约破坏可见（spec §测试硬约束 #3）', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const queryFn = vi.fn(async () => { throw new Error('network down') })
     const wrapped = wrapWithKindAndGate(queryFn)
     const ac = new AbortController()
@@ -86,6 +87,12 @@ describe('useApiInfiniteQuery / kind 双错误槽位', () => {
       expect(apiErr.cause.type).toBe(ApiErrorType.UNKNOWN)
       expect(apiErr.cause.message).toBe('network down')
     }
+    // spec §测试硬约束 #3：禁止静默降级 — 契约破坏必须 console.warn 可见
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[useApiInfiniteQuery]'),
+      expect.any(Error),
+    )
+    warnSpy.mockRestore()
   })
 
   it('abort before resolve → ApiQueryStaleError (not ApiQueryError)', async () => {

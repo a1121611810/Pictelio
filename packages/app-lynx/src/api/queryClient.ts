@@ -12,7 +12,7 @@
 //
 // 注意：401 单飞锁不放进 queryClient（破坏 Java 侧 PixivApiCore.synchronized 契约），
 // queryFn 调 apiClient.get/post 即可。
-import { QueryClient, keepPreviousData } from '@tanstack/vue-query'
+import { QueryClient, keepPreviousData, type QueryKey } from '@tanstack/vue-query'
 import { queryKeys } from './queryKeys'
 
 export function createAppQueryClient(): QueryClient {
@@ -47,38 +47,25 @@ export const queryClient: QueryClient = createAppQueryClient()
 // 特定前缀（illusts.detail）后注册以正确合并。
 // （query-core 内部按从宽到窄顺序匹配 + 后注册覆盖前注册。）
 
+// S8 重构：抽 setDefaultGcTime helper（code-review Round 1 S2 修复）
+// 数据驱动避免 8 处 setQueryDefaults 同样板
+const FIVE_MIN = 5 * 60 * 1000
+const ZERO = 0
+function setDefaultGcTime(prefix: QueryKey, ms: number) {
+  queryClient.setQueryDefaults(prefix, { gcTime: ms })
+}
+
 // 1) 详情类稳定数据：gcTime 5min（默认 30s 太短）
-queryClient.setQueryDefaults(
-  queryKeys.illusts.all, // 前缀 ['pictelio', 'illusts']
-  { gcTime: 5 * 60 * 1000 },
-)
+setDefaultGcTime(queryKeys.illusts.all, FIVE_MIN)
 // 2) 用户主页稳定数据
-queryClient.setQueryDefaults(
-  queryKeys.users.all, // 前缀 ['pictelio', 'users']
-  { gcTime: 5 * 60 * 1000 },
-)
+setDefaultGcTime(queryKeys.users.all, FIVE_MIN)
 // 3) 小说详情 / 小说系列：stable content
-queryClient.setQueryDefaults(
-  queryKeys.novels.all,
-  { gcTime: 5 * 60 * 1000 },
-)
+setDefaultGcTime(queryKeys.novels.all, FIVE_MIN)
 // 4) 推荐 / 关注 / 搜索 / 追更：低 gcTime（避免脏读，参考项目「悲观刷新」约定）
-queryClient.setQueryDefaults(
-  queryKeys.illusts.recommended(),
-  { gcTime: 0 },
-)
-queryClient.setQueryDefaults(
-  queryKeys.illusts.follow('public'),
-  { gcTime: 0 },
-)
-queryClient.setQueryDefaults(
-  queryKeys.novels.recommended(),
-  { gcTime: 0 },
-)
-queryClient.setQueryDefaults(
-  queryKeys.novels.follow('public'),
-  { gcTime: 0 },
-)
+setDefaultGcTime(queryKeys.illusts.recommended(), ZERO)
+setDefaultGcTime(queryKeys.illusts.follow('public'), ZERO)
+setDefaultGcTime(queryKeys.novels.recommended(), ZERO)
+setDefaultGcTime(queryKeys.novels.follow('public'), ZERO)
 queryClient.setQueryDefaults(
   queryKeys.search.all,
   { gcTime: 0 }, // 搜索结果时效性高
