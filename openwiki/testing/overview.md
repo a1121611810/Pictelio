@@ -95,12 +95,16 @@ An audit ([`agent-browser-e2e-perf-direction-c-feasibility.md`](/docs/agent-brow
 
 ### Static anchor validation
 
-The `.husky/pre-push` hook runs [`check-e2e-anchors.mjs`](/packages/app/scripts/check-e2e-anchors.mjs) (sub-second, no browser) when a push touches `packages/app/src/` or `packages/app/tests/agent-browser/`. It extracts anchors referenced in the specs and verifies them against `src/`:
+The `.husky/pre-push` hook delegates to [`scripts/check-push-refs.mjs`](/scripts/check-push-refs.mjs) (ADR-0142), which runs [`check-e2e-anchors.mjs`](/packages/app/scripts/check-e2e-anchors.mjs) (sub-second, no browser) when a push touches `packages/app/src/` or `packages/app/tests/agent-browser/`. It extracts anchors referenced in the specs and verifies them against `src/`:
 
 - **Hard checks (failure blocks push):** `data-testid` references, `aria-label` / `placeholder` attribute selectors, route paths (segment-matched against `src/router.tsx`, with a `KNOWN_CATCH_ALL_PATHS` whitelist), and element tag selectors.
 - **Soft checks (warning only):** CSS class selectors (UnoCSS builds classes dynamically) and `clickReliable`/`clickButtonByText` key text.
 - **Dynamic-anchor exemptions:** template placeholders containing `${` (e.g. `navTabActiveJs`'s `${label}`) and dynamically generated `data-testid` values from `data-testid={`…`}` templates (e.g. `ContentTypeToggle`'s `content-type-${opt.key}` renders `content-type-novel`/`content-type-illust`) are exempt from the static match — they are verified by the real browser regression instead.
 - Manual run: `node packages/app/scripts/check-e2e-anchors.mjs`; false positives can be bypassed with `git push --no-verify`.
+
+### Pre-push orchestration & app-lynx gate (ADR-0141 F4, ADR-0142)
+
+[`scripts/check-push-refs.mjs`](/scripts/check-push-refs.mjs) is the pre-push orchestration layer: `.husky/pre-push` is now only a thin shell passing the pre-push protocol through. It runs three domain checks based on the touched paths — app (the E2E-anchor check above), **app-lynx** ([`check-app-lynx-anchors.mjs`](/packages/app-lynx/scripts/check-app-lynx-anchors.mjs), running `pnpm test` over `packages/app-lynx`; closes the ADR-0141 F4 gap where app-lynx test failures passed silently), and `.agents/` (`verify-agent-skills.mjs`). It also handles the remote ref: a locally-missing `remote_sha` triggers a precise `git fetch` retry (then fail-open with a warn if fetch fails), and true divergence fails closed with a human-readable rebase/force-push hint — the fix for the `fatal: Invalid revision range` failure that broke `pnpm release` before the OpenWiki CI merged a docs commit (ADR-0142). Shared git primitives (`hasCommitObject`/`fetchRemoteRef`/`isAncestor`/`diffNames`/`mergeBase`/`diffTreeNames`) live in [`packages/app/scripts/lib/git-refs.mjs`](/packages/app/scripts/lib/git-refs.mjs); the app-lynx migration also landed with `50 files / 804 tests` green and `1103` workspace tests.
 
 ## AI-Generated Test Quality & Cross-Engine Consistency (ADR-0097, ADR-0098, ADR-0101)
 
