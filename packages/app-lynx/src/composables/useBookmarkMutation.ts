@@ -88,7 +88,9 @@ export function useBookmarkMutation(
       await mutation.mutateAsync(target)
       // 动画播完才上抛 onChange（ADR-0112 D5）
       setTimeout(() => onChange?.(target), BOOKMARK_ANIMATION_MS)
-    } catch {
+    } catch (e) {
+      // 测试硬约束 #3：禁止静默降级 — 失败必 console.warn 带模块前缀
+      console.warn('[useBookmarkMutation] toggle failed', e)
       // 失败静息回滚（D4：状态直接复位，不触发反向动画）
       bookmarked.value = !target
       count.value = Math.max(0, count.value + (target ? -1 : 1))
