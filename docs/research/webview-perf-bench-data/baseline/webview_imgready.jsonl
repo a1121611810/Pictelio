@@ -1,0 +1,6 @@
+{"scenario":"imgready","kind":"cold","group":0,"total":12,"hit":12,"miss":0,"p50":22,"p90":22,"p99":23,"mean":16}
+{"scenario":"imgready","kind":"scroll","group":0,"total":5,"hit":5,"miss":0,"p50":4,"p90":5,"p99":5,"mean":4}
+{"scenario":"imgready","kind":"cold","group":1,"total":12,"hit":12,"miss":0,"p50":33,"p90":35,"p99":35,"mean":23}
+{"scenario":"imgready","kind":"scroll","group":1,"total":8,"hit":8,"miss":0,"p50":4,"p90":19,"p99":19,"mean":6}
+{"scenario":"imgready","kind":"cold","group":2,"total":12,"hit":12,"miss":0,"p50":9,"p90":10,"p99":11,"mean":9}
+{"scenario":"imgready","kind":"scroll","group":2,"total":4,"hit":4,"miss":0,"p50":4,"p90":4,"p99":4,"mean":4}

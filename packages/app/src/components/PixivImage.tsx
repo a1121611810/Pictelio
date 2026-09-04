@@ -47,12 +47,14 @@ const PixivImage: Component<PixivImageProps> = (props) => {
   return (
     <>
       {displayUrl() && !failed() ? (
+        // decoding="async"：异步解码，避免图片解码阻塞在主线程帧内
         <img
           src={displayUrl()}
           alt={props.alt || ""}
           class={props.class || ""}
           style={sizingStyle}
           loading={props.loading || "lazy"}
+          decoding="async"
           draggable={props.draggable}
           onClick={props.onClick}
           onLoad={props.onLoad}

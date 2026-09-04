@@ -88,6 +88,36 @@ describe("toWebProxyUrl", () => {
   });
 });
 
+describe("pickUnprefetchedUrls", () => {
+  // 期望值来源：FeedList 预取调度规格 —— 按列表顺序挑「未预取」的前 limit 个，不重排、不去重、无副作用
+  it("按顺序挑出未预取的前 N 个（跳过已预取）", async () => {
+    const { pickUnprefetchedUrls } = await load();
+    const prefetched = new Set(["b"]);
+    expect(pickUnprefetchedUrls(["a", "b", "c", "d"], prefetched, 2)).toEqual(["a", "c"]);
+  });
+
+  it("空列表返回空数组", async () => {
+    const { pickUnprefetchedUrls } = await load();
+    expect(pickUnprefetchedUrls([], new Set(), 12)).toEqual([]);
+  });
+
+  it("全部已预取时返回空数组", async () => {
+    const { pickUnprefetchedUrls } = await load();
+    const prefetched = new Set(["a", "b"]);
+    expect(pickUnprefetchedUrls(["a", "b"], prefetched, 12)).toEqual([]);
+  });
+
+  it("候选超过 limit 时截断为前 limit 个", async () => {
+    const { pickUnprefetchedUrls } = await load();
+    expect(pickUnprefetchedUrls(["a", "b", "c", "d", "e"], new Set(), 3)).toEqual(["a", "b", "c"]);
+  });
+
+  it("limit 大于未预取数量时返回全部未预取", async () => {
+    const { pickUnprefetchedUrls } = await load();
+    expect(pickUnprefetchedUrls(["a", "b"], new Set(["b"]), 12)).toEqual(["a"]);
+  });
+});
+
 describe("loadImage", () => {
   beforeEach(async () => {
     vi.clearAllMocks();

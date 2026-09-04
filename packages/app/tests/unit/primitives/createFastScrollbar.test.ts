@@ -1,5 +1,33 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createFastScrollbar } from "@/primitives/createFastScrollbar";
+
+// --- rAF 手工队列 stub（node 环境无原生 requestAnimationFrame）---
+let rafQueue: Array<{ id: number; cb: FrameRequestCallback }> = [];
+let rafIdCounter = 0;
+vi.stubGlobal(
+  "requestAnimationFrame",
+  vi.fn((cb: FrameRequestCallback): number => {
+    const id = ++rafIdCounter;
+    rafQueue.push({ id, cb });
+    return id;
+  }),
+);
+vi.stubGlobal(
+  "cancelAnimationFrame",
+  vi.fn((id: number) => {
+    rafQueue = rafQueue.filter((entry) => entry.id !== id);
+  }),
+);
+/** 模拟下一帧：执行所有已排队的 rAF 回调 */
+function flushRaf() {
+  const pending = rafQueue;
+  rafQueue = [];
+  for (const { cb } of pending) cb(performance.now());
+}
+
+beforeEach(() => {
+  rafQueue = [];
+});
 
 function make(
   overrides: Partial<{
@@ -69,6 +97,7 @@ describe("createFastScrollbar — 拖拽位移比例映射", () => {
     // thumbTravel = 800 − 160 = 640；拖 320px = 50%
     fs.handlers.onPointerDown(ptr(100));
     fs.handlers.onPointerMove(ptr(100 + 320));
+    flushRaf();
     expect(onScrollTo).toHaveBeenCalledWith((4000 - 800) * 0.5); // 1600
     expect(fs.active()).toBe(true);
     fs.handlers.onPointerUp();
@@ -80,6 +109,7 @@ describe("createFastScrollbar — 拖拽位移比例映射", () => {
     // 起点 scrollTop=800；拖 160px（=25% 轨道）→ +25%×3200=800 → 1600
     fs.handlers.onPointerDown(ptr(50));
     fs.handlers.onPointerMove(ptr(50 + 160));
+    flushRaf();
     expect(onScrollTo).toHaveBeenCalledWith(1600);
   });
 
@@ -87,6 +117,7 @@ describe("createFastScrollbar — 拖拽位移比例映射", () => {
     const { fs, onScrollTo } = make({ scrollTop: 0, viewport: 800, content: 4000, track: 800 });
     fs.handlers.onPointerDown(ptr(0));
     fs.handlers.onPointerMove(ptr(0 + 1000)); // 超过轨道
+    flushRaf();
     const received = onScrollTo.mock.calls.at(-1)?.[0] as number;
     expect(received).toBeGreaterThan(3200); // 未 clamp（外部处理）
   });
@@ -95,6 +126,51 @@ describe("createFastScrollbar — 拖拽位移比例映射", () => {
     const { fs, onScrollTo } = make({ viewport: 800, content: 500 });
     fs.handlers.onPointerDown(ptr(100));
     fs.handlers.onPointerMove(ptr(300));
+    flushRaf();
+    expect(onScrollTo).not.toHaveBeenCalled();
+  });
+});
+
+describe("createFastScrollbar — pointermove rAF 合帧", () => {
+  it("同帧多次 pointermove 只触发一次 onScrollTo，且取最新位置", () => {
+    const { fs, onScrollTo } = make({ scrollTop: 0, viewport: 800, content: 4000, track: 800 });
+    // thumbTravel = 640；第一次 move 目标 800，第二次覆盖为 1600
+    fs.handlers.onPointerDown(ptr(100));
+    fs.handlers.onPointerMove(ptr(100 + 160));
+    fs.handlers.onPointerMove(ptr(100 + 320));
+    // flush 前事件不直接 onScrollTo
+    expect(onScrollTo).not.toHaveBeenCalled();
+    flushRaf();
+    expect(onScrollTo).toHaveBeenCalledTimes(1);
+    expect(onScrollTo).toHaveBeenCalledWith(1600);
+  });
+
+  it("pointermove 未 flush 时 pointerup 立即落位最新 top，且不二次触发", () => {
+    const { fs, onScrollTo } = make({ scrollTop: 0, viewport: 800, content: 4000, track: 800 });
+    fs.handlers.onPointerDown(ptr(100));
+    fs.handlers.onPointerMove(ptr(100 + 320)); // 目标 1600，rAF 未到
+    fs.handlers.onPointerUp();
+    // 抬手立即 flush 最新目标，终态即时落位
+    expect(onScrollTo).toHaveBeenCalledTimes(1);
+    expect(onScrollTo).toHaveBeenCalledWith(1600);
+    // flush 已取消 pending rAF，下一帧不再触发
+    flushRaf();
+    expect(onScrollTo).toHaveBeenCalledTimes(1);
+    expect(fs.active()).toBe(false);
+  });
+
+  it("preventDefault 仍在 pointermove 事件回调内同步调用（合帧不延迟）", () => {
+    const { fs } = make({ scrollTop: 0, viewport: 800, content: 4000, track: 800 });
+    fs.handlers.onPointerDown(ptr(100));
+    const move = ptr(180);
+    fs.handlers.onPointerMove(move);
+    expect(move.preventDefault).toHaveBeenCalledOnce();
+  });
+
+  it("非拖拽态 pointermove 不调度 rAF", () => {
+    const { fs, onScrollTo } = make({ scrollTop: 0, viewport: 800, content: 4000, track: 800 });
+    fs.handlers.onPointerMove(ptr(300));
+    flushRaf();
     expect(onScrollTo).not.toHaveBeenCalled();
   });
 });

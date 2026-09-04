@@ -4,6 +4,7 @@ import { setIsCheckingUpdate, setCheckCompleted, loadAccountR18 } from "@/stores
 import { settings } from "@/settings";
 import { persistScrollRestoration } from "@/stores/uiStore";
 import { scrollToTop } from "@/utils/scrollToTop";
+import { installStartupScrollGuard } from "@/utils/startupScrollGuard";
 import {
   gateActive,
   notifyWebBundleReady,
@@ -23,19 +24,6 @@ import { markContentReady } from "@/native/splashBridge";
 const STARTUP_CHECK_DELAY_MS = 500;
 /** "再按一次退出应用" toast 的显示时长（ms） */
 const EXIT_HINT_DURATION_MS = 2000;
-
-/**
- * Chromium 浏览器级滚动恢复的一次性回顶（「持久化滚动恢复」开关关闭时挂载）。
- * 该恢复不经 window.scrollTo 且不受 history.scrollRestoration="manual" 控制，
- * 会在渲染早期把 scrollY 恢复为上次会话位置；检测到恢复特征滚动（scrollY>0）
- * 立即回顶并自卸载。
- */
-function onStartupRestoreScroll(): void {
-  if (window.scrollY > 0) {
-    scrollToTop();
-  }
-  window.removeEventListener("scroll", onStartupRestoreScroll);
-}
 
 /**
  * 启动后检查更新（延迟执行，不阻塞首次渲染）。
@@ -90,6 +78,8 @@ const RootLayout: Component = (props: { children?: any }) => {
     // 滚动恢复由 @solidjs/router 内置 scrollRestoration 管理。
     // 「持久化滚动恢复」开关关闭（默认）时：重新打开 app = 全新会话，
     // 清除跨会话滚动持久化并强制回顶，冷启动始终从顶部开始。
+    // 守卫的 cleanup 挂进下方 onCleanup（组件卸载时可能仍在守卫窗口期内）。
+    let removeStartupScrollGuard: (() => void) | null = null;
     if (!persistScrollRestoration()) {
       try {
         sessionStorage.removeItem("solid-router:scroll");
@@ -99,10 +89,13 @@ const RootLayout: Component = (props: { children?: any }) => {
       // Chromium 浏览器级滚动恢复（磁盘浏览数据）不经 window.scrollTo 且不受
       // history.scrollRestoration="manual" 控制，会在渲染早期把 scrollY 恢复为
       // 上次会话位置（真机实测 t≈3.5s 0→1306，触发 scroll 事件但 calls 无 scrollTo）。
-      // 监听启动窗口内的 scroll 事件：出现恢复特征滚动（scrollY>0）立即回顶，
-      // 一次性处理后移除；5 秒窗口过后移除，不影响用户后续滚动。
-      window.addEventListener("scroll", onStartupRestoreScroll, { passive: true });
-      window.setTimeout(() => window.removeEventListener("scroll", onStartupRestoreScroll), 5000);
+      // 守卫在启动窗口内判别滚动来源：无用户交互时出现恢复特征滚动（scrollY>0）
+      // 立即回顶；用户已有交互（touchstart/pointerdown/wheel，磁盘级恢复不产生
+      // 这些事件）则永不回顶，避免把用户首次主动滚动误打回顶部。窗口过后自卸载。
+      removeStartupScrollGuard = installStartupScrollGuard({
+        isTopRequired: () => true,
+        scrollToTop: () => scrollToTop(),
+      });
       scrollToTop();
     }
 
@@ -120,6 +113,7 @@ const RootLayout: Component = (props: { children?: any }) => {
       window.removeEventListener("exitHint", onExitHint);
       clearTimeout(exitHintTimer);
       unregisterBackGesture?.();
+      removeStartupScrollGuard?.();
     });
 
     // Load persisted preferences (async) — 统一由 Settings registry 批量加载
