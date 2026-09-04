@@ -50,6 +50,7 @@ import {
 import { truncateChangelog } from "./lib/changelog.mjs";
 import { bundlePathsFor, resolveOtaPrivateKeyPath } from "./lib/release-bundle-core.mjs";
 import { parseWebOnlyArgs, buildVersionJson } from "./lib/release-webonly.mjs";
+import { assertMainNotDiverged } from "./lib/release-preflight.mjs";
 import { planOverwrite, executeOverwrite, probeRemote } from "./release-overwrite.mjs";
 import { uploadReleaseAssets, resolveUploader } from "./lib/release-uploader.mjs";
 import { probeProxyRouting } from "./lib/proxy-probe.mjs";
@@ -750,6 +751,10 @@ async function main() {
       `tag ${tag} 已存在（本地: ${localTagExists}, 远端: ${remoteTagExists}）。请删除冲突 tag 或更换版本号`,
     );
   }
+
+  // ADR-0142 D3 / ticket #353：远端分叉预检——确认前 fail-fast，零半成品
+  // （分叉时中止：版本号未 bump、无 commit/tag；fetch 失败仅 warn，由 pre-push 钩子兜底）
+  await assertMainNotDiverged({ cwd: repoRoot });
 
   // ── 发布计划确认 ──
   console.log("─".repeat(40));
