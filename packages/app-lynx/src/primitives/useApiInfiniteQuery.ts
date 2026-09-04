@@ -17,6 +17,7 @@ import {
   type QueryKey,
   type QueryFunctionContext,
   type UseInfiniteQueryOptions,
+  type InfiniteData,
 } from '@tanstack/vue-query'
 import { type ApiError, ApiErrorType } from '../api/types'
 import { ApiQueryStaleError, isApiQueryStaleError } from './useApiQuery'
@@ -81,23 +82,26 @@ export function isApiQueryError(err: unknown): err is ApiQueryError {
  * ```
  */
 export function useApiInfiniteQuery<
-  TData = unknown,
+  TQueryFnData = unknown,
   TError = Error,
+  // vue-query 5.x 类型规范：TData 默认 = InfiniteData<TQueryFnData>
+  // 显式标注以让 caller 端的 query.data.value 类型正确推断为 InfiniteData<TQueryFnData>（含 pages 字段）
+  TData = InfiniteData<TQueryFnData>,
   TQueryKey extends QueryKey = QueryKey,
   TPageParam = unknown,
 >(
-  options: UseInfiniteQueryOptions<TData, TError, TData, TQueryKey, TPageParam>,
+  options: UseInfiniteQueryOptions<TQueryFnData, TError, TData, TQueryKey, TPageParam>,
 ) {
   // UseInfiniteQueryOptions 内部 queryFn 字段是 MaybeRefDeep 形态——访问前先 unwrap
-  const originalQueryFn = (options as { queryFn?: unknown }).queryFn as InfiniteQueryFn<TData, TPageParam> | undefined
+  const originalQueryFn = (options as { queryFn?: unknown }).queryFn as InfiniteQueryFn<TQueryFnData, TPageParam> | undefined
   // 走 MaybeRefOrGetter overload（getter 形式），与 useApiQuery 同策略
   const wrappedOptions = () => ({
     ...options,
     queryFn: originalQueryFn ? wrapWithKindAndGate(originalQueryFn) : undefined,
   })
   return (useInfiniteQuery as (
-    options: MaybeRefOrGetter<UseInfiniteQueryOptions<TData, TError, TData, TQueryKey, TPageParam>>,
-  ) => ReturnType<typeof useInfiniteQuery<TData, TError, TData, TQueryKey, TPageParam>>)(
+    options: MaybeRefOrGetter<UseInfiniteQueryOptions<TQueryFnData, TError, TData, TQueryKey, TPageParam>>,
+  ) => ReturnType<typeof useInfiniteQuery<TQueryFnData, TError, TData, TQueryKey, TPageParam>>)(
     wrappedOptions,
   )
 }

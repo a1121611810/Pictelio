@@ -43,7 +43,7 @@ export interface UseApiCommentsQueryReturn {
   /** 分页错误（kind=pagination → inline banner）；非 pagination 错误返回 null */
   readonly pageError: ComputedRef<ApiError | null>
   /** 原始 query 暴露（refetch / fetchNextPage / status 等） */
-  readonly query: ReturnType<typeof useApiInfiniteQuery<PixivCommentRootResponse, Error, readonly unknown[], string | null>>
+  readonly query: ReturnType<typeof useApiInfiniteQuery<PixivCommentRootResponse, Error>>
 }
 
 export function useApiCommentsQuery(options: UseApiCommentsQueryOptions): UseApiCommentsQueryReturn {
@@ -56,10 +56,12 @@ export function useApiCommentsQuery(options: UseApiCommentsQueryOptions): UseApi
     ? queryKeys.illusts.comments(targetId)
     : queryKeys.novels.comments(targetId)
 
-  const query = useApiInfiniteQuery<PixivCommentRootResponse, Error, readonly unknown[], string | null>({
+  // 类型签名: <TQueryFnData, TError, TData = InfiniteData<TQueryFnData>, TQueryKey, TPageParam>
+  // 写 2 参让 vue-query 默认 TData = InfiniteData<PixivCommentRootResponse>（含 pages 字段）
+  const query = useApiInfiniteQuery<PixivCommentRootResponse, Error>({
     queryKey,
     queryFn: async ({ signal, pageParam }) => {
-      if (pageParam) {
+      if (typeof pageParam === 'string') {
         // next_url 路径（绝对 URL）—— apiClient 内部 rewrite + 401 重试
         return apiClient.get<PixivCommentRootResponse>(pageParam, undefined, signal)
       }
@@ -84,7 +86,7 @@ export function useApiCommentsQuery(options: UseApiCommentsQueryOptions): UseApi
   const hasMore = computed<boolean>(() => {
     const data = query.data.value
     if (!data) return false
-    return data.pages.some((p) => p.next_url != null)
+    return data.pages.some((page: { next_url: string | null }) => page.next_url != null)
   })
 
   const firstError = computed<ApiError | null>(() => {
