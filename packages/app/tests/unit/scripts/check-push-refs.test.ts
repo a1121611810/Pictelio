@@ -158,7 +158,7 @@ describe("正常路径（remote_sha 存在且为祖先）", () => {
     const f = await makeFixture();
     // 远端 feature 分支由第三方推进，本地持有旧 feature
     await git(["checkout", "-b", "feature"], f.local);
-    const shaF = await commitFiles(f.local, { "f.txt": "F" }, "feature commit");
+    await commitFiles(f.local, { "f.txt": "F" }, "feature commit");
     await git(["push", "-u", "origin", "feature"], f.local);
     const other = join(f.dir, "other");
     await git(["clone", f.remote, other], f.dir);
