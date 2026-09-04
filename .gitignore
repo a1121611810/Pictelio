@@ -48,3 +48,4 @@ packages/app/ios/
 
 # Gradle 用户缓存（GRADLE_USER_HOME 约定在仓库根，见 scripts/release 流程）
 /android/
+packages/app/bench-results/
