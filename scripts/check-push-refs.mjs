@@ -65,6 +65,23 @@ function defaultRunDomainCheck(script, cwd) {
   });
 }
 
+// 分叉/历史改写的人话报错（ADR-0142 D2）：分支引用给 rebase 指引（按实际远端与分支名生成），
+// 非分支引用（tag 等）rebase 不适用，给覆盖指引。
+function divergenceMessage(remoteRef, remote) {
+  const head = `❌ pre-push: 远端 ${remoteRef} 包含本地没有的提交（常见于 OpenWiki CI 定时合并 docs 更新）`;
+  if (remoteRef.startsWith("refs/heads/")) {
+    const branch = remoteRef.slice("refs/heads/".length);
+    return (
+      `${head}\n  - 请先执行: git fetch ${remote} && git rebase ${remote}/${branch}\n` +
+      "  - 完成后重试 push；确认为误报或确要强推（force-push）时可用 git push --no-verify 绕过"
+    );
+  }
+  return (
+    `${head}\n  - 确认远端历史是否被改写；确需覆盖可用 git push --no-verify` +
+    "（tag 需先删除远端旧 tag 再推送）"
+  );
+}
+
 // 返回进程退出码（0 放行 / 1 拦截）；不直接 process.exit，便于测试。
 export async function runPrePushChecks({
   stdinText,
@@ -72,6 +89,8 @@ export async function runPrePushChecks({
   // 与脚本位置解耦，便于 fixture/E2E 驱动；域校验脚本始终从脚本所在仓库根解析。
   gitCwd = process.cwd(),
   repoRoot = REPO_ROOT,
+  // 远端名（pre-push 协议 argv $1）；新分支 merge-base 路径的 origin/main 硬编码为既有假设
+  remote = "origin",
   runDomainCheck = defaultRunDomainCheck,
   log = console.log,
   warn = console.warn,
@@ -96,8 +115,8 @@ export async function runPrePushChecks({
     } else {
       // 已存在分支：remote_sha 本地缺失 → 精准 fetch 重试（ADR-0142 D1）
       if (!(await hasCommitObject(remoteSha, gitCwd))) {
-        const fetched = await fetchRemoteRef({ remoteRef, cwd: gitCwd });
-        if (!fetched.ok || !(await hasCommitObject(remoteSha, gitCwd))) {
+        const fetched = await fetchRemoteRef({ remoteRef, remote, cwd: gitCwd });
+        if (!fetched.ok) {
           warn(
             `${MODULE} ⚠ 远端引用 ${remoteRef}（${remoteSha.slice(0, 8)}）本地不存在且 fetch 失败` +
               (fetched.stderr ? `: ${fetched.stderr.split("\n")[0]}` : "") +
@@ -105,14 +124,17 @@ export async function runPrePushChecks({
           );
           continue;
         }
+        if (!(await hasCommitObject(remoteSha, gitCwd))) {
+          warn(
+            `${MODULE} ⚠ fetch ${remoteRef} 成功但提交 ${remoteSha.slice(0, 8)} 仍不在本地` +
+              "（push 协商后远端可能已回退或改写）\n  跳过该引用的静态校验并放行（fail-open）",
+          );
+          continue;
+        }
       }
       // 真分叉 / 远端历史改写 → 人话报错（ADR-0142 D2）
       if (!(await isAncestor(remoteSha, localSha, gitCwd))) {
-        error(
-          `❌ pre-push: 远端 ${remoteRef} 包含本地没有的提交（常见于 OpenWiki CI 定时合并 docs 更新）\n` +
-            "  - 请先执行: git fetch origin && git rebase origin/main\n" +
-            "  - 完成后重试 push；确认为误报时可用 git push --no-verify 绕过",
-        );
+        error(divergenceMessage(remoteRef, remote));
         diverged = true;
         continue;
       }
@@ -148,7 +170,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   process.stdin.setEncoding("utf-8");
   for await (const chunk of process.stdin) stdinText += chunk;
   try {
-    process.exit(await runPrePushChecks({ stdinText }));
+    // pre-push 协议 argv：$1 = 远端名（薄壳透传），$2 = 远端 URL（不使用）
+    process.exit(await runPrePushChecks({ stdinText, remote: process.argv[2] || "origin" }));
   } catch (e) {
     console.error(`${MODULE} 未预期错误: ${e.message}`);
     process.exit(1);

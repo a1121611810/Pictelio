@@ -64,3 +64,6 @@ fetch 成功后用 `git merge-base --is-ancestor` 判定：远端含本地没有
 - hook 内新增一次精准 fetch 的网络开销仅在 remote_sha 缺失时发生（正常路径零开销放行的现状不变）。
 - fail-open 路径以 warn 保持可见（遵守「禁止静默降级」约束）。
 - 钩子核心逻辑迁入可测的编排器脚本，四分支（正常 / fetch 成功 / fetch 失败放行 / 分叉报错）有真实 fixture 单测。
+- **有意偏离 spec 一处**：`diffTreeNames` 增加 `--root` flag——原 shell 钩子对 orphan 分支根提交的 `git diff-tree` 漏检为 0 文件（无 `--root` 时根提交不与空树 diff），现为全量检出。方向更安全（校验范围只增不减），已在 commit message 按「重构行为不变约束」标注。
+- code-review 复审补充（Round 1 P2 修复）：分叉指引按实际远端与分支名生成（不再硬编码 `origin/main`）；tag 等非分支引用的分叉给覆盖指引而非 rebase 指引；fail-open 的「fetch 失败」与「fetch 成功但对象仍缺失」两种文案分离；薄壳透传 pre-push 协议的 `$1` 远端名（非 origin remote 不再误 fetch origin）。
+- 可达性推论（已记入测试头注释）：「remote_sha 缺失 → fetch 成功 → 正常校验」分支逻辑上不可达——缺失 ⟹ 不在本地历史 ⟹ fetch 后必非祖先 ⟹ 必走分叉报错。

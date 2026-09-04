@@ -5,4 +5,4 @@
 #      packages/app-lynx/(src|tests) → app-lynx 单测；.agents/ → 仓库级 skill 校验
 #   2) remote_sha 本地缺失 → 精准 fetch 重试；fetch 失败 → warn + fail-open 放行
 #   3) 真分叉（远端含本地没有的提交）→ 人话报错（git fetch origin && git rebase origin/main）
-exec node "$(dirname "$0")/../scripts/check-push-refs.mjs"
+exec node "$(dirname "$0")/../scripts/check-push-refs.mjs" "$1"

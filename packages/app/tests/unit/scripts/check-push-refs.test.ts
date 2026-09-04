@@ -2,6 +2,11 @@
 // 期望值来源（oracle 溯源）：真实 git 双仓库 fixture 的已知提交拓扑；
 // git 数据零 mock（契约测试硬约束），仅域校验脚本调用（check-e2e-anchors 等）
 // 以记录型桩替代——那些脚本有各自的测试，此处只验证编排器的调度与分支语义。
+//
+// 可达性说明（code-review P2-5b）：spec Testing Decisions 中的「remote_sha 缺失 →
+// fetch 成功 → 正常校验」分支在逻辑上不可达——remote_sha 缺失 ⟹ 其不在本地历史中
+// ⟹ fetch 后必非 local_sha 祖先 ⟹ 必走分叉报错。现有用例覆盖全部可达分支，
+// 请勿为该分支补写不出的用例。
 import { describe, it, expect, afterEach } from "vitest";
 import { execFile } from "node:child_process";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
@@ -129,6 +134,48 @@ describe("正常路径（remote_sha 存在且为祖先）", () => {
     });
     expect(r.code).toBe(0);
     expect(r.calls).toEqual([]);
+  });
+
+  it("域 pattern 第二分支探针：tests/agent-browser → app 域；app-lynx/tests → app-lynx 域", async () => {
+    const f = await makeFixture();
+    const shaC = await commitFiles(
+      f.local,
+      {
+        "packages/app/tests/agent-browser/specs/x.test.ts": "x",
+        "packages/app-lynx/tests/y.test.ts": "y",
+      },
+      "touch test dirs",
+    );
+    const r = await run({
+      stdinText: `refs/heads/main ${shaC} refs/heads/main ${f.shaA}\n`,
+      gitCwd: f.local,
+    });
+    expect(r.code).toBe(0);
+    expect(r.calls).toEqual([APP_SCRIPT, LYNX_SCRIPT]);
+  });
+
+  it("分叉指引按实际分支名生成（非 main 分支不硬编码 origin/main）", async () => {
+    const f = await makeFixture();
+    // 远端 feature 分支由第三方推进，本地持有旧 feature
+    await git(["checkout", "-b", "feature"], f.local);
+    const shaF = await commitFiles(f.local, { "f.txt": "F" }, "feature commit");
+    await git(["push", "-u", "origin", "feature"], f.local);
+    const other = join(f.dir, "other");
+    await git(["clone", f.remote, other], f.dir);
+    await git(["config", "user.email", "ci@example.com"], other);
+    await git(["config", "user.name", "CI"], other);
+    await git(["checkout", "feature"], other);
+    const shaF2 = await commitFiles(other, { "f2.txt": "F2" }, "remote feature advance");
+    await git(["push", "origin", "feature"], other);
+    // 本地继续提交（不 fetch）→ 分叉
+    const shaF3 = await commitFiles(f.local, { "f3.txt": "F3" }, "local feature commit");
+    const r = await run({
+      stdinText: `refs/heads/feature ${shaF3} refs/heads/feature ${shaF2}\n`,
+      gitCwd: f.local,
+    });
+    expect(r.code).toBe(1);
+    expect(r.errors.join("\n")).toContain("git rebase origin/feature");
+    expect(r.errors.join("\n")).not.toContain("rebase origin/main");
   });
 
   it("域校验失败 → exit 1 且输出含 --no-verify 绕过指引", async () => {
