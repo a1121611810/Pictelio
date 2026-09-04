@@ -1,11 +1,11 @@
 <script setup lang="ts">
 // 收藏按钮（列表卡片 ♥ + 详情页 ♥ 复用）
 // ADR-0112：M3 动效（state-layer 环扩散/收拢 + Expressive spring 弹心）+ 乐观触发。
-// 状态机在 primitives/createBookmarkToggle（node 可测 seam）；本组件只管渲染与特效节点。
+// T4 迁移（ADR-0141）：状态机从 primitives/createBookmarkToggle 改为 composable
+// useBookmarkMutation（useMutation 替代 deps.add/remove；getter 形态保持不变 → 模板零变化）。
 // @tap.stop：阻止冒泡到卡片 tap（进详情），需实测 vue-lynx 是否支持 .stop。
 import { ref } from 'vue'
-import { addBookmark, deleteBookmark } from '../api/illust'
-import { createBookmarkToggle, BOOKMARK_ANIMATION_MS } from '../primitives/createBookmarkToggle'
+import { BOOKMARK_ANIMATION_MS, useBookmarkMutation } from '../composables/useBookmarkMutation'
 
 const props = defineProps<{
   illustId: number
@@ -17,9 +17,16 @@ const props = defineProps<{
 // change 事件：动画播完后上抛（动画完成态，ADR-0112 决策 4；供收藏列表等宿主移除已取消收藏的项）
 const emit = defineEmits<{ change: [bookmarked: boolean] }>()
 
-const bm = createBookmarkToggle(props.illustId, props.initialBookmarked, props.bookmarkCount ?? 0, {
-  add: addBookmark,
-  remove: deleteBookmark,
+// useBookmarkMutation composable（替代 createBookmarkToggle）：
+// - 内部 useMutation 调 apiClient.post → 401 重试走 apiClient seam
+// - onMutate 立即翻转（乐观触发，状态机保持与原 primitive 等价）
+// - onSuccess 350ms 后 emit('change')（动画完成态，ADR-0112 D5）
+// - onError 静息回滚 + errorMsg
+// - busy 锁由 composable 内部维护
+const bm = useBookmarkMutation({
+  illustId: props.illustId,
+  initialBookmarked: props.initialBookmarked,
+  initialCount: props.bookmarkCount ?? 0,
   onChange: (bookmarked) => emit('change', bookmarked),
 })
 
@@ -37,8 +44,8 @@ const rings = ref<Ring[]>([])
 let nextRingId = 1
 
 function onTap() {
-  if (bm.busy) return
-  const target = !bm.bookmarked
+  if (bm.busy.value) return
+  const target = !bm.bookmarked.value
   lastTarget.value = target
   animSeq.value++
   const id = nextRingId++
@@ -69,11 +76,11 @@ function onTap() {
       <view :key="animSeq" :class="animSeq > 0 ? (lastTarget ? 'bookmark-pop-add' : 'bookmark-pop-remove') : ''">
         <!-- ♥\uFE0E：U+FE0E 强制 text presentation——裸 U+2665 在 Lynx 原生被解析为彩色 emoji
              字形（固有色 #fa242f），CSS color 完全失效（心形恒红，真机实测 2026-08-25，ADR-0112） -->
-        <text class="text-[6.4vw] leading-none" :class="bm.bookmarked ? 'text-error' : 'text-outline'">♥︎</text>
+        <text class="text-[6.4vw] leading-none" :class="bm.bookmarked.value ? 'text-error' : 'text-outline'">♥︎</text>
       </view>
     </view>
-    <text v-if="bookmarkCount !== undefined" class="text-label-medium text-outline ml-1">{{ bm.count }}</text>
-    <text v-if="bm.errorMsg" class="text-label-medium text-error ml-1">{{ bm.errorMsg }}</text>
+    <text v-if="bookmarkCount !== undefined" class="text-label-medium text-outline ml-1">{{ bm.count.value }}</text>
+    <text v-if="bm.errorMsg.value" class="text-label-medium text-error ml-1">{{ bm.errorMsg.value }}</text>
   </view>
 </template>
 
