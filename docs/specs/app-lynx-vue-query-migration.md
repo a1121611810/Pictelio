@@ -89,17 +89,52 @@ vue-lynx 官方 [data-fetching 指南](https://vue.lynxjs.org/zh/guide/data-fetc
 
 - `src/index.ts` — 挂载 `VueQueryPlugin`
 - `src/api/illust.ts` / `novel.ts` / `user.ts` / `search.ts` / `comment.ts` / `auth.ts` — 不动接口签名（queryFn 调 apiClient）
-- `src/primitives/createMixFeed.ts` — 内部多源拉取改 useQueries（外部 API 不变）
-- `src/primitives/useComments.ts` — 内部 list 部分改 useInfiniteQuery（state 接口变化：loading/error/comments 派生自 useQuery 返回）
-- `src/primitives/useSearch.ts` — 内部 list 部分改 useInfiniteQuery（debounce / 双游标编排保留）
-- 各页面组件 — 从「`primitive.state.comments`」改为「`useApiInfiniteQuery(...)` 返回值 + `storeToRefs`」
+- `src/primitives/createMixFeed.ts` — 内部多源拉取改 useQueries（**R3 实际路径**：factory 形态 vs useQueries 矛盾，改用 AbortController + signal 透传，外部 API 不变；详见 ADR-0141 R2 注记）
+- `src/primitives/useComments.ts` — 内部 list 部分改 useInfiniteQuery（**R3 范围收窄**：业务编排与 useInfiniteQuery 抽象能力不兼容，consumer 未迁，useApiCommentsQuery composable 工具层仅就位）
+- `src/primitives/useSearch.ts` — 内部 list 部分改 useInfiniteQuery（**R3 范围收窄**：debounce / scope/sort 切 / 双游标 / merge 编排保留，consumer 未迁）
+- 各页面组件 — 从「`primitive.state.comments`」改为「`useApiInfiniteQuery(...)` 返回值 + `storeToRefs`」**（R3 未实施 — 详见 R4 决策）**
 
 删除：
 
-- `src/primitives/createBookmarkToggle.ts`（87 行）
-- `src/primitives/createWatchlistToggle.ts`（76 行）
-- `src/primitives/createBookmarkToggle.test.ts`（被 useBookmarkMutation.test.ts 替代）
-- `src/primitives/createWatchlistToggle.test.ts`（被 useWatchlistMutation.test.ts 替代）
+- `src/primitives/createBookmarkToggle.ts`（87 行）— **R4 决策：保留**（composable 形态不适配 Watchlist.vue list 工厂 per-item 场景；5 个原测试保护不变量）
+- `src/primitives/createWatchlistToggle.ts`（76 行）— **R4 决策：保留**（同 createBookmarkToggle 理由）
+- `src/primitives/createBookmarkToggle.test.ts`（被 useBookmarkMutation.test.ts 替代）— **R4 决策：保留**（createBookmarkToggle 保留故测试也保留）
+- `src/primitives/createWatchlistToggle.test.ts`（被 useWatchlistMutation.test.ts 替代）— **R4 决策：保留**（同 createWatchlistToggle 保留理由）
+- `src/composables/useWatchlistMutation.ts`（69 行）— **R4 决策：已删**（composable 形态不适配 list 工厂；commit 304d5f07 删除）
+
+### R4（2026-09-04 修订）— spec 字面 vs 实际 diff 偏离决策记录
+
+按 ADR-0141 R3 hard rule「spec 字面要求 vs 实际 diff 偏离时必须在 commit message 显式记录范围收窄决策」补全 R4 决策表。code-review 双轴 F9 阻塞 finding「spec 字面要求与实际 diff 多处偏离未拍板」全清单：
+
+| # | spec 字面承诺 | 实际 diff | R4 决策 | 阻塞 finding | 跟踪 |
+|---|---|---|---|---|---|
+| 1 | src/composables/useApiQuery.ts | 实现在 src/primitives/useApiQuery.ts | **保留 primitives/**（vue-query 5.x composable hook helper 与原始 useComments/useSearch 等 factory primitive 同目录语义；非 composable mutation/infinite query 形态） | 路径漂移 | 已 commit + R4 文档化 |
+| 2 | src/composables/useApiInfiniteQuery.ts | 实现在 src/primitives/useApiInfiniteQuery.ts | 同 #1 | 同 #1 | 同 #1 |
+| 3 | useComments 内部 list 改 useInfiniteQuery | 实际未迁 | **R4 决策：范围收窄**——useApiCommentsQuery composable 工具层就位，consumer 迁移独立 ticket | F5（Oracle 阻塞）| T8（独立 effort） |
+| 4 | useSearch 内部 list 改 useInfiniteQuery | 实际未迁 | **R4 决策：范围收窄**——useSearch 业务编排更深（debounce / scope/sort / 双游标 / merge），超 useInfiniteQuery 抽象能力 | F6 | T9（独立 effort） |
+| 5 | 删除 createBookmarkToggle.ts | 实际未删 | **R4 决策：保留**（factory 形态，composable 不适配 list 工厂 per-item） | F10 (R3 deferred) | T10（独立 effort 评估迁移路径） |
+| 6 | 删除 createWatchlistToggle.ts | 实际未删 | 同 #5 | F10 | T10 |
+| 7 | useFollowMutation composable | 实际未存在 | **R4 决策：推迟**——关注/取关不是 spec T4 关键路径，watchlistStore / bookmark store 已迁移 | 阻塞 finding F6 子项 | T11（独立 effort） |
+| 8 | createMixFeed 改 useQueries | 实际改 AbortController + signal 透传 | **R4 决策：路径偏离**（factory vs useQueries 形态对立；用 AbortController + signal 达到同样目的） | 阻塞 finding 路径偏离 | 已在 ADR-0141 R2 commit 585f5c0c 自承 |
+| 9 | __tests__/ 目录测试 | 实际 colocate 测 | **R4 决策：保留 colocate**（vitest 约定跟随源码；非 spec 强约束） | 路径漂移 | — |
+
+### R4 TDD oracle 补强记录
+
+code-review F7/F8 修复后，13 个新测试（useApiQuery.test.ts 11 + useApiInfiniteQuery.test.ts 7）部分 oracle 提升：
+- useApiQuery 写真 apiClient + globalThis.fetch 集成（spyOn 第三参验证 signal 透传）
+- createMixFeed 写真首载 path signal + refresh 路径旧 controller abort + 新 signal 隔离
+- useApiInfiniteQuery 类型 bug 修复（TData 默认 = InfiniteData<TQueryFnData>）
+
+仍待补 oracle：
+- useApiCommentsQuery 派生层端到端测试（vue-query 5.x hooks 需 setup() 上下文 + 真 component mount，仓库无 @vue/test-utils 依赖；端到端由 useApiInfiniteQuery.test.ts 7 个 wrap 测试 + T7 真机 bench 兜底）
+
+### R4 真机 bench 兜底（ADR-0141 R2 + commit 304d5f07）
+
+- benchNav=illust → 推荐 sub-tab + 4 卡渲染（M3 FAB + 标签 + 心数）
+- benchNav=illust-follow → 关注 sub-tab + T6 双错槽位 first banner（HTTP 500 中文文案）
+- bookmark toggle → useBookmarkMutation 触发 + M3 动画（bookmark-pop-add + bookmark-ring-out）320ms + 失败回滚契约保留
+- T6 fix 后 0 errors / 0 warnings
+- bundle 939.6 KB（baseline 758.9 → +180.7 KB）
 
 ### 默认 QueryClient 配置（来自 ADR-0141 D4）
 
