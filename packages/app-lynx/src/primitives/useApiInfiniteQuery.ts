@@ -20,7 +20,7 @@ import {
   type InfiniteData,
 } from '@tanstack/vue-query'
 import { type ApiError, ApiErrorType } from '../api/types'
-import { ApiQueryStaleError, isApiQueryStaleError } from './useApiQuery'
+import { ApiQueryStaleError, isApiQueryStaleError, withGenerationGate } from './useApiQuery'
 
 export type ApiQueryErrorKind = 'first' | 'pagination'
 
@@ -114,27 +114,17 @@ type MaybeRefOrGetter<T> = import('vue').MaybeRefOrGetter<T>
 export function wrapWithKindAndGate<TData, TPageParam>(
   queryFn: InfiniteQueryFn<TData, TPageParam>,
 ) {
+  // S7 重构：复用 useApiQuery 抽出的 withGenerationGate 公共 helper
+  // 差异仅在 catch 内的 kind 包装（与 generation-gate 无关）
   return (context: QueryFunctionContext<QueryKey, TPageParam>): Promise<TData> => {
-    let disposed = false
-    const onAbort = () => { disposed = true }
-    context.signal.addEventListener('abort', onAbort, { once: true })
-
-    // 判定本次失败是「首屏」还是「分页」：
-    // - pageParam 为 null/undefined → 首屏（initial load）
-    // - pageParam 为 string/number → 分页（fetchNextPage）
     const isFirstPage = context.pageParam === null || context.pageParam === undefined
     const kind: ApiQueryErrorKind = isFirstPage ? 'first' : 'pagination'
 
-    // ⚠️ queryFn 同步执行（见 useApiQuery wrapWithGenerationGate 注释）
-    const innerPromise = Promise.resolve(queryFn(context))
-
-    return innerPromise
-      .then((data) => {
-        if (disposed) throw new ApiQueryStaleError()
-        return data
-      })
-      .catch((err) => {
-        if (disposed) throw new ApiQueryStaleError()
+    return withGenerationGate(
+      queryFn as unknown as (ctx: { signal: AbortSignal }) => TData | Promise<TData>,
+      (err): never => {
+        // generation-gate 已把 disposed=true 替换为 ApiQueryStaleError
+        // 此处只处理「disposed=false 但 queryFn reject」的真实错误
         if (isApiQueryError(err)) throw err
         if (isApiQueryStaleError(err)) throw err
         // 原始 ApiError → 包成 ApiQueryError 携带 kind
@@ -142,13 +132,16 @@ export function wrapWithKindAndGate<TData, TPageParam>(
           throw new ApiQueryError(kind, err as ApiError)
         }
         // 非 ApiError（fetch reject 等）：仍按 kind 包裹为 generic
+        // spec §测试硬约束 #3 禁止静默降级 — 契约破坏必须 console.warn 可见
+        console.warn(
+          `[useApiInfiniteQuery] non-ApiError caught, contract violation: kind=${kind}`,
+          err,
+        )
         throw new ApiQueryError(kind, {
           type: ApiErrorType.UNKNOWN,
           message: (err as Error)?.message ?? 'unknown',
         })
-      })
-      .finally(() => {
-        context.signal.removeEventListener('abort', onAbort)
-      })
+      },
+    )({ signal: context.signal })
   }
 }
