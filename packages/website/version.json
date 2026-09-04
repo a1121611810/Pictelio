@@ -1,9 +1,9 @@
 {
-  "version": "4.30.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.30.0",
-  "changelog": "♻️ 重构\n  330ea616 refactor(app-lynx): globalFab 后置 Pinia 迁移（ADR-0140）\n  b70bf82b refactor(app-lynx): Pinia 迁移 code-review 双轴门禁修复\n  d23b87f0 refactor(app-lynx): 状态管理迁移到 Pinia setup store\n🔧 其他\n  f47b915f build(app-lynx): 引入 pinia@^4.0.3 与 @vue/devtools-api@^8.2.1（pinia peer）\n📝 文档\n  e99a5c25 docs(app-lynx): spec/ADR/glossary — app-lynx 状态管理迁移到 Pinia",
+  "version": "4.31.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.31.0",
+  "changelog": "📝 文档\n  bd5d50e9 docs(app-lynx): ADR-0141 R4 收口 — 0 阻塞 finding\n  59c6ab7c docs(app-lynx): spec R4 修订 — 偏离决策 + TDD oracle 补强\n  298113d8 docs(app-lynx): ADR-0141 R3 修订 — code-review 发现 + 测试修正\n  2ce8bb25 docs(app-lynx): ADR-0141 R2 修订 — T1-T7 实施完成 + 真机 bench 兜底\n  acebf738 docs(app-lynx): ADR-0141 + spec accepted — 启动 vue-query 迁移 T1-T7\n♻️ 重构\n  ff0c0093 refactor(app-lynx): S6/S7/S8 — code-review Round 2 修\n  1ecd188d refactor(app-lynx): F2 删 useApiCommentsQuery + S4/S5 修\n  304d5f07 refactor(app-lynx): TDD fix F7/F8/F8.2 + type bug + F10 delete\n  585f5c0c refactor(app-lynx): T6 — createMixFeed abort controller + generation 双保险\n  a509ddc8 refactor(app-lynx): T4 — useBookmarkMutation 替代 createBookmarkToggle\n  6e528af4 refactor(app-lynx): T3 — useApiQuery helper 在 App.vue 落地\n  363ad370 refactor(app-lynx): T2 foundation — queryKeys + useApiQuery helper\n  b94288e2 refactor(app-lynx): T1 spike — vue-query foundation 装入 + 最小 useQuery 验证\n🧪 测试\n  72631fd8 test(app-lynx): createMixFeed signal 透传断言修正\n✨ 新功能\n  e65a9202 feat(app-lynx): T5 — useApiCommentsQuery composable 工具层就位",
   "webBundle": {
-    "version": "4.30.0",
-    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.30.0/pictelio-4.30.0"
+    "version": "4.31.0",
+    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.31.0/pictelio-4.31.0"
   }
 }
