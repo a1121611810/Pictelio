@@ -1,18 +1,21 @@
 #!/bin/sh
 # pre-push hook: 静态校验（秒级，不跑浏览器）
 #
-# 1) E2E 锚点静态校验：
-#    背景：agent-browser E2E 曾因"改了 UI 但没人跑 E2E"漂移无人发现。
+# 1) E2E 锚点静态校验（app）：
 #    仅当本次 push 触碰 packages/app/src/ 或 packages/app/tests/agent-browser/ 时，
 #    运行 packages/app/scripts/check-e2e-anchors.mjs 校验 spec 引用的锚点
 #    （data-testid / aria-label / 路由等）在 src/ 中是否仍存在。
-#    详见 packages/app/tests/agent-browser/TESTING.md「pre-push 静态锚点校验」一节。
-# 2) 仓库级 skill 校验（T0.5，ADR-0097）：
+# 2) 单测锚点校验（app-lynx）：code-review Round 2 S5 修复
+#    仅当本次 push 触碰 packages/app-lynx/(src/|tests/) 时，
+#    运行 packages/app-lynx/scripts/check-app-lynx-anchors.mjs 跑 pnpm test 兜底
+#    （防止 commit 304d5f07 / 2ce8bb25 类「commit message 失实」问题再次无声推上 main）。
+# 3) 仓库级 skill 校验（T0.5，ADR-0097）：
 #    仅当本次 push 触碰 .agents/ 时，运行 scripts/verify-agent-skills.mjs 校验
 #    .agents/skills/ 的 frontmatter / name 一致性 / 关键段落标记（防 oracle check 漂移）。
 
 zero="0000000000000000000000000000000000000000"
 touched=0
+lynx_touched=0
 skills_touched=0
 
 # stdin 逐行：<local ref> <local sha> <remote ref> <remote sha>
@@ -21,8 +24,7 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   [ "$local_sha" = "$zero" ] && continue
 
   if [ "$remote_sha" = "$zero" ]; then
-    # 新分支：与 origin/main 的 merge-base 比较；取不到时退化为仅看顶端提交。
-    # 注意：husky 以 sh -e 执行本脚本，命令替换失败必须 || true 兜底
+    # 新分支：与 origin/main 的 merge-base 比较；取不到时退化为仅看顶端提交
     base=$(git merge-base "$local_sha" origin/main 2>/dev/null || true)
     if [ -n "$base" ]; then
       files=$(git diff --name-only "$base..$local_sha")
@@ -33,25 +35,36 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     files=$(git diff --name-only "$remote_sha..$local_sha")
   fi
 
-  if printf '%s
-' "$files" | grep -qE '^packages/app/(src/|tests/agent-browser/)'; then
+  if printf '%s\n' "$files" | grep -qE '^packages/app/(src/|tests/agent-browser/)'; then
     touched=1
   fi
-  if printf '%s
-' "$files" | grep -qE '^.agents/'; then
+  if printf '%s\n' "$files" | grep -qE '^packages/app-lynx/(src/|tests/)'; then
+    lynx_touched=1
+  fi
+  if printf '%s\n' "$files" | grep -qE '^.agents/'; then
     skills_touched=1
   fi
 done
 
 # 未触碰任何相关目录：零开销放行
-[ "$touched" -eq 0 ] && [ "$skills_touched" -eq 0 ] && exit 0
+[ "$touched" -eq 0 ] && [ "$lynx_touched" -eq 0 ] && [ "$skills_touched" -eq 0 ] && exit 0
 
 if [ "$touched" -eq 1 ]; then
   echo "pre-push: 检测到 packages/app/src 或 tests/agent-browser 改动，运行 E2E 锚点静态校验…"
   node packages/app/scripts/check-e2e-anchors.mjs || {
-    echo "pre-push: E2E 锚点校验失败，push 已阻止。"
+    echo "❌ E2E 锚点静态校验失败"
     echo "  - 修复失效锚点（同步 spec 或 src）后重试"
-    echo "  - 确认为误报时可用 git push --no-verify 绕过，并手动跑 pnpm test:agent-browser 兜底"
+    echo "  - 确认为误报时可用 git push --no-verify 绕过"
+    exit 1
+  }
+fi
+
+if [ "$lynx_touched" -eq 1 ]; then
+  echo "pre-push: 检测到 packages/app-lynx 改动，跑 app-lynx 单测…"
+  node packages/app-lynx/scripts/check-app-lynx-anchors.mjs || {
+    echo "❌ app-lynx 单测失败"
+    echo "  - 修复失败的单测后重试"
+    echo "  - 确认为误报时可用 git push --no-verify 绕过"
     exit 1
   }
 fi
@@ -59,8 +72,8 @@ fi
 if [ "$skills_touched" -eq 1 ]; then
   echo "pre-push: 检测到 .agents/ 改动，运行仓库级 skill 校验…"
   node scripts/verify-agent-skills.mjs || {
-    echo "pre-push: 仓库级 skill 校验失败，push 已阻止。"
-    echo "  - 修复 .agents/skills/ 下 SKILL.md（frontmatter / name 一致性 / 关键段落标记）后重试"
+    echo "❌ 仓库级 skill 校验失败"
+    echo "  - 修复 .agents/skills/ 下 SKILL.md（frontmatter / name 一致性）后重试"
     echo "  - 确认为误报时可用 git push --no-verify 绕过"
     exit 1
   }
