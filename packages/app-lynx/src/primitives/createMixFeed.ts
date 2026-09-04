@@ -99,6 +99,16 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
   let seen = new Set<string>()
   /** 竞态代：refresh 时 ++，在途旧 fetchMore / 首载响应据此被丢弃 */
   let generation = 0
+  /**
+   * T6 改造（ADR-0141 R2 修订）：abort controller 池
+   * - generation++ 时旧 controller 调 abort()（真发 abort signal 给 sources 内部
+   *   apiClient.get → OkHttp 真取消，符合 R1-3 真机结论「lynx fetch abort 可生效」）
+   * - dispose() 时调最后一个 controller abort
+   * - fetchPage() 调用传 `currentAc.signal`（之前传 undefined——是 T6 改造的「
+   *   让 generation-gate 真正生效到 apiClient 层」核心改动）
+   * - 8 个现有测试不传 signal 不影响：sources 内部 signal === undefined → apiClient 走非 abort 路径
+   */
+  let currentAc: AbortController | null = null
   /** 首载（含 refresh）网络阶段标志 */
   let firstLoadInFlight = false
   /** fetchMore 进行中标志 */
@@ -221,6 +231,11 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
   async function loadFirstPage(): Promise<void> {
     const g = ++generation
     clearRetry() // refresh 重建会话：挂起的补触发随旧会话作废（spec §4 T1）
+    // T6：abort 旧 controller 让旧 fetchPage 内部 apiClient 真取消（generation 标志只防脏写，
+    // signal 透传才让 OkHttp 收到 abort）。无 controller 时是首次启动。
+    if (currentAc) currentAc.abort()
+    currentAc = new AbortController()
+    const signal = currentAc.signal
     firstLoadInFlight = true
     // 新会话开始：清两槽错误（首屏 + 分页残留）
     firstErrorText = null
@@ -233,13 +248,15 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
     sourceStates = sources.map(() => ({ nextUrl: null, kind: null }))
     try {
       // 并行发请求；单源失败用占位结果捕获（不整体 reject，避免阻塞其他源）
+      // T6 改造：传 signal → sources 内部 apiClient.get 收到 abort 后真取消
+      // （lynx fetch signal 实测可生效，R1-1 真机结论）
       const results = await Promise.all(
         sources.map(
           async (
             src,
           ): Promise<{ items: MixFeedItem[]; nextUrl: string | null } | { error: unknown }> => {
             try {
-              return await withTimeout(src.fetchPage(), TIMEOUT_MS)
+              return await withTimeout(src.fetchPage(signal), TIMEOUT_MS)
             } catch (err) {
               return { error: err }
             }
@@ -330,9 +347,12 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
           .map((s, i) => (s.nextUrl !== null ? i : -1))
           .filter((i) => i >= 0)
         if (indexes.length === 0) return
+        // T6 改造：传 currentAc.signal（与 loadFirstPage 同源 abort controller）
+        // 翻页请求也会被 refresh 时的新 controller abort 掉
+        const signal = currentAc?.signal
         const settled = await Promise.allSettled(
           indexes.map((i) =>
-            withTimeout(sources[i].fetchPage(undefined, sourceStates[i].nextUrl), TIMEOUT_MS),
+            withTimeout(sources[i].fetchPage(signal, sourceStates[i].nextUrl), TIMEOUT_MS),
           ),
         )
         if (g !== generation) return // 竞态：refresh 已取代本次翻页，丢弃响应
@@ -379,8 +399,10 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
         if (srcIdx < 0) return
         try {
           // 翻页：传入该源当前 next_url（offset 分页语义；推荐类端点可忽略）
+          // T6 改造：传 currentAc.signal
+          const signal = currentAc?.signal
           const res = await withTimeout(
-            sources[srcIdx].fetchPage(undefined, sourceStates[srcIdx].nextUrl),
+            sources[srcIdx].fetchPage(signal, sourceStates[srcIdx].nextUrl),
             TIMEOUT_MS,
           )
           if (g !== generation) return // 竞态：refresh 已取代本次翻页，丢弃响应
@@ -411,6 +433,9 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
   /** 释放：清挂起补触发 + 代递增作废在途响应（页面卸载/mode 重建调用，防孤儿请求） */
   function dispose(): void {
     clearRetry()
+    // T6 改造：dispose 时 abort 旧 controller 触发 OkHttp 真取消（取代原 generation-only 模式）
+    if (currentAc) currentAc.abort()
+    currentAc = null
     generation++
   }
 
