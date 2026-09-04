@@ -681,8 +681,10 @@ describe('createMixFeed', () => {
 
     await feed.fetchMore()
     await flush()
-    // 翻页：fetchPage(undefined, 'A2')——携带该源当前 next_url（offset 分页语义）
-    expect(fetchA).toHaveBeenNthCalledWith(2, undefined, 'A2')
+    // 翻页：fetchPage(signal, 'A2')——携带该源当前 next_url（offset 分页语义）
+    // T6 改造（ADR-0141 R2 修订）：createMixFeed 内部 AbortController 透传 signal 到 sources
+    // 让 sources 可把 signal 传给 apiClient.get → OkHttp 真取消（R1-1 真机结论 117ms）
+    expect(fetchA).toHaveBeenNthCalledWith(2, expect.any(AbortSignal), 'A2')
   })
 
   it('畸形响应（items 非数组）→ 首载视为失败，error 置位不崩溃', async () => {
@@ -765,9 +767,9 @@ describe('createMixFeed time-merge', () => {
     // 追加按时间合并（老条目在后）：a1,b1,b2,a2
     expect(feed.items().map((i) => i.key)).toEqual(['a1', 'b1', 'b2', 'a2'])
     expect(feed.nextUrl()).toBeNull()
-    // 两源都携带了各自的 next_url
-    expect(fetchA).toHaveBeenNthCalledWith(2, undefined, 'A2')
-    expect(fetchB).toHaveBeenNthCalledWith(2, undefined, 'B2')
+    // 两源都携带了各自的 next_url + AbortController signal（T6 改造）
+    expect(fetchA).toHaveBeenNthCalledWith(2, expect.any(AbortSignal), 'A2')
+    expect(fetchB).toHaveBeenNthCalledWith(2, expect.any(AbortSignal), 'B2')
   })
 
   it('fetchMore time-merge 部分失败：成功源并入、失败源跳过、不置全局 pageError', async () => {
