@@ -333,14 +333,56 @@ vs spec 估算 +163 KB：实测 +33 KB（baseline 758.9 → 939.6），**tree-sh
 - **R2 commit message 「1103 tests pass」不实无法 amend（commit 锁定）**，由 R3 修订注记作为事实层补正
 
 **R3 决策待用户拍板**（review 发现但 deferred）：
-- [ ] F1 useWatchlistMutation 处理：选项 A 删除 + R3 记录 / B 真迁 Watchlist.vue / C 改名为 createWatchlistMutation 工厂形态
-- [ ] F2 useApiInfiniteQuery / useApiCommentsQuery 处理：选项 A 改 ADR-0141 R3 承认「工具层就位 ≠ 消费者迁移」 / B 真迁 useComments / useSearch consumer
-- [ ] F4 机器防线：在 `.husky/pre-push` 增加 app-lynx 路径 E2E 锚点校验
+- [x] F1 useWatchlistMutation 处理：选项 A 删除 + R3 记录（**已修 commit 304d5f07**）
+- [x] F2 useApiInfiniteQuery / useApiCommentsQuery 处理：选项 A 改 ADR-0141 R3 承认「工具层就位 ≠ 消费者迁移」（**已修 commit 1ecd188d 删 useApiCommentsQuery.ts；useApiInfiniteQuery 保留作公共 helper + future 迁移模板**）
+- [x] F4 机器防线：在 `.husky/pre-push` 增加 app-lynx 路径 E2E 锚点校验（**已修 commit 1ecd188d**——新增 packages/app-lynx/scripts/check-app-lynx-anchors.mjs）
 
 **R3 经验教训（hard rule）**：
 - 任何 commit 落笔时**必须**实际跑测试 + 把真实数字写进 commit message（"测试绿"不等于"测试 pass"——必须 verify）
 - signal 透传 / 接口签名变化类 commit **必须**同步更新所有契约测试断言（spec 配套测试是机器防线，不是可选文档）
 - spec 字面要求 vs 实际 diff 偏离时，**必须**在 commit message 显式记录「范围收窄」决策，不能用 R2 类修订「事后认领」
+
+### R4（2026-09-04 收口）— TDD 循环修复 + 0 阻塞 finding
+
+3 轮 code-review（commit 304d5f07 / 1ecd188d / ff0c0093）后所有阻塞 finding 修复 + 收口：
+
+**R4 实施清单**（4 commit 全部合并到 main）：
+
+| Commit | 主题 | 关键修复 |
+|---|---|---|
+| `304d5f07` | F7/F8/F8.2 + type bug + F10 delete | useApiQuery 写真 apiClient + globalThis.fetch 集成 oracle（spyon 第三参验证 signal 透传）+ createMixFeed signal 透传 oracle（首载 path + ref equality + refresh 隔离）+ 修 useApiInfiniteQuery 5 参类型签名 bug（TData 默认 = InfiniteData<TQueryFnData>）+ 删 useWatchlistMutation（composable 形态不适配 list 工厂） |
+| `1ecd188d` | F2 + S4 + S5 | 删 useApiCommentsQuery（零业务消费） + useBookmarkMutation catch 静默吞错加 console.warn（4 个新测试：warn 调用 + 失败回滚 + count clamp0 + errorMsg 置「操作失败」） + .husky/pre-push 加 packages/app-lynx 路径覆盖（新增 check-app-lynx-anchors.mjs 跑 pnpm test 兜底） |
+| `59c6ab7c` | spec R4 修订 | 9 条偏离决策表（路径漂移 / 工厂 vs composable 形态偏离 / 范围收窄） |
+| `ff0c0093` | S6/S7/S8 | useApiInfiniteQuery catch 加 console.warn「非契约类型 error」可见 + 抽 withGenerationGate helper（useApiQuery + useApiInfiniteQuery 共享 generation-gate 模板消除 80% 重复）+ queryClient setQueryDefaults 9 处同样板抽 setDefaultGcTime 数据驱动 |
+
+**TDD 红→绿 cycle 完整保留**：
+- S4 useBookmarkMutation catch：写真 4 个失败测试（红）→ 加 console.warn（绿）→ 4/4 pass
+- S6 useApiInfiniteQuery non-ApiError：写真 console.warn 契约破坏可见测试（红）→ 加 console.warn（绿）→ 7/7 pass
+- S7 withGenerationGate：写真失败测试覆盖原 wrap 模板（绿）→ 抽 helper 复用（绿）→ 行为不变
+- S8 setDefaultGcTime：纯重构，4 行 wrapper（数据驱动）
+
+**Round 3 review verdict**（并行 sub-agent）：
+- 0 阻塞 finding
+- workspace **1103 tests pass** + app-lynx **50 files / 804 tests pass**
+- 真机 verify 兜底：benchNav=illust + benchNav=illust-follow + 0 errors / 0 warnings
+- pre-push 防线实测能拦截 broken test（exit 1）
+
+**最终状态**：vue-query 迁移 effort 可合入 main 永闭。
+- 1 个 ADR（accepted）+ 1 个 spec（R4 偏离决策拍板）
+- 16 个 commit 全在 main（b3229251..HEAD）：6 ticket（T1-T6）+ 6 refactor/doc（R2/R3/R4/S6-S8/F2 删 + F4 防）+ 1 spike + 1 spec + 1 ADR + 1 修订
+- bundle 实测：758.9 → 939.4 KB = **+180.5 KB**（vs spec 估算 +163 KB，差异在 useQuery 真集成路径 tree-shake 边界）
+
+**真机 bench 兜底**（pictelio_ui Android 14 arm64 / lynx 4.0.1）：
+- benchNav=illust → 推荐 sub-tab + 4 卡渲染（M3 FAB + 标签 + 心数）
+- benchNav=illust-follow → 关注 sub-tab + T6 双错槽位 first banner（HTTP 500 中文文案）
+- bookmark toggle → useBookmarkMutation + M3 动画（bookmark-pop-add 320ms）+ 失败回滚
+
+**R4 经验教训（永闭 hard rule）**：
+- commit 落笔前**必须**实测 pnpm test，把真实数字写进 commit message
+- signal 透传 / 接口签名变化类 commit **必须**同步更新所有契约测试断言
+- spec 字面要求 vs 实际 diff 偏离时**必须**在 commit message 显式记录「范围收窄」决策
+- code-review 双轴循环**必须**实际跑测试拿数字（不依赖 agent 自述）
+- machine 防线（pre-push）**必须**覆盖所有 app-lynx 改动路径（修复 F3 类「1103 tests pass 失实」根因）
 
 ## 验证证据索引
 
