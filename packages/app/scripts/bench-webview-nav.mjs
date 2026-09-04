@@ -381,20 +381,29 @@ async function reportCmd() {
           50,
         ).toFixed(1),
       };
-    } else {
+    } else if (k.startsWith("coldstart/")) {
+      const valid = rs.filter((r) => r.readyMs !== null && r.readyMs !== undefined);
+      out[k] = {
+        groups: rs.length,
+        readyP50: +percentile(valid.map((r) => r.readyMs).toSorted((a, b) => a - b), 50).toFixed(0),
+        readyP90: +percentile(valid.map((r) => r.readyMs).toSorted((a, b) => a - b), 90).toFixed(0),
+        failures: rs.length - valid.length,
+      };
+    } else if (k.startsWith("switch/") || k.startsWith("nav/")) {
+      // 缺字段记录（老格式兜底行）缺省按 0 计
       out[k] = {
         gestures: rs.length,
-        jankRateMean: +(rs.reduce((s, r) => s + r.jankRate, 0) / rs.length).toFixed(4),
+        jankRateMean: +(rs.reduce((s, r) => s + (r.jankRate ?? 0), 0) / rs.length).toFixed(4),
         totalP50ofP50: +percentile(
-          rs.map((r) => r.totalP50).toSorted((a, b) => a - b),
+          rs.map((r) => r.totalP50 ?? 0).toSorted((a, b) => a - b),
           50,
         ).toFixed(2),
         totalP99ofP50: +percentile(
-          rs.map((r) => r.totalP99).toSorted((a, b) => a - b),
+          rs.map((r) => r.totalP99 ?? 0).toSorted((a, b) => a - b),
           50,
         ).toFixed(2),
         unknownDelayP90: +percentile(
-          rs.map((r) => r.unknownDelayP90).toSorted((a, b) => a - b),
+          rs.map((r) => r.unknownDelayP90 ?? 0).toSorted((a, b) => a - b),
           90,
         ).toFixed(2),
         restoredCount: rs.filter((r) => r.restored !== undefined).length
