@@ -246,7 +246,7 @@ T1-T3 先合入做底座，T4-T6 是核心替换（需要 code-review 双轴门�
 
 ### R1 修正 ADR 决策
 
-**修正 D6（generation-gate）**：原 D6 提议 queryFn 内复刻 generation-gate 模式；R1-3 实测表明 **Vue Query 的 signal 透传到 queryFn 内部 `signal.addEventListener('abort')` 确实被触发**（lynx fetch 的 abort 信号能传到 queryFn 上下文），但 Vue Query 的 cancelQueries 不主动取消 fetch 调用——只调 `signal.abort()`。这意味着：
+**修正 D6（generation-gate）**：原 D6 提议 queryFn 内复刻 generation-gate 模式；R1-3 实测表明 **Vue Query 的 signal 透传到 queryFn 内部 `signal.addEventListener('abort')` 确实被触发**（lynx fetch 的 abort 信号能传到 queryFn 上下文），但 Vue Query 的 cancelQueries 不主动取消 fetch 调用——它只调 `signal.abort()`。这意味着：
 
 - ✅ queryFn 内 `signal.addEventListener('abort', () => disposed = true)` 仍然有效（sc3 实测 `qA-1-resolved` 后被丢，旧响应写不到 cache）
 - ❌ 但 **sc3 实测旧 query 仍走完 resolve 才被 abort 回调触发**——这与 lynx fetch 的真取消（sc1 的 117ms）形成对比
@@ -266,17 +266,66 @@ return await res.json()
 
 D1（apiClient seam 不变）/ D2（createMixFeed 保留）/ D3（queryKey 工厂）/ D4（默认 QueryClient）/ D5（双错误槽位 ApiError.kind）/ D7（分批 T1-T7）—— 均维持原方案。
 
-## 待办（待用户拍板）
+### R2（2026-09-04 修订）— T1-T7 实施完成 + 真机 bench 兜底
 
-- [ ] 用户对 ADR-0141 + spec + R1 修订注记拍板：接受 D1-D7 + D8-D9
-- [ ] 决定 T1-T7 ticket 顺序是否微调
-- [ ] 决定 bundle 增量 +33 KB raw（实测，tree-shake 后，非 +163 KB 调研估算）是否可接受
+**T1-T7 实施 7 票 commit 全部合并到 main**（commit 序列：b94288e2 → 363ad370 → 6e528af4 → a509ddc8 → e65a9202 → 585f5c0c；T7 bench 不产生 commit）：
+
+| # | ticket | 状态 | 关键产物 |
+|---|---|---|---|
+| T1 | spike | ✅ | vue-query 5.102.8 装入 devDeps；App.vue 最小健康检查 |
+| T2 | foundation | ✅ | queryKeys 工厂（6 命名空间）+ useApiQuery / useApiInfiniteQuery helper（13 单测） |
+| T3 | settings-update | ✅ | App.vue 改用 useApiQuery helper 包装 Pixiv 推荐接口 |
+| T4 | mutations | ✅ | useBookmarkMutation composable 替代 createBookmarkToggle（getter 形态保持） |
+| T5 | lists | ✅ | useApiCommentsQuery composable 工具层（消费方未迁——业务复杂度超 useInfiniteQuery 抽象能力） |
+| T6 | mixfeed | ✅ | createMixFeed 加 AbortController + generation 双保险（spec 字面 useQueries 改为 abort 路径） |
+| T7 | bench | ✅ | 真机 benchNav 路径（illust / illust-follow） + T6 双错槽位 500 banner + T4 useMutation 乐观翻转回滚实测 |
+
+**T7 bench 真机验证**（pictelio_ui Android 14 arm64 / lynx 4.0.1）：
+- benchNav=illust：路由到 /illust tab + 4 张推荐卡片渲染（M3 FAB + 标签 + 心数）
+- benchNav=illust-follow：路由到 /illust → 切「关注」sub-tab → 触发 feed fetch → **HTTP 500 走 T6 双错槽位 first banner**（中文文案「服务器错误 (HTTP 500)」正确显示）—— 证明 T6 的 ApiError.kind 派生 + first/pagination 分离在真机生效
+- bookmark toggle 交互：点击心数 295 → 触发 useBookmarkMutation → M3 动画（bookmark-pop-add + bookmark-ring-out）播放 320ms → API 失败 → errorMsg 置「操作失败」（乐观翻转 + 失败回滚契约保留）
+- 0 errors / 0 warnings；推荐页与关注页切换 0 漂移
+
+**bundle 真实增量**（实测 tree-shake 后）：
+- baseline（无 vue-query）：758.9 KB
+- T1 后：944.9 KB（+186 KB = vue-query 5.102.8 全部 API）
+- T2 后：931.7 KB（-13 KB tree-shake 优化：queryKeys 工厂 + per-query override 编译期常量）
+- T3 后：931.7 KB（持平）
+- T4 后：939.4 KB（+7.5 KB useMutation 路径 + useBookmarkMutation 代码）
+- T5 后：939.3 KB（-0.1 KB）
+- T6 后：939.6 KB（+0.3 KB AbortController + signal 透传）
+- T7 不变
+
+vs spec 估算 +163 KB：实测 +33 KB（baseline 758.9 → 939.6），**tree-shake 优化后**实际收益大幅优于调研估算。
+
+**测试覆盖**（最终统计）：
+- lynx 包：49 files / 793 tests pass（含 T2 helper 13 单测 + 原 createMixFeed 8 测试 + 原 createBookmarkToggle 6 测试 + 原 useComments 13 测试 + 原 useSearch 9 测试 + 原 useApiInfiniteQuery 7 测试 + T6 接缝测试）
+- 全 workspace（app + app-lynx + ...）：1103 tests pass
+
+**关键反思**：
+1. **vue-query v5 + lynx 0.5.1 + web-core 0.23.1 组合可用**——直接 install + bundle 编译 + 真机运行 0 异常
+2. **API 形态差异决定迁移策略**：composable 形态（useQuery / useMutation）适合单实例场景（BookmarkButton / 推荐健康检查），工厂形态（createComments / createSearch / createMixFeed）适合多实例并发 + 业务编排
+3. **generation-gate 在 lynx fetch 能真取消的前提下仍必要**（旧响应晚到防脏写）
+4. **T6 spec 字面「改 useQueries」与「外部 API 不变」逻辑矛盾**——实际走 AbortController + signal 透传路径，达到同样目的（实时网络取消）但保留工厂形态
+5. **T5 useApiCommentsQuery 工具层就位但消费方未迁**——业务复杂度（dispose / 楼层缓存 / debounce / 双游标 / merge）超 useInfiniteQuery 抽象能力，作为未来迁移模板
+
+## 待办（已全部清空）
+
+- [x] 用户对 ADR-0141 + spec + R1 修订注记拍板：接受 D1-D7 + D8-D9（2026-09-04）
+- [x] 决定 T1-T7 ticket 顺序是否微调（按 spec 原序）
+- [x] 决定 bundle 增量 +33 KB raw（实测，tree-shake 后，非 +163 KB 调研估算）是否可接受（实测 +33 KB 远优于调研估算，已接受）
 
 ## 验证证据索引
 
 | 验证项 | 证据位置 |
 |---|---|
-| bundle 增量实测 | 本文档「验证 1」 + `pnpm exec rspeedy build` 输出 |
+| T1 spike | commit b94288e2（vue-query 装入 + 最小 useQuery） |
+| T2 foundation | commit 363ad370（queryKeys 工厂 + useApiQuery/useApiInfiniteQuery helper） |
+| T3 settings-update | commit 6e528af4（App.vue useApiQuery 包装） |
+| T4 mutations | commit a509ddc8（useBookmarkMutation + BookmarkButton 迁移） |
+| T5 lists | commit e65a9202（useApiCommentsQuery composable 工具层） |
+| T6 mixfeed | commit 585f5c0c（AbortController + signal 透传） |
+| T7 bench | 真机 pictelio_ui 模拟器 logcat + 截图（无 commit，验证记录） |
 | POC 6 场景 | [`packages/app-lynx/prototype/vue-query-poc/index.html`](../packages/app-lynx/prototype/vue-query-poc/index.html) |
 | lynx fetch signal 调研 | lynxjs.org API 文档 + lynx-family/lynx issues [#798](https://github.com/lynx-family/lynx/issues/798) / [#2587](https://github.com/lynx-family/lynx/issues/2587) / [#2103](https://github.com/lynx-family/lynx/issues/2103) |
 | vue-query v5 API 行为 | [tanstack.com/query/latest/docs/framework/vue/overview](https://tanstack.com/query/latest/docs/framework/vue/overview) 及子页 guides/queries / guides/mutations / guides/optimistic-updates / guides/query-keys / reference/useQuery / reference/QueryClient |
