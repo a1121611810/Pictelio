@@ -1976,10 +1976,16 @@ it('transform 承载用 view 不用 text（ADR-0108 决策 2），pop 类绑定 
   expect(bookmarkBtnVue).not.toMatch(/<text[^>]*bookmark-(pop|ring)/)
 })
 
-it('乐观化接缝：消费 createBookmarkToggle 状态机，change 延迟用 BOOKMARK_ANIMATION_MS 常量', () => {
-  expect(bookmarkBtnVue).toContain("from '../primitives/createBookmarkToggle'")
+it('乐观化接缝：消费 useBookmarkMutation 状态机，change 延迟用 BOOKMARK_ANIMATION_MS 常量', () => {
+  // T4 迁移：BookmarkButton 从 primitive 改用 composable
+  // （getter 形态保持，模板零变化——接缝断言更新为新 seam）
+  expect(bookmarkBtnVue).toContain("from '../composables/useBookmarkMutation'")
   expect(bookmarkBtnVue).toContain('BOOKMARK_ANIMATION_MS')
-  expect(bookmarkBtnVue).toContain('createBookmarkToggle(')
+  expect(bookmarkBtnVue).toContain('useBookmarkMutation(')
+  // 旧 primitive 仍存在（useWatchlistMutation 工厂模式 + 兼容 Watchlist.vue 旧消费方），
+  // 但 BookmarkButton.vue 不再消费它——通过 import 列表精确断言
+  expect(bookmarkBtnVue).not.toContain("from '../primitives/createBookmarkToggle'")
+  expect(bookmarkBtnVue).not.toContain('createBookmarkToggle(')
 })
 
 it('心形用 ♥\uFE0E（VS15 强制 text presentation，防 Lynx 原生 emoji 化导致 CSS 变色失效）', () => {
