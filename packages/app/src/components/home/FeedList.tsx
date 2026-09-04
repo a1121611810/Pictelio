@@ -1,11 +1,14 @@
 import type { JSX } from "solid-js";
-import { For, Show } from "solid-js";
+import { For, Show, createEffect } from "solid-js";
 import { createPullToRefresh } from "@/primitives/createPullToRefresh";
 import PullIndicator from "@/components/PullIndicator";
 import FeedPaginationSentinel from "@/components/home/FeedPaginationSentinel";
 import ErrorDisplay from "@/components/ErrorDisplay";
 import InlineRetryBar from "@/components/ui/InlineRetryBar";
 import type { ApiError } from "@/api/types";
+import { loadImage, pickUnprefetchedUrls } from "@/utils/imageLoader";
+import { isImageHostEnabled } from "@/stores/imageHostStore";
+import { imageCachePrefetch } from "@/stores/settingsStore";
 
 /**
  * 统一 Feed 列表容器（ADR-0078）——深模块：小接口（source + 布局 + 渲染回调）背后
@@ -13,10 +16,14 @@ import type { ApiError } from "@/api/types";
  * - 下拉刷新（createPullToRefresh + PullIndicator；overlay 模式 = A1 骨架遮罩）
  * - 滚动分页（FeedPaginationSentinel + loadingMore 底部指示）
  * - 首载骨架 / 空态 / 列表渲染
+ * - 图片预取（prefetchUrl 可选传入，对齐 VirtualFeed 的门控与 loadImage 方式）
  *
  * 状态语义（工厂已分离）：refreshing = 仅 refetch 第一页（下拉刷新）；
  * loadingMore = 分页追加（fetchNextPage）——分页加载绝不触发骨架遮罩。
  */
+
+/** 每轮预取张数：首屏 2-3 张 + 快速滚动缓冲，12 张约覆盖首屏后 2-3 屏的下载启动窗口 */
+const FEED_PREFETCH_COUNT = 12;
 
 interface FeedListSource<T> {
   items: () => T[];
@@ -41,6 +48,9 @@ interface FeedListProps<T> {
   containerClass: string;
   /** 下拉反馈：overlay = A1 骨架遮罩（首页）；indicator = PullIndicator 指示器（列表页） */
   refreshMode?: "overlay" | "indicator";
+  /** 从 item 提取预取用图片原始 URL（falsy 跳过该项）。必须与卡片实际展示的 cover() 取值
+   *  完全一致（同一 URL 字符串），否则 loadImage 的 key 与展示 src 不匹配，预热无效 */
+  prefetchUrl?: (item: T) => string | undefined;
   renderItem: (item: T) => JSX.Element;
   skeleton: () => JSX.Element;
   empty?: () => JSX.Element;
@@ -59,6 +69,25 @@ export function FeedList<T>(props: FeedListProps<T>): JSX.Element {
   // 错误派生（source 可选字段统一归并）：error 非空 = 存在失败；paginationError = 是否为分页失败
   const error = () => props.source.error?.() ?? null;
   const paginationError = () => props.source.paginationError?.() ?? false;
+
+  // ── 图片预取（对齐 VirtualFeed 的门控与调用方式）──
+  // items 变化时，挑「未预取的前 N 个」fire-and-forget 下载，快速滚动时提前占住下载窗口。
+  // 已预取 Set 闭包内维护，避免重复发起（loadImage 自身还有缓存命中 + inflight 去重兜底）。
+  const prefetchedUrls = new Set<string>();
+  createEffect(() => {
+    const extract = props.prefetchUrl;
+    if (!extract) return;
+    const currentItems = items();
+    if (currentItems.length === 0) return;
+    if (isImageHostEnabled()) return;
+    if (!imageCachePrefetch()) return;
+    const urls = currentItems.map(extract).filter((url): url is string => !!url);
+    const targets = pickUnprefetchedUrls(urls, prefetchedUrls, FEED_PREFETCH_COUNT);
+    for (const url of targets) {
+      prefetchedUrls.add(url);
+      loadImage(url).catch((err) => console.warn(`[FeedList] 图片预取失败: ${url}`, err));
+    }
+  });
 
   const list = () => (
     <>

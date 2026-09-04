@@ -17,6 +17,12 @@ const GC_THRESHOLD = 8_000;
 const GC_INTERVAL_MS = 300_000;
 /** GC 淘汰比例：每次淘汰最旧条目的比率 */
 const GC_EVICT_RATIO = 0.2;
+/**
+ * 冷启动预热登记条数上限：L1 仅登记 key（零解码成本），native getCachedKeys 一次性返回全量，
+ * 多登记无额外开销。300 条覆盖首屏 + 连续数屏的快速滚动
+ * （原 50 条只够首屏，首滑后的图片即 miss，见 docs/research/webview-perf-diagnosis.md X2）。
+ */
+const WARM_CACHE_KEY_COUNT = 300;
 
 // 模块加载时自动启动定时 GC（测试环境下不启动）
 // 浏览器环境无 process 全局；用类型安全的 globalThis 探测（不依赖 @types/node 进入 tsc 程序）
@@ -284,6 +290,29 @@ async function loadImageInner(originalUrl: string): Promise<LoadedImage> {
   };
 }
 
+// ─── 预取挑选（纯函数） ───
+
+/**
+ * 从 URL 列表中挑选「尚未预取」的前 limit 个（保持列表顺序）。
+ *
+ * 供 Feed 图片预取调度使用：调用方持有已预取 Set，items 变化后调用本函数
+ * 挑出新增的待预取目标，再逐个 loadImage（fire-and-forget）。
+ * 纯函数，无 IO，不维护任何状态。
+ */
+export function pickUnprefetchedUrls(
+  urls: readonly string[],
+  prefetched: ReadonlySet<string>,
+  limit: number,
+): string[] {
+  const picked: string[] = [];
+  for (const url of urls) {
+    if (picked.length >= limit) break;
+    if (prefetched.has(url)) continue;
+    picked.push(url);
+  }
+  return picked;
+}
+
 // ─── 带进度回调的图片加载 ───
 
 interface LoadProgress {
@@ -474,8 +503,8 @@ export async function warmCacheFromDisk(): Promise<void> {
         return;
       }
 
-      // 取最近 50 张，同步登记到 L1（只读 key，不解码图片本体）
-      const recentKeys = keys.slice(-50);
+      // 取最近 WARM_CACHE_KEY_COUNT 张，同步登记到 L1（只读 key，不解码图片本体）
+      const recentKeys = keys.slice(-WARM_CACHE_KEY_COUNT);
       for (const key of recentKeys) {
         injectCacheEntry(key);
       }

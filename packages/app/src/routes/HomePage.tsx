@@ -292,6 +292,8 @@ const IllustFeedPanel: Component<{ tab: FeedTab }> = (props) => {
       refreshMode="overlay"
       skeleton={() => <IllustRowSkeleton />}
       empty={() => <EmptyHint />}
+      // 预取 URL 与 IllustSingleCard 的 cover() 取值保持一致（large 优先），确保预热 key = 展示 src
+      prefetchUrl={(il) => il.image_urls.large ?? il.image_urls.medium}
       renderItem={(il) => (
         <IllustSingleCard illust={il} onClick={() => void navigate(`/illust/${il.id}`)} />
       )}
@@ -322,6 +324,8 @@ const NovelFeedPanel: Component<{ tab: FeedTab }> = (props) => {
       refreshMode="overlay"
       skeleton={() => <NovelRowSkeleton />}
       empty={() => <EmptyHint />}
+      // 预取 URL 与 NovelRowCard 的 cover() 取值保持一致（large → medium → square_medium），确保预热 key = 展示 src
+      prefetchUrl={(n) => n.image_urls.large ?? n.image_urls.medium ?? n.image_urls.square_medium}
       renderItem={(n) => <NovelRowCard novel={n} onClick={() => void navigate(`/novel/${n.id}`)} />}
     />
   );
