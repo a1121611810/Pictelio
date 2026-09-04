@@ -228,19 +228,32 @@ export function createFeedVirtualizer<T>(config: FeedVirtualizerConfig<T>): Feed
 
   // Scroll + resize listeners for window mode
   createEffect(() => {
-    const onScroll = () => {
+    // 全量重算（_willUpdate + 重建虚拟项数组）单次即可达主线程长任务量级，
+    // 而 scroll 事件一帧内可触发 60~120 次；合并到 rAF 每帧至多重算一次，
+    // flush 时由 virtualizer 实时读取当下 scroll 位置，末态与逐次重算一致。
+    const syncVirtualState = () => {
       instance._willUpdate();
       setVirtualItems([...instance.getVirtualItems()] as VirtualItem[]);
       setTotalSize(instance.getTotalSize());
     };
+    let scrollRafId = 0;
+    const onScroll = () => {
+      if (scrollRafId !== 0) return;
+      scrollRafId = requestAnimationFrame(() => {
+        scrollRafId = 0;
+        syncVirtualState();
+      });
+    };
     const onResize = () => {
-      instance._willUpdate();
-      setVirtualItems([...instance.getVirtualItems()] as VirtualItem[]);
-      setTotalSize(instance.getTotalSize());
+      syncVirtualState();
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onResize);
     onCleanup(() => {
+      if (scrollRafId !== 0) {
+        cancelAnimationFrame(scrollRafId);
+        scrollRafId = 0;
+      }
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onResize);
     });

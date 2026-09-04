@@ -120,12 +120,37 @@ const mockDocument = {
 };
 vi.stubGlobal("document", mockDocument);
 
+// --- rAF 手工队列 stub（node 环境无原生 requestAnimationFrame）---
+let rafQueue: Array<{ id: number; cb: FrameRequestCallback }> = [];
+let rafIdCounter = 0;
+vi.stubGlobal(
+  "requestAnimationFrame",
+  vi.fn((cb: FrameRequestCallback): number => {
+    const id = ++rafIdCounter;
+    rafQueue.push({ id, cb });
+    return id;
+  }),
+);
+vi.stubGlobal(
+  "cancelAnimationFrame",
+  vi.fn((id: number) => {
+    rafQueue = rafQueue.filter((entry) => entry.id !== id);
+  }),
+);
+/** 模拟下一帧：执行所有已排队的 rAF 回调（期间新调度的留到下一次 flush） */
+function flushRaf() {
+  const pending = rafQueue;
+  rafQueue = [];
+  for (const { cb } of pending) cb(performance.now());
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   scrollListeners = [];
   resizeListeners = [];
   mockWindow.scrollY = 0;
   elementListeners.clear();
+  rafQueue = [];
 });
 
 afterEach(() => {
@@ -381,8 +406,9 @@ describe("createFeedVirtualizer", () => {
       mockVirtualizerInstance.getVirtualItems.mockReturnValue(mockItems);
       mockVirtualizerInstance.getTotalSize.mockReturnValue(100);
 
-      // Trigger scroll
+      // Trigger scroll（scroll 经 rAF 合帧，需 flush 后才生效）
       scrollListeners.forEach((fn) => fn(new Event("scroll")));
+      flushRaf();
 
       expect(result.virtualItems()).toEqual(mockItems);
       expect(result.totalSize()).toBe(100);
@@ -410,5 +436,78 @@ describe("createFeedVirtualizer", () => {
       expect(mockResizeObserver).toHaveBeenCalled();
       expect(mockResizeObserverInstance.observe).toHaveBeenCalledWith(el);
     });
+  });
+});
+
+describe("createFeedVirtualizer — scroll rAF 合帧", () => {
+  /** 建立可手动 dispose 的 root（验证清理路径） */
+  function runWithDispose(fn: () => void): () => void {
+    let dispose!: () => void;
+    createRoot((d) => {
+      fn();
+      dispose = d;
+    });
+    return dispose;
+  }
+
+  it("同帧多次 scroll 只触发一次全量重算", () => {
+    runWithRoot(() => createFeedVirtualizer(createMockConfig()));
+
+    // 挂载阶段的初始测量不计入
+    mockVirtualizerInstance._willUpdate.mockClear();
+    mockVirtualizerInstance.getVirtualItems.mockClear();
+
+    for (let i = 0; i < 5; i++) {
+      scrollListeners.forEach((fn) => fn(new Event("scroll")));
+    }
+    // flush 前事件不直接触发重算
+    expect(mockVirtualizerInstance._willUpdate).not.toHaveBeenCalled();
+    flushRaf();
+
+    expect(mockVirtualizerInstance._willUpdate).toHaveBeenCalledTimes(1);
+    expect(mockVirtualizerInstance.getVirtualItems).toHaveBeenCalledTimes(1);
+  });
+
+  it("flush 时读取当下 scrollY（末态为最新位置，两个信号一起写入）", () => {
+    const result = runWithRoot(() => createFeedVirtualizer(createMockConfig()));
+    mockVirtualizerInstance._willUpdate.mockClear();
+    // 期望值来源：flush 时刻 mockWindow.scrollY 的独立推导（virtualItems.index === scrollY，
+    // totalSize === 2×scrollY），事件发生时的旧值 10 不得出现
+    mockVirtualizerInstance.getVirtualItems.mockImplementation(
+      () =>
+        [
+          {
+            key: mockWindow.scrollY,
+            index: mockWindow.scrollY,
+            start: 0,
+            end: 100,
+            size: 100,
+            lane: 0,
+          },
+        ] as VirtualItem[],
+    );
+    mockVirtualizerInstance.getTotalSize.mockImplementation(() => mockWindow.scrollY * 2);
+
+    mockWindow.scrollY = 10;
+    scrollListeners.forEach((fn) => fn(new Event("scroll")));
+    mockWindow.scrollY = 500; // 同帧内事件之后的最新滚动位置
+    scrollListeners.forEach((fn) => fn(new Event("scroll")));
+    flushRaf();
+
+    expect(result.virtualItems()).toHaveLength(1);
+    expect(result.virtualItems()[0]?.index).toBe(500);
+    expect(result.totalSize()).toBe(1000);
+  });
+
+  it("dispose 后 pending 的 rAF 不再触发重算，监听器已移除", () => {
+    const dispose = runWithDispose(() => createFeedVirtualizer(createMockConfig()));
+    mockVirtualizerInstance._willUpdate.mockClear();
+
+    scrollListeners.forEach((fn) => fn(new Event("scroll")));
+    dispose();
+    flushRaf();
+
+    expect(mockVirtualizerInstance._willUpdate).not.toHaveBeenCalled();
+    expect(scrollListeners).toHaveLength(0);
   });
 });

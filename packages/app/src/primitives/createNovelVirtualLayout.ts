@@ -266,14 +266,28 @@ export function createNovelVirtualLayout(
     if (typeof window === "undefined") {
       return;
     }
+    // 全量重算（_willUpdate + 重建虚拟窗口）单次即可达主线程长任务量级，
+    // 而 scroll 事件一帧内可触发 60~120 次；合并到 rAF 每帧至多重算一次，
+    // flush 时读取当下的 window.scrollY（非事件捕获旧值），保证末态正确。
+    let scrollRafId = 0;
     const onScroll = () => {
-      (instance as any).scrollOffset = window.scrollY;
-      (instance as any)._willUpdate?.();
-      setVItems([...instance.getVirtualItems()] as any);
-      setVTotalSize(instance.getTotalSize());
+      if (scrollRafId !== 0) return;
+      scrollRafId = requestAnimationFrame(() => {
+        scrollRafId = 0;
+        (instance as any).scrollOffset = window.scrollY;
+        (instance as any)._willUpdate?.();
+        setVItems([...instance.getVirtualItems()] as any);
+        setVTotalSize(instance.getTotalSize());
+      });
     };
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    onCleanup(() => {
+      if (scrollRafId !== 0) {
+        cancelAnimationFrame(scrollRafId);
+        scrollRafId = 0;
+      }
+      window.removeEventListener("scroll", onScroll);
+    });
   });
 
   const visibleBlocks = createMemo<number[]>(() => vItems().map((v) => v.index));
