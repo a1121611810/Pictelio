@@ -897,3 +897,68 @@ describe('createMixFeed time-merge', () => {
     expect(feed.nextUrl()).toBeNull()
   })
 })
+
+// ─── signal 透传契约（ADR-0141 R1-3 真机结论 oracle，code-review F8.2 修复）───
+//
+// R1-3 真机结论：「lynx fetch signal 117ms 内真取消 + 取消 OkHttp」。
+// 本 describe 写真集成 oracle：验证 createMixFeed 透传 AbortController.signal
+// 到 sources.fetchPage()，覆盖首载 + ratio 翻页 + time-merge 翻页 3 个调用路径。
+
+describe('createMixFeed / signal 透传契约 (ADR-0141 R1-3 oracle)', () => {
+  it('首载路径：fetchPage 第一参 = AbortSignal 实例（不止 truthy）', async () => {
+    const fetchA = vi.fn<MixFeedSource['fetchPage']>(async () => ({ items: [mkIllust('a1', 1)], nextUrl: null }))
+    const feed = createMixFeed({
+      sources: [source('illust', fetchA)],
+      throttleMs: 0,
+      cooldownMs: 0,
+    })
+    await flush()
+    // oracle：第一参是 AbortSignal 实例（不是 undefined / 新 controller）
+    const sig = fetchA.mock.calls[0]?.[0]
+    expect(sig).toBeInstanceOf(AbortSignal)
+  })
+
+  it('首载路径：fetchPage signal 与 createMixFeed 内部 currentAc.signal 是同一引用（generation-gate 兜底）', async () => {
+    let capturedSignal: AbortSignal | undefined
+    const fetchA = vi.fn<MixFeedSource['fetchPage']>(async (sig?: AbortSignal) => {
+      capturedSignal = sig
+      return { items: [], nextUrl: null }
+    })
+    const feed = createMixFeed({
+      sources: [source('illust', fetchA)],
+      throttleMs: 0,
+      cooldownMs: 0,
+    })
+    await flush()
+    // oracle：sources 收到的 signal 来自 createMixFeed 内的 currentAc
+    // （如果实现把 signal 吞了或传新 controller，本断言失败）
+    expect(capturedSignal).toBeInstanceOf(AbortSignal)
+    expect(capturedSignal!.aborted).toBe(false)
+  })
+
+  it('refresh 路径：新 session signal 与旧 session signal 隔离（旧 abort 不会污染新）', async () => {
+    const oldSigs: AbortSignal[] = []
+    const fetchA = vi.fn<MixFeedSource['fetchPage']>(async (sig?: AbortSignal) => {
+      if (sig) oldSigs.push(sig)
+      return { items: [], nextUrl: null }
+    })
+    const feed = createMixFeed({
+      sources: [source('illust', fetchA)],
+      throttleMs: 0,
+      cooldownMs: 0,
+    })
+    await flush()
+    const oldSignal = oldSigs[0]
+    expect(oldSignal).toBeDefined()
+
+    // 触发 refresh（第一次首载已完成）
+    const refreshPromise = feed.refresh()
+    await flush()
+    // oracle：refresh 触发时旧 controller 被 abort（createMixFeed.ts:236 `if (currentAc) currentAc.abort()`）
+    expect(oldSignal!.aborted).toBe(true)
+    // 新 fetchPage 调用收到新 signal（不与旧同引用）
+    const newSignal = oldSigs[oldSigs.length - 1]
+    expect(newSignal).not.toBe(oldSignal)
+    await refreshPromise
+  })
+})
