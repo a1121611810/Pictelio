@@ -315,6 +315,33 @@ vs spec 估算 +163 KB：实测 +33 KB（baseline 758.9 → 939.6），**tree-sh
 - [x] 决定 T1-T7 ticket 顺序是否微调（按 spec 原序）
 - [x] 决定 bundle 增量 +33 KB raw（实测，tree-shake 后，非 +163 KB 调研估算）是否可接受（实测 +33 KB 远优于调研估算，已接受）
 
+### R3（2026-09-04 修订）— code-review 发现 + 测试修正
+
+**触发**：主对话对 effort 跑了仓库级 `.agents/skills/code-review/SKILL.md` 双轴 code review（Standards + Spec 并行 sub-agent）。
+
+**关键 finding**：
+- **F3 [Spec + Standards] T6 commit (585f5c0c) 引入 signal 透传后未同步更新契约测试**：3 处 `expect(...).toHaveBeenNthCalledWith(N, undefined, 'X2')` 期望 `undefined`（旧行为），但 T6 改后 createMixFeed 三处 `fetchPage` 调用前都传 AbortController.signal → 2 个 createMixFeed.test.ts 测试失败
+- **R2 commit message 「1103 tests pass」不实**：R2 落笔时 author 未跑测试，commit 序列 T6 → R2 时 T6 失败已存在但 R2 未感知
+- **F1 [Standards] useWatchlistMutation 零消费方**：文件 69 行无 consumer，命名 `use*` 暗示 composable 但缺 setup() 上下文调用方，违反命名承诺
+- **F2 [Standards] useApiInfiniteQuery / useApiCommentsQuery 全 app-lynx 零生产消费**：diff 引入 150 + 103 行代码仅在测试被覆盖，生产路径未受益（spec T5 字面「useComments / useSearch 迁 useInfiniteQuery」未实施）
+- **F4 [Spec] 机器防线缺失**：`.husky/pre-push:37` 不覆盖 `packages/app-lynx/`，F3 类测试失败可无声通过
+- **S1-S6 建议 finding**：wrapWithGenerationGate 重复模板 / 6 处 setQueryDefaults 同样板 / 13 测试均为实现反推 / useBookmarkMutation 无单测等
+
+**R3 实施修正**（commit `72631fd8`）：
+- 修 createMixFeed.test.ts 三处断言 `undefined` → `expect.any(AbortSignal)`（oracle = 真实生产签名 `(signal, nextUrl?)`）
+- 验证：49 files / 793 tests pass（修复前 791/793 + 2 failed）
+- **R2 commit message 「1103 tests pass」不实无法 amend（commit 锁定）**，由 R3 修订注记作为事实层补正
+
+**R3 决策待用户拍板**（review 发现但 deferred）：
+- [ ] F1 useWatchlistMutation 处理：选项 A 删除 + R3 记录 / B 真迁 Watchlist.vue / C 改名为 createWatchlistMutation 工厂形态
+- [ ] F2 useApiInfiniteQuery / useApiCommentsQuery 处理：选项 A 改 ADR-0141 R3 承认「工具层就位 ≠ 消费者迁移」 / B 真迁 useComments / useSearch consumer
+- [ ] F4 机器防线：在 `.husky/pre-push` 增加 app-lynx 路径 E2E 锚点校验
+
+**R3 经验教训（hard rule）**：
+- 任何 commit 落笔时**必须**实际跑测试 + 把真实数字写进 commit message（"测试绿"不等于"测试 pass"——必须 verify）
+- signal 透传 / 接口签名变化类 commit **必须**同步更新所有契约测试断言（spec 配套测试是机器防线，不是可选文档）
+- spec 字面要求 vs 实际 diff 偏离时，**必须**在 commit message 显式记录「范围收窄」决策，不能用 R2 类修订「事后认领」
+
 ## 验证证据索引
 
 | 验证项 | 证据位置 |
