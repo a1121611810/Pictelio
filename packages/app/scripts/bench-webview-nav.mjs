@@ -303,6 +303,50 @@ async function imgreadyCmd() {
   console.log(`[imgready] 完成 → ${outFile}`);
 }
 
+// ─── coldstart: am start → 首屏卡片 DOM 就绪毫秒（T4 Query 持久化的主指标） ───
+// t0 = 宿主 am start 前时刻；200ms 粒度轮询 CDP（★/♥ 卡片文本 + 图片卡数），
+// 就绪后顺带记录当时 /pixiv-img/ 资源数与再等 4s 的晚到图片数。
+async function coldstartCmd() {
+  mkdirSync(OUT, { recursive: true });
+  const outFile = resolve(OUT, "webview_coldstart.jsonl");
+  writeFileSync(outFile, "");
+  const GROUPS_CS = Number(opt("groups", "3"));
+  for (let g = 0; g < GROUPS_CS; g++) {
+    adbShell(`am force-stop ${PKG}`);
+    await SLEEP(1500);
+    const t0 = Date.now();
+    adbShell(`am start -n ${PKG}/.MainActivityWebview`);
+    let readyMs = null,
+      imgsAtReady = 0;
+    for (let i = 0; i < 90; i++) {
+      await SLEEP(200);
+      try {
+        const r = await cdpEvaluate(
+          `(() => { const t = document.body.innerText; const imgs = document.querySelectorAll('img[src*="/pixiv-img/"]').length; return { ready: /★|♥/.test(t), imgs }; })()`,
+        );
+        if (r && r.ready) {
+          readyMs = Date.now() - t0;
+          imgsAtReady = r.imgs;
+          break;
+        }
+      } catch {}
+    }
+    if (readyMs === null) {
+      console.log(`  g${g}: 90s 内未就绪，记失败`);
+      appendFileSync(outFile, JSON.stringify({ scenario: "coldstart", kind: "tocards", group: g, readyMs: null }) + "\n");
+      continue;
+    }
+    await SLEEP(4000);
+    const late = await cdpEvaluate(`document.querySelectorAll('img[src*="/pixiv-img/"]').length`).catch(() => 0);
+    appendFileSync(
+      outFile,
+      JSON.stringify({ scenario: "coldstart", kind: "tocards", group: g, readyMs, imgsAtReady, imgsLate: Number(late) }) + "\n",
+    );
+    console.log(`  g${g}: 首屏卡片就绪 ${readyMs}ms（当时图片 ${imgsAtReady}，+4s 后 ${late}）`);
+  }
+  console.log(`[coldstart] 完成 → ${outFile}`);
+}
+
 // ─── report ───
 async function reportCmd() {
   const rows = [];
@@ -372,12 +416,16 @@ async function main() {
     await imgreadyCmd();
     return;
   }
+  if (cmd === "coldstart") {
+    await coldstartCmd();
+    return;
+  }
   if (cmd === "report") {
     await reportCmd();
     return;
   }
   console.error(
-    "用法: bench-webview-nav.mjs switch|imgready|report --serial <s> --groups <n> --out <dir>",
+    "用法: bench-webview-nav.mjs switch|imgready|coldstart|report --serial <s> --groups <n> --out <dir>",
   );
   process.exit(1);
 }
