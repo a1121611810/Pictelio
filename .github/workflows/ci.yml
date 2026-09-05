@@ -89,6 +89,17 @@ jobs:
       # Android 单测（B5 写盘原子性等 Java 防线）此前只在本地手跑，
       # CI 不跑 = 原子写回归可全绿通过（review #358 P2）。ubuntu runner
       # 预装 Android SDK；Robolectric 的 android-all 依赖经 maven 拉取。
+      # gradle 配置依赖 gitignored 生成物（capacitor.settings.gradle /
+      # capacitor.build.gradle / OAuthConfig），先按 build:android 同款流程生成
+      - name: Generate credentials config
+        run: pnpm --dir packages/app run sync:credentials
+
+      - name: Build web assets
+        run: pnpm --dir packages/app run build
+
+      - name: Capacitor sync
+        run: pnpm --dir packages/app run cap:sync
+
       - name: Gradle unit tests (testFullDebugUnitTest)
         working-directory: packages/app/android
         run: GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew testFullDebugUnitTest --no-daemon
