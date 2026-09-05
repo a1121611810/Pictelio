@@ -1,0 +1,772 @@
+--------- beginning of system
+09-05 18:01:18.686   563   580 D AutofillManagerService: Close system dialogs
+--------- beginning of main
+09-05 18:01:18.688   779   779 I vol.VolumeDialogImpl: mDialog.dismiss() reason: volume_controller from: com.android.systemui.volume.VolumeDialogImpl$7.onDismissRequested:3
+09-05 18:01:18.692   779   869 V WindowManagerShell: Transition requested: android.os.BinderProxy@5ff94f8 TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=295 displayId=0 isRunning=true baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.google.android.apps.nexuslauncher/.NexusLauncherActivity } baseActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} origActivity=null realActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} numActivities=1 lastActiveTime=12678220 supportsMultiWindow=true resizeMode=2 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@d062dd1} topActivityType=2 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{e3d6036 com.google.android.apps.nexuslauncher.NexusLauncherActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=false isVisibleRequested=true isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = null, displayChange = null }
+09-05 18:01:18.693   563   581 D CompatibilityChangeReporter: Compat change id reported: 197654537; UID 10193; state: ENABLED
+09-05 18:01:18.693  1065  1065 D TaplTarget: Launcher.onNewIntent: Intent { act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10400100 cmp=com.google.android.apps.nexuslauncher/.NexusLauncherActivity (has extras) }
+09-05 18:01:18.693   563  3283 W ProcessStats: Tracking association SourceState{6eddaac com.google.android.googlequicksearchbox:interactor/10132 BTop #6940} whose proc state 2 is better than process ProcessState{7e24864 com.google.android.gms.persistent/10127 pkg=com.google.android.gms} proc state 4 (101 skipped)
+09-05 18:01:18.694   563   581 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.google.android.apps.nexuslauncher/.NexusLauncherActivity (has extras)} with LAUNCH_SINGLE_TASK from uid 0 (BAL_ALLOW_ALLOWLISTED_UID) result code=2
+09-05 18:01:18.694   886  1162 D BtGatt.ScanManager: uid 10127 isForeground true scanMode -1
+09-05 18:01:18.696   563  1526 W AppSearchIcing: icing-search-engine.cc:283: Error: 5, Message: Document (com.google.android.googlequicksearchbox$OneSearchZeroStateGoogleSuggestions/default, zp) not found.
+09-05 18:01:18.697   779   869 D WindowManagerShell: onActivityRestartAttempt: ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity}
+09-05 18:01:18.697  1065  1768 D OneSearchSuggestProvider: Created the binder channel successfully for end point service =com.google.android.apps.search.googleapp.search.suggest.plugins.onesearch.server.OneSearchSuggestService , mChannel=z1{delegate=s1{logId=45, target=directaddress:///AndroidComponentAddress%5BIntent%20%7B%20act=grpc.io.action.BIND%20cmp=com.google.android.googlequicksearchbox/com.google.android.apps.search.googleapp.search.suggest.plugins.onesearch.server.OneSearchSuggestService%20%7D%5D}} , mOneSearchConnection=X1.T@b9e1502
+09-05 18:01:18.698   563   580 D AutofillManagerService: Close system dialogs
+09-05 18:01:18.699   779   779 I vol.VolumeDialogImpl: mDialog.dismiss() reason: volume_controller from: com.android.systemui.volume.VolumeDialogImpl$7.onDismissRequested:3
+09-05 18:01:18.699   779   779 D vol.VolumeDialogImpl: dismissH: skipping dismiss because isAnimatingDismiss is true and showingStateInconsistent is false
+09-05 18:01:18.701  1459  1688 I AiAiEcho: Predicting[0]: 
+09-05 18:01:18.701  1459  1688 I AiAiEcho: EchoTargets: 
+09-05 18:01:18.701  1459  1688 I AiAiEcho: Filtered by AiAi flag check: 
+09-05 18:01:18.701  1459  1688 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata: 
+09-05 18:01:18.701  1459  1688 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+09-05 18:01:18.702   410   410 I BpBinder: onLastStrongRef automatically unlinking death recipients: 
+09-05 18:01:18.708  1604  2209 E OpenGLRenderer: Unable to match the desired swap behavior.
+09-05 18:01:18.709  1065  1622 E OpenGLRenderer: Unable to match the desired swap behavior.
+09-05 18:01:18.717  1604  1604 I A       : (REDACTED) Created gRPC endpoint for service %s
+09-05 18:01:18.721   779   869 V WindowManagerShell: onTransitionReady android.os.BinderProxy@5ff94f8: {id=29 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@94fb3d3} m=TO_FRONT f=SHOW_WALLPAPER|MOVE_TO_TOP leash=Surface(name=Task=1)/@0x3369b37 sb=Rect(0, 0 - 720, 1280) eb=Rect(0, 0 - 720, 1280) d=0},{WCT{android.window.IWindowContainerToken$Stub$Proxy@7ec0b10} m=TO_BACK f=NONE leash=Surface(name=Task=305)/@0x51508a4 sb=Rect(0, 0 - 720, 1280) eb=Rect(0, 0 - 720, 1280) d=0},{null m=TO_FRONT f=IS_WALLPAPER leash=Surface(name=WallpaperWindowToken{8c4ec6 token=android.os.Binder@819d08})/@0x56ed60d sb=Rect(0, 0 - 720, 1280) eb=Rect(0, 0 - 720, 1280) d=0}]}
+09-05 18:01:18.722   779   869 V WindowManagerShell: Playing animation for (#29)android.os.BinderProxy@5ff94f8@0
+09-05 18:01:18.722   779   869 V WindowManagerShell:  try handler com.android.wm.shell.transition.DefaultMixedHandler@1965e5a
+09-05 18:01:18.722   779   869 V WindowManagerShell:  try handler com.android.wm.shell.keyguard.KeyguardTransitionHandler@83eed68
+09-05 18:01:18.722   779   869 V WindowManagerShell:  try handler com.android.wm.shell.activityembedding.ActivityEmbeddingController@590f581
+09-05 18:01:18.722   779   869 V WindowManagerShell:  try handler com.android.wm.shell.recents.RecentsTransitionHandler@513b3fe
+09-05 18:01:18.722   779   869 V ShellRecents: RecentsTransitionHandler.startAnimation: no controller found
+09-05 18:01:18.722   779   869 V WindowManagerShell:  try handler com.android.wm.shell.pip.PipTransition@eaf375f
+09-05 18:01:18.722   779   869 V WindowManagerShell:  try handler com.android.wm.shell.splitscreen.StageCoordinator@27c11ba
+09-05 18:01:18.722   779   869 V WindowManagerShell:  try handler com.android.wm.shell.transition.RemoteTransitionHandler@fb70f17
+09-05 18:01:18.722   779   869 V WindowManagerShell: Transition doesn't have explicit remote, search filters for match for {id=29 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@94fb3d3} m=TO_FRONT f=SHOW_WALLPAPER|MOVE_TO_TOP leash=Surface(name=Task=1)/@0x3369b37 sb=Rect(0, 0 - 720, 1280) eb=Rect(0, 0 - 720, 1280) d=0},{WCT{android.window.IWindowContainerToken$Stub$Proxy@7ec0b10} m=TO_BACK f=NONE leash=Surface(name=Task=305)/@0x51508a4 sb=Rect(0, 0 - 720, 1280) eb=Rect(0, 0 - 720, 1280) d=0},{null m=TO_FRONT f=IS_WALLPAPER leash=Surface(name=WallpaperWindowToken{8c4ec6 token=android.os.Binder@819d08})/@0x56ed60d sb=Rect(0, 0 - 720, 1280) eb=Rect(0, 0 - 720, 1280) d=0}]}
+09-05 18:01:18.722   779   869 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x0 checks=[{atype=dream independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=ANY topActivity=null},{atype=home independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@66d14b8, appThread = android.app.IApplicationThread$Stub$Proxy@7121291, debugName = LauncherToDream }}
+09-05 18:01:18.722   779   869 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x100 checks=[{atype=home independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=TOP topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity}},{atype=standard independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@18045f6, appThread = android.app.IApplicationThread$Stub$Proxy@b32edf7, debugName = QuickstepLaunchHome }}
+09-05 18:01:18.722   779   869 D RemoteTransitionHandler: Found filterPair{{types=[] flags=0x0] notFlags=0x100 checks=[{atype=home independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=TOP topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity}},{atype=standard independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@18045f6, appThread = android.app.IApplicationThread$Stub$Proxy@b32edf7, debugName = QuickstepLaunchHome }}
+09-05 18:01:18.722   779   869 V WindowManagerShell:  Delegate animation for #29 to RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@18045f6, appThread = android.app.IApplicationThread$Stub$Proxy@b32edf7, debugName = QuickstepLaunchHome }
+09-05 18:01:18.724   779   869 V WindowManagerShell:  animated by com.android.wm.shell.transition.RemoteTransitionHandler@fb70f17
+09-05 18:01:18.725   563   580 V WindowManager: Sent Transition #29 createdAt=09-05 18:01:18.688 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=295 displayId=0 isRunning=true baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.google.android.apps.nexuslauncher/.NexusLauncherActivity } baseActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} origActivity=null realActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} numActivities=1 lastActiveTime=12678220 supportsMultiWindow=true resizeMode=2 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{bbd6655 Task{50ce442 #295 type=home I=com.google.android.apps.nexuslauncher/.NexusLauncherActivity}}} topActivityType=2 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{f90a86a com.google.android.apps.nexuslauncher.NexusLauncherActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=false isVisibleRequested=true isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = null, displayChange = null }
+09-05 18:01:18.725   563   580 V WindowManager:     startWCT=WindowContainerTransaction { changes = {} hops = [] errorCallbackToken=null taskFragmentOrganizer=null }
+09-05 18:01:18.725   563   580 V WindowManager:     info={id=29 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{RemoteToken{c72d414 Task{51c6cdb #1 type=home}}} m=TO_FRONT f=SHOW_WALLPAPER|MOVE_TO_TOP leash=Surface(name=Task=1)/@0xe62f0a4 sb=Rect(0, 0 - 720, 1280) eb=Rect(0, 0 - 720, 1280) d=0},{WCT{RemoteToken{44ae5e8 Task{585ed1b #305 type=standard A=10193:io.pictelio.app}}} m=TO_BACK f=NONE leash=Surface(name=Task=305)/@0x76f65fc sb=Rect(0, 0 - 720, 1280) eb=Rect(0, 0 - 720, 1280) d=0},{null m=TO_FRONT f=IS_WALLPAPER leash=Surface(name=WallpaperWindowToken{8c4ec6 token=android.os.Binder@819d08})/@0xd05848 sb=Rect(0, 0 - 720, 1280) eb=Rect(0, 0 - 720, 1280) d=0}]}
+09-05 18:01:18.926   779   933 D EGL_emulation: app_time_stats: avg=18896.42ms min=18896.42ms max=18896.42ms count=1
+09-05 18:01:18.959   563  2239 I ImeTracker: com.google.android.apps.nexuslauncher:720124b9: onRequestHide at ORIGIN_SERVER_HIDE_INPUT reason HIDE_UNSPECIFIED_WINDOW
+09-05 18:01:18.959   563  2239 I ImeTracker: com.google.android.apps.nexuslauncher:720124b9: onCancelled at PHASE_SERVER_SHOULD_HIDE
+09-05 18:01:18.960  1356  1356 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():3227 
+09-05 18:01:18.961  1356  1356 I GoogleInputMethodService: GoogleInputMethodService.updateDeviceLockedStatus():2087 repeatCheckTimes = 0, unlocked = true
+09-05 18:01:18.961  1356  1356 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1877 onStartInput(EditorInfo{inputType=0x0(NULL) imeOptions=0x0 privateImeOptions=null actionName=UNSPECIFIED actionLabel=null actionId=0 initialSelStart=-1 initialSelEnd=-1 initialCapsMode=0x0 hintText=null label=null packageName=com.google.android.apps.nexuslauncher fieldId=0 fieldName=null extras=null}, false)
+09-05 18:01:18.961  1356  1356 I GoogleInputMethodService: GoogleInputMethodService.shouldHideHeaderOnInitialState():4008 ShouldHideHeaderOnInitialState = false
+09-05 18:01:18.962  1356  1356 I GoogleInputMethodService: GoogleInputMethodService.updateDeviceLockedStatus():2087 repeatCheckTimes = 2, unlocked = true
+09-05 18:01:18.990  1604  2132 W A       : Unable to get user prefs
+09-05 18:01:18.990  1604  2132 W A       : v2 eligibility check failed
+09-05 18:01:18.990  1604  2132 W A       : com.google.android.libraries.search.r.a.b: Request to get prefs failed
+09-05 18:01:18.990  1604  2132 W A       : 	at com.google.android.libraries.search.r.a.c.apply(PG:17)
+09-05 18:01:18.990  1604  2132 W A       : 	at com.google.apps.tiktok.tracing.ew.apply(PG:3)
+09-05 18:01:18.990  1604  2132 W A       : 	at com.google.common.w.a.h.e(PG:2)
+09-05 18:01:18.990  1604  2132 W A       : 	at com.google.common.w.a.j.run(PG:9)
+09-05 18:01:18.990  1604  2132 W A       : 	at com.google.android.libraries.i.z.run(PG:1)
+09-05 18:01:18.990  1604  2132 W A       : 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+09-05 18:01:18.990  1604  2132 W A       : 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+09-05 18:01:18.990  1604  2132 W A       : 	at com.google.android.libraries.i.h.run(PG:2)
+09-05 18:01:18.990  1604  2132 W A       : 	at java.lang.Thread.run(Thread.java:1012)
+09-05 18:01:18.990  1604  2132 W A       : 	at com.google.android.libraries.i.ai.run(PG:5)
+09-05 18:01:18.990  1604  2132 W A       : unable to retrieve gws prefs while getting consent state
+09-05 18:01:18.990  1604  2132 W A       : com.google.android.libraries.search.r.a.b: Request to get prefs failed
+09-05 18:01:18.990  1604  2132 W A       : 	at com.google.android.libraries.search.r.a.c.apply(PG:17)
+09-05 18:01:18.990  1604  2132 W A       : 	at com.google.apps.tiktok.tracing.ew.apply(PG:3)
+09-05 18:01:18.990  1604  2132 W A       : 	at com.google.common.w.a.h.e(PG:2)
+09-05 18:01:18.990  1604  2132 W A       : 	at com.google.common.w.a.j.run(PG:9)
+09-05 18:01:18.990  1604  2132 W A       : 	at com.google.android.libraries.i.z.run(PG:1)
+09-05 18:01:18.990  1604  2132 W A       : 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+09-05 18:01:18.990  1604  2132 W A       : 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+09-05 18:01:18.990  1604  2132 W A       : 	at com.google.android.libraries.i.h.run(PG:2)
+09-05 18:01:18.990  1604  2132 W A       : 	at java.lang.Thread.run(Thread.java:1012)
+09-05 18:01:18.990  1604  2132 W A       : 	at com.google.android.libraries.i.ai.run(PG:5)
+09-05 18:01:19.006  1065  1065 D SearchTargetUtil:  query= size=15
+09-05 18:01:19.006  1065  1065 D SearchTargetUtil: layoutType=extra_tall_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{bitmap_url=data:image/jpeg;base64,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
+09-05 18:01:19.006  1065  1065 D SearchTargetUtil: layoutType=short_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=false,is_personal=false,suggest_raw_text=noel haggard birth date bakersfield,group_id=web320273,response_id=136d4c1c-a215-4d3d-90e7-4a2e148eaabd,support_query_builder=false,} searchAction=noel haggard birth date bakersfield searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: e44bc6ac-6404-4ae4-b648-d5924cf4564e
+09-05 18:01:19.006  1065  1065 D SearchTargetUtil: layoutType=short_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=false,is_personal=false,suggest_raw_text=costco next program closure,group_id=web320273,response_id=136d4c1c-a215-4d3d-90e7-4a2e148eaabd,support_query_builder=false,} searchAction=costco next program closure searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: 3eef768b-108a-40c6-bfeb-c1f2a9993efe
+09-05 18:01:19.006  1065  1065 D SearchTargetUtil: layoutType=short_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=false,is_personal=false,suggest_raw_text=maksym breus wildlife photography winner,group_id=web320273,response_id=136d4c1c-a215-4d3d-90e7-4a2e148eaabd,support_query_builder=false,} searchAction=maksym breus wildlife photography winner searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: 343d2b2c-cebc-4c51-b834-9368ef1bce6d
+09-05 18:01:19.006  1065  1065 D SearchTargetUtil: layoutType=short_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=false,is_personal=false,suggest_raw_text=rogers stadium toronto storm damage,group_id=web320273,response_id=136d4c1c-a215-4d3d-90e7-4a2e148eaabd,support_query_builder=false,} searchAction=rogers stadium toronto storm damage searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: 66f11953-a8fa-4e6a-a773-ae04d96ac8e8
+09-05 18:01:19.006  1065  1065 D SearchTargetUtil: layoutType=short_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=false,is_personal=false,suggest_raw_text=north crowley high school football,group_id=web320273,response_id=136d4c1c-a215-4d3d-90e7-4a2e148eaabd,support_query_builder=false,} searchAction=north crowley high school football searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: c1dd62b9-941e-4b00-b65e-842262306997
+09-05 18:01:19.006  1065  1065 D SearchTargetUtil: layoutType=short_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=false,is_personal=false,suggest_raw_text=walmart frozen berry recall e coli,group_id=web320273,response_id=136d4c1c-a215-4d3d-90e7-4a2e148eaabd,support_query_builder=false,} searchAction=walmart frozen berry recall e coli searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: 56dce156-1abe-4516-bbfe-1c70bc299a2a
+09-05 18:01:19.006  1065  1065 D SearchTargetUtil: layoutType=short_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=false,is_personal=false,suggest_raw_text=nyt crossword answers mini,group_id=web320273,response_id=136d4c1c-a215-4d3d-90e7-4a2e148eaabd,support_query_builder=false,} searchAction=nyt crossword answers mini searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: 53b0c837-7cc2-4953-a82c-97305aa69a17
+09-05 18:01:19.006  1065  1065 D SearchTargetUtil: layoutType=short_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=false,is_personal=false,suggest_raw_text=alcohol cancer deaths,group_id=web320273,response_id=136d4c1c-a215-4d3d-90e7-4a2e148eaabd,support_query_builder=false,} searchAction=alcohol cancer deaths searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: 7d01aa02-1465-49e2-b2ef-391ba75ac98e
+09-05 18:01:19.006  1065  1065 D SearchTargetUtil: layoutType=extra_tall_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{bitmap_url=data:image/png;base64,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,suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=true,is_personal=false,suggest_raw_text=dodgers baseball,group_id=web320273,response_id=136d4c1c-a215-4d3d-90e7-4a2e148eaabd,support_query_builder=false,} searchAction=Los Angeles Dodgers searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: 3224bb47-82ce-4d43-b1c8-eee48faf083f
+09-05 18:01:19.006  1065  1065 D SearchTargetUtil: layoutType=short_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=false,is_personal=false,suggest_raw_text=zelda ocarina of time remake,group_id=web320273,response_id=136d4c1c-a215-4d3d-90e7-4a2e148eaabd,support_query_builder=false,} searchAction=zelda ocarina of time remake searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: 862acdda-ce05-4871-8ab1-285573d141a0
+09-05 18:01:19.006  1065  1065 D SearchTargetUtil: layoutType=short_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=false,is_personal=false,suggest_raw_text=pierre damas bel,group_id=web320273,response_id=136d4c1c-a215-4d3d-90e7-4a2e148eaabd,support_query_builder=false,} searchAction=pierre damas bel searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: e75fc685-2e43-48fc-9d3d-795b6c53a88a
+09-05 18:01:19.006  1065  1065 D SearchTargetUtil: layoutType=short_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=false,is_personal=false,suggest_raw_text=mass grave,group_id=web320273,response_id=136d4c1c-a215-4d3d-90e7-4a2e148eaabd,support_query_builder=false,} searchAction=mass grave searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: 3541798c-17dd-48f3-b02b-af523bbaf0ae
+09-05 18:01:19.006  1065  1065 D SearchTargetUtil: layoutType=extra_tall_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{bitmap_url=data:image/jpeg;base64,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
+09-05 18:01:19.007  1065  1065 D SearchTargetUtil: layoutType=short_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=false,is_personal=false,suggest_raw_text=apple iphone 18 pro,group_id=web320273,response_id=136d4c1c-a215-4d3d-90e7-4a2e148eaabd,support_query_builder=false,} searchAction=apple iphone 18 pro searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: 6a662371-b39a-44fb-8134-b2b4331a9c6d
+09-05 18:01:19.029   779   779 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+09-05 18:01:19.090   779   869 V WindowManagerShell: Transition animation finished (aborted=false), notifying core (#29)android.os.BinderProxy@5ff94f8@0
+09-05 18:01:19.090   563   580 V WindowManager: Finish Transition #29: created at 09-05 18:01:18.688 collect-started=0.014ms request-sent=3.5ms started=6.917ms ready=6.906ms sent=32.454ms finished=402.306ms
+09-05 18:01:19.092   779   869 V WindowManagerShell: Track 0 became idle
+09-05 18:01:19.092   779   869 V WindowManagerShell: All active transition animations finished
+09-05 18:01:19.093   563   636 D CompatibilityChangeReporter: Compat change id reported: 265195908; UID 10193; state: ENABLED
+09-05 18:01:19.096  1509  1930 I AssistantForeground: (REDACTED) Get launcher package: %s
+09-05 18:01:19.109 12825 12825 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=falsecallback=androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@6934d3c
+09-05 18:01:19.110   563  3283 D CoreBackPreview: Window{2f3dec6 u0 io.pictelio.app/io.pictelio.app.MainActivityWebview}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@b6c5961, mPriority=-1, mIsAnimationCallback=false}
+09-05 18:01:19.212   563  3283 I ActivityManager: Force stopping io.pictelio.app appid=10193 user=0: from pid 14161
+09-05 18:01:19.213   563  3283 I ActivityManager: Killing 12825:io.pictelio.app/u0a193 (adj 700): stop io.pictelio.app due to from pid 14161
+09-05 18:01:19.213   563   581 D DisplayManagerService: Drop pending events for gone uid 10193
+09-05 18:01:19.214   563  3283 I ActivityManager: Killing 12894:com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0/u0a193i9 (adj 0): isolated not needed
+09-05 18:01:19.214   563  3283 W ActivityTaskManager: Force removing ActivityRecord{d78fb2a u0 io.pictelio.app/.MainActivityWebview t305 f}}: app died, no saved state
+09-05 18:01:19.214   563  3283 W InputManager-JNI: Input channel object '2f3dec6 io.pictelio.app/io.pictelio.app.MainActivityWebview (client)' was disposed without first being removed with the input manager!
+09-05 18:01:19.214   563   589 W UsageStatsService: Unexpected activity event reported! (io.pictelio.app/io.pictelio.app.MainActivityWebview event : 23 instanceId : 103177912)
+09-05 18:01:19.217   929   929 D CarrierSvcBindHelper: onHandleForceStop: [io.pictelio.app]
+09-05 18:01:19.218   929   929 D CarrierSvcBindHelper: No carrier app for: 0
+09-05 18:01:19.219   563   592 I libprocessgroup: Successfully killed process cgroup uid 99009 pid 12894 in 5ms
+09-05 18:01:19.220  1065  1065 W FrameTracker: Missed SF frame:UNKNOWN: 80, 127360, 0, CUJ=J<LAUNCHER_APP_CLOSE_TO_HOME>
+09-05 18:01:19.220  1065  1065 W FrameTracker: Missing HWUI jank callback for vsyncId: 127360, CUJ=J<LAUNCHER_APP_CLOSE_TO_HOME>
+09-05 18:01:19.220  1065  1065 W FrameTracker: Missed SF frame:UNKNOWN: 80, 127374, 0, CUJ=J<LAUNCHER_APP_CLOSE_TO_HOME>
+09-05 18:01:19.220  1065  1065 W FrameTracker: Missing HWUI jank callback for vsyncId: 127374, CUJ=J<LAUNCHER_APP_CLOSE_TO_HOME>
+09-05 18:01:19.220  1065  1065 W FrameTracker: Missed SF frame:UNKNOWN: 80, 127403, 39673246, CUJ=J<LAUNCHER_APP_CLOSE_TO_HOME>
+09-05 18:01:19.220  1065  1065 W FrameTracker: Missed SF frame:UNKNOWN: 80, 127418, 41693413, CUJ=J<LAUNCHER_APP_CLOSE_TO_HOME>
+09-05 18:01:19.220  1065  1065 W FrameTracker: Missed SF frame:UNKNOWN: 80, 127426, 39112372, CUJ=J<LAUNCHER_APP_CLOSE_TO_HOME>
+09-05 18:01:19.220  1065  1065 W FrameTracker: Missed SF frame:UNKNOWN: 80, 127441, 38584040, CUJ=J<LAUNCHER_APP_CLOSE_TO_HOME>
+09-05 18:01:19.220  1065  1065 W FrameTracker: Missed SF frame:UNKNOWN: 80, 127456, 39260874, CUJ=J<LAUNCHER_APP_CLOSE_TO_HOME>
+09-05 18:01:19.220  1065  1065 W FrameTracker: Missed SF frame:UNKNOWN: 80, 127464, 38417874, CUJ=J<LAUNCHER_APP_CLOSE_TO_HOME>
+09-05 18:01:19.220  1065  1065 W FrameTracker: Missed SF frame:UNKNOWN: 80, 127472, 37344167, CUJ=J<LAUNCHER_APP_CLOSE_TO_HOME>
+09-05 18:01:19.220  1065  1065 W FrameTracker: Missed SF frame:UNKNOWN: 80, 127480, 39550084, CUJ=J<LAUNCHER_APP_CLOSE_TO_HOME>
+09-05 18:01:19.220  1065  1065 W FrameTracker: Missed SF frame:UNKNOWN: 80, 127488, 40251876, CUJ=J<LAUNCHER_APP_CLOSE_TO_HOME>
+09-05 18:01:19.220  1065  1065 W FrameTracker: Missed SF frame:UNKNOWN: 80, 127496, 50708752, CUJ=J<LAUNCHER_APP_CLOSE_TO_HOME>
+09-05 18:01:19.222   563   581 D DisplayManagerService: Drop pending events for gone uid 99009
+09-05 18:01:19.222   856   856 I Zygote  : Process 12894 exited due to signal 9 (Killed)
+09-05 18:01:19.223   563  2238 V ActivityManager: Got obituary of 12825:io.pictelio.app
+09-05 18:01:19.223   563   698 D ConnectivityService: releasing NetworkRequest [ REQUEST id=199, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10193 RequestorUid: 10193 RequestorPkg: io.pictelio.app UnderlyingNetworks: Null] ] (release request)
+09-05 18:01:19.223   563   583 W ActivityManager: setHasOverlayUi called on unknown pid: 12825
+09-05 18:01:19.223   375   375 I Zygote  : Process 12825 exited due to signal 9 (Killed)
+09-05 18:01:20.001   779   779 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+09-05 18:01:20.003   779   933 D EGL_emulation: app_time_stats: avg=258.43ms min=1.00ms max=1030.46ms count=4
+09-05 18:01:20.297 14164 14164 D MediaCodecList: codecHandlesFormat: no format, so no extra checks
+09-05 18:01:20.298 14164 14169 D CCodec  : allocate(c2.android.avc.encoder)
+09-05 18:01:20.299 14164 14169 I Codec2Client: Available Codec2 services: "default" "software"
+09-05 18:01:20.300 14164 14169 I CCodec  : setting up 'default' as default (vendor) store
+09-05 18:01:20.302   472  1269 I mediaswcodec: missing struct descriptor #Param::CoreIndex(--004) for field values of struct #Param::CoreIndex(F-12004)
+09-05 18:01:20.302   472  1269 I mediaswcodec: missing struct descriptor #Param::CoreIndex(--1812) for field values of struct #Param::CoreIndex(F-11812)
+09-05 18:01:20.302   472  1269 I mediaswcodec: missing struct descriptor #Param::CoreIndex(--004) for field values of struct #Param::CoreIndex(F-12004)
+09-05 18:01:20.302   472  1269 I mediaswcodec: missing struct descriptor #Param::CoreIndex(--1812) for field values of struct #Param::CoreIndex(F-11812)
+09-05 18:01:20.303 14164 14169 I CCodec  : Created component [c2.android.avc.encoder]
+09-05 18:01:20.303 14164 14169 D CCodecConfig: read media type: video/avc
+09-05 18:01:20.305 14164 14169 D ReflectedParamUpdater: extent() != 1 for single value type: algo.buffers.max-count.values
+09-05 18:01:20.305 14164 14169 D ReflectedParamUpdater: extent() != 1 for single value type: output.subscribed-indices.values
+09-05 18:01:20.305 14164 14169 D ReflectedParamUpdater: extent() != 1 for single value type: input.buffers.allocator-ids.values
+09-05 18:01:20.305 14164 14169 D ReflectedParamUpdater: extent() != 1 for single value type: output.buffers.allocator-ids.values
+09-05 18:01:20.306 14164 14169 D ReflectedParamUpdater: extent() != 1 for single value type: algo.buffers.allocator-ids.values
+09-05 18:01:20.306 14164 14169 D ReflectedParamUpdater: extent() != 1 for single value type: output.buffers.pool-ids.values
+09-05 18:01:20.306 14164 14169 D ReflectedParamUpdater: extent() != 1 for single value type: algo.buffers.pool-ids.values
+09-05 18:01:20.307 14164 14169 D ReflectedParamUpdater: ignored struct field coding.gop.values
+09-05 18:01:20.308 14164 14169 D ReflectedParamUpdater: ignored struct field coding.qp.values
+09-05 18:01:20.308 14164 14169 D CCodecConfig: ignoring local param raw.color (0xc2001809) as it is already supported
+09-05 18:01:20.308 14164 14169 I CCodecConfig: query failed after returning 12 values (BAD_INDEX)
+09-05 18:01:20.308 14164 14169 D CCodecConfig: c2 config diff is Dict {
+09-05 18:01:20.308 14164 14169 D CCodecConfig:   c2::i32 coded.average-qp.value = 0
+09-05 18:01:20.308 14164 14169 D CCodecConfig:   c2::u32 coded.bitrate.value = 64000
+09-05 18:01:20.308 14164 14169 D CCodecConfig:   c2::float coded.frame-rate.value = 1
+09-05 18:01:20.308 14164 14169 D CCodecConfig:   c2::u32 coded.picture-type.value = 0
+09-05 18:01:20.308 14164 14169 D CCodecConfig:   c2::u32 coded.pl.level = 20492
+09-05 18:01:20.308 14164 14169 D CCodecConfig:   c2::u32 coded.pl.profile = 20481
+09-05 18:01:20.308 14164 14169 D CCodecConfig:   c2::u32 coded.vui.color.matrix = 0
+09-05 18:01:20.308 14164 14169 D CCodecConfig:   c2::u32 coded.vui.color.primaries = 0
+09-05 18:01:20.308 14164 14169 D CCodecConfig:   c2::u32 coded.vui.color.range = 0
+09-05 18:01:20.308 14164 14169 D CCodecConfig:   c2::u32 coded.vui.color.transfer = 0
+09-05 18:01:20.308 14164 14169 D CCodecConfig:   c2::u32 coding.intra-refresh.mode = 0
+09-05 18:01:20.308 14164 14169 D CCodecConfig:   c2::float coding.intra-refresh.period = 0
+09-05 18:01:20.308 14164 14169 D CCodecConfig:   c2::u32 coding.request-sync-frame.value = 0
+09-05 18:01:20.308 14164 14169 D CCodecConfig:   c2::i64 coding.sync-frame-interval.value = 1000000
+09-05 18:01:20.308 14164 14169 D CCodecConfig:   c2::u32 input.delay.value = 0
+09-05 18:01:20.308 14164 14169 D CCodecConfig:   string input.media-type.value = "video/raw"
+09-05 18:01:20.308 14164 14169 D CCodecConfig:   string output.media-type.value = "video/avc"
+09-05 18:01:20.308 14164 14169 D CCodecConfig:   c2::u32 raw.color.matrix = 0
+09-05 18:01:20.308 14164 14169 D CCodecConfig:   c2::u32 raw.color.primaries = 0
+09-05 18:01:20.308 14164 14169 D CCodecConfig:   c2::u32 raw.color.range = 0
+09-05 18:01:20.308 14164 14169 D CCodecConfig:   c2::u32 raw.color.transfer = 0
+09-05 18:01:20.308 14164 14169 D CCodecConfig:   c2::u32 raw.size.height = 16
+09-05 18:01:20.308 14164 14169 D CCodecConfig:   c2::u32 raw.size.width = 16
+09-05 18:01:20.308 14164 14169 D CCodecConfig: }
+09-05 18:01:20.308 14164 14169 W ColorUtils: expected specified color aspects (0:0:0:0)
+09-05 18:01:20.311 14164 14164 D CodecSeeding: Seed: codec c2.android.avc.encoder, mediatype video/avc, overrideable 1
+09-05 18:01:20.311 14164 14164 D CodecProperties: setTuningValue(vq-target-bpp,0)
+09-05 18:01:20.311 14164 14164 D CodecProperties: setTuningValue(vq-target-bpp-1080p,1.90)
+09-05 18:01:20.311 14164 14164 D CodecProperties: setTuningValue(vq-target-bpp-720p,2.25)
+09-05 18:01:20.311 14164 14164 D CodecProperties: setTuningValue(vq-target-bpp-540p,2.65)
+09-05 18:01:20.311 14164 14164 D CodecProperties: setTuningValue(vq-target-bpp-480p,3.00)
+09-05 18:01:20.311 14164 14164 D CodecProperties: setTuningValue(vq-target-bpp-320x240,0)
+09-05 18:01:20.311 14164 14164 D CodecProperties: setTuningValue(vq-target-qpmax,-1)
+09-05 18:01:20.311 14164 14164 D CodecProperties: setTuningValue(vq-target-qpmax-1080p,45)
+09-05 18:01:20.311 14164 14164 D CodecProperties: setTuningValue(vq-target-qpmax-720p,43)
+09-05 18:01:20.311 14164 14164 D CodecProperties: setTuningValue(vq-target-qpmax-540p,42)
+09-05 18:01:20.311 14164 14164 D CodecProperties: setTuningValue(vq-target-qpmax-480p,38)
+09-05 18:01:20.311 14164 14164 D CodecProperties: setTuningValue(vq-bitrate-phaseout,1.75)
+09-05 18:01:20.311 14164 14164 D CodecProperties: setTuningValue(vq-boost-missing-qp,0.20)
+09-05 18:01:20.311 14164 14164 D CodecProperties: setFeatureValue(intra-refresh,0)
+09-05 18:01:20.311 14164 14164 D CodecProperties: setFeatureValue(qp-bounds,0)
+09-05 18:01:20.311 14164 14164 D CodecProperties: setFeatureValue(_vq_eligible.device,1)
+09-05 18:01:20.311 14164 14164 D CodecProperties: setFeatureValue(_quality.target,1)
+09-05 18:01:20.311 14164 14164 D CodecSeeding: Seed: codec c2.android.avc.encoder, mediatype video/avc, overrideable 0
+09-05 18:01:20.311 14164 14164 D MediaCodec: shapeMediaFormat: deltas(1): AMessage(what = 0x00000000) = {
+09-05 18:01:20.311 14164 14164 D MediaCodec:     int32_t android._encoding-quality-level = 0
+09-05 18:01:20.311 14164 14164 D MediaCodec:   }
+09-05 18:01:20.311 14164 14168 D MediaCodec: flushMediametrics
+09-05 18:01:20.311 14164 14169 D CCodec  : [c2.android.avc.encoder] buffers are bound to CCodec for this session
+09-05 18:01:20.311 14164 14169 D CCodecConfig: no c2 equivalents for color-format
+09-05 18:01:20.311 14164 14169 D CCodecConfig: no c2 equivalents for max-bframes
+09-05 18:01:20.311 14164 14169 D CCodecConfig: no c2 equivalents for flags
+09-05 18:01:20.311 14164 14169 D CCodecConfig: no c2 equivalents for encoder
+09-05 18:01:20.312 14164 14169 D CCodecConfig: c2 config diff is   c2::u32 coded.bitrate.value = 4000000
+09-05 18:01:20.312 14164 14169 D CCodecConfig:   c2::float coded.frame-rate.value = 60
+09-05 18:01:20.312 14164 14169 D CCodecConfig:   c2::i64 coding.sync-frame-interval.value = 10000000
+09-05 18:01:20.312 14164 14169 D CCodecConfig:   c2::u32 raw.size.height = 1280
+09-05 18:01:20.312 14164 14169 D CCodecConfig:   c2::u32 raw.size.width = 720
+09-05 18:01:20.312 14164 14169 W ColorUtils: expected specified color aspects (0:0:0:0)
+09-05 18:01:20.312 14164 14169 D CCodec  : encoding statistics level = 0
+09-05 18:01:20.312 14164 14169 D CCodec  : setup formats input: AMessage(what = 0x00000000) = {
+09-05 18:01:20.312 14164 14169 D CCodec  :   Rect crop(0, 0, 719, 1279)
+09-05 18:01:20.312 14164 14169 D CCodec  :   int32_t color-standard = 0
+09-05 18:01:20.312 14164 14169 D CCodec  :   int32_t color-range = 0
+09-05 18:01:20.312 14164 14169 D CCodec  :   int32_t color-transfer = 0
+09-05 18:01:20.312 14164 14169 D CCodec  :   int32_t frame-rate = 60
+09-05 18:01:20.312 14164 14169 D CCodec  :   int32_t height = 1280
+09-05 18:01:20.312 14164 14169 D CCodec  :   int32_t intra-refresh-period = 0
+09-05 18:01:20.312 14164 14169 D CCodec  :   string mime = "video/raw"
+09-05 18:01:20.312 14164 14169 D CCodec  :   int32_t video-qp-average = 0
+09-05 18:01:20.312 14164 14169 D CCodec  :   int32_t width = 720
+09-05 18:01:20.312 14164 14169 D CCodec  :   int32_t android._dataspace = 0
+09-05 18:01:20.312 14164 14169 D CCodec  :   int32_t using-sw-read-often = 1
+09-05 18:01:20.312 14164 14169 D CCodec  :   int64_t android._C2MemoryUsage = 1
+09-05 18:01:20.312 14164 14169 D CCodec  :   int32_t color-format = 2130708361
+09-05 18:01:20.312 14164 14169 D CCodec  :   int32_t android._color-format = 2130708361
+09-05 18:01:20.312 14164 14169 D CCodec  : }
+09-05 18:01:20.312 14164 14169 D CCodec  : setup formats output: AMessage(what = 0x00000000) = {
+09-05 18:01:20.312 14164 14169 D CCodec  :   int32_t bitrate = 4000000
+09-05 18:01:20.312 14164 14169 D CCodec  :   Rect crop(0, 0, 719, 1279)
+09-05 18:01:20.312 14164 14169 D CCodec  :   int32_t color-standard = 0
+09-05 18:01:20.312 14164 14169 D CCodec  :   int32_t color-range = 0
+09-05 18:01:20.312 14164 14169 D CCodec  :   int32_t color-transfer = 0
+09-05 18:01:20.312 14164 14169 D CCodec  :   int32_t frame-rate = 60
+09-05 18:01:20.312 14164 14169 D CCodec  :   int32_t height = 1280
+09-05 18:01:20.312 14164 14169 D CCodec  :   int32_t intra-refresh-period = 0
+09-05 18:01:20.312 14164 14169 D CCodec  :   int32_t level = 4096
+09-05 18:01:20.312 14164 14169 D CCodec  :   int32_t max-bitrate = 4000000
+09-05 18:01:20.312 14164 14169 D CCodec  :   string mime = "video/avc"
+09-05 18:01:20.312 14164 14169 D CCodec  :   int32_t profile = 65536
+09-05 18:01:20.312 14164 14169 D CCodec  :   int32_t video-qp-average = 0
+09-05 18:01:20.312 14164 14169 D CCodec  :   int32_t width = 720
+09-05 18:01:20.312 14164 14169 D CCodec  : }
+09-05 18:01:20.313 14164 14169 I CCodecConfig: query failed after returning 13 values (BAD_INDEX)
+09-05 18:01:20.313 14164 14169 D CCodec  : input format changed to AMessage(what = 0x00000000) = {
+09-05 18:01:20.313 14164 14169 D CCodec  :   Rect crop(0, 0, 719, 1279)
+09-05 18:01:20.313 14164 14169 D CCodec  :   int32_t color-standard = 1
+09-05 18:01:20.313 14164 14169 D CCodec  :   int32_t color-range = 2
+09-05 18:01:20.313 14164 14169 D CCodec  :   int32_t color-transfer = 3
+09-05 18:01:20.313 14164 14169 D CCodec  :   int32_t frame-rate = 60
+09-05 18:01:20.313 14164 14169 D CCodec  :   int32_t height = 1280
+09-05 18:01:20.313 14164 14169 D CCodec  :   int32_t intra-refresh-period = 0
+09-05 18:01:20.313 14164 14169 D CCodec  :   string mime = "video/raw"
+09-05 18:01:20.313 14164 14169 D CCodec  :   int32_t video-qp-average = 0
+09-05 18:01:20.313 14164 14169 D CCodec  :   int32_t width = 720
+09-05 18:01:20.313 14164 14169 D CCodec  :   int32_t android._dataspace = 260
+09-05 18:01:20.313 14164 14169 D CCodec  :   int32_t using-sw-read-often = 1
+09-05 18:01:20.313 14164 14169 D CCodec  :   int64_t android._C2MemoryUsage = 1
+09-05 18:01:20.313 14164 14169 D CCodec  :   int32_t color-format = 2130708361
+09-05 18:01:20.313 14164 14169 D CCodec  :   int32_t android._color-format = 2130708361
+09-05 18:01:20.313 14164 14169 D CCodec  : }
+09-05 18:01:20.313 14164 14169 D GraphicBufferSource: setting dataspace: 0x104, acquired=0
+09-05 18:01:20.313 14164 14169 D CCodec  : ISConfig not changed
+09-05 18:01:20.315 14164 14169 W Codec2Client: query -- param skipped: index = 1342179345.
+09-05 18:01:20.315 14164 14169 W Codec2Client: query -- param skipped: index = 2415921170.
+09-05 18:01:20.315 14164 14169 D CCodecBufferChannel: [c2.android.avc.encoder#109] Using basic input block pool with poolID 1 => got 1 - OK (0)
+09-05 18:01:20.315 14164 14169 D C2Store : Using DMABUF Heaps
+09-05 18:01:20.316 14164 14169 I CCodecBufferChannel: [c2.android.avc.encoder#109] Created output block pool with allocatorID 16 => poolID 61 - OK
+09-05 18:01:20.316 14164 14169 D CCodecBufferChannel: [c2.android.avc.encoder#109] Configured output block pool ids 61 => OK
+09-05 18:01:20.317   468  2669 W ResourceManagerService: Ignoring request to add new resource entry with value <= 0
+09-05 18:01:20.319 14164 14164 D MPEG4Writer: PreAllocation enabled
+09-05 18:01:20.335   410   410 W SurfaceFlinger: Invalid layer stack -1
+09-05 18:01:20.338   174   174 I hwservicemanager: getTransport: Cannot find entry android.hardware.graphics.mapper@4.0::IMapper/default in either framework or device VINTF manifest.
+09-05 18:01:20.338 14164 14167 I Gralloc4: mapper 4.x is not supported
+--------- beginning of kernel
+09-05 18:01:20.342   173   173 I servicemanager: Could not find android.hardware.graphics.allocator.IAllocator/default in the VINTF manifest.
+09-05 18:01:20.345 14164 14167 D GraphicBufferSource: got buffer with new dataSpace #104
+09-05 18:01:20.345 14164 14167 D C2OMXNode: dataspace changed to 0x104 pixel format: 0x1
+09-05 18:01:20.345   174   174 I hwservicemanager: getTransport: Cannot find entry android.hardware.graphics.mapper@4.0::IMapper/default in either framework or device VINTF manifest.
+09-05 18:01:20.346   472 14174 D SimpleC2Component: Using output block pool with poolID 61 => got 61 - 0
+09-05 18:01:20.346   472 14174 D SimpleC2Component: applied 2 configUpdates => BAD_INDEX (6)
+09-05 18:01:20.346   472 14174 D C2SoftAvcEnc: Params width 720 height 1280 level 41 colorFormat 0 bframes 0
+09-05 18:01:20.348   472 14174 E C2SoftAvcEnc: Unable to set air params = 0x1ad
+09-05 18:01:20.353 14164 14169 D CCodecConfig: c2 config diff is   Buffer coded.init-data.value = {
+09-05 18:01:20.353 14164 14169 D CCodecConfig:     00000000:  00 00 00 01 67 42 c0 29  8d 68 0b 40 a1 a4 20 20  ....gB.).h.@..  
+09-05 18:01:20.353 14164 14169 D CCodecConfig:     00000010:  20 20 f0 88 46 a0 00 00  00 01 68 ce 01 a8 35 c8    ..F.....h...5.
+09-05 18:01:20.353 14164 14169 D CCodecConfig:   }
+09-05 18:01:20.354 14164 14164 D MPEG4Writer: fpathconf _PC_FILESIZEBITS:64
+09-05 18:01:20.354 14164 14164 D MPEG4Writer: File size limit set to 4503599627370495 bytes implicitly
+09-05 18:01:20.354 14164 14164 D MPEG4Writer: MP4WtrCtrlHlpLooper Started
+09-05 18:01:20.354 14164 14164 I MPEG4Writer: limits: 4503599627370495/0 bytes/us, bit rate: -1 bps and the estimated moov size 3192 bytes
+09-05 18:01:20.356 14164 14182 I MPEG4Writer: setStartTimestampUs: 12679874243
+09-05 18:01:20.356 14164 14182 I MPEG4Writer: Earliest track starting time: 12679874243
+09-05 18:01:21.331   563   645 D ActivityManager: freezing 1367 com.google.android.apps.wellbeing
+09-05 18:01:21.334   563   645 D ActivityManager: freezing 1692 com.android.keychain
+09-05 18:01:21.335   563   645 D ActivityManager: freezing 935 com.android.settings
+09-05 18:01:21.336   563   645 D ActivityManager: freezing 3528 com.google.android.settings.intelligence
+09-05 18:01:21.473   563   758 D CompatibilityChangeReporter: Compat change id reported: 161252188; UID 10193; state: DISABLED
+09-05 18:01:21.474   563   758 W ActivityTaskManager: callingPackage for (uid=2000, pid=14187) has no WPC
+09-05 18:01:21.474   563   758 D CompatibilityChangeReporter: Compat change id reported: 265464455; UID 10193; state: DISABLED
+09-05 18:01:21.474   563   758 D CompatibilityChangeReporter: Compat change id reported: 265452344; UID 10193; state: DISABLED
+09-05 18:01:21.474   563   758 D CompatibilityChangeReporter: Compat change id reported: 266124927; UID 10193; state: DISABLED
+09-05 18:01:21.474   563   758 D CompatibilityChangeReporter: Compat change id reported: 265451093; UID 10193; state: DISABLED
+09-05 18:01:21.474   563   758 D CompatibilityChangeReporter: Compat change id reported: 265456536; UID 10193; state: DISABLED
+09-05 18:01:21.474   563   758 D CompatibilityChangeReporter: Compat change id reported: 255940284; UID 10193; state: DISABLED
+09-05 18:01:21.474   563   758 D CompatibilityChangeReporter: Compat change id reported: 236283604; UID 10193; state: DISABLED
+09-05 18:01:21.474   563   758 D CompatibilityChangeReporter: Compat change id reported: 263959004; UID 10193; state: DISABLED
+09-05 18:01:21.474   563   758 D CompatibilityChangeReporter: Compat change id reported: 264304459; UID 10193; state: DISABLED
+09-05 18:01:21.474   563   758 D CompatibilityChangeReporter: Compat change id reported: 264301586; UID 10193; state: DISABLED
+09-05 18:01:21.474   563   758 D CompatibilityChangeReporter: Compat change id reported: 254631730; UID 10193; state: DISABLED
+09-05 18:01:21.474   563   758 D CompatibilityChangeReporter: Compat change id reported: 273509367; UID 10193; state: DISABLED
+09-05 18:01:21.474   563   758 D CompatibilityChangeReporter: Compat change id reported: 263259275; UID 10193; state: DISABLED
+09-05 18:01:21.474   563   758 D CompatibilityChangeReporter: Compat change id reported: 174042980; UID 10193; state: DISABLED
+09-05 18:01:21.474   563   758 D CompatibilityChangeReporter: Compat change id reported: 174042936; UID 10193; state: DISABLED
+09-05 18:01:21.474   563   758 D CompatibilityChangeReporter: Compat change id reported: 181136395; UID 10193; state: DISABLED
+09-05 18:01:21.474   563   758 D CompatibilityChangeReporter: Compat change id reported: 194480991; UID 10193; state: ENABLED
+09-05 18:01:21.476   563   758 D CompatibilityChangeReporter: Compat change id reported: 184838306; UID 10193; state: DISABLED
+09-05 18:01:21.476   563   758 D CompatibilityChangeReporter: Compat change id reported: 185004937; UID 10193; state: DISABLED
+09-05 18:01:21.476   563   758 D CompatibilityChangeReporter: Compat change id reported: 205907456; UID 10193; state: ENABLED
+09-05 18:01:21.478   779   893 D SplashScreenView: Build android.window.SplashScreenView{8eec83c V.E...... ......ID 0,0-0,0}
+09-05 18:01:21.478   779   893 D SplashScreenView: Icon: view: android.widget.ImageView{915b9c5 V.ED..... ......I. 0,0-0,0 #10204f0 android:id/splashscreen_icon_view} drawable: com.android.wm.shell.startingsurface.SplashscreenIconDrawableFactory$ImmobileIconDrawable@384f1a size: 384
+09-05 18:01:21.478   779   893 D SplashScreenView: Branding: view: android.view.View{82fca4b G.ED..... ......I. 0,0-0,0 #10204ef android:id/splashscreen_branding_view} drawable: null size w: 0 h: 0
+09-05 18:01:21.478   779   869 V WindowManagerShell: Transition requested: android.os.BinderProxy@cfe2c28 TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=306 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=io.pictelio.app/.MainActivityWebview } baseActivity=ComponentInfo{io.pictelio.app/io.pictelio.app.MainActivityWebview} topActivity=ComponentInfo{io.pictelio.app/io.pictelio.app.MainActivityWebview} origActivity=null realActivity=ComponentInfo{io.pictelio.app/io.pictelio.app.MainActivityWebview} numActivities=1 lastActiveTime=12681007 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@89d2d41} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{ffc42e6 io.pictelio.app.MainActivityWebview} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = null, displayChange = null }
+09-05 18:01:21.479   563   758 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=io.pictelio.app/.MainActivityWebview} with LAUNCH_SINGLE_TASK from uid 2000 (BAL_ALLOW_PERMISSION) result code=0
+09-05 18:01:21.479   563  2035 D CompatibilityChangeReporter: Compat change id reported: 168419799; UID 10193; state: DISABLED
+09-05 18:01:21.479   563  2035 D CompatibilityChangeReporter: Compat change id reported: 273564678; UID 10193; state: DISABLED
+09-05 18:01:21.481   563   583 D CompatibilityChangeReporter: Compat change id reported: 135634846; UID 10193; state: DISABLED
+09-05 18:01:21.481   563   583 D CompatibilityChangeReporter: Compat change id reported: 177438394; UID 10193; state: DISABLED
+09-05 18:01:21.481   563   583 D CompatibilityChangeReporter: Compat change id reported: 135772972; UID 10193; state: DISABLED
+09-05 18:01:21.481   563   583 D CompatibilityChangeReporter: Compat change id reported: 135754954; UID 10193; state: ENABLED
+09-05 18:01:21.481   563   591 D CompatibilityChangeReporter: Compat change id reported: 143937733; UID 10193; state: ENABLED
+09-05 18:01:21.484   375   375 D Zygote  : Forked child process 14190
+09-05 18:01:21.484   563   591 I ActivityManager: Start proc 14190:io.pictelio.app/u0a193 for next-top-activity {io.pictelio.app/io.pictelio.app.MainActivityWebview}
+09-05 18:01:21.488   779   933 E OpenGLRenderer: Unable to match the desired swap behavior.
+09-05 18:01:21.494   779   869 V WindowManagerShell: onTransitionReady android.os.BinderProxy@cfe2c28: {id=30 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@a92b86c} m=OPEN f=NONE leash=Surface(name=Task=306)/@0x3e94379 sb=Rect(0, 0 - 720, 1280) eb=Rect(0, 0 - 720, 1280) d=0},{WCT{android.window.IWindowContainerToken$Stub$Proxy@4319e35} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0x576c8be sb=Rect(0, 0 - 720, 1280) eb=Rect(0, 0 - 720, 1280) d=0}]}
+09-05 18:01:21.494   563   580 V WindowManager: Sent Transition #30 createdAt=09-05 18:01:21.475 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=306 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=io.pictelio.app/.MainActivityWebview } baseActivity=ComponentInfo{io.pictelio.app/io.pictelio.app.MainActivityWebview} topActivity=ComponentInfo{io.pictelio.app/io.pictelio.app.MainActivityWebview} origActivity=null realActivity=ComponentInfo{io.pictelio.app/io.pictelio.app.MainActivityWebview} numActivities=1 lastActiveTime=12681007 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{748ceb3 Task{6d4136c #306 type=standard A=10193:io.pictelio.app}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{a6cbc70 io.pictelio.app.MainActivityWebview} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = null, displayChange = null }
+09-05 18:01:21.494   563   580 V WindowManager:     startWCT=WindowContainerTransaction { changes = {} hops = [] errorCallbackToken=null taskFragmentOrganizer=null }
+09-05 18:01:21.494   563   580 V WindowManager:     info={id=30 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{RemoteToken{748ceb3 Task{6d4136c #306 type=standard A=10193:io.pictelio.app}}} m=OPEN f=NONE leash=Surface(name=Task=306)/@0xc79c817 sb=Rect(0, 0 - 720, 1280) eb=Rect(0, 0 - 720, 1280) d=0},{WCT{RemoteToken{c72d414 Task{51c6cdb #1 type=home}}} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0xe62f0a4 sb=Rect(0, 0 - 720, 1280) eb=Rect(0, 0 - 720, 1280) d=0}]}
+09-05 18:01:21.494   779   869 V WindowManagerShell: Playing animation for (#30)android.os.BinderProxy@cfe2c28@0
+09-05 18:01:21.494   779   869 V WindowManagerShell:  try handler com.android.wm.shell.transition.DefaultMixedHandler@1965e5a
+09-05 18:01:21.494   779   869 V WindowManagerShell:  try handler com.android.wm.shell.keyguard.KeyguardTransitionHandler@83eed68
+09-05 18:01:21.494   779   869 V WindowManagerShell:  try handler com.android.wm.shell.activityembedding.ActivityEmbeddingController@590f581
+09-05 18:01:21.495   779   869 V WindowManagerShell:  try handler com.android.wm.shell.recents.RecentsTransitionHandler@513b3fe
+09-05 18:01:21.495   779   869 V ShellRecents: RecentsTransitionHandler.startAnimation: no controller found
+09-05 18:01:21.495   779   869 V WindowManagerShell:  try handler com.android.wm.shell.pip.PipTransition@eaf375f
+09-05 18:01:21.495   779   869 V WindowManagerShell:  try handler com.android.wm.shell.splitscreen.StageCoordinator@27c11ba
+09-05 18:01:21.495   779   869 V WindowManagerShell:  try handler com.android.wm.shell.transition.RemoteTransitionHandler@fb70f17
+09-05 18:01:21.495   779   869 V WindowManagerShell: Transition doesn't have explicit remote, search filters for match for {id=30 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@a92b86c} m=OPEN f=NONE leash=Surface(name=Task=306)/@0x3e94379 sb=Rect(0, 0 - 720, 1280) eb=Rect(0, 0 - 720, 1280) d=0},{WCT{android.window.IWindowContainerToken$Stub$Proxy@4319e35} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0x576c8be sb=Rect(0, 0 - 720, 1280) eb=Rect(0, 0 - 720, 1280) d=0}]}
+09-05 18:01:21.495   779   869 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x0 checks=[{atype=dream independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=ANY topActivity=null},{atype=home independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@66d14b8, appThread = android.app.IApplicationThread$Stub$Proxy@7121291, debugName = LauncherToDream }}
+09-05 18:01:21.495   779   869 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x100 checks=[{atype=home independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=TOP topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity}},{atype=standard independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@18045f6, appThread = android.app.IApplicationThread$Stub$Proxy@b32edf7, debugName = QuickstepLaunchHome }}
+09-05 18:01:21.495   779   869 V WindowManagerShell:  Delegate animation for #30 to null
+09-05 18:01:21.495   779   869 V WindowManagerShell:  try handler com.android.wm.shell.transition.DefaultTransitionHandler@a549f04
+09-05 18:01:21.495   779   869 V WindowManagerShell: start default transition animation, info = {id=30 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@a92b86c} m=OPEN f=NONE leash=Surface(name=Task=306)/@0x3e94379 sb=Rect(0, 0 - 720, 1280) eb=Rect(0, 0 - 720, 1280) d=0},{WCT{android.window.IWindowContainerToken$Stub$Proxy@4319e35} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0x576c8be sb=Rect(0, 0 - 720, 1280) eb=Rect(0, 0 - 720, 1280) d=0}]}
+09-05 18:01:21.495   779   869 V WindowManagerShell: loadAnimation: anim=android.view.animation.AnimationSet@952b2ca animAttr=0x13 type=OPEN isEntrance=false
+09-05 18:01:21.495   779   869 V WindowManagerShell: loadAnimation: anim=android.view.animation.AnimationSet@cebdc3b animAttr=0x12 type=OPEN isEntrance=true
+09-05 18:01:21.496   779   869 V WindowManagerShell:  animated by com.android.wm.shell.transition.DefaultTransitionHandler@a549f04
+09-05 18:01:21.505   779   933 D EGL_emulation: app_time_stats: avg=1502.84ms min=1502.84ms max=1502.84ms count=1
+09-05 18:01:21.517 14190 14190 I io.pictelio.app: Late-enabling -Xcheck:jni
+09-05 18:01:21.519   410   410 I BpBinder: onLastStrongRef automatically unlinking death recipients: 
+09-05 18:01:21.524 14190 14190 I io.pictelio.app: Using CollectorTypeCC GC.
+09-05 18:01:21.524  1065  1622 D EGL_emulation: app_time_stats: avg=188.08ms min=0.50ms max=2401.78ms count=14
+09-05 18:01:21.530   420   444 I adbd    : jdwp connection from 14190
+09-05 18:01:21.564  1509  1930 I AssistantForeground: (REDACTED) Get launcher package: %s
+09-05 18:01:21.565 14190 14190 D CompatibilityChangeReporter: Compat change id reported: 171979766; UID 10193; state: ENABLED
+09-05 18:01:21.565 14190 14190 D CompatibilityChangeReporter: Compat change id reported: 242716250; UID 10193; state: ENABLED
+09-05 18:01:21.567   563  2239 D CompatibilityChangeReporter: Compat change id reported: 170503758; UID 10193; state: ENABLED
+09-05 18:01:21.568 14190 14190 W ziparchive: Unable to open '/data/app/~~jyWySUYaIAHfuNpuX-6xqQ==/io.pictelio.app-a2-dQJB4YMnJBwx6Bv0-JA==/base.dm': No such file or directory
+09-05 18:01:21.568 14190 14190 W ziparchive: Unable to open '/data/app/~~jyWySUYaIAHfuNpuX-6xqQ==/io.pictelio.app-a2-dQJB4YMnJBwx6Bv0-JA==/base.dm': No such file or directory
+09-05 18:01:21.584   563  2239 W ActivityTaskManager: takeTaskSnapshot: taskId=137 not found or not visible
+09-05 18:01:21.600 14190 14190 D nativeloader: Configuring clns-6 for other apk /data/app/~~jyWySUYaIAHfuNpuX-6xqQ==/io.pictelio.app-a2-dQJB4YMnJBwx6Bv0-JA==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~jyWySUYaIAHfuNpuX-6xqQ==/io.pictelio.app-a2-dQJB4YMnJBwx6Bv0-JA==/lib/arm64, permitted_path=/data:/mnt/expand:/data/user/0/io.pictelio.app
+09-05 18:01:21.604 14190 14190 V GraphicsEnvironment: Currently set values for:
+09-05 18:01:21.604 14190 14190 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+09-05 18:01:21.604 14190 14190 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+09-05 18:01:21.605 14190 14190 V GraphicsEnvironment: ANGLE GameManagerService for io.pictelio.app: false
+09-05 18:01:21.605 14190 14190 V GraphicsEnvironment: io.pictelio.app is not listed in per-application setting
+09-05 18:01:21.605 14190 14190 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+09-05 18:01:21.609 14190 14190 D WM-WrkMgrInitializer: Initializing WorkManager with default configuration.
+09-05 18:01:21.618 14190 14190 D WM-PackageManagerHelper: Skipping component enablement for androidx.work.impl.background.systemjob.SystemJobService
+09-05 18:01:21.618 14190 14190 D WM-Schedulers: Created SystemJobScheduler and enabled SystemJobService
+09-05 18:01:21.626 14190 14235 D WM-ForceStopRunnable: The default process name was not specified.
+09-05 18:01:21.626 14190 14235 D WM-ForceStopRunnable: Performing cleanup operations.
+09-05 18:01:21.634 14190 14235 D CompatibilityChangeReporter: Compat change id reported: 160794467; UID 10193; state: ENABLED
+09-05 18:01:21.635 14190 14190 I WebViewFactory: Loading com.google.android.webview version 113.0.5672.136 (code 567263634)
+09-05 18:01:21.635 14190 14235 D WM-ForceStopRunnable: Application was force-stopped, rescheduling.
+09-05 18:01:21.637 14190 14190 W ziparchive: Unable to open '/data/app/~~cKnmJnZ67dd4KVDjPOOwMg==/com.google.android.trichromelibrary_567263634-aiUx_QBNkW3J57N7z4HLHQ==/TrichromeLibrary.dm': No such file or directory
+09-05 18:01:21.637 14190 14190 W ziparchive: Unable to open '/data/app/~~cKnmJnZ67dd4KVDjPOOwMg==/com.google.android.trichromelibrary_567263634-aiUx_QBNkW3J57N7z4HLHQ==/TrichromeLibrary.dm': No such file or directory
+09-05 18:01:21.637 14190 14190 W io.pictelio.app: Entry not found
+09-05 18:01:21.637 14190 14190 D nativeloader: Configuring clns-7 for other apk /data/app/~~cKnmJnZ67dd4KVDjPOOwMg==/com.google.android.trichromelibrary_567263634-aiUx_QBNkW3J57N7z4HLHQ==/TrichromeLibrary.apk. target_sdk_version=34, uses_libraries=ALL, library_path=/data/app/~~RKcN5lj0VGKqJxUhfgCJUw==/com.google.android.webview-YFPG7N2h4pUWY3bmpfvPVA==/lib/arm64:/data/app/~~RKcN5lj0VGKqJxUhfgCJUw==/com.google.android.webview-YFPG7N2h4pUWY3bmpfvPVA==/WebViewGoogle.apk!/lib/arm64-v8a:/data/app/~~cKnmJnZ67dd4KVDjPOOwMg==/com.google.android.trichromelibrary_567263634-aiUx_QBNkW3J57N7z4HLHQ==/TrichromeLibrary.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand
+09-05 18:01:21.639 14190 14190 D nativeloader: Configuring clns-8 for other apk /data/app/~~RKcN5lj0VGKqJxUhfgCJUw==/com.google.android.webview-YFPG7N2h4pUWY3bmpfvPVA==/WebViewGoogle.apk. target_sdk_version=34, uses_libraries=, library_path=/data/app/~~RKcN5lj0VGKqJxUhfgCJUw==/com.google.android.webview-YFPG7N2h4pUWY3bmpfvPVA==/lib/arm64:/data/app/~~RKcN5lj0VGKqJxUhfgCJUw==/com.google.android.webview-YFPG7N2h4pUWY3bmpfvPVA==/WebViewGoogle.apk!/lib/arm64-v8a:/data/app/~~cKnmJnZ67dd4KVDjPOOwMg==/com.google.android.trichromelibrary_567263634-aiUx_QBNkW3J57N7z4HLHQ==/TrichromeLibrary.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{e22ff57 com.android.cts.priv.ctsshim/10186} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{2fd6a44 com.google.android.youtube/10156} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{df272d com.android.internal.display.cutout.emulation.corner/10024} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{6c19462 com.android.internal.display.cutout.emulation.double/10029} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{16e39f3 com.google.android.googlequicksearchbox/10132} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{688e6b0 com.google.android.onetimeinitializer/10125} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{ab40929 com.google.android.ext.shared/10109} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{82894ae com.android.internal.systemui.navbar.gestural_wide_back/10037} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{328824f com.android.virtualmachine.res/10185} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{80dbddc com.google.android.federatedcompute/10180} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{1db0ee5 com.android.managedprovisioning.auto_generated_rro_product__/10041} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{2ed4dba com.android.carrierconfig.auto_generated_rro_vendor__/10080} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{494f46b com.android.systemui.emulation.pixel_3_xl/10046} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{ba6dbc8 com.android.systemui.emulation.pixel_4_xl/10013} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{1b2b461 com.android.systemui.emulation.pixel_fold/10014} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{128b86 com.android.simappdialog.auto_generated_rro_product__/10042} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{e0c6c47 com.android.htmlviewer/10105} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{a31ec74 com.google.android.health.connect.backuprestore/10191} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{305359d com.android.systemui.auto_generated_rro_product__/10030} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{3fbda12 com.google.android.apps.messaging/10130} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{a9985e3 com.google.android.soundpicker/10143} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{abb5be0 com.google.android.marvin.talkbackoverlay/10078} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{7048e99 com.google.android.configupdater/10118} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{3b9855e com.android.internal.emulation.pixel_3a_xl/10047} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{1549d3f com.android.internal.emulation.pixel_6_pro/10007} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{6aa560c com.android.internal.emulation.pixel_7_pro/10016} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{6067b55 com.android.internal.emulation.pixel_8_pro/10055} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{314996a com.android.internal.emulation.pixel_3a/10073} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{87fce5b com.android.internal.emulation.pixel_4a/10070} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{4acc6f8 com.android.internal.emulation.pixel_6a/10026} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{e0077d1 com.android.internal.emulation.pixel_7a/10074} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{75ae236 com.google.android.overlay.googlewebview/10060} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{e62f537 com.google.android.hotspot2.osulogin/10178} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{6635aa4 com.android.simappdialog/10112} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{cc3c00d com.android.internal.display.cutout.emulation.hole/10048} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{aeaebc2 com.android.internal.display.cutout.emulation.tall/10066} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{3e7add3 com.android.internal.systemui.navbar.threebutton/10000} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{4cd7d10 com.android.camera2/10139} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{1f95009 com.android.systemui.auto_generated_rro_vendor__/10076} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{d80020e com.google.android.deskclock/10148} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{4f5542f com.android.internal.systemui.navbar.twobutton/10054} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{7755a3c com.google.android.as/10131} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{4dde3c5 com.google.android.gm/10145} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{d3e311a com.android.internal.systemui.navbar.gestural_extra_wide_back/10071} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{a8d044b com.android.systemui.emulation.pixel_3/10049} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{25bde28 com.android.systemui.emulation.pixel_4/10012} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{9bdf741 com.android.systemui.emulation.pixel_5/10063} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{47e44e6 com.android.systemui.emulation.pixel_6/10004} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{2a59a27 com.android.systemui.emulation.pixel_7/10067} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{6a4b4d4 com.android.systemui.emulation.pixel_8/10038} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{331c67d com.android.nfc.auto_generated_rro_product__/10018} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{859c972 com.android.printspooler/10106} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{9c7b1c3 com.android.emergency.auto_generated_rro_product__/10035} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{2024a40 com.google.android.connectivity.resources.goldfish.overlay/10075} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{b194d79 com.android.dreams.basic/10110} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{3f70abe com.google.android.networkstack.tethering.emulator/10009} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{269a71f com.android.providers.settings.auto_generated_rro_product__/10017} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{8e1ca6c com.google.android.as.oss/10126} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{f584835 com.android.traceur.auto_generated_rro_product__/10045} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{c9514ca com.google.android.devicelockcontroller/10189} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{60b963b com.google.android.dialer/10123} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{7572158 com.android.internal.emulation.pixel_3/10036} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{e5232b1 com.android.internal.emulation.pixel_4/10052} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{a57b396 com.android.internal.emulation.pixel_5/10064} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{c135b17 com.android.internal.emulation.pixel_6/10010} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{4c8fb04 com.android.internal.emulation.pixel_7/10051} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{f2648ed com.android.internal.emulation.pixel_8/10027} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{1d37322 com.google.android.captiveportallogin/10114} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{26891b3 com.android.musicfx/10083} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{895a083 com.google.android.apps.maps/10144} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{65cc370 com.google.android.modulemetadata/10134} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{1ab86e9 com.google.android.markup/10147} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{a599f6e com.android.providers.settings.auto_generated_rro_vendor__/10077} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{3d0960f com.google.android.rkpdapp/10182} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{c22a69c com.google.android.contacts/10154} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{22ca8a5 com.android.server.telecom.auto_generated_rro_product__/10031} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{d04447a com.google.android.overlay.googleconfig/10033} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{80a842b com.android.bips.auto_generated_rro_product__/10003} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{5019088 com.google.android.apps.customization.pixel/10136} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{ce42a21 com.google.android.tag/10096} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{8822e46 com.google.android.overlay.permissioncontroller/10008} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{9ab3807 com.google.android.partnersetup/10120} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{5632d34 com.google.android.apps.wallpaper.nexus/10133} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{d38475d com.google.android.apps.nexuslauncher/10162} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{5a2e8d2 com.google.android.nearby.halfsheet/10176} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{db94da3 com.android.theme.font.notoserifsource/10028} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{c9fe8a0 com.google.android.safetycenter.resources/10183} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{4b6fc59 com.android.internal.display.cutout.emulation.waterfall/10057} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{8a2c01e com.android.internal.systemui.navbar.transparent/10021} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{90920ff com.google.android.connectivity.resources/10175} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{52aeecc com.android.providers.contacts.auto_generated_rro_product__/10015} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{5d20515 com.google.android.feedback/10158} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{b36c02a com.google.android.printservice.recommendation/10100} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{f58ce1b com.google.android.apps.photos/10142} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{b7e2bb8 com.google.android.documentsui/10099} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{e5add91 com.android.systemui.emulation.pixel_3a_xl/10020} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{b58b4f6 com.android.systemui.emulation.pixel_6_pro/10056} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{82c30f7 com.android.systemui.emulation.pixel_7_pro/10061} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{7c64b64 com.android.systemui.emulation.pixel_8_pro/10068} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{dbec1cd com.google.mainline.telemetry/10150} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{ad32a82 com.android.carrierconfig.auto_generated_rro_product__/10006} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{568e593 com.android.providers.partnerbookmarks/10103} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{64eb9d0 com.android.wallpaper.livepicker/10095} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{302adc9 com.android.providers.telephony.auto_generated_rro_product__/10022} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{b8d6cce com.android.phone.auto_generated_rro_vendor__/10081} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{7b247ef com.google.mainline.adservices/10137} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{aada2fc com.android.imsserviceentitlement/10129} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{e7f5d85 com.google.android.healthconnect.controller/10190} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{49787da com.android.internal.emulation.pixel_2_xl/10011} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{c85740b com.android.internal.emulation.pixel_3_xl/10032} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{9aff2e8 com.android.internal.emulation.pixel_4_xl/10001} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{35d4d01 com.android.internal.emulation.pixel_fold/10065} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{bf647a6 com.android.bookmarkprovider/10115} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{21545e7 com.google.android.overlay.pixelconfigcommon/10023} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{6055594 com.android.systemui.accessibility.accessibilitymenu.auto_generated_rro_product__/10069} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{4d0b83d com.android.systemui.emulation.pixel_3a/10025} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{12f3832 com.android.systemui.emulation.pixel_4a/10044} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{ce65983 com.android.systemui.emulation.pixel_6a/10043} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{bac3700 com.android.systemui.emulation.pixel_7a/10062} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{b159b39 com.google.android.settings.intelligence/10128} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{d21e406 com.google.android.projection.gearhead/10124} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{494a57e com.google.android.uwb.resources/10188} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{d8c1ac7 com.android.cts.ctsshim/10187} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{b2b0adf com.google.android.wifi.resources/10177} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{61dc32c com.google.android.wifi.dialog/10179} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{c2bb1f5 com.google.android.apps.wallpaper/10168} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{7519b8a com.google.android.odad/10119} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{1df75fb com.android.settings.auto_generated_rro_product__/10050} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{d39e618 com.android.internal.systemui.navbar.gestural/10059} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{4527871 com.google.android.apps.youtube.music/10155} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{35e656 com.android.bluetoothmidiservice/10108} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{fa576d7 com.android.storagemanager.auto_generated_rro_product__/10040} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{4f34bc4 com.google.android.cellbroadcastreceiver/10170} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{a452aad com.android.phone.auto_generated_rro_product__/10072} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{14211e2 android.auto_generated_rro_product__/10039} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{160a973 com.android.internal.systemui.navbar.gestural_narrow_back/10019} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{bbb6030 com.google.android.inputmethod.latin/10152} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{b36c4a9 android.auto_generated_rro_vendor__/10079} BLOCKED
+09-05 18:01:21.639   563  2239 I AppsFilter: interaction: PackageSetting{b4acf21 io.pictelio.app/10193} -> PackageSetting{9f36a2e com.google.android.apps.restore/10122} BLOCKED
+09-05 18:01:21.646 14190 14190 W io.pictelio.app: Accessing hidden method Landroid/os/Trace;->isTagEnabled(J)Z (unsupported, reflection, allowed)
+09-05 18:01:21.646 14190 14190 W io.pictelio.app: Accessing hidden method Landroid/os/Trace;->traceBegin(JLjava/lang/String;)V (unsupported, reflection, allowed)
+09-05 18:01:21.646 14190 14190 W io.pictelio.app: Accessing hidden method Landroid/os/Trace;->traceEnd(J)V (unsupported, reflection, allowed)
+09-05 18:01:21.646 14190 14190 W io.pictelio.app: Accessing hidden method Landroid/os/Trace;->asyncTraceBegin(JLjava/lang/String;I)V (unsupported, reflection, allowed)
+09-05 18:01:21.646 14190 14190 W io.pictelio.app: Accessing hidden method Landroid/os/Trace;->asyncTraceEnd(JLjava/lang/String;I)V (unsupported, reflection, allowed)
+09-05 18:01:21.650 14190 14190 I cr_WVCFactoryProvider: Loaded version=113.0.5672.136 minSdkVersion=29 isBundle=false multiprocess=true packageId=2
+09-05 18:01:21.652 14190 14246 D WM-PackageManagerHelper: Skipping component enablement for androidx.work.impl.background.systemalarm.RescheduleReceiver
+09-05 18:01:21.656 14190 14249 I cr_VariationsUtils: Failed reading seed file "/data/user/0/io.pictelio.app/app_webview/variations_seed_new"
+09-05 18:01:21.656 14190 14249 I cr_VariationsUtils: Failed reading seed file "/data/user/0/io.pictelio.app/app_webview/variations_seed"
+09-05 18:01:21.661 14190 14190 I cr_LibraryLoader: Successfully loaded native library
+09-05 18:01:21.661 14190 14190 I cr_CachingUmaRecorder: Flushed 8 samples from 8 histograms.
+09-05 18:01:21.665   563  1791 D CompatibilityChangeReporter: Compat change id reported: 161145287; UID 10193; state: ENABLED
+09-05 18:01:21.669   563  1791 D CompatibilityChangeReporter: Compat change id reported: 135634846; UID 99010; state: DISABLED
+09-05 18:01:21.669   563  1791 D CompatibilityChangeReporter: Compat change id reported: 177438394; UID 99010; state: DISABLED
+09-05 18:01:21.669   563  1791 D CompatibilityChangeReporter: Compat change id reported: 135772972; UID 99010; state: DISABLED
+09-05 18:01:21.669   563  1791 D CompatibilityChangeReporter: Compat change id reported: 135754954; UID 99010; state: ENABLED
+09-05 18:01:21.669   563   591 D CompatibilityChangeReporter: Compat change id reported: 143937733; UID 10193; state: ENABLED
+09-05 18:01:21.672   856   856 D Zygote  : Forked child process 14256
+09-05 18:01:21.673 14190 14190 D CompatibilityChangeReporter: Compat change id reported: 183155436; UID 10193; state: ENABLED
+09-05 18:01:21.675 14256 14256 E libc    : SetHeapTaggingLevel: re-enabling tagging after it was disabled is not supported
+09-05 18:01:21.676 14256 14256 I ocessService0:0: Using CollectorTypeCC GC.
+09-05 18:01:21.681 14256 14256 E ocessService0:0: Not starting debugger since process cannot load the jdwp agent.
+09-05 18:01:21.723   779   933 D EGL_emulation: app_time_stats: avg=5035.29ms min=16.95ms max=34967.11ms count=7
+09-05 18:01:21.732   563  1791 D ActivityManager: sync unfroze 1700 com.google.android.gms for 6
+09-05 18:01:21.733   563   591 W ActivityManager: Slow operation: 64ms so far, now at startProcess: returned from zygote!
+09-05 18:01:21.733   563  1791 D ActivityManager: sync unfroze 10768 com.google.android.adservices.api for 6
+09-05 18:01:21.735   563  2035 W ActivityManager: Slow operation: 66ms so far, now at startProcess: done updating battery stats
+09-05 18:01:21.735   563  2035 W ActivityManager: Slow operation: 66ms so far, now at startProcess: building log message
+09-05 18:01:21.735   563  2035 I ActivityManager: Start proc 14256:com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0/u0i10 for  {io.pictelio.app/org.chromium.content.app.SandboxedProcessService0:0}
+09-05 18:01:21.735   563  2035 W ActivityManager: Slow operation: 66ms so far, now at startProcess: starting to update pids map
+09-05 18:01:21.735   563  2035 W ActivityManager: Slow operation: 66ms so far, now at startProcess: done updating pids map
+09-05 18:01:21.740  1700  1700 D BoundBrokerSvc: onBind: Intent { act=com.google.android.gms.safetynet.service.START pkg=com.google.android.gms }
+09-05 18:01:21.740  1700  1700 D BoundBrokerSvc: Loading bound service for intent: Intent { act=com.google.android.gms.safetynet.service.START pkg=com.google.android.gms }
+09-05 18:01:21.760 14256 14256 D CompatibilityChangeReporter: Compat change id reported: 171979766; UID 99010; state: ENABLED
+09-05 18:01:21.760 14256 14256 D CompatibilityChangeReporter: Compat change id reported: 242716250; UID 99010; state: ENABLED
+09-05 18:01:21.764 14256 14256 I LoadedApk: No resource references to update in package com.google.android.trichromelibrary
+09-05 18:01:21.765 14256 14256 I cr_WebViewApkApp: Launched version=113.0.5672.136 minSdkVersion=29 isBundle=false processName=com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0
+09-05 18:01:21.765   563  1791 I ActivityManager: Flag disabled. Ignoring finishAttachApplication from uid: 99010. pid: 14256
+09-05 18:01:21.766 14256 14256 W SystemServiceRegistry: No service published for: virtualdevice
+09-05 18:01:21.766 14256 14256 I cr_ChildProcessService: Creating new ChildProcessService pid=14256
+09-05 18:01:21.782   563  1791 D ActivityManager: sync unfroze 2663 com.google.android.webview:webview_service for 6
+09-05 18:01:21.786 14190 14190 D CompatibilityChangeReporter: Compat change id reported: 214741472; UID 10193; state: ENABLED
+09-05 18:01:21.787   779   869 V WindowManagerShell: Transition animation finished (aborted=false), notifying core (#30)android.os.BinderProxy@cfe2c28@0
+09-05 18:01:21.787   563   580 V WindowManager: Finish Transition #30: created at 09-05 18:01:21.475 collect-started=0.009ms request-sent=2.929ms started=5.102ms ready=17.904ms sent=18.924ms finished=312.579ms
+09-05 18:01:21.788 14190 14190 D CompatibilityChangeReporter: Compat change id reported: 171228096; UID 10193; state: ENABLED
+09-05 18:01:21.788   779   869 V WindowManagerShell: Track 0 became idle
+09-05 18:01:21.788   779   869 V WindowManagerShell: All active transition animations finished
+09-05 18:01:21.794   563  1791 D ConnectivityService: requestNetwork for uid/pid:10193/14190 activeRequest: null callbackRequest: 201 [NetworkRequest [ REQUEST id=202, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10193 RequestorUid: 10193 RequestorPkg: io.pictelio.app UnderlyingNetworks: Null] ]] callback flags: 0 order: 2147483647
+09-05 18:01:21.795   563   691 D WifiNetworkFactory: got request NetworkRequest [ REQUEST id=202, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10193 RequestorUid: 10193 RequestorPkg: io.pictelio.app UnderlyingNetworks: Null] ]
+09-05 18:01:21.795   563   691 D UntrustedWifiNetworkFactory: got request NetworkRequest [ REQUEST id=202, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10193 RequestorUid: 10193 RequestorPkg: io.pictelio.app UnderlyingNetworks: Null] ]
+09-05 18:01:21.795   563   691 D OemPaidWifiNetworkFactory: got request NetworkRequest [ REQUEST id=202, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10193 RequestorUid: 10193 RequestorPkg: io.pictelio.app UnderlyingNetworks: Null] ]
+09-05 18:01:21.795   563   691 D MultiInternetWifiNetworkFactory: got request NetworkRequest [ REQUEST id=202, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10193 RequestorUid: 10193 RequestorPkg: io.pictelio.app UnderlyingNetworks: Null] ]
+09-05 18:01:21.795   563   698 D ConnectivityService: NetReassign [202 : null → 100] [c 0] [a 0] [i 0]
+09-05 18:01:21.796   563   698 D ConnectivityService: NetReassign [no changes] [c 0] [a 0] [i 1]
+09-05 18:01:21.803   563  2035 I ActivityManager: Flag disabled. Ignoring finishAttachApplication from uid: 10193. pid: 14190
+09-05 18:01:21.820 14190 14322 D libEGL  : loaded /vendor/lib64/egl/libEGL_emulation.so
+09-05 18:01:21.822 14190 14322 D libEGL  : loaded /vendor/lib64/egl/libGLESv1_CM_emulation.so
+09-05 18:01:21.824 14190 14322 D libEGL  : loaded /vendor/lib64/egl/libGLESv2_emulation.so
+09-05 18:01:21.830 14190 14190 D AppCompatDelegate: Checking for metadata for AppLocalesMetadataHolderService : Service not found
+09-05 18:01:21.836 14190 14190 W io.pictelio.app: Accessing hidden method Landroid/view/ViewGroup;->makeOptionalFitsSystemWindows()V (unsupported, reflection, allowed)
+09-05 18:01:21.844   563  1791 D ConnectivityService: requestNetwork for uid/pid:10193/14190 activeRequest: null callbackRequest: 204 [NetworkRequest [ REQUEST id=205, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10193 RequestorUid: 10193 RequestorPkg: io.pictelio.app UnderlyingNetworks: Null] ]] callback flags: 0 order: 2147483647
+09-05 18:01:21.844   563   691 D WifiNetworkFactory: got request NetworkRequest [ REQUEST id=205, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10193 RequestorUid: 10193 RequestorPkg: io.pictelio.app UnderlyingNetworks: Null] ]
+09-05 18:01:21.844   563   691 D UntrustedWifiNetworkFactory: got request NetworkRequest [ REQUEST id=205, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10193 RequestorUid: 10193 RequestorPkg: io.pictelio.app UnderlyingNetworks: Null] ]
+09-05 18:01:21.845   563   691 D OemPaidWifiNetworkFactory: got request NetworkRequest [ REQUEST id=205, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10193 RequestorUid: 10193 RequestorPkg: io.pictelio.app UnderlyingNetworks: Null] ]
+09-05 18:01:21.845   563   691 D MultiInternetWifiNetworkFactory: got request NetworkRequest [ REQUEST id=205, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10193 RequestorUid: 10193 RequestorPkg: io.pictelio.app UnderlyingNetworks: Null] ]
+09-05 18:01:21.845   563   698 D ConnectivityService: NetReassign [205 : null → 100] [c 0] [a 0] [i 2]
+09-05 18:01:21.846   563   698 D ConnectivityService: NetReassign [no changes] [c 0] [a 0] [i 0]
+09-05 18:01:21.847 14190 14190 D AutofillManager: Fill dialog is enabled:false, hints=[password, passwordAuto, creditCardNumber, creditCardSecurityCode, creditCardExpirationDate]
+09-05 18:01:21.849 14190 14190 D Capacitor: Starting BridgeActivity
+09-05 18:01:21.879 14190 14291 W cr_media: BLUETOOTH_CONNECT permission is missing.
+09-05 18:01:21.880 14190 14291 W cr_media: registerBluetoothIntentsIfNeeded: Requires BLUETOOTH permission
+09-05 18:01:21.882 14256 14305 I cr_LibraryLoader: Successfully loaded native library
+09-05 18:01:21.882 14256 14305 I cr_CachingUmaRecorder: Flushed 2 samples from 2 histograms.
+09-05 18:01:21.884 14256 14305 W SystemServiceRegistry: No service published for: uimode
+09-05 18:01:21.886 14190 14190 D CompatibilityChangeReporter: Compat change id reported: 237531167; UID 10193; state: DISABLED
+09-05 18:01:21.887 14190 14190 W OpenGLRenderer: Unknown dataspace 0
+09-05 18:01:21.901   563  1791 D CoreBackPreview: Window{4dc2f90 u0 io.pictelio.app/io.pictelio.app.MainActivityWebview}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@a3e60a8, mPriority=-1, mIsAnimationCallback=false}
+09-05 18:01:21.902   563  1791 D CoreBackPreview: Window{4dc2f90 u0 io.pictelio.app/io.pictelio.app.MainActivityWebview}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@7f287c1, mPriority=0, mIsAnimationCallback=true}
+09-05 18:01:21.906 14190 14190 D CompatibilityChangeReporter: Compat change id reported: 193247900; UID 10193; state: ENABLED
+09-05 18:01:21.907  1412  2058 I FontLog : Received query name=Google Sans&weight=700&besteffort=false, URI content://com.google.android.gms.fonts [CONTEXT service_id=132 ]
+09-05 18:01:21.907  1412  2058 I FontLog : Query [name=Google Sans&weight=700&besteffort=false] resolved to {Google Sans, wdth 100.0, wght 700, ital 0.0, bestEffort false} [CONTEXT service_id=132 ]
+09-05 18:01:21.909  1412  2058 I FontLog : Fetch {Google Sans, wdth 100.0, wght 700, ital 0.0, bestEffort false} end status Status{statusCode=SUCCESS, resolution=null} [CONTEXT service_id=132 ]
+09-05 18:01:21.913  1412  2058 I FontLog : Pulling font file for id = 62, cache size = 6 [CONTEXT service_id=132 ]
+09-05 18:01:21.913 14190 14324 W OpenGLRenderer: Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+09-05 18:01:21.913 14190 14324 W OpenGLRenderer: Failed to initialize 101010-2 format, error = EGL_SUCCESS
+09-05 18:01:21.914  1412  2058 I FontLog : Received query name=Noto Color Emoji Compat&weight=400&besteffort=false, URI content://com.google.android.gms.fonts [CONTEXT service_id=132 ]
+09-05 18:01:21.914  1412  2058 I FontLog : Query [name=Noto Color Emoji Compat&weight=400&besteffort=false] resolved to {Noto Color Emoji Compat, wdth 100.0, wght 400, ital 0.0, bestEffort false} [CONTEXT service_id=132 ]
+09-05 18:01:21.915  1412  2058 I FontLog : Fetch {Noto Color Emoji Compat, wdth 100.0, wght 400, ital 0.0, bestEffort false} end status Status{statusCode=SUCCESS, resolution=null} [CONTEXT service_id=132 ]
+09-05 18:01:21.916  1412  2058 I FontLog : Pulling font file for id = 63, cache size = 7 [CONTEXT service_id=132 ]
+09-05 18:01:21.918  1412  2058 I FontLog : Received query name=Google Sans&weight=400&besteffort=false, URI content://com.google.android.gms.fonts [CONTEXT service_id=132 ]
+09-05 18:01:21.918  1412  2058 I FontLog : Query [name=Google Sans&weight=400&besteffort=false] resolved to {Google Sans, wdth 100.0, wght 400, ital 0.0, bestEffort false} [CONTEXT service_id=132 ]
+09-05 18:01:21.919  1412  2058 I FontLog : Font PFD returned from cache for {Google Sans, wdth 100.0, wght 400, ital 0.0, bestEffort false} [CONTEXT service_id=132 ]
+09-05 18:01:21.919  1412  2058 I FontLog : Fetch {Google Sans, wdth 100.0, wght 400, ital 0.0, bestEffort false} end status Status{statusCode=SUCCESS, resolution=null} [CONTEXT service_id=132 ]
+09-05 18:01:21.919   174   174 I hwservicemanager: getTransport: Cannot find entry android.hardware.graphics.mapper@4.0::IMapper/default in either framework or device VINTF manifest.
+09-05 18:01:21.919 14190 14324 I Gralloc4: mapper 4.x is not supported
+09-05 18:01:21.921 14190 14190 W ConnectivityManager.CallbackHandler: callback not found for CALLBACK_AVAILABLE message
+09-05 18:01:21.921 14190 14190 W ConnectivityManager.CallbackHandler: callback not found for CALLBACK_AVAILABLE message
+09-05 18:01:21.921 14190 14190 W ConnectivityManager.CallbackHandler: callback not found for CALLBACK_AVAILABLE message
+09-05 18:01:21.923   173   173 I servicemanager: Could not find android.hardware.graphics.allocator.IAllocator/default in the VINTF manifest.
+09-05 18:01:21.923  1412  2058 I FontLog : Pulling font file for id = 64, cache size = 8 [CONTEXT service_id=132 ]
+09-05 18:01:21.926 14190 14324 E OpenGLRenderer: Unable to match the desired swap behavior.
+09-05 18:01:21.926  1412  2058 I FontLog : Received query name=Google Sans&weight=500&besteffort=false, URI content://com.google.android.gms.fonts [CONTEXT service_id=132 ]
+09-05 18:01:21.927  1412  2058 I FontLog : Query [name=Google Sans&weight=500&besteffort=false] resolved to {Google Sans, wdth 100.0, wght 500, ital 0.0, bestEffort false} [CONTEXT service_id=132 ]
+09-05 18:01:21.929  1412  2058 I FontLog : Font PFD returned from cache for {Google Sans, wdth 100.0, wght 500, ital 0.0, bestEffort false} [CONTEXT service_id=132 ]
+09-05 18:01:21.929  1412  2058 I FontLog : Fetch {Google Sans, wdth 100.0, wght 500, ital 0.0, bestEffort false} end status Status{statusCode=SUCCESS, resolution=null} [CONTEXT service_id=132 ]
+09-05 18:01:21.929  1412  2058 I FontLog : Pulling font file for id = 65, cache size = 9 [CONTEXT service_id=132 ]
+09-05 18:01:21.933  1412 12779 I SQLiteConnectionPool: The connection pool for /data/user/0/com.google.android.gms/databases/metadata.db has been closed but there are still 1 connections in use.  They will be closed as they are released back to the pool.
+09-05 18:01:21.934  1412 14362 W FontLog : Error updating last accessed time for {Google Sans, wdth 100.0, wght 500, ital 0.0, bestEffort false}. [CONTEXT service_id=132 ]
+09-05 18:01:21.934  1412 14362 W FontLog : java.lang.IllegalStateException: Cannot perform this operation because the connection pool has been closed.
+09-05 18:01:21.934  1412 14362 W FontLog : 	at android.database.sqlite.SQLiteConnectionPool.throwIfClosedLocked(SQLiteConnectionPool.java:1096)
+09-05 18:01:21.934  1412 14362 W FontLog : 	at android.database.sqlite.SQLiteConnectionPool.waitForConnection(SQLiteConnectionPool.java:787)
+09-05 18:01:21.934  1412 14362 W FontLog : 	at android.database.sqlite.SQLiteConnectionPool.acquireConnection(SQLiteConnectionPool.java:392)
+09-05 18:01:21.934  1412 14362 W FontLog : 	at android.database.sqlite.SQLiteSession.acquireConnection(SQLiteSession.java:896)
+09-05 18:01:21.934  1412 14362 W FontLog : 	at android.database.sqlite.SQLiteSession.executeForChangedRowCount(SQLiteSession.java:754)
+09-05 18:01:21.934  1412 14362 W FontLog : 	at android.database.sqlite.SQLiteStatement.executeUpdateDelete(SQLiteStatement.java:67)
+09-05 18:01:21.934  1412 14362 W FontLog : 	at android.database.sqlite.SQLiteDatabase.executeSql(SQLiteDatabase.java:2089)
+09-05 18:01:21.934  1412 14362 W FontLog : 	at android.database.sqlite.SQLiteDatabase.execSQL(SQLiteDatabase.java:2066)
+09-05 18:01:21.934  1412 14362 W FontLog : 	at anyn.run(:com.google.android.gms@231818044@23.18.18 (190400-535401451):6)
+09-05 18:01:21.934  1412 14362 W FontLog : 	at aced.c(:com.google.android.gms@231818044@23.18.18 (190400-535401451):6)
+09-05 18:01:21.934  1412 14362 W FontLog : 	at aced.run(:com.google.android.gms@231818044@23.18.18 (190400-535401451):7)
+09-05 18:01:21.934  1412 14362 W FontLog : 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+09-05 18:01:21.934  1412 14362 W FontLog : 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+09-05 18:01:21.934  1412 14362 W FontLog : 	at acjn.run(:com.google.android.gms@231818044@23.18.18 (190400-535401451):0)
+09-05 18:01:21.934  1412 14362 W FontLog : 	at java.lang.Thread.run(Thread.java:1012)
+09-05 18:01:22.038   779   779 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+09-05 18:01:22.301   563   580 W ziparchive: Unable to open '/data/app/~~jyWySUYaIAHfuNpuX-6xqQ==/io.pictelio.app-a2-dQJB4YMnJBwx6Bv0-JA==/base.dm': No such file or directory
+09-05 18:01:22.302   563   580 I ActivityTaskManager: Displayed io.pictelio.app/.MainActivityWebview for user 0: +827ms
+09-05 18:01:22.304  1065  1768 D OneSearchSuggestProvider: Shut down the binder channel
+09-05 18:01:22.306  1065  1127 I ImeTracker: com.google.android.apps.nexuslauncher:b87706fb: onRequestHide at ORIGIN_CLIENT_HIDE_SOFT_INPUT reason HIDE_SOFT_INPUT
+09-05 18:01:22.306   563   620 I ImeTracker: com.google.android.apps.nexuslauncher:b87706fb: onCancelled at PHASE_SERVER_SHOULD_HIDE
+09-05 18:01:22.306  1065  1102 I IPCThreadState: oneway function results for code 2 on binder at 0xb400006f643320d0 will be dropped but finished with status UNKNOWN_TRANSACTION
+09-05 18:01:22.311   563  1791 D CompatibilityChangeReporter: Compat change id reported: 214016041; UID 10193; state: ENABLED
+09-05 18:01:22.311   563  1791 I ImeTracker: io.pictelio.app:ee9a6248: onRequestHide at ORIGIN_SERVER_HIDE_INPUT reason HIDE_UNSPECIFIED_WINDOW
+09-05 18:01:22.311   563  1791 I ImeTracker: io.pictelio.app:ee9a6248: onCancelled at PHASE_SERVER_SHOULD_HIDE
+09-05 18:01:22.312  1356  1356 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():3227 
+09-05 18:01:22.312 14190 14190 D SplashScreenView: Building from parcel drawable: android.graphics.drawable.BitmapDrawable@f4573d2
+09-05 18:01:22.313  1356  1356 I GoogleInputMethodService: GoogleInputMethodService.updateDeviceLockedStatus():2087 repeatCheckTimes = 0, unlocked = true
+09-05 18:01:22.313  1356  1356 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1877 onStartInput(EditorInfo{inputType=0x0(NULL) imeOptions=0x12000000 privateImeOptions=null actionName=UNSPECIFIED actionLabel=null actionId=0 initialSelStart=-1 initialSelEnd=-1 initialCapsMode=0x0 hintText=null label=null packageName=io.pictelio.app fieldId=0 fieldName=null extras=null}, false)
+09-05 18:01:22.313  1356  1356 I GoogleInputMethodService: GoogleInputMethodService.shouldHideHeaderOnInitialState():4008 ShouldHideHeaderOnInitialState = false
+09-05 18:01:22.313  1356  1356 I GoogleInputMethodService: GoogleInputMethodService.updateDeviceLockedStatus():2087 repeatCheckTimes = 2, unlocked = true
+09-05 18:01:22.314 14190 14190 D SplashScreenView: Build android.window.SplashScreenView{1b74359 V.E...... ......ID 0,0-0,0}
+09-05 18:01:22.314 14190 14190 D SplashScreenView: Icon: view: androidx.appcompat.widget.AppCompatImageView{162fb1e V.ED..... ......I. 0,0-0,0 #10204f0 android:id/splashscreen_icon_view} drawable: android.graphics.drawable.BitmapDrawable@f4573d2 size: 384
+09-05 18:01:22.314 14190 14190 D SplashScreenView: Branding: view: android.view.View{6dc3fff G.ED..... ......I. 0,0-0,0 #10204ef android:id/splashscreen_branding_view} drawable: null size w: 0 h: 0
+09-05 18:01:22.344 14190 14448 D TrafficStats: tagSocket(210) with statsTag=0xffffffff, statsUid=-1
+09-05 18:01:22.355   563  1791 W InputManager-JNI: Input channel object '4f5333b Splash Screen io.pictelio.app (client)' was disposed without first being removed with the input manager!
+09-05 18:01:22.388  1412  2058 I FontLog : Received query Noto Color Emoji Compat, URI content://com.google.android.gms.fonts [CONTEXT service_id=132 ]
+09-05 18:01:22.388  1412  2058 I FontLog : Query [emojicompat-emoji-font] resolved to {Noto Color Emoji Compat, wdth 100.0, wght 400, ital 0.0, bestEffort false} [CONTEXT service_id=132 ]
+09-05 18:01:22.388  1412  2058 I FontLog : Fetch {Noto Color Emoji Compat, wdth 100.0, wght 400, ital 0.0, bestEffort false} end status Status{statusCode=SUCCESS, resolution=null} [CONTEXT service_id=132 ]
+09-05 18:01:22.390  1412  2058 I FontLog : Pulling font file for id = 66, cache size = 10 [CONTEXT service_id=132 ]
+09-05 18:01:22.393  1412  2058 I FontLog : Pulling font file for id = 66, cache size = 10 [CONTEXT service_id=132 ]
+09-05 18:01:22.486 14190 14190 D SplashScreenView: remove starting view
+09-05 18:01:22.510   779   933 D EGL_emulation: app_time_stats: avg=54.23ms min=11.95ms max=713.62ms count=18
+09-05 18:01:22.739   779   933 D EGL_emulation: app_time_stats: avg=14.87ms min=9.25ms max=31.79ms count=60
+09-05 18:01:23.043   779   779 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+09-05 18:01:23.322 14190 14324 D EGL_emulation: app_time_stats: avg=16.52ms min=6.82ms max=35.16ms count=58
+09-05 18:01:23.361 14190 14258 I PictelioPerf: intercept url8=aHR0cHM6 phase=hit src=disk durationMs=0 bytes=4677
+09-05 18:01:23.539 14190 14259 I PictelioPerf: intercept url8=aHR0cHM6 phase=hit src=disk durationMs=0 bytes=152712
+09-05 18:01:23.539 14190 14258 I PictelioPerf: intercept url8=aHR0cHM6 phase=hit src=disk durationMs=0 bytes=87915
+09-05 18:01:23.539 14190 14259 I PictelioPerf: intercept url8=aHR0cHM6 phase=hit src=disk durationMs=0 bytes=161409
+09-05 18:01:23.540 14190 14294 I PictelioPerf: intercept url8=aHR0cHM6 phase=hit src=disk durationMs=0 bytes=168067
+09-05 18:01:23.540 14190 14258 I PictelioPerf: intercept url8=aHR0cHM6 phase=hit src=disk durationMs=0 bytes=151405
+09-05 18:01:23.542 14190 14281 I PictelioPerf: intercept url8=aHR0cHM6 phase=hit src=disk durationMs=0 bytes=141638
+09-05 18:01:23.542 14190 14293 I PictelioPerf: intercept url8=aHR0cHM6 phase=hit src=disk durationMs=0 bytes=86574
+09-05 18:01:23.543 14190 14278 I PictelioPerf: intercept url8=aHR0cHM6 phase=hit src=disk durationMs=0 bytes=174770
+09-05 18:01:23.756   779   933 D EGL_emulation: app_time_stats: avg=14.64ms min=10.08ms max=32.60ms count=59
+09-05 18:01:23.860 14190 14333 I OtaPlugin: [ota] notifyReady-ok version=public → lastGood=public
+09-05 18:01:23.864 14190 14258 D TrafficStats: tagSocket(219) with statsTag=0xffffffff, statsUid=-1
+09-05 18:01:25.052   779   779 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+09-05 18:01:25.846 14190 14279 W chromium: [WARNING:jni_string.cc(31)] ConvertJavaStringToUTF8 called with null string.
+09-05 18:01:26.059   779   779 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+09-05 18:01:26.523   764   764 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+09-05 18:01:27.063   779   779 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+09-05 18:01:27.089 14190 14324 D EGL_emulation: app_time_stats: avg=131.76ms min=1.18ms max=3298.92ms count=27
+09-05 18:01:27.108   472 14174 D BufferPoolAccessor2.0: bufferpool2 0xb40000745d255378 : 1(1382400 size) total buffers - 1(1382400 size) used buffers - 149/150 (recycle/alloc) - 1/149 (fetch/transfer)
+09-05 18:01:27.678 14190 14757 D ProfileInstaller: Installing profile for io.pictelio.app
+09-05 18:01:30.015   779   779 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+09-05 18:01:31.999   563   645 D ActivityManager: freezing 2663 com.google.android.webview:webview_service
+09-05 18:01:32.362   472   774 D BufferPoolAccessor2.0: bufferpool2 0xb40000745d255378 : 1(1382400 size) total buffers - 0(0 size) used buffers - 149/150 (recycle/alloc) - 1/150 (fetch/transfer)
+09-05 18:01:32.362   472   774 D BufferPoolAccessor2.0: evictor expired: 1, evicted: 1
+09-05 18:01:33.238   197 14435 I keystore2: system/security/keystore2/src/watchdog.rs:319 - Watchdog thread idle -> terminating. Have a great day.
+09-05 18:01:34.458   764   764 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+09-05 18:01:35.519 14164 14183 I MPEG4Writer: setStartTimestampUs: 12679874243
+09-05 18:01:35.519 14164 14184 I MPEG4Writer: setStartTimestampUs: 12679874243
+09-05 18:01:35.520 14164 14182 V MediaWriter: Track event err/info msg:101, trackId:1, type:1000,val:-1011
+09-05 18:01:35.520 14164 14164 D MPEG4Writer: reset()
+09-05 18:01:35.520 14164 14164 D MPEG4Writer: Video track stopping. Stop source
+09-05 18:01:35.520 14164 14164 D MPEG4Writer: Video track source stopping
+09-05 18:01:35.520 14164 14164 D MPEG4Writer: Video track source stopped
+09-05 18:01:35.520 14164 14182 I MPEG4Writer: Received total/0-length (150/0) buffers and encoded 150 frames. - Video
+09-05 18:01:35.520 14164 14183 V MediaWriter: Track event err/info msg:101, trackId:2, type:1000,val:-1011
+09-05 18:01:35.520 14164 14164 D MPEG4Writer: Video track stopped. Status:0. Stop source
+09-05 18:01:35.520 14164 14183 W MPEG4Writer: 0-duration samples found: 1
+09-05 18:01:35.520 14164 14183 I MPEG4Writer: Received total/0-length (1/0) buffers and encoded 1 frames. - Metadata
+09-05 18:01:35.521 14164 14184 V MediaWriter: Track event err/info msg:101, trackId:3, type:1000,val:-1011
+09-05 18:01:35.521 14164 14184 W MPEG4Writer: 0-duration samples found: 1
+09-05 18:01:35.521 14164 14184 I MPEG4Writer: Received total/0-length (1/0) buffers and encoded 1 frames. - Metadata
+09-05 18:01:35.522 14164 14164 D MPEG4Writer: Metadata track stopping. Stop source
+09-05 18:01:35.522 14164 14164 D MPEG4Writer: Metadata track source stopping
+09-05 18:01:35.522 14164 14164 D MPEG4Writer: Metadata track source stopped
+09-05 18:01:35.522 14164 14164 D MPEG4Writer: Metadata track stopped. Status:0. Stop source
+09-05 18:01:35.522 14164 14164 D MPEG4Writer: Metadata track stopping. Stop source
+09-05 18:01:35.522 14164 14164 D MPEG4Writer: Metadata track source stopping
+09-05 18:01:35.522 14164 14164 D MPEG4Writer: Metadata track source stopped
+09-05 18:01:35.522 14164 14164 D MPEG4Writer: Metadata track stopped. Status:0. Stop source
+09-05 18:01:35.522 14164 14164 D MPEG4Writer: Duration from tracks range is [0, 9694585] us
+09-05 18:01:35.522 14164 14180 D MPEG4Writer: 0 chunks are written in the last batch
+09-05 18:01:35.523 14164 14164 D MPEG4Writer: WriterThread stopped. Status:0
+09-05 18:01:35.523 14164 14164 I MPEG4Writer: Adjust the moov start time from 12679874243 us -> 12679874243 us
+09-05 18:01:35.523 14164 14164 I MPEG4Writer: The mp4 file will not be streamable.
+09-05 18:01:35.523 14164 14164 I MPEG4Writer: MOOV atom was written to the file
+09-05 18:01:35.523 14164 14164 D MPEG4Writer: release()
+09-05 18:01:35.523 14164 14164 D MPEG4Writer: ftruncate mPreAllocateFileEndOffset:615354 mOffset:613912 mMdatEndOffset:610538 diff:1442
+09-05 18:01:35.528 14164 14164 D MPEG4Writer: final fsync() takes 5 ms, file size 613912
+09-05 18:01:35.528 14164 14164 D MPEG4Writer: MP4WtrCtrlHlpLooper stopped
+09-05 18:01:35.528 14164 14164 D MPEG4Writer: Top 5 write durations(microseconds): #1:11 #2:13 #3:21 #4:22 #5:25
+09-05 18:01:35.535 14164 14169 I hw-BpHwBinder: onLastStrongRef automatically unlinking death recipients
+09-05 18:01:35.535   472   820 I hw-BpHwBinder: onLastStrongRef automatically unlinking death recipients
+09-05 18:01:35.535   472   820 I hw-BpHwBinder: onLastStrongRef automatically unlinking death recipients
+09-05 18:01:35.536 14164 14164 D MediaCodec: flushMediametrics
+09-05 18:01:35.551 14164 14215 I BpBinder: onLastStrongRef automatically unlinking death recipients: 
+09-05 18:01:35.561   563  1791 I ActivityManager: Broadcasting: Intent { act=android.intent.action.MEDIA_SCANNER_SCAN_FILE dat=file:///... flg=0x400000 }
+09-05 18:01:35.562   563  1791 I ActivityManager: Enqueued broadcast Intent { act=android.intent.action.MEDIA_SCANNER_SCAN_FILE dat=file:///... flg=0x400000 }: 0
+09-05 18:01:35.565   563   580 I ActivityManager: Broadcast completed: result=0
+09-05 18:01:35.566 14164 14164 D ScreenRecord: success
+09-05 18:01:35.567 14164 14164 I BpBinder: onLastStrongRef automatically unlinking death recipients: 
+09-05 18:01:35.567  1463  2545 I MediaProvider: Begin Intent { act=android.intent.action.MEDIA_SCANNER_SCAN_FILE dat=file:///... flg=0x1400010 cmp=com.google.android.providers.media.module/com.android.providers.media.MediaService }
+09-05 18:01:35.564  1463  1463 W com.google.android.providers.media.module: type=1400 audit(0.0:66): avc:  denied  { search } for  comm=4173796E635461736B202331 name="tmp" dev="dm-39" ino=65538 scontext=u:r:mediaprovider_app:s0:c171,c256,c512,c768 tcontext=u:object_r:shell_data_file:s0 tclass=dir permissive=0 app=com.google.android.providers.media.module
+09-05 18:01:35.564  1463  1463 W com.google.android.providers.media.module: type=1400 audit(0.0:67): avc:  denied  { getattr } for  comm=4173796E635461736B202331 path="/data/local/tmp" dev="dm-39" ino=65538 scontext=u:r:mediaprovider_app:s0:c171,c256,c512,c768 tcontext=u:object_r:shell_data_file:s0 tclass=dir permissive=0 app=com.google.android.providers.media.module
+09-05 18:01:35.564  1463  1463 W com.google.android.providers.media.module: type=1400 audit(0.0:68): avc:  denied  { search } for  comm=4173796E635461736B202331 name="tmp" dev="dm-39" ino=65538 scontext=u:r:mediaprovider_app:s0:c171,c256,c512,c768 tcontext=u:object_r:shell_data_file:s0 tclass=dir permissive=0 app=com.google.android.providers.media.module
+09-05 18:01:35.564  1463  1463 W com.google.android.providers.media.module: type=1400 audit(0.0:69): avc:  denied  { search } for  comm=4173796E635461736B202331 name="tmp" dev="dm-39" ino=65538 scontext=u:r:mediaprovider_app:s0:c171,c256,c512,c768 tcontext=u:object_r:shell_data_file:s0 tclass=dir permissive=0 app=com.google.android.providers.media.module
+09-05 18:01:35.564  1463  1463 W com.google.android.providers.media.module: type=1400 audit(0.0:70): avc:  denied  { search } for  comm=4173796E635461736B202331 name="tmp" dev="dm-39" ino=65538 scontext=u:r:mediaprovider_app:s0:c171,c256,c512,c768 tcontext=u:object_r:shell_data_file:s0 tclass=dir permissive=0 app=com.google.android.providers.media.module
+09-05 18:01:35.568  1463  2545 W ModernMediaScanner: Failed to visit /data/local/tmp/ft2_cap.mp4: java.nio.file.AccessDeniedException: /data/local/tmp/ft2_cap.mp4
+09-05 18:01:35.568 14164 14164 I BpBinder: onLastStrongRef automatically unlinking death recipients: 
+09-05 18:01:35.568  1463  2545 I MediaProvider: Scanned internal due to REASON_DEMAND, found 0 items in 1ms, 0 inserts 0 updates 0 deletes
+09-05 18:01:35.569   472   820 D BufferPoolAccessor2.0: Destruction - bufferpool2 0xb40000745d255378 cached: 0/0M, 0/0% in use; allocs: 150, 99% recycled; transfers: 150, 99% unfetched
+09-05 18:01:35.569  1463  2545 I MediaProvider: End Intent { act=android.intent.action.MEDIA_SCANNER_SCAN_FILE dat=file:///... flg=0x1400010 cmp=com.google.android.providers.media.module/com.android.providers.media.MediaService }
+09-05 18:01:35.572  2545  2545 W audit   : audit_lost=10 audit_rate_limit=5 audit_backlog_limit=64
+09-05 18:01:35.572  2545  2545 E audit   : rate limit exceeded
