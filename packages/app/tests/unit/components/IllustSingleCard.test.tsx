@@ -103,6 +103,22 @@ describe("IllustSingleCard", () => {
     expect(container.querySelectorAll("img").length).toBe(1); // 仅剩主层
   });
 
+  it("封面渐进占位（#365 P4）：thumb 绘制前有 shimmer 层，full 绘制完成后随 thumb 一并卸载", async () => {
+    const illust = makeIllust();
+    const { container } = render(() => <IllustSingleCard illust={illust} onClick={vi.fn()} />);
+    // SkeletonShimmer 契约面 data-testid（与 thumb 层同 Show 分支；keyframes 改名不脆断）
+    const shimmer = () => container.querySelector('[data-testid="skeleton-shimmer"]');
+    // thumb 层在场期间（thumb 未绘制）shimmer 占位可见——封面区不再是纯色块
+    expect(container.querySelector('img[aria-hidden="true"]')).toBeTruthy();
+    expect(shimmer()).toBeTruthy();
+    const main = (await screen.findByAltText(illust.title)) as HTMLImageElement;
+    // full 绘制完成 → thumbSrc 收窄 → thumb 层与 shimmer 一并卸载（无常驻动画成本）
+    fireEvent.load(main);
+    await flush();
+    expect(container.querySelector('img[aria-hidden="true"]')).toBeNull();
+    expect(shimmer()).toBeNull();
+  });
+
   it("fireEvent.click 触发 onClick", () => {
     const onClick = vi.fn();
     render(() => <IllustSingleCard illust={makeIllust()} onClick={onClick} />);

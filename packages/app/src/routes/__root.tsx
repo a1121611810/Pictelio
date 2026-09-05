@@ -14,6 +14,7 @@ import {
 import StartupUpdateDialog from "@/components/StartupUpdateDialog";
 import GateOverlay from "@/components/GateOverlay";
 import { clearOverlays, registerBackGesture } from "@/services/backGestureService";
+import { runBackTransition } from "@/services/backTransitionService";
 import { warmCacheFromDisk } from "@/utils/imageLoader";
 import { loadReportedIds } from "@/stores/reportStore";
 import { loadBlockedIds } from "@/stores/blockStore";
@@ -75,6 +76,17 @@ const RootLayout: Component = (props: { children?: any }) => {
    * 在 onMount 中的启动流程完成后调用。
    */
   onMount(async () => {
+    // FT-2 冷启动反馈治理（#365 P1）：原生 splash 只承担「进程启动 + JS 引导」最前段，
+    // 根布局 loading 态（品牌 LoadingSpinner 扫光动画）首帧绘制后即释放——
+    // 后续等待（settings 水合 / auth 恢复 / feed 首取）全部由应用内可见进展接管，
+    // 消除「静态启动窗口从进程创建一路静止到 WebView 首帧」的零反馈静止段。
+    // 双 rAF：确保 spinner 首帧已实际绘制后再退出 splash，衔接处无空帧。
+    // 下方 auth 流程结束后的 markContentReady 兜底保留（幂等）：后台启动等 rAF
+    // 被节流的场景仍保证 splash 释放。
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => markContentReady());
+    });
+
     // 滚动恢复由 @solidjs/router 内置 scrollRestoration 管理。
     // 「持久化滚动恢复」开关关闭（默认）时：重新打开 app = 全新会话，
     // 清除跨会话滚动持久化并强制回顶，冷启动始终从顶部开始。
@@ -116,13 +128,18 @@ const RootLayout: Component = (props: { children?: any }) => {
       removeStartupScrollGuard?.();
     });
 
-    // Load persisted preferences (async) — 统一由 Settings registry 批量加载
-    await Promise.all([
+    // Load persisted preferences (async) — 统一由 Settings registry 批量加载。
+    // FT-2（#365 P2）：水合（~数十次 Preferences 桥 IPC）与 auth 恢复（secure storage +
+    // token 网络刷新）无数据依赖，二者并行——auth 不再串行等水合。唯一顺序点：
+    // loadAccountR18 回写 settings 必须发生在 hydrateAll 打开写门槛（phase=warm）之后，
+    // 故在 auth 分支内先 await hydrated；isLoading 释放同样以 hydrated 完成为前提
+    // （保证 feed 首帧渲染时屏蔽列表/举报列表/R18 过滤等已就绪）。
+    const hydrated = Promise.all([
       settings.hydrateAll(),
       loadReportedIds(),
       loadBlockedIds(),
       loadImageHostPreference(),
-    ]);
+    ]).then(() => undefined);
 
     // 后台预热 LRU 缓存（从 Android 文件系统读取最近图片，不阻塞启动流程）
     warmCacheFromDisk();
@@ -131,7 +148,9 @@ const RootLayout: Component = (props: { children?: any }) => {
     // Once components push overlays in Phase 5; for now the service closes top overlay if any.
     unregisterBackGesture = await registerBackGesture({
       getPathname: () => location.pathname,
-      navigateBack: () => navigate(-1),
+      // 系统返回走「动画吸收冻结」过渡（#364）：预位移 + 快照覆盖层先行动画，
+      // home remount 冻结期用户看到的是过渡进行中而非冻结硬切
+      navigateBack: () => runBackTransition(() => void navigate(-1)),
       dispatchExitHint: () => window.dispatchEvent(new CustomEvent("exitHint")),
       // OTA 门槛过渡面激活期间返回键 = 退出应用（#253，对齐 lynx /update 语义）
       shouldExitOnBack: () => gateActive(),
@@ -140,6 +159,7 @@ const RootLayout: Component = (props: { children?: any }) => {
     const [authErr] = await tryAsync(
       (async () => {
         await initializeAuth();
+        await hydrated;
         await loadAccountR18();
         if (isLoggedIn()) {
           if (location.pathname !== "/home") {
@@ -152,6 +172,8 @@ const RootLayout: Component = (props: { children?: any }) => {
         }
       })(),
     );
+    // 水合完成（写门槛 warm + 屏蔽/举报/R18 就绪）后才释放 isLoading 渲染内容
+    await hydrated;
     setIsLoading(false);
     // 兜底关闭 Splash：非 Feed 页面（login 等）
     // 由 Login.tsx 或 Feed.tsx 负责主动触发，此处兜底确保不会泄漏

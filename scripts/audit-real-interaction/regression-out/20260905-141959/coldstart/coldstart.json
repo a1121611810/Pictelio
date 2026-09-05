@@ -1,0 +1,5 @@
+{
+ "metrics": {},
+ "error": "Command failed: python3 analyze_rec.py /Users/lilianda/develop/pixivizer/scripts/audit-real-interaction/regression-out/20260905-141959/coldstart/coldstart.mp4 --out /Users/lilianda/develop/pixivizer/scripts/audit-real-interaction/regression-out/20260905-141959/coldstart/coldstart.frames.json",
+ "notes": []
+}

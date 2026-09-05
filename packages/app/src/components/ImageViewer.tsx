@@ -1,5 +1,5 @@
 import type { Component } from "solid-js";
-import { checkImageCache, loadImageWithProgress } from "../utils/imageLoader";
+import { checkImageCache, loadImage, loadImageWithProgress } from "../utils/imageLoader";
 
 interface Props {
   imageUrls: string[];
@@ -7,6 +7,20 @@ interface Props {
   previewUrls?: string[];
   initialPage?: number;
   onClose?: () => void;
+}
+
+/** 邻页预取候选（FT-4 #367）：当前页的前后一页，跳过已发起/已加载的。
+ *  纯函数便于单测：首页无前邻、末页无后邻、单页无候选。 */
+export function neighborPages(
+  currentPage: number,
+  total: number,
+  skip: (i: number) => boolean,
+): number[] {
+  const out: number[] = [];
+  for (const i of [currentPage - 1, currentPage + 1]) {
+    if (i >= 0 && i < total && !skip(i)) out.push(i);
+  }
+  return out;
 }
 
 const ImageViewer: Component<Props> = (props) => {
@@ -30,6 +44,25 @@ const ImageViewer: Component<Props> = (props) => {
     return url ? checkImageCache(url) : undefined;
   };
 
+  // ── 预览图异步加载（FT-4 #367）──
+  // 未进 LRU 缓存的页，先下小图（快）→ 翻页即有 blur-up 可看，替代纯黑等待
+  const [loadedPreviews, setLoadedPreviews] = createSignal<Record<number, string>>({});
+  const loadingPreviews = new Set<number>();
+  const previewFor = (i: number): string | undefined => previewBlobUrl(i) ?? loadedPreviews()[i];
+  const loadPreview = (i: number) => {
+    if (previewFor(i) !== undefined) return;
+    const url = props.previewUrls?.[i];
+    if (!url || loadingPreviews.has(i)) return;
+    loadingPreviews.add(i);
+    loadImage(url)
+      .then((result) => {
+        if (result.url) setLoadedPreviews((prev) => ({ ...prev, [i]: result.url }));
+      })
+      .catch(() => {
+        // 预览失败不影响主图加载路径，静默回退纯 spinner
+      });
+  };
+
   // 页面变化时，若未加载则触发下载
   createEffect(() => {
     const page = currentPage();
@@ -43,6 +76,20 @@ const ImageViewer: Component<Props> = (props) => {
     }
     loadingStarted.add(page);
     startLoad(page);
+    // 等待期可见性（FT-4）：并行拉小图，翻到即有模糊占位而非黑屏
+    loadPreview(page);
+  });
+
+  // ── 邻页预取（FT-4 #367）──
+  // 当前页加载完成后预取前后一页原图：翻页时多数情况直接命中已加载，消除「翻页 → 2s 黑屏」
+  createEffect(() => {
+    if (loadedUrls()[currentPage()] === undefined) return;
+    for (const n of neighborPages(currentPage(), props.imageUrls.length, (i) =>
+      loadingStarted.has(i),
+    )) {
+      loadingStarted.add(n);
+      startLoad(n);
+    }
   });
 
   // 初始页在挂载时立即发起加载（进度已在初始化时设为 0，不等 createEffect）
@@ -175,7 +222,7 @@ const ImageViewer: Component<Props> = (props) => {
         }}
       >
         {props.imageUrls.map((_url, i) => {
-          const pb = previewBlobUrl(i);
+          const pb = previewFor(i);
           const progress = progressMap()[i];
           const loaded = loadedUrls()[i];
 
@@ -215,14 +262,14 @@ const ImageViewer: Component<Props> = (props) => {
                 />
               </Show>
 
-              {/* Layer 3: 加载进度遮罩（仅未完成时显示） */}
+              {/* Layer 3: 加载进度遮罩（仅未完成时显示；FT-4：放大 spinner + 页码文案，等待期明确可感知） */}
               <Show when={progress !== undefined && progress < 100 && progress >= 0}>
                 <div
                   class="absolute inset-0 flex flex-col items-center justify-center gap-3"
                   style={{ "background-color": "rgba(0, 0, 0, 0.3)" }}
                 >
                   <div
-                    class="w-12 h-12 rounded-[var(--borderRadiusCircular)] border-2 border-transparent border-t-[var(--colorOverlayForeground)]"
+                    class="w-16 h-16 rounded-[var(--borderRadiusCircular)] border-[3px] border-transparent border-t-[var(--colorOverlayForeground)]"
                     style={{ animation: "spin 1s linear infinite" }}
                   />
                   <Show when={progress! > 0}>
@@ -233,6 +280,12 @@ const ImageViewer: Component<Props> = (props) => {
                       {progress}%
                     </span>
                   </Show>
+                  <span
+                    class="text-[var(--colorOverlayForeground)]"
+                    style={{ "font-size": "var(--fontSizeBase200)" }}
+                  >
+                    加载第 {i + 1}/{props.imageUrls.length} 页
+                  </span>
                 </div>
               </Show>
             </div>

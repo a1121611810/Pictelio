@@ -1,0 +1,36 @@
+{
+ "mp4": "ck0_rep1.mp4",
+ "frame_count": 3,
+ "duration_ms": 4410,
+ "mean_fps": 0.68,
+ "vfr": true,
+ "diff_threshold": 2.0,
+ "frames": [
+  {
+   "n": 1,
+   "pts_ms": 0,
+   "delta_ms": 0,
+   "diff": 0.0
+  },
+  {
+   "n": 2,
+   "pts_ms": 1209,
+   "delta_ms": 1209,
+   "diff": 56.498
+  },
+  {
+   "n": 3,
+   "pts_ms": 4410,
+   "delta_ms": 3201,
+   "diff": 0.009
+  }
+ ],
+ "change_segments": [
+  {
+   "from_ms": 1209,
+   "to_ms": 4410,
+   "peak_diff": 56.498
+  }
+ ],
+ "stalls_over_200ms": []
+}

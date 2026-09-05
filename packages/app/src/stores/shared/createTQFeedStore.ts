@@ -357,7 +357,16 @@ export function createTQFeedStore<
       return null;
     };
 
-    const loading: Accessor<boolean> = () => activeQueries().some((q) => q.isFetching);
+    const loading: Accessor<boolean> = () =>
+      activeQueries().some((q) => {
+        if (q.isFetching) return true;
+        // 首载粘滞（#366）：merge 多源 + 命令式 ensureInfiniteQueryData 组合下，
+        // isFetching 信号会在 fetch 仍在进行时失真翻 false → 骨架被提前卸载，
+        // 内容区出现数秒空白窗（体检 P3 的 s15 帧实证）。语义修正：
+        // 已激活 && 查询尚无数据（status=pending）&& 无错误 ⇒ 视为首载中。
+        // 查询成功（status=success，含合法空 feed）或出错后由 error 分支接管。
+        return activated() && q.status === "pending" && !q.error;
+      });
 
     // ── 分页错误标记 ──
     // fetchNextPage 失败时置 true（已加载结果保留，组件显示底部内联重试）；

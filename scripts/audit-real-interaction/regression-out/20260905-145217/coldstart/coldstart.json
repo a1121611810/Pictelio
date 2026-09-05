@@ -1,0 +1,48 @@
+{
+ "metrics": {
+  "splash_first_ms": {
+   "value": 13,
+   "line": null,
+   "pass": null,
+   "source": "体检报告场景 1（splash 首帧=首个显著变化帧）",
+   "note": "含 adb 注入延迟，仅记录"
+  },
+  "max_stall_ms": {
+   "value": 4650,
+   "line": "<1000",
+   "pass": false,
+   "source": "docs/research/ri-365-coldstart-report.md（FT-2 验收线：最长完全静止段 <1s）",
+   "note": "录屏 VFR 停滞段（≥200ms 段取最大）"
+  },
+  "waittime_ms": {
+   "value": 670,
+   "line": null,
+   "pass": null,
+   "source": "docs/research/ri-365-coldstart-report.md（暖基线 1782ms；网络/缓存波动，仅记录不设回归线）",
+   "note": "仅记录（网络/缓存波动）"
+  },
+  "totaltime_ms": {
+   "value": 667,
+   "line": null,
+   "pass": null,
+   "source": "docs/research/ri-365-coldstart-report.md（暖基线 1782ms；网络/缓存波动，仅记录不设回归线）",
+   "note": "仅记录"
+  },
+  "chrome_cdp_ms": {
+   "value": 6514,
+   "line": null,
+   "pass": null,
+   "source": "体检报告场景 1 首屏帧口径的 DOM 代理（/home 路由首现）",
+   "note": "CDP 口径，仅记录"
+  },
+  "first_image_cdp_ms": {
+   "value": 6769,
+   "line": null,
+   "pass": null,
+   "source": "体检报告场景 1 首图帧口径的 DOM 代理（首卡 img complete）",
+   "note": "CDP 口径，仅记录"
+  }
+ },
+ "mode": "screenrecord",
+ "notes": []
+}

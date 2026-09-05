@@ -1,0 +1,7 @@
+Starting: Intent { cmp=io.pictelio.app/.MainActivityWebview }
+Status: ok
+LaunchState: COLD
+Activity: io.pictelio.app/.MainActivityWebview
+TotalTime: 582
+WaitTime: 584
+Complete

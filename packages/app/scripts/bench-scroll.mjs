@@ -468,13 +468,16 @@ async function t1JsCmd() {
   if (ENGINE === "webview") {
     await navWebview(SCENARIO);
     // 一次性注入 hook（与 lynx 同语义：touchstart→首 touchmove 回调到达 JS 的跨线程派发延迟）
+    // 经页面内数组 + CDP 读取采集（#365 审查修复：loggingBehavior none 后 console
+    // 不再转发 logcat，原 Capacitor/Console 探针会静默产出 null 行）
     await cdpEvaluate(`(() => {
       if (window.__benchT1) return "already";
       let t0 = null;
+      window.__benchT1Log = [];
       document.addEventListener("touchstart", () => { t0 = Date.now(); }, { passive: true });
       document.addEventListener("touchmove", () => {
         if (t0 !== null) {
-          console.log("[BENCH_T1] stage t0=" + t0 + " t1=" + Date.now() + " latency=" + (Date.now() - t0));
+          window.__benchT1Log.push(Date.now() - t0);
           t0 = null;
         }
       }, { passive: true });
@@ -491,17 +494,20 @@ async function t1JsCmd() {
     const outFile = resolve(OUT, `t1_webview_${SCENARIO}.jsonl`);
     writeFileSync(outFile, "");
     for (let i = 0; i < per; i++) {
-      adb("logcat", "-c");
+      // 清窗口必须在 drag 之前（等价旧 logcat -c 的位置语义）：back-top 是 4 次
+      // 连续 swipe、各推 1 条记录，若在读取时才排空，第 1 轮起会取到上一轮
+      // back-top 的延迟而非被测 drag（#365 复检 F2-R1）
+      await cdpEvaluate("(window.__benchT1Log || []).splice(0)");
       await SLEEP(200);
       await gesture("drag", w, h);
       await SLEEP(300);
-      const src = adb("logcat", "-d", "-s", "Capacitor/Console");
-      const m = /\[BENCH_T1\][^\n]*latency=(\d+)/.exec(src);
+      // 只读不排空：本窗口内仅 drag 一次手势，[0] 即被测延迟
+      const lat = await cdpEvaluate(`(window.__benchT1Log || [])[0] ?? null`);
       const rec = {
         engine: "webview",
         scenario: SCENARIO,
         idx: i,
-        latencyMs: m ? Number(m[1]) : null,
+        latencyMs: typeof lat === "number" ? lat : null,
       };
       appendFileSync(outFile, JSON.stringify(rec) + "\n");
       console.log(`  #${i} latency=${rec.latencyMs ?? "-"}ms`);

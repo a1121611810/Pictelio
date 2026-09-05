@@ -1,0 +1,33 @@
+{
+ "metrics": {
+  "scroll_slow_delta_p90_ms": {
+   "value": 18,
+   "line": "≤34",
+   "pass": true,
+   "source": "docs/research/real-interaction-audit.md 场景 5（VFR delta p90 ≤34ms）",
+   "note": "滚动窗 800-3400ms 内帧间隔 p90"
+  },
+  "scroll_slow_stalls_over_200ms": {
+   "value": 0,
+   "line": "=0",
+   "pass": true,
+   "source": "docs/research/real-interaction-audit.md 场景 5（滚动窗内无 >200ms 停滞）",
+   "note": "滚动窗 800-3400ms 内无 >200ms 无变化段"
+  },
+  "scroll_fling_delta_p90_ms": {
+   "value": 18,
+   "line": "≤34",
+   "pass": true,
+   "source": "docs/research/real-interaction-audit.md 场景 5（VFR delta p90 ≤34ms）",
+   "note": "滚动窗 800-3400ms 内帧间隔 p90"
+  },
+  "scroll_fling_stalls_over_200ms": {
+   "value": 0,
+   "line": "=0",
+   "pass": true,
+   "source": "docs/research/real-interaction-audit.md 场景 5（滚动窗内无 >200ms 停滞）",
+   "note": "滚动窗 800-3400ms 内无 >200ms 无变化段"
+  }
+ },
+ "notes": []
+}

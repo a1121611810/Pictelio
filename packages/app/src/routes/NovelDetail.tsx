@@ -9,6 +9,7 @@ import NovelTopBar from "../components/novel/NovelTopBar";
 import NovelCoverCard from "../components/novel/NovelCoverCard";
 import NovelFooterNav from "../components/NovelFooterNav";
 import { NOVEL_INTERACTIVE_MARGIN } from "../primitives/rootMargins";
+import { goBack } from "../services/backTransitionService";
 import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior";
 import { createScrollPosition } from "@solid-primitives/scroll";
 import { createVisibilityObserver } from "@solid-primitives/intersection-observer";
@@ -336,7 +337,7 @@ const NovelDetail: Component = () => {
 
   function handleBack() {
     if (typeof window !== "undefined" && window.history.length > 1) {
-      window.history.back();
+      goBack(); // 带返回过渡（#364），与系统返回共用同一路径
     } else {
       void navigate("/home");
     }

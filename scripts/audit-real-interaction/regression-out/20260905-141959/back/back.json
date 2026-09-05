@@ -1,0 +1,49 @@
+{
+ "metrics": {
+  "response_ms_max": {
+   "value": 201,
+   "line": "≤400",
+   "pass": true,
+   "source": "docs/research/real-interaction-audit.md 场景 3（响应 ≤400ms 且 3 rep 方差 <100ms）",
+   "note": "3 rep = [193, 183, 201]ms（含注入延迟，体检同口径）"
+  },
+  "transition_frames_max": {
+   "value": 0,
+   "line": "≥1",
+   "pass": false,
+   "source": "docs/research/real-interaction-audit.md 场景 3 + FT-1A（过渡动画存在 ⇒ 过渡帧数 ≥1；VFR 快动画可被压缩为单帧切换）",
+   "note": "3 rep = [0, 0, 0]；VFR 快动画可被压缩为单帧切换，任一 rep 出现过渡帧即证明动画存在，3 rep 全 0 才判 fail"
+  },
+  "variance_ms": {
+   "value": 18,
+   "line": "<100",
+   "pass": true,
+   "source": "docs/research/real-interaction-audit.md 场景 3（响应 ≤400ms 且 3 rep 方差 <100ms）",
+   "note": "3 rep response max-min"
+  }
+ },
+ "reps": [
+  {
+   "rep": 1,
+   "response_ms": 193,
+   "settle_ms": 193,
+   "transition_frames": 0,
+   "mode": "screenrecord"
+  },
+  {
+   "rep": 2,
+   "response_ms": 183,
+   "settle_ms": 183,
+   "transition_frames": 0,
+   "mode": "screenrecord"
+  },
+  {
+   "rep": 3,
+   "response_ms": 201,
+   "settle_ms": 201,
+   "transition_frames": 0,
+   "mode": "screenrecord"
+  }
+ ],
+ "notes": []
+}

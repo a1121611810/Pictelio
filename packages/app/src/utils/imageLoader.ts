@@ -558,7 +558,11 @@ export async function warmCacheFromDisk(): Promise<void> {
         injectCacheEntry(key);
       }
 
-      console.log(`[ImageCache] Warmup: registered ${recentKeys.length}/${keys.length} entries`);
+      // DEV-gate（#365 P2）：启动路径 console 不进生产页面控制台；
+      // 排障经 chrome://inspect 查看（loggingBehavior none 后不再转发 logcat）。
+      if (import.meta.env.DEV) {
+        console.log(`[ImageCache] Warmup: registered ${recentKeys.length}/${keys.length} entries`);
+      }
     })(),
   );
   if (warmErr) {
