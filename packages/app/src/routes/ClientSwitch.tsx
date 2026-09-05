@@ -3,19 +3,19 @@ import PageTransition from "../components/PageTransition";
 import FluentIcon from "../components/ui/FluentIcon";
 import { ClientInfo } from "../native/ClientInfo";
 import { readClientKind, switchClient, type ClientKind } from "../utils/clientSwitch";
+import { goBack } from "../services/backTransitionService";
 
 /**
  * 切换渲染引擎说明页（T2）：由设置页「切换渲染引擎」入口行跳转进入。
  *
  * 替代原确认弹窗：入口行点击 → 直接导航本页，展示当前引擎、当前包支持的
  * 引擎能力、两引擎差异、实验性警告与切回路径，"确认切换"按钮接通现有
- * switchClient 深模块（行为与迁移前一致），返回操作 navigate(-1)。
+ * switchClient 深模块（行为与迁移前一致），返回操作 goBack()（带返回过渡，#364）。
  */
 const kindLabel = (kind: string) => (kind === "lynx" ? "Lynx" : "WebView");
 const kindDesc = (kind: string) => (kind === "lynx" ? "实验性渲染内核" : "网页渲染内核（默认）");
 
 const ClientSwitch: Component = () => {
-  const navigate = useNavigate();
   const [current, setCurrent] = createSignal<ClientKind>("webview");
   /** 当前包支持的 client 引擎列表；null = 无法读取（Web 环境无原生插件，保守渲染） */
   const [clientKinds, setClientKinds] = createSignal<string[] | null>(null);
@@ -116,7 +116,7 @@ const ClientSwitch: Component = () => {
           <fluent-button
             appearance="subtle"
             aria-label="返回"
-            on:click={() => navigate(-1)}
+            on:click={() => goBack()}
             class="w-8 h-8 p-0 min-w-8"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -228,7 +228,7 @@ const ClientSwitch: Component = () => {
           <div class="flex gap-3">
             <fluent-button
               appearance="secondary"
-              on:click={() => navigate(-1)}
+              on:click={() => goBack()}
               class="flex-1"
               aria-label="返回设置"
             >

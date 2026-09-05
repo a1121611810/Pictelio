@@ -1,6 +1,7 @@
 import type { Component } from "solid-js";
 import { useNavigate, useParams } from "@solidjs/router";
 import { user } from "../stores/authStore";
+import { goBack } from "../services/backTransitionService";
 import {
   illusts,
   novels,
@@ -63,7 +64,7 @@ const UserIllusts: Component = () => {
               appearance="subtle"
               aria-label="返回"
               class="w-8 h-8 p-0 min-w-8"
-              on:click={() => window.history.back()}
+              on:click={() => goBack()}
             >
               ←
             </fluent-button>

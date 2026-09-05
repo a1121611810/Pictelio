@@ -10,6 +10,7 @@ import { resetSettingsStore as resetUiStore } from "../stores/settingsStore";
 import PageTransition from "../components/PageTransition";
 import SettingsDialogs from "../components/settings/SettingsDialogs";
 import SettingsSections from "../components/settings/SettingsSections";
+import { goBack } from "../services/backTransitionService";
 
 function openDeleteAccountPage() {
   // TODO: Install @capacitor/browser and use Browser.open({ url }) for a native in-app/system browser experience.
@@ -89,7 +90,7 @@ const Settings: Component = () => {
           <fluent-button
             appearance="subtle"
             aria-label="返回"
-            on:click={() => navigate(-1)}
+            on:click={() => goBack()}
             class="w-8 h-8 p-0 min-w-8"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
