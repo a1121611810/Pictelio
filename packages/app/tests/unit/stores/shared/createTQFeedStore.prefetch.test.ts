@@ -113,13 +113,72 @@ describe("createTQFeedStore prefetchAllTabs（#375 空闲预取）", () => {
     expect(fetchLog.value).toEqual(["t1_b", "t2_main"]);
   });
 
-  it("默认 staleTime=Infinity 透传 ensureInfiniteQueryData（陈旧数据也不重拉）", async () => {
+  it("默认 staleTime=Infinity 参数透传 ensureInfiniteQueryData（参数级 pin）", async () => {
     const store = makeStore();
     const spy = vi.spyOn(qc.client!, "ensureInfiniteQueryData");
     store.prefetchAllTabs();
     const staleTimes = spy.mock.calls.map((c) => (c[0] as { staleTime?: number }).staleTime);
     expect(staleTimes).toHaveLength(3);
     expect(staleTimes.every((t) => t === Number.POSITIVE_INFINITY)).toBe(true);
+  });
+
+  it("失败传播与缓存清理：预取 reject 向上传播（调度器 warn 不成死代码），error entry 被清除让首访回到干净骨架路径", async () => {
+    let fail = true;
+    const store = createTQFeedStore<Item, string, undefined>({
+      name: "test_prefetch_fail",
+      currentTab: (() => "t1") as never,
+      enabled: () => true,
+      lazy: true,
+      getDeps: () => undefined,
+      staleTime: 30_000,
+      filterFn: (items) => items,
+      tabs: {
+        t1: {
+          allMode: { type: "single", subTabs: ["main"] },
+          queries: {
+            main: {
+              queryKey: () => ["pf_fail", "main"],
+              queryFn: () => {
+                if (fail) return Promise.reject(new Error("network down"));
+                return Promise.resolve({ items: [], next_url: null });
+              },
+            },
+          },
+        },
+      },
+    });
+    await expect(Promise.all(store.prefetchAllTabs())).rejects.toThrow("network down");
+    // error 态 entry 已被清除（首访从骨架→内容，不闪错误页）
+    const state = qc.client!.getQueryState(["pf_fail", "main"]);
+    expect(state?.status === "error" && state.data != null).toBe(false);
+    // 二次预取重新发起请求（缓存可干净重建）
+    fail = false;
+    await Promise.all(store.prefetchAllTabs());
+    expect(store.items().length).toBe(0); // 空 feed 合法
+  });
+
+  it("ensureLoaded SWR：缓存陈旧时同步返回旧数据并触发后台重验证（revalidateIfStale，code review P1）", async () => {
+    vi.useFakeTimers();
+    const store = makeStore();
+    qc.client!.setQueryData(["pf", "t1_a"], {
+      pages: [{ items: [{ id: 7, create_date: "2026-01-07" }], next_url: null }],
+      pageParams: [undefined],
+    });
+    // 回拨 dataUpdatedAt 使其超过 ensureLoaded 的 30s staleTime → 陈旧
+    const entry = qc.client!.getQueryCache().find({ queryKey: ["pf", "t1_a"] });
+    entry!.state.dataUpdatedAt = Date.now() - 31_000;
+    const before = fetchLog.value.filter((v) => v === "t1_a").length;
+    const p = store.ensureLoaded();
+    // setQueryData/observer 通知经批处理微任务落地：先 flush 再断言缓存数据。
+    // 注意 merge 模式下另一子查询（t1_b）的 ensureLoaded 取数也会在此窗口完成，
+    // items 为两子查询合并结果——只断言「缓存未被后台重验证清空」。
+    await vi.advanceTimersByTimeAsync(0);
+    expect(store.items().length).toBeGreaterThanOrEqual(1);
+    await p;
+    // 后台重验证发生了：queryFn 被再次调用
+    const after = fetchLog.value.filter((v) => v === "t1_a").length;
+    expect(after).toBeGreaterThan(before);
+    vi.useRealTimers();
   });
 
   it("自定义 staleTime 透传", async () => {

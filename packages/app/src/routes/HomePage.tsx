@@ -356,7 +356,7 @@ const HomePage: Component = () => {
     if (recIllusts().length === 0 && recNovels().length === 0) return;
     untrack(() => {
       scheduleIdleFeedPrefetch([
-        { id: "recommended-illust+novel", run: () => Promise.all(recIllustPrefetchAll()) },
+        { id: "recommended-illust", run: () => Promise.all(recIllustPrefetchAll()) },
         { id: "follow-illust", run: () => Promise.all(followIllustPrefetchAll()) },
         { id: "bookmark-illust", run: () => Promise.all(bmkIllustPrefetchAll()) },
         { id: "recommended-novel", run: () => Promise.all(recNovelPrefetchAll()) },

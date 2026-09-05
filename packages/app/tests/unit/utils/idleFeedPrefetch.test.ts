@@ -7,8 +7,9 @@
  *   可见 feed 的 SWR 刷新并发挤占（Pixiv 无公开配额，保守设计）。
  * - 一次性启动 = 预取是会话级动作，tab 切换不重跑（首页 mount 后只调度一次）。
  * - 失败不中断 + console.warn（带模块前缀）= AGENTS.md 测试硬约束 3（禁止静默降级）。
- * - node 环境无 requestIdleCallback → setTimeout(1500) 兜底分支；真机 WebView 113+
- *   走 rIC（timeout 10s 保证慢帧下仍会执行）。
+ * - node 环境无 requestIdleCallback → setTimeout(1500) 兜底分支；rIC 在项目支持区间
+ *   （WebView ≥85，docs/platform-compatibility.md）恒可用，真机走 rIC（timeout 10s
+ *   保证慢帧下仍会执行）。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 

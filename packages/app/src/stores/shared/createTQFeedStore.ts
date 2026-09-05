@@ -149,8 +149,10 @@ export type TQFeedStoreResult<TItem> = {
    * 空闲预取（#375）：对所有 tab 的活跃子查询做「填空式」预载，返回每个子查询的
    * ensure promise。默认 staleTime=Infinity——已有数据（含 feedQueryPersist 恢复的
    * 陈旧数据）一律跳过、不触发网络，只填补空缓存以消除「首访 tab 骨架等网络」；
-   * 访问时的 SWR 刷新仍由 activate 路径的 ensureLoaded（30s staleTime）负责。
-   * 不触碰 activated 信号（不改变 lazy store 的 UI 状态）；失败由调用方兜底。
+   * 访问时的 SWR 刷新由 activate 路径的 ensureLoaded（30s staleTime +
+   * revalidateIfStale）负责：陈旧缓存同步返回、后台换新。
+   * 预取失败会清除该 key 的无数据 error entry 后向上传播（调度器层 warn），
+   * 不触碰 activated 信号（不改变 lazy store 的 UI 状态）。
    */
   prefetchAllTabs: (staleTime?: number) => Promise<unknown>[];
 };
@@ -428,6 +430,10 @@ export function createTQFeedStore<
           return queryClient.ensureInfiniteQueryData({
             queryKey: def.queryKey(config.getDeps(), undefined),
             staleTime: 30_000,
+            // query-core 5.101.4 的 ensureQueryData 对已有数据默认直接返回、永不重验证
+            //（code review P1：无此项则注释承诺的 SWR 不存在）——显式开启后陈旧缓存
+            // 同步返回 + 后台重拉，恢复「访问即见数据、后台换新」的 SWR 语义
+            revalidateIfStale: true,
           } as any);
         }),
       );
@@ -441,11 +447,21 @@ export function createTQFeedStore<
         for (const key of keysForTab(tabKey)) {
           const def = queryDefMap.get(key);
           if (!def) continue;
+          const queryKey = def.queryKey(deps, undefined);
           tasks.push(
-            queryClient.ensureInfiniteQueryData({
-              queryKey: def.queryKey(deps, undefined),
-              staleTime,
-            } as any),
+            queryClient
+              .ensureInfiniteQueryData({
+                queryKey,
+                staleTime,
+              } as any)
+              .catch((err: unknown) => {
+                // 预取失败：重置该 query 回干净 pending 态（保留 observer 的 queryFn 装配，
+                // removeQueries 会连装配一起拆掉导致二次加载 Missing queryFn），避免用户
+                // 首访该 tab 从「骨架→内容」退化为「错误闪现→内容」（code review P2）；
+                // 失败仍向上传播，由调度器层 console.warn（禁静默降级）
+                queryClient.resetQueries({ queryKey });
+                throw err;
+              }),
           );
         }
       }
