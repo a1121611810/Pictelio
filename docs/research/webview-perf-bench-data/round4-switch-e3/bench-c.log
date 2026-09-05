@@ -1,0 +1,12 @@
+[nav] 应用就绪（1 轮）: 推荐  Hintaooda 的首页  插画 小说  ヒロちゃんに、オムライスを  綿菓子  ★81  桜羽エマ 魔法少女
+  g0 fwd: jank=0% p99=4.53ms | back: jank=0% p99=6.86ms scroll 0→0 ✓ path=/home
+  g1 fwd: jank=0% p99=6.74ms | back: jank=100% p99=19.94ms scroll 0→0 ✓ path=/home
+  g2 fwd: jank=0% p99=5.72ms | back: jank=0% p99=5.57ms scroll 0→0 ✓ path=/home
+  g3 fwd: jank=0% p99=5.36ms | back: jank=0% p99=3.81ms scroll 0→0 ✓ path=/home
+  g4 fwd: jank=0% p99=5.18ms | back: jank=0% p99=13.15ms scroll 0→0 ✓ path=/home
+  g5 fwd: jank=0% p99=4.56ms | back: jank=0% p99=16.57ms scroll 0→0 ✓ path=/home
+  g6 fwd: jank=0% p99=5.47ms | back: jank=0% p99=11.98ms scroll 0→0 ✓ path=/home
+  g7 fwd: jank=0% p99=6.9ms | back: jank=100% p99=17.98ms scroll 0→0 ✓ path=/home
+  g8 fwd: jank=0% p99=4.21ms | back: jank=100% p99=21.57ms scroll 0→0 ✓ path=/home
+  g9 fwd: jank=0% p99=6.78ms | back: jank=100% p99=19.81ms scroll 0→0 ✓ path=/home
+[switch] 完成 → /tmp/switch-e3c/webview_switch.jsonl

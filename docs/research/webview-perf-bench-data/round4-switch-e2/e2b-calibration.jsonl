@@ -1,0 +1,3 @@
+{"phase":"A-raf-loop-2s","rafFired":123,"gfxinfoFrames":0}
+{"phase":"B-bgpos-anim-2s","rafFired":123,"gfxinfoFrames":126}
+{"phase":"C-static-2s","rafFired":123,"gfxinfoFrames":1}

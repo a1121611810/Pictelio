@@ -1,0 +1,4 @@
+{"scenario":"switch","kind":"forward","group":0,"target":"card","wallMs":1824,"framesDump":2,"frames":2,"jankRate":0,"totalP50":6.91,"totalP90":7.85,"totalP99":7.85,"unknownDelayP50":0.65,"unknownDelayP90":1.01,"deadlineMs":16.67}
+{"scenario":"switch","kind":"back","group":0,"framesDump":1,"scrollBefore":0,"scrollAfter":0,"restored":true,"frames":1,"jankRate":0,"totalP50":16.44,"totalP90":16.44,"totalP99":16.44,"unknownDelayP50":0.81,"unknownDelayP90":0.81,"deadlineMs":16.67}
+{"scenario":"switch","kind":"forward","group":1,"target":"card","wallMs":1835,"framesDump":1,"frames":1,"jankRate":1,"totalP50":17,"totalP90":17,"totalP99":17}
+{"scenario":"switch","kind":"back","group":1,"framesDump":1,"scrollBefore":0,"scrollAfter":0,"restored":true,"frames":1,"jankRate":0,"totalP50":15.26,"totalP90":15.26,"totalP99":15.26,"unknownDelayP50":0.68,"unknownDelayP90":0.68,"deadlineMs":16.67}
