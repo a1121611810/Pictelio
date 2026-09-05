@@ -174,6 +174,12 @@ public class PixivApiPlugin extends Plugin {
                     fos.flush();
                 }
 
+                // X1：详情页预取热路径填充点——预取字节已在手，≤512KB 的缩略图/卡片图直接进
+                // 内存 LRU，详情页渲染触发 /pixiv-img/ 拦截时即内存命中（省一次磁盘回读）。
+                // key 用原始 CDN URL：无自定义图床时与拦截侧 rewriteUrl 产物同 key
+                //（IMAGE_CDN_URL 前缀一致），可直接命中
+                ImageBytesMemoryCache.getInstance().putBounded(url, bytes);
+
                 JSObject result = new JSObject();
                 result.put("cached", false);
                 result.put("path", cacheFile.getAbsolutePath());

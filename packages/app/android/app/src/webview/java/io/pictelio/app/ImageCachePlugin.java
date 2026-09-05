@@ -163,6 +163,8 @@ public class ImageCachePlugin extends Plugin {
                     f.delete();
                 }
             }
+            // X1：磁盘缓存已清空，内存字节缓存必须联动失效——否则内存命中会继续 serve 已删除的文件
+            ImageBytesMemoryCache.getInstance().clear();
             call.resolve();
         } catch (Exception e) {
             Log.e(TAG, "clearCache failed", e);
