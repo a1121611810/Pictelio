@@ -1,0 +1,24 @@
+{
+ "metrics": {
+  "open_ms": {
+   "value": 0,
+   "line": "≤200",
+   "pass": true,
+   "source": "docs/research/real-interaction-audit.md 场景 6（开启占位 ≤200ms）",
+   "note": "tap→首个显著变化帧（含注入延迟与锚点容差）"
+  },
+  "flip_max_gap_ms": {
+   "value": 148,
+   "line": "≤500",
+   "pass": true,
+   "source": "docs/research/ri-367-viewer-report.md（FT-4 验收线：翻页释放→新页首帧 ≤500ms）",
+   "note": "翻页全程（拖拽起 ~500ms 起）显著帧间最长静默；拖拽跟手帧与预取命中即视为有反馈，黑屏冻结表现为长间隔"
+  }
+ },
+ "mode_open": "screenrecord",
+ "mode_flip": "screenrecord",
+ "notes": [
+  "进入的详情非多图（{\"path\":\"/illust/149158559\",\"pages\":0,\"imgOk\":false}），返回重找",
+  "进入的详情非多图（{\"path\":\"/search\",\"pages\":0,\"imgOk\":true}），返回重找"
+ ]
+}

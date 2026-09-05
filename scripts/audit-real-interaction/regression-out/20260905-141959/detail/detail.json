@@ -1,0 +1,20 @@
+{
+ "metrics": {
+  "skeleton_ms": {
+   "value": 9,
+   "line": "≤1100",
+   "pass": true,
+   "source": "docs/research/real-interaction-audit.md 场景 2（骨架帧 ≤1.1s）",
+   "note": "含 input 注入延迟与触摸指示帧（体检同口径）"
+  },
+  "interactive_ms": {
+   "value": 707,
+   "line": "≤2000",
+   "pass": true,
+   "source": "docs/research/real-interaction-audit.md 场景 2（可交互帧 ≤2s）",
+   "note": "近似口径：末次显著变化帧（首卡大图 Feed 缓存口径，体检场景 2 同）"
+  }
+ },
+ "mode": "screenrecord",
+ "notes": []
+}

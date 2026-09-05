@@ -1,0 +1,223 @@
+{
+ "meta": {
+  "serial": "emulator-5554",
+  "launcher": "io.pictelio.app/.MainActivityWebview",
+  "screen": "720x1280",
+  "android": "14",
+  "model": "sdk_gphone64_arm64",
+  "apk_version": "4.32.0",
+  "webview_version": "113.0.5672.136",
+  "timestamp": "2026-09-05T14:22:38.266Z",
+  "scenes": [
+   "coldstart",
+   "detail",
+   "back",
+   "tabs",
+   "scroll",
+   "viewer"
+  ]
+ },
+ "overall_pass": false,
+ "scenarios": {
+  "coldstart": {
+   "metrics": {},
+   "error": "Command failed: python3 analyze_rec.py /Users/lilianda/develop/pixivizer/scripts/audit-real-interaction/regression-out/20260905-141959/coldstart/coldstart.mp4 --out /Users/lilianda/develop/pixivizer/scripts/audit-real-interaction/regression-out/20260905-141959/coldstart/coldstart.frames.json",
+   "notes": [],
+   "pass": false
+  },
+  "detail": {
+   "metrics": {
+    "skeleton_ms": {
+     "value": 9,
+     "line": "≤1100",
+     "pass": true,
+     "source": "docs/research/real-interaction-audit.md 场景 2（骨架帧 ≤1.1s）",
+     "note": "含 input 注入延迟与触摸指示帧（体检同口径）"
+    },
+    "interactive_ms": {
+     "value": 707,
+     "line": "≤2000",
+     "pass": true,
+     "source": "docs/research/real-interaction-audit.md 场景 2（可交互帧 ≤2s）",
+     "note": "近似口径：末次显著变化帧（首卡大图 Feed 缓存口径，体检场景 2 同）"
+    }
+   },
+   "mode": "screenrecord",
+   "notes": [],
+   "pass": true
+  },
+  "back": {
+   "metrics": {
+    "response_ms_max": {
+     "value": 201,
+     "line": "≤400",
+     "pass": true,
+     "source": "docs/research/real-interaction-audit.md 场景 3（响应 ≤400ms 且 3 rep 方差 <100ms）",
+     "note": "3 rep = [193, 183, 201]ms（含注入延迟，体检同口径）"
+    },
+    "transition_frames_max": {
+     "value": 0,
+     "line": "≥1",
+     "pass": false,
+     "source": "docs/research/real-interaction-audit.md 场景 3 + FT-1A（过渡动画存在 ⇒ 过渡帧数 ≥1；VFR 快动画可被压缩为单帧切换）",
+     "note": "3 rep = [0, 0, 0]；VFR 快动画可被压缩为单帧切换，任一 rep 出现过渡帧即证明动画存在，3 rep 全 0 才判 fail"
+    },
+    "variance_ms": {
+     "value": 18,
+     "line": "<100",
+     "pass": true,
+     "source": "docs/research/real-interaction-audit.md 场景 3（响应 ≤400ms 且 3 rep 方差 <100ms）",
+     "note": "3 rep response max-min"
+    }
+   },
+   "reps": [
+    {
+     "rep": 1,
+     "response_ms": 193,
+     "settle_ms": 193,
+     "transition_frames": 0,
+     "mode": "screenrecord"
+    },
+    {
+     "rep": 2,
+     "response_ms": 183,
+     "settle_ms": 183,
+     "transition_frames": 0,
+     "mode": "screenrecord"
+    },
+    {
+     "rep": 3,
+     "response_ms": 201,
+     "settle_ms": 201,
+     "transition_frames": 0,
+     "mode": "screenrecord"
+    }
+   ],
+   "notes": [],
+   "pass": false
+  },
+  "tabs": {
+   "metrics": {
+    "follow_response_ms": {
+     "value": 126,
+     "line": "≤1100",
+     "pass": true,
+     "source": "docs/research/real-interaction-audit.md 场景 4（响应 ≤1.1s）",
+     "note": "缓存直现无骨架（本会话已访问过），以首个状态变化计"
+    },
+    "follow_blank_window_max_ms": {
+     "value": 0,
+     "line": "≤500（空白窗=0）",
+     "pass": true,
+     "source": "docs/research/ri-366-shimmer-report.md（FT-3 验收线：空白窗=0；>500ms 无卡片段即 fail）",
+     "note": "骨架出现过之后骨架=0 且卡片=0 的最长连续段（DOM 元素存在性口径）"
+    },
+    "follow_content_ready_ms": {
+     "value": 126,
+     "line": null,
+     "pass": null,
+     "source": "体检报告场景 4 内容就绪（网络支配，仅记录）"
+    },
+    "bookmark_response_ms": {
+     "value": 125,
+     "line": "≤1100",
+     "pass": true,
+     "source": "docs/research/real-interaction-audit.md 场景 4（响应 ≤1.1s）",
+     "note": "骨架首现口径（DOM 元素存在性）"
+    },
+    "bookmark_blank_window_max_ms": {
+     "value": 0,
+     "line": "≤500（空白窗=0）",
+     "pass": true,
+     "source": "docs/research/ri-366-shimmer-report.md（FT-3 验收线：空白窗=0；>500ms 无卡片段即 fail）",
+     "note": "骨架出现过之后骨架=0 且卡片=0 的最长连续段（DOM 元素存在性口径）"
+    },
+    "bookmark_content_ready_ms": {
+     "value": 373,
+     "line": null,
+     "pass": null,
+     "source": "体检报告场景 4 内容就绪（网络支配，仅记录）"
+    }
+   },
+   "switches": [
+    {
+     "tab": "follow",
+     "label": "推荐→关注",
+     "response_ms": 126,
+     "cached_no_skeleton": true,
+     "content_ready_ms": 126,
+     "blank_window_max_ms": 0
+    },
+    {
+     "tab": "bookmark",
+     "label": "关注→收藏",
+     "response_ms": 125,
+     "cached_no_skeleton": false,
+     "content_ready_ms": 373,
+     "blank_window_max_ms": 0
+    }
+   ],
+   "notes": [],
+   "pass": true
+  },
+  "scroll": {
+   "metrics": {
+    "scroll_slow_delta_p90_ms": {
+     "value": 18,
+     "line": "≤34",
+     "pass": true,
+     "source": "docs/research/real-interaction-audit.md 场景 5（VFR delta p90 ≤34ms）",
+     "note": "滚动窗 800-3400ms 内帧间隔 p90"
+    },
+    "scroll_slow_stalls_over_200ms": {
+     "value": 0,
+     "line": "=0",
+     "pass": true,
+     "source": "docs/research/real-interaction-audit.md 场景 5（滚动窗内无 >200ms 停滞）",
+     "note": "滚动窗 800-3400ms 内无 >200ms 无变化段"
+    },
+    "scroll_fling_delta_p90_ms": {
+     "value": 18,
+     "line": "≤34",
+     "pass": true,
+     "source": "docs/research/real-interaction-audit.md 场景 5（VFR delta p90 ≤34ms）",
+     "note": "滚动窗 800-3400ms 内帧间隔 p90"
+    },
+    "scroll_fling_stalls_over_200ms": {
+     "value": 0,
+     "line": "=0",
+     "pass": true,
+     "source": "docs/research/real-interaction-audit.md 场景 5（滚动窗内无 >200ms 停滞）",
+     "note": "滚动窗 800-3400ms 内无 >200ms 无变化段"
+    }
+   },
+   "notes": [],
+   "pass": true
+  },
+  "viewer": {
+   "metrics": {
+    "open_ms": {
+     "value": 0,
+     "line": "≤200",
+     "pass": true,
+     "source": "docs/research/real-interaction-audit.md 场景 6（开启占位 ≤200ms）",
+     "note": "tap→首个显著变化帧（含注入延迟与锚点容差）"
+    },
+    "flip_max_gap_ms": {
+     "value": 148,
+     "line": "≤500",
+     "pass": true,
+     "source": "docs/research/ri-367-viewer-report.md（FT-4 验收线：翻页释放→新页首帧 ≤500ms）",
+     "note": "翻页全程（拖拽起 ~500ms 起）显著帧间最长静默；拖拽跟手帧与预取命中即视为有反馈，黑屏冻结表现为长间隔"
+    }
+   },
+   "mode_open": "screenrecord",
+   "mode_flip": "screenrecord",
+   "notes": [
+    "进入的详情非多图（{\"path\":\"/illust/149158559\",\"pages\":0,\"imgOk\":false}），返回重找",
+    "进入的详情非多图（{\"path\":\"/search\",\"pages\":0,\"imgOk\":true}），返回重找"
+   ],
+   "pass": true
+  }
+ }
+}

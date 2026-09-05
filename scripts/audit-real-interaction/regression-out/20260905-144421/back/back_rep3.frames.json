@@ -1,0 +1,184 @@
+{
+ "mp4": "back_rep3.mp4",
+ "frame_count": 25,
+ "duration_ms": 2806,
+ "mean_fps": 8.91,
+ "vfr": true,
+ "diff_threshold": 2.0,
+ "frames": [
+  {
+   "n": 1,
+   "pts_ms": 0,
+   "delta_ms": 0,
+   "diff": 0.0
+  },
+  {
+   "n": 2,
+   "pts_ms": 440,
+   "delta_ms": 440,
+   "diff": 0.016
+  },
+  {
+   "n": 3,
+   "pts_ms": 954,
+   "delta_ms": 514,
+   "diff": 54.594
+  },
+  {
+   "n": 4,
+   "pts_ms": 1204,
+   "delta_ms": 250,
+   "diff": 0.003
+  },
+  {
+   "n": 5,
+   "pts_ms": 1221,
+   "delta_ms": 17,
+   "diff": 0.005
+  },
+  {
+   "n": 6,
+   "pts_ms": 1236,
+   "delta_ms": 15,
+   "diff": 15.478
+  },
+  {
+   "n": 7,
+   "pts_ms": 1252,
+   "delta_ms": 16,
+   "diff": 32.013
+  },
+  {
+   "n": 8,
+   "pts_ms": 1268,
+   "delta_ms": 16,
+   "diff": 38.282
+  },
+  {
+   "n": 9,
+   "pts_ms": 1285,
+   "delta_ms": 17,
+   "diff": 39.571
+  },
+  {
+   "n": 10,
+   "pts_ms": 1301,
+   "delta_ms": 17,
+   "diff": 37.781
+  },
+  {
+   "n": 11,
+   "pts_ms": 1318,
+   "delta_ms": 17,
+   "diff": 35.935
+  },
+  {
+   "n": 12,
+   "pts_ms": 1335,
+   "delta_ms": 17,
+   "diff": 32.216
+  },
+  {
+   "n": 13,
+   "pts_ms": 1351,
+   "delta_ms": 16,
+   "diff": 26.461
+  },
+  {
+   "n": 14,
+   "pts_ms": 1368,
+   "delta_ms": 17,
+   "diff": 21.987
+  },
+  {
+   "n": 15,
+   "pts_ms": 1385,
+   "delta_ms": 17,
+   "diff": 16.717
+  },
+  {
+   "n": 16,
+   "pts_ms": 1402,
+   "delta_ms": 16,
+   "diff": 12.611
+  },
+  {
+   "n": 17,
+   "pts_ms": 1419,
+   "delta_ms": 18,
+   "diff": 10.497
+  },
+  {
+   "n": 18,
+   "pts_ms": 1434,
+   "delta_ms": 15,
+   "diff": 7.96
+  },
+  {
+   "n": 19,
+   "pts_ms": 1452,
+   "delta_ms": 17,
+   "diff": 6.489
+  },
+  {
+   "n": 20,
+   "pts_ms": 1469,
+   "delta_ms": 17,
+   "diff": 5.041
+  },
+  {
+   "n": 21,
+   "pts_ms": 1485,
+   "delta_ms": 17,
+   "diff": 4.356
+  },
+  {
+   "n": 22,
+   "pts_ms": 1502,
+   "delta_ms": 17,
+   "diff": 2.012
+  },
+  {
+   "n": 23,
+   "pts_ms": 1519,
+   "delta_ms": 17,
+   "diff": 0.915
+  },
+  {
+   "n": 24,
+   "pts_ms": 1534,
+   "delta_ms": 16,
+   "diff": 1.368
+  },
+  {
+   "n": 25,
+   "pts_ms": 2806,
+   "delta_ms": 1271,
+   "diff": 0.017
+  }
+ ],
+ "change_segments": [
+  {
+   "from_ms": 954,
+   "to_ms": 1204,
+   "peak_diff": 54.594
+  },
+  {
+   "from_ms": 1236,
+   "to_ms": 1519,
+   "peak_diff": 39.571
+  }
+ ],
+ "stalls_over_200ms": [
+  {
+   "from_ms": 0,
+   "to_ms": 954,
+   "duration_ms": 954
+  },
+  {
+   "from_ms": 954,
+   "to_ms": 1236,
+   "duration_ms": 282
+  }
+ ]
+}
