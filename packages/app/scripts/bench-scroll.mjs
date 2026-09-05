@@ -708,19 +708,20 @@ async function main() {
     }
     const out = {};
     for (const [k, rs] of Object.entries(byKey)) {
+      // 兼容缺字段记录（老格式兜底行/switch 记录可能无 unknownDelay*）：缺省按 0 计
       out[k] = {
         gestures: rs.length,
-        jankRateMean: +(rs.reduce((s, r) => s + r.jankRate, 0) / rs.length).toFixed(4),
+        jankRateMean: +(rs.reduce((s, r) => s + (r.jankRate ?? 0), 0) / rs.length).toFixed(4),
         totalP50ofP50: +percentile(
-          rs.map((r) => r.totalP50).toSorted((a, b) => a - b),
+          rs.map((r) => r.totalP50 ?? 0).toSorted((a, b) => a - b),
           50,
         ).toFixed(2),
         totalP90ofP50: +percentile(
-          rs.map((r) => r.totalP50).toSorted((a, b) => a - b),
+          rs.map((r) => r.totalP50 ?? 0).toSorted((a, b) => a - b),
           90,
         ).toFixed(2),
         unknownDelayP90: +percentile(
-          rs.map((r) => r.unknownDelayP90).toSorted((a, b) => a - b),
+          rs.map((r) => r.unknownDelayP90 ?? 0).toSorted((a, b) => a - b),
           90,
         ).toFixed(2),
       };

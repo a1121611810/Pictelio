@@ -324,8 +324,9 @@ const NovelFeedPanel: Component<{ tab: FeedTab }> = (props) => {
       refreshMode="overlay"
       skeleton={() => <NovelRowSkeleton />}
       empty={() => <EmptyHint />}
-      // 预取 URL 与 NovelRowCard 的 cover() 取值保持一致（large → medium → square_medium），确保预热 key = 展示 src
-      prefetchUrl={(n) => n.image_urls.large ?? n.image_urls.medium ?? n.image_urls.square_medium}
+      // 预取 URL 与 NovelRowCard 的 cover() 取值保持逐字一致（降档 square_medium，S4 保留
+      // square_medium || large || medium 降级链），确保预热 key = 展示 src；两处任一改动必须同步
+      prefetchUrl={(n) => n.image_urls.square_medium || n.image_urls.large || n.image_urls.medium}
       renderItem={(n) => <NovelRowCard novel={n} onClick={() => void navigate(`/novel/${n.id}`)} />}
     />
   );

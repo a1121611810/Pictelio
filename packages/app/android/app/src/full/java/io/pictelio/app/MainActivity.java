@@ -5,7 +5,6 @@ import io.pictelio.app.config.OAuthConfig;
 import android.content.pm.PackageInfo;
 import android.content.Intent;
 import android.os.Bundle;
-import android.util.Log;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
@@ -18,37 +17,12 @@ import androidx.core.splashscreen.SplashScreen;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.util.HashMap;
-import java.util.Map;
-
 /**
  * Pictelio Android 客户端 — 拦截 /pixiv-img/ 请求并代理到 i.pximg.net（注入 Referer 头）。
  */
 public class MainActivity extends BridgeActivity {
 
-    private static final String TAG = "MainActivity";
-
     /** SplashScreen 保持可见的标志位，由 AuthPlugin.hideSplash() 通过 dismissSplash() setter 控制 */
-    
-
-    /** 共享图片加载器（#58）：单实例保证 per-URL 锁在并发拦截下生效（避免同 URL 双写缓存） */
-    private volatile PixivImageLoader imageLoader;
-
-    private PixivImageLoader imageLoader() {
-        PixivImageLoader l = imageLoader;
-        if (l == null) {
-            synchronized (this) {
-                if (imageLoader == null) {
-                    imageLoader = new PixivImageLoader(this);
-                }
-                l = imageLoader;
-            }
-        }
-        return l;
-    }
 
     /** 供同包下的 AuthPlugin 调用，通知 SplashScreen 可退出 */
     static void dismissSplash() {
@@ -200,53 +174,10 @@ public class MainActivity extends BridgeActivity {
         });
     }
 
+    // X1：拦截核心抽至共享类 ImageIntercept（full/webview 两 flavor 逐字重复实现合并，
+    // 行为变化仅 spec 列明的 telemetry/immutable 头/内存热路径三处）
     private WebResourceResponse interceptImage(String url) {
-        if (url == null || !url.contains("/pixiv-img/")) return null;
-
-        try {
-            // URL 重写 + 下载 + 磁盘缓存统一走 PixivImageLoader 公共核心（#57/#58，
-            // 与 Lynx PictelioImageService 同源；未命中时补全写盘——行为增强）
-            String pixivUrl = PixivImageLoader.rewriteUrl(url);
-
-            // 读取 JS 侧持久化的缓存开关（Capacitor Preferences 存储在默认 SharedPreferences 中）
-            android.content.SharedPreferences prefs = getApplicationContext().getSharedPreferences("CapacitorStorage", android.content.Context.MODE_PRIVATE);
-            boolean diskCacheEnabled = "true".equals(prefs.getString("image_cache_disk", "true"));
-            boolean browserCacheEnabled = "true".equals(prefs.getString("image_cache_browser", "true"));
-
-            PixivImageLoader loader = imageLoader();
-            if (diskCacheEnabled) {
-                // ── A: 磁盘缓存优先 ──
-                File cached = loader.cachedFile(pixivUrl);
-                if (cached != null) {
-                    return new WebResourceResponse(mimeFor(url), null, 200, "OK", null, new FileInputStream(cached));
-                }
-                // 未命中：下载 + 写盘（#57 补全缓存写入）
-                return bytesResponse(url, loader.loadBytes(pixivUrl), browserCacheEnabled);
-            }
-
-            // ── B: 磁盘缓存关闭 → 仅下载不写盘（Referer/UA 注入在核心内） ──
-            return bytesResponse(url, loader.download(pixivUrl), browserCacheEnabled);
-        } catch (Exception e) {
-            Log.w(TAG, "interceptImage 失败: " + url, e);
-            return null;
-        }
-    }
-
-    /** 按 URL 后缀推断图片 mime（webview 专属；下载响应不再依赖服务器 Content-Type） */
-    private static String mimeFor(String url) {
-        if (url.endsWith(".png")) return "image/png";
-        if (url.endsWith(".gif")) return "image/gif";
-        if (url.endsWith(".webp")) return "image/webp";
-        return "image/jpeg";
-    }
-
-    /** 字节 → WebResourceResponse（browserCacheEnabled 时加 immutable 头） */
-    private static WebResourceResponse bytesResponse(String url, byte[] bytes, boolean browserCacheEnabled) {
-        Map<String, String> headers = new HashMap<>();
-        if (browserCacheEnabled) {
-            headers.put("Cache-Control", "public, max-age=31536000, immutable");
-        }
-        return new WebResourceResponse(mimeFor(url), null, 200, "OK", headers, new ByteArrayInputStream(bytes));
+        return ImageIntercept.interceptImage(getApplicationContext(), url);
     }
 
     // ── WebView 版本检测 ────────────────────────────────────────────

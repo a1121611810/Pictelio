@@ -7,20 +7,8 @@ import HeartIcon from "./ui/HeartIcon";
 import IllustTags from "./IllustTags";
 import IllustTypeBadge from "./IllustTypeBadge";
 import SkeletonShimmer from "./SkeletonShimmer";
-import { resolveImageUrl } from "../utils/imageLoader";
+import { pickListImageUrl, resolveImageUrl } from "../utils/imageLoader";
 import { useCardInteractions } from "../primitives/useCardInteractions";
-
-function resolveUrl(illust: PixivIllust): string {
-  const q = listQuality();
-  if (q === "medium") {
-    return illust.image_urls.medium;
-  }
-  if (q === "large") {
-    return illust.image_urls.large;
-  }
-  // Original: use original_image_url if available, otherwise fallback to large
-  return illust.meta_single_page?.original_image_url ?? illust.image_urls.large;
-}
 
 interface Props {
   illust: PixivIllust;
@@ -29,7 +17,8 @@ interface Props {
 }
 
 const ImageCard: Component<Props> = (props) => {
-  const img = () => resolveUrl(props.illust);
+  // 展示 URL 与 VirtualFeed 预取共用同一 pickListImageUrl，保证预取 key = 展示 src
+  const img = () => pickListImageUrl(props.illust, listQuality());
   const w = () => props.illust.width;
   const h = () => props.illust.height;
   const isUgoira = () => props.illust.type === "ugoira";

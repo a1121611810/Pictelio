@@ -23,11 +23,16 @@ interface NovelRowCardProps {
 }
 
 const NovelRowCard: Component<NovelRowCardProps> = (props) => {
-  // 封面 URL：优先大图，依次回退中图、方形缩略图
+  // 封面降档 square_medium（spec webview-perf-round2 §2.3）：56px 方框 × DPR3.5 ≈196px < 250px，
+  // 方框对方裁切（square_medium=250x250 方裁切档）足够清晰；单段直载不做渐进
+  // （行为变化点：旧 large 缓存 key 一次性 miss，自然回填）。
+  // S4：square_medium 可能缺省（空串），不能只取单段而把 fallback 链一起丢掉——保留
+  // square_medium || large || medium 降级链；表达式须与 HomePage NovelFeedPanel 的 prefetchUrl
+  // 逐字一致（仓库契约：预热 key = 展示 src，两处任一改动必须同步）
   const cover = () =>
-    props.novel.image_urls.large ??
-    props.novel.image_urls.medium ??
-    props.novel.image_urls.square_medium;
+    props.novel.image_urls.square_medium ||
+    props.novel.image_urls.large ||
+    props.novel.image_urls.medium;
   // 内容标签：过滤 R-18/R-18G（分级已由图上的 R-18 badge 表达，避免重复）
   const contentTags = () => props.novel.tags.filter((t) => t.name !== "R-18" && t.name !== "R-18G");
 

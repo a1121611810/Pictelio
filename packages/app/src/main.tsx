@@ -22,6 +22,7 @@ import "@fluentui/web-components/switch.js";
 import "@fluentui/web-components/textarea.js";
 import { initializeStartupPreferences } from "@/startup";
 import { initializeAuth } from "@/stores/authStore";
+import { restoreFeedCache } from "@/api/feedQueryPersist";
 import { settings } from "@/settings";
 
 function syncFluentTheme() {
@@ -52,6 +53,9 @@ async function bootstrap() {
 
   // 认证初始化不阻塞渲染，让骨架屏立即可见
   void initializeAuth();
+  // Feed 缓存恢复与认证并行无竞态：query-core hydrate 以 dataUpdatedAt 守卫（仅持久化数据比内存新才落状态），
+  // 即使 auth 链路先写入新 feed 数据也不会被旧缓存覆盖；缓存预热省一次 feed API RTT（spec T4）
+  void restoreFeedCache();
 }
 
 const [_err] = await tryAsync(bootstrap());

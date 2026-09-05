@@ -9,7 +9,7 @@ import { refreshToken, exchangeCodeForToken } from "../api/auth";
 import type { PixivUser } from "../api/types";
 import { restoreRefreshToken, saveRefreshToken, clearRefreshToken } from "../utils/secureStorage";
 import { App } from "@capacitor/app";
-import { queryClient } from "../api/queryClient";
+import { clearPersistedFeedsAndCache } from "../api/feedQueryPersist";
 import { PixivApi } from "@/native/PixivApi";
 import { tryAsync } from "@/utils/tryAsync";
 
@@ -194,6 +194,8 @@ export async function logout() {
   setIsLoggedIn(false);
   // 清除持久化 token + Native 内存（含历史明文残留），一次调用全覆盖
   await clearRefreshToken();
-  // 清空所有 TQ 缓存，防止退出登录后数据泄漏
-  queryClient.clear();
+  // 原子清空（S2）：抑制订阅写回的窗口内删持久化 feed 缓存 + 清空 TQ 内存缓存。不可手写两步：
+  // queryClient.clear() 的 removed 事件会让订阅把空快照写回刚删掉的 key（空 payload 复活）；
+  // 同时防下一账号启动时 restore 到上一账号的 feed 数据（跨账号泄漏）
+  clearPersistedFeedsAndCache();
 }

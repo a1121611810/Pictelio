@@ -5,6 +5,8 @@
 //                       同时记录 back 后 scrollY（验证 Chromium 恢复/兜底是否打回顶部，A5-b）
 //   imgready --groups N : /home 冷启动后清 resource buffer → 3 连 fling → 统计 /pixiv-img/
 //                       resource timing（duration 命中分桶 + p50/p90/p99，B1/B5）
+//   intercept --groups N : X1 拦截链路探针——每组 logcat -c → 冷启动段 dump → 3 连 fling →
+//                       scroll 段 dump，解析 PictelioPerf 日志（hit(mem|disk)/miss/err 分桶）
 //   report --out <dir>  : 汇总 *.jsonl → summary.json
 // 复用 #306 bench-scroll.mjs 的 framestats 解析与 CDP 通道（自包含拷贝，避免 CLI 副作用）。
 import { execSync } from "node:child_process";
@@ -303,6 +305,136 @@ async function imgreadyCmd() {
   console.log(`[imgready] 完成 → ${outFile}`);
 }
 
+// ─── coldstart: am start → 首屏卡片 DOM 就绪毫秒（T4 Query 持久化的主指标） ───
+// t0 = 宿主 am start 前时刻；200ms 粒度轮询 CDP（★/♥ 卡片文本 + 图片卡数），
+// 就绪后顺带记录当时 /pixiv-img/ 资源数与再等 4s 的晚到图片数。
+async function coldstartCmd() {
+  mkdirSync(OUT, { recursive: true });
+  const outFile = resolve(OUT, "webview_coldstart.jsonl");
+  writeFileSync(outFile, "");
+  const GROUPS_CS = Number(opt("groups", "3"));
+  for (let g = 0; g < GROUPS_CS; g++) {
+    adbShell(`am force-stop ${PKG}`);
+    await SLEEP(1500);
+    const t0 = Date.now();
+    adbShell(`am start -n ${PKG}/.MainActivityWebview`);
+    let readyMs = null,
+      imgsAtReady = 0;
+    for (let i = 0; i < 90; i++) {
+      await SLEEP(200);
+      try {
+        const r = await cdpEvaluate(
+          `(() => { const t = document.body.innerText; const imgs = document.querySelectorAll('img[src*="/pixiv-img/"]').length; return { ready: /★|♥/.test(t), imgs }; })()`,
+        );
+        if (r && r.ready) {
+          readyMs = Date.now() - t0;
+          imgsAtReady = r.imgs;
+          break;
+        }
+      } catch {}
+    }
+    if (readyMs === null) {
+      console.log(`  g${g}: 90s 内未就绪，记失败`);
+      appendFileSync(
+        outFile,
+        JSON.stringify({ scenario: "coldstart", kind: "tocards", group: g, readyMs: null }) + "\n",
+      );
+      continue;
+    }
+    await SLEEP(4000);
+    const late = await cdpEvaluate(
+      `document.querySelectorAll('img[src*="/pixiv-img/"]').length`,
+    ).catch(() => 0);
+    appendFileSync(
+      outFile,
+      JSON.stringify({
+        scenario: "coldstart",
+        kind: "tocards",
+        group: g,
+        readyMs,
+        imgsAtReady,
+        imgsLate: Number(late),
+      }) + "\n",
+    );
+    console.log(`  g${g}: 首屏卡片就绪 ${readyMs}ms（当时图片 ${imgsAtReady}，+4s 后 ${late}）`);
+  }
+  console.log(`[coldstart] 完成 → ${outFile}`);
+}
+
+// ─── intercept: X1 拦截链路探针（logcat PictelioPerf）——冷启动段 + 3 连 fling 滚动段 ───
+// 每组：logcat -c → 冷启动（am start → 首屏图片卡就绪）→ cold 段 dump → logcat -c →
+// 3 连 fling → scroll 段 dump。两段各自清缓冲，保证 cold/scroll 记录互不污染。
+// 行格式（PerfLog.java，-v threadtime -s PictelioPerf）：
+//   MM-DD HH:MM:SS.mmm PID TID I PictelioPerf: intercept url8=X phase=hit src=mem|disk durationMs=n bytes=n
+const INTERCEPT_RE =
+  /PictelioPerf: intercept url8=(\S+) phase=(hit|miss|err)(?: src=(\S+))? durationMs=(\d+) bytes=(-?\d+)/;
+
+function parseInterceptDump(dump) {
+  const out = [];
+  for (const line of dump.split("\n")) {
+    const m = INTERCEPT_RE.exec(line);
+    if (!m) continue;
+    const [, url8, phase, src, durMs, bytes] = m;
+    out.push({
+      scenario: "intercept",
+      url8,
+      phase,
+      src, // 仅 hit 有值；miss/err 为 undefined → JSON.stringify 自动丢弃
+      durationMs: Number(durMs),
+      bytes: Number(bytes),
+      ts: /^(\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3})/.exec(line)?.[1],
+    });
+  }
+  return out;
+}
+
+async function interceptCmd() {
+  mkdirSync(OUT, { recursive: true });
+  const { w, h } = screenSize();
+  const outFile = resolve(OUT, "webview_intercept.jsonl");
+  writeFileSync(outFile, "");
+  for (let g = 0; g < GROUPS; g++) {
+    adbShell(`logcat -c`);
+    adbShell(`am force-stop ${PKG}`);
+    await SLEEP(1200);
+    adbShell(`am start -n ${PKG}/.MainActivityWebview`);
+    // 等首屏图片卡渲染（对齐 imgready 的就绪判定；CDP 未起时 catch 为 0 继续轮询）
+    let ready = false;
+    for (let i = 0; i < 20; i++) {
+      await SLEEP(1500);
+      const n = await cdpEvaluate(
+        `document.querySelectorAll('img[src*="/pixiv-img/"]').length`,
+      ).catch(() => 0);
+      if (Number(n) >= 3) {
+        ready = true;
+        break;
+      }
+    }
+    if (!ready) console.log(`  g${g}: 首屏图片卡未渲染，仍记录本组`);
+    // 冷启动段 dump（含启动全程的全部拦截日志）
+    let cold = 0;
+    for (const r of parseInterceptDump(adbShell(`logcat -d -v threadtime -s PictelioPerf`))) {
+      appendFileSync(outFile, JSON.stringify({ ...r, kind: "cold", group: g }) + "\n");
+      cold++;
+    }
+    // 清缓冲 → 3 连 fling → 滚动段 dump
+    adbShell(`logcat -c`);
+    await SLEEP(300);
+    for (let i = 0; i < 3; i++) {
+      await gesture("fling", w, h);
+      await SLEEP(1400);
+    }
+    await SLEEP(1500);
+    let scroll = 0;
+    for (const r of parseInterceptDump(adbShell(`logcat -d -v threadtime -s PictelioPerf`))) {
+      appendFileSync(outFile, JSON.stringify({ ...r, kind: "scroll", group: g }) + "\n");
+      scroll++;
+    }
+    console.log(`  g${g}: cold=${cold} scroll=${scroll}${ready ? "" : "（未就绪）"}`);
+  }
+  console.log(`[intercept] 完成 → ${outFile}`);
+}
+
 // ─── report ───
 async function reportCmd() {
   const rows = [];
@@ -337,20 +469,68 @@ async function reportCmd() {
           50,
         ).toFixed(1),
       };
-    } else {
+    } else if (k.startsWith("coldstart/")) {
+      const valid = rs.filter((r) => r.readyMs !== null && r.readyMs !== undefined);
+      out[k] = {
+        groups: rs.length,
+        readyP50: +percentile(
+          valid.map((r) => r.readyMs).toSorted((a, b) => a - b),
+          50,
+        ).toFixed(0),
+        readyP90: +percentile(
+          valid.map((r) => r.readyMs).toSorted((a, b) => a - b),
+          90,
+        ).toFixed(0),
+        failures: rs.length - valid.length,
+      };
+    } else if (k.startsWith("intercept/")) {
+      // X1 拦截链路聚合（spec §3.6）：总数/hit 率/按 phase 的 p50/p90/p99/
+      // src=mem|disk 计数/miss bytes 均值
+      const hit = rs.filter((r) => r.phase === "hit");
+      const miss = rs.filter((r) => r.phase === "miss");
+      const err = rs.filter((r) => r.phase === "err");
+      const hitDurs = hit.map((r) => r.durationMs ?? 0).toSorted((a, b) => a - b);
+      const missDurs = miss.map((r) => r.durationMs ?? 0).toSorted((a, b) => a - b);
+      out[k] = {
+        groups: rs.length,
+        total: rs.length,
+        hitRate: rs.length ? +(hit.length / rs.length).toFixed(3) : 0,
+        byPhase: {
+          hit: {
+            n: hit.length,
+            p50: +percentile(hitDurs, 50).toFixed(1),
+            p90: +percentile(hitDurs, 90).toFixed(1),
+            p99: +percentile(hitDurs, 99).toFixed(1),
+            srcMemN: hit.filter((r) => r.src === "mem").length,
+            srcDiskN: hit.filter((r) => r.src === "disk").length,
+          },
+          miss: {
+            n: miss.length,
+            p50: +percentile(missDurs, 50).toFixed(1),
+            p90: +percentile(missDurs, 90).toFixed(1),
+            p99: +percentile(missDurs, 99).toFixed(1),
+            bytesMean: miss.length
+              ? Math.round(miss.reduce((s, r) => s + (r.bytes ?? 0), 0) / miss.length)
+              : 0,
+          },
+          err: { n: err.length },
+        },
+      };
+    } else if (k.startsWith("switch/") || k.startsWith("nav/")) {
+      // 缺字段记录（老格式兜底行）缺省按 0 计
       out[k] = {
         gestures: rs.length,
-        jankRateMean: +(rs.reduce((s, r) => s + r.jankRate, 0) / rs.length).toFixed(4),
+        jankRateMean: +(rs.reduce((s, r) => s + (r.jankRate ?? 0), 0) / rs.length).toFixed(4),
         totalP50ofP50: +percentile(
-          rs.map((r) => r.totalP50).toSorted((a, b) => a - b),
+          rs.map((r) => r.totalP50 ?? 0).toSorted((a, b) => a - b),
           50,
         ).toFixed(2),
         totalP99ofP50: +percentile(
-          rs.map((r) => r.totalP99).toSorted((a, b) => a - b),
+          rs.map((r) => r.totalP99 ?? 0).toSorted((a, b) => a - b),
           50,
         ).toFixed(2),
         unknownDelayP90: +percentile(
-          rs.map((r) => r.unknownDelayP90).toSorted((a, b) => a - b),
+          rs.map((r) => r.unknownDelayP90 ?? 0).toSorted((a, b) => a - b),
           90,
         ).toFixed(2),
         restoredCount: rs.filter((r) => r.restored !== undefined).length
@@ -372,12 +552,20 @@ async function main() {
     await imgreadyCmd();
     return;
   }
+  if (cmd === "coldstart") {
+    await coldstartCmd();
+    return;
+  }
+  if (cmd === "intercept") {
+    await interceptCmd();
+    return;
+  }
   if (cmd === "report") {
     await reportCmd();
     return;
   }
   console.error(
-    "用法: bench-webview-nav.mjs switch|imgready|report --serial <s> --groups <n> --out <dir>",
+    "用法: bench-webview-nav.mjs switch|imgready|coldstart|intercept|report --serial <s> --groups <n> --out <dir>",
   );
   process.exit(1);
 }

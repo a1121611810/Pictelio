@@ -1,7 +1,6 @@
 import type { Component } from "solid-js";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import type { PixivNovel } from "@/api/types";
-import { resolveImageUrl } from "@/utils/imageLoader";
 import PixivImage from "../PixivImage";
 import SearchableTag from "../SearchableTag";
 
@@ -48,12 +47,14 @@ const NovelCoverCard: Component<NovelCoverCardProps> = (props) => {
   const compactForm = (
     <div class="flex items-center gap-4 px-[var(--spacingHorizontalL)] py-[var(--spacingVerticalL)]">
       <PixivImage
-        src={resolveImageUrl(n().image_urls.large)}
+        src={n().image_urls.large}
+        thumbSrc={n().image_urls.medium}
+        objectFit="cover"
         alt={n().title}
         width={240}
         height={180}
         loading="eager"
-        class="w-24 h-20 rounded-[var(--borderRadiusMedium)] object-cover flex-shrink-0"
+        class="w-24 h-20 rounded-[var(--borderRadiusMedium)] flex-shrink-0"
       />
       <div class="min-w-0 flex-1">
         <h1
@@ -78,12 +79,14 @@ const NovelCoverCard: Component<NovelCoverCardProps> = (props) => {
     <div>
       <div class="relative w-full aspect-[16/9] rounded-t-[var(--borderRadiusXLarge)] overflow-hidden">
         <PixivImage
-          src={resolveImageUrl(n().image_urls.large)}
+          src={n().image_urls.large}
+          thumbSrc={n().image_urls.medium}
+          objectFit="cover"
           alt={n().title}
           width={1200}
           height={675}
           loading="eager"
-          class="w-full h-full object-cover"
+          class="w-full h-full"
         />
         <div class="absolute inset-0 bg-gradient-to-t from-[var(--colorNeutralBackground1)] to-transparent" />
       </div>
