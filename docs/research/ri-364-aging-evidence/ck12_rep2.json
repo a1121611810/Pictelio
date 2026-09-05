@@ -1,0 +1,30 @@
+{
+ "mp4": "ck12_rep2.mp4",
+ "frame_count": 2,
+ "duration_ms": 1237,
+ "mean_fps": 1.62,
+ "vfr": true,
+ "diff_threshold": 2.0,
+ "frames": [
+  {
+   "n": 1,
+   "pts_ms": 0,
+   "delta_ms": 0,
+   "diff": 0.0
+  },
+  {
+   "n": 2,
+   "pts_ms": 1237,
+   "delta_ms": 1237,
+   "diff": 56.503
+  }
+ ],
+ "change_segments": [
+  {
+   "from_ms": 1237,
+   "to_ms": 1237,
+   "peak_diff": null
+  }
+ ],
+ "stalls_over_200ms": []
+}
