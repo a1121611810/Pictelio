@@ -75,6 +75,17 @@ const RootLayout: Component = (props: { children?: any }) => {
    * 在 onMount 中的启动流程完成后调用。
    */
   onMount(async () => {
+    // FT-2 冷启动反馈治理（#365 P1）：原生 splash 只承担「进程启动 + JS 引导」最前段，
+    // 根布局 loading 态（品牌 LoadingSpinner 扫光动画）首帧绘制后即释放——
+    // 后续等待（settings 水合 / auth 恢复 / feed 首取）全部由应用内可见进展接管，
+    // 消除「静态启动窗口从进程创建一路静止到 WebView 首帧」的零反馈静止段。
+    // 双 rAF：确保 spinner 首帧已实际绘制后再退出 splash，衔接处无空帧。
+    // 下方 auth 流程结束后的 markContentReady 兜底保留（幂等）：后台启动等 rAF
+    // 被节流的场景仍保证 splash 释放。
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => markContentReady());
+    });
+
     // 滚动恢复由 @solidjs/router 内置 scrollRestoration 管理。
     // 「持久化滚动恢复」开关关闭（默认）时：重新打开 app = 全新会话，
     // 清除跨会话滚动持久化并强制回顶，冷启动始终从顶部开始。
