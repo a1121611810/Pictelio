@@ -262,6 +262,31 @@ describe("backTransitionService", () => {
       expect(overlay.querySelector("[id]")).toBeNull();
       expect(overlay.querySelector("canvas")).not.toBeNull();
     });
+
+    it("canvas 内容复制失败（污染画布 drawImage 抛错）：warn 后快照与导航照常", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const drawImage = vi.fn(() => {
+        throw new Error("tainted canvas");
+      });
+      vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+        drawImage,
+      } as unknown as CanvasRenderingContext2D);
+      pageRoot.appendChild(document.createElement("canvas"));
+      setupRect();
+      const navigateBack = vi.fn();
+
+      runBackTransition(navigateBack);
+      pump(1);
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("canvas 内容复制失败"),
+        expect.any(Error),
+      );
+      // 返回必须无条件达成，且快照（空白 canvas 降级）仍然生效
+      expect(navigateBack).toHaveBeenCalledTimes(1);
+      expect(overlays()).toHaveLength(1);
+      expect(overlays()[0].querySelector("canvas")).not.toBeNull();
+    });
   });
 
   describe("goBack（页面内返回统一入口）", () => {

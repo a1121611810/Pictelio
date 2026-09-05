@@ -170,17 +170,22 @@ export function runBackTransition(navigateBack: () => void): void {
       });
     });
 
-    // ⑤ 清理（transitionend 与兜底计时器幂等竞争）
+    // ⑤ 清理（transitionend 与兜底计时器幂等竞争；过滤后代冒泡事件，防提前终止退出动画）
     let done = false;
+    const onEnd = (e: TransitionEvent) => {
+      if (e.target !== el) return;
+      cleanup();
+    };
     const cleanup = () => {
       if (done) return;
       done = true;
+      el.removeEventListener("transitionend", onEnd);
       el.remove();
       clearTimeout(fallbackTimer);
       active = false;
     };
     const fallbackTimer = setTimeout(cleanup, EXIT_FALLBACK_MS);
-    el.addEventListener("transitionend", cleanup, { once: true });
+    el.addEventListener("transitionend", onEnd);
   });
 }
 

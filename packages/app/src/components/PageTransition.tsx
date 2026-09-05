@@ -34,17 +34,21 @@ const PageTransition: Component<{ children: JSXElement }> = (props) => {
         el.style.transform = "translate3d(0, 0, 0)";
         el.style.opacity = "1";
         let done = false;
+        // 过滤后代元素过渡事件冒泡（如 NavBar compact 切换），防提前终止进场动画
+        const onEnd = (e: TransitionEvent) => {
+          if (e.target !== el) return;
+          cleanup();
+        };
         const cleanup = () => {
           if (done) return;
           done = true;
+          el?.removeEventListener("transitionend", onEnd);
           el?.style.setProperty("transition", "");
           el?.style.setProperty("will-change", "");
         };
-        const timer = setTimeout(cleanup, ENTER_FALLBACK_MS);
-        el.addEventListener("transitionend", () => {
-          clearTimeout(timer);
-          cleanup();
-        });
+        // 兜底计时器无需在 cleanup 中清除：done 标志保证幂等
+        setTimeout(cleanup, ENTER_FALLBACK_MS);
+        el.addEventListener("transitionend", onEnd);
       });
     });
   }

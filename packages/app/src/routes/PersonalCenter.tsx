@@ -8,6 +8,7 @@ import SettingsCard from "@/components/settings/SettingsCard";
 import { Avatar } from "@/components/me/Avatar";
 import { MenuRow } from "@/components/me/MenuRow";
 import { goBack } from "@/services/backTransitionService";
+import PageTransition from "@/components/PageTransition";
 
 interface Props {
   userId?: string;
@@ -89,104 +90,106 @@ const PersonalCenter: Component<Props> = (props) => {
   };
 
   return (
-    <Show when={profileState.isRootUserPage()} fallback={props.children}>
-      <div class="min-h-screen bg-[var(--colorNeutralBackground3)]">
-        {/* 顶部栏：返回按钮 + 搜索入口 */}
-        <div class="flex items-center justify-between px-4 pt-3">
-          <fluent-button
-            appearance="subtle"
-            aria-label="返回"
-            on:click={actions.back}
-            class="w-10 h-10 p-0 min-w-10"
-          >
-            ←
-          </fluent-button>
+    <PageTransition>
+      <Show when={profileState.isRootUserPage()} fallback={props.children}>
+        <div class="min-h-screen bg-[var(--colorNeutralBackground3)]">
+          {/* 顶部栏：返回按钮 + 搜索入口 */}
+          <div class="flex items-center justify-between px-4 pt-3">
+            <fluent-button
+              appearance="subtle"
+              aria-label="返回"
+              on:click={actions.back}
+              class="w-10 h-10 p-0 min-w-10"
+            >
+              ←
+            </fluent-button>
 
-          <div
-            class="flex items-center gap-1.5 rounded-full bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke2)] px-4 py-2 cursor-pointer active:scale-[0.97] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-[var(--strokeWidthThick)] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
-            onClick={actions.search}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                actions.search();
-              }
-            }}
-            role="button"
-            tabIndex={0}
-            aria-label="搜索"
-          >
-            <FluentIcon name="search" size={16} />
-            <span class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
-              搜索
-            </span>
-          </div>
-        </div>
-
-        {/* 用户信息卡 */}
-        <div class="px-4 mt-4">
-          <SettingsCard tone="elevated">
-            <div class="flex items-center gap-4">
-              <Avatar
-                src={profileState.avatarUrl()}
-                errored={profileState.avatarErrored()}
-                name={profileState.displayUser()?.name ?? "P"}
-              />
-              <div class="flex-1 min-w-0">
-                <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] truncate leading-snug">
-                  {profileState.displayUser()?.name || "Pictelio"}
-                </p>
-                <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] truncate leading-snug">
-                  @{profileState.displayUser()?.account || ""}
-                </p>
-              </div>
+            <div
+              class="flex items-center gap-1.5 rounded-full bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke2)] px-4 py-2 cursor-pointer active:scale-[0.97] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-[var(--strokeWidthThick)] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
+              onClick={actions.search}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  actions.search();
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              aria-label="搜索"
+            >
+              <FluentIcon name="search" size={16} />
+              <span class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
+                搜索
+              </span>
             </div>
-          </SettingsCard>
-        </div>
+          </div>
 
-        {/* 功能菜单卡 */}
-        <div class="px-4 mt-4">
-          <SettingsCard tone="elevated">
-            <MenuRow
-              icon="image"
-              label={profileState.isCurrentUser() ? "我的作品" : "TA 的作品"}
-              count={profileState.totalWorks()}
-              onClick={actions.works}
-              ariaLabel={profileState.isCurrentUser() ? "我的作品" : "TA 的作品"}
-            />
-            <Show when={profileState.isCurrentUser()}>
-              <MenuRow
-                icon="bookmark"
-                label="我的收藏"
-                onClick={actions.bookmarks}
-                ariaLabel="我的收藏"
-              />
-            </Show>
-            <MenuRow
-              icon="people"
-              label={profileState.isCurrentUser() ? "我的关注" : "TA 的关注"}
-              count={profile()?.total_follow_users ?? 0}
-              onClick={actions.following}
-              ariaLabel={profileState.isCurrentUser() ? "我的关注" : "TA 的关注"}
-            />
-            <MenuRow
-              icon="people"
-              label={profileState.isCurrentUser() ? "我的粉丝" : "TA 的粉丝"}
-              onClick={actions.followers}
-              ariaLabel={profileState.isCurrentUser() ? "我的粉丝" : "TA 的粉丝"}
-            />
-          </SettingsCard>
-        </div>
-
-        {/* 设置卡（仅本人） */}
-        <Show when={profileState.isCurrentUser()}>
-          <div class="px-4 mt-3">
+          {/* 用户信息卡 */}
+          <div class="px-4 mt-4">
             <SettingsCard tone="elevated">
-              <MenuRow icon="settings" label="设置" onClick={actions.settings} ariaLabel="设置" />
+              <div class="flex items-center gap-4">
+                <Avatar
+                  src={profileState.avatarUrl()}
+                  errored={profileState.avatarErrored()}
+                  name={profileState.displayUser()?.name ?? "P"}
+                />
+                <div class="flex-1 min-w-0">
+                  <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] truncate leading-snug">
+                    {profileState.displayUser()?.name || "Pictelio"}
+                  </p>
+                  <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] truncate leading-snug">
+                    @{profileState.displayUser()?.account || ""}
+                  </p>
+                </div>
+              </div>
             </SettingsCard>
           </div>
-        </Show>
-      </div>
-    </Show>
+
+          {/* 功能菜单卡 */}
+          <div class="px-4 mt-4">
+            <SettingsCard tone="elevated">
+              <MenuRow
+                icon="image"
+                label={profileState.isCurrentUser() ? "我的作品" : "TA 的作品"}
+                count={profileState.totalWorks()}
+                onClick={actions.works}
+                ariaLabel={profileState.isCurrentUser() ? "我的作品" : "TA 的作品"}
+              />
+              <Show when={profileState.isCurrentUser()}>
+                <MenuRow
+                  icon="bookmark"
+                  label="我的收藏"
+                  onClick={actions.bookmarks}
+                  ariaLabel="我的收藏"
+                />
+              </Show>
+              <MenuRow
+                icon="people"
+                label={profileState.isCurrentUser() ? "我的关注" : "TA 的关注"}
+                count={profile()?.total_follow_users ?? 0}
+                onClick={actions.following}
+                ariaLabel={profileState.isCurrentUser() ? "我的关注" : "TA 的关注"}
+              />
+              <MenuRow
+                icon="people"
+                label={profileState.isCurrentUser() ? "我的粉丝" : "TA 的粉丝"}
+                onClick={actions.followers}
+                ariaLabel={profileState.isCurrentUser() ? "我的粉丝" : "TA 的粉丝"}
+              />
+            </SettingsCard>
+          </div>
+
+          {/* 设置卡（仅本人） */}
+          <Show when={profileState.isCurrentUser()}>
+            <div class="px-4 mt-3">
+              <SettingsCard tone="elevated">
+                <MenuRow icon="settings" label="设置" onClick={actions.settings} ariaLabel="设置" />
+              </SettingsCard>
+            </div>
+          </Show>
+        </div>
+      </Show>
+    </PageTransition>
   );
 };
 

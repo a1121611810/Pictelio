@@ -112,6 +112,41 @@ describe("PageTransition 页面容器", () => {
     expect(el.style.willChange).toBe("");
   });
 
+  it("后代元素的 transitionend 冒泡不触发清理（target 过滤），自身事件仍可清理", () => {
+    mockSvc.consumePendingBackEnter.mockReturnValue(true);
+
+    const el = mount();
+    pump(2);
+    // 后代元素的状态过渡（如 NavBar compact 切换）冒泡到页面根：必须被忽略
+    el.querySelector(".child")?.dispatchEvent(new Event("transitionend", { bubbles: true }));
+
+    expect(el.style.transition).toBe(BACK_EXIT_TRANSITION);
+
+    el.dispatchEvent(new Event("transitionend"));
+
+    expect(el.style.transition).toBe("");
+  });
+
+  it("进场动画 transitionend 缺失时由兜底计时器清理（模块常量 ENTER_FALLBACK_MS=700ms）", () => {
+    // 默认 fake 配置会连 requestAnimationFrame 一起 fake（绕过本文件的 rAF 泵），
+    // 仅 fake 定时器与 Date（同 backTransitionService.test.ts 的做法）
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    try {
+      mockSvc.consumePendingBackEnter.mockReturnValue(true);
+
+      const el = mount();
+      pump(2);
+      expect(el.style.transition).toBe(BACK_EXIT_TRANSITION);
+
+      vi.advanceTimersByTime(700);
+
+      expect(el.style.transition).toBe("");
+      expect(el.style.willChange).toBe("");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("reduced-motion：即便有返回标记也不播放进场动画", () => {
     mockSvc.prefersReducedMotion.mockReturnValue(true);
     mockSvc.consumePendingBackEnter.mockReturnValue(true);
