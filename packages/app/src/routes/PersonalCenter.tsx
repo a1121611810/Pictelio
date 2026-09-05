@@ -7,6 +7,7 @@ import FluentIcon from "@/components/ui/FluentIcon";
 import SettingsCard from "@/components/settings/SettingsCard";
 import { Avatar } from "@/components/me/Avatar";
 import { MenuRow } from "@/components/me/MenuRow";
+import { goBack } from "@/services/backTransitionService";
 
 interface Props {
   userId?: string;
@@ -83,7 +84,7 @@ const PersonalCenter: Component<Props> = (props) => {
           : `/user/${profileState.targetUserId()}/followers`,
       ),
     settings: () => void navigate("/settings"),
-    back: () => window.history.back(),
+    back: () => goBack(),
     search: () => void navigate("/search"),
   };
 

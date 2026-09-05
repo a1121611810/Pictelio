@@ -1,6 +1,6 @@
 import { type Component } from "solid-js";
-import { useNavigate } from "@solidjs/router";
 import { setPersistScrollRestoration } from "@/stores/uiStore";
+import { goBack } from "@/services/backTransitionService";
 
 // 「持久化滚动恢复」开启二次确认页（变体 B：内容偏上 + 底部固定操作栏，拇指可达）。
 // 进入方式：设置 → 外观 → 持久化滚动恢复（开启方向）。
@@ -34,17 +34,6 @@ const impacts = [
 
 /** 「持久化滚动恢复」开启二次确认页（底部操作栏） */
 const ScrollRestorationConfirm: Component = () => {
-  const navigate = useNavigate();
-
-  function back() {
-    void navigate(-1);
-  }
-
-  function confirmEnable() {
-    setPersistScrollRestoration(true);
-    void navigate(-1); // 开启后自动返回设置页
-  }
-
   return (
     <div class="min-h-screen flex flex-col bg-[var(--colorNeutralBackground2)]">
       {gradientBg()}
@@ -76,10 +65,18 @@ const ScrollRestorationConfirm: Component = () => {
       {/* 底部固定操作栏 */}
       <div class="relative z-10 px-6 pb-[max(env(safe-area-inset-bottom,0px),1rem)] pt-3 bg-[var(--colorNeutralBackground2)] border-t border-[var(--colorNeutralStroke2)]">
         <div class="flex gap-3 w-full">
-          <fluent-button appearance="secondary" style="flex:1" on:click={back}>
+          <fluent-button appearance="secondary" style="flex:1" on:click={() => goBack()}>
             取消
           </fluent-button>
-          <fluent-button appearance="primary" style="flex:1" on:click={confirmEnable}>
+          {/* 确认开启：持久化 + 自动返回设置页 */}
+          <fluent-button
+            appearance="primary"
+            style="flex:1"
+            on:click={() => {
+              setPersistScrollRestoration(true);
+              goBack();
+            }}
+          >
             确认开启
           </fluent-button>
         </div>

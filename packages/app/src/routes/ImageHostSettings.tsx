@@ -10,10 +10,10 @@ import {
   type ImageHost,
 } from "../stores/imageHostStore";
 import { validateHostInput, hasDuplicateBaseUrl, probeHosts } from "../services/imageHostService";
+import { goBack } from "../services/backTransitionService";
 import FluentDialog from "../components/ui/FluentDialog";
 
 const ImageHostSettings: Component = () => {
-  const navigate = useNavigate();
   const [showConfirmDialog, setShowConfirmDialog] = createSignal(false);
 
   const [editingHost, setEditingHost] = createSignal<ImageHost | null>(null);
@@ -138,7 +138,7 @@ const ImageHostSettings: Component = () => {
           appearance="subtle"
           aria-label="返回"
           class="w-8 h-8 p-0 min-w-8"
-          on:click={() => navigate(-1)}
+          on:click={() => goBack()}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path

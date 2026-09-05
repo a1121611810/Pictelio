@@ -7,6 +7,7 @@ import { SENTINEL_MARGIN } from "../primitives/rootMargins";
 import { createSentinel } from "@/primitives/visibility";
 import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior";
 import { scrollToTop } from "../utils/scrollToTop";
+import { goBack } from "../services/backTransitionService";
 import {
   users,
   loading,
@@ -88,7 +89,7 @@ const FollowListPage: Component<Props> = (props) => {
               appearance="subtle"
               aria-label="返回"
               class="w-8 h-8 p-0 min-w-8"
-              on:click={() => navigate(-1)}
+              on:click={() => goBack()}
             >
               ←
             </fluent-button>

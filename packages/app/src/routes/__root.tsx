@@ -14,6 +14,7 @@ import {
 import StartupUpdateDialog from "@/components/StartupUpdateDialog";
 import GateOverlay from "@/components/GateOverlay";
 import { clearOverlays, registerBackGesture } from "@/services/backGestureService";
+import { runBackTransition } from "@/services/backTransitionService";
 import { warmCacheFromDisk } from "@/utils/imageLoader";
 import { loadReportedIds } from "@/stores/reportStore";
 import { loadBlockedIds } from "@/stores/blockStore";
@@ -131,7 +132,9 @@ const RootLayout: Component = (props: { children?: any }) => {
     // Once components push overlays in Phase 5; for now the service closes top overlay if any.
     unregisterBackGesture = await registerBackGesture({
       getPathname: () => location.pathname,
-      navigateBack: () => navigate(-1),
+      // 系统返回走「动画吸收冻结」过渡（#364）：预位移 + 快照覆盖层先行动画，
+      // home remount 冻结期用户看到的是过渡进行中而非冻结硬切
+      navigateBack: () => runBackTransition(() => void navigate(-1)),
       dispatchExitHint: () => window.dispatchEvent(new CustomEvent("exitHint")),
       // OTA 门槛过渡面激活期间返回键 = 退出应用（#253，对齐 lynx /update 语义）
       shouldExitOnBack: () => gateActive(),

@@ -35,6 +35,7 @@ import IllustDetailSkeleton from "../components/skeletons/IllustDetailSkeleton";
 import DetailHeader from "../components/illust/DetailHeader";
 import DetailCard from "../components/illust/DetailCard";
 import BottomActionBar from "../components/illust/BottomActionBar";
+import { goBack } from "../services/backTransitionService";
 
 const IllustDetail: Component = () => {
   const params = useParams();
@@ -561,7 +562,7 @@ const IllustDetail: Component = () => {
             <p class="text-[var(--colorNeutralForeground2)] [font-size:var(--fontSizeBase300)]">
               该作者已被屏蔽
             </p>
-            <fluent-button appearance="secondary" on:click={() => window.history.back()}>
+            <fluent-button appearance="secondary" on:click={() => goBack()}>
               返回
             </fluent-button>
           </div>
@@ -572,7 +573,7 @@ const IllustDetail: Component = () => {
             {/* App bar header — A2 卡片式（ADR-0071） */}
             <DetailHeader
               title={illust()!.title}
-              onBack={() => window.history.back()}
+              onBack={() => goBack()}
               onMore={() => setShowActionMenu((v) => !v)}
             />
 

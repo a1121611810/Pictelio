@@ -3,6 +3,7 @@ import { Capacitor } from "@capacitor/core";
 import PageTransition from "../components/PageTransition";
 import FluentIcon from "../components/ui/FluentIcon";
 import { Ota, type OtaStatus } from "@/native/Ota";
+import { goBack } from "@/services/backTransitionService";
 
 // ── Data model ──
 interface AboutRow {
@@ -152,8 +153,6 @@ const OtaStatusRows: Component = () => {
 
 // ── Component ──
 const About: Component = () => {
-  const navigate = useNavigate();
-
   return (
     <PageTransition>
       <div class="min-h-screen pb-16">
@@ -162,7 +161,7 @@ const About: Component = () => {
           <fluent-button
             appearance="subtle"
             aria-label="返回"
-            on:click={() => navigate(-1)}
+            on:click={() => goBack()}
             class="w-8 h-8 p-0 min-w-8"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">

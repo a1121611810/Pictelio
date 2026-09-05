@@ -9,6 +9,7 @@ import {
   imageCacheDiskSize,
   setImageCacheDiskSize,
 } from "../stores/settingsStore";
+import { goBack } from "../services/backTransitionService";
 
 /**
  * 图片缓存设置页 — A（磁盘缓存）/ B（浏览器缓存）/ C（后台预取）三个独立开关。
@@ -25,7 +26,7 @@ const ImageCacheSettings: Component = () => {
           class="text-[var(--colorNeutralForeground2)] hover:text-[var(--colorNeutralForeground1)]
                  p-1 -ml-1 min-w-[40px] min-h-[40px] flex items-center justify-center
                  focus-visible:outline-2 focus-visible:outline-[var(--colorStrokeFocus2)] focus-visible:outline-offset-2"
-          onClick={() => window.history.back()}
+          onClick={() => goBack()}
           aria-label="返回"
         >
           ←
