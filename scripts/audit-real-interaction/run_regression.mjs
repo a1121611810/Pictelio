@@ -685,7 +685,14 @@ async function sceneBack(ctx) {
         await adbAsync(["shell", "input", "tap", ...XY_FIRST_CARD]);
       }
       const ready = await waitDetailReady(ctx.cdp, 30000);
-      if (!ready?.imgOk) notes.push(`rep${rep}: 详情图 30s 未就绪（网络支配），按当前状态录制`);
+      if (!ready?.imgOk) {
+        // 详情图未就绪（网络支配）时录制会让 rep 间状态不可比（variance 被污染，#368 首轮实测）：
+        // 跳过该 rep，退回首页由下一次 rep 重进
+        notes.push(`rep${rep}: 详情图 30s 未就绪（网络支配），跳过该 rep 保证 rep 间可比`);
+        await adbAsync(["shell", "input", "keyevent", "4"]);
+        await sleep(1500);
+        return null;
+      }
       await sleep(1500); // 落定
       return captureInteraction({
         name: `back_rep${rep}`,
@@ -698,6 +705,11 @@ async function sceneBack(ctx) {
       });
     };
     let r = await attempt("screenrecord");
+    if (r === null) {
+      log(`back rep${rep}: 跳过（详情图未就绪，rep 间可比性保护）`);
+      await sleep(800);
+      continue;
+    }
     if (r.failed) {
       notes.push(`rep${rep}: ${r.reason} → 降级 screencap 重跑`);
       log(`back rep${rep}: ` + notes.at(-1));
@@ -715,16 +727,16 @@ async function sceneBack(ctx) {
   }
   const responses = reps.map((x) => x.response_ms).filter((v) => v !== null);
   const transitions = reps.map((x) => x.transition_frames);
-  const variance = responses.length === 3 ? Math.max(...responses) - Math.min(...responses) : null;
+  const variance = responses.length >= 2 ? Math.max(...responses) - Math.min(...responses) : null;
   await screenshot(dir, "home_after_rep3");
   writeFileSync(
     join(dir, "back.json"),
     JSON.stringify(
       {
         metrics: {
-          response_ms_max: met(responses.length ? Math.max(...responses) : null, "≤400", responses.length === 3 ? judge(Math.max(...responses), Math.max(...responses) <= 400) : null, SRC.backResponse, `3 rep = [${responses.join(", ")}]ms（含注入延迟，体检同口径）`),
-          transition_frames_max: met(transitions.length ? Math.max(...transitions) : null, "≥1", transitions.length === 3 ? judge(Math.max(...transitions), Math.max(...transitions) >= 1) : null, SRC.backTransition, `3 rep = [${transitions.join(", ")}]；VFR 快动画可被压缩为单帧切换，任一 rep 出现过渡帧即证明动画存在，3 rep 全 0 才判 fail`),
-          variance_ms: met(variance, "<100", judge(variance, variance < 100), SRC.backResponse, "3 rep response max-min"),
+          response_ms_max: met(responses.length ? Math.max(...responses) : null, "≤400", responses.length >= 2 ? judge(Math.max(...responses), Math.max(...responses) <= 400) : null, SRC.backResponse, `${responses.length}/3 rep = [${responses.join(", ")}]ms（含注入延迟，体检同口径；未就绪 rep 已跳过保证可比）`),
+          transition_frames_max: met(transitions.length ? Math.max(...transitions) : null, "≥1", transitions.length >= 2 ? judge(Math.max(...transitions), Math.max(...transitions) >= 1) : null, SRC.backTransition, `3 rep = [${transitions.join(", ")}]；VFR 快动画可被压缩为单帧切换，任一 rep 出现过渡帧即证明动画存在，3 rep 全 0 才判 fail`),
+          variance_ms: met(variance, "<100", variance != null ? judge(variance, variance < 100) : null, SRC.backResponse, `${responses.length}/3 rep response max-min；<2 rep 时仅记录`),
         },
         reps,
         notes,
