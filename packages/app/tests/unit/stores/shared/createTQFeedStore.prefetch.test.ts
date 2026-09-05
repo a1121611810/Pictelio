@@ -13,7 +13,7 @@
  * - 预取不改变 UI 状态（不触碰 activated 信号）：lazy store 未 activate 时
  *   loading 必须保持 false（骨架判据 loading() && items 为空）。
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { QueryClient } from "@tanstack/solid-query";
 
 const qc = vi.hoisted(() => ({ client: undefined as QueryClient | undefined }));
@@ -93,6 +93,11 @@ beforeEach(() => {
   fetchLog.value = [];
 });
 
+afterEach(() => {
+  // SWR 用例开启的 fake timers 不向后续用例泄漏（复检 P3 #3）
+  vi.useRealTimers();
+});
+
 describe("createTQFeedStore prefetchAllTabs（#375 空闲预取）", () => {
   it("merge all 模式：对每个 tab 的全部子查询发起 ensure（t1_a/t1_b/t2_main）", async () => {
     const store = makeStore();
@@ -148,9 +153,10 @@ describe("createTQFeedStore prefetchAllTabs（#375 空闲预取）", () => {
       },
     });
     await expect(Promise.all(store.prefetchAllTabs())).rejects.toThrow("network down");
-    // error 态 entry 已被清除（首访从骨架→内容，不闪错误页）
+    // 正向断言 resetQueries 生效：entry 回到干净 pending 且无 error（复检 N1：
+    // 否定式断言在无修复时同样为绿，守不住该修复）
     const state = qc.client!.getQueryState(["pf_fail", "main"]);
-    expect(state?.status === "error" && state.data != null).toBe(false);
+    expect(state == null || (state.status === "pending" && state.error == null)).toBe(true);
     // 二次预取重新发起请求（缓存可干净重建）
     fail = false;
     await Promise.all(store.prefetchAllTabs());
@@ -178,7 +184,6 @@ describe("createTQFeedStore prefetchAllTabs（#375 空闲预取）", () => {
     // 后台重验证发生了：queryFn 被再次调用
     const after = fetchLog.value.filter((v) => v === "t1_a").length;
     expect(after).toBeGreaterThan(before);
-    vi.useRealTimers();
   });
 
   it("自定义 staleTime 透传", async () => {
