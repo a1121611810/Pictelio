@@ -169,6 +169,7 @@ type FeedQueryPersister = Persister & { flush: () => void };
 /**
  * 构造 feed Persister：
  * - persistClient 做 trailing debounce（合并 5s 窗口内的所有缓存事件，只写最新 payload 一次）；
+ * - persistClient 丢弃空快照（queries:[]，GC/logout 的在途尾巴），不覆盖最后有效持久化；
  * - removeClient 取消挂起的 debounce（logout 清缓存后不允许旧 payload 回写）；
  * - restoreClient 解析失败（损坏 JSON/结构非法）时删 key + warn，让核心按「无缓存」处理；
  * - storage 探测失败 → warn 一次，restore/save 双 no-op。
@@ -208,6 +209,13 @@ export function createFeedQueryPersister(storage?: Storage): FeedQueryPersister 
       // S2：logout 清缓存期间订阅仍在线，clear() 的 removed 事件携空快照到达——直接丢弃，
       // 否则 5s 后空快照会把刚删掉的持久化 key 原样写回
       if (suppressWrites) return;
+      // B3（#358）：S2 抑制窗口之外空快照仍会到达——在途 mutation 在 logout 后 settle
+      // （mutation cache 事件同样触发订阅保存）、或全部 query 被 GC（gcTime 30min 后 removed
+      // 事件）时，订阅对空缓存 dehydrate 产出 queries:[]。空快照写回零价值，只会把最后有效
+      // 持久化覆盖为空（冷启动 restore 变成无缓存，全量重拉）。直接 return 且不触碰 pending：
+      // 窗口内更早的有效 payload 照常落盘（保留最后有效持久化）；logout 的删 key 由
+      // clearPersistedFeedsAndCache 显式负责，与本守卫正交。
+      if (client.clientState.queries.length === 0) return;
       if (!ensureBackend()) return;
       // trailing：无条件保留最新 payload，窗口内多次事件合并为一次写入
       pending = client;
