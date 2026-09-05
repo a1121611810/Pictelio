@@ -1,16 +1,28 @@
 // @vitest-environment happy-dom
 /**
- * IllustSingleCard — 插画单列大图卡契约测试（ticket #179，spec: docs/spec-home-c-shell-l5.md）。
+ * IllustSingleCard — 插画单列大图卡契约测试（ticket #179，spec: docs/spec-home-c-shell-l5.md；
+ * T1 渐进封面增补 spec: docs/specs/webview-perf-round2.md §2.2）。
  *
  * props 驱动纯渲染，不依赖 store。mock 真实字段结构的 PixivIllust（见 src/api/types.ts）；
  * 封面 URL 经真实纯函数 resolveImageUrl（@/utils/imageLoader）转换。
+ * T1：封面为双层渐进 img（thumb=medium 底层先行，loadImage 预载 resolve 后主层切 large），
+ * loadImage/checkImageCache 用 vi.mock 隔离网络与 L1 全局态，resolveImageUrl 保留真实实现。
  * 交互契约：click 与 Enter keydown 均触发 onClick。
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import type { PixivIllust } from "@/api/types";
-import { resolveImageUrl } from "@/utils/imageLoader";
+import { loadImage, resolveImageUrl } from "@/utils/imageLoader";
 import IllustSingleCard from "@/components/home/IllustSingleCard";
+
+vi.mock("@/utils/imageLoader", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/utils/imageLoader")>();
+  return {
+    ...actual,
+    checkImageCache: vi.fn<() => string | undefined>(() => undefined),
+    loadImage: vi.fn(() => Promise.resolve({ url: "", cleanup: () => {} })),
+  };
+});
 
 function makeIllust(overrides: Partial<PixivIllust> = {}): PixivIllust {
   return {
@@ -43,6 +55,11 @@ function makeIllust(overrides: Partial<PixivIllust> = {}): PixivIllust {
 describe("IllustSingleCard", () => {
   afterEach(() => cleanup());
 
+  beforeEach(() => {
+    // restoreMocks 重置 mock 实现后，恢复「预载立即成功」的默认态（checkImageCache 保持 miss）
+    vi.mocked(loadImage).mockResolvedValue({ url: "", cleanup: () => {} });
+  });
+
   it("渲染标题、作者名与 ★收藏数", () => {
     render(() => <IllustSingleCard illust={makeIllust()} onClick={vi.fn()} />);
     expect(screen.getByText("测试插画标题")).toBeTruthy();
@@ -50,11 +67,22 @@ describe("IllustSingleCard", () => {
     expect(screen.getByText("★5,678")).toBeTruthy();
   });
 
-  it("封面 img src 为 resolveImageUrl(大图) 的结果", () => {
+  it("封面双层：thumb(medium) 底层先行 aria-hidden，loadImage resolve 后主层切 large", async () => {
     const illust = makeIllust();
-    render(() => <IllustSingleCard illust={illust} onClick={vi.fn()} />);
-    const img = screen.getByAltText(illust.title) as HTMLImageElement;
-    expect(img.getAttribute("src")).toBe(resolveImageUrl(illust.image_urls.large));
+    const { container } = render(() => <IllustSingleCard illust={illust} onClick={vi.fn()} />);
+    // 底层缩略图先行：thumb=medium，aria-hidden + pointer-events-none（不参与语义与交互）
+    const thumb = container.querySelector('img[aria-hidden="true"]') as HTMLImageElement;
+    expect(thumb).toBeTruthy();
+    expect(thumb.getAttribute("src")).toBe(resolveImageUrl(illust.image_urls.medium));
+    expect(thumb.getAttribute("aria-hidden")).toBe("true");
+    expect(thumb.className).toContain("pointer-events-none");
+    expect(thumb.className).toContain("absolute");
+    // thumb 层与主层一致异步解码（Standards 硬约定：异步解码防阻塞主线程帧）
+    expect(thumb.getAttribute("decoding")).toBe("async");
+    // 主层：mock loadImage resolve 后挂载，src=large（主层 relative 叠于底层之上）
+    const main = (await screen.findByAltText(illust.title)) as HTMLImageElement;
+    expect(main.getAttribute("src")).toBe(resolveImageUrl(illust.image_urls.large));
+    expect(main.className).toContain("relative");
   });
 
   it("fireEvent.click 触发 onClick", () => {
@@ -71,18 +99,18 @@ describe("IllustSingleCard", () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
-  it("封面按原图比例（aspect-ratio = width/height，非固定 16:10）", () => {
+  it("封面按原图比例（aspect-ratio = width/height，非固定 16:10）", async () => {
     const illust = makeIllust({ width: 1200, height: 800 });
     render(() => <IllustSingleCard illust={illust} onClick={vi.fn()} />);
-    const img = screen.getByAltText(illust.title) as HTMLImageElement;
+    const img = (await screen.findByAltText(illust.title)) as HTMLImageElement;
     const box = img.parentElement as HTMLElement;
     expect(box.style.aspectRatio).toBe("1200 / 800");
   });
 
-  it("宽高异常时回退 16:10", () => {
+  it("宽高异常时回退 16:10", async () => {
     const illust = makeIllust({ width: 0, height: 0 });
     render(() => <IllustSingleCard illust={illust} onClick={vi.fn()} />);
-    const img = screen.getByAltText(illust.title) as HTMLImageElement;
+    const img = (await screen.findByAltText(illust.title)) as HTMLImageElement;
     const box = img.parentElement as HTMLElement;
     expect(box.style.aspectRatio).toBe("16 / 10");
   });

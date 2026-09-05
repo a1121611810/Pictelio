@@ -1,4 +1,5 @@
 import { Capacitor } from "@capacitor/core";
+import type { PixivIllust } from "../api/types";
 import { ImageCache, type ImageCachePlugin } from "../native/ImageCache";
 import { PixivApi } from "../native/PixivApi";
 import { isImageHostEnabled } from "../stores/imageHostStore";
@@ -288,6 +289,33 @@ async function loadImageInner(originalUrl: string): Promise<LoadedImage> {
     url: resolveImageUrl(originalUrl),
     cleanup: () => {},
   };
+}
+
+// ─── 列表展示 URL 挑选（纯函数） ───
+
+/**
+ * 按列表展示档位从 illust 中挑选展示 URL（共享纯函数）。
+ *
+ * 供 ImageCard / GridCard（展示）与 VirtualFeed（滚动预取）共用——三处同一函数保证
+ * 预取 key 恒等于展示 src，修复 round-1 遗留的「quality=large/original 时预热失效」
+ * （旧实现预取写死 medium，展示却按 listQuality 取 large/original，key 不匹配）。
+ * quality 由调用方注入（settingsStore.listQuality() 是响应式 signal，保持本函数纯）。
+ *
+ * 语义与旧 ImageCard/GridCard 私有 resolveUrl 逐字等价：
+ * medium → medium；large → large；original → meta_single_page.original_image_url ?? large
+ * （ugoira 无 original 字段，自然回退 large）。
+ */
+export function pickListImageUrl(
+  illust: Pick<PixivIllust, "image_urls" | "meta_single_page">,
+  quality: "medium" | "large" | "original",
+): string {
+  if (quality === "medium") {
+    return illust.image_urls.medium;
+  }
+  if (quality === "large") {
+    return illust.image_urls.large;
+  }
+  return illust.meta_single_page?.original_image_url ?? illust.image_urls.large;
 }
 
 // ─── 预取挑选（纯函数） ───

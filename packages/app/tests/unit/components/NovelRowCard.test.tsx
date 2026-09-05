@@ -47,13 +47,31 @@ describe("NovelRowCard", () => {
     expect(screen.getByText("★1,234 · 3.2k 字")).toBeTruthy();
   });
 
-  it("封面 img src 为 resolveImageUrl(大图) 的结果", () => {
+  it("封面 img src 为 resolveImageUrl(square_medium) 的结果（T1 降档，行为变化点）", () => {
     const novel = makeNovel();
     render(() => <NovelRowCard novel={novel} onClick={vi.fn()} />);
     const img = screen.getByAltText(novel.title) as HTMLImageElement;
-    expect(img.getAttribute("src")).toBe(resolveImageUrl(novel.image_urls.large));
-    // 大图优先于 medium / square_medium 回退
+    // 行为变化点（spec: docs/specs/webview-perf-round2.md §2.3）：56px 方框降档
+    // square_medium（方框对方裁切，DPR3.5 ≈196px < 250px），不再使用 large/medium
+    expect(img.getAttribute("src")).toBe(resolveImageUrl(novel.image_urls.square_medium));
+    expect(img.getAttribute("src")).not.toBe(resolveImageUrl(novel.image_urls.large));
     expect(img.getAttribute("src")).not.toBe(resolveImageUrl(novel.image_urls.medium));
+  });
+
+  it("square_medium 为空串时回退 large（S4：降档不丢 fallback 链）", () => {
+    // 缺省态 fixture：真实 API 中 square_medium 可能缺省/空串，用类型断言构造该形状
+    const novel = makeNovel({
+      image_urls: {
+        square_medium: "",
+        medium:
+          "https://i.pximg.net/c/540x540_70/img-master/img/2026/06/30/13/50/51/101_p0_master1200.jpg",
+        large:
+          "https://i.pximg.net/c/600x1200_90/img-master/img/2026/06/30/13/50/51/101_p0_master1200.jpg",
+      } as PixivNovel["image_urls"],
+    });
+    render(() => <NovelRowCard novel={novel} onClick={vi.fn()} />);
+    const img = screen.getByAltText(novel.title) as HTMLImageElement;
+    expect(img.getAttribute("src")).toBe(resolveImageUrl(novel.image_urls.large));
   });
 
   it("有 series 时显示「系列」徽标，无 series 时不显示", () => {

@@ -9,9 +9,9 @@ import InlineRetryBar from "./ui/InlineRetryBar";
 import type { PixivIllust, ApiError } from "../api/types";
 import type { LayoutMode } from "../primitives/types";
 import { createFeedVirtualizer } from "../primitives/createFeedVirtualizer";
-import { loadImage, checkImageCache } from "../utils/imageLoader";
+import { loadImage, checkImageCache, pickListImageUrl } from "../utils/imageLoader";
 import { isImageHostEnabled } from "../stores/imageHostStore";
-import { imageCachePrefetch } from "../stores/settingsStore";
+import { imageCachePrefetch, listQuality } from "../stores/settingsStore";
 
 interface Props {
   illusts: PixivIllust[];
@@ -124,7 +124,9 @@ const VirtualFeed: Component<Props> = (props) => {
     for (let i = lastIdx + 1; i < preloadEnd; i++) {
       const ill = illustsList[i];
       if (!ill) break;
-      const url = ill.image_urls.medium || ill.image_urls.large;
+      // 预取 key 必须与卡片展示 URL 恒等（ImageCard/GridCard 同用 pickListImageUrl）；
+      // 旧实现写死 medium||large，quality=large/original 时预热 key 与展示 src 不匹配而失效
+      const url = pickListImageUrl(ill, listQuality());
       if (url && !checkImageCache(url)) {
         void tryAsync(loadImage(url));
       }

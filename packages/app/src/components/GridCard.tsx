@@ -5,19 +5,8 @@ import PixivImage from "./PixivImage";
 import HeartBurstEffect from "./HeartBurstEffect";
 import SkeletonShimmer from "./SkeletonShimmer";
 import IllustTypeBadge from "./IllustTypeBadge";
-import { resolveImageUrl } from "../utils/imageLoader";
+import { pickListImageUrl, resolveImageUrl } from "../utils/imageLoader";
 import { useCardInteractions } from "../primitives/useCardInteractions";
-
-function resolveUrl(illust: PixivIllust): string {
-  const q = listQuality();
-  if (q === "medium") {
-    return illust.image_urls.medium;
-  }
-  if (q === "large") {
-    return illust.image_urls.large;
-  }
-  return illust.meta_single_page?.original_image_url ?? illust.image_urls.large;
-}
 
 interface Props {
   illust: PixivIllust;
@@ -26,7 +15,8 @@ interface Props {
 }
 
 const GridCard: Component<Props> = (props) => {
-  const img = () => resolveUrl(props.illust);
+  // 展示 URL 与 VirtualFeed 预取共用同一 pickListImageUrl，保证预取 key = 展示 src
+  const img = () => pickListImageUrl(props.illust, listQuality());
   const {
     bookmarked,
     isFollowed,

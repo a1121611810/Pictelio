@@ -14,7 +14,7 @@
 import type { Component } from "solid-js";
 import { Show } from "solid-js";
 import type { PixivIllust } from "@/api/types";
-import { resolveImageUrl } from "@/utils/imageLoader";
+import { createProgressiveImage } from "@/primitives/createProgressiveImage";
 import AdaptiveTags from "@/components/home/AdaptiveTags";
 import IllustTypeBadge from "@/components/IllustTypeBadge";
 
@@ -26,8 +26,12 @@ interface IllustSingleCardProps {
 }
 
 const IllustSingleCard: Component<IllustSingleCardProps> = (props) => {
-  // 封面 URL：优先大图，回退中图
-  const cover = () => props.illust.image_urls.large ?? props.illust.image_urls.medium;
+  // 渐进封面（spec webview-perf-round2 §2.2）：full 优先大图回退中图，thumb 恒为中图
+  // （medium/large 同源等比互切零纵横比跳变；预载经 loadImage 与 FeedList 预取合流）
+  const cover = createProgressiveImage({
+    fullUrl: () => props.illust.image_urls.large ?? props.illust.image_urls.medium,
+    thumbUrl: () => props.illust.image_urls.medium,
+  });
   // 内容标签：过滤 R-18/R-18G（分级已由图上的 R-18 badge 表达，避免重复）
   const contentTags = () =>
     props.illust.tags.filter((t) => t.name !== "R-18" && t.name !== "R-18G");
@@ -49,14 +53,31 @@ const IllustSingleCard: Component<IllustSingleCardProps> = (props) => {
         if (e.key === "Enter") props.onClick();
       }}
     >
-      {/* 封面：按原图比例（aspect-ratio = width/height，超高长图自然拉高） */}
+      {/* 封面：按原图比例（aspect-ratio = width/height，超高长图自然拉高）+ 双层渐进 img */}
       <div class="relative bg-[var(--colorNeutralBackground2)]" style={{ "aspect-ratio": ratio() }}>
-        <img
-          src={resolveImageUrl(cover())}
-          alt={props.illust.title}
-          class="h-full w-full object-cover"
-          loading="lazy"
-        />
+        {/* 底层：thumb=medium 占位（aria-hidden + pointer-events-none，不参与语义与交互；
+            full 到位后仍保留在主层下方兜底）；thumb 失败时由原语卸载本层。
+            decoding="async"（Standards，与 PixivImage 双层一致）：异步解码，防 thumb 解码阻塞主线程帧 */}
+        <Show when={cover.thumbSrc()}>
+          <img
+            src={cover.thumbSrc()}
+            alt=""
+            aria-hidden="true"
+            class="pointer-events-none absolute inset-0 h-full w-full object-cover select-none"
+            decoding="async"
+            onError={cover.onThumbError}
+          />
+        </Show>
+        {/* 主层：full（large??medium）到位前不挂载（防白帧），挂载后覆盖 thumb */}
+        <Show when={cover.displaySrc()}>
+          <img
+            src={cover.displaySrc()}
+            alt={props.illust.title}
+            class="relative h-full w-full object-cover"
+            loading="lazy"
+            onError={cover.onDisplayError}
+          />
+        </Show>
         {/* 图上角标（A 定稿）：左上 R-18/R-18G/AI + 右上动图 */}
         <div class="absolute left-[var(--spacingHorizontalXS)] top-[var(--spacingVerticalXS)] z-10 flex items-center gap-[var(--spacingHorizontalXXS)] pointer-events-none select-none">
           {props.illust.x_restrict === 1 && (
