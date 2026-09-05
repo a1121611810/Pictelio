@@ -550,6 +550,21 @@ async function pollColdstartCdp(cdpRef, maxMs) {
 async function sceneColdstart(ctx) {
   const dir = ctx.dir("coldstart");
   const notes = [];
+  // 预检登录态（#368）：force-stop 重启后可能被 401 重定向到 /login（refresh token
+  // 轮换与 force-stop 竞态，四轮报告已知问题）——先重启核对，是登录页则 adb 键入重登，
+  // 否则本场景会测成「冷启动到登录页」（首轮实测 s15 帧）
+  adbSync(["shell", "am", "force-stop", PKG]);
+  await adbAsync(["shell", "am", "start", "-n", `${PKG}/${MAIN_ACTIVITY}`]);
+  await sleep(4500);
+  try {
+    ctx.cdp.cdp = null;
+    ctx.cdp.cdp = await Cdp.connect();
+    if ((await ctx.cdp.cdp.eval("location.pathname")) === "/login") {
+      await loginViaAdbInput(ctx.cdp);
+    }
+  } catch {
+    /* CDP 不通则交给录制流程自行处理 */
+  }
   const attempt = async (mode) => {
     adbSync(["shell", "am", "force-stop", PKG]);
     await adbAsync(["shell", "input", "keyevent", "3"]); // HOME 回桌面
@@ -1037,11 +1052,37 @@ function compareMarkdown(base, cur) {
 }
 
 // ── 主流程 ────────────────────────────────────────────────────────────────────
+/** adb input text 真实键入登录（#368）：CDP 设值不触发 SolidJS 的 input 信号
+ *  （fluent-textarea 包装），登录按钮恒 disabled；真实按键事件路径实测可用。
+ *  流程：tap 聚焦 textarea(360,960) → input text token → ESC 收起键盘 → tap 登录(360,1093)。 */
+async function loginViaAdbInput(cdpRef) {
+  log("登录：adb input text 真实键入 refresh_token…");
+  const token = readFileSync(resolve(SCRIPT_DIR, "../../packages/app/.env"), "utf8")
+    .match(/^PIXIV_REFRESH_TOKEN=(.+)$/m)?.[1]?.trim();
+  if (!token) throw new Error(".env 缺 PIXIV_REFRESH_TOKEN，无法自动重登");
+  await adbAsync(["shell", "input", "tap", "360", "960"]);
+  await sleep(800);
+  await adbAsync(["shell", "input", "text", token], 60000);
+  await sleep(600);
+  await adbAsync(["shell", "input", "keyevent", "111"]); // ESC 收起键盘
+  await sleep(600);
+  await adbAsync(["shell", "input", "tap", "360", "1093"]);
+  await sleep(5000);
+  // 核对：仍在 /login 则再点一次登录按钮（偶发首次点击被输入法吞掉）
+  try {
+    if ((await cdpRef.cdp.eval("location.pathname")) === "/login") {
+      await adbAsync(["shell", "input", "tap", "360", "1093"]);
+      await sleep(5000);
+    }
+  } catch { /* CDP 断开时由调用方重连后再验 */ }
+}
+
 async function main() {
   const meta = await envCheck();
   log(`环境自检通过：${meta.model} Android ${meta.android}，APK ${meta.apk_version}，WebView ${meta.webview_version}，launcher=${meta.launcher}`);
 
-  // 登录态检查（未登录尝试 cdp_login.mjs）
+  // 登录态检查（未登录先试 cdp_login.mjs，失败则 adb input text 真实键入——
+  // pm clear 后 CDP 设值不触发 Solid 信号，按钮恒 disabled，#368 实测）
   const cdpRef = { cdp: null };
   try {
     cdpRef.cdp = await Cdp.connect();
@@ -1057,13 +1098,14 @@ async function main() {
   if (path === "/login") {
     log("未登录 → 运行 cdp_login.mjs 注入 refresh_token…");
     const r = spawnSync(process.execPath, [join(SCRIPT_DIR, "cdp_login.mjs"), SERIAL], { stdio: "inherit", timeout: 120000 });
-    if (r.status !== 0) {
-      console.error("cdp_login.mjs 登录失败（pm clear 后 CDP 设值不触发 Solid 信号时，见 README 已知坑：adb input text 方案）");
-      process.exit(2);
-    }
     cdpRef.cdp.close();
     cdpRef.cdp = await Cdp.connect();
     path = await cdpRef.cdp.eval("location.pathname");
+    if (path === "/login") {
+      log("cdp_login 未生效 → adb input text 真实键入重试…");
+      await loginViaAdbInput(cdpRef);
+      path = await cdpRef.cdp.eval("location.pathname");
+    }
     if (path === "/login") {
       console.error("登录后仍在 /login，中止。");
       process.exit(2);
