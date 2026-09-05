@@ -270,12 +270,15 @@ public class PixivImageLoaderTest {
 
     @Test
     public void writeFile_failureInReadOnlyDir_targetNotCorruptedAndNoTmpLeftover() throws Exception {
+        // 可移植性守卫（review #358 P3）：root 下 setWritable(false) 不生效、
+        // Windows 目录只读属性不阻止建文件——前置条件不成立则跳过，不产生假失败
+        org.junit.Assume.assumeFalse("root 账户绕过目录写权限", isRunningAsRoot());
         String url = server.url("/pixiv-img/readonly-dir.jpg").toString();
         server.enqueue(new MockResponse().setResponseCode(200).setBody(new okio.Buffer().write(new byte[512])));
         File dir = loader.getCacheDir();
         File target = new File(dir, PixivImageLoader.keyToFilename(url));
         assertTrue(target.createNewFile()); // 预置空目标：断言失败后仍为空、未被半截内容污染
-        dir.setWritable(false);
+        org.junit.Assume.assumeTrue("目录写权限未生效，前置条件不成立", dir.setWritable(false));
         try {
             // 临时文件创建失败（只读目录）→ IOException 上抛，目标不被截断写入
             assertThrows(IOException.class, () -> loader.loadFile(url));
@@ -291,6 +294,8 @@ public class PixivImageLoaderTest {
 
     @Test
     public void writeFile_atomicReplace_succeedsEvenWhenExistingTargetReadOnly() throws Exception {
+        // 可移植性守卫（review #358 P3）：Windows 的 rename 语义不同，POSIX 专属用例
+        org.junit.Assume.assumeFalse(System.getProperty("os.name", "").startsWith("Windows"));
         byte[] body = new byte[256];
         java.util.Arrays.fill(body, (byte) 0x5A);
         String url = server.url("/pixiv-img/readonly-target.jpg").toString();
@@ -305,5 +310,12 @@ public class PixivImageLoaderTest {
         File file = loader.loadFile(url);
         assertEquals(target.getAbsolutePath(), file.getAbsolutePath());
         assertArrayEquals(body, Files.readAllBytes(file.toPath()));
+    }
+
+    /** root（uid=0）绕过文件权限检查，只读目录用例的前置条件不成立 */
+    private static boolean isRunningAsRoot() {
+        return "0".equals(System.getProperty("user.name"))
+                || "root".equals(System.getenv("USER"))
+                || "root".equals(System.getProperty("user.name"));
     }
 }

@@ -172,8 +172,9 @@ public final class PixivImageLoader {
      * 直接 FileOutputStream(目标) 时，prefetchImage 与拦截链路并发写同一文件可能
      * 交错产生截断文件，而 cachedFile 仅查 exists+length>0，截断文件会被当命中
      * 持久返回坏图。失败路径清理 tmp 并上抛，目标保持原内容不被半截写入污染。
+     * 包可见：prefetchImage（webview 源集）与拦截链路共享同一写盘纪律。
      */
-    private static void writeFile(File file, byte[] bytes) throws IOException {
+    static void writeFile(File file, byte[] bytes) throws IOException {
         File tmp = new File(file.getAbsolutePath() + ".tmp");
         try {
             try (FileOutputStream fos = new FileOutputStream(tmp)) {
@@ -190,7 +191,9 @@ public final class PixivImageLoader {
                 }
             }
         } catch (IOException e) {
-            tmp.delete();
+            if (!tmp.delete()) {
+                Log.w(TAG, "tmp 清理失败（留待容量淘汰/清空缓存回收）: " + tmp);
+            }
             throw e;
         }
     }

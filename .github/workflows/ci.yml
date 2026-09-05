@@ -60,3 +60,35 @@ jobs:
 
       - name: Run unit tests
         run: pnpm test:all
+
+  android-unit-test:
+    name: Android unit tests (Robolectric)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Android 单测（B5 写盘原子性等 Java 防线）此前只在本地手跑，
+      # CI 不跑 = 原子写回归可全绿通过（review #358 P2）。ubuntu runner
+      # 预装 Android SDK；Robolectric 的 android-all 依赖经 maven 拉取。
+      - name: Gradle unit tests (testFullDebugUnitTest)
+        working-directory: packages/app/android
+        run: GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew testFullDebugUnitTest --no-daemon

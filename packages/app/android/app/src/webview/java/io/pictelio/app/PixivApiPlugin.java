@@ -12,9 +12,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import android.util.Base64;
 import java.io.InputStream;
 
 import okhttp3.Request;
@@ -142,9 +140,9 @@ public class PixivApiPlugin extends Plugin {
                 cacheDir.mkdirs();
             }
 
-            // 以 URL 的 Base64 作为文件名
-            String filename = Base64.encodeToString(url.getBytes(), Base64.URL_SAFE | Base64.NO_PADDING | Base64.NO_WRAP);
-            File cacheFile = new File(cacheDir, filename);
+            // 以 URL 的 Base64 作为文件名——与拦截链路共享 PixivImageLoader 的 key 方案
+            //（原内联实现为三处重复之一，B5 收敛后写盘纪律也统一）
+            File cacheFile = new File(cacheDir, PixivImageLoader.keyToFilename(url));
 
             if (cacheFile.exists() && cacheFile.length() > 0) {
                 // 已缓存，直接返回
@@ -169,10 +167,9 @@ public class PixivApiPlugin extends Plugin {
                 }
 
                 byte[] bytes = response.body() != null ? response.body().bytes() : new byte[0];
-                try (FileOutputStream fos = new FileOutputStream(cacheFile)) {
-                    fos.write(bytes);
-                    fos.flush();
-                }
+                // B5/P1：预取与拦截链路并发写同文件是诊断 F3 的截断根源，必须走同一原子写
+                //（tmp+rename），不能直写 FileOutputStream
+                PixivImageLoader.writeFile(cacheFile, bytes);
 
                 // X1：详情页预取热路径填充点——预取字节已在手，≤512KB 的缩略图/卡片图直接进
                 // 内存 LRU，详情页渲染触发 /pixiv-img/ 拦截时即内存命中（省一次磁盘回读）。
