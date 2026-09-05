@@ -1,0 +1,9 @@
+{
+  "webview/illust-waterfall": {
+    "gestures": 30,
+    "jankRateMean": 0.0353,
+    "totalP50ofP50": 17,
+    "totalP90ofP50": 17,
+    "unknownDelayP90": 0
+  }
+}
