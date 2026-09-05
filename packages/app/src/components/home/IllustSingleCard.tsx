@@ -17,6 +17,7 @@ import type { PixivIllust } from "@/api/types";
 import { createProgressiveImage } from "@/primitives/createProgressiveImage";
 import AdaptiveTags from "@/components/home/AdaptiveTags";
 import IllustTypeBadge from "@/components/IllustTypeBadge";
+import SkeletonShimmer from "@/components/SkeletonShimmer";
 
 interface IllustSingleCardProps {
   /** 插画数据 */
@@ -58,8 +59,11 @@ const IllustSingleCard: Component<IllustSingleCardProps> = (props) => {
         {/* 底层：thumb=medium 占位（aria-hidden + pointer-events-none，不参与语义与交互；
             full 绘制完成（主 img load）后原语收窄 thumbSrc 为空串，本层从 DOM 卸载，
             回收双层常驻的合成/解码成本（B1，issue #358）；full 失败时保留兜底，thumb 失败时由原语卸载。
-            decoding="async"（Standards，与 PixivImage 双层一致）：异步解码，防 thumb 解码阻塞主线程帧 */}
+            decoding="async"（Standards，与 PixivImage 双层一致）：异步解码，防 thumb 解码阻塞主线程帧
+            FT-2（#365 P4）：thumb 绘制前由 SkeletonShimmer 渐进占位——封面区不再是纯色块，
+            与 thumb 同生命周期（full 绘制完成后随 thumb 层一并卸载，无常驻动画成本） */}
         <Show when={cover.thumbSrc()}>
+          <SkeletonShimmer class="absolute inset-0" />
           <img
             src={cover.thumbSrc()}
             alt=""
