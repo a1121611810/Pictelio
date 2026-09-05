@@ -19,6 +19,7 @@ import { markContentReady } from "@/native/splashBridge";
 import SideNavShell, { type HomeTab } from "@/components/home/SideNavShell";
 import IllustSingleCard from "@/components/home/IllustSingleCard";
 import NovelRowCard from "@/components/home/NovelRowCard";
+import SkeletonShimmer from "@/components/SkeletonShimmer";
 import { contentType } from "@/stores/uiStore";
 // ── 插画数据源（推荐/关注/收藏）──
 import {
@@ -229,30 +230,32 @@ function useFeedActivation(src: () => FeedSource<PixivIllust> | FeedSource<Pixiv
   });
 }
 
-/** 插画列表加载骨架（行卡形态，参考原型 IllustLoadingA2，animate-pulse）。 */
+/** 插画列表加载骨架（行卡形态，参考原型 IllustLoadingA2）。
+ *  FT-2（#365 P4）：animate-pulse 的透明度脉动在录屏/帧差中几乎不可辨（冷启动
+ *  chrome→首图窗口被感知为空白），改用 fluent-shimmer 移动渐变（Fluent 令牌）。 */
 const IllustRowSkeleton: Component = () => (
   <div class="flex flex-col gap-[var(--spacingVerticalM)] px-4 pt-3">
     {[0, 1, 2].map(() => (
-      <div class="flex animate-pulse items-center gap-[var(--spacingHorizontalM)] rounded-[var(--borderRadiusLarge)] border border-[var(--colorNeutralStroke1)] bg-[var(--colorNeutralBackground1)] p-[var(--spacingHorizontalM)]">
-        <div class="h-10 w-10 flex-shrink-0 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)]" />
+      <div class="flex items-center gap-[var(--spacingHorizontalM)] rounded-[var(--borderRadiusLarge)] border border-[var(--colorNeutralStroke1)] bg-[var(--colorNeutralBackground1)] p-[var(--spacingHorizontalM)]">
+        <SkeletonShimmer class="h-10 w-10 flex-shrink-0 rounded-[var(--borderRadiusMedium)]" />
         <div class="flex flex-1 flex-col gap-1.5">
-          <div class="h-3 w-3/4 rounded bg-[var(--colorNeutralBackground2)]" />
-          <div class="h-2.5 w-1/2 rounded bg-[var(--colorNeutralBackground2)]" />
+          <SkeletonShimmer class="h-3 w-3/4 rounded" />
+          <SkeletonShimmer class="h-2.5 w-1/2 rounded" />
         </div>
       </div>
     ))}
   </div>
 );
 
-/** 小说列表加载骨架（行卡形态，参考原型 NovelLoadingA2，animate-pulse）。 */
+/** 小说列表加载骨架（行卡形态，参考原型 NovelLoadingA2；shimmer 化理由同 IllustRowSkeleton）。 */
 const NovelRowSkeleton: Component = () => (
   <div class="flex flex-col gap-[var(--spacingVerticalM)] px-4 pt-3">
     {[0, 1, 2].map(() => (
-      <div class="flex animate-pulse items-center gap-[var(--spacingHorizontalM)] rounded-[var(--borderRadiusLarge)] border border-[var(--colorNeutralStroke1)] bg-[var(--colorNeutralBackground1)] p-[var(--spacingHorizontalM)]">
-        <div class="h-14 w-14 flex-shrink-0 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)]" />
+      <div class="flex items-center gap-[var(--spacingHorizontalM)] rounded-[var(--borderRadiusLarge)] border border-[var(--colorNeutralStroke1)] bg-[var(--colorNeutralBackground1)] p-[var(--spacingHorizontalM)]">
+        <SkeletonShimmer class="h-14 w-14 flex-shrink-0 rounded-[var(--borderRadiusMedium)]" />
         <div class="flex flex-1 flex-col gap-1.5">
-          <div class="h-3 w-3/4 rounded bg-[var(--colorNeutralBackground2)]" />
-          <div class="h-2.5 w-1/2 rounded bg-[var(--colorNeutralBackground2)]" />
+          <SkeletonShimmer class="h-3 w-3/4 rounded" />
+          <SkeletonShimmer class="h-2.5 w-1/2 rounded" />
         </div>
       </div>
     ))}
