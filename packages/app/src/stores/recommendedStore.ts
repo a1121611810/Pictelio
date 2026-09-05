@@ -89,3 +89,6 @@ export const refresh = store.refresh;
 export function fetchMore(_signal?: AbortSignal): Promise<unknown> | undefined {
   return store.fetchMore(_signal);
 }
+
+/** 空闲预取（#375）：填空式预载所有 tab 的活跃子查询，语义见工厂 prefetchAllTabs 注释 */
+export const prefetchAllTabs = store.prefetchAllTabs;

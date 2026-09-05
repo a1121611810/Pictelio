@@ -144,6 +144,15 @@ export type TQFeedStoreResult<TItem> = {
 
   /** 是否已激活 */
   isActivated: Accessor<boolean>;
+
+  /**
+   * 空闲预取（#375）：对所有 tab 的活跃子查询做「填空式」预载，返回每个子查询的
+   * ensure promise。默认 staleTime=Infinity——已有数据（含 feedQueryPersist 恢复的
+   * 陈旧数据）一律跳过、不触发网络，只填补空缓存以消除「首访 tab 骨架等网络」；
+   * 访问时的 SWR 刷新仍由 activate 路径的 ensureLoaded（30s staleTime）负责。
+   * 不触碰 activated 信号（不改变 lazy store 的 UI 状态）；失败由调用方兜底。
+   */
+  prefetchAllTabs: (staleTime?: number) => Promise<unknown>[];
 };
 
 // ─── 通用算法 ───
@@ -279,16 +288,21 @@ export function createTQFeedStore<
       return config.tabs[config.currentTab()];
     }
 
-    /** 获取当前 tab 下所有活跃查询的 map key 列表 */
-    function activeKeys(): string[] {
-      const tabDef = getCurrentTabDef();
+    /** 获取指定 tab 下所有活跃查询的 map key 列表（activeKeys 的 tab 参数化版本，供预取复用） */
+    function keysForTab(tabKey: TTab): string[] {
+      const tabDef = config.tabs[tabKey];
       if (!tabDef) return [];
 
       const sub = tabDef.getSubTab?.();
       if (!sub || sub === "all") {
-        return tabDef.allMode.subTabs.map((s) => `${config.currentTab()}:${s}`);
+        return tabDef.allMode.subTabs.map((s) => `${tabKey}:${s}`);
       }
-      return [`${config.currentTab()}:${sub}`];
+      return [`${tabKey}:${sub}`];
+    }
+
+    /** 获取当前 tab 下所有活跃查询的 map key 列表 */
+    function activeKeys(): string[] {
+      return keysForTab(config.currentTab());
     }
 
     /** 获取活跃查询对象列表 */
@@ -419,6 +433,25 @@ export function createTQFeedStore<
       );
     };
 
+    /** 空闲预取（语义见 TQFeedStoreResult.prefetchAllTabs 注释） */
+    const prefetchAllTabs = (staleTime: number = Number.POSITIVE_INFINITY): Promise<unknown>[] => {
+      const deps = config.getDeps();
+      const tasks: Promise<unknown>[] = [];
+      for (const tabKey of Object.keys(config.tabs) as TTab[]) {
+        for (const key of keysForTab(tabKey)) {
+          const def = queryDefMap.get(key);
+          if (!def) continue;
+          tasks.push(
+            queryClient.ensureInfiniteQueryData({
+              queryKey: def.queryKey(deps, undefined),
+              staleTime,
+            } as any),
+          );
+        }
+      }
+      return tasks;
+    };
+
     const refresh = async (_signal?: AbortSignal): Promise<unknown[]> => {
       // 刷新成功 → 分页错误标记复位（q.error 被 TanStack 清除时 error() 自然归 null）
       setPaginationError(false);
@@ -460,6 +493,7 @@ export function createTQFeedStore<
       fetchMore,
       activate: () => setActivated(true),
       isActivated: activated,
+      prefetchAllTabs,
     };
   });
 }
