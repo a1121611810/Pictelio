@@ -383,3 +383,61 @@ describe("loadImage", () => {
     }, 15_000);
   });
 });
+
+describe("isImagePrefetching", () => {
+  // oracle：inflightRequests 去重表语义（loadImage 同步注册 / .finally 移除）——
+  // spec round4 §A 三态表「inflight 有 = 预取在途；L1 有 = 预取已完成」。
+  // 本文件为 Web 环境（fetchWeb 路径）；成功/失败双路径按 IO 边界测试硬约束成对覆盖。
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { clearImageCache } = await load();
+    clearImageCache();
+  });
+
+  it("loadImage 在途返回 true，resolve 后 false 且 checkImageCache 命中（成功路径）", async () => {
+    const { loadImage, isImagePrefetching, checkImageCache } = await load();
+    const { fetchMock, resolve } = createControlledFetch();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const url = "https://i.pximg.net/test/inflight.jpg";
+    const p = loadImage(url);
+
+    // 在途窗口内：isImagePrefetching 命中（同步注册）、L1 未登记（未完成）
+    expect(isImagePrefetching(url)).toBe(true);
+    expect(checkImageCache(url)).toBeUndefined();
+
+    resolve();
+    await p;
+
+    // resolve 后：inflight 已被 .finally 清除，L1 已登记（cacheSet 在 loadImageInner 返回前）
+    expect(isImagePrefetching(url)).toBe(false);
+    expect(checkImageCache(url)).toMatch(/^\/pixiv-img\//u);
+
+    vi.unstubAllGlobals();
+  });
+
+  it("加载失败降级后返回 false，L1 按 Web 语义登记（不误标 native 失败语义）", async () => {
+    // Web 语义（imageLoader.ts fetchWeb catch 分支）：fetch 失败不向上 reject，
+    // 降级返回代理 URL 且「也标记 L1，让 checkImageCache 能命中（Web 模式无
+    // shouldInterceptRequest 兜底）」——是设计行为而非误标；
+    // inflight 条目无论成败都经 .finally 清除 → isImagePrefetching 必回 false。
+    // native 失败「不 cacheSet」的相反语义由 imageLoader.native.test.ts 覆盖。
+    const { loadImage, isImagePrefetching, checkImageCache } = await load();
+    const { fetchMock, reject } = createControlledFetch();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const url = "https://i.pximg.net/test/inflight-fail.jpg";
+    const p = loadImage(url);
+    expect(isImagePrefetching(url)).toBe(true);
+
+    reject(new Error("Network error"));
+    const result = await p; // Web 失败降级：resolve 而非 reject
+    expect(result.url).toMatch(/^\/pixiv-img\//u);
+
+    // 失败降级落定后：inflight 已清除；L1 按 Web 语义已登记
+    expect(isImagePrefetching(url)).toBe(false);
+    expect(checkImageCache(url)).toMatch(/^\/pixiv-img\//u);
+
+    vi.unstubAllGlobals();
+  });
+});

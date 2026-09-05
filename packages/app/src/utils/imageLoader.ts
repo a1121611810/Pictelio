@@ -248,6 +248,27 @@ export function loadImage(originalUrl: string): Promise<LoadedImage> {
   return promise;
 }
 
+/**
+ * 同步检查某 URL 是否存在进行中的加载（loadImage 的 inflight 去重窗口内）。
+ *
+ * 供渐进加载原语（createProgressiveImage）判断「full 预取已在途」：
+ * FeedList/VirtualFeed 预取与卡片渐进预载共享同一 inflight Promise（loadImage 去重），
+ * 在途即意味着 full 无需二次网络加载——跳过 thumb 阶段直候 full
+ * （round4 A 线候选「prefetch 命中卡跳过 thumb 直挂 full」，
+ * spec: docs/specs/webview-perf-round4.md §A）。
+ *
+ * 与 checkImageCache（L1 已加载标记）互补且互斥的三态语义——任意同步观察点必居其一：
+ * - L1 有（loadedKeys）= 预取已完成 → checkImageCache 命中，走直挂 full 路径；
+ * - inflight 有（本函数命中）= 预取在途 → 跳过 thumb 直候 full；
+ * - 两者皆无 = 未启动或已失败 → 保持渐进 thumb 路径（失败回落由原语 catch 兜底）。
+ *
+ * 无观察缝隙：cacheSet（L1 写入）发生在 loadImageInner 返回前，inflight 条目在
+ * .finally 才移除，单线程下两态不会同时为真。同步、零开销（Map.has）。
+ */
+export function isImagePrefetching(originalUrl: string): boolean {
+  return inflightRequests.has(originalUrl);
+}
+
 /** LoadImage 的内部实现 — 不含去重逻辑，由外层 loadImage 统一调度并发 */
 async function loadImageInner(originalUrl: string): Promise<LoadedImage> {
   const targetUrl = isImageHostEnabled() ? getEffectiveImageUrl(originalUrl) : originalUrl;

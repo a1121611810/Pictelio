@@ -16,6 +16,7 @@ import { checkImageCache, loadImage } from "@/utils/imageLoader";
 
 vi.mock("@/utils/imageLoader", () => ({
   checkImageCache: vi.fn<() => string | undefined>(() => undefined),
+  isImagePrefetching: vi.fn<(url: string) => boolean>(() => false),
   resolveImageUrl: (url: string) => (url ? `PROXY::${url}` : ""),
   loadImage: vi.fn(() => Promise.reject(new Error("not stubbed"))),
 }));

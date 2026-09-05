@@ -12,7 +12,9 @@ export interface PixivApiPlugin {
 
   setAccessToken(options: { accessToken: string }): Promise<void>;
 
-  prefetchImage(options: { url: string }): Promise<{ cached: boolean }>;
+  prefetchImage(options: {
+    url: string;
+  }): Promise<{ cached: boolean; path?: string; size?: number }>;
 
   /**
    * Java 401 静默刷新发现 refresh_token 被轮换时触发（Java 侧仅更新内存，
