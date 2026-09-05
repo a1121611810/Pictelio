@@ -494,11 +494,15 @@ async function t1JsCmd() {
     const outFile = resolve(OUT, `t1_webview_${SCENARIO}.jsonl`);
     writeFileSync(outFile, "");
     for (let i = 0; i < per; i++) {
+      // 清窗口必须在 drag 之前（等价旧 logcat -c 的位置语义）：back-top 是 4 次
+      // 连续 swipe、各推 1 条记录，若在读取时才排空，第 1 轮起会取到上一轮
+      // back-top 的延迟而非被测 drag（#365 复检 F2-R1）
+      await cdpEvaluate("(window.__benchT1Log || []).splice(0)");
       await SLEEP(200);
       await gesture("drag", w, h);
       await SLEEP(300);
-      // splice(0) 排空页面内采集日志，取本次手势的首个延迟（与旧 logcat -c 窗口隔离等价）
-      const lat = await cdpEvaluate(`(window.__benchT1Log || []).splice(0)[0]`);
+      // 只读不排空：本窗口内仅 drag 一次手势，[0] 即被测延迟
+      const lat = await cdpEvaluate(`(window.__benchT1Log || [])[0] ?? null`);
       const rec = {
         engine: "webview",
         scenario: SCENARIO,
