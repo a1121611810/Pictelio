@@ -107,7 +107,7 @@ Introduced in **v3.18.0** as the sole gateway for all Pixiv API communication (A
 - **401 auto-refresh** — Java side detects 401 responses, uses `synchronized` + `isRefreshing` flag to refresh the token internally, then retries once. The `refresh_token` used for the exchange is read from Java memory (injected by JS) — no SharedPreferences disk read. No JS-side Promise queue needed in production.
 - **`syncToken({ token })`** (v3.21.6, replaces `setRefreshToken`) — syncs the `refresh_token` into Java memory only, never written to disk. A `null`/empty token clears the memory value (and, on logout, the `access_token` as defense-in-depth) and idempotently removes the historical plaintext residue in `PictelioPrefs.xml` left by the old native `setRefreshToken`.
 - **`refreshTokenRotated` event** — if the Java-side 401 silent refresh receives a rotated `refresh_token`, Java updates its own memory and notifies JS via this event so `authStore` persists the new value (`saveRefreshToken`) instead of restoring a stale token after restart. Pixiv does not currently rotate refresh tokens, so this is defensive (see [API Layer — Token Persistence](/openwiki/architecture/api-layer.md#token-persistence--backup-integrity)).
-- **`prefetchImage({ url })`** — downloads images directly to the Android disk cache directory, zero bytes enter the JS heap
+- **`prefetchImage({ url })`** — downloads images directly to the Android disk cache directory, zero bytes enter the JS heap. Since v4.32.0 (round-3 B5/F3) the write uses `tmp+rename` atomic replacement (matching `writeFile`), so a truncated write can never be read back as a cache hit; `.tmp` residue is also cleaned so it can't break the `getCachedKeys` warmup path.
 - **`getSharedClient()`** (static, package-private) — exposes the internal shared `OkHttpClient` so `MainActivity.interceptImage()` can reuse the same connection pool instead of creating per-request `HttpURLConnection` instances. Reduces connection setup overhead for image proxy requests.
 - Credentials and OAuth config live only in compiled Java bytecode
 
@@ -335,6 +335,17 @@ Shared image loading core — the single source of truth for Pixiv image downloa
 **Consumers:**
 - **WebView path:** `MainActivity.interceptImage()` — calls `PixivImageLoader.cachedFile()` for disk cache hits, `loadBytes()` for cache-miss-with-write, or `download()` when disk cache is off; wraps results in `WebResourceResponse` via `bytesResponse()` and `mimeFor()` helpers
 - **Lynx path:** [`PictelioImageService`](#pictelioimageservice) — reads cached bytes, decodes to `Bitmap`, and delivers via `ImageLoadListener.onSuccess`
+
+### ImageIntercept & ImageBytesMemoryCache (v4.32.0)
+
+The WebView `/pixiv-img/` interception logic was refactored in the round-2 X1 work (#357), spec [`docs/specs/webview-perf-round2.md`](/docs/specs/webview-perf-round2.md):
+
+- **`ImageIntercept`** (`/packages/app/android/app/src/webview/java/io/pictelio/app/ImageIntercept.java`) — the previously duplicate `interceptImage` bodies in `MainActivity` (full) and `MainActivityWebview` were extracted into one shared class (both flavors compile the webview source set; lynx does not). Behavior changes are limited to three spec'd items: DEBUG-gated telemetry, the F1 header fix, and the memory fast-path.
+- **`PerfLog`** (`/packages/app/android/app/src/webview/java/io/pictelio/app/PerfLog.java`) — a single-line `Log.i` (tag `PictelioPerf`) per interception with `url8` / phase (`hit`/`miss`/`err`) / `src` (`mem`/`disk`) / duration / bytes, gated behind `BuildConfig.DEBUG` so release builds pay zero cost; parsed by `bench-webview-nav.mjs intercept`.
+- **`ImageBytesMemoryCache`** (`/packages/app/android/app/src/webview/java/io/pictelio/app/ImageBytesMemoryCache.java`) — a process-level 32MB byte-array LRU (reusing the main source set's generic `LruCache`, not the Lynx `ImageMemoryCache`) with a ≤512KB/entry cap (thumbnails/cards in, originals out). Filled at three points — miss download completion, `prefetchImage` write success (the highest-value detail hot path), and async disk-hit backfill via a single daemon thread with pending-dedup (the interception thread never re-reads disk). `clear()` is hooked into `ImageCachePlugin.clearCache`.
+- **F1 header fix:** disk hits previously returned `null` headers, which `OtaPlugin.ensureNoStore` rewrote to `Cache-Control: no-store` — so Chromium never cached a disk hit and every render of the same URL re-entered the interceptor (the 3–4ms "disk hit" hot path). Disk and memory hits now return `Cache-Control: public, max-age=31536000, immutable` (matching `bytesResponse`, and honoring the ADR-0090 browser-cache switch).
+
+See [Image Loading Pipeline — WebView Performance Round](/openwiki/architecture/image-pipeline.md#webview-performance-round-v4320-355360).
 
 ### PictelioImageService
 
