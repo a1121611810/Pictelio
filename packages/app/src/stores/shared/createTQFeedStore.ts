@@ -144,6 +144,17 @@ export type TQFeedStoreResult<TItem> = {
 
   /** 是否已激活 */
   isActivated: Accessor<boolean>;
+
+  /**
+   * 空闲预取（#375）：对所有 tab 的活跃子查询做「填空式」预载，返回每个子查询的
+   * ensure promise。默认 staleTime=Infinity——已有数据（含 feedQueryPersist 恢复的
+   * 陈旧数据）一律跳过、不触发网络，只填补空缓存以消除「首访 tab 骨架等网络」；
+   * 访问时的 SWR 刷新由 activate 路径的 ensureLoaded（30s staleTime +
+   * revalidateIfStale）负责：陈旧缓存同步返回、后台换新。
+   * 预取失败会清除该 key 的无数据 error entry 后向上传播（调度器层 warn），
+   * 不触碰 activated 信号（不改变 lazy store 的 UI 状态）。
+   */
+  prefetchAllTabs: (staleTime?: number) => Promise<unknown>[];
 };
 
 // ─── 通用算法 ───
@@ -279,16 +290,21 @@ export function createTQFeedStore<
       return config.tabs[config.currentTab()];
     }
 
-    /** 获取当前 tab 下所有活跃查询的 map key 列表 */
-    function activeKeys(): string[] {
-      const tabDef = getCurrentTabDef();
+    /** 获取指定 tab 下所有活跃查询的 map key 列表（activeKeys 的 tab 参数化版本，供预取复用） */
+    function keysForTab(tabKey: TTab): string[] {
+      const tabDef = config.tabs[tabKey];
       if (!tabDef) return [];
 
       const sub = tabDef.getSubTab?.();
       if (!sub || sub === "all") {
-        return tabDef.allMode.subTabs.map((s) => `${config.currentTab()}:${s}`);
+        return tabDef.allMode.subTabs.map((s) => `${tabKey}:${s}`);
       }
-      return [`${config.currentTab()}:${sub}`];
+      return [`${tabKey}:${sub}`];
+    }
+
+    /** 获取当前 tab 下所有活跃查询的 map key 列表 */
+    function activeKeys(): string[] {
+      return keysForTab(config.currentTab());
     }
 
     /** 获取活跃查询对象列表 */
@@ -414,9 +430,42 @@ export function createTQFeedStore<
           return queryClient.ensureInfiniteQueryData({
             queryKey: def.queryKey(config.getDeps(), undefined),
             staleTime: 30_000,
+            // query-core 5.101.4 的 ensureQueryData 对已有数据默认直接返回、永不重验证
+            //（code review P1：无此项则注释承诺的 SWR 不存在）——显式开启后陈旧缓存
+            // 同步返回 + 后台重拉，恢复「访问即见数据、后台换新」的 SWR 语义
+            revalidateIfStale: true,
           } as any);
         }),
       );
+    };
+
+    /** 空闲预取（语义见 TQFeedStoreResult.prefetchAllTabs 注释） */
+    const prefetchAllTabs = (staleTime: number = Number.POSITIVE_INFINITY): Promise<unknown>[] => {
+      const deps = config.getDeps();
+      const tasks: Promise<unknown>[] = [];
+      for (const tabKey of Object.keys(config.tabs) as TTab[]) {
+        for (const key of keysForTab(tabKey)) {
+          const def = queryDefMap.get(key);
+          if (!def) continue;
+          const queryKey = def.queryKey(deps, undefined);
+          tasks.push(
+            queryClient
+              .ensureInfiniteQueryData({
+                queryKey,
+                staleTime,
+              } as any)
+              .catch((err: unknown) => {
+                // 预取失败：重置该 query 回干净 pending 态（保留 observer 的 queryFn 装配，
+                // removeQueries 会连装配一起拆掉导致二次加载 Missing queryFn），避免用户
+                // 首访该 tab 从「骨架→内容」退化为「错误闪现→内容」（code review P2）；
+                // 失败仍向上传播，由调度器层 console.warn（禁静默降级）
+                queryClient.resetQueries({ queryKey });
+                throw err;
+              }),
+          );
+        }
+      }
+      return tasks;
     };
 
     const refresh = async (_signal?: AbortSignal): Promise<unknown[]> => {
@@ -460,6 +509,7 @@ export function createTQFeedStore<
       fetchMore,
       activate: () => setActivated(true),
       isActivated: activated,
+      prefetchAllTabs,
     };
   });
 }

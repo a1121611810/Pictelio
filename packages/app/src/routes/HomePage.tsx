@@ -10,7 +10,7 @@
  * 不再渲染底部 NavBar（首页导航由 SideNavShell 承担）。
  */
 import type { Component } from "solid-js";
-import { createEffect, onMount } from "solid-js";
+import { createEffect, onMount, untrack } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import type { PixivIllust, PixivNovel, ApiError } from "@/api/types";
 import PageTransition from "@/components/PageTransition";
@@ -21,6 +21,7 @@ import IllustSingleCard from "@/components/home/IllustSingleCard";
 import NovelRowCard from "@/components/home/NovelRowCard";
 import SkeletonShimmer from "@/components/SkeletonShimmer";
 import { contentType } from "@/stores/uiStore";
+import { scheduleIdleFeedPrefetch } from "@/utils/idleFeedPrefetch";
 // ── 插画数据源（推荐/关注/收藏）──
 import {
   illusts as recIllusts,
@@ -33,6 +34,7 @@ import {
   refresh as recIllustRefresh,
   error as recIllustError,
   paginationError as recIllustPaginationError,
+  prefetchAllTabs as recIllustPrefetchAll,
 } from "@/stores/recommendedStore";
 import {
   illusts as followIllusts,
@@ -46,6 +48,7 @@ import {
   refresh as followIllustRefresh,
   error as followIllustError,
   paginationError as followIllustPaginationError,
+  prefetchAllTabs as followIllustPrefetchAll,
 } from "@/stores/followStore";
 import {
   illusts as bmkIllusts,
@@ -59,6 +62,7 @@ import {
   refresh as bmkIllustRefresh,
   error as bmkIllustError,
   paginationError as bmkIllustPaginationError,
+  prefetchAllTabs as bmkIllustPrefetchAll,
 } from "@/stores/bookmarkStore";
 // ── 小说数据源（推荐/关注/收藏）──
 import {
@@ -72,6 +76,7 @@ import {
   refresh as recNovelRefresh,
   error as recNovelError,
   paginationError as recNovelPaginationError,
+  prefetchAllTabs as recNovelPrefetchAll,
 } from "@/stores/novelRecommendedStore";
 import {
   novels as followNovels,
@@ -85,6 +90,7 @@ import {
   refresh as followNovelRefresh,
   error as followNovelError,
   paginationError as followNovelPaginationError,
+  prefetchAllTabs as followNovelPrefetchAll,
 } from "@/stores/novelFollowStore";
 import {
   novels as bmkNovels,
@@ -98,6 +104,7 @@ import {
   refresh as bmkNovelRefresh,
   error as bmkNovelError,
   paginationError as bmkNovelPaginationError,
+  prefetchAllTabs as bmkNovelPrefetchAll,
 } from "@/stores/novelBookmarkStore";
 
 /** renderPanel 实际调用的内容域 Tab（历史由 shell 内建，不进入面板）。 */
@@ -339,6 +346,24 @@ const HomePage: Component = () => {
   onMount(() => {
     // 首页是登录后启动首屏：挂载后通知原生关闭 Splash Screen（幂等）
     markContentReady();
+  });
+
+  createEffect(() => {
+    // 空闲预取（#375）：默认落地面板（推荐插画/推荐小说其一）出数据后调度一次。
+    // gate=可见 feed 已就绪，避免预取与首屏加载抢带宽；调度器内部再按 store 串行错峰。
+    // prefetchAllTabs 是填空语义（staleTime=Infinity）：已有/已恢复的数据不重拉，
+    // 正常重启时零网络开销，仅填补空缓存以消除「首访 tab 骨架等网络」（#372 基线）。
+    if (recIllusts().length === 0 && recNovels().length === 0) return;
+    untrack(() => {
+      scheduleIdleFeedPrefetch([
+        { id: "recommended-illust", run: () => Promise.all(recIllustPrefetchAll()) },
+        { id: "follow-illust", run: () => Promise.all(followIllustPrefetchAll()) },
+        { id: "bookmark-illust", run: () => Promise.all(bmkIllustPrefetchAll()) },
+        { id: "recommended-novel", run: () => Promise.all(recNovelPrefetchAll()) },
+        { id: "follow-novel", run: () => Promise.all(followNovelPrefetchAll()) },
+        { id: "bookmark-novel", run: () => Promise.all(bmkNovelPrefetchAll()) },
+      ]);
+    });
   });
 
   return (
