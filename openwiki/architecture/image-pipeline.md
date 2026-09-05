@@ -139,6 +139,37 @@ On Android, `MainActivity.java` intercepts image requests via `shouldInterceptRe
 - SSRF protection via URL whitelist (ADR-0002)
 - Errors are logged via `android.util.Log` instead of `printStackTrace()`
 
+## WebView Performance Round (v4.32.0, #355–#360)
+
+A four-round, emulator-benchmarked effort (`bench-scroll.mjs` / `bench-webview-nav.mjs`, `dumpsys gfxinfo framestats`) that reshaped several image-path behaviors (emulator numbers are not directly extrapolable to real devices). The changes that live in the image pipeline:
+
+- **T1 progressive loading (round 2, #357):** a new [`createProgressiveImage`](/packages/app/src/primitives/createProgressiveImage.ts) primitive drives the thumbnail→original hand-off. Its state machine: L1 hit → mount full directly; miss + valid thumb → show thumb and preload full via `loadImage` (inflight-deduped with feed prefetch); miss + in-flight prefetch → skip thumb and wait for full; no thumb or `thumb===full` → single-segment load (current behavior). Thumb failure drops the thumb layer; full failure keeps the thumb as fallback; double failure sets `failed`. The home `IllustSingleCard` renders a double-layer `<img>` (thumb `medium` under full `large‖medium`); `NovelRowCard` downgrades its cover to `square_medium`.
+- **Prefetch-hit skip-thumb (round 4, #359):** [`isImagePrefetching(url)`](/packages/app/src/utils/imageLoader.ts) exposes the in-flight prefetch set so `createProgressiveImage` can skip the thumb entirely when the full image is already being prefetched — a three-state oracle with `checkImageCache` (L1 hit / in-flight / neither) that removes the second request + decode of the progressive path.
+- **T3 disk warmup 50→300:** `warmCacheFromDisk` registers the 300 most-recent disk keys into L1 at startup (key-registration only, zero decode cost).
+- **B5 home-feed prefetch + atomic writes:** `FeedList` prefetches the next `FEED_PREFETCH_COUNT=12` card images via [`pickUnprefetchedUrls`](/packages/app/src/utils/imageLoader.ts), with the prefetch key byte-identical to the card display URL. On the write side, both `writeFile` and `prefetchImage` converged on `tmp+rename` atomic replacement — eliminating truncated-file bad-image hits — and `.tmp` residue no longer breaks `getCachedKeys`.
+- **X1 interception chain (round 2, #357):** the duplicated `interceptImage` bodies were extracted into a shared [`ImageIntercept`](/packages/app/android/app/src/webview/java/io/pictelio/app/ImageIntercept.java) (both full/webview flavors compile the webview source set; lynx does not). It adds `PerfLog` DEBUG-gated telemetry, a 32MB [`ImageBytesMemoryCache`](/packages/app/android/app/src/webview/java/io/pictelio/app/ImageBytesMemoryCache.java) memory fast-path (≤512KB/entry, so originals are excluded), and the **F1 fix** — disk hits now return `Cache-Control: public, max-age=31536000, immutable` (matching `bytesResponse`) instead of the `no-store` that `OtaPlugin.ensureNoStore` had injected into null headers, which had forced a re-entry to the interceptor for every render of the same URL.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Evaluate: src changes
+    Evaluate --> DirectFull: L1 cache hit
+    Evaluate --> ThumbShown: miss and thumb valid
+    Evaluate --> WaitFull: miss and full prefetching
+    Evaluate --> SingleLoad: no thumb or thumb equals full
+    ThumbShown --> FullReady: full preload resolves
+    WaitFull --> FullReady: full preload resolves
+    FullReady --> FullPainted: main img onLoad
+    DirectFull --> FullPainted: main img onLoad
+    SingleLoad --> FullPainted: main img onLoad
+    ThumbShown --> ThumbFailed: thumb onError
+    ThumbFailed --> FullReady: full continues
+    ThumbShown --> ThumbFallback: full preload rejects
+    ThumbFallback --> [*]
+    FullPainted --> [*]
+```
+
+The `createProgressiveImage` state machine — thumbnail placeholder, in-flight-prefetch skip, and failure fallbacks (a double thumb+full failure sets `failed`, handled by the caller).
+
 ## Web Worker Measurement
 
 `packages/app/src/primitives/createImageSizeWorker.ts` uses a Web Worker (`imageSize.worker.ts`) to:

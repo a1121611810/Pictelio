@@ -95,6 +95,16 @@ flowchart LR
     API --> P[Pixiv API]
 ```
 
+## Feed Query Persistence (T4, v4.32.0)
+
+The home feed's TanStack Query state is now persisted across cold starts by [`feedQueryPersist.ts`](/packages/app/src/api/feedQueryPersist.ts) (spec: [`docs/specs/webview-perf-round2.md`](/docs/specs/webview-perf-round2.md)). A hand-written TanStack `Persister` (using only `@tanstack/query-persist-client-core`, deliberately not `PersistQueryClientProvider`/`sync-storage-persister`) restores and subscribes the six home feed stores:
+
+- **Scope:** only `["feed",…]`, `["bookmarks",…]`, and `["novel", recommended|follow_public|follow_private|bookmarks, …]` keys in `success` state (`persistableFeedQuery`); userWorks/followList/search are excluded.
+- **Storage:** `localStorage` under `pictelio:feed-query-cache`, trailing-debounced 5s on subscribe plus an immediate flush on `visibilitychange`/`pagehide`; 7-day `maxAge` with buster `tq-feed-v1`; a quota ladder truncates pages past 4.5MB before `removeItem` as a last resort. All failure modes `console.warn` (no silent degradation).
+- **Wiring:** `restoreFeedCache()` runs in `main.tsx` after render (parallel with `initializeAuth()`); `authStore.logout()` calls `clearPersistedFeeds()` before `queryClient.clear()`. Restored data is always stale (`staleTime 30s`), so `ensureLoaded` re-validates in the background (SWR).
+
+The round-2 measured effect: cold-start first-screen card-ready P50 dropped 4261→2124ms (−50.2%) by moving the feed API RTT off the critical path; the floor is the auth RTT.
+
 ### Nav Components & Adaptive Tags
 
 - **`SideNavShell`** — the home page's primary navigation (left icon rail). The selected tab highlights with a `BrandBackground2` rounded block. It reads/writes `currentTab` from `uiStore`, so entries from `PersonalCenter` ("我的收藏" → bookmarks) preset the initial tab.
@@ -124,6 +134,8 @@ The home page renders **fixed single-column layouts** via `FeedList` (no masonry
 **`VirtualFeed`** (`/packages/app/src/components/VirtualFeed.tsx`) accepts `illusts`/`loading`/`error`/`paginationError`/`hasMore` data state, `onIllustClick`/`onAuthorClick`/`onLoadMore`/`onRefresh` callbacks, a `layoutMode` (`waterfall` | `single` | `grid`), and `emptyText`/`skipAnimation`/`onNavigateToSettings`. It tracks a component-level `loadAttempted` flag: the "暂无新作品" empty message renders only when `loadAttempted` is `true`, and the skeleton renders while `loading` is `true` **or** `loadAttempted` is `false` (prevents an empty-state flash before the first fetch). The `paginationError` prop (ADR-0082) switches pagination failure from the above-list `ErrorDisplay` to a bottom `InlineRetryBar`. Scroll restoration is handled by `@solidjs/router`'s `<Router scrollRestoration>` prop; the custom `createScrollRestore`/`createVirtualScrollRestore`/`createFeedScrollStore` primitives were deleted (commit `b30366f`).
 
 `ImageCard` (`/packages/app/src/components/ImageCard.tsx`) and `GridCard` (`GridCard.tsx`) remain the card components for these secondary virtualized feeds (image loading, skeleton shimmer, author info, bookmark button). The like indicator was deduplicated into a shared [`HeartIcon`](/packages/app/src/components/ui/HeartIcon.tsx) (ADR-0091) — previously `ImageCard` and `NovelCard` each inlined an identical 28-line `HeartSvg`; `GridCard`'s Unicode `♥/♡` is intentionally left as-is.
+
+**Webview performance (v4.32.0, #355–#360):** the `scroll`/`pointermove` handlers in `createFeedVirtualizer`/`createNovelVirtualLayout`/`createFastScrollbar` are now rAF-coalesced — multiple events within one frame trigger a single recompute (T2), eliminating the input-queue delay that dominated scroll jank. Home `FeedList` also prefetches the next `FEED_PREFETCH_COUNT=12` card images via `pickUnprefetchedUrls` (prefetch key byte-identical to the card display URL, B5), and the home cards render progressive thumb→original via `createProgressiveImage` (T1) — see [Image Loading Pipeline](/openwiki/architecture/image-pipeline.md#webview-performance-round-v4320-355360).
 
 ## Pagination Failure Inline Retry (ADR-0082)
 
