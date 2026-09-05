@@ -23,7 +23,7 @@ vi.mock("@/api/queryClient", () => ({
 }));
 
 import { createTQFeedStore, type TQFeedStoreResult } from "@/stores/shared/createTQFeedStore";
-import type { ApiError } from "@/api/types";
+import { ApiErrorType, type ApiError } from "@/api/types";
 
 interface Item {
   id: number;
@@ -109,11 +109,10 @@ describe("createTQFeedStore loading 首载粘滞（#366）", () => {
     const p = store.ensureLoaded();
     await Promise.resolve();
     rejectFetch!({
-      type: 0,
-      message: "network",
+      type: ApiErrorType.NETWORK,
+      message: "network error",
       reason: "network",
-      name: "network",
-    } as unknown as ApiError);
+    } as ApiError);
     try {
       await p;
     } catch {
