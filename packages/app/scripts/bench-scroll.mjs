@@ -468,13 +468,16 @@ async function t1JsCmd() {
   if (ENGINE === "webview") {
     await navWebview(SCENARIO);
     // 一次性注入 hook（与 lynx 同语义：touchstart→首 touchmove 回调到达 JS 的跨线程派发延迟）
+    // 经页面内数组 + CDP 读取采集（#365 审查修复：loggingBehavior none 后 console
+    // 不再转发 logcat，原 Capacitor/Console 探针会静默产出 null 行）
     await cdpEvaluate(`(() => {
       if (window.__benchT1) return "already";
       let t0 = null;
+      window.__benchT1Log = [];
       document.addEventListener("touchstart", () => { t0 = Date.now(); }, { passive: true });
       document.addEventListener("touchmove", () => {
         if (t0 !== null) {
-          console.log("[BENCH_T1] stage t0=" + t0 + " t1=" + Date.now() + " latency=" + (Date.now() - t0));
+          window.__benchT1Log.push(Date.now() - t0);
           t0 = null;
         }
       }, { passive: true });
@@ -491,17 +494,16 @@ async function t1JsCmd() {
     const outFile = resolve(OUT, `t1_webview_${SCENARIO}.jsonl`);
     writeFileSync(outFile, "");
     for (let i = 0; i < per; i++) {
-      adb("logcat", "-c");
       await SLEEP(200);
       await gesture("drag", w, h);
       await SLEEP(300);
-      const src = adb("logcat", "-d", "-s", "Capacitor/Console");
-      const m = /\[BENCH_T1\][^\n]*latency=(\d+)/.exec(src);
+      // splice(0) 排空页面内采集日志，取本次手势的首个延迟（与旧 logcat -c 窗口隔离等价）
+      const lat = await cdpEvaluate(`(window.__benchT1Log || []).splice(0)[0]`);
       const rec = {
         engine: "webview",
         scenario: SCENARIO,
         idx: i,
-        latencyMs: m ? Number(m[1]) : null,
+        latencyMs: typeof lat === "number" ? lat : null,
       };
       appendFileSync(outFile, JSON.stringify(rec) + "\n");
       console.log(`  #${i} latency=${rec.latencyMs ?? "-"}ms`);

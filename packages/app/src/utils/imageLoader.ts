@@ -558,8 +558,8 @@ export async function warmCacheFromDisk(): Promise<void> {
         injectCacheEntry(key);
       }
 
-      // DEV-gate（#365 P2）：启动路径 console 走 Console 插件桥转发到 logcat，
-      // 生产构建不留启动噪音；排障时 DEV 构建仍可见。
+      // DEV-gate（#365 P2）：启动路径 console 不进生产页面控制台；
+      // 排障经 chrome://inspect 查看（loggingBehavior none 后不再转发 logcat）。
       if (import.meta.env.DEV) {
         console.log(`[ImageCache] Warmup: registered ${recentKeys.length}/${keys.length} entries`);
       }

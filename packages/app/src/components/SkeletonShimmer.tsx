@@ -10,6 +10,7 @@ interface Props {
  *  使用 Fluent Design 背景色与 --durationUltraSlow / --curveEasyEase 动画令牌。 */
 const SkeletonShimmer: Component<Props> = (props) => (
   <div
+    data-testid="skeleton-shimmer"
     class={props.class || ""}
     classList={props.classList}
     style={{
