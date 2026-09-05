@@ -119,6 +119,68 @@ describe("createProgressiveImage", () => {
     dispose();
   });
 
+  it("full resolve 后、onDisplayLoad 前：thumbSrc 保持（thumb 层仍兜底）", async () => {
+    // B1（issue #358）：thumb 卸载时机 = 主 img load（真实绘制就绪），不是预载 resolve
+    const d = createDeferred<LoadedImageLike>();
+    vi.mocked(loadImage).mockReturnValue(d.promise);
+    const { state: p, dispose } = mount(
+      () => FULL,
+      () => THUMB,
+    );
+    await flush();
+    d.resolve(loadedImage(`PROXY::${FULL}`));
+    await flush();
+    expect(p.displaySrc()).toBe(`PROXY::${FULL}`);
+    expect(p.thumbSrc()).toBe(`PROXY::${THUMB}`);
+    dispose();
+  });
+
+  it("onDisplayLoad 触发（主 img load = full 绘制就绪）：thumbSrc 收窄为空串（thumb 层卸载）", async () => {
+    // oracle：full 绘制就绪即卸载，回收双层常驻的合成/解码成本；失败路径（fullPainted=false）thumb 保留
+    const d = createDeferred<LoadedImageLike>();
+    vi.mocked(loadImage).mockReturnValue(d.promise);
+    const { state: p, dispose } = mount(
+      () => FULL,
+      () => THUMB,
+    );
+    await flush();
+    d.resolve(loadedImage(`PROXY::${FULL}`));
+    await flush();
+    p.onDisplayLoad(new Event("load"));
+    expect(p.thumbSrc()).toBe(""); // 空串 = 绘制完成后卸载（区别于 undefined = 从未挂载）
+    expect(p.displaySrc()).toBe(`PROXY::${FULL}`);
+    expect(p.failed()).toBe(false);
+    dispose();
+  });
+
+  it("fullUrl 变化（generation 重置）：fullPainted 重置，新图 thumb 层重新挂载兜底", async () => {
+    const [full, setFull] = createSignal(FULL);
+    const dA = createDeferred<LoadedImageLike>();
+    const dB = createDeferred<LoadedImageLike>();
+    vi.mocked(loadImage).mockImplementation((url: string) =>
+      url === FULL ? dA.promise : dB.promise,
+    );
+    const { state: p, dispose } = mount(full, () => THUMB);
+    await flush();
+    dA.resolve(loadedImage(`PROXY::${FULL}`));
+    await flush();
+    p.onDisplayLoad(new Event("load"));
+    expect(p.thumbSrc()).toBe(""); // A 图已绘制，thumb 已卸载
+
+    setFull(FULL_2);
+    await flush();
+    // 新一轮 URL：fullPainted 重置 → 新 thumb 层重新挂载兜底，主层暂不挂载（防白帧）
+    expect(p.thumbSrc()).toBe(`PROXY::${THUMB}`);
+    expect(p.displaySrc()).toBe("");
+    dB.resolve(loadedImage(`PROXY::${FULL_2}`));
+    await flush();
+    expect(p.displaySrc()).toBe(`PROXY::${FULL_2}`);
+    expect(p.thumbSrc()).toBe(`PROXY::${THUMB}`); // B 图 load 未触发，兜底仍在
+    p.onDisplayLoad(new Event("load"));
+    expect(p.thumbSrc()).toBe("");
+    dispose();
+  });
+
   it("无 thumb：单段直载（行为=现状，不调 loadImage）", async () => {
     const { state: p, dispose } = mount(
       () => FULL,

@@ -142,6 +142,44 @@ describe("PixivImage — 渐进 wrapper 分支（传 thumbSrc）", () => {
     expect(mainImg.style.objectFit).toBe("cover");
   });
 
+  it("full 绘制完成（主 img load）后 thumb 层从 DOM 卸载（B1：回收双层常驻成本）", async () => {
+    const d = createDeferred<LoadedImageLike>();
+    vi.mocked(loadImage).mockReturnValue(d.promise);
+    const { container } = render(() => <PixivImage src={SRC} thumbSrc={THUMB} />);
+    await flush();
+    d.resolve({ url: `PROXY::${SRC}`, cleanup: () => {} });
+    await flush();
+    expect(container.querySelectorAll("img").length).toBe(2); // painted 前：双层常驻
+    const mainImg = Array.from(container.querySelectorAll("img")).find(
+      (el) => el.getAttribute("aria-hidden") !== "true",
+    ) as HTMLImageElement;
+    fireEvent.load(mainImg);
+    await flush();
+    expect(container.querySelectorAll("img").length).toBe(1); // painted 后：仅主层
+    const remaining = container.querySelector("img") as HTMLImageElement;
+    expect(remaining.getAttribute("aria-hidden")).not.toBe("true");
+    expect(remaining.getAttribute("src")).toBe(`PROXY::${SRC}`);
+  });
+
+  it("主 img load 后 props.onLoad 仍被转发调用（链式转发语义不变）", async () => {
+    const d = createDeferred<LoadedImageLike>();
+    vi.mocked(loadImage).mockReturnValue(d.promise);
+    const propsOnLoad = vi.fn();
+    const { container } = render(() => (
+      <PixivImage src={SRC} thumbSrc={THUMB} onLoad={propsOnLoad} />
+    ));
+    await flush();
+    d.resolve({ url: `PROXY::${SRC}`, cleanup: () => {} });
+    await flush();
+    const mainImg = Array.from(container.querySelectorAll("img")).find(
+      (el) => el.getAttribute("aria-hidden") !== "true",
+    ) as HTMLImageElement;
+    fireEvent.load(mainImg);
+    await flush();
+    expect(propsOnLoad).toHaveBeenCalledTimes(1);
+    expect(propsOnLoad.mock.calls[0]?.[0]).toBeInstanceOf(Event);
+  });
+
   it("thumb onError：卸载缩略层；双失败后渲染失败 UI", async () => {
     const d = createDeferred<LoadedImageLike>();
     vi.mocked(loadImage).mockReturnValue(d.promise);
