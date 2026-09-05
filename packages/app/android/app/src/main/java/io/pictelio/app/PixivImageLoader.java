@@ -167,10 +167,34 @@ public final class PixivImageLoader {
 
     // ── 淘汰（对齐 ImageCachePlugin.enforceCacheLimit） ────────
 
-    private static void writeFile(File file, byte[] bytes) throws IOException {
-        try (FileOutputStream fos = new FileOutputStream(file)) {
-            fos.write(bytes);
-            fos.flush();
+    /**
+     * 原子写盘（B5/诊断 F3）：先写同目录临时文件，成功后 rename 原子替换目标。
+     * 直接 FileOutputStream(目标) 时，prefetchImage 与拦截链路并发写同一文件可能
+     * 交错产生截断文件，而 cachedFile 仅查 exists+length>0，截断文件会被当命中
+     * 持久返回坏图。失败路径清理 tmp 并上抛，目标保持原内容不被半截写入污染。
+     * 包可见：prefetchImage（webview 源集）与拦截链路共享同一写盘纪律。
+     */
+    static void writeFile(File file, byte[] bytes) throws IOException {
+        File tmp = new File(file.getAbsolutePath() + ".tmp");
+        try {
+            try (FileOutputStream fos = new FileOutputStream(tmp)) {
+                fos.write(bytes);
+                fos.flush();
+            }
+            if (!tmp.renameTo(file)) {
+                // 个别文件系统的 rename 不覆盖已存在目标：先删旧目标再重试一次
+                if (file.exists() && !file.delete()) {
+                    throw new IOException("无法删除旧缓存文件: " + file);
+                }
+                if (!tmp.renameTo(file)) {
+                    throw new IOException("rename 失败: " + tmp + " -> " + file);
+                }
+            }
+        } catch (IOException e) {
+            if (!tmp.delete()) {
+                Log.w(TAG, "tmp 清理失败（留待容量淘汰/清空缓存回收）: " + tmp);
+            }
+            throw e;
         }
     }
 

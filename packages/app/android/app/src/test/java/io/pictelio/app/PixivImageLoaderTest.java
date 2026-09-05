@@ -1,5 +1,6 @@
 package io.pictelio.app;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -22,6 +23,7 @@ import org.robolectric.annotation.Config;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 
 import okhttp3.OkHttpClient;
 import okhttp3.mockwebserver.MockResponse;
@@ -245,5 +247,75 @@ public class PixivImageLoaderTest {
         RecordedRequest req = server.takeRequest();
         assertEquals("https://app-api.pixiv.net/", req.getHeader("Referer"));
         assertTrue(req.getHeader("User-Agent") != null && !req.getHeader("User-Agent").isEmpty());
+    }
+
+    // ── 写盘原子性（B5/诊断 F3：tmp+rename，防并发截断写坏缓存） ──
+
+    @Test
+    public void loadFile_persistsCompleteContent_andLeavesNoTmpFiles() throws Exception {
+        byte[] body = new byte[1024];
+        for (int i = 0; i < body.length; i++) body[i] = (byte) (i % 251);
+        String url = server.url("/pixiv-img/roundtrip-atomic.jpg").toString();
+        server.enqueue(new MockResponse().setResponseCode(200).setBody(new okio.Buffer().write(body)));
+
+        File file = loader.loadFile(url);
+
+        // round-trip：磁盘内容与下载字节逐字节一致（目标文件完整，非截断）
+        assertArrayEquals(body, Files.readAllBytes(file.toPath()));
+        // 成功路径无 .tmp 残留（tmp 已被 rename 替换为目标）
+        File[] tmpFiles = file.getParentFile().listFiles((d, name) -> name.endsWith(".tmp"));
+        assertNotNull(tmpFiles);
+        assertEquals(0, tmpFiles.length);
+    }
+
+    @Test
+    public void writeFile_failureInReadOnlyDir_targetNotCorruptedAndNoTmpLeftover() throws Exception {
+        // 可移植性守卫（review #358 P3）：root 下 setWritable(false) 不生效、
+        // Windows 目录只读属性不阻止建文件——前置条件不成立则跳过，不产生假失败
+        org.junit.Assume.assumeFalse("root 账户绕过目录写权限", isRunningAsRoot());
+        String url = server.url("/pixiv-img/readonly-dir.jpg").toString();
+        server.enqueue(new MockResponse().setResponseCode(200).setBody(new okio.Buffer().write(new byte[512])));
+        File dir = loader.getCacheDir();
+        File target = new File(dir, PixivImageLoader.keyToFilename(url));
+        assertTrue(target.createNewFile()); // 预置空目标：断言失败后仍为空、未被半截内容污染
+        org.junit.Assume.assumeTrue("目录写权限未生效，前置条件不成立", dir.setWritable(false));
+        try {
+            // 临时文件创建失败（只读目录）→ IOException 上抛，目标不被截断写入
+            assertThrows(IOException.class, () -> loader.loadFile(url));
+            assertEquals("目标文件不得被写入半截内容", 0, target.length());
+            File[] tmpFiles = dir.listFiles((d, name) -> name.endsWith(".tmp"));
+            assertNotNull(tmpFiles);
+            assertEquals("失败路径不得残留 .tmp", 0, tmpFiles.length);
+        } finally {
+            // 恢复可写，避免污染同 context 缓存目录的后续测试
+            dir.setWritable(true);
+        }
+    }
+
+    @Test
+    public void writeFile_atomicReplace_succeedsEvenWhenExistingTargetReadOnly() throws Exception {
+        // 可移植性守卫（review #358 P3）：Windows 的 rename 语义不同，POSIX 专属用例
+        org.junit.Assume.assumeFalse(System.getProperty("os.name", "").startsWith("Windows"));
+        byte[] body = new byte[256];
+        java.util.Arrays.fill(body, (byte) 0x5A);
+        String url = server.url("/pixiv-img/readonly-target.jpg").toString();
+        server.enqueue(new MockResponse().setResponseCode(200).setBody(new okio.Buffer().write(body)));
+        File dir = loader.getCacheDir();
+        File target = new File(dir, PixivImageLoader.keyToFilename(url));
+        // 预置只读空目标（length=0 使 cachedFile 视为未命中，强制走写盘路径）
+        assertTrue(target.createNewFile());
+        assertTrue(target.setReadOnly());
+        // 旧实现直接 FileOutputStream(只读目标) 抛 FileNotFoundException；
+        // tmp+rename 后（POSIX rename 只看目录写权限）应成功替换且内容完整
+        File file = loader.loadFile(url);
+        assertEquals(target.getAbsolutePath(), file.getAbsolutePath());
+        assertArrayEquals(body, Files.readAllBytes(file.toPath()));
+    }
+
+    /** root（uid=0）绕过文件权限检查，只读目录用例的前置条件不成立 */
+    private static boolean isRunningAsRoot() {
+        return "0".equals(System.getProperty("user.name"))
+                || "root".equals(System.getenv("USER"))
+                || "root".equals(System.getProperty("user.name"));
     }
 }

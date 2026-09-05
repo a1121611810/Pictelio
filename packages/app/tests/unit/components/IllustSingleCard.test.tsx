@@ -52,6 +52,9 @@ function makeIllust(overrides: Partial<PixivIllust> = {}): PixivIllust {
   };
 }
 
+/** 放行微任务/宏任务队列（loadImage resolve → 原语 signal 写入） */
+const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
 describe("IllustSingleCard", () => {
   afterEach(() => cleanup());
 
@@ -83,6 +86,21 @@ describe("IllustSingleCard", () => {
     const main = (await screen.findByAltText(illust.title)) as HTMLImageElement;
     expect(main.getAttribute("src")).toBe(resolveImageUrl(illust.image_urls.large));
     expect(main.className).toContain("relative");
+  });
+
+  it("full 绘制完成（主 img load）后 thumb 层从 DOM 卸载（B1：回收双层常驻成本）", async () => {
+    const illust = makeIllust();
+    const { container } = render(() => <IllustSingleCard illust={illust} onClick={vi.fn()} />);
+    const thumb = () => container.querySelector('img[aria-hidden="true"]');
+    const main = (await screen.findByAltText(illust.title)) as HTMLImageElement;
+    // 主层已挂载但 load 未触发：双层常驻（thumb 兜底）
+    expect(thumb()).toBeTruthy();
+    expect(container.querySelectorAll("img").length).toBe(2);
+    // 主 img load 事件 = full 真实绘制就绪 → thumb 层卸载；full 失败路径不触发 load，兜底语义保持
+    fireEvent.load(main);
+    await flush();
+    expect(thumb()).toBeNull();
+    expect(container.querySelectorAll("img").length).toBe(1); // 仅剩主层
   });
 
   it("fireEvent.click 触发 onClick", () => {

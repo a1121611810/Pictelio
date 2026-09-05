@@ -33,7 +33,9 @@ interface ProgressivePixivImageProps extends Omit<
 /**
  * 渐进双 img wrapper（spec webview-perf-round2 §2.4，仅传 thumbSrc 时挂载）：
  * thumb=absolute 底层（aria-hidden + pointer-events-none，不参与语义与交互），
- * full=主层 relative（到位前不挂载，防白帧）；双失败时渲染与旧版一致的失败 UI。
+ * full=主层 relative（到位前不挂载，防白帧）；full 绘制完成（主 img load）后 thumb 层卸载，
+ * 回收双层常驻的合成/解码成本（B1，issue #358），full 失败时保留兜底；
+ * 双失败时渲染与旧版一致的失败 UI。
  */
 const ProgressivePixivImage: Component<ProgressivePixivImageProps> = (p) => {
   const progressive = createProgressiveImage({
@@ -88,7 +90,12 @@ const ProgressivePixivImage: Component<ProgressivePixivImageProps> = (p) => {
               decoding="async"
               draggable={p.draggable}
               onClick={p.onClick}
-              onLoad={p.onLoad}
+              onLoad={(e) => {
+                // 先接原语 onDisplayLoad（full 绘制就绪 → thumbSrc 收窄为空串卸载 thumb 层），
+                // 再转发调用方回调——props.onLoad 语义不变；未传时跳过（NovelCoverCard 等调用方）
+                progressive.onDisplayLoad(e);
+                p.onLoad?.(e);
+              }}
               onError={progressive.onDisplayError}
             />
           )}

@@ -487,6 +487,87 @@ describe("clearPersistedFeedsAndCache（logout 原子清空，S2）", () => {
   });
 });
 
+/**
+ * 空快照写回防护（B3，#358）：
+ * logout 抑制窗口（S2）之外空快照仍会到达——在途 mutation 在 logout 后 settle（mutation cache
+ * 事件触发 persistQueryClientSave）、或全部 query 被 GC（removed 事件，gcTime 30min）时，
+ * 订阅对空缓存 dehydrate 产出 queries:[]。空快照写回零价值，只会把最后有效持久化覆盖为空
+ * （冷启动 restore 变成无缓存）。修法 = persistClient 入口对空快照 no-op，不触碰既有 key。
+ */
+describe("空快照写回防护（B3，#358）", () => {
+  it("订阅在线 + 全部 query 被清空后推进 debounce：storage 既有 key 保持原内容，不被空快照覆盖", async () => {
+    const mem = new MemoryStorage();
+    const seeded = makeInfiniteData(2, "keep");
+    const source = new QueryClient();
+    source.setQueryData([...K_FEED], seeded);
+    await saveViaCore(source, createFeedQueryPersister(mem));
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+    const key = mem.key(0)!;
+    const seededRaw = mem.getItem(key)!;
+
+    vi.stubGlobal("localStorage", mem);
+    vi.resetModules();
+    const fresh = await import("@/api/feedQueryPersist");
+    const freshQueryClientModule = await import("@/api/queryClient");
+
+    // 订阅在线（restoreFeedCache 接线），内存缓存已恢复
+    await fresh.restoreFeedCache();
+    expect(freshQueryClientModule.queryClient.getQueryData([...K_FEED])).toEqual(seeded);
+
+    // 不走 clearPersistedFeedsAndCache（即无 S2 抑制窗口），直接清内存缓存——
+    // 模拟 GC 全部 query / 在途 mutation settle 后缓存为空的等价终态
+    freshQueryClientModule.queryClient.clear();
+
+    // 旧实现死法：removed 事件 → 订阅 dehydrate 出 queries:[] → 5s debounce 后把既有 key
+    // 覆盖为空快照，最后有效持久化丢失（下次冷启动 restore = 无缓存，全量重拉）
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+    expect(mem.getItem(key)).toBe(seededRaw);
+  });
+
+  it("空快照与有效 payload 同窗口竞争：保留排队的有效 payload（空快照不得顶掉 pending）", async () => {
+    const mem = new MemoryStorage();
+    const persister = createFeedQueryPersister(mem);
+    const source = new QueryClient();
+    source.setQueryData([...K_FEED], makeInfiniteData(1, "valid"));
+    await saveViaCore(source, persister);
+
+    // 紧随其后的空快照（如最后一个 query 在 5s 窗口内被 GC）不得顶掉已排队的有效 payload
+    persister.persistClient({
+      timestamp: Date.now(),
+      buster: FEED_PERSIST_BUSTER,
+      clientState: dehydrate(new QueryClient(), { shouldDehydrateQuery: persistableFeedQuery }),
+    });
+
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+    const saved = JSON.parse(mem.getItem(mem.key(0)!)!) as {
+      clientState: { queries: Array<{ queryKey: unknown[] }> };
+    };
+    expect(saved.clientState.queries.map((q) => q.queryKey)).toEqual([
+      ["feed", "recommended_illust"],
+    ]);
+  });
+
+  it("直接 persistClient 空快照（在途 mutation settle 等价覆盖）：no-op，既有 key 原样保留", async () => {
+    const mem = new MemoryStorage();
+    const key = await seedAndGetKey(mem);
+    const seededRaw = mem.getItem(key)!;
+    const setItemSpy = vi.spyOn(mem, "setItem");
+
+    const persister = createFeedQueryPersister(mem);
+    // 信封 timestamp/buster 按核心 persistQueryClientSave 的真实组装方式；
+    // clientState 为空 client 的真实 dehydrate 产物（契约 mock 禁手写字段）
+    persister.persistClient({
+      timestamp: Date.now(),
+      buster: FEED_PERSIST_BUSTER,
+      clientState: dehydrate(new QueryClient(), { shouldDehydrateQuery: persistableFeedQuery }),
+    });
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+
+    expect(setItemSpy).not.toHaveBeenCalled();
+    expect(mem.getItem(key)).toBe(seededRaw);
+  });
+});
+
 describe("restoreFeedCache 端到端（vi.stubGlobal localStorage）", () => {
   it("restore 注入单例 queryClient + 订阅写回 + hidden 立即 flush", async () => {
     const mem = new MemoryStorage();

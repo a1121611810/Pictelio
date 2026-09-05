@@ -140,8 +140,19 @@ public class ImageCachePlugin extends Plugin {
                 // 按最后修改时间排序，最新的在后
                 Arrays.sort(files, Comparator.comparingLong(File::lastModified));
                 for (File f : files) {
-                    if (f.isFile()) {
+                    if (!f.isFile()) {
+                        continue;
+                    }
+                    // B5 原子写引入 .tmp 中间形态（进程被杀时残留），其文件名不是合法 key，
+                    // 跳过——否则单文件 decode 失败会打挂整个预热链路
+                    if (f.getName().endsWith(".tmp")) {
+                        continue;
+                    }
+                    try {
                         keys.put(filenameToKey(f.getName()));
+                    } catch (IllegalArgumentException e) {
+                        // 防御：单文件名非法不拖垮整体（.tmp 过滤后理论不可达）
+                        Log.w(TAG, "getCachedKeys 跳过非法文件名: " + f.getName());
                     }
                 }
             }

@@ -56,7 +56,8 @@ const IllustSingleCard: Component<IllustSingleCardProps> = (props) => {
       {/* 封面：按原图比例（aspect-ratio = width/height，超高长图自然拉高）+ 双层渐进 img */}
       <div class="relative bg-[var(--colorNeutralBackground2)]" style={{ "aspect-ratio": ratio() }}>
         {/* 底层：thumb=medium 占位（aria-hidden + pointer-events-none，不参与语义与交互；
-            full 到位后仍保留在主层下方兜底）；thumb 失败时由原语卸载本层。
+            full 绘制完成（主 img load）后原语收窄 thumbSrc 为空串，本层从 DOM 卸载，
+            回收双层常驻的合成/解码成本（B1，issue #358）；full 失败时保留兜底，thumb 失败时由原语卸载。
             decoding="async"（Standards，与 PixivImage 双层一致）：异步解码，防 thumb 解码阻塞主线程帧 */}
         <Show when={cover.thumbSrc()}>
           <img
@@ -68,13 +69,15 @@ const IllustSingleCard: Component<IllustSingleCardProps> = (props) => {
             onError={cover.onThumbError}
           />
         </Show>
-        {/* 主层：full（large??medium）到位前不挂载（防白帧），挂载后覆盖 thumb */}
+        {/* 主层：full（large??medium）到位前不挂载（防白帧），挂载后覆盖 thumb；
+            onLoad 接原语 onDisplayLoad = 绘制就绪信号（触发 thumb 层卸载） */}
         <Show when={cover.displaySrc()}>
           <img
             src={cover.displaySrc()}
             alt={props.illust.title}
             class="relative h-full w-full object-cover"
             loading="lazy"
+            onLoad={cover.onDisplayLoad}
             onError={cover.onDisplayError}
           />
         </Show>
