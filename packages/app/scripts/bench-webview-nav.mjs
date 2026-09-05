@@ -72,12 +72,18 @@ function parseFramestats(dump) {
         frameCompleted = c[15];
       if (!frameInterval || frameInterval < 1e6 || frameInterval > 1e9) continue;
       if (!frameCompleted || frameCompleted <= intendedVsync) continue;
+      // E0 标定（Android 14 实测 23 列）：c[15]=SwapBuffers、c[16]=FrameCompleted。
+      // totalMs 保留原口径（SwapBuffers，与历史轮次可比）；trueTotalMs 为 AOSP summary
+      // 同口径（FrameCompleted，即 "Janky frames" 百分比所用的帧完成时间）。
+      const frameCompletedTrue = c[16] || frameCompleted;
       frames.push({
         intendedVsync,
         unknownDelayMs: (handleInputStart - intendedVsync) / 1e6,
         totalMs: (frameCompleted - intendedVsync) / 1e6,
+        trueTotalMs: (frameCompletedTrue - intendedVsync) / 1e6,
         deadlineMs: (frameDeadline - intendedVsync) / 1e6,
         jank: frameCompleted - intendedVsync > frameDeadline - intendedVsync,
+        jankTrue: frameCompletedTrue - intendedVsync > frameDeadline - intendedVsync,
       });
     }
   }
@@ -100,6 +106,14 @@ function summarize(frames) {
     unknownDelayP50: +percentile(delays, 50).toFixed(2),
     unknownDelayP90: +percentile(delays, 90).toFixed(2),
     deadlineMs: frames.length ? +frames[0].deadlineMs.toFixed(2) : 0,
+    // E1 新增：帧完成口径（c[16] FrameCompleted）的 jank 率与逐帧明细（不破坏既有字段）
+    jankTrueRate: frames.length
+      ? +(frames.filter((f) => f.jankTrue).length / frames.length).toFixed(4)
+      : 0,
+    frameCount: frames.length,
+    frameTotalMs: frames.map((f) => +f.totalMs.toFixed(2)),
+    frameTrueTotalMs: frames.map((f) => +f.trueTotalMs.toFixed(2)),
+    frameDeadlineMs: frames.map((f) => +f.deadlineMs.toFixed(2)),
   };
 }
 
@@ -177,8 +191,11 @@ async function restartApp() {
 }
 
 async function sampleFrames(outFile, meta, settleMs = 1800) {
-  adbShell(`dumpsys gfxinfo ${PKG} reset`);
-  await SLEEP(250);
+  // E1 修复：删除内部的二次 gfxinfo reset + 250ms sleep。
+  // 原实现里 reset#2 发生在调用方 click 之后 ~100-300ms，把切换最初 ~350-550ms
+  // （路由交换、骨架、数据请求、内容 mount）整体移出采样窗口，且与 back 路径
+  // （reset 在动作前）口径不对称。现在窗口统一为：调用方 reset → 动作 → settleMs → dump，
+  // forward 窗口 = back 窗口 = [动作前 ~250ms, 动作后 settleMs]，完整覆盖。
   const t0 = Date.now();
   await SLEEP(settleMs);
   const dump = adbShell(`dumpsys gfxinfo ${PKG} framestats`);
@@ -189,30 +206,49 @@ async function sampleFrames(outFile, meta, settleMs = 1800) {
     wallMs: Date.now() - t0,
     framesDump: summary ? summary.frames : frames.length,
     ...base,
+    // E1 新增：采样口径标注（summary=HWUI 自报整数、无逐帧；profiledata=环形缓冲逐帧）
+    parsePath: summary ? "summary" : "profiledata",
+    ...(summary
+      ? { frameCount: summary.frames, frameTotalMs: [], frameTrueTotalMs: [], frameDeadlineMs: [] }
+      : {}),
   };
   appendFileSync(outFile, JSON.stringify(rec) + "\n");
   return rec;
 }
 
 // ─── switch: home → illust 详情 → back ───
+// 点击目标（B 线诊断 §1.1 修正，E5 驱动同款）：旧选择器「首个含 img 的 cursor-pointer」
+// 实证命中 SideNavShell 用户头像 BUTTON → 实为 home→/me（场景污染）。修正为 img src
+// 匹配 /pixiv-img/ 且排除 user-profile 的真实插画卡。历史轮次 switch 数据不可与本修正后
+// 口径直接对比（目标不同），详见 docs/research/webview-perf-round4-switch-diagnosis.md。
+const FIND_ILLUST_CARD = `(() => {
+  const el = [...document.querySelectorAll('[class*="cursor-pointer"]')].filter((e) => {
+    const i = e.querySelector('img');
+    return i && /pixiv-img/.test(i.getAttribute("src") || "") && !/user-profile/.test(i.getAttribute("src") || "");
+  })[0];
+  return el ? "illust-card" : "none";
+})()`;
+const CLICK_ILLUST_CARD = `(() => {
+  const el = [...document.querySelectorAll('[class*="cursor-pointer"]')].filter((e) => {
+    const i = e.querySelector('img');
+    return i && /pixiv-img/.test(i.getAttribute("src") || "") && !/user-profile/.test(i.getAttribute("src") || "");
+  })[0];
+  el.click(); return "clicked-illust";
+})()`;
+
 async function switchCmd() {
   mkdirSync(OUT, { recursive: true });
   await restartApp();
   const outFile = resolve(OUT, "webview_switch.jsonl");
   writeFileSync(outFile, "");
   for (let g = 0; g < GROUPS; g++) {
-    // home 卡片无 <a>（onClick+useNavigate 跳转）→ 点「含 <img> 的 cursor-pointer 卡」
-    const href = await cdpEvaluate(`(() => {
-      const card = [...document.querySelectorAll('[class*="cursor-pointer"]')].find(e => e.querySelector("img"));
-      return card ? "card" : "none";
-    })()`);
-    if (href === "none") throw new Error("首页无可点击图片卡（feed 未渲染？）");
+    // home 卡片无 <a>（onClick+useNavigate 跳转）→ 点真实插画卡（选择器见 FIND_ILLUST_CARD 注释）
+    const href = await cdpEvaluate(FIND_ILLUST_CARD);
+    if (href === "none") throw new Error("首页无可点击插画卡（feed 未渲染？）");
     const scrollBefore = await cdpEvaluate(`window.scrollY`);
     adbShell(`dumpsys gfxinfo ${PKG} reset`);
     await SLEEP(250);
-    await cdpEvaluate(
-      `(() => { const card = [...document.querySelectorAll('[class*="cursor-pointer"]')].find(e => e.querySelector("img")); card.click(); return "clicked"; })()`,
-    );
+    await cdpEvaluate(CLICK_ILLUST_CARD);
     const fwd = await sampleFrames(
       outFile,
       { scenario: "switch", kind: "forward", group: g, target: href },
@@ -237,6 +273,15 @@ async function switchCmd() {
       scrollAfter,
       restored: Math.abs(scrollAfter - scrollBefore) < 50,
       ...base,
+      parsePath: summary ? "summary" : "profiledata", // E1 新增（与 forward 记录对齐）
+      ...(summary
+        ? {
+            frameCount: summary.frames,
+            frameTotalMs: [],
+            frameTrueTotalMs: [],
+            frameDeadlineMs: [],
+          }
+        : {}),
     };
     appendFileSync(outFile, JSON.stringify(recB) + "\n");
     console.log(
@@ -521,6 +566,11 @@ async function reportCmd() {
       out[k] = {
         gestures: rs.length,
         jankRateMean: +(rs.reduce((s, r) => s + (r.jankRate ?? 0), 0) / rs.length).toFixed(4),
+        // E1 新增：完成口径（FrameCompleted）主指标与每窗口帧数均值（老记录无字段按 0 计）
+        jankTrueRateMean: +(rs.reduce((s, r) => s + (r.jankTrueRate ?? 0), 0) / rs.length).toFixed(
+          4,
+        ),
+        frameCountMean: +(rs.reduce((s, r) => s + (r.frameCount ?? 0), 0) / rs.length).toFixed(1),
         totalP50ofP50: +percentile(
           rs.map((r) => r.totalP50 ?? 0).toSorted((a, b) => a - b),
           50,
