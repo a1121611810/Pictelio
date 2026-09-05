@@ -48,6 +48,7 @@
     "@solid-primitives/scheduled": "^1.5.3",
     "@solid-primitives/scroll": "^2.1.6",
     "@solidjs/router": "^1.0.0",
+    "@tanstack/query-persist-client-core": "5.101.4",
     "@tanstack/solid-db": "^0.2.30",
     "@tanstack/solid-query": "^5.101.4",
     "@tanstack/solid-virtual": "^3.13.36",

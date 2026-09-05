@@ -265,6 +265,9 @@ importers:
       '@solidjs/router':
         specifier: ^1.0.0
         version: 1.0.0(solid-js@1.9.14)
+      '@tanstack/query-persist-client-core':
+        specifier: 5.101.4
+        version: 5.101.4
       '@tanstack/solid-db':
         specifier: ^0.2.30
         version: 0.2.31(solid-js@1.9.14)(typescript@6.0.3)
@@ -2856,6 +2859,9 @@ packages:
 
   '@tanstack/query-core@5.102.8':
     resolution: {integrity: sha512-ZNjkJ33CqvPNec/6lZBnHqLc3EVGPZ9ySLhYahU9TcuRFdmwXewuj0c4hwSWcGHqEUwcSrKeZ+oGcvPBqXcQcg==}
+
+  '@tanstack/query-persist-client-core@5.101.4':
+    resolution: {integrity: sha512-Bmu+RfWhwYEyYZEwSeKC0gX4+KTkiEB3yO8oz9BfAY/Jfe3ndz9EnYVhihIZPmWIr8NXayF7JuraNQcrXQQCCg==}
 
   '@tanstack/solid-db@0.2.31':
     resolution: {integrity: sha512-gK3A60DfsAHq8pusgbhX8UhblpvM+cjNNrSiycTdkYTS82x0OJ3QPBylRKjvYxx2WHv1Q5S9ojGwzm4EQSMXrA==}
@@ -10354,6 +10360,10 @@ snapshots:
 
   '@tanstack/query-core@5.102.8': {}
 
+  '@tanstack/query-persist-client-core@5.101.4':
+    dependencies:
+      '@tanstack/query-core': 5.101.4
+
   '@tanstack/solid-db@0.2.31(solid-js@1.9.14)(typescript@6.0.3)':
     dependencies:
       '@solid-primitives/map': 0.7.4(solid-js@1.9.14)
@@ -10749,9 +10759,9 @@ snapshots:
       obug: 2.1.4
       std-env: 4.2.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.10(@types/node@26.2.0)(@vitest/browser-preview@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.2)(jsdom@30.0.1(canvas@3.2.3))(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.1)(jiti@1.21.7)(terser@5.49.0)(yaml@2.9.0))
+      vitest: 4.1.10(@types/node@26.2.0)(@vitest/browser-preview@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.2)(jsdom@30.0.1(canvas@3.2.3))(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(yaml@2.9.0))
     optionalDependencies:
-      '@vitest/browser': 4.1.10(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.1)(jiti@1.21.7)(terser@5.49.0)(yaml@2.9.0))(vitest@4.1.10)
+      '@vitest/browser': 4.1.10(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(yaml@2.9.0))(vitest@4.1.10)
     optional: true
 
   '@vitest/expect@4.1.10':
@@ -16330,6 +16340,7 @@ time:
   '@solidjs/testing-library@0.8.10': '2024-09-25T13:24:08.486Z'
   '@stryker-mutator/core@10.0.0': '2026-08-14T16:51:22.686Z'
   '@stryker-mutator/vitest-runner@10.0.0': '2026-08-14T16:50:27.414Z'
+  '@tanstack/query-persist-client-core@5.101.4': '2026-07-21T13:04:05.726Z'
   '@tanstack/solid-db@0.2.31': '2026-07-24T21:36:00.605Z'
   '@tanstack/solid-query@5.101.4': '2026-07-21T13:04:07.909Z'
   '@tanstack/solid-virtual@3.13.36': '2026-07-28T20:28:47.026Z'

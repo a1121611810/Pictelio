@@ -50,6 +50,13 @@ vi.mock("@/native/PixivApi", () => ({
   },
 }));
 
+// S2：logout 必须经 clearPersistedFeedsAndCache 原子清空（抑制订阅写回 + 删持久化 + 清内存），
+// mock 掉真实实现以断言调用契约（防回退成手写「clearPersistedFeeds + clear」两步复活空 payload）
+const mockClearPersistedFeedsAndCache = vi.fn();
+vi.mock("@/api/feedQueryPersist", () => ({
+  clearPersistedFeedsAndCache: (...args: unknown[]) => mockClearPersistedFeedsAndCache(...args),
+}));
+
 async function loadStore() {
   vi.resetModules();
   return import("@/stores/authStore");
@@ -286,6 +293,8 @@ describe("authStore", () => {
       expect(store.refreshTokenSig()).toBeNull();
       expect(mockSecureRemove).toHaveBeenCalled();
       expect(mockRotationListener.remove).toHaveBeenCalled();
+      // S2 防线：必须走原子清空封装（内部含 queryClient.clear），不得回退成两步手写
+      expect(mockClearPersistedFeedsAndCache).toHaveBeenCalledTimes(1);
     });
 
     it("Java 401 轮换事件 → 持久化新 token 并更新内存", async () => {
