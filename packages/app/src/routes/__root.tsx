@@ -127,13 +127,18 @@ const RootLayout: Component = (props: { children?: any }) => {
       removeStartupScrollGuard?.();
     });
 
-    // Load persisted preferences (async) — 统一由 Settings registry 批量加载
-    await Promise.all([
+    // Load persisted preferences (async) — 统一由 Settings registry 批量加载。
+    // FT-2（#365 P2）：水合（~数十次 Preferences 桥 IPC）与 auth 恢复（secure storage +
+    // token 网络刷新）无数据依赖，二者并行——auth 不再串行等水合。唯一顺序点：
+    // loadAccountR18 回写 settings 必须发生在 hydrateAll 打开写门槛（phase=warm）之后，
+    // 故在 auth 分支内先 await hydrated；isLoading 释放同样以 hydrated 完成为前提
+    // （保证 feed 首帧渲染时屏蔽列表/举报列表/R18 过滤等已就绪）。
+    const hydrated = Promise.all([
       settings.hydrateAll(),
       loadReportedIds(),
       loadBlockedIds(),
       loadImageHostPreference(),
-    ]);
+    ]).then(() => undefined);
 
     // 后台预热 LRU 缓存（从 Android 文件系统读取最近图片，不阻塞启动流程）
     warmCacheFromDisk();
@@ -151,6 +156,7 @@ const RootLayout: Component = (props: { children?: any }) => {
     const [authErr] = await tryAsync(
       (async () => {
         await initializeAuth();
+        await hydrated;
         await loadAccountR18();
         if (isLoggedIn()) {
           if (location.pathname !== "/home") {
@@ -163,6 +169,8 @@ const RootLayout: Component = (props: { children?: any }) => {
         }
       })(),
     );
+    // 水合完成（写门槛 warm + 屏蔽/举报/R18 就绪）后才释放 isLoading 渲染内容
+    await hydrated;
     setIsLoading(false);
     // 兜底关闭 Splash：非 Feed 页面（login 等）
     // 由 Login.tsx 或 Feed.tsx 负责主动触发，此处兜底确保不会泄漏
