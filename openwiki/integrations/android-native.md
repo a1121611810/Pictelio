@@ -107,7 +107,7 @@ Introduced in **v3.18.0** as the sole gateway for all Pixiv API communication (A
 - **401 auto-refresh** — Java side detects 401 responses, uses `synchronized` + `isRefreshing` flag to refresh the token internally, then retries once. The `refresh_token` used for the exchange is read from Java memory (injected by JS) — no SharedPreferences disk read. No JS-side Promise queue needed in production.
 - **`syncToken({ token })`** (v3.21.6, replaces `setRefreshToken`) — syncs the `refresh_token` into Java memory only, never written to disk. A `null`/empty token clears the memory value (and, on logout, the `access_token` as defense-in-depth) and idempotently removes the historical plaintext residue in `PictelioPrefs.xml` left by the old native `setRefreshToken`.
 - **`refreshTokenRotated` event** — if the Java-side 401 silent refresh receives a rotated `refresh_token`, Java updates its own memory and notifies JS via this event so `authStore` persists the new value (`saveRefreshToken`) instead of restoring a stale token after restart. Pixiv does not currently rotate refresh tokens, so this is defensive (see [API Layer — Token Persistence](/openwiki/architecture/api-layer.md#token-persistence--backup-integrity)).
-- **`prefetchImage({ url })`** — downloads images directly to the Android disk cache directory, zero bytes enter the JS heap. Since v4.32.0 (round-3 B5/F3) the write uses `tmp+rename` atomic replacement (matching `writeFile`), so a truncated write can never be read back as a cache hit; `.tmp` residue is also cleaned so it can't break the `getCachedKeys` warmup path.
+- **`prefetchImage({ url })`** — downloads images directly to the Android disk cache directory, zero bytes enter the JS heap. Since v4.32.0 (round-3 B5/F3) the write uses `tmp+rename` atomic replacement (matching `writeFile`), so a truncated write can never be read back as a cache hit; `.tmp` residue is also cleaned so it can't break the `getCachedKeys` warmup path. Since v4.35.0 (#379/#381) prefetch delegates the download to [`PixivImageLoader`](#pixivimageloader)'s core and takes the **official URL** as input — the download source follows the image host via [`ImageHostConfig.resolve()`](#imagehostconfig-v4350-adr-0143), but the cache key stays the official URL (see [Image Host Selection](/openwiki/architecture/image-pipeline.md#image-host-selection)).
 - **`getSharedClient()`** (static, package-private) — exposes the internal shared `OkHttpClient` so `MainActivity.interceptImage()` can reuse the same connection pool instead of creating per-request `HttpURLConnection` instances. Reduces connection setup overhead for image proxy requests.
 - Credentials and OAuth config live only in compiled Java bytecode
 
@@ -335,6 +335,21 @@ Shared image loading core — the single source of truth for Pixiv image downloa
 **Consumers:**
 - **WebView path:** `MainActivity.interceptImage()` — calls `PixivImageLoader.cachedFile()` for disk cache hits, `loadBytes()` for cache-miss-with-write, or `download()` when disk cache is off; wraps results in `WebResourceResponse` via `bytesResponse()` and `mimeFor()` helpers
 - **Lynx path:** [`PictelioImageService`](#pictelioimageservice) — reads cached bytes, decodes to `Bitmap`, and delivers via `ImageLoadListener.onSuccess`
+
+### ImageHostConfig (v4.35.0, ADR-0143)
+
+**Java:** [`/packages/app/android/app/src/main/java/io/pictelio/app/ImageHostConfig.java`](/packages/app/android/app/src/main/java/io/pictelio/app/ImageHostConfig.java)
+**Test:** `/packages/app/android/app/src/test/java/io/pictelio/app/ImageHostConfigTest.java`
+
+New deep module (both flavors share `src/main/`) that makes the image host (mirror) actually work on Android — previously its URL rewriting never reached the native out-image path, and native prefetch keyed cached bytes by the *mirror* URL while the display interceptor looked up by the *official* URL (dead prefetch data). Its single public entry `resolve(officialUrl)` decides, per download, which source URL to fetch from; the JS `imageHostStore`/`imageHostService` remain the config producer (settings + Web/dev), read natively through a `RawProvider` seam over the `image_host_settings` key in `SharedPreferences("CapacitorStorage")`.
+
+- **Four thin adapters** wire it into every download path — `PixivImageLoader.download`, `PixivApiPlugin.prefetchImage`, and lynx `PictelioApiModule.downloadZip`/`streamDownloadZip` — so the decision reaches images and ugoira zips on both engines.
+- **Cache-key invariant:** callers must key cache entries by the **official input URL** (not the resolved mirror URL), so source/switch/host changes never invalidate cached bytes. An anti-drift test asserts `keyToFilename(officialUrl)` ≡ the interceptor's `rewriteUrl` product.
+- **Four-mode mapping:** `single` (selected host, fallback first enabled) / `weighted` (per-request weight sampling, injected `Random`) / `fastest-ip` (30s-TTL in-memory probe, immediate weighted fallback + single-flight lazy 5s probe) / `race` (explicitly degrades to `weighted` — native never implemented race).
+- **Failure & validation:** mirror failure → one official retry; corrupt config → host treated off + `Log.w`; mirror host on the official pximg.net domain is skipped (anti-self-loop). Native settings validation now rejects `http://` mirrors and startup migrate disables legacy `http://` hosts (#383).
+- **Testability:** `RawProvider`/`Clock`/`Random`/`ProbeFn`/`Executor` are constructor-injected, and the singleton is keyed to the Application `Context` (rebuilds per Robolectric test) — no real HTTP, no real clock, no cross-test static config leakage.
+
+See [Image Loading Pipeline — Image Host Selection](/openwiki/architecture/image-pipeline.md#image-host-selection).
 
 ### ImageIntercept & ImageBytesMemoryCache (v4.32.0)
 
