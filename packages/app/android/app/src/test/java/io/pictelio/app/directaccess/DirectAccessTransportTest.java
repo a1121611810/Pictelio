@@ -59,9 +59,11 @@ import okhttp3.tls.HeldCertificate;
  *       RecordingDns 对照断言且更强（端到端建连事实）；</li>
  *   <li>Host 头 = 官方域名 + 端口：OkHttp 线缆格式（Host: host:port，非默认端口必带端口），
  *       由服务端 RecordedRequest 逐字节断言——URL/Host 恒不改写不变量的独立观测点；</li>
- *   <li>SNI 剥离期望（钉定连接 requestedServerNames 为空 / 系统路线为 ["localhost"]）：
- *       JDK TLS 协议行为（服务端 ExtendedSSLSession.getRequestedServerNames 返回客户端
- *       ClientHello 的 SNI 扩展原文）——观测点在服务端 socket 工厂，与被测客户端实现无关；</li>
+ *   <li>SNI 剥离期望（钉定连接 requestedServerNames 为空 / 系统路线携带 SNI）：
+ *       JDK TLS 协议行为（客户端 ExtendedSSLSession.getRequestedServerNames = JDK 从
+ *       createSocket host 参数派生的 ClientHello SNI 决策结果，与服务端 wire 观测同源）
+ *       ——观测点在客户端会话，握手完成后同步可读（2026-09-07 由服务端异步监听器改造：
+ *       CI 慢机上异步落账竞态曾致误报，观测语义不变）；</li>
  *   <li>熔断口径（3 连败 open / 冷却后半开单探 / 成功恢复清零 / 失败重开 / 421 计失败 /
  *       body 断流不计 / 其余 4xx 5xx 计传输成功）：spec #385 实施决策原文 +
  *       ChannelCircuitBreaker 契约 1-4 + ticket #389「421 无条件计边缘错配；连接/握手/
@@ -353,114 +355,21 @@ public class DirectAccessTransportTest {
         return host != null ? host : recorded.getHeader(":authority");
     }
 
-    // ── 全链路：SNI 剥离决策（ticket 验收 1，服务端观测） ────
-
-    /** 服务端 SNI 观测工厂：包裹 MockWebServer 证书工厂，捕获每次握手的客户端请求 SNI */
-    private static final class SniCapturingServerFactory extends SSLSocketFactory {
-        final SSLSocketFactory delegate;
-        /** 每次握手一条：客户端 ClientHello 的 SNI 名列表（ExtendedSSLSession 观测，null = 会话不可观测） */
-        final List<Object> capturedServerNames = Collections.synchronizedList(new ArrayList<>());
-
-        SniCapturingServerFactory(SSLSocketFactory delegate) {
-            this.delegate = delegate;
-        }
-
-        @Override
-        public Socket createSocket(Socket s, String host, int port, boolean autoClose) throws IOException {
-            // MockWebServer 4.12 accept 后恒经此重载包装（RealConnection.connectTls 同理）
-            Socket socket = delegate.createSocket(s, host, port, autoClose);
-            if (socket instanceof SSLSocket) {
-                ((SSLSocket) socket).addHandshakeCompletedListener(new CapturingListener());
-            }
-            return socket;
-        }
-
-        private final class CapturingListener implements HandshakeCompletedListener {
-            @Override
-            public void handshakeCompleted(HandshakeCompletedEvent event) {
-                SSLSession session = event.getSession();
-                if (!(session instanceof ExtendedSSLSession)) {
-                    capturedServerNames.add("UNOBSERVABLE-SESSION"); // 可见不静默
-                    return;
-                }
-                List<String> names = new ArrayList<>();
-                for (SNIServerName name : ((ExtendedSSLSession) session).getRequestedServerNames()) {
-                    names.add(new String(name.getEncoded(), StandardCharsets.UTF_8));
-                }
-                capturedServerNames.add(names);
-            }
-        }
-
-        @Override
-        public Socket createSocket(String host, int port) throws IOException {
-            return delegate.createSocket(host, port);
-        }
-
-        @Override
-        public Socket createSocket(String host, int port, java.net.InetAddress localHost, int localPort)
-                throws IOException {
-            return delegate.createSocket(host, port, localHost, localPort);
-        }
-
-        @Override
-        public Socket createSocket(java.net.InetAddress host, int port) throws IOException {
-            return delegate.createSocket(host, port);
-        }
-
-        @Override
-        public Socket createSocket(java.net.InetAddress address, int port,
-                                   java.net.InetAddress localAddress, int localPort) throws IOException {
-            return delegate.createSocket(address, port, localAddress, localPort);
-        }
-
-        @Override
-        public String[] getDefaultCipherSuites() {
-            return delegate.getDefaultCipherSuites();
-        }
-
-        @Override
-        public String[] getSupportedCipherSuites() {
-            return delegate.getSupportedCipherSuites();
-        }
-    }
-
-    @Test
-    public void fullLink_sni_strippedForPinnedConnection_sentForNonPinned() throws Exception {
-        // oracle: ticket #389「钉定连接剥 SNI；非钉定连接 SNI 照常」+ JDK TLS 行为
-        // （服务端 getRequestedServerNames = 客户端 ClientHello SNI 扩展原文；JDK 以
-        // createSocket 的 host 参数为 SNI 来源）。被测对象 = SniStrippingSSLSocketFactory
-        // 对真实 TLS 握手的干预；钉定 grant 经 PinnedDns 真实挂载（与线缆路径同源）。
-        // 服务端单证书双 SAN——不按 SNI 选证书，SNI 剥离与否不影响握手成败，观测独立成立。
-        HeldCertificate cert = testCertificate();
-        SniCapturingServerFactory capturing = new SniCapturingServerFactory(serverCerts(cert).sslSocketFactory());
-        server.useHttps(capturing, false);
-        h.pinPinnedHostToLoopback();
-        DirectAccessTransport.PinnedDns dns = new DirectAccessTransport.PinnedDns(
-                () -> SwitchState.ON, h.config::currentTable, h.config.breaker(), h.warns::add);
-        SSLSocketFactory wrapped = new DirectAccessTransport.SniStrippingSSLSocketFactory(
-                clientCerts(cert).sslSocketFactory(), h.warns::add);
-
-        // ① 非钉定连接（无 grant）：真实握手 → ClientHello 携带 SNI（JDK 默认行为，零扰动）
-        handshakeAndCapture(wrapped, dns, false, capturing, 1);
-        // ② 钉定连接（grant 在场）：真实握手 → ClientHello 不携带 SNI（剥离生效）
-        handshakeAndCapture(wrapped, dns, true, capturing, 2);
-
-        assertEquals("非钉定连接 ClientHello 携带 SNI（JDK 默认形态，零扰动对照）",
-                Collections.singletonList(PINNED_HOST), capturing.capturedServerNames.get(0));
-        assertEquals("钉定连接 ClientHello 不携带 SNI（剥离生效）",
-                Collections.emptyList(), capturing.capturedServerNames.get(1));
-    }
+    // ── 全链路：SNI 剥离决策（ticket 验收 1，客户端同步观测） ──
 
     /**
-     * 建立一条真实 TLS 连接（对端 = 本机 MockWebServer 的 TLS 端点）并完成握手：
-     * 先建底层 socket（连接到钉定 IP 字面量），再经被测工厂包装握手；
+     * 建立一条真实 TLS 连接（对端 = 本机 MockWebServer 的 TLS 端点）并完成握手，
+     * 返回<b>客户端会话</b>观测到的 requestedServerNames（即 JDK 从对端 host 参数派生的
+     * ClientHello SNI——服务端 wire 观测的同一决策源，但同步可读零竞态）。
      * pinned=true 时先经 PinnedDns 挂载 grant（与线缆路径同源的钉定语义）。
-     * 服务端 HandshakeCompletedListener 为异步触发（TLS 1.3 下客户端握手返回早于
-     * 服务端通知），等待其捕获数达到 expected 后再关闭连接。
+     *
+     * <p>历史注记（2026-09-07）：原实现用服务端 HandshakeCompletedListener 异步捕获 +
+     * 5s 轮询等待，CI 2 核慢机上钉定握手的监听器落账竞态曾致 IndexOutOfBoundsException；
+     * 本观测点改为客户端同步读取后消除竞态（观测语义不变：同为 ExtendedSSLSession
+     * 的 requestedServerNames，JDK 以 createSocket 的 host 参数为派生源）。
      */
-    private void handshakeAndCapture(SSLSocketFactory wrapped, DirectAccessTransport.PinnedDns dns,
-                                     boolean pinned, SniCapturingServerFactory capturing, int expected)
-            throws Exception {
+    private List<String> handshakeAndObserve(SSLSocketFactory wrapped, DirectAccessTransport.PinnedDns dns,
+                                             boolean pinned) throws Exception {
         if (pinned) {
             dns.lookup(PINNED_HOST); // grant 挂载到当前线程（ThreadLocal，与线缆路径同源）
         } else {
@@ -472,15 +381,44 @@ public class DirectAccessTransportTest {
             SSLSocket tls = (SSLSocket) wrapped.createSocket(raw, PINNED_HOST, server.getPort(), true);
             try {
                 tls.startHandshake();
-                long deadline = System.currentTimeMillis() + 5000;
-                while (capturing.capturedServerNames.size() < expected
-                        && System.currentTimeMillis() < deadline) {
-                    Thread.sleep(10); // 等服务端监听器异步落账
+                SSLSession session = tls.getSession(); // 握手已完成，同步可读
+                if (!(session instanceof ExtendedSSLSession)) {
+                    throw new AssertionError(
+                            "客户端会话不可观测（非 ExtendedSSLSession）: " + session.getClass());
                 }
+                List<String> names = new ArrayList<>();
+                for (SNIServerName name : ((ExtendedSSLSession) session).getRequestedServerNames()) {
+                    names.add(new String(name.getEncoded(), StandardCharsets.UTF_8));
+                }
+                return names;
             } finally {
                 tls.close();
             }
         }
+    }
+
+    @Test
+    public void fullLink_sni_strippedForPinnedConnection_sentForNonPinned() throws Exception {
+        // oracle: ticket #389「钉定连接剥 SNI；非钉定连接 SNI 照常」+ JDK TLS 行为
+        // （客户端 ExtendedSSLSession.getRequestedServerNames = JDK 从 createSocket host
+        // 参数派生的 ClientHello SNI 决策结果；钉定 grant 经 PinnedDns 真实挂载，与线缆
+        // 路径同源）。服务端单证书双 SAN——不按 SNI 选证书，剥离与否不影响握手成败。
+        HeldCertificate cert = testCertificate();
+        server.useHttps(serverCerts(cert).sslSocketFactory(), false);
+        h.pinPinnedHostToLoopback();
+        DirectAccessTransport.PinnedDns dns = new DirectAccessTransport.PinnedDns(
+                () -> SwitchState.ON, h.config::currentTable, h.config.breaker(), h.warns::add);
+        SSLSocketFactory wrapped = new DirectAccessTransport.SniStrippingSSLSocketFactory(
+                clientCerts(cert).sslSocketFactory(), h.warns::add);
+
+        // ① 非钉定连接（无 grant）：真实握手 → ClientHello 携带 SNI（JDK 默认行为，零扰动）
+        List<String> sent = handshakeAndObserve(wrapped, dns, false);
+        assertEquals("非钉定连接 ClientHello 携带 SNI（JDK 默认形态，零扰动对照）",
+                Collections.singletonList(PINNED_HOST), sent);
+        // ② 钉定连接（grant 在场）：ClientHello 不携带 SNI（剥离生效）
+        List<String> stripped = handshakeAndObserve(wrapped, dns, true);
+        assertEquals("钉定连接 ClientHello 不携带 SNI（剥离生效）",
+                Collections.emptyList(), stripped);
     }
 
     // ── 全链路：熔断闭环（ticket 验收 2） ────────────────────

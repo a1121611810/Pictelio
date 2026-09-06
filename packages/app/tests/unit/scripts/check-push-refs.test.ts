@@ -34,7 +34,11 @@ function git(args, cwd) {
 const tempDirs = [];
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((d) => rm(d, { recursive: true, force: true })));
+  // maxRetries：CI 上 git gc/pack 后台写与 rm 竞态会抛 ENOTEMPTY（2026-09-07 CI 实测），
+  // fs/promises rm 对 ENOTEMPTY/EBUSY/EMFILE 原生按 retryDelay 重试后清理
+  await Promise.all(
+    tempDirs.splice(0).map((d) => rm(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })),
+  );
 });
 
 async function commitFiles(repo, files, msg) {
