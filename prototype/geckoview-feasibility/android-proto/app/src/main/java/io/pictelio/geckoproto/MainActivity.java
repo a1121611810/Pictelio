@@ -125,7 +125,13 @@ public class MainActivity extends AppCompatActivity {
         } else {
             rb.remoteDebuggingEnabled(true);
         }
-        runtime = GeckoRuntime.create(this, rb.build());
+        if (GeoProtoApp.eagerRuntime != null) {
+            // App 预热路径：复用 eager create 的 runtime（warmUp 已预分配内容进程）
+            runtime = GeoProtoApp.eagerRuntime;
+            Log.i(TAG, "[boot] runtime 复用自 App 预热");
+        } else {
+            runtime = GeckoRuntime.create(this, rb.build());
+        }
 
         session = new GeckoSession();
         session.open(runtime);
@@ -274,6 +280,34 @@ public class MainActivity extends AppCompatActivity {
      * 内容脚本侧：browser.runtime.sendNativeMessage("pictelio_proto", msg)。
      */
     private static final class ExtBridge implements WebExtension.MessageDelegate {
+        @Override
+        public void onConnect(WebExtension.Port port) {
+            // Port 长连接（connectNative）：ping/pong 无需每次重建消息通道
+            port.setDelegate(new WebExtension.PortDelegate() {
+                @Override
+                public void onPortMessage(Object message, WebExtension.Port p) {
+                    try {
+                        JSONObject msg = message instanceof JSONObject
+                                ? (JSONObject) message
+                                : new JSONObject(String.valueOf(message));
+                        if ("ping".equals(msg.optString("type"))) {
+                            JSONObject reply = new JSONObject();
+                            reply.put("type", "pong");
+                            reply.put("seq", msg.optInt("seq"));
+                            p.postMessage(reply);
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "[ext] port 消息处理失败", e);
+                    }
+                }
+
+                @Override
+                public void onDisconnect(WebExtension.Port p) {
+                    Log.w(TAG, "[ext] port disconnected");
+                }
+            });
+        }
+
         @Override
         public GeckoResult<Object> onMessage(String nativeName, Object message,
                                              WebExtension.MessageSender sender) {

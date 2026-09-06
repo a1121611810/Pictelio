@@ -5,6 +5,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
+        android:name=".GeoProtoApp"
         android:label="GVProto"
         android:allowBackup="false"
         android:icon="@android:drawable/ic_menu_compass"

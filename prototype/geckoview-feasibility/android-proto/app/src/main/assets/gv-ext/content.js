@@ -106,8 +106,41 @@ function netProbe(url, method) {
     });
 }
 
+// Port 长连接桥基准（connectNative；与 sendNativeMessage 同场对比）
+let gvPort = null;
+function getPort() {
+  if (!gvPort) {
+    gvPort = browser.runtime.connectNative("pictelio_proto");
+  }
+  return gvPort;
+}
+
+async function portPingBench(n) {
+  const port = getPort();
+  const samples = [];
+  for (let i = 0; i < n; i++) {
+    const t = performance.now();
+    await new Promise((res) => {
+      const onMsg = (m) => {
+        if (m && m.type === "pong" && m.seq === i) {
+          try { port.onMessage.removeListener(onMsg); } catch (e) { /* 忽略 */ }
+          res(m);
+        }
+      };
+      port.onMessage.addListener(onMsg);
+      port.postMessage({ type: "ping", seq: i });
+    });
+    samples.push(performance.now() - t);
+  }
+  samples.sort((a, b) => a - b);
+  const avg = samples.reduce((s, v) => s + v, 0) / samples.length;
+  const p = (q) => Math.round(samples[Math.min(samples.length - 1, Math.floor(q * samples.length))] * 1000);
+  log(`port_ping_bench n=${n} avg=${avg.toFixed(2)}ms p50=${p(0.5)}us p95=${p(0.95)}us max=${Math.round(samples[samples.length - 1] * 1000)}us`);
+}
+
 window.__gv = {
   pingBench,
+  portPingBench,
   reportState,
   log,
   netProbe,
@@ -157,7 +190,7 @@ if (params.get("__tls") === "1") {
   setTimeout(() => netProbe("https://127.0.0.1:18443/").catch((e) => log("tls_probe_fail " + e)), 5000);
 }
 if (location.search.includes("__ping=1")) {
-  setTimeout(() => pingBench(300).catch((e) => log("ping_bench_fail " + e)), 3000);
+  setTimeout(() => pingBench(300).then(() => portPingBench(300)).catch((e) => log("ping_bench_fail " + e)), 3000);
 }
 
 // ── 5. rAF 帧率基准（跨引擎通用；gfxinfo 看不到 Gecko 自绘合成器的帧） ──

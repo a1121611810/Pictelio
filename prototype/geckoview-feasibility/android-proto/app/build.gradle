@@ -17,6 +17,8 @@ android {
     buildTypes {
         release {
             // 原型口径：R8 + 资源裁剪 + 压缩 so（-PcompressSo）+ debug 签名，测真实分发体积
+            // debuggable=true：run-as 写 A/B 旗标（warmup）需要；生产勿开
+            debuggable true
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'

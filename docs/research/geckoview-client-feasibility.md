@@ -188,6 +188,25 @@
 
 **裁决**：低版本是 GeckoView **唯一有真实收益的场景**——作为「系统 WebView 过旧设备的兼容引擎」，让完整 SPA 覆盖本已死局的设备。但该收益属于**覆盖面**（救活设备）而非体验/成本优势（内存 ×4+、需代理网络）；且是否值得为覆盖率引入三引擎架构，是独立的产品决策。
 
+## 8c. 去 Capacitor 自研壳：已验证的部分与剩余上限（第六轮）
+
+> 本原型**本身就是零 Capacitor 的自研壳**（GeckoView + 内嵌 HTTP 服务器 + WebExtension 消息桥 + Java 网关，SPA 零改动全功能跑通）。针对「不用 Capacitor 自研/换更好方案是否有进一步提升」，本轮把两个可量化的旋钮测完：
+
+| 项 | 实测 | 结论 |
+|----|------|------|
+| 桥 RTT：`sendNativeMessage`（一次性消息） | avg 1.2ms / p50 1ms / p95 5ms（n=300） | 可用但每次重建通道 |
+| **桥 RTT：Port 长连接**（`connectNative` + PortDelegate） | **avg 0.43ms / p50 <0.5ms / p95 2ms**（n=300） | 比 Capacitor 桥（avg 0.57ms / p50 0.6ms）**更快**——自研桥无天花板 |
+| 冷启动：App 级 `create+warmUp()` 预热（run-as 旗标 A/B ×5） | OFF 中位 503ms vs ON 中位 499ms（Android 9 release 包） | **无显著收益**（负结果）：引擎重活在首帧之后，预热只省 Activity 前的少量工作，还预付内容进程内存 |
+| 大 payload（图片字节） | 走本地 HTTP 服务器由引擎直取，零桥流量 | 已是最优路径（与现架构同构） |
+
+**自研壳的资产清点**（若未来采纳 GeckoView，以下已在原型中验证或可直接复用）：内嵌服务器 + SPA 零改动契约（= OTA web bundle 底座雏形，可对接 `OtaInstaller` 指针模型）、Port 消息桥、三通道网络网关（生产应直接换用主工程 `PixivApiCore`/`DirectAccessTransport`，原型是简化版）、`SecureStorageCompat`（Keystore 契约不变，直用）、webRequest 注入 PoC、深度调参 profile。
+
+**自研壳仍需补齐**（Capacitor 目前白给的）：深链/分享/下载 intent、CSP 与安全基线、crash 上报、多窗口/键盘/输入法细节、插件生命周期协议、`ClientInfo`/引擎切换门禁——一次性工程量约数人周，无持续成本。
+
+**「别的更好方案」扫描结论**（对照调研档全景）：GeckoView 生态内唯一值得点名的是 Mozilla 官方嵌入层 **android-components**（Fenix 同款，EngineView/Session 抽象），但它解决的是「多标签浏览器级 session 管理」，对单页 App 是依赖树负担而非收益；Tauri/Wails/Cordova 均弱于现状（调研档 §2）。WebView 路线的裸壳自研已被调研档 §2.1 裁决（dex 仅 0.97MB，去掉换不回东西）。
+
+**底线**：壳不是瓶颈。换任何壳都动不了内存 ×4.7（引擎结构）、FPS 已满帧、API RTT 网络主导这三件事；壳层可优化的只有亚毫秒级桥延迟（已达标）与冷启动（warmUp 无效，剩余手段是 profile/进程模型，已测尽）。
+
 ## 9. 对调研档（8d938b39）结论的增量修正
 
 | 调研档存疑点 | 本次定案 |
