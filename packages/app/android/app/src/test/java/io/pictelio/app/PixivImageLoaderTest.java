@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.Random;
 
 import okhttp3.OkHttpClient;
 import okhttp3.mockwebserver.MockResponse;
@@ -43,6 +44,8 @@ public class PixivImageLoaderTest {
     private static final String CDN = "https://i.pximg.net";
 
     private MockWebServer server;
+    /** 图床用镜像服务器（仅图床用例创建；官方下载源由 {@link #server} 扮演） */
+    private MockWebServer mirrorServer;
     private PixivImageLoader loader;
     private int requestCount;
 
@@ -59,6 +62,9 @@ public class PixivImageLoaderTest {
     @After
     public void tearDown() throws IOException {
         server.shutdown();
+        if (mirrorServer != null) {
+            mirrorServer.shutdown();
+        }
     }
 
     private String enqueueImage(int sizeBytes) {
@@ -317,5 +323,150 @@ public class PixivImageLoaderTest {
         return "0".equals(System.getProperty("user.name"))
                 || "root".equals(System.getenv("USER"))
                 || "root".equals(System.getProperty("user.name"));
+    }
+
+    // ── 图床下载源（ADR-0143 D1/D2/D4，ticket #378 T2） ──────
+
+    /**
+     * 单镜像 single 模式配置（fixture 形状对齐 imageHostStore.ts 持久化形态 + BUILT_IN_HOSTS，
+     * 先例 ImageHostConfigTest；RawProvider/Clock/Random/ProbeFn/Executor 全注入，
+     * 不触 SharedPreferences 与生产单例）。
+     */
+    private static ImageHostConfig singleMirrorConfig(String mirrorBaseUrl) {
+        String raw = "{\"masterEnabled\":true,\"mode\":\"single\",\"selectedHostId\":\"m\""
+                + ",\"hosts\":[{\"id\":\"m\",\"name\":\"mirror\",\"baseUrl\":\"" + mirrorBaseUrl
+                + "\",\"enabled\":true,\"weight\":1,\"isBuiltIn\":false,\"edited\":false}]"
+                + ",\"probeResults\":[],\"fastestHostId\":null,\"fastestHostExpiresAt\":null}";
+        return new ImageHostConfig(() -> raw, () -> 0L, new Random(1L), url -> -1L, Runnable::run);
+    }
+
+    /** 图床关配置（raw = null 即无存储条目的缺省态；resolve 恒等透传） */
+    private static ImageHostConfig hostOffConfig() {
+        return new ImageHostConfig(() -> null, () -> 0L, new Random(1L), url -> -1L, Runnable::run);
+    }
+
+    /** 每行递增字节的确定性 body（值域对齐 enqueueImage 先例） */
+    private static byte[] bodyBytes(int sizeBytes) {
+        byte[] body = new byte[sizeBytes];
+        for (int i = 0; i < sizeBytes; i++) body[i] = (byte) (i % 251);
+        return body;
+    }
+
+    @Test
+    public void keyToFilename_rewriteUrlProduct_equalsOfficialUrlKey() {
+        // Anti-drift 防线（ADR-0143 D2 源无关命中不变量；spec #376 测试决策「anti-drift 防线」，
+        // 期望值出处遵循测试硬约束 #6）：拦截侧 rewriteUrl 产物与官方 CDN URL 字面量是两条独立
+        // 路径，必须产出同一缓存键——若任一侧改写规则漂移（normalize/编码差异），预取/显示与
+        // 拦截将查写不同条目，重现「键二次断裂」（预取字节成死数据、显示永不命中）。
+        String official = "https://i.pximg.net/img-master/2020/01/01/abc.jpg";
+        assertEquals(PixivImageLoader.keyToFilename(official),
+                PixivImageLoader.keyToFilename(
+                        PixivImageLoader.rewriteUrl("/pixiv-img/img-master/2020/01/01/abc.jpg")));
+    }
+
+    @Test
+    public void download_mirrorHit_requestsMirrorWithReferer_cachesUnderOfficialKey() throws Exception {
+        mirrorServer = new MockWebServer();
+        mirrorServer.start();
+        // 镜像源字节（值域与 bodyBytes 反相，证明字节确来自镜像而非官方）
+        byte[] body = new byte[128];
+        for (int i = 0; i < body.length; i++) body[i] = (byte) (255 - i);
+        mirrorServer.enqueue(new MockResponse().setResponseCode(200).setBody(new okio.Buffer().write(body)));
+        String official = server.url("/img-master/img/2020/01/01/mirror-hit.jpg").toString();
+        loader = new PixivImageLoader(ApplicationProvider.getApplicationContext(),
+                new OkHttpClient.Builder().build(), 1 << 20,
+                singleMirrorConfig(mirrorServer.url("/").toString()));
+
+        assertArrayEquals(body, loader.loadBytes(official));
+
+        // 请求打到镜像（resolve 仅替换 host:port，path 逐字节保留），官方零流量
+        assertEquals(1, mirrorServer.getRequestCount());
+        assertEquals(0, server.getRequestCount());
+        RecordedRequest req = mirrorServer.takeRequest();
+        assertEquals("/img-master/img/2020/01/01/mirror-hit.jpg", req.getPath());
+        // 防盗链契约对镜像同样成立（镜像站代理官方资源需 Referer/UA）
+        assertEquals("https://app-api.pixiv.net/", req.getHeader("Referer"));
+        assertNotNull(req.getHeader("User-Agent"));
+
+        // 缓存键恒官方 URL（ADR-0143 D2）：镜像源字节落官方键，镜像键零条目
+        assertNotNull(loader.cachedFile(official));
+        assertNull(loader.cachedFile(
+                mirrorServer.url("/img-master/img/2020/01/01/mirror-hit.jpg").toString()));
+    }
+
+    @Test
+    public void download_mirrorHttp500_retriesOfficialOnce_cachesUnderOfficialKey() throws Exception {
+        mirrorServer = new MockWebServer();
+        mirrorServer.start();
+        byte[] body = bodyBytes(96);
+        mirrorServer.enqueue(new MockResponse().setResponseCode(500));
+        server.enqueue(new MockResponse().setResponseCode(200).setBody(new okio.Buffer().write(body)));
+        String official = server.url("/img-master/img/2020/01/01/fallback.jpg").toString();
+        loader = new PixivImageLoader(ApplicationProvider.getApplicationContext(),
+                new OkHttpClient.Builder().build(), 1 << 20,
+                singleMirrorConfig(mirrorServer.url("/").toString()));
+
+        assertArrayEquals(body, loader.loadBytes(official));
+
+        // 镜像恰一次失败 + 官方恰一次重试成功（回退不递归：官方再失败即上抛，见 both-fail 用例）
+        assertEquals(1, mirrorServer.getRequestCount());
+        assertEquals(1, server.getRequestCount());
+        // 缓存以官方 URL 键落盘（D2）；镜像键零条目
+        assertNotNull(loader.cachedFile(official));
+        assertNull(loader.cachedFile(
+                mirrorServer.url("/img-master/img/2020/01/01/fallback.jpg").toString()));
+    }
+
+    @Test
+    public void download_mirrorConnectRefused_fallsBackToOfficial() throws Exception {
+        // 镜像 connect 失败（先起服务占端口再关闭 → 连接拒绝）→ IOException → 官方回退成功
+        MockWebServer dead = new MockWebServer();
+        dead.start();
+        String deadBase = dead.url("/").toString();
+        dead.shutdown();
+        byte[] body = bodyBytes(64);
+        server.enqueue(new MockResponse().setResponseCode(200).setBody(new okio.Buffer().write(body)));
+        String official = server.url("/img-master/img/2020/01/01/connect-refused.jpg").toString();
+        loader = new PixivImageLoader(ApplicationProvider.getApplicationContext(),
+                new OkHttpClient.Builder().build(), 1 << 20, singleMirrorConfig(deadBase));
+
+        assertArrayEquals(body, loader.loadBytes(official));
+        assertEquals(1, server.getRequestCount());
+        assertNotNull(loader.cachedFile(official));
+    }
+
+    @Test
+    public void download_mirrorAndOfficialBothFail_throwsMirrorOriginalError_noCache() throws Exception {
+        // IO 边界失败路径覆盖（测试硬约束 #1）：镜像与官方均失败 → 上抛、零缓存落盘
+        mirrorServer = new MockWebServer();
+        mirrorServer.start();
+        mirrorServer.enqueue(new MockResponse().setResponseCode(503));
+        server.enqueue(new MockResponse().setResponseCode(500));
+        String official = server.url("/img-master/img/2020/01/01/both-fail.jpg").toString();
+        loader = new PixivImageLoader(ApplicationProvider.getApplicationContext(),
+                new OkHttpClient.Builder().build(), 1 << 20,
+                singleMirrorConfig(mirrorServer.url("/").toString()));
+
+        IOException ex = assertThrows(IOException.class, () -> loader.loadBytes(official));
+        // 申报语义（ticket #378）：重试仍失败抛镜像原始异常——503 来自镜像而非官方的 500
+        assertTrue(ex.getMessage().contains("503"));
+        assertEquals(1, mirrorServer.getRequestCount());
+        assertEquals(1, server.getRequestCount());
+        assertNull("两条路径均失败不得写缓存", loader.cachedFile(official));
+    }
+
+    @Test
+    public void download_hostOff_identity_singleOfficialRequest() throws Exception {
+        // resolve 恒等（图床关 fixture：raw=null 缺省态）→ 与既有官方路径逐字节等价（回归保护）：
+        // 单次官方请求、官方键落盘
+        byte[] body = bodyBytes(64);
+        server.enqueue(new MockResponse().setResponseCode(200).setBody(new okio.Buffer().write(body)));
+        String official = server.url("/img-master/img/2020/01/01/host-off.jpg").toString();
+        loader = new PixivImageLoader(ApplicationProvider.getApplicationContext(),
+                new OkHttpClient.Builder().build(), 1 << 20, hostOffConfig());
+
+        assertArrayEquals(body, loader.loadBytes(official));
+        assertEquals(1, server.getRequestCount());
+        assertNotNull(loader.cachedFile(official));
     }
 }

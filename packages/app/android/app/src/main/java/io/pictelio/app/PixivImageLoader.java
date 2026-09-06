@@ -15,7 +15,9 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -32,6 +34,9 @@ import okhttp3.Response;
  *   <li>磁盘缓存读写 + 淘汰：目录/文件名/上限沿用现有约定（{@code OAuthConfig.CACHE_DIR}、
  *       Base64 URL-safe no-padding 文件名、{@code CACHE_MAX_BYTES}），与
  *       {@code ImageCachePlugin}/{@code PixivApiPlugin.prefetchImage} 同规则 → 双 client 共享缓存</li>
+ *   <li>下载源决策（ADR-0143 D1/D4）：{@link ImageHostConfig#resolve} 决定镜像/官方下载源，
+ *       镜像失败回退官方一次；<b>缓存键恒官方 URL</b>（D2 源无关命中不变量，本类缓存路径
+ *       只认官方入参，不消费 resolve 返回值）</li>
  * </ul>
  *
  * <p>消费方（薄适配，不复制逻辑）：{@code MainActivity.interceptImage}（webview 流形态）、
@@ -42,10 +47,15 @@ public final class PixivImageLoader {
     private static final String TAG = "PixivImageLoader";
     /** 缓存目录名（对齐 OAuthConfig.CACHE_DIR / PixivApiPlugin.CACHE_DIR_NAME） */
     private static final String CACHE_DIR_NAME = "pictelio-images";
+    /** 镜像下载预算（ADR-0143 D4 / spec #376：connect 5s / call 15s，低于官方——劣化镜像不拖慢回退） */
+    private static final int MIRROR_CONNECT_TIMEOUT_SECONDS = 5;
+    private static final int MIRROR_CALL_TIMEOUT_SECONDS = 15;
 
     private final Context context;
     private final OkHttpClient client;
     private final long maxCacheBytes;
+    /** 图床下载源决策（ADR-0143 D1 深模块；resolve 不命中时行为与既有官方路径逐字节一致） */
+    private final ImageHostConfig imageHostConfig;
     /** per-URL 锁：并发同 URL 加载时避免截断写同一缓存文件（webview 拦截为多线程） */
     private final ConcurrentHashMap<String, Object> urlLocks = new ConcurrentHashMap<>();
 
@@ -53,11 +63,18 @@ public final class PixivImageLoader {
         this(context, PixivApiCore.getSharedClient(), OAuthConfig.CACHE_MAX_BYTES);
     }
 
-    /** 包可见注入构造（测试注入 mock 网络与可触发淘汰的小缓存上限） */
+    /** 包可见注入构造（测试注入 mock 网络与可触发淘汰的小缓存上限）；图床配置默认走生产单例 */
     PixivImageLoader(Context context, OkHttpClient client, long maxCacheBytes) {
+        this(context, client, maxCacheBytes, ImageHostConfig.get(context));
+    }
+
+    /** 全注入构造（包可见）：测试注入固定图床配置，不触生产单例与 SharedPreferences */
+    PixivImageLoader(Context context, OkHttpClient client, long maxCacheBytes,
+            ImageHostConfig imageHostConfig) {
         this.context = context.getApplicationContext();
         this.client = client;
         this.maxCacheBytes = maxCacheBytes;
+        this.imageHostConfig = imageHostConfig;
     }
 
     // ── URL 重写（/pixiv-img/ → i.pximg.net） ─────────────────
@@ -99,10 +116,43 @@ public final class PixivImageLoader {
         return f.exists() && f.length() > 0 ? f : null;
     }
 
-    // ── 下载（Referer/UA 注入，防盗链契约） ───────────────────
+    // ── 下载（Referer/UA 注入防盗链；下载源跟随图床，缓存键恒官方——ADR-0143 D1/D2/D4） ──
 
-    /** 下载图片字节；非 2xx 或空 body 抛 IOException */
+    /**
+     * 下载图片字节；非 2xx 或空 body 抛 IOException。
+     *
+     * <p>下载源决策（ADR-0143 D1/D4）：{@link ImageHostConfig#resolve} 命中镜像时先走镜像
+     * （专用预算 client：connect 5s / call 15s，newBuilder 复用共享连接池/线程池，不新建全局单例），
+     * 失败（IOException/非 2xx）Log.w 后以官方 URL 重试一次；重试仍失败抛镜像原始异常
+     * （ticket #378 申报语义——失败上下文已由 Log.w 记录，抛出侧保持首次失败现场）。
+     * resolve 恒等（图床关/配置损坏/无可用 host）时与既有官方路径逐字节一致（回归保护）。
+     * <b>缓存键恒官方 URL</b>（D2 源无关命中）：本方法不触缓存，调用方 loadFile/loadBytes
+     * 继续以官方入参寻址——换源/开关图床/换镜像均不使已缓存条目失效。
+     */
     public byte[] download(String url) throws IOException {
+        String downloadUrl = imageHostConfig.resolve(url);
+        if (!Objects.equals(downloadUrl, url)) {
+            // 镜像生效：预算仅用于镜像请求（官方回退保持现有 client，避免镜像预算缩窄官方通路）
+            OkHttpClient mirrorClient = client.newBuilder()
+                    .connectTimeout(MIRROR_CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                    .callTimeout(MIRROR_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                    .build();
+            try {
+                return fetch(mirrorClient, downloadUrl);
+            } catch (IOException mirrorError) {
+                Log.w(TAG, "镜像下载失败，回退官方: " + url, mirrorError);
+                try {
+                    return fetch(client, url);
+                } catch (IOException officialError) {
+                    throw mirrorError; // 申报语义：重试仍失败抛镜像原始异常（ticket #378）
+                }
+            }
+        }
+        return fetch(client, url);
+    }
+
+    /** 单次 HTTP 请求：Referer/UA 注入（i.pximg.net 防盗链契约，镜像站代理官方资源同样适用） */
+    private static byte[] fetch(OkHttpClient client, String url) throws IOException {
         Request request = new Request.Builder()
                 .url(url)
                 .addHeader("Referer", OAuthConfig.REFERER)
