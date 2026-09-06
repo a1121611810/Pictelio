@@ -1,9 +1,9 @@
 {
-  "version": "4.33.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.33.0",
-  "changelog": "🔧 其他\n  0fc1d2d1 Merge branch 'fix/ri-368-regression'\n  85e02e2d Merge branch 'fix/ri-364-back-feel' into fix/ri-368-regression\n  7f718687 Merge branch 'fix/ri-365-coldstart' into fix/ri-366-shimmer\n📝 文档\n  6d618b14 docs(research): 最终实际报告——四痛点前后对比 + 回归脚本 README + 首轮全量结果（#368/#361）\n  49daca86 docs(research): FT-4 报告——邻页预取消灭翻页黑屏，验证证据（#367）\n  d47057c3 docs(research): FT-3 报告——真因定性（loading 信号失真→骨架提前卸载→空白窗）与验证（#366）\n  0e8964ef docs: update OpenWiki (#370)\n  0bd9d621 docs(research): 老化曲线 checkpoint 12 与判读——本序列不复现老化（#364）\n  058fa981 docs(research): 老化曲线 checkpoint 8 复测（#364）\n  d483f9a9 docs(research): 老化曲线 checkpoint 4 复测（#364）\n  c615cf3d docs(research): 老化曲线 checkpoint 0 基线与复测（#364）\n  badcbd34 docs(research): FT-2 冷启动验收证据——静止段与 WaitTime 达标（#365）\n  f4e3db21 docs(research): FT-2 冷启动分段诊断——双口径（暖1.8s/冷6s）与主控段定位（#365）\n  c24ff8ca docs(research): FT-2 改造后返回过渡 3 rep 录屏与逐帧（#364）\n  18f66c69 docs(research): FT-1 改造前返回基线 3 rep 录屏与逐帧（#364）\n🐛 修复\n  2a0d0a11 fix(scripts): back 场景未就绪 rep 跳过防方差污染（#368）\n  5a67f111 fix(scripts): 登录守卫 adb 键入重试 + coldstart 预检重登（#368 登出竞态坑）\n  ca022620 fix(scripts): mp4 解析失败同路降级 screencap 重跑（#368）\n  aab108ba fix(app): FT-3 自审修复——shimmer 定位契约按消费方意图、ApiError mock 真实枚举（#366）\n  51795ebf fix(store): loading 首载粘滞——修 merge 多源下骨架提前卸载成空白窗（#366）\n  cb8a2aee fix(scripts): t1 探针清窗口移至手势前，修正跨轮错测（#365 复检 F2-R1）\n  c7e64f67 fix(app): FT-2 审查修复——注释/bench 探针/幂等测试/testid（#365）\n  f081ea6a fix(app): 审查修复——4 页补 PageTransition、transitionend 目标过滤、补 3 例测试（#364 A）\n✨ 新功能\n  316d8786 feat(app): 查看器邻页预取+预览异步加载+等待态可见性——消灭翻页黑屏静帧（#367）\n  84c1a8fa feat(home): 首屏骨架 shimmer 化并为封面加渐进占位，补骨架渲染分支契约测试（#365）\n  0deabdba feat(app): 返回方向 Fluent 页面过渡——快照覆盖层吸收 remount 冻结（#364 A）\n⚡ 性能\n  2ebd5f73 perf(app): SkeletonShimmer 改 transform 扫光层，合成器驱动不受主线程长任务影响（#366）\n  5e257b07 perf(startup): 关断桥调用日志刷屏并并行化 settings 水合与 auth 恢复（#365）\n  8254ba61 perf(startup): splash 提前释放至根布局 loading 首帧，消除冷启动零反馈静止段（#365）\n🧹 杂项\n  3d9013d1 chore(scripts): 引入真实交互体检工具与报告基线（#362）\n  1a17b80c chore(scripts): 引入真实交互体检工具与报告基线（#362）\n  70d48391 chore(scripts): 引入真实交互体检工具与报告基线（#362）\n🧪 测试\n  1b341bb0 test(app): backTransitionService 与 PageTransition 单测（#364 A）",
+  "version": "4.34.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.34.0",
+  "changelog": "🔧 其他\n  19fe0524 Merge branch 'fix/ri-371-idle-feed-prefetch'（地图 #371：首页 Feed 空闲预取，消除首访骨架等待）\n🧪 测试\n  337bba7f test(app): 补预取失败清理的正向断言与 fake timers 卫生（复检 N1/P3）\n🐛 修复\n  8a44b4cd fix(app): 预取审查闭环——ensureLoaded 补 revalidateIfStale 恢复真实 SWR + 预取失败重置缓存\n✨ 新功能\n  cb410a60 feat(app): 首页 Feed 空闲预取——填空式预载全部 tab 消除首访骨架等待",
   "webBundle": {
-    "version": "4.33.0",
-    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.33.0/pictelio-4.33.0"
+    "version": "4.34.0",
+    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.34.0/pictelio-4.34.0"
   }
 }
