@@ -88,11 +88,21 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // 2. GeckoRuntime + Session
-        runtime = GeckoRuntime.create(this, new GeckoRuntimeSettings.Builder()
+        // tuned 口径（intent extra --ez tuned true）：嵌入式场景调参——关 Fission 多内容进程
+        // （内存大头）、MSAA 降档、关 consoleOutput（logcat 噪音+开销）。未指定时保持
+        // Firefox 浏览器级默认（与首轮测试同口径，便于 A/B）。
+        boolean tuned = intent != null && intent.getBooleanExtra("tuned", false);
+        GeckoRuntimeSettings.Builder rb = new GeckoRuntimeSettings.Builder()
                 .remoteDebuggingEnabled(true)
-                .consoleOutput(true)        // 页面/扩展 console → logcat（155 无 ConsoleDelegate）
-                .aboutConfigEnabled(true)
-                .build());
+                .consoleOutput(!tuned)      // 页面/扩展 console → logcat（155 无 ConsoleDelegate）
+                .aboutConfigEnabled(true);
+        if (tuned) {
+            rb.fissionEnabled(false)
+                    .glMsaaLevel(0)
+                    .debugLogging(false);
+            Log.i(TAG, "[boot] TUNED profile: fission=off msaa=0 consoleOutput=off");
+        }
+        runtime = GeckoRuntime.create(this, rb.build());
 
         session = new GeckoSession();
         session.open(runtime);

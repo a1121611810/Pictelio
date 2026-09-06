@@ -30,6 +30,14 @@ android {
         resources {
             excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE*', 'META-INF/NOTICE*', 'META-INF/MOZILLA_PSK']
         }
+        // 包体压缩口径：so 压缩存入 APK（安装时解压，首启动略慢）。
+        // 默认（false/未设）为 page-align 未压缩直载——APK 201MB 的主因之一。
+        // 通过 -PcompressSo=true 开启对比。
+        if (project.hasProperty('compressSo')) {
+            jniLibs {
+                useLegacyPackaging = true
+            }
+        }
     }
 }
 
