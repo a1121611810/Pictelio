@@ -1,6 +1,6 @@
 package io.pictelio.app;
 
-import io.pictelio.app.config.OAuthConfig;
+import android.content.Context;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -15,15 +15,13 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 
-import okhttp3.Request;
-import okhttp3.Response;
-
 /**
  * Pixiv API 请求插件 — Capacitor 薄壳（#114），网络引擎已提取至 PixivApiCore。
  *
  * 所有 Pixiv App-API 请求通过此插件转发，自动注入 Authorization、
  * Referer、User-Agent；遇到 401 时内部静默刷新 token 后重试一次。
- * 图片预缓存直接将 i.pximg.net 资源下载到应用缓存目录。
+ * 图片预缓存经 PixivImageLoader 下载核心落盘到应用缓存目录
+ *（下载源随图床配置生效，缓存键恒为官方 URL——ADR-0143）。
  *
  * 调用方式（JS 侧）：
  *   PixivApi.request({ method, path, params, body })
@@ -33,9 +31,30 @@ import okhttp3.Response;
 @CapacitorPlugin(name = "PixivApi")
 public class PixivApiPlugin extends Plugin {
 
-    private static final String CACHE_DIR_NAME = "pictelio-images";
     private static final String PREFS_NAME = "PictelioPrefs";
     private static final String KEY_REFRESH_TOKEN = "refresh_token";
+
+    /** 共享图片加载器单例（与拦截链路共享同一下载核心）。Context 键控绑定：生产进程内
+     *  ApplicationContext 恒同一对象（绑定永不触发重建）；Robolectric 每用例新建 Application
+     *  → 自动重建，保证测试间无静态加载器/图床配置泄漏。 */
+    private static volatile PixivImageLoader imageLoader;
+    private static volatile Context imageLoaderApp;
+
+    private static PixivImageLoader imageLoader(Context context) {
+        Context app = context.getApplicationContext();
+        PixivImageLoader l = imageLoader;
+        if (l == null || imageLoaderApp != app) {
+            synchronized (PixivApiPlugin.class) {
+                app = context.getApplicationContext();
+                if (imageLoader == null || imageLoaderApp != app) {
+                    imageLoader = new PixivImageLoader(app);
+                    imageLoaderApp = app;
+                }
+                l = imageLoader;
+            }
+        }
+        return l;
+    }
 
     // ─── 插件方法：通用 API 请求 ─────────────────────────────
 
@@ -125,6 +144,14 @@ public class PixivApiPlugin extends Plugin {
 
     // ─── 插件方法：预缓存图片 ─────────────────────────────────
 
+    /**
+     * 图片预缓存（ADR-0143 T3）：下载源委托 {@link PixivImageLoader#download}——图床
+     * resolve、镜像失败官方回退、Referer/UA 注入均在下载核心内（与拦截链路同源），
+     * 本壳只做参数校验与结果映射。
+     *
+     * <p>缓存键契约（ADR-0143 D2 源无关命中不变量）：磁盘文件名与内存缓存键一律用
+     * <b>官方入参 url</b>（而非 resolve 后的下载 URL）——下载源跟随图床，缓存键不跟随。
+     */
     @PluginMethod
     public void prefetchImage(PluginCall call) {
         String url = call.getString("url");
@@ -134,58 +161,78 @@ public class PixivApiPlugin extends Plugin {
         }
 
         try {
-            // 确保缓存目录存在
-            File cacheDir = new File(getContext().getCacheDir(), CACHE_DIR_NAME);
-            if (!cacheDir.exists()) {
-                cacheDir.mkdirs();
+            PrefetchResult r = prefetchCore(getContext(), url);
+            JSObject result = new JSObject();
+            result.put("cached", r.cached);
+            result.put("path", r.path);
+            if (!r.cached) {
+                result.put("size", r.size);
             }
-
-            // 以 URL 的 Base64 作为文件名——与拦截链路共享 PixivImageLoader 的 key 方案
-            //（原内联实现为三处重复之一，B5 收敛后写盘纪律也统一）
-            File cacheFile = new File(cacheDir, PixivImageLoader.keyToFilename(url));
-
-            if (cacheFile.exists() && cacheFile.length() > 0) {
-                // 已缓存，直接返回
-                JSObject result = new JSObject();
-                result.put("cached", true);
-                result.put("path", cacheFile.getAbsolutePath());
-                call.resolve(result);
-                return;
-            }
-
-            // 下载图片
-            Request request = new Request.Builder()
-                    .url(url)
-                    .addHeader("Referer", OAuthConfig.REFERER)
-                    .addHeader("User-Agent", OAuthConfig.USER_AGENT)
-                    .build();
-
-            try (Response response = PixivApiCore.getSharedClient().newCall(request).execute()) {
-                if (!response.isSuccessful()) {
-                    call.reject("Download failed (HTTP " + response.code() + ")");
-                    return;
-                }
-
-                byte[] bytes = response.body() != null ? response.body().bytes() : new byte[0];
-                // B5/P1：预取与拦截链路并发写同文件是诊断 F3 的截断根源，必须走同一原子写
-                //（tmp+rename），不能直写 FileOutputStream
-                PixivImageLoader.writeFile(cacheFile, bytes);
-
-                // X1：详情页预取热路径填充点——预取字节已在手，≤512KB 的缩略图/卡片图直接进
-                // 内存 LRU，详情页渲染触发 /pixiv-img/ 拦截时即内存命中（省一次磁盘回读）。
-                // key 用原始 CDN URL：无自定义图床时与拦截侧 rewriteUrl 产物同 key
-                //（IMAGE_CDN_URL 前缀一致），可直接命中
-                ImageBytesMemoryCache.getInstance().putBounded(url, bytes);
-
-                JSObject result = new JSObject();
-                result.put("cached", false);
-                result.put("path", cacheFile.getAbsolutePath());
-                result.put("size", bytes.length);
-                call.resolve(result);
-            }
+            call.resolve(result);
         } catch (Exception e) {
             call.reject("Prefetch failed: " + e.getMessage());
         }
+    }
+
+    /** 预取结果：cached=true 为磁盘已命中（仅 path 有意义）；否则 size 为下载字节数 */
+    static final class PrefetchResult {
+        final boolean cached;
+        final String path;
+        final int size;
+
+        private PrefetchResult(boolean cached, String path, int size) {
+            this.cached = cached;
+            this.path = path;
+            this.size = size;
+        }
+
+        static PrefetchResult cachedHit(String path) {
+            return new PrefetchResult(true, path, 0);
+        }
+
+        static PrefetchResult downloaded(String path, int size) {
+            return new PrefetchResult(false, path, size);
+        }
+    }
+
+    /**
+     * 预取核心（生产入口）：持有共享 loader 单例（与拦截链路同源）后委托注入核心。
+     */
+    static PrefetchResult prefetchCore(Context ctx, String url) throws IOException {
+        return prefetchCore(imageLoader(ctx), url);
+    }
+
+    /**
+     * 预取核心（包可见：loader 注入的可测单口）。行为与原内联实现等价：
+     * 已缓存短路；未命中下载后经 {@link PixivImageLoader#writeFile} 原子写盘（B5 纪律，
+     * tmp+rename 防并发截断），内存 LRU 以官方 url 键填充（X1 详情页预取热路径）。
+     * 仅下载源随图床生效；非 2xx / 空 body 抛 IOException（壳映射为 reject）。
+     *
+     * <p>测试注入独立 loader（Robolectric 生产单例跨测试存活，绑定首个测试的
+     * Application 会让 SharedPreferences fixture / cacheDir 失真，故全注入隔离）。
+     */
+    static PrefetchResult prefetchCore(PixivImageLoader loader, String url) throws IOException {
+        // 磁盘文件名 = keyToFilename(官方 url)——与拦截链路共享 key 方案；不得用 resolve 返回值
+        File cacheFile = new File(loader.getCacheDir(), PixivImageLoader.keyToFilename(url));
+
+        if (cacheFile.exists() && cacheFile.length() > 0) {
+            // 已缓存，直接返回
+            return PrefetchResult.cachedHit(cacheFile.getAbsolutePath());
+        }
+
+        // 下载（图床 resolve + 镜像失败官方回退 + Referer/UA 注入均在 PixivImageLoader 内）
+        byte[] bytes = loader.download(url);
+        // B5/P1：预取与拦截链路并发写同文件是诊断 F3 的截断根源，必须走同一原子写
+        //（tmp+rename），不能直写 FileOutputStream
+        PixivImageLoader.writeFile(cacheFile, bytes);
+
+        // X1：详情页预取热路径填充点——预取字节已在手，≤512KB 的缩略图/卡片图直接进
+        // 内存 LRU，详情页渲染触发 /pixiv-img/ 拦截时即内存命中（省一次磁盘回读）。
+        // key 恒为官方入参 url（ADR-0143 D2）：无论字节来自官方还是镜像，拦截侧按官方键
+        // 查询必命中；图床关时与拦截侧 rewriteUrl 产物同 key 的既有对齐保持不变
+        ImageBytesMemoryCache.getInstance().putBounded(url, bytes);
+
+        return PrefetchResult.downloaded(cacheFile.getAbsolutePath(), bytes.length);
     }
 
     // ─── 工具方法 ─────────────────────────────────────────────
