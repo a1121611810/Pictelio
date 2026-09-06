@@ -87,8 +87,7 @@ public class AuthPlugin extends Plugin {
                 try {
                     String responseBody = response.body() != null ? response.body().string() : "";
                     if (!response.isSuccessful()) {
-                        call.reject("OAuth failed (HTTP " + response.code() + "): "
-                                + responseBody.substring(0, Math.min(300, responseBody.length())));
+                        call.reject(oauthRejectMessage(response.code(), responseBody));
                         bridge.releaseCall(call);
                         return;
                     }
@@ -123,6 +122,20 @@ public class AuthPlugin extends Plugin {
     public void hideSplash(PluginCall call) {
         SplashController.dismiss();
         call.resolve();
+    }
+
+    /**
+     * 构造 OAuth 交换失败（非 2xx）的 reject 消息（#386 code-review 审计一防线）。
+     *
+     * <p><b>跨端契约（改动前先读）</b>：前缀 {@code "OAuth failed (HTTP 4xx)"} 是 JS 侧
+     * {@code authStore.isAuthErrorPermanent}（authStore.ts）做永久/瞬时分类的判据——
+     * 其对消息做 {@code includes("OAuth failed (HTTP 40")} 子串匹配，400–409 由此判定为
+     * 永久失效（触发 logout），其余（TypeError/429 等）为瞬时（保留 token 待重试）。
+     * {@link AuthPluginTest} 钉住该前缀形态：改消息必先核对 JS 消费方。
+     */
+    static String oauthRejectMessage(int statusCode, String responseBody) {
+        return "OAuth failed (HTTP " + statusCode + "): "
+                + responseBody.substring(0, Math.min(300, responseBody.length()));
     }
 
     /**

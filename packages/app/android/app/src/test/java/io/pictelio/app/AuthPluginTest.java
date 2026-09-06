@@ -3,6 +3,7 @@ package io.pictelio.app;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 
 import com.getcapacitor.JSObject;
 
@@ -130,6 +131,25 @@ public class AuthPluginTest {
         // "Failed to parse OAuth response: ..." reject（提取前后同一条 catch 路径）
         assertThrows(JSONException.class, () -> AuthPlugin.parseTokenResponse("not-json"));
         assertThrows(JSONException.class, () -> AuthPlugin.parseTokenResponse("{broken"));
+    }
+
+    // ── 跨端 reject 消息契约（#386 code-review 审计一机器防线） ──
+
+    @Test
+    public void oauthRejectMessage_permanentClassificationPrefix_pinned() {
+        // oracle：packages/app/src/stores/authStore.ts isAuthErrorPermanent 对消息做
+        // includes("OAuth failed (HTTP 40") 子串匹配（400–409 → 永久失效触发 logout；
+        // 其余瞬时保留 token）——Java 生产者是该跨端契约唯一来源，钉住前缀形态。
+        String m400 = AuthPlugin.oauthRejectMessage(400, "body");
+        assertTrue("400 命中永久分类子串: " + m400, m400.contains("OAuth failed (HTTP 40"));
+        assertEquals("消息形态 = 前缀 + 状态码 + 截断 body",
+                "OAuth failed (HTTP 400): body", m400);
+        assertTrue("409 同在 400-409 永久区间",
+                AuthPlugin.oauthRejectMessage(409, "b").contains("OAuth failed (HTTP 40"));
+        // 300 字符截断（长 body 不撑爆 JSBridge 消息，与提取前行为一致）
+        String longBody = "x".repeat(400);
+        assertEquals("OAuth failed (HTTP 500): " + "x".repeat(300),
+                AuthPlugin.oauthRejectMessage(500, longBody));
     }
 
 }
