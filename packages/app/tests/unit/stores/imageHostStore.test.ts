@@ -5,6 +5,13 @@ const mockState = vi.hoisted(() => ({
   current: null as Settings | null,
 }));
 
+/** 平台判定开关（spec #382 Q2：native 下存量 http:// 图床 migrate 停用） */
+const platformMock = vi.hoisted(() => ({ native: false }));
+
+vi.mock("@/utils/platform", () => ({
+  isNativePlatform: () => platformMock.native,
+}));
+
 vi.mock("@/settings", () => ({
   get settings() {
     return mockState.current;
@@ -14,6 +21,37 @@ vi.mock("@/settings", () => ({
     decode: (raw: string) => JSON.parse(raw),
   },
 }));
+
+/** 含一个明文 http host（enabled）与一个 https host（enabled）的存量种子 */
+const cleartextSeed = {
+  image_host_settings: JSON.stringify({
+    masterEnabled: true,
+    mode: "single",
+    hosts: [
+      {
+        id: "c1",
+        name: "DeadMirror",
+        baseUrl: "http://dead.example",
+        enabled: true,
+        weight: 1,
+        isBuiltIn: false,
+        edited: true,
+      },
+      {
+        id: "c2",
+        name: "LiveMirror",
+        baseUrl: "https://live.example",
+        enabled: true,
+        weight: 1,
+        isBuiltIn: false,
+        edited: true,
+      },
+    ],
+    probeResults: [],
+    fastestHostId: null,
+    fastestHostExpiresAt: null,
+  }),
+};
 
 async function loadStore(seed: Record<string, string> = {}) {
   vi.resetModules();
@@ -221,5 +259,44 @@ describe("imageHostStore probe results", () => {
     expect(getFastestHost()).toBeDefined();
     expect(getFastestHost()?.id).toBe("pixiv-re");
     expect(imageHostState().fastestHostId).toBe("pixiv-re");
+  });
+});
+
+describe("imageHostStore cleartext migration (spec #382 Q2)", () => {
+  it("disables persisted http:// hosts on native and warns once", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    platformMock.native = true;
+    try {
+      const { imageHostState, loadImageHostPreference } = await loadStore(cleartextSeed);
+      await loadImageHostPreference();
+      // 幂等：会话内重复 hydrate 不重复告警（cleartextWarnedHostIds 去重）
+      await loadImageHostPreference();
+
+      const hosts = imageHostState().hosts;
+      expect(hosts.find((h) => h.id === "c1")?.enabled).toBe(false);
+      expect(hosts.find((h) => h.id === "c2")?.enabled).toBe(true);
+      const cleartextWarns = warnSpy.mock.calls.filter((c) =>
+        String(c[0]).includes("http:// 图床"),
+      );
+      expect(cleartextWarns).toHaveLength(1);
+      expect(String(cleartextWarns[0]?.[0])).toContain("DeadMirror");
+    } finally {
+      platformMock.native = false;
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("keeps http:// hosts untouched on web", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    platformMock.native = false;
+    try {
+      const { imageHostState, loadImageHostPreference } = await loadStore(cleartextSeed);
+      await loadImageHostPreference();
+
+      expect(imageHostState().hosts.find((h) => h.id === "c1")?.enabled).toBe(true);
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });

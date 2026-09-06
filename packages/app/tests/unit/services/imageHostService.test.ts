@@ -33,6 +33,27 @@ describe("validateHostInput", () => {
     const { validateHostInput } = await loadService();
     expect(validateHostInput({ name: "A", baseUrl: "https://i.pixiv.re/{path}" })).toBeNull();
   });
+
+  // ── 明文 HTTP 拦截（spec #382 Q1；oracle = Android 9+ 默认 usesCleartextTraffic=false，
+  //    manifest 未放行 cleartext → native 下 http:// 镜像被系统层拒绝，属死配置） ──
+
+  it("rejects cleartext http mirror on native", async () => {
+    const { validateHostInput, HTTP_MIRROR_REJECTED_MESSAGE } = await loadService();
+    expect(validateHostInput({ name: "A", baseUrl: "http://mirror.example" }, true)).toBe(
+      HTTP_MIRROR_REJECTED_MESSAGE,
+    );
+  });
+
+  it("accepts https mirror on native", async () => {
+    const { validateHostInput } = await loadService();
+    expect(validateHostInput({ name: "A", baseUrl: "https://mirror.example" }, true)).toBeNull();
+  });
+
+  it("accepts cleartext http mirror on web (default platform in node)", async () => {
+    const { validateHostInput } = await loadService();
+    // 默认平台参数走运行时判定：node 测试环境 Capacitor.isNativePlatform()=false → web 规则
+    expect(validateHostInput({ name: "A", baseUrl: "http://mirror.example" })).toBeNull();
+  });
 });
 
 describe("transformUrl", () => {

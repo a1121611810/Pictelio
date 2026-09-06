@@ -1,4 +1,5 @@
 import { jsonCodec, settings } from "@/settings";
+import { isNativePlatform } from "@/utils/platform";
 
 type ImageHostMode = "race" | "weighted" | "fastest-ip" | "single";
 
@@ -74,7 +75,13 @@ function defaultState(): ImageHostState {
   };
 }
 
-function migrateLegacyState(raw: unknown): ImageHostState {
+/** 本次会话已告警过的明文 HTTP host id（spec #382 Q2：幂等告警，重复 hydrate 不刷屏） */
+const cleartextWarnedHostIds = new Set<string>();
+
+export function migrateLegacyState(
+  raw: unknown,
+  native: boolean = isNativePlatform(),
+): ImageHostState {
   if (typeof raw !== "object" || raw === null) {
     return defaultState();
   }
@@ -100,6 +107,30 @@ function migrateLegacyState(raw: unknown): ImageHostState {
   for (const builtIn of BUILT_IN_HOSTS) {
     if (!hosts.some((h) => h.id === builtIn.id)) {
       hosts.push({ ...builtIn });
+    }
+  }
+
+  // 存量明文 HTTP 图床处置（spec #382 Q2）：native 下系统层拒绝 cleartext 请求（保存口
+  // 已拦截新增，这里是历史存量），置为未启用 + 可见告警——死配置不再参与下载决策；
+  // 用户改用 https:// 后可重新启用。web/dev 无此限制，不迁移。
+  if (native) {
+    const dead = hosts.filter((h) => h.enabled && h.baseUrl.startsWith("http://"));
+    if (dead.length > 0) {
+      const fresh = dead.filter((h) => !cleartextWarnedHostIds.has(h.id));
+      if (fresh.length > 0) {
+        console.warn(
+          `[imageHostStore] 已停用 ${fresh.length} 个 http:// 图床（Android 禁止明文 HTTP）: ` +
+            fresh.map((h) => h.name).join(", "),
+        );
+        for (const h of fresh) {
+          cleartextWarnedHostIds.add(h.id);
+        }
+      }
+      for (const h of hosts) {
+        if (h.baseUrl.startsWith("http://")) {
+          h.enabled = false;
+        }
+      }
     }
   }
 
