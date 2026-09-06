@@ -19,10 +19,8 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Iterator;
-import java.util.concurrent.TimeUnit;
 
 import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
@@ -39,20 +37,6 @@ import okhttp3.Response;
  */
 @CapacitorPlugin(name = "AuthPlugin")
 public class AuthPlugin extends Plugin {
-
-    private static volatile OkHttpClient client;
-
-    private static OkHttpClient getClient() {
-        if (client != null) return client;
-        synchronized (AuthPlugin.class) {
-            if (client != null) return client;
-            client = new OkHttpClient.Builder()
-                    .connectTimeout(OAuthConfig.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
-                    .readTimeout(OAuthConfig.TIMEOUT_READ, TimeUnit.MILLISECONDS)
-                    .build();
-        }
-        return client;
-    }
 
     /**
      * 使用 refresh_token 交换新的 access_token。
@@ -94,7 +78,10 @@ public class AuthPlugin extends Plugin {
                 .build();
 
         bridge.saveCall(call);
-        getClient().newCall(request).enqueue(new okhttp3.Callback() {
+        // #386：复用 PixivApiCore 共享 OkHttp 单例（同包 package-private 访问，
+        // 先例：PictelioApiModule 同包调用 PixivApiCore 静态成员），
+        // 不再自建 client——连接池/dispatcher/callTimeout 与全 app 网络面收敛为一。
+        PixivApiCore.getSharedClient().newCall(request).enqueue(new okhttp3.Callback() {
             @Override
             public void onResponse(okhttp3.Call c, Response response) {
                 try {
@@ -106,37 +93,7 @@ public class AuthPlugin extends Plugin {
                         return;
                     }
 
-                    JSONObject json = new JSONObject(responseBody);
-                    // Pixiv 返回 { response: { access_token, refresh_token, user } }
-                    JSONObject resp = json.optJSONObject("response");
-                    if (resp == null) resp = json;
-
-                    JSObject result = new JSObject();
-                    result.put("accessToken", resp.optString("access_token", ""));
-                    result.put("refreshToken", resp.optString("refresh_token", ""));
-
-                    JSONObject user = resp.optJSONObject("user");
-                    if (user != null) {
-                        result.put("userId", user.optInt("id", 0));
-                        result.put("userName", user.optString("name", ""));
-                        result.put("userAccount", user.optString("account", ""));
-
-                        // 提取 profile_image_urls（头像 URL），供 JS 侧 user() 信号使用
-                        JSONObject profileImageUrls = user.optJSONObject("profile_image_urls");
-                        if (profileImageUrls != null) {
-                            JSObject urls = new JSObject();
-                            for (Iterator<String> it = profileImageUrls.keys(); it.hasNext();) {
-                                String key = it.next();
-                                urls.put(key, profileImageUrls.optString(key, ""));
-                            }
-                            result.put("profileImageUrls", urls);
-                        }
-                    } else {
-                        result.put("userId", 0);
-                        result.put("userName", "");
-                        result.put("userAccount", "");
-                    }
-
+                    JSObject result = parseTokenResponse(responseBody);
                     call.resolve(result);
                     bridge.releaseCall(call);
                 } catch (JSONException e) {
@@ -166,6 +123,58 @@ public class AuthPlugin extends Plugin {
     public void hideSplash(PluginCall call) {
         SplashController.dismiss();
         call.resolve();
+    }
+
+    /**
+     * 解析 OAuth token 交换成功响应（HTTP 2xx）为插件结果对象（#386）。
+     *
+     * <p>包可见静态纯函数：从 refreshToken 的 onResponse 内联逻辑<b>原样提取</b>，
+     * 供 JVM 单测（AuthPluginTest）直接验证解析契约。提取后行为逐字节等价：
+     * <ul>
+     *   <li>responseBody 非法 JSON → 抛 JSONException，由调用方 catch 映射为
+     *       "Failed to parse OAuth response: ..." reject（与提取前同一条 catch 路径）；</li>
+     *   <li>缺字段时按 optString/optInt 默认值宽松降级——生产路径上错误形态
+     *       （has_error / error 载荷）以 HTTP 400 到达，已被调用方
+     *       "OAuth failed (HTTP xxx)" reject 短路，不会进入本解析核心。</li>
+     * </ul>
+     *
+     * @param responseBody HTTP 2xx 响应体
+     * @return 结果对象：accessToken / refreshToken / userId / userName / userAccount，
+     *         user 存在时另含 profileImageUrls（profile_image_urls 键值原样拷贝）
+     * @throws JSONException responseBody 非法 JSON
+     */
+    static JSObject parseTokenResponse(String responseBody) throws JSONException {
+        JSONObject json = new JSONObject(responseBody);
+        // Pixiv 返回 { response: { access_token, refresh_token, user } }
+        JSONObject resp = json.optJSONObject("response");
+        if (resp == null) resp = json;
+
+        JSObject result = new JSObject();
+        result.put("accessToken", resp.optString("access_token", ""));
+        result.put("refreshToken", resp.optString("refresh_token", ""));
+
+        JSONObject user = resp.optJSONObject("user");
+        if (user != null) {
+            result.put("userId", user.optInt("id", 0));
+            result.put("userName", user.optString("name", ""));
+            result.put("userAccount", user.optString("account", ""));
+
+            // 提取 profile_image_urls（头像 URL），供 JS 侧 user() 信号使用
+            JSONObject profileImageUrls = user.optJSONObject("profile_image_urls");
+            if (profileImageUrls != null) {
+                JSObject urls = new JSObject();
+                for (Iterator<String> it = profileImageUrls.keys(); it.hasNext();) {
+                    String key = it.next();
+                    urls.put(key, profileImageUrls.optString(key, ""));
+                }
+                result.put("profileImageUrls", urls);
+            }
+        } else {
+            result.put("userId", 0);
+            result.put("userName", "");
+            result.put("userAccount", "");
+        }
+        return result;
     }
 
     /**
