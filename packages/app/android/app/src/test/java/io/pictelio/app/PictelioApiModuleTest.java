@@ -5,10 +5,18 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.fail;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+
+import androidx.test.core.app.ApplicationProvider;
 
 import org.json.JSONArray;
 import org.json.JSONException;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -21,11 +29,19 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
+
+import io.pictelio.app.config.OAuthConfig;
+import okhttp3.mockwebserver.MockResponse;
+import okhttp3.mockwebserver.MockWebServer;
+import okhttp3.mockwebserver.RecordedRequest;
+import okhttp3.mockwebserver.SocketPolicy;
 
 /**
  * PictelioApiModule.ugoiraExtractCore 契约测试（ADR-0125 解压写盘管线）。
@@ -41,6 +57,8 @@ import java.util.zip.ZipOutputStream;
  *   <li>zip 损坏：无有效条目 → 抛「zip 无有效条目（zip 损坏）」（spec IO 边界）</li>
  *   <li>帧列表解析失败：framesJson 非法 JSON → 抛「帧列表解析失败」（spec IO 边界）</li>
  * </ul>
+ *
+ * <p>另含 ADR-0143 T4 zip 下载源测试（downloadZip/streamDownloadZip 直测，见文件末尾分组注释）。
  */
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 28)
@@ -404,4 +422,215 @@ public class PictelioApiModuleTest {
         assertTrue(payload.optBoolean("done"));
         assertEquals(2, payload.optJSONArray("urls").length());
      }
+
+    // ── ADR-0143 T4：zip 下载源接入（downloadZip / streamDownloadZip 直测） ──
+    // oracle：ADR-0143 D1/D4 + spec #376（镜像失败 → 官方重试一次；流式回退仅限「建立连接 /
+    // HTTP 状态 / 响应体获取」阶段，读取阶段失败不得换源）。
+    // 图床开启 fixture 走生产入口 ImageHostConfig.get(ctx)（SharedPreferences "CapacitorStorage"
+    // 的 image_host_settings，JSON 形状与 ImageHostConfigTest 同源 = imageHostStore.ts 真实持久化
+    // 形态，测试硬约束 #2 禁自洽 mock）。
+    // 白名单说明：@LynxMethod 入口的 https:// 校验针对 JS 传入的官方 zip URL；直测下载方法
+    // 可用 MockWebServer 的 http:// 地址（resolve 契约接受 http(s)）。
+
+    private MockWebServer mirrorServer;
+    private MockWebServer officialServer;
+    private Context zipCtx;
+
+    @Before
+    public void setUpZipDownload() throws Exception {
+        zipCtx = ApplicationProvider.getApplicationContext();
+        mirrorServer = new MockWebServer();
+        mirrorServer.start();
+        officialServer = new MockWebServer();
+        officialServer.start();
+        // ImageHostConfig.get() 为进程级单例：Robolectric 同配置用例共享类加载器时，单例可能携带
+        // 上一个用例的 Application 引用（其 prefs 指向已清理的旧沙箱目录）→ 反射重置，保证每个
+        // 用例以当前 Context 重新接线（不动 T1 冻结文件前提下唯一的确定性手段）
+        Field instance = ImageHostConfig.class.getDeclaredField("instance");
+        instance.setAccessible(true);
+        instance.set(null, null);
+        // 清除同沙箱内可能残留的图床配置（跨用例磁盘共享时保证「图床关」用例确定性）
+        imageHostPrefs().edit().remove("image_host_settings").commit();
+    }
+
+    @After
+    public void tearDownZipDownload() throws IOException {
+        mirrorServer.shutdown();
+        officialServer.shutdown();
+        // 同步重置生产单例：本类在 Gradle 单 JVM 中可能先于其他测试类执行，遗留持有本类
+        // Application 引用的单例会污染后续类的 ImageHostConfig.get() 接线（其 prefs 指向
+        // 已关闭的 MockWebServer 端口）→ 置空交还给后续类按自身 Context 重建
+        try {
+            Field instance = ImageHostConfig.class.getDeclaredField("instance");
+            instance.setAccessible(true);
+            instance.set(null, null);
+        } catch (Exception ignored) {
+            // 重置失败不影响本类断言；仅可能影响同 JVM 后续类的隔离性
+        }
+    }
+
+    /** Capacitor Preferences 落盘名（先例：ImageIntercept；oracle = ImageHostConfig.PREFS_NAME） */
+    private SharedPreferences imageHostPrefs() {
+        return zipCtx.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
+    }
+
+    /** 图床开启（single 模式指向 mirrorServer）；JSON 形状 oracle = imageHostStore.ts 持久化形态 */
+    private void enableImageHost() {
+        String json = "{\"masterEnabled\":true,\"mode\":\"single\",\"selectedHostId\":\"mirror\","
+                + "\"hosts\":[{\"id\":\"mirror\",\"name\":\"mirror\",\"baseUrl\":\""
+                + mirrorServer.url("/")
+                + "\",\"enabled\":true,\"weight\":100,\"isBuiltIn\":false,\"edited\":false}],"
+                + "\"probeResults\":[],\"fastestHostId\":null,\"fastestHostExpiresAt\":null}";
+        assertTrue("图床配置写入成功", imageHostPrefs().edit()
+                .putString("image_host_settings", json).commit());
+    }
+
+    /** 官方 zip URL：path 形态对齐真实 ugoira zip（i.pximg.net /img-zip-ugoira/&lt;illust&gt;/&lt;hash&gt;.zip） */
+    private String officialZipUrl() {
+        return officialServer.url("/img-zip-ugoira/12345/0000000_ugoira.zip").toString();
+    }
+
+    private static MockResponse zipResponse(byte[] zip) {
+        return new MockResponse().setBody(new okio.Buffer().write(zip));
+    }
+
+    private static byte[] readAllBytes(InputStream in) throws IOException {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        int n;
+        while ((n = in.read(buf)) != -1) {
+            bos.write(buf, 0, n);
+        }
+        in.close();
+        return bos.toByteArray();
+    }
+
+    @Test
+    public void downloadZip_imageHostOn_servesMirrorBytesWithoutOfficialRequest() throws Exception {
+        enableImageHost();
+        byte[] mirrorZip = buildStoreZip(new String[][]{{"000000.jpg", "MIRROR"}});
+        byte[] officialZip = buildStoreZip(new String[][]{{"000000.jpg", "OFFICIAL"}});
+        mirrorServer.enqueue(zipResponse(mirrorZip));
+        officialServer.enqueue(zipResponse(officialZip));
+        byte[] out = PictelioApiModule.downloadZip(zipCtx, officialZipUrl());
+        assertArrayEquals("zip 字节应来自镜像", mirrorZip, out);
+        assertEquals("镜像命中不得请求官方", 0, officialServer.getRequestCount());
+        assertEquals(1, mirrorServer.getRequestCount());
+        RecordedRequest req = mirrorServer.takeRequest();
+        assertEquals("官方 path 逐字节保留（ADR-0143 D1 仅替换 host）",
+                "/img-zip-ugoira/12345/0000000_ugoira.zip", req.getPath());
+        assertEquals("镜像请求保留 Referer（与官方同款头）", OAuthConfig.REFERER, req.getHeader("Referer"));
+        assertEquals("镜像请求保留 UA", OAuthConfig.USER_AGENT, req.getHeader("User-Agent"));
+    }
+
+    @Test
+    public void downloadZip_mirrorHttp500_fallsBackToOfficialOnce() throws Exception {
+        enableImageHost();
+        byte[] officialZip = buildStoreZip(new String[][]{{"000000.jpg", "OFFICIAL"}});
+        mirrorServer.enqueue(new MockResponse().setResponseCode(500));
+        officialServer.enqueue(zipResponse(officialZip));
+        byte[] out = PictelioApiModule.downloadZip(zipCtx, officialZipUrl());
+        assertArrayEquals(officialZip, out);
+        assertEquals(1, mirrorServer.getRequestCount());
+        assertEquals("回退官方恰一次", 1, officialServer.getRequestCount());
+    }
+
+    @Test
+    public void downloadZip_mirrorConnectionFailure_fallsBackToOfficial() throws Exception {
+        enableImageHost();
+        byte[] officialZip = buildStoreZip(new String[][]{{"000000.jpg", "OFFICIAL"}});
+        mirrorServer.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START));
+        officialServer.enqueue(zipResponse(officialZip));
+        byte[] out = PictelioApiModule.downloadZip(zipCtx, officialZipUrl());
+        assertArrayEquals(officialZip, out);
+        assertEquals(1, mirrorServer.getRequestCount());
+        assertEquals(1, officialServer.getRequestCount());
+    }
+
+    @Test
+    public void downloadZip_mirrorEmptyBody_fallsBackToOfficial() throws Exception {
+        enableImageHost();
+        byte[] officialZip = buildStoreZip(new String[][]{{"000000.jpg", "OFFICIAL"}});
+        mirrorServer.enqueue(new MockResponse().setBody("")); // HTTP 200 + 空 body（镜像失败形态之一）
+        officialServer.enqueue(zipResponse(officialZip));
+        byte[] out = PictelioApiModule.downloadZip(zipCtx, officialZipUrl());
+        assertArrayEquals(officialZip, out);
+        assertEquals(1, mirrorServer.getRequestCount());
+        assertEquals(1, officialServer.getRequestCount());
+    }
+
+    @Test
+    public void downloadZip_imageHostOff_singleOfficialRequestOnly() throws Exception {
+        // 图床关（@Before 已清除配置 → resolve 透传）→ 行为与接入前一致：仅官方一次
+        byte[] officialZip = buildStoreZip(new String[][]{{"000000.jpg", "OFFICIAL"}});
+        officialServer.enqueue(zipResponse(officialZip));
+        byte[] out = PictelioApiModule.downloadZip(zipCtx, officialZipUrl());
+        assertArrayEquals(officialZip, out);
+        assertEquals("图床关不得触碰镜像", 0, mirrorServer.getRequestCount());
+        assertEquals(1, officialServer.getRequestCount());
+    }
+
+    @Test
+    public void streamDownloadZip_imageHostOn_streamsMirrorBytes() throws Exception {
+        enableImageHost();
+        byte[] mirrorZip = buildStoreZip(new String[][]{{"000000.jpg", "MIRROR"}});
+        mirrorServer.enqueue(zipResponse(mirrorZip));
+        InputStream in = PictelioApiModule.streamDownloadZip(zipCtx, officialZipUrl());
+        assertArrayEquals("流式字节应来自镜像", mirrorZip, readAllBytes(in));
+        assertEquals("流式镜像命中不得请求官方", 0, officialServer.getRequestCount());
+        assertEquals(1, mirrorServer.getRequestCount());
+    }
+
+    @Test
+    public void streamDownloadZip_mirrorHttp500_fallsBackToOfficialStream() throws Exception {
+        enableImageHost();
+        byte[] officialZip = buildStoreZip(new String[][]{{"000000.jpg", "OFFICIAL"}});
+        mirrorServer.enqueue(new MockResponse().setResponseCode(500));
+        officialServer.enqueue(zipResponse(officialZip));
+        InputStream in = PictelioApiModule.streamDownloadZip(zipCtx, officialZipUrl());
+        assertArrayEquals("连接阶段失败回退 → 读到官方流", officialZip, readAllBytes(in));
+        assertEquals(1, mirrorServer.getRequestCount());
+        assertEquals(1, officialServer.getRequestCount());
+    }
+
+    @Test
+    public void streamDownloadZip_mirrorConnectionFailure_fallsBackToOfficialStream() throws Exception {
+        enableImageHost();
+        byte[] officialZip = buildStoreZip(new String[][]{{"000000.jpg", "OFFICIAL"}});
+        mirrorServer.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START));
+        officialServer.enqueue(zipResponse(officialZip));
+        InputStream in = PictelioApiModule.streamDownloadZip(zipCtx, officialZipUrl());
+        assertArrayEquals(officialZip, readAllBytes(in));
+        assertEquals(1, mirrorServer.getRequestCount());
+        assertEquals(1, officialServer.getRequestCount());
+    }
+
+    @Test
+    public void streamDownloadZip_mirrorMidStreamFailure_noSourceSwitch() throws Exception {
+        // 流式回退硬边界（oracle = ticket #380 / ADR-0143 D4）：一旦开始读取流中数据（镜像
+        // 200 已建立），失败沿原错误路径上报，不得中途换源重开官方流（JS 端有降级全量语义，
+        // 换源 = 镜像已交付帧与官方续读字节混源，破坏 zip 流物理连续性）
+        enableImageHost();
+        mirrorServer.enqueue(new MockResponse()
+                .setBody("partial-mirror-bytes")
+                .setSocketPolicy(SocketPolicy.DISCONNECT_DURING_RESPONSE_BODY));
+        InputStream in = PictelioApiModule.streamDownloadZip(zipCtx, officialZipUrl());
+        try {
+            readAllBytes(in);
+            fail("读取镜像中断流应抛 IOException");
+        } catch (IOException expected) {
+            // 预期：读取阶段失败（非连接/状态/响应体获取阶段，不回退）
+        }
+        assertEquals("读取阶段失败不得请求官方（无中途换源）", 0, officialServer.getRequestCount());
+    }
+
+    @Test
+    public void streamDownloadZip_imageHostOff_singleOfficialStream() throws Exception {
+        byte[] officialZip = buildStoreZip(new String[][]{{"000000.jpg", "OFFICIAL"}});
+        officialServer.enqueue(zipResponse(officialZip));
+        InputStream in = PictelioApiModule.streamDownloadZip(zipCtx, officialZipUrl());
+        assertArrayEquals(officialZip, readAllBytes(in));
+        assertEquals(0, mirrorServer.getRequestCount());
+        assertEquals(1, officialServer.getRequestCount());
+    }
 }

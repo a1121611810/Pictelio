@@ -154,9 +154,9 @@ public class PictelioApiModule extends LynxModule {
                     callback.invoke(0, cached.toString());
                     return;
                 }
-                // 2) 未命中：下载 zip（注入 Referer/UA）；非 2xx → 抛 "HTTP xxx"
+                // 2) 未命中：下载 zip（图床 resolve + 镜像失败官方回退，ADR-0143 T4）；非 2xx → 抛 "HTTP xxx"
                 Log.i(TAG, "ugoiraExtract 下载解压: " + illustId);
-                byte[] zipBytes = downloadZip(zipUrl);
+                byte[] zipBytes = downloadZip(ctx, zipUrl);
                 // 3) 核心：解析帧列表 → 清理 → 单次解压 → 按时序写盘 → 帧 URL 列表
                 JSONArray urls = ugoiraExtractCore(zipBytes, framesJson, dir);
                 callback.invoke(0, urls.toString());
@@ -204,7 +204,9 @@ public class PictelioApiModule extends LynxModule {
                 throw new IOException("上下文不可用");
             }
             File dir = new File(new File(ctx.getCacheDir(), PictelioImageService.UGOIRA_CACHE_DIR), illustId);
-            streamEngine.start(() -> streamDownloadZip(zipUrl), framesJson, dir, batchSize);
+            // StreamSource：图床 resolve + 镜像失败官方回退（回退仅覆盖连接建立阶段，见 streamDownloadZip javadoc）；
+            // ctx 在 Lynx 调用线程解析后传入，下载方法零实例状态（线程安全）
+            streamEngine.start(() -> streamDownloadZip(ctx, zipUrl), framesJson, dir, batchSize);
             callback.invoke(0, "{\"started\":true}");
         } catch (Throwable e) {
             String errMsg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
@@ -225,14 +227,68 @@ public class PictelioApiModule extends LynxModule {
         callback.invoke(0, "{}");
     }
 
-    /** 流式下载：OkHttp 执行后返回响应体字节流（不驻留；取消时关闭流即中断读取） */
-    private InputStream streamDownloadZip(String zipUrl) throws IOException {
-        Request request = new Request.Builder()
-                .url(zipUrl)
+    // ── ADR-0143 T4：zip 下载源接入（图床 resolve + 镜像失败官方回退一次） ──
+
+    /** 图床下载源决策（ADR-0143 D1）：官方 URL 进 → 下载源出；图床关/配置损坏/无可用 host → 原样透传。
+     * 缓存键恒官方 URL（D2）：帧写盘按 illustId 目录寻址、不依赖下载 URL，天然满足。 */
+    private static String resolveZipUrl(Context ctx, String zipUrl) {
+        return ImageHostConfig.get(ctx).resolve(zipUrl);
+    }
+
+    /** zip 请求构造（官方/镜像同款头注入：Referer + User-Agent） */
+    private static Request zipRequest(String url) {
+        return new Request.Builder()
+                .url(url)
                 .addHeader("Referer", OAuthConfig.REFERER)
                 .addHeader("User-Agent", OAuthConfig.USER_AGENT)
                 .build();
-        Response response = PixivApiCore.getSharedClient().newCall(request).execute();
+    }
+
+    /**
+     * 流式下载 zip：先经 {@link ImageHostConfig#resolve} 决策下载源，再 OkHttp 执行后返回
+     * 响应体字节流（不驻留；取消时关闭流即中断读取）。
+     *
+     * <p><b>图床回退（ADR-0143 D4）</b>：镜像失败（连接失败 / HTTP 非 2xx / 响应体获取失败）→
+     * {@link Log#w} 后以官方 URL 重试一次；图床关/配置损坏 → resolve 原样透传 → 单次官方请求
+     * （与接入前行为一致）。
+     *
+     * <p><b>流式回退语义（硬边界）</b>：回退仅覆盖<b>建立连接 / HTTP 状态判定 / 响应体获取</b>
+     * 三个阶段——本方法一返回，控制权即交给 {@link UgoiraStreamEngine} → {@link #ugoiraStreamCore}
+     * 开始消费字节；此后任何失败（读取中断 / zip 损坏 / 帧序不一致）沿原错误路径上报
+     * （engine error → JS 端已有降级全量下载语义），<b>绝不中途换源重开官方流</b>：换源 =
+     * 从头重下，而已交付帧基于镜像字节、续读基于官方字节，混源破坏 zip 条目流的物理连续性
+     * （帧序断言与字节完整性均失效）。该边界由本方法结构天然保证：返回 InputStream 后不再
+     * 持有任何连接状态，读取阶段对下载源无感知。
+     *
+     * <p><b>预算</b>：官方与镜像共用 {@link PixivApiCore#getSharedClient()} 现有预算
+     * （connect 15s / read 30s，OAuthConfig.TIMEOUT_*），<b>不缩镜像预算</b>——与图片路径
+     * （T2 对镜像缩预算）的差异理由：单图体积小、缩预算可快失败立即回退；zip 为数 MB 级大文件，
+     * 慢镜像全量下载的合法耗时可达预算量级，缩预算会误杀「慢而稳」的镜像通路，仅靠失败回退
+     * 兜底（回退成本 = 一次官方下载）。
+     *
+     * @param ctx    应用上下文（调用方已判空；仅用于读取图床配置）
+     * @param zipUrl 官方 zip URL（https 绝对地址；scheme 白名单校验在 @LynxMethod 入口）
+     * @return zip 字节流（镜像或官方来源；调用方负责关闭）
+     */
+    static InputStream streamDownloadZip(Context ctx, String zipUrl) throws IOException {
+        String mirrorUrl = resolveZipUrl(ctx, zipUrl);
+        if (mirrorUrl.equals(zipUrl)) {
+            return openZipStream(zipUrl); // 图床未生效：单次官方请求（现状行为）
+        }
+        try {
+            return openZipStream(mirrorUrl);
+        } catch (IOException e) {
+            Log.w(TAG, "zip 流式镜像连接失败，回退官方重试: " + mirrorUrl, e);
+            return openZipStream(zipUrl);
+        }
+    }
+
+    /**
+     * 单次流式连接：execute + 非 2xx / 响应体获取判定。此边界内的失败可回退换源；
+     * 返回后即进入读取阶段（失败不得换源，语义见 {@link #streamDownloadZip}）。
+     */
+    private static InputStream openZipStream(String url) throws IOException {
+        Response response = PixivApiCore.getSharedClient().newCall(zipRequest(url)).execute();
         if (!response.isSuccessful()) {
             response.close();
             throw new IOException("HTTP " + response.code());
@@ -443,14 +499,38 @@ public class PictelioApiModule extends LynxModule {
         return urls;
     }
 
-    /** OkHttp 下载 zip 字节；注入 Referer + User-Agent。非 2xx 抛 "HTTP xxx"。 */
-    private byte[] downloadZip(String zipUrl) throws IOException {
-        Request request = new Request.Builder()
-                .url(zipUrl)
-                .addHeader("Referer", OAuthConfig.REFERER)
-                .addHeader("User-Agent", OAuthConfig.USER_AGENT)
-                .build();
-        try (Response response = PixivApiCore.getSharedClient().newCall(request).execute()) {
+    /**
+     * 全量下载 zip 字节（ADR-0143 T4 图床接入）：决策下载源 → 镜像失败官方回退一次。
+     * 回退触发条件 = 连接失败 / HTTP 非 2xx / <b>空 body</b>（镜像 HTTP 200 零字节响应；
+     * {@code body.bytes()} 对空响应返回零长数组而非异常，须显式判定）；官方路径保持现状语义
+     * 不做空 body 回退（空 zip 由解压核心报「zip 无有效条目（zip 损坏）」，错误信息不劣化）。
+     * 预算与流式回退语义见 {@link #streamDownloadZip} javadoc（两态一致）。
+     *
+     * @param ctx    应用上下文（调用方已判空；仅用于读取图床配置）
+     * @param zipUrl 官方 zip URL（https 绝对地址；scheme 白名单校验在 @LynxMethod 入口）
+     * @return zip 原始字节
+     */
+    static byte[] downloadZip(Context ctx, String zipUrl) throws IOException {
+        String mirrorUrl = resolveZipUrl(ctx, zipUrl);
+        if (mirrorUrl.equals(zipUrl)) {
+            return downloadZipOnce(zipUrl); // 图床未生效：单次官方请求（现状行为）
+        }
+        try {
+            byte[] bytes = downloadZipOnce(mirrorUrl);
+            if (bytes.length == 0) {
+                Log.w(TAG, "zip 镜像响应体为空，回退官方重试: " + mirrorUrl);
+                return downloadZipOnce(zipUrl);
+            }
+            return bytes;
+        } catch (IOException e) {
+            Log.w(TAG, "zip 镜像下载失败，回退官方重试: " + mirrorUrl, e);
+            return downloadZipOnce(zipUrl);
+        }
+    }
+
+    /** 单次全量下载（现状语义逐行保留）：非 2xx 抛 "HTTP xxx"；body null 抛 "HTTP 响应体为空"。 */
+    private static byte[] downloadZipOnce(String url) throws IOException {
+        try (Response response = PixivApiCore.getSharedClient().newCall(zipRequest(url)).execute()) {
             if (!response.isSuccessful()) {
                 throw new IOException("HTTP " + response.code());
             }
