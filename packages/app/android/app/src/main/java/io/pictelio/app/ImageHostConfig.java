@@ -59,7 +59,8 @@ import okhttp3.Response;
  * 图床视为关 + {@code Log.w}（禁静默降级）。未知字段忽略；hosts 条目缺 id/baseUrl → 跳过该条目。
  *
  * <p><b>测试面</b>：RawProvider/Clock/Random/ProbeFn/Executor 全部构造器注入（接口即测试面），
- * 决策逻辑不发真 HTTP、不触真时钟。仅 {@link #resolve} 为 public（T2-T4 跨源集调用），
+ * 决策逻辑不发真 HTTP、不触真时钟。仅 {@link #resolve} 与 {@link #isOfficialDomain} 为 public
+ * （resolve 供 T2-T4 跨源集调用；isOfficialDomain 供直连子包复用白名单，#387），
  * {@link #get} 包可见（调用方同包 io.pictelio.app）。
  */
 public final class ImageHostConfig {
@@ -541,8 +542,13 @@ public final class ImageHostConfig {
         return authority.toLowerCase();
     }
 
-    /** 官方域判定：等于或属于 *.pximg.net / *.pixiv.net（oracle = validateHostInput 写入侧防线 + D4 防自环） */
-    static boolean isOfficialDomain(String hostname) {
+    /**
+     * 官方域判定：等于或属于 *.pximg.net / *.pixiv.net（oracle = validateHostInput 写入侧防线 + D4 防自环）。
+     * 契约前提：hostname 已是小写形（生产调用链经 {@link #hostnameOf} 保证）。
+     * public 供直连子包 {@code io.pictelio.app.directaccess} 复用为路由白名单（#387）——
+     * 白名单单一事实源，直连侧不自实现同语义判定。
+     */
+    public static boolean isOfficialDomain(String hostname) {
         return equalsOrSubdomainOf(hostname, "pximg.net") || equalsOrSubdomainOf(hostname, "pixiv.net");
     }
 
