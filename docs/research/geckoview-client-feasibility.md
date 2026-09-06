@@ -4,7 +4,7 @@
 > **验证日期**：2026-09-07
 > **前置**：`docs/research/android-client-engines-landscape.md`（分支 `research/android-client-engines`，8d938b39）对 GeckoView 的裁决是「可行但无必要」，并明确留下「Referer 注入 / webRequest 拦截成熟度存疑，**需 PoC**」的缺口。本报告以模拟器实测闭合该缺口，并升级裁决为——
 >
-> ## 🔴 实证可行、实证无必要：端到端能跑通且性能同水位；包体压缩后 +44MB（110MB APK）、内存 ×5.2~5.5（调参仅再省 5%）、安全更新被发版节奏绑死、Capacitor 插件层全量重写——不建议迁移
+> ## 🔴 实证可行、实证无必要：端到端能跑通且性能同水位；包体压缩后 +44MB（110MB APK）、内存深度调参后仍 ×4.7~4.9（默认口径 −12% 封顶）、安全更新被发版节奏绑死、Capacitor 插件层全量重写——不建议迁移
 
 ---
 
@@ -16,7 +16,7 @@
 | 图片管线（Referer 注入刚需） | 🟢 两条路都通 | ① 本地网关代理（现架构同构）200；② **扩展内 webRequest 注入引擎直连 200**（本次 PoC 闭合） |
 | JS↔Java 桥（替代 Capacitor bridge） | 🟢 可用且快 | native messaging p50=1ms / p95=2ms（n=300）；Capacitor 桥 p50=0.6ms 同水位 |
 | 性能（滚动/启动） | 🟢 同水位 | 滚动 59.9 vs 60.0 FPS（同手势同窗口）；冷启动 TotalTime 288 vs 589ms |
-| 内存 | 🔴 **×5.2~5.5（配对复测口径）** | 原型 5~6 进程合计 587~621MB PSS vs 基线 ~112-116MB 单进程；关 Fission 调参仅 −5% |
+| 内存 | 🔴 **×4.7~4.9（深度调参后）** | 默认口径 6 进程 ~621MB → 深度调参 540~554MB（−12%）vs 基线 ~112-116MB 单进程；渲染进程工作集 ~240MB 结构性 |
 | 包体 | 🔴 压缩后 +44MB（×2.7），未压缩 +135MB | 压缩 so（`useLegacyPackaging`）：201→**110MB** APK；AAR 86MB/ABI 压缩态 |
 | 网络通道（GFW） | 🟡 有解但有约束 | DNS 污染下引擎带 SNI 直连被注入伪响应（实测 404）→ **必须走无 SNI 钉定 IP 网关或扩展通道**，与主工程直连结论一致 |
 | 安全性 | 🟡 双刃 | TLS 校验不可绕过（实测）；e10s+Fission 多进程隔离；但 isolatedProcess 默认关、引擎更新被 App 发版绑死 |
@@ -76,8 +76,10 @@
 
 > **复核补充（第二轮 A/B 实测）**：针对「能不能压缩/调参」的质询补测了两件事——
 > ① **包体压缩**：`packagingOptions.jniLibs.useLegacyPackaging = true`（so 压缩存入 APK，安装时解压）后 APK **201MB → 110MB**，即对基线的增量从 +135MB 收窄到 **+44MB**（代价：安装后磁盘占用升高 + 首启动解压开销；Firefox Play 包 ~110-120MB 同量级）。
-> ② **运行时调参**：`GeckoRuntimeSettings.Builder` 有 ~40 个旋钮（javap 实测清单），嵌入式最相关的 `fissionEnabled(false)`（关站点隔离多内容进程）+ `glMsaaLevel(0)` + 关 console/debugLogging 配对复测结果：进程 6→5（页面 + 扩展背景页各占一个 tab 进程），**587 vs 621MB，仅 −5%**——内存大头是引擎渲染进程本身的工作集（~230-240MB，含 WebRender 软渲染缓冲 + 图片解码缓存 + JS 堆），**结构性，调参无法数量级改善**。更激进的 `GeckoPreferenceController` pref（如 image cache 上限、`dom.ipc.processCount`）空间有限且直接伤 feed 体验。
-> 结论修正：调参与压缩**能收窄但无法逆转**裁决——压缩后包体 +44MB（×2.7）仍是对 1.8MB 级纯壳的 2 个数量级增量（对含 Lynx 的 65.6MB 现包是 +67%），内存 ×5.2~5.5 依旧越狱级。
+> ② **运行时调参（两档）**：
+> - **Builder 档**：`fissionEnabled(false)` + `glMsaaLevel(0)` + 关 console/debugLogging → 进程 6→5，**587 vs 621MB，−5%**；
+> - **深度档（官方任意 pref 注入通道）**：`GeckoRuntimeSettings.Builder#configFilePath` 指向 YAML 配置（`automation` 文档通道，63+），注入 `dom.ipc.processCount:1`、`browser.cache.memory.capacity:16MB`、`browser.cache.disk.enable:false`、`image.cache.size:4MB`、`browser.sessionhistory.max_total_viewers:0`、`image.mem.animated.discardable:true` → **540~554MB（累计 −11~13%）**，滚动 FPS 59.4 无回归（见 `android-proto/app/src/main/assets/gv-config.yaml`）。
+> 结论修正：调参通道真实存在且有效（默认口径 → 深度档 −12%），压缩 −45% 包体；但**两档叠加仍 ×4.7~4.9**——内存大头是渲染进程工作集（~240MB：WebRender 缓冲 + 图片解码 + JS 堆），结构性，pref 层无法数量级改善；且 image/内存缓存下调是有代价的（回滚/解码重算）。
 
 | 进程（untuned 配对轮） | PSS |
 |------|-----|
@@ -90,7 +92,7 @@
 | **tuned 轮（fission off）** | **~587MB（5 进程）** |
 | **基线（单进程）** | **~112-116MB** |
 
-- 配对口径下原型内存 ≈ 基线 **×5.2~5.5**（首轮 543MB 为运行间方差低点，±10%）。
+- 配对口径（默认/Builder/深度三档）：621 / 587 / 540~554MB，对基线 **×4.7~5.5**；深度档为最优口径 ×4.7~4.9（运行间方差 ±10%）。
 - **口径 caveat**：原型 bundle 为 `NODE_ENV=development` 语义（DEV 分支保留，Solid DEV 开销 + 未裁剪告警路径），基线为 production bundle；模拟器为软件渲染路径。内存差异**方向性结论稳固**（引擎多进程结构决定下限），精确数字需 production bundle + 真机复测。
 
 ---
@@ -170,7 +172,7 @@
 |--------------|----------|
 | 「Referer 注入/webRequest 拦截成熟度存疑，需 PoC」 | **定案：可行**——内置扩展 webRequest blocking 注入在 GV 155 嵌入式场景实测 200（Fenix+uBlock 同路径）；但 **app 侧 Java webRequest API 从不存在**，且该通道带 SNI 受 GFW 约束（中国网络下图片仍需网关兜底） |
 | 「APK +60~100MB」 | 实测 debug APK：未压缩 +135MB（201 vs 65.6）；**压缩 so 后 +44MB（110MB）**；AAR 压缩态 86MB/ABI |
-| 「内存高于系统 WebView」 | 定量：**×5.2~5.5**（配对复测 587~621 vs 112-116MB PSS；关 Fission 调参仅 −5%，大头是引擎渲染进程工作集，结构性） |
+| 「内存高于系统 WebView」 | 定量：**默认 ×5.2~5.5 → 深度调参（configFilePath 注入 processCount/缓存上限等）后 ×4.7~4.9**（540~554 vs 112-116MB PSS；渲染进程工作集 ~240MB 结构性） |
 | 「可行但无必要」 | 升级为「**实证可行、实证无必要**」：性能无收益（同水位）、包体/内存/安全更新三重确定成本、插件层全量重写 |
 
 ---
@@ -187,7 +189,7 @@
 
 ## 11. 结论与建议
 
-1. **不迁移**。GeckoView 客户端「能做出来」（本原型即证明：登录、feed、图片、桥、探针全通，性能无劣势），但相对现状没有用户可感收益，且有包体（压缩后仍 +44MB / ×2.7）、内存（×5.2~5.5，调参仅 −5%）、安全更新滞后（引擎绑发版）、工程（Capacitor 层全量重写 + compileSdk 37 门槛）四重确定成本。
+1. **不迁移**。GeckoView 客户端「能做出来」（本原型即证明：登录、feed、图片、桥、探针全通，性能无劣势），但相对现状没有用户可感收益，且有包体（压缩后仍 +44MB / ×2.7）、内存（深度调参 −12% 后仍 ×4.7~4.9）、安全更新滞后（引擎绑发版）、工程（Capacitor 层全量重写 + compileSdk 37 门槛）四重确定成本。
 2. **本次实测资产的可复用价值**：
    - 扩展 webRequest 注入机制 = 摆脱 `shouldInterceptRequest` 单点依赖的备用图片通路知识；
    - 本地网关 + SPA 零改动模式 = 任何「自研壳」路线（含 Tauri/裸 WebView）的通用验证底座；

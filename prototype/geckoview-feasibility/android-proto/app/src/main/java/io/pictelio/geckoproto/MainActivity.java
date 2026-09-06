@@ -100,7 +100,22 @@ public class MainActivity extends AppCompatActivity {
             rb.fissionEnabled(false)
                     .glMsaaLevel(0)
                     .debugLogging(false);
-            Log.i(TAG, "[boot] TUNED profile: fission=off msaa=0 consoleOutput=off");
+            // 深度调参：assets/gv-config.yaml（任意 Gecko pref 注入，官方 automation 通道）
+            // 拷到 filesDir 后经 configFilePath 注入（/data/local/tmp 默认路径对 app uid 不可读）
+            try {
+                java.io.File cfg = new java.io.File(getFilesDir(), "gv-config.yaml");
+                try (java.io.InputStream in = getAssets().open("gv-config.yaml");
+                     java.io.OutputStream out = new java.io.FileOutputStream(cfg)) {
+                    byte[] buf = new byte[8192];
+                    int n;
+                    while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                }
+                rb.configFilePath(cfg.getAbsolutePath());
+                Log.i(TAG, "[boot] deep prefs config: " + cfg.getAbsolutePath());
+            } catch (Exception e) {
+                Log.e(TAG, "[boot] 深度配置拷贝失败（仅 Builder 级调参生效）", e);
+            }
+            Log.i(TAG, "[boot] TUNED profile: fission=off msaa=0 consoleOutput=off + deep prefs");
         }
         runtime = GeckoRuntime.create(this, rb.build());
 

@@ -1,0 +1,17 @@
+# GeckoView 深度调参 profile（原型实验用；YAML schema 见
+# firefox-source-docs mobile/android/geckoview/consumer/automation.html）
+# 目标：嵌入式单页信息流的最小内存足迹。经 MainActivity 拷贝到 filesDir
+# 并以 GeckoRuntimeSettings.Builder#configFilePath 注入（发布版也可读）。
+prefs:
+  # 内容进程数：fission 关闭后此 pref 生效（桌面默认=CPU 核数）
+  dom.ipc.processCount: 1
+  # 解码内容内存缓存（默认 -1=按 RAM 自动，模拟器 2GB 口径偏大）→ 16MB
+  browser.cache.memory.capacity: 16384
+  # 磁盘缓存关闭：图片缓存已由本地网关承担，避免双重缓存
+  browser.cache.disk.enable: false
+  # 解码图缓存上限（默认约 5MB 自动）→ 4MB
+  image.cache.size: 4194304
+  # 前进/后退页渲染快照（bfcache viewer）→ 0
+  browser.sessionhistory.max_total_viewers: 0
+  # 动图帧可丢弃（解码帧不常驻）
+  image.mem.animated.discardable: true
