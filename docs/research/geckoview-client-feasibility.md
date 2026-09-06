@@ -4,7 +4,7 @@
 > **验证日期**：2026-09-07
 > **前置**：`docs/research/android-client-engines-landscape.md`（分支 `research/android-client-engines`，8d938b39）对 GeckoView 的裁决是「可行但无必要」，并明确留下「Referer 注入 / webRequest 拦截成熟度存疑，**需 PoC**」的缺口。本报告以模拟器实测闭合该缺口，并升级裁决为——
 >
-> ## 🔴 实证可行、实证无必要：端到端能跑通且性能同水位；包体压缩后 +44MB（110MB APK）、内存深度调参后仍 ×4.7~4.9（默认口径 −12% 封顶）、安全更新被发版节奏绑死、Capacitor 插件层全量重写——不建议迁移
+> ## 🔴 实证可行、实证无必要：端到端能跑通且性能同水位；Release 包 89MB（仅 +23MB）但安装后 256MB、内存深度调参后仍 ×4.7~4.9（默认口径 −12% 封顶）、安全更新被发版节奏绑死、Capacitor 插件层全量重写——不建议迁移
 
 ---
 
@@ -17,7 +17,7 @@
 | JS↔Java 桥（替代 Capacitor bridge） | 🟢 可用且快 | native messaging p50=1ms / p95=2ms（n=300）；Capacitor 桥 p50=0.6ms 同水位 |
 | 性能（滚动/启动） | 🟢 同水位 | 滚动 59.9 vs 60.0 FPS（同手势同窗口）；冷启动 TotalTime 288 vs 589ms |
 | 内存 | 🔴 **×4.7~4.9（深度调参后）** | 默认口径 6 进程 ~621MB → 深度调参 540~554MB（−12%）vs 基线 ~112-116MB 单进程；渲染进程工作集 ~240MB 结构性 |
-| 包体 | 🔴 压缩后 +44MB（×2.7），未压缩 +135MB | 压缩 so（`useLegacyPackaging`）：201→**110MB** APK；AAR 86MB/ABI 压缩态 |
+| 包体 | 🟡 Release 构建 +23MB（×1.35）；安装后 +192MB | **Release（R8+压缩 so）APK 89MB** vs 基线 65.6MB；但安装后 256MB vs 64MB（压缩 so 解压 vs 直载二选一）；libxul 145MB 单体不可拆，可剔除小件仅 ~14MB |
 | 网络通道（GFW） | 🟡 有解但有约束 | DNS 污染下引擎带 SNI 直连被注入伪响应（实测 404）→ **必须走无 SNI 钉定 IP 网关或扩展通道**，与主工程直连结论一致 |
 | 安全性 | 🟡 双刃 | TLS 校验不可绕过（实测）；e10s+Fission 多进程隔离；但 isolatedProcess 默认关、引擎更新被 App 发版绑死 |
 | 工程成本 | 🔴 高 | Capacitor 6 插件全重写为 WebExtension messaging；compileSdk ≥37；API 形态与旧文档大量不一致（§8） |
@@ -84,6 +84,10 @@
 > **③ 页面承载裁剪（第三轮实测，回应「不需要的功能能否关闭/删除」）**：把 SPA 用不到的功能面整组关闭——WebRTC（`media.peerconnection.enabled=false`）、语音合成/识别、`geo.enabled=false`、`dom.webgpu.enabled=false`、`pdfjs.disabled=true`、遥测上报 + Builder 级 `remoteDebuggingEnabled/extensionsWebAPIEnabled/loginAutofillEnabled/webManifest/translationsOfferPopup` 全关 → **4 进程、537~581MB，与深度档在方差内持平（追加收益 ≈ 0）**，SPA 登录/图片/桥完好。两个硬边界随之确认：
 > - **e10s 多进程在 GeckoView 强制**：无单进程模式（[GeckoRuntime 源码](https://github.com/mozilla/gecko-dev/blob/master/mobile/android/geckoview/src/main/java/org/mozilla/geckoview/GeckoRuntime.java) 明注 e10s required；`browser.tabs.remote.autostart` 等关闭开关已从 Firefox 移除）——4 进程地板 = 主 + 内容 + GPU + crashhelper；
 > - **构建期删除 = 自维护 fork**：mozconfig 理论可 `--disable-webrtc` 等裁模块（Tor Browser 即自建 GeckoView 先例），但代价是自建构建设施 + 4 周列车 rebase + 无 maven 预编译 + 自担安全补丁；且可删模块（WebRTC/媒体栈）在 libxul 中仅几 MB~十几 MB——**页面承载真正需要的 SpiderMonkey/WebRender/Necko/DOM 恰好是体积与内存主体**，「删掉不需要的」动不了大头，Gecko 也没有官方 slim 分发。
+>
+> **④ 构建后口径 + 裁剪物理上限（第四轮实测，回应「构建后也这么大吗/不能裁剪吗」）**：
+> - **Release 构建**（R8 + shrinkResources + 压缩 so + debug 签名，snakeyaml 需补 keep 规则否则 DebugConfig 崩溃）：**APK 89MB**（vs 基线 65.6MB，**下载增量仅 +23MB / ×1.35**），功能全通（FCP t+571ms、登录恢复、feed 157 图零失败）。但安装后磁盘 **256MB**（基线 64MB）——压缩 so 必须解压，未压缩直载则 APK 201MB：**「下载小装完大」与「下载大装完小」二选一**，这是把引擎打进 APK 的物理属性。
+> - **AAR 解剖（裁剪的物理上限）**：`libxul.so` **145MB 单体**（SpiderMonkey+WebRender+Necko+DOM/CSS 全在其中，打包层不可拆）；可物理剔除的小件合计 **~14MB**（`libgkcodecs+libmozavcodec+libmozavutil` 7.5MB 媒体编解码、`libcrashtools` 5.9MB、`libclearkey` 0.1MB，且有引擎启动失败风险）；`omni.ja` 14.9MB 为引擎资产不可删。重编 libxul（fork 路线，`--disable-webrtc` 等）估可再减 10~25MB——相对 release 89MB 的**边际收益 <10MB**，而代价是自维护 4 周列车 fork。R8 已把非引擎部分（dex/资源/依赖）基本榨干。
 
 | 进程（untuned 配对轮） | PSS |
 |------|-----|
