@@ -93,13 +93,19 @@ public class MainActivity extends AppCompatActivity {
         // Firefox 浏览器级默认（与首轮测试同口径，便于 A/B）。
         boolean tuned = intent != null && intent.getBooleanExtra("tuned", false);
         GeckoRuntimeSettings.Builder rb = new GeckoRuntimeSettings.Builder()
-                .remoteDebuggingEnabled(true)
                 .consoleOutput(!tuned)      // 页面/扩展 console → logcat（155 无 ConsoleDelegate）
                 .aboutConfigEnabled(true);
         if (tuned) {
+            // 页面承载裁剪（Builder 级功能面关闭）：远程调试/扩展 WebAPI/登录自动填充/
+            // Web Manifest/翻译弹窗全部非 SPA 所需
             rb.fissionEnabled(false)
                     .glMsaaLevel(0)
-                    .debugLogging(false);
+                    .debugLogging(false)
+                    .remoteDebuggingEnabled(false)
+                    .extensionsWebAPIEnabled(false)
+                    .loginAutofillEnabled(false)
+                    .webManifest(false)
+                    .translationsOfferPopup(false);
             // 深度调参：assets/gv-config.yaml（任意 Gecko pref 注入，官方 automation 通道）
             // 拷到 filesDir 后经 configFilePath 注入（/data/local/tmp 默认路径对 app uid 不可读）
             try {
@@ -115,7 +121,9 @@ public class MainActivity extends AppCompatActivity {
             } catch (Exception e) {
                 Log.e(TAG, "[boot] 深度配置拷贝失败（仅 Builder 级调参生效）", e);
             }
-            Log.i(TAG, "[boot] TUNED profile: fission=off msaa=0 consoleOutput=off + deep prefs");
+            Log.i(TAG, "[boot] TUNED profile: fission=off msaa=0 + 裁剪集 + deep prefs");
+        } else {
+            rb.remoteDebuggingEnabled(true);
         }
         runtime = GeckoRuntime.create(this, rb.build());
 

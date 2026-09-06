@@ -80,6 +80,10 @@
 > - **Builder 档**：`fissionEnabled(false)` + `glMsaaLevel(0)` + 关 console/debugLogging → 进程 6→5，**587 vs 621MB，−5%**；
 > - **深度档（官方任意 pref 注入通道）**：`GeckoRuntimeSettings.Builder#configFilePath` 指向 YAML 配置（`automation` 文档通道，63+），注入 `dom.ipc.processCount:1`、`browser.cache.memory.capacity:16MB`、`browser.cache.disk.enable:false`、`image.cache.size:4MB`、`browser.sessionhistory.max_total_viewers:0`、`image.mem.animated.discardable:true` → **540~554MB（累计 −11~13%）**，滚动 FPS 59.4 无回归（见 `android-proto/app/src/main/assets/gv-config.yaml`）。
 > 结论修正：调参通道真实存在且有效（默认口径 → 深度档 −12%），压缩 −45% 包体；但**两档叠加仍 ×4.7~4.9**——内存大头是渲染进程工作集（~240MB：WebRender 缓冲 + 图片解码 + JS 堆），结构性，pref 层无法数量级改善；且 image/内存缓存下调是有代价的（回滚/解码重算）。
+>
+> **③ 页面承载裁剪（第三轮实测，回应「不需要的功能能否关闭/删除」）**：把 SPA 用不到的功能面整组关闭——WebRTC（`media.peerconnection.enabled=false`）、语音合成/识别、`geo.enabled=false`、`dom.webgpu.enabled=false`、`pdfjs.disabled=true`、遥测上报 + Builder 级 `remoteDebuggingEnabled/extensionsWebAPIEnabled/loginAutofillEnabled/webManifest/translationsOfferPopup` 全关 → **4 进程、537~581MB，与深度档在方差内持平（追加收益 ≈ 0）**，SPA 登录/图片/桥完好。两个硬边界随之确认：
+> - **e10s 多进程在 GeckoView 强制**：无单进程模式（[GeckoRuntime 源码](https://github.com/mozilla/gecko-dev/blob/master/mobile/android/geckoview/src/main/java/org/mozilla/geckoview/GeckoRuntime.java) 明注 e10s required；`browser.tabs.remote.autostart` 等关闭开关已从 Firefox 移除）——4 进程地板 = 主 + 内容 + GPU + crashhelper；
+> - **构建期删除 = 自维护 fork**：mozconfig 理论可 `--disable-webrtc` 等裁模块（Tor Browser 即自建 GeckoView 先例），但代价是自建构建设施 + 4 周列车 rebase + 无 maven 预编译 + 自担安全补丁；且可删模块（WebRTC/媒体栈）在 libxul 中仅几 MB~十几 MB——**页面承载真正需要的 SpiderMonkey/WebRender/Necko/DOM 恰好是体积与内存主体**，「删掉不需要的」动不了大头，Gecko 也没有官方 slim 分发。
 
 | 进程（untuned 配对轮） | PSS |
 |------|-----|
