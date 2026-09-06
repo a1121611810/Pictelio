@@ -271,8 +271,6 @@ export function isImagePrefetching(originalUrl: string): boolean {
 
 /** LoadImage 的内部实现 — 不含去重逻辑，由外层 loadImage 统一调度并发 */
 async function loadImageInner(originalUrl: string): Promise<LoadedImage> {
-  const targetUrl = isImageHostEnabled() ? getEffectiveImageUrl(originalUrl) : originalUrl;
-
   if (isNative) {
     // 1) 先检查 Android 文件缓存
     const imageCache = getImageCache();
@@ -283,7 +281,8 @@ async function loadImageInner(originalUrl: string): Promise<LoadedImage> {
     }
 
     // 2) 未命中：通过 PixivApi 让 Java 侧下载+缓存（二进制不进 JS 堆）
-    const [prefetchErr] = await tryAsync(PixivApi.prefetchImage({ url: targetUrl }));
+    // 下载源决策已下沉 Java（ADR-0143），JS 传官方 URL 保缓存键契约
+    const [prefetchErr] = await tryAsync(PixivApi.prefetchImage({ url: originalUrl }));
     if (prefetchErr) {
       // prefetch 失败时不标记 L1，让调用方（LazyDetailImage）重试
       console.warn("[ImageCache] Prefetch failed, caller will retry", prefetchErr);
@@ -296,7 +295,8 @@ async function loadImageInner(originalUrl: string): Promise<LoadedImage> {
     return { url: resolveImageUrl(originalUrl), cleanup: () => {} };
   }
 
-  // Web 模式
+  // Web 模式：图床改写仅 Web 生效（native 下载源由 Java 侧决策，ADR-0143）
+  const targetUrl = isImageHostEnabled() ? getEffectiveImageUrl(originalUrl) : originalUrl;
   try {
     await fetchWeb(targetUrl, originalUrl);
   } catch (err) {

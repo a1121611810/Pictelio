@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // 受控的 ImageCache 插件实例：registerPlugin 返回同一实例，测试可按用例改写 getCachedKeys 返回值
 // （字段与真实 ImageCachePlugin 契约一致，见 src/native/ImageCache.ts）
@@ -9,6 +9,29 @@ const { imageCachePlugin } = vi.hoisted(() => ({
     getCachedKeys: vi.fn().mockResolvedValue({ keys: [] }),
     clearCache: vi.fn(),
   },
+}));
+
+// 受控的图床开关（默认关闭；「图床开启」用例中显式打开）。ADR-0143 后 native 分支
+// 不再消费该开关——mock 仅用于模拟配置状态并作为回归防线。
+const { isImageHostEnabledMock } = vi.hoisted(() => ({
+  isImageHostEnabledMock: vi.fn(() => false),
+}));
+
+// 受控的图床改写：模拟「JS 侧改写为镜像 URL」的旧行为产物。正确实现下 native 分支
+// 永不调用该函数；若实现回归「JS 改写 + 镜像入参」，下方用例将以清晰 diff 失败。
+const { getEffectiveImageUrlMock } = vi.hoisted(() => ({
+  getEffectiveImageUrlMock: vi.fn((url: string) =>
+    url.replace("https://i.pximg.net", "https://i.pixiv.re"),
+  ),
+}));
+
+vi.mock("@/stores/imageHostStore", () => ({
+  isImageHostEnabled: isImageHostEnabledMock,
+}));
+
+vi.mock("@/services/imageHostService", () => ({
+  getEffectiveImageUrl: getEffectiveImageUrlMock,
+  getRaceCandidateUrls: vi.fn(() => []),
 }));
 
 vi.mock("@/native/PixivApi", () => ({
@@ -34,7 +57,9 @@ describe("loadImage on native platform", () => {
     const { loadImage } = await import("@/utils/imageLoader");
     const result = await loadImage("https://i.pximg.net/img.jpg");
 
-    // Native 路径先检查 ImageCache 磁盘缓存（未命中），然后调用 PixivApi.prefetchImage
+    // Native 路径先检查 ImageCache 磁盘缓存（未命中），然后调用 PixivApi.prefetchImage。
+    // oracle：ADR-0143 行为申报 #2 —— prefetch 入参恒为官方 URL（下载源决策在 Java 侧，
+    // JS 传官方 URL 保「缓存键恒官方 URL」契约），与图床开关无关
     expect(PixivApi.prefetchImage).toHaveBeenCalledTimes(1);
     expect(PixivApi.prefetchImage).toHaveBeenCalledWith({ url: "https://i.pximg.net/img.jpg" });
 
@@ -156,5 +181,46 @@ describe("warmCacheFromDisk", () => {
       "https://i.pximg.net/warm/a.jpg",
       "https://i.pximg.net/warm/b.jpg",
     ]);
+  });
+});
+
+describe("loadImage native × 图床开启（缓存键契约）", () => {
+  // oracle：ADR-0143 行为申报 #2（docs/adr/ADR-0143-imagehost-download-source-java-sink.md
+  // D2「缓存键恒官方 URL」/ D3「JS 决策退役于 native」）—— 下载源决策下沉 Java 后，
+  // native 分支 prefetch 入参恒为官方 URL，与图床开关/模式完全无关；
+  // 源无关命中（切源不失效、不重下）是显式不变量，此为 JS 侧防线。
+  // 防线语义：getEffectiveImageUrlMock 会把 pximg 改写为 i.pixiv.re 镜像 URL，
+  // 若实现回归「JS 改写 + 镜像入参」的旧行为，本用例以镜像 URL diff 明确失败。
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    // 显式恢复 prefetchImage 成功解析：同文件前序用例的 mockReturnValue（含 reject 的
+    // deferred）跨 mockClear 存留，不重设会让本 describe 的 loadImage 走进失败分支
+    const { PixivApi } = await import("@/native/PixivApi");
+    vi.mocked(PixivApi.prefetchImage).mockResolvedValue({ cached: false });
+    const { clearImageCache } = await import("@/utils/imageLoader");
+    clearImageCache();
+    // 模拟用户已开启图床（store mock 默认 false）
+    isImageHostEnabledMock.mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    // 恢复默认关闭，避免状态泄漏到同文件其他用例
+    isImageHostEnabledMock.mockReturnValue(false);
+  });
+
+  it("图床开启 + native 模式：prefetch 收到的仍是官方 URL，而非镜像改写 URL", async () => {
+    const { PixivApi } = await import("@/native/PixivApi");
+    const { loadImage } = await import("@/utils/imageLoader");
+
+    const url = "https://i.pximg.net/img-master/img/2026/01/01/1_p0_master1200.jpg";
+    await loadImage(url);
+
+    expect(PixivApi.prefetchImage).toHaveBeenCalledTimes(1);
+    // 官方 URL 入参（缓存键契约），即使图床开启
+    expect(PixivApi.prefetchImage).toHaveBeenCalledWith({ url });
+    // 显式排除镜像改写入参（旧行为：getEffectiveImageUrl 产物走 i.pixiv.re）
+    expect(PixivApi.prefetchImage).not.toHaveBeenCalledWith({
+      url: expect.stringContaining("i.pixiv.re"),
+    });
   });
 });

@@ -216,7 +216,7 @@ const ImageHostSettings: Component = () => {
                 {
                   value: "race" as const,
                   label: "并发请求",
-                  desc: "同时向所有启用图床发请求，取最快响应",
+                  desc: "同时向所有启用图床发请求，取最快响应；仅 Web（原生端以负载均衡运行）",
                 },
                 {
                   value: "weighted" as const,
