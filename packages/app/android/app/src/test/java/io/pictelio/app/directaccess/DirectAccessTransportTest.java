@@ -27,11 +27,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import javax.net.ssl.ExtendedSSLSession;
-import javax.net.ssl.HandshakeCompletedEvent;
-import javax.net.ssl.HandshakeCompletedListener;
-import javax.net.ssl.SNIServerName;
-import javax.net.ssl.SSLSession;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 
@@ -59,11 +54,11 @@ import okhttp3.tls.HeldCertificate;
  *       RecordingDns 对照断言且更强（端到端建连事实）；</li>
  *   <li>Host 头 = 官方域名 + 端口：OkHttp 线缆格式（Host: host:port，非默认端口必带端口），
  *       由服务端 RecordedRequest 逐字节断言——URL/Host 恒不改写不变量的独立观测点；</li>
- *   <li>SNI 剥离期望（钉定连接 requestedServerNames 为空 / 系统路线携带 SNI）：
- *       JDK TLS 协议行为（客户端 ExtendedSSLSession.getRequestedServerNames = JDK 从
- *       createSocket host 参数派生的 ClientHello SNI 决策结果，与服务端 wire 观测同源）
- *       ——观测点在客户端会话，握手完成后同步可读（2026-09-07 由服务端异步监听器改造：
- *       CI 慢机上异步落账竞态曾致误报，观测语义不变）；</li>
+ *   <li>SNI 剥离期望（钉定连接 ClientHello 无 SNI 扩展 / 系统路线携带 SNI）：
+ *       <b>线缆字节观测</b>——本地 TCP 代理窥探 ClientHello 的 SNI 扩展原文
+ *       （RFC 8446 §4.1.2 解析，provider/JVM 实现无关；2026-09-07 由服务端异步监听器 →
+ *       客户端会话两版改造而来：两者分别在 CI 环境遭遇落账竞态与
+ *       UnsupportedOperationException）；</li>
  *   <li>熔断口径（3 连败 open / 冷却后半开单探 / 成功恢复清零 / 失败重开 / 421 计失败 /
  *       body 断流不计 / 其余 4xx 5xx 计传输成功）：spec #385 实施决策原文 +
  *       ChannelCircuitBreaker 契约 1-4 + ticket #389「421 无条件计边缘错配；连接/握手/
@@ -355,21 +350,180 @@ public class DirectAccessTransportTest {
         return host != null ? host : recorded.getHeader(":authority");
     }
 
-    // ── 全链路：SNI 剥离决策（ticket 验收 1，客户端同步观测） ──
+    // ── 全链路：SNI 剥离决策（ticket 验收 1，线缆字节观测） ──
 
     /**
-     * 建立一条真实 TLS 连接（对端 = 本机 MockWebServer 的 TLS 端点）并完成握手，
-     * 返回<b>客户端会话</b>观测到的 requestedServerNames（即 JDK 从对端 host 参数派生的
-     * ClientHello SNI——服务端 wire 观测的同一决策源，但同步可读零竞态）。
-     * pinned=true 时先经 PinnedDns 挂载 grant（与线缆路径同源的钉定语义）。
+     * ClientHello 线缆窥探代理：客户端 → 本代理 → MockWebServer。accept 后读首条 TLS
+     * 记录（恒为 ClientHello），按 RFC 8446 §4.1.2 解析 SNI 扩展原文后把已读字节原样
+     * 转発，再双向泵余下流量——观测点 = <b>wire 字节</b>，与 JVM/JSSE 实现完全解耦。
      *
-     * <p>历史注记（2026-09-07）：原实现用服务端 HandshakeCompletedListener 异步捕获 +
-     * 5s 轮询等待，CI 2 核慢机上钉定握手的监听器落账竞态曾致 IndexOutOfBoundsException；
-     * 本观测点改为客户端同步读取后消除竞态（观测语义不变：同为 ExtendedSSLSession
-     * 的 requestedServerNames，JDK 以 createSocket 的 host 参数为派生源）。
+     * <p>时序保证：转発发生在服务端响应之前 → 客户端 startHandshake 返回时观测已落账
+     * （同步断言零竞态）。
+     *
+     * <p>历史注记（2026-09-07）：服务端 HandshakeCompletedListener（CI 慢机落账竞态）与
+     * 客户端 getRequestedServerNames（CI JDK 对剥离握手抛 UnsupportedOperationException）
+     * 两个观测点均 provider/环境敏感，改线缆窥探后消除。
      */
-    private List<String> handshakeAndObserve(SSLSocketFactory wrapped, DirectAccessTransport.PinnedDns dns,
-                                             boolean pinned) throws Exception {
+    private static final class SniPeekingProxy {
+        final ServerSocket listener;
+        final int upstreamPort;
+        /** 每条连接一条：解析出的 SNI 主机名列表（无 SNI 扩展 = 空列表）；异常条目以 PROXY-ERR 前缀可见 */
+        final List<Object> observed = Collections.synchronizedList(new ArrayList<>());
+        private volatile boolean running = true;
+        private final java.util.concurrent.ExecutorService pool =
+                java.util.concurrent.Executors.newCachedThreadPool(r -> {
+                    Thread t = new Thread(r, "sni-peek-proxy");
+                    t.setDaemon(true);
+                    return t;
+                });
+
+        SniPeekingProxy(int upstreamPort) throws IOException {
+            this.upstreamPort = upstreamPort;
+            this.listener = new ServerSocket(0);
+        }
+
+        int port() {
+            return listener.getLocalPort();
+        }
+
+        void start() {
+            Thread t = new Thread(this::acceptLoop, "sni-peek-accept");
+            t.setDaemon(true);
+            t.start();
+        }
+
+        void stop() throws IOException {
+            running = false;
+            listener.close();
+            pool.shutdownNow();
+        }
+
+        private void acceptLoop() {
+            while (running) {
+                try {
+                    Socket client = listener.accept();
+                    pool.execute(() -> handle(client));
+                } catch (IOException e) {
+                    return; // listener 已关停（stop）
+                }
+            }
+        }
+
+        private void handle(Socket client) {
+            Socket upstream = null;
+            try {
+                upstream = new Socket("127.0.0.1", upstreamPort);
+                client.setSoTimeout(10_000);
+                List<String> sni = peekClientHello(client.getInputStream(), upstream.getOutputStream());
+                observed.add(sni);
+                // 双向泵：窥探后的全部字节透传（下行由池线程，上行当前线程）
+                final Socket up = upstream;
+                final Socket down = client;
+                java.util.concurrent.Future<?> downstream = pool.submit(() -> {
+                    try {
+                        pump(up.getInputStream(), down.getOutputStream());
+                    } catch (IOException ignored) {
+                        // 泵中断（任一端关闭）即退出
+                    }
+                });
+                pump(client.getInputStream(), upstream.getOutputStream());
+                downstream.get(10, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                observed.add("PROXY-ERR: " + e); // 可见不静默
+            } finally {
+                try {
+                    client.close();
+                } catch (IOException ignored) {
+                    // 连接收尾，忽略
+                }
+                if (upstream != null) {
+                    try {
+                        upstream.close();
+                    } catch (IOException ignored) {
+                        // 连接收尾，忽略
+                    }
+                }
+            }
+        }
+
+        private static void pump(java.io.InputStream in, java.io.OutputStream out) throws IOException {
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) != -1) {
+                out.write(buf, 0, n);
+                out.flush();
+            }
+        }
+
+        /** 读首条 TLS 记录并解析 SNI；已读字节逐段转発（窥探不吞字节） */
+        private static List<String> peekClientHello(java.io.InputStream in, java.io.OutputStream upstream)
+                throws IOException {
+            byte[] header = readFully(in, 5, upstream);
+            if ((header[0] & 0xFF) != 0x16) {
+                return List.of("NOT-HANDSHAKE-RECORD");
+            }
+            int recordLen = ((header[3] & 0xFF) << 8) | (header[4] & 0xFF);
+            byte[] rec = readFully(in, recordLen, upstream);
+            // ClientHello 结构（RFC 8446 §4.1.2）：type(1)+len(3) → version(2)+random(32)
+            // → session_id(var) → cipher_suites(var) → compression(var) → extensions(var)
+            int i = 4;
+            i += 2 + 32;
+            int sidLen = rec[i] & 0xFF; // session_id 长度字段在当前位置（rec[38]，random 之后）
+            i += 1 + sidLen;
+            int suites = ((rec[i] & 0xFF) << 8) | (rec[i + 1] & 0xFF);
+            i += 2 + suites;
+            int comp = rec[i] & 0xFF;
+            i += 1 + comp;
+            int extTotal = ((rec[i] & 0xFF) << 8) | (rec[i + 1] & 0xFF);
+            i += 2;
+            int end = i + extTotal;
+            List<String> names = new ArrayList<>();
+            while (i + 4 <= end) {
+                int type = ((rec[i] & 0xFF) << 8) | (rec[i + 1] & 0xFF);
+                int len = ((rec[i + 2] & 0xFF) << 8) | (rec[i + 3] & 0xFF);
+                if (type == 0x0000) { // server_name 扩展
+                    int listLen = ((rec[i + 4] & 0xFF) << 8) | (rec[i + 5] & 0xFF);
+                    int j = i + 6;
+                    int jEnd = j + listLen;
+                    while (j + 3 <= jEnd) {
+                        int nameType = rec[j] & 0xFF;
+                        int nameLen = ((rec[j + 1] & 0xFF) << 8) | (rec[j + 2] & 0xFF);
+                        if (nameType == 0) {
+                            names.add(new String(rec, j + 3, nameLen, StandardCharsets.UTF_8));
+                        }
+                        j += 3 + nameLen;
+                    }
+                }
+                i += 4 + len;
+            }
+            return names;
+        }
+
+        /** 精确读 len 字节，读到的字节同步转発 upstream */
+        private static byte[] readFully(java.io.InputStream in, int len, java.io.OutputStream upstream)
+                throws IOException {
+            byte[] buf = new byte[len];
+            int off = 0;
+            while (off < len) {
+                int n = in.read(buf, off, len - off);
+                if (n == -1) {
+                    throw new IOException("EOF during ClientHello peek");
+                }
+                upstream.write(buf, off, n);
+                off += n;
+            }
+            return buf;
+        }
+    }
+
+    /**
+     * 经窥探代理建立一条真实 TLS 连接并完成握手，返回本连接 ClientHello 携带的 SNI 主机名
+     * 列表（代理观测在服务端响应前落账——startHandshake 返回即同步可断言）。
+     * pinned=true 时先经 PinnedDns 挂载 grant（与线缆路径同源的钉定语义）。
+     */
+    private List<String> handshakeViaProxy(SSLSocketFactory wrapped, DirectAccessTransport.PinnedDns dns,
+                                           SniPeekingProxy proxy, boolean pinned) throws Exception {
+        int before = proxy.observed.size();
         if (pinned) {
             dns.lookup(PINNED_HOST); // grant 挂载到当前线程（ThreadLocal，与线缆路径同源）
         } else {
@@ -377,48 +531,46 @@ public class DirectAccessTransportTest {
         }
         try (Socket raw = new Socket()) {
             raw.connect(new InetSocketAddress(InetAddress.getByAddress(new byte[]{127, 0, 0, 1}),
-                    server.getPort()), 2000);
+                    proxy.port()), 2000);
             SSLSocket tls = (SSLSocket) wrapped.createSocket(raw, PINNED_HOST, server.getPort(), true);
             try {
                 tls.startHandshake();
-                SSLSession session = tls.getSession(); // 握手已完成，同步可读
-                if (!(session instanceof ExtendedSSLSession)) {
-                    throw new AssertionError(
-                            "客户端会话不可观测（非 ExtendedSSLSession）: " + session.getClass());
-                }
-                List<String> names = new ArrayList<>();
-                for (SNIServerName name : ((ExtendedSSLSession) session).getRequestedServerNames()) {
-                    names.add(new String(name.getEncoded(), StandardCharsets.UTF_8));
-                }
-                return names;
             } finally {
                 tls.close();
             }
         }
+        assertTrue("ClientHello 观测未落账（代理窥探时序破坏）", proxy.observed.size() > before);
+        @SuppressWarnings("unchecked")
+        List<String> names = (List<String>) proxy.observed.get(before);
+        return names;
     }
 
     @Test
     public void fullLink_sni_strippedForPinnedConnection_sentForNonPinned() throws Exception {
-        // oracle: ticket #389「钉定连接剥 SNI；非钉定连接 SNI 照常」+ JDK TLS 行为
-        // （客户端 ExtendedSSLSession.getRequestedServerNames = JDK 从 createSocket host
-        // 参数派生的 ClientHello SNI 决策结果；钉定 grant 经 PinnedDns 真实挂载，与线缆
-        // 路径同源）。服务端单证书双 SAN——不按 SNI 选证书，剥离与否不影响握手成败。
+        // oracle: ticket #389「钉定连接剥 SNI；非钉定连接 SNI 照常」——观测点 = ClientHello
+        // 的 SNI 扩展 wire 字节（RFC 8446 §4.1.2 解析，provider/环境无关）。服务端单证书
+        // 双 SAN——不按 SNI 选证书，剥离与否不影响握手成败。
         HeldCertificate cert = testCertificate();
         server.useHttps(serverCerts(cert).sslSocketFactory(), false);
         h.pinPinnedHostToLoopback();
+        SniPeekingProxy proxy = new SniPeekingProxy(server.getPort());
+        proxy.start();
         DirectAccessTransport.PinnedDns dns = new DirectAccessTransport.PinnedDns(
                 () -> SwitchState.ON, h.config::currentTable, h.config.breaker(), h.warns::add);
         SSLSocketFactory wrapped = new DirectAccessTransport.SniStrippingSSLSocketFactory(
                 clientCerts(cert).sslSocketFactory(), h.warns::add);
-
-        // ① 非钉定连接（无 grant）：真实握手 → ClientHello 携带 SNI（JDK 默认行为，零扰动）
-        List<String> sent = handshakeAndObserve(wrapped, dns, false);
-        assertEquals("非钉定连接 ClientHello 携带 SNI（JDK 默认形态，零扰动对照）",
-                Collections.singletonList(PINNED_HOST), sent);
-        // ② 钉定连接（grant 在场）：ClientHello 不携带 SNI（剥离生效）
-        List<String> stripped = handshakeAndObserve(wrapped, dns, true);
-        assertEquals("钉定连接 ClientHello 不携带 SNI（剥离生效）",
-                Collections.emptyList(), stripped);
+        try {
+            // ① 非钉定连接（无 grant）：真实握手 → ClientHello 携带 SNI（JDK 默认行为，零扰动）
+            List<String> sent = handshakeViaProxy(wrapped, dns, proxy, false);
+            assertEquals("非钉定连接 ClientHello 携带 SNI（JDK 默认形态，零扰动对照）",
+                    Collections.singletonList(PINNED_HOST), sent);
+            // ② 钉定连接（grant 在场）：ClientHello 不携带 SNI（剥离生效）
+            List<String> stripped = handshakeViaProxy(wrapped, dns, proxy, true);
+            assertEquals("钉定连接 ClientHello 不携带 SNI（剥离生效）",
+                    Collections.emptyList(), stripped);
+        } finally {
+            proxy.stop();
+        }
     }
 
     // ── 全链路：熔断闭环（ticket 验收 2） ────────────────────
