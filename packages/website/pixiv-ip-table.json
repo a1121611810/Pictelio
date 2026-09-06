@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "updatedAt": "2026-09-06",
+  "entries": [
+    {"host": "i.pximg.net", "ip": "210.140.139.131"},
+    {"host": "app-api.pixiv.net", "ip": "210.140.139.155"},
+    {"host": "oauth.secure.pixiv.net", "ip": "210.140.139.155"}
+  ]
+}
