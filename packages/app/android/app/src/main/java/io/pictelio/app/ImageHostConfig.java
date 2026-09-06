@@ -99,20 +99,24 @@ public final class ImageHostConfig {
     // ── 生产单例 ─────────────────────────────────────────────
 
     private static volatile ImageHostConfig instance;
+    /** 单例绑定的 ApplicationContext。生产进程内 getApplicationContext() 恒为同一对象（绑定永不触发重建）；
+     *  Robolectric 每用例新建 Application → 绑定失效自动重建，保证测试间无静态配置泄漏（跨类密闭）。 */
+    private static volatile Context instanceApp;
 
     /** 生产入口（包可见：调用方同包）。单例，接线真实 RawProvider/时钟/探针/专用单线程 executor。 */
     static ImageHostConfig get(Context ctx) {
+        Context app = ctx.getApplicationContext();
         ImageHostConfig c = instance;
-        if (c == null) {
+        if (c == null || instanceApp != app) {
             synchronized (ImageHostConfig.class) {
-                if (instance == null) {
-                    Context app = ctx.getApplicationContext();
+                if (instance == null || instanceApp != ctx.getApplicationContext()) {
                     // 探针客户端：复用共享连接池，仅调用级 5s 超时（探测与下载预算隔离）
                     final OkHttpClient probeClient = PixivApiCore.getSharedClient().newBuilder()
                             .callTimeout(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS)
                             .build();
+                    final Context appCtx = ctx.getApplicationContext();
                     instance = new ImageHostConfig(
-                            () -> app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                            () -> appCtx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                                     .getString(PREF_KEY, null),
                             System::currentTimeMillis,
                             new Random(),
@@ -130,6 +134,7 @@ public final class ImageHostConfig {
                                 }
                             },
                             probeExecutor());
+                    instanceApp = appCtx;
                 }
                 c = instance;
             }
