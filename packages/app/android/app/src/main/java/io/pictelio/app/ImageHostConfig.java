@@ -17,6 +17,7 @@ import java.util.Objects;
 import java.util.Random;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.OkHttpClient;
@@ -411,13 +412,20 @@ public final class ImageHostConfig {
             }
             probing = true;
         }
-        probeExecutor.execute(() -> {
-            try {
-                runProbe(usable);
-            } finally {
-                probing = false;
-            }
-        });
+        try {
+            probeExecutor.execute(() -> {
+                try {
+                    runProbe(usable);
+                } finally {
+                    probing = false;
+                }
+            });
+        } catch (RejectedExecutionException e) {
+            // executor 拒绝（如已关闭）→ 复位在飞标志并可见告警，避免 probing 永真
+            // 导致 fastest-ip 静默降级 weighted 直至进程重启（review P3 #3）
+            probing = false;
+            Log.w(TAG, "fastest-ip 探测任务提交失败（视为不可达）", e);
+        }
     }
 
     /**

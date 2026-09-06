@@ -47,7 +47,8 @@ public final class PixivImageLoader {
     private static final String TAG = "PixivImageLoader";
     /** 缓存目录名（对齐 OAuthConfig.CACHE_DIR / PixivApiPlugin.CACHE_DIR_NAME） */
     private static final String CACHE_DIR_NAME = "pictelio-images";
-    /** 镜像下载预算（ADR-0143 D4 / spec #376：connect 5s / call 15s，低于官方——劣化镜像不拖慢回退） */
+    /** 镜像下载预算（实现定值：connect 5s / call 15s，低于官方 connect 15s / read 30s / call 45s
+     *  ——ADR-0143 D4「低于官方」的具体化；劣化镜像快失败，不拖慢官方回退） */
     private static final int MIRROR_CONNECT_TIMEOUT_SECONDS = 5;
     private static final int MIRROR_CALL_TIMEOUT_SECONDS = 15;
 

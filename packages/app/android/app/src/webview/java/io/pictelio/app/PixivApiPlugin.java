@@ -149,6 +149,12 @@ public class PixivApiPlugin extends Plugin {
      * resolve、镜像失败官方回退、Referer/UA 注入均在下载核心内（与拦截链路同源），
      * 本壳只做参数校验与结果映射。
      *
+     * <p>行为申报（review P3 #1 补记）：失败 reject 消息从旧内联实现的
+     * {@code "Download failed (HTTP xxx)"} 变为 {@code "Prefetch failed: <IOException 消息>"}
+     * ——JS 侧仅 tryAsync 捕获后 console.warn，无文本解析消费方，无行为影响。
+     * 另：空 body 200 响应由「写空缓存文件」变为抛 IOException 不写盘（download 核心语义，
+     * self-healing miss 改进，ADR-0143 后果节已补记）。
+     *
      * <p>缓存键契约（ADR-0143 D2 源无关命中不变量）：磁盘文件名与内存缓存键一律用
      * <b>官方入参 url</b>（而非 resolve 后的下载 URL）——下载源跟随图床，缓存键不跟随。
      */

@@ -64,6 +64,7 @@ String resolve(String officialUrl)  // 官方 URL 进 → 实际下载 URL 出
 ## 后果
 
 - **用户可见**：native 图床首次真正生效（列表/详情/动图全出镜像图）；lynx 引擎继承 webview 配置的图床（lynx 无设置 UI，共享存储契约）；fastest-ip 双引擎生效；race 在 native 显式降级。
+- **错误面微变（review 补记）**：预取 reject 消息文本随委托下载核心而变（`Download failed (HTTP xxx)` → `Prefetch failed: <IOException 消息>`，无 JS 文本消费方）；空 body 200 由「写空缓存文件」变为抛 IOException 不写盘（self-healing miss 改进）。
 - **契约固化**：prefetch 入参回归官方 URL，预取/显示键从「巧合对齐」变「契约保证」。
 - **不受影响**：三层缓存体系、`ImageCachePlugin`、ugoira 帧缓存（illustId 键，天然源无关）、web dev 图床链路（开发机有网，维持现状，另行澄清不在本期）。
 - **风险承接**：镜像对 `/img-zip-ugoira/` 的支持未实证——回退官方兜底 + 验收探针；镜像字节与官方一致性列入验收（sha256 比对）。

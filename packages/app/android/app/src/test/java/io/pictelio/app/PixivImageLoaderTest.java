@@ -362,6 +362,11 @@ public class PixivImageLoaderTest {
         assertEquals(PixivImageLoader.keyToFilename(official),
                 PixivImageLoader.keyToFilename(
                         PixivImageLoader.rewriteUrl("/pixiv-img/img-master/2020/01/01/abc.jpg")));
+        // 带 query 形态：query 在两条路径上逐字节保留（review P3 #8 补例——组合等值防漂移）
+        String officialQuery = "https://i.pximg.net/img-master/2020/01/01/abc.jpg?a=1&b=2";
+        assertEquals(PixivImageLoader.keyToFilename(officialQuery),
+                PixivImageLoader.keyToFilename(
+                        PixivImageLoader.rewriteUrl("/pixiv-img/img-master/2020/01/01/abc.jpg?a=1&b=2")));
     }
 
     @Test
