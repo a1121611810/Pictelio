@@ -75,6 +75,33 @@ i.pximg.net       — Direct Pixiv CDN
 
 Host health is tracked with success/failure counts and timeouts.
 
+### Native download-source sink (ADR-0143, v4.35.0)
+
+Since **v4.35.0** (ADR-0143, spec [`imagehost-native-fix.md`](/docs/specs/imagehost-native-fix.md) #376), the image-host decision was sunk into the Java download layer so it finally reaches the out-image path on Android. `imageHostStore`/`imageHostService` remain the config producer (settings page + Web/dev mode), but native download-source selection now lives in a deep module [`ImageHostConfig.java`](/packages/app/android/app/src/main/java/io/pictelio/app/ImageHostConfig.java) with a single entry point `resolve(officialUrl)` — official URL in, actual download URL out. Four thin adapters wire it into every download path: `PixivImageLoader.download`, `PixivApiPlugin.prefetchImage`, and lynx `PictelioApiModule.downloadZip`/`streamDownloadZip`, so images and ugoira zips both flow through the mirror on both engines.
+
+```mermaid
+flowchart TD
+    A["resolve(officialUrl)"] --> B{"host off / invalid / no host?"}
+    B -- yes --> Z["return officialUrl unchanged"]
+    B -- no --> C{"mode?"}
+    C -- single --> S["selected host (fallback: first enabled)"]
+    C -- weighted --> W["weight-sampled host"]
+    C -- race --> W
+    C -- fastest-ip --> F{"probe within 30s TTL?"}
+    F -- yes --> FH["fastest host"]
+    F -- no --> W
+    S --> R["host-rewritten URL (path+query preserved)"]
+    W --> R
+    FH --> R
+```
+
+The `resolve()` decision — official URL in, download source out, with `race` degrading to `weighted` and `fastest-ip` falling back to `weighted` when the probe TTL expires.
+
+- **Cache-key invariant (D2):** the cache key is always the **official URL** (download source follows the image host, the cache key does not) — switching source, toggling the host, or changing mirror never invalidates cached entries. A machine-enforced anti-drift test asserts `keyToFilename(officialUrl)` ≡ the interceptor's `rewriteUrl` product.
+- **Four-mode mapping (D3):** `single` = selected host (invalid → first enabled); `weighted` = per-request weight sampling; `fastest-ip` = in-memory probe result (30s TTL) with immediate weighted fallback while a single-flight lazy probe (5s timeout) runs — the probe now lives in Java so it works for both engines; `race` is **not implemented natively** and explicitly degrades to `weighted` (settings page labels it 仅 Web/Web-only).
+- **Failure fallback (D4):** mirror download failure → one official retry (mirror connect/call budgets lower than official); corrupt/missing config → image host treated as off with a visible warn; a mirror `baseUrl` on the official pximg.net domain is skipped (anti-self-loop, symmetric with the JS `validateHostInput` write-side guard).
+- **Cleartext mirror guard (#383, [`imagehost-cleartext-mirror.md`](/docs/specs/imagehost-cleartext-mirror.md)):** native validation rejects `http://` mirror URLs (Android 9+ forbids cleartext HTTP — the manifest keeps `usesCleartextTraffic` off), and a startup migrate auto-disables any previously-saved `http://` hosts with a warn. Web/dev mode keeps `http://`.
+
 ## PixivImage Component
 
 `/packages/app/src/components/PixivImage.tsx` — The main image display component that:
@@ -244,6 +271,7 @@ For ugoira illusts in feed lists (virtual scroll):
 | Image loader (L1 cache, GC, prefetch) | `/packages/app/src/utils/imageLoader.ts` |
 | Image host selection and management | `/packages/app/src/stores/imageHostStore.ts` |
 | Image host service | `/packages/app/src/services/imageHostService.ts` |
+| Image host native download-source decision (Java) | `/packages/app/android/app/src/main/java/io/pictelio/app/ImageHostConfig.java` |
 | PixivImage display component | `/packages/app/src/components/PixivImage.tsx` |
 | LazyDetailImage lazy-loading wrapper | `/packages/app/src/components/LazyDetailImage.tsx` |
 | Image cache native plugin | `/packages/app/src/native/ImageCache.ts` |
