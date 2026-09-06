@@ -292,3 +292,31 @@ _Avoid_: 设备级设置（键不含 userId 的旧模式）
 **共享设置存储（Shared settings storage）**：
 跨 client 设置契约的物理落点——SharedPreferences 文件 "CapacitorStorage"（@capacitor/preferences 默认 group）。webview 经 Capacitor 插件读写；lynx 原生经 `PictelioPrefsModule` 读写；lynx web-core dev 预览降级 IndexedDB（仅开发环境）。
 _Avoid_: 本地存储（localStorage，web-core Worker 环境不存在）
+
+### 网络直连（Direct access）
+
+**直连模式（Direct access）**【2026-09-06 新增，跨上下文】：
+不依赖代理/镜像、以「IP 直连 + 无 SNI TLS + Host 头路由」访问 Pixiv 官方边缘的网络通路模式，覆盖图片、API、OAuth 刷新三层（首次登录不在此列——PKCE 走 WebView 必带 SNI，无法免梯）。默认关闭，用户手动开启；通路失效时自动回退系统路线。能力实现在**双引擎共享的 Java 传输层**——webview 与 lynx 客户端无需各自实现即同时获得。
+_Avoid_: 免梯直连（口语别名，勿入代码与文档）；镜像模式（社区镜像是图床功能，与直连正交——用户配置的镜像 URL 不做直连化改写）
+
+**系统路线（System route）**：
+未启用直连时的默认网络通路——请求直接发往 Pixiv 官方域名，连通性依赖用户自身网络环境（可达网络或自备代理）。直连失败时的回退目标。
+_Avoid_: 代理路线（应用不内置代理，代理来自用户环境）
+
+**IP 表（IP table）**：
+直连模式使用的「Pixiv 域名 → 自建边缘 IP」静态映射配置（GFW 按 SNI 阻断 + DNS 污染，直连须钉 IP 且不发 SNI）。来源三层：APK 内置默认值、远端 JSON 定期更新、设置页手动编辑兜底。边缘 IP 按 vhost 特化（错 IP 得 421 而非封锁），通路随 GFW 策略/Pixiv 边缘拓扑变化会失效——IP 表可更新是直连可维护的前提。
+_Avoid_: 写死单一 IP 常量（无更新机制的直连不可维护）
+
+### 图床（Image host）
+
+**下载源（Download source）**【2026-09-06 新增，跨上下文】：
+缓存 miss 时由图床模式（单一/负载均衡/最快 IP）选定的**实际取数渠道**（官方 CDN 或镜像图床）。决策点收敛在 Java 下载层（双引擎共享），显示 URL 不受其影响。镜像下载失败回退官方重试一次。
+_Avoid_: 图床 URL（易与缓存键混淆——下载源只在 miss 时被咨询，不参与寻址）
+
+**缓存键（Cache key）**【2026-09-06 新增，跨上下文】：
+图片/zip 缓存条目的唯一寻址依据，**恒为官方 CDN URL**（`keyToFilename(rewriteUrl 产物)` 同一契约），与下载源解耦。预取、显示拦截、zip 三链路共用同一键空间。
+_Avoid_: 用下载 URL 做键（图床开启时预取与显示键断裂——历史 bug 根源，已由 anti-drift 测试把守）
+
+**源无关命中（Source-agnostic hit）**【2026-09-06 新增，跨上下文】：
+缓存命中判定只依赖「该图是否曾以任意来源缓存过」，与当前图床开关、模式、host 选择完全无关。切换图床/换镜像不失效、不重下；同一图全生命周期只有一个缓存条目。
+_Avoid_: 按来源分柜缓存（同图多份、切源即 miss——反模式）
