@@ -1,0 +1,59 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'io.pictelio.geckoproto'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'io.pictelio.geckoproto'
+        minSdk 28
+        targetSdk 34
+        versionCode 1
+        versionName '0.1-proto'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    packagingOptions {
+        // GeckoView AAR 内的 META-INF 许可文件冲突防御
+        resources {
+            excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE*', 'META-INF/NOTICE*', 'META-INF/MOZILLA_PSK']
+        }
+    }
+}
+
+dependencies {
+    // GeckoView 155.0 release（2026-09-03 构建），per-ABI artifact：仅 arm64（模拟器 sdk_gphone64_arm64）
+    implementation "org.mozilla.geckoview:geckoview-arm64-v8a:155.0.20260903215306"
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'androidx.appcompat:appcompat:1.7.1'
+}
+
+// GeckoView 155 的 POM 传递依赖（androidx.core 1.19 / lifecycle 2.11 等）要求 compileSdk 37，
+// 本机拿不到 android-37 平台（sdkmanager 拉清单被墙）。钉回 compileSdk-36 兼容版本组
+// （与主工程 variables.gradle 同源）——GV 运行时只用稳定 API，模拟器 API 34 实测验证。
+configurations.all {
+    resolutionStrategy.force(
+            'androidx.core:core:1.17.0',
+            'androidx.core:core-ktx:1.17.0',
+            'androidx.annotation:annotation:1.9.1',
+            'androidx.annotation:annotation-experimental:1.4.1',
+            'androidx.collection:collection:1.5.0',
+            'androidx.collection:collection-jvm:1.5.0',
+            'androidx.lifecycle:lifecycle-common:2.8.7',
+            'androidx.lifecycle:lifecycle-common-jvm:2.8.7',
+            'androidx.lifecycle:lifecycle-process:2.8.7',
+            'androidx.lifecycle:lifecycle-runtime:2.8.7',
+    )
+}

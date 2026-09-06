@@ -1,0 +1,6 @@
+android-proto/.gradle/
+android-proto/build/
+android-proto/app/build/
+android-proto/local.properties
+android-proto/local-maven/
+android-proto/app/src/main/assets/public/

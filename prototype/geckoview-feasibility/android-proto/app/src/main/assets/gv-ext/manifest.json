@@ -1,0 +1,31 @@
+{
+  "manifest_version": 2,
+  "name": "gv-proto-ext",
+  "version": "1.0",
+  "description": "Pictelio GeckoView feasibility prototype extension (throwaway)",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "gv-proto@pictelio.io",
+      "strict_min_version": "140.0"
+    }
+  },
+  "permissions": [
+    "nativeMessaging",
+    "nativeMessagingFromContent",
+    "geckoViewAddons",
+    "webRequest",
+    "webRequestBlocking",
+    "<all_urls>"
+  ],
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://localhost:18080/*", "http://127.0.0.1:18080/*", "http://127.0.0.1/*"],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ]
+}

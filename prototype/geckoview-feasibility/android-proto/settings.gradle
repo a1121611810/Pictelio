@@ -1,0 +1,25 @@
+// GeckoView 可行性原型（throwaway）—— 独立 Gradle 工程，不进主构建
+pluginManagement {
+    repositories {
+        maven { url 'https://maven.aliyun.com/repository/public' }
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        // 工程内本地仓库：GeckoView AAR 手动安装（Gradle 直连 maven.mozilla.org 大文件下载失败，
+        // curl 可达——手动 curl 下载后按 maven layout 落位，见 scripts/fetch-geckoview.sh）
+        maven { url uri("$rootDir/local-maven") }
+        maven { url 'https://maven.aliyun.com/repository/public' }
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        google()
+        mavenCentral()
+        maven { url 'https://maven.mozilla.org/maven2' }
+    }
+}
+rootProject.name = 'PictelioGeckoProto'
+include ':app'
