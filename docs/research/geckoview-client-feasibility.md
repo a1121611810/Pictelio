@@ -174,6 +174,20 @@
 
 ---
 
+## 8b. 低版本 Android 上的收益实测（API 28 / Android 9，第五轮）
+
+> 场景：`pictelio_low` 模拟器（Android 9 / API 28），系统 WebView **66.0.3359.158**（2018 年 Chromium 66，远低于项目 ≥85 门槛）——「老设备 WebView 陈旧」的标准样本。
+
+| 项 | 结果 |
+|----|------|
+| 基线 WebView 路线 | **被自家 ≥85 门禁拦死**（截图实测：升级提示页「WebView 版本过低，当前 Chrome 66，需要 85+」）——设备无法自行升级即死局 |
+| 基线 Lynx 路线 | 可用（Lynx 自带引擎，默认 client_kind=lynx 时直接进 Lynx 登录页）——但这是 Lynx 的收益，功能面是独立 MVP |
+| **GeckoView 原型** | **全功能可用**：GV 155 完整跑 SPA，FCP t+1177~1938ms，滚动 **58.0 FPS**，feed 完整渲染，4 进程 **~484MB** PSS |
+
+**网络通道的新发现（对主工程 directaccess 同样是预警）**：Android 9 的 Conscrypt 上，**无 SNI 钉定通道握手被 RST**（`SSLHandshakeException: Connection reset by peer`），而宿主机 LibreSSL 以 TLS 1.2 + 无 SNI 复测同一边缘是通的（301/200）——差异在 Android 9 的 ClientHello 形态（SNI 剥离未生效或指纹触发重置）。回退 SNI 直连则被 DNS 污染注入伪响应。最终靠**代理兜底**恢复全功能（lastGood 通道记忆后 130~135ms/请求，未记忆时每请求烧 ~17s 死通道试错）。即：**免梯直连在 Android 9 失效**——`DirectAccessTransport` javadoc 的「Android 同族行为一致」在 API 28 上被证伪，主工程的直连特性同样需要低版本设备回归。
+
+**裁决**：低版本是 GeckoView **唯一有真实收益的场景**——作为「系统 WebView 过旧设备的兼容引擎」，让完整 SPA 覆盖本已死局的设备。但该收益属于**覆盖面**（救活设备）而非体验/成本优势（内存 ×4+、需代理网络）；且是否值得为覆盖率引入三引擎架构，是独立的产品决策。
+
 ## 9. 对调研档（8d938b39）结论的增量修正
 
 | 调研档存疑点 | 本次定案 |

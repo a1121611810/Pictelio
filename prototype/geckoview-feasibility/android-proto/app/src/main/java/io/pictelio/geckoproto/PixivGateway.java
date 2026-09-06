@@ -73,14 +73,20 @@ public final class PixivGateway {
 
     private final OkHttpClient sniClient;
     private final OkHttpClient noSniClient;
+    /** 第三通道：本地代理兜底（127.0.0.1:10808，经 adb reverse 对接宿主；复刻生产老设备姿势） */
+    private final OkHttpClient proxyClient;
 
     public PixivGateway() {
         sniClient = new OkHttpClient.Builder()
-                .connectTimeout(10, TimeUnit.SECONDS)
+                .connectTimeout(8, TimeUnit.SECONDS)
                 .readTimeout(20, TimeUnit.SECONDS)
                 .writeTimeout(20, TimeUnit.SECONDS)
                 .build();
         noSniClient = buildNoSniClient();
+        proxyClient = sniClient.newBuilder()
+                .proxy(new java.net.Proxy(java.net.Proxy.Type.HTTP,
+                        new java.net.InetSocketAddress("127.0.0.1", 10808)))
+                .build();
     }
 
     // ── 无 SNI 客户端（钉定 IP 字面量 + 剥 SNI，搬运主工程已验证机制） ──
@@ -158,23 +164,16 @@ public final class PixivGateway {
 
     // ── 请求执行 ──
 
-    /** 图片：GET i.pximg.net/<path>，注入 Referer/UA；pixiv 域优先无 SNI 钉定（DNS 污染下 SNI 直连被注入 404/伪响应，实测 2026-09-07） */
+    /** 图片：GET i.pximg.net/<path>，注入 Referer/UA；三通道降级 + lastGood 记忆 */
     public byte[] image(String path) throws IOException {
         String url = IMAGE_CDN + path;
         Request req = baseBuilder(url)
                 .addHeader("Referer", REFERER)
                 .addHeader("User-Agent", UA)
                 .get().build();
-        try {
-            byte[] body = execForBody(noSniClient, req, url);
-            Log.i(TAG, "[gw][img] channel=noSniPinned bytes=" + body.length + " path=" + path);
-            return body;
-        } catch (IOException pinnedError) {
-            Log.w(TAG, "[gw][img] 无 SNI 钉定失败，回退 SNI 直连: " + pinnedError);
-            byte[] body = execForBody(sniClient, req, url);
-            Log.i(TAG, "[gw][img] channel=sniDirect bytes=" + body.length + " path=" + path);
-            return body;
-        }
+        Result r = executeWithFallback(req, "img");
+        if (r.status != 200 || r.body.length == 0) throw new IOException("HTTP " + r.status + ": " + url);
+        return r.body;
     }
 
     private static byte[] execForBody(OkHttpClient client, Request req, String url) throws IOException {
@@ -232,17 +231,37 @@ public final class PixivGateway {
             b.get();
         }
         Request req = b.build();
-        // pixiv 域：无 SNI 钉定优先（DNS 污染 + SNI 注入，见 image() 注释）
-        try {
-            Result r = toResult(noSniClient.newCall(req).execute(), "noSniPinned");
-            Log.i(TAG, "[gw][" + tag + "] ch=noSniPinned st=" + r.status + " bytes=" + r.body.length);
-            return r;
-        } catch (IOException pinnedError) {
-            Log.w(TAG, "[gw][" + tag + "] 无 SNI 钉定失败，回退 SNI 直连: " + pinnedError);
-            Result r = toResult(sniClient.newCall(req).execute(), "sniDirect");
-            Log.i(TAG, "[gw][" + tag + "] ch=sniDirect st=" + r.status + " bytes=" + r.body.length);
-            return r;
+        // pixiv 域三通道降级：无 SNI 钉定 → SNI 直连（DNS 污染下被注入伪响应）→ 代理兜底；
+        // lastGood 记忆成功通道避免重复试错（Android 9 实测 noSni 被_RST_、SNI 被注入）
+        return executeWithFallback(req, tag);
+    }
+
+    private String channelName(OkHttpClient client) {
+        if (client == noSniClient) return "noSniPinned";
+        if (client == proxyClient) return "proxy10808";
+        return "sniDirect";
+    }
+
+    /** 上次成功通道（进程级记忆；避免每次请求重试死通道烧 8s 超时——主工程熔断器的极简版） */
+    private volatile int lastGood = 0;
+
+    private Result executeWithFallback(Request req, String tag) throws IOException {
+        OkHttpClient[] channels = {noSniClient, sniClient, proxyClient};
+        IOException last = null;
+        for (int offset = 0; offset < channels.length; offset++) {
+            int idx = (lastGood + offset) % channels.length;
+            try {
+                Result r = toResult(channels[idx].newCall(req).execute(), channelName(channels[idx]));
+                if (idx != lastGood) Log.i(TAG, "[gw][" + tag + "] 通道切换 → " + channelName(channels[idx]));
+                lastGood = idx;
+                Log.i(TAG, "[gw][" + tag + "] ch=" + channelName(channels[idx]) + " st=" + r.status + " bytes=" + r.body.length);
+                return r;
+            } catch (IOException e) {
+                Log.w(TAG, "[gw][" + tag + "] " + channelName(channels[idx]) + " 失败: " + e);
+                last = e;
+            }
         }
+        throw last != null ? last : new IOException("所有通道失败");
     }
 
     private static Result toResult(Response resp, String channel) throws IOException {
