@@ -117,6 +117,22 @@ public final class DirectAccessConfig {
      *  Robolectric 每用例新建 Application → 绑定失效自动重建，保证测试间无静态配置泄漏（跨类密闭）。 */
     private static volatile Context instanceApp;
 
+    /**
+     * 单例是否已实例化（#390：PixivApiCore.getClient 接线探测用）——<b>不触发实例化</b>。
+     * getClient 可能在 DirectAccessInitProvider.onCreate 之前被调（如 JVM 单测/极端时序），
+     * 该处只能探测不能 {@link #get}（get 需要 Context）。未实例化 = install(null) = no-op
+     * 纯系统路线（降级契约）。public：跨包调用方 = PixivApiCore.getClient（#390）。
+     */
+    public static boolean isInstantiated() {
+        return instance != null;
+    }
+
+    /** 已实例化单例（调用前必须 {@link #isInstantiated()} 为真；否则 null——调用方按降级契约处理）。
+     *  public 理由同 {@link #isInstantiated()}；返回引用的消费仅限传给 install（null 安全）。 */
+    public static DirectAccessConfig peekInstance() {
+        return instance;
+    }
+
     /** 生产入口。单例，接线真实 RawProvider / 时钟 / 专用不路由拉取器 / 单线程 executor / Log.w。
      *  public：跨包调用方为 webview 源集（PixivApiPlugin 设置页命令面，T6 消费）——
      *  ImageHostConfig.get 为包可见（调用方恒同包），本类消费方跨包故放宽。 */

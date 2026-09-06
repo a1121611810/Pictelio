@@ -112,7 +112,7 @@ import okhttp3.Response;
  * <p><b>线程安全</b>：三件套实例无共享可变态（grant 走 ThreadLocal；熔断器自身 CAS）。
  * install 只应在 client 构建期调用一次（幂等防御重复调用）。
  */
-final class DirectAccessTransport {
+public final class DirectAccessTransport {
 
     private static final String TAG = "[DirectAccessTransport]";
 
@@ -131,6 +131,7 @@ final class DirectAccessTransport {
 
     /**
      * 把直连三件套装进 client builder（生产入口；warn 走 {@link Log#w}）。
+     * public：跨包调用方 = PixivApiCore.getClient（io.pictelio.app 主包，#390 接线）。
      *
      * <p><b>幂等防御</b>：以应用拦截器列表中的 {@link PinnedAccountingInterceptor} 标记
      * 判定已安装——install 是四点原子装配，查一即查全；{@code newBuilder()} 派生 builder
@@ -138,7 +139,7 @@ final class DirectAccessTransport {
      *
      * @return 同一 builder（链式）；已安装时原样返回、零改动
      */
-    static OkHttpClient.Builder install(OkHttpClient.Builder builder, DirectAccessConfig config) {
+    public static OkHttpClient.Builder install(OkHttpClient.Builder builder, DirectAccessConfig config) {
         return install(builder, config, msg -> Log.w(TAG, msg));
     }
 
@@ -152,6 +153,12 @@ final class DirectAccessTransport {
             if (i instanceof PinnedAccountingInterceptor) {
                 return builder; // 已安装（含 newBuilder 派生继承），幂等短路
             }
+        }
+        if (config == null) {
+            // 装配缺失（DirectAccessInitProvider 未跑，如 JVM 单测/极端时序）：builder 原样
+            // 返回 = 纯系统路线零改动（spec #385 降级契约——T5 接线方 PixivApiCore 以
+            // isInstantiated() 探测后可能仍传 null，此处是契约的最终守门）。
+            return builder;
         }
         ChannelCircuitBreaker breaker = config.breaker();
         // 一次性探针 client：只为提取平台默认 TLS 组件（默认 SSLSocketFactory + 默认

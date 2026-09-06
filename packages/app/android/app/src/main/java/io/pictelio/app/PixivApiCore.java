@@ -55,7 +55,18 @@ final class PixivApiCore {
         if (client != null) return client;
         synchronized (PixivApiCore.class) {
             if (client != null) return client;
-            client = new OkHttpClient.Builder()
+            // #390 直连接线：路由装在共享 client 上（Dns 钉 IP + SSF 剥 SNI + EventListener
+            // 归因），全部官方流量（API/图片/zip/刷新，双引擎）自动获得直连能力。
+            // config 为 null（DirectAccessInitProvider 未跑，如 JVM 单测）= install no-op
+            // = 纯系统路线（降级契约，spec #385 装配缺失零异常）。
+            io.pictelio.app.directaccess.DirectAccessConfig directAccessConfig =
+                    io.pictelio.app.directaccess.DirectAccessConfig.isInstantiated()
+                            ? io.pictelio.app.directaccess.DirectAccessConfig.peekInstance()
+                            : null;
+            OkHttpClient.Builder directAccessBuilder =
+                    io.pictelio.app.directaccess.DirectAccessTransport.install(
+                            new OkHttpClient.Builder(), directAccessConfig);
+            client = directAccessBuilder
                     .connectTimeout(OAuthConfig.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
                     .readTimeout(OAuthConfig.TIMEOUT_READ, TimeUnit.MILLISECONDS)
                     .callTimeout(OAuthConfig.TIMEOUT_CONNECT + OAuthConfig.TIMEOUT_READ, TimeUnit.MILLISECONDS)

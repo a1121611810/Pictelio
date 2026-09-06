@@ -55,6 +55,14 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <!-- 直连自装配（#390）：三 flavor 零 Java 装配代码，系统在 Application.onCreate
+             前回调 onCreate 预热 DirectAccessConfig 单例；语义见
+             io.pictelio.app.directaccess.DirectAccessInitProvider javadoc -->
+        <provider
+            android:name="io.pictelio.app.directaccess.DirectAccessInitProvider"
+            android:authorities="${applicationId}.directaccessinit"
+            android:exported="false" />
     </application>
 
     <!-- Permissions -->
