@@ -117,7 +117,9 @@ public final class DirectAccessConfig {
      *  Robolectric 每用例新建 Application → 绑定失效自动重建，保证测试间无静态配置泄漏（跨类密闭）。 */
     private static volatile Context instanceApp;
 
-    /** 生产入口。单例，接线真实 RawProvider / 时钟 / 专用不路由拉取器 / 单线程 executor / Log.w。 */
+    /** 生产入口。单例，接线真实 RawProvider / 时钟 / 专用不路由拉取器 / 单线程 executor / Log.w。
+     *  public：跨包调用方为 webview 源集（PixivApiPlugin 设置页命令面，T6 消费）——
+     *  ImageHostConfig.get 为包可见（调用方恒同包），本类消费方跨包故放宽。 */
     public static DirectAccessConfig get(Context ctx) {
         Context app = ctx.getApplicationContext();
         DirectAccessConfig c = instance;
