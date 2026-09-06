@@ -1,7 +1,6 @@
 package io.pictelio.app.directaccess;
 
 import android.content.Context;
-
 /**
  * 直连自装配（spec #385 / ticket #390 T5）：main 源集 ContentProvider，manifest 一条声明
  * （authorities {@code ${applicationId}.directaccessinit}，exported=false），full/webview/lynx
@@ -26,9 +25,14 @@ public final class DirectAccessInitProvider extends android.content.ContentProvi
     @Override
     public boolean onCreate() {
         // 预热 Config 单例（Context 键控；异常吞并 warn——装配失败不得阻断应用启动，
-        // 直连退化为系统路线即既有降级契约）
+        // 直连退化为系统路线即既有降级契约）。
+        // 注意用 getContext()（全 API 级可用）：requireContext() 是 API 30+ 方法，
+        // minSdk 28 设备上抛 NoSuchMethodError（#392 真机验收实测，Robolectric 未拦）。
         try {
-            DirectAccessConfig.get(requireContext().getApplicationContext());
+            Context app = getContext();
+            if (app != null) {
+                DirectAccessConfig.get(app.getApplicationContext());
+            }
         } catch (Exception e) {
             android.util.Log.w("[DirectAccessInit]", "直连配置预热失败（退化系统路线）", e);
         }
