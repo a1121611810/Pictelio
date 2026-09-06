@@ -303,6 +303,35 @@ public final class DirectAccessConfig {
         breaker.reset(ChannelCircuitBreaker.Channel.API_REFRESH);
     }
 
+    // ── 状态面（T6 设置卡状态展示消费，只读观测） ─────────────
+
+    /**
+     * 最近一次<b>成功</b>拉取远端 IP 表的时刻 ms（{@code 0} = 从未成功）。
+     * T6 设置卡状态展示只读观测（volatile 读，无迁移副作用）。
+     */
+    public long lastFetchAtMillis() {
+        return lastFetchAtMillis;
+    }
+
+    /**
+     * 参与当前合并的层级摘要（T6 设置卡状态展示）：优先级序
+     * {@code manual+remote+builtin}，{@code builtin} 恒在（兜底层永不缺席）。
+     * 「参与」= 该层配置非空的 presence 语义（摘要展示非路由判定，不逐条核对
+     * 覆盖结果；条目级合法性由 Merger 跳过 + 告警管）。
+     */
+    public String tableSourceSummary() {
+        Parsed p = currentParsed();
+        List<IpTableMerger.Entry> remote = remoteTable;
+        StringBuilder sb = new StringBuilder("builtin");
+        if (remote != null && !remote.isEmpty()) {
+            sb.insert(0, "remote+");
+        }
+        if (p.manual != null && !p.manual.isEmpty()) {
+            sb.insert(0, "manual+");
+        }
+        return sb.toString();
+    }
+
     // ── 配置解析（raw equals 复用）与跃迁检测 ─────────────────
 
     private Parsed currentParsed() {

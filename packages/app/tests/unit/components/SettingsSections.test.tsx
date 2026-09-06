@@ -1,10 +1,11 @@
 // @vitest-environment happy-dom
 /**
- * SettingsSections — 设置页 8 卡分组装配（2026-09 归类整理）。
+ * SettingsSections — 设置页 9 卡分组装配（2026-09 归类整理；ticket #391 加网络直连卡）。
  *
- * Oracle：用户选定方案「按功能域拆 8 卡」——顺序为 显示与交互 / 内容与过滤 /
- * 图片 / 翻译 / 客户端 / 更新与关于 / 账户 / 退出登录(danger)；
+ * Oracle：用户选定方案「按功能域拆卡」——顺序为 显示与交互 / 内容与过滤 /
+ * 图片 / 网络直连 / 翻译 / 客户端 / 更新与关于 / 账户 / 退出登录(danger)；
  * - 图片卡接收 onActionToast（清除图片缓存归入图片卡）
+ * - 网络直连卡紧跟图片卡（网络类设置聚拢，ticket #391 指定），无 props
  * - 账户卡不再接收 onActionToast（更新/关于条目已拆出）
  *
  * 各分区卡的内容正确性由各自组件测试覆盖（如 SettingsClient.test.tsx），
@@ -33,6 +34,9 @@ vi.mock("@/components/settings/SettingsImage", () => ({
   default: (props: { onActionToast?: (msg: string) => void }) => (
     <div data-testid="sec-image" data-prop-on-action-toast={String(!!props.onActionToast)} />
   ),
+}));
+vi.mock("@/components/settings/SettingsDirectAccess", () => ({
+  default: () => <div data-testid="sec-direct-access" />,
 }));
 vi.mock("@/components/settings/SettingsTranslate", () => ({
   default: () => <div data-testid="sec-translate" />,
@@ -70,13 +74,13 @@ vi.mock("@solidjs/router", async (importOriginal) => {
 
 import SettingsSections from "@/components/settings/SettingsSections";
 
-describe("SettingsSections 8 卡分组装配", () => {
+describe("SettingsSections 9 卡分组装配", () => {
   beforeEach(() => {
     cleanup();
     vi.clearAllMocks();
   });
 
-  it("按 8 卡顺序渲染：显示交互/内容/图片/翻译/客户端/更新/账户/退出登录", () => {
+  it("按 9 卡顺序渲染：显示交互/内容/图片/网络直连/翻译/客户端/更新/账户/退出登录", () => {
     render(() => (
       <SettingsSections
         isLoggedIn={() => true}
@@ -92,6 +96,7 @@ describe("SettingsSections 8 卡分组装配", () => {
       "sec-appearance",
       "sec-content",
       "sec-image",
+      "sec-direct-access",
       "sec-translate",
       "sec-client",
       "sec-update",
@@ -99,10 +104,10 @@ describe("SettingsSections 8 卡分组装配", () => {
       "sec-logout",
     ];
     const actual = order.map((id) => document.querySelector(`[data-testid="${id}"]`));
-    expect(actual.every(Boolean), "8 卡应全部渲染").toBe(true);
+    expect(actual.every(Boolean), "9 卡应全部渲染").toBe(true);
     expect(
       actual.map((el) => el!.getAttribute("data-testid")),
-      "卡片顺序应符合 8 卡方案",
+      "卡片顺序应符合 9 卡方案（网络直连紧跟图片卡）",
     ).toEqual(order);
   });
 

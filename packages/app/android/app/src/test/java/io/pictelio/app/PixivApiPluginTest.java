@@ -18,9 +18,17 @@ import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
 
+import com.getcapacitor.JSObject;
+
+import org.json.JSONException;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+
+import io.pictelio.app.directaccess.ChannelCircuitBreaker;
+import io.pictelio.app.directaccess.DirectAccessConfig;
+import io.pictelio.app.directaccess.DirectIpTableDefaults;
 
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -241,5 +249,92 @@ public class PixivApiPluginTest {
         assertTrue(ex.getMessage().contains("403"));
         assertNull("失败响应不得写缓存", cacheFileOf(ctx, officialUrl));
         assertNull("失败路径不得回填内存 LRU", ImageBytesMemoryCache.getInstance().get(officialUrl));
+    }
+
+    // ── 直连状态/命令面（#391 T6，先例 prefetchCore：包可见核心脱离 PluginCall 壳） ──
+    //
+    // Oracle 溯源（测试硬约束 #6）：
+    //  - fixture JSON 形态 = DirectAccessConfig 存储契约 javadoc（{"enabled":bool,
+    //    "manual":[{"host","ip"}]}），经生产读取路径 SharedPreferences "CapacitorStorage"
+    //    键 direct_access_settings 写入（真实样例硬约束 #2，非内存 mock）；
+    //  - 开关映射（false→OFF / key 缺失→UNSET）= DirectAccessConfigTest 开关注释 + SwitchState 三态语义；
+    //  - 条目数覆盖语义（manual 逐条覆盖内置，非新增）= spec #385「三层合并 逐条覆盖」；
+    //  - 熔断相位（3 连败→OPEN / reset→CLOSED 清零）= ChannelCircuitBreaker 状态机 javadoc；
+    //  - refresh 命令 started=true = refreshIpTableNow 单飞契约（DirectAccessConfigTest 已覆盖
+    //    拉取语义；此处只断言壳层委托透传。生产接线拉取器直连 raw.githubusercontent.com，
+    //    后台 daemon 线程 fire-and-forget：失败仅 warn，不影响本用例同步断言）。
+
+    /** 生产写入路径：SharedPreferences "CapacitorStorage" 的 direct_access_settings（Java 解析契约同名键） */
+    private void writeDirectAccessSettings(String json) {
+        ctx.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
+                .edit()
+                .putString("direct_access_settings", json)
+                .apply();
+    }
+
+    @Test
+    public void directAccessStatus_reflectsStoredSwitchAndManualTable_noNetworkWhenOff()
+            throws JSONException {
+        writeDirectAccessSettings(
+                "{\"enabled\":false,\"manual\":[{\"host\":\"i.pximg.net\",\"ip\":\"192.0.2.1\"}]}");
+
+        JSObject status = PixivApiPlugin.directAccessStatusCore(ctx);
+
+        assertEquals("OFF", status.getString("switchState"));
+        assertEquals("CLOSED", status.getString("imageChannel"));
+        assertEquals("CLOSED", status.getString("apiChannel"));
+        // 手动层逐条覆盖内置（spec #385）：i.pximg.net 是覆盖非新增 → 条目数 = 内置表大小
+        assertEquals("手动覆盖不新增条目", DirectIpTableDefaults.builtIn().size(),
+                status.getInteger("tableEntries").intValue());
+        assertEquals("manual+builtin", status.getString("tableSource"));
+        assertEquals("从未成功拉取应为 0", 0L, status.getLong("lastFetchAtMillis"));
+    }
+
+    @Test
+    public void directAccessStatus_missingKey_safeUnsetDefaults() throws JSONException {
+        JSObject status = PixivApiPlugin.directAccessStatusCore(ctx);
+
+        assertEquals("key 缺失 = UNSET（缺省状态）", "UNSET", status.getString("switchState"));
+        assertEquals("CLOSED", status.getString("imageChannel"));
+        assertEquals("CLOSED", status.getString("apiChannel"));
+        assertEquals("内置兜底层仍参与合并", DirectIpTableDefaults.builtIn().size(),
+                status.getInteger("tableEntries").intValue());
+        assertEquals("builtin", status.getString("tableSource"));
+    }
+
+    @Test
+    public void directAccessCommand_reset_reopensOpenCircuits() throws Exception {
+        DirectAccessConfig config = DirectAccessConfig.get(ctx);
+        for (int i = 0; i < ChannelCircuitBreaker.FAILURE_THRESHOLD; i++) {
+            config.breaker().recordFailure(ChannelCircuitBreaker.Channel.IMAGE);
+            config.breaker().recordFailure(ChannelCircuitBreaker.Channel.API_REFRESH);
+        }
+        assertEquals(ChannelCircuitBreaker.Phase.OPEN,
+                config.breaker().phase(ChannelCircuitBreaker.Channel.IMAGE));
+        assertEquals(ChannelCircuitBreaker.Phase.OPEN,
+                config.breaker().phase(ChannelCircuitBreaker.Channel.API_REFRESH));
+
+        JSObject result = PixivApiPlugin.directAccessCommandCore(ctx, "reset");
+
+        assertTrue("reset 命令应 resolve ok=true", result.getBoolean("ok"));
+        assertEquals("双通道熔断全重置回 CLOSED",
+                ChannelCircuitBreaker.Phase.CLOSED,
+                config.breaker().phase(ChannelCircuitBreaker.Channel.IMAGE));
+        assertEquals(ChannelCircuitBreaker.Phase.CLOSED,
+                config.breaker().phase(ChannelCircuitBreaker.Channel.API_REFRESH));
+    }
+
+    @Test
+    public void directAccessCommand_refreshReturnsStarted_andUnknownActionRejected()
+            throws Exception {
+        JSObject result = PixivApiPlugin.directAccessCommandCore(ctx, "refresh");
+
+        assertTrue(result.getBoolean("ok"));
+        assertTrue("空闲单例首次 refresh 必然发起（started=true）", result.getBoolean("started"));
+
+        IllegalArgumentException err = assertThrows(IllegalArgumentException.class,
+                () -> PixivApiPlugin.directAccessCommandCore(ctx, "bogus"));
+        assertTrue("未知 action 的报错应说明合法取值",
+                err.getMessage() != null && err.getMessage().contains("reset"));
     }
 }
