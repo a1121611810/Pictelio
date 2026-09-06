@@ -1,9 +1,9 @@
 {
-  "version": "4.34.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.34.0",
-  "changelog": "🔧 其他\n  19fe0524 Merge branch 'fix/ri-371-idle-feed-prefetch'（地图 #371：首页 Feed 空闲预取，消除首访骨架等待）\n🧪 测试\n  337bba7f test(app): 补预取失败清理的正向断言与 fake timers 卫生（复检 N1/P3）\n🐛 修复\n  8a44b4cd fix(app): 预取审查闭环——ensureLoaded 补 revalidateIfStale 恢复真实 SWR + 预取失败重置缓存\n✨ 新功能\n  cb410a60 feat(app): 首页 Feed 空闲预取——填空式预载全部 tab 消除首访骨架等待",
+  "version": "4.35.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.35.0",
+  "changelog": "🐛 修复\n  705fe1d6 fix(app): 图床 http:// 镜像 native 校验拦截与存量 migrate 停用（#383）\n  f868928f fix(app): code-review P3 修复——探针拒绝复位/申报补记/anti-drift 补例\n  4a1b2c3c fix(app): ImageHostConfig 单例改 Context 键控，消除测试间配置泄漏\n✨ 新功能\n  6c83882c feat(app): lynx ugoira zip 全量/流式下载接入图床下载源（#380）\n  1f4fb086 feat(app): 原生预取委托图片下载核心，缓存键恒官方入参（#379）\n  6029678b feat(app): 图片下载核心接入下载源决策与镜像失败官方回退（#378）\n  29662642 feat(app): ImageHostConfig 图床下载源决策深模块——resolve 单口四模式+惰性探针+失效兜底 (#377)\n♻️ 重构\n  612d4bee refactor(app): JS 原生分支图床改写退役，预取回归官方 URL 保键契约（#381）\n📝 文档\n  cc757467 docs(adr): 图床下载源下沉 Java 与缓存键恒官方契约（ADR-0143）+ spec #376 + 术语沉淀",
   "webBundle": {
-    "version": "4.34.0",
-    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.34.0/pictelio-4.34.0"
+    "version": "4.35.0",
+    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.35.0/pictelio-4.35.0"
   }
 }
