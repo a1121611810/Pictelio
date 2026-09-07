@@ -8,6 +8,8 @@ const mockSetOnUnauthorized = vi.fn();
 vi.mock("@/api/client", () => ({
   setAccessToken: (...args: unknown[]) => mockSetAccessToken(...args),
   setOnUnauthorized: (...args: unknown[]) => mockSetOnUnauthorized(...args),
+  // spec #393：loginWithPKCE 新会话建立时解除会话阻断
+  setAuthPermanentFailure: vi.fn(),
 }));
 
 const mockRefreshToken = vi.fn();

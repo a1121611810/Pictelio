@@ -1,5 +1,5 @@
 import type { Component } from "solid-js";
-import { isLoggedIn, isLoading, setIsLoading, initializeAuth } from "@/stores/authStore";
+import { isLoggedIn, isLoading, setIsLoading, initializeAuth, user } from "@/stores/authStore";
 import { setIsCheckingUpdate, setCheckCompleted, loadAccountR18 } from "@/stores/settingsStore";
 import { settings } from "@/settings";
 import { persistScrollRestoration } from "@/stores/uiStore";
@@ -58,6 +58,13 @@ const RootLayout: Component = (props: { children?: any }) => {
     // 依赖 location 变化
     void location.pathname;
     clearOverlays();
+  });
+
+  // 乐观登录（spec #393）：user 信息由后台 token 刷新异步就位——启动路径的 loadAccountR18
+  // 在 user 为 null 时是 no-op，故 user 就位/变更时在此补载账号级 R18/R18G。
+  // loadAccountR18 幂等（hydrate + 孤儿键清理），登录路径与其重复调用无害。
+  createEffect(() => {
+    if (user()) void loadAccountR18();
   });
 
   // 监听登录过期：当 isLoggedIn 从 true 变为 false 时自动跳转登录页
