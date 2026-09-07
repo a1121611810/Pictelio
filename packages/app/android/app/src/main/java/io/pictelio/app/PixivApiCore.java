@@ -227,9 +227,12 @@ final class PixivApiCore {
 
         try (Response response = getClient().newCall(request).execute()) {
             if (!response.isSuccessful()) {
+                // ADR-0146 D3（Lynx 分类对偶）：抛出带状态码的异常供调用方区分
+                //「凭证被拒（4xx，永久）」与「网络/服务端瞬时故障（5xx/超时，可重试）」——
+                // 归一化为 null 会把 429/5xx 误判成凭证失效
                 Log.w("PixivApiCore", "oauthTokenExchange HTTP " + response.code()
                         + " 失败（refresh_token 无效或服务端拒绝）");
-                return null;
+                throw new IOException("HTTP " + response.code());
             }
             String responseBody = response.body() != null ? response.body().string() : "";
             if (responseBody.isEmpty()) {
