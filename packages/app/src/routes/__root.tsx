@@ -62,10 +62,16 @@ const RootLayout: Component = (props: { children?: any }) => {
 
   // 乐观登录（spec #393）：user 信息由后台 token 刷新异步就位——启动路径的 loadAccountR18
   // 在 user 为 null 时是 no-op，故 user 就位/变更时在此补载账号级 R18/R18G。
-  // loadAccountR18 幂等（hydrate + 孤儿键清理），登录路径与其重复调用无害。
-  createEffect(() => {
-    if (user()) void loadAccountR18();
-  });
+  // on(user()?.id)：仅账号 ID 变化才补载（每次刷新的 user 对象身份变化不触发）；
+  // loadAccountR18 幂等，登录路径与其重复调用无害。
+  createEffect(
+    on(
+      () => user()?.id,
+      (id) => {
+        if (id != null) void loadAccountR18();
+      },
+    ),
+  );
 
   // 监听登录过期：当 isLoggedIn 从 true 变为 false 时自动跳转登录页
   createEffect(() => {
