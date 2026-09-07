@@ -678,7 +678,7 @@ describe('authStore 乐观登录（spec #393：真机直连诊断对偶）', () 
         setItem: vi.fn((_k: string, _v: string, cb: () => void) => cb()),
         getItem: (_k: string, cb: (v: string | null, e: string | null) => void) =>
           cb(opts.stored ?? null, null),
-        removeItem: vi.fn((cb: () => void) => cb()),
+        removeItem: vi.fn((_k: string, cb: () => void) => cb()),
       },
     })
   }

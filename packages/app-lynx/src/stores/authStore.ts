@@ -172,8 +172,11 @@ export const useAuthStore = defineStore("auth", () => {
     _refreshToken.value = null
     _accessTokenReady.value = false
     _user.value = null
-    // ADR-0050：清除持久化 refresh_token
-    void clearRefreshToken()
+    // ADR-0050：清除持久化 refresh_token（rejection 兜底：web-core IndexedDB 缺失等
+    // 环境性失败不得以 unhandled rejection 形态逃逸——warn 可见，禁静默）
+    clearRefreshToken().catch((e) => {
+      console.warn("[authStore] 清除持久化 refresh_token 失败", e)
+    })
   }
 
   /** 注册 401 自动刷新处理器（客户端在请求失败时调用） */
