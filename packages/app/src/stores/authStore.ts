@@ -74,43 +74,34 @@ async function setupUnauthorizedHandler() {
 /** 防止 initializeAuth 被重复调用（startup 和 onMount 都可能触发） */
 let _authPromise: Promise<void> | null = null;
 
+/**
+ * 会话世代守卫（spec #393）：logout / 主动登录递增。乐观登录把启动刷新移出关键路径后，
+ * 迟到的后台刷新结果（成功或永久失败）必须按世代丢弃——否则登出后登录态与凭证会被
+ * 复活（共享设备隐私面），重登窗口内会被旧账号覆盖，或迟到的 invalid_grant 登出新会话。
+ */
+let authEpoch = 0;
+
 export async function initializeAuth() {
   if (_authPromise) return _authPromise;
   _authPromise = (async () => {
     // restoreRefreshToken 内部完成：备份完整性检查（失效则清 token）→ 读取（含旧 Preferences 迁移）→ Native 注入
-    let token = await restoreRefreshToken();
+    const token = await restoreRefreshToken();
     if (token) {
       setRefreshTokenSig(token);
       await setupUnauthorizedHandler();
-      // 设置 tokenReady barrier：在此 barrier resolve 之前所有 API 请求被阻塞在 client.ts 入口
-      let resolveTokenReady: () => void;
-      setTokenReadyPromise(
-        new Promise((r) => {
-          resolveTokenReady = r;
-        }),
-      );
-      // 设置 refreshPromise，让并发请求在初始 token 刷新期间等待
-      const promise = performRefresh(token).finally(() => {
+      // 乐观登录（spec #393）：持久凭证存在即登录态，路由立即放行，不再被启动刷新阻塞——
+      // 网络瞬时故障（直连抖动/弱网）不应把用户误判为未登录踢到登录页。
+      setIsLoggedIn(true);
+      // 后台刷新仅补 user 信息（access_token 预热由 Java 侧 401 静默刷新承担，
+      // restore 已把 token 同步进 Java 堆）；瞬时失败由 performRefresh 内部告警自愈
+      const refresh = performRefresh(token).finally(() => {
         setRefreshPromise(null);
-        resolveTokenReady?.();
       });
-      setRefreshPromise(promise);
-      await promise;
+      setRefreshPromise(refresh);
+      void refresh;
     }
   })();
   return _authPromise;
-}
-
-/** 清除内存中的认证状态，但不删除持久化的 refresh_token */
-function clearAuthState() {
-  appStateListener?.remove();
-  appStateListener = null;
-  setAuthPermanentFailure(true);
-  setTokenReadyPromise(Promise.resolve());
-  syncToken("");
-  setRefreshTokenSig(null);
-  setUser(null);
-  setIsLoggedIn(false);
 }
 
 /**
@@ -130,29 +121,49 @@ function isAuthErrorPermanent(err: unknown): boolean {
 }
 
 async function performRefresh(token: string) {
+  const epoch = authEpoch;
   const [err] = await tryAsync(
     refreshToken(token).then(async (resp) => {
+      // 世代守卫：会话已登出/重登则丢弃迟到结果（不写信号、不落盘凭证）
+      if (epoch !== authEpoch) return;
       syncToken(resp.access_token);
       setRefreshTokenSig(resp.refresh_token);
       setUser(resp.user);
       setIsLoggedIn(true);
       lastRefreshTime = Date.now();
       await saveRefreshToken(resp.refresh_token);
+      // 世代复检：saveRefreshToken 的 await 期间若发生 logout（clearRefreshToken），
+      // 此处补清磁盘——防刚删掉的凭证被迟到的磁盘写回复活（spec #393 隐私面）。
+      // 仅当前无会话时补清（refreshTokenSig 非空 = 已重登新会话，误清会丢新会话凭证）；
+      // 补清失败必须可见（陈旧凭证滞留磁盘是隐私面，禁静默）
+      if (epoch !== authEpoch && !refreshTokenSig()) {
+        const [clearErr] = await tryAsync(clearRefreshToken());
+        if (clearErr) {
+          console.warn("[authStore] 世代复检清除迟到凭证失败（陈旧凭证滞留磁盘）", clearErr);
+        }
+      }
     }),
   );
   if (err) {
+    // 世代过期：迟到失败与本会话无关，不告警也不登出
+    if (epoch !== authEpoch) return;
     if (isAuthErrorPermanent(err)) {
       await logout();
     } else {
-      // 临时故障（网络错误等）：只清内存状态，保留 token 供下次重试
-      clearAuthState();
+      // 瞬时故障（spec #393）：仅告警，不清任何状态——登录态与持久化凭证保持，
+      // 自愈路径 = 前台恢复预刷新 + 请求级 401 静默刷新。旧 clearAuthState 会置
+      // authPermanentFailure 砖死整个会话并踢登录页，属瞬时失败的过度惩罚，已移除。
+      console.warn("[authStore] token 刷新瞬时失败（保持登录态，网络恢复后自愈）", err);
     }
   }
 }
 
 export async function loginWithToken(token: string) {
   _authPromise = null; // 主动登录重置 Promise 链
+  authEpoch++; // 世代递增：丢弃启动后台刷新的迟到结果（spec #393）
   const resp = await refreshToken(token);
+  // 新会话建立：解除 logout 置位的会话阻断（authPermanentFailure 无重置点则重登后请求永久快速失败）
+  setAuthPermanentFailure(false);
   syncToken(resp.access_token);
   setRefreshTokenSig(resp.refresh_token);
   setUser(resp.user);
@@ -170,7 +181,10 @@ export async function loginWithToken(token: string) {
  */
 export async function loginWithPKCE(code: string, codeVerifier: string) {
   _authPromise = null; // 主动登录重置 Promise 链
+  authEpoch++; // 世代递增：丢弃启动后台刷新的迟到结果（spec #393）
   const resp = await exchangeCodeForToken(code, codeVerifier);
+  // 新会话建立：解除 logout 置位的会话阻断（同 loginWithToken，spec #393）
+  setAuthPermanentFailure(false);
   syncToken(resp.access_token);
   setRefreshTokenSig(resp.refresh_token);
   setUser(resp.user);
@@ -181,6 +195,8 @@ export async function loginWithPKCE(code: string, codeVerifier: string) {
 }
 
 export async function logout() {
+  // 世代递增：启动后台刷新（乐观登录，spec #393）与在途预刷新的迟到结果按世代丢弃
+  authEpoch++;
   // 设置永久失效标记，阻塞后续所有 API 请求
   setAuthPermanentFailure(true);
   setTokenReadyPromise(Promise.resolve());

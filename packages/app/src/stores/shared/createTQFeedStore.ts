@@ -459,7 +459,13 @@ export function createTQFeedStore<
                 // removeQueries 会连装配一起拆掉导致二次加载 Missing queryFn），避免用户
                 // 首访该 tab 从「骨架→内容」退化为「错误闪现→内容」（code review P2）；
                 // 失败仍向上传播，由调度器层 console.warn（禁静默降级）
-                queryClient.resetQueries({ queryKey });
+                // **活跃 tab 例外（#393/#398 真机实测）：活跃查询被 reset 回「干净 pending」后，
+                // enabled:false 永不再自取、ensureLoaded 已跑过 → #366 首载粘滞规则令
+                // loading 恒 true = 永久骨架、ErrorDisplay 永不出现。活跃 tab 保持 error
+                // 状态，交给面板 ErrorDisplay 的重试原地重载。
+                if (!activeKeys().includes(key)) {
+                  queryClient.resetQueries({ queryKey });
+                }
                 throw err;
               }),
           );

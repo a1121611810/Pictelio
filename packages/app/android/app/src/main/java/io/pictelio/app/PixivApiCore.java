@@ -67,7 +67,9 @@ final class PixivApiCore {
                     io.pictelio.app.directaccess.DirectAccessTransport.install(
                             new OkHttpClient.Builder(), directAccessConfig);
             client = directAccessBuilder
-                    .connectTimeout(OAuthConfig.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
+                    // ADR-0145 D2 分层超时：连接预算 5s 快速失败（候选序列推进/系统路线
+                    // 可达性判定 5s 足够），读/整体预算维持 OAuthConfig 现值
+                    .connectTimeout(5_000, TimeUnit.MILLISECONDS)
                     .readTimeout(OAuthConfig.TIMEOUT_READ, TimeUnit.MILLISECONDS)
                     .callTimeout(OAuthConfig.TIMEOUT_CONNECT + OAuthConfig.TIMEOUT_READ, TimeUnit.MILLISECONDS)
                     .dispatcher(new okhttp3.Dispatcher(
@@ -92,7 +94,9 @@ final class PixivApiCore {
     // ─── API 端点 ────────────────────────────────────────────
 
     static String apiBase() {
-        return API_BASE;
+        // ADR-0146 D3：反代基址（api_proxy_base 设置）优先，官方域回退
+        ApiEndpoints.refresh();
+        return ApiEndpoints.apiBase();
     }
 
     // ─── 401 刷新 + 重试核心 ─────────────────────────────────
@@ -211,7 +215,7 @@ final class PixivApiCore {
                 .build();
 
         Request request = new Request.Builder()
-                .url(OAuthConfig.AUTH_URL)
+                .url(ApiEndpoints.oauthTokenUrl()) // ADR-0146 D3：反代感知
                 .addHeader("X-Client-Time", localTime)
                 .addHeader("X-Client-Hash", clientHash)
                 .addHeader("App-OS", OAuthConfig.APP_OS)
@@ -223,9 +227,12 @@ final class PixivApiCore {
 
         try (Response response = getClient().newCall(request).execute()) {
             if (!response.isSuccessful()) {
+                // ADR-0146 D3（Lynx 分类对偶）：抛出带状态码的异常供调用方区分
+                //「凭证被拒（4xx，永久）」与「网络/服务端瞬时故障（5xx/超时，可重试）」——
+                // 归一化为 null 会把 429/5xx 误判成凭证失效
                 Log.w("PixivApiCore", "oauthTokenExchange HTTP " + response.code()
                         + " 失败（refresh_token 无效或服务端拒绝）");
-                return null;
+                throw new IOException("HTTP " + response.code());
             }
             String responseBody = response.body() != null ? response.body().string() : "";
             if (responseBody.isEmpty()) {
