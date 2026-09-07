@@ -111,6 +111,33 @@ describe("SettingsDirectAccess 网络直连卡", () => {
     expect(await screen.findByText("0 条（builtin）")).toBeDefined();
   });
 
+  it("远端表从未拉取（lastFetchAtMillis=0）：内置表兜底提示可见（#398）", async () => {
+    render(() => <SettingsDirectAccess />);
+
+    // oracle = #398 验收：新装/无代理环境下远端表拉不到（GitHub 需代理），
+    // 必须明示「内置表兜底 + 更新途径」，避免条目数被误读为直连未配置
+    expect(
+      await screen.findByText(
+        "当前由内置表兜底；远端 IP 表未拉取（GitHub 需代理），建议在代理环境点击「立即更新 IP 表」",
+      ),
+    ).toBeDefined();
+    // 未拉取无时间可显示：最近拉取行不渲染
+    expect(screen.queryByText("最近拉取")).toBeNull();
+  });
+
+  it("远端表已拉取（lastFetchAtMillis>0）：兜底提示不渲染，显示最近拉取时间（#398）", async () => {
+    mocks.directAccessStatus.mockResolvedValue(snapshot({ lastFetchAtMillis: 1_700_000_000_000 }));
+
+    render(() => <SettingsDirectAccess />);
+
+    expect(await screen.findByText("最近拉取")).toBeDefined();
+    expect(
+      screen.queryByText(
+        "当前由内置表兜底；远端 IP 表未拉取（GitHub 需代理），建议在代理环境点击「立即更新 IP 表」",
+      ),
+    ).toBeNull();
+  });
+
   it("开关交互：点击行翻转 store 开关位", async () => {
     render(() => <SettingsDirectAccess />);
 
