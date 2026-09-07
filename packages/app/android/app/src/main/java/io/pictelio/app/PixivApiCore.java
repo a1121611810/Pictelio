@@ -13,6 +13,7 @@ import java.util.concurrent.TimeUnit;
 
 import android.util.Log;
 
+import okhttp3.ConnectionPool;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -72,6 +73,12 @@ final class PixivApiCore {
                     .connectTimeout(5_000, TimeUnit.MILLISECONDS)
                     .readTimeout(OAuthConfig.TIMEOUT_READ, TimeUnit.MILLISECONDS)
                     .callTimeout(OAuthConfig.TIMEOUT_CONNECT + OAuthConfig.TIMEOUT_READ, TimeUnit.MILLISECONDS)
+                    // ADR-0145 v2 连接保活：池 idle 30min（默认 5min 就丢弃已建立连接——
+                    // 直连握手成功后长连接复用 = 后续请求零握手开销，GFW 概率性 RST 只
+                    // 影响建连阶段）+ HTTP/2 PING 30s（防 NAT/防火墙掐空闲连接 + 快速
+                    // 检测死连接以便重建）
+                    .connectionPool(new ConnectionPool(10, 30, TimeUnit.MINUTES))
+                    .pingInterval(30_000, TimeUnit.MILLISECONDS)
                     .dispatcher(new okhttp3.Dispatcher(
                             java.util.concurrent.Executors.newCachedThreadPool()
                     ))
