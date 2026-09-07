@@ -12,7 +12,7 @@ import java.util.List;
  * {@code prototype/pixiv-bypass-feasibility} 分支（68fbd826）的
  * {@code docs/research/pixiv-direct-access-feasibility.md}（2026-09-06 实测）：
  * <ul>
- *   <li><b>图片边缘 {@code 210.140.139.131}</b>——探测矩阵 I4：无 SNI TLS 直连
+ *   <li><b>图片边缘 {@code 210.140.139.133}</b>——探测矩阵 I4：无 SNI TLS 直连
  *       {@code i.pximg.net}（钉该 IP + Host 头路由），HTTP 200 且 sha256 与经代理基线一致；</li>
  *   <li><b>API+OAuth 边缘 {@code 210.140.139.155}</b>——探测矩阵 A2/H2：无 SNI 直连下
  *       同一 IP 同时服务 {@code app-api.pixiv.net} 与 {@code oauth.secure.pixiv.net}
@@ -42,7 +42,7 @@ public final class DirectIpTableDefaults {
      * 图片边缘 IP（探针 I4 实测：钉此 IP + 无 SNI + Host 头路由 {@code i.pximg.net}，
      * sha256 与经代理基线一致）。
      */
-    public static final String IMAGE_EDGE_IP = "210.140.139.131";
+    public static final String IMAGE_EDGE_IP = "210.140.139.133";
 
     // ── API+OAuth 边缘（*.pixiv.net 域族；通道 = API_REFRESH） ──
 

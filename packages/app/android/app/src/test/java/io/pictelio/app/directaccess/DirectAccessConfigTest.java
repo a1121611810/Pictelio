@@ -42,7 +42,7 @@ import io.pictelio.app.directaccess.DirectAccessPolicy.SwitchState;
  *       写入 fixture（真实样例硬约束 #2，非内存 mock）；</li>
  *   <li><b>三层合并结果</b>（manual &gt; remote &gt; builtIn 逐条覆盖）：spec #385
  *       「IP 表三层来源：合并优先级 手动编辑 &gt; 远端 JSON &gt; APK 内置」；</li>
- *   <li><b>内置条目值</b>（210.140.139.131 / 210.140.139.155）：探针报告实测
+ *   <li><b>内置条目值</b>（210.140.139.133 / 210.140.139.155）：探针报告实测
  *       （prototype/pixiv-bypass-feasibility 68fbd826，见 DirectIpTableDefaultsTest 溯源）；</li>
  *   <li><b>anti-drift</b>（托管文件 entries ≡ 内置表）：AGENTS.md 测试硬约束 #4
  *       （重构行为不变）+ backupRulesConsistency 提取常量比对模式——
@@ -160,7 +160,7 @@ public class DirectAccessConfigTest {
         Harness h = new Harness();
         h.setEnabled(false);
         IpTableMerger.Snapshot s = h.config.currentTable();
-        assertEquals("210.140.139.131", s.ipFor("i.pximg.net"));
+        assertEquals("210.140.139.133", s.ipFor("i.pximg.net"));
         assertEquals("210.140.139.155", s.ipFor("app-api.pixiv.net"));
     }
 
@@ -172,7 +172,7 @@ public class DirectAccessConfigTest {
                 + "{\"host\":\"i.pximg.net\",\"ip\":\"not-an-ip\"},"
                 + "{\"host\":\"app-api.pixiv.net\",\"ip\":\"10.0.0.9\"}]}");
         IpTableMerger.Snapshot s = h.config.currentTable();
-        assertEquals("非法 manual 条目跳过 → 内置值存活", "210.140.139.131", s.ipFor("i.pximg.net"));
+        assertEquals("非法 manual 条目跳过 → 内置值存活", "210.140.139.133", s.ipFor("i.pximg.net"));
         assertEquals("合法 manual 条目覆盖内置", "10.0.0.9", s.ipFor("app-api.pixiv.net"));
     }
 
@@ -231,7 +231,7 @@ public class DirectAccessConfigTest {
         h.setEnabled(true);
         h.fetcher.script.add(new IOException("net down"));
         h.config.refreshIpTableNow();
-        assertEquals("从未成功 → 内置表兜底", "210.140.139.131",
+        assertEquals("从未成功 → 内置表兜底", "210.140.139.133",
                 h.config.currentTable().ipFor("i.pximg.net"));
     }
 
@@ -254,7 +254,7 @@ public class DirectAccessConfigTest {
         Harness h = new Harness();
         h.setEnabled(true);
         Files.write(h.cacheFile.toPath(), "{corrupt".getBytes(StandardCharsets.UTF_8));
-        assertEquals("损坏缓存弃用 → 内置表兜底 + 告警", "210.140.139.131",
+        assertEquals("损坏缓存弃用 → 内置表兜底 + 告警", "210.140.139.133",
                 h.config.currentTable().ipFor("i.pximg.net"));
         assertTrue(h.warns.stream().anyMatch(w -> w.contains("损坏")));
     }
@@ -266,7 +266,7 @@ public class DirectAccessConfigTest {
         h.setEnabled(true);
         h.fetcher.script.add("{\"version\":2,\"entries\":[]}");
         h.config.refreshIpTableNow();
-        assertEquals("形状失败 → 内置兜底", "210.140.139.131",
+        assertEquals("形状失败 → 内置兜底", "210.140.139.133",
                 h.config.currentTable().ipFor("i.pximg.net"));
         assertFalse(h.warns.isEmpty());
     }

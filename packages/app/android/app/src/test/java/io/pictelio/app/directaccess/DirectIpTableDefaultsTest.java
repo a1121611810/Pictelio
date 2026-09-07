@@ -17,7 +17,7 @@ import java.util.Collections;
  * <p><b>Oracle 溯源（spec #376 测试硬约束 #6：期望值出处可追溯，禁自洽 mock/同义反复）</b>
  * ——期望值全部来自独立来源：
  * <ul>
- *   <li>两个边缘 IP 字面量（210.140.139.131 / 210.140.139.155）：探针报告实测值，
+ *   <li>两个边缘 IP 字面量（210.140.139.133 / 210.140.139.155）：探针报告实测值，
  *       {@code prototype/pixiv-bypass-feasibility} 分支（68fbd826）
  *       {@code docs/research/pixiv-direct-access-feasibility.md} 探测矩阵
  *       I4（图片钉 131 直连 sha256 与基线一致）/ A2、H2（API+OAuth 边缘 155 双 vhost 打通）；</li>
@@ -35,8 +35,8 @@ public class DirectIpTableDefaultsTest {
 
     @Test
     public void imageEdgeIp_isProbeMeasuredValue() {
-        // oracle: 探针矩阵 I4（无 SNI TLS 直连 i.pximg.net 钉 210.140.139.131，sha256 与基线一致）
-        assertEquals("210.140.139.131", DirectIpTableDefaults.IMAGE_EDGE_IP);
+        // oracle: 探针矩阵 I4（无 SNI TLS 直连 i.pximg.net 钉 210.140.139.133，sha256 与基线一致）
+        assertEquals("210.140.139.133", DirectIpTableDefaults.IMAGE_EDGE_IP);
         assertEquals("i.pximg.net", DirectIpTableDefaults.IMAGE_HOST);
     }
 
@@ -62,7 +62,7 @@ public class DirectIpTableDefaultsTest {
         // oracle: 只内置实测过的条目（报告 §3.2 s.pximg.net 证伪 → 不入表）
         List<IpTableMerger.Entry> builtIn = DirectIpTableDefaults.builtIn();
         assertEquals(3, builtIn.size());
-        assertEquals(new IpTableMerger.Entry("i.pximg.net", "210.140.139.131"), builtIn.get(0));
+        assertEquals(new IpTableMerger.Entry("i.pximg.net", "210.140.139.133"), builtIn.get(0));
         assertEquals(new IpTableMerger.Entry("app-api.pixiv.net", "210.140.139.155"), builtIn.get(1));
         assertEquals(new IpTableMerger.Entry("oauth.secure.pixiv.net", "210.140.139.155"), builtIn.get(2));
     }
@@ -95,7 +95,7 @@ public class DirectIpTableDefaultsTest {
                 new IpTableMerger(warns::add).merge(null, null, DirectIpTableDefaults.builtIn());
         assertTrue("内置表不允许产生任何告警，实际: " + warns, warns.isEmpty());
         assertEquals(3, snapshot.entries().size());
-        assertEquals("210.140.139.131", snapshot.ipFor("i.pximg.net"));
+        assertEquals("210.140.139.133", snapshot.ipFor("i.pximg.net"));
         assertEquals("210.140.139.155", snapshot.ipFor("app-api.pixiv.net"));
         assertEquals("210.140.139.155", snapshot.ipFor("oauth.secure.pixiv.net"));
         assertFalse(snapshot.isEmpty());

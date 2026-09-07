@@ -70,7 +70,7 @@ public class DirectAccessPolicyTest {
 
     @Test
     public void decide_imageHost_pinnedToImageEdgeIp() {
-        // oracle: 探针 I4（i.pximg.net 钉 210.140.139.131）+ spec 判定链
+        // oracle: 探针 I4（i.pximg.net 钉 210.140.139.133）+ spec 判定链
         MutableClock clock = new MutableClock();
         ChannelCircuitBreaker.Channel ch = ChannelCircuitBreaker.Channel.IMAGE;
         DirectAccessPolicy.Decision d = DirectAccessPolicy.decide("i.pximg.net",
@@ -78,7 +78,7 @@ public class DirectAccessPolicyTest {
         assertTrue(d.isDirect());
         assertEquals(DirectAccessPolicy.Decision.Kind.PINNED, d.kind());
         assertEquals(ch, d.channel());
-        assertEquals("210.140.139.131", d.ip());
+        assertEquals("210.140.139.133", d.ip());
     }
 
     @Test
@@ -157,7 +157,7 @@ public class DirectAccessPolicyTest {
         DirectAccessPolicy.Decision d = DirectAccessPolicy.decide("I.PXIMG.NET",
                 DirectAccessPolicy.SwitchState.ON, breaker(clock), table());
         assertTrue("大小写不敏感（isOfficialDomain 契约前提为小写，Policy 负责规范化）", d.isDirect());
-        assertEquals("210.140.139.131", d.ip());
+        assertEquals("210.140.139.133", d.ip());
     }
 
     // ── IP 表缺条目 / 无表 ───────────────────────────────────
@@ -311,7 +311,7 @@ public class DirectAccessPolicyTest {
                 ChannelCircuitBreaker.Channel.API_REFRESH, "210.140.139.155"));
         // toString 审计面
         assertEquals("SYSTEM", DirectAccessPolicy.Decision.systemRoute().toString());
-        assertEquals("PINNED(IMAGE, 210.140.139.131)", d1.toString());
+        assertEquals("PINNED(IMAGE, 210.140.139.133)", d1.toString());
         assertFalse(DirectAccessPolicy.Decision.systemRoute().isDirect());
     }
 

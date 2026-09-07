@@ -63,11 +63,11 @@ public class IpTableMergerTest {
         IpTableMerger.Snapshot s = merger(warns()).merge(
                 Collections.singletonList(e("oauth.secure.pixiv.net", "10.0.0.9")),
                 Arrays.asList(
-                        e("i.pximg.net", "210.140.139.131"),
+                        e("i.pximg.net", "210.140.139.133"),
                         e("oauth.secure.pixiv.net", "10.0.0.8")),
                 DirectIpTableDefaults.builtIn());
         assertEquals("手动覆盖 oauth", "10.0.0.9", s.ipFor("oauth.secure.pixiv.net"));
-        assertEquals("远端决定 i.pximg.net", "210.140.139.131", s.ipFor("i.pximg.net"));
+        assertEquals("远端决定 i.pximg.net", "210.140.139.133", s.ipFor("i.pximg.net"));
         assertEquals("内置决定 app-api（远端/手动均未给）", "210.140.139.155",
                 s.ipFor("app-api.pixiv.net"));
         assertEquals("三 host 齐", 3, s.entries().size());
@@ -129,10 +129,10 @@ public class IpTableMergerTest {
                 e("i.pximg.net", "abc"),        // 非数字
                 e("i.pximg.net", "1.2.3.-4"),   // 负号
                 e("i.pximg.net", "1..2.3"),     // 空段
-                e("i.pximg.net", "210.140.139.131")); // 合法条目压轴
+                e("i.pximg.net", "210.140.139.133")); // 合法条目压轴
         List<String> warns = warns();
         IpTableMerger.Snapshot s = merger(warns).merge(manual, null, null);
-        assertEquals("非法条目全跳过，唯一合法条目存活", "210.140.139.131", s.ipFor("i.pximg.net"));
+        assertEquals("非法条目全跳过，唯一合法条目存活", "210.140.139.133", s.ipFor("i.pximg.net"));
         assertEquals("每条非法条目各告警一次（禁静默）", 12, warns.size());
         for (String w : warns) {
             assertTrue("告警必须含层名便于定位: " + w, w.contains("manual["));
@@ -148,7 +148,7 @@ public class IpTableMergerTest {
                 Arrays.asList(e("app-api.pixiv.net", "10.0.0.99"), e("i.pximg.net", "not-an-ip")),
                 DirectIpTableDefaults.builtIn());
         assertEquals("远端合法条目生效", "10.0.0.99", s.ipFor("app-api.pixiv.net"));
-        assertEquals("远端非法条目跳过 → 内置值存活", "210.140.139.131", s.ipFor("i.pximg.net"));
+        assertEquals("远端非法条目跳过 → 内置值存活", "210.140.139.133", s.ipFor("i.pximg.net"));
         assertEquals(1, warns.size());
     }
 
@@ -157,7 +157,7 @@ public class IpTableMergerTest {
         // 合法形态（oracle = IPv4 点分十进制规范）
         assertTrue("0.0.0.0", IpTableMerger.isValidIpv4Literal("0.0.0.0"));
         assertTrue("255.255.255.255", IpTableMerger.isValidIpv4Literal("255.255.255.255"));
-        assertTrue("210.140.139.131", IpTableMerger.isValidIpv4Literal("210.140.139.131"));
+        assertTrue("210.140.139.133", IpTableMerger.isValidIpv4Literal("210.140.139.133"));
         assertTrue("8.8.8.8", IpTableMerger.isValidIpv4Literal("8.8.8.8"));
         // 非法形态（歧义/越界/形状错）
         assertFalse("", IpTableMerger.isValidIpv4Literal(""));
@@ -179,9 +179,9 @@ public class IpTableMergerTest {
     @Test
     public void merge_whitespaceAndCase_normalized() {
         IpTableMerger.Snapshot s = merger(warns()).merge(
-                Collections.singletonList(e("  I.PXIMG.NET  ", "  210.140.139.131  ")),
+                Collections.singletonList(e("  I.PXIMG.NET  ", "  210.140.139.133  ")),
                 null, null);
-        assertEquals("大小写与空白规范化", "210.140.139.131", s.ipFor("i.pximg.net"));
+        assertEquals("大小写与空白规范化", "210.140.139.133", s.ipFor("i.pximg.net"));
     }
 
     // ── Snapshot 语义 ────────────────────────────────────────
@@ -192,7 +192,7 @@ public class IpTableMergerTest {
         assertNull("null host → null（缺条目语义）", s.ipFor(null));
         assertNull("未知 host → null", s.ipFor("s.pximg.net"));
         assertNull("空白 host → null", s.ipFor("   "));
-        assertEquals("大写查询命中", "210.140.139.131", s.ipFor("I.PXIMG.NET"));
+        assertEquals("大写查询命中", "210.140.139.133", s.ipFor("I.PXIMG.NET"));
         assertEquals("带空白查询命中", "210.140.139.155", s.ipFor(" app-api.pixiv.net "));
     }
 

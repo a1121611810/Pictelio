@@ -526,7 +526,7 @@ public final class DirectAccessConfig {
      *   <li><b>version</b>：int，当前恒 {@value #SUPPORTED_REMOTE_VERSION}（唯一受支持版本；
      *       缺失 / 非整数 / 非 1 → 形状失败）——旧客户端不误读未来格式，宁弃新表不误用，预留演进；</li>
      *   <li><b>updatedAt</b>：信息性元数据（ISO 日期字符串），不参与路由决策，缺失容忍；</li>
-     *   <li><b>entries</b>：JSON 数组，每条形如 {@code {"host": "i.pximg.net", "ip": "210.140.139.131"}}
+     *   <li><b>entries</b>：JSON 数组，每条形如 {@code {"host": "i.pximg.net", "ip": "210.140.139.133"}}
      *       ——host 为官方域名（解析即规范化小写；大小写不敏感），ip 为 IPv4 字面量。</li>
      * </ul>
      * 任何形状偏离（root 非对象 / version 非 1 / entries 非数组 / 条目缺 host-ip /
