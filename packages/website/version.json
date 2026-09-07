@@ -1,9 +1,9 @@
 {
-  "version": "4.35.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.35.0",
-  "changelog": "🐛 修复\n  705fe1d6 fix(app): 图床 http:// 镜像 native 校验拦截与存量 migrate 停用（#383）\n  f868928f fix(app): code-review P3 修复——探针拒绝复位/申报补记/anti-drift 补例\n  4a1b2c3c fix(app): ImageHostConfig 单例改 Context 键控，消除测试间配置泄漏\n✨ 新功能\n  6c83882c feat(app): lynx ugoira zip 全量/流式下载接入图床下载源（#380）\n  1f4fb086 feat(app): 原生预取委托图片下载核心，缓存键恒官方入参（#379）\n  6029678b feat(app): 图片下载核心接入下载源决策与镜像失败官方回退（#378）\n  29662642 feat(app): ImageHostConfig 图床下载源决策深模块——resolve 单口四模式+惰性探针+失效兜底 (#377)\n♻️ 重构\n  612d4bee refactor(app): JS 原生分支图床改写退役，预取回归官方 URL 保键契约（#381）\n📝 文档\n  cc757467 docs(adr): 图床下载源下沉 Java 与缓存键恒官方契约（ADR-0143）+ spec #376 + 术语沉淀",
+  "version": "4.36.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.36.0",
+  "changelog": "🧪 测试\n  2524d5cb test: SNI 观测改线缆字节窥探代理（provider 无关）\n  49efeccf test: 修两处 CI 环境敏感测试（SNI 观测竞态 + 临时目录清理竞态）\n  0136e440 test(app): 钉住 OAuth reject 消息跨端契约（code-review 审计一防线 #386）\n🐛 修复\n  95844c61 fix(app): InitProvider requireContext API30+ 崩溃改 getContext（#392）\n📝 文档\n  719c6795 docs(adr): ADR-0144 直连传输层决策记录（#392）\n  15562332 docs(app): DirectAccessConfig.get 可见性契约注释（code-review #388）\n  dba02416 docs: update OpenWiki (#384)\n✨ 新功能\n  77d24aae feat(app): 设置卡「网络直连」UI + 命令面（#391）\n  a612ec65 feat(app): 直连装配收口——InitProvider 自装配 + 共享 client 接线（#390）\n  b617a715 feat(app): DirectAccessTransport OkHttp 接线（#389）\n  1bbe33ba feat(app): 直连 Config 存储边界 + 远端 IP 表拉取（#388）\n  a089a147 feat(app): 直连纯决策核心 directaccess 子包（#387）\n♻️ 重构\n  6bd8b252 refactor(app): AuthPlugin 刷新收敛共享 client（直连 prefactor #386）",
   "webBundle": {
-    "version": "4.35.0",
-    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.35.0/pictelio-4.35.0"
+    "version": "4.36.0",
+    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.36.0/pictelio-4.36.0"
   }
 }
