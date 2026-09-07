@@ -221,6 +221,31 @@
 
 **开放风险（需真机验证）**：484~547MB 引擎内存在 3~4GB 真机上的后台驻留时长/LMK 重载率未测——这是低 RAM 设备上唯一可能吞噬覆盖收益的 UX 项。
 
+## 8e. 用户提案的可行形态：「设置入口按需下载 Gecko」（第五提案轮）
+
+> 提案：设置入口「是否使用 GeckoView」→ 勾选后按需下载 → 成功后切换，此后默认 Gecko，直到用户主动切走。
+
+**核心修正：下载对象不能是引擎组件本身，必须是变体 APK。** 运行时下载引擎的三个硬阻断：
+1. **W^X**：Android 10+ 对 targetSdk≥29 的应用 SELinux 禁止执行应用可写目录的代码——下载到 filesDir 的 `libxul.so` 无法 `dlopen`（Android 9 设备虽无此限制，但产品面覆盖 Android 10+）；
+2. **Manifest 无法运行时扩展**：Gecko 的多内容进程是 AndroidManifest 里预声明的 Service 族（`:tab*/:gpu/:crashhelper`），运行时不能添加组件声明；
+3. **Java 层动态化脆弱**：GeckoView 的 dex/JNI 回调经 R8 后动态加载无可靠契约。
+
+**可行形态 =「Gecko 变体 APK + PackageInstaller 自装」**，用户视角与提案完全一致：
+设置入口「使用 GeckoView 引擎（下载约 89MB）」→ GitHub Releases 下载 gecko-flavor APK → `PackageInstaller` session 提交（`REQUEST_INSTALL_PACKAGES`，用户点一次系统「安装」确认——无法完全无感，这是平台约束）→ 安装完成自启 → `pictelio_client_kind=gecko` 持久化 → **此后每次启动默认 Gecko，直到用户在切换入口主动改选**（与现有 webview/lynx 切换的持久化语义逐字一致）。
+
+**现成资产与落点**：
+- 引擎切换门禁/持久化：现产架构（`CapacitorStorage.pictelio_client_kind` + `MainActivity` 路由 + ADR-0062 隐藏逻辑），追加第三枚 kind 即可；
+- 分发管线：release.mjs 已产出 webview/lynx/full 多变体 APK 并发 GitHub Releases，追加 gecko flavor；
+- 登录态共享：`SecureStorageCompat` 同 Keystore alias 同密文，gecko 变体登录态直接继承（原型已验证同 bundle 跨安装恢复）；
+- 引擎骨架：本原型（内嵌服务器/Port 桥/三通道网关/深度调参 profile）即 gecko flavor 的 `LynxActivity` 对应物。
+
+**产品权衡点（需拍板）**：
+- 同 `applicationId` 变体互转（替换安装，数据/登录保留，但「切回 webview」需再下载一次 webview 包）vs full 双引擎单包（150MB 全员背负）——前者符合提案的「按需下载」，推荐；
+- 引擎版本与 APK 变体同发：每次发版需出双包（webview/gecko），4 周列车跟进节奏自定；
+- 已知体验代价不变：安装确认一步、内存 ×4.7（低 RAM 设备后台重载率需真机验证）、Android 9 需网络代理兜底。
+
+**裁决：产品形态成立**——它是「兼容引擎按需分发」而非「全量替换」，恰好把本报告「低版本覆盖有收益、全量替换不值得」的两半结论各取所需。
+
 ## 9. 对调研档（8d938b39）结论的增量修正
 
 | 调研档存疑点 | 本次定案 |
