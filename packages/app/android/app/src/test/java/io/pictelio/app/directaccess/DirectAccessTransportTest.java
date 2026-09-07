@@ -143,10 +143,14 @@ public class DirectAccessTransportTest {
 
     // ── client / 请求构造辅助 ────────────────────────────────
 
-    /** 钉定全链路 client（生产 2-arg install 入口；默认重试——单钉定路由一次成功，无重试面） */
+    /**
+     * 钉定全链路 client（install 走包可见 3-arg 注入形态，warn 路由到 {@code h.warns}
+     * 收集器——与生产 2-arg 入口同一装配路径，仅告警出口可观测，先例 = PinnedDns 直注）。
+     * 默认重试——单钉定路由一次成功，无重试面。
+     */
     private OkHttpClient pinnedClient() {
         OkHttpClient.Builder b = baseBuilder();
-        DirectAccessTransport.install(b, h.config);
+        DirectAccessTransport.install(b, h.config, h.warns::add);
         return b.build();
     }
 
@@ -172,7 +176,7 @@ public class DirectAccessTransportTest {
     private OkHttpClient retryOffPinnedClient() {
         OkHttpClient.Builder b = baseBuilder().connectTimeout(1, TimeUnit.SECONDS);
         b.retryOnConnectionFailure(false);
-        DirectAccessTransport.install(b, h.config);
+        DirectAccessTransport.install(b, h.config, h.warns::add); // warn 路由到收集器（#395 断言面）
         return b.build();
     }
 
@@ -189,6 +193,14 @@ public class DirectAccessTransportTest {
     private static void seedFailures(ChannelCircuitBreaker breaker, ChannelCircuitBreaker.Channel ch, int n) {
         for (int i = 0; i < n; i++) {
             breaker.recordFailure(ch);
+        }
+    }
+
+    /** 凭证零入日志铁律的回归观测点：告警文本不得出现任何 token 字样（大小写不敏感） */
+    private static void assertNoTokenInWarns(List<String> warns) {
+        for (String w : warns) {
+            assertFalse("告警不得包含凭证字样: " + w,
+                    w.toLowerCase(java.util.Locale.ROOT).contains("token"));
         }
     }
 
@@ -277,43 +289,54 @@ public class DirectAccessTransportTest {
             throws Exception {
         // oracle: ticket #389 记账口径——「失败归因只对直连尝试；系统路线失败零记账；
         // body 读取阶段失败不计入」。grant 用 PinnedDns 真实挂载（不走 mock——归因判定
-        // 消费的就是 Dns 挂的同一个 ThreadLocal 请求作用域对象）。
+        // 消费的就是 Dns 挂的同一个 ThreadLocal 请求作用域对象）。#395 可观测性同场景
+        // 断言：钉定失败记账点 warn 恰好一行（与记账 1:1，CAS 去重），系统路线 / body
+        // 阶段 / 对端不匹配零告警；期望值来源 = 测试自建钉定表字面量 + Channel 枚举名。
         h.pinPinnedHostToLoopback();
         ChannelCircuitBreaker breaker = h.config.breaker();
         ChannelCircuitBreaker.Channel image = ChannelCircuitBreaker.Channel.IMAGE;
         DirectAccessTransport.PinnedDns dns = new DirectAccessTransport.PinnedDns(
                 () -> SwitchState.ON, h.config::currentTable, breaker, h.warns::add);
         DirectAccessTransport.AttributionEventListener listener =
-                new DirectAccessTransport.AttributionEventListener(breaker);
+                new DirectAccessTransport.AttributionEventListener(breaker, h.warns::add);
         InetSocketAddress pinnedAddr = new InetSocketAddress(InetAddress.getByName(LOOPBACK_IP), 443);
         // 非钉定 IP 字面量（任意公网样例，仅作 ∈/∉ 对照，不发起连接）
         InetSocketAddress foreignAddr = new InetSocketAddress(InetAddress.getByName("93.184.216.34"), 443);
 
-        // (a) 系统路线（无 grant）：connectFailed / callFailed 全部零记账
+        // (a) 系统路线（无 grant）：connectFailed / callFailed 全部零记账零告警
         dns.lookup("localhost"); // SYSTEM → grant 置 null
         listener.connectFailed(null, pinnedAddr, Proxy.NO_PROXY, null, new IOException("sys"));
         listener.callFailed(null, new IOException("sys"));
         seedFailures(breaker, image, 2);
         assertEquals("系统路线失败零记账（2 保持 closed；误记则 3 open）",
                 ChannelCircuitBreaker.Phase.CLOSED, breaker.phase(image));
+        assertTrue("系统路线失败零告警（#395 零日志不变量）", h.warns.isEmpty());
 
-        // (b) 钉定 grant + connectFailed(对端 IP 匹配) → 恰好 1 次失败（CAS 去重双保险）
+        // (b) 钉定 grant + connectFailed(对端 IP 匹配) → 恰好 1 次失败 + 恰好 1 行告警
         dns.lookup(PINNED_HOST); // 新 grant（i.pximg.net → 127.0.0.1）
         listener.connectFailed(null, pinnedAddr, Proxy.NO_PROXY, null, new IOException("tls"));
         listener.connectFailed(null, pinnedAddr, Proxy.NO_PROXY, null, new IOException("again"));
         assertEquals("两次 connectFailed 只记一次（2+1=3 open）",
                 ChannelCircuitBreaker.Phase.OPEN, breaker.phase(image));
+        assertEquals("钉定 connectFailed 恰好一行告警（与记账 1:1，CAS 去重不双告警）",
+                1, h.warns.size());
+        String connectWarn = h.warns.get(0);
+        assertTrue("告警含钉定 IP", connectWarn.contains(LOOPBACK_IP));
+        assertTrue("告警含通道名", connectWarn.contains(image.name()));
+        assertNoTokenInWarns(h.warns);
 
-        // (c) body 阶段守卫：grant → 响应头到达 → callFailed 不得记账
+        // (c) body 阶段守卫：grant → 响应头到达 → callFailed 不得记账不得告警
         breaker.reset(image);
         dns.lookup(PINNED_HOST); // 新 grant
-        listener.connectFailed(null, foreignAddr, Proxy.NO_PROXY, null, new IOException("nope")); // IP 不匹配零记账
+        listener.connectFailed(null, foreignAddr, Proxy.NO_PROXY, null, new IOException("nope")); // IP 不匹配零记账零告警
         listener.responseHeadersStart(null); // headersArrived = true
-        listener.callFailed(null, new IOException("mid-body")); // body 阶段失败不计入
+        listener.callFailed(null, new IOException("mid-body")); // body 阶段失败不计入不告警
         seedFailures(breaker, image, 2);
         assertEquals("对端不匹配零记账 + body 阶段失败被 headersArrived 守卫拦截"
                         + "（2 保持 closed；任一失守则 3 open）",
                 ChannelCircuitBreaker.Phase.CLOSED, breaker.phase(image));
+        assertEquals("body 阶段失败与对端不匹配零新增告警（禁大 zip 断流噪音）",
+                1, h.warns.size());
     }
 
     // ── 全链路：钉定命中 + Host 头 + 证书校验（ticket 验收 1） ─
@@ -679,6 +702,12 @@ public class DirectAccessTransportTest {
         }
         assertEquals("421 恰好记一次失败（2+1=3 open）",
                 ChannelCircuitBreaker.Phase.OPEN, breaker.phase(image));
+        // #395 可观测性：421 错配记账点 warn 恰好一行，含 host 与钉定 IP
+        assertEquals("421 记账恰好一行告警", 1, h.warns.size());
+        String warn421 = h.warns.get(0);
+        assertTrue("告警含 host", warn421.contains(PINNED_HOST));
+        assertTrue("告警含钉定 IP", warn421.contains(LOOPBACK_IP));
+        assertNoTokenInWarns(h.warns);
     }
 
     // ── 全链路：body 阶段失败不计入（ticket 验收 4） ─────────
@@ -715,6 +744,8 @@ public class DirectAccessTransportTest {
         assertEquals("响应头到达已记 success 清零 + body 断流未记账（1 → closed；"
                         + "success 漏记则 3 → open）",
                 ChannelCircuitBreaker.Phase.CLOSED, breaker.phase(image));
+        // #395 可观测性：body 阶段断流沿既有不计入口径——零告警（禁大 zip 断流噪音）
+        assertTrue("body 阶段断流零告警", h.warns.isEmpty());
     }
 
     // ── 全链路：4xx/5xx（非 421）计传输成功不引进失败（ticket 验收 4） ──
@@ -768,6 +799,13 @@ public class DirectAccessTransportTest {
         seedFailures(breaker, image, 1);
         assertEquals("连接失败恰好记一次（1+1=2 closed；双记则 3 open）",
                 ChannelCircuitBreaker.Phase.CLOSED, breaker.phase(image));
+        // #395 可观测性：install 接线的 warnSink 直达收集器——真实建连失败恰好一行，
+        // 含钉定 IP 与通道名（期望值 = 测试钉定表字面量 + Channel 枚举名）
+        assertEquals("钉定连接失败恰好一行告警", 1, h.warns.size());
+        String connectWarn = h.warns.get(0);
+        assertTrue("告警含钉定 IP", connectWarn.contains(LOOPBACK_IP));
+        assertTrue("告警含通道名", connectWarn.contains(image.name()));
+        assertNoTokenInWarns(h.warns);
     }
 
     // ── 全链路：池命中零记账（无授凭无义务） ─────────────────
@@ -843,6 +881,8 @@ public class DirectAccessTransportTest {
                 ChannelCircuitBreaker.Phase.CLOSED, breaker.phase(ChannelCircuitBreaker.Channel.IMAGE));
         assertEquals("API_REFRESH 零记账",
                 ChannelCircuitBreaker.Phase.CLOSED, breaker.phase(ChannelCircuitBreaker.Channel.API_REFRESH));
+        // #395 可观测性：系统路线失败零日志（零记账亦零告警，logcat 零扰动不变量）
+        assertTrue("系统路线失败零告警", h.warns.isEmpty());
     }
 
     // ── install 幂等 + newBuilder 继承（ticket 验收 5） ──────
@@ -913,7 +953,7 @@ public class DirectAccessTransportTest {
     private OkHttpClient pinnedTlsClient(HeldCertificate cert) {
         OkHttpClient.Builder b = baseBuilder();
         b.sslSocketFactory(clientCerts(cert).sslSocketFactory(), clientTrustManager(cert));
-        DirectAccessTransport.install(b, h.config);
+        DirectAccessTransport.install(b, h.config, h.warns::add); // warn 路由到收集器（#395 断言面）
         return b.build();
     }
 

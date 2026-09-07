@@ -52,12 +52,14 @@ import okhttp3.Response;
  *       用 Dns 结果建连），而非钉定连接（系统路线/镜像/GitHub）grant 为 null 或 IP 不匹配
  *       → 零扰动；</li>
  *   <li><b>EventListener</b>（{@link AttributionEventListener}，经 Factory 每调用一实例）：
- *       只做传输层失败的兜底归因（见下「记账恰好一次」）；连接成功本身不记账——
+ *       只做传输层失败的兜底归因（见下「记账恰好一次」），钉定失败记账点同步经 warnSink
+ *       输出一行告警（#395 禁静默可观测性）；连接成功本身不记账——
  *       传输层成功口径 = <b>响应头到达</b>（ {@code responseHeadersStart} 只标记边界，
  *       成功记账归拦截器，因为 EventListener 拿不到状态码）；</li>
  *   <li><b>应用拦截器</b>（{@link PinnedAccountingInterceptor}）：响应阶段记账的唯一归属——
- *       {@code code == 421 && 直连} → {@code recordFailure}（421 = 边缘错配，探针实测
- *       pximg 边缘对 API Host 恒 421，spec 421 特化）；其余状态码 → {@code recordSuccess}
+ *       {@code code == 421 && 直连} → {@code recordFailure} + warn 一行（含 host/ip，
+ *       #395 可观测性；421 = 边缘错配，探针实测 pximg 边缘对 API Host 恒 421，spec 421
+ *       特化）；其余状态码 → {@code recordSuccess}
  *       （响应头到达 = 传输层成功；4xx/5xx 是应用层失败，不计传输层口径）。421 响应
  *       <b>原样返回调用方</b>（熔断内部消化，不引入新异常类型）；finally 清理 grant
  *       （请求作用域生命周期锚点，防 dispatcher 线程复用串味）。</li>
@@ -78,6 +80,9 @@ import okhttp3.Response;
  *       为真 = body 阶段失败，<b>不计入</b>——大 zip 流式中途断流不误熔断）→ 失败；</li>
  *   <li>拦截器 proceed 返回后（响应头已达）：421 → 失败；其余 → 成功。</li>
  * </ol>
+ * 失败/421 记账点在 CAS 赢得记账权的同时经 warnSink 输出一行告警（host / 钉定 IP /
+ * 通道 / 异常类名，#395 禁静默可观测性），与记账严格 1:1（同一 CAS 闸门去重，无重复噪音）；
+ * body 阶段失败与系统路线失败零记账亦零告警。
  * 凭据不灭失论证：PINNED 决策后到记账前的每条路径（建连失败 / 握手失败 / 写请求失败 /
  * 响应头前断流 / 正常响应 / 421）恰好被上述四点之一覆盖并 CAS 成功一次。钉定 IP 字面量
  * 构造地址失败的防御兜底（理论不可达：{@link IpTableMerger} 已校验严格 IPv4）当场
@@ -106,7 +111,8 @@ import okhttp3.Response;
  *       {@link DirectAccessConfig}，装配面天然分离）；</li>
  *   <li>install 幂等；{@code newBuilder()} 派生 client（镜像预算 client）自动继承全部
  *       四点安装（OkHttp newBuilder 全量复制，拦截器标记随之复制 → 重复 install 直接短路）；</li>
- *   <li>失败归因只对直连尝试：系统路线失败（grant null 或对端 IP 非钉定值）零记账。</li>
+ *   <li>失败归因只对直连尝试：系统路线失败（grant null 或对端 IP 非钉定值）零记账零告警
+ *       （logcat 零日志，系统路线零扰动）。</li>
  * </ul>
  *
  * <p><b>线程安全</b>：三件套实例无共享可变态（grant 走 ThreadLocal；熔断器自身 CAS）。
@@ -176,8 +182,8 @@ public final class DirectAccessTransport {
             warnSink.accept(TAG + " 平台默认 TLS 组件缺失（sslSocketFactory/trustManager 为 null），"
                     + "SNI 剥离停用（直连决策与熔断记账不受影响）");
         }
-        builder.eventListenerFactory(call -> new AttributionEventListener(breaker));
-        builder.addInterceptor(new PinnedAccountingInterceptor(breaker));
+        builder.eventListenerFactory(call -> new AttributionEventListener(breaker, warnSink));
+        builder.addInterceptor(new PinnedAccountingInterceptor(breaker, warnSink));
         return builder;
     }
 
@@ -401,12 +407,14 @@ public final class DirectAccessTransport {
      * <p>职责边界（恰好一次论证见类 javadoc）：
      * <ul>
      *   <li>{@code connectFailed}：连接/握手失败的<b>主归因点</b>（先于异常传播触发，
-     *       凭据在场）；对端 IP 与凭据不匹配（非钉定路线）→ 零记账；</li>
+     *       凭据在场）；对端 IP 与凭据不匹配（非钉定路线）→ 零记账零告警；记账成功同步
+     *       warn 一行（钉定 IP / 通道 / 异常，#395 可观测性；钉定路线 host 恒同 ip，不重复输出）；</li>
      *   <li>{@code responseHeadersStart}：只标记 body 阶段边界（{@code headersArrived}），
      *       <b>不记账</b>——EventListener 拿不到状态码，421 与 200 在此无法区分，
      *       响应阶段成败归拦截器（421 特化）；</li>
-     *   <li>{@code callFailed}：兜底归因（前两点均未覆盖的罕见失败路径）；
-     *       {@code headersArrived} 已置位 = body 阶段失败，<b>不计入</b>。</li>
+     *   <li>{@code callFailed}：兜底归因（前两点均未覆盖的罕见失败路径；warn 一行，
+     *       仅 ip/通道/异常——无地址入参故无 host 字段）；{@code headersArrived} 已置位 = body 阶段失败，
+     *       <b>不计入不告警</b>（禁大 zip 断流噪音）。</li>
      *   <li>{@code connectEnd}/{@code connectStart}：不重写——连接成功不是成功口径
      *       （口径 = 响应头到达，归拦截器），连接开始无任何可观测义务。</li>
      * </ul>
@@ -414,9 +422,11 @@ public final class DirectAccessTransport {
     static final class AttributionEventListener extends EventListener {
 
         private final ChannelCircuitBreaker breaker;
+        private final Consumer<String> warnSink;
 
-        AttributionEventListener(ChannelCircuitBreaker breaker) {
+        AttributionEventListener(ChannelCircuitBreaker breaker, Consumer<String> warnSink) {
             this.breaker = breaker;
+            this.warnSink = warnSink;
         }
 
         @Override
@@ -426,6 +436,11 @@ public final class DirectAccessTransport {
             if (grant != null && matchesPinnedAddress(inetSocketAddress, grant)) {
                 if (grant.tryAccount()) {
                     breaker.recordFailure(grant.channel);
+                    // 禁静默（#395）：钉定连接失败必须 logcat 可见；与记账同一 CAS 闸门，
+                    // 恰好一行、无重复噪音；钉定路线对端即字面量 IP（matchesPinnedAddress
+                    // 已比对），仅记 ip/通道/异常——host 与 ip 恒同值不重复输出
+                    warnSink.accept(TAG + " 钉定连接失败（connectFailed，已按传输失败记账）: ip="
+                            + grant.ip + " channel=" + grant.channel + " error=" + ioe);
                 }
             }
         }
@@ -444,6 +459,10 @@ public final class DirectAccessTransport {
             if (grant != null && !grant.headersArrived) {
                 if (grant.tryAccount()) {
                     breaker.recordFailure(grant.channel);
+                    // 禁静默（#395）：兜底归因点告警，与记账同一 CAS 闸门（1:1）；
+                    // body 阶段失败已在上方守卫拦截（不记账不告警）
+                    warnSink.accept(TAG + " 钉定调用失败（callFailed 兜底，已按传输失败记账）: ip="
+                            + grant.ip + " channel=" + grant.channel + " error=" + ioe);
                 }
             }
         }
@@ -462,9 +481,9 @@ public final class DirectAccessTransport {
      *
      * <ul>
      *   <li>proceed 正常返回（响应头已达）：凭据在场 → 421 = 边缘错配
-     *       {@code recordFailure}（spec 421 特化）；其余状态码（含 4xx/5xx）
-     *       = 传输层成功 {@code recordSuccess}（应用层失败不计传输口径）；
-     *       421 响应<b>原样返回</b>，不改写不抛异常；</li>
+     *       {@code recordFailure} + warn 一行（host/ip，#395 可观测性；spec 421 特化）；
+     *       其余状态码（含 4xx/5xx）= 传输层成功 {@code recordSuccess}（应用层失败不计
+     *       传输口径）；421 响应<b>原样返回</b>，不改写不抛异常；</li>
      *   <li>proceed 抛出（连接后、响应头前的失败——请求写入断流等；proceed 一旦抛出即
      *       必然响应头未达，无 body 误计面）→ {@code recordFailure} 后原样上抛；</li>
      *   <li>finally 清理 ThreadLocal 凭据：请求作用域终点（连接池命中路径不触发 Dns、
@@ -476,9 +495,11 @@ public final class DirectAccessTransport {
     static final class PinnedAccountingInterceptor implements Interceptor {
 
         private final ChannelCircuitBreaker breaker;
+        private final Consumer<String> warnSink;
 
-        PinnedAccountingInterceptor(ChannelCircuitBreaker breaker) {
+        PinnedAccountingInterceptor(ChannelCircuitBreaker breaker, Consumer<String> warnSink) {
             this.breaker = breaker;
+            this.warnSink = warnSink;
         }
 
         @Override
@@ -489,6 +510,10 @@ public final class DirectAccessTransport {
                 if (grant != null && grant.tryAccount()) {
                     if (response.code() == 421) {
                         breaker.recordFailure(grant.channel); // 边缘错配：传输层失败证据
+                        // 禁静默（#395）：421 错配记账点 warn 可见（host/ip 定位错配边缘）
+                        warnSink.accept(TAG + " 直连边缘错配（HTTP 421，已按传输失败记账）: host="
+                                + chain.request().url().host() + " ip=" + grant.ip
+                                + " channel=" + grant.channel);
                     } else {
                         breaker.recordSuccess(grant.channel); // 响应头到达：传输层成功口径
                     }
