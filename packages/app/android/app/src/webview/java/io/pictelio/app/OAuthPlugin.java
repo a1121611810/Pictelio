@@ -252,7 +252,7 @@ public class OAuthPlugin extends Plugin {
                 .build();
 
         Request request = new Request.Builder()
-                .url(OAuthConfig.AUTH_URL)
+                .url(io.pictelio.app.ApiEndpoints.oauthTokenUrl()) // ADR-0146 D3：反代感知
                 .addHeader("X-Client-Time", localTime)
                 .addHeader("X-Client-Hash", clientHash)
                 .addHeader("App-OS", OAuthConfig.APP_OS)

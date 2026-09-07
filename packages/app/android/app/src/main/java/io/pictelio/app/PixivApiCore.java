@@ -94,7 +94,9 @@ final class PixivApiCore {
     // ─── API 端点 ────────────────────────────────────────────
 
     static String apiBase() {
-        return API_BASE;
+        // ADR-0146 D3：反代基址（api_proxy_base 设置）优先，官方域回退
+        ApiEndpoints.refresh();
+        return ApiEndpoints.apiBase();
     }
 
     // ─── 401 刷新 + 重试核心 ─────────────────────────────────
@@ -213,7 +215,7 @@ final class PixivApiCore {
                 .build();
 
         Request request = new Request.Builder()
-                .url(OAuthConfig.AUTH_URL)
+                .url(ApiEndpoints.oauthTokenUrl()) // ADR-0146 D3：反代感知
                 .addHeader("X-Client-Time", localTime)
                 .addHeader("X-Client-Hash", clientHash)
                 .addHeader("App-OS", OAuthConfig.APP_OS)

@@ -32,6 +32,8 @@ public final class DirectAccessInitProvider extends android.content.ContentProvi
             Context app = getContext();
             if (app != null) {
                 DirectAccessConfig.get(app.getApplicationContext());
+                // ADR-0146 D3：绑定反代端点提供者的应用上下文（任何请求前必执行）
+                io.pictelio.app.ApiEndpoints.bind(app.getApplicationContext());
             }
         } catch (Exception e) {
             android.util.Log.w("[DirectAccessInit]", "直连配置预热失败（退化系统路线）", e);
