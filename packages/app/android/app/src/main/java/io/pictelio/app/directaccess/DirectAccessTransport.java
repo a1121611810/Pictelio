@@ -249,6 +249,9 @@ public final class DirectAccessTransport {
             GRANT.set(null); // 入口清残留（竞态面见类 javadoc「串味防护」）
             IpTableMerger.Snapshot snapshot = table.get();
             Decision decision = DirectAccessPolicy.decide(hostname, switchState.get(), breaker, snapshot);
+            // [PROBE prototype/diagnose-direct-oauth-rejection] 路线判定探针
+            android.util.Log.w("PROBE-PinnedDns", "lookup host=" + hostname
+                    + " decision=" + decision + " tableEntries=" + (snapshot == null ? -1 : snapshot.entries().size()));
             if (!decision.isDirect()) {
                 return Dns.SYSTEM.lookup(hostname); // 系统路线：零记账、逐字节现状
             }
