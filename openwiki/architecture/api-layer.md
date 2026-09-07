@@ -45,6 +45,8 @@ All native Pixiv API requests route through the **PixivApiPlugin** Java Capacito
 
 This replaces the previous architecture (three native paths: CapacitorHttp, PictelioHttp with DoH DNS, and fetch). The old `PictelioHttpPlugin.java` and `PictelioHttp.ts` were deleted.
 
+Since v4.36.0 the shared OkHttp client built by `PixivApiCore.getClient()` also carries the **direct access** routing (ADR-0144, #390): a custom Dns pins edge IPs and an SNI-stripping `SSLSocketFactory` lets official Pixiv traffic bypass SNI blocking without a proxy, with a dual-channel circuit breaker for failure attribution. `AuthPlugin.refreshToken()` was converged onto this same shared client (#386) so OAuth refresh shares the connection pool and route. See [Direct Access Transport](/openwiki/architecture/direct-access.md).
+
 ### Web/Dev Transport
 
 In development (`pnpm dev`) or PWA mode, the client uses standard `fetch` through a Vite proxy:

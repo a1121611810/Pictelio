@@ -351,6 +351,13 @@ New deep module (both flavors share `src/main/`) that makes the image host (mirr
 
 See [Image Loading Pipeline — Image Host Selection](/openwiki/architecture/image-pipeline.md#image-host-selection).
 
+### DirectAccess subpackage (v4.36.0, ADR-0144)
+
+**Java:** [`/packages/app/android/app/src/main/java/io/pictelio/app/directaccess/`](/packages/app/android/app/src/main/java/io/pictelio/app/directaccess/)
+**Test:** `/packages/app/android/app/src/test/java/io/pictelio/app/directaccess/`
+
+A self-contained main-sourceSet subpackage implementing the `网络直连` transport: pin edge IPs + strip SNI to reach Pixiv without a proxy. Eight files — `DirectAccessPolicy` (pure gate-ordered routing decision), `DirectAccessConfig` (three-state switch + three-layer IP table + breaker ownership), `ChannelCircuitBreaker` (dual-channel 3-failure/60s circuit), `DirectAccessTransport` (the package's only OkHttp-aware class: custom Dns + SNI-stripping SSLSocketFactory + EventListener + accounting interceptor), `IpTableFetcher`/`IpTableMerger`/`DirectIpTableDefaults`, and `DirectAccessInitProvider` (manifest ContentProvider self-assembly; `getContext` after the `requireContext` API-30+ crash, #392). It is installed on the shared `PixivApiCore.getClient()` OkHttp client (#390), so all official traffic (API/images/ugoira zips/OAuth refresh) gains the route with zero call-site changes. See [Direct Access Transport](/openwiki/architecture/direct-access.md).
+
 ### ImageIntercept & ImageBytesMemoryCache (v4.32.0)
 
 The WebView `/pixiv-img/` interception logic was refactored in the round-2 X1 work (#357), spec [`docs/specs/webview-perf-round2.md`](/docs/specs/webview-perf-round2.md):
