@@ -61,6 +61,9 @@ jobs:
       - name: Run unit tests
         run: pnpm test:all
 
+      - name: Worker contract tests
+        run: node --test worker/test/
+
   android-unit-test:
     name: Android unit tests (Robolectric)
     runs-on: ubuntu-latest

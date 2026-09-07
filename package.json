@@ -37,6 +37,7 @@
     "test:update-check": "vp run --filter @pictelio/update-check test",
     "test:mutation": "vp run --parallel --filter @pictelio/ugoira --filter @pictelio/update-check mutation",
     "test:all": "pnpm vp run --parallel --filter pictelio-app --filter pictelio-app-lynx --filter pictelio-website --filter @pictelio/ugoira --filter @pictelio/update-check test",
+    "test:worker": "node --test worker/test/",
     "test:app:all": "pnpm vp run --filter pictelio-app test:all",
     "test:watch": "pnpm vp run --filter pictelio-app test:watch",
     "test:agent-browser": "pnpm vp run --filter pictelio-app test:agent-browser",
