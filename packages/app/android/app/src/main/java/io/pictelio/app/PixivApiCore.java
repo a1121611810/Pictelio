@@ -67,7 +67,9 @@ final class PixivApiCore {
                     io.pictelio.app.directaccess.DirectAccessTransport.install(
                             new OkHttpClient.Builder(), directAccessConfig);
             client = directAccessBuilder
-                    .connectTimeout(OAuthConfig.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
+                    // ADR-0145 D2 分层超时：连接预算 5s 快速失败（候选序列推进/系统路线
+                    // 可达性判定 5s 足够），读/整体预算维持 OAuthConfig 现值
+                    .connectTimeout(5_000, TimeUnit.MILLISECONDS)
                     .readTimeout(OAuthConfig.TIMEOUT_READ, TimeUnit.MILLISECONDS)
                     .callTimeout(OAuthConfig.TIMEOUT_CONNECT + OAuthConfig.TIMEOUT_READ, TimeUnit.MILLISECONDS)
                     .dispatcher(new okhttp3.Dispatcher(

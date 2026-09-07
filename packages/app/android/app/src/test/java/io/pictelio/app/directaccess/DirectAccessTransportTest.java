@@ -216,18 +216,23 @@ public class DirectAccessTransportTest {
     // ── 三件套 1：钉定 Dns（纯单测） ─────────────────────────
 
     @Test
-    public void dns_pinnedWhitelistedHost_returnsSinglePinnedIpLiteral() throws Exception {
-        // oracle: manual 表字面量 + 「字面量地址零 DNS 依赖」JDK 契约。getHostName 断言不钉——
-        // 未标签回环地址的 getHostName 由 JDK 内置字面量缓存返回（如 "localhost"），
-        // 属 JDK 行为非被测契约；地址字节才是本层钉定语义。
+    public void dns_pinnedWhitelistedHost_returnsCandidateSequence() throws Exception {
+        // oracle: ADR-0145 D1 候选序列 = 主条目 ×(1+重试预算) → 同通道其余表条目 → last-good。
+        // 本 fixture：manual 覆盖 i.pximg.net→127.0.0.1，builtin 同通道无其余条目
+        //（app-api/oauth 属 API_REFRESH）→ 恰 2 候选（主 + 重试位，值同为字面量）。
+        // getHostName 断言不钉——未标签回环地址的 getHostName 由 JDK 内置字面量缓存
+        // 返回（如 "localhost"），属 JDK 行为非被测契约；地址字节才是本层钉定语义。
         h.pinPinnedHostToLoopback();
         DirectAccessTransport.PinnedDns dns = new DirectAccessTransport.PinnedDns(
-                () -> SwitchState.ON, h.config::currentTable, h.config.breaker(), h.warns::add);
+                () -> SwitchState.ON, h.config::currentTable, h.config.breaker(), h.warns::add,
+                new java.util.concurrent.ConcurrentHashMap<>());
         List<InetAddress> result = dns.lookup(PINNED_HOST);
-        assertEquals("钉定解析返回且仅返回单个地址", 1, result.size());
-        assertEquals("地址 = 钉定 IP 字面量", LOOPBACK_IP, result.get(0).getHostAddress());
-        assertTrue("地址字节 = 钉定 IP 字面量（IPv4 四字节）",
-                Arrays.equals(new byte[]{127, 0, 0, 1}, result.get(0).getAddress()));
+        assertEquals("候选序列 = 主条目 + 重试位（ADR-0145 D1）", 2, result.size());
+        for (InetAddress addr : result) {
+            assertEquals("地址 = 钉定 IP 字面量", LOOPBACK_IP, addr.getHostAddress());
+            assertTrue("地址字节 = 钉定 IP 字面量（IPv4 四字节）",
+                    Arrays.equals(new byte[]{127, 0, 0, 1}, addr.getAddress()));
+        }
         assertTrue("纯 Dns 单测不允许告警", h.warns.isEmpty());
     }
 
@@ -235,7 +240,7 @@ public class DirectAccessTransportTest {
     public void dns_nonWhitelistedHost_delegatesToSystemDns() {
         // oracle: Policy 白名单门（localhost 不在 *.pixiv.net / *.pximg.net → SYSTEM）
         DirectAccessTransport.PinnedDns dns = new DirectAccessTransport.PinnedDns(
-                () -> SwitchState.ON, h.config::currentTable, h.config.breaker(), h.warns::add);
+                () -> SwitchState.ON, h.config::currentTable, h.config.breaker(), h.warns::add, new java.util.concurrent.ConcurrentHashMap<>());
         assertEquals("非白名单 host 逐字节委托系统 Dns（结果或 UHE 同源一致）",
                 lookupTolerant(Dns.SYSTEM, "localhost"), lookupTolerant(dns, "localhost"));
     }
@@ -245,7 +250,7 @@ public class DirectAccessTransportTest {
         // oracle: spec「独立开关（默认关）」——OFF 时白名单内 host 也必须走系统路线
         h.raw.append("{\"enabled\":false}");
         DirectAccessTransport.PinnedDns dns = new DirectAccessTransport.PinnedDns(
-                () -> h.config.switchState(), h.config::currentTable, h.config.breaker(), h.warns::add);
+                () -> h.config.switchState(), h.config::currentTable, h.config.breaker(), h.warns::add, new java.util.concurrent.ConcurrentHashMap<>());
         assertEquals(lookupTolerant(Dns.SYSTEM, PINNED_HOST), lookupTolerant(dns, PINNED_HOST));
     }
 
@@ -256,7 +261,7 @@ public class DirectAccessTransportTest {
         ChannelCircuitBreaker breaker = h.config.breaker();
         seedFailures(breaker, ChannelCircuitBreaker.Channel.IMAGE, 3);
         DirectAccessTransport.PinnedDns dns = new DirectAccessTransport.PinnedDns(
-                () -> SwitchState.ON, h.config::currentTable, breaker, h.warns::add);
+                () -> SwitchState.ON, h.config::currentTable, breaker, h.warns::add, new java.util.concurrent.ConcurrentHashMap<>());
         assertEquals("熔断 open 后白名单 host 委托系统 Dns（Dns 委托即系统路线）",
                 lookupTolerant(Dns.SYSTEM, PINNED_HOST), lookupTolerant(dns, PINNED_HOST));
     }
@@ -271,7 +276,7 @@ public class DirectAccessTransportTest {
                 Collections.singletonList(new IpTableMerger.Entry(PINNED_HOST, "999.999.999.999")));
         ChannelCircuitBreaker breaker = new ChannelCircuitBreaker(new MutableClock());
         DirectAccessTransport.PinnedDns dns = new DirectAccessTransport.PinnedDns(
-                () -> SwitchState.ON, () -> badTable, breaker, h.warns::add);
+                () -> SwitchState.ON, () -> badTable, breaker, h.warns::add, new java.util.concurrent.ConcurrentHashMap<>());
         assertEquals("防御兜底回退系统路线", lookupTolerant(Dns.SYSTEM, PINNED_HOST),
                 lookupTolerant(dns, PINNED_HOST));
         assertFalse("降级必须可见（禁静默）", h.warns.isEmpty());
@@ -296,7 +301,7 @@ public class DirectAccessTransportTest {
         ChannelCircuitBreaker breaker = h.config.breaker();
         ChannelCircuitBreaker.Channel image = ChannelCircuitBreaker.Channel.IMAGE;
         DirectAccessTransport.PinnedDns dns = new DirectAccessTransport.PinnedDns(
-                () -> SwitchState.ON, h.config::currentTable, breaker, h.warns::add);
+                () -> SwitchState.ON, h.config::currentTable, breaker, h.warns::add, new java.util.concurrent.ConcurrentHashMap<>());
         DirectAccessTransport.AttributionEventListener listener =
                 new DirectAccessTransport.AttributionEventListener(breaker, h.warns::add);
         InetSocketAddress pinnedAddr = new InetSocketAddress(InetAddress.getByName(LOOPBACK_IP), 443);
@@ -400,9 +405,16 @@ public class DirectAccessTransportTest {
                     return t;
                 });
 
+        /** ADR-0145 D7：>0 时接下来的 N 条连接 accept 后立即掐断（模拟概率性 RST 形态） */
+        private volatile int dropFirst;
+
         SniPeekingProxy(int upstreamPort) throws IOException {
             this.upstreamPort = upstreamPort;
             this.listener = new ServerSocket(0);
+        }
+
+        void setDropFirstConnections(int n) {
+            dropFirst = n;
         }
 
         int port() {
@@ -433,6 +445,16 @@ public class DirectAccessTransportTest {
         }
 
         private void handle(Socket client) {
+            if (dropFirst > 0) {
+                dropFirst--;
+                observed.add("PROXY-DROPPED"); // RST 形态可见（accept 后即断）
+                try {
+                    client.close();
+                } catch (IOException ignored) {
+                    // 掐断收尾
+                }
+                return;
+            }
             Socket upstream = null;
             try {
                 upstream = new Socket("127.0.0.1", upstreamPort);
@@ -579,7 +601,7 @@ public class DirectAccessTransportTest {
         SniPeekingProxy proxy = new SniPeekingProxy(server.getPort());
         proxy.start();
         DirectAccessTransport.PinnedDns dns = new DirectAccessTransport.PinnedDns(
-                () -> SwitchState.ON, h.config::currentTable, h.config.breaker(), h.warns::add);
+                () -> SwitchState.ON, h.config::currentTable, h.config.breaker(), h.warns::add, new java.util.concurrent.ConcurrentHashMap<>());
         SSLSocketFactory wrapped = new DirectAccessTransport.SniStrippingSSLSocketFactory(
                 clientCerts(cert).sslSocketFactory(), h.warns::add);
         try {
@@ -806,6 +828,89 @@ public class DirectAccessTransportTest {
         assertTrue("告警含钉定 IP", connectWarn.contains(LOOPBACK_IP));
         assertTrue("告警含通道名", connectWarn.contains(image.name()));
         assertNoTokenInWarns(h.warns);
+    }
+
+    // ── 全链路：ADR-0145 D7 测试矩阵 ────────────────────────
+
+    @Test
+    public void fullLink_candidateRetry_absorbsProbabilisticRst_breakerClean() throws Exception {
+        // oracle: ADR-0145 D1/D3 —— 候选序列（主 + 重试位）在单请求内吸收概率性 RST：
+        // 第 1 条 route 连接即被掐断（真机 RST 形态的代理模拟），第 2 条 route 正常完成；
+        // 失败经 connectFailed 记账（CAS 恰好一次）后，最终成功幂等清零（D3）——
+        // 阈值算术：预置 2 → route 失败 +1 = 3（若不清零则已 open）→ 成功清零 →
+        // 补 seed 2 = 2 closed；无 D3 时残留 1 + 2 = 3 open，可区分。
+        HeldCertificate cert = testCertificate();
+        server.useHttps(serverCerts(cert).sslSocketFactory(), false);
+        h.pinPinnedHostToLoopback();
+        // route 迭代依赖 OkHttp 默认 retryOnConnectionFailure=true（baseBuilder 未关闭；
+        // 生产 PixivApiCore client 同样保持默认——候选序列重试在真机路径生效的前提）
+        HandshakeCertificates trust = clientCerts(cert);
+        OkHttpClient client = DirectAccessTransport.install(
+                baseBuilder().sslSocketFactory(trust.sslSocketFactory(), trust.trustManager())
+                        .connectTimeout(1, TimeUnit.SECONDS), h.config, h.warns::add).build();
+        server.enqueue(new MockResponse().setBody("ok"));
+        SniPeekingProxy proxy = new SniPeekingProxy(server.getPort());
+        proxy.start();
+        proxy.setDropFirstConnections(1);
+        try {
+            // URL 宿主 = 官方域、端口指向代理（候选 = 127.0.0.1:proxyPort ×2）
+            Response r = client.newCall(new Request.Builder()
+                    .url(HttpUrl.parse("https://" + PINNED_HOST + ":" + proxy.port() + "/flap"))
+                    .build()).execute();
+            assertEquals("候选重试吸收第 1 条 route 的 RST", "ok", r.body().string());
+            r.close();
+            // drop + 转发各一条（候选序列确实走了两条 route）
+            long drops = proxy.observed.stream().filter(o -> String.valueOf(o).contains("PROXY-DROPPED")).count();
+            assertEquals(1, drops);
+            // D3 误计清零判定（阈值算术见 oracle）
+            ChannelCircuitBreaker breaker = h.config.breaker();
+            ChannelCircuitBreaker.Channel image = ChannelCircuitBreaker.Channel.IMAGE;
+            seedFailures(breaker, image, 2);
+            assertEquals("route 失败已被最终成功清零（残留则 1+2=3 open）",
+                    ChannelCircuitBreaker.Phase.CLOSED, breaker.phase(image));
+            // 失败告警恰好一行（connectFailed；callFailed 被闩挡住）
+            long failWarns = h.warns.stream().filter(w -> w.contains("钉定连接失败")).count();
+            assertEquals(1, failWarns);
+            assertNoTokenInWarns(h.warns);
+        } finally {
+            proxy.stop();
+        }
+    }
+
+    @Test
+    public void fullLink_certRotation_untrustedChain_failsVisibly_noDegradedTrust() throws Exception {
+        // oracle: ADR-0145 D6 —— 证书轮换 = 标准校验失败可见（PixEz #1263/#1264 同款形态）：
+        // 不崩溃、不降级校验、失败记账可见（阈值算术区分单记/双记：seed 1 +1 = 2 closed）。
+        MockWebServer server2 = new MockWebServer();
+        HeldCertificate foreign = new HeldCertificate.Builder()
+                .addSubjectAlternativeName(PINNED_HOST)
+                .build();
+        HandshakeCertificates foreignCerts = new HandshakeCertificates.Builder()
+                .heldCertificate(foreign)
+                .build();
+        server2.useHttps(foreignCerts.sslSocketFactory(), false);
+        server2.enqueue(new MockResponse().setBody("should-not-reach"));
+        server2.start();
+        try {
+            h.pinPinnedHostToLoopback();
+            OkHttpClient client = retryOffPinnedClient();
+            ChannelCircuitBreaker breaker = h.config.breaker();
+            ChannelCircuitBreaker.Channel image = ChannelCircuitBreaker.Channel.IMAGE;
+            seedFailures(breaker, image, 1);
+            try {
+                client.newCall(new Request.Builder()
+                        .url(HttpUrl.parse("https://" + PINNED_HOST + ":" + server2.getPort() + "/rotated"))
+                        .build()).execute();
+                fail("不可信证书链必须握手失败（不降级校验）");
+            } catch (IOException expected) {
+                // SSLHandshakeException 形态
+            }
+            assertEquals("失败恰好记一次（1+1=2 closed；双记则 3 open）",
+                    ChannelCircuitBreaker.Phase.CLOSED, breaker.phase(image));
+            assertNoTokenInWarns(h.warns);
+        } finally {
+            server2.shutdown();
+        }
     }
 
     // ── 全链路：池命中零记账（无授凭无义务） ─────────────────
