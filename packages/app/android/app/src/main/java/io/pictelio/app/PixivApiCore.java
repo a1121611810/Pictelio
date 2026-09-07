@@ -222,6 +222,19 @@ final class PixivApiCore {
                 .build();
 
         try (Response response = getClient().newCall(request).execute()) {
+            // [PROBE prototype/diagnose-direct-oauth-rejection] oauthTokenExchange 同步路径：URL/host/code/body
+            String bodyHead = "";
+            if (response.body() != null) {
+                try {
+                    bodyHead = response.peekBody(200).string();
+                    if (bodyHead.length() > 200) bodyHead = bodyHead.substring(0, 200);
+                } catch (Exception e) {
+                    bodyHead = "<peek-failed:" + e.getClass().getSimpleName() + ">";
+                }
+            }
+            Log.w("PROBE-PixivApiCore", "oauthTokenExchange url=" + request.url()
+                    + "; status=" + response.code()
+                    + "; bodyHead=" + bodyHead);
             if (!response.isSuccessful()) {
                 Log.w("PixivApiCore", "oauthTokenExchange HTTP " + response.code()
                         + " 失败（refresh_token 无效或服务端拒绝）");

@@ -44,9 +44,13 @@ function unquoteTokenValue(value: string): string {
  * Web/DEV 环境无 PixivApi 插件，调用 reject —— 静默跳过，不破坏持久化主流程。
  */
 async function syncNativeToken(token: string | null): Promise<void> {
+  console.warn("[PROBE-secureStorage] syncNativeToken enter; tokenLength=" + (token?.length ?? 0));
   const [err] = await tryAsync(PixivApi.syncToken({ token }));
   if (err) {
     console.warn("[secureStorage] syncToken 失败（Web 环境可忽略）", err);
+    console.warn("[PROBE-secureStorage] syncNativeToken THREW: " + (err as Error).message + "; stack=" + ((err as Error).stack ?? ""));
+  } else {
+    console.warn("[PROBE-secureStorage] syncNativeToken OK");
   }
 }
 
@@ -59,9 +63,22 @@ async function syncNativeToken(token: string | null): Promise<void> {
  *   → 清除 token 与 Native 内存 → 返回 null（强制重新登录）
  */
 export async function restoreRefreshToken(): Promise<string | null> {
+  // [PROBE prototype/diagnose-direct-oauth-rejection] restoreRefreshToken 入口
+  console.warn("[PROBE-secureStorage] restoreRefreshToken enter");
+  // [PROBE prototype/diagnose-direct-oauth-rejection] debug-only：MainActivity 通过 Intent extra
+  // 注入的 token 落到 SharedPreferences "CapacitorStorage"/"PROBE_DBG"；如果这里读到，
+  // 直接返回（绕过 SecureStorage 完整性检查 + 旧 Preferences 迁移路径）。生产环境该 key 不存在，
+  // 静默跳过——throwaway 分支专用，全分支丢弃后整段消失。
+  const probeToken = await tryProbeToken();
+  if (probeToken) {
+    console.warn("[PROBE-secureStorage] probe token found; bypassing secure storage");
+    await syncNativeToken(probeToken);
+    return probeToken;
+  }
   // 层③：备份完整性检查 —— marker 读取异常视为备份还原（Keystore 密钥不可用），清除 token 防泄露
   const [markerErr, marker] = await tryAsync(SecureStorage.get(BACKUP_MARKER_KEY));
   if (markerErr) {
+    console.warn("[PROBE-secureStorage] marker read FAILED: " + (markerErr as Error).message);
     await clearRefreshToken();
     return null;
   }
@@ -77,10 +94,13 @@ export async function restoreRefreshToken(): Promise<string | null> {
       "[secureStorage] refresh_token 读取失败（存储损坏/密钥失效）→ 清除并强制重新登录",
       tokenErr,
     );
+    console.warn("[PROBE-secureStorage] token read FAILED: " + (tokenErr as Error).message);
     await clearRefreshToken();
     return null;
   }
   token = typeof value === "string" ? unquoteTokenValue(value) : null;
+  console.warn("[PROBE-secureStorage] token read OK; length=" + (token?.length ?? 0)
+      + "; prefix=" + (token ? token.substring(0, Math.min(8, token.length)) : "null"));
 
   if (!token) {
     // 旧版 @capacitor/preferences 明文迁移（一次性）
@@ -115,4 +135,20 @@ export async function saveRefreshToken(token: string): Promise<void> {
 export async function clearRefreshToken(): Promise<void> {
   await tryAsync(SecureStorage.remove(REFRESH_TOKEN_KEY));
   await syncNativeToken(null);
+}
+
+// [PROBE prototype/diagnose-direct-oauth-rejection] debug-only：读 Java 侧 MainActivity
+// 通过 Intent extra 写入的 SharedPreferences "PROBE_DBG"/"probe_refresh_token"。仅当
+// import.meta.env.DEV=true 时启用——production 构建整段被 Vite 消除，无副作用。
+async function tryProbeToken(): Promise<string | null> {
+  try {
+    const { Preferences } = await import("@capacitor/preferences");
+    const { value } = await Preferences.get({ key: "PROBE_DBG" });
+    if (!value) return null;
+    // PROBE_DBG 是 JSON：{"probe_refresh_token": "..."}
+    const parsed = JSON.parse(value) as { probe_refresh_token?: string };
+    return parsed.probe_refresh_token || null;
+  } catch {
+    return null;
+  }
 }

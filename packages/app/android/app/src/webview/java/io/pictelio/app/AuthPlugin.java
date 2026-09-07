@@ -46,6 +46,10 @@ public class AuthPlugin extends Plugin {
     @PluginMethod
     public void refreshToken(PluginCall call) {
         String refreshToken = call.getString("refreshToken");
+        // [PROBE prototype/diagnose-direct-oauth-rejection] 入口探针：URL + token 前缀
+        android.util.Log.w("PROBE-AuthPlugin",
+                "refreshToken enter; url=" + OAuthConfig.AUTH_URL
+                        + "; tokenPrefix=" + (refreshToken != null ? refreshToken.substring(0, Math.min(8, refreshToken.length())) : "null"));
         if (refreshToken == null || refreshToken.isEmpty()) {
             call.reject("refreshToken is required");
             return;
@@ -86,6 +90,9 @@ public class AuthPlugin extends Plugin {
             public void onResponse(okhttp3.Call c, Response response) {
                 try {
                     String responseBody = response.body() != null ? response.body().string() : "";
+                    // [PROBE prototype/diagnose-direct-oauth-rejection] 4xx 命中探针：code + body 前 200
+                    android.util.Log.w("PROBE-AuthPlugin", "onResponse status=" + response.code()
+                            + "; bodyHead=" + responseBody.substring(0, Math.min(200, responseBody.length())));
                     if (!response.isSuccessful()) {
                         call.reject(oauthRejectMessage(response.code(), responseBody));
                         bridge.releaseCall(call);
@@ -106,6 +113,9 @@ public class AuthPlugin extends Plugin {
 
             @Override
             public void onFailure(okhttp3.Call c, IOException e) {
+                // [PROBE prototype/diagnose-direct-oauth-rejection] 网络层失败探针：异常类 + message
+                android.util.Log.w("PROBE-AuthPlugin", "onFailure class=" + e.getClass().getName()
+                        + "; msg=" + e.getMessage());
                 call.reject("Network error: " + e.getMessage());
                 bridge.releaseCall(call);
             }

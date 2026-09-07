@@ -37,6 +37,7 @@ let appStateListener: Awaited<ReturnType<typeof App.addListener>> | null = null;
 let rotationListener: { remove: () => void } | null = null;
 
 async function setupUnauthorizedHandler() {
+  console.warn("[PROBE-authStore] setupUnauthorizedHandler start");
   setOnUnauthorized(async () => {
     const latest = refreshTokenSig();
     if (latest) {
@@ -45,9 +46,11 @@ async function setupUnauthorizedHandler() {
       await logout();
     }
   });
+  console.warn("[PROBE-authStore] setOnUnauthorized OK");
 
   // Java 侧 401 静默刷新若发现 refresh_token 被轮换，通知 JS 持久化新值
   // （避免重启后从加密存储恢复旧 token，导致 Java 401 刷新持续失败）
+  console.warn("[PROBE-authStore] about to addListener refreshTokenRotated");
   const [err, handle] = await tryAsync(
     PixivApi.addListener("refreshTokenRotated", ({ token }) => {
       if (token) {
@@ -56,11 +59,13 @@ async function setupUnauthorizedHandler() {
       }
     }),
   );
+  console.warn("[PROBE-authStore] addListener refreshTokenRotated done; err=" + (err ? (err as Error).message : "null"));
   if (!err && handle) {
     rotationListener = handle;
   }
 
   // 前台恢复时预判性刷新：如果距离上次刷新超过阈值，提前 refresh
+  console.warn("[PROBE-authStore] about to addListener appStateChange");
   appStateListener = await App.addListener("appStateChange", ({ isActive }) => {
     if (isActive && refreshTokenSig() && Date.now() - lastRefreshTime > PRE_REFRESH_THRESHOLD_MS) {
       const latest = refreshTokenSig();
@@ -69,6 +74,7 @@ async function setupUnauthorizedHandler() {
       }
     }
   });
+  console.warn("[PROBE-authStore] addListener appStateChange done");
 }
 
 /** 防止 initializeAuth 被重复调用（startup 和 onMount 都可能触发） */
@@ -77,11 +83,17 @@ let _authPromise: Promise<void> | null = null;
 export async function initializeAuth() {
   if (_authPromise) return _authPromise;
   _authPromise = (async () => {
+    // [PROBE prototype/diagnose-direct-oauth-rejection] initializeAuth 入口
+    console.warn("[PROBE-authStore] initializeAuth enter");
     // restoreRefreshToken 内部完成：备份完整性检查（失效则清 token）→ 读取（含旧 Preferences 迁移）→ Native 注入
     let token = await restoreRefreshToken();
+    console.warn("[PROBE-authStore] restoreRefreshToken returned; tokenLength=" + (token?.length ?? 0));
     if (token) {
+      console.warn("[PROBE-authStore] step: setRefreshTokenSig");
       setRefreshTokenSig(token);
+      console.warn("[PROBE-authStore] step: setupUnauthorizedHandler");
       await setupUnauthorizedHandler();
+      console.warn("[PROBE-authStore] step: setTokenReadyPromise");
       // 设置 tokenReady barrier：在此 barrier resolve 之前所有 API 请求被阻塞在 client.ts 入口
       let resolveTokenReady: () => void;
       setTokenReadyPromise(
@@ -89,15 +101,23 @@ export async function initializeAuth() {
           resolveTokenReady = r;
         }),
       );
+      console.warn("[PROBE-authStore] step: performRefresh start");
       // 设置 refreshPromise，让并发请求在初始 token 刷新期间等待
       const promise = performRefresh(token).finally(() => {
         setRefreshPromise(null);
         resolveTokenReady?.();
       });
       setRefreshPromise(promise);
+      console.warn("[PROBE-authStore] step: await promise");
       await promise;
+      console.warn("[PROBE-authStore] step: done");
+    } else {
+      console.warn("[PROBE-authStore] restoreRefreshToken returned null/falsy; skip performRefresh");
     }
-  })();
+  })().catch((err) => {
+    console.warn("[PROBE-authStore] initializeAuth THREW; err=" + (err?.stack ?? err?.message ?? String(err)));
+    throw err;
+  });
   return _authPromise;
 }
 
@@ -130,6 +150,16 @@ function isAuthErrorPermanent(err: unknown): boolean {
 }
 
 async function performRefresh(token: string) {
+  // [PROBE prototype/diagnose-direct-oauth-rejection] 进入探针
+  try {
+    console.warn("[PROBE-authStore] performRefresh enter; typeof token=" + typeof token
+      + "; constructor=" + (token?.constructor?.name ?? "none")
+      + "; length-type=" + (typeof (token as { length?: unknown })?.length)
+      + "; raw=" + JSON.stringify(token)?.substring(0, 60));
+  } catch (e) {
+    console.warn("[PROBE-authStore] performRefresh entry THREW: " + (e as Error).message);
+    throw e;
+  }
   const [err] = await tryAsync(
     refreshToken(token).then(async (resp) => {
       syncToken(resp.access_token);
@@ -141,12 +171,17 @@ async function performRefresh(token: string) {
     }),
   );
   if (err) {
+    const errMsg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    console.warn("[PROBE-authStore] performRefresh FAILED; err=" + errMsg
+        + "; isAuthErrorPermanent=" + isAuthErrorPermanent(err));
     if (isAuthErrorPermanent(err)) {
       await logout();
     } else {
       // 临时故障（网络错误等）：只清内存状态，保留 token 供下次重试
       clearAuthState();
     }
+  } else {
+    console.warn("[PROBE-authStore] performRefresh OK");
   }
 }
 

@@ -71,6 +71,48 @@ public class MainActivityWebview extends BridgeActivity {
         // 调试模式 — debug 构建时启用
         if (BuildConfig.DEBUG) {
             WebView.setWebContentsDebuggingEnabled(true);
+            // [PROBE prototype/diagnose-direct-oauth-rejection] debug-only：
+            // 通过 Intent extra 'debug_refresh_token' 接收 token，写入 SecureStorage。
+            // 调用方式：
+            //   adb shell am start -n io.pictelio.app/.MainActivity \
+            //     --es debug_refresh_token "<refresh_token>"
+            // JS 侧 restoreRefreshToken 会拿到 token 触发 performRefresh，
+            // Java 侧 PROBE-AuthPlugin / PROBE-PixivApiCore 输出真实 reject message。
+            final String debugToken = getIntent() != null
+                    ? getIntent().getStringExtra("debug_refresh_token") : null;
+            if (debugToken != null && !debugToken.isEmpty()) {
+                android.util.Log.w("PROBE-DebugToken", "Intent extra has token; injecting (debug-only); length=" + debugToken.length());
+                final android.content.Context ctx = getApplicationContext();
+                new Thread(() -> {
+                    try {
+                        // 写入 CapacitorStorage Preferences（@capacitor/preferences 默认 group），
+                        // JS 侧 restoreRefreshToken debug-only 路径会读它。
+                        final String tokenJson = "{\"probe_refresh_token\":\"" + debugToken + "\"}";
+                        final String directJson = "{\"enabled\":true,\"manual\":[]}"; // 强制直连开关 ON
+                        ctx.getSharedPreferences("CapacitorStorage", android.content.Context.MODE_PRIVATE)
+                                .edit()
+                                .putString("PROBE_DBG", tokenJson)
+                                .putString("direct_access_settings", directJson)
+                                .apply();
+                        android.util.Log.w("PROBE-DebugToken", "CapacitorStorage.PROBE_DBG written; length=" + debugToken.length()
+                                + "; direct_access_settings=" + directJson);
+                        // 同步 Java 堆 refreshToken 静态字段，让 PixivApiCore 直接拿（避免 JS roundtrip）
+                        io.pictelio.app.PixivApiCore.refreshToken = debugToken;
+                        android.util.Log.w("PROBE-DebugToken", "PixivApiCore.refreshToken set; prefix=" + debugToken.substring(0, Math.min(8, debugToken.length())));
+                        // [PROBE] 立即触发 IP 表远端拉取（用户场景："点击立即更新IP表"）
+                        try {
+                            io.pictelio.app.directaccess.DirectAccessConfig config =
+                                    io.pictelio.app.directaccess.DirectAccessConfig.get(ctx);
+                            boolean started = config.refreshIpTableNow();
+                            android.util.Log.w("PROBE-DebugToken", "refreshIpTableNow started=" + started);
+                        } catch (Throwable t) {
+                            android.util.Log.w("PROBE-DebugToken", "refreshIpTableNow failed: " + t.getMessage());
+                        }
+                    } catch (Exception e) {
+                        android.util.Log.w("PROBE-DebugToken", "inject failed: " + e.getClass().getName() + ":" + e.getMessage());
+                    }
+                }, "PROBE-DebugToken").start();
+            }
         }
     }
 
@@ -80,6 +122,19 @@ public class MainActivityWebview extends BridgeActivity {
 
         final WebView webView = bridge.getWebView();
         if (webView == null) return;
+
+        // [PROBE prototype/diagnose-direct-oauth-rejection] debug-only：把 webview console
+        // 输出桥到 logcat tag "PROBE-WebView"，让 JS 侧 console.warn 可观测。
+        if (BuildConfig.DEBUG) {
+            webView.setWebChromeClient(new android.webkit.WebChromeClient() {
+                @Override
+                public boolean onConsoleMessage(android.webkit.ConsoleMessage cm) {
+                    android.util.Log.w("PROBE-WebView",
+                            cm.message() + " (" + cm.sourceId() + ":" + cm.lineNumber() + ")");
+                    return true;
+                }
+            });
+        }
 
         // 保留 Capacitor 原有的 WebViewClient，用包装类代理非图片请求；
         // 出口统一过 OtaPlugin.ensureNoStore（OTA 坑①：本地服务器响应缺 Cache-Control
