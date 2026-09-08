@@ -326,7 +326,7 @@ describe("recommendedStore — loading and error states", () => {
     q.isFetching = true;
     q.status = "success";
     q.fetchMeta = { fetchMore: { direction: "forward" } };
-    setQueryData("follow_public", [createIllust(1, "2026-07-01T12:00:00+09:00")], null);
+    setQueryData("recommended_illust", [createIllust(1, "2026-07-01T12:00:00+09:00")], null);
 
     const store = await loadStore();
     store.setRecommendSubTab("illust");
@@ -341,7 +341,7 @@ describe("recommendedStore — loading and error states", () => {
     q.isFetching = true;
     q.status = "success";
     q.fetchMeta = null;
-    setQueryData("follow_public", [createIllust(1, "2026-07-01T12:00:00+09:00")], null);
+    setQueryData("recommended_illust", [createIllust(1, "2026-07-01T12:00:00+09:00")], null);
 
     const store = await loadStore();
     store.setRecommendSubTab("illust");

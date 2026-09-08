@@ -1,11 +1,4 @@
 // @vitest-environment happy-dom
-const _ow = console.warn.bind(console);
-console.warn = (..._a) => {
-  if (String(_a[0]).includes("Reactive value")) {
-    process.stdout.write("\n=== STACK ===\n" + new Error().stack + "\n=== END ===\n");
-  }
-  _ow(..._a);
-};
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, cleanup } from "@solidjs/testing-library";
 

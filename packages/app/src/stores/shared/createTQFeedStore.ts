@@ -190,6 +190,12 @@ function getLastNextUrl(data: { pages?: any[] }): string | null {
   return data.pages[data.pages.length - 1].next_url ?? null;
 }
 
+// fetchMeta 在 v6 适配层类型中未声明但运行时存在（core result 展开 state），经 unknown 收窄。
+function fetchDirection(q: unknown): string | undefined {
+  return (q as { fetchMeta?: { fetchMore?: { direction?: string } } }).fetchMeta?.fetchMore
+    ?.direction;
+}
+
 /** 错误类型优先级（索引越小越重要） */
 const ERROR_PRIORITY: ApiErrorType[] = [
   ApiErrorType.PROXY,
@@ -402,11 +408,6 @@ export function createTQFeedStore<
     // 通道」（fetchStatus/status/fetchMeta）镜像 core 定义：
     //   core isFetchingNextPage = isFetching && fetchMeta.fetchMore.direction === "forward"
     //   core isRefetching      = isFetching && status !== "pending" && 非分页方向
-    // fetchMeta 在 v6 适配层类型中未声明但运行时存在（core result 展开 state），
-    // 经 unknown 收窄。
-    const fetchDirection = (q: unknown): string | undefined =>
-      (q as { fetchMeta?: { fetchMore?: { direction?: string } } }).fetchMeta?.fetchMore?.direction;
-
     const refreshing: Accessor<boolean> = () =>
       activeQueries().some(
         (q) => q.fetchStatus === "fetching" && q.status !== "pending" && fetchDirection(q) == null,
