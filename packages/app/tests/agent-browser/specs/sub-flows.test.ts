@@ -139,7 +139,7 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 共享会话", 
       const novelReady = await evalBool(driver, NOVEL_FEED_READY_JS);
       expect(novelReady, "小说 Feed 应展示小说卡片或空状态").toBe(true);
 
-      await driver.clickReliable("插画");
+      await driver.clickReliable("插画", undefined, '[data-testid="content-type-illust"]');
       // 等插画 Feed 就绪，替代固定 SLEEP
       await driver.waitForJs(ILLUST_FEED_READY_JS, 15_000);
 

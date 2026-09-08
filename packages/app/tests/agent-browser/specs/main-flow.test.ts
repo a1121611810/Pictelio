@@ -120,7 +120,7 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 超长链", () 
       true,
     );
 
-    await driver.clickReliable("插画");
+    await driver.clickReliable("插画", undefined, '[data-testid="content-type-illust"]');
     // 条件等待：插画卡片渲染或「暂无内容」空态（覆盖空列表分支）
     await driver.waitForJs(
       "document.querySelectorAll('[data-testid=illust-card]').length > 0 || document.body.innerText.includes('暂无内容')",
@@ -140,7 +140,7 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 超长链", () 
   }, 60_000);
 
   it("[C1-C2] 点击插画卡片进入详情页", async () => {
-    await driver.clickReliable("插画");
+    await driver.clickReliable("插画", undefined, '[data-testid="content-type-illust"]');
     // 删除原固定 3s 等待：下一行 waitForSelector 已覆盖卡片渲染条件
 
     // 等待卡片渲染（tab 切换后 feed 重载可能较慢），再重试点击

@@ -65,6 +65,11 @@ export const setCurrentTab = (tab: Tab) =>
 
 export const contentType = () => contentTypeHandle.value();
 
+// 「已请求」类型的同步镜像：Solid 2.0 微任务批处理下 handle.value() 在同一同步轮内
+// 读到的是旧提交值，连续 setContentType 会误触同值守卫丢失末次点击（1.x 末次点击
+// 胜出语义）。本变量同步更新，守卫据此判重；首次调用前从 handle 初始化。
+let requestedContentType: ContentType | null = null;
+
 /**
  * 设置内容类型。
  *
@@ -73,9 +78,13 @@ export const contentType = () => contentTypeHandle.value();
  * 持久化失败由 registry 内部 warn 兜底，state 保持新值。
  */
 export async function setContentType(type: ContentType): Promise<void> {
-  if (type === contentTypeHandle.value()) {
+  if (requestedContentType === null) {
+    requestedContentType = contentTypeHandle.value();
+  }
+  if (type === requestedContentType) {
     return;
   }
+  requestedContentType = type;
   contentTypeHandle.set(type);
   window.dispatchEvent(new CustomEvent("contentTypeChanged"));
   // contentType 是页内状态切换（非路由导航），@solidjs/router 的 scrollRestoration

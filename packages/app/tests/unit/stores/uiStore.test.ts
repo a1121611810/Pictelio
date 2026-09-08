@@ -191,6 +191,20 @@ describe("resetUiStore", () => {
       expect(contentType()).toBe("illust"); // Default unchanged
     });
 
+    it("同一同步轮内连续切换：末次点击胜出（2.0 批处理回归锁定，#418）", async () => {
+      const { mod, contentType, setContentType } = await setup();
+      await warm(mod);
+      // 1.x 同步语义下 novel→illust→illust 的末态是 illust；2.0 微任务批处理使
+      // setContentType 内的同值守卫在同步轮内读到旧提交值（illust）而提前 return，
+      // 末态错成 novel。requestedContentType 同步镜像修复后必须保持末次点击胜出。
+      void setContentType("novel");
+      void setContentType("illust");
+      void setContentType("illust");
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(contentType()).toBe("illust");
+    });
+
     it("dispatches contentTypeChanged event", async () => {
       const { setContentType } = await setup();
       const dispatchSpy = vi.fn();
