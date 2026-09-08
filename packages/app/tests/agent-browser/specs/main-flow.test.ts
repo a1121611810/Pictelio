@@ -143,8 +143,10 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 超长链", () 
     await driver.clickReliable("插画", undefined, '[data-testid="content-type-illust"]');
     // 删除原固定 3s 等待：下一行 waitForSelector 已覆盖卡片渲染条件
 
-    // 等待卡片渲染（tab 切换后 feed 重载可能较慢），再重试点击
-    await driver.waitForSelector('[data-testid="illust-card"]', 10_000);
+    // 等待卡片渲染（tab 切换后 feed 重载可能较慢），再重试点击。
+    // 预算 30s（与 B4-B6 同口径）：套件前置用例累积后 API 限流退避会使
+    // illust 重载拖到 ~19-30s（#418 实测），10s 预算会在应用最终恢复前误报。
+    await driver.waitForSelector('[data-testid="illust-card"]', 30_000);
     let cardClicked = false;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {

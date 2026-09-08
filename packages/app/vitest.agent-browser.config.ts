@@ -62,6 +62,10 @@ export default defineConfig({
     passWithNoTests: true,
     testTimeout: 120_000,
     hookTimeout: 60_000,
+    // 套件按「共享会话」设计（每文件独立 daemon 但共享同一 Pixiv 账号与 dev server）：
+    // 并发跑文件时两个浏览器竞速同一账号会触发 API 限流 → feed 假空态（#418 实测
+    // main-flow 并发必红、solo 全绿），必须串行执行文件。
+    fileParallelism: false,
     // F2 方向：全局 retry 2→0（消除 flake 重试放大；确定性断言后套件已稳定）。
     // 已知偶发 flake 用例用 it(name, { retry: 1 }, fn) 单独兜底（Vitest 4 正确签名，
     // describe.retry 不存在）。登录流等状态破坏性用例已显式 retry: 0。
