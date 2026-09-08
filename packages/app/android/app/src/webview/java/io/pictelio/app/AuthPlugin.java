@@ -67,7 +67,7 @@ public class AuthPlugin extends Plugin {
                 .build();
 
         Request request = new Request.Builder()
-                .url(io.pictelio.app.ApiEndpoints.oauthTokenUrl()) // ADR-0146 D3：反代感知
+                .url("https://oauth.secure.pixiv.net/auth/token") // 官方域 + directaccess 钉 IP
                 .addHeader("X-Client-Time", localTime)
                 .addHeader("X-Client-Hash", clientHash)
                 .addHeader("App-OS", OAuthConfig.APP_OS)

@@ -32,8 +32,10 @@ public final class DirectAccessInitProvider extends android.content.ContentProvi
             Context app = getContext();
             if (app != null) {
                 DirectAccessConfig.get(app.getApplicationContext());
-                // ADR-0146 D3：绑定反代端点提供者的应用上下文（任何请求前必执行）
-                io.pictelio.app.ApiEndpoints.bind(app.getApplicationContext());
+                // T13：触发 OkHttpCompat 静态初始化（探测版本 + ECH/QUIC 能力），
+                // 探测结果一次性 logcat 输出，便于诊断直连兼容性。
+                // 调用 version() 而非仅 Class.forName 是为了确保静态块执行副作用。
+                android.util.Log.i("[DirectAccessInit]", "OkHttp 能力摘要: " + OkHttpCompat.summary());
             }
         } catch (Exception e) {
             android.util.Log.w("[DirectAccessInit]", "直连配置预热失败（退化系统路线）", e);

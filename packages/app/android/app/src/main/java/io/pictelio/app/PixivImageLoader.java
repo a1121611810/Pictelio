@@ -152,13 +152,28 @@ public final class PixivImageLoader {
         return fetch(client, url);
     }
 
-    /** 单次 HTTP 请求：Referer/UA 注入（i.pximg.net 防盗链契约，镜像站代理官方资源同样适用） */
+    /** 单次 HTTP 请求：Referer/UA/Host 注入（i.pximg.net 防盗链契约 + Akamai 虚拟主机路由，
+     *  镜像站代理官方资源同样适用）。
+     *
+     *  <p><b>Host 头说明</b>：directaccess 钉 IP 时，URL 字面量仍是 {@code i.pximg.net}
+     *  （DNS 层换 IP，URL 不变），OkHttp 默认会从 URL 提取 host 作为 Host 头——
+     *  本来就满足 Akamai 虚拟主机路由。但作为防御性显式注入，避免 OkHttp 行为变化
+     *  或自定义 URL 构造场景（如 CDN 镜像、代理路径重写）下 Host 头丢失导致 CDN 403。
+     *  addHeader 而非 setHeader：OkHttp 4.x 没有 setHeader；addHeader 重复时会按多值处理，
+     *  与 URL 默认 Host 头叠加，Akamai 取首条生效无影响。
+     */
     private static byte[] fetch(OkHttpClient client, String url) throws IOException {
-        Request request = new Request.Builder()
+        String host = extractHost(url);
+        Request.Builder builder = new Request.Builder()
                 .url(url)
                 .addHeader("Referer", OAuthConfig.REFERER)
-                .addHeader("User-Agent", OAuthConfig.USER_AGENT)
-                .build();
+                .addHeader("User-Agent", OAuthConfig.USER_AGENT);
+        if (host != null) {
+            // 防御性：URL 字面量 host 与请求 host 一致时 OkHttp 默认会用 URL host，
+            // addHeader 会让 host 出现两次，Akamai 取首条生效无副作用。
+            builder.addHeader("Host", host);
+        }
+        Request request = builder.build();
         try (Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 throw new IOException("图片下载失败 (HTTP " + response.code() + "): " + url);
@@ -284,6 +299,19 @@ public final class PixivImageLoader {
                 bos.write(buf, 0, n);
             }
             return bos.toByteArray();
+        }
+    }
+
+    /** 从 URL 提取 host（防御性 Host 头注入用；非法 URL 返回 null——调用方跳过注入） */
+    static String extractHost(String url) {
+        if (url == null) return null;
+        try {
+            URI uri = new URI(url);
+            String host = uri.getHost();
+            return (host != null && !host.isEmpty()) ? host : null;
+        } catch (URISyntaxException e) {
+            Log.w(TAG, "extractHost 解析失败，跳过 Host 注入: " + url, e);
+            return null;
         }
     }
 }

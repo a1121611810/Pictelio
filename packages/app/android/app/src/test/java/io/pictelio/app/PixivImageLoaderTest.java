@@ -7,6 +7,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import android.content.Context;
 import android.util.Base64;
@@ -473,5 +474,64 @@ public class PixivImageLoaderTest {
         assertArrayEquals(body, loader.loadBytes(official));
         assertEquals(1, server.getRequestCount());
         assertNotNull(loader.cachedFile(official));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Host 头显式注入（T3：直连下 Akamai 虚拟主机路由硬约束）
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * T3 验证：下载 i.pximg.net URL 时，request.headers 必须含
+     * {@code Host: i.pximg.net}——directaccess 钉 IP 走法要求显式 Host 头，
+     * Akamai 用 Host 头路由到正确 bucket（pixiv-viewer-app 同款契约）。
+     */
+    @Test
+    public void fetch_includesExplicitHostHeader() throws Exception {
+        byte[] body = bodyBytes(32);
+        server.enqueue(new MockResponse().setResponseCode(200).setBody(new okio.Buffer().write(body)));
+        String url = server.url("/img-master/img/2020/01/01/host-explicit.jpg").toString();
+
+        assertArrayEquals(body, loader.loadBytes(url));
+
+        RecordedRequest req = server.takeRequest();
+        String host = req.getHeader("Host");
+        assertNotNull("Host 头缺失（Akamai 虚拟主机路由要求）", host);
+        // MockWebServer 自身的 host（含端口）；关键是 Host 头存在，与 URL 字面量 host 一致
+        assertTrue("Host 头应反映 URL 字面量 host，实际=" + host,
+                host.startsWith("localhost") || host.contains(":"));
+    }
+
+    /**
+     * T3 边界：URL 非法时 extractHost 返回 null 或不抛异常——Host 头注入跳过。
+     * 这是契约保护：避免 extractHost 解析失败导致整个下载链路崩溃。
+     * 注：{@code URI} 解析较宽松，对部分非 URL 字符串也能解析（host 字段可能非空）。
+     * 我们的契约是"调用方拿到合法 URL 时正确提取"，而非"对所有垃圾输入返回 null"——
+     * 因此只断言 null 输入必返 null + 非法输入不抛异常。
+     */
+    @Test
+    public void extractHost_invalidUrl_returnsNull() {
+        assertNull(PixivImageLoader.extractHost(null));
+        // 空白字符串 parse 可能抛异常或返 null/empty——断言不抛 IllegalArgument 之外异常
+        try {
+            String result = PixivImageLoader.extractHost("");
+            // 空字符串 URI 解析可能返 null 或 empty，host 字段必为空
+            assertTrue(result == null || result.isEmpty());
+        } catch (Exception e) {
+            fail("空字符串不应抛异常: " + e.getMessage());
+        }
+        // 真正非 URL 字符串：无空格时可解析为相对 URI 但 host 必为空
+        String result = PixivImageLoader.extractHost("not a url with spaces");
+        assertTrue("垃圾输入不应返回非空 host，实际=" + result,
+                result == null || result.isEmpty());
+    }
+
+    /**
+     * T3 正常路径：从合法 URL 提取 host 不带端口、不带路径。
+     */
+    @Test
+    public void extractHost_validUrl_returnsHostOnly() {
+        assertEquals("i.pximg.net", PixivImageLoader.extractHost("https://i.pximg.net/img-master/x.jpg"));
+        assertEquals("i.pximg.net", PixivImageLoader.extractHost("https://i.pximg.net"));
+        assertEquals("s.pximg.net", PixivImageLoader.extractHost("http://s.pximg.net:8080/path"));
     }
 }

@@ -94,9 +94,8 @@ final class PixivApiCore {
     // ─── API 端点 ────────────────────────────────────────────
 
     static String apiBase() {
-        // ADR-0146 D3：反代基址（api_proxy_base 设置）优先，官方域回退
-        ApiEndpoints.refresh();
-        return ApiEndpoints.apiBase();
+        // 纯客户端直连主路径（去除远程代理）：始终返回官方域，由 directaccess 钉 IP
+        return "https://app-api.pixiv.net";
     }
 
     // ─── 401 刷新 + 重试核心 ─────────────────────────────────
@@ -215,7 +214,7 @@ final class PixivApiCore {
                 .build();
 
         Request request = new Request.Builder()
-                .url(ApiEndpoints.oauthTokenUrl()) // ADR-0146 D3：反代感知
+                .url("https://oauth.secure.pixiv.net/auth/token") // 官方域 + directaccess 钉 IP
                 .addHeader("X-Client-Time", localTime)
                 .addHeader("X-Client-Hash", clientHash)
                 .addHeader("App-OS", OAuthConfig.APP_OS)

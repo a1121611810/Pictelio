@@ -1,4 +1,4 @@
-import { type Component, createSignal, Show } from "solid-js";
+import { type Component, createSignal, For, Show } from "solid-js";
 import FluentIcon from "../ui/FluentIcon";
 import {
   directAccessState,
@@ -9,7 +9,18 @@ import {
   validateManualEntry,
   type DirectAccessManualEntry,
 } from "../../stores/directAccessStore";
-import { directAccessCommand, type DirectAccessPhase } from "../../native/DirectAccess";
+import {
+  networkMode,
+  networkModeLabel,
+  networkModeDescription,
+  setNetworkMode,
+  type NetworkMode,
+} from "../../stores/networkModeStore";
+import {
+  directAccessCommand,
+  dohResolve as dohResolveBridge,
+  type DirectAccessPhase,
+} from "../../native/DirectAccess";
 
 /** 命令/保存按钮共享样式（Fluent 三态 + 40px 触控目标 + focus-visible，全令牌化） */
 const ACTION_BUTTON_CLASS =
@@ -129,6 +140,36 @@ const SettingsDirectAccess: Component = () => {
     setExpanded(!expanded());
   }
 
+  // ── DoH 刷新（T6）────────────────────────────────────────────
+  const [dohExpanded, setDohExpanded] = createSignal(false);
+  const [dohHost, setDohHost] = createSignal("i.pximg.net");
+  const [dohBusy, setDohBusy] = createSignal(false);
+  const [dohResult, setDohResult] = createSignal<{ ips: string[]; timestamp: number } | null>(null);
+
+  function toggleDohSection(): void {
+    setDohResult(null);
+    setDohExpanded(!dohExpanded());
+  }
+
+  async function runDohResolve(): Promise<void> {
+    const host = dohHost().trim();
+    if (!host) return;
+    setDohBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await dohResolveBridge(host);
+      setDohResult(result);
+    } catch (err) {
+      // web/dev 环境 reject — 显示失败提示，禁静默
+      console.warn("[SettingsDirectAccess] dohResolve 失败", err);
+      setDohResult({ ips: [], timestamp: 0 });
+      setError(err instanceof Error ? err.message : "DoH 解析失败");
+    } finally {
+      setDohBusy(false);
+    }
+  }
+
   /** 保存手动 IP 表：非法 JSON / 非法条目一律拒绝并给出可见提示（禁静默降级） */
   function handleSaveManual(): void {
     setNotice(null);
@@ -164,6 +205,50 @@ const SettingsDirectAccess: Component = () => {
       <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground3)] uppercase tracking-wide mb-1">
         网络直连
       </p>
+
+      {/* 网络模式三档选择（T5，pictelio-pure-client-direct-access）：
+          standard / direct / compat——用户按网络环境切换；compat = 走系统代理（用户个人配置） */}
+      <div class="flex flex-col gap-[var(--spacingVerticalS)] mb-3">
+        <span class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground2)]">
+          网络模式
+        </span>
+        <For each={["standard", "direct", "compat"] as NetworkMode[]}>
+          {(mode) => {
+            const isSelected = () => networkMode() === mode;
+            return (
+              <div
+                class={ROW_CLASS}
+                onClick={() => setNetworkMode(mode)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setNetworkMode(mode);
+                  }
+                }}
+                role="button"
+                tabindex="0"
+                aria-label={`切换网络模式到 ${networkModeLabel(mode)}`}
+                aria-pressed={isSelected()}
+              >
+                <div class="flex items-center gap-3">
+                  <div class="relative w-6 h-6 flex-shrink-0 text-[var(--colorNeutralForeground2)]">
+                    <FluentIcon name="server" size={24} />
+                  </div>
+                  <div>
+                    <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
+                      {networkModeLabel(mode)}
+                    </p>
+                    <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
+                      {networkModeDescription(mode)}
+                    </p>
+                  </div>
+                </div>
+                <fluent-radio checked={isSelected()} />
+              </div>
+            );
+          }}
+        </For>
+      </div>
 
       {/* 开关行（行点击与开关均切换；开关 stopPropagation 防双触发，先例 SettingsImage 图床行） */}
       <div
@@ -286,6 +371,88 @@ const SettingsDirectAccess: Component = () => {
           {busy() === "refresh" ? "更新中…" : "立即更新 IP 表"}
         </button>
       </div>
+
+      {/* DoH 刷新（T6）：高级用户主动调 DoH 端点解析 host → 写缓存。
+          默认折叠：普通用户不需要；调试/IP 漂移时手动触发。 */}
+      <div
+        class={ROW_CLASS}
+        onClick={toggleDohSection}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            toggleDohSection();
+          }
+        }}
+        role="button"
+        tabindex="0"
+        aria-label="DoH 解析（高级）"
+        aria-expanded={dohExpanded()}
+      >
+        <div class="flex items-center gap-3">
+          <div class="relative w-6 h-6 flex-shrink-0 text-[var(--colorNeutralForeground2)]">
+            <FluentIcon name="search" size={24} />
+          </div>
+          <div>
+            <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
+              DoH 解析（高级）
+            </p>
+            <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
+              主动调 DoH 端点解析 host（Quad9 / Cloudflare 1.0.0.1）
+            </p>
+          </div>
+        </div>
+        <span class="text-[var(--colorNeutralForeground3)]">{dohExpanded() ? "收起" : "展开"}</span>
+      </div>
+      <Show when={dohExpanded()}>
+        <div class="flex flex-col gap-[var(--spacingVerticalS)]">
+          <input
+            type="text"
+            class="w-full rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase300)] leading-snug p-[var(--spacingHorizontalM)] border border-[var(--colorNeutralStroke1)] focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-[var(--strokeWidthThick)] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
+            placeholder="i.pximg.net"
+            aria-label="DoH 解析 host"
+            value={dohHost()}
+            oninput={(e) => setDohHost(e.currentTarget.value)}
+          />
+          <button
+            type="button"
+            class={ACTION_BUTTON_CLASS}
+            disabled={dohBusy() || !dohHost().trim()}
+            onClick={() => void runDohResolve()}
+          >
+            {dohBusy() ? "解析中…" : "立即 DoH 解析"}
+          </button>
+          <Show when={dohResult()}>
+            <div class="flex flex-col gap-[var(--spacingVerticalXS)] rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)] p-[var(--spacingHorizontalM)]">
+              <Show
+                when={dohResult()!.ips.length > 0}
+                fallback={
+                  <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorStatusWarningForeground1)] leading-snug">
+                    解析失败或返回为空——DoH 端点不可达或结果被识别为污染 IP
+                  </p>
+                }
+              >
+                <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground2)]">
+                  解析结果：
+                </p>
+                <ul class="flex flex-col gap-1">
+                  <For each={dohResult()!.ips}>
+                    {(ip) => (
+                      <li class="[font-size:var(--fontSizeBase300)] font-mono text-[var(--colorNeutralForeground1)]">
+                        {ip}
+                      </li>
+                    )}
+                  </For>
+                </ul>
+              </Show>
+              <Show when={dohResult()!.timestamp > 0}>
+                <p class="[font-size:var(--fontSizeBase100)] text-[var(--colorNeutralForeground3)]">
+                  缓存时间：{new Date(dohResult()!.timestamp).toLocaleString()}
+                </p>
+              </Show>
+            </div>
+          </Show>
+        </div>
+      </Show>
 
       {/* 反馈提示（错误/成功，禁静默降级） */}
       <Show when={error()}>

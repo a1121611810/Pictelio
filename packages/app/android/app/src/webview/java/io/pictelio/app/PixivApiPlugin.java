@@ -8,6 +8,7 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
+import io.pictelio.app.directaccess.DohResolver;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -276,6 +277,52 @@ public class PixivApiPlugin extends Plugin {
         } catch (Exception e) {
             call.reject("Direct access command failed: " + e.getMessage());
         }
+    }
+
+    /**
+     * DoH 解析桥（pictelio-pure-client-direct-access T6）—— 设置卡"立即刷新直连 IP"按钮调用。
+     * 入参 {@code host} 必填（小写规范化由 JS 侧负责），出参包含解析结果 IP 列表与时间戳。
+     *
+     * <p>失败语义：DoH 端点全不可达 → 返回 {@code ips: []}（不抛异常）+ warn 必打；
+     * JS 侧展示"刷新失败"UI（与成功态不同）。空 host / host 为 IP 字面量 → 立即返回空列表。
+     *
+     * <p>调用方式（JS 侧）：{@code PixivApi.dohResolve({ host: "i.pximg.net" })}
+     */
+    @PluginMethod
+    public void dohResolve(PluginCall call) {
+        String host = call.getString("host");
+        if (host == null) {
+            call.reject("host 必填");
+            return;
+        }
+        call.resolve(dohResolveCore(getContext(), host));
+    }
+
+    /**
+     * DoH 解析核心（包可见：脱离 PluginCall 壳，Robolectric 单测直测）。
+     * 恒返回非 null JSObject（ips 数组为空时仍返回 { ips: [], timestamp: 0 }）。
+     */
+    static JSObject dohResolveCore(Context ctx, String host) {
+        JSObject result = new JSObject();
+        long timestamp = 0L;
+        java.util.List<String> ips;
+        try {
+            DohResolver resolver = new DohResolver(ctx);
+            // forceRefresh：忽略缓存，强制走实时 DoH（设置卡"立即刷新"按钮语义）
+            ips = resolver.forceRefresh(host);
+            timestamp = resolver.getCacheTimestamp(host);
+        } catch (Exception e) {
+            // 解析失败（端点全不可达等）→ 空列表 + warn
+            android.util.Log.w("[PixivApiPlugin]", "dohResolveCore 失败，host=" + host, e);
+            ips = java.util.Collections.emptyList();
+        }
+        com.getcapacitor.JSArray arr = new com.getcapacitor.JSArray();
+        for (String ip : ips) {
+            arr.put(ip);
+        }
+        result.put("ips", arr);
+        result.put("timestamp", timestamp);
+        return result;
     }
 
     /**

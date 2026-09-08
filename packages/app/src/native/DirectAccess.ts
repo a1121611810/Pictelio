@@ -32,11 +32,20 @@ export interface DirectAccessStatus {
 /** 直连命令（reset = 双通道熔断全重置；refresh = 立即拉取远端 IP 表） */
 export type DirectAccessAction = "reset" | "refresh";
 
+/** DoH 解析结果（pictelio-pure-client-direct-access T6） */
+export interface DohResolveResult {
+  /** 解析得到的 IPv4 字面量列表（失败时为空数组） */
+  ips: string[];
+  /** 缓存写入时刻 ms（0 = 未缓存，即 DoH 失败） */
+  timestamp: number;
+}
+
 interface DirectAccessPluginMethods {
   directAccessStatus(): Promise<DirectAccessStatus>;
   directAccessCommand(options: {
     action: DirectAccessAction;
   }): Promise<{ ok: boolean; started?: boolean }>;
+  dohResolve(options: { host: string }): Promise<DohResolveResult>;
 }
 
 const DirectAccessPlugin = registerPlugin<DirectAccessPluginMethods>("PixivApi");
@@ -73,4 +82,16 @@ export async function directAccessCommand(
     throw new Error(`[DirectAccess] 命令 ${action} 仅在原生环境可用`);
   }
   return DirectAccessPlugin.directAccessCommand({ action });
+}
+
+/**
+ * DoH 解析入口（T6）—— 设置卡"立即刷新直连 IP"按钮调用。
+ * 非 native 环境：reject（DoH 仅在原生环境生效，web 下无 Android DoH 实现）；
+ * 调用方应展示"DoH 仅在 Android 原生客户端可用"。
+ */
+export async function dohResolve(host: string): Promise<DohResolveResult> {
+  if (!Capacitor.isNativePlatform()) {
+    throw new Error("[DirectAccess] dohResolve 仅在原生环境可用");
+  }
+  return DirectAccessPlugin.dohResolve({ host });
 }
