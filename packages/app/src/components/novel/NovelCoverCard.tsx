@@ -1,5 +1,5 @@
 import type { Component } from "solid-js";
-import { createSignal, For, onCleanup, onSettled, Show } from "solid-js";
+import { createSignal, For, onSettled, Show } from "solid-js";
 import type { PixivNovel } from "@/api/types";
 import PixivImage from "../PixivImage";
 import SearchableTag from "../SearchableTag";
@@ -34,13 +34,14 @@ const NovelCoverCard: Component<NovelCoverCardProps> = (props) => {
     if (heroEl?.offsetHeight) heroH = heroEl.offsetHeight;
   }
 
+  // onSettled 不能嵌套原语：onCleanup 改为返回 cleanup（卸载时 disconnect 观察器）
   onSettled(() => {
     // 初始测量 + 内容变化（字体加载/换行/图片加载）后 ResizeObserver 重测
     requestAnimationFrame(measure);
     const ro = new ResizeObserver(() => measure());
     if (compactEl) ro.observe(compactEl);
     if (heroEl) ro.observe(heroEl);
-    onCleanup(() => ro.disconnect());
+    return () => ro.disconnect();
   });
 
   // ── compact 形态（左缩略右信息）──

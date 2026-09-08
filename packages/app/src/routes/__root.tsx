@@ -54,28 +54,30 @@ const RootLayout: Component = (props: { children?: any }) => {
   let exitHintTimer: ReturnType<typeof setTimeout>;
 
   // 路由切换时清空 overlay 栈，避免旧路由未关闭的 overlay 阻塞新路由的返回手势。
-  createEffect(() => {
-    // 依赖 location 变化
-    void location.pathname;
-    clearOverlays();
-  });
+  // Solid 2.0 拆分效应：compute 只读依赖（location.pathname），apply 做副作用。
+  createEffect(
+    () => location.pathname,
+    () => clearOverlays(),
+  );
 
-  // 监听登录过期：当 isLoggedIn 从 true 变为 false 时自动跳转登录页
-  createEffect(() => {
-    const loggedIn = isLoggedIn();
-    const path = location.pathname;
-    // 跳过启动阶段（startup 代码在 onSettled 中处理了初始导航）
-    if (isLoading()) return;
-    if (!loggedIn && path !== "/login") {
-      navigate("/login", { replace: true });
-    }
-  });
+  // 监听登录过期：当 isLoggedIn 从 true 变为 false 时自动跳转登录页。
+  // Solid 2.0：compute 段提取快照（普通值），apply 段做 navigate 副作用。
+  createEffect(
+    () => ({ loggedIn: isLoggedIn(), path: location.pathname, loading: isLoading() }),
+    ({ loggedIn, path, loading }) => {
+      // 跳过启动阶段（startup 代码在 onSettled 中处理了初始导航）
+      if (loading) return;
+      if (!loggedIn && path !== "/login") {
+        navigate("/login", { replace: true });
+      }
+    },
+  );
 
   /**
    * 启动后检查更新（延迟执行，不阻塞首次渲染）。
    * 在 onSettled 中的启动流程完成后调用。
    */
-  onSettled(async () => {
+  onSettled(() => {
     // FT-2 冷启动反馈治理（#365 P1）：原生 splash 只承担「进程启动 + JS 引导」最前段，
     // 根布局 loading 态（品牌 LoadingSpinner 扫光动画）首帧绘制后即释放——
     // 后续等待（settings 水合 / auth 恢复 / feed 首取）全部由应用内可见进展接管，
@@ -90,7 +92,6 @@ const RootLayout: Component = (props: { children?: any }) => {
     // 滚动恢复由 @solidjs/router 内置 scrollRestoration 管理。
     // 「持久化滚动恢复」开关关闭（默认）时：重新打开 app = 全新会话，
     // 清除跨会话滚动持久化并强制回顶，冷启动始终从顶部开始。
-    // 守卫的 cleanup 挂进下方 onCleanup（组件卸载时可能仍在守卫窗口期内）。
     let removeStartupScrollGuard: (() => void) | null = null;
     if (!persistScrollRestoration()) {
       try {
@@ -119,80 +120,85 @@ const RootLayout: Component = (props: { children?: any }) => {
     };
     window.addEventListener("exitHint", onExitHint);
 
-    // Register cleanup synchronously (before any await) so Solid tracks it properly
+    // Solid 2.0：onSettled 回调必须同步（不能是 async 函数），清理函数改由返回值
+    // 注册（等价原 onCleanup，且天然在 await 之前同步挂到 owner）。异步启动流程
+    // 主体移入 IIFE；unregisterBackGesture 经闭包变量传递给清理函数。
     let unregisterBackGesture: (() => void) | null = null;
-    onCleanup(() => {
+
+    void (async () => {
+      // Load persisted preferences (async) — 统一由 Settings registry 批量加载。
+      // FT-2（#365 P2）：水合（~数十次 Preferences 桥 IPC）与 auth 恢复（secure storage +
+      // token 网络刷新）无数据依赖，二者并行——auth 不再串行等水合。唯一顺序点：
+      // loadAccountR18 回写 settings 必须发生在 hydrateAll 打开写门槛（phase=warm）之后，
+      // 故在 auth 分支内先 await hydrated；isLoading 释放同样以 hydrated 完成为前提
+      // （保证 feed 首帧渲染时屏蔽列表/举报列表/R18 过滤等已就绪）。
+      const hydrated = Promise.all([
+        settings.hydrateAll(),
+        loadReportedIds(),
+        loadBlockedIds(),
+        loadImageHostPreference(),
+      ]).then(() => undefined);
+
+      // 后台预热 LRU 缓存（从 Android 文件系统读取最近图片，不阻塞启动流程）
+      warmCacheFromDisk();
+
+      // Register native back gesture handler. Overlay closure is handled by backGestureStore
+      // Once components push overlays in Phase 5; for now the service closes top overlay if any.
+      unregisterBackGesture = await registerBackGesture({
+        getPathname: () => location.pathname,
+        // 系统返回走「动画吸收冻结」过渡（#364）：预位移 + 快照覆盖层先行动画，
+        // home remount 冻结期用户看到的是过渡进行中而非冻结硬切
+        navigateBack: () => runBackTransition(() => void navigate(-1)),
+        dispatchExitHint: () => window.dispatchEvent(new CustomEvent("exitHint")),
+        // OTA 门槛过渡面激活期间返回键 = 退出应用（#253，对齐 lynx /update 语义）
+        shouldExitOnBack: () => gateActive(),
+      });
+
+      const [authErr] = await tryAsync(
+        (async () => {
+          await initializeAuth();
+          await hydrated;
+          await loadAccountR18();
+          if (isLoggedIn()) {
+            if (location.pathname !== "/home") {
+              await navigate("/home", { replace: true });
+            }
+          } else {
+            if (location.pathname !== "/login") {
+              await navigate("/login", { replace: true });
+            }
+          }
+        })(),
+      );
+      // 水合完成（写门槛 warm + 屏蔽/举报/R18 就绪）后才释放 isLoading 渲染内容
+      await hydrated;
+      setIsLoading(false);
+      // 兜底关闭 Splash：非 Feed 页面（login 等）
+      // 由 Login.tsx 或 Feed.tsx 负责主动触发，此处兜底确保不会泄漏
+      const currentPath = location.pathname;
+      if (currentPath !== "/home") {
+        markContentReady();
+      }
+      // 健康上报（notifyReady 首帧挂点，#251）+ 回前台节流补查监听（均 native-only）
+      notifyWebBundleReady();
+      registerOtaResumeListener();
+      // 启动后延迟检查更新 — 确保页面渲染完成后再弹窗；不再被 autoCheckUpdate 关断
+      // （单 fetch 同时服务 OTA 门槛检查，门槛不受弹窗开关抑制，规格「检查与调度」）
+      setTimeout(() => {
+        void runStartupUpdateCheck();
+      }, STARTUP_CHECK_DELAY_MS);
+      if (authErr) {
+        console.error("[App] Auth initialization failed", authErr);
+        navigate("/login", { replace: true });
+      }
+    })();
+
+    return () => {
       window.removeEventListener("exitHint", onExitHint);
       clearTimeout(exitHintTimer);
       unregisterBackGesture?.();
       removeStartupScrollGuard?.();
-    });
-
-    // Load persisted preferences (async) — 统一由 Settings registry 批量加载。
-    // FT-2（#365 P2）：水合（~数十次 Preferences 桥 IPC）与 auth 恢复（secure storage +
-    // token 网络刷新）无数据依赖，二者并行——auth 不再串行等水合。唯一顺序点：
-    // loadAccountR18 回写 settings 必须发生在 hydrateAll 打开写门槛（phase=warm）之后，
-    // 故在 auth 分支内先 await hydrated；isLoading 释放同样以 hydrated 完成为前提
-    // （保证 feed 首帧渲染时屏蔽列表/举报列表/R18 过滤等已就绪）。
-    const hydrated = Promise.all([
-      settings.hydrateAll(),
-      loadReportedIds(),
-      loadBlockedIds(),
-      loadImageHostPreference(),
-    ]).then(() => undefined);
-
-    // 后台预热 LRU 缓存（从 Android 文件系统读取最近图片，不阻塞启动流程）
-    warmCacheFromDisk();
-
-    // Register native back gesture handler. Overlay closure is handled by backGestureStore
-    // Once components push overlays in Phase 5; for now the service closes top overlay if any.
-    unregisterBackGesture = await registerBackGesture({
-      getPathname: () => location.pathname,
-      // 系统返回走「动画吸收冻结」过渡（#364）：预位移 + 快照覆盖层先行动画，
-      // home remount 冻结期用户看到的是过渡进行中而非冻结硬切
-      navigateBack: () => runBackTransition(() => void navigate(-1)),
-      dispatchExitHint: () => window.dispatchEvent(new CustomEvent("exitHint")),
-      // OTA 门槛过渡面激活期间返回键 = 退出应用（#253，对齐 lynx /update 语义）
-      shouldExitOnBack: () => gateActive(),
-    });
-
-    const [authErr] = await tryAsync(
-      (async () => {
-        await initializeAuth();
-        await hydrated;
-        await loadAccountR18();
-        if (isLoggedIn()) {
-          if (location.pathname !== "/home") {
-            await navigate("/home", { replace: true });
-          }
-        } else {
-          if (location.pathname !== "/login") {
-            await navigate("/login", { replace: true });
-          }
-        }
-      })(),
-    );
-    // 水合完成（写门槛 warm + 屏蔽/举报/R18 就绪）后才释放 isLoading 渲染内容
-    await hydrated;
-    setIsLoading(false);
-    // 兜底关闭 Splash：非 Feed 页面（login 等）
-    // 由 Login.tsx 或 Feed.tsx 负责主动触发，此处兜底确保不会泄漏
-    const currentPath = location.pathname;
-    if (currentPath !== "/home") {
-      markContentReady();
-    }
-    // 健康上报（notifyReady 首帧挂点，#251）+ 回前台节流补查监听（均 native-only）
-    notifyWebBundleReady();
-    registerOtaResumeListener();
-    // 启动后延迟检查更新 — 确保页面渲染完成后再弹窗；不再被 autoCheckUpdate 关断
-    // （单 fetch 同时服务 OTA 门槛检查，门槛不受弹窗开关抑制，规格「检查与调度」）
-    setTimeout(() => {
-      void runStartupUpdateCheck();
-    }, STARTUP_CHECK_DELAY_MS);
-    if (authErr) {
-      console.error("[App] Auth initialization failed", authErr);
-      navigate("/login", { replace: true });
-    }
+    };
   });
 
   return (
@@ -212,7 +218,8 @@ const RootLayout: Component = (props: { children?: any }) => {
                 页面加载失败
               </p>
               <p class="text-[var(--colorNeutralForeground2)] text-sm text-center max-w-xs">
-                {err()?.message ?? "未知错误"}
+                {/* Solid 2.0：Errored fallback 的 err 是 accessor；类型为 {}，收窄为 Error 取 message */}
+                {(err() as Error)?.message ?? "未知错误"}
               </p>
               <button
                 class="px-4 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] text-sm font-medium"

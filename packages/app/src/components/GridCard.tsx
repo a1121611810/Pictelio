@@ -41,15 +41,20 @@ const GridCard: Component<Props> = (props) => {
       <div class="relative flex-1 overflow-hidden rounded-[var(--borderRadiusMedium)] min-h-0">
         {/* Skeleton overlay — 图片结构已渲染但缩略图尚未加载成功时占位 */}
         <SkeletonShimmer
-          class={["absolute inset-0 z-0 pointer-events-none transition-opacity duration-[var(--durationUltraSlow)] ease-[var(--curveEasyEase)]", { "opacity-0": thumbLoaded() }]}
-          
+          class={[
+            "absolute inset-0 z-0 pointer-events-none transition-opacity duration-[var(--durationUltraSlow)] ease-[var(--curveEasyEase)]",
+            { "opacity-0": thumbLoaded() },
+          ]}
         />
         {/* Blur-up placeholder */}
         <img
           src={resolveImageUrl(props.illust.image_urls.square_medium)}
           alt=""
-          class={["absolute inset-0 w-full h-full object-cover blur-lg scale-110 pointer-events-none z-1 transition-opacity duration-[var(--durationUltraSlow)] ease-[var(--curveEasyEase)]", { "opacity-0": mainLoaded() }]}
-          
+          class={[
+            "absolute inset-0 w-full h-full object-cover blur-lg scale-110 pointer-events-none z-1 transition-opacity duration-[var(--durationUltraSlow)] ease-[var(--curveEasyEase)]",
+            { "opacity-0": mainLoaded() },
+          ]}
+
           onLoad={() => setThumbLoaded(true)}
           onError={() => setThumbLoaded(true)}
         />
@@ -94,11 +99,14 @@ const GridCard: Component<Props> = (props) => {
         {/* Bookmark heart — bottom-right */}
         <div class="absolute bottom-1 right-1">
           <button
-            class={["min-w-10 min-h-10 flex items-center justify-center rounded-full bg-black/50 backdrop-blur-sm text-xs transition-all active:scale-90 select-none", {
-              "text-red-400": bookmarked(),
-              "text-white/70 hover:text-red-300": !bookmarked(),
-            }]}
-            
+            class={[
+              "min-w-10 min-h-10 flex items-center justify-center rounded-full bg-black/50 backdrop-blur-sm text-xs transition-all active:scale-90 select-none",
+              {
+                "text-red-400": bookmarked(),
+                "text-white/70 hover:text-red-300": !bookmarked(),
+              },
+            ]}
+
             onPointerDown={onPointerDown}
             onPointerUp={onPointerUp}
             onPointerLeave={onPointerLeave}
@@ -134,13 +142,16 @@ const GridCard: Component<Props> = (props) => {
             ·
           </span>
           <button
-            class={["inline-flex items-center min-h-[40px] font-semibold [font-size:var(--fontSizeBase100)] cursor-pointer select-none transition-colors duration-[var(--durationFast)] ease-[var(--curveEasyEase)] active:scale-[0.95] focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)] appearance-none border-none bg-transparent p-0 flex-shrink-0", {
-              "text-[var(--colorBrandForeground1)] hover:text-[var(--colorBrandForeground1Hover)]":
-                !isFollowed(),
-              "text-[var(--colorNeutralForeground3)] hover:text-[var(--colorStatusDangerForeground2)]":
-                isFollowed(),
-            }]}
-            
+            class={[
+              "inline-flex items-center min-h-[40px] font-semibold [font-size:var(--fontSizeBase100)] cursor-pointer select-none transition-colors duration-[var(--durationFast)] ease-[var(--curveEasyEase)] active:scale-[0.95] focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)] appearance-none border-none bg-transparent p-0 flex-shrink-0",
+              {
+                "text-[var(--colorBrandForeground1)] hover:text-[var(--colorBrandForeground1Hover)]":
+                  !isFollowed(),
+                "text-[var(--colorNeutralForeground3)] hover:text-[var(--colorStatusDangerForeground2)]":
+                  isFollowed(),
+              },
+            ]}
+
             onClick={toggleFollow}
             disabled={following()}
             aria-label={isFollowed() ? "取消关注" : "关注"}

@@ -267,8 +267,10 @@ describe("readerSettingsStore", () => {
       expect(store.effectiveFontSize()).toBe(20); // 手动模式 = 档位值
       store.setReaderAutoFontSize(true);
       viewport.setViewportWidth(390);
+      flush(); // 2.0 批处理语义：viewport signal set 后同步读返回旧值
       expect(store.effectiveFontSize()).toBe(17);
       viewport.setViewportWidth(428);
+      flush(); // 2.0 批处理语义
       expect(store.effectiveFontSize()).toBe(18);
     });
 
@@ -276,6 +278,7 @@ describe("readerSettingsStore", () => {
       const { store, viewport } = await loadStore();
       store.setReaderAutoFontSize(true);
       viewport.setViewportWidth(412);
+      flush(); // 2.0 批处理语义：viewport signal set 后同步读返回旧值
       expect(store.readerStyle()["--reader-font-size"]).toBe("17px");
     });
   });

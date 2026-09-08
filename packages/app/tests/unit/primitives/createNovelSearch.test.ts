@@ -1,6 +1,12 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createRoot, createSignal } from "solid-js";
+// ADR-0144：2.0 微任务批处理下，setter 写需经 flush 同步生效后才能同步断言；
+// 且 owned scope（createRoot body）内禁止同步写——setQuery/nextMatch 等在真实调用点
+// （事件处理器）运行时无 owner，测试以 runWithOwner(null) 模拟同一语境
+import { createRoot, createSignal, flush, runWithOwner } from "solid-js";
+
+/** 模拟事件处理器语境（无 active owner）驱动同步写路径（flush 排空效应 apply 亦须在此语境） */
+const fire = <T>(fn: () => T): T => runWithOwner(null, fn);
 import {
   findMatches,
   clearHighlights,
@@ -167,8 +173,12 @@ describe("createNovelSearch", () => {
     createRoot((dispose) => {
       const [text] = createSignal<string | null>("hello world\n\nfoo bar");
       const search = createNovelSearch(text, { debounceMs: 100 });
-      search.setQuery("world");
-      vi.advanceTimersByTime(100);
+      // 事件处理器语境（无 owner）：setQuery 与其排定的 debounce 回调内的写均在此语境执行
+      fire(() => {
+        search.setQuery("world");
+        vi.advanceTimersByTime(100);
+      });
+      fire(flush); // ADR-0144：批处理下 set 后同步读为旧值，排空须在无 owner 语境执行
       expect(search.matches()).toEqual([{ paragraphIndex: 0, start: 6, end: 11 }]);
       expect(search.activeIndex()).toBe(0);
       dispose();
@@ -179,8 +189,11 @@ describe("createNovelSearch", () => {
       const search = createNovelSearch(() => "hello world\n\nfoo bar", {
         debounceMs: 100,
       });
-      search.setQuery("o");
-      vi.advanceTimersByTime(100);
+      fire(() => {
+        search.setQuery("o");
+        vi.advanceTimersByTime(100);
+      });
+      fire(flush); // ADR-0144：批处理下 set 后同步读为旧值，排空须在无 owner 语境执行
 
       const paragraph0Matches = search.getMatchesForParagraph(0);
       const paragraph1Matches = search.getMatchesForParagraph(1);
@@ -197,16 +210,22 @@ describe("createNovelSearch", () => {
   it("navigates matches with nextMatch and prevMatch", () =>
     createRoot((dispose) => {
       const search = createNovelSearch(() => "a b a", { debounceMs: 100 });
-      search.setQuery("a");
-      vi.advanceTimersByTime(100);
+      fire(() => {
+        search.setQuery("a");
+        vi.advanceTimersByTime(100);
+      });
+      fire(flush); // ADR-0144：批处理下 set 后同步读为旧值，排空须在无 owner 语境执行
 
       expect(search.matches()).toHaveLength(2);
       expect(search.activeIndex()).toBe(0);
-      search.nextMatch();
+      fire(() => search.nextMatch()); // 事件处理器语境（无 owner）
+      fire(flush); // 同上
       expect(search.activeIndex()).toBe(1);
-      search.nextMatch();
+      fire(() => search.nextMatch());
+      fire(flush); // 同上
       expect(search.activeIndex()).toBe(0);
-      search.prevMatch();
+      fire(() => search.prevMatch());
+      fire(flush); // 同上
       expect(search.activeIndex()).toBe(1);
       dispose();
     }));
@@ -214,11 +233,15 @@ describe("createNovelSearch", () => {
   it("clears search state", () =>
     createRoot((dispose) => {
       const search = createNovelSearch(() => "hello world", { debounceMs: 100 });
-      search.setQuery("world");
-      vi.advanceTimersByTime(100);
+      fire(() => {
+        search.setQuery("world");
+        vi.advanceTimersByTime(100);
+      });
+      fire(flush); // ADR-0144：批处理下 set 后同步读为旧值，排空须在无 owner 语境执行
       expect(search.matches()).toHaveLength(1);
 
-      search.clearSearch();
+      fire(() => search.clearSearch()); // 事件处理器语境（无 owner）
+      fire(flush); // 同上
       expect(search.query()).toBe("");
       expect(search.matches()).toEqual([]);
       expect(search.activeIndex()).toBe(-1);

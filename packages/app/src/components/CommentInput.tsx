@@ -21,11 +21,15 @@ const CommentInput: Component<CommentInputProps> = (props) => {
   }
 
   // Focus input when replying
-  createEffect(() => {
-    if (props.replyingTo && inputRef) {
-      inputRef.focus();
-    }
-  });
+  // Solid 2.0 拆分：compute 返回 replyingTo 引用（换评论时 apply 重跑重新聚焦），apply 段操作 DOM
+  createEffect(
+    () => props.replyingTo,
+    (replyingTo) => {
+      if (replyingTo && inputRef) {
+        inputRef.focus();
+      }
+    },
+  );
 
   return (
     <div class="flex-shrink-0 border-t border-[var(--colorNeutralStroke2)] px-3 py-2.5 surface-appbar">

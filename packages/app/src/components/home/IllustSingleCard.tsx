@@ -5,7 +5,7 @@
  * + 卡内信息行（标题 / 作者 + 右侧 ★收藏）。
  * A2 规范（ADR-0074）：XLarge 圆角、NeutralBackground1 底、1px NeutralStroke1 边框、
  * 无阴影、hover 背景高亮、active 轻微缩放。
- * 可访问性：role="button" + tabIndex=0 + Enter 键触发 onClick。
+ * 可访问性：role="button" + tabindex=0 + Enter 键触发 onClick。
  *
  * 标签（A 已定稿，full）：图上 R-18/R-18G/AI 分级标 + 右上类型角标（动图/多图，ADR-0113）+ 文案 chip 动态显示
  * （AdaptiveTags 能放几个放几个 +「+N」折叠，可点搜索）。
@@ -48,7 +48,7 @@ const IllustSingleCard: Component<IllustSingleCardProps> = (props) => {
       data-testid="illust-card"
       class="cursor-pointer overflow-hidden rounded-[var(--borderRadiusXLarge)] border border-[var(--colorNeutralStroke1)] bg-[var(--colorNeutralBackground1)] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-98 focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThick)] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
       role="button"
-      tabIndex={0}
+      tabindex={0}
       onClick={props.onClick}
       onKeyDown={(e) => {
         if (e.key === "Enter") props.onClick();

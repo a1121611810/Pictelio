@@ -51,6 +51,14 @@ vi.mock("@tanstack/solid-query", async (importOriginal) => {
             },
             enumerable: true,
           },
+          // solid-query 6 兼容（#415）：工厂 loading 读取已提交通道 fetchStatus，mock 补齐 v6 真实结果形状字段
+          fetchStatus: {
+            get() {
+              // 由 isFetching 派生，保持真实不变量「isFetching=true ⇒ fetchStatus='fetching'」
+              return getQ("bookmarks").isFetching ? "fetching" : "idle";
+            },
+            enumerable: true,
+          },
           error: {
             get() {
               return getQ("bookmarks").error;
@@ -170,6 +178,7 @@ describe("novelBookmarkStore", () => {
     const store = await loadStore();
     expect(store.bookmarkRestrict()).toBe("public");
     store.setBookmarkRestrict("private");
+    flush(); // 2.0 批处理语义：set 后同步读返回旧值，先 flush 再断言
     expect(store.bookmarkRestrict()).toBe("private");
   });
 

@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createRoot, createSignal } from "solid-js";
+// ADR-0144：2.0 微任务批处理下，事件处理器/rAF 回调内的 signal 写需经 flush 同步生效后才能同步断言
+import { createRoot, createSignal, flush } from "solid-js";
 import type { ApiError } from "@/api/types";
-import type { VirtualItem } from "@tanstack/solid-virtual";
+import type { VirtualItem } from "@tanstack/virtual-core";
 
 // --- Mocks ---
 // These must be at the top level so vitest hoists them before module imports.
@@ -21,7 +22,7 @@ const mockVirtualizerInstance = {
   scrollToIndex: vi.fn(),
 };
 
-vi.mock("@tanstack/solid-virtual", () => ({
+vi.mock("@tanstack/virtual-core", () => ({
   Virtualizer: vi.fn(function VirtualizerMock() {
     return mockVirtualizerInstance;
   }),
@@ -38,7 +39,7 @@ vi.mock("@/primitives/visibility", () => ({
 // Import after mocks are set up
 import { createFeedVirtualizer } from "@/primitives/createFeedVirtualizer";
 import { createSentinel } from "@/primitives/visibility";
-import { Virtualizer as MockedVirtualizer } from "@tanstack/solid-virtual";
+import { Virtualizer as MockedVirtualizer } from "@tanstack/virtual-core";
 
 // Stub global browser APIs — must be done before any test runs
 const mockIntersectionObserver = vi.fn();
@@ -220,6 +221,7 @@ describe("createFeedVirtualizer", () => {
 
       // Simulate touch start
       el.dispatchEvent(createTouchEvent("touchstart", 100));
+      flush(); // ADR-0144：批处理下 set 后同步读为旧值，先排空再断言
 
       expect(result.pullPhase()).toBe("pulling");
     });
@@ -236,6 +238,7 @@ describe("createFeedVirtualizer", () => {
 
       // Touch move (need 120+ raw px to exceed 60 threshold with 0.5 damping)
       el.dispatchEvent(createTouchEvent("touchmove", 300));
+      flush(); // ADR-0144：批处理下 set 后同步读为旧值，先排空再断言
 
       expect(result.pullPhase()).toBe("refresh-ready");
       expect(result.pullDistance()).toBeGreaterThanOrEqual(60);
@@ -251,15 +254,18 @@ describe("createFeedVirtualizer", () => {
 
       // Touch start
       el.dispatchEvent(createTouchEvent("touchstart", 100));
+      flush(); // ADR-0144：批处理下 set 后同步读为旧值，先排空再断言
       expect(result.pullPhase()).toBe("pulling");
 
       // Touch move past threshold
       el.dispatchEvent(createTouchEvent("touchmove", 300));
+      flush(); // 同上
       expect(result.pullPhase()).toBe("refresh-ready");
       expect(result.pullDistance()).toBeGreaterThanOrEqual(60);
 
       // Touch end
       el.dispatchEvent(new Event("touchend"));
+      flush(); // 同上
 
       expect(result.pullPhase()).toBe("refreshing");
       expect(onRefresh).toHaveBeenCalledOnce();
@@ -278,12 +284,14 @@ describe("createFeedVirtualizer", () => {
       el.dispatchEvent(createTouchEvent("touchstart", 100));
       el.dispatchEvent(createTouchEvent("touchmove", 300));
       el.dispatchEvent(new Event("touchend"));
+      flush(); // ADR-0144：批处理下 set 后同步读为旧值，先排空再断言
 
       expect(result.pullPhase()).toBe("refreshing");
 
       // Simulate loading starting and then finishing
       setLoading(true);
       setLoading(false);
+      flush(); // 同上（loading 复位效应经排空后生效）
 
       expect(result.pullPhase()).toBe("idle");
       expect(result.pullDistance()).toBe(0);
@@ -392,6 +400,7 @@ describe("createFeedVirtualizer", () => {
 
     it("calls _didMount and _willUpdate on mount", () => {
       runWithRoot(() => createFeedVirtualizer(createMockConfig()));
+      flush(); // ADR-0144：onSettled 经效应队列运行，先排空再断言
 
       expect(mockVirtualizerInstance._didMount).toHaveBeenCalledOnce();
       expect(mockVirtualizerInstance._willUpdate).toHaveBeenCalled();
@@ -409,6 +418,7 @@ describe("createFeedVirtualizer", () => {
       // Trigger scroll（scroll 经 rAF 合帧，需 flush 后才生效）
       scrollListeners.forEach((fn) => fn(new Event("scroll")));
       flushRaf();
+      flush(); // ADR-0144：rAF 回调内的 signal 写同样经批处理，先排空再断言
 
       expect(result.virtualItems()).toEqual(mockItems);
       expect(result.totalSize()).toBe(100);
@@ -453,6 +463,7 @@ describe("createFeedVirtualizer — scroll rAF 合帧", () => {
   it("同帧多次 scroll 只触发一次全量重算", () => {
     runWithRoot(() => createFeedVirtualizer(createMockConfig()));
 
+    flush(); // ADR-0144：先排空，让挂载阶段（onSettled 初始测量）先完成
     // 挂载阶段的初始测量不计入
     mockVirtualizerInstance._willUpdate.mockClear();
     mockVirtualizerInstance.getVirtualItems.mockClear();
@@ -470,6 +481,7 @@ describe("createFeedVirtualizer — scroll rAF 合帧", () => {
 
   it("flush 时读取当下 scrollY（末态为最新位置，两个信号一起写入）", () => {
     const result = runWithRoot(() => createFeedVirtualizer(createMockConfig()));
+    flush(); // ADR-0144：先排空，让挂载阶段先完成
     mockVirtualizerInstance._willUpdate.mockClear();
     // 期望值来源：flush 时刻 mockWindow.scrollY 的独立推导（virtualItems.index === scrollY，
     // totalSize === 2×scrollY），事件发生时的旧值 10 不得出现
@@ -493,6 +505,7 @@ describe("createFeedVirtualizer — scroll rAF 合帧", () => {
     mockWindow.scrollY = 500; // 同帧内事件之后的最新滚动位置
     scrollListeners.forEach((fn) => fn(new Event("scroll")));
     flushRaf();
+    flush(); // ADR-0144：rAF 回调内的 signal 写同样经批处理，先排空再断言
 
     expect(result.virtualItems()).toHaveLength(1);
     expect(result.virtualItems()[0]?.index).toBe(500);
@@ -501,6 +514,7 @@ describe("createFeedVirtualizer — scroll rAF 合帧", () => {
 
   it("dispose 后 pending 的 rAF 不再触发重算，监听器已移除", () => {
     const dispose = runWithDispose(() => createFeedVirtualizer(createMockConfig()));
+    flush(); // ADR-0144：先排空，确保 scroll 监听器已注册（避免测试空转）
     mockVirtualizerInstance._willUpdate.mockClear();
 
     scrollListeners.forEach((fn) => fn(new Event("scroll")));

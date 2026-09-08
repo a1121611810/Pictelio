@@ -1,5 +1,5 @@
 import type { JSX } from "@solidjs/web";
-import type { Component, Element } from "solid-js";
+import type { Component } from "solid-js";
 import {
   BACK_EXIT_TRANSITION,
   ENTER_OFFSET,
@@ -23,8 +23,9 @@ const ENTER_FALLBACK_MS = 700;
 const PageTransition: Component<{ children: JSX.Element }> = (props) => {
   let el: HTMLDivElement | undefined;
 
-  // 同步消费返回标记：初始态必须在首帧绘制前确定（先渲染后加载，无 await）
-  const animateBackEnter = !prefersReducedMotion() && consumePendingBackEnter();
+  // 同步消费返回标记：初始态必须在首帧绘制前确定（先渲染后加载，无 await）。
+  // untrack：组件体顶层响应式读在 2.0 dev 下警告，此处为有意识的一次性读
+  const animateBackEnter = !untrack(prefersReducedMotion) && consumePendingBackEnter();
 
   if (animateBackEnter) {
     // 双 rAF：确保初始态已提交一帧后再过渡（避免初始态与终态同帧合并为直切）

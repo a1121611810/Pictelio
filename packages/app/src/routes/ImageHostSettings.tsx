@@ -27,19 +27,30 @@ const ImageHostSettings: Component = () => {
   const [isProbing, setIsProbing] = createSignal(false);
   const [probeToast, setProbeToast] = createSignal<string | null>(null);
 
-  let masterSwitchRef: HTMLElement | undefined;
-  let radioGroupRef: HTMLElement | undefined;
+  // Solid 2.0：数组 ref 中的裸变量不被编译器回写赋值（与 FluentDialog 同款问题），
+  // 必须经具名回调捕获元素。
+  let masterSwitchEl: HTMLElement | undefined;
+  let radioGroupEl: HTMLElement | undefined;
+  const masterSwitchRef = (el: HTMLElement) => {
+    masterSwitchEl = el;
+  };
+  const radioGroupRef = (el: HTMLElement) => {
+    radioGroupEl = el;
+  };
 
-  createEffect(() => {
-    const group = radioGroupRef as unknown as { value?: string } | undefined;
-    const mode = imageHostState().mode;
-    if (group) {
-      // RequestAnimationFrame 确保所有子 fluent-radio 已在 DOM 中并升级完成
-      requestAnimationFrame(() => {
-        group.value = mode;
-      });
-    }
-  });
+  // Solid 2.0 拆分效应：compute 读 store 的 mode（提取普通值），apply 段做 DOM 命令式设置。
+  createEffect(
+    () => imageHostState().mode,
+    (mode) => {
+      const group = radioGroupEl as unknown as { value?: string } | undefined;
+      if (group) {
+        // RequestAnimationFrame 确保所有子 fluent-radio 已在 DOM 中并升级完成
+        requestAnimationFrame(() => {
+          group.value = mode;
+        });
+      }
+    },
+  );
 
   function handleToggle(enabled: boolean) {
     if (enabled) {
@@ -57,8 +68,8 @@ const ImageHostSettings: Component = () => {
   function cancelEnable() {
     setShowConfirmDialog(false);
     // 同步 Fluent Switch 的视觉状态：用户点取消后，switch 不应保持开启的视觉状态
-    if (masterSwitchRef) {
-      (masterSwitchRef as unknown as { checked: boolean }).checked = false;
+    if (masterSwitchEl) {
+      (masterSwitchEl as unknown as { checked: boolean }).checked = false;
     }
   }
 
@@ -157,7 +168,11 @@ const ImageHostSettings: Component = () => {
         {/* Content */}
         <div class="px-4 py-4 flex flex-col gap-4">
           <Show when={probeToast()}>
-            <fluent-message-bar intent="success" class="mb-0" ref={fluentOn("close", () => setProbeToast(null))}>
+            <fluent-message-bar
+              intent="success"
+              class="mb-0"
+              ref={fluentOn("close", () => setProbeToast(null))}
+            >
               {probeToast()}
             </fluent-message-bar>
           </Show>
@@ -178,11 +193,14 @@ const ImageHostSettings: Component = () => {
                 </p>
               </div>
               <fluent-switch
-                ref={[masterSwitchRef, fluentOn("change", () => {
-                  handleToggle(!imageHostState().masterEnabled);
-                })]}
+                ref={[
+                  masterSwitchRef,
+                  fluentOn("change", () => {
+                    handleToggle(!imageHostState().masterEnabled);
+                  }),
+                ]}
                 checked={imageHostState().masterEnabled}
-                                aria-label="启用图床代理"
+                aria-label="启用图床代理"
               />
             </div>
           </div>
@@ -201,13 +219,19 @@ const ImageHostSettings: Component = () => {
               运行模式
             </p>
             <fluent-radio-group
-              ref={[radioGroupRef, fluentOn("change", (e: CustomEvent) => {
-                if (e.detail?.value != null) {
-                  setMode(e.detail.value);
-                }
-              })]}
+              ref={[
+                radioGroupRef,
+                fluentOn("change", (e: Event) => {
+                  // Solid 2.0：EventListener 形参须为 Event，fluent 自定义事件 detail 就地收窄
+                  const detail = (e as CustomEvent).detail as { value?: string } | undefined;
+                  if (detail?.value != null) {
+                    // fluent-radio-group 的 value 是 string，收窄为 store 的 ImageHostMode 联合类型
+                    setMode(detail.value as Parameters<typeof setMode>[0]);
+                  }
+                }),
+              ]}
               value={imageHostState().mode}
-                            disabled={!imageHostState().masterEnabled}
+              disabled={!imageHostState().masterEnabled}
               class="flex flex-col gap-3"
             >
               {[
@@ -245,10 +269,12 @@ const ImageHostSettings: Component = () => {
                     />
                     <label
                       for={inputId}
-                      class={["flex-1 cursor-pointer [font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)]", {
-                        "opacity-60": !imageHostState().masterEnabled,
-                      }]}
-                      
+                      class={[
+                        "flex-1 cursor-pointer [font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)]",
+                        {
+                          "opacity-60": !imageHostState().masterEnabled,
+                        },
+                      ]}
                     >
                       <span class="font-semibold">
                         {option.label}
@@ -276,13 +302,16 @@ const ImageHostSettings: Component = () => {
                 <For each={imageHostState().hosts.filter((h) => h.enabled)}>
                   {(host) => (
                     <div
-                      class={["flex items-center gap-3 p-3 rounded-[var(--borderRadiusMedium)] cursor-pointer transition-colors", {
-                        "bg-[var(--colorCompoundBrandBackground)] text-white":
-                          imageHostState().selectedHostId === host.id,
-                        "bg-[var(--colorNeutralBackground2)] hover:bg-[var(--colorNeutralBackground1Hover)]":
-                          imageHostState().selectedHostId !== host.id,
-                      }]}
-                      
+                      class={[
+                        "flex items-center gap-3 p-3 rounded-[var(--borderRadiusMedium)] cursor-pointer transition-colors",
+                        {
+                          "bg-[var(--colorCompoundBrandBackground)] text-white":
+                            imageHostState().selectedHostId === host.id,
+                          "bg-[var(--colorNeutralBackground2)] hover:bg-[var(--colorNeutralBackground1Hover)]":
+                            imageHostState().selectedHostId !== host.id,
+                        },
+                      ]}
+
                       onClick={() => setSelectedHostId(host.id)}
                       role="button"
                       tabindex="0"
@@ -319,8 +348,10 @@ const ImageHostSettings: Component = () => {
 
           {/* Host list */}
           <div
-            class={["rounded-[var(--borderRadiusXLarge)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] p-4", { "opacity-60": !imageHostState().masterEnabled }]}
-            
+            class={[
+              "rounded-[var(--borderRadiusXLarge)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] p-4",
+              { "opacity-60": !imageHostState().masterEnabled },
+            ]}
           >
             <div class="flex items-center justify-between mb-3">
               <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)]">
@@ -337,7 +368,9 @@ const ImageHostSettings: Component = () => {
                   <div class="flex items-center gap-3 p-3 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)]">
                     <fluent-checkbox
                       checked={host.enabled}
-                      ref={fluentOn("change", () => updateHost(host.id, { enabled: !host.enabled }))}
+                      ref={fluentOn("change", () =>
+                        updateHost(host.id, { enabled: !host.enabled }),
+                      )}
                       disabled={!imageHostState().masterEnabled}
                       aria-label={`启用 ${host.name}`}
                     />
@@ -459,7 +492,11 @@ const ImageHostSettings: Component = () => {
               部分图床在部分地区可能无法访问，失败时会自动回退到默认代理。
             </p>
           </div>
-          <fluent-button slot="actions" appearance="secondary" ref={fluentOn("click", cancelEnable)}>
+          <fluent-button
+            slot="actions"
+            appearance="secondary"
+            ref={fluentOn("click", cancelEnable)}
+          >
             取消
           </fluent-button>
           <fluent-button slot="actions" appearance="primary" ref={fluentOn("click", confirmEnable)}>

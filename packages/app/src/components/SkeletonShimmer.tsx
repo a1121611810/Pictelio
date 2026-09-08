@@ -1,9 +1,24 @@
+import type { JSX } from "@solidjs/web";
 import type { Component } from "solid-js";
 
 interface Props {
-  class?: string;
-  classList?: Record<string, boolean | undefined>;
+  /** Solid 2.0：codemod 后调用方传 class 数组/对象（classList→class 迁移），放宽为 ClassValue */
+  class?: JSX.ClassValue;
+  /** 旧 1.x classList 透传兼容（与 class 一样按 ClassValue 扁平化合并） */
+  classList?: JSX.ClassValue;
   style?: string | Record<string, string | number>;
+}
+
+/** ClassValue 扁平化为字符串（定位契约需要 substring 匹配 absolute/fixed） */
+function classToString(value: JSX.ClassValue): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  if (!value) return "";
+  if (Array.isArray(value)) return value.map(classToString).filter(Boolean).join(" ");
+  return Object.entries(value)
+    .filter(([, on]) => on)
+    .map(([name]) => name)
+    .join(" ");
 }
 
 /** 共享 shimmer 占位骨架 — 用于 SkeletonCard、ImageCard、GridCard 的列表图片区域。
@@ -18,7 +33,9 @@ interface Props {
  *  其余（SkeletonCard/各 skeleton 的流式块用法）补 position:relative 兜底。
  *  内联 position 会覆盖 class，因此必须按消费方意图二选一，不可无脑内联。 */
 const SkeletonShimmer: Component<Props> = (props) => {
-  const consumerClass = props.class || "";
+  const consumerClass = [classToString(props.class), classToString(props.classList)]
+    .filter(Boolean)
+    .join(" ");
   const consumerPositions =
     consumerClass.includes("absolute") ||
     consumerClass.includes("fixed") ||
@@ -33,8 +50,8 @@ const SkeletonShimmer: Component<Props> = (props) => {
   return (
     <div
       data-testid="skeleton-shimmer"
-      class={[consumerClass, props.classList]}
-      
+      class={consumerClass}
+
       style={outerStyle}
     >
       <div

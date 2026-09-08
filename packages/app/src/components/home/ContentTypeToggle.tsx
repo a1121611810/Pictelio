@@ -18,14 +18,17 @@ const ContentTypeToggle: Component = () => (
     {OPTIONS.map((opt) => (
       <button
         data-testid={`content-type-${opt.key}`}
-        class={["flex-1 cursor-pointer appearance-none border-none px-3 py-1 font-semibold outline-none transition-all active:scale-95 [font-size:var(--fontSizeBase100)]", {
-          "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
-            contentType() === opt.key,
-          "bg-transparent text-[var(--colorNeutralForeground2)]": contentType() !== opt.key,
-        }]}
-        
+        class={[
+          "flex-1 cursor-pointer appearance-none border-none px-3 py-1 font-semibold outline-none transition-all active:scale-95 [font-size:var(--fontSizeBase100)]",
+          {
+            "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
+              contentType() === opt.key,
+            "bg-transparent text-[var(--colorNeutralForeground2)]": contentType() !== opt.key,
+          },
+        ]}
+
         onClick={() => void setContentType(opt.key)}
-        aria-pressed={contentType() === opt.key}
+        aria-pressed={contentType() === opt.key ? "true" : "false"}
       >
         {opt.label}
       </button>

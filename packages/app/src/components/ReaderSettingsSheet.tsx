@@ -37,12 +37,15 @@ function PillRow<T extends string | number>(props: {
     <div class="flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-0.5 gap-0.5">
       {props.options.map((opt) => (
         <button
-          class={["flex-1 py-1.5 px-2 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase100)] font-medium transition-all active:scale-95 appearance-none border-none outline-none cursor-pointer text-center", {
-            "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
-              props.value() === opt.value,
-            "bg-transparent text-[var(--colorNeutralForeground2)]": props.value() !== opt.value,
-          }]}
-          
+          class={[
+            "flex-1 py-1.5 px-2 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase100)] font-medium transition-all active:scale-95 appearance-none border-none outline-none cursor-pointer text-center",
+            {
+              "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
+                props.value() === opt.value,
+              "bg-transparent text-[var(--colorNeutralForeground2)]": props.value() !== opt.value,
+            },
+          ]}
+
           onClick={() => props.onChange(opt.value)}
         >
           {opt.label}
@@ -138,13 +141,16 @@ const ReaderSettingsSheet: Component<Props> = (props) => {
                 <div class="flex-1 flex items-center gap-1">
                   {/* 自动按钮：按视口宽度实时计算（v3 公式，见 readerSettingsStore） */}
                   <button
-                    class={["flex-none px-1 py-1 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase100)] transition-all text-center appearance-none border-none outline-none cursor-pointer", {
-                      "bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] font-semibold":
-                        autoFontSize(),
-                      "bg-[var(--colorNeutralBackground2)] text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground3)]":
-                        !autoFontSize(),
-                    }]}
-                    
+                    class={[
+                      "flex-none px-1 py-1 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase100)] transition-all text-center appearance-none border-none outline-none cursor-pointer",
+                      {
+                        "bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] font-semibold":
+                          autoFontSize(),
+                        "bg-[var(--colorNeutralBackground2)] text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground3)]":
+                          !autoFontSize(),
+                      },
+                    ]}
+
                     onClick={() => setReaderAutoFontSize(true)}
                     aria-label="自动字号"
                   >
@@ -152,15 +158,18 @@ const ReaderSettingsSheet: Component<Props> = (props) => {
                   </button>
                   {FONT_SIZES.map((s) => (
                     <button
-                      class={["flex-1 py-1 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase100)] transition-all text-center appearance-none border-none outline-none cursor-pointer", {
-                        "bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] font-semibold":
-                          !autoFontSize() && fontSize() === s,
-                        "bg-[var(--colorNeutralBackground2)] text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground3)]":
-                          !autoFontSize() && fontSize() !== s,
-                        // 自动模式下档位置灰但可点（点击即退出自动并设为该档）
-                        "opacity-40 text-[var(--colorNeutralForeground2)]": autoFontSize(),
-                      }]}
-                      
+                      class={[
+                        "flex-1 py-1 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase100)] transition-all text-center appearance-none border-none outline-none cursor-pointer",
+                        {
+                          "bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] font-semibold":
+                            !autoFontSize() && fontSize() === s,
+                          "bg-[var(--colorNeutralBackground2)] text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground3)]":
+                            !autoFontSize() && fontSize() !== s,
+                          // 自动模式下档位置灰但可点（点击即退出自动并设为该档）
+                          "opacity-40 text-[var(--colorNeutralForeground2)]": autoFontSize(),
+                        },
+                      ]}
+
                       onClick={() => {
                         setReaderAutoFontSize(false);
                         setReaderFontSize(s);
@@ -231,13 +240,16 @@ const ReaderSettingsSheet: Component<Props> = (props) => {
                 {FONT_COLORS.map((c) => (
                   <div
                     role="button"
-                    tabIndex={0}
-                    class={["w-8 h-8 rounded-[var(--borderRadiusCircular)] transition-all border-2 border-solid cursor-pointer overflow-hidden", {
-                      "border-[var(--colorBrandStroke1)] scale-110": fontColor() === c,
-                      "border-transparent hover:border-[var(--colorNeutralStroke2)]":
-                        fontColor() !== c,
-                    }]}
-                    
+                    tabindex={0}
+                    class={[
+                      "w-8 h-8 rounded-[var(--borderRadiusCircular)] transition-all border-2 border-solid cursor-pointer overflow-hidden",
+                      {
+                        "border-[var(--colorBrandStroke1)] scale-110": fontColor() === c,
+                        "border-transparent hover:border-[var(--colorNeutralStroke2)]":
+                          fontColor() !== c,
+                      },
+                    ]}
+
                     style={`background-color: ${c}`}
                     onClick={() => setReaderFontColor(c)}
                     onKeyDown={(e) => e.key === "Enter" && setReaderFontColor(c)}
@@ -276,13 +288,16 @@ const ReaderSettingsSheet: Component<Props> = (props) => {
                 {BG_COLORS.map((c) => (
                   <div
                     role="button"
-                    tabIndex={0}
-                    class={["w-8 h-8 rounded-[var(--borderRadiusCircular)] border-2 border-solid transition-all cursor-pointer overflow-hidden relative", {
-                      "border-[var(--colorBrandStroke1)] scale-110": bgColor() === c,
-                      "border-transparent hover:border-[var(--colorNeutralStroke2)]":
-                        bgColor() !== c,
-                    }]}
-                    
+                    tabindex={0}
+                    class={[
+                      "w-8 h-8 rounded-[var(--borderRadiusCircular)] border-2 border-solid transition-all cursor-pointer overflow-hidden relative",
+                      {
+                        "border-[var(--colorBrandStroke1)] scale-110": bgColor() === c,
+                        "border-transparent hover:border-[var(--colorNeutralStroke2)]":
+                          bgColor() !== c,
+                      },
+                    ]}
+
                     style={`background-color: ${c || "var(--colorNeutralBackground1)"}`}
                     onClick={() => setReaderBgColor(c)}
                     onKeyDown={(e) => e.key === "Enter" && setReaderBgColor(c)}

@@ -17,19 +17,25 @@ interface Props {
  * + 品牌色标题；封面 56×56（Medium 圆角）。
  */
 const SeriesSheetItem: Component<Props> = (props) => {
+  // Solid 2.0 merge：undefined 视为真实值会覆盖默认值（1.x mergeProps 会跳过）。
+  // 本组件对 isActive 的全部用法均为真值判断，undefined 与 false 行为等价，故安全；
+  // 后续若新增「区分 undefined / false」的读取需显式兜底。
   const merged = merge({ isActive: false }, props);
 
   return (
     <div
       ref={merged.ref}
-      class={["flex items-center gap-3 px-3 py-3 rounded-[var(--borderRadiusMedium)] cursor-pointer active:scale-[0.98] transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] focus-visible:outline focus-visible:outline-[var(--colorStrokeFocus2)] focus-visible:outline-2 focus-visible:-outline-offset-2", {
-        "bg-[var(--colorBrandBackground2)]": merged.isActive,
-        "hover:bg-[var(--colorNeutralBackground2)]": !merged.isActive,
-      }]}
-      
+      class={[
+        "flex items-center gap-3 px-3 py-3 rounded-[var(--borderRadiusMedium)] cursor-pointer active:scale-[0.98] transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] focus-visible:outline focus-visible:outline-[var(--colorStrokeFocus2)] focus-visible:outline-2 focus-visible:-outline-offset-2",
+        {
+          "bg-[var(--colorBrandBackground2)]": merged.isActive,
+          "hover:bg-[var(--colorNeutralBackground2)]": !merged.isActive,
+        },
+      ]}
+
       onClick={() => merged.onClick(merged.novel.id)}
       role="button"
-      tabIndex={0}
+      tabindex={0}
       aria-label={merged.isActive ? `当前章节：${merged.novel.title}` : merged.novel.title}
       onKeyDown={(e) => e.key === "Enter" && merged.onClick(merged.novel.id)}
     >
@@ -51,11 +57,13 @@ const SeriesSheetItem: Component<Props> = (props) => {
       {/* Info */}
       <div class="flex-1 min-w-0 flex flex-col gap-0.5">
         <p
-          class={["[font-size:var(--fontSizeBase200)] font-semibold line-clamp-2 leading-tight", {
-            "text-[var(--colorBrandForeground1)]": merged.isActive,
-            "text-[var(--colorNeutralForeground1)]": !merged.isActive,
-          }]}
-          
+          class={[
+            "[font-size:var(--fontSizeBase200)] font-semibold line-clamp-2 leading-tight",
+            {
+              "text-[var(--colorBrandForeground1)]": merged.isActive,
+              "text-[var(--colorNeutralForeground1)]": !merged.isActive,
+            },
+          ]}
         >
           {props.novel.title}
         </p>

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@solidjs/testing-library";
-import { createSignal } from "solid-js";
+import { createSignal, flush } from "solid-js";
 import StickySubTabs from "@/components/ui/StickySubTabs";
 
 describe("StickySubTabs", () => {
@@ -20,6 +20,8 @@ describe("StickySubTabs", () => {
     expect(el().classList.contains("-translate-y-16")).toBe(false);
 
     setVisible(false);
+    // Solid 2.0 批量更新：class 变更在微任务 flush 后才落到 DOM，断言前显式 flush
+    flush();
     expect(el().classList.contains("translate-y-0")).toBe(false);
     expect(el().classList.contains("-translate-y-16")).toBe(true);
     // top-16 常量不受影响（transform 补偿，无 sticky 重算）

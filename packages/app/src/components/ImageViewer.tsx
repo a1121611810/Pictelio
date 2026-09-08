@@ -26,7 +26,8 @@ export function neighborPages(
 const ImageViewer: Component<Props> = (props) => {
   const [scale, setScale] = createSignal(1);
   const [position, setPosition] = createSignal({ x: 0, y: 0 });
-  const initialPage = props.initialPage ?? 0;
+  // 一次性初始页（untrack：组件体顶层响应式读在 2.0 dev 下警告）
+  const initialPage = untrack(() => props.initialPage ?? 0);
   const [currentPage, setCurrentPage] = createSignal(initialPage);
   const [animating, setAnimating] = createSignal(false);
 
@@ -63,34 +64,41 @@ const ImageViewer: Component<Props> = (props) => {
       });
   };
 
-  // 页面变化时，若未加载则触发下载
-  createEffect(() => {
-    const page = currentPage();
-    // 已加载
-    if (loadedUrls()[page] !== undefined) {
-      return;
-    }
-    // 已发起
-    if (loadingStarted.has(page)) {
-      return;
-    }
-    loadingStarted.add(page);
-    startLoad(page);
-    // 等待期可见性（FT-4）：并行拉小图，翻到即有模糊占位而非黑屏
-    loadPreview(page);
-  });
+  // 页面变化时，若未加载则触发下载（Solid 2.0 拆分：compute 提取快照，apply 触发副作用）
+  createEffect(
+    () => ({ page: currentPage(), loaded: loadedUrls()[currentPage()] }),
+    (s) => {
+      // 已加载
+      if (s.loaded !== undefined) {
+        return;
+      }
+      // 已发起
+      if (loadingStarted.has(s.page)) {
+        return;
+      }
+      loadingStarted.add(s.page);
+      startLoad(s.page);
+      // 等待期可见性（FT-4）：并行拉小图，翻到即有模糊占位而非黑屏
+      loadPreview(s.page);
+    },
+  );
 
   // ── 邻页预取（FT-4 #367）──
   // 当前页加载完成后预取前后一页原图：翻页时多数情况直接命中已加载，消除「翻页 → 2s 黑屏」
-  createEffect(() => {
-    if (loadedUrls()[currentPage()] === undefined) return;
-    for (const n of neighborPages(currentPage(), props.imageUrls.length, (i) =>
-      loadingStarted.has(i),
-    )) {
-      loadingStarted.add(n);
-      startLoad(n);
-    }
-  });
+  createEffect(
+    () => ({
+      page: currentPage(),
+      loaded: loadedUrls()[currentPage()],
+      total: props.imageUrls.length,
+    }),
+    (s) => {
+      if (s.loaded === undefined) return;
+      for (const n of neighborPages(s.page, s.total, (i) => loadingStarted.has(i))) {
+        loadingStarted.add(n);
+        startLoad(n);
+      }
+    },
+  );
 
   // 初始页在挂载时立即发起加载（进度已在初始化时设为 0，不等 createEffect）
   onSettled(() => {
@@ -159,8 +167,10 @@ const ImageViewer: Component<Props> = (props) => {
       return;
     }
     const touches = e.touches;
+    // 局部快照：2.0 批量更新下 set 后同步读返回旧值，捏合/单指滑动的互斥判断统一走快照
+    const curScale = scale();
 
-    if (touches.length === 2 && scale() >= 1) {
+    if (touches.length === 2 && curScale >= 1) {
       e.preventDefault();
       const dx = touches[0].clientX - touches[1].clientX;
       const dy = touches[0].clientY - touches[1].clientY;
@@ -168,9 +178,9 @@ const ImageViewer: Component<Props> = (props) => {
       const delta = dist / lastDist;
       lastDist = dist;
 
-      const newScale = Math.max(1, Math.min(5, scale() * delta));
+      const newScale = Math.max(1, Math.min(5, curScale * delta));
       setScale(newScale);
-    } else if (touches.length === 1 && scale() === 1) {
+    } else if (touches.length === 1 && curScale === 1) {
       const deltaX = touches[0].clientX - touchStart.x;
       if (Math.abs(deltaX) > 50) {
         if (deltaX < 0 && currentPage() < props.imageUrls.length - 1) {

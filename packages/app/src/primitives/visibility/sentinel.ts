@@ -1,5 +1,4 @@
 import type { Accessor } from "solid-js";
-import { createIntersectionObserver } from "@solid-primitives/intersection-observer";
 import { SENTINEL_MARGIN } from "../rootMargins";
 
 export interface SentinelOptions {
@@ -23,10 +22,10 @@ export interface SentinelOptions {
 /**
  * 哨兵分页原语：封装 IntersectionObserver 驱动的“加载更多”模式。
  *
- * 基于 `@solid-primitives/intersection-observer` 的 `createIntersectionObserver`：
- * - 当不指定 `root` 时，在 primitive 顶层创建 observer，库内部自动完成 observe/unobserve 与 disconnect。
- * - 当指定 `root` 时，在 `createEffect` 中创建 observer，从而响应式跟踪 `root` 信号变化；
- *   `root` 为 null 时不创建 observer，变为非 null 时自动创建；root 变化时旧 observer 被 disconnect。
+ * 基于 2.0 拆分效应（compute 提取 root/元素快照 → apply 创建原生 IntersectionObserver）：
+ * - 当不指定 `root` 时，以浏览器视口为 root，元素挂载后自动 observe，作用域销毁时 disconnect。
+ * - 当指定 `root` 时，响应式跟踪 `root` 信号变化：`root` 为 null 时不创建 observer，
+ *   变为非 null 时自动创建；root 或元素变化时旧 observer 经 apply cleanup 被 disconnect。
  *
  * 与一次性可见性的区别：不 disconnect，每次进入视口都触发 onTrigger（受 enabled 阀门控制）。
  *
@@ -50,24 +49,27 @@ export function createSentinel(options: SentinelOptions) {
     }
   }
 
-  const elements = createMemo(() => (el() ? [el()!] : []));
+  // @solid-primitives/intersection-observer 3.0 移除回调式 API，这里直接创建原生
+  // IntersectionObserver：root/元素变化或作用域销毁时经 apply 返回的 cleanup 断开旧实例。
+  const hasRoot = options.root != null;
 
-  if (options.root) {
-    createEffect(() => {
-      const root = options.root!();
-      if (!root) {
+  createEffect(
+    () => ({ root: options.root?.() ?? null, el: el() }),
+    ({ root, el: current }) => {
+      if (hasRoot && !root) {
         return;
       }
-      createIntersectionObserver(elements, handleEntries, {
+      if (!current) {
+        return;
+      }
+      const io = new IntersectionObserver(handleEntries, {
         rootMargin: options.rootMargin ?? SENTINEL_MARGIN,
-        root,
+        root: hasRoot ? root : undefined,
       });
-    });
-  } else {
-    createIntersectionObserver(elements, handleEntries, {
-      rootMargin: options.rootMargin ?? SENTINEL_MARGIN,
-    });
-  }
+      io.observe(current);
+      return () => io.disconnect();
+    },
+  );
 
   return { attach: setEl };
 }

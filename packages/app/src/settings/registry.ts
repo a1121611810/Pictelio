@@ -210,8 +210,9 @@ export function createSettings(opts: SettingsOptions): Settings {
     }
 
     defs.set(def.key, def as SettingDef<unknown>);
-    const [value, setValueRaw] = createSignal<T>(def.default);
-    // Solid setter 对泛型 T 有 Exclude<T, Function> 约束，包一层断言以便泛型项使用
+    // Solid 2.0 的 createSignal 对初值/setter 均有 Exclude<T, Function> 约束，
+    // 泛型 T 无法直接满足，统一包一层断言以便泛型项使用（settings 值恒为非函数）
+    const [value, setValueRaw] = createSignal<T>(def.default as Exclude<T, Function>);
     const setValue = (v: T) => setValueRaw(v as never);
     const localSubscribers = new Set<(v: T) => void>();
 
@@ -263,6 +264,11 @@ export function createSettings(opts: SettingsOptions): Settings {
         }
         setValue(decoded as T);
         applyValue(def as SettingDef<unknown>, decoded);
+        // SolidJS 2.0 批处理语义（#415）：syncInit 的契约是「返回后 value() 同步可见」
+        // （首屏模块级 init 紧接着同步读：readerSettingsStore 用 value() 构建 initial、
+        // themeStore/main.tsx 读 theme 应用防闪烁）。set 后不 flush 会读到默认值，
+        // 首屏状态静默丢失。属启动期命令式边界豁免。
+        flush();
       },
       async reset() {
         setValue(def.default);

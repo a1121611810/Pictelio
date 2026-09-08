@@ -8,6 +8,7 @@
  */
 import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
+import { flush } from "solid-js";
 
 const uiStore = vi.hoisted(() => ({
   currentTab: vi.fn(() => "recommended"),
@@ -102,6 +103,8 @@ describe("SideNavShell", () => {
     const bookmarksBtn = screen.getByRole("button", { name: "收藏" });
     fireEvent.click(bookmarksBtn);
     expect(uiStore.setCurrentTab).toHaveBeenCalledWith("bookmarks");
+    // Solid 2.0 批量更新：选中态 class/aria 变更在 flush 后才落到 DOM
+    flush();
     expect(bookmarksBtn.getAttribute("aria-current")).toBe("page");
     const recommendedBtn = screen.getByRole("button", { name: "推荐" });
     expect(recommendedBtn.getAttribute("aria-current")).toBe(null);
@@ -124,6 +127,8 @@ describe("SideNavShell", () => {
     const historyBtn = screen.getByRole("button", { name: "历史" });
     fireEvent.click(historyBtn);
     expect(renderPanel).toHaveBeenCalledTimes(1); // 历史 Tab 不再调用插槽
+    // Solid 2.0 批量更新：面板卸载在 flush 后才落到 DOM
+    flush();
     expect(screen.queryByTestId("panel")).toBeNull();
   });
 });

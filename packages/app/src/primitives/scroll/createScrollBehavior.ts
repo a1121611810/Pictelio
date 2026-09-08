@@ -52,40 +52,43 @@ export function createScrollBehavior(config?: ScrollBehaviorConfig): ScrollBehav
   let suppressed = false;
   let suppressTimer: ReturnType<typeof setTimeout> | undefined;
 
-  createEffect(() => {
-    const currentY = scroll.y;
-    const delta = currentY - lastScrollY;
-    const absDelta = Math.abs(delta);
+  // 2.0 拆分效应：compute 段只读滚动位置，方向判定状态机（写 signal、更新基准）移入 apply 段
+  createEffect(
+    () => scroll.y,
+    (currentY) => {
+      const delta = currentY - lastScrollY;
+      const absDelta = Math.abs(delta);
 
-    // 跳变检测：如果单次位移超过 jumpThreshold，忽略（不重置基准）
-    if (absDelta > jumpThreshold) {
-      lastScrollY = currentY;
-      return;
-    }
+      // 跳变检测：如果单次位移超过 jumpThreshold，忽略（不重置基准）
+      if (absDelta > jumpThreshold) {
+        lastScrollY = currentY;
+        return;
+      }
 
-    if (!suppressed) {
-      if (accumulate) {
-        accumulatedDelta += delta;
-        if (accumulatedDelta >= dirThreshold && delta > 0) {
-          setDirection("down");
-          accumulatedDelta = 0;
-        } else if (accumulatedDelta <= -dirThreshold && delta < 0) {
-          setDirection("up");
-          accumulatedDelta = 0;
-        }
-      } else {
-        if (absDelta >= dirThreshold) {
-          if (delta > 0 && currentY > topGuard) {
+      if (!suppressed) {
+        if (accumulate) {
+          accumulatedDelta += delta;
+          if (accumulatedDelta >= dirThreshold && delta > 0) {
             setDirection("down");
-          } else if (delta < 0) {
+            accumulatedDelta = 0;
+          } else if (accumulatedDelta <= -dirThreshold && delta < 0) {
             setDirection("up");
+            accumulatedDelta = 0;
+          }
+        } else {
+          if (absDelta >= dirThreshold) {
+            if (delta > 0 && currentY > topGuard) {
+              setDirection("down");
+            } else if (delta < 0) {
+              setDirection("up");
+            }
           }
         }
       }
-    }
 
-    lastScrollY = currentY;
-  });
+      lastScrollY = currentY;
+    },
+  );
 
   onCleanup(() => {
     if (suppressTimer) clearTimeout(suppressTimer);
@@ -95,57 +98,56 @@ export function createScrollBehavior(config?: ScrollBehaviorConfig): ScrollBehav
   const [visible, setVisible] = createSignal(true);
   let idleTimer: ReturnType<typeof setTimeout> | undefined;
 
-  createEffect(() => {
-    const d = direction();
+  // 2.0 拆分效应：compute 段快照方向与滚动位置（track 双依赖），写 signal 移入 apply 段
+  createEffect(
+    () => ({ d: direction(), y: scroll.y }),
+    ({ d, y }) => {
+      if (!hideOnScrollDown) {
+        setVisible(true);
+        return;
+      }
 
-    if (!hideOnScrollDown) {
-      setVisible(true);
-      return;
-    }
+      // 在顶部保护区内始终可见
+      if (y < topGuard) {
+        setVisible(true);
+        return;
+      }
 
-    // 在顶部保护区内始终可见
-    if (scroll.y < topGuard) {
-      setVisible(true);
-      return;
-    }
-
-    if (d === "down") {
-      setVisible(false);
-      // 清除空闲定时器
-      if (idleTimer) clearTimeout(idleTimer);
-      idleTimer = undefined;
-    } else if (d === "up") {
-      setVisible(true);
-    } else {
-      // null = 无滚动操作，空闲重现
-      setVisible(true);
-    }
-  });
+      if (d === "down") {
+        setVisible(false);
+        // 清除空闲定时器
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = undefined;
+      } else if (d === "up") {
+        setVisible(true);
+      } else {
+        // null = 无滚动操作，空闲重现
+        setVisible(true);
+      }
+    },
+  );
 
   // 空闲重现
-  createEffect(() => {
-    void scroll.y; // 跟踪滚动
-
-    if (idleTimer) clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => {
-      setDirection(null);
-      setVisible(true);
-    }, idleDelay);
-  });
-
-  onCleanup(() => {
-    if (idleTimer) clearTimeout(idleTimer);
-  });
+  createEffect(
+    () => scroll.y,
+    () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        setDirection(null);
+        setVisible(true);
+      }, idleDelay);
+      // 2.0：清理改由 apply 返回的 cleanup 负责（替代独立 onCleanup）
+      return () => {
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = undefined;
+      };
+    },
+  );
 
   // ── 阈值检测 ──
+  // 2.0 derive over write-back：直接以 memo 派生，不再维护被 effect 写回的 signal
   function scrolledPast(threshold: number): Accessor<boolean> {
-    const [past, setPast] = createSignal(false);
-
-    createEffect(() => {
-      setPast(scroll.y > threshold);
-    });
-
-    return past;
+    return createMemo(() => scroll.y > threshold);
   }
 
   // ── suppress ──

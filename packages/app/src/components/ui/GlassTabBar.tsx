@@ -1,6 +1,6 @@
 import type { JSX } from "@solidjs/web";
 import type { Component } from "solid-js";
-import { createSignal, For, onCleanup, onSettled, Show } from "solid-js";
+import { createSignal, For, onSettled, Show } from "solid-js";
 
 export interface GlassTabItem {
   key: string;
@@ -28,6 +28,7 @@ const GlassTabBar: Component<GlassTabBarProps> = (props) => {
   const [pointer, setPointer] = createSignal<{ x: number; y: number } | null>(null);
   const [reducedMotion, setReducedMotion] = createSignal(false);
 
+  // onSettled 不能嵌套原语：onCleanup 改为返回 cleanup
   onSettled(() => {
     if (typeof window.matchMedia !== "function") {
       return;
@@ -36,7 +37,7 @@ const GlassTabBar: Component<GlassTabBarProps> = (props) => {
     const update = () => setReducedMotion(mq.matches);
     update();
     mq.addEventListener("change", update);
-    onCleanup(() => mq.removeEventListener("change", update));
+    return () => mq.removeEventListener("change", update);
   });
 
   function handlePointerMove(e: PointerEvent) {
@@ -75,7 +76,7 @@ const GlassTabBar: Component<GlassTabBarProps> = (props) => {
           <button
             type="button"
             role="tab"
-            aria-selected={props.activeKey === item.key}
+            aria-selected={props.activeKey === item.key ? "true" : "false"}
             aria-current={props.activeKey === item.key ? "page" : undefined}
             class={`glass-tab-item ${props.activeKey === item.key ? "glass-tab-item-active" : ""} ${
               isCapsule() ? "min-w-14" : "flex-1"

@@ -37,7 +37,7 @@ const SearchableTag: Component<SearchableTagProps> = (props) => {
       title={props.title}
       class={`cursor-pointer inline-flex items-center active:scale-[0.98] transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--colorStrokeFocus2)] focus-visible:-outline-offset-2 ${props.class ?? ""}`}
       role="button"
-      tabIndex={0}
+      tabindex={0}
       aria-label={`搜索标签：${props.name}`}
       onClick={handleClick}
       onKeyDown={handleKeyDown}

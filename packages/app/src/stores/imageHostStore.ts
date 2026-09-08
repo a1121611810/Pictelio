@@ -182,38 +182,49 @@ const imageHostSetting = settings.define<ImageHostState>({
 
 export const imageHostState = imageHostSetting.value;
 
+/**
+ * SolidJS 2.0 批处理语义（#415）：以下 setter 全部是「读 imageHostState() → 改 → 整体
+ * set」的读-改-写模式。2.0 下 set 后同步读返回旧值，同 tick 内连续两次 set 会让后一次
+ * 基于旧状态展开、覆盖前一次的变更（丢失更新）。命令式动作边界统一先 flush 再读，
+ * 保证每次 set 基于上一次 set 的已提交结果（1.x 同步语义）。
+ */
+function mutateState(mutate: (state: ImageHostState) => ImageHostState): void {
+  imageHostSetting.set(mutate(imageHostState()));
+  // set 后立即 flush：本 setter 的写入对「下一个 setter 的读-改-写」和调用方的
+  // 同步读（如 setProbeResults 后立即 getFastestHost）同步可见，保持 1.x 语义
+  flush();
+}
+
 export function setMasterEnabled(enabled: boolean): void {
-  imageHostSetting.set({
-    ...imageHostState(),
+  mutateState((s) => ({
+    ...s,
     masterEnabled: enabled,
-  });
+  }));
 }
 
 export function setMode(mode: ImageHostMode): void {
-  imageHostSetting.set({
-    ...imageHostState(),
+  mutateState((s) => ({
+    ...s,
     mode,
     fastestHostId: null,
     fastestHostExpiresAt: null,
     // "single" mode auto-selects first enabled host
     selectedHostId:
-      mode === "single"
-        ? imageHostState().selectedHostId || getEnabledHosts()[0]?.id || null
-        : imageHostState().selectedHostId,
-  });
+      mode === "single" ? s.selectedHostId || getEnabledHosts()[0]?.id || null : s.selectedHostId,
+  }));
 }
 
 export function setSelectedHostId(hostId: string | null): void {
-  imageHostSetting.set({
-    ...imageHostState(),
+  mutateState((s) => ({
+    ...s,
     selectedHostId: hostId,
-  });
+  }));
 }
 
 export function updateHost(id: string, patch: Partial<Omit<ImageHost, "id" | "isBuiltIn">>): void {
-  const next: ImageHostState = {
-    ...imageHostState(),
-    hosts: imageHostState().hosts.map((host) => {
+  mutateState((s) => ({
+    ...s,
+    hosts: s.hosts.map((host) => {
       if (host.id !== id) {
         return host;
       }
@@ -225,8 +236,7 @@ export function updateHost(id: string, patch: Partial<Omit<ImageHost, "id" | "is
         : host.edited;
       return Object.assign({}, host, patch, { edited });
     }),
-  };
-  imageHostSetting.set(next);
+  }));
 }
 
 export function resetBuiltInHost(id: string): void {
@@ -235,31 +245,31 @@ export function resetBuiltInHost(id: string): void {
     return;
   }
 
-  imageHostSetting.set({
-    ...imageHostState(),
-    hosts: imageHostState().hosts.map((host) =>
-      host.id === id ? Object.assign({}, builtIn) : host,
-    ),
-  });
+  mutateState((s) => ({
+    ...s,
+    hosts: s.hosts.map((host) => (host.id === id ? Object.assign({}, builtIn) : host)),
+  }));
 }
 
 export function resetAllBuiltInHosts(): void {
-  const custom = imageHostState().hosts.filter((h) => !h.isBuiltIn);
-  imageHostSetting.set({
-    ...imageHostState(),
-    hosts: [...BUILT_IN_HOSTS.map((h) => Object.assign({}, h)), ...custom],
+  mutateState((s) => ({
+    ...s,
+    hosts: [
+      ...BUILT_IN_HOSTS.map((h) => Object.assign({}, h)),
+      ...s.hosts.filter((h) => !h.isBuiltIn),
+    ],
     probeResults: [],
     fastestHostId: null,
     fastestHostExpiresAt: null,
-  });
+  }));
 }
 
 export function addCustomHost(host: Omit<ImageHost, "id" | "isBuiltIn" | "edited">): void {
   const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  imageHostSetting.set({
-    ...imageHostState(),
+  mutateState((s) => ({
+    ...s,
     hosts: [
-      ...imageHostState().hosts,
+      ...s.hosts,
       {
         ...host,
         id,
@@ -267,14 +277,14 @@ export function addCustomHost(host: Omit<ImageHost, "id" | "isBuiltIn" | "edited
         edited: true,
       },
     ],
-  });
+  }));
 }
 
 export function removeCustomHost(id: string): void {
-  imageHostSetting.set({
-    ...imageHostState(),
-    hosts: imageHostState().hosts.filter((h) => h.id !== id),
-  });
+  mutateState((s) => ({
+    ...s,
+    hosts: s.hosts.filter((h) => h.id !== id),
+  }));
 }
 
 export function setProbeResults(results: ProbeResult[]): void {
@@ -292,12 +302,12 @@ export function setProbeResults(results: ProbeResult[]): void {
   });
 
   const fastest = sorted.find((r) => r.reachable);
-  imageHostSetting.set({
-    ...imageHostState(),
+  mutateState((s) => ({
+    ...s,
     probeResults: sorted,
     fastestHostId: fastest?.hostId ?? null,
     fastestHostExpiresAt: fastest ? Date.now() + 30_000 : null,
-  });
+  }));
 }
 
 export function modeLabel(mode: ImageHostMode): string {

@@ -1,5 +1,5 @@
 import type { Component } from "solid-js";
-import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import type { PixivIllustTag } from "@/api/types";
 import SearchableTag from "@/components/SearchableTag";
 import { useContainerWidth } from "@/primitives/useContainerWidth";
@@ -77,29 +77,36 @@ const AdaptiveTags: Component<AdaptiveTagsProps> = (props) => {
   };
 
   // 截断 chip 外层 ref：命令式写入 max-width（JSX style 动态值实测不可靠，未写入 DOM）
+  // Solid 2.0 拆分：compute 返回 partialWidth 快照，apply 段做 DOM 写入
   let partialRef: HTMLSpanElement | undefined;
-  createEffect(() => {
-    const f = fit();
-    if (partialRef && f?.partialWidth != null) {
-      partialRef.style.maxWidth = `${f.partialWidth}px`;
-    }
-  });
+  createEffect(
+    () => fit()?.partialWidth,
+    (partialWidth) => {
+      if (partialRef && partialWidth != null) {
+        partialRef.style.maxWidth = `${partialWidth}px`;
+      }
+    },
+  );
 
   // 测量层就绪后读数；ResizeObserver 持续监听（旋转/字体加载/容器变化重测）
+  // onSettled 不能嵌套原语：onCleanup 改为返回 cleanup
   onSettled(() => {
     measure();
     const el = measureEl;
     if (!el) return;
     const ro = new ResizeObserver(measure);
     ro.observe(el);
-    onCleanup(() => ro.disconnect());
+    return () => ro.disconnect();
   });
 
   // 标签变化后重测（等渲染完成再读宽度）
-  createEffect(() => {
-    void props.tags;
-    requestAnimationFrame(measure);
-  });
+  // Solid 2.0 拆分：compute 追踪 tags 引用，apply 延迟一帧测量（rAF 内写 signal 合法）
+  createEffect(
+    () => props.tags,
+    () => {
+      requestAnimationFrame(measure);
+    },
+  );
 
   return (
     <div ref={ref} class="relative mt-[var(--spacingVerticalXS)]">
@@ -134,7 +141,7 @@ const AdaptiveTags: Component<AdaptiveTagsProps> = (props) => {
               }}
               class={`${chipClass} min-w-0 overflow-hidden`}
               role="button"
-              tabIndex={0}
+              tabindex={0}
               aria-label={`搜索标签：${partialTag()!.name}`}
               onClick={(e) => {
                 e.stopPropagation();
@@ -149,7 +156,7 @@ const AdaptiveTags: Component<AdaptiveTagsProps> = (props) => {
             <span
               class={plusNClass}
               role="button"
-              tabIndex={0}
+              tabindex={0}
               aria-label={`还有 ${remaining()} 个标签，查看详情`}
               onClick={(e) => {
                 e.stopPropagation();

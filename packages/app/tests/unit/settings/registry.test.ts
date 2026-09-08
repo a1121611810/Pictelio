@@ -25,6 +25,7 @@ describe("Settings registry", () => {
     const { settings, mem } = make();
     const s = settings.define({ key: "foo", default: "a" });
     s.set("b");
+    flush(); // 2.0 批处理语义：set 后同步读返回旧值，先 flush 再断言
     expect(s.value()).toBe("b");
     expect(mem.dump().has("foo")).toBe(false);
 

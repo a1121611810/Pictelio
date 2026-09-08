@@ -34,7 +34,7 @@ const HistoryRowCard: Component<HistoryRowCardProps> = (props) => {
     <div
       class="flex cursor-pointer items-center gap-[var(--spacingHorizontalM)] rounded-[var(--borderRadiusLarge)] border border-[var(--colorNeutralStroke1)] bg-[var(--colorNeutralBackground1)] p-[var(--spacingHorizontalM)] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-98 focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThick)] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
       role="button"
-      tabIndex={0}
+      tabindex={0}
       onClick={props.onOpen}
       onKeyDown={(e) => {
         if (e.key === "Enter") props.onOpen();

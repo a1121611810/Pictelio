@@ -52,11 +52,14 @@ const OAuthWebView: Component<OAuthWebViewProps> = (props) => {
     }
   };
 
-  // ── 生命周期 ──
-  createEffect(() => {
-    if (!props.open || !isNative) return;
-    void startNativeOAuth();
-  });
+  // ── 生命周期 ──（Solid 2.0 拆分：compute 追踪 open，apply 发起 OAuth）
+  createEffect(
+    () => props.open,
+    (open) => {
+      if (!open || !isNative) return;
+      void startNativeOAuth();
+    },
+  );
 
   // Web 模式下不渲染
   if (!isNative) return null;

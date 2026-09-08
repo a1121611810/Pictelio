@@ -1,5 +1,5 @@
 import type { JSX } from "@solidjs/web";
-import { createSignal, onCleanup, onSettled } from "solid-js";
+import { createSignal, onSettled } from "solid-js";
 import "solid-js";
 
 /**
@@ -22,7 +22,8 @@ export function usePointerHighlight() {
     const update = () => setReducedMotion(mq.matches);
     update();
     mq.addEventListener("change", update);
-    onCleanup(() => mq.removeEventListener("change", update));
+    // 2.0：onSettled 以返回值注册清理（内部 onCleanup 不属于 apply 语义）
+    return () => mq.removeEventListener("change", update);
   });
 
   function onPointerMove(e: PointerEvent) {

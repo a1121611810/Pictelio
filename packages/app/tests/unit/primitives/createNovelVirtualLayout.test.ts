@@ -6,7 +6,8 @@
  * flush 时读取当下 window.scrollY（非事件捕获旧值）；dispose 后 pending rAF 不再触发。
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createRoot } from "solid-js";
+// ADR-0144：2.0 微任务批处理下，效应/rAF 回调内的 signal 写需经 flush 同步生效后才能同步断言
+import { createRoot, flush } from "solid-js";
 import type { NovelBlock } from "@/utils/novelBlocks";
 import type { ReaderSettings } from "@/stores/readerSettingsStore";
 
@@ -23,7 +24,7 @@ const mockVirtualizerInstance = {
   scrollOffset: undefined as number | undefined,
 };
 
-vi.mock("@tanstack/solid-virtual", () => ({
+vi.mock("@tanstack/virtual-core", () => ({
   Virtualizer: vi.fn(function VirtualizerMock() {
     return mockVirtualizerInstance;
   }),
@@ -121,6 +122,7 @@ function fireScroll() {
 describe("createNovelVirtualLayout — scroll rAF 合帧", () => {
   it("同帧多次 scroll 只触发一次全量重算", () => {
     const { result } = setup();
+    flush(); // ADR-0144：先排空，让 scroll 监听器经效应 apply 注册、挂载初始计算先完成
     // 挂载阶段（同步 effect）的初始计算不计入
     mockVirtualizerInstance._willUpdate.mockClear();
     mockVirtualizerInstance.getVirtualItems.mockClear();
@@ -131,6 +133,7 @@ describe("createNovelVirtualLayout — scroll rAF 合帧", () => {
     // flush 前事件不直接触发重算
     expect(mockVirtualizerInstance._willUpdate).not.toHaveBeenCalled();
     flushRaf();
+    flush(); // ADR-0144：rAF 回调内的 signal 写同样经批处理
 
     expect(mockVirtualizerInstance._willUpdate).toHaveBeenCalledTimes(1);
     expect(mockVirtualizerInstance.getVirtualItems).toHaveBeenCalledTimes(1);
@@ -140,6 +143,7 @@ describe("createNovelVirtualLayout — scroll rAF 合帧", () => {
 
   it("flush 时读取当下 window.scrollY（末态为最新位置）", () => {
     const { result } = setup();
+    flush(); // ADR-0144：先排空，让 scroll 监听器经效应 apply 注册
     // 期望值来源：flush 时刻 mockWindow.scrollY 的独立推导（虚拟项 index === scrollY），
     // 事件发生时的旧值 10 不得出现
     mockVirtualizerInstance.getVirtualItems.mockImplementation(() => [
@@ -151,6 +155,7 @@ describe("createNovelVirtualLayout — scroll rAF 合帧", () => {
     mockWindow.scrollY = 777; // 同帧内事件之后的最新滚动位置
     fireScroll();
     flushRaf();
+    flush(); // ADR-0144：rAF 回调内的 signal 写同样经批处理
 
     // onScroll 回调把当下 scrollY 写入 instance.scrollOffset（flush 时而非事件时）
     expect(mockVirtualizerInstance.scrollOffset).toBe(777);
@@ -159,6 +164,7 @@ describe("createNovelVirtualLayout — scroll rAF 合帧", () => {
 
   it("dispose 后 pending 的 rAF 不再触发重算，监听器已移除", () => {
     const { dispose } = setup();
+    flush(); // ADR-0144：先排空，确保 scroll 监听器已注册（避免测试空转）
     mockVirtualizerInstance._willUpdate.mockClear();
 
     fireScroll();

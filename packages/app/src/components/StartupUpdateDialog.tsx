@@ -30,30 +30,36 @@ function handleDismiss() {
  */
 const StartupUpdateDialog: Component = () => {
   // 二次保障：监控 store 状态变化，在条件满足时自动弹窗。
-  createEffect(() => {
-    if (
+  // Solid 2.0 拆分：compute 只读返回布尔快照，apply 段写 signal
+  createEffect(
+    () =>
       hasUpdate() &&
       checkCompleted() &&
-      latestVersion() &&
+      !!latestVersion() &&
       latestVersion() !== lastDismissedVersion() &&
-      !showUpdateDialog()
-    ) {
-      setShowUpdateDialog(true);
-    }
-  });
+      !showUpdateDialog(),
+    (shouldShow) => {
+      if (shouldShow) {
+        setShowUpdateDialog(true);
+      }
+    },
+  );
 
   // Escape 键关闭弹窗（无障碍支持）
-  createEffect(() => {
-    if (showUpdateDialog()) {
+  // Solid 2.0 拆分：apply 段注册监听并返回 cleanup（替代 onCleanup）
+  createEffect(
+    () => showUpdateDialog(),
+    (open) => {
+      if (!open) return;
       const onKeyDown = (e: KeyboardEvent) => {
         if (e.key === "Escape") {
           handleDismiss();
         }
       };
       document.addEventListener("keydown", onKeyDown);
-      onCleanup(() => document.removeEventListener("keydown", onKeyDown));
-    }
-  });
+      return () => document.removeEventListener("keydown", onKeyDown);
+    },
+  );
 
   function handleDownload() {
     const url = latestReleaseUrl();

@@ -10,7 +10,7 @@
  * 不再渲染底部 NavBar（首页导航由 SideNavShell 承担）。
  */
 import type { Component } from "solid-js";
-import { createEffect, onSettled, untrack } from "solid-js";
+import { createEffect, onSettled } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import type { PixivIllust, PixivNovel, ApiError } from "@/api/types";
 import PageTransition from "@/components/PageTransition";
@@ -226,15 +226,18 @@ function novelSource(tab: FeedTab): FeedSource<PixivNovel> {
 
 /** 幂等激活当前数据源：**ensureLoaded 是数据加载的唯一入口**（工厂 ADR-0042 按需查询，
  * query enabled 恒为 false）；activate 仅置订阅标志、不触发 fetch。三个源统一 ensureLoaded
- * （幂等，不重复请求）+ activate 保险（回归修复：收藏/关注 Tab 之前只 activate 不加载 → 空）。 */
+ * （幂等，不重复请求）+ activate 保险（回归修复：收藏/关注 Tab 之前只 activate 不加载 → 空）。
+ * Solid 2.0 拆分效应：compute 跟踪 tab 变化，apply 段做激活副作用（写 signal 在异步回调中，合法）。 */
 function useFeedActivation(src: () => FeedSource<PixivIllust> | FeedSource<PixivNovel>): void {
-  createEffect(() => {
-    const s = src();
-    void s.ensure?.();
-    if (s.activate) {
-      s.activate();
-    }
-  });
+  createEffect(
+    () => src(),
+    (s) => {
+      void s.ensure?.();
+      if (s.activate) {
+        s.activate();
+      }
+    },
+  );
 }
 
 /** 插画列表加载骨架（行卡形态，参考原型 IllustLoadingA2）。
@@ -348,13 +351,16 @@ const HomePage: Component = () => {
     markContentReady();
   });
 
-  createEffect(() => {
+  createEffect(
+    // Solid 2.0 拆分效应：compute 只读「可见 feed 是否已就绪」，apply 段做调度副作用。
     // 空闲预取（#375）：默认落地面板（推荐插画/推荐小说其一）出数据后调度一次。
     // gate=可见 feed 已就绪，避免预取与首屏加载抢带宽；调度器内部再按 store 串行错峰。
     // prefetchAllTabs 是填空语义（staleTime=Infinity）：已有/已恢复的数据不重拉，
     // 正常重启时零网络开销，仅填补空缓存以消除「首访 tab 骨架等网络」（#372 基线）。
-    if (recIllusts().length === 0 && recNovels().length === 0) return;
-    untrack(() => {
+    () => recIllusts().length > 0 || recNovels().length > 0,
+    (ready) => {
+      if (!ready) return;
+      // apply 段本就 untracked，原 untrack 包裹不再需要；预取闭包在 idle 回调中执行
       scheduleIdleFeedPrefetch([
         { id: "recommended-illust", run: () => Promise.all(recIllustPrefetchAll()) },
         { id: "follow-illust", run: () => Promise.all(followIllustPrefetchAll()) },
@@ -363,8 +369,8 @@ const HomePage: Component = () => {
         { id: "follow-novel", run: () => Promise.all(followNovelPrefetchAll()) },
         { id: "bookmark-novel", run: () => Promise.all(bmkNovelPrefetchAll()) },
       ]);
-    });
-  });
+    },
+  );
 
   return (
     <PageTransition>

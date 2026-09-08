@@ -21,15 +21,17 @@ const SettingsClient: Component = () => {
   /** 当前包支持的 client 引擎列表；空数组 = 尚未查询到（保守渲染） */
   const [clientKinds, setClientKinds] = createSignal<string[] | null>(null);
 
-  onSettled(async () => {
-    setCurrent(await readClientKind());
-    try {
-      const { kinds } = await ClientInfo.getClientKinds();
-      setClientKinds(kinds);
-    } catch {
-      // 原生插件不可用（web 开发环境）→ 保持 null，按 full 能力渲染
-      setClientKinds(null);
-    }
+  // onSettled 不接受 async 函数：异步分支内部消化 Promise
+  onSettled(() => {
+    void readClientKind().then((kind) => setCurrent(kind));
+    void tryAsync(ClientInfo.getClientKinds()).then(([err, result]) => {
+      if (err) {
+        // 原生插件不可用（web 开发环境）→ 保持 null，按 full 能力渲染
+        setClientKinds(null);
+        return;
+      }
+      setClientKinds(result.kinds);
+    });
   });
 
   // ADR-0062：仅 full 包（含 webview+lynx）渲染切换入口

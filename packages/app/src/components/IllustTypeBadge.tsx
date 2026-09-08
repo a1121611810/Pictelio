@@ -34,13 +34,15 @@ const IllustTypeBadge: Component<Props> = (props) => {
           {(badge) => (
             <span
               aria-label={badge.kind === "ugoira" ? "动图" : `共 ${badge.pageCount} 图`}
-              class={["flex items-center gap-[var(--spacingHorizontalXXS)] rounded-[var(--borderRadiusMedium)] bg-[var(--colorOverlayBackground)] backdrop-blur-sm text-[var(--colorOverlayForeground)] font-semibold", {
-                "px-[var(--spacingHorizontalXS)] py-[var(--spacingVerticalXXS)] [font-size:var(--fontSizeBase100)]":
-                  compact(),
-                "px-[var(--spacingHorizontalS)] py-[var(--spacingVerticalXXS)] [font-size:var(--fontSizeBase200)]":
-                  !compact(),
-              }]}
-              
+              class={[
+                "flex items-center gap-[var(--spacingHorizontalXXS)] rounded-[var(--borderRadiusMedium)] bg-[var(--colorOverlayBackground)] backdrop-blur-sm text-[var(--colorOverlayForeground)] font-semibold",
+                {
+                  "px-[var(--spacingHorizontalXS)] py-[var(--spacingVerticalXXS)] [font-size:var(--fontSizeBase100)]":
+                    compact(),
+                  "px-[var(--spacingHorizontalS)] py-[var(--spacingVerticalXXS)] [font-size:var(--fontSizeBase200)]":
+                    !compact(),
+                },
+              ]}
             >
               <FluentIcon
                 name={badge.kind === "ugoira" ? "play" : "imageMultiple"}

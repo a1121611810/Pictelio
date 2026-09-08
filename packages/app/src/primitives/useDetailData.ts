@@ -25,34 +25,39 @@ export function useDetailData<T, R extends { error?: ApiError | null }>(
   const [loading, setLoading] = createSignal(true);
   const [retryKey, setRetryKey] = createSignal(0);
 
-  createEffect(() => {
-    const rd = routeData();
-    retryKey();
-    if (!rd) {
-      setData(null);
-      setError(null);
-      setLoading(true);
-      return;
-    }
+  // 2.0 拆分效应：compute 段只读 routeData 与 retryKey，状态写移入 apply 段
+  createEffect(
+    () => {
+      retryKey();
+      return routeData();
+    },
+    (rd) => {
+      if (!rd) {
+        setData(null);
+        setError(null);
+        setLoading(true);
+        return;
+      }
 
-    if (rd.error) {
-      setError(toApiError(rd.error));
-      setData(null);
-      setLoading(false);
-      return;
-    }
+      if (rd.error) {
+        setError(toApiError(rd.error));
+        setData(null);
+        setLoading(false);
+        return;
+      }
 
-    const [err, extracted] = trySync(() => extractData(rd));
-    if (err) {
-      setError(toApiError(err));
-      setData(null);
-      setLoading(false);
-    } else if (extracted !== null) {
-      setData(extracted as any);
-      setError(null);
-      setLoading(false);
-    }
-  });
+      const [err, extracted] = trySync(() => extractData(rd));
+      if (err) {
+        setError(toApiError(err));
+        setData(null);
+        setLoading(false);
+      } else if (extracted !== null) {
+        setData(extracted as any);
+        setError(null);
+        setLoading(false);
+      }
+    },
+  );
 
   function retry() {
     setRetryKey((k) => k + 1);

@@ -43,26 +43,30 @@ const ThemeSelector: Component = () => {
                 <button
                   type="button"
                   role="button"
-                  aria-pressed={selected()}
+                  aria-pressed={selected() ? "true" : "false"}
                   aria-label={option.label}
                   onClick={() => setPageStyleTheme(option.id)}
-                  class={["flex flex-col items-center gap-2 p-4 rounded-[var(--borderRadiusMedium)] border transition-all duration-[var(--durationFast)] appearance-none bg-transparent cursor-pointer", {
-                    "border-[var(--colorCompoundBrandStroke)]": selected(),
-                    "bg-[var(--colorNeutralBackground2)]": selected(),
-                    "border-[var(--colorNeutralStroke2)]": !selected(),
-                    "hover:border-[var(--colorNeutralStroke1)]": !selected(),
-                    "hover:bg-[var(--colorNeutralBackground2)]": !selected(),
-                    "active:scale-[0.97]": true,
-                  }]}
-                  
+                  class={[
+                    "flex flex-col items-center gap-2 p-4 rounded-[var(--borderRadiusMedium)] border transition-all duration-[var(--durationFast)] appearance-none bg-transparent cursor-pointer",
+                    {
+                      "border-[var(--colorCompoundBrandStroke)]": selected(),
+                      "bg-[var(--colorNeutralBackground2)]": selected(),
+                      "border-[var(--colorNeutralStroke2)]": !selected(),
+                      "hover:border-[var(--colorNeutralStroke1)]": !selected(),
+                      "hover:bg-[var(--colorNeutralBackground2)]": !selected(),
+                      "active:scale-[0.97]": true,
+                    },
+                  ]}
                 >
                   <FluentIcon name={option.icon} size={24} />
                   <span
-                    class={["[font-size:var(--fontSizeBase200)] font-medium", {
-                      "text-[var(--colorCompoundBrandForeground1)]": selected(),
-                      "text-[var(--colorNeutralForeground1)]": !selected(),
-                    }]}
-                    
+                    class={[
+                      "[font-size:var(--fontSizeBase200)] font-medium",
+                      {
+                        "text-[var(--colorCompoundBrandForeground1)]": selected(),
+                        "text-[var(--colorNeutralForeground1)]": !selected(),
+                      },
+                    ]}
                   >
                     {option.label}
                   </span>
@@ -86,26 +90,30 @@ const ThemeSelector: Component = () => {
                 <button
                   type="button"
                   role="button"
-                  aria-pressed={selected()}
+                  aria-pressed={selected() ? "true" : "false"}
                   aria-label={option.label}
                   onClick={() => setThemePersisted(option.id)}
-                  class={["flex flex-col items-center gap-2 p-4 rounded-[var(--borderRadiusMedium)] border transition-all duration-[var(--durationFast)] appearance-none bg-transparent cursor-pointer", {
-                    "border-[var(--colorCompoundBrandStroke)]": selected(),
-                    "bg-[var(--colorNeutralBackground2)]": selected(),
-                    "border-[var(--colorNeutralStroke2)]": !selected(),
-                    "hover:border-[var(--colorNeutralStroke1)]": !selected(),
-                    "hover:bg-[var(--colorNeutralBackground2)]": !selected(),
-                    "active:scale-[0.97]": true,
-                  }]}
-                  
+                  class={[
+                    "flex flex-col items-center gap-2 p-4 rounded-[var(--borderRadiusMedium)] border transition-all duration-[var(--durationFast)] appearance-none bg-transparent cursor-pointer",
+                    {
+                      "border-[var(--colorCompoundBrandStroke)]": selected(),
+                      "bg-[var(--colorNeutralBackground2)]": selected(),
+                      "border-[var(--colorNeutralStroke2)]": !selected(),
+                      "hover:border-[var(--colorNeutralStroke1)]": !selected(),
+                      "hover:bg-[var(--colorNeutralBackground2)]": !selected(),
+                      "active:scale-[0.97]": true,
+                    },
+                  ]}
                 >
                   <FluentIcon name={option.icon} size={24} />
                   <span
-                    class={["[font-size:var(--fontSizeBase200)] font-medium", {
-                      "text-[var(--colorCompoundBrandForeground1)]": selected(),
-                      "text-[var(--colorNeutralForeground1)]": !selected(),
-                    }]}
-                    
+                    class={[
+                      "[font-size:var(--fontSizeBase200)] font-medium",
+                      {
+                        "text-[var(--colorCompoundBrandForeground1)]": selected(),
+                        "text-[var(--colorNeutralForeground1)]": !selected(),
+                      },
+                    ]}
                   >
                     {option.label}
                   </span>

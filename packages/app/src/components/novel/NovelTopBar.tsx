@@ -42,11 +42,14 @@ const NovelTopBar: Component<NovelTopBarProps> = (props) => {
           <h1 class="flex-1 min-w-0 [font-size:var(--fontSizeBase300)] font-semibold text-[var(--colorNeutralForeground1)] flex items-center gap-1">
             <span class="whitespace-nowrap flex-shrink-0">小说</span>
             <span
-              class={["truncate text-[var(--colorNeutralForeground2)]", {
-                "opacity-0": !props.showTitle(),
-                "opacity-100": props.showTitle(),
-              }]}
-              
+              class={[
+                "truncate text-[var(--colorNeutralForeground2)]",
+                {
+                  "opacity-0": !props.showTitle(),
+                  "opacity-100": props.showTitle(),
+                },
+              ]}
+
               style="transition:opacity var(--durationFast) var(--curveEasyEase)"
             >
               {props.title ? `《${props.title}》` : ""}

@@ -84,19 +84,22 @@ const Search: Component = () => {
   const [showCompactHeader, setShowCompactHeader] = createSignal(false);
 
   // ── Scroll-driven compact header ──
+  // Solid 2.0 拆分效应：compute 提取快照（普通值），apply 段写 signal（合法）。
   const pastHeaderThreshold = sb.scrolledPast(SCROLL_HEADER_THRESHOLD);
   const scrollDirection = sb.direction;
 
-  createEffect(() => {
-    if (!pastHeaderThreshold()) {
-      setShowCompactHeader(false);
-      return;
-    }
-    const d = scrollDirection();
-    // Compact header: show when scrolled past threshold AND scrolling up
-    if (d === "up") setShowCompactHeader(true);
-    else if (d === "down") setShowCompactHeader(false);
-  });
+  createEffect(
+    () => ({ past: pastHeaderThreshold(), dir: scrollDirection() }),
+    ({ past, dir }) => {
+      if (!past) {
+        setShowCompactHeader(false);
+        return;
+      }
+      // Compact header: show when scrolled past threshold AND scrolling up
+      if (dir === "up") setShowCompactHeader(true);
+      else if (dir === "down") setShowCompactHeader(false);
+    },
+  );
 
   // ── 从 URL word 参数同步到 tags + keyword ──
   function syncFromUrl(word: string) {
@@ -105,40 +108,55 @@ const Search: Component = () => {
   }
 
   // ── Sync URL params → store ──
+  // Solid 2.0 拆分效应：compute 读 searchParams 快照，apply 段做 store 写与导航联动。
   let prevUrlWord: string | undefined;
-  createEffect(() => {
-    const params = searchParams as Record<string, string | undefined>;
-    if (params.word !== undefined && params.word !== prevUrlWord) {
-      prevUrlWord = params.word;
-      syncFromUrl(params.word);
-      if (hydrated()) {
-        // Hydration 后的 URL 变化（浏览器前进/后退）触发搜索
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-          store.executeSearch();
-        }, 300);
+  createEffect(
+    () => {
+      const params = searchParams as Record<string, string | undefined>;
+      return { word: params.word, scope: params.scope, sort: params.sort };
+    },
+    ({ word, scope, sort }) => {
+      if (word !== undefined && word !== prevUrlWord) {
+        prevUrlWord = word;
+        syncFromUrl(word);
+        if (hydrated()) {
+          // Hydration 后的 URL 变化（浏览器前进/后退）触发搜索（防抖，异步安全）
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            store.executeSearch();
+          }, 300);
+        }
       }
-    }
-    if (params.scope) store.setScope(params.scope as SearchScope);
-    if (params.sort) store.setSort(params.sort as SearchSort);
-  });
+      if (scope) store.setScope(scope as SearchScope);
+      if (sort) store.setSort(sort as SearchSort);
+    },
+  );
 
   // ── Execute search on URL param hydration (only on initial load / deep links) ──
   const [hydrated, setHydrated] = createSignal(false);
-  createEffect(() => {
-    const params = searchParams as Record<string, string | undefined>;
-    if (!hydrated() && params.word?.trim()) {
-      setHydrated(true);
-      const word = params.word.trim();
-      syncFromUrl(word);
-      if (params.scope) store.setScope(params.scope as SearchScope);
-      if (params.sort) store.setSort(params.sort as SearchSort);
-      store.executeSearch();
-    }
-    if (!hydrated() && params.word === undefined) {
-      setHydrated(true);
-    }
-  });
+  createEffect(
+    () => {
+      const params = searchParams as Record<string, string | undefined>;
+      return { word: params.word, scope: params.scope, sort: params.sort, hydrated: hydrated() };
+    },
+    ({ word, scope, sort, hydrated: isHydrated }) => {
+      if (!isHydrated && word?.trim()) {
+        setHydrated(true);
+        const trimmed = word.trim();
+        syncFromUrl(trimmed);
+        if (scope) store.setScope(scope as SearchScope);
+        if (sort) store.setSort(sort as SearchSort);
+        // Solid 2.0：executeSearch 内部同步读 keyword()/scope()/sort()，而上面的 set
+        // 尚未提交（微任务批处理）。此处的「set 后立即同步执行搜索」是命令式边界，
+        // 显式 flush 保证 store 读到已提交的新值（语义与 1.x 同步可见一致）。
+        flush();
+        store.executeSearch();
+      }
+      if (!isHydrated && word === undefined) {
+        setHydrated(true);
+      }
+    },
+  );
 
   // ── Debounced search execution ──
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
@@ -152,6 +170,9 @@ const Search: Component = () => {
 
   function handleScopeChange(scope: SearchScope) {
     store.setScope(scope);
+    // Solid 2.0：executeSearch 内部同步读 scope()/keyword()，set 尚未提交（微任务批处理），
+    // 直接调用会拿到旧 scope 静默失效——此处属「set 后立即同步执行搜索」的命令式边界，flush。
+    flush();
     const kw = store.keyword().trim();
     if (kw) {
       clearTimeout(debounceTimer);
@@ -163,6 +184,8 @@ const Search: Component = () => {
 
   function handleSortChange(sort: SearchSort) {
     store.setSort(sort);
+    // Solid 2.0：同 handleScopeChange——set 后同步 executeSearch 前必须 flush 提交新值。
+    flush();
     const kw = store.keyword().trim();
     if (kw) {
       clearTimeout(debounceTimer);
@@ -187,11 +210,13 @@ const Search: Component = () => {
     <PageTransition>
       {/* ── Compact header — 滚出阈值后上滑展示 ── */}
       <header
-        class={["fixed top-0 left-0 right-0 z-30 surface-appbar transition-transform duration-[var(--durationNormal)] ease-[var(--curveEasyEase)]", {
-          "translate-y-0": showCompactHeader(),
-          "-translate-y-full": !showCompactHeader(),
-        }]}
-        
+        class={[
+          "fixed top-0 left-0 right-0 z-30 surface-appbar transition-transform duration-[var(--durationNormal)] ease-[var(--curveEasyEase)]",
+          {
+            "translate-y-0": showCompactHeader(),
+            "-translate-y-full": !showCompactHeader(),
+          },
+        ]}
       >
         <div class="flex items-center gap-2 px-4 h-12 max-w-3xl mx-auto">
           <button
@@ -295,15 +320,19 @@ const Search: Component = () => {
               <For each={SCOPE_OPTIONS}>
                 {(opt) => (
                   <button
-                    class={["flex-1 pb-[var(--spacingVerticalSNudge)] [font-size:var(--fontSizeBase300)] font-medium text-center transition-all duration-[var(--durationFast)] focus-visible:outline-[var(--colorStrokeFocus2)] focus-visible:outline-2 focus-visible:outline-offset-1 relative", {
-                      "text-[var(--colorBrandForeground1)]": store.scope() === opt.value,
-                      "text-[var(--colorNeutralForeground3)] hover:text-[var(--colorNeutralForeground1)]":
-                        store.scope() !== opt.value,
-                    }]}
-                    
+                    class={[
+                      "flex-1 pb-[var(--spacingVerticalSNudge)] [font-size:var(--fontSizeBase300)] font-medium text-center transition-all duration-[var(--durationFast)] focus-visible:outline-[var(--colorStrokeFocus2)] focus-visible:outline-2 focus-visible:outline-offset-1 relative",
+                      {
+                        "text-[var(--colorBrandForeground1)]": store.scope() === opt.value,
+                        "text-[var(--colorNeutralForeground3)] hover:text-[var(--colorNeutralForeground1)]":
+                          store.scope() !== opt.value,
+                      },
+                    ]}
+
                     onClick={() => handleScopeChange(opt.value)}
                     role="radio"
-                    aria-checked={store.scope() === opt.value}
+                    // Solid 2.0：aria-checked 仅接受枚举字符串（"true"/"false"），不再收 boolean
+                    aria-checked={store.scope() === opt.value ? "true" : "false"}
                   >
                     {opt.label}
                     {store.scope() === opt.value && (
@@ -331,13 +360,16 @@ const Search: Component = () => {
                       </span>
                     </Show>
                     <button
-                      class={["[font-size:var(--fontSizeBase200)] transition-colors duration-[var(--durationFast)] focus-visible:outline-[var(--colorStrokeFocus2)] focus-visible:outline-2 focus-visible:outline-offset-1", {
-                        "text-[var(--colorBrandForeground1)] font-semibold":
-                          store.toSorted() === opt.value,
-                        "text-[var(--colorNeutralForeground3)] hover:text-[var(--colorNeutralForeground1)]":
-                          store.toSorted() !== opt.value,
-                      }]}
-                      
+                      class={[
+                        "[font-size:var(--fontSizeBase200)] transition-colors duration-[var(--durationFast)] focus-visible:outline-[var(--colorStrokeFocus2)] focus-visible:outline-2 focus-visible:outline-offset-1",
+                        {
+                          "text-[var(--colorBrandForeground1)] font-semibold":
+                            store.toSorted() === opt.value,
+                          "text-[var(--colorNeutralForeground3)] hover:text-[var(--colorNeutralForeground1)]":
+                            store.toSorted() !== opt.value,
+                        },
+                      ]}
+
                       onClick={() => handleSortChange(opt.value)}
                     >
                       {opt.label}
@@ -364,6 +396,9 @@ const Search: Component = () => {
                   sort: store.toSorted(),
                 }).toString();
                 void navigate(`/search?${qs}`);
+                // Solid 2.0：setKeyword 尚未提交（微任务批处理），executeSearch 同步读
+                // keyword() 会拿到旧值静默失效——命令式边界，flush 后再执行。
+                flush();
                 store.executeSearch();
               }}
               onRemove={(word) => removeFromHistory(word)}

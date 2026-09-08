@@ -124,7 +124,11 @@ describe("ClientSwitch 切换渲染引擎说明页", () => {
     mocks.getClientKinds.mockResolvedValue({ kinds: ["webview"] });
     render(() => <ClientSwitch />);
 
-    await screen.findByText("Lynx");
+    // Solid 2.0 语义修正：onSettled 中的 async 初始化（setCurrent(await readClientKind())）
+    // 在微任务 flush 后才提交；原 `findByText("Lynx")` 会被「两引擎差异」区块的静态标题
+    // 立即命中而失去等待意义，导致后续同步 getByText 在 state 落地前执行。
+    // 改为直接等待仅当 current() === "lynx" 才渲染的目标文案（findByText 自带轮询等待）。
+    await screen.findByText("当前以 Lynx 渲染引擎运行。");
     expect(screen.getByText("当前以 Lynx 渲染引擎运行。")).toBeDefined();
   });
 });

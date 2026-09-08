@@ -30,11 +30,13 @@ interface StickySubTabsProps {
  */
 const StickySubTabs: Component<StickySubTabsProps> = (props) => (
   <div
-    class={[`sticky top-16 z-10 bg-[var(--colorNeutralBackground3)] transition-transform duration-[var(--durationNormal)] ease-[var(--curveEasyEase)] ${props.class ?? ""}`, {
-      "translate-y-0": props.headerVisible,
-      "-translate-y-16": !props.headerVisible,
-    }]}
-    
+    class={[
+      `sticky top-16 z-10 bg-[var(--colorNeutralBackground3)] transition-transform duration-[var(--durationNormal)] ease-[var(--curveEasyEase)] ${props.class ?? ""}`,
+      {
+        "translate-y-0": props.headerVisible,
+        "-translate-y-16": !props.headerVisible,
+      },
+    ]}
   >
     {props.children}
   </div>

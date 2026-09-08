@@ -57,6 +57,14 @@ export function createPullToRefresh(options: PullToRefreshOptions): PullToRefres
 
   const [pullDistance, setPullDistance] = createSignal(0);
   const [pullPhase, setPullPhase] = createSignal<PullPhase>("idle");
+  // 2.0 微任务批处理（ADR-0144）：set 后同步读 signal 返回旧值，
+  // 状态机内部改用同步局部变量传递目标相位，signal 仅作为对外只读投影。
+  let phase: PullPhase = "idle";
+
+  function applyPhase(next: PullPhase) {
+    phase = next;
+    setPullPhase(next);
+  }
 
   let tracking = false;
   let startY = 0;
@@ -73,12 +81,12 @@ export function createPullToRefresh(options: PullToRefreshOptions): PullToRefres
     if (dy <= 0) {
       // 向上滑动：取消下拉
       setPullDistance(0);
-      setPullPhase("idle");
+      applyPhase("idle");
       return;
     }
     const dist = Math.min(dy * damping, threshold * 1.5);
     setPullDistance(dist);
-    setPullPhase(dist >= threshold ? "refresh-ready" : "pulling");
+    applyPhase(dist >= threshold ? "refresh-ready" : "pulling");
     // 下拉中阻止原生 overscroll/橡皮筋
     e.preventDefault();
   }
@@ -86,17 +94,17 @@ export function createPullToRefresh(options: PullToRefreshOptions): PullToRefres
   function onTouchEnd() {
     if (!tracking) return;
     tracking = false;
-    if (pullPhase() === "refresh-ready" && !isRefreshing()) {
-      setPullPhase("refreshing");
+    if (phase === "refresh-ready" && !isRefreshing()) {
+      applyPhase("refreshing");
       setPullDistance(threshold);
       const settle = () => {
         setPullDistance(0);
-        setPullPhase("idle");
+        applyPhase("idle");
       };
       void Promise.resolve(options.onRefresh()).then(settle, settle);
     } else {
       setPullDistance(0);
-      setPullPhase("idle");
+      applyPhase("idle");
     }
   }
 

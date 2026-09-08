@@ -375,7 +375,12 @@ export function createTQFeedStore<
 
     const loading: Accessor<boolean> = () =>
       activeQueries().some((q) => {
-        if (q.isFetching) return true;
+        // solid-query 6 兼容（#415）：适配层 v6 的 isFetching = fetchStatus==='fetching'
+        // || isPending(() => data())，其中 isPending 探针在「fetch 进行中被 untracked
+        // 读取」后会滞留 true（RC 探针 companion 不随 settle 刷新），令骨架永不卸载。
+        // 改用已提交通道 fetchStatus === 'fetching'（TanStack 各端 isFetching 的规范语义，
+        // dispatch→settle 全程为 true，settle 后立即 false），探针通道不进入本判定。
+        if (q.fetchStatus === "fetching") return true;
         // 首载粘滞（#366）：merge 多源 + 命令式 ensureInfiniteQueryData 组合下，
         // isFetching 信号会在 fetch 仍在进行时失真翻 false → 骨架被提前卸载，
         // 内容区出现数秒空白窗（体检 P3 的 s15 帧实证）。语义修正：

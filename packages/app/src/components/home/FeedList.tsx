@@ -59,7 +59,8 @@ interface FeedListProps<T> {
 
 export function FeedList<T>(props: FeedListProps<T>): JSX.Element {
   // 注意：source 必须通过 props.source 响应式访问（tab 切换时父组件传新 source 对象）
-  const refreshMode = props.refreshMode ?? "overlay";
+  // Solid 2.0：组件体顶层 props 读会 dev warn，改为 accessor（JSX 内调用）
+  const refreshMode = () => props.refreshMode ?? "overlay";
 
   const pull = createPullToRefresh({
     onRefresh: () => void props.source.refresh(),
@@ -74,21 +75,27 @@ export function FeedList<T>(props: FeedListProps<T>): JSX.Element {
   // ── 图片预取（对齐 VirtualFeed 的门控与调用方式）──
   // items 变化时，挑「未预取的前 N 个」fire-and-forget 下载，快速滚动时提前占住下载窗口。
   // 已预取 Set 闭包内维护，避免重复发起（loadImage 自身还有缓存命中 + inflight 去重兜底）。
+  // Solid 2.0 拆分：compute 提取快照（含 URL 列表），apply 写预取 Set 并发起下载
   const prefetchedUrls = new Set<string>();
-  createEffect(() => {
-    const extract = props.prefetchUrl;
-    if (!extract) return;
-    const currentItems = items();
-    if (currentItems.length === 0) return;
-    if (isImageHostEnabled()) return;
-    if (!imageCachePrefetch()) return;
-    const urls = currentItems.map(extract).filter((url): url is string => !!url);
-    const targets = pickUnprefetchedUrls(urls, prefetchedUrls, FEED_PREFETCH_COUNT);
-    for (const url of targets) {
-      prefetchedUrls.add(url);
-      loadImage(url).catch((err) => console.warn(`[FeedList] 图片预取失败: ${url}`, err));
-    }
-  });
+  createEffect(
+    () => {
+      const extract = props.prefetchUrl;
+      if (!extract) return null;
+      const currentItems = items();
+      if (currentItems.length === 0) return null;
+      if (isImageHostEnabled()) return null;
+      if (!imageCachePrefetch()) return null;
+      return { urls: currentItems.map(extract).filter((url): url is string => !!url) };
+    },
+    (s) => {
+      if (!s) return;
+      const targets = pickUnprefetchedUrls(s.urls, prefetchedUrls, FEED_PREFETCH_COUNT);
+      for (const url of targets) {
+        prefetchedUrls.add(url);
+        loadImage(url).catch((err) => console.warn(`[FeedList] 图片预取失败: ${url}`, err));
+      }
+    },
+  );
 
   const list = () => (
     <>
@@ -104,7 +111,7 @@ export function FeedList<T>(props: FeedListProps<T>): JSX.Element {
           refreshThreshold={60}
           settingsThreshold={60}
         />
-        {refreshMode === "overlay" && pull.pullPhase() === "refreshing" ? (
+        {refreshMode() === "overlay" && pull.pullPhase() === "refreshing" ? (
           props.skeleton()
         ) : (
           <div class={props.containerClass}>

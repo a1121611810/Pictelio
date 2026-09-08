@@ -80,61 +80,71 @@ export function createFeedVirtualizer<T>(config: FeedVirtualizerConfig<T>): Feed
   // ── Pull-to-refresh state ──
   const [pullDistance, setPullDistance] = createSignal(0);
   const [pullPhase, setPullPhase] = createSignal<PullPhase>("idle");
+  // 2.0 微任务批处理（ADR-0144）：set 后同步读 signal 返回旧值，
+  // 状态机内部改用同步局部变量传递目标相位，signal 仅作为对外只读投影。
+  let phase: PullPhase = "idle";
   let touchStartY = 0;
   const maxPull = config.settingsThreshold ? config.settingsThreshold * 1.5 : MAX_PULL;
 
+  function applyPhase(next: PullPhase) {
+    phase = next;
+    setPullPhase(next);
+  }
+
   // Reset pull state when refresh completes
+  // defer: 1.x `on()` 的首跑在 setup 时同步执行（彼时 phase 恒为 "idle"，必为 no-op）；
+  // 2.0 拆分效应的首跑推迟到 flush 后，可能撞上已是 "refreshing" 的状态造成误复位，
+  // 跳过首跑与 1.x 实际语义等价。
   createEffect(
-    on(
-      () => config.loading(),
-      (loading) => {
-        if (pullPhase() === "refreshing" && !loading) {
-          setPullDistance(0);
-          setPullPhase("idle");
-        }
-      },
-    ),
+    () => config.loading(),
+    (loading) => {
+      if (phase === "refreshing" && !loading) {
+        setPullDistance(0);
+        applyPhase("idle");
+      }
+    },
+    { defer: true },
   );
 
   function handleTouchStart(e: TouchEvent) {
     if (config.loading()) return;
     if (window.scrollY > 5) return;
     touchStartY = e.touches[0].clientY;
-    setPullPhase("pulling");
+    applyPhase("pulling");
   }
 
   function handleTouchMove(e: TouchEvent) {
-    if (pullPhase() === "idle" || pullPhase() === "refreshing") return;
+    if (phase === "idle" || phase === "refreshing") return;
     const deltaY = e.touches[0].clientY - touchStartY;
     if (deltaY < 0) {
       setPullDistance(0);
-      setPullPhase("idle");
+      applyPhase("idle");
       return;
     }
     const damped = Math.min(deltaY * 0.5, maxPull);
     setPullDistance(damped);
     const st = config.settingsThreshold;
     if (st && damped >= st) {
-      setPullPhase("settings-ready");
+      applyPhase("settings-ready");
     } else if (damped >= PULL_THRESHOLD) {
-      setPullPhase("refresh-ready");
+      applyPhase("refresh-ready");
     } else {
-      setPullPhase("pulling");
+      applyPhase("pulling");
     }
   }
 
   function handleTouchEnd() {
-    if (pullPhase() === "settings-ready") {
+    if (phase === "settings-ready") {
       setPullDistance(0);
-      setPullPhase("idle");
+      applyPhase("idle");
       config.onNavigateToSettings?.();
-    } else if (pullPhase() === "refresh-ready") {
-      setPullPhase("refreshing");
+    } else if (phase === "refresh-ready") {
+      applyPhase("refreshing");
       setPullDistance(PULL_THRESHOLD * 0.6);
       config.onRefresh();
     } else {
       setPullDistance(0);
-      setPullPhase("idle");
+      applyPhase("idle");
     }
   }
 
@@ -151,16 +161,22 @@ export function createFeedVirtualizer<T>(config: FeedVirtualizerConfig<T>): Feed
   // ── Container width tracking ──
   const [containerWidth, setContainerWidth] = createSignal(0);
 
+  // 2.0：ref 回调 unowned（getOwner() 为 null），内部的 onCleanup 会静默失效；
+  // ResizeObserver 的清理改由 owned 作用域内 onSettled 返回的 cleanup 负责。
+  let containerResizeObserver: ResizeObserver | undefined;
+  onSettled(() => () => containerResizeObserver?.disconnect());
+
   function onContainerRef(el: HTMLDivElement) {
     if (!el) return;
     setContainerWidth(el.clientWidth);
+    containerResizeObserver?.disconnect();
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
         setContainerWidth(entry.contentRect.width);
       }
     });
     ro.observe(el);
-    onCleanup(() => ro.disconnect());
+    containerResizeObserver = ro;
   }
 
   // ── Virtualizer ──
@@ -190,27 +206,33 @@ export function createFeedVirtualizer<T>(config: FeedVirtualizerConfig<T>): Feed
   } as any);
 
   // Sync options when items/count/lanes change
-  createEffect(() => {
-    const count = config.items().length;
-    const cc = config.lanes();
-    instance.setOptions({
-      count,
-      estimateSize: estimateSizeFn,
-      lanes: cc,
-      overscan: 2,
-      gap: GAP,
-      getItemKey: (i: number) => config.getItemKey(i),
-      getScrollElement: () => (typeof window !== "undefined" ? window : null),
-      observeElementRect: observeWindowRect,
-      observeElementOffset: observeWindowOffset,
-      scrollToFn: windowScroll,
-      laneAssignmentMode: laneMode,
+  // 2.0 拆分效应：compute 段只读并提取普通值快照，写 signal 移入 apply 段（write-under-scope 禁令）
+  createEffect(
+    () => ({
+      count: config.items().length,
+      lanes: config.lanes(),
       scrollAdjustment: persistScrollRestoration(),
-    } as any);
-    instance.measure();
-    setVirtualItems([...instance.getVirtualItems()] as VirtualItem[]);
-    setTotalSize(instance.getTotalSize());
-  });
+    }),
+    ({ count, lanes, scrollAdjustment }) => {
+      instance.setOptions({
+        count,
+        estimateSize: estimateSizeFn,
+        lanes,
+        overscan: 2,
+        gap: GAP,
+        getItemKey: (i: number) => config.getItemKey(i),
+        getScrollElement: () => (typeof window !== "undefined" ? window : null),
+        observeElementRect: observeWindowRect,
+        observeElementOffset: observeWindowOffset,
+        scrollToFn: windowScroll,
+        laneAssignmentMode: laneMode,
+        scrollAdjustment,
+      } as any);
+      instance.measure();
+      setVirtualItems([...instance.getVirtualItems()] as VirtualItem[]);
+      setTotalSize(instance.getTotalSize());
+    },
+  );
 
   // Mount lifecycle
   onSettled(() => {
@@ -218,46 +240,51 @@ export function createFeedVirtualizer<T>(config: FeedVirtualizerConfig<T>): Feed
     instance._willUpdate();
     setVirtualItems([...instance.getVirtualItems()] as VirtualItem[]);
     setTotalSize(instance.getTotalSize());
-    onCleanup(() => cleanup?.());
 
     // 初始测量
     instance.measure();
     setVirtualItems([...instance.getVirtualItems()] as VirtualItem[]);
     setTotalSize(instance.getTotalSize());
+    // 2.0：onSettled 以返回值注册清理（替代 onCleanup）
+    return () => cleanup?.();
   });
 
   // Scroll + resize listeners for window mode
-  createEffect(() => {
-    // 全量重算（_willUpdate + 重建虚拟项数组）单次即可达主线程长任务量级，
-    // 而 scroll 事件一帧内可触发 60~120 次；合并到 rAF 每帧至多重算一次，
-    // flush 时由 virtualizer 实时读取当下 scroll 位置，末态与逐次重算一致。
-    const syncVirtualState = () => {
-      instance._willUpdate();
-      setVirtualItems([...instance.getVirtualItems()] as VirtualItem[]);
-      setTotalSize(instance.getTotalSize());
-    };
-    let scrollRafId = 0;
-    const onScroll = () => {
-      if (scrollRafId !== 0) return;
-      scrollRafId = requestAnimationFrame(() => {
-        scrollRafId = 0;
+  createEffect(
+    // 无响应式依赖：仅挂载时执行一次
+    () => null,
+    () => {
+      // 全量重算（_willUpdate + 重建虚拟项数组）单次即可达主线程长任务量级，
+      // 而 scroll 事件一帧内可触发 60~120 次；合并到 rAF 每帧至多重算一次，
+      // flush 时由 virtualizer 实时读取当下 scroll 位置，末态与逐次重算一致。
+      const syncVirtualState = () => {
+        instance._willUpdate();
+        setVirtualItems([...instance.getVirtualItems()] as VirtualItem[]);
+        setTotalSize(instance.getTotalSize());
+      };
+      let scrollRafId = 0;
+      const onScroll = () => {
+        if (scrollRafId !== 0) return;
+        scrollRafId = requestAnimationFrame(() => {
+          scrollRafId = 0;
+          syncVirtualState();
+        });
+      };
+      const onResize = () => {
         syncVirtualState();
-      });
-    };
-    const onResize = () => {
-      syncVirtualState();
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onResize);
-    onCleanup(() => {
-      if (scrollRafId !== 0) {
-        cancelAnimationFrame(scrollRafId);
-        scrollRafId = 0;
-      }
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onResize);
-    });
-  });
+      };
+      window.addEventListener("scroll", onScroll, { passive: true });
+      window.addEventListener("resize", onResize);
+      return () => {
+        if (scrollRafId !== 0) {
+          cancelAnimationFrame(scrollRafId);
+          scrollRafId = 0;
+        }
+        window.removeEventListener("scroll", onScroll);
+        window.removeEventListener("resize", onResize);
+      };
+    },
+  );
 
   // measureElement — delegates to the virtualizer instance
   function measureElement(el: HTMLElement) {

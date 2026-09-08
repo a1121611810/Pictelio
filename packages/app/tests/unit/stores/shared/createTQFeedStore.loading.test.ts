@@ -1,4 +1,3 @@
-// @vitest-environment node
 /**
  * createTQFeedStore loading 首载粘滞语义（#366 FT-3）。
  *
@@ -63,7 +62,11 @@ const makeStore = (): TQFeedStoreResult<Item> =>
   });
 
 beforeEach(() => {
-  qc.client = new QueryClient();
+  // retry:false：query-core 默认重试阶梯（1s+2s+4s）会拖垮 5s 测试超时；本文件被测
+  // 语义是 loading 粘滞与错误放行，与重试策略无关（重试由应用级 queryClient 兜底）
+  qc.client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   qc.client.clear();
   resolveFetch = null;
   rejectFetch = null;
@@ -79,6 +82,9 @@ describe("createTQFeedStore loading 首载粘滞（#366）", () => {
   it("核心回归：activate 后无数据即 loading=true，不随 isFetching 抖动提前翻 false", async () => {
     const store = makeStore();
     store.activate();
+    // 2.0 批处理语义：activate 写的 activated signal 在微任务批处理内落地，
+    // 断言前先 flush 同步应用
+    flush();
     // activate 尚未触发 fetch（fetchCalls=0、isFetching=false），status=pending：
     // 修复前此场景 loading=false（骨架提前卸载成空白窗），修复后粘滞为 true
     expect(fetchCalls).toBe(0);
@@ -104,6 +110,8 @@ describe("createTQFeedStore loading 首载粘滞（#366）", () => {
   it("出错路径：loading=false 且 error 非空（骨架让位错误态，不永久粘滞）", async () => {
     const store = makeStore();
     store.activate();
+    // 2.0 批处理语义：断言前先 flush（同上）
+    flush();
     expect(store.loading()).toBe(true);
 
     const p = store.ensureLoaded();

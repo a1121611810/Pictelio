@@ -214,6 +214,7 @@ describe("resetUiStore", () => {
       const { mod, persistScrollRestoration, setPersistScrollRestoration } = await setup();
       await warm(mod);
       setPersistScrollRestoration(true);
+      flush(); // 2.0 批处理语义：set 后同步读返回旧值，先 flush 再断言
       expect(persistScrollRestoration()).toBe(true);
       await vi.waitFor(() =>
         expect(mod.__test.primary.dump().get("persist_scroll_restoration")).toBe("true"),
@@ -287,8 +288,10 @@ describe("showUpdateDialog", () => {
   it("can be toggled via setShowUpdateDialog", async () => {
     const { setShowUpdateDialog, showUpdateDialog } = await setup();
     setShowUpdateDialog(true);
+    flush(); // 2.0 批处理语义：set 后同步读返回旧值，先 flush 再断言
     expect(showUpdateDialog()).toBe(true);
     setShowUpdateDialog(false);
+    flush(); // 2.0 批处理语义：set 后同步读返回旧值，先 flush 再断言
     expect(showUpdateDialog()).toBe(false);
   });
 });

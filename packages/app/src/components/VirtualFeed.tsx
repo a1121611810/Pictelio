@@ -47,12 +47,16 @@ const VirtualFeed: Component<Props> = (props) => {
   const columnCount = createMemo(() => LAYOUT_COLUMNS[layoutMode()]);
 
   // 标记是否已发起过数据加载（用于抑制首次渲染时的空状态）
+  // Solid 2.0 拆分：compute 返回快照，apply 写普通闭包变量（非 signal，无写限制）
   let loadAttempted = false;
-  createEffect(() => {
-    if (props.loading || props.error || props.illusts.length > 0) {
-      loadAttempted = true;
-    }
-  });
+  createEffect(
+    () => props.loading || props.error != null || props.illusts.length > 0,
+    (started) => {
+      if (started) {
+        loadAttempted = true;
+      }
+    },
+  );
 
   const estimateSize = (index: number) => {
     const ill = props.illusts[index];
@@ -113,25 +117,32 @@ const VirtualFeed: Component<Props> = (props) => {
   }
 
   // ── Scroll prediction: prefetch images just outside visible window ──
-  createEffect(() => {
-    const items = virtualItems();
-    if (items.length === 0) return;
-    if (isImageHostEnabled()) return;
-    if (!imageCachePrefetch()) return;
-    const illustsList = props.illusts;
-    const lastIdx = items[items.length - 1].index;
-    const preloadEnd = Math.min(lastIdx + 10, illustsList.length);
-    for (let i = lastIdx + 1; i < preloadEnd; i++) {
-      const ill = illustsList[i];
-      if (!ill) break;
-      // 预取 key 必须与卡片展示 URL 恒等（ImageCard/GridCard 同用 pickListImageUrl）；
-      // 旧实现写死 medium||large，quality=large/original 时预热 key 与展示 src 不匹配而失效
-      const url = pickListImageUrl(ill, listQuality());
-      if (url && !checkImageCache(url)) {
-        void tryAsync(loadImage(url));
+  // Solid 2.0 拆分：compute 提取普通值快照（含列表引用），apply 读列表项并触发预取
+  createEffect(
+    () => {
+      const items = virtualItems();
+      if (items.length === 0) return null;
+      if (isImageHostEnabled()) return null;
+      if (!imageCachePrefetch()) return null;
+      const illustsList = props.illusts;
+      const lastIdx = items[items.length - 1].index;
+      return { lastIdx, illustsList, quality: listQuality() };
+    },
+    (s) => {
+      if (!s) return;
+      const preloadEnd = Math.min(s.lastIdx + 10, s.illustsList.length);
+      for (let i = s.lastIdx + 1; i < preloadEnd; i++) {
+        const ill = s.illustsList[i];
+        if (!ill) break;
+        // 预取 key 必须与卡片展示 URL 恒等（ImageCard/GridCard 同用 pickListImageUrl）；
+        // 旧实现写死 medium||large，quality=large/original 时预热 key 与展示 src 不匹配而失效
+        const url = pickListImageUrl(ill, s.quality);
+        if (url && !checkImageCache(url)) {
+          void tryAsync(loadImage(url));
+        }
       }
-    }
-  });
+    },
+  );
 
   return (
     <div ref={containerRef} class="px-3">

@@ -47,7 +47,10 @@ function makeEntry(overrides: Partial<HistoryEntry> = {}): HistoryEntry {
 function seedStorage(entries: HistoryEntry[]): void {
   const objectData: Record<string, { versionKey: string; data: HistoryEntry }> = {};
   for (const entry of entries) {
-    objectData[`s:${entry.key}`] = { versionKey: "0f4dbba7-8e0a-4e5f-9ef3-5f8a6f9f1c00", data: entry };
+    objectData[`s:${entry.key}`] = {
+      versionKey: "0f4dbba7-8e0a-4e5f-9ef3-5f8a6f9f1c00",
+      data: entry,
+    };
   }
   window.localStorage.setItem("pictelio-browsing-history", JSON.stringify(objectData));
 }

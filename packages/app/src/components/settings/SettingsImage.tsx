@@ -53,12 +53,15 @@ const SettingsImage: Component<SettingsImageProps> = (props) => {
         <div class="flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-1.5 gap-1">
           {(["medium", "large"] as ImageQuality[]).map((q) => (
             <button
-              class={["flex-1 py-[var(--spacingVerticalS)] px-[var(--spacingHorizontalM)] rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all ease-[var(--curveEasyEase)] active:scale-[0.98] appearance-none border-none outline-none cursor-pointer", {
-                "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
-                  listQuality() === q,
-                "bg-transparent text-[var(--colorNeutralForeground2)]": listQuality() !== q,
-              }]}
-              
+              class={[
+                "flex-1 py-[var(--spacingVerticalS)] px-[var(--spacingHorizontalM)] rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all ease-[var(--curveEasyEase)] active:scale-[0.98] appearance-none border-none outline-none cursor-pointer",
+                {
+                  "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
+                    listQuality() === q,
+                  "bg-transparent text-[var(--colorNeutralForeground2)]": listQuality() !== q,
+                },
+              ]}
+
               onClick={() => setListQuality(q)}
             >
               {q === "medium" ? "默认" : "高清"}
@@ -78,12 +81,15 @@ const SettingsImage: Component<SettingsImageProps> = (props) => {
         <div class="flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-1.5 gap-1">
           {(["medium", "large", "original"] as ImageQuality[]).map((q) => (
             <button
-              class={["flex-1 py-[var(--spacingVerticalS)] px-[var(--spacingHorizontalM)] rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all ease-[var(--curveEasyEase)] active:scale-[0.98] appearance-none border-none outline-none cursor-pointer", {
-                "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
-                  detailQuality() === q,
-                "bg-transparent text-[var(--colorNeutralForeground2)]": detailQuality() !== q,
-              }]}
-              
+              class={[
+                "flex-1 py-[var(--spacingVerticalS)] px-[var(--spacingHorizontalM)] rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all ease-[var(--curveEasyEase)] active:scale-[0.98] appearance-none border-none outline-none cursor-pointer",
+                {
+                  "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
+                    detailQuality() === q,
+                  "bg-transparent text-[var(--colorNeutralForeground2)]": detailQuality() !== q,
+                },
+              ]}
+
               onClick={() => setDetailQuality(q)}
             >
               {q === "medium" ? "默认" : q === "large" ? "高清" : "原图"}
@@ -103,12 +109,15 @@ const SettingsImage: Component<SettingsImageProps> = (props) => {
         <div class="flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-1.5 gap-1">
           {(["fflate", "range"] as UgoiraExtractMode[]).map((m) => (
             <button
-              class={["flex-1 py-[var(--spacingVerticalS)] px-[var(--spacingHorizontalM)] rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all ease-[var(--curveEasyEase)] active:scale-[0.98] appearance-none border-none outline-none cursor-pointer", {
-                "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
-                  ugoiraMode() === m,
-                "bg-transparent text-[var(--colorNeutralForeground2)]": ugoiraMode() !== m,
-              }]}
-              
+              class={[
+                "flex-1 py-[var(--spacingVerticalS)] px-[var(--spacingHorizontalM)] rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all ease-[var(--curveEasyEase)] active:scale-[0.98] appearance-none border-none outline-none cursor-pointer",
+                {
+                  "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
+                    ugoiraMode() === m,
+                  "bg-transparent text-[var(--colorNeutralForeground2)]": ugoiraMode() !== m,
+                },
+              ]}
+
               onClick={() => onPickUgoiraMode(m)}
             >
               {m === "fflate" ? "fflate（默认）" : "Range 流式"}

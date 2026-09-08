@@ -107,11 +107,14 @@ const FluentDialog: Component<FluentDialogProps> = (props) => {
     }
   }
 
-  createEffect(() => {
-    // 追踪 props.open 变化；ref 未就绪时跳过，由 onSettled 兜底
-    void props.open;
-    syncOpenToHost();
-  });
+  // Solid 2.0 拆分：compute 只追踪 props.open，apply 段做 DOM 副作用（untracked）
+  createEffect(
+    () => props.open,
+    () => {
+      // ref 未就绪时跳过，由 onSettled 兜底
+      syncOpenToHost();
+    },
+  );
 
   onCleanup(() => {
     disposed = true;
@@ -131,8 +134,17 @@ const FluentDialog: Component<FluentDialogProps> = (props) => {
     syncOpenToHost();
   });
 
+  // Solid 2.0：数组 ref 中的裸变量不会像 ref={var} 那样被编译器回写赋值，
+  // 必须用具名回调捕获宿主元素，再与 fluentOn 组成数组 ref
+  const attachHostRef = (el: HTMLElement) => {
+    ref = el;
+  };
+
   return (
-    <fluent-dialog ref={[ref, fluentOn("close", () => props.onClose?.())]} aria-label={props["aria-label"]} >
+    <fluent-dialog
+      ref={[attachHostRef, fluentOn("close", () => props.onClose?.())]}
+      aria-label={props["aria-label"]}
+    >
       <fluent-dialog-body ref={bodyRef}>{props.children}</fluent-dialog-body>
     </fluent-dialog>
   );

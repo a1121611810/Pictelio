@@ -1,4 +1,5 @@
 import type { Component } from "solid-js";
+import { deep } from "solid-js";
 import { useNavigate, useParams } from "@solidjs/router";
 import { createIntersectionObserver } from "@solid-primitives/intersection-observer";
 import {
@@ -63,6 +64,7 @@ const IllustDetail: Component = () => {
     }
   }
 
+  // Solid 2.0：onSettled 内禁用 onCleanup（CLEANUP_IN_FORBIDDEN_SCOPE），清理改由返回值注册。
   onSettled(() => {
     infoObserver = new IntersectionObserver(
       (entries) => {
@@ -76,7 +78,7 @@ const IllustDetail: Component = () => {
     if (infoSentinelEl) {
       infoObserver.observe(infoSentinelEl);
     }
-    onCleanup(() => infoObserver?.disconnect());
+    return () => infoObserver?.disconnect();
   });
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<ApiError | null>(null);
@@ -150,12 +152,17 @@ const IllustDetail: Component = () => {
   }
 
   // Auto-hide toast message
-  createEffect(() => {
-    if (toastMessage()) {
+  // Solid 2.0 拆分效应：compute 读 toastMessage，apply 段起定时器并以返回值注册清理。
+  createEffect(
+    () => toastMessage(),
+    (toast) => {
+      if (!toast) {
+        return;
+      }
       const timer = setTimeout(() => setToastMessage(null), 2500);
-      onCleanup(() => clearTimeout(timer));
-    }
-  });
+      return () => clearTimeout(timer);
+    },
+  );
 
   function measureCoverContent(e: Event) {
     const img = e.target as HTMLImageElement;
@@ -304,12 +311,16 @@ const IllustDetail: Component = () => {
   let savedScrollBeforeViewer = 0;
   let viewerMaskRemover: (() => void) | null = null;
 
-  createIntersectionObserver(
-    pageElements,
-    (entries) => {
+  // Solid 2.0：createIntersectionObserver 移除回调参数，改为返回 [entries, isVisible]。
+  // 用 deep() 深度跟踪 entries store（元素变化时库内部自行 observe/unobserve），
+  // apply 段基于全部槽位的最新可见状态取最大可见页码（比旧实现逐批事件更稳定）。
+  const [pageEntries] = createIntersectionObserver(pageElements, { threshold: [0] });
+  createEffect(
+    () => deep(pageEntries),
+    (list) => {
       let maxIndex = -1;
-      for (const entry of entries) {
-        if (entry.isIntersecting) {
+      for (const entry of list) {
+        if (entry?.isIntersecting) {
           const idx = Number((entry.target as HTMLElement).dataset.pageIndex);
           if (!Number.isNaN(idx) && idx > maxIndex) {
             maxIndex = idx;
@@ -320,7 +331,6 @@ const IllustDetail: Component = () => {
         setCurrentVisiblePage(maxIndex);
       }
     },
-    { threshold: [0] },
   );
 
   // 组件卸载时确保移除即时注入的过渡遮罩，避免 DOM 泄漏
@@ -368,83 +378,96 @@ const IllustDetail: Component = () => {
   }
 
   // 查看器关闭后：移除即时遮罩 + 恢复滚动位置
-  createEffect(() => {
-    if (!viewerOpen() && !loading() && illust()) {
-      requestAnimationFrame(() => {
-        // 移除即时注入的过渡遮罩
-        viewerMaskRemover?.();
-        viewerMaskRemover = null;
+  // Solid 2.0 拆分效应：compute 提取快照，apply 段做 DOM 副作用。
+  createEffect(
+    () => ({ open: viewerOpen(), loading: loading(), has: illust() !== null }),
+    ({ open, loading: loadingNow, has }) => {
+      if (!open && !loadingNow && has) {
+        requestAnimationFrame(() => {
+          // 移除即时注入的过渡遮罩
+          viewerMaskRemover?.();
+          viewerMaskRemover = null;
 
-        // 恢复之前保存的滚动位置
-        window.scrollTo(0, savedScrollBeforeViewer);
-      });
-    }
-  });
+          // 恢复之前保存的滚动位置
+          window.scrollTo(0, savedScrollBeforeViewer);
+        });
+      }
+    },
+  );
 
   // 将查看器状态注册到 overlay 栈，供系统返回手势统一处理
-  createEffect(() => {
-    if (viewerOpen()) {
-      pushOverlay("viewer", closeViewer);
-      onCleanup(() => {
-        popOverlay("viewer");
-      });
-    }
-  });
+  // Solid 2.0：拆分效应 + apply 返回 cleanup（原 onCleanup 在 effect 内已不可用）
+  createEffect(
+    () => viewerOpen(),
+    (open) => {
+      if (open) {
+        pushOverlay("viewer", closeViewer);
+        return () => popOverlay("viewer");
+      }
+    },
+  );
 
   // 将评论面板状态注册到 overlay 栈
-  createEffect(() => {
-    if (showComments()) {
-      pushOverlay("commentSheet", () => setShowComments(false));
-      onCleanup(() => {
-        popOverlay("commentSheet");
-      });
-    }
-  });
+  createEffect(
+    () => showComments(),
+    (open) => {
+      if (open) {
+        pushOverlay("commentSheet", () => setShowComments(false));
+        return () => popOverlay("commentSheet");
+      }
+    },
+  );
 
   // 将举报面板状态注册到 overlay 栈
-  createEffect(() => {
-    if (showReportSheet()) {
-      pushOverlay("reportSheet", () => setShowReportSheet(false));
-      onCleanup(() => {
-        popOverlay("reportSheet");
-      });
-    }
-  });
+  createEffect(
+    () => showReportSheet(),
+    (open) => {
+      if (open) {
+        pushOverlay("reportSheet", () => setShowReportSheet(false));
+        return () => popOverlay("reportSheet");
+      }
+    },
+  );
 
   // 组件内加载数据：先渲染骨架屏，params 变化时自动重新请求
-  createEffect(() => {
-    const id = Number(params.id);
-    if (!id) return;
+  // Solid 2.0 拆分效应：compute 读 params.id，apply 段发起请求（写 signal 合法），
+  // 取消逻辑由 apply 返回的 cleanup 承担（重跑/卸载时中止旧请求，防竞态）。
+  createEffect(
+    () => Number(params.id),
+    (id) => {
+      if (!id) return;
 
-    // 清理旧请求，避免竞态条件
-    let cancelled = false;
-    const controller = new AbortController();
-    onCleanup(() => {
-      cancelled = true;
-      controller.abort();
-    });
+      // 清理旧请求，避免竞态条件
+      let cancelled = false;
+      const controller = new AbortController();
 
-    setLoading(true);
-    setError(null);
-    setIllust(null);
+      setLoading(true);
+      setError(null);
+      setIllust(null);
 
-    loadDetail(id, controller.signal)
-      .then((res) => {
-        if (cancelled) return;
-        const i = res.illust;
-        setIllust(i);
-        setPageRefs(new Map());
-        recordVisit(i, "illust");
-        setIsFollowed(i.user.is_followed ?? false);
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        if (err instanceof DOMException && err.name === "AbortError") return;
-        setError({ type: ApiErrorType.UNKNOWN, message: err?.message ?? "加载失败" });
-        setLoading(false);
-      });
-  });
+      loadDetail(id, controller.signal)
+        .then((res) => {
+          if (cancelled) return;
+          const i = res.illust;
+          setIllust(i);
+          setPageRefs(new Map());
+          recordVisit(i, "illust");
+          setIsFollowed(i.user.is_followed ?? false);
+          setLoading(false);
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          if (err instanceof DOMException && err.name === "AbortError") return;
+          setError({ type: ApiErrorType.UNKNOWN, message: err?.message ?? "加载失败" });
+          setLoading(false);
+        });
+
+      return () => {
+        cancelled = true;
+        controller.abort();
+      };
+    },
+  );
 
   /** Parse Pixiv internal caption links and navigate in-app */
   function handleCaptionClick(e: MouseEvent) {
@@ -780,13 +803,16 @@ const IllustDetail: Component = () => {
                     </p>
                   </div>
                   <button
-                    class={["inline-flex items-center justify-center gap-[var(--spacingHorizontalXS)] rounded-[var(--borderRadiusMedium)] font-semibold [font-size:var(--fontSizeBase200)] [line-height:var(--lineHeightBase200)] min-h-8 px-[var(--spacingHorizontalM)] border transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] active:scale-[0.97] select-none appearance-none outline-none cursor-pointer focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)] flex-shrink-0 ml-auto", {
-                      "bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] border-[var(--colorBrandBackground)] hover:bg-[var(--colorBrandBackgroundHover)] active:bg-[var(--colorBrandBackgroundPressed)]":
-                        !isFollowed(),
-                      "bg-transparent text-[var(--colorNeutralForeground2)] border-[var(--colorNeutralStroke2)] hover:text-[var(--colorStatusDangerForeground1)] hover:border-[var(--colorStatusDangerForeground1)]":
-                        isFollowed(),
-                    }]}
-                    
+                    class={[
+                      "inline-flex items-center justify-center gap-[var(--spacingHorizontalXS)] rounded-[var(--borderRadiusMedium)] font-semibold [font-size:var(--fontSizeBase200)] [line-height:var(--lineHeightBase200)] min-h-8 px-[var(--spacingHorizontalM)] border transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] active:scale-[0.97] select-none appearance-none outline-none cursor-pointer focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)] flex-shrink-0 ml-auto",
+                      {
+                        "bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] border-[var(--colorBrandBackground)] hover:bg-[var(--colorBrandBackgroundHover)] active:bg-[var(--colorBrandBackgroundPressed)]":
+                          !isFollowed(),
+                        "bg-transparent text-[var(--colorNeutralForeground2)] border-[var(--colorNeutralStroke2)] hover:text-[var(--colorStatusDangerForeground1)] hover:border-[var(--colorStatusDangerForeground1)]":
+                          isFollowed(),
+                      },
+                    ]}
+
                     onClick={toggleFollow}
                     disabled={following()}
                     aria-label={isFollowed() ? "取消关注" : "关注"}
@@ -917,13 +943,16 @@ const IllustDetail: Component = () => {
               >
                 {imageUrls().map((_, i) => (
                   <button
-                    class={["flex items-center justify-center rounded-[var(--borderRadiusCircular)] [font-size:var(--fontSizeBase200)] font-medium transition-all duration-[var(--durationFast)] min-w-9 min-h-9", {
-                      "bg-[var(--colorNeutralBackground1Selected)] text-[var(--colorNeutralForeground1)] font-semibold":
-                        i === currentVisiblePage(),
-                      "text-[var(--colorOverlayForeground)] opacity-[0.85] hover:opacity-100":
-                        i !== currentVisiblePage(),
-                    }]}
-                    
+                    class={[
+                      "flex items-center justify-center rounded-[var(--borderRadiusCircular)] [font-size:var(--fontSizeBase200)] font-medium transition-all duration-[var(--durationFast)] min-w-9 min-h-9",
+                      {
+                        "bg-[var(--colorNeutralBackground1Selected)] text-[var(--colorNeutralForeground1)] font-semibold":
+                          i === currentVisiblePage(),
+                        "text-[var(--colorOverlayForeground)] opacity-[0.85] hover:opacity-100":
+                          i !== currentVisiblePage(),
+                      },
+                    ]}
+
                     style={{
                       "text-shadow":
                         i !== currentVisiblePage() ? "var(--textShadowDefault)" : "none",

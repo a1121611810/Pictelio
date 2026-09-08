@@ -308,9 +308,22 @@ export function createSearchStore(): SearchStoreState {
     loading,
     error,
     paginationError,
-    setKeyword,
-    setScope,
-    setSort,
+    // SolidJS 2.0 批处理语义（set-后-读审计修复点）：三个 setter 是命令式 API，
+    // 调用方契约是「set 后同 tick 内 executeSearch / keyword() 读到新值」（1.x 同步
+    // 可见语义）。set 后 flush 保持该契约，属命令式边界豁免（同时消除 Search.tsx
+    // setKeyword("") 后同步 keyword().trim() 读到旧值的批处理错位）。
+    setKeyword: (word: string) => {
+      setKeyword(word);
+      flush();
+    },
+    setScope: (next: SearchScope) => {
+      setScope(next);
+      flush();
+    },
+    setSort: (next: SearchSort) => {
+      setSort(next);
+      flush();
+    },
     executeSearch,
     loadMore,
   };

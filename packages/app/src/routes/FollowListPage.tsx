@@ -78,11 +78,14 @@ const FollowListPage: Component<Props> = (props) => {
         <div class="pb-16">
           {/* Header */}
           <header
-            class={["sticky top-0 z-20 surface-appbar h-12 flex items-center px-4 gap-3 transition-transform duration-[var(--durationNormal)] ease-[var(--curveEasyEase)]", {
-              "translate-y-0": headerVisible(),
-              "-translate-y-full": !headerVisible(),
-            }]}
-            
+            class={[
+              "sticky top-0 z-20 surface-appbar h-12 flex items-center px-4 gap-3 transition-transform duration-[var(--durationNormal)] ease-[var(--curveEasyEase)]",
+              {
+                "translate-y-0": headerVisible(),
+                "-translate-y-full": !headerVisible(),
+              },
+            ]}
+
             onDblClick={scrollToTop}
           >
             <fluent-button
@@ -135,13 +138,18 @@ const FollowListPage: Component<Props> = (props) => {
                     {/* 关注按钮（非当前用户时显示） */}
                     <Show when={preview.user.is_followed != null}>
                       <button
-                        class={["inline-flex items-center justify-center min-h-[40px] font-semibold [font-size:var(--fontSizeBase100)] cursor-pointer select-none transition-colors duration-[var(--durationFast)] ease-[var(--curveEasyEase)] active:scale-[0.95] focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThick)] focus-visible:outline-[var(--colorStrokeFocus2)] appearance-none border-none bg-transparent p-0 px-[var(--spacingHorizontalS)] flex-shrink-0", {
-                          "text-[var(--colorBrandForeground1)] hover:text-[var(--colorBrandForeground1Hover)]":
-                            !preview.user.is_followed,
-                          "text-[var(--colorNeutralForeground3)] hover:text-[var(--colorStatusDangerForeground2)]":
-                            preview.user.is_followed,
-                        }]}
-                        
+                        class={[
+                          "inline-flex items-center justify-center min-h-[40px] font-semibold [font-size:var(--fontSizeBase100)] cursor-pointer select-none transition-colors duration-[var(--durationFast)] ease-[var(--curveEasyEase)] active:scale-[0.95] focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThick)] focus-visible:outline-[var(--colorStrokeFocus2)] appearance-none border-none bg-transparent p-0 px-[var(--spacingHorizontalS)] flex-shrink-0",
+                          {
+                            "text-[var(--colorBrandForeground1)] hover:text-[var(--colorBrandForeground1Hover)]":
+                              !preview.user.is_followed,
+                            // Solid 2.0：class 对象值须为严格 boolean（is_followed?: boolean，
+                            // undefined 不满足 ClassValue）；外层 Show 已保证非 null，取反归一
+                            "text-[var(--colorNeutralForeground3)] hover:text-[var(--colorStatusDangerForeground2)]":
+                              !!preview.user.is_followed,
+                          },
+                        ]}
+
                         onClick={(e) => {
                           e.stopPropagation();
                           toggleFollow(index());

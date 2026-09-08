@@ -1,4 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
+// ADR-0144：2.0 微任务批处理下，setter 写需经 flush 同步生效后才能同步断言
+import { flush } from "solid-js";
 import { createManualFetch } from "@/primitives/createManualFetch";
 
 describe("createManualFetch", () => {
@@ -18,6 +20,7 @@ describe("createManualFetch", () => {
         }),
     );
     const promise = fetcher.execute();
+    flush(); // ADR-0144：批处理下 set 后同步读为旧值，先排空再断言
     expect(fetcher.loading()).toBe(true);
     resolvePromise("done");
     await promise;
@@ -46,6 +49,7 @@ describe("createManualFetch", () => {
     expect(fetcher.data()).toBe("ok");
 
     const promise = fetcher.execute();
+    flush(); // ADR-0144：批处理下 set 后同步读为旧值，先排空再断言
     // Data 会被重置为 null，因为 execute 清空了
     expect(fetcher.data()).toBeNull();
     expect(fetcher.loading()).toBe(true);

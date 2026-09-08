@@ -152,20 +152,31 @@ export function createNovelSearch(text: Accessor<string | null>, options: NovelS
 
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
-  function recomputeMatches() {
-    const term = searchTerm();
-    const currentText = text();
-    const paragraphs = currentText ? currentText.split("\n\n") : [];
+  // 2.0：term/paragraphs 由调用方显式传入（局部变量传递），避免批处理下 set 后读 signal 拿旧值
+  function recomputeMatches(term: string, paragraphs: string[]) {
     const newMatches = findMatches(paragraphs, term, caseSensitive, maxMatches);
     setMatches(newMatches);
     setActiveIndex(newMatches.length > 0 ? 0 : -1);
   }
 
-  createEffect(() => {
-    // 跟踪 text 与 searchTerm 变化，自动重新计算匹配
-    text();
-    searchTerm();
-    recomputeMatches();
+  // 2.0 拆分效应：compute 段跟踪 text 与 searchTerm 并快照，写 signal 移入 apply 段
+  createEffect(
+    () => {
+      const term = searchTerm();
+      const currentText = text();
+      const paragraphs = currentText ? currentText.split("\n\n") : [];
+      return { term, paragraphs };
+    },
+    ({ term, paragraphs }) => {
+      recomputeMatches(term, paragraphs);
+    },
+  );
+
+  // 2.0：清理注册到 owned 作用域（原先在事件处理器内调 onCleanup 属 unowned，静默失效）
+  onCleanup(() => {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
   });
 
   function setQuery(value: string) {
@@ -174,21 +185,22 @@ export function createNovelSearch(text: Accessor<string | null>, options: NovelS
       clearTimeout(debounceTimer);
     }
 
+    const computeParagraphs = () => {
+      const currentText = text();
+      return currentText ? currentText.split("\n\n") : [];
+    };
+
     if (debounceMs === 0) {
       setSearchTerm(value);
-      recomputeMatches();
+      // 2.0 批处理：set 后同步读 searchTerm() 返回旧值，直接传递目标值
+      recomputeMatches(value, computeParagraphs());
     } else {
       debounceTimer = setTimeout(() => {
         setSearchTerm(value);
-        recomputeMatches();
+        // 同上：传目标值而非回读 signal
+        recomputeMatches(value, computeParagraphs());
       }, debounceMs);
     }
-
-    onCleanup(() => {
-      if (debounceTimer) {
-        clearTimeout(debounceTimer);
-      }
-    });
   }
 
   function getMatchesForParagraph(paragraphIndex: number): NovelSearchMatch[] {

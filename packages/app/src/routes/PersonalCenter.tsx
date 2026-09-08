@@ -52,15 +52,16 @@ const PersonalCenter: Component<Props> = (props) => {
     // HomePage 只渲染 recommended/follow/bookmarks/history 四个面板，currentTab 为
     // "me" 时四个面板全不渲染，表现为「从列表点作者/点自己进个人中心再返回，列表空白」
     // （模拟器实测复现的 bug 2/4）。
+    // Solid 2.0：onSettled 内禁用 onCleanup（CLEANUP_IN_FORBIDDEN_SCOPE），清理改由返回值注册。
     const prevTab = currentTab();
     setCurrentTab("me");
-    onCleanup(() => {
-      restoreCurrentTabOnCleanup(currentTab, setCurrentTab, prevTab);
-    });
     const uid = profileState.targetUserId();
     if (uid) {
       loadProfile(uid);
     }
+    return () => {
+      restoreCurrentTabOnCleanup(currentTab, setCurrentTab, prevTab);
+    };
   });
 
   // ── 导航动作集 ──
@@ -114,7 +115,8 @@ const PersonalCenter: Component<Props> = (props) => {
                 }
               }}
               role="button"
-              tabIndex={0}
+              // Solid 2.0：内建属性按 attribute 处理，tabIndex 改为小写 tabindex
+              tabindex={0}
               aria-label="搜索"
             >
               <FluentIcon name="search" size={16} />

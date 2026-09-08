@@ -23,22 +23,30 @@ const ClientSwitch: Component = () => {
   const [actionToast, setActionToast] = createSignal<string | null>(null);
 
   // Auto-hide action toast
-  createEffect(() => {
-    if (actionToast()) {
+  // Solid 2.0 拆分效应：compute 读 actionToast，apply 段起定时器并以返回值注册清理。
+  createEffect(
+    () => actionToast(),
+    (toast) => {
+      if (!toast) {
+        return;
+      }
       const timer = setTimeout(() => setActionToast(null), 2500);
-      onCleanup(() => clearTimeout(timer));
-    }
-  });
+      return () => clearTimeout(timer);
+    },
+  );
 
-  onSettled(async () => {
-    setCurrent(await readClientKind());
-    try {
-      const { kinds } = await ClientInfo.getClientKinds();
-      setClientKinds(kinds);
-    } catch {
-      // 原生插件不可用（web 开发环境）→ 保持 null，按"未知"保守渲染
-      setClientKinds(null);
-    }
+  // Solid 2.0：onSettled 回调必须同步，async 主体移入 IIFE（写入发生在 await 之后，合法）。
+  onSettled(() => {
+    void (async () => {
+      setCurrent(await readClientKind());
+      try {
+        const { kinds } = await ClientInfo.getClientKinds();
+        setClientKinds(kinds);
+      } catch {
+        // 原生插件不可用（web 开发环境）→ 保持 null，按"未知"保守渲染
+        setClientKinds(null);
+      }
+    })();
   });
 
   const currentLabel = () => (current() === "lynx" ? "Lynx" : "WebView");

@@ -40,7 +40,8 @@ const UgoiraViewer: Component<Props> = (props) => {
   const frameList = (): UgoiraFrame[] =>
     props.streaming ? props.streaming.frames() : (props.preloadedFrames ?? frames());
 
-  onSettled(async () => {
+  // onSettled 不接受 async 函数：异步分支内部消化 Promise
+  onSettled(() => {
     // 渐进模式：数据由父组件流式提供，直接开始播放（首帧就绪时已挂载）
     if (props.streaming) {
       setStatus("playing");
@@ -55,19 +56,20 @@ const UgoiraViewer: Component<Props> = (props) => {
       return;
     }
 
-    const [err, result] = await tryAsync(
-      downloadAndExtractUgoira(props.illustId, undefined, ugoiraMode()),
+    void tryAsync(downloadAndExtractUgoira(props.illustId, undefined, ugoiraMode())).then(
+      ([err, result]) => {
+        if (err) {
+          console.error("[UgoiraViewer] Error:", err);
+          setError((err as Error).message || "加载动图失败");
+          setStatus("paused");
+        } else {
+          blobUrls = result.blobUrls;
+          setFrames(result.frames);
+          setStatus("playing");
+          scheduleNext(0);
+        }
+      },
     );
-    if (err) {
-      console.error("[UgoiraViewer] Error:", err);
-      setError((err as Error).message || "加载动图失败");
-      setStatus("paused");
-    } else {
-      blobUrls = result.blobUrls;
-      setFrames(result.frames);
-      setStatus("playing");
-      scheduleNext(0);
-    }
   });
 
   /**
@@ -128,9 +130,14 @@ const UgoiraViewer: Component<Props> = (props) => {
   });
 
   // 帧加载完成后，测量第一帧的实际宽高比，更新容器
-  createEffect(() => {
-    if (status() === "playing" && frameList().length > 0) {
-      const url = frameList()[0].url;
+  // Solid 2.0 拆分：compute 只读返回首帧 URL 快照，apply 发起测量并返回 cleanup（替代 onCleanup）
+  createEffect(
+    () => {
+      const list = frameList();
+      return status() === "playing" && list.length > 0 ? list[0].url : null;
+    },
+    (url) => {
+      if (!url) return;
       const img = new Image();
       let alive = true;
       img.onload = () => {
@@ -139,11 +146,11 @@ const UgoiraViewer: Component<Props> = (props) => {
         }
       };
       img.src = url;
-      onCleanup(() => {
+      return () => {
         alive = false;
-      });
-    }
-  });
+      };
+    },
+  );
 
   // Inline mode wrapper
   const containerStyle = (): Record<string, string> => {
@@ -199,11 +206,13 @@ const UgoiraViewer: Component<Props> = (props) => {
 
       {status() === "paused" && (
         <div
-          class={["px-2.5 py-1 rounded-[var(--borderRadiusCircular)] bg-[var(--colorOverlaySurface)] text-[var(--colorOverlayForeground)] text-[var(--fontSizeBase200)] font-medium z-10", {
-            "absolute top-4 right-4": !props.inline,
-            "absolute top-2 right-2": props.inline,
-          }]}
-          
+          class={[
+            "px-2.5 py-1 rounded-[var(--borderRadiusCircular)] bg-[var(--colorOverlaySurface)] text-[var(--colorOverlayForeground)] text-[var(--fontSizeBase200)] font-medium z-10",
+            {
+              "absolute top-4 right-4": !props.inline,
+              "absolute top-2 right-2": props.inline === true,
+            },
+          ]}
         >
           已暂停
         </div>
@@ -212,12 +221,14 @@ const UgoiraViewer: Component<Props> = (props) => {
       {/* Error state */}
       {error() && (
         <div
-          class={["text-center px-6", {
-            "text-[var(--colorOverlayForeground)]": !props.inline,
-            "text-[var(--colorNeutralForeground1)] absolute inset-0 flex flex-col items-center justify-center bg-[var(--colorNeutralBackground2)]":
-              props.inline,
-          }]}
-          
+          class={[
+            "text-center px-6",
+            {
+              "text-[var(--colorOverlayForeground)]": !props.inline,
+              "text-[var(--colorNeutralForeground1)] absolute inset-0 flex flex-col items-center justify-center bg-[var(--colorNeutralBackground2)]":
+                props.inline === true,
+            },
+          ]}
         >
           <p class="[font-size:var(--fontSizeBase300)] mb-4">{error()}</p>
           <fluent-button appearance="secondary" ref={fluentOn("click", props.onClose)}>
@@ -260,7 +271,7 @@ const UgoiraViewer: Component<Props> = (props) => {
           alt={`frame ${currentFrame() + 1}`}
           class={{
             "max-w-full max-h-full object-contain object-top": !props.inline,
-            "w-full h-full object-cover object-top": props.inline,
+            "w-full h-full object-cover object-top": props.inline === true,
           }}
           draggable={false}
         />

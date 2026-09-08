@@ -153,13 +153,16 @@ const SideNavShell: Component<SideNavShellProps> = (props) => {
         </button>
         {SHELL_TABS.map((t) => (
           <button
-            class={["flex h-11 w-11 cursor-pointer items-center justify-center rounded-[var(--borderRadiusMedium)] border-none outline-none transition-all active:scale-95 appearance-none", {
-              "bg-[var(--colorBrandBackground2)] text-[var(--colorBrandForeground1)]":
-                tab() === t.key,
-              "text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground1Hover)]":
-                tab() !== t.key,
-            }]}
-            
+            class={[
+              "flex h-11 w-11 cursor-pointer items-center justify-center rounded-[var(--borderRadiusMedium)] border-none outline-none transition-all active:scale-95 appearance-none",
+              {
+                "bg-[var(--colorBrandBackground2)] text-[var(--colorBrandForeground1)]":
+                  tab() === t.key,
+                "text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground1Hover)]":
+                  tab() !== t.key,
+              },
+            ]}
+
             onClick={() => selectTab(t.key)}
             aria-current={tab() === t.key ? "page" : undefined}
             aria-label={t.label}

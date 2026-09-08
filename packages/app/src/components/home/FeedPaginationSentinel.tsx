@@ -6,7 +6,7 @@
  * 使用原生 IntersectionObserver，无第三方依赖。
  */
 import type { Component } from "solid-js";
-import { onCleanup, onSettled } from "solid-js";
+import { onSettled } from "solid-js";
 
 interface FeedPaginationSentinelProps {
   /** 是否还有下一页（响应式判断） */
@@ -20,6 +20,7 @@ interface FeedPaginationSentinelProps {
 const FeedPaginationSentinel: Component<FeedPaginationSentinelProps> = (props) => {
   let ref: HTMLDivElement | undefined;
 
+  // onSettled 不能嵌套原语：onCleanup 改为返回 cleanup（卸载时 disconnect 观察器）
   onSettled(() => {
     const el = ref;
     if (!el) return;
@@ -32,7 +33,7 @@ const FeedPaginationSentinel: Component<FeedPaginationSentinelProps> = (props) =
       { rootMargin: "300px" },
     );
     io.observe(el);
-    onCleanup(() => io.disconnect());
+    return () => io.disconnect();
   });
 
   return (

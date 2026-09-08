@@ -63,6 +63,14 @@ vi.mock("@tanstack/solid-query", async (importOriginal) => {
           },
           enumerable: true,
         },
+        // solid-query 6 兼容（#415）：工厂 loading 读取已提交通道 fetchStatus，mock 补齐 v6 真实结果形状字段
+        fetchStatus: {
+          get() {
+            // 由 isFetching 派生，保持真实不变量「isFetching=true ⇒ fetchStatus='fetching'」
+            return getQ((currentOpts().queryKey as string[])[1]).isFetching ? "fetching" : "idle";
+          },
+          enumerable: true,
+        },
         error: {
           get() {
             return getQ((currentOpts().queryKey as string[])[1]).error;
@@ -320,6 +328,7 @@ describe("recommendedStore — loading and error states", () => {
 
     const store = await loadStore();
     store.setRecommendSubTab("illust");
+    flush(); // 2.0 批处理语义：subTab signal set 后同步读返回旧值，activeKeys 会选错查询
     expect(store.error()).not.toBeNull();
     expect(store.error()!.type).toBe(ApiErrorType.SERVER);
   });

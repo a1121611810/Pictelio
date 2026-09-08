@@ -81,69 +81,75 @@ export function createProgressiveImage(options: ProgressiveImageOptions): Progre
   // 防止快速滚动下旧响应覆盖新卡片的展示（竞态防护硬约束）
   let generation = 0;
 
-  createEffect(() => {
-    const full = options.fullUrl();
-    const thumb = options.thumbUrl();
-    const gen = ++generation;
+  // 2.0 拆分效应：compute 段只读 URL 并自增 generation 快照（generation 绑定 compute 运行，
+  // 用于作废旧异步回调），状态机的写 signal 副作用全部移入 apply 段（write-under-scope 禁令）
+  createEffect(
+    () => {
+      const full = options.fullUrl();
+      const thumb = options.thumbUrl();
+      const gen = ++generation;
+      return { full, thumb, gen };
+    },
+    ({ full, thumb, gen }) => {
+      // 新一轮 URL：重置失败标记与绘制就绪标记（generation 切换 → 新图重新渐进，thumb 层重新挂载兜底）
+      setThumbFailed(false);
+      setFullFailed(false);
+      setFullPainted(false);
+      setSkippedForInflight(false);
 
-    // 新一轮 URL：重置失败标记与绘制就绪标记（generation 切换 → 新图重新渐进，thumb 层重新挂载兜底）
-    setThumbFailed(false);
-    setFullFailed(false);
-    setFullPainted(false);
-    setSkippedForInflight(false);
+      if (!full) {
+        setThumbSrc(undefined);
+        setDisplaySrc("");
+        return;
+      }
 
-    if (!full) {
-      setThumbSrc(undefined);
+      // L1 命中：checkImageCache 返回代理 URL（走浏览器 HTTP 缓存，0ms），直挂无渐进
+      const cached = checkImageCache(full);
+      if (cached) {
+        setThumbSrc(undefined);
+        setDisplaySrc(cached);
+        return;
+      }
+
+      // 单段直载：无 thumb 或 thumb===full 时渐进零收益，行为等同现状
+      if (!thumb || thumb === full) {
+        setThumbSrc(undefined);
+        setDisplaySrc(resolveImageUrl(full));
+        return;
+      }
+
+      // 渐进：thumb 先行占位；主 img 不挂载（防白帧），thumb 层兜底至 full 绘制就绪。
+      // 例外（round4 A 线）：full 预取已在途（FeedList/VirtualFeed 预取与卡片预载共享同一
+      // inflight Promise，isImagePrefetching 命中）→ 跳过 thumb 直候 full，消除渐进的
+      // 第二次网络加载；主层仍等预载 resolve 才挂载（防白帧 + 避免拦截器 loadBytes 与
+      // prefetchImage 跨写方并发下载）。预取失败由下方 catch 延迟挂载 thumb 兜底。
       setDisplaySrc("");
-      return;
-    }
+      if (isImagePrefetching(full)) {
+        setSkippedForInflight(true);
+        setThumbSrc(undefined);
+      } else {
+        setThumbSrc(resolveImageUrl(thumb));
+      }
 
-    // L1 命中：checkImageCache 返回代理 URL（走浏览器 HTTP 缓存，0ms），直挂无渐进
-    const cached = checkImageCache(full);
-    if (cached) {
-      setThumbSrc(undefined);
-      setDisplaySrc(cached);
-      return;
-    }
-
-    // 单段直载：无 thumb 或 thumb===full 时渐进零收益，行为等同现状
-    if (!thumb || thumb === full) {
-      setThumbSrc(undefined);
-      setDisplaySrc(resolveImageUrl(full));
-      return;
-    }
-
-    // 渐进：thumb 先行占位；主 img 不挂载（防白帧），thumb 层兜底至 full 绘制就绪。
-    // 例外（round4 A 线）：full 预取已在途（FeedList/VirtualFeed 预取与卡片预载共享同一
-    // inflight Promise，isImagePrefetching 命中）→ 跳过 thumb 直候 full，消除渐进的
-    // 第二次网络加载；主层仍等预载 resolve 才挂载（防白帧 + 避免拦截器 loadBytes 与
-    // prefetchImage 跨写方并发下载）。预取失败由下方 catch 延迟挂载 thumb 兜底。
-    setDisplaySrc("");
-    if (isImagePrefetching(full)) {
-      setSkippedForInflight(true);
-      setThumbSrc(undefined);
-    } else {
-      setThumbSrc(resolveImageUrl(thumb));
-    }
-
-    void loadImage(full).then(
-      (loaded) => {
-        if (gen !== generation) return; // URL 键守卫：陈旧回调丢弃
-        setDisplaySrc(loaded.url || resolveImageUrl(full));
-      },
-      (err: unknown) => {
-        if (gen !== generation) return;
-        // full 失败：停止切换 + warn；thumb 层保持常驻兜底，双失败才置 failed
-        console.warn("[createProgressiveImage] full 预载失败，thumb 兜底:", full, err);
-        setFullFailed(true);
-        // 在途跳过 thumb 的卡片（round4 A 线）：预载失败时延迟挂载 thumb 兜底
-        // （非静默降级，warn 已上方输出；thumb 已挂载或已失败时不重复挂载）
-        if (!rawThumbSrc() && !thumbFailed() && thumb) {
-          setThumbSrc(resolveImageUrl(thumb));
-        }
-      },
-    );
-  });
+      void loadImage(full).then(
+        (loaded) => {
+          if (gen !== generation) return; // URL 键守卫：陈旧回调丢弃
+          setDisplaySrc(loaded.url || resolveImageUrl(full));
+        },
+        (err: unknown) => {
+          if (gen !== generation) return;
+          // full 失败：停止切换 + warn；thumb 层保持常驻兜底，双失败才置 failed
+          console.warn("[createProgressiveImage] full 预载失败，thumb 兜底:", full, err);
+          setFullFailed(true);
+          // 在途跳过 thumb 的卡片（round4 A 线）：预载失败时延迟挂载 thumb 兜底
+          // （非静默降级，warn 已上方输出；thumb 已挂载或已失败时不重复挂载）
+          if (!rawThumbSrc() && !thumbFailed() && thumb) {
+            setThumbSrc(resolveImageUrl(thumb));
+          }
+        },
+      );
+    },
+  );
 
   // 卸载后拦截 in-flight 预载回调，防止向已销毁作用域的 signal 写入
   onCleanup(() => {

@@ -53,11 +53,14 @@ const UserIllusts: Component = () => {
       <PageTransition>
         <div class="pb-16">
           <header
-            class={["sticky top-0 z-20 surface-appbar h-12 flex items-center px-4 gap-3 transition-transform duration-[var(--durationNormal)] ease-[var(--curveEasyEase)]", {
-              "translate-y-0": headerVisible(),
-              "-translate-y-full": !headerVisible(),
-            }]}
-            
+            class={[
+              "sticky top-0 z-20 surface-appbar h-12 flex items-center px-4 gap-3 transition-transform duration-[var(--durationNormal)] ease-[var(--curveEasyEase)]",
+              {
+                "translate-y-0": headerVisible(),
+                "-translate-y-full": !headerVisible(),
+              },
+            ]}
+
             onDblClick={scrollToTop}
           >
             <fluent-button

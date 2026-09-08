@@ -39,13 +39,15 @@ const NavBar: Component = () => {
   const [compact, setCompact] = createSignal(false);
   const [activeTab, setActiveTab] = createSignal<NavTab>("recommended");
 
-  // Sync with currentTab from store
-  createEffect(() => {
-    const ct = toNavTab(currentTab());
-    if (ct) {
-      setActiveTab(ct);
-    }
-  });
+  // Sync with currentTab from store（Solid 2.0：compute 只读返回快照，apply 段写 signal）
+  createEffect(
+    () => toNavTab(currentTab()),
+    (ct) => {
+      if (ct) {
+        setActiveTab(ct);
+      }
+    },
+  );
 
   // ── 触摸滑动手势标志（防止点击触发）──
   let swiped = false;
@@ -66,31 +68,34 @@ const NavBar: Component = () => {
   });
   const pastTopZone = createPast(TOP_ZONE);
 
-  createEffect(() => {
-    // 如果用户关闭了自动隐藏，始终展开
-    if (!autoHideNavBar()) {
-      if (compact()) setCompact(false);
-      return;
-    }
-    // 顶部保护区内始终展开
-    if (!pastTopZone()) {
-      setCompact(false);
-      return;
-    }
-    const d = scrollDirection();
-    if (d === "down") setCompact(true);
-    else if (d === "up") setCompact(false);
-  });
+  // Solid 2.0 拆分：compute 段提取普通值快照，apply 段写 signal（untracked 合法）；
+  // 写入相同值为 no-op，等价于原「compact() 为 true 才写」的守卫
+  createEffect(
+    () => ({
+      autoHide: autoHideNavBar(),
+      inTopZone: !pastTopZone(),
+      dir: scrollDirection(),
+    }),
+    (s) => {
+      // 如果用户关闭了自动隐藏，始终展开；顶部保护区内始终展开
+      if (!s.autoHide || s.inTopZone) {
+        setCompact(false);
+        return;
+      }
+      if (s.dir === "down") setCompact(true);
+      else if (s.dir === "up") setCompact(false);
+    },
+  );
 
   onCleanup(() => {
     clearTimeout(animTimer);
   });
 
-  // Tab 切换时重置滚动跟踪
-  createEffect(() => {
-    currentTab();
-    resetScrollDirection();
-  });
+  // Tab 切换时重置滚动跟踪（Solid 2.0 拆分：compute 声明依赖，apply 做副作用）
+  createEffect(
+    () => currentTab(),
+    () => resetScrollDirection(),
+  );
 
   // ── 中心按钮触摸滑动检测 ──
   let touchStartY = 0;
@@ -140,7 +145,7 @@ const NavBar: Component = () => {
     <nav class="floating-nav" aria-label="主导航">
       <div
         class={["floating-nav-capsule relative", { "floating-nav-capsule-compact": compact() }]}
-        
+
         onPointerMove={onPointerMove}
         onPointerLeave={onPointerLeave}
       >
@@ -150,35 +155,39 @@ const NavBar: Component = () => {
         )}
         {/* 顶部内高光层（glass 容器统一高光） */}
         <span class="glass-tab-bar-highlight" aria-hidden="true" />
-
         {/* 左侧按钮组：推荐 + 关注 */}
         <div
-          class={["floating-nav-group", {
-            "floating-nav-group-visible": !compact(),
-            "floating-nav-group-hidden": compact(),
-          }]}
-          
-          aria-hidden={compact()}
+          class={[
+            "floating-nav-group",
+            {
+              "floating-nav-group-visible": !compact(),
+              "floating-nav-group-hidden": compact(),
+            },
+          ]}
+
+          aria-hidden={compact() ? "true" : "false"}
         >
           {leftTabs.map((tab) => (
             <button
-              class={["glass-tab-item min-w-14", { "glass-tab-item-active": activeTab() === tab.key }]}
-              
+              class={[
+                "glass-tab-item min-w-14",
+                { "glass-tab-item-active": activeTab() === tab.key },
+              ]}
+
               onClick={() => handleTabClick(tab.key)}
               aria-current={activeTab() === tab.key ? "page" : undefined}
               aria-label={tab.label}
-              tabIndex={compact() ? -1 : 0}
+              tabindex={compact() ? -1 : 0}
             >
               <FluentIcon name={tab.icon} active={activeTab() === tab.key} />
               <span>{tab.label}</span>
             </button>
           ))}
         </div>
-
-        {/* 中心大圆按钮（搜索入口） */}
+        {/* 中心大圆按钮（搜索入口） */}{" "}
         <button
           class={["floating-nav-center", { "scroll-top-anim": scrollToTopAnim() }]}
-          
+
           onClick={handleCenterClick}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
@@ -186,24 +195,29 @@ const NavBar: Component = () => {
         >
           <FluentIcon name="search" size={24} />
         </button>
-
         {/* 右侧按钮组：收藏 + 历史 */}
         <div
-          class={["floating-nav-group", {
-            "floating-nav-group-visible": !compact(),
-            "floating-nav-group-hidden": compact(),
-          }]}
-          
-          aria-hidden={compact()}
+          class={[
+            "floating-nav-group",
+            {
+              "floating-nav-group-visible": !compact(),
+              "floating-nav-group-hidden": compact(),
+            },
+          ]}
+
+          aria-hidden={compact() ? "true" : "false"}
         >
           {rightTabs.map((tab) => (
             <button
-              class={["glass-tab-item min-w-14", { "glass-tab-item-active": activeTab() === tab.key }]}
-              
+              class={[
+                "glass-tab-item min-w-14",
+                { "glass-tab-item-active": activeTab() === tab.key },
+              ]}
+
               onClick={() => handleTabClick(tab.key)}
               aria-current={activeTab() === tab.key ? "page" : undefined}
               aria-label={tab.label}
-              tabIndex={compact() ? -1 : 0}
+              tabindex={compact() ? -1 : 0}
             >
               <FluentIcon name={tab.icon} active={activeTab() === tab.key} />
               <span>{tab.label}</span>

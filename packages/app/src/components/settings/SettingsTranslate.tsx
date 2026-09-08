@@ -31,7 +31,12 @@ const SettingsTranslate: Component = () => {
   const [feedback, setFeedback] = createSignal<string | null>(null);
 
   onSettled(() => {
-    void loadDsApiKey().then(() => setInputKey(dsApiKey() ?? ""));
+    // loadDsApiKey 内部 setDsApiKey 后 promise 立即 resolve：2.0 批量更新下
+    // .then 回调同步读 dsApiKey() 可能拿到旧值，先 flush() 落地批量写入再读
+    void loadDsApiKey().then(() => {
+      flush();
+      setInputKey(dsApiKey() ?? "");
+    });
     void loadTranslateRestrictSettings();
     void loadTierAndThinking();
   });
@@ -166,12 +171,16 @@ const SettingsTranslate: Component = () => {
             <div class="flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-1.5 gap-1">
               <button
                 type="button"
-                class={["flex-1 py-2 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all active:scale-[0.98] appearance-none border-none outline-none cursor-pointer", {
-                  "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
-                    defaultTier() === "flash",
-                  "bg-transparent text-[var(--colorNeutralForeground2)]": defaultTier() !== "flash",
-                }]}
-                
+                class={[
+                  "flex-1 py-2 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all active:scale-[0.98] appearance-none border-none outline-none cursor-pointer",
+                  {
+                    "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
+                      defaultTier() === "flash",
+                    "bg-transparent text-[var(--colorNeutralForeground2)]":
+                      defaultTier() !== "flash",
+                  },
+                ]}
+
                 onClick={() => void setDefaultTier("flash")}
               >
                 标准
@@ -181,12 +190,15 @@ const SettingsTranslate: Component = () => {
               </button>
               <button
                 type="button"
-                class={["flex-1 py-2 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all active:scale-[0.98] appearance-none border-none outline-none cursor-pointer", {
-                  "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
-                    defaultTier() === "pro",
-                  "bg-transparent text-[var(--colorNeutralForeground2)]": defaultTier() !== "pro",
-                }]}
-                
+                class={[
+                  "flex-1 py-2 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all active:scale-[0.98] appearance-none border-none outline-none cursor-pointer",
+                  {
+                    "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
+                      defaultTier() === "pro",
+                    "bg-transparent text-[var(--colorNeutralForeground2)]": defaultTier() !== "pro",
+                  },
+                ]}
+
                 onClick={() => void setDefaultTier("pro")}
               >
                 高质量
@@ -290,7 +302,11 @@ const SettingsTranslate: Component = () => {
         >
           取消
         </fluent-button>
-        <fluent-button slot="actions" appearance="primary" ref={fluentOn("click", confirmRestrictDialog)}>
+        <fluent-button
+          slot="actions"
+          appearance="primary"
+          ref={fluentOn("click", confirmRestrictDialog)}
+        >
           我已了解并开启
         </fluent-button>
       </FluentDialog>
@@ -313,7 +329,11 @@ const SettingsTranslate: Component = () => {
         >
           取消
         </fluent-button>
-        <fluent-button slot="actions" appearance="primary" ref={fluentOn("click", confirmRestrictDialog)}>
+        <fluent-button
+          slot="actions"
+          appearance="primary"
+          ref={fluentOn("click", confirmRestrictDialog)}
+        >
           我已了解并承担全部风险
         </fluent-button>
       </FluentDialog>

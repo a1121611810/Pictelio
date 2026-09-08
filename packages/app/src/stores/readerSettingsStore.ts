@@ -106,6 +106,11 @@ export function effectiveFontSize(): number {
 }
 
 function persistAll(): void {
+  // Solid 2.0 批处理语义（set-后-读审计修复点）：7 个 setReaderXxx setter 都在
+  // 同步段内先 set 再调本函数，若不 flush，下方对 fontSize() 等的全部同步读
+  // 仍拿到旧值，持久化快照会回退到上一次状态。persistAll 属命令式读取边界，
+  // 在此统一 flush 一次保持 1.x「持久化即所见」语义（避免 7 处散落 flush）。
+  flush();
   readerSettings.set({
     ...readerSettings.value(),
     fontSize: fontSize(),

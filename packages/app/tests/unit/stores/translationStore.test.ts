@@ -111,8 +111,10 @@ describe("详情页翻译显示状态", () => {
   it("tracks translated paragraphs and original/translated toggle", async () => {
     const { store } = await loadStore();
     store.setTranslatedParagraphs({ 0: "译文一", 1: "译文二" });
+    flush(); // 2.0 批处理语义：set 后同步读返回旧值，先 flush 再断言
     expect(store.translatedParagraphs()).toEqual({ 0: "译文一", 1: "译文二" });
     store.setShowTranslation(true);
+    flush(); // 2.0 批处理语义：set 后同步读返回旧值，先 flush 再断言
     expect(store.showTranslation()).toBe(true);
   });
 
@@ -128,10 +130,12 @@ describe("详情页翻译显示状态", () => {
   it("tracks failed paragraphs and clears them on reset (S4 断点续翻)", async () => {
     const { store } = await loadStore();
     store.setFailedParagraphs(new Set([2, 5]));
+    flush(); // 2.0 批处理语义：set 后同步读返回旧值，先 flush 再断言
     expect(store.failedParagraphs().has(2)).toBe(true);
     expect(store.failedParagraphs().has(5)).toBe(true);
     expect(store.failedParagraphs().has(0)).toBe(false);
     store.resetTranslationState();
+    flush(); // 2.0 批处理语义：reset 的写同样批处理，断言前先 flush
     expect(store.failedParagraphs().size).toBe(0);
   });
 
@@ -139,8 +143,10 @@ describe("详情页翻译显示状态", () => {
     const { store } = await loadStore();
     expect(store.translationUsedThinking()).toBe(false);
     store.setTranslationUsedThinking(true);
+    flush(); // 2.0 批处理语义：set 后同步读返回旧值，先 flush 再断言
     expect(store.translationUsedThinking()).toBe(true);
     store.resetTranslationState();
+    flush(); // 2.0 批处理语义：reset 的写同样批处理，断言前先 flush
     expect(store.translationUsedThinking()).toBe(false);
   });
 });

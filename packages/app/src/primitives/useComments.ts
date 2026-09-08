@@ -40,33 +40,39 @@ export function useComments(
   const [deletingId, setDeletingId] = createSignal<number | null>(null);
 
   // 加载根评论（当 enabled + targetId 变化时触发）
-  createEffect(() => {
-    if (!enabled()) return;
-    const id = targetId();
-    const t = type();
-    const ac = new AbortController();
+  // 2.0 拆分效应：compute 段只读快照，重置/异步请求的写 signal 移入 apply 段，
+  // AbortController 经 apply 返回的 cleanup 在依赖变化/销毁时注销
+  createEffect(
+    () => {
+      if (!enabled()) return null;
+      return { id: targetId(), t: type() };
+    },
+    (snap) => {
+      if (!snap) return;
+      const ac = new AbortController();
 
-    setError(null);
-    setHasLoaded(false);
-    setRootComments([]);
-    setNextUrl(null);
+      setError(null);
+      setHasLoaded(false);
+      setRootComments([]);
+      setNextUrl(null);
 
-    void (async () => {
-      const [loadErr, res] = await tryAsync(loadRootComments(t, id, ac.signal));
-      if (ac.signal.aborted) return;
-      if (loadErr) {
-        if ((loadErr as { name?: string }).name !== "AbortError") {
-          setError("加载评论失败，请重试");
+      void (async () => {
+        const [loadErr, res] = await tryAsync(loadRootComments(snap.t, snap.id, ac.signal));
+        if (ac.signal.aborted) return;
+        if (loadErr) {
+          if ((loadErr as { name?: string }).name !== "AbortError") {
+            setError("加载评论失败，请重试");
+          }
+        } else {
+          setRootComments(res.comments);
+          setNextUrl(res.next_url);
+          setHasLoaded(true);
         }
-      } else {
-        setRootComments(res.comments);
-        setNextUrl(res.next_url);
-        setHasLoaded(true);
-      }
-    })();
+      })();
 
-    onCleanup(() => ac.abort());
-  });
+      return () => ac.abort();
+    },
+  );
 
   // 分页加载更多
   async function loadMore() {

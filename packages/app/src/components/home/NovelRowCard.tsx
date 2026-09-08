@@ -4,7 +4,7 @@
  * 视觉：左 56px 圆角封面缩略 + 「系列」徽标；右 标题 / 作者 / ★收藏·字数。
  * A2 规范（ADR-0074）：Large 圆角、NeutralBackground1 底、1px NeutralStroke1 边框、
  * 无阴影、hover 背景高亮、active 轻微缩放。
- * 可访问性：role="button" + tabIndex=0 + Enter 键触发 onClick。
+ * 可访问性：role="button" + tabindex=0 + Enter 键触发 onClick。
  *
  * 标签（A 已定稿）：封面上 AI/R-18 badge + 底部通栏标签行（AdaptiveTags 动态显示 +「+N」折叠）。
  * 落选变体（B/C/none 标签模式）已归档 throwaway，见 git 历史。
@@ -41,7 +41,7 @@ const NovelRowCard: Component<NovelRowCardProps> = (props) => {
       data-testid="novel-card"
       class="cursor-pointer rounded-[var(--borderRadiusLarge)] border border-[var(--colorNeutralStroke1)] bg-[var(--colorNeutralBackground1)] p-[var(--spacingHorizontalM)] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-98 focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThick)] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
       role="button"
-      tabIndex={0}
+      tabindex={0}
       onClick={props.onClick}
       onKeyDown={(e) => {
         if (e.key === "Enter") props.onClick();

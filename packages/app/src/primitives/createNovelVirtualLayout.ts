@@ -230,65 +230,74 @@ export function createNovelVirtualLayout(
   const [vTotalSize, setVTotalSize] = createSignal(0);
 
   // Sync when blockLayouts changes + init observers
-  createEffect(() => {
-    const layouts = blockLayouts();
-    if (layouts.length === 0) {
-      setVItems([]);
-      setVTotalSize(0);
-      return;
-    }
-    const sm = containerEl() ? containerEl()!.offsetTop : 0;
-    const spacing = paragraphSpacing();
-    // Directly set scrollRect — skip _didMount which may not exist or may override
-    if (typeof window !== "undefined") {
-      (instance as any).scrollRect = { width: window.innerWidth, height: window.innerHeight };
-    }
-    instance.setOptions({
-      count: layouts.length,
-      estimateSize: (i: number) => layouts[i]?.height ?? 0,
-      overscan: DEFAULT_OVERSCAN,
-      gap: spacing,
-      getItemKey: (i: number) => i,
-      getScrollElement: () => (typeof window !== "undefined" ? window : null),
-      observeElementRect: observeWindowRect,
-      observeElementOffset: observeWindowOffset,
-      scrollToFn: windowScroll,
-      scrollMargin: sm,
-    } as any);
-    instance.measure();
-    const items = instance.getVirtualItems();
-    setVItems([...items] as any);
-    setVTotalSize(instance.getTotalSize());
-  });
+  // 2.0 拆分效应：compute 段提取普通值快照，写 signal / 命令式初始化移入 apply 段
+  createEffect(
+    () => ({
+      layouts: blockLayouts(),
+      scrollMargin: containerEl()?.offsetTop ?? 0,
+      spacing: paragraphSpacing(),
+    }),
+    ({ layouts, scrollMargin, spacing }) => {
+      if (layouts.length === 0) {
+        setVItems([]);
+        setVTotalSize(0);
+        return;
+      }
+      // Directly set scrollRect — skip _didMount which may not exist or may override
+      if (typeof window !== "undefined") {
+        (instance as any).scrollRect = { width: window.innerWidth, height: window.innerHeight };
+      }
+      instance.setOptions({
+        count: layouts.length,
+        estimateSize: (i: number) => layouts[i]?.height ?? 0,
+        overscan: DEFAULT_OVERSCAN,
+        gap: spacing,
+        getItemKey: (i: number) => i,
+        getScrollElement: () => (typeof window !== "undefined" ? window : null),
+        observeElementRect: observeWindowRect,
+        observeElementOffset: observeWindowOffset,
+        scrollToFn: windowScroll,
+        scrollMargin,
+      } as any);
+      instance.measure();
+      const items = instance.getVirtualItems();
+      setVItems([...items] as any);
+      setVTotalSize(instance.getTotalSize());
+    },
+  );
 
   // Scroll listener
-  createEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    // 全量重算（_willUpdate + 重建虚拟窗口）单次即可达主线程长任务量级，
-    // 而 scroll 事件一帧内可触发 60~120 次；合并到 rAF 每帧至多重算一次，
-    // flush 时读取当下的 window.scrollY（非事件捕获旧值），保证末态正确。
-    let scrollRafId = 0;
-    const onScroll = () => {
-      if (scrollRafId !== 0) return;
-      scrollRafId = requestAnimationFrame(() => {
-        scrollRafId = 0;
-        (instance as any).scrollOffset = window.scrollY;
-        (instance as any)._willUpdate?.();
-        setVItems([...instance.getVirtualItems()] as any);
-        setVTotalSize(instance.getTotalSize());
-      });
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onCleanup(() => {
-      if (scrollRafId !== 0) {
-        cancelAnimationFrame(scrollRafId);
-        scrollRafId = 0;
+  createEffect(
+    // 无响应式依赖：仅挂载时执行一次
+    () => null,
+    () => {
+      if (typeof window === "undefined") {
+        return;
       }
-      window.removeEventListener("scroll", onScroll);
-    });
-  });
+      // 全量重算（_willUpdate + 重建虚拟窗口）单次即可达主线程长任务量级，
+      // 而 scroll 事件一帧内可触发 60~120 次；合并到 rAF 每帧至多重算一次，
+      // flush 时读取当下的 window.scrollY（非事件捕获旧值），保证末态正确。
+      let scrollRafId = 0;
+      const onScroll = () => {
+        if (scrollRafId !== 0) return;
+        scrollRafId = requestAnimationFrame(() => {
+          scrollRafId = 0;
+          (instance as any).scrollOffset = window.scrollY;
+          (instance as any)._willUpdate?.();
+          setVItems([...instance.getVirtualItems()] as any);
+          setVTotalSize(instance.getTotalSize());
+        });
+      };
+      window.addEventListener("scroll", onScroll, { passive: true });
+      return () => {
+        if (scrollRafId !== 0) {
+          cancelAnimationFrame(scrollRafId);
+          scrollRafId = 0;
+        }
+        window.removeEventListener("scroll", onScroll);
+      };
+    },
+  );
 
   const visibleBlocks = createMemo<number[]>(() => vItems().map((v) => v.index));
 

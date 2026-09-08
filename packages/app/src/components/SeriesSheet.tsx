@@ -44,14 +44,18 @@ const SeriesSheet: Component<Props> = (props) => {
     onTrigger: () => loadMore(),
   });
 
-  createEffect(() => {
-    if (props.isOpen && props.seriesId) {
-      reset();
-      loadInitial();
-    } else {
-      reset();
-    }
-  });
+  // Solid 2.0 拆分：compute 只读返回快照，apply 段写 signal / 发起请求
+  createEffect(
+    () => ({ open: props.isOpen, id: props.seriesId }),
+    (s) => {
+      if (s.open && s.id) {
+        reset();
+        loadInitial();
+      } else {
+        reset();
+      }
+    },
+  );
 
   onCleanup(() => {
     abortController?.abort();
@@ -167,39 +171,52 @@ const SeriesSheet: Component<Props> = (props) => {
   }
 
   // 打开 Sheet 时锁定背景滚动
-  createEffect(() => {
-    if (props.isOpen) {
+  // Solid 2.0 拆分：apply 段直接操作 DOM 并返回 cleanup（替代 onCleanup）
+  createEffect(
+    () => props.isOpen,
+    (open) => {
+      if (!open) return;
       const prev = document.body.style.overflow;
       document.body.style.overflow = "hidden";
-      onCleanup(() => {
+      return () => {
         document.body.style.overflow = prev;
-      });
-    }
-  });
+      };
+    },
+  );
 
   // 自动加载直到找到 activeNovelId，并滚动到可视区域
-  createEffect(() => {
-    const activeId = props.activeNovelId;
-    if (activeId == null || hasScrolledToActive()) {
-      return;
-    }
-
-    const currentNovels = novels();
-    const found = currentNovels.some((n) => n.id === activeId);
-
-    if (found) {
-      // 等待 DOM 渲染后滚动
-      requestAnimationFrame(() => {
-        const el = activeItemEl();
-        if (el) {
-          el.scrollIntoView({ block: "center", behavior: "smooth" });
-          setHasScrolledToActive(true);
-        }
-      });
-    } else if (hasMore() && !loadingMore() && !loading()) {
-      loadMore();
-    }
-  });
+  // Solid 2.0 拆分：compute 提取全部依赖快照，apply 段写 signal / 触发分页
+  createEffect(
+    () => {
+      const activeId = props.activeNovelId;
+      const list = novels();
+      return {
+        activeId,
+        scrolled: hasScrolledToActive(),
+        found: activeId != null && list.some((n) => n.id === activeId),
+        more: hasMore(),
+        loadingMoreNow: loadingMore(),
+        loadingNow: loading(),
+      };
+    },
+    (s) => {
+      if (s.activeId == null || s.scrolled) {
+        return;
+      }
+      if (s.found) {
+        // 等待 DOM 渲染后滚动
+        requestAnimationFrame(() => {
+          const el = activeItemEl();
+          if (el) {
+            el.scrollIntoView({ block: "center", behavior: "smooth" });
+            setHasScrolledToActive(true);
+          }
+        });
+      } else if (s.more && !s.loadingMoreNow && !s.loadingNow) {
+        loadMore();
+      }
+    },
+  );
 
   function close() {
     props.onClose();
@@ -227,7 +244,7 @@ const SeriesSheet: Component<Props> = (props) => {
           onClick={close}
           role="button"
           aria-label="关闭"
-          tabIndex={0}
+          tabindex={0}
           onKeyDown={(e) => e.key === "Enter" && close()}
         />
 

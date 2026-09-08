@@ -135,13 +135,15 @@ const SettingsUpdate: Component = () => {
           {/* Latest version tag — visible after check completes */}
           <Show when={checkCompleted() && !isCheckingUpdate()}>
             <span
-              class={["[font-size:var(--fontSizeBase200)] font-semibold leading-snug", {
-                "text-[var(--colorStatusSuccessForeground1)]":
-                  !hasUpdate() && latestVersion() !== "",
-                "text-[var(--colorBrandForeground1)]": hasUpdate(),
-                "text-[var(--colorNeutralForeground3)]": latestVersion() === "",
-              }]}
-              
+              class={[
+                "[font-size:var(--fontSizeBase200)] font-semibold leading-snug",
+                {
+                  "text-[var(--colorStatusSuccessForeground1)]":
+                    !hasUpdate() && latestVersion() !== "",
+                  "text-[var(--colorBrandForeground1)]": hasUpdate(),
+                  "text-[var(--colorNeutralForeground3)]": latestVersion() === "",
+                },
+              ]}
             >
               {latestVersion() !== ""
                 ? hasUpdate()

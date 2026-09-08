@@ -26,12 +26,18 @@ const Settings: Component = () => {
   >(null);
 
   // Auto-hide action toast
-  createEffect(() => {
-    if (actionToast()) {
+  // Solid 2.0 拆分效应：compute 读 actionToast，apply 段起定时器并以返回值注册清理
+  // （onCleanup 不可在 effect/apply 内使用）；setTimeout 回调中的写属于异步回调，不受限。
+  createEffect(
+    () => actionToast(),
+    (toast) => {
+      if (!toast) {
+        return;
+      }
       const timer = setTimeout(() => setActionToast(null), 2500);
-      onCleanup(() => clearTimeout(timer));
-    }
-  });
+      return () => clearTimeout(timer);
+    },
+  );
 
   async function handleLogout() {
     const [logoutErr] = await tryAsync(

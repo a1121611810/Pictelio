@@ -159,6 +159,11 @@ export function load(userId: number, type: ContentType = "illust", force = false
   }
   setContentType(type);
   setFetchSource({ userId, type });
+  // Solid 2.0 批处理语义（set-后-读审计修复点）：本函数是模块级命令式动作，
+  // 而 store 的派生选择器（loading/error/nextUrl 与 loadMore 的 query 选择）以
+  // contentType() 同步读为契约；set 后不 flush 的话同 tick 内读到旧值会选错 query。
+  // 属「命令式边界」豁免场景，保持 1.x 同步可见语义。
+  flush();
 }
 
 export async function loadMore() {
@@ -178,4 +183,6 @@ export async function loadMore() {
 /** Switch content type. Does not trigger fetch by itself. */
 export function switchType(type: ContentType) {
   setContentType(type);
+  // Solid 2.0 批处理语义：与 load() 同理，保持 contentType() 同步可见契约（命令式边界）
+  flush();
 }

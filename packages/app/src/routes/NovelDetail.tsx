@@ -138,8 +138,11 @@ const NovelImageBlock: Component<NovelImageBlockProps> = (props) => {
 
   return (
     <figure
-      class={["novel-image-block overflow-hidden m-0", { "cursor-pointer": dim() !== null && dim() !== undefined }]}
-      
+      class={[
+        "novel-image-block overflow-hidden m-0",
+        { "cursor-pointer": dim() !== null && dim() !== undefined },
+      ]}
+
       style={{ "aspect-ratio": aspectRatio() }}
       onClick={handleClick}
     >
@@ -319,14 +322,17 @@ const NovelContentBlock: Component<NovelContentBlockProps> = (props) => {
   }
 
   if (isImageBlock(block)) {
-    const imageIndex = props.imageBlockList().findIndex((b) => b.imageId === block.imageId);
     return (
       <NovelImageBlock
         block={block}
         containerWidth={props.containerWidth}
         dimensions={props.imageDimensions}
         style={{}}
-        onClick={() => props.onImageClick(imageIndex)}
+        // 点击时再解析行内图序号（Solid 2.0：组件 body 顶层读 accessor prop 会告警，
+        // 且事件时点取值比渲染时点更新）
+        onClick={() =>
+          props.onImageClick(props.imageBlockList().findIndex((b) => b.imageId === block.imageId))
+        }
       />
     );
   }
@@ -357,12 +363,16 @@ const NovelDetail: Component = () => {
   }
 
   // URL 参数变化时同步内部小说 ID（外部链接/前进后退），系列内切换不触发此效果。
-  createEffect(() => {
-    const paramId = Number(params.id);
-    if (paramId && paramId !== currentNovelId()) {
-      setCurrentNovelId(paramId);
-    }
-  });
+  // Solid 2.0 拆分效应：compute 提取快照（URL id + 当前内部 id），apply 段写 signal（合法），
+  // 避免 apply 段直接读 signal 触发 STRICT_READ_UNTRACKED 告警。
+  createEffect(
+    () => ({ paramId: Number(params.id), current: currentNovelId() }),
+    ({ paramId, current }) => {
+      if (paramId && paramId !== current) {
+        setCurrentNovelId(paramId);
+      }
+    },
+  );
 
   const [novelData, setNovelData] = createSignal<PixivNovel | null>(null);
   const [novelHtml, setNovelHtml] = createSignal<string | null>(null);
@@ -417,62 +427,76 @@ const NovelDetail: Component = () => {
   }
 
   // 组件内加载小说数据：currentNovelId 变化时自动请求（首次加载 + 系列内切换）
-  createEffect(() => {
-    const id = currentNovelId();
-    if (!id) {
-      return;
-    }
-    // 已加载该 ID 的数据时跳过
-    if (novelData()?.id === id) {
-      return;
-    }
-    const gen = ++loadGeneration;
-    void loadNovelById(id, gen);
-  });
+  // Solid 2.0 拆分效应：compute 提取快照（当前 id + 已加载数据 id），apply 段发起请求。
+  createEffect(
+    () => ({ id: currentNovelId(), loadedId: novelData()?.id }),
+    ({ id, loadedId }) => {
+      if (!id) {
+        return;
+      }
+      // 已加载该 ID 的数据时跳过
+      if (loadedId === id) {
+        return;
+      }
+      const gen = ++loadGeneration;
+      void loadNovelById(id, gen);
+    },
+  );
 
   const [imageDimensions, setImageDimensions] = createSignal<NovelImageDimensions>({});
   const [footerHidden, setFooterHidden] = createSignal(false);
 
   // 小说 ID 变化或图片映射重置时，清空已计算的内嵌图尺寸
-  createEffect(() => {
-    novelImages();
-    setImageDimensions({});
-  });
+  // Solid 2.0 拆分效应：compute 跟踪 novelImages，apply 段重置尺寸。
+  createEffect(
+    () => novelImages(),
+    () => {
+      setImageDimensions({});
+    },
+  );
 
   // 加载出错时允许下次恢复阅读进度
-  createEffect(() => {
-    if (detailError()) {
-      skipRestoreProgress = false;
-    }
-  });
+  createEffect(
+    () => detailError(),
+    (err) => {
+      if (err) {
+        skipRestoreProgress = false;
+      }
+    },
+  );
 
   // 小说正文加载完成后恢复阅读进度
-  createEffect(() => {
-    const html = novelHtml();
-    if (html && html.length > 0) {
-      requestAnimationFrame(() => restoreProgress());
-    }
-  });
+  createEffect(
+    () => novelHtml(),
+    (html) => {
+      if (html && html.length > 0) {
+        requestAnimationFrame(() => restoreProgress());
+      }
+    },
+  );
 
   // 获取到图片映射后，预加载每张内嵌图的真实尺寸
-  createEffect(() => {
-    const images = novelImages();
-    const ids = Object.keys(images);
-    if (ids.length === 0) {
-      return;
-    }
-
-    let cancelled = false;
-    loadNovelImageDimensions(images).then((dimensions) => {
-      if (!cancelled) {
-        setImageDimensions(dimensions);
+  // Solid 2.0：取消逻辑由 apply 返回的 cleanup 承担（重跑/卸载时丢弃旧结果，防竞态）。
+  createEffect(
+    () => novelImages(),
+    (images) => {
+      const ids = Object.keys(images);
+      if (ids.length === 0) {
+        return;
       }
-    });
 
-    onCleanup(() => {
-      cancelled = true;
-    });
-  });
+      let cancelled = false;
+      loadNovelImageDimensions(images).then((dimensions) => {
+        if (!cancelled) {
+          setImageDimensions(dimensions);
+        }
+      });
+
+      return () => {
+        cancelled = true;
+      };
+    },
+  );
 
   const [settingsOpen, setSettingsOpen] = createSignal(false);
   const [showComments, setShowComments] = createSignal(false);
@@ -547,22 +571,31 @@ const NovelDetail: Component = () => {
 
   // 切章 / URL 变化时重置翻译状态（防旧章译文串章污染）；
   // 必须同时递增 translateVersion + abort + 取消挂起确认弹窗 —— 在途翻译响应/挂起确认
-  // 到达时版本不匹配 → 丢弃（竞态防护，含 S5 确认期间切章绕过 R18G 拦截的封堵）
-  createEffect(() => {
-    void currentNovelId();
-    translateVersion++;
-    translateAbort?.abort();
-    translateAbort = null;
-    resolveRestrictConfirm(false); // 挂起的 R18/R18G 确认直接取消（旧 resolve 不悬挂）
-    resetTranslationState();
-    onCleanup(() => {
-      // 组件卸载后响应落地同样丢弃（store 是模块级全局，必须防写入）；
-      // 卸载时取消挂起的 R18/R18G 确认（旧 resolve 不悬挂）
+  // 到达时版本不匹配 → 丢弃（竞态防护，含 S5 确认期间切章绕过 R18G 拦截的封堵）。
+  // Solid 2.0 拆分效应：compute 提取快照（章节 id + 挂起确认），apply 段做重置
+  // （untracked 写 signal 合法；挂起确认由快照传入，避免 apply 段读 signal 告警），
+  // 卸载防护由返回的 cleanup 承担（原 effect 内 onCleanup 已不可用）。
+  createEffect(
+    () => ({ id: currentNovelId(), pending: restrictConfirm() }),
+    ({ pending }) => {
       translateVersion++;
       translateAbort?.abort();
-      resolveRestrictConfirm(false);
-    });
-  });
+      translateAbort = null;
+      if (pending) {
+        // 挂起的 R18/R18G 确认直接取消（旧 resolve 不悬挂）
+        pending.resolve(false);
+        setRestrictConfirm(null);
+      }
+      resetTranslationState();
+      return () => {
+        // 组件卸载后响应落地同样丢弃（store 是模块级全局，必须防写入）；
+        // 卸载时取消挂起的 R18/R18G 确认（读最新值，旧 resolve 不悬挂）
+        translateVersion++;
+        translateAbort?.abort();
+        resolveRestrictConfirm(false);
+      };
+    },
+  );
 
   async function startTranslate(retryFailed = false): Promise<void> {
     const key = dsApiKey();
@@ -814,14 +847,15 @@ const NovelDetail: Component = () => {
     },
   });
   // scroll/resize 驱动重算（thumb 位置/尺寸随滚动更新）
+  // Solid 2.0：onSettled 内禁用 onCleanup，监听器清理改由返回值注册。
   onSettled(() => {
     const onScroll = () => setScrollTick((t) => t + 1);
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll, { passive: true });
-    onCleanup(() => {
+    return () => {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
-    });
+    };
   });
   /** 章节块位置表（chapter 块 → 虚拟布局 offset），供拖拽气泡显示章节名 */
   const chapterPositions = createMemo(() => {
@@ -881,7 +915,7 @@ const NovelDetail: Component = () => {
         match.start === activeMatch.start &&
         match.end === activeMatch.end;
       nodes.push(
-        <mark class={["novel-search-match", { "novel-search-match-active": isActive }]} >
+        <mark class={["novel-search-match", { "novel-search-match-active": isActive }]}>
           {text.slice(match.start, match.end)}
         </mark>,
       );
@@ -979,11 +1013,15 @@ const NovelDetail: Component = () => {
     virtualLayout.scrollToCharIndex(saved.paragraphIndex, saved.charIndex);
   }
 
-  // 滚动停止 500ms 后保存阅读进度
-  createEffect(() => {
-    virtualLayout.currentCharIndex();
-    saveProgress();
-  });
+  // 滚动停止 500ms 后保存阅读进度（Solid 2.0 拆分效应：compute 跟踪当前阅读位置）
+  createEffect(
+    () => virtualLayout.currentCharIndex(),
+    () => saveProgress(),
+  );
+
+  // ResizeObserver 清理挂到 owned 作用域：Solid 2.0 ref 回调是 unowned，
+  // 内部 onCleanup 会静默失效（NO_OWNER_CLEANUP warn）导致观察器泄漏。
+  let textResizeObserver: ResizeObserver | undefined;
 
   function onTextContainerRef(el: HTMLElement) {
     if (!el) {
@@ -992,45 +1030,53 @@ const NovelDetail: Component = () => {
     setTextContainerWidth(el.clientWidth);
     virtualLayout.containerRef(el);
 
+    textResizeObserver?.disconnect();
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
         setTextContainerWidth(entry.contentRect.width);
       }
     });
     ro.observe(el);
-
-    onCleanup(() => ro.disconnect());
+    textResizeObserver = ro;
   }
 
-  // 将阅读设置面板状态注册到 overlay 栈
-  createEffect(() => {
-    if (settingsOpen()) {
-      pushOverlay("readerSettingsSheet", () => setSettingsOpen(false));
-      onCleanup(() => {
-        popOverlay("readerSettingsSheet");
-      });
-    }
+  onSettled(() => {
+    return () => textResizeObserver?.disconnect();
   });
+
+  // 将阅读设置面板状态注册到 overlay 栈
+  // Solid 2.0：拆分效应 + apply 返回 cleanup（原 onCleanup 在 effect 内已不可用）
+  createEffect(
+    () => settingsOpen(),
+    (open) => {
+      if (open) {
+        pushOverlay("readerSettingsSheet", () => setSettingsOpen(false));
+        return () => popOverlay("readerSettingsSheet");
+      }
+    },
+  );
 
   // 将系列目录面板状态注册到 overlay 栈
-  createEffect(() => {
-    if (seriesOpen()) {
-      pushOverlay("seriesSheet", () => setSeriesOpen(false));
-      onCleanup(() => {
-        popOverlay("seriesSheet");
-      });
-    }
-  });
+  createEffect(
+    () => seriesOpen(),
+    (open) => {
+      if (open) {
+        pushOverlay("seriesSheet", () => setSeriesOpen(false));
+        return () => popOverlay("seriesSheet");
+      }
+    },
+  );
 
   // 将评论面板状态注册到 overlay 栈
-  createEffect(() => {
-    if (showComments()) {
-      pushOverlay("commentSheet", () => setShowComments(false));
-      onCleanup(() => {
-        popOverlay("commentSheet");
-      });
-    }
-  });
+  createEffect(
+    () => showComments(),
+    (open) => {
+      if (open) {
+        pushOverlay("commentSheet", () => setShowComments(false));
+        return () => popOverlay("commentSheet");
+      }
+    },
+  );
 
   // ── Scroll-driven bottom toolbar hide/show ──
   const { direction: scrollDirection, reset: resetScrollDirection } = createScrollBehavior({
@@ -1038,18 +1084,20 @@ const NovelDetail: Component = () => {
     accumulate: true,
   });
   const scroll = createScrollPosition();
-  createEffect(() => {
-    const y = scroll.y;
-    const atBottom =
-      window.innerHeight + y >= document.documentElement.scrollHeight - BOTTOM_THRESHOLD;
-    if (atBottom) {
-      setFooterHidden(false);
-      return;
-    }
-    const d = scrollDirection();
-    if (d === "down") setFooterHidden(true);
-    else if (d === "up") setFooterHidden(false);
-  });
+  // Solid 2.0 拆分效应：compute 跟踪滚动位置与方向，apply 段写 footer 显隐（合法）。
+  createEffect(
+    () => ({ y: scroll.y, dir: scrollDirection() }),
+    ({ y, dir }) => {
+      const atBottom =
+        window.innerHeight + y >= document.documentElement.scrollHeight - BOTTOM_THRESHOLD;
+      if (atBottom) {
+        setFooterHidden(false);
+        return;
+      }
+      if (dir === "down") setFooterHidden(true);
+      else if (dir === "up") setFooterHidden(false);
+    },
+  );
 
   function openSearch() {
     setSearchOpen(true);
@@ -1061,31 +1109,40 @@ const NovelDetail: Component = () => {
   }
 
   // 切换小说时自动关闭搜索、清空高亮，并滚动到页面顶部，重置底部栏显隐状态
-  createEffect(() => {
-    currentNovelId();
-    closeSearch();
-    scrollToTop();
-    setFooterHidden(false);
-    untrack(() => resetScrollDirection());
-  });
+  // Solid 2.0 拆分效应：compute 跟踪章节 id，apply 段做重置副作用（本就 untracked，
+  // 原 untrack 包裹不再需要）。
+  createEffect(
+    () => currentNovelId(),
+    () => {
+      closeSearch();
+      scrollToTop();
+      setFooterHidden(false);
+      resetScrollDirection();
+    },
+  );
 
   const [titleEl, setTitleEl] = createSignal<HTMLHeadingElement | undefined>();
-  const titleVisible = createVisibilityObserver({ rootMargin: NOVEL_INTERACTIVE_MARGIN })(() =>
-    titleEl(),
-  );
+  // Solid 2.0：createVisibilityObserver 签名改为 (element, options?)，不再柯里化；
+  // 显式 initialValue: false 维持旧版「首帧返回 false、首次观测后才更新」语义，
+  // 避免 accessor 在首次观测前抛 NotReadyError（本页无 Loading 边界兜底）。
+  const titleVisible = createVisibilityObserver(() => titleEl(), {
+    rootMargin: NOVEL_INTERACTIVE_MARGIN,
+    initialValue: false,
+  });
   const showHeaderTitle = createMemo(() => !titleVisible());
   const [imageViewerOpen, setImageViewerOpen] = createSignal(false);
   const [imageViewerIndex, setImageViewerIndex] = createSignal(0);
 
   // 将图片查看器状态注册到 overlay 栈
-  createEffect(() => {
-    if (imageViewerOpen()) {
-      pushOverlay("viewer", () => setImageViewerOpen(false));
-      onCleanup(() => {
-        popOverlay("viewer");
-      });
-    }
-  });
+  createEffect(
+    () => imageViewerOpen(),
+    (open) => {
+      if (open) {
+        pushOverlay("viewer", () => setImageViewerOpen(false));
+        return () => popOverlay("viewer");
+      }
+    },
+  );
 
   const imageBlockList = createMemo(() => getImageBlocks(blocks()));
   const imageViewerUrls = createMemo(() => imageBlockList().map((block) => block.urls.original));

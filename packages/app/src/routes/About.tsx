@@ -219,11 +219,13 @@ const About: Component = () => {
               {section.rows.map((row, idx, arr) => {
                 const inner = (
                   <div
-                    class={["flex items-center justify-between px-4 min-h-11 py-3", {
-                      "cursor-pointer hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-[0.98] transition-transform duration-[var(--durationFast)]":
-                        !!row.url,
-                    }]}
-                    
+                    class={[
+                      "flex items-center justify-between px-4 min-h-11 py-3",
+                      {
+                        "cursor-pointer hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-[0.98] transition-transform duration-[var(--durationFast)]":
+                          !!row.url,
+                      },
+                    ]}
                   >
                     <div class="flex items-center gap-3 min-w-0 flex-1">
                       <div class="w-5 h-5 flex-shrink-0 text-[var(--colorNeutralForeground2)] flex items-center justify-center">

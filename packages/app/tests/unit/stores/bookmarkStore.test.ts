@@ -202,6 +202,7 @@ describe("bookmarkStore", () => {
       const { restrict, setRestrict } = await loadStore();
       expect(restrict()).toBe("public");
       setRestrict("private");
+      flush(); // 2.0 批处理语义：set 后同步读返回旧值，先 flush 再断言
       expect(restrict()).toBe("private");
     });
 

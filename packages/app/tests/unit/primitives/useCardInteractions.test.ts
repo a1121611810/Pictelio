@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from "vitest";
-import { createRoot } from "solid-js";
+// ADR-0144：2.0 语义下（1) owned scope 内禁止同步写 signal——toggleFollow 的同步乐观写
+// 在真实调用点（onClick 事件处理器）运行时无 owner，测试以 runWithOwner(null) 模拟同一语境；
+// （2) set 后同步读返回旧值——断言前需 flush 排空微任务批处理
+import { createRoot, flush, runWithOwner } from "solid-js";
+
+/** 模拟事件处理器语境（无 active owner）驱动同步写路径 */
+const fire = <T>(fn: () => T): T => runWithOwner(null, fn);
 import { useCardInteractions } from "@/primitives/useCardInteractions";
 import type { PixivIllust } from "@/api/types";
 
@@ -148,8 +154,10 @@ describe("useCardInteractions", () => {
         const { privateHint, toggleBookmark } = useCardInteractions(illust);
         const e = new MouseEvent("click");
         await toggleBookmark(e, true);
+        flush(); // ADR-0144：批处理下 set 后同步读为旧值，先排空再断言
         expect(privateHint()).toBe(true);
         vi.advanceTimersByTime(1500);
+        flush(); // 同上（hintTimer 回调内的写同样批处理）
         expect(privateHint()).toBe(false);
         vi.useRealTimers();
         dispose();
@@ -187,7 +195,7 @@ describe("useCardInteractions", () => {
         const { isFollowed, toggleFollow } = useCardInteractions(illust);
         const e = new MouseEvent("click");
         const stopSpy = vi.spyOn(e, "stopPropagation");
-        await toggleFollow(e);
+        await fire(() => toggleFollow(e)); // 事件处理器语境（无 owner）
         expect(illustApi.followUser).toHaveBeenCalledWith(456);
         expect(isFollowed()).toBe(true);
         expect(stopSpy).toHaveBeenCalled();
@@ -201,7 +209,7 @@ describe("useCardInteractions", () => {
         });
         const { isFollowed, toggleFollow } = useCardInteractions(illust);
         const e = new MouseEvent("click");
-        await toggleFollow(e);
+        await fire(() => toggleFollow(e)); // 事件处理器语境（无 owner）
         expect(illustApi.unfollowUser).toHaveBeenCalledWith(456);
         expect(isFollowed()).toBe(false);
         dispose();
@@ -213,7 +221,7 @@ describe("useCardInteractions", () => {
         const illust = makeIllust();
         const { isFollowed, toggleFollow } = useCardInteractions(illust);
         const e = new MouseEvent("click");
-        await toggleFollow(e);
+        await fire(() => toggleFollow(e)); // 事件处理器语境（无 owner）
         // Optimistically set to true then rolled back on error
         expect(isFollowed()).toBe(false);
         dispose();
@@ -225,7 +233,7 @@ describe("useCardInteractions", () => {
         const illust = makeIllust();
         const { following, toggleFollow } = useCardInteractions(illust);
         const e = new MouseEvent("click");
-        await toggleFollow(e);
+        await fire(() => toggleFollow(e)); // 事件处理器语境（无 owner）
         expect(following()).toBe(false);
         dispose();
       }));
@@ -236,9 +244,11 @@ describe("useCardInteractions", () => {
         const { toggleFollow } = useCardInteractions(illust);
         const e = new MouseEvent("click");
         // First call starts following
-        const p1 = toggleFollow(e);
+        const p1 = fire(() => toggleFollow(e)); // 事件处理器语境（无 owner）
+        // 2.0：模拟真实事件任务边界——两次独立 click 间微任务批处理已排空，following() 才可见
+        flush();
         // Second call should be ignored (following() is true)
-        const p2 = toggleFollow(e);
+        const p2 = fire(() => toggleFollow(e));
         await Promise.all([p1, p2]);
         expect(illustApi.followUser).toHaveBeenCalledTimes(1);
         dispose();

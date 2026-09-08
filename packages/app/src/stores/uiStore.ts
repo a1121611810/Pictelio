@@ -56,7 +56,12 @@ export function setPersistScrollRestoration(enabled: boolean): void {
 // ── 向后兼容的导出包装函数 ──
 
 export const currentTab = () => state.currentTab;
-export const setCurrentTab = (tab: Tab) => setState("currentTab", tab);
+// Solid 2.0：createStore setter 为 draft-first，1.x 路径式写法 setState("currentTab", tab)
+// 已移除，改 draft 函数（导出 API 签名不变）
+export const setCurrentTab = (tab: Tab) =>
+  setState((s) => {
+    s.currentTab = tab;
+  });
 
 export const contentType = () => contentTypeHandle.value();
 

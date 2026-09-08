@@ -31,6 +31,14 @@ interface ProgressivePixivImageProps extends Omit<
 }
 
 /**
+ * Solid 2.0 属性接近 HTML：img 的 draggable 需枚举字符串（"true"/"false"），
+ * undefined = 移除属性；组件公开 props 契约保持 boolean 不变。
+ */
+function draggableAttr(value: boolean | undefined): "true" | "false" | undefined {
+  return value === undefined ? undefined : value ? "true" : "false";
+}
+
+/**
  * 渐进双 img wrapper（spec webview-perf-round2 §2.4，仅传 thumbSrc 时挂载）：
  * thumb=absolute 底层（aria-hidden + pointer-events-none，不参与语义与交互），
  * full=主层 relative（到位前不挂载，防白帧）；full 绘制完成（主 img load）后 thumb 层卸载，
@@ -88,7 +96,7 @@ const ProgressivePixivImage: Component<ProgressivePixivImageProps> = (p) => {
               style={objectFitStyle}
               loading={p.loading || "lazy"}
               decoding="async"
-              draggable={p.draggable}
+              draggable={draggableAttr(p.draggable)}
               onClick={p.onClick}
               onLoad={(e) => {
                 // 先接原语 onDisplayLoad（full 绘制就绪 → thumbSrc 收窄为空串卸载 thumb 层），
@@ -150,7 +158,7 @@ const PixivImage: Component<PixivImageProps> = (props) => {
           style={sizingStyle}
           loading={props.loading || "lazy"}
           decoding="async"
-          draggable={props.draggable}
+          draggable={draggableAttr(props.draggable)}
           onClick={props.onClick}
           onLoad={props.onLoad}
           onError={handleError}

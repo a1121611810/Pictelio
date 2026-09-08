@@ -311,6 +311,7 @@ describe("authStore", () => {
 
       // 模拟 Java 401 静默刷新发现 token 被轮换
       mockRotationCallback?.({ token: "rotated-token" });
+      flush(); // 2.0 批处理语义：回调内 set 后同步读返回旧值，先 flush 再断言
 
       expect(store.refreshTokenSig()).toBe("rotated-token");
       expect(mockSecureSet).toHaveBeenCalledWith("rotated-token");
