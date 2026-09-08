@@ -23,6 +23,7 @@ import java.lang.ref.WeakReference;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.pictelio.app.BuildConfig;
+import io.pictelio.app.directaccess.FragmentationABTest;
 
 /**
  * Lynx client 宿主 Activity（#51，双 client 启动分支）。
@@ -50,6 +51,7 @@ public class LynxActivity extends AppCompatActivity {
 
     /** 当前 Activity 弱引用（PictelioAppModule.exitApp 使用，ADR-0066；onDestroy 清理） */
     private static WeakReference<LynxActivity> sInstance;
+    private static boolean sAbTestRun = false;
 
     // ADR-0131：LynxView 内容区尺寸（px；首次布局后更新；-1 = 未布局）。
     // SystemInfo 是全屏物理尺寸，内容区撇除系统导航条 inset（FAB 底部被裁根因），
@@ -342,6 +344,13 @@ public class LynxActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        // [PROTOTYPE] 分片 A/B 测试（延迟 5s 等网络栈就绪，只跑一次）
+        if (!sAbTestRun) {
+            sAbTestRun = true;
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                FragmentationABTest.run();
+            }, 5000);
+        }
         if (lynxView != null) {
             lynxView.onEnterForeground();
         }
