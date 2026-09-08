@@ -36,7 +36,7 @@
 | 术语 | 定义 | 迁移口径 |
 |------|------|---------|
 | **class 数组形式** | `classList={{ a: bool }}` 移除，改 `class={["base", { a: bool }]}`（字符串 + 对象混排数组）。 | 机械替换；65 处。 |
-| **fluent 事件助手（fluent event ref helper）** | `on:` 命名空间移除后，fluent-* Web Components 自定义事件（change/close 等，非 Solid 委托事件）统一经 `ref={fluentOn("change", handler)}` 挂 addEventListener 的共享助手（内部即 ref 指令工厂；支持 `ref={[existingRef, fluentOn(...)]}` 数组形式）。 | 62 处 `on:x` 全部迁移；**静默失效是最大回归风险**（不报错），必须有组件行为测试覆盖代表样本。 |
+| **fluent 事件助手（fluent event ref helper）** | `on:` 命名空间移除后，fluent-* Web Components 自定义事件（change/close 等，非 Solid 委托事件）统一经 `ref={fluentOn("change", handler)}` 挂 addEventListener 的共享助手（单段 ref 工厂：返回的 apply 回调只挂 addEventListener；监听器随元素生命周期兜底，无独立卸载语义；支持 `ref={[existingRef, fluentOn(...)]}` 数组形式，数组中的裸变量须改为具名回调——编译器只对 `ref={var}` 形态回写赋值）。 | 62 处 `on:x` 全部迁移；**静默失效是最大回归风险**（不报错），必须有组件行为测试覆盖代表样本。 |
 | **委托事件（delegated events）** | click 等内置事件由 render root 统一委托；camelCase `onClick` JSX 属性继续可用；`clearDelegatedEvents` 移除。 | 既有 `onClick` 用法不动。 |
 | **属性即 attribute** | 内建属性按 attribute 小写处理、布尔属性 presence/absence。 | 逐点核对动态 class/style/value 绑定（重点：input value、fluent 属性经 ref 命令式设置的路径不受影响）。 |
 

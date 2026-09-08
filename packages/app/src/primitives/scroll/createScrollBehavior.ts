@@ -1,4 +1,5 @@
 import type { Accessor } from "solid-js";
+import { untrack } from "solid-js";
 import { createScrollPosition } from "@solid-primitives/scroll";
 
 // ─── Types ───
@@ -165,7 +166,11 @@ export function createScrollBehavior(config?: ScrollBehaviorConfig): ScrollBehav
     suppress,
     direction,
     reset: () => {
-      lastScrollY = scroll.y;
+      // reset 是命令式重置（可能被 effect apply 段调用）；scroll.y 为一次性快照读，
+      // 按 2.0 语义显式 untrack（STRICT_READ_UNTRACKED）。
+      untrack(() => {
+        lastScrollY = scroll.y;
+      });
       setDirection(null);
     },
   };

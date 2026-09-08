@@ -2,7 +2,9 @@
  * Feed 缓存持久化（T4，设计依据：docs/specs/webview-perf-round2.md §1，参数已在 spec 定死）。
  *
  * 为什么不用 PersistQueryClientProvider：其 restore 错误处理在生产环境静默 re-throw（见
- * query-persist-client-core persist.ts），不符合本仓库「静默降级零容忍」约束，故手动接线
+ * query-persist-client-core persist.ts），不符合本仓库「静默降级零容忍」约束，故手动接线。
+ * SolidJS 2.0 迁移（ADR-0144）：@tanstack/solid-query 6.0.0-rc.3 的适配层仍基于
+ * query-core 5.101.4，与本模块依赖的 persist-client-core 5.101.4 同源兼容。
  * persistQueryClientRestore + persistQueryClientSubscribe，由本模块的 restoreFeedCache 补外层 catch+warn。
  *
  * 范围：仅首页六路 feed（illust feed / bookmarks / novel feed），userWorks/followList/search 等页面独有

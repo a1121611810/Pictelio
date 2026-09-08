@@ -194,7 +194,7 @@ pixivizer/
 │   │   ├── vite.config.ts       # Vite+ 配置（含 UnoCSS、代理、lint、fmt）
 │   │   ├── uno.config.ts        # UnoCSS shortcuts（Fluent 风格）
 │   │   ├── tsconfig.json        # TypeScript strict 配置
-│   │   ├── vitest.config.ts     # Vitest 配置（node 环境单测）
+│   │   ├── vitest.config.ts     # Vitest 配置（happy-dom 环境单测，ADR-0144）
 │   │   ├── vitest.agent-browser.config.ts # agent-browser AI 驱动 E2E 配置
 │   │   └── capacitor.config.ts  # Capacitor 配置（appId: io.pictelio.app）
 │   ├── app-lynx/                # pictelio-app-lynx — vue-lynx 客户端（登录/推荐/插画/小说/收藏/评论/搜索/追更/多图/个人中心等，与 webview 双引擎）
@@ -272,7 +272,7 @@ packages/app/src/
 │   ├── db.ts           # TanStack DB 本地数据库配置（浏览历史持久化）
 │   ├── followListStore.ts # 关注/粉丝列表状态
 │   ├── followStore.ts  # 关注作品 Feed 状态
-│   ├── historyStore.ts # 浏览历史状态（TanStack DB 查询封装）
+│   ├── historyStore.ts # 浏览历史状态（本地 localStorage 集合，ADR-0144 替换 TanStack DB）
 │   ├── imageHostStore.ts # 自定义图片托管配置状态
 │   ├── novelBookmarkStore.ts # 小说收藏状态
 │   ├── novelCache.ts   # 小说正文缓存（LRU）
@@ -604,7 +604,7 @@ Grill 澄清 → to-spec → to-tickets → implement
 ## 测试
 
 - **框架**: Vitest 4.1，通过 `vite-plus` 的 `vp test` 运行
-- **环境**: `node`
+- **环境**: `happy-dom`（SolidJS 2.0 起 `node` 环境会被 @solidjs/vite-plugin 判为 server 姿态，solid-js 解析到 server 构建、signal 写入惰性——ADR-0144）
 - **测试文件位置**:
   - `tests/unit/**/*.test.{ts,tsx}` — 单元测试，按源目录结构组织
   - `tests/agent-browser/specs/**/*.test.ts` — AI 驱动 E2E 测试

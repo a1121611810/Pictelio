@@ -1,4 +1,5 @@
 import type { Accessor } from "solid-js";
+import { untrack } from "solid-js";
 import {
   Virtualizer,
   observeWindowRect,
@@ -214,7 +215,9 @@ export function createNovelVirtualLayout(
 
   // ── TanStack Virtual: native Virtualizer ──
   const instance = new Virtualizer<Window, HTMLElement>({
-    count: blockLayouts().length,
+    // 初始快照（untrack）：count 的响应式同步由下方拆分效应的 setOptions 负责，
+    // 此处仅取创建时的初值（STRICT_READ_UNTRACKED）。
+    count: untrack(() => blockLayouts().length),
     estimateSize: (i: number) => blockLayouts()[i]?.height ?? 0,
     overscan: DEFAULT_OVERSCAN,
     gap: 0,

@@ -1,4 +1,11 @@
 // @vitest-environment happy-dom
+const _ow = console.warn.bind(console);
+console.warn = (..._a) => {
+  if (String(_a[0]).includes("Reactive value")) {
+    process.stdout.write("\n=== STACK ===\n" + new Error().stack + "\n=== END ===\n");
+  }
+  _ow(..._a);
+};
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, cleanup } from "@solidjs/testing-library";
 
@@ -83,7 +90,9 @@ vi.mock("@/components/ui/FluentIcon", () => ({
   default: () => <span>icon</span>,
 }));
 
-vi.mock("@tanstack/solid-virtual", () => {
+vi.mock("@tanstack/virtual-core", () => {
+  // ADR-0144：@tanstack/solid-virtual 已移除，src 侧 createNovelVirtualLayout /
+  // createFeedVirtualizer 直接 import @tanstack/virtual-core，mock 目标随之切换。
   // Shared state for Virtualizer constructor
   return {
     Virtualizer: vi.fn(function VirtualizerMock(

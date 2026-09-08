@@ -397,9 +397,23 @@ export function createTQFeedStore<
     // 语义分离（ADR-0078）：refreshing 仅指 refetch 第一页（下拉刷新）；
     // 分页追加用 loadingMore（isFetchingNextPage）——避免分页加载被误判为下拉刷新
     // （首页 A1 骨架遮罩曾因此把分页也渲染成清空重载）。
-    const refreshing: Accessor<boolean> = () => activeQueries().some((q) => q.isRefetching);
+    // solid-query 6：isRefetching/isFetchingNextPage 与 isFetching 同走 isPending 探针
+    // 通道（v6 适配层），untracked 中途读会在 settle 后滞留 true；统一改读「已提交
+    // 通道」（fetchStatus/status/fetchMeta）镜像 core 定义：
+    //   core isFetchingNextPage = isFetching && fetchMeta.fetchMore.direction === "forward"
+    //   core isRefetching      = isFetching && status !== "pending" && 非分页方向
+    // fetchMeta 在 v6 适配层类型中未声明但运行时存在（core result 展开 state），
+    // 经 unknown 收窄。
+    const fetchDirection = (q: unknown): string | undefined =>
+      (q as { fetchMeta?: { fetchMore?: { direction?: string } } }).fetchMeta?.fetchMore?.direction;
 
-    const loadingMore: Accessor<boolean> = () => activeQueries().some((q) => q.isFetchingNextPage);
+    const refreshing: Accessor<boolean> = () =>
+      activeQueries().some(
+        (q) => q.fetchStatus === "fetching" && q.status !== "pending" && fetchDirection(q) == null,
+      );
+
+    const loadingMore: Accessor<boolean> = () =>
+      activeQueries().some((q) => q.fetchStatus === "fetching" && fetchDirection(q) === "forward");
 
     const error: Accessor<ApiError | null> = () => {
       if (configErrorStrategy === "allMustFail") {
