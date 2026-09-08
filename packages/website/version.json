@@ -1,9 +1,9 @@
 {
-  "version": "4.36.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.36.0",
-  "changelog": "🧪 测试\n  2524d5cb test: SNI 观测改线缆字节窥探代理（provider 无关）\n  49efeccf test: 修两处 CI 环境敏感测试（SNI 观测竞态 + 临时目录清理竞态）\n  0136e440 test(app): 钉住 OAuth reject 消息跨端契约（code-review 审计一防线 #386）\n🐛 修复\n  95844c61 fix(app): InitProvider requireContext API30+ 崩溃改 getContext（#392）\n📝 文档\n  719c6795 docs(adr): ADR-0144 直连传输层决策记录（#392）\n  15562332 docs(app): DirectAccessConfig.get 可见性契约注释（code-review #388）\n  dba02416 docs: update OpenWiki (#384)\n✨ 新功能\n  77d24aae feat(app): 设置卡「网络直连」UI + 命令面（#391）\n  a612ec65 feat(app): 直连装配收口——InitProvider 自装配 + 共享 client 接线（#390）\n  b617a715 feat(app): DirectAccessTransport OkHttp 接线（#389）\n  1bbe33ba feat(app): 直连 Config 存储边界 + 远端 IP 表拉取（#388）\n  a089a147 feat(app): 直连纯决策核心 directaccess 子包（#387）\n♻️ 重构\n  6bd8b252 refactor(app): AuthPlugin 刷新收敛共享 client（直连 prefactor #386）",
+  "version": "4.37.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v4.37.0",
+  "changelog": "♻️ 重构\n  c39947b3 refactor(app): 清理网络直连残留调用点\n  bf32620e refactor(app): 彻底移除网络直连功能，回归官方域基线",
   "webBundle": {
-    "version": "4.36.0",
-    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.36.0/pictelio-4.36.0"
+    "version": "4.37.0",
+    "url": "https://github.com/a1121611810/Pictelio/releases/download/v4.37.0/pictelio-4.37.0"
   }
 }
