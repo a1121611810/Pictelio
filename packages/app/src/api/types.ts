@@ -243,8 +243,6 @@ export enum ApiErrorType {
   RATE_LIMIT = "RATE_LIMIT",
   SERVER = "SERVER",
   PROXY = "PROXY",
-  /** 直连模式专属错误：IP 钉死失败 / 421 边缘错配 / DoH 端点不可达（pictelio-pure-client-direct-access T11） */
-  DIRECT_CONNECT = "DIRECT_CONNECT",
   UNKNOWN = "UNKNOWN",
 }
 

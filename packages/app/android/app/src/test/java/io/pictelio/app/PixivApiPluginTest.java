@@ -3,7 +3,6 @@ package io.pictelio.app;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -337,57 +336,5 @@ public class PixivApiPluginTest {
                 () -> PixivApiPlugin.directAccessCommandCore(ctx, "bogus"));
         assertTrue("未知 action 的报错应说明合法取值",
                 err.getMessage() != null && err.getMessage().contains("reset"));
-    }
-
-    // ─────────────────────────────────────────────────────────────────────
-    // DoH 解析桥（T6 单测）
-    // ─────────────────────────────────────────────────────────────────────
-
-    /**
-     * T6：空 host 解析不应抛异常，返回空 IP 列表 + timestamp=0（沙箱环境 DoH 端点
-     * 不可达时也会得到同样结果，但本测试验证"host 不可达/不可用时绝不抛"的契约）。
-     */
-    @Test
-    public void dohResolveCore_returnsNonNullResult() throws Exception {
-        JSObject result = PixivApiPlugin.dohResolveCore(ctx, "i.pximg.net");
-        assertNotNull("dohResolveCore 必须返回非 null", result);
-        // 沙箱环境 DoH 不可达：ips 可能为空数组（不抛异常）
-        assertNotNull(result.get("ips"));
-        assertNotNull(result.get("timestamp"));
-    }
-
-    /**
-     * T6：DoH 解析桥返回非空结果，ips 数组 + timestamp 字段结构稳定。
-     * Robolectric 环境可访问真实网络，DoH 端点（Quad9/Cloudflare 1.0.0.1）通常可达——
-     * 测试断言"有结果时返回非空列表 + 写入缓存 + timestamp > 0"。
-     * 端点不可达场景下的契约由 {@link DohClientTest} 全端点失败测试覆盖。
-     */
-    @Test
-    public void dohResolveCore_returnsNonEmptyResult_whenEndpointsReachable() throws Exception {
-        JSObject result = PixivApiPlugin.dohResolveCore(ctx, "i.pximg.net");
-        Object ipsRaw = result.opt("ips");
-        assertNotNull("ips 字段必返回非 null JSArray", ipsRaw);
-        assertTrue("ips 必须是 JSArray", ipsRaw instanceof com.getcapacitor.JSArray);
-        com.getcapacitor.JSArray ips = (com.getcapacitor.JSArray) ipsRaw;
-        assertTrue("DoH 端点可达时 ips 应有结果，实际条数=" + ips.length(), ips.length() > 0);
-        long timestamp = result.getLong("timestamp");
-        assertTrue("成功解析应写入缓存 timestamp > 0，实际=" + timestamp, timestamp > 0L);
-    }
-
-    /**
-     * T6：非法 host（null/空）通过 dohResolvePlugin call 入口 reject——但 dohResolveCore
-     * 是剥离 PluginCall 壳的核心方法，null/无效 host 走 DohClient 内部校验返回空列表
-     * （不抛）。这是契约一致性：core 不假定 host 合法性，由 PluginCall 入口做 null 校验。
-     */
-    @Test
-    public void dohResolveCore_invalidHost_returnsEmptyIps() throws Exception {
-        // null：直接走 DoH 解析，null hostname 内部被拒（IOException），外层 catch 后空列表
-        JSObject result = PixivApiPlugin.dohResolveCore(ctx, null);
-        assertNotNull(result);
-        Object ipsRaw = result.opt("ips");
-        assertNotNull(ipsRaw);
-        com.getcapacitor.JSArray ips = (com.getcapacitor.JSArray) ipsRaw;
-        // null host 在 DohClient.resolve 抛 IOException → 外层 catch → 空数组
-        assertEquals(0, ips.length());
     }
 }

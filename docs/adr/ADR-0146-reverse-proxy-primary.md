@@ -1,16 +1,6 @@
 # ADR-0146: 免代理主路径转向「用户自建反代（Cloudflare Worker）」——无 SNI 直连降级为兜底
 
-> **状态变更（2026-09-08）：已废弃，仅作技术记录**
->
-> 用户 2026-09-08 拍板：去除项目中所有远程代理相关方式。本 ADR 描述的 CF Worker 反代主路径已不再采用。
->
-> 废弃原因：用户偏好"零中间人"——所有 GFW 抵抗必须在客户端/原生层完成，零远程基础设施。
->
-> 取代方案：见 [pictelio-pure-client-direct-access.md](../research/pictelio-pure-client-direct-access.md) + ADR-0147（待写：三档 networkMode + 客户端直连主路径）。
->
-> 代码清理：commit 移除 `worker/` 目录、`ApiEndpoints.java`、`apiProxyStore.ts`、`SettingsApiProxy.tsx`、`.github/workflows/ci.yml` 中的 Worker 合约测试任务。
-
-- 状态：~~accepted~~ → **deprecated**（依据 2026-09-08 用户决策）
+- 状态：accepted（依据 2026-09-07/08 真机+模拟器实测证据链；用户目标「重新改方案，极度稳定」mandate 下按推荐路线执行，战略选择保留推翻权）
 - 关联：修订 [ADR-0144](./ADR-0144-direct-access-transport.md) 的方案定位；承接 [ADR-0145](./ADR-0145-direct-access-v2.md)（多候选竞速/分层超时保留为兜底机制）；图床体系（ADR-0143）镜像模式同构先例
 
 ## 背景（证据链摘要）
