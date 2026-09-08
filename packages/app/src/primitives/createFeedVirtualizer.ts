@@ -4,8 +4,8 @@ import {
   observeWindowRect,
   observeWindowOffset,
   windowScroll,
-} from "@tanstack/solid-virtual";
-import type { VirtualItem } from "@tanstack/solid-virtual";
+} from "@tanstack/virtual-core";
+import type { VirtualItem } from "@tanstack/virtual-core";
 import type { ApiError } from "../api/types";
 import { createSentinel } from "@/primitives/visibility";
 import { persistScrollRestoration } from "@/stores/uiStore";

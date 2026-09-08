@@ -1,5 +1,5 @@
 import { defineConfig } from "vite-plus/test/config";
-import solid from "vite-plugin-solid";
+import solid from "@solidjs/vite-plugin";
 import AutoImport from "unplugin-auto-import/vite";
 import { resolve } from "node:path";
 
@@ -7,7 +7,43 @@ export default defineConfig({
   plugins: [
     AutoImport({
       imports: [
-        "solid-js",
+        // 与 vite.config.ts 的 SolidJS 2.0 显式导出名清单保持一致（preset "solid-js"
+        // 含 2.0 已删 API，不可用）。
+        {
+          "solid-js": [
+            "createSignal",
+            "createEffect",
+            "createMemo",
+            "createRenderEffect",
+            "createRoot",
+            "createStore",
+            "onCleanup",
+            "onSettled",
+            "untrack",
+            "flush",
+            "mapArray",
+            "reconcile",
+            "snapshot",
+            "merge",
+            "omit",
+            "children",
+            "lazy",
+            "createUniqueId",
+            "createContext",
+            "useContext",
+            "Show",
+            "For",
+            "Switch",
+            "Match",
+            "Loading",
+            "Errored",
+            "Repeat",
+            "Reveal",
+          ],
+        },
+        {
+          "@solidjs/web": ["render", "hydrate", "Portal", "Dynamic", "isServer"],
+        },
         {
           "@solidjs/router": [
             "useNavigate",
@@ -82,7 +118,10 @@ export default defineConfig({
   },
   test: {
     include: ["tests/unit/**/*.test.{ts,tsx}"],
-    environment: "node",
+    // SolidJS 2.0：@solidjs/vite-plugin 对 node 环境走「server 姿态」（solid-js 解析到
+    // server 构建，signal 写入为惰性数据）。全仓单测依赖真实 client signal 语义，
+    // 必须用 DOM 环境走 client 姿态（ADR-0144）。
+    environment: "happy-dom",
     // T0 门禁（ADR-0097）：禁止空测试文件，防空壳套件漂移（ADR-0084 教训）
     passWithNoTests: false,
     clearMocks: true,

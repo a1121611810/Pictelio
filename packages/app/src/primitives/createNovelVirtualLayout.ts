@@ -4,8 +4,8 @@ import {
   observeWindowRect,
   observeWindowOffset,
   windowScroll,
-} from "@tanstack/solid-virtual";
-import type { Virtualizer as TVirtualizer } from "@tanstack/solid-virtual";
+} from "@tanstack/virtual-core";
+import type { Virtualizer as TVirtualizer } from "@tanstack/virtual-core";
 import type { ReaderSettings } from "@/stores/readerSettingsStore";
 import type { NovelBlock, TextBlock } from "@/utils/novelBlocks";
 import type { NovelImageDimensions } from "@/utils/novelImageDimensions";

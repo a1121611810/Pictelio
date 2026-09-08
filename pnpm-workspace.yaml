@@ -18,6 +18,8 @@ minimumReleaseAge: 1440
 minimumReleaseAgeExclude:
   - "@lynx-js/web-core@0.23.1"
   - "@lynx-js/web-worker-rpc@0.23.1"
+  # solid-primitives next.4 坏发布（workspace:^ 未解析）的修复版，ADR-0144
+  - "@solid-primitives/event-listener@3.0.0-next.5"
 
 # 阻止信任降级：如果某包之前有来源证明/签名，
 # 新版本若缺少则会安装失败
@@ -62,6 +64,10 @@ allowedDeprecatedVersions:
 overrides:
   "@lynx-js/css-serializer": "0.1.7"
   "@lynx-js/template-webpack-plugin": "0.11.0"
+  # solid-primitives next 链修复：event-listener@3.0.0-next.4 的 utils 依赖带着未解析的
+  # `workspace:^` 协议发布（上游打包事故），next.5 已修复；time-based 解析会选中 next.4，
+  # 强制升到 next.5（ADR-0144）
+  "@solid-primitives/event-listener": "3.0.0-next.5"
 
 # ── 开发体验 ──
 

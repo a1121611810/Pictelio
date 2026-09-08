@@ -1,5 +1,5 @@
 import { defineConfig } from "vite-plus";
-import solid from "vite-plugin-solid";
+import solid from "@solidjs/vite-plugin";
 import UnoCSS from "unocss/vite";
 import AutoImport from "unplugin-auto-import/vite";
 import { HttpsProxyAgent } from "https-proxy-agent";
@@ -64,7 +64,44 @@ export default defineConfig(
       plugins: [
         AutoImport({
           imports: [
-            "solid-js",
+            // SolidJS 2.0：preset "solid-js" 含 2.0 已删 API（batch/produce/createResource/
+            // observable 等），换为显式导出名清单（与 vitest.config.ts 保持一致）。
+            // 清单来自 solid-js 2.0.0-rc.6 的 85 个根导出中项目实际用到的子集。
+            {
+              "solid-js": [
+                "createSignal",
+                "createEffect",
+                "createMemo",
+                "createRenderEffect",
+                "createRoot",
+                "createStore",
+                "onCleanup",
+                "onSettled",
+                "untrack",
+                "flush",
+                "mapArray",
+                "reconcile",
+                "snapshot",
+                "merge",
+                "omit",
+                "children",
+                "lazy",
+                "createUniqueId",
+                "createContext",
+                "useContext",
+                "Show",
+                "For",
+                "Switch",
+                "Match",
+                "Loading",
+                "Errored",
+                "Repeat",
+                "Reveal",
+              ],
+            },
+            {
+              "@solidjs/web": ["render", "hydrate", "Portal", "Dynamic", "isServer"],
+            },
             {
               "@solidjs/router": [
                 "useNavigate",
