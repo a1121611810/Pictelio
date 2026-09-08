@@ -15,9 +15,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 
-import io.pictelio.app.directaccess.ChannelCircuitBreaker;
-import io.pictelio.app.directaccess.DirectAccessConfig;
-
 /**
  * Pixiv API 请求插件 — Capacitor 薄壳（#114），网络引擎已提取至 PixivApiCore。
  *
@@ -242,95 +239,6 @@ public class PixivApiPlugin extends Plugin {
         ImageBytesMemoryCache.getInstance().putBounded(url, bytes);
 
         return PrefetchResult.downloaded(cacheFile.getAbsolutePath(), bytes.length);
-    }
-
-    // ─── 插件方法：直连状态查询与命令面（#391 T6） ────────────
-
-    /**
-     * 直连运行时状态快照（#391 T6 设置卡状态展示）。委托 {@link DirectAccessConfig}
-     * 读取开关三态、双通道熔断相位、合并 IP 表条目数、参与层级摘要与最近成功拉取时刻。
-     *
-     * <p>状态查询是只读观测面：<b>禁抛异常到 JSBridge</b>——任何字段取不到时保留安全默认
-     * （UNSET / 全 CLOSED / 0 条目 / builtin / 0ms），整体降级为「未配置」展示而非 reject。
-     *
-     * <p>调用方式（JS 侧）：{@code PixivApi.directAccessStatus()}
-     */
-    @PluginMethod
-    public void directAccessStatus(PluginCall call) {
-        call.resolve(directAccessStatusCore(getContext()));
-    }
-
-    /**
-     * 直连命令面（#391 T6 设置卡操作行）：{@code action = "reset"} 双通道熔断全重置；
-     * {@code action = "refresh"} 立即拉取远端 IP 表（忽略开关与 TTL，单飞——已在飞返回
-     * {@code started=false}，结果异步生效）。未知 action reject。
-     *
-     * <p>调用方式（JS 侧）：{@code PixivApi.directAccessCommand({ action })}
-     */
-    @PluginMethod
-    public void directAccessCommand(PluginCall call) {
-        try {
-            call.resolve(directAccessCommandCore(getContext(), call.getString("action")));
-        } catch (IllegalArgumentException e) {
-            call.reject(e.getMessage());
-        } catch (Exception e) {
-            call.reject("Direct access command failed: " + e.getMessage());
-        }
-    }
-
-    /**
-     * 状态快照核心（包可见：Robolectric 单测脱离 PluginCall 壳直接断言，先例 prefetchCore）。
-     * 恒返回非 null 且字段齐全的 JSObject（安全默认兜底，绝不抛出）。
-     */
-    static JSObject directAccessStatusCore(Context ctx) {
-        String switchState = "UNSET";
-        String imageChannel = "CLOSED";
-        String apiChannel = "CLOSED";
-        int tableEntries = 0;
-        String tableSource = "builtin";
-        long lastFetchAtMillis = 0L;
-        try {
-            DirectAccessConfig config = DirectAccessConfig.get(ctx);
-            switchState = config.switchState().name();
-            imageChannel = config.breaker().phase(ChannelCircuitBreaker.Channel.IMAGE).name();
-            apiChannel = config.breaker().phase(ChannelCircuitBreaker.Channel.API_REFRESH).name();
-            tableEntries = config.currentTable().entries().size();
-            tableSource = config.tableSourceSummary();
-            lastFetchAtMillis = config.lastFetchAtMillis();
-        } catch (Exception ignored) {
-            // 单例获取/字段读取失败：保留上方安全默认整体返回（状态面禁抛异常到 JSBridge）
-        }
-        JSObject result = new JSObject();
-        result.put("switchState", switchState);
-        result.put("imageChannel", imageChannel);
-        result.put("apiChannel", apiChannel);
-        result.put("tableEntries", tableEntries);
-        result.put("tableSource", tableSource);
-        result.put("lastFetchAtMillis", lastFetchAtMillis);
-        return result;
-    }
-
-    /**
-     * 命令核心（包可见，先例 prefetchCore）：reset → {@link DirectAccessConfig#resetCircuits}；
-     * refresh → {@link DirectAccessConfig#refreshIpTableNow}（返回值即 started）。
-     *
-     * @throws IllegalArgumentException 未知 action（壳映射 reject）
-     * @throws Exception               委托链路异常（壳映射 reject）
-     */
-    static JSObject directAccessCommandCore(Context ctx, String action) throws Exception {
-        DirectAccessConfig config = DirectAccessConfig.get(ctx);
-        JSObject result = new JSObject();
-        if ("reset".equals(action)) {
-            config.resetCircuits();
-            result.put("ok", true);
-            return result;
-        }
-        if ("refresh".equals(action)) {
-            result.put("ok", true);
-            result.put("started", config.refreshIpTableNow());
-            return result;
-        }
-        throw new IllegalArgumentException("action must be \"reset\" or \"refresh\"");
     }
 
     // ─── 工具方法 ─────────────────────────────────────────────

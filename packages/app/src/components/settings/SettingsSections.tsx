@@ -2,7 +2,6 @@ import type { Component } from "solid-js";
 import SettingsAppearance from "./SettingsAppearance";
 import SettingsContent from "./SettingsContent";
 import SettingsImage from "./SettingsImage";
-import SettingsDirectAccess from "./SettingsDirectAccess";
 import SettingsTranslate from "./SettingsTranslate";
 import SettingsClient from "./SettingsClient";
 import SettingsUpdate from "./SettingsUpdate";
@@ -20,11 +19,10 @@ interface SettingsSectionsProps {
 }
 
 /**
- * 设置页分区布局（A2 精修版，UI 原型用户选定后折入；2026-09 按功能域整编，
- * ticket #391 后 9 卡）。卡片化分组：每个设置区块浮起为圆角卡片（无边框、
- * 单级柔和阴影 --elevation2、圆角 --borderRadiusXLarge（ADR-0074）），卡片间大间距
- * --spacingVerticalXL、不使用分隔线（少线条原则）；危险操作（退出登录）独立
- * danger 色调卡片，不与普通设置同卡。网络直连卡紧跟图片卡（网络类设置聚拢）。
+ * 设置页分区布局（A2 精修版，UI 原型用户选定后折入）。卡片化分组：每个设置区块浮起为圆角
+ * 卡片（无边框、单级柔和阴影 --elevation2、圆角 --borderRadiusXLarge（ADR-0074）），卡片间
+ * 大间距 --spacingVerticalXL、不使用分隔线（少线条原则）；危险操作（退出登录）独立
+ * danger 色调卡片，不与普通设置同卡。
  */
 const SettingsSections: Component<SettingsSectionsProps> = (props) => {
   return (
@@ -39,10 +37,6 @@ const SettingsSections: Component<SettingsSectionsProps> = (props) => {
 
       <SettingsCard tone="elevated">
         <SettingsImage onActionToast={props.onActionToast} />
-      </SettingsCard>
-
-      <SettingsCard tone="elevated">
-        <SettingsDirectAccess />
       </SettingsCard>
 
       <SettingsCard tone="elevated">

@@ -545,8 +545,6 @@ public final class ImageHostConfig {
     /**
      * 官方域判定：等于或属于 *.pximg.net / *.pixiv.net（oracle = validateHostInput 写入侧防线 + D4 防自环）。
      * 契约前提：hostname 已是小写形（生产调用链经 {@link #hostnameOf} 保证）。
-     * public 供直连子包 {@code io.pictelio.app.directaccess} 复用为路由白名单（#387）——
-     * 白名单单一事实源，直连侧不自实现同语义判定。
      */
     public static boolean isOfficialDomain(String hostname) {
         return equalsOrSubdomainOf(hostname, "pximg.net") || equalsOrSubdomainOf(hostname, "pixiv.net");
