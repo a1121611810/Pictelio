@@ -474,7 +474,18 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 共享会话", 
         await driver.waitForText("开启图床代理？", 10_000);
 
         // 点击"确认开启"
-        await driver.clickReliable("确认开启");
+        // FluentDialog action 插槽内的按钮对 snapshot-ref/text 点击不可靠（#418 实测：
+        // ref 命中失败且宽松 aria fallback 找不到目标），改精确文本 evaluate 点击
+        //（与手工验证 3/3 通过的路径一致）
+        await driver.evaluate(
+          `(() => {
+            const b = [...document.querySelectorAll('fluent-button')].find(
+              (x) => x.textContent.trim() === '确认开启',
+            );
+            if (b) { b.click(); return 'confirmed'; }
+            return 'no-btn';
+          })()`,
+        );
         // 等开关进入打开状态（确认生效 + 弹窗关闭），替代固定 SLEEP
         await driver.waitForJs(
           "document.querySelector('fluent-switch[aria-label=\"启用图床代理\"]')?.checked === true",
