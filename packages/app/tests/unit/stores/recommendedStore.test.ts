@@ -23,6 +23,10 @@ interface QueryMock {
   hasNextPage: boolean;
   fetchNextPage: ReturnType<typeof vi.fn>;
   refetch: ReturnType<typeof vi.fn>;
+  // #417 review：工厂 refreshing/loadingMore 改读已提交通道（fetchStatus/status/fetchMeta），
+  // mock 补齐 core 真实结果形状字段（oracle = query-core 5.101.4 infiniteQueryObserver 定义）
+  status: string;
+  fetchMeta: { fetchMore?: { direction?: string } } | null;
 }
 
 const queryMocks: Record<string, QueryMock> = {};
@@ -36,6 +40,8 @@ function getQ(key: string): QueryMock {
       hasNextPage: false,
       fetchNextPage: vi.fn(),
       refetch: vi.fn(),
+      status: "success",
+      fetchMeta: null,
     };
   }
   return queryMocks[key];
@@ -95,7 +101,18 @@ vi.mock("@tanstack/solid-query", async (importOriginal) => {
           },
           enumerable: true,
         },
-        isFetchingNextPage: { get: () => false, enumerable: true },
+        status: {
+          get() {
+            return getQ((currentOpts().queryKey as string[])[1]).status;
+          },
+          enumerable: true,
+        },
+        fetchMeta: {
+          get() {
+            return getQ((currentOpts().queryKey as string[])[1]).fetchMeta;
+          },
+          enumerable: true,
+        },
       });
       return mock;
     }),
@@ -304,15 +321,31 @@ describe("recommendedStore — loading and error states", () => {
     expect(store.loading()).toBe(false);
   });
 
-  it("isFetching（含分页加载）不视为 refreshing（ADR-0078 语义分离）", async () => {
-    getQ("recommended_illust").isFetching = true;
-    setQueryData("recommended_illust", [createIllust(1, "2026-07-01T12:00:00+09:00")], null);
+  it("分页加载（fetchMeta.direction=forward）计入 loadingMore，不计入 refreshing（ADR-0078 语义分离；#417 通道改已提交字段）", async () => {
+    const q = getQ("recommended_illust");
+    q.isFetching = true;
+    q.status = "success";
+    q.fetchMeta = { fetchMore: { direction: "forward" } };
+    setQueryData("follow_public", [createIllust(1, "2026-07-01T12:00:00+09:00")], null);
 
     const store = await loadStore();
     store.setRecommendSubTab("illust");
-    // loading 覆盖任意 fetch；refreshing 仅 refetch 第一页（分页/首载不算）
+    // loading 覆盖任意 fetch；refreshing 仅 refetch 第一页（分页不算）
     expect(store.loading()).toBe(true);
     expect(store.refreshing()).toBe(false);
+    expect(store.loadingMore()).toBe(true);
+  });
+
+  it("首页 refetch（fetchStatus=fetching 且无 fetchMeta）计入 refreshing，不计入 loadingMore", async () => {
+    const q = getQ("recommended_illust");
+    q.isFetching = true;
+    q.status = "success";
+    q.fetchMeta = null;
+    setQueryData("follow_public", [createIllust(1, "2026-07-01T12:00:00+09:00")], null);
+
+    const store = await loadStore();
+    store.setRecommendSubTab("illust");
+    expect(store.refreshing()).toBe(true);
     expect(store.loadingMore()).toBe(false);
   });
 
