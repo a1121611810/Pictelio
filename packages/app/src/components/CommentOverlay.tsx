@@ -87,7 +87,7 @@ const CommentOverlay: Component<CommentOverlayProps> = (props) => {
               <span>{result.error()}</span>
               <button
                 class="underline bg-transparent border-none p-0 cursor-pointer text-[var(--colorBrandForeground1)]"
-                onClick={() => result.retry()}
+                onClick={() => window.location.reload()}
               >
                 重试
               </button>

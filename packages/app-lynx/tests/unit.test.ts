@@ -648,78 +648,12 @@ describe('authStore 原生模式登录（#53：Native OAuth 交换，token 不�
       PictelioAuth: {
         loginWithRefreshToken: (_t: string, cb: (info: string, err: string) => void) =>
           cb('', '登录凭证无效或已失效'),
-        // 凭证失效 → logout 全套（含清 Java 堆 token，spec #393）
-        clearTokens: (cb: (a: string, b: string) => void) => cb('', ''),
       },
     })
     const store = useAuthStore()
     await store.loginWithToken('bad-token')
     expect(store.isLoggedIn).toBe(false)
     expect(store.authError).toBe('登录凭证无效或已失效')
-  })
-})
-
-describe('authStore 乐观登录（spec #393：真机直连诊断对偶）', () => {
-  beforeEach(() => {
-    setActivePinia(createPinia())
-  })
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
-
-  function stubNative(opts: { refreshErr?: string; stored?: string | null }) {
-    vi.stubGlobal('NativeModules', {
-      PictelioAuth: {
-        loginWithRefreshToken: (_t: string, cb: (info: string, err: string) => void) =>
-          cb('', opts.refreshErr ?? ''),
-        clearTokens: (cb: (a: string, b: string) => void) => cb('', ''),
-      },
-      PictelioSecureStorage: {
-        setItem: vi.fn((_k: string, _v: string, cb: () => void) => cb()),
-        getItem: (_k: string, cb: (v: string | null, e: string | null) => void) =>
-          cb(opts.stored ?? null, null),
-        removeItem: vi.fn((_k: string, cb: () => void) => cb()),
-      },
-    })
-  }
-
-  it('restoreToken 有持久凭证 → 乐观登录（刷新后台执行不阻断）', async () => {
-    stubNative({ stored: 'stored-token' })
-    const store = useAuthStore()
-    const ok = await store.restoreToken()
-    expect(ok).toBe(true)
-    expect(store.isLoggedIn).toBe(true)
-  })
-
-  it('瞬时失败（5xx/超时）：登录态保持 + 凭证保留', async () => {
-    stubNative({ stored: 'stored-token', refreshErr: '网络暂不可用，请稍后重试 (HTTP 502)' })
-    const store = useAuthStore()
-    await store.restoreToken()
-    await new Promise((r) => setTimeout(r, 0)) // 后台刷新失败分类落地
-    expect(store.isLoggedIn).toBe(true) // 乐观登录不回滚
-    expect(store.currentUser).toBeNull() // user 未就绪（诚实降级）
-  })
-
-  it('凭证失效（4xx）：后台登出（清持久化凭证 + 登录态）', async () => {
-    stubNative({ stored: 'dead-token', refreshErr: '登录凭证无效或已失效 (HTTP 400)' })
-    const removeSpy = vi.fn((cb: () => void) => cb())
-    vi.stubGlobal('NativeModules', {
-      PictelioAuth: {
-        loginWithRefreshToken: (_t: string, cb: (info: string, err: string) => void) =>
-          cb('', '登录凭证无效或已失效 (HTTP 400)'),
-        clearTokens: (cb: (a: string, b: string) => void) => cb('', ''),
-      },
-      PictelioSecureStorage: {
-        setItem: vi.fn(),
-        getItem: (_k: string, cb: (v: string | null, e: string | null) => void) => cb('dead-token', null),
-        removeItem: removeSpy,
-      },
-    })
-    const store = useAuthStore()
-    await store.restoreToken()
-    await new Promise((r) => setTimeout(r, 0))
-    expect(store.isLoggedIn).toBe(false)
-    expect(removeSpy).toHaveBeenCalled()
   })
 })
 

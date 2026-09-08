@@ -28,9 +28,7 @@ export const useAuthStore = defineStore("auth", () => {
   const _authError = ref<string | null>(null)
 
   // ── 公共 getters（return 后 setup store 自动解包；模板 / .value 皆可）──
-  // 登录态 = 持久凭证存在（spec #393 乐观登录）：restore 后即登录，user 由后台刷新
-  // 异步就位；瞬时网络失败不回滚登录态，仅凭证被服务端拒绝（logout）清除。
-  const isLoggedIn = computed(() => _refreshToken.value !== null)
+  const isLoggedIn = computed(() => _accessTokenReady.value && _user.value !== null)
   const currentUser = computed(() => _user.value)
   const authError = computed(() => _authError.value)
 
@@ -57,12 +55,12 @@ export const useAuthStore = defineStore("auth", () => {
         auth.loginWithRefreshToken(token, (userInfoJson: string, err: string) => {
           if (err) {
             _authError.value = err
-            // 凭证被服务端拒绝（"凭证/invalid" 字样 = OAuth 4xx）→ 登出全套（清持久化凭证）；
-            // 网络/超时类瞬时错误 → 仅告警保持登录态（spec #393：不惩罚瞬时故障）
+            // 仅凭证类错误（OAuth 400）标记永久失效；网络/解析类错误允许重试
             if (err.includes("凭证") || err.includes("invalid")) {
-              logout()
-            } else {
-              console.warn("[authStore] token 刷新瞬时失败（保持登录态，网络恢复后自愈）", err)
+              setAuthPermanentFailure(true)
+              _accessTokenReady.value = false
+              _user.value = null
+              _refreshToken.value = null
             }
             resolve(false)
             return
@@ -105,12 +103,12 @@ export const useAuthStore = defineStore("auth", () => {
     } catch (err) {
       const apiErr = toApiError(err)
       _authError.value = apiErr.message
-      // 永久失效（OAuth 400）→ 登出全套（清持久化凭证，守卫跳登录页）；
-      // 瞬时（网络/超时/429/5xx）→ 仅告警保持登录态（spec #393）
+      // 永久失效（OAuth 400）→ 标记永久失败，强制重新登录
       if (apiErr.type === ApiErrorType.UNAUTHORIZED) {
-        await logout()
-      } else {
-        console.warn("[authStore] token 刷新瞬时失败（保持登录态，网络恢复后自愈）", err)
+        setAuthPermanentFailure(true)
+        _accessTokenReady.value = false
+        _user.value = null
+        _refreshToken.value = null
       }
       return false
     }
@@ -139,14 +137,10 @@ export const useAuthStore = defineStore("auth", () => {
    * 已在就绪态时短路返回 true（幂等）。
    */
   async function restoreToken(): Promise<boolean> {
-    if (_refreshToken.value) return true
+    if (_accessTokenReady.value) return true
     const token = await loadRefreshToken()
     if (!token) return false
-    // 乐观登录（spec #393）：持久凭证存在即登录态，路由立即放行；刷新后台执行，
-    // 瞬时失败仅告警不回滚（真机实测：直连抖动把用户误踢登录页的死循环根因）。
-    _refreshToken.value = token
-    void performRefresh(token)
-    return true
+    return performRefresh(token)
   }
 
   /** 用 refresh_token 登录：OAuth 交换 → 设置内存态 */
@@ -172,11 +166,8 @@ export const useAuthStore = defineStore("auth", () => {
     _refreshToken.value = null
     _accessTokenReady.value = false
     _user.value = null
-    // ADR-0050：清除持久化 refresh_token（rejection 兜底：web-core IndexedDB 缺失等
-    // 环境性失败不得以 unhandled rejection 形态逃逸——warn 可见，禁静默）
-    clearRefreshToken().catch((e) => {
-      console.warn("[authStore] 清除持久化 refresh_token 失败", e)
-    })
+    // ADR-0050：清除持久化 refresh_token
+    void clearRefreshToken()
   }
 
   /** 注册 401 自动刷新处理器（客户端在请求失败时调用） */
@@ -188,9 +179,11 @@ export const useAuthStore = defineStore("auth", () => {
         return
       }
       const ok = await performRefresh(token)
-      // 会话失效判定（spec #393）：仅凭证被永久清理（logout 已清 _refreshToken）才报
-      // 全屏错误页；瞬时失败 _refreshToken 仍在 → 保持登录态，由各请求错误态呈现。
-      if (!ok && _refreshToken.value === null && _authError.value) {
+      // 会话失效判定：仅「已登录会话的 401 刷新失败且进入永久失效清理态」触发全屏错误页。
+      // 登录页输错 token / 启动恢复失败也走 performRefresh，但不经过本 handler——
+      // 它们无会话可失效（Login 内联错误 / 静默回登录页是正确行为，不应跳错误页）。
+      // 判别：刷新失败 + accessToken 不再就绪（unauthorized 分支已清空状态；网络类错误保持就绪不触发）。
+      if (!ok && _accessTokenReady.value === false && _authError.value) {
         reportSessionError({ type: ApiErrorType.UNAUTHORIZED, message: _authError.value })
       }
     })

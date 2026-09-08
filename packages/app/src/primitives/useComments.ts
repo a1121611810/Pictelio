@@ -19,8 +19,6 @@ export interface UseCommentsResult {
   posting: Accessor<boolean>;
   deletingId: Accessor<number | null>;
   hasMore: Accessor<boolean>;
-  /** 错误态重试：原地重新加载评论（spec #393/#398，替代整页 reload） */
-  retry: () => void;
   loadMore: () => void;
   post: (text: string, parentId?: number) => Promise<void>;
   remove: (commentId: number) => Promise<void>;
@@ -41,11 +39,9 @@ export function useComments(
   const [posting, setPosting] = createSignal(false);
   const [deletingId, setDeletingId] = createSignal<number | null>(null);
 
-  // 加载根评论（当 enabled + targetId 变化时触发；retryKey 供错误态原地重试）
-  const [retryKey, setRetryKey] = createSignal(0);
+  // 加载根评论（当 enabled + targetId 变化时触发）
   createEffect(() => {
     if (!enabled()) return;
-    retryKey();
     const id = targetId();
     const t = type();
     const ac = new AbortController();
@@ -136,7 +132,6 @@ export function useComments(
     posting,
     deletingId,
     hasMore: () => nextUrl() !== null,
-    retry: () => setRetryKey((k) => k + 1),
     loadMore,
     post,
     remove,

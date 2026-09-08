@@ -3,7 +3,6 @@ import SettingsAppearance from "./SettingsAppearance";
 import SettingsContent from "./SettingsContent";
 import SettingsImage from "./SettingsImage";
 import SettingsDirectAccess from "./SettingsDirectAccess";
-import SettingsApiProxy from "./SettingsApiProxy";
 import SettingsTranslate from "./SettingsTranslate";
 import SettingsClient from "./SettingsClient";
 import SettingsUpdate from "./SettingsUpdate";
@@ -44,10 +43,6 @@ const SettingsSections: Component<SettingsSectionsProps> = (props) => {
 
       <SettingsCard tone="elevated">
         <SettingsDirectAccess />
-      </SettingsCard>
-
-      <SettingsCard tone="elevated">
-        <SettingsApiProxy />
       </SettingsCard>
 
       <SettingsCard tone="elevated">

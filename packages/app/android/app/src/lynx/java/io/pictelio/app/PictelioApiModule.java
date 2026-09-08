@@ -59,7 +59,7 @@ public class PictelioApiModule extends LynxModule {
 
     private static final String TAG = "PictelioApiModule";
 
-
+    private static final String API_BASE = PixivApiCore.apiBase();
 
     /** #130：API 转发线程池。executeRequest 为阻塞 IO（CONNECT 15s + READ 30s），
      * 不能占用 Lynx 调用线程；newCachedThreadPool 无固定上限、按请求伸缩
@@ -98,8 +98,7 @@ public class PictelioApiModule extends LynxModule {
      */
     @LynxMethod
     public void request(String method, String path, String body, Callback callback) {
-        // ADR-0146 D3：apiBase() 每次调用刷新（反代设置即时生效）
-        String url = PixivApiCore.apiBase() + (path == null || path.startsWith("/") ? "" : "/")
+        String url = API_BASE + (path == null || path.startsWith("/") ? "" : "/")
                 + (path == null ? "" : path);
         final String[] rotated = {""};
         API_EXECUTOR.execute(() -> {

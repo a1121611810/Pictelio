@@ -52,14 +52,12 @@ import okhttp3.Response;
  *       用 Dns 结果建连），而非钉定连接（系统路线/镜像/GitHub）grant 为 null 或 IP 不匹配
  *       → 零扰动；</li>
  *   <li><b>EventListener</b>（{@link AttributionEventListener}，经 Factory 每调用一实例）：
- *       只做传输层失败的兜底归因（见下「记账恰好一次」），钉定失败记账点同步经 warnSink
- *       输出一行告警（#395 禁静默可观测性）；连接成功本身不记账——
+ *       只做传输层失败的兜底归因（见下「记账恰好一次」）；连接成功本身不记账——
  *       传输层成功口径 = <b>响应头到达</b>（ {@code responseHeadersStart} 只标记边界，
  *       成功记账归拦截器，因为 EventListener 拿不到状态码）；</li>
  *   <li><b>应用拦截器</b>（{@link PinnedAccountingInterceptor}）：响应阶段记账的唯一归属——
- *       {@code code == 421 && 直连} → {@code recordFailure} + warn 一行（含 host/ip，
- *       #395 可观测性；421 = 边缘错配，探针实测 pximg 边缘对 API Host 恒 421，spec 421
- *       特化）；其余状态码 → {@code recordSuccess}
+ *       {@code code == 421 && 直连} → {@code recordFailure}（421 = 边缘错配，探针实测
+ *       pximg 边缘对 API Host 恒 421，spec 421 特化）；其余状态码 → {@code recordSuccess}
  *       （响应头到达 = 传输层成功；4xx/5xx 是应用层失败，不计传输层口径）。421 响应
  *       <b>原样返回调用方</b>（熔断内部消化，不引入新异常类型）；finally 清理 grant
  *       （请求作用域生命周期锚点，防 dispatcher 线程复用串味）。</li>
@@ -80,9 +78,6 @@ import okhttp3.Response;
  *       为真 = body 阶段失败，<b>不计入</b>——大 zip 流式中途断流不误熔断）→ 失败；</li>
  *   <li>拦截器 proceed 返回后（响应头已达）：421 → 失败；其余 → 成功。</li>
  * </ol>
- * 失败/421 记账点在 CAS 赢得记账权的同时经 warnSink 输出一行告警（host / 钉定 IP /
- * 通道 / 异常类名，#395 禁静默可观测性），与记账严格 1:1（同一 CAS 闸门去重，无重复噪音）；
- * body 阶段失败与系统路线失败零记账亦零告警。
  * 凭据不灭失论证：PINNED 决策后到记账前的每条路径（建连失败 / 握手失败 / 写请求失败 /
  * 响应头前断流 / 正常响应 / 421）恰好被上述四点之一覆盖并 CAS 成功一次。钉定 IP 字面量
  * 构造地址失败的防御兜底（理论不可达：{@link IpTableMerger} 已校验严格 IPv4）当场
@@ -111,8 +106,7 @@ import okhttp3.Response;
  *       {@link DirectAccessConfig}，装配面天然分离）；</li>
  *   <li>install 幂等；{@code newBuilder()} 派生 client（镜像预算 client）自动继承全部
  *       四点安装（OkHttp newBuilder 全量复制，拦截器标记随之复制 → 重复 install 直接短路）；</li>
- *   <li>失败归因只对直连尝试：系统路线失败（grant null 或对端 IP 非钉定值）零记账零告警
- *       （logcat 零日志，系统路线零扰动）。</li>
+ *   <li>失败归因只对直连尝试：系统路线失败（grant null 或对端 IP 非钉定值）零记账。</li>
  * </ul>
  *
  * <p><b>线程安全</b>：三件套实例无共享可变态（grant 走 ThreadLocal；熔断器自身 CAS）。
@@ -170,9 +164,7 @@ public final class DirectAccessTransport {
         // 一次性探针 client：只为提取平台默认 TLS 组件（默认 SSLSocketFactory + 默认
         // TrustManager），证书链校验完全保留默认。probe 不做任何请求，用后即弃。
         OkHttpClient probe = builder.build();
-        java.util.concurrent.ConcurrentHashMap<ChannelCircuitBreaker.Channel, String> lastGoodByChannel =
-                new java.util.concurrent.ConcurrentHashMap<>();
-        builder.dns(new PinnedDns(config, breaker, warnSink, lastGoodByChannel));
+        builder.dns(new PinnedDns(config, breaker, warnSink));
         SSLSocketFactory base = probe.sslSocketFactory();
         X509TrustManager trustManager = probe.x509TrustManager();
         if (base != null && trustManager != null) {
@@ -184,46 +176,32 @@ public final class DirectAccessTransport {
             warnSink.accept(TAG + " 平台默认 TLS 组件缺失（sslSocketFactory/trustManager 为 null），"
                     + "SNI 剥离停用（直连决策与熔断记账不受影响）");
         }
-        builder.eventListenerFactory(call -> new AttributionEventListener(breaker, warnSink));
-        builder.addInterceptor(new PinnedAccountingInterceptor(breaker, warnSink, lastGoodByChannel));
+        builder.eventListenerFactory(call -> new AttributionEventListener(breaker));
+        builder.addInterceptor(new PinnedAccountingInterceptor(breaker));
         return builder;
     }
 
     // ── 请求作用域凭据 ───────────────────────────────────────
 
     /**
-     * 请求作用域凭据（= 一次 {@code Dns.lookup} 的 PINNED 决策 = 一次 Breaker
-     * {@code allowDirect} 授凭）。ADR-0145 D1：凭据携带<b>候选 IP 列表</b>（主条目 +
-     * 重试位 + 同通道其余表条目 + last-good），任一候选上的连接/握手事件均归因本凭据。
-     * 记账闩 {@code accounted}：失败归因 CAS 恰好一次（多候选多次失败只记一次）；
-     * 最终成功由拦截器幂等 {@code recordSuccess 清零——多候选下「前序 route 失败、
-     * 末序成功」的保守误计被成功清零覆盖（ADR-0145 D3）。
-     * {@code headersArrived} 划出 body 阶段边界——之后的失败属流式读取断流，不计
-     * 传输层口径（禁大 zip 中途断流误熔断）。
+     * 一枚直连授凭（= 一次 {@code Dns.lookup} 的 PINNED 决策 = 一次 Breaker
+     * {@code allowDirect} 授凭）。记账闩 {@code accounted} 保证多归因点竞争下
+     * <b>恰好一次</b>（CAS 去重）；{@code headersArrived} 划出 body 阶段边界——
+     * 之后的失败属流式读取断流，不计传输层口径（禁大 zip 中途断流误熔断）。
      */
     private static final class PinnedGrant {
-        /** 表主条目 IP（日志/last-good 记账用） */
-        final String primaryIp;
-        /** 候选 IP 列表（有序：last-good → 主条目 → 重试位 → 同通道其余；任一即归因本凭据） */
-        final java.util.List<String> candidateIps;
+        final String ip;
         final ChannelCircuitBreaker.Channel channel;
         final java.util.concurrent.atomic.AtomicBoolean accounted =
                 new java.util.concurrent.atomic.AtomicBoolean(false);
         volatile boolean headersArrived;
 
-        PinnedGrant(String primaryIp, java.util.List<String> candidateIps,
-                    ChannelCircuitBreaker.Channel channel) {
-            this.primaryIp = primaryIp;
-            this.candidateIps = java.util.Collections.unmodifiableList(candidateIps);
+        PinnedGrant(String ip, ChannelCircuitBreaker.Channel channel) {
+            this.ip = ip;
             this.channel = channel;
         }
 
-        /** 对端是否为本凭据的候选之一（SSF 剥 SNI 判定 / 失败归因共用） */
-        boolean matchesPeerAddress(String hostAddress) {
-            return candidateIps.contains(hostAddress);
-        }
-
-        /** @return {@code true} = 本次调用赢得唯一一次失败记账权 */
+        /** @return {@code true} = 本次调用赢得唯一一次记账权 */
         boolean tryAccount() {
             return accounted.compareAndSet(false, true);
         }
@@ -251,24 +229,19 @@ public final class DirectAccessTransport {
         private final java.util.function.Supplier<IpTableMerger.Snapshot> table;
         private final ChannelCircuitBreaker breaker;
         private final Consumer<String> warnSink;
-        /** 通道 → 最近成功候选（ADR-0145 D1 last-good 优先位；拦截器成功时写入） */
-        private final java.util.concurrent.ConcurrentHashMap<ChannelCircuitBreaker.Channel, String> lastGood;
 
-        PinnedDns(DirectAccessConfig config, ChannelCircuitBreaker breaker, Consumer<String> warnSink,
-                  java.util.concurrent.ConcurrentHashMap<ChannelCircuitBreaker.Channel, String> lastGood) {
-            this(config::switchState, config::currentTable, breaker, warnSink, lastGood);
+        PinnedDns(DirectAccessConfig config, ChannelCircuitBreaker breaker, Consumer<String> warnSink) {
+            this(config::switchState, config::currentTable, breaker, warnSink);
         }
 
         /** 全注入构造（包可见：测试直测钉定/委托分支，无需装配完整 Config） */
         PinnedDns(java.util.function.Supplier<SwitchState> switchState,
                   java.util.function.Supplier<IpTableMerger.Snapshot> table,
-                  ChannelCircuitBreaker breaker, Consumer<String> warnSink,
-                  java.util.concurrent.ConcurrentHashMap<ChannelCircuitBreaker.Channel, String> lastGood) {
+                  ChannelCircuitBreaker breaker, Consumer<String> warnSink) {
             this.switchState = switchState;
             this.table = table;
             this.breaker = breaker;
             this.warnSink = warnSink;
-            this.lastGood = lastGood;
         }
 
         @Override
@@ -279,43 +252,24 @@ public final class DirectAccessTransport {
             if (!decision.isDirect()) {
                 return Dns.SYSTEM.lookup(hostname); // 系统路线：零记账、逐字节现状
             }
-            // 候选序列（ADR-0145 D1）：主条目 ×(1+重试预算) → 同通道其余表条目 → last-good 优先位。
-            // OkHttp RouteSelector 对地址列表逐 route 重试——概率性 RST 被同请求内原生握手重试吸收。
-            ChannelCircuitBreaker.Channel channel = decision.channel();
-            List<String> candidates = new java.util.ArrayList<>();
-            String last = lastGood.get(channel);
-            if (last != null && !last.equals(decision.ip())) {
-                candidates.add(last); // last-good 优先位（跨通道互不串扰：按通道分槽）
+            InetAddress pinned;
+            try {
+                // 严格 IPv4 字面量 → getByName 仅做字面量合法性检查，绝不发起 DNS 查询；
+                // getByAddress(bytes) 按字节构造地址，主机名回落为字面量本身——
+                // 不做反向解析，也不携带伪造主机名标签（带主机名标签的回环字面量会被
+                // JVM 的 SOCKS 层按主机名转发给本地代理，绕开钉定直连，见 lookup javadoc）
+                pinned = InetAddress.getByAddress(InetAddress.getByName(decision.ip()).getAddress());
+            } catch (UnknownHostException e) {
+                // 理论不可达（Merger/Config 已校验严格 IPv4；此处防御禁静默）：
+                // 凭据已被 Policy 消耗（门序契约），当场 recordFailure 回收记账义务，
+                // 再回退系统路线——不失凭据、不失可见性
+                breaker.recordFailure(decision.channel());
+                warnSink.accept(TAG + " 钉定 IP 字面量构造地址失败（防御兜底，已按传输失败记账并回退"
+                        + "系统路线）: host=" + hostname + " ip=" + decision.ip() + " (" + e + ")");
+                return Dns.SYSTEM.lookup(hostname);
             }
-            candidates.add(decision.ip());
-            candidates.add(decision.ip()); // 重试预算 ×1：概率性 RST 的同请求吸收
-            if (snapshot != null) {
-                for (java.util.Map.Entry<String, String> e : snapshot.entries().entrySet()) {
-                    if (e.getValue().equals(decision.ip())) continue;
-                    if (DirectAccessPolicy.classifyChannel(e.getKey()) != channel) continue;
-                    if (!candidates.contains(e.getValue())) candidates.add(e.getValue());
-                }
-            }
-            List<InetAddress> addresses = new java.util.ArrayList<>(candidates.size());
-            for (String ip : candidates) {
-                try {
-                    // 严格 IPv4 字面量 → getByName 仅做字面量合法性检查，绝不发起 DNS 查询；
-                    // getByAddress(bytes) 按字节构造地址，主机名回落为字面量本身——
-                    // 不做反向解析，也不携带伪造主机名标签（带主机名标签的回环字面量会被
-                    // JVM 的 SOCKS 层按主机名转发给本地代理，绕开钉定直连，见 lookup javadoc）
-                    addresses.add(InetAddress.getByAddress(InetAddress.getByName(ip).getAddress()));
-                } catch (UnknownHostException e) {
-                    // 理论不可达（Merger/Config 已校验严格 IPv4；此处防御禁静默）：
-                    // 凭据已被 Policy 消耗（门序契约），当场 recordFailure 回收记账义务，
-                    // 再回退系统路线——不失凭据、不失可见性
-                    breaker.recordFailure(channel);
-                    warnSink.accept(TAG + " 钉定 IP 字面量构造地址失败（防御兜底，已按传输失败记账并回退"
-                            + "系统路线）: host=" + hostname + " ip=" + ip + " (" + e + ")");
-                    return Dns.SYSTEM.lookup(hostname);
-                }
-            }
-            GRANT.set(new PinnedGrant(decision.ip(), candidates, channel));
-            return addresses;
+            GRANT.set(new PinnedGrant(decision.ip(), decision.channel()));
+            return Collections.singletonList(pinned);
         }
     }
 
@@ -364,10 +318,7 @@ public final class DirectAccessTransport {
             String peerHost = host;
             PinnedGrant grant = pinnedGrantFor(s);
             if (grant != null) {
-                // 钉定连接（ADR-0145 D1 多候选）：peer = socket 实际连上的字面量候选地址
-                //（host 参数可能是调用方传入的主机名形态，不可作字面量对端——否则 SNI
-                // 从主机名派生，剥离失效）
-                peerHost = s.getInetAddress().getHostAddress();
+                peerHost = grant.ip; // 钉定连接：字面量对端 → SNI 派生短路（主机制）
             }
             Socket socket = delegate.createSocket(s, peerHost, port, autoClose);
             if (grant != null) {
@@ -417,7 +368,7 @@ public final class DirectAccessTransport {
                 return null; // 无已连接对端（不在直连建连路径上）
             }
             PinnedGrant grant = GRANT.get();
-            if (grant == null || !grant.matchesPeerAddress(socket.getInetAddress().getHostAddress())) {
+            if (grant == null || !grant.ip.equals(socket.getInetAddress().getHostAddress())) {
                 return null; // 非钉定连接：零扰动（系统路线/镜像/GitHub 逐字节现状）
             }
             return grant;
@@ -450,14 +401,12 @@ public final class DirectAccessTransport {
      * <p>职责边界（恰好一次论证见类 javadoc）：
      * <ul>
      *   <li>{@code connectFailed}：连接/握手失败的<b>主归因点</b>（先于异常传播触发，
-     *       凭据在场）；对端 IP 与凭据不匹配（非钉定路线）→ 零记账零告警；记账成功同步
-     *       warn 一行（钉定 IP / 通道 / 异常，#395 可观测性；钉定路线 host 恒同 ip，不重复输出）；</li>
+     *       凭据在场）；对端 IP 与凭据不匹配（非钉定路线）→ 零记账；</li>
      *   <li>{@code responseHeadersStart}：只标记 body 阶段边界（{@code headersArrived}），
      *       <b>不记账</b>——EventListener 拿不到状态码，421 与 200 在此无法区分，
      *       响应阶段成败归拦截器（421 特化）；</li>
-     *   <li>{@code callFailed}：兜底归因（前两点均未覆盖的罕见失败路径；warn 一行，
-     *       仅 ip/通道/异常——无地址入参故无 host 字段）；{@code headersArrived} 已置位 = body 阶段失败，
-     *       <b>不计入不告警</b>（禁大 zip 断流噪音）。</li>
+     *   <li>{@code callFailed}：兜底归因（前两点均未覆盖的罕见失败路径）；
+     *       {@code headersArrived} 已置位 = body 阶段失败，<b>不计入</b>。</li>
      *   <li>{@code connectEnd}/{@code connectStart}：不重写——连接成功不是成功口径
      *       （口径 = 响应头到达，归拦截器），连接开始无任何可观测义务。</li>
      * </ul>
@@ -465,11 +414,9 @@ public final class DirectAccessTransport {
     static final class AttributionEventListener extends EventListener {
 
         private final ChannelCircuitBreaker breaker;
-        private final Consumer<String> warnSink;
 
-        AttributionEventListener(ChannelCircuitBreaker breaker, Consumer<String> warnSink) {
+        AttributionEventListener(ChannelCircuitBreaker breaker) {
             this.breaker = breaker;
-            this.warnSink = warnSink;
         }
 
         @Override
@@ -479,13 +426,6 @@ public final class DirectAccessTransport {
             if (grant != null && matchesPinnedAddress(inetSocketAddress, grant)) {
                 if (grant.tryAccount()) {
                     breaker.recordFailure(grant.channel);
-                    // 禁静默（#395）：钉定连接失败必须 logcat 可见；与记账同一 CAS 闸门，
-                    // 恰好一行、无重复噪音；ip 记本次 route 的字面量候选（可能是重试位/
-                    // 同通道备用，不必等于主条目）
-                    java.net.InetAddress peer = inetSocketAddress.getAddress();
-                    String peerIp = peer == null ? "unresolved" : peer.getHostAddress();
-                    warnSink.accept(TAG + " 钉定连接失败（connectFailed，已按传输失败记账）: ip="
-                            + peerIp + " channel=" + grant.channel + " error=" + ioe);
                 }
             }
         }
@@ -504,10 +444,6 @@ public final class DirectAccessTransport {
             if (grant != null && !grant.headersArrived) {
                 if (grant.tryAccount()) {
                     breaker.recordFailure(grant.channel);
-                    // 禁静默（#395）：兜底归因点告警，与记账同一 CAS 闸门（1:1）；
-                    // body 阶段失败已在上方守卫拦截（不记账不告警）
-                    warnSink.accept(TAG + " 钉定调用失败（callFailed 兜底，已按传输失败记账）: ip="
-                            + grant.primaryIp + " channel=" + grant.channel + " error=" + ioe);
                 }
             }
         }
@@ -515,7 +451,7 @@ public final class DirectAccessTransport {
         /** 对端 IP 精确匹配凭据（∈/∉ 钉定集判定；未解析地址防御为不匹配 → 零记账）。 */
         private static boolean matchesPinnedAddress(InetSocketAddress address, PinnedGrant grant) {
             InetAddress remote = address.getAddress();
-            return remote != null && grant.matchesPeerAddress(remote.getHostAddress());
+            return remote != null && grant.ip.equals(remote.getHostAddress());
         }
     }
 
@@ -526,9 +462,9 @@ public final class DirectAccessTransport {
      *
      * <ul>
      *   <li>proceed 正常返回（响应头已达）：凭据在场 → 421 = 边缘错配
-     *       {@code recordFailure} + warn 一行（host/ip，#395 可观测性；spec 421 特化）；
-     *       其余状态码（含 4xx/5xx）= 传输层成功 {@code recordSuccess}（应用层失败不计
-     *       传输口径）；421 响应<b>原样返回</b>，不改写不抛异常；</li>
+     *       {@code recordFailure}（spec 421 特化）；其余状态码（含 4xx/5xx）
+     *       = 传输层成功 {@code recordSuccess}（应用层失败不计传输口径）；
+     *       421 响应<b>原样返回</b>，不改写不抛异常；</li>
      *   <li>proceed 抛出（连接后、响应头前的失败——请求写入断流等；proceed 一旦抛出即
      *       必然响应头未达，无 body 误计面）→ {@code recordFailure} 后原样上抛；</li>
      *   <li>finally 清理 ThreadLocal 凭据：请求作用域终点（连接池命中路径不触发 Dns、
@@ -540,15 +476,9 @@ public final class DirectAccessTransport {
     static final class PinnedAccountingInterceptor implements Interceptor {
 
         private final ChannelCircuitBreaker breaker;
-        private final Consumer<String> warnSink;
-        /** 通道 → 最近成功候选（ADR-0145 D1 last-good；与 PinnedDns 共享同一 map 实例） */
-        private final java.util.concurrent.ConcurrentHashMap<ChannelCircuitBreaker.Channel, String> lastGood;
 
-        PinnedAccountingInterceptor(ChannelCircuitBreaker breaker, Consumer<String> warnSink,
-                                    java.util.concurrent.ConcurrentHashMap<ChannelCircuitBreaker.Channel, String> lastGood) {
+        PinnedAccountingInterceptor(ChannelCircuitBreaker breaker) {
             this.breaker = breaker;
-            this.warnSink = warnSink;
-            this.lastGood = lastGood;
         }
 
         @Override
@@ -556,22 +486,11 @@ public final class DirectAccessTransport {
             try {
                 Response response = chain.proceed(chain.request());
                 PinnedGrant grant = GRANT.get();
-                if (grant != null) {
+                if (grant != null && grant.tryAccount()) {
                     if (response.code() == 421) {
-                        // 边缘错配：CAS 恰好一次记账 + warn（ADR-0145：候选序列部分失败同理）
-                        if (grant.tryAccount()) {
-                            breaker.recordFailure(grant.channel); // 边缘错配：传输层失败证据
-                            // 禁静默（#395）：421 错配记账点 warn 可见（host/ip 定位错配边缘）
-                            warnSink.accept(TAG + " 直连边缘错配（HTTP 421，已按传输失败记账）: host="
-                                    + chain.request().url().host() + " ip=" + grant.primaryIp
-                                    + " channel=" + grant.channel);
-                        }
+                        breaker.recordFailure(grant.channel); // 边缘错配：传输层失败证据
                     } else {
-                        // 非错配响应头到达 = 传输层成功（ADR-0145 D3）：幂等 recordSuccess
-                        // 无条件清零——覆盖「候选序列前序 route 失败已记账、末序成功」的保守误计；
-                        // 并记 last-good（候选序列首位优先位）
-                        breaker.recordSuccess(grant.channel);
-                        lastGood.put(grant.channel, grant.primaryIp);
+                        breaker.recordSuccess(grant.channel); // 响应头到达：传输层成功口径
                     }
                 }
                 return response;

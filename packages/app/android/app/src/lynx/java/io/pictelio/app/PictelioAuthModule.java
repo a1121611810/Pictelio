@@ -48,7 +48,6 @@ public class PictelioAuthModule extends LynxModule {
                 callback.invoke("", "登录凭证无效或已失效");
                 return;
             }
-            // unreachable marker
             // token 只进 Java 堆（JS 零知）
             PixivApiCore.accessToken = result.optString("accessToken");
             String rotated = result.optString("refreshToken");

@@ -257,14 +257,6 @@ const SettingsDirectAccess: Component = () => {
             </span>
           </div>
         </Show>
-        {/* #398：远端表从未成功拉取（新装 / 无代理环境 GitHub 直连不可达）→
-            明示内置表兜底与更新途径，避免「条目 0/内置"被误读为直连未配置 */}
-        <Show when={directAccessRuntime().lastFetchAtMillis === 0}>
-          <span class="[font-size:var(--fontSizeBase100)] text-[var(--colorNeutralForeground3)]">
-            当前由内置表兜底；远端 IP 表未拉取（GitHub 需代理），建议在代理环境点击「立即更新 IP
-            表」
-          </span>
-        </Show>
       </div>
 
       {/* 命令行 */}

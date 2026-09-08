@@ -412,12 +412,8 @@ const IllustDetail: Component = () => {
   });
 
   // 组件内加载数据：先渲染骨架屏，params 变化时自动重新请求
-  const [reloadKey, setReloadKey] = createSignal(0);
   createEffect(() => {
     const id = Number(params.id);
-    // 错误态重试原地重载（spec #393/#398）：追踪 reloadKey 即可重跑本 effect——
-    // 旧实现用 window.location.reload() 会重启整个应用并被启动导航踢回 /home
-    reloadKey();
     if (!id) return;
 
     // 清理旧请求，避免竞态条件
@@ -558,7 +554,7 @@ const IllustDetail: Component = () => {
         {loading() && !illust() && <IllustDetailSkeleton />}
 
         {error() && !illust() && (
-          <ErrorDisplay error={error()!} onRetry={() => setReloadKey((k) => k + 1)} />
+          <ErrorDisplay error={error()!} onRetry={() => window.location.reload()} />
         )}
 
         {illust() && !viewerOpen() && isBlockedAuthor() && (

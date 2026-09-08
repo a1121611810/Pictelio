@@ -127,11 +127,10 @@ describe("createTQFeedStore prefetchAllTabs（#375 空闲预取）", () => {
     expect(staleTimes.every((t) => t === Number.POSITIVE_INFINITY)).toBe(true);
   });
 
-  it("失败传播：非活跃 tab 预取失败 → 重置回干净 pending（首访无错误闪现）", async () => {
+  it("失败传播与缓存清理：预取 reject 向上传播（调度器 warn 不成死代码），error entry 被清除让首访回到干净骨架路径", async () => {
     let fail = true;
-    // currentTab = t1（活跃），失败的是 t2（非活跃）→ reset 语义保留（code review P2 原意图）
     const store = createTQFeedStore<Item, string, undefined>({
-      name: "test_prefetch_fail_inactive",
+      name: "test_prefetch_fail",
       currentTab: (() => "t1") as never,
       enabled: () => true,
       lazy: true,
@@ -143,16 +142,7 @@ describe("createTQFeedStore prefetchAllTabs（#375 空闲预取）", () => {
           allMode: { type: "single", subTabs: ["main"] },
           queries: {
             main: {
-              queryKey: () => ["pf_fail", "active"],
-              queryFn: () => Promise.resolve({ items: [], next_url: null }),
-            },
-          },
-        },
-        t2: {
-          allMode: { type: "single", subTabs: ["extra"] },
-          queries: {
-            extra: {
-              queryKey: () => ["pf_fail", "inactive"],
+              queryKey: () => ["pf_fail", "main"],
               queryFn: () => {
                 if (fail) return Promise.reject(new Error("network down"));
                 return Promise.resolve({ items: [], next_url: null });
@@ -163,51 +153,14 @@ describe("createTQFeedStore prefetchAllTabs（#375 空闲预取）", () => {
       },
     });
     await expect(Promise.all(store.prefetchAllTabs())).rejects.toThrow("network down");
-    // 非活跃 tab：resetQueries 生效 → entry 回到干净 pending 且无 error（复检 N1：
+    // 正向断言 resetQueries 生效：entry 回到干净 pending 且无 error（复检 N1：
     // 否定式断言在无修复时同样为绿，守不住该修复）
-    const state = qc.client!.getQueryState(["pf_fail", "inactive"]);
+    const state = qc.client!.getQueryState(["pf_fail", "main"]);
     expect(state == null || (state.status === "pending" && state.error == null)).toBe(true);
     // 二次预取重新发起请求（缓存可干净重建）
     fail = false;
     await Promise.all(store.prefetchAllTabs());
     expect(store.items().length).toBe(0); // 空 feed 合法
-  });
-
-  it("失败传播：活跃 tab 预取失败 → 保持 error 不 reset（防永久骨架，#398）", async () => {
-    // 真机实测（#393 T3）：活跃查询被 reset 回干净 pending 后，enabled:false 永不再
-    // 自取 + #366 首载粘滞规则 → loading 恒 true = 永久骨架、ErrorDisplay 永不出现。
-    // 活跃 tab 必须保持 error 态，交给面板 ErrorDisplay 的重试原地重载。
-    let fail = true;
-    const store = createTQFeedStore<Item, string, undefined>({
-      name: "test_prefetch_fail_active",
-      currentTab: (() => "t1") as never,
-      enabled: () => true,
-      lazy: true,
-      getDeps: () => undefined,
-      staleTime: 30_000,
-      filterFn: (items) => items,
-      tabs: {
-        t1: {
-          allMode: { type: "single", subTabs: ["main"] },
-          queries: {
-            main: {
-              queryKey: () => ["pf_fail_active", "main"],
-              queryFn: () => {
-                if (fail) return Promise.reject(new Error("network down"));
-                return Promise.resolve({ items: [], next_url: null });
-              },
-            },
-          },
-        },
-      },
-    });
-    await expect(Promise.all(store.prefetchAllTabs())).rejects.toThrow("network down");
-    // error 保留（不 reset）→ FeedList 的首载失败分支可渲染 ErrorDisplay
-    expect(qc.client!.getQueryState(["pf_fail_active", "main"])?.status).toBe("error");
-    // 面板重试路径：ensureLoaded 在网络恢复后重新拉取并清 error
-    fail = false;
-    await store.ensureLoaded();
-    expect(store.error()).toBeNull();
   });
 
   it("ensureLoaded SWR：缓存陈旧时同步返回旧数据并触发后台重验证（revalidateIfStale，code review P1）", async () => {

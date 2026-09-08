@@ -369,9 +369,6 @@ const NovelDetail: Component = () => {
   const [novelNav, setNovelNav] = createSignal<SeriesNavigation | null>(null);
   const [detailLoading, setDetailLoading] = createSignal(false);
   const [detailError, setDetailError] = createSignal<ApiError | null>(null);
-  // 错误态重试原地重载（spec #393/#398）：追踪 reloadKey 重跑加载 effect——
-  // 旧实现 window.location.reload() 会重启整个应用并被启动导航踢回 /home
-  const [detailReloadKey, setDetailReloadKey] = createSignal(0);
 
   function applyEntry(entry: NovelCacheEntry) {
     batch(() => {
@@ -419,10 +416,9 @@ const NovelDetail: Component = () => {
     }
   }
 
-  // 组件内加载小说数据：currentNovelId 变化时自动请求（首次加载 + 系列内切换 + 错误重试）
+  // 组件内加载小说数据：currentNovelId 变化时自动请求（首次加载 + 系列内切换）
   createEffect(() => {
     const id = currentNovelId();
-    detailReloadKey(); // 重试原地重跑本 effect
     if (!id) {
       return;
     }
@@ -1216,7 +1212,7 @@ const NovelDetail: Component = () => {
 
         {/* ── Error state ── */}
         <Show when={detailError()}>
-          <ErrorDisplay error={detailError()!} onRetry={() => setDetailReloadKey((k) => k + 1)} />
+          <ErrorDisplay error={detailError()!} onRetry={() => window.location.reload()} />
         </Show>
 
         {/* ── Content ── */}
