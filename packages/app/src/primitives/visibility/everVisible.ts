@@ -49,7 +49,7 @@ export function createEverVisible(options: EverVisibleOptions = {}) {
   const [el, setEl] = createSignal<HTMLElement>();
   const elements = createMemo(() => (el() ? [el()!] : []));
 
-  onMount(() => {
+  onSettled(() => {
     if (options.skipObserver || everVisible()) {
       return;
     }

@@ -11,7 +11,7 @@
  * - data-page-root 属性是 backTransitionService 快照定位契约，必须始终存在。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render } from "solid-js/web";
+import { render } from "@solidjs/web";
 import { BACK_EXIT_TRANSITION, ENTER_OFFSET } from "@/services/backTransitionService";
 
 const mockSvc = vi.hoisted(() => ({

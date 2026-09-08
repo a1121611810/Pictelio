@@ -6,7 +6,7 @@
  * 并处理 close 事件与卸载清理。加载真实 @fluentui/web-components 定义。
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { render } from "solid-js/web";
+import { render } from "@solidjs/web";
 import { createSignal } from "solid-js";
 import "@fluentui/web-components/dialog.js";
 import "@fluentui/web-components/dialog-body.js";

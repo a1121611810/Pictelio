@@ -1,4 +1,5 @@
-import type { JSX } from "solid-js";
+import type { JSX } from "@solidjs/web";
+import "solid-js";
 import { For, Show, createEffect } from "solid-js";
 import { createPullToRefresh } from "@/primitives/createPullToRefresh";
 import PullIndicator from "@/components/PullIndicator";

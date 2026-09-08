@@ -56,6 +56,7 @@ export default defineConfig({
           ],
         },
         { "@/utils/tryAsync": ["tryAsync", "trySync"] },
+        { "@/primitives/fluentOn": ["fluentOn"] },
       ],
       dts: "./src/auto-imports.d.ts",
     }),

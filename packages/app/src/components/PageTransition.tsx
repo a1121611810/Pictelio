@@ -1,4 +1,5 @@
-import type { Component, JSXElement } from "solid-js";
+import type { JSX } from "@solidjs/web";
+import type { Component, Element } from "solid-js";
 import {
   BACK_EXIT_TRANSITION,
   ENTER_OFFSET,
@@ -19,7 +20,7 @@ import {
 /** 进场动画清理兜底（transitionend 未触发时移除 will-change/transition） */
 const ENTER_FALLBACK_MS = 700;
 
-const PageTransition: Component<{ children: JSXElement }> = (props) => {
+const PageTransition: Component<{ children: JSX.Element }> = (props) => {
   let el: HTMLDivElement | undefined;
 
   // 同步消费返回标记：初始态必须在首帧绘制前确定（先渲染后加载，无 await）

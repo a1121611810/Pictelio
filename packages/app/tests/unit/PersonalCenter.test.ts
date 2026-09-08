@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render } from "solid-js/web";
+import { render } from "@solidjs/web";
 import { createComponent } from "solid-js";
 
 vi.mock("@capacitor/core", () => ({
@@ -127,7 +127,7 @@ describe("PersonalCenter module", () => {
   });
 
   // ── bug 2/4 回归：进入个人中心设置 currentTab=me，卸载时恢复进入前的 tab ──
-  it("onMount 设置 currentTab=me", async () => {
+  it("onSettled 设置 currentTab=me", async () => {
     mockCurrentTabValue = "follow";
     const { default: PersonalCenter } = await import("@/routes/PersonalCenter");
     const container = document.createElement("div");

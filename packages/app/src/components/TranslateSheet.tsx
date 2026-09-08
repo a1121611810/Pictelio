@@ -98,13 +98,13 @@ const TranslateSheet: Component<TranslateSheetProps> = (props) => {
               <div class="flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-1.5 gap-1">
                 <button
                   type="button"
-                  class="flex-1 py-2 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all active:scale-[0.98] appearance-none border-none outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  classList={{
+                  class={["flex-1 py-2 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all active:scale-[0.98] appearance-none border-none outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed", {
                     "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
                       (props.tier ?? props.defaultTier) === "flash",
                     "bg-transparent text-[var(--colorNeutralForeground2)]":
                       (props.tier ?? props.defaultTier) !== "flash",
-                  }}
+                  }]}
+                  
                   disabled={translating()}
                   aria-pressed={(props.tier ?? props.defaultTier) === "flash"}
                   onClick={() =>
@@ -121,13 +121,13 @@ const TranslateSheet: Component<TranslateSheetProps> = (props) => {
                 </button>
                 <button
                   type="button"
-                  class="flex-1 py-2 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all active:scale-[0.98] appearance-none border-none outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  classList={{
+                  class={["flex-1 py-2 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all active:scale-[0.98] appearance-none border-none outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed", {
                     "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
                       (props.tier ?? props.defaultTier) === "pro",
                     "bg-transparent text-[var(--colorNeutralForeground2)]":
                       (props.tier ?? props.defaultTier) !== "pro",
-                  }}
+                  }]}
+                  
                   disabled={translating()}
                   aria-pressed={(props.tier ?? props.defaultTier) === "pro"}
                   onClick={() =>
@@ -183,13 +183,13 @@ const TranslateSheet: Component<TranslateSheetProps> = (props) => {
 
           <button
             type="button"
-            class="w-full py-3 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase300)] font-semibold transition-all active:scale-[0.98] appearance-none border-none outline-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-            classList={{
+            class={["w-full py-3 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase300)] font-semibold transition-all active:scale-[0.98] appearance-none border-none outline-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed", {
               "bg-[var(--colorBrandBackground)] text-white hover:opacity-90":
                 !dsApiKey() || !translating(),
               "bg-[var(--colorNeutralBackground2)] text-[var(--colorNeutralForeground2)]":
                 Boolean(dsApiKey()) && translating(),
-            }}
+            }]}
+            
             disabled={translating()}
             onClick={handlePrimary}
           >

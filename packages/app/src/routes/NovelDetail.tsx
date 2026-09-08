@@ -1,4 +1,5 @@
-import type { Accessor, Component, JSX } from "solid-js";
+import type { JSX } from "@solidjs/web";
+import type { Accessor, Component } from "solid-js";
 import { useNavigate, useParams } from "@solidjs/router";
 import PixivImage from "../components/PixivImage";
 import ImageViewer from "@/components/ImageViewer";
@@ -137,8 +138,8 @@ const NovelImageBlock: Component<NovelImageBlockProps> = (props) => {
 
   return (
     <figure
-      class="novel-image-block overflow-hidden m-0"
-      classList={{ "cursor-pointer": dim() !== null && dim() !== undefined }}
+      class={["novel-image-block overflow-hidden m-0", { "cursor-pointer": dim() !== null && dim() !== undefined }]}
+      
       style={{ "aspect-ratio": aspectRatio() }}
       onClick={handleClick}
     >
@@ -371,14 +372,13 @@ const NovelDetail: Component = () => {
   const [detailError, setDetailError] = createSignal<ApiError | null>(null);
 
   function applyEntry(entry: NovelCacheEntry) {
-    batch(() => {
-      setNovelData(entry.detail);
-      setNovelHtml(entry.text);
-      setNovelImages(entry.images ?? {});
-      setNovelNav(entry.nav);
-      setDetailLoading(false);
-      setDetailError(null);
-    });
+    // Solid 2.0：默认微任务批处理，batch 已移除（ADR-0144）；此处无同步读取依赖
+    setNovelData(entry.detail);
+    setNovelHtml(entry.text);
+    setNovelImages(entry.images ?? {});
+    setNovelNav(entry.nav);
+    setDetailLoading(false);
+    setDetailError(null);
     recordVisit(entry.detail, "novel");
   }
 
@@ -539,7 +539,7 @@ const NovelDetail: Component = () => {
 
   // 挂载时恢复已保存的 API key、R18/R18G 分级开关、档位与思考开关
   // （冷启动直接进详情页也能用已存配置，避免 R18 开关已开却因内存默认 false 被误拦）
-  onMount(() => {
+  onSettled(() => {
     void loadDsApiKey();
     void loadTranslateRestrictSettings();
     void loadTierAndThinking();
@@ -659,11 +659,10 @@ const NovelDetail: Component = () => {
       for (let i = 0; i < cached.length && i < allIndexes.length; i++) {
         map[allIndexes[i]] = cached[i];
       }
-      batch(() => {
-        setTranslatedParagraphs(map);
-        setShowTranslation(true);
-        setTranslationError(null); // 清掉上次失败的错误提示
-      });
+      // Solid 2.0：默认微任务批处理，batch 已移除（ADR-0144）
+      setTranslatedParagraphs(map);
+      setShowTranslation(true);
+      setTranslationError(null); // 清掉上次失败的错误提示
       return;
     }
 
@@ -713,18 +712,17 @@ const NovelDetail: Component = () => {
           }
           // 成功块：译文并入（相对 → 全局），并从失败集合移除（补翻成功；
           // 注意：回退段需排除——它们的 text 是原文占位，不能被误判为补翻成功）
-          batch(() => {
-            setTranslatedParagraphs((prev) => {
-              const next = { ...prev };
-              for (const para of p.paragraphs) {
-                const global = baseIndexes[para.index];
-                next[global] = para.text;
-                if (!fallbackRel.has(para.index)) {
-                  failedNow.delete(global);
-                }
+          // Solid 2.0：默认微任务批处理，batch 已移除（ADR-0144）
+          setTranslatedParagraphs((prev) => {
+            const next = { ...prev };
+            for (const para of p.paragraphs) {
+              const global = baseIndexes[para.index];
+              next[global] = para.text;
+              if (!fallbackRel.has(para.index)) {
+                failedNow.delete(global);
               }
-              return next;
-            });
+            }
+            return next;
           });
           if (!showTranslation()) {
             setShowTranslation(true);
@@ -816,7 +814,7 @@ const NovelDetail: Component = () => {
     },
   });
   // scroll/resize 驱动重算（thumb 位置/尺寸随滚动更新）
-  onMount(() => {
+  onSettled(() => {
     const onScroll = () => setScrollTick((t) => t + 1);
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll, { passive: true });
@@ -883,7 +881,7 @@ const NovelDetail: Component = () => {
         match.start === activeMatch.start &&
         match.end === activeMatch.end;
       nodes.push(
-        <mark class="novel-search-match" classList={{ "novel-search-match-active": isActive }}>
+        <mark class={["novel-search-match", { "novel-search-match-active": isActive }]} >
           {text.slice(match.start, match.end)}
         </mark>,
       );
@@ -1280,14 +1278,14 @@ const NovelDetail: Component = () => {
               <fluent-button
                 slot="actions"
                 appearance="secondary"
-                on:click={() => resolveRestrictConfirm(false)}
+                ref={fluentOn("click", () => resolveRestrictConfirm(false))}
               >
                 取消
               </fluent-button>
               <fluent-button
                 slot="actions"
                 appearance="primary"
-                on:click={() => resolveRestrictConfirm(true)}
+                ref={fluentOn("click", () => resolveRestrictConfirm(true))}
               >
                 我已了解并继续
               </fluent-button>

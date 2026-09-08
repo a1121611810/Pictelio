@@ -28,7 +28,7 @@ const UserIllusts: Component = () => {
   const { visible: headerVisible } = createScrollBehavior();
 
   // 组件挂载后立即加载数据（路由 loader 已触发，此处作为兜底）
-  onMount(() => {
+  onSettled(() => {
     const uid = userId();
     if (uid) {
       load(uid, contentType());
@@ -53,18 +53,18 @@ const UserIllusts: Component = () => {
       <PageTransition>
         <div class="pb-16">
           <header
-            class="sticky top-0 z-20 surface-appbar h-12 flex items-center px-4 gap-3 transition-transform duration-[var(--durationNormal)] ease-[var(--curveEasyEase)]"
-            classList={{
+            class={["sticky top-0 z-20 surface-appbar h-12 flex items-center px-4 gap-3 transition-transform duration-[var(--durationNormal)] ease-[var(--curveEasyEase)]", {
               "translate-y-0": headerVisible(),
               "-translate-y-full": !headerVisible(),
-            }}
+            }]}
+            
             onDblClick={scrollToTop}
           >
             <fluent-button
               appearance="subtle"
               aria-label="返回"
               class="w-8 h-8 p-0 min-w-8"
-              on:click={() => goBack()}
+              ref={fluentOn("click", () => goBack())}
             >
               ←
             </fluent-button>
@@ -77,7 +77,7 @@ const UserIllusts: Component = () => {
           <div class="px-4 py-3">
             <div class="flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-1.5 gap-1">
               <button
-                classList={{
+                class={{
                   "segmented-item-active": contentType() === "illust",
                   "segmented-item-inactive": contentType() !== "illust",
                 }}
@@ -86,7 +86,7 @@ const UserIllusts: Component = () => {
                 插画
               </button>
               <button
-                classList={{
+                class={{
                   "segmented-item-active": contentType() === "manga",
                   "segmented-item-inactive": contentType() !== "manga",
                 }}
@@ -95,7 +95,7 @@ const UserIllusts: Component = () => {
                 漫画
               </button>
               <button
-                classList={{
+                class={{
                   "segmented-item-active": contentType() === "novel",
                   "segmented-item-inactive": contentType() !== "novel",
                 }}

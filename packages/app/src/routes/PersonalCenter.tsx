@@ -47,7 +47,7 @@ const PersonalCenter: Component<Props> = (props) => {
     props.userId,
   );
 
-  onMount(() => {
+  onSettled(() => {
     // 记录进入个人中心前的 tab：返回 /home 时恢复，避免 currentTab 残留在 "me"——
     // HomePage 只渲染 recommended/follow/bookmarks/history 四个面板，currentTab 为
     // "me" 时四个面板全不渲染，表现为「从列表点作者/点自己进个人中心再返回，列表空白」
@@ -98,7 +98,7 @@ const PersonalCenter: Component<Props> = (props) => {
             <fluent-button
               appearance="subtle"
               aria-label="返回"
-              on:click={actions.back}
+              ref={fluentOn("click", actions.back)}
               class="w-10 h-10 p-0 min-w-10"
             >
               ←

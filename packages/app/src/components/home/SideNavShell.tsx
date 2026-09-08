@@ -1,3 +1,4 @@
+import type { JSX } from "@solidjs/web";
 /**
  * SideNavShell — 首页 C 框架外壳（Win11 设置式侧边导航列，ADR-0075）。
  *
@@ -7,8 +8,17 @@
  * 切换器（历史 Tab 隐藏）+ 内容域插槽 renderPanel(tab)。
  * 历史 Tab 内建（A2 行卡列表 + 清空按钮），不经过 renderPanel。
  */
-import type { Component, JSX } from "solid-js";
-import { createSignal, For, onMount, Show } from "solid-js";
+/**
+ * SideNavShell — 首页 C 框架外壳（Win11 设置式侧边导航列，ADR-0075）。
+ *
+ * 左侧 56px sticky 全高 icon 导航列：搜索入口 + 推荐/关注/收藏/历史四 Tab +
+ * 底部设置 / 我的（UserAvatar）。选中 Tab 以 BrandBackground2 圆角块高亮。
+ * 右侧内容区：sticky 页面大标题（当前 Tab 名）+ 用户名副标题 + contentType
+ * 切换器（历史 Tab 隐藏）+ 内容域插槽 renderPanel(tab)。
+ * 历史 Tab 内建（A2 行卡列表 + 清空按钮），不经过 renderPanel。
+ */
+import type { Component } from "solid-js";
+import { createSignal, For, onSettled, Show } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { user } from "@/stores/authStore";
 import { currentTab, setCurrentTab } from "@/stores/uiStore";
@@ -115,7 +125,7 @@ const SideNavShell: Component<SideNavShellProps> = (props) => {
   // 保证 NavBar / PersonalCenter 入口的 Tab 预设与首页选择保持一致。
   const [tab, setTab] = createSignal<HomeTab>(initialHomeTab());
 
-  onMount(() => {
+  onSettled(() => {
     scrollToTop();
   });
 
@@ -143,13 +153,13 @@ const SideNavShell: Component<SideNavShellProps> = (props) => {
         </button>
         {SHELL_TABS.map((t) => (
           <button
-            class="flex h-11 w-11 cursor-pointer items-center justify-center rounded-[var(--borderRadiusMedium)] border-none outline-none transition-all active:scale-95 appearance-none"
-            classList={{
+            class={["flex h-11 w-11 cursor-pointer items-center justify-center rounded-[var(--borderRadiusMedium)] border-none outline-none transition-all active:scale-95 appearance-none", {
               "bg-[var(--colorBrandBackground2)] text-[var(--colorBrandForeground1)]":
                 tab() === t.key,
               "text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground1Hover)]":
                 tab() !== t.key,
-            }}
+            }]}
+            
             onClick={() => selectTab(t.key)}
             aria-current={tab() === t.key ? "page" : undefined}
             aria-label={t.label}

@@ -1,5 +1,6 @@
-import type { Component, JSX } from "solid-js";
-import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import type { JSX } from "@solidjs/web";
+import type { Component } from "solid-js";
+import { createSignal, For, onCleanup, onSettled, Show } from "solid-js";
 
 export interface GlassTabItem {
   key: string;
@@ -27,7 +28,7 @@ const GlassTabBar: Component<GlassTabBarProps> = (props) => {
   const [pointer, setPointer] = createSignal<{ x: number; y: number } | null>(null);
   const [reducedMotion, setReducedMotion] = createSignal(false);
 
-  onMount(() => {
+  onSettled(() => {
     if (typeof window.matchMedia !== "function") {
       return;
     }

@@ -1,4 +1,5 @@
-import { type Component, type JSX } from "solid-js";
+import type { JSX } from "@solidjs/web";
+import { type Component } from "solid-js";
 import { ApiErrorType, type ApiError } from "../api/types";
 import { isLoggedIn } from "../stores/authStore";
 

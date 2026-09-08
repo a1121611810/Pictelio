@@ -1,5 +1,5 @@
 import type { Component } from "solid-js";
-import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show } from "solid-js";
 import type { PixivIllustTag } from "@/api/types";
 import SearchableTag from "@/components/SearchableTag";
 import { useContainerWidth } from "@/primitives/useContainerWidth";
@@ -86,7 +86,7 @@ const AdaptiveTags: Component<AdaptiveTagsProps> = (props) => {
   });
 
   // 测量层就绪后读数；ResizeObserver 持续监听（旋转/字体加载/容器变化重测）
-  onMount(() => {
+  onSettled(() => {
     measure();
     const el = measureEl;
     if (!el) return;

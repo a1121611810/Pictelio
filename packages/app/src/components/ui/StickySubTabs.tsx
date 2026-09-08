@@ -1,4 +1,5 @@
-import type { Component, JSX } from "solid-js";
+import type { JSX } from "@solidjs/web";
+import type { Component } from "solid-js";
 
 interface StickySubTabsProps {
   /**
@@ -29,11 +30,11 @@ interface StickySubTabsProps {
  */
 const StickySubTabs: Component<StickySubTabsProps> = (props) => (
   <div
-    class={`sticky top-16 z-10 bg-[var(--colorNeutralBackground3)] transition-transform duration-[var(--durationNormal)] ease-[var(--curveEasyEase)] ${props.class ?? ""}`}
-    classList={{
+    class={[`sticky top-16 z-10 bg-[var(--colorNeutralBackground3)] transition-transform duration-[var(--durationNormal)] ease-[var(--curveEasyEase)] ${props.class ?? ""}`, {
       "translate-y-0": props.headerVisible,
       "-translate-y-16": !props.headerVisible,
-    }}
+    }]}
+    
   >
     {props.children}
   </div>

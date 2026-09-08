@@ -140,7 +140,7 @@ const ImageHostSettings: Component = () => {
             appearance="subtle"
             aria-label="返回"
             class="w-8 h-8 p-0 min-w-8"
-            on:click={() => goBack()}
+            ref={fluentOn("click", () => goBack())}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path
@@ -157,7 +157,7 @@ const ImageHostSettings: Component = () => {
         {/* Content */}
         <div class="px-4 py-4 flex flex-col gap-4">
           <Show when={probeToast()}>
-            <fluent-message-bar intent="success" class="mb-0" on:close={() => setProbeToast(null)}>
+            <fluent-message-bar intent="success" class="mb-0" ref={fluentOn("close", () => setProbeToast(null))}>
               {probeToast()}
             </fluent-message-bar>
           </Show>
@@ -178,12 +178,11 @@ const ImageHostSettings: Component = () => {
                 </p>
               </div>
               <fluent-switch
-                ref={masterSwitchRef}
-                checked={imageHostState().masterEnabled}
-                on:change={() => {
+                ref={[masterSwitchRef, fluentOn("change", () => {
                   handleToggle(!imageHostState().masterEnabled);
-                }}
-                aria-label="启用图床代理"
+                })]}
+                checked={imageHostState().masterEnabled}
+                                aria-label="启用图床代理"
               />
             </div>
           </div>
@@ -202,14 +201,13 @@ const ImageHostSettings: Component = () => {
               运行模式
             </p>
             <fluent-radio-group
-              ref={radioGroupRef}
-              value={imageHostState().mode}
-              on:change={(e: CustomEvent) => {
+              ref={[radioGroupRef, fluentOn("change", (e: CustomEvent) => {
                 if (e.detail?.value != null) {
                   setMode(e.detail.value);
                 }
-              }}
-              disabled={!imageHostState().masterEnabled}
+              })]}
+              value={imageHostState().mode}
+                            disabled={!imageHostState().masterEnabled}
               class="flex flex-col gap-3"
             >
               {[
@@ -243,14 +241,14 @@ const ImageHostSettings: Component = () => {
                       value={option.value}
                       checked={imageHostState().mode === option.value}
                       disabled={!imageHostState().masterEnabled}
-                      on:click={() => setMode(option.value)}
+                      ref={fluentOn("click", () => setMode(option.value))}
                     />
                     <label
                       for={inputId}
-                      class="flex-1 cursor-pointer [font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)]"
-                      classList={{
+                      class={["flex-1 cursor-pointer [font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)]", {
                         "opacity-60": !imageHostState().masterEnabled,
-                      }}
+                      }]}
+                      
                     >
                       <span class="font-semibold">
                         {option.label}
@@ -278,13 +276,13 @@ const ImageHostSettings: Component = () => {
                 <For each={imageHostState().hosts.filter((h) => h.enabled)}>
                   {(host) => (
                     <div
-                      class="flex items-center gap-3 p-3 rounded-[var(--borderRadiusMedium)] cursor-pointer transition-colors"
-                      classList={{
+                      class={["flex items-center gap-3 p-3 rounded-[var(--borderRadiusMedium)] cursor-pointer transition-colors", {
                         "bg-[var(--colorCompoundBrandBackground)] text-white":
                           imageHostState().selectedHostId === host.id,
                         "bg-[var(--colorNeutralBackground2)] hover:bg-[var(--colorNeutralBackground1Hover)]":
                           imageHostState().selectedHostId !== host.id,
-                      }}
+                      }]}
+                      
                       onClick={() => setSelectedHostId(host.id)}
                       role="button"
                       tabindex="0"
@@ -321,8 +319,8 @@ const ImageHostSettings: Component = () => {
 
           {/* Host list */}
           <div
-            class="rounded-[var(--borderRadiusXLarge)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] p-4"
-            classList={{ "opacity-60": !imageHostState().masterEnabled }}
+            class={["rounded-[var(--borderRadiusXLarge)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] p-4", { "opacity-60": !imageHostState().masterEnabled }]}
+            
           >
             <div class="flex items-center justify-between mb-3">
               <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)]">
@@ -339,7 +337,7 @@ const ImageHostSettings: Component = () => {
                   <div class="flex items-center gap-3 p-3 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)]">
                     <fluent-checkbox
                       checked={host.enabled}
-                      on:change={() => updateHost(host.id, { enabled: !host.enabled })}
+                      ref={fluentOn("change", () => updateHost(host.id, { enabled: !host.enabled }))}
                       disabled={!imageHostState().masterEnabled}
                       aria-label={`启用 ${host.name}`}
                     />
@@ -378,7 +376,7 @@ const ImageHostSettings: Component = () => {
                         appearance="subtle"
                         aria-label="编辑"
                         class="w-8 h-8 p-0 min-w-8"
-                        on:click={() => openEdit(host)}
+                        ref={fluentOn("click", () => openEdit(host))}
                         disabled={!imageHostState().masterEnabled}
                       >
                         <svg
@@ -399,7 +397,7 @@ const ImageHostSettings: Component = () => {
                           appearance="subtle"
                           aria-label="重置"
                           class="w-8 h-8 p-0 min-w-8"
-                          on:click={() => resetBuiltInHost(host.id)}
+                          ref={fluentOn("click", () => resetBuiltInHost(host.id))}
                           disabled={!imageHostState().masterEnabled}
                         >
                           <svg
@@ -427,7 +425,7 @@ const ImageHostSettings: Component = () => {
           <div class="flex gap-3">
             <fluent-button
               appearance="primary"
-              on:click={handleProbe}
+              ref={fluentOn("click", handleProbe)}
               disabled={isProbing() || !imageHostState().masterEnabled}
               class="flex-1"
             >
@@ -438,7 +436,7 @@ const ImageHostSettings: Component = () => {
             </fluent-button>
             <fluent-button
               appearance="secondary"
-              on:click={handleResetAll}
+              ref={fluentOn("click", handleResetAll)}
               disabled={!imageHostState().masterEnabled}
               class="flex-1"
             >
@@ -461,10 +459,10 @@ const ImageHostSettings: Component = () => {
               部分图床在部分地区可能无法访问，失败时会自动回退到默认代理。
             </p>
           </div>
-          <fluent-button slot="actions" appearance="secondary" on:click={cancelEnable}>
+          <fluent-button slot="actions" appearance="secondary" ref={fluentOn("click", cancelEnable)}>
             取消
           </fluent-button>
-          <fluent-button slot="actions" appearance="primary" on:click={confirmEnable}>
+          <fluent-button slot="actions" appearance="primary" ref={fluentOn("click", confirmEnable)}>
             确认开启
           </fluent-button>
         </FluentDialog>
@@ -502,7 +500,7 @@ const ImageHostSettings: Component = () => {
           <div class="flex items-center gap-2">
             <fluent-checkbox
               checked={editEnabled()}
-              on:change={() => setEditEnabled(!editEnabled())}
+              ref={fluentOn("change", () => setEditEnabled(!editEnabled()))}
             />
             <span class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)]">
               启用
@@ -524,10 +522,10 @@ const ImageHostSettings: Component = () => {
               />
             </div>
           </Show>
-          <fluent-button slot="actions" appearance="secondary" on:click={closeEdit}>
+          <fluent-button slot="actions" appearance="secondary" ref={fluentOn("click", closeEdit)}>
             取消
           </fluent-button>
-          <fluent-button slot="actions" appearance="primary" on:click={saveEdit}>
+          <fluent-button slot="actions" appearance="primary" ref={fluentOn("click", saveEdit)}>
             保存
           </fluent-button>
         </FluentDialog>

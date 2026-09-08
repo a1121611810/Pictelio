@@ -536,7 +536,7 @@ async function raceFetch<T>(
  * 启动时从 Android 文件缓存读取最近使用的 key，登记到 L1 已加载集合。
  * 仅在 Native 平台生效；Web 平台无操作。
  *
- * 在 App.tsx onMount 中调用，与 auth 初始化并行执行。
+ * 在 App.tsx onSettled 中调用，与 auth 初始化并行执行。
  * 预热失败不影响正常功能（降级为冷启动重新下载）。
  */
 export async function warmCacheFromDisk(): Promise<void> {

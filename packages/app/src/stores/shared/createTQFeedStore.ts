@@ -5,7 +5,7 @@
  * "TanStack Query InfiniteQuery wrapper + 响应式派生数据" 模式。
  *
  * 职责：
- *  - 根据 tab/subTab 配置创建对应的 createInfiniteQuery
+ *  - 根据 tab/subTab 配置创建对应的 useInfiniteQuery
  *  - 自动推导每个查询的 enabled（仅当前 tab + subTab 的查询运行）
  *  - 提供派生数据：items / nextUrl / loading / refreshing / error
  *  - 提供动作：ensureLoaded（router loader 预取）/ refresh / fetchMore
@@ -13,7 +13,7 @@
  */
 
 import type { Accessor } from "solid-js";
-import { createInfiniteQuery } from "@tanstack/solid-query";
+import { useInfiniteQuery } from "@tanstack/solid-query";
 import { queryClient } from "../../api/queryClient";
 import { normalizeQueryError } from "../../api/normalizeQueryError";
 import { ApiErrorType, type ApiError } from "../../api/types";
@@ -232,7 +232,7 @@ export function createTQFeedStore<
 
     // ── 1. 创建所有查询（在单个 createRoot 下） ──
 
-    const queryMap = new Map<string, ReturnType<typeof createInfiniteQuery>>();
+    const queryMap = new Map<string, ReturnType<typeof useInfiniteQuery>>();
     const queryDefMap = new Map<string, QueryDef<TItem, TDeps>>();
 
     for (const [tabKey, tabDef] of Object.entries(config.tabs) as [
@@ -250,7 +250,7 @@ export function createTQFeedStore<
 
         queryMap.set(
           mapKey,
-          createInfiniteQuery(
+          useInfiniteQuery(
             () => {
               const deps = config.getDeps();
 

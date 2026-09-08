@@ -1,5 +1,6 @@
-import { createSignal, onCleanup, onMount } from "solid-js";
-import type { JSX } from "solid-js";
+import type { JSX } from "@solidjs/web";
+import { createSignal, onCleanup, onSettled } from "solid-js";
+import "solid-js";
 
 /**
  * 指针跟随高光 + prefers-reduced-motion 原语（ADR-0044）。
@@ -13,7 +14,7 @@ export function usePointerHighlight() {
   const [pointer, setPointer] = createSignal<{ x: number; y: number } | null>(null);
   const [reducedMotion, setReducedMotion] = createSignal(false);
 
-  onMount(() => {
+  onSettled(() => {
     if (typeof window.matchMedia !== "function") {
       return;
     }

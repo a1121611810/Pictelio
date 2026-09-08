@@ -2,7 +2,7 @@
  * 设置页「翻译设置」分组 —— S1 最小版：API Key（BYOK）填写 / 保存 / 清除 + 保管提示。
  * S6 扩展：默认档位 / 思考开关 / R18 开关 / 清除翻译缓存入口。
  */
-import { createSignal, onMount, Show, type Component } from "solid-js";
+import { createSignal, onSettled, Show, type Component } from "solid-js";
 import {
   dsApiKey,
   loadDsApiKey,
@@ -30,7 +30,7 @@ const SettingsTranslate: Component = () => {
   const [saving, setSaving] = createSignal(false);
   const [feedback, setFeedback] = createSignal<string | null>(null);
 
-  onMount(() => {
+  onSettled(() => {
     void loadDsApiKey().then(() => setInputKey(dsApiKey() ?? ""));
     void loadTranslateRestrictSettings();
     void loadTierAndThinking();
@@ -166,12 +166,12 @@ const SettingsTranslate: Component = () => {
             <div class="flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-1.5 gap-1">
               <button
                 type="button"
-                class="flex-1 py-2 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all active:scale-[0.98] appearance-none border-none outline-none cursor-pointer"
-                classList={{
+                class={["flex-1 py-2 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all active:scale-[0.98] appearance-none border-none outline-none cursor-pointer", {
                   "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
                     defaultTier() === "flash",
                   "bg-transparent text-[var(--colorNeutralForeground2)]": defaultTier() !== "flash",
-                }}
+                }]}
+                
                 onClick={() => void setDefaultTier("flash")}
               >
                 标准
@@ -181,12 +181,12 @@ const SettingsTranslate: Component = () => {
               </button>
               <button
                 type="button"
-                class="flex-1 py-2 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all active:scale-[0.98] appearance-none border-none outline-none cursor-pointer"
-                classList={{
+                class={["flex-1 py-2 rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase200)] font-semibold transition-all active:scale-[0.98] appearance-none border-none outline-none cursor-pointer", {
                   "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
                     defaultTier() === "pro",
                   "bg-transparent text-[var(--colorNeutralForeground2)]": defaultTier() !== "pro",
-                }}
+                }]}
+                
                 onClick={() => void setDefaultTier("pro")}
               >
                 高质量
@@ -207,7 +207,7 @@ const SettingsTranslate: Component = () => {
               </div>
               <fluent-switch
                 checked={thinkingEnabled()}
-                on:change={() => void setThinkingEnabled(!thinkingEnabled())}
+                ref={fluentOn("change", () => void setThinkingEnabled(!thinkingEnabled()))}
                 aria-label="启用思考模式"
               />
             </div>
@@ -230,7 +230,7 @@ const SettingsTranslate: Component = () => {
               </div>
               <fluent-switch
                 checked={translateR18()}
-                on:change={() => onToggleR18()}
+                ref={fluentOn("change", () => onToggleR18())}
                 aria-label="翻译 R18 内容"
               />
             </div>
@@ -246,7 +246,7 @@ const SettingsTranslate: Component = () => {
               </div>
               <fluent-switch
                 checked={translateR18G()}
-                on:change={() => onToggleR18G()}
+                ref={fluentOn("change", () => onToggleR18G())}
                 aria-label="翻译 R18G 内容"
               />
             </div>
@@ -286,11 +286,11 @@ const SettingsTranslate: Component = () => {
         <fluent-button
           slot="actions"
           appearance="secondary"
-          on:click={() => setRestrictDialog(null)}
+          ref={fluentOn("click", () => setRestrictDialog(null))}
         >
           取消
         </fluent-button>
-        <fluent-button slot="actions" appearance="primary" on:click={confirmRestrictDialog}>
+        <fluent-button slot="actions" appearance="primary" ref={fluentOn("click", confirmRestrictDialog)}>
           我已了解并开启
         </fluent-button>
       </FluentDialog>
@@ -309,11 +309,11 @@ const SettingsTranslate: Component = () => {
         <fluent-button
           slot="actions"
           appearance="secondary"
-          on:click={() => setRestrictDialog(null)}
+          ref={fluentOn("click", () => setRestrictDialog(null))}
         >
           取消
         </fluent-button>
-        <fluent-button slot="actions" appearance="primary" on:click={confirmRestrictDialog}>
+        <fluent-button slot="actions" appearance="primary" ref={fluentOn("click", confirmRestrictDialog)}>
           我已了解并承担全部风险
         </fluent-button>
       </FluentDialog>

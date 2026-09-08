@@ -45,7 +45,7 @@ vi.mock("@tanstack/solid-query", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...(actual as Record<string, unknown>),
-    createInfiniteQuery: vi.fn((optsAccessor: () => { queryKey: string[]; enabled: boolean }) => {
+    useInfiniteQuery: vi.fn((optsAccessor: () => { queryKey: string[]; enabled: boolean }) => {
       const mock = {} as Record<string, unknown>;
       function currentOpts() {
         return optsAccessor();

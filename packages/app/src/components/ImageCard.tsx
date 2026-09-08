@@ -45,15 +45,15 @@ const ImageCard: Component<Props> = (props) => {
       <div class="relative overflow-hidden">
         {/* Skeleton overlay — 缩略图加载完成后淡出 */}
         <SkeletonShimmer
-          class="absolute inset-0 z-0 pointer-events-none rounded-[var(--borderRadiusMedium)] transition-opacity duration-[var(--durationUltraSlow)] ease-[var(--curveEasyEase)]"
-          classList={{ "opacity-0": thumbLoaded() }}
+          class={["absolute inset-0 z-0 pointer-events-none rounded-[var(--borderRadiusMedium)] transition-opacity duration-[var(--durationUltraSlow)] ease-[var(--curveEasyEase)]", { "opacity-0": thumbLoaded() }]}
+          
         />
         {/* Blur-up thumbnail */}
         <img
           src={resolveImageUrl(props.illust.image_urls.square_medium)}
           alt=""
-          class="absolute inset-0 w-full h-full object-cover blur-lg scale-110 pointer-events-none transition-opacity duration-[var(--durationUltraSlow)] ease-[var(--curveEasyEase)] z-1"
-          classList={{ "opacity-0": mainLoaded() }}
+          class={["absolute inset-0 w-full h-full object-cover blur-lg scale-110 pointer-events-none transition-opacity duration-[var(--durationUltraSlow)] ease-[var(--curveEasyEase)] z-1", { "opacity-0": mainLoaded() }]}
+          
           onLoad={() => setThumbLoaded(true)}
           onError={() => setThumbLoaded(true)}
         />
@@ -105,12 +105,12 @@ const ImageCard: Component<Props> = (props) => {
         {/* Bookmark heart — 右下角 */}
         <div class="absolute bottom-[var(--spacingVerticalXS)] right-[var(--spacingHorizontalXS)]">
           <button
-            class="min-w-10 min-h-10 flex items-center justify-center rounded-full bg-[var(--colorOverlaySurface)] backdrop-blur-sm text-sm transition-all active:scale-90 select-none border-none cursor-pointer"
-            classList={{
+            class={["min-w-10 min-h-10 flex items-center justify-center rounded-full bg-[var(--colorOverlaySurface)] backdrop-blur-sm text-sm transition-all active:scale-90 select-none border-none cursor-pointer", {
               "text-[var(--colorStatusDangerForeground1)]": bookmarked(),
               "text-[var(--colorNeutralForegroundOnBrand)] hover:text-[var(--colorStatusDangerBackground1)]":
                 !bookmarked(),
-            }}
+            }]}
+            
             onPointerDown={onPointerDown}
             onPointerUp={onPointerUp}
             onPointerLeave={onPointerLeave}
@@ -151,13 +151,13 @@ const ImageCard: Component<Props> = (props) => {
             ·
           </span>
           <button
-            class="inline-flex items-center min-h-[40px] font-semibold [font-size:var(--fontSizeBase100)] cursor-pointer select-none transition-colors duration-[var(--durationFast)] ease-[var(--curveEasyEase)] active:scale-[0.95] focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)] appearance-none border-none bg-transparent p-0 flex-shrink-0"
-            classList={{
+            class={["inline-flex items-center min-h-[40px] font-semibold [font-size:var(--fontSizeBase100)] cursor-pointer select-none transition-colors duration-[var(--durationFast)] ease-[var(--curveEasyEase)] active:scale-[0.95] focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)] appearance-none border-none bg-transparent p-0 flex-shrink-0", {
               "text-[var(--colorBrandForeground1)] hover:text-[var(--colorBrandForegroundLinkHover)]":
                 !isFollowed(),
               "text-[var(--colorNeutralForeground3)] hover:text-[var(--colorStatusDangerForeground1)]":
                 isFollowed(),
-            }}
+            }]}
+            
             onClick={(e) => toggleFollow(e)}
             disabled={following()}
             aria-label={isFollowed() ? "取消关注" : "关注"}

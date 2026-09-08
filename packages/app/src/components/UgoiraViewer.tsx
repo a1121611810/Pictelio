@@ -40,7 +40,7 @@ const UgoiraViewer: Component<Props> = (props) => {
   const frameList = (): UgoiraFrame[] =>
     props.streaming ? props.streaming.frames() : (props.preloadedFrames ?? frames());
 
-  onMount(async () => {
+  onSettled(async () => {
     // 渐进模式：数据由父组件流式提供，直接开始播放（首帧就绪时已挂载）
     if (props.streaming) {
       setStatus("playing");
@@ -199,11 +199,11 @@ const UgoiraViewer: Component<Props> = (props) => {
 
       {status() === "paused" && (
         <div
-          class="px-2.5 py-1 rounded-[var(--borderRadiusCircular)] bg-[var(--colorOverlaySurface)] text-[var(--colorOverlayForeground)] text-[var(--fontSizeBase200)] font-medium z-10"
-          classList={{
+          class={["px-2.5 py-1 rounded-[var(--borderRadiusCircular)] bg-[var(--colorOverlaySurface)] text-[var(--colorOverlayForeground)] text-[var(--fontSizeBase200)] font-medium z-10", {
             "absolute top-4 right-4": !props.inline,
             "absolute top-2 right-2": props.inline,
-          }}
+          }]}
+          
         >
           已暂停
         </div>
@@ -212,15 +212,15 @@ const UgoiraViewer: Component<Props> = (props) => {
       {/* Error state */}
       {error() && (
         <div
-          class="text-center px-6"
-          classList={{
+          class={["text-center px-6", {
             "text-[var(--colorOverlayForeground)]": !props.inline,
             "text-[var(--colorNeutralForeground1)] absolute inset-0 flex flex-col items-center justify-center bg-[var(--colorNeutralBackground2)]":
               props.inline,
-          }}
+          }]}
+          
         >
           <p class="[font-size:var(--fontSizeBase300)] mb-4">{error()}</p>
-          <fluent-button appearance="secondary" on:click={props.onClose}>
+          <fluent-button appearance="secondary" ref={fluentOn("click", props.onClose)}>
             返回
           </fluent-button>
         </div>
@@ -258,7 +258,7 @@ const UgoiraViewer: Component<Props> = (props) => {
         <img
           src={frameList()[currentFrame()]!.url}
           alt={`frame ${currentFrame() + 1}`}
-          classList={{
+          class={{
             "max-w-full max-h-full object-contain object-top": !props.inline,
             "w-full h-full object-cover object-top": props.inline,
           }}

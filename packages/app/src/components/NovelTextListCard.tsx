@@ -128,12 +128,12 @@ const NovelTextListCard: Component<Props> = (props) => {
         </div>
 
         <button
-          class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full focus:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--colorBrandStroke1)] active:scale-90 transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)]"
-          classList={{
+          class={["flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full focus:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--colorBrandStroke1)] active:scale-90 transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)]", {
             "text-[var(--colorPaletteRedForeground1)]": bookmarked(),
             "text-[var(--colorNeutralForeground3)] hover:text-[var(--colorPaletteRedForeground1)]":
               !bookmarked(),
-          }}
+          }]}
+          
           onClick={toggleBookmark}
           aria-label={bookmarked() ? "取消收藏" : "收藏"}
         >

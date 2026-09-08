@@ -28,7 +28,7 @@ const EXIT_HINT_DURATION_MS = 2000;
 
 /**
  * 启动后检查更新（延迟执行，不阻塞首次渲染）。
- * 在 onMount 中的启动流程完成后调用。
+ * 在 onSettled 中的启动流程完成后调用。
  * 所有 setter 均为 settingsStore 模块级导出，无需在组件内定义。
  */
 async function runStartupUpdateCheck(): Promise<void> {
@@ -64,7 +64,7 @@ const RootLayout: Component = (props: { children?: any }) => {
   createEffect(() => {
     const loggedIn = isLoggedIn();
     const path = location.pathname;
-    // 跳过启动阶段（startup 代码在 onMount 中处理了初始导航）
+    // 跳过启动阶段（startup 代码在 onSettled 中处理了初始导航）
     if (isLoading()) return;
     if (!loggedIn && path !== "/login") {
       navigate("/login", { replace: true });
@@ -73,9 +73,9 @@ const RootLayout: Component = (props: { children?: any }) => {
 
   /**
    * 启动后检查更新（延迟执行，不阻塞首次渲染）。
-   * 在 onMount 中的启动流程完成后调用。
+   * 在 onSettled 中的启动流程完成后调用。
    */
-  onMount(async () => {
+  onSettled(async () => {
     // FT-2 冷启动反馈治理（#365 P1）：原生 splash 只承担「进程启动 + JS 引导」最前段，
     // 根布局 loading 态（品牌 LoadingSpinner 扫光动画）首帧绘制后即释放——
     // 后续等待（settings 水合 / auth 恢复 / feed 首取）全部由应用内可见进展接管，
@@ -205,14 +205,14 @@ const RootLayout: Component = (props: { children?: any }) => {
           </div>
         }
       >
-        <ErrorBoundary
+        <Errored
           fallback={(err, reset) => (
             <div class="flex flex-col items-center justify-center min-h-screen gap-4 p-8">
               <p class="text-[var(--colorStatusDangerForeground1)] text-lg font-semibold">
                 页面加载失败
               </p>
               <p class="text-[var(--colorNeutralForeground2)] text-sm text-center max-w-xs">
-                {err?.message ?? "未知错误"}
+                {err()?.message ?? "未知错误"}
               </p>
               <button
                 class="px-4 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] text-sm font-medium"
@@ -225,7 +225,7 @@ const RootLayout: Component = (props: { children?: any }) => {
         >
           {/* 子路由由 @solidjs/router 自动通过 props.children 传入 */}
           {props.children}
-        </ErrorBoundary>
+        </Errored>
       </Show>
 
       {/* Exit hint toast */}

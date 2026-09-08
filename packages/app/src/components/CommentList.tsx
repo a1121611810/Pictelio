@@ -43,8 +43,8 @@ const CommentItem: Component<CommentItemProps> = (props) => {
 
   return (
     <div
-      class="border border-[var(--colorNeutralStroke2)] rounded-[var(--borderRadiusMedium)] overflow-hidden"
-      classList={{ "opacity-50 pointer-events-none": props.isDeleting }}
+      class={["border border-[var(--colorNeutralStroke2)] rounded-[var(--borderRadiusMedium)] overflow-hidden", { "opacity-50 pointer-events-none": props.isDeleting }]}
+      
     >
       {/* Header: avatar + username + time */}
       <div class="flex items-center gap-2 px-3 py-2 bg-[var(--colorNeutralBackground2)] border-b border-[var(--colorNeutralStroke2)]">

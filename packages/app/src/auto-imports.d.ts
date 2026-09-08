@@ -27,6 +27,7 @@ declare global {
   const createSignal: typeof import('solid-js').createSignal
   const createStore: typeof import('solid-js').createStore
   const createUniqueId: typeof import('solid-js').createUniqueId
+  const fluentOn: typeof import('@/primitives/fluentOn').fluentOn
   const flush: typeof import('solid-js').flush
   const hydrate: typeof import('@solidjs/web').hydrate
   const isServer: typeof import('@solidjs/web').isServer

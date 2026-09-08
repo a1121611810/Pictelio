@@ -1,4 +1,4 @@
-import { createInfiniteQuery } from "@tanstack/solid-query";
+import { useInfiniteQuery } from "@tanstack/solid-query";
 import { loadUserIllusts } from "../api/illust";
 import { loadUserNovels } from "../api/novel";
 import { type ApiError, type PixivIllust, type PixivNovel, type ContentType } from "../api/types";
@@ -32,7 +32,7 @@ const [fetchSource, setFetchSource] = createSignal<{ userId: number; type: Conte
 
 // ── TQ Infinite Query: illust / manga ──
 const illustQuery = createRoot(() =>
-  createInfiniteQuery(
+  useInfiniteQuery(
     () => {
       const s = fetchSource();
       const isActive = s && s.type !== "novel";
@@ -63,7 +63,7 @@ const illustQuery = createRoot(() =>
 
 // ── TQ Infinite Query: novel ──
 const novelQuery = createRoot(() =>
-  createInfiniteQuery(
+  useInfiniteQuery(
     () => {
       const s = fetchSource();
       const isActive = s && s.type === "novel";

@@ -37,7 +37,7 @@ const BlocklistSheet: Component<BlocklistSheetProps> = (props) => {
           <fluent-button
             appearance="subtle"
             aria-label="关闭"
-            on:click={close}
+            ref={fluentOn("click", close)}
             class="w-8 h-8 p-0 min-w-8"
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
@@ -87,7 +87,7 @@ const BlocklistSheet: Component<BlocklistSheetProps> = (props) => {
                   </div>
                   <fluent-button
                     appearance="secondary"
-                    on:click={() => unblockUser(userId)}
+                    ref={fluentOn("click", () => unblockUser(userId))}
                     aria-label={`取消屏蔽用户 ${userId}`}
                   >
                     取消屏蔽

@@ -2,7 +2,7 @@
 // UgoiraViewer 渐进模式契约测试（ADR-0127，T3）。
 // oracle：ADR-0127 播放器接口事实（首帧即播、尾部等待不停止、done 后循环）+ spec #276 验收。
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render } from "solid-js/web";
+import { render } from "@solidjs/web";
 import { createSignal } from "solid-js";
 import UgoiraViewer from "@/components/UgoiraViewer";
 

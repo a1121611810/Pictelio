@@ -71,12 +71,12 @@ const NovelFooterNav: Component<NovelFooterNavProps> = (props) => {
           </button>
           <Show when={props.showTranslateEntry !== false}>
             <button
-              class="flex-shrink-0 whitespace-nowrap px-3 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] font-medium hover:bg-[var(--colorNeutralBackground3)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer flex items-center gap-1"
-              classList={{
+              class={["flex-shrink-0 whitespace-nowrap px-3 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] font-medium hover:bg-[var(--colorNeutralBackground3)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer flex items-center gap-1", {
                 "bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] hover:opacity-90":
                   props.translated && props.showTranslation,
                 "text-[var(--colorBrandForeground1)]": props.translated && !props.showTranslation,
-              }}
+              }]}
+              
               onClick={() => props.onToggleTranslate()}
               aria-label={
                 props.translated

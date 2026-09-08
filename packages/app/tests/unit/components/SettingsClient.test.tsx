@@ -73,7 +73,7 @@ describe("SettingsClient 切换渲染引擎入口行", () => {
     );
     render(() => <SettingsClient />);
 
-    // 能力列表经 onMount 异步加载，轮询等待入口行随能力降级而隐藏
+    // 能力列表经 onSettled 异步加载，轮询等待入口行随能力降级而隐藏
     await vi.waitFor(() => {
       expect(screen.queryByText("切换渲染引擎")).toBeNull();
     });

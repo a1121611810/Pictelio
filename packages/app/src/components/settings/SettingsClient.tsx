@@ -1,4 +1,4 @@
-import { type Component, Show, createSignal, onMount } from "solid-js";
+import { type Component, Show, createSignal, onSettled } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import FluentIcon from "../ui/FluentIcon";
 import { readClientKind, supportsClientSwitch, type ClientKind } from "../../utils/clientSwitch";
@@ -21,7 +21,7 @@ const SettingsClient: Component = () => {
   /** 当前包支持的 client 引擎列表；空数组 = 尚未查询到（保守渲染） */
   const [clientKinds, setClientKinds] = createSignal<string[] | null>(null);
 
-  onMount(async () => {
+  onSettled(async () => {
     setCurrent(await readClientKind());
     try {
       const { kinds } = await ClientInfo.getClientKinds();

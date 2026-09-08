@@ -1,5 +1,5 @@
 import type { Component } from "solid-js";
-import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createSignal, For, onCleanup, onSettled, Show } from "solid-js";
 import type { PixivNovel } from "@/api/types";
 import PixivImage from "../PixivImage";
 import SearchableTag from "../SearchableTag";
@@ -34,7 +34,7 @@ const NovelCoverCard: Component<NovelCoverCardProps> = (props) => {
     if (heroEl?.offsetHeight) heroH = heroEl.offsetHeight;
   }
 
-  onMount(() => {
+  onSettled(() => {
     // 初始测量 + 内容变化（字体加载/换行/图片加载）后 ResizeObserver 重测
     requestAnimationFrame(measure);
     const ro = new ResizeObserver(() => measure());

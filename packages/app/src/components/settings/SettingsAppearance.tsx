@@ -53,7 +53,7 @@ const SettingsAppearance: Component = () => {
         </div>
         <fluent-switch
           checked={showDetailStairs()}
-          on:change={() => setShowDetailStairs(!showDetailStairs())}
+          ref={fluentOn("change", () => setShowDetailStairs(!showDetailStairs()))}
           aria-label="详情页楼梯导航"
         />
       </div>
@@ -80,7 +80,7 @@ const SettingsAppearance: Component = () => {
         </div>
         <fluent-switch
           checked={autoHideNavBar()}
-          on:change={() => setAutoHideNavBar(!autoHideNavBar())}
+          ref={fluentOn("change", () => setAutoHideNavBar(!autoHideNavBar()))}
           aria-label="自动隐藏导航栏"
         />
       </div>
@@ -107,7 +107,7 @@ const SettingsAppearance: Component = () => {
         </div>
         <fluent-switch
           checked={persistScrollRestoration()}
-          on:change={(e: Event) => {
+          ref={fluentOn("change", (e: Event) => {
             const turningOn = (e.target as HTMLInputElement)?.checked;
             if (turningOn) {
               // 开启需要二次确认（说明影响）：跳确认页，确认后才真正开启并自动返回
@@ -116,7 +116,7 @@ const SettingsAppearance: Component = () => {
               // 关闭直接生效（默认行为，无需确认）
               setPersistScrollRestoration(false);
             }
-          }}
+          })}
           aria-label="持久化滚动恢复"
         />
       </div>

@@ -35,10 +35,10 @@ const SettingsDialogs: Component<SettingsDialogsProps> = (props) => {
           这将删除本应用在本机保存的全部数据，包括：登录凭证、图片缓存、浏览设置、屏蔽列表、举报记录。此操作不可恢复，但不会删除你的
           Pixiv 账号及其在 Pixiv 服务器上的数据。
         </p>
-        <fluent-button slot="actions" appearance="secondary" on:click={() => props.onCloseDialog()}>
+        <fluent-button slot="actions" appearance="secondary" ref={fluentOn("click", () => props.onCloseDialog())}>
           取消
         </fluent-button>
-        <fluent-button slot="actions" appearance="primary" on:click={() => props.onConfirmClear()}>
+        <fluent-button slot="actions" appearance="primary" ref={fluentOn("click", () => props.onConfirmClear())}>
           确认清除
         </fluent-button>
       </FluentDialog>
@@ -54,15 +54,15 @@ const SettingsDialogs: Component<SettingsDialogsProps> = (props) => {
           Pictelio 是第三方客户端，无法直接删除你的 Pixiv 账号。点击确认将打开 Pixiv
           官方账号删除页面，请按官方流程操作。
         </p>
-        <fluent-button slot="actions" appearance="secondary" on:click={() => props.onCloseDialog()}>
+        <fluent-button slot="actions" appearance="secondary" ref={fluentOn("click", () => props.onCloseDialog())}>
           取消
         </fluent-button>
         <fluent-button
           slot="actions"
           appearance="primary"
-          on:click={() => {
+          ref={fluentOn("click", () => {
             props.onConfirmDelete();
-          }}
+          })}
         >
           前往 Pixiv
         </fluent-button>

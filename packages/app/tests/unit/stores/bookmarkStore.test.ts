@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ApiErrorType, type PixivIllust, type ApiError } from "@/api/types";
 
 // ── Mock TanStack Query ──
-// Mock the full @tanstack/solid-query module and replace createInfiniteQuery
+// Mock the full @tanstack/solid-query module and replace useInfiniteQuery
 // With a controlled mock that returns plain-property objects mirroring the
 // Proxy-based result shape.
 
@@ -26,7 +26,7 @@ vi.mock("@tanstack/solid-query", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...(actual as Record<string, unknown>),
-    createInfiniteQuery: (...args: unknown[]) => {
+    useInfiniteQuery: (...args: unknown[]) => {
       const optsAccessor = args[0] as () => { enabled?: boolean };
       return {
         get data() {

@@ -35,7 +35,7 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
 
         <fluent-switch
           checked={showR18()}
-          on:change={() => setShowR18(!showR18())}
+          ref={fluentOn("change", () => setShowR18(!showR18()))}
           aria-label="显示 R18 内容"
         />
       </div>
@@ -63,7 +63,7 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
 
         <fluent-switch
           checked={showR18G()}
-          on:change={() => setShowR18G(!showR18G())}
+          ref={fluentOn("change", () => setShowR18G(!showR18G()))}
           aria-label="显示 R-18G 内容"
         />
       </div>

@@ -18,7 +18,7 @@ const DetailHeader: Component<DetailHeaderProps> = (props) => {
         <fluent-button
           appearance="subtle"
           aria-label="返回"
-          on:click={props.onBack}
+          ref={fluentOn("click", props.onBack)}
           class="w-9 h-9 p-0 min-w-9 flex-shrink-0"
         >
           ←
@@ -29,7 +29,7 @@ const DetailHeader: Component<DetailHeaderProps> = (props) => {
         <fluent-button
           appearance="subtle"
           aria-label="更多操作"
-          on:click={props.onMore}
+          ref={fluentOn("click", props.onMore)}
           class="w-9 h-9 p-0 min-w-9 flex-shrink-0"
         >
           ⋯

@@ -1,5 +1,5 @@
 import type { Component } from "solid-js";
-import { mergeProps, Show } from "solid-js";
+import { merge, Show } from "solid-js";
 import type { PixivNovel } from "../api/types";
 import { resolveImageUrl } from "../utils/imageLoader";
 import IllustTags from "./IllustTags";
@@ -17,16 +17,16 @@ interface Props {
  * + 品牌色标题；封面 56×56（Medium 圆角）。
  */
 const SeriesSheetItem: Component<Props> = (props) => {
-  const merged = mergeProps({ isActive: false }, props);
+  const merged = merge({ isActive: false }, props);
 
   return (
     <div
       ref={merged.ref}
-      class="flex items-center gap-3 px-3 py-3 rounded-[var(--borderRadiusMedium)] cursor-pointer active:scale-[0.98] transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] focus-visible:outline focus-visible:outline-[var(--colorStrokeFocus2)] focus-visible:outline-2 focus-visible:-outline-offset-2"
-      classList={{
+      class={["flex items-center gap-3 px-3 py-3 rounded-[var(--borderRadiusMedium)] cursor-pointer active:scale-[0.98] transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] focus-visible:outline focus-visible:outline-[var(--colorStrokeFocus2)] focus-visible:outline-2 focus-visible:-outline-offset-2", {
         "bg-[var(--colorBrandBackground2)]": merged.isActive,
         "hover:bg-[var(--colorNeutralBackground2)]": !merged.isActive,
-      }}
+      }]}
+      
       onClick={() => merged.onClick(merged.novel.id)}
       role="button"
       tabIndex={0}
@@ -51,11 +51,11 @@ const SeriesSheetItem: Component<Props> = (props) => {
       {/* Info */}
       <div class="flex-1 min-w-0 flex flex-col gap-0.5">
         <p
-          class="[font-size:var(--fontSizeBase200)] font-semibold line-clamp-2 leading-tight"
-          classList={{
+          class={["[font-size:var(--fontSizeBase200)] font-semibold line-clamp-2 leading-tight", {
             "text-[var(--colorBrandForeground1)]": merged.isActive,
             "text-[var(--colorNeutralForeground1)]": !merged.isActive,
-          }}
+          }]}
+          
         >
           {props.novel.title}
         </p>

@@ -93,7 +93,7 @@ const ImageViewer: Component<Props> = (props) => {
   });
 
   // 初始页在挂载时立即发起加载（进度已在初始化时设为 0，不等 createEffect）
-  onMount(() => {
+  onSettled(() => {
     // 移除过渡遮罩，此时 ImageViewer 自身的 spinner + 0% 已在 DOM 中可见
     const mask = document.getElementById("viewer-transition-mask");
     mask?.remove();

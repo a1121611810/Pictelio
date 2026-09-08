@@ -23,7 +23,7 @@ const Login: Component = () => {
   const [codeVerifier, setCodeVerifier] = createSignal("");
   const [codeChallenge, setCodeChallenge] = createSignal("");
 
-  onMount(() => {
+  onSettled(() => {
     if (isLoggedIn()) {
       navigate("/home", { replace: true });
     }
@@ -196,7 +196,7 @@ const Login: Component = () => {
                 style="--inline-size:100%;--min-block-size:80px"
                 placeholder="粘贴 refresh_token..."
                 value={tokenInput()}
-                on:input={(e: Event) => setTokenInput((e.target as any).value)}
+                ref={fluentOn("input", (e: Event) => setTokenInput((e.target as any).value))}
                 required
                 disabled={submitting()}
               />

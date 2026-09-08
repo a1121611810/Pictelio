@@ -17,7 +17,7 @@ const iconButtonClass =
 const NovelSearchBar: Component<Props> = (props) => {
   let inputRef: HTMLInputElement | undefined;
 
-  onMount(() => {
+  onSettled(() => {
     inputRef?.focus();
   });
 

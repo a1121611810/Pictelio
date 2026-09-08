@@ -213,7 +213,7 @@ export function createFeedVirtualizer<T>(config: FeedVirtualizerConfig<T>): Feed
   });
 
   // Mount lifecycle
-  onMount(() => {
+  onSettled(() => {
     const cleanup = instance._didMount();
     instance._willUpdate();
     setVirtualItems([...instance.getVirtualItems()] as VirtualItem[]);

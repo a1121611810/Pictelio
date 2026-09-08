@@ -67,17 +67,17 @@ const ScrollRestorationConfirm: Component = () => {
         {/* 底部固定操作栏 */}
         <div class="relative z-10 px-6 pb-[max(env(safe-area-inset-bottom,0px),1rem)] pt-3 bg-[var(--colorNeutralBackground2)] border-t border-[var(--colorNeutralStroke2)]">
           <div class="flex gap-3 w-full">
-            <fluent-button appearance="secondary" style="flex:1" on:click={() => goBack()}>
+            <fluent-button appearance="secondary" style="flex:1" ref={fluentOn("click", () => goBack())}>
               取消
             </fluent-button>
             {/* 确认开启：持久化 + 自动返回设置页 */}
             <fluent-button
               appearance="primary"
               style="flex:1"
-              on:click={() => {
+              ref={fluentOn("click", () => {
                 setPersistScrollRestoration(true);
                 goBack();
-              }}
+              })}
             >
               确认开启
             </fluent-button>

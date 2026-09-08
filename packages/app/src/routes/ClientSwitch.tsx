@@ -30,7 +30,7 @@ const ClientSwitch: Component = () => {
     }
   });
 
-  onMount(async () => {
+  onSettled(async () => {
     setCurrent(await readClientKind());
     try {
       const { kinds } = await ClientInfo.getClientKinds();
@@ -116,7 +116,7 @@ const ClientSwitch: Component = () => {
           <fluent-button
             appearance="subtle"
             aria-label="返回"
-            on:click={() => goBack()}
+            ref={fluentOn("click", () => goBack())}
             class="w-8 h-8 p-0 min-w-8"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -228,7 +228,7 @@ const ClientSwitch: Component = () => {
           <div class="flex gap-3">
             <fluent-button
               appearance="secondary"
-              on:click={() => goBack()}
+              ref={fluentOn("click", () => goBack())}
               class="flex-1"
               aria-label="返回设置"
             >
@@ -236,7 +236,7 @@ const ClientSwitch: Component = () => {
             </fluent-button>
             <fluent-button
               appearance="primary"
-              on:click={() => void handleConfirmSwitch()}
+              ref={fluentOn("click", () => void handleConfirmSwitch())}
               disabled={switching()}
               class="flex-1"
             >

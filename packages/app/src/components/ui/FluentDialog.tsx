@@ -1,4 +1,5 @@
-import { type Component, createEffect, type JSX, onCleanup, onMount } from "solid-js";
+import type { JSX } from "@solidjs/web";
+import { type Component, createEffect, onCleanup, onSettled } from "solid-js";
 
 interface FluentDialogProps {
   /** 是否打开（true → show()，false → hide()） */
@@ -107,7 +108,7 @@ const FluentDialog: Component<FluentDialogProps> = (props) => {
   }
 
   createEffect(() => {
-    // 追踪 props.open 变化；ref 未就绪时跳过，由 onMount 兜底
+    // 追踪 props.open 变化；ref 未就绪时跳过，由 onSettled 兜底
     void props.open;
     syncOpenToHost();
   });
@@ -121,17 +122,17 @@ const FluentDialog: Component<FluentDialogProps> = (props) => {
   let bodyRef: HTMLElement | undefined;
 
   // ref 回调在元素创建时触发，此时 children 尚未插入；
-  // onMount 在整棵子树（含 children）挂载完成后触发，此时重映射才可靠。
-  onMount(() => {
+  // onSettled 在整棵子树（含 children）挂载完成后触发，此时重映射才可靠。
+  onSettled(() => {
     if (bodyRef) remapSlots(bodyRef);
     // 兜底：createEffect 首跑时 ref 可能因自定义元素异步升级未就绪，
     // 当 open 恒定 true（不再变化）时 effect 不会重跑，show 会被跳过。
-    // onMount 时 ref 一定就绪，补一次状态同步，保证初始 open=true 必开。
+    // onSettled 时 ref 一定就绪，补一次状态同步，保证初始 open=true 必开。
     syncOpenToHost();
   });
 
   return (
-    <fluent-dialog ref={ref} aria-label={props["aria-label"]} on:close={() => props.onClose?.()}>
+    <fluent-dialog ref={[ref, fluentOn("close", () => props.onClose?.())]} aria-label={props["aria-label"]} >
       <fluent-dialog-body ref={bodyRef}>{props.children}</fluent-dialog-body>
     </fluent-dialog>
   );

@@ -41,7 +41,7 @@ describe("FeedPaginationSentinel", () => {
     const loadMore = vi.fn();
     render(() => <FeedPaginationSentinel hasMore={() => true} loadMore={loadMore} />);
 
-    // onMount 同步构造 IO 并 observe 哨兵元素
+    // onSettled 同步构造 IO 并 observe 哨兵元素
     expect(IOMock).toHaveBeenCalledTimes(1);
     expect(instance.observe).toHaveBeenCalledTimes(1);
 

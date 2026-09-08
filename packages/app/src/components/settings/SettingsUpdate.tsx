@@ -68,7 +68,7 @@ const SettingsUpdate: Component = () => {
         </div>
         <fluent-switch
           checked={autoCheckUpdate()}
-          on:change={() => setAutoCheckUpdate(!autoCheckUpdate())}
+          ref={fluentOn("change", () => setAutoCheckUpdate(!autoCheckUpdate()))}
           aria-label="启动时检查更新"
         />
       </div>
@@ -95,7 +95,7 @@ const SettingsUpdate: Component = () => {
         </div>
         <fluent-switch
           checked={otaAutoDownload()}
-          on:change={() => setOtaAutoDownload(!otaAutoDownload())}
+          ref={fluentOn("change", () => setOtaAutoDownload(!otaAutoDownload()))}
           aria-label="自动下载 Web 更新包"
         />
       </div>
@@ -135,13 +135,13 @@ const SettingsUpdate: Component = () => {
           {/* Latest version tag — visible after check completes */}
           <Show when={checkCompleted() && !isCheckingUpdate()}>
             <span
-              class="[font-size:var(--fontSizeBase200)] font-semibold leading-snug"
-              classList={{
+              class={["[font-size:var(--fontSizeBase200)] font-semibold leading-snug", {
                 "text-[var(--colorStatusSuccessForeground1)]":
                   !hasUpdate() && latestVersion() !== "",
                 "text-[var(--colorBrandForeground1)]": hasUpdate(),
                 "text-[var(--colorNeutralForeground3)]": latestVersion() === "",
-              }}
+              }]}
+              
             >
               {latestVersion() !== ""
                 ? hasUpdate()

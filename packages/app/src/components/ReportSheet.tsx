@@ -66,7 +66,7 @@ const ReportSheet: Component<ReportSheetProps> = (props) => {
             <fluent-button
               appearance="subtle"
               aria-label="关闭"
-              on:click={close}
+              ref={fluentOn("click", close)}
               class="w-8 h-8 p-0 min-w-8"
             >
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
@@ -87,7 +87,7 @@ const ReportSheet: Component<ReportSheetProps> = (props) => {
           </p>
           <fluent-radio-group
             value={selectedReason()}
-            on:change={(e: CustomEvent) => setSelectedReason(e.detail.value)}
+            ref={fluentOn("change", (e: CustomEvent) => setSelectedReason(e.detail.value))}
           >
             {REASONS.map((reason) => (
               <fluent-radio value={reason} disabled={alreadyReported()}>
@@ -102,7 +102,7 @@ const ReportSheet: Component<ReportSheetProps> = (props) => {
               appearance="primary"
               style="width:100%"
               disabled={!selectedReason() || submitting() || alreadyReported()}
-              on:click={handleSubmit}
+              ref={fluentOn("click", handleSubmit)}
             >
               {alreadyReported() ? "已举报" : submitting() ? "提交中…" : "提交举报"}
             </fluent-button>

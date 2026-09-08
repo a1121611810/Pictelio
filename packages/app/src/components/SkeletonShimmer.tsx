@@ -33,8 +33,8 @@ const SkeletonShimmer: Component<Props> = (props) => {
   return (
     <div
       data-testid="skeleton-shimmer"
-      class={consumerClass}
-      classList={props.classList}
+      class={[consumerClass, props.classList]}
+      
       style={outerStyle}
     >
       <div

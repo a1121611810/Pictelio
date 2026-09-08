@@ -71,7 +71,7 @@ async function setupUnauthorizedHandler() {
   });
 }
 
-/** 防止 initializeAuth 被重复调用（startup 和 onMount 都可能触发） */
+/** 防止 initializeAuth 被重复调用（startup 和 onSettled 都可能触发） */
 let _authPromise: Promise<void> | null = null;
 
 export async function initializeAuth() {

@@ -139,8 +139,8 @@ const NavBar: Component = () => {
   return (
     <nav class="floating-nav" aria-label="主导航">
       <div
-        class="floating-nav-capsule relative"
-        classList={{ "floating-nav-capsule-compact": compact() }}
+        class={["floating-nav-capsule relative", { "floating-nav-capsule-compact": compact() }]}
+        
         onPointerMove={onPointerMove}
         onPointerLeave={onPointerLeave}
       >
@@ -153,17 +153,17 @@ const NavBar: Component = () => {
 
         {/* 左侧按钮组：推荐 + 关注 */}
         <div
-          class="floating-nav-group"
-          classList={{
+          class={["floating-nav-group", {
             "floating-nav-group-visible": !compact(),
             "floating-nav-group-hidden": compact(),
-          }}
+          }]}
+          
           aria-hidden={compact()}
         >
           {leftTabs.map((tab) => (
             <button
-              class="glass-tab-item min-w-14"
-              classList={{ "glass-tab-item-active": activeTab() === tab.key }}
+              class={["glass-tab-item min-w-14", { "glass-tab-item-active": activeTab() === tab.key }]}
+              
               onClick={() => handleTabClick(tab.key)}
               aria-current={activeTab() === tab.key ? "page" : undefined}
               aria-label={tab.label}
@@ -177,8 +177,8 @@ const NavBar: Component = () => {
 
         {/* 中心大圆按钮（搜索入口） */}
         <button
-          class="floating-nav-center"
-          classList={{ "scroll-top-anim": scrollToTopAnim() }}
+          class={["floating-nav-center", { "scroll-top-anim": scrollToTopAnim() }]}
+          
           onClick={handleCenterClick}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
@@ -189,17 +189,17 @@ const NavBar: Component = () => {
 
         {/* 右侧按钮组：收藏 + 历史 */}
         <div
-          class="floating-nav-group"
-          classList={{
+          class={["floating-nav-group", {
             "floating-nav-group-visible": !compact(),
             "floating-nav-group-hidden": compact(),
-          }}
+          }]}
+          
           aria-hidden={compact()}
         >
           {rightTabs.map((tab) => (
             <button
-              class="glass-tab-item min-w-14"
-              classList={{ "glass-tab-item-active": activeTab() === tab.key }}
+              class={["glass-tab-item min-w-14", { "glass-tab-item-active": activeTab() === tab.key }]}
+              
               onClick={() => handleTabClick(tab.key)}
               aria-current={activeTab() === tab.key ? "page" : undefined}
               aria-label={tab.label}

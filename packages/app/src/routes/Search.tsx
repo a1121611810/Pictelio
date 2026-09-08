@@ -187,11 +187,11 @@ const Search: Component = () => {
     <PageTransition>
       {/* ── Compact header — 滚出阈值后上滑展示 ── */}
       <header
-        class="fixed top-0 left-0 right-0 z-30 surface-appbar transition-transform duration-[var(--durationNormal)] ease-[var(--curveEasyEase)]"
-        classList={{
+        class={["fixed top-0 left-0 right-0 z-30 surface-appbar transition-transform duration-[var(--durationNormal)] ease-[var(--curveEasyEase)]", {
           "translate-y-0": showCompactHeader(),
           "-translate-y-full": !showCompactHeader(),
-        }}
+        }]}
+        
       >
         <div class="flex items-center gap-2 px-4 h-12 max-w-3xl mx-auto">
           <button
@@ -295,12 +295,12 @@ const Search: Component = () => {
               <For each={SCOPE_OPTIONS}>
                 {(opt) => (
                   <button
-                    class="flex-1 pb-[var(--spacingVerticalSNudge)] [font-size:var(--fontSizeBase300)] font-medium text-center transition-all duration-[var(--durationFast)] focus-visible:outline-[var(--colorStrokeFocus2)] focus-visible:outline-2 focus-visible:outline-offset-1 relative"
-                    classList={{
+                    class={["flex-1 pb-[var(--spacingVerticalSNudge)] [font-size:var(--fontSizeBase300)] font-medium text-center transition-all duration-[var(--durationFast)] focus-visible:outline-[var(--colorStrokeFocus2)] focus-visible:outline-2 focus-visible:outline-offset-1 relative", {
                       "text-[var(--colorBrandForeground1)]": store.scope() === opt.value,
                       "text-[var(--colorNeutralForeground3)] hover:text-[var(--colorNeutralForeground1)]":
                         store.scope() !== opt.value,
-                    }}
+                    }]}
+                    
                     onClick={() => handleScopeChange(opt.value)}
                     role="radio"
                     aria-checked={store.scope() === opt.value}
@@ -331,13 +331,13 @@ const Search: Component = () => {
                       </span>
                     </Show>
                     <button
-                      class="[font-size:var(--fontSizeBase200)] transition-colors duration-[var(--durationFast)] focus-visible:outline-[var(--colorStrokeFocus2)] focus-visible:outline-2 focus-visible:outline-offset-1"
-                      classList={{
+                      class={["[font-size:var(--fontSizeBase200)] transition-colors duration-[var(--durationFast)] focus-visible:outline-[var(--colorStrokeFocus2)] focus-visible:outline-2 focus-visible:outline-offset-1", {
                         "text-[var(--colorBrandForeground1)] font-semibold":
                           store.toSorted() === opt.value,
                         "text-[var(--colorNeutralForeground3)] hover:text-[var(--colorNeutralForeground1)]":
                           store.toSorted() !== opt.value,
-                      }}
+                      }]}
+                      
                       onClick={() => handleSortChange(opt.value)}
                     >
                       {opt.label}

@@ -63,7 +63,7 @@ const IllustDetail: Component = () => {
     }
   }
 
-  onMount(() => {
+  onSettled(() => {
     infoObserver = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
@@ -562,7 +562,7 @@ const IllustDetail: Component = () => {
             <p class="text-[var(--colorNeutralForeground2)] [font-size:var(--fontSizeBase300)]">
               该作者已被屏蔽
             </p>
-            <fluent-button appearance="secondary" on:click={() => goBack()}>
+            <fluent-button appearance="secondary" ref={fluentOn("click", () => goBack())}>
               返回
             </fluent-button>
           </div>
@@ -780,13 +780,13 @@ const IllustDetail: Component = () => {
                     </p>
                   </div>
                   <button
-                    class="inline-flex items-center justify-center gap-[var(--spacingHorizontalXS)] rounded-[var(--borderRadiusMedium)] font-semibold [font-size:var(--fontSizeBase200)] [line-height:var(--lineHeightBase200)] min-h-8 px-[var(--spacingHorizontalM)] border transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] active:scale-[0.97] select-none appearance-none outline-none cursor-pointer focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)] flex-shrink-0 ml-auto"
-                    classList={{
+                    class={["inline-flex items-center justify-center gap-[var(--spacingHorizontalXS)] rounded-[var(--borderRadiusMedium)] font-semibold [font-size:var(--fontSizeBase200)] [line-height:var(--lineHeightBase200)] min-h-8 px-[var(--spacingHorizontalM)] border transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] active:scale-[0.97] select-none appearance-none outline-none cursor-pointer focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)] flex-shrink-0 ml-auto", {
                       "bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] border-[var(--colorBrandBackground)] hover:bg-[var(--colorBrandBackgroundHover)] active:bg-[var(--colorBrandBackgroundPressed)]":
                         !isFollowed(),
                       "bg-transparent text-[var(--colorNeutralForeground2)] border-[var(--colorNeutralStroke2)] hover:text-[var(--colorStatusDangerForeground1)] hover:border-[var(--colorStatusDangerForeground1)]":
                         isFollowed(),
-                    }}
+                    }]}
+                    
                     onClick={toggleFollow}
                     disabled={following()}
                     aria-label={isFollowed() ? "取消关注" : "关注"}
@@ -917,13 +917,13 @@ const IllustDetail: Component = () => {
               >
                 {imageUrls().map((_, i) => (
                   <button
-                    class="flex items-center justify-center rounded-[var(--borderRadiusCircular)] [font-size:var(--fontSizeBase200)] font-medium transition-all duration-[var(--durationFast)] min-w-9 min-h-9"
-                    classList={{
+                    class={["flex items-center justify-center rounded-[var(--borderRadiusCircular)] [font-size:var(--fontSizeBase200)] font-medium transition-all duration-[var(--durationFast)] min-w-9 min-h-9", {
                       "bg-[var(--colorNeutralBackground1Selected)] text-[var(--colorNeutralForeground1)] font-semibold":
                         i === currentVisiblePage(),
                       "text-[var(--colorOverlayForeground)] opacity-[0.85] hover:opacity-100":
                         i !== currentVisiblePage(),
-                    }}
+                    }]}
+                    
                     style={{
                       "text-shadow":
                         i !== currentVisiblePage() ? "var(--textShadowDefault)" : "none",

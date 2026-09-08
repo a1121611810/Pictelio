@@ -1,4 +1,4 @@
-import { type Component, createSignal, onMount, Show } from "solid-js";
+import { type Component, createSignal, onSettled, Show } from "solid-js";
 import { Capacitor } from "@capacitor/core";
 import PageTransition from "../components/PageTransition";
 import FluentIcon from "../components/ui/FluentIcon";
@@ -108,7 +108,7 @@ function formatOtaValue(status: OtaStatus, field: "current" | "lastGood" | "pend
 const OtaStatusRows: Component = () => {
   const [status, setStatus] = createSignal<OtaStatus | null>(null);
   const [failed, setFailed] = createSignal(false);
-  onMount(() => {
+  onSettled(() => {
     if (!Capacitor.isNativePlatform()) return;
     Ota.status()
       .then(setStatus)
@@ -161,7 +161,7 @@ const About: Component = () => {
           <fluent-button
             appearance="subtle"
             aria-label="返回"
-            on:click={() => goBack()}
+            ref={fluentOn("click", () => goBack())}
             class="w-8 h-8 p-0 min-w-8"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -219,11 +219,11 @@ const About: Component = () => {
               {section.rows.map((row, idx, arr) => {
                 const inner = (
                   <div
-                    class="flex items-center justify-between px-4 min-h-11 py-3"
-                    classList={{
+                    class={["flex items-center justify-between px-4 min-h-11 py-3", {
                       "cursor-pointer hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-[0.98] transition-transform duration-[var(--durationFast)]":
                         !!row.url,
-                    }}
+                    }]}
+                    
                   >
                     <div class="flex items-center gap-3 min-w-0 flex-1">
                       <div class="w-5 h-5 flex-shrink-0 text-[var(--colorNeutralForeground2)] flex items-center justify-center">

@@ -1,4 +1,5 @@
-import type { Component, JSX } from "solid-js";
+import type { JSX } from "@solidjs/web";
+import type { Component } from "solid-js";
 import { Show } from "solid-js";
 import FluentIcon from "../ui/FluentIcon";
 
@@ -29,7 +30,7 @@ const NovelTopBar: Component<NovelTopBarProps> = (props) => {
         <fluent-button
           appearance="subtle"
           aria-label="返回"
-          on:click={props.onBack}
+          ref={fluentOn("click", props.onBack)}
           class="w-9 h-9 p-0 min-w-9 flex-shrink-0"
         >
           ←
@@ -41,11 +42,11 @@ const NovelTopBar: Component<NovelTopBarProps> = (props) => {
           <h1 class="flex-1 min-w-0 [font-size:var(--fontSizeBase300)] font-semibold text-[var(--colorNeutralForeground1)] flex items-center gap-1">
             <span class="whitespace-nowrap flex-shrink-0">小说</span>
             <span
-              class="truncate text-[var(--colorNeutralForeground2)]"
-              classList={{
+              class={["truncate text-[var(--colorNeutralForeground2)]", {
                 "opacity-0": !props.showTitle(),
                 "opacity-100": props.showTitle(),
-              }}
+              }]}
+              
               style="transition:opacity var(--durationFast) var(--curveEasyEase)"
             >
               {props.title ? `《${props.title}》` : ""}

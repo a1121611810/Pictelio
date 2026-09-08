@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { PixivIllust, PixivNovel } from "@/api/types";
 
 // ── Mock TanStack Query ──
-// Two createInfiniteQuery calls: illust (first) and novel (second)
+// Two useInfiniteQuery calls: illust (first) and novel (second)
 let callCount = 0;
 
 type MockInfiniteData<T> = {
@@ -34,7 +34,7 @@ vi.mock("@tanstack/solid-query", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...(actual as Record<string, unknown>),
-    createInfiniteQuery: (..._args: unknown[]) => {
+    useInfiniteQuery: (..._args: unknown[]) => {
       const isIllust = callCount === 0;
       callCount++;
       if (isIllust) {

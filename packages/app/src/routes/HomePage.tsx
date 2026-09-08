@@ -10,7 +10,7 @@
  * 不再渲染底部 NavBar（首页导航由 SideNavShell 承担）。
  */
 import type { Component } from "solid-js";
-import { createEffect, onMount, untrack } from "solid-js";
+import { createEffect, onSettled, untrack } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import type { PixivIllust, PixivNovel, ApiError } from "@/api/types";
 import PageTransition from "@/components/PageTransition";
@@ -343,7 +343,7 @@ const NovelFeedPanel: Component<{ tab: FeedTab }> = (props) => {
 };
 
 const HomePage: Component = () => {
-  onMount(() => {
+  onSettled(() => {
     // 首页是登录后启动首屏：挂载后通知原生关闭 Splash Screen（幂等）
     markContentReady();
   });
