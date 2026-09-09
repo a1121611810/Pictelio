@@ -110,12 +110,14 @@ const AdaptiveTags: Component<AdaptiveTagsProps> = (props) => {
 
   return (
     <div ref={ref} class="relative mt-[var(--spacingVerticalXS)]">
-      {/* 测量层：absolute + visibility:hidden，不占布局；渲染全部 chip + 「+N」占位（文本用总数最宽值） */}
+      {/* 测量层：absolute + visibility:hidden，不占布局；渲染全部 chip + 「+N」占位（文本用总数最宽值）。
+          overflow-hidden 必须保留：标签单行总宽可达数百 px，无裁剪会撑大文档 scrollWidth，
+          窄视口（Android WebView 360px）整页可横向拖动（#419）；裁剪不影响子元素 offsetWidth 测量。 */}
       <div
         ref={(el) => {
           measureEl = el;
         }}
-        class="pointer-events-none absolute inset-0 flex items-center gap-[var(--spacingHorizontalXXS)]"
+        class="pointer-events-none absolute inset-0 flex items-center gap-[var(--spacingHorizontalXXS)] overflow-hidden"
         style={{ visibility: "hidden" }}
         aria-hidden="true"
       >

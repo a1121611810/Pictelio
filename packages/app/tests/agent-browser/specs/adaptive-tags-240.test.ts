@@ -134,6 +134,35 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("AdaptiveTags 240px 窄容器�
         `标签行 ${rows.length}，截断 chip ${partialRows.length} 行，省略号生效 ${ellipsisRows.length} 行`,
       );
       expect(partialRows.length, "240px 下应有截断 chip（第二个标签点点点）").toBeGreaterThan(0);
+
+      // #419 回归锁：AdaptiveTags 测量层（absolute + visibility:hidden，单行排全部标签）
+      // 一旦失去 overflow 裁剪，会把文档 scrollWidth 撑到数百 px——窄视口整页可横向拖动，
+      // 桌面宽视口不可见（溢出藏在视口内）。真布局下只有这里测得到。
+      const hScrollRaw = (
+        await driver.evaluate(
+          `(() => {
+            const d = document.scrollingElement;
+            const off = [];
+            if (d.scrollWidth > window.innerWidth) {
+              document.querySelectorAll('body *').forEach((el) => {
+                const r = el.getBoundingClientRect();
+                if (r.right > window.innerWidth + 1) {
+                  off.push(el.tagName + '.' + String(el.className).slice(0, 40) + '@' + Math.round(r.right));
+                }
+              });
+            }
+            return JSON.stringify({ vw: window.innerWidth, sw: d.scrollWidth, off: off.slice(0, 8) });
+          })()`,
+        )
+      ).trim();
+      // evaluate 结果双层 JSON 解包（同上方 TAG-ROWS 的处理）
+      const hScroll = JSON.parse(
+        (hScrollRaw.startsWith('"') ? JSON.parse(hScrollRaw) : hScrollRaw) as string,
+      ) as { vw: number; sw: number; off: string[] };
+      expect(
+        hScroll.sw,
+        `页面横向溢出：scrollWidth ${hScroll.sw} > 视口 ${hScroll.vw}；溢出元素: ${hScroll.off.join(' , ') || '（无直接越界元素，可能为负 margin/transform）'}（#419）`,
+      ).toBeLessThanOrEqual(hScroll.vw);
     } finally {
       await driver.close().catch(() => {});
     }
