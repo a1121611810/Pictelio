@@ -40,7 +40,8 @@ public class PixivApiPlugin extends Plugin {
     private static volatile PixivImageLoader imageLoader;
     private static volatile Context imageLoaderApp;
 
-    private static PixivImageLoader imageLoader(Context context) {
+    /** 包可见：GallerySaverPlugin（保存到相册）与预取共享同一 loader 单例 */
+    static PixivImageLoader imageLoader(Context context) {
         Context app = context.getApplicationContext();
         PixivImageLoader l = imageLoader;
         if (l == null || imageLoaderApp != app) {

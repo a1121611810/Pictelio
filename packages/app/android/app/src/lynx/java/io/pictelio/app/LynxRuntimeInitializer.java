@@ -49,6 +49,7 @@ public final class LynxRuntimeInitializer {
         LynxEnv.inst().registerModule("PictelioAuth", PictelioAuthModule.class);
         LynxEnv.inst().registerModule("PictelioApi", PictelioApiModule.class);
         LynxEnv.inst().registerModule("PictelioPrefs", PictelioPrefsModule.class);
+        LynxEnv.inst().registerModule("PictelioGallery", PictelioGalleryModule.class);
         LynxEnv.inst().enableLynxDebug(BuildConfig.DEBUG);
     }
 }

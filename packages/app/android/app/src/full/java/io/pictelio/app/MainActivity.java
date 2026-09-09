@@ -96,6 +96,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(PixivApiPlugin.class);
         registerPlugin(ClientInfoPlugin.class); // ADR-0062
         registerPlugin(OtaPlugin.class); // OTA web bundle（#249）
+        registerPlugin(GallerySaverPlugin.class); // 保存到相册（spec image-save-download）
         super.onCreate(savedInstanceState);
         // 调试模式 — debug 构建时启用
         if (BuildConfig.DEBUG) {
