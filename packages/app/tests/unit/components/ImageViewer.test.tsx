@@ -3,9 +3,28 @@
  * ImageViewer 邻页预取候选纯函数（#366 FT-4）。
  * oracle 溯源：预取语义 = 预取「当前页前后各一页」，跳过已发起/已加载页；
  * 边界 = 首页无前邻、末页无后邻、单页无候选（ ImageViewer 翻页边界一致）。
+ * 保存按钮契约（spec image-save-download §5）：onSavePage 缺省不渲染；点击后
+ * 成功 ✓ / 失败 ✗ 状态内联（oracle = spec 字面行为）。
  */
-import { describe, it, expect } from "vitest";
-import { neighborPages } from "@/components/ImageViewer";
+import { beforeEach, describe, it, expect, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
+import ImageViewer, { neighborPages } from "@/components/ImageViewer";
+
+vi.mock("@/utils/imageLoader", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/utils/imageLoader")>();
+  return {
+    ...actual,
+    checkImageCache: vi.fn<() => string | undefined>(() => undefined),
+    loadImage: vi.fn(() => Promise.resolve({ url: "", cleanup: () => {} })),
+    loadImageWithProgress: vi.fn(() =>
+      Promise.resolve({ url: "blob:mock", cleanup: () => {}, durationMs: 0 }),
+    ),
+  };
+});
+
+beforeEach(() => {
+  cleanup();
+});
 
 describe("neighborPages 邻页预取候选", () => {
   const nothing = () => false;
@@ -29,5 +48,37 @@ describe("neighborPages 邻页预取候选", () => {
   it("已发起/已加载的页被跳过", () => {
     expect(neighborPages(2, 5, (i) => i === 1)).toEqual([3]);
     expect(neighborPages(2, 5, (i) => i === 1 || i === 3)).toEqual([]);
+  });
+});
+
+describe("ImageViewer 保存当前页按钮（spec image-save-download §5）", () => {
+  const URLS = ["https://i.pximg.net/p0.jpg", "https://i.pximg.net/p1.jpg"];
+
+  it("onSavePage 缺省不渲染保存按钮；提供时渲染", () => {
+    render(() => <ImageViewer imageUrls={URLS} />);
+    expect(screen.queryByLabelText("保存当前页到相册")).toBeNull();
+    cleanup();
+    render(() => <ImageViewer imageUrls={URLS} onSavePage={() => Promise.resolve(true)} />);
+    expect(screen.getByLabelText("保存当前页到相册")).toBeTruthy();
+  });
+
+  it("保存成功显示 ✓，失败显示 ✗", async () => {
+    render(() => <ImageViewer imageUrls={URLS} onSavePage={() => Promise.resolve(true)} />);
+    fireEvent.click(screen.getByLabelText("保存当前页到相册"));
+    expect(await screen.findByText("✓")).toBeTruthy();
+
+    cleanup();
+    render(() => <ImageViewer imageUrls={URLS} onSavePage={() => Promise.resolve(false)} />);
+    fireEvent.click(screen.getByLabelText("保存当前页到相册"));
+    expect(await screen.findByText("✗")).toBeTruthy();
+  });
+
+  it("保存进行中按钮禁用", async () => {
+    render(() => (
+      <ImageViewer imageUrls={URLS} onSavePage={() => new Promise<boolean>(() => {})} />
+    ));
+    fireEvent.click(screen.getByLabelText("保存当前页到相册"));
+    await Promise.resolve();
+    expect((screen.getByLabelText("保存当前页到相册") as HTMLButtonElement).disabled).toBe(true);
   });
 });

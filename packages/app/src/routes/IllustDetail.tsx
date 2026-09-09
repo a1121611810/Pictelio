@@ -36,6 +36,9 @@ import IllustDetailSkeleton from "../components/skeletons/IllustDetailSkeleton";
 import DetailHeader from "../components/illust/DetailHeader";
 import DetailCard from "../components/illust/DetailCard";
 import BottomActionBar from "../components/illust/BottomActionBar";
+import PagePickerSheet from "../components/illust/PagePickerSheet";
+import { originalPageUrls, saveIllustPages } from "../utils/galleryDownload";
+import { GallerySaver } from "../native/GallerySaver";
 import { goBack } from "../services/backTransitionService";
 
 const IllustDetail: Component = () => {
@@ -547,17 +550,89 @@ const IllustDetail: Component = () => {
     return [i.image_urls.large];
   };
 
-  /** 原图 URL 列表，用于全屏查看器 */
+  /** 原图 URL 列表，用于全屏查看器与保存（语义见 galleryDownload.originalPageUrls） */
   const originalImageUrls = () => {
     const i = illust();
     if (!i) {
       return [];
     }
-    if (i.page_count > 1) {
-      return i.meta_pages.map((p) => p.image_urls.original ?? p.image_urls.large);
-    }
-    return [i.meta_single_page.original_image_url ?? i.image_urls.large];
+    return originalPageUrls(i);
   };
+
+  // ── 保存到相册（spec docs/specs/image-save-download.md）──
+  const [pickerOpen, setPickerOpen] = createSignal(false);
+  const [saving, setSaving] = createSignal(false);
+  const [saveStatus, setSaveStatus] = createSignal<string | null>(null);
+  let saveStatusTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function showSaveStatus(text: string, sticky = false) {
+    setSaveStatus(text);
+    clearTimeout(saveStatusTimer);
+    if (!sticky) {
+      saveStatusTimer = setTimeout(() => setSaveStatus(null), 2500);
+    }
+  }
+
+  /** 顺序批量保存；单张失败不中断，末尾聚合汇报（失败明细 console.warn） */
+  async function runSave(pages: number[]) {
+    const i = illust();
+    if (!i || saving() || pages.length === 0) {
+      return { saved: 0, failures: [] };
+    }
+    setSaving(true);
+    const urls = originalPageUrls(i);
+    try {
+      const outcome = await saveIllustPages({
+        pages,
+        illustId: i.id,
+        urlForPage: (p) => urls[p],
+        saveOne: async (url, fileName) => {
+          await GallerySaver.saveImage({ url, fileName });
+        },
+        onProgress: (done, total) => showSaveStatus(`保存中 ${done}/${total}…`, true),
+      });
+      if (outcome.failures.length === 0) {
+        showSaveStatus(outcome.saved > 1 ? `已保存 ${outcome.saved} 张到相册` : "已保存到相册");
+      } else {
+        showSaveStatus(
+          `保存完成 ${outcome.saved}/${pages.length}，${outcome.failures.length} 张失败`,
+        );
+      }
+      return outcome;
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /** 底部条入口：单页直存；多页开选页面板；ugoira 不提供保存 */
+  function handleSaveEntry() {
+    const i = illust();
+    if (!i || i.type === "ugoira") {
+      return;
+    }
+    if (i.page_count > 1) {
+      setPickerOpen(true);
+      return;
+    }
+    void runSave([0]);
+  }
+
+  /** 查看器保存当前页（按钮内联状态，toast 在查看器打开时隐藏） */
+  async function handleViewerSave(page: number): Promise<boolean> {
+    const outcome = await runSave([page]);
+    return outcome.saved === 1;
+  }
+
+  // 将选页面板注册到 overlay 栈，供系统返回手势统一处理
+  createEffect(
+    () => pickerOpen(),
+    (open) => {
+      if (open) {
+        pushOverlay("pagePicker", () => setPickerOpen(false));
+        return () => popOverlay("pagePicker");
+      }
+    },
+  );
 
   function scrollToPage(index: number) {
     setCurrentVisiblePage(index);
@@ -616,6 +691,16 @@ const IllustDetail: Component = () => {
                 style="position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:60;pointer-events:none"
               >
                 {toastMessage()}
+              </fluent-message-bar>
+            </Show>
+
+            {/* 保存进度/结果状态（查看器打开时隐藏——查看器按钮自带内联状态） */}
+            <Show when={saveStatus() && !viewerOpen()}>
+              <fluent-message-bar
+                intent="success"
+                style="position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:60;pointer-events:none"
+              >
+                {saveStatus()}
               </fluent-message-bar>
             </Show>
 
@@ -980,6 +1065,8 @@ const IllustDetail: Component = () => {
             onBookmarkPointerUp={onBookmarkPointerUp}
             onComments={() => setShowComments(true)}
             totalComments={illust()!.total_comments}
+            onSave={illust()!.type !== "ugoira" ? handleSaveEntry : undefined}
+            saving={saving()}
           />
         </Show>
 
@@ -989,8 +1076,20 @@ const IllustDetail: Component = () => {
             previewUrls={imageUrls()}
             initialPage={viewerStartPage()}
             onClose={closeViewer}
+            onSavePage={handleViewerSave}
           />
         )}
+
+        <PagePickerSheet
+          open={pickerOpen()}
+          pageUrls={imageUrls()}
+          busy={saving()}
+          onClose={() => setPickerOpen(false)}
+          onConfirm={(pages) => {
+            setPickerOpen(false);
+            void runSave(pages);
+          }}
+        />
 
         <ReportSheet
           illustId={illust()?.id ?? 0}

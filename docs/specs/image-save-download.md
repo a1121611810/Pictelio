@@ -80,33 +80,33 @@ saveIllustPages({ illust, pages: number[], saveOne, onProgress })
 
 ### app（SolidJS / Fluent）
 
-| 面 | 行为 |
-|----|------|
-| `BottomActionBar` | 新增「保存」按钮（收藏/评论同级，非 ugoira 显示）。单页作品点击直接保存（按钮内联「保存中…」）；多页作品点击打开选页面板。 |
+| 面                         | 行为                                                                                                                                                                                                               |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `BottomActionBar`          | 新增「保存」按钮（收藏/评论同级，非 ugoira 显示）。单页作品点击直接保存（按钮内联「保存中…」）；多页作品点击打开选页面板。                                                                                         |
 | 选页面板 `PagePickerSheet` | 基于 `FluentDialog`：medium 缩略图网格 + 选中遮罩✓；头部「全选/清除」；底部「已选 n · 保存」；确认后关闭面板，toast 汇报进度与结果（复用 `toastMessage` 通道，进度文案独立信号避免 2.5s 自动隐藏误伤进行中状态）。 |
-| `ImageViewer` | 右上角新增保存按钮（40×40 overlay token，与左上关闭镜像）；点击保存当前页；进行中转圈、成功✓ 1.2s、失败✗ + console.warn（查看器内无 toast 通道，状态内联在按钮上）。 |
-| toast | `已保存 n 张到相册` / `保存完成 x/y，z 张失败`；失败明细 console.warn。 |
+| `ImageViewer`              | 右上角新增保存按钮（40×40 overlay token，与左上关闭镜像）；点击保存当前页；进行中转圈、成功✓ 1.2s、失败✗ + console.warn（查看器内无 toast 通道，状态内联在按钮上）。                                               |
+| toast                      | `已保存 n 张到相册` / `保存完成 x/y，z 张失败`；失败明细 console.warn。                                                                                                                                            |
 
 ### app-lynx（Vue / M3 Tailwind）
 
-| 面 | 行为 |
-|----|------|
-| `IllustDetail.vue` 操作行 | `BookmarkButton` 旁新增「保存」按钮（非 ugoira 显示）；语义同 app：单页直存、多页开面板。 |
+| 面                             | 行为                                                                                                                                                                                          |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `IllustDetail.vue` 操作行      | `BookmarkButton` 旁新增「保存」按钮（非 ugoira 显示）；语义同 app：单页直存、多页开面板。                                                                                                     |
 | 选页面板 `PagePickerSheet.vue` | `absolute inset-0` 覆盖层（CommentOverlay 同款挂载契约，DOM 在 scroll-view 之后）；3 列缩略图 + 选中遮罩；全选/清除 + 「已选 n · 保存」；保存中/结果状态内联在面板底部（lynx 无全局 toast）。 |
-| 不可用环境 | web-core 下点保存 → 面板/按钮报「当前环境不支持保存到相册」。 |
+| 不可用环境                     | web-core 下点保存 → 面板/按钮报「当前环境不支持保存到相册」。                                                                                                                                 |
 
 ## 6. 测试策略（硬约束映射）
 
-| 层 | 用例 | oracle |
-|----|------|--------|
-| Java 纯函数 | `sanitizeFileName` / `mimeFor` / `extFor` | 本 spec §3/§5 字面规则 |
-| Java IO | API 28 回退：文件写入 app-ext 目录 + 命名 | 真实文件系统（Robolectric temp） |
-| Java IO | MediaStore values 构造（display_name / relative_path / mime / pending）| 纯函数 `buildImageValues`；insert 返回 null → IOException 失败路径 |
-| Java IO | 缓存命中路径（loader.cachedFile 命中零下载）/ 未命中走 download | 注入 loader 假件 |
-| TS 纯函数 | `buildSaveFileName` / `originalPageUrls` / 编排器（成功序、失败聚合、空选 no-op、进度回调次数） | spec §4/§5 + 真实 Pixiv 响应样例形态 |
-| TS 桥 | app web 回退（anchor 触发）/ lynx 无原生模块显式失败 | 桥契约 §3 |
-| 组件 | PagePickerSheet（渲染页数、勾选/全选、确认回调参数） | spec §5 |
-| E2E | agent-browser：详情页保存入口 → 面板 → 确认 → 结果 toast（web 回退路径 spy anchor） | 用户可达路径原则 |
+| 层          | 用例                                                                                            | oracle                                                             |
+| ----------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Java 纯函数 | `sanitizeFileName` / `mimeFor` / `extFor`                                                       | 本 spec §3/§5 字面规则                                             |
+| Java IO     | API 28 回退：文件写入 app-ext 目录 + 命名                                                       | 真实文件系统（Robolectric temp）                                   |
+| Java IO     | MediaStore values 构造（display_name / relative_path / mime / pending）                         | 纯函数 `buildImageValues`；insert 返回 null → IOException 失败路径 |
+| Java IO     | 缓存命中路径（loader.cachedFile 命中零下载）/ 未命中走 download                                 | 注入 loader 假件                                                   |
+| TS 纯函数   | `buildSaveFileName` / `originalPageUrls` / 编排器（成功序、失败聚合、空选 no-op、进度回调次数） | spec §4/§5 + 真实 Pixiv 响应样例形态                               |
+| TS 桥       | app web 回退（anchor 触发）/ lynx 无原生模块显式失败                                            | 桥契约 §3                                                          |
+| 组件        | PagePickerSheet（渲染页数、勾选/全选、确认回调参数）                                            | spec §5                                                            |
+| E2E         | agent-browser：详情页保存入口 → 面板 → 确认 → 结果 toast（web 回退路径 spy anchor）             | 用户可达路径原则                                                   |
 
 ## 7. 验收清单
 
@@ -120,11 +120,11 @@ saveIllustPages({ illust, pages: number[], saveOne, onProgress })
 
 ## 8. 假设记录（用户未应答 Grill，可推翻）
 
-| # | 假设 | 备选 |
-|---|------|------|
-| A1 | 「多图选页」为保存服务的选页 | 阅读跳页面板（既有楼梯导航已覆盖跳页） |
-| A2 | 「批量下载」= 作品级全部页批量 | 列表级跨作品多选批量（需独立立项） |
-| A3 | 保存目标 = 系统相册（MediaStore）为主 | 仅应用专属目录（不可见相册，弱需求） |
-| A4 | 画质恒原图 | 跟随 detailQuality 档位 |
-| A5 | ugoira 不做 | zip 导出 |
-| A6 | 入口 = 详情底部条/操作行 + 查看器，不做 Feed 卡片入口 | 卡片长按菜单 |
+| #   | 假设                                                  | 备选                                   |
+| --- | ----------------------------------------------------- | -------------------------------------- |
+| A1  | 「多图选页」为保存服务的选页                          | 阅读跳页面板（既有楼梯导航已覆盖跳页） |
+| A2  | 「批量下载」= 作品级全部页批量                        | 列表级跨作品多选批量（需独立立项）     |
+| A3  | 保存目标 = 系统相册（MediaStore）为主                 | 仅应用专属目录（不可见相册，弱需求）   |
+| A4  | 画质恒原图                                            | 跟随 detailQuality 档位                |
+| A5  | ugoira 不做                                           | zip 导出                               |
+| A6  | 入口 = 详情底部条/操作行 + 查看器，不做 Feed 卡片入口 | 卡片长按菜单                           |

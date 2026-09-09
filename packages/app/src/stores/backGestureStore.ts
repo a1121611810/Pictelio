@@ -6,7 +6,8 @@ export type OverlayType =
   | "seriesSheet"
   | "readerSettingsSheet"
   | "commentSheet"
-  | "reportSheet";
+  | "reportSheet"
+  | "pagePicker";
 
 interface OverlayEntry {
   type: OverlayType;

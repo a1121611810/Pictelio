@@ -1,4 +1,4 @@
-import type { Component } from "solid-js";
+import { Show, type Component } from "solid-js";
 import PixivImage from "../PixivImage";
 
 interface BottomActionBarProps {
@@ -11,6 +11,10 @@ interface BottomActionBarProps {
   onBookmarkPointerUp: (e: PointerEvent) => void;
   onComments: () => void;
   totalComments?: number;
+  /** 保存到相册（spec image-save-download；缺省 = 不显示入口，ugoira 不提供） */
+  onSave?: () => void;
+  /** 保存流程进行中（按钮禁用 + 文案切换） */
+  saving?: boolean;
 }
 
 /**
@@ -19,7 +23,7 @@ interface BottomActionBarProps {
  * 显示逻辑（由 IllustDetail 控制）：页面滚动到信息区（用户/作品信息）
  * 进入视口后隐藏（信息区内已有收藏/评论入口，避免重复）；否则常驻。
  *
- * 内容：左 = 作者头像 + 名字（truncate 省略号）；右 = 收藏（长按私藏）+ 评论。
+ * 内容：左 = 作者头像 + 名字（truncate 省略号）；右 = 收藏（长按私藏）+ 保存 + 评论。
  * A2 卡片条：圆角 2XLarge + elevation8 + 细边框，悬浮于页面底部。
  */
 const BottomActionBar: Component<BottomActionBarProps> = (props) => {
@@ -40,7 +44,7 @@ const BottomActionBar: Component<BottomActionBarProps> = (props) => {
           </span>
         </div>
 
-        {/* 右：收藏 + 评论 */}
+        {/* 右：收藏 + 保存 + 评论 */}
         <div class="flex items-center gap-2 ml-auto flex-shrink-0">
           <button
             type="button"
@@ -57,6 +61,17 @@ const BottomActionBar: Component<BottomActionBarProps> = (props) => {
           >
             {props.isBookmarked ? "♥ 已收藏" : "♡ 收藏"}
           </button>
+          <Show when={props.onSave}>
+            <button
+              type="button"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase200)] font-medium bg-[var(--colorBrandStroke2)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorBrandBackground)] hover:text-[var(--colorNeutralForegroundOnBrand)] active:scale-95 transition-all select-none appearance-none border-none outline-none cursor-pointer disabled:opacity-60 disabled:cursor-default"
+              onClick={props.onSave}
+              disabled={props.saving}
+              aria-label="保存到相册"
+            >
+              {props.saving ? "保存中…" : "保存"}
+            </button>
+          </Show>
           <button
             type="button"
             class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase200)] font-medium bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] hover:bg-[var(--colorBrandBackgroundHover)] active:scale-95 transition-all select-none appearance-none border-none outline-none cursor-pointer"

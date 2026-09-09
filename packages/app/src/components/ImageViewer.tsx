@@ -1,4 +1,6 @@
 import type { Component } from "solid-js";
+import { Show, createEffect, createSignal, onCleanup, onSettled, untrack } from "solid-js";
+import { tryAsync } from "../utils/tryAsync";
 import { checkImageCache, loadImage, loadImageWithProgress } from "../utils/imageLoader";
 
 interface Props {
@@ -7,6 +9,8 @@ interface Props {
   previewUrls?: string[];
   initialPage?: number;
   onClose?: () => void;
+  /** 保存当前页（spec image-save-download；缺省 = 不显示保存按钮）。resolve true=成功 */
+  onSavePage?: (page: number) => Promise<boolean>;
 }
 
 /** 邻页预取候选（FT-4 #367）：当前页的前后一页，跳过已发起/已加载的。
@@ -30,6 +34,22 @@ const ImageViewer: Component<Props> = (props) => {
   const initialPage = untrack(() => props.initialPage ?? 0);
   const [currentPage, setCurrentPage] = createSignal(initialPage);
   const [animating, setAnimating] = createSignal(false);
+
+  // ── 保存当前页（spec image-save-download §5）──
+  // 查看器内无 toast 通道：状态内联在保存按钮上（idle → saving → done 1.2s / failed 2s）
+  const [saveStatus, setSaveStatus] = createSignal<"idle" | "saving" | "done" | "failed">("idle");
+  let saveResetTimer: ReturnType<typeof setTimeout> | undefined;
+  const handleSaveCurrentPage = async () => {
+    if (!props.onSavePage || saveStatus() === "saving") {
+      return;
+    }
+    setSaveStatus("saving");
+    const page = currentPage();
+    const ok = await props.onSavePage(page);
+    setSaveStatus(ok ? "done" : "failed");
+    clearTimeout(saveResetTimer);
+    saveResetTimer = setTimeout(() => setSaveStatus("idle"), ok ? 1200 : 2000);
+  };
 
   // ── 加载状态管理 ──
   // 初始页立即设为 0%，不等 createEffect，消除感知延迟
@@ -214,6 +234,7 @@ const ImageViewer: Component<Props> = (props) => {
   onCleanup(() => {
     setScale(1);
     setPosition({ x: 0, y: 0 });
+    clearTimeout(saveResetTimer);
   });
 
   return (
@@ -310,6 +331,37 @@ const ImageViewer: Component<Props> = (props) => {
       >
         ←
       </button>
+
+      {/* 保存当前页（与左上关闭镜像；状态内联：转圈 / ✓ / ✗） */}
+      <Show when={props.onSavePage}>
+        <button
+          class="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-[var(--borderRadiusCircular)] bg-[var(--colorOverlaySurface)] text-[var(--colorOverlayForeground)] appearance-none border-none cursor-pointer disabled:cursor-default focus-visible:outline focus-visible:outline-[var(--colorStrokeFocus2)]"
+          onClick={handleSaveCurrentPage}
+          disabled={saveStatus() === "saving"}
+          aria-label="保存当前页到相册"
+        >
+          <Show when={saveStatus() === "saving"}>
+            <span
+              class="w-5 h-5 rounded-[var(--borderRadiusCircular)] border-2 border-transparent border-t-[var(--colorOverlayForeground)]"
+              style={{ animation: "spin 1s linear infinite" }}
+            />
+          </Show>
+          <Show when={saveStatus() === "done"}>
+            <span class="text-[var(--colorStatusSuccessForeground1)]">✓</span>
+          </Show>
+          <Show when={saveStatus() === "failed"}>
+            <span class="text-[var(--colorStatusDangerForeground1)]">✗</span>
+          </Show>
+          <Show when={saveStatus() === "idle"}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M12 3a1 1 0 0 1 1 1v10.59l3.3-3.3a1 1 0 0 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1zM5 19a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H6a1 1 0 0 1-1-1z"
+                fill="currentColor"
+              />
+            </svg>
+          </Show>
+        </button>
+      </Show>
     </div>
   );
 };
