@@ -12,9 +12,12 @@ import { presentError } from '../utils/errorPresentation'
 import { useSettingsStore } from '../stores/settingsStore'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import CommentOverlay from '../components/CommentOverlay.vue'
+import PagePickerSheet from '../components/PagePickerSheet.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import UgoiraViewer from '../components/UgoiraViewer.vue'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
+import { originalPageUrls, saveIllustPages } from '../utils/galleryDownload'
+import { saveImageToGallery } from '../utils/gallerySaver'
 
 const detailQuality = useSettingsStore().detailQuality
 
@@ -52,6 +55,54 @@ async function toggleFollowAuthor() {
 }
 
 const illustId = computed(() => Number(currentParams.value.id ?? 0))
+
+// ─── 保存到相册（spec docs/specs/image-save-download.md）：入口在收藏操作行；───
+// ─── 单页直存；多页开选页面板；ugoira 不提供。状态内联在操作行下方（lynx 无全局 toast）───
+const showPicker = ref(false)
+const saving = ref(false)
+const saveStatus = ref('')
+
+/** 顺序批量保存；单张失败不中断批次，末尾聚合汇报（失败明细 console.warn，spec §4） */
+async function runSave(selectedPages: number[]) {
+  const i = illust.value
+  if (!i || saving.value || !selectedPages.length) return
+  saving.value = true
+  const urls = originalPageUrls(i)
+  try {
+    const outcome = await saveIllustPages({
+      pages: selectedPages,
+      illustId: i.id,
+      urlForPage: (p) => urls[p],
+      saveOne: (url, fileName) => saveImageToGallery(url, fileName).then(() => undefined),
+      onProgress: (done, total) => {
+        saveStatus.value = `保存中 ${done}/${total}…`
+      },
+    })
+    saveStatus.value =
+      outcome.failures.length === 0
+        ? outcome.saved > 1
+          ? `已保存 ${outcome.saved} 张到相册`
+          : '已保存到相册'
+        : `保存完成 ${outcome.saved}/${selectedPages.length}，${outcome.failures.length} 张失败`
+  } finally {
+    saving.value = false
+  }
+}
+
+function onSaveEntry() {
+  const i = illust.value
+  if (!i || i.type === 'ugoira') return
+  if (i.page_count > 1) {
+    showPicker.value = true
+    return
+  }
+  void runSave([0])
+}
+
+function onConfirmPicker(selectedPages: number[]) {
+  showPicker.value = false
+  void runSave(selectedPages)
+}
 
 // 多页作品：meta_pages 或单页
 // [fix] 单页作品直接返回完整 image_urls（medium/large 正常档位）——
@@ -198,6 +249,16 @@ onMounted(async () => {
             :initial-bookmarked="illust.is_bookmarked"
             :bookmark-count="illust.total_bookmarks"
           />
+          <!-- 保存到相册（spec image-save-download）：↓ 为 U+2193 纯文本符号（规避 emoji 字形，
+               ADR-0112 教训）；ugoira 不提供（web-core 下点保存由桥显式报「当前环境不支持」） -->
+          <view
+            v-if="illust.type !== 'ugoira'"
+            class="ml-4 flex flex-row items-center"
+            @tap="onSaveEntry"
+          >
+            <text class="text-[5.6vw] leading-none text-outline">↓</text>
+            <text class="text-label-medium text-outline ml-1">{{ saving ? '保存中…' : '保存' }}</text>
+          </view>
           <!-- 评论入口（issue #164）：样式对齐 webview 版（💬 + total_comments，字段缺失时不显示） -->
           <view
             v-if="illust.total_comments !== undefined"
@@ -208,6 +269,8 @@ onMounted(async () => {
             <text class="text-label-medium text-outline ml-1">{{ illust.total_comments }}</text>
           </view>
         </view>
+        <!-- 保存进度/结果状态（内联，无全局 toast 通道） -->
+        <text v-if="saveStatus" class="text-label-medium text-primary mt-1">{{ saveStatus }}</text>
         <view class="flex flex-row flex-wrap mt-3">
           <!-- 标签行（ADR-0133 可点化）：点击 → 全局搜索弹层预填该标签（原始 tag.name，
                显示仍 translated_name 优先）——与 webview SearchableTag 语义一致。
@@ -236,5 +299,14 @@ onMounted(async () => {
     <view v-if="showComments" class="absolute inset-0">
       <CommentOverlay type="illust" :target-id="illustId" @close="showComments = false" />
     </view>
+
+    <!-- 选页面板（spec image-save-download）：挂载契约同评论弹层（DOM 在 scroll-view 之后） -->
+    <PagePickerSheet
+      v-if="showPicker"
+      :page-urls="slideSrcs"
+      :busy="saving"
+      @close="showPicker = false"
+      @confirm="onConfirmPicker"
+    />
   </view>
 </template>

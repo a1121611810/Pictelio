@@ -109,6 +109,10 @@ declare global {
       prefsSet(key: string, value: string, callback: (err: string | null) => void): void
       prefsRemove(key: string, callback: (err: string | null) => void): void
     }
+    /** 保存到相册（spec image-save-download）：cb(uri, "") 成功 / cb("", errMsg) 失败（无 null 契约） */
+    PictelioGallery: {
+      saveImage(url: string, fileName: string, callback: (uri: string, err: string) => void): void
+    }
   } | undefined
 }
 
