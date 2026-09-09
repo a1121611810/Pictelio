@@ -1,8 +1,8 @@
 # Spec: 作品图片保存（单图保存 / 多图选页 / 批量下载）
 
-- 状态：draft → accepted（自主模式：用户未参与 Grill，假设见 §8，可推翻重排）
+- 状态：implemented（2026-09-10；配套 ADR-0145 / glossary-image-save / issue #421；真机验收待设备批次）
 - 日期：2026-09-10
-- 关联：ADR-0145（待写，提交前补）；复用 ADR-0037（PixivApiPlugin 网关）、ADR-0143（图床下载源 Java 侧）、ADR-0125/0127/0128（ugoira 管线，本次不触碰）
+- 关联：ADR-0145（已补）、glossary-image-save；复用 ADR-0037（PixivApiPlugin 网关）、ADR-0143（图床下载源 Java 侧）、ADR-0125/0127/0128（ugoira 管线，本次不触碰）
 
 ## 1. 背景与目标
 
