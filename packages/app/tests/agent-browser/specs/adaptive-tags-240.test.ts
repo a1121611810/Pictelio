@@ -104,8 +104,9 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("AdaptiveTags 240px 窄容器�
       }
       console.log(`[probe] 有标签 chip: ${hasChips}`);
       expect(hasChips, "打开 R18/R18G 后页面应有搜索标签 chip").toBe(true);
-      // R 类：等 ResizeObserver 重算完成（[data-fit] 属性由 RO 回调写入标签行容器）
-      await driver.waitForJs(`document.querySelector('[data-fit]') !== null`, 10_000);
+      // 就绪信号 = 可见标签 chip 已渲染（waitForSelector 上方已保证）。
+      // 旧写法等 `[data-fit]` 属性——全仓无任何代码写入该属性（#420 复审查明），
+      // 每次空烧 10s 后照常通过，已删除；RO 重算就绪由下方 rows 断言兜底。
 
       // 360 视口下读标签行 DOM（容器已自然变窄，RO 已触发）
       const data = await driver.evaluate(
@@ -138,30 +139,29 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("AdaptiveTags 240px 窄容器�
       // #419 回归锁：AdaptiveTags 测量层（absolute + visibility:hidden，单行排全部标签）
       // 一旦失去 overflow 裁剪，会把文档 scrollWidth 撑到数百 px——窄视口整页可横向拖动，
       // 桌面宽视口不可见（溢出藏在视口内）。真布局下只有这里测得到。
-      const hScrollRaw = (
-        await driver.evaluate(
-          `(() => {
-            const d = document.scrollingElement;
-            const off = [];
-            if (d.scrollWidth > window.innerWidth) {
-              document.querySelectorAll('body *').forEach((el) => {
-                const r = el.getBoundingClientRect();
-                if (r.right > window.innerWidth + 1) {
-                  off.push(el.tagName + '.' + String(el.className).slice(0, 40) + '@' + Math.round(r.right));
-                }
-              });
-            }
-            return JSON.stringify({ vw: window.innerWidth, sw: d.scrollWidth, off: off.slice(0, 8) });
-          })()`,
-        )
-      ).trim();
+      const hScrollRaw = await driver.evaluate(
+        `(() => {
+          const d = document.scrollingElement;
+          const off = [];
+          if (d.scrollWidth > window.innerWidth) {
+            document.querySelectorAll('body *').forEach((el) => {
+              const r = el.getBoundingClientRect();
+              if (r.right > window.innerWidth + 1) {
+                off.push(el.tagName + '.' + String(el.className).slice(0, 40) + '@' + Math.round(r.right));
+              }
+            });
+          }
+          return JSON.stringify({ vw: window.innerWidth, sw: d.scrollWidth, off: off.slice(0, 8) });
+        })()`,
+      );
       // evaluate 结果双层 JSON 解包（同上方 TAG-ROWS 的处理）
+      const hScrollParsed = (hScrollRaw ?? "").trim();
       const hScroll = JSON.parse(
-        (hScrollRaw.startsWith('"') ? JSON.parse(hScrollRaw) : hScrollRaw) as string,
+        (hScrollParsed.startsWith('"') ? JSON.parse(hScrollParsed) : hScrollParsed) as string,
       ) as { vw: number; sw: number; off: string[] };
       expect(
         hScroll.sw,
-        `页面横向溢出：scrollWidth ${hScroll.sw} > 视口 ${hScroll.vw}；溢出元素: ${hScroll.off.join(' , ') || '（无直接越界元素，可能为负 margin/transform）'}（#419）`,
+        `页面横向溢出：scrollWidth ${hScroll.sw} > 视口 ${hScroll.vw}；溢出元素: ${hScroll.off.join(" , ") || "（无直接越界元素，可能为负 margin/transform）"}（#419）`,
       ).toBeLessThanOrEqual(hScroll.vw);
     } finally {
       await driver.close().catch(() => {});
