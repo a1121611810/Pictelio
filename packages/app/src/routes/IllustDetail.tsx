@@ -563,10 +563,12 @@ const IllustDetail: Component = () => {
   const [pickerOpen, setPickerOpen] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
   const [saveStatus, setSaveStatus] = createSignal<string | null>(null);
+  const [saveIntent, setSaveIntent] = createSignal<"success" | "warning">("success");
   let saveStatusTimer: ReturnType<typeof setTimeout> | undefined;
 
-  function showSaveStatus(text: string, sticky = false) {
+  function showSaveStatus(text: string, sticky = false, intent: "success" | "warning" = "success") {
     setSaveStatus(text);
+    setSaveIntent(intent);
     clearTimeout(saveStatusTimer);
     if (!sticky) {
       saveStatusTimer = setTimeout(() => setSaveStatus(null), 2500);
@@ -594,8 +596,11 @@ const IllustDetail: Component = () => {
       if (outcome.failures.length === 0) {
         showSaveStatus(outcome.saved > 1 ? `已保存 ${outcome.saved} 张到相册` : "已保存到相册");
       } else {
+        // 按结果切换严重度：全成功 success / 有失败 warning（失败不可伪装成成功语义）
         showSaveStatus(
           `保存完成 ${outcome.saved}/${pages.length}，${outcome.failures.length} 张失败`,
+          false,
+          "warning",
         );
       }
       return outcome;
@@ -622,7 +627,6 @@ const IllustDetail: Component = () => {
     const outcome = await runSave([page]);
     return outcome.saved === 1;
   }
-
   // 将选页面板注册到 overlay 栈，供系统返回手势统一处理
   createEffect(
     () => pickerOpen(),
@@ -697,7 +701,7 @@ const IllustDetail: Component = () => {
             {/* 保存进度/结果状态（查看器打开时隐藏——查看器按钮自带内联状态） */}
             <Show when={saveStatus() && !viewerOpen()}>
               <fluent-message-bar
-                intent="success"
+                intent={saveIntent()}
                 style="position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:60;pointer-events:none"
               >
                 {saveStatus()}
@@ -1076,7 +1080,8 @@ const IllustDetail: Component = () => {
             previewUrls={imageUrls()}
             initialPage={viewerStartPage()}
             onClose={closeViewer}
-            onSavePage={handleViewerSave}
+            /* 批量保存进行中暂不提供查看器保存入口（避免假失败 ✗——早退跳过≠失败） */
+            onSavePage={saving() ? undefined : handleViewerSave}
           />
         )}
 

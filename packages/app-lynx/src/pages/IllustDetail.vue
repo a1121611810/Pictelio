@@ -17,7 +17,7 @@ import SkeletonImage from '../components/SkeletonImage.vue'
 import UgoiraViewer from '../components/UgoiraViewer.vue'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
 import { originalPageUrls, saveIllustPages } from '../utils/galleryDownload'
-import { saveImageToGallery } from '../utils/gallerySaver'
+import { gallerySaveAvailable, saveImageToGallery } from '../utils/gallerySaver'
 
 const detailQuality = useSettingsStore().detailQuality
 
@@ -61,6 +61,7 @@ const illustId = computed(() => Number(currentParams.value.id ?? 0))
 const showPicker = ref(false)
 const saving = ref(false)
 const saveStatus = ref('')
+let saveStatusTimer: ReturnType<typeof setTimeout> | undefined
 
 /** 顺序批量保存；单张失败不中断批次，末尾聚合汇报（失败明细 console.warn，spec §4） */
 async function runSave(selectedPages: number[]) {
@@ -75,6 +76,7 @@ async function runSave(selectedPages: number[]) {
       urlForPage: (p) => urls[p],
       saveOne: (url, fileName) => saveImageToGallery(url, fileName).then(() => undefined),
       onProgress: (done, total) => {
+        clearTimeout(saveStatusTimer)
         saveStatus.value = `保存中 ${done}/${total}…`
       },
     })
@@ -84,6 +86,11 @@ async function runSave(selectedPages: number[]) {
           ? `已保存 ${outcome.saved} 张到相册`
           : '已保存到相册'
         : `保存完成 ${outcome.saved}/${selectedPages.length}，${outcome.failures.length} 张失败`
+    // 成功文案 2.5s 自动清除（对齐 app 端 toast 语义）；进行中文案由下一次 onProgress 覆盖
+    clearTimeout(saveStatusTimer)
+    saveStatusTimer = setTimeout(() => {
+      saveStatus.value = ''
+    }, 2500)
   } finally {
     saving.value = false
   }
@@ -92,6 +99,11 @@ async function runSave(selectedPages: number[]) {
 function onSaveEntry() {
   const i = illust.value
   if (!i || i.type === 'ugoira') return
+  // web-core 预览环境（无 PictelioGallery）：入口点了也给显式状态，不发起必然失败的批次
+  if (!gallerySaveAvailable()) {
+    saveStatus.value = '当前环境不支持保存到相册'
+    return
+  }
   if (i.page_count > 1) {
     showPicker.value = true
     return
@@ -300,13 +312,16 @@ onMounted(async () => {
       <CommentOverlay type="illust" :target-id="illustId" @close="showComments = false" />
     </view>
 
-    <!-- 选页面板（spec image-save-download）：挂载契约同评论弹层（DOM 在 scroll-view 之后） -->
-    <PagePickerSheet
-      v-if="showPicker"
-      :page-urls="slideSrcs"
-      :busy="saving"
-      @close="showPicker = false"
-      @confirm="onConfirmPicker"
-    />
+    <!-- 选页面板（spec image-save-download）：挂载契约对齐评论弹层——absolute inset-0 宿主包裹
+         （issue #139：本页根是 flex-col + flex-1 scroll-view，文档流内 w-full h-full 子元素有溢出
+         覆盖顶栏触摸层前科，必须脱离文档流） -->
+    <view v-if="showPicker" class="absolute inset-0">
+      <PagePickerSheet
+        :page-urls="slideSrcs"
+        :busy="saving"
+        @close="showPicker = false"
+        @confirm="onConfirmPicker"
+      />
+    </view>
   </view>
 </template>

@@ -102,9 +102,12 @@ public final class GallerySaver {
             }
             throw e;
         }
+        // 清 pending → 对图库可见；复位失败 = 图停留 pending（图库不可见），必须留痕
         ContentValues done = new ContentValues();
         done.put(MediaStore.MediaColumns.IS_PENDING, 0);
-        cr.update(uri, done, null, null);
+        if (cr.update(uri, done, null, null) == 0) {
+            Log.w(TAG, "IS_PENDING 复位失败（图库可能不可见，字节已写入）: " + uri);
+        }
         return new SaveResult(uri, true);
     }
 

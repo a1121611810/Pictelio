@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 /**
  * PagePickerSheet 选页面板（spec docs/specs/image-save-download.md §5/§6）。
- * oracle 溯源：交互契约 = 「打开默认全选（批量语义）；点选切换；全选/清除互斥；
- * 确认上排序页号数组」。PixivImage/loadImage 用 vi.mock 隔离网络与 L1 全局态
+ * oracle 溯源：交互契约 = 「点选切换；全选/清除互斥；确认上排序页号数组」（spec §5）；
+ * 「打开默认全选」为实现决策的防回归锁定（spec 只规定批量语义，未字面规定默认态）。
+ * PixivImage/loadImage 用 vi.mock 隔离网络与 L1 全局态
  * （对齐 IllustSingleCard.test.tsx 模式）。Solid 2.0 微任务批处理：点击后
  * await Promise.resolve() 再断言 DOM。
  */

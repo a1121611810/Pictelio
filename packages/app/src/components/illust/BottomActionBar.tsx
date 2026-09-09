@@ -64,7 +64,7 @@ const BottomActionBar: Component<BottomActionBarProps> = (props) => {
           <Show when={props.onSave}>
             <button
               type="button"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase200)] font-medium bg-[var(--colorBrandStroke2)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorBrandBackground)] hover:text-[var(--colorNeutralForegroundOnBrand)] active:scale-95 transition-all select-none appearance-none border-none outline-none cursor-pointer disabled:opacity-60 disabled:cursor-default"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase200)] font-medium bg-[var(--colorBrandStroke2)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorBrandBackground)] hover:text-[var(--colorNeutralForegroundOnBrand)] active:scale-95 transition-all select-none appearance-none border-none outline-none cursor-pointer disabled:opacity-60 disabled:cursor-default focus-visible:bg-[var(--colorNeutralBackground1Selected)] focus-visible:outline focus-visible:outline-[var(--colorStrokeFocus2)]"
               onClick={props.onSave}
               disabled={props.saving}
               aria-label="保存到相册"

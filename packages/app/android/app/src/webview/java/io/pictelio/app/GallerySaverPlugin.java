@@ -39,7 +39,8 @@ public class GallerySaverPlugin extends Plugin {
             result.put("uri", r.uri.toString());
             result.put("mediaStore", r.mediaStore);
             call.resolve(result);
-        } catch (Exception e) {
+        } catch (Throwable e) {
+            // 与 lynx 壳 PictelioGalleryModule 同姿态：Error 也不击穿到 Capacitor 外层
             Log.w(TAG, "saveImage 失败: " + url, e);
             String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
             call.reject("保存失败: " + msg);

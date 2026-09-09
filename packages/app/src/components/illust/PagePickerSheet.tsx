@@ -79,7 +79,7 @@ const PagePickerSheet: Component<PagePickerSheetProps> = (props) => {
               />
               {/* 选中遮罩：右上 ✓ 角标 + 细描边强化 */}
               <Show when={selected().has(i())}>
-                <span class="absolute top-1 right-1 w-5 h-5 rounded-[var(--borderRadiusCircular)] bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] flex items-center justify-center text-xs">
+                <span class="absolute top-1 right-1 w-5 h-5 rounded-[var(--borderRadiusCircular)] bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] flex items-center justify-center [font-size:var(--fontSizeBase100)]">
                   ✓
                 </span>
               </Show>
