@@ -1080,8 +1080,9 @@ const IllustDetail: Component = () => {
             previewUrls={imageUrls()}
             initialPage={viewerStartPage()}
             onClose={closeViewer}
-            /* 批量保存进行中暂不提供查看器保存入口（避免假失败 ✗——早退跳过≠失败） */
-            onSavePage={saving() ? undefined : handleViewerSave}
+            /* 恒传处理器 + saveBusy 禁用（非卸载）：批量并发期点击被挡，内联 ✓/✗ 反馈保持可达 */
+            onSavePage={handleViewerSave}
+            saveBusy={saving()}
           />
         )}
 

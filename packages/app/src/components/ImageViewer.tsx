@@ -11,6 +11,8 @@ interface Props {
   onClose?: () => void;
   /** 保存当前页（spec image-save-download；缺省 = 不显示保存按钮）。resolve true=成功 */
   onSavePage?: (page: number) => Promise<boolean>;
+  /** 批量保存进行中：禁用（而非卸载）保存按钮——内联 ✓/✗ 反馈保持可达，且屏蔽与批次并发 */
+  saveBusy?: boolean;
 }
 
 /** 邻页预取候选（FT-4 #367）：当前页的前后一页，跳过已发起/已加载的。
@@ -40,7 +42,7 @@ const ImageViewer: Component<Props> = (props) => {
   const [saveStatus, setSaveStatus] = createSignal<"idle" | "saving" | "done" | "failed">("idle");
   let saveResetTimer: ReturnType<typeof setTimeout> | undefined;
   const handleSaveCurrentPage = async () => {
-    if (!props.onSavePage || saveStatus() === "saving") {
+    if (!props.onSavePage || saveStatus() === "saving" || props.saveBusy) {
       return;
     }
     setSaveStatus("saving");
@@ -337,7 +339,7 @@ const ImageViewer: Component<Props> = (props) => {
         <button
           class="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-[var(--borderRadiusCircular)] bg-[var(--colorOverlaySurface)] text-[var(--colorOverlayForeground)] appearance-none border-none cursor-pointer disabled:cursor-default focus-visible:outline focus-visible:outline-[var(--colorStrokeFocus2)]"
           onClick={handleSaveCurrentPage}
-          disabled={saveStatus() === "saving"}
+          disabled={saveStatus() === "saving" || props.saveBusy}
           aria-label="保存当前页到相册"
         >
           <Show when={saveStatus() === "saving"}>

@@ -81,4 +81,17 @@ describe("ImageViewer 保存当前页按钮（spec image-save-download §5）", 
     await Promise.resolve();
     expect((screen.getByLabelText("保存当前页到相册") as HTMLButtonElement).disabled).toBe(true);
   });
+
+  it("saveBusy（批次并发）时按钮禁用但保持渲染——禁用而非隐藏，✓/✗ 反馈可达", async () => {
+    render(() => (
+      <ImageViewer imageUrls={URLS} onSavePage={() => Promise.resolve(true)} saveBusy />
+    ));
+    const btn = screen.getByLabelText("保存当前页到相册") as HTMLButtonElement;
+    expect(btn).toBeTruthy();
+    expect(btn.disabled).toBe(true);
+    // 禁用态点击不触发保存、也不进入 ✗ 假失败
+    fireEvent.click(btn);
+    await Promise.resolve();
+    expect(screen.queryByText("✗")).toBeNull();
+  });
 });
