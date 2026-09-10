@@ -10,6 +10,8 @@ import { useSettingsStore } from '../stores/settingsStore'
 import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
 import RefreshableList from '../components/RefreshableList.vue'
 import { useGlobalFabStore } from '../stores/globalFab'
+import AdaptiveTagRow from '../components/AdaptiveTagRow.vue'
+import { useSearchSheetStore } from '../stores/searchSheetStore'
 
 const isRestricted = useSettingsStore().isRestricted
 
@@ -105,6 +107,11 @@ function switchMode(m: 'recommend' | 'follow') {
 
 function openDetail(id: number) {
   void navigate(`/novel/${id}`)
+}
+
+/** 标签点击 → 全局搜索弹层（原始 tag.name，ADR-0133；同 Recommended.vue 语义） */
+function onTagTap(name: string) {
+  useSearchSheetStore().openSearch(name)
 }
 
 // ─── 全局放射 FAB 桥（ADR-0120）：注册本页动作到 globalFab，卸载时注销 ───
@@ -229,15 +236,14 @@ onUnmounted(() => {
                 ♥ {{ item.total_bookmarks }}
               </text>
             </view>
-            <view class="flex flex-row flex-wrap mt-2">
-              <text
-                v-for="tag in item.tags.slice(0, 3)"
-                :key="tag.name"
-                class="h-[8.533vw] px-2 border border-outline rounded-[var(--md-shape-small)] flex items-center justify-center m-0.5 text-label-large text-surface-on-variant bg-surface"
-              >
-                #{{ tag.translated_name || tag.name }}
-              </text>
-            </view>
+            <!-- 自适应标签行（ADR-0149）：装多少算多少 + 省略号截断 + 「+N」；
+                 chip 点击 → 全局搜索，+N/截断 chip → 进详情 -->
+            <AdaptiveTagRow
+              class="mt-2"
+              :tags="item.tags"
+              @tag-tap="onTagTap"
+              @overflow-tap="openDetail(item.id)"
+            />
           </view>
         </view>
       </list-item>

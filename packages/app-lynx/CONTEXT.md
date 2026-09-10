@@ -41,8 +41,12 @@ _Avoid_: 遮罩卡（与遮罩的 absolute 覆盖模式语义不同）
 _Avoid_: 图上 absolute 角标（list-item 内 absolute 真机高度测量异常，见「遮罩」词条）、各页面散写徽章
 
 **标签胶囊行（tag chip row）**：
-推荐轮播滑页 scrim 区的标签行（ADR-0118）——M3 assist-chip 形态（同「类型徽章行」：`bg-secondary-container` / `text-label-medium` / `md-shape-small` 圆角），文本 `translated_name || name` 带 `#` 前缀；**最多 3 个，超出折叠为「+N」**，单行不换行；插画与小说统一展示；**纯展示不可点**（app-lynx 无搜索路由）。
-_Avoid_: 全量标签堆叠、可点击标签（无搜索页）、省略号截断
+推荐轮播滑页 scrim 区的标签行（ADR-0118）——M3 assist-chip 形态（同「类型徽章行」：`bg-secondary-container` / `text-label-medium` / `md-shape-small` 圆角），文本 `translated_name || name` 带 `#` 前缀；**固定上限 3 个，超出折叠为「+N」**（轮播 scrim 现状；列表卡见「标签自适应折叠」），单行不换行；插画与小说统一展示；chip 可点 → 打开全局搜索弹层，关键词为原始 tag.name（ADR-0133）；ADR-0118 的「纯展示不可点」前提已随 ADR-0132/0133 过时。
+_Avoid_: 全量标签堆叠、各页面散写标签样式
+
+**标签自适应折叠（adaptive tag fold）**：
+标签胶囊行在**单行**内按容器实测宽度决定放几个：装得下全部显示；装不下则右侧预留「+N」，左侧贪心放完整 chip，剩余宽 ≥ 最小可读宽时再放一个**省略号截断 chip**（ADR-0149）；「+N」/截断 chip 点击进作品详情。宽度只能由 lynx.createSelectorQuery() 的 select('#id').invoke({ method: 'boundingClientRect' }) **逐元素链式 .exec()** 得到。
+_Avoid_: 硬 slice(0, N) 截断、selectAll(...).invoke(...)（双端不支持）、list-item 内 absolute 测量层（真机高度测量会把 absolute 算进内容高度）
 
 ### 分页（Pagination）
 
