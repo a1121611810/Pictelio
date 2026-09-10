@@ -54,7 +54,7 @@ async function submit() {
         v-model="tokenInput"
         class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-outline-variant text-body-large text-surface-on px-4 mb-3"
         placeholder="粘贴 Pixiv refresh_token"
-        placeholder-color="#49454f"
+        placeholder-color="#41474e"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="LOGIN_A11Y_LABELS.tokenInput"
       />

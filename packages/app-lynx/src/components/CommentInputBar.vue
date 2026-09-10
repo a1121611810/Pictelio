@@ -54,7 +54,7 @@ function send() {
         v-model="text"
         class="flex-1 h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-outline-variant text-body-large text-surface-on px-3"
         placeholder="写下评论…"
-        placeholder-color="#49454f"
+        placeholder-color="#41474e"
       />
       <!-- 发送按钮：空输入 / 超长 / 发送中禁用 -->
       <view

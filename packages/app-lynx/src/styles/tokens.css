@@ -1,5 +1,5 @@
 /* ─── Material Design 3 令牌（app-lynx / Lynx CSS 子集） ───
- * 色板 = M3 baseline（seed #6750A4，Material Theme Builder 官方导出）亮色。
+ * 色板 = M3 亮色，seed Sky #1a6fa8（对齐项目 logo 蓝色画笔：主笔触 #2b579a / 高光 #5a9fd4）。
  * 变量名分两类：
  *  - --md-*：M3 语义名（primary/secondary/tertiary/error/surface/outline 等），
  *    新代码与共享组件（NavigationBar/RefreshableList 等）优先使用；
@@ -9,59 +9,59 @@
  * MVP 用纯色 + 简单过渡替代（原生 LynxView 阶段再对表补齐）。
  */
 page {
-  /* ── M3 核心色（baseline #6750A4） ── */
-  --md-primary: #6750a4;
+  /* ── M3 核心色（Sky #1a6fa8） ── */
+  --md-primary: #1a6fa8;
   --md-on-primary: #ffffff;
-  --md-primary-container: #eaddff;
-  --md-on-primary-container: #21005d;
-  --md-secondary: #625b71;
+  --md-primary-container: #cfe5ff;
+  --md-on-primary-container: #001d33;
+  --md-secondary: #50606e;
   --md-on-secondary: #ffffff;
-  --md-secondary-container: #e8def8;
-  --md-on-secondary-container: #1d192b;
-  --md-tertiary: #7d5260;
+  --md-secondary-container: #d3e5f5;
+  --md-on-secondary-container: #0c1d29;
+  --md-tertiary: #3b6470;
   --md-on-tertiary: #ffffff;
-  --md-tertiary-container: #ffd8e4;
-  --md-on-tertiary-container: #31111d;
+  --md-tertiary-container: #bee9f8;
+  --md-on-tertiary-container: #001f28;
   --md-error: #b3261e;
   --md-on-error: #ffffff;
   --md-error-container: #f9dedc;
   --md-on-error-container: #410e0b;
 
   /* ── M3 表面 / 容器 ── */
-  --md-surface: #fef7ff;
-  --md-on-surface: #1d1b20;
-  --md-surface-variant: #e7e0ec;
-  --md-on-surface-variant: #49454f;
-  --md-outline: #79747e;
-  --md-outline-variant: #cac4d0;
+  --md-surface: #f8faff;
+  --md-on-surface: #191c20;
+  --md-surface-variant: #dde3ea;
+  --md-on-surface-variant: #41474e;
+  --md-outline: #71787e;
+  --md-outline-variant: #c1c7ce;
   --md-scrim: rgba(0, 0, 0, 0.5);
   /* 沉浸卡底部文字可读性 scrim 渐变（标题/作者叠于 full-bleed 图上）：自 M3 scrim 引申，多档不透明度渐变无单一 M3 令牌 */
   --md-scrim-overlay: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.2) 45%, rgba(0, 0, 0, 0));
   --md-surface-container-lowest: #ffffff;
-  --md-surface-container-low: #f7f2fa;
-  --md-surface-container: #f3edf7;
-  --md-surface-container-high: #ece6f0;
-  --md-surface-container-highest: #e6e0e9;
-  --md-inverse-surface: #322f35;
-  --md-inverse-on-surface: #f5eff7;
-  --md-inverse-primary: #d0bcff;
+  --md-surface-container-low: #f2f4fa;
+  --md-surface-container: #eceef4;
+  --md-surface-container-high: #e6e8ee;
+  --md-surface-container-highest: #e1e3e9;
+  --md-inverse-surface: #2e3136;
+  --md-inverse-on-surface: #eff1f7;
+  --md-inverse-primary: #93ccff;
 
   /* ── M3 补充表面 / 固定色（亮色 baseline，命名与官方 token 对齐） ── */
-  --md-surface-dim: #ded8e1;
-  --md-surface-bright: #fef7ff;
-  --md-primary-fixed: #eaddff;
-  --md-on-primary-fixed: #21005d;
-  --md-primary-fixed-dim: #d0bcff;
-  --md-on-primary-fixed-variant: #4f378b;
-  --md-secondary-fixed: #e8def8;
-  --md-on-secondary-fixed: #1d192b;
-  --md-secondary-fixed-dim: #cac4d0;
-  --md-on-secondary-fixed-variant: #4a4458;
-  --md-tertiary-fixed: #ffd8e4;
-  --md-on-tertiary-fixed: #31111d;
-  --md-tertiary-fixed-dim: #efb8c8;
-  --md-on-tertiary-fixed-variant: #633b48;
-  --md-surface-tint: #6750a4;
+  --md-surface-dim: #d8dade;
+  --md-surface-bright: #f8faff;
+  --md-primary-fixed: #cfe5ff;
+  --md-on-primary-fixed: #001d33;
+  --md-primary-fixed-dim: #93ccff;
+  --md-on-primary-fixed-variant: #0b4a72;
+  --md-secondary-fixed: #d3e5f5;
+  --md-on-secondary-fixed: #0c1d29;
+  --md-secondary-fixed-dim: #b7c9d9;
+  --md-on-secondary-fixed-variant: #384853;
+  --md-tertiary-fixed: #bee9f8;
+  --md-on-tertiary-fixed: #001f28;
+  --md-tertiary-fixed-dim: #8fd1e8;
+  --md-on-tertiary-fixed-variant: #204b58;
+  --md-surface-tint: #1a6fa8;
 
   /* ── M3 状态层（state layers，覆盖在容器色之上） ──
    * 交互反馈：hover 8% / pressed 12%。Lynx 伪类支持有限，MVP 用预计算
@@ -69,17 +69,17 @@ page {
    * 变体（web-core 预览生效；原生 LynxView 待真机验证）。
    * 值说明：pressedOnSurface = primary 叠加在 surface 上 12%（直接取 primary，
    * 视觉近似）；pressedSurface = surface-container-lowest + 12% primary 预计算。 */
-  --md-state-pressed-primary: #59408f; /* primary + 12% black */
-  --md-state-pressed-on-surface: #6750a4; /* primary 12% 叠加于 surface（近似） */
+  --md-state-pressed-primary: #155b8a; /* primary + 12% black */
+  --md-state-pressed-on-surface: #1a6fa8; /* primary 12% 叠加于 surface（近似） */
   --md-state-pressed-error: #9a1f1a; /* error + 12% black */
-  --md-state-pressed-surface: #eceaf4; /* surface-container-lowest(#fff) + 12% primary(#6750a4) alpha 合成 */
+  --md-state-pressed-surface: #e4e9f1; /* surface-container-lowest(#fff) + 12% primary(#1a6fa8) alpha 合成 */
 
   /* ── M3 状态层（半透明叠加层，MD3 官方用 alpha 层而非预计算实色） ──
    * 官方：pressed = 容器色 + 12% primary/on-surface 半透明层；disabled = on-surface 12%/38%。 */
-  --md-state-layer-pressed-primary: rgba(103, 80, 164, 0.12); /* 12% primary */
-  --md-state-layer-pressed-on-surface: rgba(29, 27, 32, 0.12); /* 12% on-surface */
-  --md-state-disabled-container: rgba(29, 27, 32, 0.12); /* on-surface 12% */
-  --md-state-disabled-on-surface: rgba(29, 27, 32, 0.38); /* on-surface 38% */
+  --md-state-layer-pressed-primary: rgba(26, 111, 168, 0.12); /* 12% primary */
+  --md-state-layer-pressed-on-surface: rgba(25, 28, 32, 0.12); /* 12% on-surface */
+  --md-state-disabled-container: rgba(25, 28, 32, 0.12); /* on-surface 12% */
+  --md-state-disabled-on-surface: rgba(25, 28, 32, 0.38); /* on-surface 38% */
 
   /* ── 兼容别名：旧 Fluent 语义 → M3 令牌（存量引用不断） ── */
   --colorNeutralBackground1: var(--md-surface-container-lowest); /* 卡片/顶栏底 */
@@ -92,10 +92,10 @@ page {
   --colorNeutralStroke2: var(--md-surface-variant);
   --colorNeutralStroke3: var(--md-surface-container-highest);
   --colorBrandBackground: var(--md-primary);
-  --colorBrandBackgroundHover: #7758b4;
-  --colorBrandBackgroundPressed: #59408f;
+  --colorBrandBackgroundHover: #2180bd;
+  --colorBrandBackgroundPressed: #155b8a;
   --colorBrandForeground1: var(--md-primary);
-  --colorBrandForeground2: #59408f;
+  --colorBrandForeground2: #155b8a;
   --colorBrandForegroundInverted: var(--md-on-primary);
   --colorBrandStroke1: var(--md-primary);
   --colorNeutralForegroundOnBrand: var(--md-on-primary);
