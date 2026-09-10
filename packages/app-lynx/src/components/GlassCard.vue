@@ -55,22 +55,23 @@ function queryRect(): void {
   // createInvokeUIMethod.js 显式处理该 method，原生 LynxView 同为标准 API。
   const q = lynx?.createSelectorQuery?.()
   if (!q) return
-  q.select(`#${cardId}`)
-    .invoke({
-      method: 'boundingClientRect',
-      params: {},
-      success: (data) => {
-        const r = data as Partial<BoundingRect> | null
-        if (!r) return
-        cachedRect = { left: r.left ?? 0, top: r.top ?? 0, width: r.width ?? 0, height: r.height ?? 0 }
-        // 矩形就绪：补上 touchstart 时被跳过的首个触点
-        if (pendingFirstPoint && touching.value) {
-          applyElastic(pendingFirstPoint)
-          pendingFirstPoint = null
-        }
-      },
-    })
-  q.exec()
+  // [fix] exec 必须挂在 select().invoke() 的返回值上：SelectorQuery 队列式，invoke 返回携带 task 的新 query；
+  // 对原 q 调 exec() 执行的是空队列 → success 永不回调（ADR-0149 spike 双端实测）。
+  const query = q.select(`#${cardId}`).invoke({
+    method: 'boundingClientRect',
+    params: {},
+    success: (data) => {
+      const r = data as Partial<BoundingRect> | null
+      if (!r) return
+      cachedRect = { left: r.left ?? 0, top: r.top ?? 0, width: r.width ?? 0, height: r.height ?? 0 }
+      // 矩形就绪：补上 touchstart 时被跳过的首个触点
+      if (pendingFirstPoint && touching.value) {
+        applyElastic(pendingFirstPoint)
+        pendingFirstPoint = null
+      }
+    },
+  })
+  query.exec()
 }
 
 interface LynxTouch {

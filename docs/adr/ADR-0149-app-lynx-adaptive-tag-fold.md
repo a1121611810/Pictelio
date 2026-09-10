@@ -50,7 +50,7 @@ throwaway spike（src/prototype/AdaptiveTagSpike.vue）在 **web-core**（__web_
 
 **负面 / 风险**：
 - 测量是**跨线程异步**的，需 ready 门控 + 重试；首帧可能有极短占位。
-- **发现既有 bug**：GlassCard.vue:50-73 的 SelectorQuery 写法（先存 q 再 q.exec()）在 web-core 下静默失效——本文档不改它，记录为待办（真机行为需单独确认）。
+- **既有 bug（已闭环）**：GlassCard.vue 的 SelectorQuery 写法（先存 q 再 q.exec()）在 web-core 下静默失效，导致 /me 账户卡「液态弹性」触摸反馈不触发；已由后续 commit be1865c4 修正为链式 exec（并修正 rspeedy-env.d.ts 的 invoke 返回类型 + 补源级守卫）。原「记录为待办」已了结。
 - 省略号依赖 max-line，web-core 预览不可验证，回归须在真机。
 
 ## 验收

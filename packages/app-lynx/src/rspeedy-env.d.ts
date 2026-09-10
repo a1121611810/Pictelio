@@ -47,14 +47,16 @@ declare global {
     addListener(event: string, handler: (...args: unknown[]) => void): void
   }
   /** SelectorQuery 的 NodesRef（布局查询；web-core 0.23.1 缺 boundingClientRect 方法，
-   *  原生 LynxView 用 invoke({ method: 'boundingClientRect' }) 标准 API，见 GlassCard.vue） */
+   *  原生 LynxView 用 invoke({ method: 'boundingClientRect' }) 标准 API，见 GlassCard.vue）。
+   *  invoke 返回「携带本次 task 的新 query」——exec() 必须挂在它的返回值上：
+   *  对原始 query 调 exec() 执行的是空队列、回调永不触发（ADR-0149 spike 双端实测）。 */
   interface LynxNodesRef {
     invoke(options: {
       method: string
       params?: Record<string, unknown>
       success?: (data: unknown) => void
       fail?: (err: unknown) => void
-    }): LynxNodesRef
+    }): LynxSelectorQuery
   }
   interface LynxSelectorQuery {
     select(selector: string): LynxNodesRef
