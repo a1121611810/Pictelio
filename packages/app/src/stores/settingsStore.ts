@@ -2,6 +2,7 @@ import { createSignal } from "solid-js";
 import { settings } from "@/settings";
 import { user } from "@/stores/authStore";
 import type { UgoiraExtractMode } from "../api/illust";
+import { UGOIRA_FORMATS, type UgoiraFormat } from "../utils/downloadQueueCore";
 
 // ── 类型定义 ──
 
@@ -26,6 +27,7 @@ const PREF_KEY_DISMISSED_UPDATE_VERSION = "dismissed_update_version";
 const PREF_KEY_OTA_LAST_KNOWN_FLOOR = "ota_last_known_floor";
 const PREF_KEY_OTA_AUTO_DOWNLOAD = "ota_auto_download";
 const PREF_KEY_UGOIRA_MODE = "settings_ugoira_mode";
+const PREF_KEY_UGOIRA_DOWNLOAD_FORMAT = "settings_ugoira_download_format";
 
 // ── 持久化设置（统一 settings registry 管理）──
 // 各持久化项用 settings.define 声明，signal 状态由 registry 管理。
@@ -148,6 +150,22 @@ const ugoiraModeHandle = settings.define<UgoiraExtractMode>({
 export const ugoiraMode = () => ugoiraModeHandle.value();
 export async function setUgoiraMode(mode: UgoiraExtractMode): Promise<void> {
   ugoiraModeHandle.set(mode);
+}
+
+// ── 动图下载格式（spec docs/specs/download-manager.md §5）：全局统一，不可逐图 ──
+// 键与 app-lynx 共享（settings_ugoira_download_format，跨引擎同契约）；
+// 任务入队时快照，之后改设置不影响已入队任务（ADR-0146 D2）。
+
+const ugoiraDownloadFormatHandle = settings.define<UgoiraFormat>({
+  key: PREF_KEY_UGOIRA_DOWNLOAD_FORMAT,
+  default: "zip",
+  validate: (v): v is UgoiraFormat =>
+    typeof v === "string" && (UGOIRA_FORMATS as readonly string[]).includes(v),
+});
+
+export const ugoiraDownloadFormat = () => ugoiraDownloadFormatHandle.value();
+export async function setUgoiraDownloadFormat(format: UgoiraFormat): Promise<void> {
+  ugoiraDownloadFormatHandle.set(format);
 }
 
 /** 兼容存根：registry hydrateAll 已加载，Phase 4 移除 */
@@ -289,6 +307,7 @@ export async function resetSettingsStore(): Promise<void> {
   await setLayoutMode("waterfall");
   await setNovelLayoutMode("list");
   await setShowDetailStairs(false);
+  await setUgoiraDownloadFormat("zip");
   await setAutoCheckUpdate(true);
   await setLastDismissedVersion("");
   setHasUpdate(false);

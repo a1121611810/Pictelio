@@ -24,6 +24,10 @@ import { initializeStartupPreferences } from "@/startup";
 import { initializeAuth } from "@/stores/authStore";
 import { restoreFeedCache } from "@/api/feedQueryPersist";
 import { settings } from "@/settings";
+// 下载队列执行器接线（webview 引擎，模块加载即注册）
+import "@/native/downloadExecutor";
+// 系统分享接线（webview 引擎，模块加载即注册）
+import "@/native/downloadSharer";
 
 function syncFluentTheme() {
   const isDark = document.documentElement.classList.contains("dark");

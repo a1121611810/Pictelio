@@ -10,6 +10,7 @@ import {
   downloadAndExtractUgoira,
   streamUgoiraFrames,
   loadDetail,
+  loadUgoiraMetadata,
   type UgoiraFrame,
 } from "../api/illust";
 import { ApiErrorType, type ApiError } from "../api/types";
@@ -21,7 +22,12 @@ import LazyDetailImage from "../components/LazyDetailImage";
 import PixivImage from "../components/PixivImage";
 import PageTransition from "../components/PageTransition";
 import HeartBurstEffect from "../components/HeartBurstEffect";
-import { ugoiraMode, detailQuality, showDetailStairs } from "../stores/settingsStore";
+import {
+  ugoiraMode,
+  ugoiraDownloadFormat,
+  detailQuality,
+  showDetailStairs,
+} from "../stores/settingsStore";
 import { blockUser, isBlocked } from "../stores/blockStore";
 import { recordVisit } from "../stores/historyStore";
 import { pushOverlay, popOverlay } from "../stores/backGestureStore";
@@ -37,8 +43,8 @@ import DetailHeader from "../components/illust/DetailHeader";
 import DetailCard from "../components/illust/DetailCard";
 import BottomActionBar from "../components/illust/BottomActionBar";
 import PagePickerSheet from "../components/illust/PagePickerSheet";
-import { originalPageUrls, saveIllustPages } from "../utils/galleryDownload";
-import { GallerySaver } from "../native/GallerySaver";
+import { originalPageUrls, buildImageTasks, buildUgoiraTask } from "../utils/galleryDownload";
+import { enqueueDownloads } from "../stores/downloadStore";
 import { goBack } from "../services/backTransitionService";
 
 const IllustDetail: Component = () => {
@@ -561,8 +567,9 @@ const IllustDetail: Component = () => {
 
   // ── 保存到相册（spec docs/specs/image-save-download.md）──
   const [pickerOpen, setPickerOpen] = createSignal(false);
-  const [saving, setSaving] = createSignal(false);
   const [saveStatus, setSaveStatus] = createSignal<string | null>(null);
+  const [queuedNotice, setQueuedNotice] = createSignal<string | null>(null);
+  let queuedNoticeTimer: ReturnType<typeof setTimeout> | undefined;
   const [saveIntent, setSaveIntent] = createSignal<"success" | "warning">("success");
   let saveStatusTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -575,57 +582,74 @@ const IllustDetail: Component = () => {
     }
   }
 
-  /** 顺序批量保存；单张失败不中断，末尾聚合汇报（失败明细 console.warn） */
-  async function runSave(pages: number[]) {
+  /** 入队提示（含「查看下载」跳转，spec docs/specs/download-manager.md §8） */
+  function showQueuedNotice(count: number) {
+    setQueuedNotice(`已加入下载队列（${count} 项），请到下载页查看`);
+    clearTimeout(queuedNoticeTimer);
+    queuedNoticeTimer = setTimeout(() => setQueuedNotice(null), 4000);
+  }
+
+  /**
+   * 保存入口改为入队（spec §8）：构造任务交给 downloadStore（下载页统一开始/暂停/停止/删除）。
+   * 返回入队条数（0 = 无可用原图）。ugoira 不在本路径（T8 单独入队）。
+   */
+  function enqueuePages(pages: number[]): number {
     const i = illust();
-    if (!i || saving() || pages.length === 0) {
-      return { saved: 0, failures: [] };
+    if (!i || i.type === "ugoira" || pages.length === 0) {
+      return 0;
     }
-    setSaving(true);
-    const urls = originalPageUrls(i);
+    const drafts = buildImageTasks(i, pages);
+    if (drafts.length === 0) {
+      showSaveStatus("没有可下载的原图", false, "warning");
+      return 0;
+    }
+    enqueueDownloads(drafts);
+    showQueuedNotice(drafts.length);
+    return drafts.length;
+  }
+
+  const [ugoiraQueuing, setUgoiraQueuing] = createSignal(false);
+
+  /** ugoira 入队：先取元数据（官方 ZIP URL），再按全局格式（T13）入队（spec §5/§8）。 */
+  async function enqueueUgoira() {
+    const i = illust();
+    if (!i || i.type !== "ugoira" || ugoiraQueuing()) {
+      return;
+    }
+    setUgoiraQueuing(true);
     try {
-      const outcome = await saveIllustPages({
-        pages,
-        illustId: i.id,
-        urlForPage: (p) => urls[p],
-        saveOne: async (url, fileName) => {
-          await GallerySaver.saveImage({ url, fileName });
-        },
-        onProgress: (done, total) => showSaveStatus(`保存中 ${done}/${total}…`, true),
-      });
-      if (outcome.failures.length === 0) {
-        showSaveStatus(outcome.saved > 1 ? `已保存 ${outcome.saved} 张到相册` : "已保存到相册");
-      } else {
-        // 按结果切换严重度：全成功 success / 有失败 warning（失败不可伪装成成功语义）
-        showSaveStatus(
-          `保存完成 ${outcome.saved}/${pages.length}，${outcome.failures.length} 张失败`,
-          false,
-          "warning",
-        );
-      }
-      return outcome;
+      const meta = await loadUgoiraMetadata(i.id);
+      const draft = buildUgoiraTask(i, meta.zip_urls.medium, ugoiraDownloadFormat(), meta.frames);
+      enqueueDownloads([draft]);
+      showQueuedNotice(1);
+    } catch (e) {
+      console.error("[IllustDetail] ugoira 元数据获取失败:", e);
+      showSaveStatus("获取动图信息失败", false, "warning");
     } finally {
-      setSaving(false);
+      setUgoiraQueuing(false);
     }
   }
 
-  /** 底部条入口：单页直存；多页开选页面板；ugoira 不提供保存 */
+  /** 底部条入口：静态单页直存 / 多页开选页面板；ugoira 取元数据后入队 */
   function handleSaveEntry() {
     const i = illust();
-    if (!i || i.type === "ugoira") {
+    if (!i) {
+      return;
+    }
+    if (i.type === "ugoira") {
+      void enqueueUgoira();
       return;
     }
     if (i.page_count > 1) {
       setPickerOpen(true);
       return;
     }
-    void runSave([0]);
+    enqueuePages([0]);
   }
 
   /** 查看器保存当前页（按钮内联状态，toast 在查看器打开时隐藏） */
   async function handleViewerSave(page: number): Promise<boolean> {
-    const outcome = await runSave([page]);
-    return outcome.saved === 1;
+    return enqueuePages([page]) === 1;
   }
   // 将选页面板注册到 overlay 栈，供系统返回手势统一处理
   createEffect(
@@ -706,6 +730,22 @@ const IllustDetail: Component = () => {
               >
                 {saveStatus()}
               </fluent-message-bar>
+            </Show>
+
+            {/* 入队提示 + 跳转下载页（spec §8） */}
+            <Show when={queuedNotice() && !viewerOpen()}>
+              <div class="fixed top-24 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-3 px-4 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] shadow-[var(--elevation2)]">
+                <span class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground1)]">
+                  {queuedNotice()}
+                </span>
+                <button
+                  type="button"
+                  class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorBrandForegroundLink)] bg-transparent border-none cursor-pointer appearance-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--colorStrokeFocus2)]"
+                  onClick={() => void navigate("/downloads")}
+                >
+                  查看下载
+                </button>
+              </div>
             </Show>
 
             {/* Images — A2 卡片化（ADR-0071）：多图竖排卡片；单图封面卡片 */}
@@ -1069,8 +1109,8 @@ const IllustDetail: Component = () => {
             onBookmarkPointerUp={onBookmarkPointerUp}
             onComments={() => setShowComments(true)}
             totalComments={illust()!.total_comments}
-            onSave={illust()!.type !== "ugoira" ? handleSaveEntry : undefined}
-            saving={saving()}
+            onSave={handleSaveEntry}
+            saving={false}
           />
         </Show>
 
@@ -1082,18 +1122,18 @@ const IllustDetail: Component = () => {
             onClose={closeViewer}
             /* 恒传处理器 + saveBusy 禁用（非卸载）：批量并发期点击被挡，内联 ✓/✗ 反馈保持可达 */
             onSavePage={handleViewerSave}
-            saveBusy={saving()}
+            saveBusy={false}
           />
         )}
 
         <PagePickerSheet
           open={pickerOpen()}
           pageUrls={imageUrls()}
-          busy={saving()}
+          busy={false}
           onClose={() => setPickerOpen(false)}
           onConfirm={(pages) => {
             setPickerOpen(false);
-            void runSave(pages);
+            enqueuePages(pages);
           }}
         />
 
