@@ -347,5 +347,9 @@ app-lynx 现状的**自研内存路由**（`src/router.ts` `_state` + `_history`
 **全局守卫鉴权（global auth guard / bootstrap 放行）**【2026-09-03 新增】：
 `router.beforeEach` + `meta.requiresAuth` 的路由级鉴权拦截（未登录 → `/login` replace；Q3 定论采用）。**守卫必须同步判断、不 await 网络**（await → RouterView 空白至守卫结束，违背先渲染后加载）；bootstrap 期（restoreToken 未完成）**直接放行**——首帧先渲染，鉴权由页面 401 兜底 + `initRouter` 收敛。对照旧自研：无路由级守卫，靠页面 `ensureAuth()`。_Avoid_: 守卫 await restoreToken、用守卫替代页面 401 兜底（拦截层与兑现层并存）
 
+**认证就绪门（auth-ready gate）**【2026-09-11 新增，ADR-0151】：
+Web 模式下「数据请求不得早于登录态恢复」的启动协调：无 access_token 的请求先等 `restoreToken()` 落定（或超时上限）再判定是否真未登录，**避免把「恢复中」误判为「未登录」而用错误文案替换骨架**。与「全局守卫鉴权」分工：守卫同步放行保证首帧先渲染，本门异步等待保证首帧请求晚于鉴权就绪。原生模式 access_token 在 Java 堆、不经此门。
+_Avoid_: 页面逐个 `ensureAuth()` 前置（覆盖不全、易漂移）、把「未登录」直接当落定错误渲染、恢复期间不显示骨架
+
 **kebab-case 陷阱**【2026-09-03 新增】：
 vue-lynx 模板编译器把**带连字符的标签**当原生自定义元素：`<router-view>`（kebab-case）编译为自定义元素 → Vue 不渲染（带 `v-slot` 时报 `v-slot can only be used on components`；无 slot 时静默渲染为空——历史「RouterView 为空」断言的真正根因）。模板必须 **PascalCase `<RouterView />`**；其余带连字符组件同理。_Avoid_: kebab-case `<router-view>`/`<router-link>`、把 RouterView 空白归因 vue-router 兼容性
