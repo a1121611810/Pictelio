@@ -43,6 +43,12 @@ vi.mock("@/native/PixivApi", () => ({
   },
 }));
 
+// ── Mock 平台判定（默认 native=true，与既有契约对齐；web 守卫用例单独覆盖）──
+const mockIsNativePlatform = vi.hoisted(() => vi.fn(() => true));
+vi.mock("@/utils/platform", () => ({
+  isNativePlatform: () => mockIsNativePlatform(),
+}));
+
 import { restoreRefreshToken, saveRefreshToken, clearRefreshToken } from "@/utils/secureStorage";
 
 /** 预设「marker 走 get、token 走 getItem」的读取状态 */
@@ -213,6 +219,61 @@ describe("saveRefreshToken / clearRefreshToken", () => {
 
     await expect(saveRefreshToken("new-token")).resolves.toBeUndefined();
     expect(mockSyncToken).toHaveBeenCalledWith({ token: "new-token" });
+  });
+});
+
+/**
+ * Web 环境 IPC 守卫：syncToken 不应被调用（spec #422 D3 真因消除）。
+ * 这是 Capacitor platform 守卫的核心 oracle：web 端刷新页面控制台不再出现
+ * "PixivApi plugin is not implemented on web" 三条 stack。
+ */
+describe("syncToken Web 环境守卫（spec #422 D3）", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSyncToken.mockResolvedValue(undefined);
+    mockSecureStorage.setItem.mockResolvedValue(undefined);
+    mockSecureStorage.remove.mockResolvedValue(undefined);
+    mockIsNativePlatform.mockReturnValue(false); // 本组用例覆盖 web 路径
+  });
+
+  it("restoreRefreshToken: web 环境 mockSecureStorage 有 token 也不调 syncToken", async () => {
+    mockSecureStorage.get.mockResolvedValue("1");
+    mockSecureStorage.getItem.mockResolvedValue("web-refresh-token");
+
+    const token = await restoreRefreshToken();
+
+    expect(token).toBe("web-refresh-token");
+    // 核心 oracle：syncToken 0 次调用——web 环境根本不发 IPC
+    expect(mockSyncToken).not.toHaveBeenCalled();
+  });
+
+  it("saveRefreshToken: web 环境不调 syncToken（持久化主流程仍走）", async () => {
+    mockSecureStorage.setItem.mockResolvedValue(undefined);
+
+    await expect(saveRefreshToken("web-new-token")).resolves.toBeUndefined();
+    expect(mockSecureStorage.setItem).toHaveBeenCalledWith("refresh_token", "web-new-token");
+    // 核心 oracle
+    expect(mockSyncToken).not.toHaveBeenCalled();
+  });
+
+  it("clearRefreshToken: web 环境不调 syncToken", async () => {
+    mockSecureStorage.remove.mockResolvedValue(undefined);
+
+    await expect(clearRefreshToken()).resolves.toBeUndefined();
+    expect(mockSecureStorage.remove).toHaveBeenCalledWith("refresh_token");
+    // 核心 oracle
+    expect(mockSyncToken).not.toHaveBeenCalled();
+  });
+
+  it("平台切换 native→web 跨多次 saveRefreshToken：第二次起 syncToken 不再被调", async () => {
+    mockSecureStorage.setItem.mockResolvedValue(undefined);
+    mockIsNativePlatform.mockReturnValue(true); // 第一次 native
+    await saveRefreshToken("token-1");
+    expect(mockSyncToken).toHaveBeenCalledTimes(1);
+
+    mockIsNativePlatform.mockReturnValue(false); // 切到 web（reload 后）
+    await saveRefreshToken("token-2");
+    expect(mockSyncToken).toHaveBeenCalledTimes(1); // 仍只 1 次
   });
 });
 
