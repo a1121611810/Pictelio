@@ -144,7 +144,10 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("AdaptiveTags 240px 窄容器�
           const d = document.scrollingElement;
           const off = [];
           if (d.scrollWidth > window.innerWidth) {
-            document.querySelectorAll('body *').forEach((el) => {
+            // querySelectorAll('*')（= body 全部后代，语义同旧 'body *'）：
+            // 锚点校验器会把选择器首 token 提取为硬校验 element-tag，而 <body> 只在
+            // index.html（src 之外）——'body *' 会造成校验器假阳性（pre-push 拦截）
+            document.body.querySelectorAll('*').forEach((el) => {
               const r = el.getBoundingClientRect();
               if (r.right > window.innerWidth + 1) {
                 off.push(el.tagName + '.' + String(el.className).slice(0, 40) + '@' + Math.round(r.right));
