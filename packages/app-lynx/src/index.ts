@@ -1,6 +1,10 @@
 import { createApp } from 'vue-lynx'
 import { VueQueryPlugin } from '@tanstack/vue-query'
 import { router } from './router'
+// 下载队列执行器接线（lynx 引擎，模块加载即注册）
+import './utils/downloadExecutor'
+// 系统分享接线（lynx 引擎，模块加载即注册）
+import './utils/downloadSharer'
 import { pinia } from './stores/pinia'
 import { queryClient } from './api/queryClient'
 

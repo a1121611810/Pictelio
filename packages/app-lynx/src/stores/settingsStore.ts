@@ -19,6 +19,7 @@ import { useAuthStore } from "./authStore"
 import { unquoteNativeString } from "../utils/tokenStorage"
 import type { ImageQuality } from "../utils/imageQuality"
 import type { UgoiraExtractMode } from "../api/ugoira"
+import { UGOIRA_FORMATS, type UgoiraFormat } from "../utils/downloadQueueCore"
 
 // ── 跨 client 契约键（ADR-0103：与 webview settingsStore defineFactory 同格式）──
 const r18Key = (uid: number) => `show_r18_${uid}`
@@ -31,6 +32,8 @@ const DEV_LEGACY_R18 = "settings_show_r18"
 const DEV_LEGACY_R18G = "settings_show_r18g"
 
 const UGOIRA_MODE_KEY = "settings_ugoira_mode"
+/** 全局动图下载格式（与 app 包共享键，spec download-manager §5） */
+const UGOIRA_DOWNLOAD_FORMAT_KEY = "settings_ugoira_download_format"
 const DETAIL_QUALITY_KEY = "settings_detail_quality"
 
 // ── PrefsStorage seam（ADR-0103 决策 3：两 adapter = 真 seam）──
@@ -136,6 +139,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const _showR18 = ref(false)
   const _showR18G = ref(false)
   const _ugoiraMode = ref<UgoiraExtractMode>("fflate")
+  const _ugoiraDownloadFormat = ref<UgoiraFormat>("zip")
   const _detailQuality = ref<ImageQuality>("medium")
 
   // ── 跨 store 组合：读 authStore.currentUser.id 推导 uid（替换原模块级 currentUser import）
@@ -147,6 +151,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const showR18 = _showR18
   const showR18G = _showR18G
   const ugoiraMode = _ugoiraMode
+  const ugoiraDownloadFormat = _ugoiraDownloadFormat
   const detailQuality = _detailQuality
 
   // ── 公共 actions（return）──
@@ -159,6 +164,20 @@ export const useSettingsStore = defineStore("settings", () => {
     const [ugoira, detailQ] = await Promise.all([idbGet(UGOIRA_MODE_KEY), idbGet(DETAIL_QUALITY_KEY)])
     if (ugoira === "fflate" || ugoira === "range") _ugoiraMode.value = ugoira
     if (detailQ === "medium" || detailQ === "large" || detailQ === "original") _detailQuality.value = detailQ
+
+    // 全局动图下载格式：native 走共享 SharedPreferences（与 webview 同键），dev 走 idbKV
+    try {
+      const raw = await prefs().get(UGOIRA_DOWNLOAD_FORMAT_KEY)
+      if (raw !== null) {
+        if ((UGOIRA_FORMATS as readonly string[]).includes(raw)) {
+          _ugoiraDownloadFormat.value = raw as UgoiraFormat
+        } else {
+          console.warn("[settingsStore] ugoira 下载格式值非法，维持默认 zip:", raw)
+        }
+      }
+    } catch (e) {
+      console.warn("[settingsStore] ugoira 下载格式加载失败（维持默认）", e)
+    }
 
     const id = uid()
     if (id === null) {
@@ -199,6 +218,13 @@ export const useSettingsStore = defineStore("settings", () => {
     void prefs()
       .set(r18gKey(id), String(enabled))
       .catch((e) => console.warn("[settingsStore] R18G 写入失败", e))
+  }
+
+  function setUgoiraDownloadFormat(format: UgoiraFormat): void {
+    _ugoiraDownloadFormat.value = format
+    void prefs()
+      .set(UGOIRA_DOWNLOAD_FORMAT_KEY, format)
+      .catch((e) => console.warn("[settingsStore] ugoira 下载格式写入失败", e))
   }
 
   function setUgoiraMode(mode: UgoiraExtractMode): void {
@@ -250,11 +276,13 @@ export const useSettingsStore = defineStore("settings", () => {
     showR18G,
     ugoiraMode,
     detailQuality,
+    ugoiraDownloadFormat,
     // actions
     loadSettings,
     setShowR18,
     setShowR18G,
     setUgoiraMode,
+    setUgoiraDownloadFormat,
     setDetailQuality,
     isRestricted,
   }

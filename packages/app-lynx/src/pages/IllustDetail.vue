@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { currentParams, navigate, goBack } from '../router'
-import { loadDetail } from '../api/illust'
+import { loadDetail, loadUgoiraMetadata } from '../api/illust'
 import { followUser, unfollowUser } from '../api/user'
 import { useAuthStore } from '../stores/authStore'
 import type { PixivIllust } from '../api/types'
@@ -16,10 +16,11 @@ import PagePickerSheet from '../components/PagePickerSheet.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import UgoiraViewer from '../components/UgoiraViewer.vue'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
-import { originalPageUrls, saveIllustPages } from '../utils/galleryDownload'
-import { gallerySaveAvailable, saveImageToGallery } from '../utils/gallerySaver'
+import { buildImageTasks, buildUgoiraTask } from '../utils/galleryDownload'
+import { useDownloadStore } from '../stores/downloadStore'
 
 const detailQuality = useSettingsStore().detailQuality
+const settings = useSettingsStore()
 
 const illust = ref<PixivIllust | null>(null)
 const loading = ref(true)
@@ -59,61 +60,74 @@ const illustId = computed(() => Number(currentParams.value.id ?? 0))
 // ─── 保存到相册（spec docs/specs/image-save-download.md）：入口在收藏操作行；───
 // ─── 单页直存；多页开选页面板；ugoira 不提供。状态内联在操作行下方（lynx 无全局 toast）───
 const showPicker = ref(false)
-const saving = ref(false)
 const saveStatus = ref('')
+const queuedNotice = ref(false)
 let saveStatusTimer: ReturnType<typeof setTimeout> | undefined
+const dl = useDownloadStore()
 
-/** 顺序批量保存；单张失败不中断批次，末尾聚合汇报（失败明细 console.warn，spec §4） */
-async function runSave(selectedPages: number[]) {
+/**
+ * 保存入口改为入队（spec docs/specs/download-manager.md §8）：构造任务交给 downloadStore
+ * （下载页统一开始/暂停/停止/删除）。返回入队条数（0 = 无可用原图）。
+ */
+function enqueuePages(selectedPages: number[]): number {
   const i = illust.value
-  if (!i || saving.value || !selectedPages.length) return
-  saving.value = true
-  const urls = originalPageUrls(i)
+  if (!i || i.type === 'ugoira' || !selectedPages.length) return 0
+  const drafts = buildImageTasks(i, selectedPages)
+  if (drafts.length === 0) {
+    saveStatus.value = '没有可下载的原图'
+    queuedNotice.value = false
+    return 0
+  }
+  dl.enqueue(drafts)
+  saveStatus.value = `已加入下载队列（${drafts.length} 项），请到下载页查看`
+  queuedNotice.value = true
+  clearTimeout(saveStatusTimer)
+  saveStatusTimer = setTimeout(() => {
+    saveStatus.value = ''
+    queuedNotice.value = false
+  }, 4000)
+  return drafts.length
+}
+
+/** ugoira 入队：先取元数据（官方 ZIP URL），再按全局格式（T13）入队（spec §5/§8）。 */
+async function enqueueUgoira() {
+  const i = illust.value
+  if (!i || i.type !== 'ugoira') return
   try {
-    const outcome = await saveIllustPages({
-      pages: selectedPages,
-      illustId: i.id,
-      urlForPage: (p) => urls[p],
-      saveOne: (url, fileName) => saveImageToGallery(url, fileName).then(() => undefined),
-      onProgress: (done, total) => {
-        clearTimeout(saveStatusTimer)
-        saveStatus.value = `保存中 ${done}/${total}…`
-      },
-    })
-    saveStatus.value =
-      outcome.failures.length === 0
-        ? outcome.saved > 1
-          ? `已保存 ${outcome.saved} 张到相册`
-          : '已保存到相册'
-        : `保存完成 ${outcome.saved}/${selectedPages.length}，${outcome.failures.length} 张失败`
-    // 成功文案 2.5s 自动清除（对齐 app 端 toast 语义）；进行中文案由下一次 onProgress 覆盖
+    const meta = await loadUgoiraMetadata(i.id)
+    const draft = buildUgoiraTask(i, meta.zip_urls.medium, settings.ugoiraDownloadFormat, meta.frames)
+    dl.enqueue([draft])
+    saveStatus.value = '已加入下载队列（1 项），请到下载页查看'
+    queuedNotice.value = true
     clearTimeout(saveStatusTimer)
     saveStatusTimer = setTimeout(() => {
       saveStatus.value = ''
-    }, 2500)
-  } finally {
-    saving.value = false
+      queuedNotice.value = false
+    }, 4000)
+  } catch (e) {
+    console.warn('[IllustDetail] ugoira 元数据获取失败', e)
+    saveStatus.value = '获取动图信息失败'
+    queuedNotice.value = false
   }
 }
 
 function onSaveEntry() {
   const i = illust.value
-  if (!i || i.type === 'ugoira') return
-  // web-core 预览环境（无 PictelioGallery）：入口点了也给显式状态，不发起必然失败的批次
-  if (!gallerySaveAvailable()) {
-    saveStatus.value = '当前环境不支持保存到相册'
+  if (!i) return
+  if (i.type === 'ugoira') {
+    void enqueueUgoira()
     return
   }
   if (i.page_count > 1) {
     showPicker.value = true
     return
   }
-  void runSave([0])
+  enqueuePages([0])
 }
 
 function onConfirmPicker(selectedPages: number[]) {
   showPicker.value = false
-  void runSave(selectedPages)
+  enqueuePages(selectedPages)
 }
 
 // 多页作品：meta_pages 或单页
@@ -261,15 +275,11 @@ onMounted(async () => {
             :initial-bookmarked="illust.is_bookmarked"
             :bookmark-count="illust.total_bookmarks"
           />
-          <!-- 保存到相册（spec image-save-download）：↓ 为 U+2193 纯文本符号（规避 emoji 字形，
-               ADR-0112 教训）；ugoira 不提供（web-core 下点保存由桥显式报「当前环境不支持」） -->
-          <view
-            v-if="illust.type !== 'ugoira'"
-            class="ml-4 flex flex-row items-center"
-            @tap="onSaveEntry"
-          >
+          <!-- 保存（spec download-manager §8）：↓ 为 U+2193 纯文本符号（规避 emoji 字形，
+               ADR-0112 教训）；静态图直接入队，ugoira 取元数据后按全局格式入队 -->
+          <view class="ml-4 flex flex-row items-center" @tap="onSaveEntry">
             <text class="text-[5.6vw] leading-none text-outline">↓</text>
-            <text class="text-label-medium text-outline ml-1">{{ saving ? '保存中…' : '保存' }}</text>
+            <text class="text-label-medium text-outline ml-1">保存</text>
           </view>
           <!-- 评论入口（issue #164）：样式对齐 webview 版（💬 + total_comments，字段缺失时不显示） -->
           <view
@@ -281,8 +291,17 @@ onMounted(async () => {
             <text class="text-label-medium text-outline ml-1">{{ illust.total_comments }}</text>
           </view>
         </view>
-        <!-- 保存进度/结果状态（内联，无全局 toast 通道） -->
-        <text v-if="saveStatus" class="text-label-medium text-primary mt-1">{{ saveStatus }}</text>
+        <!-- 保存状态（内联，无全局 toast 通道）：入队后附「查看下载」跳转 -->
+        <view v-if="saveStatus" class="flex flex-row items-center mt-1">
+          <text class="text-label-medium text-primary">{{ saveStatus }}</text>
+          <view
+            v-if="queuedNotice"
+            class="ml-3 h-[8vw] px-3 flex items-center justify-center border border-outline rounded-[var(--md-shape-full)]"
+            @tap="navigate('/downloads')"
+          >
+            <text class="text-label-medium text-primary">查看下载</text>
+          </view>
+        </view>
         <view class="flex flex-row flex-wrap mt-3">
           <!-- 标签行（ADR-0133 可点化）：点击 → 全局搜索弹层预填该标签（原始 tag.name，
                显示仍 translated_name 优先）——与 webview SearchableTag 语义一致。
@@ -318,7 +337,7 @@ onMounted(async () => {
     <view v-if="showPicker" class="absolute inset-0">
       <PagePickerSheet
         :page-urls="slideSrcs"
-        :busy="saving"
+        :busy="false"
         @close="showPicker = false"
         @confirm="onConfirmPicker"
       />

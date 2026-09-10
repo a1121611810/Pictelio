@@ -21,6 +21,14 @@ export const ME_A11Y_LABELS = {
   switchToLynx: '切换客户端到Lynx',
   bookmarks: '我的收藏',
   watchlist: '追更列表',
+  downloads: '下载管理',
+  // 动图下载格式（spec download-manager §5）：全局统一，六格式各一标注
+  downloadFormatGif: '动图下载格式GIF',
+  downloadFormatMp4: '动图下载格式MP4',
+  downloadFormatWebp: '动图下载格式WebP',
+  downloadFormatApng: '动图下载格式APNG',
+  downloadFormatZip: '动图下载格式ZIP',
+  downloadFormatTar: '动图下载格式TAR',
   r18Toggle: '显示R18内容',
   r18gToggle: '显示R18G内容',
   ugoiraFflate: '动图播放选择fflate取帧',
@@ -108,6 +116,21 @@ export const WATCHLIST_PROMPT_A11Y_LABELS = {
   dialog: '追更询问弹窗',
   decline: '暂不追更',
   confirm: '追更该系列',
+} as const
+
+/** 下载管理页 accessibility 标注（spec docs/specs/download-manager.md §7.2） */
+export const DOWNLOAD_A11Y_LABELS = {
+  pageTitle: '下载管理',
+  back: '返回',
+  toggleAll: '全选或取消全选',
+  start: '开始下载',
+  pause: '暂停下载',
+  stop: '停止下载',
+  share: '分享已下载',
+  remove: '删除下载',
+  confirmDeleteFiles: '删除文件与记录',
+  confirmDeleteRecords: '仅清空记录',
+  cancelDelete: '取消删除',
 } as const
 
 // Lynx 元素属性不支持 Vue 插值表达式，模板中用 :accessibility-element 绑定此常量

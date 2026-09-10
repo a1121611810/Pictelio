@@ -16,7 +16,7 @@ import GlassCard from '../components/GlassCard.vue'
 const auth = useAuthStore()
 const settings = useSettingsStore()
 const clientSwitch = useClientSwitchStore()
-const { showR18, showR18G, ugoiraMode, detailQuality } = storeToRefs(settings)
+const { showR18, showR18G, ugoiraMode, ugoiraDownloadFormat, detailQuality } = storeToRefs(settings)
 const switching = ref(false)
 
 // ─── 全局放射 FAB 桥（ADR-0120）：注册空动作（内环空 = 仅外环导航），卸载时注销 ───
@@ -43,6 +43,10 @@ function openBookmarks() {
 
 function openWatchlist() {
   void navigate('/watchlist')
+}
+
+function openDownloads() {
+  void navigate('/downloads')
 }
 
 function pickClient(kind: ClientKind) {
@@ -142,6 +146,15 @@ function toggleR18G() {
           @tap="openWatchlist"
         >
           <text class="text-title-medium text-surface-on">追更列表</text>
+          <text class="text-title-medium text-surface-on-variant">›</text>
+        </view>
+        <view
+          class="flex flex-row items-center justify-between py-3.5"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.downloads"
+          @tap="openDownloads"
+        >
+          <text class="text-title-medium text-surface-on">下载管理</text>
           <text class="text-title-medium text-surface-on-variant">›</text>
         </view>
       </GlassCard>
@@ -308,6 +321,68 @@ function toggleR18G() {
             @tap="pickDetailQuality('original')"
           >
             <text class="text-label-large" :class="detailQuality === 'original' ? 'text-secondary-on-container' : 'text-surface-on'">原图</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 下载格式组（spec download-manager §5）：全局统一，不可逐图 -->
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+        <text class="text-title-small font-medium text-surface-on">下载</text>
+        <text class="text-label-medium text-surface-on-variant mt-1 mb-3">动图导出格式（全局统一，不可逐图）</text>
+        <view class="flex flex-row flex-wrap gap-2">
+          <view
+            class="h-[10.667vw] px-4 flex items-center justify-center rounded-[var(--md-shape-full)] border"
+            :class="ugoiraDownloadFormat === 'gif' ? 'bg-secondary-container border-secondary-container' : 'bg-surface-container-lowest border-outline'"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.downloadFormatGif"
+            @tap="settings.setUgoiraDownloadFormat('gif')"
+          >
+            <text class="text-label-large" :class="ugoiraDownloadFormat === 'gif' ? 'text-secondary-on-container' : 'text-surface-on'">GIF</text>
+          </view>
+          <view
+            class="h-[10.667vw] px-4 flex items-center justify-center rounded-[var(--md-shape-full)] border"
+            :class="ugoiraDownloadFormat === 'mp4' ? 'bg-secondary-container border-secondary-container' : 'bg-surface-container-lowest border-outline'"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.downloadFormatMp4"
+            @tap="settings.setUgoiraDownloadFormat('mp4')"
+          >
+            <text class="text-label-large" :class="ugoiraDownloadFormat === 'mp4' ? 'text-secondary-on-container' : 'text-surface-on'">MP4</text>
+          </view>
+          <view
+            class="h-[10.667vw] px-4 flex items-center justify-center rounded-[var(--md-shape-full)] border"
+            :class="ugoiraDownloadFormat === 'webp' ? 'bg-secondary-container border-secondary-container' : 'bg-surface-container-lowest border-outline'"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.downloadFormatWebp"
+            @tap="settings.setUgoiraDownloadFormat('webp')"
+          >
+            <text class="text-label-large" :class="ugoiraDownloadFormat === 'webp' ? 'text-secondary-on-container' : 'text-surface-on'">WebP</text>
+          </view>
+          <view
+            class="h-[10.667vw] px-4 flex items-center justify-center rounded-[var(--md-shape-full)] border"
+            :class="ugoiraDownloadFormat === 'apng' ? 'bg-secondary-container border-secondary-container' : 'bg-surface-container-lowest border-outline'"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.downloadFormatApng"
+            @tap="settings.setUgoiraDownloadFormat('apng')"
+          >
+            <text class="text-label-large" :class="ugoiraDownloadFormat === 'apng' ? 'text-secondary-on-container' : 'text-surface-on'">APNG</text>
+          </view>
+          <view
+            class="h-[10.667vw] px-4 flex items-center justify-center rounded-[var(--md-shape-full)] border"
+            :class="ugoiraDownloadFormat === 'zip' ? 'bg-secondary-container border-secondary-container' : 'bg-surface-container-lowest border-outline'"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.downloadFormatZip"
+            @tap="settings.setUgoiraDownloadFormat('zip')"
+          >
+            <text class="text-label-large" :class="ugoiraDownloadFormat === 'zip' ? 'text-secondary-on-container' : 'text-surface-on'">ZIP</text>
+          </view>
+          <view
+            class="h-[10.667vw] px-4 flex items-center justify-center rounded-[var(--md-shape-full)] border"
+            :class="ugoiraDownloadFormat === 'tar' ? 'bg-secondary-container border-secondary-container' : 'bg-surface-container-lowest border-outline'"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.downloadFormatTar"
+            @tap="settings.setUgoiraDownloadFormat('tar')"
+          >
+            <text class="text-label-large" :class="ugoiraDownloadFormat === 'tar' ? 'text-secondary-on-container' : 'text-surface-on'">TAR</text>
           </view>
         </view>
       </view>
