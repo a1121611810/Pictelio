@@ -440,7 +440,9 @@ export function createTQFeedStore<
     // ── 5. 动作 ──
 
     const ensureLoaded = async (_signal?: AbortSignal): Promise<void> => {
-      const keys = activeKeys();
+      // untrack 显式快照：ensureLoaded 是命令式动作，由 effect apply 段/事件调用，
+      // keys 取调用瞬间值，不建立订阅（Solid 2 STRICT_READ_UNTRACKED 处方）
+      const keys = untrack(activeKeys);
       if (keys.length === 0) return;
 
       await Promise.all(

@@ -25,7 +25,9 @@ import FluentIcon from "../ui/FluentIcon";
 import FluentDialog from "../ui/FluentDialog";
 
 const SettingsTranslate: Component = () => {
-  const [inputKey, setInputKey] = createSignal(dsApiKey() ?? "");
+  // untrack 显式快照：输入框初值取挂载瞬间的 dsApiKey，不建立订阅——onSettled 加载
+  // 完成后会显式 setInputKey 同步最新值（见下），Solid 2 STRICT_READ_UNTRACKED 处方
+  const [inputKey, setInputKey] = createSignal(untrack(() => dsApiKey() ?? ""));
   const [showKey, setShowKey] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
   const [feedback, setFeedback] = createSignal<string | null>(null);

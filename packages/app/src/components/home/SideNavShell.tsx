@@ -129,9 +129,10 @@ const HistoryPanel: Component<{
 
 const SideNavShell: Component<SideNavShellProps> = (props) => {
   const navigate = useNavigate();
-  // 局部 Tab 状态：初始值桥接全局 currentTab，切换时反向同步，
-  // 保证 NavBar / PersonalCenter 入口的 Tab 预设与首页选择保持一致。
-  const [tab, setTab] = createSignal<HomeTab>(initialHomeTab());
+  // 局部 Tab 状态：初始值桥接全局 currentTab（untrack 显式一次性快照——组件体是
+  // 非追踪上下文，Solid 2 STRICT_READ_UNTRACKED 处方），运行时同步由下方反向同步
+  // effect 承担，保证 NavBar / PersonalCenter 入口的 Tab 预设与首页选择保持一致。
+  const [tab, setTab] = createSignal<HomeTab>(untrack(initialHomeTab));
 
   // 反向同步：全局 currentTab → 局部 tab
   // - compute 仅追踪 currentTab() 一个依赖；同值守卫 + 非法 HomeTab 跳过

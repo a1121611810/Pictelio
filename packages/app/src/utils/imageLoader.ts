@@ -296,7 +296,11 @@ async function loadImageInner(originalUrl: string): Promise<LoadedImage> {
   }
 
   // Web 模式：图床改写仅 Web 生效（native 下载源由 Java 侧决策，ADR-0143）
-  const targetUrl = isImageHostEnabled() ? getEffectiveImageUrl(originalUrl) : originalUrl;
+  // untrack 显式快照：图床配置取加载瞬间值，不建立订阅——本函数常在 effect apply 段
+  // （非追踪上下文）被调，Solid 2 STRICT_READ_UNTRACKED 处方；响应式门控读点勿仿此
+  const targetUrl = untrack(() =>
+    isImageHostEnabled() ? getEffectiveImageUrl(originalUrl) : originalUrl,
+  );
   try {
     await fetchWeb(targetUrl, originalUrl);
   } catch (err) {
@@ -420,7 +424,10 @@ export async function loadImageWithProgress(
   const [progressErr, progressResult] = await tryAsync(
     (async () => {
       // 2. 解析目标 URL（图床代理 / 原生 URL）
-      const targetUrl = isImageHostEnabled() ? getEffectiveImageUrl(originalUrl) : originalUrl;
+      // untrack 显式快照：同 loadImageInner，加载瞬间决策不建立订阅
+      const targetUrl = untrack(() =>
+        isImageHostEnabled() ? getEffectiveImageUrl(originalUrl) : originalUrl,
+      );
 
       // 3. 带进度下载（统一走 WebView 代理）
       const proxyUrl = toWebProxyUrl(targetUrl);
@@ -481,7 +488,8 @@ async function loadWithProgressWeb(
 
 /** Web 模式：通过 Vite 代理或图床代理获取图片 */
 function fetchWeb(targetUrl: string, originalUrl: string): Promise<Blob> {
-  const urls = getRaceCandidateUrls(targetUrl);
+  // untrack 显式快照：race 候选取单次加载决策值，不建立订阅（同 loadImageInner）
+  const urls = untrack(() => getRaceCandidateUrls(targetUrl));
 
   if (urls.length > 1) {
     // Web 模式：所有 race 候选 URL 转为本地代理路径，避免 CORS
