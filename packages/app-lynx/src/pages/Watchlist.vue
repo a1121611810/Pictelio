@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'watchlist' })
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { navigate, goBack } from '../router'
 import { useModalStack } from '../stores/modalStack'
 import {
@@ -18,6 +18,7 @@ import { setWatchState } from '../stores/watchlistStore'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { WATCHLIST_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import RefreshableList from '../components/RefreshableList.vue'
+import { deriveFirstLoadView } from '../utils/firstLoadView'
 
 // ─── 追更列表页（issue #225 / spec app-lynx-novel-series-watchlist §US7） ───
 // 条目是**系列**而非作品（服务端响应顶层字段即 series）：
@@ -36,11 +37,24 @@ const loadingMore = ref(false)
 const errorMsg = ref('')
 const pageErrorMsg = ref('')
 const endOfFeed = ref(false)
+/** 首载是否已成功落定（成功含 0 条）——三态判定输入（ADR-0150） */
+const settled = ref(false)
+
+/** 页级首载三态（ADR-0150）：骨架 / 错误 / 空态 / 内容 的唯一判定源 */
+const view = computed(() =>
+  deriveFirstLoadView({
+    hasItems: series.value.length > 0,
+    loading: loading.value,
+    settled: settled.value,
+    hasError: !!errorMsg.value,
+  }),
+)
 
 function sync() {
   series.value = feed.items()
   loading.value = feed.loading()
   loadingMore.value = feed.loadingMore()
+  settled.value = feed.settled()
   errorMsg.value = feed.error() ?? ''
   pageErrorMsg.value = feed.pageError() ?? ''
   endOfFeed.value =
@@ -51,6 +65,9 @@ function sync() {
 const refreshEpoch = ref(0)
 
 async function refreshFeed() {
+  // 发起前同步进入加载态并清错误：骨架立即占位（ADR-0150）
+  loading.value = true
+  errorMsg.value = ''
   await feed.refresh()
   sync()
   refreshEpoch.value++
@@ -137,10 +154,12 @@ onUnmounted(() => {
       >
     </view>
 
-    <text v-if="errorMsg && !loading" class="text-body-small text-error p-4">{{ errorMsg }}</text>
+    <!-- 有数据时刷新失败：watchlistFeed 保留已加载条目（不同于 createMixFeed 清空渲染流），
+         错误不会落 view==='error' 分支 → 顶部内联错误条兜底（不静默吞错，ADR-0104 槽位语义） -->
+    <text v-if="view === 'content' && errorMsg" class="text-body-small text-error p-4">{{ errorMsg }}</text>
 
-    <!-- 首屏骨架（对齐 NovelList issue #91 模式） -->
-    <view v-if="loading && series.length === 0" class="w-full flex-1 min-h-0">
+    <!-- 首载三态（ADR-0150）：骨架 → 错误 → 空态 → 内容，互斥单链；不依赖 loading 标志 -->
+    <view v-if="view === 'skeleton'" class="w-full flex-1 min-h-0">
       <view v-for="n in 5" :key="n" class="m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
         <view class="flex flex-row">
           <view class="shimmer w-[21.333vw] h-[21.333vw] rounded-[var(--md-shape-small)]" />
@@ -153,8 +172,17 @@ onUnmounted(() => {
       </view>
     </view>
 
+    <view v-else-if="view === 'error'" class="w-full flex-1 min-h-0 flex flex-col items-center justify-center px-8">
+      <text class="text-body-small text-error text-center">{{ errorMsg }}</text>
+      <view
+        class="mt-4 px-6 h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+        @tap="refreshFeed"
+      >
+        <text class="text-label-large font-medium text-primary-on">重试</text>
+      </view>
+    </view>
     <!-- 空态 -->
-    <view v-if="!loading && !errorMsg && series.length === 0" class="w-full flex-1 min-h-0 flex items-center justify-center">
+    <view v-else-if="view === 'empty'" class="w-full flex-1 min-h-0 flex items-center justify-center">
       <view class="flex flex-col items-center">
         <text class="text-[10.667vw] leading-none text-outline-variant">✦</text>
         <text class="text-body-large text-surface-on mt-3">暂无追更系列</text>
@@ -162,7 +190,7 @@ onUnmounted(() => {
       </view>
     </view>
 
-    <RefreshableList v-if="series.length > 0" :refresh="refreshFeed" @back-to-top="refreshEpoch++">
+    <RefreshableList v-else :refresh="refreshFeed" @back-to-top="refreshEpoch++">
     <template #default="{ onScroll }">
     <list
       :key="refreshEpoch"

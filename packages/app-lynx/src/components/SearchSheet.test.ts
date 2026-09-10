@@ -9,7 +9,9 @@
 //   - 提交点 ×3 = glossary「搜索提交点」（回车 / 点历史词条 / 点结果行）+ spec US20；
 //   - R18 行遮罩 = spec US24 + D7（isRestricted 行内遮罩，不预过滤，开关实时联动）；
 //   - 文案「搜索中…」/「受浏览限制，不予显示」= 实现定义（无 spec/原型给定文案），
-//     属 T6 文案审校范围，断言为防无意改动（characterization），不构成设计约束来源。
+//     属 T6 文案审校范围，断言为防无意改动（characterization），不构成设计约束来源；
+//   - 首搜骨架 / 空态判定 = ADR-0150（页级首载骨架）+ spec T4 #435（deriveFirstLoadView 派生，
+//     loading/isSearching → 骨架；落定且空 → 空态；有旧结果优先 → 内容）。
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -69,7 +71,7 @@ describe('SearchSheet 五态渲染分支（spec D5 / US14-US17）', () => {
   })
 
   it('首载错误：关键词保留 + 错误文案 + 重试按钮（controller.refresh）', () => {
-    expect(source).toContain("v-if=\"state.status === 'error'\"")
+    expect(source).toMatch(/v-if="[^"]*'error'/)
     expect(source).toContain("state.error ?? '搜索失败，请重试'")
     expect(source).toContain('@tap="onRetry"')
     // onRetry → refresh（错误态重试，useSearch.refresh 仅 error 态生效）
@@ -78,9 +80,17 @@ describe('SearchSheet 五态渲染分支（spec D5 / US14-US17）', () => {
     expect(onRetryFn![0]).toContain('controller.refresh()')
   })
 
-  it('无结果：换词提示（ready + 空结果，不合并「未搜索」与「无结果」）', () => {
-    expect(source).toContain("state.status === 'ready' && state.results.length === 0")
+  it('首搜骨架：无旧结果可保留时显示结果行骨架（取代纯「搜索中…」文字）', () => {
+    // ADR-0150 / spec T4 #435：首搜（results 空 ∧ loading/isSearching）→ 骨架
+    expect(source).toMatch(/v-if="[^"]*'skeleton'/)
+    expect(source).toContain('deriveFirstLoadView({')
+  })
+
+  it('无结果：换词提示（落定且空结果，不合并「未搜索」与「无结果」）', () => {
+    // ADR-0150：空态由三态纯函数派生（settled=ready ∧ 无结果 ∧ 非加载中）
+    expect(source).toMatch(/v-if="[^"]*'empty'/)
     expect(source).toContain('没有找到相关内容，试试换一个关键词')
+    expect(source).toContain("import { deriveFirstLoadView } from '../utils/firstLoadView'")
   })
 
   it('结果列表：行式（缩略图 + 标题 + 作者 · 类型/字数）+ 查看指示；item-key String（ADR-0055/0056）', () => {

@@ -20,6 +20,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { navigate } from '../router'
 import type { SearchState, SearchResultItem } from '../primitives/useSearch'
 import { useSearch } from '../primitives/useSearch'
+import { deriveFirstLoadView } from '../utils/firstLoadView'
 import { useSearchHistoryStore } from '../stores/searchHistoryStore'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
 import { useSettingsStore } from '../stores/settingsStore'
@@ -35,6 +36,16 @@ const isRestricted = useSettingsStore().isRestricted
 const controller = useSearch()
 // state 是 getter 返回的只读快照 → 用 computed 包裹保持响应式（模板自动解包）
 const state = computed<SearchState>(() => controller.state)
+
+/** 首载三态（ADR-0150）：首搜无旧结果 → 骨架；换词保留旧结果（hasItems 优先 → 内容）；ready 且空 → 空态 */
+const view = computed(() =>
+  deriveFirstLoadView({
+    hasItems: state.value.results.length > 0,
+    loading: state.value.isSearching || state.value.status === 'loading',
+    settled: state.value.status === 'ready',
+    hasError: state.value.status === 'error',
+  }),
+)
 
 // 关键词（组件私有）：v-model 输入；清空/历史词条点选时同步赋值
 const keyword = ref('')
@@ -317,7 +328,7 @@ onBeforeUnmount(() => {
       <view v-if="keyword.trim()" class="flex-1 min-h-0 mt-3 flex flex-col">
         <!-- 首载错误：关键词保留 + 重试按钮（refresh；spec US16，不静默清空） -->
         <view
-          v-if="state.status === 'error'"
+          v-if="view === 'error'"
           class="flex-1 min-h-0 flex flex-col items-center justify-center px-8"
         >
           <text class="text-body-small text-error text-center">{{ state.error ?? '搜索失败，请重试' }}</text>
@@ -331,16 +342,27 @@ onBeforeUnmount(() => {
           </view>
         </view>
 
-        <!-- 非错误态：指示条 + 列表并存（loading 保留旧结果，spec D5「搜索五态」） -->
+        <!-- 非错误态：首搜骨架 / 指示条 + 列表并存（loading 保留旧结果，spec D5「搜索五态」） -->
         <template v-else>
-          <!-- 顶部轻量指示：debounce 窗口（isSearching）+ 搜索中（loading）——不闪空白 -->
+          <!-- 首搜骨架（ADR-0150）：无旧结果可保留时显示结果行骨架，取代纯「搜索中…」文字 -->
+          <view v-if="view === 'skeleton'" class="flex-1 min-h-0">
+            <view v-for="n in 6" :key="n" class="flex flex-row items-center px-4 py-3">
+              <view class="shimmer w-[14vw] h-[14vw] rounded-[var(--md-shape-small)] flex-shrink-0" />
+              <view class="flex-1 ml-3">
+                <view class="shimmer h-[4.267vw] w-[60%] rounded-[var(--md-shape-extra-small)]" />
+                <view class="shimmer h-[3.733vw] w-[40%] mt-2 rounded-[var(--md-shape-extra-small)]" />
+              </view>
+            </view>
+          </view>
+          <template v-else>
+          <!-- 顶部轻量指示：debounce 窗口（isSearching）+ 搜索中（loading）——换词保留旧结果，不闪空白 -->
           <view v-if="state.isSearching || state.status === 'loading'" class="px-4 py-2 flex-shrink-0">
             <text class="text-label-medium text-outline">搜索中…</text>
           </view>
 
           <!-- ready 且空结果：换词提示（spec US17 / glossary「搜索五态」：不合并「未搜索」与「无结果」） -->
           <view
-            v-if="state.status === 'ready' && state.results.length === 0"
+            v-if="view === 'empty'"
             class="flex-1 min-h-0 flex items-center justify-center px-5"
           >
             <text class="text-body-medium text-outline text-center">没有找到相关内容，试试换一个关键词</text>
@@ -430,6 +452,7 @@ onBeforeUnmount(() => {
               <text class="text-label-medium text-outline">没有更多了</text>
             </list-item>
           </list>
+          </template>
         </template>
       </view>
     </view>

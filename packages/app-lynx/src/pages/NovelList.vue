@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'novels' })
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { navigate } from '../router'
 import { loadRecommendedNovels, loadFollow, loadNovelNext } from '../api/novel'
 import type { PixivNovel, PixivNovelListResponse } from '../api/types'
@@ -12,6 +12,7 @@ import RefreshableList from '../components/RefreshableList.vue'
 import { useGlobalFabStore } from '../stores/globalFab'
 import AdaptiveTagRow from '../components/AdaptiveTagRow.vue'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
+import { deriveFirstLoadView } from '../utils/firstLoadView'
 
 const isRestricted = useSettingsStore().isRestricted
 
@@ -61,11 +62,31 @@ const loadingMore = ref(false)
 const errorMsg = ref('')
 const pageErrorMsg = ref('')
 const endOfFeed = ref(false)
+/** 首载是否已成功落定（成功含 0 条）——三态判定输入（ADR-0150） */
+const settled = ref(false)
+
+/** 空态文案：按当前子 tab 取标题 / 副文案（图标同为 ✎） */
+const emptyMeta = computed(() =>
+  mode.value === 'follow'
+    ? { title: '暂无关注小说', hint: '关注的小说作者发布新作品后会展示在这里' }
+    : { title: '暂无推荐小说', hint: '稍后再来看看，会有新的推荐' },
+)
+
+/** 页级首载三态（ADR-0150）：骨架 / 错误 / 空态 / 内容 的唯一判定源 */
+const view = computed(() =>
+  deriveFirstLoadView({
+    hasItems: novels.value.length > 0,
+    loading: loading.value,
+    settled: settled.value,
+    hasError: !!errorMsg.value,
+  }),
+)
 
 function sync() {
   novels.value = feed.value.items().map((i) => i.data as PixivNovel)
   loading.value = feed.value.loading()
   loadingMore.value = feed.value.loadingMore()
+  settled.value = feed.value.settled()
   errorMsg.value = feed.value.error() ?? ''
   pageErrorMsg.value = feed.value.pageError() ?? ''
   // 到底态：所有源耗尽且列表非空（ADR-0104：footer「没有更多了」）
@@ -77,6 +98,9 @@ function sync() {
 }
 
 async function refreshFeed() {
+  // 发起前同步进入加载态并清错误：骨架立即占位（ADR-0150）
+  loading.value = true
+  errorMsg.value = ''
   await feed.value.refresh()
   sync()
   // [lynx:fix] 数据整体替换触发 vue-lynx patch RemoveNode 索引错位（框架 bug，ADR-0107 D4）；
@@ -101,7 +125,7 @@ function switchMode(m: 'recommend' | 'follow') {
   novels.value = []
   errorMsg.value = ''
   pageErrorMsg.value = ''
-  loading.value = true
+  settled.value = false // 新实例尚未落定；随后 refreshFeed 同步进入加载态
   void refreshFeed()
 }
 
@@ -173,11 +197,9 @@ onUnmounted(() => {
       </view>
     </view>
 
-    <text v-if="errorMsg && !loading" class="text-body-small text-error p-4">{{ errorMsg }}</text>
-
-    <!-- 首屏骨架（issue #91）：4~6 条列表卡占位，切 tab 重载同样显示 -->
+    <!-- 首载三态（ADR-0150）：骨架 → 错误 → 空态 → 内容，互斥单链；不依赖 loading 标志 -->
     <!-- [lynx:fix] 骨架屏高度约束在导航栏下方内容区内（不占满全屏，issue #129） -->
-    <view v-if="loading && novels.length === 0" class="w-full flex-1 min-h-0">
+    <view v-if="view === 'skeleton'" class="w-full flex-1 min-h-0">
       <view v-for="n in 5" :key="n" class="m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
         <view class="shimmer h-[32rpx] rounded-[var(--md-shape-extra-small)] w-[75%]" />
         <view class="shimmer h-[24rpx] rounded-[var(--md-shape-extra-small)] mt-1.5 w-[40%]" />
@@ -185,25 +207,17 @@ onUnmounted(() => {
         <view class="shimmer h-[24rpx] rounded-[var(--md-shape-extra-small)] mt-2 w-[60%]" />
       </view>
     </view>
-
-    <!-- 关注视图空态（P0-T5） -->
-    <view v-if="mode === 'follow' && !loading && !errorMsg && novels.length === 0" class="w-full flex-1 min-h-0 flex items-center justify-center">
+    <text v-else-if="view === 'error'" class="text-body-small text-error p-4">{{ errorMsg }}</text>
+    <!-- 空态：仅「已成功落定为空」才显示（spec 加固 3：杜绝「无数据 → 纯空白」） -->
+    <view v-else-if="view === 'empty'" class="w-full flex-1 min-h-0 flex items-center justify-center">
       <view class="flex flex-col items-center">
         <text class="text-[10.667vw] leading-none text-outline-variant">✎</text>
-        <text class="text-body-large text-surface-on mt-3">暂无关注小说</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">关注的小说作者发布新作品后会展示在这里</text>
-      </view>
-    </view>
-    <!-- 推荐视图空态（spec 加固 3）：杜绝「无数据 → 纯空白」 -->
-    <view v-if="mode === 'recommend' && !loading && !errorMsg && novels.length === 0" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <view class="flex flex-col items-center">
-        <text class="text-[10.667vw] leading-none text-outline-variant">✎</text>
-        <text class="text-body-large text-surface-on mt-3">暂无推荐小说</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">稍后再来看看，会有新的推荐</text>
+        <text class="text-body-large text-surface-on mt-3">{{ emptyMeta.title }}</text>
+        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ emptyMeta.hint }}</text>
       </view>
     </view>
 
-    <RefreshableList v-if="novels.length > 0" :refresh="refreshFeed" :fab="false" @back-to-top="refreshEpoch++">
+    <RefreshableList v-else :refresh="refreshFeed" :fab="false" @back-to-top="refreshEpoch++">
     <template #default="{ onScroll }">
     <list
       :key="refreshEpoch"

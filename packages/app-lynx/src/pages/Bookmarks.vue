@@ -19,6 +19,8 @@ import { thumbUrl } from '../utils/imageUrl'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { useSettingsStore } from '../stores/settingsStore'
 import SkeletonImage from '../components/SkeletonImage.vue'
+import SkeletonCard from '../components/SkeletonCard.vue'
+import { deriveFirstLoadView } from '../utils/firstLoadView'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 
@@ -62,6 +64,8 @@ const illustLoadingMore = ref(false)
 const illustErrorMsg = ref('')
 const illustPageErrorMsg = ref('')
 const illustEndOfFeed = ref(false)
+/** 插画 tab 首载是否已成功落定（ADR-0150） */
+const illustSettled = ref(false)
 // 取消收藏后从列表移除（BookmarkButton change 事件）：feed 内部状态不直接暴露 → 隐藏集过滤渲染
 const removedIllustIds = ref<Set<number>>(new Set())
 const visibleIllusts = computed(() => illusts.value.filter((i) => !removedIllustIds.value.has(i.id)))
@@ -70,6 +74,7 @@ function syncIllust() {
   illusts.value = illustFeed.value.items().map((i) => i.data as PixivIllust)
   illustLoading.value = illustFeed.value.loading()
   illustLoadingMore.value = illustFeed.value.loadingMore()
+  illustSettled.value = illustFeed.value.settled()
   illustErrorMsg.value = illustFeed.value.error() ?? ''
   illustPageErrorMsg.value = illustFeed.value.pageError() ?? ''
   // 到底态：所有源耗尽且列表非空（ADR-0104：footer「没有更多了」）
@@ -81,6 +86,9 @@ function syncIllust() {
 }
 
 async function refreshIllust() {
+  // 发起前同步进入加载态并清错误：骨架立即占位（ADR-0150）
+  illustLoading.value = true
+  illustErrorMsg.value = ''
   await illustFeed.value.refresh()
   syncIllust()
   // [lynx:fix] 数据整体替换触发 vue-lynx patch RemoveNode 索引错位（框架 bug，ADR-0107 D4）；
@@ -122,11 +130,14 @@ const novelLoadingMore = ref(false)
 const novelErrorMsg = ref('')
 const novelPageErrorMsg = ref('')
 const novelEndOfFeed = ref(false)
+/** 小说 tab 首载是否已成功落定（ADR-0150） */
+const novelSettled = ref(false)
 
 function syncNovel() {
   novels.value = novelFeed.value.items().map((i) => i.data as PixivNovel)
   novelLoading.value = novelFeed.value.loading()
   novelLoadingMore.value = novelFeed.value.loadingMore()
+  novelSettled.value = novelFeed.value.settled()
   novelErrorMsg.value = novelFeed.value.error() ?? ''
   novelPageErrorMsg.value = novelFeed.value.pageError() ?? ''
   novelEndOfFeed.value =
@@ -137,6 +148,9 @@ function syncNovel() {
 }
 
 async function refreshNovel() {
+  // 发起前同步进入加载态并清错误：骨架立即占位（ADR-0150）
+  novelLoading.value = true
+  novelErrorMsg.value = ''
   await novelFeed.value.refresh()
   syncNovel()
   refreshEpoch.value++ // [lynx:fix] 同上
@@ -153,6 +167,25 @@ async function loadNovelMore() {
 // 首屏错误（顶部整页提示）：随 activeTab 取当前区首屏错误（ADR-0104 槽位分离）
 const errorMsg = computed(() =>
   activeTab.value === 'illust' ? illustErrorMsg.value : novelErrorMsg.value,
+)
+
+/** 插画 tab 首载三态（ADR-0150）：骨架 / 错误 / 空态 / 内容 的唯一判定源 */
+const illustView = computed(() =>
+  deriveFirstLoadView({
+    hasItems: visibleIllusts.value.length > 0,
+    loading: illustLoading.value,
+    settled: illustSettled.value,
+    hasError: !!illustErrorMsg.value,
+  }),
+)
+/** 小说 tab 首载三态（ADR-0150） */
+const novelView = computed(() =>
+  deriveFirstLoadView({
+    hasItems: novels.value.length > 0,
+    loading: novelLoading.value,
+    settled: novelSettled.value,
+    hasError: !!novelErrorMsg.value,
+  }),
 )
 
 // tab 切换：保留各自 feed 实例（切回已加载 tab 不重新请求）；首次进入 tab 才首载
@@ -213,8 +246,6 @@ onUnmounted(() => {
       <text class="flex-1 text-title-large font-medium text-surface-on">收藏</text>
     </view>
 
-    <text v-if="errorMsg" class="text-body-small text-error p-4">{{ errorMsg }}</text>
-
     <!-- 插画/小说 tab -->
     <view class="flex flex-row border-b-[1px] border-b-outline-variant bg-surface-container-lowest">
       <view
@@ -233,8 +264,13 @@ onUnmounted(() => {
       </view>
     </view>
 
-    <!-- 插画空态 -->
-    <view v-if="activeTab === 'illust' && !illustLoading && !errorMsg && visibleIllusts.length === 0" class="flex-1 flex items-center justify-center">
+    <!-- 插画三态（ADR-0150）：骨架 → 错误 → 空态 → 内容，互斥单链 -->
+    <view v-if="activeTab === 'illust' && illustView === 'skeleton'" class="w-full flex-1 min-h-0 flex flex-row flex-wrap content-start p-1.5">
+      <SkeletonCard v-for="n in 8" :key="n" />
+    </view>
+    <text v-else-if="activeTab === 'illust' && illustView === 'error'" class="text-body-small text-error p-4">{{ errorMsg }}</text>
+    <!-- 插画空态：仅「已成功落定为空」才显示 -->
+    <view v-else-if="activeTab === 'illust' && illustView === 'empty'" class="flex-1 flex items-center justify-center">
       <view class="flex flex-col items-center">
         <text class="text-[10.667vw] leading-none text-outline-variant">♡</text>
         <text class="text-body-large text-surface-on mt-3">暂无收藏</text>
@@ -244,7 +280,7 @@ onUnmounted(() => {
 
     <!-- 插画 waterfall -->
     <RefreshableList
-      v-if="activeTab === 'illust' && (illustLoading || visibleIllusts.length > 0)"
+      v-else-if="activeTab === 'illust'"
       :refresh="refreshIllust"
       @back-to-top="refreshEpoch++"
     >
@@ -300,8 +336,17 @@ onUnmounted(() => {
     </template>
     </RefreshableList>
 
-    <!-- 小说空态 -->
-    <view v-if="activeTab === 'novel' && !novelLoading && !errorMsg && novels.length === 0" class="flex-1 flex items-center justify-center">
+    <!-- 小说三态（ADR-0150）：骨架 → 错误 → 空态 → 内容，互斥单链 -->
+    <view v-if="activeTab === 'novel' && novelView === 'skeleton'" class="w-full flex-1 min-h-0">
+      <view v-for="n in 5" :key="n" class="m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+        <view class="shimmer h-[32rpx] rounded-[var(--md-shape-extra-small)] w-[75%]" />
+        <view class="shimmer h-[24rpx] rounded-[var(--md-shape-extra-small)] mt-1.5 w-[40%]" />
+        <view class="shimmer h-[20rpx] rounded-[var(--md-shape-extra-small)] mt-1.5 w-[30%]" />
+      </view>
+    </view>
+    <text v-else-if="activeTab === 'novel' && novelView === 'error'" class="text-body-small text-error p-4">{{ errorMsg }}</text>
+    <!-- 小说空态：仅「已成功落定为空」才显示 -->
+    <view v-else-if="activeTab === 'novel' && novelView === 'empty'" class="flex-1 flex items-center justify-center">
       <view class="flex flex-col items-center">
         <text class="text-[10.667vw] leading-none text-outline-variant">♡</text>
         <text class="text-body-large text-surface-on mt-3">暂无收藏</text>
@@ -311,7 +356,7 @@ onUnmounted(() => {
 
     <!-- 小说列表 -->
     <RefreshableList
-      v-if="activeTab === 'novel' && (novelLoading || novels.length > 0)"
+      v-else-if="activeTab === 'novel'"
       :refresh="refreshNovel"
       @back-to-top="refreshEpoch++"
     >
