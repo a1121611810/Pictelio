@@ -45,8 +45,14 @@ public class LynxActivity extends AppCompatActivity {
 
     private static final String TAG = "LynxActivity";
 
+    /** 引擎降级入口标记（ADR-0153）：MainActivity 在 WebView 不可用但 Lynx 可用时置位 */
+    public static final String EXTRA_ENGINE_FALLBACK = "pictelio_engine_fallback";
+
     private LynxView lynxView;
     private final AtomicBoolean bundleLoaded = new AtomicBoolean(false);
+
+    /** 本次是否为引擎降级进入——决定错误兜底页给「退出应用」还是「返回 WebView」（ADR-0153） */
+    private boolean engineFallbackEntry;
 
     /** 当前 Activity 弱引用（PictelioAppModule.exitApp 使用，ADR-0066；onDestroy 清理） */
     private static WeakReference<LynxActivity> sInstance;
@@ -74,6 +80,16 @@ public class LynxActivity extends AppCompatActivity {
         splashScreen.setKeepOnScreenCondition(() -> !bundleLoaded.get());
         super.onCreate(savedInstanceState);
         sInstance = new WeakReference<>(this);
+
+        // ADR-0153：降级入口标记 + 一次性通知键。写键必须在 LynxView 渲染前，保证 app-lynx
+        // 首帧能读到；该键是「本次由降级进入」的信号，不是首选引擎（首选引擎不落盘）。
+        engineFallbackEntry = getIntent().getBooleanExtra(EXTRA_ENGINE_FALLBACK, false);
+        if (engineFallbackEntry) {
+            getSharedPreferences("CapacitorStorage", MODE_PRIVATE)
+                    .edit()
+                    .putString(EngineFallbackNotice.KEY, EngineFallbackNotice.VALUE_TRUE)
+                    .apply();
+        }
 
         // LynxEnv 兜底初始化（进程复用场景：Application.onCreate 未走 initLynx → LynxEnv
         // 未初始化会报 error 102）。LynxEnv.init 幂等（hasInit），与 PictelioApp 共用
@@ -292,7 +308,15 @@ public class LynxActivity extends AppCompatActivity {
             root.addView(detail, new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-            if (hasWebviewClient()) {
+            // ADR-0153：降级进入的实例不提供「返回 WebView」——用户首选仍是 webview 且
+            // WebView 仍不可用，返回 MainActivity 会再次降级，形成回环。只给退出应用。
+            if (engineFallbackEntry) {
+                Button exitButton = new Button(this);
+                exitButton.setText("退出应用");
+                exitButton.setOnClickListener(v -> finish());
+                root.addView(exitButton, new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            } else if (hasWebviewClient()) {
                 Button backButton = new Button(this);
                 backButton.setText("返回 WebView");
                 backButton.setOnClickListener(v -> switchBackToWebview());

@@ -8,6 +8,7 @@ import { useClientSwitchStore } from './stores/clientSwitchStore'
 import { useUpdateStore } from './stores/updateStore'
 import { useSearchSheetStore } from './stores/searchSheetStore'
 import { useSettingsStore } from './stores/settingsStore'
+import { useEngineFallbackStore } from './stores/engineFallbackStore'
 import { themeColorClass } from './utils/themeColor'
 import { apiClient } from './api/client'
 import { queryKeys } from './api/queryKeys'
@@ -16,6 +17,8 @@ import { useApiQuery } from './primitives/useApiQuery'
 const searchSheet = useSearchSheetStore()
 // 主题色（外观）：根 <page> 追加 .theme-* 色板类，整树 CSS 变量换色（默认 sky = 无色板类）
 const settings = useSettingsStore()
+// 引擎降级说明（ADR-0153）：WebView 不可用时原生写入一次性键，首帧消费后展示可关闭提示
+const engineFallback = useEngineFallbackStore()
 
 // T3 启动健康检查（ADR-0141 / T3 ticket）：
 // - 替代 T1 spike 的裸 useQuery（用 T2 实施的 useApiQuery helper 包装）
@@ -42,6 +45,7 @@ onMounted(() => {
 onMounted(() => {
   // ADR-0062：启动时查询当前包支持的 client 引擎列表（full/webview/lynx 各有不同）
   useClientSwitchStore().initClientSetting()
+  void engineFallback.check()
   void initRouter()
   // 检查更新（仅自动检查，无手动入口）：启动延迟执行，发现新版本
   // 直接打开强制更新页（无中间提示层）
@@ -69,6 +73,20 @@ onMounted(() => {
          v-if 卸载 = 关闭即重置（keyword/结果清空，历史保留）。
          返回键：openSearch 时 store 已 registerModal(closeSearch)（ADR-0066 后进先出）。 -->
     <SearchSheet v-if="searchSheet.isOpen" />
+    <!-- 引擎降级提示（ADR-0153）：整条可点关闭（原生 LynxView hit-testing 不识别
+         pointer-events，胶囊定位而非全宽盒——ADR-0123；点条即 dismiss） -->
+    <view
+      v-if="engineFallback.notice"
+      class="absolute z-50"
+      style="left: 50vw; top: 20vw; transform: translate(-50%, 0)"
+      @click="engineFallback.dismiss()"
+    >
+      <view class="bg-surface-container-high rounded-[var(--md-shape-medium)] px-5 py-4 shadow-[var(--md-elevation-3)]">
+        <text class="text-body-medium text-surface-on">
+          WebView 版本过低，本次已改用 Lynx 引擎运行；更新 WebView 后将自动恢复。
+        </text>
+      </view>
+    </view>
     <!-- 系统返回根路由提示（ADR-0066）：与 webview client 的 exitHint toast 语义一致。
          M3 snackbar 形态：inverse-surface 底 + inverse-on-surface 文字 + 4dp 圆角。
          [lynx:fix] 无全宽盒（ADR-0123）：原生 LynxView hit-testing 不识别 pointer-events，
