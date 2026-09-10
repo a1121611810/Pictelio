@@ -10,7 +10,7 @@ import { downloadUgoiraFrames, ugoiraExtractFrames, ugoiraExtractStreamFrames, t
 import { isNativeMode } from '../api/client'
 import { useSettingsStore } from '../stores/settingsStore'
 
-const ugoiraMode = useSettingsStore().ugoiraMode
+const settings = useSettingsStore()
 import { presentError } from '../utils/errorPresentation'
 
 const props = withDefaults(defineProps<{
@@ -121,7 +121,7 @@ onMounted(async () => {
     if (isNativeMode()) {
       await loadNativeStreaming()
     } else {
-      const dataFrames = await downloadUgoiraFrames(props.illustId, ugoiraMode.value, abort.signal)
+      const dataFrames = await downloadUgoiraFrames(props.illustId, settings.ugoiraMode, abort.signal)
       if (disposed) {
         frames = []
         return

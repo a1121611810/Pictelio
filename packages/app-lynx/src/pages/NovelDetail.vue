@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, shallowRef, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useMainThreadRef, runOnBackground } from 'vue-lynx'
 import { computeReadProgress } from '../primitives/watchlistPrompt'
 import { novelAverageParagraphHeightPx } from '../primitives/novelParagraphEstimate'
@@ -36,11 +36,13 @@ const showComments = ref(false)
 // novel-detail 不在 App.vue KeepAlive include 白名单（详情页按 :id 加载，不缓存）；
 // 守卫在 setup 顶层注册（registerBackGuard）+ onUnmounted 注销，prompt 随详情落地创建——
 // 对非缓存组件 setup/onUnmounted 与 onMounted 等价，无需 onActivated/onDeactivated。
-let prompt: WatchlistPromptController | null = null
+// shallowRef：模板读 prompt 的 dialogOpen/watchAdded 等 getter，实例本身被替换时也要触发重渲染
+//（控制器内部已是响应式，不需要深层代理）
+const prompt = shallowRef<WatchlistPromptController | null>(null)
 
 /** 详情加载完成后创建 prompt（此时 novel.series 已知，预取才能发起） */
 function setupPrompt(): void {
-  prompt = createWatchlistPrompt({
+  prompt.value = createWatchlistPrompt({
     getSeries: () => novel.value?.series ?? null,
     loadWatchState: async (seriesId) =>
       (await loadNovelSeries(seriesId)).novel_series_detail.watchlist_added,
@@ -52,13 +54,13 @@ function setupPrompt(): void {
 }
 
 function teardownPrompt(): void {
-  prompt?.dispose()
-  prompt = null
+  prompt.value?.dispose()
+  prompt.value = null
 }
 
 // 系统返回桥（ADR-0066 扩展）：guard 在 modalStack 之后、历史栈 pop 之前裁决；
 // prompt 未创建（加载期/非系列）时放行，与左上角 requestBack() 共用同一守卫链
-const unregisterBackGuard = registerBackGuard(() => prompt?.requestBack() ?? false)
+const unregisterBackGuard = registerBackGuard(() => prompt.value?.requestBack() ?? false)
 
 // ─── 滚动跟踪（ADR-0134：MT 信号；BT @scroll 不派发） ───
 // [prototype→spike] 滚动信号面：官方 list 只有边界事件（scrolltolower/scrolltoupper）；
@@ -87,22 +89,23 @@ function onNovelScrollMT(e: { detail?: { scrollTop?: number; scrollHeight?: numb
   }
   if (mtReportedTop.current >= 0 && Math.abs(top - mtReportedTop.current) < height * 0.08) return
   mtReportedTop.current = top
-  void runOnBackground((t: number, h: number) => {
+  // vue-lynx 的 runOnBackground 约束回调参数为 unknown；调用方传入的是 number，与上方 payload 同用 Number() 收敛
+  void runOnBackground((t: unknown, h: unknown) => {
     // 在背景线程执行：live 读 prompt/reachedBottom；进度纯函数复用 computeReadProgress
     //（viewport=0 保守口径，单测已覆盖 watchlistPrompt.test.ts）
-    reportNovelProgress(computeReadProgress(t, h, 0))
+    reportNovelProgress(computeReadProgress(Number(t), Number(h), 0))
   })(top, height)
 }
 
 
 function onNovelToBottom(): void {
   reachedBottom.value = true
-  prompt?.notifyScroll(1, true)
+  prompt.value?.notifyScroll(1, true)
 }
 
 /** MT→BT 桥回调（runOnBackground）：向追更 prompt 喂最新进度（≥70% 双路判定输入） */
 function reportNovelProgress(progress: number): void {
-  prompt?.notifyScroll(progress, reachedBottom.value)
+  prompt.value?.notifyScroll(progress, reachedBottom.value)
 }
 
 // 正文列表虚拟化（ADR-0134）：段落为 list-item，引擎按需挂载；各 item 共用估算高度。
@@ -169,21 +172,21 @@ watch(novelId, (id, prev) => {
 
 // ─── 弹窗事件语义差（spec §US5）：decline/confirm 继续原返回动作，cancel 留在详情页 ───
 function onWatchlistDecline(): void {
-  prompt?.decline()
+  prompt.value?.decline()
   goBack()
 }
 
 async function onWatchlistConfirm(): Promise<void> {
-  const p = prompt
+  const p = prompt.value
   if (!p) return
   await p.confirm()
   // 成功 → 弹窗已关 → 继续返回；失败 → 弹窗保留（错误条 + 可重试），留在详情页。
   // prompt === p 守：在飞期间章节跳转重建实例后，旧 confirm 落地不得驱动返回
-  if (prompt === p && !p.dialogOpen) goBack()
+  if (prompt.value === p && !p.dialogOpen) goBack()
 }
 
 function onWatchlistCancel(): void {
-  prompt?.cancel()
+  prompt.value?.cancel()
 }
 </script>
 

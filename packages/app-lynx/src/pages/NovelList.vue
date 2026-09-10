@@ -28,7 +28,10 @@ function mapNovels(r: PixivNovelListResponse): { items: MixFeedItem[]; nextUrl: 
 }
 
 function makeFeed(m: 'recommend' | 'follow') {
-  const first = m === 'recommend' ? loadRecommendedNovels : loadFollow
+  // loadFollow 首参是 restrict（signal 在第二位），与 loadRecommendedNovels(signal) 参数位不同，
+  // 不可把两者联合成一个函数值再调用——signal 会落到 restrict 位
+  const first = (signal?: AbortSignal) =>
+    m === 'recommend' ? loadRecommendedNovels(signal) : loadFollow('public', signal)
   return createMixFeed({
     // autoStart=false：构造不首载，由 refreshFeed 显式触发（mode 重建实例避免双请求浪费）
     autoStart: false,

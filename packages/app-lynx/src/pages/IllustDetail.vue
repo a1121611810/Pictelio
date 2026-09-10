@@ -16,7 +16,7 @@ import SkeletonImage from '../components/SkeletonImage.vue'
 import UgoiraViewer from '../components/UgoiraViewer.vue'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
 
-const detailQuality = useSettingsStore().detailQuality
+const settings = useSettingsStore()
 
 const illust = ref<PixivIllust | null>(null)
 const loading = ref(true)
@@ -78,10 +78,11 @@ const detailImageHeight = computed(() =>
 // 单图作品（meta_pages 空）走 [illust.image_urls] 单元素（现状语义不变）。
 // 解析组合下移为纯函数 resolvePageSrcs（深模块可测，oracle = resolveQualityUrl + proxyImageUrl 各自语义）。
 const slideSrcs = computed(() =>
-  resolvePageSrcs(pages.value, detailQuality.value, illust.value?.meta_single_page?.original_image_url),
+  resolvePageSrcs(pages.value, settings.detailQuality, illust.value?.meta_single_page?.original_image_url),
 )
 
 function openAuthor() {
+  if (!illust.value) return
   void navigate(`/user/${illust.value.user.id}`)
 }
 

@@ -2116,7 +2116,7 @@ expect(detailVueSource).toContain('@cancel="onWatchlistCancel"')
 // decline：decline() 后 goBack()
 const declineFn = /function onWatchlistDecline[\s\S]*?\n\}/.exec(detailVueSource)
 expect(declineFn).not.toBeNull()
-expect(declineFn![0]).toContain('prompt?.decline()')
+expect(declineFn![0]).toContain('prompt.value?.decline()')
 expect(declineFn![0]).toContain('goBack()')
 // confirm：await 后弹窗已关才 goBack（失败留页可重试）
 const confirmFn = /async function onWatchlistConfirm[\s\S]*?\n\}/.exec(detailVueSource)
@@ -2126,7 +2126,7 @@ expect(confirmFn![0]).toContain('!p.dialogOpen')
 // cancel：仅 cancel()，无 goBack（留页）
 const cancelFn = /function onWatchlistCancel[\s\S]*?\n\}/.exec(detailVueSource)
 expect(cancelFn).not.toBeNull()
-expect(cancelFn![0]).toContain('prompt?.cancel()')
+expect(cancelFn![0]).toContain('prompt.value?.cancel()')
 expect(cancelFn![0]).not.toContain('goBack')
 })
 
