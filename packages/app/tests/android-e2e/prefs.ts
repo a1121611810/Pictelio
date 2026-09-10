@@ -11,7 +11,7 @@
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { adbPath, APP_PACKAGE, runCapture, runOrThrow, TIMEOUTS } from "./env";
+import { adbPath, APP_PACKAGE, MAIN_ACTIVITY, runCapture, runOrThrow, TIMEOUTS } from "./env";
 
 /** CapacitorStorage.xml 在 app 数据目录内的相对路径（run-as 需相对路径，绝对路径被 SELinux 拒） */
 const PREFS_REL = "shared_prefs/CapacitorStorage.xml";
@@ -162,11 +162,12 @@ export function forceStopApp(serial: string): void {
   runOrThrow(adbPath(), ["-s", serial, "shell", "am", "force-stop", APP_PACKAGE], TIMEOUTS.adb);
 }
 
-/** 通过 am start 启动 MainActivity（走 MainActivity.onCreate 入口路由分发） */
+/** 通过 am start 启动主入口 Activity（按 flavor：full → MainActivity；webview → MainActivityWebview）
+ *  —— 走入口 onCreate 的版本门禁 / 引擎路由分发。 */
 export function startMainActivity(serial: string): void {
   runOrThrow(
     adbPath(),
-    ["-s", serial, "shell", "am", "start", "-n", "io.pictelio.app/io.pictelio.app.MainActivity"],
+    ["-s", serial, "shell", "am", "start", "-n", `${APP_PACKAGE}/${MAIN_ACTIVITY}`],
     TIMEOUTS.adb,
   );
 }

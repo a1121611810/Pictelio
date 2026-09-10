@@ -8,7 +8,15 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { remote, type Browser } from "webdriverio";
-import { adbPath, APP_PACKAGE, APP_ROOT, MAIN_ACTIVITY, runCapture, TIMEOUTS } from "./env";
+import {
+  adbPath,
+  APP_PACKAGE,
+  APP_ROOT,
+  ENTRY_ACTIVITIES,
+  MAIN_ACTIVITY,
+  runCapture,
+  TIMEOUTS,
+} from "./env";
 import { APPIUM_HOST, APPIUM_PORT } from "./appium";
 import { webviewMajorVersion } from "./avd";
 
@@ -107,8 +115,9 @@ export class AndroidE2eDriver {
       throw translateChromedriverError(e, webviewMajor);
     }
 
-    // 显式等待主 Activity 前台就绪（App 首屏渲染可能慢于 session 创建）
-    await this.waitForActivity(MAIN_ACTIVITY, TIMEOUTS.session);
+    // 显式等待入口 Activity 前台就绪（App 首屏渲染可能慢于 session 创建）。
+    // 低 WebView 设备上入口会降级到 LynxActivity（ADR-0153），故等待「任一入口」。
+    await this.waitForAnyActivity(ENTRY_ACTIVITIES, TIMEOUTS.session);
   }
 
   /** 显式等待当前 Activity 变为期望值（不用固定 sleep） */
@@ -118,6 +127,22 @@ export class AndroidE2eDriver {
       timeoutMsg: `等待 Activity ${activity} 超时（${timeoutMs / 1000}s），当前 Activity: ${await this.currentActivity().catch(() => "(未知)")}`,
       interval: 1_000,
     });
+  }
+
+  /**
+   * 显式等待当前 Activity 属于期望集合。
+   * 低 WebView 设备（pictelio_low）上 full 包 MainActivity 会立即 finish 并降级到
+   * LynxActivity（ADR-0153），就绪等待用「任一入口」而非单一 MainActivity。
+   */
+  async waitForAnyActivity(activities: readonly string[], timeoutMs = 60_000): Promise<void> {
+    await this.raw.waitUntil(
+      async () => activities.includes((await this.currentActivity()) ?? ""),
+      {
+        timeout: timeoutMs,
+        timeoutMsg: `等待 Activity ∈ [${activities.join(", ")}] 超时（${timeoutMs / 1000}s），当前 Activity: ${await this.currentActivity().catch(() => "(未知)")}`,
+        interval: 1_000,
+      },
+    );
   }
 
   /** 当前前台 Activity 短名（如 .MainActivity / .LynxActivity） */
