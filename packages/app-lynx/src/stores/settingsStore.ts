@@ -20,6 +20,7 @@ import { unquoteNativeString } from "../utils/tokenStorage"
 import type { ImageQuality } from "../utils/imageQuality"
 import type { UgoiraExtractMode } from "../api/ugoira"
 import { UGOIRA_FORMATS, type UgoiraFormat } from "../utils/downloadQueueCore"
+import { DEFAULT_THEME_COLOR, isThemeColorId, type ThemeColorId } from "../utils/themeColor"
 
 // ── 跨 client 契约键（ADR-0103：与 webview settingsStore defineFactory 同格式）──
 const r18Key = (uid: number) => `show_r18_${uid}`
@@ -35,6 +36,8 @@ const UGOIRA_MODE_KEY = "settings_ugoira_mode"
 /** 全局动图下载格式（与 app 包共享键，spec download-manager §5） */
 const UGOIRA_DOWNLOAD_FORMAT_KEY = "settings_ugoira_download_format"
 const DETAIL_QUALITY_KEY = "settings_detail_quality"
+/** 主题色（外观）：设备级共享键（native SharedPreferences / dev IndexedDB），未登录也恢复 */
+const THEME_COLOR_KEY = "settings_theme_color"
 
 // ── PrefsStorage seam（ADR-0103 决策 3：两 adapter = 真 seam）──
 
@@ -141,6 +144,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const _ugoiraMode = ref<UgoiraExtractMode>("fflate")
   const _ugoiraDownloadFormat = ref<UgoiraFormat>("zip")
   const _detailQuality = ref<ImageQuality>("medium")
+  const _themeColor = ref<ThemeColorId>(DEFAULT_THEME_COLOR)
 
   // ── 跨 store 组合：读 authStore.currentUser.id 推导 uid（替换原模块级 currentUser import）
   const auth = useAuthStore()
@@ -153,6 +157,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const ugoiraMode = _ugoiraMode
   const ugoiraDownloadFormat = _ugoiraDownloadFormat
   const detailQuality = _detailQuality
+  const themeColor = _themeColor
 
   // ── 公共 actions（return）──
 
@@ -177,6 +182,20 @@ export const useSettingsStore = defineStore("settings", () => {
       }
     } catch (e) {
       console.warn("[settingsStore] ugoira 下载格式加载失败（维持默认）", e)
+    }
+
+    // 主题色（外观）：设备级，未登录也需要恢复（先于 uid 判定）
+    try {
+      const raw = await prefs().get(THEME_COLOR_KEY)
+      if (raw !== null) {
+        if (isThemeColorId(raw)) {
+          _themeColor.value = raw
+        } else {
+          console.warn("[settingsStore] 主题色值非法，维持默认:", raw)
+        }
+      }
+    } catch (e) {
+      console.warn("[settingsStore] 主题色加载失败（维持默认）", e)
     }
 
     const id = uid()
@@ -241,6 +260,13 @@ export const useSettingsStore = defineStore("settings", () => {
     })
   }
 
+  function setThemeColor(id: ThemeColorId): void {
+    _themeColor.value = id
+    void prefs()
+      .set(THEME_COLOR_KEY, id)
+      .catch((e) => console.warn("[settingsStore] 主题色写入失败", e))
+  }
+
   /**
    * 遮罩判定：该条目是否因 R18/R18G 开关处于受限态（issue #91：过滤 → 遮罩）。
    * 纯函数，读 ref —— 开关切换后所有依赖处即时重算，无需重新请求。
@@ -276,6 +302,7 @@ export const useSettingsStore = defineStore("settings", () => {
     showR18G,
     ugoiraMode,
     detailQuality,
+    themeColor,
     ugoiraDownloadFormat,
     // actions
     loadSettings,
@@ -284,6 +311,7 @@ export const useSettingsStore = defineStore("settings", () => {
     setUgoiraMode,
     setUgoiraDownloadFormat,
     setDetailQuality,
+    setThemeColor,
     isRestricted,
   }
 })

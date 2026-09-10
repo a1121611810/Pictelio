@@ -17,6 +17,7 @@ import { bytesToDataUrl, downloadUgoiraFrames, ugoiraExtractFrames, ugoiraExtrac
 import type { UgoiraExtractMode } from '../src/api/ugoira'
 import { useSettingsStore } from '../src/stores/settingsStore'
 import { ME_A11Y_LABELS, LOGIN_A11Y_LABELS, UPDATE_A11Y_LABELS, ERROR_A11Y_LABELS, FAB_MENU_A11Y_LABELS, GLOBAL_FAB_A11Y_LABELS, WATCHLIST_A11Y_LABELS, WATCHLIST_PROMPT_A11Y_LABELS, SEARCH_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../src/utils/accessibility'
+import { THEME_COLOR_OPTIONS, DEFAULT_THEME_COLOR, isThemeColorId, themeColorClass } from '../src/utils/themeColor'
 
 describe('imageUrl.proxyImageUrl', () => {
   it('将 i.pximg.net URL 重写为本地代理路径', () => {
@@ -557,6 +558,105 @@ describe('tailwind.config 契约（Tailwind ↔ tokens.css）', () => {
     const fontSizeSection = tailwindConfigSrc.split('fontSize: {')[1].split('\n  }')[0]
     expect(fontSizeSection).not.toMatch(/rem/)
     expect(fontSizeSection).toMatch(/rpx/)
+  })
+})
+
+// ─── 主题色契约（themeColor ↔ tokens.css）───
+// 期望值来源：tokens.css 基础色板块自身（真实源文件比对），以及 themeColor.ts 的
+// 单一事实源清单。AD重申（ADR-0152）：只覆盖 --md-primary 会造成 secondary/surface/
+// outline/state-layer 串色，因此断言「每个色板类覆盖同一整套可主题颜色角色」。
+describe('主题色契约（themeColor ↔ tokens.css）', () => {
+  /** 从基础色板块（page, .theme-sky）提取可主题颜色角色：排除 M3 中与 seed 无关的
+   *  error/scrim 角色与非颜色令牌（shape/elevation）。 */
+  function extractThemeableRoles(css: string): string[] {
+    const start = css.indexOf('page,')
+    expect(start, 'tokens.css 缺少基础 page 色板块').toBeGreaterThan(-1)
+    const open = css.indexOf('{', start)
+    const end = css.indexOf('\n}', open)
+    expect(open, '基础色板块缺少 {').toBeGreaterThan(-1)
+    expect(end, '基础色板块缺少 }').toBeGreaterThan(-1)
+    const block = css.slice(open + 1, end)
+    const seedIndependent = new Set([
+      '--md-error',
+      '--md-on-error',
+      '--md-error-container',
+      '--md-on-error-container',
+      '--md-scrim',
+      '--md-scrim-overlay',
+      '--md-state-pressed-error',
+    ])
+    const roles = new Set<string>()
+    for (const m of block.matchAll(/(--md-[a-z0-9-]+)\s*:/g)) {
+      const name = m[1]!
+      if (seedIndependent.has(name)) continue
+      if (name.startsWith('--md-shape-') || name.startsWith('--md-elevation-')) continue
+      roles.add(name)
+    }
+    return [...roles]
+  }
+
+  const themeableRoles = extractThemeableRoles(tokensCss)
+
+  it('基础色板可主题角色集包含关键角色（约 48 项）', () => {
+    expect(themeableRoles.length).toBeGreaterThanOrEqual(40)
+    for (const key of [
+      '--md-primary',
+      '--md-secondary-container',
+      '--md-surface',
+      '--md-on-surface',
+      '--md-outline',
+      '--md-inverse-surface',
+      '--md-state-layer-pressed-primary',
+    ]) {
+      expect(themeableRoles).toContain(key)
+    }
+  })
+
+  it('默认主题为 sky（className=theme-sky，与基础 page 色板共规则）', () => {
+    expect(DEFAULT_THEME_COLOR).toBe('sky')
+    expect(themeColorClass('sky')).toBe('theme-sky')
+  })
+
+  it('每个主题色板类都覆盖同一套可主题角色（整组换色不变量，防只覆盖 primary）', () => {
+    expect(THEME_COLOR_OPTIONS.length).toBeGreaterThanOrEqual(6)
+    for (const option of THEME_COLOR_OPTIONS) {
+      const start = tokensCss.indexOf('.' + option.className + ' {')
+      expect(start, `tokens.css 缺少 .${option.className}`).toBeGreaterThan(-1)
+      const block = tokensCss.slice(start, tokensCss.indexOf('}', start))
+      for (const role of themeableRoles) {
+        expect(block, `.${option.className} 缺少 ${role}（会导致串色）`).toContain(`${role}:`)
+      }
+    }
+  })
+
+  it('themeColorClass 映射与清单一致（纯函数行为）', () => {
+    for (const option of THEME_COLOR_OPTIONS) {
+      expect(themeColorClass(option.id)).toBe(option.className)
+    }
+  })
+
+  it('isThemeColorId 仅接受已注册 id', () => {
+    for (const option of THEME_COLOR_OPTIONS) expect(isThemeColorId(option.id)).toBe(true)
+    expect(isThemeColorId('neon')).toBe(false)
+  })
+
+  it('App.vue 将色板类绑定到根 <page>（接线契约）', () => {
+    const appVue = readFileSync(resolve(rootDir, 'src/App.vue'), 'utf-8')
+    expect(appVue).toContain("import { useSettingsStore } from './stores/settingsStore'")
+    expect(appVue).toContain("import { themeColorClass } from './utils/themeColor'")
+    expect(appVue).toContain(':class="themeColorClass(settings.themeColor)"')
+  })
+
+  it('Me.vue 外观卡片为每个色板提供入口且 class 走 themeColorClass（防 class 双写漂移）', () => {
+    const meVue = readFileSync(resolve(rootDir, 'src/pages/Me.vue'), 'utf-8')
+    for (const option of THEME_COLOR_OPTIONS) {
+      expect(meVue, `Me.vue 缺少 ${option.id} 色板入口`).toContain(
+        `settings.setThemeColor('${option.id}')`,
+      )
+      expect(meVue, `Me.vue 缺少 ${option.id} 色板类绑定`).toContain(
+        `themeColorClass('${option.id}')`,
+      )
+    }
   })
 })
 

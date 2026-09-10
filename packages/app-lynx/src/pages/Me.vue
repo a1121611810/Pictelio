@@ -12,11 +12,12 @@ import type { ImageQuality } from '../utils/imageQuality'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { ME_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import GlassCard from '../components/GlassCard.vue'
+import { themeColorClass } from '../utils/themeColor'
 
 const auth = useAuthStore()
 const settings = useSettingsStore()
 const clientSwitch = useClientSwitchStore()
-const { showR18, showR18G, ugoiraMode, ugoiraDownloadFormat, detailQuality } = storeToRefs(settings)
+const { showR18, showR18G, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor } = storeToRefs(settings)
 const switching = ref(false)
 
 // ─── 全局放射 FAB 桥（ADR-0120）：注册空动作（内环空 = 仅外环导航），卸载时注销 ───
@@ -216,6 +217,105 @@ function toggleR18G() {
         <text v-if="switching" class="text-body-small text-primary mt-3">正在重启切换…</text>
       </view>
 
+      <!-- 外观组（主题色）：色板类 .theme-* 定义在 tokens.css，根 <page> 应用即整体换色；
+           色块自身加对应色板类（默认 sky 用 .theme-sky，与基础 page 色板共用规则）+ bg-primary 预览该色板主色。 -->
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+        <text class="text-title-small font-medium text-surface-on">外观</text>
+        <text class="text-label-medium text-surface-on-variant mt-1 mb-3">选择主题色（Material Design 3 配色）</text>
+        <view class="flex flex-row items-start justify-between">
+          <view class="flex flex-col items-center gap-1">
+            <!-- 天蓝（默认） -->
+            <view
+              class="w-10 h-10 rounded-full flex items-center justify-center border-[0.533vw]"
+              :class="[themeColor === 'sky' ? 'border-primary' : 'border-transparent', themeColorClass('sky')]"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="ME_A11Y_LABELS.themeColorSky"
+              @tap="settings.setThemeColor('sky')"
+            >
+              <view class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                <text v-if="themeColor === 'sky'" class="text-primary-on text-label-small">✓</text>
+              </view>
+            </view>
+            <text class="text-label-small text-surface-on-variant">天蓝</text>
+          </view>
+          <view class="flex flex-col items-center gap-1">
+            <!-- 紫罗兰 -->
+            <view
+              class="w-10 h-10 rounded-full flex items-center justify-center border-[0.533vw]"
+              :class="[themeColor === 'violet' ? 'border-primary' : 'border-transparent', themeColorClass('violet')]"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="ME_A11Y_LABELS.themeColorViolet"
+              @tap="settings.setThemeColor('violet')"
+            >
+              <view class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                <text v-if="themeColor === 'violet'" class="text-primary-on text-label-small">✓</text>
+              </view>
+            </view>
+            <text class="text-label-small text-surface-on-variant">紫罗兰</text>
+          </view>
+          <view class="flex flex-col items-center gap-1">
+            <!-- 樱花粉 -->
+            <view
+              class="w-10 h-10 rounded-full flex items-center justify-center border-[0.533vw]"
+              :class="[themeColor === 'pink' ? 'border-primary' : 'border-transparent', themeColorClass('pink')]"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="ME_A11Y_LABELS.themeColorPink"
+              @tap="settings.setThemeColor('pink')"
+            >
+              <view class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                <text v-if="themeColor === 'pink'" class="text-primary-on text-label-small">✓</text>
+              </view>
+            </view>
+            <text class="text-label-small text-surface-on-variant">樱花粉</text>
+          </view>
+          <view class="flex flex-col items-center gap-1">
+            <!-- 松柏绿 -->
+            <view
+              class="w-10 h-10 rounded-full flex items-center justify-center border-[0.533vw]"
+              :class="[themeColor === 'green' ? 'border-primary' : 'border-transparent', themeColorClass('green')]"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="ME_A11Y_LABELS.themeColorGreen"
+              @tap="settings.setThemeColor('green')"
+            >
+              <view class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                <text v-if="themeColor === 'green'" class="text-primary-on text-label-small">✓</text>
+              </view>
+            </view>
+            <text class="text-label-small text-surface-on-variant">松柏绿</text>
+          </view>
+          <view class="flex flex-col items-center gap-1">
+            <!-- 落日橙 -->
+            <view
+              class="w-10 h-10 rounded-full flex items-center justify-center border-[0.533vw]"
+              :class="[themeColor === 'orange' ? 'border-primary' : 'border-transparent', themeColorClass('orange')]"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="ME_A11Y_LABELS.themeColorOrange"
+              @tap="settings.setThemeColor('orange')"
+            >
+              <view class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                <text v-if="themeColor === 'orange'" class="text-primary-on text-label-small">✓</text>
+              </view>
+            </view>
+            <text class="text-label-small text-surface-on-variant">落日橙</text>
+          </view>
+          <view class="flex flex-col items-center gap-1">
+            <!-- 深青 -->
+            <view
+              class="w-10 h-10 rounded-full flex items-center justify-center border-[0.533vw]"
+              :class="[themeColor === 'teal' ? 'border-primary' : 'border-transparent', themeColorClass('teal')]"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="ME_A11Y_LABELS.themeColorTeal"
+              @tap="settings.setThemeColor('teal')"
+            >
+              <view class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                <text v-if="themeColor === 'teal'" class="text-primary-on text-label-small">✓</text>
+              </view>
+            </view>
+            <text class="text-label-small text-surface-on-variant">深青</text>
+          </view>
+        </view>
+      </view>
+
       <!-- 内容组（ADR-0051：R18/R18G 开关） -->
       <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
         <text class="text-title-small font-medium text-surface-on">内容</text>
@@ -235,7 +335,7 @@ function toggleR18G() {
             :class="showR18 ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
           >
             <!-- handle-container：32×32 与轨道同高，thumb 居中 → 距边 8px/4px -->
-            <view class="w-[8.533vw] h-[8.533vw] flex items-center justify-center">
+            <view class="w-8 h-8 flex items-center justify-center">
               <view class="rounded-full active:w-[7.467vw] active:h-[7.467vw]" :class="showR18 ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
             </view>
           </view>
@@ -252,7 +352,7 @@ function toggleR18G() {
             :class="showR18G ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
           >
             <!-- handle-container：32×32 与轨道同高，thumb 居中 → 距边 8px/4px -->
-            <view class="w-[8.533vw] h-[8.533vw] flex items-center justify-center">
+            <view class="w-8 h-8 flex items-center justify-center">
               <view class="rounded-full active:w-[7.467vw] active:h-[7.467vw]" :class="showR18G ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
             </view>
           </view>

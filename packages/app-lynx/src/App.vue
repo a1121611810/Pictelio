@@ -7,11 +7,15 @@ import SearchSheet from './components/SearchSheet.vue'
 import { useClientSwitchStore } from './stores/clientSwitchStore'
 import { useUpdateStore } from './stores/updateStore'
 import { useSearchSheetStore } from './stores/searchSheetStore'
+import { useSettingsStore } from './stores/settingsStore'
+import { themeColorClass } from './utils/themeColor'
 import { apiClient } from './api/client'
 import { queryKeys } from './api/queryKeys'
 import { useApiQuery } from './primitives/useApiQuery'
 
 const searchSheet = useSearchSheetStore()
+// 主题色（外观）：根 <page> 追加 .theme-* 色板类，整树 CSS 变量换色（默认 sky = 无色板类）
+const settings = useSettingsStore()
 
 // T3 启动健康检查（ADR-0141 / T3 ticket）：
 // - 替代 T1 spike 的裸 useQuery（用 T2 实施的 useApiQuery helper 包装）
@@ -46,7 +50,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <page class="Root">
+  <page class="Root" :class="themeColorClass(settings.themeColor)">
     <!-- [lynx:fix] 模板必须 PascalCase <RouterView>（kebab-case <router-view> 被
          vue-lynx 编译器当原生标签 → 空渲染/编译报错；ADR-0138 决策 8）。
          KeepAlive 缓存列表/静态页实例（ADR-0049）：详情返回列表不重载。

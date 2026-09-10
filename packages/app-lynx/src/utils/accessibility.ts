@@ -38,6 +38,13 @@ export const ME_A11Y_LABELS = {
   detailQualityMedium: '详情画质选择标准',
   detailQualityLarge: '详情画质选择高清',
   detailQualityOriginal: '详情画质选择原图',
+  // 主题色（外观）：每个可选色板一个标注（Me.vue 显式渲染各色块）
+  themeColorSky: '主题色天蓝',
+  themeColorViolet: '主题色紫罗兰',
+  themeColorPink: '主题色樱花粉',
+  themeColorGreen: '主题色松柏绿',
+  themeColorOrange: '主题色落日橙',
+  themeColorTeal: '主题色深青',
   logout: '退出登录',
 } as const
 

@@ -289,3 +289,84 @@ describe("settingsStore — 账号级 R18/R18G（ADR-0103）", () => {
     expect(store.showR18G).toBe(false)
   })
 })
+
+// 主题色（外观）：设备级持久化（native SharedPreferences / dev IndexedDB），
+// 未登录也应恢复；非法持久化值维持默认并 warn（禁止静默降级）。
+describe("settingsStore — 主题色（外观）", () => {
+  beforeEach(() => {
+    userRef().value = null
+    env.native = false
+    env.modules = {}
+    vi.mocked(idbGet).mockReset().mockResolvedValue(null)
+    vi.mocked(idbSet).mockReset().mockResolvedValue(undefined)
+  })
+
+  it("默认 sky", () => {
+    expect(store.themeColor).toBe("sky")
+  })
+
+  it("setThemeColor 更新 ref 并经 prefs seam 持久化（dev=IndexedDB）", () => {
+    store.setThemeColor("violet")
+    expect(store.themeColor).toBe("violet")
+    expect(vi.mocked(idbSet)).toHaveBeenCalledWith("settings_theme_color", "violet")
+  })
+
+  it("loadSettings 在未登录状态也恢复主题色（设备级，先于 uid 判定）", async () => {
+    vi.mocked(idbGet).mockImplementation(async (key: string) =>
+      key === "settings_theme_color" ? "green" : null,
+    )
+    await store.loadSettings()
+    expect(store.themeColor).toBe("green")
+  })
+
+  it("loadSettings 恢复非法值 → 维持默认 sky 并 console.warn", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    vi.mocked(idbGet).mockImplementation(async (key: string) =>
+      key === "settings_theme_color" ? "neon" : null,
+    )
+    await store.loadSettings()
+    expect(store.themeColor).toBe("sky")
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("主题色"), "neon")
+    warn.mockRestore()
+  })
+
+  it("原生模式：setThemeColor 经 PictelioPrefs 写 settings_theme_color", async () => {
+    env.native = true
+    const written: string[] = []
+    env.modules = {
+      PictelioPrefs: {
+        prefsGet: (_k: string, cb: (v: string, e: string | null) => void) => cb("", null),
+        prefsSet: (k: string, v: string, cb: (e: string | null) => void) => {
+          written.push(`${k}=${v}`)
+          cb(null)
+        },
+        prefsRemove: (_k: string, cb: (e: string | null) => void) => cb(null),
+      },
+    }
+    store.setThemeColor("orange")
+    await vi.waitFor(() => expect(written).toContain("settings_theme_color=orange"))
+  })
+
+  it("读取失败（IO 异常）→ 维持默认 sky 并 console.warn（硬约束 #1/#3）", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    vi.mocked(idbGet).mockImplementation(async (key: string) => {
+      if (key === "settings_theme_color") throw new Error("idb down")
+      return null
+    })
+    await store.loadSettings()
+    expect(store.themeColor).toBe("sky")
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("主题色加载失败"), expect.any(Error))
+    warn.mockRestore()
+  })
+
+  it("写入失败（IO 异常）→ 内存态即时更新但 warn，不静默吞（硬约束 #3）", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    vi.mocked(idbSet).mockRejectedValue(new Error("idb down"))
+    store.setThemeColor("violet")
+    expect(store.themeColor).toBe("violet")
+    await vi.waitFor(() =>
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("主题色写入失败"), expect.any(Error)),
+    )
+    warn.mockRestore()
+  })
+})
