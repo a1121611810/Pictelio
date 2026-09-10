@@ -33,7 +33,6 @@ function mapIllusts(r: PixivIllustListResponse): { items: MixFeedItem[]; nextUrl
 }
 
 function makeFeed(m: 'recommend' | 'follow') {
-  const first = m === 'recommend' ? loadRecommended : loadFollow
   return createMixFeed({
     // autoStart=false：构造不首载，由 refreshFeed 显式触发（mode 重建实例避免双请求浪费）
     autoStart: false,
@@ -41,8 +40,16 @@ function makeFeed(m: 'recommend' | 'follow') {
     sources: [
       {
         name: 'illust',
+        // [fix] 同 NovelList.vue：loadFollow(restrict, signal) 首参是 restrict，不能与
+        // loadRecommended(signal) 统一成 `first(signal)`——否则 AbortSignal 被当作 restrict
+        // 序列化成 restrict=[object AbortSignal] → Pixiv 400。
         fetchPage: (signal, nextUrl) =>
-          nextUrl ? loadNext(nextUrl, signal).then(mapIllusts) : first(signal).then(mapIllusts),
+          nextUrl
+            ? loadNext(nextUrl, signal).then(mapIllusts)
+            : (m === 'recommend'
+                ? loadRecommended(signal)
+                : loadFollow('public', signal)
+              ).then(mapIllusts),
       },
     ],
   })

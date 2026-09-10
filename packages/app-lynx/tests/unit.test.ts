@@ -882,6 +882,30 @@ describe('P0-T5 小说关注 API 契约', () => {
   })
 })
 
+// ─── 推荐/关注首载分派回归（fault：AbortSignal 被当 restrict → Pixiv 400） ───
+// oracle 溯源：api/novel.ts / api/illust.ts 的 loadFollow(restrict, signal) 签名——首参 restrict、
+// 第二参 signal（源码即独立来源）；createMixFeed 首载传入真实 currentAc.signal
+// （createMixFeed.ts loadFirstPage）。期望值 = signal 必须落在第二参、restrict 显式为 'public'，
+// 非从页面实现反推。历史 fault：两者曾别名为单个 first 变量后统一调用 first(signal)，
+// 关注分支把 AbortSignal 序列化成 restrict=[object AbortSignal] → HTTP 400。
+describe('推荐/关注首载分派（防 AbortSignal 当 restrict 回归）', () => {
+  const FOLLOW_CALL = /loadFollow\(\s*'public'\s*,\s*signal\s*\)/
+  const pageSrc = (n: string) =>
+    readFileSync(fileURLToPath(new URL('../src/pages/' + n + '.vue', import.meta.url)), 'utf8')
+
+  it('NovelList 关注首载：loadFollow(restrict, signal)，restrict 显式 public', () => {
+    const src = pageSrc('NovelList')
+    expect(src).toMatch(FOLLOW_CALL)
+    expect(src).not.toMatch(/\bconst first\b/)
+  })
+
+  it('IllustList 关注首载：loadFollow(restrict, signal)，restrict 显式 public', () => {
+    const src = pageSrc('IllustList')
+    expect(src).toMatch(FOLLOW_CALL)
+    expect(src).not.toMatch(/\bconst first\b/)
+  })
+})
+
 // ─── T5：Ugoira 播放管线契约（bytesToDataUrl + downloadUgoiraFrames） ───
 function u16(v: number, out: number[]): void {
   out.push(v & 0xff, (v >> 8) & 0xff)

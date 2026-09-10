@@ -28,7 +28,6 @@ function mapNovels(r: PixivNovelListResponse): { items: MixFeedItem[]; nextUrl: 
 }
 
 function makeFeed(m: 'recommend' | 'follow') {
-  const first = m === 'recommend' ? loadRecommendedNovels : loadFollow
   return createMixFeed({
     // autoStart=false：构造不首载，由 refreshFeed 显式触发（mode 重建实例避免双请求浪费）
     autoStart: false,
@@ -36,8 +35,17 @@ function makeFeed(m: 'recommend' | 'follow') {
     sources: [
       {
         name: 'novel',
+        // [fix] 首载分支不能统一成 `first(signal)`：loadRecommendedNovels(signal) 与
+        // loadFollow(restrict, signal) 首参语义不同，关注分支会把 AbortSignal 当作 restrict
+        // 查询参数，序列化成 restrict=[object AbortSignal] → Pixiv 400
+        // （createMixFeed 传入真实 currentAc.signal）。按参数位显式分派。
         fetchPage: (signal, nextUrl) =>
-          nextUrl ? loadNovelNext(nextUrl, signal).then(mapNovels) : first(signal).then(mapNovels),
+          nextUrl
+            ? loadNovelNext(nextUrl, signal).then(mapNovels)
+            : (m === 'recommend'
+                ? loadRecommendedNovels(signal)
+                : loadFollow('public', signal)
+              ).then(mapNovels),
       },
     ],
   })
