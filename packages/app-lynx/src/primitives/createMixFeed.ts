@@ -57,6 +57,9 @@ export interface MixFeed {
   items: () => MixFeedItem[]
   loading: () => boolean
   loadingMore: () => boolean
+  /** 首载是否已成功落定（成功含 0 条；失败不算；刷新 / 重试期间回到未落定）。
+   * 页面三态判定的输入（ADR-0150 / CONTEXT「首载落定」） */
+  settled: () => boolean
   /** 首屏/刷新失败错误文案（presentError('加载失败') 产出）；无错误 null。
    * 与 pageError() 槽位分离（ADR-0104）：首屏失败 → 顶部整页提示 */
   error: () => string | null
@@ -111,6 +114,8 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
   let currentAc: AbortController | null = null
   /** 首载（含 refresh）网络阶段标志 */
   let firstLoadInFlight = false
+  /** 首载是否已成功落定（成功含 0 条；失败不算）——页面三态判定的输入（ADR-0150 / CONTEXT「首载落定」） */
+  let firstLoadSettled = false
   /** fetchMore 进行中标志 */
   let loadMoreInFlight = false
   /** 首屏/刷新失败错误文案（presentError 产出）；与分页错误槽位分离（ADR-0104） */
@@ -237,6 +242,8 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
     currentAc = new AbortController()
     const signal = currentAc.signal
     firstLoadInFlight = true
+    // 新会话开始：回到「未落定」（刷新 / 重试期间页级骨架依据，ADR-0150）
+    firstLoadSettled = false
     // 新会话开始：清两槽错误（首屏 + 分页残留）
     firstErrorText = null
     pageErrorText = null
@@ -287,6 +294,8 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
         // 全部失败：error 置为首个错误（首屏槽）
         firstErrorText = presentError(firstError, '加载失败')
       } else {
+        // 至少一个源成功返回 = 首载落定（含 0 条真·空数据，ADR-0150）
+        firstLoadSettled = true
         const merged = merge === 'time-merge'
           ? dedupe(mergeByTime(pages.filter((p): p is MixFeedItem[] => p !== undefined), (it) => it.data.create_date))
           : dedupe(mergeByRatio(pages))
@@ -437,6 +446,7 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
     if (currentAc) currentAc.abort()
     currentAc = null
     generation++
+    firstLoadSettled = false // 释放后归假（ADR-0150；实例不再可用）
   }
 
   // 构造即触发首载（autoStart=false 时由调用方显式 refresh 触发，页面重建 feed 用）
@@ -446,6 +456,7 @@ export function createMixFeed(opts: MixFeedOptions): MixFeed {
     items: () => rendered,
     loading: () => firstLoadInFlight && rendered.length === 0,
     loadingMore: () => loadMoreInFlight,
+    settled: () => firstLoadSettled,
     error: () => firstErrorText,
     pageError: () => pageErrorText,
     nextUrl: () => {

@@ -2,13 +2,14 @@
 // 插画分类页（/illusts）：推荐/关注两个子 tab，waterfall 双列插画卡。
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'illusts' })
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { navigate } from '../router'
 import { loadRecommended, loadFollow, loadNext } from '../api/illust'
 import type { PixivIllust, PixivIllustListResponse } from '../api/types'
 import { thumbUrl } from '../utils/imageUrl'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { useSettingsStore } from '../stores/settingsStore'
+import { deriveFirstLoadView } from '../utils/firstLoadView'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
@@ -63,11 +64,31 @@ const loadingMore = ref(false)
 const errorMsg = ref('')
 const pageErrorMsg = ref('')
 const endOfFeed = ref(false)
+/** 首载是否已成功落定（成功含 0 条）——三态判定输入（ADR-0150） */
+const settled = ref(false)
+
+/** 空态文案：按当前子 tab 取图标 / 标题 / 副文案（避免模板内重复三元） */
+const emptyMeta = computed(() =>
+  mode.value === 'follow'
+    ? { icon: '♡', title: '暂无关注插画', hint: '关注的作者发布新插画后会展示在这里' }
+    : { icon: '✦', title: '暂无推荐插画', hint: '稍后再来看看，会有新的推荐' },
+)
+
+/** 页级首载三态（ADR-0150）：骨架 / 错误 / 空态 / 内容 的唯一判定源 */
+const view = computed(() =>
+  deriveFirstLoadView({
+    hasItems: illusts.value.length > 0,
+    loading: loading.value,
+    settled: settled.value,
+    hasError: !!errorMsg.value,
+  }),
+)
 
 function sync() {
   illusts.value = feed.value.items().map((i) => i.data as PixivIllust)
   loading.value = feed.value.loading()
   loadingMore.value = feed.value.loadingMore()
+  settled.value = feed.value.settled()
   errorMsg.value = feed.value.error() ?? ''
   pageErrorMsg.value = feed.value.pageError() ?? ''
   // 到底态：所有源耗尽且列表非空（ADR-0104：footer「没有更多了」）
@@ -79,6 +100,9 @@ function sync() {
 }
 
 async function refreshFeed() {
+  // 发起前同步进入加载态并清错误：骨架立即占位（ADR-0150，覆盖失败重试与真·空态刷新）
+  loading.value = true
+  errorMsg.value = ''
   await feed.value.refresh()
   sync()
   // [lynx:fix] 数据整体替换触发 vue-lynx patch RemoveNode 索引错位（框架 bug，ADR-0107 D4）；
@@ -103,7 +127,7 @@ function switchMode(m: 'recommend' | 'follow') {
   illusts.value = []
   errorMsg.value = ''
   pageErrorMsg.value = ''
-  loading.value = true
+  settled.value = false // 新实例尚未落定；随后 refreshFeed 同步进入加载态
   void refreshFeed()
 }
 
@@ -175,35 +199,27 @@ onUnmounted(() => {
       </view>
     </view>
 
-    <text v-if="errorMsg && !loading" class="text-body-small text-error p-4">{{ errorMsg }}</text>
-
+    <!-- 首载三态（ADR-0150）：骨架 → 错误 → 空态 → 内容，互斥单链；
+         触发不依赖 loading 标志（IFR 首帧用初始状态绘制，未落定即骨架） -->
     <!-- [lynx:fix] 骨架屏：首屏加载（无数据）时显示 shimmer 卡片占位，数据就绪后切换 list。
          8 个 ≈ 4 行两列，与真实卡片同比例（48.4vw 宽 + 方形图片）避免切换 reflow -->
     <!-- [lynx:fix] 骨架屏不占满全屏高度（h-full 会溢出覆盖底部导航栏，拦截 tap，issue #129）：
      改 flex-1 min-h-0 约束在导航栏下方的内容区内 -->
-    <view v-if="loading && illusts.length === 0" class="w-full flex-1 min-h-0 flex flex-row flex-wrap content-start p-1.5">
+    <view v-if="view === 'skeleton'" class="w-full flex-1 min-h-0 flex flex-row flex-wrap content-start p-1.5">
       <SkeletonCard v-for="n in 8" :key="n" />
     </view>
-
-    <!-- 关注视图空态 -->
-    <view v-if="mode === 'follow' && !loading && !errorMsg && illusts.length === 0" class="w-full flex-1 min-h-0 flex items-center justify-center">
+    <text v-else-if="view === 'error'" class="text-body-small text-error p-4">{{ errorMsg }}</text>
+    <!-- 空态：仅「已成功落定为空」才显示（spec 加固 3：杜绝「无数据 → 纯空白」） -->
+    <view v-else-if="view === 'empty'" class="w-full flex-1 min-h-0 flex items-center justify-center">
       <view class="flex flex-col items-center">
-        <text class="text-[10.667vw] leading-none text-outline-variant">♡</text>
-        <text class="text-body-large text-surface-on mt-3">暂无关注插画</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">关注的作者发布新插画后会展示在这里</text>
-      </view>
-    </view>
-    <!-- 推荐视图空态（spec 加固 3）：杜绝「无数据 → 纯空白」 -->
-    <view v-if="mode === 'recommend' && !loading && !errorMsg && illusts.length === 0" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <view class="flex flex-col items-center">
-        <text class="text-[10.667vw] leading-none text-outline-variant">✦</text>
-        <text class="text-body-large text-surface-on mt-3">暂无推荐插画</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">稍后再来看看，会有新的推荐</text>
+        <text class="text-[10.667vw] leading-none text-outline-variant">{{ emptyMeta.icon }}</text>
+        <text class="text-body-large text-surface-on mt-3">{{ emptyMeta.title }}</text>
+        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ emptyMeta.hint }}</text>
       </view>
     </view>
 
     <RefreshableList
-      v-else-if="!loading || illusts.length > 0"
+      v-else
       :refresh="refreshFeed"
       :fab="false"
       @back-to-top="refreshEpoch++"

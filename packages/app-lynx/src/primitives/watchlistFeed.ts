@@ -37,6 +37,9 @@ export interface WatchlistFeed {
   items: () => WatchlistSeries[]
   loading: () => boolean
   loadingMore: () => boolean
+  /** 首载是否已成功落定（成功含 0 条；失败不算；refresh 期间回到未落定）。
+   * 页面三态判定的输入（ADR-0150 / CONTEXT「首载落定」） */
+  settled: () => boolean
   /** 首屏/刷新失败错误文案；无错误 null */
   error: () => string | null
   /** 分页失败错误文案（保留已加载内容，nextUrl 保留供滚动重试）；无错误 null */
@@ -55,6 +58,8 @@ export function createWatchlistFeed(deps: WatchlistFeedDeps): WatchlistFeed {
   const items = ref<WatchlistSeries[]>([])
   const loading = ref(false)
   const loadingMore = ref(false)
+  /** 首载是否已成功落定（ADR-0150）；refresh 重建会话即回到未落定 */
+  const settled = ref(false)
   const error = ref<string | null>(null)
   const pageError = ref<string | null>(null)
   const nextUrl = ref<string | null>(null)
@@ -91,6 +96,7 @@ export function createWatchlistFeed(deps: WatchlistFeedDeps): WatchlistFeed {
     clearRetry() // 重建会话：挂起的补触发随旧会话作废
     const gen = ++generation
     loading.value = true
+    settled.value = false // 新会话 / 重试：回到未落定（ADR-0150）
     error.value = null
     pageError.value = null
     try {
@@ -98,6 +104,7 @@ export function createWatchlistFeed(deps: WatchlistFeedDeps): WatchlistFeed {
       if (gen !== generation) return
       items.value = mergeWatchlistPage([], page)
       nextUrl.value = page.next_url
+      settled.value = true // 成功返回（含 0 条）= 已落定
     } catch (err) {
       if (gen !== generation) return
       console.warn('[watchlistFeed] 首屏加载失败', err)
@@ -142,12 +149,14 @@ export function createWatchlistFeed(deps: WatchlistFeedDeps): WatchlistFeed {
   function dispose(): void {
     clearRetry()
     generation++
+    settled.value = false // 释放后归假（ADR-0150；实例不再可用）
   }
 
   return {
     items: () => items.value,
     loading: () => loading.value,
     loadingMore: () => loadingMore.value,
+    settled: () => settled.value,
     error: () => error.value,
     pageError: () => pageError.value,
     nextUrl: () => nextUrl.value,

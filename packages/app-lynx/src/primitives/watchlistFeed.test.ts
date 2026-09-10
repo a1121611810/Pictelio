@@ -239,3 +239,56 @@ describe("createWatchlistFeed", () => {
     expect(fetchNext).toHaveBeenCalledTimes(1)
   })
 })
+
+// oracle：ADR-0150 决策 2 / docs/specs/app-lynx-page-level-first-load-skeleton.md:60,75
+// （watchlistFeed 与 createMixFeed 同语义：成功含 0 条置真；失败不置真；refresh 回到未落定；dispose 归假）。
+describe("createWatchlistFeed 首载落定（settled，ADR-0150）", () => {
+  it("初始未落定；refresh 成功（含 0 条）落定", async () => {
+    const empty = createWatchlistFeed({
+      fetchFirst: vi.fn().mockResolvedValue(page([])),
+      fetchNext: vi.fn(),
+    })
+    expect(empty.settled()).toBe(false)
+    await empty.refresh()
+    expect(empty.settled()).toBe(true)
+  })
+
+  it("refresh 失败 → 不落定", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {})
+    const feed = createWatchlistFeed({
+      fetchFirst: vi.fn().mockRejectedValue(new Error("boom")),
+      fetchNext: vi.fn(),
+    })
+    await feed.refresh()
+    expect(feed.settled()).toBe(false)
+  })
+
+  it("refresh 重试期间回到未落定，成功后落定", async () => {
+    let resolveSlow!: (v: WatchlistNovelListResponse) => void
+    const slow = new Promise<WatchlistNovelListResponse>((res) => (resolveSlow = res))
+    const fetchFirst = vi
+      .fn()
+      .mockResolvedValueOnce(page([1], null))
+      .mockImplementationOnce(() => slow)
+    const feed = createWatchlistFeed({ fetchFirst, fetchNext: vi.fn() })
+    await feed.refresh()
+    expect(feed.settled()).toBe(true)
+
+    const p = feed.refresh()
+    expect(feed.settled()).toBe(false)
+    resolveSlow(page([9], null))
+    await p
+    expect(feed.settled()).toBe(true)
+  })
+
+  it("dispose → 落定信号归假", async () => {
+    const feed = createWatchlistFeed({
+      fetchFirst: vi.fn().mockResolvedValue(page([1], null)),
+      fetchNext: vi.fn(),
+    })
+    await feed.refresh()
+    expect(feed.settled()).toBe(true)
+    feed.dispose()
+    expect(feed.settled()).toBe(false)
+  })
+})
