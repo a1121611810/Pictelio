@@ -225,6 +225,12 @@ _Avoid_: 把绝对 next_url 原样传给原生模块
 **受限条目 level 派生（restrict level derivation）**：
 `x_restrict === 2 ? 2 : 1` 的徽章级别映射，收敛在 `RestrictedNovelCard` 组件内部（接口只收 `item`），调用方不重复该表达式。
 
+### 外观 / 主题色（Appearance / Theme color）
+
+**主题色（theme color）**【2026-09-11 新增，ADR-0152】：
+app-lynx 的可选 M3 主色（seed）——用户在「我的 → 外观」选择，整树经根 `<page>` 上的 `.theme-*` 色板类切换（CSS 变量覆盖，非运行时算色）。可选集与持久化 id 的单一事实源是 `src/utils/themeColor.ts`（`THEME_COLOR_IDS` / `THEME_COLOR_OPTIONS`）；色板值预生成在 `src/styles/tokens.css`（每个非默认色板覆盖一组 `--md-*` 颜色角色，含 surface 中性色）。默认 `sky` 使用 `.theme-sky`（与基础 `page` 色板共用同一条 CSS 规则，观感不变）。持久化键 `settings_theme_color`（设备级；native 走 `PictelioPrefs` 共享 SharedPreferences，dev 走 IndexedDB），未登录也恢复。
+_Avoid_: 运行时用 JS 计算 / 动态写 CSS 变量（Lynx 动态样式支持面窄、双端不可靠）；给色板类只覆盖 `--md-primary`（secondary/surface/outline/state-layer 不同步会串色）；把主题色做成账号级键（外观是设备级偏好，登出不应重置）。
+
 ### 状态管理（State management）
 
 **Pinia setup store**【2026-09-03 新增，ADR-0139 + ADR-0140】：
