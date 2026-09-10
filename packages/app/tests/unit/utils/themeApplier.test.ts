@@ -1,64 +1,36 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { applyPageStyleClass } from "@/utils/themeApplier";
+// @vitest-environment happy-dom
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { applyDarkClass } from "@/utils/themeApplier";
 
-let classes: string[];
-
-function createMockClassList() {
-  classes = [];
-  return {
-    add: vi.fn((token: string) => {
-      if (!classes.includes(token)) {
-        classes.push(token);
-      }
-    }),
-    remove: vi.fn((...tokens: string[]) => {
-      classes = classes.filter((c) => !tokens.includes(c));
-    }),
-    contains: vi.fn((token: string) => classes.includes(token)),
-    [Symbol.iterator]: () => classes.values(),
-  };
-}
-
-beforeEach(() => {
-  vi.stubGlobal("document", {
-    documentElement: {
-      classList: createMockClassList(),
-    },
-  });
-  classes = [];
-  vi.clearAllMocks();
+afterEach(() => {
+  vi.unstubAllGlobals();
+  document.documentElement.classList.remove("dark");
 });
 
-describe("applyPageStyleClass", () => {
+describe("applyDarkClass", () => {
   it("does nothing when document is undefined (SSR)", () => {
     vi.stubGlobal("document", undefined);
-    expect(() => applyPageStyleClass("card")).not.toThrow();
-    expect(() => applyPageStyleClass("fluent")).not.toThrow();
+    expect(() => applyDarkClass(true)).not.toThrow();
+    expect(() => applyDarkClass(false)).not.toThrow();
   });
 
-  it("adds page-card class for card style", () => {
-    applyPageStyleClass("card");
-    expect(document.documentElement.classList.add).toHaveBeenCalledWith("page-card");
-    expect(classes).toContain("page-card");
+  it("adds dark class when isDark is true", () => {
+    applyDarkClass(true);
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
   });
 
-  it("removes page-card class for fluent style", () => {
-    classes = ["page-card"];
-    applyPageStyleClass("fluent");
-    expect(document.documentElement.classList.remove).toHaveBeenCalledWith("page-card");
-    expect(classes).not.toContain("page-card");
+  it("removes dark class when isDark is false", () => {
+    document.documentElement.classList.add("dark");
+    applyDarkClass(false);
+    expect(document.documentElement.classList.contains("dark")).toBe(false);
   });
 
-  it("removes all page-* classes before adding new one", () => {
-    applyPageStyleClass("card");
-    applyPageStyleClass("fluent");
-    expect(classes).not.toContain("page-card");
-  });
-
-  it("handles switching between styles", () => {
-    applyPageStyleClass("card");
-    expect(classes).toContain("page-card");
-    applyPageStyleClass("fluent");
-    expect(classes).not.toContain("page-card");
+  it("is idempotent across repeated calls", () => {
+    applyDarkClass(true);
+    applyDarkClass(true);
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+    applyDarkClass(false);
+    applyDarkClass(false);
+    expect(document.documentElement.classList.contains("dark")).toBe(false);
   });
 });

@@ -43,7 +43,7 @@ export default defineConfig({
     page: "min-h-screen bg-[var(--colorNeutralBackground3)] text-[var(--colorNeutralForeground1)]",
 
     // ── Surfaces ──
-    "surface-card": "shadow-[var(--pageCardShadow,var(--elevation2))]",
+    "surface-card": "shadow-[var(--elevation4)]",
     "surface-card-elevated":
       "bg-[var(--colorNeutralBackground1)] rounded-[var(--borderRadiusMedium)] border border-[var(--colorNeutralStroke2)] shadow-[var(--elevation4)]",
     "surface-flyout":

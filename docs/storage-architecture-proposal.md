@@ -27,7 +27,7 @@
 
 **themeStore.ts 的 bug 只是表象，根本问题是：**
 
-1. **同步/异步混用无规则**：`theme` 双写（Preferences + localStorage），`page_style_theme` 只写 Preferences，没有统一标准
+1. **同步/异步混用无规则**：`theme` 双写（Preferences + localStorage），`page_style_theme` 只写 Preferences，没有统一标准（`page_style_theme` 已废弃，见 ADR-0148）
 2. **每个 store 重复实现持久化逻辑**：`tryAsync(Preferences.set(...))` + `console.warn` 模式在 8 个文件里重复了 30+ 次
 3. **模块加载时序无防护**：`themeStore.ts` 的 `createEffect` 在模块加载时误写入，没有机制防止
 4. **缺乏存储 Schema 定义**：key 名、默认值、校验逻辑分散在各处，没有单一事实来源
@@ -193,12 +193,14 @@ src/settings/
 ├── backends/
 │   ├── preferences.ts   # → @capacitor/preferences
 │   ├── localStorage.ts  # 同步读 + SecurityError/QuotaExceededError 坑收拢
-│   ├── mirrored.ts      # Preferences 主 + localStorage 镜像（theme/page_style_theme）
+│   ├── mirrored.ts      # Preferences 主 + localStorage 镜像（theme；page_style_theme 已废弃，见 ADR-0148）
 │   └── memory.ts        # 测试注入
 └── index.ts          # 模块级单例 settings = createSettings({...})
 ```
 
 ## 5. Store 改造示例（themeStore，bug 修复实证）
+
+> 注：本节 `page_style_theme` / `applyPageStyleClass` / `PageStyleThemeId` 示例已于 ADR-0148 废弃，仅作历史记录。
 
 **改造前：**
 ```typescript
@@ -261,7 +263,7 @@ await settings.hydrateAll();   // 其余 13+ 项异步并行加载（render 后�
 ### Phase 1：修 bug + 建立基础设施（本次任务）
 
 1. 新建 `src/settings/`（types / registry / backends / index）
-2. 修复 `themeStore.ts` 的 bug：theme + page_style_theme 改为 `settings.define`，删除 `createRoot + createEffect` 自动写回块
+2. 修复 `themeStore.ts` 的 bug：theme + page_style_theme 改为 `settings.define`，删除 `createRoot + createEffect` 自动写回块（page_style_theme 已废弃，见 ADR-0148）
 3. 补充 `themeStore` 的单元测试（memory adapter 注入，覆盖 bug 回归：模块加载不写存储 + 预置值不被覆盖）
 
 ### Phase 2：迁移设置类 store（后续任务）
@@ -331,7 +333,7 @@ v1 用乐观更新（写失败 warn 不抛），与现有 `tryAsync + console.wa
 
 ## 10. 验收标准
 
-- [ ] `themeStore.ts` bug 修复：选择卡片风格 → 关闭 app → 重开 → 仍显示卡片风格，且首屏即正确
+- [ ] `themeStore.ts` bug 修复：选择卡片风格 → 关闭 app → 重开 → 仍显示卡片风格，且首屏即正确（页面风格设置已移除，见 ADR-0148）
 - [ ] 所有设置项的读写走 `Settings` registry，无直接 `Preferences.set/get`（SecureStorage 除外）
 - [ ] 启动时不会误写入任何设置（模块加载零写入，write gate 生效）
 - [ ] 旧存储数据（String(bool)/String(number)/裸字符串）无需迁移即可正确读取

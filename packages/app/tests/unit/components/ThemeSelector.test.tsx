@@ -2,13 +2,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@solidjs/testing-library";
 import ThemeSelector from "@/components/ThemeSelector";
+import { setThemePersisted } from "@/stores/themeStore";
 
 vi.mock("@/stores/themeStore", () => ({
-  pageStyleTheme: () => "fluent",
-  setPageStyleTheme: vi.fn(),
   setThemePersisted: vi.fn(),
   getTheme: () => "system" as const,
-  PAGE_STYLE_THEME_IDS: ["fluent", "card"],
 }));
 
 describe("ThemeSelector", () => {
@@ -16,21 +14,31 @@ describe("ThemeSelector", () => {
     vi.clearAllMocks();
   });
 
-  it("renders page style options", async () => {
+  it("renders the three color theme options", async () => {
     render(() => <ThemeSelector />);
-    expect(screen.getByText("Fluent 默认")).toBeTruthy();
-    expect(screen.getByText("卡片式")).toBeTruthy();
+    expect(screen.getByText("浅色")).toBeTruthy();
+    expect(screen.getByText("跟随系统")).toBeTruthy();
+    expect(screen.getByText("深色")).toBeTruthy();
   });
 
-  it("renders without color theme swatches", async () => {
+  it("marks the active theme as selected", async () => {
     render(() => <ThemeSelector />);
-    expect(() => screen.getByText("海岸")).toThrow();
-    expect(() => screen.getByText("玫瑰")).toThrow();
+    const active = screen.getAllByRole("button", { name: "跟随系统" })[0];
+    expect(active.getAttribute("aria-pressed")).toBe("true");
+    const inactive = screen.getAllByRole("button", { name: "深色" })[0];
+    expect(inactive.getAttribute("aria-pressed")).toBe("false");
   });
 
-  it("marks Fluent as selected by default", async () => {
+  it("persists the picked theme on click", async () => {
     render(() => <ThemeSelector />);
-    const fluentBtn = screen.getAllByRole("button", { name: "Fluent 默认" })[0];
-    expect(fluentBtn.getAttribute("aria-pressed")).toBe("true");
+    screen.getAllByRole("button", { name: "深色" })[0].click();
+    expect(setThemePersisted).toHaveBeenCalledWith("dark");
+  });
+
+  it("does not render the removed page style group", async () => {
+    render(() => <ThemeSelector />);
+    expect(screen.queryByRole("group", { name: "页面风格选择" })).toBeNull();
+    expect(screen.queryByText("Fluent 默认")).toBeNull();
+    expect(screen.queryByText("卡片式")).toBeNull();
   });
 });

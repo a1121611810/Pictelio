@@ -275,12 +275,12 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════
-   Card surface — 统一卡牌容器，page-card 模式下由 tokens.css 覆盖
+   Card surface — 统一卡牌容器
    ═══════════════════════════════════════════════════════ */
 .surface-card {
-  background: var(--pageCardSurface, var(--colorNeutralBackground1));
-  border-radius: var(--pageCardRadius, var(--borderRadiusLarge));
-  box-shadow: var(--pageCardShadow, var(--elevation2));
+  background: var(--colorNeutralBackground1);
+  border-radius: var(--borderRadiusXLarge);
+  box-shadow: var(--elevation4);
   overflow: hidden;
   transition:
     box-shadow var(--durationFast) var(--curveEasyEase),
@@ -293,12 +293,6 @@ body {
     box-shadow: var(--elevation8);
     transform: translateY(-1px);
   }
-}
-
-/* 顶部应用栏（导航栏/Header）在 page-card 模式下的统一背景 */
-html.page-card .surface-appbar {
-  background: var(--colorNeutralBackground1);
-  border-bottom: 1px solid var(--colorNeutralStroke2);
 }
 
 /* Accessibility: respect reduced motion */

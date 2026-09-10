@@ -17,15 +17,12 @@ const SettingsAppearance: Component = () => {
         显示与交互
       </p>
 
-      {/* 主题与风格选择器 */}
+      {/* 明暗主题选择器 */}
       <div class="py-3">
         <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug mb-2">
-          主题与风格
+          明暗主题
         </p>
         <ThemeSelector />
-        <p class="mt-2 [font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-          卡片风格提供更大的圆角和白色卡片容器；明暗主题在所有风格下均可用
-        </p>
       </div>
 
       {/* 详情页楼梯导航开关 */}

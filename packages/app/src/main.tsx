@@ -38,7 +38,7 @@ async function bootstrap() {
   // 确保 <html> .dark 在渲染前已应用（在 index.html 中通过内联脚本处理）
   await initializeStartupPreferences();
 
-  // 首屏同步读 settings（theme / page_style_theme），render 前应用防闪烁
+  // 首屏同步读 settings（theme），render 前应用防闪烁
   settings.syncInitAll();
 
   syncFluentTheme();

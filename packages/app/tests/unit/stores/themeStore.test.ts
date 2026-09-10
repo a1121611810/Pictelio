@@ -73,17 +73,16 @@ beforeEach(() => {
 });
 
 describe("themeStore (settings registry)", () => {
-  it("模块加载不写存储（bug 回归：define 后无 page_style_theme 落盘）", async () => {
+  it("模块加载不写存储（bug 回归：define 后无任何设置落盘）", async () => {
     const { mod } = await setup();
     expect(mod.__test.primary.dump().size).toBe(0);
     expect(mod.__test.mirror.dump().size).toBe(0);
   });
 
   it("预置值不被覆盖：seed { theme: 'dark' } hydrate 后仍为 'dark'", async () => {
-    const { mod, store } = await setup({ theme: "dark", page_style_theme: "card" });
+    const { mod, store } = await setup({ theme: "dark" });
     await mod.settings.hydrateAll();
     expect(store.getTheme()).toBe("dark");
-    expect(store.pageStyleTheme()).toBe("card");
   });
 
   it("预置值经 syncInitAll 首屏同步生效（localStorage 镜像）", async () => {
@@ -103,20 +102,10 @@ describe("themeStore (settings registry)", () => {
     });
   });
 
-  it("setPageStyleTheme 持久化 page_style_theme", async () => {
-    const { mod, store } = await setup();
-    await mod.settings.hydrateAll();
-    store.setPageStyleTheme("card");
-    await vi.waitFor(() => {
-      expect(mod.__test.primary.dump().get("page_style_theme")).toBe("card");
-    });
-  });
-
-  it("hydrate 后 apply 钩子被调：dark class 与 page-card 已应用", async () => {
-    const { mod, store } = await setup({ theme: "dark", page_style_theme: "card" });
+  it("hydrate 后 apply 钩子被调：dark class 已应用", async () => {
+    const { mod, store } = await setup({ theme: "dark" });
     await mod.settings.hydrateAll();
     expect(document.documentElement.classList.contains("dark")).toBe(true);
-    expect(document.documentElement.classList.contains("page-card")).toBe(true);
     expect(store.getResolvedTheme()).toBe("dark");
   });
 
