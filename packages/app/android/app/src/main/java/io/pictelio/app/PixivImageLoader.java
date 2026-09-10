@@ -11,6 +11,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
@@ -44,6 +46,16 @@ import okhttp3.Response;
  */
 public final class PixivImageLoader {
 
+    /** 下载进度回调（done/total 字节；total <= 0 表示长度未知） */
+    public interface ProgressSink {
+        void onProgress(long done, long total);
+    }
+
+    /** 取消信号（true = 请求取消，读取循环抛 IOException 中止） */
+    public interface Cancellation {
+        boolean isCancelled();
+    }
+
     private static final String TAG = "PixivImageLoader";
     /** 缓存目录名（对齐 OAuthConfig.CACHE_DIR / PixivApiPlugin.CACHE_DIR_NAME） */
     private static final String CACHE_DIR_NAME = "pictelio-images";
@@ -51,6 +63,8 @@ public final class PixivImageLoader {
      *  ——ADR-0143 D4「低于官方」的具体化；劣化镜像快失败，不拖慢官方回退） */
     private static final int MIRROR_CONNECT_TIMEOUT_SECONDS = 5;
     private static final int MIRROR_CALL_TIMEOUT_SECONDS = 15;
+    /** 流式进度上报粒度（字节）：约每 64KB 或收尾各一次，避免大文件回调风暴 */
+    private static final long PROGRESS_REPORT_BYTES = 64 * 1024;
 
     private final Context context;
     private final OkHttpClient client;
@@ -194,6 +208,131 @@ public final class PixivImageLoader {
             writeFile(file, bytes);
             enforceCacheLimit();
             return file;
+        }
+    }
+
+    // ── 流式加载（下载队列：进度上报 + 可取消；字节直落缓存文件，不进 JS 堆） ──
+
+    /**
+     * 流式加载：缓存命中直接返回；未命中流式下载并原子写盘，全程按字节回调进度、响应取消。
+     * 与 {@link #loadFile(String)} 同缓存键/下载源/镜像回退语义（ADR-0143 不偏离）。
+     */
+    public File loadFileWithProgress(String url, ProgressSink sink, Cancellation cancel)
+            throws IOException {
+        File cached = cachedFile(url);
+        if (cached != null) {
+            reportDone(sink, cached.length());
+            return cached;
+        }
+        Object lock = urlLocks.computeIfAbsent(url, k -> new Object());
+        synchronized (lock) {
+            cached = cachedFile(url);
+            if (cached != null) {
+                reportDone(sink, cached.length());
+                return cached;
+            }
+            File target = new File(getCacheDir(), keyToFilename(url));
+            downloadToFile(url, target, sink, cancel);
+            enforceCacheLimit();
+            return target;
+        }
+    }
+
+    private static void reportDone(ProgressSink sink, long len) {
+        if (sink != null) {
+            sink.onProgress(len, len);
+        }
+    }
+
+    private void downloadToFile(String url, File target, ProgressSink sink, Cancellation cancel)
+            throws IOException {
+        String downloadUrl = imageHostConfig.resolve(url);
+        File tmp = new File(target.getAbsolutePath() + ".tmp");
+        try {
+            if (!Objects.equals(downloadUrl, url)) {
+                OkHttpClient mirrorClient = client.newBuilder()
+                        .connectTimeout(MIRROR_CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                        .callTimeout(MIRROR_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                        .build();
+                try {
+                    fetchToFile(mirrorClient, downloadUrl, tmp, sink, cancel);
+                } catch (IOException mirrorError) {
+                    Log.w(TAG, "镜像下载失败，回退官方: " + url, mirrorError);
+                    try {
+                        fetchToFile(client, url, tmp, sink, cancel);
+                    } catch (IOException officialError) {
+                        throw mirrorError;
+                    }
+                }
+            } else {
+                fetchToFile(client, url, tmp, sink, cancel);
+            }
+            atomicReplace(tmp, target);
+        } catch (IOException e) {
+            if (!tmp.delete()) {
+                Log.w(TAG, "tmp 清理失败（留待容量淘汰/清空缓存回收）: " + tmp);
+            }
+            throw e;
+        }
+    }
+
+    /** 单次流式 HTTP 请求：Referer/UA 注入 + 8KB 分块 + 进度节流 + 取消检查 */
+    private static void fetchToFile(OkHttpClient client, String url, File tmp, ProgressSink sink,
+            Cancellation cancel) throws IOException {
+        if (cancel != null && cancel.isCancelled()) {
+            throw new IOException("下载已取消: " + url);
+        }
+        Request request = new Request.Builder()
+                .url(url)
+                .addHeader("Referer", OAuthConfig.REFERER)
+                .addHeader("User-Agent", OAuthConfig.USER_AGENT)
+                .build();
+        try (Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("图片下载失败 (HTTP " + response.code() + "): " + url);
+            }
+            if (response.body() == null) {
+                throw new IOException("图片响应无 body: " + url);
+            }
+            long total = response.body().contentLength();
+            long done = 0;
+            long lastReported = 0;
+            byte[] buf = new byte[8192];
+            try (InputStream in = response.body().byteStream();
+                 OutputStream out = new FileOutputStream(tmp)) {
+                int n;
+                while ((n = in.read(buf)) != -1) {
+                    if (cancel != null && cancel.isCancelled()) {
+                        throw new IOException("下载已取消: " + url);
+                    }
+                    out.write(buf, 0, n);
+                    done += n;
+                    if (sink != null && (done - lastReported >= PROGRESS_REPORT_BYTES
+                            || (total > 0 && done >= total))) {
+                        lastReported = done;
+                        sink.onProgress(done, total);
+                    }
+                }
+            }
+            if (done == 0) {
+                throw new IOException("图片响应为空 body: " + url);
+            }
+            if (sink != null && lastReported < done) {
+                sink.onProgress(done, total > 0 ? total : done);
+            }
+        }
+    }
+
+    /** 原子替换（与 {@link #writeFile} 同纪律）：rename 优先，失败删旧目标重试一次 */
+    private static void atomicReplace(File tmp, File target) throws IOException {
+        if (tmp.renameTo(target)) {
+            return;
+        }
+        if (target.exists() && !target.delete()) {
+            throw new IOException("无法删除旧缓存文件: " + target);
+        }
+        if (!tmp.renameTo(target)) {
+            throw new IOException("rename 失败: " + tmp + " -> " + target);
         }
     }
 

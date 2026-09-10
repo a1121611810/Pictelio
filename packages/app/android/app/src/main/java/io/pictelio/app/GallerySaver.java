@@ -43,6 +43,8 @@ public final class GallerySaver {
     static final String RELATIVE_PATH = "Pictures/Pictelio";
     /** API 28 回退根：getExternalFilesDir(Pictures) 下的子目录名 */
     private static final String FALLBACK_DIR_NAME = "Pictelio";
+    /** 非图片产物（ugoira 导出：视频/归档）子目录名（Downloads/Pictelio） */
+    private static final String DOWNLOAD_DIR_NAME = "Pictelio";
 
     private GallerySaver() {}
 
@@ -69,14 +71,46 @@ public final class GallerySaver {
         if (officialUrl == null || officialUrl.isEmpty()) {
             throw new IOException("保存失败：图片 URL 为空");
         }
-        String safe = sanitizeFileName(fileName);
         File source = loader.loadFile(officialUrl);
+        return saveFile(context, source, fileName);
+    }
+
+    /**
+     * 保存一个已就位的本地文件（下载队列执行器复用；调用方自备线程）。
+     * 文件名清洗 / mime / 落盘分流与 {@link #save} 完全一致。
+     */
+    public static SaveResult saveFile(Context context, File source, String fileName)
+            throws IOException {
+        if (source == null || !source.exists()) {
+            throw new IOException("保存失败：源文件不存在");
+        }
+        String safe = sanitizeFileName(fileName);
         String mime = mimeFor(safe);
         Context app = context.getApplicationContext();
         if (Build.VERSION.SDK_INT >= 29) {
             return saveToMediaStore(app, source, safe, mime);
         }
         return saveToFallbackDir(app, source, safe, mime);
+    }
+
+    /**
+     * 保存非图片产物（ugoira 导出：GIF/WebP/APNG/MP4/ZIP/TAR）。
+     * API 29+：MediaStore.Downloads（Downloads/Pictelio）；API 28：应用专属 Downloads 目录 + 扫描。
+     * 与 {@link #save} 的区别仅在目标集合/目录（文件名清洗与 mime 同规则）。
+     */
+    public static SaveResult saveDownloadFile(Context context, File source, String fileName)
+            throws IOException {
+        if (source == null || !source.exists()) {
+            throw new IOException("保存失败：源文件不存在");
+        }
+        String safe = sanitizeFileName(fileName);
+        String mime = mimeFor(safe);
+        Context app = context.getApplicationContext();
+        if (Build.VERSION.SDK_INT >= 29) {
+            return saveToDownloads(app, source, safe, mime);
+        }
+        return saveToFallbackDir(app, source, safe, mime,
+                Environment.DIRECTORY_DOWNLOADS, DOWNLOAD_DIR_NAME);
     }
 
     // ── API 29+：MediaStore（IS_PENDING 两段式） ──────────────
@@ -87,9 +121,25 @@ public final class GallerySaver {
         Uri uri = cr.insert(
                 MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY),
                 buildImageValues(displayName, mime));
+        return writeToMediaStore(app, uri, source);
+    }
+
+    /** API 29+：非图片产物入 MediaStore.Downloads（Downloads/Pictelio）。 */
+    private static SaveResult saveToDownloads(Context app, File source, String displayName,
+            String mime) throws IOException {
+        ContentResolver cr = app.getContentResolver();
+        Uri uri = cr.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                buildDownloadValues(displayName, mime));
+        return writeToMediaStore(app, uri, source);
+    }
+
+    /** 共享两段式写入：insert 得到的 uri + pending 复位；失败清 pending 记录。 */
+    private static SaveResult writeToMediaStore(Context app, Uri uri, File source)
+            throws IOException {
         if (uri == null) {
             throw new IOException("保存失败：媒体库拒绝写入（insert 返回空）");
         }
+        ContentResolver cr = app.getContentResolver();
         try (InputStream in = new FileInputStream(source);
              OutputStream out = openMediaStoreOutput(cr, uri)) {
             copy(in, out);
@@ -129,15 +179,32 @@ public final class GallerySaver {
         return values;
     }
 
+    /** Downloads 插入 values（包可见纯构造，测试锚定字段契约） */
+    static ContentValues buildDownloadValues(String displayName, String mime) {
+        ContentValues values = new ContentValues();
+        values.put(MediaStore.MediaColumns.DISPLAY_NAME, displayName);
+        values.put(MediaStore.MediaColumns.MIME_TYPE, mime);
+        values.put(MediaStore.MediaColumns.RELATIVE_PATH,
+                Environment.DIRECTORY_DOWNLOADS + "/Pictelio");
+        values.put(MediaStore.MediaColumns.IS_PENDING, 1);
+        return values;
+    }
+
     // ── API 28：应用专属外部目录 + MediaScanner 尽力入库 ──────
 
     private static SaveResult saveToFallbackDir(Context app, File source, String displayName,
             String mime) throws IOException {
-        File picturesDir = app.getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+        return saveToFallbackDir(app, source, displayName, mime,
+                Environment.DIRECTORY_PICTURES, FALLBACK_DIR_NAME);
+    }
+
+    private static SaveResult saveToFallbackDir(Context app, File source, String displayName,
+            String mime, String dirType, String subDirName) throws IOException {
+        File picturesDir = app.getExternalFilesDir(dirType);
         if (picturesDir == null) {
             throw new IOException("保存失败：外部存储不可用");
         }
-        File dir = new File(picturesDir, FALLBACK_DIR_NAME);
+        File dir = new File(picturesDir, subDirName);
         if (!dir.exists() && !dir.mkdirs()) {
             throw new IOException("保存失败：无法创建目录 " + dir);
         }
@@ -207,16 +274,33 @@ public final class GallerySaver {
         }
     }
 
-    /** mime 映射（与 extFor 白名单一致；未知回落 image/jpeg） */
+    /**
+     * mime 映射：图片（jpg/jpeg/png/apng/gif/webp）+ 非图片产物（mp4/zip/tar）；
+     * 未知回落 image/jpeg（保持既有契约）。注意不能复用 extFor——后者是图片 URL 白名单。
+     */
     static String mimeFor(String fileNameOrUrl) {
-        String ext = extFor(fileNameOrUrl);
+        String path = fileNameOrUrl == null ? "" : fileNameOrUrl;
+        int q = path.indexOf('?');
+        if (q >= 0) {
+            path = path.substring(0, q);
+        }
+        int dot = path.lastIndexOf('.');
+        int slash = path.lastIndexOf('/');
+        String ext = (dot < 0 || dot < slash) ? "" : path.substring(dot + 1).toLowerCase(Locale.US);
         switch (ext) {
             case "png":
+            case "apng":
                 return "image/png";
             case "gif":
                 return "image/gif";
             case "webp":
                 return "image/webp";
+            case "mp4":
+                return "video/mp4";
+            case "zip":
+                return "application/zip";
+            case "tar":
+                return "application/x-tar";
             case "jpeg":
             case "jpg":
             default:
