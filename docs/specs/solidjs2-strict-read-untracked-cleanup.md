@@ -48,7 +48,7 @@ const targetUrl = untrack(() =>
 const urls = untrack(() => getRaceCandidateUrls(targetUrl));
 ```
 
-在模块 import 中增补 `untrack`（来自 `solid-js`）。
+`untrack` 经 unplugin-auto-import 全局注入（`vite.config.ts` 的 solid-js 导出名清单 + `src/auto-imports.d.ts`），源码无显式 import，与项目既有约定一致。
 
 **为什么标注点放在 imageLoader 而不是 accessor 体内**：`isImageHostEnabled` / `imageHostState` 存在合法的**响应式消费点**——`FeedList.tsx:86`、`VirtualFeed.tsx:125` 的预取门控在 compute 段（追踪区）读它们，设置页 UI 直读 `imageHostState`。若在 accessor 函数体内 untrack，会把这些真订阅一并杀死（图床总开关切换后门控不再响应）= 静默行为变化。untrack 只标在「加载管道」这个快照消费域的入口，响应式消费点不受影响。`loadImageWithProgress:423` 本次日志未触发（用户未开图床且未走详情页进度加载路径），但属同一快照语义，一并标注防换路径复发。
 

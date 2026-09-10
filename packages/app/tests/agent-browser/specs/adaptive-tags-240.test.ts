@@ -56,7 +56,8 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("AdaptiveTags 240px 窄容器�
         15_000,
       );
 
-      // 控制台警告捕获 hook（spec #427）：必须在 reload 之后、登录/首页挂载之前注入才
+      // 控制台警告捕获 hook（docs/specs/solidjs2-strict-read-untracked-cleanup.md，父 issue #427）：
+      // 必须在 reload 之后、登录/首页挂载之前注入才
       // 存活（导航/reload 清空 window 属性）；覆盖 warn+error 两通道；单行注入（CLI 约束）。
       // 同时扩容 resource timing 缓冲：默认 250 条会被 dev 模式 Vite 模块请求（/@fs/）填满，
       // /pixiv-img/ 条目被丢弃，导致下方阳性对照假红（#429 实测 resN 恰好=250）
@@ -181,7 +182,7 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("AdaptiveTags 240px 窄容器�
         `页面横向溢出：scrollWidth ${hScroll.sw} > 视口 ${hScroll.vw}；溢出元素: ${hScroll.off.join(" , ") || "（无直接越界元素，可能为负 margin/transform）"}（#419）`,
       ).toBeLessThanOrEqual(hScroll.vw);
 
-      // ── 零 STRICT_READ_UNTRACKED 通用防线（spec #427）──
+      // ── 零 STRICT_READ_UNTRACKED 通用防线（docs/specs/solidjs2-strict-read-untracked-cleanup.md，父 issue #427）──
       // 确定性重触发：SPA 往返重挂载首页——覆盖 SideNavShell 初始化器读与
       // useFeedActivation ensureLoaded 读（已登录直进首页时这两类可能先于 hook 触发，
       // 往返保证必现）；随后滚动分页——分页新图不在 L1 缓存（loadedKeys 命中会短路
