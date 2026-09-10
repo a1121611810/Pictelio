@@ -8,7 +8,7 @@
     "dev": "PICTELIO_LYNX_DEV=1 rspeedy dev",
     "build": "rspeedy build",
     "preview": "rspeedy preview",
-    "check": "tsc --noEmit -p src/tsconfig.json",
+    "check": "vue-tsc --noEmit -p src/tsconfig.json",
     "test": "vitest run",
     "lint": "echo 'oxlint via rspeedy build (MVP)'",
     "fmt": "echo 'oxfmt not wired for lynx MVP'",
@@ -37,7 +37,8 @@
     "rsbuild-plugin-tailwindcss": "^0.2.4",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.7.0",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "vue-tsc": "^3.3.11"
   },
   "engines": {
     "node": ">=18"

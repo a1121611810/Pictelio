@@ -45,6 +45,7 @@ declare global {
    */
   interface LynxGlobalEventEmitter {
     addListener(event: string, handler: (...args: unknown[]) => void): void
+    removeListener(event: string, handler: (...args: unknown[]) => void): void
   }
   /** SelectorQuery 的 NodesRef（布局查询；web-core 0.23.1 缺 boundingClientRect 方法，
    *  原生 LynxView 用 invoke({ method: 'boundingClientRect' }) 标准 API，见 GlassCard.vue） */
@@ -66,6 +67,11 @@ declare global {
     createSelectorQuery?(): LynxSelectorQuery
   }
   const lynx: LynxGlobal | undefined
+  /**
+   * Lynx 运行时全局（LynxView 内置；web-core 0.23.1 预览环境无此对象 → 引用处必须可选链探测）
+   * 仅含 CarouselSwiper.vue 需要的两个像素字段；其它字段随用随补
+   */
+  const SystemInfo: { pixelWidth: number; pixelRatio: number } | undefined
   /**
    * Lynx runtime 内置全局对象 —— 原生 Native Modules 访问点（#52）。
    * web-core 环境可能不存在或为空对象；引用前必须可选链探测。

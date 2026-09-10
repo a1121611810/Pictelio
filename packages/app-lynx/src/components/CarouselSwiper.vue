@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script setup lang="ts" generic="T">
 // ─── 自研单卡 swipe 轮播（ADR-0115 / spec: app-lynx-recommended-carousel §3.1；
 // 吸附阈值 + fling = ADR-0118 / spec: app-lynx-recommended-carousel-polish-r2 §2.2）───
 // 非原生 <swiper> 元素：按 vue-lynx 官方教程《商品详情页图片轮播》手写。
@@ -11,15 +11,13 @@
 // [ADR-0118] 松手吸附改用 calcSnapTarget（1/3 屏宽阈值 + fling 甩动）：touchend 前用最后一段
 //   移动计算瞬时速度（px/ms），位移未过 1/3 时若速度超阈值也沿速度方向翻页（快甩短距离也翻页）。
 // [单位] slide 宽度 / 吸附 / translateX 全程 px（SystemInfo.pixelWidth/pixelRatio，官方一致）。
-declare const SystemInfo: { pixelWidth: number; pixelRatio: number }
-
 import { ref } from 'vue'
 import { calcSnapTarget, clampOffset } from '../primitives/swiperMath'
 
 const props = withDefaults(
   defineProps<{
-    /** 滑页条目数组（父组件喂渲染流；长度增长时自动扩展滑动边界） */
-    slides: unknown[]
+    /** 滑页条目数组（父组件喂渲染流；长度增长时自动扩展滑动边界）；元素类型透传给 #slide 插槽 */
+    slides: T[]
     /** 每个滑页宽度（CSS px）。缺省 = 屏幕逻辑像素宽（一滑页 = 全宽），官方默认值 */
     itemWidth?: number
     /** 当前页索引变化回调（BG 侧） */
@@ -31,7 +29,7 @@ const props = withDefaults(
   }>(),
   {
     itemWidth: () =>
-      typeof SystemInfo !== 'undefined' ? SystemInfo.pixelWidth / SystemInfo.pixelRatio : 375,
+      SystemInfo ? SystemInfo.pixelWidth / SystemInfo.pixelRatio : 375,
     onIndexChange: undefined,
     onReachEnd: undefined,
     distanceToEnd: 3,
