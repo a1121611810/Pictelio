@@ -51,15 +51,23 @@ const SHELL_TABS: { key: HomeTab; label: string; icon: FluentIconName }[] = [
 ];
 
 /**
- * 初始 Tab：读取全局 currentTab（NavBar / PersonalCenter 入口会预设该值，
+ * 判定 uiStore.Tab 是否为 SideNavShell 可消费的合法 HomeTab。
+ * uiStore.Tab 含 "me"（PersonalCenter 专用），SideNavShell 局部 tab 类型为
+ * HomeTab 子集——PersonalCenter 写 setCurrentTab("me") 时本函数拦截。
+ *
+ * 提取为顶层纯函数以便单测与复用（SideNavShell 初始化 + 反向同步 effect
+ * 共享同一白名单，避免漂移）。
+ */
+export function isValidHomeTab(tab: string): tab is HomeTab {
+  return tab === "recommended" || tab === "follow" || tab === "bookmarks" || tab === "history";
+}
+
+/** 初始 Tab：读取全局 currentTab（NavBar / PersonalCenter 入口会预设该值，
  * 例如「我的收藏」→ bookmarks），非法值（如 "me"）兜底 recommended。
  */
 function initialHomeTab(): HomeTab {
   const t = currentTab();
-  if (t === "recommended" || t === "follow" || t === "bookmarks" || t === "history") {
-    return t;
-  }
-  return "recommended";
+  return isValidHomeTab(t) ? t : "recommended";
 }
 
 /** 当前用户的历史条目（响应 historyVersion，按访问时间倒序）。 */
@@ -124,6 +132,26 @@ const SideNavShell: Component<SideNavShellProps> = (props) => {
   // 局部 Tab 状态：初始值桥接全局 currentTab，切换时反向同步，
   // 保证 NavBar / PersonalCenter 入口的 Tab 预设与首页选择保持一致。
   const [tab, setTab] = createSignal<HomeTab>(initialHomeTab());
+
+  // 反向同步：全局 currentTab → 局部 tab
+  // - compute 仅追踪 currentTab() 一个依赖；同值守卫 + 非法 HomeTab 跳过
+  //   在 compute 内判断（保证 apply 收到合法值）
+  // - apply 负责 setTab 写入（SolidJS 2.0 要求 compute+apply 双函数，
+  //   单函数形式运行时报 MISSING_EFFECT_FN）
+  // - 同值守卫「短路多余 setTab 调用」：即使没有守卫 SolidJS createSignal
+  //   setter 同值 no-op 也防死循环，但显式短路让 setTab 路径更清晰
+  // - 非法 HomeTab 跳过：uiStore.Tab 含 "me"（PersonalCenter 专用），
+  //   isValidHomeTab 拦截避免破坏 HomeTab 类型不变量
+  createEffect(
+    () => {
+      const next = currentTab();
+      if (next === tab()) return undefined; // 同值守卫
+      return isValidHomeTab(next) ? next : undefined;
+    },
+    (next) => {
+      if (next !== undefined) setTab(next);
+    },
+  );
 
   onSettled(() => {
     scrollToTop();
