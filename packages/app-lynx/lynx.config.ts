@@ -87,7 +87,7 @@ const proxyAgent = new HttpsProxyAgent(proxyUrl) as unknown
 export default defineConfig({
   environments: {
     lynx: {},
-    // web 预览多入口（仅 dev）：主入口 + 页面独立预览（error-preview / login-preview）。
+    // web 预览多入口（仅 dev）：主入口 + 页面独立预览（error-preview / login-preview / color-preview）。
     // 生产（_isDev=false）web 环境只保留 main 单入口；lynx 环境恒为默认单入口（src/index.ts），
     // APK 生产 bundle 不受影响。
     web: {
@@ -97,6 +97,7 @@ export default defineConfig({
               main: './src/index.ts',
               'error-preview': './src/errorPreview.ts',
               'login-preview': './src/loginPreview.ts',
+              'color-preview': './src/colorPreview.ts',
             }
           : { main: './src/index.ts' },
       },
