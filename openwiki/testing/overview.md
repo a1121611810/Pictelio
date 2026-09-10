@@ -89,6 +89,8 @@ Two adjacent ADRs (both 2026-08-14) reshaped the E2E posture after the suite dri
 
 The CI `test` job was **removed** — [`.github/workflows/ci.yml`](/.github/workflows/ci.yml) now runs only `pnpm check:all` (type check) and `pnpm lint:all` (lint). Unit tests and agent-browser E2E run **locally only**: the E2E suite needs a real Pixiv network path plus `PIXIV_REFRESH_TOKEN`, which GitHub Runners cannot reproduce, so the old job was an empty shell (42/43 cases skipped via `skipIf`) that created false confidence. `PIXIV_REFRESH_TOKEN` is loaded only from a local `.env` and **never** enters GitHub Secrets or CI logs. Drift is instead caught by the fast [static anchor validation](#static-anchor-validation) plus manual `pnpm test:agent-browser` runs.
 
+Since ADR-0144 (v4.37.0), `check:all` type-checks `packages/app-lynx` with **`vue-tsc`** rather than `tsc` — the lynx `check` script switched to `vue-tsc --noEmit -p src/tsconfig.json` (reusing the `vue-lynx` volar plugin) so `.vue` template expressions and `defineProps`/slot inference are actually checked, closing the blind spot pure `tsc` silently skips. See [ADR-0144](/docs/adr/ADR-0144-app-lynx-vue-tsc.md).
+
 ### Assertion repositioning (ADR-0085)
 
 An audit ([`agent-browser-e2e-perf-direction-c-feasibility.md`](/docs/agent-browser-e2e-perf-direction-c-feasibility.md)) found 55 of 64 `aiAssert` calls were broad "is the page okay?" DOM checks and only one (s48) was a true semantic judgment. ADR-0085 converted the 63 broad/determinizable assertions to deterministic DOM assertions (`evaluate` + `expect`), cutting LLM calls 64 → 1 (−98.4%). `assertion.ts`/`aiAssert` survives as the semantic-judgment facility (used only by s48); the suite still requires a local `DEEPSEEK_API_KEY` for that one assertion.
