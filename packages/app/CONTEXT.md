@@ -293,6 +293,24 @@ _Avoid_: 设备级设置（键不含 userId 的旧模式）
 跨 client 设置契约的物理落点——SharedPreferences 文件 "CapacitorStorage"（@capacitor/preferences 默认 group）。webview 经 Capacitor 插件读写；lynx 原生经 `PictelioPrefsModule` 读写；lynx web-core dev 预览降级 IndexedDB（仅开发环境）。
 _Avoid_: 本地存储（localStorage，web-core Worker 环境不存在）
 
+### 引擎可用性与降级（Engine availability & fallback）
+
+**首选引擎（Preferred client）**：
+`pictelio_client_kind` 所记录的用户选择（`webview` / `lynx`），持久化于 SharedPreferences "CapacitorStorage"；只有用户显式切换才会改变。
+_Avoid_: 当前客户端、当前引擎（易与生效引擎混淆）
+
+**生效引擎（Effective client）**：
+本次启动实际承载的引擎——首选引擎经引擎可用性修正后的结果。首选引擎不可用时降级为另一引擎，但用户的首选记录不被改写。
+_Avoid_: 客户端的「当前值」（该值有两个坐标：选择与生效）
+
+**引擎可用性（Engine availability）**：
+引擎能否在当前设备与安装包上运行。两引擎判据不同——WebView 看主版本号是否达最低要求（检测不到视为可用），Lynx 看包能力与原生库是否真正加载（初始化不抛异常 ≠ native 就绪）。
+_Avoid_: 引擎版本（把可用性等同于版本号；Lynx 无可靠版本查询）
+
+**引擎降级（Engine fallback）**：
+首选引擎不可用时自动以另一引擎本次生效的动作；仅作用于本次运行，不落盘、不改写首选引擎——首选不可用是设备事实，不是用户偏好变化。
+_Avoid_: 自动切换引擎（易被读成对用户选择的持久改写）
+
 ### 网络直连（Direct access）
 
 **直连模式（Direct access）**【2026-09-06 新增，跨上下文】：

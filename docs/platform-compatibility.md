@@ -5,7 +5,7 @@
 | 层级 | 最低版本 | 检测方式 | 不满足时的行为 |
 |---|---|---|---|
 | **Android OS** | **9.0**（API 28） | `minSdkVersion = 28`（`variables.gradle`） | 系统拒绝安装（安装包层面拦截） |
-| **WebView** | **Chrome 85**（主版本号 ≥ 85） | `MainActivity.onCreate()` 中通过 `WebView.getCurrentWebViewPackage()` 获取主版本号 | 显示静态 HTML 升级提示页，不启动应用主体 |
+| **WebView** | **Chrome 85**（主版本号 ≥ 85） | `MainActivity.onCreate()` 中通过 `WebView.getCurrentWebViewPackage()` 获取主版本号 | full 包：WebView 不可用时优先自动降级到 Lynx 引擎（可用时）；Lynx 也不可用才显示静态 HTML 升级提示页。webview / lynx 单引擎包维持原行为 |
 
 ## 决定依据
 
@@ -60,6 +60,7 @@ private boolean isWebViewVersionOk() {
 ```
 
 - 无法获取版本号时（返回 -1）**放行**，避免误杀非标准 WebView 实现
+- **full 包引擎降级（ADR-0153）**：版本不足时先判 `LynxRuntimeInitializer.isAvailable()`（包能力 ∧ 初始化不抛异常 ∧ `LynxEnv.isNativeLibraryLoaded()`）；可用则本次以 Lynx 生效（**不写** `pictelio_client_kind`），不可用才显示升级页。`webview` / `lynx` 单引擎包不参与降级
 - 降级页面为纯静态 HTML（`res/raw/upgrade.html`），零外部资源，ES5 JS，兼容 Chrome 30+
 - 不初始化 Capacitor Bridge、任何插件、JS 运行时，最小化内存占用
 

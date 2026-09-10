@@ -25,14 +25,16 @@ cd packages/app && APPIUM_HOME=$HOME/.appium ANDROID_E2E_AVD=pictelio_ui ANDROID
 | AVD | 系统 | 用途 |
 |-----|------|------|
 | `pictelio_ui` | android-34 | 完整双向闭环（WebView 113） |
-| `pictelio_low` | android-28 | 降级路径验证（Lynx 可达 + 切回停升级页，WebView 66） |
+| `pictelio_low` | android-28 | 降级路径验证（Lynx 可达 + 切回自动降级进 Lynx，WebView 66）；加 `ANDROID_E2E_FLAVOR=webview` 验证单引擎包仍停升级页（ADR-0153） |
 
 两个 AVD 不能同时在线（`ensureEmulator` 检测到非目标在线即报错）。分别运行：
 ```bash
 # pictelio_ui 全量
 ANDROID_E2E_AVD=pictelio_ui ANDROID_E2E_BUILD_MODE=e2e pnpm test:android:e2e
-# pictelio_low 降级
+# pictelio_low 降级（full 包：切回自动降级进 Lynx，ADR-0153）
 ANDROID_E2E_AVD=pictelio_low ANDROID_E2E_BUILD_MODE=e2e pnpm test:android:e2e -- specs/switch-client-roundtrip-low.spec.ts
+# pictelio_low 单引擎 webview 包：仍停升级页（ADR-0153 回归）
+ANDROID_E2E_AVD=pictelio_low ANDROID_E2E_FLAVOR=webview ANDROID_E2E_BUILD_MODE=e2e pnpm test:android:e2e -- specs/webview-only-upgrade.spec.ts
 ```
 
 ## 门禁触发：路径 + PR 标签双通道
