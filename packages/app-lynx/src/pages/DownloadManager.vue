@@ -12,6 +12,7 @@ import {
   availabilityFor,
   availabilityForAll,
   groupByIllust,
+  groupKindLabel,
   hasDeletableFiles,
   progressText,
   selectAll,
@@ -196,7 +197,7 @@ onMounted(() => {
                 group.title
               }}</text>
               <text class="text-label-medium text-surface-on-variant mt-0.5">{{
-                group.kind === 'ugoira' ? '动图' : group.tasks.length + ' 张'
+                groupKindLabel(group.kind, group.tasks.length)
               }}</text>
             </view>
           </view>

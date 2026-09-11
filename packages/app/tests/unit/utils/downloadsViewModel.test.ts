@@ -6,6 +6,7 @@ import {
   availabilityFor,
   availabilityForAll,
   groupByIllust,
+  groupKindLabel,
   hasDeletableFiles,
   progressText,
   selectAll,
@@ -49,6 +50,21 @@ describe("groupByIllust（spec §7 按作品分组）", () => {
 
   it("空输入 → 空分组", () => {
     expect(groupByIllust([])).toEqual([]);
+  });
+});
+
+// 分组类型文案（oracle = spec docs/specs/novel-export.md §7 明示文案：
+// ugoira=动图 / novel=小说 / 静态图=N 张）
+describe("groupKindLabel（spec novel-export §7）", () => {
+  it("ugoira → 动图", () => {
+    expect(groupKindLabel("ugoira", 1)).toBe("动图");
+  });
+  it("novel → 小说", () => {
+    expect(groupKindLabel("novel", 1)).toBe("小说");
+  });
+  it("静态图 → N 张（含单张）", () => {
+    expect(groupKindLabel("image", 3)).toBe("3 张");
+    expect(groupKindLabel("image", 1)).toBe("1 张");
   });
 });
 

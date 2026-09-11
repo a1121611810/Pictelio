@@ -539,6 +539,8 @@ const NovelDetail: Component = () => {
     queuedNoticeTimer = setTimeout(() => setQueuedNotice(null), 4000);
   }
 
+  onCleanup(() => clearTimeout(queuedNoticeTimer));
+
   const blocks = createMemo<NovelBlock[]>(() => {
     return parseNovelBlocks(novelHtml() ?? "", novelImages());
   });
@@ -1476,13 +1478,24 @@ const NovelDetail: Component = () => {
           )}
         </Show>
 
-        {/* 导出入队提示（spec novel-export §7.1） */}
+        {/* 导出入队提示 + 跳下载页（spec novel-export §7.1） */}
         <Show when={queuedNotice()}>
           <div
-            class="fixed left-1/2 bottom-24 z-50 -translate-x-1/2 rounded-[var(--borderRadiusMedium)] px-4 py-2 text-[var(--colorNeutralForegroundOnBrand)] shadow-[var(--elevation4)] [font-size:var(--fontSizeBase200)]"
+            class="fixed left-1/2 bottom-24 z-50 -translate-x-1/2 flex items-center gap-3 rounded-[var(--borderRadiusMedium)] pl-4 pr-2 py-2 text-[var(--colorNeutralForegroundOnBrand)] shadow-[var(--elevation4)] [font-size:var(--fontSizeBase200)]"
             style={{ "background-color": "var(--colorBrandBackground)" }}
           >
-            {queuedNotice()}
+            <span>{queuedNotice()}</span>
+            <button
+              type="button"
+              class="min-h-10 px-3 rounded-[var(--borderRadiusSmall)] bg-transparent text-[var(--colorNeutralForegroundOnBrand)] border border-[var(--colorNeutralForegroundOnBrand)] outline-none cursor-pointer font-semibold hover:opacity-90 active:scale-[0.98] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--colorStrokeFocus2)]"
+              onClick={() => {
+                clearTimeout(queuedNoticeTimer);
+                setQueuedNotice(null);
+                void navigate("/downloads");
+              }}
+            >
+              查看
+            </button>
           </div>
         </Show>
       </div>

@@ -52,7 +52,7 @@
 
 ### D7：设置与 UI 落位（两端各自贴合既有结构）
 
-- **app**：新增 `components/settings/SettingsExport.tsx` 卡片（格式选择 + 三项开关），注册进 `SettingsSections`；详情页入口放 `NovelFooterNav` pill 行（与「显示设置」同级），弹 `ExportSheet`（FluentDialog）。
+- **app**：新增 `components/settings/SettingsExport.tsx` 卡片（格式选择 + 三项开关），注册进 `SettingsSections`；详情页入口放 `NovelFooterNav` pill 行（与「显示设置」同级），弹 `ExportSheet`（底部面板，对齐 `ReaderSettingsSheet`）。
 - **app-lynx**：`pages/Me.vue` 新增「导出」分组（M3 Tailwind chip/switch），入口放 `NovelDetail.vue` 操作行，弹覆盖层面板（复用既有弹层挂载契约）。
 
 ## 后果

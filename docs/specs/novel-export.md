@@ -184,7 +184,7 @@ app 的 `utils/novelBlocks.ts` 与 `api/novel.ts` 的 `parseNovelBlocks`/`parseI
 
 - **设置页**：新卡片 `SettingsExport.tsx`（注册进 `SettingsSections`，置于「下载」之后）：格式 chip 组（9 项，复用 `SettingsDownload` 的 segmented 视觉）+ 三项 `<fluent-switch>` 开关行。
 - **详情页入口**：`NovelFooterNav` pill 行新增「导出」（新 prop `onExport`；有正文时才渲染）。
-- **导出面板 `ExportSheet.tsx`**（`FluentDialog`）：格式 chip（预选全局默认）、内容开关只读摘要（「元数据 ✓ / 封面 ✓ / 插图 ✓」，提示在设置页修改）、「导出」按钮。确认 → 构造 payload → `enqueue` → 关闭 + 固定 message bar「已加入下载队列」+「查看」跳 `/downloads`。
+- **导出面板 `ExportSheet.tsx`**（底部面板，对齐 `ReaderSettingsSheet` 的 Sheet 契约）：格式 chip（预选全局默认）、内容开关只读摘要（「元数据 ✓ / 封面 ✓ / 插图 ✓」，提示在设置页修改）、「导出」按钮。确认 → 构造 payload → `enqueue` → 关闭 + 固定 message bar「已加入下载队列」+「查看」跳 `/downloads`。
 - **不可用态**：无正文（受限/未加载）时入口禁用并提示原因。
 - 交互硬约束：Fluent 令牌、4 曲线 / 5 时长、hover/active/focus-visible、触控 ≥40×40。
 
@@ -201,7 +201,7 @@ start（webview）: { id, sourceUrl, kind:"novel", targetFormat, payloadJson, fi
 start（lynx）   : start(id, sourceUrl, fileName, "novel", targetFormat, framesJson, payloadJson, cb) ; cb(uri,"")/cb("","err")
 ```
 - `sourceUrl` = Pixiv 原文展示链接（仅列表展示/元数据，不参与下载）。
-- 进度：`NovelExporter` 在「取图 / 编码」阶段回调百分比（0–100）。
+- 进度：导出执行器在关键阶段回调百分比（编码前 5% / 落盘前 90%，完成由队列置 100%）——粗粒度（单次编码不可中断分片）。
 - 取消：`PictelioDownloader.cancel(id)` 置位 `AtomicBoolean`，取图循环与编码阶段轮询中止。
 - 恢复：`downloading→paused`（进程重启），payloadJson 从队列 JSON 恢复，可重新 start。
 

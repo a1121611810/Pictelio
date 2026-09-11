@@ -109,6 +109,9 @@ public final class PictelioDownloader {
      * 执行一次小说导出任务：{@link NovelExporter} 按目标格式编码（封面/正文插图经 loader
      * 取字节，字节零进 JS 堆）→ 落盘到系统下载，返回 outputUri。阻塞 IO，调用方自备线程；
      * 失败抛 IOException（消息可读，无静默降级）。
+     *
+     * <p>进度为粗粒度（spec novel-export §8）：编码前 5%、落盘前 90%，完成由队列置 100%
+     *（单次编码不可中断分片，故不提供逐图级进度）。
      */
     public static String downloadNovel(Context context, PixivImageLoader loader, String id,
             String payloadJson, String format, String fileName, ProgressListener listener)
@@ -128,9 +131,15 @@ public final class PictelioDownloader {
         AtomicBoolean token = new AtomicBoolean(false);
         CANCELS.put(id, token);
         try {
+            if (listener != null) {
+                listener.onProgress(5, 100);
+            }
             File exported = NovelExporter.export(context, loader, payloadJson, format, id);
             if (token.get()) {
                 throw new IOException("导出已取消");
+            }
+            if (listener != null) {
+                listener.onProgress(90, 100);
             }
             GallerySaver.SaveResult result = GallerySaver.saveDownloadFile(context, exported, fileName);
             return result.uri.toString();

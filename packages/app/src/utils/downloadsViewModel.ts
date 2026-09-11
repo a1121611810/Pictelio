@@ -41,6 +41,13 @@ export function groupByIllust(tasks: readonly DownloadTask[]): DownloadGroup[] {
   return groups;
 }
 
+/** 分组头部类型文案（spec §7）：ugoira=动图 / novel=小说 / 静态图=N 张 */
+export function groupKindLabel(kind: DownloadKind, count: number): string {
+  if (kind === "ugoira") return "动图";
+  if (kind === "novel") return "小说";
+  return count + " 张";
+}
+
 export interface ActionAvailability {
   start: boolean;
   pause: boolean;

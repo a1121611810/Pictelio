@@ -19,6 +19,7 @@ import {
   availabilityFor,
   availabilityForAll,
   groupByIllust,
+  groupKindLabel,
   hasDeletableFiles,
   progressText,
   selectAll,
@@ -213,7 +214,7 @@ const DownloadManager: Component = () => {
                         {group.title}
                       </p>
                       <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
-                        {group.kind === "ugoira" ? "动图" : group.tasks.length + " 张"}
+                        {groupKindLabel(group.kind, group.tasks.length)}
                       </p>
                     </div>
                   </header>
