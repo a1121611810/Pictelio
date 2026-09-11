@@ -178,6 +178,7 @@ describe("settingsStore — 小说导出设置（spec novel-export §6）", () =
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { store } = await loadStore({ settings_novel_export_format: "bogus" });
     expect(store.novelExportFormat()).toBe("txt");
+    expect(warnSpy).toHaveBeenCalled();
     warnSpy.mockRestore();
   });
 

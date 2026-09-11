@@ -340,7 +340,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 }
 
 /** 校验并构造干净 task（丢弃未知字段/非法条目返回 null）。 */
-function normalizeTask(v: unknown): DownloadTask | null {
+function normalizeTask(v: unknown, warn: (msg: string, err?: unknown) => void): DownloadTask | null {
   if (!isRecord(v)) return null
   const {
     id,
@@ -399,7 +399,14 @@ function normalizeTask(v: unknown): DownloadTask | null {
     }
     if (clean.length > 0) t.frames = clean
   }
-  if (typeof payloadJson === 'string') t.payloadJson = payloadJson
+  if (typeof payloadJson === 'string') {
+    t.payloadJson = payloadJson
+  } else if (payloadJson !== undefined) {
+    // 测试硬约束 #3：非法载荷不得静默丢弃
+    warn('[downloadQueueCore] 丢弃非法 payloadJson: ' + id)
+  } else if (kind === 'novel') {
+    warn('[downloadQueueCore] novel 任务缺少 payloadJson: ' + id)
+  }
   if (typeof bytesDone === 'number') t.bytesDone = bytesDone
   if (typeof bytesTotal === 'number') t.bytesTotal = bytesTotal
   if (typeof outputUri === 'string') t.outputUri = outputUri
@@ -435,7 +442,7 @@ export function restore(
   const tasks: DownloadTask[] = []
   let dropped = 0
   for (const entry of parsed.tasks) {
-    const t = normalizeTask(entry)
+    const t = normalizeTask(entry, warn)
     if (!t) {
       dropped++
       continue

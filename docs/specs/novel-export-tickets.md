@@ -14,7 +14,7 @@
 | T6 | NovelExporter EPUB | T5 | EPUB3 编码 | mimetype 首个且 stored、opf/nav/ncx 结构、well-formed、插页/封面 | done |
 | T7 | NovelExporter DOCX | T5 | OOXML 编码 | zip 部件齐全、document.xml 可解析、CJK 文本存在 | done |
 | T8 | NovelExporter PDF | T5 | PdfDocument+StaticLayout 编码 | 页数>0、CJK 文本存在、插图绘制不崩；分页正确 | done（Robolectric 无法执行 PdfDocument，经 PdfBackend seam + 纯 Paginator 测试；真机保真度待设备批次） |
-| T9 | 执行器 + 桥 + TS executor | T1,T2 | `PictelioDownloader.downloadNovel`、webview 插件、lynx module、`capacitorDownloadExecutor`/`lynxDownloadExecutor` 增加 payloadJson | kind=novel 桥契约、参数校验、取消、进度；单测 | todo |
+| T9 | 执行器 + 桥 + TS executor | T1,T2 | `PictelioDownloader.downloadNovel`、webview 插件、lynx module、`capacitorDownloadExecutor`/`lynxDownloadExecutor` 增加 payloadJson | kind=novel 桥契约、参数校验、取消、进度；单测 | done |
 | T10 | app 导出 UI | T2,T3,T9 | `NovelFooterNav` 新 prop、`ExportSheet.tsx`、`NovelDetail` 接线 | 默认预选/临时覆盖/确认入队/无正文禁用；组件测试 | done |
 | T11 | app-lynx 导出 UI | T2,T3,T9 | `NovelDetail.vue` 入口 + 覆盖层面板 | 同 T10 语义；web-core 显式失败 | done |
 | T12 | E2E + 跨端契约 + 门禁 | T10,T11 | agent-browser spec + 契约测试 | 设置→导出→入队→下载页可见；键/白名单/id 双端一致；`check:all`/`lint`/`test:all`/`fmt:check` 绿 | done（agent-browser 2 用例真机跑通；settings 键一致性 + 桥契约测试绿；Java 256 测试绿；`check:all`/`test:all` 绿。PDF 真机保真度与 Java 侧 PDF 运行时留待设备批次） |

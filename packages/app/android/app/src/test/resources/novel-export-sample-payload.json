@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "meta": {
+    "id": 42,
+    "title": "Golden Novel 黄金样例",
+    "authorId": 456,
+    "authorName": "作者甲",
+    "tags": [
+      "tag1",
+      "tag2 (标签2)"
+    ],
+    "createDate": "2025-01-01T00:00:00+00:00",
+    "sourceUrl": "https://www.pixiv.net/novel/show.php?id=42",
+    "xRestrict": 0,
+    "seriesId": 7,
+    "seriesTitle": "Sample Series",
+    "description": "简介加粗与尾",
+    "coverUrl": "https://i.pximg.net/novel/cover_l.jpg"
+  },
+  "options": {
+    "includeMetadata": true,
+    "includeCover": true,
+    "includeInlineImages": true
+  },
+  "blocks": [
+    {
+      "type": "chapter",
+      "title": "第一章 起"
+    },
+    {
+      "type": "text",
+      "index": 0,
+      "text": "这是粗体与斜体，还有漢字。",
+      "inlineRuns": [
+        {
+          "start": 2,
+          "end": 4,
+          "tag": "bold"
+        },
+        {
+          "start": 5,
+          "end": 7,
+          "tag": "italic"
+        }
+      ]
+    },
+    {
+      "type": "image",
+      "imageId": "100",
+      "url": "https://i.pximg.net/img/1200/100.jpg"
+    },
+    {
+      "type": "pageBreak"
+    },
+    {
+      "type": "jump",
+      "kind": "illust",
+      "target": "illust/12345",
+      "url": "https://www.pixiv.net/artworks/12345"
+    },
+    {
+      "type": "text",
+      "index": 1,
+      "text": "外部链接[jump:https://example.com] 保留为文本"
+    },
+    {
+      "type": "text",
+      "index": 2,
+      "text": "最后一段。"
+    }
+  ]
+}

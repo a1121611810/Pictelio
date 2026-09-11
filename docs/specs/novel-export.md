@@ -152,9 +152,9 @@ app 的 `utils/novelBlocks.ts` 与 `api/novel.ts` 的 `parseNovelBlocks`/`parseI
 
 | 格式 | 元数据 | 封面 | 正文插图 | 容器/要点 |
 |------|--------|------|----------|-----------|
-| txt | 头部段落 | 链接行 | 图片 URL 行 | UTF-8 **BOM**；段落间空行；`[chapter:]`→`## `；`[newpage]`→分隔行 |
-| html | `<header>` | `<img src="data:...">` | `<img src="data:...">` | 单文件自包含 + 内联 CSS；`<ruby>` 保注音；`<h2>` 章节；转义 5 字符 |
-| md | YAML front matter（可选）或首段 | `![封面](url)` | `![图](url)` | CommonMark；`**/**``/`~~`/内联 `<u>`；ruby 用内联 HTML；链接为原始 URL |
+| txt | 头部段落 | 链接行 | 图片 URL 行 | UTF-8 **BOM**；段落间空行；`[chapter:]`→章节标题独占一行（纯文本无 Markdown 前缀）；`[newpage]`→分隔行 |
+| html | `<header>` | `<img src="data:...">` | `<img src="data:...">` | 单文件自包含 + 内联 CSS；行内样式 `<strong>/<em>/<s>/<u>`；注音在 IR 层已剥离为主文（与阅读器一致）；`<h2>` 章节；转义 5 字符 |
+| md | YAML front matter（可选）或首段 | `![封面](url)` | `![图](url)` | CommonMark；`**/**``/`~~`/内联 `<u>`；注音在 IR 层已剥离为主文（与阅读器一致）；链接为原始 URL |
 | docx | 标题段落 | 内嵌 | 内嵌 | OOXML zip：`[Content_Types].xml`、`_rels/.rels`、`word/document.xml`、`word/styles.xml`、`word/_rels/document.xml.rels`、`word/media/*`；CJK 用字体名不嵌入 |
 | pdf | 首页标题块 | 内嵌 | 内嵌 | `PdfDocument` + `StaticLayout`（A4 595×842pt、边距 16mm）；系统 CJK 字体；按页高切块；插图等比缩放绘制 |
 | epub | OPF metadata + 标题页 | 内嵌 cover | 内嵌 | EPUB 3 zip：`mimetype` **首个且 stored（level 0）**、`META-INF/container.xml`、`OEBPS/content.opf`、`OEBPS/nav.xhtml`、`OEBPS/toc.ncx`、章节 XHTML（well-formed XML）；`page-progression-direction`；`xml:lang` |
@@ -163,6 +163,7 @@ app 的 `utils/novelBlocks.ts` 与 `api/novel.ts` 的 `parseNovelBlocks`/`parseI
 | fb2 | `<description>` | base64 `<binary>` | base64 `<binary>` | FictionBook 2 XML；XHTML-ish `<body>` |
 
 - 文本类无内嵌能力的格式（txt/md/rtf）对封面/插图退化为链接：**开关不失效**，只是资产不以二进制嵌入。
+- **JSON 例外**：JSON 为无损 IR 全量转储，内容开关不适用（始终全量）；§10「内容开关生效」不含 JSON。txt/rtf 的封面链接在 `includeMetadata=false` 时仍独立保留（`includeCover` 单独控制）。
 - 单张插图下载失败 → 跳过 + `Log.w`（导出成功）；作为硬契约的「元数据/正文」失败 → 抛 `IOException`。
 
 ## 6. 设置
@@ -185,7 +186,8 @@ app 的 `utils/novelBlocks.ts` 与 `api/novel.ts` 的 `parseNovelBlocks`/`parseI
 - **设置页**：新卡片 `SettingsExport.tsx`（注册进 `SettingsSections`，置于「下载」之后）：格式 chip 组（9 项，复用 `SettingsDownload` 的 segmented 视觉）+ 三项 `<fluent-switch>` 开关行。
 - **详情页入口**：`NovelFooterNav` pill 行新增「导出」（新 prop `onExport`；有正文时才渲染）。
 - **导出面板 `ExportSheet.tsx`**（底部面板，对齐 `ReaderSettingsSheet` 的 Sheet 契约）：格式 chip（预选全局默认）、内容开关只读摘要（「元数据 ✓ / 封面 ✓ / 插图 ✓」，提示在设置页修改）、「导出」按钮。确认 → 构造 payload → `enqueue` → 关闭 + 固定 message bar「已加入下载队列」+「查看」跳 `/downloads`。
-- **不可用态**：无正文（受限/未加载）时入口禁用并提示原因。
+- **不可用态**：无正文（受限/未加载）时**不渲染导出入口**（两端一致；不提供禁用态）。
+- **下载页分组头部文案**（`groupKindLabel`，双端同源）：ugoira→「动图」/ novel→「小说」/ 静态图→「N 张」。
 - 交互硬约束：Fluent 令牌、4 曲线 / 5 时长、hover/active/focus-visible、触控 ≥40×40。
 
 ### 7.2 app-lynx（Vue / M3 Tailwind）
