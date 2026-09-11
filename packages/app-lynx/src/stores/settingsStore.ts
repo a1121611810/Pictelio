@@ -68,6 +68,42 @@ const WEBDAV_AUTO_BACKUP_DAYS_KEY = "settings_webdav_auto_backup_days"
 const WEBDAV_LAST_BACKUP_KEY = "settings_webdav_last_backup"
 const WEBDAV_EXCLUDED_KEYS_KEY = "settings_webdav_excluded_keys"
 
+/**
+ * 备份域设备级键清单（spec docs/specs/webdav-backup.md §3.1）：与 app settingsStore
+ * 的持久化设置键对齐；sets 在 app-lynx 暂无对应 store（无屏蔽/举报功能），
+ * 因此 lynx 备份的 sets 为空对象（跨引擎恢复时由 app 侧 sets 覆盖）。
+ */
+export const BACKUP_DEVICE_KEYS = [
+  UGOIRA_MODE_KEY,
+  UGOIRA_DOWNLOAD_FORMAT_KEY,
+  DETAIL_QUALITY_KEY,
+  THEME_COLOR_KEY,
+  NOVEL_EXPORT_FORMAT_KEY,
+  NOVEL_EXPORT_INCLUDE_METADATA_KEY,
+  NOVEL_EXPORT_INCLUDE_COVER_KEY,
+  NOVEL_EXPORT_INCLUDE_IMAGES_KEY,
+  WEBDAV_ENABLED_KEY,
+  WEBDAV_URL_KEY,
+  WEBDAV_USERNAME_KEY,
+  WEBDAV_DIR_KEY,
+  WEBDAV_AUTO_BACKUP_KEY,
+  WEBDAV_AUTO_BACKUP_DAYS_KEY,
+  WEBDAV_LAST_BACKUP_KEY,
+  WEBDAV_EXCLUDED_KEYS_KEY,
+] as const
+
+/** 备份域账号级键（spec §3.1；恢复按当前 uid 过滤，spec §6） */
+export function backupAccountKeys(uid: number): string[] {
+  return [r18Key(uid), r18gKey(uid), aiFilterModeKey(uid)]
+}
+
+/**
+ * 仅走 idbKV 的设备级键（native 与 web-core 一致——见 loadSettings 与对应 setter）：
+ * exportRawValues 必须双源读取，否则这些键会静默漏出备份域（本文件 loadSettings
+ * 的 ugoiraMode/detailQuality 即直接读 idbGet，不经 PrefsStorage seam）。
+ */
+const BACKUP_IDB_KEYS = [UGOIRA_MODE_KEY, DETAIL_QUALITY_KEY] as const
+
 // ── PrefsStorage seam（ADR-0103 决策 3：两 adapter = 真 seam）──
 
 interface PrefsStorage {
@@ -548,6 +584,149 @@ export const useSettingsStore = defineStore("settings", () => {
     { flush: "sync" },
   )
 
+  // ── 备份原语（spec docs/specs/webdav-backup.md §3.1/§3.2/§6；与 app registry
+  //    rawValues/setRawValues 同源同语义：原始字符串口径 + merge-by-keys）──
+
+  /** 备份导出：设备级键 + 当前账号级键的存储层原始字符串（无记录者省略） */
+  async function exportRawValues(): Promise<Record<string, string>> {
+    const p = prefs()
+    const out: Record<string, string> = {}
+    // 双源：idbKV 键（ugoiraMode/detailQuality）+ prefs 键（其余设备级与账号级）
+    for (const key of BACKUP_IDB_KEYS) {
+      try {
+        const v = await idbGet(key)
+        if (v !== null) out[key] = v
+      } catch (e) {
+        console.warn("[settingsStore] 备份导出读取失败（idbKV）", key, e)
+      }
+    }
+    const keys: string[] = [...BACKUP_DEVICE_KEYS]
+    const id = uid()
+    if (id !== null) keys.push(...backupAccountKeys(id))
+    for (const key of keys) {
+      if ((BACKUP_IDB_KEYS as readonly string[]).includes(key)) continue
+      try {
+        const v = await p.get(key)
+        if (v !== null) out[key] = v
+      } catch (e) {
+        // 读取失败 = 该键不进快照；必须可见（硬约束 #3）
+        console.warn("[settingsStore] 备份导出读取失败", key, e)
+      }
+    }
+    return out
+  }
+
+  /**
+   * 备份恢复（merge-by-keys）：仅识别已注册键；未识别键/异账号账号级键跳过。
+   * 值经既有 setter 写回（setter 自带校验与持久化，非法值返回 false 计入 skipped）。
+   */
+  async function importRawValues(
+    entries: Record<string, string>,
+  ): Promise<{ applied: string[]; skipped: string[] }> {
+    const applied: string[] = []
+    const skipped: string[] = []
+    const id = uid()
+    for (const [key, raw] of Object.entries(entries)) {
+      if (applyRawKey(key, raw, id)) applied.push(key)
+      else skipped.push(key)
+    }
+    return { applied, skipped }
+  }
+
+  /** 单键写回；返回是否识别并成功应用（异账号账号级键 → false） */
+  function applyRawKey(key: string, raw: string, id: number | null): boolean {
+    switch (key) {
+      case UGOIRA_MODE_KEY:
+        if (raw !== "fflate" && raw !== "range") return false
+        setUgoiraMode(raw)
+        return true
+      case UGOIRA_DOWNLOAD_FORMAT_KEY:
+        if (!(UGOIRA_FORMATS as readonly string[]).includes(raw)) return false
+        setUgoiraDownloadFormat(raw as UgoiraFormat)
+        return true
+      case DETAIL_QUALITY_KEY:
+        if (raw !== "medium" && raw !== "large" && raw !== "original") return false
+        setDetailQuality(raw)
+        return true
+      case THEME_COLOR_KEY:
+        if (!isThemeColorId(raw)) return false
+        setThemeColor(raw)
+        return true
+      case NOVEL_EXPORT_FORMAT_KEY:
+        if (!(NOVEL_EXPORT_FORMATS as readonly string[]).includes(raw)) return false
+        setNovelExportFormat(raw as NovelExportFormat)
+        return true
+      case NOVEL_EXPORT_INCLUDE_METADATA_KEY:
+        if (raw !== "true" && raw !== "false") return false
+        setNovelExportIncludeMetadata(raw === "true")
+        return true
+      case NOVEL_EXPORT_INCLUDE_COVER_KEY:
+        if (raw !== "true" && raw !== "false") return false
+        setNovelExportIncludeCover(raw === "true")
+        return true
+      case NOVEL_EXPORT_INCLUDE_IMAGES_KEY:
+        if (raw !== "true" && raw !== "false") return false
+        setNovelExportIncludeImages(raw === "true")
+        return true
+      case WEBDAV_ENABLED_KEY:
+        if (raw !== "true" && raw !== "false") return false
+        setWebdavEnabled(raw === "true")
+        return true
+      case WEBDAV_URL_KEY:
+        setWebdavUrl(raw)
+        return true
+      case WEBDAV_USERNAME_KEY:
+        setWebdavUsername(raw)
+        return true
+      case WEBDAV_DIR_KEY:
+        setWebdavDir(raw)
+        return true
+      case WEBDAV_AUTO_BACKUP_KEY:
+        if (raw !== "true" && raw !== "false") return false
+        setWebdavAutoBackup(raw === "true")
+        return true
+      case WEBDAV_AUTO_BACKUP_DAYS_KEY: {
+        const n = Number(raw)
+        if (!Number.isInteger(n) || n < 1 || n > 30) return false
+        setWebdavAutoBackupDays(n)
+        return true
+      }
+      case WEBDAV_LAST_BACKUP_KEY:
+        setWebdavLastBackup(raw)
+        return true
+      case WEBDAV_EXCLUDED_KEYS_KEY: {
+        try {
+          const parsed: unknown = JSON.parse(raw)
+          if (!Array.isArray(parsed) || !parsed.every((k) => typeof k === "string")) return false
+          setWebdavExcludedKeys(parsed as string[])
+          return true
+        } catch {
+          return false
+        }
+      }
+      default:
+        break
+    }
+    // 账号级键：仅当前 uid
+    if (id === null) return false
+    if (key === r18Key(id)) {
+      if (raw !== "true" && raw !== "false") return false
+      setShowR18(raw === "true")
+      return true
+    }
+    if (key === r18gKey(id)) {
+      if (raw !== "true" && raw !== "false") return false
+      setShowR18G(raw === "true")
+      return true
+    }
+    if (key === aiFilterModeKey(id)) {
+      if (!isAiFilterMode(raw)) return false
+      setAiFilterMode(raw)
+      return true
+    }
+    return false
+  }
+
   return {
     // getters（公共 ref）
     showR18,
@@ -588,6 +767,8 @@ export const useSettingsStore = defineStore("settings", () => {
     setWebdavAutoBackupDays,
     setWebdavLastBackup,
     setWebdavExcludedKeys,
+    exportRawValues,
+    importRawValues,
     isRestricted,
     isAiWork,
     isAiRestricted,

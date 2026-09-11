@@ -23,6 +23,12 @@ export const ME_A11Y_LABELS = {
   watchlist: '追更列表',
   downloads: '下载管理',
   networkCheck: '网络自检',
+  // WebDAV 备份（spec docs/specs/webdav-backup.md §7）：主开关 + 三个动作 + 撤销
+  webdavToggle: '启用WebDAV备份',
+  webdavTest: 'WebDAV连接测试',
+  webdavBackup: 'WebDAV立即备份',
+  webdavRestore: 'WebDAV恢复',
+  webdavUndo: 'WebDAV撤销上次恢复',
   // 动图下载格式（spec download-manager §5）：全局统一，六格式各一标注
   downloadFormatGif: '动图下载格式GIF',
   downloadFormatMp4: '动图下载格式MP4',

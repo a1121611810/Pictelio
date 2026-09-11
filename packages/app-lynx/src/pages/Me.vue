@@ -13,6 +13,30 @@ import { proxyImageUrl } from '../utils/imageUrl'
 import { ME_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import GlassCard from '../components/GlassCard.vue'
 import { themeColorClass } from '../utils/themeColor'
+import {
+  createLynxBackupDeps,
+  createLynxBackupWiring,
+  clearPreRestoreSnapshot,
+  loadPreRestoreSnapshot,
+  runStartupAutoBackup,
+  undoLastRestore,
+} from '../services/backupWiring'
+import { isNativeMode } from '../api/client'
+import {
+  backupNow,
+  listBackups,
+  restoreFrom,
+  testConnection,
+  type BackupFileInfo,
+} from '../utils/backupService'
+import { WEBDAV_ERROR_MESSAGES } from '../utils/backupCore'
+import { WebDavError } from '../utils/webDavBridge'
+import {
+  loadBackupPassword,
+  loadWebdavPassword,
+  saveBackupPassword,
+  saveWebdavPassword,
+} from '../utils/webdavCredentials'
 
 const auth = useAuthStore()
 const settings = useSettingsStore()
@@ -21,11 +45,134 @@ const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detai
 
 const switching = ref(false)
 
+// ─── WebDAV 备份（spec docs/specs/webdav-backup.md §7；仅原生 LynxView 渲染，§2）───
+const webdavAvailable = isNativeMode()
+const webdavBusy = ref<string | null>(null)
+const webdavStatus = ref('')
+const webdavError = ref('')
+const webdavLoginPassword = ref('')
+const webdavBackupPassword = ref('')
+const webdavLastBackupLabel = ref('')
+const webdavHasPreRestore = ref(false)
+const webdavFiles = ref<BackupFileInfo[]>([])
+const webdavShowRestore = ref(false)
+const webdavSelected = ref<BackupFileInfo | null>(null)
+
+/** 错误分类 → 用户文案（spec §5；与 app 侧 SettingsWebdav 同语义） */
+function webdavErrorMessage(err: unknown): string {
+  if (err instanceof WebDavError) {
+    return WEBDAV_ERROR_MESSAGES[err.kind] ?? err.message
+  }
+  if (err instanceof Error) return err.message
+  return String(err)
+}
+
+async function runWebdav(label: string, action: () => Promise<string>): Promise<void> {
+  webdavBusy.value = label
+  webdavStatus.value = ''
+  webdavError.value = ''
+  try {
+    webdavStatus.value = await action()
+  } catch (e) {
+    console.warn('[Me] WebDAV ' + label + ' 失败', e)
+    webdavError.value = webdavErrorMessage(e)
+  } finally {
+    webdavBusy.value = null
+  }
+}
+
+async function loadWebdavCredentials(): Promise<void> {
+  webdavLoginPassword.value = (await loadWebdavPassword()) ?? ''
+  webdavBackupPassword.value = (await loadBackupPassword()) ?? ''
+  webdavHasPreRestore.value = (await loadPreRestoreSnapshot()) !== null
+}
+
+async function saveWebdavCredentials(): Promise<void> {
+  await saveWebdavPassword(webdavLoginPassword.value)
+  await saveBackupPassword(webdavBackupPassword.value)
+}
+
+function toggleWebdavEnabled(): void {
+  const next = !settings.webdavEnabled
+  settings.setWebdavEnabled(next)
+  if (next) void loadWebdavCredentials()
+}
+
+function toggleWebdavAutoBackup(): void {
+  settings.setWebdavAutoBackup(!settings.webdavAutoBackup)
+}
+
+function pickWebdavAutoBackupDays(days: number): void {
+  settings.setWebdavAutoBackupDays(days)
+}
+
+function refreshWebdavLastBackupLabel(): void {
+  webdavLastBackupLabel.value =
+    settings.webdavLastBackup === ''
+      ? '从未备份'
+      : new Date(settings.webdavLastBackup).toLocaleString()
+}
+
+function onWebdavTest(): void {
+  void runWebdav('连接测试', async () => {
+    await saveWebdavCredentials()
+    const { fileCount } = await testConnection(createLynxBackupDeps())
+    return `连接成功，远端已有 ${fileCount} 份备份`
+  })
+}
+
+function onWebdavBackup(): void {
+  void runWebdav('立即备份', async () => {
+    await saveWebdavCredentials()
+    const r = await backupNow(createLynxBackupDeps())
+    settings.setWebdavLastBackup(new Date().toISOString())
+    refreshWebdavLastBackupLabel()
+    await clearPreRestoreSnapshot()
+    webdavHasPreRestore.value = false
+    return `已备份 ${r.fileName}（${r.bytes} 字节${r.encrypted ? '，已加密' : ''}）`
+  })
+}
+
+function onWebdavOpenRestore(): void {
+  void runWebdav('读取备份列表', async () => {
+    await saveWebdavCredentials()
+    webdavFiles.value = await listBackups(createLynxBackupDeps())
+    webdavSelected.value = null
+    webdavShowRestore.value = true
+    return webdavFiles.value.length === 0 ? '远端暂无备份' : ''
+  })
+}
+
+function onWebdavRestore(): void {
+  void runWebdav('恢复', async () => {
+    const file = webdavSelected.value
+    if (file === null) throw new Error('请先选择要恢复的备份')
+    await saveWebdavCredentials()
+    const result = await restoreFrom(createLynxBackupDeps(), file)
+    webdavHasPreRestore.value = true
+    webdavShowRestore.value = false
+    return `已恢复 ${result.summary.createdAt} 的备份（跳过异账号键 ${result.plan.skippedAccountKeys.length} 项）`
+  })
+}
+
+function onWebdavUndo(): void {
+  void runWebdav('撤销恢复', async () => {
+    const ok = await undoLastRestore(createLynxBackupWiring())
+    if (!ok) return '没有可撤销的应急快照'
+    return '已回滚到恢复前的本地状态'
+  })
+}
+
+// 启动时自动备份（T8）：登录后触发一次；开关关时零 IO
+void runStartupAutoBackup()
+
 // ─── 全局放射 FAB 桥（ADR-0120）：注册空动作（内环空 = 仅外环导航），卸载时注销 ───
 let unreg: (() => void) | undefined
 onMounted(async () => {
   unreg = useGlobalFabStore().usePage('me', {})
   await ensureAuth()
+  refreshWebdavLastBackupLabel()
+  if (settings.webdavEnabled) await loadWebdavCredentials()
 })
 
 onUnmounted(() => {
@@ -696,6 +843,149 @@ function toggleR18G() {
           <text class="text-title-medium text-error">退出登录</text>
         </view>
       </view>
+      <!-- WebDAV 备份（spec docs/specs/webdav-backup.md §7；仅原生渲染，§2 web-core 不显示） -->
+      <view
+        v-if="webdavAvailable"
+        class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]"
+      >
+        <text class="text-title-small font-medium text-surface-on">WebDAV 备份</text>
+        <text class="text-label-medium text-surface-on-variant mt-1 mb-3">备份本机设置到自托管 WebDAV</text>
+
+        <view
+          class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.webdavToggle"
+          @tap="toggleWebdavEnabled"
+        >
+          <text class="text-title-medium text-surface-on">启用 WebDAV 备份</text>
+          <view class="w-[13.867vw] h-[8.533vw] rounded-full flex items-center px-[1.067vw]"
+            :class="settings.webdavEnabled ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start'">
+            <view class="w-[6.4vw] h-[6.4vw] rounded-full" :class="settings.webdavEnabled ? 'bg-primary-on' : 'bg-outline'" />
+          </view>
+        </view>
+
+        <template v-if="settings.webdavEnabled">
+          <input
+            v-model="settings.webdavUrl"
+            class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] text-body-large text-surface-on px-4 mt-3"
+            placeholder="https://dav.example.com/remote.php/dav/files/me/"
+            placeholder-color="#41474e"
+          />
+          <input
+            v-model="settings.webdavUsername"
+            class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] text-body-large text-surface-on px-4 mt-3"
+            placeholder="用户名"
+            placeholder-color="#41474e"
+          />
+          <input
+            v-model="webdavLoginPassword"
+            class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] text-body-large text-surface-on px-4 mt-3"
+            placeholder="密码（加密存储）"
+            placeholder-color="#41474e"
+          />
+          <input
+            v-model="settings.webdavDir"
+            class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] text-body-large text-surface-on px-4 mt-3"
+            placeholder="目录（默认 Pictelio/backup）"
+            placeholder-color="#41474e"
+          />
+          <input
+            v-model="webdavBackupPassword"
+            class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] text-body-large text-surface-on px-4 mt-3"
+            placeholder="备份密码（可选，加密备份文件）"
+            placeholder-color="#41474e"
+          />
+
+          <view class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant mt-2">
+            <text class="text-title-medium text-surface-on">启动时自动备份</text>
+            <view class="flex flex-row gap-2">
+              <view
+                v-for="d in [1, 3, 7, 30]"
+                :key="d"
+                class="px-3 py-1 rounded-[var(--md-shape-full)]"
+                :class="settings.webdavAutoBackupDays === d ? 'bg-primary' : 'bg-surface-container-high'"
+                @tap="pickWebdavAutoBackupDays(d)"
+              >
+                <text class="text-label-medium" :class="settings.webdavAutoBackupDays === d ? 'text-primary-on' : 'text-surface-on'">{{ d }}天</text>
+              </view>
+              <view
+                class="px-3 py-1 rounded-[var(--md-shape-full)]"
+                :class="settings.webdavAutoBackup ? 'bg-primary' : 'bg-surface-container-high'"
+                @tap="toggleWebdavAutoBackup"
+              >
+                <text class="text-label-medium" :class="settings.webdavAutoBackup ? 'text-primary-on' : 'text-surface-on'">
+                  {{ settings.webdavAutoBackup ? '开' : '关' }}
+                </text>
+              </view>
+            </view>
+          </view>
+
+          <text class="text-label-medium text-surface-on-variant mt-3">上次备份：{{ webdavLastBackupLabel }}</text>
+
+          <view class="flex flex-row gap-2 mt-3">
+            <view
+              class="flex-1 h-[10.667vw] bg-surface-container-high rounded-[var(--md-shape-full)] flex items-center justify-center"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="ME_A11Y_LABELS.webdavTest"
+              @tap="onWebdavTest"
+            >
+              <text class="text-label-large text-surface-on">连接测试</text>
+            </view>
+            <view
+              class="flex-1 h-[10.667vw] bg-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="ME_A11Y_LABELS.webdavBackup"
+              @tap="onWebdavBackup"
+            >
+              <text class="text-label-large font-medium text-primary-on">立即备份</text>
+            </view>
+          </view>
+          <view class="flex flex-row gap-2 mt-2">
+            <view
+              class="flex-1 h-[10.667vw] bg-surface-container-high rounded-[var(--md-shape-full)] flex items-center justify-center"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="ME_A11Y_LABELS.webdavRestore"
+              @tap="onWebdavOpenRestore"
+            >
+              <text class="text-label-large text-surface-on">恢复</text>
+            </view>
+            <view
+              v-if="webdavHasPreRestore"
+              class="flex-1 h-[10.667vw] bg-surface-container-high rounded-[var(--md-shape-full)] flex items-center justify-center"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="ME_A11Y_LABELS.webdavUndo"
+              @tap="onWebdavUndo"
+            >
+              <text class="text-label-large text-surface-on">撤销上次恢复</text>
+            </view>
+          </view>
+
+          <view v-if="webdavShowRestore" class="mt-3">
+            <text class="text-label-medium text-surface-on-variant">选择要恢复的备份</text>
+            <view v-for="file in webdavFiles" :key="file.name" class="py-2.5" @tap="webdavSelected = file">
+              <text class="text-body-medium" :class="webdavSelected?.name === file.name ? 'text-primary' : 'text-surface-on'">
+                {{ file.name }}{{ file.encrypted ? '（加密）' : '' }}
+              </text>
+            </view>
+            <text v-if="webdavSelected" class="text-label-medium text-error mt-2">
+              恢复会覆盖本机对应设置（仅覆盖备份中存在的键），恢复前自动保存应急快照。
+            </text>
+            <view v-if="webdavSelected" class="flex flex-row gap-2 mt-2">
+              <view class="flex-1 h-[10.667vw] bg-surface-container-high rounded-[var(--md-shape-full)] flex items-center justify-center" @tap="webdavShowRestore = false">
+                <text class="text-label-large text-surface-on">取消</text>
+              </view>
+              <view class="flex-1 h-[10.667vw] bg-error rounded-[var(--md-shape-full)] flex items-center justify-center" @tap="onWebdavRestore">
+                <text class="text-label-large text-error-on">确认恢复</text>
+              </view>
+            </view>
+          </view>
+
+          <text v-if="webdavBusy" class="text-label-medium text-surface-on-variant mt-3">{{ webdavBusy }}…</text>
+          <text v-if="webdavStatus" class="text-label-medium text-surface-on-variant mt-2">{{ webdavStatus }}</text>
+          <text v-if="webdavError" class="text-label-medium text-error mt-2">{{ webdavError }}</text>
+        </template>
+      </view>
+
       <!-- 底部留白：让滚动到底时最后一张卡片不贴底 -->
       <view class="h-[8vw]" />
     </scroll-view>
