@@ -12,9 +12,9 @@
 | T5 | 凭据与连接配置存储 | T0 | secure storage `webdav_password` / `webdav_backup_password`；`settings_webdav_*` 共享键注册（双端） | 密码不入普通 Preferences；连接配置跨引擎读写一致；单测 | done |
 | T6 | app 设置区块 + 备份/恢复接线 | T3,T4,T5 | app Settings「WebDAV」区块（Fluent）+ 备份/恢复流程 UI | 摘要确认/二次确认/进度/错误分类文案/pre-restore 快照与撤销入口；组件单测 | done |
 | T7 | app-lynx 设置区块 + 接线 | T3,T4,T5 | app-lynx Me 页「WebDAV」区块（M3）+ 同语义流程 | 同 T6 语义；web-core 显式不渲染；组件单测 | done |
-| T8 | 启动时自动备份 | T6,T7 | 启动钩子（距上次备份超过 N 天触发，N∈{1,3,7,30} 默认 7） | 生命周期内触发；失败静默下次再试 + warn；单测 | todo |
-| T9 | pre-restore 快照与回滚 | T6,T7 | 本地应急快照（单 Preferences 键，保留到下次成功备份）+ 「撤销上次恢复」 | 恢复前必存；回滚完整；单测 | todo |
-| T10 | 契约测试 + E2E 收口 | T4,T6,T7,T8,T9 | 快照格式契约测试（magic/字段/键前缀从源码提取比对）；agent-browser spec | 契约测试绿；E2E 覆盖设置区块交互路径 | todo |
+| T8 | 启动时自动备份 | T6,T7 | 启动钩子（距上次备份超过 N 天触发，N∈{1,3,7,30} 默认 7） | 生命周期内触发；失败静默下次再试 + warn；单测 | done |
+| T9 | pre-restore 快照与回滚 | T6,T7 | 本地应急快照（单 Preferences 键，保留到下次成功备份）+ 「撤销上次恢复」 | 恢复前必存；回滚完整；单测 | done |
+| T10 | 契约测试 + E2E 收口 | T4,T6,T7,T8,T9 | 快照格式契约测试（magic/字段/键前缀从源码提取比对）；agent-browser spec | 契约测试绿；E2E 覆盖设置区块交互路径 | done |
 
 ## 关键路径
 
@@ -22,6 +22,13 @@
 `T2` 与 T1 并行（仅 T3 依赖）；`T5` 与 T1/T2 并行；T8/T9 互相独立、均挂在 T6/T7 之后。
 
 ## 备注
+
+- T10 收口：契约测试（spec ↔ 代码格式契约、跨语言桥契约、双端同源差分）已绿；
+  E2E 覆盖 Web 端边界（`webdav-backup-web-boundary.test.ts`：设置页不渲染区块，spec §2）。
+  WebDAV 区块为原生专属入口，原生交互路径由组件测试覆盖，真机链路列入
+  android-e2e 设备批次（repo 先例）。
+- 审稿闭环记录：T1/T2（3 Major + 11 Minor/Nit）、T3（1 Blocker + 3 Major）、
+  T5（1 Blocker + 1 Major）、T6（1 Blocker + 4 Major）均修复后通过。
 
 - T1/T2 无 JS 框架依赖，先落地加锁语义（协议行为 + 加密格式），后续 ticket 复用。
 - T4 遵循「同源同语义差分对齐」约定（downloadManager 先例），双端单测 + 差分。
