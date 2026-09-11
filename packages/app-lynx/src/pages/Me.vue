@@ -51,6 +51,10 @@ function openDownloads() {
   void navigate('/downloads')
 }
 
+function openNetworkCheck() {
+  void navigate('/network-check')
+}
+
 function pickClient(kind: ClientKind) {
   if (clientSwitch.selectedClient === kind || switching.value) return
   switching.value = true
@@ -157,6 +161,16 @@ function toggleR18G() {
           @tap="openDownloads"
         >
           <text class="text-title-medium text-surface-on">下载管理</text>
+          <text class="text-title-medium text-surface-on-variant">›</text>
+        </view>
+        <!-- 网络自检入口（spec docs/specs/network-self-check.md / #445） -->
+        <view
+          class="flex flex-row items-center justify-between py-3.5"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.networkCheck"
+          @tap="openNetworkCheck"
+        >
+          <text class="text-title-medium text-surface-on">网络自检</text>
           <text class="text-title-medium text-surface-on-variant">›</text>
         </view>
       </GlassCard>

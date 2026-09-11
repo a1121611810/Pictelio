@@ -61,6 +61,7 @@ vi.mock('../src/pages/UpdatePage.vue', () => ({ default: {} }))
 vi.mock('../src/pages/ErrorPage.vue', () => ({ default: {} }))
 vi.mock('../src/pages/Watchlist.vue', () => ({ default: {} }))
 vi.mock('../src/pages/DownloadManager.vue', () => ({ default: {} }))
+vi.mock('../src/pages/NetworkCheck.vue', () => ({ default: {} }))
 
 type RouterModule = typeof import('../src/router')
 
@@ -73,15 +74,16 @@ async function loadRouter(): Promise<RouterModule> {
 }
 
 describe('路由表完整性（spec D3）', () => {
-  it('16 条路由：path/name 齐全；/update、/error 无 requiresAuth 且带 backBehavior exit（P0-1）', async () => {
+  it('17 条路由：path/name 齐全；/update、/error 无 requiresAuth 且带 backBehavior exit（P0-1）', async () => {
     const mod = await loadRouter()
-    expect(mod.routes).toHaveLength(16)
+    expect(mod.routes).toHaveLength(17)
     const nameOf = (p: string) => mod.routes.find((r) => r.path === p)?.name
     expect(nameOf('/login')).toBe('login')
     expect(nameOf('/recommended')).toBe('recommended')
     expect(nameOf('/illust/:id')).toBe('illust-detail')
     expect(nameOf('/novel/:id')).toBe('novel-detail')
     expect(nameOf('/downloads')).toBe('downloads')
+    expect(nameOf('/network-check')).toBe('network-check')
     expect(nameOf('/user/:id/following')).toBe('user-following')
     // P0-1：系统页是 cleared 语义下的目的页，不可被守卫自身拦截
     expect(mod.routes.find((r) => r.path === '/update')?.meta).toEqual({ backBehavior: 'exit' })

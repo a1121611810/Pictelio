@@ -52,6 +52,7 @@ import UpdatePage from './pages/UpdatePage.vue'
 import ErrorPage from './pages/ErrorPage.vue'
 import Watchlist from './pages/Watchlist.vue'
 import DownloadManager from './pages/DownloadManager.vue'
+import NetworkCheck from './pages/NetworkCheck.vue'
 
 /**
  * 路由表（vue-router 1:1 迁移，ADR-0138 决策 3）：
@@ -78,6 +79,8 @@ export const routes: RouteRecordRaw[] = [
   { path: '/downloads', name: 'downloads', component: DownloadManager, meta: { requiresAuth: true } },
   { path: '/update', name: 'update', component: UpdatePage, meta: { backBehavior: 'exit' } },
   { path: '/error', name: 'error', component: ErrorPage, meta: { backBehavior: 'exit' } },
+  // 登录前可达：网络/登录失败时恰恰最需要它（spec docs/specs/network-self-check.md）；不标 requiresAuth
+  { path: '/network-check', name: 'network-check', component: NetworkCheck },
 ]
 
 export const router: Router = createRouter({
@@ -330,6 +333,9 @@ function registerBenchNavHandler(): void {
     // T4（spec app-lynx-benchnav-meta-exit-hooks）：/update、/error 直达（meta-exit 回归 S6 触发通道）
     pictelioBenchNavUpdate: '/update',
     pictelioBenchNavError: '/error',
+    // 网络自检直达（spec docs/specs/network-self-check.md / ticket I5）：Lynx a11y 树不暴露元素，
+    // 真机验收经 benchNav 深链到 /network-check，再以原生 NetDiag 日志为证据。
+    pictelioBenchNavNetDiag: '/network-check',
   }
   for (const [eventName, target] of Object.entries(TARGETS)) {
     // 原生发送两次（1.5s/3s）防 JS 挂载竞态；replace 幂等，重复到达无副作用

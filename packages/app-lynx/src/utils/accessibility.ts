@@ -22,6 +22,7 @@ export const ME_A11Y_LABELS = {
   bookmarks: '我的收藏',
   watchlist: '追更列表',
   downloads: '下载管理',
+  networkCheck: '网络自检',
   // 动图下载格式（spec download-manager §5）：全局统一，六格式各一标注
   downloadFormatGif: '动图下载格式GIF',
   downloadFormatMp4: '动图下载格式MP4',
