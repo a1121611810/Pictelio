@@ -24,7 +24,7 @@
 
 **D2. 快照模式（不做双向同步）**：单文件时间戳快照 + 固定保留最近 10 份轮换 + 写后读回校验（PUT → PROPFIND Depth 0 校验 `getcontentlength`，不等重试 ×3）。时间戳文件名天然免冲突 → v1 不加锁文件、不碰 ETag/If-Match（KOReader 弱 ETag 412 死循环坑）。
 
-**D3. 加密 Java 侧实现**：`PICTELIO-ENC1` magic(8B) + salt(16B) + iv(12B) + AES-256-GCM；PBKDF2-HMAC-SHA256（600k 轮，OWASP 2023）从用户密码派生。理由：`SecureStorageCompat` 有 AES/GCM 先例；Lynx JS runtime 的 `crypto.subtle` 可用性不做假设；单一实现双引擎行为必然一致。TS 层只传明文字节 + 密码，不感知加密细节。
+**D3. 加密 Java 侧实现**：`PICTELIO-ENC1` magic(13B，格式版本内嵌) + salt(16B) + iv(12B) + AES-256-GCM；PBKDF2-HMAC-SHA256（600k 轮，OWASP 2023）从用户密码派生。理由：`SecureStorageCompat` 有 AES/GCM 先例；Lynx JS runtime 的 `crypto.subtle` 可用性不做假设；单一实现双引擎行为必然一致。TS 层只传明文字节 + 密码，不感知加密细节。
 
 **D4. 凭据分级**：WebDAV 登录密码与备份加密密码存 `capacitor-secure-storage-plugin`（Android Keystore，与 refresh_token 同级）；连接配置（服务器/用户名/目录/自动备份开关）走跨引擎共享键 `settings_webdav_*`，进备份域——恢复后重输一次密码即闭环；**任何密码绝不进备份文件**。
 

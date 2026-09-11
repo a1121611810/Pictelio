@@ -256,6 +256,92 @@ public class WebDavClientTest {
         assertEquals(3, server.getRequestCount());
     }
 
+    @Test
+    public void list_propfind404_mapsNotFound() throws Exception {
+        // PROPFIND 失败路径（spec §9 每动词成功/失败双路径的缺口补齐）
+        server.enqueue(new MockResponse().setResponseCode(404));
+        try {
+            client.list(base + "missing/");
+            fail("应抛 DavException");
+        } catch (DavException e) {
+            assertEquals(Kind.NOT_FOUND, e.kind);
+        }
+    }
+
+    @Test
+    public void stat_emptyMultistatus_throwsNotFound() throws Exception {
+        // PROPFIND 200 但无条目（空目录/解析空）→ NOT_FOUND 分支
+        server.enqueue(new MockResponse().setBody(
+                "<?xml version=\"1.0\"?><D:multistatus xmlns:D=\"DAV:\"></D:multistatus>"));
+        try {
+            client.stat(base + "backup/");
+            fail("应抛 DavException");
+        } catch (DavException e) {
+            assertEquals(Kind.NOT_FOUND, e.kind);
+        }
+    }
+
+    @Test
+    public void upload_403_forbidden() throws Exception {
+        // spec §5 错误映射：403 拒绝（检查目录权限）
+        server.enqueue(new MockResponse().setResponseCode(403));
+        try {
+            client.upload(base + "f.json", "x".getBytes("UTF-8"));
+            fail("应抛 DavException");
+        } catch (DavException e) {
+            assertEquals(Kind.FORBIDDEN, e.kind);
+            assertEquals(403, e.statusCode);
+        }
+    }
+
+    @Test
+    public void upload_412_conflict() throws Exception {
+        server.enqueue(new MockResponse().setResponseCode(412));
+        try {
+            client.upload(base + "f.json", "x".getBytes("UTF-8"));
+            fail("应抛 DavException");
+        } catch (DavException e) {
+            assertEquals(Kind.CONFLICT, e.kind);
+            assertEquals(412, e.statusCode);
+        }
+    }
+
+    @Test
+    public void uploadWithVerify_nullContentLength_fallsBackToGet() throws Exception {
+        // 服务器缺 getcontentlength（自托管差异，research 结论 8）→ GET 字节比对降级
+        byte[] body = "hello".getBytes("UTF-8");
+        server.enqueue(new MockResponse().setResponseCode(201)); // PUT
+        server.enqueue(multistatusStatNoLength());               // PROPFIND：无 getcontentlength
+        server.enqueue(new MockResponse().setBody("hello"));     // GET 降级比对
+        client.uploadWithVerify(base + "f.json", body, 3);
+        RecordedRequest get = server.takeRequest(1, TimeUnit.SECONDS); // PUT
+        assertEquals("PUT", get.getMethod());
+        RecordedRequest propfind = server.takeRequest(1, TimeUnit.SECONDS);
+        assertEquals("PROPFIND", propfind.getMethod());
+        RecordedRequest fallback = server.takeRequest(1, TimeUnit.SECONDS);
+        assertEquals("GET", fallback.getMethod()); // 确认走了 GET 降级路径
+    }
+
+    @Test
+    public void uploadWithVerify_authError_notRetried() throws Exception {
+        // 401 属不可重试类：应直接上抛而非重试 ×3（避免无意义重试）
+        server.enqueue(new MockResponse().setResponseCode(401));
+        try {
+            client.uploadWithVerify(base + "f.json", "hello".getBytes("UTF-8"), 3);
+            fail("应抛 DavException");
+        } catch (DavException e) {
+            assertEquals(Kind.AUTH_FAILED, e.kind);
+        }
+        assertEquals(1, server.getRequestCount()); // 只发出 1 次 PUT，未重试
+    }
+
+    @Test
+    public void specConstants_pinnedToSpecValues() {
+        // spec §5 规范值钉死（防调用层自由传参导致与 spec 偏离）
+        assertEquals(3, WebDavClient.VERIFY_MAX_ATTEMPTS); // spec §5「不等重试 ×3」
+        assertEquals(10, WebDavClient.KEEP_BACKUPS);       // spec §5「固定保留最近 10 份，不可配」
+    }
+
     // ── 错误分类 ──
 
     @Test
@@ -304,6 +390,15 @@ public class WebDavClientTest {
                 + "<D:href>/dav/f.json</D:href>"
                 + "<D:propstat><D:prop><D:resourcetype/><D:getcontentlength>" + length
                 + "</D:getcontentlength></D:prop></D:propstat>"
+                + "</D:response></D:multistatus>");
+    }
+
+    private static MockResponse multistatusStatNoLength() {
+        return new MockResponse().setBody(
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>"
+                + "<D:multistatus xmlns:D=\"DAV:\"><D:response>"
+                + "<D:href>/dav/f.json</D:href>"
+                + "<D:propstat><D:prop><D:resourcetype/></D:prop></D:propstat>"
                 + "</D:response></D:multistatus>");
     }
 

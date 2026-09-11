@@ -5,8 +5,8 @@
 | # | 标题 | 依赖 | 交付物 | 验收 | 状态 |
 |---|------|------|--------|------|------|
 | T0 | ADR：WebDAV 备份架构决策 | — | `docs/adr/ADR-XXXX-webdav-backup-architecture.md` | 记录三层同构 / 原生插件绕 CORS+CapacitorHttp 坑 / 加密 Java 侧 / 快照模式选型的决策与权衡 | todo |
-| T1 | Java WebDavClient 核心 | T0 | main `WebDavClient.java`（OkHttp：MKCOL/PUT/GET/PROPFIND Depth 0&1/DELETE）+ MockWebServer 单测 | 409 MKCOL 视为成功；401/403/404/507 错误分类映射；读回校验 + 重试 ×3；旋转删除；Java 单测绿 | todo |
-| T2 | Java 加密封装 | T0 | `BackupCrypto.java`（PICTELIO-ENC1 + PBKDF2-HMAC-SHA256 600k + AES-256-GCM）+ 单测 | 加解密往返；错误密码 AEADBadTag 归类「密码错误或文件损坏」；KDF 参数常量可测 | todo |
+| T1 | Java WebDavClient 核心 | T0 | main `WebDavClient.java`（OkHttp：MKCOL/PUT/GET/PROPFIND Depth 0&1/DELETE）+ MockWebServer 单测 | 409 MKCOL 视为成功；401/403/404/507 错误分类映射；读回校验 + 重试 ×3；旋转删除；Java 单测绿 | done |
+| T2 | Java 加密封装 | T0 | `BackupCrypto.java`（PICTELIO-ENC1 + PBKDF2-HMAC-SHA256 600k + AES-256-GCM）+ 单测 | 加解密往返；错误密码 AEADBadTag 归类「密码错误或文件损坏」；KDF 参数常量可测 | done |
 | T3 | 双薄桥 + TS bridge seam | T1,T2 | webview `WebDavPlugin.java` + lynx `PictelioWebDavModule.java` + 两端 TS 桥接口（统一 `WebDavBridge` 类型） | MainActivity registerPlugin；LynxModule Callback 契约对齐 PictelioPrefsModule（null 参数坑）；两端桥可测 seam | todo |
 | T4 | TS 共享备份核心（双端同源） | T3 | app + app-lynx `utils/backupCore.ts`（收集/序列化/解析/恢复计划纯函数）+ 两侧单测 + 差分对齐 | 快照 schema v1 字段全；excludedKeys 剔除；恢复计划 merge-by-keys + uid 过滤；`test:app` `test:app-lynx` 绿 | todo |
 | T5 | 凭据与连接配置存储 | T0 | secure storage `webdav_password` / `webdav_backup_password`；`settings_webdav_*` 共享键注册（双端） | 密码不入普通 Preferences；连接配置跨引擎读写一致；单测 | todo |

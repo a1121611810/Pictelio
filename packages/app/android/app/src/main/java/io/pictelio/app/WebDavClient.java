@@ -3,7 +3,6 @@ package io.pictelio.app;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -69,6 +68,12 @@ public class WebDavClient {
         }
     }
 
+    /** 写后校验重试上限（spec §5「不等重试 ×3」固定值，不可配） */
+    public static final int VERIFY_MAX_ATTEMPTS = 3;
+
+    /** 备份旋转保留份数（spec §5「固定保留最近 10 份，不可配」） */
+    public static final int KEEP_BACKUPS = 10;
+
     private static final MediaType XML_MEDIA_TYPE =
             MediaType.parse("application/xml; charset=utf-8");
     private static final MediaType OCTET_STREAM =
@@ -102,7 +107,11 @@ public class WebDavClient {
                 .build();
     }
 
-    /** MKCOL 建目录：2xx 成功；409（已存在）视为成功（幂等语义） */
+    /**
+     * MKCOL 建目录：2xx 成功；409 视为成功（幂等语义，spec §4）。
+     * 注意：RFC 4918 中 MKCOL 409 也可能是父集合缺失——本方法不区分二者，
+     * 该场景由后续 PUT 的失败兜底暴露（不静默）。
+     */
     public void ensureDir(String url) throws IOException {
         Request req = authed(new Request.Builder().url(url).method("MKCOL", null).build());
         try (Response res = execute(req)) {
@@ -128,20 +137,39 @@ public class WebDavClient {
      * getcontentlength 与本地字节数相等；不等重试，最多 {@code maxAttempts} 次。
      * 仍失败抛 DavException（kind=SERVER），旧档由调用层保留。
      */
+    public void uploadWithVerify(String url, byte[] body) throws IOException {
+        uploadWithVerify(url, body, VERIFY_MAX_ATTEMPTS);
+    }
+
+    /**
+     * 带写后校验的上传（spec §5 原子性）：PUT → 校验远端与本地一致；
+     * 不等重试，最多 {@code maxAttempts} 次。校验方式：PROPFIND Depth 0 取
+     * getcontentlength；服务器缺该字段时（自托管差异，research 结论 8）
+     * 降级为 GET 字节比对。仍失败抛 DavException（kind=SERVER），旧档由调用层保留。
+     * 认证/权限/配额/路径类错误（非 NETWORK/SERVER）不重试，直接上抛。
+     */
     public void uploadWithVerify(String url, byte[] body, int maxAttempts) throws IOException {
         IOException last = null;
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 upload(url, body);
-                DavEntry stat = stat(url);
-                if (stat.contentLength != null && stat.contentLength == body.length) return;
+                if (verifyRemoteEquals(url, body)) return;
                 last = new DavException(Kind.SERVER, -1,
-                        "写后校验失败（第 " + attempt + " 次，远端大小不一致）");
-            } catch (IOException e) {
+                        "写后校验失败（第 " + attempt + " 次，远端与本地不一致）");
+            } catch (DavException e) {
+                if (e.kind != Kind.NETWORK && e.kind != Kind.SERVER) throw e; // 不可重试类直接上抛
                 last = e;
             }
         }
         throw last != null ? last : new DavException(Kind.SERVER, -1, "uploadWithVerify 失败");
+    }
+
+    /** 远端内容是否与本地一致：优先 getcontentlength，缺失时 GET 字节比对 */
+    private boolean verifyRemoteEquals(String url, byte[] body) throws IOException {
+        DavEntry stat = stat(url);
+        if (stat.contentLength != null) return stat.contentLength == body.length;
+        System.err.println("[WebDavClient] 服务器缺 getcontentlength，降级为 GET 字节比对: " + url);
+        return java.util.Arrays.equals(download(url), body);
     }
 
     /** GET 下载字节 */
@@ -182,6 +210,10 @@ public class WebDavClient {
      * {@code prefix} 的文件，删除超额旧档。删除失败仅记日志不阻塞（调用层
      * 聚合 warn）。返回删除的文件 href 列表。
      */
+    public List<String> prune(String dirUrl, String prefix) throws IOException {
+        return prune(dirUrl, prefix, KEEP_BACKUPS);
+    }
+
     public List<String> prune(String dirUrl, String prefix, int keep) throws IOException {
         List<DavEntry> entries = list(dirUrl);
         List<String> candidates = new ArrayList<>();
@@ -189,7 +221,9 @@ public class WebDavClient {
             String name = lastSegment(e.href);
             if (!e.isCollection && name.startsWith(prefix)) candidates.add(e.href);
         }
-        candidates.sort(String::compareTo);
+        // 按文件名字典序 = 按时间戳排序（spec §5「按文件名时间戳排序」；
+        // 混合格式 href 下按完整 href 排序会偏离语义，故取文件名段）
+        candidates.sort(java.util.Comparator.comparing(WebDavClient::lastSegment));
         List<String> deleted = new ArrayList<>();
         while (candidates.size() > keep) {
             String href = candidates.remove(0);
@@ -231,15 +265,22 @@ public class WebDavClient {
         while (block.find()) {
             String chunk = block.group(1);
             Matcher href = HREF.matcher(chunk);
-            if (!href.find()) continue;
+            if (!href.find()) {
+                // 契约破坏必须可见（仓库测试硬约束 #3 的 Java 侧对应物）
+                System.err.println("[WebDavClient] multistatus response 块缺 href，已跳过: "
+                        + chunk.substring(0, Math.min(80, chunk.length())));
+                continue;
+            }
             boolean isCollection = COLLECTION.matcher(chunk).find();
             Long length = null;
             Matcher len = GETCONTENTLENGTH.matcher(chunk);
             if (len.find()) {
                 try {
                     length = Long.parseLong(len.group(1));
-                } catch (NumberFormatException ignored) {
-                    length = null; // 非标准返回（Joplin 逐服务器兼容先例），降级为未知
+                } catch (NumberFormatException e) {
+                    // >19 位溢出等异常值：降级为未知大小，warn 可见
+                    System.err.println("[WebDavClient] getcontentlength 非标准值: " + len.group(1));
+                    length = null;
                 }
             }
             out.add(new DavEntry(href.group(1).trim(), isCollection, length));
@@ -299,8 +340,4 @@ public class WebDavClient {
         return new DavException(kind, code, op + " → HTTP " + code);
     }
 
-    /** 大小写无关的后缀匹配（旋转/选档筛选用） */
-    static boolean hasExtension(String name, String ext) {
-        return name.toLowerCase(Locale.ROOT).endsWith(ext.toLowerCase(Locale.ROOT));
-    }
 }

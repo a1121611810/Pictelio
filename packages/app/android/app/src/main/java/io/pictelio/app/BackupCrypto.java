@@ -25,7 +25,7 @@ import javax.crypto.spec.SecretKeySpec;
  * <p>Java 侧而非 TS 的理由：SecureStorageCompat 已有 AES/GCM 先例；Lynx JS runtime
  * 的 crypto.subtle 可用性不做假设；单一实现双引擎行为必然一致。
  *
- * <p>密码错误 / 密文损坏统一抛 {@link CryptoException}（kind=BAD_PASSWORD_OR_CORRUPT），
+ * <p>密码错误 / 密文损坏统一抛 {@link CryptoException}（message=「密码错误或文件损坏」），
  * 由调用层映射为用户文案「密码错误或文件损坏」（spec §6）。
  */
 public class BackupCrypto {

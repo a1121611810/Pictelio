@@ -28,10 +28,12 @@ public class BackupCryptoTest {
 
     @Test
     public void envelope_layout_matchesSpec() throws Exception {
-        // 封装布局：magic(8) + salt(16) + iv(12) + ciphertext（含 16B GCM tag）
         byte[] envelope = BackupCrypto.encrypt(PLAINTEXT, PASSWORD);
-        // 布局：magic(13, "PICTELIO-ENC1") + salt(16) + iv(12) + ciphertext(明文长度 + 16B GCM tag)
+        // 布局（spec §3.3）：magic(13) + salt(16) + iv(12) + ciphertext(明文长度 + 16B GCM tag)
         assertEquals(BackupCrypto.MAGIC.length + 16 + 12 + PLAINTEXT.length + 16, envelope.length);
+        // magic 内容钉死 spec 字面量（防实现侧笔误漂移——characterization 防线）
+        assertEquals("PICTELIO-ENC1",
+                new String(BackupCrypto.MAGIC, java.nio.charset.StandardCharsets.US_ASCII));
         assertEquals(13, BackupCrypto.MAGIC.length); // "PICTELIO-ENC1"，含格式版本
         byte[] magic = BackupCrypto.MAGIC;
         for (int i = 0; i < magic.length; i++) {
@@ -41,8 +43,8 @@ public class BackupCryptoTest {
 
     @Test
     public void kdf_iterations_meetOwasp2023() throws Exception {
-        // OWASP Password Storage Cheat Sheet：PBKDF2-HMAC-SHA256 推荐 ≥ 600k 轮
-        assertTrue(BackupCrypto.KDF_ITERATIONS >= 600_000);
+        // OWASP Password Storage Cheat Sheet：PBKDF2-HMAC-SHA256 推荐精确值 600k 轮
+        assertEquals(600_000, BackupCrypto.KDF_ITERATIONS);
         assertEquals(256, BackupCrypto.KEY_BITS);
         assertEquals(128, BackupCrypto.GCM_TAG_BITS);
     }
