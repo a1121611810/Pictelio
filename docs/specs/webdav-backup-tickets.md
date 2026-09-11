@@ -9,7 +9,7 @@
 | T2 | Java 加密封装 | T0 | `BackupCrypto.java`（PICTELIO-ENC1 + PBKDF2-HMAC-SHA256 600k + AES-256-GCM）+ 单测 | 加解密往返；错误密码 AEADBadTag 归类「密码错误或文件损坏」；KDF 参数常量可测 | done |
 | T3 | 双薄桥 + TS bridge seam | T1,T2 | webview `WebDavPlugin.java` + lynx `PictelioWebDavModule.java` + 两端 TS 桥接口（统一 `WebDavBridge` 类型） | MainActivity registerPlugin；LynxModule Callback 契约对齐 PictelioPrefsModule（null 参数坑）；两端桥可测 seam | todo |
 | T4 | TS 共享备份核心（双端同源） | T3 | app + app-lynx `utils/backupCore.ts`（收集/序列化/解析/恢复计划纯函数）+ 两侧单测 + 差分对齐 | 快照 schema v1 字段全；excludedKeys 剔除；恢复计划 merge-by-keys + uid 过滤；`test:app` `test:app-lynx` 绿 | todo |
-| T5 | 凭据与连接配置存储 | T0 | secure storage `webdav_password` / `webdav_backup_password`；`settings_webdav_*` 共享键注册（双端） | 密码不入普通 Preferences；连接配置跨引擎读写一致；单测 | todo |
+| T5 | 凭据与连接配置存储 | T0 | secure storage `webdav_password` / `webdav_backup_password`；`settings_webdav_*` 共享键注册（双端） | 密码不入普通 Preferences；连接配置跨引擎读写一致；单测 | done |
 | T6 | app 设置区块 + 备份/恢复接线 | T3,T4,T5 | app Settings「WebDAV」区块（Fluent）+ 备份/恢复流程 UI | 摘要确认/二次确认/进度/错误分类文案/pre-restore 快照与撤销入口；组件单测 | todo |
 | T7 | app-lynx 设置区块 + 接线 | T3,T4,T5 | app-lynx Me 页「WebDAV」区块（M3）+ 同语义流程 | 同 T6 语义；web-core 显式不渲染；组件单测 | todo |
 | T8 | 启动时自动备份 | T6,T7 | 启动钩子（距上次备份超过 N 天触发，N∈{1,3,7,30} 默认 7） | 生命周期内触发；失败静默下次再试 + warn；单测 | todo |
