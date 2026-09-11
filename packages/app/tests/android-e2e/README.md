@@ -88,3 +88,32 @@ Lynx 侧：`await ctx.driver.switchToNative()` 后用 accessibility id（`$("~la
 - Appium 3 启用 Chromedriver 自动下载用 server 参数 `--allow-insecure *:chromedriver_autodownload`（不是 capability `chromedriverAutodownload`，feature 名须含 automationName 前缀）。
 - 设备 AVD 名在 `ro.boot.qemu.avd_name`（`ro.kernel.qemu.avd_name` 为空）。
 - MainActivity 的 WebView 版本不足路径曾跳过 `super.onCreate()` 导致崩溃（已修）——模拟器上 app 起不来先看 logcat 的 SuperNotCalledException。
+
+## WebDAV 备份链路（spec docs/specs/webdav-backup.md，默认跳过）
+
+`specs/webdav-backup.spec.ts` 覆盖 WebDAV 备份的真实原生链路（唯一需要外部 WebDAV 服务器的用例），
+默认跳过（`WEBDAV_E2E_ENABLED=1` 才运行），避免无服务器环境 CI 失败。
+
+前置与运行：
+
+```bash
+# 1) 本地最小 WebDAV 服务器（或任意 WebDAV 服务器；DAV_PORT / WEBDAV_E2E_URL 可配）
+node /tmp/pictelio-dav-server.cjs          # 监听 0.0.0.0:8081，根 /tmp/pictelio-dav
+
+# 2) 模拟器回环 → 宿主（debug 网络安全配置仅放行 127.0.0.1/localhost cleartext）
+adb reverse tcp:8081 tcp:8081
+
+# 3) 本机无直连外网时，让模拟器走宿主代理（否则登录不可达）
+adb shell settings put global http_proxy 10.0.2.2:10808
+
+# 4) 运行（复用已构建 APK；PIXIV_REFRESH_TOKEN 由 packages/app/.env 提供）
+cd packages/app && set -a && . ./.env && set +a
+WEBDAV_E2E_ENABLED=1 ANDROID_E2E_SKIP_BUILD=1 ANDROID_E2E_AVD=pictelio_ui \
+  pnpm vitest run -c tests/android-e2e/vitest.config.ts specs/webdav-backup.spec.ts
+```
+
+断言 oracle（独立于实现）：服务器磁盘上的真实备份文件（可解析为 spec §3.2 快照）、
+spec §8 密码红线（快照不含任何 password 键）、§5/§6 流程文案。
+
+> 实测坑：WebDriver `execute` 的脚本体必须显式 `return`（IIFE 返回值会被丢弃 → 恒 null）；
+> WebView 的 `innerText` 返回 null，断言用 `textContent`。
