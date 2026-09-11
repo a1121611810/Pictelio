@@ -325,6 +325,26 @@ describe("Settings registry — backup rawValues / setRawValues（spec webdav-ba
     warn.mockRestore();
   });
 
+  it("rawValues：存储读取失败 → 该键省略 + warn（不静默，硬约束 #3）", async () => {
+    const { settings } = make();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    settings.define({ key: "a", default: "d" });
+    await settings.hydrateAll();
+    const original = settings.rawValues;
+    expect(typeof original).toBe("function");
+    // 用注入 adapter 的抛错路径：memory adapter 的 get 被替换为抛错
+    const broken = createMemoryAdapter();
+    broken.get = async () => {
+      throw new Error("disk io");
+    };
+    const brokenSettings = createSettings({ storages: { preferences: broken } });
+    brokenSettings.define({ key: "a", default: "d" });
+    await brokenSettings.hydrateAll().catch(() => {});
+    expect(await brokenSettings.rawValues()).toEqual({});
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
   it("setRawValues 写回后落盘（持久化经 handle.set 正常管线）", async () => {
     const { settings, mem } = make();
     settings.define({ key: "a", default: "d" });

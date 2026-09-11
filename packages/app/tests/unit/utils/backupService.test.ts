@@ -367,6 +367,23 @@ describe("backupService — 自动备份判定（spec §7 T8）", () => {
     expect(calls.uploadWithVerify).toHaveLength(2);
   });
 
+  it("maybeAutoBackup：恰好 N 天 → 跳过；超过 N 天 → 执行（spec §7「超过 N 天」，S9 边界）", async () => {
+    const { maybeAutoBackup } = await import("@/utils/backupService");
+    const now = new Date(2026, 8, 11, 12, 0, 0);
+    const { deps: d, calls } = deps();
+    const exactly7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    expect(
+      await maybeAutoBackup(d, { enabled: true, days: 7, lastBackupAt: exactly7 }, now),
+    ).toBeNull();
+    expect(calls.uploadWithVerify).toHaveLength(0);
+
+    const justOver7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000 - 60_000).toISOString();
+    expect(
+      await maybeAutoBackup(d, { enabled: true, days: 7, lastBackupAt: justOver7 }, now),
+    ).not.toBeNull();
+    expect(calls.uploadWithVerify).toHaveLength(1);
+  });
+
   it("maybeAutoBackup：时间戳损坏 → warn 并按从未备份处理（不静默）", async () => {
     const { maybeAutoBackup } = await import("@/utils/backupService");
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});

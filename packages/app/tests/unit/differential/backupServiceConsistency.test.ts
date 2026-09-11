@@ -16,7 +16,15 @@ const javaClient = readFileSync(
   "utf8",
 );
 
-const ASYNC_EXPORTS = ["backupNow", "listBackups", "restoreFrom", "testConnection"] as const;
+const ASYNC_EXPORTS = [
+  "backupNow",
+  "listBackups",
+  "restoreFrom",
+  "prepareRestore",
+  "applyPreparedRestore",
+  "testConnection",
+  "maybeAutoBackup",
+] as const;
 const SYNC_EXPORTS = ["selectBackupFiles", "dirUrlOf", "fileUrlOf", "backupFileName"] as const;
 
 describe("backupService 双端同源一致性", () => {
@@ -46,9 +54,16 @@ describe("backupService 双端同源一致性", () => {
   it("恢复流程钩子顺序（T9 应急快照先于写回）双端一致", () => {
     for (const src of [app, lynx]) {
       const hookIdx = src.indexOf("await deps.onBeforeApply()");
-      const applyIdx = src.indexOf("await deps.apply(plan)");
+      const applyIdx = src.indexOf("await deps.apply(prepared.plan)");
       expect(hookIdx).toBeGreaterThan(0);
       expect(applyIdx).toBeGreaterThan(hookIdx);
+    }
+  });
+
+  it("双端自动备份边界一致（spec §7「超过 N 天」：恰好 N 天跳过，S9）", () => {
+    for (const src of [app, lynx]) {
+      expect(src).toContain("if (elapsedDays <= state.days) return null");
+      expect(src).toContain('console.warn("[backupService] 上次备份时间非法');
     }
   });
 });

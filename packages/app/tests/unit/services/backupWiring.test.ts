@@ -3,6 +3,11 @@
 // oracle：spec §3.1 sets 构成（blockStore/reportStore）+ §3.2 snapshot 分组 +
 // §6 merge-by-keys / 应急快照保留语义。
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const testDir = path.dirname(fileURLToPath(import.meta.url));
 import { createSettings } from "@/settings/registry";
 import { createMemoryAdapter } from "@/settings/backends/memory";
 import { jsonCodec } from "@/settings/codecs";
@@ -55,7 +60,18 @@ describe("backupWiring — collect（spec §3.1/§3.2）", () => {
 
     expect(raw).toEqual({ settings_ugoira_mode: "fflate" });
     expect(sets).toEqual({ blocked_user_ids: [1, 2], reported_ids: [3] });
-    expect(BACKUP_SET_KEYS).toEqual(["blocked_user_ids", "reported_ids"]);
+    // M2：sets 键以真实源（blockStore/reportStore 的 PREF_KEY 常量）为 oracle，杜绝自洽字面量
+    const blockSrc = readFileSync(
+      path.resolve(testDir, "../../../src/stores/blockStore.ts"),
+      "utf8",
+    );
+    const reportSrc = readFileSync(
+      path.resolve(testDir, "../../../src/stores/reportStore.ts"),
+      "utf8",
+    );
+    const blockKey = blockSrc.match(/PREF_KEY_BLOCKED_IDS = "([^"]+)"/)?.[1];
+    const reportKey = reportSrc.match(/PREF_KEY_REPORTED_IDS = "([^"]+)"/)?.[1];
+    expect(BACKUP_SET_KEYS).toEqual([blockKey, reportKey]);
   });
 
   it("损坏的 set 值 → 跳过 + warn（不静默）", async () => {
@@ -170,5 +186,47 @@ describe("backupWiring — T8 启动时自动备份", () => {
     // 默认 webdavEnabled=false → 直接返回 null
     expect(await runStartupAutoBackup()).toBeNull();
     expect(settings).toBeTruthy();
+  });
+});
+describe("backupWiring — 审稿补强（S10/M5/M6）", () => {
+  it("S10：运行时键 settings_webdav_last_backup 不进备份域", async () => {
+    const { settings } = makeStore({
+      settings_ugoira_mode: "fflate",
+      settings_webdav_last_backup: "2026-09-01T00:00:00+08:00",
+    });
+    const { raw } = await createBackupWiring({ settings }).collect();
+    expect(raw.settings_ugoira_mode).toBe("fflate");
+    expect(raw.settings_webdav_last_backup).toBeUndefined();
+  });
+
+  it("M5：开关关 → 不触碰桥（spy 证明，非自述）", async () => {
+    const { settings } = makeStore();
+    // runStartupAutoBackup 读真实 settingsStore（默认全关）→ 真实 @/native/WebDav 不被调用
+    const { runStartupAutoBackup } = await import("@/services/backupWiring");
+    const bridge = await import("@/native/WebDav");
+    const ensureDir = vi.spyOn(bridge, "ensureDir");
+    const upload = vi.spyOn(bridge, "uploadWithVerify");
+    expect(await runStartupAutoBackup()).toBeNull();
+    expect(ensureDir).not.toHaveBeenCalled();
+    expect(upload).not.toHaveBeenCalled();
+    ensureDir.mockRestore();
+    upload.mockRestore();
+    expect(settings).toBeTruthy();
+  });
+
+  it("M6：savePreRestoreSnapshot 落盘失败必须上抛（不静默）", async () => {
+    const { settings } = makeStore({ settings_ugoira_mode: "fflate" });
+    const wiring = createBackupWiring({ settings });
+    const { Preferences } = await import("@capacitor/preferences");
+    const spy = vi.spyOn(Preferences, "set").mockRejectedValueOnce(new Error("quota"));
+    await expect(savePreRestoreSnapshot(wiring)).rejects.toThrow("quota");
+    spy.mockRestore();
+  });
+
+  it("M6：clearPreRestoreSnapshot 删除失败必须上抛（不静默）", async () => {
+    const { Preferences } = await import("@capacitor/preferences");
+    const spy = vi.spyOn(Preferences, "remove").mockRejectedValueOnce(new Error("io"));
+    await expect(clearPreRestoreSnapshot()).rejects.toThrow("io");
+    spy.mockRestore();
   });
 });

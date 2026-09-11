@@ -19,7 +19,8 @@ const h = vi.hoisted(() => ({
   setLastBackup: vi.fn(),
   backupNow: vi.fn(),
   listBackups: vi.fn(),
-  restoreFrom: vi.fn(),
+  prepareRestore: vi.fn(),
+  applyPreparedRestore: vi.fn(),
   testConnection: vi.fn(),
   clearPreRestore: vi.fn(async () => {}),
   loadPreRestore: vi.fn(async () => null),
@@ -53,8 +54,13 @@ vi.mock("@/stores/settingsStore", () => ({
 vi.mock("@/utils/backupService", () => ({
   backupNow: h.backupNow,
   listBackups: h.listBackups,
-  restoreFrom: h.restoreFrom,
+  prepareRestore: h.prepareRestore,
+  applyPreparedRestore: h.applyPreparedRestore,
   testConnection: h.testConnection,
+}));
+
+vi.mock("@/stores/authStore", () => ({
+  user: () => ({ id: 42 }),
 }));
 
 vi.mock("@/services/backupWiring", () => ({
@@ -63,6 +69,11 @@ vi.mock("@/services/backupWiring", () => ({
   clearPreRestoreSnapshot: h.clearPreRestore,
   loadPreRestoreSnapshot: h.loadPreRestore,
   undoLastRestore: h.undoLastRestore,
+}));
+
+const platform = vi.hoisted(() => ({ native: true }));
+vi.mock("@/utils/platform", () => ({
+  isNativePlatform: () => platform.native,
 }));
 
 vi.mock("@/utils/webdavCredentials", () => ({
@@ -93,8 +104,20 @@ describe("SettingsWebdav（spec §7）", () => {
   beforeEach(() => {
     cleanup();
     vi.clearAllMocks();
+    platform.native = true;
     h.loadPreRestore.mockResolvedValue(null);
     h.undoLastRestore.mockResolvedValue(true);
+  });
+
+  it("Web 平台（非原生）不渲染区块（spec §2/§7）", async () => {
+    platform.native = false;
+    const [enabled] = createSignal(true);
+    h.enabled = enabled;
+    h.url = () => "https://dav/";
+    render(() => <SettingsWebdav />);
+    await flushAll();
+    expect(screen.queryByText("启用 WebDAV 备份")).toBeNull();
+    expect(screen.queryByText("立即备份")).toBeNull();
   });
 
   it("开关关闭时表单不渲染（仅主开关）", async () => {
@@ -144,7 +167,7 @@ describe("SettingsWebdav（spec §7）", () => {
     await vi.waitFor(() => expect(screen.getByText("认证失败，请检查用户名与密码")).toBeTruthy());
   });
 
-  it("恢复流程：选档 → 摘要确认 → 调用 restoreFrom", async () => {
+  it("恢复流程：选档 → 摘要确认（前置）→ 确认后写回（两段式，S2/S3）", async () => {
     h.listBackups.mockResolvedValue([
       {
         name: "pictelio-backup-20260911-173005.json",
@@ -154,8 +177,14 @@ describe("SettingsWebdav（spec §7）", () => {
         timestamp: "20260911-173005",
       },
     ]);
-    h.restoreFrom.mockResolvedValue({
-      plan: { apply: {}, sets: {}, skippedAccountKeys: [], skippedExcludedKeys: [] },
+    const prepared = {
+      snapshot: { format: "pictelio-backup", schemaVersion: 1 },
+      plan: {
+        apply: { a: "1" },
+        sets: {},
+        skippedAccountKeys: ["show_r18_99"],
+        skippedExcludedKeys: [],
+      },
       summary: {
         createdAt: "2026-09-11T17:30:05+08:00",
         engine: "webview",
@@ -166,15 +195,28 @@ describe("SettingsWebdav（spec §7）", () => {
         setCount: 0,
       },
       wasEncrypted: false,
-    });
+    };
+    h.prepareRestore.mockResolvedValue(prepared);
+    h.applyPreparedRestore.mockResolvedValue({ applied: ["a"], skipped: [] });
     await renderOpen();
     fireEvent.click(screen.getByText("恢复"));
     await vi.waitFor(() =>
       expect(screen.getByText(/pictelio-backup-20260911-173005\.json/)).toBeTruthy(),
     );
+    // 等待列表按钮脱离 busy disabled 态（onOpenRestore 的 finally 尚未执行时点击会被忽略）
+    await vi.waitFor(() => {
+      const btn = screen.getByText(/pictelio-backup-20260911-173005\.json/).closest("button");
+      expect((btn as HTMLButtonElement).disabled).toBe(false);
+    });
     fireEvent.click(screen.getByText(/pictelio-backup-20260911-173005\.json/));
-    await vi.waitFor(() => expect(screen.getByText(/恢复会覆盖本机对应设置/)).toBeTruthy());
+    await vi.waitFor(() => expect(h.prepareRestore).toHaveBeenCalled());
+    // 摘要确认：展示来源引擎/版本/计数（spec §6.2）
+    await vi.waitFor(() => expect(screen.getByText(/来源引擎/)).toBeTruthy());
+    expect(screen.getByText(/应用版本/)).toBeTruthy();
+    expect(h.applyPreparedRestore).not.toHaveBeenCalled(); // 确认前零写回
     fireEvent.click(screen.getByText("确认恢复"));
-    await vi.waitFor(() => expect(h.restoreFrom).toHaveBeenCalled());
+    await vi.waitFor(() => expect(h.applyPreparedRestore).toHaveBeenCalled());
+    // 结果反馈实际写入/跳过计数（spec §6.8）
+    await vi.waitFor(() => expect(screen.getByText(/写入 1 项，跳过 0 项/)).toBeTruthy());
   });
 });

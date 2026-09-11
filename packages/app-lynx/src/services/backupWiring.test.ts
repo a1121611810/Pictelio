@@ -138,6 +138,27 @@ describe("backupWiring（lynx）— collect / apply（spec §3.1/§6）", () => 
     expect(res.skipped).toEqual(["settings_ugoira_mode"])
   })
 
+  it("S10：运行时键 settings_webdav_last_backup 不进备份域 + 恰好 N 天跳过", async () => {
+    env.prefs.set("settings_webdav_last_backup", "2026-09-01T00:00:00+08:00")
+    env.idb.set("settings_ugoira_mode", "fflate")
+    const { raw } = await createLynxBackupWiring().collect()
+    expect(raw.settings_ugoira_mode).toBe("fflate")
+    expect(raw.settings_webdav_last_backup).toBeUndefined()
+
+    const { maybeAutoBackup } = await import("../utils/backupService")
+    const now = new Date(2026, 8, 11, 12, 0, 0)
+    const store = fresh()
+    store.setWebdavEnabled(true)
+    store.setWebdavUrl("https://dav.example.com/")
+    const exactly7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    const depsForAuto = (await import("./backupWiring")).createLynxBackupDeps()
+    env.bridge.ensureDir.mockClear()
+    expect(
+      await maybeAutoBackup(depsForAuto, { enabled: true, days: 7, lastBackupAt: exactly7 }, now),
+    ).toBeNull()
+    expect(env.bridge.ensureDir).not.toHaveBeenCalled()
+  })
+
   it("currentUid：登录返回 uid，未登录 null（spec §6）", () => {
     fresh()
     expect(currentUid()).toBe(42)

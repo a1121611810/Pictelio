@@ -36,6 +36,12 @@ export const BACKUP_SET_KEYS = ["blocked_user_ids", "reported_ids"] as const;
 /** pre-restore 应急快照的 Preferences 键（T9；与设置域隔离，不参与备份） */
 export const PRE_RESTORE_KEY = "webdav_pre_restore_snapshot";
 
+/**
+ * 备份域排除的运行时键（spec §3.1 连接配置只列 server/user/dir/auto-switch）：
+ * 上次备份时间是运行时状态，进快照会在恢复时扰动自动备份调度（review S10）。
+ */
+export const BACKUP_RUNTIME_KEYS = ["settings_webdav_last_backup"] as const;
+
 export interface CollectedBackupData {
   raw: Record<string, string>;
   sets: BackupSets;
@@ -88,6 +94,8 @@ export function createBackupWiring(opts: BackupWiringOptions = {}): BackupWiring
       for (const [key, value] of Object.entries(all)) {
         // sets 独立成组（spec §3.2 sets 字段），不重复出现在 deviceKeys
         if ((BACKUP_SET_KEYS as readonly string[]).includes(key)) continue;
+        // 运行时状态不进备份域（恢复写回会扰动自动备份调度）
+        if ((BACKUP_RUNTIME_KEYS as readonly string[]).includes(key)) continue;
         raw[key] = value;
       }
       return { raw, sets: parseSets(all) };
@@ -172,6 +180,13 @@ export function currentBackupConfig(): BackupConfig {
  * 成功后记录时间并清除应急快照；失败不打扰用户（warn + 下次启动再试）。
  */
 export async function runStartupAutoBackup(): Promise<BackupResult | null> {
+  // S5：登录信号可能先于 settings hydrate 翻转——先确保 hydrated，
+  // 否则 webdavEnabled() 读到默认 false 会把本次会话的自动备份静默跳过。
+  try {
+    await defaultSettings.hydrateAll();
+  } catch (e) {
+    console.warn("[backupWiring] hydrateAll 失败（继续按当前值判定）", e);
+  }
   if (!webdavEnabled()) return null;
   try {
     const result = await maybeAutoBackup(createBackupDeps(currentBackupConfig()), {
@@ -205,7 +220,7 @@ export function createBackupDeps(config: BackupConfig, opts: BackupDepsOptions =
     bridge: webdavBridge as unknown as BackupBridge,
     config,
     collect: () => wiring.collect(),
-    apply: (plan) => wiring.apply(plan).then(() => undefined),
+    apply: (plan) => wiring.apply(plan),
     credentials,
     currentUid: opts.currentUid ?? (() => user()?.id ?? null),
     engine: "webview",

@@ -25,6 +25,9 @@ import type { BackupSets } from "../utils/backupCore"
 /** pre-restore 应急快照键（T9；设备级 idbKV，不参与备份域） */
 export const PRE_RESTORE_KEY = "webdav_pre_restore_snapshot"
 
+/** 备份域排除的运行时键（spec §3.1；进快照会扰动自动备份调度，review S10） */
+export const BACKUP_RUNTIME_KEYS = ["settings_webdav_last_backup"] as const
+
 export interface CollectedBackupData {
   raw: Record<string, string>
   sets: BackupSets
@@ -41,7 +44,12 @@ export interface LynxBackupWiring {
 export function createLynxBackupWiring(): LynxBackupWiring {
   return {
     async collect(): Promise<CollectedBackupData> {
-      const raw = await useSettingsStore().exportRawValues()
+      const all = await useSettingsStore().exportRawValues()
+      const raw: Record<string, string> = {}
+      for (const [key, value] of Object.entries(all)) {
+        if ((BACKUP_RUNTIME_KEYS as readonly string[]).includes(key)) continue
+        raw[key] = value
+      }
       // app-lynx 暂无屏蔽/举报 store（spec §3.1 sets 为空对象）
       return { raw, sets: {} }
     },
@@ -124,7 +132,7 @@ export function createLynxBackupDeps(config: BackupConfig = currentBackupConfig(
     bridge: bridge as unknown as BackupBridge,
     config,
     collect: () => wiring.collect(),
-    apply: (plan) => wiring.apply(plan).then(() => undefined),
+    apply: (plan) => wiring.apply(plan),
     credentials: async () => ({
       loginPassword: await loadWebdavPassword(),
       backupPassword: await loadBackupPassword(),

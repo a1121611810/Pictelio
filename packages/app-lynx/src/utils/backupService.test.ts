@@ -89,6 +89,7 @@ function deps(overrides: Partial<BackupDeps> = {}, canned: {
     },
     async apply(plan) {
       calls.apply.push(plan);
+      return { applied: [], skipped: [] };
     },
     async credentials() {
       return { loginPassword: "login-pw", backupPassword: null };

@@ -27,11 +27,13 @@ import {
   undoLastRestore,
 } from "../../services/backupWiring";
 import {
+  applyPreparedRestore,
   backupNow,
   listBackups,
-  restoreFrom,
+  prepareRestore,
   testConnection,
   type BackupFileInfo,
+  type PreparedRestore,
 } from "../../utils/backupService";
 import { WEBDAV_ERROR_MESSAGES, BackupFormatError } from "../../utils/backupCore";
 import {
@@ -41,12 +43,14 @@ import {
   saveWebdavPassword,
 } from "../../utils/webdavCredentials";
 import { WebDavError, type WebDavErrorKind } from "../../native/WebDav";
+import { isNativePlatform } from "../../utils/platform";
+import { user } from "../../stores/authStore";
 
 const FIELD_CLASS =
   "flex-1 min-w-0 px-3 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)] border border-[var(--colorNeutralStroke1)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-[-1px] focus-visible:outline-[color:var(--colorStrokeFocus2)]";
 
 const BUTTON_CLASS =
-  "px-3 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] font-medium hover:bg-[var(--colorNeutralBackground3)] active:scale-95 transition-transform duration-[var(--durationFast)] appearance-none border-none outline-none cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--colorStrokeFocus2)] disabled:opacity-50";
+  "min-h-[40px] px-3 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] font-medium hover:bg-[var(--colorNeutralBackground3)] active:scale-[0.98] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] appearance-none border-none outline-none cursor-pointer focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-2 focus-visible:outline-[var(--colorStrokeFocus2)] disabled:opacity-50";
 
 const LABEL_CLASS =
   "[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground2)]";
@@ -60,7 +64,9 @@ type RestoreStep = "list" | "confirm";
  */
 function errorMessage(err: unknown): string {
   if (err instanceof WebDavError) {
-    return WEBDAV_ERROR_MESSAGES[err.kind as WebDavErrorKind] ?? err.message;
+    const base = WEBDAV_ERROR_MESSAGES[err.kind as WebDavErrorKind] ?? err.message;
+    // spec §5「其他（含原始状态码）」：SERVER 类附 HTTP 码，便于用户/排障定位
+    return err.kind === "SERVER" && err.statusCode > 0 ? `${base}（HTTP ${err.statusCode}）` : base;
   }
   if (err instanceof BackupFormatError) return err.message;
   if (err instanceof Error) return err.message;
@@ -90,19 +96,22 @@ const SettingsWebdav: Component = () => {
   const [error, setError] = createSignal("");
   const [loginPassword, setLoginPassword] = createSignal("");
   const [backupPassword, setBackupPassword] = createSignal("");
-  const [pasteSensitive, setPasteSensitive] = createSignal<string[]>([]);
+  const [sensitiveKeys, setSensitiveKeys] = createSignal<string[]>([]);
   const [showRestore, setShowRestore] = createSignal(false);
   const [restoreStep, setRestoreStep] = createSignal<RestoreStep>("list");
   const [files, setFiles] = createSignal<BackupFileInfo[]>([]);
   const [selected, setSelected] = createSignal<BackupFileInfo | null>(null);
-  const [encryptedHint, setEncryptedHint] = createSignal(false);
+  const [prepared, setPrepared] = createSignal<PreparedRestore | null>(null);
+  const [promptPassword, setPromptPassword] = createSignal("");
+  const [needsPassword, setNeedsPassword] = createSignal(false);
+  const [restoreError, setRestoreError] = createSignal("");
   const [hasPreRestore, setHasPreRestore] = createSignal(false);
 
   /** 敏感项候选：当前账号级键（show_r18_* / show_r18g_* / ai_filter_mode_*） */
   async function refreshSensitiveKeys() {
     const wiring = createBackupWiring();
     const { raw } = await wiring.collect();
-    setPasteSensitive(
+    setSensitiveKeys(
       Object.keys(raw).filter(
         (k) =>
           k.startsWith("show_r18_") ||
@@ -152,6 +161,11 @@ const SettingsWebdav: Component = () => {
       return `连接成功，远端已有 ${fileCount} 份备份`;
     });
 
+  /** S4：任何可能产生/清除应急快照的操作后刷新撤销入口 */
+  async function refreshPreRestoreFlag(): Promise<void> {
+    setHasPreRestore((await loadPreRestoreSnapshot()) !== null);
+  }
+
   const onBackup = () =>
     run("立即备份", async () => {
       await saveCredentials();
@@ -159,7 +173,7 @@ const SettingsWebdav: Component = () => {
       await setWebdavLastBackup(new Date().toISOString());
       // spec §6：应急快照保留到下次成功备份为止
       await clearPreRestoreSnapshot();
-      setHasPreRestore(false);
+      await refreshPreRestoreFlag();
       return `已备份 ${r.fileName}（${r.bytes} 字节${r.encrypted ? "，已加密" : ""}，清理旧档 ${r.deletedOld.length} 份）`;
     });
 
@@ -169,33 +183,86 @@ const SettingsWebdav: Component = () => {
       const list = await listBackups(buildDeps());
       setFiles(list);
       setSelected(null);
+      setPrepared(null);
+      setRestoreError("");
       setRestoreStep("list");
       setShowRestore(true);
       return list.length === 0 ? "远端暂无备份" : "";
     });
 
-  const onRestore = () =>
-    run("恢复", async () => {
-      const file = selected();
-      if (file === null) throw new Error("请先选择要恢复的备份");
-      await saveCredentials();
-      const result = await restoreFrom(buildDeps(), file);
-      setHasPreRestore(true);
-      setShowRestore(false);
-      const { summary } = result;
-      return `已恢复 ${summary.createdAt} 的备份（设备级 ${summary.deviceKeyCount} 项，账号级 ${summary.accountKeyCountForUid} 项，sets ${summary.setCount} 组；跳过异账号键 ${result.plan.skippedAccountKeys.length} 项）`;
+  /** S2/S7：选档后先「准备」（下载→解密→解析→摘要），确认前零写回 */
+  function onSelectFile(file: BackupFileInfo): void {
+    setSelected(file);
+    setPrepared(null);
+    setRestoreError("");
+    if (file.encrypted && backupPassword() === "") {
+      setNeedsPassword(true); // 加密档且无已保存备份密码 → 本次输入
+      return;
+    }
+    setNeedsPassword(false);
+    // 显式传档：Solid 2.0 批处理下 setSelected 后同 tick 读 selected() 仍是旧值
+    void prepareSelected(file);
+  }
+
+  async function prepareSelected(fileArg?: BackupFileInfo): Promise<void> {
+    const file = fileArg ?? selected();
+    if (file === null) return;
+    setBusy("读取备份摘要");
+    setError("");
+    setRestoreError("");
+    try {
+      const result = await prepareRestore(
+        buildDeps(),
+        file,
+        needsPassword() ? promptPassword() : undefined,
+      );
+      setPrepared(result);
+      setRestoreStep("confirm");
+    } catch (e) {
+      console.warn("[SettingsWebdav] 读取备份摘要失败", e);
+      // 错误渲染在对话框内（S4：外层错误被弹窗遮罩挡住不可见）
+      setRestoreError(errorMessage(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const onRestore = () => {
+    const preparedRestore = prepared();
+    if (preparedRestore === null) return;
+    void run("恢复", async () => {
+      try {
+        const result = await applyPreparedRestore(buildDeps(), preparedRestore);
+        setShowRestore(false);
+        const { summary, plan } = preparedRestore;
+        const uid = user()?.id ?? null;
+        const skippedLabel =
+          uid === null
+            ? `未登录，账号级键全部跳过 ${plan.skippedAccountKeys.length} 项`
+            : `跳过异账号键 ${plan.skippedAccountKeys.length} 项`;
+        return `已恢复 ${summary.createdAt} 的备份（写入 ${result.applied.length} 项，跳过 ${result.skipped.length} 项；设备级 ${summary.deviceKeyCount}，账号级 ${summary.accountKeyCountForUid}，sets ${summary.setCount}；${skippedLabel}）`;
+      } finally {
+        // S4：写回中途失败也必须暴露可回滚入口
+        await refreshPreRestoreFlag();
+      }
     });
+  };
 
   const onUndo = () =>
     run("撤销恢复", async () => {
       const ok = await undoLastRestore(createBackupWiring());
+      await refreshPreRestoreFlag();
       if (!ok) return "没有可撤销的应急快照";
       return "已回滚到恢复前的本地状态";
     });
 
+  // spec §2/§7：仅 Android 原生暴露入口（web dev 不渲染本区块）；
+  // 放在 hooks 之后保持 hook 调用无条件
+  if (!isNativePlatform()) return null;
+
   return (
     <div class="py-3 flex flex-col gap-3">
-      <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground3)] uppercase tracking-wide">
+      <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground3)] uppercase">
         WebDAV 备份
       </p>
 
@@ -283,11 +350,11 @@ const SettingsWebdav: Component = () => {
             </div>
           </div>
 
-          <Show when={pasteSensitive().length > 0}>
+          <Show when={sensitiveKeys().length > 0}>
             <div class="flex flex-col gap-1">
               <span class={LABEL_CLASS}>敏感项排除（勾选后不进入备份文件）</span>
               <div class="flex flex-wrap gap-2">
-                <For each={pasteSensitive()}>
+                <For each={sensitiveKeys()}>
                   {(key) => (
                     <label class="flex items-center gap-1 [font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground2)]">
                       <input
@@ -420,11 +487,8 @@ const SettingsWebdav: Component = () => {
                   <button
                     type="button"
                     class={BUTTON_CLASS + " text-left"}
-                    onClick={() => {
-                      setSelected(f);
-                      setEncryptedHint(f.encrypted);
-                      setRestoreStep("confirm");
-                    }}
+                    disabled={busy() !== null}
+                    onClick={() => onSelectFile(f)}
                   >
                     {f.name}
                     {f.encrypted ? "（加密）" : ""}
@@ -434,17 +498,68 @@ const SettingsWebdav: Component = () => {
             </div>
           </Show>
         </Show>
-        <Show when={restoreStep() === "confirm" && selected() !== null}>
+        {/* S7：加密档且无已保存备份密码 → 本次输入（解密后才能出摘要） */}
+        <Show when={restoreStep() === "list" && needsPassword() && selected() !== null}>
+          <div class="flex flex-col gap-2 mt-2">
+            <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
+              「{selected()!.name}」已加密，请输入备份密码以读取摘要：
+            </p>
+            <input
+              type="password"
+              class={FIELD_CLASS}
+              value={promptPassword()}
+              autocomplete="off"
+              onInput={(e) => setPromptPassword(e.currentTarget.value)}
+            />
+            <div class="flex gap-2">
+              <button type="button" class={BUTTON_CLASS} onClick={() => setNeedsPassword(false)}>
+                取消
+              </button>
+              <button
+                type="button"
+                class={BUTTON_CLASS}
+                disabled={busy() !== null || promptPassword() === ""}
+                onClick={() => void prepareSelected(selected() ?? undefined)}
+              >
+                解密并查看摘要
+              </button>
+            </div>
+          </div>
+        </Show>
+        {/* S2：摘要确认展示在写回之前（时间/来源引擎/版本/三类计数） */}
+        <Show when={restoreStep() === "confirm" && prepared() !== null}>
           <div class="flex flex-col gap-2">
             <p>将恢复：{selected()!.name}</p>
-            <Show when={encryptedHint()}>
+            <ul class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground2)]">
+              <li>备份时间：{prepared()!.summary.createdAt}</li>
+              <li>来源引擎：{prepared()!.summary.engine}</li>
+              <li>应用版本：{prepared()!.summary.appVersion}</li>
+              <li>
+                设备级 {prepared()!.summary.deviceKeyCount} 项 / 账号级（当前账号）
+                {prepared()!.summary.accountKeyCountForUid} 项 / sets {prepared()!.summary.setCount}{" "}
+                组
+              </li>
+              <li>
+                跳过账号级键 {prepared()!.plan.skippedAccountKeys.length} 项
+                {user()?.id == null ? "（当前未登录，账号级键全部跳过）" : "（非当前账号）"}
+              </li>
+            </ul>
+            <Show when={prepared()!.wasEncrypted}>
               <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
-                该备份已加密，将使用上方「备份密码」解密。
+                该备份已加密，已用备份密码解密。
               </p>
             </Show>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorStatusWarningForeground1)]">
               恢复会覆盖本机对应设置（仅覆盖备份中存在的键）；恢复前会自动保存应急快照，可撤销。
             </p>
+            <Show when={restoreError() !== ""}>
+              <p
+                class="[font-size:var(--fontSizeBase200)] text-[var(--colorStatusDangerForeground1)]"
+                role="alert"
+              >
+                {restoreError()}
+              </p>
+            </Show>
             <div class="flex gap-2">
               <button type="button" class={BUTTON_CLASS} onClick={() => setRestoreStep("list")}>
                 返回
@@ -459,6 +574,15 @@ const SettingsWebdav: Component = () => {
               </button>
             </div>
           </div>
+        </Show>
+        {/* 摘要读取失败（解密/解析）时在对话内提示，避免被遮罩挡住（S4） */}
+        <Show when={restoreError() !== "" && restoreStep() === "list" && !needsPassword()}>
+          <p
+            class="[font-size:var(--fontSizeBase200)] text-[var(--colorStatusDangerForeground1)] mt-2"
+            role="alert"
+          >
+            {restoreError()}
+          </p>
         </Show>
       </FluentDialog>
     </div>

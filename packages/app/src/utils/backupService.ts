@@ -67,8 +67,8 @@ export interface BackupDeps {
   config: BackupConfig;
   /** 收集备份域原始键值 + sets（T6/T7 接线到 settings registry / persisted sets） */
   collect(): Promise<{ raw: Record<string, string>; sets: BackupSets }>;
-  /** 写回恢复计划（T6/T7 接线：settings 写回 + sets 写回） */
-  apply(plan: RestorePlan): Promise<void>;
+  /** 写回恢复计划（T6/T7 接线：settings 写回 + sets 写回）；返回实际写入/跳过键（spec §6.8） */
+  apply(plan: RestorePlan): Promise<{ applied: string[]; skipped: string[] }>;
   /** 读取两个密码（secure storage；登录密码必填，备份加密密码可选） */
   credentials(): Promise<{ loginPassword: string | null; backupPassword: string | null }>;
   /** 当前登录 uid（账号级键过滤；未登录 null，spec §6） */
@@ -191,20 +191,29 @@ export async function listBackups(deps: BackupDeps): Promise<BackupFileInfo[]> {
   return selectBackupFiles(entries);
 }
 
-export interface RestoreResult {
+/** 恢复准备结果（下载→解密→解析→计划+摘要；spec §6.2 摘要确认前零写回） */
+export interface PreparedRestore {
+  snapshot: BackupSnapshotV1;
   plan: RestorePlan;
   summary: BackupSummary;
   wasEncrypted: boolean;
 }
 
+export interface RestoreResult extends PreparedRestore {
+  applied: string[];
+  skipped: string[];
+}
+
 /**
- * 恢复（spec §6）：下载 → 判定加密 → 解密（需要备份密码）→ 解析 → 计划 → 写回。
- * 解密失败（CRYPTO）与 schema 过高（SCHEMA_TOO_NEW）由调用层按类型渲染文案。
+ * 恢复准备（spec §6.1/§6.2）：下载 → 加密判定 → 解密 → 解析 → 恢复计划 + 摘要。
+ * 不写回任何本地状态——pre-restore 快照与写回都在 applyPreparedRestore。
+ * passwordOverride：用户为本次加密档临时输入的备份密码（优先于 secure storage）。
  */
-export async function restoreFrom(
+export async function prepareRestore(
   deps: BackupDeps,
   file: { name: string; encrypted: boolean },
-): Promise<RestoreResult> {
+  passwordOverride?: string,
+): Promise<PreparedRestore> {
   const creds = await deps.credentials();
   const auth = { user: deps.config.username, password: creds.loginPassword ?? "" };
   const downloaded = await deps.bridge.download(fileUrlOf(deps.config, file.name), auth);
@@ -212,7 +221,10 @@ export async function restoreFrom(
   const wasEncrypted = file.encrypted || (await deps.bridge.isEncrypted(downloaded));
   let plain = downloaded;
   if (wasEncrypted) {
-    const pwd = creds.backupPassword;
+    const pwd =
+      passwordOverride !== undefined && passwordOverride !== ""
+        ? passwordOverride
+        : creds.backupPassword;
     if (pwd === null || pwd === "") {
       throw new Error("该备份已加密，请先输入备份密码");
     }
@@ -220,11 +232,34 @@ export async function restoreFrom(
   }
 
   const snapshot: BackupSnapshotV1 = parseSnapshot(plain, BACKUP_SCHEMA_VERSION);
-  const plan = planRestore(snapshot, deps.currentUid());
-  if (deps.onBeforeApply) await deps.onBeforeApply();
-  await deps.apply(plan);
+  return {
+    snapshot,
+    plan: planRestore(snapshot, deps.currentUid()),
+    summary: summarize(snapshot, deps.currentUid()),
+    wasEncrypted,
+  };
+}
 
-  return { plan, summary: summarize(snapshot, deps.currentUid()), wasEncrypted };
+/**
+ * 恢复执行（spec §6.4/§6.8）：pre-restore 应急快照 → 写回 → 返回实际写入/跳过计数。
+ * 与 prepareRestore 分离，保证「摘要确认」发生在任何写回之前。
+ */
+export async function applyPreparedRestore(
+  deps: BackupDeps,
+  prepared: PreparedRestore,
+): Promise<{ applied: string[]; skipped: string[] }> {
+  if (deps.onBeforeApply) await deps.onBeforeApply();
+  return await deps.apply(prepared.plan);
+}
+
+/** 一步恢复（prepare + apply；程序化调用用；UI 走两段式以展示摘要确认） */
+export async function restoreFrom(
+  deps: BackupDeps,
+  file: { name: string; encrypted: boolean },
+): Promise<RestoreResult> {
+  const prepared = await prepareRestore(deps, file);
+  const result = await applyPreparedRestore(deps, prepared);
+  return { ...prepared, ...result };
 }
 
 /** 连接测试（spec §7「连接测试按钮」）：MKCOL 幂等 + 列目录探活 */
@@ -247,7 +282,8 @@ export interface AutoBackupState {
 
 /**
  * 启动时自动备份判定（T8，spec §7：生命周期内触发——WebView 无后台执行）。
- * 规则：开关关 → 不执行；从未备份 → 执行；距上次不足 N 天 → 跳过。
+ * 规则（spec §7「距上次备份超过 N 天则执行」）：开关关 → 不执行；从未备份 → 执行；
+ * 距上次 ≤ N 天（含恰好 N 天）→ 跳过；> N 天 → 执行。
  * 返回本次备份结果或 null（跳过）。
  */
 export async function maybeAutoBackup(
@@ -260,7 +296,7 @@ export async function maybeAutoBackup(
     const last = Date.parse(state.lastBackupAt);
     if (!Number.isNaN(last)) {
       const elapsedDays = (now.getTime() - last) / (24 * 60 * 60 * 1000);
-      if (elapsedDays < state.days) return null;
+      if (elapsedDays <= state.days) return null;
     } else {
       // 时间戳损坏：不静默跳过，warn 后按「该备份了」处理（硬约束 #3）
       console.warn("[backupService] 上次备份时间非法，按从未备份处理:", state.lastBackupAt);
