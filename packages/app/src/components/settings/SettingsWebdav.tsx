@@ -511,6 +511,15 @@ const SettingsWebdav: Component = () => {
               autocomplete="off"
               onInput={(e) => setPromptPassword(e.currentTarget.value)}
             />
+            {/* M6：解密失败必须在密码块内可见（否则 needsPassword 挡住列表步错误块） */}
+            <Show when={restoreError() !== ""}>
+              <p
+                class="[font-size:var(--fontSizeBase200)] text-[var(--colorStatusDangerForeground1)]"
+                role="alert"
+              >
+                {restoreError()}
+              </p>
+            </Show>
             <div class="flex gap-2">
               <button type="button" class={BUTTON_CLASS} onClick={() => setNeedsPassword(false)}>
                 取消

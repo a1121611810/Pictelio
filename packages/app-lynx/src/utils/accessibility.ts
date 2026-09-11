@@ -29,6 +29,13 @@ export const ME_A11Y_LABELS = {
   webdavBackup: 'WebDAV立即备份',
   webdavRestore: 'WebDAV恢复',
   webdavUndo: 'WebDAV撤销上次恢复',
+  webdavAutoDays: 'WebDAV自动备份周期',
+  webdavAutoToggle: 'WebDAV自动备份开关',
+  webdavSensitiveGroup: 'WebDAV敏感项排除',
+  webdavRestoreFiles: 'WebDAV备份档案列表',
+  webdavDecrypt: 'WebDAV解密并查看摘要',
+  webdavRestoreCancel: 'WebDAV取消恢复',
+  webdavRestoreConfirm: 'WebDAV确认恢复',
   // 动图下载格式（spec download-manager §5）：全局统一，六格式各一标注
   downloadFormatGif: '动图下载格式GIF',
   downloadFormatMp4: '动图下载格式MP4',

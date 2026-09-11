@@ -10,6 +10,35 @@ import { ME_A11Y_LABELS } from '../utils/accessibility'
 const meVue = readFileSync(fileURLToPath(new URL('../pages/Me.vue', import.meta.url)), 'utf8')
 
 describe('Me 页 WebDAV 区块（spec §7）', () => {
+  it('spec §7 敏感项排除与非 HTTPS 警告存在（T7 M3/M4 防线）', () => {
+    expect(meVue).toContain('敏感项排除（勾选后不进入备份文件）')
+    expect(meVue).toContain('webdavSensitiveKeys')
+    expect(meVue).toContain('toggleWebdavExcluded')
+    expect(meVue).toContain('非 HTTPS 连接存在泄露风险')
+  })
+
+  it('B1：三个密码输入框 type="password"（不可逆显，spec §7）', () => {
+    const passwordInputs = (meVue.match(/type="password"/g) ?? []).length
+    expect(passwordInputs).toBe(3) // 登录密码 / 备份密码 / 恢复解密提示
+  })
+
+  it('M1：URL/用户名/目录经 setter 持久化（防 v-model 直改 ref 不落盘回归）', () => {
+    for (const kind of ['url', 'username', 'dir'] as const) {
+      expect(meVue).toContain(`onWebdavFieldInput('${kind}', $event)`)
+    }
+    expect(meVue).toContain('settings.setWebdavUrl(value)')
+    expect(meVue).toContain('settings.setWebdavUsername(value)')
+    expect(meVue).toContain('settings.setWebdavDir(value)')
+  })
+
+  it('M2：启动自动备份由 router 钩子触发（不在 Me 挂载时），且 appVersion 用构建常量', () => {
+    expect(meVue).not.toContain('void runStartupAutoBackup()')
+    const routerSource = readFileSync(fileURLToPath(new URL('../router.ts', import.meta.url)), 'utf8')
+    expect(routerSource).toContain('void runStartupAutoBackup()')
+    const wiring = readFileSync(fileURLToPath(new URL('../services/backupWiring.ts', import.meta.url)), 'utf8')
+    expect(wiring).toContain('appVersion: __APP_VERSION__')
+  })
+
   it('spec §7 字段齐全（服务器/用户名/密码/目录/备份密码/自动备份/上次备份/四动作）', () => {
     expect(meVue).toContain('WebDAV 备份')
     expect(meVue).toContain('dav.example.com') // 服务器地址示例

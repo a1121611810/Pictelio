@@ -20,6 +20,7 @@ import { useAuthStore } from './stores/authStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { useModalStack } from './stores/modalStack'
 import { registerSessionErrorHandler } from './utils/errorPresentation'
+import { runStartupAutoBackup } from './services/backupWiring'
 
 /** 首帧/栈空回退目标（ADR-0049）：初始路由 = 推荐页（首帧内容化） */
 export const RECOMMENDED_PATH = '/recommended'
@@ -385,6 +386,9 @@ export async function initRouter(): Promise<void> {
   const ok = await auth.restoreToken()
   // ADR-0103：账号级设置需 uid 已知（restoreToken 之后）再加载
   await useSettingsStore().loadSettings()
+  // T8：启动时自动备份——必须在 loadSettings 之后（否则读到默认 false 静默跳过）；
+  // 失败仅 warn，不阻塞启动（spec §7）
+  void runStartupAutoBackup()
   await navigate(ok ? RECOMMENDED_PATH : '/login', { replace: true })
   // 登录态恢复已定局：守卫开始执行鉴权拦截（bootstrap 期放行至此结束）
   markBootstrapDone()

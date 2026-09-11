@@ -139,7 +139,8 @@ export function createLynxBackupDeps(config: BackupConfig = currentBackupConfig(
     }),
     currentUid,
     engine: "lynx",
-    appVersion: "lynx",
+    // spec §3.2：快照记录应用版本（构建期注入，与 APK 版本单一事实源一致）
+    appVersion: __APP_VERSION__,
     onBeforeApply: () => savePreRestoreSnapshot(wiring),
   }
 }

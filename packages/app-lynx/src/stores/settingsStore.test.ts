@@ -693,3 +693,68 @@ describe("settingsStore.webdav（T5）", () => {
   })
 })
 
+
+describe('settingsStore 备份原语（T7 m3：exportRawValues / importRawValues 直测）', () => {
+  beforeEach(() => {
+    vi.mocked(idbGet).mockReset().mockResolvedValue(null)
+    vi.mocked(idbSet).mockReset().mockResolvedValue(undefined)
+    vi.mocked(idbRemove).mockReset().mockResolvedValue(undefined)
+    env.native = true
+    env.modules = {}
+    userRef().value = { id: 42 }
+  })
+
+  function prefsModule(map: Map<string, string>) {
+    env.native = true
+    env.modules = {
+      PictelioPrefs: {
+        prefsGet: (k: string, cb: (v: string, e: string | null) => void) =>
+          cb(map.has(k) ? JSON.stringify(map.get(k)!) : '', null),
+        prefsSet: (k: string, v: string, cb: (e: string | null) => void) => {
+          map.set(k, v)
+          cb(null)
+        },
+        prefsRemove: (k: string, cb: (e: string | null) => void) => {
+          map.delete(k)
+          cb(null)
+        },
+      },
+    }
+  }
+
+  it('exportRawValues：双源读取（idbKV 的 ugoiraMode/detailQuality + prefs 其余）+ 未记录键省略', async () => {
+    vi.mocked(idbGet).mockImplementation(async (key: string) =>
+      key === 'settings_ugoira_mode' ? 'fflate' : key === 'settings_detail_quality' ? 'large' : null,
+    )
+    const map = new Map<string, string>([['settings_theme_color', 'blue']])
+    prefsModule(map)
+
+    const raw = await store.exportRawValues()
+    expect(raw.settings_ugoira_mode).toBe('fflate') // idb 源
+    expect(raw.settings_detail_quality).toBe('large') // idb 源（另一键，m3 补测）
+    expect(raw.settings_theme_color).toBe('blue') // prefs 源
+    expect(raw.show_r18_42).toBeUndefined() // 无记录账号键不出现
+  })
+
+  it('importRawValues：设备/账号键写回；异账号与未知键跳过（merge-by-keys）', async () => {
+    const map = new Map<string, string>()
+    prefsModule(map)
+
+    const res = await store.importRawValues({
+      settings_ugoira_mode: 'range',
+      settings_detail_quality: 'original',
+      show_r18_42: 'true',
+      show_r18_99: 'true',
+      unknown_key: 'x',
+    })
+
+    expect(store.ugoiraMode).toBe('range')
+    expect(store.detailQuality).toBe('original')
+    expect(store.showR18).toBe(true)
+    expect(res.applied).toContain('settings_ugoira_mode')
+    expect(res.applied).toContain('show_r18_42')
+    expect(res.skipped).toContain('show_r18_99')
+    expect(res.skipped).toContain('unknown_key')
+    expect(map.has('show_r18_99')).toBe(false) // 异账号键未落盘
+  })
+})
