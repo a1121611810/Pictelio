@@ -40,6 +40,14 @@ const KNOWN_CATCH_ALL_PATHS = new Map([
   ["/recommended", "历史遗留路径，依赖 catch-all 渲染首页（router.tsx 无此路由）"],
 ]);
 
+/**
+ * 已知非路由的 URL 片段白名单：出现在 location/includes/startsWith 断言里、以 "/" 开头，
+ * 但不是 router 路由（图片代理、资源路径等）。登记时注明原因。
+ */
+const KNOWN_NON_ROUTE_PATHS = new Map([
+  ["/pixiv-img/", "图片代理路径断言（图片 URL 校验），非页面路由"],
+]);
+
 // ─── 文件收集 ───
 
 /** 递归收集目录下匹配扩展名的文件 */
@@ -169,6 +177,8 @@ const failures = [];
 const warnings = [];
 /** @type {Anchor[]} */
 const catchAllNotes = [];
+/** @type {Anchor[]} */
+const nonRouteNotes = [];
 
 for (const a of allAnchors) {
   switch (a.kind) {
@@ -201,6 +211,8 @@ for (const a of allAnchors) {
       if (routePatterns.some((p) => routeMatches(p, a.value))) break;
       if (KNOWN_CATCH_ALL_PATHS.has(a.value)) {
         catchAllNotes.push(a);
+      } else if (KNOWN_NON_ROUTE_PATHS.has(a.value)) {
+        nonRouteNotes.push(a);
       } else {
         failures.push(a);
       }
@@ -231,6 +243,13 @@ if (catchAllNotes.length > 0) {
   console.log("\n[提示] 以下路径不在 router.tsx 具体路由中，已在 catch-all 白名单登记：");
   for (const a of catchAllNotes) {
     console.log(`  - ${a.value}（${a.file}:${a.line}）—— ${KNOWN_CATCH_ALL_PATHS.get(a.value)}`);
+  }
+}
+
+if (nonRouteNotes.length > 0) {
+  console.log("\n[提示] 以下以 / 开头的值是非路由 URL 片段（图片代理等），已在非路由白名单登记：");
+  for (const a of nonRouteNotes) {
+    console.log(`  - ${a.value}（${a.file}:${a.line}）—— ${KNOWN_NON_ROUTE_PATHS.get(a.value)}`);
   }
 }
 

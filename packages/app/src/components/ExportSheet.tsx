@@ -22,6 +22,19 @@ interface ExportSheetProps {
  * 格式预选设置页默认值、可临时覆盖本次格式；内容开关只读展示（在设置页修改）。
  * 底部弹层形态（对齐 ReaderSettingsSheet 的 Sheet 契约）。
  */
+/** 本次导出面板每个格式的 a11y 标签（显式字面量：便于 E2E 静态锚点校验） */
+const FORMAT_ARIA_LABELS: Record<NovelExportFormat, string> = {
+  txt: "导出格式 TXT",
+  html: "导出格式 HTML",
+  md: "导出格式 Markdown",
+  docx: "导出格式 Word (.docx)",
+  pdf: "导出格式 PDF",
+  epub: "导出格式 EPUB",
+  rtf: "导出格式 RTF",
+  json: "导出格式 JSON",
+  fb2: "导出格式 FB2",
+};
+
 /** 开关状态文案（模块级：不捕获组件作用域，避免每次渲染重建） */
 const optionText = (on: boolean) => (on ? "开" : "关");
 
@@ -79,7 +92,7 @@ const ExportSheet: Component<ExportSheetProps> = (props) => {
                       "bg-transparent text-[var(--colorNeutralForeground2)]": selected() !== fmt,
                     },
                   ]}
-                  aria-label={`导出格式 ${NOVEL_EXPORT_FORMAT_LABELS[fmt]}`}
+                  aria-label={FORMAT_ARIA_LABELS[fmt]}
                   aria-pressed={selected() === fmt ? "true" : "false"}
                   onClick={() => setSelected(fmt)}
                 >

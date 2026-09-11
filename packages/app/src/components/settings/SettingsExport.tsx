@@ -21,6 +21,19 @@ import {
  * 小说导出的全局默认格式 + 三项内容开关（元数据 / 封面 / 正文内嵌插图，默认全开）。
  * 导出面板可临时覆盖本次格式；内容开关只在此处配置。
  */
+/** 每个格式的 a11y 标签（显式字面量：便于 E2E 静态锚点校验，且避免模板拼接漂移） */
+const FORMAT_ARIA_LABELS: Record<NovelExportFormat, string> = {
+  txt: "小说导出格式 TXT",
+  html: "小说导出格式 HTML",
+  md: "小说导出格式 Markdown",
+  docx: "小说导出格式 Word (.docx)",
+  pdf: "小说导出格式 PDF",
+  epub: "小说导出格式 EPUB",
+  rtf: "小说导出格式 RTF",
+  json: "小说导出格式 JSON",
+  fb2: "小说导出格式 FB2",
+};
+
 const SettingsExport: Component = () => {
   return (
     <div class="py-3 flex flex-col">
@@ -49,7 +62,7 @@ const SettingsExport: Component = () => {
                     novelExportFormat() !== fmt,
                 },
               ]}
-              aria-label={`小说导出格式 ${NOVEL_EXPORT_FORMAT_LABELS[fmt]}`}
+              aria-label={FORMAT_ARIA_LABELS[fmt]}
               aria-pressed={novelExportFormat() === fmt ? "true" : "false"}
               onClick={() => void setNovelExportFormat(fmt)}
             >
