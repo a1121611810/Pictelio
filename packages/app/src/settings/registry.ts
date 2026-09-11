@@ -360,6 +360,50 @@ export function createSettings(opts: SettingsOptions): Settings {
     }
   }
 
+  async function rawValues(): Promise<Record<string, string>> {
+    const out: Record<string, string> = {};
+    for (const [key, def] of defs) {
+      const storage = resolveStorage(def);
+      try {
+        const raw = await storage.get(key);
+        if (raw !== null) out[key] = raw;
+      } catch (e) {
+        // 读取失败 = 该键不进快照；必须可见（仓库测试硬约束 #3）
+        report(def, "read", e);
+      }
+    }
+    return out;
+  }
+
+  async function setRawValues(
+    entries: Record<string, string>,
+  ): Promise<{ applied: string[]; skipped: string[] }> {
+    const applied: string[] = [];
+    const skipped: string[] = [];
+    for (const [key, raw] of Object.entries(entries)) {
+      const def = defs.get(key);
+      const handle = handles.get(key);
+      if (!def || !handle) {
+        skipped.push(key); // 未注册键（异引擎 / 更新版本遗留）不写，spec §6
+        continue;
+      }
+      const decoded = decodeSetting(def, raw);
+      if (decoded === undefined) {
+        report(def, "read", new Error(`restore corrupt value for ${key}: ${raw}`));
+        skipped.push(key);
+        continue;
+      }
+      try {
+        handle.set(decoded as never);
+        applied.push(key);
+      } catch (e) {
+        report(def, "write", e);
+        skipped.push(key);
+      }
+    }
+    return { applied, skipped };
+  }
+
   return {
     define,
     defineFactory,
@@ -373,6 +417,8 @@ export function createSettings(opts: SettingsOptions): Settings {
       for (const [k, h] of handles) out[k] = h.value();
       return out;
     },
+    rawValues,
+    setRawValues,
     onChange,
   };
 }

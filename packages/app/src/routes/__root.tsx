@@ -5,6 +5,7 @@ import { settings } from "@/settings";
 import { persistScrollRestoration } from "@/stores/uiStore";
 import { scrollToTop } from "@/utils/scrollToTop";
 import { installStartupScrollGuard } from "@/utils/startupScrollGuard";
+import { runStartupAutoBackup } from "@/services/backupWiring";
 import {
   gateActive,
   notifyWebBundleReady,
@@ -52,6 +53,15 @@ const RootLayout: Component = (props: { children?: any }) => {
   const location = useLocation();
   const [showExitHint, setShowExitHint] = createSignal(false);
   let exitHintTimer: ReturnType<typeof setTimeout>;
+
+  // 启动后自动备份（T8，spec §7）：开关关时零 IO；失败仅 warn 不阻塞启动。
+  createEffect(
+    () => isLoggedIn(),
+    (loggedIn) => {
+      if (!loggedIn) return;
+      void runStartupAutoBackup();
+    },
+  );
 
   // 路由切换时清空 overlay 栈，避免旧路由未关闭的 overlay 阻塞新路由的返回手势。
   // Solid 2.0 拆分效应：compute 只读依赖（location.pathname），apply 做副作用。

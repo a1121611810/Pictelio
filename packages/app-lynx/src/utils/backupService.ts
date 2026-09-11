@@ -236,3 +236,35 @@ export async function testConnection(deps: BackupDeps): Promise<{ fileCount: num
   const entries = await deps.bridge.list(dirUrl, auth);
   return { fileCount: selectBackupFiles(entries).length };
 }
+/** 自动备份开关状态（T8；设置域注入） */
+export interface AutoBackupState {
+  enabled: boolean;
+  /** 周期天数（spec §7：1/3/7/30，默认 7） */
+  days: number;
+  /** 上次备份时间（ISO；空串 = 从未备份） */
+  lastBackupAt: string;
+}
+
+/**
+ * 启动时自动备份判定（T8，spec §7：生命周期内触发——WebView 无后台执行）。
+ * 规则：开关关 → 不执行；从未备份 → 执行；距上次不足 N 天 → 跳过。
+ * 返回本次备份结果或 null（跳过）。
+ */
+export async function maybeAutoBackup(
+  deps: BackupDeps,
+  state: AutoBackupState,
+  now: Date = deps.now?.() ?? new Date(),
+): Promise<BackupResult | null> {
+  if (!state.enabled) return null;
+  if (state.lastBackupAt !== "") {
+    const last = Date.parse(state.lastBackupAt);
+    if (!Number.isNaN(last)) {
+      const elapsedDays = (now.getTime() - last) / (24 * 60 * 60 * 1000);
+      if (elapsedDays < state.days) return null;
+    } else {
+      // 时间戳损坏：不静默跳过，warn 后按「该备份了」处理（硬约束 #3）
+      console.warn("[backupService] 上次备份时间非法，按从未备份处理:", state.lastBackupAt);
+    }
+  }
+  return backupNow(deps);
+}

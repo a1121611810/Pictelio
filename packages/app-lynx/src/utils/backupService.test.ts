@@ -297,3 +297,39 @@ describe("backupService — 列档与连接测试（spec §7）", () => {
     expect(res.fileCount).toBe(1);
   });
 });
+describe("backupService — 自动备份判定（spec §7 T8）", () => {
+  it("maybeAutoBackup：开关关 → 跳过；从未备份 → 执行；未到期 → 跳过；到期 → 执行", async () => {
+    const { maybeAutoBackup } = await import("./backupService")
+    const now = new Date(2026, 8, 11, 12, 0, 0)
+    const { deps: d, calls } = deps()
+    expect(await maybeAutoBackup(d, { enabled: false, days: 7, lastBackupAt: "" }, now)).toBeNull()
+    expect(calls.uploadWithVerify).toHaveLength(0)
+
+    const r1 = await maybeAutoBackup(d, { enabled: true, days: 7, lastBackupAt: "" }, now)
+    expect(r1).not.toBeNull()
+    expect(calls.uploadWithVerify).toHaveLength(1)
+
+    const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString()
+    expect(
+      await maybeAutoBackup(d, { enabled: true, days: 7, lastBackupAt: threeDaysAgo }, now),
+    ).toBeNull()
+    expect(calls.uploadWithVerify).toHaveLength(1)
+
+    const eightDaysAgo = new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000).toISOString()
+    expect(
+      await maybeAutoBackup(d, { enabled: true, days: 7, lastBackupAt: eightDaysAgo }, now),
+    ).not.toBeNull()
+    expect(calls.uploadWithVerify).toHaveLength(2)
+  })
+
+  it("maybeAutoBackup：时间戳损坏 → warn 并按从未备份处理（不静默）", async () => {
+    const { maybeAutoBackup } = await import("./backupService")
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const { deps: d, calls } = deps()
+    const r = await maybeAutoBackup(d, { enabled: true, days: 7, lastBackupAt: "not-a-date" })
+    expect(r).not.toBeNull()
+    expect(calls.uploadWithVerify).toHaveLength(1)
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+});

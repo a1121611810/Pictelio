@@ -268,3 +268,68 @@ describe("Settings registry", () => {
     expect(mem.dump().has("foo")).toBe(false);
   });
 });
+
+describe("Settings registry — backup rawValues / setRawValues（spec webdav-backup §3.2/§6）", () => {
+  it("rawValues：只含存储层有记录的键（原始字符串），默认值不写入", async () => {
+    const { settings, mem } = make();
+    settings.define({ key: "a", default: "d1" });
+    settings.define<number>({ key: "b", default: 2 });
+    await settings.hydrateAll();
+
+    expect(await settings.rawValues()).toEqual({});
+
+    await mem.set("a", "x");
+    await mem.set("b", "7");
+    expect(await settings.rawValues()).toEqual({ a: "x", b: "7" });
+  });
+
+  it("rawValues：动态工厂已实例化的账号级键包含、未实例化 uid 不出现", async () => {
+    const { settings, mem } = make();
+    const factory = settings.defineFactory<string>({ keyPrefix: "show_r18", default: "false" });
+    await settings.hydrateAll();
+    factory.forId(42);
+    await mem.set("show_r18_42", "true");
+    await mem.set("show_r18_99", "true"); // 未实例化 → 不进快照（当前账号语义）
+
+    const raw = await settings.rawValues();
+    expect(raw.show_r18_42).toBe("true");
+    expect(raw.show_r18_99).toBeUndefined();
+  });
+
+  it("setRawValues：已注册键写回并触发内存更新；未注册键跳过（merge-by-keys）", async () => {
+    const { settings } = make();
+    const s = settings.define({ key: "a", default: "d" });
+    await settings.hydrateAll();
+
+    const res = await settings.setRawValues({ a: "restored", foreign_key: "x" });
+    expect(res.applied).toEqual(["a"]);
+    expect(res.skipped).toEqual(["foreign_key"]);
+    expect(s.value()).toBe("restored");
+  });
+
+  it("setRawValues：损坏值（validate 拒绝）不写回且计入 skipped + warn", async () => {
+    const { settings } = make();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const s = settings.define<number>({
+      key: "n",
+      default: 1,
+      validate: (v): v is number => typeof v === "number" && v >= 1 && v <= 30,
+    });
+    await settings.hydrateAll();
+
+    const res = await settings.setRawValues({ n: "999" });
+    expect(res.applied).toEqual([]);
+    expect(res.skipped).toEqual(["n"]);
+    expect(s.value()).toBe(1); // 保持本地值（不触碰）
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("setRawValues 写回后落盘（持久化经 handle.set 正常管线）", async () => {
+    const { settings, mem } = make();
+    settings.define({ key: "a", default: "d" });
+    await settings.hydrateAll();
+    await settings.setRawValues({ a: "persisted" });
+    await vi.waitFor(() => expect(mem.dump().get("a")).toBe("persisted"));
+  });
+});
