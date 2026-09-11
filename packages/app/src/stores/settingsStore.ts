@@ -1,5 +1,8 @@
 import { createSignal } from "solid-js";
 import { settings } from "@/settings";
+// 注意：codec 从子路径导入而非 "@/settings" 桶文件——settingsStore 被 10+ 测试
+// mock "@/settings"（getter 注入 harness），桶文件新增具名导入会击穿这些 mock
+import { jsonCodec } from "@/settings/codecs";
 import { user } from "@/stores/authStore";
 import { isAiFilterMode, type AiFilterMode } from "../utils/aiFilter";
 import type { UgoiraExtractMode } from "../api/illust";
@@ -41,6 +44,16 @@ const PREF_KEY_NOVEL_EXPORT_FORMAT = "settings_novel_export_format";
 const PREF_KEY_NOVEL_EXPORT_INCLUDE_METADATA = "settings_novel_export_include_metadata";
 const PREF_KEY_NOVEL_EXPORT_INCLUDE_COVER = "settings_novel_export_include_cover";
 const PREF_KEY_NOVEL_EXPORT_INCLUDE_IMAGES = "settings_novel_export_include_images";
+// WebDAV 连接配置（spec docs/specs/webdav-backup.md §7/§8；跨引擎共享键，
+// 键字符串与 app-lynx settingsStore 逐字一致，契约测试 differential/webdavSettingsConsistency 防漂移）
+const PREF_KEY_WEBDAV_ENABLED = "settings_webdav_enabled";
+const PREF_KEY_WEBDAV_URL = "settings_webdav_url";
+const PREF_KEY_WEBDAV_USERNAME = "settings_webdav_username";
+const PREF_KEY_WEBDAV_DIR = "settings_webdav_dir";
+const PREF_KEY_WEBDAV_AUTO_BACKUP = "settings_webdav_auto_backup";
+const PREF_KEY_WEBDAV_AUTO_BACKUP_DAYS = "settings_webdav_auto_backup_days";
+const PREF_KEY_WEBDAV_LAST_BACKUP = "settings_webdav_last_backup";
+const PREF_KEY_WEBDAV_EXCLUDED_KEYS = "settings_webdav_excluded_keys";
 
 // ── 持久化设置（统一 settings registry 管理）──
 // 各持久化项用 settings.define 声明，signal 状态由 registry 管理。
@@ -380,6 +393,88 @@ export {
 
 // ── 重置所有设置到默认值 ──
 
+// ── WebDAV 连接配置（spec docs/specs/webdav-backup.md §7/§8）──
+// 进备份域（密码除外，密码走 secure storage，见 utils/webdavCredentials）。
+// 存储后端 = preferences（默认）→ 与 lynx PictelioPrefsModule 同一 SharedPreferences 文件。
+
+const webdavEnabledHandle = settings.define<boolean>({
+  key: PREF_KEY_WEBDAV_ENABLED,
+  default: false,
+});
+export const webdavEnabled = () => webdavEnabledHandle.value();
+export async function setWebdavEnabled(enabled: boolean): Promise<void> {
+  webdavEnabledHandle.set(enabled);
+}
+
+const webdavUrlHandle = settings.define<string>({
+  key: PREF_KEY_WEBDAV_URL,
+  default: "",
+});
+export const webdavUrl = () => webdavUrlHandle.value();
+export async function setWebdavUrl(url: string): Promise<void> {
+  webdavUrlHandle.set(url);
+}
+
+const webdavUsernameHandle = settings.define<string>({
+  key: PREF_KEY_WEBDAV_USERNAME,
+  default: "",
+});
+export const webdavUsername = () => webdavUsernameHandle.value();
+export async function setWebdavUsername(username: string): Promise<void> {
+  webdavUsernameHandle.set(username);
+}
+
+const webdavDirHandle = settings.define<string>({
+  key: PREF_KEY_WEBDAV_DIR,
+  default: "Pictelio/backup",
+});
+export const webdavDir = () => webdavDirHandle.value();
+export async function setWebdavDir(dir: string): Promise<void> {
+  webdavDirHandle.set(dir);
+}
+
+const webdavAutoBackupHandle = settings.define<boolean>({
+  key: PREF_KEY_WEBDAV_AUTO_BACKUP,
+  default: false,
+});
+export const webdavAutoBackup = () => webdavAutoBackupHandle.value();
+export async function setWebdavAutoBackup(enabled: boolean): Promise<void> {
+  webdavAutoBackupHandle.set(enabled);
+}
+
+/** 自动备份周期天数（spec §7：N∈{1,3,7,30}，默认 7） */
+const webdavAutoBackupDaysHandle = settings.define<number>({
+  key: PREF_KEY_WEBDAV_AUTO_BACKUP_DAYS,
+  default: 7,
+  validate: (v): v is number => typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 30,
+});
+export const webdavAutoBackupDays = () => webdavAutoBackupDaysHandle.value();
+export async function setWebdavAutoBackupDays(days: number): Promise<void> {
+  webdavAutoBackupDaysHandle.set(days);
+}
+
+/** 上次备份时间（ISO-8601，只读展示于设置区块；空串 = 从未备份） */
+const webdavLastBackupHandle = settings.define<string>({
+  key: PREF_KEY_WEBDAV_LAST_BACKUP,
+  default: "",
+});
+export const webdavLastBackup = () => webdavLastBackupHandle.value();
+export async function setWebdavLastBackup(iso: string): Promise<void> {
+  webdavLastBackupHandle.set(iso);
+}
+
+/** 敏感项排除清单（导出界面勾选持久化；恢复时不触碰本地对应键，spec §6） */
+const webdavExcludedKeysHandle = settings.define<string[]>({
+  key: PREF_KEY_WEBDAV_EXCLUDED_KEYS,
+  default: [],
+  codec: jsonCodec,
+  validate: (v): v is string[] => Array.isArray(v) && v.every((k) => typeof k === "string"),
+});
+export const webdavExcludedKeys = () => webdavExcludedKeysHandle.value();
+export async function setWebdavExcludedKeys(keys: string[]): Promise<void> {
+  webdavExcludedKeysHandle.set(keys);
+}
+
 /** 重置所有设置项为默认值，并尽可能持久化。 */
 export async function resetSettingsStore(): Promise<void> {
   setListQuality("medium");
@@ -401,6 +496,14 @@ export async function resetSettingsStore(): Promise<void> {
   await setNovelExportIncludeCover(DEFAULT_NOVEL_EXPORT_OPTIONS.includeCover);
   await setNovelExportIncludeImages(DEFAULT_NOVEL_EXPORT_OPTIONS.includeInlineImages);
   await setAutoCheckUpdate(true);
+  await setWebdavEnabled(false);
+  await setWebdavUrl("");
+  await setWebdavUsername("");
+  await setWebdavDir("Pictelio/backup");
+  await setWebdavAutoBackup(false);
+  await setWebdavAutoBackupDays(7);
+  await setWebdavLastBackup("");
+  await setWebdavExcludedKeys([]);
   await setLastDismissedVersion("");
   setHasUpdate(false);
   setLatestVersion("");

@@ -24,11 +24,15 @@ vi.mock("@/stores/authStore", () => ({
   user: () => mockUser.current,
 }));
 
-vi.mock("@/settings", () => ({
-  get settings() {
-    return mockState.current;
-  },
-}));
+vi.mock("@/settings", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/settings")>();
+  return {
+    ...actual,
+    get settings() {
+      return mockState.current;
+    },
+  };
+});
 
 async function loadStore(seed: Record<string, string> = {}) {
   vi.resetModules();

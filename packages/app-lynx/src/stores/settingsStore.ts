@@ -57,6 +57,16 @@ const NOVEL_EXPORT_FORMAT_KEY = "settings_novel_export_format"
 const NOVEL_EXPORT_INCLUDE_METADATA_KEY = "settings_novel_export_include_metadata"
 const NOVEL_EXPORT_INCLUDE_COVER_KEY = "settings_novel_export_include_cover"
 const NOVEL_EXPORT_INCLUDE_IMAGES_KEY = "settings_novel_export_include_images"
+// WebDAV 连接配置（spec docs/specs/webdav-backup.md §7/§8；跨引擎共享键，
+// 键字符串与 app settingsStore 逐字一致，app 侧契约测试 differential/webdavSettingsConsistency 防漂移）
+const WEBDAV_ENABLED_KEY = "settings_webdav_enabled"
+const WEBDAV_URL_KEY = "settings_webdav_url"
+const WEBDAV_USERNAME_KEY = "settings_webdav_username"
+const WEBDAV_DIR_KEY = "settings_webdav_dir"
+const WEBDAV_AUTO_BACKUP_KEY = "settings_webdav_auto_backup"
+const WEBDAV_AUTO_BACKUP_DAYS_KEY = "settings_webdav_auto_backup_days"
+const WEBDAV_LAST_BACKUP_KEY = "settings_webdav_last_backup"
+const WEBDAV_EXCLUDED_KEYS_KEY = "settings_webdav_excluded_keys"
 
 // ── PrefsStorage seam（ADR-0103 决策 3：两 adapter = 真 seam）──
 
@@ -168,6 +178,16 @@ export const useSettingsStore = defineStore("settings", () => {
   const _novelExportFormat = ref<NovelExportFormat>(DEFAULT_NOVEL_EXPORT_FORMAT)
   const _novelExportOptions = ref<NovelExportOptions>({ ...DEFAULT_NOVEL_EXPORT_OPTIONS })
 
+  // WebDAV 连接配置（设备级，默认与 app §7 逐字一致）
+  const _webdavEnabled = ref(false)
+  const _webdavUrl = ref("")
+  const _webdavUsername = ref("")
+  const _webdavDir = ref("Pictelio/backup")
+  const _webdavAutoBackup = ref(false)
+  const _webdavAutoBackupDays = ref(7)
+  const _webdavLastBackup = ref("")
+  const _webdavExcludedKeys = ref<string[]>([])
+
   // ── 跨 store 组合：读 authStore.currentUser.id 推导 uid（替换原模块级 currentUser import）
   const auth = useAuthStore()
   /** 当前账号 ID（未登录 null）——登出由下方 watch 兜底重置 refs */
@@ -183,6 +203,14 @@ export const useSettingsStore = defineStore("settings", () => {
   const themeColor = _themeColor
   const novelExportFormat = _novelExportFormat
   const novelExportOptions = _novelExportOptions
+  const webdavEnabled = _webdavEnabled
+  const webdavUrl = _webdavUrl
+  const webdavUsername = _webdavUsername
+  const webdavDir = _webdavDir
+  const webdavAutoBackup = _webdavAutoBackup
+  const webdavAutoBackupDays = _webdavAutoBackupDays
+  const webdavLastBackup = _webdavLastBackup
+  const webdavExcludedKeys = _webdavExcludedKeys
 
   // ── 公共 actions（return）──
 
@@ -250,6 +278,48 @@ export const useSettingsStore = defineStore("settings", () => {
       _novelExportOptions.value = opts
     } catch (e) {
       console.warn("[settingsStore] 小说导出设置加载失败（维持默认）", e)
+    }
+
+    // WebDAV 连接配置：设备级，未登录也加载（恢复配置无需登录）
+    try {
+      const p = prefs()
+      const enabled = await p.get(WEBDAV_ENABLED_KEY)
+      if (enabled === "true") _webdavEnabled.value = true
+      const url = await p.get(WEBDAV_URL_KEY)
+      if (url !== null) _webdavUrl.value = url
+      const username = await p.get(WEBDAV_USERNAME_KEY)
+      if (username !== null) _webdavUsername.value = username
+      const dir = await p.get(WEBDAV_DIR_KEY)
+      if (dir !== null) _webdavDir.value = dir
+      const auto = await p.get(WEBDAV_AUTO_BACKUP_KEY)
+      if (auto === "true") _webdavAutoBackup.value = true
+      const days = await p.get(WEBDAV_AUTO_BACKUP_DAYS_KEY)
+      if (days !== null) {
+        const n = Number(days)
+        if (Number.isInteger(n) && n >= 1 && n <= 30) {
+          _webdavAutoBackupDays.value = n
+        } else {
+          console.warn("[settingsStore] WebDAV 自动备份周期非法，维持默认 7:", days)
+        }
+      }
+      const last = await p.get(WEBDAV_LAST_BACKUP_KEY)
+      if (last !== null) _webdavLastBackup.value = last
+      const excluded = await p.get(WEBDAV_EXCLUDED_KEYS_KEY)
+      const rawExcluded = excluded === null ? null : unquoteNativeString(excluded)
+      if (rawExcluded !== null) {
+        try {
+          const parsed: unknown = JSON.parse(rawExcluded)
+          if (Array.isArray(parsed) && parsed.every((k) => typeof k === "string")) {
+            _webdavExcludedKeys.value = parsed
+          } else {
+            console.warn("[settingsStore] WebDAV 排除清单非法，维持默认空:", rawExcluded)
+          }
+        } catch {
+          console.warn("[settingsStore] WebDAV 排除清单解析失败，维持默认空:", rawExcluded)
+        }
+      }
+    } catch (e) {
+      console.warn("[settingsStore] WebDAV 连接配置加载失败（维持默认）", e)
     }
 
     const id = uid()
@@ -370,6 +440,56 @@ export const useSettingsStore = defineStore("settings", () => {
       .catch((e) => console.warn("[settingsStore] 小说导出开关写入失败", e))
   }
 
+  // ── WebDAV 连接配置 actions（spec §7/§8；进备份域，密码除外走 utils/webdavCredentials）──
+
+  function setWebdavEnabled(enabled: boolean): void {
+    _webdavEnabled.value = enabled
+    void prefs().set(WEBDAV_ENABLED_KEY, String(enabled))
+      .catch((e) => console.warn("[settingsStore] WebDAV 开关写入失败", e))
+  }
+
+  function setWebdavUrl(url: string): void {
+    _webdavUrl.value = url
+    void prefs().set(WEBDAV_URL_KEY, url)
+      .catch((e) => console.warn("[settingsStore] WebDAV 服务器地址写入失败", e))
+  }
+
+  function setWebdavUsername(username: string): void {
+    _webdavUsername.value = username
+    void prefs().set(WEBDAV_USERNAME_KEY, username)
+      .catch((e) => console.warn("[settingsStore] WebDAV 用户名写入失败", e))
+  }
+
+  function setWebdavDir(dir: string): void {
+    _webdavDir.value = dir
+    void prefs().set(WEBDAV_DIR_KEY, dir)
+      .catch((e) => console.warn("[settingsStore] WebDAV 目录写入失败", e))
+  }
+
+  function setWebdavAutoBackup(enabled: boolean): void {
+    _webdavAutoBackup.value = enabled
+    void prefs().set(WEBDAV_AUTO_BACKUP_KEY, String(enabled))
+      .catch((e) => console.warn("[settingsStore] WebDAV 自动备份开关写入失败", e))
+  }
+
+  function setWebdavAutoBackupDays(days: number): void {
+    _webdavAutoBackupDays.value = days
+    void prefs().set(WEBDAV_AUTO_BACKUP_DAYS_KEY, String(days))
+      .catch((e) => console.warn("[settingsStore] WebDAV 自动备份周期写入失败", e))
+  }
+
+  function setWebdavLastBackup(iso: string): void {
+    _webdavLastBackup.value = iso
+    void prefs().set(WEBDAV_LAST_BACKUP_KEY, iso)
+      .catch((e) => console.warn("[settingsStore] WebDAV 上次备份时间写入失败", e))
+  }
+
+  function setWebdavExcludedKeys(keys: string[]): void {
+    _webdavExcludedKeys.value = keys
+    void prefs().set(WEBDAV_EXCLUDED_KEYS_KEY, JSON.stringify(keys))
+      .catch((e) => console.warn("[settingsStore] WebDAV 排除清单写入失败", e))
+  }
+
   /**
    * 遮罩判定：该条目是否因 R18/R18G 开关处于受限态（issue #91：过滤 → 遮罩）。
    * 纯函数，读 ref —— 开关切换后所有依赖处即时重算，无需重新请求。
@@ -431,6 +551,14 @@ export const useSettingsStore = defineStore("settings", () => {
     ugoiraDownloadFormat,
     novelExportFormat,
     novelExportOptions,
+    webdavEnabled,
+    webdavUrl,
+    webdavUsername,
+    webdavDir,
+    webdavAutoBackup,
+    webdavAutoBackupDays,
+    webdavLastBackup,
+    webdavExcludedKeys,
     // actions
     loadSettings,
     setShowR18,
@@ -444,6 +572,14 @@ export const useSettingsStore = defineStore("settings", () => {
     setNovelExportIncludeMetadata,
     setNovelExportIncludeCover,
     setNovelExportIncludeImages,
+    setWebdavEnabled,
+    setWebdavUrl,
+    setWebdavUsername,
+    setWebdavDir,
+    setWebdavAutoBackup,
+    setWebdavAutoBackupDays,
+    setWebdavLastBackup,
+    setWebdavExcludedKeys,
     isRestricted,
     isAiWork,
     isAiRestricted,
