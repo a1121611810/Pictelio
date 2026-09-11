@@ -4,6 +4,29 @@
 
 ## 术语
 
+### WebDAV 备份（跨端功能，wayfinder #455）
+
+**备份域（backup scope）**：
+WebDAV 备份功能划定的一期数据边界——全部设置类键 + 屏蔽列表 + 举报记录。
+
+**排除域（out of backup）**：
+凭证（refresh_token）、浏览/搜索历史、下载队列记录、可重建缓存——明确不进备份的数据类别。
+
+**账号级键过滤恢复（account-key filtered restore）**：
+恢复时账号级设置键（`show_r18_${uid}` 等，ADR-0103 契约）仅应用与当前登录 uid 匹配者，避免异账号恢复产生孤儿键。
+
+**备份传输三层（backup transport layering）**：
+WebDAV 备份的架构分层——Java 单一 `WebDavClient` 核心（OkHttp 协议子集）+ 双薄桥（webview 走 Capacitor `WebDavPlugin`，lynx 走 `PictelioWebDavModule`）+ TS 共享纯函数层（收集/序列化/加密，双引擎同源同语义差分对齐）。
+
+**备份快照格式 v1（backup snapshot format v1）**：
+引擎无关单文件 JSON（`format/schemaVersion/deviceKeys/accountKeys/sets/excludedKeys`），时间戳文件名天然免冲突不加锁；加密封装 `PICTELIO-ENC1`（PBKDF2-HMAC-SHA256 600k + AES-256-GCM，Java 侧实现）；写后 PROPFIND 校验原子性；固定保留最近 10 份轮换。
+
+**恢复语义 v1（restore semantics v1）**：
+整档恢复 + merge-by-keys（备份中存在的键覆盖本地，没有的键不触碰）；账号级键按当前登录 uid 应用；恢复前自动生成本地 pre-restore 应急快照（保留到下次成功备份），可一键回滚；schemaVersion 过高拒绝、excludedKeys 不触碰本地对应键。
+
+**连接配置进备份（connection-config in scope）**：
+WebDAV 服务器地址/用户名/目录/自动备份开关属设置域（跨引擎共享键 `settings_webdav_*`），进备份域；密码仅存 secure storage，绝不进备份文件。
+
 ### 浏览导航
 
 **列表页（List）**：
