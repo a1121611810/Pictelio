@@ -117,3 +117,14 @@ spec §8 密码红线（快照不含任何 password 键）、§5/§6 流程文�
 
 > 实测坑：WebDriver `execute` 的脚本体必须显式 `return`（IIFE 返回值会被丢弃 → 恒 null）；
 > WebView 的 `innerText` 返回 null，断言用 `textContent`。
+
+`specs/webdav-backup-lynx.spec.ts`（同一开关）覆盖 **lynx 引擎的原生链路**：
+因 Lynx 4.0.1 accessibility 树不暴露内容节点、lynx UI 自动化不可行，改为「写 prefs
+（`pictelio_client_kind=lynx` + webdav 配置）→ 启动 → LynxActivity →
+router.loadSettings → runStartupAutoBackup → PictelioWebDavModule → 真实服务器」，
+断言服务器落盘快照的 `engine=lynx`、真实 `appVersion`、以及 `last_backup` 回写
+真实 SharedPreferences。全程无需 UI 点击。
+
+> 真机发现：Lynx JS runtime **没有 `TextEncoder`/`TextDecoder`**，快照序列化处抛错会让
+> lynx 自动备份在调用桥之前就失败（node/jsdom 单测覆盖不到）；现改用纯 JS UTF-8 实现
+> （`backupCore.utf8Encode/utf8Decode`），两侧单测含字节序列对照 oracle。

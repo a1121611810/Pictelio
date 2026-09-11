@@ -4,6 +4,8 @@
 // 与 RFC/规格派生的边界（schemaVersion 过高拒绝、merge-by-keys 不触碰额外键）。
 import { describe, it, expect } from "vitest";
 import {
+  utf8Decode,
+  utf8Encode,
   BACKUP_FORMAT,
   BACKUP_SCHEMA_VERSION,
   ACCOUNT_KEY_PREFIXES,
@@ -222,5 +224,24 @@ describe("backupCore — 错误分类文案（spec §5）", () => {
       expect(WEBDAV_ERROR_MESSAGES[kind].length).toBeGreaterThan(0);
     }
     expect(WEBDAV_ERROR_MESSAGES.CRYPTO).toBe("密码错误或文件损坏"); // spec §6 原文
+  });
+});
+describe("backupCore — UTF-8 纯 JS 编解码（Lynx runtime 无 TextEncoder，真机实测）", () => {
+  it("往返无损：ASCII / 中文 / emoji（代理对）/ 混合", () => {
+    for (const s of [
+      "",
+      '{"a":1}',
+      "设置_小说导出_格式",
+      "emoji 🐧🚀 混合",
+      "\u0000\u007f\u0080\u07ff\u0800\uffff", // 各编码长度边界
+    ]) {
+      expect(utf8Decode(utf8Encode(s))).toBe(s);
+    }
+  });
+
+  it("与 TextEncoder 字节序列一致（Node 环境可用的独立 oracle）", () => {
+    for (const s of ["a", "中文", "混合🐧x", "\u0000\u0080\u0800"]) {
+      expect(Array.from(utf8Encode(s))).toEqual(Array.from(new TextEncoder().encode(s)));
+    }
   });
 });

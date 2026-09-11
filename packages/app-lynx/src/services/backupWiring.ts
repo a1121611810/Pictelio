@@ -165,7 +165,8 @@ export async function runStartupAutoBackup(): Promise<BackupResult | null> {
     }
     return result
   } catch (e) {
-    console.warn("[backupWiring] 启动时自动备份失败", e)
+    // 携带 message：Lynx console 对 Error 对象只显示 {}，仅带对象无法定位
+    console.warn("[backupWiring] 启动时自动备份失败:", e instanceof Error ? e.message : String(e), e)
     return null
   }
 }
