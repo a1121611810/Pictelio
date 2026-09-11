@@ -234,7 +234,7 @@ function onWatchlistCancel(): void {
 </script>
 
 <template>
-  <view class="w-full h-full bg-surface">
+  <view class="w-full h-full flex flex-col relative bg-surface">
     <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
       <!-- 左上角返回改走 requestBack：与系统返回共用同一守卫链（spec §US3） -->
       <view class="py-1 pr-2" @tap="requestBack"><text class="text-[6.4vw] leading-none text-surface-on">‹</text></view>
@@ -243,14 +243,14 @@ function onWatchlistCancel(): void {
 
     <!-- 加载期骨架（issue #91）：header 照常渲染，正文区骨架占位 -->
     <SkeletonNovel v-if="loading" />
-    <view v-else-if="errorMsg" class="w-full h-full flex items-center justify-center">
+    <view v-else-if="errorMsg" class="w-full flex-1 min-h-0 flex items-center justify-center">
       <text class="text-body-medium text-error p-4">{{ errorMsg }}</text>
     </view>
     <!-- 正文列表虚拟化（ADR-0134）：官方指南「超三屏用 list」；红线 = Vue :key 与 Lynx
          :item-key 双份一致 + 稳定 id；estimated 按段落估算滚动条。 -->
     <list
       v-else-if="novel && !isRestricted(novel)"
-      class="w-full h-full"
+      class="w-full flex-1 min-h-0"
       list-type="single"
       scroll-orientation="vertical"
       :lower-threshold-item-count="5"
@@ -317,7 +317,7 @@ function onWatchlistCancel(): void {
       </list-item>
     </list>
     <!-- 受限小说：列表结构性改动不涉及（不拉正文），保留原头部+遮罩形态 -->
-    <view v-else class="w-full h-full p-4 relative">
+    <view v-else class="w-full flex-1 min-h-0 p-4 relative">
       <view class="py-5 px-4 bg-surface-container-lowest mb-3">
         <text class="text-title-large font-bold text-surface-on">{{ novel?.title }}</text>
         <text class="text-body-medium text-surface-on-variant mt-2">by {{ novel?.user.name }}</text>
@@ -353,18 +353,22 @@ function onWatchlistCancel(): void {
       </view>
     </view>
 
-    <!-- 评论弹层（issue #164）：根 view 内、正文列表之后的覆盖层 → 弹层打开时滚动位置不丢失 -->
-    <CommentOverlay v-if="showComments" type="novel" :target-id="novelId" @close="showComments = false" />
+    <!-- 评论弹层（issue #164 / 布局流修复 issue #139 同族）：必须 absolute 脱离 flex 流，
+         否则文档流内 w-full h-full 兄弟会被 h-full 的 list 顶出视口（弹层在屏幕外挂载） -->
+    <view v-if="showComments" class="absolute inset-0">
+      <CommentOverlay type="novel" :target-id="novelId" @close="showComments = false" />
+    </view>
 
-    <!-- 导出弹层（spec §7.2）：同一覆盖层挂载契约，DOM 在正文列表之后 -->
-    <NovelExportSheet
-      v-if="exportOpen"
-      :open="exportOpen"
-      :default-format="settings.novelExportFormat"
-      :options="settings.novelExportOptions"
-      @close="exportOpen = false"
-      @export="enqueueNovelExport"
-    />
+    <!-- 导出弹层（spec §7.2）：同一覆盖层挂载契约（absolute inset-0 宿主脱离文档流） -->
+    <view v-if="exportOpen" class="absolute inset-0">
+      <NovelExportSheet
+        :open="exportOpen"
+        :default-format="settings.novelExportFormat"
+        :options="settings.novelExportOptions"
+        @close="exportOpen = false"
+        @export="enqueueNovelExport"
+      />
+    </view>
 
     <!-- 追更询问弹窗（issue #226 / spec §US5）：open 期间自行注册 modalStack，
          返回键优先关弹窗 = cancel（留在详情页） -->
