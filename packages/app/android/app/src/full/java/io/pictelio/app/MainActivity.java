@@ -114,6 +114,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(PictelioDownloaderPlugin.class); // 下载队列执行器（spec download-manager T3）
         registerPlugin(PictelioSharePlugin.class); // 系统分享（spec download-manager T6）
         registerPlugin(NetDiagPlugin.class); // 网络自检（spec network-self-check）
+        registerPlugin(WebDavPlugin.class); // WebDAV 备份薄桥（spec webdav-backup T3）
         super.onCreate(savedInstanceState);
         // 调试模式 — debug 构建时启用
         if (BuildConfig.DEBUG) {
