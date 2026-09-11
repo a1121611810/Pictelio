@@ -94,7 +94,7 @@ describe('SearchSheet 五态渲染分支（spec D5 / US14-US17）', () => {
   })
 
   it('结果列表：行式（缩略图 + 标题 + 作者 · 类型/字数）+ 查看指示；item-key String（ADR-0055/0056）', () => {
-    expect(source).toContain('v-else-if="state.results.length > 0"') // 属性断言，不锁换行/缩进（P2-2）
+    expect(source).toContain('v-else-if="visibleResults.length > 0"') // AI 仅看态过滤后的可见集（ADR-0155）
     expect(source).toContain('list-type="single"')
     expect(source).toContain(':item-key="rowKey(row)"')
     expect(source).toContain('row.entity.user.name }} · {{ rowSub(row)')
@@ -217,8 +217,26 @@ describe('SearchSheet R18/R18G 行遮罩（spec US24 / D7：不预过滤，isRes
   })
 
   it('非受限行照常渲染缩略图（SkeletonImage lite 模式）+ 标题 + 作者 · 类型/字数', () => {
-    expect(source).toContain('v-if="!isRestricted(row.entity)"')
+    expect(source).toContain('v-if="!isRowMasked(row)"')
     expect(source).toContain('<SkeletonImage')
     expect(source).toContain(':src="rowThumb(row)"')
+  })
+})
+
+describe('SearchSheet AI 三态行遮罩（ADR-0155：mask 行内遮罩 / only 过滤）', () => {
+  it('遮罩谓词合并 R18 与 AI（R18 优先）', () => {
+    expect(source).toContain('function isRowMasked(row: SearchResultItem): boolean {')
+    expect(source).toContain('isRestricted(row.entity) || isAiRestricted(row.entity)')
+  })
+
+  it('AI 徽章：纯 AI=AI / 辅助=AI辅助，走 secondary-container 语义色', () => {
+    expect(source).toContain("aiLevel(row) === 2 ? 'AI' : 'AI辅助'")
+    expect(source).toContain("'bg-secondary-container text-secondary-on-container'")
+  })
+
+  it('AI 行文案 + 仅看态过滤（visibleResults）', () => {
+    expect(source).toContain('AI 作品，已在设置中遮罩')
+    expect(source).toContain('const visibleResults = useAiOnlyVisible(rawResults, (r) => r.entity)')
+    expect(source).toContain('v-for="row in visibleResults"')
   })
 })

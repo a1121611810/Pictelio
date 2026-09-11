@@ -37,6 +37,7 @@ function makeEntry(overrides: Partial<HistoryEntry> = {}): HistoryEntry {
     userName: "author",
     thumbnailUrl: "https://example.com/t.jpg",
     xRestrict: 0,
+    aiType: 0,
     visitedAt: Date.now(),
     visitCount: 1,
     ...overrides,

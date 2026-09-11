@@ -1,17 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { filterNovels, filterFeedIllusts } from "@/utils/r18Filter";
-import type { PixivNovel, PixivIllust } from "@/api/types";
+import { filterNovels, filterFeedIllusts, filterUserPreviews } from "@/utils/r18Filter";
+import type { PixivNovel, PixivIllust, PixivUserPreview } from "@/api/types";
 
 vi.mock("@/stores/settingsStore", () => ({
   showR18: vi.fn(() => false),
   showR18G: vi.fn(() => false),
+  aiFilterMode: vi.fn(() => "show"),
 }));
 
 vi.mock("@/stores/blockStore", () => ({
   isBlocked: vi.fn((id: number) => id === 999),
 }));
 
-import { showR18, showR18G } from "@/stores/settingsStore";
+import { showR18, showR18G, aiFilterMode } from "@/stores/settingsStore";
 
 function createNovel(id: number, xRestrict: number, userId: number): PixivNovel {
   return {
@@ -29,7 +30,7 @@ function createNovel(id: number, xRestrict: number, userId: number): PixivNovel 
   } as PixivNovel;
 }
 
-function createIllust(id: number, xRestrict: number, userId: number): PixivIllust {
+function createIllust(id: number, xRestrict: number, userId: number, aiType?: number): PixivIllust {
   return {
     id,
     title: `illust-${id}`,
@@ -43,6 +44,7 @@ function createIllust(id: number, xRestrict: number, userId: number): PixivIllus
     total_bookmarks: 10,
     tags: [],
     x_restrict: xRestrict,
+    illust_ai_type: aiType,
     create_date: "2026-01-01T00:00:00Z",
     meta_pages: [],
     meta_single_page: {},
@@ -93,6 +95,70 @@ describe("r18Filter", () => {
       vi.mocked(showR18G).mockReturnValue(false);
       const illusts = [createIllust(1, 1, 1), createIllust(2, 0, 999), createIllust(3, 0, 1)];
       expect(filterFeedIllusts(illusts)).toEqual([illusts[2]]);
+    });
+  });
+
+  describe("filterFeedIllusts × AI 三态（ADR-0155）", () => {
+    beforeEach(() => {
+      vi.mocked(showR18).mockReturnValue(true);
+      vi.mocked(showR18G).mockReturnValue(true);
+    });
+
+    it("mask：移除 ai_type>=1 的插画，保留非 AI（ai_type=0 / 缺失）", () => {
+      vi.mocked(aiFilterMode).mockReturnValue("mask");
+      const illusts = [
+        createIllust(1, 0, 1, 2),
+        createIllust(2, 0, 1, 0),
+        createIllust(3, 0, 1, undefined),
+      ];
+      expect(filterFeedIllusts(illusts)).toEqual([illusts[1], illusts[2]]);
+    });
+
+    it("only：仅保留 AI 插画（ai_type=1 也算 AI）", () => {
+      vi.mocked(aiFilterMode).mockReturnValue("only");
+      const illusts = [
+        createIllust(1, 0, 1, 1),
+        createIllust(2, 0, 1, 2),
+        createIllust(3, 0, 1, 0),
+      ];
+      expect(filterFeedIllusts(illusts)).toEqual([illusts[0], illusts[1]]);
+    });
+
+    it("show：不做 AI 处理", () => {
+      vi.mocked(aiFilterMode).mockReturnValue("show");
+      const illusts = [createIllust(1, 0, 1, 2), createIllust(2, 0, 1, 0)];
+      expect(filterFeedIllusts(illusts)).toEqual(illusts);
+    });
+  });
+
+  describe("filterUserPreviews × AI 三态（直测）", () => {
+    it("mask：从预览内层移除 AI 插画，预览本身保留", () => {
+      vi.mocked(showR18).mockReturnValue(true);
+      vi.mocked(showR18G).mockReturnValue(true);
+      vi.mocked(aiFilterMode).mockReturnValue("mask");
+      const preview: PixivUserPreview = {
+        user: { id: 1, name: "author", account: "author", profile_image_urls: {} },
+        illusts: [createIllust(1, 0, 1, 2), createIllust(2, 0, 1, 0)],
+        novels: [],
+        is_muted: false,
+      };
+      const out = filterUserPreviews([preview]);
+      expect(out).toHaveLength(1);
+      expect(out[0].illusts.map((i) => i.id)).toEqual([2]);
+    });
+
+    it("only：预览内层只保留 AI 插画", () => {
+      vi.mocked(showR18).mockReturnValue(true);
+      vi.mocked(showR18G).mockReturnValue(true);
+      vi.mocked(aiFilterMode).mockReturnValue("only");
+      const preview: PixivUserPreview = {
+        user: { id: 1, name: "author", account: "author", profile_image_urls: {} },
+        illusts: [createIllust(1, 0, 1, 1), createIllust(2, 0, 1, 0)],
+        novels: [],
+        is_muted: false,
+      };
+      const out = filterUserPreviews([preview]);
+      expect(out[0].illusts.map((i) => i.id)).toEqual([1]);
     });
   });
 });

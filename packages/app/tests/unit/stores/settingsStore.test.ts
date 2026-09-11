@@ -274,3 +274,51 @@ describe("settingsStore — 账号级 R18/R18G（ADR-0103）", () => {
     });
   });
 });
+
+describe("settingsStore — 账号级 AI 三态过滤（ADR-0155）", () => {
+  beforeEach(() => {
+    mockUser.current = null;
+  });
+
+  it("未登录：aiFilterMode 恒 show，set 不落盘", async () => {
+    const { store, mem } = await loadStore();
+    expect(store.aiFilterMode()).toBe("show");
+    await store.setAiFilterMode("only");
+    expect(store.aiFilterMode()).toBe("show");
+    expect(mem.dump().has("ai_filter_mode")).toBe(false);
+  });
+
+  it("登录后 loadAccountR18 加载 ai_filter_mode_42", async () => {
+    mockUser.current = { id: 42 };
+    const { store } = await loadStore({ ai_filter_mode_42: "only" });
+    await store.loadAccountR18();
+    expect(store.aiFilterMode()).toBe("only");
+  });
+
+  it("setAiFilterMode 写 ai_filter_mode_42（账号键）", async () => {
+    mockUser.current = { id: 42 };
+    const { store, mem } = await loadStore();
+    await store.setAiFilterMode("mask");
+    expect(store.aiFilterMode()).toBe("mask");
+    await vi.waitFor(() => expect(mem.dump().get("ai_filter_mode_42")).toBe("mask"));
+  });
+
+  it("非法持久化值 → 回退默认 show", async () => {
+    mockUser.current = { id: 42 };
+    const { store } = await loadStore({ ai_filter_mode_42: "bogus" });
+    await store.loadAccountR18();
+    expect(store.aiFilterMode()).toBe("show");
+  });
+
+  it("登出后回默认 show；换账号独立（互不污染）", async () => {
+    mockUser.current = { id: 42 };
+    const { store } = await loadStore();
+    await store.setAiFilterMode("only");
+    mockUser.current = null;
+    expect(store.aiFilterMode()).toBe("show");
+    mockUser.current = { id: 7 };
+    expect(store.aiFilterMode()).toBe("show");
+    await store.loadAccountR18();
+    expect(store.aiFilterMode()).toBe("show");
+  });
+});

@@ -24,9 +24,14 @@ import { deriveFirstLoadView } from '../utils/firstLoadView'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 
-const isRestricted = useSettingsStore().isRestricted
+const settings = useSettingsStore()
+const isRestricted = settings.isRestricted
+const isAiRestricted = settings.isAiRestricted
 import RestrictOverlay from '../components/RestrictOverlay.vue'
+import AiRestrictedIllustCard from '../components/AiRestrictedIllustCard.vue'
+import { useAiOnlyVisible } from '../composables/useAiOnlyVisible'
 import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
+import AiRestrictedNovelCard from '../components/AiRestrictedNovelCard.vue'
 import RefreshableList from '../components/RefreshableList.vue'
 
 const uid = useAuthStore().currentUser?.id
@@ -68,7 +73,11 @@ const illustEndOfFeed = ref(false)
 const illustSettled = ref(false)
 // 取消收藏后从列表移除（BookmarkButton change 事件）：feed 内部状态不直接暴露 → 隐藏集过滤渲染
 const removedIllustIds = ref<Set<number>>(new Set())
-const visibleIllusts = computed(() => illusts.value.filter((i) => !removedIllustIds.value.has(i.id)))
+// 仅看态：非 AI 条目一并从渲染流移除（服务端分页判空仍基于 feed.items，不受影响）
+const aiVisibleIllusts = useAiOnlyVisible(illusts)
+const visibleIllusts = computed(() =>
+  aiVisibleIllusts.value.filter((i) => !removedIllustIds.value.has(i.id)),
+)
 
 function syncIllust() {
   illusts.value = illustFeed.value.items().map((i) => i.data as PixivIllust)
@@ -125,6 +134,8 @@ const novelFeed = ref(
   }),
 )
 const novels = ref<PixivNovel[]>([])
+/** 仅看态：非 AI 小说从渲染流移除 */
+const visibleNovels = useAiOnlyVisible(novels)
 const novelLoading = ref(false)
 const novelLoadingMore = ref(false)
 const novelErrorMsg = ref('')
@@ -181,7 +192,7 @@ const illustView = computed(() =>
 /** 小说 tab 首载三态（ADR-0150） */
 const novelView = computed(() =>
   deriveFirstLoadView({
-    hasItems: novels.value.length > 0,
+    hasItems: visibleNovels.value.length > 0,
     loading: novelLoading.value,
     settled: novelSettled.value,
     hasError: !!novelErrorMsg.value,
@@ -310,6 +321,7 @@ onUnmounted(() => {
           >
             <RestrictOverlay :overlay="false" :level="item.x_restrict === 2 ? 2 : 1" />
           </view>
+          <AiRestrictedIllustCard v-else-if="isAiRestricted(item)" :item="item" />
           <view v-else class="relative" @tap.stop="onImageTap(item)">
             <SkeletonImage :src="thumbUrl(item.image_urls)" height="48.4vw" lazy-load />
           </view>
@@ -372,12 +384,13 @@ onUnmounted(() => {
       @scroll="onScroll"
     >
       <list-item
-        v-for="item in novels"
+        v-for="item in visibleNovels"
         :key="item.id"
         :item-key="String(item.id)"
         class="w-full"
       >
         <RestrictedNovelCard v-if="isRestricted(item)" :item="item" />
+        <AiRestrictedNovelCard v-else-if="isAiRestricted(item)" :item="item" />
         <view v-else class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]" @tap="openNovel(item.id)"><view class="flex-1 flex flex-col">
                     <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>
                     <text class="text-body-medium text-surface-on-variant mt-1.5">by {{ item.user.name }}</text>

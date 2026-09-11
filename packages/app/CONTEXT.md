@@ -293,6 +293,20 @@ _Avoid_: 设备级设置（键不含 userId 的旧模式）
 跨 client 设置契约的物理落点——SharedPreferences 文件 "CapacitorStorage"（@capacitor/preferences 默认 group）。webview 经 Capacitor 插件读写；lynx 原生经 `PictelioPrefsModule` 读写；lynx web-core dev 预览降级 IndexedDB（仅开发环境）。
 _Avoid_: 本地存储（localStorage，web-core Worker 环境不存在）
 
+### 内容过滤（Content filtering）
+
+**AI 作品（AI work）**：
+Pixiv 响应中 `illust_ai_type` / `novel_ai_type >= 1` 的作品，即 AI 辅助（1）或纯 AI 生成（2）。字段缺失或为 0 视为非 AI 作品。0/1/2 的值语义以本词条为准（`src/utils/aiFilter.ts` 消费）。
+_Avoid_: AI 内容（易与 AI 翻译等上下文混淆）、AI 图（小说同样适用）
+
+**AI 内容过滤（AI content filter）**：
+账号级三态设置，控制 AI 作品在列表 / 搜索 / 详情 / 历史中的呈现方式。模式三选一：显示 `show`（不处理）、遮罩 `mask`、仅看 `only`。存储键 `ai_filter_mode_${uid}`，与 app-lynx 共享（沿用 ADR-0103 契约）。
+_Avoid_: AI 过滤开关（三态不是布尔开关）
+
+**AI 模式（AI filter mode）**：
+`show | mask | only` 三个取值的总称。「遮罩」在 app（webview）沿用其 R18 的过滤隐藏——作品从 store 派生结果中移除；在 app-lynx 沿用其 R18 的占位 scrim 遮罩卡。**两端不追求同一视觉形态**。
+_Avoid_: AI 等级、把「遮罩」端间统一为叠加层（app 端不新建遮罩组件）
+
 ### 引擎可用性与降级（Engine availability & fallback）
 
 **首选引擎（Preferred client）**：

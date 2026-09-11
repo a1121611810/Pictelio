@@ -138,7 +138,11 @@ async function refreshFeed() {
 
 // ─── 受限过滤（渲染层）：数据层照常加载，受限条目从可视滑页流中滤掉 ───
 // isRestricted 依赖 settingsStore 的 showR18/showR18G（响应式），computed 自动随开关重算。
-const visibleItems = computed(() => items.value.filter((it) => !isRestricted(it.data)))
+// AI 三态（ADR-0155）：本页 R18 走「过滤隐藏」，AI 同口径——mask 隐藏 AI / only 隐藏非 AI。
+const shouldHideByAi = useSettingsStore().shouldHideByAi
+const visibleItems = computed(() =>
+  items.value.filter((it) => !isRestricted(it.data) && !shouldHideByAi(it.data)),
+)
 
 // ─── 轮播回调 ───
 function onReachEnd() {
@@ -159,7 +163,7 @@ function openItem(item: MixFeedItem) {
   void navigate(`${prefix}${item.id}`)
 }
 function onSlideTap(item: MixFeedItem) {
-  if (!isRestricted(item.data)) openItem(item)
+  if (!isRestricted(item.data) && !shouldHideByAi(item.data)) openItem(item)
 }
 
 // 点击标签 → 全局搜索弹层（ADR-0133）：TagChipRow 只发原始 tag.name（纯展示组件不依赖 store），

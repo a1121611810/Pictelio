@@ -15,10 +15,14 @@ import SkeletonImage from '../components/SkeletonImage.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
+import AiRestrictedIllustCard from '../components/AiRestrictedIllustCard.vue'
+import { useAiOnlyVisible } from '../composables/useAiOnlyVisible'
 import RefreshableList from '../components/RefreshableList.vue'
 import { useGlobalFabStore } from '../stores/globalFab'
 
-const isRestricted = useSettingsStore().isRestricted
+const settings = useSettingsStore()
+const isRestricted = settings.isRestricted
+const isAiRestricted = settings.isAiRestricted
 
 // ─── 分页收敛（ADR-0104）：迁移到 createMixFeed 深模块 ───
 // 双防抖 / 竞态代 / 分批渲染（pageSize=20，替代原 pendingIllusts 队列）/ 空页防护 /
@@ -58,6 +62,8 @@ function makeFeed(m: 'recommend' | 'follow') {
 
 const feed = ref(makeFeed(mode.value))
 const illusts = ref<PixivIllust[]>([])
+/** 仅看态：非 AI 条目从渲染流移除（服务端分页判空仍基于 feed.items，不受影响） */
+const visibleIllusts = useAiOnlyVisible(illusts)
 
 const loading = ref(false)
 const loadingMore = ref(false)
@@ -77,7 +83,7 @@ const emptyMeta = computed(() =>
 /** 页级首载三态（ADR-0150）：骨架 / 错误 / 空态 / 内容 的唯一判定源 */
 const view = computed(() =>
   deriveFirstLoadView({
-    hasItems: illusts.value.length > 0,
+    hasItems: visibleIllusts.value.length > 0,
     loading: loading.value,
     settled: settled.value,
     hasError: !!errorMsg.value,
@@ -238,7 +244,7 @@ onUnmounted(() => {
       @scroll="onScroll"
     >
       <list-item
-        v-for="item in illusts"
+        v-for="item in visibleIllusts"
         :key="item.id"
         :item-key="String(item.id)"
         class="bg-surface-container-lowest rounded-[var(--md-shape-medium)] flex flex-col overflow-hidden shadow-[var(--md-elevation-1)]"
@@ -259,6 +265,7 @@ onUnmounted(() => {
         >
           <RestrictOverlay :overlay="false" :level="item.x_restrict === 2 ? 2 : 1" />
         </view>
+        <AiRestrictedIllustCard v-else-if="isAiRestricted(item)" :item="item" />
         <view v-else class="relative" @tap.stop="onImageTap(item)">
           <SkeletonImage :src="thumbUrl(item.image_urls)" height="48.4vw" lazy-load />
         </view>

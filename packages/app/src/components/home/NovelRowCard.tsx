@@ -57,8 +57,8 @@ const NovelRowCard: Component<NovelRowCardProps> = (props) => {
             class="h-full w-full object-cover"
             loading="lazy"
           />
-          {/* AI 生成 badge（左上；novel_ai_type>1 才显示） */}
-          <Show when={props.novel.novel_ai_type != null && props.novel.novel_ai_type > 1}>
+          {/* AI 生成 badge（左上；novel_ai_type>=1 才显示） */}
+          <Show when={props.novel.novel_ai_type != null && props.novel.novel_ai_type >= 1}>
             <span
               class="absolute left-[var(--strokeWidthThin)] top-[var(--strokeWidthThin)] rounded-[var(--borderRadiusSmall)] px-[var(--spacingHorizontalXXS)] font-bold [font-size:var(--fontSizeBase100)]"
               style={{

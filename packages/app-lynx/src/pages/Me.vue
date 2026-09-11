@@ -17,7 +17,8 @@ import { themeColorClass } from '../utils/themeColor'
 const auth = useAuthStore()
 const settings = useSettingsStore()
 const clientSwitch = useClientSwitchStore()
-const { showR18, showR18G, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, novelExportFormat, novelExportOptions } = storeToRefs(settings)
+const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, novelExportFormat, novelExportOptions } = storeToRefs(settings)
+
 const switching = ref(false)
 
 // ─── 全局放射 FAB 桥（ADR-0120）：注册空动作（内环空 = 仅外环导航），卸载时注销 ───
@@ -354,6 +355,40 @@ function toggleR18G() {
             <!-- handle-container：32×32 与轨道同高，thumb 居中 → 距边 8px/4px -->
             <view class="w-8 h-8 flex items-center justify-center">
               <view class="rounded-full active:w-[7.467vw] active:h-[7.467vw]" :class="showR18G ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
+            </view>
+          </view>
+        </view>
+
+        <!-- AI 作品三态过滤（ADR-0155）：显示 / 遮罩 / 仅看；逐项静态 a11y label（注册表完整性测试要求） -->
+        <view class="flex flex-row items-center justify-between py-3.5">
+          <text class="text-title-medium text-surface-on">AI 作品</text>
+          <view class="flex flex-row gap-0 rounded-[var(--md-shape-full)] border border-outline overflow-hidden">
+            <view
+              class="flex-1 h-[10.667vw] flex items-center justify-center active:bg-layer-pressed-on-surface"
+              :class="aiFilterMode === 'show' ? 'bg-secondary-container' : 'bg-surface-container-lowest'"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="ME_A11Y_LABELS.aiFilterShow"
+              @tap="settings.setAiFilterMode('show')"
+            >
+              <text class="text-label-large" :class="aiFilterMode === 'show' ? 'text-secondary-on-container' : 'text-surface-on'">显示</text>
+            </view>
+            <view
+              class="flex-1 h-[10.667vw] flex items-center justify-center active:bg-layer-pressed-on-surface"
+              :class="aiFilterMode === 'mask' ? 'bg-secondary-container' : 'bg-surface-container-lowest'"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="ME_A11Y_LABELS.aiFilterMask"
+              @tap="settings.setAiFilterMode('mask')"
+            >
+              <text class="text-label-large" :class="aiFilterMode === 'mask' ? 'text-secondary-on-container' : 'text-surface-on'">遮罩</text>
+            </view>
+            <view
+              class="flex-1 h-[10.667vw] flex items-center justify-center active:bg-layer-pressed-on-surface"
+              :class="aiFilterMode === 'only' ? 'bg-secondary-container' : 'bg-surface-container-lowest'"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="ME_A11Y_LABELS.aiFilterOnly"
+              @tap="settings.setAiFilterMode('only')"
+            >
+              <text class="text-label-large" :class="aiFilterMode === 'only' ? 'text-secondary-on-container' : 'text-surface-on'">仅看</text>
             </view>
           </view>
         </view>

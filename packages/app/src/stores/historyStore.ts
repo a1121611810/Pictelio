@@ -13,6 +13,7 @@
 
 import type { PixivIllust, PixivNovel } from "@/api/types";
 import { user } from "@/stores/authStore";
+import { getAiType } from "@/utils/aiFilter";
 
 // ─── Types ───
 
@@ -27,6 +28,8 @@ export interface HistoryEntry {
   userName: string;
   thumbnailUrl: string;
   xRestrict: 0 | 1 | 2;
+  /** Pixiv AI 类型：0/undefined=非 AI，1=AI 辅助，2=纯 AI（ADR-0155） */
+  aiType: number;
   visitedAt: number;
   visitCount: number;
 }
@@ -88,16 +91,28 @@ function createLocalHistoryCollection(): HistoryCollection {
       if (raw) {
         const parsed = JSON.parse(raw) as Record<string, StoredItem>;
         let skipped = 0;
+        let missingAiType = 0;
         for (const [encoded, stored] of Object.entries(parsed)) {
           const key = encoded.startsWith("s:") ? encoded.slice(2) : encoded;
           if (stored && typeof stored === "object" && "data" in stored && stored.data) {
-            items.set(key, stored.data);
+            // 老数据（ADR-0155 之前）无 aiType 字段：按 0（非 AI）迁移，显式 warn 不静默降级
+            if (typeof stored.data.aiType !== "number") {
+              missingAiType += 1;
+              items.set(key, { ...stored.data, aiType: 0 });
+            } else {
+              items.set(key, stored.data);
+            }
           } else {
             skipped += 1;
           }
         }
         if (skipped > 0) {
           console.warn(`[historyStore] 浏览历史存在 ${skipped} 条损坏条目，已跳过`);
+        }
+        if (missingAiType > 0) {
+          console.warn(
+            `[historyStore] 浏览历史 ${missingAiType} 条缺少 aiType，已按 0（非 AI）迁移`,
+          );
         }
       }
     } catch (err) {
@@ -179,6 +194,7 @@ export function recordVisit(item: PixivIllust | PixivNovel, type: "illust" | "no
       userName: item.user.name ?? "",
       thumbnailUrl: item.image_urls.square_medium ?? "",
       xRestrict: item.x_restrict as 0 | 1 | 2,
+      aiType: getAiType(item),
       visitedAt: Date.now(),
       visitCount: 1,
     });

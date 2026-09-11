@@ -1,5 +1,20 @@
 import type { Component } from "solid-js";
-import { showR18, setShowR18, showR18G, setShowR18G } from "../../stores/settingsStore";
+import {
+  showR18,
+  setShowR18,
+  showR18G,
+  setShowR18G,
+  aiFilterMode,
+  setAiFilterMode,
+} from "../../stores/settingsStore";
+import type { AiFilterMode } from "../../utils/aiFilter";
+import FluentIcon from "../ui/FluentIcon";
+
+const AI_FILTER_OPTIONS: { value: AiFilterMode; label: string }[] = [
+  { value: "show", label: "显示" },
+  { value: "mask", label: "遮罩" },
+  { value: "only", label: "仅看" },
+];
 
 interface SettingsContentProps {
   onOpenBlocklist: () => void;
@@ -66,6 +81,51 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
           ref={fluentOn("change", () => setShowR18G(!showR18G()))}
           aria-label="显示 R-18G 内容"
         />
+      </div>
+
+      {/* AI 作品三态过滤（ADR-0155）：显示 / 遮罩 / 仅看 */}
+      <div class="py-3">
+        <div class="flex items-center gap-3">
+          <div class="relative w-6 h-6 flex-shrink-0 text-[var(--colorNeutralForeground2)]">
+            <FluentIcon name="filter" size={24} />
+          </div>
+          <div>
+            <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
+              AI 作品
+            </p>
+            <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
+              控制 AI 生成 / AI 辅助作品的显示方式
+            </p>
+          </div>
+        </div>
+
+        <div class="mt-3 grid grid-cols-3 gap-2" role="group" aria-label="AI 作品过滤模式">
+          <For each={AI_FILTER_OPTIONS}>
+            {(option) => {
+              const selected = () => aiFilterMode() === option.value;
+              return (
+                <button
+                  type="button"
+                  aria-pressed={selected() ? "true" : "false"}
+                  aria-label={option.label}
+                  onClick={() => void setAiFilterMode(option.value)}
+                  class={[
+                    "flex items-center justify-center py-2 min-h-10 rounded-[var(--borderRadiusMedium)] border transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] appearance-none cursor-pointer [font-size:var(--fontSizeBase300)] focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)]",
+                    {
+                      "border-[var(--colorCompoundBrandStroke)] bg-[var(--colorNeutralBackground2)] text-[var(--colorCompoundBrandForeground1)] font-semibold":
+                        selected(),
+                      "border-[var(--colorNeutralStroke2)] bg-transparent text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground2)]":
+                        !selected(),
+                      "active:scale-[0.97]": true,
+                    },
+                  ]}
+                >
+                  {option.label}
+                </button>
+              );
+            }}
+          </For>
+        </div>
       </div>
 
       {/* 管理屏蔽列表 */}

@@ -38,6 +38,13 @@ const LEGACY_R18G = "show_r18g"
 /** lynx dev（web-core IndexedDB）遗留键 */
 const DEV_LEGACY_R18 = "settings_show_r18"
 const DEV_LEGACY_R18G = "settings_show_r18g"
+/** AI 三态过滤（ADR-0155）：账号级共享键（与 app 同契约），无 legacy 键 */
+const aiFilterModeKey = (uid: number) => `ai_filter_mode_${uid}`
+/** AI 模式：show 显示 / mask 遮罩 / only 仅看 */
+export type AiFilterMode = "show" | "mask" | "only"
+function isAiFilterMode(v: unknown): v is AiFilterMode {
+  return v === "show" || v === "mask" || v === "only"
+}
 
 const UGOIRA_MODE_KEY = "settings_ugoira_mode"
 /** 全局动图下载格式（与 app 包共享键，spec download-manager §5） */
@@ -153,6 +160,7 @@ export const useSettingsStore = defineStore("settings", () => {
   // ── 私有 state（闭包内 ref，不 return —— 物理私有，替代原 `_` 命名约定）──
   const _showR18 = ref(false)
   const _showR18G = ref(false)
+  const _aiFilterMode = ref<AiFilterMode>("show")
   const _ugoiraMode = ref<UgoiraExtractMode>("fflate")
   const _ugoiraDownloadFormat = ref<UgoiraFormat>("zip")
   const _detailQuality = ref<ImageQuality>("medium")
@@ -168,6 +176,7 @@ export const useSettingsStore = defineStore("settings", () => {
   // ── 公共 state（return —— setup store 自动解包，模板 / `.value` 皆可）──
   const showR18 = _showR18
   const showR18G = _showR18G
+  const aiFilterMode = _aiFilterMode
   const ugoiraMode = _ugoiraMode
   const ugoiraDownloadFormat = _ugoiraDownloadFormat
   const detailQuality = _detailQuality
@@ -247,6 +256,7 @@ export const useSettingsStore = defineStore("settings", () => {
     if (id === null) {
       _showR18.value = false
       _showR18G.value = false
+      _aiFilterMode.value = "show"
       return
     }
     const storage = prefs()
@@ -258,11 +268,21 @@ export const useSettingsStore = defineStore("settings", () => {
       await migrateLegacy(storage, legacy[1], r18gKey(id))
       _showR18.value = (await storage.get(r18Key(id))) === "true"
       _showR18G.value = (await storage.get(r18gKey(id))) === "true"
+      const rawAi = await storage.get(aiFilterModeKey(id))
+      if (rawAi === null) {
+        _aiFilterMode.value = "show"
+      } else if (isAiFilterMode(rawAi)) {
+        _aiFilterMode.value = rawAi
+      } else {
+        console.warn("[settingsStore] AI 模式值非法，维持默认 show:", rawAi)
+        _aiFilterMode.value = "show"
+      }
     } catch (e) {
       // 存储不可用：维持默认（静默降级规则：warn 可见）
       console.warn("[settingsStore] 账号级设置加载失败（维持默认）", e)
       _showR18.value = false
       _showR18G.value = false
+      _aiFilterMode.value = "show"
     }
   }
 
@@ -282,6 +302,16 @@ export const useSettingsStore = defineStore("settings", () => {
     void prefs()
       .set(r18gKey(id), String(enabled))
       .catch((e) => console.warn("[settingsStore] R18G 写入失败", e))
+  }
+
+  /** 设置 AI 三态（账号级，未登录不落盘；ADR-0155） */
+  function setAiFilterMode(mode: AiFilterMode): void {
+    _aiFilterMode.value = mode
+    const id = uid()
+    if (id === null) return
+    void prefs()
+      .set(aiFilterModeKey(id), mode)
+      .catch((e) => console.warn("[settingsStore] AI 模式写入失败", e))
   }
 
   function setUgoiraDownloadFormat(format: UgoiraFormat): void {
@@ -350,6 +380,26 @@ export const useSettingsStore = defineStore("settings", () => {
     return false
   }
 
+  /** AI 判定：ai_type >= 1（AI 辅助与纯 AI 都算）；字段缺失视为 0（ADR-0155 D1） */
+  function isAiWork(item: { illust_ai_type?: number; novel_ai_type?: number }): boolean {
+    return (item.illust_ai_type ?? item.novel_ai_type ?? 0) >= 1
+  }
+
+  /** 「遮罩」态：AI 条目应渲染 AI 遮罩卡（列表/详情） */
+  function isAiRestricted(item: { illust_ai_type?: number; novel_ai_type?: number }): boolean {
+    return _aiFilterMode.value === "mask" && isAiWork(item)
+  }
+
+  /** 「仅看」态：非 AI 条目应被过滤移除（app-lynx 唯一的 AI 过滤态） */
+  function isAiOnlyFiltered(item: { illust_ai_type?: number; novel_ai_type?: number }): boolean {
+    return _aiFilterMode.value === "only" && !isAiWork(item)
+  }
+
+  /** shouldHideByAi：统一过滤谓词（show 时恒 false） */
+  function shouldHideByAi(item: { illust_ai_type?: number; novel_ai_type?: number }): boolean {
+    return _aiFilterMode.value === "mask" ? isAiWork(item) : isAiOnlyFiltered(item)
+  }
+
   /**
    * 登出重置（ADR-0103 Q5）：账号消失时内存态回默认，不写盘。
    * flush: "sync"——登出是同一 tick 内连续同步变更（_user=null 等），
@@ -364,6 +414,7 @@ export const useSettingsStore = defineStore("settings", () => {
       if (!u) {
         _showR18.value = false
         _showR18G.value = false
+        _aiFilterMode.value = "show"
       }
     },
     { flush: "sync" },
@@ -373,6 +424,7 @@ export const useSettingsStore = defineStore("settings", () => {
     // getters（公共 ref）
     showR18,
     showR18G,
+    aiFilterMode,
     ugoiraMode,
     detailQuality,
     themeColor,
@@ -383,6 +435,7 @@ export const useSettingsStore = defineStore("settings", () => {
     loadSettings,
     setShowR18,
     setShowR18G,
+    setAiFilterMode,
     setUgoiraMode,
     setUgoiraDownloadFormat,
     setDetailQuality,
@@ -392,5 +445,9 @@ export const useSettingsStore = defineStore("settings", () => {
     setNovelExportIncludeCover,
     setNovelExportIncludeImages,
     isRestricted,
+    isAiWork,
+    isAiRestricted,
+    isAiOnlyFiltered,
+    shouldHideByAi,
   }
 })

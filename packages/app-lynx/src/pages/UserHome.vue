@@ -24,11 +24,16 @@ import SkeletonCard from '../components/SkeletonCard.vue'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
+import AiRestrictedIllustCard from '../components/AiRestrictedIllustCard.vue'
+import { useAiOnlyVisible } from '../composables/useAiOnlyVisible'
 import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
+import AiRestrictedNovelCard from '../components/AiRestrictedNovelCard.vue'
 import RefreshableList from '../components/RefreshableList.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 
-const isRestricted = useSettingsStore().isRestricted
+const settings = useSettingsStore()
+const isRestricted = settings.isRestricted
+const isAiRestricted = settings.isAiRestricted
 
 const userId = Number(currentParams.value.id)
 
@@ -59,6 +64,8 @@ const illustFeed = ref(
   }),
 )
 const illusts = ref<PixivIllust[]>([])
+/** 仅看态：非 AI 条目从渲染流移除（服务端分页判空仍基于 feed.items，不受影响） */
+const visibleIllusts = useAiOnlyVisible(illusts)
 const illustLoading = ref(false)
 const illustLoadingMore = ref(false)
 const illustErrorMsg = ref('')
@@ -121,6 +128,8 @@ const novelFeed = ref(
   }),
 )
 const novels = ref<PixivNovel[]>([])
+/** 仅看态：非 AI 小说从渲染流移除 */
+const visibleNovels = useAiOnlyVisible(novels)
 const novelLoading = ref(false)
 const novelLoadingMore = ref(false)
 const novelErrorMsg = ref('')
@@ -168,7 +177,7 @@ const errorMsg = computed(() =>
 /** 插画 tab 首载三态（ADR-0150）：骨架 / 错误 / 空态 / 内容 的唯一判定源 */
 const illustView = computed(() =>
   deriveFirstLoadView({
-    hasItems: illusts.value.length > 0,
+    hasItems: visibleIllusts.value.length > 0,
     loading: illustLoading.value,
     settled: illustSettled.value,
     hasError: !!illustErrorMsg.value,
@@ -177,7 +186,7 @@ const illustView = computed(() =>
 /** 小说 tab 首载三态（ADR-0150） */
 const novelView = computed(() =>
   deriveFirstLoadView({
-    hasItems: novels.value.length > 0,
+    hasItems: visibleNovels.value.length > 0,
     loading: novelLoading.value,
     settled: novelSettled.value,
     hasError: !!novelErrorMsg.value,
@@ -322,7 +331,7 @@ onUnmounted(() => {
       @scroll="onScroll"
     >
       <list-item
-        v-for="item in illusts"
+        v-for="item in visibleIllusts"
         :key="item.id"
         :item-key="String(item.id)"
         class="bg-surface-container-lowest rounded-[var(--md-shape-medium)] flex flex-col overflow-hidden shadow-[var(--md-elevation-1)]"
@@ -334,6 +343,7 @@ onUnmounted(() => {
           >
             <RestrictOverlay :overlay="false" :level="item.x_restrict === 2 ? 2 : 1" />
           </view>
+          <AiRestrictedIllustCard v-else-if="isAiRestricted(item)" :item="item" />
           <view v-else class="relative" @tap.stop="onImageTap(item)">
             <SkeletonImage :src="thumbUrl(item.image_urls)" height="48.4vw" lazy-load />
           </view>
@@ -389,12 +399,13 @@ onUnmounted(() => {
       @scroll="onScroll"
     >
       <list-item
-        v-for="item in novels"
+        v-for="item in visibleNovels"
         :key="item.id"
         :item-key="String(item.id)"
         class="w-full"
       >
         <RestrictedNovelCard v-if="isRestricted(item)" :item="item" />
+        <AiRestrictedNovelCard v-else-if="isAiRestricted(item)" :item="item" />
         <view v-else class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]" @tap="openNovel(item.id)"><view class="flex-1 flex flex-col">
                     <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>
                     <view class="flex flex-row mt-1.5">

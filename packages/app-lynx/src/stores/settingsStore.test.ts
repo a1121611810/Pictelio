@@ -183,6 +183,16 @@ describe("M3 token 契约（Material Design 3 改造）", () => {
     const glassBlock = overlaySrc.split(".restrict-overlay")[1] ?? ""
     expect(glassBlock).not.toMatch(/rgba?\(|#[0-9a-fA-F]{3,8}/)
   })
+
+  it("AiOverlay M3 遮罩走 token 且样式块无 backdrop-filter/字面色值（ADR-0155）", () => {
+    const overlaySrc = readFileSync(resolve(here, "../components/AiOverlay.vue"), "utf-8")
+    expect(overlaySrc).toContain("var(--md-scrim)")
+    const styleBlock = overlaySrc.split("<style")[1] ?? ""
+    expect(styleBlock).not.toContain("backdrop-filter")
+    expect(styleBlock).not.toContain("@supports")
+    const glassBlock = overlaySrc.split(".ai-overlay")[1] ?? ""
+    expect(glassBlock).not.toMatch(/rgba?\(|#[0-9a-fA-F]{3,8}/)
+  })
 })
 
 describe("settingsStore — 账号级 R18/R18G（ADR-0103）", () => {
@@ -442,5 +452,86 @@ describe("settingsStore — 小说导出设置（spec novel-export §6）", () =
     expect(store.novelExportFormat).toBe("txt")
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("小说导出格式"), "bogus")
     warn.mockRestore()
+  })
+})
+
+// AI 三态过滤（ADR-0155）：账号级共享键 ai_filter_mode_${uid}；真值表 3 模式 × 4 值。
+// 期望值 oracle = docs/adr/ADR-0155 三态语义（独立于实现）。
+describe("settingsStore — AI 三态过滤（ADR-0155）", () => {
+  beforeEach(() => {
+    userRef().value = null
+    env.native = false
+    env.modules = {}
+    vi.mocked(idbGet).mockReset().mockResolvedValue(null)
+    vi.mocked(idbSet).mockReset().mockResolvedValue(undefined)
+    vi.mocked(idbRemove).mockReset().mockResolvedValue(undefined)
+  })
+
+  // 3 模式 × 4 值真值表由 tests/differential/aiFilterTruthTable.test.ts 消费共享 fixture
+  // （sharedAiFilterTruthTable.ts，与 app 侧逐字节一致）断言——两端实现直接对同一 fixture
+  // 断言，任一实现漂移即失败（机器防线）；本文件不再内联第二份表（避免 duplicate oracle）。
+
+  it("isAiWork：ai_type>=1 为 AI（插画/小说字段都识别），缺失视为非 AI", () => {
+    expect(store.isAiWork({ illust_ai_type: 0 })).toBe(false)
+    expect(store.isAiWork({ illust_ai_type: 1 })).toBe(true)
+    expect(store.isAiWork({ novel_ai_type: 2 })).toBe(true)
+    expect(store.isAiWork({})).toBe(false)
+  })
+
+  it("默认 show", () => {
+    expect(store.aiFilterMode).toBe("show")
+  })
+
+  it("原生模式：setAiFilterMode 写 ai_filter_mode_42", async () => {
+    env.native = true
+    const written: string[] = []
+    env.modules = {
+      PictelioPrefs: {
+        prefsGet: (_k: string, cb: (v: string, e: string | null) => void) => cb("", null),
+        prefsSet: (k: string, v: string, cb: (e: string | null) => void) => {
+          written.push(`${k}=${v}`)
+          cb(null)
+        },
+        prefsRemove: (_k: string, cb: (e: string | null) => void) => cb(null),
+      },
+    }
+    userRef().value = { id: 42 }
+    store.setAiFilterMode("only")
+    await vi.waitFor(() => expect(written).toContain("ai_filter_mode_42=only"))
+  })
+
+  it("dev 模式：loadSettings 读共享键 ai_filter_mode_42", async () => {
+    vi.mocked(idbGet).mockImplementation(async (k: string) =>
+      k === "ai_filter_mode_42" ? "mask" : null,
+    )
+    userRef().value = { id: 42 }
+    await store.loadSettings()
+    expect(store.aiFilterMode).toBe("mask")
+  })
+
+  it("非法持久化值 → 默认 show + warn（禁止静默降级）", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    vi.mocked(idbGet).mockImplementation(async (k: string) =>
+      k === "ai_filter_mode_42" ? "bogus" : null,
+    )
+    userRef().value = { id: 42 }
+    await store.loadSettings()
+    expect(store.aiFilterMode).toBe("show")
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("AI 模式值非法"), "bogus")
+    warn.mockRestore()
+  })
+
+  it("未登录：loadSettings 保持默认 show 且不写盘", async () => {
+    await store.loadSettings()
+    expect(store.aiFilterMode).toBe("show")
+    expect(vi.mocked(idbSet)).not.toHaveBeenCalled()
+  })
+
+  it("登出：watch currentUser → aiFilterMode 重置 show", () => {
+    userRef().value = { id: 42 }
+    store.setAiFilterMode("only")
+    expect(store.aiFilterMode).toBe("only")
+    userRef().value = null
+    expect(store.aiFilterMode).toBe("show")
   })
 })

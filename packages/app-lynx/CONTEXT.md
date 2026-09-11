@@ -17,6 +17,16 @@ _Avoid_: 遮罩卡（与遮罩的 absolute 覆盖模式语义不同）
 **遮罩（overlay）**：
 `RestrictOverlay` 组件的 absolute 覆盖模式（铺满父容器），用于详情页正文等「内容仍渲染、遮罩盖其上」的场景。列表卡一律用流内受限卡模式，**禁止**在 list-item 内使用 absolute 遮罩（真机高度测量异常，会撑满内容区）。
 
+**AI 条目（AI item）**：
+`illust_ai_type` / `novel_ai_type >= 1` 的作品（0/undefined=非 AI，1=AI 辅助，2=纯 AI）。由 `settingsStore.isAiRestricted()` 依据账号级 AI 模式判定是否处于遮罩态。
+_Avoid_: AI 内容（与 AI 翻译混淆）
+
+**AI 遮罩卡（AI restricted card）**：
+AI 模式为「遮罩」时，列表中 AI 条目的占位卡：scrim 半透明底 + AI 徽章（纯 AI 显示「AI」，AI 辅助显示「AI辅助」）+ 文案，无交互。形态对齐 R18 受限卡（插画方形图区 / `RestrictedNovelCard` 小说高度），但**不实现 absolute 遮罩**（list-item 内高度测量约束，见「遮罩」词条）。
+
+**AI 模式（AI filter mode）**【跨上下文】：
+`show | mask | only`，账号级设置 `ai_filter_mode_${uid}`。`mask` 在 app-lynx 落地为 AI 遮罩卡；`only` 完全过滤移除非 AI 作品（app-lynx 唯一的 AI 过滤态）；`show` 不处理。谓词与术语与 app 侧互镜像（详见 `packages/app/CONTEXT.md`）。
+
 ### 覆盖层与命中测试（Overlay & hit-testing）
 
 **平台约束（ADR-0123，不可变）**：

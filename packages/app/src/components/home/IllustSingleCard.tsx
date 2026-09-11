@@ -97,7 +97,7 @@ const IllustSingleCard: Component<IllustSingleCardProps> = (props) => {
               R-18G
             </fluent-badge>
           )}
-          <Show when={props.illust.illust_ai_type != null && props.illust.illust_ai_type > 1}>
+          <Show when={props.illust.illust_ai_type != null && props.illust.illust_ai_type >= 1}>
             <fluent-badge appearance="filled">
               {props.illust.illust_ai_type === 2 ? "AI" : "AI辅助"}
             </fluent-badge>

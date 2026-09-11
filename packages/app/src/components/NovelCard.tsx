@@ -87,7 +87,7 @@ const NovelCard: Component<Props> = (props) => {
                 {props.novel.x_restrict === 1 ? "R-18" : "R-18G"}
               </fluent-badge>
             )}
-            {props.novel.novel_ai_type != null && props.novel.novel_ai_type > 1 && (
+            {props.novel.novel_ai_type != null && props.novel.novel_ai_type >= 1 && (
               <fluent-badge appearance="filled">
                 {props.novel.novel_ai_type === 2 ? "AI" : "AI辅助"}
               </fluent-badge>
@@ -260,7 +260,7 @@ export const NovelCoverCard: Component<Props> = (props) => {
               {props.novel.x_restrict === 1 ? "R-18" : "R-18G"}
             </fluent-badge>
           )}
-          {props.novel.novel_ai_type != null && props.novel.novel_ai_type > 1 && (
+          {props.novel.novel_ai_type != null && props.novel.novel_ai_type >= 1 && (
             <fluent-badge appearance="filled">
               {props.novel.novel_ai_type === 2 ? "AI" : "AI辅助"}
             </fluent-badge>

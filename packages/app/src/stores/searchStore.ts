@@ -11,6 +11,8 @@ import { searchIllust, searchNovel, searchIllustNext, searchNovelNext } from "@/
 import { toApiError } from "@/api/client";
 import { ApiErrorType } from "@/api/types";
 import { mergeSearchResults } from "@/utils/searchMerger";
+import { aiFilterMode } from "@/stores/settingsStore";
+import { filterSearchResultsByAiMode } from "@/utils/aiFilter";
 
 interface SearchStoreState {
   /** Current search keyword */
@@ -121,7 +123,13 @@ export function createSearchStore(): SearchStoreState {
   const [nextNovelUrl, setNextNovelUrl] = createSignal<string | null>(null);
 
   // ── Merged results (computed) ──
-  const results = createMemo(() => mergeSearchResults(illustResults(), novelResults()));
+  // AI 三态过滤在派生层（缓存仍存服务端原始结果）：切换模式即时重算，无需重搜（ADR-0155）
+  const results = createMemo(() =>
+    filterSearchResultsByAiMode(
+      mergeSearchResults(illustResults(), novelResults()),
+      aiFilterMode(),
+    ),
+  );
   const hasMore = createMemo(() => hasMoreIllust() || hasMoreNovel());
 
   // ── AbortController management ──

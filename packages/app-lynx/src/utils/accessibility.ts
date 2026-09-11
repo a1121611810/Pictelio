@@ -44,6 +44,10 @@ export const ME_A11Y_LABELS = {
   novelExportIncludeImages: '小说导出包含正文插图',
   r18Toggle: '显示R18内容',
   r18gToggle: '显示R18G内容',
+  // AI 作品三态过滤（ADR-0155）
+  aiFilterShow: 'AI作品显示全部',
+  aiFilterMask: 'AI作品遮罩',
+  aiFilterOnly: 'AI作品仅看',
   ugoiraFflate: '动图播放选择fflate取帧',
   ugoiraRange: '动图播放选择Range流式取帧',
   ugoiraConfirm: '确认切换到Range流式',

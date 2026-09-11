@@ -101,7 +101,7 @@ const ImageCard: Component<Props> = (props) => {
               R-18G
             </fluent-badge>
           )}
-          {props.illust.illust_ai_type != null && props.illust.illust_ai_type > 1 && (
+          {props.illust.illust_ai_type != null && props.illust.illust_ai_type >= 1 && (
             <fluent-badge appearance="filled">
               {props.illust.illust_ai_type === 2 ? "AI" : "AI辅助"}
             </fluent-badge>

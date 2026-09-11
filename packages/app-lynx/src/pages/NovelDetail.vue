@@ -18,9 +18,11 @@ import {
   type WatchlistPromptController,
 } from '../primitives/createWatchlistPrompt'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
+import AiOverlay from '../components/AiOverlay.vue'
 
 const settings = useSettingsStore()
 const isRestricted = settings.isRestricted
+const isAiRestricted = settings.isAiRestricted
 import CommentOverlay from '../components/CommentOverlay.vue'
 import NovelExportSheet from '../components/NovelExportSheet.vue'
 import SkeletonNovel from '../components/SkeletonNovel.vue'
@@ -179,7 +181,8 @@ async function loadNovel(): Promise<void> {
     // prompt 在详情落地后创建：getSeries 此时已知，系列预取才能发起；
     // 停留计时（dwellMs）从详情就绪起算，语义上更贴近「实质阅读时长」
     setupPrompt()
-    if (!isRestricted(detailRes.novel)) {
+    // AI 遮罩态同样不拉正文（与 R18 一致：遮罩是内容不可达而非仅视觉遮挡，ADR-0155）
+    if (!isRestricted(detailRes.novel) && !isAiRestricted(detailRes.novel)) {
       const data = await fetchNovelData(novelId.value)
       if (gen !== loadGeneration) return
       // 保留原 fetchNovelText 的空正文语义：提取失败 → 走 catch 展示错误
@@ -249,7 +252,7 @@ function onWatchlistCancel(): void {
     <!-- 正文列表虚拟化（ADR-0134）：官方指南「超三屏用 list」；红线 = Vue :key 与 Lynx
          :item-key 双份一致 + 稳定 id；estimated 按段落估算滚动条。 -->
     <list
-      v-else-if="novel && !isRestricted(novel)"
+      v-else-if="novel && !isRestricted(novel) && !isAiRestricted(novel)"
       class="w-full flex-1 min-h-0"
       list-type="single"
       scroll-orientation="vertical"
@@ -349,7 +352,8 @@ function onWatchlistCancel(): void {
       </view>
       <view class="relative p-4">
         <view class="min-h-[60vw]" />
-        <RestrictOverlay :level="novel && novel.x_restrict === 2 ? 2 : 1" />
+        <RestrictOverlay v-if="novel && isRestricted(novel)" :level="novel.x_restrict === 2 ? 2 : 1" />
+        <AiOverlay v-else-if="novel && isAiRestricted(novel)" :ai-type="novel.novel_ai_type ?? 0" />
       </view>
     </view>
 

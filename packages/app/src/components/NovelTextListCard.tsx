@@ -85,7 +85,7 @@ const NovelTextListCard: Component<Props> = (props) => {
                 {props.novel.x_restrict === 1 ? "R-18" : "R-18G"}
               </fluent-badge>
             )}
-            {props.novel.novel_ai_type != null && props.novel.novel_ai_type > 1 && (
+            {props.novel.novel_ai_type != null && props.novel.novel_ai_type >= 1 && (
               <fluent-badge
                 data-testid="novel-ai-badge"
                 appearance="filled"

@@ -1,6 +1,7 @@
 import { createSignal } from "solid-js";
 import { settings } from "@/settings";
 import { user } from "@/stores/authStore";
+import { isAiFilterMode, type AiFilterMode } from "../utils/aiFilter";
 import type { UgoiraExtractMode } from "../api/illust";
 import { UGOIRA_FORMATS, type UgoiraFormat } from "../utils/downloadQueueCore";
 import {
@@ -23,6 +24,7 @@ const PREF_KEY_LAYOUT_MODE = "layout_mode";
 const PREF_KEY_AUTO_HIDE_NAV_BAR = "auto_hide_nav_bar";
 const PREF_KEY_SHOW_R18 = "show_r18";
 const PREF_KEY_SHOW_R18G = "show_r18g";
+const PREF_KEY_AI_FILTER_MODE = "ai_filter_mode";
 const PREF_KEY_SHOW_DETAIL_STAIRS = "show_detail_stairs";
 const PREF_KEY_AUTO_CHECK_UPDATE = "auto_check_update";
 const PREF_KEY_NOVEL_LAYOUT_MODE = "novel_layout_mode";
@@ -125,14 +127,39 @@ export async function setShowR18G(enabled: boolean): Promise<void> {
   window.dispatchEvent(new CustomEvent("r18gChanged"));
 }
 
+// ── AI 作品三态过滤（ADR-0155：账号级设置，键 ai_filter_mode_${uid}，跨 client 共享）──
+// 三态 show/mask/only 以裸字符串持久化；无旧键迁移（本次全新键）。
+// app 端「mask」沿用 app R18 的过滤隐藏口径（见 aiFilter.ts 注释）。
+
+const aiFilterModeFactory = settings.defineFactory<AiFilterMode>({
+  keyPrefix: PREF_KEY_AI_FILTER_MODE,
+  default: "show",
+  validate: isAiFilterMode,
+});
+
+export const aiFilterMode = (): AiFilterMode => {
+  const id = uid();
+  return id !== null ? aiFilterModeFactory.forId(id).value() : "show";
+};
+export async function setAiFilterMode(mode: AiFilterMode): Promise<void> {
+  const id = uid();
+  if (id === null) return; // 未登录：不落盘（账号级语义）
+  aiFilterModeFactory.forId(id).set(mode);
+  window.dispatchEvent(new CustomEvent("aiFilterChanged"));
+}
+
 /**
- * 登录后加载当前账号的 R18/R18G（__root 在 initializeAuth 后 + 各登录成功分支调用）。
+ * 登录后加载当前账号的 R18/R18G + AI 三态（__root 在 initializeAuth 后 + 各登录成功分支调用）。
  * 顺带一次性清理已移除年龄功能的孤儿键（幂等：键不存在 remove 为 no-op）。
  */
 export async function loadAccountR18(): Promise<void> {
   const id = uid();
   if (id === null) return;
-  await Promise.all([r18Factory.forId(id).hydrate(), r18gFactory.forId(id).hydrate()]);
+  await Promise.all([
+    r18Factory.forId(id).hydrate(),
+    r18gFactory.forId(id).hydrate(),
+    aiFilterModeFactory.forId(id).hydrate(),
+  ]);
   await Promise.all([settings.remove("age_confirmed"), settings.remove("is_adult")]).catch((e) =>
     console.warn("[settingsStore] 孤儿键清理失败", e),
   );
@@ -364,6 +391,7 @@ export async function resetSettingsStore(): Promise<void> {
   await setImageCacheDiskSize(300);
   await setShowR18(false);
   await setShowR18G(false);
+  await setAiFilterMode("show");
   await setLayoutMode("waterfall");
   await setNovelLayoutMode("list");
   await setShowDetailStairs(false);

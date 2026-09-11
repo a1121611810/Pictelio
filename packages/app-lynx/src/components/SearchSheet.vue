@@ -27,20 +27,26 @@ import { useSettingsStore } from '../stores/settingsStore'
 import { thumbUrl } from '../utils/imageUrl'
 import { SEARCH_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import SkeletonImage from './SkeletonImage.vue'
+import { useAiOnlyVisible } from '../composables/useAiOnlyVisible'
 import type { SearchScope, SearchSort } from '../api/types'
 
 const searchHistory = useSearchHistoryStore()
 const searchSheet = useSearchSheetStore()
-const isRestricted = useSettingsStore().isRestricted
+const settings = useSettingsStore()
+const isRestricted = settings.isRestricted
+const isAiRestricted = settings.isAiRestricted
 
 const controller = useSearch()
 // state 是 getter 返回的只读快照 → 用 computed 包裹保持响应式（模板自动解包）
 const state = computed<SearchState>(() => controller.state)
+/** 仅看态：非 AI 结果从渲染流移除（分页/空态仍基于服务端返回语义） */
+const rawResults = computed(() => state.value.results)
+const visibleResults = useAiOnlyVisible(rawResults, (r) => r.entity)
 
 /** 首载三态（ADR-0150）：首搜无旧结果 → 骨架；换词保留旧结果（hasItems 优先 → 内容）；ready 且空 → 空态 */
 const view = computed(() =>
   deriveFirstLoadView({
-    hasItems: state.value.results.length > 0,
+    hasItems: visibleResults.value.length > 0,
     loading: state.value.isSearching || state.value.status === 'loading',
     settled: state.value.status === 'ready',
     hasError: state.value.status === 'error',
@@ -90,6 +96,30 @@ function rowSub(row: SearchResultItem): string {
 /** R18 等级派生（对齐 RestrictedNovelCard：x_restrict===2 → R-18G，否则 R-18） */
 function restrictLevel(row: SearchResultItem): 1 | 2 {
   return row.entity.x_restrict === 2 ? 2 : 1
+}
+
+// ── AI 三态（ADR-0155）行遮罩辅助 ──
+
+/** 行是否处于遮罩态：R18 受限 或 AI 遮罩态（R18 优先） */
+function isRowMasked(row: SearchResultItem): boolean {
+  return isRestricted(row.entity) || isAiRestricted(row.entity)
+}
+
+/** AI 等级派生（novel_ai_type===2 → 纯 AI，否则 AI 辅助） */
+function aiLevel(row: SearchResultItem): 1 | 2 {
+  const t = row.entity.illust_ai_type ?? row.entity.novel_ai_type ?? 0
+  return t === 2 ? 2 : 1
+}
+
+/** 遮罩行徽章文案（R18 优先） */
+function rowMaskLabel(row: SearchResultItem): string {
+  if (isRestricted(row.entity)) return restrictLevel(row) === 2 ? 'R-18G' : 'R-18'
+  return aiLevel(row) === 2 ? 'AI' : 'AI辅助'
+}
+
+/** 遮罩行原因文案 */
+function rowMaskHint(row: SearchResultItem): string {
+  return isRestricted(row.entity) ? '受浏览限制，不予显示' : 'AI 作品，已在设置中遮罩'
 }
 
 // ── 输入 ──
@@ -371,7 +401,7 @@ onBeforeUnmount(() => {
           <!-- 结果列表：行式（缩略图 + 标题 + 作者 · 类型/字数）；item-key 必须 String（ADR-0055/0056）。
                loading 期间旧结果保留展示；首搜无旧结果时列表为空 + 上方轻量指示 -->
           <list
-            v-else-if="state.results.length > 0"
+            v-else-if="visibleResults.length > 0"
             class="flex-1 min-h-0"
             list-type="single"
             scroll-orientation="vertical"
@@ -379,7 +409,7 @@ onBeforeUnmount(() => {
             @scrolltolower="onLoadMore"
           >
             <list-item
-              v-for="row in state.results"
+              v-for="row in visibleResults"
               :key="rowKey(row)"
               :item-key="rowKey(row)"
               class="w-full"
@@ -389,10 +419,10 @@ onBeforeUnmount(() => {
                      流内模式含两行文案，14vw 盒内溢出——badge-only 缩放复用；不预过滤 isRestricted()） -->
                 <view
                   class="w-[14vw] h-[14vw] rounded-[var(--md-shape-small)] overflow-hidden flex-shrink-0 bg-surface-container-highest"
-                  :class="isRestricted(row.entity) ? 'bg-scrim flex items-center justify-center' : ''"
+                  :class="isRowMasked(row) ? 'bg-scrim flex items-center justify-center' : ''"
                 >
                   <SkeletonImage
-                    v-if="!isRestricted(row.entity)"
+                    v-if="!isRowMasked(row)"
                     :src="rowThumb(row)"
                     aspect-ratio="1 / 1"
                     min-h="14vw"
@@ -402,15 +432,15 @@ onBeforeUnmount(() => {
                   <text
                     v-else
                     class="text-label-medium font-semibold px-2 py-0.5 rounded-[var(--md-shape-extra-small)]"
-                    :class="restrictLevel(row) === 2 ? 'bg-error text-error-on' : 'bg-error-container text-error-on-container'"
-                  >{{ restrictLevel(row) === 2 ? 'R-18G' : 'R-18' }}</text>
+                    :class="isRestricted(row.entity) ? (restrictLevel(row) === 2 ? 'bg-error text-error-on' : 'bg-error-container text-error-on-container') : 'bg-secondary-container text-secondary-on-container'"
+                  >{{ rowMaskLabel(row) }}</text>
                 </view>
 
-                <!-- 文本区：R18 行标题遮蔽（scrim 条 + 文案），作者行照常 -->
+                <!-- 文本区：遮罩行标题遮蔽（scrim 条 + 文案），作者行照常 -->
                 <view class="flex-1 ml-3 min-w-0">
-                  <template v-if="isRestricted(row.entity)">
+                  <template v-if="isRowMasked(row)">
                     <view class="h-[4.267vw] bg-scrim rounded-[var(--md-shape-extra-small)] w-full" />
-                    <text class="text-body-small text-surface-on-variant mt-1 [max-line:1]">受浏览限制，不予显示</text>
+                    <text class="text-body-small text-surface-on-variant mt-1 [max-line:1]">{{ rowMaskHint(row) }}</text>
                   </template>
                   <template v-else>
                     <text class="text-body-medium text-surface-on [max-line:1]" style="word-break: break-all">{{ row.entity.title }}</text>

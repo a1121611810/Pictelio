@@ -51,6 +51,8 @@ export interface PixivIllust {
   total_view?: number;
   tags: PixivIllustTag[];
   x_restrict: number;
+  /** Pixiv AI 类型：0/undefined=非 AI，1=AI 辅助，2=纯 AI（ADR-0155，判定见 settingsStore.isAiWork） */
+  illust_ai_type?: number;
   create_date: string;
   caption?: string;
   total_comments?: number;
@@ -80,6 +82,8 @@ export interface PixivNovel {
   total_bookmarks: number;
   total_view?: number;
   x_restrict: number;
+  /** Pixiv AI 类型：0/undefined=非 AI，1=AI 辅助，2=纯 AI（ADR-0155，判定见 settingsStore.isAiWork） */
+  novel_ai_type?: number;
   create_date: string;
   caption?: string;
   total_comments?: number;

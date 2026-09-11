@@ -8,13 +8,17 @@ import type { PixivNovel, PixivNovelListResponse } from '../api/types'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { useSettingsStore } from '../stores/settingsStore'
 import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
+import AiRestrictedNovelCard from '../components/AiRestrictedNovelCard.vue'
+import { useAiOnlyVisible } from '../composables/useAiOnlyVisible'
 import RefreshableList from '../components/RefreshableList.vue'
 import { useGlobalFabStore } from '../stores/globalFab'
 import AdaptiveTagRow from '../components/AdaptiveTagRow.vue'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 
-const isRestricted = useSettingsStore().isRestricted
+const settings = useSettingsStore()
+const isRestricted = settings.isRestricted
+const isAiRestricted = settings.isAiRestricted
 
 // ─── 分页收敛（ADR-0104）：迁移到 createMixFeed 深模块 ───
 // 双防抖（800ms 节流 + 3s 冷却）/ 竞态代 / 分批渲染 / 空页防护 / 15s 超时 /
@@ -56,6 +60,8 @@ function makeFeed(m: 'recommend' | 'follow') {
 
 const feed = ref(makeFeed(mode.value))
 const novels = ref<PixivNovel[]>([])
+/** 仅看态：非 AI 条目从渲染流移除（服务端分页判空仍基于 feed.items，不受影响） */
+const visibleNovels = useAiOnlyVisible(novels)
 
 const loading = ref(false)
 const loadingMore = ref(false)
@@ -75,7 +81,7 @@ const emptyMeta = computed(() =>
 /** 页级首载三态（ADR-0150）：骨架 / 错误 / 空态 / 内容 的唯一判定源 */
 const view = computed(() =>
   deriveFirstLoadView({
-    hasItems: novels.value.length > 0,
+    hasItems: visibleNovels.value.length > 0,
     loading: loading.value,
     settled: settled.value,
     hasError: !!errorMsg.value,
@@ -230,7 +236,7 @@ onUnmounted(() => {
       @scroll="onScroll"
     >
       <list-item
-        v-for="item in novels"
+        v-for="item in visibleNovels"
         :key="item.id"
         :item-key="String(item.id)"
         class="w-full"
@@ -240,6 +246,7 @@ onUnmounted(() => {
              流内无 absolute——真机 Lynx 的 absolute 子元素会被 single list item
              高度测量算进内容高度，导致整卡撑满内容区，实测 2026-08-11） -->
         <RestrictedNovelCard v-if="isRestricted(item)" :item="item" />
+        <AiRestrictedNovelCard v-else-if="isAiRestricted(item)" :item="item" />
         <view v-else class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
           <view class="flex-1 flex flex-col">
             <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>

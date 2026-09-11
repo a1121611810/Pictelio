@@ -29,6 +29,8 @@ import {
   clearAllHistory,
   type HistoryEntry,
 } from "@/stores/historyStore";
+import { aiFilterMode } from "@/stores/settingsStore";
+import { isAiHiddenByType } from "@/utils/aiFilter";
 import UserAvatar from "@/components/UserAvatar";
 import FluentIcon, { type FluentIconName } from "@/components/ui/FluentIcon";
 import ContentTypeToggle from "@/components/home/ContentTypeToggle";
@@ -70,13 +72,19 @@ function initialHomeTab(): HomeTab {
   return isValidHomeTab(t) ? t : "recommended";
 }
 
-/** 当前用户的历史条目（响应 historyVersion，按访问时间倒序）。 */
+/** 当前用户的历史条目（响应 historyVersion + AI 模式，按访问时间倒序）。 */
 function historyRows(): HistoryEntry[] {
   historyVersion[0]();
-  const uid = String(user()?.id ?? "");
+  const uid = String(currentUserId());
+  const mode = aiFilterMode();
   return historyCollection.toArray
-    .filter((e) => e.userId === uid)
+    .filter((e) => e.userId === uid && !isAiHiddenByType(e.aiType ?? 0, mode))
     .toSorted((a, b) => b.visitedAt - a.visitedAt);
+}
+
+/** 当前登录用户 id（字符串）——历史条目 userId 的存储口径。 */
+function currentUserId(): string {
+  return String(user()?.id ?? "");
 }
 
 /** 历史 Tab 面板：A2 行卡列表（HistoryRowCard）+ 清空按钮 + 空态。 */

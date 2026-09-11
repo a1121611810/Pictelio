@@ -88,7 +88,7 @@ const GridCard: Component<Props> = (props) => {
               R-18G
             </fluent-badge>
           )}
-          {props.illust.illust_ai_type != null && props.illust.illust_ai_type > 1 && (
+          {props.illust.illust_ai_type != null && props.illust.illust_ai_type >= 1 && (
             <fluent-badge appearance="filled" style="font-size:var(--fontSizeBase100)">
               {props.illust.illust_ai_type === 2 ? "AI" : "AI辅"}
             </fluent-badge>

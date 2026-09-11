@@ -70,6 +70,24 @@ describe("IllustSingleCard", () => {
     expect(screen.getByText("★5,678")).toBeTruthy();
   });
 
+  // AI badge 守卫由 >1 修正为 >=1（ADR-0155 D1）：ai_type=1 从死分支变为「AI辅助」
+  it("AI badge：illust_ai_type=1 显示「AI辅助」", () => {
+    render(() => <IllustSingleCard illust={makeIllust({ illust_ai_type: 1 })} onClick={vi.fn()} />);
+    expect(screen.getByText("AI辅助")).toBeTruthy();
+  });
+
+  it("AI badge：illust_ai_type=2 显示「AI」", () => {
+    render(() => <IllustSingleCard illust={makeIllust({ illust_ai_type: 2 })} onClick={vi.fn()} />);
+    expect(screen.getByText("AI")).toBeTruthy();
+    expect(screen.queryByText("AI辅助")).toBeNull();
+  });
+
+  it("AI badge：illust_ai_type=0 或字段缺失不渲染", () => {
+    render(() => <IllustSingleCard illust={makeIllust({ illust_ai_type: 0 })} onClick={vi.fn()} />);
+    expect(screen.queryByText("AI")).toBeNull();
+    expect(screen.queryByText("AI辅助")).toBeNull();
+  });
+
   it("封面双层：thumb(medium) 底层先行 aria-hidden，loadImage resolve 后主层切 large", async () => {
     const illust = makeIllust();
     const { container } = render(() => <IllustSingleCard illust={illust} onClick={vi.fn()} />);
