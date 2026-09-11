@@ -6,6 +6,7 @@ import SettingsDownload from "./SettingsDownload";
 import SettingsExport from "./SettingsExport";
 import SettingsTranslate from "./SettingsTranslate";
 import SettingsClient from "./SettingsClient";
+import SettingsNetDiag from "./SettingsNetDiag";
 import SettingsUpdate from "./SettingsUpdate";
 import SettingsAccount from "./SettingsAccount";
 import SettingsCard from "./SettingsCard";
@@ -55,6 +56,10 @@ const SettingsSections: Component<SettingsSectionsProps> = (props) => {
 
       <SettingsCard tone="elevated">
         <SettingsClient />
+      </SettingsCard>
+
+      <SettingsCard tone="elevated">
+        <SettingsNetDiag />
       </SettingsCard>
 
       <SettingsCard tone="elevated">

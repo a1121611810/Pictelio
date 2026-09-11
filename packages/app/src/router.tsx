@@ -17,6 +17,7 @@ import Settings from "@/routes/Settings";
 import ClientSwitch from "@/routes/ClientSwitch";
 import ScrollRestorationConfirm from "@/routes/ScrollRestorationConfirm";
 import DownloadManager from "@/routes/DownloadManager";
+import NetworkCheck from "@/routes/NetworkCheck";
 
 /** /user/:id/followers 和 /my/followers 共享的视图 */
 const FollowersPage = () => <FollowListPage mode="followers" />;
@@ -41,6 +42,7 @@ export const routes: RouteDefinition[] = [
       { path: "/client-switch", component: ClientSwitch },
       { path: "/scroll-restoration-confirm", component: ScrollRestorationConfirm },
       { path: "/downloads", component: DownloadManager },
+      { path: "/network-check", component: NetworkCheck },
       { path: "/user/:id", component: PersonalCenter },
       { path: "/user/:id/illusts", component: UserIllusts },
       { path: "/user/:id/following", component: () => <FollowListPage mode="following" /> },

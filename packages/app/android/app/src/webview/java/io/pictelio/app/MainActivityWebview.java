@@ -70,6 +70,7 @@ public class MainActivityWebview extends BridgeActivity {
         registerPlugin(GallerySaverPlugin.class); // 保存到相册（spec image-save-download）
         registerPlugin(PictelioDownloaderPlugin.class); // 下载队列执行器（spec download-manager T3）
         registerPlugin(PictelioSharePlugin.class); // 系统分享（spec download-manager T6）
+        registerPlugin(NetDiagPlugin.class); // 网络自检（spec network-self-check）
         super.onCreate(savedInstanceState);
         // 调试模式 — debug 构建时启用
         if (BuildConfig.DEBUG) {

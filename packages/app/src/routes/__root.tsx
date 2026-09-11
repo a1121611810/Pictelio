@@ -67,7 +67,8 @@ const RootLayout: Component = (props: { children?: any }) => {
     ({ loggedIn, path, loading }) => {
       // 跳过启动阶段（startup 代码在 onSettled 中处理了初始导航）
       if (loading) return;
-      if (!loggedIn && path !== "/login") {
+      // 网络自检页登录前可达：网络/登录失败时恰恰最需要它（spec docs/specs/network-self-check.md）
+      if (!loggedIn && path !== "/login" && path !== "/network-check") {
         navigate("/login", { replace: true });
       }
     },

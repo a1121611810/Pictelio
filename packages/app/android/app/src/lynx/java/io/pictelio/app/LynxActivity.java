@@ -114,6 +114,7 @@ public class LynxActivity extends AppCompatActivity {
         builder.registerModule("PictelioAuth", PictelioAuthModule.class);
         builder.registerModule("PictelioApi", PictelioApiModule.class);
         builder.registerModule("PictelioPrefs", PictelioPrefsModule.class);
+        builder.registerModule("NetDiag", NetDiagModule.class);
         lynxView = builder.build(this);
 
         // Splash 退出时机：bundle 渲染成功/失败（替代 webview 分支 AuthPlugin.hideSplash 桥）
@@ -148,6 +149,8 @@ public class LynxActivity extends AppCompatActivity {
                             // meta-exit 回归（S6）触发通道（版本检查/401 链无法在测试中伪造）
                             case "update" -> new String[]{"pictelioBenchNavUpdate"};
                             case "error" -> new String[]{"pictelioBenchNavError"};
+                            // 网络自检直达（spec docs/specs/network-self-check.md）
+                            case "netdiag" -> new String[]{"pictelioBenchNavNetDiag"};
                             default -> new String[0];
                         };
                         // 四次广播（1.5/3/4.5/6s）：页面级监听（如 NovelList 子 tab）可能晚于路由监听，

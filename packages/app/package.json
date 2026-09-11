@@ -42,6 +42,7 @@
     "@chenglou/pretext": "^0.0.8",
     "@fluentui/tokens": "1.0.0-alpha.23",
     "@fluentui/web-components": "3.0.3",
+    "@pictelio/net-diagnostics": "workspace:*",
     "@pictelio/novel-export": "workspace:*",
     "@pictelio/ugoira": "workspace:*",
     "@pictelio/update-check": "workspace:*",
