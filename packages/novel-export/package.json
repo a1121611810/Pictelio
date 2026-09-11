@@ -1,0 +1,19 @@
+{
+  "name": "@pictelio/novel-export",
+  "version": "0.1.0",
+  "description": "小说多格式导出共享纯逻辑库（提取 / 块解析 / payload / 任务草稿 / 格式表），app 与 app-lynx 共用",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "check": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.10"
+  }
+}

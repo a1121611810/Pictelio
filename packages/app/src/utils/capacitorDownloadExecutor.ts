@@ -8,10 +8,12 @@ export interface PictelioDownloaderNative {
     id: string;
     sourceUrl: string;
     fileName: string;
-    kind: "image" | "ugoira";
+    kind: "image" | "ugoira" | "novel";
     targetFormat: string;
     /** ugoira 帧时序 JSON（无则空串） */
     framesJson: string;
+    /** 小说导出载荷 JSON（kind="novel"；其他 kind 传空串，spec novel-export §8） */
+    payloadJson: string;
   }): Promise<{ uri: string }>;
   cancel(options: { id: string }): Promise<void>;
   deleteFile(options: { uri: string }): Promise<void>;
@@ -54,6 +56,7 @@ export function createCapacitorDownloadExecutor(
           kind: task.kind,
           targetFormat: task.targetFormat,
           framesJson: task.frames ? JSON.stringify(task.frames) : "",
+          payloadJson: task.payloadJson ?? "",
         })
         .then((r) => {
           if (active.get(task.id) !== cb) return;

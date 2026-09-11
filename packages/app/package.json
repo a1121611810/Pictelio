@@ -42,6 +42,7 @@
     "@chenglou/pretext": "^0.0.8",
     "@fluentui/tokens": "1.0.0-alpha.23",
     "@fluentui/web-components": "3.0.3",
+    "@pictelio/novel-export": "workspace:*",
     "@pictelio/ugoira": "workspace:*",
     "@pictelio/update-check": "workspace:*",
     "@solid-primitives/intersection-observer": "3.0.0-next.3",

@@ -130,6 +130,30 @@ describe("createCapacitorDownloadExecutor（spec §4.3）", () => {
     expect(f.cancelled).toContain("a");
   });
 
+  it("novel 任务透传 kind/targetFormat/payloadJson（spec novel-export §8）", () => {
+    const f = fakeNative();
+    const exec = createCapacitorDownloadExecutor(f.native);
+    const a = callbacks();
+    const t: DownloadTask = {
+      ...task("novel_7_epub_111"),
+      kind: "novel",
+      targetFormat: "epub",
+      fileName: "Pictelio_7.epub",
+      sourceUrl: "https://www.pixiv.net/novel/show.php?id=7",
+      payloadJson: '{"schema":1}',
+    };
+    exec.start(t, 1, a.cb);
+    expect(f.native.start).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "novel_7_epub_111",
+        kind: "novel",
+        targetFormat: "epub",
+        payloadJson: '{"schema":1}',
+        framesJson: "",
+      }),
+    );
+  });
+
   it("pause 委托 cancel；deleteFile 委托原生", async () => {
     const f = fakeNative();
     const exec = createCapacitorDownloadExecutor(f.native);

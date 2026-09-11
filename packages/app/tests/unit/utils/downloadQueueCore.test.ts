@@ -364,3 +364,59 @@ describe("持久化 serialize / restore（spec §4.4）", () => {
     expect(c.msgs.some((m) => m.includes("丢弃 3 条"))).toBe(true);
   });
 });
+
+// novel 导出任务（oracle = spec docs/specs/novel-export.md §3.3/§4）
+describe("novel 导出任务（spec docs/specs/novel-export.md §3.3/§4）", () => {
+  const payloadJson = JSON.stringify({
+    schema: 1,
+    meta: { id: 7, title: "n" },
+    blocks: [{ type: "text", index: 0, text: "正文" }],
+  });
+
+  it("kind=novel 草稿携带 payloadJson，入队后原样保留（opaque 快照）", () => {
+    const s = enqueue(
+      { tasks: [] },
+      [
+        draft("novel_7_epub_111", {
+          kind: "novel",
+          page: undefined,
+          targetFormat: "epub",
+          fileName: "Pictelio_7.epub",
+          payloadJson,
+        }),
+      ],
+      1,
+    );
+    const t = findTask(s, "novel_7_epub_111");
+    expect(t?.kind).toBe("novel");
+    expect(t?.payloadJson).toBe(payloadJson);
+    expect(t?.targetFormat).toBe("epub");
+  });
+
+  it("serialize/restore 往返保留 novel 任务与 payloadJson", () => {
+    const s = {
+      tasks: [
+        task({
+          id: "novel_7_epub_111",
+          kind: "novel",
+          sourceUrl: "https://www.pixiv.net/novel/show.php?id=7",
+          targetFormat: "epub",
+          fileName: "Pictelio_7.epub",
+          payloadJson,
+        }),
+      ],
+    };
+    expect(restore(serialize(s)).tasks).toEqual(s.tasks);
+  });
+
+  it("非法 payloadJson 类型（非字符串）被丢弃，条目其余字段保留", () => {
+    const raw = JSON.stringify({
+      version: 1,
+      tasks: [{ ...task({ id: "novel_7_pdf_111", kind: "novel" }), payloadJson: 42 }],
+    });
+    const c = captureWarn();
+    const restored = restore(raw, c.warn);
+    expect(restored.tasks.map((t) => t.id)).toEqual(["novel_7_pdf_111"]);
+    expect(restored.tasks[0]?.payloadJson).toBeUndefined();
+  });
+});

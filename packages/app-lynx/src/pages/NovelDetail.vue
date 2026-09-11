@@ -4,10 +4,14 @@ import { useMainThreadRef, runOnBackground } from 'vue-lynx'
 import { computeReadProgress } from '../primitives/watchlistPrompt'
 import { novelAverageParagraphHeightPx } from '../primitives/novelParagraphEstimate'
 import { currentParams, goBack, requestBack, registerBackGuard } from '../router'
-import { loadNovelDetail, fetchNovelText, loadNovelSeries, addNovelWatchlist } from '../api/novel'
+import { loadNovelDetail, fetchNovelData, loadNovelSeries, addNovelWatchlist } from '../api/novel'
+import type { NovelExportFormat, NovelImagesMap } from '@pictelio/novel-export'
+import { buildNovelExportPayload, buildNovelExportTaskDraft } from '@pictelio/novel-export'
 import type { PixivNovel } from '../api/types'
 import { presentError } from '../utils/errorPresentation'
+import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { useSettingsStore } from '../stores/settingsStore'
+import { useDownloadStore } from '../stores/downloadStore'
 import { isDismissed, markDismissed, setWatchState } from '../stores/watchlistStore'
 import {
   createWatchlistPrompt,
@@ -15,13 +19,17 @@ import {
 } from '../primitives/createWatchlistPrompt'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
 
-const isRestricted = useSettingsStore().isRestricted
+const settings = useSettingsStore()
+const isRestricted = settings.isRestricted
 import CommentOverlay from '../components/CommentOverlay.vue'
+import NovelExportSheet from '../components/NovelExportSheet.vue'
 import SkeletonNovel from '../components/SkeletonNovel.vue'
 import WatchlistPromptDialog from '../components/WatchlistPromptDialog.vue'
 
 const novel = ref<PixivNovel | null>(null)
 const text = ref('')
+/** 正文内嵌图片映射（[pixivimage:id] → 图片 URL 档位），导出 payload 用 */
+const novelImages = ref<NovelImagesMap>({})
 const loading = ref(true)
 const errorMsg = ref('')
 
@@ -29,6 +37,39 @@ const novelId = computed(() => Number(currentParams.value.id ?? 0))
 
 // ─── 评论弹层（issue #164）：入口在作者/元信息行附近；弹层挂根 view 内、scroll-view 之后 ───
 const showComments = ref(false)
+
+// ─── 小说导出（spec docs/specs/novel-export.md §7.2 / ADR-0154 D7）───
+// 入口仅在正文可用时渲染；面板格式为本次临时选择，内容开关取设置页快照（入队即快照）。
+const exportOpen = ref(false)
+/** 内联状态提示（lynx 无全局 toast）：约 4s 后自动隐藏 */
+const exportNotice = ref('')
+let exportNoticeTimer: ReturnType<typeof setTimeout> | undefined
+const downloads = useDownloadStore()
+
+/** 构造导出载荷并加入下载队列（格式为本次临时选择，不写回设置） */
+function enqueueNovelExport(format: NovelExportFormat): void {
+  const n = novel.value
+  if (!n) return
+  const payload = buildNovelExportPayload({
+    novel: n,
+    text: text.value,
+    images: novelImages.value,
+    options: settings.novelExportOptions,
+  })
+  const draft = buildNovelExportTaskDraft({
+    payload,
+    format,
+    title: n.title,
+    thumbnailUrl: n.image_urls.medium ?? n.image_urls.large ?? '',
+  })
+  downloads.enqueue([draft])
+  exportOpen.value = false
+  exportNotice.value = '已加入下载队列，请到下载页查看'
+  clearTimeout(exportNoticeTimer)
+  exportNoticeTimer = setTimeout(() => {
+    exportNotice.value = ''
+  }, 4000)
+}
 
 // ─── 追更询问（issue #226 / spec §US4 接线半） ───
 // 页面保持薄：预取 + 触发判定 + 弹窗状态机全部在 createWatchlistPrompt；
@@ -127,6 +168,7 @@ async function loadNovel(): Promise<void> {
   errorMsg.value = ''
   novel.value = null
   text.value = ''
+  novelImages.value = {}
   reachedBottom.value = false
   teardownPrompt()
   try {
@@ -138,9 +180,12 @@ async function loadNovel(): Promise<void> {
     // 停留计时（dwellMs）从详情就绪起算，语义上更贴近「实质阅读时长」
     setupPrompt()
     if (!isRestricted(detailRes.novel)) {
-      const fullText = await fetchNovelText(novelId.value)
+      const data = await fetchNovelData(novelId.value)
       if (gen !== loadGeneration) return
-      text.value = fullText
+      // 保留原 fetchNovelText 的空正文语义：提取失败 → 走 catch 展示错误
+      if (!data.text) throw new Error('小说正文提取失败')
+      text.value = data.text
+      novelImages.value = data.images
     }
   } catch (err) {
     if (gen !== loadGeneration) return
@@ -157,6 +202,7 @@ onMounted(() => {
 onUnmounted(() => {
   unregisterBackGuard()
   teardownPrompt()
+  clearTimeout(exportNoticeTimer)
   loadGeneration++ // 卸载后任何在飞响应落地即作废
 })
 
@@ -240,6 +286,19 @@ function onWatchlistCancel(): void {
           <text class="text-[6.4vw] leading-none">💬</text>
           <text class="text-label-medium text-outline ml-1">{{ novel?.total_comments }}</text>
         </view>
+        <!-- 导出入口（spec §7.2）：仅正文可用时渲染；label 内联，不进 ME_A11Y_LABELS -->
+        <view
+          v-if="text.length > 0"
+          class="mt-2 flex flex-row items-center"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          accessibility-label="导出小说"
+          @tap="exportOpen = true"
+        >
+          <text class="text-[6.4vw] leading-none">⬆</text>
+          <text class="text-label-medium text-outline ml-1">导出</text>
+        </view>
+        <!-- 入队内联提示（lynx 无全局 toast）：约 4s 后自动隐藏 -->
+        <text v-if="exportNotice" class="text-label-medium text-primary mt-1.5">{{ exportNotice }}</text>
       </view>
       </list-item>
       <list-item
@@ -296,6 +355,16 @@ function onWatchlistCancel(): void {
 
     <!-- 评论弹层（issue #164）：根 view 内、正文列表之后的覆盖层 → 弹层打开时滚动位置不丢失 -->
     <CommentOverlay v-if="showComments" type="novel" :target-id="novelId" @close="showComments = false" />
+
+    <!-- 导出弹层（spec §7.2）：同一覆盖层挂载契约，DOM 在正文列表之后 -->
+    <NovelExportSheet
+      v-if="exportOpen"
+      :open="exportOpen"
+      :default-format="settings.novelExportFormat"
+      :options="settings.novelExportOptions"
+      @close="exportOpen = false"
+      @export="enqueueNovelExport"
+    />
 
     <!-- 追更询问弹窗（issue #226 / spec §US5）：open 期间自行注册 modalStack，
          返回键优先关弹窗 = cancel（留在详情页） -->

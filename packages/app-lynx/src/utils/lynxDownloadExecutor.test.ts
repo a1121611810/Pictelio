@@ -45,6 +45,7 @@ function harness() {
         _k: string,
         _t: string,
         _fj: string,
+        _pj: string,
         cb: (uri: string, err: string) => void,
       ) => {
         startCbs.set(id, cb)
@@ -121,5 +122,28 @@ describe('createLynxDownloadExecutor（spec §4.3）', () => {
     const h = harness()
     await h.exec.deleteFile('content://a')
     expect(h.deleted).toEqual(['content://a'])
+  })
+
+  it('novel 任务透传 kind/targetFormat/payloadJson（spec novel-export §8）', () => {
+    const h = harness()
+    const a = callbacks()
+    const t: DownloadTask = {
+      ...task('novel_7_pdf_111'),
+      kind: 'novel',
+      targetFormat: 'pdf',
+      fileName: 'Pictelio_7.pdf',
+      payloadJson: '{"schema":1}',
+    }
+    h.exec.start(t, 1, a.cb)
+    expect(h.native.start).toHaveBeenCalledWith(
+      'novel_7_pdf_111',
+      t.sourceUrl,
+      t.fileName,
+      'novel',
+      'pdf',
+      '',
+      '{"schema":1}',
+      expect.any(Function),
+    )
   })
 })

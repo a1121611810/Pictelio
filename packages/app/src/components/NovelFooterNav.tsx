@@ -20,6 +20,8 @@ interface NovelFooterNavProps {
   showTranslateEntry?: boolean;
   /** 点击翻译 / 切换：未翻译时打开面板，已翻译时切换原文译文 */
   onToggleTranslate: () => void;
+  /** 点击导出（spec docs/specs/novel-export.md §7.1）；无正文时不传，入口隐藏 */
+  onExport?: () => void;
 }
 
 const NovelFooterNav: Component<NovelFooterNavProps> = (props) => {
@@ -90,6 +92,16 @@ const NovelFooterNav: Component<NovelFooterNavProps> = (props) => {
               }
             >
               {props.translated ? (props.showTranslation ? "原文" : "译文") : "翻译"}
+            </button>
+          </Show>
+          <Show when={props.onExport}>
+            <button
+              class="flex-shrink-0 whitespace-nowrap px-3 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] font-medium hover:bg-[var(--colorNeutralBackground3)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer flex items-center gap-1"
+              onClick={() => props.onExport?.()}
+              aria-label="导出小说"
+            >
+              <FluentIcon name="open" size={20} />
+              导出
             </button>
           </Show>
           <Show when={props.novel.series?.id ? props.novelNav?.nextNovel : undefined}>

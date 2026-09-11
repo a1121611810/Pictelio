@@ -1,4 +1,10 @@
 // ─── 小说 API（复用现有 app 端点 + 正文提取逻辑） ───
+import {
+  extractNovelDataFromHtml,
+  extractNovelTextFromHtml,
+  type NovelImagesMap,
+  type SeriesNavigation,
+} from "@pictelio/novel-export"
 import { apiClient } from "./client"
 import type {
   PixivNovelListResponse,
@@ -6,6 +12,10 @@ import type {
   NovelSeriesDetailResponse,
   WatchlistNovelListResponse,
 } from "./types"
+
+// 正文/系列导航/内嵌图片提取统一走共享包 @pictelio/novel-export（ADR-0154 D1）。
+// 原本地 extractNovelTextFromHtml 实现已迁入共享包，此处 re-export 保持既有 import 可用。
+export { extractNovelDataFromHtml, extractNovelTextFromHtml }
 
 export function loadRecommendedNovels(signal?: AbortSignal): Promise<PixivNovelListResponse> {
   return apiClient.get<PixivNovelListResponse>(
@@ -92,21 +102,6 @@ export function loadWatchlistNovelsNext(
 }
 
 /**
- * 从 /webview/v2/novel 返回的 HTML 中提取小说正文。
- * 正文数据藏在 <script> 标签的 window.pixiv.novel.text 中。
- * （与现有 app 的 extractNovelTextFromHtml 逻辑同源）
- */
-export function extractNovelTextFromHtml(html: string): string {
-  const match = html.match(/"text"\s*:\s*"((?:[^"\\]|\\.)*)"/u)
-  if (!match) return ""
-  try {
-    return JSON.parse(`"${match[1]}"`) as string
-  } catch {
-    return match[1].replace(/\\n/gu, "\n").replace(/\\r/gu, "").replace(/\\t/gu, " ")
-  }
-}
-
-/**
  * 加载小说正文纯文本（/webview/v2/novel 返回 HTML 而非 JSON）。
  * 双模式由 apiClient.requestRaw 统一处理：
  * - web 模式：rewriteUrl → /pixiv-api 代理路径 + Bearer 头（fetch 返回原始文本）；
@@ -118,4 +113,17 @@ export async function fetchNovelText(novelId: number): Promise<string> {
   const text = extractNovelTextFromHtml(html)
   if (!text) throw new Error("小说正文提取失败")
   return text
+}
+
+/**
+ * 加载小说正文 + 系列导航 + 内嵌图片映射（与 app api/novel.ts fetchNovelData 同语义）。
+ * 复用共享包 extractNovelDataFromHtml；补齐 lynx 侧缺失的 images 提取。
+ */
+export async function fetchNovelData(novelId: number): Promise<{
+  text: string
+  navigation: SeriesNavigation
+  images: NovelImagesMap
+}> {
+  const html = await apiClient.requestRaw('GET', '/webview/v2/novel', { id: String(novelId) })
+  return extractNovelDataFromHtml(html)
 }

@@ -49,6 +49,21 @@ public class ShareHelperTest {
         assertEquals("application/octet-stream", ShareHelper.mimeForName(null));
     }
 
+    /** 小说导出文档 MIME（ADR-0154 D4 / spec §3.3 D4）：9 项逐一锚定。 */
+    @Test
+    public void mimeForName_documentFormats() {
+        assertEquals("text/plain", ShareHelper.mimeForName("Pictelio_1.txt"));
+        assertEquals("text/html", ShareHelper.mimeForName("Pictelio_1.html"));
+        assertEquals("text/markdown", ShareHelper.mimeForName("Pictelio_1.md"));
+        assertEquals("application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                ShareHelper.mimeForName("Pictelio_1.docx"));
+        assertEquals("application/pdf", ShareHelper.mimeForName("Pictelio_1.pdf"));
+        assertEquals("application/epub+zip", ShareHelper.mimeForName("Pictelio_1.epub"));
+        assertEquals("application/rtf", ShareHelper.mimeForName("Pictelio_1.rtf"));
+        assertEquals("application/json", ShareHelper.mimeForName("Pictelio_1.json"));
+        assertEquals("application/x-fictionbook+xml", ShareHelper.mimeForName("Pictelio_1.fb2"));
+    }
+
     @Test
     public void buildIntent_single_send() throws IOException {
         Intent intent = ShareHelper.buildIntent(ctx,

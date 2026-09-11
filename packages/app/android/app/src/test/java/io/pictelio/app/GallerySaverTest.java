@@ -80,6 +80,21 @@ public class GallerySaverTest {
         assertEquals("image/jpeg", GallerySaver.mimeFor("Pictelio_1"));
     }
 
+    /** 小说导出文档 MIME（ADR-0154 D4 / spec §3.3 D4）：9 项逐一锚定。 */
+    @Test
+    public void mimeFor_documentFormats() {
+        assertEquals("text/plain", GallerySaver.mimeFor("Pictelio_1.txt"));
+        assertEquals("text/html", GallerySaver.mimeFor("Pictelio_1.html"));
+        assertEquals("text/markdown", GallerySaver.mimeFor("Pictelio_1.md"));
+        assertEquals("application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                GallerySaver.mimeFor("Pictelio_1.docx"));
+        assertEquals("application/pdf", GallerySaver.mimeFor("Pictelio_1.pdf"));
+        assertEquals("application/epub+zip", GallerySaver.mimeFor("Pictelio_1.epub"));
+        assertEquals("application/rtf", GallerySaver.mimeFor("Pictelio_1.rtf"));
+        assertEquals("application/json", GallerySaver.mimeFor("Pictelio_1.json"));
+        assertEquals("application/x-fictionbook+xml", GallerySaver.mimeFor("Pictelio_1.fb2"));
+    }
+
     @Test
     public void sanitizeFileName_stripsSeparatorsAndControlChars() throws IOException {
         assertEquals("Pictelio_1_p0.jpg", GallerySaver.sanitizeFileName("Pictelio_1_p0.jpg"));

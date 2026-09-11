@@ -39,7 +39,7 @@ public class PictelioDownloaderModule extends LynxModule {
 
     @LynxMethod
     public void start(String id, String sourceUrl, String fileName, String kind, String targetFormat,
-            String framesJson, Callback callback) {
+            String framesJson, String payloadJson, Callback callback) {
         if (id == null || id.isEmpty() || sourceUrl == null || sourceUrl.isEmpty()
                 || fileName == null || fileName.isEmpty()) {
             callback.invoke("", "id、sourceUrl、fileName 均不能为空");
@@ -49,16 +49,27 @@ public class PictelioDownloaderModule extends LynxModule {
             callback.invoke("", "ugoira 任务缺少 targetFormat");
             return;
         }
+        if ("novel".equals(kind) && (targetFormat == null || targetFormat.isEmpty()
+                || payloadJson == null || payloadJson.isEmpty())) {
+            callback.invoke("", "novel 任务缺少 targetFormat 或 payloadJson");
+            return;
+        }
         final Context app = appContext();
         EXECUTOR.execute(() -> {
             try {
                 PictelioDownloader.ProgressListener listener =
                         (done, total) -> PROGRESS.put(id, new long[]{done, total});
-                String uri = "ugoira".equals(kind)
-                        ? PictelioDownloader.downloadUgoira(app, PictelioGalleryModule.imageLoader(app),
-                                id, sourceUrl, targetFormat, fileName, framesJson, listener)
-                        : PictelioDownloader.download(app, PictelioGalleryModule.imageLoader(app),
-                                id, sourceUrl, fileName, listener);
+                String uri;
+                if ("ugoira".equals(kind)) {
+                    uri = PictelioDownloader.downloadUgoira(app, PictelioGalleryModule.imageLoader(app),
+                            id, sourceUrl, targetFormat, fileName, framesJson, listener);
+                } else if ("novel".equals(kind)) {
+                    uri = PictelioDownloader.downloadNovel(app, PictelioGalleryModule.imageLoader(app),
+                            id, payloadJson, targetFormat, fileName, listener);
+                } else {
+                    uri = PictelioDownloader.download(app, PictelioGalleryModule.imageLoader(app),
+                            id, sourceUrl, fileName, listener);
+                }
                 PROGRESS.remove(id);
                 callback.invoke(uri, "");
             } catch (Throwable e) {

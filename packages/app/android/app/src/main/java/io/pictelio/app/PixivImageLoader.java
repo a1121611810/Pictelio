@@ -43,8 +43,11 @@ import okhttp3.Response;
  *
  * <p>消费方（薄适配，不复制逻辑）：{@code MainActivity.interceptImage}（webview 流形态）、
  * {@code PictelioImageService}（Lynx Bitmap 形态，见 #58/#59）。
+ *
+ * <p>非 final 是<b>测试缝</b>：{@link NovelExporter} 的取图注入要求测试可覆盖
+ * {@link #loadBytes(String)} 提供确定性字节（生产调用方零影响，公开 API 不变）。
  */
-public final class PixivImageLoader {
+public class PixivImageLoader {
 
     /** 下载进度回调（done/total 字节；total <= 0 表示长度未知） */
     public interface ProgressSink {

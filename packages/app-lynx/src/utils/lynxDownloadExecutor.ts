@@ -13,6 +13,7 @@ export interface LynxDownloaderNative {
     kind: string,
     targetFormat: string,
     framesJson: string,
+    payloadJson: string,
     cb: (uri: string, err: string) => void,
   ): void
   pollProgress(id: string, cb: (payload: string, err: string) => void): void
@@ -61,7 +62,8 @@ export function createLynxDownloadExecutor(
       )
 
       const framesJson = task.frames ? JSON.stringify(task.frames) : ''
-      native.start(task.id, task.sourceUrl, task.fileName, task.kind, task.targetFormat, framesJson, (uri, err) => {
+      const payloadJson = task.payloadJson ?? ''
+      native.start(task.id, task.sourceUrl, task.fileName, task.kind, task.targetFormat, framesJson, payloadJson, (uri, err) => {
         stopPolling(task.id)
         if (active.get(task.id) !== cb) return
         active.delete(task.id)

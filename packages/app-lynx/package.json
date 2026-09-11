@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@lynx-js/web-core": "^0.23.1",
+    "@pictelio/novel-export": "workspace:*",
     "@pictelio/ugoira": "workspace:*",
     "@pictelio/update-check": "workspace:*",
     "@tanstack/vue-query": "^5.102.8",

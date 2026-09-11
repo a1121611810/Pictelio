@@ -3,6 +3,7 @@ import SettingsAppearance from "./SettingsAppearance";
 import SettingsContent from "./SettingsContent";
 import SettingsImage from "./SettingsImage";
 import SettingsDownload from "./SettingsDownload";
+import SettingsExport from "./SettingsExport";
 import SettingsTranslate from "./SettingsTranslate";
 import SettingsClient from "./SettingsClient";
 import SettingsUpdate from "./SettingsUpdate";
@@ -42,6 +43,10 @@ const SettingsSections: Component<SettingsSectionsProps> = (props) => {
 
       <SettingsCard tone="elevated">
         <SettingsDownload />
+      </SettingsCard>
+
+      <SettingsCard tone="elevated">
+        <SettingsExport />
       </SettingsCard>
 
       <SettingsCard tone="elevated">

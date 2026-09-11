@@ -118,6 +118,24 @@ public final class ShareHelper {
                 return "application/zip";
             case "tar":
                 return "application/x-tar";
+            case "txt":
+                return "text/plain";
+            case "html":
+                return "text/html";
+            case "md":
+                return "text/markdown";
+            case "docx":
+                return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+            case "pdf":
+                return "application/pdf";
+            case "epub":
+                return "application/epub+zip";
+            case "rtf":
+                return "application/rtf";
+            case "json":
+                return "application/json";
+            case "fb2":
+                return "application/x-fictionbook+xml";
             default:
                 return "application/octet-stream";
         }

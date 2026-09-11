@@ -275,7 +275,8 @@ public final class GallerySaver {
     }
 
     /**
-     * mime 映射：图片（jpg/jpeg/png/apng/gif/webp）+ 非图片产物（mp4/zip/tar）；
+     * mime 映射：图片（jpg/jpeg/png/apng/gif/webp）+ 非图片产物（mp4/zip/tar）
+     * + 小说导出文档（txt/html/md/docx/pdf/epub/rtf/json/fb2，ADR-0154 D4 / spec §3.3 D4）；
      * 未知回落 image/jpeg（保持既有契约）。注意不能复用 extFor——后者是图片 URL 白名单。
      */
     static String mimeFor(String fileNameOrUrl) {
@@ -301,6 +302,24 @@ public final class GallerySaver {
                 return "application/zip";
             case "tar":
                 return "application/x-tar";
+            case "txt":
+                return "text/plain";
+            case "html":
+                return "text/html";
+            case "md":
+                return "text/markdown";
+            case "docx":
+                return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+            case "pdf":
+                return "application/pdf";
+            case "epub":
+                return "application/epub+zip";
+            case "rtf":
+                return "application/rtf";
+            case "json":
+                return "application/json";
+            case "fb2":
+                return "application/x-fictionbook+xml";
             case "jpeg":
             case "jpg":
             default:

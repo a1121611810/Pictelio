@@ -11,7 +11,7 @@ export type DownloadStatus =
   | "completed"
   | "failed";
 
-export type DownloadKind = "image" | "ugoira";
+export type DownloadKind = "image" | "ugoira" | "novel";
 
 /** 删除二次确认的两条路径（spec §3.3）：删文件+记录 / 仅清记录 */
 export type DeleteMode = "files" | "records";
@@ -32,6 +32,11 @@ export interface DownloadTask {
   page?: number;
   /** ugoira 帧时序（kind=ugoira 且需动画编码时携带；容器类可缺省） */
   frames?: UgoiraFrameTiming[];
+  /**
+   * 小说导出载荷（kind="novel"；序列化的 NovelExportPayload，队列核心不解析其结构；
+   * 见 docs/specs/novel-export.md §3.3/§4）。opaque 字段，入队即快照。
+   */
+  payloadJson?: string;
   sourceUrl: string;
   targetFormat: string;
   fileName: string;
@@ -118,6 +123,7 @@ function newTask(draft: DownloadTaskDraft, now: number): DownloadTask {
   };
   if (draft.page !== undefined) t.page = draft.page;
   if (draft.frames !== undefined) t.frames = draft.frames.map((f) => ({ ...f }));
+  if (draft.payloadJson !== undefined) t.payloadJson = draft.payloadJson;
   return t;
 }
 
@@ -349,6 +355,7 @@ function normalizeTask(v: unknown): DownloadTask | null {
     progress,
     page,
     frames,
+    payloadJson,
     bytesDone,
     bytesTotal,
     outputUri,
@@ -360,7 +367,7 @@ function normalizeTask(v: unknown): DownloadTask | null {
   if (typeof id !== "string" || id === "") return null;
   if (typeof illustId !== "number" || !Number.isFinite(illustId)) return null;
   if (typeof title !== "string" || typeof thumbnailUrl !== "string") return null;
-  if (kind !== "image" && kind !== "ugoira") return null;
+  if (kind !== "image" && kind !== "ugoira" && kind !== "novel") return null;
   if (typeof sourceUrl !== "string" || typeof targetFormat !== "string") return null;
   if (typeof fileName !== "string") return null;
   if (typeof status !== "string" || !STATUS_SET.has(status)) return null;
@@ -392,6 +399,7 @@ function normalizeTask(v: unknown): DownloadTask | null {
     }
     if (clean.length > 0) t.frames = clean;
   }
+  if (typeof payloadJson === "string") t.payloadJson = payloadJson;
   if (typeof bytesDone === "number") t.bytesDone = bytesDone;
   if (typeof bytesTotal === "number") t.bytesTotal = bytesTotal;
   if (typeof outputUri === "string") t.outputUri = outputUri;

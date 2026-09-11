@@ -20,6 +20,13 @@ import { unquoteNativeString } from "../utils/tokenStorage"
 import type { ImageQuality } from "../utils/imageQuality"
 import type { UgoiraExtractMode } from "../api/ugoira"
 import { UGOIRA_FORMATS, type UgoiraFormat } from "../utils/downloadQueueCore"
+import {
+  DEFAULT_NOVEL_EXPORT_FORMAT,
+  DEFAULT_NOVEL_EXPORT_OPTIONS,
+  NOVEL_EXPORT_FORMATS,
+  type NovelExportFormat,
+  type NovelExportOptions,
+} from "@pictelio/novel-export"
 import { DEFAULT_THEME_COLOR, isThemeColorId, type ThemeColorId } from "../utils/themeColor"
 
 // ── 跨 client 契约键（ADR-0103：与 webview settingsStore defineFactory 同格式）──
@@ -38,6 +45,11 @@ const UGOIRA_DOWNLOAD_FORMAT_KEY = "settings_ugoira_download_format"
 const DETAIL_QUALITY_KEY = "settings_detail_quality"
 /** 主题色（外观）：设备级共享键（native SharedPreferences / dev IndexedDB），未登录也恢复 */
 const THEME_COLOR_KEY = "settings_theme_color"
+/** 小说导出（spec docs/specs/novel-export.md §6）：全局默认格式 + 三项内容开关（与 app 共享键） */
+const NOVEL_EXPORT_FORMAT_KEY = "settings_novel_export_format"
+const NOVEL_EXPORT_INCLUDE_METADATA_KEY = "settings_novel_export_include_metadata"
+const NOVEL_EXPORT_INCLUDE_COVER_KEY = "settings_novel_export_include_cover"
+const NOVEL_EXPORT_INCLUDE_IMAGES_KEY = "settings_novel_export_include_images"
 
 // ── PrefsStorage seam（ADR-0103 决策 3：两 adapter = 真 seam）──
 
@@ -145,6 +157,8 @@ export const useSettingsStore = defineStore("settings", () => {
   const _ugoiraDownloadFormat = ref<UgoiraFormat>("zip")
   const _detailQuality = ref<ImageQuality>("medium")
   const _themeColor = ref<ThemeColorId>(DEFAULT_THEME_COLOR)
+  const _novelExportFormat = ref<NovelExportFormat>(DEFAULT_NOVEL_EXPORT_FORMAT)
+  const _novelExportOptions = ref<NovelExportOptions>({ ...DEFAULT_NOVEL_EXPORT_OPTIONS })
 
   // ── 跨 store 组合：读 authStore.currentUser.id 推导 uid（替换原模块级 currentUser import）
   const auth = useAuthStore()
@@ -158,6 +172,8 @@ export const useSettingsStore = defineStore("settings", () => {
   const ugoiraDownloadFormat = _ugoiraDownloadFormat
   const detailQuality = _detailQuality
   const themeColor = _themeColor
+  const novelExportFormat = _novelExportFormat
+  const novelExportOptions = _novelExportOptions
 
   // ── 公共 actions（return）──
 
@@ -196,6 +212,35 @@ export const useSettingsStore = defineStore("settings", () => {
       }
     } catch (e) {
       console.warn("[settingsStore] 主题色加载失败（维持默认）", e)
+    }
+
+    // 小说导出：全局默认格式 + 三项内容开关（native 共享 SharedPreferences / dev idbKV）
+    try {
+      const rawFormat = await prefs().get(NOVEL_EXPORT_FORMAT_KEY)
+      if (rawFormat !== null) {
+        if ((NOVEL_EXPORT_FORMATS as readonly string[]).includes(rawFormat)) {
+          _novelExportFormat.value = rawFormat as NovelExportFormat
+        } else {
+          console.warn("[settingsStore] 小说导出格式值非法，维持默认 txt:", rawFormat)
+        }
+      }
+      const opts: NovelExportOptions = { ...DEFAULT_NOVEL_EXPORT_OPTIONS }
+      const toggleKeys = [
+        [NOVEL_EXPORT_INCLUDE_METADATA_KEY, "includeMetadata"],
+        [NOVEL_EXPORT_INCLUDE_COVER_KEY, "includeCover"],
+        [NOVEL_EXPORT_INCLUDE_IMAGES_KEY, "includeInlineImages"],
+      ] as const
+      for (const [key, field] of toggleKeys) {
+        const raw = await prefs().get(key)
+        if (raw === "true" || raw === "false") {
+          opts[field] = raw === "true"
+        } else if (raw !== null) {
+          console.warn(`[settingsStore] 小说导出开关值非法，维持默认（${key}）:`, raw)
+        }
+      }
+      _novelExportOptions.value = opts
+    } catch (e) {
+      console.warn("[settingsStore] 小说导出设置加载失败（维持默认）", e)
     }
 
     const id = uid()
@@ -267,6 +312,34 @@ export const useSettingsStore = defineStore("settings", () => {
       .catch((e) => console.warn("[settingsStore] 主题色写入失败", e))
   }
 
+  function setNovelExportFormat(format: NovelExportFormat): void {
+    _novelExportFormat.value = format
+    void prefs()
+      .set(NOVEL_EXPORT_FORMAT_KEY, format)
+      .catch((e) => console.warn("[settingsStore] 小说导出格式写入失败", e))
+  }
+
+  function setNovelExportIncludeMetadata(enabled: boolean): void {
+    _novelExportOptions.value = { ..._novelExportOptions.value, includeMetadata: enabled }
+    void prefs()
+      .set(NOVEL_EXPORT_INCLUDE_METADATA_KEY, String(enabled))
+      .catch((e) => console.warn("[settingsStore] 小说导出开关写入失败", e))
+  }
+
+  function setNovelExportIncludeCover(enabled: boolean): void {
+    _novelExportOptions.value = { ..._novelExportOptions.value, includeCover: enabled }
+    void prefs()
+      .set(NOVEL_EXPORT_INCLUDE_COVER_KEY, String(enabled))
+      .catch((e) => console.warn("[settingsStore] 小说导出开关写入失败", e))
+  }
+
+  function setNovelExportIncludeImages(enabled: boolean): void {
+    _novelExportOptions.value = { ..._novelExportOptions.value, includeInlineImages: enabled }
+    void prefs()
+      .set(NOVEL_EXPORT_INCLUDE_IMAGES_KEY, String(enabled))
+      .catch((e) => console.warn("[settingsStore] 小说导出开关写入失败", e))
+  }
+
   /**
    * 遮罩判定：该条目是否因 R18/R18G 开关处于受限态（issue #91：过滤 → 遮罩）。
    * 纯函数，读 ref —— 开关切换后所有依赖处即时重算，无需重新请求。
@@ -304,6 +377,8 @@ export const useSettingsStore = defineStore("settings", () => {
     detailQuality,
     themeColor,
     ugoiraDownloadFormat,
+    novelExportFormat,
+    novelExportOptions,
     // actions
     loadSettings,
     setShowR18,
@@ -312,6 +387,10 @@ export const useSettingsStore = defineStore("settings", () => {
     setUgoiraDownloadFormat,
     setDetailQuality,
     setThemeColor,
+    setNovelExportFormat,
+    setNovelExportIncludeMetadata,
+    setNovelExportIncludeCover,
+    setNovelExportIncludeImages,
     isRestricted,
   }
 })

@@ -43,8 +43,14 @@ public class PictelioDownloaderPlugin extends Plugin {
         final String kind = call.getString("kind");
         final String targetFormat = call.getString("targetFormat");
         final String framesJson = call.getString("framesJson");
+        final String payloadJson = call.getString("payloadJson");
         if ("ugoira".equals(kind) && (targetFormat == null || targetFormat.isEmpty())) {
             call.reject("ugoira 任务缺少 targetFormat");
+            return;
+        }
+        if ("novel".equals(kind) && (targetFormat == null || targetFormat.isEmpty()
+                || payloadJson == null || payloadJson.isEmpty())) {
+            call.reject("novel 任务缺少 targetFormat 或 payloadJson");
             return;
         }
         final Context app = getContext().getApplicationContext();
@@ -53,10 +59,16 @@ public class PictelioDownloaderPlugin extends Plugin {
             try {
                 PictelioDownloader.ProgressListener listener =
                         (done, total) -> notifyProgress(id, done, total);
-                String uri = "ugoira".equals(kind)
-                        ? PictelioDownloader.downloadUgoira(app, loader, id, sourceUrl,
-                                targetFormat, fileName, framesJson, listener)
-                        : PictelioDownloader.download(app, loader, id, sourceUrl, fileName, listener);
+                String uri;
+                if ("ugoira".equals(kind)) {
+                    uri = PictelioDownloader.downloadUgoira(app, loader, id, sourceUrl,
+                            targetFormat, fileName, framesJson, listener);
+                } else if ("novel".equals(kind)) {
+                    uri = PictelioDownloader.downloadNovel(app, loader, id, payloadJson,
+                            targetFormat, fileName, listener);
+                } else {
+                    uri = PictelioDownloader.download(app, loader, id, sourceUrl, fileName, listener);
+                }
                 JSObject result = new JSObject();
                 result.put("uri", uri);
                 call.resolve(result);

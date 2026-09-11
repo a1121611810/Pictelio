@@ -3,6 +3,13 @@ import { settings } from "@/settings";
 import { user } from "@/stores/authStore";
 import type { UgoiraExtractMode } from "../api/illust";
 import { UGOIRA_FORMATS, type UgoiraFormat } from "../utils/downloadQueueCore";
+import {
+  DEFAULT_NOVEL_EXPORT_FORMAT,
+  DEFAULT_NOVEL_EXPORT_OPTIONS,
+  NOVEL_EXPORT_FORMATS,
+  type NovelExportFormat,
+  type NovelExportOptions,
+} from "@pictelio/novel-export";
 
 // ── 类型定义 ──
 
@@ -28,6 +35,10 @@ const PREF_KEY_OTA_LAST_KNOWN_FLOOR = "ota_last_known_floor";
 const PREF_KEY_OTA_AUTO_DOWNLOAD = "ota_auto_download";
 const PREF_KEY_UGOIRA_MODE = "settings_ugoira_mode";
 const PREF_KEY_UGOIRA_DOWNLOAD_FORMAT = "settings_ugoira_download_format";
+const PREF_KEY_NOVEL_EXPORT_FORMAT = "settings_novel_export_format";
+const PREF_KEY_NOVEL_EXPORT_INCLUDE_METADATA = "settings_novel_export_include_metadata";
+const PREF_KEY_NOVEL_EXPORT_INCLUDE_COVER = "settings_novel_export_include_cover";
+const PREF_KEY_NOVEL_EXPORT_INCLUDE_IMAGES = "settings_novel_export_include_images";
 
 // ── 持久化设置（统一 settings registry 管理）──
 // 各持久化项用 settings.define 声明，signal 状态由 registry 管理。
@@ -166,6 +177,55 @@ const ugoiraDownloadFormatHandle = settings.define<UgoiraFormat>({
 export const ugoiraDownloadFormat = () => ugoiraDownloadFormatHandle.value();
 export async function setUgoiraDownloadFormat(format: UgoiraFormat): Promise<void> {
   ugoiraDownloadFormatHandle.set(format);
+}
+
+// ── 小说导出（spec docs/specs/novel-export.md §6）：全局默认格式 + 三项内容开关 ──
+// 键与 app-lynx 共享（settings_novel_export_*，跨引擎同契约）；导出任务入队时快照。
+
+const novelExportFormatHandle = settings.define<NovelExportFormat>({
+  key: PREF_KEY_NOVEL_EXPORT_FORMAT,
+  default: DEFAULT_NOVEL_EXPORT_FORMAT,
+  validate: (v): v is NovelExportFormat =>
+    typeof v === "string" && (NOVEL_EXPORT_FORMATS as readonly string[]).includes(v),
+});
+
+export const novelExportFormat = () => novelExportFormatHandle.value();
+export async function setNovelExportFormat(format: NovelExportFormat): Promise<void> {
+  novelExportFormatHandle.set(format);
+}
+
+const novelExportIncludeMetadataHandle = settings.define<boolean>({
+  key: PREF_KEY_NOVEL_EXPORT_INCLUDE_METADATA,
+  default: DEFAULT_NOVEL_EXPORT_OPTIONS.includeMetadata,
+});
+const novelExportIncludeCoverHandle = settings.define<boolean>({
+  key: PREF_KEY_NOVEL_EXPORT_INCLUDE_COVER,
+  default: DEFAULT_NOVEL_EXPORT_OPTIONS.includeCover,
+});
+const novelExportIncludeImagesHandle = settings.define<boolean>({
+  key: PREF_KEY_NOVEL_EXPORT_INCLUDE_IMAGES,
+  default: DEFAULT_NOVEL_EXPORT_OPTIONS.includeInlineImages,
+});
+
+export const novelExportIncludeMetadata = () => novelExportIncludeMetadataHandle.value();
+export const novelExportIncludeCover = () => novelExportIncludeCoverHandle.value();
+export const novelExportIncludeImages = () => novelExportIncludeImagesHandle.value();
+
+/** 当前内容开关快照（导出面板展示 / 入队共用），与设置页三项一一对应 */
+export const novelExportOptions = (): NovelExportOptions => ({
+  includeMetadata: novelExportIncludeMetadata(),
+  includeCover: novelExportIncludeCover(),
+  includeInlineImages: novelExportIncludeImages(),
+});
+
+export async function setNovelExportIncludeMetadata(v: boolean): Promise<void> {
+  novelExportIncludeMetadataHandle.set(v);
+}
+export async function setNovelExportIncludeCover(v: boolean): Promise<void> {
+  novelExportIncludeCoverHandle.set(v);
+}
+export async function setNovelExportIncludeImages(v: boolean): Promise<void> {
+  novelExportIncludeImagesHandle.set(v);
 }
 
 /** 兼容存根：registry hydrateAll 已加载，Phase 4 移除 */
@@ -308,6 +368,10 @@ export async function resetSettingsStore(): Promise<void> {
   await setNovelLayoutMode("list");
   await setShowDetailStairs(false);
   await setUgoiraDownloadFormat("zip");
+  await setNovelExportFormat(DEFAULT_NOVEL_EXPORT_FORMAT);
+  await setNovelExportIncludeMetadata(DEFAULT_NOVEL_EXPORT_OPTIONS.includeMetadata);
+  await setNovelExportIncludeCover(DEFAULT_NOVEL_EXPORT_OPTIONS.includeCover);
+  await setNovelExportIncludeImages(DEFAULT_NOVEL_EXPORT_OPTIONS.includeInlineImages);
   await setAutoCheckUpdate(true);
   await setLastDismissedVersion("");
   setHasUpdate(false);

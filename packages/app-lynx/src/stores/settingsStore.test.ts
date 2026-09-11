@@ -370,3 +370,77 @@ describe("settingsStore — 主题色（外观）", () => {
     warn.mockRestore()
   })
 })
+
+// 小说导出设置（oracle = spec docs/specs/novel-export.md §6：4 键 + 默认值 + 非法值 warn）
+describe("settingsStore — 小说导出设置（spec novel-export §6）", () => {
+  beforeEach(() => {
+    userRef().value = null
+    env.native = false
+    env.modules = {}
+    vi.mocked(idbGet).mockReset().mockResolvedValue(null)
+    vi.mocked(idbSet).mockReset().mockResolvedValue(undefined)
+  })
+
+  it("默认：格式 txt + 三项开关全开", () => {
+    expect(store.novelExportFormat).toBe("txt")
+    expect(store.novelExportOptions).toEqual({
+      includeMetadata: true,
+      includeCover: true,
+      includeInlineImages: true,
+    })
+  })
+
+  it("setNovelExportFormat 更新 ref 并经 prefs seam 持久化（dev=IndexedDB）", () => {
+    store.setNovelExportFormat("epub")
+    expect(store.novelExportFormat).toBe("epub")
+    expect(vi.mocked(idbSet)).toHaveBeenCalledWith("settings_novel_export_format", "epub")
+  })
+
+  it("setNovelExportInclude* 分别持久化且更新快照", () => {
+    store.setNovelExportIncludeMetadata(false)
+    store.setNovelExportIncludeCover(false)
+    expect(store.novelExportOptions).toEqual({
+      includeMetadata: false,
+      includeCover: false,
+      includeInlineImages: true,
+    })
+    expect(vi.mocked(idbSet)).toHaveBeenCalledWith(
+      "settings_novel_export_include_metadata",
+      "false",
+    )
+    expect(vi.mocked(idbSet)).toHaveBeenCalledWith("settings_novel_export_include_cover", "false")
+  })
+
+  it("loadSettings 恢复合法格式与开关", async () => {
+    vi.mocked(idbGet).mockImplementation(async (key: string) => {
+      switch (key) {
+        case "settings_novel_export_format":
+          return "pdf"
+        case "settings_novel_export_include_metadata":
+          return "false"
+        case "settings_novel_export_include_images":
+          return "false"
+        default:
+          return null
+      }
+    })
+    await store.loadSettings()
+    expect(store.novelExportFormat).toBe("pdf")
+    expect(store.novelExportOptions).toEqual({
+      includeMetadata: false,
+      includeCover: true,
+      includeInlineImages: false,
+    })
+  })
+
+  it("loadSettings 非法格式值维持默认 txt 并 console.warn", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    vi.mocked(idbGet).mockImplementation(async (key: string) =>
+      key === "settings_novel_export_format" ? "bogus" : null,
+    )
+    await store.loadSettings()
+    expect(store.novelExportFormat).toBe("txt")
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("小说导出格式"), "bogus")
+    warn.mockRestore()
+  })
+})

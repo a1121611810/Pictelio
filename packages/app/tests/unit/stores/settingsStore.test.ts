@@ -140,6 +140,66 @@ describe("settingsStore — ugoiraMode", () => {
   });
 });
 
+// 小说导出设置（oracle = spec docs/specs/novel-export.md §6：4 键 + 默认值）
+describe("settingsStore — 小说导出设置（spec novel-export §6）", () => {
+  it("默认：格式 txt + 三项开关全开", async () => {
+    const { store } = await loadStore();
+    expect(store.novelExportFormat()).toBe("txt");
+    expect(store.novelExportOptions()).toEqual({
+      includeMetadata: true,
+      includeCover: true,
+      includeInlineImages: true,
+    });
+  });
+
+  it("setNovelExportFormat 更新 state + 持久化", async () => {
+    const { store, mem } = await loadStore();
+    await store.setNovelExportFormat("epub");
+    expect(store.novelExportFormat()).toBe("epub");
+    await vi.waitFor(() => expect(mem.dump().get("settings_novel_export_format")).toBe("epub"));
+  });
+
+  it("hydrateAll 恢复合法格式与开关", async () => {
+    const { store } = await loadStore({
+      settings_novel_export_format: "pdf",
+      settings_novel_export_include_metadata: "false",
+      settings_novel_export_include_cover: "false",
+      settings_novel_export_include_images: "true",
+    });
+    expect(store.novelExportFormat()).toBe("pdf");
+    expect(store.novelExportOptions()).toEqual({
+      includeMetadata: false,
+      includeCover: false,
+      includeInlineImages: true,
+    });
+  });
+
+  it("非法格式值忽略（保持默认 txt）", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { store } = await loadStore({ settings_novel_export_format: "bogus" });
+    expect(store.novelExportFormat()).toBe("txt");
+    warnSpy.mockRestore();
+  });
+
+  it("setNovelExportInclude* 三项分别落盘", async () => {
+    const { store, mem } = await loadStore();
+    await store.setNovelExportIncludeMetadata(false);
+    await store.setNovelExportIncludeCover(false);
+    await store.setNovelExportIncludeImages(false);
+    expect(store.novelExportOptions()).toEqual({
+      includeMetadata: false,
+      includeCover: false,
+      includeInlineImages: false,
+    });
+    await vi.waitFor(() => {
+      const d = mem.dump();
+      expect(d.get("settings_novel_export_include_metadata")).toBe("false");
+      expect(d.get("settings_novel_export_include_cover")).toBe("false");
+      expect(d.get("settings_novel_export_include_images")).toBe("false");
+    });
+  });
+});
+
 describe("settingsStore — 账号级 R18/R18G（ADR-0103）", () => {
   beforeEach(() => {
     mockUser.current = null;

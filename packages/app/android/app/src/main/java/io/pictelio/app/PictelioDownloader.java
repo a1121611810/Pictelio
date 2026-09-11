@@ -105,6 +105,40 @@ public final class PictelioDownloader {
         }
     }
 
+    /**
+     * 执行一次小说导出任务：{@link NovelExporter} 按目标格式编码（封面/正文插图经 loader
+     * 取字节，字节零进 JS 堆）→ 落盘到系统下载，返回 outputUri。阻塞 IO，调用方自备线程；
+     * 失败抛 IOException（消息可读，无静默降级）。
+     */
+    public static String downloadNovel(Context context, PixivImageLoader loader, String id,
+            String payloadJson, String format, String fileName, ProgressListener listener)
+            throws IOException {
+        if (id == null || id.isEmpty()) {
+            throw new IOException("导出失败：任务 id 为空");
+        }
+        if (payloadJson == null || payloadJson.isEmpty()) {
+            throw new IOException("导出失败：导出载荷为空");
+        }
+        if (format == null || format.isEmpty()) {
+            throw new IOException("导出失败：导出格式为空");
+        }
+        if (fileName == null || fileName.isEmpty()) {
+            throw new IOException("导出失败：文件名为空");
+        }
+        AtomicBoolean token = new AtomicBoolean(false);
+        CANCELS.put(id, token);
+        try {
+            File exported = NovelExporter.export(context, loader, payloadJson, format, id);
+            if (token.get()) {
+                throw new IOException("导出已取消");
+            }
+            GallerySaver.SaveResult result = GallerySaver.saveDownloadFile(context, exported, fileName);
+            return result.uri.toString();
+        } finally {
+            CANCELS.remove(id);
+        }
+    }
+
     /** 请求取消任务；返回是否命中在途任务（未命中 = 已完成/未知，幂等 no-op） */
     public static boolean cancel(String id) {
         if (id == null) {

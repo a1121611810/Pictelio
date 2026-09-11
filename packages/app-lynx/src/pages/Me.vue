@@ -17,7 +17,7 @@ import { themeColorClass } from '../utils/themeColor'
 const auth = useAuthStore()
 const settings = useSettingsStore()
 const clientSwitch = useClientSwitchStore()
-const { showR18, showR18G, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor } = storeToRefs(settings)
+const { showR18, showR18G, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, novelExportFormat, novelExportOptions } = storeToRefs(settings)
 const switching = ref(false)
 
 // ─── 全局放射 FAB 桥（ADR-0120）：注册空动作（内环空 = 仅外环导航），卸载时注销 ───
@@ -483,6 +483,155 @@ function toggleR18G() {
             @tap="settings.setUgoiraDownloadFormat('tar')"
           >
             <text class="text-label-large" :class="ugoiraDownloadFormat === 'tar' ? 'text-secondary-on-container' : 'text-surface-on'">TAR</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 导出组（spec docs/specs/novel-export.md §6/§7.2）：全局默认格式 + 三项内容开关 -->
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+        <text class="text-title-small font-medium text-surface-on">导出</text>
+        <text class="text-label-medium text-surface-on-variant mt-1 mb-3">小说导出格式（全局默认，导出面板可临时覆盖）</text>
+        <view class="flex flex-row flex-wrap gap-2">
+          <view
+            class="h-[10.667vw] px-4 flex items-center justify-center rounded-[var(--md-shape-full)] border"
+            :class="novelExportFormat === 'txt' ? 'bg-secondary-container border-secondary-container' : 'bg-surface-container-lowest border-outline'"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.novelExportFormatTxt"
+            @tap="settings.setNovelExportFormat('txt')"
+          >
+            <text class="text-label-large" :class="novelExportFormat === 'txt' ? 'text-secondary-on-container' : 'text-surface-on'">TXT</text>
+          </view>
+          <view
+            class="h-[10.667vw] px-4 flex items-center justify-center rounded-[var(--md-shape-full)] border"
+            :class="novelExportFormat === 'html' ? 'bg-secondary-container border-secondary-container' : 'bg-surface-container-lowest border-outline'"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.novelExportFormatHtml"
+            @tap="settings.setNovelExportFormat('html')"
+          >
+            <text class="text-label-large" :class="novelExportFormat === 'html' ? 'text-secondary-on-container' : 'text-surface-on'">HTML</text>
+          </view>
+          <view
+            class="h-[10.667vw] px-4 flex items-center justify-center rounded-[var(--md-shape-full)] border"
+            :class="novelExportFormat === 'md' ? 'bg-secondary-container border-secondary-container' : 'bg-surface-container-lowest border-outline'"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.novelExportFormatMd"
+            @tap="settings.setNovelExportFormat('md')"
+          >
+            <text class="text-label-large" :class="novelExportFormat === 'md' ? 'text-secondary-on-container' : 'text-surface-on'">MD</text>
+          </view>
+          <view
+            class="h-[10.667vw] px-4 flex items-center justify-center rounded-[var(--md-shape-full)] border"
+            :class="novelExportFormat === 'docx' ? 'bg-secondary-container border-secondary-container' : 'bg-surface-container-lowest border-outline'"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.novelExportFormatDocx"
+            @tap="settings.setNovelExportFormat('docx')"
+          >
+            <text class="text-label-large" :class="novelExportFormat === 'docx' ? 'text-secondary-on-container' : 'text-surface-on'">Word</text>
+          </view>
+          <view
+            class="h-[10.667vw] px-4 flex items-center justify-center rounded-[var(--md-shape-full)] border"
+            :class="novelExportFormat === 'pdf' ? 'bg-secondary-container border-secondary-container' : 'bg-surface-container-lowest border-outline'"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.novelExportFormatPdf"
+            @tap="settings.setNovelExportFormat('pdf')"
+          >
+            <text class="text-label-large" :class="novelExportFormat === 'pdf' ? 'text-secondary-on-container' : 'text-surface-on'">PDF</text>
+          </view>
+          <view
+            class="h-[10.667vw] px-4 flex items-center justify-center rounded-[var(--md-shape-full)] border"
+            :class="novelExportFormat === 'epub' ? 'bg-secondary-container border-secondary-container' : 'bg-surface-container-lowest border-outline'"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.novelExportFormatEpub"
+            @tap="settings.setNovelExportFormat('epub')"
+          >
+            <text class="text-label-large" :class="novelExportFormat === 'epub' ? 'text-secondary-on-container' : 'text-surface-on'">EPUB</text>
+          </view>
+          <view
+            class="h-[10.667vw] px-4 flex items-center justify-center rounded-[var(--md-shape-full)] border"
+            :class="novelExportFormat === 'rtf' ? 'bg-secondary-container border-secondary-container' : 'bg-surface-container-lowest border-outline'"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.novelExportFormatRtf"
+            @tap="settings.setNovelExportFormat('rtf')"
+          >
+            <text class="text-label-large" :class="novelExportFormat === 'rtf' ? 'text-secondary-on-container' : 'text-surface-on'">RTF</text>
+          </view>
+          <view
+            class="h-[10.667vw] px-4 flex items-center justify-center rounded-[var(--md-shape-full)] border"
+            :class="novelExportFormat === 'json' ? 'bg-secondary-container border-secondary-container' : 'bg-surface-container-lowest border-outline'"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.novelExportFormatJson"
+            @tap="settings.setNovelExportFormat('json')"
+          >
+            <text class="text-label-large" :class="novelExportFormat === 'json' ? 'text-secondary-on-container' : 'text-surface-on'">JSON</text>
+          </view>
+          <view
+            class="h-[10.667vw] px-4 flex items-center justify-center rounded-[var(--md-shape-full)] border"
+            :class="novelExportFormat === 'fb2' ? 'bg-secondary-container border-secondary-container' : 'bg-surface-container-lowest border-outline'"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.novelExportFormatFb2"
+            @tap="settings.setNovelExportFormat('fb2')"
+          >
+            <text class="text-label-large" :class="novelExportFormat === 'fb2' ? 'text-secondary-on-container' : 'text-surface-on'">FB2</text>
+          </view>
+        </view>
+        <!-- 内容开关：默认全开；文本格式（TXT/MD/RTF）对图像退化为链接 -->
+        <view class="mt-4 flex flex-col">
+          <view
+            class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.novelExportIncludeMetadata"
+            @tap="settings.setNovelExportIncludeMetadata(!novelExportOptions.includeMetadata)"
+          >
+            <view class="flex flex-col">
+              <text class="text-title-medium text-surface-on">包含元数据</text>
+              <text class="text-label-medium text-surface-on-variant">标题、作者、标签、系列与原文链接</text>
+            </view>
+            <view
+              class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
+              :class="novelExportOptions.includeMetadata ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
+            >
+              <view class="w-8 h-8 flex items-center justify-center">
+                <view class="rounded-full" :class="novelExportOptions.includeMetadata ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
+              </view>
+            </view>
+          </view>
+          <view
+            class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.novelExportIncludeCover"
+            @tap="settings.setNovelExportIncludeCover(!novelExportOptions.includeCover)"
+          >
+            <view class="flex flex-col">
+              <text class="text-title-medium text-surface-on">包含封面</text>
+              <text class="text-label-medium text-surface-on-variant">在支持图片的格式中嵌入封面</text>
+            </view>
+            <view
+              class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
+              :class="novelExportOptions.includeCover ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
+            >
+              <view class="w-8 h-8 flex items-center justify-center">
+                <view class="rounded-full" :class="novelExportOptions.includeCover ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
+              </view>
+            </view>
+          </view>
+          <view
+            class="flex flex-row items-center justify-between py-3.5"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.novelExportIncludeImages"
+            @tap="settings.setNovelExportIncludeImages(!novelExportOptions.includeInlineImages)"
+          >
+            <view class="flex flex-col">
+              <text class="text-title-medium text-surface-on">包含正文插图</text>
+              <text class="text-label-medium text-surface-on-variant">文本格式仅保留图片链接</text>
+            </view>
+            <view
+              class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
+              :class="novelExportOptions.includeInlineImages ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
+            >
+              <view class="w-8 h-8 flex items-center justify-center">
+                <view class="rounded-full" :class="novelExportOptions.includeInlineImages ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
+              </view>
+            </view>
           </view>
         </view>
       </view>

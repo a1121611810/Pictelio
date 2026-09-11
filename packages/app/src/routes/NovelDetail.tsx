@@ -34,6 +34,14 @@ import {
   selectInlineImageUrl,
 } from "../utils/novelBlocks";
 import type { NovelBlock, TextBlock, ImageBlock, JumpBlock, InlineRun } from "../utils/novelBlocks";
+import ExportSheet from "../components/ExportSheet";
+import { enqueueDownloads } from "../stores/downloadStore";
+import { novelExportFormat, novelExportOptions } from "../stores/settingsStore";
+import {
+  buildNovelExportPayload,
+  buildNovelExportTaskDraft,
+  type NovelExportFormat,
+} from "@pictelio/novel-export";
 import { loadNovelImageDimensions, type NovelImageDimensions } from "../utils/novelImageDimensions";
 import ReaderSettingsSheet from "../components/ReaderSettingsSheet";
 import SeriesSheet from "../components/SeriesSheet";
@@ -503,6 +511,33 @@ const NovelDetail: Component = () => {
   const [seriesOpen, setSeriesOpen] = createSignal(false);
   const [searchOpen, setSearchOpen] = createSignal(false);
   const [textContainerWidth, setTextContainerWidth] = createSignal(0);
+
+  // ── 小说导出（spec docs/specs/novel-export.md §7.1）──
+  const [exportOpen, setExportOpen] = createSignal(false);
+  const [queuedNotice, setQueuedNotice] = createSignal<string | null>(null);
+  let queuedNoticeTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /** 构造导出载荷并加入下载队列（格式为本次临时选择，内容开关取设置页快照） */
+  function enqueueNovelExport(format: NovelExportFormat): void {
+    const novel = novelData();
+    if (!novel) return;
+    const payload = buildNovelExportPayload({
+      novel,
+      text: novelHtml() ?? "",
+      images: novelImages(),
+      options: novelExportOptions(),
+    });
+    const draft = buildNovelExportTaskDraft({
+      payload,
+      format,
+      title: novel.title,
+      thumbnailUrl: novel.image_urls.medium ?? novel.image_urls.large ?? "",
+    });
+    enqueueDownloads([draft]);
+    setQueuedNotice("已加入下载队列，请到下载页查看");
+    clearTimeout(queuedNoticeTimer);
+    queuedNoticeTimer = setTimeout(() => setQueuedNotice(null), 4000);
+  }
 
   const blocks = createMemo<NovelBlock[]>(() => {
     return parseNovelBlocks(novelHtml() ?? "", novelImages());
@@ -1078,6 +1113,17 @@ const NovelDetail: Component = () => {
     },
   );
 
+  // 将导出面板状态注册到 overlay 栈
+  createEffect(
+    () => exportOpen(),
+    (open) => {
+      if (open) {
+        pushOverlay("novelExportSheet", () => setExportOpen(false));
+        return () => popOverlay("novelExportSheet");
+      }
+    },
+  );
+
   // ── Scroll-driven bottom toolbar hide/show ──
   const { direction: scrollDirection, reset: resetScrollDirection } = createScrollBehavior({
     directionThreshold: 30,
@@ -1231,6 +1277,8 @@ const NovelDetail: Component = () => {
         setTranslateOpen(true);
       }
     },
+    // 正文未就绪（受限/未加载）时不提供导出入口（spec §7.1 不可用态）
+    onExport: (novelHtml() ?? "").length > 0 ? () => setExportOpen(true) : undefined,
   });
 
   return (
@@ -1294,6 +1342,19 @@ const NovelDetail: Component = () => {
         {/* ── 浮层（页面级：阅读设置/翻译/系列/评论/查看器）── */}
 
         <ReaderSettingsSheet isOpen={settingsOpen()} onClose={() => setSettingsOpen(false)} />
+
+        <Show when={exportOpen()}>
+          <ExportSheet
+            isOpen
+            onClose={() => setExportOpen(false)}
+            defaultFormat={novelExportFormat()}
+            options={novelExportOptions()}
+            onExport={(fmt) => {
+              enqueueNovelExport(fmt);
+              setExportOpen(false);
+            }}
+          />
+        </Show>
 
         <TranslateSheet
           isOpen={translateOpen()}
@@ -1413,6 +1474,16 @@ const NovelDetail: Component = () => {
               {c()}
             </div>
           )}
+        </Show>
+
+        {/* 导出入队提示（spec novel-export §7.1） */}
+        <Show when={queuedNotice()}>
+          <div
+            class="fixed left-1/2 bottom-24 z-50 -translate-x-1/2 rounded-[var(--borderRadiusMedium)] px-4 py-2 text-[var(--colorNeutralForegroundOnBrand)] shadow-[var(--elevation4)] [font-size:var(--fontSizeBase200)]"
+            style={{ "background-color": "var(--colorBrandBackground)" }}
+          >
+            {queuedNotice()}
+          </div>
         </Show>
       </div>
     </PageTransition>
