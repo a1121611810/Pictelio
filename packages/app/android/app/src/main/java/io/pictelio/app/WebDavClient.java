@@ -178,7 +178,12 @@ public class WebDavClient {
         try (Response res = execute(req)) {
             if (!res.isSuccessful()) throw classify(res.code(), "GET " + url);
             ResponseBody resBody = res.body();
-            return resBody != null ? resBody.bytes() : new byte[0];
+            try {
+                return resBody != null ? resBody.bytes() : new byte[0];
+            } catch (IOException e) {
+                // 响应头已收到、体读取失败（连接中断）：归类 NETWORK，保持可重试语义
+                throw new DavException(Kind.NETWORK, -1, "GET 响应体读取失败: " + e.getMessage());
+            }
         }
     }
 

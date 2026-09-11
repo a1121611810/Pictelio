@@ -80,7 +80,7 @@
 2. 若启用加密：TS 层把明文字节 + 密码交给 Java 加密封装
 3. MKCOL 确保目录存在（409 视为成功）
 4. PUT 上传
-5. **写后校验**：PROPFIND Depth 0 取 `getcontentlength`，不等本地字节数则重试 ×3（`VERIFY_MAX_ATTEMPTS`，不可配）；仍失败 → 本次备份失败，旧档保留。服务器缺 `getcontentlength` 字段时（自托管差异，调研结论 8）降级为 GET 字节比对。服务器缺 `getcontentlength` 字段时（自托管差异，调研结论 8）降级为 GET 字节比对
+5. **写后校验**：PROPFIND Depth 0 取 `getcontentlength`，不等本地字节数则重试 ×3（`VERIFY_MAX_ATTEMPTS`，不可配）；仍失败 → 本次备份失败，旧档保留。服务器缺 `getcontentlength` 字段时（自托管差异，调研结论 8）降级为 GET 字节比对
 6. 旋转：PROPFIND Depth 1 列目录，按文件名时间戳排序，DELETE 超额旧档（固定保留最近 10 份，不可配）；删除失败仅 warn 不阻塞
 7. 记录「上次备份时间」到连接配置域
 
