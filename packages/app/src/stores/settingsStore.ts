@@ -504,6 +504,9 @@ export async function resetSettingsStore(): Promise<void> {
   await setWebdavAutoBackupDays(7);
   await setWebdavLastBackup("");
   await setWebdavExcludedKeys([]);
+  // 注意：webdav_password / webdav_backup_password 有意保留在 secure storage
+  // （与 refresh_token 重置策略一致，ADR 先例）；是否随重置/登出清除由 UI 工单
+  // （T6+）拍板——避免「用户清设置」误删凭据导致无法连接。
   await setLastDismissedVersion("");
   setHasUpdate(false);
   setLatestVersion("");

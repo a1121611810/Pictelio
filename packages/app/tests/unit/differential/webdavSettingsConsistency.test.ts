@@ -1,5 +1,9 @@
 // WebDAV 连接配置键双端一致性（spec docs/specs/webdav-backup.md §7/§8 / ADR-0156 D4）
-// oracle = spec §7 设置区块字段 + §8 凭据存储键（独立来源，不从实现推导）。
+// oracle 分层（如实标注，硬约束 #6）：
+//   - settings_webdav_* 精确键名：spec 只给通配（§8「settings_webdav_*」），
+//     键名 oracle = 双端逐字一致（差分）+ settings_* 跨引擎命名约定（ADR-0103）
+//   - 默认值 "Pictelio/backup" / 7：spec §7 字面（spec:65/110）
+//   - SECURE_KEYS：spec §8 原文（"键如 webdav_password/webdav_backup_password"）
 // 防漂移：app settingsStore 与 app-lynx settingsStore 必须使用同一组键字符串，
 // 否则同一设备切换引擎后 WebDAV 连接配置读不到（跨引擎契约破坏）。
 import { describe, expect, it } from "vitest";
@@ -53,7 +57,8 @@ describe("WebDAV 设置键双端一致（spec webdav-backup §7/§8）", () => {
     expect(appStore).toContain('"Pictelio/backup"');
     expect(lynxStore).toContain('"Pictelio/backup"');
     expect(appStore).toContain("default: 7");
-    expect(lynxStore).toContain("ref(7)");
+    // 语义断言（非形态锁定）：lynx 侧 days 默认值 7，容忍 ref<number>(7) 等写法
+    expect(/ref(?:<[^>]+>)?\(\s*7\s*\)/.test(lynxStore)).toBe(true);
   });
 
   for (const key of SECURE_KEYS) {

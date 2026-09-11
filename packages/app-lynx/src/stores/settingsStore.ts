@@ -283,8 +283,13 @@ export const useSettingsStore = defineStore("settings", () => {
     // WebDAV 连接配置：设备级，未登录也加载（恢复配置无需登录）
     try {
       const p = prefs()
+      // 布尔键：值损坏（非 true/false 的非 null 值）warn 可见（禁静默降级，
+      // 对齐小说导出开关先例与 app 侧 registry corrupt warn 行为）
       const enabled = await p.get(WEBDAV_ENABLED_KEY)
       if (enabled === "true") _webdavEnabled.value = true
+      else if (enabled !== null && enabled !== "false") {
+        console.warn("[settingsStore] WebDAV 开关值非法，维持默认 false:", enabled)
+      }
       const url = await p.get(WEBDAV_URL_KEY)
       if (url !== null) _webdavUrl.value = url
       const username = await p.get(WEBDAV_USERNAME_KEY)
@@ -293,6 +298,9 @@ export const useSettingsStore = defineStore("settings", () => {
       if (dir !== null) _webdavDir.value = dir
       const auto = await p.get(WEBDAV_AUTO_BACKUP_KEY)
       if (auto === "true") _webdavAutoBackup.value = true
+      else if (auto !== null && auto !== "false") {
+        console.warn("[settingsStore] WebDAV 自动备份开关值非法，维持默认 false:", auto)
+      }
       const days = await p.get(WEBDAV_AUTO_BACKUP_DAYS_KEY)
       if (days !== null) {
         const n = Number(days)
@@ -304,8 +312,8 @@ export const useSettingsStore = defineStore("settings", () => {
       }
       const last = await p.get(WEBDAV_LAST_BACKUP_KEY)
       if (last !== null) _webdavLastBackup.value = last
-      const excluded = await p.get(WEBDAV_EXCLUDED_KEYS_KEY)
-      const rawExcluded = excluded === null ? null : unquoteNativeString(excluded)
+      // 注：prefs adapter 的 get 已做 unquoteNativeString（native 路径），此处直接解析
+      const rawExcluded = await p.get(WEBDAV_EXCLUDED_KEYS_KEY)
       if (rawExcluded !== null) {
         try {
           const parsed: unknown = JSON.parse(rawExcluded)

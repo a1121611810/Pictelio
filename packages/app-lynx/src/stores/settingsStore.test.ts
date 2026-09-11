@@ -535,3 +535,161 @@ describe("settingsStore — AI 三态过滤（ADR-0155）", () => {
     expect(store.aiFilterMode).toBe("show")
   })
 })
+
+// WebDAV 连接配置单测（spec docs/specs/webdav-backup.md §7/§8；T5 双端对齐 app settingsStoreWebdav.test.ts）
+// IO 边界双路径（硬约束 #1）：原生 PictelioPrefs 成功/降级 + dev idbKV 降级 + 写失败。
+describe("settingsStore.webdav（T5）", () => {
+  beforeEach(() => {
+    vi.mocked(idbGet).mockReset().mockResolvedValue(null)
+    vi.mocked(idbSet).mockReset().mockResolvedValue(undefined)
+    vi.mocked(idbRemove).mockReset().mockResolvedValue(undefined)
+    userRef().value = null
+    env.native = false
+    env.modules = {}
+  })
+
+  /** 注入原生 PictelioPrefs（storeMap 为种子数据；failGet/failSet 构造失败路径） */
+  function nativePrefs(map: Map<string, string>, opts: { failGet?: boolean; failSet?: boolean } = {}) {
+    env.native = true
+    env.modules = {
+      PictelioPrefs: {
+        prefsGet: (k: string, cb: (v: string, e: string | null) => void) => {
+          if (opts.failGet) {
+            cb("", "keystore lost")
+            return
+          }
+          // native Callback 值带 JSON 引号（adapter 层 unquote 契约）；
+          // 用 JSON.stringify 包裹以正确转义内嵌引号（真实 Callback 编码形态，
+          // 手写 "${v}" 对含引号值（如 JSON 数组）会产生非法 JSON）
+          const v = map.get(k)
+          cb(v === undefined ? "" : JSON.stringify(v), null)
+        },
+        prefsSet: (_k: string, _v: string, cb: (e: string | null) => void) => {
+          if (opts.failSet) {
+            cb("disk full")
+            return
+          }
+          cb(null)
+        },
+        prefsRemove: (_k: string, cb: (e: string | null) => void) => cb(null),
+      },
+    }
+  }
+
+  it("原生模式：loadSettings 恢复 8 键（默认值对齐 app 侧 spec §7）", async () => {
+    nativePrefs(
+      new Map([
+        ["settings_webdav_enabled", "true"],
+        ["settings_webdav_url", "https://dav.example.com"],
+        ["settings_webdav_username", "alice"],
+        ["settings_webdav_dir", "MyBackup/dir"],
+        ["settings_webdav_auto_backup", "true"],
+        ["settings_webdav_auto_backup_days", "30"],
+        ["settings_webdav_last_backup", "2026-09-11T17:30:00+08:00"],
+        ["settings_webdav_excluded_keys", '["show_r18_1"]'],
+      ]),
+    )
+    await store.loadSettings()
+    expect(store.webdavEnabled).toBe(true)
+    expect(store.webdavUrl).toBe("https://dav.example.com")
+    expect(store.webdavUsername).toBe("alice")
+    expect(store.webdavDir).toBe("MyBackup/dir")
+    expect(store.webdavAutoBackup).toBe(true)
+    expect(store.webdavAutoBackupDays).toBe(30)
+    expect(store.webdavLastBackup).toBe("2026-09-11T17:30:00+08:00")
+    expect(store.webdavExcludedKeys).toEqual(["show_r18_1"])
+  })
+
+  it("默认值：无记录 → 全关、目录 Pictelio/backup、周期 7、排除清单空", async () => {
+    nativePrefs(new Map())
+    await store.loadSettings()
+    expect(store.webdavEnabled).toBe(false)
+    expect(store.webdavDir).toBe("Pictelio/backup")
+    expect(store.webdavAutoBackupDays).toBe(7)
+    expect(store.webdavExcludedKeys).toEqual([])
+  })
+
+  it("降级：days 非法值 → 默认 7 + warn", async () => {
+    nativePrefs(new Map([["settings_webdav_auto_backup_days", "999"]]))
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    await store.loadSettings()
+    expect(store.webdavAutoBackupDays).toBe(7)
+    expect(warn).toHaveBeenCalledWith(
+      "[settingsStore] WebDAV 自动备份周期非法，维持默认 7:",
+      "999",
+    )
+    warn.mockRestore()
+  })
+
+  it("降级：布尔键非法值 → 默认 false + warn（对齐 app registry corrupt 行为）", async () => {
+    nativePrefs(new Map([["settings_webdav_enabled", "yes"]]))
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    await store.loadSettings()
+    expect(store.webdavEnabled).toBe(false)
+    expect(warn).toHaveBeenCalledWith(
+      "[settingsStore] WebDAV 开关值非法，维持默认 false:",
+      "yes",
+    )
+    warn.mockRestore()
+  })
+
+  it("降级：排除清单非法 JSON → 默认空 + warn", async () => {
+    nativePrefs(new Map([["settings_webdav_excluded_keys", "{not-json"]]))
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    await store.loadSettings()
+    expect(store.webdavExcludedKeys).toEqual([])
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it("降级：原生读取失败 → 维持默认 + warn（不静默）", async () => {
+    nativePrefs(new Map([["settings_webdav_url", "https://x"]]), { failGet: true })
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    await store.loadSettings()
+    expect(store.webdavUrl).toBe("")
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it("成功：setWebdavEnabled 经 PictelioPrefs 写 settings_webdav_enabled", async () => {
+    const written: string[] = []
+    env.native = true
+    env.modules = {
+      PictelioPrefs: {
+        prefsGet: (_k: string, cb: (v: string, e: string | null) => void) => cb("", null),
+        prefsSet: (k: string, v: string, cb: (e: string | null) => void) => {
+          written.push(`${k}=${v}`)
+          cb(null)
+        },
+        prefsRemove: (_k: string, cb: (e: string | null) => void) => cb(null),
+      },
+    }
+    store.setWebdavEnabled(true)
+    await vi.waitFor(() => expect(written).toContain("settings_webdav_enabled=true"))
+  })
+
+  it("失败：prefsSet 报错 → warn 可见（fire-and-forget 不抛）", async () => {
+    nativePrefs(new Map(), { failSet: true })
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    store.setWebdavDir("Other/dir")
+    await vi.waitFor(() =>
+      expect(warn).toHaveBeenCalledWith(
+        "[settingsStore] WebDAV 目录写入失败",
+        expect.anything(),
+      ),
+    )
+    warn.mockRestore()
+  })
+
+  it("dev 降级：web-core 无 NativeModules → 走 idbKV 读写", async () => {
+    env.native = false
+    vi.mocked(idbGet).mockImplementation(async (key: string) =>
+      key === "settings_webdav_url" ? "https://dev.example.com" : null,
+    )
+    await store.loadSettings()
+    expect(store.webdavUrl).toBe("https://dev.example.com")
+    store.setWebdavAutoBackupDays(3)
+    expect(vi.mocked(idbSet)).toHaveBeenCalledWith("settings_webdav_auto_backup_days", "3")
+  })
+})
+
