@@ -34,3 +34,15 @@
 - T4 遵循「同源同语义差分对齐」约定（downloadManager 先例），双端单测 + 差分。
 - 每 ticket 完成后走 `code-review` → `tdd` 修复闭环（AGENTS.md 工作流硬约束）。
 - 真实 WebDAV 链路不接外部服务：T1 MockWebServer 级单测兜底。
+## 设备验证结论（2026-09-11，pictelio_ui / Android 14 / WebView 113）
+
+- **webview 引擎（full flavor）**：`specs/webdav-backup.spec.ts` 通过——真实登录、UI 启用与配置、
+  连接测试、立即备份、恢复（选档→摘要前置→确认）。服务器侧完整走过 MKCOL(409 幂等) → PUT →
+  写后校验 PROPFIND → 旋转 PROPFIND → 恢复 GET；落盘快照 `engine=webview`、`appVersion=4.37.0`、
+  含 `settings_webdav_url` 且无任何 password 键（§8 红线）。
+- **lynx 引擎**：`specs/webdav-backup-lynx.spec.ts` 通过——经 `PictelioWebDavModule` 真实上传，
+  落盘快照 `engine=lynx`、`appVersion=4.37.0`，`settings_webdav_last_backup` 回写真实
+  SharedPreferences（完整回路）。两 spec 默认跳过（`WEBDAV_E2E_ENABLED=1` 才跑）。
+- **真机发现并修复**：Lynx JS runtime 无 `TextEncoder`/`TextDecoder` → 快照序列化抛错，
+  lynx 自动备份在调用原生桥之前即失败（node/jsdom 单测覆盖不到）；改用纯 JS UTF-8
+  （`backupCore.utf8Encode/utf8Decode`，附字节序列对照测试）。
