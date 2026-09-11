@@ -2,7 +2,7 @@
 // 与 app native/WebDav.ts 同源同语义（双端差分对齐约定）：
 // 统一类型 + base64 字节过桥 + cb(code, payload) → WebDavError 分类映射。
 // 协议逻辑全在 Java PictelioWebDavModule → WebDavClient / BackupCrypto。
-import { getNativeModules, isNativeMode } from "../api/client"
+import { isNativeMode } from "../api/client"
 
 /** 与 Java WebDavClient.Kind 逐字一致（+CRYPTO：密码错误或文件损坏） */
 export type WebDavErrorKind =
@@ -109,7 +109,11 @@ export function base64ToBytes(base64: string): Uint8Array {
   let value = 0
   for (const ch of clean) {
     const idx = B64_ALPHABET.indexOf(ch)
-    if (idx < 0) continue // 容错：跳过空白/非法字符
+    if (idx < 0) {
+      // 非法字符不静默丢弃（硬约束 #3）：继续解析但 warn 可见
+      console.warn("[webDavBridge] base64 含非法字符，已跳过:", ch)
+      continue
+    }
     value = (value << 6) | idx
     bits += 6
     if (bits >= 8) {
@@ -149,11 +153,14 @@ function call<T>(invoke: (cb: WebDavCallback) => void, map: (payload: string) =>
       try {
         parsed = JSON.parse(payload) as WebDavErrorPayload
       } catch {
-        // payload 非 JSON（不应发生）：按 SERVER 原样上抛，warn 已由 Java Log.w 打
+        // payload 非 JSON（契约破坏）：显式 warn，按 SERVER 原样上抛
+        console.warn("[webDavBridge] 错误 payload 非 JSON，按 SERVER 处理:", payload)
       }
-      const kind = WEBDAV_ERROR_KINDS.includes(parsed.kind as WebDavErrorKind)
-        ? (parsed.kind as WebDavErrorKind)
-        : "SERVER"
+      const known = WEBDAV_ERROR_KINDS.includes(parsed.kind as WebDavErrorKind)
+      if (!known) {
+        console.warn("[webDavBridge] 未知错误 kind，按 SERVER 归类:", parsed.kind, parsed.message)
+      }
+      const kind = known ? (parsed.kind as WebDavErrorKind) : "SERVER"
       reject(new WebDavError(kind, parsed.statusCode, parsed.message))
     })
   })
@@ -193,7 +200,7 @@ export function download(url: string, creds: WebDavCreds): Promise<Uint8Array> {
 export function list(url: string, creds: WebDavCreds): Promise<WebDavEntry[]> {
   return call(
     (cb) => nativeModule()!.list(url, creds.user, creds.password, cb),
-    (p) => (JSON.parse(p) as Array<Record<string, unknown>>).map((o) => parseEntry(JSON.stringify(o))),
+    (p) => JSON.parse(p) as WebDavEntry[],
   )
 }
 

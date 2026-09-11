@@ -92,20 +92,29 @@ export function base64ToBytes(base64: string): Uint8Array {
 
 // ── 错误映射 ──
 
-/** Capacitor reject(message, code) → WebDavError（code 缺失/未知 → SERVER） */
+/**
+ * Capacitor reject(message, code, error, data) → WebDavError。
+ * statusCode 走 data 通道（PluginCall.reject 第 4 参 → JS 异常 .data.statusCode，
+ * 与 lynx 桥同语义）；code 缺失/未知（含原生插件未注册的 UNIMPLEMENTED）→ SERVER + warn。
+ */
 function toWebDavError(err: unknown): WebDavError {
   const code = (err as { code?: string } | null)?.code;
   const message = err instanceof Error ? err.message : String(err);
-  const kind = WEBDAV_ERROR_KINDS.includes(code as WebDavErrorKind)
-    ? (code as WebDavErrorKind)
-    : "SERVER";
-  return new WebDavError(kind, -1, message);
+  const known = WEBDAV_ERROR_KINDS.includes(code as WebDavErrorKind);
+  if (!known) {
+    // 禁止静默降级（硬约束 #3）：未知 code（含插件未注册）必须可见
+    console.warn("[WebDav] 未知错误 code，按 SERVER 归类:", code, message);
+  }
+  const kind = known ? (code as WebDavErrorKind) : "SERVER";
+  const statusCode = (err as { data?: { statusCode?: number } } | null)?.data?.statusCode ?? -1;
+  return new WebDavError(kind, statusCode, message);
 }
 
 async function guardNative(): Promise<void> {
   // 功能仅 Android 原生暴露入口（spec §2）；Web dev 提前失败，错误分类一致
   if (!isNativePlatform()) {
-    throw new WebDavError("SERVER", -1, "WebDAV 备份仅 Android 原生可用");
+    // isNativePlatform 在 iOS 亦为 true；本项目仅 Android 目标，文案按「原生客户端」表述
+    throw new WebDavError("SERVER", -1, "WebDAV 备份仅在原生客户端可用");
   }
 }
 

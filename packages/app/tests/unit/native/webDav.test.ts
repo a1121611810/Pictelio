@@ -34,6 +34,7 @@ import {
   ensureDir,
   download,
   list,
+  upload,
   uploadWithVerify,
   WebDavError,
   bytesToBase64,
@@ -163,6 +164,140 @@ describe("WebDav 桥", () => {
     };
     const err = await ensureDir("https://dav/", { user: "u", password: "p" }).catch((e) => e);
     expect(err).toBeInstanceOf(WebDavError);
-    expect((err as WebDavError).message).toContain("仅 Android 原生可用");
+    expect((err as WebDavError).message).toContain("仅在原生客户端可用");
+  });
+});
+
+describe("WebDav 桥 — 全动词双路径（spec §4/§5 硬约束 #1）", () => {
+  beforeEach(() => {
+    fake.plugin = {};
+    fake.native = true;
+  });
+
+  it("upload：成功传 base64 与凭据；空字节合法（空 base64 不被判缺参）", async () => {
+    const seen: Array<Record<string, unknown>> = [];
+    fake.plugin = {
+      async upload(opts: Record<string, unknown>) {
+        seen.push(opts);
+      },
+    };
+    await upload("https://dav/f.json", { user: "u", password: "p" }, new Uint8Array([1, 2, 3]));
+    await upload("https://dav/empty.json", { user: "u", password: "p" }, new Uint8Array([]));
+    expect(seen[0]).toMatchObject({ url: "https://dav/f.json", base64: "AQID" });
+    expect(seen[1].base64).toBe("");
+  });
+
+  it("upload：失败 → WebDavError 且透传 statusCode（data 通道，M1）", async () => {
+    fake.plugin = {
+      async upload(): Promise<void> {
+        const e = new FakeCapError("配额不足", "QUOTA_EXCEEDED");
+        (e as unknown as { data: { statusCode: number } }).data = { statusCode: 507 };
+        throw e;
+      },
+    };
+    const err = (await upload(
+      "https://dav/f",
+      { user: "u", password: "p" },
+      new Uint8Array([1]),
+    ).catch((e) => e)) as WebDavError;
+    expect(err.kind).toBe("QUOTA_EXCEEDED");
+    expect(err.statusCode).toBe(507);
+  });
+
+  it("uploadWithVerify：缺省 maxAttempts 不下发（undefined）", async () => {
+    let received: Record<string, unknown> = {};
+    fake.plugin = {
+      async uploadWithVerify(opts: Record<string, unknown>) {
+        received = opts;
+      },
+    };
+    await uploadWithVerify("https://dav/f", { user: "u", password: "p" }, new Uint8Array([1]));
+    expect(received.maxAttempts).toBeUndefined();
+  });
+
+  it("stat：成功返回条目；NOT_FOUND 失败映射", async () => {
+    fake.plugin = {
+      async stat() {
+        return { entry: { href: "/dav/f.json", isCollection: false, contentLength: 7 } };
+      },
+    };
+    const { stat } = await import("@/native/WebDav");
+    expect(await stat("https://dav/f.json", { user: "u", password: "p" })).toEqual({
+      href: "/dav/f.json",
+      isCollection: false,
+      contentLength: 7,
+    });
+    fake.plugin = {
+      async stat(): Promise<{ entry: never }> {
+        throw new FakeCapError("路径不存在", "NOT_FOUND");
+      },
+    };
+    const err = (await stat("https://dav/missing", { user: "u", password: "p" }).catch(
+      (e) => e,
+    )) as WebDavError;
+    expect(err.kind).toBe("NOT_FOUND");
+  });
+
+  it("deleteResource：成功与 FORBIDDEN 失败", async () => {
+    const { deleteResource } = await import("@/native/WebDav");
+    fake.plugin = { async delete() {} };
+    await deleteResource("https://dav/f.json", { user: "u", password: "p" });
+    fake.plugin = {
+      async delete(): Promise<void> {
+        throw new FakeCapError("拒绝", "FORBIDDEN");
+      },
+    };
+    const err = (await deleteResource("https://dav/f.json", { user: "u", password: "p" }).catch(
+      (e) => e,
+    )) as WebDavError;
+    expect(err.kind).toBe("FORBIDDEN");
+  });
+
+  it("prune：成功返回删除清单", async () => {
+    const { prune } = await import("@/native/WebDav");
+    let received: Record<string, unknown> = {};
+    fake.plugin = {
+      async prune(opts: Record<string, unknown>) {
+        received = opts;
+        return { deleted: ["/dav/old.json"] };
+      },
+    };
+    const deleted = await prune(
+      "https://dav/backup/",
+      { user: "u", password: "p" },
+      "pictelio-backup-",
+      10,
+    );
+    expect(deleted).toEqual(["/dav/old.json"]);
+    expect(received.keep).toBe(10);
+  });
+
+  it("encrypt / decrypt / isEncrypted：字节往返与分类（CRYPTO）", async () => {
+    const { encrypt, decrypt, isEncrypted } = await import("@/native/WebDav");
+    fake.plugin = {
+      async encrypt({ base64 }: { base64: string }) {
+        return { base64: bytesToBase64(new Uint8Array([...base64ToBytes(base64), 9])) };
+      },
+      async decrypt({ base64 }: { base64: string }) {
+        const b = base64ToBytes(base64);
+        return { base64: bytesToBase64(b.subarray(0, b.length - 1)) };
+      },
+      async isEncrypted({ base64 }: { base64: string }) {
+        return { encrypted: base64ToBytes(base64)[0] === 1 };
+      },
+    };
+    const cipher = await encrypt(new Uint8Array([4, 5]), "pw");
+    expect(cipher).toEqual(new Uint8Array([4, 5, 9]));
+    expect(await decrypt(cipher, "pw")).toEqual(new Uint8Array([4, 5]));
+    expect(await isEncrypted(new Uint8Array([1, 2]))).toBe(true);
+    expect(await isEncrypted(new Uint8Array([0, 2]))).toBe(false);
+
+    fake.plugin = {
+      async decrypt(): Promise<{ base64: string }> {
+        throw new FakeCapError("密码错误或文件损坏", "CRYPTO");
+      },
+    };
+    const err = (await decrypt(new Uint8Array([1]), "bad").catch((e) => e)) as WebDavError;
+    expect(err.kind).toBe("CRYPTO");
   });
 });

@@ -12,7 +12,6 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.IOException;
 import java.util.List;
 
 import io.pictelio.app.WebDavClient.DavEntry;
@@ -144,13 +143,21 @@ public class WebDavPlugin extends Plugin {
             try {
                 call.resolve(op.exec());
             } catch (DavException e) {
-                call.reject(e.getMessage(), e.kind.name());
+                // 第 4 参 data 经 Capacitor 原样拷进 JS 异常（native-bridge returnResult），
+                // TS 侧读 err.data.statusCode —— 与 lynx 桥的 statusCode 语义对齐（spec §5）
+                call.reject(e.getMessage(), e.kind.name(), null, statusData(e.statusCode));
             } catch (BackupCrypto.CryptoException e) {
                 call.reject(e.getMessage(), "CRYPTO");
             } catch (Exception e) {
                 call.reject("WebDAV 操作失败: " + e.getMessage(), "SERVER");
             }
         }, "webdav").start();
+    }
+
+    private static JSObject statusData(int statusCode) {
+        JSObject data = new JSObject();
+        data.put("statusCode", statusCode);
+        return data;
     }
 
     private static String required(PluginCall call, String key) {
@@ -168,7 +175,8 @@ public class WebDavPlugin extends Plugin {
     }
 
     private static byte[] body64(PluginCall call) {
-        String b64 = required(call, "base64");
+        // 空 base64 是合法输入（空字节数组；与 lynx 桥 decode 语义一致）——不得用 required 判缺参
+        String b64 = call.getString("base64", "");
         return Base64.decode(b64, Base64.DEFAULT);
     }
 

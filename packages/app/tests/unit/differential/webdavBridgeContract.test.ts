@@ -20,6 +20,9 @@ const webDavModule = read(
 );
 const clientJava = read("../../../android/app/src/main/java/io/pictelio/app/WebDavClient.java");
 const mainActivity = read("../../../android/app/src/full/java/io/pictelio/app/MainActivity.java");
+const mainActivityWebview = read(
+  "../../../android/app/src/webview/java/io/pictelio/app/MainActivityWebview.java",
+);
 const lynxInitializer = read(
   "../../../android/app/src/lynx/java/io/pictelio/app/LynxRuntimeInitializer.java",
 );
@@ -55,13 +58,12 @@ describe("WebDAV 桥跨语言契约", () => {
   it("Kind 枚举（Java）与双端 TS WEBDAV_ERROR_KINDS 逐字一致", () => {
     // Java 枚举名从源码提取（不含 CRYPTO——那是桥层对 CryptoException 的归类）
     const enumBlock = clientJava.match(/public enum Kind \{([\s\S]*?)\}/)?.[1] ?? "";
-    const javaKinds = [...enumBlock.matchAll(/\b([A-Z][A-Z_]+)\b/g)]
-      .map((m) => m[1])
-      .filter((n) => n !== "BINARY" && !n.startsWith("HTTP"));
+    // 先剥行注释（"// 连接/超时/IO" 里的 IO 会被裸正则误抓），再取全大写枚举名
+    const enumBody = enumBlock.replace(/\/\/.*$/gm, "");
+    const javaKinds = [...enumBody.matchAll(/\b([A-Z][A-Z_]+)\b/g)].map((m) => m[1]);
     const expectedJava = KINDS.filter((k) => k !== "CRYPTO");
-    for (const kind of expectedJava) {
-      expect(javaKinds, `Java Kind 缺 ${kind}`).toContain(kind);
-    }
+    // 集合相等（双向）：Java 枚举多出/缺少任何 kind 都必须失败（防漂移）
+    expect(new Set(javaKinds)).toEqual(new Set(expectedJava));
     // 两个 TS 桥声明同一集合（含 CRYPTO）
     for (const kind of KINDS) {
       expect(appBridge).toContain(`"${kind}"`);
@@ -69,11 +71,12 @@ describe("WebDAV 桥跨语言契约", () => {
     }
   });
 
-  it("错误 payload 键三处一致（kind / statusCode / message）", () => {
-    // Java 模块产出的 JSON 键 == TS 桥解析读取的键
+  it("错误 payload 键四处一致（kind / statusCode / message）", () => {
+    // Java 模块产出的 JSON 键 == 双端 TS 桥解析读取的键（app 侧经 err.data.statusCode）
     for (const key of ["kind", "statusCode", "message"]) {
       expect(webDavModule).toContain(`"${key}"`);
       expect(lynxBridge).toContain(key);
+      expect(appBridge).toContain(key);
     }
     expect(appBridge).toContain("WebDavErrorKind");
   });
@@ -87,8 +90,10 @@ describe("WebDAV 桥跨语言契约", () => {
     }
   });
 
-  it("注册点存在（漏注册 = 桥静默失效）", () => {
+  it("注册点存在（漏注册 = 桥静默失效；两个 flavor 都要）", () => {
+    // B1 防线：webview-only flavor（MainActivityWebview）与 full flavor 都必须注册
     expect(mainActivity).toContain("registerPlugin(WebDavPlugin.class)");
+    expect(mainActivityWebview).toContain("registerPlugin(WebDavPlugin.class)");
     expect(lynxInitializer).toContain(
       'registerModule("PictelioWebDav", PictelioWebDavModule.class)',
     );

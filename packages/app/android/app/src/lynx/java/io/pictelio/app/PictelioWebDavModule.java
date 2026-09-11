@@ -12,7 +12,6 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -118,12 +117,14 @@ public class PictelioWebDavModule extends LynxModule {
 
     // ── 薄桥内部 ──
 
-    private interface Op {
+    /** 包可见：JVM 行为测试直接驱动（验证 Callback 双参契约） */
+    interface Op {
         String exec() throws Exception;
     }
 
     /** 阻塞 IO 线程池执行；成功/失败统一双参回调（无 null） */
-    private static void run(Callback callback, Op op) {
+    /** 包可见：JVM 行为测试直接驱动 */
+    static void run(Callback callback, Op op) {
         EXECUTOR.execute(() -> {
             try {
                 callback.invoke(0, op.exec());
