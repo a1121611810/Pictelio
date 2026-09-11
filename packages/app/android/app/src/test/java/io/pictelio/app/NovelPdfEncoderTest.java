@@ -38,6 +38,10 @@ import java.util.List;
  * {@code PdfRenderer} 亦恒返回 0 页。故真实 {@code AndroidPdfBackend} 无法在单测跑通；
  * 本测试通过包可见测试缝 {@link NovelPdfEncoder.PdfBackend} 注入假件，验证编码编排/分页/落盘契约，
  * 并断言产物以 {@code %PDF-} 开头且长度非平凡。真机渲染保真度由设备批次验收覆盖。
+ *
+ * <p><b>期望值性质（code-review Oracle 标注）</b>：注入假件写出的 {@code %PDF-} 头 / 页尺寸 /
+ * 长度断言验证的是<b>管线自洽（plumbing）</b>，不是 PDF 规范符合性——假件输出由测试自身构造，
+ * 不可作为「PDF 正确」的证据；规范/渲染保真度只由设备批次验收。
  */
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 28)

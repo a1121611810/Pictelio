@@ -3,6 +3,7 @@ package io.pictelio.app;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
@@ -256,5 +257,17 @@ public class NovelEpubEncoderTest {
         Document chapter = parseXml(zip.get(chapterName(zip)));
         assertTrue("正文应保留",
                 chapter.getDocumentElement().getTextContent().contains("普通段落"));
+    }
+
+    @Test
+    public void epub_cancelled_throwsCancellationIOException() throws Exception {
+        NovelExportModel model =
+                NovelExportModel.parse(NovelExportTestData.buildPayload(true, true, true));
+        IOException e = assertThrows(IOException.class,
+                () -> NovelEpubEncoder.encode(context, loader, model, "novel_epub_cancel",
+                        () -> true));
+        assertEquals("导出已取消", e.getMessage());
+        assertTrue("应为 NovelExportCancelledException",
+                e instanceof NovelExportCancelledException);
     }
 }

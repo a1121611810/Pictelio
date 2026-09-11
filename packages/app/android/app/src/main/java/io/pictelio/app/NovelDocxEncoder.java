@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.BooleanSupplier;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -50,6 +51,15 @@ public final class NovelDocxEncoder {
     /** 编码为 {@code <outputDir>/<id>.docx} 并返回该文件。 */
     public static File encode(Context context, PixivImageLoader loader, NovelExportModel model,
             String id) throws IOException {
+        return encode(context, loader, model, id, () -> false);
+    }
+
+    /** 可取消版本：编码前与每次取图前轮询取消信号，命中抛 {@link NovelExportCancelledException}。 */
+    static File encode(Context context, PixivImageLoader loader, NovelExportModel model,
+            String id, BooleanSupplier cancelled) throws IOException {
+        if (cancelled.getAsBoolean()) {
+            throw new NovelExportCancelledException();
+        }
         File dir = NovelExporter.outputDir(context);
         File out = new File(dir, id + ".docx");
 
@@ -59,7 +69,7 @@ public final class NovelDocxEncoder {
 
         // ① 封面（可选）：内联图片段
         if (model.options.includeCover && model.meta.coverUrl != null) {
-            byte[] cover = loadImage(loader, model.meta.coverUrl);
+            byte[] cover = loadImage(loader, model.meta.coverUrl, cancelled);
             if (cover != null) {
                 Media m = newMedia(cover, model.meta.coverUrl, media, counters);
                 appendPicture(body, m, media.size());
@@ -97,7 +107,7 @@ public final class NovelDocxEncoder {
             } else if (b instanceof NovelExportModel.ImageBlock) {
                 if (model.options.includeInlineImages) {
                     NovelExportModel.ImageBlock img = (NovelExportModel.ImageBlock) b;
-                    byte[] bytes = loadImage(loader, img.url);
+                    byte[] bytes = loadImage(loader, img.url, cancelled);
                     if (bytes != null) {
                         Media m = newMedia(bytes, img.url, media, counters);
                         appendPicture(body, m, media.size());
@@ -163,8 +173,9 @@ public final class NovelDocxEncoder {
             if (opts.outWidth > 0 && opts.outHeight > 0) {
                 return new int[]{opts.outWidth, opts.outHeight};
             }
-        } catch (Throwable ignored) {
-            // 测试/异常环境下解码不可用：退回默认比例
+        } catch (Throwable e) {
+            // 测试/异常环境下解码不可用：退回默认比例（降级可见，硬约束 #3）
+            Log.w(TAG, "图片尺寸解码失败，回退 600x400", e);
         }
         return new int[]{600, 400};
     }
@@ -409,14 +420,21 @@ public final class NovelDocxEncoder {
         zip.closeEntry();
     }
 
-    private static byte[] loadImage(PixivImageLoader loader, String url) {
+    /** 取图：先轮询取消（命中抛 {@link NovelExportCancelledException}，绝不降级为跳过）。 */
+    private static byte[] loadImage(PixivImageLoader loader, String url, BooleanSupplier cancelled)
+            throws NovelExportCancelledException {
         try {
+            if (cancelled.getAsBoolean()) {
+                throw new NovelExportCancelledException();
+            }
             byte[] bytes = loader.loadBytes(url);
             if (bytes == null || bytes.length == 0) {
                 Log.w(TAG, "图片为空，已跳过: " + url);
                 return null;
             }
             return bytes;
+        } catch (NovelExportCancelledException e) {
+            throw e; // 取消是任务级硬中止，不得被下方 catch 吞掉
         } catch (Exception e) {
             Log.w(TAG, "图片下载失败，已跳过: " + url, e);
             return null;

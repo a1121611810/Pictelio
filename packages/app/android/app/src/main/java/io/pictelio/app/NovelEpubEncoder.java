@@ -17,6 +17,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 import java.util.zip.CRC32;
 import java.util.zip.Deflater;
 import java.util.zip.ZipEntry;
@@ -53,6 +54,15 @@ public final class NovelEpubEncoder {
     /** 编码为 {@code <outputDir>/<id>.epub} 并返回该文件。 */
     public static File encode(Context context, PixivImageLoader loader, NovelExportModel model,
             String id) throws IOException {
+        return encode(context, loader, model, id, () -> false);
+    }
+
+    /** 可取消版本：编码前与每次取图前轮询取消信号，命中抛 {@link NovelExportCancelledException}。 */
+    static File encode(Context context, PixivImageLoader loader, NovelExportModel model,
+            String id, BooleanSupplier cancelled) throws IOException {
+        if (cancelled.getAsBoolean()) {
+            throw new NovelExportCancelledException();
+        }
         File dir = NovelExporter.outputDir(context);
         File out = new File(dir, id + ".epub");
 
@@ -61,7 +71,7 @@ public final class NovelEpubEncoder {
         Map<String, byte[]> imageBytesByPath = new LinkedHashMap<>();
         String coverHref = null;
         if (model.options.includeCover && model.meta.coverUrl != null) {
-            byte[] cover = loadImage(loader, model.meta.coverUrl);
+            byte[] cover = loadImage(loader, model.meta.coverUrl, cancelled);
             if (cover != null) {
                 String name = "cover." + ext(model.meta.coverUrl);
                 imageBytesByPath.put(OEBPS + "images/" + name, cover);
@@ -79,7 +89,7 @@ public final class NovelEpubEncoder {
                 if (imageHrefByUrl.containsKey(img.url)) {
                     continue;
                 }
-                byte[] bytes = loadImage(loader, img.url);
+                byte[] bytes = loadImage(loader, img.url, cancelled);
                 if (bytes == null) {
                     continue; // loadImage 内已 Log.w，跳过该图但导出继续
                 }
@@ -453,15 +463,24 @@ public final class NovelEpubEncoder {
 
     // ── 取图 / 扩展名 / MIME / 转义 ──────────────────────────
 
-    /** 取图：失败（异常/空字节）→ Log.w 返回 null，调用方跳过该图。 */
-    private static byte[] loadImage(PixivImageLoader loader, String url) {
+    /**
+     * 取图：先轮询取消（命中抛 {@link NovelExportCancelledException}，绝不降级为跳过）；
+     * 其余失败（异常/空字节）→ Log.w 返回 null，调用方跳过该图。
+     */
+    private static byte[] loadImage(PixivImageLoader loader, String url, BooleanSupplier cancelled)
+            throws NovelExportCancelledException {
         try {
+            if (cancelled.getAsBoolean()) {
+                throw new NovelExportCancelledException();
+            }
             byte[] bytes = loader.loadBytes(url);
             if (bytes == null || bytes.length == 0) {
                 Log.w(TAG, "图片为空，已跳过: " + url);
                 return null;
             }
             return bytes;
+        } catch (NovelExportCancelledException e) {
+            throw e; // 取消是任务级硬中止，不得被下方 catch 吞掉
         } catch (Exception e) {
             Log.w(TAG, "图片下载失败，已跳过: " + url, e);
             return null;

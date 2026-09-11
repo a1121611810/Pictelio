@@ -26,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 
@@ -170,6 +171,23 @@ public class NovelExporterTest {
         assertTrue("跳转链接缺失", text.contains("https://www.pixiv.net/artworks/123"));
     }
 
+    /**
+     * spec §5：文本格式封面退化为链接，且封面开关独立于元数据开关
+     * （includeMetadata=false + includeCover=true 时仍应输出封面链接；修复前被元数据块连累丢失）。
+     */
+    @Test
+    public void export_txt_rtf_coverLinkIndependentOfMetadata() throws Exception {
+        String payload = buildPayload(false, true, false);
+
+        String txtText = read(NovelExporter.export(context, loader, payload, "txt", "novel_cover_txt"));
+        assertFalse("元数据已关，不应含标题行", txtText.contains("《夜行"));
+        assertTrue("封面链接应独立于元数据保留", txtText.contains(COVER_URL));
+
+        String rtfText = read(NovelExporter.export(context, loader, payload, "rtf", "novel_cover_rtf"));
+        assertFalse("元数据已关，不应含作者行", rtfText.contains("作者"));
+        assertTrue("封面链接应独立于元数据保留", rtfText.contains(COVER_URL));
+    }
+
     // ── html ──────────────────────────────────────────────────
 
     @Test
@@ -302,6 +320,43 @@ public class NovelExporterTest {
         // Robolectric（实测 SDK 28/34 + @GraphicsMode(NATIVE)）下 nativeCreateDocument()
         // 返回 0，任何 startPage 抛 IllegalStateException，JVM 单测无法跑通。PDF 编码逻辑
         // 改由 NovelPdfEncoderTest 经注入后端 + 纯分页器验证（见该测试类头注释）。
+    }
+
+    // ── 取消（spec novel-export §8；ADR-0154 D2） ──────────────
+
+    @Test
+    public void export_cancelledSupplier_throwsWithCancelledMessage() throws Exception {
+        String payload = buildPayload(true, true, true);
+        IOException e = assertThrows(IOException.class,
+                () -> NovelExporter.export(context, loader, payload, "html", "cancelled",
+                        () -> true));
+        assertEquals("导出已取消", e.getMessage());
+        assertTrue("应为 NovelExportCancelledException，而非图片降级跳过",
+                e instanceof NovelExportCancelledException);
+    }
+
+    @Test
+    public void export_cancelledSupplier_doesNotWriteOutputFile() throws Exception {
+        String payload = buildPayload(true, true, true);
+        assertThrows(IOException.class,
+                () -> NovelExporter.export(context, loader, payload, "html", "cancel_nofile",
+                        () -> true));
+        File out = new File(NovelExporter.outputDir(context), "cancel_nofile.html");
+        assertFalse("已取消的导出不应写出文件", out.exists());
+    }
+
+    @Test
+    public void export_cancelDuringImageFetch_isNotDowngradedToSkip() throws Exception {
+        String payload = buildPayload(true, true, true);
+        // 首次（导出入口）不取消，第二次（取封面图前）取消 —— 验证取图阶段可中断
+        int[] calls = {0};
+        BooleanSupplier cancelOnSecondCheck = () -> calls[0]++ > 0;
+        IOException e = assertThrows(IOException.class,
+                () -> NovelExporter.export(context, loader, payload, "html", "cancel_mid",
+                        cancelOnSecondCheck));
+        assertEquals("导出已取消", e.getMessage());
+        File out = new File(NovelExporter.outputDir(context), "cancel_mid.html");
+        assertFalse("取图阶段取消必须中止导出，而非跳过图片后继续写出", out.exists());
     }
 
     @Test

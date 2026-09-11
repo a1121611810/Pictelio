@@ -134,7 +134,8 @@ public final class PictelioDownloader {
             if (listener != null) {
                 listener.onProgress(5, 100);
             }
-            File exported = NovelExporter.export(context, loader, payloadJson, format, id);
+            // 传入取消信号：编码与每次取图都会轮询，命中即抛 NovelExportCancelledException
+            File exported = NovelExporter.export(context, loader, payloadJson, format, id, token::get);
             if (token.get()) {
                 throw new IOException("导出已取消");
             }

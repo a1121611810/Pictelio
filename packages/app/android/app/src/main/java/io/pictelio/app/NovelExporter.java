@@ -16,6 +16,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 
 /**
  * 小说导出深模块（spec docs/specs/novel-export.md §5；ADR-0154 D2；main sourceSet 双引擎共享）。
@@ -65,6 +66,20 @@ public final class NovelExporter {
      */
     public static File export(Context context, PixivImageLoader loader, String payloadJson,
             String format, String id) throws IOException {
+        return export(context, loader, payloadJson, format, id, () -> false);
+    }
+
+    /**
+     * 可取消版本：编码前与每次取图前轮询 {@code cancelled}，命中即抛
+     * {@link NovelExportCancelledException}（消息「导出已取消」），不降级为跳过图片。
+     *
+     * @param cancelled 取消信号（如 {@code AtomicBoolean::get}）；非空
+     */
+    public static File export(Context context, PixivImageLoader loader, String payloadJson,
+            String format, String id, BooleanSupplier cancelled) throws IOException {
+        if (cancelled.getAsBoolean()) {
+            throw new NovelExportCancelledException();
+        }
         if (!isKnownFormat(format)) {
             throw new IOException("不支持的导出格式：" + format);
         }
@@ -74,7 +89,7 @@ public final class NovelExporter {
             case "txt":
                 return write(dir, id, "txt", txt(model));
             case "html":
-                return write(dir, id, "html", utf8(html(model, loader)));
+                return write(dir, id, "html", utf8(html(model, loader, cancelled)));
             case "md":
                 return write(dir, id, "md", utf8(md(model)));
             case "rtf":
@@ -82,13 +97,13 @@ public final class NovelExporter {
             case "json":
                 return write(dir, id, "json", utf8(json(payloadJson)));
             case "fb2":
-                return write(dir, id, "fb2", utf8(fb2(model, loader)));
+                return write(dir, id, "fb2", utf8(fb2(model, loader, cancelled)));
             case "epub":
-                return NovelEpubEncoder.encode(context, loader, model, id);
+                return NovelEpubEncoder.encode(context, loader, model, id, cancelled);
             case "docx":
-                return NovelDocxEncoder.encode(context, loader, model, id);
+                return NovelDocxEncoder.encode(context, loader, model, id, cancelled);
             case "pdf":
-                return NovelPdfEncoder.encode(context, loader, model, id);
+                return NovelPdfEncoder.encode(context, loader, model, id, cancelled);
             default:
                 throw new IOException("不支持的导出格式：" + format);
         }
@@ -134,6 +149,10 @@ public final class NovelExporter {
         if (m.options.includeMetadata) {
             appendTxtMeta(sb, m);
         }
+        // 封面开关独立于元数据开关（spec §5：文本格式封面退化为链接）
+        if (m.options.includeCover && m.meta.coverUrl != null) {
+            sb.append("封面：").append(m.meta.coverUrl).append("\n\n");
+        }
         for (NovelExportModel.Block b : m.blocks) {
             if (b instanceof NovelExportModel.TextBlock) {
                 sb.append(((NovelExportModel.TextBlock) b).text).append("\n\n");
@@ -173,15 +192,13 @@ public final class NovelExporter {
         if (m.meta.description != null && !m.meta.description.isEmpty()) {
             sb.append("简介：").append(m.meta.description).append("\n");
         }
-        if (m.options.includeCover && m.meta.coverUrl != null) {
-            sb.append("封面：").append(m.meta.coverUrl).append("\n");
-        }
         sb.append("\n");
     }
 
     // ── HTML（单文件自包含；转义 5 字符；data URI 内嵌图片） ────
 
-    private static String html(NovelExportModel m, PixivImageLoader loader) {
+    private static String html(NovelExportModel m, PixivImageLoader loader,
+            BooleanSupplier cancelled) throws NovelExportCancelledException {
         StringBuilder sb = new StringBuilder();
         sb.append("<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n<meta charset=\"utf-8\">\n");
         sb.append("<title>").append(escapeHtml(m.meta.title)).append("</title>\n");
@@ -190,7 +207,7 @@ public final class NovelExporter {
             appendHtmlMeta(sb, m);
         }
         if (m.options.includeCover && m.meta.coverUrl != null) {
-            byte[] cover = loadImage(loader, m.meta.coverUrl);
+            byte[] cover = loadImage(loader, m.meta.coverUrl, cancelled);
             if (cover != null) {
                 sb.append("<p class=\"cover\"><img src=\"").append(dataUri(m.meta.coverUrl, cover))
                         .append("\" alt=\"cover\"></p>\n");
@@ -210,7 +227,7 @@ public final class NovelExporter {
             } else if (b instanceof NovelExportModel.ImageBlock) {
                 if (m.options.includeInlineImages) {
                     NovelExportModel.ImageBlock img = (NovelExportModel.ImageBlock) b;
-                    byte[] bytes = loadImage(loader, img.url);
+                    byte[] bytes = loadImage(loader, img.url, cancelled);
                     if (bytes != null) {
                         sb.append("<img src=\"").append(dataUri(img.url, bytes))
                                 .append("\" alt=\"").append(escapeHtml(img.imageId))
@@ -339,10 +356,11 @@ public final class NovelExporter {
             if (m.meta.description != null && !m.meta.description.isEmpty()) {
                 sb.append(escapeRtf("简介：" + m.meta.description)).append("\\par\n");
             }
-            if (m.options.includeCover && m.meta.coverUrl != null) {
-                sb.append(escapeRtf("封面：" + m.meta.coverUrl)).append("\\par\n");
-            }
             sb.append("\\par\n");
+        }
+        // 封面开关独立于元数据开关（spec §5：文本格式封面退化为链接）
+        if (m.options.includeCover && m.meta.coverUrl != null) {
+            sb.append(escapeRtf("封面：" + m.meta.coverUrl)).append("\\par\n");
         }
         for (NovelExportModel.Block b : m.blocks) {
             if (b instanceof NovelExportModel.TextBlock) {
@@ -406,12 +424,13 @@ public final class NovelExporter {
 
     // ── FB2（FictionBook 2 XML；图片 base64 <binary>） ─────────
 
-    private static String fb2(NovelExportModel m, PixivImageLoader loader) {
+    private static String fb2(NovelExportModel m, PixivImageLoader loader,
+            BooleanSupplier cancelled) throws NovelExportCancelledException {
         StringBuilder binaries = new StringBuilder();
         StringBuilder body = new StringBuilder();
         String coverId = null;
         if (m.options.includeCover && m.meta.coverUrl != null) {
-            byte[] cover = loadImage(loader, m.meta.coverUrl);
+            byte[] cover = loadImage(loader, m.meta.coverUrl, cancelled);
             if (cover != null) {
                 coverId = "cover";
                 binaries.append("<binary id=\"cover\" content-type=\"").append(imageMime(m.meta.coverUrl))
@@ -434,7 +453,7 @@ public final class NovelExporter {
             } else if (b instanceof NovelExportModel.ImageBlock) {
                 if (m.options.includeInlineImages) {
                     NovelExportModel.ImageBlock img = (NovelExportModel.ImageBlock) b;
-                    byte[] bytes = loadImage(loader, img.url);
+                    byte[] bytes = loadImage(loader, img.url, cancelled);
                     if (bytes != null) {
                         String id = "img" + imageIndex++;
                         binaries.append("<binary id=\"").append(id).append("\" content-type=\"")
@@ -547,15 +566,24 @@ public final class NovelExporter {
 
     // ── 图片取字节 / data URI / MIME ──────────────────────────
 
-    /** 取图：失败（IOException/空字节）→ Log.w 返回 null，调用方跳过该图。 */
-    private static byte[] loadImage(PixivImageLoader loader, String url) {
+    /**
+     * 取图：先轮询取消（命中抛 {@link NovelExportCancelledException}，绝不降级为跳过）；
+     * 其余失败（IOException/空字节）→ Log.w 返回 null，调用方跳过该图。
+     */
+    private static byte[] loadImage(PixivImageLoader loader, String url, BooleanSupplier cancelled)
+            throws NovelExportCancelledException {
         try {
+            if (cancelled.getAsBoolean()) {
+                throw new NovelExportCancelledException();
+            }
             byte[] bytes = loader.loadBytes(url);
             if (bytes == null || bytes.length == 0) {
                 Log.w(TAG, "图片为空，已跳过: " + url);
                 return null;
             }
             return bytes;
+        } catch (NovelExportCancelledException e) {
+            throw e; // 取消是任务级硬中止，不得被下方 catch 吞掉
         } catch (Exception e) {
             Log.w(TAG, "图片下载失败，已跳过: " + url, e);
             return null;

@@ -32,3 +32,30 @@
 - T9 会修改既有 `PictelioDownloaderPlugin`/`Module` 的 `start` 签名——**调用点完备性审计**（code-review 审计一）：`capacitorDownloadExecutor.ts`、`lynxDownloadExecutor.ts` 及所有调用者必须同步。
 - T4 修改 MIME 映射是**输出契约变化**（无损影响分享/落盘），必须全调用点核对 + 测试。
 - 浏览器 dev 无编码：T12 的 agent-browser 用 mock 执行器验证 UI/队列链路，不验证产物字节。
+
+## Code review 闭环记录（2026-09，双轴 Standards + Spec）
+
+固定点 `c51e72ff`；两轴并行子代理执行。审计一（调用点完备性，CodeGraph + 全仓 grep）：`DownloadKind`（8 处）、`payloadJson`、两端 executor/native 桥、MIME、`OverlayType`、`novelBlocks`/`api/novel` re-export、设置键 8 项全部枚举，无遗漏（c6ab5f8a 的下载页分组标签遗漏已在 3b41d943 修复并加机器防线）。审计二（Oracle check）：多数测试 oracle 合法（spec 字面量/真实样例/差分/性质）；嫌疑项已消解或标注（见下）。
+
+| 发现 | 级别 | 处置 | 证据 |
+|------|------|------|------|
+| Standards #1 / Spec S1：队列静默丢弃非法 `payloadJson` | blocking | **已修**：非字符串 / novel 缺载荷均 `warn`；测试断言该 warn | commit `4824ca91` |
+| Standards #2：测试未断言 warn（掩盖 #1） | major | **已修** | `4824ca91` |
+| Standards #3 / Spec S2：导出不可取消 | major | **已修**：`NovelExportCancelledException` + `BooleanSupplier` 经 `NovelExporter`/三编码器逐次取图轮询；`downloadNovel(token::get)` | 见 Java diff + 新测试 |
+| Standards #4：跨语言 payload 无 oracle | major | **已修**：golden fixture（真实 `buildNovelExportPayload` 产出）→ Java test resource（逐字节守护）→ `NovelExportModelGoldenTest` 解析 | `4824ca91` |
+| Standards #5：桥契约仅子串断言 | major | **已修**：断言参数顺序/元数与键集合相等 | `4824ca91` |
+| Standards #6：E2E 同义反复跳过 | major | **已修**：mock 小说 detail/body，使 `[S2]` 确定性走真实断言（去除 `expect(true)`） | 见 E2E diff |
+| Standards #7：设置非法值测试未断言 warn | minor | **已修** | `4824ca91` |
+| Standards #8：T9 状态与 diff 矛盾 | minor | **已修**（T9 → done） | `4824ca91` |
+| Spec S3：txt 章节 `## ` 前缀 | minor | **对齐 spec**：txt 为纯文本章节标题独占一行 | `4824ca91` |
+| Spec S4：HTML/MD ruby 未保留 | major | **对齐 spec**：IR 层已剥离注音为主文（与阅读器一致） | `4824ca91` |
+| Spec S5：txt/rtf 封面链接被元数据开关连累 | minor | **已修**：封面链接独立于 `includeMetadata` | 见 Java diff |
+| Spec S6：`§7.1` 入口「隐藏 vs 禁用」矛盾 | minor | **对齐 spec**：无正文不渲染入口 | `4824ca91` |
+| Spec S7：json 忽略内容开关歧义 | minor | **对齐 spec**：JSON 恒全量 IR 转储，开关不适用 | `4824ca91` |
+| Spec S8：spec 随实现修订 | process | 记录（正当对账，非缺陷） | 本表 |
+| Oracle：`groupKindLabel` 误标 spec §7 | — | **补 spec**：§7.1 增列 ugoira/novel/静态图 文案作为 oracle | `4824ca91` |
+| Oracle：PDF FakeBackend 自洽 | — | **标注**：fake backend 仅验编排/分页，PDF 保真度留设备批次 | 见 `NovelPdfEncoderTest` 头注释 |
+| Baseline：编码器 helper 重复（A）/ SettingsExport chip 重复（B）/ block 分发（E） | judgement | **接受暂缓**（纯重构，非阻塞；避免在评审收口期扩大改动面） | — |
+| Baseline：Me.vue 手写 9 chip（D） | judgement | **不适用**：Me.vue a11y 机器门禁要求逐字 `ME_A11Y_LABELS.<key>` 字面引用，v-for 会破坏该门禁 | `tests/unit.test.ts` |
+| Baseline：`NovelImageUrls` 类型过严（F） | judgement | **暂缓**：改 `Partial` 会波及阅读器布局/搜索，风险大于收益；运行期回退链已有防御 | spec §3.3 |
+

@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 
 /**
  * PDF 编码器（T8；spec docs/specs/novel-export.md §5）。
@@ -119,16 +120,31 @@ public final class NovelPdfEncoder {
     /** 生产入口：{@code <outputDir>/<id>.pdf}。 */
     public static File encode(Context context, PixivImageLoader loader, NovelExportModel model,
             String id) throws IOException {
-        return encode(context, loader, model, id, new AndroidPdfBackend());
+        return encode(context, loader, model, id, () -> false, new AndroidPdfBackend());
+    }
+
+    /** 可取消生产入口：注入取消信号，使用生产 PdfDocument 后端。 */
+    static File encode(Context context, PixivImageLoader loader, NovelExportModel model, String id,
+            BooleanSupplier cancelled) throws IOException {
+        return encode(context, loader, model, id, cancelled, new AndroidPdfBackend());
     }
 
     /** 包可见注入入口（测试缝）：允许替换 PDF 后端而保持生产签名不变。 */
     static File encode(Context context, PixivImageLoader loader, NovelExportModel model, String id,
             PdfBackend backend) throws IOException {
+        return encode(context, loader, model, id, () -> false, backend);
+    }
+
+    /** 全参数版本：可取消 + 可替换后端。 */
+    static File encode(Context context, PixivImageLoader loader, NovelExportModel model, String id,
+            BooleanSupplier cancelled, PdfBackend backend) throws IOException {
+        if (cancelled.getAsBoolean()) {
+            throw new NovelExportCancelledException();
+        }
         File dir = NovelExporter.outputDir(context);
         File out = new File(dir, id + ".pdf");
         try {
-            render(loader, model, backend);
+            render(loader, model, backend, cancelled);
             try (FileOutputStream fos = new FileOutputStream(out)) {
                 backend.writeTo(fos);
             }
@@ -173,10 +189,11 @@ public final class NovelPdfEncoder {
     }
 
     /** 测量所有块并生成绘制项（封面/插图取字节 → 解码；失败跳过）。 */
-    private static List<Item> layoutItems(PixivImageLoader loader, NovelExportModel model) {
+    private static List<Item> layoutItems(PixivImageLoader loader, NovelExportModel model,
+            BooleanSupplier cancelled) throws NovelExportCancelledException {
         List<Item> items = new ArrayList<>();
         if (model.options.includeCover && model.meta.coverUrl != null) {
-            byte[] bytes = loadImage(loader, model.meta.coverUrl);
+            byte[] bytes = loadImage(loader, model.meta.coverUrl, cancelled);
             Bitmap bmp = decode(bytes, model.meta.coverUrl);
             if (bmp != null) {
                 items.add(imageItem(bmp));
@@ -216,7 +233,7 @@ public final class NovelPdfEncoder {
             } else if (b instanceof NovelExportModel.ImageBlock) {
                 if (model.options.includeInlineImages) {
                     NovelExportModel.ImageBlock img = (NovelExportModel.ImageBlock) b;
-                    byte[] bytes = loadImage(loader, img.url);
+                    byte[] bytes = loadImage(loader, img.url, cancelled);
                     Bitmap bmp = decode(bytes, img.url);
                     if (bmp != null) {
                         items.add(imageItem(bmp));
@@ -295,8 +312,9 @@ public final class NovelPdfEncoder {
 
     // ── 绘制 / 分页 ──────────────────────────────────────────
 
-    private static void render(PixivImageLoader loader, NovelExportModel model, PdfBackend backend) {
-        List<Item> items = layoutItems(loader, model);
+    private static void render(PixivImageLoader loader, NovelExportModel model, PdfBackend backend,
+            BooleanSupplier cancelled) throws NovelExportCancelledException {
+        List<Item> items = layoutItems(loader, model, cancelled);
         List<Integer> heights = new ArrayList<>(items.size());
         List<Boolean> breaks = new ArrayList<>(items.size());
         for (Item item : items) {
@@ -375,14 +393,21 @@ public final class NovelPdfEncoder {
 
     // ── 取图 / 解码 ──────────────────────────────────────────
 
-    private static byte[] loadImage(PixivImageLoader loader, String url) {
+    /** 取图：先轮询取消（命中抛 {@link NovelExportCancelledException}，绝不降级为跳过）。 */
+    private static byte[] loadImage(PixivImageLoader loader, String url, BooleanSupplier cancelled)
+            throws NovelExportCancelledException {
         try {
+            if (cancelled.getAsBoolean()) {
+                throw new NovelExportCancelledException();
+            }
             byte[] bytes = loader.loadBytes(url);
             if (bytes == null || bytes.length == 0) {
                 Log.w(TAG, "图片为空，已跳过: " + url);
                 return null;
             }
             return bytes;
+        } catch (NovelExportCancelledException e) {
+            throw e; // 取消是任务级硬中止，不得被下方 catch 吞掉
         } catch (Exception e) {
             Log.w(TAG, "图片下载失败，已跳过: " + url, e);
             return null;
