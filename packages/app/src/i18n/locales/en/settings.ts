@@ -1,16 +1,7 @@
-// 英文字典：key 集合必须与源语言完全一致（satisfies Dict 编译期强制）。
-import type { Dict } from "./zh-CN";
+// 英文 · 设置域：文案按 docs/style-guides/ui-copy.md（Apple HIG 基线）产出。
+import type { SettingsKey } from "../zh-CN/settings";
 
-const en = {
-  "error.action.checkProxy": "Check proxy settings",
-  "error.action.relogin": "Sign in again",
-  "error.action.backHome": "Back to home",
-  "error.action.retry": "Retry",
-  "error.hint.proxy": "Make sure the local proxy 127.0.0.1:10808 is running",
-  "error.hint.network": "Check your network connection",
-  "error.hint.unauthorized": "Session expired. Sign in again",
-  "error.hint.rateLimit": "Too many requests. Try again later",
-  "error.hint.server": "Pixiv server is temporarily unavailable. Try again later",
+const enSettings = {
   "settings.appearance.sectionTitle": "Display & Interaction",
   "settings.appearance.theme": "Theme",
   "settings.appearance.detailStairs": "Detail page stair navigation",
@@ -24,6 +15,6 @@ const en = {
     "Off: reopen at the top of lists (default). On: restore your last position.",
   "settings.appearance.language": "Language",
   "settings.appearance.languageDesc": "Change the interface language. Applies immediately.",
-} as const satisfies Dict;
+} as const satisfies Record<SettingsKey, string>;
 
-export default en;
+export default enSettings;

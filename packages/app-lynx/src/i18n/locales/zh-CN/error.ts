@@ -1,6 +1,5 @@
-// 源语言字典（简中）。扁平点号 key，规范与主端一致：<域>.<区块>.<语义>。
-// 副端手写 message 模块（选型票 #494：Lynx 无 Intl，vue-i18n 的 $d/$n 不可用）。
-const zhCN = {
+// 错误呈现域（副端）。zh 值 = 存量文案逐字快照，迁移期禁改写。
+const zhError = {
   "error.hint.unauthorized": "请重新登录",
   "error.hint.network": "请检查网络连接是否正常",
   "error.hint.proxy": "请检查本地代理是否已运行",
@@ -10,6 +9,5 @@ const zhCN = {
   "error.hintSeparator": "。",
 } as const;
 
-export default zhCN;
-export type I18nKey = keyof typeof zhCN;
-export type Dict = Record<I18nKey, string>;
+export default zhError;
+export type ErrorKey = keyof typeof zhError;
