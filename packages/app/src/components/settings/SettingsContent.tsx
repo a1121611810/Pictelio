@@ -6,6 +6,8 @@ import {
   setShowR18G,
   aiFilterMode,
   setAiFilterMode,
+  relatedInjection,
+  setRelatedInjection,
 } from "../../stores/settingsStore";
 import type { AiFilterMode } from "../../utils/aiFilter";
 import FluentIcon from "../ui/FluentIcon";
@@ -80,6 +82,29 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
           checked={showR18G()}
           ref={fluentOn("change", () => setShowR18G(!showR18G()))}
           aria-label="显示 R-18G 内容"
+        />
+      </div>
+
+      {/* 相关作品注入行开关（spec docs/specs/related-injection.md） */}
+      <div class="flex items-center justify-between py-3">
+        <div class="flex items-center gap-3">
+          <div class="relative w-6 h-6 flex-shrink-0 text-[var(--colorNeutralForeground2)]">
+            <FluentIcon name="imageMultiple" size={24} />
+          </div>
+          <div>
+            <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
+              相关作品注入
+            </p>
+            <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
+              从详情返回后，在该作品下方插入一行相关作品推荐
+            </p>
+          </div>
+        </div>
+
+        <fluent-switch
+          checked={relatedInjection()}
+          ref={fluentOn("change", () => void setRelatedInjection(!relatedInjection()))}
+          aria-label="相关作品注入"
         />
       </div>
 

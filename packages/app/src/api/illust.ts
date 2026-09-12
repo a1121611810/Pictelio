@@ -52,6 +52,18 @@ export function loadDetail(
   );
 }
 
+/** 相关作品（spec docs/specs/related-injection.md）：官方 related 端点，响应与 recommended 同构 */
+export function loadRelated(
+  illustId: number,
+  signal?: AbortSignal,
+): Promise<PixivIllustListResponse> {
+  return apiClient.get<PixivIllustListResponse>(
+    "/v1/illust/related",
+    { illust_id: String(illustId), filter: "for_ios" },
+    signal,
+  );
+}
+
 export function loadNext(url: string, signal?: AbortSignal): Promise<PixivIllustListResponse> {
   return apiClient.get<PixivIllustListResponse>(url, undefined, signal);
 }

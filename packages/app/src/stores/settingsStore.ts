@@ -28,6 +28,7 @@ const PREF_KEY_AUTO_HIDE_NAV_BAR = "auto_hide_nav_bar";
 const PREF_KEY_SHOW_R18 = "show_r18";
 const PREF_KEY_SHOW_R18G = "show_r18g";
 const PREF_KEY_AI_FILTER_MODE = "ai_filter_mode";
+const PREF_KEY_RELATED_INJECTION = "related_injection";
 const PREF_KEY_SHOW_DETAIL_STAIRS = "show_detail_stairs";
 const PREF_KEY_AUTO_CHECK_UPDATE = "auto_check_update";
 const PREF_KEY_NOVEL_LAYOUT_MODE = "novel_layout_mode";
@@ -159,6 +160,19 @@ export async function setAiFilterMode(mode: AiFilterMode): Promise<void> {
   if (id === null) return; // 未登录：不落盘（账号级语义）
   aiFilterModeFactory.forId(id).set(mode);
   window.dispatchEvent(new CustomEvent("aiFilterChanged"));
+}
+
+// ── 相关作品注入行（spec docs/specs/related-injection.md；设备级 UI 偏好，默认开）──
+
+const relatedInjectionHandle = settings.define<boolean>({
+  key: PREF_KEY_RELATED_INJECTION,
+  default: true,
+  validate: (v): v is boolean => typeof v === "boolean",
+});
+
+export const relatedInjection = () => relatedInjectionHandle.value();
+export async function setRelatedInjection(enabled: boolean): Promise<void> {
+  relatedInjectionHandle.set(enabled);
 }
 
 /**
@@ -487,6 +501,7 @@ export async function resetSettingsStore(): Promise<void> {
   await setShowR18(false);
   await setShowR18G(false);
   await setAiFilterMode("show");
+  await setRelatedInjection(true);
   await setLayoutMode("waterfall");
   await setNovelLayoutMode("list");
   await setShowDetailStairs(false);
