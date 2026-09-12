@@ -664,9 +664,7 @@ const NovelDetail: Component = () => {
       setTranslationError(
         new TranslateError(
           "unknown",
-          xRestrict === 2
-            ? t("novelDetail.r18gBlockError")
-            : t("novelDetail.r18BlockError"),
+          xRestrict === 2 ? t("novelDetail.r18gBlockError") : t("novelDetail.r18BlockError"),
         ),
       );
       return;
@@ -831,7 +829,9 @@ const NovelDetail: Component = () => {
       }
       setTranslationError(
         // i18n: set 时快照（瞬态）
-        err instanceof TranslateError ? err : new TranslateError("unknown", t("novelDetail.translateFailed")),
+        err instanceof TranslateError
+          ? err
+          : new TranslateError("unknown", t("novelDetail.translateFailed")),
       );
     } finally {
       if (version === translateVersion) {
@@ -1379,15 +1379,14 @@ const NovelDetail: Component = () => {
             <FluentDialog
               open
               onClose={() => resolveRestrictConfirm(false)}
-              aria-label={c().xRestrict === 2 ? t("novelDetail.r18gAria") : t("novelDetail.r18Aria")}
+              aria-label={
+                c().xRestrict === 2 ? t("novelDetail.r18gAria") : t("novelDetail.r18Aria")
+              }
             >
               <h3 slot="title">
                 {c().xRestrict === 2 ? t("novelDetail.r18gTitle") : t("novelDetail.r18Aria")}
               </h3>
-              <Show
-                when={c().xRestrict === 2}
-                fallback={<p>{t("novelDetail.r18DialogBody")}</p>}
-              >
+              <Show when={c().xRestrict === 2} fallback={<p>{t("novelDetail.r18DialogBody")}</p>}>
                 <p>{t("novelDetail.r18gDialogBody")}</p>
               </Show>
               <fluent-button

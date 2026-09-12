@@ -141,7 +141,9 @@ const NovelTextListCard: Component<Props> = (props) => {
           ]}
 
           onClick={toggleBookmark}
-          aria-label={bookmarked() ? t("novelTextCard.unbookmarkAria") : t("novelTextCard.bookmarkAria")}
+          aria-label={
+            bookmarked() ? t("novelTextCard.unbookmarkAria") : t("novelTextCard.bookmarkAria")
+          }
         >
           {bookmarked() ? "♥" : "♡"}
         </button>

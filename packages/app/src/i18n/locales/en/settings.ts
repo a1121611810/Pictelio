@@ -20,9 +20,11 @@ const enSettings = {
   // ── Content & filtering (SettingsContent) ──
   "settings.content.sectionTitle": "Content & Filtering",
   "settings.content.showR18": "Show R18 content",
-  "settings.content.showR18Desc": "Hides sensitive content from lists when off. Refresh lists to apply.",
+  "settings.content.showR18Desc":
+    "Hides sensitive content from lists when off. Refresh lists to apply.",
   "settings.content.showR18G": "Show R-18G content",
-  "settings.content.showR18GDesc": "Hides graphic content from lists when off. Refresh lists to apply.",
+  "settings.content.showR18GDesc":
+    "Hides graphic content from lists when off. Refresh lists to apply.",
   "settings.content.relatedInjection": "Related works injection",
   "settings.content.relatedInjectionDesc":
     "Shows a row of related works under a work when you return from its detail page.",
@@ -48,7 +50,8 @@ const enSettings = {
   // ── Updates & About (SettingsUpdate) ──
   "settings.update.sectionTitle": "Updates & About",
   "settings.update.autoCheck": "Check for updates on launch",
-  "settings.update.autoCheckDesc": "Checks for new versions in the background each time the app opens",
+  "settings.update.autoCheckDesc":
+    "Checks for new versions in the background each time the app opens",
   "settings.update.otaAutoDownload": "Auto-download web updates",
   "settings.update.otaAutoDownloadDesc":
     "Downloads silently and applies at next launch. The forced-update minimum version ignores this switch.",
@@ -109,7 +112,8 @@ const enSettings = {
     "Used by default when exporting from the detail page. The export panel can override it for a single export without changing this default.",
   "settings.export.contentTitle": "Export content",
   "settings.export.includeMetadata": "Include metadata",
-  "settings.export.includeMetadataDesc": "Title, author, tags, series, publish date, and original link",
+  "settings.export.includeMetadataDesc":
+    "Title, author, tags, series, publish date, and original link",
   "settings.export.includeCover": "Include cover",
   "settings.export.includeCoverDesc":
     "Embeds the cover in formats that support images (HTML/PDF/EPUB/DOCX/FB2)",
@@ -141,8 +145,7 @@ const enSettings = {
 
   // ── Sign out (LogoutRow) ──
   "settings.logout.title": "Sign out",
-  "settings.logout.desc":
-    "Clears the current sign-in credentials. Other local data is kept.",
+  "settings.logout.desc": "Clears the current sign-in credentials. Other local data is kept.",
 
   // ── Images & network (SettingsImage) ──
   "settings.image.sectionTitle": "Images & Network",
@@ -160,8 +163,7 @@ const enSettings = {
   "settings.image.ugoiraDialogTitle": "Switch to Range streaming?",
   "settings.image.ugoiraDialogBody1":
     "Range streaming fetches frames on demand with lower memory use. If a Range request fails, playback switches to full loading automatically (native/WebView always switches automatically) without interrupting playback.",
-  "settings.image.ugoiraDialogBody2":
-    "After confirming, ugoira will prefer Range streaming.",
+  "settings.image.ugoiraDialogBody2": "After confirming, ugoira will prefer Range streaming.",
   "settings.image.cancel": "Cancel",
   "settings.image.ugoiraDialogConfirm": "Switch",
   "settings.image.cache": "Image cache",

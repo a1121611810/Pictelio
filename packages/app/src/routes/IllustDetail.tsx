@@ -950,9 +950,15 @@ const IllustDetail: Component = () => {
 
                     onClick={toggleFollow}
                     disabled={following()}
-                    aria-label={isFollowed() ? t("illustDetail.unfollowAria") : t("illustDetail.followAria")}
+                    aria-label={
+                      isFollowed() ? t("illustDetail.unfollowAria") : t("illustDetail.followAria")
+                    }
                   >
-                    {following() ? "…" : isFollowed() ? t("illustDetail.following") : t("illustDetail.follow")}
+                    {following()
+                      ? "…"
+                      : isFollowed()
+                        ? t("illustDetail.following")
+                        : t("illustDetail.follow")}
                   </button>
                 </div>
               </DetailCard>
@@ -1004,7 +1010,9 @@ const IllustDetail: Component = () => {
                       }}
                       disabled={bookmarking()}
                     >
-                      {illust()!.is_bookmarked ? t("illustDetail.bookmarked") : t("illustDetail.bookmark")}
+                      {illust()!.is_bookmarked
+                        ? t("illustDetail.bookmarked")
+                        : t("illustDetail.bookmark")}
                     </button>
                     <HeartBurstEffect trigger={bookmarkBurstTrigger} />
                   </div>

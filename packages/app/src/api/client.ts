@@ -168,7 +168,11 @@ export function classifyError(status: number, error: unknown, responseBody?: unk
   }
 
   if (!status && error instanceof TypeError) {
-    return { type: ApiErrorType.NETWORK, message: "网络不可用，请检查连接", messageKey: "error.api.network" };
+    return {
+      type: ApiErrorType.NETWORK,
+      message: "网络不可用，请检查连接",
+      messageKey: "error.api.network",
+    };
   }
   // 尝试提取 Pixiv 错误消息
   const pixivMsg = responseBody ? extractPixivErrorMessage(responseBody) : null;

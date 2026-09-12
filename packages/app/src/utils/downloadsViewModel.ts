@@ -83,7 +83,9 @@ export function availabilityForAll(tasks: readonly DownloadTask[]): ActionAvaila
 
 /** 删除确认是否提供「删除文件」选项：任一所选 completed 且有 outputUri（spec §3.3） */
 export function hasDeletableFiles(tasks: readonly DownloadTask[], ids: readonly string[]): boolean {
-  return tasks.some((task) => ids.includes(task.id) && task.status === "completed" && !!task.outputUri);
+  return tasks.some(
+    (task) => ids.includes(task.id) && task.status === "completed" && !!task.outputUri,
+  );
 }
 
 export function statusLabel(status: DownloadStatus): string {

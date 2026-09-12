@@ -225,7 +225,10 @@ export function createSearchStore(): SearchStoreState {
           // scope=all: both failed, set error
           if (currentScope === "all" && !anySucceeded) {
             // i18n: set 时快照（瞬态）
-            setError({ type: ApiErrorType.UNKNOWN, message: t("core.store.searchStore.searchFailed") });
+            setError({
+              type: ApiErrorType.UNKNOWN,
+              message: t("core.store.searchStore.searchFailed"),
+            });
           }
 
           // 写入搜索结果缓存（键含筛选段）

@@ -74,7 +74,11 @@ const RelatedStripRow: Component<RelatedStripRowProps> = (props) => {
           </div>
         }
       >
-        <div class="mt-2 flex gap-2 overflow-x-auto pb-1" role="list" aria-label={t("home.related.listAria")}>
+        <div
+          class="mt-2 flex gap-2 overflow-x-auto pb-1"
+          role="list"
+          aria-label={t("home.related.listAria")}
+        >
           <For each={props.row.items}>
             {(il) => (
               <button

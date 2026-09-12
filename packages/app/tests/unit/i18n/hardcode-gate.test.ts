@@ -34,7 +34,13 @@ function isConsoleArg(node: ts.Node): boolean {
 
 function collectLiterals(file: string): string[] {
   const source = fs.readFileSync(file, "utf-8");
-  const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  const sf = ts.createSourceFile(
+    file,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
   const hits: string[] = [];
   const visit = (node: ts.Node): void => {
     let text: string | undefined;
@@ -58,15 +64,27 @@ describe("i18n 回潮门禁：src 内禁硬编码中文字符串字面量", () =
     for (const file of walk(SRC)) {
       const rel = path.relative(SRC, file).split(path.sep).join("/");
       // 字典/类型域文件本身就是中文源；测试文件自带的期望文案合法
-      if (rel.startsWith("i18n/locales/") || /\.test\.(ts|tsx)$/.test(rel) || rel.endsWith(".d.ts")) {
+      if (
+        rel.startsWith("i18n/locales/") ||
+        /\.test\.(ts|tsx)$/.test(rel) ||
+        rel.endsWith(".d.ts")
+      ) {
         continue;
       }
       if (WHITELIST.includes(rel)) continue;
       const hits = collectLiterals(file);
       if (hits.length > 0) {
-        offenders.push(`${rel}: ${hits.slice(0, 3).map((h) => `"${h.slice(0, 30)}"`).join(", ")}${hits.length > 3 ? ` (+${hits.length - 3})` : ""}`);
+        offenders.push(
+          `${rel}: ${hits
+            .slice(0, 3)
+            .map((h) => `"${h.slice(0, 30)}"`)
+            .join(", ")}${hits.length > 3 ? ` (+${hits.length - 3})` : ""}`,
+        );
       }
     }
-    expect(offenders, `以下文件含硬编码中文文案（抽取到 i18n 字典，或加入 hardcode-whitelist.json 并说明理由）：\n${offenders.join("\n")}`).toEqual([]);
+    expect(
+      offenders,
+      `以下文件含硬编码中文文案（抽取到 i18n 字典，或加入 hardcode-whitelist.json 并说明理由）：\n${offenders.join("\n")}`,
+    ).toEqual([]);
   });
 });

@@ -46,7 +46,8 @@ describe("B1 错误文案 key 化：messageKey 渲染 ≡ message 快照（zh �
     expect(toApiError(new Error(""))).toEqual({ type: ApiErrorType.UNKNOWN, message: "" });
     // 带 type 的对象透传不加不改：messageKey 随原对象保留
     expect(
-      toApiError({ type: ApiErrorType.PROXY, message: "x", messageKey: "error.api.proxy" }).messageKey,
+      toApiError({ type: ApiErrorType.PROXY, message: "x", messageKey: "error.api.proxy" })
+        .messageKey,
     ).toBe("error.api.proxy");
     expect(toApiError({ type: ApiErrorType.PROXY, message: "x" }).messageKey).toBeUndefined();
   });

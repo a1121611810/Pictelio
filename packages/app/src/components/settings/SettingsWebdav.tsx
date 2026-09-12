@@ -273,7 +273,9 @@ const SettingsWebdav: Component = () => {
         // i18n: set 时快照（瞬态）
         const skippedLabel =
           uid === null
-            ? t("settings.webdav.status.skippedLoggedOut", { count: plan.skippedAccountKeys.length })
+            ? t("settings.webdav.status.skippedLoggedOut", {
+                count: plan.skippedAccountKeys.length,
+              })
             : t("settings.webdav.status.skippedOtherAccount", {
                 count: plan.skippedAccountKeys.length,
               });
@@ -436,7 +438,11 @@ const SettingsWebdav: Component = () => {
                 onChange={(e) => void setWebdavAutoBackupDays(Number(e.currentTarget.value))}
               >
                 <For each={[1, 3, 7, 30]}>
-                  {(d) => <option value={String(d)}>{t("settings.webdav.autoBackupDays", { days: d })}</option>}
+                  {(d) => (
+                    <option value={String(d)}>
+                      {t("settings.webdav.autoBackupDays", { days: d })}
+                    </option>
+                  )}
                 </For>
               </select>
               <fluent-switch
@@ -587,9 +593,13 @@ const SettingsWebdav: Component = () => {
           <div class="flex flex-col gap-2">
             <p>{t("settings.webdav.restoreWillApply", { name: selected()!.name })}</p>
             <ul class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground2)]">
-              <li>{t("settings.webdav.summaryCreatedAt", { value: prepared()!.summary.createdAt })}</li>
+              <li>
+                {t("settings.webdav.summaryCreatedAt", { value: prepared()!.summary.createdAt })}
+              </li>
               <li>{t("settings.webdav.summaryEngine", { value: prepared()!.summary.engine })}</li>
-              <li>{t("settings.webdav.summaryAppVersion", { value: prepared()!.summary.appVersion })}</li>
+              <li>
+                {t("settings.webdav.summaryAppVersion", { value: prepared()!.summary.appVersion })}
+              </li>
               <li>
                 {t("settings.webdav.summaryCounts", {
                   device: prepared()!.summary.deviceKeyCount,

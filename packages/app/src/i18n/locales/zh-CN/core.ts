@@ -60,7 +60,8 @@ const zhCore = {
   "core.service.imageHostService.urlInvalid": "请输入有效的 URL",
   "core.service.imageHostService.protocolUnsupported": "仅支持 http:// 或 https:// 协议",
   "core.service.imageHostService.pixivDomainRejected": "图床 URL 不能直接使用 Pixiv 官方域名",
-  "core.service.imageHostService.cleartextHttpRejected": "Android 禁止明文 HTTP，请使用 https:// 镜像",
+  "core.service.imageHostService.cleartextHttpRejected":
+    "Android 禁止明文 HTTP，请使用 https:// 镜像",
 
   // ── services/otaService ──
   "core.service.otaService.noBundleAvailable": "无可用更新包",

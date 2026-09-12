@@ -30,12 +30,8 @@ const PullIndicator: Component<Props> = (props) => {
             <span class="spinner w-4 h-4" />
             {t("pullIndicator.refreshing")}
           </Match>
-          <Match when={props.zone === "settings-ready"}>
-            {t("pullIndicator.settingsReady")}
-          </Match>
-          <Match when={props.zone === "refresh-ready"}>
-            {t("pullIndicator.refreshReady")}
-          </Match>
+          <Match when={props.zone === "settings-ready"}>{t("pullIndicator.settingsReady")}</Match>
+          <Match when={props.zone === "refresh-ready"}>{t("pullIndicator.refreshReady")}</Match>
           <Match when={props.zone === "pulling" && props.distance < props.refreshThreshold}>
             {t("pullIndicator.pulling")}
           </Match>

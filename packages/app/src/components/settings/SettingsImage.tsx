@@ -128,9 +128,7 @@ const SettingsImage: Component<SettingsImageProps> = (props) => {
 
               onClick={() => onPickUgoiraMode(m)}
             >
-              {m === "fflate"
-                ? t("settings.image.ugoiraFflate")
-                : t("settings.image.ugoiraRange")}
+              {m === "fflate" ? t("settings.image.ugoiraFflate") : t("settings.image.ugoiraRange")}
             </button>
           ))}
         </div>

@@ -230,7 +230,10 @@ export function parseSnapshot(
   if (schemaVersion > supportedVersion) {
     throw new BackupFormatError(
       "SCHEMA_TOO_NEW",
-      t("core.util.backupCore.schemaTooNew", { current: schemaVersion, supported: supportedVersion }),
+      t("core.util.backupCore.schemaTooNew", {
+        current: schemaVersion,
+        supported: supportedVersion,
+      }),
     );
   }
   if (

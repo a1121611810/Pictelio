@@ -292,7 +292,8 @@ const enRoutes = {
   "illustDetail.blockedDoneToast": "Artist blocked",
   "illustDetail.tapRetry": "Tap to retry",
   "illustDetail.viewDownloads": "View downloads",
-  "illustDetail.queuedNotice": "Added {{count}} items to the download queue. See the downloads page",
+  "illustDetail.queuedNotice":
+    "Added {{count}} items to the download queue. See the downloads page",
   "illustDetail.saveNoImages": "No downloadable originals",
   "illustDetail.ugoiraMetaFailed": "Couldn't fetch ugoira info",
   "illustDetail.unfollowAria": "Unfollow",
@@ -317,7 +318,8 @@ const enRoutes = {
   "novelDetail.viewQueued": "View",
   "novelDetail.untranslatedMark": "[Untranslated]",
   "novelDetail.r18BlockError": "The “Translate R18 content” switch is off. Blocked",
-  "novelDetail.r18gBlockError": "The “Translate R18G content” switch is off. Blocked (nothing was sent)",
+  "novelDetail.r18gBlockError":
+    "The “Translate R18G content” switch is off. Blocked (nothing was sent)",
   "novelDetail.policyBlockError": "Content rating check failed. Blocked (nothing was sent)",
   "novelDetail.translateFailed": "Translation failed. Try again",
   "novelDetail.r18Aria": "Translate R18 content?",

@@ -153,10 +153,18 @@ const PersonalCenter: Component<Props> = (props) => {
             <SettingsCard tone="elevated">
               <MenuRow
                 icon="image"
-                label={profileState.isCurrentUser() ? t("personalCenter.myWorks") : t("personalCenter.theirWorks")}
+                label={
+                  profileState.isCurrentUser()
+                    ? t("personalCenter.myWorks")
+                    : t("personalCenter.theirWorks")
+                }
                 count={profileState.totalWorks()}
                 onClick={actions.works}
-                ariaLabel={profileState.isCurrentUser() ? t("personalCenter.myWorks") : t("personalCenter.theirWorks")}
+                ariaLabel={
+                  profileState.isCurrentUser()
+                    ? t("personalCenter.myWorks")
+                    : t("personalCenter.theirWorks")
+                }
               />
               <Show when={profileState.isCurrentUser()}>
                 <MenuRow
@@ -168,16 +176,32 @@ const PersonalCenter: Component<Props> = (props) => {
               </Show>
               <MenuRow
                 icon="people"
-                label={profileState.isCurrentUser() ? t("personalCenter.myFollowing") : t("personalCenter.theirFollowing")}
+                label={
+                  profileState.isCurrentUser()
+                    ? t("personalCenter.myFollowing")
+                    : t("personalCenter.theirFollowing")
+                }
                 count={profile()?.total_follow_users ?? 0}
                 onClick={actions.following}
-                ariaLabel={profileState.isCurrentUser() ? t("personalCenter.myFollowing") : t("personalCenter.theirFollowing")}
+                ariaLabel={
+                  profileState.isCurrentUser()
+                    ? t("personalCenter.myFollowing")
+                    : t("personalCenter.theirFollowing")
+                }
               />
               <MenuRow
                 icon="people"
-                label={profileState.isCurrentUser() ? t("personalCenter.myFollowers") : t("personalCenter.theirFollowers")}
+                label={
+                  profileState.isCurrentUser()
+                    ? t("personalCenter.myFollowers")
+                    : t("personalCenter.theirFollowers")
+                }
                 onClick={actions.followers}
-                ariaLabel={profileState.isCurrentUser() ? t("personalCenter.myFollowers") : t("personalCenter.theirFollowers")}
+                ariaLabel={
+                  profileState.isCurrentUser()
+                    ? t("personalCenter.myFollowers")
+                    : t("personalCenter.theirFollowers")
+                }
               />
             </SettingsCard>
           </div>

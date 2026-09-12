@@ -38,7 +38,9 @@ const SeriesSheetItem: Component<Props> = (props) => {
       role="button"
       tabindex={0}
       aria-label={
-        merged.isActive ? t("series.itemActiveAria", { title: merged.novel.title }) : merged.novel.title
+        merged.isActive
+          ? t("series.itemActiveAria", { title: merged.novel.title })
+          : merged.novel.title
       }
       onKeyDown={(e) => e.key === "Enter" && merged.onClick(merged.novel.id)}
     >

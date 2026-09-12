@@ -36,7 +36,9 @@ const CommentInput: Component<CommentInputProps> = (props) => {
     <div class="flex-shrink-0 border-t border-[var(--colorNeutralStroke2)] px-3 py-2.5 surface-appbar">
       <Show when={props.replyingTo}>
         <div class="flex items-center gap-1 mb-1.5 px-1 text-[var(--colorNeutralForeground2)] [font-size:var(--fontSizeBase200)]">
-          <span class="truncate">{t("comment.replyingTo", { name: props.replyingTo!.user.name })}</span>
+          <span class="truncate">
+            {t("comment.replyingTo", { name: props.replyingTo!.user.name })}
+          </span>
           <button
             class="text-[var(--colorBrandForeground1)] font-medium bg-transparent border-none p-0 cursor-pointer flex-shrink-0 ml-auto text-[var(--fontSizeBase100)]"
             onClick={props.onCancelReply}

@@ -309,8 +309,7 @@ const enComponents2 = {
   "translate.tierStandard": "Standard",
   "translate.tierPro": "High quality",
   "translate.progress": "Translated {{done}} / {{total}} blocks{{suffix}}",
-  "translate.progressSuffix":
-    ". The first screen is ready. The rest continues in the background…",
+  "translate.progressSuffix": ". The first screen is ready. The rest continues in the background…",
   "translate.failedHint":
     "{{count}} blocks failed (marked as Untranslated in the text). Retry the failed blocks. Successful blocks aren't billed again.",
 

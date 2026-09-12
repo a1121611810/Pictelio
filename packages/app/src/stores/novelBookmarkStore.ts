@@ -74,7 +74,10 @@ export async function ensureLoaded(): Promise<void> {
   setFallbackError(null);
   if (!user()) {
     // i18n: set 时快照（瞬态）
-    setFallbackError({ type: ApiErrorType.UNAUTHORIZED, message: t("core.store.novelBookmarkStore.notSignedIn") });
+    setFallbackError({
+      type: ApiErrorType.UNAUTHORIZED,
+      message: t("core.store.novelBookmarkStore.notSignedIn"),
+    });
     return;
   }
   await store.ensureLoaded();

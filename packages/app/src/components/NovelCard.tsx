@@ -121,7 +121,9 @@ const NovelCard: Component<Props> = (props) => {
           </div>
           <IllustTags tags={props.novel.tags} size="small" class="max-h-[54px] overflow-hidden" />
           <div class="flex items-center gap-[var(--spacingHorizontalS)] text-[var(--colorNeutralForeground3)] [font-size:var(--fontSizeBase100)]">
-            <span>{t("novelCard.statsWords", { count: props.novel.text_length.toLocaleString() })}</span>
+            <span>
+              {t("novelCard.statsWords", { count: props.novel.text_length.toLocaleString() })}
+            </span>
             {props.novel.series?.title && (
               <button
                 class="inline-flex items-center bg-transparent border-none p-0 cursor-pointer text-[var(--colorBrandForeground1)] hover:text-[var(--colorBrandForegroundLinkHover)] [font-size:var(--fontSizeBase100)]"

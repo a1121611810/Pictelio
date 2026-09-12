@@ -174,7 +174,11 @@ const ImageCard: Component<Props> = (props) => {
             disabled={following()}
             aria-label={isFollowed() ? t("imageCard.unfollowAria") : t("imageCard.followAria")}
           >
-            {following() ? t("imageCard.following") : isFollowed() ? t("imageCard.followed") : t("imageCard.follow")}
+            {following()
+              ? t("imageCard.following")
+              : isFollowed()
+                ? t("imageCard.followed")
+                : t("imageCard.follow")}
           </button>
         </p>
         <div class="mt-[var(--spacingVerticalXS)] max-h-[54px] overflow-hidden">

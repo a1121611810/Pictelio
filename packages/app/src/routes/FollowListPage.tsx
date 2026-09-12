@@ -98,7 +98,9 @@ const FollowListPage: Component<Props> = (props) => {
               ←
             </fluent-button>
             <h1 class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] tracking-tight leading-none">
-              {props.mode === "following" ? t("followList.followingTitle") : t("followList.followersTitle")}
+              {props.mode === "following"
+                ? t("followList.followingTitle")
+                : t("followList.followersTitle")}
             </h1>
           </header>
 
@@ -155,9 +157,15 @@ const FollowListPage: Component<Props> = (props) => {
                           e.stopPropagation();
                           toggleFollow(index());
                         }}
-                        aria-label={preview.user.is_followed ? t("followList.unfollow") : t("followList.follow")}
+                        aria-label={
+                          preview.user.is_followed
+                            ? t("followList.unfollow")
+                            : t("followList.follow")
+                        }
                       >
-                        {preview.user.is_followed ? t("followList.following") : t("followList.follow")}
+                        {preview.user.is_followed
+                          ? t("followList.following")
+                          : t("followList.follow")}
                       </button>
                     </Show>
                   </div>

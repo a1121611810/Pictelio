@@ -126,7 +126,11 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
           </div>
         </div>
 
-        <div class="mt-3 grid grid-cols-3 gap-2" role="group" aria-label={t("settings.content.aiFilter.groupLabel")}>
+        <div
+          class="mt-3 grid grid-cols-3 gap-2"
+          role="group"
+          aria-label={t("settings.content.aiFilter.groupLabel")}
+        >
           <For each={AI_FILTER_OPTIONS}>
             {(option) => {
               const selected = () => aiFilterMode() === option.value;

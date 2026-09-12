@@ -28,9 +28,17 @@ const sections: AboutSection[] = [
     titleKey: "about.section.disclaimer",
     rows: [
       { labelKey: "about.row.thirdParty", valueKey: "about.row.thirdPartyValue", icon: "info" },
-      { labelKey: "about.row.contentSource", valueKey: "about.row.contentSourceValue", icon: "info" },
+      {
+        labelKey: "about.row.contentSource",
+        valueKey: "about.row.contentSourceValue",
+        icon: "info",
+      },
       { labelKey: "about.row.copyright", valueKey: "about.row.copyrightValue", icon: "info" },
-      { labelKey: "about.row.ageRestriction", valueKey: "about.row.ageRestrictionValue", icon: "info" },
+      {
+        labelKey: "about.row.ageRestriction",
+        valueKey: "about.row.ageRestrictionValue",
+        icon: "info",
+      },
     ],
   },
   {
@@ -125,11 +133,17 @@ const OtaStatusRows: Component = () => {
   return (
     <Show
       when={!failed()}
-      fallback={<div class="ota-row text-[var(--colorNeutralForeground3)]">{t("about.ota.unavailable")}</div>}
+      fallback={
+        <div class="ota-row text-[var(--colorNeutralForeground3)]">
+          {t("about.ota.unavailable")}
+        </div>
+      }
     >
       <Show
         when={status()}
-        fallback={<div class="ota-row text-[var(--colorNeutralForeground3)]">{t("about.ota.loading")}</div>}
+        fallback={
+          <div class="ota-row text-[var(--colorNeutralForeground3)]">{t("about.ota.loading")}</div>
+        }
       >
         {(st) => (
           <>

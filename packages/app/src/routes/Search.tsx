@@ -542,16 +542,20 @@ const SearchHistorySection: Component<HistoryProps> = (props) => {
       <Show
         when={props.history.length > 0}
         fallback={
-        <div class="flex flex-col items-center gap-2 py-12 text-center">
+          <div class="flex flex-col items-center gap-2 py-12 text-center">
             <span class="text-[var(--colorNeutralForeground4)]">
               <FluentIcon name="search" size={40} />
             </span>
-            <p class="text-[var(--colorNeutralForeground3)] text-sm">{t("searchPage.historyEmpty")}</p>
+            <p class="text-[var(--colorNeutralForeground3)] text-sm">
+              {t("searchPage.historyEmpty")}
+            </p>
           </div>
         }
       >
         <div class="flex items-center justify-between mb-3">
-          <h3 class="text-sm font-semibold text-[var(--colorNeutralForeground1)]">{t("searchPage.historyTitle")}</h3>
+          <h3 class="text-sm font-semibold text-[var(--colorNeutralForeground1)]">
+            {t("searchPage.historyTitle")}
+          </h3>
           <button class="history-clear-btn" onClick={props.onClear}>
             {t("searchPage.historyClear")}
           </button>

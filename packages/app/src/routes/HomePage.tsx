@@ -459,9 +459,7 @@ const HomePage: Component = () => {
           if (tab === "recommended" && contentType() === "illust") {
             const proto = protoVariant();
             if (proto) {
-              return (
-                <RankingPrototype variant={proto} feed={<IllustFeedPanel tab={tab} />} />
-              );
+              return <RankingPrototype variant={proto} feed={<IllustFeedPanel tab={tab} />} />;
             }
           }
           return contentType() === "illust" ? (

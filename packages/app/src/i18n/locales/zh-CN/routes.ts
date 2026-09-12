@@ -58,13 +58,16 @@ const zhRoutes = {
   "imageCache.title": "图片缓存",
   "imageCache.disk": "磁盘缓存",
   "imageCache.diskAria": "启用磁盘缓存",
-  "imageCache.diskDesc": "将图片缓存到本地文件。开启后：重复浏览无需重新下载， 重启应用后缓存仍在。磁盘缓存上限可在下方调节。",
+  "imageCache.diskDesc":
+    "将图片缓存到本地文件。开启后：重复浏览无需重新下载， 重启应用后缓存仍在。磁盘缓存上限可在下方调节。",
   "imageCache.browser": "浏览器缓存",
   "imageCache.browserAria": "启用浏览器缓存",
-  "imageCache.browserDesc": "通过 HTTP 缓存头让浏览器缓存图片。开启后：同一张图在本次启动内 不再请求网络，回滚浏览立即显示。",
+  "imageCache.browserDesc":
+    "通过 HTTP 缓存头让浏览器缓存图片。开启后：同一张图在本次启动内 不再请求网络，回滚浏览立即显示。",
   "imageCache.prefetch": "后台预取",
   "imageCache.prefetchAria": "启用后台预取",
-  "imageCache.prefetchDesc": "提前加载视口外的图片。开启后：滚动更流畅，但消耗更多流量。 流量敏感用户建议关闭。",
+  "imageCache.prefetchDesc":
+    "提前加载视口外的图片。开启后：滚动更流畅，但消耗更多流量。 流量敏感用户建议关闭。",
   "imageCache.diskLimit": "磁盘缓存上限",
   "imageCache.diskSizeNote": "当前最多缓存约 {{size}} MB。 修改后新写入的缓存文件按新上限淘汰。",
   "imageCache.independentNote": "三个开关各自独立，修改后立即生效。",
@@ -116,13 +119,16 @@ const zhRoutes = {
   "clientSwitch.kindDescWebview": "网页渲染内核（默认）",
   "clientSwitch.currentEngine": "当前引擎",
   "clientSwitch.runningLynx": "当前以 Lynx 渲染引擎运行。",
-  "clientSwitch.runningWebview": "当前以 WebView 渲染引擎运行；切换后应用将重启并以 Lynx 引擎启动。",
+  "clientSwitch.runningWebview":
+    "当前以 WebView 渲染引擎运行；切换后应用将重启并以 Lynx 引擎启动。",
   "clientSwitch.supportedEngines": "当前包支持的引擎",
   "clientSwitch.unknownKinds": "未知（当前环境无法读取包能力信息）",
   "clientSwitch.differences": "两引擎差异",
-  "clientSwitch.webviewDesc": "系统网页渲染内核，兼容性与稳定性最佳，功能最全；Pictelio 主应用默认使用。",
+  "clientSwitch.webviewDesc":
+    "系统网页渲染内核，兼容性与稳定性最佳，功能最全；Pictelio 主应用默认使用。",
   "clientSwitch.lynxDesc": "实验性渲染引擎，性能与流畅度优先；仍在迭代中，部分功能可能不可用。",
-  "clientSwitch.warning": "Lynx 渲染引擎仍在迭代中，部分功能可能不可用。切换前请确认已知悉相关风险。",
+  "clientSwitch.warning":
+    "Lynx 渲染引擎仍在迭代中，部分功能可能不可用。切换前请确认已知悉相关风险。",
   "clientSwitch.switchBackTitle": "如何切回 WebView",
   "clientSwitch.switchBackDesc":
     "切换后如需回到 WebView：打开 Lynx 客户端 → 「个人中心」→ 切换渲染引擎 → 确认切回。 应用将重启并恢复 WebView 引擎。本页仅提供「切换到 Lynx」单向入口。",
@@ -190,7 +196,8 @@ const zhRoutes = {
   "downloadManager.deleteDialogAria": "删除下载确认",
   "downloadManager.deleteDialogTitle": "删除下载",
   "downloadManager.deleteDialogBody": "将移除 {{count}} 条下载记录。",
-  "downloadManager.deleteDialogNote": "「删除文件与记录」会同时删除已下载的文件；「仅清空记录」保留已下载文件。",
+  "downloadManager.deleteDialogNote":
+    "「删除文件与记录」会同时删除已下载的文件；「仅清空记录」保留已下载文件。",
   "downloadManager.cancel": "取消",
   "downloadManager.clearRecords": "仅清空记录",
   "downloadManager.deleteFiles": "删除文件与记录",
@@ -202,7 +209,8 @@ const zhRoutes = {
   "imageHost.intro": "配置第三方 Pixiv 图片代理源。",
   "imageHost.enable": "启用图床代理",
   "imageHost.enableDesc": "开启后，图片将通过下方配置的第三方服务器加载",
-  "imageHost.warning": "图片流量将不经过 Pixiv 官方服务器。第三方图床的可用性、速度和隐私策略不受 Pictelio 控制。",
+  "imageHost.warning":
+    "图片流量将不经过 Pixiv 官方服务器。第三方图床的可用性、速度和隐私策略不受 Pictelio 控制。",
   "imageHost.modeTitle": "运行模式",
   "imageHost.modeRace": "并发请求",
   "imageHost.modeRaceDesc": "同时向所有启用图床发请求，取最快响应；仅 Web（原生端以负载均衡运行）",

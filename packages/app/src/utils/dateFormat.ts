@@ -6,7 +6,11 @@ import { currentLocale, t } from "@/i18n";
 export function formatDate(input: string | number | Date): string {
   const d = input instanceof Date ? input : new Date(input);
   const localeTag = currentLocale() === "en" ? "en-US" : "zh-CN";
-  return new Intl.DateTimeFormat(localeTag, { year: "numeric", month: "numeric", day: "numeric" }).format(d);
+  return new Intl.DateTimeFormat(localeTag, {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  }).format(d);
 }
 
 /** 相对时间：<1min 刚刚 / <60min N分钟前 / <24h N小时前 / <30d N天前，之后落绝对日期 */

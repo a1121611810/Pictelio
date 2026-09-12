@@ -55,7 +55,11 @@ const PagePickerSheet: Component<PagePickerSheetProps> = (props) => {
   };
 
   return (
-    <FluentDialog open={props.open} onClose={props.onClose} aria-label={t("illust.pagePicker.dialogAria")}>
+    <FluentDialog
+      open={props.open}
+      onClose={props.onClose}
+      aria-label={t("illust.pagePicker.dialogAria")}
+    >
       <h3 slot="title">{t("illust.pagePicker.title")}</h3>
       <div class="grid grid-cols-3 gap-2 max-h-[55vh] overflow-y-auto">
         <For each={props.pageUrls}>
@@ -120,7 +124,9 @@ const PagePickerSheet: Component<PagePickerSheetProps> = (props) => {
           disabled={selected().size === 0 || props.busy}
           ref={fluentOn("click", confirm)}
         >
-          {props.busy ? t("illust.pagePicker.saving") : t("illust.pagePicker.saveCount", { count: selected().size })}
+          {props.busy
+            ? t("illust.pagePicker.saving")
+            : t("illust.pagePicker.saveCount", { count: selected().size })}
         </fluent-button>
       </div>
     </FluentDialog>

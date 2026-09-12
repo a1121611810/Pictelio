@@ -36,7 +36,6 @@ const errorSuffix = () => {
 };
 
 const GateOverlay: Component = () => {
-
   return (
     <Show when={gateActive()}>
       <div

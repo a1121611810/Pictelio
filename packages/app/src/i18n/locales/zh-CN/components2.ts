@@ -98,7 +98,8 @@ const zhComponents2 = {
   "export.formatAria.fb2": "导出格式 FB2",
   "export.formatHint": "默认使用设置页选择的格式；此处修改仅作用于本次导出。",
   "export.contentLabel": "导出内容",
-  "export.contentSummary": "正文（必含） · 元数据 {{metadata}} · 封面 {{cover}} · 正文插图 {{inlineImages}}",
+  "export.contentSummary":
+    "正文（必含） · 元数据 {{metadata}} · 封面 {{cover}} · 正文插图 {{inlineImages}}",
   "export.contentHint": "内容开关在设置页「导出」中修改。",
   "export.optionOn": "开",
   "export.optionOff": "关",
@@ -293,7 +294,8 @@ const zhComponents2 = {
   "translate.closeAria": "关闭",
   "translate.noKeyHint":
     "尚未配置 DeepSeek API Key。请前往「设置 → 翻译设置」填写你自己的 API Key（BYOK，密钥仅存本机、直连服务商）。",
-  "translate.privacyHint": "将小说正文翻译为简体中文。内容将发送至 DeepSeek（你选择的模型），按量计费。",
+  "translate.privacyHint":
+    "将小说正文翻译为简体中文。内容将发送至 DeepSeek（你选择的模型），按量计费。",
   "translate.tierLabel": "翻译质量（本页临时）",
   "translate.tierStandard": "标准",
   "translate.tierPro": "高质量",

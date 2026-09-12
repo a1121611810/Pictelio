@@ -224,9 +224,7 @@ const ClientSwitch: Component = () => {
           </section>
 
           {/* 实验性警告 */}
-          <fluent-message-bar intent="warning">
-            {t("clientSwitch.warning")}
-          </fluent-message-bar>
+          <fluent-message-bar intent="warning">{t("clientSwitch.warning")}</fluent-message-bar>
 
           {/* 切回路径指引 */}
           <section class="rounded-[var(--borderRadiusXLarge)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] p-4">

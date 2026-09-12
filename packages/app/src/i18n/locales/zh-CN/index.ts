@@ -8,7 +8,15 @@ import components1_ from "./components1";
 import components2_ from "./components2";
 import core_ from "./core";
 
-const zhCN = { ...error_, ...settings_, ...time_, ...routes_, ...components1_, ...components2_, ...core_ } as const;
+const zhCN = {
+  ...error_,
+  ...settings_,
+  ...time_,
+  ...routes_,
+  ...components1_,
+  ...components2_,
+  ...core_,
+} as const;
 
 export default zhCN;
 export type I18nKey = keyof typeof zhCN;

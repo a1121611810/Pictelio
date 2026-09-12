@@ -6,9 +6,11 @@ const zhSettings = {
   "settings.appearance.detailStairs": "详情页楼梯导航",
   "settings.appearance.detailStairsDesc": "在多页作品中显示右侧页码导航条，方便快速跳转",
   "settings.appearance.autoHideNav": "自动隐藏导航栏",
-  "settings.appearance.autoHideNavDesc": "在个人页与关注列表等页面向下滚动时收起导航栏，上滑时重新显示",
+  "settings.appearance.autoHideNavDesc":
+    "在个人页与关注列表等页面向下滚动时收起导航栏，上滑时重新显示",
   "settings.appearance.persistScroll": "持久化滚动恢复",
-  "settings.appearance.persistScrollDesc": "关闭时重新打开应用始终从列表顶部开始（默认）；开启后恢复上次浏览位置",
+  "settings.appearance.persistScrollDesc":
+    "关闭时重新打开应用始终从列表顶部开始（默认）；开启后恢复上次浏览位置",
   "settings.appearance.language": "语言",
   "settings.appearance.languageDesc": "切换界面显示语言，立即生效",
 
@@ -66,7 +68,8 @@ const zhSettings = {
   "settings.translate.tierPro": "高质量",
   "settings.translate.tierProPrice": "v4-pro · ¥3/6 每百万",
   "settings.translate.thinking": "启用思考模式",
-  "settings.translate.thinkingDesc": "默认关。开启后翻译更慢、产生额外 reasoning token 计费、temperature 不生效",
+  "settings.translate.thinkingDesc":
+    "默认关。开启后翻译更慢、产生额外 reasoning token 计费、temperature 不生效",
   "settings.translate.sensitiveTitle": "敏感内容翻译",
   "settings.translate.r18": "翻译 R18 内容",
   "settings.translate.r18Desc": "默认关。开启需确认风险，正文将发送至 AI 服务商",
@@ -99,7 +102,8 @@ const zhSettings = {
   "settings.export.includeCover": "包含封面",
   "settings.export.includeCoverDesc": "在支持图片的格式（HTML/PDF/EPUB/DOCX/FB2）中嵌入封面",
   "settings.export.includeImages": "包含正文插图",
-  "settings.export.includeImagesDesc": "嵌入正文中的 Pixiv 插图；文本格式（TXT/MD/RTF）仅保留图片链接",
+  "settings.export.includeImagesDesc":
+    "嵌入正文中的 Pixiv 插图；文本格式（TXT/MD/RTF）仅保留图片链接",
   "settings.export.formatTxt": "小说导出格式 TXT",
   "settings.export.formatHtml": "小说导出格式 HTML",
   "settings.export.formatMd": "小说导出格式 Markdown",
@@ -159,7 +163,8 @@ const zhSettings = {
   // ── 网络自检（SettingsNetDiag）──
   "settings.netdiag.sectionTitle": "诊断",
   "settings.netdiag.entry": "网络自检",
-  "settings.netdiag.desc": "检测本机网络、DNS、连接、TLS 与 Pixiv 可达性，并生成可复制的脱敏诊断报告。",
+  "settings.netdiag.desc":
+    "检测本机网络、DNS、连接、TLS 与 Pixiv 可达性，并生成可复制的脱敏诊断报告。",
 
   // ── 数据清理/删号确认（SettingsDialogs）──
   "settings.dialogs.clearAria": "清除所有本地数据？",
@@ -227,7 +232,8 @@ const zhSettings = {
   "settings.webdav.summaryCreatedAt": "备份时间：{{value}}",
   "settings.webdav.summaryEngine": "来源引擎：{{value}}",
   "settings.webdav.summaryAppVersion": "应用版本：{{value}}",
-  "settings.webdav.summaryCounts": "设备级 {{device}} 项 / 账号级（当前账号）{{account}} 项 / sets {{sets}} 组",
+  "settings.webdav.summaryCounts":
+    "设备级 {{device}} 项 / 账号级（当前账号）{{account}} 项 / sets {{sets}} 组",
   "settings.webdav.summarySkipped": "跳过账号级键 {{count}} 项",
   "settings.webdav.summarySkippedLoggedOut": "（当前未登录，账号级键全部跳过）",
   "settings.webdav.summarySkippedOther": "（非当前账号）",

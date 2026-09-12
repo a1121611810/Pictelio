@@ -58,7 +58,11 @@ const BottomActionBar: Component<BottomActionBarProps> = (props) => {
             onPointerUp={props.onBookmarkPointerUp}
             onPointerLeave={props.onBookmarkPointerUp}
             disabled={props.bookmarking}
-            aria-label={props.isBookmarked ? t("illust.actionBar.unbookmarkAria") : t("illust.actionBar.bookmarkAria")}
+            aria-label={
+              props.isBookmarked
+                ? t("illust.actionBar.unbookmarkAria")
+                : t("illust.actionBar.bookmarkAria")
+            }
           >
             {props.isBookmarked ? t("illust.actionBar.bookmarked") : t("illust.actionBar.bookmark")}
           </button>
