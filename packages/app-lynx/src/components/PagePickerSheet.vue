@@ -5,6 +5,7 @@
 // 打开（挂载）默认全选（批量语义默认值）；确认上抛升序 0-based 页号数组，
 // 保存流程由宿主（IllustDetail）编排。
 import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { t } from '../i18n'
 import { useModalStack } from '../stores/modalStack'
 import { proxyImageUrl } from '../utils/imageUrl'
 import SkeletonImage from './SkeletonImage.vue'
@@ -65,9 +66,9 @@ onBeforeUnmount(() => {
     <!-- 底部面板：@tap.stop 防穿透 -->
     <view class="absolute left-0 right-0 bottom-0 bg-surface-container-lowest rounded-t-[var(--md-shape-large)] p-4" @tap.stop>
       <view class="flex flex-row items-center mb-2">
-        <text class="text-title-medium font-medium text-surface-on flex-1">选择要保存的页</text>
+        <text class="text-title-medium font-medium text-surface-on flex-1">{{ t('pagePicker.title') }}</text>
         <view class="px-2 py-1" @tap="toggleAll">
-          <text class="text-label-large text-primary">{{ allSelected() ? '清除全选' : '全选' }}</text>
+          <text class="text-label-large text-primary">{{ allSelected() ? t('pagePicker.clearAll') : t('pagePicker.selectAll') }}</text>
         </view>
       </view>
 
@@ -97,13 +98,13 @@ onBeforeUnmount(() => {
       </scroll-view>
 
       <view class="flex flex-row items-center mt-3">
-        <text class="text-label-large text-outline flex-1">已选 {{ selected.length }} / {{ pageUrls.length }} 页</text>
+        <text class="text-label-large text-outline flex-1">{{ t('pagePicker.selectedCount', { selected: selected.length, total: pageUrls.length }) }}</text>
         <view
           class="h-[11vw] px-6 rounded-full bg-primary flex items-center justify-center"
           :class="!selected.length || busy ? 'opacity-40' : ''"
           @tap="confirm"
         >
-          <text class="text-label-large text-surface-on">{{ busy ? '保存中…' : `保存（${selected.length}）` }}</text>
+          <text class="text-label-large text-surface-on">{{ busy ? t('pagePicker.saving') : t('pagePicker.save', { count: selected.length }) }}</text>
         </view>
       </view>
     </view>

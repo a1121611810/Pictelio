@@ -12,6 +12,7 @@
 // router.handleSystemBack 的 modalStack 优先于页面返回（ADR-0066 扩展）；
 // 关闭/卸载时注销。closeTopModal pop 后调用 → 本组件 emit('cancel')。
 import { watch, onBeforeUnmount } from 'vue'
+import { t } from '../i18n'
 import { useModalStack } from '../stores/modalStack'
 import { WATCHLIST_PROMPT_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 
@@ -79,12 +80,12 @@ onBeforeUnmount(() => {
     :accessibility-label="WATCHLIST_PROMPT_A11Y_LABELS.dialog"
   >
     <view class="w-[74.667vw] max-w-[74.667vw] bg-surface-container-high rounded-[var(--md-shape-extra-large)] px-6 pt-5 pb-3 shadow-[var(--md-elevation-3)]">
-      <text class="text-headline-small font-medium text-surface-on">追更这个系列？</text>
+      <text class="text-headline-small font-medium text-surface-on">{{ t('watchlistPrompt.title') }}</text>
       <text class="text-body-medium text-surface-on-variant mt-4 leading-snug">
         《{{ seriesTitle }}》· {{ authorName }}
       </text>
       <text class="text-body-small text-surface-on-variant mt-1.5 leading-snug">
-        追更后可在「我的 → 追更列表」查看最新更新
+        {{ t('watchlistPrompt.hint') }}
       </text>
 
       <!-- 追更失败错误条（M3 error token）：保留「追更」可重试 -->
@@ -100,7 +101,7 @@ onBeforeUnmount(() => {
           :accessibility-label="WATCHLIST_PROMPT_A11Y_LABELS.decline"
           @tap="onDecline"
         >
-          <text class="text-label-large font-medium text-primary">暂不</text>
+          <text class="text-label-large font-medium text-primary">{{ t('watchlistPrompt.decline') }}</text>
         </view>
         <!-- busy 禁用态：opacity-40 + tap 守卫（防连点，对齐 createBookmarkToggle busy 语义） -->
         <view
@@ -110,7 +111,7 @@ onBeforeUnmount(() => {
           :accessibility-label="WATCHLIST_PROMPT_A11Y_LABELS.confirm"
           @tap="onConfirm"
         >
-          <text class="text-label-large font-medium" :class="busy ? 'text-surface-on-variant' : 'text-primary'">追更</text>
+          <text class="text-label-large font-medium" :class="busy ? 'text-surface-on-variant' : 'text-primary'">{{ t('watchlistPrompt.confirm') }}</text>
         </view>
       </view>
     </view>

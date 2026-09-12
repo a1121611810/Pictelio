@@ -8,6 +8,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import type { CommentContentType } from '../api/comment'
 import type { PixivComment } from '../api/types'
+import { t } from '../i18n'
 import type { CommentsState } from '../primitives/useComments'
 import { useComments } from '../primitives/useComments'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
@@ -95,7 +96,7 @@ onBeforeUnmount(() => {
       <!-- M3 bottom sheet 顶部：居中标题（title-large）+ 关闭按钮 -->
       <view class="flex flex-row items-center h-[11.733vw] px-4 flex-shrink-0">
         <view class="w-[8vw]" />
-        <text class="flex-1 text-center text-title-large font-medium text-surface-on">评论 ({{ state.comments.length }})</text>
+        <text class="flex-1 text-center text-title-large font-medium text-surface-on">{{ t('commentOverlay.title', { count: state.comments.length }) }}</text>
         <view class="w-[8vw] h-[8vw] flex items-center justify-center" @tap="onClose">
           <text class="text-[6.4vw] leading-none text-surface-on-variant">×</text>
         </view>
@@ -117,12 +118,12 @@ onBeforeUnmount(() => {
         v-else-if="view === 'error'"
         class="w-full flex-1 min-h-0 flex flex-col items-center justify-center"
       >
-        <text class="text-body-small text-error px-8 text-center">{{ state.error ?? '加载失败，请重试' }}</text>
+        <text class="text-body-small text-error px-8 text-center">{{ state.error ?? t('commentOverlay.loadFailedRetry') }}</text>
         <view
           class="mt-4 px-6 h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
           @tap="retry"
         >
-          <text class="text-label-large font-medium text-primary-on">重试</text>
+          <text class="text-label-large font-medium text-primary-on">{{ t('commentOverlay.retry') }}</text>
         </view>
       </view>
 
@@ -138,7 +139,7 @@ onBeforeUnmount(() => {
           v-if="view === 'empty'"
           class="w-full flex-1 min-h-0 flex flex-col items-center justify-center"
         >
-          <text class="text-body-medium text-outline">还没有评论</text>
+          <text class="text-body-medium text-outline">{{ t('commentOverlay.empty') }}</text>
         </view>
 
         <!-- 评论列表：flex-1 min-h-0，独立垂直滚动；item-key 必须 String（ADR-0056） -->
@@ -180,7 +181,7 @@ onBeforeUnmount(() => {
             full-span
             class="w-full h-10 flex items-center justify-center"
           >
-            <text class="text-label-medium text-outline">没有更多了</text>
+            <text class="text-label-medium text-outline">{{ t('commentOverlay.noMore') }}</text>
           </list-item>
         </list>
       </template>

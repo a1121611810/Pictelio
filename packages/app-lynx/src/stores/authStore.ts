@@ -12,6 +12,7 @@
 // 模块级 `import { currentUser }` + 兼容桥；T5 收口）。
 import { ref, computed } from "vue"
 import { defineStore } from "pinia"
+import { t } from "../i18n"
 import { isNativeMode, getNativeModules, setAccessToken, setOnUnauthorized, setAuthPermanentFailure, setAuthReadyProvider } from "../api/client"
 import { loginWithRefreshToken } from "../api/auth"
 import type { PixivUser } from "../api/types"
@@ -50,7 +51,7 @@ export const useAuthStore = defineStore("auth", () => {
         clearTokens: (callback: (arg1: string, arg2: string) => void) => void
       } | undefined
       if (!auth) {
-        _authError.value = "原生认证模块不可用"
+        _authError.value = t("authStore.nativeAuthUnavailable") // i18n: 赋值时快照（瞬态）
         return false
       }
       return new Promise((resolve) => {
@@ -91,7 +92,7 @@ export const useAuthStore = defineStore("auth", () => {
             })
             resolve(true)
           } catch (e) {
-            _authError.value = "登录响应解析失败"
+            _authError.value = t("authStore.responseParseFailed") // i18n: 赋值时快照（瞬态）
             resolve(false)
           }
         })
@@ -157,7 +158,7 @@ export const useAuthStore = defineStore("auth", () => {
   async function loginWithToken(token: string): Promise<void> {
     const trimmed = token.trim()
     if (!trimmed) {
-      _authError.value = "请输入 refresh_token"
+      _authError.value = t("authStore.emptyToken") // i18n: 赋值时快照（瞬态）
       return
     }
     await performRefresh(trimmed)

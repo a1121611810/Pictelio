@@ -6,6 +6,7 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { getNativeModules, isNativeMode } from '../api/client'
+import { t } from '../i18n'
 import { idbGet, idbSet } from '../utils/idbKV'
 import { unquoteNativeString } from '../utils/tokenStorage'
 import {
@@ -79,7 +80,7 @@ const delegatingExecutor: DownloadExecutor = {
   start(task, runId, cb) {
     if (!executor) {
       console.warn('[downloadStore] 下载执行器未接入，任务失败')
-      cb.onFail('下载执行器未接入')
+      cb.onFail(t('downloadStore.executorNotReady')) // i18n: 赋值时快照（瞬态，message 流经任务错误展示）
       return
     }
     executor.start(task, runId, cb)
@@ -93,7 +94,7 @@ const delegatingExecutor: DownloadExecutor = {
   deleteFile(uri) {
     if (!executor) {
       console.warn('[downloadStore] 下载执行器未接入，删除文件失败')
-      return Promise.reject(new Error('下载执行器未接入'))
+      return Promise.reject(new Error(t('downloadStore.executorNotReady'))) // i18n: 抛出时快照（瞬态）
     }
     return executor.deleteFile(uri)
   },
@@ -145,11 +146,11 @@ export const useDownloadStore = defineStore('downloads', () => {
       .tasks.filter((t) => ids.includes(t.id) && t.status === 'completed' && t.outputUri)
       .map((t) => t.outputUri as string)
     if (uris.length === 0) {
-      throw new Error('没有可分享的已下载文件')
+      throw new Error(t('downloadStore.nothingToShare')) // i18n: 抛出时快照（瞬态）
     }
     if (!sharer) {
       console.warn('[downloadStore] 分享器未接入（T6）')
-      throw new Error('分享功能未接入')
+      throw new Error(t('downloadStore.shareUnavailable')) // i18n: 抛出时快照（瞬态）
     }
     await sharer(uris)
   }

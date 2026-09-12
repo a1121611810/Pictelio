@@ -5,6 +5,7 @@
 // 删除权限在渲染层判定：currentUser.id === comment.user.id 时显示删除（删除中置灰 + 「删除中…」）。
 import { computed } from 'vue'
 import type { PixivComment, PixivCommentParent } from '../api/types'
+import { t } from '../i18n'
 import { useAuthStore } from '../stores/authStore'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { formatRelativeTime } from '../utils/dateFormat'
@@ -74,7 +75,7 @@ const isMine = computed(() => useAuthStore().currentUser?.id === props.comment.u
       <!-- 楼层引用块：回复 xxx：… -->
       <view v-if="parent" class="mt-1.5 px-2.5 py-1.5 bg-surface-container-highest rounded-[var(--md-shape-extra-small)]">
         <text class="text-label-medium text-surface-on-variant line-clamp-1">
-          回复 {{ parent.user.name }}：{{ parent.comment }}
+          {{ t('commentItem.replyTo', { name: parent.user.name }) }}{{ parent.comment }}
         </text>
       </view>
 
@@ -83,16 +84,16 @@ const isMine = computed(() => useAuthStore().currentUser?.id === props.comment.u
 
       <!-- 操作行：回复 / 展开楼层（has_replies 时）/ 删除（本人时，删除中置灰） -->
       <view class="flex flex-row items-center gap-5 mt-2">
-        <text class="text-label-medium text-outline" @tap="emit('reply')">回复</text>
+        <text class="text-label-medium text-outline" @tap="emit('reply')">{{ t('commentItem.reply') }}</text>
         <text
           v-if="comment.has_replies && !hideThreadToggle"
           class="text-label-medium text-primary underline"
           @tap="emit('toggleReplies')"
         >
-          {{ expanded ? '收起回复' : `展开 ${comment.reply_count ?? 0} 条回复` }}
+          {{ expanded ? t('commentItem.collapseReplies') : t('commentItem.expandReplies', { count: comment.reply_count ?? 0 }) }}
         </text>
-        <text v-if="isMine && !deleting" class="text-label-medium text-outline" @tap="emit('delete')">删除</text>
-        <text v-if="isMine && deleting" class="text-label-medium text-error">删除中…</text>
+        <text v-if="isMine && !deleting" class="text-label-medium text-outline" @tap="emit('delete')">{{ t('commentItem.delete') }}</text>
+        <text v-if="isMine && deleting" class="text-label-medium text-error">{{ t('commentItem.deleting') }}</text>
       </view>
     </view>
   </view>

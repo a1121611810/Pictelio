@@ -3,6 +3,9 @@
 // 职责：备份域分区（设备级/账号级/排除）、快照 v1 序列化与解析、恢复计划（merge-by-keys）。
 // 无 IO：原始 KV 与 sets 由调用层（T6/T7 接线）注入——
 // 快照内的值就是存储层原始字符串（跨引擎共享 SharedPreferences 的口径，ADR-0103）。
+// BackupFormatError 的 message 经 t() 快照产出（抛出时定格；展示在 Me 恢复流程错误条），
+// WEBDAV_ERROR_MESSAGES 注册表因被源级测试钉住字面量暂不抽取（B9 #508）。
+import { t } from "../i18n";
 import type { WebDavErrorKind } from "./webDavBridge"
 
 
@@ -209,19 +212,20 @@ export function parseSnapshot(
   try {
     raw = JSON.parse(utf8Decode(bytes))
   } catch {
-    throw new BackupFormatError("NOT_BACKUP", "不是有效的 Pictelio 备份（JSON 解析失败）")
+    throw new BackupFormatError("NOT_BACKUP", t("backupCore.notBackupJson")) // i18n: 抛出时快照（瞬态）
   }
   if (!isRecord(raw) || raw.format !== BACKUP_FORMAT) {
-    throw new BackupFormatError("NOT_BACKUP", "不是 Pictelio 备份（format 标识不符）")
+    throw new BackupFormatError("NOT_BACKUP", t("backupCore.notBackupFormat")) // i18n: 抛出时快照（瞬态）
   }
   const schemaVersion = raw.schemaVersion
   if (typeof schemaVersion !== "number" || !Number.isInteger(schemaVersion) || schemaVersion < 1) {
-    throw new BackupFormatError("CORRUPT", "备份 schemaVersion 缺失或非法")
+    throw new BackupFormatError("CORRUPT", t("backupCore.schemaMissing")) // i18n: 抛出时快照（瞬态）
   }
   if (schemaVersion > supportedVersion) {
     throw new BackupFormatError(
       "SCHEMA_TOO_NEW",
-      `备份来自更新版本的应用（schemaVersion ${schemaVersion} > ${supportedVersion}），请升级后恢复`,
+      // i18n: 抛出时快照（瞬态）
+      t("backupCore.schemaTooNew", { version: schemaVersion, supported: supportedVersion }),
     )
   }
   if (
@@ -234,7 +238,7 @@ export function parseSnapshot(
     !isRecord(raw.sets) ||
     !Object.values(raw.sets).every((v) => Array.isArray(v))
   ) {
-    throw new BackupFormatError("CORRUPT", "备份字段缺失或类型不符")
+    throw new BackupFormatError("CORRUPT", t("backupCore.fieldsInvalid")) // i18n: 抛出时快照（瞬态）
   }
   return {
     format: BACKUP_FORMAT,

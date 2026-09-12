@@ -11,6 +11,7 @@ import {
   type NovelExportFormat,
   type NovelExportOptions,
 } from '@pictelio/novel-export'
+import { t } from '../i18n'
 import { useModalStack } from '../stores/modalStack'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 
@@ -79,11 +80,11 @@ function onConfirm(): void {
       <!-- 顶部：居中标题 + 关闭 -->
       <view class="flex flex-row items-center h-[11.733vw] px-4 flex-shrink-0">
         <view class="w-[8vw]" />
-        <text class="flex-1 text-center text-title-large font-medium text-surface-on">导出小说</text>
+        <text class="flex-1 text-center text-title-large font-medium text-surface-on">{{ t('novelExportSheet.title') }}</text>
         <view
           class="w-[8vw] h-[8vw] flex items-center justify-center"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
-          accessibility-label="关闭导出面板"
+          :accessibility-label="t('novelExportSheet.closeA11y')"
           @tap="onClose"
         >
           <text class="text-[6.4vw] leading-none text-surface-on-variant">×</text>
@@ -92,7 +93,7 @@ function onConfirm(): void {
 
       <!-- 格式选择：M3 chip 行（视觉同 Me.vue 导出格式 chip：选中 secondary-container，未选 outline） -->
       <view class="px-4 pt-2">
-        <text class="text-title-small font-medium text-surface-on">导出格式</text>
+        <text class="text-title-small font-medium text-surface-on">{{ t('novelExportSheet.formatTitle') }}</text>
         <view class="flex flex-row flex-wrap gap-2 mt-2">
           <view
             v-for="fmt in NOVEL_EXPORT_FORMATS"
@@ -100,7 +101,7 @@ function onConfirm(): void {
             class="h-[10.667vw] px-4 flex items-center justify-center rounded-[var(--md-shape-full)] border"
             :class="selected === fmt ? 'bg-secondary-container border-secondary-container' : 'bg-surface-container-lowest border-outline'"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
-            :accessibility-label="'选择导出格式' + NOVEL_EXPORT_FORMAT_LABELS[fmt]"
+            :accessibility-label="t('novelExportSheet.formatA11y', { label: NOVEL_EXPORT_FORMAT_LABELS[fmt] })"
             @tap="selected = fmt"
           >
             <text
@@ -110,13 +111,13 @@ function onConfirm(): void {
           </view>
         </view>
         <text class="text-label-medium text-surface-on-variant mt-2 leading-snug">
-          默认使用设置页选择的格式；此处修改仅作用于本次导出。
+          {{ t('novelExportSheet.formatHint') }}
         </text>
       </view>
 
       <!-- 内容摘要（只读）：正文恒含，三项开关取设置页快照 -->
       <view class="px-4 pt-3">
-        <text class="text-title-small font-medium text-surface-on">导出内容</text>
+        <text class="text-title-small font-medium text-surface-on">{{ t('novelExportSheet.contentTitle') }}</text>
         <text class="text-label-medium text-surface-on-variant mt-1 leading-snug">
           正文（必含） · 元数据 {{ options.includeMetadata ? '开' : '关' }} · 封面 {{ options.includeCover ? '开' : '关' }} · 正文插图 {{ options.includeInlineImages ? '开' : '关' }}
         </text>
@@ -128,10 +129,10 @@ function onConfirm(): void {
         <view
           class="w-full h-[12.8vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
-          accessibility-label="导出"
+          :accessibility-label="t('novelExportSheet.export')"
           @tap="onConfirm"
         >
-          <text class="text-label-large font-medium text-primary-on">导出</text>
+          <text class="text-label-large font-medium text-primary-on">{{ t('novelExportSheet.export') }}</text>
         </view>
       </view>
     </view>

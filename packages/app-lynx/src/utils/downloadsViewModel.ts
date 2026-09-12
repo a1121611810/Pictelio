@@ -1,6 +1,8 @@
 // ─── 下载页视图模型（纯函数，spec docs/specs/download-manager.md §7）───
 // 与 app 包 src/utils/downloadsViewModel.ts 同源同语义（双端差分对齐）；
 // 纯函数、零框架依赖，node 可单测。UI 组件只负责渲染与事件接线。
+// 文案经 i18n t() 产出（调用点在模板/computed 内，语言切换即时生效；zh 渲染逐字不变）。
+import { t } from '../i18n'
 import {
   canPause,
   canStart,
@@ -43,9 +45,9 @@ export function groupByIllust(tasks: readonly DownloadTask[]): DownloadGroup[] {
 
 /** 分组头部类型文案（spec §7）：ugoira=动图 / novel=小说 / 静态图=N 张 */
 export function groupKindLabel(kind: DownloadKind, count: number): string {
-  if (kind === 'ugoira') return '动图'
-  if (kind === 'novel') return '小说'
-  return count + ' 张'
+  if (kind === 'ugoira') return t('downloadsViewModel.kind.ugoira')
+  if (kind === 'novel') return t('downloadsViewModel.kind.novel')
+  return t('downloadsViewModel.kind.images', { count })
 }
 
 export interface ActionAvailability {
@@ -87,24 +89,25 @@ export function hasDeletableFiles(tasks: readonly DownloadTask[], ids: readonly 
 export function statusLabel(status: DownloadStatus): string {
   switch (status) {
     case 'queued':
-      return '排队中'
+      return t('downloadsViewModel.status.queued')
     case 'downloading':
-      return '下载中'
+      return t('downloadsViewModel.status.downloading')
     case 'paused':
-      return '已暂停'
+      return t('downloadsViewModel.status.paused')
     case 'stopped':
-      return '已停止'
+      return t('downloadsViewModel.status.stopped')
     case 'completed':
-      return '已完成'
+      return t('downloadsViewModel.status.completed')
     case 'failed':
-      return '失败'
+      return t('downloadsViewModel.status.failed')
   }
 }
 
 /** 列表副标题文案（状态 / 进度 / 错误） */
 export function progressText(task: DownloadTask): string {
-  if (task.status === 'completed') return '已完成'
-  if (task.status === 'failed') return task.error ? '失败：' + task.error : '失败'
+  if (task.status === 'completed') return t('downloadsViewModel.status.completed')
+  if (task.status === 'failed')
+    return task.error ? t('downloadsViewModel.failedWithReason', { error: task.error }) : t('downloadsViewModel.status.failed')
   if (task.status === 'downloading') return task.progress + '%'
   return statusLabel(task.status)
 }

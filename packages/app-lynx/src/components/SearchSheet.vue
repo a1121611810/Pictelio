@@ -18,6 +18,7 @@
 // （docs/research/global-search-patterns.md §4.2）。
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { navigate } from '../router'
+import { t, type I18nKey } from '../i18n'
 import type { SearchState, SearchResultItem } from '../primitives/useSearch'
 import { useSearch } from '../primitives/useSearch'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
@@ -112,18 +113,19 @@ function chipTextCls(active: boolean): string {
   return active ? 'text-primary-on-container font-medium' : 'text-surface-on-variant'
 }
 
-const PERIOD_PRESETS: { value: '1d' | '1w' | '1m' | '6m' | '1y'; label: string }[] = [
-  { value: '1d', label: '24 小时内' },
-  { value: '1w', label: '一周内' },
-  { value: '1m', label: '一个月内' },
-  { value: '6m', label: '半年内' },
-  { value: '1y', label: '一年内' },
+// 期间预设 label 存 i18n key（模板渲染处 t(p.labelKey)，语言切换即时生效）
+const PERIOD_PRESETS: { value: '1d' | '1w' | '1m' | '6m' | '1y'; labelKey: I18nKey }[] = [
+  { value: '1d', labelKey: 'searchSheet.period.1d' },
+  { value: '1w', labelKey: 'searchSheet.period.1w' },
+  { value: '1m', labelKey: 'searchSheet.period.1m' },
+  { value: '6m', labelKey: 'searchSheet.period.6m' },
+  { value: '1y', labelKey: 'searchSheet.period.1y' },
 ]
 const RES_OPTIONS = [1000, 2000, 3000]
-const AI_OPTIONS: { value: SearchFilters['aiOverride']; label: string }[] = [
-  { value: 'follow', label: '跟随设置' },
-  { value: 'all', label: '全部显示' },
-  { value: 'hide', label: '隐藏 AI' },
+const AI_OPTIONS: { value: SearchFilters['aiOverride']; labelKey: I18nKey }[] = [
+  { value: 'follow', labelKey: 'searchSheet.ai.follow' },
+  { value: 'all', labelKey: 'searchSheet.ai.all' },
+  { value: 'hide', labelKey: 'searchSheet.ai.hide' },
 ]
 
 function bandLabel(band: { min: number; max: number | null }): string {
@@ -177,9 +179,9 @@ function rowThumb(row: SearchResultItem): string {
 
 /** 行式副标题：作者 · 类型/字数（spec D5；字数对齐各列表页 `{{ text_length }} 字` 惯例） */
 function rowSub(row: SearchResultItem): string {
-  if (row.type === 'novel') return `${row.entity.text_length} 字`
-  const t = row.entity.type
-  return t === 'manga' ? '漫画' : t === 'ugoira' ? '动图' : '插画'
+  if (row.type === 'novel') return t('searchSheet.charCount', { count: row.entity.text_length })
+  const kind = row.entity.type
+  return kind === 'manga' ? t('searchSheet.type.manga') : kind === 'ugoira' ? t('searchSheet.type.ugoira') : t('searchSheet.type.illust')
 }
 
 /** R18 等级派生（对齐 RestrictedNovelCard：x_restrict===2 → R-18G，否则 R-18） */
@@ -368,7 +370,7 @@ onBeforeUnmount(() => {
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="SEARCH_A11Y_LABELS.clearHistory"
             @tap="onClearHistory"
-          >清空</text>
+          >{{ t('searchSheet.clear') }}</text>
         </view>
         <view v-if="searchHistory.history.length > 0" class="flex flex-row flex-wrap gap-2 mt-2">
           <view
@@ -458,7 +460,7 @@ onBeforeUnmount(() => {
           <text
             class="text-label-medium"
             :class="filterOpen ? 'text-primary-on-container font-medium' : 'text-surface-on-variant'"
-          >筛选</text>
+          >{{ t('searchSheet.filter') }}</text>
           <view
             v-if="activeFilterCount > 0"
             class="ml-2 min-w-[5.333vw] h-[5.333vw] px-[1.6vw] rounded-full bg-primary flex items-center justify-center"
@@ -476,14 +478,14 @@ onBeforeUnmount(() => {
         class="mx-4 mt-2 max-h-[42vh] flex-shrink-0 border border-outline rounded-[var(--md-shape-large)] p-3 flex flex-col gap-3"
       >
         <view v-if="activeFilterCount > 0" class="flex flex-row justify-end">
-          <text class="text-label-medium text-primary" @tap="clearAllFilters">清除全部</text>
+          <text class="text-label-medium text-primary" @tap="clearAllFilters">{{ t('searchSheet.clearAll') }}</text>
         </view>
 
         <view>
-          <text class="text-label-medium text-outline">期间</text>
+          <text class="text-label-medium text-outline">{{ t('searchSheet.periodTitle') }}</text>
           <view class="flex flex-row flex-wrap gap-2 mt-1">
             <view :class="chipCls(filters.period.kind === 'any')" @tap="onFilterChange({ ...filters, period: { kind: 'any' } })">
-              <text class="text-body-small" :class="chipTextCls(filters.period.kind === 'any')">全部</text>
+              <text class="text-body-small" :class="chipTextCls(filters.period.kind === 'any')">{{ t('searchSheet.all') }}</text>
             </view>
             <view
               v-for="p in PERIOD_PRESETS"
@@ -491,19 +493,19 @@ onBeforeUnmount(() => {
               :class="chipCls(isPresetActive(p.value))"
               @tap="togglePeriodPreset(p.value)"
             >
-              <text class="text-body-small" :class="chipTextCls(isPresetActive(p.value))">{{ p.label }}</text>
+              <text class="text-body-small" :class="chipTextCls(isPresetActive(p.value))">{{ t(p.labelKey) }}</text>
             </view>
           </view>
         </view>
 
         <view>
-          <text class="text-label-medium text-outline">收藏数</text>
+          <text class="text-label-medium text-outline">{{ t('searchSheet.bookmarkTitle') }}</text>
           <view class="flex flex-row flex-wrap gap-2 mt-1">
             <view
               :class="chipCls(filters.bookmark === null, bookmarkDimmed)"
               @tap="!bookmarkDimmed && onFilterChange({ ...filters, bookmark: null })"
             >
-              <text class="text-body-small" :class="chipTextCls(filters.bookmark === null)">不限</text>
+              <text class="text-body-small" :class="chipTextCls(filters.bookmark === null)">{{ t('searchSheet.unlimited') }}</text>
             </view>
             <view
               v-for="band in BOOKMARK_BANDS"
@@ -518,13 +520,13 @@ onBeforeUnmount(() => {
         </view>
 
         <view>
-          <text class="text-label-medium text-outline">比例 · 仅插画</text>
+          <text class="text-label-medium text-outline">{{ t('searchSheet.ratioTitle') }}</text>
           <view class="flex flex-row flex-wrap gap-2 mt-1">
             <view
               :class="chipCls(filters.ratio === null, illustDimmed)"
               @tap="!illustDimmed && setRatio(null)"
             >
-              <text class="text-body-small" :class="chipTextCls(filters.ratio === null)">全部</text>
+              <text class="text-body-small" :class="chipTextCls(filters.ratio === null)">{{ t('searchSheet.all') }}</text>
             </view>
             <view
               v-for="r in ['landscape', 'portrait', 'square']"
@@ -532,20 +534,20 @@ onBeforeUnmount(() => {
               :class="chipCls(filters.ratio === r, illustDimmed)"
               @tap="!illustDimmed && setRatio(filters.ratio === r ? null : r)"
             >
-              <text class="text-body-small" :class="chipTextCls(filters.ratio === r)">{{ r === 'landscape' ? '横图' : r === 'portrait' ? '竖图' : '方图' }}</text>
+              <text class="text-body-small" :class="chipTextCls(filters.ratio === r)">{{ r === 'landscape' ? t('searchSheet.ratio.landscape') : r === 'portrait' ? t('searchSheet.ratio.portrait') : t('searchSheet.ratio.square') }}</text>
             </view>
           </view>
           <text v-if="illustDimmed" class="text-label-small text-outline mt-1 block">切到「插画」范围后可用（已设的值会保留）</text>
         </view>
 
         <view>
-          <text class="text-label-medium text-outline">分辨率 · 仅插画</text>
+          <text class="text-label-medium text-outline">{{ t('searchSheet.resolutionTitle') }}</text>
           <view class="flex flex-row flex-wrap gap-2 mt-1">
             <view
               :class="chipCls(filters.minPixels === null, illustDimmed)"
               @tap="!illustDimmed && setMinPixels(null)"
             >
-              <text class="text-body-small" :class="chipTextCls(filters.minPixels === null)">不限</text>
+              <text class="text-body-small" :class="chipTextCls(filters.minPixels === null)">{{ t('searchSheet.unlimited') }}</text>
             </view>
             <view
               v-for="px in RES_OPTIONS"
@@ -559,7 +561,7 @@ onBeforeUnmount(() => {
         </view>
 
         <view>
-          <text class="text-label-medium text-outline">AI 作品</text>
+          <text class="text-label-medium text-outline">{{ t('searchSheet.aiTitle') }}</text>
           <view class="flex flex-row flex-wrap gap-2 mt-1">
             <view
               v-for="opt in AI_OPTIONS"
@@ -567,10 +569,10 @@ onBeforeUnmount(() => {
               :class="chipCls(filters.aiOverride === opt.value)"
               @tap="setAiOverride(opt.value)"
             >
-              <text class="text-body-small" :class="chipTextCls(filters.aiOverride === opt.value)">{{ opt.label }}</text>
+              <text class="text-body-small" :class="chipTextCls(filters.aiOverride === opt.value)">{{ t(opt.labelKey) }}</text>
             </view>
           </view>
-          <text class="text-label-small text-outline mt-1 block">只影响本次搜索，不改动设置里的 AI 偏好</text>
+          <text class="text-label-small text-outline mt-1 block">{{ t('searchSheet.aiHint') }}</text>
         </view>
       </scroll-view>
 
@@ -588,7 +590,7 @@ onBeforeUnmount(() => {
             :accessibility-label="SEARCH_A11Y_LABELS.retry"
             @tap="onRetry"
           >
-            <text class="text-label-large font-medium text-primary-on">重试</text>
+            <text class="text-label-large font-medium text-primary-on">{{ t('searchSheet.retry') }}</text>
           </view>
         </view>
 
@@ -687,7 +689,7 @@ onBeforeUnmount(() => {
                 :accessibility-label="SEARCH_A11Y_LABELS.retry"
                 @tap="onLoadMore"
               >
-                <text class="text-label-large font-medium text-primary-on">重试</text>
+                <text class="text-label-large font-medium text-primary-on">{{ t('searchSheet.retry') }}</text>
               </view>
             </list-item>
 

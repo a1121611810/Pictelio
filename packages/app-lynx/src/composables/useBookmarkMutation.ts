@@ -26,6 +26,7 @@
 
 import { ref, type Ref } from 'vue'
 import { useMutation } from '@tanstack/vue-query'
+import { t } from '../i18n'
 import { apiClient } from '../api/client'
 import { mutationKeys } from '../api/queryKeys'
 
@@ -94,7 +95,7 @@ export function useBookmarkMutation(
       // 失败静息回滚（D4：状态直接复位，不触发反向动画）
       bookmarked.value = !target
       count.value = Math.max(0, count.value + (target ? -1 : 1))
-      errorMsg.value = '操作失败'
+      errorMsg.value = t('useBookmarkMutation.actionFailed') // i18n: 赋值时快照（瞬态）
     } finally {
       busy.value = false
     }

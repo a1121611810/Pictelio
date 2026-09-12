@@ -8,6 +8,7 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { downloadUgoiraFrames, ugoiraExtractFrames, ugoiraExtractStreamFrames, type UgoiraFrameData } from '../api/ugoira'
 import { isNativeMode } from '../api/client'
+import { t } from '../i18n'
 import { useSettingsStore } from '../stores/settingsStore'
 
 const ugoiraMode = useSettingsStore().ugoiraMode
@@ -130,14 +131,14 @@ onMounted(async () => {
     }
     if (disposed) return
     if (frames.length === 0) {
-      errorMsg.value = '动图无帧数据'
+      errorMsg.value = t('ugoiraViewer.noFrames') // i18n: 赋值时快照（瞬态）
     } else if (!isNativeMode()) {
       // 原生渐进模式已在首批回调时开播
       playFrom(0)
     }
   } catch (err) {
     if (!disposed && !abort.signal.aborted) {
-      errorMsg.value = presentError(err, '动图加载失败')
+      errorMsg.value = presentError(err, t('ugoiraViewer.loadFailed')) // i18n: 赋值时快照（瞬态）
     }
   } finally {
     if (!disposed) loading.value = false

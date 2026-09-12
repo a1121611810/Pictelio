@@ -7,6 +7,9 @@
 //   LynxView 下 absolute 子元素会被 list item 高度测量算进内容高度，列表卡必须用此模式。
 // 无任何交互——不跳设置、无按钮，点击不响应也不穿透到下层卡片。
 // M3 形态：scrim 半透明黑遮罩 + 中央 AI 徽章（纯 AI=secondary-container / AI 辅助同款）+ 文案。
+import { computed } from "vue";
+import { t } from "../i18n";
+
 const props = defineProps<{
   /** Pixiv ai_type 原始值：0/undefined=非 AI，1=AI 辅助，2=纯 AI（徽章文案单点派生） */
   aiType: number;
@@ -14,7 +17,8 @@ const props = defineProps<{
   overlay?: boolean;
 }>();
 
-const badge = props.aiType === 2 ? "AI" : "AI辅助";
+// computed 内调 t()：语言切换即时生效（徽章随 locale 响应）
+const badge = computed(() => (props.aiType === 2 ? t("aiOverlay.pure") : t("aiOverlay.assisted")));
 
 // 空处理器：阻止 tap 穿透触发下层卡片的 openDetail
 function swallow() {}
@@ -32,7 +36,7 @@ function swallow() {}
         >{{ badge }}</text
       >
       <text class="text-label-medium text-[var(--colorOverlayForeground)] opacity-80 mt-2"
-        >AI 作品，已在设置中遮罩</text
+        >{{ t('aiOverlay.maskHint') }}</text
       >
     </view>
   </view>

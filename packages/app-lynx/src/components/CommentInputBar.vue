@@ -5,6 +5,7 @@
 // 回复态由父层（CommentOverlay）在提交成功后清除。
 import { ref, computed } from 'vue'
 import type { PixivComment } from '../api/types'
+import { t } from '../i18n'
 import { MAX_COMMENT_LENGTH } from '../api/comment'
 
 const props = defineProps<{
@@ -41,8 +42,8 @@ function send() {
   <view class="w-full bg-surface-container-lowest border-t border-t-outline-variant px-3 py-2">
     <!-- 回复态提示条：回复 xxx + 取消 -->
     <view v-if="replyingTo" class="flex flex-row items-center justify-between mb-2">
-      <text class="text-label-medium text-primary [max-line:1] flex-1">回复 {{ replyingTo.user.name }}</text>
-      <text class="text-label-medium text-outline underline ml-2" @tap="emit('cancelReply')">取消</text>
+      <text class="text-label-medium text-primary [max-line:1] flex-1">{{ t('commentInputBar.replyingTo', { name: replyingTo.user.name }) }}</text>
+      <text class="text-label-medium text-outline underline ml-2" @tap="emit('cancelReply')">{{ t('commentInputBar.cancel') }}</text>
     </view>
 
     <!-- 操作类错误（发表失败等）：输入栏区域展示 -->
@@ -53,7 +54,7 @@ function send() {
       <input
         v-model="text"
         class="flex-1 h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-outline-variant text-body-large text-surface-on px-3"
-        placeholder="写下评论…"
+        :placeholder="t('commentInputBar.placeholder')"
         placeholder-color="#41474e"
       />
       <!-- 发送按钮：空输入 / 超长 / 发送中禁用 -->
@@ -63,7 +64,7 @@ function send() {
         @tap="send"
       >
         <text class="text-label-large font-medium" :class="canSend ? 'text-primary-on' : 'text-outline'">
-          {{ posting ? '发送中…' : '发送' }}
+          {{ posting ? t('commentInputBar.posting') : t('commentInputBar.send') }}
         </text>
       </view>
     </view>

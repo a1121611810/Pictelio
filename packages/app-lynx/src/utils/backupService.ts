@@ -4,6 +4,7 @@
 // 「列档 → 下载 → 解密 → 解析 → 恢复计划 → 写回」两条流程收敛为纯编排，
 // IO 全部经注入 seam（bridge / collect / apply / credentials / config），
 // UI（T6/T7）只负责渲染与调用。
+import { t } from "../i18n";
 import {
   BACKUP_SCHEMA_VERSION,
   buildSnapshot,
@@ -226,7 +227,7 @@ export async function prepareRestore(
         ? passwordOverride
         : creds.backupPassword;
     if (pwd === null || pwd === "") {
-      throw new Error("该备份已加密，请先输入备份密码");
+      throw new Error(t("backupService.encryptedNeedsPassword")); // i18n: 抛出时快照（瞬态）
     }
     plain = await deps.bridge.decrypt(downloaded, pwd);
   }
