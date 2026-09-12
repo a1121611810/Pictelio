@@ -10,6 +10,7 @@
  * 不再渲染底部 NavBar（首页导航由 SideNavShell 承担）。
  */
 import type { Component } from "solid-js";
+import { t } from "../i18n";
 import { createEffect, onSettled } from "solid-js";
 import { useLocation, useNavigate } from "@solidjs/router";
 import type { PixivIllust, PixivNovel, ApiError } from "@/api/types";
@@ -286,9 +287,11 @@ const NovelRowSkeleton: Component = () => (
 /** 空态提示（加载完成且无数据时展示）。 */
 const EmptyHint: Component = () => (
   <div class="py-14 flex flex-col items-center gap-1">
-    <p class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground2)]">暂无内容</p>
+    <p class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground2)]">
+      {t("homePage.empty.title")}
+    </p>
     <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
-      换一个内容类型或稍后再来看看
+      {t("homePage.empty.desc")}
     </p>
   </div>
 );

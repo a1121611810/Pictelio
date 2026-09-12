@@ -331,6 +331,8 @@ const enRoutes = {
     "This work contains R18G (extreme) content. Beyond the risks above, this content crosses legal red lines: your API account may be closed, and the provider may report it to regulators or law enforcement. The app provider accepts no liability for any of this.",
   "novelDetail.cancel": "Cancel",
   "novelDetail.understood": "I understand. Continue",
+  "homePage.empty.title": "Nothing here yet",
+  "homePage.empty.desc": "Try another content type or check back later",
 } as const satisfies Record<ZhRoutesKey, string>;
 
 export default enRoutes;

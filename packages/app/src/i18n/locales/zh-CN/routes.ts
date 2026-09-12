@@ -318,6 +318,8 @@ const zhRoutes = {
     "该作品包含 R18G（极端）内容。除上述风险外，此类内容违反法律法规红线，可能导致你的 API 账号被关闭，服务商可能向主管部门/执法机构报告。App 提供方不承担由此产生的任何责任。",
   "novelDetail.cancel": "取消",
   "novelDetail.understood": "我已了解并继续",
+  "homePage.empty.title": "暂无内容",
+  "homePage.empty.desc": "换一个内容类型或稍后再来看看",
 } as const;
 
 export default zhRoutes;
