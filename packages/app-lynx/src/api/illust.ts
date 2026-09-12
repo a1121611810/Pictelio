@@ -45,6 +45,15 @@ export function loadUgoiraMetadata(illustId: number): Promise<PixivUgoiraMetadat
     .then((r) => r.ugoira_metadata)
 }
 
+// ─── 相关作品（spec docs/specs/related-injection.md）───
+export function loadRelated(illustId: number, signal?: AbortSignal): Promise<PixivIllustListResponse> {
+  return apiClient.get<PixivIllustListResponse>(
+    "/v1/illust/related",
+    { illust_id: String(illustId), filter: "for_ios" },
+    signal,
+  )
+}
+
 export function loadNext(url: string, signal?: AbortSignal): Promise<PixivIllustListResponse> {
   return apiClient.get<PixivIllustListResponse>(url, undefined, signal)
 }

@@ -2,13 +2,14 @@
 // 插画分类页（/illusts）：推荐/关注两个子 tab，waterfall 双列插画卡。
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'illusts' })
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted, onActivated } from 'vue'
 import { navigate } from '../router'
 import { loadRecommended, loadFollow, loadNext } from '../api/illust'
 import type { PixivIllust, PixivIllustListResponse } from '../api/types'
 import { thumbUrl } from '../utils/imageUrl'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { useSettingsStore } from '../stores/settingsStore'
+import { useRelatedInjectionStore, type RelatedRow } from '../stores/relatedInjection'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
@@ -23,6 +24,8 @@ import { useGlobalFabStore } from '../stores/globalFab'
 const settings = useSettingsStore()
 const isRestricted = settings.isRestricted
 const isAiRestricted = settings.isAiRestricted
+// ─── 相关作品注入行（spec docs/specs/related-injection.md）───
+const related = useRelatedInjectionStore()
 
 // ─── 分页收敛（ADR-0104）：迁移到 createMixFeed 深模块 ───
 // 双防抖 / 竞态代 / 分批渲染（pageSize=20，替代原 pendingIllusts 队列）/ 空页防护 /
@@ -107,6 +110,8 @@ function sync() {
 
 async function refreshFeed() {
   // 发起前同步进入加载态并清错误：骨架立即占位（ADR-0150，覆盖失败重试与真·空态刷新）
+  // 新会话：清空本 tab 注入行（spec §4.4）
+  related.clearRows(mode.value)
   loading.value = true
   errorMsg.value = ''
   await feed.value.refresh()
@@ -128,6 +133,7 @@ function switchMode(m: 'recommend' | 'follow') {
   if (mode.value === m) return
   mode.value = m
   // 重建 feed 实例：先释放旧实例（清挂起补触发 + 作废在途响应），新实例 generation 从 0 起
+  related.clearRows(m)
   feed.value?.dispose()
   feed.value = makeFeed(m)
   illusts.value = []
@@ -138,8 +144,38 @@ function switchMode(m: 'recommend' | 'follow') {
 }
 
 function openDetail(id: number) {
+  // 记录锚点：从本页卡片进详情，返回后在该卡下方注入相关作品行（注入行内点击走 openRelated 不记录）
+  related.recordAnchor(mode.value, id)
   void navigate(`/illust/${id}`)
 }
+
+/** 注入行内缩略图点击：进详情但不记录新锚点（防循环注入） */
+function openRelated(id: number) {
+  void navigate(`/illust/${id}`)
+}
+
+/** 仅看态过滤后的交织渲染流：插画条目 + 锚点下方的相关作品行（开关关闭即隐藏行） */
+type DisplayEntry = { kind: 'illust'; item: PixivIllust } | { kind: 'row'; row: RelatedRow }
+const displayItems = computed<DisplayEntry[]>(() => {
+  const rows = settings.relatedInjection ? related.rows(mode.value) : []
+  if (rows.length === 0) return visibleIllusts.value.map((item) => ({ kind: 'illust' as const, item }))
+  const out: DisplayEntry[] = []
+  for (const item of visibleIllusts.value) {
+    out.push({ kind: 'illust', item })
+    const row = rows.find((r) => r.anchorId === item.id)
+    if (row) out.push({ kind: 'row', row })
+  }
+  return out
+})
+
+// 返回消费锚点：本页在 KeepAlive 白名单内（ADR-0049），返回时 onActivated 触发；
+// tab 不匹配时 consume 内部保留 pending，交给正确的 tab。
+onActivated(() => {
+  void related.consumeAnchor(
+    mode.value,
+    illusts.value.map((i) => i.id),
+  )
+})
 
 // 图片区点击（spec：列表交互）：受限条目（R18/R18G 且开关关闭）不跳详情，其余进详情。
 // 外层 .stop 继续保证遮罩点击不穿透；RestrictOverlay 自身 @tap="swallow" 双保险。
@@ -243,15 +279,47 @@ onUnmounted(() => {
       @scrolltolower="loadMore"
       @scroll="onScroll"
     >
+      <!-- 交织渲染流（spec docs/specs/related-injection.md）：插画条目 + 锚点下方的相关作品行 -->
+      <template v-for="entry in displayItems" :key="entry.kind === 'row' ? `rel-${entry.row.anchorId}` : entry.item.id">
+      <!-- 相关作品行：full-span，固定两行网格缩略（横滑容器在原生 waterfall list-item 内不可靠，spec §5.2 允许降级） -->
       <list-item
-        v-for="item in visibleIllusts"
-        :key="item.id"
-        :item-key="String(item.id)"
+        v-if="entry.kind === 'row'"
+        :item-key="`rel-${entry.row.anchorId}`"
+        full-span
+        class="w-full bg-surface-container-lowest rounded-[var(--md-shape-medium)] p-2.5"
+      >
+        <view class="w-full flex flex-col">
+          <view class="flex flex-row items-center justify-between">
+            <text class="text-title-small font-medium text-surface-on">相关作品</text>
+            <view accessibility-element :accessibility-label="`收起相关作品`" @tap.stop="related.removeRow(mode, entry.row.anchorId)">
+              <text class="text-body-small text-outline">收起</text>
+            </view>
+          </view>
+          <view v-if="entry.row.loading" class="flex flex-row flex-wrap gap-2 mt-2">
+            <view v-for="n in 8" :key="n" class="w-[22vw] h-[22vw] rounded-[var(--md-shape-medium)] bg-surface-variant" />
+          </view>
+          <view v-else class="flex flex-row flex-wrap gap-2 mt-2">
+            <view
+              v-for="rel in entry.row.items.slice(0, 8)"
+              :key="rel.id"
+              accessibility-element
+              :accessibility-label="`查看相关作品 ${rel.title}`"
+              class="w-[22vw] h-[22vw] rounded-[var(--md-shape-medium)] overflow-hidden"
+              @tap.stop="openRelated(rel.id)"
+            >
+              <SkeletonImage :src="thumbUrl(rel.image_urls)" height="22vw" lazy-load />
+            </view>
+          </view>
+        </view>
+      </list-item>
+      <list-item
+        v-else
+        :item-key="String(entry.item.id)"
         class="bg-surface-container-lowest rounded-[var(--md-shape-medium)] flex flex-col overflow-hidden shadow-[var(--md-elevation-1)]"
       >
         <!-- [lynx:fix] 原生 list-item 根级 @tap 失效（fiber 不触发，真机实测 2026-08-02）；
              把 openDetail 绑到内容 view（子元素 tap 已验证工作），♥ 的 @tap.stop 仍阻止冒泡 -->
-        <view class="w-full flex flex-col" @tap="openDetail(item.id)">
+        <view class="w-full flex flex-col" @tap="openDetail(entry.item.id)">
         <!-- [lynx:fix] 间距：web-core 瀑布流引擎忽略 list-item 的 margin/padding 且内部任何 view 包裹
              都会导致 item 定位计算崩（全部重叠在起点）。间距用 list 官方属性
              list-main-axis-gap（行距）/ list-cross-axis-gap（列距），经 vue-lynx style 对象绑定
@@ -260,28 +328,29 @@ onUnmounted(() => {
              原生 LynxView 下 aspect-ratio + min-h 组合解析为 0 导致图片不显示（issue #140）；
              图片 @load 后才隐藏 shimmer 显示图片（骨架关闭时机 = 图片加载完成，而非 API 数据返回） -->
         <view
-          v-if="isRestricted(item)" @tap.stop
+          v-if="isRestricted(entry.item)" @tap.stop
           class="w-full h-[48.4vw] flex items-center justify-center bg-[var(--md-scrim)] rounded-[var(--md-shape-medium)]"
         >
-          <RestrictOverlay :overlay="false" :level="item.x_restrict === 2 ? 2 : 1" />
+          <RestrictOverlay :overlay="false" :level="entry.item.x_restrict === 2 ? 2 : 1" />
         </view>
-        <AiRestrictedIllustCard v-else-if="isAiRestricted(item)" :item="item" />
-        <view v-else class="relative" @tap.stop="onImageTap(item)">
-          <SkeletonImage :src="thumbUrl(item.image_urls)" height="48.4vw" lazy-load />
+        <AiRestrictedIllustCard v-else-if="isAiRestricted(entry.item)" :item="entry.item" />
+        <view v-else class="relative" @tap.stop="onImageTap(entry.item)">
+          <SkeletonImage :src="thumbUrl(entry.item.image_urls)" height="48.4vw" lazy-load />
         </view>
         <!-- 类型徽章行（动图/多图，ADR-0113）：流内元素，受限条目照常显示，普通单图零占位 -->
-        <IllustTypeBadgeRow :illust="item" />
-        <text class="text-title-small font-medium text-surface-on mt-2 mx-2.5 [max-line:1]">{{ item.title }}</text>
-        <text class="text-body-small text-surface-on-variant mt-1 mx-2.5 [max-line:1]">{{ item.user.name }}</text>
+        <IllustTypeBadgeRow :illust="entry.item" />
+        <text class="text-title-small font-medium text-surface-on mt-2 mx-2.5 [max-line:1]">{{ entry.item.title }}</text>
+        <text class="text-body-small text-surface-on-variant mt-1 mx-2.5 [max-line:1]">{{ entry.item.user.name }}</text>
         <view class="mt-1 mx-2.5 mb-2.5">
           <BookmarkButton
-            :illust-id="item.id"
-            :initial-bookmarked="item.is_bookmarked"
-            :bookmark-count="item.total_bookmarks"
+            :illust-id="entry.item.id"
+            :initial-bookmarked="entry.item.is_bookmarked"
+            :bookmark-count="entry.item.total_bookmarks"
           />
         </view>
         </view>
       </list-item>
+      </template>
       <list-item v-if="loadingMore || pageErrorMsg || endOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
         <text v-if="loadingMore" class="text-body-medium text-outline">加载中…</text>
         <text v-else-if="pageErrorMsg" class="text-body-medium text-error">{{ pageErrorMsg }}</text>

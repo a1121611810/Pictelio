@@ -52,6 +52,8 @@ const UGOIRA_DOWNLOAD_FORMAT_KEY = "settings_ugoira_download_format"
 const DETAIL_QUALITY_KEY = "settings_detail_quality"
 /** 主题色（外观）：设备级共享键（native SharedPreferences / dev IndexedDB），未登录也恢复 */
 const THEME_COLOR_KEY = "settings_theme_color"
+/** 相关作品注入行（spec docs/specs/related-injection.md）：设备级开关，默认开；键与 app 逐字一致 */
+const RELATED_INJECTION_KEY = "related_injection"
 /** 小说导出（spec docs/specs/novel-export.md §6）：全局默认格式 + 三项内容开关（与 app 共享键） */
 const NOVEL_EXPORT_FORMAT_KEY = "settings_novel_export_format"
 const NOVEL_EXPORT_INCLUDE_METADATA_KEY = "settings_novel_export_include_metadata"
@@ -211,6 +213,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const _ugoiraDownloadFormat = ref<UgoiraFormat>("zip")
   const _detailQuality = ref<ImageQuality>("medium")
   const _themeColor = ref<ThemeColorId>(DEFAULT_THEME_COLOR)
+  const _relatedInjection = ref(true)
   const _novelExportFormat = ref<NovelExportFormat>(DEFAULT_NOVEL_EXPORT_FORMAT)
   const _novelExportOptions = ref<NovelExportOptions>({ ...DEFAULT_NOVEL_EXPORT_OPTIONS })
 
@@ -237,6 +240,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const ugoiraDownloadFormat = _ugoiraDownloadFormat
   const detailQuality = _detailQuality
   const themeColor = _themeColor
+  const relatedInjection = _relatedInjection
   const novelExportFormat = _novelExportFormat
   const novelExportOptions = _novelExportOptions
   const webdavEnabled = _webdavEnabled
@@ -285,6 +289,18 @@ export const useSettingsStore = defineStore("settings", () => {
       }
     } catch (e) {
       console.warn("[settingsStore] 主题色加载失败（维持默认）", e)
+    }
+
+    // 相关作品注入（spec docs/specs/related-injection.md）：设备级，未登录也恢复
+    try {
+      const raw = await prefs().get(RELATED_INJECTION_KEY)
+      if (raw === "true") _relatedInjection.value = true
+      else if (raw === "false") _relatedInjection.value = false
+      else if (raw !== null) {
+        console.warn("[settingsStore] 相关作品注入开关值非法，维持默认 true:", raw)
+      }
+    } catch (e) {
+      console.warn("[settingsStore] 相关作品注入开关加载失败（维持默认）", e)
     }
 
     // 小说导出：全局默认格式 + 三项内容开关（native 共享 SharedPreferences / dev idbKV）
@@ -454,6 +470,13 @@ export const useSettingsStore = defineStore("settings", () => {
     void prefs()
       .set(THEME_COLOR_KEY, id)
       .catch((e) => console.warn("[settingsStore] 主题色写入失败", e))
+  }
+
+  function setRelatedInjection(enabled: boolean): void {
+    _relatedInjection.value = enabled
+    void prefs()
+      .set(RELATED_INJECTION_KEY, String(enabled))
+      .catch((e) => console.warn("[settingsStore] 相关作品注入开关写入失败", e))
   }
 
   function setNovelExportFormat(format: NovelExportFormat): void {
@@ -735,6 +758,7 @@ export const useSettingsStore = defineStore("settings", () => {
     ugoiraMode,
     detailQuality,
     themeColor,
+    relatedInjection,
     ugoiraDownloadFormat,
     novelExportFormat,
     novelExportOptions,
@@ -755,6 +779,7 @@ export const useSettingsStore = defineStore("settings", () => {
     setUgoiraDownloadFormat,
     setDetailQuality,
     setThemeColor,
+    setRelatedInjection,
     setNovelExportFormat,
     setNovelExportIncludeMetadata,
     setNovelExportIncludeCover,

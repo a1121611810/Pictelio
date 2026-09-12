@@ -42,7 +42,7 @@ import {
 const auth = useAuthStore()
 const settings = useSettingsStore()
 const clientSwitch = useClientSwitchStore()
-const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, novelExportFormat, novelExportOptions } = storeToRefs(settings)
+const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, novelExportFormat, novelExportOptions, relatedInjection } = storeToRefs(settings)
 
 const switching = ref(false)
 
@@ -309,6 +309,9 @@ function toggleR18() {
 }
 function toggleR18G() {
   settings.setShowR18G(!showR18G.value)
+}
+function toggleRelatedInjection() {
+  settings.setRelatedInjection(!relatedInjection.value)
 }
 </script>
 
@@ -588,6 +591,24 @@ function toggleR18G() {
             <!-- handle-container：32×32 与轨道同高，thumb 居中 → 距边 8px/4px -->
             <view class="w-8 h-8 flex items-center justify-center">
               <view class="rounded-full active:w-[7.467vw] active:h-[7.467vw]" :class="showR18G ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
+            </view>
+          </view>
+        </view>
+
+        <!-- 相关作品注入行开关（spec docs/specs/related-injection.md）：设备级，默认开 -->
+        <view
+          class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.relatedInjectionToggle"
+          @tap="toggleRelatedInjection"
+        >
+          <text class="text-title-medium text-surface-on">相关作品注入</text>
+          <view
+            class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
+            :class="relatedInjection ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
+          >
+            <view class="w-8 h-8 flex items-center justify-center">
+              <view class="rounded-full active:w-[7.467vw] active:h-[7.467vw]" :class="relatedInjection ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
             </view>
           </view>
         </view>
