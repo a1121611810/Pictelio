@@ -159,10 +159,14 @@ packages/search-core/          # 新共享包 @pictelio/search-core（零 IO 纯
 3. **lynx**：useSearch 单测扩展（filters ref 重搜语义）；SearchSheet 折叠区组件测试；**模拟器过折叠区点击可达性**（原生 pointer-events 怪癖：全屏 pointer-events-none 容器吞点击的历史坑）+ 80vh 内滚动布局。
 4. **契约/差分**：URL 编解码与参数构建 round-trip 差分；transport 层 next_url 断言保持既有差分测试。
 5. **E2E**：agent-browser 搜索筛选主流程（设筛选 → URL 回填 → 刷新/返回保持）；S 端切换回归。
-   - **交付状态（2026-09-12 实施）**：1-4 已交付（自动化门禁 check:all / test:all / lint:all 全绿）；
-     **遗留验收项**：agent-browser 筛选主流程 E2E 用例与 lynx 折叠区真机/模拟器点击可达性批次——
-     挂账至实施工单（#485），不阻塞 spec 收口；lynx 折叠区已按既有 pointer-events 怪癖清单做了
-     实现规避（折叠区非全屏 pointer-events-none 容器、(0,0) 锚定于 sheet 根），真机批次仍须过一遍。
+   - **交付状态（2026-09-12 实施 + 模拟器批次补验）**：1-4 已交付（自动化门禁 check:all / test:all / lint:all 全绿）。
+     **模拟器批次已补验**（emulator pictelio_ui / WebView 113，webview+lynx 双引擎）：
+     ① webview CDP 冒烟 11/11 PASS（脚本 `scripts/audit-real-interaction/search_filter_smoke.mjs`）——
+     期间预设落 URL（fp）/结果集刷新/横图 w≥h 语义/★ 下限/热门置灰标注+比例透传可用/scope=小说
+     置灰+值保留标注/清除全部清 URL；② lynx 真机驱动：FAB 直达搜索 → 输入即搜 → 筛选折叠区
+     **点击可达性通过**（pointer-events 怪癖未复现：chip 点击生效、徽标计数、清除全部浮现、
+     scope=小说 置灰+筛选值保留）；③ 引擎往返切换（webview→lynx→webview）正常。
+     **仅剩**：agent-browser 筛选主流程 E2E 用例（可选后续，CI 化时补）。
 
 ## 9. 已知取舍与未来候选
 
