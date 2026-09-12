@@ -7,12 +7,16 @@
 // fetch 成功 → 正常校验」分支在逻辑上不可达——remote_sha 缺失 ⟹ 其不在本地历史中
 // ⟹ fetch 后必非 local_sha 祖先 ⟹ 必走分叉报错。现有用例覆盖全部可达分支，
 // 请勿为该分支补写不出的用例。
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { execFile } from "node:child_process";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { runPrePushChecks } from "../../../../../scripts/check-push-refs.mjs";
+
+// 真实 git 双仓库 fixture（init/clone/push × N 子进程）：默认 5s 预算在全量并发
+// 跑下必超时（单跑 ~13s），文件级放宽到 30s——只影响本文件。
+vi.setConfig({ testTimeout: 30_000 });
 
 const ZERO = "0000000000000000000000000000000000000000";
 const APP_SCRIPT = "packages/app/scripts/check-e2e-anchors.mjs";
