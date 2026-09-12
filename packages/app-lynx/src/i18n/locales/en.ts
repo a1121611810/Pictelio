@@ -2,10 +2,10 @@
 import type { Dict } from "./zh-CN";
 
 const en = {
-  "error.hint.unauthorized": "Please sign in again",
-  "error.hint.network": "Please check your network connection",
-  "error.hint.proxy": "Please check that the local proxy is running",
-  "error.hint.server": "Pixiv server is temporarily unavailable, please try again later",
+  "error.hint.unauthorized": "Sign in again",
+  "error.hint.network": "Check your network connection",
+  "error.hint.proxy": "Check that the local proxy is running",
+  "error.hint.server": "Pixiv server is temporarily unavailable. Try again later",
   "error.fallback.loadFailed": "Failed to load",
   "error.fallback.sessionExpired": "Session expired",
   "error.hintSeparator": ". ",
