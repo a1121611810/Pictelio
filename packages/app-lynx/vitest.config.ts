@@ -34,5 +34,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts', 'src/**/*.test.ts'],
+    // i18n locale 钉源语言：Node ≥22 暴露 navigator.language（en-US），跟随系统探测会被带偏
+    setupFiles: ['tests/setup/i18n-locale.ts'],
   },
 })

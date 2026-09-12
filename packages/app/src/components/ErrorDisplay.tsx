@@ -2,6 +2,7 @@ import type { JSX } from "@solidjs/web";
 import { type Component } from "solid-js";
 import { ApiErrorType, type ApiError } from "../api/types";
 import { isLoggedIn } from "../stores/authStore";
+import { t, type I18nKey } from "../i18n";
 
 interface ErrorDisplayProps {
   error: ApiError;
@@ -12,34 +13,27 @@ function isNavigationAction(type: ApiErrorType): boolean {
   return type === ApiErrorType.UNAUTHORIZED || type === ApiErrorType.FORBIDDEN;
 }
 
+const ACTION_LABELS: Partial<Record<ApiErrorType, I18nKey>> = {
+  [ApiErrorType.PROXY]: "error.action.checkProxy",
+  [ApiErrorType.UNAUTHORIZED]: "error.action.relogin",
+  [ApiErrorType.FORBIDDEN]: "error.action.backHome",
+};
+
 function actionableLabel(type: ApiErrorType): string {
-  switch (type) {
-    case ApiErrorType.PROXY:
-      return "检查代理设置";
-    case ApiErrorType.UNAUTHORIZED:
-      return "重新登录";
-    case ApiErrorType.FORBIDDEN:
-      return "返回首页";
-    default:
-      return "重试";
-  }
+  return t(ACTION_LABELS[type] ?? "error.action.retry");
 }
 
+const HINT_KEYS: Partial<Record<ApiErrorType, I18nKey>> = {
+  [ApiErrorType.PROXY]: "error.hint.proxy",
+  [ApiErrorType.NETWORK]: "error.hint.network",
+  [ApiErrorType.UNAUTHORIZED]: "error.hint.unauthorized",
+  [ApiErrorType.RATE_LIMIT]: "error.hint.rateLimit",
+  [ApiErrorType.SERVER]: "error.hint.server",
+};
+
 function actionableHint(type: ApiErrorType): string | null {
-  switch (type) {
-    case ApiErrorType.PROXY:
-      return "请确保本地代理 127.0.0.1:10808 已运行";
-    case ApiErrorType.NETWORK:
-      return "请检查网络连接是否正常";
-    case ApiErrorType.UNAUTHORIZED:
-      return "登录已过期，需要重新登录";
-    case ApiErrorType.RATE_LIMIT:
-      return "请求过于频繁，请稍后重试";
-    case ApiErrorType.SERVER:
-      return "Pixiv 服务器暂时不可用，请稍后重试";
-    default:
-      return null;
-  }
+  const key = HINT_KEYS[type];
+  return key ? t(key) : null;
 }
 
 const S: Record<string, string | JSX.CSSProperties> = {

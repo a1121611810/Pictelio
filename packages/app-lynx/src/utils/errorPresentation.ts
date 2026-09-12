@@ -5,15 +5,16 @@
 import { ref } from "vue"
 import { toApiError } from "./errors"
 import { ApiErrorType, type ApiError } from "../api/types"
+import { t, type I18nKey } from "../i18n"
 
 // 分档操作提示（hint）：主文案（classifyError 产出，含 HTTP 状态码）后拼接。
 // 无 hint 的类型（RATE_LIMIT / FORBIDDEN / UNKNOWN）只显示主文案——
 // RATE_LIMIT 的 classifyError 主文案已含「请稍后重试」，再拼会重复。
-const HINTS: Partial<Record<ApiErrorType, string>> = {
-  [ApiErrorType.UNAUTHORIZED]: "请重新登录",
-  [ApiErrorType.NETWORK]: "请检查网络连接是否正常",
-  [ApiErrorType.PROXY]: "请检查本地代理是否已运行",
-  [ApiErrorType.SERVER]: "Pixiv 服务器暂时不可用，请稍后重试",
+const HINT_KEYS: Partial<Record<ApiErrorType, I18nKey>> = {
+  [ApiErrorType.UNAUTHORIZED]: "error.hint.unauthorized",
+  [ApiErrorType.NETWORK]: "error.hint.network",
+  [ApiErrorType.PROXY]: "error.hint.proxy",
+  [ApiErrorType.SERVER]: "error.hint.server",
 }
 
 /**
@@ -23,12 +24,14 @@ const HINTS: Partial<Record<ApiErrorType, string>> = {
  * @param err 任意抛出的值（ApiError / Error / 未知）
  * @param fallbackMsg 无法提取信息时的兜底文案（保留各页面「加载失败/加载更多失败」语义）
  */
-export function presentError(err: unknown, fallbackMsg = "加载失败"): string {
+export function presentError(err: unknown, fallbackMsg = t("error.fallback.loadFailed")): string {
   const apiErr = toApiError(err, fallbackMsg)
   // toApiError 对已带 type 的对象直接透传，不校验 message 空 → 此处兜底保证恒非空串
   const msg = apiErr.message || fallbackMsg
-  const hint = HINTS[apiErr.type]
-  return hint ? `${msg}。${hint}` : msg
+  const key = HINT_KEYS[apiErr.type]
+  const hint = key ? t(key) : undefined
+  // 分隔符随语言走（简中「。」/ 英文「. 」），hint 插槽语义不变
+  return hint ? `${msg}${t("error.hintSeparator")}${hint}` : msg
 }
 
 // ─── 会话级错误（UNAUTHORIZED）全屏错误页触发链 ───

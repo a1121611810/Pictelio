@@ -28,6 +28,9 @@ import { settings } from "@/settings";
 import "@/native/downloadExecutor";
 // 系统分享接线（webview 引擎，模块加载即注册）
 import "@/native/downloadSharer";
+// i18n 模块加载即注册语言设置键（settings_language），必须在 initializeStartupPreferences
+// 的 hydrateAll 之前完成 define，否则存储值不会被加载（抽取原型 #496）
+import "@/i18n";
 
 function syncFluentTheme() {
   const isDark = document.documentElement.classList.contains("dark");

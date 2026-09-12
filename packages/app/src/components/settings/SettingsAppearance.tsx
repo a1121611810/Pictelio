@@ -7,6 +7,14 @@ import {
   setShowDetailStairs,
 } from "../../stores/settingsStore";
 import { persistScrollRestoration, setPersistScrollRestoration } from "../../stores/uiStore";
+import { currentLocale, setLanguage, t, type Locale } from "../../i18n";
+
+const LANGUAGES: readonly Locale[] = ["zh-CN", "en"];
+
+const LANGUAGE_AUTONYMS: Record<Locale, string> = {
+  "zh-CN": "简体中文",
+  en: "English",
+};
 
 const SettingsAppearance: Component = () => {
   const navigate = useNavigate();
@@ -14,13 +22,13 @@ const SettingsAppearance: Component = () => {
   return (
     <div class="py-3 flex flex-col">
       <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground3)] uppercase tracking-wide mb-1">
-        显示与交互
+        {t("settings.appearance.sectionTitle")}
       </p>
 
       {/* 明暗主题选择器 */}
       <div class="py-3">
         <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug mb-2">
-          明暗主题
+          {t("settings.appearance.theme")}
         </p>
         <ThemeSelector />
       </div>
@@ -38,20 +46,20 @@ const SettingsAppearance: Component = () => {
           </div>
           <div class="min-w-0">
             <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
-              详情页楼梯导航
+              {t("settings.appearance.detailStairs")}
               <span class="inline-flex items-center ml-1 px-[var(--spacingHorizontalXS)] py-[var(--spacingVerticalXXS)] rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase100)] font-semibold text-[var(--colorPaletteGreenForeground2)] bg-[var(--colorPaletteGreenBackground2)] align-middle">
                 Beta
               </span>
             </p>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-              在多页作品中显示右侧页码导航条，方便快速跳转
+              {t("settings.appearance.detailStairsDesc")}
             </p>
           </div>
         </div>
         <fluent-switch
           checked={showDetailStairs()}
           ref={fluentOn("change", () => setShowDetailStairs(!showDetailStairs()))}
-          aria-label="详情页楼梯导航"
+          aria-label={t("settings.appearance.detailStairs")}
         />
       </div>
 
@@ -68,17 +76,17 @@ const SettingsAppearance: Component = () => {
           </div>
           <div class="min-w-0">
             <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
-              自动隐藏导航栏
+              {t("settings.appearance.autoHideNav")}
             </p>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-              在个人页与关注列表等页面向下滚动时收起导航栏，上滑时重新显示
+              {t("settings.appearance.autoHideNavDesc")}
             </p>
           </div>
         </div>
         <fluent-switch
           checked={autoHideNavBar()}
           ref={fluentOn("change", () => setAutoHideNavBar(!autoHideNavBar()))}
-          aria-label="自动隐藏导航栏"
+          aria-label={t("settings.appearance.autoHideNav")}
         />
       </div>
 
@@ -95,10 +103,10 @@ const SettingsAppearance: Component = () => {
           </div>
           <div class="min-w-0">
             <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
-              持久化滚动恢复
+              {t("settings.appearance.persistScroll")}
             </p>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-              关闭时重新打开应用始终从列表顶部开始（默认）；开启后恢复上次浏览位置
+              {t("settings.appearance.persistScrollDesc")}
             </p>
           </div>
         </div>
@@ -114,8 +122,39 @@ const SettingsAppearance: Component = () => {
               setPersistScrollRestoration(false);
             }
           })}
-          aria-label="持久化滚动恢复"
+          aria-label={t("settings.appearance.persistScroll")}
         />
+      </div>
+
+      {/* 界面语言（抽取原型 #496：跟随系统 + 手动覆盖 + 即时切换；回退跟随系统的入口属 spec 范围） */}
+      <div class="flex items-center justify-between py-3 gap-3">
+        <div class="min-w-0">
+          <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
+            {t("settings.appearance.language")}
+          </p>
+          <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
+            {t("settings.appearance.languageDesc")}
+          </p>
+        </div>
+        <div
+          class="flex items-center gap-2 flex-shrink-0"
+          role="group"
+          aria-label={t("settings.appearance.language")}
+        >
+          {LANGUAGES.map((lang) => (
+            <button
+              class={`px-[var(--spacingHorizontalM)] py-[var(--spacingVerticalS)] rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase300)] border border-[var(--colorNeutralStroke1)] ${
+                currentLocale() === lang
+                  ? "bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] border-[var(--colorBrandBackground)]"
+                  : "bg-[var(--colorNeutralBackground3)] text-[var(--colorNeutralForeground1)]"
+              }`}
+              aria-pressed={currentLocale() === lang ? "true" : "false"}
+              onClick={() => setLanguage(lang)}
+            >
+              {LANGUAGE_AUTONYMS[lang]}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
