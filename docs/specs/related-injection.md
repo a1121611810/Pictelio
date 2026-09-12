@@ -1,9 +1,9 @@
 # Spec: 相关作品注入行（双端：app webview + app-lynx）
 
-- 状态：spec 定稿待实施（2026-09-12）
+- 状态：implemented（2026-09-12 当日实施于分支 `feat/related-injection`，7 commits 3f773575..d232e4c8；门禁 check:all / test:all（app 1673 + lynx 1154 + 其余包）/ lint:all 全绿；仓库级双轴 code-review 首轮 PASS-with-comments → 复审修复 commit d232e4c8 → 复审 PASS。遗留：模拟器/真机视觉批次（lynx 横滑降级行为、行高观感）挂账于 #490）
 - 日期：2026-09-12
 - 关联：评估结论 = 「返回列表原位插入相关作品」方案 B 形态（原位下方横滑条，非逐条散插）；官方接口 `/v1/illust/related`；小说无官方 related 端点（Phase 2 挂账）
-- 工单：见 spec issue + T 系 tickets（to-tickets 流水线）
+- 工单：spec [#486](https://github.com/a1121611810/Pictelio/issues/486) / T1 [#487](https://github.com/a1121611810/Pictelio/issues/487) / T2 [#488](https://github.com/a1121611810/Pictelio/issues/488) / T3 [#489](https://github.com/a1121611810/Pictelio/issues/489) / T4 [#490](https://github.com/a1121611810/Pictelio/issues/490)（#487-#489 已关）
 
 ## 1. 背景与目标
 
