@@ -74,7 +74,8 @@ const enCore = {
   "core.store.reportStore.reasonSpam": "Spam",
   "core.store.reportStore.reasonOther": "Other",
   "core.store.reportStore.emailSubject": "[Pictelio report] Work ID: {{id}}",
-  "core.store.reportStore.emailBody": "Work ID: {{id}}\nReason: {{reason}}\n\nAdditional details:\n",
+  "core.store.reportStore.emailBody":
+    "Work ID: {{id}}\nReason: {{reason}}\n\nAdditional details:\n",
 
   // ── stores/readerSettingsStore (cross-layer: options hold labelKey, rendered via t()) ──
   "core.store.readerSettings.fontFamilySans": "Sans-serif",

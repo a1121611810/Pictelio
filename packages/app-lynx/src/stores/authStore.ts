@@ -12,7 +12,7 @@
 // 模块级 `import { currentUser }` + 兼容桥；T5 收口）。
 import { ref, computed } from "vue"
 import { defineStore } from "pinia"
-import { t } from "../i18n"
+import { t, apiErrorMessage } from "../i18n"
 import { isNativeMode, getNativeModules, setAccessToken, setOnUnauthorized, setAuthPermanentFailure, setAuthReadyProvider } from "../api/client"
 import { loginWithRefreshToken } from "../api/auth"
 import type { PixivUser } from "../api/types"
@@ -105,7 +105,7 @@ export const useAuthStore = defineStore("auth", () => {
       return true
     } catch (err) {
       const apiErr = toApiError(err)
-      _authError.value = apiErr.message
+      _authError.value = apiErrorMessage(apiErr)
       // 永久失效（OAuth 400）→ 标记永久失败，强制重新登录
       if (apiErr.type === ApiErrorType.UNAUTHORIZED) {
         setAuthPermanentFailure(true)

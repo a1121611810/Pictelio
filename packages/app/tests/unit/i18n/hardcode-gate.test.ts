@@ -10,7 +10,7 @@ import ts from "typescript";
 const SRC = path.resolve(__dirname, "../../../src");
 const WHITELIST = JSON.parse(
   fs.readFileSync(path.resolve(__dirname, "hardcode-whitelist.json"), "utf-8"),
-) as string[];
+) as { path: string; reason: string }[];
 
 const CJK = /[一-鿿]/;
 
@@ -91,7 +91,7 @@ describe("i18n 回潮门禁：src 内禁硬编码中文字符串字面量", () =
       ) {
         continue;
       }
-      if (WHITELIST.includes(rel)) continue;
+      if (WHITELIST.some((e) => e.path === rel)) continue;
       const hits = collectLiterals(file);
       if (hits.length > 0) {
         offenders.push(

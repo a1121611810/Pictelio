@@ -1,51 +1,174 @@
 [
-  "App.vue",
-  "api/auth.ts",
-  "api/client.ts",
-  "api/comment.ts",
-  "api/novel.ts",
-  "api/ugoira.ts",
-  "components/AdaptiveTagRow.vue",
-  "components/AiOverlay.vue",
-  "components/BookmarkButton.vue",
-  "components/CarouselSwiper.vue",
-  "components/GlobalFab.vue",
-  "components/NovelExportSheet.vue",
-  "components/RefreshableList.vue",
-  "components/RestrictOverlay.vue",
-  "components/SearchSheet.vue",
-  "components/UgoiraViewer.vue",
-  "components/navTabs.ts",
-  "errorPreview.ts",
-  "errorPrototype/ErrorPagePreview.vue",
-  "pages/DownloadManager.vue",
-  "pages/FollowList.vue",
-  "pages/Me.vue",
-  "pages/NovelDetail.vue",
-  "pages/Recommended.vue",
-  "primitives/createBookmarkToggle.ts",
-  "primitives/createGlobalFab.ts",
-  "primitives/createMixFeed.ts",
-  "primitives/createWatchlistPrompt.ts",
-  "primitives/createWatchlistToggle.ts",
-  "primitives/measureRects.ts",
-  "primitives/mergeByTime.ts",
-  "primitives/useComments.ts",
-  "primitives/useSearch.ts",
-  "primitives/watchlistFeed.ts",
-  "stores/authStore.ts",
-  "stores/relatedInjection.ts",
-  "stores/settingsStore.ts",
-  "stores/updateStore.ts",
-  "utils/accessibility.ts",
-  "utils/backupCore.ts",
-  "utils/downloadManager.ts",
-  "utils/downloadQueueCore.ts",
-  "utils/errorPresentation.ts",
-  "utils/errors.ts",
-  "utils/galleryDownload.ts",
-  "utils/gallerySaver.ts",
-  "utils/lynxShare.ts",
-  "utils/netDiagnostics.ts",
-  "utils/webDavBridge.ts"
+  {
+    "path": "App.vue",
+    "reason": "存量豁免（收尾审计已核，非用户可见主文案）"
+  },
+  {
+    "path": "api/auth.ts",
+    "reason": "API 层 message 快照/契约串（展示层已走 messageKey，ADR-0157 D6）"
+  },
+  {
+    "path": "api/client.ts",
+    "reason": "API 层 message 快照/契约串（展示层已走 messageKey，ADR-0157 D6）"
+  },
+  {
+    "path": "api/comment.ts",
+    "reason": "API 层 message 快照/契约串（展示层已走 messageKey，ADR-0157 D6）"
+  },
+  {
+    "path": "api/novel.ts",
+    "reason": "API 层 message 快照/契约串（展示层已走 messageKey，ADR-0157 D6）"
+  },
+  {
+    "path": "api/ugoira.ts",
+    "reason": "API 层 message 快照/契约串（展示层已走 messageKey，ADR-0157 D6）"
+  },
+  {
+    "path": "components/AdaptiveTagRow.vue",
+    "reason": "存量豁免（收尾审计已核，非用户可见主文案）"
+  },
+  {
+    "path": "components/AiOverlay.vue",
+    "reason": "存量豁免（收尾审计已核，非用户可见主文案）"
+  },
+  {
+    "path": "components/BookmarkButton.vue",
+    "reason": "存量豁免（收尾审计已核，非用户可见主文案）"
+  },
+  {
+    "path": "components/CarouselSwiper.vue",
+    "reason": "存量豁免（收尾审计已核，非用户可见主文案）"
+  },
+  {
+    "path": "components/GlobalFab.vue",
+    "reason": "存量豁免（收尾审计已核，非用户可见主文案）"
+  },
+  {
+    "path": "components/RefreshableList.vue",
+    "reason": "存量豁免（收尾审计已核，非用户可见主文案）"
+  },
+  {
+    "path": "components/RestrictOverlay.vue",
+    "reason": "存量豁免（收尾审计已核，非用户可见主文案）"
+  },
+  {
+    "path": "components/UgoiraViewer.vue",
+    "reason": "存量豁免（收尾审计已核，非用户可见主文案）"
+  },
+  {
+    "path": "components/navTabs.ts",
+    "reason": "存量豁免（收尾审计已核，非用户可见主文案）"
+  },
+  {
+    "path": "errorPreview.ts",
+    "reason": "错误页预览原型（调试工具）"
+  },
+  {
+    "path": "errorPrototype/ErrorPagePreview.vue",
+    "reason": "错误页预览原型（调试工具）"
+  },
+  {
+    "path": "pages/DownloadManager.vue",
+    "reason": "存量豁免（收尾审计已核，非用户可见主文案）"
+  },
+  {
+    "path": "pages/Me.vue",
+    "reason": "语言选择器 autonym（简体中文/English 语言本名，ui-copy R8 不翻译）"
+  },
+  {
+    "path": "pages/Recommended.vue",
+    "reason": "存量豁免（收尾审计已核，非用户可见主文案）"
+  },
+  {
+    "path": "primitives/createBookmarkToggle.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "primitives/createGlobalFab.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "primitives/createMixFeed.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "primitives/createWatchlistPrompt.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "primitives/createWatchlistToggle.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "primitives/measureRects.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "primitives/mergeByTime.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "primitives/useComments.ts",
+    "reason": "评论域 fallback 经 toErrorText(t(key)) 收敛后残余（throw/边界串）"
+  },
+  {
+    "path": "primitives/watchlistFeed.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "stores/authStore.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "stores/relatedInjection.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "stores/settingsStore.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "stores/updateStore.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "utils/accessibility.ts",
+    "reason": "a11y 注册表静态中文 label（E2E 定位契约，review 已豁免）"
+  },
+  {
+    "path": "utils/backupCore.ts",
+    "reason": "zh 契约常量（UI 已走 i18n key，契约测试钉原文）"
+  },
+  {
+    "path": "utils/downloadManager.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "utils/downloadQueueCore.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "utils/errors.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "utils/galleryDownload.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "utils/gallerySaver.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "utils/lynxShare.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "utils/netDiagnostics.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "utils/webDavBridge.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  }
 ]

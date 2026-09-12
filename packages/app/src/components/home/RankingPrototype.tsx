@@ -124,7 +124,11 @@ const RankedList: Component<{ initialMode?: number }> = (props) => {
   return (
     <div>
       {/* mode 切换 chips（横滚） */}
-      <div class="flex gap-2 overflow-x-auto px-4 pb-1" role="tablist" aria-label={t("ranking.modeListAria")}>
+      <div
+        class="flex gap-2 overflow-x-auto px-4 pb-1"
+        role="tablist"
+        aria-label={t("ranking.modeListAria")}
+      >
         <For each={RANK_MODE_KEYS}>
           {(m, i) => (
             <button
@@ -297,7 +301,11 @@ const VariantA: Component<{ feed: JSX.Element; onOpenAll: () => void }> = (props
               </button>
             </div>
             {/* 横向缩略图 + 名次角标 */}
-            <div class="mt-2 flex gap-2 overflow-x-auto pb-1" role="list" aria-label={t("ranking.todayListAria")}>
+            <div
+              class="mt-2 flex gap-2 overflow-x-auto pb-1"
+              role="list"
+              aria-label={t("ranking.todayListAria")}
+            >
               <For each={entries}>
                 {(e) => (
                   <div role="listitem" class="relative w-20 flex-shrink-0">
@@ -365,7 +373,11 @@ const VariantB: Component<{ feed: JSX.Element }> = (props) => {
   const [sub, setSub] = createSignal(0);
   return (
     <>
-      <div class="flex gap-2 overflow-x-auto px-4 pt-3" role="tablist" aria-label={t("ranking.subtabListAria")}>
+      <div
+        class="flex gap-2 overflow-x-auto px-4 pt-3"
+        role="tablist"
+        aria-label={t("ranking.subtabListAria")}
+      >
         <For each={SUB_TAB_KEYS}>
           {(tabKey, i) => (
             <button
@@ -399,7 +411,10 @@ const VariantB: Component<{ feed: JSX.Element }> = (props) => {
 
 const VariantC: Component<{ feed: JSX.Element; onOpen: (mode: number) => void }> = (props) => (
   <>
-    <div class="flex items-center gap-2 overflow-x-auto px-4 pt-3" aria-label={t("ranking.entryAria")}>
+    <div
+      class="flex items-center gap-2 overflow-x-auto px-4 pt-3"
+      aria-label={t("ranking.entryAria")}
+    >
       <span class="flex flex-none items-center gap-1 font-semibold text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase300)]">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path d="M3 8 L7 12 L12 5 L17 12 L21 8 L19 18 H5 Z" />

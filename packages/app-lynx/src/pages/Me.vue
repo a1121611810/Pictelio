@@ -43,7 +43,7 @@ import { t, locale } from '../i18n'
 const auth = useAuthStore()
 const settings = useSettingsStore()
 const clientSwitch = useClientSwitchStore()
-const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, novelExportFormat, novelExportOptions, relatedInjection } = storeToRefs(settings)
+const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, language, novelExportFormat, novelExportOptions, relatedInjection } = storeToRefs(settings)
 
 const switching = ref(false)
 
@@ -567,6 +567,39 @@ function toggleRelatedInjection() {
               </view>
             </view>
             <text class="text-label-small text-surface-on-variant">{{ t('me.appearance.colorTeal') }}</text>
+          </view>
+        </view>
+        <!-- 界面语言（spec docs/specs/i18n.md §3：跟随系统 + 手动覆盖 + 即时切换；autonym 按 ui-copy R8 不翻译） -->
+        <view class="mt-4 pt-3 border-t-[1px] border-t-surface-variant">
+          <text class="text-label-medium text-surface-on-variant">{{ t('me.appearance.language') }}</text>
+          <view class="flex flex-row flex-wrap gap-2 mt-2">
+            <view
+              class="px-3 py-1.5 rounded-full border-[0.533vw]"
+              :class="language === '' ? 'bg-secondary-container border-primary' : 'bg-surface-container border-transparent'"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="ME_A11Y_LABELS.languageFollowSystem"
+              @tap="settings.setLanguage('')"
+            >
+              <text class="text-label-medium" :class="language === '' ? 'text-primary-on' : 'text-surface-on'">{{ t('me.appearance.languageFollowSystem') }}</text>
+            </view>
+            <view
+              class="px-3 py-1.5 rounded-full border-[0.533vw]"
+              :class="language === 'zh-CN' ? 'bg-secondary-container border-primary' : 'bg-surface-container border-transparent'"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="ME_A11Y_LABELS.languageZh"
+              @tap="settings.setLanguage('zh-CN')"
+            >
+              <text class="text-label-medium" :class="language === 'zh-CN' ? 'text-primary-on' : 'text-surface-on'">简体中文</text>
+            </view>
+            <view
+              class="px-3 py-1.5 rounded-full border-[0.533vw]"
+              :class="language === 'en' ? 'bg-secondary-container border-primary' : 'bg-surface-container border-transparent'"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="ME_A11Y_LABELS.languageEn"
+              @tap="settings.setLanguage('en')"
+            >
+              <text class="text-label-medium" :class="language === 'en' ? 'text-primary-on' : 'text-surface-on'">English</text>
+            </view>
           </view>
         </view>
       </view>

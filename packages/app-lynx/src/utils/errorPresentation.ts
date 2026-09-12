@@ -53,7 +53,7 @@ export function registerSessionErrorHandler(handler: () => void): void {
 
 /** 报告会话级错误：写 fatalError + 触发导航回调。handler 未注册时 console.warn（禁止静默降级） */
 export function reportSessionError(err: unknown): void {
-  fatalError.value = toApiError(err, "登录已过期")
+  fatalError.value = toApiError(err, t("error.fallback.sessionExpired"))
   if (sessionErrorHandler) {
     sessionErrorHandler()
   } else {

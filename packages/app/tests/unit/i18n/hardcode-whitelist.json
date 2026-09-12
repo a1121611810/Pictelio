@@ -1,32 +1,106 @@
 [
-  "api/_oauthFetch.ts",
-  "api/client.ts",
-  "api/feedQueryPersist.ts",
-  "api/illust.ts",
-  "api/normalizeQueryError.ts",
-  "api/novel.ts",
-  "api/translate.ts",
-  "components/ReportSheet.tsx",
-  "components/home/FeedList.tsx",
-  "components/home/RankingPrototype.tsx",
-  "components/settings/SettingsAppearance.tsx",
-  "components/settings/SettingsWebdav.tsx",
-  "native/GallerySaver.ts",
-  "native/WebDav.ts",
-  "primitives/createNovelTranslator.ts",
-  "services/imageHostService.ts",
-  "services/otaService.ts",
-  "stores/authStore.ts",
-  "stores/historyStore.ts",
-  "stores/imageHostStore.ts",
-  "stores/novelCache.ts",
-  "stores/readerSettingsStore.ts",
-  "stores/relatedInjectionStore.ts",
-  "stores/reportStore.ts",
-  "utils/backupCore.ts",
-  "utils/downloadManager.ts",
-  "utils/downloadQueueCore.ts",
-  "utils/galleryDownload.ts",
-  "utils/idleFeedPrefetch.ts",
-  "utils/prompts.ts"
+  {
+    "path": "api/_oauthFetch.ts",
+    "reason": "API 层 message 快照/契约串（展示层已走 messageKey，ADR-0157 D6）"
+  },
+  {
+    "path": "api/client.ts",
+    "reason": "API 层 message 快照/契约串（展示层已走 messageKey，ADR-0157 D6）"
+  },
+  {
+    "path": "api/feedQueryPersist.ts",
+    "reason": "API 层 message 快照/契约串（展示层已走 messageKey，ADR-0157 D6）"
+  },
+  {
+    "path": "api/illust.ts",
+    "reason": "API 层 message 快照/契约串（展示层已走 messageKey，ADR-0157 D6）"
+  },
+  {
+    "path": "api/normalizeQueryError.ts",
+    "reason": "API 层 message 快照/契约串（展示层已走 messageKey，ADR-0157 D6）"
+  },
+  {
+    "path": "api/novel.ts",
+    "reason": "API 层 message 快照/契约串（展示层已走 messageKey，ADR-0157 D6）"
+  },
+  {
+    "path": "api/translate.ts",
+    "reason": "API 层 message 快照/契约串（展示层已走 messageKey，ADR-0157 D6）"
+  },
+  {
+    "path": "components/home/FeedList.tsx",
+    "reason": "存量豁免（收尾审计已核，非用户可见主文案）"
+  },
+  {
+    "path": "components/settings/SettingsAppearance.tsx",
+    "reason": "语言选择器 autonym（简体中文/English 语言本名，ui-copy R8 不翻译）"
+  },
+  {
+    "path": "components/settings/SettingsWebdav.tsx",
+    "reason": "存量豁免（收尾审计已核，非用户可见主文案）"
+  },
+  {
+    "path": "native/GallerySaver.ts",
+    "reason": "原生桥插件层错误串（开发者面向，不上 UI）"
+  },
+  {
+    "path": "native/WebDav.ts",
+    "reason": "原生桥插件层错误串（开发者面向，不上 UI）"
+  },
+  {
+    "path": "primitives/createNovelTranslator.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "services/imageHostService.ts",
+    "reason": "zh 契约常量（UI 已走 i18n key，契约测试钉原文）"
+  },
+  {
+    "path": "services/otaService.ts",
+    "reason": "存量豁免（收尾审计已核，非用户可见主文案）"
+  },
+  {
+    "path": "stores/authStore.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "stores/historyStore.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "stores/imageHostStore.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "stores/novelCache.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "stores/relatedInjectionStore.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "utils/backupCore.ts",
+    "reason": "zh 契约常量（UI 已走 i18n key，契约测试钉原文）"
+  },
+  {
+    "path": "utils/downloadManager.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "utils/downloadQueueCore.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "utils/galleryDownload.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "utils/idleFeedPrefetch.ts",
+    "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
+  },
+  {
+    "path": "utils/prompts.ts",
+    "reason": "LLM 翻译提示词，非 UI 文案（永久豁免）"
+  }
 ]

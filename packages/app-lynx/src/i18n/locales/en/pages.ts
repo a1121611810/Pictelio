@@ -191,6 +191,8 @@ const enPages = {
   "me.client.lynxHint": "Native rendering with vue-lynx",
   "me.client.restarting": "Restarting…",
   "me.appearance.title": "Appearance",
+  "me.appearance.language": "Interface language",
+  "me.appearance.languageFollowSystem": "Automatic",
   "me.appearance.themeColorHint": "Choose a theme color (Material Design 3)",
   "me.appearance.colorSky": "Sky blue",
   "me.appearance.colorViolet": "Violet",

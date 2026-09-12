@@ -9,7 +9,7 @@ import ts from "typescript";
 const SRC = path.resolve(__dirname, "../src");
 const WHITELIST = JSON.parse(
   fs.readFileSync(path.resolve(__dirname, "hardcode-whitelist.json"), "utf-8"),
-) as string[];
+) as { path: string; reason: string }[];
 
 const CJK = /[一-鿿]/;
 
@@ -93,7 +93,7 @@ describe("i18n 回潮门禁（副端）：src 内禁硬编码中文文案", () =
       if (rel.startsWith("i18n/locales/") || /\.test\.(ts|tsx)$/.test(rel) || rel.endsWith(".d.ts")) {
         continue;
       }
-      if (WHITELIST.includes(rel)) continue;
+      if (WHITELIST.some((e) => e.path === rel)) continue;
       const hits = scan(file);
       if (hits.length > 0) {
         offenders.push(`${rel}: ${hits.slice(0, 3).map((h) => `"${h}"`).join(", ")}${hits.length > 3 ? ` (+${hits.length - 3})` : ""}`);

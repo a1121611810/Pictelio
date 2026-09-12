@@ -191,6 +191,8 @@ const zhPages = {
   "me.client.lynxHint": "vue-lynx 原生渲染",
   "me.client.restarting": "正在重启切换…",
   "me.appearance.title": "外观",
+  "me.appearance.language": "界面语言",
+  "me.appearance.languageFollowSystem": "跟随系统",
   "me.appearance.themeColorHint": "选择主题色（Material Design 3 配色）",
   "me.appearance.colorSky": "天蓝",
   "me.appearance.colorViolet": "紫罗兰",

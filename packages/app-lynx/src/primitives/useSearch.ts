@@ -32,6 +32,7 @@ import { searchTransport } from "../api/search"
 import type { SearchTransport } from "../api/search"
 import type { PixivIllust, PixivNovel, SearchScope, SearchSort } from "../api/types"
 import { toApiError } from "../utils/errors"
+import { t, apiErrorMessage } from "../i18n"
 import {
   DEFAULT_SEARCH_FILTERS,
   buildIllustSearchRequest,
@@ -145,9 +146,9 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
     return disposed || signal.aborted
   }
 
-  /** 错误归一为中文文案：优先透传 ApiError.message（client.classifyError 已产中文） */
+  /** 错误归一为展示文案：messageKey 优先（classifyError 产出可走 i18n），fallback 回退 */
   function toErrorText(e: unknown, fallback: string): string {
-    return toApiError(e, fallback).message
+    return apiErrorMessage(toApiError(e, fallback))
   }
 
   /** 清空回 idle：取消待发 debounce + 中止在途 + 清结果（reset() 与空词共用；筛选保留） */
@@ -242,7 +243,7 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
     if (scope === "all") {
       if (failures.length === 2) {
         statusRef.value = "error"
-        errorRef.value = toErrorText(failures[0], "搜索失败，请重试")
+        errorRef.value = toErrorText(failures[0], t("searchSheet.searchFailed"))
         return
       }
       if (failures.length === 1) {
@@ -254,7 +255,7 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
       }
     } else if (failures.length > 0) {
       statusRef.value = "error"
-      errorRef.value = toErrorText(failures[0], "搜索失败，请重试")
+      errorRef.value = toErrorText(failures[0], t("searchSheet.searchFailed"))
       return
     }
     statusRef.value = "ready"
@@ -354,7 +355,7 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
       nextIllustUrlRef.value = res.next_url
     } catch (e) {
       if (!isStale(signal)) {
-        errorRef.value = toErrorText(e, "加载更多失败")
+        errorRef.value = toErrorText(e, t("searchSheet.loadMoreFailed"))
         paginationErrorRef.value = true
       }
     }
@@ -371,7 +372,7 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
       nextNovelUrlRef.value = res.next_url
     } catch (e) {
       if (!isStale(signal)) {
-        errorRef.value = toErrorText(e, "加载更多失败")
+        errorRef.value = toErrorText(e, t("searchSheet.loadMoreFailed"))
         paginationErrorRef.value = true
       }
     }
