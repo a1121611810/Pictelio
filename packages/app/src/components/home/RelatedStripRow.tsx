@@ -11,6 +11,7 @@ import type { RelatedRow } from "@/stores/relatedInjectionStore";
 import { RELATED_ROW_SIZE } from "@/stores/relatedInjectionStore";
 import SkeletonShimmer from "@/components/SkeletonShimmer";
 import type { PixivIllust } from "@/api/types";
+import { resolveImageUrl } from "@/utils/imageLoader";
 
 interface RelatedStripRowProps {
   row: RelatedRow;
@@ -20,9 +21,12 @@ interface RelatedStripRowProps {
   onDismiss: () => void;
 }
 
-/** 缩略图取值（square_medium 优先，与列表卡降级链一致） */
-const thumb = (il: PixivIllust) =>
-  il.image_urls.square_medium || il.image_urls.medium || il.image_urls.large;
+/** 缩略图取值（square_medium 优先）；必须经 resolveImageUrl 转 /pixiv-img/ 代理——
+ *  原生 WebView 只对代理路径注入 Referer，裸 pximg URL 会 403（模拟器实测 2026-09-12） */
+const thumb = (il: PixivIllust) => {
+  const raw = il.image_urls.square_medium || il.image_urls.medium || il.image_urls.large;
+  return raw ? resolveImageUrl(raw) : "";
+};
 
 const RelatedStripRow: Component<RelatedStripRowProps> = (props) => {
   return (
