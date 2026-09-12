@@ -959,7 +959,7 @@ function toggleRelatedInjection() {
         v-if="webdavAvailable"
         class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]"
       >
-        <text class="text-title-small font-medium text-surface-on">WebDAV 备份</text>
+        <text class="text-title-small font-medium text-surface-on">{{ t('me.webdav.title') }}</text>
         <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.webdav.hint') }}</text>
 
         <view
@@ -989,12 +989,12 @@ function toggleRelatedInjection() {
             v-if="settings.webdavUrl !== '' && !settings.webdavUrl.startsWith('https://')"
             class="text-label-medium text-error mt-1"
           >
-            非 HTTPS 连接存在泄露风险
+            {{ t('me.webdav.httpsWarning') }}
           </text>
           <input
             v-model="settings.webdavUsername"
             class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] text-body-large text-surface-on px-4 mt-3"
-            placeholder="用户名"
+            :placeholder="t('me.webdav.usernamePlaceholder')"
             placeholder-color="#41474e"
             @input="onWebdavFieldInput('username', $event)"
           />
@@ -1003,13 +1003,13 @@ function toggleRelatedInjection() {
             v-model="webdavLoginPassword"
             type="password"
             class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] text-body-large text-surface-on px-4 mt-3"
-            placeholder="密码（加密存储）"
+            :placeholder="t('me.webdav.passwordPlaceholder')"
             placeholder-color="#41474e"
           />
           <input
             v-model="settings.webdavDir"
             class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] text-body-large text-surface-on px-4 mt-3"
-            placeholder="目录（默认 Pictelio/backup）"
+            :placeholder="t('me.webdav.dirPlaceholder')"
             placeholder-color="#41474e"
             @input="onWebdavFieldInput('dir', $event)"
           />
@@ -1017,7 +1017,7 @@ function toggleRelatedInjection() {
             v-model="webdavBackupPassword"
             type="password"
             class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] text-body-large text-surface-on px-4 mt-3"
-            placeholder="备份密码（可选，加密备份文件）"
+            :placeholder="t('me.webdav.backupPasswordPlaceholder')"
             placeholder-color="#41474e"
           />
           <!-- M3：敏感项排除（spec §7；账号级敏感键勾选后不进备份文件） -->
@@ -1027,7 +1027,7 @@ function toggleRelatedInjection() {
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="ME_A11Y_LABELS.webdavSensitiveGroup"
           >
-            <text class="text-label-medium text-surface-on-variant">敏感项排除（勾选后不进入备份文件）</text>
+            <text class="text-label-medium text-surface-on-variant">{{ t('me.webdav.sensitiveExclusionHint') }}</text>
             <view class="flex flex-row flex-wrap gap-2 mt-2">
               <view
                 v-for="key in webdavSensitiveKeys"
@@ -1044,7 +1044,7 @@ function toggleRelatedInjection() {
           </view>
 
           <view class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant mt-2">
-            <text class="text-title-medium text-surface-on">启动时自动备份</text>
+            <text class="text-title-medium text-surface-on">{{ t('me.webdav.autoBackup') }}</text>
             <view class="flex flex-row gap-2">
               <view
                 class="flex flex-row gap-2"
@@ -1075,7 +1075,7 @@ function toggleRelatedInjection() {
             </view>
           </view>
 
-          <text class="text-label-medium text-surface-on-variant mt-3">上次备份：{{ webdavLastBackupLabel }}</text>
+          <text class="text-label-medium text-surface-on-variant mt-3">{{ t('me.webdav.lastBackup', { value: webdavLastBackupLabel }) }}</text>
 
           <view class="flex flex-row gap-2 mt-3">
             <view
@@ -1084,7 +1084,7 @@ function toggleRelatedInjection() {
               :accessibility-label="ME_A11Y_LABELS.webdavTest"
               @tap="onWebdavTest"
             >
-              <text class="text-label-large text-surface-on">连接测试</text>
+              <text class="text-label-large text-surface-on">{{ t('me.webdav.action.test') }}</text>
             </view>
             <view
               class="flex-1 h-[10.667vw] bg-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
@@ -1092,7 +1092,7 @@ function toggleRelatedInjection() {
               :accessibility-label="ME_A11Y_LABELS.webdavBackup"
               @tap="onWebdavBackup"
             >
-              <text class="text-label-large font-medium text-primary-on">立即备份</text>
+              <text class="text-label-large font-medium text-primary-on">{{ t('me.webdav.action.backup') }}</text>
             </view>
           </view>
           <view class="flex flex-row gap-2 mt-2">
@@ -1111,7 +1111,7 @@ function toggleRelatedInjection() {
               :accessibility-label="ME_A11Y_LABELS.webdavUndo"
               @tap="onWebdavUndo"
             >
-              <text class="text-label-large text-surface-on">撤销上次恢复</text>
+              <text class="text-label-large text-surface-on">{{ t('me.webdav.undoLastRestore') }}</text>
             </view>
           </view>
 
@@ -1121,7 +1121,7 @@ function toggleRelatedInjection() {
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="ME_A11Y_LABELS.webdavRestoreFiles"
           >
-            <text class="text-label-medium text-surface-on-variant">选择要恢复的备份</text>
+            <text class="text-label-medium text-surface-on-variant">{{ t('me.webdav.chooseBackup') }}</text>
             <view v-for="file in webdavFiles" :key="file.name" class="py-2.5" @tap="onWebdavSelectFile(file)">
               <text class="text-body-medium" :class="webdavSelected?.name === file.name ? 'text-primary' : 'text-surface-on'">
                 {{ file.name }}{{ file.encrypted ? t('me.webdav.encryptedBadge') : '' }}
@@ -1154,7 +1154,7 @@ function toggleRelatedInjection() {
                 {{ t('me.webdav.summaryCounts', { device: webdavPrepared.summary.deviceKeyCount, account: webdavPrepared.summary.accountKeyCountForUid, sets: webdavPrepared.summary.setCount }) }}
               </text>
               <text class="text-label-medium text-error mt-2">
-                恢复会覆盖本机对应设置（仅覆盖备份中存在的键），恢复前自动保存应急快照。
+                {{ t('me.webdav.overwriteWarning') }}
               </text>
             </view>
             <text v-if="webdavRestoreError" class="text-label-medium text-error mt-2">{{ webdavRestoreError }}</text>
@@ -1173,7 +1173,7 @@ function toggleRelatedInjection() {
                 :accessibility-label="ME_A11Y_LABELS.webdavRestoreConfirm"
                 @tap="onWebdavRestore"
               >
-                <text class="text-label-large text-error-on">确认恢复</text>
+                <text class="text-label-large text-error-on">{{ t('me.webdav.confirmRestore') }}</text>
               </view>
             </view>
           </view>

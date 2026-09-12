@@ -46,6 +46,11 @@ export function setLanguage(lang: Locale | ""): void {
   languageHandle.set(lang);
 }
 
+/** 当前是否为「跟随系统」态（手动覆盖未设置）——设置页跟随系统入口的选中态。 */
+export function isFollowingSystem(): boolean {
+  return languageHandle.value() === "";
+}
+
 // 非源语言按需分 chunk，模块加载即后台预取（非阻塞）。
 const [enDict, setEnDict] = createSignal<Dict | undefined>(undefined);
 void import("./locales/en").then(
@@ -76,8 +81,13 @@ export function t(key: I18nKey, args?: Record<string, string | number>): string 
   if (rendered !== undefined) {
     return rendered;
   }
-  const fallback = zhCN[key] ?? key;
-  return args ? safeResolveTemplate(fallback, args) : fallback;
+  const fallback = zhCN[key];
+  if (fallback !== undefined) {
+    return args ? safeResolveTemplate(fallback, args) : fallback;
+  }
+  // 双字典皆缺（类型外运行时防御）：回退 key 本身并可见（禁静默降级，与副端对齐）
+  console.warn(`[i18n] missing key: ${String(key)}`);
+  return key;
 }
 
 /** ApiError 展示文案：messageKey 优先（i18n 渲染），message 快照回退（B1）。 */

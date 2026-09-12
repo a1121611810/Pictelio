@@ -15,6 +15,7 @@ import {
   NOVEL_EXPORT_FORMAT_LABELS,
   type NovelExportFormat,
 } from '@pictelio/novel-export'
+import zhMisc from '../i18n/locales/zh-CN/misc'
 
 const src = readFileSync(fileURLToPath(new URL('./NovelExportSheet.vue', import.meta.url)), 'utf8')
 /** 去 HTML 注释与行注释后的代码本文（负向断言对象：约束说明本身会提到目标串） */
@@ -59,8 +60,19 @@ describe('NovelExportSheet.vue 结构契约（spec §3.1/§7.2）', () => {
   })
 
   it('内容摘要为只读（不调用设置 setter）+ 提示在设置页修改', () => {
-    expect(src).toContain('正文（必含）')
-    expect(src).toContain('内容开关在设置页「导出」中修改')
+    // #511 补抽：摘要行走 computed + contentSummary key（{{metadata}}/{{cover}}/{{inlineImages}} 插值），
+    // 开/关走 stateOn/stateOff；zh 字典值 = 存量文案逐字快照（渲染产物不变，oracle：迁移前模板字面量）
+    expect(zhMisc['novelExportSheet.contentSummary']).toBe(
+      '正文（必含） · 元数据 {{metadata}} · 封面 {{cover}} · 正文插图 {{inlineImages}}',
+    )
+    expect(zhMisc['novelExportSheet.stateOn']).toBe('开')
+    expect(zhMisc['novelExportSheet.stateOff']).toBe('关')
+    expect(src).toContain("t('novelExportSheet.contentSummary'")
+    expect(src).toContain('t(\'novelExportSheet.stateOn\') : t(\'novelExportSheet.stateOff\')')
+    expect(src).toContain('{{ contentSummary }}')
+    // 设置页指引：t(key) 调用形态 + zh 值逐字节不变
+    expect(zhMisc['novelExportSheet.contentHint']).toBe('内容开关在设置页「导出」中修改')
+    expect(src).toContain("t('novelExportSheet.contentHint')")
     expect(code).not.toContain('setNovelExport')
   })
 

@@ -12,7 +12,9 @@ describe("utils/dateFormat（B10 日期层）", () => {
     setLanguage("zh-CN");
     expect(formatRelativeTime("2026-09-12T11:59:40+08:00", NOW)).toBe("刚刚");
     expect(formatRelativeTime("2026-09-12T11:55:00+08:00", NOW)).toBe("5分钟前");
+    expect(formatRelativeTime("2026-09-12T11:00:00+08:00", NOW)).toBe("1小时前");
     expect(formatRelativeTime("2026-09-12T09:00:00+08:00", NOW)).toBe("3小时前");
+    expect(formatRelativeTime("2026-09-11T12:00:00+08:00", NOW)).toBe("1天前");
     expect(formatRelativeTime("2026-09-09T12:00:00+08:00", NOW)).toBe("3天前");
   });
 
@@ -25,6 +27,8 @@ describe("utils/dateFormat（B10 日期层）", () => {
     setLanguage("en");
     await vi.waitFor(() => {
       expect(formatRelativeTime("2026-09-12T11:59:00+08:00", NOW)).toBe("1 minute ago");
+    expect(formatRelativeTime("2026-09-12T11:00:00+08:00", NOW)).toBe("1 hour ago");
+    expect(formatRelativeTime("2026-09-11T12:00:00+08:00", NOW)).toBe("1 day ago");
       expect(formatRelativeTime("2026-09-12T11:55:00+08:00", NOW)).toBe("5 minutes ago");
     });
     expect(formatDate("2026-09-12T12:00:00+08:00")).toBe("9/12/2026");

@@ -22,15 +22,21 @@ import {
   FONT_COLORS,
   BG_COLORS,
 } from "../stores/readerSettingsStore";
-import { t } from "../i18n";
+import { t, type I18nKey } from "../i18n";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
 }
 
+/** 选项文案：i18n 选项存 labelKey 渲染时 t()（跨层，store 侧模块加载期不能调 t）；
+ * 非文案值（行高数字档位）走 text 直显。 */
+type PillOption<T extends string | number> =
+  | { value: T; labelKey: I18nKey }
+  | { value: T; text: string };
+
 function PillRow<T extends string | number>(props: {
-  options: readonly { value: T; label: string }[];
+  options: readonly PillOption<T>[];
   value: () => T;
   onChange: (v: T) => void;
 }) {
@@ -49,7 +55,7 @@ function PillRow<T extends string | number>(props: {
 
           onClick={() => props.onChange(opt.value)}
         >
-          {opt.label}
+          {"labelKey" in opt ? t(opt.labelKey) : opt.text}
         </button>
       ))}
     </div>
@@ -228,7 +234,7 @@ const ReaderSettingsSheet: Component<Props> = (props) => {
                 {t("readerSettings.lineHeight")}
               </p>
               <PillRow
-                options={LINE_HEIGHTS.map((lh) => ({ value: lh, label: String(lh) }))}
+                options={LINE_HEIGHTS.map((lh) => ({ value: lh, text: String(lh) }))}
                 value={lineHeight}
                 onChange={(v) => setReaderLineHeight(v as number)}
               />

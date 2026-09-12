@@ -2,7 +2,7 @@
 // SolidJS 2 批处理语义（registry #415 注释）：settings handle 的 set 在无 flush 时同步读不可见，
 // 断言前必须 flush 微任务（solidjs2-authoring-gotchas 先例）。
 import { describe, expect, it, vi } from "vitest";
-import { currentLocale, setLanguage, t } from "@/i18n";
+import { currentLocale, isFollowingSystem, setLanguage, t } from "@/i18n";
 
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
@@ -29,5 +29,22 @@ describe("i18n 原型（@solid-primitives/i18n）", () => {
     await flush();
     expect(t("error.action.retry")).toBe("重试");
     expect(t("settings.appearance.language")).toBe("语言");
+  });
+
+  it("跟随系统态：setLanguage 空串后 isFollowingSystem 为真（设置页入口选中态，#511）", async () => {
+    setLanguage("en");
+    await flush();
+    expect(isFollowingSystem()).toBe(false);
+    setLanguage("");
+    await flush();
+    expect(isFollowingSystem()).toBe(true);
+  });
+
+  it("缺 key 防御：warn 且回退 key 本身（禁静默降级——类型外运行时防御路径）", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    // @ts-expect-error 故意传不存在的 key 走运行时防御分支
+    expect(t("nonexistent.key" as never)).toBe("nonexistent.key");
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 });

@@ -18,9 +18,10 @@ const REASONS: ReportReason[] = ["pornography", "violence", "infringement", "spa
 const REPORT_EMAIL = "a1121611810@outlook.com";
 
 function openReportEmail(illustId: number, reason: ReportReason) {
-  const subject = encodeURIComponent(`[Pictelio 举报] 作品 ID: ${illustId}`);
+  const reasonLabel = t(REPORT_REASON_LABELS[reason]);
+  const subject = encodeURIComponent(t("core.store.reportStore.emailSubject", { id: illustId }));
   const body = encodeURIComponent(
-    `举报作品 ID: ${illustId}\n举报原因: ${REPORT_REASON_LABELS[reason]}\n\n补充说明：\n`,
+    t("core.store.reportStore.emailBody", { id: illustId, reason: reasonLabel }),
   );
   window.location.href = `mailto:${REPORT_EMAIL}?subject=${subject}&body=${body}`;
 }
@@ -95,7 +96,7 @@ const ReportSheet: Component<ReportSheetProps> = (props) => {
           >
             {REASONS.map((reason) => (
               <fluent-radio value={reason} disabled={alreadyReported()}>
-                {REPORT_REASON_LABELS[reason]}
+                {t(REPORT_REASON_LABELS[reason])}
               </fluent-radio>
             ))}
           </fluent-radio-group>

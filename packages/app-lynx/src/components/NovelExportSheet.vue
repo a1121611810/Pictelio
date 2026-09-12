@@ -4,7 +4,7 @@
 // 底部面板（DOM 顺序靠后，天然覆盖宿主），面板 @tap.stop 防穿透；挂载时注册 modalStack，
 // 返回键优先关面板（ADR-0066 扩展）。确认导出不做任何 IO——只 emit 本次选中的格式，
 // 由父页构造 payload 并入队（web-core 无原生模块，入队纯 JS 可用；编码失败在执行器）。
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import {
   NOVEL_EXPORT_FORMATS,
   NOVEL_EXPORT_FORMAT_LABELS,
@@ -33,6 +33,18 @@ const emit = defineEmits<{
 
 /** 本次选择的格式（临时覆盖，不写回设置页） */
 const selected = ref<NovelExportFormat>(props.defaultFormat)
+
+// 内容摘要行（只读）：正文恒含，三项开关取设置页快照；渲染时 t()（computed 内建立
+// locale 响应依赖，语言切换即时生效），开关值亦走字典（stateOn/stateOff）
+const contentSummary = computed(() =>
+  t('novelExportSheet.contentSummary', {
+    metadata: props.options.includeMetadata ? t('novelExportSheet.stateOn') : t('novelExportSheet.stateOff'),
+    cover: props.options.includeCover ? t('novelExportSheet.stateOn') : t('novelExportSheet.stateOff'),
+    inlineImages: props.options.includeInlineImages
+      ? t('novelExportSheet.stateOn')
+      : t('novelExportSheet.stateOff'),
+  }),
+)
 
 // 每次打开重置为全局默认格式（临时覆盖不写回设置）
 watch(
@@ -119,9 +131,9 @@ function onConfirm(): void {
       <view class="px-4 pt-3">
         <text class="text-title-small font-medium text-surface-on">{{ t('novelExportSheet.contentTitle') }}</text>
         <text class="text-label-medium text-surface-on-variant mt-1 leading-snug">
-          正文（必含） · 元数据 {{ options.includeMetadata ? '开' : '关' }} · 封面 {{ options.includeCover ? '开' : '关' }} · 正文插图 {{ options.includeInlineImages ? '开' : '关' }}
+          {{ contentSummary }}
         </text>
-        <text class="text-label-medium text-outline mt-1 leading-snug">内容开关在设置页「导出」中修改</text>
+        <text class="text-label-medium text-outline mt-1 leading-snug">{{ t('novelExportSheet.contentHint') }}</text>
       </view>
 
       <!-- 确认导出 -->

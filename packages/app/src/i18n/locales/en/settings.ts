@@ -15,6 +15,7 @@ const enSettings = {
   "settings.appearance.persistScrollDesc":
     "Off: reopen at the top of lists (default). On: restore your last position.",
   "settings.appearance.language": "Language",
+  "settings.appearance.followSystem": "Automatic",
   "settings.appearance.languageDesc": "Change the interface language. Applies immediately.",
 
   // ── Content & filtering (SettingsContent) ──

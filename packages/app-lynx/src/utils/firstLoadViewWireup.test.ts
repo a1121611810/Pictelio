@@ -6,6 +6,7 @@
 // 行为正确性（首帧骨架、刷新不闪、失败显错误）由 web-core + 模拟器 / 真机闭环承担。
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
+import zhMisc from '../i18n/locales/zh-CN/misc'
 
 /** 读取相对本测试文件的 .vue 源码 */
 function read(rel: string): string {
@@ -79,8 +80,10 @@ describe('首载三态 状态映射与错误可见性（ADR-0150 / spec:57 / T4 
 
   it('关注 / 取关动作失败必须可见（不得写入仅无数据时渲染的 errorMsg 槽）', () => {
     const src = read('../pages/FollowList.vue')
-    expect(src).toContain("pageErrorMsg.value = '操作失败'")
-    expect(src).not.toContain("errorMsg.value = '操作失败'")
+    // #511 补抽：文案走 t('followList.actionFailed')（赋值时快照）；zh 字典值 = 存量文案「操作失败」逐字快照
+    expect(zhMisc['followList.actionFailed']).toBe('操作失败')
+    expect(src).toContain("pageErrorMsg.value = t('followList.actionFailed')")
+    expect(src).not.toContain("errorMsg.value = t('followList.actionFailed')")
   })
 
   it('追更列表：有数据刷新失败必须可见（watchlistFeed 保留 items，不落 error 分支）', () => {

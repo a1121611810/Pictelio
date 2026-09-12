@@ -1,8 +1,9 @@
 // lynx 组件/工具域（components/stores/utils/composables 用户可见文案，B9 批次工单 #508）。
 // zh 值 = 存量文案逐字快照，迁移期禁改写。
-// 未抽取清单（源级测试钉住字面量，与 B8 处理一致）：utils/accessibility.ts 全部 A11Y 注册表、
-// navTabs a11yLabel、SearchSheet 标题/占位/scope-sort chips/五态文案等（SearchSheet.test.ts 钉住）、
-// NovelExportSheet 内容摘要与设置页提示（template.test.ts 钉住）、backupCore WEBDAV_ERROR_MESSAGES。
+// #511 第 2 类补抽：SearchSheet 标题/占位/历史/scope-sort chips/五态、NovelExportSheet
+// 内容摘要与设置页指引、Me.vue WebDAV 区块、FollowList 操作失败、NovelDetail 已追更/系列行
+// 原被源级测试钉住跳过，本批同步改测试为「t(key) 调用形态 + zh 字典值逐字节不变」双断言。
+// 仍未抽取：utils/accessibility.ts 全部 A11Y 注册表、navTabs a11yLabel、backupCore WEBDAV_ERROR_MESSAGES。
 const zhMisc = {
   // ─── navTabs.ts（底部导航 tab label；a11yLabel 属 E2E 契约不抽取） ───
   "navTabs.recommended": "推荐",
@@ -70,8 +71,26 @@ const zhMisc = {
   "pagePicker.saving": "保存中…",
   "pagePicker.save": "保存（{{count}}）",
 
-  // ─── SearchSheet.vue（全局搜索弹层；标题/占位/scope-sort chips/五态文案被
-  //     SearchSheet.test.ts 源级钉住，未抽取） ───
+  // ─── SearchSheet.vue（全局搜索弹层；#511 补抽标题/占位/历史/scope-sort chips/五态文案，
+  //     SearchSheet.test.ts 同步改为 t(key) 调用形态 + zh 字典值双断言） ───
+  "searchSheet.title": "搜索",
+  "searchSheet.placeholder": "输入标签 / 关键词",
+  "searchSheet.history": "搜索历史",
+  "searchSheet.historyEmptyHint": "输入关键词开始搜索",
+  "searchSheet.scope.all": "全部",
+  "searchSheet.scope.illust": "插画",
+  "searchSheet.scope.novel": "小说",
+  "searchSheet.sort.newest": "最新",
+  "searchSheet.sort.oldest": "最早",
+  "searchSheet.sort.popular": "热门",
+  "searchSheet.bookmarkDimmedHint": "热门榜不支持按收藏数筛（切回最新/最早恢复）",
+  "searchSheet.ratioDimmedHint": "切到「插画」范围后可用（已设的值会保留）",
+  "searchSheet.searchFailed": "搜索失败，请重试",
+  "searchSheet.searching": "搜索中…",
+  "searchSheet.emptyHint": "没有找到相关内容，试试换一个关键词",
+  "searchSheet.rowAction": "查看 ›",
+  "searchSheet.loadMoreFailed": "加载更多失败",
+  "searchSheet.noMore": "没有更多了",
   "searchSheet.retry": "重试",
   "searchSheet.clear": "清空",
   "searchSheet.filter": "筛选",
@@ -100,15 +119,42 @@ const zhMisc = {
   "searchSheet.type.ugoira": "动图",
   "searchSheet.type.illust": "插画",
 
-  // ─── NovelExportSheet.vue（小说导出面板；内容摘要行与设置页提示被
-  //     NovelExportSheet.template.test.ts 钉住，未抽取） ───
+  // ─── NovelExportSheet.vue（小说导出面板；#511 补抽内容摘要行与设置页指引，
+  //     NovelExportSheet.template.test.ts 同步改为 t(key) 调用形态 + zh 字典值双断言） ───
   "novelExportSheet.title": "导出小说",
   "novelExportSheet.closeA11y": "关闭导出面板",
   "novelExportSheet.formatTitle": "导出格式",
   "novelExportSheet.formatA11y": "选择导出格式{{label}}",
   "novelExportSheet.formatHint": "默认使用设置页选择的格式；此处修改仅作用于本次导出。",
   "novelExportSheet.contentTitle": "导出内容",
+  "novelExportSheet.contentSummary":
+    "正文（必含） · 元数据 {{metadata}} · 封面 {{cover}} · 正文插图 {{inlineImages}}",
+  "novelExportSheet.stateOn": "开",
+  "novelExportSheet.stateOff": "关",
+  "novelExportSheet.contentHint": "内容开关在设置页「导出」中修改",
   "novelExportSheet.export": "导出",
+
+  // ─── pages/Me.vue WebDAV 区块（#511 补抽；连接测试/立即备份复用 me.webdav.action.*） ───
+  "me.webdav.title": "WebDAV 备份",
+  "me.webdav.httpsWarning": "非 HTTPS 连接存在泄露风险",
+  "me.webdav.usernamePlaceholder": "用户名",
+  "me.webdav.passwordPlaceholder": "密码（加密存储）",
+  "me.webdav.dirPlaceholder": "目录（默认 Pictelio/backup）",
+  "me.webdav.backupPasswordPlaceholder": "备份密码（可选，加密备份文件）",
+  "me.webdav.sensitiveExclusionHint": "敏感项排除（勾选后不进入备份文件）",
+  "me.webdav.autoBackup": "启动时自动备份",
+  "me.webdav.lastBackup": "上次备份：{{value}}",
+  "me.webdav.undoLastRestore": "撤销上次恢复",
+  "me.webdav.chooseBackup": "选择要恢复的备份",
+  "me.webdav.overwriteWarning": "恢复会覆盖本机对应设置（仅覆盖备份中存在的键），恢复前自动保存应急快照。",
+  "me.webdav.confirmRestore": "确认恢复",
+
+  // ─── pages/FollowList.vue（#511 补抽关注/取关动作失败内联错误） ───
+  "followList.actionFailed": "操作失败",
+
+  // ─── pages/NovelDetail.vue（#511 补抽系列行与已追更 chip；novelDetail 其余 key 在 pages.ts） ───
+  "novelDetail.watchAdded": "已追更",
+  "novelDetail.seriesTitle": "《{{title}}》",
 
   // ─── stores/authStore.ts（登录错误，赋值时快照） ───
   "authStore.nativeAuthUnavailable": "原生认证模块不可用",

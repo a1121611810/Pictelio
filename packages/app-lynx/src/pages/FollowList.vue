@@ -112,7 +112,7 @@ async function toggleFollow(user: PixivUserPreview) {
     }
   } catch {
     // 操作失败必须可见：errorMsg 在三态链中仅「无数据」时渲染，动作失败时列表非空 → 走内联错误条
-    pageErrorMsg.value = '操作失败'
+    pageErrorMsg.value = t('followList.actionFailed') // i18n: 赋值时快照（瞬态）
   } finally {
     busyId.value = null
   }

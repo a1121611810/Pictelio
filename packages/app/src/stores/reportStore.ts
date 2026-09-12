@@ -1,3 +1,4 @@
+import type { I18nKey } from "@/i18n";
 import { createPersistedSetSetting } from "./shared/createPersistedSet";
 
 const PREF_KEY_REPORTED_IDS = "reported_ids";
@@ -5,13 +6,14 @@ const PREF_KEY_REPORTED_IDS = "reported_ids";
 /** 举报原因类型 */
 export type ReportReason = "pornography" | "violence" | "infringement" | "spam" | "other";
 
-/** 举报原因显示标签 */
-export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
-  pornography: "色情",
-  violence: "暴力",
-  infringement: "侵权",
-  spam: "垃圾广告",
-  other: "其他",
+/** 举报原因显示标签（跨层改造：模块加载期不能调 t()，store 存 key 纯数据，
+ * 消费方 ReportSheet 渲染时 t(key)） */
+export const REPORT_REASON_LABELS: Record<ReportReason, I18nKey> = {
+  pornography: "core.store.reportStore.reasonPornography",
+  violence: "core.store.reportStore.reasonViolence",
+  infringement: "core.store.reportStore.reasonInfringement",
+  spam: "core.store.reportStore.reasonSpam",
+  other: "core.store.reportStore.reasonOther",
 };
 
 /** 已举报作品记录 */

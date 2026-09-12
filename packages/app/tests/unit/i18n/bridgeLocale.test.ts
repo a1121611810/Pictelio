@@ -13,8 +13,14 @@ function makeDeferred<T>() {
 let bridgeDeferred = makeDeferred<{ languageTag: string }>();
 
 vi.mock("@/native/ClientInfo", () => ({
-  ClientInfo: { getLocale: () => bridgeDeferred.promise },
+  ClientInfo: {
+    getLocale: () => bridgeDeferred.promise,
+    // catch 降级路径用例（review nit 5）：插件 reject 时不崩、locale 维持
+    ...({} as Record<string, never>),
+  },
 }));
+
+const bridgeReject = makeDeferred<never>();
 
 beforeEach(() => {
   bridgeDeferred = makeDeferred<{ languageTag: string }>();
@@ -35,6 +41,20 @@ describe("refreshSystemLocaleFromBridge（P1-1 启动竞态）", () => {
     expect(currentLocale()).toBe("en"); // 双重 guard 生效：手动 en 保持
     setLanguage(""); // 还原跟随系统（handle 归 ""）
     await flush();
+  });
+
+  it("插件不可用（getLocale reject）时降级不崩、维持当前 locale（#511 catch 路径）", async () => {
+    const mod = await import("@/native/ClientInfo");
+    const original = mod.ClientInfo.getLocale;
+    mod.ClientInfo.getLocale = () => Promise.reject(new Error("plugin unavailable")) as never;
+    try {
+      setLanguage("");
+      await flush();
+      await expect(refreshSystemLocaleFromBridge()).resolves.toBeUndefined();
+      expect(currentLocale()).toBe("zh-CN"); // 维持 navigator 兜底
+    } finally {
+      mod.ClientInfo.getLocale = original; // 恢复 mock，防污染后续用例
+    }
   });
 
   it("无手动覆盖时桥结果正常生效（跟随系统路径不回归）", async () => {

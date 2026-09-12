@@ -66,6 +66,26 @@ const enCore = {
 
   // ── services/otaService ──
   "core.service.otaService.noBundleAvailable": "No update package available",
+
+  // ── stores/reportStore (cross-layer: store holds keys, ReportSheet renders via t()) ──
+  "core.store.reportStore.reasonPornography": "Pornography",
+  "core.store.reportStore.reasonViolence": "Violence",
+  "core.store.reportStore.reasonInfringement": "Copyright infringement",
+  "core.store.reportStore.reasonSpam": "Spam",
+  "core.store.reportStore.reasonOther": "Other",
+  "core.store.reportStore.emailSubject": "[Pictelio report] Work ID: {{id}}",
+  "core.store.reportStore.emailBody": "Work ID: {{id}}\nReason: {{reason}}\n\nAdditional details:\n",
+
+  // ── stores/readerSettingsStore (cross-layer: options hold labelKey, rendered via t()) ──
+  "core.store.readerSettings.fontFamilySans": "Sans-serif",
+  "core.store.readerSettings.fontFamilySerif": "Serif",
+  "core.store.readerSettings.fontFamilySystem": "System",
+  "core.store.readerSettings.fontFamilyMono": "Monospace",
+  "core.store.readerSettings.fontWeightLight": "Light",
+  "core.store.readerSettings.fontWeightRegular": "Regular",
+  "core.store.readerSettings.fontWeightMedium": "Medium",
+  "core.store.readerSettings.fontWeightSemibold": "Semibold",
+  "core.store.readerSettings.fontWeightBold": "Bold",
 } as const satisfies Record<ZhCoreKey, string>;
 
 export default enCore;

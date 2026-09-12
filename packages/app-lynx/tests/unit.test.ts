@@ -18,6 +18,7 @@ import type { UgoiraExtractMode } from '../src/api/ugoira'
 import { useSettingsStore } from '../src/stores/settingsStore'
 import { ME_A11Y_LABELS, LOGIN_A11Y_LABELS, UPDATE_A11Y_LABELS, ERROR_A11Y_LABELS, FAB_MENU_A11Y_LABELS, GLOBAL_FAB_A11Y_LABELS, WATCHLIST_A11Y_LABELS, WATCHLIST_PROMPT_A11Y_LABELS, SEARCH_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../src/utils/accessibility'
 import { THEME_COLOR_OPTIONS, DEFAULT_THEME_COLOR, isThemeColorId, themeColorClass } from '../src/utils/themeColor'
+import zhMisc from '../src/i18n/locales/zh-CN/misc'
 
 describe('imageUrl.proxyImageUrl', () => {
   it('将 i.pximg.net URL 重写为本地代理路径', () => {
@@ -2226,9 +2227,10 @@ expect(detailVueSource).toContain(':estimated-main-axis-size-px="estimatedHeight
 
 it('受限小说分支保留系列信息行 + 评论入口（spec 回归项，P1-1）', () => {
 // 断言须落在受限分支段内（以注释锚点分段；list meta 卡同样含这两串——全局断言为弱断言）
+// #511 补抽：系列名走 t('novelDetail.seriesTitle')（受限分支段内断言调用形态）
 const restricted = detailVueSource.split('<!-- 受限小说')[1] ?? ''
 expect(detailVueSource.split('RestrictOverlay').length).toBeGreaterThanOrEqual(2)
-expect(restricted).toContain('《{{ novel.series.title }}》')
+expect(restricted).toContain("t('novelDetail.seriesTitle'")
 expect(restricted).toContain('@tap="showComments = true"')
 })
 
@@ -2256,9 +2258,12 @@ expect(cancelFn![0]).not.toContain('goBack')
 
 it('系列信息行：《系列名》+ watchAdded=true 时「已追更」chip', () => {
 expect(detailVueSource).toContain('novel?.series')
-expect(detailVueSource).toContain('《{{ novel.series.title }}》')
+// #511 补抽：系列名/已追更走 t(key)；zh 字典值 = 存量文案逐字快照（渲染产物不变）
+expect(zhMisc['novelDetail.seriesTitle']).toBe('《{{title}}》')
+expect(zhMisc['novelDetail.watchAdded']).toBe('已追更')
+expect(detailVueSource).toContain("t('novelDetail.seriesTitle'")
 expect(detailVueSource).toContain("prompt?.watchAdded === true")
-expect(detailVueSource).toContain('已追更')
+expect(detailVueSource).toContain("t('novelDetail.watchAdded')")
 })
 
 it('章节内跳转：watch novelId 重载（dispose + 重建，spec §6-2）', () => {

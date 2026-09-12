@@ -15,6 +15,7 @@ import type { Component } from "solid-js";
 import { createSignal, For, onSettled, Show } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import type { PixivIllust } from "@/api/types";
+import { t, type I18nKey } from "@/i18n";
 import { illusts as recIllusts } from "@/stores/recommendedStore";
 import { resolveImageUrl } from "@/utils/imageLoader";
 
@@ -22,10 +23,11 @@ import { resolveImageUrl } from "@/utils/imageLoader";
 
 type ProtoVariant = "a" | "b" | "c";
 
-const VARIANTS: { key: ProtoVariant; label: string }[] = [
-  { key: "a", label: "A 横滑条注入" },
-  { key: "b", label: "B 子tab扩展" },
-  { key: "c", label: "C 入口+榜单页" },
+// i18n: 模块加载期不能调 t()，存 labelKey 渲染时翻译
+const VARIANTS: { key: ProtoVariant; labelKey: I18nKey }[] = [
+  { key: "a", labelKey: "ranking.protoVariantA" },
+  { key: "b", labelKey: "ranking.protoVariantB" },
+  { key: "c", labelKey: "ranking.protoVariantC" },
 ];
 
 /** URL query → 变体（非法/缺省 = 不启用原型） */
@@ -79,8 +81,9 @@ function buildRankEntries(count: number): RankEntry[] {
     } else {
       out.push({
         rank,
-        title: `排行榜作品 #${rank}`,
-        author: `画师样本 ${rank}`,
+        // i18n: mock 文案构造时快照（瞬态）——真实作品标题/画师名本就不翻译，切语言后重挂载再生效
+        title: t("ranking.mock.entryTitle", { rank }),
+        author: t("ranking.mock.artistSample", { rank }),
         bookmarks: 20000 - rank * 437,
         img: placeholderImg(rank),
       });
@@ -91,11 +94,25 @@ function buildRankEntries(count: number): RankEntry[] {
 
 // ── 共用：榜单列表（mode 切换 + 日期回看 + 榜单行）──
 
-const RANK_MODES = ["日榜", "周榜", "月榜", "新人", "原创", "R-18"];
+// i18n: mode 名存 key 渲染时翻译；变体 C 入口 chips 复用前 4 个
+const RANK_MODE_KEYS = [
+  "ranking.mode.daily",
+  "ranking.mode.weekly",
+  "ranking.mode.monthly",
+  "ranking.mode.newcomer",
+  "ranking.mode.original",
+  "ranking.mode.r18",
+] as const satisfies readonly I18nKey[];
+
+const ENTRY_MODE_KEYS = RANK_MODE_KEYS.slice(0, 4);
 
 const fmtDate = (offset: number): string => {
   const d = new Date(Date.now() - offset * 86400000);
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+  return t("ranking.dateLong", {
+    year: d.getFullYear(),
+    month: d.getMonth() + 1,
+    day: d.getDate(),
+  });
 };
 
 const RankedList: Component<{ initialMode?: number }> = (props) => {
@@ -107,8 +124,8 @@ const RankedList: Component<{ initialMode?: number }> = (props) => {
   return (
     <div>
       {/* mode 切换 chips（横滚） */}
-      <div class="flex gap-2 overflow-x-auto px-4 pb-1" role="tablist" aria-label="排行榜种类">
-        <For each={RANK_MODES}>
+      <div class="flex gap-2 overflow-x-auto px-4 pb-1" role="tablist" aria-label={t("ranking.modeListAria")}>
+        <For each={RANK_MODE_KEYS}>
           {(m, i) => (
             <button
               type="button"
@@ -125,7 +142,7 @@ const RankedList: Component<{ initialMode?: number }> = (props) => {
                 },
               ]}
             >
-              {m}
+              {t(m)}
             </button>
           )}
         </For>
@@ -135,7 +152,7 @@ const RankedList: Component<{ initialMode?: number }> = (props) => {
       <div class="flex items-center justify-center gap-2 py-2">
         <button
           type="button"
-          aria-label="前一天"
+          aria-label={t("ranking.prevDayAria")}
           onClick={() => setOffset(offset() + 1)}
           class="flex h-10 w-10 cursor-pointer items-center justify-center appearance-none rounded-[var(--borderRadiusCircular)] border-none text-[var(--colorNeutralForeground2)] outline-none transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-95 focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)]"
         >
@@ -153,13 +170,13 @@ const RankedList: Component<{ initialMode?: number }> = (props) => {
           {fmtDate(offset())}
           <Show when={offset() === 0}>
             <span class="rounded-full bg-[var(--colorBrandBackground2)] px-2 py-0.5 font-semibold text-[var(--colorBrandForeground1)] [font-size:var(--fontSizeBase100)]">
-              今日
+              {t("ranking.today")}
             </span>
           </Show>
         </span>
         <button
           type="button"
-          aria-label="后一天"
+          aria-label={t("ranking.nextDayAria")}
           disabled={offset() === 0}
           onClick={() => setOffset(Math.max(0, offset() - 1))}
           class="flex h-10 w-10 cursor-pointer items-center justify-center appearance-none rounded-[var(--borderRadiusCircular)] border-none text-[var(--colorNeutralForeground2)] outline-none transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-95 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)]"
@@ -177,7 +194,7 @@ const RankedList: Component<{ initialMode?: number }> = (props) => {
       </div>
 
       {/* 榜单行（只读原型：不跳转详情） */}
-      <div class="flex flex-col" role="list" aria-label="排行榜列表">
+      <div class="flex flex-col" role="list" aria-label={t("ranking.listAria")}>
         <For each={entries}>
           {(e) => (
             <div
@@ -228,7 +245,7 @@ const RankingPageView: Component<{ onBack: () => void; initialMode?: number }> =
     <div class="flex items-center gap-1 px-3 pt-2">
       <button
         type="button"
-        aria-label="返回推荐"
+        aria-label={t("ranking.backToRecommendedAria")}
         onClick={props.onBack}
         class="flex h-10 w-10 flex-none cursor-pointer items-center justify-center appearance-none rounded-[var(--borderRadiusCircular)] border-none text-[var(--colorNeutralForeground2)] outline-none transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-95 focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)]"
       >
@@ -243,7 +260,7 @@ const RankingPageView: Component<{ onBack: () => void; initialMode?: number }> =
         </svg>
       </button>
       <h2 class="font-semibold text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase400)]">
-        排行榜
+        {t("ranking.title")}
       </h2>
     </div>
     <RankedList initialMode={props.initialMode} />
@@ -263,11 +280,11 @@ const VariantA: Component<{ feed: JSX.Element; onOpenAll: () => void }> = (props
             {/* 标题行 */}
             <div class="flex items-center justify-between">
               <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground2)]">
-                今日排行 Top {entries.length}
+                {t("ranking.todayTop", { count: entries.length })}
               </p>
               <button
                 type="button"
-                aria-label="收起排行榜"
+                aria-label={t("ranking.collapseAria")}
                 onClick={() => setDismissed(true)}
                 class="flex h-8 w-8 items-center justify-center rounded-[var(--borderRadiusCircular)] text-[var(--colorNeutralForeground3)] transition-colors duration-[var(--durationFast)] ease-[var(--curveEasyEase)] hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-[0.98] focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)]"
               >
@@ -280,13 +297,13 @@ const VariantA: Component<{ feed: JSX.Element; onOpenAll: () => void }> = (props
               </button>
             </div>
             {/* 横向缩略图 + 名次角标 */}
-            <div class="mt-2 flex gap-2 overflow-x-auto pb-1" role="list" aria-label="今日排行榜">
+            <div class="mt-2 flex gap-2 overflow-x-auto pb-1" role="list" aria-label={t("ranking.todayListAria")}>
               <For each={entries}>
                 {(e) => (
                   <div role="listitem" class="relative w-20 flex-shrink-0">
                     <img
                       src={e.img}
-                      alt={`第${e.rank}名：${e.title}`}
+                      alt={t("ranking.entryAlt", { rank: e.rank, title: e.title })}
                       loading="lazy"
                       decoding="async"
                       class="h-20 w-20 rounded-[var(--borderRadiusMedium)] object-cover select-none"
@@ -310,11 +327,11 @@ const VariantA: Component<{ feed: JSX.Element; onOpenAll: () => void }> = (props
               {/* 尾部「全部」入口（A+C 组合预览） */}
               <button
                 type="button"
-                aria-label="查看完整排行榜"
+                aria-label={t("ranking.viewAllAria")}
                 onClick={props.onOpenAll}
                 class="flex h-20 w-20 flex-none cursor-pointer flex-col items-center justify-center gap-1 appearance-none rounded-[var(--borderRadiusMedium)] border border-dashed border-[var(--colorNeutralStroke2)] text-[var(--colorNeutralForeground2)] outline-none transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-[0.98] [font-size:var(--fontSizeBase200)] focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)]"
               >
-                全部
+                {t("ranking.viewAll")}
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path
                     d="M9 4 L17 12 L9 20"
@@ -336,15 +353,21 @@ const VariantA: Component<{ feed: JSX.Element; onOpenAll: () => void }> = (props
 
 // ── 变体 B：推荐子 tab 扩展（混合/插画/漫画/排行）──
 
-const SUB_TABS = ["混合", "插画", "漫画", "排行"];
+// i18n: 子 tab 名存 key 渲染时翻译
+const SUB_TAB_KEYS = [
+  "ranking.subtab.mixed",
+  "ranking.subtab.illust",
+  "ranking.subtab.manga",
+  "ranking.subtab.rank",
+] as const satisfies readonly I18nKey[];
 
 const VariantB: Component<{ feed: JSX.Element }> = (props) => {
   const [sub, setSub] = createSignal(0);
   return (
     <>
-      <div class="flex gap-2 overflow-x-auto px-4 pt-3" role="tablist" aria-label="推荐子标签">
-        <For each={SUB_TABS}>
-          {(t, i) => (
+      <div class="flex gap-2 overflow-x-auto px-4 pt-3" role="tablist" aria-label={t("ranking.subtabListAria")}>
+        <For each={SUB_TAB_KEYS}>
+          {(tabKey, i) => (
             <button
               type="button"
               role="tab"
@@ -360,7 +383,7 @@ const VariantB: Component<{ feed: JSX.Element }> = (props) => {
                 },
               ]}
             >
-              {t}
+              {t(tabKey)}
             </button>
           )}
         </For>
@@ -376,21 +399,21 @@ const VariantB: Component<{ feed: JSX.Element }> = (props) => {
 
 const VariantC: Component<{ feed: JSX.Element; onOpen: (mode: number) => void }> = (props) => (
   <>
-    <div class="flex items-center gap-2 overflow-x-auto px-4 pt-3" aria-label="排行榜入口">
+    <div class="flex items-center gap-2 overflow-x-auto px-4 pt-3" aria-label={t("ranking.entryAria")}>
       <span class="flex flex-none items-center gap-1 font-semibold text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase300)]">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path d="M3 8 L7 12 L12 5 L17 12 L21 8 L19 18 H5 Z" />
         </svg>
-        排行榜
+        {t("ranking.title")}
       </span>
-      <For each={["日榜", "周榜", "月榜", "新人"]}>
+      <For each={ENTRY_MODE_KEYS}>
         {(m, i) => (
           <button
             type="button"
             onClick={() => props.onOpen(i())}
             class="h-10 flex-none cursor-pointer appearance-none rounded-full border border-[var(--colorNeutralStroke1)] bg-[var(--colorNeutralBackground1)] px-4 text-[var(--colorNeutralForeground2)] outline-none transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] hover:bg-[var(--colorNeutralBackground1Hover)] hover:text-[var(--colorNeutralForeground1)] active:scale-95 [font-size:var(--fontSizeBase200)] focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)]"
           >
-            {m}
+            {t(m)}
           </button>
         )}
       </For>
@@ -418,16 +441,19 @@ const PrototypeSwitcher: Component<{ current: ProtoVariant }> = (props) => {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
-  const label = () => VARIANTS.find((v) => v.key === props.current)?.label ?? "";
+  const label = () => {
+    const labelKey = VARIANTS.find((v) => v.key === props.current)?.labelKey;
+    return labelKey ? t(labelKey) : "";
+  };
   return (
     <div
       class="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-full bg-[var(--colorNeutralForeground1)] px-2 py-1 text-[var(--colorNeutralForegroundOnBrand)] shadow-[var(--elevation8)]"
       role="group"
-      aria-label="原型变体切换"
+      aria-label={t("ranking.protoSwitchAria")}
     >
       <button
         type="button"
-        aria-label="上一个变体"
+        aria-label={t("ranking.protoPrevAria")}
         onClick={() => cycle(-1)}
         class="flex h-9 w-9 cursor-pointer items-center justify-center appearance-none rounded-full border-none bg-transparent outline-none transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] active:scale-90 focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)]"
       >
@@ -444,7 +470,7 @@ const PrototypeSwitcher: Component<{ current: ProtoVariant }> = (props) => {
       <span class="min-w-28 text-center [font-size:var(--fontSizeBase200)]">{label()}</span>
       <button
         type="button"
-        aria-label="下一个变体"
+        aria-label={t("ranking.protoNextAria")}
         onClick={() => cycle(1)}
         class="flex h-9 w-9 cursor-pointer items-center justify-center appearance-none rounded-full border-none bg-transparent outline-none transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] active:scale-90 focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)]"
       >

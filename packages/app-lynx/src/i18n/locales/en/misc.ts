@@ -72,6 +72,26 @@ const enMisc = {
   "pagePicker.save": "Save ({{count}})",
 
   // ─── SearchSheet.vue ───
+  "searchSheet.title": "Search",
+  "searchSheet.placeholder": "Enter a tag or keyword",
+  "searchSheet.history": "Search history",
+  "searchSheet.historyEmptyHint": "Type a keyword to search",
+  "searchSheet.scope.all": "All",
+  "searchSheet.scope.illust": "Illustrations",
+  "searchSheet.scope.novel": "Novels",
+  "searchSheet.sort.newest": "Newest",
+  "searchSheet.sort.oldest": "Oldest",
+  "searchSheet.sort.popular": "Popular",
+  "searchSheet.bookmarkDimmedHint":
+    "Bookmark filters aren't available on Popular. Switch to Newest or Oldest to restore them",
+  "searchSheet.ratioDimmedHint":
+    "Available after switching to the Illustrations scope. Values you set are kept",
+  "searchSheet.searchFailed": "Search failed. Try again",
+  "searchSheet.searching": "Searching…",
+  "searchSheet.emptyHint": "No results found. Try a different keyword",
+  "searchSheet.rowAction": "View ›",
+  "searchSheet.loadMoreFailed": "Failed to load more",
+  "searchSheet.noMore": "No more content",
   "searchSheet.retry": "Retry",
   "searchSheet.clear": "Clear",
   "searchSheet.filter": "Filters",
@@ -108,7 +128,35 @@ const enMisc = {
   "novelExportSheet.formatHint":
     "Defaults to the format chosen in Settings. Changes here apply to this export only.",
   "novelExportSheet.contentTitle": "Content",
+  "novelExportSheet.contentSummary":
+    "Body text (always included) · Metadata {{metadata}} · Cover {{cover}} · Inline images {{inlineImages}}",
+  "novelExportSheet.stateOn": "On",
+  "novelExportSheet.stateOff": "Off",
+  "novelExportSheet.contentHint": "Change content options in Settings → Export",
   "novelExportSheet.export": "Export",
+
+  // ─── pages/Me.vue WebDAV section ───
+  "me.webdav.title": "WebDAV backup",
+  "me.webdav.httpsWarning": "Non-HTTPS connections risk leaking your credentials",
+  "me.webdav.usernamePlaceholder": "Username",
+  "me.webdav.passwordPlaceholder": "Password (stored encrypted)",
+  "me.webdav.dirPlaceholder": "Directory (default Pictelio/backup)",
+  "me.webdav.backupPasswordPlaceholder": "Backup password (optional, encrypts the backup file)",
+  "me.webdav.sensitiveExclusionHint": "Sensitive items (selected items are excluded from the backup)",
+  "me.webdav.autoBackup": "Auto backup on launch",
+  "me.webdav.lastBackup": "Last backup: {{value}}",
+  "me.webdav.undoLastRestore": "Undo last restore",
+  "me.webdav.chooseBackup": "Choose a backup to restore",
+  "me.webdav.overwriteWarning":
+    "Restoring overwrites matching settings on this device (only keys present in the backup). A safety snapshot is saved automatically first.",
+  "me.webdav.confirmRestore": "Confirm restore",
+
+  // ─── pages/FollowList.vue ───
+  "followList.actionFailed": "Action failed",
+
+  // ─── pages/NovelDetail.vue ───
+  "novelDetail.watchAdded": "Following",
+  "novelDetail.seriesTitle": "“{{title}}”",
 
   // ─── stores/authStore.ts ───
   "authStore.nativeAuthUnavailable": "Native authentication module unavailable",

@@ -12,6 +12,7 @@ const zhSettings = {
   "settings.appearance.persistScrollDesc":
     "关闭时重新打开应用始终从列表顶部开始（默认）；开启后恢复上次浏览位置",
   "settings.appearance.language": "语言",
+  "settings.appearance.followSystem": "跟随系统",
   "settings.appearance.languageDesc": "切换界面显示语言，立即生效",
 
   // ── 内容与过滤（SettingsContent）──

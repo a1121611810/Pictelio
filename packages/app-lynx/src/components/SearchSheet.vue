@@ -205,15 +205,15 @@ function aiLevel(row: SearchResultItem): 1 | 2 {
   return t === 2 ? 2 : 1
 }
 
-/** 遮罩行徽章文案（R18 优先） */
+/** 遮罩行徽章文案（R18 优先；AI 段复用 AiOverlay 域 key） */
 function rowMaskLabel(row: SearchResultItem): string {
   if (isRestricted(row.entity)) return restrictLevel(row) === 2 ? 'R-18G' : 'R-18'
-  return aiLevel(row) === 2 ? 'AI' : 'AI辅助'
+  return aiLevel(row) === 2 ? t('aiOverlay.pure') : t('aiOverlay.assisted')
 }
 
-/** 遮罩行原因文案 */
+/** 遮罩行原因文案（复用 RestrictOverlay / AiOverlay 域 key，zh 值逐字一致） */
 function rowMaskHint(row: SearchResultItem): string {
-  return isRestricted(row.entity) ? '受浏览限制，不予显示' : 'AI 作品，已在设置中遮罩'
+  return isRestricted(row.entity) ? t('restrictOverlay.blocked') : t('aiOverlay.maskHint')
 }
 
 // ── 输入 ──
@@ -323,7 +323,7 @@ onBeforeUnmount(() => {
       <!-- 标题栏：居中「搜索」+ × 关闭 -->
       <view class="flex flex-row items-center h-[11.733vw] px-4 flex-shrink-0">
         <view class="w-[8vw]" />
-        <text class="flex-1 text-center text-title-large font-medium text-surface-on">搜索</text>
+        <text class="flex-1 text-center text-title-large font-medium text-surface-on">{{ t('searchSheet.title') }}</text>
         <view
           class="w-[8vw] h-[8vw] flex items-center justify-center"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
@@ -342,7 +342,7 @@ onBeforeUnmount(() => {
           v-model="keyword"
           confirm-type="search"
           class="flex-1 h-[11.2vw] box-border bg-surface-container-highest rounded-[var(--md-shape-full)] text-body-medium text-surface-on px-5"
-          placeholder="输入标签 / 关键词"
+          :placeholder="t('searchSheet.placeholder')"
           placeholder-color="#41474e"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="SEARCH_A11Y_LABELS.input"
@@ -363,7 +363,7 @@ onBeforeUnmount(() => {
       <!-- 词条区（idle 且无词：spec D5）：搜索历史 chips（单删 × + 全清入口）/ 无历史提示 -->
       <view v-if="!keyword.trim()" class="flex-shrink-0 px-4 mt-4">
         <view class="flex flex-row items-center justify-between">
-          <text class="text-label-large text-surface-on">搜索历史</text>
+          <text class="text-label-large text-surface-on">{{ t('searchSheet.history') }}</text>
           <text
             v-if="searchHistory.history.length > 0"
             class="text-label-medium text-primary"
@@ -383,7 +383,7 @@ onBeforeUnmount(() => {
             <text class="text-body-small text-surface-on-variant ml-2 flex-shrink-0" @tap.stop="onHistoryRemove(w)">×</text>
           </view>
         </view>
-        <text v-else class="text-body-medium text-outline mt-3 block">输入关键词开始搜索</text>
+        <text v-else class="text-body-medium text-outline mt-3 block">{{ t('searchSheet.historyEmptyHint') }}</text>
       </view>
 
       <!-- scope 段：全部 / 插画 / 小说（空词只更新状态；有词立即重搜，spec US10） -->
@@ -395,7 +395,7 @@ onBeforeUnmount(() => {
           :accessibility-label="SEARCH_A11Y_LABELS.scopeAll"
           @tap="onScopeTap('all')"
         >
-          <text class="text-body-small" :class="scopeTextCls(state.scope === 'all')">全部</text>
+          <text class="text-body-small" :class="scopeTextCls(state.scope === 'all')">{{ t('searchSheet.scope.all') }}</text>
         </view>
         <view
           class="h-[10.667vw] px-4 rounded-[var(--md-shape-full)] flex items-center"
@@ -404,7 +404,7 @@ onBeforeUnmount(() => {
           :accessibility-label="SEARCH_A11Y_LABELS.scopeIllust"
           @tap="onScopeTap('illust')"
         >
-          <text class="text-body-small" :class="scopeTextCls(state.scope === 'illust')">插画</text>
+          <text class="text-body-small" :class="scopeTextCls(state.scope === 'illust')">{{ t('searchSheet.scope.illust') }}</text>
         </view>
         <view
           class="h-[10.667vw] px-4 rounded-[var(--md-shape-full)] flex items-center"
@@ -413,7 +413,7 @@ onBeforeUnmount(() => {
           :accessibility-label="SEARCH_A11Y_LABELS.scopeNovel"
           @tap="onScopeTap('novel')"
         >
-          <text class="text-body-small" :class="scopeTextCls(state.scope === 'novel')">小说</text>
+          <text class="text-body-small" :class="scopeTextCls(state.scope === 'novel')">{{ t('searchSheet.scope.novel') }}</text>
         </view>
       </view>
 
@@ -426,7 +426,7 @@ onBeforeUnmount(() => {
           :accessibility-label="SEARCH_A11Y_LABELS.sortNewest"
           @tap="onSortTap('date_desc')"
         >
-          <text class="text-label-medium" :class="sortTextCls(state.sort === 'date_desc')">最新</text>
+          <text class="text-label-medium" :class="sortTextCls(state.sort === 'date_desc')">{{ t('searchSheet.sort.newest') }}</text>
         </view>
         <view
           class="h-[10.667vw] px-4 rounded-[var(--md-shape-full)] flex items-center"
@@ -435,7 +435,7 @@ onBeforeUnmount(() => {
           :accessibility-label="SEARCH_A11Y_LABELS.sortOldest"
           @tap="onSortTap('date_asc')"
         >
-          <text class="text-label-medium" :class="sortTextCls(state.sort === 'date_asc')">最早</text>
+          <text class="text-label-medium" :class="sortTextCls(state.sort === 'date_asc')">{{ t('searchSheet.sort.oldest') }}</text>
         </view>
         <view
           class="h-[10.667vw] px-4 rounded-[var(--md-shape-full)] flex items-center"
@@ -444,7 +444,7 @@ onBeforeUnmount(() => {
           :accessibility-label="SEARCH_A11Y_LABELS.sortPopular"
           @tap="onSortTap('popular_desc')"
         >
-          <text class="text-label-medium" :class="sortTextCls(state.sort === 'popular_desc')">热门</text>
+          <text class="text-label-medium" :class="sortTextCls(state.sort === 'popular_desc')">{{ t('searchSheet.sort.popular') }}</text>
         </view>
       </view>
 
@@ -516,7 +516,7 @@ onBeforeUnmount(() => {
               <text class="text-body-small" :class="chipTextCls(isBandActive(band))">{{ bandLabel(band) }}</text>
             </view>
           </view>
-          <text v-if="bookmarkDimmed" class="text-label-small text-outline mt-1 block">热门榜不支持按收藏数筛（切回最新/最早恢复）</text>
+          <text v-if="bookmarkDimmed" class="text-label-small text-outline mt-1 block">{{ t('searchSheet.bookmarkDimmedHint') }}</text>
         </view>
 
         <view>
@@ -537,7 +537,7 @@ onBeforeUnmount(() => {
               <text class="text-body-small" :class="chipTextCls(filters.ratio === r)">{{ r === 'landscape' ? t('searchSheet.ratio.landscape') : r === 'portrait' ? t('searchSheet.ratio.portrait') : t('searchSheet.ratio.square') }}</text>
             </view>
           </view>
-          <text v-if="illustDimmed" class="text-label-small text-outline mt-1 block">切到「插画」范围后可用（已设的值会保留）</text>
+          <text v-if="illustDimmed" class="text-label-small text-outline mt-1 block">{{ t('searchSheet.ratioDimmedHint') }}</text>
         </view>
 
         <view>
@@ -583,7 +583,7 @@ onBeforeUnmount(() => {
           v-if="view === 'error'"
           class="flex-1 min-h-0 flex flex-col items-center justify-center px-8"
         >
-          <text class="text-body-small text-error text-center">{{ state.error ?? '搜索失败，请重试' }}</text>
+          <text class="text-body-small text-error text-center">{{ state.error ?? t('searchSheet.searchFailed') }}</text>
           <view
             class="mt-4 px-6 h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
@@ -609,7 +609,7 @@ onBeforeUnmount(() => {
           <template v-else>
           <!-- 顶部轻量指示：debounce 窗口（isSearching）+ 搜索中（loading）——换词保留旧结果，不闪空白 -->
           <view v-if="state.isSearching || state.status === 'loading'" class="px-4 py-2 flex-shrink-0">
-            <text class="text-label-medium text-outline">搜索中…</text>
+            <text class="text-label-medium text-outline">{{ t('searchSheet.searching') }}</text>
           </view>
 
           <!-- ready 且空结果：换词提示（spec US17 / glossary「搜索五态」：不合并「未搜索」与「无结果」） -->
@@ -617,7 +617,7 @@ onBeforeUnmount(() => {
             v-if="view === 'empty'"
             class="flex-1 min-h-0 flex items-center justify-center px-5"
           >
-            <text class="text-body-medium text-outline text-center">没有找到相关内容，试试换一个关键词</text>
+            <text class="text-body-medium text-outline text-center">{{ t('searchSheet.emptyHint') }}</text>
           </view>
 
           <!-- 结果列表：行式（缩略图 + 标题 + 作者 · 类型/字数）；item-key 必须 String（ADR-0055/0056）。
@@ -670,7 +670,7 @@ onBeforeUnmount(() => {
                   </template>
                 </view>
 
-                <text class="text-[3.2vw] text-surface-on-variant flex-shrink-0 ml-2">查看 ›</text>
+                <text class="text-[3.2vw] text-surface-on-variant flex-shrink-0 ml-2">{{ t('searchSheet.rowAction') }}</text>
               </view>
             </list-item>
 
@@ -682,7 +682,7 @@ onBeforeUnmount(() => {
               full-span
               class="w-full py-4 flex flex-col items-center"
             >
-              <text class="text-label-medium text-error">加载更多失败</text>
+              <text class="text-label-medium text-error">{{ t('searchSheet.loadMoreFailed') }}</text>
               <view
                 class="mt-3 px-5 h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
                 :accessibility-element="A11Y_ELEMENT_ENABLED"
@@ -701,7 +701,7 @@ onBeforeUnmount(() => {
               full-span
               class="w-full py-4 flex items-center justify-center"
             >
-              <text class="text-label-medium text-outline">没有更多了</text>
+              <text class="text-label-medium text-outline">{{ t('searchSheet.noMore') }}</text>
             </list-item>
           </list>
           </template>

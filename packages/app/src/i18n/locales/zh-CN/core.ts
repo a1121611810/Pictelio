@@ -1,9 +1,9 @@
 // 核心层域（stores/utils/primitives/services 的用户可见文案，工单 #506 B7）。
 // zh 值 = 抽取前源文案逐字节一致（含模板串拼接形态），测试断言依赖。
 // 白名单（不抽，见工单回报）：utils/prompts.ts（LLM prompt 非 UI 文案）、
-// readerSettingsStore FONT_FAMILIES/FONT_WEIGHTS label、reportStore REPORT_REASON_LABELS
-// （模块加载期常量，消费方在 components 层渲染，跨批移交）、WEBDAV_ERROR_MESSAGES（契约常量，
-// UI 渲染走 settings.webdav.error.*，契约测试钉原文）。
+// WEBDAV_ERROR_MESSAGES（契约常量，UI 渲染走 settings.webdav.error.*，契约测试钉原文）。
+// reportStore REPORT_REASON_LABELS / readerSettingsStore FONT_FAMILIES/FONT_WEIGHTS
+// 原为跨批移交白名单，已按跨层改造完成（store 存 key，消费方 components 层渲染时 t()）。
 const zhCore = {
   // ── stores/imageHostStore ──
   "core.store.imageHostStore.modeRace": "并发请求",
@@ -65,6 +65,26 @@ const zhCore = {
 
   // ── services/otaService ──
   "core.service.otaService.noBundleAvailable": "无可用更新包",
+
+  // ── stores/reportStore（跨层：store 存 key，ReportSheet 渲染时 t()；mailto 模板含 {{var}}）──
+  "core.store.reportStore.reasonPornography": "色情",
+  "core.store.reportStore.reasonViolence": "暴力",
+  "core.store.reportStore.reasonInfringement": "侵权",
+  "core.store.reportStore.reasonSpam": "垃圾广告",
+  "core.store.reportStore.reasonOther": "其他",
+  "core.store.reportStore.emailSubject": "[Pictelio 举报] 作品 ID: {{id}}",
+  "core.store.reportStore.emailBody": "举报作品 ID: {{id}}\n举报原因: {{reason}}\n\n补充说明：\n",
+
+  // ── stores/readerSettingsStore（跨层：选项表存 labelKey，ReaderSettingsSheet 渲染时 t()）──
+  "core.store.readerSettings.fontFamilySans": "无衬线",
+  "core.store.readerSettings.fontFamilySerif": "衬线",
+  "core.store.readerSettings.fontFamilySystem": "系统",
+  "core.store.readerSettings.fontFamilyMono": "等宽",
+  "core.store.readerSettings.fontWeightLight": "细",
+  "core.store.readerSettings.fontWeightRegular": "常规",
+  "core.store.readerSettings.fontWeightMedium": "中等",
+  "core.store.readerSettings.fontWeightSemibold": "半粗",
+  "core.store.readerSettings.fontWeightBold": "粗",
 } as const;
 
 export default zhCore;

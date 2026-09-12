@@ -7,7 +7,7 @@ import {
   setShowDetailStairs,
 } from "../../stores/settingsStore";
 import { persistScrollRestoration, setPersistScrollRestoration } from "../../stores/uiStore";
-import { currentLocale, setLanguage, t, type Locale } from "../../i18n";
+import { currentLocale, isFollowingSystem, setLanguage, t, type Locale } from "../../i18n";
 
 const LANGUAGES: readonly Locale[] = ["zh-CN", "en"];
 
@@ -126,7 +126,7 @@ const SettingsAppearance: Component = () => {
         />
       </div>
 
-      {/* 界面语言（抽取原型 #496：跟随系统 + 手动覆盖 + 即时切换；回退跟随系统的入口属 spec 范围） */}
+      {/* 界面语言（spec §3：跟随系统 + 手动覆盖 + 即时切换；三选 chip，跟随系统 = setLanguage("")） */}
       <div class="flex items-center justify-between py-3 gap-3">
         <div class="min-w-0">
           <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
@@ -141,14 +141,25 @@ const SettingsAppearance: Component = () => {
           role="group"
           aria-label={t("settings.appearance.language")}
         >
+          <button
+            class={`px-[var(--spacingHorizontalM)] py-[var(--spacingVerticalS)] rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase300)] border border-[var(--colorNeutralStroke1)] ${
+              isFollowingSystem()
+                ? "bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] border-[var(--colorBrandBackground)]"
+                : "bg-[var(--colorNeutralBackground3)] text-[var(--colorNeutralForeground1)]"
+            }`}
+            aria-pressed={isFollowingSystem() ? "true" : "false"}
+            onClick={() => setLanguage("")}
+          >
+            {t("settings.appearance.followSystem")}
+          </button>
           {LANGUAGES.map((lang) => (
             <button
               class={`px-[var(--spacingHorizontalM)] py-[var(--spacingVerticalS)] rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase300)] border border-[var(--colorNeutralStroke1)] ${
-                currentLocale() === lang
+                !isFollowingSystem() && currentLocale() === lang
                   ? "bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] border-[var(--colorBrandBackground)]"
                   : "bg-[var(--colorNeutralBackground3)] text-[var(--colorNeutralForeground1)]"
               }`}
-              aria-pressed={currentLocale() === lang ? "true" : "false"}
+              aria-pressed={!isFollowingSystem() && currentLocale() === lang ? "true" : "false"}
               onClick={() => setLanguage(lang)}
             >
               {LANGUAGE_AUTONYMS[lang]}

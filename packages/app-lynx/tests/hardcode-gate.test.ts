@@ -50,9 +50,9 @@ function collectTsLiterals(source: string, kind: ts.ScriptKind): string[] {
 function collectVueTemplate(source: string): string[] {
   const hits: string[] = [];
   const noScript = source.replace(/<script[\s\S]*?<\/script>/g, "");
-  const attrRe = /[\w:-]+\s*=\s*"([^"]*)"/g;
+  const attrRe = /[\w:-]+\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
   for (const m of noScript.matchAll(attrRe)) {
-    const v = m[1]?.trim();
+    const v = (m[1] ?? m[2] ?? "").trim();
     if (v && CJK.test(v)) hits.push(v.slice(0, 40));
   }
   // 剥 {{ ... }} 插值与 < > 标签，剩文本节点

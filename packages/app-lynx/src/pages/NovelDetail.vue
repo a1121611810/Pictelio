@@ -273,12 +273,12 @@ function onWatchlistCancel(): void {
         </text>
         <!-- 系列信息行（spec §US4）：已追更显示 M3 assist-chip 风格标记 -->
         <view v-if="novel?.series" class="mt-1.5 flex flex-row items-center">
-          <text class="text-label-medium text-outline">《{{ novel.series.title }}》</text>
+          <text class="text-label-medium text-outline">{{ t('novelDetail.seriesTitle', { title: novel.series.title }) }}</text>
           <view
             v-if="prompt?.watchAdded === true"
             class="ml-2 px-2 py-0.5 rounded-[var(--md-shape-full)] bg-secondary-container"
           >
-            <text class="text-label-small text-secondary-on-container">已追更</text>
+            <text class="text-label-small text-secondary-on-container">{{ t('novelDetail.watchAdded') }}</text>
           </view>
         </view>
         <!-- 评论入口（issue #164）：💬 + total_comments，字段缺失时不显示（对齐插画页惯例） -->
@@ -333,12 +333,12 @@ function onWatchlistCancel(): void {
         </text>
         <!-- 系列信息行（与 meta 卡一致；受限小说保留，spec 回归项） -->
         <view v-if="novel?.series" class="mt-1.5 flex flex-row items-center">
-          <text class="text-label-medium text-outline">《{{ novel.series.title }}》</text>
+          <text class="text-label-medium text-outline">{{ t('novelDetail.seriesTitle', { title: novel.series.title }) }}</text>
           <view
             v-if="prompt?.watchAdded === true"
             class="ml-2 px-2 py-0.5 rounded-[var(--md-shape-full)] bg-secondary-container"
           >
-            <text class="text-label-small text-secondary-on-container">已追更</text>
+            <text class="text-label-small text-secondary-on-container">{{ t('novelDetail.watchAdded') }}</text>
           </view>
         </view>
         <!-- 评论入口（与 meta 卡一致） -->
