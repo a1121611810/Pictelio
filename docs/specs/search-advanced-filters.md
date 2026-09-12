@@ -1,6 +1,6 @@
 # Spec: 搜索高级筛选（双端：app webview + app-lynx）
 
-- 状态：draft（终审稿 v1，2026-09-12；决策经 wayfinder 地图 #474 收敛，#475~#479 全闭，终审通过后转 ready-for-implementation）
+- 状态：implemented（2026-09-12 终审通过并当日实施于分支 `feat/search-advanced-filters`，9 commits；门禁 check:all/test:all/lint:all 全绿 + 仓库级双轴 code-review 复审；遗留：agent-browser 筛选主流程 E2E 用例与 lynx 折叠区真机批次，见 §8）
 - 日期：2026-09-12
 - 关联：wayfinder [#474](https://github.com/a1121611810/Pictelio/issues/474)（地图）/ research `docs/research/pixiv-appapi-search-filter-params.md`（分支 `research/search-filter-api-surface`，7781735e）/ 原型 `docs/research/search-filter-ui-proto/`（分支 `prototype/search-filter-ui`，84df25fd）/ ADR-0132（lynx 全局搜索，第 8 条契约）/ ADR-0155（AI 三态）/ feature-gap 报告 P0-2（`docs/research/pictelio-feature-gap-vs-third-party.md`，分支 research/feature-gap-reverify-20260912）
 - 工单：待终审后 to-tickets 流水线拆票（地图外）
