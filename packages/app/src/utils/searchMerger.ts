@@ -13,12 +13,13 @@ export function mergeSearchResults(
     ...novels.map((n) => ({ type: "novel" as const, entity: n, date: n.create_date })),
   ];
 
-  items.sort((a, b) => {
+  // toSorted：不改动入参数组（oxlint perf 警告项）；行为等价（排序后返回新数组）
+  const sorted = items.toSorted((a, b) => {
     const dateCmp = b.date.localeCompare(a.date);
     if (dateCmp !== 0) return dateCmp;
     // 同一日期时 illust 优先（同类型返回 0，满足 sort 一致弱序反称性——修复前同类型对返回 1 违反弱序，依赖 V8 稳定排序）
     return a.type === b.type ? 0 : a.type === "illust" ? -1 : 1;
   });
 
-  return items;
+  return sorted;
 }

@@ -16,7 +16,7 @@ interface Harness {
 function mount(over: {
   filters?: SearchFilters;
   scope?: "all" | "illust" | "novel";
-  sort?: "date_desc" | "date_asc" | "popular_desc";
+  currentSort?: "date_desc" | "date_asc" | "popular_desc";
 }): Harness {
   const onChange = vi.fn();
   const onClose = vi.fn();
@@ -26,7 +26,7 @@ function mount(over: {
       onClose={onClose}
       filters={() => over.filters ?? DEFAULT_SEARCH_FILTERS}
       scope={() => over.scope ?? "all"}
-      sort={() => over.sort ?? "date_desc"}
+      currentSort={() => over.currentSort ?? "date_desc"}
       onChange={onChange}
     />
   ));
@@ -120,7 +120,7 @@ describe("SearchFilterSheet", () => {
   });
 
   it("热门排序：收藏数整组置灰 + 标注（#478）", () => {
-    mount({ sort: "popular_desc" });
+    mount({ currentSort: "popular_desc" });
     expect(
       (group("收藏数").getByRole("button", { name: "不限" }) as HTMLButtonElement).disabled,
     ).toBe(true);

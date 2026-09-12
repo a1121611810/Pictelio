@@ -506,7 +506,7 @@ const Search: Component = () => {
         onClose={() => setFilterSheetOpen(false)}
         filters={() => store.filters()}
         scope={() => store.scope()}
-        sort={() => store.toSorted()}
+        currentSort={() => store.toSorted()}
         onChange={handleFiltersChange}
       />
 

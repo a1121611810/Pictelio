@@ -30,8 +30,8 @@ interface Props {
   filters: () => SearchFilters;
   /** 搜索范围：scope=novel 时插画专属维度置灰 */
   scope: () => "all" | "illust" | "novel";
-  /** 排序：热门时收藏数置灰 */
-  sort: () => "date_desc" | "date_asc" | "popular_desc";
+  /** 排序：热门时收藏数置灰（命名避开 Array#sort 以免触发 oxlint 误报） */
+  currentSort: () => "date_desc" | "date_asc" | "popular_desc";
   /** 即改即搜入口（父级 450ms 去抖） */
   onChange: (next: SearchFilters) => void;
 }
@@ -63,6 +63,27 @@ const AI_OPTIONS: { value: AiOverride; label: string }[] = [
 ];
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** 以下四个为模块级纯函数：单调用点内完成联合类型窄化（跨 accessor 调用 TS 无法窄化），
+ * 且不闭包组件 props（oxlint perf：避免每次渲染重建）。 */
+function isPreset(filters: SearchFilters, v: PeriodPreset): boolean {
+  return filters.period.kind === "preset" && filters.period.preset === v;
+}
+
+function toggledPreset(filters: SearchFilters, v: PeriodPreset): SearchFilters["period"] {
+  return isPreset(filters, v) ? { kind: "any" } : { kind: "preset", preset: v };
+}
+
+function isBand(filters: SearchFilters, band: BookmarkBand): boolean {
+  const cur = filters.bookmark;
+  return cur !== null && cur.min === band.min && cur.max === band.max;
+}
+
+function toggledBookmark(filters: SearchFilters, band: BookmarkBand): SearchFilters {
+  const cur = filters.bookmark;
+  const isSame = cur !== null && cur.min === band.min && cur.max === band.max;
+  return { ...filters, bookmark: isSame ? null : { ...band } };
+}
 
 function FilterChip(props: {
   label: string;
@@ -103,30 +124,10 @@ const SearchFilterSheet: Component<Props> = (props) => {
   );
 
   const ratioDisabled = () => props.scope() === "novel";
-  const bookmarkDisabled = () => props.sort() === "popular_desc";
+  const bookmarkDisabled = () => props.currentSort() === "popular_desc";
 
   function setPeriod(next: SearchFilters["period"]): void {
     props.onChange({ ...props.filters(), period: next });
-  }
-
-  /** 单调用点内完成窄化（跨 accessor 调用 TS 无法窄化联合类型） */
-  function isPresetPeriod(p: SearchFilters["period"], v: PeriodPreset): boolean {
-    return p.kind === "preset" && p.preset === v;
-  }
-
-  function togglePreset(p: SearchFilters["period"], v: PeriodPreset): SearchFilters["period"] {
-    return isPresetPeriod(p, v) ? { kind: "any" } : { kind: "preset", preset: v };
-  }
-
-  function toggleBookmark(band: BookmarkBand): void {
-    const cur = props.filters().bookmark;
-    const isSame = cur !== null && cur.min === band.min && cur.max === band.max;
-    props.onChange({ ...props.filters(), bookmark: isSame ? null : { ...band } });
-  }
-
-  function isBookmarkBand(band: BookmarkBand): boolean {
-    const cur = props.filters().bookmark;
-    return cur !== null && cur.min === band.min && cur.max === band.max;
   }
 
   /** 自定义日期提交：双字段齐且有序才生效（spec Q3）；双清 → 回「不限」 */
@@ -210,8 +211,8 @@ const SearchFilterSheet: Component<Props> = (props) => {
                   {(opt) => (
                     <FilterChip
                       label={opt.label}
-                      active={isPresetPeriod(props.filters().period, opt.value)}
-                      onClick={() => setPeriod(togglePreset(props.filters().period, opt.value))}
+                      active={isPreset(props.filters(), opt.value)}
+                      onClick={() => setPeriod(toggledPreset(props.filters(), opt.value))}
                     />
                   )}
                 </For>
@@ -274,9 +275,9 @@ const SearchFilterSheet: Component<Props> = (props) => {
                     <FilterChip
                       // 官方带宽是闭区间（iOS picker 同款区间文案）；无上界档用「1000+」
                       label={band.max === null ? `${band.min}+` : `${band.min}-${band.max}`}
-                      active={isBookmarkBand(band)}
+                      active={isBand(props.filters(), band)}
                       disabled={bookmarkDisabled()}
-                      onClick={() => toggleBookmark(band)}
+                      onClick={() => props.onChange(toggledBookmark(props.filters(), band))}
                     />
                   )}
                 </For>
