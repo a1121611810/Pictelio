@@ -4,88 +4,93 @@ import PageTransition from "../components/PageTransition";
 import FluentIcon from "../components/ui/FluentIcon";
 import { Ota, type OtaStatus } from "@/native/Ota";
 import { goBack } from "@/services/backTransitionService";
+import { t, type I18nKey } from "@/i18n";
 
 // ── Data model ──
+// 模块级常量存 key、渲染时 t(key)（i18n 机械抽取规范）；label/value 保留 string
+// 槽位承载原样展示的专名与数据（如 "SolidJS"、APP_VERSION），需翻译的文案走 labelKey/valueKey。
 interface AboutRow {
-  label: string;
-  value: string;
+  label?: string;
+  labelKey?: I18nKey;
+  value?: string;
+  valueKey?: I18nKey;
   icon: Parameters<typeof FluentIcon>[0]["name"];
   url?: string;
 }
 
 interface AboutSection {
-  title: string;
+  titleKey: I18nKey;
   rows: AboutRow[];
 }
 
 const sections: AboutSection[] = [
   {
-    title: "免责声明",
+    titleKey: "about.section.disclaimer",
     rows: [
-      { label: "第三方客户端", value: "与 Pixiv 官方无关", icon: "info" },
-      { label: "内容来源", value: "Pixiv 公开 API", icon: "info" },
-      { label: "版权", value: "归原作者所有", icon: "info" },
-      { label: "年龄限制", value: "未成年请在监护人指导下使用", icon: "info" },
+      { labelKey: "about.row.thirdParty", valueKey: "about.row.thirdPartyValue", icon: "info" },
+      { labelKey: "about.row.contentSource", valueKey: "about.row.contentSourceValue", icon: "info" },
+      { labelKey: "about.row.copyright", valueKey: "about.row.copyrightValue", icon: "info" },
+      { labelKey: "about.row.ageRestriction", valueKey: "about.row.ageRestrictionValue", icon: "info" },
     ],
   },
   {
-    title: "应用信息",
-    rows: [{ label: "应用版本", value: APP_VERSION, icon: "info" }],
+    titleKey: "about.section.appInfo",
+    rows: [{ labelKey: "about.row.appVersion", value: APP_VERSION, icon: "info" }],
   },
   {
-    title: "致谢",
+    titleKey: "about.section.credits",
     rows: [
       {
         label: "SolidJS",
-        value: "响应式 UI 框架",
+        valueKey: "about.value.solidjs",
         icon: "wrench",
         url: "https://www.solidjs.com/",
       },
       {
         label: "Capacitor",
-        value: "跨平台原生运行时",
+        valueKey: "about.value.capacitor",
         icon: "wrench",
         url: "https://capacitorjs.com/",
       },
       {
         label: "TypeScript",
-        value: "类型安全 JavaScript",
+        valueKey: "about.value.typescript",
         icon: "wrench",
         url: "https://www.typescriptlang.org/",
       },
       {
         label: "Vite",
-        value: "下一代前端构建工具",
+        valueKey: "about.value.vite",
         icon: "wrench",
         url: "https://vitejs.dev/",
       },
       {
         label: "Fluent Design 2",
-        value: "Microsoft 设计语言",
+        valueKey: "about.value.fluentDesign",
         icon: "info",
         url: "https://fluent2.microsoft.design/",
       },
       {
         label: "Fluent UI Icons",
-        value: "微软开源图标库",
+        valueKey: "about.value.fluentIcons",
         icon: "info",
         url: "https://github.com/microsoft/fluentui-system-icons",
       },
       {
         label: "Fluent UI Web Components",
-        value: "基于 FAST 的 Fluent Web 组件库",
+        valueKey: "about.value.fluentWebComponents",
         icon: "wrench",
         url: "https://github.com/microsoft/fluentui/tree/master/packages/web-components",
       },
       {
         label: "Microsoft FAST",
-        value: "自适应 Web Component 引擎",
+        valueKey: "about.value.fast",
         icon: "info",
         url: "https://github.com/microsoft/fast",
       },
       {
         label: "pixivts",
-        value: "Pixiv API 封装 (book000)",
+        valueKey: "about.value.pixivts",
         icon: "wrench",
         url: "https://github.com/book000/pixivts",
       },
@@ -99,9 +104,9 @@ const sections: AboutSection[] = [
  * 仅原生环境渲染（web/dev 无原生桥）；status 不可达时优雅降级为一行提示（禁静默吞错）。
  */
 function formatOtaValue(status: OtaStatus, field: "current" | "lastGood" | "pending"): string {
-  if (field === "pending") return status.pending || "无";
+  if (field === "pending") return status.pending || t("about.ota.none");
   const v = status[field]; // 收窄后为 string（current/lastGood）
-  if (v === "public") return "APK 内置";
+  if (v === "public") return t("about.ota.builtIn");
   return v;
 }
 
@@ -120,28 +125,28 @@ const OtaStatusRows: Component = () => {
   return (
     <Show
       when={!failed()}
-      fallback={<div class="ota-row text-[var(--colorNeutralForeground3)]">OTA 状态不可用</div>}
+      fallback={<div class="ota-row text-[var(--colorNeutralForeground3)]">{t("about.ota.unavailable")}</div>}
     >
       <Show
         when={status()}
-        fallback={<div class="ota-row text-[var(--colorNeutralForeground3)]">加载中…</div>}
+        fallback={<div class="ota-row text-[var(--colorNeutralForeground3)]">{t("about.ota.loading")}</div>}
       >
         {(st) => (
           <>
             <div class="ota-row">
-              <span class="ota-label">Web 包（当前）</span>
+              <span class="ota-label">{t("about.ota.current")}</span>
               <span>{formatOtaValue(st(), "current")}</span>
             </div>
             <div class="ota-row">
-              <span class="ota-label">Web 包（上次健康）</span>
+              <span class="ota-label">{t("about.ota.lastGood")}</span>
               <span>{formatOtaValue(st(), "lastGood")}</span>
             </div>
             <div class="ota-row">
-              <span class="ota-label">待生效</span>
+              <span class="ota-label">{t("about.ota.pending")}</span>
               <span>{formatOtaValue(st(), "pending")}</span>
             </div>
             <div class="ota-row flex-wrap">
-              <span class="ota-label">验签公钥指纹</span>
+              <span class="ota-label">{t("about.ota.fingerprint")}</span>
               <span class="break-all">{st().publicKeyFingerprint || "—"}</span>
             </div>
           </>
@@ -160,7 +165,7 @@ const About: Component = () => {
         <header class="sticky top-0 z-20 surface-appbar h-12 flex items-center px-4 gap-3">
           <fluent-button
             appearance="subtle"
-            aria-label="返回"
+            aria-label={t("about.back")}
             ref={fluentOn("click", () => goBack())}
             class="w-8 h-8 p-0 min-w-8"
           >
@@ -172,7 +177,7 @@ const About: Component = () => {
             </svg>
           </fluent-button>
           <h1 class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] flex-1">
-            关于
+            {t("about.title")}
           </h1>
         </header>
 
@@ -190,7 +195,7 @@ const About: Component = () => {
               Pictelio
             </p>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug mt-0.5">
-              第三方插画浏览器
+              {t("about.tagline")}
             </p>
           </div>
         </div>
@@ -198,7 +203,7 @@ const About: Component = () => {
         {/* ── OTA 状态（#254：四要素，仅原生环境） ── */}
         <section class="mb-1">
           <p class="px-5 py-2 [font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground2)] uppercase tracking-wide">
-            Web 更新包状态
+            {t("about.otaSectionTitle")}
           </p>
           <div class="mx-4 surface-card px-4 py-1 [font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)]">
             <style>{`
@@ -213,7 +218,7 @@ const About: Component = () => {
         {sections.map((section) => (
           <section class="mb-1">
             <p class="px-5 py-2 [font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground2)] uppercase tracking-wide">
-              {section.title}
+              {t(section.titleKey)}
             </p>
             <div class="mx-4 surface-card">
               {section.rows.map((row, idx, arr) => {
@@ -232,12 +237,12 @@ const About: Component = () => {
                         <FluentIcon name={row.icon} size={20} />
                       </div>
                       <span class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)] leading-snug">
-                        {row.label}
+                        {row.labelKey ? t(row.labelKey) : row.label}
                       </span>
                     </div>
                     <div class="flex items-center gap-1 flex-shrink-0 ml-3">
                       <span class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug text-right">
-                        {row.value}
+                        {row.valueKey ? t(row.valueKey) : row.value}
                       </span>
                       {row.url && (
                         <svg

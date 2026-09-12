@@ -8,6 +8,7 @@ import { createSentinel } from "@/primitives/visibility";
 import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior";
 import { scrollToTop } from "../utils/scrollToTop";
 import { goBack } from "../services/backTransitionService";
+import { t, apiErrorMessage } from "../i18n";
 import {
   users,
   loading,
@@ -90,14 +91,14 @@ const FollowListPage: Component<Props> = (props) => {
           >
             <fluent-button
               appearance="subtle"
-              aria-label="返回"
+              aria-label={t("followList.back")}
               class="w-8 h-8 p-0 min-w-8"
               ref={fluentOn("click", () => goBack())}
             >
               ←
             </fluent-button>
             <h1 class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] tracking-tight leading-none">
-              {props.mode === "following" ? "关注" : "粉丝"}
+              {props.mode === "following" ? t("followList.followingTitle") : t("followList.followersTitle")}
             </h1>
           </header>
 
@@ -106,7 +107,7 @@ const FollowListPage: Component<Props> = (props) => {
             {error() && (
               <div class="text-center py-4 px-4 rounded-[var(--borderRadiusMedium)] bg-[var(--colorStatusDangerBackground2)] text-[var(--colorStatusDangerForeground1)]">
                 <p class="[font-size:var(--fontSizeBase200)]">
-                  {error()?.message ?? "加载失败，请重试"}
+                  {error() ? apiErrorMessage(error()!) : t("followList.loadFailedFallback")}
                 </p>
               </div>
             )}
@@ -154,9 +155,9 @@ const FollowListPage: Component<Props> = (props) => {
                           e.stopPropagation();
                           toggleFollow(index());
                         }}
-                        aria-label={preview.user.is_followed ? "取消关注" : "关注"}
+                        aria-label={preview.user.is_followed ? t("followList.unfollow") : t("followList.follow")}
                       >
-                        {preview.user.is_followed ? "已关注" : "关注"}
+                        {preview.user.is_followed ? t("followList.following") : t("followList.follow")}
                       </button>
                     </Show>
                   </div>
@@ -193,11 +194,13 @@ const FollowListPage: Component<Props> = (props) => {
               </div>
             )}
 
-            {loading() && <LoadingSpinner text="加载中..." />}
+            {loading() && <LoadingSpinner text={t("followList.loading")} />}
 
             {!loading() && users().length === 0 && !error() && (
               <p class="text-[var(--colorNeutralForeground2)] text-center py-8 [font-size:var(--fontSizeBase300)]">
-                {props.mode === "following" ? "还没有关注任何人" : "还没有粉丝"}
+                {props.mode === "following"
+                  ? t("followList.emptyFollowing")
+                  : t("followList.emptyFollowers")}
               </p>
             )}
 

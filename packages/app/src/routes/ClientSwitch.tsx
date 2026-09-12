@@ -4,6 +4,7 @@ import FluentIcon from "../components/ui/FluentIcon";
 import { ClientInfo } from "../native/ClientInfo";
 import { readClientKind, switchClient, type ClientKind } from "../utils/clientSwitch";
 import { goBack } from "../services/backTransitionService";
+import { t } from "../i18n";
 
 /**
  * 切换渲染引擎说明页（T2）：由设置页「切换渲染引擎」入口行跳转进入。
@@ -13,7 +14,8 @@ import { goBack } from "../services/backTransitionService";
  * switchClient 深模块（行为与迁移前一致），返回操作 goBack()（带返回过渡，#364）。
  */
 const kindLabel = (kind: string) => (kind === "lynx" ? "Lynx" : "WebView");
-const kindDesc = (kind: string) => (kind === "lynx" ? "实验性渲染内核" : "网页渲染内核（默认）");
+const kindDesc = (kind: string) =>
+  kind === "lynx" ? t("clientSwitch.kindDescLynx") : t("clientSwitch.kindDescWebview");
 
 const ClientSwitch: Component = () => {
   const [current, setCurrent] = createSignal<ClientKind>("webview");
@@ -60,11 +62,16 @@ const ClientSwitch: Component = () => {
         console.warn("[client-switch] 切换失败", result.reason);
         // busy：已有切换在途，静默忽略（防连点）
         if (result.reason !== "busy") {
-          setActionToast(result.reason === "timeout" ? "切换超时，请重试" : "切换失败，请重试");
+          // i18n: set 时快照（瞬态）
+          setActionToast(
+            result.reason === "timeout"
+              ? t("clientSwitch.timeoutToast")
+              : t("clientSwitch.failToast"),
+          );
         }
         return;
       }
-      setActionToast("已切换到 Lynx，正在重启…");
+      setActionToast(t("clientSwitch.switchedToast")); // i18n: set 时快照（瞬态）
     } finally {
       // 成功路径下 Activity 立即重建销毁本页，此处幂等无副作用；
       // finally 保证任何异常路径都不会让遮罩锁死页面（防御性，深模块当前不抛）
@@ -104,7 +111,7 @@ const ClientSwitch: Component = () => {
           >
             <fluent-spinner size="medium" />
             <p class="[font-size:var(--fontSizeBase300)] font-semibold text-[var(--colorOverlayForeground)]">
-              正在切换引擎…
+              {t("clientSwitch.switching")}
             </p>
           </div>
         </Show>
@@ -123,7 +130,7 @@ const ClientSwitch: Component = () => {
         <header class="sticky top-0 z-20 surface-appbar h-12 flex items-center px-4 gap-3">
           <fluent-button
             appearance="subtle"
-            aria-label="返回"
+            aria-label={t("clientSwitch.back")}
             ref={fluentOn("click", () => goBack())}
             class="w-8 h-8 p-0 min-w-8"
           >
@@ -135,7 +142,7 @@ const ClientSwitch: Component = () => {
             </svg>
           </fluent-button>
           <h1 class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] flex-1">
-            切换渲染引擎
+            {t("clientSwitch.title")}
           </h1>
         </header>
 
@@ -144,28 +151,28 @@ const ClientSwitch: Component = () => {
           {/* 当前引擎 */}
           <section class="rounded-[var(--borderRadiusXLarge)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] p-4">
             <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground3)] uppercase tracking-wide mb-1">
-              当前引擎
+              {t("clientSwitch.currentEngine")}
             </p>
             <p class="[font-size:var(--fontSizeBase500)] font-semibold text-[var(--colorCompoundBrandForeground1)] leading-snug">
               {currentLabel()}
             </p>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
               {current() === "lynx"
-                ? "当前以 Lynx 渲染引擎运行。"
-                : "当前以 WebView 渲染引擎运行；切换后应用将重启并以 Lynx 引擎启动。"}
+                ? t("clientSwitch.runningLynx")
+                : t("clientSwitch.runningWebview")}
             </p>
           </section>
 
           {/* 当前包支持的引擎能力列表 */}
           <section class="rounded-[var(--borderRadiusXLarge)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] p-4">
             <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground3)] uppercase tracking-wide mb-2">
-              当前包支持的引擎
+              {t("clientSwitch.supportedEngines")}
             </p>
             <Show
               when={clientKinds() !== null}
               fallback={
                 <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-                  未知（当前环境无法读取包能力信息）
+                  {t("clientSwitch.unknownKinds")}
                 </p>
               }
             >
@@ -194,7 +201,7 @@ const ClientSwitch: Component = () => {
           {/* 两引擎差异说明 */}
           <section class="rounded-[var(--borderRadiusXLarge)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] p-4">
             <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground3)] uppercase tracking-wide mb-2">
-              两引擎差异
+              {t("clientSwitch.differences")}
             </p>
             <div class="flex flex-col gap-3">
               <div>
@@ -202,7 +209,7 @@ const ClientSwitch: Component = () => {
                   WebView
                 </p>
                 <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-                  系统网页渲染内核，兼容性与稳定性最佳，功能最全；Pictelio 主应用默认使用。
+                  {t("clientSwitch.webviewDesc")}
                 </p>
               </div>
               <div>
@@ -210,7 +217,7 @@ const ClientSwitch: Component = () => {
                   Lynx
                 </p>
                 <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-                  实验性渲染引擎，性能与流畅度优先；仍在迭代中，部分功能可能不可用。
+                  {t("clientSwitch.lynxDesc")}
                 </p>
               </div>
             </div>
@@ -218,17 +225,16 @@ const ClientSwitch: Component = () => {
 
           {/* 实验性警告 */}
           <fluent-message-bar intent="warning">
-            Lynx 渲染引擎仍在迭代中，部分功能可能不可用。切换前请确认已知悉相关风险。
+            {t("clientSwitch.warning")}
           </fluent-message-bar>
 
           {/* 切回路径指引 */}
           <section class="rounded-[var(--borderRadiusXLarge)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] p-4">
             <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground3)] uppercase tracking-wide mb-1">
-              如何切回 WebView
+              {t("clientSwitch.switchBackTitle")}
             </p>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-              切换后如需回到 WebView：打开 Lynx 客户端 → 「个人中心」→ 切换渲染引擎 → 确认切回。
-              应用将重启并恢复 WebView 引擎。本页仅提供「切换到 Lynx」单向入口。
+              {t("clientSwitch.switchBackDesc")}
             </p>
           </section>
 
@@ -238,9 +244,9 @@ const ClientSwitch: Component = () => {
               appearance="secondary"
               ref={fluentOn("click", () => goBack())}
               class="flex-1"
-              aria-label="返回设置"
+              aria-label={t("clientSwitch.backToSettings")}
             >
-              返回
+              {t("clientSwitch.back")}
             </fluent-button>
             <fluent-button
               appearance="primary"
@@ -251,7 +257,7 @@ const ClientSwitch: Component = () => {
               <Show when={switching()}>
                 <fluent-spinner size="tiny" slot="start" />
               </Show>
-              确认切换
+              {t("clientSwitch.confirm")}
             </fluent-button>
           </div>
         </div>

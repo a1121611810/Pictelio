@@ -11,12 +11,13 @@
  */
 import type { Component } from "solid-js";
 import { createEffect, onSettled } from "solid-js";
-import { useNavigate } from "@solidjs/router";
+import { useLocation, useNavigate } from "@solidjs/router";
 import type { PixivIllust, PixivNovel, ApiError } from "@/api/types";
 import PageTransition from "@/components/PageTransition";
 import { FeedList } from "@/components/home/FeedList";
 import { markContentReady } from "@/native/splashBridge";
 import SideNavShell, { type HomeTab } from "@/components/home/SideNavShell";
+import RankingPrototype, { parseProtoVariant } from "@/components/home/RankingPrototype";
 import IllustSingleCard from "@/components/home/IllustSingleCard";
 import RelatedStripRow from "@/components/home/RelatedStripRow";
 import NovelRowCard from "@/components/home/NovelRowCard";
@@ -413,6 +414,11 @@ function clearAllRelatedRows(): void {
 }
 
 const HomePage: Component = () => {
+  const location = useLocation();
+  // PROTOTYPE（throwaway）：排行榜融合形态变体（仅 DEV + ?variant= 生效），裁决后移除
+  const protoVariant = () =>
+    import.meta.env.DEV ? parseProtoVariant(location.query.variant) : undefined;
+
   onSettled(() => {
     // 首页是登录后启动首屏：挂载后通知原生关闭 Splash Screen（幂等）
     markContentReady();
@@ -448,6 +454,15 @@ const HomePage: Component = () => {
           // 历史 Tab 由 SideNavShell 内建，此处不会实际命中，仅类型收窄占位
           if (tab === "history") {
             return <></>;
+          }
+          // PROTOTYPE（throwaway）：变体挂推荐×插画面板；小说面板与生产路径零变化
+          if (tab === "recommended" && contentType() === "illust") {
+            const proto = protoVariant();
+            if (proto) {
+              return (
+                <RankingPrototype variant={proto} feed={<IllustFeedPanel tab={tab} />} />
+              );
+            }
           }
           return contentType() === "illust" ? (
             <IllustFeedPanel tab={tab} />

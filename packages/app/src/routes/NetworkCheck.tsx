@@ -9,14 +9,16 @@ import {
 } from "@pictelio/net-diagnostics";
 import PageTransition from "../components/PageTransition";
 import { goBack } from "../services/backTransitionService";
+import { t, type I18nKey } from "../i18n";
 import { collectNetDiagInput } from "../native/NetDiag";
 import { user } from "../stores/authStore";
 
-const STATUS_LABEL: Record<DiagStatus, string> = {
-  ok: "通过",
-  warn: "注意",
-  fail: "失败",
-  skipped: "跳过",
+// 状态标签存 key，渲染时 t()（i18n 机械抽取规范）
+const STATUS_LABEL: Record<DiagStatus, I18nKey> = {
+  ok: "networkCheck.status.ok",
+  warn: "networkCheck.status.warn",
+  fail: "networkCheck.status.fail",
+  skipped: "networkCheck.status.skipped",
 };
 const STATUS_COLOR: Record<DiagStatus, string> = {
   ok: "var(--colorStatusSuccessForeground1)",
@@ -93,12 +95,12 @@ const NetworkCheck: Component = () => {
           <button
             class="text-[var(--colorNeutralForeground2)] hover:text-[var(--colorNeutralForeground1)] p-1 -ml-1 min-w-[40px] min-h-[40px] flex items-center justify-center focus-visible:outline-2 focus-visible:outline-[var(--colorStrokeFocus2)] focus-visible:outline-offset-2"
             onClick={() => goBack()}
-            aria-label="返回"
+            aria-label={t("networkCheck.back")}
           >
             ←
           </button>
           <h1 class="text-[var(--fontSizeHero700)] font-semibold text-[var(--colorNeutralForeground1)]">
-            网络自检
+            {t("networkCheck.title")}
           </h1>
         </div>
 
@@ -107,7 +109,7 @@ const NetworkCheck: Component = () => {
             when={report()}
             fallback={
               <div class="surface-flyout p-4 text-[var(--fontSizeBase300)] text-[var(--colorNeutralForeground3)]">
-                正在自检…
+                {t("networkCheck.checking")}
               </div>
             }
           >
@@ -122,12 +124,12 @@ const NetworkCheck: Component = () => {
                   </p>
                   <Show when={rep().degraded}>
                     <p class="mt-1 text-[var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
-                      开发态降级执行器：仅覆盖部分检查项，结论不代表真机完整能力。
+                      {t("networkCheck.degradedNote")}
                     </p>
                   </Show>
                   <Show when={rep().action}>
                     <p class="mt-1 text-[var(--fontSizeBase300)] text-[var(--colorNeutralForeground2)]">
-                      建议：{rep().action}
+                      {t("networkCheck.actionPrefix", { action: rep().action ?? "" })}
                     </p>
                   </Show>
                 </div>
@@ -140,7 +142,7 @@ const NetworkCheck: Component = () => {
                           class="shrink-0 text-[var(--fontSizeBase200)] font-semibold pt-0.5"
                           style={{ color: STATUS_COLOR[c.status] }}
                         >
-                          [{STATUS_LABEL[c.status]}]
+                          [{t(STATUS_LABEL[c.status])}]
                         </span>
                         <div class="min-w-0">
                           <p class="text-[var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)]">
@@ -170,14 +172,14 @@ const NetworkCheck: Component = () => {
               onClick={() => void run()}
               disabled={running()}
             >
-              {running() ? "自检中…" : "重新自检"}
+              {running() ? t("networkCheck.running") : t("networkCheck.rerun")}
             </button>
             <button
               class="flex-1 min-h-[40px] rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground3)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase300)] font-semibold active:scale-[0.98] transition-transform duration-[var(--durationFast)] disabled:opacity-50"
               onClick={() => void copyReport()}
               disabled={!input()}
             >
-              {copied() ? "已复制" : "复制报告"}
+              {copied() ? t("networkCheck.copied") : t("networkCheck.copyReport")}
             </button>
           </div>
         </div>

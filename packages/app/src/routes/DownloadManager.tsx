@@ -14,6 +14,7 @@ import {
 } from "../stores/downloadStore";
 import { toWebProxyUrl } from "../utils/imageLoader";
 import type { DeleteMode, DownloadTask } from "../utils/downloadQueueCore";
+import { t, type I18nKey } from "../i18n";
 import {
   allSelected,
   availabilityFor,
@@ -43,7 +44,7 @@ const TaskRow: Component<TaskRowProps> = (props) => (
       type="button"
       role="checkbox"
       aria-checked={props.selected ? "true" : "false"}
-      aria-label={"选择 " + props.task.fileName}
+      aria-label={t("downloadManager.selectTaskAria", { name: props.task.fileName })}
       class={[
         "w-6 h-6 rounded-[var(--borderRadiusSmall)] border flex items-center justify-center shrink-0 cursor-pointer appearance-none transition-colors duration-[var(--durationFast)] ease-[var(--curveEasyEase)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--colorStrokeFocus2)]",
         props.selected
@@ -109,7 +110,9 @@ const DownloadManager: Component = () => {
   );
   const summary = createMemo(() => summarize(tasks(), effectiveIds()));
   const deletingFiles = createMemo(() => hasDeletableFiles(tasks(), deleteTarget() ?? []));
-  const scopePrefix = createMemo(() => (selected().size > 0 ? "选中" : "全部"));
+  const scopeKey = createMemo<I18nKey>(() =>
+    selected().size > 0 ? "downloadManager.scopeSelected" : "downloadManager.scopeAll",
+  );
 
   function toggle(id: string): void {
     setSelected(toggleId(selected(), id));
@@ -126,7 +129,7 @@ const DownloadManager: Component = () => {
   async function actShare(): Promise<void> {
     try {
       await shareDownloads(effectiveIds());
-      setStatus("已调起系统分享");
+      setStatus(t("downloadManager.shareToast")); // i18n: set 时快照（瞬态）
     } catch (e) {
       report(e);
     }
@@ -137,7 +140,12 @@ const DownloadManager: Component = () => {
     if (!target) return;
     try {
       await deleteDownloads(target, mode);
-      setStatus(mode === "files" ? "已删除文件与记录" : "已清空记录");
+      // i18n: set 时快照（瞬态）
+      setStatus(
+        mode === "files"
+          ? t("downloadManager.deletedFilesToast")
+          : t("downloadManager.clearedRecordsToast"),
+      );
       setSelected(new Set<string>());
     } catch (e) {
       report(e);
@@ -152,7 +160,7 @@ const DownloadManager: Component = () => {
         <header class="sticky top-0 z-20 surface-appbar h-12 flex items-center px-4 gap-3">
           <button
             type="button"
-            aria-label="返回"
+            aria-label={t("downloadManager.back")}
             class="w-8 h-8 p-0 flex items-center justify-center rounded-[var(--borderRadiusMedium)] bg-transparent border-none outline-none cursor-pointer text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorSubtleBackgroundHover)] active:scale-[0.98] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--colorStrokeFocus2)]"
             onClick={() => goBack()}
           >
@@ -164,7 +172,7 @@ const DownloadManager: Component = () => {
             </svg>
           </button>
           <h1 class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] flex-1">
-            下载管理
+            {t("downloadManager.title")}
           </h1>
         </header>
 
@@ -182,19 +190,24 @@ const DownloadManager: Component = () => {
           fallback={
             <div class="flex flex-col items-center justify-center py-24 gap-3 text-[var(--colorNeutralForeground3)]">
               <FluentIcon name="list" size={40} />
-              <p class="[font-size:var(--fontSizeBase300)]">暂无下载任务</p>
-              <p class="[font-size:var(--fontSizeBase200)]">在作品详情页点击保存即可加入下载队列</p>
+              <p class="[font-size:var(--fontSizeBase300)]">{t("downloadManager.emptyTitle")}</p>
+              <p class="[font-size:var(--fontSizeBase200)]">{t("downloadManager.emptyHint")}</p>
             </div>
           }
         >
           <div class="px-4 pt-3 flex items-center justify-between gap-3">
             <button type="button" class={BTN} onClick={toggleAll}>
-              {allSelected(tasks(), selected()) ? "取消全选" : "全选"}
+              {allSelected(tasks(), selected())
+                ? t("downloadManager.clearSelection")
+                : t("downloadManager.selectAll")}
             </button>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
               {selected().size > 0
-                ? "已选 " + selected().size + " / 共 " + tasks().length
-                : "全部 " + tasks().length}
+                ? t("downloadManager.selectedCount", {
+                    selected: selected().size,
+                    total: tasks().length,
+                  })
+                : t("downloadManager.totalCount", { total: tasks().length })}
             </p>
           </div>
 
@@ -241,7 +254,7 @@ const DownloadManager: Component = () => {
               disabled={!availability().start}
               onClick={() => startDownloads(effectiveIds())}
             >
-              {scopePrefix()}开始
+              {t("downloadManager.actionStart", { scope: t(scopeKey()) })}
             </button>
             <button
               type="button"
@@ -249,7 +262,7 @@ const DownloadManager: Component = () => {
               disabled={!availability().pause}
               onClick={() => pauseDownloads(effectiveIds())}
             >
-              {scopePrefix()}暂停
+              {t("downloadManager.actionPause", { scope: t(scopeKey()) })}
             </button>
             <button
               type="button"
@@ -257,7 +270,7 @@ const DownloadManager: Component = () => {
               disabled={!availability().stop}
               onClick={() => stopDownloads(effectiveIds())}
             >
-              {scopePrefix()}停止
+              {t("downloadManager.actionStop", { scope: t(scopeKey()) })}
             </button>
             <button
               type="button"
@@ -265,7 +278,7 @@ const DownloadManager: Component = () => {
               disabled={!availability().share}
               onClick={() => void actShare()}
             >
-              分享
+              {t("downloadManager.share")}
             </button>
             <button
               type="button"
@@ -273,10 +286,14 @@ const DownloadManager: Component = () => {
               disabled={!availability().delete}
               onClick={() => setDeleteTarget(effectiveIds())}
             >
-              {scopePrefix()}删除
+              {t("downloadManager.actionDelete", { scope: t(scopeKey()) })}
             </button>
             <p class="w-full text-center [font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
-              {summary().count} 项 · 已完成 {summary().completed} · 进行中 {summary().active}
+              {t("downloadManager.summary", {
+                count: summary().count,
+                completed: summary().completed,
+                active: summary().active,
+              })}
             </p>
           </div>
         </Show>
@@ -284,30 +301,30 @@ const DownloadManager: Component = () => {
         <FluentDialog
           open={deleteTarget() !== null}
           onClose={() => setDeleteTarget(null)}
-          aria-label="删除下载确认"
+          aria-label={t("downloadManager.deleteDialogAria")}
         >
           <h2
             slot="title"
             class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)]"
           >
-            删除下载
+            {t("downloadManager.deleteDialogTitle")}
           </h2>
           <p class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground2)] leading-snug">
-            将移除 {(deleteTarget() ?? []).length} 条下载记录。
+            {t("downloadManager.deleteDialogBody", { count: (deleteTarget() ?? []).length })}
           </p>
           <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] mt-2 leading-snug">
-            「删除文件与记录」会同时删除已下载的文件；「仅清空记录」保留已下载文件。
+            {t("downloadManager.deleteDialogNote")}
           </p>
           <div slot="actions" class="flex flex-wrap gap-2 justify-end">
             <button type="button" class={BTN} onClick={() => setDeleteTarget(null)}>
-              取消
+              {t("downloadManager.cancel")}
             </button>
             <button type="button" class={BTN} onClick={() => void confirmDelete("records")}>
-              仅清空记录
+              {t("downloadManager.clearRecords")}
             </button>
             <Show when={deletingFiles()}>
               <button type="button" class={BTN} onClick={() => void confirmDelete("files")}>
-                删除文件与记录
+                {t("downloadManager.deleteFiles")}
               </button>
             </Show>
           </div>

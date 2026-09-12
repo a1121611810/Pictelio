@@ -8,6 +8,7 @@ import OAuthWebView from "../components/OAuthWebView";
 import { generatePKCE } from "../api/pkceAuth";
 import { loginWithPKCE } from "../stores/authStore";
 import { loadAccountR18 } from "../stores/settingsStore";
+import { t } from "../i18n";
 import { markContentReady } from "@/native/splashBridge";
 
 const isNative = Capacitor.isNativePlatform();
@@ -49,7 +50,7 @@ const Login: Component = () => {
     );
     setSubmitting(false);
     if (loginErr) {
-      setError(toApiError(loginErr, "登录失败"));
+      setError(toApiError(loginErr, t("login.signInFailed"))); // i18n: set 时快照（瞬态）
     }
   };
 
@@ -63,7 +64,7 @@ const Login: Component = () => {
       })(),
     );
     if (pkceErr) {
-      setError(toApiError(pkceErr, "无法创建登录链接"));
+      setError(toApiError(pkceErr, t("login.createLinkFailed"))); // i18n: set 时快照（瞬态）
     }
   };
 
@@ -80,7 +81,7 @@ const Login: Component = () => {
     setSubmitting(false);
     setShowOAuth(false);
     if (pkceLoginErr) {
-      setError(toApiError(pkceLoginErr, "PKCE 登录失败"));
+      setError(toApiError(pkceLoginErr, t("login.pkceFailed"))); // i18n: set 时快照（瞬态）
     }
   };
 
@@ -155,7 +156,7 @@ const Login: Component = () => {
               margin: "6px 0 0",
             }}
           >
-            第三方插画浏览器
+            {t("login.tagline")}
           </p>
         </div>
       </div>
@@ -176,7 +177,7 @@ const Login: Component = () => {
               disabled={submitting()}
               onClick={handleOAuthStart}
             >
-              通过 Pixiv 登录
+              {t("login.withPixiv")}
             </fluent-button>
 
             <Show when={!showAdvanced}>
@@ -185,7 +186,7 @@ const Login: Component = () => {
                 style="width:100%;--block-size:50px;font-size:var(--fontSizeBase300)"
                 onClick={() => setShowAdvanced(true)}
               >
-                使用 refresh_token
+                {t("login.useRefreshToken")}
               </fluent-button>
             </Show>
           </Show>
@@ -194,7 +195,7 @@ const Login: Component = () => {
             <form onSubmit={handleSubmit} class="flex flex-col gap-3">
               <fluent-textarea
                 style="--inline-size:100%;--min-block-size:80px"
-                placeholder="粘贴 refresh_token..."
+                placeholder={t("login.refreshTokenPlaceholder")}
                 value={tokenInput()}
                 ref={fluentOn("input", (e: Event) => setTokenInput((e.target as any).value))}
                 required
@@ -209,7 +210,7 @@ const Login: Component = () => {
                 disabled={submitting() || !tokenInput().trim()}
                 onClick={handleSubmit}
               >
-                {submitting() ? "登录中..." : "登录"}
+                {submitting() ? t("login.signingIn") : t("login.signIn")}
               </fluent-button>
             </form>
           </Show>
@@ -220,7 +221,7 @@ const Login: Component = () => {
               style="width:100%;--block-size:50px;font-size:var(--fontSizeBase300);font-weight:600"
               onClick={() => setShowAdvanced(true)}
             >
-              使用 refresh_token 登录
+              {t("login.useRefreshTokenSignIn")}
             </fluent-button>
           </Show>
         </div>

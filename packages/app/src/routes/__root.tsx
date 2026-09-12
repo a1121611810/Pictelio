@@ -21,6 +21,7 @@ import { loadReportedIds } from "@/stores/reportStore";
 import { loadBlockedIds } from "@/stores/blockStore";
 import { loadImageHostPreference } from "@/stores/imageHostStore";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import { t } from "@/i18n";
 import { markContentReady } from "@/native/splashBridge";
 /** 启动后检查更新的延迟时间（ms），确保页面渲染完成后再弹窗 */
 const STARTUP_CHECK_DELAY_MS = 500;
@@ -218,7 +219,7 @@ const RootLayout: Component = (props: { children?: any }) => {
         when={!isLoading()}
         fallback={
           <div class="min-h-screen flex items-center justify-center bg-[var(--colorNeutralBackground2)]">
-            <LoadingSpinner size="lg" text="加载中" />
+            <LoadingSpinner size="lg" text={t("root.loading")} />
           </div>
         }
       >
@@ -226,17 +227,17 @@ const RootLayout: Component = (props: { children?: any }) => {
           fallback={(err, reset) => (
             <div class="flex flex-col items-center justify-center min-h-screen gap-4 p-8">
               <p class="text-[var(--colorStatusDangerForeground1)] text-lg font-semibold">
-                页面加载失败
+                {t("root.pageLoadFailed")}
               </p>
               <p class="text-[var(--colorNeutralForeground2)] text-sm text-center max-w-xs">
                 {/* Solid 2.0：Errored fallback 的 err 是 accessor；类型为 {}，收窄为 Error 取 message */}
-                {(err() as Error)?.message ?? "未知错误"}
+                {(err() as Error)?.message ?? t("root.unknownError")}
               </p>
               <button
                 class="px-4 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] text-sm font-medium"
                 onClick={reset}
               >
-                重试
+                {t("error.action.retry")}
               </button>
             </div>
           )}
@@ -249,7 +250,7 @@ const RootLayout: Component = (props: { children?: any }) => {
       {/* Exit hint toast */}
       <Show when={showExitHint()}>
         <div class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke2)] rounded-[var(--borderRadiusXLarge)] shadow-[var(--elevation8)] px-5 py-2.5 text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] font-medium whitespace-nowrap pointer-events-none transition-all duration-[var(--durationGentle)]">
-          再按一次退出应用
+          {t("root.exitHint")}
         </div>
       </Show>
 

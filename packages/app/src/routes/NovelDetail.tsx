@@ -53,6 +53,7 @@ import { pushOverlay, popOverlay } from "../stores/backGestureStore";
 import { scrollToTop } from "../utils/scrollToTop";
 import { createFastScrollbar } from "../primitives/createFastScrollbar";
 import { toApiError } from "../api/client";
+import { t } from "../i18n";
 import { recordVisit } from "../stores/historyStore";
 import TranslateSheet from "../components/TranslateSheet";
 import { translateNovel } from "../primitives/createNovelTranslator";
@@ -167,7 +168,7 @@ const NovelImageBlock: Component<NovelImageBlockProps> = (props) => {
           >
             <span class="spinner w-4 h-4" />
             <span class="text-[var(--colorNeutralForegroundDisabled)] [font-size:var(--fontSizeBase100)]">
-              加载中...
+              {t("novelDetail.imageLoading")}
             </span>
           </div>
         </Match>
@@ -178,7 +179,7 @@ const NovelImageBlock: Component<NovelImageBlockProps> = (props) => {
           >
             <span class="text-[var(--colorNeutralForeground3)] text-xs">⚠</span>
             <span class="text-[var(--colorNeutralForegroundDisabled)] [font-size:var(--fontSizeBase100)]">
-              图片加载失败
+              {t("novelDetail.imageFailed")}
             </span>
           </div>
         </Match>
@@ -186,7 +187,7 @@ const NovelImageBlock: Component<NovelImageBlockProps> = (props) => {
           {(d) => (
             <PixivImage
               src={selectInlineImageUrl(props.block.urls, props.containerWidth())}
-              alt={`内嵌图片 ${props.block.imageId}`}
+              alt={t("novelDetail.inlineImageAlt", { id: props.block.imageId })}
               width={d().width}
               height={d().height}
               loading="lazy"
@@ -213,9 +214,12 @@ function isImageBlock(block: NovelBlock): block is ImageBlock {
 
 /** jump 块显示文本（站内跳转显示类型 + ID，外部链接显示 URL） */
 function jumpLabel(block: JumpBlock): string {
-  if (block.kind === "illust") return `插画 #${block.target.replace(/^illust\//u, "")}`;
-  if (block.kind === "novel") return `小说 #${block.target.replace(/^novel\//u, "")}`;
-  if (block.kind === "user") return `用户 #${block.target.replace(/^user\//u, "")}`;
+  if (block.kind === "illust")
+    return t("novelDetail.jumpIllust", { id: block.target.replace(/^illust\//u, "") });
+  if (block.kind === "novel")
+    return t("novelDetail.jumpNovel", { id: block.target.replace(/^novel\//u, "") });
+  if (block.kind === "user")
+    return t("novelDetail.jumpUser", { id: block.target.replace(/^user\//u, "") });
   if (block.kind === "external") return block.target;
   return block.target;
 }
@@ -534,7 +538,7 @@ const NovelDetail: Component = () => {
       thumbnailUrl: novel.image_urls.medium ?? novel.image_urls.large ?? "",
     });
     enqueueDownloads([draft]);
-    setQueuedNotice("已加入下载队列，请到下载页查看");
+    setQueuedNotice(t("novelDetail.queuedNotice")); // i18n: set 时快照（瞬态）
     clearTimeout(queuedNoticeTimer);
     queuedNoticeTimer = setTimeout(() => setQueuedNotice(null), 4000);
   }
@@ -656,12 +660,13 @@ const NovelDetail: Component = () => {
     const policy = decideTranslatePolicy(xRestrict, translateR18(), translateR18G());
     if (policy === "block") {
       setTranslateOpen(true);
+      // i18n: set 时快照（瞬态）
       setTranslationError(
         new TranslateError(
           "unknown",
           xRestrict === 2
-            ? "未开启「翻译 R18G 内容」开关，已拦截（不发送任何内容）"
-            : "未开启「翻译 R18 内容」开关，已拦截",
+            ? t("novelDetail.r18gBlockError")
+            : t("novelDetail.r18BlockError"),
         ),
       );
       return;
@@ -686,7 +691,7 @@ const NovelDetail: Component = () => {
       if (currentPolicy === "block") {
         setTranslateOpen(true);
         setTranslationError(
-          new TranslateError("unknown", "内容分级校验未通过，已拦截（不发送任何内容）"),
+          new TranslateError("unknown", t("novelDetail.policyBlockError")), // i18n: set 时快照（瞬态）
         );
         return;
       }
@@ -825,7 +830,8 @@ const NovelDetail: Component = () => {
         return;
       }
       setTranslationError(
-        err instanceof TranslateError ? err : new TranslateError("unknown", "翻译失败，请重试"),
+        // i18n: set 时快照（瞬态）
+        err instanceof TranslateError ? err : new TranslateError("unknown", t("novelDetail.translateFailed")),
       );
     } finally {
       if (version === translateVersion) {
@@ -980,7 +986,7 @@ const NovelDetail: Component = () => {
       <>
         {content}
         <span class="[font-size:var(--fontSizeBase100)] text-[var(--colorStatusDangerForeground1)] ml-1 align-super">
-          〔未翻译〕
+          {t("novelDetail.untranslatedMark")}
         </span>
       </>
     );
@@ -1373,41 +1379,30 @@ const NovelDetail: Component = () => {
             <FluentDialog
               open
               onClose={() => resolveRestrictConfirm(false)}
-              aria-label={c().xRestrict === 2 ? "翻译 R18G 内容？" : "翻译 R18 内容？"}
+              aria-label={c().xRestrict === 2 ? t("novelDetail.r18gAria") : t("novelDetail.r18Aria")}
             >
               <h3 slot="title">
-                {c().xRestrict === 2 ? "翻译 R18G 内容？（法律红线）" : "翻译 R18 内容？"}
+                {c().xRestrict === 2 ? t("novelDetail.r18gTitle") : t("novelDetail.r18Aria")}
               </h3>
               <Show
                 when={c().xRestrict === 2}
-                fallback={
-                  <p>
-                    该作品包含 R18 内容。翻译需将正文发送至你选择的 AI 服务商，可能：①
-                    被内容审核拒绝（失败段落保留原文）；② 违反服务商使用条款，导致你的 API
-                    账号被警告、暂停或封禁；③
-                    内容可能被去标识化后用于模型训练。所有风险由你自行承担。
-                  </p>
-                }
+                fallback={<p>{t("novelDetail.r18DialogBody")}</p>}
               >
-                <p>
-                  该作品包含 R18G（极端）内容。除上述风险外，此类内容违反法律法规红线，可能导致你的
-                  API 账号被关闭，服务商可能向主管部门/执法机构报告。App
-                  提供方不承担由此产生的任何责任。
-                </p>
+                <p>{t("novelDetail.r18gDialogBody")}</p>
               </Show>
               <fluent-button
                 slot="actions"
                 appearance="secondary"
                 ref={fluentOn("click", () => resolveRestrictConfirm(false))}
               >
-                取消
+                {t("novelDetail.cancel")}
               </fluent-button>
               <fluent-button
                 slot="actions"
                 appearance="primary"
                 ref={fluentOn("click", () => resolveRestrictConfirm(true))}
               >
-                我已了解并继续
+                {t("novelDetail.understood")}
               </fluent-button>
             </FluentDialog>
           )}
@@ -1494,7 +1489,7 @@ const NovelDetail: Component = () => {
                 void navigate("/downloads");
               }}
             >
-              查看
+              {t("novelDetail.viewQueued")}
             </button>
           </div>
         </Show>

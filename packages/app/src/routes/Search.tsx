@@ -14,24 +14,27 @@ import {
 import { createScrollBehavior } from "@/primitives/scroll/createScrollBehavior";
 import type { SearchScope, SearchSort } from "@/api/types";
 import PageTransition from "@/components/PageTransition";
+import { t, type I18nKey } from "@/i18n";
 import { scrollToTop } from "@/utils/scrollToTop";
 import { goBack } from "@/services/backTransitionService";
 
-const SCOPE_OPTIONS: { value: SearchScope; label: string }[] = [
-  { value: "all", label: "全部" },
-  { value: "illust", label: "插画·漫画" },
-  { value: "novel", label: "小说" },
+// 模块级常量存 key，渲染时 t()（i18n 机械抽取规范）
+const SCOPE_OPTIONS: { value: SearchScope; label: I18nKey }[] = [
+  { value: "all", label: "searchPage.scopeAll" },
+  { value: "illust", label: "searchPage.scopeIllust" },
+  { value: "novel", label: "searchPage.scopeNovel" },
 ];
 
-const SORT_OPTIONS: { value: SearchSort; label: string }[] = [
-  { value: "date_desc", label: "最新" },
-  { value: "date_asc", label: "最早" },
-  { value: "popular_desc", label: "热门" },
+const SORT_OPTIONS: { value: SearchSort; label: I18nKey }[] = [
+  { value: "date_desc", label: "searchPage.sortNewest" },
+  { value: "date_asc", label: "searchPage.sortOldest" },
+  { value: "popular_desc", label: "searchPage.sortPopular" },
 ];
 
-/** 获取当前 scope 的中文标签 */
+/** 获取当前 scope 的标签（渲染时翻译） */
 function scopeLabel(value: SearchScope): string {
-  return SCOPE_OPTIONS.find((o) => o.value === value)?.label ?? "全部";
+  const key = SCOPE_OPTIONS.find((o) => o.value === value)?.label ?? "searchPage.scopeAll";
+  return t(key);
 }
 
 const Search: Component = () => {
@@ -286,7 +289,7 @@ const Search: Component = () => {
           <button
             class="flex items-center justify-center min-w-10 min-h-10 rounded-[var(--borderRadiusSmall)] text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-95 transition-all duration-[var(--durationFast)] flex-shrink-0"
             onClick={() => goBack()}
-            aria-label="返回"
+            aria-label={t("searchPage.back")}
           >
             <FluentIcon name="chevronLeft" size={20} />
           </button>
@@ -300,7 +303,7 @@ const Search: Component = () => {
                   onClick={onCompactInputFocus}
                 >
                   <FluentIcon name="search" size={16} />
-                  <span>搜索</span>
+                  <span>{t("searchPage.search")}</span>
                 </span>
               }
             >
@@ -325,7 +328,7 @@ const Search: Component = () => {
                   e.stopPropagation();
                   handleClearSearch();
                 }}
-                aria-label="清除搜索"
+                aria-label={t("searchPage.clearSearchAria")}
               >
                 <FluentIcon name="dismiss" size={16} />
               </button>
@@ -336,7 +339,7 @@ const Search: Component = () => {
           <button
             class="flex-shrink-0 text-xs text-[var(--colorNeutralForeground3)] whitespace-nowrap px-[var(--spacingHorizontalXS)] py-[var(--spacingVerticalXXS)] rounded-[var(--borderRadiusSmall)] hover:bg-[var(--colorNeutralBackground1Hover)] transition-colors duration-[var(--durationFast)]"
             onClick={() => scrollToTop()}
-            aria-label="切换筛选"
+            aria-label={t("searchPage.toggleFiltersAria")}
           >
             {scopeLabel(store.scope())}
           </button>
@@ -350,7 +353,7 @@ const Search: Component = () => {
             <button
               class="flex items-center justify-center min-w-10 min-h-10 rounded-[var(--borderRadiusSmall)] text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-95 transition-all duration-[var(--durationFast)] flex-shrink-0"
               onClick={() => goBack()}
-              aria-label="返回"
+              aria-label={t("searchPage.back")}
             >
               <FluentIcon name="chevronLeft" size={20} />
             </button>
@@ -360,14 +363,14 @@ const Search: Component = () => {
             <TagInput
               tags={tags()}
               onTagsChange={handleTagsChange}
-              placeholder="输入标签，空格/回车添加"
+              placeholder={t("searchPage.searchPlaceholder")}
               inputRef={(el) => (mainInputRef = el)}
             />
             <Show when={tags().length > 0}>
               <button
                 class="flex items-center justify-center min-w-8 min-h-8 rounded-[var(--borderRadiusSmall)] text-[var(--colorNeutralForeground3)] hover:bg-[var(--colorNeutralBackground2)] hover:text-[var(--colorNeutralForeground1)] active:scale-90 transition-all duration-[var(--durationFast)]"
                 onClick={() => handleClearSearch()}
-                aria-label="清除搜索"
+                aria-label={t("searchPage.clearSearchAria")}
               >
                 <FluentIcon name="dismiss" size={18} />
               </button>
@@ -376,7 +379,7 @@ const Search: Component = () => {
             <button
               class="relative flex items-center justify-center min-w-10 min-h-10 rounded-[var(--borderRadiusSmall)] text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground2)] active:scale-90 transition-all duration-[var(--durationFast)] flex-shrink-0"
               onClick={() => setFilterSheetOpen(true)}
-              aria-label="筛选"
+              aria-label={t("searchPage.filtersAria")}
             >
               <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
                 <path d="M2.5 3h15l-6 7v6l-3 1.5v-7.5l-6-7z" fill="currentColor" />
@@ -394,7 +397,7 @@ const Search: Component = () => {
             <div
               class="flex border-b border-[var(--colorNeutralStroke2)]"
               role="radiogroup"
-              aria-label="搜索范围"
+              aria-label={t("searchPage.scopeAria")}
             >
               <For each={SCOPE_OPTIONS}>
                 {(opt) => (
@@ -413,7 +416,7 @@ const Search: Component = () => {
                     // Solid 2.0：aria-checked 仅接受枚举字符串（"true"/"false"），不再收 boolean
                     aria-checked={store.scope() === opt.value ? "true" : "false"}
                   >
-                    {opt.label}
+                    {t(opt.label)}
                     {store.scope() === opt.value && (
                       <span class="absolute bottom-0 left-0 right-0 h-[var(--strokeWidthThick)] bg-[var(--colorBrandStroke1)] rounded-full" />
                     )}
@@ -425,7 +428,7 @@ const Search: Component = () => {
             <div
               class="flex items-center justify-center gap-[var(--spacingHorizontalS)]"
               role="group"
-              aria-label="排序方式"
+              aria-label={t("searchPage.sortAria")}
             >
               <For each={SORT_OPTIONS}>
                 {(opt, index) => (
@@ -451,7 +454,7 @@ const Search: Component = () => {
 
                       onClick={() => handleSortChange(opt.value)}
                     >
-                      {opt.label}
+                      {t(opt.label)}
                     </button>
                   </>
                 )}
@@ -515,7 +518,7 @@ const Search: Component = () => {
         <button
           class="fixed z-20 bottom-24 right-4 w-11 h-11 flex items-center justify-center rounded-[var(--borderRadiusCircular)] bg-[var(--colorOverlaySurface)] backdrop-blur-[var(--backdropBlurDefault)] backdrop-saturate-[var(--backdropSaturateDefault)] border border-[var(--colorNeutralStroke2)] shadow-[var(--elevation4)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorOverlaySurfaceHover)] active:scale-90 transition-all duration-[var(--durationFast)]"
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          aria-label="回顶"
+          aria-label={t("searchPage.backToTopAria")}
         >
           <FluentIcon name="chevronUp" size={20} />
         </button>
@@ -539,18 +542,18 @@ const SearchHistorySection: Component<HistoryProps> = (props) => {
       <Show
         when={props.history.length > 0}
         fallback={
-          <div class="flex flex-col items-center gap-2 py-12 text-center">
+        <div class="flex flex-col items-center gap-2 py-12 text-center">
             <span class="text-[var(--colorNeutralForeground4)]">
               <FluentIcon name="search" size={40} />
             </span>
-            <p class="text-[var(--colorNeutralForeground3)] text-sm">输入关键词开始搜索</p>
+            <p class="text-[var(--colorNeutralForeground3)] text-sm">{t("searchPage.historyEmpty")}</p>
           </div>
         }
       >
         <div class="flex items-center justify-between mb-3">
-          <h3 class="text-sm font-semibold text-[var(--colorNeutralForeground1)]">最近搜索</h3>
+          <h3 class="text-sm font-semibold text-[var(--colorNeutralForeground1)]">{t("searchPage.historyTitle")}</h3>
           <button class="history-clear-btn" onClick={props.onClear}>
-            清空
+            {t("searchPage.historyClear")}
           </button>
         </div>
         <div class="flex flex-col gap-1">
@@ -569,7 +572,7 @@ const SearchHistorySection: Component<HistoryProps> = (props) => {
                     e.stopPropagation();
                     props.onRemove(word);
                   }}
-                  aria-label={`删除 ${word}`}
+                  aria-label={t("searchPage.removeHistoryAria", { word })}
                 >
                   <FluentIcon name="dismiss" size={14} />
                 </button>

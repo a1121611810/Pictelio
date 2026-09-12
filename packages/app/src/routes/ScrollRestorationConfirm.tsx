@@ -1,6 +1,7 @@
 import { type Component } from "solid-js";
 import { setPersistScrollRestoration } from "@/stores/uiStore";
 import { goBack } from "@/services/backTransitionService";
+import { t, type I18nKey } from "@/i18n";
 import PageTransition from "@/components/PageTransition";
 
 // 「持久化滚动恢复」开启二次确认页（变体 B：内容偏上 + 底部固定操作栏，拇指可达）。
@@ -26,12 +27,10 @@ const gradientBg = () => (
   />
 );
 
-const title = "开启持久化滚动恢复？";
-const subtitle = "开启后，列表将不再固定从顶部开始";
-const impacts = [
-  "重新打开应用后，列表会停留在上次浏览的位置，不再从顶部开始",
-  "浏览列表时，图片加载可能导致列表位置出现跳动",
-];
+// 模块级常量存 key，渲染时 t(key)（i18n 机械抽取规范）
+const titleKey: I18nKey = "scrollConfirm.title";
+const subtitleKey: I18nKey = "scrollConfirm.subtitle";
+const impactKeys: I18nKey[] = ["scrollConfirm.impact1", "scrollConfirm.impact2"];
 
 /** 「持久化滚动恢复」开启二次确认页（底部操作栏） */
 const ScrollRestorationConfirm: Component = () => {
@@ -48,17 +47,17 @@ const ScrollRestorationConfirm: Component = () => {
             </svg>
           </div>
           <h1 class="text-[var(--fontSizeHero800)] font-semibold text-[var(--colorNeutralForeground1)] leading-tight mb-2">
-            {title}
+            {t(titleKey)}
           </h1>
           <p class="text-[var(--fontSizeBase400)] text-[var(--colorNeutralForeground2)] leading-snug mb-5">
-            {subtitle}
+            {t(subtitleKey)}
           </p>
           <div class="surface-card rounded-[var(--borderRadiusMedium)] p-5 flex flex-col gap-3">
-            {impacts.map((t) => (
+            {impactKeys.map((key) => (
               <div class="flex items-start gap-3">
                 <span class="w-1.5 h-1.5 mt-[0.55em] flex-shrink-0 rounded-[var(--borderRadiusCircular)] bg-[var(--colorBrandStroke2)]" />
                 <p class="text-[var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-                  {t}
+                  {t(key)}
                 </p>
               </div>
             ))}
@@ -72,7 +71,7 @@ const ScrollRestorationConfirm: Component = () => {
               style="flex:1"
               ref={fluentOn("click", () => goBack())}
             >
-              取消
+              {t("scrollConfirm.cancel")}
             </fluent-button>
             {/* 确认开启：持久化 + 自动返回设置页 */}
             <fluent-button
@@ -83,7 +82,7 @@ const ScrollRestorationConfirm: Component = () => {
                 goBack();
               })}
             >
-              确认开启
+              {t("scrollConfirm.confirm")}
             </fluent-button>
           </div>
         </div>

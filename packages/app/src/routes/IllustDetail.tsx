@@ -46,6 +46,7 @@ import PagePickerSheet from "../components/illust/PagePickerSheet";
 import { originalPageUrls, buildImageTasks, buildUgoiraTask } from "../utils/galleryDownload";
 import { enqueueDownloads } from "../stores/downloadStore";
 import { goBack } from "../services/backTransitionService";
+import { t } from "../i18n";
 
 const IllustDetail: Component = () => {
   const params = useParams();
@@ -145,14 +146,14 @@ const IllustDetail: Component = () => {
     }
     setShowActionMenu(false);
     if (isBlocked(i.user.id)) {
-      setToastMessage("该作者已被屏蔽");
+      setToastMessage(t("illustDetail.blockedAuthor")); // i18n: set 时快照（瞬态）
       return;
     }
-    if (!window.confirm("确定要屏蔽该作者吗？屏蔽后其作品将不再显示在推荐和关注列表中。")) {
+    if (!window.confirm(t("illustDetail.blockConfirm"))) {
       return;
     }
     await blockUser(i.user.id);
-    setToastMessage("已屏蔽该作者");
+    setToastMessage(t("illustDetail.blockedDoneToast")); // i18n: set 时快照（瞬态）
   }
 
   function openReport() {
@@ -467,7 +468,11 @@ const IllustDetail: Component = () => {
         .catch((err) => {
           if (cancelled) return;
           if (err instanceof DOMException && err.name === "AbortError") return;
-          setError({ type: ApiErrorType.UNKNOWN, message: err?.message ?? "加载失败" });
+          // i18n: set 时快照（瞬态）；字面量 fallback 抽 key（error.fallback.loadFailed zh 同文）
+          setError({
+            type: ApiErrorType.UNKNOWN,
+            message: err?.message ?? t("error.fallback.loadFailed"),
+          });
           setLoading(false);
         });
 
@@ -584,7 +589,8 @@ const IllustDetail: Component = () => {
 
   /** 入队提示（含「查看下载」跳转，spec docs/specs/download-manager.md §8） */
   function showQueuedNotice(count: number) {
-    setQueuedNotice(`已加入下载队列（${count} 项），请到下载页查看`);
+    // i18n: set 时快照（瞬态）
+    setQueuedNotice(t("illustDetail.queuedNotice", { count }));
     clearTimeout(queuedNoticeTimer);
     queuedNoticeTimer = setTimeout(() => setQueuedNotice(null), 4000);
   }
@@ -600,7 +606,7 @@ const IllustDetail: Component = () => {
     }
     const drafts = buildImageTasks(i, pages);
     if (drafts.length === 0) {
-      showSaveStatus("没有可下载的原图", false, "warning");
+      showSaveStatus(t("illustDetail.saveNoImages"), false, "warning"); // i18n: set 时快照（瞬态）
       return 0;
     }
     enqueueDownloads(drafts);
@@ -624,7 +630,7 @@ const IllustDetail: Component = () => {
       showQueuedNotice(1);
     } catch (e) {
       console.error("[IllustDetail] ugoira 元数据获取失败:", e);
-      showSaveStatus("获取动图信息失败", false, "warning");
+      showSaveStatus(t("illustDetail.ugoiraMetaFailed"), false, "warning"); // i18n: set 时快照（瞬态）
     } finally {
       setUgoiraQueuing(false);
     }
@@ -686,10 +692,10 @@ const IllustDetail: Component = () => {
         {illust() && !viewerOpen() && isBlockedAuthor() && (
           <div class="flex flex-col items-center justify-center h-screen gap-4 px-6">
             <p class="text-[var(--colorNeutralForeground2)] [font-size:var(--fontSizeBase300)]">
-              该作者已被屏蔽
+              {t("illustDetail.blockedAuthor")}
             </p>
             <fluent-button appearance="secondary" ref={fluentOn("click", () => goBack())}>
-              返回
+              {t("illustDetail.back")}
             </fluent-button>
           </div>
         )}
@@ -743,7 +749,7 @@ const IllustDetail: Component = () => {
                   class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorBrandForegroundLink)] bg-transparent border-none cursor-pointer appearance-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--colorStrokeFocus2)]"
                   onClick={() => void navigate("/downloads")}
                 >
-                  查看下载
+                  {t("illustDetail.viewDownloads")}
                 </button>
               </div>
             </Show>
@@ -868,10 +874,10 @@ const IllustDetail: Component = () => {
                         onClick={() => startUgoiraLoad(illust()!.id)}
                       >
                         <span class="text-[var(--colorStatusDangerForeground1)] [font-size:var(--fontSizeBase300)]">
-                          加载失败
+                          {t("error.fallback.loadFailed")}
                         </span>
                         <span class="text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] underline">
-                          点击重试
+                          {t("illustDetail.tapRetry")}
                         </span>
                       </div>
                     )}
@@ -944,9 +950,9 @@ const IllustDetail: Component = () => {
 
                     onClick={toggleFollow}
                     disabled={following()}
-                    aria-label={isFollowed() ? "取消关注" : "关注"}
+                    aria-label={isFollowed() ? t("illustDetail.unfollowAria") : t("illustDetail.followAria")}
                   >
-                    {following() ? "…" : isFollowed() ? "已关注" : "关注"}
+                    {following() ? "…" : isFollowed() ? t("illustDetail.following") : t("illustDetail.follow")}
                   </button>
                 </div>
               </DetailCard>
@@ -998,7 +1004,7 @@ const IllustDetail: Component = () => {
                       }}
                       disabled={bookmarking()}
                     >
-                      {illust()!.is_bookmarked ? "♥ 已收藏" : "♡ 收藏"}
+                      {illust()!.is_bookmarked ? t("illustDetail.bookmarked") : t("illustDetail.bookmark")}
                     </button>
                     <HeartBurstEffect trigger={bookmarkBurstTrigger} />
                   </div>
@@ -1022,7 +1028,7 @@ const IllustDetail: Component = () => {
             {illust()!.page_count === 1 && illust()!.type !== "ugoira" && (
               <div class="px-4 pb-8">
                 <p class="text-center text-[var(--colorNeutralForeground3)] [font-size:var(--fontSizeBase200)]">
-                  点击图片查看原图 · 双指缩放 · 左右滑动翻页
+                  {t("illustDetail.viewerHint")}
                 </p>
               </div>
             )}
@@ -1047,7 +1053,7 @@ const IllustDetail: Component = () => {
                   }, 600);
                   scrollToTop();
                 }}
-                aria-label="回顶"
+                aria-label={t("illustDetail.backToTopAria")}
               >
                 ↑
               </button>
@@ -1068,7 +1074,7 @@ const IllustDetail: Component = () => {
                   "max-height": imageUrls().length > 20 ? "60vh" : "none",
                   "overflow-y": imageUrls().length > 20 ? "auto" : "visible",
                 }}
-                aria-label="页面导航"
+                aria-label={t("illustDetail.pageNavAria")}
               >
                 {imageUrls().map((_, i) => (
                   <button
@@ -1087,7 +1093,7 @@ const IllustDetail: Component = () => {
                         i !== currentVisiblePage() ? "var(--textShadowDefault)" : "none",
                     }}
                     onClick={() => scrollToPage(i)}
-                    aria-label={`第 ${i + 1} 页`}
+                    aria-label={t("illustDetail.pageN", { page: i + 1 })}
                     aria-current={i === currentVisiblePage() ? "true" : undefined}
                   >
                     {i + 1}

@@ -19,6 +19,7 @@ import NavBar from "../components/NavBar";
 import PageTransition from "../components/PageTransition";
 import { layoutMode } from "../stores/settingsStore";
 import { scrollToTop } from "../utils/scrollToTop";
+import { t } from "../i18n";
 import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior";
 
 const UserIllusts: Component = () => {
@@ -65,14 +66,14 @@ const UserIllusts: Component = () => {
           >
             <fluent-button
               appearance="subtle"
-              aria-label="返回"
+              aria-label={t("userIllusts.back")}
               class="w-8 h-8 p-0 min-w-8"
               ref={fluentOn("click", () => goBack())}
             >
               ←
             </fluent-button>
             <h1 class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] tracking-tight leading-none truncate">
-              {(viewedUser() || user())?.name ?? ""} 的作品
+              {t("userIllusts.worksOf", { name: (viewedUser() || user())?.name ?? "" })}
             </h1>
           </header>
 
@@ -86,7 +87,7 @@ const UserIllusts: Component = () => {
                 }}
                 onClick={() => handleTabSwitch("illust")}
               >
-                插画
+                {t("userIllusts.tabIllust")}
               </button>
               <button
                 class={{
@@ -95,7 +96,7 @@ const UserIllusts: Component = () => {
                 }}
                 onClick={() => handleTabSwitch("manga")}
               >
-                漫画
+                {t("userIllusts.tabManga")}
               </button>
               <button
                 class={{
@@ -104,7 +105,7 @@ const UserIllusts: Component = () => {
                 }}
                 onClick={() => handleTabSwitch("novel")}
               >
-                小说
+                {t("userIllusts.tabNovel")}
               </button>
             </div>
           </div>
