@@ -6,6 +6,7 @@ import { filterNovels } from "../utils/r18Filter";
 import { contentType } from "./uiStore";
 import { user } from "./authStore";
 import { adaptNovelResponse } from "./shared/novelHelpers";
+import { t } from "../i18n";
 // ── Signals ──
 
 const [bookmarkRestrictState, setBookmarkRestrict] = createSignal<RestrictType>("public");
@@ -72,7 +73,8 @@ export function isNovelBookmarkCached(): boolean {
 export async function ensureLoaded(): Promise<void> {
   setFallbackError(null);
   if (!user()) {
-    setFallbackError({ type: ApiErrorType.UNAUTHORIZED, message: "未登录" });
+    // i18n: set 时快照（瞬态）
+    setFallbackError({ type: ApiErrorType.UNAUTHORIZED, message: t("core.store.novelBookmarkStore.notSignedIn") });
     return;
   }
   await store.ensureLoaded();

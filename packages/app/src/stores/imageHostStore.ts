@@ -1,5 +1,6 @@
 import { jsonCodec, settings } from "@/settings";
 import { isNativePlatform } from "@/utils/platform";
+import { t } from "@/i18n";
 
 type ImageHostMode = "race" | "weighted" | "fastest-ip" | "single";
 
@@ -312,12 +313,12 @@ export function setProbeResults(results: ProbeResult[]): void {
 
 export function modeLabel(mode: ImageHostMode): string {
   return mode === "race"
-    ? "并发请求"
+    ? t("core.store.imageHostStore.modeRace") // i18n: 调用时快照（瞬态）
     : mode === "weighted"
-      ? "负载均衡"
+      ? t("core.store.imageHostStore.modeWeighted")
       : mode === "fastest-ip"
-        ? "最快 IP 地址"
-        : "单一图床";
+        ? t("core.store.imageHostStore.modeFastestIp")
+        : t("core.store.imageHostStore.modeSingle");
 }
 
 /** 兼容存根：加载已持久化的图床设置（实际由 registry hydrate 管线处理） */

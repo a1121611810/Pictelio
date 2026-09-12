@@ -3,6 +3,7 @@
 // 提供 Preferences KV seam、注册原生执行器 seam（T3 接入）、把状态镜像进 Solid signal。
 import { createSignal } from "solid-js";
 import { Preferences } from "@capacitor/preferences";
+import { t } from "../i18n";
 import {
   createDownloadManager,
   type DownloadExecutor,
@@ -32,7 +33,7 @@ const delegatingExecutor: DownloadExecutor = {
   start(task, runId, cb) {
     if (!executor) {
       console.warn("[downloadStore] 下载执行器未接入，任务失败");
-      cb.onFail("下载执行器未接入");
+      cb.onFail(t("core.store.downloadStore.executorNotReady")); // i18n: set 时快照（瞬态）
       return;
     }
     executor.start(task, runId, cb);
@@ -46,7 +47,7 @@ const delegatingExecutor: DownloadExecutor = {
   deleteFile(uri) {
     if (!executor) {
       console.warn("[downloadStore] 下载执行器未接入，删除文件失败");
-      return Promise.reject(new Error("下载执行器未接入"));
+      return Promise.reject(new Error(t("core.store.downloadStore.executorNotReady")));
     }
     return executor.deleteFile(uri);
   },
@@ -101,14 +102,14 @@ export function flushDownloadQueue(): Promise<void> {
 export async function shareDownloads(ids: readonly string[]): Promise<void> {
   const uris = manager
     .getState()
-    .tasks.filter((t) => ids.includes(t.id) && t.status === "completed" && t.outputUri)
-    .map((t) => t.outputUri as string);
+    .tasks.filter((task) => ids.includes(task.id) && task.status === "completed" && task.outputUri)
+    .map((task) => task.outputUri as string);
   if (uris.length === 0) {
-    throw new Error("没有可分享的已下载文件");
+    throw new Error(t("core.store.downloadStore.nothingToShare")); // i18n: set 时快照（瞬态）
   }
   if (!sharer) {
     console.warn("[downloadStore] 分享器未接入（T6）");
-    throw new Error("分享功能未接入");
+    throw new Error(t("core.store.downloadStore.sharerNotReady")); // i18n: set 时快照（瞬态）
   }
   await sharer(uris);
 }

@@ -9,6 +9,7 @@ import {
 } from "../api/comment";
 import { createSentinel } from "./visibility";
 import { SHEET_LAZY_MARGIN } from "./rootMargins";
+import { t } from "../i18n";
 
 export interface UseCommentsResult {
   comments: Accessor<PixivComment[]>;
@@ -61,7 +62,7 @@ export function useComments(
         if (ac.signal.aborted) return;
         if (loadErr) {
           if ((loadErr as { name?: string }).name !== "AbortError") {
-            setError("加载评论失败，请重试");
+            setError(t("core.primitive.useComments.loadFailed")); // i18n: set 时快照（瞬态）
           }
         } else {
           setRootComments(res.comments);
@@ -82,7 +83,7 @@ export function useComments(
     const [err, res] = await tryAsync(loadRootCommentsNext(url));
     setLoadingMore(false);
     if (err) {
-      setError("加载更多失败");
+      setError(t("core.primitive.useComments.loadMoreFailed")); // i18n: set 时快照（瞬态）
     } else {
       setRootComments((prev) => [...prev, ...res.comments]);
       setNextUrl(res.next_url);
@@ -103,13 +104,13 @@ export function useComments(
     const [apiErr] = await tryAsync(apiPostComment(type(), targetId(), text, parentId));
     if (apiErr) {
       setPosting(false);
-      setPostError("发送失败，请重试");
+      setPostError(t("core.primitive.useComments.postFailed")); // i18n: set 时快照（瞬态）
       return;
     }
     const [loadErr, res] = await tryAsync(loadRootComments(type(), targetId()));
     setPosting(false);
     if (loadErr) {
-      setPostError("发送失败，请重试");
+      setPostError(t("core.primitive.useComments.postFailed"));
       return;
     }
     setRootComments(res.comments);
@@ -125,7 +126,7 @@ export function useComments(
     }
     setDeletingId(null);
     if (delErr) {
-      setError("删除失败");
+      setError(t("core.primitive.useComments.deleteFailed")); // i18n: set 时快照（瞬态）
     }
   }
 

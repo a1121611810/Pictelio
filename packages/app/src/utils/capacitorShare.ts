@@ -1,5 +1,8 @@
 // ─── 系统分享（webview 引擎：Capacitor 插件桥，spec docs/specs/download-manager.md §4.1）───
 // 纯注入工厂（零 @capacitor/core 依赖，node 可测）；生产接线在 native/downloadSharer.ts。
+// 错误文案经 t() 调用时快照（i18n B7），经 DownloadManager report(e) 原样展示给用户。
+import { t } from "../i18n";
+
 export interface PictelioShareNative {
   share(options: { uris: string[]; mime?: string }): Promise<void>;
 }
@@ -10,7 +13,7 @@ export function createCapacitorSharer(
 ): (uris: readonly string[]) => Promise<void> {
   return async (uris) => {
     if (uris.length === 0) {
-      throw new Error("没有可分享的文件");
+      throw new Error(t("core.util.capacitorShare.nothingToShare")); // i18n: set 时快照（瞬态）
     }
     await native.share({ uris: [...uris] });
   };

@@ -3,7 +3,11 @@
 // 职责：备份域分区（设备级/账号级/排除）、快照 v1 序列化与解析、恢复计划（merge-by-keys）。
 // 无 IO：原始 KV（键→存储字符串）与 sets 由调用层（T6/T7 接线）注入——
 // 快照内的值就是存储层原始字符串（跨引擎共享 SharedPreferences 的口径，ADR-0103）。
+// 拒绝边界文案经 t() 抛出时快照（i18n B7），经 SettingsWebdav errorMessage 原样展示。
+// 注意：WEBDAV_ERROR_MESSAGES 保持中文契约常量不抽取（settings.webdav.error.* 与之逐字一致，
+// 契约测试钉原文；UI 渲染走 i18n key，不走本表）。
 import type { WebDavErrorKind } from "@/native/WebDav";
+import { t } from "@/i18n";
 
 // ── UTF-8 编解码（纯 JS）──
 // Lynx JS runtime 不提供 TextEncoder/TextDecoder（2026-09-11 真机实测：
@@ -211,19 +215,22 @@ export function parseSnapshot(
   try {
     raw = JSON.parse(utf8Decode(bytes));
   } catch {
-    throw new BackupFormatError("NOT_BACKUP", "不是有效的 Pictelio 备份（JSON 解析失败）");
+    throw new BackupFormatError(
+      "NOT_BACKUP",
+      t("core.util.backupCore.notBackupJson"), // i18n: set 时快照（瞬态）
+    );
   }
   if (!isRecord(raw) || raw.format !== BACKUP_FORMAT) {
-    throw new BackupFormatError("NOT_BACKUP", "不是 Pictelio 备份（format 标识不符）");
+    throw new BackupFormatError("NOT_BACKUP", t("core.util.backupCore.notBackupFormat"));
   }
   const schemaVersion = raw.schemaVersion;
   if (typeof schemaVersion !== "number" || !Number.isInteger(schemaVersion) || schemaVersion < 1) {
-    throw new BackupFormatError("CORRUPT", "备份 schemaVersion 缺失或非法");
+    throw new BackupFormatError("CORRUPT", t("core.util.backupCore.schemaVersionInvalid"));
   }
   if (schemaVersion > supportedVersion) {
     throw new BackupFormatError(
       "SCHEMA_TOO_NEW",
-      `备份来自更新版本的应用（schemaVersion ${schemaVersion} > ${supportedVersion}），请升级后恢复`,
+      t("core.util.backupCore.schemaTooNew", { current: schemaVersion, supported: supportedVersion }),
     );
   }
   if (
@@ -236,7 +243,7 @@ export function parseSnapshot(
     !isRecord(raw.sets) ||
     !Object.values(raw.sets).every((v) => Array.isArray(v))
   ) {
-    throw new BackupFormatError("CORRUPT", "备份字段缺失或类型不符");
+    throw new BackupFormatError("CORRUPT", t("core.util.backupCore.fieldsInvalid"));
   }
   return {
     format: BACKUP_FORMAT,

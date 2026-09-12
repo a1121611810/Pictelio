@@ -17,6 +17,7 @@ import {
   type BackupSummary,
   type RestorePlan,
 } from "./backupCore";
+import { t } from "../i18n";
 
 /** 旋转保留份数（与 Java WebDavClient.KEEP_BACKUPS=10 同值，spec §5 固定不可配） */
 export const KEEP_BACKUPS = 10;
@@ -226,7 +227,7 @@ export async function prepareRestore(
         ? passwordOverride
         : creds.backupPassword;
     if (pwd === null || pwd === "") {
-      throw new Error("该备份已加密，请先输入备份密码");
+      throw new Error(t("core.util.backupService.backupEncrypted")); // i18n: set 时快照（瞬态）
     }
     plain = await deps.bridge.decrypt(downloaded, pwd);
   }

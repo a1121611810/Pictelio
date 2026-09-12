@@ -1,6 +1,8 @@
 // ─── 下载页视图模型（纯函数，spec docs/specs/download-manager.md §7）───
 // 与 app-lynx 的 downloadsViewModel.ts 同源同语义（双端差分对齐）；
 // 纯函数、零框架依赖，node 可单测。UI 组件只负责渲染与事件接线。
+// 文案经 t() 调用时快照（i18n B7）——渲染处仍在组件 JSX 内，zh 逐字不变。
+import { t } from "../i18n";
 import {
   canPause,
   canStart,
@@ -23,19 +25,19 @@ export interface DownloadGroup {
 export function groupByIllust(tasks: readonly DownloadTask[]): DownloadGroup[] {
   const groups: DownloadGroup[] = [];
   const index = new Map<number, number>();
-  for (const t of tasks) {
-    const i = index.get(t.illustId);
+  for (const task of tasks) {
+    const i = index.get(task.illustId);
     if (i === undefined) {
-      index.set(t.illustId, groups.length);
+      index.set(task.illustId, groups.length);
       groups.push({
-        illustId: t.illustId,
-        title: t.title,
-        thumbnailUrl: t.thumbnailUrl,
-        kind: t.kind,
-        tasks: [t],
+        illustId: task.illustId,
+        title: task.title,
+        thumbnailUrl: task.thumbnailUrl,
+        kind: task.kind,
+        tasks: [task],
       });
     } else {
-      groups[i]!.tasks.push(t);
+      groups[i]!.tasks.push(task);
     }
   }
   return groups;
@@ -43,9 +45,9 @@ export function groupByIllust(tasks: readonly DownloadTask[]): DownloadGroup[] {
 
 /** 分组头部类型文案（spec §7）：ugoira=动图 / novel=小说 / 静态图=N 张 */
 export function groupKindLabel(kind: DownloadKind, count: number): string {
-  if (kind === "ugoira") return "动图";
-  if (kind === "novel") return "小说";
-  return count + " 张";
+  if (kind === "ugoira") return t("core.util.downloadsViewModel.kindUgoira"); // i18n: 调用时快照（瞬态）
+  if (kind === "novel") return t("core.util.downloadsViewModel.kindNovel");
+  return t("core.util.downloadsViewModel.kindPageCount", { count });
 }
 
 export interface ActionAvailability {
@@ -61,13 +63,13 @@ export function availabilityFor(
   tasks: readonly DownloadTask[],
   ids: readonly string[],
 ): ActionAvailability {
-  const chosen = tasks.filter((t) => ids.includes(t.id));
+  const chosen = tasks.filter((task) => ids.includes(task.id));
   return {
     start: chosen.some(canStart),
     pause: chosen.some(canPause),
     stop: chosen.some(canStop),
     delete: chosen.length > 0,
-    share: chosen.some((t) => t.status === "completed" && !!t.outputUri),
+    share: chosen.some((task) => task.status === "completed" && !!task.outputUri),
   };
 }
 
@@ -75,36 +77,39 @@ export function availabilityFor(
 export function availabilityForAll(tasks: readonly DownloadTask[]): ActionAvailability {
   return availabilityFor(
     tasks,
-    tasks.map((t) => t.id),
+    tasks.map((task) => task.id),
   );
 }
 
 /** 删除确认是否提供「删除文件」选项：任一所选 completed 且有 outputUri（spec §3.3） */
 export function hasDeletableFiles(tasks: readonly DownloadTask[], ids: readonly string[]): boolean {
-  return tasks.some((t) => ids.includes(t.id) && t.status === "completed" && !!t.outputUri);
+  return tasks.some((task) => ids.includes(task.id) && task.status === "completed" && !!task.outputUri);
 }
 
 export function statusLabel(status: DownloadStatus): string {
   switch (status) {
     case "queued":
-      return "排队中";
+      return t("core.util.downloadsViewModel.statusQueued"); // i18n: 调用时快照（瞬态）
     case "downloading":
-      return "下载中";
+      return t("core.util.downloadsViewModel.statusDownloading");
     case "paused":
-      return "已暂停";
+      return t("core.util.downloadsViewModel.statusPaused");
     case "stopped":
-      return "已停止";
+      return t("core.util.downloadsViewModel.statusStopped");
     case "completed":
-      return "已完成";
+      return t("core.util.downloadsViewModel.statusCompleted");
     case "failed":
-      return "失败";
+      return t("core.util.downloadsViewModel.statusFailed");
   }
 }
 
 /** 列表副标题文案（状态 / 进度 / 错误） */
 export function progressText(task: DownloadTask): string {
-  if (task.status === "completed") return "已完成";
-  if (task.status === "failed") return task.error ? "失败：" + task.error : "失败";
+  if (task.status === "completed") return t("core.util.downloadsViewModel.statusCompleted");
+  if (task.status === "failed")
+    return task.error
+      ? t("core.util.downloadsViewModel.statusFailedWithReason", { reason: task.error })
+      : t("core.util.downloadsViewModel.statusFailed");
   if (task.status === "downloading") return task.progress + "%";
   return statusLabel(task.status);
 }
@@ -119,19 +124,21 @@ export function summarize(
   tasks: readonly DownloadTask[],
   ids: readonly string[],
 ): SelectionSummary {
-  const chosen = tasks.filter((t) => ids.includes(t.id));
+  const chosen = tasks.filter((task) => ids.includes(task.id));
   return {
     count: chosen.length,
-    completed: chosen.filter((t) => t.status === "completed").length,
-    active: chosen.filter((t) => t.status === "downloading").length,
+    completed: chosen.filter((task) => task.status === "completed").length,
+    active: chosen.filter((task) => task.status === "downloading").length,
   };
 }
 
 /** 分享目标 uri（仅 completed 且有 outputUri） */
 export function shareableUris(tasks: readonly DownloadTask[], ids: readonly string[]): string[] {
   const uris: string[] = [];
-  for (const t of tasks) {
-    if (ids.includes(t.id) && t.status === "completed" && t.outputUri) uris.push(t.outputUri);
+  for (const task of tasks) {
+    if (ids.includes(task.id) && task.status === "completed" && task.outputUri) {
+      uris.push(task.outputUri);
+    }
   }
   return uris;
 }
@@ -145,12 +152,12 @@ export function toggleId(selected: ReadonlySet<string>, id: string): Set<string>
 }
 
 export function selectAll(tasks: readonly DownloadTask[]): Set<string> {
-  return new Set(tasks.map((t) => t.id));
+  return new Set(tasks.map((task) => task.id));
 }
 
 export function allSelected(
   tasks: readonly DownloadTask[],
   selected: ReadonlySet<string>,
 ): boolean {
-  return tasks.length > 0 && tasks.every((t) => selected.has(t.id));
+  return tasks.length > 0 && tasks.every((task) => selected.has(task.id));
 }

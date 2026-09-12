@@ -12,6 +12,7 @@ import { ApiErrorType } from "@/api/types";
 import { mergeSearchResults } from "@/utils/searchMerger";
 import { aiFilterMode } from "@/stores/settingsStore";
 import { filterSearchResultsByAiMode } from "@/utils/aiFilter";
+import { t } from "@/i18n";
 import {
   DEFAULT_SEARCH_FILTERS,
   buildCacheKey,
@@ -223,7 +224,8 @@ export function createSearchStore(): SearchStoreState {
 
           // scope=all: both failed, set error
           if (currentScope === "all" && !anySucceeded) {
-            setError({ type: ApiErrorType.UNKNOWN, message: "搜索失败，请稍后重试" });
+            // i18n: set 时快照（瞬态）
+            setError({ type: ApiErrorType.UNKNOWN, message: t("core.store.searchStore.searchFailed") });
           }
 
           // 写入搜索结果缓存（键含筛选段）
