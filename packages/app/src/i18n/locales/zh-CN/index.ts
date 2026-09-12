@@ -2,12 +2,13 @@
 // key 规范 <域>.<区块>.<语义>；新增域文件必须同步 en/<域>.ts（per-domain satisfies 编译期强制）。
 import error_ from "./error";
 import settings_ from "./settings";
+import time_ from "./time";
 import routes_ from "./routes";
 import components1_ from "./components1";
 import components2_ from "./components2";
 import core_ from "./core";
 
-const zhCN = { ...error_, ...settings_, ...routes_, ...components1_, ...components2_, ...core_ } as const;
+const zhCN = { ...error_, ...settings_, ...time_, ...routes_, ...components1_, ...components2_, ...core_ } as const;
 
 export default zhCN;
 export type I18nKey = keyof typeof zhCN;

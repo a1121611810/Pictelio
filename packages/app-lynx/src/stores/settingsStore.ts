@@ -17,6 +17,7 @@ import { idbGet, idbSet, idbRemove } from "../utils/idbKV"
 import { getNativeModules, isNativeMode } from "../api/client"
 import { useAuthStore } from "./authStore"
 import { unquoteNativeString } from "../utils/tokenStorage"
+import { setLocale, followSystemLocale } from "../i18n"
 import type { ImageQuality } from "../utils/imageQuality"
 import type { UgoiraExtractMode } from "../api/ugoira"
 import { UGOIRA_FORMATS, type UgoiraFormat } from "../utils/downloadQueueCore"
@@ -69,6 +70,8 @@ const WEBDAV_AUTO_BACKUP_KEY = "settings_webdav_auto_backup"
 const WEBDAV_AUTO_BACKUP_DAYS_KEY = "settings_webdav_auto_backup_days"
 const WEBDAV_LAST_BACKUP_KEY = "settings_webdav_last_backup"
 const WEBDAV_EXCLUDED_KEYS_KEY = "settings_webdav_excluded_keys"
+/** UI 语言（spec docs/specs/i18n.md §4.1）：设备级共享键，与 app i18n PREF_KEY_LANGUAGE 逐字一致；"" = 跟随系统 */
+const LANGUAGE_KEY = "settings_language"
 
 /**
  * 备份域设备级键清单（spec docs/specs/webdav-backup.md §3.1）：与 app settingsStore
@@ -80,6 +83,7 @@ export const BACKUP_DEVICE_KEYS = [
   UGOIRA_DOWNLOAD_FORMAT_KEY,
   DETAIL_QUALITY_KEY,
   THEME_COLOR_KEY,
+  LANGUAGE_KEY,
   NOVEL_EXPORT_FORMAT_KEY,
   NOVEL_EXPORT_INCLUDE_METADATA_KEY,
   NOVEL_EXPORT_INCLUDE_COVER_KEY,
@@ -213,6 +217,8 @@ export const useSettingsStore = defineStore("settings", () => {
   const _ugoiraDownloadFormat = ref<UgoiraFormat>("zip")
   const _detailQuality = ref<ImageQuality>("medium")
   const _themeColor = ref<ThemeColorId>(DEFAULT_THEME_COLOR)
+  /** UI 语言："" = 跟随系统；设备级，未登录也恢复 */
+  const _language = ref<"" | "zh-CN" | "en">("")
   const _relatedInjection = ref(true)
   const _novelExportFormat = ref<NovelExportFormat>(DEFAULT_NOVEL_EXPORT_FORMAT)
   const _novelExportOptions = ref<NovelExportOptions>({ ...DEFAULT_NOVEL_EXPORT_OPTIONS })
@@ -240,6 +246,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const ugoiraDownloadFormat = _ugoiraDownloadFormat
   const detailQuality = _detailQuality
   const themeColor = _themeColor
+  const language = _language
   const relatedInjection = _relatedInjection
   const novelExportFormat = _novelExportFormat
   const novelExportOptions = _novelExportOptions
@@ -289,6 +296,19 @@ export const useSettingsStore = defineStore("settings", () => {
       }
     } catch (e) {
       console.warn("[settingsStore] 主题色加载失败（维持默认）", e)
+    }
+
+    // UI 语言（spec docs/specs/i18n.md §4.1）：设备级，未登录也需要恢复；非法值维持跟随系统
+    try {
+      const raw = await prefs().get(LANGUAGE_KEY)
+      if (raw === "en" || raw === "zh-CN") {
+        _language.value = raw
+        setLocale(raw)
+      } else if (raw !== null) {
+        console.warn("[settingsStore] 语言值非法，维持跟随系统:", raw)
+      }
+    } catch (e) {
+      console.warn("[settingsStore] 语言加载失败（维持跟随系统）", e)
     }
 
     // 相关作品注入（spec docs/specs/related-injection.md）：设备级，未登录也恢复
@@ -470,6 +490,16 @@ export const useSettingsStore = defineStore("settings", () => {
     void prefs()
       .set(THEME_COLOR_KEY, id)
       .catch((e) => console.warn("[settingsStore] 主题色写入失败", e))
+  }
+
+  /** UI 语言切换（B10）：同步 lynx i18n module ref，持久化设备级共享键 */
+  function setLanguage(l: "" | "zh-CN" | "en"): void {
+    _language.value = l
+    if (l === "") followSystemLocale()
+    else setLocale(l)
+    void prefs()
+      .set(LANGUAGE_KEY, l)
+      .catch((e) => console.warn("[settingsStore] 语言写入失败", e))
   }
 
   function setRelatedInjection(enabled: boolean): void {
@@ -675,6 +705,10 @@ export const useSettingsStore = defineStore("settings", () => {
         if (!isThemeColorId(raw)) return false
         setThemeColor(raw)
         return true
+      case LANGUAGE_KEY:
+        if (raw !== "" && raw !== "en" && raw !== "zh-CN") return false
+        setLanguage(raw)
+        return true
       case NOVEL_EXPORT_FORMAT_KEY:
         if (!(NOVEL_EXPORT_FORMATS as readonly string[]).includes(raw)) return false
         setNovelExportFormat(raw as NovelExportFormat)
@@ -758,6 +792,7 @@ export const useSettingsStore = defineStore("settings", () => {
     ugoiraMode,
     detailQuality,
     themeColor,
+    language,
     relatedInjection,
     ugoiraDownloadFormat,
     novelExportFormat,
@@ -779,6 +814,7 @@ export const useSettingsStore = defineStore("settings", () => {
     setUgoiraDownloadFormat,
     setDetailQuality,
     setThemeColor,
+    setLanguage,
     setRelatedInjection,
     setNovelExportFormat,
     setNovelExportIncludeMetadata,

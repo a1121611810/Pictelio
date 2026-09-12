@@ -2,22 +2,9 @@ import type { Component } from "solid-js";
 import type { PixivComment } from "../api/types";
 import { user } from "../stores/authStore";
 import { resolveImageUrl } from "../utils/imageLoader";
+import { formatRelativeTime } from "../utils/dateFormat";
 
 // ─── Helpers ───
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffMin = Math.floor(diffMs / 60_000);
-  if (diffMin < 1) return "刚刚";
-  if (diffMin < 60) return `${diffMin}分钟前`;
-  const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour}小时前`;
-  const diffDay = Math.floor(diffHour / 24);
-  if (diffDay < 30) return `${diffDay}天前`;
-  return d.toLocaleDateString("zh-CN");
-}
 
 // ─── CommentItem (internal sub-component) ───
 
@@ -70,7 +57,7 @@ const CommentItem: Component<CommentItemProps> = (props) => {
           {props.comment.user.name}
         </button>
         <span class="[font-size:var(--fontSizeBase75)] text-[var(--colorNeutralForeground3)] ml-auto">
-          {formatDate(props.comment.date)}
+          {formatRelativeTime(props.comment.date)}
         </span>
       </div>
 

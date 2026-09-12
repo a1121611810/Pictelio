@@ -10,6 +10,8 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import android.content.Intent;
 import android.util.Log;
 
+import java.util.Locale;
+
 /**
  * Client 能力信息插件（ADR-0062）——webview 前端读取当前包支持的 client 引擎列表，
  * 并提供 Activity 级重启（引擎切换，issue #120）。
@@ -34,6 +36,19 @@ public class ClientInfoPlugin extends Plugin {
         }
         JSObject result = new JSObject();
         result.put("kinds", kinds);
+        call.resolve(result);
+    }
+
+    /**
+     * 当前应用生效 locale（B10 i18n）：Android 13+ 的 per-app language 由系统管理，
+     * configuration 里的首个 locale 即应用生效语言。WebView 侧 navigator.language 不可信
+     * （Chromium 会异步重置应用 locale，Google #37113860），跟随系统态经此桥校正。
+     */
+    @PluginMethod
+    public void getLocale(PluginCall call) {
+        Locale locale = getContext().getResources().getConfiguration().getLocales().get(0);
+        JSObject result = new JSObject();
+        result.put("languageTag", locale.toLanguageTag());
         call.resolve(result);
     }
 

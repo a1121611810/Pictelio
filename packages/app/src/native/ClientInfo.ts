@@ -10,6 +10,8 @@ import { registerPlugin } from "@capacitor/core";
  */
 interface ClientInfoPlugin {
   getClientKinds(): Promise<{ kinds: string[] }>;
+  /** 当前应用生效 locale（B10 i18n）：Android 13+ per-app language，跟随系统态经此桥校正 */
+  getLocale(): Promise<{ languageTag: string }>;
   /** Activity 级重启（进程保留）：切换引擎后新 Activity 由入口路由按开关分发 */
   restart(): Promise<void>;
 }

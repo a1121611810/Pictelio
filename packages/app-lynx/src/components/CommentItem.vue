@@ -7,6 +7,7 @@ import { computed } from 'vue'
 import type { PixivComment, PixivCommentParent } from '../api/types'
 import { useAuthStore } from '../stores/authStore'
 import { proxyImageUrl } from '../utils/imageUrl'
+import { formatRelativeTime } from '../utils/dateFormat'
 import SkeletonImage from './SkeletonImage.vue'
 
 const props = defineProps<{
@@ -25,21 +26,7 @@ const emit = defineEmits<{
   toggleReplies: []
 }>()
 
-// 相对时间（参考 webview CommentList formatDate）：刚刚 / N分钟前 / N小时前 / N天前，30 天后落日期
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr)
-  const now = new Date()
-  const diffMs = now.getTime() - d.getTime()
-  const diffMin = Math.floor(diffMs / 60_000)
-  if (diffMin < 1) return '刚刚'
-  if (diffMin < 60) return `${diffMin}分钟前`
-  const diffHour = Math.floor(diffMin / 60)
-  if (diffHour < 24) return `${diffHour}小时前`
-  const diffDay = Math.floor(diffHour / 24)
-  if (diffDay < 30) return `${diffDay}天前`
-  return d.toLocaleDateString('zh-CN')
-}
-
+// 相对时间：utils/dateFormat（参考 webview CommentList）：刚刚 / N分钟前 / N小时前 / N天前，30 天后落日期
 // 楼层引用：parent_comment 可能是空对象（Record<string, never>），运行时判定后归一
 const parent = computed<PixivCommentParent | null>(() => {
   const p = props.comment.parent_comment
@@ -81,7 +68,7 @@ const isMine = computed(() => useAuthStore().currentUser?.id === props.comment.u
       <!-- 用户名 + 相对时间 -->
       <view class="flex flex-row items-center gap-2">
         <text class="text-title-small font-medium text-surface-on">{{ comment.user.name }}</text>
-        <text class="text-label-medium text-outline">{{ formatDate(comment.date) }}</text>
+        <text class="text-label-medium text-outline">{{ formatRelativeTime(comment.date) }}</text>
       </view>
 
       <!-- 楼层引用块：回复 xxx：… -->

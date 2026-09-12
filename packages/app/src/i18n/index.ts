@@ -78,3 +78,20 @@ export function apiErrorMessage(e: {
 }): string {
   return e.messageKey ? t(e.messageKey as I18nKey, e.params) : e.message;
 }
+
+/** 原生桥注入有效 locale（B10）：WebView 会异步重置应用 locale（Google #37113860），
+ * navigator.language 不可信——native 环境启动后经 ClientInfo 桥校正「跟随系统」态。
+ * 手动覆盖（handle ≠ ""）时不校正；web dev / 插件不可用静默维持 navigator 兜底。 */
+export async function refreshSystemLocaleFromBridge(): Promise<void> {
+  if (languageHandle.value() !== "") return;
+  try {
+    const { ClientInfo } = await import("@/native/ClientInfo");
+    const { languageTag } = await ClientInfo.getLocale();
+    const mapped: Locale = languageTag?.startsWith("en") ? "en" : SOURCE_LOCALE;
+    if (mapped !== localeSignal()) {
+      setLocaleSignal(mapped);
+    }
+  } catch {
+    // 插件不可用（web dev）：维持 navigator 兜底，属预期
+  }
+}

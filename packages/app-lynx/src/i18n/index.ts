@@ -26,9 +26,14 @@ export const locale = ref<Locale>(detectSystemLocale())
 
 const DICTS: Record<Locale, Dict> = { "zh-CN": zhCN, en }
 
-/** 切换语言（原型不持久化——接线 lynx settingsStore 属 spec 范围）。 */
+/** 切换语言（原型不持久化——持久化接线在 lynx settingsStore 的 setLanguage）。 */
 export function setLocale(l: Locale): void {
   locale.value = l
+}
+
+/** 回到跟随系统（settings_language = "" 时由 settingsStore 调用）。 */
+export function followSystemLocale(): void {
+  locale.value = detectSystemLocale()
 }
 
 function applyVars(tpl: string, vars?: Record<string, string | number>): string {
