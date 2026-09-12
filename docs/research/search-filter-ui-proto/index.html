@@ -1,0 +1,540 @@
+<!doctype html>
+<!-- PROTOTYPE — 用后即弃（wayfinder #474 / 票 #477）
+     问题：双端搜索高级筛选的 UI 形态选哪种？
+     四个变体，?variant= 切换 + 底部悬浮条（← → 键同效）：
+       wa = A · webview 底部 Sheet（ReaderSettingsSheet 范式，差距报告建议）
+       wb = B · webview 页内展开面板（筛选常驻可见）
+       la = C · lynx SearchSheet 内折叠筛选区
+       lb = D · lynx 二级弹层（覆盖在 SearchSheet 上）
+     已内置 #476 已拍决策：即改即搜（改动闪「重新搜索」）/ 一键全清+逐维可清 /
+     入口激活数徽标 / scope=all 插画专属维度可用（仅传插画路）、scope=小说 置灰不清值 /
+     无值即默认（chips 点选默认档或再点取消即清该维）。
+     运行：python3 -m http.server 8642 --directory <本目录> 后开 http://127.0.0.1:8642/?variant=wa
+-->
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PROTOTYPE · 双端搜索高级筛选 UI 形态对比（#477）</title>
+<style>
+  :root{
+    /* Fluent（webview 变体） */
+    --brand:#0f6cbd; --brand-fill:#eff6fc; --brand-fill2:#c7e0f4;
+    --bg:#fafafa; --card:#fff; --stroke:#e0e0e0; --txt:#242424; --txt2:#616161;
+    /* M3（lynx 变体） */
+    --m3-primary:#6750a4; --m3-pc:#eaddff; --m3-onpc:#21005d;
+    --m3-surface:#fef7ff; --m3-schigh:#ece6f0; --m3-sc:#e8def8; --m3-outline:#79747e; --m3-onvar:#49454f;
+  }
+  *{box-sizing:border-box; margin:0; font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;}
+  [hidden]{display:none !important;}
+  body{background:#2b2b2b; color:#eee; padding:14px 0 90px;}
+  .proto-header{max-width:860px;margin:0 auto 12px;padding:0 8px;font-size:13px;color:#bbb;}
+  .proto-header b{color:#ffd479; font-weight:600;}
+  .proto-header .hint{display:block;color:#888;margin-top:2px;}
+  #stage{display:flex;justify-content:center;}
+  .phone{position:relative;width:400px;height:760px;border-radius:26px;overflow:hidden;
+    box-shadow:0 0 0 8px #111,0 18px 60px rgba(0,0,0,.6);background:#fff;}
+  .variant{position:absolute;inset:0;display:none;overflow:hidden;background:var(--bg);}
+  .variant.on{display:block;}
+
+  /* ── 通用 chips ── */
+  .chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+  .chip{border:1px solid var(--stroke);background:#fff;color:var(--txt);border-radius:999px;
+    padding:5px 12px;font-size:12.5px;cursor:pointer;user-select:none;line-height:1.4;}
+  .chip.on{background:var(--brand-fill2);border-color:var(--brand);color:var(--brand);font-weight:600;}
+  .chip.off{opacity:.35;pointer-events:none;}
+  .chips.m3 .chip{border-color:var(--m3-outline);background:transparent;color:var(--m3-onvar);border-radius:8px;padding:6px 12px;}
+  .chips.m3 .chip.on{background:var(--m3-pc);border-color:transparent;color:var(--m3-onpc);}
+  .dim{margin-bottom:14px;}
+  .dim>label{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--txt2);margin-bottom:6px;font-weight:600;}
+  .only-tag{font-style:normal;font-size:10px;color:var(--brand);border:1px solid var(--brand);
+    border-radius:4px;padding:0 4px;font-weight:400;white-space:nowrap;}
+  .note{font-size:10.5px;color:#b25e00;margin-top:5px;}
+  .dim.dimmed{opacity:.35;pointer-events:none;}
+  .dim.dimmed>label .only-tag{opacity:1;}
+
+  /* ── 结果占位 ── */
+  .ph{background:linear-gradient(135deg,#e8e8ec,#d6d6de);border-radius:8px;position:relative;}
+  .ph::after{content:attr(data-t);position:absolute;left:6px;bottom:4px;font-size:10px;color:#888;}
+  .results-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 12px;overflow:auto;}
+
+  /* ════ webview 顶部 ════ */
+  .wv-topbar{display:flex;gap:8px;align-items:center;padding:10px 12px;background:var(--card);border-bottom:1px solid var(--stroke);}
+  .wv-topbar .back{font-size:18px;color:var(--txt);cursor:pointer;padding:2px 6px;}
+  .wv-search{flex:1;border:1px solid var(--stroke);border-bottom:2px solid var(--brand);border-radius:6px;
+    padding:7px 10px;font-size:13px;color:var(--txt);background:#fff;}
+  .iconbtn{position:relative;width:36px;height:36px;border:1px solid var(--stroke);border-radius:6px;background:#fff;
+    cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;}
+  .iconbtn:hover{background:var(--brand-fill);}
+  .badge{position:absolute;top:-6px;right:-6px;min-width:16px;height:16px;border-radius:8px;background:var(--brand);
+    color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;padding:0 4px;}
+  .badge[hidden]{display:none;}
+  .chips-row{display:flex;gap:6px;padding:8px 12px 2px;flex-wrap:wrap;}
+  .chips-row .lbl{font-size:11px;color:var(--txt2);align-self:center;margin-right:2px;}
+
+  /* ════ wa：webview 底部 Sheet ════ */
+  .wv-page{position:absolute;inset:0;display:flex;flex-direction:column;}
+  .wv-page .results-grid{flex:1;}
+  .sheet-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.4);z-index:30;}
+  .wv-sheet{position:absolute;left:0;right:0;bottom:0;z-index:31;background:var(--card);
+    border-radius:12px 12px 0 0;box-shadow:0 -8px 28px rgba(0,0,0,.18);padding:6px 16px 18px;max-height:78%;overflow:auto;}
+  .wv-sheet .sheet-head{display:flex;align-items:center;gap:10px;margin:2px 0 12px;}
+  .wv-sheet .handle{width:32px;height:4px;border-radius:2px;background:var(--stroke);margin:2px auto 6px;}
+  .wv-sheet .sheet-head b{font-size:15px;color:var(--txt);flex:1;}
+  .wv-sheet .sheet-head{position:relative;}
+  .wv-sheet .handle{position:static;margin:0;}
+  .clearall{border:none;background:none;color:var(--brand);font-size:12.5px;cursor:pointer;font-weight:600;}
+  .daterange{display:flex;gap:6px;align-items:center;margin-top:6px;}
+  .daterange input{border:1px solid var(--stroke);border-radius:6px;padding:4px 6px;font-size:12px;color:var(--txt);}
+
+  /* ════ wb：webview 页内展开 ════ */
+  .wv-panel{margin:6px 12px;border:1px solid var(--stroke);border-radius:10px;background:var(--card);padding:10px 12px;}
+  .wv-panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+  .wv-panel-head b{font-size:13.5px;color:var(--txt);display:flex;gap:8px;align-items:center;}
+  .badge-inline{background:var(--brand);color:#fff;border-radius:8px;font-size:10px;padding:1px 6px;}
+
+  /* ════ lynx ════ */
+  .lyx-page{position:absolute;inset:0;background:var(--m3-surface);}
+  .lyx-page .fake{height:56px;display:flex;align-items:flex-end;padding:0 16px 8px;color:var(--m3-onvar);font-size:15px;font-weight:600;}
+  .lyx-page .rows{padding:8px 16px;display:grid;gap:8px;}
+  .lyx-page .ph{height:52px;}
+  .lyx-scrim{position:absolute;inset:0;background:rgba(0,0,0,.32);z-index:10;}
+  .lyx-sheet{position:absolute;left:0;right:0;bottom:0;height:80%;z-index:11;background:var(--m3-surface);
+    border-radius:24px 24px 0 0;padding:8px 14px 10px;display:flex;flex-direction:column;overflow:hidden;}
+  .lyx-handle{width:36px;height:4px;border-radius:2px;background:#cac4d0;margin:2px auto 10px;}
+  .lyx-input{background:var(--m3-schigh);border-radius:999px;padding:11px 16px;font-size:13.5px;color:var(--m3-onvar);margin-bottom:10px;}
+  .lyx-sheet .chips-row{padding:2px 0 8px;}
+  .lyx-filter-row{display:flex;align-items:center;gap:8px;width:100%;border:none;background:var(--m3-schigh);
+    border-radius:10px;padding:9px 12px;font-size:13px;color:var(--m3-onvar);cursor:pointer;margin-bottom:8px;}
+  .lyx-filter-row .badge{position:static;background:var(--m3-primary);border-radius:9px;padding:1px 6px;}
+  .lyx-filter-row .chev{margin-left:auto;transition:transform .2s;}
+  .lyx-filter-row.open .chev{transform:rotate(180deg);}
+  .lyx-filter-sec{border:1px dashed var(--m3-outline);border-radius:12px;padding:10px 12px;margin-bottom:8px;overflow:auto;}
+  .lyx-results{flex:1;overflow:auto;display:grid;gap:8px;align-content:start;}
+  .lyx-row{display:flex;gap:10px;align-items:center;}
+  .lyx-row .ph{width:52px;height:52px;flex:none;}
+  .lyx-row .meta{font-size:12.5px;color:var(--m3-onvar);}
+  .lyx-row .meta small{display:block;color:var(--m3-outline);font-size:11px;margin-top:2px;}
+  .lyx-sub{position:absolute;inset:0;z-index:20;background:var(--m3-surface);border-radius:24px 24px 0 0;
+    top:12%;display:flex;flex-direction:column;padding:14px 16px;box-shadow:0 -10px 30px rgba(0,0,0,.25);}
+  .lyx-sub .sub-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+  .lyx-sub .sub-head b{font-size:16px;color:var(--m3-onvar);flex:1;}
+  .lyx-sub .closex{border:none;background:var(--m3-schigh);color:var(--m3-onvar);width:32px;height:32px;border-radius:16px;cursor:pointer;font-size:14px;}
+  .lyx-sub .dims{flex:1;overflow:auto;}
+  .lyx-sub .footnote{font-size:11px;color:var(--m3-outline);padding:8px 2px 0;}
+
+  /* ── 即改即搜 flash ── */
+  .flash{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:60;background:#333;color:#fff;
+    border-radius:999px;padding:6px 14px;font-size:12px;opacity:0;transition:opacity .25s;pointer-events:none;}
+  .flash.show{opacity:.95;}
+
+  /* ── 悬浮切换条（原型脚手架，非被评对象） ── */
+  .switcher{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:99;display:flex;align-items:center;gap:10px;
+    background:#151515;border:1px solid #444;border-radius:999px;padding:8px 14px;box-shadow:0 8px 24px rgba(0,0,0,.5);}
+  .switcher button{background:#333;border:none;color:#fff;width:30px;height:30px;border-radius:15px;cursor:pointer;font-size:15px;}
+  .switcher button:hover{background:#555;}
+  .switcher .vlabel{font-size:13px;color:#fff;min-width:240px;text-align:center;}
+  .switcher .vlabel small{display:block;color:#9a9a9a;font-size:10.5px;}
+</style>
+</head>
+<body>
+<header class="proto-header">
+  <b>PROTOTYPE（用后即弃）</b>　双端搜索高级筛选 · UI 形态对比 — wayfinder #474 / 票 #477
+  <span class="hint">底部悬浮条或 ← → 键切换四个变体；URL ?variant= 可直接分享某个变体。chips 可点：即改即搜、徽标计数、scope=小说 时插画专属维度置灰（值保留）。</span>
+</header>
+
+<main id="stage">
+<div class="phone" id="phone">
+
+  <!-- ════ 变体 A（wa）：webview 底部 Sheet ════ -->
+  <section class="variant" data-variant="wa">
+    <div class="wv-page">
+      <div class="wv-topbar">
+        <span class="back">←</span>
+        <div class="wv-search">東方 Project</div>
+        <button class="iconbtn" data-open-sheet aria-label="筛选">
+          <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M1 2h14L10 8.5V14l-4-2V8.5L1 2z" fill="currentColor"/></svg>
+          <span class="badge" data-badge hidden>0</span>
+        </button>
+      </div>
+      <div class="chips-row"><span class="lbl">范围</span>
+        <div class="chips" data-dim-group="scope">
+          <span class="chip on" data-default>全部</span><span class="chip">插画</span><span class="chip">小说</span>
+        </div>
+      </div>
+      <div class="chips-row"><span class="lbl">排序</span>
+        <div class="chips" data-dim-group="sort">
+          <span class="chip on" data-default>最新</span><span class="chip">最早</span><span class="chip">热门</span>
+        </div>
+      </div>
+      <div class="results-grid" data-results>
+        <div class="ph" style="height:150px" data-t="插画 · 横图"></div>
+        <div class="ph" style="height:210px" data-t="插画 · 竖图"></div>
+        <div class="ph" style="height:120px" data-t="漫画 · 3P"></div>
+        <div class="ph" style="height:180px" data-t="插画 · 方图"></div>
+        <div class="ph" style="height:170px" data-t="插画 · 竖图"></div>
+        <div class="ph" style="height:130px" data-t="动图 · 2s"></div>
+      </div>
+    </div>
+    <div class="sheet-backdrop" data-sheet-backdrop hidden></div>
+    <div class="wv-sheet" data-sheet hidden>
+      <div class="handle"></div>
+      <div class="sheet-head"><b>筛选</b><button class="clearall" data-clear-all>清除全部</button></div>
+      <div class="dim"><label>期间</label>
+        <div class="chips" data-dim-group="duration">
+          <span class="chip on" data-default>不限</span><span class="chip">24h 内</span><span class="chip">一周内</span>
+          <span class="chip">一月内</span><span class="chip">半年内</span><span class="chip">一年内</span>
+        </div>
+        <div class="daterange"><input type="date"><span style="font-size:11px;color:var(--txt2)">→</span><input type="date"></div>
+      </div>
+      <div class="dim"><label>收藏数</label>
+        <div class="chips" data-dim-group="bookmark">
+          <span class="chip on" data-default>不限</span><span class="chip">100+</span><span class="chip">500+</span>
+          <span class="chip">1000+</span><span class="chip">5000+</span>
+        </div>
+        <p class="note">⚠ Premium 参数：免费账号服务端静默忽略（AppAPI 实证 #475）</p>
+      </div>
+      <div class="dim illust-only"><label>比例 <i class="only-tag">仅插画</i></label>
+        <div class="chips" data-dim-group="ratio">
+          <span class="chip on" data-default>全部</span><span class="chip">横图</span><span class="chip">竖图</span><span class="chip">方图</span>
+        </div>
+      </div>
+      <div class="dim illust-only"><label>分辨率 <i class="only-tag">仅插画</i></label>
+        <div class="chips" data-dim-group="res">
+          <span class="chip on" data-default>不限</span><span class="chip">≥1000px</span><span class="chip">≥2000px</span><span class="chip">≥3000px</span>
+        </div>
+      </div>
+      <div class="dim"><label>AI 作品</label>
+        <div class="chips" data-dim-group="ai">
+          <span class="chip on" data-default>全部</span><span class="chip">隐藏 AI</span><span class="chip off">仅看 AI</span>
+        </div>
+        <p class="note">「仅看 AI」= search_ai_type 2，超官方行为，暂不提供</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════ 变体 B（wb）：webview 页内展开面板 ════ -->
+  <section class="variant" data-variant="wb">
+    <div class="wv-page">
+      <div class="wv-topbar">
+        <span class="back">←</span>
+        <div class="wv-search">東方 Project</div>
+        <button class="iconbtn" data-toggle-panel aria-label="展开筛选">
+          <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M1 2h14L10 8.5V14l-4-2V8.5L1 2z" fill="currentColor"/></svg><span class="badge" data-badge hidden>0</span>
+        </button>
+      </div>
+      <div class="chips-row"><span class="lbl">范围</span>
+        <div class="chips" data-dim-group="scope">
+          <span class="chip on" data-default>全部</span><span class="chip">插画</span><span class="chip">小说</span>
+        </div>
+      </div>
+      <div class="chips-row"><span class="lbl">排序</span>
+        <div class="chips" data-dim-group="sort">
+          <span class="chip on" data-default>最新</span><span class="chip">最早</span><span class="chip">热门</span>
+        </div>
+      </div>
+      <div class="wv-panel" data-panel>
+        <div class="wv-panel-head"><b>筛选 <span class="badge-inline" data-badge hidden>0</span></b>
+          <button class="clearall" data-clear-all>清除全部</button></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 14px;">
+          <div class="dim"><label>期间</label>
+            <div class="chips" data-dim-group="duration">
+              <span class="chip on" data-default>不限</span><span class="chip">一周内</span><span class="chip">一月内</span><span class="chip">一年内</span>
+            </div>
+            <div class="daterange"><input type="date"><span style="font-size:11px;color:var(--txt2)">→</span><input type="date"></div>
+          </div>
+          <div class="dim"><label>收藏数</label>
+            <div class="chips" data-dim-group="bookmark">
+              <span class="chip on" data-default>不限</span><span class="chip">100+</span><span class="chip">500+</span><span class="chip">1000+</span>
+            </div>
+            <p class="note">⚠ 免费账号服务端忽略</p>
+          </div>
+          <div class="dim illust-only"><label>比例 <i class="only-tag">仅插画</i></label>
+            <div class="chips" data-dim-group="ratio">
+              <span class="chip on" data-default>全部</span><span class="chip">横图</span><span class="chip">竖图</span><span class="chip">方图</span>
+            </div>
+          </div>
+          <div class="dim illust-only"><label>分辨率 <i class="only-tag">仅插画</i></label>
+            <div class="chips" data-dim-group="res">
+              <span class="chip on" data-default>不限</span><span class="chip">≥1000px</span><span class="chip">≥2000px</span>
+            </div>
+          </div>
+          <div class="dim" style="grid-column:1/-1;"><label>AI 作品</label>
+            <div class="chips" data-dim-group="ai">
+              <span class="chip on" data-default>全部</span><span class="chip">隐藏 AI</span><span class="chip off">仅看 AI</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="results-grid" data-results style="flex:1;">
+        <div class="ph" style="height:130px" data-t="插画 · 横图"></div>
+        <div class="ph" style="height:150px" data-t="插画 · 竖图"></div>
+        <div class="ph" style="height:110px" data-t="漫画"></div>
+        <div class="ph" style="height:140px" data-t="插画 · 方图"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════ 变体 C（la）：lynx SearchSheet 内折叠筛选区 ════ -->
+  <section class="variant" data-variant="la">
+    <div class="lyx-page">
+      <div class="fake">推荐</div>
+      <div class="rows"><div class="ph"></div><div class="ph"></div><div class="ph"></div></div>
+    </div>
+    <div class="lyx-scrim"></div>
+    <div class="lyx-sheet">
+      <div class="lyx-handle"></div>
+      <div class="lyx-input">🔍 東方 Project</div>
+      <div class="chips-row"><span class="lbl" style="font-size:11px;color:var(--m3-outline);margin-right:2px;">范围</span>
+        <div class="chips m3" data-dim-group="scope">
+          <span class="chip on" data-default>全部</span><span class="chip">插画</span><span class="chip">小说</span>
+        </div>
+      </div>
+      <div class="chips-row" style="padding-bottom:6px;"><span class="lbl" style="font-size:11px;color:var(--m3-outline);margin-right:2px;">排序</span>
+        <div class="chips m3" data-dim-group="sort">
+          <span class="chip on" data-default>最新</span><span class="chip">最早</span><span class="chip">热门</span>
+        </div>
+      </div>
+      <button class="lyx-filter-row" data-toggle-filter>
+        筛选 <span class="badge" data-badge hidden>0</span> <span class="chev">▾</span>
+      </button>
+      <div class="lyx-filter-sec" data-filter-sec hidden>
+        <div class="dim"><label style="color:var(--m3-outline)">期间</label>
+          <div class="chips m3" data-dim-group="duration">
+            <span class="chip on" data-default>不限</span><span class="chip">一周内</span><span class="chip">一月内</span><span class="chip">半年内</span><span class="chip">一年内</span>
+          </div>
+        </div>
+        <div class="dim"><label style="color:var(--m3-outline)">收藏数</label>
+          <div class="chips m3" data-dim-group="bookmark">
+            <span class="chip on" data-default>不限</span><span class="chip">100+</span><span class="chip">500+</span><span class="chip">1000+</span>
+          </div>
+          <p class="note">⚠ 免费账号服务端忽略（Premium）</p>
+        </div>
+        <div class="dim illust-only"><label style="color:var(--m3-outline)">比例 <i class="only-tag">仅插画</i></label>
+          <div class="chips m3" data-dim-group="ratio">
+            <span class="chip on" data-default>全部</span><span class="chip">横图</span><span class="chip">竖图</span><span class="chip">方图</span>
+          </div>
+        </div>
+        <div class="dim illust-only"><label style="color:var(--m3-outline)">分辨率 <i class="only-tag">仅插画</i></label>
+          <div class="chips m3" data-dim-group="res">
+            <span class="chip on" data-default>不限</span><span class="chip">≥1000px</span><span class="chip">≥2000px</span>
+          </div>
+        </div>
+        <div class="dim" style="margin-bottom:0;"><label style="color:var(--m3-outline)">AI 作品</label>
+          <div class="chips m3" data-dim-group="ai">
+            <span class="chip on" data-default>全部</span><span class="chip">隐藏 AI</span><span class="chip off">仅看 AI</span>
+          </div>
+        </div>
+        <div style="text-align:right;margin-top:8px;"><button class="clearall" data-clear-all style="color:var(--m3-primary);">清除全部</button></div>
+      </div>
+      <div class="lyx-results" data-results>
+        <div class="lyx-row"><div class="ph" data-t=""></div><div class="meta">東方紅魔郷 若干<small>插画 · 2,341 收藏</small></div></div>
+        <div class="lyx-row"><div class="ph"></div><div class="meta">東方永夜抄 感想<small>小说 · 1.2 万字</small></div></div>
+        <div class="lyx-row"><div class="ph"></div><div class="meta">博丽神社例大祭 <small>插画 · 876 收藏</small></div></div>
+        <div class="lyx-row"><div class="ph"></div><div class="meta">秘封俱乐部日记 <small>小说 · 4,300 字</small></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════ 变体 D（lb）：lynx 二级弹层 ════ -->
+  <section class="variant" data-variant="lb">
+    <div class="lyx-page">
+      <div class="fake">推荐</div>
+      <div class="rows"><div class="ph"></div><div class="ph"></div></div>
+    </div>
+    <div class="lyx-scrim"></div>
+    <div class="lyx-sheet">
+      <div class="lyx-handle"></div>
+      <div class="lyx-input">🔍 東方 Project</div>
+      <div class="chips-row"><span class="lbl" style="font-size:11px;color:var(--m3-outline);margin-right:2px;">范围</span>
+        <div class="chips m3" data-dim-group="scope">
+          <span class="chip on" data-default>全部</span><span class="chip">插画</span><span class="chip">小说</span>
+        </div>
+      </div>
+      <div class="chips-row" style="padding-bottom:6px;"><span class="lbl" style="font-size:11px;color:var(--m3-outline);margin-right:2px;">排序</span>
+        <div class="chips m3" data-dim-group="sort">
+          <span class="chip on" data-default>最新</span><span class="chip">最早</span><span class="chip">热门</span>
+        </div>
+      </div>
+      <button class="lyx-filter-row" data-open-sub>
+        <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M1 2h14L10 8.5V14l-4-2V8.5L1 2z" fill="currentColor"/></svg> 筛选 <span class="badge" data-badge hidden>0</span> <span class="chev">›</span>
+      </button>
+      <div class="lyx-results" data-results>
+        <div class="lyx-row"><div class="ph"></div><div class="meta">東方紅魔郷 若干<small>插画 · 2,341 收藏</small></div></div>
+        <div class="lyx-row"><div class="ph"></div><div class="meta">東方永夜抄 感想<small>小说 · 1.2 万字</small></div></div>
+        <div class="lyx-row"><div class="ph"></div><div class="meta">博丽神社例大祭 <small>插画 · 876 收藏</small></div></div>
+        <div class="lyx-row"><div class="ph"></div><div class="meta">秘封俱乐部日记 <small>小说 · 4,300 字</small></div></div>
+      </div>
+      <div class="lyx-sub" data-sub hidden>
+        <div class="sub-head"><b>筛选 <span class="badge" data-badge hidden style="position:static;background:var(--m3-primary);border-radius:9px;padding:1px 6px;">0</span></b>
+          <button class="clearall" data-clear-all style="color:var(--m3-primary);">清除全部</button>
+          <button class="closex" data-close-sub>✕</button>
+        </div>
+        <div class="dims">
+          <div class="dim"><label style="color:var(--m3-outline)">期间</label>
+            <div class="chips m3" data-dim-group="duration">
+              <span class="chip on" data-default>不限</span><span class="chip">一周内</span><span class="chip">一月内</span><span class="chip">半年内</span><span class="chip">一年内</span>
+            </div>
+            <div class="daterange"><input type="date"><span style="font-size:11px;color:var(--m3-outline)">→</span><input type="date"></div>
+          </div>
+          <div class="dim"><label style="color:var(--m3-outline)">收藏数</label>
+            <div class="chips m3" data-dim-group="bookmark">
+              <span class="chip on" data-default>不限</span><span class="chip">100+</span><span class="chip">500+</span><span class="chip">1000+</span><span class="chip">5000+</span>
+            </div>
+            <p class="note">⚠ 免费账号服务端忽略（Premium）</p>
+          </div>
+          <div class="dim illust-only"><label style="color:var(--m3-outline)">比例 <i class="only-tag">仅插画</i></label>
+            <div class="chips m3" data-dim-group="ratio">
+              <span class="chip on" data-default>全部</span><span class="chip">横图</span><span class="chip">竖图</span><span class="chip">方图</span>
+            </div>
+          </div>
+          <div class="dim illust-only"><label style="color:var(--m3-outline)">分辨率 <i class="only-tag">仅插画</i></label>
+            <div class="chips m3" data-dim-group="res">
+              <span class="chip on" data-default>不限</span><span class="chip">≥1000px</span><span class="chip">≥2000px</span><span class="chip">≥3000px</span>
+            </div>
+          </div>
+          <div class="dim"><label style="color:var(--m3-outline)">AI 作品</label>
+            <div class="chips m3" data-dim-group="ai">
+              <span class="chip on" data-default>全部</span><span class="chip">隐藏 AI</span><span class="chip off">仅看 AI</span>
+            </div>
+            <p class="note" style="color:var(--m3-outline)">「仅看 AI」超官方行为，暂不提供</p>
+          </div>
+        </div>
+        <div class="footnote">关闭即生效（即改即搜已在改动时触发）；返回键优先关闭本层（modalStack 先例）</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="flash" id="flash">⟳ 已按新筛选重新搜索</div>
+</div>
+</main>
+
+<div class="switcher">
+  <button id="prev">←</button>
+  <span class="vlabel"><span id="vlabel"></span><small id="vdesc"></small></span>
+  <button id="next">→</button>
+</div>
+
+<script>
+// ── 变体切换（?variant= + 悬浮条 + 键盘） ──
+var ORDER = ['wa','wb','la','lb'];
+var META = {
+  wa:['A · webview 底部 Sheet','ReaderSettingsSheet 范式 · 结果区不被挤压 · 差距报告建议'],
+  wb:['B · webview 页内展开','筛选常驻可见 · 零层级跳转 · 挤占结果区'],
+  la:['lynx-A · 弹层内折叠区','单表面 · 默认折叠不占空间 · 展开时结果被推下'],
+  lb:['lynx-B · 二级弹层','空间充裕 · 栈深一层 · 需过原生定位/pointer-events 怪癖'],
+};
+function current(){ var v=new URLSearchParams(location.search).get('variant'); return ORDER.indexOf(v)>=0?v:ORDER[0]; }
+function apply(v){
+  document.querySelectorAll('.variant').forEach(function(s){ s.classList.toggle('on', s.dataset.variant===v); });
+  document.getElementById('vlabel').textContent = META[v][0];
+  document.getElementById('vdesc').textContent = META[v][1];
+  var u=new URL(location); u.searchParams.set('variant',v); history.replaceState(null,'',u);
+}
+document.getElementById('prev').onclick=function(){ apply(ORDER[(ORDER.indexOf(current())+ORDER.length-1)%ORDER.length]); };
+document.getElementById('next').onclick=function(){ apply(ORDER[(ORDER.indexOf(current())+1)%ORDER.length]); };
+document.addEventListener('keydown',function(e){
+  if(/INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  if(e.key==='ArrowLeft') document.getElementById('prev').click();
+  if(e.key==='ArrowRight') document.getElementById('next').click();
+});
+apply(current());
+
+// ── 即改即搜 flash ──
+var flashTimer;
+function refetched(){
+  var f=document.getElementById('flash');
+  f.classList.add('show'); clearTimeout(flashTimer);
+  flashTimer=setTimeout(function(){ f.classList.remove('show'); },900);
+}
+
+// ── chips 单选组：点非默认=选中；再点已选中=回默认（逐维可清）；点默认=清该维 ──
+function groupOf(chip){ return chip.closest('[data-dim-group]'); }
+function activeChip(group){ return group.querySelector('.chip.on'); }
+function defaultChip(group){ return group.querySelector('.chip[data-default]'); }
+function dimensionNames(){ return ['duration','bookmark','ratio','res','ai']; }
+function activeCount(scopeEl){
+  var n=0;
+  dimensionNames().forEach(function(d){
+    scopeEl.querySelectorAll('[data-dim-group="'+d+'"]').forEach(function(g){
+      var a=activeChip(g); if(a && !a.hasAttribute('data-default')) n++;
+    });
+  });
+  return n;
+}
+function refreshBadges(scopeEl){
+  var n=activeCount(scopeEl);
+  scopeEl.querySelectorAll('[data-badge]').forEach(function(b){
+    b.hidden = n===0; b.textContent=n;
+  });
+  scopeEl.querySelectorAll('[data-clear-all]').forEach(function(b){ b.style.opacity = n? '1':'.4'; });
+}
+function applyScopeGate(scopeEl){
+  var sg=scopeEl.querySelector('[data-dim-group="scope"]');
+  var scope=activeChip(sg)?activeChip(sg).textContent:'全部';
+  scopeEl.querySelectorAll('.illust-only').forEach(function(d){
+    d.classList.toggle('dimmed', scope==='小说');
+  });
+}
+document.addEventListener('click',function(e){
+  var chip=e.target.closest('.chip'); if(!chip||chip.classList.contains('off')) return;
+  var group=groupOf(chip); if(!group) return;
+  var scopeEl=chip.closest('.variant');
+  var wasActive=chip.classList.contains('on');
+  if(wasActive){ var def=defaultChip(group); activeChip(group).classList.remove('on'); if(def&&def!==chip) def.classList.add('on'); }
+  else{ var cur=activeChip(group); if(cur) cur.classList.remove('on'); chip.classList.add('on'); }
+  var isScope = group.dataset.dimGroup==='scope';
+  var isDim = dimensionNames().indexOf(group.dataset.dimGroup)>=0;
+  if(isScope){ applyScopeGate(scopeEl); }
+  if(isDim||isScope){
+    refetched();
+    refreshBadges(scopeEl);
+  }
+});
+
+// ── 变体内专属交互 ──
+document.querySelectorAll('.variant').forEach(function(sec){
+  // wa：底部 Sheet
+  var sheet=sec.querySelector('[data-sheet]');
+  if(sheet){
+    sec.querySelector('[data-open-sheet]').addEventListener('click',function(){ sheet.hidden=false; sec.querySelector('[data-sheet-backdrop]').hidden=false; });
+    sec.querySelector('[data-sheet-backdrop]').addEventListener('click',function(){ sheet.hidden=true; sec.querySelector('[data-sheet-backdrop]').hidden=true; });
+  }
+  // wb：页内面板折叠
+  var panel=sec.querySelector('[data-panel]');
+  if(panel){
+    sec.querySelector('[data-toggle-panel]').addEventListener('click',function(){ panel.hidden=!panel.hidden; });
+  }
+  // la：折叠筛选区
+  var fsec=sec.querySelector('[data-filter-sec]');
+  if(fsec){
+    var row=sec.querySelector('[data-toggle-filter]');
+    row.addEventListener('click',function(){ fsec.hidden=!fsec.hidden; row.classList.toggle('open'); });
+  }
+  // lb：二级弹层
+  var sub=sec.querySelector('[data-sub]');
+  if(sub){
+    sec.querySelector('[data-open-sub]').addEventListener('click',function(){ sub.hidden=false; });
+    sec.querySelector('[data-close-sub]').addEventListener('click',function(){ sub.hidden=true; });
+  }
+  // 清除全部
+  sec.querySelectorAll('[data-clear-all]').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      sec.querySelectorAll('[data-dim-group]').forEach(function(g){
+        var def=defaultChip(g); if(!def) return;
+        g.querySelectorAll('.chip').forEach(function(c){ c.classList.remove('on'); });
+        def.classList.add('on');
+      });
+      sec.querySelectorAll('.daterange input').forEach(function(i){ i.value=''; });
+      applyScopeGate(sec); refreshBadges(sec); refetched();
+    });
+  });
+  // 日期改动也算筛选动作
+  sec.querySelectorAll('.daterange input').forEach(function(i){
+    i.addEventListener('change',refetched);
+  });
+  refreshBadges(sec); applyScopeGate(sec);
+});
+</script>
+</body>
+</html>
