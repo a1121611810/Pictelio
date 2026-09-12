@@ -128,14 +128,27 @@ export function isOAuthTokenErrorResponse(status: number, responseBody: unknown)
   );
 }
 
-/** 统一将任意错误值转换为 ApiError，已有 type 的保留原 type，否则创建 UNKNOWN */
-export function toApiError(e: unknown, fallbackMsg = "加载失败"): ApiError {
+/**
+ * 统一将任意错误值转换为 ApiError，已有 type 的保留原 type，否则创建 UNKNOWN。
+ * fallbackMsg 未显式传入（走默认「加载失败」）时附带 messageKey 供展示层走 i18n；
+ * 调用方传自定义 fallback 时不带 key（避免覆盖调用方语义）。
+ */
+export function toApiError(e: unknown, fallbackMsg?: string): ApiError {
   if (e && typeof e === "object" && "type" in e) {
     return e as ApiError;
   }
+  const raw = (e as { message?: string } | null | undefined)?.message;
+  if (raw !== undefined) {
+    // 与旧实现 ?? 语义一致：空串透传，不落 fallback
+    return { type: ApiErrorType.UNKNOWN, message: raw };
+  }
+  if (fallbackMsg !== undefined) {
+    return { type: ApiErrorType.UNKNOWN, message: fallbackMsg };
+  }
   return {
     type: ApiErrorType.UNKNOWN,
-    message: (e as { message?: string }).message ?? fallbackMsg,
+    message: "加载失败",
+    messageKey: "error.fallback.loadFailed",
   };
 }
 
@@ -150,32 +163,39 @@ export function classifyError(status: number, error: unknown, responseBody?: unk
     return {
       type: ApiErrorType.PROXY,
       message: "本地代理连接失败（127.0.0.1:10808），请检查代理软件是否运行",
+      messageKey: "error.api.proxy",
     };
   }
 
   if (!status && error instanceof TypeError) {
-    return { type: ApiErrorType.NETWORK, message: "网络不可用，请检查连接" };
+    return { type: ApiErrorType.NETWORK, message: "网络不可用，请检查连接", messageKey: "error.api.network" };
   }
   // 尝试提取 Pixiv 错误消息
   const pixivMsg = responseBody ? extractPixivErrorMessage(responseBody) : null;
   const suffix = pixivMsg ? ` (${pixivMsg})` : "";
   switch (status) {
     case 401:
+      // 401 的服务端详情走冒号形态（历史行为），其余状态码走括号 suffix
       return {
         type: ApiErrorType.UNAUTHORIZED,
         message: `登录已过期 (HTTP 401)${suffix ? `: ${pixivMsg}` : ""}`,
+        messageKey: "error.api.unauthorized",
+        params: { status: 401, detail: suffix ? `: ${pixivMsg}` : "" },
         status: 401,
       };
     case 403:
       return {
         type: ApiErrorType.FORBIDDEN,
         message: `没有权限访问 (HTTP 403)${suffix}`,
+        messageKey: "error.api.forbidden",
+        params: { status: 403, detail: suffix },
         status: 403,
       };
     case 429:
       return {
         type: ApiErrorType.RATE_LIMIT,
         message: "请求过于频繁，请稍后重试 (HTTP 429)",
+        messageKey: "error.api.rateLimit",
         status: 429,
       };
     default:
@@ -184,6 +204,7 @@ export function classifyError(status: number, error: unknown, responseBody?: unk
         return {
           type: ApiErrorType.UNAUTHORIZED,
           message: "登录凭证已失效，请重新登录",
+          messageKey: "error.api.invalidGrant",
           status: 400,
         };
       }
@@ -191,6 +212,8 @@ export function classifyError(status: number, error: unknown, responseBody?: unk
         return {
           type: ApiErrorType.SERVER,
           message: `服务器错误 (HTTP ${status})${suffix}`,
+          messageKey: "error.api.server",
+          params: { status, detail: suffix },
           status,
         };
       }
@@ -198,10 +221,18 @@ export function classifyError(status: number, error: unknown, responseBody?: unk
         return {
           type: ApiErrorType.UNKNOWN,
           message: `请求失败 (HTTP ${status})${suffix}`,
+          messageKey: "error.api.unknownStatus",
+          params: { status, detail: suffix },
           status,
         };
       }
-      return { type: ApiErrorType.UNKNOWN, message: `未知错误${suffix}`, status };
+      return {
+        type: ApiErrorType.UNKNOWN,
+        message: `未知错误${suffix}`,
+        messageKey: "error.api.unknown",
+        params: { detail: suffix },
+        status,
+      };
   }
 }
 

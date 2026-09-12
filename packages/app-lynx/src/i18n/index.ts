@@ -46,3 +46,12 @@ export function t(key: I18nKey, vars?: Record<string, string | number>): string 
   }
   return applyVars(tpl, vars)
 }
+
+/** ApiError 展示文案：messageKey 优先（i18n 渲染），message 快照回退（B1）。 */
+export function apiErrorMessage(e: {
+  messageKey?: string
+  message: string
+  params?: Record<string, string | number>
+}): string {
+  return e.messageKey ? t(e.messageKey as I18nKey, e.params) : e.message
+}

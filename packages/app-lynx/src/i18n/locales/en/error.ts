@@ -10,6 +10,15 @@ const enError = {
   "error.fallback.loadFailed": "Failed to load",
   "error.fallback.sessionExpired": "Session expired",
   "error.hintSeparator": ". ",
+  "error.api.proxy": "Local proxy connection failed. Check that the proxy app is running.",
+  "error.api.network": "Network unavailable. Check your connection.",
+  "error.api.unauthorized": "Session expired (HTTP {{status}}){{detail}}",
+  "error.api.forbidden": "Access denied (HTTP {{status}}){{detail}}",
+  "error.api.rateLimit": "Too many requests. Try again later (HTTP 429)",
+  "error.api.invalidGrant": "Your login credentials have expired. Sign in again",
+  "error.api.server": "Server error (HTTP {{status}}){{detail}}",
+  "error.api.unknownStatus": "Request failed (HTTP {{status}}){{detail}}",
+  "error.api.unknown": "Unknown error{{detail}}",
 } as const satisfies Record<ErrorKey, string>;
 
 export default enError;

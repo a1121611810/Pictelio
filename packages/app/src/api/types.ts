@@ -250,6 +250,10 @@ export enum ApiErrorType {
 
 export interface ApiError {
   type: ApiErrorType;
+  /** 非响应式上下文的快照文案（简中）：日志、兜底展示用；展示层优先 messageKey */
   message: string;
   status?: number;
+  /** i18n：展示层优先用 messageKey + params 渲染（B1）；string 避免 api 层反向依赖 i18n 类型 */
+  messageKey?: string;
+  params?: Record<string, string | number>;
 }

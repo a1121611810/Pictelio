@@ -116,31 +116,75 @@ export function classifyError(status: number, error: unknown, responseBody?: unk
     typeof responseBody === "object" &&
     (responseBody as Record<string, unknown>).error === "proxy_error"
   ) {
-    return { type: ApiErrorType.PROXY, message: "本地代理连接失败，请检查代理软件是否运行" }
+    return {
+      type: ApiErrorType.PROXY,
+      message: "本地代理连接失败，请检查代理软件是否运行",
+      messageKey: "error.api.proxy",
+    }
   }
   if (!status && error instanceof TypeError) {
-    return { type: ApiErrorType.NETWORK, message: "网络不可用，请检查连接" }
+    return { type: ApiErrorType.NETWORK, message: "网络不可用，请检查连接", messageKey: "error.api.network" }
   }
   const pixivMsg = responseBody ? extractPixivErrorMessage(responseBody) : null
   const suffix = pixivMsg ? ` (${pixivMsg})` : ""
   switch (status) {
     case 401:
-      return { type: ApiErrorType.UNAUTHORIZED, message: `登录已过期 (HTTP 401)${suffix}`, status: 401 }
+      return {
+        type: ApiErrorType.UNAUTHORIZED,
+        message: `登录已过期 (HTTP 401)${suffix}`,
+        messageKey: "error.api.unauthorized",
+        params: { status: 401, detail: suffix },
+        status: 401,
+      }
     case 403:
-      return { type: ApiErrorType.FORBIDDEN, message: `没有权限访问 (HTTP 403)${suffix}`, status: 403 }
+      return {
+        type: ApiErrorType.FORBIDDEN,
+        message: `没有权限访问 (HTTP 403)${suffix}`,
+        messageKey: "error.api.forbidden",
+        params: { status: 403, detail: suffix },
+        status: 403,
+      }
     case 429:
-      return { type: ApiErrorType.RATE_LIMIT, message: "请求过于频繁，请稍后重试 (HTTP 429)", status: 429 }
+      return {
+        type: ApiErrorType.RATE_LIMIT,
+        message: "请求过于频繁，请稍后重试 (HTTP 429)",
+        messageKey: "error.api.rateLimit",
+        status: 429,
+      }
     default:
       if (status === 400 && isOAuthTokenErrorResponse(status, responseBody)) {
-        return { type: ApiErrorType.UNAUTHORIZED, message: "登录凭证已失效，请重新登录", status: 400 }
+        return {
+          type: ApiErrorType.UNAUTHORIZED,
+          message: "登录凭证已失效，请重新登录",
+          messageKey: "error.api.invalidGrant",
+          status: 400,
+        }
       }
       if (status >= 500) {
-        return { type: ApiErrorType.SERVER, message: `服务器错误 (HTTP ${status})${suffix}`, status }
+        return {
+          type: ApiErrorType.SERVER,
+          message: `服务器错误 (HTTP ${status})${suffix}`,
+          messageKey: "error.api.server",
+          params: { status, detail: suffix },
+          status,
+        }
       }
       if (status > 0) {
-        return { type: ApiErrorType.UNKNOWN, message: `请求失败 (HTTP ${status})${suffix}`, status }
+        return {
+          type: ApiErrorType.UNKNOWN,
+          message: `请求失败 (HTTP ${status})${suffix}`,
+          messageKey: "error.api.unknownStatus",
+          params: { status, detail: suffix },
+          status,
+        }
       }
-      return { type: ApiErrorType.UNKNOWN, message: `未知错误${suffix}`, status }
+      return {
+        type: ApiErrorType.UNKNOWN,
+        message: `未知错误${suffix}`,
+        messageKey: "error.api.unknown",
+        params: { detail: suffix },
+        status,
+      }
   }
 }
 

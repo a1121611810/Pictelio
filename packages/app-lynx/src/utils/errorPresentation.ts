@@ -5,7 +5,7 @@
 import { ref } from "vue"
 import { toApiError } from "./errors"
 import { ApiErrorType, type ApiError } from "../api/types"
-import { t, type I18nKey } from "../i18n"
+import { t, apiErrorMessage, type I18nKey } from "../i18n"
 
 // 分档操作提示（hint）：主文案（classifyError 产出，含 HTTP 状态码）后拼接。
 // 无 hint 的类型（RATE_LIMIT / FORBIDDEN / UNKNOWN）只显示主文案——
@@ -26,8 +26,9 @@ const HINT_KEYS: Partial<Record<ApiErrorType, I18nKey>> = {
  */
 export function presentError(err: unknown, fallbackMsg = t("error.fallback.loadFailed")): string {
   const apiErr = toApiError(err, fallbackMsg)
-  // toApiError 对已带 type 的对象直接透传，不校验 message 空 → 此处兜底保证恒非空串
-  const msg = apiErr.message || fallbackMsg
+  // toApiError 对已带 type 的对象直接透传，不校验 message 空 → 此处兜底保证恒非空串；
+  // messageKey 优先（classifyError 产出可走 i18n），message 快照兜底
+  const msg = apiErrorMessage(apiErr) || fallbackMsg
   const key = HINT_KEYS[apiErr.type]
   const hint = key ? t(key) : undefined
   // 分隔符随语言走（简中「。」/ 英文「. 」），hint 插槽语义不变

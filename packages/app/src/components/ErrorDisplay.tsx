@@ -2,7 +2,7 @@ import type { JSX } from "@solidjs/web";
 import { type Component } from "solid-js";
 import { ApiErrorType, type ApiError } from "../api/types";
 import { isLoggedIn } from "../stores/authStore";
-import { t, type I18nKey } from "../i18n";
+import { t, apiErrorMessage, type I18nKey } from "../i18n";
 
 interface ErrorDisplayProps {
   error: ApiError;
@@ -124,7 +124,7 @@ const ErrorDisplay: Component<ErrorDisplayProps> = (props) => {
           <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
         </svg>
       </div>
-      <p style={S.message}>{props.error.message}</p>
+      <p style={S.message}>{apiErrorMessage(props.error)}</p>
       {showHint() && <p style={S.hint}>{showHint()}</p>}
       {(props.onRetry || isNav()) && (
         <button

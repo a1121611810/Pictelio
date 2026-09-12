@@ -59,7 +59,22 @@ const dict = createMemo<Dict | undefined>(() =>
 
 const rawT = translator(dict, resolveTemplate);
 
-/** 翻译函数：字典未就绪时回退源语言，源语言也没有则回退 key（键完备性由 satisfies Dict 编译期保证）。 */
+/** 翻译函数：字典未就绪时回退源语言，源语言也没有则回退 key（键完备性由 satisfies Dict 编译期保证）。
+ * 回退链同样走插值——字典未就绪窗口不得吐原始模板（B1 实测教训）。 */
 export function t(key: I18nKey, args?: Record<string, string | number>): string {
-  return rawT(key, args) ?? zhCN[key] ?? key;
+  const rendered = rawT(key, args);
+  if (rendered !== undefined) {
+    return rendered;
+  }
+  const fallback = zhCN[key] ?? key;
+  return args ? resolveTemplate(fallback, args) : fallback;
+}
+
+/** ApiError 展示文案：messageKey 优先（i18n 渲染），message 快照回退（B1）。 */
+export function apiErrorMessage(e: {
+  messageKey?: string;
+  message: string;
+  params?: Record<string, string | number>;
+}): string {
+  return e.messageKey ? t(e.messageKey as I18nKey, e.params) : e.message;
 }
