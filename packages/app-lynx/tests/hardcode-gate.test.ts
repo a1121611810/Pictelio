@@ -72,7 +72,7 @@ describe("i18n 回潮门禁（副端）：src 内禁硬编码中文文案", () =
     const offenders: string[] = [];
     for (const file of walk(SRC)) {
       const rel = path.relative(SRC, file).split(path.sep).join("/");
-      if (rel.startsWith("i18n/locales/") || /\.test\.(ts|tsx)$/.test(rel) || /\.d\.ts$/.test(rel)) {
+      if (rel.startsWith("i18n/locales/") || /\.test\.(ts|tsx)$/.test(rel) || rel.endsWith(".d.ts")) {
         continue;
       }
       if (WHITELIST.includes(rel)) continue;

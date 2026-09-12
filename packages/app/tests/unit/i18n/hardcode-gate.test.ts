@@ -58,7 +58,7 @@ describe("i18n 回潮门禁：src 内禁硬编码中文字符串字面量", () =
     for (const file of walk(SRC)) {
       const rel = path.relative(SRC, file).split(path.sep).join("/");
       // 字典/类型域文件本身就是中文源；测试文件自带的期望文案合法
-      if (rel.startsWith("i18n/locales/") || /\.test\.(ts|tsx)$/.test(rel) || /\.d\.ts$/.test(rel)) {
+      if (rel.startsWith("i18n/locales/") || /\.test\.(ts|tsx)$/.test(rel) || rel.endsWith(".d.ts")) {
         continue;
       }
       if (WHITELIST.includes(rel)) continue;
