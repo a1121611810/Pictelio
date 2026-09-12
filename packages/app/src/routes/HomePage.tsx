@@ -18,9 +18,19 @@ import { FeedList } from "@/components/home/FeedList";
 import { markContentReady } from "@/native/splashBridge";
 import SideNavShell, { type HomeTab } from "@/components/home/SideNavShell";
 import IllustSingleCard from "@/components/home/IllustSingleCard";
+import RelatedStripRow from "@/components/home/RelatedStripRow";
 import NovelRowCard from "@/components/home/NovelRowCard";
 import SkeletonShimmer from "@/components/SkeletonShimmer";
 import { contentType } from "@/stores/uiStore";
+import {
+  consumeRelatedAnchor,
+  recordRelatedAnchor,
+  relatedRows,
+  removeRelatedRow,
+  clearRelatedRows,
+  type RelatedRow,
+} from "@/stores/relatedInjectionStore";
+import { relatedInjection } from "@/stores/settingsStore";
 import { scheduleIdleFeedPrefetch } from "@/utils/idleFeedPrefetch";
 // ── 插画数据源（推荐/关注/收藏）──
 import {
@@ -282,22 +292,55 @@ const EmptyHint: Component = () => (
   </div>
 );
 
-/** 插画单列大图 Feed 面板（数据源激活 + FeedList 统一交互：下拉刷新 A1 遮罩 + 滚动分页，ADR-0078）。 */
+/** 注入行联合渲染条目：主列表插画 or 锚点下方的相关作品行（spec docs/specs/related-injection.md） */
+type IllustRenderItem = PixivIllust | { relatedRow: RelatedRow };
+
+/** 插画单列大图 Feed 面板（数据源激活 + FeedList 统一交互：下拉刷新 A1 遮罩 + 滚动分页，ADR-0078）。
+ *  相关作品注入（spec #486）：点击卡片记锚点 → 重挂载消费 → 在锚点卡片下方交织注入行。 */
 const IllustFeedPanel: Component<{ tab: FeedTab }> = (props) => {
   const navigate = useNavigate();
   const src = () => illustSource(props.tab);
   useFeedActivation(src);
 
+  // 返回消费锚点：路由返回时面板重挂载（store 模块层存活）。
+  // tab 不匹配时 consume 内部保留 pending，交给正确的 tab 面板。
+  onSettled(() => {
+    void consumeRelatedAnchor(
+      props.tab,
+      src()
+        .items()
+        .map((i) => i.id),
+    );
+  });
+
+  /** 主列表 + 注入行交织（开关关闭即隐藏全部行；数据保留，重开即恢复） */
+  const renderItems = (): IllustRenderItem[] => {
+    const rows = relatedInjection() ? relatedRows(props.tab) : [];
+    const items = src().items();
+    if (rows.length === 0) return items;
+    const out: IllustRenderItem[] = [];
+    for (const il of items) {
+      out.push(il);
+      const row = rows.find((r) => r.anchorId === il.id);
+      if (row) out.push({ relatedRow: row });
+    }
+    return out;
+  };
+
   return (
     <FeedList
       source={{
-        items: () => src().items(),
+        items: renderItems,
         loading: () => src().loading(),
         refreshing: () => src().refreshing(),
         loadingMore: () => src().loadingMore(),
         nextUrl: () => src().nextUrl(),
         fetchMore: () => src().fetchMore(),
-        refresh: () => src().refresh(),
+        // 下拉刷新 = 新会话：清空该 tab 注入行
+        refresh: () => {
+          clearRelatedRows(props.tab);
+          return src().refresh();
+        },
         error: () => src().error(),
         paginationError: () => src().paginationError(),
       }}
@@ -305,11 +348,28 @@ const IllustFeedPanel: Component<{ tab: FeedTab }> = (props) => {
       refreshMode="overlay"
       skeleton={() => <IllustRowSkeleton />}
       empty={() => <EmptyHint />}
-      // 预取 URL 与 IllustSingleCard 的 cover() 取值保持一致（large 优先），确保预热 key = 展示 src
-      prefetchUrl={(il) => il.image_urls.large ?? il.image_urls.medium}
-      renderItem={(il) => (
-        <IllustSingleCard illust={il} onClick={() => void navigate(`/illust/${il.id}`)} />
-      )}
+      // 预取 URL 与 IllustSingleCard 的 cover() 取值保持一致（large 优先），确保预热 key = 展示 src；
+      // 注入行条目不参与主列表预取
+      prefetchUrl={(item) =>
+        "relatedRow" in item ? undefined : (item.image_urls.large ?? item.image_urls.medium)
+      }
+      renderItem={(item) =>
+        "relatedRow" in item ? (
+          <RelatedStripRow
+            row={item.relatedRow}
+            onNavigate={(id) => void navigate(`/illust/${id}`)}
+            onDismiss={() => removeRelatedRow(props.tab, item.relatedRow.anchorId)}
+          />
+        ) : (
+          <IllustSingleCard
+            illust={item}
+            onClick={() => {
+              recordRelatedAnchor(props.tab, item.id);
+              void navigate(`/illust/${item.id}`);
+            }}
+          />
+        )
+      }
     />
   );
 };
