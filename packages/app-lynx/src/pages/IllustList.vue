@@ -9,7 +9,7 @@ import type { PixivIllust, PixivIllustListResponse } from '../api/types'
 import { thumbUrl } from '../utils/imageUrl'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { useSettingsStore } from '../stores/settingsStore'
-import { useRelatedInjectionStore, type RelatedRow } from '../stores/relatedInjection'
+import { useRelatedInjectionStore, RELATED_GRID_SIZE, type RelatedRow } from '../stores/relatedInjection'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
@@ -299,8 +299,9 @@ onUnmounted(() => {
             <view v-for="n in 8" :key="n" class="w-[22vw] h-[22vw] rounded-[var(--md-shape-medium)] bg-surface-variant" />
           </view>
           <view v-else class="flex flex-row flex-wrap gap-2 mt-2">
+            <!-- 固定两行网格降级（spec §5.2）：8 = 2 行 × 4 列，超出截断（RELATED_GRID_SIZE） -->
             <view
-              v-for="rel in entry.row.items.slice(0, 8)"
+              v-for="rel in entry.row.items.slice(0, RELATED_GRID_SIZE)"
               :key="rel.id"
               accessibility-element
               :accessibility-label="`查看相关作品 ${rel.title}`"

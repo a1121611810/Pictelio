@@ -758,3 +758,61 @@ describe('settingsStore 备份原语（T7 m3：exportRawValues / importRawValues
     expect(map.has('show_r18_99')).toBe(false) // 异账号键未落盘
   })
 })
+
+// related_injection 设备级开关（spec docs/specs/related-injection.md；review P2 补测：加载/非法值/写入路径）
+describe("settingsStore.relatedInjection（spec #486）", () => {
+  /** prefs seam（与上方 WebDAV describe 同款 mock） */
+  function prefsModule(map: Map<string, string>) {
+    env.native = true
+    env.modules = {
+      PictelioPrefs: {
+        prefsGet: (k: string, cb: (v: string, e: string | null) => void) =>
+          cb(map.has(k) ? JSON.stringify(map.get(k)!) : '', null),
+        prefsSet: (k: string, v: string, cb: (e: string | null) => void) => {
+          map.set(k, v)
+          cb(null)
+        },
+        prefsRemove: (k: string, cb: (e: string | null) => void) => {
+          map.delete(k)
+          cb(null)
+        },
+      },
+    }
+  }
+
+  beforeEach(() => {
+    vi.mocked(idbGet).mockReset().mockResolvedValue(null)
+    vi.mocked(idbSet).mockReset().mockResolvedValue(undefined)
+    setActivePinia(createPinia())
+    store = useSettingsStore()
+  })
+
+  it("默认开启", () => {
+    expect(store.relatedInjection).toBe(true)
+  })
+
+  it("setRelatedInjection 持久化到 prefs（键 related_injection，native 路径）", async () => {
+    const map = new Map<string, string>()
+    prefsModule(map)
+    store.setRelatedInjection(false)
+    await vi.waitFor(() => expect(map.get("related_injection")).toBe("false"))
+    expect(store.relatedInjection).toBe(false)
+  })
+
+  it("loadSettings 从 prefs 恢复持久化开关", async () => {
+    const map = new Map<string, string>([["related_injection", "false"]])
+    prefsModule(map)
+    await store.loadSettings()
+    expect(store.relatedInjection).toBe(false)
+  })
+
+  it("loadSettings 非法值不覆盖当前值（warn 可见，禁静默降级）", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const map = new Map<string, string>([["related_injection", "bogus"]])
+    prefsModule(map)
+    await store.loadSettings()
+    expect(store.relatedInjection).toBe(true)
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("相关作品注入"), "bogus")
+    warnSpy.mockRestore()
+  })
+})

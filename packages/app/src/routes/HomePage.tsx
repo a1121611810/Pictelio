@@ -405,10 +405,19 @@ const NovelFeedPanel: Component<{ tab: FeedTab }> = (props) => {
   );
 };
 
+/** 相关作品注入（spec #486 §4.4）：切 contentType 视为新会话，清空全部 tab 注入行 */
+function clearAllRelatedRows(): void {
+  clearRelatedRows("recommended");
+  clearRelatedRows("follow");
+  clearRelatedRows("bookmarks");
+}
+
 const HomePage: Component = () => {
   onSettled(() => {
     // 首页是登录后启动首屏：挂载后通知原生关闭 Splash Screen（幂等）
     markContentReady();
+    window.addEventListener("contentTypeChanged", clearAllRelatedRows);
+    return () => window.removeEventListener("contentTypeChanged", clearAllRelatedRows);
   });
 
   createEffect(

@@ -26,4 +26,9 @@ describe("queryKeys search", () => {
     const key = queryKeys.searchAutocomplete("star");
     expect(key).toEqual(["search", "autocomplete", "star"]);
   });
+
+  it("related returns correct key structure", () => {
+    const key = queryKeys.related(42);
+    expect(key).toEqual(["related", 42]);
+  });
 });

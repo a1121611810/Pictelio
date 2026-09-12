@@ -158,9 +158,6 @@ describe("relatedInjectionStore 状态机（spec §4）", () => {
   });
 
   it("开关关闭：pending 被消费但不注入", async () => {
-    const { setRelatedInjection } = await import("@/stores/settingsStore");
-    setRelatedInjection(false);
-    await flush();
     const store = await loadStore({ related_injection: "false" });
     store.recordRelatedAnchor("recommended", 1);
     await flush();

@@ -24,21 +24,33 @@ export interface RelatedRow {
 export const MAX_RELATED_ANCHORS = 3
 /** 单行相关作品上限 */
 export const RELATED_ROW_SIZE = 20
+/** lynx 行为固定两行网格降级（spec §5.2）：8 = 2 行 × 4 列，超出截断 */
+export const RELATED_GRID_SIZE = 8
 /** related 缓存时长（同一作品反复进出零重复请求） */
 const RELATED_CACHE_TTL_MS = 5 * 60_000
+/** 缓存容量上限（防长会话无界累积） */
+const RELATED_CACHE_MAX = 50
 
 export type RelatedFeedTab = 'recommend' | 'follow'
 
-/** 模块级缓存：anchorId → 过滤后条目（时间戳失效） */
+/** 模块级缓存：anchorId → 过滤后条目（时间戳失效 + 容量上限淘汰） */
 const cache = new Map<number, { at: number; items: PixivIllust[] }>()
 
 async function fetchRelatedIllusts(settings: ReturnType<typeof useSettingsStore>, anchorId: number): Promise<PixivIllust[]> {
   const hit = cache.get(anchorId)
-  if (hit && Date.now() - hit.at < RELATED_CACHE_TTL_MS) return hit.items
+  if (hit) {
+    if (Date.now() - hit.at < RELATED_CACHE_TTL_MS) return hit.items
+    cache.delete(anchorId)
+  }
   const res = await loadRelated(anchorId)
   const items = res.illusts
     .filter((i) => !settings.isRestricted(i) && !settings.isAiRestricted(i))
     .slice(0, RELATED_ROW_SIZE)
+  if (cache.size >= RELATED_CACHE_MAX) {
+    // 简单 FIFO 淘汰：删最早写入的 key（Map 迭代序 = 插入序）
+    const oldest = cache.keys().next().value
+    if (oldest !== undefined) cache.delete(oldest)
+  }
   cache.set(anchorId, { at: Date.now(), items })
   return items
 }

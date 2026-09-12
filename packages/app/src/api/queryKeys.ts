@@ -50,4 +50,7 @@ export const queryKeys = {
   ) => ["search", "novel", word, sort, searchTarget] as const,
 
   searchAutocomplete: (word: string) => ["search", "autocomplete", word] as const,
+
+  /** 相关作品（spec docs/specs/related-injection.md）：["related", illustId] */
+  related: (illustId: number) => ["related", illustId] as const,
 } as const;

@@ -1,17 +1,21 @@
 // 相关作品注入行状态机（lynx）单元测试（spec docs/specs/related-injection.md §3/§4/§6）。
-// Oracle 溯源：状态语义与 app 端 relatedInjectionStore.test.ts 同源（spec §4）；
-// settings 以 mock 注入（isRestricted = x_restrict===1，与 settingsStore 遮罩判定契约一致）。
+// Oracle 溯源：状态语义与 app 端 relatedInjectionStore.test.ts 同源（spec §4）。
+// isRestricted mock = 真实两态契约的镜像（!showR18∧x=1 ∨ !showR18G∧x=2；两态矩阵本身由
+// settingsStore.test.ts 12 例真实实现守卫，此处不重写实现，仅消费契约）。
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const mockState = vi.hoisted(() => ({
   relatedInjection: true,
+  showR18: false,
+  showR18G: false,
   loadRelated: vi.fn(),
 }));
 
 vi.mock("./settingsStore", () => ({
   useSettingsStore: () => ({
     relatedInjection: mockState.relatedInjection,
-    isRestricted: (i: { x_restrict: number }) => i.x_restrict === 1,
+    isRestricted: (i: { x_restrict: number }) =>
+      (!mockState.showR18 && i.x_restrict === 1) || (!mockState.showR18G && i.x_restrict === 2),
     isAiRestricted: (_i: unknown) => false,
   }),
 }));
@@ -42,6 +46,8 @@ describe("relatedInjection store（lynx，spec §4）", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     mockState.relatedInjection = true;
+    mockState.showR18 = false;
+    mockState.showR18G = false;
     mockState.loadRelated.mockReset();
   });
 
@@ -83,6 +89,18 @@ describe("relatedInjection store（lynx，spec §4）", () => {
     await store.consumeAnchor("recommend", []);
     await flush();
     expect(store.rows("recommend")[0].items.map((i) => i.id)).toEqual([5]);
+  });
+
+  it("R18G 开关关闭时 x_restrict=2 被过滤（两态契约）", async () => {
+    const store = useRelatedInjectionStore();
+    mockState.showR18 = true;
+    mockState.loadRelated.mockResolvedValue({
+      illusts: [illust(6, 2), illust(7)],
+    });
+    store.recordAnchor("recommend", 14);
+    await store.consumeAnchor("recommend", []);
+    await flush();
+    expect(store.rows("recommend")[0].items.map((i) => i.id)).toEqual([7]);
   });
 
   it("上限 MAX_RELATED_ANCHORS=3 与同锚点去重", async () => {
