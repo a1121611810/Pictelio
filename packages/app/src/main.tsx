@@ -24,14 +24,14 @@ import { initializeStartupPreferences } from "@/startup";
 import { initializeAuth } from "@/stores/authStore";
 import { restoreFeedCache } from "@/api/feedQueryPersist";
 import { settings } from "@/settings";
+// i18n 模块加载即注册语言设置键（settings_language），必须在 __root.tsx 渲染期
+// settings.hydrateAll()（全量 hydrate 兜底）之前完成 define，否则存储值不会被加载。
+// 本 import 兼具副作用注册与 refreshSystemLocaleFromBridge 引入两职（review P2-9：不再重复导入）
 import { refreshSystemLocaleFromBridge } from "@/i18n";
 // 下载队列执行器接线（webview 引擎，模块加载即注册）
 import "@/native/downloadExecutor";
 // 系统分享接线（webview 引擎，模块加载即注册）
 import "@/native/downloadSharer";
-// i18n 模块加载即注册语言设置键（settings_language），必须在 initializeStartupPreferences
-// 的 hydrateAll 之前完成 define，否则存储值不会被加载（抽取原型 #496）
-import "@/i18n";
 
 function syncFluentTheme() {
   const isDark = document.documentElement.classList.contains("dark");

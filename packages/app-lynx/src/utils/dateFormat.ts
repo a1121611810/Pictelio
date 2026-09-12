@@ -16,10 +16,14 @@ export function formatRelativeTime(dateStr: string, now: Date = new Date()): str
   const d = new Date(dateStr)
   const diffMin = Math.floor((now.getTime() - d.getTime()) / 60_000)
   if (diffMin < 1) return t("time.justNow")
+  // en 复数两态（review P2-1）：1 走单数 key；zh 单复同形，单数 key 值与模板产物逐字一致
+  if (diffMin === 1) return t("time.minuteAgo")
   if (diffMin < 60) return t("time.minutesAgo", { count: diffMin })
   const diffHour = Math.floor(diffMin / 60)
+  if (diffHour === 1) return t("time.hourAgo")
   if (diffHour < 24) return t("time.hoursAgo", { count: diffHour })
   const diffDay = Math.floor(diffHour / 24)
+  if (diffDay === 1) return t("time.dayAgo")
   if (diffDay < 30) return t("time.daysAgo", { count: diffDay })
   return formatDate(d)
 }

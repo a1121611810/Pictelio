@@ -45,7 +45,7 @@ import {
 import { WebDavError, type WebDavErrorKind } from "../../native/WebDav";
 import { isNativePlatform } from "../../utils/platform";
 import { user } from "../../stores/authStore";
-import { t, type I18nKey } from "../../i18n";
+import { currentLocale, t, type I18nKey } from "../../i18n";
 
 const FIELD_CLASS =
   "flex-1 min-w-0 px-3 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)] border border-[var(--colorNeutralStroke1)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-[-1px] focus-visible:outline-[color:var(--colorStrokeFocus2)]";
@@ -458,7 +458,9 @@ const SettingsWebdav: Component = () => {
             {t("settings.webdav.lastBackupLabel")}
             {webdavLastBackup() === ""
               ? t("settings.webdav.neverBackedUp")
-              : new Date(webdavLastBackup()).toLocaleString()}
+              : new Date(webdavLastBackup()).toLocaleString(
+                  currentLocale() === "en" ? "en-US" : "zh-CN",
+                )}
           </p>
 
           <div class="flex flex-wrap gap-2">

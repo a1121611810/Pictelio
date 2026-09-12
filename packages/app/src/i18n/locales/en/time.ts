@@ -3,6 +3,9 @@ import type { TimeKey } from "../zh-CN/time";
 
 const enTime = {
   "time.justNow": "Now",
+  "time.minuteAgo": "1 minute ago",
+  "time.hourAgo": "1 hour ago",
+  "time.dayAgo": "1 day ago",
   "time.minutesAgo": "{{count}} minutes ago",
   "time.hoursAgo": "{{count}} hours ago",
   "time.daysAgo": "{{count}} days ago",

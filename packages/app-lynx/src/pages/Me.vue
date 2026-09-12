@@ -38,7 +38,7 @@ import {
   saveBackupPassword,
   saveWebdavPassword,
 } from '../utils/webdavCredentials'
-import { t } from '../i18n'
+import { t, locale } from '../i18n'
 
 const auth = useAuthStore()
 const settings = useSettingsStore()
@@ -144,7 +144,7 @@ function refreshWebdavLastBackupLabel(): void {
   webdavLastBackupLabel.value =
     settings.webdavLastBackup === ''
       ? t('me.webdav.neverBackedUp') // i18n: 赋值时快照（瞬态）
-      : new Date(settings.webdavLastBackup).toLocaleString()
+      : new Date(settings.webdavLastBackup).toLocaleString(locale.value === 'en' ? 'en-US' : 'zh-CN')
 }
 
 function onWebdavTest(): void {

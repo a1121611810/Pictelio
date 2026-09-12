@@ -5,7 +5,7 @@
 // 未走 README 的 async memo + <Loading> 悬念模式：现有组件树无 Loading 包裹，Nullable 平滑
 // 降级更贴近现状；async 模式是否切换属 spec 决策。
 import { createMemo, createSignal } from "solid-js";
-import { resolveTemplate, translator } from "@solid-primitives/i18n";
+import { type TemplateResolver, translator } from "@solid-primitives/i18n";
 import { settings } from "@/settings";
 import zhCN, { type Dict, type I18nKey } from "./locales/zh-CN";
 
@@ -57,7 +57,17 @@ const dict = createMemo<Dict | undefined>(() =>
   localeSignal() === SOURCE_LOCALE ? zhCN : enDict(),
 );
 
-const rawT = translator(dict, resolveTemplate);
+// 插值解析器：函数替换器形态（review P2-2）——库自带 resolveTemplate 用字符串替换，
+// params 值含 $&/$' 等 `$` 模式时会被解释；error.api.* 的 params.detail 是服务端原始数据，必须防注入。
+// （与库 TemplateResolver 的泛型签名在集成缝处一次断言，实现保持纯字符串语义）
+const safeResolveTemplate = (str: string, vars?: Record<string, string | number>): string => {
+  if (!vars) return str;
+  return str.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, name: string) =>
+    name in vars ? String(vars[name]) : match,
+  );
+};
+
+const rawT = translator(dict, safeResolveTemplate as unknown as TemplateResolver);
 
 /** 翻译函数：字典未就绪时回退源语言，源语言也没有则回退 key（键完备性由 satisfies Dict 编译期保证）。
  * 回退链同样走插值——字典未就绪窗口不得吐原始模板（B1 实测教训）。 */
@@ -67,7 +77,7 @@ export function t(key: I18nKey, args?: Record<string, string | number>): string 
     return rendered;
   }
   const fallback = zhCN[key] ?? key;
-  return args ? resolveTemplate(fallback, args) : fallback;
+  return args ? safeResolveTemplate(fallback, args) : fallback;
 }
 
 /** ApiError 展示文案：messageKey 优先（i18n 渲染），message 快照回退（B1）。 */
@@ -81,12 +91,15 @@ export function apiErrorMessage(e: {
 
 /** 原生桥注入有效 locale（B10）：WebView 会异步重置应用 locale（Google #37113860），
  * navigator.language 不可信——native 环境启动后经 ClientInfo 桥校正「跟随系统」态。
- * 手动覆盖（handle ≠ ""）时不校正；web dev / 插件不可用静默维持 navigator 兜底。 */
+ * 手动覆盖（handle ≠ ""）时不校正；Web dev / 插件不可用静默维持 navigator 兜底。 */
 export async function refreshSystemLocaleFromBridge(): Promise<void> {
   if (languageHandle.value() !== "") return;
   try {
     const { ClientInfo } = await import("@/native/ClientInfo");
     const { languageTag } = await ClientInfo.getLocale();
+    // 双重 guard：桥往返（await）期间 hydrateAll 可能落地手动覆盖（code-review P1-1，
+    // 手动 > 系统优先级在并发下必须保持），覆盖前重查
+    if (languageHandle.value() !== "") return;
     const mapped: Locale = languageTag?.startsWith("en") ? "en" : SOURCE_LOCALE;
     if (mapped !== localeSignal()) {
       setLocaleSignal(mapped);

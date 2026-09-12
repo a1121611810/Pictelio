@@ -45,10 +45,16 @@ function collectTsLiterals(source: string, kind: ts.ScriptKind): string[] {
   return hits;
 }
 
-/** vue 模板区：{{ }} 插值表达式剥掉，扫文本节点与属性值中的 CJK（即用户可见文案漏网） */
+/** vue 模板区：先扫属性值（静态 placeholder/aria-label/title 等，review P1-2 实证盲区——
+ * 剥标签会把属性值一并剥掉），再剥插值与标签扫文本节点 */
 function collectVueTemplate(source: string): string[] {
   const hits: string[] = [];
   const noScript = source.replace(/<script[\s\S]*?<\/script>/g, "");
+  const attrRe = /[\w:-]+\s*=\s*"([^"]*)"/g;
+  for (const m of noScript.matchAll(attrRe)) {
+    const v = m[1]?.trim();
+    if (v && CJK.test(v)) hits.push(v.slice(0, 40));
+  }
   // 剥 {{ ... }} 插值与 < > 标签，剩文本节点
   const textOnly = noScript.replace(/\{\{[\s\S]*?\}\}/g, "").replace(/<[^>]*>/g, "\n");
   for (const line of textOnly.split("\n")) {
@@ -68,6 +74,18 @@ function scan(file: string): string[] {
 }
 
 describe("i18n 回潮门禁（副端）：src 内禁硬编码中文文案", () => {
+  it("扫描器自检：属性值与文本节点样例必须命中（防线有效性，review P1-2）", () => {
+    const sample = [
+      "<template>",
+      '  <input placeholder="搜索作品" />',
+      "  <text>暂无内容</text>",
+      "</template>",
+    ].join("\n");
+    const hits = collectVueTemplate(sample);
+    expect(hits).toContain("搜索作品");
+    expect(hits).toContain("暂无内容");
+  });
+
   it("白名单外零命中", () => {
     const offenders: string[] = [];
     for (const file of walk(SRC)) {
