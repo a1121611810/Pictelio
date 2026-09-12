@@ -35,7 +35,7 @@ import {
   type BackupFileInfo,
   type PreparedRestore,
 } from "../../utils/backupService";
-import { WEBDAV_ERROR_MESSAGES, BackupFormatError } from "../../utils/backupCore";
+import { BackupFormatError } from "../../utils/backupCore";
 import {
   loadBackupPassword,
   loadWebdavPassword,
@@ -45,6 +45,7 @@ import {
 import { WebDavError, type WebDavErrorKind } from "../../native/WebDav";
 import { isNativePlatform } from "../../utils/platform";
 import { user } from "../../stores/authStore";
+import { t, type I18nKey } from "../../i18n";
 
 const FIELD_CLASS =
   "flex-1 min-w-0 px-3 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)] border border-[var(--colorNeutralStroke1)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-[-1px] focus-visible:outline-[color:var(--colorStrokeFocus2)]";
@@ -59,14 +60,32 @@ const LABEL_CLASS =
 type RestoreStep = "list" | "confirm";
 
 /**
+ * 错误分类 → i18n key（spec §5；WebDavError 之外的类型走各自 message）。
+ * zh 值与 backupCore.WEBDAV_ERROR_MESSAGES 逐字一致（备份契约测试钉原文）；
+ * 渲染经 t()（i18n B2：存 key，不再模块加载时快照文案）。
+ */
+const WEBDAV_ERROR_KEYS: Record<WebDavErrorKind, I18nKey> = {
+  AUTH_FAILED: "settings.webdav.error.AUTH_FAILED",
+  FORBIDDEN: "settings.webdav.error.FORBIDDEN",
+  NOT_FOUND: "settings.webdav.error.NOT_FOUND",
+  QUOTA_EXCEEDED: "settings.webdav.error.QUOTA_EXCEEDED",
+  CONFLICT: "settings.webdav.error.CONFLICT",
+  NETWORK: "settings.webdav.error.NETWORK",
+  SERVER: "settings.webdav.error.SERVER",
+  CRYPTO: "settings.webdav.error.CRYPTO",
+};
+
+/**
  * 错误分类 → 用户文案（spec §5；WebDavError 之外的类型走各自 message）。
  * 未知错误不静默：message 原样展示（toWebDavError 已 warn）。
  */
 function errorMessage(err: unknown): string {
   if (err instanceof WebDavError) {
-    const base = WEBDAV_ERROR_MESSAGES[err.kind as WebDavErrorKind] ?? err.message;
+    const base = t(WEBDAV_ERROR_KEYS[err.kind as WebDavErrorKind]) || err.message;
     // spec §5「其他（含原始状态码）」：SERVER 类附 HTTP 码，便于用户/排障定位
-    return err.kind === "SERVER" && err.statusCode > 0 ? `${base}（HTTP ${err.statusCode}）` : base;
+    return err.kind === "SERVER" && err.statusCode > 0
+      ? t("settings.webdav.error.httpStatus", { base, code: err.statusCode })
+      : base;
   }
   if (err instanceof BackupFormatError) return err.message;
   if (err instanceof Error) return err.message;
@@ -91,7 +110,8 @@ function buildDeps() {
  * 所有 IO 经 services/backupWiring + utils/backupService（组件只做状态与渲染）。
  */
 const SettingsWebdav: Component = () => {
-  const [busy, setBusy] = createSignal<string | null>(null);
+  // busy 存 i18n key，渲染时 t(key)（i18n B2：模块存活状态不快照文案）
+  const [busy, setBusy] = createSignal<I18nKey | null>(null);
   const [status, setStatus] = createSignal("");
   const [error, setError] = createSignal("");
   const [loginPassword, setLoginPassword] = createSignal("");
@@ -135,14 +155,16 @@ const SettingsWebdav: Component = () => {
     },
   );
 
-  async function run(label: string, action: () => Promise<string>): Promise<void> {
+  async function run(label: I18nKey, action: () => Promise<string>): Promise<void> {
     setBusy(label);
     setStatus("");
     setError("");
     try {
+      // i18n: set 时快照（瞬态）
       setStatus(await action());
     } catch (e) {
       console.warn("[SettingsWebdav] " + label + " 失败", e);
+      // i18n: set 时快照（瞬态）
       setError(errorMessage(e));
     } finally {
       setBusy(null);
@@ -155,10 +177,10 @@ const SettingsWebdav: Component = () => {
   };
 
   const onTest = () =>
-    run("连接测试", async () => {
+    run("settings.webdav.action.test", async () => {
       await saveCredentials();
       const { fileCount } = await testConnection(buildDeps());
-      return `连接成功，远端已有 ${fileCount} 份备份`;
+      return t("settings.webdav.status.testOk", { count: fileCount });
     });
 
   /** S4：任何可能产生/清除应急快照的操作后刷新撤销入口 */
@@ -167,18 +189,29 @@ const SettingsWebdav: Component = () => {
   }
 
   const onBackup = () =>
-    run("立即备份", async () => {
+    run("settings.webdav.action.backupNow", async () => {
       await saveCredentials();
       const r = await backupNow(buildDeps());
       await setWebdavLastBackup(new Date().toISOString());
       // spec §6：应急快照保留到下次成功备份为止
       await clearPreRestoreSnapshot();
       await refreshPreRestoreFlag();
-      return `已备份 ${r.fileName}（${r.bytes} 字节${r.encrypted ? "，已加密" : ""}，清理旧档 ${r.deletedOld.length} 份）`;
+      // i18n: set 时快照（瞬态）
+      return r.encrypted
+        ? t("settings.webdav.status.backupOkEncrypted", {
+            name: r.fileName,
+            bytes: r.bytes,
+            count: r.deletedOld.length,
+          })
+        : t("settings.webdav.status.backupOk", {
+            name: r.fileName,
+            bytes: r.bytes,
+            count: r.deletedOld.length,
+          });
     });
 
   const onOpenRestore = () =>
-    run("读取备份列表", async () => {
+    run("settings.webdav.action.loadList", async () => {
       await saveCredentials();
       const list = await listBackups(buildDeps());
       setFiles(list);
@@ -187,7 +220,7 @@ const SettingsWebdav: Component = () => {
       setRestoreError("");
       setRestoreStep("list");
       setShowRestore(true);
-      return list.length === 0 ? "远端暂无备份" : "";
+      return list.length === 0 ? t("settings.webdav.status.noBackups") : "";
     });
 
   /** S2/S7：选档后先「准备」（下载→解密→解析→摘要），确认前零写回 */
@@ -207,7 +240,7 @@ const SettingsWebdav: Component = () => {
   async function prepareSelected(fileArg?: BackupFileInfo): Promise<void> {
     const file = fileArg ?? selected();
     if (file === null) return;
-    setBusy("读取备份摘要");
+    setBusy("settings.webdav.action.prepare");
     setError("");
     setRestoreError("");
     try {
@@ -221,6 +254,7 @@ const SettingsWebdav: Component = () => {
     } catch (e) {
       console.warn("[SettingsWebdav] 读取备份摘要失败", e);
       // 错误渲染在对话框内（S4：外层错误被弹窗遮罩挡住不可见）
+      // i18n: set 时快照（瞬态）
       setRestoreError(errorMessage(e));
     } finally {
       setBusy(null);
@@ -230,17 +264,28 @@ const SettingsWebdav: Component = () => {
   const onRestore = () => {
     const preparedRestore = prepared();
     if (preparedRestore === null) return;
-    void run("恢复", async () => {
+    void run("settings.webdav.action.restore", async () => {
       try {
         const result = await applyPreparedRestore(buildDeps(), preparedRestore);
         setShowRestore(false);
         const { summary, plan } = preparedRestore;
         const uid = user()?.id ?? null;
+        // i18n: set 时快照（瞬态）
         const skippedLabel =
           uid === null
-            ? `未登录，账号级键全部跳过 ${plan.skippedAccountKeys.length} 项`
-            : `跳过异账号键 ${plan.skippedAccountKeys.length} 项`;
-        return `已恢复 ${summary.createdAt} 的备份（写入 ${result.applied.length} 项，跳过 ${result.skipped.length} 项；设备级 ${summary.deviceKeyCount}，账号级 ${summary.accountKeyCountForUid}，sets ${summary.setCount}；${skippedLabel}）`;
+            ? t("settings.webdav.status.skippedLoggedOut", { count: plan.skippedAccountKeys.length })
+            : t("settings.webdav.status.skippedOtherAccount", {
+                count: plan.skippedAccountKeys.length,
+              });
+        return t("settings.webdav.status.restoreOk", {
+          time: summary.createdAt,
+          applied: result.applied.length,
+          skipped: result.skipped.length,
+          device: summary.deviceKeyCount,
+          account: summary.accountKeyCountForUid,
+          sets: summary.setCount,
+          skippedLabel,
+        });
       } finally {
         // S4：写回中途失败也必须暴露可回滚入口
         await refreshPreRestoreFlag();
@@ -249,11 +294,11 @@ const SettingsWebdav: Component = () => {
   };
 
   const onUndo = () =>
-    run("撤销恢复", async () => {
+    run("settings.webdav.action.undo", async () => {
       const ok = await undoLastRestore(createBackupWiring());
       await refreshPreRestoreFlag();
-      if (!ok) return "没有可撤销的应急快照";
-      return "已回滚到恢复前的本地状态";
+      if (!ok) return t("settings.webdav.status.nothingToUndo");
+      return t("settings.webdav.status.undoOk");
     });
 
   // spec §2/§7：仅 Android 原生暴露入口（web dev 不渲染本区块）；
@@ -263,14 +308,14 @@ const SettingsWebdav: Component = () => {
   return (
     <div class="py-3 flex flex-col gap-3">
       <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground3)] uppercase">
-        WebDAV 备份
+        {t("settings.webdav.sectionTitle")}
       </p>
 
       <div class="flex items-center justify-between gap-3">
         <span class="flex items-center gap-2">
           <FluentIcon name="server" size={20} />
           <span class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)]">
-            启用 WebDAV 备份
+            {t("settings.webdav.enable")}
           </span>
         </span>
         <fluent-switch
@@ -284,7 +329,7 @@ const SettingsWebdav: Component = () => {
       <Show when={webdavEnabled()}>
         <div class="flex flex-col gap-3">
           <div class="flex flex-col gap-1">
-            <span class={LABEL_CLASS}>服务器地址</span>
+            <span class={LABEL_CLASS}>{t("settings.webdav.serverUrl")}</span>
             <input
               type="url"
               class={FIELD_CLASS}
@@ -296,14 +341,14 @@ const SettingsWebdav: Component = () => {
             />
             <Show when={webdavUrl() !== "" && !webdavUrl().startsWith("https://")}>
               <span class="[font-size:var(--fontSizeBase200)] text-[var(--colorStatusWarningForeground1)]">
-                非 HTTPS 连接存在泄露风险（spec §7）
+                {t("settings.webdav.httpsWarning")}
               </span>
             </Show>
           </div>
 
           <div class="flex gap-2">
             <div class="flex-1 flex flex-col gap-1">
-              <span class={LABEL_CLASS}>用户名</span>
+              <span class={LABEL_CLASS}>{t("settings.webdav.username")}</span>
               <input
                 type="text"
                 class={FIELD_CLASS}
@@ -314,7 +359,7 @@ const SettingsWebdav: Component = () => {
               />
             </div>
             <div class="flex-1 flex flex-col gap-1">
-              <span class={LABEL_CLASS}>密码（加密存储）</span>
+              <span class={LABEL_CLASS}>{t("settings.webdav.password")}</span>
               <input
                 type="password"
                 class={FIELD_CLASS}
@@ -327,7 +372,7 @@ const SettingsWebdav: Component = () => {
 
           <div class="flex gap-2">
             <div class="flex-1 flex flex-col gap-1">
-              <span class={LABEL_CLASS}>目录</span>
+              <span class={LABEL_CLASS}>{t("settings.webdav.dir")}</span>
               <input
                 type="text"
                 class={FIELD_CLASS}
@@ -338,11 +383,11 @@ const SettingsWebdav: Component = () => {
               />
             </div>
             <div class="flex-1 flex flex-col gap-1">
-              <span class={LABEL_CLASS}>备份密码（可选，加密备份文件）</span>
+              <span class={LABEL_CLASS}>{t("settings.webdav.backupPassword")}</span>
               <input
                 type="password"
                 class={FIELD_CLASS}
-                placeholder="留空则不加密"
+                placeholder={t("settings.webdav.backupPasswordPlaceholder")}
                 value={backupPassword()}
                 autocomplete="off"
                 onInput={(e) => setBackupPassword(e.currentTarget.value)}
@@ -352,7 +397,7 @@ const SettingsWebdav: Component = () => {
 
           <Show when={sensitiveKeys().length > 0}>
             <div class="flex flex-col gap-1">
-              <span class={LABEL_CLASS}>敏感项排除（勾选后不进入备份文件）</span>
+              <span class={LABEL_CLASS}>{t("settings.webdav.sensitiveExclude")}</span>
               <div class="flex flex-wrap gap-2">
                 <For each={sensitiveKeys()}>
                   {(key) => (
@@ -380,7 +425,7 @@ const SettingsWebdav: Component = () => {
             <span class="flex items-center gap-2">
               <FluentIcon name="history" size={20} />
               <span class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)]">
-                启动时自动备份
+                {t("settings.webdav.autoBackup")}
               </span>
             </span>
             <div class="flex items-center gap-2">
@@ -391,7 +436,7 @@ const SettingsWebdav: Component = () => {
                 onChange={(e) => void setWebdavAutoBackupDays(Number(e.currentTarget.value))}
               >
                 <For each={[1, 3, 7, 30]}>
-                  {(d) => <option value={String(d)}>每 {d} 天</option>}
+                  {(d) => <option value={String(d)}>{t("settings.webdav.autoBackupDays", { days: d })}</option>}
                 </For>
               </select>
               <fluent-switch
@@ -404,8 +449,10 @@ const SettingsWebdav: Component = () => {
           </div>
 
           <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-            上次备份：
-            {webdavLastBackup() === "" ? "从未备份" : new Date(webdavLastBackup()).toLocaleString()}
+            {t("settings.webdav.lastBackupLabel")}
+            {webdavLastBackup() === ""
+              ? t("settings.webdav.neverBackedUp")
+              : new Date(webdavLastBackup()).toLocaleString()}
           </p>
 
           <div class="flex flex-wrap gap-2">
@@ -415,7 +462,7 @@ const SettingsWebdav: Component = () => {
               disabled={busy() !== null}
               onClick={() => void onTest()}
             >
-              连接测试
+              {t("settings.webdav.action.test")}
             </button>
             <button
               type="button"
@@ -423,7 +470,7 @@ const SettingsWebdav: Component = () => {
               disabled={busy() !== null}
               onClick={() => void onBackup()}
             >
-              立即备份
+              {t("settings.webdav.action.backupNow")}
             </button>
             <button
               type="button"
@@ -431,7 +478,7 @@ const SettingsWebdav: Component = () => {
               disabled={busy() !== null}
               onClick={() => void onOpenRestore()}
             >
-              恢复
+              {t("settings.webdav.action.restore")}
             </button>
             <Show when={hasPreRestore()}>
               <button
@@ -440,7 +487,7 @@ const SettingsWebdav: Component = () => {
                 disabled={busy() !== null}
                 onClick={() => void onUndo()}
               >
-                撤销上次恢复
+                {t("settings.webdav.action.undoLast")}
               </button>
             </Show>
           </div>
@@ -450,7 +497,7 @@ const SettingsWebdav: Component = () => {
               class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]"
               role="status"
             >
-              {busy()}…
+              {t(busy()!)}…
             </p>
           </Show>
           <Show when={status() !== ""}>
@@ -476,11 +523,11 @@ const SettingsWebdav: Component = () => {
       <FluentDialog
         open={showRestore()}
         onClose={() => setShowRestore(false)}
-        aria-label="恢复 WebDAV 备份"
+        aria-label={t("settings.webdav.restoreTitle")}
       >
-        <h3 slot="title">恢复 WebDAV 备份</h3>
+        <h3 slot="title">{t("settings.webdav.restoreTitle")}</h3>
         <Show when={restoreStep() === "list"}>
-          <Show when={files().length > 0} fallback={<p>远端暂无备份文件</p>}>
+          <Show when={files().length > 0} fallback={<p>{t("settings.webdav.restoreEmpty")}</p>}>
             <div class="flex flex-col gap-1 max-h-[50vh] overflow-y-auto">
               <For each={files()}>
                 {(f) => (
@@ -491,7 +538,7 @@ const SettingsWebdav: Component = () => {
                     onClick={() => onSelectFile(f)}
                   >
                     {f.name}
-                    {f.encrypted ? "（加密）" : ""}
+                    {f.encrypted ? t("settings.webdav.fileEncrypted") : ""}
                   </button>
                 )}
               </For>
@@ -502,7 +549,7 @@ const SettingsWebdav: Component = () => {
         <Show when={restoreStep() === "list" && needsPassword() && selected() !== null}>
           <div class="flex flex-col gap-2 mt-2">
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
-              「{selected()!.name}」已加密，请输入备份密码以读取摘要：
+              {t("settings.webdav.encryptedPrompt", { name: selected()!.name })}
             </p>
             <input
               type="password"
@@ -522,7 +569,7 @@ const SettingsWebdav: Component = () => {
             </Show>
             <div class="flex gap-2">
               <button type="button" class={BUTTON_CLASS} onClick={() => setNeedsPassword(false)}>
-                取消
+                {t("settings.webdav.cancel")}
               </button>
               <button
                 type="button"
@@ -530,7 +577,7 @@ const SettingsWebdav: Component = () => {
                 disabled={busy() !== null || promptPassword() === ""}
                 onClick={() => void prepareSelected(selected() ?? undefined)}
               >
-                解密并查看摘要
+                {t("settings.webdav.decryptAndPreview")}
               </button>
             </div>
           </div>
@@ -538,28 +585,34 @@ const SettingsWebdav: Component = () => {
         {/* S2：摘要确认展示在写回之前（时间/来源引擎/版本/三类计数） */}
         <Show when={restoreStep() === "confirm" && prepared() !== null}>
           <div class="flex flex-col gap-2">
-            <p>将恢复：{selected()!.name}</p>
+            <p>{t("settings.webdav.restoreWillApply", { name: selected()!.name })}</p>
             <ul class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground2)]">
-              <li>备份时间：{prepared()!.summary.createdAt}</li>
-              <li>来源引擎：{prepared()!.summary.engine}</li>
-              <li>应用版本：{prepared()!.summary.appVersion}</li>
+              <li>{t("settings.webdav.summaryCreatedAt", { value: prepared()!.summary.createdAt })}</li>
+              <li>{t("settings.webdav.summaryEngine", { value: prepared()!.summary.engine })}</li>
+              <li>{t("settings.webdav.summaryAppVersion", { value: prepared()!.summary.appVersion })}</li>
               <li>
-                设备级 {prepared()!.summary.deviceKeyCount} 项 / 账号级（当前账号）
-                {prepared()!.summary.accountKeyCountForUid} 项 / sets {prepared()!.summary.setCount}{" "}
-                组
+                {t("settings.webdav.summaryCounts", {
+                  device: prepared()!.summary.deviceKeyCount,
+                  account: prepared()!.summary.accountKeyCountForUid,
+                  sets: prepared()!.summary.setCount,
+                })}
               </li>
               <li>
-                跳过账号级键 {prepared()!.plan.skippedAccountKeys.length} 项
-                {user()?.id == null ? "（当前未登录，账号级键全部跳过）" : "（非当前账号）"}
+                {t("settings.webdav.summarySkipped", {
+                  count: prepared()!.plan.skippedAccountKeys.length,
+                })}
+                {user()?.id == null
+                  ? t("settings.webdav.summarySkippedLoggedOut")
+                  : t("settings.webdav.summarySkippedOther")}
               </li>
             </ul>
             <Show when={prepared()!.wasEncrypted}>
               <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
-                该备份已加密，已用备份密码解密。
+                {t("settings.webdav.restoredEncrypted")}
               </p>
             </Show>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorStatusWarningForeground1)]">
-              恢复会覆盖本机对应设置（仅覆盖备份中存在的键）；恢复前会自动保存应急快照，可撤销。
+              {t("settings.webdav.restoreWarning")}
             </p>
             <Show when={restoreError() !== ""}>
               <p
@@ -571,7 +624,7 @@ const SettingsWebdav: Component = () => {
             </Show>
             <div class="flex gap-2">
               <button type="button" class={BUTTON_CLASS} onClick={() => setRestoreStep("list")}>
-                返回
+                {t("settings.webdav.back")}
               </button>
               <button
                 type="button"
@@ -579,7 +632,7 @@ const SettingsWebdav: Component = () => {
                 disabled={busy() !== null}
                 onClick={() => void onRestore()}
               >
-                确认恢复
+                {t("settings.webdav.confirmRestore")}
               </button>
             </div>
           </div>

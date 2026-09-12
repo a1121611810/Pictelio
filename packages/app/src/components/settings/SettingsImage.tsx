@@ -13,6 +13,7 @@ import {
 import type { UgoiraExtractMode } from "../../api/illust";
 import { imageHostState, setMasterEnabled, modeLabel } from "../../stores/imageHostStore";
 import { clearImageCache } from "../../utils/imageLoader";
+import { t } from "../../i18n";
 
 interface SettingsImageProps {
   onActionToast: (msg: string) => void;
@@ -25,7 +26,10 @@ const SettingsImage: Component<SettingsImageProps> = (props) => {
 
   function handleClearImageCache() {
     const [err] = trySync(() => clearImageCache());
-    props.onActionToast(err ? "清除图片缓存失败" : "图片缓存已清除");
+    // i18n: set 时快照（瞬态）
+    props.onActionToast(
+      err ? t("settings.image.clearCacheFailed") : t("settings.image.cacheCleared"),
+    );
   }
 
   function onPickUgoiraMode(mode: UgoiraExtractMode) {
@@ -39,7 +43,7 @@ const SettingsImage: Component<SettingsImageProps> = (props) => {
   return (
     <div class="py-3 flex flex-col">
       <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground3)] uppercase tracking-wide mb-1">
-        图片与网络
+        {t("settings.image.sectionTitle")}
       </p>
 
       {/* List image quality */}
@@ -47,7 +51,7 @@ const SettingsImage: Component<SettingsImageProps> = (props) => {
         <div class="flex items-center gap-2 mb-2">
           <FluentIcon name="image" size={20} />
           <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
-            列表画质
+            {t("settings.image.listQuality")}
           </p>
         </div>
         <div class="flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-1.5 gap-1">
@@ -64,7 +68,7 @@ const SettingsImage: Component<SettingsImageProps> = (props) => {
 
               onClick={() => setListQuality(q)}
             >
-              {q === "medium" ? "默认" : "高清"}
+              {q === "medium" ? t("settings.image.qualityMedium") : t("settings.image.qualityHigh")}
             </button>
           ))}
         </div>
@@ -75,7 +79,7 @@ const SettingsImage: Component<SettingsImageProps> = (props) => {
         <div class="flex items-center gap-2 mb-2">
           <FluentIcon name="imageSearch" size={20} />
           <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
-            详情画质
+            {t("settings.image.detailQuality")}
           </p>
         </div>
         <div class="flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-1.5 gap-1">
@@ -92,7 +96,11 @@ const SettingsImage: Component<SettingsImageProps> = (props) => {
 
               onClick={() => setDetailQuality(q)}
             >
-              {q === "medium" ? "默认" : q === "large" ? "高清" : "原图"}
+              {q === "medium"
+                ? t("settings.image.qualityMedium")
+                : q === "large"
+                  ? t("settings.image.qualityHigh")
+                  : t("settings.image.qualityOriginal")}
             </button>
           ))}
         </div>
@@ -103,7 +111,7 @@ const SettingsImage: Component<SettingsImageProps> = (props) => {
         <div class="flex items-center gap-2 mb-2">
           <FluentIcon name="image" size={20} />
           <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
-            动图播放方案
+            {t("settings.image.ugoiraModeTitle")}
           </p>
         </div>
         <div class="flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-1.5 gap-1">
@@ -120,12 +128,14 @@ const SettingsImage: Component<SettingsImageProps> = (props) => {
 
               onClick={() => onPickUgoiraMode(m)}
             >
-              {m === "fflate" ? "fflate（默认）" : "Range 流式"}
+              {m === "fflate"
+                ? t("settings.image.ugoiraFflate")
+                : t("settings.image.ugoiraRange")}
             </button>
           ))}
         </div>
         <p class="mt-1 text-[var(--fontSizeBase100)] text-[var(--colorNeutralForeground3)] leading-snug">
-          Range 流式按需取帧、内存更低；原生端（WebView）自动降级为全量，失败不中断播放。
+          {t("settings.image.ugoiraModeDesc")}
         </p>
       </div>
 
@@ -133,16 +143,15 @@ const SettingsImage: Component<SettingsImageProps> = (props) => {
       <FluentDialog
         open={showUgoiraConfirm()}
         onClose={() => setShowUgoiraConfirm(false)}
-        aria-label="切换到 Range 流式？"
+        aria-label={t("settings.image.ugoiraDialogAria")}
       >
-        <div slot="title">切换到 Range 流式？</div>
+        <div slot="title">{t("settings.image.ugoiraDialogTitle")}</div>
         <div slot="content" class="flex flex-col gap-2">
           <p class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)] leading-snug">
-            Range 流式按需取帧、内存占用更低；若 Range 请求失败将自动切换为 fflate
-            全量播放（原生端/WebView 恒走自动切换），不中断播放。
+            {t("settings.image.ugoiraDialogBody1")}
           </p>
           <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-            确认切换后，动图将优先使用 Range 流式方案。
+            {t("settings.image.ugoiraDialogBody2")}
           </p>
         </div>
         <fluent-button
@@ -150,7 +159,7 @@ const SettingsImage: Component<SettingsImageProps> = (props) => {
           appearance="secondary"
           ref={fluentOn("click", () => setShowUgoiraConfirm(false))}
         >
-          取消
+          {t("settings.image.cancel")}
         </fluent-button>
         <fluent-button
           slot="actions"
@@ -160,7 +169,7 @@ const SettingsImage: Component<SettingsImageProps> = (props) => {
             setShowUgoiraConfirm(false);
           })}
         >
-          确认切换
+          {t("settings.image.ugoiraDialogConfirm")}
         </fluent-button>
       </FluentDialog>
 
@@ -178,14 +187,14 @@ const SettingsImage: Component<SettingsImageProps> = (props) => {
         }}
         role="button"
         tabindex="0"
-        aria-label="图片缓存"
+        aria-label={t("settings.image.cache")}
       >
         <div class="flex items-center gap-3">
           <div class="relative w-6 h-6 flex-shrink-0 text-[var(--colorNeutralForeground2)]">
             <FluentIcon name="server" size={24} />
           </div>
           <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
-            图片缓存
+            {t("settings.image.cache")}
           </p>
         </div>
         <span class="text-[var(--colorNeutralForeground3)] ml-2">→</span>
@@ -203,7 +212,7 @@ const SettingsImage: Component<SettingsImageProps> = (props) => {
         }}
         role="button"
         tabindex="0"
-        aria-label="清除图片缓存"
+        aria-label={t("settings.image.clearCache")}
       >
         <div class="flex items-center gap-3">
           <div class="relative w-6 h-6 flex-shrink-0 text-[var(--colorNeutralForeground2)]">
@@ -216,10 +225,10 @@ const SettingsImage: Component<SettingsImageProps> = (props) => {
           </div>
           <div>
             <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
-              清除图片缓存
+              {t("settings.image.clearCache")}
             </p>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-              清理已下载的插画和小说封面缓存
+              {t("settings.image.clearCacheDesc")}
             </p>
           </div>
         </div>
@@ -239,7 +248,7 @@ const SettingsImage: Component<SettingsImageProps> = (props) => {
         }}
         role="button"
         tabindex="0"
-        aria-label="图床代理"
+        aria-label={t("settings.image.hostProxy")}
       >
         <div class="flex items-center gap-3">
           <div class="relative w-6 h-6 flex-shrink-0 text-[var(--colorNeutralForeground2)]">
@@ -247,12 +256,15 @@ const SettingsImage: Component<SettingsImageProps> = (props) => {
           </div>
           <div>
             <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
-              图床代理
+              {t("settings.image.hostProxy")}
             </p>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
               {imageHostState().masterEnabled
-                ? `${modeLabel(imageHostState().mode)} · ${imageHostState().hosts.filter((h) => h.enabled).length} 个图床`
-                : "使用默认代理"}
+                ? t("settings.image.hostProxySummary", {
+                    label: modeLabel(imageHostState().mode),
+                    count: imageHostState().hosts.filter((h) => h.enabled).length,
+                  })
+                : t("settings.image.hostProxyDefault")}
             </p>
           </div>
         </div>
@@ -266,7 +278,7 @@ const SettingsImage: Component<SettingsImageProps> = (props) => {
                 setMasterEnabled(false);
               }
             })}
-            aria-label="启用图床代理"
+            aria-label={t("settings.image.hostProxyEnable")}
             onClick={(e: MouseEvent) => e.stopPropagation()}
           />
           <svg

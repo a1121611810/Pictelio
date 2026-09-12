@@ -38,6 +38,7 @@
   "components/home/FeedList.tsx",
   "components/home/HistoryRowCard.tsx",
   "components/home/IllustSingleCard.tsx",
+  "components/home/RankingPrototype.tsx",
   "components/home/RelatedStripRow.tsx",
   "components/home/SideNavShell.tsx",
   "components/illust/BottomActionBar.tsx",

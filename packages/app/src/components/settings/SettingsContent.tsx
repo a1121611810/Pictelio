@@ -11,11 +11,13 @@ import {
 } from "../../stores/settingsStore";
 import type { AiFilterMode } from "../../utils/aiFilter";
 import FluentIcon from "../ui/FluentIcon";
+import { t, type I18nKey } from "../../i18n";
 
-const AI_FILTER_OPTIONS: { value: AiFilterMode; label: string }[] = [
-  { value: "show", label: "显示" },
-  { value: "mask", label: "遮罩" },
-  { value: "only", label: "仅看" },
+// 模块级常量存 key，渲染时 t(key)（i18n B2：不许模块加载时快照文案）
+const AI_FILTER_OPTIONS: { value: AiFilterMode; label: I18nKey }[] = [
+  { value: "show", label: "settings.content.aiFilter.show" },
+  { value: "mask", label: "settings.content.aiFilter.mask" },
+  { value: "only", label: "settings.content.aiFilter.only" },
 ];
 
 interface SettingsContentProps {
@@ -26,7 +28,7 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
   return (
     <div class="py-3 flex flex-col">
       <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground3)] uppercase tracking-wide mb-1">
-        内容与过滤
+        {t("settings.content.sectionTitle")}
       </p>
 
       {/* 显示 R18 内容开关行 */}
@@ -42,10 +44,10 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
           </div>
           <div>
             <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
-              显示 R18 内容
+              {t("settings.content.showR18")}
             </p>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-              关闭后列表中不展示敏感内容，需刷新列表生效
+              {t("settings.content.showR18Desc")}
             </p>
           </div>
         </div>
@@ -53,7 +55,7 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
         <fluent-switch
           checked={showR18()}
           ref={fluentOn("change", () => setShowR18(!showR18()))}
-          aria-label="显示 R18 内容"
+          aria-label={t("settings.content.showR18")}
         />
       </div>
 
@@ -70,10 +72,10 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
           </div>
           <div>
             <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
-              显示 R-18G 内容
+              {t("settings.content.showR18G")}
             </p>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-              关闭后列表中不展示猎奇内容，需刷新列表生效
+              {t("settings.content.showR18GDesc")}
             </p>
           </div>
         </div>
@@ -81,7 +83,7 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
         <fluent-switch
           checked={showR18G()}
           ref={fluentOn("change", () => setShowR18G(!showR18G()))}
-          aria-label="显示 R-18G 内容"
+          aria-label={t("settings.content.showR18G")}
         />
       </div>
 
@@ -93,10 +95,10 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
           </div>
           <div>
             <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
-              相关作品注入
+              {t("settings.content.relatedInjection")}
             </p>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-              从详情返回后，在该作品下方插入一行相关作品推荐
+              {t("settings.content.relatedInjectionDesc")}
             </p>
           </div>
         </div>
@@ -104,7 +106,7 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
         <fluent-switch
           checked={relatedInjection()}
           ref={fluentOn("change", () => void setRelatedInjection(!relatedInjection()))}
-          aria-label="相关作品注入"
+          aria-label={t("settings.content.relatedInjection")}
         />
       </div>
 
@@ -116,15 +118,15 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
           </div>
           <div>
             <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
-              AI 作品
+              {t("settings.content.aiFilter.title")}
             </p>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-              控制 AI 生成 / AI 辅助作品的显示方式
+              {t("settings.content.aiFilter.desc")}
             </p>
           </div>
         </div>
 
-        <div class="mt-3 grid grid-cols-3 gap-2" role="group" aria-label="AI 作品过滤模式">
+        <div class="mt-3 grid grid-cols-3 gap-2" role="group" aria-label={t("settings.content.aiFilter.groupLabel")}>
           <For each={AI_FILTER_OPTIONS}>
             {(option) => {
               const selected = () => aiFilterMode() === option.value;
@@ -132,7 +134,7 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
                 <button
                   type="button"
                   aria-pressed={selected() ? "true" : "false"}
-                  aria-label={option.label}
+                  aria-label={t(option.label)}
                   onClick={() => void setAiFilterMode(option.value)}
                   class={[
                     "flex items-center justify-center py-2 min-h-10 rounded-[var(--borderRadiusMedium)] border transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] appearance-none cursor-pointer [font-size:var(--fontSizeBase300)] focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)]",
@@ -145,7 +147,7 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
                     },
                   ]}
                 >
-                  {option.label}
+                  {t(option.label)}
                 </button>
               );
             }}
@@ -165,7 +167,7 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
         }}
         role="button"
         tabindex="0"
-        aria-label="管理屏蔽列表"
+        aria-label={t("settings.content.blocklist")}
       >
         <div class="flex items-center gap-3">
           <div class="relative w-6 h-6 flex-shrink-0 text-[var(--colorNeutralForeground2)]">
@@ -178,10 +180,10 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
           </div>
           <div>
             <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
-              管理屏蔽列表
+              {t("settings.content.blocklist")}
             </p>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-              查看或解除已屏蔽的作者
+              {t("settings.content.blocklistDesc")}
             </p>
           </div>
         </div>

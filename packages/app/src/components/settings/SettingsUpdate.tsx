@@ -16,6 +16,7 @@ import {
 } from "../../stores/settingsStore";
 import PictelioIcon from "../PictelioIcon";
 import { checkForUpdate } from "../../services/updateService";
+import { t } from "../../i18n";
 
 async function handleCheckUpdate() {
   if (isCheckingUpdate()) {
@@ -43,7 +44,7 @@ const SettingsUpdate: Component = () => {
   return (
     <div class="py-3 flex flex-col">
       <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground3)] uppercase tracking-wide mb-1">
-        更新与关于
+        {t("settings.update.sectionTitle")}
       </p>
 
       {/* 启动时检查更新 — toggle row */}
@@ -59,17 +60,17 @@ const SettingsUpdate: Component = () => {
           </div>
           <div class="min-w-0">
             <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
-              启动时检查更新
+              {t("settings.update.autoCheck")}
             </p>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-              每次打开 App 时后台检测新版本
+              {t("settings.update.autoCheckDesc")}
             </p>
           </div>
         </div>
         <fluent-switch
           checked={autoCheckUpdate()}
           ref={fluentOn("change", () => setAutoCheckUpdate(!autoCheckUpdate()))}
-          aria-label="启动时检查更新"
+          aria-label={t("settings.update.autoCheck")}
         />
       </div>
 
@@ -86,17 +87,17 @@ const SettingsUpdate: Component = () => {
           </div>
           <div class="min-w-0">
             <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
-              自动下载 Web 更新包
+              {t("settings.update.otaAutoDownload")}
             </p>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-              静默下载并在下次启动生效；强制更新门槛不受此开关影响
+              {t("settings.update.otaAutoDownloadDesc")}
             </p>
           </div>
         </div>
         <fluent-switch
           checked={otaAutoDownload()}
           ref={fluentOn("change", () => setOtaAutoDownload(!otaAutoDownload()))}
-          aria-label="自动下载 Web 更新包"
+          aria-label={t("settings.update.otaAutoDownload")}
         />
       </div>
 
@@ -112,7 +113,7 @@ const SettingsUpdate: Component = () => {
         }}
         role="button"
         tabindex="0"
-        aria-label="检查更新"
+        aria-label={t("settings.update.checkNow")}
       >
         <div class="flex items-center gap-3 min-w-0">
           <div class="relative w-6 h-6 flex-shrink-0 text-[var(--colorNeutralForeground2)] flex items-center justify-center">
@@ -124,7 +125,7 @@ const SettingsUpdate: Component = () => {
             </svg>
           </div>
           <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
-            检查更新
+            {t("settings.update.checkNow")}
           </p>
         </div>
         <div class="flex items-center gap-2 flex-shrink-0 ml-3">
@@ -169,7 +170,7 @@ const SettingsUpdate: Component = () => {
         }}
         role="button"
         tabindex="0"
-        aria-label="关于"
+        aria-label={t("settings.update.about")}
       >
         <div class="flex items-center gap-3 min-w-0">
           <PictelioIcon size="32" class="flex-shrink-0" />
@@ -178,7 +179,7 @@ const SettingsUpdate: Component = () => {
               Pictelio
             </p>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-              关于 · v{APP_VERSION}
+              {t("settings.update.aboutVersion", { version: APP_VERSION })}
             </p>
           </div>
         </div>

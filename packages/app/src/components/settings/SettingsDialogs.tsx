@@ -1,6 +1,7 @@
 import type { Component } from "solid-js";
 import BlocklistSheet from "../BlocklistSheet";
 import FluentDialog from "../ui/FluentDialog";
+import { t } from "../../i18n";
 
 interface SettingsDialogsProps {
   showBlocklist: boolean;
@@ -28,26 +29,23 @@ const SettingsDialogs: Component<SettingsDialogsProps> = (props) => {
       <FluentDialog
         open={props.dialogType === "clear"}
         onClose={() => props.onCloseDialog()}
-        aria-label="清除所有本地数据？"
+        aria-label={t("settings.dialogs.clearAria")}
       >
-        <h3 slot="title">清除所有本地数据？</h3>
-        <p>
-          这将删除本应用在本机保存的全部数据，包括：登录凭证、图片缓存、浏览设置、屏蔽列表、举报记录。此操作不可恢复，但不会删除你的
-          Pixiv 账号及其在 Pixiv 服务器上的数据。
-        </p>
+        <h3 slot="title">{t("settings.dialogs.clearTitle")}</h3>
+        <p>{t("settings.dialogs.clearBody")}</p>
         <fluent-button
           slot="actions"
           appearance="secondary"
           ref={fluentOn("click", () => props.onCloseDialog())}
         >
-          取消
+          {t("settings.dialogs.cancel")}
         </fluent-button>
         <fluent-button
           slot="actions"
           appearance="primary"
           ref={fluentOn("click", () => props.onConfirmClear())}
         >
-          确认清除
+          {t("settings.dialogs.clearConfirm")}
         </fluent-button>
       </FluentDialog>
 
@@ -55,19 +53,16 @@ const SettingsDialogs: Component<SettingsDialogsProps> = (props) => {
       <FluentDialog
         open={props.dialogType === "deleteAccount"}
         onClose={() => props.onCloseDialog()}
-        aria-label="删除 Pixiv 账号？"
+        aria-label={t("settings.dialogs.deleteAria")}
       >
-        <h3 slot="title">删除 Pixiv 账号？</h3>
-        <p>
-          Pictelio 是第三方客户端，无法直接删除你的 Pixiv 账号。点击确认将打开 Pixiv
-          官方账号删除页面，请按官方流程操作。
-        </p>
+        <h3 slot="title">{t("settings.dialogs.deleteTitle")}</h3>
+        <p>{t("settings.dialogs.deleteBody")}</p>
         <fluent-button
           slot="actions"
           appearance="secondary"
           ref={fluentOn("click", () => props.onCloseDialog())}
         >
-          取消
+          {t("settings.dialogs.cancel")}
         </fluent-button>
         <fluent-button
           slot="actions"
@@ -76,7 +71,7 @@ const SettingsDialogs: Component<SettingsDialogsProps> = (props) => {
             props.onConfirmDelete();
           })}
         >
-          前往 Pixiv
+          {t("settings.dialogs.deleteConfirm")}
         </fluent-button>
       </FluentDialog>
     </>

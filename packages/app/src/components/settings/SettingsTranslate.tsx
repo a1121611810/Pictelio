@@ -21,6 +21,7 @@ import {
 } from "@/stores/translationStore";
 import { clearTranslationCache } from "@/utils/translationCache";
 import { tryAsync } from "@/utils/tryAsync";
+import { t } from "@/i18n";
 import FluentIcon from "../ui/FluentIcon";
 import FluentDialog from "../ui/FluentDialog";
 
@@ -49,23 +50,23 @@ const SettingsTranslate: Component = () => {
     const [err] = await tryAsync(saveDsApiKey(inputKey()));
     setSaving(false);
     if (err) {
-      setFeedback("保存失败，请重试");
+      setFeedback(t("settings.translate.saveFailed")); // i18n: set 时快照（瞬态）
       return;
     }
-    setFeedback("已保存");
+    setFeedback(t("settings.translate.saved")); // i18n: set 时快照（瞬态）
     setTimeout(() => setFeedback(null), 2000);
   }
 
   async function handleClear() {
     await clearDsApiKey();
     setInputKey("");
-    setFeedback("已清除");
+    setFeedback(t("settings.translate.cleared")); // i18n: set 时快照（瞬态）
     setTimeout(() => setFeedback(null), 2000);
   }
 
   async function handleClearCache() {
     await clearTranslationCache();
-    setFeedback("已清除翻译缓存");
+    setFeedback(t("settings.translate.cacheCleared")); // i18n: set 时快照（瞬态）
     setTimeout(() => setFeedback(null), 2000);
   }
 
@@ -101,7 +102,7 @@ const SettingsTranslate: Component = () => {
     <>
       <div class="py-3 flex flex-col">
         <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground3)] uppercase tracking-wide mb-1">
-          翻译设置
+          {t("settings.translate.sectionTitle")}
         </p>
 
         <div class="py-2">
@@ -112,8 +113,7 @@ const SettingsTranslate: Component = () => {
             </p>
           </div>
           <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug mb-2">
-            填写你自己的 API Key，加密存储于本机，仅用于直连 DeepSeek 翻译服务（按量自付）。
-            请妥善保管，勿将 key 暴露给他人；泄露造成的损失由你自行承担。
+            {t("settings.translate.byokDesc")}
           </p>
           <div class="flex gap-2">
             <input
@@ -131,7 +131,7 @@ const SettingsTranslate: Component = () => {
               class="flex-shrink-0 px-3 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] font-medium hover:bg-[var(--colorNeutralBackground3)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer"
               onClick={() => setShowKey((v) => !v)}
             >
-              {showKey() ? "隐藏" : "显示"}
+              {showKey() ? t("settings.translate.hide") : t("settings.translate.show")}
             </button>
           </div>
           <Show when={dsApiKey()}>
@@ -140,7 +140,7 @@ const SettingsTranslate: Component = () => {
               class="mt-2 px-2 py-1 rounded-[var(--borderRadiusSmall)] text-[var(--colorStatusDangerForeground1)] [font-size:var(--fontSizeBase200)] hover:bg-[var(--colorStatusDangerBackground1)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer"
               onClick={() => void handleClear()}
             >
-              清除已保存的 Key
+              {t("settings.translate.clearKey")}
             </button>
           </Show>
           <div class="flex items-center gap-2 mt-2">
@@ -150,7 +150,7 @@ const SettingsTranslate: Component = () => {
               disabled={saving()}
               onClick={() => void handleSave()}
             >
-              {saving() ? "保存中…" : "保存"}
+              {saving() ? t("settings.translate.saving") : t("settings.translate.save")}
             </button>
             <Show when={feedback()}>
               {(msg) => (
@@ -164,11 +164,11 @@ const SettingsTranslate: Component = () => {
           {/* 翻译质量与思考（S6，决策 #22）：默认档位 + 思考开关 */}
           <div class="py-2 mt-2">
             <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug mb-2">
-              翻译质量与思考
+              {t("settings.translate.qualityTitle")}
             </p>
 
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug mb-1">
-              默认翻译质量（档位切换入口后续版本提供）
+              {t("settings.translate.defaultTierLabel")}
             </p>
             <div class="flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-1.5 gap-1">
               <button
@@ -185,9 +185,9 @@ const SettingsTranslate: Component = () => {
 
                 onClick={() => void setDefaultTier("flash")}
               >
-                标准
+                {t("settings.translate.tierStandard")}
                 <small class="block font-normal [font-size:var(--fontSizeBase100)] text-[var(--colorNeutralForeground3)]">
-                  v4-flash · ¥1/2 每百万
+                  {t("settings.translate.tierStandardPrice")}
                 </small>
               </button>
               <button
@@ -203,9 +203,9 @@ const SettingsTranslate: Component = () => {
 
                 onClick={() => void setDefaultTier("pro")}
               >
-                高质量
+                {t("settings.translate.tierPro")}
                 <small class="block font-normal [font-size:var(--fontSizeBase100)] text-[var(--colorNeutralForeground3)]">
-                  v4-pro · ¥3/6 每百万
+                  {t("settings.translate.tierProPrice")}
                 </small>
               </button>
             </div>
@@ -213,16 +213,16 @@ const SettingsTranslate: Component = () => {
             <div class="flex items-center justify-between py-2 mt-1">
               <div>
                 <p class="[font-size:var(--fontSizeBase300)] font-medium text-[var(--colorNeutralForeground1)] leading-snug">
-                  启用思考模式
+                  {t("settings.translate.thinking")}
                 </p>
                 <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-                  默认关。开启后翻译更慢、产生额外 reasoning token 计费、temperature 不生效
+                  {t("settings.translate.thinkingDesc")}
                 </p>
               </div>
               <fluent-switch
                 checked={thinkingEnabled()}
                 ref={fluentOn("change", () => void setThinkingEnabled(!thinkingEnabled()))}
-                aria-label="启用思考模式"
+                aria-label={t("settings.translate.thinking")}
               />
             </div>
           </div>
@@ -230,38 +230,38 @@ const SettingsTranslate: Component = () => {
           {/* 敏感内容翻译（S5）：R18/R18G 双开关，默认关（决策 #23） */}
           <div class="py-2 mt-2">
             <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug mb-1">
-              敏感内容翻译
+              {t("settings.translate.sensitiveTitle")}
             </p>
 
             <div class="flex items-center justify-between py-2">
               <div>
                 <p class="[font-size:var(--fontSizeBase300)] font-medium text-[var(--colorNeutralForeground1)] leading-snug">
-                  翻译 R18 内容
+                  {t("settings.translate.r18")}
                 </p>
                 <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-                  默认关。开启需确认风险，正文将发送至 AI 服务商
+                  {t("settings.translate.r18Desc")}
                 </p>
               </div>
               <fluent-switch
                 checked={translateR18()}
                 ref={fluentOn("change", () => onToggleR18())}
-                aria-label="翻译 R18 内容"
+                aria-label={t("settings.translate.r18")}
               />
             </div>
 
             <div class="flex items-center justify-between py-2">
               <div>
                 <p class="[font-size:var(--fontSizeBase300)] font-medium text-[var(--colorNeutralForeground1)] leading-snug">
-                  翻译 R18G 内容
+                  {t("settings.translate.r18g")}
                 </p>
                 <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-                  默认关。法律红线，需更强警告与二次确认
+                  {t("settings.translate.r18gDesc")}
                 </p>
               </div>
               <fluent-switch
                 checked={translateR18G()}
                 ref={fluentOn("change", () => onToggleR18G())}
-                aria-label="翻译 R18G 内容"
+                aria-label={t("settings.translate.r18g")}
               />
             </div>
           </div>
@@ -269,17 +269,17 @@ const SettingsTranslate: Component = () => {
           {/* 译文缓存（S3）：LRU 200 章 / ~8MB + 手动清除（决策 #24） */}
           <div class="py-2 mt-2">
             <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug mb-1">
-              译文缓存
+              {t("settings.translate.cacheTitle")}
             </p>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug mb-2">
-              LRU 200 章 / ~8MB 上限，作者修改正文后自动失效重翻。清除不影响已保存的 API Key。
+              {t("settings.translate.cacheDesc")}
             </p>
             <button
               type="button"
               class="px-4 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] font-medium hover:bg-[var(--colorNeutralBackground3)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer"
               onClick={() => void handleClearCache()}
             >
-              清除翻译缓存
+              {t("settings.translate.clearCache")}
             </button>
           </div>
         </div>
@@ -289,27 +289,23 @@ const SettingsTranslate: Component = () => {
       <FluentDialog
         open={restrictDialog() === "r18"}
         onClose={() => setRestrictDialog(null)}
-        aria-label="开启 R18 翻译？"
+        aria-label={t("settings.translate.r18DialogAria")}
       >
-        <h3 slot="title">开启「翻译 R18 内容」？</h3>
-        <p>
-          该作品包含 R18 内容。翻译需将正文发送至你选择的 AI 服务商，可能：①
-          被内容审核拒绝（失败段落保留原文）；② 违反服务商使用条款，导致你的 API
-          账号被警告、暂停或封禁；③ 内容可能被去标识化后用于模型训练。所有风险由你自行承担。
-        </p>
+        <h3 slot="title">{t("settings.translate.r18DialogTitle")}</h3>
+        <p>{t("settings.translate.r18DialogBody")}</p>
         <fluent-button
           slot="actions"
           appearance="secondary"
           ref={fluentOn("click", () => setRestrictDialog(null))}
         >
-          取消
+          {t("settings.translate.cancel")}
         </fluent-button>
         <fluent-button
           slot="actions"
           appearance="primary"
           ref={fluentOn("click", confirmRestrictDialog)}
         >
-          我已了解并开启
+          {t("settings.translate.r18DialogConfirm")}
         </fluent-button>
       </FluentDialog>
 
@@ -317,26 +313,23 @@ const SettingsTranslate: Component = () => {
       <FluentDialog
         open={restrictDialog() === "r18g"}
         onClose={() => setRestrictDialog(null)}
-        aria-label="开启 R18G 翻译？"
+        aria-label={t("settings.translate.r18gDialogAria")}
       >
-        <h3 slot="title">开启「翻译 R18G 内容」？（法律红线）</h3>
-        <p>
-          该作品包含 R18G（极端）内容。除上述风险外，此类内容违反法律法规红线，可能导致你的 API
-          账号被关闭，服务商可能向主管部门/执法机构报告。App 提供方不承担由此产生的任何责任。
-        </p>
+        <h3 slot="title">{t("settings.translate.r18gDialogTitle")}</h3>
+        <p>{t("settings.translate.r18gDialogBody")}</p>
         <fluent-button
           slot="actions"
           appearance="secondary"
           ref={fluentOn("click", () => setRestrictDialog(null))}
         >
-          取消
+          {t("settings.translate.cancel")}
         </fluent-button>
         <fluent-button
           slot="actions"
           appearance="primary"
           ref={fluentOn("click", confirmRestrictDialog)}
         >
-          我已了解并承担全部风险
+          {t("settings.translate.r18gDialogConfirm")}
         </fluent-button>
       </FluentDialog>
     </>

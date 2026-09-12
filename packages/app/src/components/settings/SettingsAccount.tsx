@@ -1,4 +1,5 @@
 import type { Component } from "solid-js";
+import { t } from "../../i18n";
 
 interface Props {
   onClearData: () => void;
@@ -10,7 +11,7 @@ const SettingsAccount: Component<Props> = (props) => {
   return (
     <div class="py-3 flex flex-col">
       <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground3)] uppercase tracking-wide mb-1">
-        账户
+        {t("settings.account.sectionTitle")}
       </p>
 
       {/* 清除所有本地数据 */}
@@ -25,7 +26,7 @@ const SettingsAccount: Component<Props> = (props) => {
         }}
         role="button"
         tabindex="0"
-        aria-label="清除所有本地数据"
+        aria-label={t("settings.account.clearData")}
       >
         <div class="flex items-center gap-3">
           <div class="relative w-6 h-6 flex-shrink-0 text-[var(--colorStatusDangerForeground1)]">
@@ -38,10 +39,10 @@ const SettingsAccount: Component<Props> = (props) => {
           </div>
           <div>
             <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorStatusDangerForeground1)] leading-snug">
-              清除所有本地数据
+              {t("settings.account.clearData")}
             </p>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-              删除登录凭证、图片缓存、设置、屏蔽与举报记录
+              {t("settings.account.clearDataDesc")}
             </p>
           </div>
         </div>
@@ -59,7 +60,7 @@ const SettingsAccount: Component<Props> = (props) => {
         }}
         role="button"
         tabindex="0"
-        aria-label="删除 Pixiv 账号"
+        aria-label={t("settings.account.deleteAccount")}
       >
         <div class="flex items-center gap-3">
           <div class="relative w-6 h-6 flex-shrink-0 text-[var(--colorNeutralForeground2)]">
@@ -72,10 +73,10 @@ const SettingsAccount: Component<Props> = (props) => {
           </div>
           <div>
             <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
-              删除 Pixiv 账号
+              {t("settings.account.deleteAccount")}
             </p>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-              打开 Pixiv 官方账号删除页面，按官方流程操作
+              {t("settings.account.deleteAccountDesc")}
             </p>
           </div>
         </div>
