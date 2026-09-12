@@ -558,13 +558,13 @@ const NovelDetail: Component = () => {
     if (!showTranslation()) {
       return bs;
     }
-    const t = translatedParagraphs();
-    if (Object.keys(t).length === 0) {
+    const tp = translatedParagraphs();
+    if (Object.keys(tp).length === 0) {
       return bs;
     }
     // oxlint-disable-next-line no-map-spread -- blocks are immutable; copy-on-write required to swap in translated text
     return bs.map((b) =>
-      b.type === "text" && t[b.index] !== undefined ? { ...b, text: t[b.index] } : b,
+      b.type === "text" && tp[b.index] !== undefined ? { ...b, text: tp[b.index] } : b,
     );
   });
 
@@ -713,8 +713,8 @@ const NovelDetail: Component = () => {
     if (targets.length === 0) {
       return; // 补翻模式但没有失败段落
     }
-    const texts = targets.map((t) => t.text);
-    const baseIndexes = targets.map((t) => t.index);
+    const texts = targets.map((item) => item.text);
+    const baseIndexes = targets.map((item) => item.index);
 
     // 档位（S6 全局默认 + S7 详情页临时切换）：缓存维度与请求 model 统一用实际档位
     const model = TIER_MODELS[translateTier() ?? defaultTier()];
@@ -886,13 +886,13 @@ const NovelDetail: Component = () => {
     onScrollTo: (top) => {
       const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
       window.scrollTo({ top: Math.min(max, Math.max(0, top)), behavior: "auto" });
-      setScrollTick((t) => t + 1);
+      setScrollTick((prev) => prev + 1);
     },
   });
   // scroll/resize 驱动重算（thumb 位置/尺寸随滚动更新）
   // Solid 2.0：onSettled 内禁用 onCleanup，监听器清理改由返回值注册。
   onSettled(() => {
-    const onScroll = () => setScrollTick((t) => t + 1);
+    const onScroll = () => setScrollTick((prev) => prev + 1);
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll, { passive: true });
     return () => {

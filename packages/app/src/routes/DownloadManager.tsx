@@ -100,7 +100,7 @@ const DownloadManager: Component = () => {
 
   const tasks = createMemo(() => downloadState().tasks);
   const groups = createMemo(() => groupByIllust(tasks()));
-  const allIds = createMemo<readonly string[]>(() => tasks().map((t) => t.id));
+  const allIds = createMemo<readonly string[]>(() => tasks().map((task) => task.id));
   const effectiveIds = createMemo<readonly string[]>(() => {
     const sel = selected();
     return sel.size > 0 ? [...sel] : allIds();
