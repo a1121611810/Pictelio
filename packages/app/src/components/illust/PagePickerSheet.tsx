@@ -3,6 +3,7 @@ import type { Component } from "solid-js";
 import FluentDialog from "../ui/FluentDialog";
 import PixivImage from "../PixivImage";
 import { fluentOn } from "../../primitives/fluentOn";
+import { t } from "../../i18n";
 
 interface PagePickerSheetProps {
   open: boolean;
@@ -54,8 +55,8 @@ const PagePickerSheet: Component<PagePickerSheetProps> = (props) => {
   };
 
   return (
-    <FluentDialog open={props.open} onClose={props.onClose} aria-label="选择要保存的页">
-      <h3 slot="title">选择要保存的页</h3>
+    <FluentDialog open={props.open} onClose={props.onClose} aria-label={t("illust.pagePicker.dialogAria")}>
+      <h3 slot="title">{t("illust.pagePicker.title")}</h3>
       <div class="grid grid-cols-3 gap-2 max-h-[55vh] overflow-y-auto">
         <For each={props.pageUrls}>
           {(url, i) => (
@@ -68,11 +69,15 @@ const PagePickerSheet: Component<PagePickerSheetProps> = (props) => {
               }`}
               onClick={() => toggle(i())}
               aria-pressed={selected().has(i()) ? "true" : "false"}
-              aria-label={`第 ${i() + 1} 页${selected().has(i()) ? "（已选）" : ""}`}
+              aria-label={
+                selected().has(i())
+                  ? t("illust.pagePicker.pageSelectedAria", { page: i() + 1 })
+                  : t("illust.pagePicker.pageAria", { page: i() + 1 })
+              }
             >
               <PixivImage
                 src={url}
-                alt={`第 ${i() + 1} 页`}
+                alt={t("illust.pagePicker.pageAria", { page: i() + 1 })}
                 width={200}
                 height={200}
                 class="w-full h-full object-cover"
@@ -102,17 +107,20 @@ const PagePickerSheet: Component<PagePickerSheetProps> = (props) => {
             }
           }}
         >
-          {allSelected() ? "清除全选" : "全选"}
+          {allSelected() ? t("illust.pagePicker.clearAll") : t("illust.pagePicker.selectAll")}
         </button>
         <span class="ml-auto [font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground2)]">
-          已选 {selected().size} / {props.pageUrls.length} 页
+          {t("illust.pagePicker.selectedCount", {
+            selected: selected().size,
+            total: props.pageUrls.length,
+          })}
         </span>
         <fluent-button
           appearance="primary"
           disabled={selected().size === 0 || props.busy}
           ref={fluentOn("click", confirm)}
         >
-          {props.busy ? "保存中…" : `保存（${selected().size}）`}
+          {props.busy ? t("illust.pagePicker.saving") : t("illust.pagePicker.saveCount", { count: selected().size })}
         </fluent-button>
       </div>
     </FluentDialog>

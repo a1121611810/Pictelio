@@ -18,6 +18,7 @@ import { createProgressiveImage } from "@/primitives/createProgressiveImage";
 import AdaptiveTags from "@/components/home/AdaptiveTags";
 import IllustTypeBadge from "@/components/IllustTypeBadge";
 import SkeletonShimmer from "@/components/SkeletonShimmer";
+import { t } from "../../i18n";
 
 interface IllustSingleCardProps {
   /** 插画数据 */
@@ -99,7 +100,7 @@ const IllustSingleCard: Component<IllustSingleCardProps> = (props) => {
           )}
           <Show when={props.illust.illust_ai_type != null && props.illust.illust_ai_type >= 1}>
             <fluent-badge appearance="filled">
-              {props.illust.illust_ai_type === 2 ? "AI" : "AI辅助"}
+              {props.illust.illust_ai_type === 2 ? "AI" : t("home.illustSingle.aiAssisted")}
             </fluent-badge>
           </Show>
         </div>

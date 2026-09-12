@@ -1,4 +1,5 @@
 import type { Component } from "solid-js";
+import { t } from "../../i18n";
 
 interface DetailHeaderProps {
   title: string;
@@ -17,7 +18,7 @@ const DetailHeader: Component<DetailHeaderProps> = (props) => {
       <div class="rounded-[var(--borderRadiusXLarge)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] px-[var(--spacingHorizontalL)] h-12 flex items-center gap-2">
         <fluent-button
           appearance="subtle"
-          aria-label="返回"
+          aria-label={t("illust.header.backAria")}
           ref={fluentOn("click", props.onBack)}
           class="w-9 h-9 p-0 min-w-9 flex-shrink-0"
         >
@@ -28,7 +29,7 @@ const DetailHeader: Component<DetailHeaderProps> = (props) => {
         </h1>
         <fluent-button
           appearance="subtle"
-          aria-label="更多操作"
+          aria-label={t("illust.header.moreAria")}
           ref={fluentOn("click", props.onMore)}
           class="w-9 h-9 p-0 min-w-9 flex-shrink-0"
         >

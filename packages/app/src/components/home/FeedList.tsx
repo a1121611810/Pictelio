@@ -10,6 +10,7 @@ import type { ApiError } from "@/api/types";
 import { loadImage, pickUnprefetchedUrls } from "@/utils/imageLoader";
 import { isImageHostEnabled } from "@/stores/imageHostStore";
 import { imageCachePrefetch } from "@/stores/settingsStore";
+import { t } from "../../i18n";
 
 /**
  * 统一 Feed 列表容器（ADR-0078）——深模块：小接口（source + 布局 + 渲染回调）背后
@@ -124,7 +125,7 @@ export function FeedList<T>(props: FeedListProps<T>): JSX.Element {
         </Show>
         {/* 分页失败（error 非空 + paginationError）：保留已加载列表，底部显示内联重试条（只重试失败页） */}
         <Show when={error() != null && paginationError()}>
-          <InlineRetryBar message="加载更多失败" onRetry={() => void props.source.fetchMore()} />
+          <InlineRetryBar onRetry={() => void props.source.fetchMore()} />
         </Show>
         <FeedPaginationSentinel
           hasMore={() => !!props.source.nextUrl()}
@@ -134,7 +135,7 @@ export function FeedList<T>(props: FeedListProps<T>): JSX.Element {
         <Show when={props.source.loadingMore()}>
           <div class="flex justify-center py-[var(--spacingVerticalM)]">
             <span class="[font-size:var(--fontSizeBase100)] text-[var(--colorNeutralForeground3)]">
-              加载中…
+              {t("home.feedList.loadingMore")}
             </span>
           </div>
         </Show>

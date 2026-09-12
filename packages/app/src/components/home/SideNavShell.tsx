@@ -36,6 +36,7 @@ import FluentIcon, { type FluentIconName } from "@/components/ui/FluentIcon";
 import ContentTypeToggle from "@/components/home/ContentTypeToggle";
 import HistoryRowCard from "@/components/home/HistoryRowCard";
 import { scrollToTop } from "@/utils/scrollToTop";
+import { t, type I18nKey } from "../../i18n";
 
 /** 首页内容域 Tab（历史内建，不进入 renderPanel）。 */
 export type HomeTab = "recommended" | "follow" | "bookmarks" | "history";
@@ -45,11 +46,11 @@ interface SideNavShellProps {
   renderPanel: (tab: HomeTab) => JSX.Element;
 }
 
-const SHELL_TABS: { key: HomeTab; label: string; icon: FluentIconName }[] = [
-  { key: "recommended", label: "推荐", icon: "home" },
-  { key: "follow", label: "关注", icon: "people" },
-  { key: "bookmarks", label: "收藏", icon: "bookmark" },
-  { key: "history", label: "历史", icon: "history" },
+const SHELL_TABS: { key: HomeTab; labelKey: I18nKey; icon: FluentIconName }[] = [
+  { key: "recommended", labelKey: "home.tab.recommended", icon: "home" },
+  { key: "follow", labelKey: "home.tab.follow", icon: "people" },
+  { key: "bookmarks", labelKey: "home.tab.bookmarks", icon: "bookmark" },
+  { key: "history", labelKey: "home.tab.history", icon: "history" },
 ];
 
 /**
@@ -96,14 +97,14 @@ const HistoryPanel: Component<{
     <div class="px-4 pt-2">
       <div class="flex items-center justify-between px-1 pb-2">
         <span class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
-          浏览历史
+          {t("home.history.title")}
         </span>
         <button
           class="cursor-pointer appearance-none border-none px-2 py-1 font-medium outline-none transition-all active:scale-95 [font-size:var(--fontSizeBase200)] text-[var(--colorDangerForeground)] hover:bg-[var(--colorDangerBackground)]"
           onClick={() => void clearAllHistory()}
-          aria-label="清空浏览历史"
+          aria-label={t("home.history.clearAria")}
         >
-          清空
+          {t("home.history.clear")}
         </button>
       </div>
       <Show
@@ -111,10 +112,10 @@ const HistoryPanel: Component<{
         fallback={
           <div class="flex flex-col items-center gap-2 py-16">
             <p class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground2)]">
-              暂无浏览记录
+              {t("home.history.empty")}
             </p>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
-              浏览过的作品会出现在这里
+              {t("home.history.emptyHint")}
             </p>
           </div>
         }
@@ -179,46 +180,46 @@ const SideNavShell: Component<SideNavShellProps> = (props) => {
       {/* ── 左侧导航列（56px sticky 全高）── */}
       <nav
         class="sticky top-0 flex h-screen w-14 flex-none flex-col items-center gap-1 pt-3"
-        aria-label="主导航"
+        aria-label={t("home.sidenav.mainNavAria")}
       >
         <button
           class="mb-2 flex h-11 w-11 cursor-pointer items-center justify-center rounded-[var(--borderRadiusMedium)] border-none text-[var(--colorNeutralForeground2)] outline-none transition-all hover:bg-[var(--colorNeutralBackground1)] hover:text-[var(--colorNeutralForeground1)] active:scale-95 appearance-none"
           onClick={() => void navigate("/search")}
-          aria-label="搜索"
+          aria-label={t("home.sidenav.searchAria")}
         >
           <FluentIcon name="search" />
         </button>
-        {SHELL_TABS.map((t) => (
+        {SHELL_TABS.map((item) => (
           <button
             class={[
               "flex h-11 w-11 cursor-pointer items-center justify-center rounded-[var(--borderRadiusMedium)] border-none outline-none transition-all active:scale-95 appearance-none",
               {
                 "bg-[var(--colorBrandBackground2)] text-[var(--colorBrandForeground1)]":
-                  tab() === t.key,
+                  tab() === item.key,
                 "text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground1Hover)]":
-                  tab() !== t.key,
+                  tab() !== item.key,
               },
             ]}
 
-            onClick={() => selectTab(t.key)}
-            aria-current={tab() === t.key ? "page" : undefined}
-            aria-label={t.label}
+            onClick={() => selectTab(item.key)}
+            aria-current={tab() === item.key ? "page" : undefined}
+            aria-label={t(item.labelKey)}
           >
-            <FluentIcon name={t.icon} active={tab() === t.key} />
+            <FluentIcon name={item.icon} active={tab() === item.key} />
           </button>
         ))}
         <div class="flex-1" />
         <button
           class="flex h-11 w-11 cursor-pointer items-center justify-center rounded-[var(--borderRadiusMedium)] border-none text-[var(--colorNeutralForeground2)] outline-none transition-all hover:bg-[var(--colorNeutralBackground1Hover)] hover:text-[var(--colorNeutralForeground1)] active:scale-95 appearance-none"
           onClick={() => void navigate("/settings")}
-          aria-label="设置"
+          aria-label={t("home.sidenav.settingsAria")}
         >
           <FluentIcon name="settings" />
         </button>
         <button
           class="mb-3 flex h-11 w-11 cursor-pointer items-center justify-center rounded-[var(--borderRadiusMedium)] border-none outline-none transition-all hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-95 appearance-none"
           onClick={() => void navigate("/me")}
-          aria-label="我的"
+          aria-label={t("home.sidenav.meAria")}
         >
           <UserAvatar />
         </button>
@@ -229,10 +230,10 @@ const SideNavShell: Component<SideNavShellProps> = (props) => {
         <div class="sticky top-0 z-20 flex items-end justify-between gap-3 bg-[var(--colorNeutralBackground2)] px-4 pb-2 pt-4">
           <div class="min-w-0">
             <h1 class="leading-tight tracking-tight [font-size:var(--fontSizeBase500)] font-semibold text-[var(--colorNeutralForeground1)]">
-              {SHELL_TABS.find((t) => t.key === tab())?.label}
+              {t(SHELL_TABS.find((s) => s.key === tab())?.labelKey ?? "home.tab.recommended")}
             </h1>
             <p class="mt-0.5 truncate [font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
-              {user()?.name ?? "Pictelio"} 的首页
+              {t("home.sidenav.homeTitle", { name: user()?.name ?? "Pictelio" })}
             </p>
           </div>
           <Show when={tab() !== "history"}>

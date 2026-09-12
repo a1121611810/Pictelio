@@ -10,6 +10,7 @@ import type { Component } from "solid-js";
 import { Show } from "solid-js";
 import type { HistoryEntry } from "@/stores/historyStore";
 import { resolveImageUrl } from "@/utils/imageLoader";
+import { t } from "../../i18n";
 
 interface HistoryRowCardProps {
   /** 历史条目 */
@@ -67,7 +68,11 @@ const HistoryRowCard: Component<HistoryRowCardProps> = (props) => {
           {props.entry.title}
         </p>
         <p class="mt-[var(--spacingVerticalXXS)] truncate text-[var(--colorNeutralForeground3)] [font-size:var(--fontSizeBase200)]">
-          {props.entry.userName} · {time()} · {props.entry.visitCount}次
+          {t("home.historyCard.meta", {
+            userName: props.entry.userName,
+            time: time(),
+            count: props.entry.visitCount,
+          })}
         </p>
       </div>
 
@@ -78,7 +83,7 @@ const HistoryRowCard: Component<HistoryRowCardProps> = (props) => {
           e.stopPropagation();
           props.onDelete();
         }}
-        aria-label={`删除 ${props.entry.title}`}
+        aria-label={t("home.historyCard.deleteAria", { title: props.entry.title })}
       >
         ✕
       </button>

@@ -7,10 +7,11 @@
  */
 import type { Component } from "solid-js";
 import { contentType, setContentType, type ContentType } from "@/stores/uiStore";
+import { t, type I18nKey } from "../../i18n";
 
-const OPTIONS: { key: ContentType; label: string }[] = [
-  { key: "illust", label: "插画" },
-  { key: "novel", label: "小说" },
+const OPTIONS: { key: ContentType; labelKey: I18nKey }[] = [
+  { key: "illust", labelKey: "home.contentToggle.illust" },
+  { key: "novel", labelKey: "home.contentToggle.novel" },
 ];
 
 const ContentTypeToggle: Component = () => (
@@ -30,7 +31,7 @@ const ContentTypeToggle: Component = () => (
         onClick={() => void setContentType(opt.key)}
         aria-pressed={contentType() === opt.key ? "true" : "false"}
       >
-        {opt.label}
+        {t(opt.labelKey)}
       </button>
     ))}
   </div>

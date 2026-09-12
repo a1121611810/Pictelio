@@ -12,6 +12,7 @@ import { RELATED_ROW_SIZE } from "@/stores/relatedInjectionStore";
 import SkeletonShimmer from "@/components/SkeletonShimmer";
 import type { PixivIllust } from "@/api/types";
 import { resolveImageUrl } from "@/utils/imageLoader";
+import { t } from "../../i18n";
 
 interface RelatedStripRowProps {
   row: RelatedRow;
@@ -37,7 +38,7 @@ const RelatedStripRow: Component<RelatedStripRowProps> = (props) => {
       {/* 标题行 */}
       <div class="flex items-center justify-between">
         <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground2)]">
-          相关作品
+          {t("home.related.title")}
           <Show when={!props.row.loading}>
             <span class="ml-1 font-normal text-[var(--colorNeutralForeground3)]">
               {props.row.items.length}/{RELATED_ROW_SIZE}
@@ -46,7 +47,7 @@ const RelatedStripRow: Component<RelatedStripRowProps> = (props) => {
         </p>
         <button
           type="button"
-          aria-label="收起相关作品"
+          aria-label={t("home.related.dismissAria")}
           onClick={props.onDismiss}
           class="flex h-8 w-8 items-center justify-center rounded-[var(--borderRadiusCircular)] text-[var(--colorNeutralForeground3)] transition-colors duration-[var(--durationFast)] ease-[var(--curveEasyEase)] hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-[0.98] focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)]"
         >
@@ -73,13 +74,13 @@ const RelatedStripRow: Component<RelatedStripRowProps> = (props) => {
           </div>
         }
       >
-        <div class="mt-2 flex gap-2 overflow-x-auto pb-1" role="list" aria-label="相关作品列表">
+        <div class="mt-2 flex gap-2 overflow-x-auto pb-1" role="list" aria-label={t("home.related.listAria")}>
           <For each={props.row.items}>
             {(il) => (
               <button
                 type="button"
                 role="listitem"
-                aria-label={`查看相关作品：${il.title}`}
+                aria-label={t("home.related.viewAria", { title: il.title })}
                 onClick={() => props.onNavigate(il.id)}
                 class="w-20 flex-shrink-0 cursor-pointer rounded-[var(--borderRadiusMedium)] focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)]"
               >

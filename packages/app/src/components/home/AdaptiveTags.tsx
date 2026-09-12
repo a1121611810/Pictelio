@@ -4,6 +4,7 @@ import type { PixivIllustTag } from "@/api/types";
 import SearchableTag from "@/components/SearchableTag";
 import { useContainerWidth } from "@/primitives/useContainerWidth";
 import { computeVisibleTags } from "./adaptiveTagFit";
+import { t } from "../../i18n";
 
 /**
  * 自适应标签行（用户确认的简单方案）：
@@ -144,7 +145,7 @@ const AdaptiveTags: Component<AdaptiveTagsProps> = (props) => {
               class={`${chipClass} min-w-0 overflow-hidden`}
               role="button"
               tabindex={0}
-              aria-label={`搜索标签：${partialTag()!.name}`}
+              aria-label={t("home.adaptiveTags.searchTagAria", { name: partialTag()!.name })}
               onClick={(e) => {
                 e.stopPropagation();
                 props.onOverflowClick();
@@ -159,7 +160,7 @@ const AdaptiveTags: Component<AdaptiveTagsProps> = (props) => {
               class={plusNClass}
               role="button"
               tabindex={0}
-              aria-label={`还有 ${remaining()} 个标签，查看详情`}
+              aria-label={t("home.adaptiveTags.moreTagsAria", { count: remaining() })}
               onClick={(e) => {
                 e.stopPropagation();
                 props.onOverflowClick();

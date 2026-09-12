@@ -1,5 +1,6 @@
 import type { Component } from "solid-js";
 import FluentIcon from "@/components/ui/FluentIcon";
+import { t } from "../../i18n";
 
 interface TagInputProps {
   tags: string[];
@@ -46,7 +47,7 @@ const TagInput: Component<TagInputProps> = (props) => {
             <button
               class="flex items-center justify-center w-4 h-4 rounded-full hover:bg-[var(--colorBrandBackground1Hover)] active:scale-[0.98] transition-all duration-[var(--durationFast)] flex-shrink-0"
               onClick={() => removeTag(index())}
-              aria-label={`移除标签 ${tag}`}
+              aria-label={t("ui.tagInput.removeTagAria", { name: tag })}
             >
               <FluentIcon name="dismiss" size={10} />
             </button>
@@ -59,8 +60,8 @@ const TagInput: Component<TagInputProps> = (props) => {
         class="flex-1 min-w-[80px] bg-transparent border-none outline-none text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase300)] placeholder:text-[var(--colorNeutralForeground3)]"
         placeholder={
           props.tags.length === 0
-            ? (props.placeholder ?? "输入标签，空格/回车添加")
-            : "继续添加标签"
+            ? (props.placeholder ?? t("ui.tagInput.placeholder"))
+            : t("ui.tagInput.placeholderMore")
         }
         value={inputValue()}
         onInput={(e) => setInputValue(e.currentTarget.value)}

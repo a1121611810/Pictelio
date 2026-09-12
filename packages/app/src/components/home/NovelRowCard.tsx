@@ -14,6 +14,7 @@ import { Show } from "solid-js";
 import type { PixivNovel } from "@/api/types";
 import { resolveImageUrl } from "@/utils/imageLoader";
 import AdaptiveTags from "@/components/home/AdaptiveTags";
+import { t } from "../../i18n";
 
 interface NovelRowCardProps {
   /** 小说数据 */
@@ -98,7 +99,7 @@ const NovelRowCard: Component<NovelRowCardProps> = (props) => {
                   color: "var(--colorNeutralForegroundOnBrand)",
                 }}
               >
-                系列
+                {t("home.novelRow.series")}
               </span>
             </Show>
             <p
@@ -112,8 +113,10 @@ const NovelRowCard: Component<NovelRowCardProps> = (props) => {
             {props.novel.user.name}
           </p>
           <p class="text-[var(--colorNeutralForeground3)] [font-size:var(--fontSizeBase200)]">
-            ★{props.novel.total_bookmarks.toLocaleString()} ·{" "}
-            {(props.novel.text_length / 1000).toFixed(1)}k 字
+            {t("home.novelRow.stats", {
+              bookmarks: props.novel.total_bookmarks.toLocaleString(),
+              words: (props.novel.text_length / 1000).toFixed(1),
+            })}
           </p>
         </div>
       </div>

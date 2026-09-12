@@ -1,5 +1,6 @@
 import { Show, type Component } from "solid-js";
 import PixivImage from "../PixivImage";
+import { t } from "../../i18n";
 
 interface BottomActionBarProps {
   /** 作者名（超出一行省略号截断） */
@@ -57,9 +58,9 @@ const BottomActionBar: Component<BottomActionBarProps> = (props) => {
             onPointerUp={props.onBookmarkPointerUp}
             onPointerLeave={props.onBookmarkPointerUp}
             disabled={props.bookmarking}
-            aria-label={props.isBookmarked ? "取消收藏" : "收藏"}
+            aria-label={props.isBookmarked ? t("illust.actionBar.unbookmarkAria") : t("illust.actionBar.bookmarkAria")}
           >
-            {props.isBookmarked ? "♥ 已收藏" : "♡ 收藏"}
+            {props.isBookmarked ? t("illust.actionBar.bookmarked") : t("illust.actionBar.bookmark")}
           </button>
           <Show when={props.onSave}>
             <button
@@ -67,9 +68,9 @@ const BottomActionBar: Component<BottomActionBarProps> = (props) => {
               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase200)] font-medium bg-[var(--colorBrandStroke2)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorBrandBackground)] hover:text-[var(--colorNeutralForegroundOnBrand)] active:scale-95 transition-all select-none appearance-none border-none outline-none cursor-pointer disabled:opacity-60 disabled:cursor-default focus-visible:bg-[var(--colorNeutralBackground1Selected)] focus-visible:outline focus-visible:outline-[var(--colorStrokeFocus2)]"
               onClick={props.onSave}
               disabled={props.saving}
-              aria-label="保存到相册"
+              aria-label={t("illust.actionBar.saveAria")}
             >
-              {props.saving ? "保存中…" : "保存"}
+              {props.saving ? t("illust.actionBar.saving") : t("illust.actionBar.save")}
             </button>
           </Show>
           <button
@@ -77,7 +78,7 @@ const BottomActionBar: Component<BottomActionBarProps> = (props) => {
             class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase200)] font-medium bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] hover:bg-[var(--colorBrandBackgroundHover)] active:scale-95 transition-all select-none appearance-none border-none outline-none cursor-pointer"
             onClick={props.onComments}
           >
-            💬 评论
+            {t("illust.actionBar.comments")}
             {props.totalComments !== undefined ? ` ${props.totalComments.toLocaleString()}` : ""}
           </button>
         </div>
