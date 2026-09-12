@@ -32,3 +32,25 @@ describe('IllustList.vue 首载三态接线（ADR-0150 / T1 #432）', () => {
     expect(code).toMatch(/v-else-if="[^"]*'empty'/)
   })
 })
+
+describe('IllustList.vue 相关作品注入接线（spec docs/specs/related-injection.md）', () => {
+  it('交织渲染流消费 displayItems（含 full-span 注入行）', () => {
+    expect(code).toMatch(/v-for="entry in displayItems"/)
+    expect(code).toContain("useRelatedInjectionStore()")
+    expect(code).toContain('entry.kind')
+  })
+
+  it('卡片点击记录锚点、行内点击走 openRelated（防循环注入）', () => {
+    expect(code).toContain('related.recordAnchor(mode.value, id)')
+    expect(code).toContain('function openRelated')
+  })
+
+  it('onActivated 消费锚点（KeepAlive 返回时机，ADR-0049）', () => {
+    expect(code).toContain('onActivated(')
+    expect(code).toContain('related.consumeAnchor(')
+  })
+
+  it('刷新 / 切 tab 清空注入行（spec §4.4）', () => {
+    expect(code).toContain('related.clearRows(mode.value)')
+  })
+})
