@@ -17,8 +17,8 @@ import {
   searchIllustNext,
   searchNovelNext,
   searchTransport,
-  deriveSearchTarget,
 } from "./search"
+import { BOOKMARK_BANDS, DEFAULT_SEARCH_FILTERS } from "@pictelio/search-core"
 import { ApiErrorType, type PixivIllust, type PixivIllustListResponse, type PixivNovel, type PixivNovelListResponse } from "./types"
 
 // ─── 真实契约样例 —— 字段形状来自 api/types.ts（与 webview 同源契约） ───
@@ -121,12 +121,12 @@ describe("api/search（web 模式：fetch + /pixiv-api 代理）", () => {
     vi.unstubAllGlobals()
   })
 
-  it("searchIllust 默认参数 → 标准端点 + search_target=partial_match_for_tags + filter=for_ios（含 Bearer）", async () => {
+  it("searchIllust 默认参数 → 标准端点 + 恒发两 bool + 无 search_target（单词标签不传参，#906；含 Bearer）", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify(ILLUST_RESPONSE), { status: 200 }))
     const result = await searchIllust("Fate")
     // rewriteUrl："/v1/search/illust" → "/pixiv-api/v1/search/illust"（代理路径，glossary-search-pagination 相对路径契约）
     expect(fetchMock).toHaveBeenCalledWith(
-      "/pixiv-api/v1/search/illust?word=Fate&sort=date_desc&search_target=partial_match_for_tags&filter=for_ios",
+      "/pixiv-api/v1/search/illust?word=Fate&filter=for_ios&merge_plain_keyword_results=true&include_translated_tag_results=true&sort=date_desc",
       expect.objectContaining({
         method: "GET",
         headers: expect.objectContaining({ Authorization: "Bearer web-token" }),
@@ -135,42 +135,64 @@ describe("api/search（web 模式：fetch + /pixiv-api 代理）", () => {
     expect(result).toEqual(ILLUST_RESPONSE)
   })
 
-  it("searchIllust 关键词含空格 → search_target 派生为 exact_match_for_tags", async () => {
+  it("searchIllust 关键词含空格 → search_target=exact_match_for_tags", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify(ILLUST_RESPONSE), { status: 200 }))
     await searchIllust("Fate night")
-    // 空格派生：含空格 → exact_match_for_tags（对齐 webview searchStore 语义）
+    // 空格派生：含空格 → exact_match_for_tags（target 规则单点在 search-core）
     expect(fetchMock).toHaveBeenCalledWith(
-      "/pixiv-api/v1/search/illust?word=Fate+night&sort=date_desc&search_target=exact_match_for_tags&filter=for_ios",
+      "/pixiv-api/v1/search/illust?word=Fate+night&filter=for_ios&merge_plain_keyword_results=true&include_translated_tag_results=true&sort=date_desc&search_target=exact_match_for_tags",
       expect.anything(),
     )
   })
 
-  it("searchIllust sort=popular_desc → popular-preview 端点（无 sort 参数，不分页），其余参数不变", async () => {
+  it("searchIllust sort=popular_desc → popular-preview 端点（无 sort 参数，不分页），恒发 bool 不变", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify(ILLUST_RESPONSE), { status: 200 }))
     await searchIllust("Fate", "popular_desc")
     expect(fetchMock).toHaveBeenCalledWith(
-      "/pixiv-api/v1/search/popular-preview/illust?word=Fate&search_target=partial_match_for_tags&filter=for_ios",
+      "/pixiv-api/v1/search/popular-preview/illust?word=Fate&filter=for_ios&merge_plain_keyword_results=true&include_translated_tag_results=true",
       expect.anything(),
     )
   })
 
-  it("searchNovel 默认参数 → 标准端点 + 参数", async () => {
+  it("searchNovel 默认参数 → 标准端点 + 恒显式 partial（#1038 同义词展开）", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify(NOVEL_RESPONSE), { status: 200 }))
     const result = await searchNovel("小説")
     expect(fetchMock).toHaveBeenCalledWith(
-      "/pixiv-api/v1/search/novel?word=%E5%B0%8F%E8%AA%AC&sort=date_desc&search_target=partial_match_for_tags&filter=for_ios",
+      "/pixiv-api/v1/search/novel?word=%E5%B0%8F%E8%AA%AC&filter=for_ios&merge_plain_keyword_results=true&include_translated_tag_results=true&sort=date_desc&search_target=partial_match_for_tags",
       expect.anything(),
     )
     expect(result).toEqual(NOVEL_RESPONSE)
   })
 
-  it("searchNovel sort=popular_desc → /v1/search/popular-preview/novel", async () => {
+  it("searchNovel sort=popular_desc → /v1/search/popular-preview/novel（target 恒显式）", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify(NOVEL_RESPONSE), { status: 200 }))
-    await searchNovel("test", "popular_desc", "exact_match_for_tags")
+    await searchNovel("test", "popular_desc")
     expect(fetchMock).toHaveBeenCalledWith(
-      "/pixiv-api/v1/search/popular-preview/novel?word=test&search_target=exact_match_for_tags&filter=for_ios",
+      "/pixiv-api/v1/search/popular-preview/novel?word=test&filter=for_ios&merge_plain_keyword_results=true&include_translated_tag_results=true&search_target=partial_match_for_tags",
       expect.anything(),
     )
+  })
+
+  it("筛选透传：收藏数区间/比例/分辨率进参数；popular 下收藏数不携带（#478 矩阵）", async () => {
+    fetchMock.mockImplementation(async () => new Response(JSON.stringify(ILLUST_RESPONSE), { status: 200 }))
+    await searchIllust("Fate", "date_desc", undefined, {
+      ...DEFAULT_SEARCH_FILTERS,
+      bookmark: BOOKMARK_BANDS[3]!,
+      ratio: "landscape",
+      minPixels: 2000,
+    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("bookmark_num_min=100&bookmark_num_max=299&ratio_pattern=landscape&width_min=2000&height_min=2000"),
+      expect.anything(),
+    )
+    fetchMock.mockClear()
+    await searchIllust("Fate", "popular_desc", undefined, {
+      ...DEFAULT_SEARCH_FILTERS,
+      bookmark: BOOKMARK_BANDS[3]!,
+    })
+    const popularUrl = fetchMock.mock.calls[0]![0] as string
+    expect(popularUrl).toContain("/v1/search/popular-preview/illust")
+    expect(popularUrl).not.toContain("bookmark_num")
   })
 
   it("searchIllustNext 绝对 next_url（app-api.pixiv.net）放行 + 原始响应透传（transport 不自发分页）", async () => {
@@ -238,7 +260,7 @@ describe("api/search（web 模式：fetch + /pixiv-api 代理）", () => {
   it("signal 透传：AbortController.signal 原样传给 fetch", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify(ILLUST_RESPONSE), { status: 200 }))
     const controller = new AbortController()
-    await searchIllust("Fate", "date_desc", "partial_match_for_tags", controller.signal)
+    await searchIllust("Fate", "date_desc", controller.signal)
     expect(fetchMock).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({ signal: controller.signal }),
@@ -268,15 +290,10 @@ describe("api/search（web 模式：fetch + /pixiv-api 代理）", () => {
   })
 })
 
-describe("deriveSearchTarget（对齐 webview searchStore 派生规则）", () => {
-  it("无空格 → partial_match_for_tags", () => {
-    expect(deriveSearchTarget("星空")).toBe("partial_match_for_tags")
-    expect(deriveSearchTarget("Fate/stay")).toBe("partial_match_for_tags")
-  })
-
-  it("含空格 → exact_match_for_tags", () => {
-    expect(deriveSearchTarget("星空 花火")).toBe("exact_match_for_tags")
-    expect(deriveSearchTarget("Fate night")).toBe("exact_match_for_tags")
+describe("deriveSearchTarget（target 规则已上移 @pictelio/search-core，真值表见其套件）", () => {
+  it("导出已移除（传输层不再持有 target 规则）", () => {
+    const mod = searchTransport as unknown as Record<string, unknown>
+    expect("deriveSearchTarget" in mod).toBe(false)
   })
 })
 

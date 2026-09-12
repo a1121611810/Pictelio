@@ -9,8 +9,9 @@
 //   （PixivIllustListResponse / PixivNovelListResponse，与 webview app api/types.ts 同源，
 //   样例参照 api/search.test.ts 的 ILLUST_ITEM/NOVEL_ITEM）。
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest"
-import { SEARCH_DEBOUNCE_MS, mergeSearchResults, useSearch } from "./useSearch"
+import { FILTER_DEBOUNCE_MS, SEARCH_DEBOUNCE_MS, mergeSearchResults, useSearch } from "./useSearch"
 import type { SearchTransport } from "../api/search"
+import { BOOKMARK_BANDS, DEFAULT_SEARCH_FILTERS, type SearchFilters } from "@pictelio/search-core"
 import {
   ApiErrorType,
   type PixivIllust,
@@ -18,12 +19,11 @@ import {
   type PixivNovel,
   type PixivNovelListResponse,
   type SearchSort,
-  type SearchTarget,
 } from "../api/types"
 
 // ─── 真实契约样例（字段形状对齐 api/types.ts；仅 id/日期参数化） ───
 
-function makeIllust(id: number, createDate: string): PixivIllust {
+function makeIllust(id: number, createDate: string, totalBookmarks = 100): PixivIllust {
   return {
     id,
     title: `作品${id}`,
@@ -48,7 +48,7 @@ function makeIllust(id: number, createDate: string): PixivIllust {
     height: 1600,
     page_count: 1,
     is_bookmarked: false,
-    total_bookmarks: 100,
+    total_bookmarks: totalBookmarks,
     tags: [{ name: "星空", translated_name: "starry sky" }],
     x_restrict: 0,
     create_date: createDate,
@@ -203,18 +203,18 @@ describe("useSearch", () => {
       await vi.advanceTimersByTimeAsync(300)
       expect(transport.searchIllust).toHaveBeenCalledTimes(1)
       expect(transport.searchNovel).toHaveBeenCalledTimes(1)
-      // 最后一次词 + 默认 sort + 无空格 → partial_match_for_tags（deriveSearchTarget 语义）
+      // 最后一次词 + 默认 sort + 默认筛选；target 规则单点在 search-core（真值表见其套件）
       expect(transport.searchIllust).toHaveBeenCalledWith(
         "abc",
         "date_desc",
-        "partial_match_for_tags",
         expect.any(AbortSignal),
+        DEFAULT_SEARCH_FILTERS,
       )
       expect(transport.searchNovel).toHaveBeenCalledWith(
         "abc",
         "date_desc",
-        "partial_match_for_tags",
         expect.any(AbortSignal),
+        DEFAULT_SEARCH_FILTERS,
       )
       expect(c.state.status).toBe("ready")
       expect(c.state.isSearching).toBe(false)
@@ -254,7 +254,7 @@ describe("useSearch", () => {
       const d1 = deferred<PixivIllustListResponse>()
       const d2 = deferred<PixivIllustListResponse>()
       const searchIllustMock = vi.fn<
-        (word: string, sort: SearchSort, target: SearchTarget, signal?: AbortSignal) => Promise<PixivIllustListResponse>
+        (word: string, sort: SearchSort, signal?: AbortSignal, filters?: SearchFilters) => Promise<PixivIllustListResponse>
       >()
       searchIllustMock.mockImplementationOnce(() => d1.promise)
       searchIllustMock.mockImplementationOnce(() => d2.promise)
@@ -266,7 +266,7 @@ describe("useSearch", () => {
       c.search("a")
       await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
       expect(c.state.status).toBe("loading")
-      const firstSignal = searchIllustMock.mock.calls[0]![3]!
+      const firstSignal = searchIllustMock.mock.calls[0]![2]!
       c.search("ab") // 新词 → 触发新搜索
       await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
       expect(firstSignal.aborted).toBe(true) // 旧请求被 abort（AbortController 轮换）
@@ -278,7 +278,7 @@ describe("useSearch", () => {
       expect(c.state.status).toBe("loading") // 未被旧响应改写为 ready
       expect(c.state.results).toEqual([])
 
-      const secondSignal = searchIllustMock.mock.calls[1]![3]!
+      const secondSignal = searchIllustMock.mock.calls[1]![2]!
       expect(secondSignal.aborted).toBe(false) // 新请求持有新信号
       d2.resolve(illustResponse([makeIllust(2, "2026-01-02T00:00:00+09:00")], null))
       await d2.promise
@@ -359,14 +359,14 @@ describe("useSearch", () => {
       expect(transport.searchIllust).toHaveBeenCalledWith(
         "花",
         "popular_desc",
-        "partial_match_for_tags",
         expect.any(AbortSignal),
+        DEFAULT_SEARCH_FILTERS,
       )
       expect(transport.searchNovel).toHaveBeenCalledWith(
         "花",
         "popular_desc",
-        "partial_match_for_tags",
         expect.any(AbortSignal),
+        DEFAULT_SEARCH_FILTERS,
       )
       expect(c.state.sort).toBe("popular_desc")
       await settle()
@@ -571,15 +571,15 @@ describe("useSearch", () => {
   describe("生命周期（reset / dispose）", () => {
     it("reset：清空结果回 idle + 中止在途（迟到响应不回填）", async () => {
       const searchIllustMock = vi.fn<
-        (word: string, sort: SearchSort, target: SearchTarget, signal?: AbortSignal) => Promise<PixivIllustListResponse>
-      >((_w, _s, _t, signal) => abortAwarePending<PixivIllustListResponse>(signal))
+        (word: string, sort: SearchSort, signal?: AbortSignal, filters?: SearchFilters) => Promise<PixivIllustListResponse>
+      >((_w, _s, signal) => abortAwarePending<PixivIllustListResponse>(signal))
       const transport = createTransport({ searchIllust: searchIllustMock })
       const c = useSearch({ transport })
       c.setScope("illust")
       c.search("x")
       await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
       expect(c.state.status).toBe("loading")
-      const signal = searchIllustMock.mock.calls[0]![3]!
+      const signal = searchIllustMock.mock.calls[0]![2]!
       c.reset()
       expect(c.state.status).toBe("idle")
       expect(c.state.results).toEqual([])
@@ -590,15 +590,15 @@ describe("useSearch", () => {
 
     it("dispose：abort 在途（不再写状态）；此后 search/refresh 等均 no-op", async () => {
       const searchIllustMock = vi.fn<
-        (word: string, sort: SearchSort, target: SearchTarget, signal?: AbortSignal) => Promise<PixivIllustListResponse>
-      >((_w, _s, _t, signal) => abortAwarePending<PixivIllustListResponse>(signal))
+        (word: string, sort: SearchSort, signal?: AbortSignal, filters?: SearchFilters) => Promise<PixivIllustListResponse>
+      >((_w, _s, signal) => abortAwarePending<PixivIllustListResponse>(signal))
       const transport = createTransport({ searchIllust: searchIllustMock })
       const c = useSearch({ transport })
       c.setScope("illust")
       c.search("x")
       await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
       expect(c.state.status).toBe("loading")
-      const signal = searchIllustMock.mock.calls[0]![3]!
+      const signal = searchIllustMock.mock.calls[0]![2]!
       c.dispose()
       expect(signal.aborted).toBe(true)
       await vi.advanceTimersByTimeAsync(0)
@@ -614,5 +614,86 @@ describe("useSearch", () => {
       await vi.advanceTimersByTimeAsync(1000)
       expect(searchIllustMock).toHaveBeenCalledTimes(1) // 仅 dispose 前那次
     })
+  })
+})
+
+describe("筛选（spec §5.2/§3.4；#474 T4）", () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it("setFilters：450ms debounce 重搜，末次生效；isSearching 窗口标记", async () => {
+    const transport = createTransport()
+    const c = useSearch({ transport })
+    c.search("花")
+    await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
+    expect(transport.searchIllust).toHaveBeenCalledTimes(1)
+    c.setFilters({ ...DEFAULT_SEARCH_FILTERS, ratio: "landscape" })
+    await vi.advanceTimersByTimeAsync(200)
+    c.setFilters({ ...DEFAULT_SEARCH_FILTERS, ratio: "portrait" })
+    expect(c.state.isSearching).toBe(true) // 筛选去抖窗口同输入窗口标记
+    await vi.advanceTimersByTimeAsync(FILTER_DEBOUNCE_MS)
+    expect(transport.searchIllust).toHaveBeenCalledTimes(2)
+    expect(c.state.filters.ratio).toBe("portrait")
+  })
+
+  it("setFilters：空词只存状态不请求（与 setScope/setSort 同语义）", async () => {
+    const transport = createTransport()
+    const c = useSearch({ transport })
+    c.setFilters({ ...DEFAULT_SEARCH_FILTERS, ratio: "landscape" })
+    expect(c.state.filters.ratio).toBe("landscape")
+    expect(transport.searchIllust).not.toHaveBeenCalled()
+  })
+
+  it("收藏数兜底：非热门路径按 total_bookmarks 本地过滤（spec §7）", async () => {
+    const transport = createTransport({
+      searchIllust: vi.fn(async () =>
+        illustResponse(
+          [makeIllust(1, "2026-08-10T00:00:00+09:00", 50), makeIllust(2, "2026-08-11T00:00:00+09:00", 5000)],
+          null,
+        ),
+      ),
+    })
+    const c = useSearch({ transport })
+    c.setScope("illust")
+    c.search("星空")
+    await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
+    c.setFilters({ ...DEFAULT_SEARCH_FILTERS, bookmark: BOOKMARK_BANDS[6]! })
+    await vi.advanceTimersByTimeAsync(FILTER_DEBOUNCE_MS)
+    expect(c.state.results.map((r) => r.entity.id)).toEqual([2])
+  })
+
+  it("热门路径收藏数不兜底（#478 置灰语义：请求不带参数，本地也不过滤）", async () => {
+    const transport = createTransport({
+      searchIllust: vi.fn(async () =>
+        illustResponse(
+          [makeIllust(1, "2026-08-10T00:00:00+09:00", 50), makeIllust(2, "2026-08-11T00:00:00+09:00", 5000)],
+          null,
+        ),
+      ),
+    })
+    const c = useSearch({ transport })
+    c.setScope("illust")
+    c.setSort("popular_desc")
+    c.search("星空")
+    await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
+    c.setFilters({ ...DEFAULT_SEARCH_FILTERS, bookmark: BOOKMARK_BANDS[6]! })
+    await vi.advanceTimersByTimeAsync(FILTER_DEBOUNCE_MS)
+    expect(c.state.results).toHaveLength(2)
+  })
+
+  it("dispose：取消待发筛选 debounce（不再请求）", async () => {
+    const transport = createTransport()
+    const c = useSearch({ transport })
+    c.search("花")
+    await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
+    expect(transport.searchIllust).toHaveBeenCalledTimes(1)
+    c.setFilters({ ...DEFAULT_SEARCH_FILTERS, ratio: "landscape" })
+    c.dispose()
+    await vi.advanceTimersByTimeAsync(FILTER_DEBOUNCE_MS)
+    expect(transport.searchIllust).toHaveBeenCalledTimes(1) // 待发筛选搜索被取消
   })
 })

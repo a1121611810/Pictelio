@@ -27,21 +27,36 @@ import { useSettingsStore } from '../stores/settingsStore'
 import { thumbUrl } from '../utils/imageUrl'
 import { SEARCH_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import SkeletonImage from './SkeletonImage.vue'
-import { useAiOnlyVisible } from '../composables/useAiOnlyVisible'
+import {
+  BOOKMARK_BANDS,
+  countActiveFilters,
+  DEFAULT_SEARCH_FILTERS,
+  resolveAiMode,
+  type SearchFilters,
+} from '@pictelio/search-core'
 import type { SearchScope, SearchSort } from '../api/types'
 
 const searchHistory = useSearchHistoryStore()
 const searchSheet = useSearchSheetStore()
 const settings = useSettingsStore()
 const isRestricted = settings.isRestricted
-const isAiRestricted = settings.isAiRestricted
 
 const controller = useSearch()
 // state 是 getter 返回的只读快照 → 用 computed 包裹保持响应式（模板自动解包）
 const state = computed<SearchState>(() => controller.state)
 /** 仅看态：非 AI 结果从渲染流移除（分页/空态仍基于服务端返回语义） */
 const rawResults = computed(() => state.value.results)
-const visibleResults = useAiOnlyVisible(rawResults, (r) => r.entity)
+/** 有效 AI 模式（#479 面板覆盖：follow=账号设置 / all=show / hide=mask；解析单点 search-core） */
+const effectiveAiMode = computed(() =>
+  resolveAiMode(settings.aiFilterMode, state.value.filters.aiOverride),
+)
+/** 仅看态移除非 AI 行（ADR-0155 only 语义）；mask 走行遮罩，不在数据层移除 */
+const visibleResults = computed(() => {
+  const rows = rawResults.value
+  return effectiveAiMode.value === 'only'
+    ? rows.filter((r) => !settings.isAiWork(r.entity))
+    : rows
+})
 
 /** 首载三态（ADR-0150）：首搜无旧结果 → 骨架；换词保留旧结果（hasItems 优先 → 内容）；ready 且空 → 空态 */
 const view = computed(() =>
@@ -75,6 +90,80 @@ const sortCls = (active: boolean) =>
 const sortTextCls = (active: boolean) =>
   active ? 'text-primary-on-container' : 'text-surface-on-variant'
 
+// ── 筛选折叠区（#474/#477：SearchSheet 内折叠筛选区，默认折叠；spec §4/§5） ──
+// 交互语义与 webview SearchFilterSheet 同规格（#476）：即改即搜（450ms debounce 在
+// controller.setFilters）；再点已选回默认=逐维可清；scope=novel 比例/分辨率置灰不清值；
+// 热门排序收藏数置灰（popular-preview 忽略区间）；关闭弹层随 controller.dispose 重置（Q1）。
+const filterOpen = ref(false)
+const filters = computed(() => state.value.filters)
+const activeFilterCount = computed(() => countActiveFilters(filters.value))
+const illustDimmed = computed(() => state.value.scope === 'novel')
+const bookmarkDimmed = computed(() => state.value.sort === 'popular_desc')
+
+function onFilterChange(next: SearchFilters): void {
+  controller.setFilters(next)
+}
+
+function chipCls(active: boolean, disabled = false): string {
+  const tone = active ? 'bg-primary-container' : 'bg-surface-container-high'
+  return `h-[8.533vw] px-3 rounded-[var(--md-shape-full)] flex items-center ${tone}${disabled ? ' opacity-40' : ''}`
+}
+function chipTextCls(active: boolean): string {
+  return active ? 'text-primary-on-container font-medium' : 'text-surface-on-variant'
+}
+
+const PERIOD_PRESETS: { value: '1d' | '1w' | '1m' | '6m' | '1y'; label: string }[] = [
+  { value: '1d', label: '24 小时内' },
+  { value: '1w', label: '一周内' },
+  { value: '1m', label: '一个月内' },
+  { value: '6m', label: '半年内' },
+  { value: '1y', label: '一年内' },
+]
+const RES_OPTIONS = [1000, 2000, 3000]
+const AI_OPTIONS: { value: SearchFilters['aiOverride']; label: string }[] = [
+  { value: 'follow', label: '跟随设置' },
+  { value: 'all', label: '全部显示' },
+  { value: 'hide', label: '隐藏 AI' },
+]
+
+function bandLabel(band: { min: number; max: number | null }): string {
+  return band.max === null ? `${band.min}+` : `${band.min}-${band.max}`
+}
+function isPresetActive(v: (typeof PERIOD_PRESETS)[number]['value']): boolean {
+  const p = filters.value.period
+  return p.kind === 'preset' && p.preset === v
+}
+function togglePeriodPreset(v: (typeof PERIOD_PRESETS)[number]['value']): void {
+  const p = filters.value.period
+  onFilterChange({
+    ...filters.value,
+    period: p.kind === 'preset' && p.preset === v ? { kind: 'any' } : { kind: 'preset', preset: v },
+  })
+}
+function isBandActive(band: { min: number; max: number | null }): boolean {
+  const b = filters.value.bookmark
+  return b !== null && b.min === band.min && b.max === band.max
+}
+function toggleBookmark(band: { min: number; max: number | null }): void {
+  const b = filters.value.bookmark
+  onFilterChange({
+    ...filters.value,
+    bookmark: b !== null && b.min === band.min && b.max === band.max ? null : { ...band },
+  })
+}
+function setRatio(v: 'landscape' | 'portrait' | 'square' | null): void {
+  onFilterChange({ ...filters.value, ratio: v })
+}
+function setMinPixels(v: number | null): void {
+  onFilterChange({ ...filters.value, minPixels: v })
+}
+function setAiOverride(v: SearchFilters['aiOverride']): void {
+  onFilterChange({ ...filters.value, aiOverride: v })
+}
+function clearAllFilters(): void {
+  onFilterChange({ ...DEFAULT_SEARCH_FILTERS })
+}
+
 // ── 结果行渲染辅助 ──
 function rowKey(row: SearchResultItem): string {
   // item-key 必须 String（ADR-0055/0056）：type 前缀防插画/小说 id 撞 key
@@ -100,9 +189,12 @@ function restrictLevel(row: SearchResultItem): 1 | 2 {
 
 // ── AI 三态（ADR-0155）行遮罩辅助 ──
 
-/** 行是否处于遮罩态：R18 受限 或 AI 遮罩态（R18 优先） */
+/** 行是否处于遮罩态：R18 受限 或 AI 遮罩态（R18 优先；AI 段走有效模式注入，#479） */
 function isRowMasked(row: SearchResultItem): boolean {
-  return isRestricted(row.entity) || isAiRestricted(row.entity)
+  return (
+    isRestricted(row.entity) ||
+    (effectiveAiMode.value === 'mask' && settings.isAiWork(row.entity))
+  )
 }
 
 /** AI 等级派生（novel_ai_type===2 → 纯 AI，否则 AI 辅助） */
@@ -353,6 +445,134 @@ onBeforeUnmount(() => {
           <text class="text-label-medium" :class="sortTextCls(state.sort === 'popular_desc')">热门</text>
         </view>
       </view>
+
+      <!-- 筛选折叠区开关（#474/#477：默认折叠；激活数徽标；chevron 翻转用字符切换） -->
+      <view class="flex flex-row gap-2 px-4 mt-2 flex-shrink-0">
+        <view
+          class="h-[10.667vw] px-4 rounded-[var(--md-shape-full)] flex items-center flex-1"
+          :class="filterOpen ? 'bg-primary-container' : 'bg-surface-container-high'"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="SEARCH_A11Y_LABELS.filterToggle"
+          @tap="filterOpen = !filterOpen"
+        >
+          <text
+            class="text-label-medium"
+            :class="filterOpen ? 'text-primary-on-container font-medium' : 'text-surface-on-variant'"
+          >筛选</text>
+          <view
+            v-if="activeFilterCount > 0"
+            class="ml-2 min-w-[5.333vw] h-[5.333vw] px-[1.6vw] rounded-full bg-primary flex items-center justify-center"
+          >
+            <text class="text-[3.2vw] leading-none text-primary-on">{{ activeFilterCount }}</text>
+          </view>
+          <text class="text-label-medium ml-auto text-surface-on-variant">{{ filterOpen ? '⌃' : '⌄' }}</text>
+        </view>
+      </view>
+
+      <!-- 折叠筛选区：view 不滚动 → scroll-view（lynx 滚动容器）；范围/排序联动置灰在 computed -->
+      <scroll-view
+        v-if="filterOpen"
+        scroll-orientation="vertical"
+        class="mx-4 mt-2 max-h-[42vh] flex-shrink-0 border border-outline rounded-[var(--md-shape-large)] p-3 flex flex-col gap-3"
+      >
+        <view v-if="activeFilterCount > 0" class="flex flex-row justify-end">
+          <text class="text-label-medium text-primary" @tap="clearAllFilters">清除全部</text>
+        </view>
+
+        <view>
+          <text class="text-label-medium text-outline">期间</text>
+          <view class="flex flex-row flex-wrap gap-2 mt-1">
+            <view :class="chipCls(filters.period.kind === 'any')" @tap="onFilterChange({ ...filters, period: { kind: 'any' } })">
+              <text class="text-body-small" :class="chipTextCls(filters.period.kind === 'any')">全部</text>
+            </view>
+            <view
+              v-for="p in PERIOD_PRESETS"
+              :key="p.value"
+              :class="chipCls(isPresetActive(p.value))"
+              @tap="togglePeriodPreset(p.value)"
+            >
+              <text class="text-body-small" :class="chipTextCls(isPresetActive(p.value))">{{ p.label }}</text>
+            </view>
+          </view>
+        </view>
+
+        <view>
+          <text class="text-label-medium text-outline">收藏数</text>
+          <view class="flex flex-row flex-wrap gap-2 mt-1">
+            <view
+              :class="chipCls(filters.bookmark === null, bookmarkDimmed)"
+              @tap="!bookmarkDimmed && onFilterChange({ ...filters, bookmark: null })"
+            >
+              <text class="text-body-small" :class="chipTextCls(filters.bookmark === null)">不限</text>
+            </view>
+            <view
+              v-for="band in BOOKMARK_BANDS"
+              :key="band.min"
+              :class="chipCls(isBandActive(band), bookmarkDimmed)"
+              @tap="!bookmarkDimmed && toggleBookmark(band)"
+            >
+              <text class="text-body-small" :class="chipTextCls(isBandActive(band))">{{ bandLabel(band) }}</text>
+            </view>
+          </view>
+          <text v-if="bookmarkDimmed" class="text-label-small text-outline mt-1 block">热门榜不支持按收藏数筛（切回最新/最早恢复）</text>
+        </view>
+
+        <view>
+          <text class="text-label-medium text-outline">比例 · 仅插画</text>
+          <view class="flex flex-row flex-wrap gap-2 mt-1">
+            <view
+              :class="chipCls(filters.ratio === null, illustDimmed)"
+              @tap="!illustDimmed && setRatio(null)"
+            >
+              <text class="text-body-small" :class="chipTextCls(filters.ratio === null)">全部</text>
+            </view>
+            <view
+              v-for="r in ['landscape', 'portrait', 'square']"
+              :key="r"
+              :class="chipCls(filters.ratio === r, illustDimmed)"
+              @tap="!illustDimmed && setRatio(filters.ratio === r ? null : r)"
+            >
+              <text class="text-body-small" :class="chipTextCls(filters.ratio === r)">{{ r === 'landscape' ? '横图' : r === 'portrait' ? '竖图' : '方图' }}</text>
+            </view>
+          </view>
+          <text v-if="illustDimmed" class="text-label-small text-outline mt-1 block">切到「插画」范围后可用（已设的值会保留）</text>
+        </view>
+
+        <view>
+          <text class="text-label-medium text-outline">分辨率 · 仅插画</text>
+          <view class="flex flex-row flex-wrap gap-2 mt-1">
+            <view
+              :class="chipCls(filters.minPixels === null, illustDimmed)"
+              @tap="!illustDimmed && setMinPixels(null)"
+            >
+              <text class="text-body-small" :class="chipTextCls(filters.minPixels === null)">不限</text>
+            </view>
+            <view
+              v-for="px in RES_OPTIONS"
+              :key="px"
+              :class="chipCls(filters.minPixels === px, illustDimmed)"
+              @tap="!illustDimmed && setMinPixels(filters.minPixels === px ? null : px)"
+            >
+              <text class="text-body-small" :class="chipTextCls(filters.minPixels === px)">≥{{ px }}px</text>
+            </view>
+          </view>
+        </view>
+
+        <view>
+          <text class="text-label-medium text-outline">AI 作品</text>
+          <view class="flex flex-row flex-wrap gap-2 mt-1">
+            <view
+              v-for="opt in AI_OPTIONS"
+              :key="opt.value"
+              :class="chipCls(filters.aiOverride === opt.value)"
+              @tap="setAiOverride(opt.value)"
+            >
+              <text class="text-body-small" :class="chipTextCls(filters.aiOverride === opt.value)">{{ opt.label }}</text>
+            </view>
+          </view>
+          <text class="text-label-small text-outline mt-1 block">只影响本次搜索，不改动设置里的 AI 偏好</text>
+        </view>
+      </scroll-view>
 
       <!-- 结果区（有关键词时）：五态 = 搜索中（保留旧结果+轻量指示）/ 首载错误 / 无结果 / 结果列表（含分页 footer） / idle -->
       <view v-if="keyword.trim()" class="flex-1 min-h-0 mt-3 flex flex-col">

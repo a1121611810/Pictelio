@@ -1,23 +1,19 @@
 // ─── Pixiv 搜索 API 端点适配层（app-lynx 全局搜索，issue #291） ───
-// 端点/参数/next_url 断言与 webview 版（packages/app/src/api/search.ts）逐字对齐
-// （ADR-0132 第 8 条：双端共享同一后端语义，改契约须同步 ADR）。
-// 差异注记：search_target 默认按词派生（对齐 webview 调用点 searchStore 的
-// `keyword().includes(" ")` 语义，而非 webview 函数签名的常量默认值）。
+// 参数构建（端点路由 / search_target 规则 / 筛选映射）单点在 @pictelio/search-core
+// （#480 拍板；ADR-0132 第 8 条修订——原「与 webview 逐字对齐」升级为共享核心单点）。
+// 本文件只做 GET 与 next_url 断言（传输层零加工，分页决策在控制器）。
 import { apiClient } from "./client"
+import {
+  buildIllustSearchRequest,
+  buildNovelSearchRequest,
+  DEFAULT_SEARCH_FILTERS,
+  type SearchFilters,
+} from "@pictelio/search-core"
 import type {
   PixivIllustListResponse,
   PixivNovelListResponse,
   SearchSort,
-  SearchTarget,
 } from "./types"
-
-/**
- * 搜索目标派生：关键词含空格 → 多标签精确匹配，否则单标签部分匹配
- * （对齐 webview searchStore 的 `keyword().includes(" ")` 语义）。
- */
-export function deriveSearchTarget(word: string): SearchTarget {
-  return word.includes(" ") ? "exact_match_for_tags" : "partial_match_for_tags"
-}
 
 /** 非法 next_url 的统一错误：带模块前缀（便于定位）+ warn 可见，不静默 */
 function invalidNextUrlError(fnName: string): Error {
@@ -49,43 +45,21 @@ function assertPixivUrl(url: string, fnName: string): void {
 export function searchIllust(
   word: string,
   sort: SearchSort = "date_desc",
-  searchTarget: SearchTarget = deriveSearchTarget(word),
   signal?: AbortSignal,
+  filters: SearchFilters = DEFAULT_SEARCH_FILTERS,
 ): Promise<PixivIllustListResponse> {
-  // sort=popular_desc 路由到独立热门预览端点（不分页），其他排序走标准搜索端点
-  if (sort === "popular_desc") {
-    return apiClient.get<PixivIllustListResponse>(
-      "/v1/search/popular-preview/illust",
-      { word, search_target: searchTarget, filter: "for_ios" },
-      signal,
-    )
-  }
-  return apiClient.get<PixivIllustListResponse>(
-    "/v1/search/illust",
-    { word, sort, search_target: searchTarget, filter: "for_ios" },
-    signal,
-  )
+  const req = buildIllustSearchRequest({ word, sort, filters })
+  return apiClient.get<PixivIllustListResponse>(req.endpoint, req.params, signal)
 }
 
 export function searchNovel(
   word: string,
   sort: SearchSort = "date_desc",
-  searchTarget: SearchTarget = deriveSearchTarget(word),
   signal?: AbortSignal,
+  filters: SearchFilters = DEFAULT_SEARCH_FILTERS,
 ): Promise<PixivNovelListResponse> {
-  // sort=popular_desc 路由到独立热门预览端点（不分页），其他排序走标准搜索端点
-  if (sort === "popular_desc") {
-    return apiClient.get<PixivNovelListResponse>(
-      "/v1/search/popular-preview/novel",
-      { word, search_target: searchTarget, filter: "for_ios" },
-      signal,
-    )
-  }
-  return apiClient.get<PixivNovelListResponse>(
-    "/v1/search/novel",
-    { word, sort, search_target: searchTarget, filter: "for_ios" },
-    signal,
-  )
+  const req = buildNovelSearchRequest({ word, sort, filters })
+  return apiClient.get<PixivNovelListResponse>(req.endpoint, req.params, signal)
 }
 
 export function searchIllustNext(
@@ -112,14 +86,14 @@ export interface SearchTransport {
   searchIllust(
     word: string,
     sort: SearchSort,
-    searchTarget: SearchTarget,
     signal?: AbortSignal,
+    filters?: SearchFilters,
   ): Promise<PixivIllustListResponse>
   searchNovel(
     word: string,
     sort: SearchSort,
-    searchTarget: SearchTarget,
     signal?: AbortSignal,
+    filters?: SearchFilters,
   ): Promise<PixivNovelListResponse>
   searchIllustNext(url: string, signal?: AbortSignal): Promise<PixivIllustListResponse>
   searchNovelNext(url: string, signal?: AbortSignal): Promise<PixivNovelListResponse>

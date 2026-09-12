@@ -372,6 +372,9 @@ importers:
       '@pictelio/novel-export':
         specifier: workspace:*
         version: link:../novel-export
+      '@pictelio/search-core':
+        specifier: workspace:*
+        version: link:../search-core
       '@pictelio/ugoira':
         specifier: workspace:*
         version: link:../ugoira

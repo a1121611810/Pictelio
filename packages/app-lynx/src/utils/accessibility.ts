@@ -137,6 +137,7 @@ export const SEARCH_A11Y_LABELS = {
   sortNewest: '排序最新',
   sortOldest: '排序最早',
   sortPopular: '排序热门',
+  filterToggle: '筛选',
 } as const
 
 /** 追更列表页 accessibility 标注（issue #225：/watchlist 页 + 取消追更二次确认 Dialog） */

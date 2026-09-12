@@ -28,10 +28,17 @@
 //
 // 关注点分离：不写搜索历史（提交点由 SearchSheet 组件负责）；不做记忆化缓存（spec D2）。
 import { computed, ref } from "vue"
-import { deriveSearchTarget, searchTransport } from "../api/search"
+import { searchTransport } from "../api/search"
 import type { SearchTransport } from "../api/search"
 import type { PixivIllust, PixivNovel, SearchScope, SearchSort } from "../api/types"
 import { toApiError } from "../utils/errors"
+import {
+  DEFAULT_SEARCH_FILTERS,
+  buildIllustSearchRequest,
+  buildNovelSearchRequest,
+  filterByBookmarkBand,
+  type SearchFilters,
+} from "@pictelio/search-core"
 
 export type SearchStatus = "idle" | "loading" | "ready" | "error"
 
@@ -50,6 +57,8 @@ export interface SearchState {
   hasMore: boolean
   scope: SearchScope
   sort: SearchSort
+  /** 当前筛选（canonical shape 单点在 @pictelio/search-core，spec §3.1） */
+  filters: SearchFilters
   /** debounce 窗口内为 true（用户输入中、等待 300ms 触发）；触发后由 status='loading' 承接 */
   isSearching: boolean
   /** true = 当前 error 来自分页（loadMore）而非首载（UI 显示保留结果 + 内联重试） */
@@ -64,6 +73,8 @@ export interface SearchController {
   setScope(scope: SearchScope): void
   /** 切排序：同上 */
   setSort(sort: SearchSort): void
+  /** 更新筛选：关键词非空时 450ms debounce 重搜（spec §5.2 即改即搜）；空词只存状态 */
+  setFilters(filters: SearchFilters): void
   /** 分页加载更多：all → 双游标并行；单 scope → 单游标 */
   loadMore(): Promise<void>
   /** 错误态重试（其余状态 no-op） */
@@ -76,6 +87,9 @@ export interface SearchController {
 
 /** 输入防抖窗口（spec D2：300ms 即输即搜） */
 export const SEARCH_DEBOUNCE_MS = 300
+
+/** 筛选即改即搜防抖窗口（spec §5.2：末次改动 400-500ms） */
+export const FILTER_DEBOUNCE_MS = 450
 
 /**
  * 插画 + 小说按 create_date 降序混排为单一时间线（纯函数，仅 scope=all 使用）。
@@ -113,6 +127,7 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
   const nextNovelUrlRef = ref<string | null>(null)
   const scopeRef = ref<SearchScope>("all")
   const sortRef = ref<SearchSort>("date_desc")
+  const filtersRef = ref<SearchFilters>(DEFAULT_SEARCH_FILTERS)
   const isSearchingRef = ref(false)
   const paginationErrorRef = ref(false)
 
@@ -121,6 +136,7 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
   let disposed = false
   let loadingMore = false // loadMore 重入门控
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
+  let filterTimer: ReturnType<typeof setTimeout> | null = null // 筛选即改即搜去抖（spec §5.2）
   /** 最近一次 search() 的 trim 后关键词（setScope/setSort/refresh 重搜依据；reset 清空） */
   let keyword = ""
 
@@ -134,11 +150,15 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
     return toApiError(e, fallback).message
   }
 
-  /** 清空回 idle：取消待发 debounce + 中止在途 + 清结果（reset() 与空词共用） */
+  /** 清空回 idle：取消待发 debounce + 中止在途 + 清结果（reset() 与空词共用；筛选保留） */
   function resetToIdle(): void {
     if (debounceTimer != null) {
       clearTimeout(debounceTimer)
       debounceTimer = null
+    }
+    if (filterTimer != null) {
+      clearTimeout(filterTimer)
+      filterTimer = null
     }
     isSearchingRef.value = false
     ac.abort()
@@ -173,7 +193,7 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
 
     const scope = scopeRef.value
     const sort = sortRef.value
-    const target = deriveSearchTarget(word)
+    const filters = filtersRef.value
     const failures: unknown[] = []
     // 局部暂存（失败侧保持空——「失败侧清空」语义与既有实现一致）
     const illustData = { items: [] as PixivIllust[], next: null as string | null }
@@ -181,7 +201,7 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
 
     const fetchIllust = async (): Promise<void> => {
       try {
-        const res = await transport.searchIllust(word, sort, target, signal)
+        const res = await transport.searchIllust(word, sort, signal, filters)
         if (isStale(signal)) return
         illustData.items = res.illusts
         illustData.next = res.next_url
@@ -192,7 +212,7 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
 
     const fetchNovel = async (): Promise<void> => {
       try {
-        const res = await transport.searchNovel(word, sort, target, signal)
+        const res = await transport.searchNovel(word, sort, signal, filters)
         if (isStale(signal)) return
         novelData.items = res.novels
         novelData.next = res.next_url
@@ -286,6 +306,20 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
     rerunIfKeyword()
   }
 
+  /** 更新筛选：关键词非空 → 取消待发并 450ms debounce 重搜（即改即搜，spec §5.2）；空词只存状态 */
+  function setFilters(next: SearchFilters): void {
+    if (disposed) return
+    filtersRef.value = next
+    if (keyword === "") return
+    if (filterTimer != null) clearTimeout(filterTimer)
+    isSearchingRef.value = true
+    filterTimer = setTimeout(() => {
+      filterTimer = null
+      isSearchingRef.value = false
+      void executeSearch(keyword)
+    }, FILTER_DEBOUNCE_MS)
+  }
+
   /** 分页加载更多：ready + hasMore 时才生效；all → 双游标并行，单 scope → 单游标 */
   async function loadMore(): Promise<void> {
     if (disposed) return
@@ -365,30 +399,48 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
       clearTimeout(debounceTimer)
       debounceTimer = null
     }
+    if (filterTimer != null) {
+      clearTimeout(filterTimer)
+      filterTimer = null
+    }
     ac.abort()
   }
 
-  /** 按 scope 组装结果：all = 时间线混排；单 scope = 服务端顺序（不被混排器重排） */
+  /** 按 scope 组装结果：all = 时间线混排；单 scope = 服务端顺序（不被混排器重排）。
+   * 收藏数客户端兜底（spec §7）：非热门路径按 total_bookmarks 本地过滤（服务端对
+   * 免费账号静默忽略区间参数）；热门路径不兜底（#478 置灰语义）。 */
   function buildResults(
     illusts: PixivIllust[],
     novels: PixivNovel[],
     scope: SearchScope,
+    sort: SearchSort,
+    filters: SearchFilters,
   ): SearchResultItem[] {
-    if (scope === "all") return mergeSearchResults(illusts, novels)
+    const band = sort === "popular_desc" ? null : filters.bookmark
+    const fIllusts = filterByBookmarkBand(illusts, band, (i) => i.total_bookmarks)
+    const fNovels = filterByBookmarkBand(novels, band, (n) => n.total_bookmarks)
+    if (scope === "all") return mergeSearchResults(fIllusts, fNovels)
     if (scope === "illust") {
-      return illusts.map((i) => ({ type: "illust" as const, entity: i, date: i.create_date }))
+      return fIllusts.map((i) => ({ type: "illust" as const, entity: i, date: i.create_date }))
     }
-    return novels.map((n) => ({ type: "novel" as const, entity: n, date: n.create_date }))
+    return fNovels.map((n) => ({ type: "novel" as const, entity: n, date: n.create_date }))
   }
 
   // state 只读（computed 聚合 + getter，无 setter）；controller 是唯一写者
   const stateComputed = computed<SearchState>(() => ({
     status: statusRef.value,
-    results: buildResults(illustsRef.value, novelsRef.value, scopeRef.value),
+    results: buildResults(
+      illustsRef.value,
+      novelsRef.value,
+      scopeRef.value,
+      sortRef.value,
+      filtersRef.value,
+    ),
     error: errorRef.value,
     hasMore: nextIllustUrlRef.value != null || nextNovelUrlRef.value != null,
     scope: scopeRef.value,
     sort: sortRef.value,
+    filters: filtersRef.value,
     isSearching: isSearchingRef.value,
     paginationError: paginationErrorRef.value,
   }))
@@ -400,6 +452,7 @@ export function useSearch(config: { transport?: SearchTransport } = {}): SearchC
     search,
     setScope,
     setSort,
+    setFilters,
     loadMore,
     refresh,
     reset,

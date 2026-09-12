@@ -224,9 +224,10 @@ describe('SearchSheet R18/R18G 行遮罩（spec US24 / D7：不预过滤，isRes
 })
 
 describe('SearchSheet AI 三态行遮罩（ADR-0155：mask 行内遮罩 / only 过滤）', () => {
-  it('遮罩谓词合并 R18 与 AI（R18 优先）', () => {
+  it('遮罩谓词合并 R18 与 AI（R18 优先；AI 段=有效模式注入，#479 面板覆盖）', () => {
     expect(source).toContain('function isRowMasked(row: SearchResultItem): boolean {')
-    expect(source).toContain('isRestricted(row.entity) || isAiRestricted(row.entity)')
+    expect(source).toContain('isRestricted(row.entity) ||')
+    expect(source).toContain("effectiveAiMode.value === 'mask' && settings.isAiWork(row.entity)")
   })
 
   it('AI 徽章：纯 AI=AI / 辅助=AI辅助，走 secondary-container 语义色', () => {
@@ -234,9 +235,41 @@ describe('SearchSheet AI 三态行遮罩（ADR-0155：mask 行内遮罩 / only �
     expect(source).toContain("'bg-secondary-container text-secondary-on-container'")
   })
 
-  it('AI 行文案 + 仅看态过滤（visibleResults）', () => {
+  it('AI 行文案 + 有效模式过滤（visibleResults：follow=账号设置 / only=移除非 AI；#479 覆盖经 resolveAiMode）', () => {
     expect(source).toContain('AI 作品，已在设置中遮罩')
-    expect(source).toContain('const visibleResults = useAiOnlyVisible(rawResults, (r) => r.entity)')
+    expect(source).toContain('resolveAiMode(settings.aiFilterMode, state.value.filters.aiOverride)')
+    expect(source).toContain("effectiveAiMode.value === 'only'")
     expect(source).toContain('v-for="row in visibleResults"')
+  })
+})
+
+describe('SearchSheet 筛选折叠区（#474/#477：SearchSheet 内折叠筛选区，默认折叠）', () => {
+  it('开关：激活数徽标 + a11y 标签 + 字符 chevron', () => {
+    expect(source).toContain('v-if="filterOpen"')
+    expect(source).toContain("filterOpen = !filterOpen")
+    expect(source).toContain('SEARCH_A11Y_LABELS.filterToggle')
+    expect(source).toContain('{{ activeFilterCount }}')
+  })
+
+  it('维度齐全：期间预设/收藏数七档/比例/分辨率/AI 覆盖 + 清除全部（仅激活时）', () => {
+    expect(source).toContain('v-for="p in PERIOD_PRESETS"')
+    expect(source).toContain('v-for="band in BOOKMARK_BANDS"')
+    expect(source).toContain("v-for=\"r in ['landscape', 'portrait', 'square']\"")
+    expect(source).toContain('v-for="px in RES_OPTIONS"')
+    expect(source).toContain('v-for="opt in AI_OPTIONS"')
+    expect(source).toContain('v-if="activeFilterCount > 0"')
+    expect(source).toContain('@tap="clearAllFilters"')
+  })
+
+  it('置灰联动：scope=novel 比例/分辨率置灰不清值；热门下收藏数置灰（#476 Q4/#478）', () => {
+    expect(source).toContain('illustDimmed')
+    expect(source).toContain('bookmarkDimmed')
+    expect(source).toContain('热门榜不支持按收藏数筛（切回最新/最早恢复）')
+    expect(source).toContain('切到「插画」范围后可用（已设的值会保留）')
+  })
+
+  it('变更入口走 controller.setFilters（450ms debounce 在控制器内层，spec §5.2）', () => {
+    expect(source).toContain('function onFilterChange(next: SearchFilters): void {')
+    expect(source).toContain('controller.setFilters(next)')
   })
 })
