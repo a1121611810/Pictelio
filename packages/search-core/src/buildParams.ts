@@ -64,7 +64,7 @@ function novelTargetParam(word: string): string {
   return word.includes(" ") ? "exact_match_for_tags" : "partial_match_for_tags";
 }
 
-/** 期间与收藏数公共段（两者都受热门矩阵约束的期间除外——期间热门透传） */
+/** 期间段：popular-preview 同样接受期间（透传）；收藏数段见 applyBookmark（#478） */
 function applyPeriod(
   params: Record<string, string>,
   filters: SearchFilters,

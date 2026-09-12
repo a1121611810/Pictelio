@@ -291,8 +291,9 @@ describe("api/search（web 模式：fetch + /pixiv-api 代理）", () => {
 })
 
 describe("deriveSearchTarget（target 规则已上移 @pictelio/search-core，真值表见其套件）", () => {
-  it("导出已移除（传输层不再持有 target 规则）", () => {
-    const mod = searchTransport as unknown as Record<string, unknown>
+  it("传输层模块不再导出 deriveSearchTarget（动态 import 断言，防导出回流）", async () => {
+    vi.resetModules()
+    const mod = (await import("./search")) as unknown as Record<string, unknown>
     expect("deriveSearchTarget" in mod).toBe(false)
   })
 })

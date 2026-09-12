@@ -143,10 +143,64 @@ describe("api/search.ts（薄传输层）", () => {
     );
   });
 
+  it("searchIllust 返回响应原样透传（transport 零加工）", async () => {
+    const expected = {
+      illusts: [
+        {
+          id: 1,
+          title: "Test",
+          type: "illust",
+          user: { id: 1, name: "a", account: "a", profile_image_urls: {} },
+          image_urls: { square_medium: "", medium: "", large: "" },
+          width: 100,
+          height: 100,
+          page_count: 1,
+          is_bookmarked: false,
+          total_bookmarks: 0,
+          illust_ai_type: 2,
+          tags: [{ name: "tag1" }],
+          x_restrict: 0,
+          create_date: "2026-01-01T00:00:00Z",
+          meta_pages: [],
+          meta_single_page: {},
+        },
+      ],
+      next_url: null,
+    };
+    mockGet.mockResolvedValue(expected);
+    const { searchIllust } = await loadApi();
+    expect(await searchIllust("test")).toEqual(expected);
+  });
+
+  it("searchNovel 返回响应原样透传（transport 零加工）", async () => {
+    const expected = {
+      novels: [
+        {
+          id: 1,
+          title: "Test Novel",
+          user: { id: 1, name: "a", account: "a", profile_image_urls: {} },
+          image_urls: { square_medium: "", medium: "", large: "" },
+          tags: [],
+          page_count: 1,
+          text_length: 1000,
+          is_bookmarked: false,
+          total_bookmarks: 0,
+          novel_ai_type: 1,
+          x_restrict: 0,
+          create_date: "2026-01-01T00:00:00Z",
+        },
+      ],
+      next_url: null,
+    };
+    mockGet.mockResolvedValue(expected);
+    const { searchNovel } = await loadApi();
+    expect(await searchNovel("test")).toEqual(expected);
+  });
+
   it("searchAutocomplete calls apiClient.get with correct params", async () => {
-    mockGet.mockResolvedValue({ tags: [] });
+    mockGet.mockResolvedValue({ tags: [{ name: "star", translated_name: "星" }] });
     const { searchAutocomplete } = await loadApi();
-    await searchAutocomplete("star");
+    const result = await searchAutocomplete("star");
 
     expect(mockGet).toHaveBeenCalledWith(
       "/v1/search/autocomplete",
@@ -156,5 +210,6 @@ describe("api/search.ts（薄传输层）", () => {
       },
       undefined,
     );
+    expect(result).toEqual({ tags: [{ name: "star", translated_name: "星" }] });
   });
 });

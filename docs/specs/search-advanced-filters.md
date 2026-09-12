@@ -99,7 +99,7 @@ packages/search-core/          # 新共享包 @pictelio/search-core（零 IO 纯
   - lynx `api/search.ts`：同上。
 - **状态归属**（#476 派生结论）：
   - webview：扩展现有 `createSearchStore`（+筛选 signals）；`Search.tsx` URL 编解码接 search-core；新增 `components/search/SearchFilterSheet.tsx`（底部 Sheet，ReaderSettingsSheet 范式，入口=搜索栏筛选 icon+激活数徽标）。
-  - lynx：扩展 `useSearch` controller（+filters ref，与 scopeRef/sortRef 同位）；`SearchSheet.vue` 新增折叠筛选区组件（默认折叠，#477 拍板）。
+  - lynx：扩展 `useSearch` controller（+filters ref，与 scopeRef/sortRef 同位）；`SearchSheet.vue` 新增折叠筛选区组件（默认折叠，#477 拍板）。**一期裁剪：lynx 期间仅预设五档，自定义起止日期为 webview 专属**（lynx 无便利的原生 date input；状态/参数层已支持 custom，二期补 UI 即可）。
 
 ## 5. 交互与数据流（#476 全部拍板）
 
@@ -159,6 +159,10 @@ packages/search-core/          # 新共享包 @pictelio/search-core（零 IO 纯
 3. **lynx**：useSearch 单测扩展（filters ref 重搜语义）；SearchSheet 折叠区组件测试；**模拟器过折叠区点击可达性**（原生 pointer-events 怪癖：全屏 pointer-events-none 容器吞点击的历史坑）+ 80vh 内滚动布局。
 4. **契约/差分**：URL 编解码与参数构建 round-trip 差分；transport 层 next_url 断言保持既有差分测试。
 5. **E2E**：agent-browser 搜索筛选主流程（设筛选 → URL 回填 → 刷新/返回保持）；S 端切换回归。
+   - **交付状态（2026-09-12 实施）**：1-4 已交付（自动化门禁 check:all / test:all / lint:all 全绿）；
+     **遗留验收项**：agent-browser 筛选主流程 E2E 用例与 lynx 折叠区真机/模拟器点击可达性批次——
+     挂账至实施工单（#485），不阻塞 spec 收口；lynx 折叠区已按既有 pointer-events 怪癖清单做了
+     实现规避（折叠区非全屏 pointer-events-none 容器、(0,0) 锚定于 sheet 根），真机批次仍须过一遍。
 
 ## 9. 已知取舍与未来候选
 

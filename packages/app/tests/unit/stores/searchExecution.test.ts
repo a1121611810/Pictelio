@@ -185,6 +185,48 @@ describe("searchStore executeSearch", () => {
     dispose();
   });
 
+  it("换筛选不命中脏缓存：同词不同筛选重新请求；同参数复搜命中缓存（spec §6.2）", async () => {
+    mockSearchIllust.mockResolvedValue({
+      illusts: [{ id: 1, create_date: "2026-01-01T00:00:00+09:00", total_bookmarks: 10 }],
+      next_url: null,
+    });
+    const { store, dispose } = setup();
+    store.setScope("illust");
+    store.setKeyword("cache-key-isolation-check");
+    store.setFilters(DEFAULT_SEARCH_FILTERS);
+    await store.executeSearch();
+    expect(mockSearchIllust).toHaveBeenCalledTimes(1);
+
+    // 同词换筛选 → 缓存键不同 → 必须重新请求（不得命中上一键的缓存）
+    store.setFilters({ ...DEFAULT_SEARCH_FILTERS, ratio: "landscape" });
+    await store.executeSearch();
+    expect(mockSearchIllust).toHaveBeenCalledTimes(2);
+
+    // 同词同筛选复搜 → 命中缓存，不再请求
+    await store.executeSearch();
+    expect(mockSearchIllust).toHaveBeenCalledTimes(2);
+    dispose();
+  });
+
+  it("inFlight 判重键含筛选段：筛选变更在飞行中不重复发同参请求", async () => {
+    let resolveIllust!: (v: unknown) => void;
+    const pending = new Promise((r) => (resolveIllust = r));
+    mockSearchIllust.mockReturnValue(pending);
+    const { store, dispose } = setup();
+    store.setScope("illust");
+    store.setKeyword("inflight-filter-check");
+    store.setFilters({ ...DEFAULT_SEARCH_FILTERS, ratio: "landscape" });
+
+    const p1 = store.executeSearch();
+    store.setFilters({ ...DEFAULT_SEARCH_FILTERS, ratio: "landscape" }); // 同筛选再触发
+    const p2 = store.executeSearch();
+    expect(mockSearchIllust).toHaveBeenCalledTimes(1);
+
+    resolveIllust({ illusts: [], next_url: null });
+    await Promise.all([p1, p2]);
+    dispose();
+  });
+
   it("热门路径收藏数不兜底（#478 置灰语义：请求不带参数，本地也不过滤）", async () => {
     mockSearchIllust.mockResolvedValue({
       illusts: [

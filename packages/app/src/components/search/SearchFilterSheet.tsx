@@ -94,7 +94,7 @@ function FilterChip(props: {
   return (
     <button
       class={[
-        "px-3 py-1.5 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase200)] transition-all active:scale-95 appearance-none border-none outline-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-40",
+        "min-h-10 px-3 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase200)] transition-all active:scale-95 appearance-none border-none outline-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-40",
         {
           "bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] font-semibold":
             props.active,

@@ -22,7 +22,7 @@
 
 综合最小值由 #4 `Promise.any` 决定：**Chrome 85**。
 
-> **已知债务（ADR-0145 review 记录）**：ES2023 `Array.prototype.toSorted`（Chrome 110+）已在既有代码（`SideNavShell.tsx`、`NovelDetail.tsx`、`imageHostStore.ts`）与 2026-09 保存功能（`PagePickerSheet.tsx`）使用。Chrome 85–109 的 WebView 上触及相应代码路径会抛 `TypeError`。既有行为，未提升 `MIN_WEBVIEW_MAJOR_VERSION`；提升前应在升级验证批次中一并评估。
+> **已知债务（ADR-0145 review 记录）**：ES2023 `Array.prototype.toSorted`（Chrome 110+）已在既有代码（`SideNavShell.tsx`、`NovelDetail.tsx`、`imageHostStore.ts`、`utils/searchMerger.ts`）与 2026-09 保存功能（`PagePickerSheet.tsx`）使用。Chrome 85–109 的 WebView 上触及相应代码路径会抛 `TypeError`。既有行为，未提升 `MIN_WEBVIEW_MAJOR_VERSION`；提升前应在升级验证批次中一并评估。
 
 ### 软降级项（布局/视觉缺陷，不闪退）
 

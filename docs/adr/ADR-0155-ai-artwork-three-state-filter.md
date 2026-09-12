@@ -41,6 +41,11 @@ R18 在两端的既有实现并不相同：app 在 store 层（`r18Filter.ts` �
 - 新增跨端存储键一致性契约测试（照 `novelExportSettingsConsistency.test.ts` 的 readFileSync 双端对照模式），防 `ai_filter_mode_` 键名漂移。
 - `ai_type` 的 0/1/2 语义此前仅存在于 research 文档且自相矛盾（文档称 1 显示 badge，代码 `>1` 永不显示）。本次以 types.ts 注释 + 纯函数 + 真值表单测把语义固化为可追溯 oracle。
 
+## 修订（2026-09-12，wayfinder #474 / spec `docs/specs/search-advanced-filters.md` #479）
+
+- **搜索筛选面板 AI 覆盖**：搜索页筛选面板新增「AI 作品」行（跟随设置 / 全部显示 / 隐藏 AI），**只影响本次搜索**、不写回账号级设置 `ai_filter_mode_${uid}`；其他场景（Feed/收藏/历史等）照旧听账号设置。实现 = 有效模式解析（`@pictelio/search-core` 的 `resolveAiMode`：follow 原样 / all→show / hide→mask）注入各端既有管线（webview `filterSearchResultsByAiMode` 的 mode 参数；lynx 行遮罩 / 仅看判定）。
+- **服务端 `search_ai_type` 评估后不接入**：AI 过滤维持全客户端处理（D4 的搜索覆盖语义不变）；面板不设「仅看」档（仅看仍仅经账号设置生效）。
+
 ## 关联
 
 - 术语：`packages/app/CONTEXT.md`「内容过滤」、`packages/app-lynx/CONTEXT.md`「受限内容」

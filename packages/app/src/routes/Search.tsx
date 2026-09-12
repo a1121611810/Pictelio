@@ -374,7 +374,7 @@ const Search: Component = () => {
             </Show>
             {/* 筛选入口：icon + 激活数徽标（#476 Q6：0 激活时隐藏徽标） */}
             <button
-              class="relative flex items-center justify-center min-w-9 min-h-9 rounded-[var(--borderRadiusSmall)] text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground2)] active:scale-90 transition-all duration-[var(--durationFast)] flex-shrink-0"
+              class="relative flex items-center justify-center min-w-10 min-h-10 rounded-[var(--borderRadiusSmall)] text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground2)] active:scale-90 transition-all duration-[var(--durationFast)] flex-shrink-0"
               onClick={() => setFilterSheetOpen(true)}
               aria-label="筛选"
             >
@@ -382,7 +382,7 @@ const Search: Component = () => {
                 <path d="M2.5 3h15l-6 7v6l-3 1.5v-7.5l-6-7z" fill="currentColor" />
               </svg>
               <Show when={activeFilterCount() > 0}>
-                <span class="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-[var(--borderRadiusCircular)] bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] text-[10px] leading-4 text-center">
+                <span class="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-[var(--borderRadiusCircular)] bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] text-[var(--fontSizeBase100)] leading-4 text-center">
                   {activeFilterCount()}
                 </span>
               </Show>

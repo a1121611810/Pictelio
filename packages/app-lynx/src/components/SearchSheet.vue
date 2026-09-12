@@ -106,7 +106,7 @@ function onFilterChange(next: SearchFilters): void {
 
 function chipCls(active: boolean, disabled = false): string {
   const tone = active ? 'bg-primary-container' : 'bg-surface-container-high'
-  return `h-[8.533vw] px-3 rounded-[var(--md-shape-full)] flex items-center ${tone}${disabled ? ' opacity-40' : ''}`
+  return `h-[10.667vw] px-3 rounded-[var(--md-shape-full)] flex items-center ${tone}${disabled ? ' opacity-40' : ''}`
 }
 function chipTextCls(active: boolean): string {
   return active ? 'text-primary-on-container font-medium' : 'text-surface-on-variant'
