@@ -46,9 +46,10 @@ export function loadUgoiraMetadata(illustId: number): Promise<PixivUgoiraMetadat
 }
 
 // ─── 相关作品（spec docs/specs/related-injection.md）───
+// 注意是 v2——/v1/illust/related 实测 404（端点不存在），/v2/illust/related 实测 200（模拟器 2026-09-12）
 export function loadRelated(illustId: number, signal?: AbortSignal): Promise<PixivIllustListResponse> {
   return apiClient.get<PixivIllustListResponse>(
-    "/v1/illust/related",
+    "/v2/illust/related",
     { illust_id: String(illustId), filter: "for_ios" },
     signal,
   )

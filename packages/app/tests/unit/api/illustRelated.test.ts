@@ -1,5 +1,5 @@
 // loadRelated API 单元测试（spec docs/specs/related-injection.md §6）。
-// Oracle 溯源：端点/参数形状来自官方 App API `/v1/illust/related`（与 /v1/illust/recommended
+// Oracle 溯源：端点/参数形状来自官方 App API `/v2/illust/related`（与 /v1/illust/recommended
 // 同构，filter=for_ios 为项目恒定惯例），期望值非从被测实现反推。
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
@@ -16,11 +16,11 @@ describe("loadRelated（相关作品）", () => {
     getMock.mockReset();
   });
 
-  it("GET /v1/illust/related，携带 illust_id 与 filter=for_ios", async () => {
+  it("GET /v2/illust/related，携带 illust_id 与 filter=for_ios", async () => {
     getMock.mockResolvedValue({ illusts: [], next_url: null });
     await loadRelated(123);
     expect(getMock).toHaveBeenCalledWith(
-      "/v1/illust/related",
+      "/v2/illust/related",
       { illust_id: "123", filter: "for_ios" },
       undefined,
     );

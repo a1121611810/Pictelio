@@ -52,13 +52,14 @@ export function loadDetail(
   );
 }
 
-/** 相关作品（spec docs/specs/related-injection.md）：官方 related 端点，响应与 recommended 同构 */
+/** 相关作品（spec docs/specs/related-injection.md）：官方 related 端点，响应与 recommended 同构。
+ *  注意是 v2——/v1/illust/related 实测 404（端点不存在），/v2/illust/related 实测 200（模拟器 2026-09-12） */
 export function loadRelated(
   illustId: number,
   signal?: AbortSignal,
 ): Promise<PixivIllustListResponse> {
   return apiClient.get<PixivIllustListResponse>(
-    "/v1/illust/related",
+    "/v2/illust/related",
     { illust_id: String(illustId), filter: "for_ios" },
     signal,
   );
