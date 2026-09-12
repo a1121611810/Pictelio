@@ -1,4 +1,5 @@
 import { type Component } from "solid-js";
+import { t } from "../i18n";
 
 interface SearchableTagProps {
   /** 标签名（搜索关键词） */
@@ -38,11 +39,13 @@ const SearchableTag: Component<SearchableTagProps> = (props) => {
       class={`cursor-pointer inline-flex items-center active:scale-[0.98] transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--colorStrokeFocus2)] focus-visible:-outline-offset-2 ${props.class ?? ""}`}
       role="button"
       tabindex={0}
-      aria-label={`搜索标签：${props.name}`}
+      aria-label={t("searchableTag.searchAria", { name: props.name })}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
     >
-      {props.translatedName ? `${props.name}（${props.translatedName}）` : props.name}
+      {props.translatedName
+        ? t("searchableTag.translatedLabel", { name: props.name, translated: props.translatedName })
+        : props.name}
     </span>
   );
 };

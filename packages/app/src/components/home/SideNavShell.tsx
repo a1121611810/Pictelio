@@ -69,8 +69,8 @@ export function isValidHomeTab(tab: string): tab is HomeTab {
  * 例如「我的收藏」→ bookmarks），非法值（如 "me"）兜底 recommended。
  */
 function initialHomeTab(): HomeTab {
-  const t = currentTab();
-  return isValidHomeTab(t) ? t : "recommended";
+  const tab = currentTab();
+  return isValidHomeTab(tab) ? tab : "recommended";
 }
 
 /** 当前用户的历史条目（响应 historyVersion + AI 模式，按访问时间倒序）。 */

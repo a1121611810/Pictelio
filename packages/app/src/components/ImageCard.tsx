@@ -9,6 +9,7 @@ import IllustTypeBadge from "./IllustTypeBadge";
 import SkeletonShimmer from "./SkeletonShimmer";
 import { pickListImageUrl, resolveImageUrl } from "../utils/imageLoader";
 import { useCardInteractions } from "../primitives/useCardInteractions";
+import { t } from "../i18n";
 
 interface Props {
   illust: PixivIllust;
@@ -103,7 +104,7 @@ const ImageCard: Component<Props> = (props) => {
           )}
           {props.illust.illust_ai_type != null && props.illust.illust_ai_type >= 1 && (
             <fluent-badge appearance="filled">
-              {props.illust.illust_ai_type === 2 ? "AI" : "AI辅助"}
+              {props.illust.illust_ai_type === 2 ? "AI" : t("imageCard.aiAssisted")}
             </fluent-badge>
           )}
         </div>
@@ -123,7 +124,7 @@ const ImageCard: Component<Props> = (props) => {
             onPointerUp={onPointerUp}
             onPointerLeave={onPointerLeave}
             onClick={(e) => e.stopPropagation()}
-            aria-label={bookmarked() ? "取消收藏" : "收藏"}
+            aria-label={bookmarked() ? t("imageCard.unbookmarkAria") : t("imageCard.bookmarkAria")}
           >
             <HeartIcon filled={bookmarked()} size={16} />
           </button>
@@ -132,7 +133,7 @@ const ImageCard: Component<Props> = (props) => {
         {privateHint() && (
           <div class="absolute inset-0 flex items-center justify-center bg-black/60 pointer-events-none z-10">
             <span class="text-white [font-size:var(--fontSizeBase200)] font-medium">
-              已私密收藏
+              {t("imageCard.privateBadge")}
             </span>
           </div>
         )}
@@ -171,9 +172,9 @@ const ImageCard: Component<Props> = (props) => {
 
             onClick={(e) => toggleFollow(e)}
             disabled={following()}
-            aria-label={isFollowed() ? "取消关注" : "关注"}
+            aria-label={isFollowed() ? t("imageCard.unfollowAria") : t("imageCard.followAria")}
           >
-            {following() ? "关注中…" : isFollowed() ? "已关注" : "关注"}
+            {following() ? t("imageCard.following") : isFollowed() ? t("imageCard.followed") : t("imageCard.follow")}
           </button>
         </p>
         <div class="mt-[var(--spacingVerticalXS)] max-h-[54px] overflow-hidden">

@@ -9,6 +9,7 @@ import PullIndicator from "./PullIndicator";
 import InlineRetryBar from "./ui/InlineRetryBar";
 import type { PixivNovel, ApiError } from "../api/types";
 import type { NovelLayoutMode } from "../stores/settingsStore";
+import { t } from "../i18n";
 
 const GAP = 12;
 
@@ -166,24 +167,24 @@ const NovelVirtualFeed: Component<Props> = (props) => {
       </div>
 
       {props.loading && props.novels.length > 0 && pullPhase() !== "refreshing" && (
-        <LoadingSpinner text="加载中..." />
+        <LoadingSpinner text={t("virtualFeed.loading")} />
       )}
 
       {!props.hasMore && props.novels.length > 0 && (
         <p class="text-[var(--colorNeutralForeground3)] text-center py-4 [font-size:var(--fontSizeBase200)]">
-          已经到底了
+          {t("virtualFeed.endReached")}
         </p>
       )}
 
       {props.novels.length === 0 && !props.loading && !props.error && (
         <p class="text-[var(--colorNeutralForeground2)] text-center py-16 [font-size:var(--fontSizeBase300)]">
-          暂无小说
+          {t("virtualFeed.empty")}
         </p>
       )}
 
       {/* 分页失败：保留已加载结果，在列表底部显示内联重试条（textList / coverWall 通用插入点） */}
       <Show when={props.error && props.paginationError && props.novels.length > 0}>
-        <InlineRetryBar message="加载更多失败" onRetry={props.onLoadMore} />
+        <InlineRetryBar message={t("virtualFeed.loadMoreFailed")} onRetry={props.onLoadMore} />
       </Show>
 
       <div ref={sentinelAttach} class="h-1" />

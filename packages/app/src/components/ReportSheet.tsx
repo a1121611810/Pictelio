@@ -5,6 +5,7 @@ import {
   type ReportReason,
   REPORT_REASON_LABELS,
 } from "../stores/reportStore";
+import { t } from "../i18n";
 
 interface ReportSheetProps {
   illustId: number;
@@ -61,11 +62,11 @@ const ReportSheet: Component<ReportSheetProps> = (props) => {
           {/* Header */}
           <div class="flex items-center justify-between px-5 pt-1 pb-2">
             <h2 class="[font-size:var(--fontSizeBase500)] font-semibold text-[var(--colorNeutralForeground1)]">
-              举报作品
+              {t("report.title")}
             </h2>
             <fluent-button
               appearance="subtle"
-              aria-label="关闭"
+              aria-label={t("report.closeAria")}
               ref={fluentOn("click", close)}
               class="w-8 h-8 p-0 min-w-8"
             >
@@ -83,7 +84,7 @@ const ReportSheet: Component<ReportSheetProps> = (props) => {
 
           {/* Reason list */}
           <p class="px-5 pt-3 [font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
-            请选择举报原因：
+            {t("report.selectReason")}
           </p>
           <fluent-radio-group
             value={selectedReason()}
@@ -107,10 +108,14 @@ const ReportSheet: Component<ReportSheetProps> = (props) => {
               disabled={!selectedReason() || submitting() || alreadyReported()}
               ref={fluentOn("click", handleSubmit)}
             >
-              {alreadyReported() ? "已举报" : submitting() ? "提交中…" : "提交举报"}
+              {alreadyReported()
+                ? t("report.reported")
+                : submitting()
+                  ? t("report.submitting")
+                  : t("report.submit")}
             </fluent-button>
             <p class="mt-3 text-center [font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
-              提交后将打开邮件客户端发送举报详情
+              {t("report.emailHint")}
             </p>
           </div>
         </div>

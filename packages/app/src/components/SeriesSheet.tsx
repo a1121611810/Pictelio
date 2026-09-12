@@ -6,6 +6,7 @@ import LoadingSpinner from "./LoadingSpinner";
 import { SHEET_LAZY_MARGIN } from "../primitives/rootMargins";
 import { createSentinel } from "@/primitives/visibility";
 import { getSeries, setSeries } from "../stores/novelCache";
+import { t } from "../i18n";
 
 interface Props {
   seriesId: number;
@@ -117,7 +118,7 @@ const SeriesSheet: Component<Props> = (props) => {
       }
       setLoading(false);
       if (err) {
-        setError((err as { message?: string }).message ?? "加载失败");
+        setError((err as { message?: string }).message ?? t("error.fallback.loadFailed")); // i18n: set 时快照（瞬态）
         return;
       }
     }
@@ -140,7 +141,7 @@ const SeriesSheet: Component<Props> = (props) => {
     }
     setLoadingMore(false);
     if (err) {
-      setError((err as { message?: string }).message ?? "加载失败");
+      setError((err as { message?: string }).message ?? t("error.fallback.loadFailed")); // i18n: set 时快照（瞬态）
       return;
     }
   }
@@ -157,7 +158,7 @@ const SeriesSheet: Component<Props> = (props) => {
     const [err, result] = await tryAsync(loadSeries(props.seriesId));
     if (!abortController?.signal.aborted) {
       if (err) {
-        setError((err as { message?: string }).message ?? "加载失败");
+        setError((err as { message?: string }).message ?? t("error.fallback.loadFailed")); // i18n: set 时快照（瞬态）
       } else {
         applyResult(result, false);
         void setSeries(props.seriesId, {
@@ -243,7 +244,7 @@ const SeriesSheet: Component<Props> = (props) => {
           style="background-color:var(--colorScrim)"
           onClick={close}
           role="button"
-          aria-label="关闭"
+          aria-label={t("series.closeScrimAria")}
           tabindex={0}
           onKeyDown={(e) => e.key === "Enter" && close()}
         />
@@ -262,12 +263,12 @@ const SeriesSheet: Component<Props> = (props) => {
           {/* Header */}
           <div class="flex items-center justify-between px-5 pt-1 pb-2">
             <h2 class="[font-size:var(--fontSizeBase500)] font-semibold text-[var(--colorNeutralForeground1)]">
-              系列作品
+              {t("series.title")}
             </h2>
             <button
               class="w-10 h-10 flex items-center justify-center rounded-[var(--borderRadiusMedium)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorNeutralBackground2)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer"
               onClick={close}
-              aria-label="关闭"
+              aria-label={t("series.closeAria")}
             >
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                 <path
@@ -297,8 +298,11 @@ const SeriesSheet: Component<Props> = (props) => {
 
             <Show when={seriesDetail()}>
               <p class="[font-size:var(--fontSizeBase100)] text-[var(--colorNeutralForeground3)] mt-1">
-                总字数: {totalCount().toLocaleString()}字 · {novels().length}部作品
-                {hasMore() ? "+" : ""}
+                {t("series.stats", {
+                  words: totalCount().toLocaleString(),
+                  count: novels().length,
+                  more: hasMore() ? "+" : "",
+                })}
               </p>
             </Show>
           </div>
@@ -310,7 +314,7 @@ const SeriesSheet: Component<Props> = (props) => {
             {/* Loading state */}
             <Show when={loading() && novels().length === 0}>
               <div class="flex justify-center py-8">
-                <LoadingSpinner text="加载中..." />
+                <LoadingSpinner text={t("series.loading")} />
               </div>
             </Show>
 
@@ -318,13 +322,13 @@ const SeriesSheet: Component<Props> = (props) => {
             <Show when={error()}>
               <div class="flex flex-col items-center justify-center py-8 gap-3 px-5">
                 <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorStatusDangerForeground1)] text-center">
-                  加载失败：{error()}
+                  {t("series.loadFailed", { detail: error() ?? "" })}
                 </p>
                 <button
                   class="px-4 py-1.5 rounded-[var(--borderRadiusMedium)] bg-[var(--colorBrandBackground)] text-white [font-size:var(--fontSizeBase200)] font-medium border-none cursor-pointer active:scale-95 transition-all"
                   onClick={() => refetch()}
                 >
-                  重试
+                  {t("series.retry")}
                 </button>
               </div>
             </Show>
@@ -348,7 +352,7 @@ const SeriesSheet: Component<Props> = (props) => {
             {/* Empty state */}
             <Show when={!loading() && !error() && novels().length === 0 && seriesDetail()}>
               <p class="text-center py-8 [font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
-                暂无作品
+                {t("series.empty")}
               </p>
             </Show>
 

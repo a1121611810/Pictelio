@@ -3,6 +3,7 @@ import { merge, Show } from "solid-js";
 import type { PixivNovel } from "../api/types";
 import { resolveImageUrl } from "../utils/imageLoader";
 import IllustTags from "./IllustTags";
+import { t } from "../i18n";
 
 interface Props {
   novel: PixivNovel;
@@ -36,7 +37,9 @@ const SeriesSheetItem: Component<Props> = (props) => {
       onClick={() => merged.onClick(merged.novel.id)}
       role="button"
       tabindex={0}
-      aria-label={merged.isActive ? `当前章节：${merged.novel.title}` : merged.novel.title}
+      aria-label={
+        merged.isActive ? t("series.itemActiveAria", { title: merged.novel.title }) : merged.novel.title
+      }
       onKeyDown={(e) => e.key === "Enter" && merged.onClick(merged.novel.id)}
     >
       {/* Active indicator — 圆角胶囊指示条 */}
@@ -68,7 +71,7 @@ const SeriesSheetItem: Component<Props> = (props) => {
           {props.novel.title}
         </p>
         <p class="[font-size:var(--fontSizeBase100)] text-[var(--colorNeutralForeground3)] flex items-center gap-1">
-          <span>📖 {props.novel.text_length.toLocaleString()}字</span>
+          <span>{t("series.itemWords", { count: props.novel.text_length.toLocaleString() })}</span>
         </p>
         {/* 标签 */}
         <div class="mt-1">
@@ -79,7 +82,7 @@ const SeriesSheetItem: Component<Props> = (props) => {
       {/* 当前章节徽标 */}
       <Show when={merged.isActive}>
         <span class="flex-shrink-0 px-2 py-1 rounded-[var(--borderRadiusCircular)] bg-[var(--colorBrandForeground1)] text-[var(--colorNeutralForegroundOnBrand)] [font-size:var(--fontSizeBase100)] font-semibold whitespace-nowrap">
-          当前
+          {t("series.currentBadge")}
         </span>
       </Show>
     </div>

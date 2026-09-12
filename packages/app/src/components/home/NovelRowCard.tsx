@@ -35,7 +35,7 @@ const NovelRowCard: Component<NovelRowCardProps> = (props) => {
     props.novel.image_urls.large ||
     props.novel.image_urls.medium;
   // 内容标签：过滤 R-18/R-18G（分级已由图上的 R-18 badge 表达，避免重复）
-  const contentTags = () => props.novel.tags.filter((t) => t.name !== "R-18" && t.name !== "R-18G");
+  const contentTags = () => props.novel.tags.filter((tag) => tag.name !== "R-18" && tag.name !== "R-18G");
 
   return (
     <div

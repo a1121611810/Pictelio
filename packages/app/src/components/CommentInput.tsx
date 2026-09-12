@@ -1,5 +1,6 @@
 import type { Component } from "solid-js";
 import type { PixivComment } from "../api/types";
+import { t } from "../i18n";
 
 interface CommentInputProps {
   posting: boolean;
@@ -35,12 +36,12 @@ const CommentInput: Component<CommentInputProps> = (props) => {
     <div class="flex-shrink-0 border-t border-[var(--colorNeutralStroke2)] px-3 py-2.5 surface-appbar">
       <Show when={props.replyingTo}>
         <div class="flex items-center gap-1 mb-1.5 px-1 text-[var(--colorNeutralForeground2)] [font-size:var(--fontSizeBase200)]">
-          <span class="truncate">回复 @{props.replyingTo!.user.name}</span>
+          <span class="truncate">{t("comment.replyingTo", { name: props.replyingTo!.user.name })}</span>
           <button
             class="text-[var(--colorBrandForeground1)] font-medium bg-transparent border-none p-0 cursor-pointer flex-shrink-0 ml-auto text-[var(--fontSizeBase100)]"
             onClick={props.onCancelReply}
           >
-            取消回复
+            {t("comment.cancelReply")}
           </button>
         </div>
       </Show>
@@ -56,7 +57,11 @@ const CommentInput: Component<CommentInputProps> = (props) => {
           ref={inputRef!}
           type="text"
           class="flex-1 h-9 bg-transparent text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] outline-none border-none placeholder:text-[var(--colorNeutralForeground3)] p-0"
-          placeholder={props.replyingTo ? `回复 @${props.replyingTo!.user.name}...` : "写下评论..."}
+          placeholder={
+            props.replyingTo
+              ? t("comment.replyPlaceholder", { name: props.replyingTo.user.name })
+              : t("comment.placeholder")
+          }
           value={inputText()}
           onInput={(e) => setInputText((e.target as HTMLInputElement).value)}
           onKeyDown={(e) => {
@@ -68,7 +73,7 @@ const CommentInput: Component<CommentInputProps> = (props) => {
           disabled={!inputText().trim() || props.posting}
           onClick={handleSubmit}
         >
-          {props.posting ? "···" : "发送"}
+          {props.posting ? "···" : t("comment.send")}
         </button>
       </div>
     </div>

@@ -1,20 +1,21 @@
 import type { Component } from "solid-js";
 import { getTheme, setThemePersisted } from "@/stores/themeStore";
 import FluentIcon from "@/components/ui/FluentIcon";
+import { t, type I18nKey } from "@/i18n";
 
 const THEME_OPTIONS: {
   id: "light" | "dark" | "system";
-  label: string;
+  label: I18nKey;
   icon: Parameters<typeof FluentIcon>[0]["name"];
 }[] = [
-  { id: "light", label: "浅色", icon: "weatherSunny" },
-  { id: "system", label: "跟随系统", icon: "settings" },
-  { id: "dark", label: "深色", icon: "weatherMoon" },
+  { id: "light", label: "theme.light", icon: "weatherSunny" },
+  { id: "system", label: "theme.system", icon: "settings" },
+  { id: "dark", label: "theme.dark", icon: "weatherMoon" },
 ];
 
 const ThemeSelector: Component = () => {
   return (
-    <div class="grid grid-cols-3 gap-3" role="group" aria-label="明暗主题选择">
+    <div class="grid grid-cols-3 gap-3" role="group" aria-label={t("theme.groupAria")}>
       <For each={THEME_OPTIONS}>
         {(option) => {
           const selected = () => getTheme() === option.id;
@@ -23,7 +24,7 @@ const ThemeSelector: Component = () => {
               type="button"
               role="button"
               aria-pressed={selected() ? "true" : "false"}
-              aria-label={option.label}
+              aria-label={t(option.label)}
               onClick={() => setThemePersisted(option.id)}
               class={[
                 "flex flex-col items-center gap-2 p-4 rounded-[var(--borderRadiusMedium)] border transition-all duration-[var(--durationFast)] appearance-none bg-transparent cursor-pointer",
@@ -47,7 +48,7 @@ const ThemeSelector: Component = () => {
                   },
                 ]}
               >
-                {option.label}
+                {t(option.label)}
               </span>
             </button>
           );

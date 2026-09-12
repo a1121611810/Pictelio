@@ -1,4 +1,5 @@
 import type { Component } from "solid-js";
+import { t } from "../i18n";
 
 type PullZone = "idle" | "pulling" | "refresh-ready" | "refreshing" | "settings-ready";
 
@@ -27,15 +28,19 @@ const PullIndicator: Component<Props> = (props) => {
         <Switch>
           <Match when={props.zone === "refreshing"}>
             <span class="spinner w-4 h-4" />
-            刷新中...
+            {t("pullIndicator.refreshing")}
           </Match>
-          <Match when={props.zone === "settings-ready"}>⚙️ 松手进入设置</Match>
-          <Match when={props.zone === "refresh-ready"}>✨ 松开刷新 · 继续下拉进入设置</Match>
+          <Match when={props.zone === "settings-ready"}>
+            {t("pullIndicator.settingsReady")}
+          </Match>
+          <Match when={props.zone === "refresh-ready"}>
+            {t("pullIndicator.refreshReady")}
+          </Match>
           <Match when={props.zone === "pulling" && props.distance < props.refreshThreshold}>
-            ↓ 下拉刷新
+            {t("pullIndicator.pulling")}
           </Match>
           <Match when={props.zone === "pulling" && props.distance >= props.refreshThreshold}>
-            ✨ 松开刷新
+            {t("pullIndicator.releaseToRefresh")}
           </Match>
         </Switch>
       </div>

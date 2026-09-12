@@ -1,5 +1,6 @@
 import type { Component, Accessor } from "solid-js";
 import FluentIcon from "./ui/FluentIcon";
+import { t } from "../i18n";
 
 interface Props {
   query: Accessor<string>;
@@ -36,8 +37,8 @@ const NovelSearchBar: Component<Props> = (props) => {
         type="search"
         value={props.query()}
         onInput={(e) => props.setQuery(e.currentTarget.value)}
-        placeholder="搜索小说内容"
-        aria-label="搜索小说内容"
+        placeholder={t("novelSearch.placeholder")}
+        aria-label={t("novelSearch.searchAria")}
         class="flex-1 min-w-0 bg-transparent border-none outline-none text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase300)] placeholder:text-[var(--colorNeutralForeground3)]"
       />
 
@@ -46,8 +47,8 @@ const NovelSearchBar: Component<Props> = (props) => {
           type="button"
           class={iconButtonClass}
           onClick={handleClear}
-          aria-label="清除"
-          title="清除"
+          aria-label={t("novelSearch.clear")}
+          title={t("novelSearch.clear")}
         >
           <FluentIcon name="dismiss" size={18} />
         </button>
@@ -67,8 +68,8 @@ const NovelSearchBar: Component<Props> = (props) => {
         class={iconButtonClass}
         onClick={props.onPrev}
         disabled={props.matchCount() === 0}
-        aria-label="上一处"
-        title="上一处"
+        aria-label={t("novelSearch.prevMatch")}
+        title={t("novelSearch.prevMatch")}
       >
         <FluentIcon name="chevronLeft" size={20} />
       </button>
@@ -77,8 +78,8 @@ const NovelSearchBar: Component<Props> = (props) => {
         class={iconButtonClass}
         onClick={props.onNext}
         disabled={props.matchCount() === 0}
-        aria-label="下一处"
-        title="下一处"
+        aria-label={t("novelSearch.nextMatch")}
+        title={t("novelSearch.nextMatch")}
       >
         <FluentIcon name="chevronRight" size={20} />
       </button>
@@ -86,8 +87,8 @@ const NovelSearchBar: Component<Props> = (props) => {
         type="button"
         class={iconButtonClass}
         onClick={props.onClose}
-        aria-label="关闭搜索"
-        title="关闭搜索"
+        aria-label={t("novelSearch.close")}
+        title={t("novelSearch.close")}
       >
         <FluentIcon name="dismiss" size={20} />
       </button>

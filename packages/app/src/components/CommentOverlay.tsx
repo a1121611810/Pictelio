@@ -4,6 +4,7 @@ import { type CommentContentType } from "../api/comment";
 import { useComments } from "../primitives/useComments";
 import CommentList from "./CommentList";
 import CommentInput from "./CommentInput";
+import { t } from "../i18n";
 
 interface CommentOverlayProps {
   type: CommentContentType;
@@ -63,12 +64,12 @@ const CommentOverlay: Component<CommentOverlayProps> = (props) => {
           {/* Header */}
           <header class="flex items-center justify-between px-4 h-12 flex-shrink-0 border-b border-[var(--colorNeutralStroke2)]">
             <h2 class="[font-size:var(--fontSizeBase300)] font-semibold text-[var(--colorNeutralForeground1)]">
-              评论
+              {t("comment.title")}
             </h2>
             <button
               class="w-8 h-8 flex items-center justify-center rounded-[var(--borderRadiusSmall)] text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground2)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer"
               onClick={props.onClose}
-              aria-label="关闭"
+              aria-label={t("comment.closeAria")}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                 <path
@@ -89,7 +90,7 @@ const CommentOverlay: Component<CommentOverlayProps> = (props) => {
                 class="underline bg-transparent border-none p-0 cursor-pointer text-[var(--colorBrandForeground1)]"
                 onClick={() => window.location.reload()}
               >
-                重试
+                {t("comment.retry")}
               </button>
             </div>
           </Show>

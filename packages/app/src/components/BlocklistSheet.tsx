@@ -1,5 +1,6 @@
 import type { Component } from "solid-js";
 import { blockedIds, unblockUser } from "../stores/blockStore";
+import { t } from "../i18n";
 
 function ids() {
   return [...blockedIds()];
@@ -32,11 +33,11 @@ const BlocklistSheet: Component<BlocklistSheetProps> = (props) => {
         {/* Header */}
         <div class="flex items-center justify-between px-5 pt-1 pb-2">
           <h2 class="[font-size:var(--fontSizeBase500)] font-semibold text-[var(--colorNeutralForeground1)]">
-            屏蔽列表
+            {t("blocklist.title")}
           </h2>
           <fluent-button
             appearance="subtle"
-            aria-label="关闭"
+            aria-label={t("blocklist.closeAria")}
             ref={fluentOn("click", close)}
             class="w-8 h-8 p-0 min-w-8"
           >
@@ -72,7 +73,7 @@ const BlocklistSheet: Component<BlocklistSheetProps> = (props) => {
                   />
                 </svg>
                 <p class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground3)]">
-                  暂无屏蔽用户
+                  {t("blocklist.empty")}
                 </p>
               </div>
             }
@@ -82,15 +83,15 @@ const BlocklistSheet: Component<BlocklistSheetProps> = (props) => {
                 <div class="flex items-center justify-between px-3 py-3 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)]">
                   <div class="min-w-0">
                     <p class="[font-size:var(--fontSizeBase300)] font-semibold text-[var(--colorNeutralForeground1)] truncate">
-                      用户 ID: {userId}
+                      {t("blocklist.userId", { userId })}
                     </p>
                   </div>
                   <fluent-button
                     appearance="secondary"
                     ref={fluentOn("click", () => unblockUser(userId))}
-                    aria-label={`取消屏蔽用户 ${userId}`}
+                    aria-label={t("blocklist.unblockAria", { userId })}
                   >
-                    取消屏蔽
+                    {t("blocklist.unblock")}
                   </fluent-button>
                 </div>
               ))}
@@ -101,7 +102,7 @@ const BlocklistSheet: Component<BlocklistSheetProps> = (props) => {
         {/* Footer hint */}
         <div class="px-5 pb-6 pt-2">
           <p class="text-center [font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
-            屏蔽用户后，其作品将不再出现在推荐和关注列表中
+            {t("blocklist.hint")}
           </p>
         </div>
       </div>

@@ -2,6 +2,7 @@ import type { Component } from "solid-js";
 import { downloadAndExtractUgoira, type UgoiraFrame } from "../api/illust";
 import { ugoiraMode } from "../stores/settingsStore";
 import PixivImage from "./PixivImage";
+import { t } from "../i18n";
 
 interface Props {
   illustId: number;
@@ -60,7 +61,7 @@ const UgoiraViewer: Component<Props> = (props) => {
       ([err, result]) => {
         if (err) {
           console.error("[UgoiraViewer] Error:", err);
-          setError((err as Error).message || "加载动图失败");
+          setError((err as Error).message || t("ugoira.loadFailed")); // i18n: set 时快照（瞬态）
           setStatus("paused");
         } else {
           blobUrls = result.blobUrls;
@@ -191,7 +192,7 @@ const UgoiraViewer: Component<Props> = (props) => {
             e.stopPropagation();
             props.onClose();
           }}
-          aria-label="关闭"
+          aria-label={t("ugoira.closeAria")}
         >
           ←
         </button>
@@ -200,7 +201,7 @@ const UgoiraViewer: Component<Props> = (props) => {
       {/* Status: loading — full-screen: text badge; inline: centered spinner */}
       {status() === "loading" && !props.inline && (
         <div class="absolute top-4 right-4 px-2.5 py-1 rounded-[var(--borderRadiusCircular)] bg-[var(--colorOverlaySurface)] text-[var(--colorOverlayForeground)] text-[var(--fontSizeBase200)] font-medium z-10">
-          加载中...
+          {t("ugoira.loading")}
         </div>
       )}
 
@@ -214,7 +215,7 @@ const UgoiraViewer: Component<Props> = (props) => {
             },
           ]}
         >
-          已暂停
+          {t("ugoira.paused")}
         </div>
       )}
 
@@ -232,7 +233,7 @@ const UgoiraViewer: Component<Props> = (props) => {
         >
           <p class="[font-size:var(--fontSizeBase300)] mb-4">{error()}</p>
           <fluent-button appearance="secondary" ref={fluentOn("click", props.onClose)}>
-            返回
+            {t("ugoira.back")}
           </fluent-button>
         </div>
       )}

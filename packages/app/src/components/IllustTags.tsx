@@ -1,6 +1,7 @@
 import type { Component } from "solid-js";
 import type { PixivIllustTag } from "../api/types";
 import SearchableTag from "./SearchableTag";
+import { t } from "../i18n";
 
 interface IllustTagsProps {
   tags: PixivIllustTag[];
@@ -22,7 +23,7 @@ const IllustTags: Component<IllustTagsProps> = (props) => {
     <div
       class={`flex flex-wrap gap-[var(--spacingHorizontalXXS)] ${props.class ?? ""}`}
       role="list"
-      aria-label="作品标签"
+      aria-label={t("illustTags.listAria")}
     >
       <For each={props.tags}>
         {(tag) => (

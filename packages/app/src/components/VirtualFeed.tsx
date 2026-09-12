@@ -12,6 +12,7 @@ import { createFeedVirtualizer } from "../primitives/createFeedVirtualizer";
 import { loadImage, checkImageCache, pickListImageUrl } from "../utils/imageLoader";
 import { isImageHostEnabled } from "../stores/imageHostStore";
 import { imageCachePrefetch, listQuality } from "../stores/settingsStore";
+import { t } from "../i18n";
 
 interface Props {
   illusts: PixivIllust[];
@@ -229,19 +230,19 @@ const VirtualFeed: Component<Props> = (props) => {
 
       {!props.hasMore && props.illusts.length > 0 && (
         <p class="text-[var(--colorNeutralForeground3)] text-center py-4 [font-size:var(--fontSizeBase200)]">
-          已经到底了
+          {t("virtualFeed.endReached")}
         </p>
       )}
 
       {props.illusts.length === 0 && !props.loading && !props.error && loadAttempted && (
         <p class="text-[var(--colorNeutralForeground2)] text-center py-16 [font-size:var(--fontSizeBase300)]">
-          {props.emptyText ?? "暂无新作品"}
+          {props.emptyText ?? t("virtualFeed.emptyNew")}
         </p>
       )}
 
       {/* 分页失败：保留已加载结果，在列表底部显示内联重试条（只重试失败页） */}
       <Show when={props.error && props.paginationError && props.illusts.length > 0}>
-        <InlineRetryBar message="加载更多失败" onRetry={props.onLoadMore} />
+        <InlineRetryBar message={t("virtualFeed.loadMoreFailed")} onRetry={props.onLoadMore} />
       </Show>
 
       <div ref={sentinelAttach} class="h-1" />

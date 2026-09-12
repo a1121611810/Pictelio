@@ -2,6 +2,7 @@ import type { Component } from "solid-js";
 import { Show, createEffect, createSignal, onCleanup, onSettled, untrack } from "solid-js";
 import { tryAsync } from "../utils/tryAsync";
 import { checkImageCache, loadImage, loadImageWithProgress } from "../utils/imageLoader";
+import { t } from "../i18n";
 
 interface Props {
   imageUrls: string[];
@@ -317,7 +318,10 @@ const ImageViewer: Component<Props> = (props) => {
                     class="text-[var(--colorOverlayForeground)]"
                     style={{ "font-size": "var(--fontSizeBase200)" }}
                   >
-                    加载第 {i + 1}/{props.imageUrls.length} 页
+                    {t("imageViewer.loadingPage", {
+                      current: i + 1,
+                      total: props.imageUrls.length,
+                    })}
                   </span>
                 </div>
               </Show>
@@ -340,7 +344,7 @@ const ImageViewer: Component<Props> = (props) => {
           class="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-[var(--borderRadiusCircular)] bg-[var(--colorOverlaySurface)] text-[var(--colorOverlayForeground)] appearance-none border-none cursor-pointer disabled:cursor-default focus-visible:outline focus-visible:outline-[var(--colorStrokeFocus2)]"
           onClick={handleSaveCurrentPage}
           disabled={saveStatus() === "saving" || props.saveBusy}
-          aria-label="保存当前页到相册"
+          aria-label={t("imageViewer.savePageAria")}
         >
           <Show when={saveStatus() === "saving"}>
             <span

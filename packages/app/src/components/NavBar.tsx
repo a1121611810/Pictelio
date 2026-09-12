@@ -4,24 +4,25 @@ import { currentTab, setCurrentTab } from "../stores/uiStore";
 import FluentIcon, { type FluentIconName } from "./ui/FluentIcon";
 import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior";
 import { usePointerHighlight } from "../primitives/usePointerHighlight";
+import { t, type I18nKey } from "../i18n";
 
 // ── Tab definitions ──
 type NavTab = "recommended" | "follow" | "bookmarks" | "history";
 
 interface TabDef {
   key: NavTab;
-  label: string;
+  label: I18nKey;
   icon: FluentIconName;
 }
 
 const leftTabs: TabDef[] = [
-  { key: "recommended", label: "推荐", icon: "home" },
-  { key: "follow", label: "关注", icon: "people" },
+  { key: "recommended", label: "navBar.tab.recommended", icon: "home" },
+  { key: "follow", label: "navBar.tab.follow", icon: "people" },
 ];
 
 const rightTabs: TabDef[] = [
-  { key: "bookmarks", label: "收藏", icon: "bookmark" },
-  { key: "history", label: "历史", icon: "history" },
+  { key: "bookmarks", label: "navBar.tab.bookmarks", icon: "bookmark" },
+  { key: "history", label: "navBar.tab.history", icon: "history" },
 ];
 
 /** 类型守卫：判断 Tab 是否属于 NavTab */
@@ -142,7 +143,7 @@ const NavBar: Component = () => {
   }
 
   return (
-    <nav class="floating-nav" aria-label="主导航">
+    <nav class="floating-nav" aria-label={t("navBar.mainAria")}>
       <div
         class={["floating-nav-capsule relative", { "floating-nav-capsule-compact": compact() }]}
 
@@ -176,11 +177,11 @@ const NavBar: Component = () => {
 
               onClick={() => handleTabClick(tab.key)}
               aria-current={activeTab() === tab.key ? "page" : undefined}
-              aria-label={tab.label}
+              aria-label={t(tab.label)}
               tabindex={compact() ? -1 : 0}
             >
               <FluentIcon name={tab.icon} active={activeTab() === tab.key} />
-              <span>{tab.label}</span>
+              <span>{t(tab.label)}</span>
             </button>
           ))}
         </div>
@@ -191,7 +192,7 @@ const NavBar: Component = () => {
           onClick={handleCenterClick}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
-          aria-label="搜索"
+          aria-label={t("navBar.searchAria")}
         >
           <FluentIcon name="search" size={24} />
         </button>
@@ -216,11 +217,11 @@ const NavBar: Component = () => {
 
               onClick={() => handleTabClick(tab.key)}
               aria-current={activeTab() === tab.key ? "page" : undefined}
-              aria-label={tab.label}
+              aria-label={t(tab.label)}
               tabindex={compact() ? -1 : 0}
             >
               <FluentIcon name={tab.icon} active={activeTab() === tab.key} />
-              <span>{tab.label}</span>
+              <span>{t(tab.label)}</span>
             </button>
           ))}
         </div>

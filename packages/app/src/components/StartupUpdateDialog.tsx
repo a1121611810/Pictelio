@@ -10,6 +10,7 @@ import {
   checkCompleted,
   lastDismissedVersion,
 } from "../stores/settingsStore";
+import { t } from "../i18n";
 
 /**
  * Dismiss the current update version and hide the dialog.
@@ -85,7 +86,7 @@ const StartupUpdateDialog: Component = () => {
           {/* 顶部标题 */}
           <div class="px-5 pt-5 pb-2 flex-shrink-0">
             <h2 class="text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase500)] font-semibold leading-tight m-0">
-              发现新版本
+              {t("startupUpdate.title")}
             </h2>
             <p class="mt-0.5 text-[var(--colorBrandForeground1)] [font-size:var(--fontSizeBase300)] font-semibold leading-snug">
               v{latestVersion()}
@@ -95,8 +96,10 @@ const StartupUpdateDialog: Component = () => {
           {/* 正文内容 */}
           <div class="px-5 py-2 flex-shrink-0 text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase300)] leading-relaxed">
             <p class="m-0">
-              Pictelio <span class="font-semibold">v{latestVersion()}</span> 已发布，当前版本为{" "}
-              <span class="font-semibold">v{APP_VERSION}</span>。
+              Pictelio <span class="font-semibold">v{latestVersion()}</span>{" "}
+              {t("startupUpdate.bodyPublishedSuffix")}
+              <span class="font-semibold">v{APP_VERSION}</span>
+              {t("startupUpdate.bodyEnd")}
             </p>
           </div>
 
@@ -119,14 +122,14 @@ const StartupUpdateDialog: Component = () => {
               onClick={handleDismiss}
               class="flex-1 min-h-[44px] text-[var(--fontSizeBase300)] font-semibold"
             >
-              稍后再说
+              {t("startupUpdate.later")}
             </fluent-button>
             <fluent-button
               appearance="primary"
               onClick={handleDownload}
               class="flex-1 min-h-[44px] text-[var(--fontSizeBase300)] font-semibold"
             >
-              前往下载
+              {t("startupUpdate.download")}
             </fluent-button>
           </div>
         </div>

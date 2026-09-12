@@ -1,6 +1,7 @@
 import { type Component } from "solid-js";
 import type { PixivNovel, SeriesNavigation } from "../api/types";
 import FluentIcon from "./ui/FluentIcon";
+import { t } from "../i18n";
 
 // ── 小说底部导航栏：上一章、目录、显示设置、下一章 ──
 
@@ -45,7 +46,7 @@ const NovelFooterNav: Component<NovelFooterNavProps> = (props) => {
                 class="flex-shrink-0 whitespace-nowrap px-3 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] font-medium hover:bg-[var(--colorNeutralBackground3)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer flex items-center gap-1"
                 onClick={() => props.onPrevChapter(prev().id)}
               >
-                ◀ 上一章
+                ◀ {t("novelFooterNav.prev")}
               </button>
             )}
           </Show>
@@ -53,10 +54,10 @@ const NovelFooterNav: Component<NovelFooterNavProps> = (props) => {
             <button
               class="flex-shrink-0 whitespace-nowrap px-3 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] font-medium hover:bg-[var(--colorNeutralBackground3)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer flex items-center gap-2"
               onClick={() => props.onOpenSeries()}
-              aria-label="打开系列目录"
+              aria-label={t("novelFooterNav.seriesAria")}
             >
               <FluentIcon name="list" size={20} />
-              目录
+              {t("novelFooterNav.contents")}
             </button>
           </Show>
           <button
@@ -69,7 +70,7 @@ const NovelFooterNav: Component<NovelFooterNavProps> = (props) => {
             >
               Aa
             </span>
-            显示设置
+            {t("novelFooterNav.displaySettings")}
           </button>
           <Show when={props.showTranslateEntry !== false}>
             <button
@@ -86,22 +87,26 @@ const NovelFooterNav: Component<NovelFooterNavProps> = (props) => {
               aria-label={
                 props.translated
                   ? props.showTranslation
-                    ? "切换到原文"
-                    : "切换到译文"
-                  : "打开翻译面板"
+                    ? t("novelFooterNav.switchOriginalAria")
+                    : t("novelFooterNav.switchTranslationAria")
+                  : t("novelFooterNav.openTranslateAria")
               }
             >
-              {props.translated ? (props.showTranslation ? "原文" : "译文") : "翻译"}
+              {props.translated
+                ? props.showTranslation
+                  ? t("novelFooterNav.original")
+                  : t("novelFooterNav.translation")
+                : t("novelFooterNav.translate")}
             </button>
           </Show>
           <Show when={props.onExport}>
             <button
               class="flex-shrink-0 whitespace-nowrap px-3 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] font-medium hover:bg-[var(--colorNeutralBackground3)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer flex items-center gap-1"
               onClick={() => props.onExport?.()}
-              aria-label="导出小说"
+              aria-label={t("novelFooterNav.exportAria")}
             >
               <FluentIcon name="open" size={20} />
-              导出
+              {t("novelFooterNav.export")}
             </button>
           </Show>
           <Show when={props.novel.series?.id ? props.novelNav?.nextNovel : undefined}>
@@ -110,7 +115,7 @@ const NovelFooterNav: Component<NovelFooterNavProps> = (props) => {
                 class="flex-shrink-0 whitespace-nowrap px-3 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] [font-size:var(--fontSizeBase200)] font-medium hover:opacity-90 active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer flex items-center gap-1"
                 onClick={() => props.onNextChapter(next().id)}
               >
-                下一章 ▶
+                {t("novelFooterNav.next")} ▶
               </button>
             )}
           </Show>

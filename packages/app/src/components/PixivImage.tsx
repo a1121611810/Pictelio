@@ -1,6 +1,7 @@
 import type { Component } from "solid-js";
 import { createProgressiveImage } from "../primitives/createProgressiveImage";
 import { checkImageCache, resolveImageUrl } from "../utils/imageLoader";
+import { t } from "../i18n";
 
 interface PixivImageProps {
   src: string;
@@ -68,7 +69,7 @@ const ProgressivePixivImage: Component<ProgressivePixivImageProps> = (p) => {
             ⚠
           </span>
           <span class="text-[var(--colorNeutralForegroundDisabled)] [font-size:var(--fontSizeBase100)]">
-            加载失败
+            {t("error.fallback.loadFailed")}
           </span>
         </div>
       ) : (
@@ -172,7 +173,7 @@ const PixivImage: Component<PixivImageProps> = (props) => {
             ⚠
           </span>
           <span class="text-[var(--colorNeutralForegroundDisabled)] [font-size:var(--fontSizeBase100)]">
-            加载失败
+            {t("error.fallback.loadFailed")}
           </span>
         </div>
       ) : props.hideLoadingPlaceholder ? null : (
@@ -188,7 +189,7 @@ const PixivImage: Component<PixivImageProps> = (props) => {
         >
           <span class="spinner w-4 h-4" />
           <span class="text-[var(--colorNeutralForegroundDisabled)] [font-size:var(--fontSizeBase100)]">
-            加载中...
+            {t("pixivImage.loading")}
           </span>
         </div>
       )}

@@ -22,6 +22,7 @@ import {
   FONT_COLORS,
   BG_COLORS,
 } from "../stores/readerSettingsStore";
+import { t } from "../i18n";
 
 interface Props {
   isOpen: boolean;
@@ -79,12 +80,12 @@ const ReaderSettingsSheet: Component<Props> = (props) => {
           {/* Header */}
           <div class="flex items-center justify-between px-5 pt-1 pb-2">
             <h2 class="[font-size:var(--fontSizeBase500)] font-semibold text-[var(--colorNeutralForeground1)]">
-              阅读设置
+              {t("readerSettings.title")}
             </h2>
             <button
               class="w-8 h-8 flex items-center justify-center rounded-[var(--borderRadiusMedium)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorNeutralBackground2)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer"
               onClick={close}
-              aria-label="关闭"
+              aria-label={t("readerSettings.closeAria")}
             >
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                 <path
@@ -110,17 +111,19 @@ const ReaderSettingsSheet: Component<Props> = (props) => {
                 "line-height": `${lineHeight()}`,
               }}
             >
-              <p class="leading-relaxed">夜色如墨，灯火阑珊。她推开窗，风裹着雨气扑面而来。</p>
-              <p class="mt-1 opacity-60 [font-size:var(--fontSizeBase100)]">阅读设置实时预览</p>
+              <p class="leading-relaxed">{t("readerSettings.previewBody")}</p>
+              <p class="mt-1 opacity-60 [font-size:var(--fontSizeBase100)]">
+                {t("readerSettings.previewCaption")}
+              </p>
             </div>
 
             {/* ── Font size ── */}
             <div>
               <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground1)] mb-2">
-                字号
+                {t("readerSettings.fontSize")}
                 <Show when={autoFontSize()}>
                   <span class="ml-2 [font-size:var(--fontSizeBase100)] font-normal text-[var(--colorNeutralForeground3)]">
-                    自动 · {effectiveFontSize()}px
+                    {t("readerSettings.autoSize", { size: effectiveFontSize() })}
                   </span>
                 </Show>
               </p>
@@ -134,7 +137,7 @@ const ReaderSettingsSheet: Component<Props> = (props) => {
                     }
                   }}
                   disabled={autoFontSize() || fontSize() <= FONT_SIZES[0]}
-                  aria-label="减小字号"
+                  aria-label={t("readerSettings.decreaseFontSize")}
                 >
                   A⁻
                 </button>
@@ -152,9 +155,9 @@ const ReaderSettingsSheet: Component<Props> = (props) => {
                     ]}
 
                     onClick={() => setReaderAutoFontSize(true)}
-                    aria-label="自动字号"
+                    aria-label={t("readerSettings.autoAria")}
                   >
-                    自动
+                    {t("readerSettings.auto")}
                   </button>
                   {FONT_SIZES.map((s) => (
                     <button
@@ -188,7 +191,7 @@ const ReaderSettingsSheet: Component<Props> = (props) => {
                     }
                   }}
                   disabled={autoFontSize() || fontSize() >= FONT_SIZES[FONT_SIZES.length - 1]}
-                  aria-label="增大字号"
+                  aria-label={t("readerSettings.increaseFontSize")}
                 >
                   A⁺
                 </button>
@@ -198,7 +201,7 @@ const ReaderSettingsSheet: Component<Props> = (props) => {
             {/* ── Font weight ── */}
             <div>
               <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground1)] mb-2">
-                字重
+                {t("readerSettings.fontWeight")}
               </p>
               <PillRow
                 options={FONT_WEIGHTS}
@@ -210,7 +213,7 @@ const ReaderSettingsSheet: Component<Props> = (props) => {
             {/* ── Font family ── */}
             <div>
               <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground1)] mb-2">
-                字体
+                {t("readerSettings.fontFamily")}
               </p>
               <PillRow
                 options={FONT_FAMILIES}
@@ -222,7 +225,7 @@ const ReaderSettingsSheet: Component<Props> = (props) => {
             {/* ── Line height ── */}
             <div>
               <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground1)] mb-2">
-                行距
+                {t("readerSettings.lineHeight")}
               </p>
               <PillRow
                 options={LINE_HEIGHTS.map((lh) => ({ value: lh, label: String(lh) }))}
@@ -234,7 +237,7 @@ const ReaderSettingsSheet: Component<Props> = (props) => {
             {/* ── Text color ── */}
             <div>
               <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground1)] mb-2">
-                文字颜色
+                {t("readerSettings.textColor")}
               </p>
               <div class="flex gap-2 items-center">
                 {FONT_COLORS.map((c) => (
@@ -253,14 +256,14 @@ const ReaderSettingsSheet: Component<Props> = (props) => {
                     style={`background-color: ${c}`}
                     onClick={() => setReaderFontColor(c)}
                     onKeyDown={(e) => e.key === "Enter" && setReaderFontColor(c)}
-                    aria-label={`文字颜色 ${c}`}
+                    aria-label={t("readerSettings.textColorValue", { color: c })}
                   />
                 ))}
                 <button
                   class="w-8 h-8 rounded-[var(--borderRadiusCircular)] border-2 border-dashed border-[var(--colorNeutralStroke2)] flex items-center justify-center [font-size:var(--fontSizeBase100)] text-[var(--colorNeutralForeground3)] appearance-none bg-transparent cursor-pointer"
                   onClick={() => setReaderFontColor("")}
-                  aria-label="重置"
-                  title="重置"
+                  aria-label={t("readerSettings.reset")}
+                  title={t("readerSettings.reset")}
                 >
                   ↺
                 </button>
@@ -273,7 +276,7 @@ const ReaderSettingsSheet: Component<Props> = (props) => {
                     class="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
                     value={fontColor() || "#000000"}
                     onInput={(e) => setReaderFontColor(e.currentTarget.value)}
-                    aria-label="自定义文字颜色"
+                    aria-label={t("readerSettings.customTextColorAria")}
                   />
                 </label>
               </div>
@@ -282,7 +285,7 @@ const ReaderSettingsSheet: Component<Props> = (props) => {
             {/* ── Background color ── */}
             <div>
               <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground1)] mb-2">
-                背景色
+                {t("readerSettings.bgColor")}
               </p>
               <div class="flex gap-2 items-center flex-wrap">
                 {BG_COLORS.map((c) => (
@@ -301,7 +304,11 @@ const ReaderSettingsSheet: Component<Props> = (props) => {
                     style={`background-color: ${c || "var(--colorNeutralBackground1)"}`}
                     onClick={() => setReaderBgColor(c)}
                     onKeyDown={(e) => e.key === "Enter" && setReaderBgColor(c)}
-                    aria-label={`背景色 ${c || "默认"}`}
+                    aria-label={
+                      c === ""
+                        ? t("readerSettings.bgColorDefault")
+                        : t("readerSettings.bgColorValue", { color: c })
+                    }
                   >
                     {c === "" && (
                       <div
@@ -325,7 +332,7 @@ const ReaderSettingsSheet: Component<Props> = (props) => {
                     class="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
                     value={bgColor() || "#ffffff"}
                     onInput={(e) => setReaderBgColor(e.currentTarget.value)}
-                    aria-label="自定义背景色"
+                    aria-label={t("readerSettings.customBgColorAria")}
                   />
                 </label>
               </div>

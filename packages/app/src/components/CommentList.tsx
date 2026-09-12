@@ -3,6 +3,7 @@ import type { PixivComment } from "../api/types";
 import { user } from "../stores/authStore";
 import { resolveImageUrl } from "../utils/imageLoader";
 import { formatRelativeTime } from "../utils/dateFormat";
+import { t } from "../i18n";
 
 // ─── Helpers ───
 
@@ -91,14 +92,14 @@ const CommentItem: Component<CommentItemProps> = (props) => {
             class="[font-size:var(--fontSizeBase75)] text-[var(--colorNeutralForeground3)] hover:text-[var(--colorBrandForeground1)] font-medium bg-transparent border-none p-0 cursor-pointer transition-colors"
             onClick={props.onReply}
           >
-            回复
+            {t("comment.reply")}
           </button>
           <Show when={Number(props.currentUserId) === Number(props.comment.user.id)}>
             <button
               class="[font-size:var(--fontSizeBase75)] text-[var(--colorNeutralForeground3)] hover:text-[var(--colorStatusDangerForeground1)] font-medium bg-transparent border-none p-0 cursor-pointer transition-colors"
               onClick={props.onDelete}
             >
-              删除
+              {t("comment.delete")}
             </button>
           </Show>
         </div>
@@ -124,8 +125,8 @@ const CommentList: Component<CommentListProps> = (props) => {
     <div class="flex-1 overflow-y-auto">
       <Show when={props.hasLoaded && props.comments.length === 0}>
         <div class="flex flex-col items-center justify-center py-12 text-[var(--colorNeutralForeground3)] [font-size:var(--fontSizeBase200)]">
-          <p>还没有评论</p>
-          <p class="mt-1">来写第一条吧</p>
+          <p>{t("comment.empty")}</p>
+          <p class="mt-1">{t("comment.emptyHint")}</p>
         </div>
       </Show>
 

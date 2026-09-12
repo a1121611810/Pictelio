@@ -3,6 +3,7 @@ import { Show } from "solid-js";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { gateActive, gateError, gateFloor, gateHealing, selfHeal } from "@/services/otaService";
 import { latestReleaseUrl, latestVersion } from "@/stores/settingsStore";
+import { t } from "@/i18n";
 
 /**
  * OTA 强制门槛全屏过渡面（#253，D4 裁决：全屏面合并 T1/T2，单一表面三状态）。
@@ -24,7 +25,18 @@ function handleDownload(): void {
   }
 }
 
+// t() args 只接受 string | number：floor/error 快照在此收窄（accessor 二次调用不继承窄化）
+const floorSuffix = () => {
+  const floor = gateFloor();
+  return floor ? t("gate.floorSuffix", { version: floor }) : "";
+};
+const errorSuffix = () => {
+  const err = gateError();
+  return err ? t("gate.errorSuffix", { detail: err }) : t("gate.period");
+};
+
 const GateOverlay: Component = () => {
+
   return (
     <Show when={gateActive()}>
       <div
@@ -36,11 +48,13 @@ const GateOverlay: Component = () => {
           fallback={
             <>
               <h2 class="m-0 text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase500)] font-semibold leading-tight">
-                需要更新后才能继续使用
+                {t("gate.title")}
               </h2>
               <p class="m-0 text-[var(--colorNeutralForeground2)] [font-size:var(--fontSizeBase300)] leading-relaxed">
-                当前版本低于最低可用版本{gateFloor() ? `（${gateFloor()}）` : ""}，自动更新未成功
-                {gateError() ? `：${gateError()}` : "。"}
+                {t("gate.updateRequiredBody", {
+                  floor: floorSuffix(),
+                  error: errorSuffix(),
+                })}
               </p>
               <div class="mt-2 flex w-full max-w-[360px] flex-col gap-2">
                 <fluent-button
@@ -48,7 +62,7 @@ const GateOverlay: Component = () => {
                   class="min-h-[44px] text-[var(--fontSizeBase300)] font-semibold"
                   onClick={() => void selfHeal()}
                 >
-                  重试更新
+                  {t("gate.retryUpdate")}
                 </fluent-button>
                 <Show when={latestReleaseUrl()}>
                   <fluent-button
@@ -56,16 +70,16 @@ const GateOverlay: Component = () => {
                     class="min-h-[44px] text-[var(--fontSizeBase300)] font-semibold"
                     onClick={handleDownload}
                   >
-                    前往下载 v{latestVersion()}
+                    {t("gate.downloadVersion", { version: latestVersion() })}
                   </fluent-button>
                 </Show>
               </div>
             </>
           }
         >
-          <LoadingSpinner size="lg" text="正在更新…" />
+          <LoadingSpinner size="lg" text={t("gate.updating")} />
           <p class="m-0 text-[var(--colorNeutralForeground2)] [font-size:var(--fontSizeBase300)] leading-relaxed">
-            正在更新到新版本，完成后自动继续
+            {t("gate.updatingHint")}
           </p>
         </Show>
       </div>

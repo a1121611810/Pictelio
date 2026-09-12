@@ -36,7 +36,7 @@ const IllustSingleCard: Component<IllustSingleCardProps> = (props) => {
   });
   // 内容标签：过滤 R-18/R-18G（分级已由图上的 R-18 badge 表达，避免重复）
   const contentTags = () =>
-    props.illust.tags.filter((t) => t.name !== "R-18" && t.name !== "R-18G");
+    props.illust.tags.filter((tag) => tag.name !== "R-18" && tag.name !== "R-18G");
   // 原图宽高比（width/height 可能异常，回退 16:10）
   const ratio = () => {
     const w = props.illust.width;

@@ -12,6 +12,7 @@ import {
   failedParagraphs,
   type TranslateTier,
 } from "@/stores/translationStore";
+import { t } from "@/i18n";
 
 interface TranslateSheetProps {
   isOpen: boolean;
@@ -29,15 +30,15 @@ interface TranslateSheetProps {
 /** 主按钮文案（模块级：仅依赖 store 信号，避免组件内重复创建） */
 function primaryLabel(): string {
   if (!dsApiKey()) {
-    return "前往设置填写 Key";
+    return t("translate.setUpKey");
   }
   if (translating()) {
-    return "翻译中…";
+    return t("translate.translating");
   }
   if (failedParagraphs().size > 0) {
-    return `补翻失败块（${failedParagraphs().size} 段）`;
+    return t("translate.retryFailedCount", { count: failedParagraphs().size });
   }
-  return "开始翻译";
+  return t("translate.start");
 }
 
 const TranslateSheet: Component<TranslateSheetProps> = (props) => {
@@ -52,7 +53,7 @@ const TranslateSheet: Component<TranslateSheetProps> = (props) => {
         class="fixed inset-0 z-40"
         role="dialog"
         aria-modal="true"
-        aria-label="AI 翻译"
+        aria-label={t("translate.dialogAria")}
         onClick={(e) => {
           if (e.target === e.currentTarget) {
             props.onClose();
@@ -64,13 +65,13 @@ const TranslateSheet: Component<TranslateSheetProps> = (props) => {
           <div class="mx-auto w-9 h-1 rounded-full bg-[var(--colorNeutralStroke2)] mb-3" />
           <div class="flex items-center justify-between mb-3">
             <h3 class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)]">
-              AI 翻译
+              {t("translate.title")}
             </h3>
             <button
               type="button"
               class="w-8 h-8 flex items-center justify-center rounded-[var(--borderRadiusSmall)] text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground2)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer"
               onClick={() => props.onClose()}
-              aria-label="关闭"
+              aria-label={t("translate.closeAria")}
             >
               ✕
             </button>
@@ -78,14 +79,13 @@ const TranslateSheet: Component<TranslateSheetProps> = (props) => {
 
           <Show when={!dsApiKey()}>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground2)] leading-relaxed mb-3">
-              尚未配置 DeepSeek API Key。请前往「设置 → 翻译设置」填写你自己的 API Key
-              （BYOK，密钥仅存本机、直连服务商）。
+              {t("translate.noKeyHint")}
             </p>
           </Show>
 
           <Show when={Boolean(dsApiKey())}>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground2)] leading-relaxed mb-3">
-              将小说正文翻译为简体中文。内容将发送至 DeepSeek（你选择的模型），按量计费。
+              {t("translate.privacyHint")}
             </p>
           </Show>
 
@@ -93,7 +93,7 @@ const TranslateSheet: Component<TranslateSheetProps> = (props) => {
           <Show when={props.onSelectTier && Boolean(dsApiKey())}>
             <div class="mb-3">
               <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug mb-1">
-                翻译质量（本页临时）
+                {t("translate.tierLabel")}
               </p>
               <div class="flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-1.5 gap-1">
                 <button
@@ -117,7 +117,7 @@ const TranslateSheet: Component<TranslateSheetProps> = (props) => {
                       : props.onSelectTier?.("flash")
                   }
                 >
-                  标准
+                  {t("translate.tierStandard")}
                   <small class="block font-normal [font-size:var(--fontSizeBase100)] text-[var(--colorNeutralForeground3)]">
                     v4-flash · ¥1/2
                   </small>
@@ -140,7 +140,7 @@ const TranslateSheet: Component<TranslateSheetProps> = (props) => {
                     props.tier === "pro" ? props.onSelectTier?.(null) : props.onSelectTier?.("pro")
                   }
                 >
-                  高质量
+                  {t("translate.tierPro")}
                   <small class="block font-normal [font-size:var(--fontSizeBase100)] text-[var(--colorNeutralForeground3)]">
                     v4-pro · ¥3/6
                   </small>
@@ -171,8 +171,12 @@ const TranslateSheet: Component<TranslateSheetProps> = (props) => {
                     />
                   </div>
                   <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground2)] mt-2">
-                    已翻译 {p().done} / {p().total} 块
-                    {p().done > 0 && p().done < p().total ? "，首屏内容已出，其余后台续翻中…" : ""}
+                    {t("translate.progress", {
+                      done: p().done,
+                      total: p().total,
+                      suffix:
+                        p().done > 0 && p().done < p().total ? t("translate.progressSuffix") : "",
+                    })}
                   </p>
                 </div>
               )}
@@ -182,8 +186,7 @@ const TranslateSheet: Component<TranslateSheetProps> = (props) => {
           {/* 失败信息 + 补翻（S4）：翻译完成后有失败段 → 提示可补翻 */}
           <Show when={!translating() && failedParagraphs().size > 0}>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorStatusDangerForeground1)] bg-[var(--colorStatusDangerBackground1)] rounded-[var(--borderRadiusMedium)] px-3 py-2 mb-3">
-              {failedParagraphs().size}{" "}
-              段翻译失败（正文中已标记「未翻译」）。可补翻失败块，成功段落不会重复计费。
+              {t("translate.failedHint", { count: failedParagraphs().size })}
             </p>
           </Show>
 

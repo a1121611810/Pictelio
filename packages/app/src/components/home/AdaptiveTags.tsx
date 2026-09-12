@@ -52,7 +52,7 @@ const AdaptiveTags: Component<AdaptiveTagsProps> = (props) => {
     if (children.length < total + 1) return;
     setChipWidths(children.slice(0, total).map((c) => c.offsetWidth));
     setPlusWidth((children[total] as HTMLElement).offsetWidth);
-    setTick((t) => t + 1);
+    setTick((prev) => prev + 1);
   };
 
   /** 测量与宽度均就绪后才渲染结果（ready 前显示占位，杜绝反馈循环） */
@@ -72,9 +72,9 @@ const AdaptiveTags: Component<AdaptiveTagsProps> = (props) => {
     return f?.partialWidth != null ? props.tags[f.visible] : undefined;
   };
   const partialText = () => {
-    const t = partialTag();
-    if (!t) return "";
-    return t.translated_name ? `${t.name}（${t.translated_name}）` : t.name;
+    const tag = partialTag();
+    if (!tag) return "";
+    return tag.translated_name ? `${tag.name}（${tag.translated_name}）` : tag.name;
   };
 
   // 截断 chip 外层 ref：命令式写入 max-width（JSX style 动态值实测不可靠，未写入 DOM）

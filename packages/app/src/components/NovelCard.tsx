@@ -6,6 +6,7 @@ import HeartBurstEffect from "./HeartBurstEffect";
 import IllustTags from "./IllustTags";
 import SearchableTag from "./SearchableTag";
 import { resolveImageUrl } from "../utils/imageLoader";
+import { t } from "../i18n";
 
 interface Props {
   novel: PixivNovel;
@@ -89,7 +90,7 @@ const NovelCard: Component<Props> = (props) => {
             )}
             {props.novel.novel_ai_type != null && props.novel.novel_ai_type >= 1 && (
               <fluent-badge appearance="filled">
-                {props.novel.novel_ai_type === 2 ? "AI" : "AI辅助"}
+                {props.novel.novel_ai_type === 2 ? "AI" : t("novelCard.aiAssisted")}
               </fluent-badge>
             )}
           </div>
@@ -120,7 +121,7 @@ const NovelCard: Component<Props> = (props) => {
           </div>
           <IllustTags tags={props.novel.tags} size="small" class="max-h-[54px] overflow-hidden" />
           <div class="flex items-center gap-[var(--spacingHorizontalS)] text-[var(--colorNeutralForeground3)] [font-size:var(--fontSizeBase100)]">
-            <span>{props.novel.text_length.toLocaleString()}字</span>
+            <span>{t("novelCard.statsWords", { count: props.novel.text_length.toLocaleString() })}</span>
             {props.novel.series?.title && (
               <button
                 class="inline-flex items-center bg-transparent border-none p-0 cursor-pointer text-[var(--colorBrandForeground1)] hover:text-[var(--colorBrandForegroundLinkHover)] [font-size:var(--fontSizeBase100)]"
@@ -128,7 +129,7 @@ const NovelCard: Component<Props> = (props) => {
                   e.stopPropagation();
                   props.onSeriesClick?.(props.novel.series!.id!);
                 }}
-                aria-label={`查看系列: ${props.novel.series.title}`}
+                aria-label={t("novelCard.seriesAria", { title: props.novel.series.title })}
               >
                 <span aria-hidden="true">·</span>
                 <span class="ml-[var(--spacingHorizontalXXS)] truncate max-w-[100px]">
@@ -160,7 +161,7 @@ const NovelCard: Component<Props> = (props) => {
               }
             }}
             onClick={(e) => e.stopPropagation()}
-            aria-label={bookmarked() ? "取消收藏" : "收藏"}
+            aria-label={bookmarked() ? t("novelCard.unbookmarkAria") : t("novelCard.bookmarkAria")}
           >
             <HeartIcon filled={bookmarked()} size={16} />
           </button>
@@ -172,7 +173,7 @@ const NovelCard: Component<Props> = (props) => {
       {privateHint() && (
         <div class="absolute inset-0 flex items-center justify-center bg-[var(--colorOverlayBackground)] rounded-[var(--borderRadiusMedium)] pointer-events-none z-10">
           <span class="text-[var(--colorOverlayForeground)] [font-size:var(--fontSizeBase200)] font-medium">
-            已私密收藏
+            {t("novelCard.privateBadge")}
           </span>
         </div>
       )}
@@ -230,9 +231,9 @@ export const NovelCoverCard: Component<Props> = (props) => {
   };
 
   const tags = () => {
-    const t = props.novel.tags;
-    const visible = t.slice(0, 2);
-    const overflow = t.length - 2;
+    const list = props.novel.tags;
+    const visible = list.slice(0, 2);
+    const overflow = list.length - 2;
     return { visible, overflow };
   };
 
@@ -262,7 +263,7 @@ export const NovelCoverCard: Component<Props> = (props) => {
           )}
           {props.novel.novel_ai_type != null && props.novel.novel_ai_type >= 1 && (
             <fluent-badge appearance="filled">
-              {props.novel.novel_ai_type === 2 ? "AI" : "AI辅助"}
+              {props.novel.novel_ai_type === 2 ? "AI" : t("novelCard.aiAssisted")}
             </fluent-badge>
           )}
         </div>
@@ -287,7 +288,7 @@ export const NovelCoverCard: Component<Props> = (props) => {
               }
             }}
             onClick={(e) => e.stopPropagation()}
-            aria-label={bookmarked() ? "取消收藏" : "收藏"}
+            aria-label={bookmarked() ? t("novelCard.unbookmarkAria") : t("novelCard.bookmarkAria")}
           >
             <HeartIcon filled={bookmarked()} size={16} />
           </button>
@@ -337,7 +338,7 @@ export const NovelCoverCard: Component<Props> = (props) => {
               e.stopPropagation();
               props.onSeriesClick?.(props.novel.series!.id!);
             }}
-            aria-label={`查看系列: ${props.novel.series.title}`}
+            aria-label={t("novelCard.seriesAria", { title: props.novel.series.title })}
           >
             <fluent-badge
               appearance="subtle"
@@ -353,7 +354,7 @@ export const NovelCoverCard: Component<Props> = (props) => {
       {privateHint() && (
         <div class="absolute inset-0 flex items-center justify-center bg-[var(--colorOverlayBackground)] rounded-[var(--borderRadiusMedium)] pointer-events-none z-10">
           <span class="text-[var(--colorOverlayForeground)] [font-size:var(--fontSizeBase200)] font-medium">
-            已私密收藏
+            {t("novelCard.privateBadge")}
           </span>
         </div>
       )}

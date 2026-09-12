@@ -3,6 +3,7 @@ import type { PixivNovel } from "../api/types";
 import { addBookmark, deleteBookmark } from "../api/novel";
 import HeartBurstEffect from "./HeartBurstEffect";
 import SearchableTag from "./SearchableTag";
+import { t } from "../i18n";
 
 interface Props {
   novel: PixivNovel;
@@ -64,12 +65,14 @@ const NovelTextListCard: Component<Props> = (props) => {
               data-testid="novel-author"
               class="inline-block text-[var(--colorBrandForeground1)] hover:underline focus:outline-hidden focus-visible:underline truncate max-w-[50%]"
               onClick={handleAuthorClick}
-              aria-label={`作者: ${props.novel.user.name}`}
+              aria-label={t("novelTextCard.authorAria", { name: props.novel.user.name })}
             >
               @{props.novel.user.name}
             </button>
             <span class="flex-shrink-0">·</span>
-            <span class="flex-shrink-0">{props.novel.text_length.toLocaleString()}字</span>
+            <span class="flex-shrink-0">
+              {t("novelTextCard.statsWords", { count: props.novel.text_length.toLocaleString() })}
+            </span>
             <span class="flex-shrink-0">·</span>
             <span class="flex-shrink-0">⭐ {props.novel.total_bookmarks.toLocaleString()}</span>
           </div>
@@ -91,7 +94,7 @@ const NovelTextListCard: Component<Props> = (props) => {
                 appearance="filled"
                 class="[font-size:var(--fontSizeBase100)]"
               >
-                {props.novel.novel_ai_type === 2 ? "AI" : "AI辅助"}
+                {props.novel.novel_ai_type === 2 ? "AI" : t("novelTextCard.aiAssisted")}
               </fluent-badge>
             )}
             {props.novel.series?.title && (
@@ -99,7 +102,7 @@ const NovelTextListCard: Component<Props> = (props) => {
                 data-testid="novel-series"
                 class="inline-flex items-center focus:outline-hidden focus-visible:underline"
                 onClick={handleSeriesClick}
-                aria-label={`查看系列: ${props.novel.series.title}`}
+                aria-label={t("novelTextCard.seriesAria", { title: props.novel.series.title })}
               >
                 <fluent-badge
                   appearance="subtle"
@@ -138,7 +141,7 @@ const NovelTextListCard: Component<Props> = (props) => {
           ]}
 
           onClick={toggleBookmark}
-          aria-label={bookmarked() ? "取消收藏" : "收藏"}
+          aria-label={bookmarked() ? t("novelTextCard.unbookmarkAria") : t("novelTextCard.bookmarkAria")}
         >
           {bookmarked() ? "♥" : "♡"}
         </button>

@@ -7,6 +7,7 @@ import SkeletonShimmer from "./SkeletonShimmer";
 import IllustTypeBadge from "./IllustTypeBadge";
 import { pickListImageUrl, resolveImageUrl } from "../utils/imageLoader";
 import { useCardInteractions } from "../primitives/useCardInteractions";
+import { t } from "../i18n";
 
 interface Props {
   illust: PixivIllust;
@@ -90,7 +91,7 @@ const GridCard: Component<Props> = (props) => {
           )}
           {props.illust.illust_ai_type != null && props.illust.illust_ai_type >= 1 && (
             <fluent-badge appearance="filled" style="font-size:var(--fontSizeBase100)">
-              {props.illust.illust_ai_type === 2 ? "AI" : "AI辅"}
+              {props.illust.illust_ai_type === 2 ? "AI" : t("gridCard.aiAssisted")}
             </fluent-badge>
           )}
         </div>
@@ -111,7 +112,7 @@ const GridCard: Component<Props> = (props) => {
             onPointerUp={onPointerUp}
             onPointerLeave={onPointerLeave}
             onClick={(e) => e.stopPropagation()}
-            aria-label={bookmarked() ? "取消收藏" : "收藏"}
+            aria-label={bookmarked() ? t("gridCard.unbookmarkAria") : t("gridCard.bookmarkAria")}
           >
             {bookmarked() ? "♥" : "♡"}
           </button>
@@ -119,7 +120,9 @@ const GridCard: Component<Props> = (props) => {
         </div>
         {privateHint() && (
           <div class="absolute inset-0 flex items-center justify-center bg-black/60 rounded-[var(--borderRadiusMedium)] pointer-events-none z-10">
-            <span class="text-white [font-size:var(--fontSizeBase100)] font-medium">已私密</span>
+            <span class="text-white [font-size:var(--fontSizeBase100)] font-medium">
+              {t("gridCard.privateBadge")}
+            </span>
           </div>
         )}
       </div>
@@ -154,9 +157,9 @@ const GridCard: Component<Props> = (props) => {
 
             onClick={toggleFollow}
             disabled={following()}
-            aria-label={isFollowed() ? "取消关注" : "关注"}
+            aria-label={isFollowed() ? t("gridCard.unfollowAria") : t("gridCard.followAria")}
           >
-            {following() ? "…" : isFollowed() ? "已关注" : "关注"}
+            {following() ? "…" : isFollowed() ? t("gridCard.followed") : t("gridCard.follow")}
           </button>
         </p>
       </div>

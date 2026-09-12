@@ -1,4 +1,5 @@
 import type { Component } from "solid-js";
+import { t } from "../i18n";
 
 // ── 作品操作菜单：举报、屏蔽作者 ──
 
@@ -26,7 +27,7 @@ const IllustActionMenu: Component<IllustActionMenuProps> = (props) => {
               fill="currentColor"
             />
           </svg>
-          举报
+          {t("illustMenu.report")}
         </button>
         <button
           class="flex items-center gap-3 px-4 py-2.5 text-left [font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorNeutralBackground1Hover)] active:bg-[var(--colorNeutralBackground1Pressed)] transition-colors appearance-none border-none outline-none cursor-pointer focus-visible:bg-[var(--colorNeutralBackground1Selected)]"
@@ -38,7 +39,7 @@ const IllustActionMenu: Component<IllustActionMenuProps> = (props) => {
               fill="currentColor"
             />
           </svg>
-          屏蔽作者
+          {t("illustMenu.blockAuthor")}
         </button>
       </div>
     </Show>
