@@ -15,6 +15,7 @@ import { useGlobalFabStore } from '../stores/globalFab'
 import AdaptiveTagRow from '../components/AdaptiveTagRow.vue'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
+import { t } from '../i18n'
 
 const settings = useSettingsStore()
 const isRestricted = settings.isRestricted
@@ -71,11 +72,11 @@ const endOfFeed = ref(false)
 /** 首载是否已成功落定（成功含 0 条）——三态判定输入（ADR-0150） */
 const settled = ref(false)
 
-/** 空态文案：按当前子 tab 取标题 / 副文案（图标同为 ✎） */
+/** 空态文案：按当前子 tab 取标题 / 副文案（图标同为 ✎）；t 在 computed 内调用，随 locale 响应 */
 const emptyMeta = computed(() =>
   mode.value === 'follow'
-    ? { title: '暂无关注小说', hint: '关注的小说作者发布新作品后会展示在这里' }
-    : { title: '暂无推荐小说', hint: '稍后再来看看，会有新的推荐' },
+    ? { title: t('novels.empty.follow.title'), hint: t('novels.empty.follow.hint') }
+    : { title: t('novels.empty.recommend.title'), hint: t('novels.empty.recommend.hint') },
 )
 
 /** 页级首载三态（ADR-0150）：骨架 / 错误 / 空态 / 内容 的唯一判定源 */
@@ -180,7 +181,7 @@ onUnmounted(() => {
   <view class="w-full h-full flex flex-col bg-surface">
     <!-- M3 TopAppBar：顶层页，居中标题，无返回箭头 -->
     <view class="flex flex-row items-center justify-center h-[17.067vw] px-4 bg-surface">
-      <text class="text-title-large font-medium text-surface-on">小说</text>
+      <text class="text-title-large font-medium text-surface-on">{{ t('novels.title') }}</text>
     </view>
 
     <!-- 推荐/关注切换（M3 secondary tabs：选中 primary 文字 + 底部 0.8vw primary 指示条，
@@ -192,14 +193,14 @@ onUnmounted(() => {
         :class="mode === 'recommend' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
         @tap="switchMode('recommend')"
       >
-        <text class="text-title-small font-medium">推荐</text>
+        <text class="text-title-small font-medium">{{ t('novels.tab.recommend') }}</text>
       </view>
       <view
         class="flex-1 h-[12.8vw] flex items-center justify-center"
         :class="mode === 'follow' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
         @tap="switchMode('follow')"
       >
-        <text class="text-title-small font-medium">关注</text>
+        <text class="text-title-small font-medium">{{ t('novels.tab.follow') }}</text>
       </view>
     </view>
 
@@ -252,7 +253,9 @@ onUnmounted(() => {
             <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>
             <text class="text-body-medium text-surface-on-variant mt-1.5">by {{ item.user.name }}</text>
             <view class="flex flex-row mt-1.5">
-              <text class="text-label-medium text-surface-on-variant mr-4">{{ item.text_length }} 字</text>
+              <text class="text-label-medium text-surface-on-variant mr-4">{{
+                t('novels.charCount', { count: item.text_length })
+              }}</text>
               <text v-if="item.total_bookmarks > 0" class="text-label-medium text-surface-on-variant mr-4">
                 ♥ {{ item.total_bookmarks }}
               </text>
@@ -269,9 +272,9 @@ onUnmounted(() => {
         </view>
       </list-item>
       <list-item v-if="loadingMore || pageErrorMsg || endOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text v-if="loadingMore" class="text-body-medium text-outline">加载中…</text>
+        <text v-if="loadingMore" class="text-body-medium text-outline">{{ t('novels.footer.loading') }}</text>
         <text v-else-if="pageErrorMsg" class="text-body-medium text-error">{{ pageErrorMsg }}</text>
-        <text v-else class="text-body-medium text-outline">没有更多了</text>
+        <text v-else class="text-body-medium text-outline">{{ t('novels.footer.end') }}</text>
       </list-item>
     </list>
     </template>

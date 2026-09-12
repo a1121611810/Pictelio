@@ -20,6 +20,7 @@ import AiRestrictedIllustCard from '../components/AiRestrictedIllustCard.vue'
 import { useAiOnlyVisible } from '../composables/useAiOnlyVisible'
 import RefreshableList from '../components/RefreshableList.vue'
 import { useGlobalFabStore } from '../stores/globalFab'
+import { t } from '../i18n'
 
 const settings = useSettingsStore()
 const isRestricted = settings.isRestricted
@@ -76,11 +77,19 @@ const endOfFeed = ref(false)
 /** 首载是否已成功落定（成功含 0 条）——三态判定输入（ADR-0150） */
 const settled = ref(false)
 
-/** 空态文案：按当前子 tab 取图标 / 标题 / 副文案（避免模板内重复三元） */
+/** 空态文案：按当前子 tab 取图标 / 标题 / 副文案（避免模板内重复三元）；t 在 computed 内调用，随 locale 响应 */
 const emptyMeta = computed(() =>
   mode.value === 'follow'
-    ? { icon: '♡', title: '暂无关注插画', hint: '关注的作者发布新插画后会展示在这里' }
-    : { icon: '✦', title: '暂无推荐插画', hint: '稍后再来看看，会有新的推荐' },
+    ? {
+        icon: '♡',
+        title: t('illustList.empty.follow.title'),
+        hint: t('illustList.empty.follow.hint'),
+      }
+    : {
+        icon: '✦',
+        title: t('illustList.empty.recommend.title'),
+        hint: t('illustList.empty.recommend.hint'),
+      },
 )
 
 /** 页级首载三态（ADR-0150）：骨架 / 错误 / 空态 / 内容 的唯一判定源 */
@@ -219,7 +228,7 @@ onUnmounted(() => {
   <view class="w-full h-full flex flex-col bg-surface">
     <!-- M3 TopAppBar：顶层页，居中标题，无返回箭头 -->
     <view class="flex flex-row items-center justify-center h-[17.067vw] px-4 bg-surface">
-      <text class="text-title-large font-medium text-surface-on">插画</text>
+      <text class="text-title-large font-medium text-surface-on">{{ t('illustList.title') }}</text>
     </view>
 
     <!-- 推荐/关注切换（M3 secondary tabs）：容器 border-b 分割线 + surface-container-lowest 底，
@@ -230,14 +239,14 @@ onUnmounted(() => {
         :class="mode === 'recommend' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
         @tap="switchMode('recommend')"
       >
-        <text class="text-title-small font-medium">推荐</text>
+        <text class="text-title-small font-medium">{{ t('illustList.tab.recommend') }}</text>
       </view>
       <view
         class="flex-1 h-[12.8vw] flex items-center justify-center"
         :class="mode === 'follow' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
         @tap="switchMode('follow')"
       >
-        <text class="text-title-small font-medium">关注</text>
+        <text class="text-title-small font-medium">{{ t('illustList.tab.follow') }}</text>
       </view>
     </view>
 
@@ -290,9 +299,9 @@ onUnmounted(() => {
       >
         <view class="w-full flex flex-col">
           <view class="flex flex-row items-center justify-between">
-            <text class="text-title-small font-medium text-surface-on">相关作品</text>
-            <view accessibility-element :accessibility-label="`收起相关作品`" @tap.stop="related.removeRow(mode, entry.row.anchorId)">
-              <text class="text-body-small text-outline">收起</text>
+            <text class="text-title-small font-medium text-surface-on">{{ t('illustList.related.title') }}</text>
+            <view accessibility-element :accessibility-label="t('illustList.related.collapseA11y')" @tap.stop="related.removeRow(mode, entry.row.anchorId)">
+              <text class="text-body-small text-outline">{{ t('illustList.related.collapse') }}</text>
             </view>
           </view>
           <view v-if="entry.row.loading" class="flex flex-row flex-wrap gap-2 mt-2">
@@ -304,7 +313,7 @@ onUnmounted(() => {
               v-for="rel in entry.row.items.slice(0, RELATED_GRID_SIZE)"
               :key="rel.id"
               accessibility-element
-              :accessibility-label="`查看相关作品 ${rel.title}`"
+              :accessibility-label="t('illustList.related.viewA11y', { title: rel.title })"
               class="w-[22vw] h-[22vw] rounded-[var(--md-shape-medium)] overflow-hidden"
               @tap.stop="openRelated(rel.id)"
             >
@@ -353,9 +362,9 @@ onUnmounted(() => {
       </list-item>
       </template>
       <list-item v-if="loadingMore || pageErrorMsg || endOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text v-if="loadingMore" class="text-body-medium text-outline">加载中…</text>
+        <text v-if="loadingMore" class="text-body-medium text-outline">{{ t('illustList.footer.loading') }}</text>
         <text v-else-if="pageErrorMsg" class="text-body-medium text-error">{{ pageErrorMsg }}</text>
-        <text v-else class="text-body-medium text-outline">没有更多了</text>
+        <text v-else class="text-body-medium text-outline">{{ t('illustList.footer.end') }}</text>
       </list-item>
     </list>
     </template>

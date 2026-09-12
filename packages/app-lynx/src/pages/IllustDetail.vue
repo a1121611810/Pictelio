@@ -18,6 +18,7 @@ import UgoiraViewer from '../components/UgoiraViewer.vue'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
 import { buildImageTasks, buildUgoiraTask } from '../utils/galleryDownload'
 import { useDownloadStore } from '../stores/downloadStore'
+import { t } from '../i18n'
 
 const detailQuality = useSettingsStore().detailQuality
 const settings = useSettingsStore()
@@ -49,7 +50,7 @@ async function toggleFollowAuthor() {
       following.value = true
     }
   } catch {
-    followError.value = '操作失败'
+    followError.value = t('illustDetail.actionFailed') // i18n: 赋值时快照（瞬态）
   } finally {
     followBusy.value = false
   }
@@ -74,12 +75,12 @@ function enqueuePages(selectedPages: number[]): number {
   if (!i || i.type === 'ugoira' || !selectedPages.length) return 0
   const drafts = buildImageTasks(i, selectedPages)
   if (drafts.length === 0) {
-    saveStatus.value = '没有可下载的原图'
+    saveStatus.value = t('illustDetail.save.noOriginal') // i18n: 赋值时快照（瞬态）
     queuedNotice.value = false
     return 0
   }
   dl.enqueue(drafts)
-  saveStatus.value = `已加入下载队列（${drafts.length} 项），请到下载页查看`
+  saveStatus.value = t('illustDetail.save.queued', { count: drafts.length }) // i18n: 赋值时快照（瞬态）
   queuedNotice.value = true
   clearTimeout(saveStatusTimer)
   saveStatusTimer = setTimeout(() => {
@@ -97,7 +98,7 @@ async function enqueueUgoira() {
     const meta = await loadUgoiraMetadata(i.id)
     const draft = buildUgoiraTask(i, meta.zip_urls.medium, settings.ugoiraDownloadFormat, meta.frames)
     dl.enqueue([draft])
-    saveStatus.value = '已加入下载队列（1 项），请到下载页查看'
+    saveStatus.value = t('illustDetail.save.queued', { count: 1 }) // i18n: 赋值时快照（瞬态）
     queuedNotice.value = true
     clearTimeout(saveStatusTimer)
     saveStatusTimer = setTimeout(() => {
@@ -106,7 +107,7 @@ async function enqueueUgoira() {
     }, 4000)
   } catch (e) {
     console.warn('[IllustDetail] ugoira 元数据获取失败', e)
-    saveStatus.value = '获取动图信息失败'
+    saveStatus.value = t('illustDetail.save.ugoiraInfoFailed') // i18n: 赋值时快照（瞬态）
     queuedNotice.value = false
   }
 }
@@ -169,7 +170,7 @@ onMounted(async () => {
     // P0-T3：同步作者关注状态（详情 API 可能不返回 is_followed，缺省 false）
     following.value = !!res.illust.user.is_followed
   } catch (err) {
-    errorMsg.value = presentError(err, '加载失败')
+    errorMsg.value = presentError(err, t('error.fallback.loadFailed'))
   } finally {
     loading.value = false
   }
@@ -183,7 +184,7 @@ onMounted(async () => {
   <view class="w-full h-full flex flex-col relative bg-surface">
     <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
       <view class="py-1 pr-2" @tap="goBack"><text class="text-[6.4vw] leading-none text-surface-on">‹</text></view>
-      <text class="flex-1 text-title-large font-medium text-surface-on">作品详情</text>
+      <text class="flex-1 text-title-large font-medium text-surface-on">{{ t('illustDetail.title') }}</text>
     </view>
 
     <!-- [lynx:fix] 骨架屏：加载中显示 shimmer 占位（图片区 1:1 + 文字条），数据就绪后切换 scroll-view -->
@@ -263,7 +264,7 @@ onMounted(async () => {
             @tap.stop="toggleFollowAuthor"
           >
             <text class="text-body-medium" :class="following ? 'text-primary' : 'text-primary-on'">
-              {{ following ? '已关注' : '关注' }}
+              {{ following ? t('illustDetail.follow.following') : t('illustDetail.follow.follow') }}
             </text>
           </view>
         </view>
@@ -279,7 +280,7 @@ onMounted(async () => {
                ADR-0112 教训）；静态图直接入队，ugoira 取元数据后按全局格式入队 -->
           <view class="ml-4 flex flex-row items-center" @tap="onSaveEntry">
             <text class="text-[5.6vw] leading-none text-outline">↓</text>
-            <text class="text-label-medium text-outline ml-1">保存</text>
+            <text class="text-label-medium text-outline ml-1">{{ t('illustDetail.save.action') }}</text>
           </view>
           <!-- 评论入口（issue #164）：样式对齐 webview 版（💬 + total_comments，字段缺失时不显示） -->
           <view
@@ -299,7 +300,7 @@ onMounted(async () => {
             class="ml-3 h-[8vw] px-3 flex items-center justify-center border border-outline rounded-[var(--md-shape-full)]"
             @tap="navigate('/downloads')"
           >
-            <text class="text-label-medium text-primary">查看下载</text>
+            <text class="text-label-medium text-primary">{{ t('illustDetail.save.viewDownloads') }}</text>
           </view>
         </view>
         <view class="flex flex-row flex-wrap mt-3">

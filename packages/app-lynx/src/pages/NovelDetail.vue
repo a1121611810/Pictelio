@@ -19,6 +19,7 @@ import {
 } from '../primitives/createWatchlistPrompt'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
 import AiOverlay from '../components/AiOverlay.vue'
+import { t } from '../i18n'
 
 const settings = useSettingsStore()
 const isRestricted = settings.isRestricted
@@ -66,7 +67,7 @@ function enqueueNovelExport(format: NovelExportFormat): void {
   })
   downloads.enqueue([draft])
   exportOpen.value = false
-  exportNotice.value = '已加入下载队列，请到下载页查看'
+  exportNotice.value = t('novelDetail.export.queued') // i18n: 赋值时快照（瞬态）
   clearTimeout(exportNoticeTimer)
   exportNoticeTimer = setTimeout(() => {
     exportNotice.value = ''
@@ -186,13 +187,13 @@ async function loadNovel(): Promise<void> {
       const data = await fetchNovelData(novelId.value)
       if (gen !== loadGeneration) return
       // 保留原 fetchNovelText 的空正文语义：提取失败 → 走 catch 展示错误
-      if (!data.text) throw new Error('小说正文提取失败')
+      if (!data.text) throw new Error(t('novelDetail.bodyExtractFailed')) // i18n: 构造时快照（瞬态）
       text.value = data.text
       novelImages.value = data.images
     }
   } catch (err) {
     if (gen !== loadGeneration) return
-    errorMsg.value = presentError(err, '加载失败')
+    errorMsg.value = presentError(err, t('error.fallback.loadFailed'))
   } finally {
     if (gen === loadGeneration) loading.value = false
   }
@@ -241,7 +242,7 @@ function onWatchlistCancel(): void {
     <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
       <!-- 左上角返回改走 requestBack：与系统返回共用同一守卫链（spec §US3） -->
       <view class="py-1 pr-2" @tap="requestBack"><text class="text-[6.4vw] leading-none text-surface-on">‹</text></view>
-      <text class="flex-1 text-title-large font-medium text-surface-on">小说</text>
+      <text class="flex-1 text-title-large font-medium text-surface-on">{{ t('novelDetail.title') }}</text>
     </view>
 
     <!-- 加载期骨架（issue #91）：header 照常渲染，正文区骨架占位 -->
@@ -265,7 +266,7 @@ function onWatchlistCancel(): void {
         <text class="text-title-large font-bold text-surface-on">{{ novel?.title }}</text>
         <text class="text-body-medium text-surface-on-variant mt-2">by {{ novel?.user.name }}</text>
         <text class="text-label-medium text-outline mt-1.5">
-          {{ novel?.text_length }} 字
+          {{ t('novelDetail.charCount', { count: novel?.text_length ?? '' }) }}
           <template v-if="novel?.total_bookmarks != null">
              · ♥ {{ novel?.total_bookmarks }}
           </template>
@@ -294,11 +295,11 @@ function onWatchlistCancel(): void {
           v-if="text.length > 0"
           class="mt-2 flex flex-row items-center"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
-          accessibility-label="导出小说"
+          :accessibility-label="t('novelDetail.export.a11y')"
           @tap="exportOpen = true"
         >
           <text class="text-[6.4vw] leading-none">⬆</text>
-          <text class="text-label-medium text-outline ml-1">导出</text>
+          <text class="text-label-medium text-outline ml-1">{{ t('novelDetail.export.action') }}</text>
         </view>
         <!-- 入队内联提示（lynx 无全局 toast）：约 4s 后自动隐藏 -->
         <text v-if="exportNotice" class="text-label-medium text-primary mt-1.5">{{ exportNotice }}</text>
@@ -315,7 +316,7 @@ function onWatchlistCancel(): void {
       </list-item>
       <list-item :key="'end'" :item-key="'end'" class="w-full">
         <view class="flex items-center justify-center p-6">
-          <text class="text-body-small text-outline">— 完 —</text>
+          <text class="text-body-small text-outline">{{ t('novelDetail.end') }}</text>
         </view>
       </list-item>
     </list>
@@ -325,7 +326,7 @@ function onWatchlistCancel(): void {
         <text class="text-title-large font-bold text-surface-on">{{ novel?.title }}</text>
         <text class="text-body-medium text-surface-on-variant mt-2">by {{ novel?.user.name }}</text>
         <text class="text-label-medium text-outline mt-1.5">
-          {{ novel?.text_length }} 字
+          {{ t('novelDetail.charCount', { count: novel?.text_length ?? '' }) }}
           <template v-if="novel?.total_bookmarks != null">
              · ♥ {{ novel?.total_bookmarks }}
           </template>

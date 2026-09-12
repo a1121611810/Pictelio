@@ -38,6 +38,7 @@ import {
   saveBackupPassword,
   saveWebdavPassword,
 } from '../utils/webdavCredentials'
+import { t } from '../i18n'
 
 const auth = useAuthStore()
 const settings = useSettingsStore()
@@ -69,7 +70,10 @@ function webdavErrorMessage(err: unknown): string {
   if (err instanceof WebDavError) {
     const base = WEBDAV_ERROR_MESSAGES[err.kind] ?? err.message
     // spec §5「其他（含原始状态码）」，与 app 侧 SettingsWebdav 同语义
-    return err.kind === 'SERVER' && err.statusCode > 0 ? `${base}（HTTP ${err.statusCode}）` : base
+    // i18n: 拼接时快照（瞬态）
+    return err.kind === 'SERVER' && err.statusCode > 0
+      ? `${base}${t('me.webdav.httpStatusSuffix', { status: err.statusCode })}`
+      : base
   }
   if (err instanceof Error) return err.message
   return String(err)
@@ -139,39 +143,46 @@ function pickWebdavAutoBackupDays(days: number): void {
 function refreshWebdavLastBackupLabel(): void {
   webdavLastBackupLabel.value =
     settings.webdavLastBackup === ''
-      ? '从未备份'
+      ? t('me.webdav.neverBackedUp') // i18n: 赋值时快照（瞬态）
       : new Date(settings.webdavLastBackup).toLocaleString()
 }
 
 function onWebdavTest(): void {
-  void runWebdav('连接测试', async () => {
+  void runWebdav(t('me.webdav.action.test'), async () => {
+    // i18n: busy 标签赋值时快照（瞬态）
     await saveWebdavCredentials()
     const { fileCount } = await testConnection(createLynxBackupDeps())
-    return `连接成功，远端已有 ${fileCount} 份备份`
+    return t('me.webdav.testOk', { count: fileCount }) // i18n: 赋值时快照（瞬态）
   })
 }
 
 function onWebdavBackup(): void {
-  void runWebdav('立即备份', async () => {
+  void runWebdav(t('me.webdav.action.backup'), async () => {
+    // i18n: busy 标签赋值时快照（瞬态）
     await saveWebdavCredentials()
     const r = await backupNow(createLynxBackupDeps())
     settings.setWebdavLastBackup(new Date().toISOString())
     refreshWebdavLastBackupLabel()
     await clearPreRestoreSnapshot()
     webdavHasPreRestore.value = false
-    return `已备份 ${r.fileName}（${r.bytes} 字节${r.encrypted ? '，已加密' : ''}）`
+    return t('me.webdav.backupDone', {
+      name: r.fileName,
+      size: r.bytes,
+      encrypted: r.encrypted ? t('me.webdav.encryptedSuffix') : '',
+    }) // i18n: 赋值时快照（瞬态）
   })
 }
 
 function onWebdavOpenRestore(): void {
-  void runWebdav('读取备份列表', async () => {
+  void runWebdav(t('me.webdav.action.listBackups'), async () => {
+    // i18n: busy 标签赋值时快照（瞬态）
     await saveWebdavCredentials()
     webdavFiles.value = await listBackups(createLynxBackupDeps())
     webdavSelected.value = null
     webdavPrepared.value = null
     webdavRestoreError.value = ''
     webdavShowRestore.value = true
-    return webdavFiles.value.length === 0 ? '远端暂无备份' : ''
+    return webdavFiles.value.length === 0 ? t('me.webdav.noRemoteBackups') : '' // i18n: 赋值时快照（瞬态）
   })
 }
 
@@ -191,7 +202,7 @@ function onWebdavSelectFile(file: BackupFileInfo): void {
 async function prepareWebdavSelected(fileArg?: BackupFileInfo): Promise<void> {
   const file = fileArg ?? webdavSelected.value
   if (file === null) return
-  webdavBusy.value = '读取备份摘要'
+  webdavBusy.value = t('me.webdav.action.readSummary') // i18n: 赋值时快照（瞬态）
   webdavRestoreError.value = ''
   try {
     webdavPrepared.value = await prepareRestore(
@@ -210,16 +221,22 @@ async function prepareWebdavSelected(fileArg?: BackupFileInfo): Promise<void> {
 function onWebdavRestore(): void {
   const prepared = webdavPrepared.value
   if (prepared === null) return
-  void runWebdav('恢复', async () => {
+  void runWebdav(t('me.webdav.action.restore'), async () => {
+    // i18n: busy 标签赋值时快照（瞬态）
     try {
       const result = await applyPreparedRestore(createLynxBackupDeps(), prepared)
       webdavShowRestore.value = false
       const uid = auth.currentUser?.id ?? null
       const skippedLabel =
         uid === null
-          ? `未登录，账号级键全部跳过 ${prepared.plan.skippedAccountKeys.length} 项`
-          : `跳过异账号键 ${prepared.plan.skippedAccountKeys.length} 项`
-      return `已恢复 ${prepared.summary.createdAt} 的备份（写入 ${result.applied.length} 项，跳过 ${result.skipped.length} 项；${skippedLabel}）`
+          ? t('me.webdav.restoreSkipSignedOut', { count: prepared.plan.skippedAccountKeys.length })
+          : t('me.webdav.restoreSkipOtherAccount', { count: prepared.plan.skippedAccountKeys.length }) // i18n: 快照（瞬态）
+      return t('me.webdav.restoreDone', {
+        createdAt: prepared.summary.createdAt,
+        applied: result.applied.length,
+        skipped: result.skipped.length,
+        skippedDetail: skippedLabel,
+      }) // i18n: 赋值时快照（瞬态）
     } finally {
       // S4：写回中途失败也必须暴露可回滚入口
       webdavHasPreRestore.value = (await loadPreRestoreSnapshot()) !== null
@@ -228,10 +245,11 @@ function onWebdavRestore(): void {
 }
 
 function onWebdavUndo(): void {
-  void runWebdav('撤销恢复', async () => {
+  void runWebdav(t('me.webdav.action.undoRestore'), async () => {
+    // i18n: busy 标签赋值时快照（瞬态）
     const ok = await undoLastRestore(createLynxBackupWiring())
-    if (!ok) return '没有可撤销的应急快照'
-    return '已回滚到恢复前的本地状态'
+    if (!ok) return t('me.webdav.nothingToUndo') // i18n: 赋值时快照（瞬态）
+    return t('me.webdav.undone') // i18n: 赋值时快照（瞬态）
   })
 }
 
@@ -334,7 +352,7 @@ function toggleRelatedInjection() {
         class="text-title-large font-medium text-surface-on"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="ME_A11Y_LABELS.pageTitle"
-        >我的</text
+        >{{ t('me.title') }}</text
       >
     </view>
 
@@ -363,7 +381,7 @@ function toggleRelatedInjection() {
           :accessibility-label="ME_A11Y_LABELS.bookmarks"
           @tap="openBookmarks"
         >
-          <text class="text-title-medium text-surface-on">我的收藏</text>
+          <text class="text-title-medium text-surface-on">{{ t('me.bookmarks') }}</text>
           <text class="text-title-medium text-surface-on-variant">›</text>
         </view>
         <!-- 追更列表入口（issue #225 / spec §US7）：账户组第二行 -->
@@ -373,7 +391,7 @@ function toggleRelatedInjection() {
           :accessibility-label="ME_A11Y_LABELS.watchlist"
           @tap="openWatchlist"
         >
-          <text class="text-title-medium text-surface-on">追更列表</text>
+          <text class="text-title-medium text-surface-on">{{ t('me.watchlist') }}</text>
           <text class="text-title-medium text-surface-on-variant">›</text>
         </view>
         <view
@@ -382,7 +400,7 @@ function toggleRelatedInjection() {
           :accessibility-label="ME_A11Y_LABELS.downloads"
           @tap="openDownloads"
         >
-          <text class="text-title-medium text-surface-on">下载管理</text>
+          <text class="text-title-medium text-surface-on">{{ t('me.downloads') }}</text>
           <text class="text-title-medium text-surface-on-variant">›</text>
         </view>
         <!-- 网络自检入口（spec docs/specs/network-self-check.md / #445） -->
@@ -392,7 +410,7 @@ function toggleRelatedInjection() {
           :accessibility-label="ME_A11Y_LABELS.networkCheck"
           @tap="openNetworkCheck"
         >
-          <text class="text-title-medium text-surface-on">网络自检</text>
+          <text class="text-title-medium text-surface-on">{{ t('me.networkCheck') }}</text>
           <text class="text-title-medium text-surface-on-variant">›</text>
         </view>
       </GlassCard>
@@ -403,9 +421,9 @@ function toggleRelatedInjection() {
           class="text-title-small font-medium text-surface-on"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="ME_A11Y_LABELS.clientGroupTitle"
-          >客户端</text
+          >{{ t('me.client.title') }}</text
         >
-        <text class="text-label-medium text-surface-on-variant mt-1 mb-3">选择渲染引擎后保存并重启生效</text>
+        <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.client.hint') }}</text>
         <view
           class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
@@ -417,7 +435,7 @@ function toggleRelatedInjection() {
               class="text-title-medium text-surface-on"
               :accessibility-element="A11Y_ELEMENT_ENABLED"
               :accessibility-label="ME_A11Y_LABELS.webviewOptionTitle"
-              >WebView（现有）</text
+              >{{ t('me.client.webview') }}</text
             >
             <text class="text-label-medium text-surface-on-variant mt-0.5">SolidJS + Capacitor</text>
           </view>
@@ -440,9 +458,9 @@ function toggleRelatedInjection() {
               class="text-title-medium text-surface-on"
               :accessibility-element="A11Y_ELEMENT_ENABLED"
               :accessibility-label="ME_A11Y_LABELS.lynxOptionTitle"
-              >Lynx（当前）</text
+              >{{ t('me.client.lynx') }}</text
             >
-            <text class="text-label-medium text-surface-on-variant mt-0.5">vue-lynx 原生渲染</text>
+            <text class="text-label-medium text-surface-on-variant mt-0.5">{{ t('me.client.lynxHint') }}</text>
           </view>
           <view
             class="w-[5.333vw] h-[5.333vw] rounded-full flex items-center justify-center active:bg-layer-pressed-on-surface"
@@ -451,14 +469,14 @@ function toggleRelatedInjection() {
             <view v-if="clientSwitch.selectedClient === 'lynx'" class="w-[2.667vw] h-[2.667vw] rounded-full bg-primary-on" />
           </view>
         </view>
-        <text v-if="switching" class="text-body-small text-primary mt-3">正在重启切换…</text>
+        <text v-if="switching" class="text-body-small text-primary mt-3">{{ t('me.client.restarting') }}</text>
       </view>
 
       <!-- 外观组（主题色）：色板类 .theme-* 定义在 tokens.css，根 <page> 应用即整体换色；
            色块自身加对应色板类（默认 sky 用 .theme-sky，与基础 page 色板共用规则）+ bg-primary 预览该色板主色。 -->
       <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
-        <text class="text-title-small font-medium text-surface-on">外观</text>
-        <text class="text-label-medium text-surface-on-variant mt-1 mb-3">选择主题色（Material Design 3 配色）</text>
+        <text class="text-title-small font-medium text-surface-on">{{ t('me.appearance.title') }}</text>
+        <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.appearance.themeColorHint') }}</text>
         <view class="flex flex-row items-start justify-between">
           <view class="flex flex-col items-center gap-1">
             <!-- 天蓝（默认） -->
@@ -473,7 +491,7 @@ function toggleRelatedInjection() {
                 <text v-if="themeColor === 'sky'" class="text-primary-on text-label-small">✓</text>
               </view>
             </view>
-            <text class="text-label-small text-surface-on-variant">天蓝</text>
+            <text class="text-label-small text-surface-on-variant">{{ t('me.appearance.colorSky') }}</text>
           </view>
           <view class="flex flex-col items-center gap-1">
             <!-- 紫罗兰 -->
@@ -488,7 +506,7 @@ function toggleRelatedInjection() {
                 <text v-if="themeColor === 'violet'" class="text-primary-on text-label-small">✓</text>
               </view>
             </view>
-            <text class="text-label-small text-surface-on-variant">紫罗兰</text>
+            <text class="text-label-small text-surface-on-variant">{{ t('me.appearance.colorViolet') }}</text>
           </view>
           <view class="flex flex-col items-center gap-1">
             <!-- 樱花粉 -->
@@ -503,7 +521,7 @@ function toggleRelatedInjection() {
                 <text v-if="themeColor === 'pink'" class="text-primary-on text-label-small">✓</text>
               </view>
             </view>
-            <text class="text-label-small text-surface-on-variant">樱花粉</text>
+            <text class="text-label-small text-surface-on-variant">{{ t('me.appearance.colorPink') }}</text>
           </view>
           <view class="flex flex-col items-center gap-1">
             <!-- 松柏绿 -->
@@ -518,7 +536,7 @@ function toggleRelatedInjection() {
                 <text v-if="themeColor === 'green'" class="text-primary-on text-label-small">✓</text>
               </view>
             </view>
-            <text class="text-label-small text-surface-on-variant">松柏绿</text>
+            <text class="text-label-small text-surface-on-variant">{{ t('me.appearance.colorGreen') }}</text>
           </view>
           <view class="flex flex-col items-center gap-1">
             <!-- 落日橙 -->
@@ -533,7 +551,7 @@ function toggleRelatedInjection() {
                 <text v-if="themeColor === 'orange'" class="text-primary-on text-label-small">✓</text>
               </view>
             </view>
-            <text class="text-label-small text-surface-on-variant">落日橙</text>
+            <text class="text-label-small text-surface-on-variant">{{ t('me.appearance.colorOrange') }}</text>
           </view>
           <view class="flex flex-col items-center gap-1">
             <!-- 深青 -->
@@ -548,22 +566,22 @@ function toggleRelatedInjection() {
                 <text v-if="themeColor === 'teal'" class="text-primary-on text-label-small">✓</text>
               </view>
             </view>
-            <text class="text-label-small text-surface-on-variant">深青</text>
+            <text class="text-label-small text-surface-on-variant">{{ t('me.appearance.colorTeal') }}</text>
           </view>
         </view>
       </view>
 
       <!-- 内容组（ADR-0051：R18/R18G 开关） -->
       <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
-        <text class="text-title-small font-medium text-surface-on">内容</text>
-        <text class="text-label-medium text-surface-on-variant mt-1 mb-3">默认隐藏 R-18 / R-18G 内容</text>
+        <text class="text-title-small font-medium text-surface-on">{{ t('me.content.title') }}</text>
+        <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.content.hint') }}</text>
         <view
           class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="ME_A11Y_LABELS.r18Toggle"
           @tap="toggleR18"
         >
-          <text class="text-title-medium text-surface-on">显示 R-18 内容</text>
+          <text class="text-title-medium text-surface-on">{{ t('me.content.showR18') }}</text>
           <!-- M3 switch（官方 token v0.192 + _handle.scss）：轨道 52×32dp；
                thumb 外层 32×32 handle-container 居中定位（未选中 16dp→距左 8px，
                选中 24dp→距右 4px，按压 28dp 居中不溢出）；未选中轨道 2dp outline 边框 -->
@@ -583,7 +601,7 @@ function toggleRelatedInjection() {
           :accessibility-label="ME_A11Y_LABELS.r18gToggle"
           @tap="toggleR18G"
         >
-          <text class="text-title-medium text-surface-on">显示 R-18G 内容</text>
+          <text class="text-title-medium text-surface-on">{{ t('me.content.showR18G') }}</text>
           <view
             class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
             :class="showR18G ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
@@ -602,7 +620,7 @@ function toggleRelatedInjection() {
           :accessibility-label="ME_A11Y_LABELS.relatedInjectionToggle"
           @tap="toggleRelatedInjection"
         >
-          <text class="text-title-medium text-surface-on">相关作品注入</text>
+          <text class="text-title-medium text-surface-on">{{ t('me.content.relatedInjection') }}</text>
           <view
             class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
             :class="relatedInjection ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
@@ -615,7 +633,7 @@ function toggleRelatedInjection() {
 
         <!-- AI 作品三态过滤（ADR-0155）：显示 / 遮罩 / 仅看；逐项静态 a11y label（注册表完整性测试要求） -->
         <view class="flex flex-row items-center justify-between py-3.5">
-          <text class="text-title-medium text-surface-on">AI 作品</text>
+          <text class="text-title-medium text-surface-on">{{ t('me.content.ai') }}</text>
           <view class="flex flex-row gap-0 rounded-[var(--md-shape-full)] border border-outline overflow-hidden">
             <view
               class="flex-1 h-[10.667vw] flex items-center justify-center active:bg-layer-pressed-on-surface"
@@ -624,7 +642,7 @@ function toggleRelatedInjection() {
               :accessibility-label="ME_A11Y_LABELS.aiFilterShow"
               @tap="settings.setAiFilterMode('show')"
             >
-              <text class="text-label-large" :class="aiFilterMode === 'show' ? 'text-secondary-on-container' : 'text-surface-on'">显示</text>
+              <text class="text-label-large" :class="aiFilterMode === 'show' ? 'text-secondary-on-container' : 'text-surface-on'">{{ t('me.content.aiShow') }}</text>
             </view>
             <view
               class="flex-1 h-[10.667vw] flex items-center justify-center active:bg-layer-pressed-on-surface"
@@ -633,7 +651,7 @@ function toggleRelatedInjection() {
               :accessibility-label="ME_A11Y_LABELS.aiFilterMask"
               @tap="settings.setAiFilterMode('mask')"
             >
-              <text class="text-label-large" :class="aiFilterMode === 'mask' ? 'text-secondary-on-container' : 'text-surface-on'">遮罩</text>
+              <text class="text-label-large" :class="aiFilterMode === 'mask' ? 'text-secondary-on-container' : 'text-surface-on'">{{ t('me.content.aiMask') }}</text>
             </view>
             <view
               class="flex-1 h-[10.667vw] flex items-center justify-center active:bg-layer-pressed-on-surface"
@@ -642,7 +660,7 @@ function toggleRelatedInjection() {
               :accessibility-label="ME_A11Y_LABELS.aiFilterOnly"
               @tap="settings.setAiFilterMode('only')"
             >
-              <text class="text-label-large" :class="aiFilterMode === 'only' ? 'text-secondary-on-container' : 'text-surface-on'">仅看</text>
+              <text class="text-label-large" :class="aiFilterMode === 'only' ? 'text-secondary-on-container' : 'text-surface-on'">{{ t('me.content.aiOnly') }}</text>
             </view>
           </view>
         </view>
@@ -650,8 +668,8 @@ function toggleRelatedInjection() {
 
       <!-- T6：动图播放组 -->
       <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
-        <text class="text-title-small font-medium text-surface-on">动图播放</text>
-        <text class="text-label-medium text-surface-on-variant mt-1 mb-3">Ugoira 动图取帧方式</text>
+        <text class="text-title-small font-medium text-surface-on">{{ t('me.ugoira.title') }}</text>
+        <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.ugoira.hint') }}</text>
         <!-- M3 segmented button：容器 outline 边框 + 全圆角，40dp 高，选中段 secondary-container -->
         <view class="flex flex-row gap-0 rounded-[var(--md-shape-full)] border border-outline overflow-hidden">
           <view
@@ -661,7 +679,7 @@ function toggleRelatedInjection() {
             :accessibility-label="ME_A11Y_LABELS.ugoiraFflate"
             @tap="pickUgoiraMode('fflate')"
           >
-            <text class="text-label-large" :class="ugoiraMode === 'fflate' ? 'text-secondary-on-container' : 'text-surface-on'">fflate（默认）</text>
+            <text class="text-label-large" :class="ugoiraMode === 'fflate' ? 'text-secondary-on-container' : 'text-surface-on'">{{ t('me.ugoira.fflate') }}</text>
           </view>
           <view
             class="flex-1 h-[10.667vw] flex items-center justify-center border-l border-l-outline active:bg-layer-pressed-on-surface"
@@ -670,18 +688,18 @@ function toggleRelatedInjection() {
             :accessibility-label="ME_A11Y_LABELS.ugoiraRange"
             @tap="pickUgoiraMode('range')"
           >
-            <text class="text-label-large" :class="ugoiraMode === 'range' ? 'text-secondary-on-container' : 'text-surface-on'">Range 流式</text>
+            <text class="text-label-large" :class="ugoiraMode === 'range' ? 'text-secondary-on-container' : 'text-surface-on'">{{ t('me.ugoira.range') }}</text>
           </view>
         </view>
         <text class="text-label-medium text-surface-on-variant mt-2 leading-snug">
-          Range 流式按需取帧、内存更低；若 Range 请求失败将自动切换为 fflate 全量播放（网页端），不中断。原生模式不受本设置影响。
+          {{ t('me.ugoira.rangeHint') }}
         </text>
       </view>
 
       <!-- issue #148 T2：详情画质档位组（medium=标准 / large=高清 / original=原图） -->
       <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
-        <text class="text-title-small font-medium text-surface-on">详情画质</text>
-        <text class="text-label-medium text-surface-on-variant mt-1 mb-3">列表缩略图 / 详情大图清晰度</text>
+        <text class="text-title-small font-medium text-surface-on">{{ t('me.quality.title') }}</text>
+        <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.quality.hint') }}</text>
         <!-- M3 segmented button（三档）：容器 outline 边框 + 全圆角，40dp 高，选中段 secondary-container -->
         <view class="flex flex-row gap-0 rounded-[var(--md-shape-full)] border border-outline overflow-hidden">
           <view
@@ -691,7 +709,7 @@ function toggleRelatedInjection() {
             :accessibility-label="ME_A11Y_LABELS.detailQualityMedium"
             @tap="pickDetailQuality('medium')"
           >
-            <text class="text-label-large" :class="detailQuality === 'medium' ? 'text-secondary-on-container' : 'text-surface-on'">标准</text>
+            <text class="text-label-large" :class="detailQuality === 'medium' ? 'text-secondary-on-container' : 'text-surface-on'">{{ t('me.quality.medium') }}</text>
           </view>
           <view
             class="flex-1 h-[10.667vw] flex items-center justify-center border-l border-l-outline active:bg-layer-pressed-on-surface"
@@ -700,7 +718,7 @@ function toggleRelatedInjection() {
             :accessibility-label="ME_A11Y_LABELS.detailQualityLarge"
             @tap="pickDetailQuality('large')"
           >
-            <text class="text-label-large" :class="detailQuality === 'large' ? 'text-secondary-on-container' : 'text-surface-on'">高清</text>
+            <text class="text-label-large" :class="detailQuality === 'large' ? 'text-secondary-on-container' : 'text-surface-on'">{{ t('me.quality.large') }}</text>
           </view>
           <view
             class="flex-1 h-[10.667vw] flex items-center justify-center border-l border-l-outline active:bg-layer-pressed-on-surface"
@@ -709,15 +727,15 @@ function toggleRelatedInjection() {
             :accessibility-label="ME_A11Y_LABELS.detailQualityOriginal"
             @tap="pickDetailQuality('original')"
           >
-            <text class="text-label-large" :class="detailQuality === 'original' ? 'text-secondary-on-container' : 'text-surface-on'">原图</text>
+            <text class="text-label-large" :class="detailQuality === 'original' ? 'text-secondary-on-container' : 'text-surface-on'">{{ t('me.quality.original') }}</text>
           </view>
         </view>
       </view>
 
       <!-- 下载格式组（spec download-manager §5）：全局统一，不可逐图 -->
       <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
-        <text class="text-title-small font-medium text-surface-on">下载</text>
-        <text class="text-label-medium text-surface-on-variant mt-1 mb-3">动图导出格式（全局统一，不可逐图）</text>
+        <text class="text-title-small font-medium text-surface-on">{{ t('me.download.title') }}</text>
+        <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.download.formatHint') }}</text>
         <view class="flex flex-row flex-wrap gap-2">
           <view
             class="h-[10.667vw] px-4 flex items-center justify-center rounded-[var(--md-shape-full)] border"
@@ -778,8 +796,8 @@ function toggleRelatedInjection() {
 
       <!-- 导出组（spec docs/specs/novel-export.md §6/§7.2）：全局默认格式 + 三项内容开关 -->
       <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
-        <text class="text-title-small font-medium text-surface-on">导出</text>
-        <text class="text-label-medium text-surface-on-variant mt-1 mb-3">小说导出格式（全局默认，导出面板可临时覆盖）</text>
+        <text class="text-title-small font-medium text-surface-on">{{ t('me.export.title') }}</text>
+        <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.export.formatHint') }}</text>
         <view class="flex flex-row flex-wrap gap-2">
           <view
             class="h-[10.667vw] px-4 flex items-center justify-center rounded-[var(--md-shape-full)] border"
@@ -872,8 +890,8 @@ function toggleRelatedInjection() {
             @tap="settings.setNovelExportIncludeMetadata(!novelExportOptions.includeMetadata)"
           >
             <view class="flex flex-col">
-              <text class="text-title-medium text-surface-on">包含元数据</text>
-              <text class="text-label-medium text-surface-on-variant">标题、作者、标签、系列与原文链接</text>
+              <text class="text-title-medium text-surface-on">{{ t('me.export.includeMetadata') }}</text>
+              <text class="text-label-medium text-surface-on-variant">{{ t('me.export.includeMetadataHint') }}</text>
             </view>
             <view
               class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
@@ -891,8 +909,8 @@ function toggleRelatedInjection() {
             @tap="settings.setNovelExportIncludeCover(!novelExportOptions.includeCover)"
           >
             <view class="flex flex-col">
-              <text class="text-title-medium text-surface-on">包含封面</text>
-              <text class="text-label-medium text-surface-on-variant">在支持图片的格式中嵌入封面</text>
+              <text class="text-title-medium text-surface-on">{{ t('me.export.includeCover') }}</text>
+              <text class="text-label-medium text-surface-on-variant">{{ t('me.export.includeCoverHint') }}</text>
             </view>
             <view
               class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
@@ -910,8 +928,8 @@ function toggleRelatedInjection() {
             @tap="settings.setNovelExportIncludeImages(!novelExportOptions.includeInlineImages)"
           >
             <view class="flex flex-col">
-              <text class="text-title-medium text-surface-on">包含正文插图</text>
-              <text class="text-label-medium text-surface-on-variant">文本格式仅保留图片链接</text>
+              <text class="text-title-medium text-surface-on">{{ t('me.export.includeImages') }}</text>
+              <text class="text-label-medium text-surface-on-variant">{{ t('me.export.includeImagesHint') }}</text>
             </view>
             <view
               class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
@@ -933,7 +951,7 @@ function toggleRelatedInjection() {
           :accessibility-label="ME_A11Y_LABELS.logout"
           @tap="onLogout"
         >
-          <text class="text-title-medium text-error">退出登录</text>
+          <text class="text-title-medium text-error">{{ t('me.logout') }}</text>
         </view>
       </view>
       <!-- WebDAV 备份（spec docs/specs/webdav-backup.md §7；仅原生渲染，§2 web-core 不显示） -->
@@ -942,7 +960,7 @@ function toggleRelatedInjection() {
         class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]"
       >
         <text class="text-title-small font-medium text-surface-on">WebDAV 备份</text>
-        <text class="text-label-medium text-surface-on-variant mt-1 mb-3">备份本机设置到自托管 WebDAV</text>
+        <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.webdav.hint') }}</text>
 
         <view
           class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant"
@@ -950,7 +968,7 @@ function toggleRelatedInjection() {
           :accessibility-label="ME_A11Y_LABELS.webdavToggle"
           @tap="toggleWebdavEnabled"
         >
-          <text class="text-title-medium text-surface-on">启用 WebDAV 备份</text>
+          <text class="text-title-medium text-surface-on">{{ t('me.webdav.enabled') }}</text>
           <view class="w-[13.867vw] h-[8.533vw] rounded-full flex items-center px-[1.067vw]"
             :class="settings.webdavEnabled ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start'">
             <view class="w-[6.4vw] h-[6.4vw] rounded-full" :class="settings.webdavEnabled ? 'bg-primary-on' : 'bg-outline'" />
@@ -1040,7 +1058,7 @@ function toggleRelatedInjection() {
                   :class="settings.webdavAutoBackupDays === d ? 'bg-primary' : 'bg-surface-container-high'"
                   @tap="pickWebdavAutoBackupDays(d)"
                 >
-                  <text class="text-label-medium" :class="settings.webdavAutoBackupDays === d ? 'text-primary-on' : 'text-surface-on'">{{ d }}天</text>
+                  <text class="text-label-medium" :class="settings.webdavAutoBackupDays === d ? 'text-primary-on' : 'text-surface-on'">{{ t('me.webdav.days', { count: d }) }}</text>
                 </view>
               </view>
               <view
@@ -1051,7 +1069,7 @@ function toggleRelatedInjection() {
                 @tap="toggleWebdavAutoBackup"
               >
                 <text class="text-label-medium" :class="settings.webdavAutoBackup ? 'text-primary-on' : 'text-surface-on'">
-                  {{ settings.webdavAutoBackup ? '开' : '关' }}
+                  {{ settings.webdavAutoBackup ? t('me.webdav.on') : t('me.webdav.off') }}
                 </text>
               </view>
             </view>
@@ -1084,7 +1102,7 @@ function toggleRelatedInjection() {
               :accessibility-label="ME_A11Y_LABELS.webdavRestore"
               @tap="onWebdavOpenRestore"
             >
-              <text class="text-label-large text-surface-on">恢复</text>
+              <text class="text-label-large text-surface-on">{{ t('me.webdav.action.restore') }}</text>
             </view>
             <view
               v-if="webdavHasPreRestore"
@@ -1106,17 +1124,17 @@ function toggleRelatedInjection() {
             <text class="text-label-medium text-surface-on-variant">选择要恢复的备份</text>
             <view v-for="file in webdavFiles" :key="file.name" class="py-2.5" @tap="onWebdavSelectFile(file)">
               <text class="text-body-medium" :class="webdavSelected?.name === file.name ? 'text-primary' : 'text-surface-on'">
-                {{ file.name }}{{ file.encrypted ? '（加密）' : '' }}
+                {{ file.name }}{{ file.encrypted ? t('me.webdav.encryptedBadge') : '' }}
               </text>
             </view>
             <!-- S7：加密档且无已保存备份密码 → 本次输入 -->
             <view v-if="webdavNeedsPassword && webdavSelected" class="mt-2">
-              <text class="text-label-medium text-surface-on-variant">该备份已加密，请输入备份密码以读取摘要：</text>
+              <text class="text-label-medium text-surface-on-variant">{{ t('me.webdav.encryptedPrompt') }}</text>
               <input
                 v-model="webdavPromptPassword"
                 type="password"
                 class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] text-body-large text-surface-on px-4 mt-2"
-                placeholder="备份密码"
+                :placeholder="t('me.webdav.restorePromptPlaceholder')"
                 placeholder-color="#41474e"
               />
               <view
@@ -1125,15 +1143,15 @@ function toggleRelatedInjection() {
                 :accessibility-label="ME_A11Y_LABELS.webdavDecrypt"
                 @tap="prepareWebdavSelected()"
               >
-                <text class="text-label-large font-medium text-primary-on">解密并查看摘要</text>
+                <text class="text-label-large font-medium text-primary-on">{{ t('me.webdav.decrypt') }}</text>
               </view>
             </view>
             <!-- S2：摘要展示在写回之前 -->
             <view v-if="webdavPrepared" class="mt-2">
-              <text class="text-label-medium text-surface-on-variant">备份时间：{{ webdavPrepared.summary.createdAt }}</text>
-              <text class="text-label-medium text-surface-on-variant">来源引擎：{{ webdavPrepared.summary.engine }} · 版本 {{ webdavPrepared.summary.appVersion }}</text>
+              <text class="text-label-medium text-surface-on-variant">{{ t('me.webdav.summaryCreatedAt', { value: webdavPrepared.summary.createdAt }) }}</text>
+              <text class="text-label-medium text-surface-on-variant">{{ t('me.webdav.summarySource', { engine: webdavPrepared.summary.engine, version: webdavPrepared.summary.appVersion }) }}</text>
               <text class="text-label-medium text-surface-on-variant">
-                设备级 {{ webdavPrepared.summary.deviceKeyCount }} 项 / 账号级（当前账号）{{ webdavPrepared.summary.accountKeyCountForUid }} 项 / sets {{ webdavPrepared.summary.setCount }} 组
+                {{ t('me.webdav.summaryCounts', { device: webdavPrepared.summary.deviceKeyCount, account: webdavPrepared.summary.accountKeyCountForUid, sets: webdavPrepared.summary.setCount }) }}
               </text>
               <text class="text-label-medium text-error mt-2">
                 恢复会覆盖本机对应设置（仅覆盖备份中存在的键），恢复前自动保存应急快照。
@@ -1147,7 +1165,7 @@ function toggleRelatedInjection() {
                 :accessibility-label="ME_A11Y_LABELS.webdavRestoreCancel"
                 @tap="webdavShowRestore = false"
               >
-                <text class="text-label-large text-surface-on">取消</text>
+                <text class="text-label-large text-surface-on">{{ t('me.webdav.cancel') }}</text>
               </view>
               <view
                 class="flex-1 h-[10.667vw] bg-error rounded-[var(--md-shape-full)] flex items-center justify-center"
@@ -1173,9 +1191,9 @@ function toggleRelatedInjection() {
     <!-- M3 Dialog（二次确认，选择 Range 时）：fixed 全屏 scrim 遮罩 + 居中卡片 + 标题/内容/操作区 -->
     <view v-if="ugoiraConfirm" class="fixed inset-0 bg-scrim z-50 flex items-center justify-center">
       <view class="w-[74.667vw] max-w-[74.667vw] bg-surface-container-high rounded-[var(--md-shape-extra-large)] px-6 pt-5 pb-3 shadow-[var(--md-elevation-3)]">
-        <text class="text-headline-small font-medium text-surface-on">切换到 Range 流式？</text>
+        <text class="text-headline-small font-medium text-surface-on">{{ t('me.ugoira.confirmTitle') }}</text>
         <text class="text-body-medium text-surface-on-variant mt-4 leading-snug">
-          Range 流式按需取帧、内存更低；原生端依赖 Range 支持，个别网络环境可能更慢。
+          {{ t('me.ugoira.confirmBody') }}
         </text>
         <view class="flex flex-row justify-end mt-6 gap-2">
           <view
@@ -1184,7 +1202,7 @@ function toggleRelatedInjection() {
             :accessibility-label="ME_A11Y_LABELS.ugoiraCancel"
             @tap="ugoiraConfirm = false"
           >
-            <text class="text-label-large font-medium text-primary">取消</text>
+            <text class="text-label-large font-medium text-primary">{{ t('me.ugoira.cancel') }}</text>
           </view>
           <view
             class="h-[10.667vw] px-4 flex items-center justify-center active:bg-layer-pressed-primary"
@@ -1192,7 +1210,7 @@ function toggleRelatedInjection() {
             :accessibility-label="ME_A11Y_LABELS.ugoiraConfirm"
             @tap="confirmUgoiraRange"
           >
-            <text class="text-label-large font-medium text-primary">确认</text>
+            <text class="text-label-large font-medium text-primary">{{ t('me.ugoira.confirm') }}</text>
           </view>
         </view>
       </view>

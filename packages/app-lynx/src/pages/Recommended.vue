@@ -31,6 +31,7 @@ import BookmarkButton from '../components/BookmarkButton.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
+import { t } from '../i18n'
 
 const isRestricted = useSettingsStore().isRestricted
 
@@ -214,7 +215,7 @@ onActivated(() => {
   <view class="w-full h-full flex flex-col bg-surface">
     <!-- M3 TopAppBar：surface 背景 + 居中标题（title-large），无导航图标（顶层页） -->
     <view class="flex flex-row items-center justify-center h-[17.067vw] px-4 bg-surface">
-      <text class="text-title-large font-medium text-surface-on">推荐</text>
+      <text class="text-title-large font-medium text-surface-on">{{ t('recommended.title') }}</text>
     </view>
 
     <!-- 首载沉浸骨架 / 整页错误（ADR-0118：渲染流为空即显骨架，不依赖 loading——冷启动请求前立即出现） -->
@@ -279,7 +280,9 @@ onActivated(() => {
             :bookmark-count="currentItem.data.total_bookmarks"
           />
         </view>
-        <text v-else-if="currentItem" class="text-label-medium text-white/70 mt-3">{{ currentItem.data.text_length }} 字</text>
+        <text v-else-if="currentItem" class="text-label-medium text-white/70 mt-3">{{
+          t('recommended.charCount', { count: currentItem.data.text_length })
+        }}</text>
       </view>
 
       <!-- 分页加载失败（fetchMore）内联提示：保留当前滑页，可重试 -->

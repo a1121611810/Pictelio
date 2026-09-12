@@ -5,6 +5,7 @@ import { useAuthStore } from '../stores/authStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { LOGIN_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { presentError } from '../utils/errorPresentation'
+import { t } from '../i18n'
 
 const auth = useAuthStore()
 const settings = useSettingsStore()
@@ -26,10 +27,10 @@ async function submit() {
       markSessionEstablished()
       await navigate('/recommended', { replace: true })
     } else {
-      errorMsg.value = auth.authError ?? '登录失败'
+      errorMsg.value = auth.authError ?? t('login.error.failed') // i18n: 赋值时快照（瞬态）
     }
   } catch (err) {
-    errorMsg.value = presentError(err, '登录失败')
+    errorMsg.value = presentError(err, t('login.error.failed'))
   } finally {
     submitting.value = false
   }
@@ -53,7 +54,7 @@ async function submit() {
       <input
         v-model="tokenInput"
         class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-outline-variant text-body-large text-surface-on px-4 mb-3"
-        placeholder="粘贴 Pixiv refresh_token"
+        :placeholder="t('login.token.placeholder')"
         placeholder-color="#41474e"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="LOGIN_A11Y_LABELS.tokenInput"
@@ -70,11 +71,11 @@ async function submit() {
           class="text-label-large font-medium text-primary-on"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="LOGIN_A11Y_LABELS.submit"
-          >{{ submitting ? '登录中…' : '登录' }}</text
+          >{{ submitting ? t('login.submitting') : t('login.submit') }}</text
         >
       </view>
     </view>
 
-    <text class="text-label-medium text-surface-on-variant mt-6">登录后进入推荐插画 / 小说 / 个人中心</text>
+    <text class="text-label-medium text-surface-on-variant mt-6">{{ t('login.afterHint') }}</text>
   </view>
 </template>

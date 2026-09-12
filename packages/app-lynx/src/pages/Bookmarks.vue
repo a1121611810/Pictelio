@@ -33,6 +33,7 @@ import { useAiOnlyVisible } from '../composables/useAiOnlyVisible'
 import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
 import AiRestrictedNovelCard from '../components/AiRestrictedNovelCard.vue'
 import RefreshableList from '../components/RefreshableList.vue'
+import { t } from '../i18n'
 
 const uid = useAuthStore().currentUser?.id
 if (!uid) {
@@ -254,7 +255,7 @@ onUnmounted(() => {
   <view class="w-full h-full flex flex-col bg-surface">
     <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
       <view class="py-1 pr-2" @tap="goBack"><text class="text-[6.4vw] leading-none text-surface-on">‹</text></view>
-      <text class="flex-1 text-title-large font-medium text-surface-on">收藏</text>
+      <text class="flex-1 text-title-large font-medium text-surface-on">{{ t('bookmarks.title') }}</text>
     </view>
 
     <!-- 插画/小说 tab -->
@@ -264,14 +265,14 @@ onUnmounted(() => {
         :class="activeTab === 'illust' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
         @tap="switchTab('illust')"
       >
-        <text class="text-title-small font-medium">插画</text>
+        <text class="text-title-small font-medium">{{ t('bookmarks.tab.illust') }}</text>
       </view>
       <view
         class="flex-1 h-[12.8vw] flex items-center justify-center"
         :class="activeTab === 'novel' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
         @tap="switchTab('novel')"
       >
-        <text class="text-title-small font-medium">小说</text>
+        <text class="text-title-small font-medium">{{ t('bookmarks.tab.novel') }}</text>
       </view>
     </view>
 
@@ -284,8 +285,8 @@ onUnmounted(() => {
     <view v-else-if="activeTab === 'illust' && illustView === 'empty'" class="flex-1 flex items-center justify-center">
       <view class="flex flex-col items-center">
         <text class="text-[10.667vw] leading-none text-outline-variant">♡</text>
-        <text class="text-body-large text-surface-on mt-3">暂无收藏</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">收藏喜欢的作品后会展示在这里</text>
+        <text class="text-body-large text-surface-on mt-3">{{ t('bookmarks.empty.title') }}</text>
+        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ t('bookmarks.empty.hint') }}</text>
       </view>
     </view>
 
@@ -340,9 +341,9 @@ onUnmounted(() => {
         </view>
       </list-item>
       <list-item v-if="illustLoadingMore || illustPageErrorMsg || illustEndOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text v-if="illustLoadingMore" class="text-body-medium text-outline">加载中…</text>
+        <text v-if="illustLoadingMore" class="text-body-medium text-outline">{{ t('bookmarks.footer.loading') }}</text>
         <text v-else-if="illustPageErrorMsg" class="text-body-medium text-error">{{ illustPageErrorMsg }}</text>
-        <text v-else class="text-body-medium text-outline">没有更多了</text>
+        <text v-else class="text-body-medium text-outline">{{ t('bookmarks.footer.end') }}</text>
       </list-item>
     </list>
     </template>
@@ -361,8 +362,8 @@ onUnmounted(() => {
     <view v-else-if="activeTab === 'novel' && novelView === 'empty'" class="flex-1 flex items-center justify-center">
       <view class="flex flex-col items-center">
         <text class="text-[10.667vw] leading-none text-outline-variant">♡</text>
-        <text class="text-body-large text-surface-on mt-3">暂无收藏</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">收藏喜欢的作品后会展示在这里</text>
+        <text class="text-body-large text-surface-on mt-3">{{ t('bookmarks.empty.title') }}</text>
+        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ t('bookmarks.empty.hint') }}</text>
       </view>
     </view>
 
@@ -395,7 +396,9 @@ onUnmounted(() => {
                     <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>
                     <text class="text-body-medium text-surface-on-variant mt-1.5">by {{ item.user.name }}</text>
                     <view class="flex flex-row mt-1.5">
-                      <text class="text-label-medium text-outline mr-4">{{ item.text_length }} 字</text>
+                      <text class="text-label-medium text-outline mr-4">{{
+                        t('bookmarks.charCount', { count: item.text_length })
+                      }}</text>
                       <text v-if="item.total_bookmarks > 0" class="text-label-medium text-outline mr-4">
                         ♥ {{ item.total_bookmarks }}
                       </text>
@@ -405,9 +408,9 @@ onUnmounted(() => {
         </view>
       </list-item>
       <list-item v-if="novelLoadingMore || novelPageErrorMsg || novelEndOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text v-if="novelLoadingMore" class="text-body-medium text-outline">加载中…</text>
+        <text v-if="novelLoadingMore" class="text-body-medium text-outline">{{ t('bookmarks.footer.loading') }}</text>
         <text v-else-if="novelPageErrorMsg" class="text-body-medium text-error">{{ novelPageErrorMsg }}</text>
-        <text v-else class="text-body-medium text-outline">没有更多了</text>
+        <text v-else class="text-body-medium text-outline">{{ t('bookmarks.footer.end') }}</text>
       </list-item>
     </list>
     </template>

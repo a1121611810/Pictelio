@@ -22,6 +22,7 @@ const isRestricted = settings.isRestricted
 const isAiRestricted = settings.isAiRestricted
 import RefreshableList from '../components/RefreshableList.vue'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import { t } from '../i18n'
 
 // ─── 分页收敛（ADR-0104）：迁移到 createMixFeed 深模块 ───
 // 单源关注 feed（/v2/illust/follow，offset 分页）；双防抖/竞态/空页防护/15s 超时/
@@ -129,12 +130,12 @@ onUnmounted(() => {
       <view
         class="py-1 pr-2"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
-        accessibility-label="返回"
+        :accessibility-label="t('following.backA11y')"
         @tap="requestBack"
       >
         <text class="text-[6.4vw] leading-none text-surface-on">‹</text>
       </view>
-      <text class="flex-1 text-center text-title-large font-medium text-surface-on">关注</text>
+      <text class="flex-1 text-center text-title-large font-medium text-surface-on">{{ t('following.title') }}</text>
     </view>
 
     <!-- 首载三态（ADR-0150）：骨架 → 错误 → 空态 → 内容，互斥单链；不依赖 loading 标志 -->
@@ -148,14 +149,14 @@ onUnmounted(() => {
         class="mt-4 px-6 h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
         @tap="refreshFeed"
       >
-        <text class="text-label-large font-medium text-primary-on">重试</text>
+        <text class="text-label-large font-medium text-primary-on">{{ t('following.retry') }}</text>
       </view>
     </view>
     <view v-else-if="view === 'empty'" class="w-full flex-1 min-h-0 flex items-center justify-center">
       <view class="flex flex-col items-center">
         <text class="text-[10.667vw] leading-none text-outline-variant">♡</text>
-        <text class="text-body-large text-surface-on mt-3">暂无关注更新</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">关注你喜欢的作者后，这里会展示他们的新作品</text>
+        <text class="text-body-large text-surface-on mt-3">{{ t('following.empty.title') }}</text>
+        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ t('following.empty.hint') }}</text>
       </view>
     </view>
 
@@ -205,9 +206,9 @@ onUnmounted(() => {
         </view>
       </list-item>
       <list-item v-if="loadingMore || pageErrorMsg || endOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text v-if="loadingMore" class="text-body-medium text-outline">加载中…</text>
+        <text v-if="loadingMore" class="text-body-medium text-outline">{{ t('following.footer.loading') }}</text>
         <text v-else-if="pageErrorMsg" class="text-body-medium text-error">{{ pageErrorMsg }}</text>
-        <text v-else class="text-body-medium text-outline">没有更多了</text>
+        <text v-else class="text-body-medium text-outline">{{ t('following.footer.end') }}</text>
       </list-item>
     </list>
     </template>

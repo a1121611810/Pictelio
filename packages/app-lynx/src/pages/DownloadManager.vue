@@ -20,6 +20,7 @@ import {
   toggleId,
 } from '../utils/downloadsViewModel'
 import { DOWNLOAD_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import { t } from '../i18n'
 
 // ─── 下载管理页（spec docs/specs/download-manager.md §7.2） ───
 // 列表 + 单选/多选 + 对全部或选中项的开始/暂停/停止/删除；删除二次确认二分；已完成可系统分享。
@@ -62,7 +63,7 @@ function report(e: unknown) {
 async function actShare() {
   try {
     await dl.share(effectiveIds.value)
-    statusMsg.value = '已调起系统分享'
+    statusMsg.value = t('downloads.shared') // i18n: 赋值时快照（瞬态）
   } catch (e) {
     report(e)
   }
@@ -99,7 +100,7 @@ async function confirmDelete(mode: DeleteMode) {
   if (!target) return
   try {
     await dl.deleteTasks(target, mode)
-    statusMsg.value = mode === 'files' ? '已删除文件与记录' : '已清空记录'
+    statusMsg.value = mode === 'files' ? t('downloads.deletedFiles') : t('downloads.deletedRecords') // i18n: 赋值时快照（瞬态）
     selected.value = new Set<string>()
   } catch (e) {
     report(e)
@@ -138,7 +139,7 @@ onMounted(() => {
         class="flex-1 text-title-large font-medium text-surface-on"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="DOWNLOAD_A11Y_LABELS.pageTitle"
-        >下载管理</text
+        >{{ t('downloads.title') }}</text
       >
     </view>
 
@@ -151,9 +152,9 @@ onMounted(() => {
     >
       <view class="flex flex-col items-center">
         <text class="text-[10.667vw] leading-none text-outline-variant">↓</text>
-        <text class="text-body-large text-surface-on mt-3">暂无下载任务</text>
+        <text class="text-body-large text-surface-on mt-3">{{ t('downloads.empty.title') }}</text>
         <text class="text-body-medium text-surface-on-variant mt-1.5"
-          >在作品详情页点击保存即可加入下载队列</text
+          >{{ t('downloads.empty.hint') }}</text
         >
       </view>
     </view>
@@ -168,14 +169,14 @@ onMounted(() => {
           @tap="toggleAll"
         >
           <text class="text-label-large text-primary">{{
-            allSelected(tasks, selected) ? '取消全选' : '全选'
+            allSelected(tasks, selected) ? t('downloads.deselectAll') : t('downloads.selectAll')
           }}</text>
         </view>
         <text class="text-label-medium text-surface-on-variant">
           {{
             selected.size > 0
-              ? '已选 ' + selected.size + ' / 共 ' + tasks.length
-              : '全部 ' + tasks.length
+              ? t('downloads.countSelected', { selected: selected.size, total: tasks.length })
+              : t('downloads.countAll', { total: tasks.length })
           }}
         </text>
       </view>
@@ -206,7 +207,7 @@ onMounted(() => {
             :key="task.id"
             class="flex flex-row items-center px-3 py-2 border-t border-outline-variant"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
-            :accessibility-label="'选择 ' + task.fileName"
+            :accessibility-label="t('downloads.taskA11y', { name: task.fileName })"
             @tap="toggle(task.id)"
           >
             <view
@@ -250,7 +251,13 @@ onMounted(() => {
            改为正常文档流占位后 5 个动作与删除弹窗均正常（模拟器实证 2026-??）。 -->
       <view class="w-full flex flex-col items-center gap-1 py-2 bg-surface-container border-t border-outline-variant">
         <text class="text-label-medium text-surface-on-variant">
-          {{ summary.count }} 项 · 已完成 {{ summary.completed }} · 进行中 {{ summary.active }}
+          {{
+            t('downloads.summary', {
+              count: summary.count,
+              completed: summary.completed,
+              active: summary.active,
+            })
+          }}
         </text>
         <view class="flex flex-row gap-1">
           <view
@@ -260,7 +267,9 @@ onMounted(() => {
             :accessibility-label="DOWNLOAD_A11Y_LABELS.start"
             @tap="runStart"
           >
-            <text class="text-label-medium text-surface-on">{{ (scoped ? '选中' : '全部') + '开始' }}</text>
+            <text class="text-label-medium text-surface-on">{{
+              scoped ? t('downloads.startSelected') : t('downloads.startAll')
+            }}</text>
           </view>
           <view
             class="h-[10.667vw] px-3 flex items-center justify-center border border-outline rounded-[var(--md-shape-full)] bg-surface-container-lowest"
@@ -269,7 +278,9 @@ onMounted(() => {
             :accessibility-label="DOWNLOAD_A11Y_LABELS.pause"
             @tap="runPause"
           >
-            <text class="text-label-medium text-surface-on">{{ (scoped ? '选中' : '全部') + '暂停' }}</text>
+            <text class="text-label-medium text-surface-on">{{
+              scoped ? t('downloads.pauseSelected') : t('downloads.pauseAll')
+            }}</text>
           </view>
           <view
             class="h-[10.667vw] px-3 flex items-center justify-center border border-outline rounded-[var(--md-shape-full)] bg-surface-container-lowest"
@@ -278,7 +289,9 @@ onMounted(() => {
             :accessibility-label="DOWNLOAD_A11Y_LABELS.stop"
             @tap="runStop"
           >
-            <text class="text-label-medium text-surface-on">{{ (scoped ? '选中' : '全部') + '停止' }}</text>
+            <text class="text-label-medium text-surface-on">{{
+              scoped ? t('downloads.stopSelected') : t('downloads.stopAll')
+            }}</text>
           </view>
           <view
             class="h-[10.667vw] px-3 flex items-center justify-center border border-outline rounded-[var(--md-shape-full)] bg-surface-container-lowest"
@@ -287,7 +300,7 @@ onMounted(() => {
             :accessibility-label="DOWNLOAD_A11Y_LABELS.share"
             @tap="runShare"
           >
-            <text class="text-label-medium text-surface-on">分享</text>
+            <text class="text-label-medium text-surface-on">{{ t('downloads.share') }}</text>
           </view>
           <view
             class="h-[10.667vw] px-3 flex items-center justify-center border border-outline rounded-[var(--md-shape-full)] bg-surface-container-lowest"
@@ -296,7 +309,9 @@ onMounted(() => {
             :accessibility-label="DOWNLOAD_A11Y_LABELS.remove"
             @tap="runDelete"
           >
-            <text class="text-label-medium text-error">{{ (scoped ? '选中' : '全部') + '删除' }}</text>
+            <text class="text-label-medium text-error">{{
+              scoped ? t('downloads.deleteSelected') : t('downloads.deleteAll')
+            }}</text>
           </view>
         </view>
       </view>
@@ -310,9 +325,9 @@ onMounted(() => {
         class="absolute bg-surface-container-high rounded-[var(--md-shape-extra-large)] px-6 pt-5 pb-3 shadow-[var(--md-elevation-3)]"
         style="left: 12.667vw; top: 70vw; width: 74.667vw"
       >
-        <text class="text-headline-small font-medium text-surface-on">删除下载</text>
+        <text class="text-headline-small font-medium text-surface-on">{{ t('downloads.deleteTitle') }}</text>
         <text class="text-body-medium text-surface-on-variant mt-4 leading-snug">
-          将移除 {{ deleteTarget.length }} 条下载记录。「删除文件与记录」会同时删除已下载文件；「仅清空记录」保留已下载文件。
+          {{ t('downloads.deleteBody', { count: deleteTarget.length }) }}
         </text>
         <view class="flex flex-row flex-wrap justify-end mt-6 gap-2">
           <view
@@ -321,7 +336,7 @@ onMounted(() => {
             :accessibility-label="DOWNLOAD_A11Y_LABELS.cancelDelete"
             @tap="closeDelete"
           >
-            <text class="text-label-large font-medium text-primary">取消</text>
+            <text class="text-label-large font-medium text-primary">{{ t('downloads.cancel') }}</text>
           </view>
           <view
             class="h-[10.667vw] px-4 flex items-center justify-center"
@@ -329,7 +344,7 @@ onMounted(() => {
             :accessibility-label="DOWNLOAD_A11Y_LABELS.confirmDeleteRecords"
             @tap="confirmDelete('records')"
           >
-            <text class="text-label-large font-medium text-primary">仅清空记录</text>
+            <text class="text-label-large font-medium text-primary">{{ t('downloads.deleteRecordsOnly') }}</text>
           </view>
           <view
             v-if="deletingFiles"
@@ -338,7 +353,7 @@ onMounted(() => {
             :accessibility-label="DOWNLOAD_A11Y_LABELS.confirmDeleteFiles"
             @tap="confirmDelete('files')"
           >
-            <text class="text-label-large font-medium text-error">删除文件与记录</text>
+            <text class="text-label-large font-medium text-error">{{ t('downloads.deleteFilesAndRecords') }}</text>
           </view>
         </view>
       </view>

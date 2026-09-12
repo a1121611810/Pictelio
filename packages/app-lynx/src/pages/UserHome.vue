@@ -30,6 +30,7 @@ import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
 import AiRestrictedNovelCard from '../components/AiRestrictedNovelCard.vue'
 import RefreshableList from '../components/RefreshableList.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
+import { t } from '../i18n'
 
 const settings = useSettingsStore()
 const isRestricted = settings.isRestricted
@@ -232,7 +233,7 @@ onMounted(async () => {
   try {
     detail.value = await getUserDetail(userId)
   } catch (err) {
-    detailError.value = presentError(err, '用户信息加载失败')
+    detailError.value = presentError(err, t('userHome.loadProfileFailed'))
   }
   illustLoaded = true
   void refreshIllust()
@@ -250,7 +251,7 @@ onUnmounted(() => {
     <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
       <view class="py-1 pr-2" @tap="goBack"><text class="text-[6.4vw] leading-none text-surface-on">‹</text></view>
       <text class="flex-1 text-title-large font-medium text-surface-on [max-line:1]">
-        {{ detail?.user.name || '用户主页' }}
+        {{ detail?.user.name || t('userHome.titleFallback') }}
       </text>
     </view>
 
@@ -270,11 +271,11 @@ onUnmounted(() => {
         <view class="flex flex-row mt-1.5">
           <view class="h-[8.533vw] px-2 border border-outline rounded-[var(--md-shape-small)] flex items-center justify-center bg-surface" @tap="openFollowing">
             <text class="text-label-medium text-surface-on-variant">
-              关注 {{ detail.profile.total_follow_users ?? '-' }}
+              {{ t('userHome.followCount', { count: detail.profile.total_follow_users ?? '-' }) }}
             </text>
           </view>
           <view class="h-[8.533vw] px-2 ml-2 border border-outline rounded-[var(--md-shape-small)] flex items-center justify-center bg-surface" @tap="openFollowers">
-            <text class="text-label-medium text-surface-on-variant">粉丝</text>
+            <text class="text-label-medium text-surface-on-variant">{{ t('userHome.followers') }}</text>
           </view>
         </view>
       </view>
@@ -287,14 +288,14 @@ onUnmounted(() => {
         :class="activeTab === 'illust' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
         @tap="switchTab('illust')"
       >
-        <text class="text-title-small font-medium">插画</text>
+        <text class="text-title-small font-medium">{{ t('userHome.tab.illust') }}</text>
       </view>
       <view
         class="flex-1 h-[12.8vw] flex items-center justify-center"
         :class="activeTab === 'novel' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
         @tap="switchTab('novel')"
       >
-        <text class="text-title-small font-medium">小说</text>
+        <text class="text-title-small font-medium">{{ t('userHome.tab.novel') }}</text>
       </view>
     </view>
 
@@ -306,8 +307,8 @@ onUnmounted(() => {
     <view v-else-if="activeTab === 'illust' && illustView === 'empty'" class="flex-1 flex items-center justify-center">
       <view class="flex flex-col items-center">
         <text class="text-[10.667vw] leading-none text-outline-variant">▦</text>
-        <text class="text-body-large text-surface-on mt-3">暂无作品</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">该用户还没有发布作品</text>
+        <text class="text-body-large text-surface-on mt-3">{{ t('userHome.empty.title') }}</text>
+        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ t('userHome.empty.hint') }}</text>
       </view>
     </view>
 
@@ -356,9 +357,9 @@ onUnmounted(() => {
         </view>
       </list-item>
       <list-item v-if="illustLoadingMore || illustPageErrorMsg || illustEndOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text v-if="illustLoadingMore" class="text-body-medium text-outline">加载中…</text>
+        <text v-if="illustLoadingMore" class="text-body-medium text-outline">{{ t('userHome.footer.loading') }}</text>
         <text v-else-if="illustPageErrorMsg" class="text-body-medium text-error">{{ illustPageErrorMsg }}</text>
-        <text v-else class="text-body-medium text-outline">没有更多了</text>
+        <text v-else class="text-body-medium text-outline">{{ t('userHome.footer.end') }}</text>
       </list-item>
     </list>
     </template>
@@ -376,8 +377,8 @@ onUnmounted(() => {
     <view v-else-if="activeTab === 'novel' && novelView === 'empty'" class="flex-1 flex items-center justify-center">
       <view class="flex flex-col items-center">
         <text class="text-[10.667vw] leading-none text-outline-variant">▦</text>
-        <text class="text-body-large text-surface-on mt-3">暂无作品</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">该用户还没有发布作品</text>
+        <text class="text-body-large text-surface-on mt-3">{{ t('userHome.empty.title') }}</text>
+        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ t('userHome.empty.hint') }}</text>
       </view>
     </view>
 
@@ -409,7 +410,9 @@ onUnmounted(() => {
         <view v-else class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]" @tap="openNovel(item.id)"><view class="flex-1 flex flex-col">
                     <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>
                     <view class="flex flex-row mt-1.5">
-                      <text class="text-label-medium text-outline mr-4">{{ item.text_length }} 字</text>
+                      <text class="text-label-medium text-outline mr-4">{{
+                        t('userHome.charCount', { count: item.text_length })
+                      }}</text>
                       <text v-if="item.total_bookmarks > 0" class="text-label-medium text-outline mr-4">
                         ♥ {{ item.total_bookmarks }}
                       </text>
@@ -419,9 +422,9 @@ onUnmounted(() => {
         </view>
       </list-item>
       <list-item v-if="novelLoadingMore || novelPageErrorMsg || novelEndOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text v-if="novelLoadingMore" class="text-body-medium text-outline">加载中…</text>
+        <text v-if="novelLoadingMore" class="text-body-medium text-outline">{{ t('userHome.footer.loading') }}</text>
         <text v-else-if="novelPageErrorMsg" class="text-body-medium text-error">{{ novelPageErrorMsg }}</text>
-        <text v-else class="text-body-medium text-outline">没有更多了</text>
+        <text v-else class="text-body-medium text-outline">{{ t('userHome.footer.end') }}</text>
       </list-item>
     </list>
     </template>

@@ -16,6 +16,7 @@ import { presentError } from '../utils/errorPresentation'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import RefreshableList from '../components/RefreshableList.vue'
+import { t } from '../i18n'
 
 const userId = Number(currentParams.value.id)
 const isFollowing = computed(() => routeState.value.name === 'user-following')
@@ -63,7 +64,7 @@ async function fetchFirstPage() {
     // epoch 与 users 替换同 tick flush（key 变化走整树替换，不发生子节点 patch）
     refreshEpoch.value++
   } catch (err) {
-    const msg = presentError(err, '加载失败')
+    const msg = presentError(err, t('error.fallback.loadFailed'))
     // 有数据（刷新失败）→ 内联错误条；无数据（首载失败）→ 首屏错误分支（ADR-0104 槽位分离）
     if (users.value.length > 0) pageErrorMsg.value = msg
     else errorMsg.value = msg
@@ -91,7 +92,7 @@ async function loadMore() {
     users.value.push(...fresh)
     nextUrl.value = fresh.length === 0 ? null : res.next_url
   } catch (err) {
-    pageErrorMsg.value = presentError(err, '加载更多失败')
+    pageErrorMsg.value = presentError(err, t('followList.loadMoreFailed'))
   } finally {
     loadingMore.value = false
     lastLoadEndedAt = Date.now()
@@ -133,7 +134,7 @@ const refreshEpoch = ref(0)
   <view class="w-full h-full flex flex-col bg-surface">
     <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
       <view class="py-1 pr-2" @tap="goBack"><text class="text-[6.4vw] leading-none text-surface-on">‹</text></view>
-      <text class="flex-1 text-title-large font-medium text-surface-on">{{ isFollowing ? '关注' : '粉丝' }}</text>
+      <text class="flex-1 text-title-large font-medium text-surface-on">{{ isFollowing ? t('followList.title.following') : t('followList.title.followers') }}</text>
     </view>
 
     <!-- 有数据时的内联错误（刷新 / 分页失败）：不吞错、不打乱三态判定（ADR-0104 槽位分离） -->
@@ -156,14 +157,14 @@ const refreshEpoch = ref(0)
         class="mt-4 px-6 h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
         @tap="fetchFirstPage"
       >
-        <text class="text-label-large font-medium text-primary-on">重试</text>
+        <text class="text-label-large font-medium text-primary-on">{{ t('followList.retry') }}</text>
       </view>
     </view>
     <view v-else-if="view === 'empty'" class="w-full flex-1 min-h-0 flex items-center justify-center">
       <view class="flex flex-col items-center">
         <text class="text-[10.667vw] leading-none text-outline-variant">◎</text>
-        <text class="text-body-large text-surface-on mt-3">{{ isFollowing ? '暂无关注' : '暂无粉丝' }}</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ isFollowing ? '关注其他用户后这里会展示他们' : '被其他用户关注后会展示在这里' }}</text>
+        <text class="text-body-large text-surface-on mt-3">{{ isFollowing ? t('followList.empty.following') : t('followList.empty.followers') }}</text>
+        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ isFollowing ? t('followList.empty.followingHint') : t('followList.empty.followersHint') }}</text>
       </view>
     </view>
 
@@ -205,13 +206,13 @@ const refreshEpoch = ref(0)
             @tap="toggleFollow(item)"
           >
             <text class="text-body-medium" :class="item.user.is_followed ? 'text-primary' : 'text-primary-on'">
-              {{ item.user.is_followed ? '已关注' : '关注' }}
+              {{ item.user.is_followed ? t('followList.following') : t('followList.follow') }}
             </text>
           </view>
         </view>
       </list-item>
       <list-item v-if="loadingMore" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text class="text-body-medium text-outline">加载中…</text>
+        <text class="text-body-medium text-outline">{{ t('followList.footer.loading') }}</text>
       </list-item>
     </list>
     </template>
