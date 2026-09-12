@@ -1,9 +1,14 @@
 import { apiClient } from "./client";
+import {
+  buildIllustSearchRequest,
+  buildNovelSearchRequest,
+  DEFAULT_SEARCH_FILTERS,
+  type SearchFilters,
+} from "@pictelio/search-core";
 import type {
   PixivIllustListResponse,
   PixivNovelListResponse,
   SearchSort,
-  SearchTarget,
   PixivAutocompleteResponse,
 } from "./types";
 
@@ -17,46 +22,28 @@ function assertPixivUrl(url: string, fnName: string): void {
   throw new Error(`${fnName}: invalid next_url — must point to app-api.pixiv.net`);
 }
 
+/**
+ * 搜索请求传输层（薄）：端点路由 / search_target 规则 / 筛选→参数映射全部单点在
+ * `@pictelio/search-core`（#480 拍板；ADR-0132 第 8 条修订）。本文件只做 GET 与 next_url 断言。
+ */
 export function searchIllust(
   word: string,
   sort: SearchSort = "date_desc",
-  searchTarget: SearchTarget = "partial_match_for_tags",
   signal?: AbortSignal,
+  filters: SearchFilters = DEFAULT_SEARCH_FILTERS,
 ): Promise<PixivIllustListResponse> {
-  // sort=popular_desc 路由到独立热门预览端点（不分页），其他排序走标准搜索端点
-  if (sort === "popular_desc") {
-    return apiClient.get<PixivIllustListResponse>(
-      "/v1/search/popular-preview/illust",
-      { word, search_target: searchTarget, filter: "for_ios" },
-      signal,
-    );
-  }
-  return apiClient.get<PixivIllustListResponse>(
-    "/v1/search/illust",
-    { word, sort, search_target: searchTarget, filter: "for_ios" },
-    signal,
-  );
+  const req = buildIllustSearchRequest({ word, sort, filters });
+  return apiClient.get<PixivIllustListResponse>(req.endpoint, req.params, signal);
 }
 
 export function searchNovel(
   word: string,
   sort: SearchSort = "date_desc",
-  searchTarget: SearchTarget = "partial_match_for_tags",
   signal?: AbortSignal,
+  filters: SearchFilters = DEFAULT_SEARCH_FILTERS,
 ): Promise<PixivNovelListResponse> {
-  // sort=popular_desc 路由到独立热门预览端点（不分页），其他排序走标准搜索端点
-  if (sort === "popular_desc") {
-    return apiClient.get<PixivNovelListResponse>(
-      "/v1/search/popular-preview/novel",
-      { word, search_target: searchTarget, filter: "for_ios" },
-      signal,
-    );
-  }
-  return apiClient.get<PixivNovelListResponse>(
-    "/v1/search/novel",
-    { word, sort, search_target: searchTarget, filter: "for_ios" },
-    signal,
-  );
+  const req = buildNovelSearchRequest({ word, sort, filters });
+  return apiClient.get<PixivNovelListResponse>(req.endpoint, req.params, signal);
 }
 
 export function searchIllustNext(

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createRoot } from "solid-js";
 import { createSearchStore } from "@/stores/searchStore";
+import { BOOKMARK_BANDS, DEFAULT_SEARCH_FILTERS } from "@pictelio/search-core";
 
 const mockSearchIllust = vi.fn();
 const mockSearchNovel = vi.fn();
@@ -141,6 +142,65 @@ describe("searchStore executeSearch", () => {
     expect(store.paginationError()).toBe(false);
     expect(store.error()).toBeNull();
 
+    dispose();
+  });
+
+  it("AI 覆盖 hide：客户端隐藏 AI 作品（#479 面板覆盖注入，aiOverride 不进请求）", async () => {
+    mockSearchIllust.mockResolvedValue({
+      illusts: [
+        { id: 1, create_date: "2026-01-01T00:00:00+09:00", illust_ai_type: 2, total_bookmarks: 10 },
+        { id: 2, create_date: "2026-01-02T00:00:00+09:00", illust_ai_type: 0, total_bookmarks: 10 },
+      ],
+      next_url: null,
+    });
+    const { store, dispose } = setup();
+    store.setScope("illust");
+    store.setKeyword("ai-override-hide");
+    store.setFilters({ ...DEFAULT_SEARCH_FILTERS, aiOverride: "hide" });
+    await store.executeSearch();
+
+    // 账号设置为默认 show（uid=null 回退），覆盖 hide → mask 语义 → AI 作品被移除
+    expect(store.results().map((r) => r.entity.id)).toEqual([2]);
+    // 覆盖参数不进请求（search_ai_type 永不发送）
+    const args = mockSearchIllust.mock.calls[0] as unknown[];
+    expect(JSON.stringify(args[3])).not.toContain("search_ai_type");
+    dispose();
+  });
+
+  it("收藏数客户端兜底：非热门路径按 total_bookmarks 本地过滤（spec §7）", async () => {
+    mockSearchIllust.mockResolvedValue({
+      illusts: [
+        { id: 1, create_date: "2026-01-01T00:00:00+09:00", total_bookmarks: 50 },
+        { id: 2, create_date: "2026-01-02T00:00:00+09:00", total_bookmarks: 5000 },
+      ],
+      next_url: null,
+    });
+    const { store, dispose } = setup();
+    store.setScope("illust");
+    store.setKeyword("bookmark-fallback-check");
+    store.setFilters({ ...DEFAULT_SEARCH_FILTERS, bookmark: BOOKMARK_BANDS[6]! });
+    await store.executeSearch();
+
+    expect(store.results().map((r) => r.entity.id)).toEqual([2]);
+    dispose();
+  });
+
+  it("热门路径收藏数不兜底（#478 置灰语义：请求不带参数，本地也不过滤）", async () => {
+    mockSearchIllust.mockResolvedValue({
+      illusts: [
+        { id: 1, create_date: "2026-01-01T00:00:00+09:00", total_bookmarks: 50 },
+        { id: 2, create_date: "2026-01-02T00:00:00+09:00", total_bookmarks: 5000 },
+      ],
+      next_url: null,
+    });
+    const { store, dispose } = setup();
+    store.setScope("illust");
+    store.setSort("popular_desc");
+    store.setKeyword("popular-bookmark-check");
+    store.setFilters({ ...DEFAULT_SEARCH_FILTERS, bookmark: BOOKMARK_BANDS[6]! });
+    await store.executeSearch();
+
+    expect(store.results()).toHaveLength(2);
     dispose();
   });
 });

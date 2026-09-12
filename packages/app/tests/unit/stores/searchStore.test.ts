@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createRoot } from "solid-js";
 import { createSearchStore } from "@/stores/searchStore";
+import { DEFAULT_SEARCH_FILTERS } from "@pictelio/search-core";
 
 /**
  * SolidJS 2.0 语义：createRoot body 属 owned scope，同步写 signal 会 throw
@@ -80,6 +81,7 @@ describe("searchStore", () => {
     expect(typeof store.scope).toBe("function");
     expect(typeof store.sort).toBe("function");
     expect(typeof store.toSorted).toBe("function");
+    expect(typeof store.filters).toBe("function");
     expect(typeof store.results).toBe("function");
     expect(typeof store.loading).toBe("function");
     expect(typeof store.error).toBe("function");
@@ -87,8 +89,19 @@ describe("searchStore", () => {
     expect(typeof store.setKeyword).toBe("function");
     expect(typeof store.setScope).toBe("function");
     expect(typeof store.setSort).toBe("function");
+    expect(typeof store.setFilters).toBe("function");
     expect(typeof store.executeSearch).toBe("function");
     expect(typeof store.loadMore).toBe("function");
+    dispose();
+  });
+
+  it("filters 默认值 + setFilters 提交（SolidJS 2 flush 语义）", () => {
+    const { store, dispose } = setup();
+    expect(store.filters()).toEqual(DEFAULT_SEARCH_FILTERS);
+    store.setFilters({ ...DEFAULT_SEARCH_FILTERS, ratio: "landscape", aiOverride: "hide" });
+    flush(); // 2.0 批处理语义
+    expect(store.filters().ratio).toBe("landscape");
+    expect(store.filters().aiOverride).toBe("hide");
     dispose();
   });
 

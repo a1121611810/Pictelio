@@ -2,7 +2,6 @@ import type {
   PixivIllust,
   PixivNovel,
   SearchSort,
-  SearchTarget,
   SearchScope,
   ApiError,
   SearchResultItem,
@@ -13,6 +12,13 @@ import { ApiErrorType } from "@/api/types";
 import { mergeSearchResults } from "@/utils/searchMerger";
 import { aiFilterMode } from "@/stores/settingsStore";
 import { filterSearchResultsByAiMode } from "@/utils/aiFilter";
+import {
+  DEFAULT_SEARCH_FILTERS,
+  buildCacheKey,
+  filterByBookmarkBand,
+  resolveAiMode,
+  type SearchFilters,
+} from "@pictelio/search-core";
 
 interface SearchStoreState {
   /** Current search keyword */
@@ -23,6 +29,8 @@ interface SearchStoreState {
   sort: () => SearchSort;
   /** Sort order (alias, used by Search.tsx) */
   toSorted: () => SearchSort;
+  /** 筛选状态（canonical shape 单点在 @pictelio/search-core，spec §3.1） */
+  filters: () => SearchFilters;
   /** Merged search results (illust + novel combined) */
   results: () => SearchResultItem[];
   /** Whether a search request is in flight */
@@ -37,6 +45,8 @@ interface SearchStoreState {
   setScope: (scope: SearchScope) => void;
   /** Update the sort order */
   setSort: (sort: SearchSort) => void;
+  /** 更新筛选状态（仅改状态；即改即搜的 450ms 去抖触发在 Search.tsx，spec §5.2） */
+  setFilters: (filters: SearchFilters) => void;
   /** Execute a search with current keyword/scope/sort. Checks internal cache first. */
   executeSearch: () => Promise<void>;
   /** Whether there are more results to load */
@@ -59,26 +69,11 @@ interface SearchCacheEntry {
 const SEARCH_CACHE_MAX = 20;
 const searchCache = new Map<string, SearchCacheEntry>();
 
-function getSearchCacheKey(word: string, scope: SearchScope, sort: SearchSort): string {
-  return `${word}_${scope}_${sort}`;
-}
-
-function readSearchCache(
-  word: string,
-  scope: SearchScope,
-  sort: SearchSort,
-): SearchCacheEntry | undefined {
-  const key = getSearchCacheKey(word, scope, sort);
+function readSearchCacheByKey(key: string): SearchCacheEntry | undefined {
   return searchCache.get(key);
 }
 
-function writeSearchCache(
-  word: string,
-  scope: SearchScope,
-  sort: SearchSort,
-  entry: SearchCacheEntry,
-): void {
-  const key = getSearchCacheKey(word, scope, sort);
+function writeSearchCacheByKey(key: string, entry: SearchCacheEntry): void {
   searchCache.delete(key);
   searchCache.set(key, entry);
   if (searchCache.size > SEARCH_CACHE_MAX) {
@@ -91,10 +86,8 @@ export function createSearchStore(): SearchStoreState {
   const [keyword, setKeyword] = createSignal("");
   const [scope, setScope] = createSignal<SearchScope>("all");
   const [sort, setSort] = createSignal<SearchSort>("date_desc");
-  // 多标签（含空格）时使用精确标签匹配，单标签使用部分匹配以搜到复合标签
-  const searchTarget = createMemo<SearchTarget>(() => {
-    return keyword().includes(" ") ? "exact_match_for_tags" : "partial_match_for_tags";
-  });
+  // 筛选状态（canonical shape 单点在 search-core；默认 = 全部不限 + AI 跟随账号设置）
+  const [filters, setFiltersSig] = createSignal<SearchFilters>(DEFAULT_SEARCH_FILTERS);
   const [illustResults, setIllustResults] = createSignal<PixivIllust[]>([]);
   const [novelResults, setNovelResults] = createSignal<PixivNovel[]>([]);
   const [loading, setLoading] = createSignal(false);
@@ -123,13 +116,18 @@ export function createSearchStore(): SearchStoreState {
   const [nextNovelUrl, setNextNovelUrl] = createSignal<string | null>(null);
 
   // ── Merged results (computed) ──
-  // AI 三态过滤在派生层（缓存仍存服务端原始结果）：切换模式即时重算，无需重搜（ADR-0155）
-  const results = createMemo(() =>
-    filterSearchResultsByAiMode(
-      mergeSearchResults(illustResults(), novelResults()),
-      aiFilterMode(),
-    ),
-  );
+  // 派生层过滤（缓存仍存服务端原始结果）：AI 三态（ADR-0155）+ 面板覆盖（#479，
+  // resolveAiMode：follow=账号设置 / all=show / hide=mask）+ 收藏数客户端兜底（spec §7，
+  // 服务端对免费账号静默忽略区间参数；热门路径不兜底——#478 置灰语义）。
+  const results = createMemo(() => {
+    const merged = mergeSearchResults(illustResults(), novelResults());
+    const effectiveAi = resolveAiMode(aiFilterMode(), filters().aiOverride);
+    const withBookmark =
+      sort() === "popular_desc"
+        ? merged
+        : filterByBookmarkBand(merged, filters().bookmark, (row) => row.entity.total_bookmarks);
+    return filterSearchResultsByAiMode(withBookmark, effectiveAi);
+  });
   const hasMore = createMemo(() => hasMoreIllust() || hasMoreNovel());
 
   // ── AbortController management ──
@@ -151,7 +149,9 @@ export function createSearchStore(): SearchStoreState {
 
     const currentScope = scope();
     const currentSort = sort();
-    const searchKey = `${kw}_${currentScope}_${currentSort}`;
+    const currentFilters = filters();
+    // 缓存/判重键含筛选规范段（search-core 单点）——换筛选不命中脏缓存（spec §6.2）
+    const searchKey = buildCacheKey(kw, currentScope, currentSort, currentFilters);
     // 相同参数搜索已在飞行 → 跳过（由第一个请求负责写入结果）
     if (inFlightSearchKey === searchKey) return;
     inFlightSearchKey = searchKey;
@@ -164,7 +164,7 @@ export function createSearchStore(): SearchStoreState {
       setPaginationError(false);
 
       // Check internal cache first
-      const cached = readSearchCache(kw, currentScope, currentSort);
+      const cached = readSearchCacheByKey(searchKey);
       if (cached) {
         setIllustResults(cached.illustResults);
         setNovelResults(cached.novelResults);
@@ -189,12 +189,11 @@ export function createSearchStore(): SearchStoreState {
 
       const [err] = await tryAsync(
         (async () => {
-          const currentTarget = searchTarget();
           let anySucceeded = false;
 
           if (currentScope === "illust" || currentScope === "all") {
             const [illustErr, illustRes] = await tryAsync(
-              searchIllust(kw, currentSort, currentTarget, signal),
+              searchIllust(kw, currentSort, signal, currentFilters),
             );
             if (illustErr) {
               if ((illustErr as Error).name === "AbortError") throw illustErr;
@@ -209,7 +208,7 @@ export function createSearchStore(): SearchStoreState {
 
           if (currentScope === "novel" || currentScope === "all") {
             const [novelErr, novelRes] = await tryAsync(
-              searchNovel(kw, currentSort, currentTarget, signal),
+              searchNovel(kw, currentSort, signal, currentFilters),
             );
             if (novelErr) {
               if ((novelErr as Error).name === "AbortError") throw novelErr;
@@ -227,8 +226,8 @@ export function createSearchStore(): SearchStoreState {
             setError({ type: ApiErrorType.UNKNOWN, message: "搜索失败，请稍后重试" });
           }
 
-          // 写入搜索结果缓存
-          writeSearchCache(kw, currentScope, currentSort, {
+          // 写入搜索结果缓存（键含筛选段）
+          writeSearchCacheByKey(searchKey, {
             illustResults: illustResults(),
             novelResults: novelResults(),
             hasMoreIllust: hasMoreIllust(),
@@ -311,12 +310,13 @@ export function createSearchStore(): SearchStoreState {
     scope,
     sort,
     toSorted: sort,
+    filters,
     results,
     hasMore,
     loading,
     error,
     paginationError,
-    // SolidJS 2.0 批处理语义（set-后-读审计修复点）：三个 setter 是命令式 API，
+    // SolidJS 2.0 批处理语义（set-后-读审计修复点）：这些 setter 是命令式 API，
     // 调用方契约是「set 后同 tick 内 executeSearch / keyword() 读到新值」（1.x 同步
     // 可见语义）。set 后 flush 保持该契约，属命令式边界豁免（同时消除 Search.tsx
     // setKeyword("") 后同步 keyword().trim() 读到旧值的批处理错位）。
@@ -330,6 +330,10 @@ export function createSearchStore(): SearchStoreState {
     },
     setSort: (next: SearchSort) => {
       setSort(next);
+      flush();
+    },
+    setFilters: (next: SearchFilters) => {
+      setFiltersSig(next);
       flush();
     },
     executeSearch,

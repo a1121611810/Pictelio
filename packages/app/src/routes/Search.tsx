@@ -4,6 +4,13 @@ import FluentIcon from "@/components/ui/FluentIcon";
 import TagInput from "@/components/ui/TagInput";
 import { createSearchStore } from "@/stores/searchStore";
 import SearchResults from "@/components/SearchResults";
+import SearchFilterSheet from "@/components/search/SearchFilterSheet";
+import {
+  countActiveFilters,
+  decodeFiltersQuery,
+  encodeFiltersQuery,
+  type SearchFilters,
+} from "@pictelio/search-core";
 import { createScrollBehavior } from "@/primitives/scroll/createScrollBehavior";
 import type { SearchScope, SearchSort } from "@/api/types";
 import PageTransition from "@/components/PageTransition";
@@ -33,6 +40,16 @@ const Search: Component = () => {
 
   const store = createSearchStore();
 
+  // ── URL query 构建（word/scope/sort + 筛选段 fp/fd/fb/fr/fw/fa；spec §6.3）──
+  function buildSearchQuery(): string {
+    return new URLSearchParams({
+      word: store.keyword().trim(),
+      scope: store.scope(),
+      sort: store.toSorted(),
+      ...encodeFiltersQuery(store.filters()),
+    }).toString();
+  }
+
   // ── Tag chips ──
   const [tags, setTags] = createSignal<string[]>([]);
 
@@ -44,12 +61,7 @@ const Search: Component = () => {
     debounceTimer = setTimeout(() => {
       if (newTags.length > 0) {
         addToHistory(newTags.join(" "));
-        const qs = new URLSearchParams({
-          word: newTags.join(" "),
-          scope: store.scope(),
-          sort: store.toSorted(),
-        }).toString();
-        void navigate(`/search?${qs}`);
+        void navigate(`/search?${buildSearchQuery()}`);
         store.executeSearch();
       }
     }, 300);
@@ -108,14 +120,26 @@ const Search: Component = () => {
   }
 
   // ── Sync URL params → store ──
-  // Solid 2.0 拆分效应：compute 读 searchParams 快照，apply 段做 store 写与导航联动。
+  // Solid 2.0 拆分效应：compute 读 searchParams 快照（含筛选六键，快照缺失会导致
+  // 仅筛变化的 URL 更新不触发 effect），apply 段做 store 写与导航联动。
   let prevUrlWord: string | undefined;
   createEffect(
     () => {
       const params = searchParams as Record<string, string | undefined>;
-      return { word: params.word, scope: params.scope, sort: params.sort };
+      return {
+        word: params.word,
+        scope: params.scope,
+        sort: params.sort,
+        fp: params.fp,
+        fd: params.fd,
+        fb: params.fb,
+        fr: params.fr,
+        fw: params.fw,
+        fa: params.fa,
+      };
     },
-    ({ word, scope, sort }) => {
+    (snap) => {
+      const { word, scope, sort } = snap;
       if (word !== undefined && word !== prevUrlWord) {
         prevUrlWord = word;
         syncFromUrl(word);
@@ -129,6 +153,16 @@ const Search: Component = () => {
       }
       if (scope) store.setScope(scope as SearchScope);
       if (sort) store.setSort(sort as SearchSort);
+      // 筛选段回填（浏览器前进/后退；spec §6.3）：解码结果与当前不同才写入并重搜——
+      // 面板自身触发的 navigate 解码值与当前一致 → 不回环、不重复搜索。
+      const urlFilters = decodeFiltersQuery(snap);
+      if (JSON.stringify(urlFilters) !== JSON.stringify(store.filters())) {
+        store.setFilters(urlFilters);
+        if (store.keyword().trim() !== "") {
+          clearTimeout(filterDebounceTimer);
+          filterDebounceTimer = setTimeout(() => store.executeSearch(), 300);
+        }
+      }
     },
   );
 
@@ -137,15 +171,27 @@ const Search: Component = () => {
   createEffect(
     () => {
       const params = searchParams as Record<string, string | undefined>;
-      return { word: params.word, scope: params.scope, sort: params.sort, hydrated: hydrated() };
+      return {
+        word: params.word,
+        scope: params.scope,
+        sort: params.sort,
+        fp: params.fp,
+        fd: params.fd,
+        fb: params.fb,
+        fr: params.fr,
+        fw: params.fw,
+        fa: params.fa,
+        hydrated: hydrated(),
+      };
     },
-    ({ word, scope, sort, hydrated: isHydrated }) => {
+    ({ word, scope, sort, hydrated: isHydrated, ...filterSnap }) => {
       if (!isHydrated && word?.trim()) {
         setHydrated(true);
         const trimmed = word.trim();
         syncFromUrl(trimmed);
         if (scope) store.setScope(scope as SearchScope);
         if (sort) store.setSort(sort as SearchSort);
+        store.setFilters(decodeFiltersQuery(filterSnap));
         // Solid 2.0：executeSearch 内部同步读 keyword()/scope()/sort()，而上面的 set
         // 尚未提交（微任务批处理）。此处的「set 后立即同步执行搜索」是命令式边界，
         // 显式 flush 保证 store 读到已提交的新值（语义与 1.x 同步可见一致）。
@@ -160,7 +206,12 @@ const Search: Component = () => {
 
   // ── Debounced search execution ──
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
-  onCleanup(() => clearTimeout(debounceTimer));
+  // 筛选即改即搜去抖（spec §5.2：末次改动后 400-500ms）
+  let filterDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+  onCleanup(() => {
+    clearTimeout(debounceTimer);
+    clearTimeout(filterDebounceTimer);
+  });
   function handleClearSearch() {
     clearTimeout(debounceTimer);
     setTags([]);
@@ -176,8 +227,7 @@ const Search: Component = () => {
     const kw = store.keyword().trim();
     if (kw) {
       clearTimeout(debounceTimer);
-      const qs = new URLSearchParams({ word: kw, scope, sort: store.toSorted() }).toString();
-      void navigate(`/search?${qs}`);
+      void navigate(`/search?${buildSearchQuery()}`);
       store.executeSearch();
     }
   }
@@ -189,10 +239,20 @@ const Search: Component = () => {
     const kw = store.keyword().trim();
     if (kw) {
       clearTimeout(debounceTimer);
-      const qs = new URLSearchParams({ word: kw, scope: store.scope(), sort }).toString();
-      void navigate(`/search?${qs}`);
+      void navigate(`/search?${buildSearchQuery()}`);
       store.executeSearch();
     }
+  }
+
+  /** 筛选面板变更入口（#476 即改即搜）：状态先落 store，末次改动 450ms 去抖后导航 + 重搜 */
+  function handleFiltersChange(next: SearchFilters) {
+    store.setFilters(next);
+    if (store.keyword().trim() === "") return; // 空词只存状态（与 scope/sort 语义一致）
+    clearTimeout(filterDebounceTimer);
+    filterDebounceTimer = setTimeout(() => {
+      void navigate(`/search?${buildSearchQuery()}`);
+      store.executeSearch();
+    }, 450);
   }
 
   let mainInputRef: HTMLInputElement | undefined;
@@ -205,6 +265,10 @@ const Search: Component = () => {
   }
 
   const hasActiveSearch = createMemo(() => store.keyword().trim() !== "");
+
+  // ── 筛选面板（#477 变体 A：底部 Sheet；入口=筛选 icon+激活数徽标） ──
+  const [filterSheetOpen, setFilterSheetOpen] = createSignal(false);
+  const activeFilterCount = () => countActiveFilters(store.filters());
 
   return (
     <PageTransition>
@@ -308,6 +372,21 @@ const Search: Component = () => {
                 <FluentIcon name="dismiss" size={18} />
               </button>
             </Show>
+            {/* 筛选入口：icon + 激活数徽标（#476 Q6：0 激活时隐藏徽标） */}
+            <button
+              class="relative flex items-center justify-center min-w-9 min-h-9 rounded-[var(--borderRadiusSmall)] text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground2)] active:scale-90 transition-all duration-[var(--durationFast)] flex-shrink-0"
+              onClick={() => setFilterSheetOpen(true)}
+              aria-label="筛选"
+            >
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path d="M2.5 3h15l-6 7v6l-3 1.5v-7.5l-6-7z" fill="currentColor" />
+              </svg>
+              <Show when={activeFilterCount() > 0}>
+                <span class="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-[var(--borderRadiusCircular)] bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] text-[10px] leading-4 text-center">
+                  {activeFilterCount()}
+                </span>
+              </Show>
+            </button>
           </div>
 
           {/* ── Scope + Sort controls — Fluent 2 tabs + inline sort ── */}
@@ -390,12 +469,7 @@ const Search: Component = () => {
                 setTags(tagList);
                 store.setKeyword(word);
                 addToHistory(word);
-                const qs = new URLSearchParams({
-                  word,
-                  scope: store.scope(),
-                  sort: store.toSorted(),
-                }).toString();
-                void navigate(`/search?${qs}`);
+                void navigate(`/search?${buildSearchQuery()}`);
                 // Solid 2.0：setKeyword 尚未提交（微任务批处理），executeSearch 同步读
                 // keyword() 会拿到旧值静默失效——命令式边界，flush 后再执行。
                 flush();
@@ -425,6 +499,16 @@ const Search: Component = () => {
           </Show>
         </div>
       </div>
+
+      {/* ── 筛选面板（受控：状态在 searchStore，变更经 handleFiltersChange 即改即搜） ── */}
+      <SearchFilterSheet
+        isOpen={filterSheetOpen()}
+        onClose={() => setFilterSheetOpen(false)}
+        filters={() => store.filters()}
+        scope={() => store.scope()}
+        sort={() => store.toSorted()}
+        onChange={handleFiltersChange}
+      />
 
       {/* ── Back to top ── */}
       <Show when={showBackToTop()}>

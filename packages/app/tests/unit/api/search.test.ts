@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { BOOKMARK_BANDS, DEFAULT_SEARCH_FILTERS } from "@pictelio/search-core";
 
 const mockGet = vi.fn();
 const mockPost = vi.fn();
@@ -15,8 +16,12 @@ async function loadApi() {
   return import("@/api/search");
 }
 
-describe("api/search.ts", () => {
-  it("searchIllust calls apiClient.get with correct endpoint and params", async () => {
+/**
+ * 本文件只断言「薄传输层」行为：参数构建的真值表单点在 @pictelio/search-core
+ * （packages/search-core/tests/buildParams.test.ts，oracle=研究文档官方抓包值）。
+ */
+describe("api/search.ts（薄传输层）", () => {
+  it("默认筛选：单词标签 illust 不传 search_target（#906），恒发两 bool", async () => {
     mockGet.mockResolvedValue({ illusts: [], next_url: null });
     const { searchIllust } = await loadApi();
     await searchIllust("星空");
@@ -25,96 +30,79 @@ describe("api/search.ts", () => {
       "/v1/search/illust",
       {
         word: "星空",
-        sort: "date_desc",
-        search_target: "partial_match_for_tags",
         filter: "for_ios",
+        merge_plain_keyword_results: "true",
+        include_translated_tag_results: "true",
+        sort: "date_desc",
       },
       undefined,
     );
   });
 
-  it("searchIllust passes custom sort and searchTarget", async () => {
+  it("多标签（含空格）→ exact_match_for_tags（target 规则单点在 search-core）", async () => {
     mockGet.mockResolvedValue({ illusts: [], next_url: null });
     const { searchIllust } = await loadApi();
-    await searchIllust("Fate", "date_asc", "title_and_caption");
-
+    await searchIllust("東方 フラン");
     expect(mockGet).toHaveBeenCalledWith(
       "/v1/search/illust",
-      {
-        word: "Fate",
-        sort: "date_asc",
-        search_target: "title_and_caption",
-        filter: "for_ios",
-      },
+      expect.objectContaining({ word: "東方 フラン", search_target: "exact_match_for_tags" }),
       undefined,
     );
   });
 
-  it("searchIllust with sort=popular_desc calls popular-preview endpoint", async () => {
+  it("热门路由 popular-preview：无 sort、收藏数不携带、期间/比例透传", async () => {
     mockGet.mockResolvedValue({ illusts: [], next_url: null });
     const { searchIllust } = await loadApi();
-    await searchIllust("Fate", "popular_desc", "title_and_caption");
+    await searchIllust("Fate", "popular_desc", undefined, {
+      ...DEFAULT_SEARCH_FILTERS,
+      bookmark: BOOKMARK_BANDS[3]!,
+      ratio: "landscape",
+    });
+    const [endpoint, params] = mockGet.mock.calls[0] as [string, Record<string, string>];
+    expect(endpoint).toBe("/v1/search/popular-preview/illust");
+    expect(params.sort).toBeUndefined();
+    expect(params.bookmark_num_min).toBeUndefined();
+    expect(params.ratio_pattern).toBe("landscape");
+  });
 
-    // popular_desc 应路由到独立预览端点，不含 sort 参数
+  it("非热门 + 筛选：区间/比例/分辨率参数透传", async () => {
+    mockGet.mockResolvedValue({ illusts: [], next_url: null });
+    const { searchIllust } = await loadApi();
+    await searchIllust("星空", "date_desc", undefined, {
+      ...DEFAULT_SEARCH_FILTERS,
+      bookmark: BOOKMARK_BANDS[3]!,
+      ratio: "landscape",
+      minPixels: 2000,
+    });
     expect(mockGet).toHaveBeenCalledWith(
-      "/v1/search/popular-preview/illust",
-      {
-        word: "Fate",
-        search_target: "title_and_caption",
-        filter: "for_ios",
-      },
+      "/v1/search/illust",
+      expect.objectContaining({
+        bookmark_num_min: "100",
+        bookmark_num_max: "299",
+        ratio_pattern: "landscape",
+        width_min: "2000",
+        height_min: "2000",
+      }),
       undefined,
     );
   });
 
-  it("searchNovel calls apiClient.get with correct endpoint and params", async () => {
+  it("novel：恒显式 partial（#1038）；比例/分辨率不进小说路", async () => {
     mockGet.mockResolvedValue({ novels: [], next_url: null });
     const { searchNovel } = await loadApi();
-    await searchNovel("小説");
-
+    await searchNovel("小説", "date_desc", undefined, {
+      ...DEFAULT_SEARCH_FILTERS,
+      ratio: "portrait",
+      minPixels: 3000,
+    });
     expect(mockGet).toHaveBeenCalledWith(
       "/v1/search/novel",
-      {
-        word: "小説",
-        sort: "date_desc",
-        search_target: "partial_match_for_tags",
-        filter: "for_ios",
-      },
+      expect.objectContaining({ search_target: "partial_match_for_tags" }),
       undefined,
     );
-  });
-
-  it("searchNovel passes custom sort and searchTarget", async () => {
-    mockGet.mockResolvedValue({ novels: [], next_url: null });
-    const { searchNovel } = await loadApi();
-    await searchNovel("test", "date_asc", "exact_match_for_tags");
-
-    expect(mockGet).toHaveBeenCalledWith(
-      "/v1/search/novel",
-      {
-        word: "test",
-        sort: "date_asc",
-        search_target: "exact_match_for_tags",
-        filter: "for_ios",
-      },
-      undefined,
-    );
-  });
-
-  it("searchNovel with sort=popular_desc calls popular-preview endpoint", async () => {
-    mockGet.mockResolvedValue({ novels: [], next_url: null });
-    const { searchNovel } = await loadApi();
-    await searchNovel("test", "popular_desc", "exact_match_for_tags");
-
-    expect(mockGet).toHaveBeenCalledWith(
-      "/v1/search/popular-preview/novel",
-      {
-        word: "test",
-        search_target: "exact_match_for_tags",
-        filter: "for_ios",
-      },
-      undefined,
-    );
+    const [, params] = mockGet.mock.calls[0] as [string, Record<string, string>];
+    expect(params.ratio_pattern).toBeUndefined();
+    expect(params.width_min).toBeUndefined();
   });
 
   it("searchIllustNext passes URL directly", async () => {
@@ -168,73 +156,5 @@ describe("api/search.ts", () => {
       },
       undefined,
     );
-  });
-
-  it("searchIllust returns PixivIllustListResponse", async () => {
-    const expected = {
-      illusts: [
-        {
-          id: 1,
-          title: "Test",
-          type: "illust",
-          user: { id: 1, name: "a", account: "a", profile_image_urls: {} },
-          image_urls: { square_medium: "", medium: "", large: "" },
-          width: 100,
-          height: 100,
-          page_count: 1,
-          is_bookmarked: false,
-          total_bookmarks: 0,
-          tags: [{ name: "tag1" }],
-          x_restrict: 0,
-          create_date: "2026-01-01T00:00:00Z",
-          meta_pages: [],
-          meta_single_page: {},
-        },
-      ],
-      next_url: null,
-    };
-    mockGet.mockResolvedValue(expected);
-    const { searchIllust } = await loadApi();
-    const result = await searchIllust("test");
-
-    expect(result).toEqual(expected);
-    expect(result.illusts).toHaveLength(1);
-  });
-
-  it("searchNovel returns PixivNovelListResponse", async () => {
-    const expected = {
-      novels: [
-        {
-          id: 1,
-          title: "Test Novel",
-          user: { id: 1, name: "a", account: "a", profile_image_urls: {} },
-          image_urls: { square_medium: "", medium: "", large: "" },
-          tags: [],
-          page_count: 1,
-          text_length: 1000,
-          is_bookmarked: false,
-          total_bookmarks: 0,
-          x_restrict: 0,
-          create_date: "2026-01-01T00:00:00Z",
-        },
-      ],
-      next_url: null,
-    };
-    mockGet.mockResolvedValue(expected);
-    const { searchNovel } = await loadApi();
-    const result = await searchNovel("test");
-
-    expect(result).toEqual(expected);
-    expect(result.novels).toHaveLength(1);
-  });
-
-  it("searchAutocomplete returns PixivAutocompleteResponse", async () => {
-    const expected = { tags: [{ name: "star", translated_name: "星" }] };
-    mockGet.mockResolvedValue(expected);
-    const { searchAutocomplete } = await loadApi();
-    const result = await searchAutocomplete("star");
-
-    expect(result).toEqual(expected);
-    expect(result.tags).toHaveLength(1);
   });
 });
