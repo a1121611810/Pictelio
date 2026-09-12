@@ -2,8 +2,19 @@
 // 新增域文件时在本文件与 zh-CN/index.ts 同步注册。
 import error_ from "./error";
 import settings_ from "./settings";
+import routes_ from "./routes";
+import components1_ from "./components1";
+import components2_ from "./components2";
+import core_ from "./core";
 import type { Dict } from "../zh-CN";
 
-const en = { ...error_, ...settings_ } as const satisfies Dict;
+const en = {
+  ...error_,
+  ...settings_,
+  ...routes_,
+  ...components1_,
+  ...components2_,
+  ...core_,
+} as const satisfies Dict;
 
 export default en;
