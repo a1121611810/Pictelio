@@ -1,4 +1,5 @@
 import { createSignal, For, Show, type Component } from "solid-js";
+import { t, type I18nKey } from "../../i18n";
 import {
   BOOKMARK_BANDS,
   countActiveFilters,
@@ -36,18 +37,19 @@ interface Props {
   onChange: (next: SearchFilters) => void;
 }
 
-const PERIOD_PRESET_OPTIONS: { value: "1d" | "1w" | "1m" | "6m" | "1y"; label: string }[] = [
-  { value: "1d", label: "24 小时内" },
-  { value: "1w", label: "一周内" },
-  { value: "1m", label: "一个月内" },
-  { value: "6m", label: "半年内" },
-  { value: "1y", label: "一年内" },
+// 模块级选项数组存 i18n key，渲染时 t(key)（B4 labelKey 范式）
+const PERIOD_PRESET_OPTIONS: { value: "1d" | "1w" | "1m" | "6m" | "1y"; labelKey: I18nKey }[] = [
+  { value: "1d", labelKey: "search.filterSheet.period24h" },
+  { value: "1w", labelKey: "search.filterSheet.period1w" },
+  { value: "1m", labelKey: "search.filterSheet.period1m" },
+  { value: "6m", labelKey: "search.filterSheet.period6m" },
+  { value: "1y", labelKey: "search.filterSheet.period1y" },
 ];
 
-const RATIO_OPTIONS: { value: RatioPattern; label: string }[] = [
-  { value: "landscape", label: "横图" },
-  { value: "portrait", label: "竖图" },
-  { value: "square", label: "方图" },
+const RATIO_OPTIONS: { value: RatioPattern; labelKey: I18nKey }[] = [
+  { value: "landscape", labelKey: "search.filterSheet.ratioLandscape" },
+  { value: "portrait", labelKey: "search.filterSheet.ratioPortrait" },
+  { value: "square", labelKey: "search.filterSheet.ratioSquare" },
 ];
 
 const RES_OPTIONS: { value: number; label: string }[] = [
@@ -56,10 +58,10 @@ const RES_OPTIONS: { value: number; label: string }[] = [
   { value: 3000, label: "≥3000px" },
 ];
 
-const AI_OPTIONS: { value: AiOverride; label: string }[] = [
-  { value: "follow", label: "跟随设置" },
-  { value: "all", label: "全部显示" },
-  { value: "hide", label: "隐藏 AI" },
+const AI_OPTIONS: { value: AiOverride; labelKey: I18nKey }[] = [
+  { value: "follow", labelKey: "search.filterSheet.aiFollow" },
+  { value: "all", labelKey: "search.filterSheet.aiShowAll" },
+  { value: "hide", labelKey: "search.filterSheet.aiHide" },
 ];
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -162,7 +164,7 @@ const SearchFilterSheet: Component<Props> = (props) => {
           {/* Header：筛选 + 清除全部（仅激活时出现，#476 Q6）+ 关闭 */}
           <div class="flex items-center justify-between px-5 pt-1 pb-2">
             <h2 class="[font-size:var(--fontSizeBase500)] font-semibold text-[var(--colorNeutralForeground1)]">
-              筛选
+              {t("search.filterSheet.title")}
             </h2>
             <div class="flex items-center gap-2">
               <Show when={countActiveFilters(props.filters()) > 0}>
@@ -173,15 +175,15 @@ const SearchFilterSheet: Component<Props> = (props) => {
                     setCustomEnd("");
                     props.onChange({ ...DEFAULT_SEARCH_FILTERS });
                   }}
-                  aria-label="清除全部筛选"
+                  aria-label={t("search.filterSheet.clearAllAria")}
                 >
-                  清除全部
+                  {t("search.filterSheet.clearAll")}
                 </button>
               </Show>
               <button
                 class="w-8 h-8 flex items-center justify-center rounded-[var(--borderRadiusMedium)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorNeutralBackground2)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer"
                 onClick={() => props.onClose()}
-                aria-label="关闭"
+                aria-label={t("search.filterSheet.closeAria")}
               >
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                   <path
@@ -197,20 +199,20 @@ const SearchFilterSheet: Component<Props> = (props) => {
 
           <div class="px-5 py-3 flex flex-col gap-5">
             {/* ── 期间 ── */}
-            <div role="group" aria-label="投稿期间">
+            <div role="group" aria-label={t("search.filterSheet.periodGroupAria")}>
               <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground1)] mb-2">
-                期间
+                {t("search.filterSheet.periodLabel")}
               </p>
               <div class="flex flex-wrap gap-2">
                 <FilterChip
-                  label="全部"
+                  label={t("search.filterSheet.all")}
                   active={props.filters().period.kind === "any"}
                   onClick={() => setPeriod({ kind: "any" })}
                 />
                 <For each={PERIOD_PRESET_OPTIONS}>
                   {(opt) => (
                     <FilterChip
-                      label={opt.label}
+                      label={t(opt.labelKey)}
                       active={isPreset(props.filters(), opt.value)}
                       onClick={() => setPeriod(toggledPreset(props.filters(), opt.value))}
                     />
@@ -227,7 +229,7 @@ const SearchFilterSheet: Component<Props> = (props) => {
                     },
                   ]}
                 >
-                  自定义
+                  {t("search.filterSheet.custom")}
                 </span>
               </div>
               {/* 自定义起止（YYYY-MM-DD）：双字段齐且有序才生效（spec Q3 生效时机） */}
@@ -240,7 +242,7 @@ const SearchFilterSheet: Component<Props> = (props) => {
                     setCustomStart(e.currentTarget.value);
                     commitCustomDates(e.currentTarget.value, customEnd());
                   }}
-                  aria-label="开始日期"
+                  aria-label={t("search.filterSheet.startDateAria")}
                 />
                 <span class="text-[var(--colorNeutralForeground3)] [font-size:var(--fontSizeBase200)]">
                   →
@@ -253,19 +255,19 @@ const SearchFilterSheet: Component<Props> = (props) => {
                     setCustomEnd(e.currentTarget.value);
                     commitCustomDates(customStart(), e.currentTarget.value);
                   }}
-                  aria-label="结束日期"
+                  aria-label={t("search.filterSheet.endDateAria")}
                 />
               </div>
             </div>
 
             {/* ── 收藏数（热门下置灰：popular-preview 服务端忽略区间，#478） ── */}
-            <div role="group" aria-label="收藏数">
+            <div role="group" aria-label={t("search.filterSheet.bookmarkGroupAria")}>
               <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground1)] mb-2">
-                收藏数
+                {t("search.filterSheet.bookmarkLabel")}
               </p>
               <div class="flex flex-wrap gap-2">
                 <FilterChip
-                  label="不限"
+                  label={t("search.filterSheet.any")}
                   active={props.filters().bookmark === null}
                   disabled={bookmarkDisabled()}
                   onClick={() => props.onChange({ ...props.filters(), bookmark: null })}
@@ -284,22 +286,22 @@ const SearchFilterSheet: Component<Props> = (props) => {
               </div>
               <Show when={bookmarkDisabled()}>
                 <p class="mt-1.5 [font-size:var(--fontSizeBase100)] text-[var(--colorNeutralForeground3)]">
-                  热门榜不支持按收藏数筛（切回最新/最早恢复）
+                  {t("search.filterSheet.bookmarkDisabledHint")}
                 </p>
               </Show>
             </div>
 
             {/* ── 比例（仅插画：scope=novel 置灰不清值，#476 Q4） ── */}
-            <div role="group" aria-label="比例">
+            <div role="group" aria-label={t("search.filterSheet.ratioGroupAria")}>
               <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground1)] mb-2">
-                比例
+                {t("search.filterSheet.ratioLabel")}
                 <span class="ml-2 [font-size:var(--fontSizeBase100)] font-normal text-[var(--colorBrandForeground1)] border border-[var(--colorBrandStroke1)] rounded-[var(--borderRadiusSmall)] px-1">
-                  仅插画
+                  {t("search.filterSheet.illustOnly")}
                 </span>
               </p>
               <div class="flex flex-wrap gap-2">
                 <FilterChip
-                  label="全部"
+                  label={t("search.filterSheet.all")}
                   active={props.filters().ratio === null}
                   disabled={ratioDisabled()}
                   onClick={() => props.onChange({ ...props.filters(), ratio: null })}
@@ -307,7 +309,7 @@ const SearchFilterSheet: Component<Props> = (props) => {
                 <For each={RATIO_OPTIONS}>
                   {(opt) => (
                     <FilterChip
-                      label={opt.label}
+                      label={t(opt.labelKey)}
                       active={props.filters().ratio === opt.value}
                       disabled={ratioDisabled()}
                       onClick={() =>
@@ -322,22 +324,22 @@ const SearchFilterSheet: Component<Props> = (props) => {
               </div>
               <Show when={ratioDisabled()}>
                 <p class="mt-1.5 [font-size:var(--fontSizeBase100)] text-[var(--colorNeutralForeground3)]">
-                  切到「插画」范围后可用（已设的值会保留）
+                  {t("search.filterSheet.ratioDisabledHint")}
                 </p>
               </Show>
             </div>
 
             {/* ── 分辨率（仅插画：同上） ── */}
-            <div role="group" aria-label="分辨率">
+            <div role="group" aria-label={t("search.filterSheet.resolutionGroupAria")}>
               <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground1)] mb-2">
-                分辨率
+                {t("search.filterSheet.resolutionLabel")}
                 <span class="ml-2 [font-size:var(--fontSizeBase100)] font-normal text-[var(--colorBrandForeground1)] border border-[var(--colorBrandStroke1)] rounded-[var(--borderRadiusSmall)] px-1">
-                  仅插画
+                  {t("search.filterSheet.illustOnly")}
                 </span>
               </p>
               <div class="flex flex-wrap gap-2">
                 <FilterChip
-                  label="不限"
+                  label={t("search.filterSheet.any")}
                   active={props.filters().minPixels === null}
                   disabled={ratioDisabled()}
                   onClick={() => props.onChange({ ...props.filters(), minPixels: null })}
@@ -361,15 +363,15 @@ const SearchFilterSheet: Component<Props> = (props) => {
             </div>
 
             {/* ── AI 作品（#479：只管本次搜索；「仅看」仅经设置，面板不设档） ── */}
-            <div role="group" aria-label="AI 作品">
+            <div role="group" aria-label={t("search.filterSheet.aiGroupAria")}>
               <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground1)] mb-2">
-                AI 作品
+                {t("search.filterSheet.aiLabel")}
               </p>
               <div class="flex flex-wrap gap-2">
                 <For each={AI_OPTIONS}>
                   {(opt) => (
                     <FilterChip
-                      label={opt.label}
+                      label={t(opt.labelKey)}
                       active={props.filters().aiOverride === opt.value}
                       onClick={() => props.onChange({ ...props.filters(), aiOverride: opt.value })}
                     />
@@ -377,7 +379,7 @@ const SearchFilterSheet: Component<Props> = (props) => {
                 </For>
               </div>
               <p class="mt-1.5 [font-size:var(--fontSizeBase100)] text-[var(--colorNeutralForeground3)]">
-                只影响本次搜索，不改动设置里的 AI 偏好
+                {t("search.filterSheet.aiHint")}
               </p>
             </div>
           </div>

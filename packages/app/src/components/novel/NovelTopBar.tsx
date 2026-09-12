@@ -1,6 +1,7 @@
 import type { JSX } from "@solidjs/web";
 import type { Component } from "solid-js";
 import { Show } from "solid-js";
+import { t } from "../../i18n";
 import FluentIcon from "../ui/FluentIcon";
 
 interface NovelTopBarProps {
@@ -29,7 +30,7 @@ const NovelTopBar: Component<NovelTopBarProps> = (props) => {
       >
         <fluent-button
           appearance="subtle"
-          aria-label="返回"
+          aria-label={t("novel.topBar.backAria")}
           ref={fluentOn("click", props.onBack)}
           class="w-9 h-9 p-0 min-w-9 flex-shrink-0"
         >
@@ -40,7 +41,7 @@ const NovelTopBar: Component<NovelTopBarProps> = (props) => {
           fallback={<div class="flex-1 min-w-0">{props.searchBar}</div>}
         >
           <h1 class="flex-1 min-w-0 [font-size:var(--fontSizeBase300)] font-semibold text-[var(--colorNeutralForeground1)] flex items-center gap-1">
-            <span class="whitespace-nowrap flex-shrink-0">小说</span>
+            <span class="whitespace-nowrap flex-shrink-0">{t("novel.topBar.novelLabel")}</span>
             <span
               class={[
                 "truncate text-[var(--colorNeutralForeground2)]",
@@ -52,7 +53,7 @@ const NovelTopBar: Component<NovelTopBarProps> = (props) => {
 
               style="transition:opacity var(--durationFast) var(--curveEasyEase)"
             >
-              {props.title ? `《${props.title}》` : ""}
+              {props.title ? t("novel.topBar.titleWrapped", { title: props.title }) : ""}
             </span>
           </h1>
         </Show>
@@ -61,7 +62,7 @@ const NovelTopBar: Component<NovelTopBarProps> = (props) => {
             type="button"
             class="w-9 h-9 flex items-center justify-center rounded-[var(--borderRadiusMedium)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorNeutralBackground2)] active:scale-95 transition-all appearance-none border-none outline-none cursor-pointer flex-shrink-0 focus-visible:[box-shadow:0_0_0_var(--strokeWidthThick)_var(--colorStrokeFocus2)]"
             onClick={props.onOpenSearch}
-            aria-label="搜索"
+            aria-label={t("novel.topBar.searchAria")}
           >
             <FluentIcon name="search" size={20} />
           </button>

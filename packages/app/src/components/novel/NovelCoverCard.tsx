@@ -1,6 +1,7 @@
 import type { Component } from "solid-js";
 import { createSignal, For, onSettled, Show } from "solid-js";
 import type { PixivNovel } from "@/api/types";
+import { t } from "../../i18n";
 import PixivImage from "../PixivImage";
 import SearchableTag from "../SearchableTag";
 
@@ -105,9 +106,9 @@ const NovelCoverCard: Component<NovelCoverCardProps> = (props) => {
           <button
             class="[font-size:var(--fontSizeBase100)] text-[var(--colorBrandForeground1)] mt-1 bg-transparent border-none p-0 cursor-pointer hover:underline"
             onClick={() => props.onSeriesClick()}
-            aria-label={`打开系列目录：${n().series?.title ?? ""}`}
+            aria-label={t("novel.coverCard.seriesAria", { title: n().series?.title ?? "" })}
           >
-            系列：{n().series?.title}
+            {t("novel.coverCard.seriesLabel", { title: n().series?.title ?? "" })}
           </button>
         </Show>
         <div class="flex flex-wrap gap-1.5 mt-2">
@@ -165,7 +166,9 @@ const NovelCoverCard: Component<NovelCoverCardProps> = (props) => {
             type="button"
             class="w-10 h-10 rounded-[var(--borderRadiusCircular)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke2)] shadow-[var(--elevation4)] flex items-center justify-center text-[var(--colorNeutralForeground2)] hover:text-[var(--colorBrandForeground1)] hover:border-[var(--colorBrandStroke1)] active:scale-90 transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] appearance-none outline-none cursor-pointer focus-visible:[box-shadow:0_0_0_var(--strokeWidthThick)_var(--colorStrokeFocus2)]"
             onClick={() => setExpanded((v) => !v)}
-            aria-label={expanded() ? "收起封面" : "展开封面"}
+            aria-label={
+              expanded() ? t("novel.coverCard.collapseAria") : t("novel.coverCard.expandAria")
+            }
           >
             <svg
               width="20"
@@ -196,7 +199,7 @@ const NovelStats: Component<{ novel: PixivNovel; onCommentsClick: () => void }> 
   return (
     <Show when={n()}>
       <div class="flex items-center gap-3 mt-2 text-[var(--colorNeutralForeground3)] [font-size:var(--fontSizeBase100)]">
-        <span>📖 {n().text_length.toLocaleString()}字</span>
+        <span>{t("novel.coverCard.statsWords", { count: n().text_length.toLocaleString() })}</span>
         <span>⭐ {n().total_bookmarks}</span>
         <Show when={n().total_comments != null}>
           <span
