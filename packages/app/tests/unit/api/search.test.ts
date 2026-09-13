@@ -4,12 +4,17 @@ import { BOOKMARK_BANDS, DEFAULT_SEARCH_FILTERS } from "@pictelio/search-core";
 const mockGet = vi.fn();
 const mockPost = vi.fn();
 
-vi.mock("@/api/client", () => ({
-  apiClient: {
-    get: (...args: unknown[]) => mockGet(...args),
-    post: (...args: unknown[]) => mockPost(...args),
-  },
-}));
+// 保留 client 真实导出（next_url 守卫复用真实 isTrustedPixivHost），只替换 apiClient
+vi.mock("@/api/client", async (importActual) => {
+  const actual = await importActual<typeof import("@/api/client")>();
+  return {
+    ...actual,
+    apiClient: {
+      get: (...args: unknown[]) => mockGet(...args),
+      post: (...args: unknown[]) => mockPost(...args),
+    },
+  };
+});
 
 async function loadApi() {
   vi.resetModules();

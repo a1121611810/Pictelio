@@ -17,6 +17,7 @@ import { useInfiniteQuery } from "@tanstack/solid-query";
 import { queryClient } from "../../api/queryClient";
 import { normalizeQueryError } from "../../api/normalizeQueryError";
 import { ApiErrorType, type ApiError } from "../../api/types";
+import { fetchDirection } from "./fetchDirection";
 
 // ─── 内部类型 ───
 
@@ -188,12 +189,6 @@ function flattenPages<T>(data: { pages?: any[] }): T[] {
 function getLastNextUrl(data: { pages?: any[] }): string | null {
   if (!data?.pages?.length) return null;
   return data.pages[data.pages.length - 1].next_url ?? null;
-}
-
-// fetchMeta 在 v6 适配层类型中未声明但运行时存在（core result 展开 state），经 unknown 收窄。
-function fetchDirection(q: unknown): string | undefined {
-  return (q as { fetchMeta?: { fetchMore?: { direction?: string } } }).fetchMeta?.fetchMore
-    ?.direction;
 }
 
 /** 错误类型优先级（索引越小越重要） */

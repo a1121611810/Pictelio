@@ -58,11 +58,21 @@ describe("router configuration", () => {
       "/user/:id/following",
       "/user/:id/followers",
       "/my/followers",
+      "/ranking",
     ];
 
     for (const path of expected) {
       expect(paths).toContain(path);
     }
+  });
+
+  it("registers /ranking before the catch-all route", () => {
+    const paths = collectPaths(routes[0].children as any[]);
+    const rankingIndex = paths.indexOf("/ranking");
+    const catchAllIndex = paths.findIndex((p) => p.includes("*"));
+    expect(rankingIndex).toBeGreaterThanOrEqual(0);
+    // 具体路由必须排在 catch-all 之前（否则永远被兜底吞掉）
+    expect(catchAllIndex).toBeGreaterThan(rankingIndex);
   });
 
   it("has a catch-all route", () => {

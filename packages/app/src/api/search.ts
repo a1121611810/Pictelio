@@ -1,4 +1,5 @@
 import { apiClient } from "./client";
+import { assertPixivUrl } from "./urlGuard";
 import {
   buildIllustSearchRequest,
   buildNovelSearchRequest,
@@ -11,16 +12,6 @@ import type {
   SearchSort,
   PixivAutocompleteResponse,
 } from "./types";
-
-/** 验证 next_url 只指向 Pixiv API 域名（防御 SSRF） */
-function assertPixivUrl(url: string, fnName: string): void {
-  // 允许本地代理路径
-  if (url.startsWith("/pixiv-api")) return;
-  // 验证绝对 URL 的 hostname
-  const [urlErr, parsed] = trySync(() => new URL(url));
-  if (!urlErr && parsed.hostname === "app-api.pixiv.net") return;
-  throw new Error(`${fnName}: invalid next_url — must point to app-api.pixiv.net`);
-}
 
 /**
  * 搜索请求传输层（薄）：端点路由 / search_target 规则 / 筛选→参数映射全部单点在

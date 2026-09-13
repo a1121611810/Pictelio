@@ -370,6 +370,13 @@ const enRoutes = {
   "ranking.backToRecommendedAria": "Back to recommendations",
   "ranking.mock.entryTitle": "Ranking work #{{rank}}",
   "ranking.mock.artistSample": "Sample artist {{rank}}",
+
+  // ── Ranking page (spec docs/specs/ranking.md; #514 page skeleton) ──
+  "ranking.page.title": "Rankings",
+  "ranking.page.back": "Back",
+  "ranking.page.empty": "No ranking entries",
+  "ranking.page.rowAria": "No.{{rank}}: {{title}}",
+  "ranking.page.bookmarks": "★{{count}}",
 } as const satisfies Record<ZhRoutesKey, string>;
 
 export default enRoutes;

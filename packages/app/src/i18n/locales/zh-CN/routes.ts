@@ -355,6 +355,13 @@ const zhRoutes = {
   "ranking.backToRecommendedAria": "返回推荐",
   "ranking.mock.entryTitle": "排行榜作品 #{{rank}}",
   "ranking.mock.artistSample": "画师样本 {{rank}}",
+
+  // ── 排行榜页（spec docs/specs/ranking.md；#514 页面骨架）──
+  "ranking.page.title": "排行榜",
+  "ranking.page.back": "返回",
+  "ranking.page.empty": "暂无榜单内容",
+  "ranking.page.rowAria": "第{{rank}}名：{{title}}",
+  "ranking.page.bookmarks": "★{{count}}",
 } as const;
 
 export default zhRoutes;
