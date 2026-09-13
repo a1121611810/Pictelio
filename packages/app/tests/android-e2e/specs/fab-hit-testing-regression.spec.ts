@@ -165,7 +165,10 @@ describe("ADR-0123 回归：页面点击恢复（FAB 全屏容器吞触摸修复
 
   beforeAll(async () => {
     expect(token.length).toBeGreaterThan(0);
-    const { serial: s } = await ensureEmulator(process.env.ANDROID_E2E_AVD);
+    // 本 spec 的坐标常量绑定 pixel_4 720×1280/density 320（pictelio_low）；
+    // 显式缺省用 pictelio_low，避免自动选择到 pictelio_ui(1080×2160) 时几何断言必然失败。
+    // 用 || 而非 ??：空字符串（CI 里 ANDROID_E2E_AVD= 的常见形态）会绕过 ?? 但不该绕过本缺省
+    const { serial: s } = await ensureEmulator(process.env.ANDROID_E2E_AVD || "pictelio_low");
     serial = s;
     assertDeviceGeometry(serial);
     assertDebugApkInstalled(serial);

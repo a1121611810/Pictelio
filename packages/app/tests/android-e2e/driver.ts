@@ -169,13 +169,7 @@ export class AndroidE2eDriver {
     // 先回 NATIVE：app 曾重启时 WebView devtools target 已变更（新 pid），而当前 chromedriver
     // 会话仍绑定旧 target → 后续 findElement 报 disconnected。recreateChromeDriverSessions=true
     // 会在「切 NATIVE」时销毁旧会话，切回 WEBVIEW 时按新 target 重建（settings-sync/roundtrip 复现）。
-    try {
-      if ((await this.currentContext()).startsWith("WEBVIEW")) {
-        await this.raw.switchContext("NATIVE_APP");
-      }
-    } catch {
-      // 首次会话/设备瞬时异常：忽略，后续等待逻辑仍会兜底
-    }
+    // app 重启后旧 chromedriver 会话的清理移到下方 target 就绪后的重试循环里
     let target: string | null = null;
     await this.raw.waitUntil(
       async () => {
@@ -194,9 +188,34 @@ export class AndroidE2eDriver {
       throw new Error("[android-e2e] 内部错误：WEBVIEW context 等待成功但未记录目标");
     }
     const webviewContext: string = target;
-    await this.switchContextWithRetry(webviewContext);
-    console.log(`[android-e2e] 已切换到 ${webviewContext}`);
-    return webviewContext;
+    // app 重启后 WebView devtools target 变更（新 pid），Appium 仍持有旧 chromedriver 会话 →
+    // 后续 getUrl/findElement 报 disconnected。无条件「回 NATIVE 再切 WEBVIEW」触发
+    // recreateChromeDriverSessions 的销毁/重建，并用 getUrl 探针校验；断连则重试整轮。
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        // 回 NATIVE：recreateChromeDriverSessions=true 会在离开 WEBVIEW 时销毁旧 chromedriver
+        // 会话，切回时按新 target 重建。失败不致命（可能本就在 NATIVE），但必须可见（禁静默降级）。
+        await this.raw.switchContext("NATIVE_APP").catch((e: unknown) => {
+          console.warn(
+            `[android-e2e] 回 NATIVE_APP 失败（attempt ${attempt + 1}）: ${e instanceof Error ? e.message : String(e)}`,
+          );
+        });
+        await this.switchContextWithRetry(webviewContext);
+        await this.raw.getUrl();
+        console.log(`[android-e2e] 已切换到 ${webviewContext} (attempt ${attempt + 1})`);
+        return webviewContext;
+      } catch (e) {
+        lastErr = translateChromedriverError(e, webviewMajorVersion(this.serial));
+        // 版本不匹配 / session 创建失败属确定性失败，重试只会反复拉起 chromedriver：
+        // 立即抛出带指引的错误（switchContextWithRetry 已翻译过，这里保持同一实例）。
+        if (/chromedriver|chrome version|session not created/iu.test(String(lastErr.message))) {
+          throw lastErr;
+        }
+        await new Promise((r) => setTimeout(r, 1_500));
+      }
+    }
+    throw lastErr ?? new Error("[android-e2e] switchToWebView 失败：无可用 WEBVIEW context");
   }
 
   /** 切回 NATIVE_APP context */

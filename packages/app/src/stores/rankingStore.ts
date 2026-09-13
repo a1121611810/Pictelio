@@ -12,7 +12,7 @@
  * 保证「先渲染骨架、后发请求」。
  */
 import type { Accessor } from "solid-js";
-import { createSignal, untrack } from "solid-js";
+import { createEffect, createSignal, untrack } from "solid-js";
 import { useInfiniteQuery } from "@tanstack/solid-query";
 import { DEFAULT_RANK_MODE, rankingCacheKey, type RankingQuery } from "@pictelio/ranking-core";
 import { queryClient } from "@/api/queryClient";
@@ -98,21 +98,37 @@ export function createRankingStore(initial?: RankingQuery): RankingStoreResult {
   );
 
   /**
-   * 可同步读取 `q.data` 的唯一充分条件：**已有提交过的数据**（`dataUpdatedAt > 0`）。
+   * 响应式路径**永不直接读 `q.data`**，只读「已提交页」快照 committedPages。
    *
-   * 依据（v6 适配层 v6.0.0-rc.3 源码 computeData）：`data()` 只有在「state.data 已存在」
-   * 时同步返回；其余分支返回 **Promise**（进行中的 fetch）或 **NEVER 哨兵**（
-   * `!isEnabled()` 且无数据，即本 store 的 enabled:false + 客户端级 ensureInfiniteQueryData）。
-   * 读取 NEVER 会让所在投影永不落定 → 根 <Show> 永久停在 fallback（app 白屏「加载中」）；
-   * 读取进行中的 Promise 会让整棵路由过渡挂起（transition 不提交 → `navigate()` 不生效）。
-   * 因此**只在数据已提交后**展开 data；首载/重取期间由骨架与 loading/refreshing 表达。
-   * 与既有 createTQFeedStore 的实际读取条件一致（它靠 loading 短路，仅在 success 后读 data）。
+   * 依据（v6 适配层 6.0.0-rc.3 `computeData`）：`data()` 仅当
+   * 「fetchStatus 已落定（idle）且 state.data 已存在」时同步返回；
+   * 其余分支返回 **进行中的 Promise**（fetching/paused）或 **NEVER 哨兵**
+   * （`!isEnabled()` 且无数据——本 store 正是 enabled:false + 客户端级
+   * `ensureInfiniteQueryData`）。在响应式作用域读到它们会让所在投影挂起或永不落定：
+   * 前者使路由过渡不提交（登录后 navigate('/home') 不生效），后者让根 <Show> 永久停在
+   * fallback（app 白屏「加载中」）。
+   *
+   * 拆分为「快照」而非「守卫」的原因：重取（SWR revalidate / 下拉刷新）期间 data() 返回
+   * 进行中的 Promise，若直接按守卫读会让列表在刷新时闪空。快照在 idle 落定时更新，
+   * 重取期间保留上一份已提交数据——与既有 createTQFeedStore 的实际语义一致
+   * （它靠 loading 短路，仅在 success 后读 data，刷新时由 refreshing 覆盖显示）。
    */
-  const dataReadable: Accessor<boolean> = () => q.dataUpdatedAt > 0;
+  const [committedPages, setCommittedPages] = createSignal<PixivIllustListResponse[]>([]);
+  // 双参 createEffect（Solid 2.0 处方）：compute 段只在可安全同步读取时取页快照，
+  // apply 段写 signal。非 idle（fetching/paused）时 compute 在读到 data() 之前返回 null，
+  // 因此重取期间不会触碰未提交的 data()，只保留上一份快照。
+  createEffect(
+    () => {
+      if (q.fetchStatus !== "idle" || q.dataUpdatedAt === 0) return null;
+      return q.data?.pages ?? [];
+    },
+    (pages) => {
+      if (pages) setCommittedPages(pages);
+    },
+  );
 
   /** 服务端返回的全量条目（过滤前，页序 × 页内序） */
-  const serverItems: Accessor<PixivIllust[]> = () =>
-    dataReadable() ? flattenIllusts(q.data?.pages ?? []) : [];
+  const serverItems: Accessor<PixivIllust[]> = () => flattenIllusts(committedPages());
   const serverCount: Accessor<number> = () => serverItems().length;
 
   const entries: Accessor<RankEntry[]> = () => {
@@ -128,8 +144,7 @@ export function createRankingStore(initial?: RankingQuery): RankingStoreResult {
   };
 
   const nextUrl: Accessor<string | null> = () => {
-    if (!dataReadable()) return null;
-    const pages = q.data?.pages ?? [];
+    const pages = committedPages();
     if (pages.length === 0) return null;
     return pages[pages.length - 1]!.next_url ?? null;
   };

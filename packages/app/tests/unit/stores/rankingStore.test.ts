@@ -9,7 +9,7 @@
  * - 空响应 = 空态而非永久 loading：spec §5.3 状态机。
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createRoot } from "solid-js";
+import { createMemo, createRoot } from "solid-js";
 import { QueryClient } from "@tanstack/solid-query";
 
 const qc = vi.hoisted(() => ({ client: undefined as QueryClient | undefined }));
@@ -201,11 +201,13 @@ describe("rankingStore", () => {
     disposeB();
   });
 
-  it("首载请求进行中（pending+fetching）时读 entries()/serverCount()/nextUrl() 仍返回同步空值（不展开未提交的 data）", async () => {
-    // oracle：TanStack v6 适配层 computeData ——「无提交数据」时 data() 返回进行中的 Promise
-    // 或（enabled:false 且无数据）NEVER 哨兵；读取前者会挂起路由过渡（navigate 不提交）、
-    // 读取后者会让投影永不落定（app 白屏）。首载期间必须只暴露骨架可用的空值。
-    // 设备侧表现（白屏/登录后不跳转）由 packages/app/tests/android-e2e 覆盖。
+  it("首载请求进行中时响应式读 entries()/serverCount()/nextUrl() 不抛挂起（回归：v6 未提交的 data() 返回 Promise/NEVER）", async () => {
+    // oracle：spec docs/specs/ranking.md §6.2 +「先渲染后加载」硬约束——首载期间必须能渲染骨架。
+    // 断言形态：在 **Solid 响应式作用域**（createMemo）内读，锁定「未提交数据时 reactive 读
+    // 不抛挂起且返回空数组；落定后能读到数据」这一契约。
+    // 诚实说明判定力：本用例**不会**在修复前的实现上变红——修复前的失效模式是 Solid 投影
+    // 被 NEVER/Promise 永久挂起（app 白屏 / 路由过渡不提交），happy-dom + 本 mock 不重现该
+    // 挂起。真正的端到端 oracle 是 packages/app/tests/android-e2e（冷启动必须渲染 /home）。
     let resolveFetch!: (v: unknown) => void;
     fetchRankingMock.mockImplementation(
       () =>
@@ -216,13 +218,29 @@ describe("rankingStore", () => {
     const { store, dispose } = setup();
     try {
       const inflight = store.ensureLoaded();
+      // 让查询真正进入 fetching（任务已派发、数据未提交）——这是会命中适配层 Promise 分支的时刻
+      await new Promise((r) => setTimeout(r, 0));
       expect(store.loading()).toBe(true);
-      expect(Array.isArray(store.entries())).toBe(true);
-      expect(store.entries()).toEqual([]);
+      let readValue: unknown;
+      let readErr: unknown = null;
+      createRoot((d) => {
+        const reactiveEntries = createMemo(() => store.entries());
+        try {
+          readValue = reactiveEntries();
+        } catch (e) {
+          readErr = e;
+        }
+        d();
+      });
+      expect(readErr).toBeNull();
+      expect(readValue).toEqual([]);
       expect(store.serverCount()).toBe(0);
       expect(store.nextUrl()).toBeNull();
+      expect(store.loading()).toBe(true);
+
       resolveFetch({ illusts: [illust(1, "2020-01-01")], next_url: null });
       await inflight;
+      await new Promise((r) => setTimeout(r, 0)); // 让快照 effect 落定
       expect(store.entries().map((e) => e.illust.id)).toEqual([1]);
     } finally {
       dispose();
