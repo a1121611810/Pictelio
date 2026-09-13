@@ -39,7 +39,15 @@ describe("RankingEntryCard.vue（#519）", () => {
 
   it("失败隐藏 + warn（禁静默降级）", () => {
     expect(src).toContain("console.warn")
-    expect(src).toContain("!error")
+    expect(src).toContain("hasError: !!error.value")
+    expect(src).toContain('v-if="visible"')
+  })
+
+  it("settled-empty 不由可见性误显示 + 无死状态 loading（审阅修复）", () => {
+    expect(src).toContain("settled: settled.value")
+    expect(src).toContain("itemCount: illusts.value.length")
+    expect(src).not.toContain("const loading = ref")
+    expect(src).toContain("void refresh()")
   })
 
   it("宿主 IllustList 受开关控制且仅推荐 tab 渲染", () => {

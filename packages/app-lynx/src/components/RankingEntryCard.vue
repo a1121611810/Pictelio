@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // 插画页推荐 tab 顶部排行榜入口大卡（spec docs/specs/ranking.md §5.1/§5.2；#519）。
-// 固定「日榜·今日」：createRankingFeed 默认 (daily,today)，与榜单页共用同 query key（进榜单页不二次首屏）。
-// 受 rankingEntry 开关控制（宿主 v-if，关闭时不构造数据源）；收起当次隐藏（refreshEpoch 变化恢复）。
+// 固定「日榜·今日」：createRankingFeed(DEFAULT_RANK_MODE, null)。lynx 无共享查询缓存
+// （spec §6.3 只要求复用 createMixFeed），故本卡与榜单页各自首载，不承诺「进榜单页不二次首屏」。
+// 受 rankingEntry 开关控制（宿主 v-if，关闭时不构造数据源）；收起当次隐藏（下拉刷新 / 重进恢复）。
 // 样式：Tailwind utility + M3 语义色，无 scoped CSS、无 rem。
 defineOptions({ name: 'ranking-entry-card' })
 import { computed, onActivated, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -19,7 +20,7 @@ const props = defineProps<{ refreshEpoch?: number }>()
 const feed = createRankingFeed({ mode: DEFAULT_RANK_MODE, date: null }, () => sync())
 
 const illusts = ref<PixivIllust[]>([])
-const loading = ref(false)
+const settled = ref(false)
 const error = ref('')
 const dismissed = ref(false)
 
@@ -34,25 +35,35 @@ const heroSrc = computed(() => {
 
 function sync() {
   illusts.value = feed.items()
-  loading.value = feed.loading()
+  settled.value = feed.settled()
   error.value = feed.error() ?? ''
 }
 
 const visible = computed(() =>
-  isEntryVisible({ dismissed: dismissed.value, hasError: !!error.value, itemCount: illusts.value.length }),
+  isEntryVisible({
+    dismissed: dismissed.value,
+    hasError: !!error.value,
+    settled: settled.value,
+    itemCount: illusts.value.length,
+  }),
 )
 
 // 宿主下拉刷新（refreshEpoch 变化）→ 恢复被收起的入口
 watch(
   () => props.refreshEpoch,
   (next, prev) => {
-    if (shouldResetDismissed(prev, next)) dismissed.value = false
+    if (!shouldResetDismissed(prev, next)) return
+    dismissed.value = false
+    // 宿主下拉刷新 → 重取数据并清 error（spec §5.1「刷新容器内」，F5）
+    void refresh()
   },
 )
 
 // KeepAlive 返回重进（IllustList 在 include 白名单）→ 收起态不跨挂载保留（spec §5.1「重进恢复」）
 onActivated(() => {
   dismissed.value = false
+  // 首载失败被隐藏后重进应重试（spec §5.1「重进恢复」）；成功态不重复拉取
+  if (error.value) void refresh()
 })
 
 // 失败可见化（禁静默降级；入口失败即隐藏，不留永久骨架）
@@ -61,7 +72,6 @@ watch(error, (msg) => {
 })
 
 async function refresh() {
-  loading.value = true
   await feed.refresh()
   sync()
 }

@@ -13,7 +13,7 @@ import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { ref } from "vue"
 import { setActivePinia, createPinia } from "pinia"
-import { useSettingsStore } from "./settingsStore"
+import { useSettingsStore, BACKUP_DEVICE_KEYS } from "./settingsStore"
 import { idbGet, idbSet, idbRemove } from "../utils/idbKV"
 
 vi.mock("../utils/idbKV", () => ({
@@ -756,6 +756,40 @@ describe('settingsStore 备份原语（T7 m3：exportRawValues / importRawValues
     expect(res.skipped).toContain('show_r18_99')
     expect(res.skipped).toContain('unknown_key')
     expect(map.has('show_r18_99')).toBe(false) // 异账号键未落盘
+  })
+
+  // ── #519 code-review 回归：设备级键必须全部登记进备份域（否则跨引擎恢复静默丢键）──
+  // oracle：spec docs/specs/webdav-backup.md §3.1 + app registry.rawValues 全键语义。
+  it('settingsStore.ts 内所有 *_KEY 字面量 ⊆ BACKUP_DEVICE_KEYS（设备级键完整性守卫）', () => {
+    const storeSrc = readFileSync(fileURLToPath(new URL('./settingsStore.ts', import.meta.url)), 'utf8')
+    const declared = [...storeSrc.matchAll(/const [A-Z_]+_KEY = "([^"]+)"/g)].map((m) => m[1]!)
+    expect(declared.length).toBeGreaterThan(10)
+    const missing = declared.filter((k) => !(BACKUP_DEVICE_KEYS as readonly string[]).includes(k))
+    expect(missing).toEqual([])
+  })
+
+  it('exportRawValues 含 related_injection / ranking_entry（设备级开关）', async () => {
+    prefsModule(new Map<string, string>([
+      ['related_injection', 'false'],
+      ['ranking_entry', 'false'],
+    ]))
+    const raw = await store.exportRawValues()
+    expect(raw.related_injection).toBe('false')
+    expect(raw.ranking_entry).toBe('false')
+  })
+
+  it('importRawValues 写回 related_injection / ranking_entry（非法值跳过）', async () => {
+    prefsModule(new Map<string, string>())
+    const res = await store.importRawValues({
+      related_injection: 'false',
+      ranking_entry: 'false',
+      related_injection_bogus: 'bogus',
+    })
+    expect(store.relatedInjection).toBe(false)
+    expect(store.rankingEntry).toBe(false)
+    expect(res.applied).toContain('related_injection')
+    expect(res.applied).toContain('ranking_entry')
+    expect(res.skipped).toContain('related_injection_bogus')
   })
 })
 

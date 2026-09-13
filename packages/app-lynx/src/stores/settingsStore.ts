@@ -86,6 +86,8 @@ export const BACKUP_DEVICE_KEYS = [
   DETAIL_QUALITY_KEY,
   THEME_COLOR_KEY,
   LANGUAGE_KEY,
+  RELATED_INJECTION_KEY,
+  RANKING_ENTRY_KEY,
   NOVEL_EXPORT_FORMAT_KEY,
   NOVEL_EXPORT_INCLUDE_METADATA_KEY,
   NOVEL_EXPORT_INCLUDE_COVER_KEY,
@@ -731,6 +733,14 @@ export const useSettingsStore = defineStore("settings", () => {
       case LANGUAGE_KEY:
         if (raw !== "" && raw !== "en" && raw !== "zh-CN") return false
         setLanguage(raw)
+        return true
+      case RELATED_INJECTION_KEY:
+        if (raw !== "true" && raw !== "false") return false
+        setRelatedInjection(raw === "true")
+        return true
+      case RANKING_ENTRY_KEY:
+        if (raw !== "true" && raw !== "false") return false
+        setRankingEntry(raw === "true")
         return true
       case NOVEL_EXPORT_FORMAT_KEY:
         if (!(NOVEL_EXPORT_FORMATS as readonly string[]).includes(raw)) return false
