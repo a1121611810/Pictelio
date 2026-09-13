@@ -98,13 +98,17 @@ export function createRankingStore(initial?: RankingQuery): RankingStoreResult {
   );
 
   /**
-   * 已落定可读数据：查询未激活/未开始（status=pending 且 fetchStatus=idle）时**不得**读 `q.data`。
-   * TanStack v6 适配层对「pending 且未启用」的查询，`data()` 返回 Solid 的 NEVER 哨兵，
-   * 读取会使所在投影永不落定 → 整棵根 <Show> 停在 fallback（登录后首页永久「加载中」）。
-   * 先读 meta（status/fetchStatus），仅在查询已启用/进行中/有结果时才展开 data。
+   * 可同步读取 `q.data` 的唯一充分条件：**已有提交过的数据**（`dataUpdatedAt > 0`）。
+   *
+   * 依据（v6 适配层 v6.0.0-rc.3 源码 computeData）：`data()` 只有在「state.data 已存在」
+   * 时同步返回；其余分支返回 **Promise**（进行中的 fetch）或 **NEVER 哨兵**（
+   * `!isEnabled()` 且无数据，即本 store 的 enabled:false + 客户端级 ensureInfiniteQueryData）。
+   * 读取 NEVER 会让所在投影永不落定 → 根 <Show> 永久停在 fallback（app 白屏「加载中」）；
+   * 读取进行中的 Promise 会让整棵路由过渡挂起（transition 不提交 → `navigate()` 不生效）。
+   * 因此**只在数据已提交后**展开 data；首载/重取期间由骨架与 loading/refreshing 表达。
+   * 与既有 createTQFeedStore 的实际读取条件一致（它靠 loading 短路，仅在 success 后读 data）。
    */
-  const dataReadable: Accessor<boolean> = () =>
-    !(q.status === "pending" && q.fetchStatus === "idle");
+  const dataReadable: Accessor<boolean> = () => q.dataUpdatedAt > 0;
 
   /** 服务端返回的全量条目（过滤前，页序 × 页内序） */
   const serverItems: Accessor<PixivIllust[]> = () =>

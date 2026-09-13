@@ -201,6 +201,34 @@ describe("rankingStore", () => {
     disposeB();
   });
 
+  it("首载请求进行中（pending+fetching）时读 entries()/serverCount()/nextUrl() 仍返回同步空值（不展开未提交的 data）", async () => {
+    // oracle：TanStack v6 适配层 computeData ——「无提交数据」时 data() 返回进行中的 Promise
+    // 或（enabled:false 且无数据）NEVER 哨兵；读取前者会挂起路由过渡（navigate 不提交）、
+    // 读取后者会让投影永不落定（app 白屏）。首载期间必须只暴露骨架可用的空值。
+    // 设备侧表现（白屏/登录后不跳转）由 packages/app/tests/android-e2e 覆盖。
+    let resolveFetch!: (v: unknown) => void;
+    fetchRankingMock.mockImplementation(
+      () =>
+        new Promise((res) => {
+          resolveFetch = res;
+        }),
+    );
+    const { store, dispose } = setup();
+    try {
+      const inflight = store.ensureLoaded();
+      expect(store.loading()).toBe(true);
+      expect(Array.isArray(store.entries())).toBe(true);
+      expect(store.entries()).toEqual([]);
+      expect(store.serverCount()).toBe(0);
+      expect(store.nextUrl()).toBeNull();
+      resolveFetch({ illusts: [illust(1, "2020-01-01")], next_url: null });
+      await inflight;
+      expect(store.entries().map((e) => e.illust.id)).toEqual([1]);
+    } finally {
+      dispose();
+    }
+  });
+
   it("未激活时读 entries()/serverCount()/nextUrl() 返回空值而不挂起（回归：禁用查询的 data() 返回 Solid NEVER）", () => {
     // oracle：spec §6.2「enabled:false + ensureLoaded」下，首帧必须能渲染骨架；
     // TanStack v6 适配层对 pending+idle 的查询 data() 返回 NEVER，直接读会让投影永不落定。
