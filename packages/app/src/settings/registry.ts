@@ -228,8 +228,13 @@ export function createSettings(opts: SettingsOptions): Settings {
 
         if (def.persist === false) return;
         if (def.shouldPersist && !def.shouldPersist(next, prev)) return;
-        // write gate：hydrateAll 完成前的 set 只更新内存，不落盘
-        if (phase !== "warm") return;
+        // write gate：hydrateAll 完成前的 set 只更新内存，不落盘。
+        // 丢弃必须可见（测试硬约束 3 / ADR-0159 决策 2）：冷态写说明调用时序有误，
+        // 每次丢弃都 warn，不改「不落盘」语义本身。
+        if (phase !== "warm") {
+          console.warn(`[settings-registry] 冷态丢弃写入（phase=cold）: ${def.key}`);
+          return;
+        }
 
         if (def.debounceMs && def.debounceMs > 0) {
           const existing = debounceTimers.get(def.key);

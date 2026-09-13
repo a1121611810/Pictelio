@@ -60,6 +60,10 @@
     "reason": "存量豁免（收尾审计已核，非用户可见主文案）"
   },
   {
+    "path": "settings/registry.ts",
+    "reason": "开发者面向日志串（console.warn 可观测性契约，ADR-0159 决策 2，不上 UI）"
+  },
+  {
     "path": "stores/authStore.ts",
     "reason": "开发者面向/死代码路径/契约串（review round1 P2 移交清单已核）"
   },

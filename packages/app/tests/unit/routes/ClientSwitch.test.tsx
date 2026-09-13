@@ -5,12 +5,18 @@
  * 覆盖：页面渲染关键内容（标题 / 当前引擎 / 能力列表 / 确认按钮）、
  * 确认按钮触发 switchClient("lynx")、失败 reason → toast 映射
  *（timeout → 切换超时；write-failed/restart-failed → 切换失败；busy 静默）、
- * 能力读取失败降级为未知。
+ * 能力读取失败降级为未知、E2E 钩子结果契约（title 序列）。
  *
  * mock 模式参照 tests/unit/utils/clientSwitch.test.ts：mock @capacitor/preferences、
  * @/native/ClientInfo 与 @/utils/clientSwitch；useNavigate 参照 NovelDetail.test.tsx。
+ *
+ * __E2E__ 单测环境不做编译期 define（见 vitest.config.ts），用 vi.stubGlobal 运行时注入：
+ * 既有用例 stub false（对齐生产默认），钩子契约用例 stub true。
+ * Oracle 来源（测试硬约束 6）：E2E 钩子 title 契约 = ADR-0159 决策 2 /
+ * docs/specs/engine-switch-e2e-recovery.md 决策 4 的字面量
+ *（E2E-HOOK-CALLED → E2E-SWITCH-OK / E2E-SWITCH-<REASON>）。
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 
 const mocks = vi.hoisted(() => ({
@@ -45,9 +51,15 @@ describe("ClientSwitch 切换渲染引擎说明页", () => {
   beforeEach(() => {
     cleanup();
     vi.clearAllMocks();
+    // __E2E__ 默认 stub false（对齐生产构建语义，钩子块不注册）
+    vi.stubGlobal("__E2E__", false);
     mocks.readClientKind.mockResolvedValue("webview");
     mocks.getClientKinds.mockResolvedValue({ kinds: ["webview", "lynx"] });
     mocks.switchClient.mockResolvedValue({ ok: true });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("渲染标题、当前引擎、能力列表与确认按钮", async () => {
@@ -130,5 +142,42 @@ describe("ClientSwitch 切换渲染引擎说明页", () => {
     // 改为直接等待仅当 current() === "lynx" 才渲染的目标文案（findByText 自带轮询等待）。
     await screen.findByText("当前以 Lynx 渲染引擎运行。");
     expect(screen.getByText("当前以 Lynx 渲染引擎运行。")).toBeDefined();
+  });
+});
+
+describe("ClientSwitch E2E 钩子结果契约（ADR-0159 决策 2 / spec 决策 4）", () => {
+  /** 钩子经 window.pictelioE2e 暴露（组件内 Record cast 注册，测试侧同型读取） */
+  function e2eHook(): { confirmSwitchClient: () => void } {
+    const h = (window as unknown as Record<string, unknown>).pictelioE2e as
+      | { confirmSwitchClient: () => void }
+      | undefined;
+    expect(h).toBeDefined();
+    return h!;
+  }
+
+  beforeEach(() => {
+    // 内层 beforeEach 在外层之后执行：覆盖外层的 false，注册钩子块
+    vi.stubGlobal("__E2E__", true);
+  });
+
+  it("调用钩子立即置 title=E2E-HOOK-CALLED，结算后置 E2E-SWITCH-OK", async () => {
+    render(() => <ClientSwitch />);
+
+    e2eHook().confirmSwitchClient();
+
+    // 立即标记：同步（先于任何 await），E2E 可区分「钩子已调」与「结算中」
+    expect(document.title).toBe("E2E-HOOK-CALLED");
+    // flush 微任务等待结算（vi.waitFor 轮询，参照本文件既有异步断言模式）
+    await vi.waitFor(() => expect(document.title).toBe("E2E-SWITCH-OK"));
+  });
+
+  it("切换失败（reason=timeout）→ title=E2E-SWITCH-TIMEOUT", async () => {
+    mocks.switchClient.mockResolvedValue({ ok: false, reason: "timeout" });
+    render(() => <ClientSwitch />);
+
+    e2eHook().confirmSwitchClient();
+
+    expect(document.title).toBe("E2E-HOOK-CALLED");
+    await vi.waitFor(() => expect(document.title).toBe("E2E-SWITCH-TIMEOUT"));
   });
 });

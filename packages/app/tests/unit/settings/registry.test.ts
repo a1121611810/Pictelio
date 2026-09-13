@@ -3,6 +3,10 @@
  * Settings registry 单元测试 —— 注入式（memory adapter），零 vi.mock。
  *
  * 测试跨的 seam 与生产代码相同：createSettings({ storages }) 的注入点。
+ *
+ * Oracle 来源（测试硬约束 6）：
+ * - write gate 冷态丢写 warn：ADR-0159 决策 2（docs/adr/ADR-0159-bridge-thread-unblocking.md）
+ *   / docs/specs/engine-switch-e2e-recovery.md 决策 3 的 warn 字面量契约。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createSettings } from "@/settings/registry";
@@ -40,6 +44,24 @@ describe("Settings registry", () => {
     await settings.hydrateAll();
     settings.get("foo")!.set("b");
     expect(mem.dump().get("foo")).toBe("b");
+  });
+
+  it("冷态丢弃写入时 warn（模块前缀 + phase + key），且不落盘语义不变", () => {
+    // Oracle：ADR-0159 决策 2 / spec engine-switch-e2e-recovery 决策 3 ——
+    // warn 字面量 `[settings-registry] 冷态丢弃写入（phase=cold）: <key>`；
+    // 「冷态不落盘」语义本身不变（内存仍更新，仅存储层无记录）。
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { settings, mem } = make();
+    const s = settings.define({ key: "cold_key", default: "a" });
+    s.set("b");
+    flush(); // 2.0 批处理语义：set 后同步读返回旧值，先 flush 再断言
+    expect(s.value()).toBe("b"); // 内存仍更新（gate 语义不变）
+    expect(mem.dump().has("cold_key")).toBe(false); // 不落盘（gate 语义不变）
+    expect(warn).toHaveBeenCalledTimes(1); // 每次丢弃都 warn
+    expect(warn.mock.calls[0]?.[0]).toBe(
+      "[settings-registry] 冷态丢弃写入（phase=cold）: cold_key",
+    );
+    warn.mockRestore();
   });
 
   // ── parse 兼容通道（旧数据格式）──

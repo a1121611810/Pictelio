@@ -115,7 +115,10 @@ export default defineConfig({
       cacheMaxBytes: 314572800,
     }),
     APP_VERSION: JSON.stringify("3.21.2"),
-    __E2E__: "false", // 与 vite.config.ts 的 --mode e2e define 对齐；单测环境恒为 false
+    // __E2E__ 不在此 define：define 会在编译期把标识符替换为字面量 false，
+    // E2E 钩子块被整体消除，单测无法触达。测试需要钩子时用
+    // vi.stubGlobal("__E2E__", true) 运行时注入（见 tests/unit/routes/ClientSwitch.test.tsx）。
+    // 生产构建仍由 vite.config.ts 的 --mode e2e define 控制，零泄漏不变。
   },
   test: {
     include: ["tests/unit/**/*.test.{ts,tsx}"],

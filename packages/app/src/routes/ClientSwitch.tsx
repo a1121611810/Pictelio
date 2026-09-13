@@ -2,7 +2,12 @@ import type { Component } from "solid-js";
 import PageTransition from "../components/PageTransition";
 import FluentIcon from "../components/ui/FluentIcon";
 import { ClientInfo } from "../native/ClientInfo";
-import { readClientKind, switchClient, type ClientKind } from "../utils/clientSwitch";
+import {
+  readClientKind,
+  switchClient,
+  type ClientKind,
+  type SwitchOutcome,
+} from "../utils/clientSwitch";
 import { goBack } from "../services/backTransitionService";
 import { t } from "../i18n";
 
@@ -53,8 +58,11 @@ const ClientSwitch: Component = () => {
 
   const currentLabel = () => (current() === "lynx" ? "Lynx" : "WebView");
 
-  /** 确认切换：深模块 switchClient 完成写开关 + 原生重启编排（行为与迁移前弹窗一致） */
-  async function handleConfirmSwitch() {
+  /**
+   * 确认切换：深模块 switchClient 完成写开关 + 原生重启编排（行为与迁移前弹窗一致）。
+   * 返回 SwitchOutcome 供 E2E 钩子回传结果契约（ADR-0159 决策 2）；UI 反馈不变。
+   */
+  async function handleConfirmSwitch(): Promise<SwitchOutcome> {
     setSwitching(true);
     try {
       const result = await switchClient("lynx");
@@ -69,9 +77,10 @@ const ClientSwitch: Component = () => {
               : t("clientSwitch.failToast"),
           );
         }
-        return;
+        return result;
       }
       setActionToast(t("clientSwitch.switchedToast")); // i18n: set 时快照（瞬态）
+      return result;
     } finally {
       // 成功路径下 Activity 立即重建销毁本页，此处幂等无副作用；
       // finally 保证任何异常路径都不会让遮罩锁死页面（防御性，深模块当前不抛）
@@ -85,12 +94,20 @@ const ClientSwitch: Component = () => {
   // 通过此全局钩子触发确认逻辑，绕过对话框交互限制。
   // __E2E__ 由 vite.config define 控制：仅 --mode e2e 构建为 true，
   // 生产构建被替换为 false 并整体消除，无生产泄漏。
+  // 结果契约（ADR-0159 决策 2）：调用立即置 title=E2E-HOOK-CALLED，
+  // handleConfirmSwitch 结算后置 E2E-SWITCH-OK 或 E2E-SWITCH-<REASON>
+  //（BUSY / WRITE-FAILED / TIMEOUT / RESTART-FAILED），E2E 据此断言切换终态。
   if (__E2E__) {
     const e2eWindow = window as unknown as Record<string, unknown>;
     e2eWindow.pictelioE2e = {
       ...(e2eWindow.pictelioE2e as Record<string, unknown> | undefined),
       confirmSwitchClient: () => {
-        void handleConfirmSwitch();
+        document.title = "E2E-HOOK-CALLED";
+        void handleConfirmSwitch().then((outcome) => {
+          document.title = outcome.ok
+            ? "E2E-SWITCH-OK"
+            : "E2E-SWITCH-" + outcome.reason.toUpperCase();
+        });
       },
     };
   }
