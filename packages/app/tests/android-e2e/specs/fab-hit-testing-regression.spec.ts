@@ -140,9 +140,12 @@ function assertLynxActivityForeground(serial: string, context: string): void {
   }
 }
 
-/** 截屏（exec-out 直接取 PNG 字节流）。 */
+/** 截屏（exec-out 直接取 PNG 字节流）。maxBuffer 放宽到 20MB——Node spawnSync
+ *  默认 1MB，1080×2160 的 PNG 字节流会 ENOBUFS（pictelio_ui 实测）。 */
 function screenshot(serial: string): Buffer {
-  return execFileSync(adbPath(), ["-s", serial, "exec-out", "screencap", "-p"]);
+  return execFileSync(adbPath(), ["-s", serial, "exec-out", "screencap", "-p"], {
+    maxBuffer: 20 * 1024 * 1024,
+  });
 }
 
 /** 像素 diff（canvas 解码 PNG；采样步长 2，逐通道阈值 24），返回差异采样点数。 */
@@ -310,7 +313,8 @@ async function loginViaWebview(ctx: AndroidE2eContext): Promise<void> {
  * `PictelioSecureStorage.setItem.refresh_token` 登录写入 marker，故不能等 marker；
  * 改为软校验「uiautomator dump 不再出现登录页 EditText」（登录页唯一表单元素，
  * 已登录 /recommended 无输入框）+ LynxActivity 保持前台（离开即刻报错）。
- * dump 不可用（Lynx a11y 树空是已知 SDK 限制）→ warn 一次并跳过软校验；
+ * dump 不可用（Lynx a11y 树空是已知 SDK 限制；pictelio_ui 上 uiautomator dump
+ * 实测必然被 SIGKILL 退出码 137）→ 以前台 Activity + 3s 稳定窗口判定；
  * 万一漏判（实际仍停登录页），后续 FAB 控制组用例必红（登录页无 FAB）。
  * 60s 超时，失败附 logcat 尾部 50 行。
  */
@@ -321,13 +325,22 @@ async function waitForLynxLoggedInHome(serial: string, timeoutMs = 60_000): Prom
     assertLynxActivityForeground(serial, "登录态确认");
     const xml = dumpUiXml(serial);
     if (xml === null) {
+      // dump 不可用（pictelio_ui 的 Lynx 上 uiautomator dump 实测必然被 SIGKILL，
+      // 退出码 137）：以「LynxActivity 前台 + 稳定窗口」为准返回——真正的登录态
+      // oracle 由 FAB 控制组用例兜底（登录页无 FAB 必红）。稳定窗口 3s 后复验
+      // 前台，排除恢复中途瞬时态。
       if (!warnedNoDump) {
         console.warn(
-          "[fab] 跳过「无登录页输入框」软校验：uiautomator dump 不可用（Lynx a11y 树空是已知 SDK 限制），仅以前台 Activity 判定",
+          "[fab] uiautomator dump 不可用（Lynx a11y 树空是已知 SDK 限制）：以前台 Activity + 3s 稳定窗口判定，登录态由 FAB 用例兜底",
         );
         warnedNoDump = true;
       }
-    } else if (!dumpHasEditText(xml)) {
+      await SLEEP(3_000);
+      assertLynxActivityForeground(serial, "登录态确认（稳定窗口复验）");
+      console.log("[fab] ✓ 已登录 Lynx 主界面（前台 + 稳定窗口；dump 不可用）");
+      return;
+    }
+    if (!dumpHasEditText(xml)) {
       console.log("[fab] ✓ 已登录 Lynx 主界面（dump 无登录页 EditText + LynxActivity 前台）");
       return;
     }
