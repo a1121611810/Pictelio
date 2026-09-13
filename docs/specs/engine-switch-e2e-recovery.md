@@ -1,6 +1,6 @@
 # Spec: 引擎切换线 E2E 恢复（桥线程卸载 + 测试契约刷新）
 
-- 状态：ready-for-agent
+- 状态：implemented（2026-09-14；分支 fix/engine-switch-e2e-recovery，T1-T7 全部落地 + code-review 双轮 PASS。E2E 验收：最终 APK 下 oneway / roundtrip / 3x / settings-sync-contract 18/18 绿、roundtrip-low 2/2 绿（ADR-0153 降级实测通过）、fab-hit-testing 2/2 绿（该套件自 2026-08-30 以来首次完整跑通）——移交清单 10 failed → 0 failed、连带的 fab 跳过转绿。工程门禁 check:all / lint:all / test:all 绿）
 - 日期：2026-09-13
 - 决策依据：ADR-0159（插件桥线程卸载与引擎切换线 E2E 契约修复）
 - 失败清单：`docs/android-e2e-engine-switch-known-failures.md`（10 failed / 21 passed / 5 skipped，6 spec）

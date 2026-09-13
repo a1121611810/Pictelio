@@ -1,7 +1,7 @@
 # Android E2E 已知失败清单：双引擎切换线（与排行榜需求无关）
 
 > **用途**：本文档是一份**移交记录**。这些失败与排行榜需求（spec #512 / 工单 #513–#519）**没有调用关系**，因此不在排行榜分支修复，**另开分支处理**。
-> **状态**：仅记录，未修复。
+> **状态**：✅ **已修复（2026-09-14，分支 `fix/engine-switch-e2e-recovery`，spec #520 / 工单 #521–#528）**。根因与修复见 `docs/adr/ADR-0159-bridge-thread-unblocking.md`；验收：10 failed → 0 failed，连带的 fab 跳过也转绿（该套件首次完整跑通）。以下为原始移交内容，留存备查。
 > **记录时间**：2026-09-13
 > **被测分支/版本**：`feat/solidjs-2-migration`，HEAD `0e6bba07`
 > **设备**：`pictelio_ui`（emulator-5556，android-34，WebView 113.0.5672.136）、`pictelio_low`（emulator-5554，android-28，WebView 66）
