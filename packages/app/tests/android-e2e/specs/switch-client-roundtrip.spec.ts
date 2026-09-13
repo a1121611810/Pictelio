@@ -20,9 +20,8 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { setupAndroidE2e, type AndroidE2eContext } from "../setup";
-import { readClientPrefs } from "../prefs";
-
-const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
+import { pollPrefs } from "../prefs";
+import { SLEEP, openSettingsFromHome, switchToLynxFromSettings } from "../helpers";
 
 /** 启用系统无障碍服务（Lynx accessibility 树暴露前提，表单元素可定位）。
  *  启用 TalkBack 后 Android 会弹「允许通知」权限询问（阻塞后续 Activity 分发），
@@ -143,47 +142,17 @@ describe("S2 双向闭环：WebView → Lynx → 切回 WebView（pictelio_ui）
     });
     console.log(`[S2] ✓ WebView 登录成功: ${await driver.raw.getUrl()}`);
 
-    // 导航到设置页
-    await driver.raw.execute(
-      `(() => { const h = document.querySelector('h1'); if (h) h.click(); })()`,
-    );
-    await SLEEP(3_000);
-    await driver.raw.execute(
-      `(() => { const el = document.querySelector("[aria-label='设置']"); if (el) el.click(); })()`,
-    );
-    await SLEEP(3_000);
-    await driver.raw.waitUntil(async () => (await driver.raw.getUrl()).includes("/settings"), {
-      timeout: 30_000,
-      timeoutMsg: "未进入设置页",
-      interval: 2_000,
-    });
-    // 点切换 + E2E 钩子确认
-    await driver.raw.waitUntil(
-      async () => await driver.raw.$("[aria-label='切换渲染引擎']").isExisting(),
-      { timeout: 10_000, interval: 500 },
-    );
-    await driver.raw.execute(
-      `(() => { const el = document.querySelector("[aria-label='切换渲染引擎']"); if (el) el.click(); })()`,
-    );
-    // T2 起：点击入口行 → 跳转说明页 /client-switch（不再是确认弹窗）
-    await driver.raw.waitUntil(
-      async () => (await driver.raw.getUrl().catch(() => "")).includes("/client-switch"),
-      { timeout: 10_000, timeoutMsg: "未跳转到 /client-switch 说明页", interval: 1_000 },
-    );
-    await driver.raw.waitUntil(
-      async () => await driver.raw.$("fluent-button=确认切换").isExisting(),
-      { timeout: 10_000, timeoutMsg: "说明页确认切换按钮未出现", interval: 500 },
-    );
-    await driver.raw.execute(
-      `(() => { const e2e = (window).pictelioE2e; if (e2e && e2e.confirmSwitchClient) { e2e.confirmSwitchClient(); document.title = 'E2E-HOOK-CALLED'; } else { document.title = 'E2E-HOOK-MISSING'; } })()`,
-    );
-    // execute 返回值被 Chromedriver 包裹不可靠，用 title 读回钩子状态
-    const hookTitle = (await driver.raw.getTitle()) as string;
-    expect(hookTitle, "E2E 钩子应存在（--mode e2e 构建）").toBe("E2E-HOOK-CALLED");
-    await SLEEP(2_000);
+    // 导航到设置页：/home 点 SideNavShell 设置按钮（aria-label「设置」）直达，
+    // 无需 /me 中转（h1 为纯展示标题，h1.click 位置性选择器已失效）
+    await openSettingsFromHome(ctx);
 
-    const prefs = readClientPrefs(ctx.serial);
-    expect(prefs.clientKind, "pictelio_client_kind 应为 lynx").toBe("lynx");
+    // 点「切换渲染引擎」行 → /client-switch 说明页 → E2E 钩子确认
+    //（结果契约断言 E2E-SWITCH-OK，见 helpers.switchToLynxFromSettings）
+    await switchToLynxFromSettings(ctx);
+
+    // 落盘断言轮询化：Capacitor 桥异步 apply 落盘，单读与写入天然竞态（#10 flaky 根因）
+    await pollPrefs(ctx.serial, (p) => p.clientKind === "lynx", 30_000);
+    console.log("[S2] ✓ pictelio_client_kind=lynx 已写入");
   }, 180_000);
 
   it("LynxActivity 可达 + Lynx 渲染成功（logcat 断言，无致命错误）", async () => {
