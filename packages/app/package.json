@@ -44,6 +44,7 @@
     "@fluentui/web-components": "3.0.3",
     "@pictelio/net-diagnostics": "workspace:*",
     "@pictelio/novel-export": "workspace:*",
+    "@pictelio/ranking-core": "workspace:*",
     "@pictelio/search-core": "workspace:*",
     "@pictelio/ugoira": "workspace:*",
     "@pictelio/update-check": "workspace:*",
