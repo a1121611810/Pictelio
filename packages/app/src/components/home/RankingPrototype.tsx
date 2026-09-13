@@ -3,7 +3,7 @@
  *
  * 问题：排行榜不新增首页分类时，三种「与推荐融合」的形态哪种观感/层级最好？
  * 变体（/home?variant= 切换；浮动底栏 ←/→ 或键盘方向键循环）：
- *   a  strip      — 横滑条注入：推荐 Feed 顶部「今日排行 Top 20」横滑缩略图（RelatedStripRow 同形态），尾部「全部」可进榜单页（A+C 组合预览）
+ *   a  strip      — 横滑条注入：推荐 Feed 顶部「今日排行 Top 20」横滑缩略图（RelatedStripRow 同形态），标题行「全部」可进榜单页（A+C 组合预览）
  *   b  subtab     — 推荐 tab 子 tab 扩展：混合/插画/漫画/排行，排行=页内榜单列表（mode + 日期回看收在列表上方）
  *   c  entrypage  — 顶部一行 chips 入口 + 就地全屏榜单页（榜单头返回 + mode 切换 + 日期回看 + 榜单行）
  * 数据：mock——优先取推荐 Feed 已加载的真实插画倒序重排（真实图片密度下判定），不足 20 补 SVG 渐变占位；
@@ -12,7 +12,7 @@
  */
 import type { JSX } from "@solidjs/web";
 import type { Component } from "solid-js";
-import { createSignal, For, onSettled, Show } from "solid-js";
+import { createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import type { PixivIllust } from "@/api/types";
 import { t, type I18nKey } from "@/i18n";
@@ -116,16 +116,19 @@ const fmtDate = (offset: number): string => {
 };
 
 const RankedList: Component<{ initialMode?: number }> = (props) => {
-  const [mode, setMode] = createSignal(props.initialMode ?? 0);
+  // Solid 2 STRICT_READ_UNTRACKED 处方：body 内一次性读 props 用 untrack 显式快照（SideNavShell 同款）
+  const [mode, setMode] = createSignal(untrack(() => props.initialMode ?? 0));
   // 日期回看：offset = 往前推的天数（0 = 今日；未来无数据 → next 在 0 时禁用）
   const [offset, setOffset] = createSignal(0);
-  const entries = buildRankEntries(20);
+  // memo = 追踪作用域：feed store 深层代理的读取必须留在追踪内（body 直读会刷数千条警告）；
+  // 附带收益：feed 后到时榜单自动从占位图换成真实作品
+  const entries = createMemo(() => buildRankEntries(20));
 
   return (
     <div>
-      {/* mode 切换 chips（横滚） */}
+      {/* mode 切换 chips（窄屏换行展示，不横滚裁切） */}
       <div
-        class="flex gap-2 overflow-x-auto px-4 pb-1"
+        class="flex flex-wrap gap-2 px-4 pb-1"
         role="tablist"
         aria-label={t("ranking.modeListAria")}
       >
@@ -199,7 +202,7 @@ const RankedList: Component<{ initialMode?: number }> = (props) => {
 
       {/* 榜单行（只读原型：不跳转详情） */}
       <div class="flex flex-col" role="list" aria-label={t("ranking.listAria")}>
-        <For each={entries}>
+        <For each={entries()}>
           {(e) => (
             <div
               role="listitem"
@@ -221,7 +224,7 @@ const RankedList: Component<{ initialMode?: number }> = (props) => {
                 alt=""
                 loading="lazy"
                 decoding="async"
-                class="h-14 w-14 flex-none rounded-[var(--borderRadiusMedium)] object-cover select-none"
+                class="h-14 w-14 flex-none rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground3)] object-cover select-none"
               />
               <span class="min-w-0 flex-1">
                 <span class="block truncate text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase300)]">
@@ -275,30 +278,50 @@ const RankingPageView: Component<{ onBack: () => void; initialMode?: number }> =
 
 const VariantA: Component<{ feed: JSX.Element; onOpenAll: () => void }> = (props) => {
   const [dismissed, setDismissed] = createSignal(false);
-  const entries = buildRankEntries(20);
+  // memo = 追踪作用域（同 RankedList：body 直读 feed store 深层代理会刷 STRICT_READ_UNTRACKED 警告）
+  const entries = createMemo(() => buildRankEntries(20));
   return (
     <>
       <Show when={!dismissed()}>
         <div class="px-4 pt-3">
           <div class="rounded-[var(--borderRadiusLarge)] border border-[var(--colorNeutralStroke2)] bg-[var(--colorNeutralBackground2)] px-[var(--spacingHorizontalS)] py-[var(--spacingVerticalS)]">
-            {/* 标题行 */}
+            {/* 标题行：左标题 + 右「全部 / 收起」（全部入口放标题行，窄屏不被横滚裁切） */}
             <div class="flex items-center justify-between">
               <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground2)]">
-                {t("ranking.todayTop", { count: entries.length })}
+                {t("ranking.todayTop", { count: entries().length })}
               </p>
-              <button
-                type="button"
-                aria-label={t("ranking.collapseAria")}
-                onClick={() => setDismissed(true)}
-                class="flex h-8 w-8 items-center justify-center rounded-[var(--borderRadiusCircular)] text-[var(--colorNeutralForeground3)] transition-colors duration-[var(--durationFast)] ease-[var(--curveEasyEase)] hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-[0.98] focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)]"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path
-                    d="M4.397 4.553l.073-.084a.75.75 0 0 1 .977-.073l.084.073L12 10.94l6.47-6.47a.75.75 0 0 1 1.06 1.06L13.06 12l6.47 6.47a.75.75 0 0 1 .073.977l-.073.084a.75.75 0 0 1-.977.073l-.084-.073L12 13.06l-6.47 6.47a.75.75 0 0 1-1.06-1.06L10.94 12l-6.47-6.47a.75.75 0 0 1-.073-.977z"
-                    fill="currentColor"
-                  />
-                </svg>
-              </button>
+              <div class="flex items-center">
+                <button
+                  type="button"
+                  aria-label={t("ranking.viewAllAria")}
+                  onClick={props.onOpenAll}
+                  class="flex h-8 cursor-pointer items-center gap-0.5 appearance-none rounded-[var(--borderRadiusMedium)] border-none bg-transparent px-2 text-[var(--colorBrandForeground1)] outline-none transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-[0.98] [font-size:var(--fontSizeBase200)] focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)]"
+                >
+                  {t("ranking.viewAll")}
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path
+                      d="M9 4 L17 12 L9 20"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  aria-label={t("ranking.collapseAria")}
+                  onClick={() => setDismissed(true)}
+                  class="flex h-8 w-8 items-center justify-center rounded-[var(--borderRadiusCircular)] text-[var(--colorNeutralForeground3)] transition-colors duration-[var(--durationFast)] ease-[var(--curveEasyEase)] hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-[0.98] focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)]"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path
+                      d="M4.397 4.553l.073-.084a.75.75 0 0 1 .977-.073l.084.073L12 10.94l6.47-6.47a.75.75 0 0 1 1.06 1.06L13.06 12l6.47 6.47a.75.75 0 0 1 .073.977l-.073.084a.75.75 0 0 1-.977.073l-.084-.073L12 13.06l-6.47 6.47a.75.75 0 0 1-1.06-1.06L10.94 12l-6.47-6.47a.75.75 0 0 1-.073-.977z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                </button>
+              </div>
             </div>
             {/* 横向缩略图 + 名次角标 */}
             <div
@@ -306,7 +329,7 @@ const VariantA: Component<{ feed: JSX.Element; onOpenAll: () => void }> = (props
               role="list"
               aria-label={t("ranking.todayListAria")}
             >
-              <For each={entries}>
+              <For each={entries()}>
                 {(e) => (
                   <div role="listitem" class="relative w-20 flex-shrink-0">
                     <img
@@ -314,7 +337,7 @@ const VariantA: Component<{ feed: JSX.Element; onOpenAll: () => void }> = (props
                       alt={t("ranking.entryAlt", { rank: e.rank, title: e.title })}
                       loading="lazy"
                       decoding="async"
-                      class="h-20 w-20 rounded-[var(--borderRadiusMedium)] object-cover select-none"
+                      class="h-20 w-20 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground3)] object-cover select-none"
                     />
                     <span
                       class={[
@@ -332,24 +355,6 @@ const VariantA: Component<{ feed: JSX.Element; onOpenAll: () => void }> = (props
                   </div>
                 )}
               </For>
-              {/* 尾部「全部」入口（A+C 组合预览） */}
-              <button
-                type="button"
-                aria-label={t("ranking.viewAllAria")}
-                onClick={props.onOpenAll}
-                class="flex h-20 w-20 flex-none cursor-pointer flex-col items-center justify-center gap-1 appearance-none rounded-[var(--borderRadiusMedium)] border border-dashed border-[var(--colorNeutralStroke2)] text-[var(--colorNeutralForeground2)] outline-none transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-[0.98] [font-size:var(--fontSizeBase200)] focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)]"
-              >
-                {t("ranking.viewAll")}
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path
-                    d="M9 4 L17 12 L9 20"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-              </button>
             </div>
           </div>
         </div>
@@ -374,7 +379,7 @@ const VariantB: Component<{ feed: JSX.Element }> = (props) => {
   return (
     <>
       <div
-        class="flex gap-2 overflow-x-auto px-4 pt-3"
+        class="flex flex-wrap gap-2 px-4 pt-3"
         role="tablist"
         aria-label={t("ranking.subtabListAria")}
       >
@@ -411,10 +416,7 @@ const VariantB: Component<{ feed: JSX.Element }> = (props) => {
 
 const VariantC: Component<{ feed: JSX.Element; onOpen: (mode: number) => void }> = (props) => (
   <>
-    <div
-      class="flex items-center gap-2 overflow-x-auto px-4 pt-3"
-      aria-label={t("ranking.entryAria")}
-    >
+    <div class="flex flex-wrap items-center gap-2 px-4 pt-3" aria-label={t("ranking.entryAria")}>
       <span class="flex flex-none items-center gap-1 font-semibold text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase300)]">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path d="M3 8 L7 12 L12 5 L17 12 L21 8 L19 18 H5 Z" />
@@ -448,8 +450,9 @@ const PrototypeSwitcher: Component<{ current: ProtoVariant }> = (props) => {
   };
   onSettled(() => {
     const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable))
+        return;
       if (e.key === "ArrowLeft") cycle(-1);
       if (e.key === "ArrowRight") cycle(1);
     };

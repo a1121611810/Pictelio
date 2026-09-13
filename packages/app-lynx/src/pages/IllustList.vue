@@ -19,12 +19,17 @@ import RestrictOverlay from '../components/RestrictOverlay.vue'
 import AiRestrictedIllustCard from '../components/AiRestrictedIllustCard.vue'
 import { useAiOnlyVisible } from '../composables/useAiOnlyVisible'
 import RefreshableList from '../components/RefreshableList.vue'
+import RankingPrototype from '../components/RankingPrototype.vue'
+import { DEV } from '../utils/devFlag'
 import { useGlobalFabStore } from '../stores/globalFab'
 import { t } from '../i18n'
 
 const settings = useSettingsStore()
 const isRestricted = settings.isRestricted
 const isAiRestricted = settings.isAiRestricted
+// PROTOTYPE（throwaway）：排行榜融合形态原型，仅 dev 构建挂载（生产构建消除），裁决后整块移除。
+// 不直接写 __DEV__（SFC 内会被改写为 process.env 形态，web 预览无 process → 白屏，见 utils/devFlag.ts）
+const protoOn = DEV
 // ─── 相关作品注入行（spec docs/specs/related-injection.md）───
 const related = useRelatedInjectionStore()
 
@@ -249,6 +254,9 @@ onUnmounted(() => {
         <text class="text-title-small font-medium">{{ t('illustList.tab.follow') }}</text>
       </view>
     </view>
+
+    <!-- PROTOTYPE（throwaway）：排行榜融合形态原型，插在子 tab 与内容链之间；覆盖层/切换器由组件自带 -->
+    <RankingPrototype v-if="protoOn" :illusts="illusts" />
 
     <!-- 首载三态（ADR-0150）：骨架 → 错误 → 空态 → 内容，互斥单链；
          触发不依赖 loading 标志（IFR 首帧用初始状态绘制，未落定即骨架） -->
