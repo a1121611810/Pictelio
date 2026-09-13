@@ -1,10 +1,11 @@
 # Spec: 排行榜（插画榜；双端：app webview + app-lynx）
 
-- 状态：draft（2026-09-13 定稿于 Grill 12 项裁决 + 缝确认；待 `to-tickets` 拆票）
+- 状态：spec 定稿待实施（2026-09-13；12 项裁决 + 测试缝确认 → 已拆票）
 - 日期：2026-09-13
 - 关联：原型归档 commit `58170a2b`（入口形态 A/B/C 与 ①/②/③）、`6a2b20fc`（范围层级 S1/S2/S3）；入口形态与范围均已在原型上裁决
 - 端点事实：`/v1/illust/ranking`（**非** `/v1/ranking/illust`），响应顶层 `illusts` + `next_url`，条目**无 rank 字段**，单页 30 条
-- 工单：spec #待建 / 拆票见 `to-tickets`
+- 工单：spec [#512](https://github.com/a1121611810/Pictelio/issues/512) / T1 [#513](https://github.com/a1121611810/Pictelio/issues/513)（ranking-core）/ T2 [#514](https://github.com/a1121611810/Pictelio/issues/514)（webview 页面骨架）/ T3 [#515](https://github.com/a1121611810/Pictelio/issues/515)（webview 维度+日期）/ T4 [#516](https://github.com/a1121611810/Pictelio/issues/516)（webview 入口+开关）/ T5 [#517](https://github.com/a1121611810/Pictelio/issues/517)（lynx 页面骨架）/ T6 [#518](https://github.com/a1121611810/Pictelio/issues/518)（lynx 维度+日期）/ T7 [#519](https://github.com/a1121611810/Pictelio/issues/519)（lynx 入口+开关）
+- 依赖链：`#513 → (#514 → #515, #514 → #516)` 与 `#513 → (#517 → #518, #517 → #519)`；webview 与 lynx 两条支线在 #513 之后可并行
 
 ## 1. 背景与目标
 
