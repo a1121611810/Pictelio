@@ -16,7 +16,8 @@ export default defineConfig({
   root: configDir,
   test: {
     name: "android-e2e",
-    include: ["specs/**/*.spec.ts"],
+    // specs/** 为模拟器 E2E；unit/** 为契约工具纯函数单测（不碰 adb，issue #523）
+    include: ["specs/**/*.spec.ts", "unit/**/*.test.ts"],
     environment: "node",
     globalSetup: ["./globalSetup.ts"],
     // 完整链路：编译 APK（分钟级）+ 模拟器 boot + session 创建，超时必须宽松

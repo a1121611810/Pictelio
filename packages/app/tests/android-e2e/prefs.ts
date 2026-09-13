@@ -54,6 +54,44 @@ export function readClientPrefs(serial: string): ClientPrefs {
 }
 
 /**
+ * 轮询读取 CapacitorStorage.xml 直到谓词满足（issue #523，T3 共享契约工具）。
+ *
+ * 为什么必须轮询：app 侧写 prefs 走「JS 桥排队 → Java 线程 → SharedPreferences
+ * editor.apply()」异步链（apply 只保证写内存，落盘由调度器异步 flush），且桥
+ * 调用本身有排队延迟。测试用 adb run-as 单次直读读到的是落盘瞬间的文件，与
+ * 写入天然竞态（#10 flaky / roundtrip 单读失败的根因）——断言「写入已生效」
+ * 必须按固定间隔重读，直到谓词满足或超时。
+ *
+ * @param serial adb 设备序列号
+ * @param predicate 判定快照是否满足期望（满足即停，返回该次快照）
+ * @param timeoutMs 总超时，默认 30s
+ * @param intervalMs 轮询间隔，默认 1s
+ * @param readFn 读取函数，默认 readClientPrefs；仅单测注入 fake 用，E2E 勿传
+ * @returns 满足谓词的那次快照
+ * @throws Error 超时未满足：消息含「轮询超时」与最后一次 rawXml 快照（诊断用）
+ */
+export async function pollPrefs(
+  serial: string,
+  predicate: (prefs: ClientPrefs) => boolean,
+  timeoutMs = 30_000,
+  intervalMs = 1_000,
+  readFn: (serial: string) => ClientPrefs = readClientPrefs,
+): Promise<ClientPrefs> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const prefs = readFn(serial);
+    if (predicate(prefs)) return prefs;
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `[android-e2e] pollPrefs 轮询超时（timeoutMs=${timeoutMs}, intervalMs=${intervalMs}）。` +
+          `最后一次 CapacitorStorage.xml 快照: ${prefs.rawXml || "(文件不存在)"}`,
+      );
+    }
+    await new Promise<void>((r) => setTimeout(r, intervalMs));
+  }
+}
+
+/**
  * 覆写设备上 CapacitorStorage.xml 的 pictelio_client_kind 值（模拟 app 写入）。
  * 用 run-as sh -c 相对路径写文件（run-as 的 cwd 即 app 数据目录，绝对路径
  * 重定向被 SELinux 拒）。先 cat 原文件替换值再写回，文件不存在则新建。
