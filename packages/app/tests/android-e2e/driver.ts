@@ -166,6 +166,16 @@ export class AndroidE2eDriver {
 
   /** 等待 WEBVIEW context 出现并切换过去（返回实际 context 名） */
   async switchToWebView(timeoutMs = 30_000): Promise<string> {
+    // 先回 NATIVE：app 曾重启时 WebView devtools target 已变更（新 pid），而当前 chromedriver
+    // 会话仍绑定旧 target → 后续 findElement 报 disconnected。recreateChromeDriverSessions=true
+    // 会在「切 NATIVE」时销毁旧会话，切回 WEBVIEW 时按新 target 重建（settings-sync/roundtrip 复现）。
+    try {
+      if ((await this.currentContext()).startsWith("WEBVIEW")) {
+        await this.raw.switchContext("NATIVE_APP");
+      }
+    } catch {
+      // 首次会话/设备瞬时异常：忽略，后续等待逻辑仍会兜底
+    }
     let target: string | null = null;
     await this.raw.waitUntil(
       async () => {
