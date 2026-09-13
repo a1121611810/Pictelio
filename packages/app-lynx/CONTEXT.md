@@ -369,3 +369,25 @@ _Avoid_: 页面逐个 `ensureAuth()` 前置（覆盖不全、易漂移）、把�
 
 **kebab-case 陷阱**【2026-09-03 新增】：
 vue-lynx 模板编译器把**带连字符的标签**当原生自定义元素：`<router-view>`（kebab-case）编译为自定义元素 → Vue 不渲染（带 `v-slot` 时报 `v-slot can only be used on components`；无 slot 时静默渲染为空——历史「RouterView 为空」断言的真正根因）。模板必须 **PascalCase `<RouterView />`**；其余带连字符组件同理。_Avoid_: kebab-case `<router-view>`/`<router-link>`、把 RouterView 空白归因 vue-router 兼容性
+
+### 排行榜（Ranking）【2026-09-13 新增，跨上下文，spec docs/specs/ranking.md】
+
+**排行榜入口（ranking entry）**：
+插画页推荐 tab 顶部**注入**的排行榜展示位（本端为榜首编辑大卡形态：第 1 名全幅背景 + 右侧第 2/3 名缩略），固定呈现「日榜 · 今日」。入口**不承担维度与日期状态**，也不提供档位切换（原型里的 mini 维度行已按裁决移除）。
+_Avoid_: 排行榜 tab（本项目明确不新增导航分类，见 ADR-0158）
+
+**榜单页（ranking page）**：
+承载**维度切换**（7 档）与**按日期回看**的独立路由页面，与入口分离。
+_Avoid_: 榜单入口（入口只负责展示与跳转）
+
+**榜单维度（ranking mode）**：
+服务端榜单种类。本期 7 档：日/周/月/新人/原创/R-18/R-18G。**档位即 mode**，不做「期间 × R-18」二维展开。
+_Avoid_: 榜单筛选（维度是并列的榜种，不是对同一列表的过滤条件）
+
+**榜单日期（ranking date）**：
+榜单对应的日期，「今日」= 未指定日期。「今日」时「后一天」不可用（不请求未来）。**本端只做箭头步进，无日历选择器**——Lynx 的 `input` 只支持 `text|number|digit|password|tel|email`（语义是选软键盘，非 HTML5 输入控件），无原生日期输入，自研月历挂账二期；日期文案手写格式化（Lynx 运行时无 Intl，禁用 `Intl.DateTimeFormat`）。
+_Avoid_: 在 lynx 用 `<input type="date">`（web-core 预览会透传成真实 HTML input 而「看起来能用」，原生 LynxView 只认上述 6 个枚举值——最易误判的一条路）
+
+**名次（rank）**：
+作品在榜单中的序位，由**分页偏移 + 下标**推得（服务端响应不返回名次字段）。本端对受限条目**保留并盖遮罩**、名次不变（与 webview 滤除条目留下名次空洞的口径不同，两端差异为既有事实，不为榜单页破例）。
+_Avoid_: 序号 / 排名编号（避免暗示「连续编号」，名次是位置不是计数）
