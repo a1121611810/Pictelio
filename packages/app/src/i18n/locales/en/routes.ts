@@ -335,9 +335,9 @@ const enRoutes = {
   "homePage.empty.desc": "Try another content type or check back later",
 
   // ── Ranking prototype (home/RankingPrototype; PROTOTYPE throwaway) ──
-  "ranking.protoVariantA": "A strip injection",
-  "ranking.protoVariantB": "B sub-tab extension",
-  "ranking.protoVariantC": "C entry + ranking page",
+  "ranking.protoScopeS1": "S1 entry only",
+  "ranking.protoScopeS2": "S2 basic ranking page",
+  "ranking.protoScopeS3": "S3 full ranking page",
   "ranking.protoSwitchAria": "Prototype variant switcher",
   "ranking.protoPrevAria": "Previous variant",
   "ranking.protoNextAria": "Next variant",
@@ -360,11 +360,12 @@ const enRoutes = {
   "ranking.entryAlt": "No.{{rank}}: {{title}}",
   "ranking.viewAllAria": "View full rankings",
   "ranking.viewAll": "See all",
-  "ranking.subtabListAria": "Recommendation sub-tabs",
-  "ranking.subtab.mixed": "Mixed",
-  "ranking.subtab.illust": "Illustrations",
-  "ranking.subtab.manga": "Manga",
-  "ranking.subtab.rank": "Rankings",
+  "ranking.scopeHintS1":
+    "Entry only: the strip shows today's Top 20, tapping opens the work. No ranking page, no category switch, no date history",
+  "ranking.scopeHintS2":
+    "Entry + basic ranking page: switch category (daily/weekly/monthly/newcomers/original/R-18), today only",
+  "ranking.scopeHintS3":
+    "Entry + full ranking page: category switch + date history (today badge, future dates disabled)",
   "ranking.entryAria": "Rankings entry",
   "ranking.backToRecommendedAria": "Back to recommendations",
   "ranking.mock.entryTitle": "Ranking work #{{rank}}",

@@ -322,9 +322,9 @@ const zhRoutes = {
   "homePage.empty.desc": "换一个内容类型或稍后再来看看",
 
   // ── 排行榜原型（home/RankingPrototype；PROTOTYPE throwaway，zh 值 = 抽取前源文案逐字节一致）──
-  "ranking.protoVariantA": "A 横滑条注入",
-  "ranking.protoVariantB": "B 子tab扩展",
-  "ranking.protoVariantC": "C 入口+榜单页",
+  "ranking.protoScopeS1": "S1 只做入口",
+  "ranking.protoScopeS2": "S2 简化榜单页",
+  "ranking.protoScopeS3": "S3 完整榜单页",
   "ranking.protoSwitchAria": "原型变体切换",
   "ranking.protoPrevAria": "上一个变体",
   "ranking.protoNextAria": "下一个变体",
@@ -347,11 +347,10 @@ const zhRoutes = {
   "ranking.entryAlt": "第{{rank}}名：{{title}}",
   "ranking.viewAllAria": "查看完整排行榜",
   "ranking.viewAll": "全部",
-  "ranking.subtabListAria": "推荐子标签",
-  "ranking.subtab.mixed": "混合",
-  "ranking.subtab.illust": "插画",
-  "ranking.subtab.manga": "漫画",
-  "ranking.subtab.rank": "排行",
+  "ranking.scopeHintS1":
+    "只有入口：横滑条看今日 Top 20，点图进作品详情。无榜单页、无维度切换、无日期回看",
+  "ranking.scopeHintS2": "入口 + 简化榜单页：可切维度（日/周/月/新人/原创/R-18），但只能看今日",
+  "ranking.scopeHintS3": "入口 + 完整榜单页：维度切换 + 按日期回看（今日标记、未来日期禁用）",
   "ranking.entryAria": "排行榜入口",
   "ranking.backToRecommendedAria": "返回推荐",
   "ranking.mock.entryTitle": "排行榜作品 #{{rank}}",
