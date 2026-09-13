@@ -275,6 +275,25 @@ const enPages = {
   "ranking.page.emptyHint": "Check back later",
   "ranking.footer.loading": "Loading…",
   "ranking.footer.end": "No more results",
+
+  // ── Ranking mode/date controls + R-18 guidance (spec docs/specs/ranking.md §5.3/§5.7; #518) ──
+  "ranking.mode.daily": "Daily",
+  "ranking.mode.weekly": "Weekly",
+  "ranking.mode.monthly": "Monthly",
+  "ranking.mode.newcomer": "Newcomers",
+  "ranking.mode.original": "Original",
+  "ranking.mode.r18": "R-18",
+  "ranking.mode.r18g": "R-18G",
+  "ranking.modeListAria": "Ranking categories",
+  "ranking.prevDayAria": "Previous day",
+  "ranking.nextDayAria": "Next day",
+  "ranking.today": "Today",
+  "ranking.dateLong": "{{year}}-{{month}}-{{day}}",
+  "ranking.r18Notice.title": "R-18 rankings require a pixiv setting",
+  "ranking.r18Notice.body":
+    "This ranking requires \"Show R-18 works\" to be enabled in your pixiv web settings. Enable it, then come back and retry.",
+  "ranking.r18Notice.action": "Open pixiv settings",
+  "ranking.r18Notice.retry": "Retry",
 } as const satisfies Record<ZhPagesKey, string>;
 
 export default enPages;

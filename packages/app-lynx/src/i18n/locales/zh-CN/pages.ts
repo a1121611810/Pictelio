@@ -273,6 +273,25 @@ const zhPages = {
   "ranking.page.emptyHint": "稍后再来看看",
   "ranking.footer.loading": "加载中…",
   "ranking.footer.end": "没有更多了",
+
+  // ── 排行榜维度 / 日期控件 + R-18 指引（spec docs/specs/ranking.md §5.3/§5.7；#518）──
+  "ranking.mode.daily": "日榜",
+  "ranking.mode.weekly": "周榜",
+  "ranking.mode.monthly": "月榜",
+  "ranking.mode.newcomer": "新人",
+  "ranking.mode.original": "原创",
+  "ranking.mode.r18": "R-18",
+  "ranking.mode.r18g": "R-18G",
+  "ranking.modeListAria": "排行榜种类",
+  "ranking.prevDayAria": "前一天",
+  "ranking.nextDayAria": "后一天",
+  "ranking.today": "今日",
+  "ranking.dateLong": "{{year}}年{{month}}月{{day}}日",
+  "ranking.r18Notice.title": "R-18 榜单需要先在 pixiv 开启",
+  "ranking.r18Notice.body":
+    "此榜单需账号在 pixiv 网页端开启「显示 R-18 作品」后才可浏览。开启后返回本页重试。",
+  "ranking.r18Notice.action": "前往 pixiv 设置",
+  "ranking.r18Notice.retry": "重试",
 } as const;
 
 export default zhPages;

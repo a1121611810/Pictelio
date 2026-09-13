@@ -17,7 +17,6 @@ function mapIllusts(r: PixivIllustListResponse): { items: MixFeedItem[]; nextUrl
 }
 
 export interface RankingFeed {
-  query: () => RankingQuery
   /** 切换维度/日期（#518）：释放旧实例（作废在途响应）后以新参数重建（沿用构造时的 onUpdate） */
   setQuery: (query: RankingQuery) => void
   items: () => PixivIllust[]
@@ -50,14 +49,11 @@ function makeFeed(query: RankingQuery, onUpdate?: () => void): MixFeed {
 }
 
 export function createRankingFeed(initial: RankingQuery, onUpdate?: () => void): RankingFeed {
-  let query = initial
-  let feed = makeFeed(query, onUpdate)
+  let feed = makeFeed(initial, onUpdate)
 
   return {
-    query: () => query,
     setQuery: (next) => {
       feed.dispose()
-      query = next
       // 沿用构造时的 onUpdate：否则切换后 createMixFeed 的防抖补发不再触发页面重新快照
       feed = makeFeed(next, onUpdate)
     },

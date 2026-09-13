@@ -122,4 +122,19 @@ describe("createRankingFeed", () => {
     expect(feed.items()).toEqual([])
     feed.dispose()
   })
+
+  it("setQuery 改变请求参数（维度/日期随动）", async () => {
+    loadRankingMock.mockResolvedValue(page([1]))
+    const feed = createRankingFeed({ mode: "daily", date: null })
+    await feed.refresh()
+    expect(loadRankingMock).toHaveBeenLastCalledWith({ mode: "daily", date: null }, expect.anything())
+
+    feed.setQuery({ mode: "weekly", date: "2026-09-01" })
+    await feed.refresh()
+    expect(loadRankingMock).toHaveBeenLastCalledWith(
+      { mode: "weekly", date: "2026-09-01" },
+      expect.anything(),
+    )
+    feed.dispose()
+  })
 })
