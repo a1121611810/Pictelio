@@ -232,7 +232,7 @@ export function createSettings(opts: SettingsOptions): Settings {
         // 丢弃必须可见（测试硬约束 3 / ADR-0159 决策 2）：冷态写说明调用时序有误，
         // 每次丢弃都 warn，不改「不落盘」语义本身。
         if (phase !== "warm") {
-          console.warn(`[settings-registry] 冷态丢弃写入（phase=cold）: ${def.key}`);
+          console.warn(`[settings-registry] 冷态丢弃写入（phase=${phase}）: ${def.key}`);
           return;
         }
 

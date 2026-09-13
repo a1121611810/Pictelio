@@ -156,8 +156,21 @@ describe("ClientSwitch E2E 钩子结果契约（ADR-0159 决策 2 / spec 决策 
   }
 
   beforeEach(() => {
-    // 内层 beforeEach 在外层之后执行：覆盖外层的 false，注册钩子块
+    // 本 describe 是外层 describe 的顶层兄弟（非嵌套），外层 beforeEach 不生效——
+    // 必须自给全部前置（cleanup / clearAllMocks / 默认 mock），不依赖外层残留状态
+    //（ADR-0159 复审 #4）。
+    cleanup();
+    vi.clearAllMocks();
+    // __E2E__ stub true：注册钩子块（生产仅 --mode e2e 构建注册，单测运行时注入）
     vi.stubGlobal("__E2E__", true);
+    mocks.readClientKind.mockResolvedValue("webview");
+    mocks.getClientKinds.mockResolvedValue({ kinds: ["webview", "lynx"] });
+    mocks.switchClient.mockResolvedValue({ ok: true });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
   });
 
   it("调用钩子立即置 title=E2E-HOOK-CALLED，结算后置 E2E-SWITCH-OK", async () => {

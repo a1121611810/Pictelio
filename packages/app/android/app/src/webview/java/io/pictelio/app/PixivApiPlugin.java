@@ -96,10 +96,11 @@ public class PixivApiPlugin extends Plugin {
                     JSONObject coreResult = PixivApiCore.executeRequest(method, url, body, false,
                             token -> {
                                 // token 轮换：通知 JS 侧持久化新值（webview 专属；Lynx 走 PictelioAuth）。
-                                // notifyListeners 经 sendResponseMessage 投递 WebView，工作线程调用安全。
+                                // eventListeners 是非并发 HashMap（桥线程写），工作线程直接读存在
+                                // 数据竞争（ADR-0159 复审 #2）——经 bridge.execute 回桥线程投递。
                                 JSObject data = new JSObject();
                                 data.put("token", token);
-                                notifyListeners("refreshTokenRotated", data);
+                                bridge.execute(() -> notifyListeners("refreshTokenRotated", data));
                             });
                     // JSONObject → JSObject 桥接（#114：Core 去 Capacitor 化）
                     JSObject result = new JSObject();

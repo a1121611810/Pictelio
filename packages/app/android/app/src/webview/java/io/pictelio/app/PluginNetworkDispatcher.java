@@ -12,7 +12,7 @@ import java.util.function.Consumer;
  * <p>Capacitor Bridge 用单个 HandlerThread 串行执行所有 @PluginMethod，request()/
  * prefetchImage() 的同步 OkHttp execute（connect+read 超时上限 45s）会把
  * Preferences.set 等其他插件调用在桥队列挂起（引擎切换 5s 写超时的根因）。
- * 本类包装插件自有的 cached 线程池：{@link #dispatch} 提交后调用线程立即返回，
+ * 本类包装插件自有的固定上界线程池：{@link #dispatch} 提交后调用线程立即返回，
  * 任务在工作线程执行，成功经 onSuccess、异常经 onFailure 在工作线程回调
  * （PluginCall 线程安全，Capacitor 标准异步插件模式）。
  *
@@ -32,7 +32,11 @@ final class PluginNetworkDispatcher {
     private final ExecutorService executor;
 
     PluginNetworkDispatcher() {
-        this.executor = Executors.newCachedThreadPool(r -> {
+        // 固定上界（ADR-0159 复审 #3）：OkHttp Dispatcher 的 maxRequests 只约束 enqueue()
+        // 异步调用，同步 execute() 不受限——cached 无界池在弱网慢请求堆积 + Feed 连发
+        // 时可膨胀出数十工作线程（每线程 ~1MB 栈），低端机内存不可控。上界 8 对齐共享
+        // OkHttp 客户端 per-host 10 的意图（排队在池队列完成，不占桥线程）。
+        this.executor = Executors.newFixedThreadPool(8, r -> {
             Thread t = new Thread(r, "PictelioNet-" + SEQ.incrementAndGet());
             t.setDaemon(true);
             return t;
