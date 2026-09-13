@@ -46,6 +46,8 @@ export interface RankingStoreResult {
 
   /** 名次条目（保序；过滤只移除，不重编号） */
   entries: Accessor<RankEntry[]>;
+  /** 服务端返回条目数（**过滤前**；R-18 指引判定用，区别于 entries 的过滤后计数） */
+  serverCount: Accessor<number>;
   nextUrl: Accessor<string | null>;
   loading: Accessor<boolean>;
   refreshing: Accessor<boolean>;
@@ -95,8 +97,12 @@ export function createRankingStore(initial?: RankingQuery): RankingStoreResult {
     () => queryClient,
   );
 
+  /** 服务端返回的全量条目（过滤前，页序 × 页内序） */
+  const serverItems: Accessor<PixivIllust[]> = () => flattenIllusts(q.data?.pages ?? []);
+  const serverCount: Accessor<number> = () => serverItems().length;
+
   const entries: Accessor<RankEntry[]> = () => {
-    const flat = flattenIllusts(q.data?.pages ?? []);
+    const flat = serverItems();
     // 先按服务端下标定名次，再走既有过滤链；过滤只移除、不重编号（名次空洞为预期）
     const kept = new Set(filterFeedIllusts(flat));
     const out: RankEntry[] = [];
@@ -158,12 +164,15 @@ export function createRankingStore(initial?: RankingQuery): RankingStoreResult {
   const setQuery = (next: RankingQuery): void => {
     setPaginationError(false);
     setQuerySig(next);
+    // set-后-读契约（同 searchStore 的 setter）：调用方同 tick 内 ensureLoaded 必须读到新参数
+    flush();
   };
 
   return {
     query,
     setQuery,
     entries,
+    serverCount,
     nextUrl,
     loading,
     refreshing,

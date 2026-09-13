@@ -336,6 +336,7 @@ const zhRoutes = {
   "ranking.mode.newcomer": "新人",
   "ranking.mode.original": "原创",
   "ranking.mode.r18": "R-18",
+  "ranking.mode.r18g": "R-18G",
   "ranking.prevDayAria": "前一天",
   "ranking.nextDayAria": "后一天",
   "ranking.today": "今日",
@@ -362,6 +363,14 @@ const zhRoutes = {
   "ranking.page.empty": "暂无榜单内容",
   "ranking.page.rowAria": "第{{rank}}名：{{title}}",
   "ranking.page.bookmarks": "★{{count}}",
+
+  // ── 排行榜维度 / 日期控件 + R-18 指引（spec docs/specs/ranking.md §5.3/§5.7；#515）──
+  "ranking.controls.pickDateAria": "选择日期",
+  "ranking.r18Notice.title": "R-18 榜单需要先在 pixiv 开启",
+  "ranking.r18Notice.body":
+    "此榜单需账号在 pixiv 网页端开启「显示 R-18 作品」后才可浏览。开启后返回本页重试。",
+  "ranking.r18Notice.action": "前往 pixiv 设置",
+  "ranking.r18Notice.retry": "重试",
 } as const;
 
 export default zhRoutes;

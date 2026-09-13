@@ -105,6 +105,8 @@ describe("rankingStore", () => {
       [1, 1],
       [3, 3],
     ]);
+    // serverCount = 服务端过滤前计数（R-18 指引判定依据，spec §5.7）
+    expect(store.serverCount()).toBe(3);
     dispose();
   });
 
@@ -152,6 +154,31 @@ describe("rankingStore", () => {
     expect(store.entries()).toEqual([]);
     expect(store.loading()).toBe(false);
     expect(store.nextUrl()).toBeNull();
+    dispose();
+  });
+
+  it("setQuery 改变请求参数；切回命中各自缓存（互不清空）", async () => {
+    fetchRankingMock.mockResolvedValue({ illusts: [], next_url: null });
+    const { store, dispose } = setup();
+    await store.ensureLoaded();
+    expect(fetchRankingMock).toHaveBeenLastCalledWith(
+      { mode: "daily", date: null },
+      expect.anything(),
+    );
+    const callsAfterFirst = fetchRankingMock.mock.calls.length;
+
+    store.setQuery({ mode: "weekly", date: "2026-09-01" });
+    await store.ensureLoaded();
+    expect(fetchRankingMock).toHaveBeenLastCalledWith(
+      { mode: "weekly", date: "2026-09-01" },
+      expect.anything(),
+    );
+    expect(fetchRankingMock.mock.calls.length).toBe(callsAfterFirst + 1);
+
+    // 切回日榜今日：命中 daily/null 缓存（不再请求），证明各 (mode,date) 缓存互不清空
+    store.setQuery({ mode: "daily", date: null });
+    await store.ensureLoaded();
+    expect(fetchRankingMock.mock.calls.length).toBe(callsAfterFirst + 1);
     dispose();
   });
 });

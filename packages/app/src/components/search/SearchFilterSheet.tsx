@@ -1,5 +1,6 @@
 import { createSignal, For, Show, type Component } from "solid-js";
 import { t, type I18nKey } from "../../i18n";
+import FilterChip from "@/components/ui/FilterChip";
 import {
   BOOKMARK_BANDS,
   countActiveFilters,
@@ -85,34 +86,6 @@ function toggledBookmark(filters: SearchFilters, band: BookmarkBand): SearchFilt
   const cur = filters.bookmark;
   const isSame = cur !== null && cur.min === band.min && cur.max === band.max;
   return { ...filters, bookmark: isSame ? null : { ...band } };
-}
-
-function FilterChip(props: {
-  label: string;
-  active: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      class={[
-        "min-h-10 px-3 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase200)] transition-all active:scale-95 appearance-none border-none outline-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-40",
-        {
-          "bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] font-semibold":
-            props.active,
-          "bg-[var(--colorNeutralBackground2)] text-[var(--colorNeutralForeground2)] hover:bg-[var(--colorNeutralBackground3)]":
-            !props.active,
-        },
-      ]}
-      disabled={props.disabled ?? false}
-      aria-pressed={props.active ? "true" : "false"}
-      onClick={() => {
-        if (!props.disabled) props.onClick();
-      }}
-    >
-      {props.label}
-    </button>
-  );
 }
 
 const SearchFilterSheet: Component<Props> = (props) => {
