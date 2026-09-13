@@ -48,10 +48,6 @@
     "reason": "存量豁免（收尾审计已核，非用户可见主文案）"
   },
   {
-    "path": "components/RankingPrototype.vue",
-    "reason": "PROTOTYPE throwaway（排行榜入口形态原型，DEV 门禁挂载，随正式实现一并移除）；文案为原型瞬态常量，不进 i18n 字典以免污染词条"
-  },
-  {
     "path": "components/RestrictOverlay.vue",
     "reason": "存量豁免（收尾审计已核，非用户可见主文案）"
   },

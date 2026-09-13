@@ -43,7 +43,7 @@ import { t, locale } from '../i18n'
 const auth = useAuthStore()
 const settings = useSettingsStore()
 const clientSwitch = useClientSwitchStore()
-const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, language, novelExportFormat, novelExportOptions, relatedInjection } = storeToRefs(settings)
+const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, language, novelExportFormat, novelExportOptions, relatedInjection, rankingEntry } = storeToRefs(settings)
 
 const switching = ref(false)
 
@@ -330,6 +330,9 @@ function toggleR18G() {
 }
 function toggleRelatedInjection() {
   settings.setRelatedInjection(!relatedInjection.value)
+}
+function toggleRankingEntry() {
+  settings.setRankingEntry(!rankingEntry.value)
 }
 </script>
 
@@ -660,6 +663,24 @@ function toggleRelatedInjection() {
           >
             <view class="w-8 h-8 flex items-center justify-center">
               <view class="rounded-full active:w-[7.467vw] active:h-[7.467vw]" :class="relatedInjection ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
+            </view>
+          </view>
+        </view>
+
+        <!-- 排行榜入口开关（spec docs/specs/ranking.md §5.8）：设备级，默认开 -->
+        <view
+          class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.rankingEntryToggle"
+          @tap="toggleRankingEntry"
+        >
+          <text class="text-title-medium text-surface-on">{{ t('me.content.rankingEntry') }}</text>
+          <view
+            class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
+            :class="rankingEntry ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
+          >
+            <view class="w-8 h-8 flex items-center justify-center">
+              <view class="rounded-full active:w-[7.467vw] active:h-[7.467vw]" :class="rankingEntry ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
             </view>
           </view>
         </view>

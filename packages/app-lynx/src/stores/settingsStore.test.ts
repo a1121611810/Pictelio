@@ -816,3 +816,92 @@ describe("settingsStore.relatedInjection（spec #486）", () => {
     warnSpy.mockRestore()
   })
 })
+
+// ranking_entry 设备级开关（spec docs/specs/ranking.md §5.8；#519：加载/非法值/写入）
+describe("settingsStore.rankingEntry（spec #519）", () => {
+  function prefsModule(map: Map<string, string>) {
+    env.native = true
+    env.modules = {
+      PictelioPrefs: {
+        prefsGet: (k: string, cb: (v: string, e: string | null) => void) =>
+          cb(map.has(k) ? JSON.stringify(map.get(k)!) : '', null),
+        prefsSet: (k: string, v: string, cb: (e: string | null) => void) => {
+          map.set(k, v)
+          cb(null)
+        },
+        prefsRemove: (k: string, cb: (e: string | null) => void) => {
+          map.delete(k)
+          cb(null)
+        },
+      },
+    }
+  }
+
+  beforeEach(() => {
+    env.native = false
+    vi.mocked(idbGet).mockReset().mockResolvedValue(null)
+    vi.mocked(idbSet).mockReset().mockResolvedValue(undefined)
+    setActivePinia(createPinia())
+    store = useSettingsStore()
+  })
+
+  it("默认开启", () => {
+    expect(store.rankingEntry).toBe(true)
+  })
+
+  it("loadSettings 读取失败 → warn 可见、维持默认（禁静默降级，硬约束 #1）", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    vi.mocked(idbGet).mockImplementation(async (key: string) => {
+      if (key === "ranking_entry") throw new Error("read fail")
+      return null
+    })
+    await store.loadSettings()
+    expect(store.rankingEntry).toBe(true)
+    await vi.waitFor(() =>
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("排行榜入口"), expect.anything()),
+    )
+    warnSpy.mockRestore()
+  })
+
+  it("prefs 写入失败 → warn 可见（不抛出，硬约束 #1）", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    env.native = true
+    env.modules = {
+      PictelioPrefs: {
+        prefsGet: (_k: string, cb: (v: string, e: string | null) => void) => cb("", null),
+        prefsSet: (_k: string, _v: string, cb: (e: string | null) => void) => cb("storage full"),
+        prefsRemove: (_k: string, cb: (e: string | null) => void) => cb(null),
+      },
+    }
+    store.setRankingEntry(true)
+    await vi.waitFor(() =>
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("排行榜入口"), expect.anything()),
+    )
+    warnSpy.mockRestore()
+  })
+
+  it("setRankingEntry 持久化到 prefs（键 ranking_entry）", async () => {
+    const map = new Map<string, string>()
+    prefsModule(map)
+    store.setRankingEntry(false)
+    await vi.waitFor(() => expect(map.get("ranking_entry")).toBe("false"))
+    expect(store.rankingEntry).toBe(false)
+  })
+
+  it("loadSettings 从 prefs 恢复持久化开关", async () => {
+    const map = new Map<string, string>([["ranking_entry", "false"]])
+    prefsModule(map)
+    await store.loadSettings()
+    expect(store.rankingEntry).toBe(false)
+  })
+
+  it("loadSettings 非法值不覆盖当前值（warn 可见，禁静默降级）", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const map = new Map<string, string>([["ranking_entry", "bogus"]])
+    prefsModule(map)
+    await store.loadSettings()
+    expect(store.rankingEntry).toBe(true)
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("排行榜入口"), "bogus")
+    warnSpy.mockRestore()
+  })
+})

@@ -205,6 +205,7 @@ const enPages = {
   "me.content.showR18": "Show R-18 content",
   "me.content.showR18G": "Show R-18G content",
   "me.content.relatedInjection": "Related works injection",
+  "me.content.rankingEntry": "Rankings entry",
   "me.content.ai": "AI works",
   "me.content.aiShow": "Show",
   "me.content.aiMask": "Mask",
@@ -294,6 +295,14 @@ const enPages = {
     "This ranking requires \"Show R-18 works\" to be enabled in your pixiv web settings. Enable it, then come back and retry.",
   "ranking.r18Notice.action": "Open pixiv settings",
   "ranking.r18Notice.retry": "Retry",
+
+  // ── Recommended-feed entry card (spec docs/specs/ranking.md §5.2; #519) ──
+  "ranking.entry.firstBadge": "No. 1",
+  "ranking.entry.viewAll": "See all",
+  "ranking.entry.viewAllAria": "View full rankings",
+  "ranking.entry.collapseAria": "Collapse rankings",
+  "ranking.entry.stripAria": "Rankings entry",
+  "ranking.entry.itemAria": "No.{{rank}}: {{title}}",
 } as const satisfies Record<ZhPagesKey, string>;
 
 export default enPages;

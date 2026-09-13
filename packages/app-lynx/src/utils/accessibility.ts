@@ -59,6 +59,7 @@ export const ME_A11Y_LABELS = {
   r18Toggle: '显示R18内容',
   r18gToggle: '显示R18G内容',
   relatedInjectionToggle: '相关作品注入开关',
+  rankingEntryToggle: '排行榜入口开关',
   // AI 作品三态过滤（ADR-0155）
   aiFilterShow: 'AI作品显示全部',
   aiFilterMask: 'AI作品遮罩',

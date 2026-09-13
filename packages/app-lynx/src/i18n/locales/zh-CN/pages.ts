@@ -205,6 +205,7 @@ const zhPages = {
   "me.content.showR18": "显示 R-18 内容",
   "me.content.showR18G": "显示 R-18G 内容",
   "me.content.relatedInjection": "相关作品注入",
+  "me.content.rankingEntry": "排行榜入口",
   "me.content.ai": "AI 作品",
   "me.content.aiShow": "显示",
   "me.content.aiMask": "遮罩",
@@ -292,6 +293,14 @@ const zhPages = {
     "此榜单需账号在 pixiv 网页端开启「显示 R-18 作品」后才可浏览。开启后返回本页重试。",
   "ranking.r18Notice.action": "前往 pixiv 设置",
   "ranking.r18Notice.retry": "重试",
+
+  // ── 推荐流入口大卡（spec docs/specs/ranking.md §5.2；#519）──
+  "ranking.entry.firstBadge": "第 1 名",
+  "ranking.entry.viewAll": "全部",
+  "ranking.entry.viewAllAria": "查看完整排行榜",
+  "ranking.entry.collapseAria": "收起排行榜",
+  "ranking.entry.stripAria": "排行榜入口",
+  "ranking.entry.itemAria": "第{{rank}}名：{{title}}",
 } as const;
 
 export default zhPages;

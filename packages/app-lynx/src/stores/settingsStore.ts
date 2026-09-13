@@ -55,6 +55,8 @@ const DETAIL_QUALITY_KEY = "settings_detail_quality"
 const THEME_COLOR_KEY = "settings_theme_color"
 /** 相关作品注入行（spec docs/specs/related-injection.md）：设备级开关，默认开；键与 app 逐字一致 */
 const RELATED_INJECTION_KEY = "related_injection"
+/** 排行榜入口大卡（spec docs/specs/ranking.md §5.8）：设备级开关，默认开；键与 app 逐字一致 */
+const RANKING_ENTRY_KEY = "ranking_entry"
 /** 小说导出（spec docs/specs/novel-export.md §6）：全局默认格式 + 三项内容开关（与 app 共享键） */
 const NOVEL_EXPORT_FORMAT_KEY = "settings_novel_export_format"
 const NOVEL_EXPORT_INCLUDE_METADATA_KEY = "settings_novel_export_include_metadata"
@@ -220,6 +222,7 @@ export const useSettingsStore = defineStore("settings", () => {
   /** UI 语言："" = 跟随系统；设备级，未登录也恢复 */
   const _language = ref<"" | "zh-CN" | "en">("")
   const _relatedInjection = ref(true)
+  const _rankingEntry = ref(true)
   const _novelExportFormat = ref<NovelExportFormat>(DEFAULT_NOVEL_EXPORT_FORMAT)
   const _novelExportOptions = ref<NovelExportOptions>({ ...DEFAULT_NOVEL_EXPORT_OPTIONS })
 
@@ -248,6 +251,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const themeColor = _themeColor
   const language = _language
   const relatedInjection = _relatedInjection
+  const rankingEntry = _rankingEntry
   const novelExportFormat = _novelExportFormat
   const novelExportOptions = _novelExportOptions
   const webdavEnabled = _webdavEnabled
@@ -321,6 +325,18 @@ export const useSettingsStore = defineStore("settings", () => {
       }
     } catch (e) {
       console.warn("[settingsStore] 相关作品注入开关加载失败（维持默认）", e)
+    }
+
+    // 排行榜入口大卡（spec docs/specs/ranking.md §5.8）：设备级，未登录也恢复
+    try {
+      const raw = await prefs().get(RANKING_ENTRY_KEY)
+      if (raw === "true") _rankingEntry.value = true
+      else if (raw === "false") _rankingEntry.value = false
+      else if (raw !== null) {
+        console.warn("[settingsStore] 排行榜入口开关值非法，维持默认 true:", raw)
+      }
+    } catch (e) {
+      console.warn("[settingsStore] 排行榜入口开关加载失败（维持默认）", e)
     }
 
     // 小说导出：全局默认格式 + 三项内容开关（native 共享 SharedPreferences / dev idbKV）
@@ -507,6 +523,13 @@ export const useSettingsStore = defineStore("settings", () => {
     void prefs()
       .set(RELATED_INJECTION_KEY, String(enabled))
       .catch((e) => console.warn("[settingsStore] 相关作品注入开关写入失败", e))
+  }
+
+  function setRankingEntry(enabled: boolean): void {
+    _rankingEntry.value = enabled
+    void prefs()
+      .set(RANKING_ENTRY_KEY, String(enabled))
+      .catch((e) => console.warn("[settingsStore] 排行榜入口开关写入失败", e))
   }
 
   function setNovelExportFormat(format: NovelExportFormat): void {
@@ -794,6 +817,7 @@ export const useSettingsStore = defineStore("settings", () => {
     themeColor,
     language,
     relatedInjection,
+    rankingEntry,
     ugoiraDownloadFormat,
     novelExportFormat,
     novelExportOptions,
@@ -816,6 +840,7 @@ export const useSettingsStore = defineStore("settings", () => {
     setThemeColor,
     setLanguage,
     setRelatedInjection,
+    setRankingEntry,
     setNovelExportFormat,
     setNovelExportIncludeMetadata,
     setNovelExportIncludeCover,
