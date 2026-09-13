@@ -1,6 +1,6 @@
 # Spec: 排行榜（插画榜；双端：app webview + app-lynx）
 
-- 状态：spec 定稿待实施（2026-09-13；12 项裁决 + 测试缝确认 → 已拆票）
+- 状态：implemented（2026-09-13 当日实施于分支 `feat/solidjs-2-migration`，7 工单 #513–#519 全落地：`31de4de0`→`fe505d53`→`97d191d8`→`9fc21b01`→`f7761853`→`a87e2bd6`→`fbe2046f`；门禁 `check:all` / `test:all` 全绿（app 186 文件 1747 用例 + lynx 92 文件 1221 用例 + 共享包）；仓库级双轴 code-review 复审：1 Blocking（lynx 设备级键未入备份域）+ 4 Should-fix 全部修复（`5cbcc308`/`eb494255`），复审零 Blocking。**遗留**：Android 模拟器 E2E 套件在本机被既有环境问题阻断（chromedriver 113.0.5672.63 为 113 线最后一版、无与设备 WebView 113.0.5672.136 匹配的构建 → `disconnected: not connected to DevTools`；模拟器 DNS 探测失败；`fab-hit-testing` 期望 720x1280 而套件自动选中 1080x2160 的 `pictelio_ui`），失败面全部在引擎切换/网络自检等既有路径，非排行榜；spec §8 四项实测验证项、§9 扩展路径）
 - 日期：2026-09-13
 - 关联：原型归档 commit `58170a2b`（入口形态 A/B/C 与 ①/②/③）、`6a2b20fc`（范围层级 S1/S2/S3）；入口形态与范围均已在原型上裁决
 - 端点事实：`/v1/illust/ranking`（**非** `/v1/ranking/illust`），响应顶层 `illusts` + `next_url`，条目**无 rank 字段**，单页 30 条
