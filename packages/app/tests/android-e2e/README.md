@@ -47,12 +47,43 @@ AVD 检测启动 → boot 等待 → chromedriver 预置 → 编译安装 APK �
 
 ### 环境变量
 
-| 变量                       | 作用                                                    |
-| -------------------------- | ------------------------------------------------------- |
-| `ANDROID_E2E_AVD`          | 指定 AVD（如 `pictelio_ui`），默认自动选择              |
-| `ANDROID_E2E_SKIP_BUILD=1` | 跳过 `pnpm build:android`，直接使用既有 APK（快速迭代） |
-| `ANDROID_E2E_APPIUM_PORT`  | Appium 端口，默认 4723                                  |
-| `CHROMEDRIVER_EXECUTABLE`  | 手动指定 Chromedriver 路径（自动下载失败时的逃生通道）  |
+| 变量                       | 作用                                                                                      |
+| -------------------------- | ----------------------------------------------------------------------------------------- |
+| `ANDROID_E2E_AVD`          | 指定 AVD（如 `pictelio_ui`），默认自动选择                                                |
+| `ANDROID_E2E_BUILD_MODE`   | 设为 `e2e` 时改跑 `pnpm build:android:e2e`（保留 E2E 钩子），默认普通构建，见「构建模式」 |
+| `ANDROID_E2E_SKIP_BUILD=1` | 跳过 `pnpm build:android`，直接使用既有 APK（快速迭代）                                   |
+| `ANDROID_E2E_APPIUM_PORT`  | Appium 端口，默认 4723                                                                    |
+| `CHROMEDRIVER_EXECUTABLE`  | 手动指定 Chromedriver 路径（自动下载失败时的逃生通道）                                    |
+
+### 构建模式（ANDROID_E2E_BUILD_MODE）
+
+`build-install.ts` 的 `buildDebugApk()` 默认跑 `pnpm build:android`（普通构建，web 产物**不含**
+`window.pictelioE2e` E2E 钩子）；设置 `ANDROID_E2E_BUILD_MODE=e2e` 时改跑
+`pnpm build:android:e2e`（web 构建带 `--mode e2e`，define `__E2E__=true` 保留钩子）。
+
+- **依赖 `window.pictelioE2e` 钩子的用例**：`switch-client-oneway` / `switch-client-roundtrip` /
+  `switch-client-roundtrip-3x`（经 `/client-switch` 页的钩子触发切换）。用普通构建跑这些用例
+  会红在「E2E 钩子应存在」类断言上——先确认 `ANDROID_E2E_BUILD_MODE=e2e`。
+- `switch-client-roundtrip-low` 走契约层（`prefs.ts` adb 写 pref + 重启），不依赖钩子，两种构建均可。
+- 快速迭代：`ANDROID_E2E_SKIP_BUILD=1` 跳过编译直接复用既有 APK。构建模式随产物本身固化，
+  **切换 BUILD_MODE 后必须重新编译**，SKIP_BUILD 复用的旧产物不会因此改变模式。
+
+### AVD 选择（ANDROID_E2E_AVD）
+
+- 默认自动选择：`avd.ts` 按 `KNOWN_AVDS` 顺序（`pictelio_ui` → `pictelio_low`）取第一个存在的，
+  即默认落在 `pictelio_ui`（android-34，WebView ≥ 85，可真实运行 App）。
+- 以下用例必须在 `pictelio_low`（android-28，WebView < 85）上运行：
+  - `switch-client-roundtrip-low`：spec 内已 pin 缺省 `pictelio_low`，并在 setup 连设备之前用
+    环境常量做整文件 skip guard（解析到其他 AVD 时跳过，防 ADR-0153「未自动降级」假失败，
+    ADR-0159 根因 3）；
+  - `fab-hit-testing-regression`：spec 内已 pin 缺省 `pictelio_low`（坐标常量绑定
+    720×1280 / density 320，跑 pictelio_ui 几何断言必失败）；
+  - `webview-only-upgrade`：spec **未** pin AVD，需按其头注释显式
+    `ANDROID_E2E_AVD=pictelio_low`（另有 `ANDROID_E2E_FLAVOR=webview` 的 skip guard；
+    不显式指定时会被自动选到 pictelio_ui）。
+  - pin 缺省不禁止显式覆盖：`ANDROID_E2E_AVD=pictelio_low` 始终有效。
+- `ensureEmulator` 的抢用保护：检测到已在线模拟器但不是目标 AVD 时**直接抛错**（提示先关闭
+  或设置 `ANDROID_E2E_AVD`），不抢用，避免误测错设备；无在线模拟器时才以 `-no-window` 启动目标 AVD。
 
 ## 关键行为说明
 
