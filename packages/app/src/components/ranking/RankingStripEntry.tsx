@@ -17,6 +17,7 @@ import SkeletonShimmer from "@/components/SkeletonShimmer";
 import FluentIcon from "@/components/ui/FluentIcon";
 import { resolveImageUrl } from "@/utils/imageLoader";
 import { t } from "@/i18n";
+import { createDeferredMount } from "@/primitives/createDeferredMount";
 
 /** 入口横滑条展示数（spec §3.4：取首屏 30 条的前 20） */
 const STRIP_LIMIT = 20;
@@ -147,10 +148,15 @@ const StripInner: Component<RankingStripEntryProps> = (props) => {
 };
 
 /** 开关关闭时不创建子组件 → 不构造数据源、不发请求 */
-const RankingStripEntry: Component<RankingStripEntryProps> = (props) => (
-  <Show when={rankingEntry()}>
-    <StripInner refreshEpoch={props.refreshEpoch} />
-  </Show>
-);
+const RankingStripEntry: Component<RankingStripEntryProps> = (props) => {
+  // 延迟挂载（createDeferredMount）：StripInner 会构造 v6 查询并读取其投影，
+  // 若发生在路由过渡中会令过渡永不提交（登录后 navigate('/home') 停在 /login 的根因）。
+  const ready = createDeferredMount();
+  return (
+    <Show when={ready() && rankingEntry()}>
+      <StripInner refreshEpoch={props.refreshEpoch} />
+    </Show>
+  );
+};
 
 export default RankingStripEntry;

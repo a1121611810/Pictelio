@@ -58,6 +58,12 @@ vi.mock("@solidjs/router", async (importOriginal) => {
 
 import Ranking from "@/routes/Ranking";
 
+/** 渲染榜单页并等待延迟挂载（createDeferredMount）落定——主体挂载后才有 DOM/接线可断言 */
+async function renderRanking(): Promise<void> {
+  render(() => <Ranking />);
+  await new Promise((r) => setTimeout(r, 0));
+}
+
 const modeChip = (label: string) =>
   screen
     .getAllByRole("button")
@@ -75,23 +81,23 @@ describe("Ranking 页面接线（#515）", () => {
     mocks.state.entries = [];
   });
 
-  it("点击维度 chip → setQuery 带新 mode + ensureLoaded", () => {
-    render(() => <Ranking />);
+  it("点击维度 chip → setQuery 带新 mode + ensureLoaded", async () => {
+    await renderRanking();
     fireEvent.click(modeChip("周榜"));
     expect(mocks.setQuery).toHaveBeenLastCalledWith({ mode: "weekly", date: null });
     expect(mocks.ensureLoaded).toHaveBeenCalled();
   });
 
-  it("今日时「后一天」禁用（页面接线）", () => {
-    render(() => <Ranking />);
+  it("今日时「后一天」禁用（页面接线）", async () => {
+    await renderRanking();
     expect((screen.getByLabelText("后一天") as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("R-18 档首载失败（服务端无数据）→ 渲染可操作指引，不显示普通空态", () => {
+  it("R-18 档首载失败（服务端无数据）→ 渲染可操作指引，不显示普通空态", async () => {
     mocks.state.error = { type: "unknown", message: "boom" };
     mocks.state.serverCount = 0;
     mocks.state.loading = false;
-    render(() => <Ranking />);
+    await renderRanking();
     fireEvent.click(modeChip("R-18"));
     // Solid 2.0：事件内 signal 写批处理，DOM 断言前需 flush（同 searchExecution.test.ts）
     flush();
@@ -100,10 +106,10 @@ describe("Ranking 页面接线（#515）", () => {
     expect(screen.queryByText("暂无榜单内容")).toBeNull();
   });
 
-  it("R-18 档服务端有数据但客户端过滤光 → 不显示指引（普通空态）", () => {
+  it("R-18 档服务端有数据但客户端过滤光 → 不显示指引（普通空态）", async () => {
     mocks.state.serverCount = 30; // 服务端有数据，entries 因过滤为空
     mocks.state.loading = false;
-    render(() => <Ranking />);
+    await renderRanking();
     fireEvent.click(modeChip("R-18"));
     expect(screen.queryByText("R-18 榜单需要先在 pixiv 开启")).toBeNull();
   });

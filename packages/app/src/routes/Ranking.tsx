@@ -18,6 +18,7 @@ import RankingRowCard, { rankingCover } from "@/components/ranking/RankingRowCar
 import RankingSkeleton from "@/components/ranking/RankingSkeleton";
 import { shouldShowR18Notice } from "@/components/ranking/rankingNotice";
 import { createRankingStore } from "@/stores/rankingStore";
+import { createDeferredMount } from "@/primitives/createDeferredMount";
 import { createScrollBehavior } from "@/primitives/scroll/createScrollBehavior";
 import { scrollToTop } from "@/utils/scrollToTop";
 import { t } from "@/i18n";
@@ -36,7 +37,7 @@ function normalizeDate(iso: string): string | null {
   return iso === jstToday() ? null : iso;
 }
 
-const Ranking: Component = () => {
+const RankingInner: Component = () => {
   const navigate = useNavigate();
   const store = createRankingStore();
   const { visible: headerVisible } = createScrollBehavior();
@@ -167,6 +168,20 @@ const Ranking: Component = () => {
       </PageTransition>
       <NavBar />
     </>
+  );
+};
+
+/**
+ * 路由出口：延迟到宿主提交后挂载榜单页主体（createDeferredMount）。
+ * 主体内的 createRankingStore 会构造 v6 查询并读取其投影，若在路由过渡中执行会令过渡
+ * 永不提交；骨架作为过渡期间的 fallback 立即渲染（先渲染后加载）。
+ */
+const Ranking: Component = () => {
+  const ready = createDeferredMount();
+  return (
+    <Show when={ready()}>
+      <RankingInner />
+    </Show>
   );
 };
 
