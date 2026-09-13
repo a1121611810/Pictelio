@@ -1,6 +1,6 @@
 # Spec: 引擎切换线 E2E 恢复（桥线程卸载 + 测试契约刷新）
 
-- 状态：implemented（2026-09-14；分支 fix/engine-switch-e2e-recovery，T1-T7 全部落地 + code-review 双轮 PASS。E2E 验收：最终 APK 下 oneway / roundtrip / 3x / settings-sync-contract 18/18 绿、roundtrip-low 2/2 绿（ADR-0153 降级实测通过）、fab-hit-testing 2/2 绿（该套件自 2026-08-30 以来首次完整跑通）——移交清单 10 failed → 0 failed、连带的 fab 跳过转绿。工程门禁：check:all / lint:all 绿；单测 app 1752 / lynx 1221 / ugoira 等全绿（根 test:all 并发下 relatedInjectionStore 有与本 effort 无关的既有 flake，单跑稳定；agent-browser 套件为内容/网络依赖型既有失败，与本 effort 改动零交集，见 #528）
+- 状态：implemented（2026-09-14；分支 fix/engine-switch-e2e-recovery，T1-T7 全部落地 + code-review 双轮 PASS。E2E 验收：最终 APK 下 oneway / roundtrip / 3x / settings-sync-contract 18/18 绿、roundtrip-low 2/2 绿（ADR-0153 降级实测通过）、fab-hit-testing 2/2 绿（该套件自 2026-08-30 以来首次完整跑通）——移交清单 10 failed → 0 failed、连带的 fab 跳过转绿。工程门禁：check:all / lint:all 绿；单测 app 1752 / lynx 1221 / ugoira 等全绿（根 test:all 并发下 relatedInjectionStore 有与本 effort 无关的既有 flake，单跑稳定）。agent-browser 套件的失败已做基线 bisect 实证：在分叉点 0e6bba07 复跑同样 4 spec 得到逐字一致的 9 失败（横向溢出 600>360、Feed 空、保存失败等）——为分支既有的内容/UI 问题，非本 effort 回归，见 #528）
 - 日期：2026-09-13
 - 决策依据：ADR-0159（插件桥线程卸载与引擎切换线 E2E 契约修复）
 - 失败清单：`docs/android-e2e-engine-switch-known-failures.md`（10 failed / 21 passed / 5 skipped，6 spec）
