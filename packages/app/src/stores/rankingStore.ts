@@ -12,7 +12,7 @@
  * 保证「先渲染骨架、后发请求」。
  */
 import type { Accessor } from "solid-js";
-import { createEffect, createSignal, untrack } from "solid-js";
+import { createSignal, untrack } from "solid-js";
 import { useInfiniteQuery } from "@tanstack/solid-query";
 import { DEFAULT_RANK_MODE, rankingCacheKey, type RankingQuery } from "@pictelio/ranking-core";
 import { queryClient } from "@/api/queryClient";
@@ -113,22 +113,22 @@ export function createRankingStore(initial?: RankingQuery): RankingStoreResult {
    * 重取期间保留上一份已提交数据——与既有 createTQFeedStore 的实际语义一致
    * （它靠 loading 短路，仅在 success 后读 data，刷新时由 refreshing 覆盖显示）。
    */
-  const [committedPages, setCommittedPages] = createSignal<PixivIllustListResponse[]>([]);
-  // 双参 createEffect（Solid 2.0 处方）：compute 段只在可安全同步读取时取页快照，
-  // apply 段写 signal。非 idle（fetching/paused）时 compute 在读到 data() 之前返回 null，
-  // 因此重取期间不会触碰未提交的 data()，只保留上一份快照。
-  createEffect(
-    () => {
-      if (q.fetchStatus !== "idle" || q.dataUpdatedAt === 0) return null;
-      return q.data?.pages ?? [];
-    },
-    (pages) => {
-      if (pages) setCommittedPages(pages);
-    },
-  );
+  // 快照必须是**纯惰性读取**，禁止用 createEffect 建立它：本 store 由组件在路由
+  // 过渡（transition）中挂载创建，而在过渡中创建 effect 会让过渡永不提交
+  // （实机实证：登录后 navigate('/home') 永久停在 /login；移除该 effect 即恢复）。
+  // 因此快照在访问器被读取时刷新——仅当「已落定且有提交数据」才展开 data()。
+  let committedPages: PixivIllustListResponse[] = [];
+  const readCommittedPages = (): PixivIllustListResponse[] => {
+    // 读取 fetchStatus/dataUpdatedAt 建立响应式依赖；此时两个 meta 字段都是同步通道，
+    // 不会挂起。只有满足条件才触碰 data()（适配层此时同步返回数据）。
+    if (q.fetchStatus === "idle" && q.dataUpdatedAt > 0) {
+      committedPages = q.data?.pages ?? [];
+    }
+    return committedPages;
+  };
 
   /** 服务端返回的全量条目（过滤前，页序 × 页内序） */
-  const serverItems: Accessor<PixivIllust[]> = () => flattenIllusts(committedPages());
+  const serverItems: Accessor<PixivIllust[]> = () => flattenIllusts(readCommittedPages());
   const serverCount: Accessor<number> = () => serverItems().length;
 
   const entries: Accessor<RankEntry[]> = () => {
@@ -144,7 +144,7 @@ export function createRankingStore(initial?: RankingQuery): RankingStoreResult {
   };
 
   const nextUrl: Accessor<string | null> = () => {
-    const pages = committedPages();
+    const pages = readCommittedPages();
     if (pages.length === 0) return null;
     return pages[pages.length - 1]!.next_url ?? null;
   };
