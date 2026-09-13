@@ -265,6 +265,14 @@ const zhPages = {
   "me.webdav.summarySource": "来源引擎：{{engine}} · 版本 {{version}}",
   "me.webdav.summaryCounts": "设备级 {{device}} 项 / 账号级（当前账号）{{account}} 项 / sets {{sets}} 组",
   "me.webdav.cancel": "取消",
+
+  // ── 排行榜页（spec docs/specs/ranking.md；#517 页面骨架）──
+  "ranking.page.title": "排行榜",
+  "ranking.page.retry": "重试",
+  "ranking.page.empty": "暂无榜单内容",
+  "ranking.page.emptyHint": "稍后再来看看",
+  "ranking.footer.loading": "加载中…",
+  "ranking.footer.end": "没有更多了",
 } as const;
 
 export default zhPages;

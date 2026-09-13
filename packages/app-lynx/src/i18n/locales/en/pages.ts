@@ -267,6 +267,14 @@ const enPages = {
   "me.webdav.summarySource": "Source engine: {{engine}} · version {{version}}",
   "me.webdav.summaryCounts": "{{device}} device keys / {{account}} account keys (current account) / {{sets}} sets",
   "me.webdav.cancel": "Cancel",
+
+  // ── Ranking page (spec docs/specs/ranking.md; #517 page skeleton) ──
+  "ranking.page.title": "Rankings",
+  "ranking.page.retry": "Retry",
+  "ranking.page.empty": "No ranking entries",
+  "ranking.page.emptyHint": "Check back later",
+  "ranking.footer.loading": "Loading…",
+  "ranking.footer.end": "No more results",
 } as const satisfies Record<ZhPagesKey, string>;
 
 export default enPages;

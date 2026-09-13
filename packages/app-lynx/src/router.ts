@@ -54,6 +54,7 @@ import ErrorPage from './pages/ErrorPage.vue'
 import Watchlist from './pages/Watchlist.vue'
 import DownloadManager from './pages/DownloadManager.vue'
 import NetworkCheck from './pages/NetworkCheck.vue'
+import Ranking from './pages/Ranking.vue'
 
 /**
  * 路由表（vue-router 1:1 迁移，ADR-0138 决策 3）：
@@ -77,6 +78,7 @@ export const routes: RouteRecordRaw[] = [
   { path: '/bookmarks', name: 'bookmarks', component: Bookmarks, meta: { requiresAuth: true } },
   { path: '/me', name: 'me', component: Me, meta: { requiresAuth: true } },
   { path: '/watchlist', name: 'watchlist', component: Watchlist, meta: { requiresAuth: true } },
+  { path: '/ranking', name: 'ranking', component: Ranking, meta: { requiresAuth: true } },
   { path: '/downloads', name: 'downloads', component: DownloadManager, meta: { requiresAuth: true } },
   { path: '/update', name: 'update', component: UpdatePage, meta: { backBehavior: 'exit' } },
   { path: '/error', name: 'error', component: ErrorPage, meta: { backBehavior: 'exit' } },
