@@ -47,13 +47,14 @@ AVD 检测启动 → boot 等待 → chromedriver 预置 → 编译安装 APK �
 
 ### 环境变量
 
-| 变量                       | 作用                                                                                      |
-| -------------------------- | ----------------------------------------------------------------------------------------- |
-| `ANDROID_E2E_AVD`          | 指定 AVD（如 `pictelio_ui`），默认自动选择                                                |
-| `ANDROID_E2E_BUILD_MODE`   | 设为 `e2e` 时改跑 `pnpm build:android:e2e`（保留 E2E 钩子），默认普通构建，见「构建模式」 |
-| `ANDROID_E2E_SKIP_BUILD=1` | 跳过 `pnpm build:android`，直接使用既有 APK（快速迭代）                                   |
-| `ANDROID_E2E_APPIUM_PORT`  | Appium 端口，默认 4723                                                                    |
-| `CHROMEDRIVER_EXECUTABLE`  | 手动指定 Chromedriver 路径（自动下载失败时的逃生通道）                                    |
+| 变量                       | 作用                                                                                                                                                                                                           |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ANDROID_E2E_AVD`          | 指定 AVD（如 `pictelio_ui`），默认自动选择                                                                                                                                                                     |
+| `ANDROID_E2E_HTTP_PROXY`   | 可选；设为宿主代理（如 `10.0.2.2:10808`）时为模拟器设全局 HTTP 代理（`settings put global http_proxy`），用于宿主网络直连 pixiv 受限（DNS 污染）的环境；teardown 会清除（`settings delete`）。默认不设、零影响 |
+| `ANDROID_E2E_BUILD_MODE`   | 设为 `e2e` 时改跑 `pnpm build:android:e2e`（保留 E2E 钩子），默认普通构建，见「构建模式」                                                                                                                      |
+| `ANDROID_E2E_SKIP_BUILD=1` | 跳过 `pnpm build:android`，直接使用既有 APK（快速迭代）                                                                                                                                                        |
+| `ANDROID_E2E_APPIUM_PORT`  | Appium 端口，默认 4723                                                                                                                                                                                         |
+| `CHROMEDRIVER_EXECUTABLE`  | 手动指定 Chromedriver 路径（自动下载失败时的逃生通道）                                                                                                                                                         |
 
 ### 构建模式（ANDROID_E2E_BUILD_MODE）
 
@@ -76,8 +77,10 @@ AVD 检测启动 → boot 等待 → chromedriver 预置 → 编译安装 APK �
   - `switch-client-roundtrip-low`：spec 内已 pin 缺省 `pictelio_low`，并在 setup 连设备之前用
     环境常量做整文件 skip guard（解析到其他 AVD 时跳过，防 ADR-0153「未自动降级」假失败，
     ADR-0159 根因 3）；
-  - `fab-hit-testing-regression`：spec 内已 pin 缺省 `pictelio_low`（坐标常量绑定
-    720×1280 / density 320，跑 pictelio_ui 几何断言必失败）；
+  - `fab-hit-testing-regression`：spec 内已 pin 缺省 `pictelio_ui`（阶段 A webview 登录需
+    WebView ≥ 85；坐标常量按 1080×2160 / density 480 的 vw 几何推导。显式
+    `ANDROID_E2E_AVD=pictelio_low` 会整文件 skip——该 AVD WebView 66 < 85，
+    client_kind=webview 重启触发 ADR-0153 自动降级，无 WEBVIEW context）；
   - `webview-only-upgrade`：spec **未** pin AVD，需按其头注释显式
     `ANDROID_E2E_AVD=pictelio_low`（另有 `ANDROID_E2E_FLAVOR=webview` 的 skip guard；
     不显式指定时会被自动选到 pictelio_ui）。
