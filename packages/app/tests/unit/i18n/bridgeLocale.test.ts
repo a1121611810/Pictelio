@@ -20,8 +20,6 @@ vi.mock("@/native/ClientInfo", () => ({
   },
 }));
 
-const bridgeReject = makeDeferred<never>();
-
 beforeEach(() => {
   bridgeDeferred = makeDeferred<{ languageTag: string }>();
 });
