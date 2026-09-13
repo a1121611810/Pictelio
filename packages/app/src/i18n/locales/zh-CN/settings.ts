@@ -23,6 +23,9 @@ const zhSettings = {
   "settings.content.showR18GDesc": "关闭后列表中不展示猎奇内容，需刷新列表生效",
   "settings.content.relatedInjection": "相关作品注入",
   "settings.content.relatedInjectionDesc": "从详情返回后，在该作品下方插入一行相关作品推荐",
+  "settings.content.rankingEntry": "排行榜入口",
+  "settings.content.rankingEntryDesc":
+    "在推荐流顶部显示今日排行入口（关闭后入口隐藏，榜单页仍可访问）",
   "settings.content.aiFilter.title": "AI 作品",
   "settings.content.aiFilter.desc": "控制 AI 生成 / AI 辅助作品的显示方式",
   "settings.content.aiFilter.groupLabel": "AI 作品过滤模式",

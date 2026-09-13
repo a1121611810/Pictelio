@@ -334,14 +334,7 @@ const enRoutes = {
   "homePage.empty.title": "Nothing here yet",
   "homePage.empty.desc": "Try another content type or check back later",
 
-  // ── Ranking prototype (home/RankingPrototype; PROTOTYPE throwaway) ──
-  "ranking.protoScopeS1": "S1 entry only",
-  "ranking.protoScopeS2": "S2 basic ranking page",
-  "ranking.protoScopeS3": "S3 full ranking page",
-  "ranking.protoSwitchAria": "Prototype variant switcher",
-  "ranking.protoPrevAria": "Previous variant",
-  "ranking.protoNextAria": "Next variant",
-  "ranking.title": "Rankings",
+  // ── Ranking: mode catalog + mode/date controls (spec docs/specs/ranking.md §3.2/§5.3) ──
   "ranking.modeListAria": "Ranking categories",
   "ranking.mode.daily": "Daily",
   "ranking.mode.weekly": "Weekly",
@@ -354,23 +347,14 @@ const enRoutes = {
   "ranking.nextDayAria": "Next day",
   "ranking.today": "Today",
   "ranking.dateLong": "{{year}}-{{month}}-{{day}}",
-  "ranking.listAria": "Ranking list",
-  "ranking.todayTop": "Today's Top {{count}}",
-  "ranking.todayListAria": "Today's rankings",
-  "ranking.collapseAria": "Collapse rankings",
-  "ranking.entryAlt": "No.{{rank}}: {{title}}",
-  "ranking.viewAllAria": "View full rankings",
-  "ranking.viewAll": "See all",
-  "ranking.scopeHintS1":
-    "Entry only: the strip shows today's Top 20, tapping opens the work. No ranking page, no category switch, no date history",
-  "ranking.scopeHintS2":
-    "Entry + basic ranking page: switch category (daily/weekly/monthly/newcomers/original/R-18), today only",
-  "ranking.scopeHintS3":
-    "Entry + full ranking page: category switch + date history (today badge, future dates disabled)",
-  "ranking.entryAria": "Rankings entry",
-  "ranking.backToRecommendedAria": "Back to recommendations",
-  "ranking.mock.entryTitle": "Ranking work #{{rank}}",
-  "ranking.mock.artistSample": "Sample artist {{rank}}",
+
+  // ── Recommended-feed entry strip (spec docs/specs/ranking.md §5.2; #516) ──
+  "ranking.entry.title": "Today's Top {{count}}",
+  "ranking.entry.viewAll": "See all",
+  "ranking.entry.viewAllAria": "View full rankings",
+  "ranking.entry.collapseAria": "Collapse rankings",
+  "ranking.entry.stripAria": "Today's rankings",
+  "ranking.entry.itemAria": "No.{{rank}}: {{title}}",
 
   // ── Ranking page (spec docs/specs/ranking.md; #514 page skeleton) ──
   "ranking.page.title": "Rankings",

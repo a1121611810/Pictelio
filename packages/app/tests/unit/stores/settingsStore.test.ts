@@ -326,3 +326,22 @@ describe("settingsStore — 账号级 AI 三态过滤（ADR-0155）", () => {
     expect(store.aiFilterMode()).toBe("show");
   });
 });
+
+describe("settingsStore — rankingEntry（排行榜入口开关，设备级默认开）", () => {
+  it("无记录 → 默认开启", async () => {
+    const { store } = await loadStore();
+    expect(store.rankingEntry()).toBe(true);
+  });
+
+  it("hydrate ranking_entry=false → 关闭（真实 key 读取）", async () => {
+    const { store } = await loadStore({ ranking_entry: "false" });
+    expect(store.rankingEntry()).toBe(false);
+  });
+
+  it("setRankingEntry(false) → 更新 state + 持久化", async () => {
+    const { store, mem } = await loadStore();
+    await store.setRankingEntry(false);
+    expect(store.rankingEntry()).toBe(false);
+    await vi.waitFor(() => expect(mem.dump().get("ranking_entry")).toBe("false"));
+  });
+});

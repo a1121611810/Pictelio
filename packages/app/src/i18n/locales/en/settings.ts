@@ -29,6 +29,9 @@ const enSettings = {
   "settings.content.relatedInjection": "Related works injection",
   "settings.content.relatedInjectionDesc":
     "Shows a row of related works under a work when you return from its detail page.",
+  "settings.content.rankingEntry": "Rankings entry",
+  "settings.content.rankingEntryDesc":
+    "Shows today's ranking entry at the top of the recommended feed (the ranking page stays reachable when off).",
   "settings.content.aiFilter.title": "AI works",
   "settings.content.aiFilter.desc":
     "Controls how AI-generated and AI-assisted works are displayed.",

@@ -12,13 +12,13 @@
 import type { Component } from "solid-js";
 import { t } from "../i18n";
 import { createEffect, onSettled } from "solid-js";
-import { useLocation, useNavigate } from "@solidjs/router";
+import { useNavigate } from "@solidjs/router";
 import type { PixivIllust, PixivNovel, ApiError } from "@/api/types";
 import PageTransition from "@/components/PageTransition";
 import { FeedList } from "@/components/home/FeedList";
 import { markContentReady } from "@/native/splashBridge";
 import SideNavShell, { type HomeTab } from "@/components/home/SideNavShell";
-import RankingPrototype, { parseProtoVariant } from "@/components/home/RankingPrototype";
+import RankingStripEntry from "@/components/ranking/RankingStripEntry";
 import IllustSingleCard from "@/components/home/IllustSingleCard";
 import RelatedStripRow from "@/components/home/RelatedStripRow";
 import NovelRowCard from "@/components/home/NovelRowCard";
@@ -305,6 +305,8 @@ const IllustFeedPanel: Component<{ tab: FeedTab }> = (props) => {
   const navigate = useNavigate();
   const src = () => illustSource(props.tab);
   useFeedActivation(src);
+  // 下拉刷新代：刷新时恢复被收起的排行榜入口（spec §5.1「刷新恢复」）
+  const [feedEpoch, setFeedEpoch] = createSignal(0);
 
   // 返回消费锚点：路由返回时面板重挂载（store 模块层存活）。
   // tab 不匹配时 consume 内部保留 pending，交给正确的 tab 面板。
@@ -332,49 +334,57 @@ const IllustFeedPanel: Component<{ tab: FeedTab }> = (props) => {
   };
 
   return (
-    <FeedList
-      source={{
-        items: renderItems,
-        loading: () => src().loading(),
-        refreshing: () => src().refreshing(),
-        loadingMore: () => src().loadingMore(),
-        nextUrl: () => src().nextUrl(),
-        fetchMore: () => src().fetchMore(),
-        // 下拉刷新 = 新会话：清空该 tab 注入行
-        refresh: () => {
-          clearRelatedRows(props.tab);
-          return src().refresh();
-        },
-        error: () => src().error(),
-        paginationError: () => src().paginationError(),
-      }}
-      containerClass="flex flex-col gap-[var(--spacingVerticalM)] px-4 pt-3"
-      refreshMode="overlay"
-      skeleton={() => <IllustRowSkeleton />}
-      empty={() => <EmptyHint />}
-      // 预取 URL 与 IllustSingleCard 的 cover() 取值保持一致（large 优先），确保预热 key = 展示 src；
-      // 注入行条目不参与主列表预取
-      prefetchUrl={(item) =>
-        "relatedRow" in item ? undefined : (item.image_urls.large ?? item.image_urls.medium)
-      }
-      renderItem={(item) =>
-        "relatedRow" in item ? (
-          <RelatedStripRow
-            row={item.relatedRow}
-            onNavigate={(id) => void navigate(`/illust/${id}`)}
-            onDismiss={() => removeRelatedRow(props.tab, item.relatedRow.anchorId)}
-          />
-        ) : (
-          <IllustSingleCard
-            illust={item}
-            onClick={() => {
-              recordRelatedAnchor(props.tab, item.id);
-              void navigate(`/illust/${item.id}`);
-            }}
-          />
-        )
-      }
-    />
+    <>
+      {/* 排行榜入口（spec docs/specs/ranking.md §5.1）：推荐×插画面板列表第一张卡之前；
+          开关由 RankingStripEntry 内部 gate（关闭时不建数据源） */}
+      <Show when={props.tab === "recommended"}>
+        <RankingStripEntry refreshEpoch={feedEpoch()} />
+      </Show>
+      <FeedList
+        source={{
+          items: renderItems,
+          loading: () => src().loading(),
+          refreshing: () => src().refreshing(),
+          loadingMore: () => src().loadingMore(),
+          nextUrl: () => src().nextUrl(),
+          fetchMore: () => src().fetchMore(),
+          // 下拉刷新 = 新会话：清空该 tab 注入行 + 恢复排行榜入口
+          refresh: () => {
+            clearRelatedRows(props.tab);
+            setFeedEpoch((n) => n + 1);
+            return src().refresh();
+          },
+          error: () => src().error(),
+          paginationError: () => src().paginationError(),
+        }}
+        containerClass="flex flex-col gap-[var(--spacingVerticalM)] px-4 pt-3"
+        refreshMode="overlay"
+        skeleton={() => <IllustRowSkeleton />}
+        empty={() => <EmptyHint />}
+        // 预取 URL 与 IllustSingleCard 的 cover() 取值保持一致（large 优先），确保预热 key = 展示 src；
+        // 注入行条目不参与主列表预取
+        prefetchUrl={(item) =>
+          "relatedRow" in item ? undefined : (item.image_urls.large ?? item.image_urls.medium)
+        }
+        renderItem={(item) =>
+          "relatedRow" in item ? (
+            <RelatedStripRow
+              row={item.relatedRow}
+              onNavigate={(id) => void navigate(`/illust/${id}`)}
+              onDismiss={() => removeRelatedRow(props.tab, item.relatedRow.anchorId)}
+            />
+          ) : (
+            <IllustSingleCard
+              illust={item}
+              onClick={() => {
+                recordRelatedAnchor(props.tab, item.id);
+                void navigate(`/illust/${item.id}`);
+              }}
+            />
+          )
+        }
+      />
+    </>
   );
 };
 
@@ -417,11 +427,6 @@ function clearAllRelatedRows(): void {
 }
 
 const HomePage: Component = () => {
-  const location = useLocation();
-  // PROTOTYPE（throwaway）：排行榜融合形态变体（仅 DEV + ?variant= 生效），裁决后移除
-  const protoVariant = () =>
-    import.meta.env.DEV ? parseProtoVariant(location.query.variant) : undefined;
-
   onSettled(() => {
     // 首页是登录后启动首屏：挂载后通知原生关闭 Splash Screen（幂等）
     markContentReady();
@@ -457,13 +462,6 @@ const HomePage: Component = () => {
           // 历史 Tab 由 SideNavShell 内建，此处不会实际命中，仅类型收窄占位
           if (tab === "history") {
             return <></>;
-          }
-          // PROTOTYPE（throwaway）：变体挂推荐×插画面板；小说面板与生产路径零变化
-          if (tab === "recommended" && contentType() === "illust") {
-            const proto = protoVariant();
-            if (proto) {
-              return <RankingPrototype variant={proto} feed={<IllustFeedPanel tab={tab} />} />;
-            }
           }
           return contentType() === "illust" ? (
             <IllustFeedPanel tab={tab} />

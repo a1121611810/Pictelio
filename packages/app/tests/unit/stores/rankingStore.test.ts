@@ -181,4 +181,23 @@ describe("rankingStore", () => {
     expect(fetchRankingMock.mock.calls.length).toBe(callsAfterFirst + 1);
     dispose();
   });
+
+  it("入口与榜单页同键共用缓存：第二个 store ensureLoaded 不重复请求（spec §6.2）", async () => {
+    fetchRankingMock.mockResolvedValue({ illusts: [illust(1, "2026-01-01")], next_url: null });
+    const a = setup();
+    await a.store.ensureLoaded();
+    const calls = fetchRankingMock.mock.calls.length;
+
+    // 第二个 store 用默认 (daily, today)，与第一个同 query key → 命中缓存
+    let disposeB!: () => void;
+    let storeB!: ReturnType<typeof createRankingStore>;
+    createRoot((d) => {
+      disposeB = d;
+      storeB = createRankingStore();
+    });
+    await storeB.ensureLoaded();
+    expect(fetchRankingMock.mock.calls.length).toBe(calls);
+    a.dispose();
+    disposeB();
+  });
 });

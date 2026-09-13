@@ -29,6 +29,7 @@ const PREF_KEY_SHOW_R18 = "show_r18";
 const PREF_KEY_SHOW_R18G = "show_r18g";
 const PREF_KEY_AI_FILTER_MODE = "ai_filter_mode";
 const PREF_KEY_RELATED_INJECTION = "related_injection";
+const PREF_KEY_RANKING_ENTRY = "ranking_entry";
 const PREF_KEY_SHOW_DETAIL_STAIRS = "show_detail_stairs";
 const PREF_KEY_AUTO_CHECK_UPDATE = "auto_check_update";
 const PREF_KEY_NOVEL_LAYOUT_MODE = "novel_layout_mode";
@@ -173,6 +174,19 @@ const relatedInjectionHandle = settings.define<boolean>({
 export const relatedInjection = () => relatedInjectionHandle.value();
 export async function setRelatedInjection(enabled: boolean): Promise<void> {
   relatedInjectionHandle.set(enabled);
+}
+
+// ── 排行榜入口横滑条（spec docs/specs/ranking.md §5.8；设备级 UI 偏好，默认开）──
+
+const rankingEntryHandle = settings.define<boolean>({
+  key: PREF_KEY_RANKING_ENTRY,
+  default: true,
+  validate: (v): v is boolean => typeof v === "boolean",
+});
+
+export const rankingEntry = () => rankingEntryHandle.value();
+export async function setRankingEntry(enabled: boolean): Promise<void> {
+  rankingEntryHandle.set(enabled);
 }
 
 /**

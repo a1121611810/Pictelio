@@ -1,6 +1,6 @@
 // routes 域（页面骨架文案，域=页面名 camelCase）。
 // B3 机械抽取（工单 #502）：zh 值 = 抽取前源文案逐字节一致（含 JSX 折行的单空格拼接），测试断言依赖。
-// HomePage.tsx（排行榜原型并行开发中）与 ./home/RankingPrototype 引用文案不在本批次范围。
+// 排行榜相关文案（榜单页 / 入口横滑条 / 维度 / 日期 / R-18 指引）由 #513/#515/#516 增量补入。
 const zhRoutes = {
   // ── 登录（Login）──
   "login.tagline": "第三方插画浏览器",
@@ -321,14 +321,7 @@ const zhRoutes = {
   "homePage.empty.title": "暂无内容",
   "homePage.empty.desc": "换一个内容类型或稍后再来看看",
 
-  // ── 排行榜原型（home/RankingPrototype；PROTOTYPE throwaway，zh 值 = 抽取前源文案逐字节一致）──
-  "ranking.protoScopeS1": "S1 只做入口",
-  "ranking.protoScopeS2": "S2 简化榜单页",
-  "ranking.protoScopeS3": "S3 完整榜单页",
-  "ranking.protoSwitchAria": "原型变体切换",
-  "ranking.protoPrevAria": "上一个变体",
-  "ranking.protoNextAria": "下一个变体",
-  "ranking.title": "排行榜",
+  // ── 排行榜：维度目录 + 维度/日期控件（spec docs/specs/ranking.md §3.2/§5.3）──
   "ranking.modeListAria": "排行榜种类",
   "ranking.mode.daily": "日榜",
   "ranking.mode.weekly": "周榜",
@@ -341,21 +334,14 @@ const zhRoutes = {
   "ranking.nextDayAria": "后一天",
   "ranking.today": "今日",
   "ranking.dateLong": "{{year}}年{{month}}月{{day}}日",
-  "ranking.listAria": "排行榜列表",
-  "ranking.todayTop": "今日排行 Top {{count}}",
-  "ranking.todayListAria": "今日排行榜",
-  "ranking.collapseAria": "收起排行榜",
-  "ranking.entryAlt": "第{{rank}}名：{{title}}",
-  "ranking.viewAllAria": "查看完整排行榜",
-  "ranking.viewAll": "全部",
-  "ranking.scopeHintS1":
-    "只有入口：横滑条看今日 Top 20，点图进作品详情。无榜单页、无维度切换、无日期回看",
-  "ranking.scopeHintS2": "入口 + 简化榜单页：可切维度（日/周/月/新人/原创/R-18），但只能看今日",
-  "ranking.scopeHintS3": "入口 + 完整榜单页：维度切换 + 按日期回看（今日标记、未来日期禁用）",
-  "ranking.entryAria": "排行榜入口",
-  "ranking.backToRecommendedAria": "返回推荐",
-  "ranking.mock.entryTitle": "排行榜作品 #{{rank}}",
-  "ranking.mock.artistSample": "画师样本 {{rank}}",
+
+  // ── 推荐流入口横滑条（spec docs/specs/ranking.md §5.2；#516）──
+  "ranking.entry.title": "今日排行 Top {{count}}",
+  "ranking.entry.viewAll": "全部",
+  "ranking.entry.viewAllAria": "查看完整排行榜",
+  "ranking.entry.collapseAria": "收起排行榜",
+  "ranking.entry.stripAria": "今日排行榜",
+  "ranking.entry.itemAria": "第{{rank}}名：{{title}}",
 
   // ── 排行榜页（spec docs/specs/ranking.md；#514 页面骨架）──
   "ranking.page.title": "排行榜",

@@ -8,6 +8,8 @@ import {
   setAiFilterMode,
   relatedInjection,
   setRelatedInjection,
+  rankingEntry,
+  setRankingEntry,
 } from "../../stores/settingsStore";
 import type { AiFilterMode } from "../../utils/aiFilter";
 import FluentIcon from "../ui/FluentIcon";
@@ -107,6 +109,29 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
           checked={relatedInjection()}
           ref={fluentOn("change", () => void setRelatedInjection(!relatedInjection()))}
           aria-label={t("settings.content.relatedInjection")}
+        />
+      </div>
+
+      {/* 排行榜入口横滑条开关（spec docs/specs/ranking.md §5.8） */}
+      <div class="flex items-center justify-between py-3">
+        <div class="flex items-center gap-3">
+          <div class="relative w-6 h-6 flex-shrink-0 text-[var(--colorNeutralForeground2)]">
+            <FluentIcon name="list" size={24} />
+          </div>
+          <div>
+            <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
+              {t("settings.content.rankingEntry")}
+            </p>
+            <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
+              {t("settings.content.rankingEntryDesc")}
+            </p>
+          </div>
+        </div>
+
+        <fluent-switch
+          checked={rankingEntry()}
+          ref={fluentOn("change", () => void setRankingEntry(!rankingEntry()))}
+          aria-label={t("settings.content.rankingEntry")}
         />
       </div>
 
