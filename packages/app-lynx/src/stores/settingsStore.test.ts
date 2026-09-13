@@ -768,6 +768,17 @@ describe('settingsStore 备份原语（T7 m3：exportRawValues / importRawValues
     expect(missing).toEqual([])
   })
 
+  it('BACKUP_DEVICE_KEYS 每项均有 applyRawKey 分支（导入侧完整性守卫）', () => {
+    const storeSrc = readFileSync(fileURLToPath(new URL('./settingsStore.ts', import.meta.url)), 'utf8')
+    const constByLiteral = new Map(
+      [...storeSrc.matchAll(/const ([A-Z_]+_KEY) = "([^"]+)"/g)].map((m) => [m[2]!, m[1]!]),
+    )
+    const uncovered = (BACKUP_DEVICE_KEYS as readonly string[])
+      .map((key) => ({ key, constName: constByLiteral.get(key) }))
+      .filter((x) => !x.constName || !storeSrc.includes(`case ${x.constName}:`))
+    expect(uncovered).toEqual([])
+  })
+
   it('exportRawValues 含 related_injection / ranking_entry（设备级开关）', async () => {
     prefsModule(new Map<string, string>([
       ['related_injection', 'false'],
