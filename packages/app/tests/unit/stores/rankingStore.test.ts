@@ -200,4 +200,18 @@ describe("rankingStore", () => {
     a.dispose();
     disposeB();
   });
+
+  it("未激活时读 entries()/serverCount()/nextUrl() 返回空值而不挂起（回归：禁用查询的 data() 返回 Solid NEVER）", () => {
+    // oracle：spec §6.2「enabled:false + ensureLoaded」下，首帧必须能渲染骨架；
+    // TanStack v6 适配层对 pending+idle 的查询 data() 返回 NEVER，直接读会让投影永不落定。
+    const { store, dispose } = setup();
+    try {
+      expect(store.entries()).toEqual([]);
+      expect(store.serverCount()).toBe(0);
+      expect(store.nextUrl()).toBeNull();
+      expect(store.loading()).toBe(true);
+    } finally {
+      dispose();
+    }
+  });
 });

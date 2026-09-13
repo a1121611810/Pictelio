@@ -97,8 +97,18 @@ export function createRankingStore(initial?: RankingQuery): RankingStoreResult {
     () => queryClient,
   );
 
+  /**
+   * 已落定可读数据：查询未激活/未开始（status=pending 且 fetchStatus=idle）时**不得**读 `q.data`。
+   * TanStack v6 适配层对「pending 且未启用」的查询，`data()` 返回 Solid 的 NEVER 哨兵，
+   * 读取会使所在投影永不落定 → 整棵根 <Show> 停在 fallback（登录后首页永久「加载中」）。
+   * 先读 meta（status/fetchStatus），仅在查询已启用/进行中/有结果时才展开 data。
+   */
+  const dataReadable: Accessor<boolean> = () =>
+    !(q.status === "pending" && q.fetchStatus === "idle");
+
   /** 服务端返回的全量条目（过滤前，页序 × 页内序） */
-  const serverItems: Accessor<PixivIllust[]> = () => flattenIllusts(q.data?.pages ?? []);
+  const serverItems: Accessor<PixivIllust[]> = () =>
+    dataReadable() ? flattenIllusts(q.data?.pages ?? []) : [];
   const serverCount: Accessor<number> = () => serverItems().length;
 
   const entries: Accessor<RankEntry[]> = () => {
@@ -114,6 +124,7 @@ export function createRankingStore(initial?: RankingQuery): RankingStoreResult {
   };
 
   const nextUrl: Accessor<string | null> = () => {
+    if (!dataReadable()) return null;
     const pages = q.data?.pages ?? [];
     if (pages.length === 0) return null;
     return pages[pages.length - 1]!.next_url ?? null;
