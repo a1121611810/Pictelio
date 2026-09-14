@@ -194,10 +194,15 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 超长链", () 
       15_000,
     );
     expect(bookmarkBtn, "详情页应存在收藏按钮").toBe(true);
-    // 点击收藏（evaluate 注入 el.click()，CLI click 对 fluent-button 不可靠）
-    await driver.evaluate(
-      `(() => { const b = document.querySelector('[aria-label="收藏"], [aria-label="取消收藏"]'); if (b) { b.click(); return "clicked"; } return "not-found"; })()`,
-    );
+    // 点击收藏：详情页心形只挂 pointerdown/pointerup（ADR-0160 D4 双轨收藏——
+    // 单击 = 快速收藏，长按 500ms = 收藏面板），el.click() 不触发任何收藏路径；
+    // 故此处按「短按」派发指针手势（pointerup 早于 500ms 长按阈值即走快速收藏）；
+    // 手势函数复用，避免两处注入漂移
+    const tapBookmark = () =>
+      driver.evaluate(
+        `(() => { const b = document.querySelector('[aria-label="收藏"], [aria-label="取消收藏"]'); if (!b) return "not-found"; b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); b.dispatchEvent(new PointerEvent('pointerup', { bubbles: true })); return "tapped"; })()`,
+      );
+    expect(await tapBookmark(), "应能对收藏按钮派发短按手势").toContain("tapped");
     // 等收藏接口回包（按钮 aria-label 变化或页面无错误）
     await driver.waitForJs(
       "document.querySelector('[aria-label=取消收藏]') !== null || document.body.innerText.includes('加载失败')",
@@ -207,10 +212,8 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 超长链", () 
       false,
     );
 
-    // 再次点击取消收藏
-    await driver.evaluate(
-      `(() => { const b = document.querySelector('[aria-label="收藏"], [aria-label="取消收藏"]'); if (b) { b.click(); return "clicked"; } return "not-found"; })()`,
-    );
+    // 再次点击取消收藏（同一短按手势；收藏态翻转后按钮原地复用）
+    expect(await tapBookmark(), "应能再次派发短按手势以取消收藏").toContain("tapped");
     // 取消收藏后页面无错误
     await driver.waitForJs(
       "document.querySelector('[aria-label=收藏]') !== null || document.body.innerText.includes('加载失败')",
