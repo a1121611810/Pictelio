@@ -166,6 +166,25 @@ describe("IllustDetail 心形手势（长按 = 面板 / 单击 = 快速收藏）
     expect(api.addBookmark).not.toHaveBeenCalled();
   });
 
+  it("长按后面板已开、松手仍不得走快速收藏（长按不得双触发）", async () => {
+    vi.useFakeTimers();
+    render(() => <IllustDetail />);
+    await flush();
+
+    const heart = screen.getByLabelText("收藏");
+    fireEvent.pointerDown(heart);
+    await vi.advanceTimersByTimeAsync(600);
+    await flush();
+    expect(screen.queryByTestId("bookmark-panel")).not.toBeNull();
+
+    // 关键：长按开面板后松手，pointerup 不得再触发快速收藏（生产靠 longPressTimer 归零抑制）
+    fireEvent.pointerUp(heart);
+    await flush();
+
+    expect(api.addBookmark).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("bookmark-panel")).not.toBeNull();
+  });
+
   it("单击（<500ms）：快速收藏 public + 无标签，不打开面板（spec D1/D3）", async () => {
     vi.useFakeTimers();
     render(() => <IllustDetail />);

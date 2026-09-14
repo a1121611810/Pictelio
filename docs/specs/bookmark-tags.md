@@ -97,7 +97,7 @@ Android 真机验收暴露：**webview 原生构建下所有写操作（含本�
 
 ## 验收实证（2026-09-14，Android 模拟器 pictelio_ui，webview 端）
 
-`packages/app/tests/android-e2e/specs/bookmark-tags.spec.ts` 4/4 绿（设备级长按/单击 + host 侧直连 Pixiv 读真值）：
+`packages/app/tests/android-e2e/specs/bookmark-tags.spec.ts` **6/6 绿**（设备级长按/单击/返回键 + host 侧直连 Pixiv 读真值）：
 
 - 用例 1：设备级长按（`input motionevent DOWN/UP`，静止 700ms）打开收藏面板，且**不产生收藏**（长按不再是私密直存）。
 - 用例 2：单击 = 快速收藏（不弹面板），服务端 `is_bookmarked=true, restrict=public`；再点还原。
@@ -106,6 +106,8 @@ Android 真机验收暴露：**webview 原生构建下所有写操作（含本�
   ①写入真的落库（非前端乐观自嗨）；②`tags[]` 以空格 join 单值上线；③**`is_registered` 语义确证**：
   新建标签从不是作品标签，却出现在 `is_registered` 集合中 → `is_registered:true` =「该条收藏已保存的标签」。
 - 用例 4（**oracle B**）：重开面板，预填（来自服务端 `bookmark/detail`）显示已保存标签为选中态、按钮为「保存修改」；末尾取消收藏还原账号状态（服务端复核 `is_bookmarked=false`）。
+- 用例 5：面板内切「私密」保存 → 服务端 `restrict=private` 且已注册标签保留（覆盖式编辑改变可见性）。
+- 用例 6：`adb shell input keyevent 4` → 面板关闭且 URL 不变（overlay 栈语义：返回键先关面板不退页）。
 - **附带修复（ADR-0161）**：真机验收暴露 webview 原生构建下**所有写操作失败**（原生 POST 载荷被塞进 query、body 为空，Pixiv 返回 400/404）；已改为表单体并补契约测试。web 模式与 agent-browser E2E 全绿曾掩盖该原生写路径长期失效。
 
-lynx 端设备验证（本 SDK 限制下完整 UI 不可自动化，仓库既有约定）：引擎切换 + LynxActivity 启动渲染 + FAB/页面点击回归 3 项设备级用例全绿（`lynx-boot-renders.spec.ts`、`fab-hit-testing-regression.spec.ts`）；长按在原生 LynxView 的**可触发性**仍需真机手动确认，见跟进 issue。
+lynx 端设备验证（本 SDK 限制下完整 UI 不可自动化，仓库既有约定）：引擎切换 + LynxActivity 启动渲染 + FAB/页面点击回归 3 项设备级用例全绿（`lynx-boot-renders.spec.ts`、`fab-hit-testing-regression.spec.ts`）；长按在原生 LynxView 的**可触发性**、面板可操作性与 lynx 私密写路径见跟进票 **#538**（lynx 端设备取证）；E2E 纳入 CI 的编排决策见 **#539**。

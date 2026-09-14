@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { ApiErrorType } from "@/api/types";
 
 // Mock apiClient
 const mockGet = vi.fn();
@@ -340,7 +341,12 @@ describe("api/illust.ts 收藏加标签", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { loadBookmarkDetail } = await loadApi();
 
-    await expect(loadBookmarkDetail(999)).rejects.toThrow(/bookmark_detail/);
+    // 断言「显式失败且展示层可本地化」：抛 ApiError 形状（带 messageKey），不是裸 Error——
+    // message 快照是简中、只作日志兜底；面板经 apiErrorMessage 必须拿到 messageKey 才能随 locale 渲染
+    await expect(loadBookmarkDetail(999)).rejects.toMatchObject({
+      type: ApiErrorType.UNKNOWN,
+      messageKey: "error.fallback.loadFailed",
+    });
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("[loadBookmarkDetail]"));
   });
 

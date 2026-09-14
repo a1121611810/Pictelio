@@ -35,6 +35,9 @@ interface PrefillSnapshot {
 
 const EMPTY_PREFILL: PrefillSnapshot = { selected: [], restrict: "public", bookmarked: false };
 
+/** 选择反馈（上限/空/重复）自动清除时长；与 app-lynx 的 BOOKMARK_PANEL_FEEDBACK_MS 同语义 */
+const BOOKMARK_PANEL_FEEDBACK_MS = 2500;
+
 // ─── chip 样式（Fluent token 化；选中 = 品牌填充，未选 = 描边） ───
 const CHIP_BASE =
   "inline-flex items-center gap-1.5 min-h-10 px-[var(--spacingHorizontalM)] rounded-[var(--borderRadiusCircular)] [font-size:var(--fontSizeBase200)] border transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] active:scale-[0.98] select-none appearance-none outline-none cursor-pointer focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)]";
@@ -94,7 +97,7 @@ const BookmarkPanel: Component<BookmarkPanelProps> = (props) => {
   const [saving, setSaving] = createSignal(false);
   const [saveError, setSaveError] = createSignal<string | null>(null);
   /** 已收藏态（预填真值；未落定前用宿主快照兜底，仅用于保存按钮文案） */
-  const [bookmarked, setBookmarked] = createSignal(props.isBookmarked);
+  const [bookmarked, setBookmarked] = createSignal(untrack(() => props.isBookmarked));
 
   // ─── 预填请求（detail）：generation gate + AbortController ───
   let detailGen = 0;
@@ -218,7 +221,7 @@ const BookmarkPanel: Component<BookmarkPanelProps> = (props) => {
     setSelected([]);
     setRestrict("public");
     setPrefill(EMPTY_PREFILL);
-    setBookmarked(props.isBookmarked);
+    setBookmarked(untrack(() => props.isBookmarked));
     setInput("");
     setFeedback(null);
     setSaving(false);
@@ -232,7 +235,7 @@ const BookmarkPanel: Component<BookmarkPanelProps> = (props) => {
       if (!fb) {
         return;
       }
-      const timer = setTimeout(() => setFeedback(null), 2500);
+      const timer = setTimeout(() => setFeedback(null), BOOKMARK_PANEL_FEEDBACK_MS);
       return () => clearTimeout(timer);
     },
   );

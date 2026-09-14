@@ -1,4 +1,5 @@
 import { apiClient } from "./client";
+import { ApiErrorType } from "./types";
 import {
   unzipFrames,
   parseZipEocd,
@@ -392,7 +393,13 @@ export async function loadBookmarkDetail(
   );
   if (!res || typeof res !== "object" || !("bookmark_detail" in res)) {
     console.warn("[loadBookmarkDetail] 响应缺 bookmark_detail 字段（契约破坏）");
-    throw new Error("bookmark_detail 缺失（响应契约破坏）");
+    // 抛 ApiError 形状（而非 new Error）：message 快照是简中、只作日志兜底，
+    // 展示层（BookmarkPanel 经 apiErrorMessage）必须走 messageKey 才能随 locale 渲染
+    throw {
+      type: ApiErrorType.UNKNOWN,
+      message: "[loadBookmarkDetail] bookmark_detail missing (contract violation)",
+      messageKey: "error.fallback.loadFailed",
+    };
   }
   return res.bookmark_detail ?? null;
 }

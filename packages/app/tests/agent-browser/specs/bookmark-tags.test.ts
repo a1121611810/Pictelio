@@ -93,8 +93,21 @@ function mockIllustDetail(id: number): string {
   });
 }
 
-/** GET /v2/illust/bookmark/detail：bookmark_detail=null = 未收藏（预填空态，spec D6） */
-const MOCK_BOOKMARK_DETAIL = JSON.stringify({ bookmark_detail: null });
+/**
+ * GET /v2/illust/bookmark/detail：**未收藏的真实形状**。
+ *
+ * oracle：真机 probe（2026-09-14，app-api.pixiv.net）——未收藏时 `bookmark_detail` **不是 null**，
+ * 而是返回对象且 `is_bookmarked:false` + 作品自身标签（`is_registered:false`）；
+ * `is_registered:true` 才是该条收藏已保存的标签。见 `packages/app/src/api/illust.ts` 的 JSDoc
+ * 与 `docs/specs/bookmark-tags.md` 验收实证节。测试硬约束 #2：mock 必须来自真实数据形状。
+ */
+const MOCK_BOOKMARK_DETAIL = JSON.stringify({
+  bookmark_detail: {
+    is_bookmarked: false,
+    restrict: "public",
+    tags: [{ name: UNIVERSE_TAG, is_registered: false }],
+  },
+});
 
 /** GET /v1/user/bookmark-tags/illust：标签库候选（公开/私密分库共用同一份 mock） */
 const MOCK_TAG_UNIVERSE = JSON.stringify({
