@@ -1,6 +1,6 @@
 # Spec: SolidJS 2 STRICT_READ_UNTRACKED 清零（图床读点洪水 + 两个单发 + E2E 零警告防线）
 
-- 状态：spec（Grill 已拍板 3 问；待 to-tickets）
+- 状态：implemented（2026-09-10 落地：T1 五点 untrack 标注 `#428`、T2 E2E 零警告通用防线 `#429`，父 issue #427 已关闭）
 - 日期：2026-09-10
 - 关联：`docs/specs/solidjs2-strict-warnings-cleanup.md`（第一轮，D1-D3 已随 405581df/4235a086/370ce058 落地）；ADR-0144（SolidJS 2 迁移）；本轮不新增 ADR（纯 dev 诊断标注，无架构取舍）
 
