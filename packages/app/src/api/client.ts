@@ -338,7 +338,6 @@ async function nativeExecuteRequest<T>(
   method: "GET" | "POST",
   path: string,
   data?: Record<string, string>,
-  body?: Record<string, string>,
   signal?: AbortSignal,
 ): Promise<T> {
   // 认证永久失效 → 快速失败，不产生网络流量
@@ -361,12 +360,17 @@ async function nativeExecuteRequest<T>(
   /** 实际执行请求（不包含重试逻辑） */
   async function exec(): Promise<T> {
     if (isNative) {
+      // 线形态（ADR-0161）：GET 参数走 query；**POST 载荷必须走表单体**——
+      // Pixiv 对「query 承载的 POST」返回 400/404（2026-09-14 host 侧 + 真机双实证：
+      // bookmark/add 与 bookmark/delete 均失败），改表单体即 200。web 分支与 app-lynx
+      // 原生分支都已是表单体，此处对齐口径。
+      const isPost = method === "POST";
       const result = await PixivApi.request({
         method,
         // rewriteUrl 归一化：绝对 next_url → 相对路径（防插件双域名 404）
         path: rewriteUrl(path),
-        params: data,
-        body: body ? JSON.stringify(body) : undefined,
+        params: isPost ? undefined : data,
+        body: isPost ? new URLSearchParams(data ?? {}).toString() : undefined,
       });
       if (result.status >= 400) {
         let parsedBody: unknown = null;
@@ -451,7 +455,7 @@ function request<T>(
     if (existing) {
       return existing as Promise<T>;
     }
-    const promise = nativeExecuteRequest<T>(method, path, data, undefined, signal);
+    const promise = nativeExecuteRequest<T>(method, path, data, signal);
     inflightGetRequests.set(key, promise);
     void tryAsync(
       promise.finally(() => {

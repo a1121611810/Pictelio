@@ -82,3 +82,15 @@
 - webview「长按 = 私密直存」为既有行为，本 spec 将其改写；依赖该语义的既有测试/E2E 必须随 D3 同步对齐，不允许双语义并存。
 - lynx 长按为全新手势面，真机 hit-testing 风险（ADR-0123 家族）在验收票中以模拟器实测关闭。
 - 标签库分页本期首屏即可验收；滚动追加为可选增强，不阻塞验收。
+
+## 实施中发现的前置缺陷（已在本次一并修复，ADR-0161）
+
+Android 真机验收暴露：**webview 原生构建下所有写操作（含本功能的收藏保存）失败**。根因是
+`request()` 对 POST 把载荷放进插件 `params`（→ query string）且 body 为空，Pixiv 以 400/404
+拒绝；web 分支与 app-lynx 原生分支本就是表单体，唯 webview 原生分支不一致（且此前无任何原生
+写路径自动化覆盖，故长期未被发现）。已在 `packages/app/src/api/client.ts` 修正为
+`application/x-www-form-urlencoded` 表单体，并补契约测试（oracle = host 侧直连实测 + 双端分支
+一致性）。详见 **ADR-0161**。
+
+对验收口径的影响：本 spec 的 T7（#536）必须以**服务端真值**为准（host 侧直连 Pixiv 读
+`bookmark/detail`），不得只看 UI 绿；读路径全绿不能证明写路径可用。
