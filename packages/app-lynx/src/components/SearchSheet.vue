@@ -202,7 +202,9 @@ function isRowMasked(row: SearchResultItem): boolean {
 
 /** AI 等级派生（novel_ai_type===2 → 纯 AI，否则 AI 辅助） */
 function aiLevel(row: SearchResultItem): 1 | 2 {
-  const t = row.entity.illust_ai_type ?? row.entity.novel_ai_type ?? 0
+  // 联合类型不能直接取可选属性——经结构化中间类型收窄（同 settingsStore.isAiWork 形态）
+  const item: { illust_ai_type?: number; novel_ai_type?: number } = row.entity
+  const t = item.illust_ai_type ?? item.novel_ai_type ?? 0
   return t === 2 ? 2 : 1
 }
 
