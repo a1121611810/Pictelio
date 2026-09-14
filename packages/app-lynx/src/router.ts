@@ -20,6 +20,7 @@ import { useAuthStore } from './stores/authStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { useModalStack } from './stores/modalStack'
 import { registerSessionErrorHandler } from './utils/errorPresentation'
+import { runStartupAutoBackup } from './services/backupWiring'
 
 /** 首帧/栈空回退目标（ADR-0049）：初始路由 = 推荐页（首帧内容化） */
 export const RECOMMENDED_PATH = '/recommended'
@@ -51,6 +52,9 @@ import FollowList from './pages/FollowList.vue'
 import UpdatePage from './pages/UpdatePage.vue'
 import ErrorPage from './pages/ErrorPage.vue'
 import Watchlist from './pages/Watchlist.vue'
+import DownloadManager from './pages/DownloadManager.vue'
+import NetworkCheck from './pages/NetworkCheck.vue'
+import Ranking from './pages/Ranking.vue'
 
 /**
  * 路由表（vue-router 1:1 迁移，ADR-0138 决策 3）：
@@ -74,8 +78,12 @@ export const routes: RouteRecordRaw[] = [
   { path: '/bookmarks', name: 'bookmarks', component: Bookmarks, meta: { requiresAuth: true } },
   { path: '/me', name: 'me', component: Me, meta: { requiresAuth: true } },
   { path: '/watchlist', name: 'watchlist', component: Watchlist, meta: { requiresAuth: true } },
+  { path: '/ranking', name: 'ranking', component: Ranking, meta: { requiresAuth: true } },
+  { path: '/downloads', name: 'downloads', component: DownloadManager, meta: { requiresAuth: true } },
   { path: '/update', name: 'update', component: UpdatePage, meta: { backBehavior: 'exit' } },
   { path: '/error', name: 'error', component: ErrorPage, meta: { backBehavior: 'exit' } },
+  // 登录前可达：网络/登录失败时恰恰最需要它（spec docs/specs/network-self-check.md）；不标 requiresAuth
+  { path: '/network-check', name: 'network-check', component: NetworkCheck },
 ]
 
 export const router: Router = createRouter({
@@ -328,6 +336,9 @@ function registerBenchNavHandler(): void {
     // T4（spec app-lynx-benchnav-meta-exit-hooks）：/update、/error 直达（meta-exit 回归 S6 触发通道）
     pictelioBenchNavUpdate: '/update',
     pictelioBenchNavError: '/error',
+    // 网络自检直达（spec docs/specs/network-self-check.md / ticket I5）：Lynx a11y 树不暴露元素，
+    // 真机验收经 benchNav 深链到 /network-check，再以原生 NetDiag 日志为证据。
+    pictelioBenchNavNetDiag: '/network-check',
   }
   for (const [eventName, target] of Object.entries(TARGETS)) {
     // 原生发送两次（1.5s/3s）防 JS 挂载竞态；replace 幂等，重复到达无副作用
@@ -357,6 +368,16 @@ function registerBenchNavHandler(): void {
       void navigate(target, { replace: true })
     })
   }
+  // 详情页直达（#542）：原生经事件载荷携带 illust_id（数值——lynx 4.0.1 载荷通道
+  // 仅数值存活，字符串不可用）。缺/坏载荷显式 warn（非静默，测试钩子可快速定位）。
+  emitter.addListener('pictelioBenchNavIllustDetail', (...args: unknown[]) => {
+    const id = args[0]
+    if (typeof id === 'number' && Number.isFinite(id) && id > 0) {
+      void navigate(`/illust/${id}`, { replace: true })
+    } else {
+      console.warn('[router] benchNav 详情页直达载荷缺 illust_id，跳过')
+    }
+  })
 }
 // 模块加载即注册（先于 initRouter 的网络恢复；initRouter 中重复调用幂等）——
 // 否则广播窗口（onLoadSuccess+1.5/3s）落在 restoreToken 之后时事件被丢弃。
@@ -377,6 +398,9 @@ export async function initRouter(): Promise<void> {
   const ok = await auth.restoreToken()
   // ADR-0103：账号级设置需 uid 已知（restoreToken 之后）再加载
   await useSettingsStore().loadSettings()
+  // T8：启动时自动备份——必须在 loadSettings 之后（否则读到默认 false 静默跳过）；
+  // 失败仅 warn，不阻塞启动（spec §7）
+  void runStartupAutoBackup()
   await navigate(ok ? RECOMMENDED_PATH : '/login', { replace: true })
   // 登录态恢复已定局：守卫开始执行鉴权拦截（bootstrap 期放行至此结束）
   markBootstrapDone()

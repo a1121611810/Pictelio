@@ -12,6 +12,7 @@
 import { type Component, For, Show } from "solid-js";
 import FluentIcon from "./ui/FluentIcon";
 import { resolveIllustTypeBadges, type IllustTypeBadgeSource } from "./illustTypeBadges";
+import { t } from "../i18n";
 
 interface Props {
   /** 判定所需最小字段集（PixivIllust 结构兼容） */
@@ -33,20 +34,26 @@ const IllustTypeBadge: Component<Props> = (props) => {
         <For each={badges()}>
           {(badge) => (
             <span
-              aria-label={badge.kind === "ugoira" ? "动图" : `共 ${badge.pageCount} 图`}
-              class="flex items-center gap-[var(--spacingHorizontalXXS)] rounded-[var(--borderRadiusMedium)] bg-[var(--colorOverlayBackground)] backdrop-blur-sm text-[var(--colorOverlayForeground)] font-semibold"
-              classList={{
-                "px-[var(--spacingHorizontalXS)] py-[var(--spacingVerticalXXS)] [font-size:var(--fontSizeBase100)]":
-                  compact(),
-                "px-[var(--spacingHorizontalS)] py-[var(--spacingVerticalXXS)] [font-size:var(--fontSizeBase200)]":
-                  !compact(),
-              }}
+              aria-label={
+                badge.kind === "ugoira"
+                  ? t("illustBadge.ugoiraAria")
+                  : t("illustBadge.pageCountAria", { count: badge.pageCount })
+              }
+              class={[
+                "flex items-center gap-[var(--spacingHorizontalXXS)] rounded-[var(--borderRadiusMedium)] bg-[var(--colorOverlayBackground)] backdrop-blur-sm text-[var(--colorOverlayForeground)] font-semibold",
+                {
+                  "px-[var(--spacingHorizontalXS)] py-[var(--spacingVerticalXXS)] [font-size:var(--fontSizeBase100)]":
+                    compact(),
+                  "px-[var(--spacingHorizontalS)] py-[var(--spacingVerticalXXS)] [font-size:var(--fontSizeBase200)]":
+                    !compact(),
+                },
+              ]}
             >
               <FluentIcon
                 name={badge.kind === "ugoira" ? "play" : "imageMultiple"}
                 size={compact() ? 12 : 14}
               />
-              {badge.kind === "ugoira" ? "动图" : badge.pageCount}
+              {badge.kind === "ugoira" ? t("illustBadge.ugoira") : badge.pageCount}
             </span>
           )}
         </For>

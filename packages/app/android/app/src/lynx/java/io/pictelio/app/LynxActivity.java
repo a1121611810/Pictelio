@@ -45,8 +45,14 @@ public class LynxActivity extends AppCompatActivity {
 
     private static final String TAG = "LynxActivity";
 
+    /** 引擎降级入口标记（ADR-0153）：MainActivity 在 WebView 不可用但 Lynx 可用时置位 */
+    public static final String EXTRA_ENGINE_FALLBACK = "pictelio_engine_fallback";
+
     private LynxView lynxView;
     private final AtomicBoolean bundleLoaded = new AtomicBoolean(false);
+
+    /** 本次是否为引擎降级进入——决定错误兜底页给「退出应用」还是「返回 WebView」（ADR-0153） */
+    private boolean engineFallbackEntry;
 
     /** 当前 Activity 弱引用（PictelioAppModule.exitApp 使用，ADR-0066；onDestroy 清理） */
     private static WeakReference<LynxActivity> sInstance;
@@ -75,6 +81,16 @@ public class LynxActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         sInstance = new WeakReference<>(this);
 
+        // ADR-0153：降级入口标记 + 一次性通知键。写键必须在 LynxView 渲染前，保证 app-lynx
+        // 首帧能读到；该键是「本次由降级进入」的信号，不是首选引擎（首选引擎不落盘）。
+        engineFallbackEntry = getIntent().getBooleanExtra(EXTRA_ENGINE_FALLBACK, false);
+        if (engineFallbackEntry) {
+            getSharedPreferences("CapacitorStorage", MODE_PRIVATE)
+                    .edit()
+                    .putString(EngineFallbackNotice.KEY, EngineFallbackNotice.VALUE_TRUE)
+                    .apply();
+        }
+
         // LynxEnv 兜底初始化（进程复用场景：Application.onCreate 未走 initLynx → LynxEnv
         // 未初始化会报 error 102）。LynxEnv.init 幂等（hasInit），与 PictelioApp 共用
         // LynxRuntimeInitializer 单点（issue #122），重复调用安全。
@@ -98,6 +114,7 @@ public class LynxActivity extends AppCompatActivity {
         builder.registerModule("PictelioAuth", PictelioAuthModule.class);
         builder.registerModule("PictelioApi", PictelioApiModule.class);
         builder.registerModule("PictelioPrefs", PictelioPrefsModule.class);
+        builder.registerModule("NetDiag", NetDiagModule.class);
         lynxView = builder.build(this);
 
         // Splash 退出时机：bundle 渲染成功/失败（替代 webview 分支 AuthPlugin.hideSplash 桥）
@@ -132,6 +149,9 @@ public class LynxActivity extends AppCompatActivity {
                             // meta-exit 回归（S6）触发通道（版本检查/401 链无法在测试中伪造）
                             case "update" -> new String[]{"pictelioBenchNavUpdate"};
                             case "error" -> new String[]{"pictelioBenchNavError"};
+                            // 网络自检直达（spec docs/specs/network-self-check.md）
+                            case "netdiag" -> new String[]{"pictelioBenchNavNetDiag"};
+                            // 详情页直达（#542）走载荷通道（illust_id 数值经 extra 传入），不入本表
                             default -> new String[0];
                         };
                         // 四次广播（1.5/3/4.5/6s）：页面级监听（如 NovelList 子 tab）可能晚于路由监听，
@@ -142,6 +162,29 @@ public class LynxActivity extends AppCompatActivity {
                                     if (!isFinishing() && !event.isEmpty())
                                         lynxView.sendGlobalEvent(event, new JavaOnlyArray());
                                 }, delay);
+                            }
+                        }
+                        // 详情页直达（#542）：载荷通道实测仅数值存活（lynx 4.0.1 无 JavaOnlyString，
+                        // 字符串不可走载荷），illust_id 经 intent extra "benchNavIllustId" 数值下发；
+                        // 同窗口四次广播，JS 侧缺载荷显式 warn（非静默）。
+                        if ("illust-detail".equals(benchNav)) {
+                            String rawId = getIntent().getStringExtra("benchNavIllustId");
+                            Long illustId = null;
+                            try {
+                                if (rawId != null) illustId = Long.parseLong(rawId);
+                            } catch (NumberFormatException ignored) {
+                            }
+                            if (illustId != null) {
+                                final long detailId = illustId;
+                                for (long delay : new long[]{1500, 3000, 4500, 6000}) {
+                                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                                        if (!isFinishing())
+                                            lynxView.sendGlobalEvent("pictelioBenchNavIllustDetail",
+                                                    JavaOnlyArray.of(detailId));
+                                    }, delay);
+                                }
+                            } else {
+                                Log.w(TAG, "benchNav=illust-detail 缺 benchNavIllustId extra，详情页直达跳过");
                             }
                         }
                     }
@@ -292,7 +335,15 @@ public class LynxActivity extends AppCompatActivity {
             root.addView(detail, new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-            if (hasWebviewClient()) {
+            // ADR-0153：降级进入的实例不提供「返回 WebView」——用户首选仍是 webview 且
+            // WebView 仍不可用，返回 MainActivity 会再次降级，形成回环。只给退出应用。
+            if (engineFallbackEntry) {
+                Button exitButton = new Button(this);
+                exitButton.setText("退出应用");
+                exitButton.setOnClickListener(v -> finish());
+                root.addView(exitButton, new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            } else if (hasWebviewClient()) {
                 Button backButton = new Button(this);
                 backButton.setText("返回 WebView");
                 backButton.setOnClickListener(v -> switchBackToWebview());

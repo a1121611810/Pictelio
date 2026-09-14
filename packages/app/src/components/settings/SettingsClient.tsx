@@ -1,8 +1,9 @@
-import { type Component, Show, createSignal, onMount } from "solid-js";
+import { type Component, Show, createSignal, onSettled } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import FluentIcon from "../ui/FluentIcon";
 import { readClientKind, supportsClientSwitch, type ClientKind } from "../../utils/clientSwitch";
 import { ClientInfo } from "../../native/ClientInfo";
+import { t } from "../../i18n";
 
 /**
  * 客户端切换区块（webview ↔ lynx）。
@@ -21,15 +22,17 @@ const SettingsClient: Component = () => {
   /** 当前包支持的 client 引擎列表；空数组 = 尚未查询到（保守渲染） */
   const [clientKinds, setClientKinds] = createSignal<string[] | null>(null);
 
-  onMount(async () => {
-    setCurrent(await readClientKind());
-    try {
-      const { kinds } = await ClientInfo.getClientKinds();
-      setClientKinds(kinds);
-    } catch {
-      // 原生插件不可用（web 开发环境）→ 保持 null，按 full 能力渲染
-      setClientKinds(null);
-    }
+  // onSettled 不接受 async 函数：异步分支内部消化 Promise
+  onSettled(() => {
+    void readClientKind().then((kind) => setCurrent(kind));
+    void tryAsync(ClientInfo.getClientKinds()).then(([err, result]) => {
+      if (err) {
+        // 原生插件不可用（web 开发环境）→ 保持 null，按 full 能力渲染
+        setClientKinds(null);
+        return;
+      }
+      setClientKinds(result.kinds);
+    });
   });
 
   // ADR-0062：仅 full 包（含 webview+lynx）渲染切换入口
@@ -39,7 +42,7 @@ const SettingsClient: Component = () => {
     <Show when={supportsSwitch()}>
       <div class="py-3 flex flex-col">
         <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground3)] uppercase tracking-wide mb-1">
-          客户端
+          {t("settings.client.sectionTitle")}
         </p>
 
         <div
@@ -53,7 +56,7 @@ const SettingsClient: Component = () => {
           }}
           role="button"
           tabindex="0"
-          aria-label="切换渲染引擎"
+          aria-label={t("settings.client.switchEngine")}
         >
           <div class="flex items-center gap-3">
             <div class="relative w-6 h-6 flex-shrink-0 text-[var(--colorNeutralForeground2)]">
@@ -61,12 +64,12 @@ const SettingsClient: Component = () => {
             </div>
             <div>
               <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
-                切换渲染引擎
+                {t("settings.client.switchEngine")}
               </p>
               <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
                 {current() === "lynx"
-                  ? "当前：Lynx（实验性）· 点击查看引擎说明"
-                  : "当前：WebView · 点击查看引擎说明"}
+                  ? t("settings.client.currentLynx")
+                  : t("settings.client.currentWebview")}
               </p>
             </div>
           </div>

@@ -1,4 +1,5 @@
-import type { Accessor, Component, JSX } from "solid-js";
+import type { JSX } from "@solidjs/web";
+import type { Accessor, Component } from "solid-js";
 import { useNavigate, useParams } from "@solidjs/router";
 import PixivImage from "../components/PixivImage";
 import ImageViewer from "@/components/ImageViewer";
@@ -33,6 +34,14 @@ import {
   selectInlineImageUrl,
 } from "../utils/novelBlocks";
 import type { NovelBlock, TextBlock, ImageBlock, JumpBlock, InlineRun } from "../utils/novelBlocks";
+import ExportSheet from "../components/ExportSheet";
+import { enqueueDownloads } from "../stores/downloadStore";
+import { novelExportFormat, novelExportOptions } from "../stores/settingsStore";
+import {
+  buildNovelExportPayload,
+  buildNovelExportTaskDraft,
+  type NovelExportFormat,
+} from "@pictelio/novel-export";
 import { loadNovelImageDimensions, type NovelImageDimensions } from "../utils/novelImageDimensions";
 import ReaderSettingsSheet from "../components/ReaderSettingsSheet";
 import SeriesSheet from "../components/SeriesSheet";
@@ -44,6 +53,7 @@ import { pushOverlay, popOverlay } from "../stores/backGestureStore";
 import { scrollToTop } from "../utils/scrollToTop";
 import { createFastScrollbar } from "../primitives/createFastScrollbar";
 import { toApiError } from "../api/client";
+import { t } from "../i18n";
 import { recordVisit } from "../stores/historyStore";
 import TranslateSheet from "../components/TranslateSheet";
 import { translateNovel } from "../primitives/createNovelTranslator";
@@ -137,8 +147,11 @@ const NovelImageBlock: Component<NovelImageBlockProps> = (props) => {
 
   return (
     <figure
-      class="novel-image-block overflow-hidden m-0"
-      classList={{ "cursor-pointer": dim() !== null && dim() !== undefined }}
+      class={[
+        "novel-image-block overflow-hidden m-0",
+        { "cursor-pointer": dim() !== null && dim() !== undefined },
+      ]}
+
       style={{ "aspect-ratio": aspectRatio() }}
       onClick={handleClick}
     >
@@ -155,7 +168,7 @@ const NovelImageBlock: Component<NovelImageBlockProps> = (props) => {
           >
             <span class="spinner w-4 h-4" />
             <span class="text-[var(--colorNeutralForegroundDisabled)] [font-size:var(--fontSizeBase100)]">
-              加载中...
+              {t("novelDetail.imageLoading")}
             </span>
           </div>
         </Match>
@@ -166,7 +179,7 @@ const NovelImageBlock: Component<NovelImageBlockProps> = (props) => {
           >
             <span class="text-[var(--colorNeutralForeground3)] text-xs">⚠</span>
             <span class="text-[var(--colorNeutralForegroundDisabled)] [font-size:var(--fontSizeBase100)]">
-              图片加载失败
+              {t("novelDetail.imageFailed")}
             </span>
           </div>
         </Match>
@@ -174,7 +187,7 @@ const NovelImageBlock: Component<NovelImageBlockProps> = (props) => {
           {(d) => (
             <PixivImage
               src={selectInlineImageUrl(props.block.urls, props.containerWidth())}
-              alt={`内嵌图片 ${props.block.imageId}`}
+              alt={t("novelDetail.inlineImageAlt", { id: props.block.imageId })}
               width={d().width}
               height={d().height}
               loading="lazy"
@@ -201,9 +214,12 @@ function isImageBlock(block: NovelBlock): block is ImageBlock {
 
 /** jump 块显示文本（站内跳转显示类型 + ID，外部链接显示 URL） */
 function jumpLabel(block: JumpBlock): string {
-  if (block.kind === "illust") return `插画 #${block.target.replace(/^illust\//u, "")}`;
-  if (block.kind === "novel") return `小说 #${block.target.replace(/^novel\//u, "")}`;
-  if (block.kind === "user") return `用户 #${block.target.replace(/^user\//u, "")}`;
+  if (block.kind === "illust")
+    return t("novelDetail.jumpIllust", { id: block.target.replace(/^illust\//u, "") });
+  if (block.kind === "novel")
+    return t("novelDetail.jumpNovel", { id: block.target.replace(/^novel\//u, "") });
+  if (block.kind === "user")
+    return t("novelDetail.jumpUser", { id: block.target.replace(/^user\//u, "") });
   if (block.kind === "external") return block.target;
   return block.target;
 }
@@ -318,14 +334,17 @@ const NovelContentBlock: Component<NovelContentBlockProps> = (props) => {
   }
 
   if (isImageBlock(block)) {
-    const imageIndex = props.imageBlockList().findIndex((b) => b.imageId === block.imageId);
     return (
       <NovelImageBlock
         block={block}
         containerWidth={props.containerWidth}
         dimensions={props.imageDimensions}
         style={{}}
-        onClick={() => props.onImageClick(imageIndex)}
+        // 点击时再解析行内图序号（Solid 2.0：组件 body 顶层读 accessor prop 会告警，
+        // 且事件时点取值比渲染时点更新）
+        onClick={() =>
+          props.onImageClick(props.imageBlockList().findIndex((b) => b.imageId === block.imageId))
+        }
       />
     );
   }
@@ -356,12 +375,16 @@ const NovelDetail: Component = () => {
   }
 
   // URL 参数变化时同步内部小说 ID（外部链接/前进后退），系列内切换不触发此效果。
-  createEffect(() => {
-    const paramId = Number(params.id);
-    if (paramId && paramId !== currentNovelId()) {
-      setCurrentNovelId(paramId);
-    }
-  });
+  // Solid 2.0 拆分效应：compute 提取快照（URL id + 当前内部 id），apply 段写 signal（合法），
+  // 避免 apply 段直接读 signal 触发 STRICT_READ_UNTRACKED 告警。
+  createEffect(
+    () => ({ paramId: Number(params.id), current: currentNovelId() }),
+    ({ paramId, current }) => {
+      if (paramId && paramId !== current) {
+        setCurrentNovelId(paramId);
+      }
+    },
+  );
 
   const [novelData, setNovelData] = createSignal<PixivNovel | null>(null);
   const [novelHtml, setNovelHtml] = createSignal<string | null>(null);
@@ -371,14 +394,13 @@ const NovelDetail: Component = () => {
   const [detailError, setDetailError] = createSignal<ApiError | null>(null);
 
   function applyEntry(entry: NovelCacheEntry) {
-    batch(() => {
-      setNovelData(entry.detail);
-      setNovelHtml(entry.text);
-      setNovelImages(entry.images ?? {});
-      setNovelNav(entry.nav);
-      setDetailLoading(false);
-      setDetailError(null);
-    });
+    // Solid 2.0：默认微任务批处理，batch 已移除（ADR-0144）；此处无同步读取依赖
+    setNovelData(entry.detail);
+    setNovelHtml(entry.text);
+    setNovelImages(entry.images ?? {});
+    setNovelNav(entry.nav);
+    setDetailLoading(false);
+    setDetailError(null);
     recordVisit(entry.detail, "novel");
   }
 
@@ -417,68 +439,111 @@ const NovelDetail: Component = () => {
   }
 
   // 组件内加载小说数据：currentNovelId 变化时自动请求（首次加载 + 系列内切换）
-  createEffect(() => {
-    const id = currentNovelId();
-    if (!id) {
-      return;
-    }
-    // 已加载该 ID 的数据时跳过
-    if (novelData()?.id === id) {
-      return;
-    }
-    const gen = ++loadGeneration;
-    void loadNovelById(id, gen);
-  });
+  // Solid 2.0 拆分效应：compute 提取快照（当前 id + 已加载数据 id），apply 段发起请求。
+  createEffect(
+    () => ({ id: currentNovelId(), loadedId: novelData()?.id }),
+    ({ id, loadedId }) => {
+      if (!id) {
+        return;
+      }
+      // 已加载该 ID 的数据时跳过
+      if (loadedId === id) {
+        return;
+      }
+      const gen = ++loadGeneration;
+      void loadNovelById(id, gen);
+    },
+  );
 
   const [imageDimensions, setImageDimensions] = createSignal<NovelImageDimensions>({});
   const [footerHidden, setFooterHidden] = createSignal(false);
 
   // 小说 ID 变化或图片映射重置时，清空已计算的内嵌图尺寸
-  createEffect(() => {
-    novelImages();
-    setImageDimensions({});
-  });
+  // Solid 2.0 拆分效应：compute 跟踪 novelImages，apply 段重置尺寸。
+  createEffect(
+    () => novelImages(),
+    () => {
+      setImageDimensions({});
+    },
+  );
 
   // 加载出错时允许下次恢复阅读进度
-  createEffect(() => {
-    if (detailError()) {
-      skipRestoreProgress = false;
-    }
-  });
+  createEffect(
+    () => detailError(),
+    (err) => {
+      if (err) {
+        skipRestoreProgress = false;
+      }
+    },
+  );
 
   // 小说正文加载完成后恢复阅读进度
-  createEffect(() => {
-    const html = novelHtml();
-    if (html && html.length > 0) {
-      requestAnimationFrame(() => restoreProgress());
-    }
-  });
+  createEffect(
+    () => novelHtml(),
+    (html) => {
+      if (html && html.length > 0) {
+        requestAnimationFrame(() => restoreProgress());
+      }
+    },
+  );
 
   // 获取到图片映射后，预加载每张内嵌图的真实尺寸
-  createEffect(() => {
-    const images = novelImages();
-    const ids = Object.keys(images);
-    if (ids.length === 0) {
-      return;
-    }
-
-    let cancelled = false;
-    loadNovelImageDimensions(images).then((dimensions) => {
-      if (!cancelled) {
-        setImageDimensions(dimensions);
+  // Solid 2.0：取消逻辑由 apply 返回的 cleanup 承担（重跑/卸载时丢弃旧结果，防竞态）。
+  createEffect(
+    () => novelImages(),
+    (images) => {
+      const ids = Object.keys(images);
+      if (ids.length === 0) {
+        return;
       }
-    });
 
-    onCleanup(() => {
-      cancelled = true;
-    });
-  });
+      let cancelled = false;
+      loadNovelImageDimensions(images).then((dimensions) => {
+        if (!cancelled) {
+          setImageDimensions(dimensions);
+        }
+      });
+
+      return () => {
+        cancelled = true;
+      };
+    },
+  );
 
   const [settingsOpen, setSettingsOpen] = createSignal(false);
   const [showComments, setShowComments] = createSignal(false);
   const [seriesOpen, setSeriesOpen] = createSignal(false);
   const [searchOpen, setSearchOpen] = createSignal(false);
   const [textContainerWidth, setTextContainerWidth] = createSignal(0);
+
+  // ── 小说导出（spec docs/specs/novel-export.md §7.1）──
+  const [exportOpen, setExportOpen] = createSignal(false);
+  const [queuedNotice, setQueuedNotice] = createSignal<string | null>(null);
+  let queuedNoticeTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /** 构造导出载荷并加入下载队列（格式为本次临时选择，内容开关取设置页快照） */
+  function enqueueNovelExport(format: NovelExportFormat): void {
+    const novel = novelData();
+    if (!novel) return;
+    const payload = buildNovelExportPayload({
+      novel,
+      text: novelHtml() ?? "",
+      images: novelImages(),
+      options: novelExportOptions(),
+    });
+    const draft = buildNovelExportTaskDraft({
+      payload,
+      format,
+      title: novel.title,
+      thumbnailUrl: novel.image_urls.medium ?? novel.image_urls.large ?? "",
+    });
+    enqueueDownloads([draft]);
+    setQueuedNotice(t("novelDetail.queuedNotice")); // i18n: set 时快照（瞬态）
+    clearTimeout(queuedNoticeTimer);
+    queuedNoticeTimer = setTimeout(() => setQueuedNotice(null), 4000);
+  }
+
+  onCleanup(() => clearTimeout(queuedNoticeTimer));
 
   const blocks = createMemo<NovelBlock[]>(() => {
     return parseNovelBlocks(novelHtml() ?? "", novelImages());
@@ -493,13 +558,13 @@ const NovelDetail: Component = () => {
     if (!showTranslation()) {
       return bs;
     }
-    const t = translatedParagraphs();
-    if (Object.keys(t).length === 0) {
+    const tp = translatedParagraphs();
+    if (Object.keys(tp).length === 0) {
       return bs;
     }
     // oxlint-disable-next-line no-map-spread -- blocks are immutable; copy-on-write required to swap in translated text
     return bs.map((b) =>
-      b.type === "text" && t[b.index] !== undefined ? { ...b, text: t[b.index] } : b,
+      b.type === "text" && tp[b.index] !== undefined ? { ...b, text: tp[b.index] } : b,
     );
   });
 
@@ -539,7 +604,7 @@ const NovelDetail: Component = () => {
 
   // 挂载时恢复已保存的 API key、R18/R18G 分级开关、档位与思考开关
   // （冷启动直接进详情页也能用已存配置，避免 R18 开关已开却因内存默认 false 被误拦）
-  onMount(() => {
+  onSettled(() => {
     void loadDsApiKey();
     void loadTranslateRestrictSettings();
     void loadTierAndThinking();
@@ -547,22 +612,31 @@ const NovelDetail: Component = () => {
 
   // 切章 / URL 变化时重置翻译状态（防旧章译文串章污染）；
   // 必须同时递增 translateVersion + abort + 取消挂起确认弹窗 —— 在途翻译响应/挂起确认
-  // 到达时版本不匹配 → 丢弃（竞态防护，含 S5 确认期间切章绕过 R18G 拦截的封堵）
-  createEffect(() => {
-    void currentNovelId();
-    translateVersion++;
-    translateAbort?.abort();
-    translateAbort = null;
-    resolveRestrictConfirm(false); // 挂起的 R18/R18G 确认直接取消（旧 resolve 不悬挂）
-    resetTranslationState();
-    onCleanup(() => {
-      // 组件卸载后响应落地同样丢弃（store 是模块级全局，必须防写入）；
-      // 卸载时取消挂起的 R18/R18G 确认（旧 resolve 不悬挂）
+  // 到达时版本不匹配 → 丢弃（竞态防护，含 S5 确认期间切章绕过 R18G 拦截的封堵）。
+  // Solid 2.0 拆分效应：compute 提取快照（章节 id + 挂起确认），apply 段做重置
+  // （untracked 写 signal 合法；挂起确认由快照传入，避免 apply 段读 signal 告警），
+  // 卸载防护由返回的 cleanup 承担（原 effect 内 onCleanup 已不可用）。
+  createEffect(
+    () => ({ id: currentNovelId(), pending: restrictConfirm() }),
+    ({ pending }) => {
       translateVersion++;
       translateAbort?.abort();
-      resolveRestrictConfirm(false);
-    });
-  });
+      translateAbort = null;
+      if (pending) {
+        // 挂起的 R18/R18G 确认直接取消（旧 resolve 不悬挂）
+        pending.resolve(false);
+        setRestrictConfirm(null);
+      }
+      resetTranslationState();
+      return () => {
+        // 组件卸载后响应落地同样丢弃（store 是模块级全局，必须防写入）；
+        // 卸载时取消挂起的 R18/R18G 确认（读最新值，旧 resolve 不悬挂）
+        translateVersion++;
+        translateAbort?.abort();
+        resolveRestrictConfirm(false);
+      };
+    },
+  );
 
   async function startTranslate(retryFailed = false): Promise<void> {
     const key = dsApiKey();
@@ -586,12 +660,11 @@ const NovelDetail: Component = () => {
     const policy = decideTranslatePolicy(xRestrict, translateR18(), translateR18G());
     if (policy === "block") {
       setTranslateOpen(true);
+      // i18n: set 时快照（瞬态）
       setTranslationError(
         new TranslateError(
           "unknown",
-          xRestrict === 2
-            ? "未开启「翻译 R18G 内容」开关，已拦截（不发送任何内容）"
-            : "未开启「翻译 R18 内容」开关，已拦截",
+          xRestrict === 2 ? t("novelDetail.r18gBlockError") : t("novelDetail.r18BlockError"),
         ),
       );
       return;
@@ -616,7 +689,7 @@ const NovelDetail: Component = () => {
       if (currentPolicy === "block") {
         setTranslateOpen(true);
         setTranslationError(
-          new TranslateError("unknown", "内容分级校验未通过，已拦截（不发送任何内容）"),
+          new TranslateError("unknown", t("novelDetail.policyBlockError")), // i18n: set 时快照（瞬态）
         );
         return;
       }
@@ -638,8 +711,8 @@ const NovelDetail: Component = () => {
     if (targets.length === 0) {
       return; // 补翻模式但没有失败段落
     }
-    const texts = targets.map((t) => t.text);
-    const baseIndexes = targets.map((t) => t.index);
+    const texts = targets.map((item) => item.text);
+    const baseIndexes = targets.map((item) => item.index);
 
     // 档位（S6 全局默认 + S7 详情页临时切换）：缓存维度与请求 model 统一用实际档位
     const model = TIER_MODELS[translateTier() ?? defaultTier()];
@@ -659,11 +732,10 @@ const NovelDetail: Component = () => {
       for (let i = 0; i < cached.length && i < allIndexes.length; i++) {
         map[allIndexes[i]] = cached[i];
       }
-      batch(() => {
-        setTranslatedParagraphs(map);
-        setShowTranslation(true);
-        setTranslationError(null); // 清掉上次失败的错误提示
-      });
+      // Solid 2.0：默认微任务批处理，batch 已移除（ADR-0144）
+      setTranslatedParagraphs(map);
+      setShowTranslation(true);
+      setTranslationError(null); // 清掉上次失败的错误提示
       return;
     }
 
@@ -713,18 +785,17 @@ const NovelDetail: Component = () => {
           }
           // 成功块：译文并入（相对 → 全局），并从失败集合移除（补翻成功；
           // 注意：回退段需排除——它们的 text 是原文占位，不能被误判为补翻成功）
-          batch(() => {
-            setTranslatedParagraphs((prev) => {
-              const next = { ...prev };
-              for (const para of p.paragraphs) {
-                const global = baseIndexes[para.index];
-                next[global] = para.text;
-                if (!fallbackRel.has(para.index)) {
-                  failedNow.delete(global);
-                }
+          // Solid 2.0：默认微任务批处理，batch 已移除（ADR-0144）
+          setTranslatedParagraphs((prev) => {
+            const next = { ...prev };
+            for (const para of p.paragraphs) {
+              const global = baseIndexes[para.index];
+              next[global] = para.text;
+              if (!fallbackRel.has(para.index)) {
+                failedNow.delete(global);
               }
-              return next;
-            });
+            }
+            return next;
           });
           if (!showTranslation()) {
             setShowTranslation(true);
@@ -757,7 +828,10 @@ const NovelDetail: Component = () => {
         return;
       }
       setTranslationError(
-        err instanceof TranslateError ? err : new TranslateError("unknown", "翻译失败，请重试"),
+        // i18n: set 时快照（瞬态）
+        err instanceof TranslateError
+          ? err
+          : new TranslateError("unknown", t("novelDetail.translateFailed")),
       );
     } finally {
       if (version === translateVersion) {
@@ -812,18 +886,19 @@ const NovelDetail: Component = () => {
     onScrollTo: (top) => {
       const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
       window.scrollTo({ top: Math.min(max, Math.max(0, top)), behavior: "auto" });
-      setScrollTick((t) => t + 1);
+      setScrollTick((prev) => prev + 1);
     },
   });
   // scroll/resize 驱动重算（thumb 位置/尺寸随滚动更新）
-  onMount(() => {
-    const onScroll = () => setScrollTick((t) => t + 1);
+  // Solid 2.0：onSettled 内禁用 onCleanup，监听器清理改由返回值注册。
+  onSettled(() => {
+    const onScroll = () => setScrollTick((prev) => prev + 1);
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll, { passive: true });
-    onCleanup(() => {
+    return () => {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
-    });
+    };
   });
   /** 章节块位置表（chapter 块 → 虚拟布局 offset），供拖拽气泡显示章节名 */
   const chapterPositions = createMemo(() => {
@@ -883,7 +958,7 @@ const NovelDetail: Component = () => {
         match.start === activeMatch.start &&
         match.end === activeMatch.end;
       nodes.push(
-        <mark class="novel-search-match" classList={{ "novel-search-match-active": isActive }}>
+        <mark class={["novel-search-match", { "novel-search-match-active": isActive }]}>
           {text.slice(match.start, match.end)}
         </mark>,
       );
@@ -911,7 +986,7 @@ const NovelDetail: Component = () => {
       <>
         {content}
         <span class="[font-size:var(--fontSizeBase100)] text-[var(--colorStatusDangerForeground1)] ml-1 align-super">
-          〔未翻译〕
+          {t("novelDetail.untranslatedMark")}
         </span>
       </>
     );
@@ -981,11 +1056,15 @@ const NovelDetail: Component = () => {
     virtualLayout.scrollToCharIndex(saved.paragraphIndex, saved.charIndex);
   }
 
-  // 滚动停止 500ms 后保存阅读进度
-  createEffect(() => {
-    virtualLayout.currentCharIndex();
-    saveProgress();
-  });
+  // 滚动停止 500ms 后保存阅读进度（Solid 2.0 拆分效应：compute 跟踪当前阅读位置）
+  createEffect(
+    () => virtualLayout.currentCharIndex(),
+    () => saveProgress(),
+  );
+
+  // ResizeObserver 清理挂到 owned 作用域：Solid 2.0 ref 回调是 unowned，
+  // 内部 onCleanup 会静默失效（NO_OWNER_CLEANUP warn）导致观察器泄漏。
+  let textResizeObserver: ResizeObserver | undefined;
 
   function onTextContainerRef(el: HTMLElement) {
     if (!el) {
@@ -994,45 +1073,64 @@ const NovelDetail: Component = () => {
     setTextContainerWidth(el.clientWidth);
     virtualLayout.containerRef(el);
 
+    textResizeObserver?.disconnect();
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
         setTextContainerWidth(entry.contentRect.width);
       }
     });
     ro.observe(el);
-
-    onCleanup(() => ro.disconnect());
+    textResizeObserver = ro;
   }
 
-  // 将阅读设置面板状态注册到 overlay 栈
-  createEffect(() => {
-    if (settingsOpen()) {
-      pushOverlay("readerSettingsSheet", () => setSettingsOpen(false));
-      onCleanup(() => {
-        popOverlay("readerSettingsSheet");
-      });
-    }
+  onSettled(() => {
+    return () => textResizeObserver?.disconnect();
   });
+
+  // 将阅读设置面板状态注册到 overlay 栈
+  // Solid 2.0：拆分效应 + apply 返回 cleanup（原 onCleanup 在 effect 内已不可用）
+  createEffect(
+    () => settingsOpen(),
+    (open) => {
+      if (open) {
+        pushOverlay("readerSettingsSheet", () => setSettingsOpen(false));
+        return () => popOverlay("readerSettingsSheet");
+      }
+    },
+  );
 
   // 将系列目录面板状态注册到 overlay 栈
-  createEffect(() => {
-    if (seriesOpen()) {
-      pushOverlay("seriesSheet", () => setSeriesOpen(false));
-      onCleanup(() => {
-        popOverlay("seriesSheet");
-      });
-    }
-  });
+  createEffect(
+    () => seriesOpen(),
+    (open) => {
+      if (open) {
+        pushOverlay("seriesSheet", () => setSeriesOpen(false));
+        return () => popOverlay("seriesSheet");
+      }
+    },
+  );
 
   // 将评论面板状态注册到 overlay 栈
-  createEffect(() => {
-    if (showComments()) {
-      pushOverlay("commentSheet", () => setShowComments(false));
-      onCleanup(() => {
-        popOverlay("commentSheet");
-      });
-    }
-  });
+  createEffect(
+    () => showComments(),
+    (open) => {
+      if (open) {
+        pushOverlay("commentSheet", () => setShowComments(false));
+        return () => popOverlay("commentSheet");
+      }
+    },
+  );
+
+  // 将导出面板状态注册到 overlay 栈
+  createEffect(
+    () => exportOpen(),
+    (open) => {
+      if (open) {
+        pushOverlay("novelExportSheet", () => setExportOpen(false));
+        return () => popOverlay("novelExportSheet");
+      }
+    },
+  );
 
   // ── Scroll-driven bottom toolbar hide/show ──
   const { direction: scrollDirection, reset: resetScrollDirection } = createScrollBehavior({
@@ -1040,18 +1138,20 @@ const NovelDetail: Component = () => {
     accumulate: true,
   });
   const scroll = createScrollPosition();
-  createEffect(() => {
-    const y = scroll.y;
-    const atBottom =
-      window.innerHeight + y >= document.documentElement.scrollHeight - BOTTOM_THRESHOLD;
-    if (atBottom) {
-      setFooterHidden(false);
-      return;
-    }
-    const d = scrollDirection();
-    if (d === "down") setFooterHidden(true);
-    else if (d === "up") setFooterHidden(false);
-  });
+  // Solid 2.0 拆分效应：compute 跟踪滚动位置与方向，apply 段写 footer 显隐（合法）。
+  createEffect(
+    () => ({ y: scroll.y, dir: scrollDirection() }),
+    ({ y, dir }) => {
+      const atBottom =
+        window.innerHeight + y >= document.documentElement.scrollHeight - BOTTOM_THRESHOLD;
+      if (atBottom) {
+        setFooterHidden(false);
+        return;
+      }
+      if (dir === "down") setFooterHidden(true);
+      else if (dir === "up") setFooterHidden(false);
+    },
+  );
 
   function openSearch() {
     setSearchOpen(true);
@@ -1063,31 +1163,40 @@ const NovelDetail: Component = () => {
   }
 
   // 切换小说时自动关闭搜索、清空高亮，并滚动到页面顶部，重置底部栏显隐状态
-  createEffect(() => {
-    currentNovelId();
-    closeSearch();
-    scrollToTop();
-    setFooterHidden(false);
-    untrack(() => resetScrollDirection());
-  });
+  // Solid 2.0 拆分效应：compute 跟踪章节 id，apply 段做重置副作用（本就 untracked，
+  // 原 untrack 包裹不再需要）。
+  createEffect(
+    () => currentNovelId(),
+    () => {
+      closeSearch();
+      scrollToTop();
+      setFooterHidden(false);
+      resetScrollDirection();
+    },
+  );
 
   const [titleEl, setTitleEl] = createSignal<HTMLHeadingElement | undefined>();
-  const titleVisible = createVisibilityObserver({ rootMargin: NOVEL_INTERACTIVE_MARGIN })(() =>
-    titleEl(),
-  );
+  // Solid 2.0：createVisibilityObserver 签名改为 (element, options?)，不再柯里化；
+  // 显式 initialValue: false 维持旧版「首帧返回 false、首次观测后才更新」语义，
+  // 避免 accessor 在首次观测前抛 NotReadyError（本页无 Loading 边界兜底）。
+  const titleVisible = createVisibilityObserver(() => titleEl(), {
+    rootMargin: NOVEL_INTERACTIVE_MARGIN,
+    initialValue: false,
+  });
   const showHeaderTitle = createMemo(() => !titleVisible());
   const [imageViewerOpen, setImageViewerOpen] = createSignal(false);
   const [imageViewerIndex, setImageViewerIndex] = createSignal(0);
 
   // 将图片查看器状态注册到 overlay 栈
-  createEffect(() => {
-    if (imageViewerOpen()) {
-      pushOverlay("viewer", () => setImageViewerOpen(false));
-      onCleanup(() => {
-        popOverlay("viewer");
-      });
-    }
-  });
+  createEffect(
+    () => imageViewerOpen(),
+    (open) => {
+      if (open) {
+        pushOverlay("viewer", () => setImageViewerOpen(false));
+        return () => popOverlay("viewer");
+      }
+    },
+  );
 
   const imageBlockList = createMemo(() => getImageBlocks(blocks()));
   const imageViewerUrls = createMemo(() => imageBlockList().map((block) => block.urls.original));
@@ -1176,6 +1285,8 @@ const NovelDetail: Component = () => {
         setTranslateOpen(true);
       }
     },
+    // 正文未就绪（受限/未加载）时不提供导出入口（spec §7.1 不可用态）
+    onExport: (novelHtml() ?? "").length > 0 ? () => setExportOpen(true) : undefined,
   });
 
   return (
@@ -1240,6 +1351,19 @@ const NovelDetail: Component = () => {
 
         <ReaderSettingsSheet isOpen={settingsOpen()} onClose={() => setSettingsOpen(false)} />
 
+        <Show when={exportOpen()}>
+          <ExportSheet
+            isOpen
+            onClose={() => setExportOpen(false)}
+            defaultFormat={novelExportFormat()}
+            options={novelExportOptions()}
+            onExport={(fmt) => {
+              enqueueNovelExport(fmt);
+              setExportOpen(false);
+            }}
+          />
+        </Show>
+
         <TranslateSheet
           isOpen={translateOpen()}
           onClose={() => setTranslateOpen(false)}
@@ -1255,41 +1379,29 @@ const NovelDetail: Component = () => {
             <FluentDialog
               open
               onClose={() => resolveRestrictConfirm(false)}
-              aria-label={c().xRestrict === 2 ? "翻译 R18G 内容？" : "翻译 R18 内容？"}
+              aria-label={
+                c().xRestrict === 2 ? t("novelDetail.r18gAria") : t("novelDetail.r18Aria")
+              }
             >
               <h3 slot="title">
-                {c().xRestrict === 2 ? "翻译 R18G 内容？（法律红线）" : "翻译 R18 内容？"}
+                {c().xRestrict === 2 ? t("novelDetail.r18gTitle") : t("novelDetail.r18Aria")}
               </h3>
-              <Show
-                when={c().xRestrict === 2}
-                fallback={
-                  <p>
-                    该作品包含 R18 内容。翻译需将正文发送至你选择的 AI 服务商，可能：①
-                    被内容审核拒绝（失败段落保留原文）；② 违反服务商使用条款，导致你的 API
-                    账号被警告、暂停或封禁；③
-                    内容可能被去标识化后用于模型训练。所有风险由你自行承担。
-                  </p>
-                }
-              >
-                <p>
-                  该作品包含 R18G（极端）内容。除上述风险外，此类内容违反法律法规红线，可能导致你的
-                  API 账号被关闭，服务商可能向主管部门/执法机构报告。App
-                  提供方不承担由此产生的任何责任。
-                </p>
+              <Show when={c().xRestrict === 2} fallback={<p>{t("novelDetail.r18DialogBody")}</p>}>
+                <p>{t("novelDetail.r18gDialogBody")}</p>
               </Show>
               <fluent-button
                 slot="actions"
                 appearance="secondary"
-                on:click={() => resolveRestrictConfirm(false)}
+                ref={fluentOn("click", () => resolveRestrictConfirm(false))}
               >
-                取消
+                {t("novelDetail.cancel")}
               </fluent-button>
               <fluent-button
                 slot="actions"
                 appearance="primary"
-                on:click={() => resolveRestrictConfirm(true)}
+                ref={fluentOn("click", () => resolveRestrictConfirm(true))}
               >
-                我已了解并继续
+                {t("novelDetail.understood")}
               </fluent-button>
             </FluentDialog>
           )}
@@ -1358,6 +1470,27 @@ const NovelDetail: Component = () => {
               {c()}
             </div>
           )}
+        </Show>
+
+        {/* 导出入队提示 + 跳下载页（spec novel-export §7.1） */}
+        <Show when={queuedNotice()}>
+          <div
+            class="fixed left-1/2 bottom-24 z-50 -translate-x-1/2 flex items-center gap-3 rounded-[var(--borderRadiusMedium)] pl-4 pr-2 py-2 text-[var(--colorNeutralForegroundOnBrand)] shadow-[var(--elevation4)] [font-size:var(--fontSizeBase200)]"
+            style={{ "background-color": "var(--colorBrandBackground)" }}
+          >
+            <span>{queuedNotice()}</span>
+            <button
+              type="button"
+              class="min-h-10 px-3 rounded-[var(--borderRadiusSmall)] bg-transparent text-[var(--colorNeutralForegroundOnBrand)] border border-[var(--colorNeutralForegroundOnBrand)] outline-none cursor-pointer font-semibold hover:opacity-90 active:scale-[0.98] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--colorStrokeFocus2)]"
+              onClick={() => {
+                clearTimeout(queuedNoticeTimer);
+                setQueuedNotice(null);
+                void navigate("/downloads");
+              }}
+            >
+              {t("novelDetail.viewQueued")}
+            </button>
+          </div>
         </Show>
       </div>
     </PageTransition>

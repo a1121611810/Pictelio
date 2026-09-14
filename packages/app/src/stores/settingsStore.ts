@@ -1,7 +1,19 @@
 import { createSignal } from "solid-js";
 import { settings } from "@/settings";
+// 注意：codec 从子路径导入而非 "@/settings" 桶文件——settingsStore 被 10+ 测试
+// mock "@/settings"（getter 注入 harness），桶文件新增具名导入会击穿这些 mock
+import { jsonCodec } from "@/settings/codecs";
 import { user } from "@/stores/authStore";
+import { isAiFilterMode, type AiFilterMode } from "../utils/aiFilter";
 import type { UgoiraExtractMode } from "../api/illust";
+import { UGOIRA_FORMATS, type UgoiraFormat } from "../utils/downloadQueueCore";
+import {
+  DEFAULT_NOVEL_EXPORT_FORMAT,
+  DEFAULT_NOVEL_EXPORT_OPTIONS,
+  NOVEL_EXPORT_FORMATS,
+  type NovelExportFormat,
+  type NovelExportOptions,
+} from "@pictelio/novel-export";
 
 // ── 类型定义 ──
 
@@ -15,6 +27,9 @@ const PREF_KEY_LAYOUT_MODE = "layout_mode";
 const PREF_KEY_AUTO_HIDE_NAV_BAR = "auto_hide_nav_bar";
 const PREF_KEY_SHOW_R18 = "show_r18";
 const PREF_KEY_SHOW_R18G = "show_r18g";
+const PREF_KEY_AI_FILTER_MODE = "ai_filter_mode";
+const PREF_KEY_RELATED_INJECTION = "related_injection";
+const PREF_KEY_RANKING_ENTRY = "ranking_entry";
 const PREF_KEY_SHOW_DETAIL_STAIRS = "show_detail_stairs";
 const PREF_KEY_AUTO_CHECK_UPDATE = "auto_check_update";
 const PREF_KEY_NOVEL_LAYOUT_MODE = "novel_layout_mode";
@@ -26,6 +41,21 @@ const PREF_KEY_DISMISSED_UPDATE_VERSION = "dismissed_update_version";
 const PREF_KEY_OTA_LAST_KNOWN_FLOOR = "ota_last_known_floor";
 const PREF_KEY_OTA_AUTO_DOWNLOAD = "ota_auto_download";
 const PREF_KEY_UGOIRA_MODE = "settings_ugoira_mode";
+const PREF_KEY_UGOIRA_DOWNLOAD_FORMAT = "settings_ugoira_download_format";
+const PREF_KEY_NOVEL_EXPORT_FORMAT = "settings_novel_export_format";
+const PREF_KEY_NOVEL_EXPORT_INCLUDE_METADATA = "settings_novel_export_include_metadata";
+const PREF_KEY_NOVEL_EXPORT_INCLUDE_COVER = "settings_novel_export_include_cover";
+const PREF_KEY_NOVEL_EXPORT_INCLUDE_IMAGES = "settings_novel_export_include_images";
+// WebDAV 连接配置（spec docs/specs/webdav-backup.md §7/§8；跨引擎共享键，
+// 键字符串与 app-lynx settingsStore 逐字一致，契约测试 differential/webdavSettingsConsistency 防漂移）
+const PREF_KEY_WEBDAV_ENABLED = "settings_webdav_enabled";
+const PREF_KEY_WEBDAV_URL = "settings_webdav_url";
+const PREF_KEY_WEBDAV_USERNAME = "settings_webdav_username";
+const PREF_KEY_WEBDAV_DIR = "settings_webdav_dir";
+const PREF_KEY_WEBDAV_AUTO_BACKUP = "settings_webdav_auto_backup";
+const PREF_KEY_WEBDAV_AUTO_BACKUP_DAYS = "settings_webdav_auto_backup_days";
+const PREF_KEY_WEBDAV_LAST_BACKUP = "settings_webdav_last_backup";
+const PREF_KEY_WEBDAV_EXCLUDED_KEYS = "settings_webdav_excluded_keys";
 
 // ── 持久化设置（统一 settings registry 管理）──
 // 各持久化项用 settings.define 声明，signal 状态由 registry 管理。
@@ -112,14 +142,65 @@ export async function setShowR18G(enabled: boolean): Promise<void> {
   window.dispatchEvent(new CustomEvent("r18gChanged"));
 }
 
+// ── AI 作品三态过滤（ADR-0155：账号级设置，键 ai_filter_mode_${uid}，跨 client 共享）──
+// 三态 show/mask/only 以裸字符串持久化；无旧键迁移（本次全新键）。
+// app 端「mask」沿用 app R18 的过滤隐藏口径（见 aiFilter.ts 注释）。
+
+const aiFilterModeFactory = settings.defineFactory<AiFilterMode>({
+  keyPrefix: PREF_KEY_AI_FILTER_MODE,
+  default: "show",
+  validate: isAiFilterMode,
+});
+
+export const aiFilterMode = (): AiFilterMode => {
+  const id = uid();
+  return id !== null ? aiFilterModeFactory.forId(id).value() : "show";
+};
+export async function setAiFilterMode(mode: AiFilterMode): Promise<void> {
+  const id = uid();
+  if (id === null) return; // 未登录：不落盘（账号级语义）
+  aiFilterModeFactory.forId(id).set(mode);
+  window.dispatchEvent(new CustomEvent("aiFilterChanged"));
+}
+
+// ── 相关作品注入行（spec docs/specs/related-injection.md；设备级 UI 偏好，默认开）──
+
+const relatedInjectionHandle = settings.define<boolean>({
+  key: PREF_KEY_RELATED_INJECTION,
+  default: true,
+  validate: (v): v is boolean => typeof v === "boolean",
+});
+
+export const relatedInjection = () => relatedInjectionHandle.value();
+export async function setRelatedInjection(enabled: boolean): Promise<void> {
+  relatedInjectionHandle.set(enabled);
+}
+
+// ── 排行榜入口横滑条（spec docs/specs/ranking.md §5.8；设备级 UI 偏好，默认开）──
+
+const rankingEntryHandle = settings.define<boolean>({
+  key: PREF_KEY_RANKING_ENTRY,
+  default: true,
+  validate: (v): v is boolean => typeof v === "boolean",
+});
+
+export const rankingEntry = () => rankingEntryHandle.value();
+export async function setRankingEntry(enabled: boolean): Promise<void> {
+  rankingEntryHandle.set(enabled);
+}
+
 /**
- * 登录后加载当前账号的 R18/R18G（__root 在 initializeAuth 后 + 各登录成功分支调用）。
+ * 登录后加载当前账号的 R18/R18G + AI 三态（__root 在 initializeAuth 后 + 各登录成功分支调用）。
  * 顺带一次性清理已移除年龄功能的孤儿键（幂等：键不存在 remove 为 no-op）。
  */
 export async function loadAccountR18(): Promise<void> {
   const id = uid();
   if (id === null) return;
-  await Promise.all([r18Factory.forId(id).hydrate(), r18gFactory.forId(id).hydrate()]);
+  await Promise.all([
+    r18Factory.forId(id).hydrate(),
+    r18gFactory.forId(id).hydrate(),
+    aiFilterModeFactory.forId(id).hydrate(),
+  ]);
   await Promise.all([settings.remove("age_confirmed"), settings.remove("is_adult")]).catch((e) =>
     console.warn("[settingsStore] 孤儿键清理失败", e),
   );
@@ -148,6 +229,71 @@ const ugoiraModeHandle = settings.define<UgoiraExtractMode>({
 export const ugoiraMode = () => ugoiraModeHandle.value();
 export async function setUgoiraMode(mode: UgoiraExtractMode): Promise<void> {
   ugoiraModeHandle.set(mode);
+}
+
+// ── 动图下载格式（spec docs/specs/download-manager.md §5）：全局统一，不可逐图 ──
+// 键与 app-lynx 共享（settings_ugoira_download_format，跨引擎同契约）；
+// 任务入队时快照，之后改设置不影响已入队任务（ADR-0146 D2）。
+
+const ugoiraDownloadFormatHandle = settings.define<UgoiraFormat>({
+  key: PREF_KEY_UGOIRA_DOWNLOAD_FORMAT,
+  default: "zip",
+  validate: (v): v is UgoiraFormat =>
+    typeof v === "string" && (UGOIRA_FORMATS as readonly string[]).includes(v),
+});
+
+export const ugoiraDownloadFormat = () => ugoiraDownloadFormatHandle.value();
+export async function setUgoiraDownloadFormat(format: UgoiraFormat): Promise<void> {
+  ugoiraDownloadFormatHandle.set(format);
+}
+
+// ── 小说导出（spec docs/specs/novel-export.md §6）：全局默认格式 + 三项内容开关 ──
+// 键与 app-lynx 共享（settings_novel_export_*，跨引擎同契约）；导出任务入队时快照。
+
+const novelExportFormatHandle = settings.define<NovelExportFormat>({
+  key: PREF_KEY_NOVEL_EXPORT_FORMAT,
+  default: DEFAULT_NOVEL_EXPORT_FORMAT,
+  validate: (v): v is NovelExportFormat =>
+    typeof v === "string" && (NOVEL_EXPORT_FORMATS as readonly string[]).includes(v),
+});
+
+export const novelExportFormat = () => novelExportFormatHandle.value();
+export async function setNovelExportFormat(format: NovelExportFormat): Promise<void> {
+  novelExportFormatHandle.set(format);
+}
+
+const novelExportIncludeMetadataHandle = settings.define<boolean>({
+  key: PREF_KEY_NOVEL_EXPORT_INCLUDE_METADATA,
+  default: DEFAULT_NOVEL_EXPORT_OPTIONS.includeMetadata,
+});
+const novelExportIncludeCoverHandle = settings.define<boolean>({
+  key: PREF_KEY_NOVEL_EXPORT_INCLUDE_COVER,
+  default: DEFAULT_NOVEL_EXPORT_OPTIONS.includeCover,
+});
+const novelExportIncludeImagesHandle = settings.define<boolean>({
+  key: PREF_KEY_NOVEL_EXPORT_INCLUDE_IMAGES,
+  default: DEFAULT_NOVEL_EXPORT_OPTIONS.includeInlineImages,
+});
+
+export const novelExportIncludeMetadata = () => novelExportIncludeMetadataHandle.value();
+export const novelExportIncludeCover = () => novelExportIncludeCoverHandle.value();
+export const novelExportIncludeImages = () => novelExportIncludeImagesHandle.value();
+
+/** 当前内容开关快照（导出面板展示 / 入队共用），与设置页三项一一对应 */
+export const novelExportOptions = (): NovelExportOptions => ({
+  includeMetadata: novelExportIncludeMetadata(),
+  includeCover: novelExportIncludeCover(),
+  includeInlineImages: novelExportIncludeImages(),
+});
+
+export async function setNovelExportIncludeMetadata(v: boolean): Promise<void> {
+  novelExportIncludeMetadataHandle.set(v);
+}
+export async function setNovelExportIncludeCover(v: boolean): Promise<void> {
+  novelExportIncludeCoverHandle.set(v);
+}
+export async function setNovelExportIncludeImages(v: boolean): Promise<void> {
+  novelExportIncludeImagesHandle.set(v);
 }
 
 /** 兼容存根：registry hydrateAll 已加载，Phase 4 移除 */
@@ -275,6 +421,88 @@ export {
 
 // ── 重置所有设置到默认值 ──
 
+// ── WebDAV 连接配置（spec docs/specs/webdav-backup.md §7/§8）──
+// 进备份域（密码除外，密码走 secure storage，见 utils/webdavCredentials）。
+// 存储后端 = preferences（默认）→ 与 lynx PictelioPrefsModule 同一 SharedPreferences 文件。
+
+const webdavEnabledHandle = settings.define<boolean>({
+  key: PREF_KEY_WEBDAV_ENABLED,
+  default: false,
+});
+export const webdavEnabled = () => webdavEnabledHandle.value();
+export async function setWebdavEnabled(enabled: boolean): Promise<void> {
+  webdavEnabledHandle.set(enabled);
+}
+
+const webdavUrlHandle = settings.define<string>({
+  key: PREF_KEY_WEBDAV_URL,
+  default: "",
+});
+export const webdavUrl = () => webdavUrlHandle.value();
+export async function setWebdavUrl(url: string): Promise<void> {
+  webdavUrlHandle.set(url);
+}
+
+const webdavUsernameHandle = settings.define<string>({
+  key: PREF_KEY_WEBDAV_USERNAME,
+  default: "",
+});
+export const webdavUsername = () => webdavUsernameHandle.value();
+export async function setWebdavUsername(username: string): Promise<void> {
+  webdavUsernameHandle.set(username);
+}
+
+const webdavDirHandle = settings.define<string>({
+  key: PREF_KEY_WEBDAV_DIR,
+  default: "Pictelio/backup",
+});
+export const webdavDir = () => webdavDirHandle.value();
+export async function setWebdavDir(dir: string): Promise<void> {
+  webdavDirHandle.set(dir);
+}
+
+const webdavAutoBackupHandle = settings.define<boolean>({
+  key: PREF_KEY_WEBDAV_AUTO_BACKUP,
+  default: false,
+});
+export const webdavAutoBackup = () => webdavAutoBackupHandle.value();
+export async function setWebdavAutoBackup(enabled: boolean): Promise<void> {
+  webdavAutoBackupHandle.set(enabled);
+}
+
+/** 自动备份周期天数（spec §7：N∈{1,3,7,30}，默认 7） */
+const webdavAutoBackupDaysHandle = settings.define<number>({
+  key: PREF_KEY_WEBDAV_AUTO_BACKUP_DAYS,
+  default: 7,
+  validate: (v): v is number => typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 30,
+});
+export const webdavAutoBackupDays = () => webdavAutoBackupDaysHandle.value();
+export async function setWebdavAutoBackupDays(days: number): Promise<void> {
+  webdavAutoBackupDaysHandle.set(days);
+}
+
+/** 上次备份时间（ISO-8601，只读展示于设置区块；空串 = 从未备份） */
+const webdavLastBackupHandle = settings.define<string>({
+  key: PREF_KEY_WEBDAV_LAST_BACKUP,
+  default: "",
+});
+export const webdavLastBackup = () => webdavLastBackupHandle.value();
+export async function setWebdavLastBackup(iso: string): Promise<void> {
+  webdavLastBackupHandle.set(iso);
+}
+
+/** 敏感项排除清单（导出界面勾选持久化；恢复时不触碰本地对应键，spec §6） */
+const webdavExcludedKeysHandle = settings.define<string[]>({
+  key: PREF_KEY_WEBDAV_EXCLUDED_KEYS,
+  default: [],
+  codec: jsonCodec,
+  validate: (v): v is string[] => Array.isArray(v) && v.every((k) => typeof k === "string"),
+});
+export const webdavExcludedKeys = () => webdavExcludedKeysHandle.value();
+export async function setWebdavExcludedKeys(keys: string[]): Promise<void> {
+  webdavExcludedKeysHandle.set(keys);
+}
+
 /** 重置所有设置项为默认值，并尽可能持久化。 */
 export async function resetSettingsStore(): Promise<void> {
   setListQuality("medium");
@@ -286,10 +514,28 @@ export async function resetSettingsStore(): Promise<void> {
   await setImageCacheDiskSize(300);
   await setShowR18(false);
   await setShowR18G(false);
+  await setAiFilterMode("show");
+  await setRelatedInjection(true);
   await setLayoutMode("waterfall");
   await setNovelLayoutMode("list");
   await setShowDetailStairs(false);
+  await setUgoiraDownloadFormat("zip");
+  await setNovelExportFormat(DEFAULT_NOVEL_EXPORT_FORMAT);
+  await setNovelExportIncludeMetadata(DEFAULT_NOVEL_EXPORT_OPTIONS.includeMetadata);
+  await setNovelExportIncludeCover(DEFAULT_NOVEL_EXPORT_OPTIONS.includeCover);
+  await setNovelExportIncludeImages(DEFAULT_NOVEL_EXPORT_OPTIONS.includeInlineImages);
   await setAutoCheckUpdate(true);
+  await setWebdavEnabled(false);
+  await setWebdavUrl("");
+  await setWebdavUsername("");
+  await setWebdavDir("Pictelio/backup");
+  await setWebdavAutoBackup(false);
+  await setWebdavAutoBackupDays(7);
+  await setWebdavLastBackup("");
+  await setWebdavExcludedKeys([]);
+  // 注意：webdav_password / webdav_backup_password 有意保留在 secure storage
+  // （与 refresh_token 重置策略一致，ADR 先例）；是否随重置/登出清除由 UI 工单
+  // （T6+）拍板——避免「用户清设置」误删凭据导致无法连接。
   await setLastDismissedVersion("");
   setHasUpdate(false);
   setLatestVersion("");

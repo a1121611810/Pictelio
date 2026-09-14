@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
+import { t } from '../i18n'
 import { useGlobalFabStore } from '../stores/globalFab'
 import { A11Y_ELEMENT_ENABLED, GLOBAL_FAB_A11Y_LABELS } from '../utils/accessibility'
 import { screenHeightVw as deriveScreenHeightVw, type ViewportContentSize, type ViewportSystemInfo } from '../utils/viewportGeometry'
@@ -229,7 +230,7 @@ function onFabTap(): void {
           class="leading-none mt-[1px]"
           :class="e.tab.name === view.active ? 'text-secondary-on-container' : 'text-surface-on-variant'"
           style="font-size: 3.2vw"
-        >{{ e.tab.label }}</text>
+        >{{ t(e.tab.labelKey) }}</text>
       </view>
 
       <!-- 内环：全局搜索项（首位）+ 页面动作项（刷新/回顶/扩展）——固定圆形尺寸（vw 缩放） -->

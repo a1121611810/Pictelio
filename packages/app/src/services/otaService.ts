@@ -25,6 +25,7 @@ import {
   setOtaLastKnownFloor,
   setShowUpdateDialog,
 } from "@/stores/settingsStore";
+import { t } from "@/i18n";
 
 declare const APP_VERSION: string;
 
@@ -158,7 +159,7 @@ export async function selfHeal(): Promise<boolean> {
   const urlBase = lastGateResult?.webBundle?.url;
   if (!urlBase) {
     console.warn("[ota] 自愈无可用 bundle 元数据（webBundle 缺失），转阻断态");
-    setGateError("无可用更新包");
+    setGateError(t("core.service.otaService.noBundleAvailable")); // i18n: set 时快照（瞬态）
     setGateHealing(false);
     return false;
   }

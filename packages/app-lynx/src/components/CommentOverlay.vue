@@ -8,8 +8,10 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import type { CommentContentType } from '../api/comment'
 import type { PixivComment } from '../api/types'
+import { t } from '../i18n'
 import type { CommentsState } from '../primitives/useComments'
 import { useComments } from '../primitives/useComments'
+import { deriveFirstLoadView } from '../utils/firstLoadView'
 import { useModalStack } from '../stores/modalStack'
 import CommentItem from './CommentItem.vue'
 import CommentInputBar from './CommentInputBar.vue'
@@ -27,6 +29,16 @@ const emit = defineEmits<{
 const controller = useComments({ type: props.type, targetId: props.targetId })
 // state 是 getter 返回的只读快照 → 用 computed 包裹保持响应式（模板自动解包）
 const state = computed<CommentsState>(() => controller.state)
+
+/** 首载三态（ADR-0150）：idle 视同加载中（打开即骨架），ready 才判定空态 */
+const view = computed(() =>
+  deriveFirstLoadView({
+    hasItems: state.value.comments.length > 0,
+    loading: state.value.status === 'loading' || state.value.status === 'idle',
+    settled: state.value.status === 'ready',
+    hasError: state.value.status === 'error',
+  }),
+)
 
 // 回复态：点条目「回复」设置；提交成功清除
 const replyingTo = ref<PixivComment | null>(null)
@@ -84,14 +96,14 @@ onBeforeUnmount(() => {
       <!-- M3 bottom sheet 顶部：居中标题（title-large）+ 关闭按钮 -->
       <view class="flex flex-row items-center h-[11.733vw] px-4 flex-shrink-0">
         <view class="w-[8vw]" />
-        <text class="flex-1 text-center text-title-large font-medium text-surface-on">评论 ({{ state.comments.length }})</text>
+        <text class="flex-1 text-center text-title-large font-medium text-surface-on">{{ t('commentOverlay.title', { count: state.comments.length }) }}</text>
         <view class="w-[8vw] h-[8vw] flex items-center justify-center" @tap="onClose">
           <text class="text-[6.4vw] leading-none text-surface-on-variant">×</text>
         </view>
       </view>
 
-      <!-- 首屏加载：骨架（复用 App.vue 全局 shimmer） -->
-      <view v-if="state.status === 'loading'" class="w-full flex-1 min-h-0 px-4 pt-4">
+      <!-- 首屏加载：骨架（idle/loading 均归骨架；复用 App.vue 全局 shimmer） -->
+      <view v-if="view === 'skeleton'" class="w-full flex-1 min-h-0 px-4 pt-4">
         <view v-for="n in 4" :key="n" class="flex flex-row items-start mb-5">
           <view class="shimmer w-[8vw] h-[8vw] rounded-full flex-shrink-0" />
           <view class="flex-1 ml-3">
@@ -103,15 +115,15 @@ onBeforeUnmount(() => {
 
       <!-- 首屏错误：全屏错误 + 重试按钮（open） -->
       <view
-        v-else-if="state.status === 'error'"
+        v-else-if="view === 'error'"
         class="w-full flex-1 min-h-0 flex flex-col items-center justify-center"
       >
-        <text class="text-body-small text-error px-8 text-center">{{ state.error ?? '加载失败，请重试' }}</text>
+        <text class="text-body-small text-error px-8 text-center">{{ state.error ?? t('commentOverlay.loadFailedRetry') }}</text>
         <view
           class="mt-4 px-6 h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
           @tap="retry"
         >
-          <text class="text-label-large font-medium text-primary-on">重试</text>
+          <text class="text-label-large font-medium text-primary-on">{{ t('commentOverlay.retry') }}</text>
         </view>
       </view>
 
@@ -124,10 +136,10 @@ onBeforeUnmount(() => {
 
         <!-- 空列表 -->
         <view
-          v-if="state.comments.length === 0"
+          v-if="view === 'empty'"
           class="w-full flex-1 min-h-0 flex flex-col items-center justify-center"
         >
-          <text class="text-body-medium text-outline">还没有评论</text>
+          <text class="text-body-medium text-outline">{{ t('commentOverlay.empty') }}</text>
         </view>
 
         <!-- 评论列表：flex-1 min-h-0，独立垂直滚动；item-key 必须 String（ADR-0056） -->
@@ -169,7 +181,7 @@ onBeforeUnmount(() => {
             full-span
             class="w-full h-10 flex items-center justify-center"
           >
-            <text class="text-label-medium text-outline">没有更多了</text>
+            <text class="text-label-medium text-outline">{{ t('commentOverlay.noMore') }}</text>
           </list-item>
         </list>
       </template>

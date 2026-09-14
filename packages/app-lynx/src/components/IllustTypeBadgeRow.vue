@@ -7,6 +7,7 @@
 // [lynx:fix] 严禁 absolute 定位——list-item 内 absolute 子元素会被真机高度测量
 // 算进内容高度（CONTEXT.md「遮罩」词条，2026-08-11 实测）。
 import { computed } from 'vue'
+import { t } from '../i18n'
 import { resolveIllustTypeBadges, type IllustTypeBadgeSource } from './illustTypeBadges'
 
 const props = defineProps<{
@@ -16,13 +17,14 @@ const props = defineProps<{
 
 // ▶ = U+25B6 + U+FE0E 变体选择器（强制 text presentation，防 Lynx 原生把 emoji-able
 // 字符解析为彩色 emoji 字形导致 CSS color 失效，ADR-0112 平台事实，♥ 同案）；
-// ⧉ = U+29C9 非 emoji 字符，无需 VS15
-const UGOIRA_LABEL = '\u25B6\uFE0E 动图'
-
+// ⧉ = U+29C9 非 emoji 字符，无需 VS15——图标字符随 key 进字典（非文案，双语言一致）
 const badges = computed(() =>
   resolveIllustTypeBadges(props.illust).map((b) => ({
     key: b.kind,
-    label: b.kind === 'ugoira' ? UGOIRA_LABEL : `\u29C9 ${b.pageCount} 图`,
+    label:
+      b.kind === 'ugoira'
+        ? t('illustTypeBadgeRow.ugoira')
+        : t('illustTypeBadgeRow.multiPages', { count: b.pageCount }),
   })),
 )
 </script>

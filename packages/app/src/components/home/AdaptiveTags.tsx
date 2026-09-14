@@ -1,9 +1,10 @@
 import type { Component } from "solid-js";
-import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import type { PixivIllustTag } from "@/api/types";
 import SearchableTag from "@/components/SearchableTag";
 import { useContainerWidth } from "@/primitives/useContainerWidth";
 import { computeVisibleTags } from "./adaptiveTagFit";
+import { t } from "../../i18n";
 
 /**
  * 自适应标签行（用户确认的简单方案）：
@@ -51,7 +52,7 @@ const AdaptiveTags: Component<AdaptiveTagsProps> = (props) => {
     if (children.length < total + 1) return;
     setChipWidths(children.slice(0, total).map((c) => c.offsetWidth));
     setPlusWidth((children[total] as HTMLElement).offsetWidth);
-    setTick((t) => t + 1);
+    setTick((prev) => prev + 1);
   };
 
   /** 测量与宽度均就绪后才渲染结果（ready 前显示占位，杜绝反馈循环） */
@@ -71,44 +72,56 @@ const AdaptiveTags: Component<AdaptiveTagsProps> = (props) => {
     return f?.partialWidth != null ? props.tags[f.visible] : undefined;
   };
   const partialText = () => {
-    const t = partialTag();
-    if (!t) return "";
-    return t.translated_name ? `${t.name}（${t.translated_name}）` : t.name;
+    const tag = partialTag();
+    if (!tag) return "";
+    return tag.translated_name ? `${tag.name}（${tag.translated_name}）` : tag.name;
   };
 
   // 截断 chip 外层 ref：命令式写入 max-width（JSX style 动态值实测不可靠，未写入 DOM）
+  // Solid 2.0 拆分：compute 返回 partialWidth 快照，apply 段做 DOM 写入
   let partialRef: HTMLSpanElement | undefined;
-  createEffect(() => {
-    const f = fit();
-    if (partialRef && f?.partialWidth != null) {
-      partialRef.style.maxWidth = `${f.partialWidth}px`;
-    }
-  });
+  createEffect(
+    () => fit()?.partialWidth,
+    (partialWidth) => {
+      if (partialRef && partialWidth != null) {
+        partialRef.style.maxWidth = `${partialWidth}px`;
+      }
+    },
+  );
 
   // 测量层就绪后读数；ResizeObserver 持续监听（旋转/字体加载/容器变化重测）
-  onMount(() => {
+  // onSettled 不能嵌套原语：onCleanup 改为返回 cleanup
+  onSettled(() => {
     measure();
     const el = measureEl;
     if (!el) return;
     const ro = new ResizeObserver(measure);
     ro.observe(el);
-    onCleanup(() => ro.disconnect());
+    return () => ro.disconnect();
   });
 
   // 标签变化后重测（等渲染完成再读宽度）
-  createEffect(() => {
-    void props.tags;
-    requestAnimationFrame(measure);
-  });
+  // Solid 2.0 拆分：compute 追踪 tags 引用，apply 延迟一帧测量（rAF 内写 signal 合法）
+  createEffect(
+    () => props.tags,
+    () => {
+      requestAnimationFrame(measure);
+    },
+  );
 
   return (
     <div ref={ref} class="relative mt-[var(--spacingVerticalXS)]">
-      {/* 测量层：absolute + visibility:hidden，不占布局；渲染全部 chip + 「+N」占位（文本用总数最宽值） */}
+      {/* 测量层：absolute + visibility:hidden，不占布局；渲染全部 chip + 「+N」占位（文本用总数最宽值）。
+          overflow-hidden 必须保留：标签单行总宽可达数百 px，无裁剪会撑大文档 scrollWidth，
+          窄视口（Android WebView 360px）整页可横向拖动（#419）；裁剪不影响子元素 offsetWidth 测量。
+          首页全 feed 渲染时 SearchableTag 实例可达 ~2000，dev 模式 solid-refresh 的 per-type
+          HMR signal 会报 HUGE_FAN_OUT——已裁定接受（#426：信号属 solid-refresh 内部、
+          createSelector 无 key 可反转；dev-only，生产构建无 solid-refresh）。 */}
       <div
         ref={(el) => {
           measureEl = el;
         }}
-        class="pointer-events-none absolute inset-0 flex items-center gap-[var(--spacingHorizontalXXS)]"
+        class="pointer-events-none absolute inset-0 flex items-center gap-[var(--spacingHorizontalXXS)] overflow-hidden"
         style={{ visibility: "hidden" }}
         aria-hidden="true"
       >
@@ -134,8 +147,8 @@ const AdaptiveTags: Component<AdaptiveTagsProps> = (props) => {
               }}
               class={`${chipClass} min-w-0 overflow-hidden`}
               role="button"
-              tabIndex={0}
-              aria-label={`搜索标签：${partialTag()!.name}`}
+              tabindex={0}
+              aria-label={t("home.adaptiveTags.searchTagAria", { name: partialTag()!.name })}
               onClick={(e) => {
                 e.stopPropagation();
                 props.onOverflowClick();
@@ -149,8 +162,8 @@ const AdaptiveTags: Component<AdaptiveTagsProps> = (props) => {
             <span
               class={plusNClass}
               role="button"
-              tabIndex={0}
-              aria-label={`还有 ${remaining()} 个标签，查看详情`}
+              tabindex={0}
+              aria-label={t("home.adaptiveTags.moreTagsAria", { count: remaining() })}
               onClick={(e) => {
                 e.stopPropagation();
                 props.onOverflowClick();

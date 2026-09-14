@@ -30,7 +30,8 @@ export function listAvds(): string[] {
 /**
  * 解析目标 AVD：
  * - 显式传入 avdName 时校验其存在性；
- * - 未传入时按 KNOWN_AVDS 顺序取第一个存在的（默认 pictelio_low）。
+ * - 未传入时按 KNOWN_AVDS 顺序取第一个存在的（当前顺序为
+ *   `pictelio_ui` → `pictelio_low`，故实际默认是 pictelio_ui）。
  * 一个都不存在时给出创建指引的清晰报错。
  */
 export function resolveAvd(avdName?: string): AvdName {

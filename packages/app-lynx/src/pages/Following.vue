@@ -1,22 +1,28 @@
 <script setup lang="ts">
 // 关注 Feed（P0-T4）：关注作者的插画时间线，waterfall 分页（复用推荐页模式）。
 // 顶部栏含返回箭头（ADR-0120 移除底部导航栏后补）；本页非 tab 页，放射 FAB 不显示。
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { navigate, requestBack } from '../router'
 import { loadFollow, loadNext } from '../api/illust'
 import type { PixivIllust, PixivIllustListResponse } from '../api/types'
 import { thumbUrl } from '../utils/imageUrl'
+import { deriveFirstLoadView } from '../utils/firstLoadView'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { useSettingsStore } from '../stores/settingsStore'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
+import AiRestrictedIllustCard from '../components/AiRestrictedIllustCard.vue'
+import { useAiOnlyVisible } from '../composables/useAiOnlyVisible'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 
-const isRestricted = useSettingsStore().isRestricted
+const settings = useSettingsStore()
+const isRestricted = settings.isRestricted
+const isAiRestricted = settings.isAiRestricted
 import RefreshableList from '../components/RefreshableList.vue'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import { t } from '../i18n'
 
 // ─── 分页收敛（ADR-0104）：迁移到 createMixFeed 深模块 ───
 // 单源关注 feed（/v2/illust/follow，offset 分页）；双防抖/竞态/空页防护/15s 超时/
@@ -43,16 +49,31 @@ const feed = ref(
 )
 
 const illusts = ref<PixivIllust[]>([])
+/** 仅看态：非 AI 条目从渲染流移除（服务端分页判空仍基于 feed.items，不受影响） */
+const visibleIllusts = useAiOnlyVisible(illusts)
 const loading = ref(false)
 const loadingMore = ref(false)
 const errorMsg = ref('')
 const pageErrorMsg = ref('')
 const endOfFeed = ref(false)
+/** 首载是否已成功落定（成功含 0 条）——三态判定输入（ADR-0150） */
+const settled = ref(false)
+
+/** 页级首载三态（ADR-0150）：骨架 / 错误 / 空态 / 内容 的唯一判定源 */
+const view = computed(() =>
+  deriveFirstLoadView({
+    hasItems: visibleIllusts.value.length > 0,
+    loading: loading.value,
+    settled: settled.value,
+    hasError: !!errorMsg.value,
+  }),
+)
 
 function sync() {
   illusts.value = feed.value.items().map((i) => i.data as PixivIllust)
   loading.value = feed.value.loading()
   loadingMore.value = feed.value.loadingMore()
+  settled.value = feed.value.settled()
   errorMsg.value = feed.value.error() ?? ''
   pageErrorMsg.value = feed.value.pageError() ?? ''
   // 到底态：所有源耗尽且列表非空（ADR-0104：footer「没有更多了」）
@@ -64,6 +85,9 @@ function sync() {
 }
 
 async function refreshFeed() {
+  // 发起前同步进入加载态并清错误：骨架立即占位（ADR-0150）
+  loading.value = true
+  errorMsg.value = ''
   await feed.value.refresh()
   sync()
   // [lynx:fix] 数据整体替换触发 vue-lynx patch RemoveNode 索引错位（框架 bug，ADR-0107 D4）；
@@ -106,29 +130,34 @@ onUnmounted(() => {
       <view
         class="py-1 pr-2"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
-        accessibility-label="返回"
+        :accessibility-label="t('following.backA11y')"
         @tap="requestBack"
       >
         <text class="text-[6.4vw] leading-none text-surface-on">‹</text>
       </view>
-      <text class="flex-1 text-center text-title-large font-medium text-surface-on">关注</text>
+      <text class="flex-1 text-center text-title-large font-medium text-surface-on">{{ t('following.title') }}</text>
     </view>
 
-    <text v-if="errorMsg && !loading" class="text-body-small text-error p-4">{{ errorMsg }}</text>
-
-    <!-- 骨架屏：首屏加载时 shimmer 卡片占位（与真实卡片同比例，避免 reflow） -->
+    <!-- 首载三态（ADR-0150）：骨架 → 错误 → 空态 → 内容，互斥单链；不依赖 loading 标志 -->
     <!-- [lynx:fix] 骨架屏不占满全屏高度（h-full 会溢出覆盖底部导航栏，拦截 tap，issue #129） -->
-    <view v-if="loading && illusts.length === 0" class="w-full flex-1 min-h-0 flex flex-row flex-wrap content-start p-1.5">
+    <view v-if="view === 'skeleton'" class="w-full flex-1 min-h-0 flex flex-row flex-wrap content-start p-1.5">
       <SkeletonCard v-for="n in 8" :key="n" />
     </view>
-
-    <!-- 空态（加载失败时由 errorMsg 显示错误，不显示空态） -->
-    <view v-else-if="!loading && !errorMsg && illusts.length === 0" class="w-full flex-1 min-h-0 flex items-center justify-center">
+    <view v-else-if="view === 'error'" class="w-full flex-1 min-h-0 flex flex-col items-center justify-center px-8">
+      <text class="text-body-small text-error text-center">{{ errorMsg }}</text>
+      <view
+        class="mt-4 px-6 h-[10.667vw] bg-primary active:bg-state-pressed-primary rounded-[var(--md-shape-full)] flex items-center justify-center"
+        @tap="refreshFeed"
+      >
+        <text class="text-label-large font-medium text-primary-on">{{ t('following.retry') }}</text>
+      </view>
+    </view>
+    <view v-else-if="view === 'empty'" class="w-full flex-1 min-h-0 flex items-center justify-center">
       <view class="flex flex-col items-center">
-          <text class="text-[10.667vw] leading-none text-outline-variant">♡</text>
-          <text class="text-body-large text-surface-on mt-3">暂无关注更新</text>
-          <text class="text-body-medium text-surface-on-variant mt-1.5">关注你喜欢的作者后，这里会展示他们的新作品</text>
-        </view>
+        <text class="text-[10.667vw] leading-none text-outline-variant">♡</text>
+        <text class="text-body-large text-surface-on mt-3">{{ t('following.empty.title') }}</text>
+        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ t('following.empty.hint') }}</text>
+      </view>
     </view>
 
     <RefreshableList v-else :refresh="refreshFeed" @back-to-top="refreshEpoch++">
@@ -146,7 +175,7 @@ onUnmounted(() => {
       @scroll="onScroll"
     >
       <list-item
-        v-for="item in illusts"
+        v-for="item in visibleIllusts"
         :key="item.id"
         :item-key="String(item.id)"
         class="bg-surface-container-lowest rounded-[var(--md-shape-medium)] flex flex-col overflow-hidden shadow-[var(--md-elevation-1)]"
@@ -159,6 +188,7 @@ onUnmounted(() => {
           >
             <RestrictOverlay :overlay="false" :level="item.x_restrict === 2 ? 2 : 1" />
           </view>
+          <AiRestrictedIllustCard v-else-if="isAiRestricted(item)" :item="item" />
           <view v-else class="relative" @tap.stop="onImageTap(item)">
             <SkeletonImage :src="thumbUrl(item.image_urls)" height="48.4vw" lazy-load />
           </view>
@@ -176,9 +206,9 @@ onUnmounted(() => {
         </view>
       </list-item>
       <list-item v-if="loadingMore || pageErrorMsg || endOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text v-if="loadingMore" class="text-body-medium text-outline">加载中…</text>
+        <text v-if="loadingMore" class="text-body-medium text-outline">{{ t('following.footer.loading') }}</text>
         <text v-else-if="pageErrorMsg" class="text-body-medium text-error">{{ pageErrorMsg }}</text>
-        <text v-else class="text-body-medium text-outline">没有更多了</text>
+        <text v-else class="text-body-medium text-outline">{{ t('following.footer.end') }}</text>
       </list-item>
     </list>
     </template>

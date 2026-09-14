@@ -7,12 +7,17 @@
 // - 原生回调契约来自 PixivApiModule：(status, data, rotatedRefreshToken)，
 //   data 即原始响应字符串（PixivApiCore 对非 JSON 响应原样返回）。
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { apiClient, setAccessToken, setOnUnauthorized, setAuthPermanentFailure, rewriteUrl } from "./client"
+import { apiClient, setAccessToken, setOnUnauthorized, setAuthPermanentFailure, setAuthReadyProvider, rewriteUrl } from "./client"
 import { ApiErrorType } from "./types"
 import { PIXIV_USER_AGENT, PIXIV_REFERER, PIXIV_API_BASE } from "./userAgent"
 
 // 真实结构样例：/webview/v2/novel 返回的 HTML（含 window.pixiv.novel.text）
 const NOVEL_HTML = `<script>window.pixiv = { novel: { "text": "第一行\\n第二行" } }</script>`
+
+// 认证就绪门（client.setAuthReadyProvider）默认清空，防跨用例泄漏；用例内按需注册。
+beforeEach(() => {
+  setAuthReadyProvider(null)
+})
 
 describe("client.requestRaw web 模式（fetch + /pixiv-api 代理）", () => {
   const fetchMock = vi.fn()
@@ -100,6 +105,40 @@ describe("client.requestRaw web 模式（fetch + /pixiv-api 代理）", () => {
     ).rejects.toMatchObject({
       type: ApiErrorType.UNAUTHORIZED,
     })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  // 启动竞态回归（用户报告：刷新页面先闪「未登录，请先登录」红字而非骨架）：
+  // 子页面 onMounted 早于 App.onMounted → 首帧 GET 早于 restoreToken。
+  // 修复：无 token 时先等「认证就绪」落定，再判定是否真的未登录。
+  it("web 模式无 token + 认证恢复在飞 → 请求等待恢复落定后带 Bearer 发出（不误抛未登录）", async () => {
+    setAccessToken("")
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    setAuthReadyProvider(async () => {
+      await gate
+      setAccessToken("restored-token")
+      return true
+    })
+    fetchMock.mockResolvedValue(new Response(NOVEL_HTML, { status: 200 }))
+    const p = apiClient.requestRaw("GET", "/webview/v2/novel", { id: "123" })
+    // 恢复门未落定：请求必须仍在等待，不得提前发出
+    await Promise.resolve()
+    expect(fetchMock).not.toHaveBeenCalled()
+    release()
+    await p
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe("Bearer restored-token")
+  })
+
+  it("web 模式无 token + 恢复失败 → 仍抛未登录（不永久挂起）", async () => {
+    setAccessToken("")
+    setAuthReadyProvider(async () => false)
+    await expect(
+      apiClient.requestRaw("GET", "/webview/v2/novel", { id: "123" }),
+    ).rejects.toMatchObject({ type: ApiErrorType.UNAUTHORIZED })
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })

@@ -8,7 +8,7 @@
  * mock 全部桩化 otaService 信号（组件只读信号 + 触发 selfHeal，不实现逻辑）。
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render } from "solid-js/web";
+import { render } from "@solidjs/web";
 
 const mockOtaService = vi.hoisted(() => ({
   gateActive: vi.fn(() => false),

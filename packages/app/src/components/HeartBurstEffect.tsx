@@ -62,13 +62,16 @@ const HeartBurstEffect: Component<Props> = (props) => {
     containerRef.appendChild(frag);
   }
 
-  createEffect(() => {
-    const count = props.trigger();
-    if (count === 0) {
-      return;
-    }
-    burst();
-  });
+  // Solid 2.0 拆分：compute 追踪 trigger，apply 段做 DOM 副作用（burst 无 signal 写）
+  createEffect(
+    () => props.trigger(),
+    (count) => {
+      if (count === 0) {
+        return;
+      }
+      burst();
+    },
+  );
 
   onCleanup(() => {
     if (containerRef) {

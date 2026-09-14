@@ -25,7 +25,7 @@ export const MenuRow: Component<MenuRowProps> = (props) => {
         }
       }}
       role="button"
-      tabIndex={0}
+      tabindex={0}
       aria-label={props.ariaLabel}
     >
       <div class="w-6 h-6 flex-shrink-0 text-[var(--colorNeutralForeground2)]">

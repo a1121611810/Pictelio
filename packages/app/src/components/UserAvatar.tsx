@@ -9,27 +9,30 @@ const UserAvatar: Component = () => {
   const [avatarUrl, setAvatarUrl] = createSignal("");
   const [errored, setErrored] = createSignal(false);
 
-  createEffect(() => {
-    const u = user();
-    if (!u) {
-      return;
-    }
-    const src = u.profile_image_urls.px_50x50 || u.profile_image_urls.medium || "";
-    console.log(src, !!u.profile_image_urls.px_50x50, !!u.profile_image_urls.medium);
-    if (!src) {
-      return;
-    }
-    if (isNative) {
-      void tryAsync(
-        loadImage(src).then((r) => {
-          setAvatarUrl(r.url);
-        }),
-      );
-    } else {
-      const url = resolveImageUrl(src);
-      setAvatarUrl(url);
-    }
-  });
+  // Solid 2.0 拆分：compute 只读返回 src 快照，apply 段写 signal / 发起加载
+  createEffect(
+    () => {
+      const u = user();
+      if (!u) {
+        return "";
+      }
+      return u.profile_image_urls.px_50x50 || u.profile_image_urls.medium || "";
+    },
+    (src) => {
+      if (!src) {
+        return;
+      }
+      if (isNative) {
+        void tryAsync(
+          loadImage(src).then((r) => {
+            setAvatarUrl(r.url);
+          }),
+        );
+      } else {
+        setAvatarUrl(resolveImageUrl(src));
+      }
+    },
+  );
 
   return (
     <>

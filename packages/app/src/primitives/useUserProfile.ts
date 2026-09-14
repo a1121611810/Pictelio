@@ -46,39 +46,51 @@ export function useUserProfile(
   const [avatarUrl, setAvatarUrl] = createSignal("");
   const [avatarErrored, setAvatarErrored] = createSignal(false);
 
-  createEffect(() => {
-    const u = displayUser();
-    if (!u) {
-      setAvatarUrl("");
-      return;
-    }
-    const src = u.profile_image_urls.px_50x50 || u.profile_image_urls.medium || "";
-    if (!src) {
-      setAvatarUrl("");
-      return;
-    }
-    setAvatarErrored(false);
-    if (isNative) {
-      let cancelled = false;
-      onCleanup(() => {
-        cancelled = true;
-      });
-      void tryAsync(
-        (async () => {
-          const [err, r] = await tryAsync(loadImage(src));
-          if (cancelled) return;
-          if (err) {
-            setAvatarErrored(true);
-            return;
-          }
-          setAvatarUrl(r!.url);
-          r!.cleanup();
-        })(),
-      );
-    } else {
-      setAvatarUrl(resolveImageUrl(src));
-    }
-  });
+  // 2.0 拆分效应：compute 段只读并提取头像 URL 普通值，写 signal / 异步预载移入 apply 段，
+  // 取消标记经 apply 返回的 cleanup 注销
+  createEffect(
+    () => {
+      const u = displayUser();
+      if (!u) {
+        return { src: "", hasUser: false };
+      }
+      return {
+        src: u.profile_image_urls.px_50x50 || u.profile_image_urls.medium || "",
+        hasUser: true,
+      };
+    },
+    ({ src, hasUser }) => {
+      if (!hasUser) {
+        setAvatarUrl("");
+        return;
+      }
+      if (!src) {
+        setAvatarUrl("");
+        return;
+      }
+      setAvatarErrored(false);
+      if (isNative) {
+        let cancelled = false;
+        void tryAsync(
+          (async () => {
+            const [err, r] = await tryAsync(loadImage(src));
+            if (cancelled) return;
+            if (err) {
+              setAvatarErrored(true);
+              return;
+            }
+            setAvatarUrl(r!.url);
+            r!.cleanup();
+          })(),
+        );
+        return () => {
+          cancelled = true;
+        };
+      } else {
+        setAvatarUrl(resolveImageUrl(src));
+      }
+    },
+  );
 
   return {
     targetUserId,

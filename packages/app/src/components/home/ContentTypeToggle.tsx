@@ -7,10 +7,11 @@
  */
 import type { Component } from "solid-js";
 import { contentType, setContentType, type ContentType } from "@/stores/uiStore";
+import { t, type I18nKey } from "../../i18n";
 
-const OPTIONS: { key: ContentType; label: string }[] = [
-  { key: "illust", label: "插画" },
-  { key: "novel", label: "小说" },
+const OPTIONS: { key: ContentType; labelKey: I18nKey }[] = [
+  { key: "illust", labelKey: "home.contentToggle.illust" },
+  { key: "novel", labelKey: "home.contentToggle.novel" },
 ];
 
 const ContentTypeToggle: Component = () => (
@@ -18,16 +19,19 @@ const ContentTypeToggle: Component = () => (
     {OPTIONS.map((opt) => (
       <button
         data-testid={`content-type-${opt.key}`}
-        class="flex-1 cursor-pointer appearance-none border-none px-3 py-1 font-semibold outline-none transition-all active:scale-95 [font-size:var(--fontSizeBase100)]"
-        classList={{
-          "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
-            contentType() === opt.key,
-          "bg-transparent text-[var(--colorNeutralForeground2)]": contentType() !== opt.key,
-        }}
+        class={[
+          "flex-1 cursor-pointer appearance-none border-none px-3 py-1 font-semibold outline-none transition-all active:scale-95 [font-size:var(--fontSizeBase100)]",
+          {
+            "bg-[var(--colorNeutralBackground1)] text-[var(--colorNeutralForeground1)] shadow-[var(--elevation2)]":
+              contentType() === opt.key,
+            "bg-transparent text-[var(--colorNeutralForeground2)]": contentType() !== opt.key,
+          },
+        ]}
+
         onClick={() => void setContentType(opt.key)}
-        aria-pressed={contentType() === opt.key}
+        aria-pressed={contentType() === opt.key ? "true" : "false"}
       >
-        {opt.label}
+        {t(opt.labelKey)}
       </button>
     ))}
   </div>

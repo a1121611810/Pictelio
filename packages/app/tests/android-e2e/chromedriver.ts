@@ -117,11 +117,14 @@ export async function ensureChromedriver(serial: string): Promise<number | null>
   const cdVersion = chromedriverVersionFor(major) ?? `${major}.0.0.0`;
   // zip 文件名随 CPU 架构：arm64（Apple Silicon）/ mac64（Intel）。
   // 老版 chromedriver（2.x 等）无 arm64 构建——arm64 下载失败时 fallback mac64。
-  const archList = process.arch === "arm64" ? ["arm64", "64"] : ["64"];
+  // 命名契约（googleapis 实际文件名）：arm64 → chromedriver_mac_arm64.zip；
+  // Intel → chromedriver_mac64.zip。曾误拼为 chromedriver_mac_64.zip → WebView 66
+  // （chromedriver 2.40，仅 mac64 版）在 Apple Silicon 上必然下载失败。
+  const archList = process.arch === "arm64" ? ["mac_arm64", "mac64"] : ["mac64"];
   const tmpZip = resolve(process.env.TMPDIR ?? "/tmp", `cd-${major}.zip`);
   let downloaded = false;
   for (const arch of archList) {
-    const zipUrl = `https://chromedriver.storage.googleapis.com/${cdVersion}/chromedriver_mac_${arch}.zip`;
+    const zipUrl = `https://chromedriver.storage.googleapis.com/${cdVersion}/chromedriver_${arch}.zip`;
     try {
       execFileSync("curl", ["-sL", "--max-time", "120", "-x", proxy, "-o", tmpZip, zipUrl], {
         env: proxyEnv(),

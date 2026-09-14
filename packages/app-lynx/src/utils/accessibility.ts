@@ -21,8 +21,49 @@ export const ME_A11Y_LABELS = {
   switchToLynx: '切换客户端到Lynx',
   bookmarks: '我的收藏',
   watchlist: '追更列表',
+  downloads: '下载管理',
+  networkCheck: '网络自检',
+  // WebDAV 备份（spec docs/specs/webdav-backup.md §7）：主开关 + 三个动作 + 撤销
+  webdavToggle: '启用WebDAV备份',
+  webdavTest: 'WebDAV连接测试',
+  webdavBackup: 'WebDAV立即备份',
+  webdavRestore: 'WebDAV恢复',
+  webdavUndo: 'WebDAV撤销上次恢复',
+  webdavAutoDays: 'WebDAV自动备份周期',
+  webdavAutoToggle: 'WebDAV自动备份开关',
+  webdavSensitiveGroup: 'WebDAV敏感项排除',
+  webdavRestoreFiles: 'WebDAV备份档案列表',
+  webdavDecrypt: 'WebDAV解密并查看摘要',
+  webdavRestoreCancel: 'WebDAV取消恢复',
+  webdavRestoreConfirm: 'WebDAV确认恢复',
+  // 动图下载格式（spec download-manager §5）：全局统一，六格式各一标注
+  downloadFormatGif: '动图下载格式GIF',
+  downloadFormatMp4: '动图下载格式MP4',
+  downloadFormatWebp: '动图下载格式WebP',
+  downloadFormatApng: '动图下载格式APNG',
+  downloadFormatZip: '动图下载格式ZIP',
+  downloadFormatTar: '动图下载格式TAR',
+  // 小说导出（spec docs/specs/novel-export.md §6/§7.2）：默认格式 9 项 + 三项内容开关
+  novelExportFormatTxt: '小说导出格式TXT',
+  novelExportFormatHtml: '小说导出格式HTML',
+  novelExportFormatMd: '小说导出格式Markdown',
+  novelExportFormatDocx: '小说导出格式Word',
+  novelExportFormatPdf: '小说导出格式PDF',
+  novelExportFormatEpub: '小说导出格式EPUB',
+  novelExportFormatRtf: '小说导出格式RTF',
+  novelExportFormatJson: '小说导出格式JSON',
+  novelExportFormatFb2: '小说导出格式FB2',
+  novelExportIncludeMetadata: '小说导出包含元数据',
+  novelExportIncludeCover: '小说导出包含封面',
+  novelExportIncludeImages: '小说导出包含正文插图',
   r18Toggle: '显示R18内容',
   r18gToggle: '显示R18G内容',
+  relatedInjectionToggle: '相关作品注入开关',
+  rankingEntryToggle: '排行榜入口开关',
+  // AI 作品三态过滤（ADR-0155）
+  aiFilterShow: 'AI作品显示全部',
+  aiFilterMask: 'AI作品遮罩',
+  aiFilterOnly: 'AI作品仅看',
   ugoiraFflate: '动图播放选择fflate取帧',
   ugoiraRange: '动图播放选择Range流式取帧',
   ugoiraConfirm: '确认切换到Range流式',
@@ -30,6 +71,16 @@ export const ME_A11Y_LABELS = {
   detailQualityMedium: '详情画质选择标准',
   detailQualityLarge: '详情画质选择高清',
   detailQualityOriginal: '详情画质选择原图',
+  // 主题色（外观）：每个可选色板一个标注（Me.vue 显式渲染各色块）
+  themeColorSky: '主题色天蓝',
+  themeColorViolet: '主题色紫罗兰',
+  themeColorPink: '主题色樱花粉',
+  themeColorGreen: '主题色松柏绿',
+  themeColorOrange: '主题色落日橙',
+  themeColorTeal: '主题色深青',
+  languageFollowSystem: '界面语言跟随系统',
+  languageZh: '界面语言简体中文',
+  languageEn: '界面语言English',
   logout: '退出登录',
 } as const
 
@@ -91,6 +142,7 @@ export const SEARCH_A11Y_LABELS = {
   sortNewest: '排序最新',
   sortOldest: '排序最早',
   sortPopular: '排序热门',
+  filterToggle: '筛选',
 } as const
 
 /** 追更列表页 accessibility 标注（issue #225：/watchlist 页 + 取消追更二次确认 Dialog） */
@@ -108,6 +160,21 @@ export const WATCHLIST_PROMPT_A11Y_LABELS = {
   dialog: '追更询问弹窗',
   decline: '暂不追更',
   confirm: '追更该系列',
+} as const
+
+/** 下载管理页 accessibility 标注（spec docs/specs/download-manager.md §7.2） */
+export const DOWNLOAD_A11Y_LABELS = {
+  pageTitle: '下载管理',
+  back: '返回',
+  toggleAll: '全选或取消全选',
+  start: '开始下载',
+  pause: '暂停下载',
+  stop: '停止下载',
+  share: '分享已下载',
+  remove: '删除下载',
+  confirmDeleteFiles: '删除文件与记录',
+  confirmDeleteRecords: '仅清空记录',
+  cancelDelete: '取消删除',
 } as const
 
 // Lynx 元素属性不支持 Vue 插值表达式，模板中用 :accessibility-element 绑定此常量

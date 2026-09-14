@@ -5,7 +5,7 @@
  * + 卡内信息行（标题 / 作者 + 右侧 ★收藏）。
  * A2 规范（ADR-0074）：XLarge 圆角、NeutralBackground1 底、1px NeutralStroke1 边框、
  * 无阴影、hover 背景高亮、active 轻微缩放。
- * 可访问性：role="button" + tabIndex=0 + Enter 键触发 onClick。
+ * 可访问性：role="button" + tabindex=0 + Enter 键触发 onClick。
  *
  * 标签（A 已定稿，full）：图上 R-18/R-18G/AI 分级标 + 右上类型角标（动图/多图，ADR-0113）+ 文案 chip 动态显示
  * （AdaptiveTags 能放几个放几个 +「+N」折叠，可点搜索）。
@@ -18,6 +18,7 @@ import { createProgressiveImage } from "@/primitives/createProgressiveImage";
 import AdaptiveTags from "@/components/home/AdaptiveTags";
 import IllustTypeBadge from "@/components/IllustTypeBadge";
 import SkeletonShimmer from "@/components/SkeletonShimmer";
+import { t } from "../../i18n";
 
 interface IllustSingleCardProps {
   /** 插画数据 */
@@ -35,7 +36,7 @@ const IllustSingleCard: Component<IllustSingleCardProps> = (props) => {
   });
   // 内容标签：过滤 R-18/R-18G（分级已由图上的 R-18 badge 表达，避免重复）
   const contentTags = () =>
-    props.illust.tags.filter((t) => t.name !== "R-18" && t.name !== "R-18G");
+    props.illust.tags.filter((tag) => tag.name !== "R-18" && tag.name !== "R-18G");
   // 原图宽高比（width/height 可能异常，回退 16:10）
   const ratio = () => {
     const w = props.illust.width;
@@ -48,7 +49,7 @@ const IllustSingleCard: Component<IllustSingleCardProps> = (props) => {
       data-testid="illust-card"
       class="cursor-pointer overflow-hidden rounded-[var(--borderRadiusXLarge)] border border-[var(--colorNeutralStroke1)] bg-[var(--colorNeutralBackground1)] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-98 focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThick)] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
       role="button"
-      tabIndex={0}
+      tabindex={0}
       onClick={props.onClick}
       onKeyDown={(e) => {
         if (e.key === "Enter") props.onClick();
@@ -97,9 +98,9 @@ const IllustSingleCard: Component<IllustSingleCardProps> = (props) => {
               R-18G
             </fluent-badge>
           )}
-          <Show when={props.illust.illust_ai_type != null && props.illust.illust_ai_type > 1}>
+          <Show when={props.illust.illust_ai_type != null && props.illust.illust_ai_type >= 1}>
             <fluent-badge appearance="filled">
-              {props.illust.illust_ai_type === 2 ? "AI" : "AI辅助"}
+              {props.illust.illust_ai_type === 2 ? "AI" : t("home.illustSingle.aiAssisted")}
             </fluent-badge>
           </Show>
         </div>

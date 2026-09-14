@@ -210,8 +210,9 @@ export function createSettings(opts: SettingsOptions): Settings {
     }
 
     defs.set(def.key, def as SettingDef<unknown>);
-    const [value, setValueRaw] = createSignal<T>(def.default);
-    // Solid setter 对泛型 T 有 Exclude<T, Function> 约束，包一层断言以便泛型项使用
+    // Solid 2.0 的 createSignal 对初值/setter 均有 Exclude<T, Function> 约束，
+    // 泛型 T 无法直接满足，统一包一层断言以便泛型项使用（settings 值恒为非函数）
+    const [value, setValueRaw] = createSignal<T>(def.default as Exclude<T, Function>);
     const setValue = (v: T) => setValueRaw(v as never);
     const localSubscribers = new Set<(v: T) => void>();
 
@@ -227,8 +228,13 @@ export function createSettings(opts: SettingsOptions): Settings {
 
         if (def.persist === false) return;
         if (def.shouldPersist && !def.shouldPersist(next, prev)) return;
-        // write gate：hydrateAll 完成前的 set 只更新内存，不落盘
-        if (phase !== "warm") return;
+        // write gate：hydrateAll 完成前的 set 只更新内存，不落盘。
+        // 丢弃必须可见（测试硬约束 3 / ADR-0159 决策 2）：冷态写说明调用时序有误，
+        // 每次丢弃都 warn，不改「不落盘」语义本身。
+        if (phase !== "warm") {
+          console.warn(`[settings-registry] 冷态丢弃写入（phase=${phase}）: ${def.key}`);
+          return;
+        }
 
         if (def.debounceMs && def.debounceMs > 0) {
           const existing = debounceTimers.get(def.key);
@@ -263,6 +269,11 @@ export function createSettings(opts: SettingsOptions): Settings {
         }
         setValue(decoded as T);
         applyValue(def as SettingDef<unknown>, decoded);
+        // SolidJS 2.0 批处理语义（#415）：syncInit 的契约是「返回后 value() 同步可见」
+        // （首屏模块级 init 紧接着同步读：readerSettingsStore 用 value() 构建 initial、
+        // themeStore/main.tsx 读 theme 应用防闪烁）。set 后不 flush 会读到默认值，
+        // 首屏状态静默丢失。属启动期命令式边界豁免。
+        flush();
       },
       async reset() {
         setValue(def.default);
@@ -354,6 +365,50 @@ export function createSettings(opts: SettingsOptions): Settings {
     }
   }
 
+  async function rawValues(): Promise<Record<string, string>> {
+    const out: Record<string, string> = {};
+    for (const [key, def] of defs) {
+      const storage = resolveStorage(def);
+      try {
+        const raw = await storage.get(key);
+        if (raw !== null) out[key] = raw;
+      } catch (e) {
+        // 读取失败 = 该键不进快照；必须可见（仓库测试硬约束 #3）
+        report(def, "read", e);
+      }
+    }
+    return out;
+  }
+
+  async function setRawValues(
+    entries: Record<string, string>,
+  ): Promise<{ applied: string[]; skipped: string[] }> {
+    const applied: string[] = [];
+    const skipped: string[] = [];
+    for (const [key, raw] of Object.entries(entries)) {
+      const def = defs.get(key);
+      const handle = handles.get(key);
+      if (!def || !handle) {
+        skipped.push(key); // 未注册键（异引擎 / 更新版本遗留）不写，spec §6
+        continue;
+      }
+      const decoded = decodeSetting(def, raw);
+      if (decoded === undefined) {
+        report(def, "read", new Error(`restore corrupt value for ${key}: ${raw}`));
+        skipped.push(key);
+        continue;
+      }
+      try {
+        handle.set(decoded as never);
+        applied.push(key);
+      } catch (e) {
+        report(def, "write", e);
+        skipped.push(key);
+      }
+    }
+    return { applied, skipped };
+  }
+
   return {
     define,
     defineFactory,
@@ -367,6 +422,8 @@ export function createSettings(opts: SettingsOptions): Settings {
       for (const [k, h] of handles) out[k] = h.value();
       return out;
     },
+    rawValues,
+    setRawValues,
     onChange,
   };
 }

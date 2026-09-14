@@ -1,4 +1,5 @@
-import type { Component, JSX } from "solid-js";
+import type { JSX } from "@solidjs/web";
+import type { Component } from "solid-js";
 
 interface SettingsCardProps {
   /** elevated=柔和阴影无边框（默认）；danger=危险操作卡片 */

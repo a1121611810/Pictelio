@@ -50,4 +50,13 @@ export const queryKeys = {
   ) => ["search", "novel", word, sort, searchTarget] as const,
 
   searchAutocomplete: (word: string) => ["search", "autocomplete", word] as const,
+
+  /** 相关作品（spec docs/specs/related-injection.md）：["related", illustId] */
+  related: (illustId: number) => ["related", illustId] as const,
+
+  /**
+   * 排行榜（spec docs/specs/ranking.md）：键段由 @pictelio/ranking-core 的
+   * rankingCacheKey 单点生成（已把「今日」与显式今日归一）；入口与榜单页共用同键。
+   */
+  ranking: (cacheKey: string) => ["ranking", cacheKey] as const,
 } as const;

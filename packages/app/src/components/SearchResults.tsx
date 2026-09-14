@@ -8,6 +8,7 @@ import ErrorDisplay from "@/components/ErrorDisplay";
 import InlineRetryBar from "@/components/ui/InlineRetryBar";
 import FluentIcon from "@/components/ui/FluentIcon";
 import { createSentinel } from "@/primitives/visibility";
+import { t } from "@/i18n";
 
 interface Props {
   results: SearchResultItem[];
@@ -72,13 +73,13 @@ const SearchResults: Component<Props> = (props) => {
         {/* Loading indicator */}
         <Show when={props.loading}>
           <div class="py-[var(--spacingVerticalXXL)]">
-            <LoadingSpinner text="加载中..." />
+            <LoadingSpinner text={t("searchResults.loading")} />
           </div>
         </Show>
 
         {/* 分页失败内联重试条：在列表之后、哨兵之前显示，只重试失败页 */}
         <Show when={isPaginationError()}>
-          <InlineRetryBar message="加载更多失败" onRetry={props.onLoadMore} />
+          <InlineRetryBar message={t("searchResults.loadMoreFailed")} onRetry={props.onLoadMore} />
         </Show>
 
         {/* Sentinel for auto-load more (IntersectionObserver) */}
@@ -91,7 +92,7 @@ const SearchResults: Component<Props> = (props) => {
           <div class="flex items-center gap-3 py-[var(--spacingVerticalXXL)]" role="separator">
             <span class="flex-1 h-[var(--strokeWidthThin)] bg-[var(--colorNeutralStroke2)]" />
             <span class="text-[var(--colorNeutralForeground4)] [font-size:var(--fontSizeBase200)] flex-shrink-0">
-              没有更多了
+              {t("searchResults.endReached")}
             </span>
             <span class="flex-1 h-[var(--strokeWidthThin)] bg-[var(--colorNeutralStroke2)]" />
           </div>
@@ -105,10 +106,10 @@ const SearchResults: Component<Props> = (props) => {
             </span>
             <div class="flex flex-col gap-[var(--spacingVerticalXS)]">
               <p class="text-[var(--colorNeutralForeground3)] [font-size:var(--fontSizeBase300)] font-medium">
-                没有找到相关作品
+                {t("searchResults.empty")}
               </p>
               <p class="text-[var(--colorNeutralForeground4)] [font-size:var(--fontSizeBase200)]">
-                试试其他关键词或调整筛选条件
+                {t("searchResults.emptyHint")}
               </p>
             </div>
           </div>

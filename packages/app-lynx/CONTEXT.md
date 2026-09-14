@@ -17,6 +17,16 @@ _Avoid_: 遮罩卡（与遮罩的 absolute 覆盖模式语义不同）
 **遮罩（overlay）**：
 `RestrictOverlay` 组件的 absolute 覆盖模式（铺满父容器），用于详情页正文等「内容仍渲染、遮罩盖其上」的场景。列表卡一律用流内受限卡模式，**禁止**在 list-item 内使用 absolute 遮罩（真机高度测量异常，会撑满内容区）。
 
+**AI 条目（AI item）**：
+`illust_ai_type` / `novel_ai_type >= 1` 的作品（0/undefined=非 AI，1=AI 辅助，2=纯 AI）。由 `settingsStore.isAiRestricted()` 依据账号级 AI 模式判定是否处于遮罩态。
+_Avoid_: AI 内容（与 AI 翻译混淆）
+
+**AI 遮罩卡（AI restricted card）**：
+AI 模式为「遮罩」时，列表中 AI 条目的占位卡：scrim 半透明底 + AI 徽章（纯 AI 显示「AI」，AI 辅助显示「AI辅助」）+ 文案，无交互。形态对齐 R18 受限卡（插画方形图区 / `RestrictedNovelCard` 小说高度），但**不实现 absolute 遮罩**（list-item 内高度测量约束，见「遮罩」词条）。
+
+**AI 模式（AI filter mode）**【跨上下文】：
+`show | mask | only`，账号级设置 `ai_filter_mode_${uid}`。`mask` 在 app-lynx 落地为 AI 遮罩卡；`only` 完全过滤移除非 AI 作品（app-lynx 唯一的 AI 过滤态）；`show` 不处理。谓词与术语与 app 侧互镜像（详见 `packages/app/CONTEXT.md`）。
+
 ### 覆盖层与命中测试（Overlay & hit-testing）
 
 **平台约束（ADR-0123，不可变）**：
@@ -41,8 +51,12 @@ _Avoid_: 遮罩卡（与遮罩的 absolute 覆盖模式语义不同）
 _Avoid_: 图上 absolute 角标（list-item 内 absolute 真机高度测量异常，见「遮罩」词条）、各页面散写徽章
 
 **标签胶囊行（tag chip row）**：
-推荐轮播滑页 scrim 区的标签行（ADR-0118）——M3 assist-chip 形态（同「类型徽章行」：`bg-secondary-container` / `text-label-medium` / `md-shape-small` 圆角），文本 `translated_name || name` 带 `#` 前缀；**最多 3 个，超出折叠为「+N」**，单行不换行；插画与小说统一展示；**纯展示不可点**（app-lynx 无搜索路由）。
-_Avoid_: 全量标签堆叠、可点击标签（无搜索页）、省略号截断
+推荐轮播滑页 scrim 区的标签行（ADR-0118）——M3 assist-chip 形态（同「类型徽章行」：`bg-secondary-container` / `text-label-medium` / `md-shape-small` 圆角），文本 `translated_name || name` 带 `#` 前缀；**固定上限 3 个，超出折叠为「+N」**（轮播 scrim 现状；列表卡见「标签自适应折叠」），单行不换行；插画与小说统一展示；chip 可点 → 打开全局搜索弹层，关键词为原始 tag.name（ADR-0133）；ADR-0118 的「纯展示不可点」前提已随 ADR-0132/0133 过时。
+_Avoid_: 全量标签堆叠、各页面散写标签样式
+
+**标签自适应折叠（adaptive tag fold）**：
+标签胶囊行在**单行**内按容器实测宽度决定放几个：装得下全部显示；装不下则右侧预留「+N」，左侧贪心放完整 chip，剩余宽 ≥ 最小可读宽时再放一个**省略号截断 chip**（ADR-0149）；「+N」/截断 chip 点击进作品详情。宽度只能由 lynx.createSelectorQuery() 的 select('#id').invoke({ method: 'boundingClientRect' }) **逐元素链式 .exec()** 得到。
+_Avoid_: 硬 slice(0, N) 截断、selectAll(...).invoke(...)（双端不支持）、list-item 内 absolute 测量层（真机高度测量会把 absolute 算进内容高度）
 
 ### 分页（Pagination）
 
@@ -98,8 +112,16 @@ _Avoid_: 全 bleed `aspectFill` 铺满整屏（图被裁）、`widthFix` 式底�
 推荐轮播松手翻页判定（ADR-0118，替代 ADR-0115「吸附最近页 round 50%」语义）——拖过 **1/3 屏宽**松手即翻页、未过回弹；叠加 **fling 甩动判定**：快速滑动（位移短但速度超阈值）即使未到 1/3 也沿速度方向翻页，慢拖仍按阈值。上一张/下一张对称生效，吸附动画保留。
 _Avoid_: 50% 阈值（旧语义）、纯位置判定无 fling、位移放大跟手
 
+**页级首载骨架（page-level first-load skeleton）**：
+页面/组件首次向数据源取数期间的整页占位（各页按自有布局渲染 shimmer 卡 / 行 / 正文条）。触发 = **渲染流为空且该源尚未成功落定**——不依赖 loading 标志，冷启动（含 IFR 首帧）立即出现；已有数据刷新不闪骨架；失败换错误提示；仅**已成功落定为空**才显示空态文案。「沉浸骨架」是本规则在推荐轮播页的实例。
+_Avoid_: 依赖 loading 标志的显隐时机、首帧空态文案闪现、把「图片三态」的图级骨架当作页级首载占位
+
+**首载落定（first-load settle）**：
+某数据源首页请求已返回的判定：**成功返回即已落定（含返回 0 条）**，失败不算。是「骨架 ↔ 空态文案」的切换依据——未落定显骨架，已落定且为空显空态文案，失败显错误。显式刷新 / 重试回到未落定并重新显骨架。
+_Avoid_: 用 loading 标志代替落定判定、把失败当作落定（会让空态文案覆盖错误）
+
 **沉浸骨架（immersive skeleton）**：
-推荐轮播首载骨架（ADR-0118）——按滑页布局的骨架：上部全宽 shimmer 图区 + 底部 scrim 区域文字条（标题/作者/徽章位），取代「加载中…」文字。触发 = **渲染流为空即显**（不依赖 loading 标志，冷启动请求前立即出现）；已有数据时刷新不闪骨架；失败换整页错误提示。与「图片三态」的图级骨架（CoverImage 内 shimmer）不同层：本词条是**页级首载占位**。
+推荐轮播首载骨架（ADR-0118）——按滑页布局的骨架：上部全宽 shimmer 图区 + 底部 scrim 区域文字条（标题/作者/徽章位），取代「加载中…」文字。触发 = **渲染流为空即显**（不依赖 loading 标志，冷启动请求前立即出现）；已有数据时刷新不闪骨架；失败换整页错误提示。与「图片三态」的图级骨架（CoverImage 内 shimmer）不同层：本词条是**页级首载占位**，即通用「页级首载骨架」在轮播页的实例。
 _Avoid_: 纯文字加载态、依赖 loading 标志的显隐时机、刷新时闪骨架
 
 **轮播 scrim 页面级遮罩（carousel page-level scrim overlay）**：
@@ -114,7 +136,7 @@ _Avoid_: 二次确认（口语别名，勿入代码与文档）、到底自动�
 
 ### 列表操作（List actions）
 列表页唯一的浮动操作入口（M3 FAB menu），固定于列表容器右下角。常态为一个刷新 FAB（56dp，primary-container）；点击后 FAB 变身为 close button（图标 ✕，同尺寸原位），浮出 scrim，并从 FAB top-trailing edge 展开两个 medium-button 规格菜单项：「刷新」「回顶」。执行任一操作后自动收起。双端同构（LynxView / web-core 同一实现与动画）。
-_Avoid_: 堆叠 FAB、speed dial、下拉刷新手势（已废弃，ADR-0107）、页面自持刷新态
+_Avoid_: 堆叠 FAB、speed dial、下拉刷新手势（已废弃，ADR-0107）、页面自持刷新 UI 态（刷新旋转 / 在飞锁；首载三态 loading 快照见「页级首载骨架」）
 
 **刷新旋转（refresh spin）**：
 刷新进行中的视觉反馈：↻ 图标在主 FAB（或菜单中的刷新项图标）持续旋转（1s/圈），与禁用态/忙碌态共同构成「可见刷新过程」（ADR-0108）。刷新结束图标复位。双端同构。
@@ -125,7 +147,7 @@ _Avoid_: 无动画静默刷新、JS 计时器驱动旋转、骨架遮罩
 _Avoid_: 滚动阈值显示、JS 逐帧驱动回顶、常驻轮询 timer
 
 **RefreshableList**：
-列表操作容器组件（深模块），本上下文唯一合法的列表刷新/回顶入口承载者。接口仅两件：`:refresh` 函数 prop（页面传入幂等刷新函数）与默认 slot（放现有 `<list>`）。内部持有刷新态、M3 FAB menu 展开态、互斥规则、旋转与展开动画、回顶防重入；**页面禁止自持刷新态**。9 个列表实例统一消费。
+列表操作容器组件（深模块），本上下文唯一合法的列表刷新/回顶入口承载者。接口仅两件：`:refresh` 函数 prop（页面传入幂等刷新函数）与默认 slot（放现有 `<list>`）。内部持有刷新态、M3 FAB menu 展开态、互斥规则、旋转与展开动画、回顶防重入；**页面禁止自持刷新 UI 态**（刷新旋转 / 在飞锁归本组件；首载三态所需的 loading 快照不在此列，见「页级首载骨架」）。9 个列表实例统一消费。
 _Avoid_: 页面直接渲染刷新按钮、复活独立 Fab 组件（Fab.vue 已删除）、下拉刷新手势、页面写 `<refresh>` 标签
 
 ### 作品交互（Work interactions）
@@ -212,6 +234,12 @@ _Avoid_: 把绝对 next_url 原样传给原生模块
 
 **受限条目 level 派生（restrict level derivation）**：
 `x_restrict === 2 ? 2 : 1` 的徽章级别映射，收敛在 `RestrictedNovelCard` 组件内部（接口只收 `item`），调用方不重复该表达式。
+
+### 外观 / 主题色（Appearance / Theme color）
+
+**主题色（theme color）**【2026-09-11 新增，ADR-0152】：
+app-lynx 的可选 M3 主色（seed）——用户在「我的 → 外观」选择，整树经根 `<page>` 上的 `.theme-*` 色板类切换（CSS 变量覆盖，非运行时算色）。可选集与持久化 id 的单一事实源是 `src/utils/themeColor.ts`（`THEME_COLOR_IDS` / `THEME_COLOR_OPTIONS`）；色板值预生成在 `src/styles/tokens.css`（每个非默认色板覆盖一组 `--md-*` 颜色角色，含 surface 中性色）。默认 `sky` 使用 `.theme-sky`（与基础 `page` 色板共用同一条 CSS 规则，观感不变）。持久化键 `settings_theme_color`（设备级；native 走 `PictelioPrefs` 共享 SharedPreferences，dev 走 IndexedDB），未登录也恢复。
+_Avoid_: 运行时用 JS 计算 / 动态写 CSS 变量（Lynx 动态样式支持面窄、双端不可靠）；给色板类只覆盖 `--md-primary`（secondary/surface/outline/state-layer 不同步会串色）；把主题色做成账号级键（外观是设备级偏好，登出不应重置）。
 
 ### 状态管理（State management）
 
@@ -335,5 +363,31 @@ app-lynx 现状的**自研内存路由**（`src/router.ts` `_state` + `_history`
 **全局守卫鉴权（global auth guard / bootstrap 放行）**【2026-09-03 新增】：
 `router.beforeEach` + `meta.requiresAuth` 的路由级鉴权拦截（未登录 → `/login` replace；Q3 定论采用）。**守卫必须同步判断、不 await 网络**（await → RouterView 空白至守卫结束，违背先渲染后加载）；bootstrap 期（restoreToken 未完成）**直接放行**——首帧先渲染，鉴权由页面 401 兜底 + `initRouter` 收敛。对照旧自研：无路由级守卫，靠页面 `ensureAuth()`。_Avoid_: 守卫 await restoreToken、用守卫替代页面 401 兜底（拦截层与兑现层并存）
 
+**认证就绪门（auth-ready gate）**【2026-09-11 新增，ADR-0151】：
+Web 模式下「数据请求不得早于登录态恢复」的启动协调：无 access_token 的请求先等 `restoreToken()` 落定（或超时上限）再判定是否真未登录，**避免把「恢复中」误判为「未登录」而用错误文案替换骨架**。与「全局守卫鉴权」分工：守卫同步放行保证首帧先渲染，本门异步等待保证首帧请求晚于鉴权就绪。原生模式 access_token 在 Java 堆、不经此门。
+_Avoid_: 页面逐个 `ensureAuth()` 前置（覆盖不全、易漂移）、把「未登录」直接当落定错误渲染、恢复期间不显示骨架
+
 **kebab-case 陷阱**【2026-09-03 新增】：
 vue-lynx 模板编译器把**带连字符的标签**当原生自定义元素：`<router-view>`（kebab-case）编译为自定义元素 → Vue 不渲染（带 `v-slot` 时报 `v-slot can only be used on components`；无 slot 时静默渲染为空——历史「RouterView 为空」断言的真正根因）。模板必须 **PascalCase `<RouterView />`**；其余带连字符组件同理。_Avoid_: kebab-case `<router-view>`/`<router-link>`、把 RouterView 空白归因 vue-router 兼容性
+
+### 排行榜（Ranking）【2026-09-13 新增，跨上下文，spec docs/specs/ranking.md】
+
+**排行榜入口（ranking entry）**：
+插画页推荐 tab 顶部**注入**的排行榜展示位（本端为榜首编辑大卡形态：第 1 名全幅背景 + 右侧第 2/3 名缩略），固定呈现「日榜 · 今日」。入口**不承担维度与日期状态**，也不提供档位切换（原型里的 mini 维度行已按裁决移除）。
+_Avoid_: 排行榜 tab（本项目明确不新增导航分类，见 ADR-0158）
+
+**榜单页（ranking page）**：
+承载**维度切换**（7 档）与**按日期回看**的独立路由页面，与入口分离。
+_Avoid_: 榜单入口（入口只负责展示与跳转）
+
+**榜单维度（ranking mode）**：
+服务端榜单种类。本期 7 档：日/周/月/新人/原创/R-18/R-18G。**档位即 mode**，不做「期间 × R-18」二维展开。
+_Avoid_: 榜单筛选（维度是并列的榜种，不是对同一列表的过滤条件）
+
+**榜单日期（ranking date）**：
+榜单对应的日期，「今日」= 未指定日期。「今日」时「后一天」不可用（不请求未来）。**本端只做箭头步进，无日历选择器**——Lynx 的 `input` 只支持 `text|number|digit|password|tel|email`（语义是选软键盘，非 HTML5 输入控件），无原生日期输入，自研月历挂账二期；日期文案手写格式化（Lynx 运行时无 Intl，禁用 `Intl.DateTimeFormat`）。
+_Avoid_: 在 lynx 用 `<input type="date">`（web-core 预览会透传成真实 HTML input 而「看起来能用」，原生 LynxView 只认上述 6 个枚举值——最易误判的一条路）
+
+**名次（rank）**：
+作品在榜单中的序位，由**分页偏移 + 下标**推得（服务端响应不返回名次字段）。本端对受限条目**保留并盖遮罩**、名次不变（与 webview 滤除条目留下名次空洞的口径不同，两端差异为既有事实，不为榜单页破例）。
+_Avoid_: 序号 / 排名编号（避免暗示「连续编号」，名次是位置不是计数）

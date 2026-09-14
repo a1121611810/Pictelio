@@ -95,6 +95,7 @@ describe("blockStore", () => {
     });
     await loadBlockedIds();
     resetBlockedIds();
+    flush(); // 2.0 批处理语义：set 后同步读返回旧值，先 flush 再断言
 
     expect(blockedIds().size).toBe(0);
     expect(isBlocked(111)).toBe(false);

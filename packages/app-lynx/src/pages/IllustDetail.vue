@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { currentParams, navigate, goBack } from '../router'
-import { loadDetail } from '../api/illust'
+import { loadDetail, loadUgoiraMetadata } from '../api/illust'
 import { followUser, unfollowUser } from '../api/user'
 import { useAuthStore } from '../stores/authStore'
 import type { PixivIllust } from '../api/types'
@@ -10,17 +10,69 @@ import { resolvePageSrcs } from '../utils/imageQuality'
 import { detailImageHeightVw } from '../utils/imageLayout'
 import { presentError } from '../utils/errorPresentation'
 import { useSettingsStore } from '../stores/settingsStore'
+import { useBookmarkMutation } from '../composables/useBookmarkMutation'
 import BookmarkButton from '../components/BookmarkButton.vue'
+import BookmarkPanel from '../components/BookmarkPanel.vue'
 import CommentOverlay from '../components/CommentOverlay.vue'
+import PagePickerSheet from '../components/PagePickerSheet.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import UgoiraViewer from '../components/UgoiraViewer.vue'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
+import { buildImageTasks, buildUgoiraTask } from '../utils/galleryDownload'
+import { useDownloadStore } from '../stores/downloadStore'
+import { t } from '../i18n'
 
 const settings = useSettingsStore()
 
 const illust = ref<PixivIllust | null>(null)
 const loading = ref(true)
 const errorMsg = ref('')
+
+// 路由参数 id（收藏状态机与详情请求共用；提至最前——bm 在 setup 期即读它取值）
+const illustId = computed(() => Number(currentParams.value.id ?? 0))
+
+// ─── 双轨收藏（T5 #534 / spec docs/specs/bookmark-tags.md D3/D8 + ADR-0160）───
+// 页面持有**唯一**收藏状态机实例：单击心形 toggle（快速收藏，恒公开、动效不变）与收藏面板
+// saveWith（覆盖式保存：完整标签集 + 可见性）共用同一份 bookmarked/count/busy——面板保存后
+// 心形即时一致，不引入第二份状态。初始值先占位为未收藏，详情返回后由页面写入服务端真值
+// （状态写入归宿主，spec D9 语义）。IllustDetail 不在 KeepAlive 白名单 → 每次进入实例独立。
+const bm = useBookmarkMutation({
+  illustId: illustId.value,
+  initialBookmarked: false,
+  initialCount: 0,
+})
+
+/** 心形组件 ref：面板保存成功后播收藏动效（与单击收藏同一动效资产） */
+const heartRef = ref<{ playBurst?: () => void } | null>(null)
+/** 收藏面板开合（T5：长按心形 500ms 打开；关闭 = 宿主 v-if 卸载 → 面板内部 dispose） */
+const showBookmarkPanel = ref(false)
+/** 打开面板时的收藏态快照：面板打开期间心形不可达（遮罩覆盖）→ 快照即保存前真值。
+ * 仅「保存前未收藏」的保存播爆发动效（覆盖式编辑不播），对齐 webview handleBookmarkSaved */
+const panelOpenedBookmarked = ref(false)
+
+/** 作品标签建议来源（原形 name，与 webview 面板 workTags 同源；spec D5） */
+const workTags = computed(() => illust.value?.tags?.map((tag) => tag.name) ?? [])
+
+function openBookmarkPanel(): void {
+  panelOpenedBookmarked.value = bm.bookmarked.value
+  // 清掉上一次快速收藏的残留 errorMsg（同一实例的状态）：否则面板 footer 会把旧错误
+  // 误报成「保存失败」（面板打开时的错误行只应呈现本次保存的结果）
+  bm.errorMsg.value = ''
+  showBookmarkPanel.value = true
+}
+
+/** 面板保存成功（saveWith 已乐观置位 bookmarked=true，失败则不上抛 saved）：关面板 + 补动效 */
+function onBookmarkPanelSaved(): void {
+  showBookmarkPanel.value = false
+  if (panelOpenedBookmarked.value) return
+  // 仅「保存前未收藏」的保存播爆发动效（覆盖式编辑不播），对齐 webview handleBookmarkSaved
+  if (heartRef.value?.playBurst) {
+    heartRef.value.playBurst()
+    return
+  }
+  // 动效通道断（模板 ref 未就绪）→ 显式告警，不静默（测试硬约束 #3 精神）
+  console.warn('[IllustDetail] 心形 ref 未就绪，面板保存的收藏动效被跳过')
+}
 
 // ─── 评论弹层（issue #164）：入口在收藏操作行；弹层挂根 view 内、scroll-view 之后 ───
 const showComments = ref(false)
@@ -45,13 +97,84 @@ async function toggleFollowAuthor() {
       following.value = true
     }
   } catch {
-    followError.value = '操作失败'
+    followError.value = t('illustDetail.actionFailed') // i18n: 赋值时快照（瞬态）
   } finally {
     followBusy.value = false
   }
 }
 
-const illustId = computed(() => Number(currentParams.value.id ?? 0))
+// ─── 保存到相册（spec docs/specs/image-save-download.md）：入口在收藏操作行；───
+// ─── 单页直存；多页开选页面板；ugoira 不提供。状态内联在操作行下方（lynx 无全局 toast）───
+const showPicker = ref(false)
+const saveStatus = ref('')
+const queuedNotice = ref(false)
+let saveStatusTimer: ReturnType<typeof setTimeout> | undefined
+const dl = useDownloadStore()
+
+/**
+ * 保存入口改为入队（spec docs/specs/download-manager.md §8）：构造任务交给 downloadStore
+ * （下载页统一开始/暂停/停止/删除）。返回入队条数（0 = 无可用原图）。
+ */
+function enqueuePages(selectedPages: number[]): number {
+  const i = illust.value
+  if (!i || i.type === 'ugoira' || !selectedPages.length) return 0
+  const drafts = buildImageTasks(i, selectedPages)
+  if (drafts.length === 0) {
+    saveStatus.value = t('illustDetail.save.noOriginal') // i18n: 赋值时快照（瞬态）
+    queuedNotice.value = false
+    return 0
+  }
+  dl.enqueue(drafts)
+  saveStatus.value = t('illustDetail.save.queued', { count: drafts.length }) // i18n: 赋值时快照（瞬态）
+  queuedNotice.value = true
+  clearTimeout(saveStatusTimer)
+  saveStatusTimer = setTimeout(() => {
+    saveStatus.value = ''
+    queuedNotice.value = false
+  }, 4000)
+  return drafts.length
+}
+
+/** ugoira 入队：先取元数据（官方 ZIP URL），再按全局格式（T13）入队（spec §5/§8）。 */
+async function enqueueUgoira() {
+  const i = illust.value
+  if (!i || i.type !== 'ugoira') return
+  try {
+    const meta = await loadUgoiraMetadata(i.id)
+    const draft = buildUgoiraTask(i, meta.zip_urls.medium, settings.ugoiraDownloadFormat, meta.frames)
+    dl.enqueue([draft])
+    saveStatus.value = t('illustDetail.save.queued', { count: 1 }) // i18n: 赋值时快照（瞬态）
+    queuedNotice.value = true
+    clearTimeout(saveStatusTimer)
+    saveStatusTimer = setTimeout(() => {
+      saveStatus.value = ''
+      queuedNotice.value = false
+    }, 4000)
+  } catch (e) {
+    console.warn('[IllustDetail] ugoira 元数据获取失败', e)
+    saveStatus.value = t('illustDetail.save.ugoiraInfoFailed') // i18n: 赋值时快照（瞬态）
+    queuedNotice.value = false
+  }
+}
+
+function onSaveEntry() {
+  const i = illust.value
+  if (!i) return
+  if (i.type === 'ugoira') {
+    void enqueueUgoira()
+    return
+  }
+  if (i.page_count > 1) {
+    showPicker.value = true
+    return
+  }
+  enqueuePages([0])
+}
+
+function onConfirmPicker(selectedPages: number[]) {
+  showPicker.value = false
+  enqueuePages(selectedPages)
+}
 
 // 多页作品：meta_pages 或单页
 // [fix] 单页作品直接返回完整 image_urls（medium/large 正常档位）——
@@ -92,8 +215,15 @@ onMounted(async () => {
     illust.value = res.illust
     // P0-T3：同步作者关注状态（详情 API 可能不返回 is_followed，缺省 false）
     following.value = !!res.illust.user.is_followed
+    // T5：把服务端收藏真值写入页面持有的状态机（面板打开前的状态快照依据）
+    if (res.illust.total_bookmarks === undefined) {
+      // 字段契约恒在（PixivIllust.total_bookmarks: number）——缺失即契约破坏，显式告警不静默
+      console.warn('[IllustDetail] total_bookmarks 缺失（契约破坏），收藏数按 0 展示')
+    }
+    bm.bookmarked.value = !!res.illust.is_bookmarked
+    bm.count.value = Math.max(0, res.illust.total_bookmarks ?? 0)
   } catch (err) {
-    errorMsg.value = presentError(err, '加载失败')
+    errorMsg.value = presentError(err, t('error.fallback.loadFailed'))
   } finally {
     loading.value = false
   }
@@ -107,7 +237,7 @@ onMounted(async () => {
   <view class="w-full h-full flex flex-col relative bg-surface">
     <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
       <view class="py-1 pr-2" @tap="goBack"><text class="text-[6.4vw] leading-none text-surface-on">‹</text></view>
-      <text class="flex-1 text-title-large font-medium text-surface-on">作品详情</text>
+      <text class="flex-1 text-title-large font-medium text-surface-on">{{ t('illustDetail.title') }}</text>
     </view>
 
     <!-- [lynx:fix] 骨架屏：加载中显示 shimmer 占位（图片区 1:1 + 文字条），数据就绪后切换 scroll-view -->
@@ -170,35 +300,56 @@ onMounted(async () => {
       </view>
       <view class="p-4 bg-surface-container-lowest">
         <text class="text-headline-small font-bold text-surface-on">{{ illust.title }}</text>
-        <view class="flex flex-row items-center mt-2" @tap="openAuthor">
-          <SkeletonImage
-            v-if="illust.user.profile_image_urls"
-            :src="proxyImageUrl(illust.user.profile_image_urls.medium || illust.user.profile_image_urls.px_170x170 || '')"
-            aspect-ratio="1 / 1"
-            min-h="9vw"
-            class="w-[10.667vw] h-[10.667vw] rounded-full"
-          />
-          <text class="text-body-medium text-surface-on-variant ml-2 flex-1">by {{ illust.user.name }}</text>
+        <view class="flex flex-row items-center mt-2">
+          <!-- 作者行命中区只含头像 + 名字（#542）：整行可点会让心形附近的坐标偏移
+               静默跳转作者页（自动化假绿路径）；收窄后偏移落空处 = 响亮失败 -->
+          <view
+            class="flex flex-row items-center flex-1 min-w-0"
+            data-testid="illust-detail-author"
+            @tap="openAuthor"
+          >
+            <SkeletonImage
+              v-if="illust.user.profile_image_urls"
+              :src="proxyImageUrl(illust.user.profile_image_urls.medium || illust.user.profile_image_urls.px_170x170 || '')"
+              aspect-ratio="1 / 1"
+              min-h="9vw"
+              class="w-[10.667vw] h-[10.667vw] rounded-full"
+            />
+            <text class="text-body-medium text-surface-on-variant ml-2 flex-1">by {{ illust.user.name }}</text>
+          </view>
           <!-- P0-T3：关注作者（非本人时显示） -->
           <view
             v-if="!isSelfAuthor"
             class="px-4 h-[10.667vw] flex items-center justify-center rounded-[var(--md-shape-full)]"
             :class="following ? 'border border-outline bg-transparent active:bg-layer-pressed-primary' : 'bg-primary active:bg-state-pressed-primary'"
-            @tap.stop="toggleFollowAuthor"
+            @tap="toggleFollowAuthor"
           >
             <text class="text-body-medium" :class="following ? 'text-primary' : 'text-primary-on'">
-              {{ following ? '已关注' : '关注' }}
+              {{ following ? t('illustDetail.follow.following') : t('illustDetail.follow.follow') }}
             </text>
           </view>
         </view>
         <text v-if="followError" class="text-label-medium text-error mt-1">{{ followError }}</text>
         <text class="text-body-small text-outline mt-1.5">{{ illust.width }} × {{ illust.height }}</text>
         <view class="mt-2 flex flex-row items-center">
+          <!-- 双轨收藏（T5 #534）：单击 = 快速收藏（toggle，恒公开、动效不变）；
+               长按 500ms = 打开收藏面板（enable-long-press + @long-press）。
+               mutation 注入 = 面板 saveWith 与本心形共用同一状态机实例 -->
           <BookmarkButton
+            ref="heartRef"
             :illust-id="illust.id"
             :initial-bookmarked="illust.is_bookmarked"
             :bookmark-count="illust.total_bookmarks"
+            :mutation="bm"
+            enable-long-press
+            @long-press="openBookmarkPanel"
           />
+          <!-- 保存（spec download-manager §8）：↓ 为 U+2193 纯文本符号（规避 emoji 字形，
+               ADR-0112 教训）；静态图直接入队，ugoira 取元数据后按全局格式入队 -->
+          <view class="ml-4 flex flex-row items-center" @tap="onSaveEntry">
+            <text class="text-[5.6vw] leading-none text-outline">↓</text>
+            <text class="text-label-medium text-outline ml-1">{{ t('illustDetail.save.action') }}</text>
+          </view>
           <!-- 评论入口（issue #164）：样式对齐 webview 版（💬 + total_comments，字段缺失时不显示） -->
           <view
             v-if="illust.total_comments !== undefined"
@@ -207,6 +358,17 @@ onMounted(async () => {
           >
             <text class="text-[6.4vw] leading-none">💬</text>
             <text class="text-label-medium text-outline ml-1">{{ illust.total_comments }}</text>
+          </view>
+        </view>
+        <!-- 保存状态（内联，无全局 toast 通道）：入队后附「查看下载」跳转 -->
+        <view v-if="saveStatus" class="flex flex-row items-center mt-1">
+          <text class="text-label-medium text-primary">{{ saveStatus }}</text>
+          <view
+            v-if="queuedNotice"
+            class="ml-3 h-[8vw] px-3 flex items-center justify-center border border-outline rounded-[var(--md-shape-full)]"
+            @tap="navigate('/downloads')"
+          >
+            <text class="text-label-medium text-primary">{{ t('illustDetail.save.viewDownloads') }}</text>
           </view>
         </view>
         <view class="flex flex-row flex-wrap mt-3">
@@ -236,6 +398,34 @@ onMounted(async () => {
          且不动其结构（issue #139/#129 修复保持）。覆盖层形态 → 弹层打开时页面滚动位置不丢失 -->
     <view v-if="showComments" class="absolute inset-0">
       <CommentOverlay type="illust" :target-id="illustId" @close="showComments = false" />
+    </view>
+
+    <!-- 选页面板（spec image-save-download）：挂载契约对齐评论弹层——absolute inset-0 宿主包裹
+         （issue #139：本页根是 flex-col + flex-1 scroll-view，文档流内 w-full h-full 子元素有溢出
+         覆盖顶栏触摸层前科，必须脱离文档流） -->
+    <view v-if="showPicker" class="absolute inset-0">
+      <PagePickerSheet
+        :page-urls="slideSrcs"
+        :busy="false"
+        @close="showPicker = false"
+        @confirm="onConfirmPicker"
+      />
+    </view>
+
+    <!-- 收藏面板（T5 #534 / spec docs/specs/bookmark-tags.md D8）：挂**页面层**（非 list-item），
+         DOM 顺序靠后覆盖内容区；v-if 条件渲染 = 关闭态不渲染（ADR-0123 全屏层规则）。
+         saveWith 直取页面状态机（覆盖式保存 + 乐观置位 + 失败回滚），保存成功上抛 saved。
+         系统返回键关面板由面板内部 modalStack 注册承担（与 CommentOverlay 同机制）。 -->
+    <view v-if="showBookmarkPanel" class="absolute inset-0">
+      <BookmarkPanel
+        :illust-id="illustId"
+        :work-tags="workTags"
+        :save-with="bm.saveWith"
+        :save-error="bm.errorMsg.value"
+        :saving="bm.busy.value"
+        @close="showBookmarkPanel = false"
+        @saved="onBookmarkPanelSaved"
+      />
     </view>
   </view>
 </template>

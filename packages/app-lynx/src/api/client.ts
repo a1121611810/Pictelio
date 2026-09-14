@@ -5,6 +5,7 @@
 import { ApiErrorType, type ApiError } from "./types"
 import { requestFetch } from "../utils/fetchWrapper"
 import { saveRefreshToken } from "../utils/tokenStorage"
+import { withTimeout } from "../utils/withTimeout"
 import { PIXIV_USER_AGENT, PIXIV_REFERER, PIXIV_CONTENT_TYPE, PIXIV_API_BASE, PIXIV_AUTH_BASE } from "./userAgent"
 
 export interface PixivApiClient {
@@ -45,6 +46,25 @@ export function setOnUnauthorized(handler: (() => Promise<void>) | null) {
 }
 export function setAuthPermanentFailure(v: boolean) {
   authPermanentFailure = v
+}
+
+// ─── 认证就绪门（web 模式）───
+// 启动竞态：子页面 onMounted 早于 App.onMounted（Vue 子先父后），页面的首帧数据请求
+// 会跑在 initRouter→restoreToken 之前；web 模式无 access_token 时若直接抛 UNAUTHORIZED，
+// 三态判定会把它当「已失败」渲染红字（骨架被替换）。由 authStore 注册本提供者：
+// 无 token 的请求先请它触发/等待恢复落定，再判定是否真的未登录。
+// 原生模式 access_token 在 Java 堆（不经此门）。
+let authReadyProvider: (() => Promise<boolean>) | null = null
+const AUTH_READY_WAIT_MS = 10_000
+
+export function setAuthReadyProvider(fn: (() => Promise<boolean>) | null): void {
+  authReadyProvider = fn
+}
+
+/** web 模式无 token：等恢复落定（带上限，防恢复挂起把请求无限拖住）后再判定未登录 */
+async function awaitAuthReady(): Promise<void> {
+  if (accessToken || !authReadyProvider) return
+  await withTimeout(authReadyProvider(), AUTH_READY_WAIT_MS).catch(() => {})
 }
 
 // ─── GET 去重 ───
@@ -96,31 +116,75 @@ export function classifyError(status: number, error: unknown, responseBody?: unk
     typeof responseBody === "object" &&
     (responseBody as Record<string, unknown>).error === "proxy_error"
   ) {
-    return { type: ApiErrorType.PROXY, message: "本地代理连接失败，请检查代理软件是否运行" }
+    return {
+      type: ApiErrorType.PROXY,
+      message: "本地代理连接失败，请检查代理软件是否运行",
+      messageKey: "error.api.proxy",
+    }
   }
   if (!status && error instanceof TypeError) {
-    return { type: ApiErrorType.NETWORK, message: "网络不可用，请检查连接" }
+    return { type: ApiErrorType.NETWORK, message: "网络不可用，请检查连接", messageKey: "error.api.network" }
   }
   const pixivMsg = responseBody ? extractPixivErrorMessage(responseBody) : null
   const suffix = pixivMsg ? ` (${pixivMsg})` : ""
   switch (status) {
     case 401:
-      return { type: ApiErrorType.UNAUTHORIZED, message: `登录已过期 (HTTP 401)${suffix}`, status: 401 }
+      return {
+        type: ApiErrorType.UNAUTHORIZED,
+        message: `登录已过期 (HTTP 401)${suffix}`,
+        messageKey: "error.api.unauthorized",
+        params: { status: 401, detail: suffix },
+        status: 401,
+      }
     case 403:
-      return { type: ApiErrorType.FORBIDDEN, message: `没有权限访问 (HTTP 403)${suffix}`, status: 403 }
+      return {
+        type: ApiErrorType.FORBIDDEN,
+        message: `没有权限访问 (HTTP 403)${suffix}`,
+        messageKey: "error.api.forbidden",
+        params: { status: 403, detail: suffix },
+        status: 403,
+      }
     case 429:
-      return { type: ApiErrorType.RATE_LIMIT, message: "请求过于频繁，请稍后重试 (HTTP 429)", status: 429 }
+      return {
+        type: ApiErrorType.RATE_LIMIT,
+        message: "请求过于频繁，请稍后重试 (HTTP 429)",
+        messageKey: "error.api.rateLimit",
+        status: 429,
+      }
     default:
       if (status === 400 && isOAuthTokenErrorResponse(status, responseBody)) {
-        return { type: ApiErrorType.UNAUTHORIZED, message: "登录凭证已失效，请重新登录", status: 400 }
+        return {
+          type: ApiErrorType.UNAUTHORIZED,
+          message: "登录凭证已失效，请重新登录",
+          messageKey: "error.api.invalidGrant",
+          status: 400,
+        }
       }
       if (status >= 500) {
-        return { type: ApiErrorType.SERVER, message: `服务器错误 (HTTP ${status})${suffix}`, status }
+        return {
+          type: ApiErrorType.SERVER,
+          message: `服务器错误 (HTTP ${status})${suffix}`,
+          messageKey: "error.api.server",
+          params: { status, detail: suffix },
+          status,
+        }
       }
       if (status > 0) {
-        return { type: ApiErrorType.UNKNOWN, message: `请求失败 (HTTP ${status})${suffix}`, status }
+        return {
+          type: ApiErrorType.UNKNOWN,
+          message: `请求失败 (HTTP ${status})${suffix}`,
+          messageKey: "error.api.unknownStatus",
+          params: { status, detail: suffix },
+          status,
+        }
       }
-      return { type: ApiErrorType.UNKNOWN, message: `未知错误${suffix}`, status }
+      return {
+        type: ApiErrorType.UNKNOWN,
+        message: `未知错误${suffix}`,
+        messageKey: "error.api.unknown",
+        params: { detail: suffix },
+        status,
+      }
   }
 }
 
@@ -144,6 +208,9 @@ export function getNativeModules(): {
   PictelioApi?: unknown
   PictelioApp?: unknown
   PictelioPrefs?: unknown
+  PictelioDownloader?: unknown
+  PictelioGallery?: unknown
+  PictelioShare?: unknown
 } | undefined {
   return (typeof NativeModules !== "undefined" ? NativeModules : undefined) ??
     (globalThis as { NativeModules?: unknown }).NativeModules as never
@@ -268,6 +335,9 @@ async function execute<T>(
   }
 
   if (method === "GET" && !accessToken) {
+    await awaitAuthReady()
+  }
+  if (method === "GET" && !accessToken) {
     throw { type: ApiErrorType.UNAUTHORIZED, message: "未登录，请先登录" } as ApiError
   }
 
@@ -350,6 +420,9 @@ async function executeRaw(
     })
   }
 
+  if (method === "GET" && !accessToken) {
+    await awaitAuthReady()
+  }
   if (method === "GET" && !accessToken) {
     throw { type: ApiErrorType.UNAUTHORIZED, message: "未登录，请先登录" } as ApiError
   }

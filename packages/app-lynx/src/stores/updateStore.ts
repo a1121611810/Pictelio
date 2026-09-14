@@ -13,6 +13,7 @@ import { checkForUpdate, type CheckResult, type FetchLike } from "@pictelio/upda
 import { requestFetch } from "../utils/fetchWrapper"
 import { navigate, resetHistory } from "../router"
 import { getNativeModules, isNativeMode } from "../api/client"
+import { openExternalUrl } from "../utils/nativeUrl"
 
 /** 启动后检查更新的延迟（ms）：先让首帧渲染/交互就绪，与主 app STARTUP_CHECK_DELAY_MS 对齐 */
 const STARTUP_CHECK_DELAY_MS = 500
@@ -128,16 +129,7 @@ export const useUpdateStore = defineStore("update", () => {
       console.warn("[updateStore] 打开 release 页失败: 无 latestReleaseUrl")
       return
     }
-    const module = getNativeModules()?.PictelioApp as
-      | { openUrl?: (url: string, cb?: (err: string | null) => void) => void }
-      | undefined
-    if (!module?.openUrl) {
-      console.warn("[updateStore] 原生桥 openUrl 不可用（web-core 预览属预期），release: " + url)
-      return
-    }
-    module.openUrl(url, (err) => {
-      if (err) console.warn("[updateStore] 打开 release 页失败:", err)
-    })
+    openExternalUrl(url, "updateStore")
   }
 
   /** 「退出应用」（更新页顶部原"返回"位置 + 返回键兜底）：关闭 Lynx 宿主 Activity */

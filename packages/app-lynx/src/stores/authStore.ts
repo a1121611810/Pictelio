@@ -12,7 +12,8 @@
 // 模块级 `import { currentUser }` + 兼容桥；T5 收口）。
 import { ref, computed } from "vue"
 import { defineStore } from "pinia"
-import { isNativeMode, getNativeModules, setAccessToken, setOnUnauthorized, setAuthPermanentFailure } from "../api/client"
+import { t, apiErrorMessage } from "../i18n"
+import { isNativeMode, getNativeModules, setAccessToken, setOnUnauthorized, setAuthPermanentFailure, setAuthReadyProvider } from "../api/client"
 import { loginWithRefreshToken } from "../api/auth"
 import type { PixivUser } from "../api/types"
 import { ApiErrorType } from "../api/types"
@@ -24,6 +25,8 @@ export const useAuthStore = defineStore("auth", () => {
   // ── 私有 state（闭包内 ref，不 return —— 物理私有，替代原 `_` 命名约定）──
   const _refreshToken = ref<string | null>(null)
   const _accessTokenReady = ref(false)
+  /** 恢复在飞去重：首帧可能有多个请求同时触发恢复，共享同一次 OAuth 交换 */
+  let _restoreInFlight: Promise<boolean> | null = null
   const _user = ref<PixivUser | null>(null)
   const _authError = ref<string | null>(null)
 
@@ -48,7 +51,7 @@ export const useAuthStore = defineStore("auth", () => {
         clearTokens: (callback: (arg1: string, arg2: string) => void) => void
       } | undefined
       if (!auth) {
-        _authError.value = "原生认证模块不可用"
+        _authError.value = t("authStore.nativeAuthUnavailable") // i18n: 赋值时快照（瞬态）
         return false
       }
       return new Promise((resolve) => {
@@ -89,7 +92,7 @@ export const useAuthStore = defineStore("auth", () => {
             })
             resolve(true)
           } catch (e) {
-            _authError.value = "登录响应解析失败"
+            _authError.value = t("authStore.responseParseFailed") // i18n: 赋值时快照（瞬态）
             resolve(false)
           }
         })
@@ -102,7 +105,7 @@ export const useAuthStore = defineStore("auth", () => {
       return true
     } catch (err) {
       const apiErr = toApiError(err)
-      _authError.value = apiErr.message
+      _authError.value = apiErrorMessage(apiErr)
       // 永久失效（OAuth 400）→ 标记永久失败，强制重新登录
       if (apiErr.type === ApiErrorType.UNAUTHORIZED) {
         setAuthPermanentFailure(true)
@@ -138,16 +141,24 @@ export const useAuthStore = defineStore("auth", () => {
    */
   async function restoreToken(): Promise<boolean> {
     if (_accessTokenReady.value) return true
-    const token = await loadRefreshToken()
-    if (!token) return false
-    return performRefresh(token)
+    if (_restoreInFlight) return _restoreInFlight
+    _restoreInFlight = (async () => {
+      try {
+        const token = await loadRefreshToken()
+        if (!token) return false
+        return await performRefresh(token)
+      } finally {
+        _restoreInFlight = null
+      }
+    })()
+    return _restoreInFlight
   }
 
   /** 用 refresh_token 登录：OAuth 交换 → 设置内存态 */
   async function loginWithToken(token: string): Promise<void> {
     const trimmed = token.trim()
     if (!trimmed) {
-      _authError.value = "请输入 refresh_token"
+      _authError.value = t("authStore.emptyToken") // i18n: 赋值时快照（瞬态）
       return
     }
     await performRefresh(trimmed)
@@ -201,3 +212,8 @@ export const useAuthStore = defineStore("auth", () => {
     registerUnauthorizedHandler,
   }
 })
+
+// 注册「认证就绪」提供者（client 在 web 模式无 access_token 时调用）：
+// 首帧数据请求由此触发/等待 token 恢复，避免把「恢复中」误判为「未登录」把骨架换成红字。
+// 惰性箭头：调用发生在请求期（app.use(pinia) 之后），不在模块加载期取 store。
+setAuthReadyProvider(() => useAuthStore().restoreToken())

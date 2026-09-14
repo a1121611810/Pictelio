@@ -1,4 +1,5 @@
 import type { Component } from "solid-js";
+import { deep } from "solid-js";
 import { useNavigate, useParams } from "@solidjs/router";
 import { createIntersectionObserver } from "@solid-primitives/intersection-observer";
 import {
@@ -9,6 +10,7 @@ import {
   downloadAndExtractUgoira,
   streamUgoiraFrames,
   loadDetail,
+  loadUgoiraMetadata,
   type UgoiraFrame,
 } from "../api/illust";
 import { ApiErrorType, type ApiError } from "../api/types";
@@ -20,13 +22,19 @@ import LazyDetailImage from "../components/LazyDetailImage";
 import PixivImage from "../components/PixivImage";
 import PageTransition from "../components/PageTransition";
 import HeartBurstEffect from "../components/HeartBurstEffect";
-import { ugoiraMode, detailQuality, showDetailStairs } from "../stores/settingsStore";
+import {
+  ugoiraMode,
+  ugoiraDownloadFormat,
+  detailQuality,
+  showDetailStairs,
+} from "../stores/settingsStore";
 import { blockUser, isBlocked } from "../stores/blockStore";
 import { recordVisit } from "../stores/historyStore";
 import { pushOverlay, popOverlay } from "../stores/backGestureStore";
 import { sanitizeHtml } from "../utils/html";
 import { scrollToTop } from "../utils/scrollToTop";
 import ReportSheet from "../components/ReportSheet";
+import { openBookmarkPanel } from "../stores/bookmarkPanelStore";
 import IllustTags from "../components/IllustTags";
 import CommentOverlay from "../components/CommentOverlay";
 import IllustActionMenu from "../components/IllustActionMenu";
@@ -35,7 +43,11 @@ import IllustDetailSkeleton from "../components/skeletons/IllustDetailSkeleton";
 import DetailHeader from "../components/illust/DetailHeader";
 import DetailCard from "../components/illust/DetailCard";
 import BottomActionBar from "../components/illust/BottomActionBar";
+import PagePickerSheet from "../components/illust/PagePickerSheet";
+import { originalPageUrls, buildImageTasks, buildUgoiraTask } from "../utils/galleryDownload";
+import { enqueueDownloads } from "../stores/downloadStore";
 import { goBack } from "../services/backTransitionService";
+import { t } from "../i18n";
 
 const IllustDetail: Component = () => {
   const params = useParams();
@@ -63,7 +75,8 @@ const IllustDetail: Component = () => {
     }
   }
 
-  onMount(() => {
+  // Solid 2.0：onSettled 内禁用 onCleanup（CLEANUP_IN_FORBIDDEN_SCOPE），清理改由返回值注册。
+  onSettled(() => {
     infoObserver = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
@@ -76,7 +89,7 @@ const IllustDetail: Component = () => {
     if (infoSentinelEl) {
       infoObserver.observe(infoSentinelEl);
     }
-    onCleanup(() => infoObserver?.disconnect());
+    return () => infoObserver?.disconnect();
   });
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<ApiError | null>(null);
@@ -134,14 +147,14 @@ const IllustDetail: Component = () => {
     }
     setShowActionMenu(false);
     if (isBlocked(i.user.id)) {
-      setToastMessage("该作者已被屏蔽");
+      setToastMessage(t("illustDetail.blockedAuthor")); // i18n: set 时快照（瞬态）
       return;
     }
-    if (!window.confirm("确定要屏蔽该作者吗？屏蔽后其作品将不再显示在推荐和关注列表中。")) {
+    if (!window.confirm(t("illustDetail.blockConfirm"))) {
       return;
     }
     await blockUser(i.user.id);
-    setToastMessage("已屏蔽该作者");
+    setToastMessage(t("illustDetail.blockedDoneToast")); // i18n: set 时快照（瞬态）
   }
 
   function openReport() {
@@ -150,12 +163,17 @@ const IllustDetail: Component = () => {
   }
 
   // Auto-hide toast message
-  createEffect(() => {
-    if (toastMessage()) {
+  // Solid 2.0 拆分效应：compute 读 toastMessage，apply 段起定时器并以返回值注册清理。
+  createEffect(
+    () => toastMessage(),
+    (toast) => {
+      if (!toast) {
+        return;
+      }
       const timer = setTimeout(() => setToastMessage(null), 2500);
-      onCleanup(() => clearTimeout(timer));
-    }
-  });
+      return () => clearTimeout(timer);
+    },
+  );
 
   function measureCoverContent(e: Event) {
     const img = e.target as HTMLImageElement;
@@ -251,7 +269,12 @@ const IllustDetail: Component = () => {
 
   let longPressTimer: ReturnType<typeof setTimeout>;
 
-  async function toggleBookmark(privateBookmark = false) {
+  /**
+   * 快速收藏（单击心形；spec docs/specs/bookmark-tags.md D3）：
+   * 零决策——恒公开、无标签；可见性/标签的决策走长按唤出的收藏面板。
+   * （原「长按 = 私密直存」语义已由 ADR-0160 D3/D4 升级为面板入口，私密分支随之无调用点）
+   */
+  async function toggleBookmark() {
     const i = illust();
     if (!i || bookmarking()) {
       return;
@@ -262,7 +285,7 @@ const IllustDetail: Component = () => {
         if (i.is_bookmarked) {
           await deleteBookmark(i.id);
         } else {
-          await addBookmark(i.id, privateBookmark ? "private" : "public");
+          await addBookmark(i.id, "public");
         }
         setIllust({
           ...i,
@@ -283,8 +306,16 @@ const IllustDetail: Component = () => {
 
   function onBookmarkPointerDown(_e: PointerEvent) {
     longPressTimer = setTimeout(() => {
-      // Private
-      toggleBookmark(true);
+      // ADR-0160 D4：长按 = 收藏面板（#545 起全局单宿主，经 store 唤起）
+      const i = illust();
+      if (i) {
+        openBookmarkPanel({
+          illustId: i.id,
+          isBookmarked: i.is_bookmarked,
+          workTags: i.tags.map((tag) => tag.name),
+          onSaved: handleBookmarkSaved,
+        });
+      }
       longPressTimer = 0 as any;
     }, 500);
   }
@@ -293,8 +324,24 @@ const IllustDetail: Component = () => {
     if (longPressTimer) {
       clearTimeout(longPressTimer);
       longPressTimer = 0 as any;
-      // Public
-      toggleBookmark(false);
+      // 短按 = 快速收藏（恒公开；私密/标签在面板内决策）
+      toggleBookmark();
+    }
+  }
+
+  /**
+   * 收藏面板保存成功（ADR-0160 D2/D4，spec docs/specs/bookmark-tags.md）：
+   * 面板恒为「收藏/覆盖」方向，故 is_bookmarked 置 true；仅原未收藏时计数 +1
+   * （覆盖式编辑不改变收藏数）并播爆发动效——与快速收藏同一视觉语义。
+   */
+  function handleBookmarkSaved() {
+    const i = illust();
+    if (!i) {
+      return;
+    }
+    if (!i.is_bookmarked) {
+      setIllust({ ...i, is_bookmarked: true, total_bookmarks: i.total_bookmarks + 1 });
+      setBookmarkBurstTrigger((n) => n + 1);
     }
   }
 
@@ -304,12 +351,16 @@ const IllustDetail: Component = () => {
   let savedScrollBeforeViewer = 0;
   let viewerMaskRemover: (() => void) | null = null;
 
-  createIntersectionObserver(
-    pageElements,
-    (entries) => {
+  // Solid 2.0：createIntersectionObserver 移除回调参数，改为返回 [entries, isVisible]。
+  // 用 deep() 深度跟踪 entries store（元素变化时库内部自行 observe/unobserve），
+  // apply 段基于全部槽位的最新可见状态取最大可见页码（比旧实现逐批事件更稳定）。
+  const [pageEntries] = createIntersectionObserver(pageElements, { threshold: [0] });
+  createEffect(
+    () => deep(pageEntries),
+    (list) => {
       let maxIndex = -1;
-      for (const entry of entries) {
-        if (entry.isIntersecting) {
+      for (const entry of list) {
+        if (entry?.isIntersecting) {
           const idx = Number((entry.target as HTMLElement).dataset.pageIndex);
           if (!Number.isNaN(idx) && idx > maxIndex) {
             maxIndex = idx;
@@ -320,7 +371,6 @@ const IllustDetail: Component = () => {
         setCurrentVisiblePage(maxIndex);
       }
     },
-    { threshold: [0] },
   );
 
   // 组件卸载时确保移除即时注入的过渡遮罩，避免 DOM 泄漏
@@ -368,83 +418,102 @@ const IllustDetail: Component = () => {
   }
 
   // 查看器关闭后：移除即时遮罩 + 恢复滚动位置
-  createEffect(() => {
-    if (!viewerOpen() && !loading() && illust()) {
-      requestAnimationFrame(() => {
-        // 移除即时注入的过渡遮罩
-        viewerMaskRemover?.();
-        viewerMaskRemover = null;
+  // Solid 2.0 拆分效应：compute 提取快照，apply 段做 DOM 副作用。
+  createEffect(
+    () => ({ open: viewerOpen(), loading: loading(), has: illust() !== null }),
+    ({ open, loading: loadingNow, has }) => {
+      if (!open && !loadingNow && has) {
+        requestAnimationFrame(() => {
+          // 移除即时注入的过渡遮罩
+          viewerMaskRemover?.();
+          viewerMaskRemover = null;
 
-        // 恢复之前保存的滚动位置
-        window.scrollTo(0, savedScrollBeforeViewer);
-      });
-    }
-  });
+          // 恢复之前保存的滚动位置
+          window.scrollTo(0, savedScrollBeforeViewer);
+        });
+      }
+    },
+  );
 
   // 将查看器状态注册到 overlay 栈，供系统返回手势统一处理
-  createEffect(() => {
-    if (viewerOpen()) {
-      pushOverlay("viewer", closeViewer);
-      onCleanup(() => {
-        popOverlay("viewer");
-      });
-    }
-  });
+  // Solid 2.0：拆分效应 + apply 返回 cleanup（原 onCleanup 在 effect 内已不可用）
+  createEffect(
+    () => viewerOpen(),
+    (open) => {
+      if (open) {
+        pushOverlay("viewer", closeViewer);
+        return () => popOverlay("viewer");
+      }
+    },
+  );
 
   // 将评论面板状态注册到 overlay 栈
-  createEffect(() => {
-    if (showComments()) {
-      pushOverlay("commentSheet", () => setShowComments(false));
-      onCleanup(() => {
-        popOverlay("commentSheet");
-      });
-    }
-  });
+  createEffect(
+    () => showComments(),
+    (open) => {
+      if (open) {
+        pushOverlay("commentSheet", () => setShowComments(false));
+        return () => popOverlay("commentSheet");
+      }
+    },
+  );
 
   // 将举报面板状态注册到 overlay 栈
-  createEffect(() => {
-    if (showReportSheet()) {
-      pushOverlay("reportSheet", () => setShowReportSheet(false));
-      onCleanup(() => {
-        popOverlay("reportSheet");
-      });
-    }
-  });
+  createEffect(
+    () => showReportSheet(),
+    (open) => {
+      if (open) {
+        pushOverlay("reportSheet", () => setShowReportSheet(false));
+        return () => popOverlay("reportSheet");
+      }
+    },
+  );
+
+  // 收藏面板返回键接线已随面板全局化迁入 BookmarkPanelHost（#545）
 
   // 组件内加载数据：先渲染骨架屏，params 变化时自动重新请求
-  createEffect(() => {
-    const id = Number(params.id);
-    if (!id) return;
+  // Solid 2.0 拆分效应：compute 读 params.id，apply 段发起请求（写 signal 合法），
+  // 取消逻辑由 apply 返回的 cleanup 承担（重跑/卸载时中止旧请求，防竞态）。
+  createEffect(
+    () => Number(params.id),
+    (id) => {
+      if (!id) return;
 
-    // 清理旧请求，避免竞态条件
-    let cancelled = false;
-    const controller = new AbortController();
-    onCleanup(() => {
-      cancelled = true;
-      controller.abort();
-    });
+      // 清理旧请求，避免竞态条件
+      let cancelled = false;
+      const controller = new AbortController();
 
-    setLoading(true);
-    setError(null);
-    setIllust(null);
+      setLoading(true);
+      setError(null);
+      setIllust(null);
 
-    loadDetail(id, controller.signal)
-      .then((res) => {
-        if (cancelled) return;
-        const i = res.illust;
-        setIllust(i);
-        setPageRefs(new Map());
-        recordVisit(i, "illust");
-        setIsFollowed(i.user.is_followed ?? false);
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        if (err instanceof DOMException && err.name === "AbortError") return;
-        setError({ type: ApiErrorType.UNKNOWN, message: err?.message ?? "加载失败" });
-        setLoading(false);
-      });
-  });
+      loadDetail(id, controller.signal)
+        .then((res) => {
+          if (cancelled) return;
+          const i = res.illust;
+          setIllust(i);
+          setPageRefs(new Map());
+          recordVisit(i, "illust");
+          setIsFollowed(i.user.is_followed ?? false);
+          setLoading(false);
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          if (err instanceof DOMException && err.name === "AbortError") return;
+          // i18n: set 时快照（瞬态）；字面量 fallback 抽 key（error.fallback.loadFailed zh 同文）
+          setError({
+            type: ApiErrorType.UNKNOWN,
+            message: err?.message ?? t("error.fallback.loadFailed"),
+          });
+          setLoading(false);
+        });
+
+      return () => {
+        cancelled = true;
+        controller.abort();
+      };
+    },
+  );
 
   /** Parse Pixiv internal caption links and navigate in-app */
   function handleCaptionClick(e: MouseEvent) {
@@ -524,17 +593,112 @@ const IllustDetail: Component = () => {
     return [i.image_urls.large];
   };
 
-  /** 原图 URL 列表，用于全屏查看器 */
+  /** 原图 URL 列表，用于全屏查看器与保存（语义见 galleryDownload.originalPageUrls） */
   const originalImageUrls = () => {
     const i = illust();
     if (!i) {
       return [];
     }
-    if (i.page_count > 1) {
-      return i.meta_pages.map((p) => p.image_urls.original ?? p.image_urls.large);
-    }
-    return [i.meta_single_page.original_image_url ?? i.image_urls.large];
+    return originalPageUrls(i);
   };
+
+  // ── 保存到相册（spec docs/specs/image-save-download.md）──
+  const [pickerOpen, setPickerOpen] = createSignal(false);
+  const [saveStatus, setSaveStatus] = createSignal<string | null>(null);
+  const [queuedNotice, setQueuedNotice] = createSignal<string | null>(null);
+  let queuedNoticeTimer: ReturnType<typeof setTimeout> | undefined;
+  const [saveIntent, setSaveIntent] = createSignal<"success" | "warning">("success");
+  let saveStatusTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function showSaveStatus(text: string, sticky = false, intent: "success" | "warning" = "success") {
+    setSaveStatus(text);
+    setSaveIntent(intent);
+    clearTimeout(saveStatusTimer);
+    if (!sticky) {
+      saveStatusTimer = setTimeout(() => setSaveStatus(null), 2500);
+    }
+  }
+
+  /** 入队提示（含「查看下载」跳转，spec docs/specs/download-manager.md §8） */
+  function showQueuedNotice(count: number) {
+    // i18n: set 时快照（瞬态）
+    setQueuedNotice(t("illustDetail.queuedNotice", { count }));
+    clearTimeout(queuedNoticeTimer);
+    queuedNoticeTimer = setTimeout(() => setQueuedNotice(null), 4000);
+  }
+
+  /**
+   * 保存入口改为入队（spec §8）：构造任务交给 downloadStore（下载页统一开始/暂停/停止/删除）。
+   * 返回入队条数（0 = 无可用原图）。ugoira 不在本路径（T8 单独入队）。
+   */
+  function enqueuePages(pages: number[]): number {
+    const i = illust();
+    if (!i || i.type === "ugoira" || pages.length === 0) {
+      return 0;
+    }
+    const drafts = buildImageTasks(i, pages);
+    if (drafts.length === 0) {
+      showSaveStatus(t("illustDetail.saveNoImages"), false, "warning"); // i18n: set 时快照（瞬态）
+      return 0;
+    }
+    enqueueDownloads(drafts);
+    showQueuedNotice(drafts.length);
+    return drafts.length;
+  }
+
+  const [ugoiraQueuing, setUgoiraQueuing] = createSignal(false);
+
+  /** ugoira 入队：先取元数据（官方 ZIP URL），再按全局格式（T13）入队（spec §5/§8）。 */
+  async function enqueueUgoira() {
+    const i = illust();
+    if (!i || i.type !== "ugoira" || ugoiraQueuing()) {
+      return;
+    }
+    setUgoiraQueuing(true);
+    try {
+      const meta = await loadUgoiraMetadata(i.id);
+      const draft = buildUgoiraTask(i, meta.zip_urls.medium, ugoiraDownloadFormat(), meta.frames);
+      enqueueDownloads([draft]);
+      showQueuedNotice(1);
+    } catch (e) {
+      console.error("[IllustDetail] ugoira 元数据获取失败:", e);
+      showSaveStatus(t("illustDetail.ugoiraMetaFailed"), false, "warning"); // i18n: set 时快照（瞬态）
+    } finally {
+      setUgoiraQueuing(false);
+    }
+  }
+
+  /** 底部条入口：静态单页直存 / 多页开选页面板；ugoira 取元数据后入队 */
+  function handleSaveEntry() {
+    const i = illust();
+    if (!i) {
+      return;
+    }
+    if (i.type === "ugoira") {
+      void enqueueUgoira();
+      return;
+    }
+    if (i.page_count > 1) {
+      setPickerOpen(true);
+      return;
+    }
+    enqueuePages([0]);
+  }
+
+  /** 查看器保存当前页（按钮内联状态，toast 在查看器打开时隐藏） */
+  async function handleViewerSave(page: number): Promise<boolean> {
+    return enqueuePages([page]) === 1;
+  }
+  // 将选页面板注册到 overlay 栈，供系统返回手势统一处理
+  createEffect(
+    () => pickerOpen(),
+    (open) => {
+      if (open) {
+        pushOverlay("pagePicker", () => setPickerOpen(false));
+        return () => popOverlay("pagePicker");
+      }
+    },
+  );
 
   function scrollToPage(index: number) {
     setCurrentVisiblePage(index);
@@ -560,10 +724,10 @@ const IllustDetail: Component = () => {
         {illust() && !viewerOpen() && isBlockedAuthor() && (
           <div class="flex flex-col items-center justify-center h-screen gap-4 px-6">
             <p class="text-[var(--colorNeutralForeground2)] [font-size:var(--fontSizeBase300)]">
-              该作者已被屏蔽
+              {t("illustDetail.blockedAuthor")}
             </p>
-            <fluent-button appearance="secondary" on:click={() => goBack()}>
-              返回
+            <fluent-button appearance="secondary" ref={fluentOn("click", () => goBack())}>
+              {t("illustDetail.back")}
             </fluent-button>
           </div>
         )}
@@ -594,6 +758,32 @@ const IllustDetail: Component = () => {
               >
                 {toastMessage()}
               </fluent-message-bar>
+            </Show>
+
+            {/* 保存进度/结果状态（查看器打开时隐藏——查看器按钮自带内联状态） */}
+            <Show when={saveStatus() && !viewerOpen()}>
+              <fluent-message-bar
+                intent={saveIntent()}
+                style="position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:60;pointer-events:none"
+              >
+                {saveStatus()}
+              </fluent-message-bar>
+            </Show>
+
+            {/* 入队提示 + 跳转下载页（spec §8） */}
+            <Show when={queuedNotice() && !viewerOpen()}>
+              <div class="fixed top-24 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-3 px-4 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] shadow-[var(--elevation2)]">
+                <span class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground1)]">
+                  {queuedNotice()}
+                </span>
+                <button
+                  type="button"
+                  class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorBrandForegroundLink)] bg-transparent border-none cursor-pointer appearance-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--colorStrokeFocus2)]"
+                  onClick={() => void navigate("/downloads")}
+                >
+                  {t("illustDetail.viewDownloads")}
+                </button>
+              </div>
             </Show>
 
             {/* Images — A2 卡片化（ADR-0071）：多图竖排卡片；单图封面卡片 */}
@@ -716,10 +906,10 @@ const IllustDetail: Component = () => {
                         onClick={() => startUgoiraLoad(illust()!.id)}
                       >
                         <span class="text-[var(--colorStatusDangerForeground1)] [font-size:var(--fontSizeBase300)]">
-                          加载失败
+                          {t("error.fallback.loadFailed")}
                         </span>
                         <span class="text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase200)] underline">
-                          点击重试
+                          {t("illustDetail.tapRetry")}
                         </span>
                       </div>
                     )}
@@ -780,18 +970,27 @@ const IllustDetail: Component = () => {
                     </p>
                   </div>
                   <button
-                    class="inline-flex items-center justify-center gap-[var(--spacingHorizontalXS)] rounded-[var(--borderRadiusMedium)] font-semibold [font-size:var(--fontSizeBase200)] [line-height:var(--lineHeightBase200)] min-h-8 px-[var(--spacingHorizontalM)] border transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] active:scale-[0.97] select-none appearance-none outline-none cursor-pointer focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)] flex-shrink-0 ml-auto"
-                    classList={{
-                      "bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] border-[var(--colorBrandBackground)] hover:bg-[var(--colorBrandBackgroundHover)] active:bg-[var(--colorBrandBackgroundPressed)]":
-                        !isFollowed(),
-                      "bg-transparent text-[var(--colorNeutralForeground2)] border-[var(--colorNeutralStroke2)] hover:text-[var(--colorStatusDangerForeground1)] hover:border-[var(--colorStatusDangerForeground1)]":
-                        isFollowed(),
-                    }}
+                    class={[
+                      "inline-flex items-center justify-center gap-[var(--spacingHorizontalXS)] rounded-[var(--borderRadiusMedium)] font-semibold [font-size:var(--fontSizeBase200)] [line-height:var(--lineHeightBase200)] min-h-8 px-[var(--spacingHorizontalM)] border transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] active:scale-[0.97] select-none appearance-none outline-none cursor-pointer focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)] flex-shrink-0 ml-auto",
+                      {
+                        "bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] border-[var(--colorBrandBackground)] hover:bg-[var(--colorBrandBackgroundHover)] active:bg-[var(--colorBrandBackgroundPressed)]":
+                          !isFollowed(),
+                        "bg-transparent text-[var(--colorNeutralForeground2)] border-[var(--colorNeutralStroke2)] hover:text-[var(--colorStatusDangerForeground1)] hover:border-[var(--colorStatusDangerForeground1)]":
+                          isFollowed(),
+                      },
+                    ]}
+
                     onClick={toggleFollow}
                     disabled={following()}
-                    aria-label={isFollowed() ? "取消关注" : "关注"}
+                    aria-label={
+                      isFollowed() ? t("illustDetail.unfollowAria") : t("illustDetail.followAria")
+                    }
                   >
-                    {following() ? "…" : isFollowed() ? "已关注" : "关注"}
+                    {following()
+                      ? "…"
+                      : isFollowed()
+                        ? t("illustDetail.following")
+                        : t("illustDetail.follow")}
                   </button>
                 </div>
               </DetailCard>
@@ -843,7 +1042,9 @@ const IllustDetail: Component = () => {
                       }}
                       disabled={bookmarking()}
                     >
-                      {illust()!.is_bookmarked ? "♥ 已收藏" : "♡ 收藏"}
+                      {illust()!.is_bookmarked
+                        ? t("illustDetail.bookmarked")
+                        : t("illustDetail.bookmark")}
                     </button>
                     <HeartBurstEffect trigger={bookmarkBurstTrigger} />
                   </div>
@@ -867,7 +1068,7 @@ const IllustDetail: Component = () => {
             {illust()!.page_count === 1 && illust()!.type !== "ugoira" && (
               <div class="px-4 pb-8">
                 <p class="text-center text-[var(--colorNeutralForeground3)] [font-size:var(--fontSizeBase200)]">
-                  点击图片查看原图 · 双指缩放 · 左右滑动翻页
+                  {t("illustDetail.viewerHint")}
                 </p>
               </div>
             )}
@@ -892,7 +1093,7 @@ const IllustDetail: Component = () => {
                   }, 600);
                   scrollToTop();
                 }}
-                aria-label="回顶"
+                aria-label={t("illustDetail.backToTopAria")}
               >
                 ↑
               </button>
@@ -913,23 +1114,26 @@ const IllustDetail: Component = () => {
                   "max-height": imageUrls().length > 20 ? "60vh" : "none",
                   "overflow-y": imageUrls().length > 20 ? "auto" : "visible",
                 }}
-                aria-label="页面导航"
+                aria-label={t("illustDetail.pageNavAria")}
               >
                 {imageUrls().map((_, i) => (
                   <button
-                    class="flex items-center justify-center rounded-[var(--borderRadiusCircular)] [font-size:var(--fontSizeBase200)] font-medium transition-all duration-[var(--durationFast)] min-w-9 min-h-9"
-                    classList={{
-                      "bg-[var(--colorNeutralBackground1Selected)] text-[var(--colorNeutralForeground1)] font-semibold":
-                        i === currentVisiblePage(),
-                      "text-[var(--colorOverlayForeground)] opacity-[0.85] hover:opacity-100":
-                        i !== currentVisiblePage(),
-                    }}
+                    class={[
+                      "flex items-center justify-center rounded-[var(--borderRadiusCircular)] [font-size:var(--fontSizeBase200)] font-medium transition-all duration-[var(--durationFast)] min-w-9 min-h-9",
+                      {
+                        "bg-[var(--colorNeutralBackground1Selected)] text-[var(--colorNeutralForeground1)] font-semibold":
+                          i === currentVisiblePage(),
+                        "text-[var(--colorOverlayForeground)] opacity-[0.85] hover:opacity-100":
+                          i !== currentVisiblePage(),
+                      },
+                    ]}
+
                     style={{
                       "text-shadow":
                         i !== currentVisiblePage() ? "var(--textShadowDefault)" : "none",
                     }}
                     onClick={() => scrollToPage(i)}
-                    aria-label={`第 ${i + 1} 页`}
+                    aria-label={t("illustDetail.pageN", { page: i + 1 })}
                     aria-current={i === currentVisiblePage() ? "true" : undefined}
                   >
                     {i + 1}
@@ -949,8 +1153,11 @@ const IllustDetail: Component = () => {
             bookmarking={bookmarking()}
             onBookmarkPointerDown={onBookmarkPointerDown}
             onBookmarkPointerUp={onBookmarkPointerUp}
+            onBookmarkActivate={() => void toggleBookmark()}
             onComments={() => setShowComments(true)}
             totalComments={illust()!.total_comments}
+            onSave={handleSaveEntry}
+            saving={false}
           />
         </Show>
 
@@ -960,8 +1167,22 @@ const IllustDetail: Component = () => {
             previewUrls={imageUrls()}
             initialPage={viewerStartPage()}
             onClose={closeViewer}
+            /* 恒传处理器 + saveBusy 禁用（非卸载）：批量并发期点击被挡，内联 ✓/✗ 反馈保持可达 */
+            onSavePage={handleViewerSave}
+            saveBusy={false}
           />
         )}
+
+        <PagePickerSheet
+          open={pickerOpen()}
+          pageUrls={imageUrls()}
+          busy={false}
+          onClose={() => setPickerOpen(false)}
+          onConfirm={(pages) => {
+            setPickerOpen(false);
+            enqueuePages(pages);
+          }}
+        />
 
         <ReportSheet
           illustId={illust()?.id ?? 0}

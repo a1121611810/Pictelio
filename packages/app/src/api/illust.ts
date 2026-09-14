@@ -1,4 +1,5 @@
 import { apiClient } from "./client";
+import { ApiErrorType } from "./types";
 import {
   unzipFrames,
   parseZipEocd,
@@ -14,6 +15,9 @@ import type {
   PixivUgoiraMetadataResponse,
   ContentType,
   RestrictType,
+  PixivBookmarkDetail,
+  PixivBookmarkDetailResponse,
+  PixivUserBookmarkTagsResponse,
 } from "./types";
 
 export function loadRecommended(
@@ -48,6 +52,19 @@ export function loadDetail(
   return apiClient.get<PixivIllustDetailResponse>(
     "/v1/illust/detail",
     { illust_id: String(illustId) },
+    signal,
+  );
+}
+
+/** 相关作品（spec docs/specs/related-injection.md）：官方 related 端点，响应与 recommended 同构。
+ *  注意是 v2——/v1/illust/related 实测 404（端点不存在），/v2/illust/related 实测 200（模拟器 2026-09-12） */
+export function loadRelated(
+  illustId: number,
+  signal?: AbortSignal,
+): Promise<PixivIllustListResponse> {
+  return apiClient.get<PixivIllustListResponse>(
+    "/v2/illust/related",
+    { illust_id: String(illustId), filter: "for_ios" },
     signal,
   );
 }
@@ -320,17 +337,96 @@ export async function streamUgoiraFrames(
   }
 }
 
-export function addBookmark(illustId: number, restrict: RestrictType = "public"): Promise<void> {
-  return apiClient.post("/v2/illust/bookmark/add", {
+/**
+ * 收藏插画（快速收藏与收藏面板保存共用）。
+ *
+ * 线上格式 oracle（ADR-0160 D1）：tags 非空时以收藏标签空格 join 成单值写入字面量字段
+ * `tags[]`（pixivpy3 aapi.py `illust_bookmark_add` 与六实现差分一致，见
+ * docs/research/bookmark-tags-similar-clients.md）；空标签集 / undefined 不发 tags 字段。
+ * 覆盖式编辑（ADR-0160 D2）：对已收藏作品直接重发本请求即整条覆盖（完整标签集 + 可见性），
+ * 不先 delete——服务端无 edit 端点，先删会让收藏状态闪断。
+ */
+export function addBookmark(
+  illustId: number,
+  restrict: RestrictType = "public",
+  tags?: string[],
+): Promise<void> {
+  const body: Record<string, string> = {
     illust_id: String(illustId),
     restrict,
-  });
+  };
+  if (tags && tags.length > 0) {
+    body["tags[]"] = tags.join(" ");
+  }
+  return apiClient.post("/v2/illust/bookmark/add", body);
 }
 
 export function deleteBookmark(illustId: number): Promise<void> {
   return apiClient.post("/v1/illust/bookmark/delete", {
     illust_id: String(illustId),
   });
+}
+
+/**
+ * 收藏详情（收藏面板预填数据源，ADR-0160 D5/D6）。
+ *
+ * 真实响应形状（2026-09-14 真机 probe 实测，`app-api.pixiv.net/v2/illust/bookmark/detail`）：
+ * - **未收藏**：`bookmark_detail` 仍非 null，返回 `is_bookmarked: false` + 作品自身标签
+ *   （全部 `is_registered: false`）作建议——不是「null 表示未收藏」；
+ * - **已收藏**：`is_bookmarked: true`，其中 `is_registered: true` 的标签才是该条收藏
+ *   已保存的标签（面板据此预填已选）。
+ * 故调用方一律以 `is_bookmarked` / `is_registered` 判定，不得以「是否为 null」判定。
+ *
+ * 契约破坏（缺 `bookmark_detail` 键）= **显式报错**，不静默归一为「未收藏」：既然未收藏也返回
+ * 对象，键整体缺失只可能是响应形状变更；若归一为 null，面板会以「空预填」覆盖已有收藏
+ * （清空既有标签），违反 spec D6「无真值不覆盖」。故 warn + throw（面板走 detailError → 禁存）。
+ * 键存在但显式 null 仍返回 null（未收藏的防御分支，与 lynx 侧同语义）。
+ */
+export async function loadBookmarkDetail(
+  illustId: number,
+  signal?: AbortSignal,
+): Promise<PixivBookmarkDetail | null> {
+  const res = await apiClient.get<PixivBookmarkDetailResponse | null>(
+    "/v2/illust/bookmark/detail",
+    { illust_id: String(illustId) },
+    signal,
+  );
+  if (!res || typeof res !== "object" || !("bookmark_detail" in res)) {
+    console.warn("[loadBookmarkDetail] 响应缺 bookmark_detail 字段（契约破坏）");
+    // 抛 ApiError 形状（而非 new Error）：message 快照是简中、只作日志兜底，
+    // 展示层（BookmarkPanel 经 apiErrorMessage）必须走 messageKey 才能随 locale 渲染
+    throw {
+      type: ApiErrorType.UNKNOWN,
+      message: "[loadBookmarkDetail] bookmark_detail missing (contract violation)",
+      messageKey: "error.fallback.loadFailed",
+    };
+  }
+  return res.bookmark_detail ?? null;
+}
+
+/**
+ * 标签库（用户历史收藏标签，公开/私密分库；ADR-0160 D5）。
+ * user_id 由调用方显式传入（loadBookmarks 先例）；offset 可选，传则透传
+ * （next_url 分页兼容，spec D4：本期首屏 + 追加可选）。
+ */
+export function loadUserBookmarkTags(
+  userId: number,
+  restrict: RestrictType = "public",
+  offset?: number,
+  signal?: AbortSignal,
+): Promise<PixivUserBookmarkTagsResponse> {
+  const params: Record<string, string> = {
+    user_id: String(userId),
+    restrict,
+  };
+  if (offset !== undefined) {
+    params.offset = String(offset);
+  }
+  return apiClient.get<PixivUserBookmarkTagsResponse>(
+    "/v1/user/bookmark-tags/illust",
+    params,
+    signal,
+  );
 }
 
 export function followUser(userId: number, restrict?: "public" | "private"): Promise<void> {

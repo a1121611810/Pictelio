@@ -3,6 +3,12 @@ import { apiClient, getAccessToken } from "./client";
 import { PIXIV_USER_AGENT } from "./userAgent";
 import { createDedupedRequest } from "@/utils/createDedupedRequest";
 import { PixivApi } from "@/native/PixivApi";
+import {
+  extractNovelDataFromHtml,
+  extractNovelTextFromHtml,
+  type NovelImageUrls,
+  type NovelImagesMap,
+} from "@pictelio/novel-export";
 import type {
   PixivNovelListResponse,
   PixivNovelDetailResponse,
@@ -12,118 +18,12 @@ import type {
   SeriesNavigation,
 } from "./types";
 
+// ─── 小说内嵌图片 / 正文提取：共享包 @pictelio/novel-export（消费方零改动） ───
+// 原实现已迁入共享包；此处 re-export 保持既有 import 路径可用（ADR-0154 D1）。
+export { extractNovelTextFromHtml, extractNovelDataFromHtml };
+export type { NovelImageUrls, NovelImagesMap };
+
 const isNative = Capacitor.isNativePlatform();
-
-// ─── 小说内嵌图片类型 ───
-
-type NovelImageSize = "240mw" | "480mw" | "1200x1200" | "128x128" | "original";
-
-export type NovelImageUrls = Record<NovelImageSize, string>;
-
-interface NovelImageItem {
-  novelImageId: string;
-  sl: string;
-  urls: NovelImageUrls;
-}
-
-export type NovelImagesMap = Record<string, NovelImageItem>;
-
-/**
- * 按大括号平衡从 HTML 中提取指定 key 对应的 JSON 对象。
- * 会跳过字符串内部的引号和转义字符，能处理任意层嵌套。
- */
-function extractBalancedObject(html: string, key: string): unknown {
-  const pattern = new RegExp(`"${key}"\\s*:\\s*\\{`, "u");
-  const match = pattern.exec(html);
-  if (!match) {
-    return undefined;
-  }
-
-  const start = html.indexOf("{", match.index);
-  if (start === -1) {
-    return undefined;
-  }
-
-  let depth = 0;
-  let inString = false;
-  let escape = false;
-
-  for (let i = start; i < html.length; i++) {
-    const char = html[i];
-    if (inString) {
-      if (escape) {
-        escape = false;
-      } else if (char === "\\") {
-        escape = true;
-      } else if (char === '"') {
-        inString = false;
-      }
-    } else {
-      if (char === '"') {
-        inString = true;
-      } else if (char === "{") {
-        depth++;
-      } else if (char === "}") {
-        depth--;
-        if (depth === 0) {
-          const [parseErr, parsed] = trySync(() => JSON.parse(html.slice(start, i + 1)));
-          if (parseErr) return undefined;
-          return parsed;
-        }
-      }
-    }
-  }
-
-  return undefined;
-}
-
-/**
- * 从 /webview/v2/novel 返回的 HTML 中提取小说正文。
- * 正文数据藏在 <script> 标签的 window.pixiv.novel.text 中。
- */
-export function extractNovelTextFromHtml(html: string): string {
-  // 匹配 window.pixiv = { ..., novel: { ..., "text": "...", ... }, ... }
-  const match = html.match(/"text"\s*:\s*"((?:[^"\\]|\\.)*)"/u);
-  if (!match) {
-    return "";
-  }
-  // 解义 JSON 转义序列
-  const [parseErr, parsed] = trySync(() => JSON.parse(`"${match[1]}"`) as string);
-  if (parseErr) {
-    return match[1].replace(/\\n/gu, "\n").replace(/\\r/gu, "").replace(/\\t/gu, " ");
-  }
-  return parsed;
-}
-
-/**
- * 从 /webview/v2/novel 返回的 HTML 中提取正文 + 系列导航数据。
- */
-export function extractNovelDataFromHtml(html: string): {
-  text: string;
-  navigation: SeriesNavigation;
-  images: NovelImagesMap;
-} {
-  // 复用已有的 text 提取
-  const text = extractNovelTextFromHtml(html);
-
-  // 单独提取 seriesNavigation（简单对象结构，用正则即可）
-  let navigation: SeriesNavigation = {};
-  const navMatch = html.match(/"seriesNavigation"\s*:\s*(\{(?:[^{}]|\{[^{}]*\})*\})/u);
-  if (navMatch) {
-    const [navErr, parsed] = trySync(() => JSON.parse(navMatch[1]));
-    if (!navErr) {
-      navigation = {
-        nextNovel: parsed.nextNovel ?? null,
-        prevNovel: parsed.prevNovel ?? null,
-      };
-    }
-  }
-
-  // 提取内嵌图片映射
-  const images = (extractBalancedObject(html, "images") as NovelImagesMap | undefined) ?? {};
-
-  return { text, navigation, images };
-}
 
 /**
  * 获取正文 + 系列导航数据 + 内嵌图片映射。

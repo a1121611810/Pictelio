@@ -1,7 +1,7 @@
 /**
  * mirrored adapter —— Preferences 主 + localStorage 镜像。
  *
- * 用于首屏防闪烁项（theme / page_style_theme）：
+ * 用于首屏防闪烁项（theme）：
  * - 写：primary 成功 → mirror 尽力跟随（镜像冗余，失败只记日志）
  * - 读：永远从 primary 读（权威源）；mirror 只通过 getSync 暴露（首屏同步读）
  * - 独有不变量：read() 的结果必然 ≥ readSync() 的新鲜度

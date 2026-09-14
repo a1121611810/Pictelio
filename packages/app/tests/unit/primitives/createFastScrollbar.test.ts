@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+// ADR-0144：2.0 微任务批处理下，事件处理器内的 signal 写需经 flush 同步生效后才能同步断言
+import { flush } from "solid-js";
 import { createFastScrollbar } from "@/primitives/createFastScrollbar";
 
 // --- rAF 手工队列 stub（node 环境无原生 requestAnimationFrame）---
@@ -98,9 +100,11 @@ describe("createFastScrollbar — 拖拽位移比例映射", () => {
     fs.handlers.onPointerDown(ptr(100));
     fs.handlers.onPointerMove(ptr(100 + 320));
     flushRaf();
+    flush(); // ADR-0144：批处理下 set 后同步读为旧值，先排空再断言
     expect(onScrollTo).toHaveBeenCalledWith((4000 - 800) * 0.5); // 1600
     expect(fs.active()).toBe(true);
     fs.handlers.onPointerUp();
+    flush(); // 同上
     expect(fs.active()).toBe(false);
   });
 

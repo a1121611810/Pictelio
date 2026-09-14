@@ -8,7 +8,15 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { remote, type Browser } from "webdriverio";
-import { adbPath, APP_PACKAGE, APP_ROOT, MAIN_ACTIVITY, runCapture, TIMEOUTS } from "./env";
+import {
+  adbPath,
+  APP_PACKAGE,
+  APP_ROOT,
+  ENTRY_ACTIVITIES,
+  MAIN_ACTIVITY,
+  runCapture,
+  TIMEOUTS,
+} from "./env";
 import { APPIUM_HOST, APPIUM_PORT } from "./appium";
 import { webviewMajorVersion } from "./avd";
 
@@ -90,13 +98,17 @@ export class AndroidE2eDriver {
           // android-28 模拟器冷启动慢，Appium 默认 adbExecTimeout 20s 不够
           "appium:adbExecTimeout": 60_000,
           // WebView 已开 setWebContentsDebuggingEnabled(true)，Chromedriver 自动匹配设备 WebView 主版本
-          "appium:chromedriverAutodownload": true,
+          // （chromedriverAutodownload 是 appium 扩展键、不在 W3C 能力类型内——
+          //   与下方 chromedriverExecutable 同走 capabilities cast 通道赋值）
           "appium:recreateChromeDriverSessions": true,
           // 真机（ColorOS/OPPO）：adb shell 无 WRITE_SECURE_SETTINGS，uiautomator2 初始化
           // 清理 hidden_api_policy 会抛 SecurityException → 忽略该错误（仅 log，无副作用）
           "appium:ignoreHiddenApiPolicyError": true,
         },
       };
+      // appium 扩展键不在 W3C 能力类型内、运行时生效（cast 通道，chromedriverExecutable 逃生通道同款）
+      (browserOptions.capabilities as Record<string, unknown>)["appium:chromedriverAutodownload"] =
+        true;
       // 手动指定 Chromedriver（chromedriverAutodownload 下载失败时的逃生通道）
       if (process.env.CHROMEDRIVER_EXECUTABLE) {
         (browserOptions.capabilities as Record<string, unknown>)["appium:chromedriverExecutable"] =
@@ -107,8 +119,9 @@ export class AndroidE2eDriver {
       throw translateChromedriverError(e, webviewMajor);
     }
 
-    // 显式等待主 Activity 前台就绪（App 首屏渲染可能慢于 session 创建）
-    await this.waitForActivity(MAIN_ACTIVITY, TIMEOUTS.session);
+    // 显式等待入口 Activity 前台就绪（App 首屏渲染可能慢于 session 创建）。
+    // 低 WebView 设备上入口会降级到 LynxActivity（ADR-0153），故等待「任一入口」。
+    await this.waitForAnyActivity(ENTRY_ACTIVITIES, TIMEOUTS.session);
   }
 
   /** 显式等待当前 Activity 变为期望值（不用固定 sleep） */
@@ -118,6 +131,22 @@ export class AndroidE2eDriver {
       timeoutMsg: `等待 Activity ${activity} 超时（${timeoutMs / 1000}s），当前 Activity: ${await this.currentActivity().catch(() => "(未知)")}`,
       interval: 1_000,
     });
+  }
+
+  /**
+   * 显式等待当前 Activity 属于期望集合。
+   * 低 WebView 设备（pictelio_low）上 full 包 MainActivity 会立即 finish 并降级到
+   * LynxActivity（ADR-0153），就绪等待用「任一入口」而非单一 MainActivity。
+   */
+  async waitForAnyActivity(activities: readonly string[], timeoutMs = 60_000): Promise<void> {
+    await this.raw.waitUntil(
+      async () => activities.includes((await this.currentActivity()) ?? ""),
+      {
+        timeout: timeoutMs,
+        timeoutMsg: `等待 Activity ∈ [${activities.join(", ")}] 超时（${timeoutMs / 1000}s），当前 Activity: ${await this.currentActivity().catch(() => "(未知)")}`,
+        interval: 1_000,
+      },
+    );
   }
 
   /** 当前前台 Activity 短名（如 .MainActivity / .LynxActivity） */
@@ -141,6 +170,10 @@ export class AndroidE2eDriver {
 
   /** 等待 WEBVIEW context 出现并切换过去（返回实际 context 名） */
   async switchToWebView(timeoutMs = 30_000): Promise<string> {
+    // 先回 NATIVE：app 曾重启时 WebView devtools target 已变更（新 pid），而当前 chromedriver
+    // 会话仍绑定旧 target → 后续 findElement 报 disconnected。recreateChromeDriverSessions=true
+    // 会在「切 NATIVE」时销毁旧会话，切回 WEBVIEW 时按新 target 重建（settings-sync/roundtrip 复现）。
+    // app 重启后旧 chromedriver 会话的清理移到下方 target 就绪后的重试循环里
     let target: string | null = null;
     await this.raw.waitUntil(
       async () => {
@@ -159,9 +192,37 @@ export class AndroidE2eDriver {
       throw new Error("[android-e2e] 内部错误：WEBVIEW context 等待成功但未记录目标");
     }
     const webviewContext: string = target;
-    await this.switchContextWithRetry(webviewContext);
-    console.log(`[android-e2e] 已切换到 ${webviewContext}`);
-    return webviewContext;
+    // app 重启后 WebView devtools target 变更（新 pid），Appium 仍持有旧 chromedriver 会话 →
+    // 后续 getUrl/findElement 报 disconnected。无条件「回 NATIVE 再切 WEBVIEW」触发
+    // recreateChromeDriverSessions 的销毁/重建，并用 getUrl 探针校验；断连则重试整轮。
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        // 回 NATIVE：recreateChromeDriverSessions=true 会在离开 WEBVIEW 时销毁旧 chromedriver
+        // 会话，切回时按新 target 重建。失败不致命（可能本就在 NATIVE），但必须可见（禁静默降级）。
+        await this.raw.switchContext("NATIVE_APP").catch((e: unknown) => {
+          console.warn(
+            `[android-e2e] 回 NATIVE_APP 失败（attempt ${attempt + 1}）: ${e instanceof Error ? e.message : String(e)}`,
+          );
+        });
+        await this.switchContextWithRetry(webviewContext);
+        await this.raw.getUrl();
+        console.log(`[android-e2e] 已切换到 ${webviewContext} (attempt ${attempt + 1})`);
+        return webviewContext;
+      } catch (e) {
+        lastErr = translateChromedriverError(e, webviewMajorVersion(this.serial));
+        // 版本不匹配 / session 创建失败属确定性失败，重试只会反复拉起 chromedriver：
+        // 立即抛出带指引的错误（switchContextWithRetry 已翻译过，这里保持同一实例）。
+        if (
+          lastErr instanceof Error &&
+          /chromedriver|chrome version|session not created/iu.test(lastErr.message)
+        ) {
+          throw lastErr;
+        }
+        await new Promise((r) => setTimeout(r, 1_500));
+      }
+    }
+    throw lastErr ?? new Error("[android-e2e] switchToWebView 失败：无可用 WEBVIEW context");
   }
 
   /** 切回 NATIVE_APP context */

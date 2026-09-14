@@ -24,14 +24,17 @@ export interface AndroidE2eContext {
   serial: string;
   /** 实际使用的 AVD 名 */
   avd: string;
-  /** 收尾：关闭 session；本进程启动的 Appium server 一并停止 */
+  /** 本次运行经 ANDROID_E2E_HTTP_PROXY 设置的设备全局代理（未设置时为 null） */
+  httpProxy: string | null;
+  /** 收尾：关闭 session；本进程启动的 Appium server 一并停止；清除本次设置的全局代理 */
   teardown: () => Promise<void>;
 }
 
 /**
  * 完整端到端准备流程：
  * 1. 校验 uiautomator2 driver 已安装（appium:setup）
- * 2. 检测/启动 AVD 并等待 boot 完成
+ * 2. 检测/启动 AVD 并等待 boot 完成（可选 ANDROID_E2E_HTTP_PROXY：给设备设全局代理，
+ *    teardown 时清除——用于宿主直连 pixiv 受限的 DNS 污染环境，默认不设零影响）
  * 3. 编译 debug APK（可 ANDROID_E2E_SKIP_BUILD=1 跳过）并 adb install
  * 4. 启动/复用 Appium server
  * 5. 创建 WebdriverIO session，等待 MainActivity 前台就绪
@@ -43,6 +46,23 @@ export async function setupAndroidE2e(avdName?: string): Promise<AndroidE2eConte
 
   const { avd, serial } = await ensureEmulator(requestedAvd);
   assertDeviceOnline(serial);
+
+  // 可选设备全局代理（ANDROID_E2E_HTTP_PROXY，如 10.0.2.2:10808 = 宿主 v2ray）。
+  // 默认不设、对他人环境零影响；由运行方按网络环境显式提供——典型场景：宿主直连
+  // pixiv 受限（模拟器 DNS 被污染、app-api.pixiv.net TCP 超时），设备走宿主代理后
+  // API 立即可达（2026-09-14 fab spec 诊断实测）。teardown 统一 `settings delete`
+  // 清除（模拟器全局代理默认本就不存在，不尝试恢复运行前原值，简单优先）。
+  const httpProxy = process.env.ANDROID_E2E_HTTP_PROXY ?? "";
+  if (httpProxy !== "") {
+    runOrThrow(
+      adbPath(),
+      ["-s", serial, "shell", "settings", "put", "global", "http_proxy", httpProxy],
+      TIMEOUTS.adb,
+    );
+    console.log(
+      `[android-e2e] ✓ 已设模拟器全局代理 ${httpProxy}（ANDROID_E2E_HTTP_PROXY；teardown 时清除）`,
+    );
+  }
 
   // 预置与设备 WebView 匹配的 chromedriver（缺失时走代理下载，避免 Appium 自动下载失败）
   await ensureChromedriver(serial);
@@ -57,7 +77,7 @@ export async function setupAndroidE2e(avdName?: string): Promise<AndroidE2eConte
     // 真机：依赖外部预装的 e2e 构建 full-debug APK（adb install 被 ColorOS 拦截）。
     // 校验包确实存在，避免基线不对齐（被测 APK 非本次构建产物）。
     const installed = runCapture(adbPath(), ["-s", serial, "shell", "pm", "path", APP_PACKAGE]);
-    if (!installed.includes("package:")) {
+    if (!installed.stdout.includes("package:")) {
       throw new Error(`真机 ${serial} 未预装 ${APP_PACKAGE}（e2e full-debug APK）——请先手动安装`);
     }
     console.log(`[android-e2e] ✓ 真机 ${serial} 已预装 ${APP_PACKAGE}（外部预装约定）`);
@@ -103,7 +123,22 @@ export async function setupAndroidE2e(avdName?: string): Promise<AndroidE2eConte
   const teardown = async (): Promise<void> => {
     await driver.dispose();
     await appium.stop();
+    // 恢复基线：仅当本次运行设置过全局代理才清除（best-effort，收尾失败不阻断）
+    if (httpProxy !== "") {
+      try {
+        runOrThrow(
+          adbPath(),
+          ["-s", serial, "shell", "settings", "delete", "global", "http_proxy"],
+          TIMEOUTS.adb,
+        );
+        console.log("[android-e2e] ✓ 已清除模拟器全局代理（teardown 恢复基线）");
+      } catch (e) {
+        console.warn(
+          `[android-e2e] 清除模拟器全局代理失败（不影响用例结果）: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+    }
   };
 
-  return { driver, serial, avd, teardown };
+  return { driver, serial, avd, httpProxy: httpProxy === "" ? null : httpProxy, teardown };
 }

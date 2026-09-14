@@ -1,6 +1,7 @@
 import type { Component } from "solid-js";
 import { createProgressiveImage } from "../primitives/createProgressiveImage";
 import { checkImageCache, resolveImageUrl } from "../utils/imageLoader";
+import { t } from "../i18n";
 
 interface PixivImageProps {
   src: string;
@@ -28,6 +29,14 @@ interface ProgressivePixivImageProps extends Omit<
   "thumbSrc" | "hideLoadingPlaceholder"
 > {
   thumbSrc: string;
+}
+
+/**
+ * Solid 2.0 属性接近 HTML：img 的 draggable 需枚举字符串（"true"/"false"），
+ * undefined = 移除属性；组件公开 props 契约保持 boolean 不变。
+ */
+function draggableAttr(value: boolean | undefined): "true" | "false" | undefined {
+  return value === undefined ? undefined : value ? "true" : "false";
 }
 
 /**
@@ -60,7 +69,7 @@ const ProgressivePixivImage: Component<ProgressivePixivImageProps> = (p) => {
             ⚠
           </span>
           <span class="text-[var(--colorNeutralForegroundDisabled)] [font-size:var(--fontSizeBase100)]">
-            加载失败
+            {t("error.fallback.loadFailed")}
           </span>
         </div>
       ) : (
@@ -88,7 +97,7 @@ const ProgressivePixivImage: Component<ProgressivePixivImageProps> = (p) => {
               style={objectFitStyle}
               loading={p.loading || "lazy"}
               decoding="async"
-              draggable={p.draggable}
+              draggable={draggableAttr(p.draggable)}
               onClick={p.onClick}
               onLoad={(e) => {
                 // 先接原语 onDisplayLoad（full 绘制就绪 → thumbSrc 收窄为空串卸载 thumb 层），
@@ -150,7 +159,7 @@ const PixivImage: Component<PixivImageProps> = (props) => {
           style={sizingStyle}
           loading={props.loading || "lazy"}
           decoding="async"
-          draggable={props.draggable}
+          draggable={draggableAttr(props.draggable)}
           onClick={props.onClick}
           onLoad={props.onLoad}
           onError={handleError}
@@ -164,7 +173,7 @@ const PixivImage: Component<PixivImageProps> = (props) => {
             ⚠
           </span>
           <span class="text-[var(--colorNeutralForegroundDisabled)] [font-size:var(--fontSizeBase100)]">
-            加载失败
+            {t("error.fallback.loadFailed")}
           </span>
         </div>
       ) : props.hideLoadingPlaceholder ? null : (
@@ -180,7 +189,7 @@ const PixivImage: Component<PixivImageProps> = (props) => {
         >
           <span class="spinner w-4 h-4" />
           <span class="text-[var(--colorNeutralForegroundDisabled)] [font-size:var(--fontSizeBase100)]">
-            加载中...
+            {t("pixivImage.loading")}
           </span>
         </div>
       )}

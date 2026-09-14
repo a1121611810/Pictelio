@@ -8,6 +8,7 @@ import SettingsCard from "@/components/settings/SettingsCard";
 import { Avatar } from "@/components/me/Avatar";
 import { MenuRow } from "@/components/me/MenuRow";
 import { goBack } from "@/services/backTransitionService";
+import { t } from "@/i18n";
 import PageTransition from "@/components/PageTransition";
 
 interface Props {
@@ -47,20 +48,21 @@ const PersonalCenter: Component<Props> = (props) => {
     props.userId,
   );
 
-  onMount(() => {
+  onSettled(() => {
     // 记录进入个人中心前的 tab：返回 /home 时恢复，避免 currentTab 残留在 "me"——
     // HomePage 只渲染 recommended/follow/bookmarks/history 四个面板，currentTab 为
     // "me" 时四个面板全不渲染，表现为「从列表点作者/点自己进个人中心再返回，列表空白」
     // （模拟器实测复现的 bug 2/4）。
+    // Solid 2.0：onSettled 内禁用 onCleanup（CLEANUP_IN_FORBIDDEN_SCOPE），清理改由返回值注册。
     const prevTab = currentTab();
     setCurrentTab("me");
-    onCleanup(() => {
-      restoreCurrentTabOnCleanup(currentTab, setCurrentTab, prevTab);
-    });
     const uid = profileState.targetUserId();
     if (uid) {
       loadProfile(uid);
     }
+    return () => {
+      restoreCurrentTabOnCleanup(currentTab, setCurrentTab, prevTab);
+    };
   });
 
   // ── 导航动作集 ──
@@ -97,8 +99,8 @@ const PersonalCenter: Component<Props> = (props) => {
           <div class="flex items-center justify-between px-4 pt-3">
             <fluent-button
               appearance="subtle"
-              aria-label="返回"
-              on:click={actions.back}
+              aria-label={t("personalCenter.back")}
+              ref={fluentOn("click", actions.back)}
               class="w-10 h-10 p-0 min-w-10"
             >
               ←
@@ -114,12 +116,13 @@ const PersonalCenter: Component<Props> = (props) => {
                 }
               }}
               role="button"
-              tabIndex={0}
-              aria-label="搜索"
+              // Solid 2.0：内建属性按 attribute 处理，tabIndex 改为小写 tabindex
+              tabindex={0}
+              aria-label={t("personalCenter.search")}
             >
               <FluentIcon name="search" size={16} />
               <span class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
-                搜索
+                {t("personalCenter.search")}
               </span>
             </div>
           </div>
@@ -150,31 +153,55 @@ const PersonalCenter: Component<Props> = (props) => {
             <SettingsCard tone="elevated">
               <MenuRow
                 icon="image"
-                label={profileState.isCurrentUser() ? "我的作品" : "TA 的作品"}
+                label={
+                  profileState.isCurrentUser()
+                    ? t("personalCenter.myWorks")
+                    : t("personalCenter.theirWorks")
+                }
                 count={profileState.totalWorks()}
                 onClick={actions.works}
-                ariaLabel={profileState.isCurrentUser() ? "我的作品" : "TA 的作品"}
+                ariaLabel={
+                  profileState.isCurrentUser()
+                    ? t("personalCenter.myWorks")
+                    : t("personalCenter.theirWorks")
+                }
               />
               <Show when={profileState.isCurrentUser()}>
                 <MenuRow
                   icon="bookmark"
-                  label="我的收藏"
+                  label={t("personalCenter.myBookmarks")}
                   onClick={actions.bookmarks}
-                  ariaLabel="我的收藏"
+                  ariaLabel={t("personalCenter.myBookmarks")}
                 />
               </Show>
               <MenuRow
                 icon="people"
-                label={profileState.isCurrentUser() ? "我的关注" : "TA 的关注"}
+                label={
+                  profileState.isCurrentUser()
+                    ? t("personalCenter.myFollowing")
+                    : t("personalCenter.theirFollowing")
+                }
                 count={profile()?.total_follow_users ?? 0}
                 onClick={actions.following}
-                ariaLabel={profileState.isCurrentUser() ? "我的关注" : "TA 的关注"}
+                ariaLabel={
+                  profileState.isCurrentUser()
+                    ? t("personalCenter.myFollowing")
+                    : t("personalCenter.theirFollowing")
+                }
               />
               <MenuRow
                 icon="people"
-                label={profileState.isCurrentUser() ? "我的粉丝" : "TA 的粉丝"}
+                label={
+                  profileState.isCurrentUser()
+                    ? t("personalCenter.myFollowers")
+                    : t("personalCenter.theirFollowers")
+                }
                 onClick={actions.followers}
-                ariaLabel={profileState.isCurrentUser() ? "我的粉丝" : "TA 的粉丝"}
+                ariaLabel={
+                  profileState.isCurrentUser()
+                    ? t("personalCenter.myFollowers")
+                    : t("personalCenter.theirFollowers")
+                }
               />
             </SettingsCard>
           </div>
@@ -183,7 +210,12 @@ const PersonalCenter: Component<Props> = (props) => {
           <Show when={profileState.isCurrentUser()}>
             <div class="px-4 mt-3">
               <SettingsCard tone="elevated">
-                <MenuRow icon="settings" label="设置" onClick={actions.settings} ariaLabel="设置" />
+                <MenuRow
+                  icon="settings"
+                  label={t("personalCenter.settings")}
+                  onClick={actions.settings}
+                  ariaLabel={t("personalCenter.settings")}
+                />
               </SettingsCard>
             </div>
           </Show>

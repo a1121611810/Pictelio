@@ -43,6 +43,7 @@
 import { ref, onUnmounted } from 'vue'
 import { createFabMenuState, type FabMenuExtraItem } from '../primitives/createFabMenu'
 import { useScrollIndicator } from '../primitives/useScrollIndicator'
+import { t } from '../i18n'
 import { FAB_MENU_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import ScrollIndicator from './ScrollIndicator.vue'
 
@@ -173,7 +174,7 @@ onUnmounted(() => {
         @tap="onRefreshItemTap"
       >
         <text class="text-[4.8vw] leading-none text-on-surface-variant">↻</text>
-        <text class="text-[3.733vw] leading-none text-on-surface">刷新</text>
+        <text class="text-[3.733vw] leading-none text-on-surface">{{ t('refreshableList.refresh') }}</text>
       </view>
 
       <!-- 回顶项：图标 ↑ + label -->
@@ -184,7 +185,7 @@ onUnmounted(() => {
         @tap="onBackToTopItemTap"
       >
         <text class="text-[4.8vw] leading-none text-on-surface-variant">↑</text>
-        <text class="text-[3.733vw] leading-none text-on-surface">回顶</text>
+        <text class="text-[3.733vw] leading-none text-on-surface">{{ t('refreshableList.backToTop') }}</text>
       </view>
 
       <!-- 扩展项（T4）：页面按需配置（上一页/下一页等），visible 控制显隐；

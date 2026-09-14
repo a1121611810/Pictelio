@@ -13,51 +13,13 @@
  * 交互定位：WebdriverIO `$`/`$$` 定位器（实测 execute 在 Chromedriver 下返回值
  * 被 Appium 包裹拿不到，`$` 定位器 + getText/click 可靠）。
  *
- * 断言：关键状态用显式等待（waitUntil/waitFor）；少量固定等待仅用于
- * SPA 路由切换动画与原生退出时序（页面过渡 ~300ms、exitApp ~600ms）。
+ * 断言：关键状态全部用显式条件等待（waitUntil）或 pollPrefs 轮询，不用固定 sleep；
+ * 导航 DOM 契约见 ../helpers.ts（SideNavShell 设置按钮 aria-label 语义化定位）。
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { setupAndroidE2e, type AndroidE2eContext } from "../setup";
-import { readClientPrefs } from "../prefs";
-
-const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-/** WebView 内按文本点击（`$` 定位器 + execute DOM click 兜底，覆盖自定义元素/不可交互元素） */
-async function clickByText(ctx: AndroidE2eContext, text: string): Promise<boolean> {
-  const { driver } = ctx;
-  // fluent-button 有 shadow DOM，textContent 在 light DOM slot 里；优先 fluent-button=
-  try {
-    if (await driver.raw.$(`fluent-button=${text}`).isExisting()) {
-      await driver.raw.$(`fluent-button=${text}`).click();
-      return true;
-    }
-  } catch {
-    // interactable 失败走 execute 兜底
-  }
-  try {
-    if (await driver.raw.$(`button=${text}`).isExisting()) {
-      await driver.raw.$(`button=${text}`).click();
-      return true;
-    }
-  } catch {
-    // interactable 失败走 execute 兜底
-  }
-  // 通用 fallback：execute 遍历元素（文本或 aria-label 匹配）直接 DOM click，
-  // 绕过 $ 的 interactable 检查（custom element / 滚动容器内元素）。
-  // execute 返回值被 Chromedriver 包裹不可靠读取，靠后续断言验证效果。
-  await driver.raw.execute(
-    `(() => {
-      const els = [...document.querySelectorAll('button, fluent-button, [role="button"], [aria-label], div, span')];
-      const el = els.find((n) =>
-        (n.textContent && n.textContent.trim().includes(${JSON.stringify(text)})) ||
-        n.getAttribute && n.getAttribute('aria-label') === ${JSON.stringify(text)}
-      );
-      if (el) { el.click(); return 'clicked'; }
-      return 'not-found';
-    })()`,
-  );
-  return true;
-}
+import { pollPrefs } from "../prefs";
+import { clickByText, openSettingsFromHome, switchToLynxFromSettings } from "../helpers";
 
 describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("S2 单向链路：WebView → LynxActivity", () => {
   let ctx: AndroidE2eContext;
@@ -128,86 +90,22 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("S2 单向链路：WebView →
 
   it("导航到设置页并点击「切换渲染引擎」", async () => {
     const { driver } = ctx;
-    // 顺序导航（诊断验证）：/home → h1.click → /me → 设置行.click → /settings
-    // 减少 getUrl 轮询频率（频繁 getUrl + SPA 切换会导致 Chromedriver DevTools 断开）
-    const url = async () => await driver.raw.getUrl().catch(() => "");
-    const clickEl = (sel: string) =>
-      driver.raw.execute(
-        `(() => { const el = document.querySelector("${sel}"); if (el) el.click(); })()`,
-      );
+    // 新导航契约（a5e2c27c 后）：/home 点 SideNavShell 设置按钮（aria-label「设置」）
+    // 直达 /settings——h1 为纯展示标题，h1.click 位置性选择器已失效
+    await openSettingsFromHome(ctx);
+    console.log(`[S2] ✓ 已进入设置页: ${await driver.raw.getUrl()}`);
 
-    // 若在 /home 或 feed 页：点击 h1 进 /me
-    const u1 = await url();
-    if (!u1.includes("/me") && !u1.includes("/settings")) {
-      await clickEl("h1");
-      await SLEEP(3_000);
-    }
-    // 若在 /me：点击设置行进 /settings
-    const u2 = await url();
-    if (u2.includes("/me")) {
-      await driver.raw.waitUntil(
-        async () => await driver.raw.$("[aria-label='设置']").isExisting(),
-        { timeout: 10_000, timeoutMsg: "/me 未渲染设置行", interval: 500 },
-      );
-      await clickEl("[aria-label='设置']");
-      await SLEEP(3_000);
-    }
-
-    // 断言进入设置页（失败时带当前 URL 诊断）
-    await driver.raw.waitUntil(async () => (await url()).includes("/settings"), {
-      timeout: 30_000,
-      timeoutMsg: `未进入设置页（当前 URL: ${(await url()) || "(获取失败)"}）`,
-      interval: 1_000,
-    });
-    console.log(`[S2] ✓ 已进入设置页: ${await url()}`);
-
-    // 找到「切换渲染引擎」行（aria-label）并点击
-    await driver.raw.waitUntil(
-      async () => await driver.raw.$("[aria-label='切换渲染引擎']").isExisting(),
-      { timeout: 10_000, timeoutMsg: "未找到切换渲染引擎行", interval: 500 },
-    );
-    await clickEl("[aria-label='切换渲染引擎']");
-
-    // T2 起：点击入口行 → 跳转说明页 /client-switch（不再是确认弹窗）。
-    // 确认按钮与 E2E 钩子均由说明页渲染/注册（钩子仅在 DEV/e2e 构建存在）。
-    await driver.raw.waitUntil(async () => (await url()).includes("/client-switch"), {
-      timeout: 10_000,
-      timeoutMsg: "未跳转到 /client-switch 说明页",
-      interval: 500,
-    });
-    await driver.raw.waitUntil(
-      async () => await driver.raw.$("fluent-button=确认切换").isExisting(),
-      { timeout: 10_000, timeoutMsg: "说明页确认切换按钮未出现", interval: 500 },
-    );
-    await driver.raw.execute(
-      `(() => {
-        const e2e = (window).pictelioE2e;
-        if (e2e && e2e.confirmSwitchClient) {
-          e2e.confirmSwitchClient();
-          document.title = 'E2E-HOOK-CALLED';
-        } else {
-          document.title = 'E2E-HOOK-MISSING';
-        }
-      })()`,
-    );
-    // execute 返回值被 Chromedriver 包裹不可靠，改用 title 读回钩子状态
-    const title = (await driver.raw.getTitle()) as string;
-    expect(title, "E2E 钩子应存在（DEV 构建）").toBe("E2E-HOOK-CALLED");
-    await SLEEP(1_000);
-    console.log("[S2] ✓ 已触发确认切换，等待应用退出…");
+    // 设置页点「切换渲染引擎」行 → /client-switch 说明页 → E2E 钩子确认
+    //（结果契约断言 E2E-SWITCH-OK，见 helpers.switchToLynxFromSettings）
+    await switchToLynxFromSettings(ctx);
+    console.log("[S2] ✓ 已触发确认切换（E2E-SWITCH-OK），等待应用退出…");
   }, 120_000);
 
   it("应用退出后 SharedPreferences 已写 lynx", async () => {
     const { serial } = ctx;
-    // 写入经 Capacitor 桥 + SharedPreferences.apply 异步落盘，实测 >2s（模拟器更慢）——
-    // 固定 sleep 2s 在慢环境下误报；改轮询（最长 15s），仍能检测真实写入失败（超时后断言失败）
-    let clientKind: string | null = null;
-    for (let i = 0; i < 15; i++) {
-      clientKind = readClientPrefs(serial).clientKind;
-      if (clientKind === "lynx") break;
-      await SLEEP(1_000);
-    }
-    expect(clientKind, "pictelio_client_kind 应为 lynx（轮询 15s 内写入）").toBe("lynx");
+    // 写入经 Capacitor 桥 + SharedPreferences.apply 异步落盘，单读与写入天然竞态
+    // —— 落盘断言必须轮询（超时抛错并附最后一次 XML 快照，等价断言失败）
+    await pollPrefs(serial, (p) => p.clientKind === "lynx", 15_000);
     console.log("[S2] ✓ 契约确认：pictelio_client_kind=lynx 已写入");
   }, 60_000);
 

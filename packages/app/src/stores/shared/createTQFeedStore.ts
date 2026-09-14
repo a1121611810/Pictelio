@@ -5,7 +5,7 @@
  * "TanStack Query InfiniteQuery wrapper + 响应式派生数据" 模式。
  *
  * 职责：
- *  - 根据 tab/subTab 配置创建对应的 createInfiniteQuery
+ *  - 根据 tab/subTab 配置创建对应的 useInfiniteQuery
  *  - 自动推导每个查询的 enabled（仅当前 tab + subTab 的查询运行）
  *  - 提供派生数据：items / nextUrl / loading / refreshing / error
  *  - 提供动作：ensureLoaded（router loader 预取）/ refresh / fetchMore
@@ -13,10 +13,11 @@
  */
 
 import type { Accessor } from "solid-js";
-import { createInfiniteQuery } from "@tanstack/solid-query";
+import { useInfiniteQuery } from "@tanstack/solid-query";
 import { queryClient } from "../../api/queryClient";
 import { normalizeQueryError } from "../../api/normalizeQueryError";
 import { ApiErrorType, type ApiError } from "../../api/types";
+import { fetchDirection } from "./fetchDirection";
 
 // ─── 内部类型 ───
 
@@ -232,7 +233,7 @@ export function createTQFeedStore<
 
     // ── 1. 创建所有查询（在单个 createRoot 下） ──
 
-    const queryMap = new Map<string, ReturnType<typeof createInfiniteQuery>>();
+    const queryMap = new Map<string, ReturnType<typeof useInfiniteQuery>>();
     const queryDefMap = new Map<string, QueryDef<TItem, TDeps>>();
 
     for (const [tabKey, tabDef] of Object.entries(config.tabs) as [
@@ -250,7 +251,7 @@ export function createTQFeedStore<
 
         queryMap.set(
           mapKey,
-          createInfiniteQuery(
+          useInfiniteQuery(
             () => {
               const deps = config.getDeps();
 
@@ -375,7 +376,12 @@ export function createTQFeedStore<
 
     const loading: Accessor<boolean> = () =>
       activeQueries().some((q) => {
-        if (q.isFetching) return true;
+        // solid-query 6 兼容（#415）：适配层 v6 的 isFetching = fetchStatus==='fetching'
+        // || isPending(() => data())，其中 isPending 探针在「fetch 进行中被 untracked
+        // 读取」后会滞留 true（RC 探针 companion 不随 settle 刷新），令骨架永不卸载。
+        // 改用已提交通道 fetchStatus === 'fetching'（TanStack 各端 isFetching 的规范语义，
+        // dispatch→settle 全程为 true，settle 后立即 false），探针通道不进入本判定。
+        if (q.fetchStatus === "fetching") return true;
         // 首载粘滞（#366）：merge 多源 + 命令式 ensureInfiniteQueryData 组合下，
         // isFetching 信号会在 fetch 仍在进行时失真翻 false → 骨架被提前卸载，
         // 内容区出现数秒空白窗（体检 P3 的 s15 帧实证）。语义修正：
@@ -392,9 +398,18 @@ export function createTQFeedStore<
     // 语义分离（ADR-0078）：refreshing 仅指 refetch 第一页（下拉刷新）；
     // 分页追加用 loadingMore（isFetchingNextPage）——避免分页加载被误判为下拉刷新
     // （首页 A1 骨架遮罩曾因此把分页也渲染成清空重载）。
-    const refreshing: Accessor<boolean> = () => activeQueries().some((q) => q.isRefetching);
+    // solid-query 6：isRefetching/isFetchingNextPage 与 isFetching 同走 isPending 探针
+    // 通道（v6 适配层），untracked 中途读会在 settle 后滞留 true；统一改读「已提交
+    // 通道」（fetchStatus/status/fetchMeta）镜像 core 定义：
+    //   core isFetchingNextPage = isFetching && fetchMeta.fetchMore.direction === "forward"
+    //   core isRefetching      = isFetching && status !== "pending" && 非分页方向
+    const refreshing: Accessor<boolean> = () =>
+      activeQueries().some(
+        (q) => q.fetchStatus === "fetching" && q.status !== "pending" && fetchDirection(q) == null,
+      );
 
-    const loadingMore: Accessor<boolean> = () => activeQueries().some((q) => q.isFetchingNextPage);
+    const loadingMore: Accessor<boolean> = () =>
+      activeQueries().some((q) => q.fetchStatus === "fetching" && fetchDirection(q) === "forward");
 
     const error: Accessor<ApiError | null> = () => {
       if (configErrorStrategy === "allMustFail") {
@@ -420,7 +435,9 @@ export function createTQFeedStore<
     // ── 5. 动作 ──
 
     const ensureLoaded = async (_signal?: AbortSignal): Promise<void> => {
-      const keys = activeKeys();
+      // untrack 显式快照：ensureLoaded 是命令式动作，由 effect apply 段/事件调用，
+      // keys 取调用瞬间值，不建立订阅（Solid 2 STRICT_READ_UNTRACKED 处方）
+      const keys = untrack(activeKeys);
       if (keys.length === 0) return;
 
       await Promise.all(

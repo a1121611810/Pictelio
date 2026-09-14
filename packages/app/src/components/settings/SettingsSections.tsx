@@ -2,8 +2,12 @@ import type { Component } from "solid-js";
 import SettingsAppearance from "./SettingsAppearance";
 import SettingsContent from "./SettingsContent";
 import SettingsImage from "./SettingsImage";
+import SettingsDownload from "./SettingsDownload";
+import SettingsExport from "./SettingsExport";
 import SettingsTranslate from "./SettingsTranslate";
 import SettingsClient from "./SettingsClient";
+import SettingsNetDiag from "./SettingsNetDiag";
+import SettingsWebdav from "./SettingsWebdav";
 import SettingsUpdate from "./SettingsUpdate";
 import SettingsAccount from "./SettingsAccount";
 import SettingsCard from "./SettingsCard";
@@ -40,11 +44,27 @@ const SettingsSections: Component<SettingsSectionsProps> = (props) => {
       </SettingsCard>
 
       <SettingsCard tone="elevated">
+        <SettingsDownload />
+      </SettingsCard>
+
+      <SettingsCard tone="elevated">
+        <SettingsExport />
+      </SettingsCard>
+
+      <SettingsCard tone="elevated">
         <SettingsTranslate />
       </SettingsCard>
 
       <SettingsCard tone="elevated">
         <SettingsClient />
+      </SettingsCard>
+
+      <SettingsCard tone="elevated">
+        <SettingsWebdav />
+      </SettingsCard>
+
+      <SettingsCard tone="elevated">
+        <SettingsNetDiag />
       </SettingsCard>
 
       <SettingsCard tone="elevated">

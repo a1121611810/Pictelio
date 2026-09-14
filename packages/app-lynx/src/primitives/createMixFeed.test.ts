@@ -962,3 +962,86 @@ describe('createMixFeed / signal 透传契约 (ADR-0141 R1-3 oracle)', () => {
     await refreshPromise
   })
 })
+
+// oracle：ADR-0150 决策 2 / docs/specs/app-lynx-page-level-first-load-skeleton.md:59,75
+// （首载成功含 0 条置真；失败不置真；刷新 / 重试回到未落定；dispose 归假）。
+describe('createMixFeed 首载落定（settled，ADR-0150）', () => {
+  it('autoStart:false 实例初始未落定', () => {
+    const feed = createMixFeed({
+      autoStart: false,
+      sources: [source('illust', vi.fn())],
+    })
+    expect(feed.settled()).toBe(false)
+    feed.dispose()
+  })
+
+  it('首载成功（有数据）→ 落定', async () => {
+    const feed = createMixFeed({
+      sources: [source('illust', async () => ({ items: [mkIllust('a1', 1)], nextUrl: null }))],
+      throttleMs: 0,
+      cooldownMs: 0,
+    })
+    expect(feed.settled()).toBe(false)
+    await flush()
+    expect(feed.settled()).toBe(true)
+  })
+
+  it('首载成功但返回 0 条 → 仍落定（真空态可与加载中区分）', async () => {
+    const feed = createMixFeed({
+      sources: [source('illust', async () => ({ items: [], nextUrl: null }))],
+      throttleMs: 0,
+      cooldownMs: 0,
+    })
+    await flush()
+    expect(feed.settled()).toBe(true)
+    expect(feed.items()).toHaveLength(0)
+  })
+
+  it('首载失败 → 不落定且错误槽有值', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const feed = createMixFeed({
+      sources: [
+        source('illust', async () => {
+          throw new Error('boom')
+        }),
+      ],
+      throttleMs: 0,
+      cooldownMs: 0,
+    })
+    await flush()
+    expect(feed.settled()).toBe(false)
+    expect(feed.error()).toBeTruthy()
+  })
+
+  it('refresh 重试 → 期间同步回到未落定，成功后再次落定', async () => {
+    const fetchA = vi
+      .fn<MixFeedSource['fetchPage']>()
+      .mockResolvedValueOnce({ items: [], nextUrl: null })
+      .mockResolvedValueOnce({ items: [mkIllust('a1', 1)], nextUrl: null })
+    const feed = createMixFeed({
+      sources: [source('illust', fetchA)],
+      throttleMs: 0,
+      cooldownMs: 0,
+    })
+    await flush()
+    expect(feed.settled()).toBe(true)
+
+    const p = feed.refresh()
+    expect(feed.settled()).toBe(false)
+    await p
+    expect(feed.settled()).toBe(true)
+    expect(feed.items()).toHaveLength(1)
+  })
+
+  it('dispose → 落定信号归假', async () => {
+    const feed = createMixFeed({
+      sources: [source('illust', async () => ({ items: [mkIllust('a1', 1)], nextUrl: null }))],
+      throttleMs: 0,
+      cooldownMs: 0,
+    })
+    await flush()
+    expect(feed.settled()).toBe(true)
+    feed.dispose()
+    expect(feed.settled()).toBe(false)
+  })
+})

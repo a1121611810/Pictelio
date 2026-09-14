@@ -61,3 +61,9 @@ app-lynx 与 webview client 的功能差距中，**搜索**是剩余最大缺口
 - 非 tab 页放射 FAB 出现后与页面自身 UI（如详情页底部操作栏）是否冲突（每页核查）；
 - 「即输即搜」在 lynx input 上的触发节奏（输入事件 / IME / 中文 input）与 300ms debounce 实测；
 - 弹层在原生 LynxView 的键盘弹出交互（输入框自动聚焦 + 键盘遮挡 80vh 面板底部输入区）——现有 CommentInputBar 有键盘适配先例可参照。
+
+## 修订（2026-09-12，wayfinder #474 → spec `docs/specs/search-advanced-filters.md`）
+
+- **第 8 条修订**：lynx `src/api/search.ts` 与 webview 的「逐字对齐」契约升级为**参数构建单点共享**——新增共享包 `@pictelio/search-core`（筛选状态 → 请求参数 / URL 编解码 / 缓存键的零 IO 纯函数，先例 `@pictelio/update-check` 双端共用），两端 `api/search.ts` 降级为同构薄传输层（fetch/代理 + `next_url` 域名断言）。逐字镜像约定对该文件不再适用；仓库其余镜像/差分约定不变。
+- **第 4 条行为更新**：`search_target` 派生规则以 spec §6.1 为准（illust 端 partial 场景**不传**该参数以并入标题命中（Shaft #906）；novel 端恒显式传；含空格多标签仍传 `exact_match_for_tags`），并恒发 `merge_plain_keyword_results=true` / `include_translated_tag_results=true`。
+- 依据：双端搜索高级筛选 spec（用户终审通过 2026-09-12，#475~#480 全闭）。

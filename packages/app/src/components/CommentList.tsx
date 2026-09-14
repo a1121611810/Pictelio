@@ -2,22 +2,10 @@ import type { Component } from "solid-js";
 import type { PixivComment } from "../api/types";
 import { user } from "../stores/authStore";
 import { resolveImageUrl } from "../utils/imageLoader";
+import { formatRelativeTime } from "../utils/dateFormat";
+import { t } from "../i18n";
 
 // ─── Helpers ───
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffMin = Math.floor(diffMs / 60_000);
-  if (diffMin < 1) return "刚刚";
-  if (diffMin < 60) return `${diffMin}分钟前`;
-  const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour}小时前`;
-  const diffDay = Math.floor(diffHour / 24);
-  if (diffDay < 30) return `${diffDay}天前`;
-  return d.toLocaleDateString("zh-CN");
-}
 
 // ─── CommentItem (internal sub-component) ───
 
@@ -43,8 +31,10 @@ const CommentItem: Component<CommentItemProps> = (props) => {
 
   return (
     <div
-      class="border border-[var(--colorNeutralStroke2)] rounded-[var(--borderRadiusMedium)] overflow-hidden"
-      classList={{ "opacity-50 pointer-events-none": props.isDeleting }}
+      class={[
+        "border border-[var(--colorNeutralStroke2)] rounded-[var(--borderRadiusMedium)] overflow-hidden",
+        { "opacity-50 pointer-events-none": props.isDeleting },
+      ]}
     >
       {/* Header: avatar + username + time */}
       <div class="flex items-center gap-2 px-3 py-2 bg-[var(--colorNeutralBackground2)] border-b border-[var(--colorNeutralStroke2)]">
@@ -68,7 +58,7 @@ const CommentItem: Component<CommentItemProps> = (props) => {
           {props.comment.user.name}
         </button>
         <span class="[font-size:var(--fontSizeBase75)] text-[var(--colorNeutralForeground3)] ml-auto">
-          {formatDate(props.comment.date)}
+          {formatRelativeTime(props.comment.date)}
         </span>
       </div>
 
@@ -102,14 +92,14 @@ const CommentItem: Component<CommentItemProps> = (props) => {
             class="[font-size:var(--fontSizeBase75)] text-[var(--colorNeutralForeground3)] hover:text-[var(--colorBrandForeground1)] font-medium bg-transparent border-none p-0 cursor-pointer transition-colors"
             onClick={props.onReply}
           >
-            回复
+            {t("comment.reply")}
           </button>
           <Show when={Number(props.currentUserId) === Number(props.comment.user.id)}>
             <button
               class="[font-size:var(--fontSizeBase75)] text-[var(--colorNeutralForeground3)] hover:text-[var(--colorStatusDangerForeground1)] font-medium bg-transparent border-none p-0 cursor-pointer transition-colors"
               onClick={props.onDelete}
             >
-              删除
+              {t("comment.delete")}
             </button>
           </Show>
         </div>
@@ -135,8 +125,8 @@ const CommentList: Component<CommentListProps> = (props) => {
     <div class="flex-1 overflow-y-auto">
       <Show when={props.hasLoaded && props.comments.length === 0}>
         <div class="flex flex-col items-center justify-center py-12 text-[var(--colorNeutralForeground3)] [font-size:var(--fontSizeBase200)]">
-          <p>还没有评论</p>
-          <p class="mt-1">来写第一条吧</p>
+          <p>{t("comment.empty")}</p>
+          <p class="mt-1">{t("comment.emptyHint")}</p>
         </div>
       </Show>
 

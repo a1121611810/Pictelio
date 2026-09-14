@@ -83,7 +83,9 @@ vi.mock("@/components/ui/FluentIcon", () => ({
   default: () => <span>icon</span>,
 }));
 
-vi.mock("@tanstack/solid-virtual", () => {
+vi.mock("@tanstack/virtual-core", () => {
+  // ADR-0144：@tanstack/solid-virtual 已移除，src 侧 createNovelVirtualLayout /
+  // createFeedVirtualizer 直接 import @tanstack/virtual-core，mock 目标随之切换。
   // Shared state for Virtualizer constructor
   return {
     Virtualizer: vi.fn(function VirtualizerMock(

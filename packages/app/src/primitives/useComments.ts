@@ -9,6 +9,7 @@ import {
 } from "../api/comment";
 import { createSentinel } from "./visibility";
 import { SHEET_LAZY_MARGIN } from "./rootMargins";
+import { t } from "../i18n";
 
 export interface UseCommentsResult {
   comments: Accessor<PixivComment[]>;
@@ -40,33 +41,39 @@ export function useComments(
   const [deletingId, setDeletingId] = createSignal<number | null>(null);
 
   // 加载根评论（当 enabled + targetId 变化时触发）
-  createEffect(() => {
-    if (!enabled()) return;
-    const id = targetId();
-    const t = type();
-    const ac = new AbortController();
+  // 2.0 拆分效应：compute 段只读快照，重置/异步请求的写 signal 移入 apply 段，
+  // AbortController 经 apply 返回的 cleanup 在依赖变化/销毁时注销
+  createEffect(
+    () => {
+      if (!enabled()) return null;
+      return { id: targetId(), t: type() };
+    },
+    (snap) => {
+      if (!snap) return;
+      const ac = new AbortController();
 
-    setError(null);
-    setHasLoaded(false);
-    setRootComments([]);
-    setNextUrl(null);
+      setError(null);
+      setHasLoaded(false);
+      setRootComments([]);
+      setNextUrl(null);
 
-    void (async () => {
-      const [loadErr, res] = await tryAsync(loadRootComments(t, id, ac.signal));
-      if (ac.signal.aborted) return;
-      if (loadErr) {
-        if ((loadErr as { name?: string }).name !== "AbortError") {
-          setError("加载评论失败，请重试");
+      void (async () => {
+        const [loadErr, res] = await tryAsync(loadRootComments(snap.t, snap.id, ac.signal));
+        if (ac.signal.aborted) return;
+        if (loadErr) {
+          if ((loadErr as { name?: string }).name !== "AbortError") {
+            setError(t("core.primitive.useComments.loadFailed")); // i18n: set 时快照（瞬态）
+          }
+        } else {
+          setRootComments(res.comments);
+          setNextUrl(res.next_url);
+          setHasLoaded(true);
         }
-      } else {
-        setRootComments(res.comments);
-        setNextUrl(res.next_url);
-        setHasLoaded(true);
-      }
-    })();
+      })();
 
-    onCleanup(() => ac.abort());
-  });
+      return () => ac.abort();
+    },
+  );
 
   // 分页加载更多
   async function loadMore() {
@@ -76,7 +83,7 @@ export function useComments(
     const [err, res] = await tryAsync(loadRootCommentsNext(url));
     setLoadingMore(false);
     if (err) {
-      setError("加载更多失败");
+      setError(t("core.primitive.useComments.loadMoreFailed")); // i18n: set 时快照（瞬态）
     } else {
       setRootComments((prev) => [...prev, ...res.comments]);
       setNextUrl(res.next_url);
@@ -97,13 +104,13 @@ export function useComments(
     const [apiErr] = await tryAsync(apiPostComment(type(), targetId(), text, parentId));
     if (apiErr) {
       setPosting(false);
-      setPostError("发送失败，请重试");
+      setPostError(t("core.primitive.useComments.postFailed")); // i18n: set 时快照（瞬态）
       return;
     }
     const [loadErr, res] = await tryAsync(loadRootComments(type(), targetId()));
     setPosting(false);
     if (loadErr) {
-      setPostError("发送失败，请重试");
+      setPostError(t("core.primitive.useComments.postFailed"));
       return;
     }
     setRootComments(res.comments);
@@ -119,7 +126,7 @@ export function useComments(
     }
     setDeletingId(null);
     if (delErr) {
-      setError("删除失败");
+      setError(t("core.primitive.useComments.deleteFailed")); // i18n: set 时快照（瞬态）
     }
   }
 

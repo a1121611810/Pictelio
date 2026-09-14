@@ -2,6 +2,7 @@ import { Preferences } from "@capacitor/preferences";
 import { SecureStorage } from "@aparajita/capacitor-secure-storage";
 import { PixivApi } from "@/native/PixivApi";
 import { tryAsync } from "./tryAsync";
+import { isNativePlatform } from "@/utils/platform";
 
 const REFRESH_TOKEN_KEY = "refresh_token";
 /** 备份完整性检查标记键 */
@@ -41,12 +42,17 @@ function unquoteTokenValue(value: string): string {
 
 /**
  * 向 Native 同步当前 refresh_token（供 Java 401 静默刷新使用）。
- * Web/DEV 环境无 PixivApi 插件，调用 reject —— 静默跳过，不破坏持久化主流程。
+ * Web 环境无 PixivApi 插件，根本不发 IPC 调用（消除启动期 CapacitorException
+ * 噪音 + 节省 IPC；catch 兜底保留为原生环境 plugin 安装损坏的最后防线）。
  */
 async function syncNativeToken(token: string | null): Promise<void> {
+  // Web 环境根本不发 IPC——与项目 platform.ts 守卫一致
+  // （若未来引入桌面 Capacitor/iOS WebView，可改用 `isPluginAvailable('PixivApi')` 精确守卫）
+  if (!isNativePlatform()) return;
+
   const [err] = await tryAsync(PixivApi.syncToken({ token }));
   if (err) {
-    console.warn("[secureStorage] syncToken 失败（Web 环境可忽略）", err);
+    console.warn("[secureStorage] syncToken 失败", err);
   }
 }
 

@@ -21,12 +21,14 @@ import { setupAndroidE2e, type AndroidE2eContext } from "../setup";
 import {
   currentTopActivity,
   forceStopApp,
+  pollPrefs,
   readClientPrefs,
   startMainActivity,
   writeClientKind,
   writePrefKey,
   dumpPrefsToFile,
 } from "../prefs";
+import { openSettingsFromHome } from "../helpers";
 
 const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const HAS_TOKEN = !!process.env.PIXIV_REFRESH_TOKEN;
@@ -164,28 +166,25 @@ describe("T5 跨 client 设置同步契约（ADR-0103）", () => {
     await loginToHome(ctx, serial);
 
     // 登录成功 → loadAccountR18 已跑（迁移播种 + 孤儿清理）→ 进设置页
-    await driver.raw.execute(
-      `(() => { const h = document.querySelector('h1'); if (h) h.click(); })()`,
-    );
-    await SLEEP(3_000);
-    await driver.raw.execute(
-      `(() => { const el = document.querySelector("[aria-label='设置']"); if (el) el.click(); })()`,
-    );
-    await SLEEP(3_000);
-    await driver.raw.waitUntil(
-      async () => (await driver.raw.getUrl().catch(() => "")).includes("/settings"),
-      { timeout: 30_000, timeoutMsg: "未进入设置页", interval: 1_000 },
-    );
+    // （/home 点 SideNavShell 设置按钮直达，见 helpers.openSettingsFromHome；
+    // h1 为纯展示标题，h1.click 位置性选择器已失效）
+    await openSettingsFromHome(ctx);
 
     // 迁移文件断言（先于 UI——区分「迁移未跑」vs「UI 读取问题」）：
-    // 预置老键 show_r18=true 应已播种为账号键 show_r18_${uid}=true 并删老键
-    const migrated = readClientPrefs(serial);
-    expect(migrated.rawXml).toMatch(/<string name="show_r18_\d+">true<\/string>/u);
-    expect(migrated.rawXml).toMatch(/<string name="show_r18g_\d+">true<\/string>/u);
-    expect(migrated.rawXml).not.toContain('name="show_r18"');
-    // 孤儿键清理：age_confirmed / is_adult 已删除
-    expect(migrated.rawXml).not.toContain("age_confirmed");
-    expect(migrated.rawXml).not.toContain("is_adult");
+    // 预置老键 show_r18=true 应已播种为账号键 show_r18_${uid}=true 并删老键。
+    // 写入走「JS 桥排队 → Java → editor.apply() 异步落盘」链（ADR-0159 #10 根因），
+    // 单次直读与落盘天然竞态——轮询等完整迁移态出现（播种 + 删老键 + 孤儿清理），
+    // 超时 30s；超时错误由 pollPrefs 附带最后快照，无需重复诊断信息。
+    await pollPrefs(
+      serial,
+      (p) =>
+        /<string name="show_r18_\d+">true<\/string>/u.test(p.rawXml) &&
+        /<string name="show_r18g_\d+">true<\/string>/u.test(p.rawXml) &&
+        !p.rawXml.includes('name="show_r18"') &&
+        !p.rawXml.includes("age_confirmed") &&
+        !p.rawXml.includes("is_adult"),
+      30_000,
+    );
 
     // UI 断言：R18 开关应为开（迁移播种的真实 UI 读回）
     await driver.raw.waitUntil(
@@ -200,15 +199,21 @@ describe("T5 跨 client 设置同步契约（ADR-0103）", () => {
     await ctx.driver.raw.execute(
       `(() => { const el = document.querySelector("[aria-label='显示 R18 内容']"); if (el) el.click(); })()`,
     );
-    await SLEEP(2_500);
+    // toggle 写入与迁移同走异步落盘链（ADR-0159 #10 根因）：删除原固定 2.5s 等待 +
+    // 单次直读，改为轮询等 show_r18_${uid} 翻转为 false 且账号级契约态完整
+    // （超时 30s；超时错误由 pollPrefs 附带最后快照）。
+    const prefs = await pollPrefs(
+      serial,
+      (p) =>
+        /<string name="show_r18_\d+">false<\/string>/u.test(p.rawXml) &&
+        /<string name="show_r18g_\d+">true<\/string>/u.test(p.rawXml) &&
+        !p.rawXml.includes('name="show_r18"') &&
+        !p.rawXml.includes("age_confirmed") &&
+        !p.rawXml.includes("is_adult"),
+      30_000,
+    );
+    // 落盘后的最终态快照留档（诊断证据；轮询超时时错误消息已含最后快照）
     dumpPrefsToFile(serial, "t5-after-toggle");
-    const prefs = readClientPrefs(serial);
-    expect(prefs.fileExists).toBe(true);
-    expect(prefs.rawXml).toMatch(/<string name="show_r18_\d+">false<\/string>/u);
-    expect(prefs.rawXml).toMatch(/<string name="show_r18g_\d+">true<\/string>/u);
-    expect(prefs.rawXml).not.toContain('name="show_r18"');
-    expect(prefs.rawXml).not.toContain("age_confirmed");
-    expect(prefs.rawXml).not.toContain("is_adult");
     console.log(`[T5] ✓ 迁移 + 账号级键契约断言通过，uid=${extractUid(prefs.rawXml)}`);
   }, 300_000);
 
@@ -235,9 +240,14 @@ describe("T5 跨 client 设置同步契约（ADR-0103）", () => {
     await SLEEP(500);
     startMainActivity(serial);
 
-    // 文件级断言：键已写入真实文件（lynx 写入路径的等价契约）
-    const after = readClientPrefs(serial);
-    expect(after.rawXml).toContain(`<string name="show_r18g_${uid}">true</string>`);
+    // 文件级断言：键已写入真实文件（lynx 写入路径的等价契约）。
+    // 重启后 app 侧仍可能异步写同一文件（同 ADR-0159 落盘竞态），单次直读改轮询
+    // 等期望键值出现（超时 30s；超时错误由 pollPrefs 附带最后快照）。
+    await pollPrefs(
+      serial,
+      (p) => p.rawXml.includes(`<string name="show_r18g_${uid}">true</string>`),
+      30_000,
+    );
 
     // 说明：webview 侧 UI 读回（设置页 R18G 开关为开）不在此处重复断言——
     // ① webview UI 读文件路径已由 test 1 证明（迁移值 show_r18_<uid>=true → 开关 ON）；

@@ -7,13 +7,18 @@ import {
   setProbeResults,
 } from "../stores/imageHostStore";
 import { isNativePlatform } from "@/utils/platform";
+import { t } from "../i18n";
 
 interface HostInput {
   name: string;
   baseUrl: string;
 }
 
-/** 明文 HTTP 拒绝文案（native 专用规则，spec #382：Android 9+ 系统层拒绝 cleartext 请求） */
+/**
+ * 明文 HTTP 拒绝文案（native 专用规则，spec #382：Android 9+ 系统层拒绝 cleartext 请求）。
+ * zh 契约常量（spec 原文钉版）；运行时渲染经 validateHostInput 的 t()（i18n B7），
+ * zh 输出与此常量逐字一致。
+ */
 export const HTTP_MIRROR_REJECTED_MESSAGE = "Android 禁止明文 HTTP，请使用 https:// 镜像";
 
 export function validateHostInput(
@@ -24,26 +29,26 @@ export function validateHostInput(
   const baseUrl = input.baseUrl.trim();
 
   if (!name) {
-    return "名称不能为空";
+    return t("core.service.imageHostService.nameRequired"); // i18n: 调用时快照（瞬态）
   }
   if (!baseUrl) {
-    return "代理 URL 不能为空";
+    return t("core.service.imageHostService.urlRequired");
   }
 
   const [err, url] = trySync(() => new URL(baseUrl));
   if (err) {
-    return "请输入有效的 URL";
+    return t("core.service.imageHostService.urlInvalid");
   }
   if (!/^https?:$/u.test(url!.protocol)) {
-    return "仅支持 http:// 或 https:// 协议";
+    return t("core.service.imageHostService.protocolUnsupported");
   }
   if (url!.hostname.includes("pximg.net")) {
-    return "图床 URL 不能直接使用 Pixiv 官方域名";
+    return t("core.service.imageHostService.pixivDomainRejected");
   }
   // native 下明文 HTTP 被系统层拒绝（usesCleartextTraffic 缺省 false，targetSdk 36）——
   // 在保存口拦截，避免产生「保存成功但永不生效」的死配置；web/dev 无此限制（spec #382 Q1）
   if (native && url!.protocol === "http:") {
-    return HTTP_MIRROR_REJECTED_MESSAGE;
+    return t("core.service.imageHostService.cleartextHttpRejected");
   }
 
   return null;

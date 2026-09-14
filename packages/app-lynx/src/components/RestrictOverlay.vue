@@ -10,6 +10,8 @@
 //   整个内容区（实测 2026-08-11，小说推荐页满屏遮罩）。
 // 无任何交互——不跳设置、无按钮、无提示，点击遮罩不响应也不应穿透到下层卡片的 tap。
 // M3 形态：scrim 半透明黑遮罩 + 中央徽章（R-18=error-container / R-18G=error）。
+import { t } from '../i18n'
+
 const props = defineProps<{
   level: 1 | 2
   /** false = 纯流内徽章块（列表卡用，调用方自备 bg-scrim 背景与尺寸）；默认 true = 绝对定位覆盖 */
@@ -33,7 +35,7 @@ function swallow() {}
         class="text-label-medium font-semibold px-2 py-0.5 rounded-[var(--md-shape-extra-small)]"
         :class="level === 2 ? 'bg-error text-error-on' : 'bg-error-container text-error-on-container'"
       >{{ badge }}</text>
-      <text class="text-label-medium text-white mt-2" style="opacity: 0.8">受浏览限制，不予显示</text>
+      <text class="text-label-medium text-white mt-2" style="opacity: 0.8">{{ t('restrictOverlay.blocked') }}</text>
     </view>
   </view>
 </template>

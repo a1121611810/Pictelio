@@ -23,6 +23,7 @@ function makeEntry(overrides: Partial<HistoryEntry> = {}): HistoryEntry {
     thumbnailUrl:
       "https://i.pximg.net/c/250x250_80/img-master/img/2026/06/30/13/50/51/303_p0_square1200.jpg",
     xRestrict: 0,
+    aiType: 0,
     // 本地时区 09:05，组件用同构造逻辑取 HH:mm，避免时区差异
     visitedAt: new Date(2026, 0, 15, 9, 5).getTime(),
     visitCount: 3,

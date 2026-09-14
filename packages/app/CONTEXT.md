@@ -4,6 +4,29 @@
 
 ## 术语
 
+### WebDAV 备份（跨端功能，wayfinder #455）
+
+**备份域（backup scope）**：
+WebDAV 备份功能划定的一期数据边界——全部设置类键 + 屏蔽列表 + 举报记录。
+
+**排除域（out of backup）**：
+凭证（refresh_token）、浏览/搜索历史、下载队列记录、可重建缓存——明确不进备份的数据类别。
+
+**账号级键过滤恢复（account-key filtered restore）**：
+恢复时账号级设置键（`show_r18_${uid}` 等，ADR-0103 契约）仅应用与当前登录 uid 匹配者，避免异账号恢复产生孤儿键。
+
+**备份传输三层（backup transport layering）**：
+WebDAV 备份的架构分层——Java 单一 `WebDavClient` 核心（OkHttp 协议子集）+ 双薄桥（webview 走 Capacitor `WebDavPlugin`，lynx 走 `PictelioWebDavModule`）+ TS 共享纯函数层（收集/序列化/加密，双引擎同源同语义差分对齐）。
+
+**备份快照格式 v1（backup snapshot format v1）**：
+引擎无关单文件 JSON（`format/schemaVersion/deviceKeys/accountKeys/sets/excludedKeys`），时间戳文件名天然免冲突不加锁；加密封装 `PICTELIO-ENC1`（PBKDF2-HMAC-SHA256 600k + AES-256-GCM，Java 侧实现）；写后 PROPFIND 校验原子性；固定保留最近 10 份轮换。
+
+**恢复语义 v1（restore semantics v1）**：
+整档恢复 + merge-by-keys（备份中存在的键覆盖本地，没有的键不触碰）；账号级键按当前登录 uid 应用；恢复前自动生成本地 pre-restore 应急快照（保留到下次成功备份），可一键回滚；schemaVersion 过高拒绝、excludedKeys 不触碰本地对应键。
+
+**连接配置进备份（connection-config in scope）**：
+WebDAV 服务器地址/用户名/目录/自动备份开关属设置域（跨引擎共享键 `settings_webdav_*`），进备份域；密码仅存 secure storage，绝不进备份文件。
+
 ### 浏览导航
 
 **列表页（List）**：
@@ -293,6 +316,38 @@ _Avoid_: 设备级设置（键不含 userId 的旧模式）
 跨 client 设置契约的物理落点——SharedPreferences 文件 "CapacitorStorage"（@capacitor/preferences 默认 group）。webview 经 Capacitor 插件读写；lynx 原生经 `PictelioPrefsModule` 读写；lynx web-core dev 预览降级 IndexedDB（仅开发环境）。
 _Avoid_: 本地存储（localStorage，web-core Worker 环境不存在）
 
+### 内容过滤（Content filtering）
+
+**AI 作品（AI work）**：
+Pixiv 响应中 `illust_ai_type` / `novel_ai_type >= 1` 的作品，即 AI 辅助（1）或纯 AI 生成（2）。字段缺失或为 0 视为非 AI 作品。0/1/2 的值语义以本词条为准（`src/utils/aiFilter.ts` 消费）。
+_Avoid_: AI 内容（易与 AI 翻译等上下文混淆）、AI 图（小说同样适用）
+
+**AI 内容过滤（AI content filter）**：
+账号级三态设置，控制 AI 作品在列表 / 搜索 / 详情 / 历史中的呈现方式。模式三选一：显示 `show`（不处理）、遮罩 `mask`、仅看 `only`。存储键 `ai_filter_mode_${uid}`，与 app-lynx 共享（沿用 ADR-0103 契约）。
+_Avoid_: AI 过滤开关（三态不是布尔开关）
+
+**AI 模式（AI filter mode）**：
+`show | mask | only` 三个取值的总称。「遮罩」在 app（webview）沿用其 R18 的过滤隐藏——作品从 store 派生结果中移除；在 app-lynx 沿用其 R18 的占位 scrim 遮罩卡。**两端不追求同一视觉形态**。
+_Avoid_: AI 等级、把「遮罩」端间统一为叠加层（app 端不新建遮罩组件）
+
+### 引擎可用性与降级（Engine availability & fallback）
+
+**首选引擎（Preferred client）**：
+`pictelio_client_kind` 所记录的用户选择（`webview` / `lynx`），持久化于 SharedPreferences "CapacitorStorage"；只有用户显式切换才会改变。
+_Avoid_: 当前客户端、当前引擎（易与生效引擎混淆）
+
+**生效引擎（Effective client）**：
+本次启动实际承载的引擎——首选引擎经引擎可用性修正后的结果。首选引擎不可用时降级为另一引擎，但用户的首选记录不被改写。
+_Avoid_: 客户端的「当前值」（该值有两个坐标：选择与生效）
+
+**引擎可用性（Engine availability）**：
+引擎能否在当前设备与安装包上运行。两引擎判据不同——WebView 看主版本号是否达最低要求（检测不到视为可用），Lynx 看包能力与原生库是否真正加载（初始化不抛异常 ≠ native 就绪）。
+_Avoid_: 引擎版本（把可用性等同于版本号；Lynx 无可靠版本查询）
+
+**引擎降级（Engine fallback）**：
+首选引擎不可用时自动以另一引擎本次生效的动作；仅作用于本次运行，不落盘、不改写首选引擎——首选不可用是设备事实，不是用户偏好变化。
+_Avoid_: 自动切换引擎（易被读成对用户选择的持久改写）
+
 ### 网络直连（Direct access）
 
 **直连模式（Direct access）**【2026-09-06 新增，跨上下文】：
@@ -320,3 +375,25 @@ _Avoid_: 用下载 URL 做键（图床开启时预取与显示键断裂——历
 **源无关命中（Source-agnostic hit）**【2026-09-06 新增，跨上下文】：
 缓存命中判定只依赖「该图是否曾以任意来源缓存过」，与当前图床开关、模式、host 选择完全无关。切换图床/换镜像不失效、不重下；同一图全生命周期只有一个缓存条目。
 _Avoid_: 按来源分柜缓存（同图多份、切源即 miss——反模式）
+
+### 排行榜（Ranking）【2026-09-13 新增，跨上下文，spec docs/specs/ranking.md】
+
+**排行榜入口（ranking entry）**：
+推荐流顶部**注入**的排行榜展示位（本端为横滑条形态），固定呈现「日榜 · 今日」的前 20 名，点击进作品详情或榜单页。入口**不承担维度与日期状态**——它不随用户在榜单页里选过的维度/日期变化，标题恒为「今日排行」。
+_Avoid_: 排行榜 tab / 排行榜分类（本项目明确不新增导航分类，见 ADR-0158）
+
+**榜单页（ranking page）**：
+承载**维度切换**（7 档）与**按日期回看**的独立页面，与入口分离。浏览能力（切档、回看、无限滚动）全部收在这里，而不是摊进入口。
+_Avoid_: 榜单入口（入口只负责展示与跳转）
+
+**榜单维度（ranking mode）**：
+服务端榜单种类。本期 7 档：日/周/月/新人/原创/R-18/R-18G。**档位即 mode**，不做「期间 × R-18」二维展开；其中 R-18 取日榜、R-18G 取周榜的不对称由服务端 mode 目录决定。
+_Avoid_: 榜单筛选 / 榜单分类（维度是并列的榜种，不是对同一列表的过滤条件）
+
+**榜单日期（ranking date）**：
+榜单对应的日期，「今日」= 未指定日期（由服务端按日本时区解析）。回看即显式指定过去的日期。
+_Avoid_: 榜单时间范围（那是搜索的期间语义，二者不是一回事）
+
+**名次（rank）**：
+作品在榜单中的序位，由**分页偏移 + 下标**推得（服务端响应不返回名次字段）。客户端过滤掉条目时**不重编号**——因此被过滤的条目会留下名次空洞，这是已知行为而非缺陷。
+_Avoid_: 序号 / 排名编号（避免暗示「连续编号」，名次是位置不是计数）

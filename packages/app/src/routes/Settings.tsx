@@ -10,6 +10,7 @@ import { resetSettingsStore as resetUiStore } from "../stores/settingsStore";
 import PageTransition from "../components/PageTransition";
 import SettingsDialogs from "../components/settings/SettingsDialogs";
 import SettingsSections from "../components/settings/SettingsSections";
+import { t } from "../i18n";
 import { goBack } from "../services/backTransitionService";
 
 function openDeleteAccountPage() {
@@ -26,12 +27,18 @@ const Settings: Component = () => {
   >(null);
 
   // Auto-hide action toast
-  createEffect(() => {
-    if (actionToast()) {
+  // Solid 2.0 拆分效应：compute 读 actionToast，apply 段起定时器并以返回值注册清理
+  // （onCleanup 不可在 effect/apply 内使用）；setTimeout 回调中的写属于异步回调，不受限。
+  createEffect(
+    () => actionToast(),
+    (toast) => {
+      if (!toast) {
+        return;
+      }
       const timer = setTimeout(() => setActionToast(null), 2500);
-      onCleanup(() => clearTimeout(timer));
-    }
-  });
+      return () => clearTimeout(timer);
+    },
+  );
 
   async function handleLogout() {
     const [logoutErr] = await tryAsync(
@@ -41,9 +48,9 @@ const Settings: Component = () => {
       })(),
     );
     if (logoutErr) {
-      setActionToast("退出登录失败");
+      setActionToast(t("settingsPage.logoutFailed")); // i18n: set 时快照（瞬态）
     } else {
-      setActionToast("已退出登录");
+      setActionToast(t("settingsPage.loggedOut")); // i18n: set 时快照（瞬态）
     }
   }
 
@@ -62,9 +69,9 @@ const Settings: Component = () => {
       })(),
     );
     if (clearErr) {
-      setActionToast("清除失败，请重试");
+      setActionToast(t("settingsPage.clearFailed")); // i18n: set 时快照（瞬态）
     } else {
-      setActionToast("本地数据已清除");
+      setActionToast(t("settingsPage.cleared")); // i18n: set 时快照（瞬态）
     }
   }
 
@@ -89,8 +96,8 @@ const Settings: Component = () => {
         <header class="sticky top-0 z-20 surface-appbar h-12 flex items-center px-4 gap-3">
           <fluent-button
             appearance="subtle"
-            aria-label="返回"
-            on:click={() => goBack()}
+            aria-label={t("settingsPage.back")}
+            ref={fluentOn("click", () => goBack())}
             class="w-8 h-8 p-0 min-w-8"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -101,7 +108,7 @@ const Settings: Component = () => {
             </svg>
           </fluent-button>
           <h1 class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] flex-1">
-            设置
+            {t("settingsPage.title")}
           </h1>
         </header>
 

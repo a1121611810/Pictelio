@@ -10,17 +10,29 @@
  * 不再渲染底部 NavBar（首页导航由 SideNavShell 承担）。
  */
 import type { Component } from "solid-js";
-import { createEffect, onMount, untrack } from "solid-js";
+import { t } from "../i18n";
+import { createEffect, onSettled } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import type { PixivIllust, PixivNovel, ApiError } from "@/api/types";
 import PageTransition from "@/components/PageTransition";
 import { FeedList } from "@/components/home/FeedList";
 import { markContentReady } from "@/native/splashBridge";
 import SideNavShell, { type HomeTab } from "@/components/home/SideNavShell";
+import RankingStripEntry from "@/components/ranking/RankingStripEntry";
 import IllustSingleCard from "@/components/home/IllustSingleCard";
+import RelatedStripRow from "@/components/home/RelatedStripRow";
 import NovelRowCard from "@/components/home/NovelRowCard";
 import SkeletonShimmer from "@/components/SkeletonShimmer";
 import { contentType } from "@/stores/uiStore";
+import {
+  consumeRelatedAnchor,
+  recordRelatedAnchor,
+  relatedRows,
+  removeRelatedRow,
+  clearRelatedRows,
+  type RelatedRow,
+} from "@/stores/relatedInjectionStore";
+import { relatedInjection } from "@/stores/settingsStore";
 import { scheduleIdleFeedPrefetch } from "@/utils/idleFeedPrefetch";
 // ── 插画数据源（推荐/关注/收藏）──
 import {
@@ -226,15 +238,18 @@ function novelSource(tab: FeedTab): FeedSource<PixivNovel> {
 
 /** 幂等激活当前数据源：**ensureLoaded 是数据加载的唯一入口**（工厂 ADR-0042 按需查询，
  * query enabled 恒为 false）；activate 仅置订阅标志、不触发 fetch。三个源统一 ensureLoaded
- * （幂等，不重复请求）+ activate 保险（回归修复：收藏/关注 Tab 之前只 activate 不加载 → 空）。 */
+ * （幂等，不重复请求）+ activate 保险（回归修复：收藏/关注 Tab 之前只 activate 不加载 → 空）。
+ * Solid 2.0 拆分效应：compute 跟踪 tab 变化，apply 段做激活副作用（写 signal 在异步回调中，合法）。 */
 function useFeedActivation(src: () => FeedSource<PixivIllust> | FeedSource<PixivNovel>): void {
-  createEffect(() => {
-    const s = src();
-    void s.ensure?.();
-    if (s.activate) {
-      s.activate();
-    }
-  });
+  createEffect(
+    () => src(),
+    (s) => {
+      void s.ensure?.();
+      if (s.activate) {
+        s.activate();
+      }
+    },
+  );
 }
 
 /** 插画列表加载骨架（行卡形态，参考原型 IllustLoadingA2）。
@@ -272,42 +287,104 @@ const NovelRowSkeleton: Component = () => (
 /** 空态提示（加载完成且无数据时展示）。 */
 const EmptyHint: Component = () => (
   <div class="py-14 flex flex-col items-center gap-1">
-    <p class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground2)]">暂无内容</p>
+    <p class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground2)]">
+      {t("homePage.empty.title")}
+    </p>
     <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
-      换一个内容类型或稍后再来看看
+      {t("homePage.empty.desc")}
     </p>
   </div>
 );
 
-/** 插画单列大图 Feed 面板（数据源激活 + FeedList 统一交互：下拉刷新 A1 遮罩 + 滚动分页，ADR-0078）。 */
+/** 注入行联合渲染条目：主列表插画 or 锚点下方的相关作品行（spec docs/specs/related-injection.md） */
+type IllustRenderItem = PixivIllust | { relatedRow: RelatedRow };
+
+/** 插画单列大图 Feed 面板（数据源激活 + FeedList 统一交互：下拉刷新 A1 遮罩 + 滚动分页，ADR-0078）。
+ *  相关作品注入（spec #486）：点击卡片记锚点 → 重挂载消费 → 在锚点卡片下方交织注入行。 */
 const IllustFeedPanel: Component<{ tab: FeedTab }> = (props) => {
   const navigate = useNavigate();
   const src = () => illustSource(props.tab);
   useFeedActivation(src);
+  // 下拉刷新代：刷新时恢复被收起的排行榜入口（spec §5.1「刷新恢复」）
+  const [feedEpoch, setFeedEpoch] = createSignal(0);
+
+  // 返回消费锚点：路由返回时面板重挂载（store 模块层存活）。
+  // tab 不匹配时 consume 内部保留 pending，交给正确的 tab 面板。
+  onSettled(() => {
+    void consumeRelatedAnchor(
+      props.tab,
+      src()
+        .items()
+        .map((i) => i.id),
+    );
+  });
+
+  /** 主列表 + 注入行交织（开关关闭即隐藏全部行；数据保留，重开即恢复） */
+  const renderItems = (): IllustRenderItem[] => {
+    const rows = relatedInjection() ? relatedRows(props.tab) : [];
+    const items = src().items();
+    if (rows.length === 0) return items;
+    const out: IllustRenderItem[] = [];
+    for (const il of items) {
+      out.push(il);
+      const row = rows.find((r) => r.anchorId === il.id);
+      if (row) out.push({ relatedRow: row });
+    }
+    return out;
+  };
 
   return (
-    <FeedList
-      source={{
-        items: () => src().items(),
-        loading: () => src().loading(),
-        refreshing: () => src().refreshing(),
-        loadingMore: () => src().loadingMore(),
-        nextUrl: () => src().nextUrl(),
-        fetchMore: () => src().fetchMore(),
-        refresh: () => src().refresh(),
-        error: () => src().error(),
-        paginationError: () => src().paginationError(),
-      }}
-      containerClass="flex flex-col gap-[var(--spacingVerticalM)] px-4 pt-3"
-      refreshMode="overlay"
-      skeleton={() => <IllustRowSkeleton />}
-      empty={() => <EmptyHint />}
-      // 预取 URL 与 IllustSingleCard 的 cover() 取值保持一致（large 优先），确保预热 key = 展示 src
-      prefetchUrl={(il) => il.image_urls.large ?? il.image_urls.medium}
-      renderItem={(il) => (
-        <IllustSingleCard illust={il} onClick={() => void navigate(`/illust/${il.id}`)} />
-      )}
-    />
+    <>
+      {/* 排行榜入口（spec docs/specs/ranking.md §5.1）：推荐×插画面板列表第一张卡之前；
+          开关由 RankingStripEntry 内部 gate（关闭时不建数据源） */}
+      <Show when={props.tab === "recommended"}>
+        <RankingStripEntry refreshEpoch={feedEpoch()} />
+      </Show>
+      <FeedList
+        source={{
+          items: renderItems,
+          loading: () => src().loading(),
+          refreshing: () => src().refreshing(),
+          loadingMore: () => src().loadingMore(),
+          nextUrl: () => src().nextUrl(),
+          fetchMore: () => src().fetchMore(),
+          // 下拉刷新 = 新会话：清空该 tab 注入行 + 恢复排行榜入口
+          refresh: () => {
+            clearRelatedRows(props.tab);
+            setFeedEpoch((n) => n + 1);
+            return src().refresh();
+          },
+          error: () => src().error(),
+          paginationError: () => src().paginationError(),
+        }}
+        containerClass="flex flex-col gap-[var(--spacingVerticalM)] px-4 pt-3"
+        refreshMode="overlay"
+        skeleton={() => <IllustRowSkeleton />}
+        empty={() => <EmptyHint />}
+        // 预取 URL 与 IllustSingleCard 的 cover() 取值保持一致（large 优先），确保预热 key = 展示 src；
+        // 注入行条目不参与主列表预取
+        prefetchUrl={(item) =>
+          "relatedRow" in item ? undefined : (item.image_urls.large ?? item.image_urls.medium)
+        }
+        renderItem={(item) =>
+          "relatedRow" in item ? (
+            <RelatedStripRow
+              row={item.relatedRow}
+              onNavigate={(id) => void navigate(`/illust/${id}`)}
+              onDismiss={() => removeRelatedRow(props.tab, item.relatedRow.anchorId)}
+            />
+          ) : (
+            <IllustSingleCard
+              illust={item}
+              onClick={() => {
+                recordRelatedAnchor(props.tab, item.id);
+                void navigate(`/illust/${item.id}`);
+              }}
+            />
+          )
+        }
+      />
+    </>
   );
 };
 
@@ -342,19 +419,31 @@ const NovelFeedPanel: Component<{ tab: FeedTab }> = (props) => {
   );
 };
 
+/** 相关作品注入（spec #486 §4.4）：切 contentType 视为新会话，清空全部 tab 注入行 */
+function clearAllRelatedRows(): void {
+  clearRelatedRows("recommended");
+  clearRelatedRows("follow");
+  clearRelatedRows("bookmarks");
+}
+
 const HomePage: Component = () => {
-  onMount(() => {
+  onSettled(() => {
     // 首页是登录后启动首屏：挂载后通知原生关闭 Splash Screen（幂等）
     markContentReady();
+    window.addEventListener("contentTypeChanged", clearAllRelatedRows);
+    return () => window.removeEventListener("contentTypeChanged", clearAllRelatedRows);
   });
 
-  createEffect(() => {
+  createEffect(
+    // Solid 2.0 拆分效应：compute 只读「可见 feed 是否已就绪」，apply 段做调度副作用。
     // 空闲预取（#375）：默认落地面板（推荐插画/推荐小说其一）出数据后调度一次。
     // gate=可见 feed 已就绪，避免预取与首屏加载抢带宽；调度器内部再按 store 串行错峰。
     // prefetchAllTabs 是填空语义（staleTime=Infinity）：已有/已恢复的数据不重拉，
     // 正常重启时零网络开销，仅填补空缓存以消除「首访 tab 骨架等网络」（#372 基线）。
-    if (recIllusts().length === 0 && recNovels().length === 0) return;
-    untrack(() => {
+    () => recIllusts().length > 0 || recNovels().length > 0,
+    (ready) => {
+      if (!ready) return;
+      // apply 段本就 untracked，原 untrack 包裹不再需要；预取闭包在 idle 回调中执行
       scheduleIdleFeedPrefetch([
         { id: "recommended-illust", run: () => Promise.all(recIllustPrefetchAll()) },
         { id: "follow-illust", run: () => Promise.all(followIllustPrefetchAll()) },
@@ -363,8 +452,8 @@ const HomePage: Component = () => {
         { id: "follow-novel", run: () => Promise.all(followNovelPrefetchAll()) },
         { id: "bookmark-novel", run: () => Promise.all(bmkNovelPrefetchAll()) },
       ]);
-    });
-  });
+    },
+  );
 
   return (
     <PageTransition>

@@ -11,7 +11,7 @@
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { adbPath, APP_PACKAGE, runCapture, runOrThrow, TIMEOUTS } from "./env";
+import { adbPath, APP_PACKAGE, MAIN_ACTIVITY, runCapture, runOrThrow, TIMEOUTS } from "./env";
 
 /** CapacitorStorage.xml 在 app 数据目录内的相对路径（run-as 需相对路径，绝对路径被 SELinux 拒） */
 const PREFS_REL = "shared_prefs/CapacitorStorage.xml";
@@ -51,6 +51,44 @@ export function readClientPrefs(serial: string): ClientPrefs {
     fileExists: true,
     rawXml: xml,
   };
+}
+
+/**
+ * 轮询读取 CapacitorStorage.xml 直到谓词满足（issue #523，T3 共享契约工具）。
+ *
+ * 为什么必须轮询：app 侧写 prefs 走「JS 桥排队 → Java 线程 → SharedPreferences
+ * editor.apply()」异步链（apply 只保证写内存，落盘由调度器异步 flush），且桥
+ * 调用本身有排队延迟。测试用 adb run-as 单次直读读到的是落盘瞬间的文件，与
+ * 写入天然竞态（#10 flaky / roundtrip 单读失败的根因）——断言「写入已生效」
+ * 必须按固定间隔重读，直到谓词满足或超时。
+ *
+ * @param serial adb 设备序列号
+ * @param predicate 判定快照是否满足期望（满足即停，返回该次快照）
+ * @param timeoutMs 总超时，默认 30s
+ * @param intervalMs 轮询间隔，默认 1s
+ * @param readFn 读取函数，默认 readClientPrefs；仅单测注入 fake 用，E2E 勿传
+ * @returns 满足谓词的那次快照
+ * @throws Error 超时未满足：消息含「轮询超时」与最后一次 rawXml 快照（诊断用）
+ */
+export async function pollPrefs(
+  serial: string,
+  predicate: (prefs: ClientPrefs) => boolean,
+  timeoutMs = 30_000,
+  intervalMs = 1_000,
+  readFn: (serial: string) => ClientPrefs = readClientPrefs,
+): Promise<ClientPrefs> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const prefs = readFn(serial);
+    if (predicate(prefs)) return prefs;
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `[android-e2e] pollPrefs 轮询超时（timeoutMs=${timeoutMs}, intervalMs=${intervalMs}）。` +
+          `最后一次 CapacitorStorage.xml 快照: ${prefs.rawXml || "(文件不存在)"}`,
+      );
+    }
+    await new Promise<void>((r) => setTimeout(r, intervalMs));
+  }
 }
 
 /**
@@ -162,11 +200,12 @@ export function forceStopApp(serial: string): void {
   runOrThrow(adbPath(), ["-s", serial, "shell", "am", "force-stop", APP_PACKAGE], TIMEOUTS.adb);
 }
 
-/** 通过 am start 启动 MainActivity（走 MainActivity.onCreate 入口路由分发） */
+/** 通过 am start 启动主入口 Activity（按 flavor：full → MainActivity；webview → MainActivityWebview）
+ *  —— 走入口 onCreate 的版本门禁 / 引擎路由分发。 */
 export function startMainActivity(serial: string): void {
   runOrThrow(
     adbPath(),
-    ["-s", serial, "shell", "am", "start", "-n", "io.pictelio.app/io.pictelio.app.MainActivity"],
+    ["-s", serial, "shell", "am", "start", "-n", `${APP_PACKAGE}/${MAIN_ACTIVITY}`],
     TIMEOUTS.adb,
   );
 }

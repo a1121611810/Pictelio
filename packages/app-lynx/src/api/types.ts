@@ -51,6 +51,8 @@ export interface PixivIllust {
   total_view?: number;
   tags: PixivIllustTag[];
   x_restrict: number;
+  /** Pixiv AI 类型：0/undefined=非 AI，1=AI 辅助，2=纯 AI（ADR-0155，判定见 settingsStore.isAiWork） */
+  illust_ai_type?: number;
   create_date: string;
   caption?: string;
   total_comments?: number;
@@ -80,6 +82,8 @@ export interface PixivNovel {
   total_bookmarks: number;
   total_view?: number;
   x_restrict: number;
+  /** Pixiv AI 类型：0/undefined=非 AI，1=AI 辅助，2=纯 AI（ADR-0155，判定见 settingsStore.isAiWork） */
+  novel_ai_type?: number;
   create_date: string;
   caption?: string;
   total_comments?: number;
@@ -190,6 +194,39 @@ export interface PixivUserFollowingResponse {
   next_url: string | null;
 }
 
+// ─── 收藏加标签（issue #531 / spec docs/specs/bookmark-tags.md D1/D4）───
+// 字段名与形状来源：docs/research/bookmark-tags-similar-clients.md §7.3/§7.4（六实现差分）。
+
+/** 收藏可见性（与 webview api/types.ts RestrictType 同源） */
+export type RestrictType = "public" | "private";
+
+/**
+ * GET /v2/illust/bookmark/detail 的 `bookmark_detail`。
+ *
+ * 响应形状（2026-09-14 真机 probe 实测，与 webview 侧同源）：**未收藏时并非 null**，
+ * 而是返回对象且 `is_bookmarked:false` + 作品自身标签（`is_registered:false`）。
+ * 字段 optional 宽容解析——缺字段由消费方显式暴露（不静默），不做服务端纠错。
+ */
+export interface PixivBookmarkDetail {
+  is_bookmarked?: boolean;
+  restrict?: RestrictType;
+  /**
+   * `is_registered` = **该条收藏已保存的标签**（预填勾选依据）；`false` 者多为作品自身标签（建议来源）。
+   * _Avoid_：读成「标签库已注册」——新建收藏标签同样为 true（见 spec 验收实证）。
+   */
+  tags?: { name: string; is_registered?: boolean }[];
+}
+
+export interface PixivBookmarkDetailResponse {
+  bookmark_detail: PixivBookmarkDetail | null;
+}
+
+/** GET /v1/user/bookmark-tags/illust 响应：标签库按公开性分库；next_url 兼容分页 */
+export interface PixivUserBookmarkTagsResponse {
+  bookmark_tags: { name: string; count: number }[];
+  next_url: string | null;
+}
+
 // ─── 错误类型 ───
 
 export enum ApiErrorType {
@@ -203,9 +240,13 @@ export enum ApiErrorType {
 }
 
 export interface ApiError {
-  type: ApiErrorType;
-  message: string;
-  status?: number;
+  type: ApiErrorType
+  /** 非响应式上下文的快照文案（简中）：日志、兜底展示用；展示层优先 messageKey */
+  message: string
+  status?: number
+  /** i18n：展示层优先用 messageKey + params 渲染（B1）；string 避免 api 层反向依赖 i18n 类型 */
+  messageKey?: string
+  params?: Record<string, string | number>
 }
 
 // ─── 评论（issue #162，字段与现有 app 同源） ───

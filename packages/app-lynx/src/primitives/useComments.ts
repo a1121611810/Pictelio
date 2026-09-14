@@ -8,6 +8,7 @@
 // 错误语义：列表类（首次加载/分页）失败 → error（分页失败时 status 保持 ready、
 // 保留列表）；操作类（发表/删除/楼层展开）失败 → actionError。
 import { computed, ref } from "vue"
+import { t, apiErrorMessage } from "../i18n"
 import type { PixivComment } from "../api/types"
 import { MAX_COMMENT_LENGTH, commentTransport } from "../api/comment"
 import type { CommentContentType, CommentsTransport } from "../api/comment"
@@ -67,9 +68,9 @@ export function useComments(config: {
   let disposed = false
   let loadingMore = false // loadMore 重入门控（state 无该字段，内部自持）
 
-  /** 错误归一为中文文案：优先透传 ApiError.message（client.classifyError 已产中文） */
+  /** 错误归一为展示文案：messageKey 优先（classifyError 产出可走 i18n），fallback 回退 */
   function toErrorText(e: unknown, fallback: string): string {
-    return toApiError(e, fallback).message
+    return apiErrorMessage(toApiError(e, fallback))
   }
 
   /** 加载根评论的公共路径（open 与 post 成功后复用） */
@@ -87,7 +88,7 @@ export function useComments(config: {
         statusRef.value = "error"
       }
       // post 后刷新失败 → status 保持 ready/error，仅置 error（banner 保留列表）
-      errorRef.value = toErrorText(e, "加载评论失败，请重试")
+      errorRef.value = toErrorText(e, t("comments.loadFailedReload"))
     }
   }
 
@@ -120,7 +121,7 @@ export function useComments(config: {
     } catch (e) {
       // I1：分页失败 → status 保持 ready，error 置值（banner 保留列表）
       if (!disposed && !signal.aborted) {
-        errorRef.value = toErrorText(e, "加载更多失败")
+        errorRef.value = toErrorText(e, t("comments.loadMoreFailed"))
       }
     } finally {
       loadingMore = false
@@ -152,7 +153,7 @@ export function useComments(config: {
     } catch (e) {
       // 楼层失败 → actionError（操作类错误）
       if (!disposed && !signal.aborted) {
-        actionErrorRef.value = toErrorText(e, "楼层加载失败")
+        actionErrorRef.value = toErrorText(e, t("comments.loadRepliesFailed"))
       }
     } finally {
       if (loadingRepliesIdRef.value === commentId) {
@@ -176,7 +177,7 @@ export function useComments(config: {
       postingRef.value = false
       if (!disposed) {
         // I3：失败 → false + actionError
-        actionErrorRef.value = toErrorText(e, "发送失败，请重试")
+        actionErrorRef.value = toErrorText(e, t("comments.sendFailed"))
       }
       return false
     }
@@ -197,7 +198,7 @@ export function useComments(config: {
       deletingIdRef.value = null
       // I4：失败仅置 actionError
       if (!disposed) {
-        actionErrorRef.value = toErrorText(e, "删除失败，请重试")
+        actionErrorRef.value = toErrorText(e, t("comments.deleteFailed"))
       }
       return
     }

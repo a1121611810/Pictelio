@@ -10,10 +10,12 @@ import { RESTRICTION_TRUTH_TABLE } from "./sharedRestrictionTruthTable";
 vi.mock("@/stores/settingsStore", () => ({
   showR18: vi.fn(() => false),
   showR18G: vi.fn(() => false),
+  aiFilterMode: vi.fn(() => "show"),
 }));
 
 vi.mock("@/stores/blockStore", () => ({
   isBlocked: vi.fn(() => false),
+  blockedIds: vi.fn(() => new Set<number>()),
 }));
 
 import { showR18, showR18G } from "@/stores/settingsStore";

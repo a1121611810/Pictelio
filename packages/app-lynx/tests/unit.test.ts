@@ -17,6 +17,8 @@ import { bytesToDataUrl, downloadUgoiraFrames, ugoiraExtractFrames, ugoiraExtrac
 import type { UgoiraExtractMode } from '../src/api/ugoira'
 import { useSettingsStore } from '../src/stores/settingsStore'
 import { ME_A11Y_LABELS, LOGIN_A11Y_LABELS, UPDATE_A11Y_LABELS, ERROR_A11Y_LABELS, FAB_MENU_A11Y_LABELS, GLOBAL_FAB_A11Y_LABELS, WATCHLIST_A11Y_LABELS, WATCHLIST_PROMPT_A11Y_LABELS, SEARCH_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../src/utils/accessibility'
+import { THEME_COLOR_OPTIONS, DEFAULT_THEME_COLOR, isThemeColorId, themeColorClass } from '../src/utils/themeColor'
+import zhMisc from '../src/i18n/locales/zh-CN/misc'
 
 describe('imageUrl.proxyImageUrl', () => {
   it('将 i.pximg.net URL 重写为本地代理路径', () => {
@@ -560,6 +562,105 @@ describe('tailwind.config 契约（Tailwind ↔ tokens.css）', () => {
   })
 })
 
+// ─── 主题色契约（themeColor ↔ tokens.css）───
+// 期望值来源：tokens.css 基础色板块自身（真实源文件比对），以及 themeColor.ts 的
+// 单一事实源清单。AD重申（ADR-0152）：只覆盖 --md-primary 会造成 secondary/surface/
+// outline/state-layer 串色，因此断言「每个色板类覆盖同一整套可主题颜色角色」。
+describe('主题色契约（themeColor ↔ tokens.css）', () => {
+  /** 从基础色板块（page, .theme-sky）提取可主题颜色角色：排除 M3 中与 seed 无关的
+   *  error/scrim 角色与非颜色令牌（shape/elevation）。 */
+  function extractThemeableRoles(css: string): string[] {
+    const start = css.indexOf('page,')
+    expect(start, 'tokens.css 缺少基础 page 色板块').toBeGreaterThan(-1)
+    const open = css.indexOf('{', start)
+    const end = css.indexOf('\n}', open)
+    expect(open, '基础色板块缺少 {').toBeGreaterThan(-1)
+    expect(end, '基础色板块缺少 }').toBeGreaterThan(-1)
+    const block = css.slice(open + 1, end)
+    const seedIndependent = new Set([
+      '--md-error',
+      '--md-on-error',
+      '--md-error-container',
+      '--md-on-error-container',
+      '--md-scrim',
+      '--md-scrim-overlay',
+      '--md-state-pressed-error',
+    ])
+    const roles = new Set<string>()
+    for (const m of block.matchAll(/(--md-[a-z0-9-]+)\s*:/g)) {
+      const name = m[1]!
+      if (seedIndependent.has(name)) continue
+      if (name.startsWith('--md-shape-') || name.startsWith('--md-elevation-')) continue
+      roles.add(name)
+    }
+    return [...roles]
+  }
+
+  const themeableRoles = extractThemeableRoles(tokensCss)
+
+  it('基础色板可主题角色集包含关键角色（约 48 项）', () => {
+    expect(themeableRoles.length).toBeGreaterThanOrEqual(40)
+    for (const key of [
+      '--md-primary',
+      '--md-secondary-container',
+      '--md-surface',
+      '--md-on-surface',
+      '--md-outline',
+      '--md-inverse-surface',
+      '--md-state-layer-pressed-primary',
+    ]) {
+      expect(themeableRoles).toContain(key)
+    }
+  })
+
+  it('默认主题为 sky（className=theme-sky，与基础 page 色板共规则）', () => {
+    expect(DEFAULT_THEME_COLOR).toBe('sky')
+    expect(themeColorClass('sky')).toBe('theme-sky')
+  })
+
+  it('每个主题色板类都覆盖同一套可主题角色（整组换色不变量，防只覆盖 primary）', () => {
+    expect(THEME_COLOR_OPTIONS.length).toBeGreaterThanOrEqual(6)
+    for (const option of THEME_COLOR_OPTIONS) {
+      const start = tokensCss.indexOf('.' + option.className + ' {')
+      expect(start, `tokens.css 缺少 .${option.className}`).toBeGreaterThan(-1)
+      const block = tokensCss.slice(start, tokensCss.indexOf('}', start))
+      for (const role of themeableRoles) {
+        expect(block, `.${option.className} 缺少 ${role}（会导致串色）`).toContain(`${role}:`)
+      }
+    }
+  })
+
+  it('themeColorClass 映射与清单一致（纯函数行为）', () => {
+    for (const option of THEME_COLOR_OPTIONS) {
+      expect(themeColorClass(option.id)).toBe(option.className)
+    }
+  })
+
+  it('isThemeColorId 仅接受已注册 id', () => {
+    for (const option of THEME_COLOR_OPTIONS) expect(isThemeColorId(option.id)).toBe(true)
+    expect(isThemeColorId('neon')).toBe(false)
+  })
+
+  it('App.vue 将色板类绑定到根 <page>（接线契约）', () => {
+    const appVue = readFileSync(resolve(rootDir, 'src/App.vue'), 'utf-8')
+    expect(appVue).toContain("import { useSettingsStore } from './stores/settingsStore'")
+    expect(appVue).toContain("import { themeColorClass } from './utils/themeColor'")
+    expect(appVue).toContain(':class="themeColorClass(settings.themeColor)"')
+  })
+
+  it('Me.vue 外观卡片为每个色板提供入口且 class 走 themeColorClass（防 class 双写漂移）', () => {
+    const meVue = readFileSync(resolve(rootDir, 'src/pages/Me.vue'), 'utf-8')
+    for (const option of THEME_COLOR_OPTIONS) {
+      expect(meVue, `Me.vue 缺少 ${option.id} 色板入口`).toContain(
+        `settings.setThemeColor('${option.id}')`,
+      )
+      expect(meVue, `Me.vue 缺少 ${option.id} 色板类绑定`).toContain(
+        `themeColorClass('${option.id}')`,
+      )
+    }
+  })
+})
+
 describe('client 原生模式 API 转发（#53：JS 零知 access_token）', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
@@ -879,6 +980,30 @@ describe('P0-T5 小说关注 API 契约', () => {
   it('loadFollow(novel) 失败透传 reject', async () => {
     vi.spyOn(apiClient, 'get').mockRejectedValue(new Error('403'))
     await expect(loadNovelFollow()).rejects.toThrow('403')
+  })
+})
+
+// ─── 推荐/关注首载分派回归（fault：AbortSignal 被当 restrict → Pixiv 400） ───
+// oracle 溯源：api/novel.ts / api/illust.ts 的 loadFollow(restrict, signal) 签名——首参 restrict、
+// 第二参 signal（源码即独立来源）；createMixFeed 首载传入真实 currentAc.signal
+// （createMixFeed.ts loadFirstPage）。期望值 = signal 必须落在第二参、restrict 显式为 'public'，
+// 非从页面实现反推。历史 fault：两者曾别名为单个 first 变量后统一调用 first(signal)，
+// 关注分支把 AbortSignal 序列化成 restrict=[object AbortSignal] → HTTP 400。
+describe('推荐/关注首载分派（防 AbortSignal 当 restrict 回归）', () => {
+  const FOLLOW_CALL = /loadFollow\(\s*'public'\s*,\s*signal\s*\)/
+  const pageSrc = (n: string) =>
+    readFileSync(fileURLToPath(new URL('../src/pages/' + n + '.vue', import.meta.url)), 'utf8')
+
+  it('NovelList 关注首载：loadFollow(restrict, signal)，restrict 显式 public', () => {
+    const src = pageSrc('NovelList')
+    expect(src).toMatch(FOLLOW_CALL)
+    expect(src).not.toMatch(/\bconst first\b/)
+  })
+
+  it('IllustList 关注首载：loadFollow(restrict, signal)，restrict 显式 public', () => {
+    const src = pageSrc('IllustList')
+    expect(src).toMatch(FOLLOW_CALL)
+    expect(src).not.toMatch(/\bconst first\b/)
   })
 })
 
@@ -2102,9 +2227,10 @@ expect(detailVueSource).toContain(':estimated-main-axis-size-px="estimatedHeight
 
 it('受限小说分支保留系列信息行 + 评论入口（spec 回归项，P1-1）', () => {
 // 断言须落在受限分支段内（以注释锚点分段；list meta 卡同样含这两串——全局断言为弱断言）
+// #511 补抽：系列名走 t('novelDetail.seriesTitle')（受限分支段内断言调用形态）
 const restricted = detailVueSource.split('<!-- 受限小说')[1] ?? ''
 expect(detailVueSource.split('RestrictOverlay').length).toBeGreaterThanOrEqual(2)
-expect(restricted).toContain('《{{ novel.series.title }}》')
+expect(restricted).toContain("t('novelDetail.seriesTitle'")
 expect(restricted).toContain('@tap="showComments = true"')
 })
 
@@ -2132,9 +2258,12 @@ expect(cancelFn![0]).not.toContain('goBack')
 
 it('系列信息行：《系列名》+ watchAdded=true 时「已追更」chip', () => {
 expect(detailVueSource).toContain('novel?.series')
-expect(detailVueSource).toContain('《{{ novel.series.title }}》')
+// #511 补抽：系列名/已追更走 t(key)；zh 字典值 = 存量文案逐字快照（渲染产物不变）
+expect(zhMisc['novelDetail.seriesTitle']).toBe('《{{title}}》')
+expect(zhMisc['novelDetail.watchAdded']).toBe('已追更')
+expect(detailVueSource).toContain("t('novelDetail.seriesTitle'")
 expect(detailVueSource).toContain("prompt?.watchAdded === true")
-expect(detailVueSource).toContain('已追更')
+expect(detailVueSource).toContain("t('novelDetail.watchAdded')")
 })
 
 it('章节内跳转：watch novelId 重载（dispose + 重建，spec §6-2）', () => {

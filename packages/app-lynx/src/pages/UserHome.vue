@@ -20,13 +20,21 @@ import { presentError } from '../utils/errorPresentation'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { useSettingsStore } from '../stores/settingsStore'
 import SkeletonImage from '../components/SkeletonImage.vue'
+import SkeletonCard from '../components/SkeletonCard.vue'
+import { deriveFirstLoadView } from '../utils/firstLoadView'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
+import AiRestrictedIllustCard from '../components/AiRestrictedIllustCard.vue'
+import { useAiOnlyVisible } from '../composables/useAiOnlyVisible'
 import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
+import AiRestrictedNovelCard from '../components/AiRestrictedNovelCard.vue'
 import RefreshableList from '../components/RefreshableList.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
+import { t } from '../i18n'
 
-const isRestricted = useSettingsStore().isRestricted
+const settings = useSettingsStore()
+const isRestricted = settings.isRestricted
+const isAiRestricted = settings.isAiRestricted
 
 const userId = Number(currentParams.value.id)
 
@@ -57,16 +65,21 @@ const illustFeed = ref(
   }),
 )
 const illusts = ref<PixivIllust[]>([])
+/** 仅看态：非 AI 条目从渲染流移除（服务端分页判空仍基于 feed.items，不受影响） */
+const visibleIllusts = useAiOnlyVisible(illusts)
 const illustLoading = ref(false)
 const illustLoadingMore = ref(false)
 const illustErrorMsg = ref('')
 const illustPageErrorMsg = ref('')
 const illustEndOfFeed = ref(false)
+/** 插画 tab 首载是否已成功落定（ADR-0150） */
+const illustSettled = ref(false)
 
 function syncIllust() {
   illusts.value = illustFeed.value.items().map((i) => i.data as PixivIllust)
   illustLoading.value = illustFeed.value.loading()
   illustLoadingMore.value = illustFeed.value.loadingMore()
+  illustSettled.value = illustFeed.value.settled()
   illustErrorMsg.value = illustFeed.value.error() ?? ''
   illustPageErrorMsg.value = illustFeed.value.pageError() ?? ''
   // 到底态：所有源耗尽且列表非空（ADR-0104：footer「没有更多了」）
@@ -78,6 +91,9 @@ function syncIllust() {
 }
 
 async function refreshIllust() {
+  // 发起前同步进入加载态并清错误：骨架立即占位（ADR-0150）
+  illustLoading.value = true
+  illustErrorMsg.value = ''
   await illustFeed.value.refresh()
   syncIllust()
   // [lynx:fix] 数据整体替换触发 vue-lynx patch RemoveNode 索引错位（框架 bug，ADR-0107 D4）；
@@ -113,16 +129,21 @@ const novelFeed = ref(
   }),
 )
 const novels = ref<PixivNovel[]>([])
+/** 仅看态：非 AI 小说从渲染流移除 */
+const visibleNovels = useAiOnlyVisible(novels)
 const novelLoading = ref(false)
 const novelLoadingMore = ref(false)
 const novelErrorMsg = ref('')
 const novelPageErrorMsg = ref('')
 const novelEndOfFeed = ref(false)
+/** 小说 tab 首载是否已成功落定（ADR-0150） */
+const novelSettled = ref(false)
 
 function syncNovel() {
   novels.value = novelFeed.value.items().map((i) => i.data as PixivNovel)
   novelLoading.value = novelFeed.value.loading()
   novelLoadingMore.value = novelFeed.value.loadingMore()
+  novelSettled.value = novelFeed.value.settled()
   novelErrorMsg.value = novelFeed.value.error() ?? ''
   novelPageErrorMsg.value = novelFeed.value.pageError() ?? ''
   novelEndOfFeed.value =
@@ -133,6 +154,9 @@ function syncNovel() {
 }
 
 async function refreshNovel() {
+  // 发起前同步进入加载态并清错误：骨架立即占位（ADR-0150）
+  novelLoading.value = true
+  novelErrorMsg.value = ''
   await novelFeed.value.refresh()
   syncNovel()
   refreshEpoch.value++ // [lynx:fix] 同上
@@ -149,6 +173,25 @@ async function loadNovelMore() {
 // 首屏错误（顶部整页提示）：随 activeTab 取当前区首屏错误（ADR-0104 槽位分离）
 const errorMsg = computed(() =>
   activeTab.value === 'illust' ? illustErrorMsg.value : novelErrorMsg.value,
+)
+
+/** 插画 tab 首载三态（ADR-0150）：骨架 / 错误 / 空态 / 内容 的唯一判定源 */
+const illustView = computed(() =>
+  deriveFirstLoadView({
+    hasItems: visibleIllusts.value.length > 0,
+    loading: illustLoading.value,
+    settled: illustSettled.value,
+    hasError: !!illustErrorMsg.value,
+  }),
+)
+/** 小说 tab 首载三态（ADR-0150） */
+const novelView = computed(() =>
+  deriveFirstLoadView({
+    hasItems: visibleNovels.value.length > 0,
+    loading: novelLoading.value,
+    settled: novelSettled.value,
+    hasError: !!novelErrorMsg.value,
+  }),
 )
 
 // tab 切换：保留各自 feed 实例（切回已加载 tab 不重新请求）；首次进入 tab 才首载
@@ -190,7 +233,7 @@ onMounted(async () => {
   try {
     detail.value = await getUserDetail(userId)
   } catch (err) {
-    detailError.value = presentError(err, '用户信息加载失败')
+    detailError.value = presentError(err, t('userHome.loadProfileFailed'))
   }
   illustLoaded = true
   void refreshIllust()
@@ -208,11 +251,9 @@ onUnmounted(() => {
     <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
       <view class="py-1 pr-2" @tap="goBack"><text class="text-[6.4vw] leading-none text-surface-on">‹</text></view>
       <text class="flex-1 text-title-large font-medium text-surface-on [max-line:1]">
-        {{ detail?.user.name || '用户主页' }}
+        {{ detail?.user.name || t('userHome.titleFallback') }}
       </text>
     </view>
-
-    <text v-if="errorMsg" class="text-body-small text-error p-4">{{ errorMsg }}</text>
 
     <text v-if="detailError" class="text-body-small text-error p-4">{{ detailError }}</text>
 
@@ -230,11 +271,11 @@ onUnmounted(() => {
         <view class="flex flex-row mt-1.5">
           <view class="h-[8.533vw] px-2 border border-outline rounded-[var(--md-shape-small)] flex items-center justify-center bg-surface" @tap="openFollowing">
             <text class="text-label-medium text-surface-on-variant">
-              关注 {{ detail.profile.total_follow_users ?? '-' }}
+              {{ t('userHome.followCount', { count: detail.profile.total_follow_users ?? '-' }) }}
             </text>
           </view>
           <view class="h-[8.533vw] px-2 ml-2 border border-outline rounded-[var(--md-shape-small)] flex items-center justify-center bg-surface" @tap="openFollowers">
-            <text class="text-label-medium text-surface-on-variant">粉丝</text>
+            <text class="text-label-medium text-surface-on-variant">{{ t('userHome.followers') }}</text>
           </view>
         </view>
       </view>
@@ -247,29 +288,33 @@ onUnmounted(() => {
         :class="activeTab === 'illust' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
         @tap="switchTab('illust')"
       >
-        <text class="text-title-small font-medium">插画</text>
+        <text class="text-title-small font-medium">{{ t('userHome.tab.illust') }}</text>
       </view>
       <view
         class="flex-1 h-[12.8vw] flex items-center justify-center"
         :class="activeTab === 'novel' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
         @tap="switchTab('novel')"
       >
-        <text class="text-title-small font-medium">小说</text>
+        <text class="text-title-small font-medium">{{ t('userHome.tab.novel') }}</text>
       </view>
     </view>
 
-    <!-- 插画空态（错误态下不显示，避免与错误文本同显） -->
-    <view v-if="activeTab === 'illust' && !illustLoading && !errorMsg && illusts.length === 0" class="flex-1 flex items-center justify-center">
+    <!-- 插画三态（ADR-0150）：骨架 → 错误 → 空态 → 内容，互斥单链 -->
+    <view v-if="activeTab === 'illust' && illustView === 'skeleton'" class="w-full flex-1 min-h-0 flex flex-row flex-wrap content-start p-1.5">
+      <SkeletonCard v-for="n in 8" :key="n" />
+    </view>
+    <text v-else-if="activeTab === 'illust' && illustView === 'error'" class="text-body-small text-error p-4">{{ errorMsg }}</text>
+    <view v-else-if="activeTab === 'illust' && illustView === 'empty'" class="flex-1 flex items-center justify-center">
       <view class="flex flex-col items-center">
         <text class="text-[10.667vw] leading-none text-outline-variant">▦</text>
-        <text class="text-body-large text-surface-on mt-3">暂无作品</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">该用户还没有发布作品</text>
+        <text class="text-body-large text-surface-on mt-3">{{ t('userHome.empty.title') }}</text>
+        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ t('userHome.empty.hint') }}</text>
       </view>
     </view>
 
     <!-- 插画 waterfall -->
     <RefreshableList
-      v-if="activeTab === 'illust' && (illustLoading || illusts.length > 0)"
+      v-else-if="activeTab === 'illust'"
       :refresh="refreshIllust"
       @back-to-top="refreshEpoch++"
     >
@@ -287,7 +332,7 @@ onUnmounted(() => {
       @scroll="onScroll"
     >
       <list-item
-        v-for="item in illusts"
+        v-for="item in visibleIllusts"
         :key="item.id"
         :item-key="String(item.id)"
         class="bg-surface-container-lowest rounded-[var(--md-shape-medium)] flex flex-col overflow-hidden shadow-[var(--md-elevation-1)]"
@@ -299,6 +344,7 @@ onUnmounted(() => {
           >
             <RestrictOverlay :overlay="false" :level="item.x_restrict === 2 ? 2 : 1" />
           </view>
+          <AiRestrictedIllustCard v-else-if="isAiRestricted(item)" :item="item" />
           <view v-else class="relative" @tap.stop="onImageTap(item)">
             <SkeletonImage :src="thumbUrl(item.image_urls)" height="48.4vw" lazy-load />
           </view>
@@ -311,26 +357,34 @@ onUnmounted(() => {
         </view>
       </list-item>
       <list-item v-if="illustLoadingMore || illustPageErrorMsg || illustEndOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text v-if="illustLoadingMore" class="text-body-medium text-outline">加载中…</text>
+        <text v-if="illustLoadingMore" class="text-body-medium text-outline">{{ t('userHome.footer.loading') }}</text>
         <text v-else-if="illustPageErrorMsg" class="text-body-medium text-error">{{ illustPageErrorMsg }}</text>
-        <text v-else class="text-body-medium text-outline">没有更多了</text>
+        <text v-else class="text-body-medium text-outline">{{ t('userHome.footer.end') }}</text>
       </list-item>
     </list>
     </template>
     </RefreshableList>
 
-    <!-- 小说空态 -->
-    <view v-if="activeTab === 'novel' && !novelLoading && novels.length === 0" class="flex-1 flex items-center justify-center">
+    <!-- 小说三态（ADR-0150）：骨架 → 错误 → 空态 → 内容，互斥单链 -->
+    <view v-if="activeTab === 'novel' && novelView === 'skeleton'" class="w-full flex-1 min-h-0">
+      <view v-for="n in 5" :key="n" class="m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+        <view class="shimmer h-[32rpx] rounded-[var(--md-shape-extra-small)] w-[75%]" />
+        <view class="shimmer h-[24rpx] rounded-[var(--md-shape-extra-small)] mt-1.5 w-[40%]" />
+        <view class="shimmer h-[24rpx] rounded-[var(--md-shape-extra-small)] mt-1.5 w-[60%]" />
+      </view>
+    </view>
+    <text v-else-if="activeTab === 'novel' && novelView === 'error'" class="text-body-small text-error p-4">{{ errorMsg }}</text>
+    <view v-else-if="activeTab === 'novel' && novelView === 'empty'" class="flex-1 flex items-center justify-center">
       <view class="flex flex-col items-center">
         <text class="text-[10.667vw] leading-none text-outline-variant">▦</text>
-        <text class="text-body-large text-surface-on mt-3">暂无作品</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">该用户还没有发布作品</text>
+        <text class="text-body-large text-surface-on mt-3">{{ t('userHome.empty.title') }}</text>
+        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ t('userHome.empty.hint') }}</text>
       </view>
     </view>
 
     <!-- 小说列表 -->
     <RefreshableList
-      v-else-if="activeTab === 'novel' && (novelLoading || novels.length > 0)"
+      v-else-if="activeTab === 'novel'"
       :refresh="refreshNovel"
       @back-to-top="refreshEpoch++"
     >
@@ -346,16 +400,19 @@ onUnmounted(() => {
       @scroll="onScroll"
     >
       <list-item
-        v-for="item in novels"
+        v-for="item in visibleNovels"
         :key="item.id"
         :item-key="String(item.id)"
         class="w-full"
       >
         <RestrictedNovelCard v-if="isRestricted(item)" :item="item" />
+        <AiRestrictedNovelCard v-else-if="isAiRestricted(item)" :item="item" />
         <view v-else class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]" @tap="openNovel(item.id)"><view class="flex-1 flex flex-col">
                     <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>
                     <view class="flex flex-row mt-1.5">
-                      <text class="text-label-medium text-outline mr-4">{{ item.text_length }} 字</text>
+                      <text class="text-label-medium text-outline mr-4">{{
+                        t('userHome.charCount', { count: item.text_length })
+                      }}</text>
                       <text v-if="item.total_bookmarks > 0" class="text-label-medium text-outline mr-4">
                         ♥ {{ item.total_bookmarks }}
                       </text>
@@ -365,9 +422,9 @@ onUnmounted(() => {
         </view>
       </list-item>
       <list-item v-if="novelLoadingMore || novelPageErrorMsg || novelEndOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text v-if="novelLoadingMore" class="text-body-medium text-outline">加载中…</text>
+        <text v-if="novelLoadingMore" class="text-body-medium text-outline">{{ t('userHome.footer.loading') }}</text>
         <text v-else-if="novelPageErrorMsg" class="text-body-medium text-error">{{ novelPageErrorMsg }}</text>
-        <text v-else class="text-body-medium text-outline">没有更多了</text>
+        <text v-else class="text-body-medium text-outline">{{ t('userHome.footer.end') }}</text>
       </list-item>
     </list>
     </template>

@@ -10,6 +10,7 @@ import {
   setImageCacheDiskSize,
 } from "../stores/settingsStore";
 import { goBack } from "../services/backTransitionService";
+import { t } from "../i18n";
 import PageTransition from "../components/PageTransition";
 
 /**
@@ -29,12 +30,12 @@ const ImageCacheSettings: Component = () => {
                  p-1 -ml-1 min-w-[40px] min-h-[40px] flex items-center justify-center
                  focus-visible:outline-2 focus-visible:outline-[var(--colorStrokeFocus2)] focus-visible:outline-offset-2"
             onClick={() => goBack()}
-            aria-label="返回"
+            aria-label={t("imageCache.back")}
           >
             ←
           </button>
           <h1 class="text-[var(--fontSizeHero700)] font-semibold text-[var(--colorNeutralForeground1)]">
-            图片缓存
+            {t("imageCache.title")}
           </h1>
         </div>
 
@@ -43,17 +44,16 @@ const ImageCacheSettings: Component = () => {
           <div class="surface-flyout p-4">
             <div class="flex items-center justify-between mb-2">
               <h2 class="text-[var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)]">
-                磁盘缓存
+                {t("imageCache.disk")}
               </h2>
               <fluent-switch
                 checked={imageCacheDisk()}
                 onChange={(e: Event) => setImageCacheDisk((e.target as HTMLInputElement).checked)}
-                aria-label="启用磁盘缓存"
+                aria-label={t("imageCache.diskAria")}
               />
             </div>
             <p class="text-[var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-              将图片缓存到本地文件。开启后：重复浏览无需重新下载，
-              重启应用后缓存仍在。磁盘缓存上限可在下方调节。
+              {t("imageCache.diskDesc")}
             </p>
           </div>
 
@@ -61,19 +61,18 @@ const ImageCacheSettings: Component = () => {
           <div class="surface-flyout p-4">
             <div class="flex items-center justify-between mb-2">
               <h2 class="text-[var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)]">
-                浏览器缓存
+                {t("imageCache.browser")}
               </h2>
               <fluent-switch
                 checked={imageCacheBrowser()}
                 onChange={(e: Event) =>
                   setImageCacheBrowser((e.target as HTMLInputElement).checked)
                 }
-                aria-label="启用浏览器缓存"
+                aria-label={t("imageCache.browserAria")}
               />
             </div>
             <p class="text-[var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-              通过 HTTP 缓存头让浏览器缓存图片。开启后：同一张图在本次启动内
-              不再请求网络，回滚浏览立即显示。
+              {t("imageCache.browserDesc")}
             </p>
           </div>
 
@@ -81,18 +80,18 @@ const ImageCacheSettings: Component = () => {
           <div class="surface-flyout p-4">
             <div class="flex items-center justify-between mb-2">
               <h2 class="text-[var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)]">
-                后台预取
+                {t("imageCache.prefetch")}
               </h2>
               <fluent-switch
                 checked={imageCachePrefetch()}
                 onChange={(e: Event) =>
                   setImageCachePrefetch((e.target as HTMLInputElement).checked)
                 }
-                aria-label="启用后台预取"
+                aria-label={t("imageCache.prefetchAria")}
               />
             </div>
             <p class="text-[var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
-              提前加载视口外的图片。开启后：滚动更流畅，但消耗更多流量。 流量敏感用户建议关闭。
+              {t("imageCache.prefetchDesc")}
             </p>
           </div>
 
@@ -100,7 +99,7 @@ const ImageCacheSettings: Component = () => {
           <div class="surface-flyout p-4">
             <div class="flex items-center justify-between mb-2">
               <h2 class="text-[var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)]">
-                磁盘缓存上限
+                {t("imageCache.diskLimit")}
               </h2>
               <span class="[font-size:var(--fontSizeBase300)] font-semibold text-[var(--colorCompoundBrandForeground1)]">
                 {imageCacheDiskSize()} MB
@@ -125,13 +124,13 @@ const ImageCacheSettings: Component = () => {
               </span>
             </div>
             <p class="text-[var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug mt-2">
-              当前最多缓存约 {imageCacheDiskSize()} MB。 修改后新写入的缓存文件按新上限淘汰。
+              {t("imageCache.diskSizeNote", { size: imageCacheDiskSize() })}
             </p>
           </div>
 
           {/* 说明 */}
           <p class="text-[var(--fontSizeBase100)] text-[var(--colorNeutralForegroundDisabled)] text-center pt-2">
-            三个开关各自独立，修改后立即生效。
+            {t("imageCache.independentNote")}
           </p>
         </div>
       </div>

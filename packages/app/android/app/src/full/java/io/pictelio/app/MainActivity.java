@@ -62,6 +62,20 @@ public class MainActivity extends BridgeActivity {
             return; // 不注册插件、不做 WebView 版本检查
         }
 
+        // ADR-0153：WebView 不可用时优先降级到 Lynx。仅 full 包成立——本 sourceSet 才引用得到
+        // LynxActivity / LynxRuntimeInitializer（webview 包编译期无此类）。降级只在运行时生效，
+        // 不写 pictelio_client_kind；Lynx 也不可用才落到下面的升级页。
+        // Android 硬约束：先 super.onCreate（同 lynx 分支），再 startActivity + finish。
+        boolean webviewOk = isWebViewVersionOk();
+        if (!webviewOk && LynxRuntimeInitializer.isAvailable(getApplication())) {
+            super.onCreate(savedInstanceState);
+            Intent fallbackIntent = new Intent(this, LynxActivity.class);
+            fallbackIntent.putExtra(LynxActivity.EXTRA_ENGINE_FALLBACK, true);
+            startActivity(fallbackIntent);
+            finish();
+            return;
+        }
+
         // 确保每次 Activity 重建时 Splash 可重新显示
         SplashController.keepVisible();
         SplashScreen splashScreen = SplashScreen.installSplashScreen(this);
@@ -80,7 +94,7 @@ public class MainActivity extends BridgeActivity {
                 splashScreenView.remove();
             }
         });
-        if (!isWebViewVersionOk()) {
+        if (!webviewOk) {
             // WebView 版本不足时立即关闭 Splash，显示升级提示页。
             // 必须先 super.onCreate（Android 硬约束：跳过即 SuperNotCalledException 崩溃），
             // 且不初始化 Capacitor Bridge / 插件。
@@ -96,6 +110,11 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(PixivApiPlugin.class);
         registerPlugin(ClientInfoPlugin.class); // ADR-0062
         registerPlugin(OtaPlugin.class); // OTA web bundle（#249）
+        registerPlugin(GallerySaverPlugin.class); // 保存到相册（spec image-save-download）
+        registerPlugin(PictelioDownloaderPlugin.class); // 下载队列执行器（spec download-manager T3）
+        registerPlugin(PictelioSharePlugin.class); // 系统分享（spec download-manager T6）
+        registerPlugin(NetDiagPlugin.class); // 网络自检（spec network-self-check）
+        registerPlugin(WebDavPlugin.class); // WebDAV 备份薄桥（spec webdav-backup T3）
         super.onCreate(savedInstanceState);
         // 调试模式 — debug 构建时启用
         if (BuildConfig.DEBUG) {

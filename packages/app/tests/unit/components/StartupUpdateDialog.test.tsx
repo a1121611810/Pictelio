@@ -9,7 +9,7 @@
  * 同时验证「稍后再说」点击行为不变（dismiss）。
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render } from "solid-js/web";
+import { render } from "@solidjs/web";
 import StartupUpdateDialog from "@/components/StartupUpdateDialog";
 
 vi.mock("@/stores/settingsStore", () => ({

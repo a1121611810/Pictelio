@@ -483,6 +483,22 @@ export class AgentBrowserDriver {
    * 点击第一个可交互元素（用于点卡片等通用操作）。
    */
   async clickFirst(skipCount = 6): Promise<boolean> {
+    // 0. 真实鼠标点击按元素中心做命中测试：L5 单列长图卡片中心常在视口外
+    //    （elementFromPoint 落到 <html>），先滚动到可视区再点（SolidJS 2.0 迁移
+    //    验收 #418 实测定位的几何性失败根因）。
+    try {
+      await this.evaluate(
+        `(() => {
+          const el = document.querySelector('[data-testid="illust-card"]');
+          if (el) { el.scrollIntoView({ block: 'center' }); }
+          return 'scrolled';
+        })()`,
+      );
+      await new Promise((r) => setTimeout(r, 400));
+    } catch {
+      /* 滚动失败不阻断后续尝试 */
+    }
+
     // 1. 尝试 CSS 选择器（不受 snapshot ref 过期影响）。
     //    主 Feed 为 L5 单列 IllustSingleCard（ADR-0075），无 .image-card class，
     //    用 S4 补充的 data-testid="illust-card" 稳定定位（ImageCard 瀑布流同用）。

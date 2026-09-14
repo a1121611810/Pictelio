@@ -1,5 +1,5 @@
 import { defineConfig } from "vite-plus/test/config";
-import solid from "vite-plugin-solid";
+import solid from "@solidjs/vite-plugin";
 import AutoImport from "unplugin-auto-import/vite";
 import { resolve } from "node:path";
 
@@ -7,7 +7,43 @@ export default defineConfig({
   plugins: [
     AutoImport({
       imports: [
-        "solid-js",
+        // 与 vite.config.ts 的 SolidJS 2.0 显式导出名清单保持一致（preset "solid-js"
+        // 含 2.0 已删 API，不可用）。
+        {
+          "solid-js": [
+            "createSignal",
+            "createEffect",
+            "createMemo",
+            "createRenderEffect",
+            "createRoot",
+            "createStore",
+            "onCleanup",
+            "onSettled",
+            "untrack",
+            "flush",
+            "mapArray",
+            "reconcile",
+            "snapshot",
+            "merge",
+            "omit",
+            "children",
+            "lazy",
+            "createUniqueId",
+            "createContext",
+            "useContext",
+            "Show",
+            "For",
+            "Switch",
+            "Match",
+            "Loading",
+            "Errored",
+            "Repeat",
+            "Reveal",
+          ],
+        },
+        {
+          "@solidjs/web": ["render", "hydrate", "Portal", "Dynamic", "isServer"],
+        },
         {
           "@solidjs/router": [
             "useNavigate",
@@ -20,6 +56,7 @@ export default defineConfig({
           ],
         },
         { "@/utils/tryAsync": ["tryAsync", "trySync"] },
+        { "@/primitives/fluentOn": ["fluentOn"] },
       ],
       dts: "./src/auto-imports.d.ts",
     }),
@@ -78,11 +115,21 @@ export default defineConfig({
       cacheMaxBytes: 314572800,
     }),
     APP_VERSION: JSON.stringify("3.21.2"),
-    __E2E__: "false", // 与 vite.config.ts 的 --mode e2e define 对齐；单测环境恒为 false
+    // __E2E__ 不在此 define：define 会在编译期把标识符替换为字面量 false，
+    // E2E 钩子块被整体消除，单测无法触达。测试需要钩子时用
+    // vi.stubGlobal("__E2E__", true) 运行时注入（见 tests/unit/routes/ClientSwitch.test.tsx）。
+    // 生产构建仍由 vite.config.ts 的 --mode e2e define 控制，零泄漏不变。
   },
   test: {
     include: ["tests/unit/**/*.test.{ts,tsx}"],
-    environment: "node",
+    // SolidJS 2.0：@solidjs/vite-plugin 对 node 环境走「server 姿态」（solid-js 解析到
+    // server 构建，signal 写入为惰性数据）。全仓单测依赖真实 client signal 语义，
+    // 必须用 DOM 环境走 client 姿态（ADR-0144）。
+    environment: "happy-dom",
+    // i18n locale 钉源语言：跟随系统默认会随环境 navigator.language 漂移，测试须确定性
+    // happy-dom textContent 数值补丁：happy-dom 违反规范（`textContent = 0` 得空元素），
+    // 会让 Solid 的数值文本更新崩掉（详见 tests/setup/happy-dom-textcontent.ts）
+    setupFiles: ["./tests/setup/i18n-locale.ts", "./tests/setup/happy-dom-textcontent.ts"],
     // T0 门禁（ADR-0097）：禁止空测试文件，防空壳套件漂移（ADR-0084 教训）
     passWithNoTests: false,
     clearMocks: true,

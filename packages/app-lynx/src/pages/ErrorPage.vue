@@ -5,6 +5,7 @@ import { navigate, resetHistory } from '../router'
 import { useAuthStore } from '../stores/authStore'
 import { fatalError, presentError } from '../utils/errorPresentation'
 import { ERROR_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import { t } from '../i18n'
 
 // 会话失效（UNAUTHORIZED）全屏错误页 —— 定稿方案 C（全屏品牌色块，UI 原型选定）：
 // - 进入语义：router 装配的 handler resetHistory + navigate('/error', { replace }) → 历史栈为空，返回键
@@ -30,7 +31,7 @@ function backToLogin() {
     </text>
     <!-- 副文案：半透明白（presentError 分档文案，含 HTTP 状态码与 hint） -->
     <text class="text-body-medium text-primary-on mt-4 text-center leading-relaxed" style="opacity: 0.8">
-      {{ presentError(fatalError, '登录已过期') }}
+      {{ presentError(fatalError, t('error.fallback.sessionExpired')) }}
     </text>
     <!-- M3 反色 filled 按钮：on-primary 底 + primary 字（全圆角 pill） -->
     <view
@@ -39,7 +40,7 @@ function backToLogin() {
       :accessibility-label="ERROR_A11Y_LABELS.backToLogin"
       @tap="backToLogin"
     >
-      <text class="text-label-large text-primary font-medium">返回登录</text>
+      <text class="text-label-large text-primary font-medium">{{ t('errorPage.backToLogin') }}</text>
     </view>
   </view>
 </template>

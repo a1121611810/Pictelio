@@ -1,5 +1,6 @@
-import type { Component } from "solid-js";
+import { Show, type Component } from "solid-js";
 import PixivImage from "../PixivImage";
+import { t } from "../../i18n";
 
 interface BottomActionBarProps {
   /** 作者名（超出一行省略号截断） */
@@ -11,6 +12,16 @@ interface BottomActionBarProps {
   onBookmarkPointerUp: (e: PointerEvent) => void;
   onComments: () => void;
   totalComments?: number;
+  /** 保存到相册（spec image-save-download；缺省 = 不显示入口，ugoira 不提供） */
+  onSave?: () => void;
+  /** 保存流程进行中（按钮禁用 + 文案切换） */
+  saving?: boolean;
+  /**
+   * 键盘/辅助技术激活（#544）：Enter/Space 经浏览器合成的 click（detail === 0）
+   * 触发，与指针路径（pointerup 短按 = 快速收藏、长按 = 面板）互斥不双触发。
+   * 缺省 = 心形键盘不可达（既有缺陷形态，测试环境可省略）。
+   */
+  onBookmarkActivate?: () => void;
 }
 
 /**
@@ -19,7 +30,8 @@ interface BottomActionBarProps {
  * 显示逻辑（由 IllustDetail 控制）：页面滚动到信息区（用户/作品信息）
  * 进入视口后隐藏（信息区内已有收藏/评论入口，避免重复）；否则常驻。
  *
- * 内容：左 = 作者头像 + 名字（truncate 省略号）；右 = 收藏（长按私藏）+ 评论。
+ * 内容：左 = 作者头像 + 名字（truncate 省略号）；右 = 收藏（单击快速收藏 / 长按开收藏面板，
+ * 见 ADR-0160 D3/D4）+ 保存 + 评论。
  * A2 卡片条：圆角 2XLarge + elevation8 + 细边框，悬浮于页面底部。
  */
 const BottomActionBar: Component<BottomActionBarProps> = (props) => {
@@ -40,11 +52,11 @@ const BottomActionBar: Component<BottomActionBarProps> = (props) => {
           </span>
         </div>
 
-        {/* 右：收藏 + 评论 */}
+        {/* 右：收藏 + 保存 + 评论 */}
         <div class="flex items-center gap-2 ml-auto flex-shrink-0">
           <button
             type="button"
-            class={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase200)] font-medium transition-all active:scale-95 select-none appearance-none border-none outline-none cursor-pointer ${
+            class={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase200)] font-medium transition-all active:scale-95 select-none appearance-none border-none outline-none cursor-pointer focus-visible:bg-[var(--colorNeutralBackground1Selected)] focus-visible:outline focus-visible:outline-[var(--colorStrokeFocus2)] ${
               props.isBookmarked
                 ? "bg-[var(--colorStatusDangerBackground2)] text-[var(--colorStatusDangerForeground1)]"
                 : "bg-[var(--colorBrandStroke2)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorBrandBackground)] hover:text-[var(--colorNeutralForegroundOnBrand)]"
@@ -52,17 +64,37 @@ const BottomActionBar: Component<BottomActionBarProps> = (props) => {
             onPointerDown={props.onBookmarkPointerDown}
             onPointerUp={props.onBookmarkPointerUp}
             onPointerLeave={props.onBookmarkPointerUp}
+            onClick={(e) => {
+              // 键盘合成的 click detail === 0（UI Events 规范）；指针 click ≥1，
+              // 由 pointerup 快速收藏路径独占——detail 守卫即双触发防线（#544）
+              if (e.detail === 0) props.onBookmarkActivate?.();
+            }}
             disabled={props.bookmarking}
-            aria-label={props.isBookmarked ? "取消收藏" : "收藏"}
+            aria-label={
+              props.isBookmarked
+                ? t("illust.actionBar.unbookmarkAria")
+                : t("illust.actionBar.bookmarkAria")
+            }
           >
-            {props.isBookmarked ? "♥ 已收藏" : "♡ 收藏"}
+            {props.isBookmarked ? t("illust.actionBar.bookmarked") : t("illust.actionBar.bookmark")}
           </button>
+          <Show when={props.onSave}>
+            <button
+              type="button"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase200)] font-medium bg-[var(--colorBrandStroke2)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorBrandBackground)] hover:text-[var(--colorNeutralForegroundOnBrand)] active:scale-95 transition-all select-none appearance-none border-none outline-none cursor-pointer disabled:opacity-60 disabled:cursor-default focus-visible:bg-[var(--colorNeutralBackground1Selected)] focus-visible:outline focus-visible:outline-[var(--colorStrokeFocus2)]"
+              onClick={props.onSave}
+              disabled={props.saving}
+              aria-label={t("illust.actionBar.saveAria")}
+            >
+              {props.saving ? t("illust.actionBar.saving") : t("illust.actionBar.save")}
+            </button>
+          </Show>
           <button
             type="button"
             class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase200)] font-medium bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] hover:bg-[var(--colorBrandBackgroundHover)] active:scale-95 transition-all select-none appearance-none border-none outline-none cursor-pointer"
             onClick={props.onComments}
           >
-            💬 评论
+            {t("illust.actionBar.comments")}
             {props.totalComments !== undefined ? ` ${props.totalComments.toLocaleString()}` : ""}
           </button>
         </div>

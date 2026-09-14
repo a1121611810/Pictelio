@@ -16,6 +16,7 @@
 // width/height）后按**该图实际比例**修正容器高度（pageHeightVw 纯函数）。默认 false → 现状不变，
 // 现有调用方零 blast radius。仅 box 布局生效（full 布局是全 bleed 铺满，无需修正）。
 import { ref, computed, watch } from 'vue'
+import { t } from '../i18n'
 import { resolveSkeletonStyle } from './skeletonStyle'
 import { deriveCoverState, deriveRetryState, isUnloadableSrc } from '../utils/coverImage'
 import { ratioToHeightVw } from '../utils/coverDisplay'
@@ -154,13 +155,13 @@ const state = computed(() => deriveCoverState(loaded.value, failed.value))
       v-else-if="state === 'failed'"
       class="absolute inset-0 flex flex-col items-center justify-center gap-3"
     >
-      <text class="text-body-medium text-outline">图片加载失败</text>
+      <text class="text-body-medium text-outline">{{ t('coverImage.loadFailed') }}</text>
       <view
         v-if="retry"
         class="min-w-12 min-h-12 flex items-center justify-center px-5 rounded-[var(--md-shape-full)] border border-outline bg-surface-container-lowest active:bg-state-pressed-on-surface"
         @tap.stop="onRetry"
       >
-        <text class="text-label-large text-primary">重试</text>
+        <text class="text-label-large text-primary">{{ t('coverImage.retry') }}</text>
       </view>
     </view>
   </view>

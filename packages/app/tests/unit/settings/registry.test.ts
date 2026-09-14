@@ -3,6 +3,10 @@
  * Settings registry 单元测试 —— 注入式（memory adapter），零 vi.mock。
  *
  * 测试跨的 seam 与生产代码相同：createSettings({ storages }) 的注入点。
+ *
+ * Oracle 来源（测试硬约束 6）：
+ * - write gate 冷态丢写 warn：ADR-0159 决策 2（docs/adr/ADR-0159-bridge-thread-unblocking.md）
+ *   / docs/specs/engine-switch-e2e-recovery.md 决策 3 的 warn 字面量契约。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createSettings } from "@/settings/registry";
@@ -25,6 +29,7 @@ describe("Settings registry", () => {
     const { settings, mem } = make();
     const s = settings.define({ key: "foo", default: "a" });
     s.set("b");
+    flush(); // 2.0 批处理语义：set 后同步读返回旧值，先 flush 再断言
     expect(s.value()).toBe("b");
     expect(mem.dump().has("foo")).toBe(false);
 
@@ -39,6 +44,24 @@ describe("Settings registry", () => {
     await settings.hydrateAll();
     settings.get("foo")!.set("b");
     expect(mem.dump().get("foo")).toBe("b");
+  });
+
+  it("冷态丢弃写入时 warn（模块前缀 + phase + key），且不落盘语义不变", () => {
+    // Oracle：ADR-0159 决策 2 / spec engine-switch-e2e-recovery 决策 3 ——
+    // warn 字面量 `[settings-registry] 冷态丢弃写入（phase=cold）: <key>`；
+    // 「冷态不落盘」语义本身不变（内存仍更新，仅存储层无记录）。
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { settings, mem } = make();
+    const s = settings.define({ key: "cold_key", default: "a" });
+    s.set("b");
+    flush(); // 2.0 批处理语义：set 后同步读返回旧值，先 flush 再断言
+    expect(s.value()).toBe("b"); // 内存仍更新（gate 语义不变）
+    expect(mem.dump().has("cold_key")).toBe(false); // 不落盘（gate 语义不变）
+    expect(warn).toHaveBeenCalledTimes(1); // 每次丢弃都 warn
+    expect(warn.mock.calls[0]?.[0]).toBe(
+      "[settings-registry] 冷态丢弃写入（phase=cold）: cold_key",
+    );
+    warn.mockRestore();
   });
 
   // ── parse 兼容通道（旧数据格式）──
@@ -265,5 +288,90 @@ describe("Settings registry", () => {
     s.set("b");
     await settings.remove("foo");
     expect(mem.dump().has("foo")).toBe(false);
+  });
+});
+
+describe("Settings registry — backup rawValues / setRawValues（spec webdav-backup §3.2/§6）", () => {
+  it("rawValues：只含存储层有记录的键（原始字符串），默认值不写入", async () => {
+    const { settings, mem } = make();
+    settings.define({ key: "a", default: "d1" });
+    settings.define<number>({ key: "b", default: 2 });
+    await settings.hydrateAll();
+
+    expect(await settings.rawValues()).toEqual({});
+
+    await mem.set("a", "x");
+    await mem.set("b", "7");
+    expect(await settings.rawValues()).toEqual({ a: "x", b: "7" });
+  });
+
+  it("rawValues：动态工厂已实例化的账号级键包含、未实例化 uid 不出现", async () => {
+    const { settings, mem } = make();
+    const factory = settings.defineFactory<string>({ keyPrefix: "show_r18", default: "false" });
+    await settings.hydrateAll();
+    factory.forId(42);
+    await mem.set("show_r18_42", "true");
+    await mem.set("show_r18_99", "true"); // 未实例化 → 不进快照（当前账号语义）
+
+    const raw = await settings.rawValues();
+    expect(raw.show_r18_42).toBe("true");
+    expect(raw.show_r18_99).toBeUndefined();
+  });
+
+  it("setRawValues：已注册键写回并触发内存更新；未注册键跳过（merge-by-keys）", async () => {
+    const { settings } = make();
+    const s = settings.define({ key: "a", default: "d" });
+    await settings.hydrateAll();
+
+    const res = await settings.setRawValues({ a: "restored", foreign_key: "x" });
+    expect(res.applied).toEqual(["a"]);
+    expect(res.skipped).toEqual(["foreign_key"]);
+    expect(s.value()).toBe("restored");
+  });
+
+  it("setRawValues：损坏值（validate 拒绝）不写回且计入 skipped + warn", async () => {
+    const { settings } = make();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const s = settings.define<number>({
+      key: "n",
+      default: 1,
+      validate: (v): v is number => typeof v === "number" && v >= 1 && v <= 30,
+    });
+    await settings.hydrateAll();
+
+    const res = await settings.setRawValues({ n: "999" });
+    expect(res.applied).toEqual([]);
+    expect(res.skipped).toEqual(["n"]);
+    expect(s.value()).toBe(1); // 保持本地值（不触碰）
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("rawValues：存储读取失败 → 该键省略 + warn（不静默，硬约束 #3）", async () => {
+    const { settings } = make();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    settings.define({ key: "a", default: "d" });
+    await settings.hydrateAll();
+    const original = settings.rawValues;
+    expect(typeof original).toBe("function");
+    // 用注入 adapter 的抛错路径：memory adapter 的 get 被替换为抛错
+    const broken = createMemoryAdapter();
+    broken.get = async () => {
+      throw new Error("disk io");
+    };
+    const brokenSettings = createSettings({ storages: { preferences: broken } });
+    brokenSettings.define({ key: "a", default: "d" });
+    await brokenSettings.hydrateAll().catch(() => {});
+    expect(await brokenSettings.rawValues()).toEqual({});
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("setRawValues 写回后落盘（持久化经 handle.set 正常管线）", async () => {
+    const { settings, mem } = make();
+    settings.define({ key: "a", default: "d" });
+    await settings.hydrateAll();
+    await settings.setRawValues({ a: "persisted" });
+    await vi.waitFor(() => expect(mem.dump().get("a")).toBe("persisted"));
   });
 });

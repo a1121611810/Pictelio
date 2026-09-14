@@ -4,24 +4,35 @@ import { useMainThreadRef, runOnBackground } from 'vue-lynx'
 import { computeReadProgress } from '../primitives/watchlistPrompt'
 import { novelAverageParagraphHeightPx } from '../primitives/novelParagraphEstimate'
 import { currentParams, goBack, requestBack, registerBackGuard } from '../router'
-import { loadNovelDetail, fetchNovelText, loadNovelSeries, addNovelWatchlist } from '../api/novel'
+import { loadNovelDetail, fetchNovelData, loadNovelSeries, addNovelWatchlist } from '../api/novel'
+import type { NovelExportFormat, NovelImagesMap } from '@pictelio/novel-export'
+import { buildNovelExportPayload, buildNovelExportTaskDraft } from '@pictelio/novel-export'
 import type { PixivNovel } from '../api/types'
 import { presentError } from '../utils/errorPresentation'
+import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { useSettingsStore } from '../stores/settingsStore'
+import { useDownloadStore } from '../stores/downloadStore'
 import { isDismissed, markDismissed, setWatchState } from '../stores/watchlistStore'
 import {
   createWatchlistPrompt,
   type WatchlistPromptController,
 } from '../primitives/createWatchlistPrompt'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
+import AiOverlay from '../components/AiOverlay.vue'
+import { t } from '../i18n'
 
-const isRestricted = useSettingsStore().isRestricted
+const settings = useSettingsStore()
+const isRestricted = settings.isRestricted
+const isAiRestricted = settings.isAiRestricted
 import CommentOverlay from '../components/CommentOverlay.vue'
+import NovelExportSheet from '../components/NovelExportSheet.vue'
 import SkeletonNovel from '../components/SkeletonNovel.vue'
 import WatchlistPromptDialog from '../components/WatchlistPromptDialog.vue'
 
 const novel = ref<PixivNovel | null>(null)
 const text = ref('')
+/** 正文内嵌图片映射（[pixivimage:id] → 图片 URL 档位），导出 payload 用 */
+const novelImages = ref<NovelImagesMap>({})
 const loading = ref(true)
 const errorMsg = ref('')
 
@@ -29,6 +40,39 @@ const novelId = computed(() => Number(currentParams.value.id ?? 0))
 
 // ─── 评论弹层（issue #164）：入口在作者/元信息行附近；弹层挂根 view 内、scroll-view 之后 ───
 const showComments = ref(false)
+
+// ─── 小说导出（spec docs/specs/novel-export.md §7.2 / ADR-0154 D7）───
+// 入口仅在正文可用时渲染；面板格式为本次临时选择，内容开关取设置页快照（入队即快照）。
+const exportOpen = ref(false)
+/** 内联状态提示（lynx 无全局 toast）：约 4s 后自动隐藏 */
+const exportNotice = ref('')
+let exportNoticeTimer: ReturnType<typeof setTimeout> | undefined
+const downloads = useDownloadStore()
+
+/** 构造导出载荷并加入下载队列（格式为本次临时选择，不写回设置） */
+function enqueueNovelExport(format: NovelExportFormat): void {
+  const n = novel.value
+  if (!n) return
+  const payload = buildNovelExportPayload({
+    novel: n,
+    text: text.value,
+    images: novelImages.value,
+    options: settings.novelExportOptions,
+  })
+  const draft = buildNovelExportTaskDraft({
+    payload,
+    format,
+    title: n.title,
+    thumbnailUrl: n.image_urls.medium ?? n.image_urls.large ?? '',
+  })
+  downloads.enqueue([draft])
+  exportOpen.value = false
+  exportNotice.value = t('novelDetail.export.queued') // i18n: 赋值时快照（瞬态）
+  clearTimeout(exportNoticeTimer)
+  exportNoticeTimer = setTimeout(() => {
+    exportNotice.value = ''
+  }, 4000)
+}
 
 // ─── 追更询问（issue #226 / spec §US4 接线半） ───
 // 页面保持薄：预取 + 触发判定 + 弹窗状态机全部在 createWatchlistPrompt；
@@ -130,6 +174,7 @@ async function loadNovel(): Promise<void> {
   errorMsg.value = ''
   novel.value = null
   text.value = ''
+  novelImages.value = {}
   reachedBottom.value = false
   teardownPrompt()
   try {
@@ -140,14 +185,18 @@ async function loadNovel(): Promise<void> {
     // prompt 在详情落地后创建：getSeries 此时已知，系列预取才能发起；
     // 停留计时（dwellMs）从详情就绪起算，语义上更贴近「实质阅读时长」
     setupPrompt()
-    if (!isRestricted(detailRes.novel)) {
-      const fullText = await fetchNovelText(novelId.value)
+    // AI 遮罩态同样不拉正文（与 R18 一致：遮罩是内容不可达而非仅视觉遮挡，ADR-0155）
+    if (!isRestricted(detailRes.novel) && !isAiRestricted(detailRes.novel)) {
+      const data = await fetchNovelData(novelId.value)
       if (gen !== loadGeneration) return
-      text.value = fullText
+      // 保留原 fetchNovelText 的空正文语义：提取失败 → 走 catch 展示错误
+      if (!data.text) throw new Error(t('novelDetail.bodyExtractFailed')) // i18n: 构造时快照（瞬态）
+      text.value = data.text
+      novelImages.value = data.images
     }
   } catch (err) {
     if (gen !== loadGeneration) return
-    errorMsg.value = presentError(err, '加载失败')
+    errorMsg.value = presentError(err, t('error.fallback.loadFailed'))
   } finally {
     if (gen === loadGeneration) loading.value = false
   }
@@ -160,6 +209,7 @@ onMounted(() => {
 onUnmounted(() => {
   unregisterBackGuard()
   teardownPrompt()
+  clearTimeout(exportNoticeTimer)
   loadGeneration++ // 卸载后任何在飞响应落地即作废
 })
 
@@ -191,23 +241,23 @@ function onWatchlistCancel(): void {
 </script>
 
 <template>
-  <view class="w-full h-full bg-surface">
+  <view class="w-full h-full flex flex-col relative bg-surface">
     <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
       <!-- 左上角返回改走 requestBack：与系统返回共用同一守卫链（spec §US3） -->
       <view class="py-1 pr-2" @tap="requestBack"><text class="text-[6.4vw] leading-none text-surface-on">‹</text></view>
-      <text class="flex-1 text-title-large font-medium text-surface-on">小说</text>
+      <text class="flex-1 text-title-large font-medium text-surface-on">{{ t('novelDetail.title') }}</text>
     </view>
 
     <!-- 加载期骨架（issue #91）：header 照常渲染，正文区骨架占位 -->
     <SkeletonNovel v-if="loading" />
-    <view v-else-if="errorMsg" class="w-full h-full flex items-center justify-center">
+    <view v-else-if="errorMsg" class="w-full flex-1 min-h-0 flex items-center justify-center">
       <text class="text-body-medium text-error p-4">{{ errorMsg }}</text>
     </view>
     <!-- 正文列表虚拟化（ADR-0134）：官方指南「超三屏用 list」；红线 = Vue :key 与 Lynx
          :item-key 双份一致 + 稳定 id；estimated 按段落估算滚动条。 -->
     <list
-      v-else-if="novel && !isRestricted(novel)"
-      class="w-full h-full"
+      v-else-if="novel && !isRestricted(novel) && !isAiRestricted(novel)"
+      class="w-full flex-1 min-h-0"
       list-type="single"
       scroll-orientation="vertical"
       :lower-threshold-item-count="5"
@@ -219,19 +269,19 @@ function onWatchlistCancel(): void {
         <text class="text-title-large font-bold text-surface-on">{{ novel?.title }}</text>
         <text class="text-body-medium text-surface-on-variant mt-2">by {{ novel?.user.name }}</text>
         <text class="text-label-medium text-outline mt-1.5">
-          {{ novel?.text_length }} 字
+          {{ t('novelDetail.charCount', { count: novel?.text_length ?? '' }) }}
           <template v-if="novel?.total_bookmarks != null">
              · ♥ {{ novel?.total_bookmarks }}
           </template>
         </text>
         <!-- 系列信息行（spec §US4）：已追更显示 M3 assist-chip 风格标记 -->
         <view v-if="novel?.series" class="mt-1.5 flex flex-row items-center">
-          <text class="text-label-medium text-outline">《{{ novel.series.title }}》</text>
+          <text class="text-label-medium text-outline">{{ t('novelDetail.seriesTitle', { title: novel.series.title }) }}</text>
           <view
             v-if="prompt?.watchAdded === true"
             class="ml-2 px-2 py-0.5 rounded-[var(--md-shape-full)] bg-secondary-container"
           >
-            <text class="text-label-small text-secondary-on-container">已追更</text>
+            <text class="text-label-small text-secondary-on-container">{{ t('novelDetail.watchAdded') }}</text>
           </view>
         </view>
         <!-- 评论入口（issue #164）：💬 + total_comments，字段缺失时不显示（对齐插画页惯例） -->
@@ -243,6 +293,19 @@ function onWatchlistCancel(): void {
           <text class="text-[6.4vw] leading-none">💬</text>
           <text class="text-label-medium text-outline ml-1">{{ novel?.total_comments }}</text>
         </view>
+        <!-- 导出入口（spec §7.2）：仅正文可用时渲染；label 内联，不进 ME_A11Y_LABELS -->
+        <view
+          v-if="text.length > 0"
+          class="mt-2 flex flex-row items-center"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="t('novelDetail.export.a11y')"
+          @tap="exportOpen = true"
+        >
+          <text class="text-[6.4vw] leading-none">⬆</text>
+          <text class="text-label-medium text-outline ml-1">{{ t('novelDetail.export.action') }}</text>
+        </view>
+        <!-- 入队内联提示（lynx 无全局 toast）：约 4s 后自动隐藏 -->
+        <text v-if="exportNotice" class="text-label-medium text-primary mt-1.5">{{ exportNotice }}</text>
       </view>
       </list-item>
       <list-item
@@ -256,29 +319,29 @@ function onWatchlistCancel(): void {
       </list-item>
       <list-item :key="'end'" :item-key="'end'" class="w-full">
         <view class="flex items-center justify-center p-6">
-          <text class="text-body-small text-outline">— 完 —</text>
+          <text class="text-body-small text-outline">{{ t('novelDetail.end') }}</text>
         </view>
       </list-item>
     </list>
     <!-- 受限小说：列表结构性改动不涉及（不拉正文），保留原头部+遮罩形态 -->
-    <view v-else class="w-full h-full p-4 relative">
+    <view v-else class="w-full flex-1 min-h-0 p-4 relative">
       <view class="py-5 px-4 bg-surface-container-lowest mb-3">
         <text class="text-title-large font-bold text-surface-on">{{ novel?.title }}</text>
         <text class="text-body-medium text-surface-on-variant mt-2">by {{ novel?.user.name }}</text>
         <text class="text-label-medium text-outline mt-1.5">
-          {{ novel?.text_length }} 字
+          {{ t('novelDetail.charCount', { count: novel?.text_length ?? '' }) }}
           <template v-if="novel?.total_bookmarks != null">
              · ♥ {{ novel?.total_bookmarks }}
           </template>
         </text>
         <!-- 系列信息行（与 meta 卡一致；受限小说保留，spec 回归项） -->
         <view v-if="novel?.series" class="mt-1.5 flex flex-row items-center">
-          <text class="text-label-medium text-outline">《{{ novel.series.title }}》</text>
+          <text class="text-label-medium text-outline">{{ t('novelDetail.seriesTitle', { title: novel.series.title }) }}</text>
           <view
             v-if="prompt?.watchAdded === true"
             class="ml-2 px-2 py-0.5 rounded-[var(--md-shape-full)] bg-secondary-container"
           >
-            <text class="text-label-small text-secondary-on-container">已追更</text>
+            <text class="text-label-small text-secondary-on-container">{{ t('novelDetail.watchAdded') }}</text>
           </view>
         </view>
         <!-- 评论入口（与 meta 卡一致） -->
@@ -293,12 +356,27 @@ function onWatchlistCancel(): void {
       </view>
       <view class="relative p-4">
         <view class="min-h-[60vw]" />
-        <RestrictOverlay :level="novel && novel.x_restrict === 2 ? 2 : 1" />
+        <RestrictOverlay v-if="novel && isRestricted(novel)" :level="novel.x_restrict === 2 ? 2 : 1" />
+        <AiOverlay v-else-if="novel && isAiRestricted(novel)" :ai-type="novel.novel_ai_type ?? 0" />
       </view>
     </view>
 
-    <!-- 评论弹层（issue #164）：根 view 内、正文列表之后的覆盖层 → 弹层打开时滚动位置不丢失 -->
-    <CommentOverlay v-if="showComments" type="novel" :target-id="novelId" @close="showComments = false" />
+    <!-- 评论弹层（issue #164 / 布局流修复 issue #139 同族）：必须 absolute 脱离 flex 流，
+         否则文档流内 w-full h-full 兄弟会被 h-full 的 list 顶出视口（弹层在屏幕外挂载） -->
+    <view v-if="showComments" class="absolute inset-0">
+      <CommentOverlay type="novel" :target-id="novelId" @close="showComments = false" />
+    </view>
+
+    <!-- 导出弹层（spec §7.2）：同一覆盖层挂载契约（absolute inset-0 宿主脱离文档流） -->
+    <view v-if="exportOpen" class="absolute inset-0">
+      <NovelExportSheet
+        :open="exportOpen"
+        :default-format="settings.novelExportFormat"
+        :options="settings.novelExportOptions"
+        @close="exportOpen = false"
+        @export="enqueueNovelExport"
+      />
+    </view>
 
     <!-- 追更询问弹窗（issue #226 / spec §US5）：open 期间自行注册 modalStack，
          返回键优先关弹窗 = cancel（留在详情页） -->

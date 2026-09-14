@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+// ADR-0144：2.0 微任务批处理下，事件处理器内的 signal 写需经 flush 同步生效后才能同步断言
+import { flush } from "solid-js";
 import { createPullToRefresh, type TouchEventLike } from "@/primitives/createPullToRefresh";
 
 /** 构造假 touch 事件（可测结构） */
@@ -18,9 +20,11 @@ describe("createPullToRefresh", () => {
     const p = createPullToRefresh({ onRefresh, threshold: 60, damping: 0.4 });
     p.touchHandlers.onTouchStart(touch(100));
     p.touchHandlers.onTouchMove(touch(200)); // dy=100 → 阻尼后 40 < 60
+    flush(); // ADR-0144：批处理下 set 后同步读为旧值，先排空再断言
     expect(p.pullPhase()).toBe("pulling");
     expect(p.pullDistance()).toBeCloseTo(40);
     p.touchHandlers.onTouchEnd();
+    flush(); // 同上
     expect(p.pullPhase()).toBe("idle");
     expect(p.pullDistance()).toBe(0);
     expect(onRefresh).not.toHaveBeenCalled();
@@ -31,13 +35,16 @@ describe("createPullToRefresh", () => {
     const p = createPullToRefresh({ onRefresh, threshold: 60, damping: 0.4 });
     p.touchHandlers.onTouchStart(touch(100));
     p.touchHandlers.onTouchMove(touch(260)); // dy=160 → 阻尼 64 >= 60
+    flush(); // ADR-0144：批处理下 set 后同步读为旧值，先排空再断言
     expect(p.pullPhase()).toBe("refresh-ready");
     expect(p.pullDistance()).toBeCloseTo(64);
     p.touchHandlers.onTouchEnd();
+    flush(); // 同上
     expect(p.pullPhase()).toBe("refreshing");
     expect(p.pullDistance()).toBe(60); // 保持指示器展开
     expect(onRefresh).toHaveBeenCalledTimes(1);
-    await Promise.resolve();
+    await Promise.resolve(); // onRefresh 已 resolve → settle 回调先于测试续体执行
+    flush(); // ADR-0144：settle 内的 signal 写同样经批处理，排空后再断言
     expect(p.pullPhase()).toBe("idle");
     expect(p.pullDistance()).toBe(0);
   });
@@ -66,8 +73,10 @@ describe("createPullToRefresh", () => {
     const p = createPullToRefresh({ onRefresh });
     p.touchHandlers.onTouchStart(touch(100));
     p.touchHandlers.onTouchMove(touch(200));
+    flush(); // ADR-0144：批处理下 set 后同步读为旧值，先排空再断言
     expect(p.pullPhase()).toBe("pulling");
     p.touchHandlers.onTouchMove(touch(80)); // dy=-20 → 取消
+    flush(); // 同上
     expect(p.pullPhase()).toBe("idle");
     expect(p.pullDistance()).toBe(0);
     p.touchHandlers.onTouchEnd();

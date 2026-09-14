@@ -19,6 +19,7 @@ import NavBar from "../components/NavBar";
 import PageTransition from "../components/PageTransition";
 import { layoutMode } from "../stores/settingsStore";
 import { scrollToTop } from "../utils/scrollToTop";
+import { t } from "../i18n";
 import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior";
 
 const UserIllusts: Component = () => {
@@ -28,7 +29,7 @@ const UserIllusts: Component = () => {
   const { visible: headerVisible } = createScrollBehavior();
 
   // 组件挂载后立即加载数据（路由 loader 已触发，此处作为兜底）
-  onMount(() => {
+  onSettled(() => {
     const uid = userId();
     if (uid) {
       load(uid, contentType());
@@ -53,23 +54,26 @@ const UserIllusts: Component = () => {
       <PageTransition>
         <div class="pb-16">
           <header
-            class="sticky top-0 z-20 surface-appbar h-12 flex items-center px-4 gap-3 transition-transform duration-[var(--durationNormal)] ease-[var(--curveEasyEase)]"
-            classList={{
-              "translate-y-0": headerVisible(),
-              "-translate-y-full": !headerVisible(),
-            }}
+            class={[
+              "sticky top-0 z-20 surface-appbar h-12 flex items-center px-4 gap-3 transition-transform duration-[var(--durationNormal)] ease-[var(--curveEasyEase)]",
+              {
+                "translate-y-0": headerVisible(),
+                "-translate-y-full": !headerVisible(),
+              },
+            ]}
+
             onDblClick={scrollToTop}
           >
             <fluent-button
               appearance="subtle"
-              aria-label="返回"
+              aria-label={t("userIllusts.back")}
               class="w-8 h-8 p-0 min-w-8"
-              on:click={() => goBack()}
+              ref={fluentOn("click", () => goBack())}
             >
               ←
             </fluent-button>
-            <h1 class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--pageCardTextPrimary)] tracking-tight leading-none truncate">
-              {(viewedUser() || user())?.name ?? ""} 的作品
+            <h1 class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] tracking-tight leading-none truncate">
+              {t("userIllusts.worksOf", { name: (viewedUser() || user())?.name ?? "" })}
             </h1>
           </header>
 
@@ -77,31 +81,31 @@ const UserIllusts: Component = () => {
           <div class="px-4 py-3">
             <div class="flex bg-[var(--colorNeutralBackground2)] rounded-[var(--borderRadiusMedium)] p-1.5 gap-1">
               <button
-                classList={{
+                class={{
                   "segmented-item-active": contentType() === "illust",
                   "segmented-item-inactive": contentType() !== "illust",
                 }}
                 onClick={() => handleTabSwitch("illust")}
               >
-                插画
+                {t("userIllusts.tabIllust")}
               </button>
               <button
-                classList={{
+                class={{
                   "segmented-item-active": contentType() === "manga",
                   "segmented-item-inactive": contentType() !== "manga",
                 }}
                 onClick={() => handleTabSwitch("manga")}
               >
-                漫画
+                {t("userIllusts.tabManga")}
               </button>
               <button
-                classList={{
+                class={{
                   "segmented-item-active": contentType() === "novel",
                   "segmented-item-inactive": contentType() !== "novel",
                 }}
                 onClick={() => handleTabSwitch("novel")}
               >
-                小说
+                {t("userIllusts.tabNovel")}
               </button>
             </div>
           </div>

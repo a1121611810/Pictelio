@@ -10,6 +10,9 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createRoot, createSignal } from "solid-js";
+// ADR-0144：2.0 微任务批处理下，事件处理器（onDisplayLoad/onThumbError 等）内的
+// signal 写需经 flush 同步生效后才能同步断言；别名避免与本文件宏任务 flush 助手重名
+import { flush as flushSync } from "solid-js";
 import {
   createProgressiveImage,
   type ProgressiveImageState,
@@ -151,6 +154,7 @@ describe("createProgressiveImage", () => {
     d.resolve(loadedImage(`PROXY::${FULL}`));
     await flush();
     p.onDisplayLoad(new Event("load"));
+    flushSync(); // ADR-0144：批处理下 set 后同步读为旧值，先排空再断言
     expect(p.thumbSrc()).toBe(""); // 空串 = 绘制完成后卸载（区别于 undefined = 从未挂载）
     expect(p.displaySrc()).toBe(`PROXY::${FULL}`);
     expect(p.failed()).toBe(false);
@@ -169,6 +173,7 @@ describe("createProgressiveImage", () => {
     dA.resolve(loadedImage(`PROXY::${FULL}`));
     await flush();
     p.onDisplayLoad(new Event("load"));
+    flushSync(); // ADR-0144：批处理下 set 后同步读为旧值，先排空再断言
     expect(p.thumbSrc()).toBe(""); // A 图已绘制，thumb 已卸载
 
     setFull(FULL_2);
@@ -181,6 +186,7 @@ describe("createProgressiveImage", () => {
     expect(p.displaySrc()).toBe(`PROXY::${FULL_2}`);
     expect(p.thumbSrc()).toBe(`PROXY::${THUMB}`); // B 图 load 未触发，兜底仍在
     p.onDisplayLoad(new Event("load"));
+    flushSync(); // ADR-0144：批处理下 set 后同步读为旧值，先排空再断言
     expect(p.thumbSrc()).toBe("");
     dispose();
   });
@@ -386,6 +392,7 @@ describe("createProgressiveImage", () => {
     expect(p.displaySrc()).toBe(`PROXY::${FULL}`);
     expect(p.thumbSrc()).toBeUndefined(); // resolve 后仍无 thumb
     p.onDisplayLoad(new Event("load"));
+    flushSync(); // ADR-0144：批处理下 set 后同步读为旧值，先排空再断言
     expect(p.thumbSrc()).toBe(""); // 绘制后收窄为空串（无 thumb 层不变）
     dispose();
   });
@@ -457,6 +464,7 @@ describe("createProgressiveImage", () => {
     await flush();
     expect(p.thumbSrc()).toBe(`PROXY::${THUMB}`);
     p.onThumbError(); // 延迟挂载的 thumb 也失败
+    flushSync(); // ADR-0144：批处理下 set 后同步读为旧值，先排空再断言
     expect(p.failed()).toBe(true);
     dispose();
   });
@@ -579,6 +587,7 @@ describe("createProgressiveImage", () => {
     d.resolve(loadedImage(`PROXY::${FULL}`));
     await flush();
     p.onDisplayLoad(new Event("load")); // full 绘制就绪 → 兜底窗口关闭
+    flushSync(); // ADR-0144：批处理下 set 后同步读为旧值，先排空再断言
     expect(p.thumbSrc()).toBe(""); // thumb 层已卸载（fullPainted 收窄）
     p.onDisplayError(); // 迟发失败
     await flush();

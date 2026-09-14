@@ -1,17 +1,25 @@
 <script setup lang="ts">
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'novels' })
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { navigate } from '../router'
 import { loadRecommendedNovels, loadFollow, loadNovelNext } from '../api/novel'
 import type { PixivNovel, PixivNovelListResponse } from '../api/types'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { useSettingsStore } from '../stores/settingsStore'
 import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
+import AiRestrictedNovelCard from '../components/AiRestrictedNovelCard.vue'
+import { useAiOnlyVisible } from '../composables/useAiOnlyVisible'
 import RefreshableList from '../components/RefreshableList.vue'
 import { useGlobalFabStore } from '../stores/globalFab'
+import AdaptiveTagRow from '../components/AdaptiveTagRow.vue'
+import { useSearchSheetStore } from '../stores/searchSheetStore'
+import { deriveFirstLoadView } from '../utils/firstLoadView'
+import { t } from '../i18n'
 
-const isRestricted = useSettingsStore().isRestricted
+const settings = useSettingsStore()
+const isRestricted = settings.isRestricted
+const isAiRestricted = settings.isAiRestricted
 
 // ─── 分页收敛（ADR-0104）：迁移到 createMixFeed 深模块 ───
 // 双防抖（800ms 节流 + 3s 冷却）/ 竞态代 / 分批渲染 / 空页防护 / 15s 超时 /
@@ -28,10 +36,6 @@ function mapNovels(r: PixivNovelListResponse): { items: MixFeedItem[]; nextUrl: 
 }
 
 function makeFeed(m: 'recommend' | 'follow') {
-  // loadFollow 首参是 restrict（signal 在第二位），与 loadRecommendedNovels(signal) 参数位不同，
-  // 不可把两者联合成一个函数值再调用——signal 会落到 restrict 位
-  const first = (signal?: AbortSignal) =>
-    m === 'recommend' ? loadRecommendedNovels(signal) : loadFollow('public', signal)
   return createMixFeed({
     // autoStart=false：构造不首载，由 refreshFeed 显式触发（mode 重建实例避免双请求浪费）
     autoStart: false,
@@ -39,8 +43,17 @@ function makeFeed(m: 'recommend' | 'follow') {
     sources: [
       {
         name: 'novel',
+        // [fix] 首载分支不能统一成 `first(signal)`：loadRecommendedNovels(signal) 与
+        // loadFollow(restrict, signal) 首参语义不同，关注分支会把 AbortSignal 当作 restrict
+        // 查询参数，序列化成 restrict=[object AbortSignal] → Pixiv 400
+        // （createMixFeed 传入真实 currentAc.signal）。按参数位显式分派。
         fetchPage: (signal, nextUrl) =>
-          nextUrl ? loadNovelNext(nextUrl, signal).then(mapNovels) : first(signal).then(mapNovels),
+          nextUrl
+            ? loadNovelNext(nextUrl, signal).then(mapNovels)
+            : (m === 'recommend'
+                ? loadRecommendedNovels(signal)
+                : loadFollow('public', signal)
+              ).then(mapNovels),
       },
     ],
   })
@@ -48,17 +61,39 @@ function makeFeed(m: 'recommend' | 'follow') {
 
 const feed = ref(makeFeed(mode.value))
 const novels = ref<PixivNovel[]>([])
+/** 仅看态：非 AI 条目从渲染流移除（服务端分页判空仍基于 feed.items，不受影响） */
+const visibleNovels = useAiOnlyVisible(novels)
 
 const loading = ref(false)
 const loadingMore = ref(false)
 const errorMsg = ref('')
 const pageErrorMsg = ref('')
 const endOfFeed = ref(false)
+/** 首载是否已成功落定（成功含 0 条）——三态判定输入（ADR-0150） */
+const settled = ref(false)
+
+/** 空态文案：按当前子 tab 取标题 / 副文案（图标同为 ✎）；t 在 computed 内调用，随 locale 响应 */
+const emptyMeta = computed(() =>
+  mode.value === 'follow'
+    ? { title: t('novels.empty.follow.title'), hint: t('novels.empty.follow.hint') }
+    : { title: t('novels.empty.recommend.title'), hint: t('novels.empty.recommend.hint') },
+)
+
+/** 页级首载三态（ADR-0150）：骨架 / 错误 / 空态 / 内容 的唯一判定源 */
+const view = computed(() =>
+  deriveFirstLoadView({
+    hasItems: visibleNovels.value.length > 0,
+    loading: loading.value,
+    settled: settled.value,
+    hasError: !!errorMsg.value,
+  }),
+)
 
 function sync() {
   novels.value = feed.value.items().map((i) => i.data as PixivNovel)
   loading.value = feed.value.loading()
   loadingMore.value = feed.value.loadingMore()
+  settled.value = feed.value.settled()
   errorMsg.value = feed.value.error() ?? ''
   pageErrorMsg.value = feed.value.pageError() ?? ''
   // 到底态：所有源耗尽且列表非空（ADR-0104：footer「没有更多了」）
@@ -70,6 +105,9 @@ function sync() {
 }
 
 async function refreshFeed() {
+  // 发起前同步进入加载态并清错误：骨架立即占位（ADR-0150）
+  loading.value = true
+  errorMsg.value = ''
   await feed.value.refresh()
   sync()
   // [lynx:fix] 数据整体替换触发 vue-lynx patch RemoveNode 索引错位（框架 bug，ADR-0107 D4）；
@@ -94,12 +132,17 @@ function switchMode(m: 'recommend' | 'follow') {
   novels.value = []
   errorMsg.value = ''
   pageErrorMsg.value = ''
-  loading.value = true
+  settled.value = false // 新实例尚未落定；随后 refreshFeed 同步进入加载态
   void refreshFeed()
 }
 
 function openDetail(id: number) {
   void navigate(`/novel/${id}`)
+}
+
+/** 标签点击 → 全局搜索弹层（原始 tag.name，ADR-0133；同 Recommended.vue 语义） */
+function onTagTap(name: string) {
+  useSearchSheetStore().openSearch(name)
 }
 
 // ─── 全局放射 FAB 桥（ADR-0120）：注册本页动作到 globalFab，卸载时注销 ───
@@ -138,7 +181,7 @@ onUnmounted(() => {
   <view class="w-full h-full flex flex-col bg-surface">
     <!-- M3 TopAppBar：顶层页，居中标题，无返回箭头 -->
     <view class="flex flex-row items-center justify-center h-[17.067vw] px-4 bg-surface">
-      <text class="text-title-large font-medium text-surface-on">小说</text>
+      <text class="text-title-large font-medium text-surface-on">{{ t('novels.title') }}</text>
     </view>
 
     <!-- 推荐/关注切换（M3 secondary tabs：选中 primary 文字 + 底部 0.8vw primary 指示条，
@@ -150,22 +193,20 @@ onUnmounted(() => {
         :class="mode === 'recommend' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
         @tap="switchMode('recommend')"
       >
-        <text class="text-title-small font-medium">推荐</text>
+        <text class="text-title-small font-medium">{{ t('novels.tab.recommend') }}</text>
       </view>
       <view
         class="flex-1 h-[12.8vw] flex items-center justify-center"
         :class="mode === 'follow' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
         @tap="switchMode('follow')"
       >
-        <text class="text-title-small font-medium">关注</text>
+        <text class="text-title-small font-medium">{{ t('novels.tab.follow') }}</text>
       </view>
     </view>
 
-    <text v-if="errorMsg && !loading" class="text-body-small text-error p-4">{{ errorMsg }}</text>
-
-    <!-- 首屏骨架（issue #91）：4~6 条列表卡占位，切 tab 重载同样显示 -->
+    <!-- 首载三态（ADR-0150）：骨架 → 错误 → 空态 → 内容，互斥单链；不依赖 loading 标志 -->
     <!-- [lynx:fix] 骨架屏高度约束在导航栏下方内容区内（不占满全屏，issue #129） -->
-    <view v-if="loading && novels.length === 0" class="w-full flex-1 min-h-0">
+    <view v-if="view === 'skeleton'" class="w-full flex-1 min-h-0">
       <view v-for="n in 5" :key="n" class="m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
         <view class="shimmer h-[32rpx] rounded-[var(--md-shape-extra-small)] w-[75%]" />
         <view class="shimmer h-[24rpx] rounded-[var(--md-shape-extra-small)] mt-1.5 w-[40%]" />
@@ -173,25 +214,17 @@ onUnmounted(() => {
         <view class="shimmer h-[24rpx] rounded-[var(--md-shape-extra-small)] mt-2 w-[60%]" />
       </view>
     </view>
-
-    <!-- 关注视图空态（P0-T5） -->
-    <view v-if="mode === 'follow' && !loading && !errorMsg && novels.length === 0" class="w-full flex-1 min-h-0 flex items-center justify-center">
+    <text v-else-if="view === 'error'" class="text-body-small text-error p-4">{{ errorMsg }}</text>
+    <!-- 空态：仅「已成功落定为空」才显示（spec 加固 3：杜绝「无数据 → 纯空白」） -->
+    <view v-else-if="view === 'empty'" class="w-full flex-1 min-h-0 flex items-center justify-center">
       <view class="flex flex-col items-center">
         <text class="text-[10.667vw] leading-none text-outline-variant">✎</text>
-        <text class="text-body-large text-surface-on mt-3">暂无关注小说</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">关注的小说作者发布新作品后会展示在这里</text>
-      </view>
-    </view>
-    <!-- 推荐视图空态（spec 加固 3）：杜绝「无数据 → 纯空白」 -->
-    <view v-if="mode === 'recommend' && !loading && !errorMsg && novels.length === 0" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <view class="flex flex-col items-center">
-        <text class="text-[10.667vw] leading-none text-outline-variant">✎</text>
-        <text class="text-body-large text-surface-on mt-3">暂无推荐小说</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">稍后再来看看，会有新的推荐</text>
+        <text class="text-body-large text-surface-on mt-3">{{ emptyMeta.title }}</text>
+        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ emptyMeta.hint }}</text>
       </view>
     </view>
 
-    <RefreshableList v-if="novels.length > 0" :refresh="refreshFeed" :fab="false" @back-to-top="refreshEpoch++">
+    <RefreshableList v-else :refresh="refreshFeed" :fab="false" @back-to-top="refreshEpoch++">
     <template #default="{ onScroll }">
     <list
       :key="refreshEpoch"
@@ -204,7 +237,7 @@ onUnmounted(() => {
       @scroll="onScroll"
     >
       <list-item
-        v-for="item in novels"
+        v-for="item in visibleNovels"
         :key="item.id"
         :item-key="String(item.id)"
         class="w-full"
@@ -214,32 +247,34 @@ onUnmounted(() => {
              流内无 absolute——真机 Lynx 的 absolute 子元素会被 single list item
              高度测量算进内容高度，导致整卡撑满内容区，实测 2026-08-11） -->
         <RestrictedNovelCard v-if="isRestricted(item)" :item="item" />
+        <AiRestrictedNovelCard v-else-if="isAiRestricted(item)" :item="item" />
         <view v-else class="relative flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
           <view class="flex-1 flex flex-col">
             <text class="text-title-medium font-medium text-surface-on [max-line:2]">{{ item.title }}</text>
             <text class="text-body-medium text-surface-on-variant mt-1.5">by {{ item.user.name }}</text>
             <view class="flex flex-row mt-1.5">
-              <text class="text-label-medium text-surface-on-variant mr-4">{{ item.text_length }} 字</text>
+              <text class="text-label-medium text-surface-on-variant mr-4">{{
+                t('novels.charCount', { count: item.text_length })
+              }}</text>
               <text v-if="item.total_bookmarks > 0" class="text-label-medium text-surface-on-variant mr-4">
                 ♥ {{ item.total_bookmarks }}
               </text>
             </view>
-            <view class="flex flex-row flex-wrap mt-2">
-              <text
-                v-for="tag in item.tags.slice(0, 3)"
-                :key="tag.name"
-                class="h-[8.533vw] px-2 border border-outline rounded-[var(--md-shape-small)] flex items-center justify-center m-0.5 text-label-large text-surface-on-variant bg-surface"
-              >
-                #{{ tag.translated_name || tag.name }}
-              </text>
-            </view>
+            <!-- 自适应标签行（ADR-0149）：装多少算多少 + 省略号截断 + 「+N」；
+                 chip 点击 → 全局搜索，+N/截断 chip → 进详情 -->
+            <AdaptiveTagRow
+              class="mt-2"
+              :tags="item.tags"
+              @tag-tap="onTagTap"
+              @overflow-tap="openDetail(item.id)"
+            />
           </view>
         </view>
       </list-item>
       <list-item v-if="loadingMore || pageErrorMsg || endOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text v-if="loadingMore" class="text-body-medium text-outline">加载中…</text>
+        <text v-if="loadingMore" class="text-body-medium text-outline">{{ t('novels.footer.loading') }}</text>
         <text v-else-if="pageErrorMsg" class="text-body-medium text-error">{{ pageErrorMsg }}</text>
-        <text v-else class="text-body-medium text-outline">没有更多了</text>
+        <text v-else class="text-body-medium text-outline">{{ t('novels.footer.end') }}</text>
       </list-item>
     </list>
     </template>

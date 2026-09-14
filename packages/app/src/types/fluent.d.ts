@@ -4,11 +4,13 @@
  * @fluentui/web-components 提供了 Web Components 的实现和类型定义，
  * 但未声明 SolidJS 的 JSX.IntrinsicElements。本文件补充这些声明，
  * 使 <fluent-button> 等自定义元素在 SolidJS JSX 中通过类型检查。
+ *
+ * SolidJS 2.0：JSX 类型归属 @solidjs/web（模块化 namespace），模块扩充目标随之变更。
  */
 
-import "solid-js";
+import "@solidjs/web";
 
-declare module "solid-js" {
+declare module "@solidjs/web" {
   namespace JSX {
     interface IntrinsicElements {
       "fluent-badge": Record<string, unknown>;

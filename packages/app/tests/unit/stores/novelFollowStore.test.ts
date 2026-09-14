@@ -40,7 +40,7 @@ vi.mock("@tanstack/solid-query", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...(actual as Record<string, unknown>),
-    createInfiniteQuery: vi.fn(
+    useInfiniteQuery: vi.fn(
       (optsAccessor: () => { queryKey: readonly unknown[]; enabled: boolean }) => {
         const mock = {} as Record<string, unknown>;
         function currentOpts() {
@@ -56,6 +56,16 @@ vi.mock("@tanstack/solid-query", async (importOriginal) => {
           isFetching: {
             get() {
               return getQ(queryKeyToLookupKey(currentOpts().queryKey)).isFetching;
+            },
+            enumerable: true,
+          },
+          // solid-query 6 兼容（#415）：工厂 loading 读取已提交通道 fetchStatus，mock 补齐 v6 真实结果形状字段
+          fetchStatus: {
+            get() {
+              // 由 isFetching 派生，保持真实不变量「isFetching=true ⇒ fetchStatus='fetching'」
+              return getQ(queryKeyToLookupKey(currentOpts().queryKey)).isFetching
+                ? "fetching"
+                : "idle";
             },
             enumerable: true,
           },
@@ -230,6 +240,7 @@ describe("novelFollowStore", () => {
     getQ("follow_public").error = { type: ApiErrorType.SERVER, message: "err" };
     const store = await loadStore();
     store.setNovelFollowTab("public");
+    flush(); // 2.0 批处理语义：tab signal set 后同步读返回旧值，activeKeys 会选错查询
     expect(store.error()?.type).toBe(ApiErrorType.SERVER);
   });
 

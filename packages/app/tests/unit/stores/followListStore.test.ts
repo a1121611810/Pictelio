@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { PixivUserPreview } from "@/api/types";
 
 // ── Mock TanStack Query for followListStore ──
-// Note: createTQFeedStore 工厂内部使用 createInfiniteQuery，
+// Note: createTQFeedStore 工厂内部使用 useInfiniteQuery，
 // 工厂的 items 访问器读取 data.pages[].items，因此 mock data
 // 使用 items 字段（与 API 原始 user_previews 不同）。
 type MockInfiniteData<T> = {
@@ -22,7 +22,7 @@ vi.mock("@tanstack/solid-query", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...(actual as Record<string, unknown>),
-    createInfiniteQuery: (...args: unknown[]) => {
+    useInfiniteQuery: (...args: unknown[]) => {
       const optsAccessor = args[0] as () => { enabled?: boolean };
       return {
         get data() {

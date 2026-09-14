@@ -4,23 +4,20 @@
 // oracle = 双侧源码本身（Java @PluginMethod 注解 ↔ TS interface 声明），
 // 非手写自洽字段——单侧改动即测试报警。
 import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const JAVA_ROOT = "../../../android/app/src/webview/java/io/pictelio/app/";
-const OTA_PLUGIN_JAVA = readFileSync(
-  new URL(`${JAVA_ROOT}OtaPlugin.java`, import.meta.url),
-  "utf-8",
-);
+// Solid 2.0 迁移注：happy-dom 测试姿态下 vite 会改写 `new URL(rel, import.meta.url)`
+// 资产模式（http URL 下抛 "The URL must be of scheme file"）。改用与
+// differential 契约测试相同的 fileURLToPath 显式路径解析（import.meta.url 恒 file://）。
+const TEST_DIR = dirname(fileURLToPath(import.meta.url));
+const JAVA_DIR = resolve(TEST_DIR, "../../../android/app/src/webview/java/io/pictelio/app/");
+const OTA_PLUGIN_JAVA = readFileSync(resolve(JAVA_DIR, "OtaPlugin.java"), "utf-8");
 // #252 重构后安装流水线拆至 OtaInstaller（插件与 Worker 共用），契约面 = 两文件并集
-const OTA_INSTALLER_JAVA = readFileSync(
-  new URL(`${JAVA_ROOT}OtaInstaller.java`, import.meta.url),
-  "utf-8",
-);
-const OTA_WORKER_JAVA = readFileSync(
-  new URL(`${JAVA_ROOT}OtaWorker.java`, import.meta.url),
-  "utf-8",
-);
-const OTA_TS = readFileSync(new URL("../../../src/native/Ota.ts", import.meta.url), "utf-8");
+const OTA_INSTALLER_JAVA = readFileSync(resolve(JAVA_DIR, "OtaInstaller.java"), "utf-8");
+const OTA_WORKER_JAVA = readFileSync(resolve(JAVA_DIR, "OtaWorker.java"), "utf-8");
+const OTA_TS = readFileSync(resolve(TEST_DIR, "../../../src/native/Ota.ts"), "utf-8");
 
 /** Java @PluginMethod 方法名（紧随注解的 public void x(PluginCall ...)） */
 function extractJavaPluginMethods(source: string): string[] {

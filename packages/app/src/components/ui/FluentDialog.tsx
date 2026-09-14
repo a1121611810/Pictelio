@@ -1,4 +1,5 @@
-import { type Component, createEffect, type JSX, onCleanup, onMount } from "solid-js";
+import type { JSX } from "@solidjs/web";
+import { type Component, createEffect, onCleanup, onSettled, untrack } from "solid-js";
 
 interface FluentDialogProps {
   /** 是否打开（true → show()，false → hide()） */
@@ -86,7 +87,8 @@ const FluentDialog: Component<FluentDialogProps> = (props) => {
     if (inner) {
       // 就绪帧可能晚到：同一宏任务内 open 已翻转为 false 时不得再 show，
       // 否则用户关掉的弹窗会被重新弹开。判 props.open 既消除竞态也保证幂等。
-      if (props.open && !inner.open) callHost("show");
+      // rAF 回调是有意的一次性快照读（每帧取当下 open），按 2.0 语义显式 untrack。
+      if (untrack(() => props.open) && !inner.open) callHost("show");
       return;
     }
     if (framesLeft <= 0) {
@@ -96,21 +98,24 @@ const FluentDialog: Component<FluentDialogProps> = (props) => {
     requestAnimationFrame(() => showWhenReady(framesLeft - 1));
   }
 
-  /** 把当前 open 状态同步到宿主 */
-  function syncOpenToHost() {
+  /** 把 open 状态同步到宿主（open 由调用方传入：apply 段禁止读响应式代理） */
+  function syncOpenToHost(open: boolean) {
     if (!ref) return;
-    if (props.open) {
+    if (open) {
       showWhenReady();
     } else if (isOpen()) {
       callHost("hide");
     }
   }
 
-  createEffect(() => {
-    // 追踪 props.open 变化；ref 未就绪时跳过，由 onMount 兜底
-    void props.open;
-    syncOpenToHost();
-  });
+  // Solid 2.0 拆分：compute 只追踪 props.open，apply 段接收普通值做 DOM 副作用（untracked）
+  createEffect(
+    () => props.open,
+    (open) => {
+      // ref 未就绪时跳过，由 onSettled 兜底
+      syncOpenToHost(open);
+    },
+  );
 
   onCleanup(() => {
     disposed = true;
@@ -121,17 +126,27 @@ const FluentDialog: Component<FluentDialogProps> = (props) => {
   let bodyRef: HTMLElement | undefined;
 
   // ref 回调在元素创建时触发，此时 children 尚未插入；
-  // onMount 在整棵子树（含 children）挂载完成后触发，此时重映射才可靠。
-  onMount(() => {
+  // onSettled 在整棵子树（含 children）挂载完成后触发，此时重映射才可靠。
+  onSettled(() => {
     if (bodyRef) remapSlots(bodyRef);
     // 兜底：createEffect 首跑时 ref 可能因自定义元素异步升级未就绪，
     // 当 open 恒定 true（不再变化）时 effect 不会重跑，show 会被跳过。
-    // onMount 时 ref 一定就绪，补一次状态同步，保证初始 open=true 必开。
-    syncOpenToHost();
+    // onSettled 时 ref 一定就绪，补一次状态同步，保证初始 open=true 必开。
+    // （onSettled 作用域内响应式读取是合法的一次性读，无需 untrack。）
+    syncOpenToHost(props.open);
   });
 
+  // Solid 2.0：数组 ref 中的裸变量不会像 ref={var} 那样被编译器回写赋值，
+  // 必须用具名回调捕获宿主元素，再与 fluentOn 组成数组 ref
+  const attachHostRef = (el: HTMLElement) => {
+    ref = el;
+  };
+
   return (
-    <fluent-dialog ref={ref} aria-label={props["aria-label"]} on:close={() => props.onClose?.()}>
+    <fluent-dialog
+      ref={[attachHostRef, fluentOn("close", () => props.onClose?.())]}
+      aria-label={props["aria-label"]}
+    >
       <fluent-dialog-body ref={bodyRef}>{props.children}</fluent-dialog-body>
     </fluent-dialog>
   );

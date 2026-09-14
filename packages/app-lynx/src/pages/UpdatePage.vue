@@ -3,6 +3,7 @@
 defineOptions({ name: 'update' })
 import { useUpdateStore } from '../stores/updateStore'
 import { UPDATE_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import { t } from '../i18n'
 
 const update = useUpdateStore()
 
@@ -33,27 +34,27 @@ const changelogLines = () =>
         :accessibility-label="UPDATE_A11Y_LABELS.exit"
         @tap="update.exitUpdatePage"
       >
-        <text class="text-label-large text-error pr-4">退出应用</text>
+        <text class="text-label-large text-error pr-4">{{ t('update.exit') }}</text>
       </view>
       <text
         class="flex-1 text-title-large font-medium text-surface-on"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="UPDATE_A11Y_LABELS.pageTitle"
-        >更新</text
+        >{{ t('update.title') }}</text
       >
     </view>
 
     <scroll-view scroll-orientation="vertical" class="w-full flex-1 px-4">
       <!-- 版本信息 -->
       <view class="mt-[8vw] flex flex-col items-center">
-        <text class="text-body-medium text-outline">发现新版本</text>
+        <text class="text-body-medium text-outline">{{ t('update.newVersion') }}</text>
         <text class="text-headline-medium font-bold text-surface-on mt-2">v{{ update.updateResult?.latestVersion }}</text>
-        <text class="text-body-small text-outline mt-2">当前版本 v{{ appVersion }}</text>
+        <text class="text-body-small text-outline mt-2">{{ t('update.currentVersion', { version: appVersion }) }}</text>
       </view>
 
       <!-- 更新内容（changelog 多行） -->
       <view class="bg-surface-container-lowest mt-[6vw] p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
-        <text class="text-title-small font-medium text-surface-on">更新内容</text>
+        <text class="text-title-small font-medium text-surface-on">{{ t('update.changelogTitle') }}</text>
         <view v-if="changelogLines().length" class="mt-3 flex flex-col gap-1">
           <text
             v-for="(line, i) in changelogLines()"
@@ -62,7 +63,7 @@ const changelogLines = () =>
             >{{ line }}</text
           >
         </view>
-        <text v-else class="text-body-small text-outline mt-3">暂无更新说明</text>
+        <text v-else class="text-body-small text-outline mt-3">{{ t('update.noChangelog') }}</text>
       </view>
 
       <!-- 下载新版本（页面唯一主动作） -->
@@ -72,7 +73,7 @@ const changelogLines = () =>
         :accessibility-label="UPDATE_A11Y_LABELS.download"
         @tap="update.openReleasePage"
       >
-        <text class="text-label-large text-primary-on font-medium">下载新版本</text>
+        <text class="text-label-large text-primary-on font-medium">{{ t('update.download') }}</text>
       </view>
 
       <!-- 底部留白 -->

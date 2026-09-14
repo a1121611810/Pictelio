@@ -116,5 +116,17 @@ export interface Settings {
   remove(key: string): Promise<void>;
   get<T = unknown>(key: string): SettingHandle<T> | undefined;
   snapshot(): Record<string, unknown>;
+  /**
+   * 备份域原始字符串快照（spec docs/specs/webdav-backup.md §3.2 口径）：
+   * 逐已注册键读其存储层原始字符串（含动态工厂已实例化的账号级键；
+   * 未实例化 uid 不出现，天然只含当前账号）。读取失败/无记录者省略。
+   */
+  rawValues(): Promise<Record<string, string>>;
+  /**
+   * 恢复写回（spec §6 merge-by-keys）：仅写已注册键（未注册键跳过并返回）；
+   * 经 decode → handle.set 走正常管线（内存 + apply 钩子 + 持久化）。
+   * 返回 { applied, skipped }（skipped 含未注册与损坏值）。
+   */
+  setRawValues(entries: Record<string, string>): Promise<{ applied: string[]; skipped: string[] }>;
   onChange(cb: (key: string, value: unknown) => void): () => void;
 }

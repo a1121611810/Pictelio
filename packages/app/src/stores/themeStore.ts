@@ -1,10 +1,5 @@
 import { settings } from "@/settings";
-import { applyPageStyleClass, applyDarkClass } from "@/utils/themeApplier";
-
-/** 页面风格主题 */
-export type PageStyleThemeId = "fluent" | "card";
-
-export const PAGE_STYLE_THEME_IDS: readonly PageStyleThemeId[] = ["fluent", "card"];
+import { applyDarkClass } from "@/utils/themeApplier";
 
 /** 明暗主题 */
 export type Theme = "light" | "dark" | "system";
@@ -53,24 +48,6 @@ export function setTheme(t: Theme): void {
 /** 设置并持久化明暗主题（registry 接管 Preferences + localStorage 镜像双写） */
 export function setThemePersisted(newTheme: Theme): void {
   themeHandle.set(newTheme);
-}
-
-// ── 页面风格主题状态（统一 settings registry 管理）──
-
-const pageStyleHandle = settings.define<PageStyleThemeId>({
-  key: "page_style_theme",
-  default: "fluent",
-  storage: "mirrored",
-  syncInit: true,
-  validate: (v): v is PageStyleThemeId =>
-    (PAGE_STYLE_THEME_IDS as readonly string[]).includes(v as string),
-  apply: (id) => applyPageStyleClass(id),
-});
-
-export const pageStyleTheme = (): PageStyleThemeId => pageStyleHandle.value();
-
-export function setPageStyleTheme(id: PageStyleThemeId): void {
-  pageStyleHandle.set(id);
 }
 
 // ── 模块级副作用：系统主题跟随 ──

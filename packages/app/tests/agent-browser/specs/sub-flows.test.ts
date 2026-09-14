@@ -139,7 +139,7 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 共享会话", 
       const novelReady = await evalBool(driver, NOVEL_FEED_READY_JS);
       expect(novelReady, "小说 Feed 应展示小说卡片或空状态").toBe(true);
 
-      await driver.clickReliable("插画");
+      await driver.clickReliable("插画", undefined, '[data-testid="content-type-illust"]');
       // 等插画 Feed 就绪，替代固定 SLEEP
       await driver.waitForJs(ILLUST_FEED_READY_JS, 15_000);
 
@@ -198,10 +198,14 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 共享会话", 
         15_000,
       );
       expect(bookmarkBtnReady, "详情页应存在收藏按钮").toBe(true);
-      // 点击收藏（evaluate 注入 el.click()，CLI click 对 fluent-button 不可靠）
-      await driver.evaluate(
-        `(() => { const b = document.querySelector('[aria-label="收藏"]'); if (b) { b.click(); return "clicked"; } return "not-found"; })()`,
-      );
+      // 点击收藏：详情页心形只挂 pointerdown/pointerup（ADR-0160 D4 双轨收藏——
+      // 单击 = 快速收藏，长按 500ms = 收藏面板），el.click() 不触发任何收藏路径；
+      // 故按「短按」派发指针手势（pointerup 早于 500ms 长按阈值即走快速收藏）
+      const tapBookmark = () =>
+        driver.evaluate(
+          `(() => { const b = document.querySelector('[aria-label="收藏"], [aria-label="取消收藏"]'); if (!b) return "not-found"; b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); b.dispatchEvent(new PointerEvent('pointerup', { bubbles: true })); return "tapped"; })()`,
+        );
+      expect(await tapBookmark(), "应能对收藏按钮派发短按手势").toContain("tapped");
       // C 方向：确定性断言替代 LLM（宽松语义，收藏接口依赖真实网络）——按钮 aria-label 变化或页面无错误
       await driver.waitForJs(
         "document.querySelector('[aria-label=取消收藏]') !== null || document.body.innerText.includes('加载失败')",
@@ -211,6 +215,9 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 共享会话", 
         false,
       );
 
+      // 取消收藏（本用例题为「收藏与取消收藏」，此处补齐第二次短按动作——
+      // 原实现只点击一次，下一步断言恒真、无实际覆盖）
+      expect(await tapBookmark(), "应能再次派发短按手势以取消收藏").toContain("tapped");
       // 取消收藏后：按钮恢复或页面无错误（宽松语义）
       await driver.waitForJs(
         "document.querySelector('[aria-label=收藏]') !== null || document.body.innerText.includes('加载失败')",
@@ -434,6 +441,11 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 共享会话", 
       const dialogShown = await driver.waitForText("开启图床代理？", 10_000);
       // C 方向：确定性断言替代 LLM —— 确认对话框标题出现
       expect(dialogShown, "点击开关后应弹出「开启图床代理？」确认对话框").toBe(true);
+      // 等弹窗真正 open（同 test 3：innerText 出现 ≠ open 完成，#418）
+      await driver.waitForJs(
+        "[...document.querySelectorAll('fluent-dialog')].some((d) => d.shadowRoot?.querySelector('dialog')?.open === true)",
+        10_000,
+      );
 
       // 点击"取消"
       await driver.clickReliable("取消");
@@ -472,25 +484,44 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("agent-browser 共享会话", 
         if (!sw2.includes("clicked")) console.warn("[图床设置] fluent-switch 未找到");
         // 等确认对话框出现，替代固定 SLEEP
         await driver.waitForText("开启图床代理？", 10_000);
-
-        // 点击"确认开启"
-        await driver.clickReliable("确认开启");
-        // 等开关进入打开状态（确认生效 + 弹窗关闭），替代固定 SLEEP
+        // 等弹窗真正 open（ADR-0087：自定义元素异步升级 + shadow 内 <dialog> show
+        // 是异步的；innerText 出现 ≠ open 完成——就绪前点击确认不生效，#418 实测）
         await driver.waitForJs(
-          "document.querySelector('fluent-switch[aria-label=\"启用图床代理\"]')?.checked === true",
+          "[...document.querySelectorAll('fluent-dialog')].some((d) => d.shadowRoot?.querySelector('dialog')?.open === true)",
           10_000,
         );
 
-        // C 方向：确定性断言替代 LLM —— 确认后开关打开（读 property）且弹窗关闭
-        const enabledChecked = JSON.parse(
+        // 点击"确认开启"
+        // FluentDialog action 插槽内的按钮对 snapshot-ref/text 点击不可靠（#418 实测：
+        // ref 命中失败且宽松 aria fallback 找不到目标），改精确文本 evaluate 点击
+        //（与手工验证 3/3 通过的路径一致）。
+        // 确认点击偶发被吞（重开过渡窗口），带界内重试：点击后 3s 内 checked 未翻
+        // true 则再点，最多 3 次——应用语义 = 确认必然生效（手工 5/5），重试只消
+        // 除时序窗口，不改变断言语义。
+        let enabledChecked = false;
+        for (let attempt = 0; attempt < 3 && !enabledChecked; attempt++) {
           await driver.evaluate(
-            "document.querySelector('[aria-label=\"启用图床代理\"]')?.checked ?? false",
-          ),
-        ) as boolean;
+            `(() => {
+              const b = [...document.querySelectorAll('fluent-button')].find(
+                (x) => x.textContent.trim() === '确认开启',
+              );
+              if (b) { b.click(); return 'confirmed'; }
+              return 'no-btn';
+            })()`,
+          );
+          enabledChecked = await driver.waitForJs(
+            "document.querySelector('fluent-switch[aria-label=\"启用图床代理\"]')?.checked === true",
+            3_000,
+          );
+        }
+
+        // C 方向：确定性断言替代 LLM —— 确认后开关打开（读 property）且弹窗关闭。
+        // 注意关闭动画（300ms gentle）期间 innerText 仍含标题文本，弹窗关闭断言
+        // 必须给动画预算（#418 实测：checked=true 后立即读文本会误报未关闭）。
         expect(enabledChecked, "确认开启后主开关应处于打开状态").toBe(true);
-        const dialogGone = await evalBool(
-          driver,
+        const dialogGone = await driver.waitForJs(
           '!document.body.innerText.includes("开启图床代理？")',
+          5_000,
         );
         expect(dialogGone, "确认后对话框应关闭").toBe(true);
 

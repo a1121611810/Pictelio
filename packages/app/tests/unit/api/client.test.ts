@@ -551,3 +551,63 @@ describe("apiClient.get — error classification", () => {
     });
   });
 });
+
+// ─── 原生 POST 线形态（ADR-0161）────────────────────────────────────────────
+// oracle 溯源（2026-09-14 双实证）：
+// 1) host 侧直连 Pixiv 实测：`POST /v2/illust/bookmark/add?illust_id=…&restrict=…`（query 承载、
+//    空 body）→ HTTP 400「不正なリクエストです」；同一请求改为 `application/x-www-form-urlencoded`
+//    表单体 → HTTP 200 且服务端 bookmark/detail 立即 is_bookmarked=true；
+//    `POST /v1/illust/bookmark/delete?illust_id=…`（query 承载）同样被拒（404 同错误体）。
+// 2) 同仓语义一致性：web 分支（本文件下方既有用例）与 app-lynx 原生分支都以 URLSearchParams
+//    表单体发送 POST；webview 原生分支是唯一把载荷塞进 query 的通道。
+// 据此锁定契约：原生 POST ⇒ `body` = 表单编码串、`params` = undefined；GET ⇒ `params` 照旧。
+describe("原生请求线形态（ADR-0161）", () => {
+  it("POST：载荷走表单体，不放进 query（否则 Pixiv 返回 400/404）", async () => {
+    isNativeMock.mockReturnValue(true);
+    try {
+      const { apiClient } = await loadModule();
+      const { PixivApi } = await import("@/native/PixivApi");
+      (PixivApi.request as ReturnType<typeof vi.fn>).mockResolvedValue({ status: 200, data: "{}" });
+
+      await apiClient.post("/v2/illust/bookmark/add", {
+        illust_id: "146304729",
+        restrict: "public",
+        "tags[]": "a b",
+      });
+
+      expect(PixivApi.request).toHaveBeenCalledTimes(1);
+      const arg = (PixivApi.request as ReturnType<typeof vi.fn>).mock.calls[0][0] as {
+        method: string;
+        path: string;
+        params?: unknown;
+        body?: string;
+      };
+      expect(arg.method).toBe("POST");
+      expect(arg.path).toBe("/v2/illust/bookmark/add");
+      expect(arg.params).toBeUndefined();
+      expect(arg.body).toBe("illust_id=146304729&restrict=public&tags%5B%5D=a+b");
+    } finally {
+      isNativeMock.mockReturnValue(false);
+    }
+  });
+
+  it("GET：参数仍走 query，不产生 body（回归保护）", async () => {
+    isNativeMock.mockReturnValue(true);
+    try {
+      const { apiClient } = await loadModule();
+      const { PixivApi } = await import("@/native/PixivApi");
+      (PixivApi.request as ReturnType<typeof vi.fn>).mockResolvedValue({ status: 200, data: "{}" });
+
+      await apiClient.get("/v2/illust/bookmark/detail", { illust_id: "146304729" });
+
+      const arg = (PixivApi.request as ReturnType<typeof vi.fn>).mock.calls[0][0] as {
+        params?: Record<string, string>;
+        body?: string;
+      };
+      expect(arg.params).toEqual({ illust_id: "146304729" });
+      expect(arg.body).toBeUndefined();
+    } finally {
+      isNativeMock.mockReturnValue(false);
+    }
+  });
+});

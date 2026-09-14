@@ -60,4 +60,6 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 网络自检：读 NetworkCapabilities（类型/validated/captive/metered）。normal 权限，无需运行时申请，且不碰 SSID/位置。 -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 </manifest>

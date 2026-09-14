@@ -4,7 +4,7 @@
 // 全局限制，现有页面的品牌色在 web 预览同样缺失，仅白底设计不明显）。
 // 错误页 C 为全屏品牌紫，缺失时退化为白底 → 预览用内联具体色值展示效果；
 // 生产 ErrorPage.vue 用令牌版（真机 lynx 的 CSS 变量机制正常）。
-// 色值取自 tokens.css：primary=#6750a4、on-primary=#ffffff。
+// 色值取自 tokens.css：primary=#1a6fa8、on-primary=#ffffff。
 import { ERROR_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import type { ApiError } from '../api/types'
 
@@ -13,7 +13,7 @@ defineProps<{ error: ApiError | null }>()
 
 <template>
   <view
-    style="display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #6750a4; padding: 40px; width: 100%; height: 100%;"
+    style="display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #1a6fa8; padding: 40px; width: 100%; height: 100%;"
   >
     <text
       style="font-size: 32px; font-weight: 700; color: #ffffff; text-align: center;"
@@ -30,7 +30,7 @@ defineProps<{ error: ApiError | null }>()
       :accessibility-element="A11Y_ELEMENT_ENABLED"
       :accessibility-label="ERROR_A11Y_LABELS.backToLogin"
     >
-      <text style="font-size: 16px; color: #6750a4; font-weight: 600;">返回登录</text>
+      <text style="font-size: 16px; color: #1a6fa8; font-weight: 600;">返回登录</text>
     </view>
   </view>
 </template>

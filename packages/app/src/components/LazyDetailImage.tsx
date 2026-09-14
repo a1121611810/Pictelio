@@ -1,5 +1,4 @@
 import type { Component } from "solid-js";
-import { onCleanup } from "solid-js";
 import PixivImage from "./PixivImage";
 import { createEverVisible } from "@/primitives/visibility";
 import { LAZY_LOAD_MARGIN } from "../primitives/rootMargins";
@@ -59,57 +58,67 @@ const LazyDetailImage: Component<Props> = (props) => {
   // loadImage 内部有 inflight dedup，同一 URL 重复调用只发一次请求。
 
   // 1. src 变化时重置 cacheReadyFor 和 retryTrigger，确保跨插图导航时从骨架屏重新开始
-  createEffect(() => {
-    void props.src;
-    setCacheReadyFor("");
-    setRetryTrigger(0);
-  });
+  // Solid 2.0 拆分：compute 追踪 src，apply 段写 signal（合法）
+  createEffect(
+    () => props.src,
+    () => {
+      setCacheReadyFor("");
+      setRetryTrigger(0);
+    },
+  );
 
   // 2. cacheReadyFor 不是当前 src 且 shouldLoad 为 true 时触发 loadImage
-  createEffect(() => {
-    let cancelled = false;
-    onCleanup(() => {
-      cancelled = true;
-    });
+  // Solid 2.0 拆分：compute 提取普通值快照，apply 段发起加载并统一返回 cleanup
+  //（替代原三处 onCleanup：取消标志 / 重试定时器 / 超时定时器）
+  createEffect(
+    () => ({
+      src: props.src,
+      attempt: retryTrigger(),
+      should: shouldLoad(),
+      ready: cacheReadyFor(),
+    }),
+    (s) => {
+      if (!s.should || !s.src || s.ready === s.src) return;
 
-    const src = props.src;
-    const attempt = retryTrigger();
-    if (shouldLoad() && src && cacheReadyFor() !== src) {
+      let cancelled = false;
       let retryTimer: ReturnType<typeof setTimeout> | undefined;
-      onCleanup(() => {
-        if (retryTimer) clearTimeout(retryTimer);
-      });
+      let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
 
       const LOAD_TIMEOUT = 12_000;
       const loadWithTimeout = Promise.race([
-        loadImage(src),
+        loadImage(s.src),
         new Promise<never>((_, reject) => {
-          const t = setTimeout(() => reject(new Error("loadImage timeout")), LOAD_TIMEOUT);
-          onCleanup(() => clearTimeout(t));
+          timeoutTimer = setTimeout(() => reject(new Error("loadImage timeout")), LOAD_TIMEOUT);
         }),
       ]);
 
       loadWithTimeout
         .then(() => {
-          if (!cancelled && props.src === src) {
-            setCacheReadyFor(src);
+          if (!cancelled && props.src === s.src) {
+            setCacheReadyFor(s.src);
           }
         })
         .catch(() => {
-          if (!cancelled && props.src === src) {
-            if (attempt < MAX_RETRIES) {
+          if (!cancelled && props.src === s.src) {
+            if (s.attempt < MAX_RETRIES) {
               retryTimer = setTimeout(() => {
-                if (!cancelled) setRetryTrigger(attempt + 1);
+                if (!cancelled) setRetryTrigger(s.attempt + 1);
               }, RETRY_DELAY_MS);
             } else {
               // 所有重试均失败，仍标记就绪让 PixivImage 渲染，
               // shouldInterceptRequest 通过 OkHttp 兜底下载
-              setCacheReadyFor(src);
+              setCacheReadyFor(s.src);
             }
           }
         });
-    }
-  });
+
+      return () => {
+        cancelled = true;
+        if (retryTimer) clearTimeout(retryTimer);
+        if (timeoutTimer) clearTimeout(timeoutTimer);
+      };
+    },
+  );
 
   const canDisplayImage = createMemo(
     () => props.src && cacheReadyFor() === props.src && shouldLoad(),

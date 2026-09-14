@@ -16,15 +16,32 @@ export const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "
 /** monorepo 根目录 */
 export const REPO_ROOT = resolve(APP_ROOT, "..", "..");
 
-/** debug APK 产物路径（pnpm build:android 输出；ADR-0062 flavor 拆分后为 full flavor） */
+/** E2E 目标 flavor（ANDROID_E2E_FLAVOR=webview 时跑单引擎 webview 包；默认 full） */
+export type E2eFlavor = "full" | "webview";
+export const E2E_FLAVOR: E2eFlavor =
+  process.env.ANDROID_E2E_FLAVOR === "webview" ? "webview" : "full";
+
+/**
+ * debug APK 产物路径。`pnpm build:android` 的 `assembleDebug` 会构建全部 flavor，
+ * 故同一构建产物即可切换 E2E 目标包（ADR-0062 flavor 拆分）。
+ */
 export const APK_PATH = resolve(
   APP_ROOT,
-  "android/app/build/outputs/apk/full/debug/app-full-debug.apk",
+  `android/app/build/outputs/apk/${E2E_FLAVOR}/debug/app-${E2E_FLAVOR}-debug.apk`,
 );
 
-/** App 包名与主入口 Activity（冒烟测试断言目标） */
+/** App 包名与主入口 Activity（按 flavor 变化；冒烟测试断言目标） */
 export const APP_PACKAGE = "io.pictelio.app";
-export const MAIN_ACTIVITY = `${APP_PACKAGE}.MainActivity`;
+export const MAIN_ACTIVITY =
+  E2E_FLAVOR === "webview" ? `${APP_PACKAGE}.MainActivityWebview` : `${APP_PACKAGE}.MainActivity`;
+export const LYNX_ACTIVITY = `${APP_PACKAGE}.LynxActivity`;
+
+/**
+ * 全部可能的入口 Activity。低 WebView 设备上 full 包的 MainActivity 会在
+ * onCreate 内立即 finish 并路由/降级（ADR-0153），session 就绪等待必须接受
+ * 「任一入口」而非单一 MainActivity。
+ */
+export const ENTRY_ACTIVITIES = [MAIN_ACTIVITY, LYNX_ACTIVITY] as const;
 
 /** 复用本机固定 AVD（ADR-0061：不新建/删除）。pictelio_ui（android-34）优先：
  *  WebView ≥ 85（项目 minWebviewVersion），可真实运行 App；pictelio_low（android-28）
@@ -131,13 +148,29 @@ export interface RunResult {
 }
 
 /**
+ * runCapture 输出缓冲上界：logcat -d 逐帧日志（lynx OnPatchFinishForFiber 级）
+ * 可达数 MB，Node 默认 1MB 会抛 ENOBUFS（#543 实测触发，导致空响应绕过重试）。
+ * 先例：scripts/audit-real-interaction/run_regression.mjs adbBuffer 同款 64MB。
+ */
+const MAX_CAPTURE_BUFFER = 64 * 1024 * 1024;
+
+/**
  * 同步执行命令并收集输出（默认不抛错，由调用方按退出码判断）。
  * 用于 adb 探测类命令——失败本身是合法状态（如设备未连接）。
+ *
+ * timeoutMs 显式标注 number（#543）：默认值 TIMEOUTS.adb 是 as const 字面量，
+ * 不标注会把形参推断成 `30000`，调用点传其他超时即编译错误。
  */
-export function runCapture(cmd: string, args: string[], timeoutMs = TIMEOUTS.adb): RunResult {
+export function runCapture(
+  cmd: string,
+  args: string[],
+  timeoutMs: number = TIMEOUTS.adb,
+  maxBufferBytes: number = MAX_CAPTURE_BUFFER,
+): RunResult {
   const r = spawnSync(cmd, args, {
     encoding: "utf-8",
     timeout: timeoutMs,
+    maxBuffer: maxBufferBytes,
     env: cleanEnv(),
   });
   if (r.error) {
@@ -156,8 +189,13 @@ export function runCapture(cmd: string, args: string[], timeoutMs = TIMEOUTS.adb
 /**
  * 执行命令，非零退出即抛错（带 stderr 摘要）。用于必须成功的步骤（install 等）。
  */
-export function runOrThrow(cmd: string, args: string[], timeoutMs = TIMEOUTS.adb): string {
-  const r = runCapture(cmd, args, timeoutMs);
+export function runOrThrow(
+  cmd: string,
+  args: string[],
+  timeoutMs: number = TIMEOUTS.adb,
+  maxBufferBytes: number = MAX_CAPTURE_BUFFER,
+): string {
+  const r = runCapture(cmd, args, timeoutMs, maxBufferBytes);
   if (r.code !== 0) {
     throw new Error(
       `[android-e2e] 命令退出码 ${r.code}: ${cmd} ${args.join(" ")}\n` +

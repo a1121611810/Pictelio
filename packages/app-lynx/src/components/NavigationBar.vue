@@ -4,6 +4,7 @@
 // secondary-container 胶囊指示器内（on-secondary-container 色），非 active
 // 用 on-surface-variant；label 12sp。图标用 unicode 文本符号（Lynx 无 icon 库）。
 // 顶层页（推荐/插画/小说/我的）接入；点击 navigate 到对应路由。
+import { t } from '../i18n'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import type { NavTab } from './navTabs'
 
@@ -43,7 +44,7 @@ const emit = defineEmits<{
       <text
         class="text-label-medium font-medium mt-1"
         :class="activeName === tab.name ? 'text-surface-on' : 'text-surface-on-variant'"
-      >{{ tab.label }}</text>
+      >{{ t(tab.labelKey) }}</text>
     </view>
   </view>
 </template>

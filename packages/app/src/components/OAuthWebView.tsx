@@ -2,6 +2,7 @@ import type { Component } from "solid-js";
 import { Capacitor } from "@capacitor/core";
 import { toApiError } from "../api/client";
 import type { ApiError } from "../api/types";
+import { t } from "../i18n";
 
 /**
  * OAuthWebView 组件的属性。
@@ -45,18 +46,21 @@ const OAuthWebView: Component<OAuthWebViewProps> = (props) => {
       if (err?.message === "cancelled") {
         props.onCancel();
       } else {
-        props.onError(toApiError(err, "OAuth 登录失败"));
+        props.onError(toApiError(err, t("oauth.signInFailed"))); // i18n: set 时快照（瞬态）
       }
     } else {
       props.onSuccess(result.code);
     }
   };
 
-  // ── 生命周期 ──
-  createEffect(() => {
-    if (!props.open || !isNative) return;
-    void startNativeOAuth();
-  });
+  // ── 生命周期 ──（Solid 2.0 拆分：compute 追踪 open，apply 发起 OAuth）
+  createEffect(
+    () => props.open,
+    (open) => {
+      if (!open || !isNative) return;
+      void startNativeOAuth();
+    },
+  );
 
   // Web 模式下不渲染
   if (!isNative) return null;
@@ -85,10 +89,10 @@ const OAuthWebView: Component<OAuthWebViewProps> = (props) => {
               color: "var(--colorNeutralForeground1)",
             }}
           >
-            Pixiv 登录
+            {t("oauth.title")}
           </span>
           <fluent-button appearance="subtle" onClick={props.onCancel}>
-            取消
+            {t("oauth.cancel")}
           </fluent-button>
         </div>
 

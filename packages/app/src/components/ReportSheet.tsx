@@ -5,6 +5,7 @@ import {
   type ReportReason,
   REPORT_REASON_LABELS,
 } from "../stores/reportStore";
+import { t } from "../i18n";
 
 interface ReportSheetProps {
   illustId: number;
@@ -17,9 +18,10 @@ const REASONS: ReportReason[] = ["pornography", "violence", "infringement", "spa
 const REPORT_EMAIL = "a1121611810@outlook.com";
 
 function openReportEmail(illustId: number, reason: ReportReason) {
-  const subject = encodeURIComponent(`[Pictelio 举报] 作品 ID: ${illustId}`);
+  const reasonLabel = t(REPORT_REASON_LABELS[reason]);
+  const subject = encodeURIComponent(t("core.store.reportStore.emailSubject", { id: illustId }));
   const body = encodeURIComponent(
-    `举报作品 ID: ${illustId}\n举报原因: ${REPORT_REASON_LABELS[reason]}\n\n补充说明：\n`,
+    t("core.store.reportStore.emailBody", { id: illustId, reason: reasonLabel }),
   );
   window.location.href = `mailto:${REPORT_EMAIL}?subject=${subject}&body=${body}`;
 }
@@ -61,12 +63,12 @@ const ReportSheet: Component<ReportSheetProps> = (props) => {
           {/* Header */}
           <div class="flex items-center justify-between px-5 pt-1 pb-2">
             <h2 class="[font-size:var(--fontSizeBase500)] font-semibold text-[var(--colorNeutralForeground1)]">
-              举报作品
+              {t("report.title")}
             </h2>
             <fluent-button
               appearance="subtle"
-              aria-label="关闭"
-              on:click={close}
+              aria-label={t("report.closeAria")}
+              ref={fluentOn("click", close)}
               class="w-8 h-8 p-0 min-w-8"
             >
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
@@ -83,15 +85,18 @@ const ReportSheet: Component<ReportSheetProps> = (props) => {
 
           {/* Reason list */}
           <p class="px-5 pt-3 [font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
-            请选择举报原因：
+            {t("report.selectReason")}
           </p>
           <fluent-radio-group
             value={selectedReason()}
-            on:change={(e: CustomEvent) => setSelectedReason(e.detail.value)}
+            ref={fluentOn("change", (e: Event) =>
+              // fluent 自定义事件的 detail 为 any：按 ReportReason 联合收窄
+              setSelectedReason((e as CustomEvent<{ value: ReportReason }>).detail.value),
+            )}
           >
             {REASONS.map((reason) => (
               <fluent-radio value={reason} disabled={alreadyReported()}>
-                {REPORT_REASON_LABELS[reason]}
+                {t(REPORT_REASON_LABELS[reason])}
               </fluent-radio>
             ))}
           </fluent-radio-group>
@@ -102,12 +107,16 @@ const ReportSheet: Component<ReportSheetProps> = (props) => {
               appearance="primary"
               style="width:100%"
               disabled={!selectedReason() || submitting() || alreadyReported()}
-              on:click={handleSubmit}
+              ref={fluentOn("click", handleSubmit)}
             >
-              {alreadyReported() ? "已举报" : submitting() ? "提交中…" : "提交举报"}
+              {alreadyReported()
+                ? t("report.reported")
+                : submitting()
+                  ? t("report.submitting")
+                  : t("report.submit")}
             </fluent-button>
             <p class="mt-3 text-center [font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
-              提交后将打开邮件客户端发送举报详情
+              {t("report.emailHint")}
             </p>
           </div>
         </div>

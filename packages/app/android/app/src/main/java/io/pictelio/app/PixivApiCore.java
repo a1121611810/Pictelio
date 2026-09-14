@@ -41,9 +41,10 @@ final class PixivApiCore {
     private static final String API_BASE = "https://app-api.pixiv.net";
 
     private static volatile OkHttpClient client;
-    /** #53：Lynx Native Module（PictelioAuth/PictelioApi）同包读写；access_token 只进不出 */
-    static String accessToken;
-    static String refreshToken;
+    /** #53：Lynx Native Module（PictelioAuth/PictelioApi）同包读写；access_token 只进不出。
+     *  volatile：401 并发窗口（ADR-0159 复审 #1）下工作线程读、刷新线程写。 */
+    static volatile String accessToken;
+    static volatile String refreshToken;
     /** 刷新 token 中的锁，防止并发 401 重复刷新 */
     private static volatile boolean isRefreshing = false;
 
@@ -119,11 +120,18 @@ final class PixivApiCore {
             int statusCode = response.code();
             String responseBody = response.body() != null ? response.body().string() : "";
 
-            // 401 且未重试过 → 静默刷新 token 后重试
+            // 401 且未重试过 → 静默刷新 token 后重试。
+            // 并发窗口（ADR-0159 复审 #1）：桥线程卸载后多个 401 可同时到达。旧桥线程
+            // 串行下「后到 401 进锁时刷新必已完成」不再成立——若刷新已被他人完成
+            // （accessToken 相对本次请求已变化），跳过冗余刷新（OAuth 限频 30s，多余
+            // 刷新会撞限频且失败时把裸 401 泄漏给 JS），直接用新 token 重试。
+            // 注意：token 比较是有意的引用同一性（== / !=）——refreshAccessTokenCore
+            // 成功时必然赋新 String 实例；改用 equals 会把「同值新实例」误判为未刷新。
             if (statusCode == 401 && !isRetry) {
+                final String tokenBefore = accessToken;
                 String rotated = null;
                 synchronized (PixivApiCore.class) {
-                    if (!isRefreshing) {
+                    if (accessToken == tokenBefore && !isRefreshing) {
                         isRefreshing = true;
                         try {
                             rotated = refreshAccessTokenCore();
@@ -136,6 +144,10 @@ final class PixivApiCore {
                     if (rotationListener != null && !rotated.isEmpty()) {
                         rotationListener.onRefreshTokenRotated(rotated);
                     }
+                    return executeRequest(method, url, body, true, rotationListener);
+                }
+                if (accessToken != tokenBefore) {
+                    // 他人已完成刷新：共享新 token 重试一次（isRetry 防循环）
                     return executeRequest(method, url, body, true, rotationListener);
                 }
             }

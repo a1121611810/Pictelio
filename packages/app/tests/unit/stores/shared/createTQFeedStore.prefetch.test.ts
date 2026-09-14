@@ -1,4 +1,3 @@
-// @vitest-environment node
 /**
  * createTQFeedStore prefetchAllTabs 空闲预取语义（地图 #371 / #375 实施记录）。
  *
@@ -88,7 +87,12 @@ const makeStore = (): TQFeedStoreResult<Item> =>
 const fetchLog: { value: FetchLog } = { value: [] };
 
 beforeEach(() => {
-  qc.client = new QueryClient();
+  // retry:false：query-core 默认重试阶梯（1s+2s+4s）会拖垮 5s 测试超时；
+  // 本文件被测语义是预取的填空/传播/清理行为，与重试策略无关（重试策略由
+  // 应用级 queryClient 配置兜底，不在断言范围内）
+  qc.client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   qc.client.clear();
   fetchLog.value = [];
 });
@@ -237,6 +241,9 @@ describe("createTQFeedStore prefetchAllTabs（#375 空闲预取）", () => {
     expect(store.loading()).toBe(false);
     await Promise.all(store.prefetchAllTabs());
     expect(fetchLog.value.toSorted()).toEqual(["t1_a", "t1_b", "t2_main"]);
+    // 2.0 批处理语义：data projection 的落地在 fetch promise resolve 之后的微任务，
+    // loading 的 isPending 探针需先 flush 才能看到已提交状态
+    flush();
     expect(store.loading()).toBe(false);
     expect(store.isActivated()).toBe(false);
   });

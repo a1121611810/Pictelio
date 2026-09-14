@@ -17,6 +17,12 @@ import { AgentBrowserDriver } from "../driver";
 const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const BASE = "http://localhost:5173";
 
+/** driver.evaluate 输出经 CLI JSON 序列化（可能双层编码），统一剥壳转 number */
+const evalNum = (raw: string): number => {
+  const t = (raw ?? "").trim();
+  return Number(t.startsWith('"') ? (JSON.parse(t) as string) : t);
+};
+
 /** 设置浏览器视口为 360 宽（真实 resize，RO 自然触发，复现 360 机型场景） */
 function setViewport(w: number, h: number): void {
   const r = spawnSync("agent-browser", ["set", "viewport", String(w), String(h)], {
@@ -48,6 +54,15 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("AdaptiveTags 240px 窄容器�
       await driver.waitForJs(
         `document.body.innerText.includes('登录') || document.body.innerText.includes('推荐')`,
         15_000,
+      );
+
+      // 控制台警告捕获 hook（docs/specs/solidjs2-strict-read-untracked-cleanup.md，父 issue #427）：
+      // 必须在 reload 之后、登录/首页挂载之前注入才
+      // 存活（导航/reload 清空 window 属性）；覆盖 warn+error 两通道；单行注入（CLI 约束）。
+      // 同时扩容 resource timing 缓冲：默认 250 条会被 dev 模式 Vite 模块请求（/@fs/）填满，
+      // /pixiv-img/ 条目被丢弃，导致下方阳性对照假红（#429 实测 resN 恰好=250）
+      await driver.evaluate(
+        `performance.setResourceTimingBufferSize(10000);window.__strictWarns=[];['warn','error'].forEach(m=>{const o=console[m].bind(console);console[m]=(...a)=>{window.__strictWarns.push(a.map(String).join(' '));o(...a)}});'ok'`,
       );
 
       // 登录（真实请求；dev 模式走 Vite 代理；ADR-0103：年龄确认已移除，无拦截）
@@ -104,8 +119,9 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("AdaptiveTags 240px 窄容器�
       }
       console.log(`[probe] 有标签 chip: ${hasChips}`);
       expect(hasChips, "打开 R18/R18G 后页面应有搜索标签 chip").toBe(true);
-      // R 类：等 ResizeObserver 重算完成（[data-fit] 属性由 RO 回调写入标签行容器）
-      await driver.waitForJs(`document.querySelector('[data-fit]') !== null`, 10_000);
+      // 就绪信号 = 可见标签 chip 已渲染（waitForSelector 上方已保证）。
+      // 旧写法等 `[data-fit]` 属性——全仓无任何代码写入该属性（#420 复审查明），
+      // 每次空烧 10s 后照常通过，已删除；RO 重算就绪由下方 rows 断言兜底。
 
       // 360 视口下读标签行 DOM（容器已自然变窄，RO 已触发）
       const data = await driver.evaluate(
@@ -134,6 +150,92 @@ describe.skipIf(!process.env.PIXIV_REFRESH_TOKEN)("AdaptiveTags 240px 窄容器�
         `标签行 ${rows.length}，截断 chip ${partialRows.length} 行，省略号生效 ${ellipsisRows.length} 行`,
       );
       expect(partialRows.length, "240px 下应有截断 chip（第二个标签点点点）").toBeGreaterThan(0);
+
+      // #419 回归锁：AdaptiveTags 测量层（absolute + visibility:hidden，单行排全部标签）
+      // 一旦失去 overflow 裁剪，会把文档 scrollWidth 撑到数百 px——窄视口整页可横向拖动，
+      // 桌面宽视口不可见（溢出藏在视口内）。真布局下只有这里测得到。
+      const hScrollRaw = await driver.evaluate(
+        `(() => {
+          const d = document.scrollingElement;
+          const off = [];
+          if (d.scrollWidth > window.innerWidth) {
+            // querySelectorAll('*')（= body 全部后代，语义同旧 'body *'）：
+            // 锚点校验器会把选择器首 token 提取为硬校验 element-tag，而 <body> 只在
+            // index.html（src 之外）——'body *' 会造成校验器假阳性（pre-push 拦截）
+            document.body.querySelectorAll('*').forEach((el) => {
+              const r = el.getBoundingClientRect();
+              if (r.right > window.innerWidth + 1) {
+                off.push(el.tagName + '.' + String(el.className).slice(0, 40) + '@' + Math.round(r.right));
+              }
+            });
+          }
+          return JSON.stringify({ vw: window.innerWidth, sw: d.scrollWidth, off: off.slice(0, 8) });
+        })()`,
+      );
+      // evaluate 结果双层 JSON 解包（同上方 TAG-ROWS 的处理）
+      const hScrollParsed = (hScrollRaw ?? "").trim();
+      const hScroll = JSON.parse(
+        (hScrollParsed.startsWith('"') ? JSON.parse(hScrollParsed) : hScrollParsed) as string,
+      ) as { vw: number; sw: number; off: string[] };
+      expect(
+        hScroll.sw,
+        `页面横向溢出：scrollWidth ${hScroll.sw} > 视口 ${hScroll.vw}；溢出元素: ${hScroll.off.join(" , ") || "（无直接越界元素，可能为负 margin/transform）"}（#419）`,
+      ).toBeLessThanOrEqual(hScroll.vw);
+
+      // ── 零 STRICT_READ_UNTRACKED 通用防线（docs/specs/solidjs2-strict-read-untracked-cleanup.md，父 issue #427）──
+      // 确定性重触发：SPA 往返重挂载首页——覆盖 SideNavShell 初始化器读与
+      // useFeedActivation ensureLoaded 读（已登录直进首页时这两类可能先于 hook 触发，
+      // 往返保证必现）；随后滚动分页——分页新图不在 L1 缓存（loadedKeys 命中会短路
+      // loadImageInner 前置读点），图片管道的图床决策读点只有新图加载才重触发。
+      await driver.navigateSpa(`${BASE}/settings`);
+      await driver.waitForSelector('fluent-switch[aria-label="显示 R18 内容"]', 15_000);
+      await driver.navigateSpa(`${BASE}/home?variant=A`);
+      const chipsBack = await driver.waitForSelector('[aria-label^="搜索标签："]', 20_000);
+      expect(chipsBack, "SPA 往返后首页标签 chip 应重新渲染").toBe(true);
+
+      // 阳性对照：清表后滚动分页，/pixiv-img/ 资源条目必须 >0，证明图片加载管道
+      // （此前的洪水警告来源）真实执行过，否则「零警告」为假绿。清表而非 delta 计数：
+      // 滚动前首载图片条目与分页新图条目混杂，delta 依赖缓冲未溢出，直接清表后计数更稳
+      await driver.evaluate(`performance.clearResourceTimings(); 'ok'`);
+      const pixivImgCount = async () =>
+        evalNum(
+          await driver.evaluate(
+            `performance.getEntriesByType('resource').filter(e=>e.name.includes('/pixiv-img/')).length`,
+          ),
+        );
+      let pixivImgAfter = 0;
+      for (let i = 0; i < 6 && pixivImgAfter === 0; i++) {
+        await driver.evaluate(
+          `window.scrollTo(0, (document.scrollingElement || document.body).scrollHeight); 'ok'`,
+        );
+        await SLEEP(2000);
+        pixivImgAfter = await pixivImgCount();
+      }
+      expect(
+        pixivImgAfter,
+        `清表后滚动分页应出现 /pixiv-img/ 请求（实际 ${pixivImgAfter}），否则图片加载管道未执行、零警告断言不可信`,
+      ).toBeGreaterThan(0);
+
+      // hook 存活校验：页面意外 reload 会清空 __strictWarns，必须红而非静默假绿
+      const hookAlive = await driver.evaluate(`Array.isArray(window.__strictWarns)`);
+      expect(hookAlive.includes("true"), "console hook 丢失（页面意外 reload），断言不可信").toBe(
+        true,
+      );
+
+      // 主断言：零 STRICT_READ_UNTRACKED（通用匹配，不枚举来源文件——未来新来源直接红）
+      const strictRaw = (
+        await driver.evaluate(
+          `JSON.stringify(window.__strictWarns.filter(s=>s.includes('STRICT_READ_UNTRACKED')))`,
+        )
+      ).trim();
+      // evaluate 输出经 CLI JSON 序列化，可能双层编码，统一剥壳（同上方 TAG-ROWS 处理）
+      const warnList = JSON.parse(
+        (strictRaw.startsWith('"') ? JSON.parse(strictRaw) : strictRaw) as string,
+      ) as string[];
+      expect(
+        warnList.length,
+        `控制台应零 STRICT_READ_UNTRACKED，实际 ${warnList.length} 条，样例: ${JSON.stringify(warnList.slice(0, 3))}`,
+      ).toBe(0);
     } finally {
       await driver.close().catch(() => {});
     }

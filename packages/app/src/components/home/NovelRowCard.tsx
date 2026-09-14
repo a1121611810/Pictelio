@@ -4,7 +4,7 @@
  * 视觉：左 56px 圆角封面缩略 + 「系列」徽标；右 标题 / 作者 / ★收藏·字数。
  * A2 规范（ADR-0074）：Large 圆角、NeutralBackground1 底、1px NeutralStroke1 边框、
  * 无阴影、hover 背景高亮、active 轻微缩放。
- * 可访问性：role="button" + tabIndex=0 + Enter 键触发 onClick。
+ * 可访问性：role="button" + tabindex=0 + Enter 键触发 onClick。
  *
  * 标签（A 已定稿）：封面上 AI/R-18 badge + 底部通栏标签行（AdaptiveTags 动态显示 +「+N」折叠）。
  * 落选变体（B/C/none 标签模式）已归档 throwaway，见 git 历史。
@@ -14,6 +14,7 @@ import { Show } from "solid-js";
 import type { PixivNovel } from "@/api/types";
 import { resolveImageUrl } from "@/utils/imageLoader";
 import AdaptiveTags from "@/components/home/AdaptiveTags";
+import { t } from "../../i18n";
 
 interface NovelRowCardProps {
   /** 小说数据 */
@@ -34,14 +35,15 @@ const NovelRowCard: Component<NovelRowCardProps> = (props) => {
     props.novel.image_urls.large ||
     props.novel.image_urls.medium;
   // 内容标签：过滤 R-18/R-18G（分级已由图上的 R-18 badge 表达，避免重复）
-  const contentTags = () => props.novel.tags.filter((t) => t.name !== "R-18" && t.name !== "R-18G");
+  const contentTags = () =>
+    props.novel.tags.filter((tag) => tag.name !== "R-18" && tag.name !== "R-18G");
 
   return (
     <div
       data-testid="novel-card"
       class="cursor-pointer rounded-[var(--borderRadiusLarge)] border border-[var(--colorNeutralStroke1)] bg-[var(--colorNeutralBackground1)] p-[var(--spacingHorizontalM)] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-98 focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThick)] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
       role="button"
-      tabIndex={0}
+      tabindex={0}
       onClick={props.onClick}
       onKeyDown={(e) => {
         if (e.key === "Enter") props.onClick();
@@ -57,8 +59,8 @@ const NovelRowCard: Component<NovelRowCardProps> = (props) => {
             class="h-full w-full object-cover"
             loading="lazy"
           />
-          {/* AI 生成 badge（左上；novel_ai_type>1 才显示） */}
-          <Show when={props.novel.novel_ai_type != null && props.novel.novel_ai_type > 1}>
+          {/* AI 生成 badge（左上；novel_ai_type>=1 才显示） */}
+          <Show when={props.novel.novel_ai_type != null && props.novel.novel_ai_type >= 1}>
             <span
               class="absolute left-[var(--strokeWidthThin)] top-[var(--strokeWidthThin)] rounded-[var(--borderRadiusSmall)] px-[var(--spacingHorizontalXXS)] font-bold [font-size:var(--fontSizeBase100)]"
               style={{
@@ -98,7 +100,7 @@ const NovelRowCard: Component<NovelRowCardProps> = (props) => {
                   color: "var(--colorNeutralForegroundOnBrand)",
                 }}
               >
-                系列
+                {t("home.novelRow.series")}
               </span>
             </Show>
             <p
@@ -112,8 +114,10 @@ const NovelRowCard: Component<NovelRowCardProps> = (props) => {
             {props.novel.user.name}
           </p>
           <p class="text-[var(--colorNeutralForeground3)] [font-size:var(--fontSizeBase200)]">
-            ★{props.novel.total_bookmarks.toLocaleString()} ·{" "}
-            {(props.novel.text_length / 1000).toFixed(1)}k 字
+            {t("home.novelRow.stats", {
+              bookmarks: props.novel.total_bookmarks.toLocaleString(),
+              words: (props.novel.text_length / 1000).toFixed(1),
+            })}
           </p>
         </div>
       </div>

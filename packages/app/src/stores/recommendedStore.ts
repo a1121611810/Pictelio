@@ -13,9 +13,8 @@ const [recommendSubTabState, setRecommendSubTabRaw] = createSignal<RecommendSubT
 export const recommendSubTab = recommendSubTabState;
 
 export function setRecommendSubTab(t: RecommendSubTab) {
-  batch(() => {
-    setRecommendSubTabRaw(t);
-  });
+  // Solid 2.0：默认微任务批处理，batch 已移除（ADR-0144）
+  setRecommendSubTabRaw(t);
 }
 
 /**

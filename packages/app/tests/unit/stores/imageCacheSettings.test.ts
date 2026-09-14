@@ -49,25 +49,31 @@ describe("imageCache A/B/C 开关", () => {
   it("setImageCacheDisk 切换后值变化并持久化", async () => {
     const { setImageCacheDisk, imageCacheDisk, mem } = await loadStore();
     setImageCacheDisk(false);
+    flush(); // 2.0 批处理语义：set 后同步读返回旧值，先 flush 再断言
     expect(imageCacheDisk()).toBe(false);
     await vi.waitFor(() => expect(mem.dump().get("image_cache_disk")).toBe("false"));
     setImageCacheDisk(true);
+    flush(); // 2.0 批处理语义：set 后同步读返回旧值，先 flush 再断言
     expect(imageCacheDisk()).toBe(true);
   });
 
   it("setImageCacheBrowser 切换后值变化", async () => {
     const { setImageCacheBrowser, imageCacheBrowser } = await loadStore();
     setImageCacheBrowser(false);
+    flush(); // 2.0 批处理语义：set 后同步读返回旧值，先 flush 再断言
     expect(imageCacheBrowser()).toBe(false);
     setImageCacheBrowser(true);
+    flush(); // 2.0 批处理语义：set 后同步读返回旧值，先 flush 再断言
     expect(imageCacheBrowser()).toBe(true);
   });
 
   it("setImageCachePrefetch 切换后值变化", async () => {
     const { setImageCachePrefetch, imageCachePrefetch } = await loadStore();
     setImageCachePrefetch(false);
+    flush(); // 2.0 批处理语义：set 后同步读返回旧值，先 flush 再断言
     expect(imageCachePrefetch()).toBe(false);
     setImageCachePrefetch(true);
+    flush(); // 2.0 批处理语义：set 后同步读返回旧值，先 flush 再断言
     expect(imageCachePrefetch()).toBe(true);
   });
 
@@ -111,18 +117,21 @@ describe("imageCacheDiskSize 磁盘缓存上限", () => {
   it("setImageCacheDiskSize(150) 更新值", async () => {
     const { setImageCacheDiskSize, imageCacheDiskSize } = await loadStore();
     setImageCacheDiskSize(150);
+    flush(); // 2.0 批处理语义：set 后同步读返回旧值，先 flush 再断言
     expect(imageCacheDiskSize()).toBe(150);
   });
 
   it("低于下限 30 被 clamp 到 50", async () => {
     const { setImageCacheDiskSize, imageCacheDiskSize } = await loadStore();
     setImageCacheDiskSize(30);
+    flush(); // 2.0 批处理语义：set 后同步读返回旧值，先 flush 再断言
     expect(imageCacheDiskSize()).toBe(50);
   });
 
   it("高于上限 1200 被 clamp 到 1000", async () => {
     const { setImageCacheDiskSize, imageCacheDiskSize } = await loadStore();
     setImageCacheDiskSize(1200);
+    flush(); // 2.0 批处理语义：set 后同步读返回旧值，先 flush 再断言
     expect(imageCacheDiskSize()).toBe(1000);
   });
 

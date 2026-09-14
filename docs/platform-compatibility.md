@@ -5,7 +5,7 @@
 | 层级 | 最低版本 | 检测方式 | 不满足时的行为 |
 |---|---|---|---|
 | **Android OS** | **9.0**（API 28） | `minSdkVersion = 28`（`variables.gradle`） | 系统拒绝安装（安装包层面拦截） |
-| **WebView** | **Chrome 85**（主版本号 ≥ 85） | `MainActivity.onCreate()` 中通过 `WebView.getCurrentWebViewPackage()` 获取主版本号 | 显示静态 HTML 升级提示页，不启动应用主体 |
+| **WebView** | **Chrome 85**（主版本号 ≥ 85） | `MainActivity.onCreate()` 中通过 `WebView.getCurrentWebViewPackage()` 获取主版本号 | full 包：WebView 不可用时优先自动降级到 Lynx 引擎（可用时）；Lynx 也不可用才显示静态 HTML 升级提示页。webview / lynx 单引擎包维持原行为 |
 
 ## 决定依据
 
@@ -21,6 +21,8 @@
 | 4 | Web API | `Promise.any()` — `imageLoader.ts` 图片加载核心路径 | Chrome 85 | 任何图片加载触发 `TypeError` |
 
 综合最小值由 #4 `Promise.any` 决定：**Chrome 85**。
+
+> **已知债务（ADR-0145 review 记录）**：ES2023 `Array.prototype.toSorted`（Chrome 110+）已在既有代码（`SideNavShell.tsx`、`NovelDetail.tsx`、`imageHostStore.ts`、`utils/searchMerger.ts`）与 2026-09 保存功能（`PagePickerSheet.tsx`）使用。Chrome 85–109 的 WebView 上触及相应代码路径会抛 `TypeError`。既有行为，未提升 `MIN_WEBVIEW_MAJOR_VERSION`；提升前应在升级验证批次中一并评估。
 
 ### 软降级项（布局/视觉缺陷，不闪退）
 
@@ -58,6 +60,7 @@ private boolean isWebViewVersionOk() {
 ```
 
 - 无法获取版本号时（返回 -1）**放行**，避免误杀非标准 WebView 实现
+- **full 包引擎降级（ADR-0153）**：版本不足时先判 `LynxRuntimeInitializer.isAvailable()`（包能力 ∧ 初始化不抛异常 ∧ `LynxEnv.isNativeLibraryLoaded()`）；可用则本次以 Lynx 生效（**不写** `pictelio_client_kind`），不可用才显示升级页。`webview` / `lynx` 单引擎包不参与降级
 - 降级页面为纯静态 HTML（`res/raw/upgrade.html`），零外部资源，ES5 JS，兼容 Chrome 30+
 - 不初始化 Capacitor Bridge、任何插件、JS 运行时，最小化内存占用
 

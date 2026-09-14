@@ -1,4 +1,5 @@
 import { settings, jsonCodec, type Codec } from "@/settings";
+import type { I18nKey } from "@/i18n";
 import { viewportWidth } from "@/primitives/viewportWidth";
 
 // ── Types ──
@@ -28,20 +29,22 @@ const DEFAULTS: ReaderSettings = {
 
 export const ALLOWED_FONT_FAMILIES = ["sans-serif", "serif", "system-ui", "monospace"] as const;
 
+// 选项显示文案（跨层改造：模块加载期不能调 t()，存 labelKey 纯数据，
+// 消费方 ReaderSettingsSheet 渲染时 t(labelKey)——这正是当初 label 跳过抽取的原因）
 const FONT_FAMILIES = [
-  { value: "sans-serif", label: "无衬线" },
-  { value: "serif", label: "衬线" },
-  { value: "system-ui", label: "系统" },
-  { value: "monospace", label: "等宽" },
-] as const;
+  { value: "sans-serif", labelKey: "core.store.readerSettings.fontFamilySans" },
+  { value: "serif", labelKey: "core.store.readerSettings.fontFamilySerif" },
+  { value: "system-ui", labelKey: "core.store.readerSettings.fontFamilySystem" },
+  { value: "monospace", labelKey: "core.store.readerSettings.fontFamilyMono" },
+] as const satisfies readonly { value: string; labelKey: I18nKey }[];
 
 const FONT_WEIGHTS = [
-  { value: 300, label: "细" },
-  { value: 400, label: "常规" },
-  { value: 500, label: "中等" },
-  { value: 600, label: "半粗" },
-  { value: 700, label: "粗" },
-] as const;
+  { value: 300, labelKey: "core.store.readerSettings.fontWeightLight" },
+  { value: 400, labelKey: "core.store.readerSettings.fontWeightRegular" },
+  { value: 500, labelKey: "core.store.readerSettings.fontWeightMedium" },
+  { value: 600, labelKey: "core.store.readerSettings.fontWeightSemibold" },
+  { value: 700, labelKey: "core.store.readerSettings.fontWeightBold" },
+] as const satisfies readonly { value: number; labelKey: I18nKey }[];
 
 const LINE_HEIGHTS = [1.4, 1.6, 1.8, 2.0, 2.2] as const;
 
@@ -106,6 +109,11 @@ export function effectiveFontSize(): number {
 }
 
 function persistAll(): void {
+  // Solid 2.0 批处理语义（set-后-读审计修复点）：7 个 setReaderXxx setter 都在
+  // 同步段内先 set 再调本函数，若不 flush，下方对 fontSize() 等的全部同步读
+  // 仍拿到旧值，持久化快照会回退到上一次状态。persistAll 属命令式读取边界，
+  // 在此统一 flush 一次保持 1.x「持久化即所见」语义（避免 7 处散落 flush）。
+  flush();
   readerSettings.set({
     ...readerSettings.value(),
     fontSize: fontSize(),

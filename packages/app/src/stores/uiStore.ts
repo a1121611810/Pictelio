@@ -56,9 +56,19 @@ export function setPersistScrollRestoration(enabled: boolean): void {
 // ── 向后兼容的导出包装函数 ──
 
 export const currentTab = () => state.currentTab;
-export const setCurrentTab = (tab: Tab) => setState("currentTab", tab);
+// Solid 2.0：createStore setter 为 draft-first，1.x 路径式写法 setState("currentTab", tab)
+// 已移除，改 draft 函数（导出 API 签名不变）
+export const setCurrentTab = (tab: Tab) =>
+  setState((s) => {
+    s.currentTab = tab;
+  });
 
 export const contentType = () => contentTypeHandle.value();
+
+// 「已请求」类型的同步镜像：Solid 2.0 微任务批处理下 handle.value() 在同一同步轮内
+// 读到的是旧提交值，连续 setContentType 会误触同值守卫丢失末次点击（1.x 末次点击
+// 胜出语义）。本变量同步更新，守卫据此判重；首次调用前从 handle 初始化。
+let requestedContentType: ContentType | null = null;
 
 /**
  * 设置内容类型。
@@ -68,9 +78,13 @@ export const contentType = () => contentTypeHandle.value();
  * 持久化失败由 registry 内部 warn 兜底，state 保持新值。
  */
 export async function setContentType(type: ContentType): Promise<void> {
-  if (type === contentTypeHandle.value()) {
+  if (requestedContentType === null) {
+    requestedContentType = contentTypeHandle.value();
+  }
+  if (type === requestedContentType) {
     return;
   }
+  requestedContentType = type;
   contentTypeHandle.set(type);
   window.dispatchEvent(new CustomEvent("contentTypeChanged"));
   // contentType 是页内状态切换（非路由导航），@solidjs/router 的 scrollRestoration

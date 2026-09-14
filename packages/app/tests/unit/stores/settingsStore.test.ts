@@ -24,11 +24,15 @@ vi.mock("@/stores/authStore", () => ({
   user: () => mockUser.current,
 }));
 
-vi.mock("@/settings", () => ({
-  get settings() {
-    return mockState.current;
-  },
-}));
+vi.mock("@/settings", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/settings")>();
+  return {
+    ...actual,
+    get settings() {
+      return mockState.current;
+    },
+  };
+});
 
 async function loadStore(seed: Record<string, string> = {}) {
   vi.resetModules();
@@ -140,6 +144,67 @@ describe("settingsStore — ugoiraMode", () => {
   });
 });
 
+// 小说导出设置（oracle = spec docs/specs/novel-export.md §6：4 键 + 默认值）
+describe("settingsStore — 小说导出设置（spec novel-export §6）", () => {
+  it("默认：格式 txt + 三项开关全开", async () => {
+    const { store } = await loadStore();
+    expect(store.novelExportFormat()).toBe("txt");
+    expect(store.novelExportOptions()).toEqual({
+      includeMetadata: true,
+      includeCover: true,
+      includeInlineImages: true,
+    });
+  });
+
+  it("setNovelExportFormat 更新 state + 持久化", async () => {
+    const { store, mem } = await loadStore();
+    await store.setNovelExportFormat("epub");
+    expect(store.novelExportFormat()).toBe("epub");
+    await vi.waitFor(() => expect(mem.dump().get("settings_novel_export_format")).toBe("epub"));
+  });
+
+  it("hydrateAll 恢复合法格式与开关", async () => {
+    const { store } = await loadStore({
+      settings_novel_export_format: "pdf",
+      settings_novel_export_include_metadata: "false",
+      settings_novel_export_include_cover: "false",
+      settings_novel_export_include_images: "true",
+    });
+    expect(store.novelExportFormat()).toBe("pdf");
+    expect(store.novelExportOptions()).toEqual({
+      includeMetadata: false,
+      includeCover: false,
+      includeInlineImages: true,
+    });
+  });
+
+  it("非法格式值忽略（保持默认 txt）", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { store } = await loadStore({ settings_novel_export_format: "bogus" });
+    expect(store.novelExportFormat()).toBe("txt");
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it("setNovelExportInclude* 三项分别落盘", async () => {
+    const { store, mem } = await loadStore();
+    await store.setNovelExportIncludeMetadata(false);
+    await store.setNovelExportIncludeCover(false);
+    await store.setNovelExportIncludeImages(false);
+    expect(store.novelExportOptions()).toEqual({
+      includeMetadata: false,
+      includeCover: false,
+      includeInlineImages: false,
+    });
+    await vi.waitFor(() => {
+      const d = mem.dump();
+      expect(d.get("settings_novel_export_include_metadata")).toBe("false");
+      expect(d.get("settings_novel_export_include_cover")).toBe("false");
+      expect(d.get("settings_novel_export_include_images")).toBe("false");
+    });
+  });
+});
+
 describe("settingsStore — 账号级 R18/R18G（ADR-0103）", () => {
   beforeEach(() => {
     mockUser.current = null;
@@ -211,5 +276,72 @@ describe("settingsStore — 账号级 R18/R18G（ADR-0103）", () => {
       expect(mem.dump().has("age_confirmed")).toBe(false);
       expect(mem.dump().has("is_adult")).toBe(false);
     });
+  });
+});
+
+describe("settingsStore — 账号级 AI 三态过滤（ADR-0155）", () => {
+  beforeEach(() => {
+    mockUser.current = null;
+  });
+
+  it("未登录：aiFilterMode 恒 show，set 不落盘", async () => {
+    const { store, mem } = await loadStore();
+    expect(store.aiFilterMode()).toBe("show");
+    await store.setAiFilterMode("only");
+    expect(store.aiFilterMode()).toBe("show");
+    expect(mem.dump().has("ai_filter_mode")).toBe(false);
+  });
+
+  it("登录后 loadAccountR18 加载 ai_filter_mode_42", async () => {
+    mockUser.current = { id: 42 };
+    const { store } = await loadStore({ ai_filter_mode_42: "only" });
+    await store.loadAccountR18();
+    expect(store.aiFilterMode()).toBe("only");
+  });
+
+  it("setAiFilterMode 写 ai_filter_mode_42（账号键）", async () => {
+    mockUser.current = { id: 42 };
+    const { store, mem } = await loadStore();
+    await store.setAiFilterMode("mask");
+    expect(store.aiFilterMode()).toBe("mask");
+    await vi.waitFor(() => expect(mem.dump().get("ai_filter_mode_42")).toBe("mask"));
+  });
+
+  it("非法持久化值 → 回退默认 show", async () => {
+    mockUser.current = { id: 42 };
+    const { store } = await loadStore({ ai_filter_mode_42: "bogus" });
+    await store.loadAccountR18();
+    expect(store.aiFilterMode()).toBe("show");
+  });
+
+  it("登出后回默认 show；换账号独立（互不污染）", async () => {
+    mockUser.current = { id: 42 };
+    const { store } = await loadStore();
+    await store.setAiFilterMode("only");
+    mockUser.current = null;
+    expect(store.aiFilterMode()).toBe("show");
+    mockUser.current = { id: 7 };
+    expect(store.aiFilterMode()).toBe("show");
+    await store.loadAccountR18();
+    expect(store.aiFilterMode()).toBe("show");
+  });
+});
+
+describe("settingsStore — rankingEntry（排行榜入口开关，设备级默认开）", () => {
+  it("无记录 → 默认开启", async () => {
+    const { store } = await loadStore();
+    expect(store.rankingEntry()).toBe(true);
+  });
+
+  it("hydrate ranking_entry=false → 关闭（真实 key 读取）", async () => {
+    const { store } = await loadStore({ ranking_entry: "false" });
+    expect(store.rankingEntry()).toBe(false);
+  });
+
+  it("setRankingEntry(false) → 更新 state + 持久化", async () => {
+    const { store, mem } = await loadStore();
+    await store.setRankingEntry(false);
+    expect(store.rankingEntry()).toBe(false);
+    await vi.waitFor(() => expect(mem.dump().get("ranking_entry")).toBe("false"));
   });
 });

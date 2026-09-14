@@ -11,6 +11,7 @@ import {
 } from "../stores/imageHostStore";
 import { validateHostInput, hasDuplicateBaseUrl, probeHosts } from "../services/imageHostService";
 import { goBack } from "../services/backTransitionService";
+import { t } from "../i18n";
 import PageTransition from "../components/PageTransition";
 import FluentDialog from "../components/ui/FluentDialog";
 
@@ -27,19 +28,30 @@ const ImageHostSettings: Component = () => {
   const [isProbing, setIsProbing] = createSignal(false);
   const [probeToast, setProbeToast] = createSignal<string | null>(null);
 
-  let masterSwitchRef: HTMLElement | undefined;
-  let radioGroupRef: HTMLElement | undefined;
+  // Solid 2.0：数组 ref 中的裸变量不被编译器回写赋值（与 FluentDialog 同款问题），
+  // 必须经具名回调捕获元素。
+  let masterSwitchEl: HTMLElement | undefined;
+  let radioGroupEl: HTMLElement | undefined;
+  const masterSwitchRef = (el: HTMLElement) => {
+    masterSwitchEl = el;
+  };
+  const radioGroupRef = (el: HTMLElement) => {
+    radioGroupEl = el;
+  };
 
-  createEffect(() => {
-    const group = radioGroupRef as unknown as { value?: string } | undefined;
-    const mode = imageHostState().mode;
-    if (group) {
-      // RequestAnimationFrame 确保所有子 fluent-radio 已在 DOM 中并升级完成
-      requestAnimationFrame(() => {
-        group.value = mode;
-      });
-    }
-  });
+  // Solid 2.0 拆分效应：compute 读 store 的 mode（提取普通值），apply 段做 DOM 命令式设置。
+  createEffect(
+    () => imageHostState().mode,
+    (mode) => {
+      const group = radioGroupEl as unknown as { value?: string } | undefined;
+      if (group) {
+        // RequestAnimationFrame 确保所有子 fluent-radio 已在 DOM 中并升级完成
+        requestAnimationFrame(() => {
+          group.value = mode;
+        });
+      }
+    },
+  );
 
   function handleToggle(enabled: boolean) {
     if (enabled) {
@@ -57,8 +69,8 @@ const ImageHostSettings: Component = () => {
   function cancelEnable() {
     setShowConfirmDialog(false);
     // 同步 Fluent Switch 的视觉状态：用户点取消后，switch 不应保持开启的视觉状态
-    if (masterSwitchRef) {
-      (masterSwitchRef as unknown as { checked: boolean }).checked = false;
+    if (masterSwitchEl) {
+      (masterSwitchEl as unknown as { checked: boolean }).checked = false;
     }
   }
 
@@ -92,7 +104,7 @@ const ImageHostSettings: Component = () => {
     }
 
     if (hasDuplicateBaseUrl(editBaseUrl(), host.id)) {
-      setEditError("已存在相同 URL 的图床");
+      setEditError(t("imageHost.duplicateUrl")); // i18n: set 时快照（瞬态）
       return;
     }
 
@@ -108,7 +120,7 @@ const ImageHostSettings: Component = () => {
   async function handleProbe() {
     const enabled = imageHostState().hosts.filter((h) => h.enabled);
     if (enabled.length === 0) {
-      setProbeToast("请先启用至少一个图床");
+      setProbeToast(t("imageHost.enableFirst")); // i18n: set 时快照（瞬态）
       return;
     }
 
@@ -117,18 +129,19 @@ const ImageHostSettings: Component = () => {
       (async () => {
         const results = await probeHosts();
         const reachable = results.filter((r) => r.reachable).length;
-        setProbeToast(`测速完成：${reachable}/${results.length} 个可用`);
+        // i18n: set 时快照（瞬态）
+        setProbeToast(t("imageHost.probeDone", { ok: reachable, total: results.length }));
       })(),
     );
     setIsProbing(false);
     if (probeErr) {
-      setProbeToast("测速失败");
+      setProbeToast(t("imageHost.probeFailed")); // i18n: set 时快照（瞬态）
     }
   }
 
   function handleResetAll() {
     resetAllBuiltInHosts();
-    setProbeToast("已恢复默认图床配置");
+    setProbeToast(t("imageHost.resetDone")); // i18n: set 时快照（瞬态）
   }
 
   return (
@@ -138,9 +151,9 @@ const ImageHostSettings: Component = () => {
         <div class="sticky top-0 z-10 flex items-center gap-3 px-4 py-3 bg-[var(--colorNeutralBackground1)] shadow-[var(--elevation4)]">
           <fluent-button
             appearance="subtle"
-            aria-label="返回"
+            aria-label={t("imageHost.back")}
             class="w-8 h-8 p-0 min-w-8"
-            on:click={() => goBack()}
+            ref={fluentOn("click", () => goBack())}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path
@@ -150,20 +163,24 @@ const ImageHostSettings: Component = () => {
             </svg>
           </fluent-button>
           <h1 class="[font-size:var(--fontSizeBase500)] font-semibold text-[var(--colorNeutralForeground1)]">
-            图床代理
+            {t("imageHost.title")}
           </h1>
         </div>
 
         {/* Content */}
         <div class="px-4 py-4 flex flex-col gap-4">
           <Show when={probeToast()}>
-            <fluent-message-bar intent="success" class="mb-0" on:close={() => setProbeToast(null)}>
+            <fluent-message-bar
+              intent="success"
+              class="mb-0"
+              ref={fluentOn("close", () => setProbeToast(null))}
+            >
               {probeToast()}
             </fluent-message-bar>
           </Show>
 
           <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
-            配置第三方 Pixiv 图片代理源。
+            {t("imageHost.intro")}
           </p>
 
           {/* Master switch */}
@@ -171,68 +188,72 @@ const ImageHostSettings: Component = () => {
             <div class="flex items-center justify-between">
               <div>
                 <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)]">
-                  启用图床代理
+                  {t("imageHost.enable")}
                 </p>
                 <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
-                  开启后，图片将通过下方配置的第三方服务器加载
+                  {t("imageHost.enableDesc")}
                 </p>
               </div>
               <fluent-switch
-                ref={masterSwitchRef}
+                ref={[
+                  masterSwitchRef,
+                  fluentOn("change", () => {
+                    handleToggle(!imageHostState().masterEnabled);
+                  }),
+                ]}
                 checked={imageHostState().masterEnabled}
-                on:change={() => {
-                  handleToggle(!imageHostState().masterEnabled);
-                }}
-                aria-label="启用图床代理"
+                aria-label={t("imageHost.enable")}
               />
             </div>
           </div>
 
           {/* Warning banner */}
           <Show when={imageHostState().masterEnabled}>
-            <fluent-message-bar intent="warning">
-              图片流量将不经过 Pixiv 官方服务器。第三方图床的可用性、速度和隐私策略不受 Pictelio
-              控制。
-            </fluent-message-bar>
+            <fluent-message-bar intent="warning">{t("imageHost.warning")}</fluent-message-bar>
           </Show>
 
           {/* Mode selector */}
           <div class="rounded-[var(--borderRadiusXLarge)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] p-4">
             <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] mb-3">
-              运行模式
+              {t("imageHost.modeTitle")}
             </p>
             <fluent-radio-group
-              ref={radioGroupRef}
+              ref={[
+                radioGroupRef,
+                fluentOn("change", (e: Event) => {
+                  // Solid 2.0：EventListener 形参须为 Event，fluent 自定义事件 detail 就地收窄
+                  const detail = (e as CustomEvent).detail as { value?: string } | undefined;
+                  if (detail?.value != null) {
+                    // fluent-radio-group 的 value 是 string，收窄为 store 的 ImageHostMode 联合类型
+                    setMode(detail.value as Parameters<typeof setMode>[0]);
+                  }
+                }),
+              ]}
               value={imageHostState().mode}
-              on:change={(e: CustomEvent) => {
-                if (e.detail?.value != null) {
-                  setMode(e.detail.value);
-                }
-              }}
               disabled={!imageHostState().masterEnabled}
               class="flex flex-col gap-3"
             >
               {[
                 {
                   value: "race" as const,
-                  label: "并发请求",
-                  desc: "同时向所有启用图床发请求，取最快响应；仅 Web（原生端以负载均衡运行）",
+                  label: t("imageHost.modeRace"),
+                  desc: t("imageHost.modeRaceDesc"),
                 },
                 {
                   value: "weighted" as const,
-                  label: "负载均衡",
-                  desc: "按权重随机选择图床",
+                  label: t("imageHost.modeWeighted"),
+                  desc: t("imageHost.modeWeightedDesc"),
                   recommended: true,
                 },
                 {
                   value: "fastest-ip" as const,
-                  label: "最快 IP 地址",
-                  desc: "探测后固定使用延迟最低的图床，30 秒刷新",
+                  label: t("imageHost.modeFastestIp"),
+                  desc: t("imageHost.modeFastestIpDesc"),
                 },
                 {
                   value: "single" as const,
-                  label: "单一图床",
-                  desc: "指定使用某一个图床，不轮询",
+                  label: t("imageHost.modeSingle"),
+                  desc: t("imageHost.modeSingleDesc"),
                 },
               ].map((option) => {
                 const inputId = `mode-${option.value}`;
@@ -243,20 +264,22 @@ const ImageHostSettings: Component = () => {
                       value={option.value}
                       checked={imageHostState().mode === option.value}
                       disabled={!imageHostState().masterEnabled}
-                      on:click={() => setMode(option.value)}
+                      ref={fluentOn("click", () => setMode(option.value))}
                     />
                     <label
                       for={inputId}
-                      class="flex-1 cursor-pointer [font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)]"
-                      classList={{
-                        "opacity-60": !imageHostState().masterEnabled,
-                      }}
+                      class={[
+                        "flex-1 cursor-pointer [font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)]",
+                        {
+                          "opacity-60": !imageHostState().masterEnabled,
+                        },
+                      ]}
                     >
                       <span class="font-semibold">
                         {option.label}
                         {option.recommended && (
                           <span class="ml-2 px-[var(--spacingHorizontalXS)] py-[var(--spacingVerticalXXS)] rounded-[var(--borderRadiusSmall)] [font-size:var(--fontSizeBase100)] font-semibold text-[var(--colorPaletteGreenForeground2)] bg-[var(--colorPaletteGreenBackground2)]">
-                            推荐
+                            {t("imageHost.recommended")}
                           </span>
                         )}
                       </span>
@@ -273,22 +296,25 @@ const ImageHostSettings: Component = () => {
             <Show when={imageHostState().mode === "single" && imageHostState().masterEnabled}>
               <div class="mt-3 flex flex-col gap-1.5">
                 <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
-                  选择要使用的图床
+                  {t("imageHost.pickHost")}
                 </p>
                 <For each={imageHostState().hosts.filter((h) => h.enabled)}>
                   {(host) => (
                     <div
-                      class="flex items-center gap-3 p-3 rounded-[var(--borderRadiusMedium)] cursor-pointer transition-colors"
-                      classList={{
-                        "bg-[var(--colorCompoundBrandBackground)] text-white":
-                          imageHostState().selectedHostId === host.id,
-                        "bg-[var(--colorNeutralBackground2)] hover:bg-[var(--colorNeutralBackground1Hover)]":
-                          imageHostState().selectedHostId !== host.id,
-                      }}
+                      class={[
+                        "flex items-center gap-3 p-3 rounded-[var(--borderRadiusMedium)] cursor-pointer transition-colors",
+                        {
+                          "bg-[var(--colorCompoundBrandBackground)] text-white":
+                            imageHostState().selectedHostId === host.id,
+                          "bg-[var(--colorNeutralBackground2)] hover:bg-[var(--colorNeutralBackground1Hover)]":
+                            imageHostState().selectedHostId !== host.id,
+                        },
+                      ]}
+
                       onClick={() => setSelectedHostId(host.id)}
                       role="button"
                       tabindex="0"
-                      aria-label={`使用 ${host.name}`}
+                      aria-label={t("imageHost.useHostAria", { name: host.name })}
                     >
                       <div class="flex-1 min-w-0">
                         <p class="[font-size:var(--fontSizeBase300)] font-semibold truncate">
@@ -321,15 +347,19 @@ const ImageHostSettings: Component = () => {
 
           {/* Host list */}
           <div
-            class="rounded-[var(--borderRadiusXLarge)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] p-4"
-            classList={{ "opacity-60": !imageHostState().masterEnabled }}
+            class={[
+              "rounded-[var(--borderRadiusXLarge)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] p-4",
+              { "opacity-60": !imageHostState().masterEnabled },
+            ]}
           >
             <div class="flex items-center justify-between mb-3">
               <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)]">
-                图床列表
+                {t("imageHost.hostList")}
               </p>
               <span class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)]">
-                {imageHostState().hosts.filter((h) => h.enabled).length} 个启用
+                {t("imageHost.enabledCount", {
+                  count: imageHostState().hosts.filter((h) => h.enabled).length,
+                })}
               </span>
             </div>
 
@@ -339,9 +369,11 @@ const ImageHostSettings: Component = () => {
                   <div class="flex items-center gap-3 p-3 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground2)]">
                     <fluent-checkbox
                       checked={host.enabled}
-                      on:change={() => updateHost(host.id, { enabled: !host.enabled })}
+                      ref={fluentOn("change", () =>
+                        updateHost(host.id, { enabled: !host.enabled }),
+                      )}
                       disabled={!imageHostState().masterEnabled}
-                      aria-label={`启用 ${host.name}`}
+                      aria-label={t("imageHost.enableHostAria", { name: host.name })}
                     />
                     <div class="flex-1 min-w-0">
                       <p class="[font-size:var(--fontSizeBase300)] font-semibold text-[var(--colorNeutralForeground1)] truncate">
@@ -353,7 +385,7 @@ const ImageHostSettings: Component = () => {
                       {imageHostState().mode === "weighted" && host.enabled && (
                         <div class="flex items-center gap-2 mt-2">
                           <span class="[font-size:var(--fontSizeBase100)] text-[var(--colorNeutralForeground3)]">
-                            权重
+                            {t("imageHost.weight")}
                           </span>
                           <input
                             type="range"
@@ -376,9 +408,9 @@ const ImageHostSettings: Component = () => {
                     <div class="flex items-center gap-1 flex-shrink-0">
                       <fluent-button
                         appearance="subtle"
-                        aria-label="编辑"
+                        aria-label={t("imageHost.edit")}
                         class="w-8 h-8 p-0 min-w-8"
-                        on:click={() => openEdit(host)}
+                        ref={fluentOn("click", () => openEdit(host))}
                         disabled={!imageHostState().masterEnabled}
                       >
                         <svg
@@ -397,9 +429,9 @@ const ImageHostSettings: Component = () => {
                       <Show when={host.isBuiltIn && host.edited}>
                         <fluent-button
                           appearance="subtle"
-                          aria-label="重置"
+                          aria-label={t("imageHost.reset")}
                           class="w-8 h-8 p-0 min-w-8"
-                          on:click={() => resetBuiltInHost(host.id)}
+                          ref={fluentOn("click", () => resetBuiltInHost(host.id))}
                           disabled={!imageHostState().masterEnabled}
                         >
                           <svg
@@ -427,91 +459,103 @@ const ImageHostSettings: Component = () => {
           <div class="flex gap-3">
             <fluent-button
               appearance="primary"
-              on:click={handleProbe}
+              ref={fluentOn("click", handleProbe)}
               disabled={isProbing() || !imageHostState().masterEnabled}
               class="flex-1"
             >
               <Show when={isProbing()}>
                 <fluent-spinner size="tiny" slot="start" />
               </Show>
-              立即测速
+              {t("imageHost.probeNow")}
             </fluent-button>
             <fluent-button
               appearance="secondary"
-              on:click={handleResetAll}
+              ref={fluentOn("click", handleResetAll)}
               disabled={!imageHostState().masterEnabled}
               class="flex-1"
             >
-              全部重置
+              {t("imageHost.resetAll")}
             </fluent-button>
           </div>
         </div>
 
         {/* Confirmation dialog */}
-        <FluentDialog open={showConfirmDialog()} onClose={cancelEnable} aria-label="开启图床代理？">
-          <h3 slot="title">开启图床代理？</h3>
+        <FluentDialog
+          open={showConfirmDialog()}
+          onClose={cancelEnable}
+          aria-label={t("imageHost.confirmAria")}
+        >
+          <h3 slot="title">{t("imageHost.confirmTitle")}</h3>
           <div class="flex flex-col gap-2">
             <p class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)] leading-snug">
-              图片将通过你配置的第三方服务器加载。
+              {t("imageHost.confirmBody1")}
             </p>
             <p class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)] leading-snug">
-              这些服务器不受 Pictelio 控制，可用性、速度或隐私风险由对应服务承担。
+              {t("imageHost.confirmBody2")}
             </p>
             <p class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)] leading-snug">
-              部分图床在部分地区可能无法访问，失败时会自动回退到默认代理。
+              {t("imageHost.confirmBody3")}
             </p>
           </div>
-          <fluent-button slot="actions" appearance="secondary" on:click={cancelEnable}>
-            取消
+          <fluent-button
+            slot="actions"
+            appearance="secondary"
+            ref={fluentOn("click", cancelEnable)}
+          >
+            {t("imageHost.cancel")}
           </fluent-button>
-          <fluent-button slot="actions" appearance="primary" on:click={confirmEnable}>
-            确认开启
+          <fluent-button slot="actions" appearance="primary" ref={fluentOn("click", confirmEnable)}>
+            {t("imageHost.confirmEnable")}
           </fluent-button>
         </FluentDialog>
 
         {/* Edit dialog */}
-        <FluentDialog open={editingHost() !== null} onClose={closeEdit} aria-label="编辑图床">
-          <h3 slot="title">编辑图床</h3>
+        <FluentDialog
+          open={editingHost() !== null}
+          onClose={closeEdit}
+          aria-label={t("imageHost.editAria")}
+        >
+          <h3 slot="title">{t("imageHost.editTitle")}</h3>
           <Show when={editError()}>
             <fluent-message-bar intent="error">{editError()}</fluent-message-bar>
           </Show>
           <div>
             <label class="block [font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] mb-1">
-              名称
+              {t("imageHost.nameLabel")}
             </label>
             <input
               type="text"
               value={editName()}
               onInput={(e) => setEditName(e.currentTarget.value)}
-              placeholder="例如 PixivCat"
+              placeholder={t("imageHost.namePlaceholder")}
               class="w-full px-3 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase300)] outline-none focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
             />
           </div>
           <div>
             <label class="block [font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] mb-1">
-              代理 URL
+              {t("imageHost.urlLabel")}
             </label>
             <input
               type="text"
               value={editBaseUrl()}
               onInput={(e) => setEditBaseUrl(e.currentTarget.value)}
-              placeholder="https://i.pixiv.re 或 https://example.com/image/{path}"
+              placeholder={t("imageHost.urlPlaceholder")}
               class="w-full px-3 py-2 rounded-[var(--borderRadiusMedium)] bg-[var(--colorNeutralBackground1)] border border-[var(--colorNeutralStroke1)] text-[var(--colorNeutralForeground1)] [font-size:var(--fontSizeBase300)] outline-none focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-[color:var(--colorStrokeFocus2)]"
             />
           </div>
           <div class="flex items-center gap-2">
             <fluent-checkbox
               checked={editEnabled()}
-              on:change={() => setEditEnabled(!editEnabled())}
+              ref={fluentOn("change", () => setEditEnabled(!editEnabled()))}
             />
             <span class="[font-size:var(--fontSizeBase300)] text-[var(--colorNeutralForeground1)]">
-              启用
+              {t("imageHost.enabledCheckbox")}
             </span>
           </div>
           <Show when={imageHostState().mode === "weighted"}>
             <div>
               <label class="block [font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] mb-1">
-                权重 {editWeight()}
+                {t("imageHost.weightValue", { weight: editWeight() })}
               </label>
               <input
                 type="range"
@@ -524,11 +568,11 @@ const ImageHostSettings: Component = () => {
               />
             </div>
           </Show>
-          <fluent-button slot="actions" appearance="secondary" on:click={closeEdit}>
-            取消
+          <fluent-button slot="actions" appearance="secondary" ref={fluentOn("click", closeEdit)}>
+            {t("imageHost.cancel")}
           </fluent-button>
-          <fluent-button slot="actions" appearance="primary" on:click={saveEdit}>
-            保存
+          <fluent-button slot="actions" appearance="primary" ref={fluentOn("click", saveEdit)}>
+            {t("imageHost.save")}
           </fluent-button>
         </FluentDialog>
       </div>

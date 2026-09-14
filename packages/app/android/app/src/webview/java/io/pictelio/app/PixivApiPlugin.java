@@ -34,13 +34,18 @@ public class PixivApiPlugin extends Plugin {
     private static final String PREFS_NAME = "PictelioPrefs";
     private static final String KEY_REFRESH_TOKEN = "refresh_token";
 
+    /** 网络卸载器（ADR-0159 决策 1）：request/prefetchImage 的阻塞执行体提交到
+     *  插件自有线程池，桥线程只保留参数校验快路径。随插件实例存活，无需 shutdown。 */
+    private final PluginNetworkDispatcher net = new PluginNetworkDispatcher();
+
     /** 共享图片加载器单例（与拦截链路共享同一下载核心）。Context 键控绑定：生产进程内
      *  ApplicationContext 恒同一对象（绑定永不触发重建）；Robolectric 每用例新建 Application
      *  → 自动重建，保证测试间无静态加载器/图床配置泄漏。 */
     private static volatile PixivImageLoader imageLoader;
     private static volatile Context imageLoaderApp;
 
-    private static PixivImageLoader imageLoader(Context context) {
+    /** 包可见：GallerySaverPlugin（保存到相册）与预取共享同一 loader 单例 */
+    static PixivImageLoader imageLoader(Context context) {
         Context app = context.getApplicationContext();
         PixivImageLoader l = imageLoader;
         if (l == null || imageLoaderApp != app) {
@@ -70,7 +75,7 @@ public class PixivApiPlugin extends Plugin {
             return;
         }
 
-        // 构建 URL
+        // 构建 URL（纯字符串拼接快路径，留在桥线程）
         StringBuilder urlBuilder = new StringBuilder(PixivApiCore.apiBase());
         if (!path.startsWith("/")) urlBuilder.append('/');
         urlBuilder.append(path);
@@ -83,22 +88,28 @@ public class PixivApiPlugin extends Plugin {
 
         String url = urlBuilder.toString();
 
-        try {
-            JSONObject coreResult = PixivApiCore.executeRequest(method, url, body, false,
-                    token -> {
-                        // token 轮换：通知 JS 侧持久化新值（webview 专属；Lynx 走 PictelioAuth）
-                        JSObject data = new JSObject();
-                        data.put("token", token);
-                        notifyListeners("refreshTokenRotated", data);
-                    });
-            // JSONObject → JSObject 桥接（#114：Core 去 Capacitor 化）
-            JSObject result = new JSObject();
-            result.put("status", coreResult.getInt("status"));
-            result.put("data", coreResult.getString("data"));
-            call.resolve(result);
-        } catch (Exception e) {
-            call.reject("Request failed: " + e.getMessage());
-        }
+        // ADR-0159 决策 1：阻塞执行体（OkHttp execute + 401 刷新重试，最坏 45s）卸载到
+        // 工作线程，resolve/reject 在工作线程回调（PluginCall 线程安全，Capacitor 标准
+        // 异步插件模式）。try 块「执行体 + JSONObject→JSObject 映射」的覆盖范围与原实现等价。
+        net.dispatch(
+                () -> {
+                    JSONObject coreResult = PixivApiCore.executeRequest(method, url, body, false,
+                            token -> {
+                                // token 轮换：通知 JS 侧持久化新值（webview 专属；Lynx 走 PictelioAuth）。
+                                // eventListeners 是非并发 HashMap（桥线程写），工作线程直接读存在
+                                // 数据竞争（ADR-0159 复审 #2）——经 bridge.execute 回桥线程投递。
+                                JSObject data = new JSObject();
+                                data.put("token", token);
+                                bridge.execute(() -> notifyListeners("refreshTokenRotated", data));
+                            });
+                    // JSONObject → JSObject 桥接（#114：Core 去 Capacitor 化）
+                    JSObject result = new JSObject();
+                    result.put("status", coreResult.getInt("status"));
+                    result.put("data", coreResult.getString("data"));
+                    return result;
+                },
+                result -> call.resolve(result),
+                e -> call.reject("Request failed: " + e.getMessage()));
     }
 
     // ─── 插件方法：同步 Refresh Token（内存持有，不落盘） ─────────
@@ -166,18 +177,19 @@ public class PixivApiPlugin extends Plugin {
             return;
         }
 
-        try {
-            PrefetchResult r = prefetchCore(getContext(), url);
-            JSObject result = new JSObject();
-            result.put("cached", r.cached);
-            result.put("path", r.path);
-            if (!r.cached) {
-                result.put("size", r.size);
-            }
-            call.resolve(result);
-        } catch (Exception e) {
-            call.reject("Prefetch failed: " + e.getMessage());
-        }
+        // ADR-0159 决策 1：下载/落盘执行体（网络 I/O + 原子写盘）卸载到工作线程（同 request）
+        net.dispatch(
+                () -> prefetchCore(getContext(), url),
+                r -> {
+                    JSObject result = new JSObject();
+                    result.put("cached", r.cached);
+                    result.put("path", r.path);
+                    if (!r.cached) {
+                        result.put("size", r.size);
+                    }
+                    call.resolve(result);
+                },
+                e -> call.reject("Prefetch failed: " + e.getMessage()));
     }
 
     /** 预取结果：cached=true 为磁盘已命中（仅 path 有意义）；否则 size 为下载字节数 */

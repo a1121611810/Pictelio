@@ -8,6 +8,7 @@ import { createSentinel } from "@/primitives/visibility";
 import { createScrollBehavior } from "../primitives/scroll/createScrollBehavior";
 import { scrollToTop } from "../utils/scrollToTop";
 import { goBack } from "../services/backTransitionService";
+import { t, apiErrorMessage } from "../i18n";
 import {
   users,
   loading,
@@ -54,7 +55,7 @@ const FollowListPage: Component<Props> = (props) => {
   const { visible: headerVisible } = createScrollBehavior();
 
   // 组件挂载后立即发起数据请求（不在 loader 中阻塞导航）
-  onMount(() => {
+  onSettled(() => {
     const uid = routeParams.id ? Number(routeParams.id) : user()?.id;
     if (uid && uid > 0) {
       loadList(props.mode, uid);
@@ -78,23 +79,28 @@ const FollowListPage: Component<Props> = (props) => {
         <div class="pb-16">
           {/* Header */}
           <header
-            class="sticky top-0 z-20 surface-appbar h-12 flex items-center px-4 gap-3 transition-transform duration-[var(--durationNormal)] ease-[var(--curveEasyEase)]"
-            classList={{
-              "translate-y-0": headerVisible(),
-              "-translate-y-full": !headerVisible(),
-            }}
+            class={[
+              "sticky top-0 z-20 surface-appbar h-12 flex items-center px-4 gap-3 transition-transform duration-[var(--durationNormal)] ease-[var(--curveEasyEase)]",
+              {
+                "translate-y-0": headerVisible(),
+                "-translate-y-full": !headerVisible(),
+              },
+            ]}
+
             onDblClick={scrollToTop}
           >
             <fluent-button
               appearance="subtle"
-              aria-label="返回"
+              aria-label={t("followList.back")}
               class="w-8 h-8 p-0 min-w-8"
-              on:click={() => goBack()}
+              ref={fluentOn("click", () => goBack())}
             >
               ←
             </fluent-button>
-            <h1 class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--pageCardTextPrimary)] tracking-tight leading-none">
-              {props.mode === "following" ? "关注" : "粉丝"}
+            <h1 class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] tracking-tight leading-none">
+              {props.mode === "following"
+                ? t("followList.followingTitle")
+                : t("followList.followersTitle")}
             </h1>
           </header>
 
@@ -103,7 +109,7 @@ const FollowListPage: Component<Props> = (props) => {
             {error() && (
               <div class="text-center py-4 px-4 rounded-[var(--borderRadiusMedium)] bg-[var(--colorStatusDangerBackground2)] text-[var(--colorStatusDangerForeground1)]">
                 <p class="[font-size:var(--fontSizeBase200)]">
-                  {error()?.message ?? "加载失败，请重试"}
+                  {error() ? apiErrorMessage(error()!) : t("followList.loadFailedFallback")}
                 </p>
               </div>
             )}
@@ -125,30 +131,41 @@ const FollowListPage: Component<Props> = (props) => {
                       />
                     </div>
                     <div class="flex-1 min-w-0">
-                      <p class="[font-size:var(--fontSizeBase300)] font-semibold text-[var(--pageCardTextPrimary)] truncate">
+                      <p class="[font-size:var(--fontSizeBase300)] font-semibold text-[var(--colorNeutralForeground1)] truncate">
                         {preview.user.name}
                       </p>
-                      <p class="[font-size:var(--fontSizeBase100)] text-[var(--pageCardTextSecondary)] truncate">
+                      <p class="[font-size:var(--fontSizeBase100)] text-[var(--colorNeutralForeground3)] truncate">
                         @{preview.user.account}
                       </p>
                     </div>
                     {/* 关注按钮（非当前用户时显示） */}
                     <Show when={preview.user.is_followed != null}>
                       <button
-                        class="inline-flex items-center justify-center min-h-[40px] font-semibold [font-size:var(--fontSizeBase100)] cursor-pointer select-none transition-colors duration-[var(--durationFast)] ease-[var(--curveEasyEase)] active:scale-[0.95] focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThick)] focus-visible:outline-[var(--colorStrokeFocus2)] appearance-none border-none bg-transparent p-0 px-[var(--spacingHorizontalS)] flex-shrink-0"
-                        classList={{
-                          "text-[var(--colorBrandForeground1)] hover:text-[var(--colorBrandForeground1Hover)]":
-                            !preview.user.is_followed,
-                          "text-[var(--colorNeutralForeground3)] hover:text-[var(--colorStatusDangerForeground2)]":
-                            preview.user.is_followed,
-                        }}
+                        class={[
+                          "inline-flex items-center justify-center min-h-[40px] font-semibold [font-size:var(--fontSizeBase100)] cursor-pointer select-none transition-colors duration-[var(--durationFast)] ease-[var(--curveEasyEase)] active:scale-[0.95] focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThick)] focus-visible:outline-[var(--colorStrokeFocus2)] appearance-none border-none bg-transparent p-0 px-[var(--spacingHorizontalS)] flex-shrink-0",
+                          {
+                            "text-[var(--colorBrandForeground1)] hover:text-[var(--colorBrandForeground1Hover)]":
+                              !preview.user.is_followed,
+                            // Solid 2.0：class 对象值须为严格 boolean（is_followed?: boolean，
+                            // undefined 不满足 ClassValue）；外层 Show 已保证非 null，取反归一
+                            "text-[var(--colorNeutralForeground3)] hover:text-[var(--colorStatusDangerForeground2)]":
+                              !!preview.user.is_followed,
+                          },
+                        ]}
+
                         onClick={(e) => {
                           e.stopPropagation();
                           toggleFollow(index());
                         }}
-                        aria-label={preview.user.is_followed ? "取消关注" : "关注"}
+                        aria-label={
+                          preview.user.is_followed
+                            ? t("followList.unfollow")
+                            : t("followList.follow")
+                        }
                       >
-                        {preview.user.is_followed ? "已关注" : "关注"}
+                        {preview.user.is_followed
+                          ? t("followList.following")
+                          : t("followList.follow")}
                       </button>
                     </Show>
                   </div>
@@ -185,11 +202,13 @@ const FollowListPage: Component<Props> = (props) => {
               </div>
             )}
 
-            {loading() && <LoadingSpinner text="加载中..." />}
+            {loading() && <LoadingSpinner text={t("followList.loading")} />}
 
             {!loading() && users().length === 0 && !error() && (
               <p class="text-[var(--colorNeutralForeground2)] text-center py-8 [font-size:var(--fontSizeBase300)]">
-                {props.mode === "following" ? "还没有关注任何人" : "还没有粉丝"}
+                {props.mode === "following"
+                  ? t("followList.emptyFollowing")
+                  : t("followList.emptyFollowers")}
               </p>
             )}
 
