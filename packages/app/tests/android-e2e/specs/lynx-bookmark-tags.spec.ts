@@ -882,8 +882,12 @@ async function enterDetailAndResolveId(): Promise<string> {
     const removed = pubBefore.filter((id) => !pubAfter.includes(id));
     if (added.length !== 1 || removed.length !== 0) {
       console.warn(
-        `[lynx-bookmark-tags] 第 ${attempt} 次尝试：单击心形未产生唯一新收藏（+${added.length}/-${removed.length}）→ 判定不是插画详情页，返回重试`,
+        `[lynx-bookmark-tags] 第 ${attempt} 次尝试：单击心形未产生唯一新收藏（+${added.length}/-${removed.length}）→ 判定不是插画详情页，回滚本次新增后重试`,
       );
+      // 本次点击仍可能已写入收藏（只是数量不唯一）——逐条回滚，避免在真实账号留痕
+      for (const id of added) {
+        hostDeleteBookmark(String(id));
+      }
       pressBack();
       await SLEEP(4_000);
       continue;
