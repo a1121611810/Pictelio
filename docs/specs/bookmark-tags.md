@@ -110,4 +110,10 @@ Android 真机验收暴露：**webview 原生构建下所有写操作（含本�
 - 用例 6：`adb shell input keyevent 4` → 面板关闭且 URL 不变（overlay 栈语义：返回键先关面板不退页）。
 - **附带修复（ADR-0161）**：真机验收暴露 webview 原生构建下**所有写操作失败**（原生 POST 载荷被塞进 query、body 为空，Pixiv 返回 400/404）；已改为表单体并补契约测试。web 模式与 agent-browser E2E 全绿曾掩盖该原生写路径长期失效。
 
-lynx 端设备验证（本 SDK 限制下完整 UI 不可自动化，仓库既有约定）：引擎切换 + LynxActivity 启动渲染 + FAB/页面点击回归 3 项设备级用例全绿（`lynx-boot-renders.spec.ts`、`fab-hit-testing-regression.spec.ts`）；长按在原生 LynxView 的**可触发性**、面板可操作性与 lynx 私密写路径见跟进票 **#538**（lynx 端设备取证）；E2E 纳入 CI 的编排决策见 **#539**。
+lynx 端设备验收（`packages/app/tests/android-e2e/specs/lynx-bookmark-tags.spec.ts`，**3/3 绿**；设备级真实输入 + 像素定位 + host 侧直连 Pixiv 读真值）：
+
+- 用例 ①：`input motionevent DOWN/UP` 静止 700ms 长按心形 → 面板出现（截图取证），且 **host 侧 `is_bookmarked=false` + 收藏集合逐项不变** → 旧「私密直存」语义在 lynx 详情页确已消失；
+- 用例 ②：面板内 tap「私密」→ tap 作品标签建议 chip → tap 保存 → host 侧 `is_bookmarked=true`、`restrict="private"`、`is_registered` 含所投标签（多轮实测：`まのさば` / `NIKKE` / `Lumine(GenshinImpact)`）→ 覆盖「可见性 + 加标签」双路径；
+- 用例 ③：host 侧**表单体**取消收藏（ADR-0161）→ 复核 `is_bookmarked=false` 且集合回到基线（含非空转前置断言）。
+
+另有通用 lynx 回归 3 项设备级用例全绿（`lynx-boot-renders.spec.ts`、`fab-hit-testing-regression.spec.ts`：引擎切换 + 启动渲染 + FAB/页面点击）。取证中暴露的基建缺口已开票：**#542**（benchNav 缺详情页场景 + 作者行整行可点致坐标自动化误命中）、**#543**（`runCapture` 字面量超时/maxBuffer + lynx 详情页图片加载失败）；E2E 纳入 CI 的编排决策见 **#539**。
