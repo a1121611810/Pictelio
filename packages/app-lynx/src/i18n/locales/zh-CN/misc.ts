@@ -201,6 +201,38 @@ const zhMisc = {
 
   // ─── composables/useBookmarkMutation.ts（收藏失败回滚提示） ───
   "useBookmarkMutation.actionFailed": "操作失败",
+
+  // ─── components/BookmarkPanel.vue（收藏面板；spec docs/specs/bookmark-tags.md D8/D10 + ADR-0160）───
+  // 键面与文案对齐 webview 面板（packages/app/src/components/BookmarkPanel.tsx 的 t() 键名 +
+  // 其 zh 字典值逐字一致），双端同键名同语义（spec D10）。
+  "bookmarkPanel.title": "收藏到…",
+  "bookmarkPanel.closeAria": "关闭",
+  "bookmarkPanel.closeScrimAria": "关闭收藏面板",
+  "bookmarkPanel.detailLoading": "正在获取收藏状态…",
+  "bookmarkPanel.detailFailed": "收藏状态获取失败：{{detail}}（为避免覆盖错误数据，保存已禁用）",
+  "bookmarkPanel.visibilityLabel": "可见性",
+  "bookmarkPanel.visibilityPublic": "公开",
+  "bookmarkPanel.visibilityPrivate": "私密",
+  "bookmarkPanel.selectedLabel": "已选标签（{{count}}/{{limit}}）",
+  "bookmarkPanel.selectedEmpty": "尚未选择标签",
+  "bookmarkPanel.removeTagAria": "移除标签 {{tag}}",
+  "bookmarkPanel.newTagLabel": "新建标签",
+  "bookmarkPanel.newTagPlaceholder": "输入后按空格或回车添加",
+  "bookmarkPanel.newTagAddAria": "添加",
+  "bookmarkPanel.limitReached": "最多只能选择 {{limit}} 个标签",
+  "bookmarkPanel.newTagEmpty": "标签不能为空",
+  "bookmarkPanel.newTagDuplicate": "该标签已在已选中",
+  "bookmarkPanel.universeLabel": "我的标签",
+  "bookmarkPanel.universeLoading": "正在加载标签库…",
+  "bookmarkPanel.universeFailed": "标签库加载失败，仍可手动输入",
+  "bookmarkPanel.universeEmpty": "暂无历史标签",
+  "bookmarkPanel.universeTagAria": "标签 {{name}}，使用过 {{count}} 次",
+  "bookmarkPanel.suggestionsLabel": "作品标签",
+  "bookmarkPanel.suggestionAria": "加入作品标签 {{name}}",
+  "bookmarkPanel.saveFailed": "保存失败：{{detail}}",
+  "bookmarkPanel.saving": "保存中…",
+  "bookmarkPanel.save": "收藏",
+  "bookmarkPanel.saveEdit": "保存修改",
 } as const;
 
 export default zhMisc;

@@ -10,7 +10,9 @@ import { resolvePageSrcs } from '../utils/imageQuality'
 import { detailImageHeightVw } from '../utils/imageLayout'
 import { presentError } from '../utils/errorPresentation'
 import { useSettingsStore } from '../stores/settingsStore'
+import { useBookmarkMutation } from '../composables/useBookmarkMutation'
 import BookmarkButton from '../components/BookmarkButton.vue'
+import BookmarkPanel from '../components/BookmarkPanel.vue'
 import CommentOverlay from '../components/CommentOverlay.vue'
 import PagePickerSheet from '../components/PagePickerSheet.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
@@ -26,6 +28,52 @@ const settings = useSettingsStore()
 const illust = ref<PixivIllust | null>(null)
 const loading = ref(true)
 const errorMsg = ref('')
+
+// 路由参数 id（收藏状态机与详情请求共用；提至最前——bm 在 setup 期即读它取值）
+const illustId = computed(() => Number(currentParams.value.id ?? 0))
+
+// ─── 双轨收藏（T5 #534 / spec docs/specs/bookmark-tags.md D3/D8 + ADR-0160）───
+// 页面持有**唯一**收藏状态机实例：单击心形 toggle（快速收藏，恒公开、动效不变）与收藏面板
+// saveWith（覆盖式保存：完整标签集 + 可见性）共用同一份 bookmarked/count/busy——面板保存后
+// 心形即时一致，不引入第二份状态。初始值先占位为未收藏，详情返回后由页面写入服务端真值
+// （状态写入归宿主，spec D9 语义）。IllustDetail 不在 KeepAlive 白名单 → 每次进入实例独立。
+const bm = useBookmarkMutation({
+  illustId: illustId.value,
+  initialBookmarked: false,
+  initialCount: 0,
+})
+
+/** 心形组件 ref：面板保存成功后播收藏动效（与单击收藏同一动效资产） */
+const heartRef = ref<{ playBurst?: () => void } | null>(null)
+/** 收藏面板开合（T5：长按心形 500ms 打开；关闭 = 宿主 v-if 卸载 → 面板内部 dispose） */
+const showBookmarkPanel = ref(false)
+/** 打开面板时的收藏态快照：面板打开期间心形不可达（遮罩覆盖）→ 快照即保存前真值。
+ * 仅「保存前未收藏」的保存播爆发动效（覆盖式编辑不播），对齐 webview handleBookmarkSaved */
+const panelOpenedBookmarked = ref(false)
+
+/** 作品标签建议来源（原形 name，与 webview 面板 workTags 同源；spec D5） */
+const workTags = computed(() => illust.value?.tags?.map((tag) => tag.name) ?? [])
+
+function openBookmarkPanel(): void {
+  panelOpenedBookmarked.value = bm.bookmarked.value
+  // 清掉上一次快速收藏的残留 errorMsg（同一实例的状态）：否则面板 footer 会把旧错误
+  // 误报成「保存失败」（面板打开时的错误行只应呈现本次保存的结果）
+  bm.errorMsg.value = ''
+  showBookmarkPanel.value = true
+}
+
+/** 面板保存成功（saveWith 已乐观置位 bookmarked=true，失败则不上抛 saved）：关面板 + 补动效 */
+function onBookmarkPanelSaved(): void {
+  showBookmarkPanel.value = false
+  if (panelOpenedBookmarked.value) return
+  // 仅「保存前未收藏」的保存播爆发动效（覆盖式编辑不播），对齐 webview handleBookmarkSaved
+  if (heartRef.value?.playBurst) {
+    heartRef.value.playBurst()
+    return
+  }
+  // 动效通道断（模板 ref 未就绪）→ 显式告警，不静默（测试硬约束 #3 精神）
+  console.warn('[IllustDetail] 心形 ref 未就绪，面板保存的收藏动效被跳过')
+}
 
 // ─── 评论弹层（issue #164）：入口在收藏操作行；弹层挂根 view 内、scroll-view 之后 ───
 const showComments = ref(false)
@@ -55,8 +103,6 @@ async function toggleFollowAuthor() {
     followBusy.value = false
   }
 }
-
-const illustId = computed(() => Number(currentParams.value.id ?? 0))
 
 // ─── 保存到相册（spec docs/specs/image-save-download.md）：入口在收藏操作行；───
 // ─── 单页直存；多页开选页面板；ugoira 不提供。状态内联在操作行下方（lynx 无全局 toast）───
@@ -169,6 +215,13 @@ onMounted(async () => {
     illust.value = res.illust
     // P0-T3：同步作者关注状态（详情 API 可能不返回 is_followed，缺省 false）
     following.value = !!res.illust.user.is_followed
+    // T5：把服务端收藏真值写入页面持有的状态机（面板打开前的状态快照依据）
+    if (res.illust.total_bookmarks === undefined) {
+      // 字段契约恒在（PixivIllust.total_bookmarks: number）——缺失即契约破坏，显式告警不静默
+      console.warn('[IllustDetail] total_bookmarks 缺失（契约破坏），收藏数按 0 展示')
+    }
+    bm.bookmarked.value = !!res.illust.is_bookmarked
+    bm.count.value = Math.max(0, res.illust.total_bookmarks ?? 0)
   } catch (err) {
     errorMsg.value = presentError(err, t('error.fallback.loadFailed'))
   } finally {
@@ -271,10 +324,17 @@ onMounted(async () => {
         <text v-if="followError" class="text-label-medium text-error mt-1">{{ followError }}</text>
         <text class="text-body-small text-outline mt-1.5">{{ illust.width }} × {{ illust.height }}</text>
         <view class="mt-2 flex flex-row items-center">
+          <!-- 双轨收藏（T5 #534）：单击 = 快速收藏（toggle，恒公开、动效不变）；
+               长按 500ms = 打开收藏面板（enable-long-press + @long-press）。
+               mutation 注入 = 面板 saveWith 与本心形共用同一状态机实例 -->
           <BookmarkButton
+            ref="heartRef"
             :illust-id="illust.id"
             :initial-bookmarked="illust.is_bookmarked"
             :bookmark-count="illust.total_bookmarks"
+            :mutation="bm"
+            enable-long-press
+            @long-press="openBookmarkPanel"
           />
           <!-- 保存（spec download-manager §8）：↓ 为 U+2193 纯文本符号（规避 emoji 字形，
                ADR-0112 教训）；静态图直接入队，ugoira 取元数据后按全局格式入队 -->
@@ -341,6 +401,22 @@ onMounted(async () => {
         :busy="false"
         @close="showPicker = false"
         @confirm="onConfirmPicker"
+      />
+    </view>
+
+    <!-- 收藏面板（T5 #534 / spec docs/specs/bookmark-tags.md D8）：挂**页面层**（非 list-item），
+         DOM 顺序靠后覆盖内容区；v-if 条件渲染 = 关闭态不渲染（ADR-0123 全屏层规则）。
+         saveWith 直取页面状态机（覆盖式保存 + 乐观置位 + 失败回滚），保存成功上抛 saved。
+         系统返回键关面板由面板内部 modalStack 注册承担（与 CommentOverlay 同机制）。 -->
+    <view v-if="showBookmarkPanel" class="absolute inset-0">
+      <BookmarkPanel
+        :illust-id="illustId"
+        :work-tags="workTags"
+        :save-with="bm.saveWith"
+        :save-error="bm.errorMsg.value"
+        :saving="bm.busy.value"
+        @close="showBookmarkPanel = false"
+        @saved="onBookmarkPanelSaved"
       />
     </view>
   </view>

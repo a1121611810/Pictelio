@@ -3,19 +3,39 @@
 // ADR-0112：M3 动效（state-layer 环扩散/收拢 + Expressive spring 弹心）+ 乐观触发。
 // T4 迁移（ADR-0141）：状态机从 primitives/createBookmarkToggle 改为 composable
 // useBookmarkMutation（useMutation 替代 deps.add/remove；getter 形态保持不变 → 模板零变化）。
+// T5 双轨收藏（spec docs/specs/bookmark-tags.md D3/D8 + ADR-0160 D4）：
+//  - mutation 可选注入：详情页把页面持有的同一实例传进来（心形快速收藏与收藏面板保存
+//    共用一份状态/计数，避免第二份状态漂移）；列表卡片缺省自建，行为不变。
+//  - enableLongPress：详情页启用手势——按住 500ms 上抛 longPress（宿主开收藏面板），
+//    同一次手势的 tap 被吞掉（不额外触发快速收藏）。列表卡片不开（列表不加入口，spec D3）。
+//  - playBurst：面板保存成功后由宿主经模板 ref 调用（与单击收藏播同一动效资产）。
 // @tap.stop：阻止冒泡到卡片 tap（进详情），需实测 vue-lynx 是否支持 .stop。
-import { ref } from 'vue'
-import { BOOKMARK_ANIMATION_MS, useBookmarkMutation } from '../composables/useBookmarkMutation'
+import { onBeforeUnmount, ref } from 'vue'
+import {
+  BOOKMARK_ANIMATION_MS,
+  useBookmarkMutation,
+  type UseBookmarkMutationReturn,
+} from '../composables/useBookmarkMutation'
+import { useLongPress, type TouchLikeEvent } from '../composables/useLongPress'
 
 const props = defineProps<{
   illustId: number
   initialBookmarked: boolean
   /** 收藏数（可选，传入则显示计数） */
   bookmarkCount?: number
+  /** 外部共享的状态机实例（详情页：心形 + 收藏面板共用；缺省自建——列表卡片路径）。
+   * 注入时本组件的 change 事件不再上抛（onChange 归宿主，同一实例只有一份回调） */
+  mutation?: UseBookmarkMutationReturn
+  /** 启用长按唤出收藏面板（详情页专用；spec D3 列表卡片不加入口） */
+  enableLongPress?: boolean
 }>()
 
 // change 事件：动画播完后上抛（动画完成态，ADR-0112 决策 4；供收藏列表等宿主移除已取消收藏的项）
-const emit = defineEmits<{ change: [bookmarked: boolean] }>()
+const emit = defineEmits<{
+  change: [bookmarked: boolean]
+  /** 长按（500ms）触发：宿主打开收藏面板 */
+  longPress: []
+}>()
 
 // useBookmarkMutation composable（替代 createBookmarkToggle）：
 // - 内部 useMutation 调 apiClient.post → 401 重试走 apiClient seam
@@ -23,12 +43,18 @@ const emit = defineEmits<{ change: [bookmarked: boolean] }>()
 // - onSuccess 350ms 后 emit('change')（动画完成态，ADR-0112 D5）
 // - onError 静息回滚 + errorMsg
 // - busy 锁由 composable 内部维护
-const bm = useBookmarkMutation({
-  illustId: props.illustId,
-  initialBookmarked: props.initialBookmarked,
-  initialCount: props.bookmarkCount ?? 0,
-  onChange: (bookmarked) => emit('change', bookmarked),
-})
+// 注入路径不重复建实例（同一份 ref，面板 saveWith 与本组件 toggle 互斥共用 busy 锁）
+const bm =
+  props.mutation ??
+  useBookmarkMutation({
+    illustId: props.illustId,
+    initialBookmarked: props.initialBookmarked,
+    initialCount: props.bookmarkCount ?? 0,
+    onChange: (bookmarked) => emit('change', bookmarked),
+  })
+
+// 长按通道（enableLongPress = false 时 handler 直接返回，不注册计时）
+const longPress = useLongPress({ onTrigger: () => emit('longPress') })
 
 /** 主心 pop 重播代（:key 重挂载触发动画重播） */
 const animSeq = ref(0)
@@ -43,9 +69,8 @@ interface Ring {
 const rings = ref<Ring[]>([])
 let nextRingId = 1
 
-function onTap() {
-  if (bm.busy.value) return
-  const target = !bm.bookmarked.value
+/** 播放一次收藏动效（state-layer 环 + 主心 pop）；target=true 收藏向、false 取消向 */
+function startBurst(target: boolean) {
   lastTarget.value = target
   animSeq.value++
   const id = nextRingId++
@@ -54,12 +79,53 @@ function onTap() {
   setTimeout(() => {
     rings.value = rings.value.filter((r) => r.id !== id)
   }, BOOKMARK_ANIMATION_MS)
+}
+
+function onTap() {
+  // 长按已开面板：同一次手势的 tap 必须被吞掉（不额外走快速收藏，spec D3 双轨互斥）
+  if (longPress.consumeLongPress()) return
+  if (bm.busy.value) return
+  const target = !bm.bookmarked.value
+  startBurst(target)
   void bm.toggle()
 }
+
+function onTouchStart(e: TouchLikeEvent): void {
+  if (!props.enableLongPress) return
+  longPress.onTouchStart(e)
+}
+function onTouchMove(e: TouchLikeEvent): void {
+  if (!props.enableLongPress) return
+  longPress.onTouchMove(e)
+}
+function onTouchEnd(): void {
+  if (!props.enableLongPress) return
+  longPress.onTouchEnd()
+}
+
+onBeforeUnmount(() => {
+  longPress.cancel()
+})
+
+/**
+ * 收藏爆发动效重播（T5 面板保存成功路径）：宿主（IllustDetail）在 saveWith 成功后经
+ * 模板 ref 调用——与单击收藏播同一动效资产（webview handleBookmarkSaved 同语义）。
+ */
+function playBurst(): void {
+  startBurst(true)
+}
+
+defineExpose({ playBurst })
 </script>
 
 <template>
-  <view class="flex flex-row items-center" @tap.stop="onTap">
+  <view
+    class="flex flex-row items-center"
+    @tap.stop="onTap"
+    @touchstart="onTouchStart"
+    @touchmove="onTouchMove"
+    @touchend="onTouchEnd"
+  >
     <view class="relative flex items-center justify-center">
       <!-- state-layer 环层（主心下层）：收藏红环扩散 / 取消灰环收拢 -->
       <view
