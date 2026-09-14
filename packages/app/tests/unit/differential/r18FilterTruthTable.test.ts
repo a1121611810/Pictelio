@@ -15,6 +15,7 @@ vi.mock("@/stores/settingsStore", () => ({
 
 vi.mock("@/stores/blockStore", () => ({
   isBlocked: vi.fn(() => false),
+  blockedIds: vi.fn(() => new Set<number>()),
 }));
 
 import { showR18, showR18G } from "@/stores/settingsStore";

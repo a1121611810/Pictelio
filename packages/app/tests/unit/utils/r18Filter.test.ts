@@ -10,6 +10,7 @@ vi.mock("@/stores/settingsStore", () => ({
 
 vi.mock("@/stores/blockStore", () => ({
   isBlocked: vi.fn((id: number) => id === 999),
+  blockedIds: vi.fn(() => new Set<number>([999])),
 }));
 
 import { showR18, showR18G, aiFilterMode } from "@/stores/settingsStore";

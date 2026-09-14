@@ -42,7 +42,11 @@ vi.mock("@/api/illust", () => ({ ...api }));
 vi.mock("@/stores/authStore", () => ({ user: () => ({ id: 42 }) }));
 vi.mock("@/stores/backGestureStore", () => ({ pushOverlay: vi.fn(), popOverlay: vi.fn() }));
 vi.mock("@/stores/historyStore", () => ({ recordVisit: vi.fn() }));
-vi.mock("@/stores/blockStore", () => ({ blockUser: vi.fn(), isBlocked: () => false }));
+vi.mock("@/stores/blockStore", () => ({
+  blockUser: vi.fn(),
+  isBlocked: () => false,
+  blockedIds: () => new Set<number>(),
+}));
 vi.mock("@/stores/downloadStore", () => ({ enqueueDownloads: vi.fn() }));
 vi.mock("@/stores/settingsStore", () => ({
   ugoiraMode: () => "fflate",

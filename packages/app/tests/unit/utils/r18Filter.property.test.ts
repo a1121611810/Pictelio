@@ -25,6 +25,8 @@ vi.mock("@/stores/settingsStore", () => ({
 
 vi.mock("@/stores/blockStore", () => ({
   isBlocked: (id: number) => blockedIds.has(id),
+  // #426 起 r18Filter 改整集快照读，mock 须提供 blockedIds 访问器
+  blockedIds: () => new Set(blockedIds),
 }));
 
 import { showR18, showR18G } from "@/stores/settingsStore";

@@ -113,7 +113,10 @@ const AdaptiveTags: Component<AdaptiveTagsProps> = (props) => {
     <div ref={ref} class="relative mt-[var(--spacingVerticalXS)]">
       {/* 测量层：absolute + visibility:hidden，不占布局；渲染全部 chip + 「+N」占位（文本用总数最宽值）。
           overflow-hidden 必须保留：标签单行总宽可达数百 px，无裁剪会撑大文档 scrollWidth，
-          窄视口（Android WebView 360px）整页可横向拖动（#419）；裁剪不影响子元素 offsetWidth 测量。 */}
+          窄视口（Android WebView 360px）整页可横向拖动（#419）；裁剪不影响子元素 offsetWidth 测量。
+          首页全 feed 渲染时 SearchableTag 实例可达 ~2000，dev 模式 solid-refresh 的 per-type
+          HMR signal 会报 HUGE_FAN_OUT——已裁定接受（#426：信号属 solid-refresh 内部、
+          createSelector 无 key 可反转；dev-only，生产构建无 solid-refresh）。 */}
       <div
         ref={(el) => {
           measureEl = el;
