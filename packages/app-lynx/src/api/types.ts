@@ -201,13 +201,19 @@ export interface PixivUserFollowingResponse {
 export type RestrictType = "public" | "private";
 
 /**
- * GET /v2/illust/bookmark/detail 的 `bookmark_detail`：未收藏为 null。
- * 字段 optional 宽容解析——缺字段由消费方按未提供处理，不做服务端纠错。
+ * GET /v2/illust/bookmark/detail 的 `bookmark_detail`。
+ *
+ * 响应形状（2026-09-14 真机 probe 实测，与 webview 侧同源）：**未收藏时并非 null**，
+ * 而是返回对象且 `is_bookmarked:false` + 作品自身标签（`is_registered:false`）。
+ * 字段 optional 宽容解析——缺字段由消费方显式暴露（不静默），不做服务端纠错。
  */
 export interface PixivBookmarkDetail {
   is_bookmarked?: boolean;
   restrict?: RestrictType;
-  /** 作品自带标签；is_registered = 该标签已在用户标签库中（勾选态参考） */
+  /**
+   * `is_registered` = **该条收藏已保存的标签**（预填勾选依据）；`false` 者多为作品自身标签（建议来源）。
+   * _Avoid_：读成「标签库已注册」——新建收藏标签同样为 true（见 spec 验收实证）。
+   */
   tags?: { name: string; is_registered?: boolean }[];
 }
 

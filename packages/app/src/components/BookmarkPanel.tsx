@@ -372,6 +372,7 @@ const BookmarkPanel: Component<BookmarkPanelProps> = (props) => {
                 type="button"
                 aria-pressed={restrict() === "public" ? "true" : "false"}
                 class={`${CHIP_BASE} ${restrict() === "public" ? CHIP_SELECTED : CHIP_IDLE}`}
+                data-testid="bookmark-panel-visibility-public"
                 onClick={() => setRestrict("public")}
               >
                 {t("bookmarkPanel.visibilityPublic")}
@@ -380,6 +381,7 @@ const BookmarkPanel: Component<BookmarkPanelProps> = (props) => {
                 type="button"
                 aria-pressed={restrict() === "private" ? "true" : "false"}
                 class={`${CHIP_BASE} ${restrict() === "private" ? CHIP_SELECTED : CHIP_IDLE}`}
+                data-testid="bookmark-panel-visibility-private"
                 onClick={() => setRestrict("private")}
               >
                 {t("bookmarkPanel.visibilityPrivate")}

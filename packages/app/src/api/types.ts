@@ -132,13 +132,25 @@ export interface PixivUgoiraMetadataResponse {
 }
 
 // ─── 收藏标签（ADR-0160 收藏加标签，spec docs/specs/bookmark-tags.md D4） ───
-/** 收藏详情中的单个收藏标签；is_registered=标签库已注册（预填勾选依据），字段缺省宽容解析 */
+/**
+ * 收藏详情中的单个标签。
+ *
+ * `is_registered` 语义（2026-09-14 真机 + host 侧直连实测确证）：`true` = **该条收藏已保存的
+ * 标签**（面板据此预填已选）；`false` = 作品自身标签（未收藏时返回，仅作建议）。
+ * _Avoid_：把 `is_registered` 读成「标签库已注册」——新建的收藏标签也会为 true（实证见 spec 验收节）。
+ */
 export interface PixivBookmarkDetailTag {
   name: string;
   is_registered?: boolean;
 }
 
-/** GET /v2/illust/bookmark/detail 的 bookmark_detail（未收藏时为 null；内层字段 optional 宽容解析） */
+/**
+ * GET /v2/illust/bookmark/detail 的 bookmark_detail（内层字段 optional 宽容解析）。
+ *
+ * 响应形状（2026-09-14 真机 probe）：**未收藏时并非 null**，而是返回对象且 `is_bookmarked:false`
+ * + 作品自身标签（`is_registered:false`）。调用方一律以 `is_bookmarked` / `is_registered` 判定；
+ * 类型上的 `| null` 仅作防御（字段显式 null / 缺字段由 API 层区分处理）。
+ */
 export interface PixivBookmarkDetail {
   is_bookmarked?: boolean;
   restrict?: RestrictType;
