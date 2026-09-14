@@ -623,6 +623,12 @@ Grill 澄清 → to-spec → to-tickets → implement
 - **E2E 测试**: 12 个 spec —— agent-browser 6 个（main-flow、sub-flows、translation-flow、update-flow、route-switch-instant、adaptive-tags-240）+ android-e2e 6 个（smoke、client-kind-contract、switch-client-oneway/roundtrip/roundtrip-low/roundtrip-3x）
 - `passWithNoTests: false` — T0 门禁（ADR-0097）：禁止空测试文件，防空壳套件漂移（ADR-0084 教训）
 
+### 门禁边界与 E2E 编排（#539 拍板，2026-09-15）
+
+- **CI 门禁**（`.github/workflows/ci.yml`）= `check:all` + `lint:all` + **`test:all`（app 单测 + agent-browser E2E，后者随 `test:all` 组合已在门禁内运行）** + Robolectric Java 单测。
+- **android-e2e（模拟器 Appium）不入门禁**，保持手动按需跑（AVD + Appium + 真实 token + BENCH_NAV 构建/设备代理等环境前置，入 CI 每次 PR 增加数十分钟且稳定性风险高）；17 个 spec 定位为**按需取证工具**（真机验收、调查取证如 `lynx-detail-image-probe`、回归复跑）。
+- **关键行为必须有 CI 内单测防线**（语义翻转、手势契约、跨端契约、状态机）：先例 = `IllustDetail.gesture.test.tsx`（长按语义）、`firstLoadViewWireup.test.ts`（跨页接线）、`*.template.test.ts`（lynx 源级守卫）、`r18FilterTruthTable/property`（过滤差分）。review 时「CI 内无机器防线」的阻塞判定以本条为口径——单测防线已存在即不阻塞，android-e2e-only 的覆盖不作为阻塞项复现。
+
 ### 测试硬约束（违反视为架构违规）
 
 1. **IO 边界测试强制覆盖**：任何从外部数据源读取数据的函数（fetch/HTTP、Preferences、原生桥、JSON 解析）必须同时具备成功路径与失败/降级路径的单元测试。禁止只测纯函数而不测 IO 边界；E2E 无法构造的状态（依赖外部发布、网络时序）由函数测试兜底。
