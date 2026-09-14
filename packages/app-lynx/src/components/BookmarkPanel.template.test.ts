@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url'
 import zhMisc from '../i18n/locales/zh-CN/misc'
 import enMisc from '../i18n/locales/en/misc'
 import { BOOKMARK_TAG_LIMIT } from '../utils/bookmarkTags'
+import { INPUT_PLACEHOLDER_COLOR } from '../utils/lynxPlatformColors'
 
 const src = readFileSync(fileURLToPath(new URL('./BookmarkPanel.vue', import.meta.url)), 'utf8')
 /** 去 HTML 注释与整行行注释（约束说明本身会提到被禁止的串，负向断言必须在代码本文上做） */
@@ -177,9 +178,12 @@ describe('BookmarkPanel 交互接线（spec D5/D6/D11 + D2/D9）', () => {
     expect(code).toContain('v-for="name in workTags"')
   })
 
-  it('placeholder-color 保持十六进制（Lynx 平台属性不解析 var()，可用性优先；FIX-5 实测结论）', () => {
-    // 实测：编译产物中 placeholder-color 原样落入平台属性通道（var() 仅出现在 CSS/style 通道），
-    // 全仓无平台属性承载 var() 的先例；web-core 预览会把它映射为 CSS 自定义属性而「假绿」。
-    expect(code).toContain('placeholder-color="#41474e"')
+  it('placeholder-color 绑定 lynxPlatformColors 常量（Lynx 平台属性不解析 var()；FIX-5 实测结论，#537 令牌化）', () => {
+    // 实测（FIX-5）：编译产物中 placeholder-color 原样落入平台属性通道（var() 仅出现在 CSS/style 通道），
+    // 故以 TS 常量字面量承载（lynxPlatformColors.ts 单点定义 = tokens.css --md-on-surface-variant），
+    // 模板禁止散写十六进制；web-core 预览会把它映射为 CSS 自定义属性而「假绿」。
+    expect(code).toContain(':placeholder-color="INPUT_PLACEHOLDER_COLOR"')
+    expect(code).not.toContain('placeholder-color="#')
+    expect(INPUT_PLACEHOLDER_COLOR).toBe('#41474e')
   })
 })

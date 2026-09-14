@@ -6,6 +6,7 @@ import { useSettingsStore } from '../stores/settingsStore'
 import { LOGIN_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { presentError } from '../utils/errorPresentation'
 import { t } from '../i18n'
+import { INPUT_PLACEHOLDER_COLOR } from '../utils/lynxPlatformColors'
 
 const auth = useAuthStore()
 const settings = useSettingsStore()
@@ -55,7 +56,7 @@ async function submit() {
         v-model="tokenInput"
         class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-outline-variant text-body-large text-surface-on px-4 mb-3"
         :placeholder="t('login.token.placeholder')"
-        placeholder-color="#41474e"
+        :placeholder-color="INPUT_PLACEHOLDER_COLOR"
         :accessibility-element="A11Y_ELEMENT_ENABLED"
         :accessibility-label="LOGIN_A11Y_LABELS.tokenInput"
       />

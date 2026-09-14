@@ -36,6 +36,7 @@ import {
   type SearchFilters,
 } from '@pictelio/search-core'
 import type { SearchScope, SearchSort } from '../api/types'
+import { INPUT_PLACEHOLDER_COLOR } from '../utils/lynxPlatformColors'
 
 const searchHistory = useSearchHistoryStore()
 const searchSheet = useSearchSheetStore()
@@ -343,7 +344,7 @@ onBeforeUnmount(() => {
           confirm-type="search"
           class="flex-1 h-[11.2vw] box-border bg-surface-container-highest rounded-[var(--md-shape-full)] text-body-medium text-surface-on px-5"
           :placeholder="t('searchSheet.placeholder')"
-          placeholder-color="#41474e"
+          :placeholder-color="INPUT_PLACEHOLDER_COLOR"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="SEARCH_A11Y_LABELS.input"
           @input="onInput"

@@ -24,6 +24,7 @@ import { useBookmarkPanel } from '../composables/useBookmarkPanel'
 import { useAuthStore } from '../stores/authStore'
 import { useModalStack } from '../stores/modalStack'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import { INPUT_PLACEHOLDER_COLOR } from '../utils/lynxPlatformColors'
 
 const props = defineProps<{
   /** 目标作品 id（面板内预填/标签库请求的作用域；变化即重载） */
@@ -232,16 +233,13 @@ onBeforeUnmount(() => {
         <view class="mt-4">
           <text class="text-label-medium text-outline">{{ t('bookmarkPanel.newTagLabel') }}</text>
           <view class="flex flex-row items-center gap-2 mt-2">
-            <!-- placeholder-color 是 Lynx **平台属性**（非 CSS）：实测不解析 var()——编译产物把
-                 "#41474e" 原样落入属性通道（var() 只出现在 CSS/style 通道），全仓亦无平台属性承载
-                 var() 的先例；web-core 预览把它映射为 CSS 自定义属性会「假绿」（ADR-0056 同族坑）。
-                 故保留十六进制值（沿用 SearchSheet / CommentInputBar / Login / Me 既有写法），
-                 令牌化跟踪见 issue 待办 -->
+            <!-- placeholder-color 是 Lynx **平台属性**（非 CSS）：实测不解析 var()（FIX-5），
+                 颜色值以常量承载（lynxPlatformColors.ts 单点定义），禁止散写十六进制 -->
             <input
               v-model="input"
               class="flex-1 h-[11.2vw] box-border bg-surface-container-highest rounded-[var(--md-shape-full)] text-body-medium text-surface-on px-5"
               :placeholder="t('bookmarkPanel.newTagPlaceholder')"
-              placeholder-color="#41474e"
+              :placeholder-color="INPUT_PLACEHOLDER_COLOR"
               :accessibility-element="A11Y_ELEMENT_ENABLED"
               :accessibility-label="t('bookmarkPanel.newTagLabel')"
               @input="onInput"

@@ -39,6 +39,7 @@ import {
   saveWebdavPassword,
 } from '../utils/webdavCredentials'
 import { t, locale } from '../i18n'
+import { INPUT_PLACEHOLDER_COLOR } from '../utils/lynxPlatformColors'
 
 const auth = useAuthStore()
 const settings = useSettingsStore()
@@ -1035,7 +1036,7 @@ function toggleRankingEntry() {
             v-model="settings.webdavUrl"
             class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] text-body-large text-surface-on px-4 mt-3"
             placeholder="https://dav.example.com/remote.php/dav/files/me/"
-            placeholder-color="#41474e"
+            :placeholder-color="INPUT_PLACEHOLDER_COLOR"
             @input="onWebdavFieldInput('url', $event)"
           />
           <!-- M4：非 HTTPS 警告（spec §7） -->
@@ -1049,7 +1050,7 @@ function toggleRankingEntry() {
             v-model="settings.webdavUsername"
             class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] text-body-large text-surface-on px-4 mt-3"
             :placeholder="t('me.webdav.usernamePlaceholder')"
-            placeholder-color="#41474e"
+            :placeholder-color="INPUT_PLACEHOLDER_COLOR"
             @input="onWebdavFieldInput('username', $event)"
           />
           <!-- B1：密码输入框不可逆显（spec §7） -->
@@ -1058,13 +1059,13 @@ function toggleRankingEntry() {
             type="password"
             class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] text-body-large text-surface-on px-4 mt-3"
             :placeholder="t('me.webdav.passwordPlaceholder')"
-            placeholder-color="#41474e"
+            :placeholder-color="INPUT_PLACEHOLDER_COLOR"
           />
           <input
             v-model="settings.webdavDir"
             class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] text-body-large text-surface-on px-4 mt-3"
             :placeholder="t('me.webdav.dirPlaceholder')"
-            placeholder-color="#41474e"
+            :placeholder-color="INPUT_PLACEHOLDER_COLOR"
             @input="onWebdavFieldInput('dir', $event)"
           />
           <input
@@ -1072,7 +1073,7 @@ function toggleRankingEntry() {
             type="password"
             class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] text-body-large text-surface-on px-4 mt-3"
             :placeholder="t('me.webdav.backupPasswordPlaceholder')"
-            placeholder-color="#41474e"
+            :placeholder-color="INPUT_PLACEHOLDER_COLOR"
           />
           <!-- M3：敏感项排除（spec §7；账号级敏感键勾选后不进备份文件） -->
           <view
@@ -1189,7 +1190,7 @@ function toggleRankingEntry() {
                 type="password"
                 class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] text-body-large text-surface-on px-4 mt-2"
                 :placeholder="t('me.webdav.restorePromptPlaceholder')"
-                placeholder-color="#41474e"
+                :placeholder-color="INPUT_PLACEHOLDER_COLOR"
               />
               <view
                 class="h-[10.667vw] bg-primary rounded-[var(--md-shape-full)] flex items-center justify-center mt-2"

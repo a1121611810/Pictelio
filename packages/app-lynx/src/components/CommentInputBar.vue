@@ -7,6 +7,7 @@ import { ref, computed } from 'vue'
 import type { PixivComment } from '../api/types'
 import { t } from '../i18n'
 import { MAX_COMMENT_LENGTH } from '../api/comment'
+import { INPUT_PLACEHOLDER_COLOR } from '../utils/lynxPlatformColors'
 
 const props = defineProps<{
   /** 发表中：发送按钮禁用并显示「发送中…」 */
@@ -55,7 +56,7 @@ function send() {
         v-model="text"
         class="flex-1 h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] rounded-b-none border-b-[1px] border-b-outline-variant text-body-large text-surface-on px-3"
         :placeholder="t('commentInputBar.placeholder')"
-        placeholder-color="#41474e"
+        :placeholder-color="INPUT_PLACEHOLDER_COLOR"
       />
       <!-- 发送按钮：空输入 / 超长 / 发送中禁用 -->
       <view
