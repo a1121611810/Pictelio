@@ -12,7 +12,14 @@
 // bench 兜底——单元测试仅覆盖 catch helper 的纯函数行为。
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ref, type Ref } from 'vue'
+import { createApp, effectScope, ref, type Ref } from 'vue'
+import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
+import { apiClient } from '../api/client'
+import {
+  BOOKMARK_ANIMATION_MS,
+  useBookmarkMutation,
+  type UseBookmarkMutationReturn,
+} from './useBookmarkMutation'
 
 /** 抽自 useBookmarkMutation 的失败 catch 纯函数（修复后） */
 function applyToggleFailure(
@@ -91,5 +98,185 @@ describe('useBookmarkMutation toggle 失败 catch 路径', () => {
     expect((warnSpy.mock.calls[0][1] as Error).message).toBe('a')
     expect((warnSpy.mock.calls[1][1] as Error).message).toBe('b')
     expect((warnSpy.mock.calls[2][1] as Error).message).toBe('c')
+  })
+})
+
+// ─── saveWith 面板保存变体端到端测试（spec docs/specs/bookmark-tags.md D5/D6/D9
+// + ADR-0160 D2/D6，GitHub ticket #533）───
+//
+// 真实 vue-query useMutation 触发（补齐上方历史注释所指的端到端缺口）：
+// - 上下文构造：useQueryClient 需 injection context → createApp + VueQueryPlugin
+//   provide + app.runWithContext 包 effectScope.run（无 DOM 需求，node 环境可跑）
+// - api mock 先例：useApiQuery.test.ts §B 的 spyOn(apiClient, 'post')——toggle 直调
+//   apiClient.post，saveWith 经 addBookmark 也落到同一 post，一处 spy 覆盖双路径
+// - oracle：载荷字面量来自 T3 addBookmark 契约（pixivpy3 illust_bookmark_add：
+//   空格 join 单值 + `tags[]` 字段名，见 api/illust.ts 头注）；状态机断言来自
+//   模块头注六条不变量。
+describe('useBookmarkMutation saveWith（面板保存变体）', () => {
+  let cleanups: Array<() => void> = []
+
+  afterEach(() => {
+    cleanups.forEach((fn) => fn())
+    cleanups = []
+  })
+
+  /** 挂载 composable：runWithContext 提供 injection context，effectScope 收纳副作用 */
+  function setupComposable(opts: {
+    initialBookmarked?: boolean
+    initialCount?: number
+    onChange?: (bookmarked: boolean) => void
+  } = {}) {
+    const postSpy = vi.spyOn(apiClient, 'post').mockResolvedValue(undefined as never)
+    const app = createApp({ render: () => null })
+    app.use(VueQueryPlugin, { queryClient: new QueryClient() })
+    const scope = effectScope()
+    let ret!: UseBookmarkMutationReturn
+    app.runWithContext(() => {
+      scope.run(() => {
+        ret = useBookmarkMutation({
+          illustId: 42,
+          initialBookmarked: opts.initialBookmarked ?? false,
+          initialCount: opts.initialCount ?? 0,
+          onChange: opts.onChange,
+        })
+      })
+    })
+    cleanups.push(() => {
+      scope.stop()
+      postSpy.mockRestore()
+    })
+    return { ret, postSpy }
+  }
+
+  it('载荷正确：restrict + tags 经 addBookmark 序列化到 post（oracle = T3 契约：空格 join + tags[] 字段）', async () => {
+    const { ret, postSpy } = setupComposable()
+    await ret.saveWith('private', ['風景', '東方Project'])
+    expect(postSpy).toHaveBeenCalledOnce()
+    expect(postSpy).toHaveBeenCalledWith('/v2/illust/bookmark/add', {
+      illust_id: '42',
+      restrict: 'private',
+      'tags[]': '風景 東方Project',
+    })
+  })
+
+  it('空标签集不发 tags[] 字段（spec D1 序列化语义透传）', async () => {
+    const { ret, postSpy } = setupComposable()
+    await ret.saveWith('public', [])
+    expect(postSpy).toHaveBeenCalledWith('/v2/illust/bookmark/add', {
+      illust_id: '42',
+      restrict: 'public',
+    })
+  })
+
+  it('原未收藏：乐观置 bookmarked=true + count+1（不变量 #1）', async () => {
+    const { ret } = setupComposable({ initialBookmarked: false, initialCount: 2 })
+    await ret.saveWith('private', ['a'])
+    expect(ret.bookmarked.value).toBe(true)
+    expect(ret.count.value).toBe(3)
+  })
+
+  it('原已收藏（覆盖式编辑）：count 不再 +1，直接重发 add 不先 delete（spec D2）', async () => {
+    const { ret, postSpy } = setupComposable({ initialBookmarked: true, initialCount: 5 })
+    await ret.saveWith('public', ['x'])
+    expect(ret.bookmarked.value).toBe(true)
+    expect(ret.count.value).toBe(5)
+    expect(postSpy).toHaveBeenCalledOnce()
+    expect(postSpy).toHaveBeenCalledWith(
+      '/v2/illust/bookmark/add',
+      expect.objectContaining({ illust_id: '42' }),
+    )
+  })
+
+  it('失败静息回滚到原态 + errorMsg + console.warn 带模块前缀（不变量 #3 + 硬约束 #3）', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { ret, postSpy } = setupComposable({ initialBookmarked: true, initialCount: 5 })
+    postSpy.mockRejectedValueOnce(new Error('boom'))
+    await ret.saveWith('private', ['a'])
+    expect(ret.bookmarked.value).toBe(true) // 回滚到保存前原态
+    expect(ret.count.value).toBe(5)
+    expect(ret.errorMsg.value).toBe('操作失败')
+    expect(ret.busy.value).toBe(false)
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[useBookmarkMutation]'),
+      expect.any(Error),
+    )
+    warnSpy.mockRestore()
+  })
+
+  it('失败回滚：原未收藏时 bookmarked 还原 false + count 还原', async () => {
+    const { ret, postSpy } = setupComposable({ initialBookmarked: false, initialCount: 2 })
+    postSpy.mockRejectedValueOnce(new Error('boom'))
+    await ret.saveWith('public', [])
+    expect(ret.bookmarked.value).toBe(false)
+    expect(ret.count.value).toBe(2)
+    expect(ret.errorMsg.value).toBe('操作失败')
+  })
+
+  it('成功后 350ms 才触发 onChange(true)（不变量 #4）', async () => {
+    vi.useFakeTimers()
+    try {
+      const onChange = vi.fn()
+      const { ret } = setupComposable({ onChange })
+      await ret.saveWith('public', ['a'])
+      expect(onChange).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(BOOKMARK_ANIMATION_MS)
+      expect(onChange).toHaveBeenCalledWith(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('再次调用前 errorMsg 清空（不变量 #5）：失败一次后成功 → errorMsg 复位空串', async () => {
+    const { ret, postSpy } = setupComposable({ initialBookmarked: true, initialCount: 5 })
+    postSpy.mockRejectedValueOnce(new Error('boom'))
+    await ret.saveWith('private', [])
+    expect(ret.errorMsg.value).toBe('操作失败')
+    await ret.saveWith('public', [])
+    expect(ret.errorMsg.value).toBe('')
+  })
+
+  it('busy 互斥：saveWith pending 期间 toggle / saveWith 均 no-op（不变量 #2）', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const { ret, postSpy } = setupComposable()
+    postSpy.mockImplementation(() => gate)
+    const pending = ret.saveWith('private', ['a'])
+    await vi.waitFor(() => expect(postSpy).toHaveBeenCalledTimes(1))
+    expect(ret.busy.value).toBe(true)
+    await ret.toggle()
+    await ret.saveWith('public', [])
+    expect(postSpy).toHaveBeenCalledTimes(1) // 只有第一次 saveWith 发出请求
+    expect(ret.bookmarked.value).toBe(true) // toggle no-op，状态未被翻转
+    release()
+    await pending
+    expect(ret.busy.value).toBe(false)
+  })
+
+  it('busy 互斥（反向）：toggle pending 期间 saveWith no-op', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const { ret, postSpy } = setupComposable({ initialBookmarked: true, initialCount: 1 })
+    postSpy.mockImplementation(() => gate)
+    const pending = ret.toggle()
+    await vi.waitFor(() => expect(postSpy).toHaveBeenCalledTimes(1))
+    expect(ret.busy.value).toBe(true)
+    await ret.saveWith('public', ['a'])
+    expect(postSpy).toHaveBeenCalledTimes(1) // 只有 toggle 的 delete 发出
+    expect(postSpy).toHaveBeenCalledWith('/v1/illust/bookmark/delete', { illust_id: '42' })
+    release()
+    await pending
+  })
+
+  it('toggle 快速收藏路径行为不变：add 不带 restrict/tags payload（spec D3 恒公开、零决策）', async () => {
+    const { ret, postSpy } = setupComposable({ initialBookmarked: false, initialCount: 0 })
+    await ret.toggle()
+    expect(postSpy).toHaveBeenCalledOnce()
+    expect(postSpy).toHaveBeenCalledWith('/v2/illust/bookmark/add', { illust_id: '42' })
+    expect(ret.bookmarked.value).toBe(true)
+    expect(ret.count.value).toBe(1)
   })
 })
