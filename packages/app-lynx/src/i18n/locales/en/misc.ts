@@ -204,6 +204,38 @@ const enMisc = {
 
   // ─── composables/useBookmarkMutation.ts ───
   "useBookmarkMutation.actionFailed": "Action failed",
+
+  // ─── components/BookmarkPanel.vue (bookmark panel; spec docs/specs/bookmark-tags.md D8/D10) ───
+  // Key surface and wording mirror the webview panel (packages/app/src/components/BookmarkPanel.tsx).
+  "bookmarkPanel.title": "Add to bookmarks",
+  "bookmarkPanel.closeAria": "Close",
+  "bookmarkPanel.closeScrimAria": "Close bookmark panel",
+  "bookmarkPanel.detailLoading": "Loading bookmark status…",
+  "bookmarkPanel.detailFailed":
+    "Could not load bookmark status: {{detail}} (saving is disabled to avoid overwriting wrong data)",
+  "bookmarkPanel.visibilityLabel": "Visibility",
+  "bookmarkPanel.visibilityPublic": "Public",
+  "bookmarkPanel.visibilityPrivate": "Private",
+  "bookmarkPanel.selectedLabel": "Selected tags ({{count}}/{{limit}})",
+  "bookmarkPanel.selectedEmpty": "No tags selected yet",
+  "bookmarkPanel.removeTagAria": "Remove tag {{tag}}",
+  "bookmarkPanel.newTagLabel": "New tag",
+  "bookmarkPanel.newTagPlaceholder": "Type, then press space or enter",
+  "bookmarkPanel.newTagAddAria": "Add",
+  "bookmarkPanel.limitReached": "You can select at most {{limit}} tags",
+  "bookmarkPanel.newTagEmpty": "Tag cannot be empty",
+  "bookmarkPanel.newTagDuplicate": "Tag already selected",
+  "bookmarkPanel.universeLabel": "My tags",
+  "bookmarkPanel.universeLoading": "Loading your tags…",
+  "bookmarkPanel.universeFailed": "Could not load your tags; you can still type them",
+  "bookmarkPanel.universeEmpty": "No tags yet",
+  "bookmarkPanel.universeTagAria": "Tag {{name}}, used {{count}} times",
+  "bookmarkPanel.suggestionsLabel": "Work tags",
+  "bookmarkPanel.suggestionAria": "Add work tag {{name}}",
+  "bookmarkPanel.saveFailed": "Save failed: {{detail}}",
+  "bookmarkPanel.saving": "Saving…",
+  "bookmarkPanel.save": "Bookmark",
+  "bookmarkPanel.saveEdit": "Save changes",
 } as const satisfies Record<ZhMiscKey, string>;
 
 export default enMisc;
