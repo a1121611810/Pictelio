@@ -14,6 +14,9 @@ import type {
   PixivUgoiraMetadataResponse,
   ContentType,
   RestrictType,
+  PixivBookmarkDetail,
+  PixivBookmarkDetailResponse,
+  PixivUserBookmarkTagsResponse,
 } from "./types";
 
 export function loadRecommended(
@@ -333,17 +336,75 @@ export async function streamUgoiraFrames(
   }
 }
 
-export function addBookmark(illustId: number, restrict: RestrictType = "public"): Promise<void> {
-  return apiClient.post("/v2/illust/bookmark/add", {
+/**
+ * 收藏插画（快速收藏与收藏面板保存共用）。
+ *
+ * 线上格式 oracle（ADR-0160 D1）：tags 非空时以收藏标签空格 join 成单值写入字面量字段
+ * `tags[]`（pixivpy3 aapi.py `illust_bookmark_add` 与六实现差分一致，见
+ * docs/research/bookmark-tags-similar-clients.md）；空标签集 / undefined 不发 tags 字段。
+ * 覆盖式编辑（ADR-0160 D2）：对已收藏作品直接重发本请求即整条覆盖（完整标签集 + 可见性），
+ * 不先 delete——服务端无 edit 端点，先删会让收藏状态闪断。
+ */
+export function addBookmark(
+  illustId: number,
+  restrict: RestrictType = "public",
+  tags?: string[],
+): Promise<void> {
+  const body: Record<string, string> = {
     illust_id: String(illustId),
     restrict,
-  });
+  };
+  if (tags && tags.length > 0) {
+    body["tags[]"] = tags.join(" ");
+  }
+  return apiClient.post("/v2/illust/bookmark/add", body);
 }
 
 export function deleteBookmark(illustId: number): Promise<void> {
   return apiClient.post("/v1/illust/bookmark/delete", {
     illust_id: String(illustId),
   });
+}
+
+/**
+ * 收藏详情（收藏面板预填数据源，ADR-0160 D5/D6）。
+ * 未收藏时响应 bookmark_detail 为 null（契约内可空，归一返回 null 供调用方判定非编辑态）。
+ */
+export async function loadBookmarkDetail(
+  illustId: number,
+  signal?: AbortSignal,
+): Promise<PixivBookmarkDetail | null> {
+  const res = await apiClient.get<PixivBookmarkDetailResponse>(
+    "/v2/illust/bookmark/detail",
+    { illust_id: String(illustId) },
+    signal,
+  );
+  return res.bookmark_detail ?? null;
+}
+
+/**
+ * 标签库（用户历史收藏标签，公开/私密分库；ADR-0160 D5）。
+ * user_id 由调用方显式传入（loadBookmarks 先例）；offset 可选，传则透传
+ * （next_url 分页兼容，spec D4：本期首屏 + 追加可选）。
+ */
+export function loadUserBookmarkTags(
+  userId: number,
+  restrict: RestrictType = "public",
+  offset?: number,
+  signal?: AbortSignal,
+): Promise<PixivUserBookmarkTagsResponse> {
+  const params: Record<string, string> = {
+    user_id: String(userId),
+    restrict,
+  };
+  if (offset !== undefined) {
+    params.offset = String(offset);
+  }
+  return apiClient.get<PixivUserBookmarkTagsResponse>(
+    "/v1/user/bookmark-tags/illust",
+    params,
+    signal,
+  );
 }
 
 export function followUser(userId: number, restrict?: "public" | "private"): Promise<void> {

@@ -131,6 +131,35 @@ export interface PixivUgoiraMetadataResponse {
   ugoira_metadata: PixivUgoiraMetadata;
 }
 
+// ─── 收藏标签（ADR-0160 收藏加标签，spec docs/specs/bookmark-tags.md D4） ───
+/** 收藏详情中的单个收藏标签；is_registered=标签库已注册（预填勾选依据），字段缺省宽容解析 */
+export interface PixivBookmarkDetailTag {
+  name: string;
+  is_registered?: boolean;
+}
+
+/** GET /v2/illust/bookmark/detail 的 bookmark_detail（未收藏时为 null；内层字段 optional 宽容解析） */
+export interface PixivBookmarkDetail {
+  is_bookmarked?: boolean;
+  restrict?: RestrictType;
+  tags?: PixivBookmarkDetailTag[];
+}
+
+export interface PixivBookmarkDetailResponse {
+  bookmark_detail: PixivBookmarkDetail | null;
+}
+
+/** GET /v1/user/bookmark-tags/illust 的单个标签库条目 */
+export interface PixivBookmarkTag {
+  name: string;
+  count?: number;
+}
+
+export interface PixivUserBookmarkTagsResponse {
+  bookmark_tags: PixivBookmarkTag[];
+  next_url: string | null;
+}
+
 // ─── 评论 ───
 export interface PixivCommentUser {
   id: number;
