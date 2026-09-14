@@ -47,6 +47,8 @@ const SEL = {
   heartIdle: 'button[aria-label="收藏"]',
   heartActive: 'button[aria-label="取消收藏"]',
   suggestionChip: 'button[aria-label^="加入作品标签 "]',
+  visibilityPublic: '[data-testid="bookmark-panel-visibility-public"]',
+  visibilityPrivate: '[data-testid="bookmark-panel-visibility-private"]',
 } as const;
 
 /** 验收用新建标签（ASCII，便于在证据与断言中稳定比对） */
@@ -261,6 +263,16 @@ async function chipPressed(selector: string, label: string): Promise<boolean> {
         ),
       selector,
       label,
+    ),
+  );
+}
+
+/** 元素是否处于按下态（aria-pressed="true"；可见性 chip 用 testid 定位）。 */
+async function pressed(selector: string): Promise<boolean> {
+  return Boolean(
+    await ctx.driver.raw.execute(
+      (sel: string) => document.querySelector(sel)?.getAttribute("aria-pressed") === "true",
+      selector,
     ),
   );
 }
@@ -499,6 +511,40 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  // 兜底清理：用例中途失败时也把账号状态还原（best-effort；失败不掩盖用例本身的红）
+  if (illustId) {
+    try {
+      if (serverBookmarkDetail(illustId)?.is_bookmarked === true) {
+        const res = runCapture(
+          "curl",
+          [
+            "-s",
+            "-x",
+            hostProxy(),
+            "-X",
+            "POST",
+            "https://app-api.pixiv.net/v1/illust/bookmark/delete",
+            "-H",
+            `Authorization: Bearer ${hostAccessToken()}`,
+            "-H",
+            "Content-Type: application/x-www-form-urlencoded",
+            "-H",
+            `User-Agent: ${PIXIV_UA}`,
+            "-H",
+            "Referer: https://app-api.pixiv.net/",
+            "--data",
+            `illust_id=${illustId}`,
+          ],
+          30_000,
+        );
+        console.log(
+          `[bookmark-tags] 兜底清理：取消收藏 ${illustId}（响应 ${res.stdout.slice(0, 60)}）`,
+        );
+      }
+    } catch (e) {
+      console.warn(`[bookmark-tags] 兜底清理失败（不影响用例结果）: ${String(e)}`);
+    }
+  }
   await ctx?.teardown();
 });
 
@@ -515,6 +561,22 @@ describe("收藏加标签 · webview 详情页真机验收", () => {
 
     await tapScrimAbovePanel();
     await waitFor(async () => !(await exists(SEL.panel)), "panel-closed", 15_000);
+  });
+
+  it("系统返回键先关面板、不退页（#532 验收：overlay 栈语义）", async () => {
+    await scrollPageToTop();
+    await longPressSelector(SEL.heartIdle);
+    await waitFor(() => exists(SEL.panel), "panel-open-back", 15_000);
+    await waitFor(() => isEnabled(SEL.save), "prefill-ready-back", 25_000);
+
+    const before = await ctx.driver.raw.getUrl();
+    // 设备级返回键
+    runOrThrow(adbPath(), ["-s", serial, "shell", "input", "keyevent", "4"]);
+
+    await waitFor(async () => !(await exists(SEL.panel)), "panel-closed-by-back", 15_000);
+    const after = await ctx.driver.raw.getUrl();
+    expect(after).toBe(before);
+    expect(after).toContain(`/illust/${illustId}`);
   });
 
   it("单击心形 = 快速收藏（不弹面板），再点还原", async () => {
@@ -560,6 +622,10 @@ describe("收藏加标签 · webview 详情页真机验收", () => {
     await inputEl.setValue(NEW_TAG);
     await SLEEP(400);
     await tapInPanel(SEL.add);
+    // 收起软键盘/失焦：输入聚焦会让 WebView 滚动页面（并遮挡面板），实测会连带把详情页
+    // 滚到信息区 → 底部操作条自动隐藏，后续心形断言找不到元素
+    await ctx.driver.raw.execute(() => (document.activeElement as HTMLElement | null)?.blur());
+    await SLEEP(300);
     await waitFor(async () => (await pageText()).includes(NEW_TAG), "new-tag-added", 15_000);
     // 新建标签进入已选集（选中态）
     await waitFor(() => chipPressed("button", `移除标签 ${NEW_TAG}`), "new-tag-selected", 15_000);
@@ -567,6 +633,7 @@ describe("收藏加标签 · webview 详情页真机验收", () => {
     // 3) 保存
     await tapInPanel(SEL.save);
     await waitFor(async () => !(await exists(SEL.panel)), "panel-closed-after-save", 30_000);
+    await scrollPageToTop();
     await waitFor(() => exists(SEL.heartActive), "bookmarked-after-save", 25_000);
 
     // 4) oracle A：host 侧直连 Pixiv 读服务端真值
@@ -583,8 +650,33 @@ describe("收藏加标签 · webview 详情页真机验收", () => {
     );
   });
 
+  it("面板切「私密」保存 → 服务端 restrict=private 且标签保留（覆盖式编辑）", async () => {
+    await scrollPageToTop();
+    await longPressSelector(SEL.heartActive); // 上一用例已收藏（public）
+    await waitFor(() => exists(SEL.panel), "panel-open-private", 15_000);
+    await waitFor(() => isEnabled(SEL.save), "prefill-ready-private", 25_000);
+
+    await tapInPanel(SEL.visibilityPrivate);
+    await waitFor(() => pressed(SEL.visibilityPrivate), "private-chip-pressed", 15_000);
+    await tapInPanel(SEL.save);
+    await waitFor(async () => !(await exists(SEL.panel)), "panel-closed-private", 30_000);
+    await scrollPageToTop();
+
+    const server = serverBookmarkDetail(illustId);
+    expect(server?.is_bookmarked).toBe(true);
+    expect(server?.restrict).toBe("private");
+    const registered = (server?.tags ?? [])
+      .filter((tag) => tag.is_registered)
+      .map((tag) => tag.name);
+    expect(registered).toContain(NEW_TAG);
+    console.log(
+      `[bookmark-tags] 私密写路径：restrict=private，标签保留 [${registered.join(", ")}]`,
+    );
+  });
+
   it("oracle B：重开面板，预填（服务端数据）显示已保存标签，并清理账号状态", async () => {
     await scrollPageToTop();
+    await waitFor(() => exists(SEL.heartActive), "heart-visible-for-oracle-b", 25_000);
     await longPressSelector(SEL.heartActive);
     await waitFor(() => exists(SEL.panel), "panel-open-3", 15_000);
 
