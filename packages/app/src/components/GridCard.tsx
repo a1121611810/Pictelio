@@ -24,7 +24,6 @@ const GridCard: Component<Props> = (props) => {
     following,
     toggleFollow,
     bookmarkBurstTrigger,
-    privateHint,
     onPointerDown,
     onPointerUp,
     onPointerLeave,
@@ -118,13 +117,6 @@ const GridCard: Component<Props> = (props) => {
           </button>
           <HeartBurstEffect trigger={bookmarkBurstTrigger} size={60} particleCount={4} />
         </div>
-        {privateHint() && (
-          <div class="absolute inset-0 flex items-center justify-center bg-black/60 rounded-[var(--borderRadiusMedium)] pointer-events-none z-10">
-            <span class="text-white [font-size:var(--fontSizeBase100)] font-medium">
-              {t("gridCard.privateBadge")}
-            </span>
-          </div>
-        )}
       </div>
       {/* Info bar — matches ImageCard styling */}
       <div class="p-2.5">

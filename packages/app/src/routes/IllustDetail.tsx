@@ -34,7 +34,7 @@ import { pushOverlay, popOverlay } from "../stores/backGestureStore";
 import { sanitizeHtml } from "../utils/html";
 import { scrollToTop } from "../utils/scrollToTop";
 import ReportSheet from "../components/ReportSheet";
-import BookmarkPanel from "../components/BookmarkPanel";
+import { openBookmarkPanel } from "../stores/bookmarkPanelStore";
 import IllustTags from "../components/IllustTags";
 import CommentOverlay from "../components/CommentOverlay";
 import IllustActionMenu from "../components/IllustActionMenu";
@@ -106,7 +106,6 @@ const IllustDetail: Component = () => {
   const [isFollowed, setIsFollowed] = createSignal(false);
   const [following, setFollowing] = createSignal(false);
   const [showReportSheet, setShowReportSheet] = createSignal(false);
-  const [showBookmarkPanel, setShowBookmarkPanel] = createSignal(false);
   const [showActionMenu, setShowActionMenu] = createSignal(false);
   const [showComments, setShowComments] = createSignal(false);
   const [toastMessage, setToastMessage] = createSignal<string | null>(null);
@@ -307,8 +306,16 @@ const IllustDetail: Component = () => {
 
   function onBookmarkPointerDown(_e: PointerEvent) {
     longPressTimer = setTimeout(() => {
-      // ADR-0160 D4：长按 = 收藏面板（原「私密直存」语义升级；可见性在面板内切换）
-      setShowBookmarkPanel(true);
+      // ADR-0160 D4：长按 = 收藏面板（#545 起全局单宿主，经 store 唤起）
+      const i = illust();
+      if (i) {
+        openBookmarkPanel({
+          illustId: i.id,
+          isBookmarked: i.is_bookmarked,
+          workTags: i.tags.map((tag) => tag.name),
+          onSaved: handleBookmarkSaved,
+        });
+      }
       longPressTimer = 0 as any;
     }, 500);
   }
@@ -462,16 +469,7 @@ const IllustDetail: Component = () => {
     },
   );
 
-  // 将收藏面板状态注册到 overlay 栈（返回键先关面板，ADR-0160 D3/D4）
-  createEffect(
-    () => showBookmarkPanel(),
-    (open) => {
-      if (open) {
-        pushOverlay("bookmarkPanel", () => setShowBookmarkPanel(false));
-        return () => popOverlay("bookmarkPanel");
-      }
-    },
-  );
+  // 收藏面板返回键接线已随面板全局化迁入 BookmarkPanelHost（#545）
 
   // 组件内加载数据：先渲染骨架屏，params 变化时自动重新请求
   // Solid 2.0 拆分效应：compute 读 params.id，apply 段发起请求（写 signal 合法），
@@ -1189,14 +1187,6 @@ const IllustDetail: Component = () => {
           illustId={illust()?.id ?? 0}
           isOpen={showReportSheet()}
           onClose={() => setShowReportSheet(false)}
-        />
-        <BookmarkPanel
-          illustId={illust()?.id ?? 0}
-          isBookmarked={illust()?.is_bookmarked ?? false}
-          workTags={illust()?.tags.map((tag) => tag.name) ?? []}
-          isOpen={showBookmarkPanel()}
-          onClose={() => setShowBookmarkPanel(false)}
-          onSaved={handleBookmarkSaved}
         />
         <CommentOverlay
           type="illust"

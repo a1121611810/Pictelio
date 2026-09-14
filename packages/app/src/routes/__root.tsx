@@ -21,6 +21,7 @@ import { loadReportedIds } from "@/stores/reportStore";
 import { loadBlockedIds } from "@/stores/blockStore";
 import { loadImageHostPreference } from "@/stores/imageHostStore";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import BookmarkPanelHost from "@/components/BookmarkPanelHost";
 import { t } from "@/i18n";
 import { markContentReady } from "@/native/splashBridge";
 /** 启动后检查更新的延迟时间（ms），确保页面渲染完成后再弹窗 */
@@ -256,6 +257,7 @@ const RootLayout: Component = (props: { children?: any }) => {
 
       <StartupUpdateDialog />
       <GateOverlay />
+      <BookmarkPanelHost />
     </div>
   );
 };

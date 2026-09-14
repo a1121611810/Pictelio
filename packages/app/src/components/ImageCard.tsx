@@ -29,7 +29,6 @@ const ImageCard: Component<Props> = (props) => {
     following,
     toggleFollow,
     bookmarkBurstTrigger,
-    privateHint,
     onPointerDown,
     onPointerUp,
     onPointerLeave,
@@ -130,13 +129,6 @@ const ImageCard: Component<Props> = (props) => {
           </button>
           <HeartBurstEffect trigger={bookmarkBurstTrigger} size={80} particleCount={6} />
         </div>
-        {privateHint() && (
-          <div class="absolute inset-0 flex items-center justify-center bg-black/60 pointer-events-none z-10">
-            <span class="text-white [font-size:var(--fontSizeBase200)] font-medium">
-              {t("imageCard.privateBadge")}
-            </span>
-          </div>
-        )}
       </div>
       {/* Info area — A2 宽松 padding（ADR-0070） */}
       <div class="px-[var(--spacingHorizontalL)] py-[var(--spacingVerticalL)]">

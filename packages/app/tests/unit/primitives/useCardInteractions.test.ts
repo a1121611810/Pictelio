@@ -8,6 +8,11 @@ import { createRoot, flush, runWithOwner } from "solid-js";
 /** 模拟事件处理器语境（无 active owner）驱动同步写路径 */
 const fire = <T>(fn: () => T): T => runWithOwner(null, fn);
 import { useCardInteractions } from "@/primitives/useCardInteractions";
+import {
+  bookmarkPanelOpen,
+  bookmarkPanelRequest,
+  closeBookmarkPanel,
+} from "@/stores/bookmarkPanelStore";
 import type { PixivIllust } from "@/api/types";
 
 // Mock the API module before importing useCardInteractions
@@ -85,13 +90,6 @@ describe("useCardInteractions", () => {
         dispose();
       }));
 
-    it("initial privateHint is false", () =>
-      createRoot((dispose) => {
-        const { privateHint } = useCardInteractions(makeIllust());
-        expect(privateHint()).toBe(false);
-        dispose();
-      }));
-
     it("initial following is false", () =>
       createRoot((dispose) => {
         const { following } = useCardInteractions(makeIllust());
@@ -127,16 +125,6 @@ describe("useCardInteractions", () => {
         dispose();
       }));
 
-    it("passes 'private' to addBookmark when privateBookmark is true", () =>
-      createRoot(async (dispose) => {
-        const illust = makeIllust({ is_bookmarked: false });
-        const { toggleBookmark } = useCardInteractions(illust);
-        const e = new MouseEvent("click");
-        await toggleBookmark(e, true);
-        expect(illustApi.addBookmark).toHaveBeenCalledWith(123, "private");
-        dispose();
-      }));
-
     it("increments bookmarkBurstTrigger on bookmark", () =>
       createRoot(async (dispose) => {
         const illust = makeIllust({ is_bookmarked: false });
@@ -144,22 +132,6 @@ describe("useCardInteractions", () => {
         const e = new MouseEvent("click");
         await toggleBookmark(e);
         expect(bookmarkBurstTrigger()).toBe(1);
-        dispose();
-      }));
-
-    it("shows privateHint when privateBookmark is true and hides after 1500ms", () =>
-      createRoot(async (dispose) => {
-        vi.useFakeTimers();
-        const illust = makeIllust({ is_bookmarked: false });
-        const { privateHint, toggleBookmark } = useCardInteractions(illust);
-        const e = new MouseEvent("click");
-        await toggleBookmark(e, true);
-        flush(); // ADR-0144：批处理下 set 后同步读为旧值，先排空再断言
-        expect(privateHint()).toBe(true);
-        vi.advanceTimersByTime(1500);
-        flush(); // 同上（hintTimer 回调内的写同样批处理）
-        expect(privateHint()).toBe(false);
-        vi.useRealTimers();
         dispose();
       }));
 
@@ -256,10 +228,10 @@ describe("useCardInteractions", () => {
   });
 
   describe("pointer events", () => {
-    it("onPointerDown sets a timer that triggers private bookmark after 500ms", () =>
+    it("onPointerDown sets a timer that opens the bookmark panel after 500ms (#545)", () =>
       createRoot(async (dispose) => {
         vi.useFakeTimers();
-        const illust = makeIllust({ is_bookmarked: false });
+        const illust = makeIllust({ is_bookmarked: false, tags: [{ name: "風景" }] });
         const { bookmarked, bookmarkBurstTrigger, onPointerDown } = useCardInteractions(illust);
 
         onPointerDown(new PointerEvent("pointerdown"));
@@ -267,14 +239,50 @@ describe("useCardInteractions", () => {
 
         // Not yet 500ms
         vi.advanceTimersByTime(499);
-        expect(bookmarked()).toBe(false);
+        expect(bookmarkPanelOpen()).toBe(false);
 
-        // Timer fires at 500ms → private bookmark
-        // Use async variant so toggleBookmark's await resolves
+        // Timer fires at 500ms → 面板打开（非私密直存：不发收藏 API、卡片状态不变）
         await vi.advanceTimersByTimeAsync(1);
+        expect(bookmarkPanelOpen()).toBe(true);
+        expect(bookmarkPanelRequest()?.illustId).toBe(123);
+        expect(bookmarkPanelRequest()?.workTags).toEqual(["風景"]);
+        expect(illustApi.addBookmark).not.toHaveBeenCalled();
+        expect(bookmarked()).toBe(false);
+        expect(bookmarkBurstTrigger()).toBe(0);
+
+        // 宿主派发 onSaved（面板保存成功）→ 卡片置收藏 + 爆发动效
+        bookmarkPanelRequest()!.onSaved();
+        flush(); // ADR-0144：批处理下 set 后同步读为旧值，先排空再断言
         expect(bookmarked()).toBe(true);
         expect(bookmarkBurstTrigger()).toBe(1);
 
+        closeBookmarkPanel();
+        vi.useRealTimers();
+        dispose();
+      }));
+
+    it("long-press on already-bookmarked card opens the panel without deleting (#545)", () =>
+      createRoot(async (dispose) => {
+        vi.useFakeTimers();
+        const illust = makeIllust({ is_bookmarked: true });
+        const { bookmarked, bookmarkBurstTrigger, onPointerDown } = useCardInteractions(illust);
+
+        onPointerDown(new PointerEvent("pointerdown"));
+        await vi.advanceTimersByTimeAsync(500);
+
+        // 原语义此处是误触取消收藏；#545 后打开面板且不动收藏态
+        expect(bookmarkPanelOpen()).toBe(true);
+        expect(bookmarkPanelRequest()?.isBookmarked).toBe(true);
+        expect(illustApi.deleteBookmark).not.toHaveBeenCalled();
+        expect(bookmarked()).toBe(true);
+
+        // 面板覆盖式保存成功派发 onSaved：已收藏态不重复计爆发（闭包内 !bookmarked 守卫）
+        bookmarkPanelRequest()!.onSaved();
+        flush();
+        expect(bookmarked()).toBe(true);
+        expect(bookmarkBurstTrigger()).toBe(0);
+
+        closeBookmarkPanel();
         vi.useRealTimers();
         dispose();
       }));

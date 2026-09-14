@@ -9,12 +9,12 @@
  * oracle 溯源（测试硬约束 #6）：
  * - 长按阈值 500ms + 单击/长按语义分流 = ADR-0160 D3/D4、spec D3「webview 长按 500ms」；
  * - 快速收藏载荷 (illustId, "public") 无 tags = spec D1/D3（公开 + 零决策）；
- * - 面板出现即可见 `data-testid="bookmark-panel"` = BookmarkPanel 既有测试契约（同选择器）。
+ * - 面板打开断言 = bookmarkPanelStore.bookmarkPanelOpen（#545 起面板全局单宿主
+ *   BookmarkPanelHost 挂 __root，不在本页渲染树内；宿主接线由 BookmarkPanelHost.test.tsx 覆盖）。
  *
  * mock 范围（跟 tests/unit/routes/NovelDetail.test.tsx 惯例）：数据层（@/api/illust）、
- * 与手势无关的重子组件、路由参数与浏览器观察器；BookmarkPanel / BottomActionBar 保留
- * 真实实现——被测入口（`button[aria-label="收藏"]`）由 BottomActionBar 提供，
- * 面板 DOM 由真实 BookmarkPanel 提供（其数据层已 mock）。
+ * 与手势无关的重子组件、路由参数与浏览器观察器；被测入口
+ * （`button[aria-label="收藏"]`）由 BottomActionBar 提供。
  *
  * 环境注意：本页含「数值初值 0」的动态文本（total_bookmarks 等），依赖
  * tests/setup/happy-dom-textcontent.ts 的 happy-dom textContent 数值强转补丁——
@@ -88,6 +88,7 @@ vi.mock("@solidjs/router", async (importOriginal) => {
 });
 
 import IllustDetail from "@/routes/IllustDetail";
+import { bookmarkPanelOpen, closeBookmarkPanel } from "@/stores/bookmarkPanelStore";
 
 /** 详情页数据层最小真值（loadDetail → { illust }） */
 const ILLUST = {
@@ -127,6 +128,7 @@ async function flush(): Promise<void> {
 beforeEach(() => {
   cleanup();
   vi.clearAllMocks();
+  closeBookmarkPanel();
   // happy-dom 无 IntersectionObserver：IllustDetail 底部操作条显隐观察需要（不影响断言）
   vi.stubGlobal(
     "IntersectionObserver",
@@ -162,7 +164,7 @@ describe("IllustDetail 心形手势（长按 = 面板 / 单击 = 快速收藏）
     await vi.advanceTimersByTimeAsync(600);
     await flush();
 
-    expect(screen.queryByTestId("bookmark-panel")).not.toBeNull();
+    expect(bookmarkPanelOpen()).toBe(true);
     expect(api.addBookmark).not.toHaveBeenCalled();
   });
 
@@ -175,14 +177,14 @@ describe("IllustDetail 心形手势（长按 = 面板 / 单击 = 快速收藏）
     fireEvent.pointerDown(heart);
     await vi.advanceTimersByTimeAsync(600);
     await flush();
-    expect(screen.queryByTestId("bookmark-panel")).not.toBeNull();
+    expect(bookmarkPanelOpen()).toBe(true);
 
     // 关键：长按开面板后松手，pointerup 不得再触发快速收藏（生产靠 longPressTimer 归零抑制）
     fireEvent.pointerUp(heart);
     await flush();
 
     expect(api.addBookmark).not.toHaveBeenCalled();
-    expect(screen.queryByTestId("bookmark-panel")).not.toBeNull();
+    expect(bookmarkPanelOpen()).toBe(true);
   });
 
   it("单击（<500ms）：快速收藏 public + 无标签，不打开面板（spec D1/D3）", async () => {
@@ -197,6 +199,6 @@ describe("IllustDetail 心形手势（长按 = 面板 / 单击 = 快速收藏）
     await flush();
 
     expect(api.addBookmark).toHaveBeenCalledWith(123, "public");
-    expect(screen.queryByTestId("bookmark-panel")).toBeNull();
+    expect(bookmarkPanelOpen()).toBe(false);
   });
 });

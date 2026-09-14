@@ -1,15 +1,15 @@
 import type { Accessor } from "solid-js";
 import type { PixivIllust } from "../api/types";
 import { addBookmark, deleteBookmark, followUser, unfollowUser } from "../api/illust";
+import { openBookmarkPanel } from "../stores/bookmarkPanelStore";
 
 interface CardInteractions {
   bookmarked: Accessor<boolean>;
-  toggleBookmark: (e: MouseEvent, privateBookmark?: boolean) => Promise<void>;
+  toggleBookmark: (e: MouseEvent) => Promise<void>;
   isFollowed: Accessor<boolean>;
   following: Accessor<boolean>;
   toggleFollow: (e: MouseEvent) => Promise<void>;
   bookmarkBurstTrigger: Accessor<number>;
-  privateHint: Accessor<boolean>;
   onPointerDown: (e: PointerEvent) => void;
   onPointerUp: (e: PointerEvent) => void;
   onPointerLeave: () => void;
@@ -18,12 +18,10 @@ interface CardInteractions {
 export function useCardInteractions(illust: PixivIllust): CardInteractions {
   const [bookmarked, setBookmarked] = createSignal(illust.is_bookmarked);
   const [bookmarkBurstTrigger, setBookmarkBurstTrigger] = createSignal(0);
-  const [privateHint, setPrivateHint] = createSignal(false);
   const [isFollowed, setIsFollowed] = createSignal(illust.user.is_followed ?? false);
   const [following, setFollowing] = createSignal(false);
 
   let longPressTimer: ReturnType<typeof setTimeout>;
-  let hintTimer: ReturnType<typeof setTimeout>;
 
   const toggleFollow = async (e: MouseEvent) => {
     e.stopPropagation();
@@ -40,13 +38,8 @@ export function useCardInteractions(illust: PixivIllust): CardInteractions {
     }
   };
 
-  const showPrivateToast = () => {
-    setPrivateHint(true);
-    clearTimeout(hintTimer);
-    hintTimer = setTimeout(() => setPrivateHint(false), 1500);
-  };
-
-  const toggleBookmark = async (e: MouseEvent, privateBookmark = false) => {
+  /** 快速收藏（公开）：卡片心形短按路径。可见性/标签的深度编辑走长按收藏面板（#545）。 */
+  const toggleBookmark = async (e: MouseEvent) => {
     e.stopPropagation();
     if (bookmarked()) {
       const [err] = await tryAsync(deleteBookmark(illust.id));
@@ -54,20 +47,29 @@ export function useCardInteractions(illust: PixivIllust): CardInteractions {
         setBookmarked(false);
       }
     } else {
-      const [err] = await tryAsync(addBookmark(illust.id, privateBookmark ? "private" : "public"));
+      const [err] = await tryAsync(addBookmark(illust.id, "public"));
       if (!err) {
         setBookmarked(true);
         setBookmarkBurstTrigger((n) => n + 1);
-        if (privateBookmark) {
-          showPrivateToast();
-        }
       }
     }
   };
 
-  const onPointerDown = (e: PointerEvent) => {
+  const onPointerDown = (_e: PointerEvent) => {
     longPressTimer = setTimeout(() => {
-      toggleBookmark(e as any, true);
+      // 长按 = 收藏面板（#541 裁决：与详情页同语义，私密直存退役；
+      // 不分收藏状态——已收藏时长按不再误触取消收藏）
+      openBookmarkPanel({
+        illustId: illust.id,
+        isBookmarked: bookmarked(),
+        workTags: illust.tags.map((tag) => tag.name),
+        onSaved: () => {
+          if (!bookmarked()) {
+            setBookmarked(true);
+            setBookmarkBurstTrigger((n) => n + 1);
+          }
+        },
+      });
       longPressTimer = 0 as any;
     }, 500);
   };
@@ -76,7 +78,7 @@ export function useCardInteractions(illust: PixivIllust): CardInteractions {
     if (longPressTimer) {
       clearTimeout(longPressTimer);
       longPressTimer = 0 as any;
-      toggleBookmark(e as any, false);
+      toggleBookmark(e);
     }
   };
 
@@ -94,7 +96,6 @@ export function useCardInteractions(illust: PixivIllust): CardInteractions {
     following,
     toggleFollow,
     bookmarkBurstTrigger,
-    privateHint,
     onPointerDown,
     onPointerUp,
     onPointerLeave,
