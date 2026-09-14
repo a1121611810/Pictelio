@@ -260,7 +260,7 @@ const BookmarkPanel: Component<BookmarkPanelProps> = (props) => {
 
   return (
     <Show when={props.isOpen}>
-      <div class="fixed inset-0 z-50">
+      <div class="fixed inset-0 z-50" data-testid="bookmark-panel">
         {/* Scrim */}
         <div
           class="absolute inset-0"
@@ -268,6 +268,7 @@ const BookmarkPanel: Component<BookmarkPanelProps> = (props) => {
           onClick={close}
           role="button"
           aria-label={t("bookmarkPanel.closeScrimAria")}
+          data-testid="bookmark-panel-scrim"
           tabindex={0}
           onKeyDown={(e) => e.key === "Enter" && close()}
         />
@@ -369,6 +370,7 @@ const BookmarkPanel: Component<BookmarkPanelProps> = (props) => {
                     <button
                       type="button"
                       class={`${CHIP_BASE} ${CHIP_SELECTED}`}
+                      aria-pressed="true"
                       aria-label={t("bookmarkPanel.removeTagAria", { tag: name })}
                       onClick={() => handleToggleTag(name)}
                     >
@@ -403,6 +405,7 @@ const BookmarkPanel: Component<BookmarkPanelProps> = (props) => {
             <div class="flex gap-2 mt-2">
               <input
                 id="bookmark-panel-tag-input"
+                data-testid="bookmark-panel-input"
                 type="text"
                 value={input()}
                 onInput={(e) => setInput(e.currentTarget.value)}
@@ -415,6 +418,7 @@ const BookmarkPanel: Component<BookmarkPanelProps> = (props) => {
                 type="button"
                 class={`${CHIP_BASE} ${CHIP_IDLE}`}
                 aria-label={t("bookmarkPanel.newTagAddAria")}
+                data-testid="bookmark-panel-add"
                 onClick={commitInput}
               >
                 {t("bookmarkPanel.newTagAddAria")}
@@ -528,6 +532,7 @@ const BookmarkPanel: Component<BookmarkPanelProps> = (props) => {
               type="button"
               class="w-full min-h-10 rounded-[var(--borderRadiusMedium)] bg-[var(--colorBrandBackground)] text-[var(--colorNeutralForegroundOnBrand)] [font-size:var(--fontSizeBase300)] font-semibold hover:bg-[var(--colorBrandBackgroundHover)] active:bg-[var(--colorBrandBackgroundPressed)] active:scale-[0.98] transition-all duration-[var(--durationFast)] ease-[var(--curveEasyEase)] disabled:opacity-60 disabled:cursor-default select-none appearance-none border-none outline-none cursor-pointer focus-visible:outline focus-visible:outline-offset-[var(--strokeWidthThin)] focus-visible:outline-[var(--colorStrokeFocus2)]"
               disabled={saving() || detailLoading() || detailError() !== null}
+              data-testid="bookmark-panel-save"
               onClick={() => void handleSave()}
             >
               {saving()
