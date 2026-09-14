@@ -7,6 +7,7 @@ export type OverlayType =
   | "readerSettingsSheet"
   | "commentSheet"
   | "reportSheet"
+  | "bookmarkPanel"
   | "pagePicker"
   | "novelExportSheet";
 
