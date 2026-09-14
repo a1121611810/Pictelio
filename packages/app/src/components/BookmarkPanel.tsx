@@ -277,6 +277,7 @@ const BookmarkPanel: Component<BookmarkPanelProps> = (props) => {
         <div
           class="absolute bottom-0 left-0 right-0 bg-[var(--colorNeutralBackground1)] rounded-t-[var(--borderRadius3XLarge)] shadow-[var(--elevation28)]"
           style="max-height:80vh;overflow-y:auto;animation:fluent-slide-down var(--durationGentle) var(--curveDecelerateMid) both"
+          data-testid="bookmark-panel-sheet"
         >
           {/* Drag handle */}
           <div class="flex justify-center pt-2 pb-1">

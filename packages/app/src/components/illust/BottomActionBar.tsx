@@ -24,7 +24,8 @@ interface BottomActionBarProps {
  * 显示逻辑（由 IllustDetail 控制）：页面滚动到信息区（用户/作品信息）
  * 进入视口后隐藏（信息区内已有收藏/评论入口，避免重复）；否则常驻。
  *
- * 内容：左 = 作者头像 + 名字（truncate 省略号）；右 = 收藏（长按私藏）+ 保存 + 评论。
+ * 内容：左 = 作者头像 + 名字（truncate 省略号）；右 = 收藏（单击快速收藏 / 长按开收藏面板，
+ * 见 ADR-0160 D3/D4）+ 保存 + 评论。
  * A2 卡片条：圆角 2XLarge + elevation8 + 细边框，悬浮于页面底部。
  */
 const BottomActionBar: Component<BottomActionBarProps> = (props) => {
