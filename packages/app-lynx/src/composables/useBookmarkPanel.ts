@@ -8,7 +8,8 @@
 // - 标签库（D4/D6）：loadUserBookmarkTags 按可见性分库拉候选，切换可见性即重拉；
 // - 选择 reducer（D5）：toggle/上限/去重/新建提交全部走 utils/bookmarkTags 纯函数；
 // - 保存（D2/D9）：经宿主 saveWith（useBookmarkMutation 的覆盖式保存变体）——面板**不**
-//   直连 addBookmark，保留乐观状态机与六条不变量；失败按宿主 errorMsg 判定并回滚预填态。
+//   直连 addBookmark，保留乐观状态机与六条不变量；成败按宿主 saveWith 的显式返回值判定
+//   （FIX-2），失败回滚预填态（errorMsg 仅由组件渲染文案，不作成败推断依据）。
 //
 // 竞态防护（用户故事 13 家族 / 硬约束 3）：detail 与标签库各自持 generation + AbortController，
 // 关闭（dispose）/作品变化/可见性切换都会中止旧请求，晚到响应按代数丢弃。
@@ -17,7 +18,8 @@
 // - 预填失败 → detailStatus='error' + 面板内提示 + 保存禁用（无真值不覆盖，D6）；
 // - 标签库失败 → universeStatus='error' + 候选区降级提示，保存不受阻（D6）；
 //   未登录（无 userId）同样显式降级（不发 user_id=0 的垃圾请求）；
-// - 保存失败 → 宿主 errorMsg 非空判定 + 回滚预填态 + 面板保持打开（US12）。
+// - 保存失败（宿主 saveWith 返回 false）→ 回滚预填态 + 面板保持打开（US12）——成败判定
+//   不读 errorMsg 文案（FIX-2 显式成败通道）。
 import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { loadBookmarkDetail, loadUserBookmarkTags } from '../api/illust'
 import type { PixivBookmarkDetail, RestrictType } from '../api/types'
@@ -48,10 +50,9 @@ export interface UseBookmarkPanelOptions {
   getIllustId: () => number
   /** 当前登录用户 id（标签库作用域；null = 未登录 → 标签库降级） */
   getUserId: () => number | null
-  /** 宿主收藏状态机的保存变体（T4 saveWith）——面板保存的唯一通道 */
-  saveWith: (restrict: RestrictType, tags: string[]) => Promise<void>
-  /** 宿主 mutation 的 errorMsg 读取器（保存失败判定：saveWith 失败静息不 throw） */
-  getSaveError: () => string
+  /** 宿主收藏状态机的保存变体（T4 saveWith）——面板保存的唯一通道；
+   * 返回 true=成功 / false=失败静息回滚（或 busy no-op）——成败判定的唯一依据（FIX-2） */
+  saveWith: (restrict: RestrictType, tags: string[]) => Promise<boolean>
   /** 宿主 mutation 的 busy 读取器（保存中禁存） */
   getSaving: () => boolean
   /** 保存成功回调（宿主更新页面收藏态并关面板） */
@@ -276,10 +277,11 @@ export function useBookmarkPanel(options: UseBookmarkPanelOptions): UseBookmarkP
     if (!canSave.value) return
     const restrictAtSave = restrict.value
     const tagsAtSave = [...selected.value]
-    await options.saveWith(restrictAtSave, tagsAtSave)
+    // 成败由宿主 saveWith 的显式返回值判定（FIX-2：saveWith 失败静息回滚 → false）；
+    // errorMsg 只用于组件渲染文案，不再作为成败的字符串哨兵
+    const ok = await options.saveWith(restrictAtSave, tagsAtSave)
     if (disposed) return
-    // 失败判定走宿主 errorMsg（saveWith 失败静息回滚不 throw，T4 不变量 3）
-    if (options.getSaveError() !== '') {
+    if (!ok) {
       // 回滚到预填态（US12：不丢上下文），错误文案由面板 footer 呈现宿主 errorMsg
       selected.value = [...prefillSelected]
       restrict.value = prefillRestrict

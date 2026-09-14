@@ -9,7 +9,11 @@
 // - i18n 键面与 zh 值 = webview 面板（packages/app/src/components/BookmarkPanel.tsx 的 t() 键名
 //   + packages/app/src/i18n/locales/zh-CN/components2.ts 的 zh 值）——下方 PREFILL_ZH 是逐字粘贴的
 //   快照 oracle（spec D10「同键名同语义」），不从被测模板反推；
-// - 保存通道 = spec D2/D9：面板经宿主 saveWith（不直连 addBookmark）。
+// - 保存通道 = spec D2/D9：面板经宿主 saveWith（不直连 addBookmark）；saved 事件无参
+//   （FIX-3：宿主接线 `@saved="onBookmarkPanelSaved"` 不消费 restrict）+ 成败经 saveWith
+//   布尔返回值（FIX-2）；
+// - placeholder-color 十六进制值 = FIX-5 实测结论（编译产物属性通道 + web-core 源码 + 官方
+//   文档：lynx var() 只在 CSS/style 通道解析，平台属性不解析）。
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -150,6 +154,13 @@ describe('BookmarkPanel 交互接线（spec D5/D6/D11 + D2/D9）', () => {
     expect(code).toContain('saveWith: (restrict, tags) => props.saveWith(restrict, tags)')
   })
 
+  it('saved 事件无参（FIX-3 死参数通道清理：宿主 onBookmarkPanelSaved 不消费 restrict）', () => {
+    // 宿主接线为无参 `@saved="onBookmarkPanelSaved"`（IllustDetail.vue）——携带 restrict 无消费方
+    expect(code).toContain('saved: []')
+    expect(code).toContain("emit('saved')")
+    expect(code).not.toMatch(/emit\('saved',/)
+  })
+
   it('保存失败禁用/呈现：canSave 门控按钮 + 宿主 errorMsg 渲染（禁止静默降级）', () => {
     expect(code).toContain(':class="canSave ?')
     expect(code).toContain('saveFailed')
@@ -164,5 +175,11 @@ describe('BookmarkPanel 交互接线（spec D5/D6/D11 + D2/D9）', () => {
 
   it('作品标签建议来自 props.workTags（建议来源，不是收藏状态的一部分）', () => {
     expect(code).toContain('v-for="name in workTags"')
+  })
+
+  it('placeholder-color 保持十六进制（Lynx 平台属性不解析 var()，可用性优先；FIX-5 实测结论）', () => {
+    // 实测：编译产物中 placeholder-color 原样落入平台属性通道（var() 仅出现在 CSS/style 通道），
+    // 全仓无平台属性承载 var() 的先例；web-core 预览会把它映射为 CSS 自定义属性而「假绿」。
+    expect(code).toContain('placeholder-color="#41474e"')
   })
 })

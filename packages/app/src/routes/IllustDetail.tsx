@@ -270,7 +270,12 @@ const IllustDetail: Component = () => {
 
   let longPressTimer: ReturnType<typeof setTimeout>;
 
-  async function toggleBookmark(privateBookmark = false) {
+  /**
+   * 快速收藏（单击心形；spec docs/specs/bookmark-tags.md D3）：
+   * 零决策——恒公开、无标签；可见性/标签的决策走长按唤出的收藏面板。
+   * （原「长按 = 私密直存」语义已由 ADR-0160 D3/D4 升级为面板入口，私密分支随之无调用点）
+   */
+  async function toggleBookmark() {
     const i = illust();
     if (!i || bookmarking()) {
       return;
@@ -281,7 +286,7 @@ const IllustDetail: Component = () => {
         if (i.is_bookmarked) {
           await deleteBookmark(i.id);
         } else {
-          await addBookmark(i.id, privateBookmark ? "private" : "public");
+          await addBookmark(i.id, "public");
         }
         setIllust({
           ...i,
@@ -312,8 +317,8 @@ const IllustDetail: Component = () => {
     if (longPressTimer) {
       clearTimeout(longPressTimer);
       longPressTimer = 0 as any;
-      // Public
-      toggleBookmark(false);
+      // 短按 = 快速收藏（恒公开；私密/标签在面板内决策）
+      toggleBookmark();
     }
   }
 

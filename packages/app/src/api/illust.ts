@@ -375,17 +375,25 @@ export function deleteBookmark(illustId: number): Promise<void> {
  * - **已收藏**：`is_bookmarked: true`，其中 `is_registered: true` 的标签才是该条收藏
  *   已保存的标签（面板据此预填已选）。
  * 故调用方一律以 `is_bookmarked` / `is_registered` 判定，不得以「是否为 null」判定。
- * `?? null` 仅作响应缺字段的防御性归一。
+ *
+ * 契约破坏（缺 `bookmark_detail` 键）= **显式报错**，不静默归一为「未收藏」：既然未收藏也返回
+ * 对象，键整体缺失只可能是响应形状变更；若归一为 null，面板会以「空预填」覆盖已有收藏
+ * （清空既有标签），违反 spec D6「无真值不覆盖」。故 warn + throw（面板走 detailError → 禁存）。
+ * 键存在但显式 null 仍返回 null（未收藏的防御分支，与 lynx 侧同语义）。
  */
 export async function loadBookmarkDetail(
   illustId: number,
   signal?: AbortSignal,
 ): Promise<PixivBookmarkDetail | null> {
-  const res = await apiClient.get<PixivBookmarkDetailResponse>(
+  const res = await apiClient.get<PixivBookmarkDetailResponse | null>(
     "/v2/illust/bookmark/detail",
     { illust_id: String(illustId) },
     signal,
   );
+  if (!res || typeof res !== "object" || !("bookmark_detail" in res)) {
+    console.warn("[loadBookmarkDetail] 响应缺 bookmark_detail 字段（契约破坏）");
+    throw new Error("bookmark_detail 缺失（响应契约破坏）");
+  }
   return res.bookmark_detail ?? null;
 }
 

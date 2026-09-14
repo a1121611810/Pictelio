@@ -43,8 +43,8 @@
 
 **D4 API 面**：两端 illust API 模块各新增/扩展三个函数——
 - `addBookmark(illustId, restrict, tags?)`（webview 已有前两参，扩展第三参；lynx 补 restrict + tags）
-- `loadBookmarkDetail(illustId)` → `GET /v2/illust/bookmark/detail`（响应 `bookmark_detail` 可空；非空含 `is_bookmarked`/`restrict`/`tags[]`）
-- `loadUserBookmarkTags(restrict, offset?)` → `GET /v1/user/bookmark-tags/illust`（`user_id` 取当前用户；分页 `next_url` 兼容，本期首屏 + 追加可选）
+- `loadBookmarkDetail(illustId)` → `GET /v2/illust/bookmark/detail`（**实测响应形状**：未收藏时**仍返回对象**而非 null——`is_bookmarked:false` + 作品自身标签 `is_registered:false`；`is_registered:true` 的标签才是该条收藏已保存的标签。详见下方验收实证）
+- `loadUserBookmarkTags(userId, restrict, offset?)` → `GET /v1/user/bookmark-tags/illust`（分页 `next_url` 兼容，本期首屏 + 追加可选）。**签名说明**：本 spec 初稿写「`user_id` 由函数内部取当前用户」，实现改为**显式收 `userId`**（与既有 `loadBookmarks(userId, restrict)` 先例一致，避免 api 层依赖 auth 状态）；调用方（面板）传当前登录用户 id，两端一致。
 
 **D5 面板状态模型**：标签选择是纯函数 reducer——toggle（勾/取消）、上限 10（拒绝第 11 个并反馈）、去重（勾选态幂等）、新建提交（空格提交 token、trim、非空校验、并入已选）。webview 与 lynx **同一语义**、各自实现（无双端共享包；reducer 纯函数便于 node 单测）。
 
@@ -94,3 +94,18 @@ Android 真机验收暴露：**webview 原生构建下所有写操作（含本�
 
 对验收口径的影响：本 spec 的 T7（#536）必须以**服务端真值**为准（host 侧直连 Pixiv 读
 `bookmark/detail`），不得只看 UI 绿；读路径全绿不能证明写路径可用。
+
+## 验收实证（2026-09-14，Android 模拟器 pictelio_ui，webview 端）
+
+`packages/app/tests/android-e2e/specs/bookmark-tags.spec.ts` 4/4 绿（设备级长按/单击 + host 侧直连 Pixiv 读真值）：
+
+- 用例 1：设备级长按（`input motionevent DOWN/UP`，静止 700ms）打开收藏面板，且**不产生收藏**（长按不再是私密直存）。
+- 用例 2：单击 = 快速收藏（不弹面板），服务端 `is_bookmarked=true, restrict=public`；再点还原。
+- 用例 3（**oracle A**）：面板内勾选作品标签 + 内联新建 `e2e-tag-<ts>` → 保存后 host 侧直读服务端：
+  `is_bookmarked=true, restrict=public, is_registered=[e2e-tag-591910, 原神]` —— 证明
+  ①写入真的落库（非前端乐观自嗨）；②`tags[]` 以空格 join 单值上线；③**`is_registered` 语义确证**：
+  新建标签从不是作品标签，却出现在 `is_registered` 集合中 → `is_registered:true` =「该条收藏已保存的标签」。
+- 用例 4（**oracle B**）：重开面板，预填（来自服务端 `bookmark/detail`）显示已保存标签为选中态、按钮为「保存修改」；末尾取消收藏还原账号状态（服务端复核 `is_bookmarked=false`）。
+- **附带修复（ADR-0161）**：真机验收暴露 webview 原生构建下**所有写操作失败**（原生 POST 载荷被塞进 query、body 为空，Pixiv 返回 400/404）；已改为表单体并补契约测试。web 模式与 agent-browser E2E 全绿曾掩盖该原生写路径长期失效。
+
+lynx 端设备验证（本 SDK 限制下完整 UI 不可自动化，仓库既有约定）：引擎切换 + LynxActivity 启动渲染 + FAB/页面点击回归 3 项设备级用例全绿（`lynx-boot-renders.spec.ts`、`fab-hit-testing-regression.spec.ts`）；长按在原生 LynxView 的**可触发性**仍需真机手动确认，见跟进 issue。
