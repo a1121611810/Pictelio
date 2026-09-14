@@ -194,6 +194,33 @@ export interface PixivUserFollowingResponse {
   next_url: string | null;
 }
 
+// ─── 收藏加标签（issue #531 / spec docs/specs/bookmark-tags.md D1/D4）───
+// 字段名与形状来源：docs/research/bookmark-tags-similar-clients.md §7.3/§7.4（六实现差分）。
+
+/** 收藏可见性（与 webview api/types.ts RestrictType 同源） */
+export type RestrictType = "public" | "private";
+
+/**
+ * GET /v2/illust/bookmark/detail 的 `bookmark_detail`：未收藏为 null。
+ * 字段 optional 宽容解析——缺字段由消费方按未提供处理，不做服务端纠错。
+ */
+export interface PixivBookmarkDetail {
+  is_bookmarked?: boolean;
+  restrict?: RestrictType;
+  /** 作品自带标签；is_registered = 该标签已在用户标签库中（勾选态参考） */
+  tags?: { name: string; is_registered?: boolean }[];
+}
+
+export interface PixivBookmarkDetailResponse {
+  bookmark_detail: PixivBookmarkDetail | null;
+}
+
+/** GET /v1/user/bookmark-tags/illust 响应：标签库按公开性分库；next_url 兼容分页 */
+export interface PixivUserBookmarkTagsResponse {
+  bookmark_tags: { name: string; count: number }[];
+  next_url: string | null;
+}
+
 // ─── 错误类型 ───
 
 export enum ApiErrorType {
