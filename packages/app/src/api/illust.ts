@@ -368,7 +368,14 @@ export function deleteBookmark(illustId: number): Promise<void> {
 
 /**
  * 收藏详情（收藏面板预填数据源，ADR-0160 D5/D6）。
- * 未收藏时响应 bookmark_detail 为 null（契约内可空，归一返回 null 供调用方判定非编辑态）。
+ *
+ * 真实响应形状（2026-09-14 真机 probe 实测，`app-api.pixiv.net/v2/illust/bookmark/detail`）：
+ * - **未收藏**：`bookmark_detail` 仍非 null，返回 `is_bookmarked: false` + 作品自身标签
+ *   （全部 `is_registered: false`）作建议——不是「null 表示未收藏」；
+ * - **已收藏**：`is_bookmarked: true`，其中 `is_registered: true` 的标签才是该条收藏
+ *   已保存的标签（面板据此预填已选）。
+ * 故调用方一律以 `is_bookmarked` / `is_registered` 判定，不得以「是否为 null」判定。
+ * `?? null` 仅作响应缺字段的防御性归一。
  */
 export async function loadBookmarkDetail(
   illustId: number,
