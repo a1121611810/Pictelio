@@ -1,6 +1,14 @@
 // ─── 插画 API（复用现有 app 端点） ───
 import { apiClient } from "./client"
-import type { PixivIllustListResponse, PixivIllustDetailResponse, PixivUgoiraMetadata, PixivUgoiraMetadataResponse } from "./types"
+import type {
+  PixivBookmarkDetailResponse,
+  PixivIllustListResponse,
+  PixivIllustDetailResponse,
+  PixivUgoiraMetadata,
+  PixivUgoiraMetadataResponse,
+  PixivUserBookmarkTagsResponse,
+  RestrictType,
+} from "./types"
 
 export function loadRecommended(signal?: AbortSignal): Promise<PixivIllustListResponse> {
   return apiClient.get<PixivIllustListResponse>(
@@ -71,12 +79,66 @@ export function loadUserIllusts(
   )
 }
 
-// ─── 收藏（对齐主项目，默认收藏到 public） ───
-export function addBookmark(illustId: number): Promise<void> {
-  return apiClient.post("/v2/illust/bookmark/add", {
+// ─── 收藏（默认公开；T3 收藏加标签，spec docs/specs/bookmark-tags.md） ───
+/**
+ * 收藏插画（可带可见性与收藏标签）。
+ *
+ * oracle（pixivpy3 aapi.py `illust_bookmark_add`，六实现差分互证见
+ * docs/research/bookmark-tags-similar-clients.md §7.1）：tags 序列化为多个标签空格
+ * join 的单值、字面量字段名 `tags[]`；空标签集不发 tags 字段。
+ *
+ * 覆盖式编辑（spec D2 / ADR-0160 D2）：对已收藏作品直接重发本请求即整体覆盖该收藏的
+ * 标签集与可见性——服务端无 edit 端点，不先 delete（避免收藏状态闪断）。
+ */
+export function addBookmark(
+  illustId: number,
+  restrict: RestrictType = "public",
+  tags?: string[],
+): Promise<void> {
+  const body: Record<string, string> = {
     illust_id: String(illustId),
-    restrict: "public",
-  })
+    restrict,
+  }
+  if (tags && tags.length > 0) {
+    body["tags[]"] = tags.join(" ")
+  }
+  return apiClient.post("/v2/illust/bookmark/add", body)
+}
+
+/**
+ * 书签详情（预填链路，spec D6）：判断是否已收藏 + 当前可见性 + 已有标签。
+ * 响应形状见 PixivBookmarkDetailResponse（bookmark_detail 可空、字段宽容解析）。
+ */
+export function loadBookmarkDetail(
+  illustId: number,
+  signal?: AbortSignal,
+): Promise<PixivBookmarkDetailResponse> {
+  return apiClient.get<PixivBookmarkDetailResponse>(
+    "/v2/illust/bookmark/detail",
+    { illust_id: String(illustId) },
+    signal,
+  )
+}
+
+/**
+ * 用户收藏标签库（面板候选，spec D4/D6）：标签库按公开性分库（restrict 分库）。
+ * user_id 显式传参——与同模块 loadBookmarks(userId, restrict) 先例一致，
+ * 由调用方（T4 面板数据层）从 authStore 解析当前用户 id。
+ */
+export function loadUserBookmarkTags(
+  userId: number,
+  restrict: RestrictType = "public",
+  offset?: number,
+  signal?: AbortSignal,
+): Promise<PixivUserBookmarkTagsResponse> {
+  const params: Record<string, string> = {
+    user_id: String(userId),
+    restrict,
+  }
+  if (offset !== undefined) {
+    params["offset"] = String(offset)
+  }
+  return apiClient.get<PixivUserBookmarkTagsResponse>("/v1/user/bookmark-tags/illust", params, signal)
 }
 
 export function deleteBookmark(illustId: number): Promise<void> {
