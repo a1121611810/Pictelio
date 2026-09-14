@@ -5,6 +5,8 @@
 //   下方 snake_case 响应字面量即该端点的真实字段名，非与本实现自洽的 mock 字段；
 // - 上限 10 / 空格提交 token / 去重 = spec D5/D11 + glossary「标签上限」「空格分隔序列化」；
 // - 保存载荷 = spec D1/D2（restrict + 完整标签集经 saveWith 覆盖式保存）+ ADR-0160 D2；
+// - 保存成效判定 = 宿主 saveWith 的 Promise<boolean> 返回值（FIX-2：显式成败通道；errorMsg
+//   仅用于文案渲染，不再作为成败推断的字符串哨兵——失败用例刻意不提供任何错误文案）；
 // - 失败路径（detail 禁存 / 标签库降级 / 保存回滚）= spec D6 + US12 + 测试硬约束 #1/#3；
 // - 竞态（可见性切换重拉分库、晚到响应丢弃）= spec D6「切换后标签库候选按分库重拉」+ 硬约束 3。
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -52,7 +54,6 @@ function universeResponse(names: string[]): PixivUserBookmarkTagsResponse {
 interface Harness {
   panel: UseBookmarkPanelReturn
   saveWith: ReturnType<typeof vi.fn>
-  saveError: ReturnType<typeof ref<string>>
   saving: ReturnType<typeof ref<boolean>>
   onSaved: ReturnType<typeof vi.fn>
   scope: EffectScope
@@ -61,15 +62,15 @@ interface Harness {
 function mount(overrides: Partial<{
   illustId: number
   userId: number | null
-  saveBehavior: () => Promise<void>
+  /** 宿主 saveWith 行为（FIX-2：成败经返回值显式表达，不再读 errorMsg 字符串哨兵） */
+  saveBehavior: () => Promise<boolean> | boolean
 }> = {}): Harness {
   const scope = effectScope()
-  const saveError = ref('')
   const saving = ref(false)
   const onSaved = vi.fn()
   const saveWith = vi.fn(async (..._args: [RestrictType, string[]]) => {
-    if (overrides.saveBehavior) await overrides.saveBehavior()
-    else saveError.value = ''
+    if (overrides.saveBehavior) return await overrides.saveBehavior()
+    return true
   })
   let panel!: UseBookmarkPanelReturn
   scope.run(() => {
@@ -77,12 +78,11 @@ function mount(overrides: Partial<{
       getIllustId: () => overrides.illustId ?? 12345,
       getUserId: () => (overrides.userId === undefined ? 999 : overrides.userId),
       saveWith: (...args: [RestrictType, string[]]) => saveWith(...args),
-      getSaveError: () => saveError.value,
       getSaving: () => saving.value,
       onSaved,
     })
   })
-  return { panel, saveWith, saveError, saving, onSaved, scope }
+  return { panel, saveWith, saving, onSaved, scope }
 }
 
 /** 让在飞 promise 链结算（load 内 await 若干层） */
@@ -343,25 +343,39 @@ describe('useBookmarkPanel 保存（spec D2/D9 + US12）', () => {
     h.scope.stop()
   })
 
-  it('保存失败（宿主 errorMsg 非空）→ 回滚预填态 + 不触发 onSaved + 面板保持打开', async () => {
+  it('保存失败（宿主 saveWith 返回 false）→ 回滚预填态 + 不触发 onSaved + 面板保持打开', async () => {
     loadBookmarkDetail.mockResolvedValue(detailResponse({ restrict: 'public' }))
     loadUserBookmarkTags.mockResolvedValue(universeResponse([]))
-    const h = mount({
-      saveBehavior: async () => {
-        // 模拟 useBookmarkMutation.saveWith 的失败静息回滚：只写 errorMsg（不 throw）
-        h.saveError.value = '操作失败'
-      },
-    })
+    // 宿主失败行为 = useBookmarkMutation.saveWith 的失败静息回滚（不 throw、只返回 false）；
+    // 本用例刻意不提供任何错误文案，成败判定只可能来自返回值（FIX-2：禁用 errorMsg 字符串哨兵）
+    const h = mount({ saveBehavior: () => false })
     await h.panel.load()
     h.panel.toggleTag('风景')
     h.panel.toggleTag('新しい')
     h.panel.restrict.value = 'private'
     await h.panel.save()
+    expect(h.saveWith).toHaveBeenCalledWith('private', ['オリジナル', '風景', '风景', '新しい'])
     expect(h.onSaved).not.toHaveBeenCalled()
     // 回滚到预填快照（spec US12：不丢上下文）
     expect(h.panel.selected.value).toEqual(['オリジナル', '風景'])
     expect(h.panel.restrict.value).toBe('public')
     h.scope.stop()
+  })
+
+  it('失败返回 false 时面板不关（onSaved 只由 true 触发）：成功 → 关面板回调、失败 → 保持打开', async () => {
+    loadBookmarkDetail.mockResolvedValue({ bookmark_detail: null })
+    loadUserBookmarkTags.mockResolvedValue(universeResponse([]))
+    const fail = mount({ saveBehavior: () => false })
+    await fail.panel.load()
+    await fail.panel.save()
+    expect(fail.onSaved).not.toHaveBeenCalled()
+    fail.scope.stop()
+
+    const ok = mount({ saveBehavior: () => true })
+    await ok.panel.load()
+    await ok.panel.save()
+    expect(ok.onSaved).toHaveBeenCalledTimes(1)
+    ok.scope.stop()
   })
 
   it('预填未就绪（detail 失败）→ 保存 no-op（禁存，D6）', async () => {

@@ -127,7 +127,9 @@ export default defineConfig({
     // 必须用 DOM 环境走 client 姿态（ADR-0144）。
     environment: "happy-dom",
     // i18n locale 钉源语言：跟随系统默认会随环境 navigator.language 漂移，测试须确定性
-    setupFiles: ["./tests/setup/i18n-locale.ts"],
+    // happy-dom textContent 数值补丁：happy-dom 违反规范（`textContent = 0` 得空元素），
+    // 会让 Solid 的数值文本更新崩掉（详见 tests/setup/happy-dom-textcontent.ts）
+    setupFiles: ["./tests/setup/i18n-locale.ts", "./tests/setup/happy-dom-textcontent.ts"],
     // T0 门禁（ADR-0097）：禁止空测试文件，防空壳套件漂移（ADR-0084 教训）
     passWithNoTests: false,
     clearMocks: true,

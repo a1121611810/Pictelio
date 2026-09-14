@@ -323,13 +323,25 @@ describe("api/illust.ts 收藏加标签", () => {
     await expect(loadBookmarkDetail(999)).resolves.toBeNull();
   });
 
-  it("loadBookmarkDetail 缺字段宽容：可选字段缺省不抛错，bookmark_detail 缺省归一为 null", async () => {
+  it("loadBookmarkDetail 可选字段缺省宽容：bookmark_detail 空对象不抛错", async () => {
     mockGet.mockResolvedValue({ bookmark_detail: {} });
     const { loadBookmarkDetail } = await loadApi();
-    await expect(loadBookmarkDetail(999)).resolves.toEqual({});
 
+    await expect(loadBookmarkDetail(999)).resolves.toEqual({});
+  });
+
+  it("loadBookmarkDetail 契约破坏：响应缺 bookmark_detail 键 → warn + throw（禁止静默归一为未收藏）", async () => {
+    // oracle（测试硬约束 #6）：2026-09-14 真机 probe —— 未收藏时服务端仍返回对象
+    // （is_bookmarked:false + 作品标签 is_registered:false），且 lynx 侧同语义
+    // （packages/app-lynx/src/composables/useBookmarkPanel.ts：字段缺失 = 契约破坏）。
+    // 静默归一为 null 会让面板以「空预填」覆盖已有收藏（清空既有标签），
+    // 违反 spec D6「无真值不覆盖」。
     mockGet.mockResolvedValue({});
-    await expect(loadBookmarkDetail(999)).resolves.toBeNull();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { loadBookmarkDetail } = await loadApi();
+
+    await expect(loadBookmarkDetail(999)).rejects.toThrow(/bookmark_detail/);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("[loadBookmarkDetail]"));
   });
 
   it("loadBookmarkDetail 失败路径：apiClient.get 错误向上传播", async () => {

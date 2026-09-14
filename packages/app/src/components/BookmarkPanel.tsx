@@ -7,7 +7,7 @@ import {
   toggleBookmarkTag,
   commitBookmarkTagToken,
 } from "../utils/bookmarkTagSelection";
-import { t } from "../i18n";
+import { t, apiErrorMessage } from "../i18n";
 
 interface BookmarkPanelProps {
   /** 目标插画 id（面板内所有请求的作用域；变化即重置 + 中止旧请求） */
@@ -18,8 +18,9 @@ interface BookmarkPanelProps {
   workTags?: string[];
   isOpen: boolean;
   onClose: () => void;
-  /** 保存成功回调：由宿主（IllustDetail）决定状态写入（含爆发动效） */
-  onSaved: (isBookmarked: boolean, restrict: RestrictType) => void;
+  /** 保存成功回调：由宿主（IllustDetail）决定状态写入（含爆发动效）。
+   * 无参——保存恒为「收藏/覆盖」方向（ADR-0160 D2），真实收藏态以宿主自身状态为准。 */
+  onSaved: () => void;
 }
 
 /** 输入/选择反馈判别（文案由 i18n 渲染） */
@@ -42,8 +43,27 @@ const CHIP_SELECTED =
 const CHIP_IDLE =
   "bg-transparent text-[var(--colorNeutralForeground1)] border-[var(--colorNeutralStroke2)] hover:bg-[var(--colorNeutralBackground2)]";
 
+/** 展示层可渲染的错误形状（ApiError 结构子集，见 src/api/types.ts） */
+interface DisplayError {
+  message: string;
+  messageKey?: string;
+  params?: Record<string, string | number>;
+}
+
+function isDisplayError(e: unknown): e is DisplayError {
+  // ApiError 是 client.ts 抛出的普通对象（非 Error 子类），故按 message 字段形状判定
+  return (
+    e !== null && typeof e === "object" && typeof (e as { message?: unknown }).message === "string"
+  );
+}
+
+/**
+ * 错误 → 展示文案：messageKey 优先经 i18n 渲染（src/api/types.ts ApiError 注释 /
+ * ErrorDisplay.tsx 先例），普通 Error 与其他值回退快照文案（String(e)）。
+ * message 快照恒为简中，英文 locale 下直用即泄漏中文，故展示层不得绕过 messageKey。
+ */
 function errorMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
+  return isDisplayError(e) ? apiErrorMessage(e) : String(e);
 }
 
 /**
@@ -81,11 +101,18 @@ const BookmarkPanel: Component<BookmarkPanelProps> = (props) => {
   let detailAbort: AbortController | null = null;
 
   function applyPrefill(detail: PixivBookmarkDetail | null) {
+    // detail 非 null ≠ 已收藏：未收藏时服务端也返回对象（2026-09-14 真机 probe），
+    // 已收藏真值看 is_bookmarked。字段缺失 = 契约破坏（禁止静默降级：显式告警，按未收藏处理，
+    // 与 lynx 侧 useBookmarkPanel 同语义）——按已收藏处理会把空预填当成待保存的完整集合。
+    if (detail !== null && detail.is_bookmarked === undefined) {
+      console.warn("[BookmarkPanel] bookmark_detail.is_bookmarked 缺失（契约破坏），按未收藏处理");
+    }
     // is_registered = 该标签已在用户标签库（勾选依据，ADR-0160 D5）；缺省宽容按未注册
     const marked = (detail?.tags ?? []).filter((tag) => tag.is_registered).map((tag) => tag.name);
     const nextRestrict: RestrictType = detail?.restrict === "private" ? "private" : "public";
-    // 已收藏真值以预填为准（detail 为 null = 服务端判定未收藏），props 快照仅作请求前的兜底展示
-    const nextBookmarked = detail ? (detail.is_bookmarked ?? true) : false;
+    // 已收藏真值 = is_bookmarked === true；detail 为 null 是「键显式 null」的防御分支（未收藏），
+    // props 快照仅作请求落定前的兜底展示
+    const nextBookmarked = detail?.is_bookmarked === true;
     const snapshot: PrefillSnapshot = {
       selected: marked,
       restrict: nextRestrict,
@@ -157,7 +184,13 @@ const BookmarkPanel: Component<BookmarkPanelProps> = (props) => {
       loadUserBookmarkTags(s.userId, s.restrict, undefined, controller.signal).then(
         (res) => {
           if (myGen !== universeGen || controller.signal.aborted) return;
-          setUniverseTags(res.bookmark_tags ?? []);
+          const tags = res?.bookmark_tags;
+          if (tags === undefined || tags === null) {
+            console.warn(
+              "[BookmarkPanel] 标签库响应缺 bookmark_tags 字段（契约破坏），按空候选处理",
+            );
+          }
+          setUniverseTags(tags ?? []);
           setUniverseLoading(false);
         },
         (e) => {
@@ -217,11 +250,14 @@ const BookmarkPanel: Component<BookmarkPanelProps> = (props) => {
   function commitInput() {
     const res = commitBookmarkTagToken(selected(), input());
     if (res.error) {
+      // 失败保留反馈（用户需看到拒绝原因）
       setFeedback(res.error);
       return;
     }
     setSelected(res.selected);
     setInput("");
+    // 成功即清反馈（lynx 侧同语义；移除上一轮的拒绝原因，避免陈旧提示）
+    setFeedback(null);
   }
 
   // spec D11：输入空格即提交当前 token（与服务端空格分隔语义一致）；Enter 同义提交
@@ -250,7 +286,7 @@ const BookmarkPanel: Component<BookmarkPanelProps> = (props) => {
       setRestrict(snapshot.restrict);
       return;
     }
-    props.onSaved(true, restrictAtSave);
+    props.onSaved();
     props.onClose();
   }
 

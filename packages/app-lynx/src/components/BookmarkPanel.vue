@@ -12,7 +12,8 @@
 //
 // 数据/交互状态全部收敛在 composable useBookmarkPanel（预填 detail + 标签库分库 + 竞态守护）；
 // 保存经 props.saveWith（宿主 useBookmarkMutation.saveWith 覆盖式保存变体）——面板不直连
-// addBookmark，保留乐观状态机与六条不变量；失败由宿主 errorMsg 呈现并回滚预填态。
+// addBookmark，保留乐观状态机与六条不变量；成败由该调用的布尔返回值判定（FIX-2），失败回滚
+// 预填态、宿主 errorMsg 仅用于 footer 文案渲染。
 // a11y 标注直接用 i18n 文案键（不新增静态注册表：面板文案随 locale 变化，E2E 定位以
 // accessibility-element 暴露 + 文案锚定为准）。
 import { computed, onBeforeUnmount, onMounted } from 'vue'
@@ -29,9 +30,10 @@ const props = defineProps<{
   illustId: number
   /** 作品自带标签名（建议来源，spec D5；原形 name，不取 translated_name） */
   workTags?: string[]
-  /** 宿主收藏状态机的保存变体（T4 saveWith）——面板保存的唯一通道 */
-  saveWith: (restrict: RestrictType, tags: string[]) => Promise<void>
-  /** 宿主 mutation 的 errorMsg（保存失败呈现 + 回滚触发，禁止静默降级） */
+  /** 宿主收藏状态机的保存变体（T4 saveWith）——面板保存的唯一通道；
+   * 返回 true=成功 / false=失败静息回滚（成败判定唯一依据，FIX-2） */
+  saveWith: (restrict: RestrictType, tags: string[]) => Promise<boolean>
+  /** 宿主 mutation 的 errorMsg（仅用于保存失败文案渲染，不作成败判定） */
   saveError: string
   /** 宿主 mutation 的 busy（保存中禁用保存按钮，与快速收藏共用互斥锁） */
   saving: boolean
@@ -40,8 +42,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   /** 请求关闭（遮罩 / × / 系统返回键）→ 宿主 v-if 卸载本组件 */
   close: []
-  /** 保存成功（宿主更新页面收藏态并关面板） */
-  saved: [restrict: RestrictType]
+  /** 保存成功（宿主更新页面收藏态并关面板）——无参：宿主不消费可见性 */
+  saved: []
 }>()
 
 const auth = useAuthStore()
@@ -50,9 +52,8 @@ const panel = useBookmarkPanel({
   getIllustId: () => props.illustId,
   getUserId: () => auth.currentUser?.id ?? null,
   saveWith: (restrict, tags) => props.saveWith(restrict, tags),
-  getSaveError: () => props.saveError,
   getSaving: () => props.saving,
-  onSaved: (restrict) => emit('saved', restrict),
+  onSaved: () => emit('saved'),
 })
 
 const { restrict, selected, input, feedback, universeTags, detailStatus, detailError, universeStatus, prefillBookmarked, canSave } =
@@ -231,6 +232,11 @@ onBeforeUnmount(() => {
         <view class="mt-4">
           <text class="text-label-medium text-outline">{{ t('bookmarkPanel.newTagLabel') }}</text>
           <view class="flex flex-row items-center gap-2 mt-2">
+            <!-- placeholder-color 是 Lynx **平台属性**（非 CSS）：实测不解析 var()——编译产物把
+                 "#41474e" 原样落入属性通道（var() 只出现在 CSS/style 通道），全仓亦无平台属性承载
+                 var() 的先例；web-core 预览把它映射为 CSS 自定义属性会「假绿」（ADR-0056 同族坑）。
+                 故保留十六进制值（沿用 SearchSheet / CommentInputBar / Login / Me 既有写法），
+                 令牌化跟踪见 issue 待办 -->
             <input
               v-model="input"
               class="flex-1 h-[11.2vw] box-border bg-surface-container-highest rounded-[var(--md-shape-full)] text-body-medium text-surface-on px-5"
