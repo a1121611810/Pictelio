@@ -98,13 +98,17 @@ export class AndroidE2eDriver {
           // android-28 模拟器冷启动慢，Appium 默认 adbExecTimeout 20s 不够
           "appium:adbExecTimeout": 60_000,
           // WebView 已开 setWebContentsDebuggingEnabled(true)，Chromedriver 自动匹配设备 WebView 主版本
-          "appium:chromedriverAutodownload": true,
+          // （chromedriverAutodownload 是 appium 扩展键、不在 W3C 能力类型内——
+          //   与下方 chromedriverExecutable 同走 capabilities cast 通道赋值）
           "appium:recreateChromeDriverSessions": true,
           // 真机（ColorOS/OPPO）：adb shell 无 WRITE_SECURE_SETTINGS，uiautomator2 初始化
           // 清理 hidden_api_policy 会抛 SecurityException → 忽略该错误（仅 log，无副作用）
           "appium:ignoreHiddenApiPolicyError": true,
         },
       };
+      // appium 扩展键不在 W3C 能力类型内、运行时生效（cast 通道，chromedriverExecutable 逃生通道同款）
+      (browserOptions.capabilities as Record<string, unknown>)["appium:chromedriverAutodownload"] =
+        true;
       // 手动指定 Chromedriver（chromedriverAutodownload 下载失败时的逃生通道）
       if (process.env.CHROMEDRIVER_EXECUTABLE) {
         (browserOptions.capabilities as Record<string, unknown>)["appium:chromedriverExecutable"] =
@@ -209,7 +213,10 @@ export class AndroidE2eDriver {
         lastErr = translateChromedriverError(e, webviewMajorVersion(this.serial));
         // 版本不匹配 / session 创建失败属确定性失败，重试只会反复拉起 chromedriver：
         // 立即抛出带指引的错误（switchContextWithRetry 已翻译过，这里保持同一实例）。
-        if (/chromedriver|chrome version|session not created/iu.test(String(lastErr.message))) {
+        if (
+          lastErr instanceof Error &&
+          /chromedriver|chrome version|session not created/iu.test(lastErr.message)
+        ) {
           throw lastErr;
         }
         await new Promise((r) => setTimeout(r, 1_500));

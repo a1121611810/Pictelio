@@ -77,7 +77,7 @@ export async function setupAndroidE2e(avdName?: string): Promise<AndroidE2eConte
     // 真机：依赖外部预装的 e2e 构建 full-debug APK（adb install 被 ColorOS 拦截）。
     // 校验包确实存在，避免基线不对齐（被测 APK 非本次构建产物）。
     const installed = runCapture(adbPath(), ["-s", serial, "shell", "pm", "path", APP_PACKAGE]);
-    if (!installed.includes("package:")) {
+    if (!installed.stdout.includes("package:")) {
       throw new Error(`真机 ${serial} 未预装 ${APP_PACKAGE}（e2e full-debug APK）——请先手动安装`);
     }
     console.log(`[android-e2e] ✓ 真机 ${serial} 已预装 ${APP_PACKAGE}（外部预装约定）`);

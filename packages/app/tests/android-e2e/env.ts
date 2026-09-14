@@ -148,13 +148,29 @@ export interface RunResult {
 }
 
 /**
+ * runCapture 输出缓冲上界：logcat -d 逐帧日志（lynx OnPatchFinishForFiber 级）
+ * 可达数 MB，Node 默认 1MB 会抛 ENOBUFS（#543 实测触发，导致空响应绕过重试）。
+ * 先例：scripts/audit-real-interaction/run_regression.mjs adbBuffer 同款 64MB。
+ */
+const MAX_CAPTURE_BUFFER = 64 * 1024 * 1024;
+
+/**
  * 同步执行命令并收集输出（默认不抛错，由调用方按退出码判断）。
  * 用于 adb 探测类命令——失败本身是合法状态（如设备未连接）。
+ *
+ * timeoutMs 显式标注 number（#543）：默认值 TIMEOUTS.adb 是 as const 字面量，
+ * 不标注会把形参推断成 `30000`，调用点传其他超时即编译错误。
  */
-export function runCapture(cmd: string, args: string[], timeoutMs = TIMEOUTS.adb): RunResult {
+export function runCapture(
+  cmd: string,
+  args: string[],
+  timeoutMs: number = TIMEOUTS.adb,
+  maxBufferBytes: number = MAX_CAPTURE_BUFFER,
+): RunResult {
   const r = spawnSync(cmd, args, {
     encoding: "utf-8",
     timeout: timeoutMs,
+    maxBuffer: maxBufferBytes,
     env: cleanEnv(),
   });
   if (r.error) {
@@ -173,8 +189,13 @@ export function runCapture(cmd: string, args: string[], timeoutMs = TIMEOUTS.adb
 /**
  * 执行命令，非零退出即抛错（带 stderr 摘要）。用于必须成功的步骤（install 等）。
  */
-export function runOrThrow(cmd: string, args: string[], timeoutMs = TIMEOUTS.adb): string {
-  const r = runCapture(cmd, args, timeoutMs);
+export function runOrThrow(
+  cmd: string,
+  args: string[],
+  timeoutMs: number = TIMEOUTS.adb,
+  maxBufferBytes: number = MAX_CAPTURE_BUFFER,
+): string {
+  const r = runCapture(cmd, args, timeoutMs, maxBufferBytes);
   if (r.code !== 0) {
     throw new Error(
       `[android-e2e] 命令退出码 ${r.code}: ${cmd} ${args.join(" ")}\n` +
