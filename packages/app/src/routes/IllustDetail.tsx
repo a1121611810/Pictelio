@@ -34,6 +34,7 @@ import { pushOverlay, popOverlay } from "../stores/backGestureStore";
 import { sanitizeHtml } from "../utils/html";
 import { scrollToTop } from "../utils/scrollToTop";
 import ReportSheet from "../components/ReportSheet";
+import BookmarkPanel from "../components/BookmarkPanel";
 import IllustTags from "../components/IllustTags";
 import CommentOverlay from "../components/CommentOverlay";
 import IllustActionMenu from "../components/IllustActionMenu";
@@ -105,6 +106,7 @@ const IllustDetail: Component = () => {
   const [isFollowed, setIsFollowed] = createSignal(false);
   const [following, setFollowing] = createSignal(false);
   const [showReportSheet, setShowReportSheet] = createSignal(false);
+  const [showBookmarkPanel, setShowBookmarkPanel] = createSignal(false);
   const [showActionMenu, setShowActionMenu] = createSignal(false);
   const [showComments, setShowComments] = createSignal(false);
   const [toastMessage, setToastMessage] = createSignal<string | null>(null);
@@ -300,8 +302,8 @@ const IllustDetail: Component = () => {
 
   function onBookmarkPointerDown(_e: PointerEvent) {
     longPressTimer = setTimeout(() => {
-      // Private
-      toggleBookmark(true);
+      // ADR-0160 D4：长按 = 收藏面板（原「私密直存」语义升级；可见性在面板内切换）
+      setShowBookmarkPanel(true);
       longPressTimer = 0 as any;
     }, 500);
   }
@@ -312,6 +314,22 @@ const IllustDetail: Component = () => {
       longPressTimer = 0 as any;
       // Public
       toggleBookmark(false);
+    }
+  }
+
+  /**
+   * 收藏面板保存成功（ADR-0160 D2/D4，spec docs/specs/bookmark-tags.md）：
+   * 面板恒为「收藏/覆盖」方向，故 is_bookmarked 置 true；仅原未收藏时计数 +1
+   * （覆盖式编辑不改变收藏数）并播爆发动效——与快速收藏同一视觉语义。
+   */
+  function handleBookmarkSaved() {
+    const i = illust();
+    if (!i) {
+      return;
+    }
+    if (!i.is_bookmarked) {
+      setIllust({ ...i, is_bookmarked: true, total_bookmarks: i.total_bookmarks + 1 });
+      setBookmarkBurstTrigger((n) => n + 1);
     }
   }
 
@@ -435,6 +453,17 @@ const IllustDetail: Component = () => {
       if (open) {
         pushOverlay("reportSheet", () => setShowReportSheet(false));
         return () => popOverlay("reportSheet");
+      }
+    },
+  );
+
+  // 将收藏面板状态注册到 overlay 栈（返回键先关面板，ADR-0160 D3/D4）
+  createEffect(
+    () => showBookmarkPanel(),
+    (open) => {
+      if (open) {
+        pushOverlay("bookmarkPanel", () => setShowBookmarkPanel(false));
+        return () => popOverlay("bookmarkPanel");
       }
     },
   );
@@ -1155,6 +1184,14 @@ const IllustDetail: Component = () => {
           illustId={illust()?.id ?? 0}
           isOpen={showReportSheet()}
           onClose={() => setShowReportSheet(false)}
+        />
+        <BookmarkPanel
+          illustId={illust()?.id ?? 0}
+          isBookmarked={illust()?.is_bookmarked ?? false}
+          workTags={illust()?.tags.map((tag) => tag.name) ?? []}
+          isOpen={showBookmarkPanel()}
+          onClose={() => setShowBookmarkPanel(false)}
+          onSaved={handleBookmarkSaved}
         />
         <CommentOverlay
           type="illust"
