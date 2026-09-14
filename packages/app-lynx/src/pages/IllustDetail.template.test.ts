@@ -62,3 +62,14 @@ describe('IllustDetail 双轨收藏接线（spec D3/D8）', () => {
     expect(code).toContain('illust.value?.tags?.map((tag) => tag.name) ?? []')
   })
 })
+
+describe('IllustDetail 作者行命中区（#542）', () => {
+  it('openAuthor 只挂在头像+名字内层 view（整行可点会让坐标自动化静默跳作者页）', () => {
+    expect((code.match(/@tap="openAuthor"/g) ?? []).length).toBe(1)
+    // 内层命中容器 + 测试锚点（web-core/CDP 调试用；原生 a11y 树不暴露，ADR-0123）
+    expect(code).toContain('data-testid="illust-detail-author"')
+    // 关注按钮不再依赖 @tap.stop 自保（外层无 tap handler，误触面消失）
+    expect(code).not.toContain('@tap.stop="toggleFollowAuthor"')
+    expect(code).toContain('@tap="toggleFollowAuthor"')
+  })
+})

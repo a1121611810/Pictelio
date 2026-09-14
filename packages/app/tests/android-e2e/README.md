@@ -162,3 +162,17 @@ router.loadSettings → runStartupAutoBackup → PictelioWebDavModule → 真实
 > 真机发现：Lynx JS runtime **没有 `TextEncoder`/`TextDecoder`**，快照序列化处抛错会让
 > lynx 自动备份在调用桥之前就失败（node/jsdom 单测覆盖不到）；现改用纯 JS UTF-8 实现
 > （`backupCore.utf8Encode/utf8Decode`），两侧单测含字节序列对照 oracle。
+
+## benchNav 深链（lynx 手势/交互类验收首选通道）
+
+- **深链优先**：需要「进入某页面」的 lynx 验收一律首选 benchNav 深链（`am start --es benchNav <target>`），
+  不要退回坐标点击 + 像素定位（作者行这类整行可点区域曾致坐标偏移静默误命中，#542）。
+  详情页直达：`--es benchNav illust-detail --es benchNavIllustId <id>`——illust_id 经
+  **数值事件载荷**下发（lynx 4.0.1 载荷通道仅数值存活，字符串不可用；`GlobalEventEmitter.emit`
+  的到达可在 logcat `js_app.cc` 行确认，JS 侧缺载荷会显式 warn）。
+- **构建链必须全程 `BENCH_NAV=1`**：`pnpm build:android` 内部会**重跑 lynx bundle 构建**
+  （不带该 env 即注入 `__BENCH_NAV__=false`，整块钩子被 tree-shake）——只对
+  `build:app-lynx` 单独注入会被随后的整链构建覆盖回无钩子版本（#542 实测坑）。
+  正确姿势：`BENCH_NAV=1 pnpm build:android`；出货构建不注入，天然零钩子。
+- **console 探针**：lynx JS 的 console.warn/log 落 logcat（tag `lynx`，`lynx_console.cc`），
+  可作为无 UI 信号的事件到达/分支判定探针。

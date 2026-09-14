@@ -151,6 +151,7 @@ public class LynxActivity extends AppCompatActivity {
                             case "error" -> new String[]{"pictelioBenchNavError"};
                             // 网络自检直达（spec docs/specs/network-self-check.md）
                             case "netdiag" -> new String[]{"pictelioBenchNavNetDiag"};
+                            // 详情页直达（#542）走载荷通道（illust_id 数值经 extra 传入），不入本表
                             default -> new String[0];
                         };
                         // 四次广播（1.5/3/4.5/6s）：页面级监听（如 NovelList 子 tab）可能晚于路由监听，
@@ -161,6 +162,29 @@ public class LynxActivity extends AppCompatActivity {
                                     if (!isFinishing() && !event.isEmpty())
                                         lynxView.sendGlobalEvent(event, new JavaOnlyArray());
                                 }, delay);
+                            }
+                        }
+                        // 详情页直达（#542）：载荷通道实测仅数值存活（lynx 4.0.1 无 JavaOnlyString，
+                        // 字符串不可走载荷），illust_id 经 intent extra "benchNavIllustId" 数值下发；
+                        // 同窗口四次广播，JS 侧缺载荷显式 warn（非静默）。
+                        if ("illust-detail".equals(benchNav)) {
+                            String rawId = getIntent().getStringExtra("benchNavIllustId");
+                            Long illustId = null;
+                            try {
+                                if (rawId != null) illustId = Long.parseLong(rawId);
+                            } catch (NumberFormatException ignored) {
+                            }
+                            if (illustId != null) {
+                                final long detailId = illustId;
+                                for (long delay : new long[]{1500, 3000, 4500, 6000}) {
+                                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                                        if (!isFinishing())
+                                            lynxView.sendGlobalEvent("pictelioBenchNavIllustDetail",
+                                                    JavaOnlyArray.of(detailId));
+                                    }, delay);
+                                }
+                            } else {
+                                Log.w(TAG, "benchNav=illust-detail 缺 benchNavIllustId extra，详情页直达跳过");
                             }
                         }
                     }

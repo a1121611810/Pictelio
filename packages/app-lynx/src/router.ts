@@ -368,6 +368,16 @@ function registerBenchNavHandler(): void {
       void navigate(target, { replace: true })
     })
   }
+  // 详情页直达（#542）：原生经事件载荷携带 illust_id（数值——lynx 4.0.1 载荷通道
+  // 仅数值存活，字符串不可用）。缺/坏载荷显式 warn（非静默，测试钩子可快速定位）。
+  emitter.addListener('pictelioBenchNavIllustDetail', (...args: unknown[]) => {
+    const id = args[0]
+    if (typeof id === 'number' && Number.isFinite(id) && id > 0) {
+      void navigate(`/illust/${id}`, { replace: true })
+    } else {
+      console.warn('[router] benchNav 详情页直达载荷缺 illust_id，跳过')
+    }
+  })
 }
 // 模块加载即注册（先于 initRouter 的网络恢复；initRouter 中重复调用幂等）——
 // 否则广播窗口（onLoadSuccess+1.5/3s）落在 restoreToken 之后时事件被丢弃。

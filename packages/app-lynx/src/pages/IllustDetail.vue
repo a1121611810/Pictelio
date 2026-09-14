@@ -300,21 +300,29 @@ onMounted(async () => {
       </view>
       <view class="p-4 bg-surface-container-lowest">
         <text class="text-headline-small font-bold text-surface-on">{{ illust.title }}</text>
-        <view class="flex flex-row items-center mt-2" @tap="openAuthor">
-          <SkeletonImage
-            v-if="illust.user.profile_image_urls"
-            :src="proxyImageUrl(illust.user.profile_image_urls.medium || illust.user.profile_image_urls.px_170x170 || '')"
-            aspect-ratio="1 / 1"
-            min-h="9vw"
-            class="w-[10.667vw] h-[10.667vw] rounded-full"
-          />
-          <text class="text-body-medium text-surface-on-variant ml-2 flex-1">by {{ illust.user.name }}</text>
+        <view class="flex flex-row items-center mt-2">
+          <!-- 作者行命中区只含头像 + 名字（#542）：整行可点会让心形附近的坐标偏移
+               静默跳转作者页（自动化假绿路径）；收窄后偏移落空处 = 响亮失败 -->
+          <view
+            class="flex flex-row items-center flex-1 min-w-0"
+            data-testid="illust-detail-author"
+            @tap="openAuthor"
+          >
+            <SkeletonImage
+              v-if="illust.user.profile_image_urls"
+              :src="proxyImageUrl(illust.user.profile_image_urls.medium || illust.user.profile_image_urls.px_170x170 || '')"
+              aspect-ratio="1 / 1"
+              min-h="9vw"
+              class="w-[10.667vw] h-[10.667vw] rounded-full"
+            />
+            <text class="text-body-medium text-surface-on-variant ml-2 flex-1">by {{ illust.user.name }}</text>
+          </view>
           <!-- P0-T3：关注作者（非本人时显示） -->
           <view
             v-if="!isSelfAuthor"
             class="px-4 h-[10.667vw] flex items-center justify-center rounded-[var(--md-shape-full)]"
             :class="following ? 'border border-outline bg-transparent active:bg-layer-pressed-primary' : 'bg-primary active:bg-state-pressed-primary'"
-            @tap.stop="toggleFollowAuthor"
+            @tap="toggleFollowAuthor"
           >
             <text class="text-body-medium" :class="following ? 'text-primary' : 'text-primary-on'">
               {{ following ? t('illustDetail.follow.following') : t('illustDetail.follow.follow') }}
