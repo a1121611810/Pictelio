@@ -49,3 +49,33 @@ describe("BottomActionBar 保存入口", () => {
     expect(save.textContent).toContain("保存中");
   });
 });
+
+describe("BottomActionBar 收藏键盘激活（#544）", () => {
+  const heart = () => screen.getByLabelText("收藏");
+
+  it("键盘合成 click（detail=0）触发 onBookmarkActivate", () => {
+    const onBookmarkActivate = vi.fn();
+    renderBar({ onBookmarkActivate });
+    fireEvent.click(heart()); // testing-library fireEvent.click 默认 detail 0
+    expect(onBookmarkActivate).toHaveBeenCalledTimes(1);
+  });
+
+  it("指针 click（detail≥1）不触发 onBookmarkActivate（指针路径独占，防双触发）", () => {
+    const onBookmarkActivate = vi.fn();
+    renderBar({ onBookmarkActivate });
+    fireEvent.click(heart(), { detail: 1 });
+    expect(onBookmarkActivate).not.toHaveBeenCalled();
+  });
+
+  it("onBookmarkActivate 缺省时键盘 click 不抛错（可选 prop）", () => {
+    renderBar();
+    expect(() => fireEvent.click(heart())).not.toThrow();
+  });
+
+  it("心形具备 focus-visible 三态反馈（对齐同条保存按钮，硬约束）", () => {
+    renderBar();
+    const cls = heart().className;
+    expect(cls).toContain("focus-visible:outline");
+    expect(cls).toContain("focus-visible:outline-[var(--colorStrokeFocus2)]");
+  });
+});

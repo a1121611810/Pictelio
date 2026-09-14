@@ -1153,6 +1153,7 @@ const IllustDetail: Component = () => {
             bookmarking={bookmarking()}
             onBookmarkPointerDown={onBookmarkPointerDown}
             onBookmarkPointerUp={onBookmarkPointerUp}
+            onBookmarkActivate={() => void toggleBookmark()}
             onComments={() => setShowComments(true)}
             totalComments={illust()!.total_comments}
             onSave={handleSaveEntry}

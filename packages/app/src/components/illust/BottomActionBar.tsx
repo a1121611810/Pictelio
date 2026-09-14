@@ -16,6 +16,12 @@ interface BottomActionBarProps {
   onSave?: () => void;
   /** 保存流程进行中（按钮禁用 + 文案切换） */
   saving?: boolean;
+  /**
+   * 键盘/辅助技术激活（#544）：Enter/Space 经浏览器合成的 click（detail === 0）
+   * 触发，与指针路径（pointerup 短按 = 快速收藏、长按 = 面板）互斥不双触发。
+   * 缺省 = 心形键盘不可达（既有缺陷形态，测试环境可省略）。
+   */
+  onBookmarkActivate?: () => void;
 }
 
 /**
@@ -50,7 +56,7 @@ const BottomActionBar: Component<BottomActionBarProps> = (props) => {
         <div class="flex items-center gap-2 ml-auto flex-shrink-0">
           <button
             type="button"
-            class={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase200)] font-medium transition-all active:scale-95 select-none appearance-none border-none outline-none cursor-pointer ${
+            class={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--borderRadiusMedium)] [font-size:var(--fontSizeBase200)] font-medium transition-all active:scale-95 select-none appearance-none border-none outline-none cursor-pointer focus-visible:bg-[var(--colorNeutralBackground1Selected)] focus-visible:outline focus-visible:outline-[var(--colorStrokeFocus2)] ${
               props.isBookmarked
                 ? "bg-[var(--colorStatusDangerBackground2)] text-[var(--colorStatusDangerForeground1)]"
                 : "bg-[var(--colorBrandStroke2)] text-[var(--colorNeutralForeground1)] hover:bg-[var(--colorBrandBackground)] hover:text-[var(--colorNeutralForegroundOnBrand)]"
@@ -58,6 +64,11 @@ const BottomActionBar: Component<BottomActionBarProps> = (props) => {
             onPointerDown={props.onBookmarkPointerDown}
             onPointerUp={props.onBookmarkPointerUp}
             onPointerLeave={props.onBookmarkPointerUp}
+            onClick={(e) => {
+              // 键盘合成的 click detail === 0（UI Events 规范）；指针 click ≥1，
+              // 由 pointerup 快速收藏路径独占——detail 守卫即双触发防线（#544）
+              if (e.detail === 0) props.onBookmarkActivate?.();
+            }}
             disabled={props.bookmarking}
             aria-label={
               props.isBookmarked
