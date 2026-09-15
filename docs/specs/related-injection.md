@@ -72,10 +72,15 @@ interface RelatedRow {
 
 ### 5.2 lynx（app-lynx）
 
+> **§5.2 v2（2026-09-16，ADR-0162）**：lynx 瀑布流 `<list>` 中途插入 list-item 会被 vue-lynx patch
+> **静默丢弃**（模拟器取证 2026-09-15：related 请求发出、数据就位、行从不渲染；用户侧表现为
+> 「隔几个才出现」= 后续分页 patch 后偶尔物化）。渲染缝自本节 v1 的「列表条目交织」下沉为
+> **锚点卡 list-item 内部展开段**：紧贴锚点成立、滚动位置保留、不发生 list 级插入。
+
 - **API**：`api/illust.ts` 新增 `loadRelated`（同参数）。
-- **状态**：新 Pinia store `stores/relatedInjection.ts`：`rowsByTab: { recommend: RelatedRow[]; follow: RelatedRow[] }` + pendingAnchor + 模块级 Map 缓存 + 同语义 actions。
+- **状态**：新 Pinia store `stores/relatedInjection.ts`：`rowsByTab: { recommend: RelatedRow[]; follow: RelatedRow[] }` + pendingAnchor + 模块级 Map 缓存 + 同语义 actions + `rowFor(tab, anchorId)` 渲染查询（v2）。
 - **返回检测**：`IllustList.vue` 在 KeepAlive 白名单（ADR-0049）内 → `onActivated` 消费 pendingAnchor（Recommended.vue 已有 onActivated 先例）。
-- **渲染**：页面维护 `displayItems = 交织(illusts, rows)`；`<list>` waterfall 中为行渲染 `full-span` list-item（横向 `<scroll-view scroll-orientation="horizontal"`？不行——list-item 内横向滚动在 lynx 原生 list waterfall 下受限，**实现时若横滑容器不可行，降级为固定两行网格条（2 行 × N 列，超出截断）**，spec 允许此实现自由度，但必须 full-span 且高度固定）；行内点击 `openDetail` 不记锚点。
+- **渲染（v2）**：列表只渲染纯插画流（`visibleIllusts`，v-for）；锚点卡 list-item 内部、`openDetail` 冒泡域外的兄弟位渲染 `RelatedInlineSection.vue`（哑组件，props 进 emits 出）：头行（相关作品/收起）+ loading 骨架与 **2×2 网格**（`RELATED_GRID_SIZE=4`，20vw 缩略图）互斥双分支；段经 `relatedRowFor(item.id)` 条件挂载，收起 = `removeRow`，缩略图点击 = `openRelated`（不记锚点）。v1 的 full-span 交织行与 `displayItems` 已删除。
 - **设置**：`settingsStore.ts` 新增 `_relatedInjection` ref + `relatedInjection`/`setRelatedInjection`（storage key `related_injection`，沿用 idbSet 范式 + per-user key）；UI 放 `Me.vue` 内容开关区（R18 行同款 switch 行）。
 
 ## 6. 测试要求（IO 边界 + oracle）
