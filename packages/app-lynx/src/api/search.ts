@@ -15,11 +15,26 @@ import type {
   SearchSort,
 } from "./types"
 
-/** 非法 next_url 的统一错误：带模块前缀（便于定位）+ warn 可见，不静默 */
-function invalidNextUrlError(fnName: string): Error {
+/** 非法 next_url 的统一错误：带模块前缀 + 实际 URL 值（禁止静默降级：字段缺失/域外 = 契约破坏，必须可定位） */
+function invalidNextUrlError(fnName: string, url: string): Error {
   const message = `${fnName}: invalid next_url — must point to app-api.pixiv.net`
-  console.warn(`[api/search] ${message}`)
+  console.warn(`[api/search] ${message}:`, url)
   return new Error(`[api/search] ${message}`)
+}
+
+/**
+ * hostname 字符串解析（lynx 运行时取证 2026-09-15，模拟器 logcat 实证）：
+ * lynx 的 URL 全局 polyfill 不抛错但 `.hostname` 字段为 undefined（浏览器语义缺失），
+ * 合法的 app-api.pixiv.net next_url 经 new URL 断言 100% 误拒 → 搜索分页必败且
+ * 重试秒败无感。故不用 URL 全局：正则取 http(s) authority（[userinfo@]host[:port]）
+ * 去 userinfo 与端口。仅 http(s) 绝对 URL 可解析，其余返回 null。
+ */
+function extractHostname(url: string): string | null {
+  const m = /^https?:\/\/([^/?#]+)/.exec(url)
+  if (!m) return null
+  const authority = m[1].split("@").pop() ?? m[1]
+  const host = authority.split(":")[0]
+  return host || null
 }
 
 /**
@@ -31,15 +46,8 @@ function invalidNextUrlError(fnName: string): Error {
 function assertPixivUrl(url: string, fnName: string): void {
   // 允许本地代理路径
   if (url.startsWith("/pixiv-api")) return
-  // 验证绝对 URL 的 hostname
-  let parsed: URL
-  try {
-    parsed = new URL(url)
-  } catch {
-    throw invalidNextUrlError(fnName)
-  }
-  if (parsed.hostname === "app-api.pixiv.net") return
-  throw invalidNextUrlError(fnName)
+  if (extractHostname(url) === "app-api.pixiv.net") return
+  throw invalidNextUrlError(fnName, url)
 }
 
 export function searchIllust(

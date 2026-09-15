@@ -226,9 +226,10 @@ describe("api/search（web 模式：fetch + /pixiv-api 代理）", () => {
       "[api/search] searchIllustNext: invalid next_url",
     )
     expect(fetchMock).not.toHaveBeenCalled()
-    // 静默降级禁令：SSRF 拒绝路径必须 warn 可见
+    // 静默降级禁令：SSRF 拒绝路径必须 warn 可见（且携带实际 next_url 便于定位——取证 2026-09-15）
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining("[api/search] searchIllustNext: invalid next_url"),
+      "https://evil.example.com/steal",
     )
     warnSpy.mockRestore()
   })
