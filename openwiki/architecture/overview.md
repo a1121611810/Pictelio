@@ -18,11 +18,15 @@ tags: [architecture, pictelio, solidjs, capacitor, monorepo]
 | `pictelio-app-lynx` | `/packages/app-lynx/` | vue-lynx MVP on ReactLynx runtime — parallel rendering client |
 | `@pictelio/update-check` | `/packages/update-check/` | Shared update-check logic (`isNewer` / `isBelowMin` / `checkForUpdate`) consumed by both clients (ADR-0089), extended with OTA `minWebVersion`/`webBundle` dual-coordinate fields (ADR-0122) |
 | `@pictelio/ugoira` | `/packages/ugoira/` | Ugoira (animated illust) shared package |
+| `@pictelio/ranking-core` | `/packages/ranking-core/` | Ranking shared pure logic — 7 rank modes, `mode`→API mode mapping, cache keys, date handling (ADR-0158) |
+| `@pictelio/search-core` | `/packages/search-core/` | Search advanced-filter shared pure logic — period/bookmark-band/ratio/resolution/AI-override state + request building + URL codec |
+| `@pictelio/net-diagnostics` | `/packages/net-diagnostics/` | Network self-check pure logic — check plan, per-probe judgment/attribution, report formatting (consumed by `/network-check`) |
+| `@pictelio/novel-export` | `/packages/novel-export/` | Novel export shared pure logic — 9-format whitelist/MIME/ext, Pixiv HTML extraction, block parsing, export payload building (ADR-0154) |
 
 Root `package.json` delegates all commands via `vp run --filter`. Build tooling uses **vite-plus** (`vp` CLI), which wraps Vite with oxlint, oxfmt, and vitest.
 
 **Mobile targets:**
-- **Android** — Four custom Capacitor plugins (Auth, ImageCache, OAuth, PixivApi) with Java implementations under `/packages/app/android/`. The **PixivApiPlugin** (v3.18.0+) replaced the now-deleted PictelioHttpPlugin as the single gateway for all Pixiv API requests (ADR-0037). See [Android Native & Build](/openwiki/integrations/android-native.md).
+- **Android** — Custom Capacitor plugins (Auth, ImageCache, OAuth, PixivApi, ClientInfo, Ota, plus v5.0.0's GallerySaver/WebDav download-executor surface) with Java implementations under `/packages/app/android/`. The **PixivApiPlugin** (v3.18.0+) replaced the now-deleted PictelioHttpPlugin as the single gateway for all Pixiv API requests (ADR-0037). See [Android Native & Build](/openwiki/integrations/android-native.md).
 - **iOS** — Initially introduced in v3.18.0, iOS platform support and files (`/packages/app/ios/`) were **removed in v3.19.1** — the project is now **Android-only**.
 
 ## Boot Sequence
@@ -68,9 +72,18 @@ sequenceDiagram
 - **`queryClient`** (`/packages/app/src/api/queryClient.ts`) — TanStack Query client with custom error normalization
 - **`routes`** (`/packages/app/src/router.tsx`) — `@solidjs/router` `RouteDefinition[]` array (migrated from `@tanstack/solid-router`). See [Routing](#routing).
 
+## Internationalization (i18n, ADR-0157, v5.0.0)
+
+Both clients were fully hardcoded to Simplified Chinese before v5.0.0 (~321 files with CJK literals). [ADR-0157](/docs/adr/ADR-0157-i18n-selection-and-loading.md) introduced dual-language support (zh-CN source + English):
+
+- **App** — [`@solid-primitives/i18n`](/packages/app/src/i18n/index.ts) (1.09 kB gzip, peer-pinned to solid 2.0 RC). zh-CN dictionary is statically inlined (zero first-frame flicker); `en` is a dynamic `import()` chunk prefetched at module load. `t(key, vars)` always returns a string with a fallback chain `rawT(key) ?? zhCN[key] ?? key` (fallback also interpolates — never leaks raw `{{var}}` templates).
+- **app-lynx** — a hand-written message module (`packages/app-lynx/src/i18n/`, module `ref` + pure `t(key, vars)`), zero `Intl` dependency (Lynx has no `Intl`).
+- **Language preference** — `settings_language` (`""` = follow system / `"zh-CN"` / `"en"`), a cross-engine key. Manual override > system; system locale is only read through an explicit injection point (`ClientInfo.getLocale()` bridge / `navigator.language` dev fallback) because Chromium asynchronously resets the WebView locale (Google #37113860).
+- **Error copy** — `ApiError` gained `messageKey` + `params`; `classifyError`/`toApiError` produce both a Chinese `message` snapshot (logs/tests) and a `messageKey` (rendered via `apiErrorMessage()`). `{{detail}}` server text is data, not translated.
+
 ## Server State Management (TanStack Query)
 
-Per [ADR-0093](/docs/adr/ADR-0093-tanstack-query-adoption.md), server state was migrated from hand-written `createStore`/`createResource`/`createSignal`+try-catch patterns to `@tanstack/solid-query` v5 via **thin-store wrappers** (the store files' public API is unchanged; only the internals swapped to TanStack Query hooks):
+Per [ADR-0093](/docs/adr/ADR-0093-tanstack-query-adoption.md), server state was migrated from hand-written `createStore`/`createResource`/`createSignal`+try-catch patterns to TanStack Query via **thin-store wrappers** (the store files' public API is unchanged; only the internals swapped to TanStack Query hooks). The SolidJS 2.0 migration ([ADR-0144-solidjs-2](/docs/adr/ADR-0144-solidjs-2-migration.md)) moved the client to `@tanstack/solid-query` **6.0.0-rc.3** (v5's peer was solid 1.x-only):
 
 - **Key factory** — [`queryKeys.ts`](/packages/app/src/api/queryKeys.ts) returns `as const` tuples (`["illust", "bookmarks", userId, restrict]`, `["illust", "feed", tab, subTab]`, `["search", "illust", word, sort, target]`, …) so keys are precise and prefix-invalidatable (`invalidateQueries({ queryKey: ["illust"] })` clears all illust caches on logout).
 - **Pagination** — `createInfiniteQuery` with Pixiv's `next_url` cursor; `select` flatMaps `data.pages` into a single render array (`structuralSharing: false` is hardcoded by the Solid adapter, safe because item references stay identical and `<For>` reconciliation skips unchanged elements).
@@ -117,6 +130,9 @@ Key differences from TanStack Router:
 | `/user/:id/followers` | `FollowListPage` | `onMount` → `load()` |
 | `/my/followers` | `FollowListPage` | `onMount` → `load()` |
 | `/search` | `Search` | — |
+| `/ranking` | `Ranking` | `createRankingStore` per `(mode, date)` InfiniteQuery, page-order-preserving flatten (ADR-0158) |
+| `/downloads` | `DownloadManager` | `downloadStore` (Solid shell over `utils/downloadManager`) |
+| `/network-check` | `NetworkCheck` | `@pictelio/net-diagnostics` `evaluate()` over `collectNetDiagInput` |
 | `/about` | `About` | — |
 | `/debug` | `DebugImage` | — |
 | `/client-switch` | `ClientSwitch` | Engine-switch info page (engine diff, warnings, loading mask); triggers restart via `ClientInfoPlugin` |
@@ -242,6 +258,7 @@ Font sizes use fluid `clamp(rem + vw)` via UnoCSS preflights, defined in `/packa
 - **Bundler:** [Rspeedy](https://github.com/lynx-family/rspeedy) (`@lynx-js/rspeedy`), a Lynx-optimized build tool
 - **CSS:** [Tailwind CSS v3](/packages/app-lynx/tailwind.config.ts) with `@lynx-js/tailwind-preset`, configured with `spacing` in `vw` and `fontSize` in `rpx` (see [ADR-0046](/docs/adr/ADR-0046-app-lynx-tailwind.md)). All 6 pages migrated from scoped CSS to Tailwind utilities (T2–T8).
 - **Design tokens:** Color palette adapted to Tailwind's semantic color scale; components were systematically aligned to **Material Design 3** (M3) — FAB, chips, dialogs, snackbar, segmented buttons, pressed-state layers, and the official switch `handle-container` geometry (commit `bf3c4fb` and follow-ups)
+- **Theme color (ADR-0152, v5.0.0):** user-selectable theme color via **static pre-generated M3 palettes** — each non-default theme is a `.theme-*` class in `tokens.css` overriding the full `--md-*` role set (seed → `SchemeTonalSpot`), switched by a root `<page>` class binding; default `sky` reuses `.theme-sky`. Persisted device-level as `settings_theme_color` (`utils/themeColor.ts` is the id/class/validation single source of truth). Chosen over runtime `@material/material-color-utilities` because Lynx's dynamic CSS-variable writes are unproven.
 - **Responsive strategy:** Width/spacing/padding use `vw` (viewport-relative), font sizes use `rpx` (Lynx responsive pixels). Rationale in [ADR-0086](/docs/adr/ADR-0086-lynx-responsive-units.md) and [glossary-lynx-units](/docs/adr/glossary-lynx-units.md).
 
 ### Routing

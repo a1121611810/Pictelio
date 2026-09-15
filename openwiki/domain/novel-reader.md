@@ -1,7 +1,7 @@
 ---
 type: Concept
 title: Novel Reader
-description: The novel reading experience — virtualized text layout with in-text search highlighting, reading progress tracking, series navigation, three feed layout modes, Pretext library integration, and AI translation (DeepSeek BYOK, S1-S7 complete pipeline).
+description: The novel reading experience — virtualized text layout with in-text search highlighting, reading progress tracking, series navigation, three feed layout modes, Pretext library integration, AI translation (DeepSeek BYOK, S1-S7 complete pipeline), and multi-format export (9 formats via @pictelio/novel-export, ADR-0154).
 tags: [novel, reader, virtual-scroll, pretext, text-layout, translation]
 timestamp: 2026-07-31T23:47:05+08:00
 ---
@@ -203,6 +203,18 @@ The novel feed is rendered two ways:
 
 > The monolithic `novelStore.ts` was **deleted** — the split stores are now imported directly by route components (mirroring the illust `feedStore.ts` split).
 
+## Novel Export (ADR-0154, v5.0.0)
+
+Novels can now be exported to **9 formats** — `txt`/`html`/`md`/`docx`/`pdf`/`epub`/`rtf`/`json`/`fb2` — across both clients. The feature is architected as shared pure logic + a single Java encoder, then reuses the download queue:
+
+- **Shared pure-logic package** [`@pictelio/novel-export`](/packages/novel-export/) — the format whitelist / labels / extensions / MIME (`formats.ts`), Pixiv HTML extraction (`extract.ts`), body block parsing (`blocks.ts` — `parseNovelBlocks`/`parseInlineRuns`, re-exported by the app's `utils/novelBlocks.ts` so existing callers keep working), and export payload construction (`exportPayload.ts`). The app-lynx client consumes the package directly, which also fills its previously-missing image extraction.
+- **Java encoder** `NovelExporter.java` (dual-engine, `src/main`) — the single encoding implementation for all 9 formats: text formats are string serialization; `epub`/`docx` use `ZipOutputStream` container assembly; `pdf` uses `android.graphics.pdf.PdfDocument` + `StaticLayout` (system CJK fonts, zero font payload). Cover/illustrations are fetched via `PixivImageLoader` in Java (bytes never enter the JS heap, ADR-0037).
+- **Download-queue reuse** (`kind = "novel"`) — export is a queue task type, so persistence, cross-restart recovery, start/pause/stop/delete, progress, and share all come free (ADR-0146). The task snapshots `targetFormat` and content switches at enqueue time.
+- **Settings** — `settings_novel_export_format` (default `txt`) plus `settings_novel_export_include_metadata`/`_include_cover`/`_include_images` (default on). The export sheet allows a per-export temporary override without writing back the global default.
+- **Output** — `Downloads/Pictelio/Pictelio_<novelId>.<ext>` via `GallerySaver.saveDownloadFile`. Web preview / lynx web-core do not generate any format — tasks fail explicitly with a `console.warn` (no fake success), since the Java encoder runs only on Android.
+
+See [ADR-0154](/docs/adr/ADR-0154-novel-export.md), [glossary](/docs/adr/glossary-novel-export.md), and [spec](/docs/specs/novel-export.md).
+
 ## Key Source Files
 
 | Purpose | Path |
@@ -238,6 +250,7 @@ The novel feed is rendered two ways:
 | Novel footer nav | `/packages/app/src/components/NovelFooterNav.tsx` |
 | Novel search bar | `/packages/app/src/components/NovelSearchBar.tsx` |
 | Novel blocks parser | `/packages/app/src/utils/novelBlocks.ts` |
+| Novel export shared logic | `/packages/novel-export/src/` (`formats.ts`, `blocks.ts`, `exportPayload.ts`, `extract.ts`) |
 | Novel image dimensions | `/packages/app/src/utils/novelImageDimensions.ts` |
 | Pretext support check | `/packages/app/src/primitives/isPretextSupported.ts` |
 | Novels stylesheet | `/packages/app/src/styles/novel-reader.css` |
