@@ -274,7 +274,11 @@ onActivated(() => {
         >
         <text v-if="currentItem" class="text-body-medium text-white/85 mt-2">{{ currentItem.data.user.name }}</text>
         <view v-if="currentItem && currentItem.kind === 'illust'" class="mt-5">
+          <!-- [lynx:fix] :key 每卡重挂载：BookmarkButton 的状态机（useBookmarkMutation）只在 setup
+               读一次 props——轮播宿主实例跨 slide 持久时收藏数/收藏态/illustId 全部冻结在首卡
+               （收藏数恒 135 + 点 ♥ 收藏到错误作品），key 变化强制重建实例 -->
           <BookmarkButton
+            :key="currentItem.data.id"
             :illust-id="currentItem.data.id"
             :initial-bookmarked="currentItem.data.is_bookmarked"
             :bookmark-count="currentItem.data.total_bookmarks"
