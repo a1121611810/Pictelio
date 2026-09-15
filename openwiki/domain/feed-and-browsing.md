@@ -1,7 +1,7 @@
 ---
 type: Concept
 title: Feed & Browsing
-description: The illust and novel browsing system — a C-shell home page (SideNavShell side nav + single-column fixed L5 layout) backed by six TanStack Query feed stores, unified FeedList with pull-to-refresh and adaptive tag chips, plus secondary virtualized feeds, R18 filtering, search, bookmarks, browsing history, and user profiles.
+description: The illust and novel browsing system — a C-shell home page (SideNavShell side nav + single-column fixed L5 layout) backed by six TanStack Query feed stores, unified FeedList with pull-to-refresh and adaptive tag chips, plus secondary virtualized feeds, search (with advanced filters), ranking, related-works injection, bookmarks (with tag panel), browsing history, R18 and AI-work filtering (SolidJS) / overlay masking (app-lynx).
 tags: [feed, browsing, virtual-scroll, pixiv, side-nav, a2-cardization]
 ---
 
@@ -179,6 +179,16 @@ User settings control visibility of each tier. Per [ADR-0103](/docs/adr/ADR-0103
 
 **app-lynx equivalent:** [`settingsStore.ts`](/packages/app-lynx/src/stores/settingsStore.ts) provides `showR18`/`showR18G` switches (default `false`, account-scoped `show_r18_${uid}` keys persisted in shared `CapacitorStorage` per ADR-0103) and `isRestricted(item)` — a pure reactive function that drives a glass overlay (`RestrictOverlay.vue`) instead of removing items from the list. All feed pages render the full list; restricted entries show an R-18 / R-18G badge with "该内容已在设置中隐藏" and no click-through. Toggling a switch in settings makes the overlay disappear instantly without re-fetching. `filterByRestrict` has been deleted. Also adds `SkeletonNovel.vue` for novel list/detail loading states. Switches live on the Me page. Spec: [app-lynx R18 overlay + skeleton](/docs/specs/app-lynx-r18-overlay-skeleton.md), originating from [ADR-0051](/docs/adr/ADR-0051-lynx-r18-filter.md).
 
+## AI Works Three-State Filter (ADR-0155, v5.0.0)
+
+Pixiv responses carry `ai_type` (0/undefined = not AI, 1 = AI-assisted, 2 = pure AI). An account-level switch `ai_filter_mode_${uid}` (shared `CapacitorStorage` key, ADR-0103 contract) now controls AI works with three modes:
+
+- `show` (default) — no AI handling.
+- `mask` — app filters AI works out of the store-derived list (mirroring its R18 approach); app-lynx renders the full list with a non-interactive AI mask card (mirroring its R18 overlay).
+- `only` — both clients fully filter out non-AI works (the only mode that removes items on lynx).
+
+The AI judgment is `ai_type >= 1` (correcting a `> 1` badge guard that made the "AI-assisted" branch dead code); it converges in pure functions (`app/utils/aiFilter.ts` `getAiType`, lynx `settingsStore.isAiWork`). Coverage spans feed/search/detail/history; search AI handling is client-side only (Pixiv's search API has no `ai_type` param), with a per-search override that does not write back the account setting. History entries gained an `aiType` field. See [ADR-0155](/docs/adr/ADR-0155-ai-artwork-three-state-filter.md) and [spec](/docs/specs/ai-artwork-three-state-filter.md).
+
 ## Search
 
 `/packages/app/src/routes/Search.tsx` — Dedicated search page for illusts and novels with a back button in the search bar. Backed by:
@@ -193,11 +203,47 @@ User settings control visibility of each tier. Per [ADR-0103](/docs/adr/ADR-0103
 
 **app-lynx global search (ADR-0132/0133):** The vue-lynx client implements search as a **bottom-sheet command palette** (`SearchSheet.vue`) opened from a FAB dual-form entry, not a `/search` route. It mirrors the webview API contract exactly (scope all/illust/novel, sort latest/oldest/popular with `popular_desc` → `popular-preview` endpoints) but adds 300ms-debounced type-to-search with `AbortController` rotation, device-level `searchHistoryStore` (10-item idbKV, not account-scoped), and `next_url` Pixiv-domain validation ported from the webview SSRF guard. Tapping a tag chip prefills the sheet with the raw `tag.name` and auto-searches (ADR-0133). See [Architecture Overview > Global Search](/openwiki/architecture/overview.md#global-search--multi-image-detail-adr-0129--adr-0133-v4270).
 
+### Search Advanced Filters (v5.0.0)
+
+Both clients gained an advanced-filter panel backed by the shared [`@pictelio/search-core`](/packages/search-core/) package (single source of truth, replacing ADR-0132's per-engine mirroring). The filter state (`SearchFilters`) covers five dimensions:
+
+- **Period** (`period`) — preset `1d`/`1w`/`1m`/`6m`/`1y` or a custom start/end date range; mapped to Pixiv `start_date`/`end_date`.
+- **Bookmark count band** (`bookmark`) — one of 7 bands (10–29 … 1000+), encoded as the `blt`/`bgt` bookmark-range params.
+- **Aspect ratio** (`ratio`) — landscape/portrait/square (illust path only).
+- **Min resolution** (`minPixels`) — pixel lower bound (illust path only).
+- **AI override** (`aiOverride`) — `follow`/`all`/`hide`, a per-search override that does **not** write back the account-level AI setting (ADR-0155 revision #479).
+
+The package is zero-IO: `buildParams.ts` constructs the endpoint + request params (single-word tags omit `search_target`, novels always send it; popular → `popular-preview` endpoints with no `sort`/pagination/`bookmark` params), `filters.ts` normalizes untrusted URL input field-by-field (invalid values revert to default), and `urlCodec.ts` round-trips filter state through the URL. See [ADR-0155 revision](/docs/adr/ADR-0155-ai-artwork-three-state-filter.md) and [spec](/docs/specs/search-advanced-filters.md).
+
+## Ranking (ADR-0158, v5.0.0)
+
+A ranking/leaderboard page (`/ranking`) closes the feature-gap P0-1 gap (present in 7/7 competitor clients). It reuses the official `/v1/illust/ranking` API (mode + date) and the existing auth/pagination/image pipeline:
+
+- **7 rank modes** — daily/weekly/monthly/rookie/original/R18/R18G, defined once in [`@pictelio/ranking-core`](/packages/ranking-core/) `modes.ts` (`RANK_MODES`); `id` is the client-stable identifier, `apiMode` the server mode string (`day`/`week`/`month`/`week_rookie`/`week_original`/`day_r18`/`week_r18g`).
+- **No new nav category** — the entry is injected into the feed (webview: horizontal scroll bar atop the recommended feed; lynx: a "榜首编辑大卡" atop the illust tab), and the full browsing capability lives in the `/ranking` route. The entry only carries "today's daily ranking" — mode/date state stays in the ranking page.
+- **`createRankingStore`** — a `(mode, date)`-keyed TanStack InfiniteQuery that flattens pages **strictly preserving page order × within-page order** (deliberately **not** the `createTQFeedStore` merge path, which sorts by `create_date` and would destroy rank order). Rank = `offset + index + 1`.
+- **Ranking gaps** — restricted items are filtered out but **not renumbered**, leaving rank holes (e.g. rank 4/5 missing while 6 still shows 6). This is a documented known behavior, not a bug (ADRs #7).
+
+See [ADR-0158](/docs/adr/ADR-0158-ranking-information-architecture.md) and [spec](/docs/specs/ranking.md).
+
+## Related Works Injection (v5.0.0)
+
+`/packages/app/src/stores/relatedInjectionStore.ts` injects a "related works" row after an anchor illust when browsing the recommended/follow/bookmarks feed tabs. Clicking an illust card records a one-shot `{tab, illustId}` anchor; a session-local row (max 3 anchors, 20 items each) is injected after the anchor card, with `loadRelated` fetching similar works (5-min stale time). Rows are cleared on pull-to-refresh or tab switch, dedupe against the anchor and already-shown IDs, and are gated by the `relatedInjection` settings switch. The lynx client mirrors this via `relatedInjection.ts`. Spec: [`docs/specs/related-injection.md`](/docs/specs/related-injection.md).
+
 ## Bookmarks
 
 Bookmarks is no longer a standalone route. The **bookmarks tab** inside `/home` renders `IllustSingleCard`/`NovelRowCard` lists backed directly by `bookmarkStore` / `novelBookmarkStore` (via the `IllustFeedPanel`/`NovelFeedPanel` mapping). The legacy `BookmarksFeed` component and the `IllustBookmarks`/`NovelBookmarks` route components were **deleted** in the ADR-0083 dead-code cleanup (they were no longer embedded in the home page). The `PersonalCenter` "My Bookmarks" link navigates to `/home` with `setCurrentTab("bookmarks")`.
 
 Bookmark state is managed by `/packages/app/src/stores/bookmarkStore.ts` (illusts) and `novelBookmarkStore.ts` (novels), which integrate with the Pixiv API and toggle bookmarks with optimistic UI updates.
+
+### Bookmark + Tags Panel (ADR-0160, v5.0.0)
+
+Illust bookmarks gained **tagging**: a single tap on the heart stays fast-bookmark (zero decisions), while a **long-press** opens the bookmark panel (detail pages only, both clients) for visibility + tags + inline tag creation + save. Key contract points:
+
+- **Wire format** — tags are space-joined into a single `tags[]` form field (the six-client consensus; no repeated-key arrays), and editing re-sends `bookmark/add` with the full tag set **without** delete-then-add (no edit endpoint exists).
+- **Data source triangle** — prefill (`/v2/illust/bookmark/detail`) + tag library (`/v1/user/bookmark-tags/illust`) + the work's own tags, capped at 10 tags.
+- **Behavior change** — the webview long-press "private quick-save" was upgraded to the full panel (visibility toggled inside); lynx `addBookmark` gained the `restrict` parameter it had been missing.
+- Scope is illusts only (novel tagging deferred). Backed by `bookmarkPanelStore.ts` / lynx `BookmarkButton` + panel. See [ADR-0160](/docs/adr/ADR-0160-illust-bookmark-tags.md), [glossary](/docs/adr/glossary-bookmark-tags.md), [spec](/docs/specs/bookmark-tags.md).
 
 ## Author Click Navigation
 
@@ -231,12 +277,13 @@ Route Page (navigate) → VirtualFeed (prop pass-through)
 
 ## Browsing History
 
-`/packages/app/src/stores/historyStore.ts` — Persists history using **TanStack DB** with `localStorageCollectionOptions`:
-- L1 = in-memory collection (TanStack DB)
+`/packages/app/src/stores/historyStore.ts` — Persists history in a **local `localStorage` collection** (ADR-0144 D2 replaced `@tanstack/solid-db`, which had no solid-js 2.0 adapter; the storage key and entry JSON shape were kept byte-compatible so old data survives):
+- L1 = in-memory `Map` collection
 - L2 = full serialization to localStorage (`pictelio-browsing-history`)
 - Composite key: `${userId}_${type}_${id}` for user isolation
 - Lazy expiry: entries older than 30 days cleared on write
 - `historyVersion` signal acts as a non-reactive invalidation token
+- Entries carry an `aiType` field (ADR-0155) for AI-mode history filtering
 
 **History tab:** The history tab is now built into `SideNavShell` (`SideNavShell.tsx` `HistoryPanel`) rather than rendered via a separate `HistoryFeed` route component. It renders an A2 `HistoryRowCard` list (sorted by `visitedAt` descending) with a clear-all button and empty state, reading `historyCollection` filtered by `userId`. The legacy `HistoryFeed` component was **deleted** in the ADR-0083 dead-code cleanup. History entries retain author click navigation per [ADR-0032](/docs/adr/ADR-0032-author-click-navigation.md); old entries without `authorId` degrade gracefully to plain text.
 
@@ -281,6 +328,10 @@ User profile data is loaded via `/packages/app/src/primitives/useUserProfile.ts`
 | Search page | `/packages/app/src/routes/Search.tsx` |
 | Search store | `/packages/app/src/stores/searchStore.ts` |
 | History store | `/packages/app/src/stores/historyStore.ts` |
+| Ranking store | `/packages/app/src/stores/rankingStore.ts` |
+| Related-works injection store | `/packages/app/src/stores/relatedInjectionStore.ts` |
+| Bookmark panel store | `/packages/app/src/stores/bookmarkPanelStore.ts` |
+| AI filter utility | `/packages/app/src/utils/aiFilter.ts` |
 | Bookmark store | `/packages/app/src/stores/bookmarkStore.ts` |
 | R18 filter utility | `/packages/app/src/utils/r18Filter.ts` |
 | Block/report store | `/packages/app/src/stores/blockStore.ts` |

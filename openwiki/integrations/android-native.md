@@ -1,7 +1,7 @@
 ---
 type: Concept
 title: Android Native & Build
-description: The Capacitor Android native runtime layer with three Gradle product flavors (full/webview/lynx) producing separate APKs since v4.0.0. Covers six Capacitor plugins (Auth, ImageCache, OAuth, PixivApi, ClientInfo, Ota), Lynx Native Modules, shared Java utilities, Gradle build pipeline, release signing, and WebView configuration.
+description: The Capacitor Android native runtime layer with three Gradle product flavors (full/webview/lynx) producing separate APKs since v4.0.0. Covers Capacitor plugins (Auth, ImageCache, OAuth, PixivApi, ClientInfo, Ota, plus v5.0.0's GallerySaver/WebDav/download-executor surface), Lynx Native Modules, shared Java utilities (PixivImageLoader, SecureStorageCompat, NovelExporter, WebDavClient), engine availability fallback, Gradle build pipeline, release signing, and WebView configuration.
 tags: [android, capacitor, native, gradle, build, plugins, pixiv-api-gateway]
 ---
 
@@ -420,6 +420,49 @@ Shared, idempotent Lynx runtime initialization point. Extracted from `PictelioAp
 |--------|----------|
 | `PictelioApp.initLynx()` | Process cold start (full flavor) |
 | `LynxActivity.onCreate()` | Process reuse after engine switch (error 102 fix) |
+
+## Download, Save & Backup (v5.0.0)
+
+v5.0.0 added a data-management cluster built on shared Java deep modules + thin dual bridges (webview Capacitor plugin ↔ lynx LynxModule), following the ADR-0143 deep-module convention. Bytes stay in the Java heap (ADR-0037); the JS layer holds only metadata/percentages.
+
+### GallerySaver (Image Save-to-Album, ADR-0145)
+
+- **Java:** `GallerySaver.java` (shared `src/main`), reusing `PixivImageLoader.loadFile` for byte acquisition (cache-first, mirror/Referer/UA semantics inherited — not duplicated).
+- **Bridges:** `GallerySaverPlugin` (webview) + `PictelioGalleryModule` (lynx) — thin param/thread/result mapping only.
+- **Disk routing:** API ≥ 29 → `MediaStore` (`Pictures/Pictelio`, `IS_PENDING` two-phase, zero permission); API 28 (minSdk) → app-specific external dir + `MediaScannerConnection`.
+- **File naming:** single source of truth in JS (`Pictelio_<illustId>[_p<N>].<ext>`); Java only `sanitizeFileName`s.
+- Entry on detail pages (single save / page-select / batch); ugoira excluded. See [ADR-0145](/docs/adr/ADR-0145-image-save-download.md), [glossary](/docs/adr/glossary-image-save.md).
+
+### Download Queue & Ugoira Multi-format Export (ADR-0146)
+
+- **Queue state machine in JS** (`utils/downloadQueueCore.ts`, node-testable, persisted under `download_queue_v1`); **bytes/encoding in Java** deep-module executors.
+- **Task = one output file**; `targetFormat` snapshotted at enqueue (later setting changes don't affect queued tasks). Pause (retain bytes) vs stop (discard partial) are distinct; delete offers file-vs-record split.
+- **Ugoira export formats:** ZIP/TAR (Java container), APNG (Java chunk reassembly), GIF (BitmapFactory + palette quantization + LZW), MP4 (MediaCodec H.264 + MediaMuxer), WebP (libwebp + pure-Java VP8X/ANIM/ANMF assembly). Route: `/downloads` (`DownloadManager.tsx` / lynx `DownloadManager.vue`). See [ADR-0146](/docs/adr/ADR-0146-download-queue-export.md), [spec](/docs/specs/download-manager.md).
+
+### NovelExporter (Novel Multi-format Export, ADR-0154)
+
+- **Java:** `NovelExporter.java` (shared `src/main`) implements all 9 formats: `txt/html/md/rtf/json/fb2` string serialization, `epub`/`docx` via `ZipOutputStream`, `pdf` via `android.graphics.pdf.PdfDocument` + `StaticLayout` (system CJK fonts, zero font payload).
+- **Shared pure logic** in [`@pictelio/novel-export`](/packages/novel-export/) — format whitelist/MIME, HTML extraction, block parsing, payload building (re-exports the app's `novelBlocks.ts`).
+- **Reuses the download queue** as `kind: "novel"` with `payloadJson` (opaque to queue core). Output `Downloads/Pictelio`. Web preview / lynx web-core **do not** generate formats (task fails explicitly, no fake success). See [ADR-0154](/docs/adr/ADR-0154-novel-export.md).
+
+### WebDAV Backup (ADR-0156)
+
+- **Java single core `WebDavClient`** — raw OkHttp subset of the WebDAV protocol (MKCOL idempotent / PUT / GET / PROPFIND / DELETE). Dual thin bridges: `WebDavPlugin` (webview) + `PictelioWebDavModule` (lynx).
+- **Snapshot mode** — single timestamped file, keep-last-10 rotation, write-then-read-back verification (PUT → PROPFIND `getcontentlength`). No lock files / ETag.
+- **Encryption in Java** — `PICTELIO-ENC1` magic + AES-256-GCM, PBKDF2-HMAC-SHA256 (600k rounds) from the user password; passwords never enter the backup file.
+- **Credentials tiering** — WebDAV/backup passwords in Keystore; connection config in shared `settings_webdav_*` keys (included in the backup domain; excluded runtime key = last-backup time). See [ADR-0156](/docs/adr/ADR-0156-webdav-backup-architecture.md), [spec](/docs/specs/webdav-backup.md).
+
+### Network Self-Check
+
+`/network-check` runs [`@pictelio/net-diagnostics`](/packages/net-diagnostics/) `evaluate()` over device capability bits + probe results, yielding per-probe status (green/yellow/red/skipped) + attribution (`auth`/`proxy`/`service`/`network`/`device`) + a sanitized copyable report. Input collected via `collectNetDiagInput` → `native/NetDiag`. See [ADR](/docs/adr/ADR-0153-engine-availability-fallback.md) and [spec](/docs/specs/network-self-check.md).
+
+### Engine Availability Fallback (ADR-0153)
+
+The `full` APK no longer dead-ends on the static "upgrade WebView" page when system WebView < 85: `MainActivity` falls back to the Lynx engine for that launch **without** rewriting `pictelio_client_kind`. Availability is judged per-engine (WebView: `getCurrentWebViewPackage()` ≥ `MIN_WEBVIEW_VERSION`, fail-open on undetectable; Lynx: `CLIENT_KINDS` includes lynx ∧ `ensureInitialized()` no-throw ∧ `isNativeLibraryLoaded()`). A one-shot `pictelio_engine_fallback_notice` flag drives a dismissible notice; the fallback path's error page offers only "exit app" (no loop back). See [ADR-0153](/docs/adr/ADR-0153-engine-availability-fallback.md).
+
+### Bridge Thread Unblocking & POST Form Body (ADR-0159 / ADR-0161)
+
+Two native write-path fixes land together: ADR-0159 offloads `PixivApiPlugin` network I/O off the single Capacitor `Bridge` handler thread (which previously serialized every `@PluginMethod`, so a slow request could block `Preferences.set`/`hydrateAll` and silently drop the engine switch); ADR-0161 fixes the webview native POST path to send `application/x-www-form-urlencoded` **form body** (matching the web branch and lynx) instead of query-string params + empty body — the bug that made all native bookmark/follow/comment writes fail with HTTP 400 while reads worked. See [ADR-0159](/docs/adr/ADR-0159-bridge-thread-unblocking.md) and [ADR-0161](/docs/adr/ADR-0161-native-post-form-body.md).
 
 ## WebView Configuration
 
