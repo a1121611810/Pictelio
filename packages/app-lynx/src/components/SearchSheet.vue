@@ -16,7 +16,7 @@
 // handler）——故 onInput 按事件 detail.isComposing 过滤，组合态不搜，
 // 组合结束的 lynxinput 事件（isComposing=false）自然触发即输即搜
 // （docs/research/global-search-patterns.md §4.2）。
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { navigate } from '../router'
 import { t, type I18nKey } from '../i18n'
 import type { SearchState, SearchResultItem } from '../primitives/useSearch'
@@ -60,10 +60,27 @@ const visibleResults = computed(() => {
     : rows
 })
 
+// ── [lynx:fix] 结果列表整树重建防御（ADR-0107 D4 同款，IllustList/Bookmarks 先例）──
+// useSearch 的换词/setScope/setSort 落表是「整表替换」——原生 <list> 就地 patch 会触发
+// vue-lynx RemoveNode 索引错位（旧行残留/错位，即「选了小说还能看到插画」）。
+// status 落定为 ready 的同一 tick bump epoch（watch 先于渲染），:key 变化走整树替换。
+// 分页 append 不改 status → 不 bump，走安全的就地追加。
+const listEpoch = ref(0)
+/** scope/sort 显式切换的重开意图：重搜 loading 期间隐藏旧结果（骨架重开），落定即复位 */
+const scopeRestart = ref(false)
+watch(
+  () => state.value.status,
+  (s) => {
+    if (s === 'ready') listEpoch.value++
+    if (s !== 'loading') scopeRestart.value = false
+  },
+)
+
 /** 首载三态（ADR-0150）：首搜无旧结果 → 骨架；换词保留旧结果（hasItems 优先 → 内容）；ready 且空 → 空态 */
 const view = computed(() =>
   deriveFirstLoadView({
-    hasItems: visibleResults.value.length > 0,
+    // scope/sort 切换的骨架重开（Grill 2026-09-15 拍板）：显式 chip 重搜期间隐藏旧结果
+    hasItems: scopeRestart.value ? false : visibleResults.value.length > 0,
     loading: state.value.isSearching || state.value.status === 'loading',
     settled: state.value.status === 'ready',
     hasError: state.value.status === 'error',
@@ -268,10 +285,14 @@ function onClearInput(): void {
 }
 
 // scope / sort / 分页 / 重试
+// 显式 chip 重搜（有词且真的发生切换才触发重搜——重复点击已选 chip 时 setScope 幂等返回，
+// 置重开意图会让列表被误判为空态）→ 置重开意图：loading 期间隐藏旧结果（骨架重开）
 function onScopeTap(scope: SearchScope): void {
+  if (scope !== state.value.scope && keyword.value.trim() !== '') scopeRestart.value = true
   controller.setScope(scope)
 }
 function onSortTap(sort: SearchSort): void {
+  if (sort !== state.value.sort && keyword.value.trim() !== '') scopeRestart.value = true
   controller.setSort(sort)
 }
 function onLoadMore(): void {
@@ -627,6 +648,7 @@ onBeforeUnmount(() => {
                loading 期间旧结果保留展示；首搜无旧结果时列表为空 + 上方轻量指示 -->
           <list
             v-else-if="visibleResults.length > 0"
+            :key="listEpoch"
             class="flex-1 min-h-0"
             list-type="single"
             scroll-orientation="vertical"
