@@ -173,3 +173,37 @@ describe("relatedInjection store（lynx，spec §4）", () => {
     expect(store.rows("follow")).toHaveLength(0);
   });
 });
+
+describe("rowFor（ADR-0162 卡内展开段渲染查询）", () => {
+  it("命中 / 未命中 / tab 隔离", async () => {
+    const store = useRelatedInjectionStore();
+    mockState.loadRelated.mockResolvedValue({ illusts: [illust(11)] });
+    store.recordAnchor("recommend", 55);
+    await store.consumeAnchor("recommend", []);
+    await flush();
+    expect(store.rowFor("recommend", 55)?.loading).toBe(false);
+    expect(store.rowFor("recommend", 999)).toBeUndefined();
+    expect(store.rowFor("follow", 55)).toBeUndefined();
+  });
+
+  it("loading 态透传：消费即占位，填充前可查（卡内骨架渲染输入）", async () => {
+    const store = useRelatedInjectionStore();
+    let resolveFetch!: (v: { illusts: ReturnType<typeof illust>[] }) => void;
+    mockState.loadRelated.mockReturnValue(
+      new Promise((r) => {
+        resolveFetch = r;
+      }),
+    );
+    store.recordAnchor("recommend", 66);
+    const pending = store.consumeAnchor("recommend", []);
+    await flush();
+    expect(store.rowFor("recommend", 66)?.loading).toBe(true);
+    expect(store.rowFor("recommend", 66)?.items).toHaveLength(0);
+    resolveFetch({ illusts: [illust(12)] });
+    await pending;
+    await flush();
+    const row = store.rowFor("recommend", 66);
+    expect(row?.loading).toBe(false);
+    expect(row?.items).toHaveLength(1);
+  });
+});

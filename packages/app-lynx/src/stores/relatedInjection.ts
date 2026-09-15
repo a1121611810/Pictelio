@@ -24,8 +24,8 @@ export interface RelatedRow {
 export const MAX_RELATED_ANCHORS = 3
 /** 单行相关作品上限 */
 export const RELATED_ROW_SIZE = 20
-/** lynx 行为固定两行网格降级（spec §5.2）：8 = 2 行 × 4 列，超出截断 */
-export const RELATED_GRID_SIZE = 8
+/** lynx 卡内展开段网格（spec §5.2 v2，ADR-0162）：4 = 2 行 × 2 列（列宽 48.4vw 内），超出截断 */
+export const RELATED_GRID_SIZE = 4
 /** related 缓存时长（同一作品反复进出零重复请求） */
 const RELATED_CACHE_TTL_MS = 5 * 60_000
 /** 缓存容量上限（防长会话无界累积） */
@@ -61,6 +61,12 @@ export const useRelatedInjectionStore = defineStore('relatedInjection', () => {
 
   function rows(tab: RelatedFeedTab): RelatedRow[] {
     return rowsByTab.value[tab]
+  }
+
+  /** 渲染查询（ADR-0162 卡内展开段）：锚点 id → 该卡应展示的行；无则 undefined。
+   * 响应性：读 rowsByTab.value，mutateRows 整体替换即触发全部读者 */
+  function rowFor(tab: RelatedFeedTab, anchorId: number): RelatedRow | undefined {
+    return rowsByTab.value[tab].find((r) => r.anchorId === anchorId)
   }
 
   /** 点击首页插画卡片进详情前调用（注入行内点击不记录，防循环注入） */
@@ -133,5 +139,5 @@ export const useRelatedInjectionStore = defineStore('relatedInjection', () => {
     })
   }
 
-  return { pendingAnchor, rowsByTab, rows, recordAnchor, consumeAnchor, removeRow, clearRows }
+  return { pendingAnchor, rowsByTab, rows, rowFor, recordAnchor, consumeAnchor, removeRow, clearRows }
 })
