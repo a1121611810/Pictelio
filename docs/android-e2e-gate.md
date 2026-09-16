@@ -35,7 +35,14 @@ ANDROID_E2E_AVD=pictelio_ui ANDROID_E2E_BUILD_MODE=e2e pnpm test:android:e2e
 ANDROID_E2E_AVD=pictelio_low ANDROID_E2E_BUILD_MODE=e2e pnpm test:android:e2e -- specs/switch-client-roundtrip-low.spec.ts
 # pictelio_low 单引擎 webview 包：仍停升级页（ADR-0153 回归）
 ANDROID_E2E_AVD=pictelio_low ANDROID_E2E_FLAVOR=webview ANDROID_E2E_BUILD_MODE=e2e pnpm test:android:e2e -- specs/webview-only-upgrade.spec.ts
+# 引擎降级取证矩阵 M1–M4（ADR-0164，发版前转换矩阵门手动跑；两个 AVD 各跑一轮）
+ANDROID_E2E_AVD=pictelio_ui ANDROID_E2E_BUILD_MODE=e2e pnpm test:android:e2e -- specs/engine-fallback-matrix.spec.ts
+ANDROID_E2E_AVD=pictelio_low ANDROID_E2E_BUILD_MODE=e2e pnpm test:android:e2e -- specs/engine-fallback-matrix.spec.ts
 ```
+
+> 缺省引擎翻转（ADR-0164）后，`setup.ts` 在 `pm clear` 后显式播种 `pictelio_client_kind=webview`
+> 基线（把「全新安装=webview」的隐式前提显式化）；引擎降级取证依赖 DEBUG-only 覆盖键
+> `pictelio_debug_force_lynx_unavailable`（release 构建该分支被 R8 死代码消除，生产包无此键）。
 
 ## 门禁触发：路径 + PR 标签双通道
 
@@ -49,12 +56,26 @@ packages/app/src/components/AgeGate.tsx
 packages/app/src/routes/NovelDetail.tsx        # 仅 fluent-dialog 相关段
 packages/app/src/routes/Settings.tsx           # E2E 钩子 + 切换确认
 packages/app/src/utils/clientSwitch.ts
+packages/app/src/components/settings/SettingsClient.tsx
+packages/app/src/components/EngineFallbackBanner.tsx
+packages/app/src/routes/ClientSwitch.tsx
+packages/app/src/routes/__root.tsx             # 引擎降级提示条挂载（仅相关段）
 packages/app/android/app/src/main/java/io/pictelio/app/MainActivity.java
 packages/app/android/app/src/main/java/io/pictelio/app/LynxActivity.java
+packages/app/android/app/src/main/java/io/pictelio/app/engine/  # 引擎决策模块（ADR-0164）
+packages/app/android/app/src/full/java/io/pictelio/app/PictelioApp.java
+packages/app/android/app/src/full/java/io/pictelio/app/FullEngineProbe.java
+packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioAppModule.java
+packages/app/android/app/src/lynx/java/io/pictelio/app/LynxRuntimeInitializer.java
+packages/app/android/app/src/webview/java/io/pictelio/app/ClientInfoPlugin.java
+packages/app/android/app/src/webview/java/io/pictelio/app/MainActivityWebview.java
 packages/app-lynx/src/pages/Me.vue
 packages/app-lynx/src/pages/Login.vue
 packages/app-lynx/src/pages/Recommended.vue
+packages/app-lynx/src/stores/settingsStore.ts  # autoFallbackEngine 设备级键
+packages/app-lynx/src/utils/engineState.ts
 packages/app-lynx/src/utils/accessibility.ts
+packages/app/tests/android-e2e/setup.ts        # E2E 基线播种（ADR-0164）
 ```
 
 ### 通道 2：PR 标签 `needs-android-e2e`

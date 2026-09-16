@@ -438,6 +438,7 @@ packages/app/src/
 - **图片代理**: `MainActivity.java` 中 `shouldInterceptRequest` 拦截所有 `/pixiv-img/` 请求，代理到 `i.pximg.net` 并注入正确的 Referer 和 User-Agent 头。
 - **原生桥接**: `src/native/` 目录包含 Android 原生通信模块：`PixivApi.ts`（PixivApiPlugin 网关桥）、`AuthPlugin.ts`（原生认证插件）、`OAuthPlugin.ts`（OAuth 登录）、`ImageCache.ts`（原生图片缓存）。
 - **插件注册**: 自定义插件在 `MainActivity.java` 的 `onCreate` 中通过 `registerPlugin()` 注册，**必须在 `super.onCreate(savedInstanceState)` 之前**。
+- **引擎决策（ADR-0164）**: 缺省引擎为 **Lynx**（`pictelio_client_kind` 缺省语义翻转，仅 full 包可感知）。引擎路由唯一决策地 = `android/app/src/main/java/io/pictelio/app/engine/EngineRouting`（15 格矩阵纯函数：预检 + 运行时硬错误双向降级 + 失败记忆 + 无障碍回退 + forced extra 防回环）；`PictelioApp`（预热）与 `MainActivity`（路由）**必须**共用 `resolve`，禁止各自读键决策。引擎键常量唯一所有者 = `EnginePrefs`（TS 侧镜像经 `engineKeysConsistency` 测试钉住）；Java 侧缺省值单一事实来源 = `build.gradle` full flavor `CLIENT_KINDS[0]`。运行时硬错误自动回退受设备级开关 `pictelio_engine_auto_fallback`（缺省开）控制，10s 加载超时永不自动跳。
 
 ### 安全存储
 

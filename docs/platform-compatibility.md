@@ -5,7 +5,7 @@
 | 层级 | 最低版本 | 检测方式 | 不满足时的行为 |
 |---|---|---|---|
 | **Android OS** | **9.0**（API 28） | `minSdkVersion = 28`（`variables.gradle`） | 系统拒绝安装（安装包层面拦截） |
-| **WebView** | **Chrome 85**（主版本号 ≥ 85） | `MainActivity.onCreate()` 中通过 `WebView.getCurrentWebViewPackage()` 获取主版本号 | full 包：WebView 不可用时优先自动降级到 Lynx 引擎（可用时）；Lynx 也不可用才显示静态 HTML 升级提示页。webview / lynx 单引擎包维持原行为 |
+| **WebView** | **Chrome 85**（主版本号 ≥ 85） | 启动时经 `WebViewAvailability`（`WebView.getCurrentWebViewPackage()`）获取主版本号 | **缺省引擎为 Lynx（ADR-0164）**：Lynx 可用时缺省以 Lynx 启动，WebView 版本是降级目标的门槛；Lynx 也不可用时显示静态 HTML 双失败升级页。webview / lynx 单引擎包维持原行为 |
 
 ## 决定依据
 
@@ -38,38 +38,24 @@
 
 `variables.gradle` 中 `minSdkVersion = 28` 在编译时写入 APK 的 `AndroidManifest.xml`。安装时 Android 系统的 `PackageManagerService` 校验该值，低于 28 的设备直接拒绝，显示系统标准提示。
 
-### WebView 版本检测（应用内）
+### 引擎决策与双向降级（应用内，ADR-0164）
 
-`MainActivity.onCreate()` 在最早期（`registerPlugin()` 和 `super.onCreate()` 之前）执行检测：
+**缺省引擎为 Lynx**（`pictelio_client_kind` 缺省语义翻转，仅 full 包可感知）。启动决策收敛在 `io.pictelio.app.engine.EngineRouting`（单一决策模块，`PictelioApp` 预热与 `MainActivity` 路由共用同一 `resolve`）：
 
-```java
-private static final int MIN_WEBVIEW_MAJOR_VERSION = 85;
-
-private static int getWebViewMajorVersion() {
-    PackageInfo pi = WebView.getCurrentWebViewPackage();
-    if (pi == null || pi.versionName == null) return -1;
-    int dotIdx = pi.versionName.indexOf('.');
-    return dotIdx > 0 ? Integer.parseInt(pi.versionName.substring(0, dotIdx)) : -1;
-}
-
-private boolean isWebViewVersionOk() {
-    int major = getWebViewMajorVersion();
-    if (major < 0) return true;   // 检测失败保守放行
-    return major >= MIN_WEBVIEW_MAJOR_VERSION;
-}
-```
-
-- 无法获取版本号时（返回 -1）**放行**，避免误杀非标准 WebView 实现
-- **full 包引擎降级（ADR-0153）**：版本不足时先判 `LynxRuntimeInitializer.isAvailable()`（包能力 ∧ 初始化不抛异常 ∧ `LynxEnv.isNativeLibraryLoaded()`）；可用则本次以 Lynx 生效（**不写** `pictelio_client_kind`），不可用才显示升级页。`webview` / `lynx` 单引擎包不参与降级
-- 降级页面为纯静态 HTML（`res/raw/upgrade.html`），零外部资源，ES5 JS，兼容 Chrome 30+
-- 不初始化 Capacitor Bridge、任何插件、JS 运行时，最小化内存占用
+- **WebView 探测**：`WebViewAvailability`（framework API）取主版本号，阈值 `OAuthConfig.MIN_WEBVIEW_VERSION`（85）；无法获取版本号（-1）**放行**（fail-open，避免误杀非标准 WebView 实现）——口径与历史版本一致
+- **Lynx 探测**：`LynxRuntimeInitializer.isAvailable()`（包能力含 lynx ∧ 初始化不抛异常 ∧ `LynxEnv.isNativeLibraryLoaded()`）
+- **双向降级**：首选 Lynx 而预检不可用 → 本次以 WebView 生效（写生效状态快照，**不改写首选**）；首选 WebView 而 WebView 过低且 Lynx 可用 → 本次以 Lynx 生效（ADR-0153 保持）
+- **运行时硬错误**（bundle 加载失败 / 致命渲染错误 9902·990200·InstantiationException）：自动回退 WebView 一次并写**失败记忆**（versionCode 精确匹配，应用升级自动遗忘）；**10s 加载超时不自动跳**（手动错误页）。设备级开关 `pictelio_engine_auto_fallback`（缺省开）控制运行时自动跳
+- **无障碍回退**：系统无障碍服务启用 ∧ 两引擎均可用 → 以 WebView 生效；WebView 不可用时仍以 Lynx 兜底
+- **双失败**（Lynx 不可用 ∧ WebView < 85）：静态升级页 `res/raw/upgrade.html?reason=no_engine`（纯静态、零外部资源、ES5 JS，兼容 Chrome 30+；不初始化 Capacitor Bridge / 插件 / JS 运行时）
+- `webview` / `lynx` 单引擎包不参与引擎决策降级（维持原行为）
 
 ### 版本阈值更新
 
-若需调整最低 WebView 版本，只需修改 `MainActivity.java` 中的常量：
+若需调整最低 WebView 版本，只需修改 `config/OAuthConfig.java` 中的常量：
 
 ```java
-private static final int MIN_WEBVIEW_MAJOR_VERSION = 85;
+public static final int MIN_WEBVIEW_VERSION = 85;
 ```
 
 ## 不支持的场景
