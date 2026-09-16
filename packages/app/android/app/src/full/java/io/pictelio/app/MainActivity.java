@@ -1,8 +1,5 @@
 package io.pictelio.app;
 
-import io.pictelio.app.config.OAuthConfig;
-
-import android.content.pm.PackageInfo;
 import android.content.Intent;
 import android.os.Bundle;
 import android.webkit.WebResourceRequest;
@@ -17,12 +14,19 @@ import androidx.core.splashscreen.SplashScreen;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
 
+import io.pictelio.app.engine.EngineRoute;
+import io.pictelio.app.engine.EngineRouting;
+
 /**
  * Pictelio Android 客户端 — 拦截 /pixiv-img/ 请求并代理到 i.pximg.net（注入 Referer 头）。
+ *
+ * <p>入口路由（ADR-0164）：引擎决策唯一经 {@link EngineRouting#resolve}
+ * （与 {@link PictelioApp} 预热共用同一决策入口）；本 Activity 是路由壳，
+ * BOOT_LYNX 分发 {@link LynxActivity}、UPGRADE_PAGE 落升级页、BOOT_WEBVIEW
+ * 落 Capacitor 启动。决策细节（首选/失败记忆/无障碍/双失败）全部在 EngineRouting，
+ * ADR-0153 的「WebView 不可用 → Lynx」反向降级保留为矩阵 S10。
  */
 public class MainActivity extends BridgeActivity {
-
-    /** SplashScreen 保持可见的标志位，由 AuthPlugin.hideSplash() 通过 dismissSplash() setter 控制 */
 
     /** 供同包下的 AuthPlugin 调用，通知 SplashScreen 可退出 */
     static void dismissSplash() {
@@ -31,15 +35,16 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // ① lynx client 入口路由（#51）：在 Splash/WebView 检查之前分发。
-        // 读 SharedPreferences("CapacitorStorage") 的 pictelio_client_kind：
-        // "lynx" → 跳 LynxActivity（纯 LynxView，无 Capacitor bridge），本 Activity 不初始化。
-        // 研究结论：BridgeActivity.onCreate 无条件创建 WebView，不可同 Activity，故双 Activity 分发。
+        // ① 引擎入口路由（#51 / ADR-0164）：在 Splash/WebView 检查之前分发。
+        // resolve 读 preferred（pictelio_client_kind，缺省即 lynx）+ 失败记忆 + 探针，
+        // 经 spec §4 决策矩阵裁决并落生效状态快照。研究结论：BridgeActivity.onCreate
+        // 无条件创建 WebView，不可同 Activity，故双 Activity 分发。
         // 注意：Android 硬约束——onCreate 必须调用 super.onCreate（否则 SuperNotCalledException，
-        // 真机实测 2026-08-01），故 lynx 分支先 super 再跳转（bridge 初始化浪费可接受，立即 finish）。
-        String clientKind = getSharedPreferences("CapacitorStorage", MODE_PRIVATE)
-                .getString("pictelio_client_kind", "webview");
-        if ("lynx".equals(clientKind)) {
+        // 真机实测 2026-08-01），故各分支先 super 再跳转（bridge 初始化浪费可接受，立即 finish）。
+        EngineRoute route = EngineRouting.resolve(getApplication(), FullEngineProbe.create(getApplication()),
+                getIntent().getBooleanExtra(EngineRouting.EXTRA_FORCED_WEBVIEW, false),
+                getIntent().getStringExtra(EngineRouting.EXTRA_STAY_REASON));
+        if (route.action == EngineRoute.Action.BOOT_LYNX) {
             super.onCreate(savedInstanceState);
             // 修复「缩小后点图标永远回推荐页」（ADR-0102，模拟器实证根因）：
             // MainActivity 是 singleTask 路由壳，每次路由后 finish，永远没有存活实例可收
@@ -57,24 +62,30 @@ public class MainActivity extends BridgeActivity {
             //（getIntent 读取，ADR-0136）；无 extras 时 putExtras 为空，零影响
             Intent lynxIntent = new Intent(this, LynxActivity.class);
             lynxIntent.putExtras(getIntent());
+            // 降级进入标记（fallbackEntry = 生效 Lynx ∧ WebView 不可用，spec §4 派生规则）：
+            // LynxActivity 错误页只给「退出应用」不给「返回 WebView」，防回环（ADR-0153 E7
+            // 的「单次弹跳」被吸收为「不弹跳」，ADR-0164 决策 10）。
+            if (route.fallbackEntry) {
+                lynxIntent.putExtra(LynxActivity.EXTRA_ENGINE_FALLBACK, true);
+            }
             startActivity(lynxIntent);
             finish();
-            return; // 不注册插件、不做 WebView 版本检查
+            return; // 不注册插件、不做 WebView 版本检查（resolve 已裁决 Lynx 可用）
         }
-
-        // ADR-0153：WebView 不可用时优先降级到 Lynx。仅 full 包成立——本 sourceSet 才引用得到
-        // LynxActivity / LynxRuntimeInitializer（webview 包编译期无此类）。降级只在运行时生效，
-        // 不写 pictelio_client_kind；Lynx 也不可用才落到下面的升级页。
-        // Android 硬约束：先 super.onCreate（同 lynx 分支），再 startActivity + finish。
-        boolean webviewOk = isWebViewVersionOk();
-        if (!webviewOk && LynxRuntimeInitializer.isAvailable(getApplication())) {
+        if (route.action == EngineRoute.Action.UPGRADE_PAGE) {
+            // 双失败 / stay 且 WebView 不合格（S3/S5'/S11/E7）：升级提示页。
+            // ADR-0164 决策 7：?reason= 携带原因码，upgrade.html 据此区分
+            // 「WebView 版本过低」与「两引擎均不可用」文案。
+            // 必须先 super.onCreate（Android 硬约束：跳过即 SuperNotCalledException 崩溃），
+            // 且不初始化 Capacitor Bridge / 插件。
             super.onCreate(savedInstanceState);
-            Intent fallbackIntent = new Intent(this, LynxActivity.class);
-            fallbackIntent.putExtra(LynxActivity.EXTRA_ENGINE_FALLBACK, true);
-            startActivity(fallbackIntent);
-            finish();
+            SplashController.dismiss();
+            showWebViewUpgradeError(route.reason != null ? route.reason.code : null);
             return;
         }
+        // BOOT_WEBVIEW：首选 webview / 预检降级（S2 lynx_unavailable）/ 失败记忆（S4）
+        // / stay 回环落地 / 无障碍回退（S1a）——WebView 可用性已由 resolve 裁决
+        // （ADR-0153 的「不可用降级 Lynx」保留为矩阵 S10；决策细节全部在 EngineRouting）。
 
         // 确保每次 Activity 重建时 Splash 可重新显示
         SplashController.keepVisible();
@@ -94,15 +105,6 @@ public class MainActivity extends BridgeActivity {
                 splashScreenView.remove();
             }
         });
-        if (!webviewOk) {
-            // WebView 版本不足时立即关闭 Splash，显示升级提示页。
-            // 必须先 super.onCreate（Android 硬约束：跳过即 SuperNotCalledException 崩溃），
-            // 且不初始化 Capacitor Bridge / 插件。
-            super.onCreate(savedInstanceState);
-            SplashController.dismiss();
-            showWebViewUpgradeError();
-            return;
-        }
 
         registerPlugin(ImageCachePlugin.class);
         registerPlugin(AuthPlugin.class);
@@ -199,49 +201,23 @@ public class MainActivity extends BridgeActivity {
         return ImageIntercept.interceptImage(getApplicationContext(), url);
     }
 
-    // ── WebView 版本检测 ────────────────────────────────────────────
-
-    /**
-     * 提取当前设备 WebView 的主版本号。
-     *
-     * @return 主版本号（如 85）；无法获取时返回 -1。
-     */
-    private static int getWebViewMajorVersion() {
-        try {
-            PackageInfo pi = WebView.getCurrentWebViewPackage();
-            if (pi == null || pi.versionName == null) return -1;
-            int dotIdx = pi.versionName.indexOf('.');
-            if (dotIdx > 0) {
-                return Integer.parseInt(pi.versionName.substring(0, dotIdx));
-            }
-            return -1;
-        } catch (Exception e) {
-            return -1;
-        }
-    }
-
-    /**
-     * 检查当前 WebView 版本是否满足最低要求。
-     *
-     * 无法检测到版本时保守放行（避免误杀非标准实现）。
-     */
-    private boolean isWebViewVersionOk() {
-        int major = getWebViewMajorVersion();
-        if (major < 0) return true;     // 检测失败 → 放行，让应用自己处理
-        return major >= OAuthConfig.MIN_WEBVIEW_VERSION;
-    }
+    // ── 升级提示页（探测逻辑已移交 WebViewAvailability，ADR-0164 决策 3 收编）──
 
     /**
      * 显示 WebView 升级提示页，阻止应用正常启动。
      *
-     * 直接加载本地静态 HTML，不初始化 Capacitor Bridge / 插件 / WebViewClient 等任何额外组件。
+     * <p>{@code reasonCode} 非空时以 query 传递（ADR-0164 决策 7：upgrade.html 据此
+     * 区分「WebView 版本过低」与「两引擎均不可用」文案）；null = 旧语义单引擎文案。
+     *
+     * <p>直接加载本地静态 HTML，不初始化 Capacitor Bridge / 插件 / WebViewClient 等任何额外组件。
      */
-    private void showWebViewUpgradeError() {
+    private void showWebViewUpgradeError(String reasonCode) {
         setContentView(R.layout.activity_webview_error);
         WebView wv = findViewById(R.id.webview_error);
         if (wv != null) {
             wv.getSettings().setJavaScriptEnabled(true);
-            wv.loadUrl("file:///android_res/raw/upgrade.html");
+            wv.loadUrl("file:///android_res/raw/upgrade.html"
+                    + (reasonCode == null ? "" : "?reason=" + reasonCode));
         }
     }
 

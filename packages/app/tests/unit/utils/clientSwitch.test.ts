@@ -8,6 +8,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  * - 读/写均直对 @capacitor/preferences 单键（不依赖 settings 层）
  * - switchClient 内化：in-flight 锁（busy）、5s 写入超时（timeout）、
  *   原生 restart（fallback App.exitApp）、错误模式显式返回
+ *
+ * oracle 溯源：缺省值 DEFAULT_CLIENT = "lynx" 的期望来源 = ADR-0164 决策 1
+ * （缺省即 Lynx，键缺省 = 从未显式选择 → 归一化为 CLIENT_KINDS[0]），
+ * 与 docs/specs/engine-default-lynx-bidirectional-fallback.md §3 键契约表一致。
  */
 
 const mocks = vi.hoisted(() => ({
@@ -51,23 +55,24 @@ describe("readClientKind（直读 Preferences 单键）", () => {
     await expect(readClientKind()).resolves.toBe("webview");
   });
 
-  it("无记录（null）→ 默认 webview", async () => {
+  it("无记录（null）→ 默认 lynx（ADR-0164 缺省翻转）", async () => {
     mocks.preferencesGet.mockResolvedValue({ value: null });
     const { readClientKind, DEFAULT_CLIENT } = await loadModule();
     await expect(readClientKind()).resolves.toBe(DEFAULT_CLIENT);
+    await expect(readClientKind()).resolves.toBe("lynx");
   });
 
-  it("异常值 → 默认 webview（不抛）", async () => {
+  it("异常值 → 默认 lynx（不抛）", async () => {
     mocks.preferencesGet.mockResolvedValue({ value: "unknown-kind" });
     const { readClientKind } = await loadModule();
-    await expect(readClientKind()).resolves.toBe("webview");
+    await expect(readClientKind()).resolves.toBe("lynx");
   });
 
-  it("读取失败（get reject）→ 默认 webview + console.warn（禁止静默降级）", async () => {
+  it("读取失败（get reject）→ 默认 lynx + console.warn（禁止静默降级）", async () => {
     mocks.preferencesGet.mockRejectedValue(new Error("bridge 故障"));
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { readClientKind } = await loadModule();
-    await expect(readClientKind()).resolves.toBe("webview");
+    await expect(readClientKind()).resolves.toBe("lynx");
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("[clientSwitch]"), expect.anything());
     warn.mockRestore();
   });

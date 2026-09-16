@@ -13,6 +13,7 @@ import {
   runOtaCheck,
 } from "@/services/otaService";
 import StartupUpdateDialog from "@/components/StartupUpdateDialog";
+import EngineFallbackBanner from "@/components/EngineFallbackBanner";
 import GateOverlay from "@/components/GateOverlay";
 import { clearOverlays, registerBackGesture } from "@/services/backGestureService";
 import { runBackTransition } from "@/services/backTransitionService";
@@ -256,6 +257,7 @@ const RootLayout: Component = (props: { children?: any }) => {
       </Show>
 
       <StartupUpdateDialog />
+      <EngineFallbackBanner />
       <GateOverlay />
       <BookmarkPanelHost />
     </div>

@@ -4,8 +4,11 @@ import FluentIcon from "../components/ui/FluentIcon";
 import { ClientInfo } from "../native/ClientInfo";
 import {
   readClientKind,
+  readEngineState,
+  reasonKey,
   switchClient,
   type ClientKind,
+  type EngineSnapshot,
   type SwitchOutcome,
 } from "../utils/clientSwitch";
 import { goBack } from "../services/backTransitionService";
@@ -21,11 +24,12 @@ import { t } from "../i18n";
 const kindLabel = (kind: string) => (kind === "lynx" ? "Lynx" : "WebView");
 const kindDesc = (kind: string) =>
   kind === "lynx" ? t("clientSwitch.kindDescLynx") : t("clientSwitch.kindDescWebview");
-
 const ClientSwitch: Component = () => {
   const [current, setCurrent] = createSignal<ClientKind>("webview");
   /** 当前包支持的 client 引擎列表；null = 无法读取（Web 环境无原生插件，保守渲染） */
   const [clientKinds, setClientKinds] = createSignal<string[] | null>(null);
+  /** 生效状态快照；null = 无记录/畸形（按无降级渲染，spec E11 禁静默已由 warn 承担） */
+  const [engineState, setEngineState] = createSignal<EngineSnapshot | null>(null);
   const [switching, setSwitching] = createSignal(false);
   const [actionToast, setActionToast] = createSignal<string | null>(null);
 
@@ -46,6 +50,7 @@ const ClientSwitch: Component = () => {
   onSettled(() => {
     void (async () => {
       setCurrent(await readClientKind());
+      setEngineState(await readEngineState());
       try {
         const { kinds } = await ClientInfo.getClientKinds();
         setClientKinds(kinds);
@@ -57,6 +62,16 @@ const ClientSwitch: Component = () => {
   });
 
   const currentLabel = () => (current() === "lynx" ? "Lynx" : "WebView");
+
+  /** 降级双态：快照缺失或 effective === preferred（按首选运行）→ 不显示 */
+  const degradedState = (): EngineSnapshot | null => {
+    const s = engineState();
+    if (s === null || s.effective === s.preferred) return null;
+    return s;
+  };
+
+  const effectiveLabel = (s: EngineSnapshot): string =>
+    s.effective === null ? t("settings.client.engineNone") : kindLabel(s.effective);
 
   /**
    * 确认切换：深模块 switchClient 完成写开关 + 原生重启编排（行为与迁移前弹窗一致）。
@@ -178,6 +193,24 @@ const ClientSwitch: Component = () => {
                 ? t("clientSwitch.runningLynx")
                 : t("clientSwitch.runningWebview")}
             </p>
+            {/* 本次生效双态（spec §7.2）：快照显示降级（effective ≠ preferred）时，
+                展示「首选 X · 本次生效 Y」+ 原因文案；无快照/按首选运行则不渲染 */}
+            <Show when={degradedState()}>
+              <div
+                class="mt-3 pt-3 border-t border-[var(--colorNeutralStroke1)] flex flex-col gap-1"
+                role="status"
+              >
+                <p class="[font-size:var(--fontSizeBase200)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
+                  {t("settings.client.effectiveState", {
+                    preferred: kindLabel(degradedState()!.preferred),
+                    effective: effectiveLabel(degradedState()!),
+                  })}
+                </p>
+                <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
+                  {t(reasonKey(degradedState()!.reason))}
+                </p>
+              </div>
+            </Show>
           </section>
 
           {/* 当前包支持的引擎能力列表 */}

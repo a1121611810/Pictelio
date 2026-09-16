@@ -51,10 +51,10 @@
 <body>
 <div class="card">
   <div class="icon">⚠️</div>
-  <h1>WebView 版本过低</h1>
+  <h1 id="pageTitle">WebView 版本过低</h1>
   <p>当前 WebView 版本</p>
   <div class="version" id="ver">检测中…</div>
-  <p>需要 <b>85</b> 或更高版本才能运行此应用。</p>
+  <p id="reasonDetail">需要 <b>85</b> 或更高版本才能运行此应用。</p>
   <p>请前往 Google Play 更新<br><b>Android System WebView</b><br>或安装最新版 <b>Chrome 浏览器</b>。</p>
   <a class="btn" href="market://details?id=com.google.android.webview">前往 Google Play 更新</a>
   <p class="hint">Chrome 85 发布于 2020 年 8 月</p>
@@ -68,6 +68,15 @@
     } else {
       el.textContent = '未知版本';
     }
+  })();
+  // 双失败文案切换（ADR-0164 决策 7）：full 包 UPGRADE_PAGE 经 ?reason=no_engine 区分
+  // 「WebView 版本过低」与「两引擎均不可用」；仅换标题与说明段，按钮/版本徽标不动。
+  // ES5、零外部资源；reason 缺失/其他值 → 文案原样不变。
+  (function(){
+    if (!/[?&]reason=no_engine/.test(location.search)) return;
+    document.getElementById('pageTitle').textContent = '应用无法启动';
+    document.getElementById('reasonDetail').textContent =
+      '本机无法运行 Lynx 引擎，且 WebView 版本过低（需要 85 或更高）。请升级 Android System WebView 或 Chrome 后重试。';
   })();
 </script>
 </body>

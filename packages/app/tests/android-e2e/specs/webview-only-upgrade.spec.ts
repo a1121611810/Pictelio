@@ -41,7 +41,12 @@ describe.skipIf(E2E_FLAVOR !== "webview")(
       await driver.switchToNative();
       await SLEEP(3_000);
       const src = await driver.raw.getPageSource();
-      const isUpgradePage = src.includes("WebView") || src.includes("升级") || src.includes("更新");
+      // 精确文案 oracle（#556 T4 收紧，ADR-0164 决策 7）：webview 单引擎包不带
+      // ?reason → upgrade.html 保持既有「WebView 版本过低」文案；断言标题字面量
+      // 或「需要 85」版本门槛，替代原 includes("WebView")||升级||更新 弱 oracle
+      //（应用任意页面/文案都可能命中，无回归判别力）。
+      const isUpgradePage =
+        src.includes("WebView 版本过低") || (src.includes("需要") && src.includes("85"));
       expect(isUpgradePage, "webview 单引擎包应停在升级页").toBe(true);
       expect(currentTopActivity(ctx.serial), "单引擎包不应出现 LynxActivity").not.toBe(
         LYNX_ACTIVITY,

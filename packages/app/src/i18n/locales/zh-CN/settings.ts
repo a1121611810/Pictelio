@@ -130,6 +130,12 @@ const zhSettings = {
   "settings.client.switchEngine": "切换渲染引擎",
   "settings.client.currentLynx": "当前：Lynx（实验性）· 点击查看引擎说明",
   "settings.client.currentWebview": "当前：WebView · 点击查看引擎说明",
+  "settings.client.autoFallback": "自动回退 WebView",
+  "settings.client.autoFallbackDesc": "Lynx 运行出错时自动改用 WebView；关闭后出错仅显示错误页",
+  "settings.client.effectiveState": "首选 {{preferred}} · 本次生效 {{effective}}",
+  "settings.client.kindLynx": "Lynx",
+  "settings.client.kindWebview": "WebView",
+  "settings.client.engineNone": "无可用引擎",
 
   // ── 退出登录（LogoutRow）──
   "settings.logout.title": "退出登录",

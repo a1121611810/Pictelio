@@ -950,3 +950,182 @@ describe("settingsStore.rankingEntry（spec #519）", () => {
     warnSpy.mockRestore()
   })
 })
+
+// 引擎自动回退开关（ADR-0164 / #555 T3）：设备级布尔缺省开；键 pictelio_engine_auto_fallback
+// 与 app 侧逐字一致（唯一所有者 = Java EnginePrefs.KEY_AUTO_FALLBACK，字面量已核对引擎源码）。
+// 期望值 oracle = spec engine-default-lynx §3 键表（缺省 true，值域 "true"/"false"）。
+describe("settingsStore.autoFallbackEngine（ADR-0164）", () => {
+  /** prefs seam（与前述 describe 同款 mock：native Callback 值带 JSON 引号） */
+  function prefsModule(map: Map<string, string>) {
+    env.native = true
+    env.modules = {
+      PictelioPrefs: {
+        prefsGet: (k: string, cb: (v: string, e: string | null) => void) =>
+          cb(map.has(k) ? JSON.stringify(map.get(k)!) : "", null),
+        prefsSet: (k: string, v: string, cb: (e: string | null) => void) => {
+          map.set(k, v)
+          cb(null)
+        },
+        prefsRemove: (k: string, cb: (e: string | null) => void) => {
+          map.delete(k)
+          cb(null)
+        },
+      },
+    }
+  }
+
+  beforeEach(() => {
+    env.native = true
+    env.modules = {}
+    userRef().value = null
+    vi.mocked(idbGet).mockReset().mockResolvedValue(null)
+    vi.mocked(idbSet).mockReset().mockResolvedValue(undefined)
+    vi.mocked(idbRemove).mockReset().mockResolvedValue(undefined)
+    setActivePinia(createPinia())
+    store = useSettingsStore()
+  })
+
+  it("默认开启（缺省 true，spec §3）", () => {
+    expect(store.autoFallbackEngine).toBe(true)
+  })
+
+  it("loadSettings 从 prefs 恢复 \"false\"", async () => {
+    prefsModule(new Map<string, string>([["pictelio_engine_auto_fallback", "false"]]))
+    await store.loadSettings()
+    expect(store.autoFallbackEngine).toBe(false)
+  })
+
+  it("loadSettings 非法值 → 维持默认 true + warn（禁静默降级）", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    prefsModule(new Map<string, string>([["pictelio_engine_auto_fallback", "yes"]]))
+    await store.loadSettings()
+    expect(store.autoFallbackEngine).toBe(true)
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("引擎自动回退"), "yes")
+    warnSpy.mockRestore()
+  })
+
+  it("loadSettings 读取失败 → 维持默认 true + warn（硬约束 #1/#3）", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    // dev 模式 idb 抛异常 → loadSettings catch 分支（native 读失败由 adapter resolve(null) + warn，见 WebDAV 读取失败用例）
+    env.native = false
+    vi.mocked(idbGet).mockImplementation(async (key: string) => {
+      if (key === "pictelio_engine_auto_fallback") throw new Error("read fail")
+      return null
+    })
+    await store.loadSettings()
+    expect(store.autoFallbackEngine).toBe(true)
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("引擎自动回退开关加载失败"),
+      expect.anything(),
+    )
+    warnSpy.mockRestore()
+  })
+
+  it("setAutoFallbackEngine 持久化 String(enabled)（native 路径，键 pictelio_engine_auto_fallback）", async () => {
+    const map = new Map<string, string>()
+    prefsModule(map)
+    store.setAutoFallbackEngine(false)
+    await vi.waitFor(() => expect(map.get("pictelio_engine_auto_fallback")).toBe("false"))
+    expect(store.autoFallbackEngine).toBe(false)
+  })
+
+  it("prefs 写入失败 → 内存态已更新 + warn 可见（不抛出，硬约束 #3）", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    env.native = true
+    env.modules = {
+      PictelioPrefs: {
+        prefsGet: (_k: string, cb: (v: string, e: string | null) => void) => cb("", null),
+        prefsSet: (_k: string, _v: string, cb: (e: string | null) => void) => cb("disk full"),
+        prefsRemove: (_k: string, cb: (e: string | null) => void) => cb(null),
+      },
+    }
+    store.setAutoFallbackEngine(false)
+    expect(store.autoFallbackEngine).toBe(false)
+    await vi.waitFor(() =>
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("引擎自动回退"), expect.anything()),
+    )
+    warnSpy.mockRestore()
+  })
+
+  it("applyRawKey：importRawValues 写回合法值、非法值跳过", async () => {
+    prefsModule(new Map<string, string>())
+    const res = await store.importRawValues({
+      pictelio_engine_auto_fallback: "false",
+      pictelio_engine_auto_fallback_bogus: "bogus",
+    })
+    expect(store.autoFallbackEngine).toBe(false)
+    expect(res.applied).toContain("pictelio_engine_auto_fallback")
+    expect(res.skipped).toContain("pictelio_engine_auto_fallback_bogus")
+  })
+})
+
+// ADR-0164 备份域排除（#555 T3）：引擎「设备事实/协议键」恢复到跨设备是错的（失败记忆/
+// 快照/optout/取证键/一次性通知键都是本机事实），不得进备份域。分区实现事实：backupCore
+// partitionKeys 对未知键一律落入 deviceKeys（无独立排除集），lynx 侧守卫 = 备份域白名单
+// （exportRawValues 只读 BACKUP_DEVICE_KEYS + 账号级键；importRawValues 只认 applyRawKey
+// 分支）。键字面量 oracle = Java EnginePrefs.KEY_*（已核对引擎源码）+ engineFallbackNotice.ts。
+describe("settingsStore 引擎设备事实键备份域排除（ADR-0164）", () => {
+  /** 引擎设备事实/协议键（恢复跨设备是错；ADR-0164 spec §3） */
+  const ENGINE_FACT_KEYS = [
+    "pictelio_engine_state",
+    "pictelio_engine_lynx_failure_version",
+    "pictelio_engine_fallback_optout",
+    "pictelio_debug_force_lynx_unavailable",
+    "pictelio_engine_fallback_notice",
+  ] as const
+
+  beforeEach(() => {
+    env.native = true
+    env.modules = {}
+    userRef().value = { id: 42 }
+    vi.mocked(idbGet).mockReset().mockResolvedValue(null)
+    vi.mocked(idbSet).mockReset().mockResolvedValue(undefined)
+    vi.mocked(idbRemove).mockReset().mockResolvedValue(undefined)
+    setActivePinia(createPinia())
+    store = useSettingsStore()
+  })
+
+  function prefsModule(map: Map<string, string>) {
+    env.native = true
+    env.modules = {
+      PictelioPrefs: {
+        prefsGet: (k: string, cb: (v: string, e: string | null) => void) =>
+          cb(map.has(k) ? JSON.stringify(map.get(k)!) : "", null),
+        prefsSet: (k: string, v: string, cb: (e: string | null) => void) => {
+          map.set(k, v)
+          cb(null)
+        },
+        prefsRemove: (k: string, cb: (e: string | null) => void) => {
+          map.delete(k)
+          cb(null)
+        },
+      },
+    }
+  }
+
+  it("引擎设备事实键与 pictelio_client_kind 均不在 BACKUP_DEVICE_KEYS（首选键现行为：不入备份域）", () => {
+    for (const key of [...ENGINE_FACT_KEYS, "pictelio_client_kind"]) {
+      expect(BACKUP_DEVICE_KEYS as readonly string[]).not.toContain(key)
+    }
+  })
+
+  it("exportRawValues 不导出引擎设备事实键（即使存储中存在）", async () => {
+    prefsModule(new Map<string, string>(ENGINE_FACT_KEYS.map((k) => [k, "seeded"])))
+    const raw = await store.exportRawValues()
+    for (const key of ENGINE_FACT_KEYS) {
+      expect(raw[key]).toBeUndefined()
+    }
+  })
+
+  it("importRawValues 跳过引擎设备事实键（恢复永不写回）", async () => {
+    const map = new Map<string, string>()
+    prefsModule(map)
+    const entries = Object.fromEntries(ENGINE_FACT_KEYS.map((k) => [k, "restored"]))
+    const res = await store.importRawValues(entries)
+    expect(res.applied).toEqual([])
+    for (const key of ENGINE_FACT_KEYS) {
+      expect(res.skipped).toContain(key)
+      expect(map.has(key)).toBe(false) // 未落盘
+    }
+  })
+})

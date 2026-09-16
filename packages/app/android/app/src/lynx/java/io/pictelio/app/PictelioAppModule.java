@@ -10,6 +10,8 @@ import com.lynx.jsbridge.LynxModule;
 import com.lynx.react.bridge.Callback;
 import com.lynx.tasm.behavior.LynxContext;
 
+import io.pictelio.app.engine.EnginePrefs;
+
 /**
  * client 切换重启 Native Module（#51）。
  *
@@ -23,7 +25,8 @@ import com.lynx.tasm.behavior.LynxContext;
  *       （T0-DIAG 临时通道：无可用分享应用时日志已写盘，回调可读提示而非失败）</li>
  * </ul>
  *
- * <p>{@code setClientKind} 落盘文件必须是 {@code "CapacitorStorage"} ——
+ * <p>{@code setClientKind} 落盘文件必须是 {@code "CapacitorStorage"}（键/文件常量
+ * 别名 {@link EnginePrefs}——引擎键唯一所有者，ADR-0164 决策 3）——
  * 与 {@code @capacitor/preferences} 默认 group、MainActivity 分发读取的是同一文件，
  * 保证 webview/lynx 两侧读到同一开关。
  */
@@ -31,10 +34,10 @@ public class PictelioAppModule extends LynxModule {
 
     private static final String TAG = "PictelioAppModule";
 
-    /** SharedPreferences 文件（@capacitor/preferences 默认 group，勿改） */
-    public static final String CLIENT_PREFS = "CapacitorStorage";
-    /** client 开关 key（app-lynx clientSwitchStore 同名） */
-    public static final String CLIENT_KEY = "pictelio_client_kind";
+    /** SharedPreferences 文件（@capacitor/preferences 默认 group，勿改；别名 EnginePrefs 单一所有者） */
+    public static final String CLIENT_PREFS = EnginePrefs.PREFS_FILE;
+    /** client 开关 key（app-lynx clientSwitchStore 同名；别名 EnginePrefs 单一所有者） */
+    public static final String CLIENT_KEY = EnginePrefs.KEY_PREFERRED_KIND;
 
     /** httpGet 线程池（阻塞 IO 不占 Lynx 调用线程；同 PictelioApiModule 模式） */
     private static final java.util.concurrent.ExecutorService HTTP_EXECUTOR =
@@ -76,6 +79,13 @@ public class PictelioAppModule extends LynxModule {
                     .edit()
                     .putString(CLIENT_KEY, kind)
                     .apply();
+            // S12（ADR-0164 决策 9）：显式选择清失败记忆——否则残留记忆会在下次启动
+            // 被 S4 弹回 webview，显式选择失效。
+            try {
+                EnginePrefs.clearLynxFailure(appContext());
+            } catch (Exception clearEx) {
+                Log.w(TAG, "clearLynxFailure 失败（显式选择可能被失败记忆覆盖）", clearEx);
+            }
             callback.invoke();
         } catch (Exception e) {
             Log.w(TAG, "setClientKind(" + kind + ") 失败", e);
@@ -86,9 +96,11 @@ public class PictelioAppModule extends LynxModule {
     @LynxMethod
     public void getClientKind(Callback callback) {
         try {
+            // 缺省读 null（非 "webview"）：absent → containsKind 归一化 → CLIENT_KINDS[0]
+            //（= 本包缺省引擎，full 包翻转后为 lynx，ADR-0164 决策 1）。
             String stored = appContext()
                     .getSharedPreferences(CLIENT_PREFS, Context.MODE_PRIVATE)
-                    .getString(CLIENT_KEY, "webview");
+                    .getString(CLIENT_KEY, null);
             // ADR-0062：归一化——存储值不在当前包支持列表时回退到包默认引擎
             // （如 full 包切到 lynx 后换装 lynx-only 包，残留 "webview" → 归一为 "lynx"）
             String kind = containsKind(stored) ? stored : BuildConfig.CLIENT_KINDS[0];

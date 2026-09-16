@@ -144,6 +144,25 @@ const enRoutes = {
   "clientSwitch.failToast": "Couldn't switch. Try again",
   "clientSwitch.switchedToast": "Switched to Lynx. Restarting…",
 
+  // ── Engine fallback reason codes (ADR-0164; code set pinned to Java EngineRoute.Reason via consistency tests) ──
+  "engineFallback.reason.preferred": "Running the preferred engine",
+  "engineFallback.reason.lynx_unavailable":
+    "The Lynx engine is unavailable on this device; WebView is used instead",
+  "engineFallback.reason.lynx_known_bad":
+    "Lynx failed before on this app version; WebView is used instead",
+  "engineFallback.reason.lynx_retry": "WebView unavailable; retrying with Lynx",
+  "engineFallback.reason.webview_unavailable": "WebView unavailable; Lynx is in effect this time",
+  "engineFallback.reason.a11y_webview": "WebView enabled for accessibility services",
+  "engineFallback.reason.a11y_lynx_last_resort":
+    "WebView unavailable; Lynx is used as a fallback even with accessibility services on",
+  "engineFallback.reason.no_engine": "Neither engine is available",
+  "engineFallback.reason.forced_webview": "WebView is forced for this launch",
+  "engineFallback.reason.runtime_failure": "Lynx hit a runtime error; WebView is used instead",
+  "engineFallback.reason.unknown": "Engine state unknown",
+  "engineFallback.banner.ack": "Got it",
+  "engineFallback.banner.suppress": "Don't show again",
+  "engineFallback.banner.aria": "Engine fallback notice",
+
   // ── About (About) ──
   "about.title": "About",
   "about.back": "Back",

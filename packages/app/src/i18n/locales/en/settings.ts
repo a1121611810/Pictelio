@@ -146,6 +146,13 @@ const enSettings = {
   "settings.client.switchEngine": "Switch rendering engine",
   "settings.client.currentLynx": "Current: Lynx (experimental) · Tap for engine details",
   "settings.client.currentWebview": "Current: WebView · Tap for engine details",
+  "settings.client.autoFallback": "Auto-fallback to WebView",
+  "settings.client.autoFallbackDesc":
+    "Automatically switch to WebView when Lynx fails at runtime; when off, a failure only shows the error page",
+  "settings.client.effectiveState": "Preferred {{preferred}} · Effective {{effective}}",
+  "settings.client.kindLynx": "Lynx",
+  "settings.client.kindWebview": "WebView",
+  "settings.client.engineNone": "No engine available",
 
   // ── Sign out (LogoutRow) ──
   "settings.logout.title": "Sign out",

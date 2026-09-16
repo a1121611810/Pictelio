@@ -12,6 +12,8 @@ import android.util.Log;
 
 import java.util.Locale;
 
+import io.pictelio.app.engine.EnginePrefs;
+
 /**
  * Client 能力信息插件（ADR-0062）——webview 前端读取当前包支持的 client 引擎列表，
  * 并提供 Activity 级重启（引擎切换，issue #120）。
@@ -62,6 +64,14 @@ public class ClientInfoPlugin extends Plugin {
     @PluginMethod
     public void restart(PluginCall call) {
         try {
+            // S12（ADR-0164 决策 9）：显式切换前清 Lynx 失败记忆——JS 侧 switchClient
+            // 已写 pictelio_client_kind（显式选择语义），残留记忆会让新引擎下次启动
+            // 又被 S4 弹回。失败不阻断重启（记忆可由升级/显式选择自愈）。
+            try {
+                EnginePrefs.clearLynxFailure(getContext().getApplicationContext());
+            } catch (Exception clearEx) {
+                Log.w(TAG, "clearLynxFailure 失败（显式选择可能被失败记忆覆盖）", clearEx);
+            }
             Intent intent = getActivity().getPackageManager()
                     .getLaunchIntentForPackage(getContext().getPackageName());
             if (intent == null) {

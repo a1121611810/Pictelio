@@ -35,7 +35,9 @@ android {
             dimension "client"
             manifestPlaceholders = [launcherActivity: ".MainActivity", appClass: ".PictelioApp"]
             // ADR-0062：包支持的 client 引擎列表（BuildConfig.CLIENT_KINDS）
-            buildConfigField "String[]", "CLIENT_KINDS", '{"webview", "lynx"}'
+            // ADR-0164：CLIENT_KINDS[0] 是 Java 侧缺省引擎的单一事实来源——
+            // 首选键 pictelio_client_kind 缺省时归一化为 kinds 含 lynx → LYNX（翻转，T2）。
+            buildConfigField "String[]", "CLIENT_KINDS", '{"lynx", "webview"}'
         }
         webview {
             dimension "client"

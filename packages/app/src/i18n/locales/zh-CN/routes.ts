@@ -138,6 +138,22 @@ const zhRoutes = {
   "clientSwitch.failToast": "切换失败，请重试",
   "clientSwitch.switchedToast": "已切换到 Lynx，正在重启…",
 
+  // ── 引擎降级原因码（ADR-0164；code 集合与 Java EngineRoute.Reason 经一致性测试钉住）──
+  "engineFallback.reason.preferred": "按首选引擎运行",
+  "engineFallback.reason.lynx_unavailable": "Lynx 引擎在本机不可用，已改用 WebView",
+  "engineFallback.reason.lynx_known_bad": "Lynx 在本版本曾运行失败，已改用 WebView",
+  "engineFallback.reason.lynx_retry": "WebView 不可用，重试 Lynx",
+  "engineFallback.reason.webview_unavailable": "WebView 不可用，本次以 Lynx 生效",
+  "engineFallback.reason.a11y_webview": "已为无障碍服务启用 WebView",
+  "engineFallback.reason.a11y_lynx_last_resort": "WebView 不可用，无障碍服务下仍以 Lynx 兜底",
+  "engineFallback.reason.no_engine": "两个引擎均不可用",
+  "engineFallback.reason.forced_webview": "本次已强制使用 WebView",
+  "engineFallback.reason.runtime_failure": "Lynx 运行出错，已改用 WebView",
+  "engineFallback.reason.unknown": "引擎状态未知",
+  "engineFallback.banner.ack": "知道了",
+  "engineFallback.banner.suppress": "不再提示",
+  "engineFallback.banner.aria": "引擎降级说明",
+
   // ── 关于（About）──
   "about.title": "关于",
   "about.back": "返回",

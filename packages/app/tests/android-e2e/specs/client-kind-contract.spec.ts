@@ -5,6 +5,9 @@
  * 1. 读真实 CapacitorStorage.xml，断言初始为默认 webview（或不存在）
  * 2. 写入 lynx → 重启 app → 断言 MainActivity 分发到 LynxActivity
  * 3. 写入 webview → 重启 app → 断言 MainActivity 留在 WebView 主界面
+ * 4. 读回写入值（真实数据源比对）
+ * 5. 自有 pm clear（键真缺席）→ 启动 → 断言 LynxActivity
+ *    （ADR-0164 翻转契约：无键 = lynx；断言后恢复 webview 基线）
  *
  * 纯 adb 驱动（run-as + am + dumpsys），不需要 Appium/WebView session——
  * S1 的定位是「秒级区分写入问题 vs 分发问题」，快且独立于 UI 层。
@@ -65,7 +68,7 @@ describe("S1 SharedPreferences 契约（pictelio_client_kind → MainActivity �
     }
   });
 
-  it("初始：CapacitorStorage 无 pictelio_client_kind（默认 webview）", async () => {
+  it("初始：CapacitorStorage 无 pictelio_client_kind（缺省语义 = lynx，ADR-0164）", async () => {
     const prefs = readClientPrefs(serial);
     dumpPrefsToFile(serial, "initial");
     // pm clear 后文件可能不存在，或存在但无该键
@@ -112,4 +115,34 @@ describe("S1 SharedPreferences 契约（pictelio_client_kind → MainActivity �
     // 原始 XML 应包含该键（真实数据源比对）
     expect(prefs.rawXml).toContain("pictelio_client_kind");
   });
+
+  it("自有 pm clear（无键）→ 启动 → 翻转契约：缺省分发到 LynxActivity（ADR-0164）", async () => {
+    // setup.ts 的播种（webview 基线）在本 spec 的 beforeAll pm clear 已被清掉；
+    // 本用例再次 pm clear 确保键真缺席（无键 = 从未显式选择 = 缺省 lynx），然后
+    // 恢复 webview 基线，不影响其他 spec 复用设备。
+    runOrThrow(adbPath(), ["-s", serial, "shell", "pm", "clear", APP_PACKAGE], TIMEOUTS.adb);
+    const prefs = readClientPrefs(serial);
+    dumpPrefsToFile(serial, "flip-contract-cleared");
+    // oracle：键真缺席（ADR-0164 决策 1「从未选择不是偏好」——不播种缺省键）
+    expect(prefs.clientKind).toBeNull();
+
+    forceStopApp(serial);
+    // 系统可能残留权限弹窗（GrantPermissionsActivity），阻塞分发——tap Allow 区域关闭
+    //（同上「写入 lynx」用例的防御模式）
+    await new Promise((r) => setTimeout(r, 500));
+    const { adbPath: ap } = await import("../env");
+    const { execFileSync } = await import("node:child_process");
+    try {
+      execFileSync(ap(), ["-s", serial, "shell", "input", "tap", "500", "650"]);
+    } catch {
+      // 无弹窗时忽略
+    }
+    startMainActivity(serial);
+
+    const activity = await waitForActivity(serial, "io.pictelio.app.LynxActivity");
+    expect(activity).toBe("io.pictelio.app.LynxActivity");
+
+    // 恢复 webview 基线（后续 spec / 收尾约定不受翻转用例污染）
+    writeClientKind(serial, "webview");
+  }, 60_000);
 });

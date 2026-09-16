@@ -2,7 +2,7 @@
   <img src="packages/app/assets/logo/pictelio-logo.svg" width="120" height="120" alt="Pictelio Logo">
   <h1 align="center">Pictelio</h1>
   <p align="center">
-    <strong>A third-party Pixiv illustration browser built with SolidJS</strong>
+    <strong>A dual-engine third-party Pixiv browser — Lynx by default, with a SolidJS WebView client</strong>
     <br>
     Packaged as a native Android app with Capacitor
   </p>
@@ -10,7 +10,7 @@
     <a href="https://github.com/a1121611810/pixivizer/blob/main/LICENSE">
       <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT">
     </a>
-    <img src="https://img.shields.io/badge/SolidJS-1.9.14-2c4f7c?logo=solid" alt="SolidJS">
+    <img src="https://img.shields.io/badge/SolidJS-2.0.0--rc.6-2c4f7c?logo=solid" alt="SolidJS">
     <img src="https://img.shields.io/badge/TypeScript-6.0.3-3178C6?logo=typescript" alt="TypeScript">
     <img src="https://img.shields.io/badge/UnoCSS-66.7.5-333333?logo=unocss" alt="UnoCSS">
     <img src="https://img.shields.io/badge/Capacitor-8.5.0-119EFF?logo=capacitor" alt="Capacitor">
@@ -55,6 +55,7 @@
 
 ## Features
 
+- **Dual Engine** — Lynx-powered by default with automatic WebView fallback; switchable in settings, and it runs even on devices with an outdated WebView
 - **Browse** — Recommended and Following feeds for both illustrations and novels
 - **Illust Detail** — Full-resolution images, multi-page support, Ugoira animated playback
 - **Novel Reader** — Virtualized text layout, keyword search, series navigation with reading progress
@@ -80,7 +81,7 @@ pnpm dev          # Vite dev server at localhost:5173
 https_proxy=http://127.0.0.1:7890 pnpm dev
 ```
 
-**Build APK:** Requires Android Studio, JDK 21, Android SDK (minSdkLevel=28, WebView≥85).
+**Build APK:** Requires Android Studio, JDK 21, Android SDK (minSdkLevel=28). The default Lynx engine also runs on devices with WebView < 85; WebView ≥ 85 is only required for the switchable WebView client.
 
 ```bash
 pnpm build:android          # Debug APK

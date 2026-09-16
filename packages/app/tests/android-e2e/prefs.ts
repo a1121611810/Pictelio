@@ -24,11 +24,18 @@ export interface ClientPrefs {
   rawXml: string;
 }
 
+/** CapacitorStorage.xml 单次原始读取结果（文件存在性 + 原始 XML） */
+interface PrefsFile {
+  fileExists: boolean;
+  rawXml: string;
+}
+
 /**
- * 读取设备上 CapacitorStorage.xml 的 pictelio_client_kind 值。
- * 用 run-as 访问 app 私有目录（debug 包可读）。文件不存在 → clientKind=null。
+ * 读取设备上 CapacitorStorage.xml 的原始内容（run-as cat，debug 包可读）。
+ * 文件不存在 / run-as 失败 → fileExists=false（rawXml 保留失败输出供诊断）。
+ * readClientPrefs / readPrefValue 共用同一 adb 调用路径，不重复实现。
  */
-export function readClientPrefs(serial: string): ClientPrefs {
+function readPrefsXml(serial: string): PrefsFile {
   const r = runCapture(adbPath(), [
     "-s",
     serial,
@@ -37,19 +44,39 @@ export function readClientPrefs(serial: string): ClientPrefs {
   ]);
   if (r.code !== 0 || r.stdout.trim() === "") {
     // 文件可能不存在（首次启动前）
-    return { clientKind: null, fileExists: false, rawXml: r.stdout };
+    return { fileExists: false, rawXml: r.stdout };
   }
-  const xml = r.stdout;
-  // Capacitor/Android SharedPreferences 两种序列化形式都兼容：
-  // ① <string name="key">value</string>（Capacitor Preferences 实际格式）
-  // ② <string name="key" value="value"/>（少数实现）
+  return { fileExists: true, rawXml: r.stdout };
+}
+
+/**
+ * 从 SharedPreferences XML 提取指定键的字符串值。
+ * Capacitor/Android SharedPreferences 两种序列化形式都兼容：
+ * ① <string name="key">value</string>（Capacitor Preferences 实际格式）
+ * ② <string name="key" value="value"/>（少数实现）
+ * 键不存在 → null。
+ */
+function extractStringValue(xml: string, key: string): string | null {
   const m =
-    /<string name="pictelio_client_kind">([^<]*)<\/string>/u.exec(xml) ??
-    /name="pictelio_client_kind"\s+value="([^"]*)"/u.exec(xml);
+    new RegExp(`<string name="${key}">([^<]*)</string>`, "u").exec(xml) ??
+    new RegExp(`name="${key}"\\s+value="([^"]*)"`, "u").exec(xml);
+  return m?.[1] ?? null;
+}
+
+/**
+ * 读取设备上 CapacitorStorage.xml 的 pictelio_client_kind 值。
+ * 用 run-as 访问 app 私有目录（debug 包可读）。文件不存在 → clientKind=null。
+ */
+export function readClientPrefs(serial: string): ClientPrefs {
+  const { fileExists, rawXml } = readPrefsXml(serial);
+  if (!fileExists) {
+    return { clientKind: null, fileExists: false, rawXml };
+  }
   return {
-    clientKind: (m?.[1] as ClientPrefs["clientKind"]) ?? null,
+    clientKind:
+      (extractStringValue(rawXml, "pictelio_client_kind") as ClientPrefs["clientKind"]) ?? null,
     fileExists: true,
-    rawXml: xml,
+    rawXml,
   };
 }
 
@@ -144,6 +171,108 @@ export function writeClientKind(serial: string, kind: "webview" | "lynx"): strin
     );
   }
   return kind;
+}
+
+/** EnginePrefs.KEY_* 的 TS 镜像（唯一所有者 = Java
+ *  android/.../engine/EnginePrefs.java；键字面量漂移由一致性测试/本文件注释锚定）。
+ *  E2E 侧只读这些键做取证播种，不在此处发明新键。 */
+export const ENGINE_KEYS = {
+  /** 首选引擎（"lynx" | "webview"；翻转后缺省语义 = lynx） */
+  preferredKind: "pictelio_client_kind",
+  /** 运行时自动回退开关（"true" | "false"；缺省 true） */
+  autoFallback: "pictelio_engine_auto_fallback",
+  /** Lynx 失败记忆（versionCode 十进制字符串；与当前版本精确相等才命中） */
+  failureMemory: "pictelio_engine_lynx_failure_version",
+  /** 生效状态快照（每次 EngineRouting.resolve 覆写） */
+  state: "pictelio_engine_state",
+  /** webview 提示条「不再提示」 */
+  fallbackOptout: "pictelio_engine_fallback_optout",
+  /** E2E 取证键：强制 Lynx 探针返回 false（仅 DEBUG 构建被读取，release 无此分支） */
+  debugForceLynxUnavailable: "pictelio_debug_force_lynx_unavailable",
+} as const;
+
+/** 生效状态快照（EngineRoute.snapshotLine 解析结果；spec §3 / §3.1） */
+export interface EngineStateSnapshot {
+  /** 首选引擎（"lynx" | "webview"） */
+  preferred: string;
+  /** 本次生效引擎；null = effective=none（双失败，无引擎生效，落升级页） */
+  effective: string | null;
+  /** 降级原因码（spec §3.1 稳定 ASCII） */
+  reason: string;
+}
+
+/**
+ * 解析快照行 `preferred=<kind|none> effective=<kind|none> reason=<code>`
+ * （格式唯一来源 = Java EngineRoute.snapshotLine()）。畸形行 → null（E11：
+ * 禁止静默——解析失败按「无快照」处理，不构造部分合法的假数据）。
+ * 纯函数，单测直接覆盖（unit/prefs.engineState.test.ts）。
+ */
+export function parseEngineState(raw: string | null): EngineStateSnapshot | null {
+  if (raw === null) return null;
+  // 锚定整行（^…$）：值被污染（前后混入其他内容）时按畸形处理，不误提取
+  const m = /^preferred=(\S+) effective=(\S+) reason=(\S+)$/u.exec(raw);
+  if (!m) return null;
+  const preferred = m[1];
+  const effectiveRaw = m[2];
+  const reason = m[3];
+  if (preferred === undefined || effectiveRaw === undefined || reason === undefined) return null;
+  return {
+    preferred,
+    effective: effectiveRaw === "none" ? null : effectiveRaw,
+    reason,
+  };
+}
+
+/**
+ * 读取 CapacitorStorage.xml 中任意字符串键的值（run-as 直读，debug 包可读）。
+ * 文件不存在或键不存在 → null。用于取证键写入后的落盘校验。
+ */
+export function readPrefValue(serial: string, key: string): string | null {
+  const { fileExists, rawXml } = readPrefsXml(serial);
+  if (!fileExists) return null;
+  return extractStringValue(rawXml, key);
+}
+
+/**
+ * 读取引擎生效状态快照（KEY_STATE 行 → 结构化；配合 pollEngineState 轮询）。
+ * 键不存在 / 行畸形 → null。
+ */
+export function readEngineState(serial: string): EngineStateSnapshot | null {
+  return parseEngineState(readPrefValue(serial, ENGINE_KEYS.state));
+}
+
+/**
+ * 轮询引擎状态快照直到谓词满足（pollPrefs 的引擎态镜像，#557 T5）。
+ *
+ * 为什么必须轮询：快照由 Java 侧 SharedPreferences.apply() 异步落盘（见
+ * pollPrefs 注释的同款竞态），adb 直读是落盘瞬间的文件——「快照已发布」断言
+ * 必须按固定间隔重读。
+ *
+ * @param predicate 判定快照是否满足期望（满足即停；传 `(s) => s !== null` 即
+ *   「等快照首次出现」，随后用 expect toEqual 做精确断言——失败时 vitest 差异
+ *   直接给出真实快照，诊断优于在谓词里静默等满超时）
+ * @returns 满足谓词的那次快照
+ * @throws Error 超时未满足：消息含最后一次快照原始值（诊断用）
+ */
+export async function pollEngineState(
+  serial: string,
+  predicate: (state: EngineStateSnapshot | null) => boolean,
+  timeoutMs = 30_000,
+  intervalMs = 1_000,
+  readFn: (serial: string) => EngineStateSnapshot | null = readEngineState,
+): Promise<EngineStateSnapshot | null> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const state = readFn(serial);
+    if (predicate(state)) return state;
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `[android-e2e] pollEngineState 轮询超时（timeoutMs=${timeoutMs}, intervalMs=${intervalMs}）。` +
+          `最后一次 ${ENGINE_KEYS.state} 原始值: ${readPrefValue(serial, ENGINE_KEYS.state) ?? "(键不存在)"}`,
+      );
+    }
+    await new Promise<void>((r) => setTimeout(r, intervalMs));
+  }
 }
 
 /**
