@@ -1,6 +1,9 @@
 // ─── 平台 API 收口：URL 域名字符串解析（spec docs/specs/qa-defense-lines.md §3.T4）───
-// 全仓唯一 URL 域名解析入口（术语 safeParseURL）：任何需要 hostname 的业务一律经本函数，
+// lynx 新代码的 URL 域名解析唯一入口：任何需要 hostname 的业务一律经本函数，
 // 禁用 URL 全局（new URL / .hostname）。
+// 存量迁移挂账（review P1-1，先于本收口存在，语义为 fail-closed 无现行功能破坏）：
+// api/client.ts isTrustedPixivHost、utils/imageUrl.ts isTrustedImageHost、
+// utils/proxyRedact.ts redactProxyUrl —— 迁移前本函数的「唯一」指 lynx 新代码面。
 //
 // Oracle（期望值出处，禁止从实现反推）：
 // - lynx 运行时事实（取证 2026-09-15，模拟器 logcat 实证，ADR-0163）：URL 全局 polyfill

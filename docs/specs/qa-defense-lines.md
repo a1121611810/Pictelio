@@ -13,7 +13,7 @@
 | **宿主矩阵（host matrix）** | 可复用组件在 ≥2 种宿主形态（列表宿主 / 复用·轮播宿主）下的行为测试 |
 | **init-only props** | 只在组件 setup 时被读一次、此后变更不生效的 props（如 `initialBookmarked`/`initialCount`/`initialCount` 类） |
 | **平台一致性自检页（platform conformance self-check page）** | Lynx 端 debug 自检路由：对项目依赖的平台 API 面跑规范派生断言，渲染 PASS/FAIL 矩阵 |
-| **`safeParseURL`** | 平台 API 收口函数：hostname 字符串解析（禁 URL 全局），全仓唯一 URL 域名解析入口 |
+| **`safeParseUrl`** | 平台 API 收口函数：hostname 字符串解析（禁 URL 全局），lynx 新代码唯一 URL 域名解析入口（存量迁移挂账见 §6） |
 
 ## 1. 目标
 
@@ -89,3 +89,4 @@
 - 错误监控接入（Sentry + lynx 捕获探针）
 - lynx bundle OTA 化（对齐 webview 快慢双通道）
 - 转换矩阵脚本化触发器（`pnpm qa:matrix` 一键）
+- **存量裸 URL 全局迁移挂账**（review P1-1，fail-closed 无现行功能破坏）：`api/client.ts isTrustedPixivHost`（仅 web 路径消费）、`utils/imageUrl.ts isTrustedImageHost`（被 `/i.pximg.net/` marker 路径掩蔽）、`utils/proxyRedact.ts redactProxyUrl`（未登记形态）——迁移至 `utils/safeParseUrl.ts extractHostname`

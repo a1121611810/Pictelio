@@ -348,7 +348,7 @@ function registerBenchNavHandler(): void {
     pictelioBenchNavPlatformCheck: '/platform-check',
   }
   for (const [eventName, target] of Object.entries(TARGETS)) {
-    // 原生发送两次（1.5s/3s）防 JS 挂载竞态；replace 幂等，重复到达无副作用
+    // 原生发送四次（1.5/3/4.5/6s，LynxActivity.onLoadSuccess）防 JS 挂载竞态；replace 幂等，重复到达无副作用
     emitter.addListener(eventName, () => {
       void navigate(target, { replace: true })
     })
