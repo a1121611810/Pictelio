@@ -17,8 +17,8 @@ android {
         applicationId "io.pictelio.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 50000
-        versionName "5.0.0"
+        versionCode 50001
+        versionName "5.0.1"
         buildConfigField "String", "OTA_ED25519_PUBLIC_KEY_B64", "\"${otaPublicKeyB64}\""
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
