@@ -10,7 +10,7 @@ import {
   type SearchFilters,
 } from "@pictelio/search-core"
 // hostname 解析收口（spec docs/specs/qa-defense-lines.md §3.T4）：原本地副本
-// （6dc641d1 修复版实现）迁移至 utils/safeParseUrl 全仓唯一入口，此处仅导入复用。
+// （6dc641d1 修复版实现）迁移至 utils/safeParseUrl（lynx 新代码唯一入口），此处仅导入复用。
 // 禁止回流 URL 全局——search.template.test.ts 源级守卫 + PlatformCheck 自检页常驻可见。
 import { extractHostname } from "../utils/safeParseUrl"
 import type {

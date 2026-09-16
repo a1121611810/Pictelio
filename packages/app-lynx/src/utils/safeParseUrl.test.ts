@@ -5,7 +5,7 @@
 // - 负向用例锚收口契约（与 api/search.ts 6dc641d1 修复版同构）：仅小写 http(s) 绝对
 //   URL 可解析，相对路径 / 其它 scheme 一律返回 null（调用方决策，如 search.ts 的
 //   /pixiv-api 代理路径先 startsWith 放行再走断言）。
-// 源级防线：本工具是全仓唯一 URL 域名解析入口，禁 URL 全局（lynx `.hostname` 为
+// 源级防线：本工具是 lynx 新代码的 URL 域名解析唯一入口，禁 URL 全局（lynx `.hostname` 为
 // undefined，取证 2026-09-15，ADR-0163）——剥注释后断言无 `new URL(`。
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
