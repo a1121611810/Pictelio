@@ -59,6 +59,11 @@ const KEY_PAIRS = [
     ts: "KEY_FAILURE_MEMORY",
     contract: "pictelio_engine_lynx_failure_version",
   },
+  {
+    java: "KEY_FALLBACK_OPTOUT",
+    ts: "KEY_FALLBACK_OPTOUT",
+    contract: "pictelio_engine_fallback_optout",
+  },
 ] as const;
 
 describe("引擎持久化键一致性（Java EnginePrefs ↔ TS clientSwitch，防漂移）", () => {
@@ -70,10 +75,11 @@ describe("引擎持久化键一致性（Java EnginePrefs ↔ TS clientSwitch，�
     expect(extractTsConstant(ts)).toBe(extractJavaConstant(java));
   });
 
-  it("clientSwitch.ts 确实引用开关/快照镜像常量（集成锚点，防只声明不接线）", () => {
+  it("clientSwitch.ts 确实引用开关/快照/降级提示 optout 镜像常量（集成锚点，防只声明不接线）", () => {
     const src = readFileSync(tsFile, "utf8");
     expect(src).toMatch(/key:\s*KEY_AUTO_FALLBACK\s*}/);
     expect(src).toMatch(/key:\s*KEY_ENGINE_STATE\s*}/);
+    expect(src).toMatch(/key:\s*KEY_FALLBACK_OPTOUT\s*}/);
   });
 
   it("EnginePrefs 确实以 KEY_STATE 发布快照、读 KEY_AUTO_FALLBACK（集成锚点）", () => {

@@ -123,6 +123,9 @@ export const KEY_AUTO_FALLBACK = "pictelio_engine_auto_fallback";
 /** 生效状态快照（每次 EngineRouting.resolve 覆写一行；Java 名 KEY_STATE）。 */
 export const KEY_ENGINE_STATE = "pictelio_engine_state";
 
+/** 降级提示条「不再提示」（"true" = 永久关闭；absent = 提示；Java 名 KEY_FALLBACK_OPTOUT）。 */
+export const KEY_FALLBACK_OPTOUT = "pictelio_engine_fallback_optout";
+
 /**
  * 读取自动回退开关。口径与 Java `EnginePrefs.autoFallbackEnabled` 逐字一致：
  * absent/"" → true（缺省开）、"false" → false、其余畸形值 → warn + true（fail-open
@@ -199,6 +202,33 @@ export async function readEngineState(): Promise<EngineSnapshot | null> {
   } catch (e) {
     console.warn("[clientSwitch] 读取引擎状态快照失败，按无降级处理", e);
     return null;
+  }
+}
+
+/**
+ * 降级提示条 optout（提示条「不再提示」，ADR-0164 决策 6）。口径与 Java
+ * `EnginePrefs.setFallbackOptout` 读取侧一致："true" → 不再提示；absent/其余值 → 提示。
+ * 读取失败 → warn + false（禁静默；桥故障按「仍提示」处理，宁可多提示不可漏提示）。永不抛。
+ */
+export async function readEngineFallbackOptout(): Promise<boolean> {
+  try {
+    const { value } = await Preferences.get({ key: KEY_FALLBACK_OPTOUT });
+    return value === "true";
+  } catch (e) {
+    console.warn("[clientSwitch] 读取降级提示 optout 失败，按仍提示处理", e);
+    return false;
+  }
+}
+
+/**
+ * 写降级提示条 optout = "true"（「不再提示」）。写入失败只 warn（带模块前缀，
+ * 测试硬约束 3）——下次启动仍提示，可接受（spec E12 单次提示缺失自愈口径）。永不抛。
+ */
+export async function writeEngineFallbackOptout(): Promise<void> {
+  try {
+    await Preferences.set({ key: KEY_FALLBACK_OPTOUT, value: "true" });
+  } catch (e) {
+    console.warn("[clientSwitch] 降级提示 optout 写入失败（下次启动仍提示）", e);
   }
 }
 

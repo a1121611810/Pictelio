@@ -150,6 +150,9 @@ const zhRoutes = {
   "engineFallback.reason.forced_webview": "本次已强制使用 WebView",
   "engineFallback.reason.runtime_failure": "Lynx 运行出错，已改用 WebView",
   "engineFallback.reason.unknown": "引擎状态未知",
+  "engineFallback.banner.ack": "知道了",
+  "engineFallback.banner.suppress": "不再提示",
+  "engineFallback.banner.aria": "引擎降级说明",
 
   // ── 关于（About）──
   "about.title": "关于",

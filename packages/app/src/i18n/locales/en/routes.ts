@@ -159,6 +159,9 @@ const enRoutes = {
   "engineFallback.reason.forced_webview": "WebView is forced for this launch",
   "engineFallback.reason.runtime_failure": "Lynx hit a runtime error; WebView is used instead",
   "engineFallback.reason.unknown": "Engine state unknown",
+  "engineFallback.banner.ack": "Got it",
+  "engineFallback.banner.suppress": "Don't show again",
+  "engineFallback.banner.aria": "Engine fallback notice",
 
   // ── About (About) ──
   "about.title": "About",

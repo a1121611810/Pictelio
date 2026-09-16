@@ -9,6 +9,7 @@ import { useUpdateStore } from './stores/updateStore'
 import { useSearchSheetStore } from './stores/searchSheetStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { useEngineFallbackStore } from './stores/engineFallbackStore'
+import { t } from './i18n'
 import { themeColorClass } from './utils/themeColor'
 import { apiClient } from './api/client'
 import { queryKeys } from './api/queryKeys'
@@ -82,9 +83,7 @@ onMounted(() => {
       @click="engineFallback.dismiss()"
     >
       <view class="bg-surface-container-high rounded-[var(--md-shape-medium)] px-5 py-4 shadow-[var(--md-elevation-3)]">
-        <text class="text-body-medium text-surface-on">
-          WebView 版本过低，本次已改用 Lynx 引擎运行；更新 WebView 后将自动恢复。
-        </text>
+        <text class="text-body-medium text-surface-on">{{ t('engineFallback.legacyBanner') }}</text>
       </view>
     </view>
     <!-- 系统返回根路由提示（ADR-0066）：与 webview client 的 exitHint toast 语义一致。

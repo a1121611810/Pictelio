@@ -207,6 +207,8 @@ const zhPages = {
   "engineFallback.reason.forced_webview": "本次已强制使用 WebView",
   "engineFallback.reason.runtime_failure": "Lynx 运行出错，已改用 WebView",
   "engineFallback.reason.unknown": "引擎状态未知",
+  // App.vue 降级提示条（ADR-0153 既有文案逐字迁移，T4 #556 i18n 化）
+  "engineFallback.legacyBanner": "WebView 版本过低，本次已改用 Lynx 引擎运行；更新 WebView 后将自动恢复。",
   "me.appearance.title": "外观",
   "me.appearance.language": "界面语言",
   "me.appearance.languageFollowSystem": "跟随系统",

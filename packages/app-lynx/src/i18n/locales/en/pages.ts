@@ -207,6 +207,9 @@ const enPages = {
   "engineFallback.reason.forced_webview": "WebView was forced for this launch",
   "engineFallback.reason.runtime_failure": "Lynx hit an error; WebView is in use",
   "engineFallback.reason.unknown": "Engine state unknown",
+  // App.vue fallback banner (word-for-word migration of the legacy zh copy, T4 #556)
+  "engineFallback.legacyBanner":
+    "Your WebView version is too low, so the app ran on the Lynx engine this time; it switches back automatically once WebView is updated.",
   "me.appearance.title": "Appearance",
   "me.appearance.language": "Interface language",
   "me.appearance.languageFollowSystem": "Automatic",
