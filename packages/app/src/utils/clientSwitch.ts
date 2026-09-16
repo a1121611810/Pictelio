@@ -127,7 +127,8 @@ export const KEY_ENGINE_STATE = "pictelio_engine_state";
 export const KEY_FALLBACK_OPTOUT = "pictelio_engine_fallback_optout";
 
 /**
- * 读取自动回退开关。口径与 Java `EnginePrefs.autoFallbackEnabled` 逐字一致：
+ * 读取自动回退开关。口径与 Java `EnginePrefs.autoFallbackEnabled` 一致
+ *（除 "" 分支：TS 静默返回 true、Java 侧走畸形 warn，结果同为 true）：
  * absent/"" → true（缺省开）、"false" → false、其余畸形值 → warn + true（fail-open
  * 到产品缺省）。永不抛（桥故障按缺省开处理 + warn，禁静默）。
  */
@@ -206,8 +207,8 @@ export async function readEngineState(): Promise<EngineSnapshot | null> {
 }
 
 /**
- * 降级提示条 optout（提示条「不再提示」，ADR-0164 决策 6）。口径与 Java
- * `EnginePrefs.setFallbackOptout` 读取侧一致："true" → 不再提示；absent/其余值 → 提示。
+ * 降级提示条 optout（提示条「不再提示」，ADR-0164 决策 6）。读取侧与 Java
+ * `EnginePrefs.readOptOut` 一致："true" → 不再提示；absent/其余值 → 提示。
  * 读取失败 → warn + false（禁静默；桥故障按「仍提示」处理，宁可多提示不可漏提示）。永不抛。
  */
 export async function readEngineFallbackOptout(): Promise<boolean> {

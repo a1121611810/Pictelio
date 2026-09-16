@@ -209,7 +209,8 @@ export interface EngineStateSnapshot {
  */
 export function parseEngineState(raw: string | null): EngineStateSnapshot | null {
   if (raw === null) return null;
-  const m = /preferred=(\S+) effective=(\S+) reason=(\S+)/u.exec(raw);
+  // 锚定整行（^…$）：值被污染（前后混入其他内容）时按畸形处理，不误提取
+  const m = /^preferred=(\S+) effective=(\S+) reason=(\S+)$/u.exec(raw);
   if (!m) return null;
   const preferred = m[1];
   const effectiveRaw = m[2];

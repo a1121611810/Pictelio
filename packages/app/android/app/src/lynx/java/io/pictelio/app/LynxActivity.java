@@ -336,6 +336,9 @@ public class LynxActivity extends AppCompatActivity {
      * 哨兵短路成静默无操作（兜底页永不渲染 = ADR-0064 白屏回归）。
      */
     private void onFatal(EngineRouting.LynxFailureKind kind, String message) {
+        // 竞态容忍口径：两生产者同时通过快速路径时，onLynxFailure 可能被求值两次——
+        // 失败记忆写入幂等（同 versionCode）；若 A（超时→错误页）先夺 errorShown 锁，
+        // B 已写的记忆仍生效（下次启动 S4 直达 WebView），窗口极窄、后果良性自愈。
         if (errorShown.get()) return; // 首胜快速路径（分支内仍有原子抢占）
         EngineRouting.FailureVerdict verdict = EngineRouting.onLynxFailure(
                 getApplicationContext(), LynxProbe.create(getApplication()), kind);

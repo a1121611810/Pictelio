@@ -68,7 +68,7 @@ describe("S1 SharedPreferences 契约（pictelio_client_kind → MainActivity �
     }
   });
 
-  it("初始：CapacitorStorage 无 pictelio_client_kind（默认 webview）", async () => {
+  it("初始：CapacitorStorage 无 pictelio_client_kind（缺省语义 = lynx，ADR-0164）", async () => {
     const prefs = readClientPrefs(serial);
     dumpPrefsToFile(serial, "initial");
     // pm clear 后文件可能不存在，或存在但无该键

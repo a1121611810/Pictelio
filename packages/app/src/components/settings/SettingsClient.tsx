@@ -20,7 +20,8 @@ const kindLabelKey = (kind: ClientKind): I18nKey =>
 
 /**
  * 客户端切换区块（webview ↔ lynx）。
- * 主应用默认 webview；切换后写入 SharedPreferences("CapacitorStorage").pictelio_client_kind
+ * 缺省引擎 = lynx（ADR-0164）；本应用自身是 webview 客户端。切换写入
+ * SharedPreferences("CapacitorStorage").pictelio_client_kind
  * 并由原生重启分发（MainActivity 入口路由 → LynxActivity）。切回入口在 Lynx 客户端 Me 页。
  *
  * ADR-0062：仅当当前包同时支持 webview 与 lynx（full 包）时渲染切换入口；

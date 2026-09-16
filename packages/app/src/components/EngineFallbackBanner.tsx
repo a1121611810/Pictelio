@@ -17,7 +17,7 @@ import { t } from "@/i18n";
  * （先例：StartupUpdateDialog 因 fluent-dialog 同类问题改手写覆盖层）。
  *
  * 显示条件（快照驱动，只读不写——降级绝不落盘首选，ADR-0164 决策 4）：
- *   effective=webview ∧ preferred=lynx ∧ 未 optout。
+ *   effective=webview ∧ preferred=lynx ∧ reason≠preferred ∧ 未 optout。
  * 「知道了」仅关闭本次（local signal）；「不再提示」写 pictelio_engine_fallback_optout
  *（镜像 Java EnginePrefs.KEY_FALLBACK_OPTOUT）后关闭。
  * 定位：胶囊居中（exitHint pill 同款 z-50 层级），pointer-events 仅在 pill 自身生效、
@@ -31,7 +31,13 @@ const EngineFallbackBanner: Component = () => {
   // 任一读取失败由 utils 层 warn + 安全缺省（快照 null / optout false，禁静默）。
   void (async () => {
     const [state, optedOut] = await Promise.all([readEngineState(), readEngineFallbackOptout()]);
-    if (state && state.effective === "webview" && state.preferred === "lynx" && !optedOut) {
+    if (
+      state &&
+      state.effective === "webview" &&
+      state.preferred === "lynx" &&
+      state.reason !== "preferred" &&
+      !optedOut
+    ) {
       setReason(state.reason);
       setVisible(true);
     }
