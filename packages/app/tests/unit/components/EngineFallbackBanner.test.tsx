@@ -117,6 +117,16 @@ describe("EngineFallbackBanner 显示条件（快照 + optout）", () => {
     expect(screen.queryByRole("status")).toBeNull();
   });
 
+  it("守卫分支：effective=webview ∧ preferred=lynx 但 reason=preferred（防御矩阵外组合）→ 不渲染", async () => {
+    // oracle：spec §7.2 显示条件含 reason≠preferred（review P2 补守卫）；
+    // 当前矩阵该组合不可达，测试钉住防御分支防未来回归
+    seed("preferred=lynx effective=webview reason=preferred");
+    render(() => <EngineFallbackBanner />);
+    await flushAsync();
+
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
   it("快照缺失（null）→ 不渲染", async () => {
     seed(null);
     render(() => <EngineFallbackBanner />);
