@@ -151,6 +151,9 @@ public class LynxActivity extends AppCompatActivity {
                             case "error" -> new String[]{"pictelioBenchNavError"};
                             // 网络自检直达（spec docs/specs/network-self-check.md）
                             case "netdiag" -> new String[]{"pictelioBenchNavNetDiag"};
+                            // 平台一致性自检直达（spec docs/specs/qa-defense-lines.md §3.T4 / #550）：
+                            // debug 自检页唯一入口（前端 /platform-check 不进导航）
+                            case "platform-check" -> new String[]{"pictelioBenchNavPlatformCheck"};
                             // 详情页直达（#542）走载荷通道（illust_id 数值经 extra 传入），不入本表
                             default -> new String[0];
                         };

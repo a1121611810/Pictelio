@@ -55,6 +55,7 @@ import Watchlist from './pages/Watchlist.vue'
 import DownloadManager from './pages/DownloadManager.vue'
 import NetworkCheck from './pages/NetworkCheck.vue'
 import Ranking from './pages/Ranking.vue'
+import PlatformCheck from './pages/PlatformCheck.vue'
 
 /**
  * 路由表（vue-router 1:1 迁移，ADR-0138 决策 3）：
@@ -84,6 +85,9 @@ export const routes: RouteRecordRaw[] = [
   { path: '/error', name: 'error', component: ErrorPage, meta: { backBehavior: 'exit' } },
   // 登录前可达：网络/登录失败时恰恰最需要它（spec docs/specs/network-self-check.md）；不标 requiresAuth
   { path: '/network-check', name: 'network-check', component: NetworkCheck },
+  // 平台一致性自检页（spec docs/specs/qa-defense-lines.md §3.T4 / #550）：debug 页，
+  // 不标 requiresAuth（避免登录耦合）、不进任何导航入口——仅 benchNav 深链可达
+  { path: '/platform-check', name: 'platform-check', component: PlatformCheck },
 ]
 
 export const router: Router = createRouter({
@@ -339,6 +343,9 @@ function registerBenchNavHandler(): void {
     // 网络自检直达（spec docs/specs/network-self-check.md / ticket I5）：Lynx a11y 树不暴露元素，
     // 真机验收经 benchNav 深链到 /network-check，再以原生 NetDiag 日志为证据。
     pictelioBenchNavNetDiag: '/network-check',
+    // 平台一致性自检直达（spec docs/specs/qa-defense-lines.md §3.T4 / #550）：
+    // debug 自检页唯一入口（不进导航），对齐 /network-check 深链先例。
+    pictelioBenchNavPlatformCheck: '/platform-check',
   }
   for (const [eventName, target] of Object.entries(TARGETS)) {
     // 原生发送两次（1.5s/3s）防 JS 挂载竞态；replace 幂等，重复到达无副作用

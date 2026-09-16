@@ -9,6 +9,10 @@ import {
   DEFAULT_SEARCH_FILTERS,
   type SearchFilters,
 } from "@pictelio/search-core"
+// hostname 解析收口（spec docs/specs/qa-defense-lines.md §3.T4）：原本地副本
+// （6dc641d1 修复版实现）迁移至 utils/safeParseUrl 全仓唯一入口，此处仅导入复用。
+// 禁止回流 URL 全局——search.template.test.ts 源级守卫 + PlatformCheck 自检页常驻可见。
+import { extractHostname } from "../utils/safeParseUrl"
 import type {
   PixivIllustListResponse,
   PixivNovelListResponse,
@@ -20,21 +24,6 @@ function invalidNextUrlError(fnName: string, url: string): Error {
   const message = `${fnName}: invalid next_url — must point to app-api.pixiv.net`
   console.warn(`[api/search] ${message}:`, url)
   return new Error(`[api/search] ${message}`)
-}
-
-/**
- * hostname 字符串解析（lynx 运行时取证 2026-09-15，模拟器 logcat 实证）：
- * lynx 的 URL 全局 polyfill 不抛错但 `.hostname` 字段为 undefined（浏览器语义缺失），
- * 合法的 app-api.pixiv.net next_url 经 new URL 断言 100% 误拒 → 搜索分页必败且
- * 重试秒败无感。故不用 URL 全局：正则取 http(s) authority（[userinfo@]host[:port]）
- * 去 userinfo 与端口。仅 http(s) 绝对 URL 可解析，其余返回 null。
- */
-function extractHostname(url: string): string | null {
-  const m = /^https?:\/\/([^/?#]+)/.exec(url)
-  if (!m) return null
-  const authority = m[1].split("@").pop() ?? m[1]
-  const host = authority.split(":")[0]
-  return host || null
 }
 
 /**

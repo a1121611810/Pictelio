@@ -76,6 +76,10 @@
     "reason": "语言选择器 autonym（简体中文/English 语言本名，ui-copy R8 不翻译）"
   },
   {
+    "path": "pages/PlatformCheck.vue",
+    "reason": "平台一致性自检页（开发者面向 debug 工具，仅 benchNav 可达，spec qa-defense-lines §3.T4）"
+  },
+  {
     "path": "pages/Recommended.vue",
     "reason": "存量豁免（收尾审计已核，非用户可见主文案）"
   },

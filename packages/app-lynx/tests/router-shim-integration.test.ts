@@ -63,6 +63,7 @@ vi.mock('../src/pages/Watchlist.vue', () => ({ default: {} }))
 vi.mock('../src/pages/DownloadManager.vue', () => ({ default: {} }))
 vi.mock('../src/pages/NetworkCheck.vue', () => ({ default: {} }))
 vi.mock('../src/pages/Ranking.vue', () => ({ default: {} }))
+vi.mock('../src/pages/PlatformCheck.vue', () => ({ default: {} }))
 
 type RouterModule = typeof import('../src/router')
 
@@ -75,9 +76,9 @@ async function loadRouter(): Promise<RouterModule> {
 }
 
 describe('路由表完整性（spec D3）', () => {
-  it('18 条路由：path/name 齐全；/update、/error 无 requiresAuth 且带 backBehavior exit（P0-1）', async () => {
+  it('19 条路由：path/name 齐全；/update、/error 无 requiresAuth 且带 backBehavior exit（P0-1）', async () => {
     const mod = await loadRouter()
-    expect(mod.routes).toHaveLength(18)
+    expect(mod.routes).toHaveLength(19)
     const nameOf = (p: string) => mod.routes.find((r) => r.path === p)?.name
     expect(nameOf('/login')).toBe('login')
     expect(nameOf('/recommended')).toBe('recommended')
@@ -87,6 +88,9 @@ describe('路由表完整性（spec D3）', () => {
     expect(nameOf('/network-check')).toBe('network-check')
     expect(nameOf('/ranking')).toBe('ranking')
     expect(nameOf('/user/:id/following')).toBe('user-following')
+    // 平台一致性自检页（spec qa-defense-lines §3.T4 / #550）：debug 路由，无登录耦合
+    expect(nameOf('/platform-check')).toBe('platform-check')
+    expect(mod.routes.find((r) => r.path === '/platform-check')?.meta?.requiresAuth).toBeUndefined()
     // P0-1：系统页是 cleared 语义下的目的页，不可被守卫自身拦截
     expect(mod.routes.find((r) => r.path === '/update')?.meta).toEqual({ backBehavior: 'exit' })
     expect(mod.routes.find((r) => r.path === '/error')?.meta).toEqual({ backBehavior: 'exit' })
