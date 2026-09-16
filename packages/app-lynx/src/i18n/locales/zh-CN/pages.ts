@@ -190,6 +190,23 @@ const zhPages = {
   "me.client.lynx": "Lynx（当前）",
   "me.client.lynxHint": "vue-lynx 原生渲染",
   "me.client.restarting": "正在重启切换…",
+  "me.client.autoFallback": "自动回退 WebView",
+  "me.client.autoFallbackDesc": "Lynx 运行出错时自动改用 WebView，关闭后出错仅提示",
+  "me.client.effectiveState": "首选 {{preferred}} · 本次生效 {{effective}}",
+
+  // ─── 引擎降级原因文案（ADR-0164 / #555）：生效状态快照 reason 码 → UI 文案
+  //     （Me 客户端卡双态行；T4 App.vue 提示条复用）。码集 = EngineRoute.Reason 全 10 码 + unknown 兜底 ───
+  "engineFallback.reason.preferred": "按首选引擎运行",
+  "engineFallback.reason.lynx_unavailable": "Lynx 引擎在本机不可用，已改用 WebView",
+  "engineFallback.reason.lynx_known_bad": "Lynx 在本版本曾运行失败，已改用 WebView",
+  "engineFallback.reason.lynx_retry": "WebView 不可用，重试 Lynx",
+  "engineFallback.reason.webview_unavailable": "WebView 不可用，本次以 Lynx 生效",
+  "engineFallback.reason.a11y_webview": "已为无障碍服务启用 WebView",
+  "engineFallback.reason.a11y_lynx_last_resort": "WebView 不可用，无障碍服务下仍以 Lynx 兜底",
+  "engineFallback.reason.no_engine": "两个引擎均不可用",
+  "engineFallback.reason.forced_webview": "本次已强制使用 WebView",
+  "engineFallback.reason.runtime_failure": "Lynx 运行出错，已改用 WebView",
+  "engineFallback.reason.unknown": "引擎状态未知",
   "me.appearance.title": "外观",
   "me.appearance.language": "界面语言",
   "me.appearance.languageFollowSystem": "跟随系统",

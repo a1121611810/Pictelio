@@ -1,9 +1,22 @@
 import { type Component, Show, createSignal, onSettled } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import FluentIcon from "../ui/FluentIcon";
-import { readClientKind, supportsClientSwitch, type ClientKind } from "../../utils/clientSwitch";
+import {
+  readClientKind,
+  readAutoFallbackSwitch,
+  writeAutoFallbackSwitch,
+  readEngineState,
+  reasonKey,
+  supportsClientSwitch,
+  type ClientKind,
+  type EngineSnapshot,
+} from "../../utils/clientSwitch";
 import { ClientInfo } from "../../native/ClientInfo";
-import { t } from "../../i18n";
+import { t, type I18nKey } from "../../i18n";
+
+/** 引擎显示名 i18n 键（品牌名两语言同文案，键化保证插值完备） */
+const kindLabelKey = (kind: ClientKind): I18nKey =>
+  kind === "lynx" ? "settings.client.kindLynx" : "settings.client.kindWebview";
 
 /**
  * 客户端切换区块（webview ↔ lynx）。
@@ -21,6 +34,10 @@ const SettingsClient: Component = () => {
   const [current, setCurrent] = createSignal<ClientKind>("webview");
   /** 当前包支持的 client 引擎列表；空数组 = 尚未查询到（保守渲染） */
   const [clientKinds, setClientKinds] = createSignal<string[] | null>(null);
+  /** 自动回退开关（缺省开；读取失败也按开，与 readAutoFallbackSwitch 口径一致） */
+  const [autoFallback, setAutoFallback] = createSignal(true);
+  /** 生效状态快照；null = 无记录/畸形（按无降级渲染） */
+  const [engineState, setEngineState] = createSignal<EngineSnapshot | null>(null);
 
   // onSettled 不接受 async 函数：异步分支内部消化 Promise
   onSettled(() => {
@@ -33,10 +50,29 @@ const SettingsClient: Component = () => {
       }
       setClientKinds(result.kinds);
     });
+    void readAutoFallbackSwitch().then(setAutoFallback);
+    void readEngineState().then(setEngineState);
   });
 
   // ADR-0062：仅 full 包（含 webview+lynx）渲染切换入口
   const supportsSwitch = () => supportsClientSwitch(clientKinds());
+
+  /** 降级双态：快照缺失或 effective === preferred（按首选运行）→ 不渲染 */
+  const degradedState = (): EngineSnapshot | null => {
+    const s = engineState();
+    if (s === null || s.effective === s.preferred) return null;
+    return s;
+  };
+
+  const effectiveLabel = (s: EngineSnapshot): string =>
+    s.effective === null ? t("settings.client.engineNone") : t(kindLabelKey(s.effective));
+
+  /** 乐观切换：先更 UI 再落盘；写入失败仅 warn（writeAutoFallbackSwitch 不抛），重启后回落实际值 */
+  const toggleAutoFallback = () => {
+    const next = !autoFallback();
+    setAutoFallback(next);
+    void writeAutoFallbackSwitch(next);
+  };
 
   return (
     <Show when={supportsSwitch()}>
@@ -75,6 +111,51 @@ const SettingsClient: Component = () => {
           </div>
           <span class="text-[var(--colorNeutralForeground3)] ml-2">→</span>
         </div>
+
+        {/* 自动回退 WebView 开关行（ADR-0164 决策 5：只管运行时硬错误是否自动跳，
+            不影响启动预检降级）；行式样照 SettingsContent 开关行范式 */}
+        <div class="flex items-center justify-between py-3">
+          <div class="flex items-center gap-3">
+            <div class="relative w-6 h-6 flex-shrink-0 text-[var(--colorNeutralForeground2)]">
+              <FluentIcon name="history" size={24} />
+            </div>
+            <div>
+              <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
+                {t("settings.client.autoFallback")}
+              </p>
+              <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
+                {t("settings.client.autoFallbackDesc")}
+              </p>
+            </div>
+          </div>
+
+          <fluent-switch
+            checked={autoFallback()}
+            ref={fluentOn("change", toggleAutoFallback)}
+            aria-label={t("settings.client.autoFallback")}
+          />
+        </div>
+
+        {/* 本次生效双态行（spec §7.2）：读生效状态快照，降级（effective ≠ preferred）时
+            显示「首选 X · 本次生效 Y」+ 原因文案；无快照/按首选运行则不渲染。纯文本行。 */}
+        <Show when={degradedState()}>
+          <div class="flex items-start gap-3 py-3" role="status">
+            <div class="relative w-6 h-6 flex-shrink-0 text-[var(--colorNeutralForeground2)]">
+              <FluentIcon name="info" size={24} />
+            </div>
+            <div>
+              <p class="[font-size:var(--fontSizeBase300)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
+                {t("settings.client.effectiveState", {
+                  preferred: t(kindLabelKey(degradedState()!.preferred)),
+                  effective: effectiveLabel(degradedState()!),
+                })}
+              </p>
+              <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
+                {t(reasonKey(degradedState()!.reason))}
+              </p>
+            </div>
+          </div>
+        </Show>
       </div>
     </Show>
   );

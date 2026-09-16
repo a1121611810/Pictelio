@@ -190,6 +190,23 @@ const enPages = {
   "me.client.lynx": "Lynx (current)",
   "me.client.lynxHint": "Native rendering with vue-lynx",
   "me.client.restarting": "Restarting…",
+  "me.client.autoFallback": "Auto-fallback to WebView",
+  "me.client.autoFallbackDesc": "Switch to WebView automatically when Lynx fails; when off, failures only show a notice",
+  "me.client.effectiveState": "Preferred {{preferred}} · effective this launch {{effective}}",
+
+  // Engine fallback reason copy (ADR-0164 / #555): engine-state snapshot reason code → UI copy.
+  // Code set = EngineRoute.Reason (10 codes) + unknown fallback.
+  "engineFallback.reason.preferred": "Running on your preferred engine",
+  "engineFallback.reason.lynx_unavailable": "Lynx isn’t available on this device; WebView is in use",
+  "engineFallback.reason.lynx_known_bad": "Lynx failed before on this version; WebView is in use",
+  "engineFallback.reason.lynx_retry": "WebView unavailable; retrying with Lynx",
+  "engineFallback.reason.webview_unavailable": "WebView unavailable; Lynx is in effect",
+  "engineFallback.reason.a11y_webview": "WebView enabled for accessibility services",
+  "engineFallback.reason.a11y_lynx_last_resort": "WebView unavailable; staying on Lynx for accessibility",
+  "engineFallback.reason.no_engine": "Neither engine is available",
+  "engineFallback.reason.forced_webview": "WebView was forced for this launch",
+  "engineFallback.reason.runtime_failure": "Lynx hit an error; WebView is in use",
+  "engineFallback.reason.unknown": "Engine state unknown",
   "me.appearance.title": "Appearance",
   "me.appearance.language": "Interface language",
   "me.appearance.languageFollowSystem": "Automatic",

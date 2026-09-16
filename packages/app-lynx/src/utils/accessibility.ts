@@ -60,6 +60,8 @@ export const ME_A11Y_LABELS = {
   r18gToggle: '显示R18G内容',
   relatedInjectionToggle: '相关作品注入开关',
   rankingEntryToggle: '排行榜入口开关',
+  // 引擎自动回退开关（ADR-0164 / #555：Me 客户端卡 M3 switch 行）
+  autoFallbackEngine: '自动回退WebView开关',
   // AI 作品三态过滤（ADR-0155）
   aiFilterShow: 'AI作品显示全部',
   aiFilterMask: 'AI作品遮罩',

@@ -57,6 +57,10 @@ const THEME_COLOR_KEY = "settings_theme_color"
 const RELATED_INJECTION_KEY = "related_injection"
 /** 排行榜入口大卡（spec docs/specs/ranking.md §5.8）：设备级开关，默认开；键与 app 逐字一致 */
 const RANKING_ENTRY_KEY = "ranking_entry"
+/** 引擎自动回退开关（ADR-0164 / spec engine-default-lynx §3）：设备级布尔，缺省开；
+ *  只管 Lynx 运行时硬错误是否自动跳 WebView（不管预检降级）。键与 app 侧逐字一致，
+ *  唯一所有者 = Java EnginePrefs.KEY_AUTO_FALLBACK，TS 侧镜像常量经一致性测试钉住 */
+const AUTO_FALLBACK_ENGINE_KEY = "pictelio_engine_auto_fallback"
 /** 小说导出（spec docs/specs/novel-export.md §6）：全局默认格式 + 三项内容开关（与 app 共享键） */
 const NOVEL_EXPORT_FORMAT_KEY = "settings_novel_export_format"
 const NOVEL_EXPORT_INCLUDE_METADATA_KEY = "settings_novel_export_include_metadata"
@@ -88,6 +92,7 @@ export const BACKUP_DEVICE_KEYS = [
   LANGUAGE_KEY,
   RELATED_INJECTION_KEY,
   RANKING_ENTRY_KEY,
+  AUTO_FALLBACK_ENGINE_KEY,
   NOVEL_EXPORT_FORMAT_KEY,
   NOVEL_EXPORT_INCLUDE_METADATA_KEY,
   NOVEL_EXPORT_INCLUDE_COVER_KEY,
@@ -225,6 +230,8 @@ export const useSettingsStore = defineStore("settings", () => {
   const _language = ref<"" | "zh-CN" | "en">("")
   const _relatedInjection = ref(true)
   const _rankingEntry = ref(true)
+  /** 引擎自动回退开关（ADR-0164）：设备级，缺省开（用户设置，进备份域；区别于失败记忆等设备事实） */
+  const _autoFallbackEngine = ref(true)
   const _novelExportFormat = ref<NovelExportFormat>(DEFAULT_NOVEL_EXPORT_FORMAT)
   const _novelExportOptions = ref<NovelExportOptions>({ ...DEFAULT_NOVEL_EXPORT_OPTIONS })
 
@@ -254,6 +261,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const language = _language
   const relatedInjection = _relatedInjection
   const rankingEntry = _rankingEntry
+  const autoFallbackEngine = _autoFallbackEngine
   const novelExportFormat = _novelExportFormat
   const novelExportOptions = _novelExportOptions
   const webdavEnabled = _webdavEnabled
@@ -339,6 +347,18 @@ export const useSettingsStore = defineStore("settings", () => {
       }
     } catch (e) {
       console.warn("[settingsStore] 排行榜入口开关加载失败（维持默认）", e)
+    }
+
+    // 引擎自动回退开关（ADR-0164）：设备级，未登录也恢复
+    try {
+      const raw = await prefs().get(AUTO_FALLBACK_ENGINE_KEY)
+      if (raw === "true") _autoFallbackEngine.value = true
+      else if (raw === "false") _autoFallbackEngine.value = false
+      else if (raw !== null) {
+        console.warn("[settingsStore] 引擎自动回退开关值非法，维持默认 true:", raw)
+      }
+    } catch (e) {
+      console.warn("[settingsStore] 引擎自动回退开关加载失败（维持默认）", e)
     }
 
     // 小说导出：全局默认格式 + 三项内容开关（native 共享 SharedPreferences / dev idbKV）
@@ -532,6 +552,14 @@ export const useSettingsStore = defineStore("settings", () => {
     void prefs()
       .set(RANKING_ENTRY_KEY, String(enabled))
       .catch((e) => console.warn("[settingsStore] 排行榜入口开关写入失败", e))
+  }
+
+  /** 引擎自动回退开关（ADR-0164）：双端共享键（Java 侧 EnginePrefs 同读此键） */
+  function setAutoFallbackEngine(enabled: boolean): void {
+    _autoFallbackEngine.value = enabled
+    void prefs()
+      .set(AUTO_FALLBACK_ENGINE_KEY, String(enabled))
+      .catch((e) => console.warn("[settingsStore] 引擎自动回退开关写入失败", e))
   }
 
   function setNovelExportFormat(format: NovelExportFormat): void {
@@ -742,6 +770,10 @@ export const useSettingsStore = defineStore("settings", () => {
         if (raw !== "true" && raw !== "false") return false
         setRankingEntry(raw === "true")
         return true
+      case AUTO_FALLBACK_ENGINE_KEY:
+        if (raw !== "true" && raw !== "false") return false
+        setAutoFallbackEngine(raw === "true")
+        return true
       case NOVEL_EXPORT_FORMAT_KEY:
         if (!(NOVEL_EXPORT_FORMATS as readonly string[]).includes(raw)) return false
         setNovelExportFormat(raw as NovelExportFormat)
@@ -828,6 +860,7 @@ export const useSettingsStore = defineStore("settings", () => {
     language,
     relatedInjection,
     rankingEntry,
+    autoFallbackEngine,
     ugoiraDownloadFormat,
     novelExportFormat,
     novelExportOptions,
@@ -851,6 +884,7 @@ export const useSettingsStore = defineStore("settings", () => {
     setLanguage,
     setRelatedInjection,
     setRankingEntry,
+    setAutoFallbackEngine,
     setNovelExportFormat,
     setNovelExportIncludeMetadata,
     setNovelExportIncludeCover,

@@ -9,6 +9,7 @@
 import { Preferences } from "@capacitor/preferences";
 import { App } from "@capacitor/app";
 import { ClientInfo } from "@/native/ClientInfo";
+import type { I18nKey } from "@/i18n";
 
 export type ClientKind = "webview" | "lynx";
 
@@ -105,4 +106,121 @@ export function supportsClientSwitch(kinds: unknown): boolean {
   if (kinds === null || kinds === undefined) return true;
   if (!Array.isArray(kinds)) return false;
   return kinds.includes("webview") && kinds.includes("lynx");
+}
+
+// ─── 引擎降级（ADR-0164 / spec docs/specs/engine-default-lynx-bidirectional-fallback.md §3）───
+// 以下键的字面量唯一所有者是 Java 侧 EnginePrefs
+//（packages/app/android/app/src/main/java/io/pictelio/app/engine/EnginePrefs.java），
+// TS 侧为镜像常量——由 tests/unit/utils/engineKeysConsistency.test.ts 从两侧源码
+// 提取字面量比对钉住，任一方漂移即红灯；禁止在别处内联这些字符串。
+
+/** Lynx 失败记忆（失败时 versionCode 十进制字符串；Java 名 KEY_FAILURE_MEMORY）。 */
+export const KEY_FAILURE_MEMORY = "pictelio_engine_lynx_failure_version";
+
+/** 运行时自动回退 WebView 开关（"true" | "false"；缺省开；Java 名 KEY_AUTO_FALLBACK）。 */
+export const KEY_AUTO_FALLBACK = "pictelio_engine_auto_fallback";
+
+/** 生效状态快照（每次 EngineRouting.resolve 覆写一行；Java 名 KEY_STATE）。 */
+export const KEY_ENGINE_STATE = "pictelio_engine_state";
+
+/**
+ * 读取自动回退开关。口径与 Java `EnginePrefs.autoFallbackEnabled` 逐字一致：
+ * absent/"" → true（缺省开）、"false" → false、其余畸形值 → warn + true（fail-open
+ * 到产品缺省）。永不抛（桥故障按缺省开处理 + warn，禁静默）。
+ */
+export async function readAutoFallbackSwitch(): Promise<boolean> {
+  try {
+    const { value } = await Preferences.get({ key: KEY_AUTO_FALLBACK });
+    if (value === null || value === undefined || value === "") return true;
+    if (value === "false") return false;
+    if (value === "true") return true;
+    console.warn("[clientSwitch] 自动回退开关值畸形，按缺省开处理:", value);
+    return true;
+  } catch (e) {
+    console.warn("[clientSwitch] 读取自动回退开关失败，按缺省开处理", e);
+    return true;
+  }
+}
+
+/**
+ * 写自动回退开关（"true" / "false"）。调用方（设置 UI）已乐观更新，本函数
+ * 永不抛——持久化失败只 warn（带模块前缀，测试硬约束 3），重启后回落实际值。
+ */
+export async function writeAutoFallbackSwitch(enabled: boolean): Promise<void> {
+  try {
+    await Preferences.set({ key: KEY_AUTO_FALLBACK, value: enabled ? "true" : "false" });
+  } catch (e) {
+    console.warn("[clientSwitch] 自动回退开关写入失败（UI 已乐观更新，重启后回滚）", e);
+  }
+}
+
+/** 生效状态快照（键 `pictelio_engine_state`，行格式见 Java `EngineRoute.snapshotLine`）。 */
+export interface EngineSnapshot {
+  /** 用户首选引擎（恒合法）。 */
+  preferred: ClientKind;
+  /** 本次生效引擎；null = 无引擎可用（双失败）或 effective=none。 */
+  effective: ClientKind | null;
+  /** 降级原因码（稳定 ASCII，见 REASON_I18N_KEYS）。 */
+  reason: string;
+}
+
+/** 快照行 `preferred=<kind> effective=<kind|none> reason=<code>`（字段顺序即契约）。 */
+const ENGINE_STATE_LINE_RE = /^preferred=(\S+) effective=(\S+) reason=(\S+)$/;
+
+/** 内部：解析快照行；畸形 → warn（禁静默，spec E11）+ null。 */
+function parseEngineSnapshotLine(raw: string): EngineSnapshot | null {
+  const m = ENGINE_STATE_LINE_RE.exec(raw.trim());
+  const malformed = (): EngineSnapshot | null => {
+    console.warn("[clientSwitch] 引擎状态快照畸形", raw);
+    return null;
+  };
+  if (!m) return malformed();
+  if (m[1] !== "webview" && m[1] !== "lynx") return malformed();
+  let effective: ClientKind | null;
+  if (m[2] === "none") {
+    effective = null;
+  } else if (m[2] === "webview" || m[2] === "lynx") {
+    effective = m[2];
+  } else {
+    return malformed();
+  }
+  return { preferred: m[1], effective, reason: m[3] };
+}
+
+/**
+ * 读取生效状态快照；无记录/畸形 → null（畸形路径 warn，禁静默）。永不抛。
+ * 返回 null = 按无降级渲染（UI 侧降级双态行不显示）。
+ */
+export async function readEngineState(): Promise<EngineSnapshot | null> {
+  try {
+    const { value } = await Preferences.get({ key: KEY_ENGINE_STATE });
+    if (value === null || value === undefined || value === "") return null;
+    return parseEngineSnapshotLine(value);
+  } catch (e) {
+    console.warn("[clientSwitch] 读取引擎状态快照失败，按无降级处理", e);
+    return null;
+  }
+}
+
+/**
+ * 降级原因码 → i18n 键（spec §3.1：持久层只存稳定 ASCII 码，UI 侧映射文案）。
+ * code 集合与 Java `EngineRoute.Reason` 枚举由
+ * tests/unit/utils/engineReasonCodesConsistency.test.ts 双向钉住。
+ */
+export const REASON_I18N_KEYS = {
+  preferred: "engineFallback.reason.preferred",
+  lynx_unavailable: "engineFallback.reason.lynx_unavailable",
+  lynx_known_bad: "engineFallback.reason.lynx_known_bad",
+  lynx_retry: "engineFallback.reason.lynx_retry",
+  webview_unavailable: "engineFallback.reason.webview_unavailable",
+  a11y_webview: "engineFallback.reason.a11y_webview",
+  a11y_lynx_last_resort: "engineFallback.reason.a11y_lynx_last_resort",
+  no_engine: "engineFallback.reason.no_engine",
+  forced_webview: "engineFallback.reason.forced_webview",
+  runtime_failure: "engineFallback.reason.runtime_failure",
+} as const satisfies Record<string, I18nKey>;
+
+/** 原因码 → i18n 键；未知码回退 unknown 键（UI 显式显示「引擎状态未知」，即暴露错误态）。 */
+export function reasonKey(code: string): I18nKey {
+  return (REASON_I18N_KEYS as Record<string, I18nKey>)[code] ?? "engineFallback.reason.unknown";
 }

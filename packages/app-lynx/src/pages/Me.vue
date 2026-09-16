@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'me' })
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { navigate, resetHistory, ensureAuth } from '../router'
 import { useGlobalFabStore } from '../stores/globalFab'
@@ -11,6 +11,7 @@ import { useSettingsStore } from '../stores/settingsStore'
 import type { ImageQuality } from '../utils/imageQuality'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { ME_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import { readEngineState, REASON_I18N_KEYS, type EngineKind, type EngineStateSnapshot } from '../utils/engineState'
 import GlassCard from '../components/GlassCard.vue'
 import { themeColorClass } from '../utils/themeColor'
 import {
@@ -44,9 +45,45 @@ import { INPUT_PLACEHOLDER_COLOR } from '../utils/lynxPlatformColors'
 const auth = useAuthStore()
 const settings = useSettingsStore()
 const clientSwitch = useClientSwitchStore()
-const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, language, novelExportFormat, novelExportOptions, relatedInjection, rankingEntry } = storeToRefs(settings)
+const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, language, novelExportFormat, novelExportOptions, relatedInjection, rankingEntry, autoFallbackEngine } = storeToRefs(settings)
 
 const switching = ref(false)
+
+// ─── 引擎生效状态快照（ADR-0164 / #555）：客户端卡「本次生效」双态行数据源 ───
+// 读不到（键缺失/读取失败/畸形）→ null 不渲染（engineState 读取侧已 warn，禁静默）；
+// 仅降级生效（effective ≠ none 且 ≠ preferred）时渲染，正常与双失败（错误页兜底）都隐藏。
+const engineState = ref<EngineStateSnapshot | null>(null)
+const degradedEngineState = computed<EngineStateSnapshot & { effective: EngineKind } | null>(() => {
+  const s = engineState.value
+  if (s === null || s.effective === 'none' || s.effective === s.preferred) return null
+  return s as EngineStateSnapshot & { effective: EngineKind }
+})
+
+/** 引擎显示名（Lynx/WebView 为产品名，双语同形，不进 i18n 字典） */
+function engineDisplayName(kind: EngineKind): string {
+  return kind === 'lynx' ? 'Lynx' : 'WebView'
+}
+
+/** 双态行主文案（t 在 computed 内调用保持 locale 响应） */
+const effectiveStateText = computed(() => {
+  const s = degradedEngineState.value
+  if (s === null) return ''
+  return t('me.client.effectiveState', {
+    preferred: engineDisplayName(s.preferred),
+    effective: engineDisplayName(s.effective),
+  })
+})
+
+/** 双态行原因文案（reasonKey 映射：引擎状态快照降级原因码 → i18n） */
+const degradedReasonText = computed(() => {
+  const s = degradedEngineState.value
+  return s === null ? '' : t(REASON_I18N_KEYS[s.reason])
+})
+
+/** 自动回退开关（ADR-0164）：一键翻转，设备级 setter 自带持久化；与引擎切换互不影响，无需 switching 守卫 */
+function toggleAutoFallbackEngine() {
+  settings.setAutoFallbackEngine(!autoFallbackEngine.value)
+}
 
 // ─── WebDAV 备份（spec docs/specs/webdav-backup.md §7；仅原生 LynxView 渲染，§2）───
 const webdavAvailable = isNativeMode()
@@ -261,6 +298,10 @@ function onWebdavUndo(): void {
 let unreg: (() => void) | undefined
 onMounted(async () => {
   unreg = useGlobalFabStore().usePage('me', {})
+  // 引擎生效状态快照（fire-and-forget）：失败/无快照 → null 不渲染（读取侧 warn）
+  void readEngineState().then((s) => {
+    engineState.value = s
+  })
   await ensureAuth()
   refreshWebdavLastBackupLabel()
   if (settings.webdavEnabled) await loadWebdavCredentials()
@@ -472,6 +513,32 @@ function toggleRankingEntry() {
           >
             <view v-if="clientSwitch.selectedClient === 'lynx'" class="w-[2.667vw] h-[2.667vw] rounded-full bg-primary-on" />
           </view>
+        </view>
+        <!-- 自动回退 WebView 开关（ADR-0164 / #555）：设备级缺省开；M3 switch（照内容组 R18 行逐字范式） -->
+        <view
+          class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.autoFallbackEngine"
+          @tap="toggleAutoFallbackEngine"
+        >
+          <view class="flex flex-col">
+            <text class="text-title-medium text-surface-on">{{ t('me.client.autoFallback') }}</text>
+            <text class="text-label-medium text-surface-on-variant mt-0.5">{{ t('me.client.autoFallbackDesc') }}</text>
+          </view>
+          <view
+            class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
+            :class="autoFallbackEngine ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
+          >
+            <!-- handle-container：32×32 与轨道同高，thumb 居中 → 距边 8px/4px -->
+            <view class="w-8 h-8 flex items-center justify-center">
+              <view class="rounded-full active:w-[7.467vw] active:h-[7.467vw]" :class="autoFallbackEngine ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
+            </view>
+          </view>
+        </view>
+        <!-- 生效双态行（ADR-0164）：仅降级生效时渲染（effective≠none 且≠preferred）；正常与双失败不显示 -->
+        <view v-if="degradedEngineState" class="pt-3">
+          <text class="text-label-medium text-surface-on-variant">{{ effectiveStateText }}</text>
+          <text class="text-label-medium text-surface-on-variant mt-1">{{ degradedReasonText }}</text>
         </view>
         <text v-if="switching" class="text-body-small text-primary mt-3">{{ t('me.client.restarting') }}</text>
       </view>

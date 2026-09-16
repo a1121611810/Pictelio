@@ -22,6 +22,7 @@ import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 const mocks = vi.hoisted(() => ({
   readClientKind: vi.fn(),
   switchClient: vi.fn(),
+  readEngineState: vi.fn(),
   getClientKinds: vi.fn(),
   navigate: vi.fn(),
 }));
@@ -32,11 +33,17 @@ vi.mock("@capacitor/preferences", () => ({
 vi.mock("@/native/ClientInfo", () => ({
   ClientInfo: { getClientKinds: mocks.getClientKinds },
 }));
-vi.mock("@/utils/clientSwitch", () => ({
-  readClientKind: mocks.readClientKind,
-  switchClient: mocks.switchClient,
-  supportsClientSwitch: vi.fn(),
-}));
+vi.mock("@/utils/clientSwitch", async (importOriginal) => {
+  // 部分 mock：readClientKind/switchClient 由用例控制；reasonKey/读写解析走真实实现
+  //（真实 reasonKey 映射 + 真实 zh 字典渲染降级文案，IO 由 @capacitor/preferences mock 承担）
+  const actual = await importOriginal<typeof import("@/utils/clientSwitch")>();
+  return {
+    ...actual,
+    readClientKind: mocks.readClientKind,
+    switchClient: mocks.switchClient,
+    readEngineState: mocks.readEngineState,
+  };
+});
 vi.mock("@solidjs/router", async (importOriginal) => {
   const actual = await importOriginal();
   return {
@@ -54,6 +61,7 @@ describe("ClientSwitch 切换渲染引擎说明页", () => {
     // __E2E__ 默认 stub false（对齐生产构建语义，钩子块不注册）
     vi.stubGlobal("__E2E__", false);
     mocks.readClientKind.mockResolvedValue("webview");
+    mocks.readEngineState.mockResolvedValue(null);
     mocks.getClientKinds.mockResolvedValue({ kinds: ["webview", "lynx"] });
     mocks.switchClient.mockResolvedValue({ ok: true });
   });
@@ -143,6 +151,32 @@ describe("ClientSwitch 切换渲染引擎说明页", () => {
     await screen.findByText("当前以 Lynx 渲染引擎运行。");
     expect(screen.getByText("当前以 Lynx 渲染引擎运行。")).toBeDefined();
   });
+
+  it("生效状态快照降级（effective ≠ preferred）→ 当前引擎区显示「首选 X · 本次生效 Y」+ 原因文案", async () => {
+    // oracle：快照结构 = Java EngineRoute.snapshotLine 反序列化形态（spec §3）；
+    // 文案 = zh 字典（settings.client.effectiveState / engineFallback.reason.lynx_unavailable）
+    mocks.readEngineState.mockResolvedValue({
+      preferred: "lynx",
+      effective: "webview",
+      reason: "lynx_unavailable",
+    });
+    render(() => <ClientSwitch />);
+
+    expect(await screen.findByText("首选 Lynx · 本次生效 WebView")).toBeDefined();
+    expect(await screen.findByText("Lynx 引擎在本机不可用，已改用 WebView")).toBeDefined();
+  });
+
+  it("生效状态快照按首选运行（effective === preferred）→ 不渲染双态行", async () => {
+    mocks.readEngineState.mockResolvedValue({
+      preferred: "lynx",
+      effective: "lynx",
+      reason: "preferred",
+    });
+    render(() => <ClientSwitch />);
+
+    expect(await screen.findByText("确认切换")).toBeDefined();
+    expect(screen.queryByText(/首选 Lynx · 本次生效/)).toBeNull();
+  });
 });
 
 describe("ClientSwitch E2E 钩子结果契约（ADR-0159 决策 2 / spec 决策 4）", () => {
@@ -164,6 +198,7 @@ describe("ClientSwitch E2E 钩子结果契约（ADR-0159 决策 2 / spec 决策 
     // __E2E__ stub true：注册钩子块（生产仅 --mode e2e 构建注册，单测运行时注入）
     vi.stubGlobal("__E2E__", true);
     mocks.readClientKind.mockResolvedValue("webview");
+    mocks.readEngineState.mockResolvedValue(null);
     mocks.getClientKinds.mockResolvedValue({ kinds: ["webview", "lynx"] });
     mocks.switchClient.mockResolvedValue({ ok: true });
   });
