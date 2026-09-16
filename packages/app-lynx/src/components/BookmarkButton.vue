@@ -10,6 +10,9 @@
 //    同一次手势的 tap 被吞掉（不额外触发快速收藏）。列表卡片不开（列表不加入口，spec D3）。
 //  - playBurst：面板保存成功后由宿主经模板 ref 调用（与单击收藏播同一动效资产）。
 // @tap.stop：阻止冒泡到卡片 tap（进详情），需实测 vue-lynx 是否支持 .stop。
+// init-only props（illustId/initialBookmarked/bookmarkCount）：宿主必须按作品 remount（:key），
+// 否则状态机冻结在首卡（ADR-0163；真实缺陷：轮播收藏数恒首卡值，commit 44ee6401）。
+// 宿主矩阵契约测试：BookmarkButton.host-matrix.test.ts。
 import { onBeforeUnmount, ref } from 'vue'
 import {
   BOOKMARK_ANIMATION_MS,
