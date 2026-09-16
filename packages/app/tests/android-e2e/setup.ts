@@ -11,6 +11,7 @@ import { ensureAppiumServer, assertUiautomator2DriverInstalled } from "./appium"
 import { ensureEmulator, assertDeviceOnline } from "./avd";
 import { ensureChromedriver } from "./chromedriver";
 import { buildDebugApk, installApk } from "./build-install";
+import { writeClientKind } from "./prefs";
 import { adbPath, APP_PACKAGE, runCapture, runOrThrow, sdkRoot, TIMEOUTS } from "./env";
 
 // uiautomator2 driver 的 session 创建在 vitest 进程内执行（remote()），
@@ -107,6 +108,15 @@ export async function setupAndroidE2e(avdName?: string): Promise<AndroidE2eConte
     runOrThrow(adbPath(), ["-s", serial, "shell", "pm", "clear", APP_PACKAGE], TIMEOUTS.adb);
     console.log(`[android-e2e] ✓ 已清空 ${APP_PACKAGE} 数据（冒烟基线干净）`);
   }
+
+  // ADR-0164 翻转后「无键 = lynx」（缺省即 Lynx）。既有 spec 的隐式基线是
+  // 「全新安装 = webview」，播种把该前提显式化（显式 webview → S9 首选 webview 照旧），
+  // 保住既有 spec 基线；「无键 → LynxActivity」翻转契约由 client-kind-contract
+  // 自带的二次 pm clear 用例显式断言。
+  writeClientKind(serial, "webview");
+  console.log(
+    `[android-e2e] ✓ 已播种 pictelio_client_kind=webview（ADR-0164 缺省翻转后的 E2E 基线）`,
+  );
 
   const appium = await ensureAppiumServer();
 

@@ -23,6 +23,8 @@ import java.lang.ref.WeakReference;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.pictelio.app.BuildConfig;
+import io.pictelio.app.engine.Engine;
+import io.pictelio.app.engine.EnginePrefs;
 
 /**
  * Lynx client 宿主 Activity（#51，双 client 启动分支）。
@@ -367,7 +369,10 @@ public class LynxActivity extends AppCompatActivity {
     }
 
     /**
-     * 清除 client 开关并重启 MainActivity（webview 宿主）。
+     * 显式选择 webview 首选并重启 MainActivity（webview 宿主，ADR-0164 决策 9）。
+     * 旧实现删 pictelio_client_kind 键——缺省翻转为 lynx 后「删键 = 回 lynx = 死循环」，
+     * 故改为 {@link EnginePrefs#setPreferredExplicit}（写首选 + 清失败记忆，S12 显式选择语义：
+     * 下次启动 S9 首选 webview 照旧，且不被残留失败记忆 S4 弹回）。
      * 用反射探测 MainActivity：lynx-only 包无该类（编译期也不可引用，
      * 故 Intent 目标同样走反射），full 包存在且 Manifest 已注册为非 LAUNCHER。
      */
@@ -379,10 +384,7 @@ public class LynxActivity extends AppCompatActivity {
             Log.w(TAG, "当前包无 MainActivity（lynx-only），无法切回 WebView");
             return;
         }
-        getSharedPreferences("CapacitorStorage", MODE_PRIVATE)
-                .edit()
-                .remove("pictelio_client_kind")
-                .apply();
+        EnginePrefs.setPreferredExplicit(this, Engine.WEBVIEW);
         android.content.Intent intent = new android.content.Intent(this, mainActivityClass);
         intent.addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK | android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intent);

@@ -13,8 +13,13 @@ import { ClientInfo } from "@/native/ClientInfo";
 export type ClientKind = "webview" | "lynx";
 
 export const CLIENT_KIND_KEY = "pictelio_client_kind";
-/** 主应用（pictelio-app）自身是 webview client */
-export const DEFAULT_CLIENT: ClientKind = "webview";
+/**
+ * 缺省引擎（无记录/异常时的回退值）。ADR-0164：缺省语义翻转为 "lynx"
+ * （键缺省 = 从未显式选择 → Java 侧归一化为 CLIENT_KINDS[0]，翻转后即 lynx）。
+ * 注意：本应用自身是 webview client 与缺省值是两个概念——后者随 ADR-0164 翻转，
+ * 前者（NetDiag/backupWiring 的 engine: "webview" 字面量）不变。
+ */
+export const DEFAULT_CLIENT: ClientKind = "lynx";
 
 /** 切换结果：error modes 显式声明（接口契约的一部分，UI 据此映射 toast） */
 export type SwitchOutcome =
@@ -24,13 +29,13 @@ export type SwitchOutcome =
 /** 开关写入超时（ms）：切换是用户主动一次性操作，5s 未完成视为失败并给出反馈 */
 const WRITE_TIMEOUT_MS = 5_000;
 
-/** 读取当前 client（无记录/异常 → webview 默认） */
+/** 读取当前 client（无记录/异常 → 缺省引擎 DEFAULT_CLIENT，翻转后为 lynx） */
 export async function readClientKind(): Promise<ClientKind> {
   try {
     const { value } = await Preferences.get({ key: CLIENT_KIND_KEY });
     return value === "lynx" || value === "webview" ? value : DEFAULT_CLIENT;
   } catch (e) {
-    console.warn("[clientSwitch] 读取 client kind 失败，默认 webview", e);
+    console.warn("[clientSwitch] 读取 client kind 失败，按缺省引擎处理", e);
     return DEFAULT_CLIENT;
   }
 }

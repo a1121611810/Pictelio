@@ -1,23 +1,26 @@
 package io.pictelio.app;
 
 import android.app.Application;
-import android.content.SharedPreferences;
 import android.util.Log;
 import android.webkit.WebView;
+
+import io.pictelio.app.engine.EngineRoute;
+import io.pictelio.app.engine.EngineRouting;
 
 /**
  * Pictelio Application 入口。
  *
- * <p>按 client 开关（SharedPreferences("CapacitorStorage") 的
- * {@code pictelio_client_kind}）条件初始化（#51）：
+ * <p>按引擎路由（{@link EngineRouting#resolve}，ADR-0164 决策 3：预热与 MainActivity
+ * 路由共用同一决策入口，消灭「预热与路由各读一次键」的漂移面）条件初始化（#51）：
  * <ul>
- *   <li>lynx → 初始化 Lynx runtime（LynxEnv + 全局 Native Modules），跳过 WebView 预热；
- *   <li>webview（默认）→ 保持现状：预热 WebView 服务进程。
+ *   <li>BOOT_LYNX → 初始化 Lynx runtime（LynxEnv + 全局 Native Modules），跳过 WebView 预热；
+ *   <li>BOOT_WEBVIEW → 预热 WebView 服务进程；
+ *   <li>UPGRADE_PAGE → 双失败 / 引擎均不可用，不预热（消灭「预热与路由错位」）。
  * </ul>
  *
  * <p>WebView 预热与 SplashScreen 互补：SplashScreen 掩盖 Activity 初始化到首帧
- * 绘制之间的视觉空白；预热缩短 WebView 服务进程初始化耗时。异常安全：预热失败
- * 静默吞异常，app 正常启动，正式 WebView 回退冷初始化路径。
+ * 绘制之间的视觉空白；预热缩短 WebView 服务进程初始化耗时。异常安全：预热/初始化失败
+ * 静默吞异常，app 正常启动，正式引擎创建时回退冷初始化路径。
  */
 public class PictelioApp extends Application {
 
@@ -26,12 +29,15 @@ public class PictelioApp extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
-        String clientKind = getSharedPreferences(PictelioAppModule.CLIENT_PREFS, MODE_PRIVATE)
-                .getString(PictelioAppModule.CLIENT_KEY, "webview");
-        if ("lynx".equals(clientKind)) {
-            initLynx();
-        } else {
-            warmUpWebView();
+        // 引擎决策唯一入口：本进程无需 intent 路由（forced/stay 仅 MainActivity 语义）。
+        // 探针惰性求值——首选 webview 的用户依旧不加载 Lynx（成本与旧实现持平）。
+        EngineRoute route = EngineRouting.resolve(this, FullEngineProbe.create(this), false, null);
+        switch (route.action) {
+            case BOOT_LYNX -> initLynx();
+            case BOOT_WEBVIEW -> warmUpWebView();
+            case UPGRADE_PAGE -> {
+                // 双失败：MainActivity 会落升级页，预热哪个引擎都无意义
+            }
         }
     }
 

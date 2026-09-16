@@ -1,8 +1,5 @@
 package io.pictelio.app;
 
-import io.pictelio.app.config.OAuthConfig;
-
-import android.content.pm.PackageInfo;
 import android.content.Intent;
 import android.os.Bundle;
 import android.webkit.WebResourceRequest;
@@ -16,6 +13,8 @@ import androidx.core.splashscreen.SplashScreen;
 
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
+
+import io.pictelio.app.engine.WebViewAvailability;
 
 /**
  * Pictelio Android 客户端 — 拦截 /pixiv-img/ 请求并代理到 i.pximg.net（注入 Referer 头）。
@@ -51,7 +50,7 @@ public class MainActivityWebview extends BridgeActivity {
                 splashScreenView.remove();
             }
         });
-        if (!isWebViewVersionOk()) {
+        if (!WebViewAvailability.isOk(this)) {
             // WebView 版本不足时立即关闭 Splash，显示升级提示页。
             // 必须先 super.onCreate（Android 硬约束：跳过即 SuperNotCalledException 崩溃），
             // 且不初始化 Capacitor Bridge / 插件。
@@ -157,36 +156,9 @@ public class MainActivityWebview extends BridgeActivity {
     }
 
     // ── WebView 版本检测 ────────────────────────────────────────────
-
-    /**
-     * 提取当前设备 WebView 的主版本号。
-     *
-     * @return 主版本号（如 85）；无法获取时返回 -1。
-     */
-    private static int getWebViewMajorVersion() {
-        try {
-            PackageInfo pi = WebView.getCurrentWebViewPackage();
-            if (pi == null || pi.versionName == null) return -1;
-            int dotIdx = pi.versionName.indexOf('.');
-            if (dotIdx > 0) {
-                return Integer.parseInt(pi.versionName.substring(0, dotIdx));
-            }
-            return -1;
-        } catch (Exception e) {
-            return -1;
-        }
-    }
-
-    /**
-     * 检查当前 WebView 版本是否满足最低要求。
-     *
-     * 无法检测到版本时保守放行（避免误杀非标准实现）。
-     */
-    private boolean isWebViewVersionOk() {
-        int major = getWebViewMajorVersion();
-        if (major < 0) return true;     // 检测失败 → 放行，让应用自己处理
-        return major >= OAuthConfig.MIN_WEBVIEW_VERSION;
-    }
+    // 探测逻辑收编至 WebViewAvailability（src/main，ADR-0164 决策 3）——
+    // 原 getWebViewMajorVersion/isWebViewVersionOk 逐字重复实现删除，
+    // fail-open 口径不变（版本不可解析 → 放行）。
 
     /**
      * 显示 WebView 升级提示页，阻止应用正常启动。
