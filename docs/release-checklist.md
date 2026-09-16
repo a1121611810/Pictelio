@@ -171,3 +171,4 @@ node scripts/release-bundle.mjs --version=<version>   # dist 默认 dist/，产�
 1. **双引擎转换清单全过**：按 `docs/agents/qa-transition-checklist.md`（手工版转换矩阵 R1-R4，内容断言口径）逐行执行，lynx + webview 双引擎全过方可发布。
 2. **pre-release 分阶段发布**：GitHub Releases 先以 pre-release 标记发布（beta 通道），挂 ≥3 天收集真机反馈后再转 stable（`gh release edit <tag> --prerelease=false`，或在 Release 页面取消 pre-release 勾选）。本项目不经 Play 分发，pre-release 标记即分阶段发布（ADR-0163「发布侧适配」）。
 3. **发布中发现缺陷先登记再修**：转换矩阵覆盖范围内的任何缺陷，先在 `docs/agents/qa-transition-checklist.md` 登记（标记回归行或新增矩阵行），再进入修复流程，确保修复自带回归防线。
+4. **引擎降级取证（ADR-0164）**：`pictelio_ui` 与 `pictelio_low` 各跑一轮 `specs/engine-fallback-matrix.spec.ts`（M1–M3'，命令见 `docs/android-e2e-gate.md`）；并对 release full 包 APK 做取证键消除断言——`unzip -p <apk> 'classes*.dex' | grep -c pictelio_debug_force_lynx_unavailable` 必须为 **0**（DEBUG 取证键在 release 被 R8 死代码消除的验收动作，非零 = 发布包含测试后门，禁止发布）。
