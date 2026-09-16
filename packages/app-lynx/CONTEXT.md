@@ -391,3 +391,21 @@ _Avoid_: 在 lynx 用 `<input type="date">`（web-core 预览会透传成真实 
 **名次（rank）**：
 作品在榜单中的序位，由**分页偏移 + 下标**推得（服务端响应不返回名次字段）。本端对受限条目**保留并盖遮罩**、名次不变（与 webview 滤除条目留下名次空洞的口径不同，两端差异为既有事实，不为榜单页破例）。
 _Avoid_: 序号 / 排名编号（避免暗示「连续编号」，名次是位置不是计数）
+
+### 质量防线与平台事实（QA defense lines & platform facts）【2026-09-16 新增，ADR-0162/0163，spec docs/specs/qa-defense-lines.md】
+
+**平台事实（platform fact）**：
+只在真实 Lynx 运行时成立、单测环境（happy-dom）与 web-core 预览**无法证明也无法证伪**的行为差异。已实证三例：URL 全局 polyfill `.hostname` 为 `undefined`（happy-dom 正常）、原生 list 对结构变更的三态行为（插入=丢弃/移除=留空位/替换=错位）、`pointer-events` 命中失效。纪律：**每个平台事实必须有设备探针记录（logcat/截图）+ 源级守卫**，禁止「单测绿+预览绿」当作设备行为的证据。
+_Avoid_: 把 happy-dom 单测当 Lynx 运行时行为的 oracle（「预览假绿」——placeholder-color、彩色 emoji、URL 三次同模式）
+
+**源级守卫（source-level guard）**：
+针对平台事实/接线的**源码形态断言测试**（`*.template.test.ts` 惯例）：读源文件、剥注释、对代码本文做正/负向匹配。用于锁「框架 bug workaround 不被删」「平台危险 API 不回流」「接线不回退」这类**行为测试测不到的回归面**。断言必须语义级（不锁局部变量名），并注明 oracle 出处（ADR/spec/取证记录）。
+_Avoid_: 用它替代行为测试（两者互补：守卫锁形态，模拟器/真机闭环锁行为）
+
+**整树重建防御（epoch rebuild defense）**：
+原生 `<list>` 面对结构性数据变更（插入/删除/整体替换）的唯一可靠手段：给 `<list>` 绑 `:key="epoch"`，在数据落定的同一 tick bump（watch 先于渲染）→ key 变化走整树替换，**绕过就地 patch**。代价：滚动位置回顶（lynx list 无 scroll-to-offset API，FAB 回顶即靠重建实现）。既证危险的就地操作：中途插入 list-item=静默丢弃、单项移除=留空位、整表替换=索引错位（ADR-0107 D4 / ADR-0112 D5 / ADR-0162）。
+_Avoid_: 对 list 结构变更做「就地 patch + 祈祷」；用 scroll API 恢复位置（不存在该 API）
+
+**卡内展开段（inline expansion section）**：
+注入类增强内容（如相关作品）在瀑布流中的渲染形态：作为**锚点卡 list-item 内部的条件段**（`openDetail` 冒泡域外的兄弟位），**不**作为独立 list-item 织入列表。紧贴锚点成立、滚动位置保留、绕开插入丢弃。先例：`RelatedInlineSection`（spec related-injection §5.2 v2）。
+_Avoid_: 向原生瀑布流中途插入 list-item（必丢，ADR-0162）；横滑条（原生 waterfall list-item 内不可靠，spec §5.2 v1 已证）
