@@ -397,3 +397,21 @@ _Avoid_: 榜单时间范围（那是搜索的期间语义，二者不是一回�
 **名次（rank）**：
 作品在榜单中的序位，由**分页偏移 + 下标**推得（服务端响应不返回名次字段）。客户端过滤掉条目时**不重编号**——因此被过滤的条目会留下名次空洞，这是已知行为而非缺陷。
 _Avoid_: 序号 / 排名编号（避免暗示「连续编号」，名次是位置不是计数）
+
+### 引擎切换与双向降级（Engine Routing）【2026-09-16 新增，跨上下文，spec docs/specs/engine-default-lynx-bidirectional-fallback.md】
+
+**失败记忆（Failure memory）**：
+设备级键 `pictelio_engine_lynx_failure_version`，记录 Lynx 上次硬运行时失败时的应用 versionCode。与当前版本精确相等才命中，应用升级自动遗忘；只在自动回退开关开启时读写。消除「每次冷启动白屏一次再弹回」，不是用户偏好——降级永远不改写首选引擎。
+_Avoid_: 把失败记忆写成首选引擎（设备事实 ≠ 偏好变化，ADR-0153 决策 2 的对称推广）；用「失败次数/时间窗」做键值（版本精确匹配已足够）
+
+**生效状态快照（Effective-engine snapshot）**：
+设备级键 `pictelio_engine_state`，引擎路由决策时覆写的单行 `preferred=<kind> effective=<kind|none> reason=<code>`。双端设置 UI 的「首选 X · 本次生效 Y」与 android-e2e 的 adb 断言消费同一份字符串，无第二通道。
+_Avoid_: 前端自行重算生效引擎（预测 ≠ 事实，以原生落盘为准）；快照里写中文文案（持久层只存稳定 ASCII 原因码）
+
+**强制 WebView（Forced webview）**：
+Intent extra `pictelio_engine_forced_webview`，Lynx 运行时硬错误自动跳转落地 MainActivity 时携带：本次启动不再重新决策引擎（仍过 WebView 版本门禁）。与失败记忆（跨启动）共同构成防回环双保险。
+_Avoid_: 用「删首选键」实现返回 WebView（默认翻转后删键 = 回 lynx = 死循环）；用静态会话标记防回环（与显式切回冲突，ADR-0153 决策 5）
+
+**无障碍回退（Accessibility fallback）**：
+系统无障碍服务启用且两引擎均可用时，即使首选 lynx 也以 WebView 生效；WebView 不可用时仍以 Lynx 兜底（无障碍降级优于应用不可用）。背景：lynx 的 a11y 树只暴露表单元素，渲染成功不触发任何失败信号。
+_Avoid_: 把无障碍回退交给自动回退开关管（它是输入信号，不是运行时失败）；无障碍启用时停在升级页（比无障碍降级更差）
