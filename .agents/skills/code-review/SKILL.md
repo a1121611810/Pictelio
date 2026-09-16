@@ -1,19 +1,20 @@
 ---
 name: code-review
-description: 审查 git diff（固定点到 HEAD）的双轴 code review（Standards + Spec），带两个阻塞级强制审计（调用点完备性 + 期望值溯源）与触发式维度卡点。Spec 轴强制「翻转/接口变更的调用点完备性审计」（blast radius review）和测试「期望值溯源」（Oracle check），对抗两类 AI 评审缺陷：漏迁移调用点、测试迎合实现；并配共享强制机制（brief 注入 / 证据要求 / 声称成功无效）对抗模型跳过。Pictelio 仓库版：审计一机器证据通道为 CodeGraph，审计二锚 AGENTS.md 测试硬约束 #1-6（Oracle check / Test strength，调研依据 docs/research/ai-generated-test-quality.md）。项目级 skill，按加载优先级遮蔽全局同名 skill。
+description: 审查 git diff（固定点到 HEAD）的双轴 code review（Standards + Spec），带三个阻塞级强制审计（调用点完备性 + 期望值溯源 + 平台与宿主契约）与触发式维度卡点。Spec 轴强制「翻转/接口变更的调用点完备性审计」（blast radius review）、测试「期望值溯源」（Oracle check）与「平台与宿主契约」审计，对抗三类评审盲区：漏迁移调用点、测试迎合实现、平台/宿主契约层失明；并配共享强制机制（brief 注入 / 证据要求 / 声称成功无效）对抗模型跳过。Pictelio 仓库版：审计一机器证据通道为 CodeGraph，审计二锚 AGENTS.md 测试硬约束 #1-6（Oracle check / Test strength，调研依据 docs/research/ai-generated-test-quality.md），审计三锚 ADR-0162/0163（lynx list 结构变更三态、平台事实探针纪律、init-only props 宿主契约）。项目级 skill，按加载优先级遮蔽全局同名 skill。
 ---
 
-# Code Review（Pictelio 统一双审计版 · 翻转完备性审计 + Oracle check）
+# Code Review（Pictelio 统一三审计版 · 翻转完备性审计 + Oracle check + 平台与宿主契约）
 
 对 `git diff <fixed-point>...HEAD`（three-dot，基于 merge-base）的双轴审查：**Standards**（是否符合仓库文档化的编码规范）与 **Spec**（是否忠实实现源起 issue/PRD/spec）。两条轴作为**并行 sub-agent** 运行，互不污染上下文，最后汇总。
 
 ## 为什么存在这个版本
 
-三个来源，缺一不可：
+四个来源，缺一不可：
 
 1. **翻转/接口变更类改动的完整性无法从 diff 证明**（blast radius 原则）。评审对象是 diff，但这类改动的风险恰恰在「应该改却没来改的调用点」——缺席的文件不进 diff，逐行评审永远看不到。结构性后果：默认行为翻转（开关默认态反转、转义/渲染策略翻转）漏掉一个消费方，线上表现为静默错误；接口收窄/签名变化漏改一个调用点，类型检查拦不住运行时行为偏差。审计一只靠人肉逐行无法完备，必须配机器证据（见审计一）。
 2. **AI 生成测试会迎合实现**（Oracle 缺陷）。"测试全绿"不证明"测试正确"——期望值从实现反推、同义反复断言、自洽 mock，都让测试成为实现的镜子。审阅必须对照独立来源（spec/真实样例/字面量/不变量/差分），而非被检对象自身。调研依据：`docs/research/ai-generated-test-quality.md`、`docs/research/deepseek-harness-agents-analysis.md`；决策记录：ADR-0097。
 3. **AI 执行会跳过或假装完成**。措辞是弱强制；强制机制（brief 注入、证据要求、"声称成功无效"）和机器防线（门禁脚本、代码索引工具）才是硬强制。
+4. **平台运行时与跨组件契约层对 diff 评审结构性失明**。Lynx 运行时语义 ≠ 浏览器语义（URL polyfill `.hostname` 为 undefined）、vue-lynx 原生 `<list>` 结构变更被 patch 静默丢弃（ADR-0162）、init-only props 在复用宿主下状态冻结——这类缺陷单测全绿、review 通过，只在真机状态转换（返回/翻页/切筛选/换卡）中暴露（2026-09-15/16 四缺陷实证，ADR-0163）。拦截只能靠审查纪律前置（见审计三）。
 
 ## 流程
 
@@ -23,12 +24,12 @@ description: 审查 git diff（固定点到 HEAD）的双轴 code review（Stand
 4. **并行 spawn 两个 sub-agent**（general-purpose）：Standards 轴与 Spec 轴，上下文互不污染。Spec sub-agent 的 brief **必须**逐字包含下方「Spec 轴强制增量」全部指令原文（brief 注入），不得改写、缩写或"酌情执行"。
 5. **汇总**：两轴报告分列 `## Standards` / `## Spec`，不合并不重排。结尾一行总结每轴 finding 数与最严重项；不跨轴选 winner。
 
-## Spec 轴强制增量（阻塞项）：双审计 + 共享强制机制
+## Spec 轴强制增量（阻塞项）：三审计 + 共享强制机制
 
-### 共享强制机制（双审计都必须执行）
+### 共享强制机制（三审计都必须执行）
 
 - **必须+禁止配对**：指令以「必须…/禁止…」成对书写，不留灰色地带。
-- **brief 注入**：Spec sub-agent 的 brief **必须**逐字包含审计一、审计二全部指令原文——强制指令穿透到 sub-agent。
+- **brief 注入**：Spec sub-agent 的 brief **必须**逐字包含审计一、审计二、审计三全部指令原文——强制指令穿透到 sub-agent。
 - **证据要求 + 声称成功无效**：声称完成了枚举/溯源但拿不出证据（grep 命令、索引工具查询结果、未截断计数）＝无效，视为未执行。**不信任 agent 的自述**。
 - **characterization 识别**：期望值只是"当前行为"锁定（快照、从实现输出抄写）而无规格依据的测试，是 characterization（防回归）而非 specification（防错误）——不能作为"实现正确"的证据，必须标出。
 - **心智判据**：每个审计配一个可证伪检验（见下），用反事实回答"这样审会不会漏"。
@@ -76,6 +77,22 @@ description: 审查 git diff（固定点到 HEAD）的双轴 code review（Stand
 - **心智判据**：把实现改成"显然错误但符合该测试断言"的版本，测试会红吗？不会 = conformance 嫌疑。
 - **Test strength**：每个测试必须能说清它防的 **intended regression**（目标回归）；断言必须验证**可观察行为**（事件流、存储、日志、输出），**禁止** restate implementation；说不出的 = 嫌疑。
 
+### 审计三 · 平台与宿主契约（Lynx 双引擎防线）
+
+**触发信号**（命中任一即触发审计）：
+
+- **原生 `<list>` 结构变更**：向 lynx 原生瀑布流/列表**插入、删除或替换** list-item（full-span 交织行、整表替换、中途插入均算）
+- **Lynx 平台全局 API 新用法**：diff 中首次使用 `new URL`、新全局对象、新 bridge 行为依赖（lynx 运行时 ≠ 浏览器标准语义）
+- **init-only props 组件接入新宿主形态**：只在组件 setup 时被读一次、此后变更不生效的 props（`initial[A-Z]*` 命名模式，如 `initialBookmarked`/`initialCount`）的可复用组件，被新的宿主形态引用（复用同一实例的列表/轮播宿主）
+
+**审计要求**：
+
+- **(a) 原生 `<list>` 结构变更**：**必须**同时具备——① epoch 整树重建防御（`:key` 重建）**或**结构规避（如锚点卡内展开段，不做列表结构变更）；② 设备 spike 记录（模拟器/真机取证，落 ADR 或测试文件头注释）。lynx 平台事实：瀑布流 list-item **插入 = 静默丢弃 / 移除 = 留空位 / 替换 = 错位**（依据 ADR-0162，与 ADR-0107 D4、ADR-0112 D5 合并阅读）。裸结构变更 patch 且 ①②缺一 = **阻塞 finding**。
+- **(b) Lynx 平台全局 API 新用法**：**必须**同时具备——① 设备探针记录（logcat/截图取证；平台一致性自检页 `/platform-check` 为标准载体）；② 源级守卫测试（`.template.test.ts` 剥注释断言，禁止裸用回流）。**happy-dom 单测不得作为 Lynx 运行时行为的 oracle**（它是浏览器语义参考实现）。已知反例：lynx URL polyfill `.hostname` 为 undefined，单测全绿而真机搜索翻页必败（依据 ADR-0163）。无探针记录或无源级守卫 = **阻塞 finding**。
+- **(c) init-only props 组件接入新宿主形态**：**必须**具备宿主矩阵测试（同一实例依次喂两组 props，断言状态随 props 刷新的契约行为）**或**组件头注释显式 remount 契约（「宿主必须按作品 remount（`:key`），否则状态冻结在首卡」，`BookmarkButton` 先例）。两者皆无 = **阻塞 finding**。已知反例：轮播复用宿主下收藏数冻结在首卡（ADR-0163 背景表）。
+- **禁止**以「单测全绿」作为平台语义或宿主契约无缺陷的证据——缺陷只在真 Lynx 运行时、复用宿主、状态转换中出现。
+- **心智判据**：这段代码依赖的平台行为，有一份真机/模拟器取证记录吗？该组件被第二种宿主形态复用时，生命周期契约写下了吗（测试或注释）？任一答「没有」= 审计不完备。
+
 ## 触发式维度卡点（命中才强制；tooling 已强制的不报）
 
 | 维度 | 触发信号 | 必查项 |
@@ -116,6 +133,7 @@ Smell baseline（每个读「是什么 → 怎么修」）：
 
 - **审计一防线判定锚**：`docs/adr/ADR-0097-agent-skill-repo-localization.md`（治理记录：无机器防线 = 审计不完备）
 - **审计二锚点**：AGENTS.md 测试硬约束 #1-6（完整清单）+ `docs/research/ai-generated-test-quality.md`（Oracle check / Test strength 原始出处）
+- **审计三锚点**：`docs/adr/ADR-0162-lynx-related-inline-section.md`（lynx 瀑布流 list 结构变更三态 + spike 方法）+ `docs/adr/ADR-0163-qa-defense-lines.md`（QA 防线三网：转换矩阵 / 宿主矩阵 / 平台一致性自检；平台事实 = 探针记录 + 源级守卫；init-only props 宿主契约）+ spec `docs/specs/qa-defense-lines.md`
 - **机器证据工具**：CodeGraph（`.codegraph/` 已建图，`codegraph explore` 提供调用路径与 blast radius 机器证据；健康检查 `codegraph status`）；不可用时退化为全仓 grep + 显式声明证据命令
 
 ## 本仓库测试硬约束对照（核心 4 条，完整清单见 AGENTS.md「测试硬约束」#1-#6；审查测试时逐条过）

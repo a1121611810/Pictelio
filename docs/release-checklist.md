@@ -163,3 +163,11 @@ node scripts/release-bundle.mjs --version=<version>   # dist 默认 dist/，产�
   3. Branch 选择 `gh-pages`，文件夹选 `/ (root)`
   4. 点击 Save
 - 启用后官网地址：https://a1121611810.github.io/pixivizer
+
+## 发版前 QA 防线（#547 / ADR-0163）
+
+除既有构建/签名/上传步骤外，每次发版前必须完成以下三项：
+
+1. **双引擎转换清单全过**：按 `docs/agents/qa-transition-checklist.md`（手工版转换矩阵 R1-R4，内容断言口径）逐行执行，lynx + webview 双引擎全过方可发布。
+2. **pre-release 分阶段发布**：GitHub Releases 先以 pre-release 标记发布（beta 通道），挂 ≥3 天收集真机反馈后再转 stable（`gh release edit <tag> --prerelease=false`，或在 Release 页面取消 pre-release 勾选）。本项目不经 Play 分发，pre-release 标记即分阶段发布（ADR-0163「发布侧适配」）。
+3. **发布中发现缺陷先登记再修**：转换矩阵覆盖范围内的任何缺陷，先在 `docs/agents/qa-transition-checklist.md` 登记（标记回归行或新增矩阵行），再进入修复流程，确保修复自带回归防线。
