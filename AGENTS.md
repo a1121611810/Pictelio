@@ -1,6 +1,6 @@
 # Pictelio
 
-基于 SolidJS 的 Pixiv 第三方客户端，通过 Capacitor 打包为 Android 原生应用。项目名为 **Pictelio**（目录名为 pixivizer）。
+双渲染客户端的 Pixiv 第三方客户端——缺省 **Lynx** 客户端（vue-lynx，Material Design 3），可切换 **WebView** 客户端（SolidJS，Fluent Design 2）；通过 Capacitor 打包为 Android 原生应用（ADR-0164 起缺省引擎为 Lynx）。项目名为 **Pictelio**（目录名为 pixivizer）。
 
 ## 项目概览
 
@@ -588,9 +588,9 @@ Grill 澄清 → to-spec → to-tickets → implement
   - 测试文件额外启用 vitest 插件，禁用 `no-console` 和 `require-mock-type-parameters`
 - **格式化**: 使用 `vite-plus` 内置 oxfmt，配置在 `vite.config.ts` 的 `fmt` 字段
 - **Android**：
-  - **平台要求**：`minSdkVersion = 28`（Android 9.0），WebView ≥ **85**（2020-08 Chrome/WebView）。详见 `docs/platform-compatibility.md`。
+  - **平台要求**：`minSdkVersion = 28`（Android 9.0）。WebView ≥ **85**（2020-08 Chrome/WebView）**不是运行前提**——它只是 WebView 客户端可用的门槛：缺省引擎为 Lynx（ADR-0164），WebView 过低时按引擎矩阵自动降级，仅 Lynx 也不可用才显示升级页。详见 `docs/platform-compatibility.md`。
   - `minSdkVersion = 28` 在 `variables.gradle` 中定义（commit `d1ad95c` 自 30 下调）；低于 Android 9 的设备安装时由系统直接拒绝。
-  - 启动时 `MainActivity` 通过 `WebView.getCurrentWebViewPackage()` 检测 WebView 主版本号，低于 85 则加载 `res/raw/upgrade.html` 提示用户升级 WebView，不初始化 Capacitor / JS 环境。
+  - 启动引擎决策由 `io.pictelio.app.engine.EngineRouting.resolve` 统一做出（`PictelioApp` 预热与 `MainActivity` 路由共用，见上方「引擎决策」条目）；WebView 探测收编在 `WebViewAvailability`（`getCurrentWebViewPackage()`，取不到版本 -1 fail-open 放行）。WebView 过低**不再**直接加载 `res/raw/upgrade.html`——只有 Lynx 也不可用（双失败）才显示该页（带 `?reason=no_engine`，不初始化 Capacitor / JS 环境）。
   - 项目位于 `packages/app/android/`，源码与关键配置纳入版本控制
   - `android/.gitignore` 负责忽略构建产物（`.gradle/`、`build/` 等）和 Capacitor 自动生成文件（`capacitor.config.json`、`capacitor.settings.gradle`、`app/capacitor.build.gradle`、复制的 `app/src/main/assets/public` 等）
   - 自定义 Capacitor 插件在 `MainActivity.java` 中通过 `registerPlugin()` 注册（**必须在 `super.onCreate()` 之前**）
