@@ -459,7 +459,11 @@ async function launchBenchNav(scenario: "illust" | "carousel"): Promise<void> {
  * 帧稳定等待：连拍两帧对比 ≤ STABLE_TH 即认为画面静止，返回后一帧。
  * 用于「列表加载完成」「返回落地」「翻页触底」等无法条件等待的渲染收敛场景。
  */
-async function waitForStableFrame(label: string, region: Region, timeoutMs = 30_000): Promise<Buffer> {
+async function waitForStableFrame(
+  label: string,
+  region: Region,
+  timeoutMs = 30_000,
+): Promise<Buffer> {
   const deadline = Date.now() + timeoutMs;
   let prev = await screenshot(`stable-${label}`);
   while (Date.now() < deadline) {
@@ -846,10 +850,17 @@ describe.skipIf(SKIPPED)(
           input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
         })()`,
       );
-      await driver.raw.waitUntil(async () => {
-        const n = await probeWebviewNumber(ROW_COUNT_EXPR);
-        return Number.isFinite(n) && n > 0;
-      }, { timeout: 60_000, timeoutMsg: "webview 搜索结果未渲染（original 应有多结果）", interval: 2_000 });
+      await driver.raw.waitUntil(
+        async () => {
+          const n = await probeWebviewNumber(ROW_COUNT_EXPR);
+          return Number.isFinite(n) && n > 0;
+        },
+        {
+          timeout: 60_000,
+          timeoutMsg: "webview 搜索结果未渲染（original 应有多结果）",
+          interval: 2_000,
+        },
+      );
 
       // 断言① 翻页后行数增加（数值对比；哨兵 IntersectionObserver 由滚动到底触发）
       const countBefore = await probeWebviewNumber(ROW_COUNT_EXPR);
