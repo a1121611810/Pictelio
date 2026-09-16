@@ -16,10 +16,61 @@
 //
 // 实现：与 api/search.ts 修复版（6dc641d1）同构的正则解析——仅 http(s) 绝对 URL
 // 可解析，其余（相对路径 / 其它 scheme）返回 null，由调用方决策。
+/**
+ * 合法主机形态：点分标签（字母数字/连字符，标签不以连字符起止）或方括号 IPv6 字面量。
+ * 端口：纯数字（空端口 "" 按 WHATWG 视为无端口）。
+ * 校验意义（review P1-1 迁移对齐）：旧实现经 WHATWG URL 构造——非法 host/port（如
+ * `host:badport`、含空格主机）会 throw，白名单类调用点因此返回 false（fail-closed）。
+ * 纯正则解析不带该校验会**放松**语义（`https://i.pximg.net:badport/` 从拒绝变接受），
+ * 故此处显式补校验，任一段不合规 → null（调用方 fail-closed）。
+ */
+const HOST_RE =
+  /^(?:\[[0-9a-fA-F:.]+\]|[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)*)$/
+const PORT_RE = /^\d+$/
+
+/** 拆分 authority（已去 userinfo）为 host 与 port（IPv6 感知）；形态不合规返回 null */
+function splitAuthority(authority: string): { host: string; port: string | null } | null {
+  let host: string
+  let port: string | null = null
+  if (authority.startsWith("[")) {
+    const close = authority.indexOf("]")
+    if (close === -1) return null
+    host = authority.slice(0, close + 1)
+    const rest = authority.slice(close + 1)
+    if (rest !== "") {
+      if (!rest.startsWith(":")) return null
+      port = rest.slice(1)
+    }
+  } else {
+    const idx = authority.indexOf(":")
+    if (idx === -1) {
+      host = authority
+    } else {
+      host = authority.slice(0, idx)
+      port = authority.slice(idx + 1)
+    }
+  }
+  if (!HOST_RE.test(host)) return null
+  if (port !== null && port !== "" && !PORT_RE.test(port)) return null
+  return { host, port }
+}
+
 export function extractHostname(url: string): string | null {
+  const authority = extractAuthority(url)
+  if (authority === null) return null
+  return splitAuthority(authority)?.host ?? null
+}
+
+/**
+ * 提取 http(s) 绝对 URL 的 authority（去 userinfo，**保留端口**）。
+ * 供需要 host:port 形态的调用方使用（如 proxyRedact 的脱敏输出），
+ * 与 extractHostname（去端口）共用同一解析正则与形态校验——平台事实与禁用 URL 全局
+ * 的约束同前。非 http(s) 或非绝对 URL、authority 形态不合规均返回 null。
+ */
+export function extractAuthority(url: string): string | null {
   const m = /^https?:\/\/([^/?#]+)/.exec(url)
   if (!m) return null
-  const authority = m[1].split("@").pop() ?? m[1]
-  const host = authority.split(":")[0]
-  return host || null
+  const authority = m[1].split("@").pop() ?? null
+  if (authority === null) return null
+  return splitAuthority(authority) === null ? null : authority
 }

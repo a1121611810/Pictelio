@@ -1,6 +1,7 @@
 // ─── 图片 URL 工具（app-lynx） ───
 // Pixiv CDN 直连 URL → 本地代理路径（/pixiv-img/...），与现有 app 同策略。
 // 禁止在代码中硬编码 i.pximg.net。
+import { extractHostname } from './safeParseUrl'
 
 export function proxyImageUrl(url: string): string {
   if (!url) return ""
@@ -22,14 +23,13 @@ export function proxyImageUrl(url: string): string {
 /**
  * 图片主机白名单：*.pximg.net 与 *.pixiv.net（含根域）。
  * 与既有 /i.pximg.net/ marker 同风格，禁止硬编码完整 CDN URL（项目约束）。
+ * 迁移（review P1-1 挂账清账）：解析改经 safeParseUrl（禁 URL 全局，ADR-0163）；
+ * hostname 小写化对齐 WHATWG 语义（浏览器 URL 会小写化 host）。
  */
 function isTrustedImageHost(url: string): boolean {
-  try {
-    const host = new URL(url).hostname
-    return host === "pximg.net" || host.endsWith(".pximg.net") || host === "pixiv.net" || host.endsWith(".pixiv.net")
-  } catch {
-    return false
-  }
+  const host = extractHostname(url)?.toLowerCase()
+  if (host === undefined) return false
+  return host === "pximg.net" || host.endsWith(".pximg.net") || host === "pixiv.net" || host.endsWith(".pixiv.net")
 }
 
 /** 生成代理后的缩略图 URL（square_medium 加速列表加载） */

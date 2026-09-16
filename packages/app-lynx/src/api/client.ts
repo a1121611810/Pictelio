@@ -7,6 +7,7 @@ import { requestFetch } from "../utils/fetchWrapper"
 import { saveRefreshToken } from "../utils/tokenStorage"
 import { withTimeout } from "../utils/withTimeout"
 import { PIXIV_USER_AGENT, PIXIV_REFERER, PIXIV_CONTENT_TYPE, PIXIV_API_BASE, PIXIV_AUTH_BASE } from "./userAgent"
+import { extractHostname } from "../utils/safeParseUrl"
 
 export interface PixivApiClient {
   get<T>(path: string, params?: Record<string, string>, signal?: AbortSignal): Promise<T>
@@ -276,14 +277,17 @@ export function shouldAttachAuth(rewrittenUrl: string): boolean {
  * Pixiv 受信主机白名单（从常量解析 hostname，禁止硬编码域名字符串——项目约束）。
  * 精确 hostname 比对天然防伪后缀域（如 app-api.pixiv.net.evil.com 的 hostname 不等于白名单）。
  * 纯函数，可单测。
+ * 迁移（review P1-1 挂账清账）：解析改经 utils/safeParseUrl（禁 URL 全局——lynx 运行时
+ * `.hostname` 为 undefined，ADR-0163）；hostname 小写化对齐 WHATWG 语义（浏览器 URL 会
+ * 小写化 host，字符串解析不做，故显式补）。常量侧 host 在模块加载期预解析（常量恒 http(s)
+ * 绝对 URL，非 null）。
  */
+const API_HOST = extractHostname(PIXIV_API_BASE)
+const AUTH_HOST = extractHostname(PIXIV_AUTH_BASE)
 export function isTrustedPixivHost(url: string): boolean {
-  try {
-    const host = new URL(url).hostname
-    return host === new URL(PIXIV_API_BASE).hostname || host === new URL(PIXIV_AUTH_BASE).hostname
-  } catch {
-    return false
-  }
+  const host = extractHostname(url)?.toLowerCase()
+  if (host === undefined) return false
+  return host === API_HOST || host === AUTH_HOST
 }
 
 async function execute<T>(

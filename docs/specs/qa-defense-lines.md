@@ -89,4 +89,4 @@
 - 错误监控接入（Sentry + lynx 捕获探针）
 - lynx bundle OTA 化（对齐 webview 快慢双通道）
 - 转换矩阵脚本化触发器（`pnpm qa:matrix` 一键）
-- **存量裸 URL 全局迁移挂账**（review P1-1，fail-closed 无现行功能破坏）：`api/client.ts isTrustedPixivHost`（仅 web 路径消费）、`utils/imageUrl.ts isTrustedImageHost`（被 `/i.pximg.net/` marker 路径掩蔽）、`utils/proxyRedact.ts redactProxyUrl`（未登记形态）——迁移至 `utils/safeParseUrl.ts extractHostname`
+- **存量裸 URL 全局迁移（review P1-1，已清账 2026-09-16）**：`api/client.ts isTrustedPixivHost`、`utils/imageUrl.ts isTrustedImageHost`、`utils/proxyRedact.ts redactProxyUrl` 三处已迁至 `utils/safeParseUrl`（`extractHostname` / `extractAuthority`）；接缝同步补 WHATWG 对齐的形态校验（非法 host/port → null，防纯正则解析相对 URL 构造**放松**白名单语义，安全方向 fail-closed）；迁移守卫 = `safeParseUrl.test.ts` 三文件无裸 `new URL(` 断言
