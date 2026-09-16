@@ -84,16 +84,23 @@ public final class LynxRuntimeInitializer {
     }
 
     /**
-     * Lynx 引擎可用性判定（ADR-0153）：初始化不抛异常 ∧ native 库真正加载。
+     * Lynx 引擎可用性判定（ADR-0153）：CLIENT_KINDS 含 lynx ∧ 初始化不抛异常 ∧ native 库真正加载。
+     *
+     * <p>CLIENT_KINDS 能力合取（ADR-0153 决策 1 声明、ADR-0164 §7.1 收口）：webview 单引擎包
+     * 即使 native 库加载成功也不可承载 lynx 客户端（能力隐藏，ADR-0062）——提前于
+     * {@link #ensureInitialized} 返回 false，避免无谓的 LynxEnv 初始化。full/lynx 包不受影响。
      *
      * <p>**不能只用 {@link LynxEnv#hasInited()}**：init() 在 liblynx / liblynxtrace 加载失败时
      * 吞掉 UnsatisfiedLinkError 并正常返回，此时 hasInited()==true 而 native 未加载，且后续
      * init() 短路、进程内不可恢复。只有 {@link LynxEnv#isNativeLibraryLoaded()} 是真信号。
      * 不调用 getLynxVersion()（SDK 返回硬编码 "0.0.1"）。
      *
-     * @return true = 可承载 Lynx 客户端；false = 初始化失败或 native 未加载
+     * @return true = 可承载 Lynx 客户端；false = 包不含 lynx 能力、初始化失败或 native 未加载
      */
     public static boolean isAvailable(Application app) {
+        if (!clientKindsContainLynx()) {
+            return false;
+        }
         try {
             ensureInitialized(app);
         } catch (Throwable t) {
@@ -106,5 +113,13 @@ public final class LynxRuntimeInitializer {
             Log.w(TAG, "Lynx 初始化未抛异常但 native 未加载，判定引擎不可用");
         }
         return available;
+    }
+
+    /** 本包 CLIENT_KINDS 是否声明 lynx 能力（编译期常量，ADR-0062）。 */
+    private static boolean clientKindsContainLynx() {
+        for (String kind : BuildConfig.CLIENT_KINDS) {
+            if ("lynx".equals(kind)) return true;
+        }
+        return false;
     }
 }
