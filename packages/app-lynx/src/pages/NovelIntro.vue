@@ -14,6 +14,7 @@ import { loadNovelDetail, loadNovelSeries, addNovelWatchlist } from '../api/nove
 import type { PixivNovel } from '../api/types'
 import { presentError } from '../utils/errorPresentation'
 import { proxyImageUrl } from '../utils/imageUrl'
+import { stripNovelCaptionHtml } from '../utils/novelCaption'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
@@ -46,6 +47,9 @@ const coverSrc = computed(() => {
   const urls = novel.value?.image_urls
   return proxyImageUrl(urls?.large || urls?.medium || '')
 })
+
+/** 简介纯文本（Pixiv caption 含 <br> 等标签，直接上屏漏字面量——2026-09-18 实证）；空 = 无简介 */
+const captionText = computed(() => stripNovelCaptionHtml(novel.value?.caption ?? ''))
 
 // ─── 受限/AI 派生态（票 #580：对齐正文页语义） ───
 const r18Masked = computed(() => !!novel.value && isRestricted(novel.value))
@@ -135,7 +139,7 @@ function onTagOverflow(): void {
 
 /** 简介 2 行截断 → 弹全文面板（#584）；受限态置灰不打开（与 CTA 同判定） */
 function openCaption(): void {
-  if (masked.value || !novel.value?.caption) return
+  if (masked.value || !captionText.value) return
   captionOpen.value = true
 }
 
@@ -207,9 +211,9 @@ function startReading(): void {
           @overflow-tap="onTagOverflow"
         />
 
-        <!-- 简介（票 #584）：2 行截断；点开弹全文面板；受限态遮罩 + 入口置灰 -->
+        <!-- 简介（票 #584）：纯文本 2 行截断；点开弹全文面板；受限态遮罩 + 入口置灰 -->
         <view class="mt-3 relative" @tap="openCaption">
-          <text v-if="novel.caption" class="text-body-small text-white/85 leading-[1.5] [max-line:2]">{{ novel.caption }}</text>
+          <text v-if="captionText" class="text-body-small text-white/85 leading-[1.5] [max-line:2]">{{ captionText }}</text>
           <text v-else class="text-body-small text-white/60 leading-[1.5]">{{ t('novelIntro.noCaption') }}</text>
           <!-- 谓词与正文页同款（票 #580）：R-18 优先、AI mask 次之 -->
           <RestrictOverlay v-if="r18Masked" :level="novel.x_restrict === 2 ? 2 : 1" />
@@ -264,7 +268,7 @@ function startReading(): void {
 
     <!-- 简介全文面板（票 #584：scrim 内展开） -->
     <view v-if="captionOpen" class="absolute inset-0">
-      <NovelCaptionSheet :caption="novel?.caption ?? ''" @close="captionOpen = false" />
+      <NovelCaptionSheet :caption="captionText" @close="captionOpen = false" />
     </view>
 
     <!-- 返回键：模板末位（DOM 顺序即层序，原生 LynxView 不吃 z-index）浮于三态之上 -->

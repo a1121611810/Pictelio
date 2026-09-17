@@ -87,6 +87,13 @@ describe("NovelIntro 信息架构与受限/AI 态（#587）", () => {
     expect(tag).toContain(':initial-bookmarked="novel.is_bookmarked"');
   });
 
+  it("简介以纯文本渲染（stripNovelCaptionHtml 清洗，禁 <br> 字面量上屏——2026-09-18 实证）", () => {
+    expect(source).toContain("stripNovelCaptionHtml(novel.value?.caption ?? '')");
+    expect(source).toContain("{{ captionText }}");
+    expect(source).not.toContain("{{ novel.caption }}");
+    expect(source).toContain(':caption="captionText"');
+  });
+
   it("弹层挂载契约：评论/简介全文均 absolute inset-0 宿主脱离文档流（issue #139 同族）", () => {
     expect(source).toContain('<view v-if="showComments" class="absolute inset-0">');
     expect(source).toContain('<view v-if="captionOpen" class="absolute inset-0">');
