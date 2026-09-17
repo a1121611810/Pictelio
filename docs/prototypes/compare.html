@@ -1,0 +1,32 @@
+<!doctype html>
+<!-- 原型对比页（throwaway，查看用）：E 为选定方案（含线性图标）；A-D 为候选存档。 -->
+<html lang="zh-CN"><head><meta charset="utf-8"><title>选中菜单方案对比（选定 E）</title>
+<style>
+ body{margin:0;background:#20242c;color:#e8eaef;font-family:-apple-system,"PingFang SC",sans-serif}
+ h1{font-size:20px;font-weight:600;margin:20px 24px 4px}
+ p.sub{margin:0 24px 16px;color:#9aa3af;font-size:13px}
+ .row{display:flex;gap:16px;padding:0 24px 20px;align-items:flex-start}
+ figure{margin:0;background:#2b303a;border-radius:12px;padding:12px;flex:1 1 0;min-width:0}
+ figure img{width:100%;height:auto;display:block;border-radius:8px;cursor:zoom-in}
+ figcaption{font-size:13px;color:#c7ccd6;margin-top:10px;line-height:1.5}
+ figcaption b{color:#fff}
+ .win{background:#1f3a2b;outline:2px solid #57d08a}
+ .win figcaption b{color:#8ff0b4}
+</style></head><body>
+<h1>选中操作菜单 · 方案对比</h1>
+<p class="sub">E = 选定方案（浅色 M3 浮层 + 线性图标在上文字在下）；A–D 为候选存档；图标处理对比见 shots/icons.png。可交互原型：lynx-novel-text-selection-toolbar.html?variant=A|B|C|D|E</p>
+<div class="row">
+  <figure class="win"><img src="shots/E.png" alt="E"><figcaption><b>E · 【选定】浅色 M3 浮层 + 线性图标在上文字在下</b><br>surface-container-high + elevation-3；图标 = view 画的线性图标（复制两片叠纸 / 搜索描边圆+短棒），无字体・图片依赖</figcaption></figure>
+</div>
+<div class="row">
+  <figure><img src="shots/icons.png" alt="icons"><figcaption><b>图标处理对比</b><br>I1 线性（选定）/ I2 字形（否决）/ I3 实心 / I4 无图标</figcaption></figure>
+</div>
+<div class="row">
+  <figure><img src="shots/A.png" alt="A"><figcaption><b>A · 反色胶囊（纯文字）</b></figcaption></figure>
+  <figure><img src="shots/B.png" alt="B"><figcaption><b>B · 反色工具条（图标+文字）</b></figcaption></figure>
+</div>
+<div class="row">
+  <figure><img src="shots/C.png" alt="C"><figcaption><b>C · 浅色 M3 浮层（横向条目）</b></figcaption></figure>
+  <figure><img src="shots/D.png" alt="D"><figcaption><b>D · 极简浮层（分隔线）</b></figcaption></figure>
+</div>
+</body></html>

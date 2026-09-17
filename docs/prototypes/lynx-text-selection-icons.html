@@ -1,0 +1,96 @@
+<!doctype html>
+<!--
+  PROTOTYPE（throwaway）：选中菜单的图标处理方式对比（版式固定 = 选定方案 E：
+  浅色 M3 浮层 surface-container-high + elevation-3 + shape-medium，条目「图标在上、文字在下」）。
+  只换图标，不换版式。浏览器直接打开；?only=I1|I2|I3|I4 可只看单个。
+-->
+<html lang="zh-CN"><head><meta charset="utf-8"><title>图标处理方式对比</title>
+<style>
+  :root{
+    --surface:#f8faff; --on-surface:#191c20; --surface-container-high:#e6e8ee;
+    --shape-medium:34px; --elevation-3:0 4px 8px 3px rgba(0,0,0,.15),0 1px 3px rgba(0,0,0,.3);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:32px 0 48px;background:#dfe4ec;color:var(--on-surface);
+       font-family:-apple-system,"PingFang SC","Noto Sans CJK SC",sans-serif}
+  .row{margin:0 auto 28px;width:1080px}
+  .ctx{font-size:40px;line-height:56px;color:var(--on-surface);margin-bottom:18px}
+  .ctx .sel{background:rgba(26,111,168,.26);border-radius:6px}
+  .toolbar{display:inline-flex;gap:4px;padding:14px 16px;border-radius:var(--shape-medium);
+           background:var(--surface-container-high);box-shadow:var(--elevation-3)}
+  .item{width:132px;height:132px;display:flex;flex-direction:column;align-items:center;
+        justify-content:center;gap:10px;font-size:26px}
+  .glyph{font-size:52px;line-height:1}
+  .cap{margin-top:12px;font-size:26px;color:#41474e}
+  /* ── I1：view 画的线性图标（描边）── */
+  .ic{position:relative;width:52px;height:52px;color:var(--on-surface)}
+  .ic .sheet{position:absolute;width:30px;height:34px;border:3px solid currentColor;border-radius:7px}
+  .ic .sheet.back{left:16px;top:2px}
+  .ic .sheet.front{left:2px;top:16px;background:var(--surface-container-high)}
+  .ic .lens{position:absolute;left:2px;top:2px;width:30px;height:30px;border:3px solid currentColor;border-radius:50%}
+  .ic .handle{position:absolute;left:31px;top:33px;width:17px;height:3.5px;background:currentColor;
+              border-radius:2px;transform:rotate(45deg);transform-origin:left center}
+  /* ── I2：符号字形（单色）── */
+  .sym{font-size:50px;line-height:1;font-weight:300}
+  /* ── I3：实心图标 ── */
+  .ic.solid .sheet{background:currentColor;border:none}
+  .ic.solid .sheet.front{box-shadow:0 0 0 3px var(--surface-container-high)}
+  .ic.solid .lens{background:currentColor;border:none}
+  .ic.solid .lens::after{content:'';position:absolute;left:8px;top:8px;width:14px;height:14px;
+                         border-radius:50%;background:var(--surface-container-high)}
+</style></head><body>
+
+<div class="row" data-i="I1">
+  <div class="ctx">朋友圈转发的少了，<span class="sel">讨论也没那么热闹</span>，我自己实测完的感受是</div>
+  <div class="toolbar">
+    <div class="item">
+      <div class="ic"><span class="sheet back"></span><span class="sheet front"></span></div>
+      复制
+    </div>
+    <div class="item">
+      <div class="ic"><span class="lens"></span><span class="handle"></span></div>
+      搜索
+    </div>
+  </div>
+  <div class="cap"><b>I1 · 线性图标（用 view 画：描边 + 圆角，随主题文字色）</b></div>
+</div>
+
+<div class="row" data-i="I2">
+  <div class="ctx">朋友圈转发的少了，<span class="sel">讨论也没那么热闹</span>，我自己实测完的感受是</div>
+  <div class="toolbar">
+    <div class="item"><span class="sym">❐</span>复制</div>
+    <div class="item"><span class="sym">⌕</span>搜索</div>
+  </div>
+  <div class="cap"><b>I2 · 符号字形（❐ / ⌕，单色、跟文字同色）</b></div>
+</div>
+
+<div class="row" data-i="I3">
+  <div class="ctx">朋友圈转发的少了，<span class="sel">讨论也没那么热闹</span>，我自己实测完的感受是</div>
+  <div class="toolbar">
+    <div class="item">
+      <div class="ic solid"><span class="sheet back"></span><span class="sheet front"></span></div>
+      复制
+    </div>
+    <div class="item">
+      <div class="ic solid"><span class="lens"></span><span class="handle"></span></div>
+      搜索
+    </div>
+  </div>
+  <div class="cap"><b>I3 · 实心图标（同样用 view 画，视觉更重）</b></div>
+</div>
+
+<div class="row" data-i="I4">
+  <div class="ctx">朋友圈转发的少了，<span class="sel">讨论也没那么热闹</span>，我自己实测完的感受是</div>
+  <div class="toolbar">
+    <div class="item" style="height:96px">复制</div>
+    <div class="item" style="height:96px">搜索</div>
+  </div>
+  <div class="cap"><b>I4 · 不要图标（纯文字，浮层更矮）</b></div>
+</div>
+
+<script>
+  const q = new URLSearchParams(location.search);
+  const only = (q.get('only') || '').toUpperCase();
+  if (only) for (const r of document.querySelectorAll('.row')) if (r.dataset.i !== only) r.remove();
+</script>
+</body></html>
