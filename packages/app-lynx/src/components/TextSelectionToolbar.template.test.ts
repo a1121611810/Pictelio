@@ -21,6 +21,18 @@ describe('TextSelectionToolbar · 视觉与契约', () => {
     expect(code).not.toMatch(/width:\s*'1[0-9.]+vw'/u)
   })
 
+  it('视觉令牌锁定（选定方案 E：浅色浮层 + elevation-3 + 绝对定位胶囊）', () => {
+    expect(code).toContain('bg-surface-container-high')
+    expect(code).toContain('shadow-[var(--md-elevation-3)]')
+    expect(code).toContain('absolute')
+    expect(code).toContain('rounded-[var(--md-shape-medium)]')
+  })
+
+  it('条目不冒泡（@tap.stop：否则胶囊内点击会触发页面根的 tap-away 收起）', () => {
+    expect(code).toContain('@tap.stop')
+    expect(code).toContain('@tap.stop\n') // 胶囊级
+  })
+
   it('图标用 view 绘制（border/rotate），禁 emoji 或字形回退', () => {
     expect(code).toContain('border-solid border-on-surface')
     expect(code).toContain('rotate-45')

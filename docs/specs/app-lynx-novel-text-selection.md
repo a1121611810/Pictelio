@@ -17,7 +17,7 @@ Lynx 客户端的小说详情页目前**无法选中正文文字**：段落是�
 - **复制**：经新增的原生模块 `PictelioClipboard.setText` 写入系统剪贴板（Lynx 无内置剪贴板 API，见 #560），反馈为原位「已复制」。
 - **搜索**：把选中文字交给全局搜索弹层 `openSearch(keyword)`（跳搜索页 + 预填，长文本先截断）。
 - **定位**：`getTextBoundingRect`（内容区 dp）→ vw，置于选区上方、顶部越界翻转到下方；不依赖 `pointer-events`（ADR-0123），胶囊尺寸浮层。
-- **消失**：点空白（引擎派发 `start=-1`）/ 列表滚动（**必须自行监听**——滚动不派发选中事件）/ 返回键（modalStack 三级语义）。
+- **消失**：点正文/点别处（引擎清空事件或宿主 tap-away——**点空白引擎不派发任何事件**）/ 列表滚动（**必须自行监听**——滚动不派发选中事件）/ 返回键（modalStack 三级语义）/ 切章卸载；长按抬手的那次 tap 被 `@longpress` 打标消费。
 
 范围：段内选中（含整段）；跨段、划线、分享、翻译、webview 端、其他文本面均不做。
 
@@ -53,20 +53,23 @@ Lynx 客户端的小说详情页目前**无法选中正文文字**：段落是�
 **不变式（实现必须守）**
 1. **索引即身份**：`start` / `end` 是**该段渲染文本**的字符索引（实证：`start=10,end=11` ↔ 该段第 11 字）→ 选中文字本地 `slice` 得出，**不需要 `getSelectedText`**。越界 / 纯空白 → 收起 + `console.warn`。
 2. **动作前校验**：执行 `copy` / `search` 时，捕获的段落文本必须仍等于当前 `paragraphs[i]`，否则 warn + 收起 + no-op（防回收重建后复制到别的段落）。
-3. **定位先于显示**：只有测矩成功才给 `style`；失败保持隐藏 + warn——不猜位置、不渲染在 `(0,0)`。
+3. **定位先于显示，重测不闪烁**：首次测矩成功才给 `style`；失败保持隐藏 + warn（不猜位置、不渲染在 `(0,0)`）。拖手柄会逐帧派发 `selectionchange`，此期间**保留上一次成功位置**（不逐帧隐藏重挂），失败时沿用上次位置。
+   另：`getTextBoundingRect` 对**整段** range 必失败（`code:1`，实证）→ 测量范围收敛到 `[start, len-1)`；仅末位单字符的退化场景再向左扩一位。
 4. **dp→vw 用实测内容宽**（根 view 的 `boundingClientRect`；与 `getTextBoundingRect` 同源同单位）：**不得引入 density 常量、`SystemInfo`、`getViewportSize`**（后者是物理 px，探针里正是用错基准导致菜单落在屏幕上部）。
 5. **异步结果全等落地**：`(id, start, end, generation)` 四项全等才应用；拖手柄的事件风暴合并到最后一次。
 6. **可见性 ⇔ modalStack 注册**：隐藏态绝不持有注册（悬空注册会白吞一次返回键）；`search()` 先收起自己再 `openSearch`（弹层注册落后进先出）。
 7. **复制无乐观态**：`copied` 只在通道 resolve 后出现；失败显示「复制失败」并 warn（#568 教训：禁假成功）。
 8. **滚动收起**：BT `@scroll` + `:scroll-event-throttle="0"`（MT 信号本构建不派发）；处理器在隐藏态**零成本早退**（该信号 60Hz 常驻）。
+   补充实证：**点空白/点正文的行为不对称**——点正文会派发 `start === -1`（选区与手柄消失），点列表空白/页头**什么都不派发** → 菜单不会自己收，故宿主在根 view 上转发 `@tap`（tap-away）；而**长按抬手的 release 会被判为 tap**，宿主 `@longpress` 打标、模块消费该次 tap（否则菜单被自己这次长按的抬手收掉）。
 9. **冻结 + 宽限窗**：动作点击瞬间冻结快照；`start === -1` 在 ~150ms 宽限窗内不立即收起（防「点菜单时引擎先清选」把载荷打没）。
-10. **清选尽力而为**：引擎侧清选**未取证** → 适配器返回 `false` + warn once，工具条照收；原生高亮可能残留（列入验收清单）。
+10. **清选尽力而为**：适配器用 `setTextSelection` 退化参数尽力清选，失败只 warn once、工具条照收；**设备实证：滚动收起后原生高亮可能残留**（新选中或点正文会自然清掉）——记为已知项，不阻塞。
 
 **端口（恰好三个，其余依赖不造缝）**
 - `SelectionEnginePort`：`measureRange(nodeId,{start,end}) → {ok,rect|reason}`（reason ∈ `no-engine`/`bad-range`/`timeout`/`bad-calibration`）、`contentWidthDp()`、`clearRange(nodeId) → boolean`。生产 `createLynxSelectionEngine`（复用 `primitives/measureRects.ts` 的平台规则：逐 id `select`、`exec` 必须链在 `invoke` 返回值上、1500ms 超时）+ 测试 fake = **真 seam**。
 - `ClipboardPort`：`writeText(text) → Promise<void>`；生产 `createLynxClipboard`（探测 `NativeModules.PictelioClipboard`，缺失 → warn + reject）+ 测试 fake。
 - `SearchPort`：`openWithKeyword(keyword)`；2 行适配器，价值 = 把 `openSearch` 的**幂等吞词**怪癖收编到一处（已开则先 `closeSearch()` 再开 + warn）。
 - **不设端口**：`getParagraphText`（页面闭包，无变异）、`registerModal`（一次调用）——单实现即假设缝。
+- 与初版 spec 的差异（实现期收敛，均已并入上文）：端口为 2 成员（`measureRange` / `clearRange`，vp→vw 校准移入适配器）；视图改用单个 `view` 对象 prop；组合式函数另暴露 `onTapAway` / `notifyLongPress`（设备驱动的新增）。
 
 **原生模块（ID 6 修订）**：`PictelioClipboardModule extends LynxModule`（无类注解）+ 公开 `(Context)` 构造 + `@LynxMethod setText(String, Callback)`；`ClipboardManager` + `ClipData.newPlainText` + `setPrimaryClip`；回调双参 `invoke("1","")` / `invoke("", msg)`（Share 同款；**禁传 null**）；错误消息用 `e.getMessage() != null ? … : getClass().getSimpleName()`；**注册只加 `LynxRuntimeInitializer`**（`LynxActivity` 的 per-view 列表本身就不含 Gallery/Share/Downloader/WebDav）；Android 13+ 系统自带剪贴板预览，不加自家 toast。**可测缝**：把写入逻辑放包可见静态方法（`static void copyInto(Context, String, Callback)`），测试直接驱动它——仓库里**没有任何测试构造过 LynxModule**（构造函数要 `LynxContext`），先例是 `PictelioWebDavModuleTest` 驱动的 `PictelioWebDavModule.run(Callback, Op)`。
 

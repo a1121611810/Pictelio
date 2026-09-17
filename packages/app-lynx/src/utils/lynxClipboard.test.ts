@@ -19,9 +19,19 @@ describe('createLynxClipboard（注入工厂）', () => {
     warn.mockRestore()
   })
 
-  it('原生失败且错误串为空 → 仍 resolve（不把空错误当失败）', async () => {
+  it('契约破坏（ok 缺失且无错误串）→ reject，绝不假成功（review N2）', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const setText = vi.fn((_text: string, cb: (ok: string, err: string) => void) => cb('', ''))
-    await expect(createLynxClipboard({ setText })('x')).resolves.toBeUndefined()
+    await expect(createLynxClipboard({ setText })('x')).rejects.toThrow('clipboard write failed without message')
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('ok 标记非 "1"（原生返回失败码但错误串为空）→ reject（review N2）', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const setText = vi.fn((_text: string, cb: (ok: string, err: string) => void) => cb('0', ''))
+    await expect(createLynxClipboard({ setText })('x')).rejects.toBeInstanceOf(Error)
+    warn.mockRestore()
   })
 })
 

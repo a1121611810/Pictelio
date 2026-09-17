@@ -16,11 +16,18 @@ export interface ClipboardNative {
 export function createLynxClipboard(native: ClipboardNative): (text: string) => Promise<void> {
   return (text) =>
     new Promise((resolve, reject) => {
-      native.setText(text, (_ok, err) => {
+      native.setText(text, (ok, err) => {
         const message = unquoteNativeString(err)
-        if (message) {
-          console.warn('[lynxClipboard] 复制失败:', message)
-          reject(new Error(message))
+        // 成功判据 = ok 标记（"1"）；只看 err 会把 ('', '') 这类契约破坏当成功（禁假成功 #568）
+        const failure = message !== null && message.length > 0 ? message : null
+        if (ok !== '1' || failure !== null) {
+          if (failure !== null) {
+            console.warn('[lynxClipboard] 复制失败:', failure)
+            reject(new Error(failure))
+            return
+          }
+          console.warn('[lynxClipboard] 复制失败：原生未返回成功标记')
+          reject(new Error('clipboard write failed without message'))
           return
         }
         resolve()

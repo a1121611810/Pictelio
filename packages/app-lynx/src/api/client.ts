@@ -212,7 +212,6 @@ export function getNativeModules(): {
   PictelioDownloader?: unknown
   PictelioGallery?: unknown
   PictelioShare?: unknown
-  PictelioClipboard?: unknown
 } | undefined {
   return (typeof NativeModules !== "undefined" ? NativeModules : undefined) ??
     (globalThis as { NativeModules?: unknown }).NativeModules as never

@@ -413,7 +413,7 @@ _Avoid_: 向原生瀑布流中途插入 list-item（必丢，ADR-0162）；横�
 ### 正文选中与操作菜单（Text selection & selection toolbar）【2026-09-17 新增，地图 #558，spec docs/specs/app-lynx-novel-text-selection.md】
 
 **正文选中（novel text selection）**：
-小说正文段落上的**原生文字选中**能力（长按得选区与拖拽手柄）。开启方式 = `<text>` 上的**静态字面量属性** `text-selection="true"` + `flatten="false"`；`flatten=false` 是硬前提（扁平化文本不是真实平台视图，不可选，静态负控实证：`flatten="true"` 长按 0 次事件）。选中变化经 `:bindselectionchange` 到达 JS，payload `{start, end, direction}`；`start === -1` 表示选区被清除（点空白的信号来源）。范围 = 单段（含整段）。
+小说正文段落上的**原生文字选中**能力（长按得选区与拖拽手柄）。开启方式 = `<text>` 上的**静态字面量属性** `text-selection="true"` + `flatten="false"`；`flatten=false` 是硬前提（扁平化文本不是真实平台视图，不可选，静态负控实证：`flatten="true"` 长按 0 次事件）。选中变化经 `:bindselectionchange` 到达 JS，payload `{start, end, direction}`；`start === -1` 表示选区被清除——**设备实证：点正文会派发它，点空白不会**（点空白收起要靠宿主转发 `@tap`）。`start`/`end` 是 **UTF-16 码元**下标且**可能落在代理对中间**（选中 emoji 给高代理单元区间）→ 切片前必须向外吸附到代理对边界。范围 = 单段（含整段）。
 _Avoid_: 高亮（指划线批注，本能力不做持久化）；选区高亮色（`::selection` 视觉，非能力名）
 
 **操作菜单（selection toolbar）**：

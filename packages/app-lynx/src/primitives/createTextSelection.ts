@@ -5,9 +5,10 @@
 // 全部依赖注入（房屋先例 createWatchlistPrompt / createBookmarkToggle），node 直接可测。
 //
 // 关键不变式（spec §ID 不变式 1-10，违反即回归）：
-//   1 索引即身份：start/end 是该段**渲染文本**的字符索引（**按码点计数**——设备实证：emoji
-//     段落里引擎给的是码点下标，直接用 String.slice（UTF-16 码元）会劈开代理对，
-//     剪贴板里得到半个字符 → 必须 Array.from 后切片）
+//   1 索引即身份：start/end 是该段**渲染文本**的 UTF-16 码元下标（设备实证：某段 35 码元 /
+//     34 码点，选中末位字符引擎给 (34,35) → 只有码元解释成立）。但引擎在 emoji 上会把 range
+//     落在**代理对中间**（选中 emoji 给 (11,12) = 高代理单元）→ 必须把 range 吸附到代理对
+//     边界之外再切片，否则剪贴板里得到半个字符（设备实证：粘贴显示 ◇?）
 //   2 动作前校验：执行动作时段落文本必须未变，否则收起（防回收重建后复制错段）
 //   3 定位先于显示：测矩失败保持隐藏，不猜位置
 //   4 单位：端口只讲 vw，dp 换算在适配器层
@@ -123,12 +124,34 @@ interface Snapshot {
   paragraphText: string
 }
 
+function isHighSurrogate(code: number): boolean {
+  return code >= 0xd800 && code <= 0xdbff
+}
+
+function isLowSurrogate(code: number): boolean {
+  return code >= 0xdc00 && code <= 0xdfff
+}
+
 /**
- * 段落的码点数组（引擎索引单位；设备实证：含 emoji 的段落用 `String.slice` 会劈开代理对，
- * 复制出半个字符——粘贴显示为 ◇?）。
+ * 把选区 range 吸附到代理对边界之外（引擎给的下标可能落在代理对中间）。
+ * - start 指到**低代理单元**（对尾）→ 退回对首（start - 1），把整个字符纳入选中；
+ * - end 的前一位（end - 1，闭区间末位）是**高代理单元**（对首）→ 前进到对尾（end + 1）。
+ * 非代理对场景是恒等变换（普通 CJK/ASCII 无影响）。
  */
-function codePointsOf(text: string): string[] {
-  return Array.from(text)
+function snapRangeToSurrogates(
+  text: string,
+  start: number,
+  end: number,
+): { start: number; end: number } {
+  let safeStart = start
+  let safeEnd = end
+  if (safeStart > 0 && isLowSurrogate(text.charCodeAt(safeStart))) {
+    safeStart -= 1
+  }
+  if (safeEnd < text.length && isHighSurrogate(text.charCodeAt(safeEnd - 1))) {
+    safeEnd += 1
+  }
+  return { start: safeStart, end: safeEnd }
 }
 
 const DEFAULT_FEEDBACK_TTL_MS = 2000
@@ -140,7 +163,14 @@ export function createTextSelection(deps: TextSelectionDeps): TextSelection {
   const feedbackTtlMs = deps.feedbackTtlMs ?? DEFAULT_FEEDBACK_TTL_MS
   const graceMs = deps.graceMs ?? DEFAULT_GRACE_MS
   const tapGuardMs = deps.tapGuardMs ?? DEFAULT_TAP_GUARD_MS
-  const schedule = deps.schedule ?? ((fn, ms) => setTimeout(fn, ms) as unknown as () => void)
+  const schedule =
+    deps.schedule ??
+    ((fn: () => void, ms: number): (() => void) => {
+      const id = setTimeout(fn, ms)
+      return () => {
+        clearTimeout(id)
+      }
+    })
 
   let snapshot: Snapshot | null = null
   let style: Record<string, string> | null = null
@@ -262,11 +292,26 @@ export function createTextSelection(deps: TextSelectionDeps): TextSelection {
   }
 
   async function applyMeasure(expected: Snapshot, gen: number): Promise<void> {
-    const outcome = await deps.engine.measureRange(expected.nodeId, { start: expected.start, end: expected.end })
+    // 整段选中（end === 码元数）会让 getTextBoundingRect 失败（全量 range → code:1，设备实证）：
+    // 测量范围收敛到 len-1，复制仍用原始下标（review B3）
+    const units = expected.paragraphText.length
+    let measureStart = expected.start
+    let measureEnd = expected.end >= units ? units - 1 : expected.end
+    if (measureEnd <= measureStart) {
+      // 退化（例如只选中末位单字符，且它是整段末尾）→ 向左扩一位，仍保持非空且非全量
+      measureStart = Math.max(0, measureStart - 1)
+    }
+    if (measureEnd <= measureStart) {
+      if (shouldWarn('degenerate-range')) {
+        console.warn('[textSelection] 测量范围退化（整段仅一字符），菜单不显示', expected.nodeId)
+      }
+      return
+    }
+    const outcome = await deps.engine.measureRange(expected.nodeId, { start: measureStart, end: measureEnd })
     if (disposed || gen !== generation || snapshot !== expected) return
     if (!outcome.ok) {
       if (shouldWarn('measure-' + outcome.reason)) {
-        console.warn('[textSelection] 选中范围测量失败，菜单不显示', outcome.reason)
+        console.warn('[textSelection] 选中范围测量失败（沿用上次位置或保持隐藏）', outcome.reason)
       }
       return
     }
@@ -295,14 +340,15 @@ export function createTextSelection(deps: TextSelectionDeps): TextSelection {
       }
       return
     }
-    const chars = codePointsOf(paragraphText)
-    if (end > chars.length) {
+    // 越界按 UTF-16 码元数判定（引擎索引单位）
+    if (end > paragraphText.length) {
       if (shouldWarn('range-out-of-bounds')) {
-        console.warn('[textSelection] 选中范围越界，忽略', nodeId, start, end, chars.length)
+        console.warn('[textSelection] 选中范围越界，忽略', nodeId, start, end, paragraphText.length)
       }
       return
     }
-    const text = chars.slice(start, end).join('')
+    const snapped = snapRangeToSurrogates(paragraphText, start, end)
+    const text = paragraphText.slice(snapped.start, snapped.end)
     if (text.trim().length === 0) {
       if (shouldWarn('blank-selection')) {
         console.warn('[textSelection] 选中内容为空白，忽略', nodeId)
@@ -315,9 +361,10 @@ export function createTextSelection(deps: TextSelectionDeps): TextSelection {
     cancelFeedback?.()
     cancelFeedback = null
 
-    const next: Snapshot = { nodeId, start, end, text, paragraphText }
+    const next: Snapshot = { nodeId, start: snapped.start, end: snapped.end, text, paragraphText }
     snapshot = next
-    style = null
+    // style 不置空：拖手柄会逐帧派发 selectionchange，逐帧隐藏/重挂 = 闪烁（review N1）；
+    // 保留上次成功位置同时让「可见 ⇔ modalStack 注册」不变式天然成立（review B2）
     copyState = 'idle'
     const gen = ++generation
     notify()

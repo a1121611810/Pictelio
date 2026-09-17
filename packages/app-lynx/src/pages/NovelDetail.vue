@@ -395,8 +395,9 @@ function onWatchlistCancel(): void {
     </view>
 
     <!-- 选中操作菜单（spec app-lynx-novel-text-selection §ID 4）：root 内、正文列表之后的绝对定位胶囊
-         （DOM 顺序即层序；必须避开 list 的 v-else-if / v-else 相邻约束）；不铺全屏层（ADR-0123），
-         「点空白收起」由引擎 start === -1 事件承担 -->
+         （DOM 顺序即层序；必须避开 list 的 v-else-if / v-else 相邻约束）；不铺全屏层（ADR-0123）。
+         收起路径：点空白/点别处 = 根 view 的 @tap 转发（设备实测：引擎对点空白**不派发**清空事件）；
+         长按抬手的那次 tap 由 @longpress 打标消费（否则菜单会被自己这次长按的抬手收掉） -->
     <TextSelectionToolbar :view="selection.view" @action="onSelectionAction" />
 
     <!-- 评论弹层（issue #164 / 布局流修复 issue #139 同族）：必须 absolute 脱离 flex 流，

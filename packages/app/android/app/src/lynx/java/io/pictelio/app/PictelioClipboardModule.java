@@ -52,7 +52,9 @@ public class PictelioClipboardModule extends LynxModule {
             manager.setPrimaryClip(ClipData.newPlainText("Pictelio", text));
             callback.invoke("1", "");
         } catch (Throwable e) {
-            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            // 失败必须带非空原因（JS 侧以 ok 标记 + 非空错误串判失败，见 utils/lynxClipboard.ts）
+            String raw = e.getMessage();
+            String msg = raw != null && !raw.isEmpty() ? raw : e.getClass().getSimpleName();
             Log.w(TAG, "写入剪贴板失败: " + msg);
             callback.invoke("", msg);
         }

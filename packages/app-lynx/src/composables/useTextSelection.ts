@@ -64,23 +64,40 @@ export function createSelectionSearchPort(store: {
   }
 }
 
+/** 段落节点 id 编码（模板 :id/:key/:item-key 与会话查表共用；索引即身份） */
+export function paragraphNodeId(index: number): string {
+  return `p-${index}`
+}
+
+/** 段落节点 id → 文本（越界/非法/未知 → null；IO 边界按缺失处理，调用方 warn） */
+export function paragraphTextFromId(paragraphs: readonly string[], nodeId: string): string | null {
+  if (!nodeId.startsWith('p-')) return null
+  if (!/^p-\d+$/u.test(nodeId)) return null
+  return paragraphs[Number(nodeId.slice(2))] ?? null
+}
+
 export function useTextSelection(options: UseTextSelectionOptions): UseTextSelectionReturn {
   const searchSheet = useSearchSheetStore()
   const selection = createTextSelection({
-    getParagraphText: (nodeId) => {
-      const match = /^p-(\d+)$/u.exec(nodeId)
-      if (match === null) return null
-      return options.paragraphs.value[Number(match[1])] ?? null
-    },
+    getParagraphText: (nodeId) => paragraphTextFromId(options.paragraphs.value, nodeId),
     engine: createLynxSelectionEngine({ probeId: TEXT_SELECTION_ROOT_ID }),
     clipboard: { writeText: writeClipboardText },
     search: createSelectionSearchPort(searchSheet),
     registerModal: (close) => useModalStack().registerModal(close),
+    // 惰性读标签（getter）：t() 在视图读取时才求值 → 语言切换即时生效（i18n 契约）
     labels: {
-      copy: t('novelDetail.selection.copy'),
-      search: t('novelDetail.selection.search'),
-      copied: t('novelDetail.selection.copied'),
-      copyFailed: t('novelDetail.selection.copyFailed'),
+      get copy() {
+        return t('novelDetail.selection.copy')
+      },
+      get search() {
+        return t('novelDetail.selection.search')
+      },
+      get copied() {
+        return t('novelDetail.selection.copied')
+      },
+      get copyFailed() {
+        return t('novelDetail.selection.copyFailed')
+      },
     },
   })
 
@@ -97,7 +114,7 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
 
   return {
     rootId: TEXT_SELECTION_ROOT_ID,
-    paragraphId: (index: number) => `p-${index}`,
+    paragraphId: paragraphNodeId,
     // 用 getter 暴露（模板读取即最新值；别处返回 Ref 会在模板里被当成对象传下去）
     get view(): TextSelectionView {
       return view.value

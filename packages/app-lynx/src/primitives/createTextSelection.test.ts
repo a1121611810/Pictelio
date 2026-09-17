@@ -155,23 +155,45 @@ describe('createTextSelection · 选中与定位', () => {
     expect(ctx.written).toEqual(['这是'])
   })
 
-  it('按码点切片：emoji（代理对）不被劈开，索引与引擎同单位', async () => {
+  it('代理对吸附：引擎给的下标落在 emoji 中间时，向外吸附到整字符（设备实证 → 🌸）', async () => {
     const ctx = setup()
-    // '第三段带 emoji 🌸 与英文混合。' 的码点下标：🌸 = 11
-    select(ctx, 11, 12, 'p-2')
+    const text = PARAGRAPHS['p-2']
+    const i = text.indexOf('🌸') // 高代理单元下标
+    expect(text.length).toBe(Array.from(text).length + 1) // 含一个代理对
+    select(ctx, i, i + 1, 'p-2') // 引擎选中 emoji 时给的是「高代理单元」区间
     await flush()
     expect(ctx.ctl.getView().visible).toBe(true)
     ctx.ctl.copy()
     await flush()
-    expect(ctx.written).toEqual(['🌸'])
-    expect(ctx.written[0].length).toBe(2) // 完整代理对（两码元）而非半个字符
+    expect(ctx.written).toEqual(['🌸']) // 吸附后 = 完整代理对（2 码元），而非半个字符
+    expect(ctx.written[0].length).toBe(2)
+  })
 
-    // 码点 13 = 「与」；若按 UTF-16 码元切片，slice(13,14) 会得到 emoji 之后的空格 → 判别式断言
-    select(ctx, 13, 14, 'p-2')
+  it('码元索引口径：emoji 之后的空格 / 「与」按下标取（普通字符不受吸附影响）', async () => {
+    const ctx = setup()
+    const text = PARAGRAPHS['p-2']
+    const i = text.indexOf('🌸')
+    select(ctx, i + 3, i + 4, 'p-2') // emoji 占 2 码元 → 其后「空格 + 与」里的「与」
     await flush()
     ctx.ctl.copy()
     await flush()
-    expect(ctx.written[1]).toBe('与')
+    expect(ctx.written[0]).toBe('与')
+    select(ctx, i + 4, i + 5, 'p-2')
+    await flush()
+    ctx.ctl.copy()
+    await flush()
+    expect(ctx.written[1]).toBe('英')
+  })
+
+  it('越界判定用码元数：末位字符（码元下标）合法', async () => {
+    const ctx = setup()
+    const text = PARAGRAPHS['p-2']
+    select(ctx, text.length - 1, text.length, 'p-2')
+    await flush()
+    expect(ctx.ctl.getView().visible).toBe(true)
+    ctx.ctl.copy()
+    await flush()
+    expect(ctx.written).toEqual(['。'])
   })
 
   it('未知节点 / 越界 / 空白选中 → 忽略且不显示（warn 一次）', async () => {
@@ -335,8 +357,8 @@ describe('createTextSelection · 动作', () => {
     const view = ctx.ctl.getView()
     expect(view.copyState).toBe('failed')
     expect(view.items[0]).toMatchObject({ key: 'copy', label: '复制失败', state: 'error' })
-    ctx.scheduler.fire()
-    expect(view.visible !== false).toBe(true) // 无 TTL 任务 → 仍可见
+    ctx.scheduler.fire() // 失败态不得挂自动收起任务：触发全部在挂任务后仍可见
+    expect(ctx.ctl.getView().visible).toBe(true)
   })
 
   it('动作前校验（不变式 2）：段落文本已变 → 不写剪贴板并收起', async () => {
@@ -361,6 +383,86 @@ describe('createTextSelection · 动作', () => {
     expect(ctx.opened).toEqual(['第 1 段．这是一段用于']) // 12 字以内 → 原样（首行）
     expect(ctx.ctl.getView().visible).toBe(false)
     expect(ctx.modals).toHaveLength(0)
+  })
+})
+
+describe('createTextSelection · review 回归锁', () => {
+  it('B1：默认调度器可用（取消不抛错，且不误杀下一次选中）', async () => {
+    vi.useFakeTimers()
+    try {
+      // 不注入 schedule → 走生产默认实现（原实现返回 timer id，调用即 TypeError 中断 dismiss）
+      const cleared: string[] = []
+      const written: string[] = []
+      const ctl = createTextSelection({
+        getParagraphText: (nodeId) => PARAGRAPHS[nodeId] ?? null,
+        engine: {
+          measureRange: () => Promise.resolve({ ok: true, rectVw: { left: 10, top: 20, width: 5, height: 3 } }),
+          clearRange: (nodeId) => {
+            cleared.push(nodeId)
+            return Promise.resolve(true)
+          },
+        },
+        clipboard: {
+          writeText: (text) => {
+            written.push(text)
+            return Promise.resolve()
+          },
+        },
+        search: { openWithKeyword: () => {} },
+        registerModal: () => () => {},
+        labels: { copy: '复制', search: '搜索', copied: '已复制', copyFailed: '复制失败' },
+      })
+      ctl.onSelectionChange({ target: { id: 'p-0' }, detail: { start: 6, end: 8 } })
+      await Promise.resolve()
+      ctl.copy()
+      await Promise.resolve()
+      expect(ctl.getView().copyState).toBe('copied')
+      // 复制后立刻收起：走 clearTimers → 取消反馈定时器（旧实现在此抛 TypeError，菜单卡住）
+      expect(() => ctl.dismiss()).not.toThrow()
+      expect(ctl.getView().visible).toBe(false)
+      expect(cleared).toEqual(['p-0'])
+      // 旧定时器不得在之后杀掉新的选中
+      ctl.onSelectionChange({ target: { id: 'p-1' }, detail: { start: 0, end: 2 } })
+      await Promise.resolve()
+      expect(ctl.getView().visible).toBe(true)
+      vi.advanceTimersByTime(5000)
+      expect(ctl.getView().visible).toBe(true)
+      expect(written).toEqual(['这是'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('B2/N1：重测失败不破坏「可见 ⇔ 注册」不变式（保留上次成功位置，注册数恒为 1）', async () => {
+    const ctx = setup()
+    select(ctx)
+    await flush()
+    expect(ctx.ctl.getView().visible).toBe(true)
+    expect(ctx.modals).toHaveLength(1)
+
+    ctx.setOutcome({ ok: false, reason: 'timeout' })
+    select(ctx, 0, 3) // 拖手柄后的重测失败
+    await flush()
+    expect(ctx.ctl.getView().visible).toBe(true) // 保留上次位置（不闪烁、不悬空）
+    expect(ctx.modals).toHaveLength(1)
+  })
+
+  it('B3：整段选中（end === 码点数）→ 测量范围收敛到 len-1（全量 range 必失败）', async () => {
+    const ctx = setup()
+    const len = PARAGRAPHS['p-0'].length
+    select(ctx, 0, len)
+    await flush()
+    expect(ctx.measureCalls).toEqual([{ nodeId: 'p-0', start: 0, end: len - 1 }])
+    expect(ctx.ctl.getView().visible).toBe(true)
+  })
+
+  it('B3 边界：仅选中末位字符 → 测量范围向左扩一位（仍能出菜单）', async () => {
+    const ctx = setup()
+    const len = PARAGRAPHS['p-0'].length
+    select(ctx, len - 1, len)
+    await flush()
+    expect(ctx.measureCalls).toEqual([{ nodeId: 'p-0', start: len - 2, end: len - 1 }])
+    expect(ctx.ctl.getView().visible).toBe(true)
   })
 })
 

@@ -49,10 +49,10 @@ const itemStyle = computed<Record<string, string>>(() => ({
     @tap.stop
   >
     <view
-      v-for="item in view.items"
+      v-for="(item, index) in view.items"
       :key="item.key"
       class="flex flex-col items-center justify-center"
-      :style="{ ...itemStyle, marginLeft: item.key === view.items[0].key ? '0' : `${TOOLBAR_ITEM_GAP_VW}vw` }"
+      :style="{ ...itemStyle, marginLeft: index === 0 ? '0' : `${TOOLBAR_ITEM_GAP_VW}vw` }"
       :accessibility-element="A11Y_ELEMENT_ENABLED"
       :accessibility-label="item.label"
       @tap.stop="emit('action', item.key)"
@@ -74,7 +74,11 @@ const itemStyle = computed<Record<string, string>>(() => ({
           class="absolute left-[2.9vw] top-[3vw] w-[1.7vw] h-[0.33vw] bg-on-surface rounded-full rotate-45 origin-left"
         />
       </view>
-      <text class="text-[2.4vw] leading-[3vw] text-on-surface">{{ item.label }}</text>
+      <text
+        class="text-[2.4vw] leading-[3vw]"
+        :class="item.state === 'error' ? 'text-error' : 'text-on-surface'"
+        >{{ item.label }}</text
+      >
     </view>
   </view>
 </template>
