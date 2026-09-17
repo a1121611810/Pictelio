@@ -56,6 +56,8 @@ import DownloadManager from './pages/DownloadManager.vue'
 import NetworkCheck from './pages/NetworkCheck.vue'
 import Ranking from './pages/Ranking.vue'
 import PlatformCheck from './pages/PlatformCheck.vue'
+// PROBE-ONLY（wayfinder #559，throwaway 分支）：文字选中能力实证页，不入 main
+import TextProbe from './pages/TextProbe.vue'
 
 /**
  * 路由表（vue-router 1:1 迁移，ADR-0138 决策 3）：
@@ -88,6 +90,8 @@ export const routes: RouteRecordRaw[] = [
   // 平台一致性自检页（spec docs/specs/qa-defense-lines.md §3.T4 / #550）：debug 页，
   // 不标 requiresAuth（避免登录耦合）、不进任何导航入口——仅 benchNav 深链可达
   { path: '/platform-check', name: 'platform-check', component: PlatformCheck },
+  // PROBE-ONLY（#559）：不标 requiresAuth，probe 构建下为初始路由
+  { path: '/text-probe', name: 'text-probe', component: TextProbe },
 ]
 
 export const router: Router = createRouter({
@@ -408,7 +412,8 @@ export async function initRouter(): Promise<void> {
   // T8：启动时自动备份——必须在 loadSettings 之后（否则读到默认 false 静默跳过）；
   // 失败仅 warn，不阻塞启动（spec §7）
   void runStartupAutoBackup()
-  await navigate(ok ? RECOMMENDED_PATH : '/login', { replace: true })
+  // PROBE-ONLY（#559）：probe 构建强制进实证页（不依赖登录/网络）；原逻辑见 git 历史
+  await navigate('/text-probe', { replace: true })
   // 登录态恢复已定局：守卫开始执行鉴权拦截（bootstrap 期放行至此结束）
   markBootstrapDone()
 }
