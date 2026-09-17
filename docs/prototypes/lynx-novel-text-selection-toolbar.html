@@ -1,0 +1,164 @@
+<!doctype html>
+<!--
+  PROTOTYPE（throwaway，随时可删）：lynx 小说正文「长按选中 → 操作菜单」的 4 个视觉方案。
+  用途：给用户挑视觉方向；不参与构建、无依赖，直接浏览器打开即可。
+  切换：?variant=A|B|C|D（默认 A），或页面底部切换条 / ←→ 方向键。
+  Token 与尺寸取自 packages/app-lynx/src/styles/tokens.css 与 NovelDetail.vue（surface/on-surface、
+  inverse-surface 家族、shape-medium、elevation-3、正文 32rpx≈46px / 行高 44rpx≈63px @1080 宽）。
+  注意：lynx 客户端当前**无暗色模式**（只有 6 套主题色板），故按亮色渲染；主题色影响手柄/高亮与
+  primary 系配色，图中以默认 sky(#1a6fa8) 呈现。
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>原型：选中操作菜单 4 案</title>
+<style>
+  :root {
+    --surface: #f8faff;
+    --on-surface: #191c20;
+    --on-surface-variant: #41474e;
+    --surface-container: #eceef4;
+    --surface-container-high: #e6e8ee;
+    --surface-container-highest: #e1e3e9;
+    --inverse-surface: #2e3136;
+    --inverse-on-surface: #eff1f7;
+    --primary: #1a6fa8;
+    --primary-container: #cfe5ff;
+    --on-primary: #ffffff;
+    --outline: #71787e;
+    --outline-variant: #c1c7ce;
+    --shape-medium: 34px;
+    --shape-large: 46px;
+    --elevation-3: 0 4px 8px 3px rgba(0,0,0,.15), 0 1px 3px rgba(0,0,0,.3);
+  }
+  * { box-sizing: border-box; }
+  body.clean { padding-bottom: 24px; }
+  body.clean #switcher { display: none; }
+  body {
+    margin: 0; padding: 28px 0 40px;
+    background: #dfe4ec;
+    font-family: -apple-system, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+  }
+  .stage { width: 1080px; margin: 0 auto; }
+  .phone {
+    position: relative; width: 1080px; height: 940px; overflow: hidden;
+    background: var(--surface); color: var(--on-surface);
+  }
+  /* ── 真实阅读器 chrome（NovelDetail.vue：顶栏 h-[17.067vw]）── */
+  .topbar { height: 184px; display: flex; align-items: center; padding: 0 32px; font-size: 56px; }
+  .back { padding-right: 20px; color: var(--on-surface); }
+  .title { font-size: 42px; font-weight: 500; }
+  .body { padding: 24px 32px; font-size: 46px; line-height: 63px; }
+  .body p { margin: 0 0 40px; }
+  /* ── 选中高亮与手柄（引擎绘制；此处按主题 primary 呈现）── */
+  .sel { background: rgba(26,111,168,.26); border-radius: 6px; }
+  .handle {
+    position: absolute; width: 40px; height: 40px; border-radius: 50%;
+    background: var(--primary); top: 60px;
+  }
+  .handle.l { left: -20px; } .handle.r { right: -20px; }
+  .selwrap { position: relative; display: inline-block; }
+  /* ── 浮层通用 ── */
+  .toolbar { position: absolute; left: 50%; transform: translate(-50%, -100%); display: flex; align-items: center; }
+  .v-a .toolbar { gap: 56px; padding: 22px 34px; border-radius: var(--shape-medium);
+    background: var(--inverse-surface); color: var(--inverse-on-surface); box-shadow: var(--elevation-3); }
+  .v-a .item { font-size: 32px; }
+  .v-b .toolbar { gap: 6px; padding: 14px 18px; border-radius: var(--shape-medium);
+    background: var(--inverse-surface); color: var(--inverse-on-surface); box-shadow: var(--elevation-3); }
+  .v-b .item { width: 132px; height: 132px; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 10px; font-size: 26px; }
+  .v-c .toolbar { gap: 8px; padding: 16px 18px; border-radius: var(--shape-medium);
+    background: var(--surface-container-high); color: var(--on-surface); box-shadow: var(--elevation-3); }
+  .v-c .item { display: flex; align-items: center; gap: 14px; padding: 20px 26px; font-size: 32px; }
+  .v-d .toolbar { gap: 0; padding: 12px 8px; border-radius: var(--shape-large);
+    background: rgba(248,250,255,.94); color: var(--on-surface);
+    border: 1px solid var(--outline-variant); box-shadow: 0 2px 10px rgba(0,0,0,.10); }
+  .v-d .item { font-size: 30px; padding: 16px 30px; }
+  .v-d .sep { width: 1px; height: 44px; background: var(--outline-variant); }
+  .cap { margin-top: 16px; font-size: 30px; color: #3a3f45; text-align: center; }
+  /* ── 切换条（原型专用，明显不属于设计）── */
+  #switcher { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 18px; padding: 14px 22px; border-radius: 999px;
+    background: #101418; color: #fff; font-size: 26px; box-shadow: 0 6px 20px rgba(0,0,0,.35); z-index: 99; }
+  #switcher button { all: unset; cursor: pointer; padding: 6px 16px; font-size: 30px; }
+  #switcher .k { opacity: .6; font-size: 22px; }
+</style>
+</head>
+<body>
+<div class="stage">
+<div class="phone" id="phone">
+  <div class="topbar"><span class="back">‹</span><span class="title">小说</span></div>
+  <div class="body">
+    <p>最近 DeepSeek 的动静，说实话不算小。型能力明摆着是往上走的。</p>
+    <p>但可以肯定的是，它激发了我，就像没有当初 GPT-3 出来时那种惊艳感。朋友圈转发的少了，<span class="selwrap"><span class="sel">讨论也没那么热闹</span><span class="handle l"></span><span class="handle r"></span></span>，我自己实测完的感受是：模型肯定是强了，但你要说“卧槽”，还真没有。</p>
+  </div>
+  <div class="toolbar" id="toolbar" style="top: 812px;"></div>
+</div>
+</div>
+<div class="cap" id="cap"></div>
+</div>
+
+<div id="switcher">
+  <button id="prev">←</button>
+  <span id="label">A</span>
+  <span class="k">?variant=A|B|C|D</span>
+  <button id="next">→</button>
+</div>
+
+<script>
+  const COPY_ICON = '<svg width="44" height="44" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="11" height="11" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M15 6.5A2.5 2.5 0 0 0 12.5 4h-6A2.5 2.5 0 0 0 4 6.5v6A2.5 2.5 0 0 0 6.5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  const SEARCH_ICON = '<svg width="44" height="44" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.2" stroke="currentColor" stroke-width="1.8"/><path d="M15.8 15.8 20 20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+
+  const VARIANTS = {
+    A: { name: '反色胶囊 · 纯文字', note: 'M3 inverse-surface 胶囊；两枚文字条目，最紧凑，视觉最“工具条”',
+         items: '<span class="item">复制</span><span class="item">搜索</span>' },
+    B: { name: '反色工具条 · 图标+文字', note: '同反色底，但条目 = 图标在上文字在下、触控面更大（对齐参考图形态）',
+         items: '<span class="item">' + COPY_ICON + '复制</span><span class="item">' + SEARCH_ICON + '搜索</span>' },
+    C: { name: '浅色 M3 浮层 · 横向条目', note: 'surface-container-high + elevation-3（M3 Menu 家族）；浅色不抢阅读注意力',
+         items: '<span class="item">' + COPY_ICON + '复制</span><span class="item">' + SEARCH_ICON + '搜索</span>' },
+    D: { name: '极简浮层 · 分隔线', note: '半透明白底 + 描边，双条目用竖线分隔；遮挡最小、最“轻”',
+         items: '<span class="item">复制</span><span class="sep"></span><span class="item">搜索</span>' },
+  };
+
+  const params = new URLSearchParams(location.search);
+  let current = (params.get('variant') || 'A').toUpperCase();
+  if (!VARIANTS[current]) current = 'A';
+  // ?chrome=off → 出图模式：隐藏切换条与多余留白（效果图用）
+  if (params.get('chrome') === 'off') document.body.classList.add('clean');
+
+  function render(key) {
+    const v = VARIANTS[key];
+    document.getElementById('phone').className = 'phone v-' + key.toLowerCase();
+    document.getElementById('toolbar').innerHTML = v.items;
+    // 定位：与真实实现同语义——工具栏底边贴选区上方，水平对齐选区中心
+    requestAnimationFrame(() => {
+      const phone = document.getElementById('phone');
+      const wrap = document.querySelector('.selwrap');
+      const pb = phone.getBoundingClientRect(), sb = wrap.getBoundingClientRect();
+      const bar = document.getElementById('toolbar');
+      bar.style.left = (sb.left - pb.left + sb.width / 2) + 'px';
+      bar.style.top = (sb.top - pb.top - 18) + 'px';
+    });
+    document.getElementById('label').textContent = key + ' · ' + v.name;
+    document.getElementById('cap').innerHTML = '<b>' + key + ' · ' + v.name + '</b><br>' + v.note;
+    document.title = '原型 ' + key + ' — 选中操作菜单';
+  }
+  const order = Object.keys(VARIANTS);
+  function go(key) {
+    current = key;
+    const url = new URL(location.href); url.searchParams.set('variant', key);
+    history.replaceState(null, '', url);
+    render(key);
+  }
+  document.getElementById('prev').onclick = () => go(order[(order.indexOf(current) + order.length - 1) % order.length]);
+  document.getElementById('next').onclick = () => go(order[(order.indexOf(current) + 1) % order.length]);
+  addEventListener('keydown', (e) => {
+    const t = document.activeElement;
+    if (t && /INPUT|TEXTAREA/.test(t.tagName)) return;
+    if (e.key === 'ArrowLeft') document.getElementById('prev').click();
+    if (e.key === 'ArrowRight') document.getElementById('next').click();
+  });
+  render(current);
+</script>
+</body>
+</html>
