@@ -34,6 +34,9 @@ const enPages = {
   "illustDetail.save.queued": "Added {{count}} items to the download queue (see Downloads)",
   "illustDetail.save.ugoiraInfoFailed": "Could not load ugoira info",
 
+  // NovelIntro.vue (novel intro page, map #575 / spec #585)
+  "novelIntro.retry": "Retry",
+
   // NovelDetail.vue
   "novelDetail.title": "Novel",
   "novelDetail.charCount": "{{count}} characters",
