@@ -85,7 +85,7 @@ export function createLynxSelectionEngine(options: LynxSelectionEngineOptions): 
           finished = true
           if (!value && !clearWarned) {
             clearWarned = true
-            console.warn('[lynxSelectionEngine] 引擎侧清选通道不可用（原生高亮可能残留）')
+            console.warn('[lynxSelectionEngine] 引擎侧清选调用失败（引擎可能仍显示选区）')
           }
           resolve(value)
         }
@@ -97,7 +97,7 @@ export function createLynxSelectionEngine(options: LynxSelectionEngineOptions): 
         query
           .select('#' + nodeId)
           .invoke({
-            // 退化为「负坐标 + 不显示手柄」= 引擎侧的清除调用（设备行为待验收，见 spec 未取证项 1）
+            // 退化为「负坐标 + 不显示手柄」= 引擎侧的清除调用（设备实验 S1 已证有效，见 ADR-0165 §8）
             method: 'setTextSelection',
             params: { startX: -1, startY: -1, endX: -1, endY: -1, showStartHandle: false, showEndHandle: false },
             success: () => settle(true),

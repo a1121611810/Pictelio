@@ -62,7 +62,7 @@ Lynx 客户端的小说详情页目前**无法选中正文文字**：段落是�
 8. **滚动收起**：BT `@scroll` + `:scroll-event-throttle="0"`（MT 信号本构建不派发）；处理器在隐藏态**零成本早退**（该信号 60Hz 常驻）。
    补充实证：**点空白/点正文的行为不对称**——点正文会派发 `start === -1`（选区与手柄消失），点列表空白/页头**什么都不派发** → 菜单不会自己收，故宿主在根 view 上转发 `@tap`（tap-away）；而**长按抬手的 release 会被判为 tap**，宿主 `@longpress` 打标、模块消费该次 tap（否则菜单被自己这次长按的抬手收掉）。
 9. **冻结 + 宽限窗**：动作点击瞬间冻结快照；`start === -1` 在 ~150ms 宽限窗内不立即收起（防「点菜单时引擎先清选」把载荷打没）。
-10. **清选尽力而为**：适配器用 `setTextSelection` 退化参数尽力清选，失败只 warn once、工具条照收；**设备实证：滚动收起后原生高亮可能残留**（新选中或点正文会自然清掉）——记为已知项，不阻塞。
+10. **清选已实证有效**：适配器用 `setTextSelection` 退化参数清选——**设备实验（延时无点击执行）**：调用后手柄像素 382→0、高亮回落背景基线；对照组不调用则原样保留。备选清法（零长 range / 极小区间 / 全节点重复 / 整表重建）均无增益或代价更大（见 ADR-0165 §8）。失败只 warn once、不阻断收起。
 
 **端口（恰好三个，其余依赖不造缝）**
 - `SelectionEnginePort`：`measureRange(nodeId,{start,end}) → {ok,rect|reason}`（reason ∈ `no-engine`/`bad-range`/`timeout`/`bad-calibration`）、`contentWidthDp()`、`clearRange(nodeId) → boolean`。生产 `createLynxSelectionEngine`（复用 `primitives/measureRects.ts` 的平台规则：逐 id `select`、`exec` 必须链在 `invoke` 返回值上、1500ms 超时）+ 测试 fake = **真 seam**。
@@ -80,7 +80,7 @@ Lynx 客户端的小说详情页目前**无法选中正文文字**：段落是�
 ④ 不新增 `getSelectedText` 的类型声明与调用（本地切片，省一次跨线程往返与一个失败面）。
 
 **未取证 · 实现前补探针**（探针页在 `probe/text-selection-559` 分支，可直接复用）
-1. 引擎能否**程序化清选**（`setTextSelection` 退化参数是否真的清除高亮）——决定「滚动收起后高亮残留」是缺陷还是可接受。
+1. ~~引擎能否程序化清选~~ **已结案：能**（探针实验 S1 有效；早前「残留」观察为像素分析伪影——列表滚动指示条被误计为手柄，见 ADR-0165 §8 测量坑）。
 2. 索引单位是 **UTF-16 code unit 还是 code point**（含 emoji / 代理对的段落会不会错位切片）。
 3. 点自绘菜单时引擎是否派发 `start === -1`（决定不变式 9 的宽限窗是否必要）。
 
