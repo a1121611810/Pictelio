@@ -61,6 +61,51 @@ describe('loadNovelDetail 契约（/v2/novel/detail）', () => {
   })
 })
 
+// ─── series 形态归一（2026-09-18 模拟器实证：真机 detail 响应 series 无 id/title 字面键，
+// 旧契约下系列行渲染《undefined》+ watchlist 预取 loadNovelSeries(undefined) → HTTP 400） ───
+describe('loadNovelDetail series 归一（/v2/novel/detail 响应形态疑变防线）', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('备选字段 series_id/series_title 归一为仓库契约 {id,title}', async () => {
+    const spy = vi.spyOn(apiClient, 'get').mockResolvedValue({
+      novel: { ...NOVEL, series: { series_id: 1145480, series_title: '夜の向こう側 シリーズ' } as PixivNovel['series'] },
+    })
+    const res = await loadNovelDetail(23876543)
+    expect(spy).toHaveBeenCalledWith('/v2/novel/detail', { novel_id: '23876543' })
+    expect(res.novel.series).toEqual({ id: 1145480, title: '夜の向こう側 シリーズ' })
+  })
+
+  it('旧契约 {id,title} 原样透传（已有调用方零 blast radius）', async () => {
+    vi.spyOn(apiClient, 'get').mockResolvedValue({ novel: NOVEL })
+    const res = await loadNovelDetail(23876543)
+    expect(res.novel.series).toEqual({ id: 1145480, title: '夜の向こう側 シリーズ' })
+  })
+
+  it('字段全缺 = 契约破坏：series 以 undefined 上抛（行隐藏/询问保守不弹）+ 显式 warn（禁静默）', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(apiClient, 'get').mockResolvedValue({
+      novel: { ...NOVEL, series: { series_type: 2 } as unknown as PixivNovel['series'] },
+    })
+    const res = await loadNovelDetail(23876543)
+    expect(res.novel.series).toBeUndefined()
+    expect(warnSpy).toHaveBeenCalled()
+    warnSpy.mockRestore()
+  })
+
+  it('series 缺省（非系列作品）：归一为 undefined，不 warn', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(apiClient, 'get').mockResolvedValue({
+      novel: { ...NOVEL, series: undefined },
+    })
+    const res = await loadNovelDetail(23876543)
+    expect(res.novel.series).toBeUndefined()
+    expect(warnSpy).not.toHaveBeenCalled()
+    warnSpy.mockRestore()
+  })
+})
+
 // ─── 小说收藏契约（票 #587；oracle = webview api/novel.ts addBookmark/deleteBookmark 逐字对齐） ───
 describe('小说收藏契约（/v2/novel/bookmark/add · /v1/novel/bookmark/delete）', () => {
   afterEach(() => {

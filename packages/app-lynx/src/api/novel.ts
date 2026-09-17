@@ -33,10 +33,30 @@ export function loadFollow(
   return apiClient.get<PixivNovelListResponse>("/v1/novel/follow", { restrict }, signal)
 }
 
+// ─── novel.series 形态归一（2026-09-18 模拟器实证） ───
+// /v2/novel/detail 的 series 对象在真机响应中**不含** id/title 字面键（旧契约 {id,title}）——
+// 症状链：系列行渲染《undefined》+ createWatchlistPrompt 预取 loadNovelSeries(undefined) →
+// HTTP 400（logcat「追更状态预取失败」）。容忍备选字段名（series_id / series_title）归一到
+// 仓库契约 {id,title}；字段缺失 = 契约破坏，显式 warn 并以 undefined 上抛（系列行隐藏、
+// 追更询问保守不弹），禁止把 0/'' 假对象静默塞进数据流。
+function normalizeNovelSeries(raw: unknown): PixivNovelDetailResponse["novel"]["series"] {
+  if (raw == null) return undefined
+  const r = raw as Record<string, unknown>
+  const id = (r.id ?? r.series_id) as number | undefined
+  const title = (r.title ?? r.series_title) as string | undefined
+  if (id == null || title == null) {
+    console.warn("[novelApi] novel.series 缺 id/title（响应契约疑变）", raw)
+    return undefined
+  }
+  return { id, title }
+}
+
 export function loadNovelDetail(novelId: number): Promise<PixivNovelDetailResponse> {
   return apiClient.get<PixivNovelDetailResponse>("/v2/novel/detail", {
     novel_id: String(novelId),
-  })
+  }).then((res) => ({
+    novel: { ...res.novel, series: normalizeNovelSeries(res.novel.series) },
+  }))
 }
 
 export function loadNovelNext(url: string, signal?: AbortSignal): Promise<PixivNovelListResponse> {
