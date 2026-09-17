@@ -145,6 +145,7 @@ const enPages = {
   "networkCheck.rerun": "Run again",
   "networkCheck.copied": "Copied",
   "networkCheck.copyReport": "Copy report",
+  "networkCheck.copyFailed": "Copy failed: clipboard is unavailable here (screenshot the report instead)",
 
   // UpdatePage.vue
   "update.exit": "Exit app",

@@ -4,6 +4,8 @@ defineOptions({ name: 'network-check' })
 import { ref } from 'vue'
 import { evaluate, formatReport, type DiagInput, type DiagReport, type DiagStatus } from '@pictelio/net-diagnostics'
 import { collectNetDiagInput } from '../utils/netDiagnostics'
+import { writeClipboardText } from '../utils/lynxClipboard'
+import { copyOutcome } from '../primitives/copyOutcome'
 import { useAuthStore } from '../stores/authStore'
 import { goBack } from '../router'
 import { t, type I18nKey } from '../i18n'
@@ -13,6 +15,8 @@ const report = ref<DiagReport | null>(null)
 const input = ref<DiagInput | null>(null)
 const running = ref(false)
 const copied = ref(false)
+/** 复制失败态（#568：Lynx 运行时没有 navigator，缺通道时必须可见失败而非假成功） */
+const copyFailed = ref(false)
 
 // 状态标签存 key、渲染时 t()（模板内响应 locale 切换；禁止加载时快照）
 const STATUS_KEY: Record<DiagStatus, I18nKey> = {
@@ -32,6 +36,7 @@ async function run() {
   if (running.value) return
   running.value = true
   copied.value = false
+  copyFailed.value = false
   try {
     const uid = auth.currentUser?.id
     const inp = await collectNetDiagInput(__APP_VERSION__, uid === undefined ? undefined : String(uid))
@@ -56,15 +61,10 @@ async function run() {
 
 async function copyReport() {
   if (!input.value) return
-  try {
-    const nav = globalThis.navigator as
-      | { clipboard?: { writeText?: (t: string) => Promise<void> } }
-      | undefined
-    await nav?.clipboard?.writeText?.(formatReport(input.value))
-    copied.value = true
-  } catch (e) {
-    console.warn('[network-check] 复制失败:', e)
-  }
+  // 走自建剪贴板通道（Lynx 无 navigator / 无内置 API）；失败可见，绝不置「已复制」（#568）
+  const outcome = await copyOutcome(writeClipboardText, formatReport(input.value))
+  copied.value = outcome === 'copied'
+  copyFailed.value = outcome === 'failed'
 }
 
 void run()
@@ -116,6 +116,8 @@ void run()
       >
         <text class="text-label-large text-surface-on font-medium">{{ copied ? t('networkCheck.copied') : t('networkCheck.copyReport') }}</text>
       </view>
+      <!-- 失败可见（#568）：不静默、不冒充成功 -->
+      <text v-if="copyFailed" class="text-label-medium text-error mt-1.5">{{ t('networkCheck.copyFailed') }}</text>
       <view class="h-[8vw]" />
     </scroll-view>
   </view>

@@ -106,8 +106,9 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
     view.value = selection.getView()
   })
   onScopeDispose(() => {
-    unsubscribe()
+    // 先 dispose（其 notify 还能送到本订阅）再退订：卸载后视图落到「不可见」而不是停在旧值
     selection.dispose()
+    unsubscribe()
   })
   // 段落源变化（切章 / 重载）→ 收起：旧索引对新文本无意义（spec 不变式 1）
   watch(options.paragraphs, () => selection.dismiss())

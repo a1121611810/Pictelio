@@ -72,6 +72,54 @@ public class PictelioClipboardModuleTest {
         assertEquals("讨论也没那么热闹", clip.getItemAt(0).getText().toString());
     }
 
+    /** 只把剪贴板服务替换为 null 的 Context（覆盖 manager == null 分支；Robolectric 默认会给真 shadow） */
+    private static Context contextWithoutClipboardService() {
+        final Context base = ApplicationProvider.getApplicationContext();
+        return new android.content.ContextWrapper(base) {
+            @Override
+            public Object getSystemService(String name) {
+                return Context.CLIPBOARD_SERVICE.equals(name) ? null : super.getSystemService(name);
+            }
+        };
+    }
+
+    /** 取剪贴板服务时抛「空消息」异常（覆盖错误串兜底：失败必须给出非空原因） */
+    private static Context contextThrowingEmptyMessage() {
+        final Context base = ApplicationProvider.getApplicationContext();
+        return new android.content.ContextWrapper(base) {
+            @Override
+            public Object getSystemService(String name) {
+                if (Context.CLIPBOARD_SERVICE.equals(name)) {
+                    throw new IllegalStateException("");
+                }
+                return super.getSystemService(name);
+            }
+        };
+    }
+
+    @Test
+    public void copyInto_nullClipboardService_failsVisiblyWithoutCrash() throws Exception {
+        RecordingCallback cb = new RecordingCallback();
+        PictelioClipboardModule.copyInto(contextWithoutClipboardService(), "内容", cb);
+
+        Object[] args = cb.await();
+        assertEquals(2, args.length);
+        assertEquals("", args[0]);
+        assertNotNull(args[1]);
+        assertTrue(((String) args[1]).contains("剪贴板服务不可用"));
+    }
+
+    @Test
+    public void copyInto_exceptionWithEmptyMessage_fallsBackToClassName() throws Exception {
+        RecordingCallback cb = new RecordingCallback();
+        PictelioClipboardModule.copyInto(contextThrowingEmptyMessage(), "内容", cb);
+
+        Object[] args = cb.await();
+        assertEquals("", args[0]);
+        // 空 message 不得原样透出（JS 侧以非空错误串判失败）→ 兜底为异常类名
+        assertEquals("IllegalStateException", args[1]);
+    }
+
     @Test
     public void copyInto_emptyText_failsVisiblyAndKeepsClipboardUntouched() throws Exception {
         Context ctx = ApplicationProvider.getApplicationContext();

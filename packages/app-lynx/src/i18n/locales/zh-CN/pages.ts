@@ -145,6 +145,7 @@ const zhPages = {
   "networkCheck.rerun": "重新自检",
   "networkCheck.copied": "已复制",
   "networkCheck.copyReport": "复制诊断报告",
+  "networkCheck.copyFailed": "复制失败：当前环境不支持复制（报告可截图保存）",
 
   // ─── UpdatePage.vue（强制更新页） ───
   "update.exit": "退出应用",

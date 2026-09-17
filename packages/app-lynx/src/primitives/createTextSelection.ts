@@ -441,6 +441,7 @@ export function createTextSelection(deps: TextSelectionDeps): TextSelection {
     snapshot = null
     style = null
     copyState = 'idle'
+    notify() // 先通知（仍挂着的消费者看到已清空），再清订阅
     listeners.clear()
   }
 
