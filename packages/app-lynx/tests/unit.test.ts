@@ -2227,12 +2227,12 @@ expect(detailVueSource).toContain(":item-key=\"'end'\"")
 expect(detailVueSource).toContain(':estimated-main-axis-size-px="estimatedHeightPx"')
 })
 
-it('受限小说分支保留系列信息行 + 评论入口（spec 回归项，P1-1）', () => {
-// 断言须落在受限分支段内（以注释锚点分段；list meta 卡同样含这两串——全局断言为弱断言）
-// #511 补抽：系列名走 t('novelDetail.seriesTitle')（受限分支段内断言调用形态）
+it('受限小说分支：评论入口保留，系列行已按头部精简移除（spec #585 票 #589，地图决策 #578）', () => {
+// 断言须落在受限分支段内（以注释锚点分段）
+// 头部精简（票 #589）：字数/收藏/系列信息移至介绍页（NovelIntro）——受限分支同步移除
 const restricted = detailVueSource.split('<!-- 受限小说')[1] ?? ''
 expect(detailVueSource.split('RestrictOverlay').length).toBeGreaterThanOrEqual(2)
-expect(restricted).toContain("t('novelDetail.seriesTitle'")
+expect(restricted).not.toContain("t('novelDetail.seriesTitle'")
 expect(restricted).toContain('@tap="showComments = true"')
 })
 
@@ -2258,14 +2258,16 @@ expect(cancelFn![0]).toContain('prompt.value?.cancel()')
 expect(cancelFn![0]).not.toContain('goBack')
 })
 
-it('系列信息行：《系列名》+ watchAdded=true 时「已追更」chip', () => {
-expect(detailVueSource).toContain('novel?.series')
-// #511 补抽：系列名/已追更走 t(key)；zh 字典值 = 存量文案逐字快照（渲染产物不变）
+it('头部精简后：正文页不再渲染系列行/已追更 chip（介绍页承载）；i18n 键保留供介绍页复用（spec #585 票 #589）', () => {
+// 票 #589：正文页头部 = 标题 + 作者 + 评论/导出入口；系列行（含 chip）移除
+expect(detailVueSource).not.toContain("t('novelDetail.seriesTitle'")
+expect(detailVueSource).not.toContain("prompt?.watchAdded === true")
+expect(detailVueSource).not.toContain("t('novelDetail.watchAdded')")
+// zh 字典值 = 存量文案逐字快照；键仍被 NovelIntro（系列行/chip）引用，不得删除
 expect(zhMisc['novelDetail.seriesTitle']).toBe('《{{title}}》')
 expect(zhMisc['novelDetail.watchAdded']).toBe('已追更')
-expect(detailVueSource).toContain("t('novelDetail.seriesTitle'")
-expect(detailVueSource).toContain("prompt?.watchAdded === true")
-expect(detailVueSource).toContain("t('novelDetail.watchAdded')")
+// 追更询问数据链不变（票 #582）：系列判定数据仍经详情端点加载供 prompt 使用
+expect(detailVueSource).toContain('getSeries: () => novel.value?.series ?? null')
 })
 
 it('章节内跳转：watch novelId 重载（dispose + 重建，spec §6-2）', () => {

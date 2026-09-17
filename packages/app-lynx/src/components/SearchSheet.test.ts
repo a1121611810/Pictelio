@@ -175,12 +175,12 @@ describe('SearchSheet 提交点 ×3 写历史（glossary「搜索提交点」/ s
     expect(fn![0]).toContain('controller.search(word)')
   })
 
-  it('提交点③ 点结果行：addHistory + closeSearch + navigate 详情（插画 /illust/、小说 /novel/）', () => {
+  it('提交点③ 点结果行：addHistory + closeSearch + navigate 详情（插画 /illust/、小说先进介绍页 /novel/:id/intro，票 #588）', () => {
     const fn = /function onResultTap\(row: SearchResultItem\): void \{[\s\S]*?\n\}/.exec(source)
     expect(fn).not.toBeNull()
     expect(fn![0]).toContain('addHistory(keyword.value)')
     expect(fn![0]).toContain('closeSearch()')
-    expect(fn![0]).toContain("`/novel/${row.entity.id}`")
+    expect(fn![0]).toContain("`/novel/${row.entity.id}/intro`")
     expect(fn![0]).toContain("`/illust/${row.entity.id}`")
   })
 

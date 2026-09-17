@@ -52,6 +52,7 @@ vi.mock('../src/pages/IllustList.vue', () => ({ default: {} }))
 vi.mock('../src/pages/IllustDetail.vue', () => ({ default: {} }))
 vi.mock('../src/pages/NovelList.vue', () => ({ default: {} }))
 vi.mock('../src/pages/NovelDetail.vue', () => ({ default: {} }))
+vi.mock('../src/pages/NovelIntro.vue', () => ({ default: {} }))
 vi.mock('../src/pages/Me.vue', () => ({ default: {} }))
 vi.mock('../src/pages/UserHome.vue', () => ({ default: {} }))
 vi.mock('../src/pages/Following.vue', () => ({ default: {} }))
@@ -76,14 +77,17 @@ async function loadRouter(): Promise<RouterModule> {
 }
 
 describe('路由表完整性（spec D3）', () => {
-  it('19 条路由：path/name 齐全；/update、/error 无 requiresAuth 且带 backBehavior exit（P0-1）', async () => {
+  it('20 条路由：path/name 齐全；/update、/error 无 requiresAuth 且带 backBehavior exit（P0-1）', async () => {
     const mod = await loadRouter()
-    expect(mod.routes).toHaveLength(19)
+    expect(mod.routes).toHaveLength(20)
     const nameOf = (p: string) => mod.routes.find((r) => r.path === p)?.name
     expect(nameOf('/login')).toBe('login')
     expect(nameOf('/recommended')).toBe('recommended')
     expect(nameOf('/illust/:id')).toBe('illust-detail')
     expect(nameOf('/novel/:id')).toBe('novel-detail')
+    // 小说介绍页（spec #585 / 票 #586）：与 /novel/:id 平级共存，同标 requiresAuth
+    expect(nameOf('/novel/:id/intro')).toBe('novel-intro')
+    expect(mod.routes.find((r) => r.path === '/novel/:id/intro')?.meta?.requiresAuth).toBe(true)
     expect(nameOf('/downloads')).toBe('downloads')
     expect(nameOf('/network-check')).toBe('network-check')
     expect(nameOf('/ranking')).toBe('ranking')

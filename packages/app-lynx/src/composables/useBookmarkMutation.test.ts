@@ -44,6 +44,7 @@ describe('useBookmarkMutation（驱动真实 composable + spyOn(apiClient.post)�
     initialBookmarked?: boolean
     initialCount?: number
     onChange?: (bookmarked: boolean) => void
+    targetKind?: 'illust' | 'novel'
   } = {}) {
     const postSpy = vi.spyOn(apiClient, 'post').mockResolvedValue(undefined as never)
     const app = createApp({ render: () => null })
@@ -57,6 +58,7 @@ describe('useBookmarkMutation（驱动真实 composable + spyOn(apiClient.post)�
           initialBookmarked: opts.initialBookmarked ?? false,
           initialCount: opts.initialCount ?? 0,
           onChange: opts.onChange,
+          targetKind: opts.targetKind,
         })
       })
     })
@@ -315,6 +317,43 @@ describe('useBookmarkMutation（驱动真实 composable + spyOn(apiClient.post)�
       expect(postSpy).toHaveBeenCalledWith('/v1/illust/bookmark/delete', { illust_id: '42' })
       release()
       await pending
+    })
+  })
+
+  // ─── 小说收藏（spec #585 / 票 #587：targetKind='novel' 端点分派）───
+  // Oracle：端点/载荷逐字对齐 webview api/novel.ts addBookmark/deleteBookmark
+  //（POST /v2/novel/bookmark/add {novel_id, restrict}、POST /v1/novel/bookmark/delete {novel_id}）。
+  describe("targetKind='novel' 端点分派", () => {
+    it('toggle add 走 /v2/novel/bookmark/add 且恒 public（同 D3 语义）', async () => {
+      const { ret, postSpy } = setupComposable({ initialBookmarked: false, targetKind: 'novel' })
+      await ret.toggle()
+      expect(postSpy).toHaveBeenCalledOnce()
+      expect(postSpy).toHaveBeenCalledWith('/v2/novel/bookmark/add', {
+        novel_id: '42',
+        restrict: 'public',
+      })
+      expect(ret.bookmarked.value).toBe(true)
+    })
+
+    it('toggle delete 走 /v1/novel/bookmark/delete 带 novel_id（非 illust_id）', async () => {
+      const { ret, postSpy } = setupComposable({ initialBookmarked: true, targetKind: 'novel' })
+      await ret.toggle()
+      expect(postSpy).toHaveBeenCalledOnce()
+      expect(postSpy).toHaveBeenCalledWith('/v1/novel/bookmark/delete', { novel_id: '42' })
+      expect(ret.bookmarked.value).toBe(false)
+    })
+
+    it('novel saveWith 不支持 tags：显式 warn（禁静默丢载荷）+ 按 restrict 保存', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const { ret, postSpy } = setupComposable({ targetKind: 'novel' })
+      const ok = await ret.saveWith('private', ['tagA', 'tagB'])
+      expect(ok).toBe(true)
+      expect(warnSpy).toHaveBeenCalled()
+      expect(postSpy).toHaveBeenCalledWith('/v2/novel/bookmark/add', {
+        novel_id: '42',
+        restrict: 'private',
+      })
+      warnSpy.mockRestore()
     })
   })
 })

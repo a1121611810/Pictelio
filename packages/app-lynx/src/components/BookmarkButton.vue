@@ -10,8 +10,9 @@
 //    同一次手势的 tap 被吞掉（不额外触发快速收藏）。列表卡片不开（列表不加入口，spec D3）。
 //  - playBurst：面板保存成功后由宿主经模板 ref 调用（与单击收藏播同一动效资产）。
 // @tap.stop：阻止冒泡到卡片 tap（进详情），需实测 vue-lynx 是否支持 .stop。
-// init-only props（illustId/initialBookmarked/bookmarkCount）：宿主必须按作品 remount（:key），
-// 否则状态机冻结在首卡（ADR-0163；真实缺陷：轮播收藏数恒首卡值，commit 44ee6401）。
+// init-only props（illustId/initialBookmarked/bookmarkCount/targetKind）：宿主必须按作品
+// remount（:key），否则状态机冻结在首卡（ADR-0163；真实缺陷：轮播收藏数恒首卡值，commit 44ee6401）。
+// targetKind 与 mutation 注入互斥：注入路径的端点语义随注入实例，props.targetKind 被忽略（warn）。
 // 宿主矩阵契约测试：BookmarkButton.host-matrix.test.ts。
 import { onBeforeUnmount, ref } from 'vue'
 import {
@@ -31,6 +32,8 @@ const props = defineProps<{
   mutation?: UseBookmarkMutationReturn
   /** 启用长按唤出收藏面板（详情页专用；spec D3 列表卡片不加入口） */
   enableLongPress?: boolean
+  /** 收藏目标类型（spec #585 / 票 #587）：默认插画；小说介绍页传 'novel'（端点分派） */
+  targetKind?: 'illust' | 'novel'
 }>()
 
 // change 事件：动画播完后上抛（动画完成态，ADR-0112 决策 4；供收藏列表等宿主移除已取消收藏的项）
@@ -46,7 +49,11 @@ const emit = defineEmits<{
 // - onSuccess 350ms 后 emit('change')（动画完成态，ADR-0112 D5）
 // - onError 静息回滚 + errorMsg
 // - busy 锁由 composable 内部维护
-// 注入路径不重复建实例（同一份 ref，面板 saveWith 与本组件 toggle 互斥共用 busy 锁）
+// 注入路径不重复建实例（同一份 ref，面板 saveWith 与本组件 toggle 互斥共用 busy 锁）。
+// targetKind 仅自建路径生效：注入端点语义随宿主实例，误传会被静默吞——显式 warn（禁静默）。
+if (props.mutation && props.targetKind === 'novel') {
+  console.warn('[BookmarkButton] mutation 注入路径忽略 targetKind（端点语义随注入实例）')
+}
 const bm =
   props.mutation ??
   useBookmarkMutation({
@@ -54,6 +61,7 @@ const bm =
     initialBookmarked: props.initialBookmarked,
     initialCount: props.bookmarkCount ?? 0,
     onChange: (bookmarked) => emit('change', bookmarked),
+    targetKind: props.targetKind,
   })
 
 // 长按通道（enableLongPress = false 时 handler 直接返回，不注册计时）

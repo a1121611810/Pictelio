@@ -44,6 +44,7 @@ import IllustList from './pages/IllustList.vue'
 import IllustDetail from './pages/IllustDetail.vue'
 import NovelList from './pages/NovelList.vue'
 import NovelDetail from './pages/NovelDetail.vue'
+import NovelIntro from './pages/NovelIntro.vue'
 import Me from './pages/Me.vue'
 import UserHome from './pages/UserHome.vue'
 import Following from './pages/Following.vue'
@@ -72,6 +73,9 @@ export const routes: RouteRecordRaw[] = [
   { path: '/illust/:id', name: 'illust-detail', component: IllustDetail, meta: { requiresAuth: true } },
   { path: '/novels', name: 'novels', component: NovelList, meta: { requiresAuth: true } },
   { path: '/novel/:id', name: 'novel-detail', component: NovelDetail, meta: { requiresAuth: true } },
+  // 小说介绍页（spec #585 / 票 #586）：三段式导航中间页；与 /novel/:id 平级共存，
+  // 不做路由级重定向（benchNav / 测试深链依赖 /novel/:id 直达可达性）
+  { path: '/novel/:id/intro', name: 'novel-intro', component: NovelIntro, meta: { requiresAuth: true } },
   { path: '/user/:id', name: 'user-home', component: UserHome, meta: { requiresAuth: true } },
   { path: '/user/:id/following', name: 'user-following', component: FollowList, meta: { requiresAuth: true } },
   { path: '/user/:id/followers', name: 'user-followers', component: FollowList, meta: { requiresAuth: true } },

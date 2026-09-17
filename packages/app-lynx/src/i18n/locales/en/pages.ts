@@ -34,9 +34,18 @@ const enPages = {
   "illustDetail.save.queued": "Added {{count}} items to the download queue (see Downloads)",
   "illustDetail.save.ugoiraInfoFailed": "Could not load ugoira info",
 
+  // NovelIntro.vue (novel intro page, map #575 / spec #585)
+  "novelIntro.retry": "Retry",
+  "novelIntro.startReading": "Start reading",
+  "novelIntro.startReadingA11y": "Start reading",
+  "novelIntro.authorA11y": "View author profile",
+  "novelIntro.noCaption": "No description",
+  "novelIntro.captionTitle": "Description",
+  "novelIntro.closeA11y": "Close",
+  "novelIntro.commentsA11y": "View comments",
+
   // NovelDetail.vue
   "novelDetail.title": "Novel",
-  "novelDetail.charCount": "{{count}} characters",
   "novelDetail.export.a11y": "Export novel",
   "novelDetail.export.action": "Export",
   "novelDetail.export.queued": "Added to the download queue (see Downloads)",

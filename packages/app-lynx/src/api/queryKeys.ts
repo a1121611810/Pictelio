@@ -85,6 +85,7 @@ export const queryKeys = {
  */
 export const mutationKeys = {
   illustBookmark: () => ['mutation', 'illust', 'bookmark'] as const,
+  novelBookmark: () => ['mutation', 'novel', 'bookmark'] as const,
   novelWatchlist: () => ['mutation', 'novel', 'watchlist'] as const,
   userFollow: () => ['mutation', 'user', 'follow'] as const,
   illustComment: () => ['mutation', 'illust', 'comment'] as const,

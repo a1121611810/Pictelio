@@ -263,11 +263,11 @@ function onHistoryTap(word: string): void {
   controller.search(word)
 }
 
-/** 提交点③ 点击结果行：写历史 + 关层 + 跳详情（回原页位置感由导航历史保持） */
+/** 提交点③ 点击结果行：写历史 + 关层 + 跳详情（回原页位置感由导航历史保持）；小说先进介绍页（票 #588） */
 function onResultTap(row: SearchResultItem): void {
   searchHistory.addHistory(keyword.value)
   searchSheet.closeSearch()
-  void navigate(row.type === 'novel' ? `/novel/${row.entity.id}` : `/illust/${row.entity.id}`)
+  void navigate(row.type === 'novel' ? `/novel/${row.entity.id}/intro` : `/illust/${row.entity.id}`)
 }
 
 function onHistoryRemove(word: string): void {

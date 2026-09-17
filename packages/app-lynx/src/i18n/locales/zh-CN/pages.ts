@@ -34,9 +34,18 @@ const zhPages = {
   "illustDetail.save.queued": "已加入下载队列（{{count}} 项），请到下载页查看",
   "illustDetail.save.ugoiraInfoFailed": "获取动图信息失败",
 
+  // ─── NovelIntro.vue（小说介绍页，地图 #575 / spec #585） ───
+  "novelIntro.retry": "重试",
+  "novelIntro.startReading": "开始阅读",
+  "novelIntro.startReadingA11y": "开始阅读",
+  "novelIntro.authorA11y": "查看作者主页",
+  "novelIntro.noCaption": "暂无简介",
+  "novelIntro.captionTitle": "简介",
+  "novelIntro.closeA11y": "关闭",
+  "novelIntro.commentsA11y": "查看评论",
+
   // ─── NovelDetail.vue（小说详情页） ───
   "novelDetail.title": "小说",
-  "novelDetail.charCount": "{{count}} 字",
   "novelDetail.export.a11y": "导出小说",
   "novelDetail.export.action": "导出",
   "novelDetail.export.queued": "已加入下载队列，请到下载页查看",

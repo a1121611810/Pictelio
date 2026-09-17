@@ -287,26 +287,12 @@ function onWatchlistCancel(): void {
       @scrolltolower="onNovelToBottom"
     >
       <list-item :key="'meta'" :item-key="'meta'" :estimated-main-axis-size-px="estimatedHeightPx" class="w-full">
+        <!-- 头部精简（spec #585 / 票 #589）：标题 + 作者小字；字数/收藏/系列信息由介绍页（NovelIntro）承载。
+             系列判定数据（novel.series）仍经详情端点加载——追更询问（prompt getSeries）依赖它，不随行移除而移除。 -->
         <view class="py-5 px-4 bg-surface-container-lowest mb-3">
         <text class="text-title-large font-bold text-surface-on">{{ novel?.title }}</text>
         <text class="text-body-medium text-surface-on-variant mt-2">by {{ novel?.user.name }}</text>
-        <text class="text-label-medium text-outline mt-1.5">
-          {{ t('novelDetail.charCount', { count: novel?.text_length ?? '' }) }}
-          <template v-if="novel?.total_bookmarks != null">
-             · ♥ {{ novel?.total_bookmarks }}
-          </template>
-        </text>
-        <!-- 系列信息行（spec §US4）：已追更显示 M3 assist-chip 风格标记 -->
-        <view v-if="novel?.series" class="mt-1.5 flex flex-row items-center">
-          <text class="text-label-medium text-outline">{{ t('novelDetail.seriesTitle', { title: novel.series.title }) }}</text>
-          <view
-            v-if="prompt?.watchAdded === true"
-            class="ml-2 px-2 py-0.5 rounded-[var(--md-shape-full)] bg-secondary-container"
-          >
-            <text class="text-label-small text-secondary-on-container">{{ t('novelDetail.watchAdded') }}</text>
-          </view>
-        </view>
-        <!-- 评论入口（issue #164）：💬 + total_comments，字段缺失时不显示（对齐插画页惯例） -->
+        <!-- 评论入口（issue #164）：💬 + total_comments，字段缺失时不显示（对齐插画页惯例）；票 #578 两端都留 -->
         <view
           v-if="novel?.total_comments !== undefined"
           class="mt-2 flex flex-row items-center"
@@ -359,24 +345,9 @@ function onWatchlistCancel(): void {
     <!-- 受限小说：列表结构性改动不涉及（不拉正文），保留原头部+遮罩形态 -->
     <view v-else class="w-full flex-1 min-h-0 p-4 relative">
       <view class="py-5 px-4 bg-surface-container-lowest mb-3">
+        <!-- 头部精简同 meta 卡（票 #589）；受限遮罩/追更询问行为不变 -->
         <text class="text-title-large font-bold text-surface-on">{{ novel?.title }}</text>
         <text class="text-body-medium text-surface-on-variant mt-2">by {{ novel?.user.name }}</text>
-        <text class="text-label-medium text-outline mt-1.5">
-          {{ t('novelDetail.charCount', { count: novel?.text_length ?? '' }) }}
-          <template v-if="novel?.total_bookmarks != null">
-             · ♥ {{ novel?.total_bookmarks }}
-          </template>
-        </text>
-        <!-- 系列信息行（与 meta 卡一致；受限小说保留，spec 回归项） -->
-        <view v-if="novel?.series" class="mt-1.5 flex flex-row items-center">
-          <text class="text-label-medium text-outline">{{ t('novelDetail.seriesTitle', { title: novel.series.title }) }}</text>
-          <view
-            v-if="prompt?.watchAdded === true"
-            class="ml-2 px-2 py-0.5 rounded-[var(--md-shape-full)] bg-secondary-container"
-          >
-            <text class="text-label-small text-secondary-on-container">{{ t('novelDetail.watchAdded') }}</text>
-          </view>
-        </view>
         <!-- 评论入口（与 meta 卡一致） -->
         <view
           v-if="novel?.total_comments !== undefined"
