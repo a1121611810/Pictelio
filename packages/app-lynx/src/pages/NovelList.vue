@@ -137,7 +137,7 @@ function switchMode(m: 'recommend' | 'follow') {
 }
 
 function openDetail(id: number) {
-  void navigate(`/novel/${id}`)
+  void navigate(`/novel/${id}/intro`) // 三段式：先进介绍页（票 #588）
 }
 
 /** 标签点击 → 全局搜索弹层（原始 tag.name，ADR-0133；同 Recommended.vue 语义） */

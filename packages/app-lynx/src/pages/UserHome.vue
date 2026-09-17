@@ -214,7 +214,7 @@ function openIllust(id: number) {
   void navigate(`/illust/${id}`)
 }
 function openNovel(id: number) {
-  void navigate(`/novel/${id}`)
+  void navigate(`/novel/${id}/intro`) // 三段式：先进介绍页（票 #588）
 }
 
 // 图片区点击（spec：列表交互）：受限条目（R18/R18G 且开关关闭）不跳详情，其余进详情。

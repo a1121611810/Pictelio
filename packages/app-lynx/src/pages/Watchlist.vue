@@ -79,10 +79,10 @@ async function loadMore() {
   sync()
 }
 
-/** 决策 D4：直达最新一话（latest_content_id 是作品 id） */
+/** 决策 D4：直达最新一话（latest_content_id 是作品 id）；三段式改道先进介绍页（票 #588） */
 function openLatest(item: WatchlistSeries) {
   if (isWatchlistSeriesMasked(item)) return
-  void navigate(`/novel/${item.latest_content_id}`)
+  void navigate(`/novel/${item.latest_content_id}/intro`)
 }
 
 // ─── 取消追更（M3 Dialog 二次确认 + createWatchlistToggle 状态机） ───
