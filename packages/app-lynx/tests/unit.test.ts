@@ -2218,9 +2218,11 @@ expect(detailVueSource).toContain('@scrolltolower="onNovelToBottom"')
 
 it('list 虚拟化结构：meta/p-<idx>/end 三段 item 且 key 双份一致（ADR-0134）', () => {
 expect(detailVueSource).toContain(":key=\"'meta'\"")
-expect(detailVueSource).toContain(":key=\"`p-${idx}`\"")
+// 段落 id 自 spec app-lynx-novel-text-selection 起由会话唯一所有（selection.paragraphId），
+// 不变式不变：Vue :key 与 Lynx :item-key 同源同表达式（漂移即整表重建 bug）
+expect(detailVueSource).toContain(':key="selection.paragraphId(idx)"')
 expect(detailVueSource).toContain(":item-key=\"'meta'\"")
-expect(detailVueSource).toContain(":item-key=\"`p-${idx}`\"")
+expect(detailVueSource).toContain(':item-key="selection.paragraphId(idx)"')
 expect(detailVueSource).toContain(":item-key=\"'end'\"")
 expect(detailVueSource).toContain(':estimated-main-axis-size-px="estimatedHeightPx"')
 })

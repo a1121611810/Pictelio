@@ -121,6 +121,13 @@ declare global {
     PictelioGallery: {
       saveImage(url: string, fileName: string, callback: (uri: string, err: string) => void): void
     }
+    /**
+     * 剪贴板薄桥（spec app-lynx-novel-text-selection §ID 6）：Lynx 运行时无 navigator / 无内置剪贴板 API。
+     * cb("1", "") 成功 / cb("", errMsg) 失败（无 null 契约，同 PictelioClipboardModule.java）
+     */
+    PictelioClipboard: {
+      setText(text: string, callback: (ok: string, err: string) => void): void
+    }
   } | undefined
 }
 
