@@ -45,6 +45,7 @@ import { useMutation } from '@tanstack/vue-query'
 import { t } from '../i18n'
 import { apiClient } from '../api/client'
 import { addBookmark } from '../api/illust'
+import { addNovelBookmark, deleteNovelBookmark } from '../api/novel'
 import type { RestrictType } from '../api/types'
 import { mutationKeys } from '../api/queryKeys'
 
@@ -57,6 +58,12 @@ export interface UseBookmarkMutationOptions {
   initialCount: number
   /** 可选：动画完成态（350ms 后）回调，参数为目标态（true=收藏 / false=取消） */
   onChange?: (bookmarked: boolean) => void
+  /**
+   * 收藏目标类型（spec #585 / 票 #587）：'illust'（默认，现状）| 'novel'（小说介绍页）。
+   * 小说端点无 tags 载荷（Pixiv 端点差异，oracle=webview api/novel.ts addBookmark）——
+   * novel 形态下 saveWith 的 tags 无法上送，将显式 warn 后按 restrict 保存（禁静默丢载荷）。
+   */
+  targetKind?: 'illust' | 'novel'
 }
 
 export interface UseBookmarkMutationReturn {
@@ -84,7 +91,8 @@ type BookmarkMutationVars =
 export function useBookmarkMutation(
   options: UseBookmarkMutationOptions,
 ): UseBookmarkMutationReturn {
-  const { illustId, initialBookmarked, initialCount, onChange } = options
+  const { illustId, initialBookmarked, initialCount, onChange, targetKind = 'illust' } = options
+  const isNovel = targetKind === 'novel'
 
   // ─── 响应式状态（与原 createBookmarkToggle 一致） ───
   const bookmarked = ref(initialBookmarked)
@@ -99,9 +107,16 @@ export function useBookmarkMutation(
   // 因此用 useMutationOptions.onMutate 闭包读 bookmarked 翻转目标，
   // 再 mutate(target) 触发 API。
   const mutation = useMutation<void, Error, BookmarkMutationVars>({
-    mutationKey: mutationKeys.illustBookmark(),
+    mutationKey: isNovel ? mutationKeys.novelBookmark() : mutationKeys.illustBookmark(),
     mutationFn: async (vars: BookmarkMutationVars) => {
       if (vars.kind === 'save') {
+        if (isNovel) {
+          // 小说收藏端点无 tags 载荷（Pixiv 端点差异）——面板路径当前无小说宿主；
+          // 万一被调用，显式 warn 后按 restrict 保存（禁静默丢载荷，测试硬约束 3）
+          console.warn('[useBookmarkMutation] novel saveWith 不支持 tags，按 restrict 保存', vars.tags)
+          await addNovelBookmark(illustId, vars.restrict)
+          return
+        }
         // 面板保存恒为「收藏/覆盖」方向（spec D5/D6 + ADR-0160 D2 覆盖式编辑）：
         // 经 T3 addBookmark 序列化 restrict + tags（空格 join 单值、tags[] 字段名）。
         await addBookmark(illustId, vars.restrict, vars.tags)
@@ -110,7 +125,15 @@ export function useBookmarkMutation(
       if (vars.target) {
         // 快速收藏恒公开（spec D3）：显式 restrict=public + 无 tags（零决策）；
         // 经 addBookmark 单点序列化，避免此处再手拼 payload（FIX-1）
+        if (isNovel) {
+          await addNovelBookmark(illustId, 'public')
+          return
+        }
         await addBookmark(illustId, 'public')
+        return
+      }
+      if (isNovel) {
+        await deleteNovelBookmark(illustId)
         return
       }
       await apiClient.post('/v1/illust/bookmark/delete', { illust_id: String(illustId) })

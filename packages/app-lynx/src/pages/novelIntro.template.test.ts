@@ -44,3 +44,52 @@ describe("NovelIntro 三态与数据链路（#586）", () => {
     expect(source).not.toContain("registerBackGuard");
   });
 });
+
+describe("NovelIntro 信息架构与受限/AI 态（#587）", () => {
+  it("谓词与正文页同源（票 #580 差分对齐：settings.isRestricted / isAiRestricted）", () => {
+    expect(source).toContain("const isRestricted = settings.isRestricted");
+    expect(source).toContain("const isAiRestricted = settings.isAiRestricted");
+  });
+
+  it("受限遮罩顺序同正文页：R-18 优先（v-if）、AI mask 次之（v-else-if），level 由 x_restrict 派生", () => {
+    expect(source).toContain(
+      '<RestrictOverlay v-if="r18Masked" :level="novel.x_restrict === 2 ? 2 : 1" />',
+    );
+    expect(source).toContain('<AiOverlay v-else-if="aiMasked"');
+  });
+
+  it("CTA「开始阅读」：masked 置灰类绑定 + 处理器守卫（置灰=不可点，非仅视觉）", () => {
+    expect(source).toContain("function startReading(): void {");
+    expect(source).toMatch(/if \(masked\.value\) return/);
+    expect(source).toContain("void navigate(`/novel/${novelId.value}`)");
+    expect(source).toContain("? 'bg-white/20' : 'bg-primary");
+  });
+
+  it("简介展开入口与 CTA 同判定（#584：受限态入口置灰）", () => {
+    expect(source).toMatch(/function openCaption\(\): void \{[\s\S]*?if \(masked\.value\) return/);
+  });
+
+  it("信息架构完整（票 #577）：AI 徽章/系列行+已追更/作者行/标签行/统计行/评论入口齐备", () => {
+    expect(source).toContain("<AdaptiveTagRow");
+    expect(source).toContain("t('novelDetail.seriesTitle'");
+    expect(source).toContain("t('novelDetail.watchAdded')");
+    expect(source).toMatch(/@tap="openAuthor"/);
+    expect(source).toContain("void navigate(`/user/${id}`)");
+    expect(source).toMatch(/novel\.total_view != null/); // 可选字段缺省显式降级（段隐藏）
+    expect(source).toContain("t('aiOverlay.pure')");
+    expect(source).toContain('type="novel"');
+  });
+
+  it("收藏按钮 target-kind='novel'（端点分派）+ 按 :key remount（init-only props 契约 ADR-0163）", () => {
+    const tag = source.match(/<BookmarkButton\s[\s\S]*?>/)?.[0] ?? "";
+    expect(tag).toContain('target-kind="novel"');
+    expect(tag).toContain(":key=\"novel.id\"");
+    expect(tag).toContain(':initial-bookmarked="novel.is_bookmarked"');
+  });
+
+  it("弹层挂载契约：评论/简介全文均 absolute inset-0 宿主脱离文档流（issue #139 同族）", () => {
+    expect(source).toContain('<view v-if="showComments" class="absolute inset-0">');
+    expect(source).toContain('<view v-if="captionOpen" class="absolute inset-0">');
+    expect(source).toContain("<NovelCaptionSheet");
+  });
+});

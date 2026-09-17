@@ -36,6 +36,13 @@ const enPages = {
 
   // NovelIntro.vue (novel intro page, map #575 / spec #585)
   "novelIntro.retry": "Retry",
+  "novelIntro.startReading": "Start reading",
+  "novelIntro.startReadingA11y": "Start reading",
+  "novelIntro.authorA11y": "View author profile",
+  "novelIntro.noCaption": "No description",
+  "novelIntro.captionTitle": "Description",
+  "novelIntro.closeA11y": "Close",
+  "novelIntro.commentsA11y": "View comments",
 
   // NovelDetail.vue
   "novelDetail.title": "Novel",

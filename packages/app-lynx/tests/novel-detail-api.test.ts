@@ -5,7 +5,7 @@
 // IO 边界硬约束：成功与失败两条路径都必须覆盖。
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { apiClient } from '../src/api/client'
-import { loadNovelDetail } from '../src/api/novel'
+import { loadNovelDetail, addNovelBookmark, deleteNovelBookmark } from '../src/api/novel'
 import type { PixivNovel } from '../src/api/types'
 
 // PixivNovel 字段逐字清单（types.ts）：id/title/user/image_urls/tags/page_count/text_length/
@@ -58,5 +58,38 @@ describe('loadNovelDetail 契约（/v2/novel/detail）', () => {
   it('失败路径：apiClient.get 拒绝时错误向上传播（由页面 presentError 映射，不静默吞）', async () => {
     vi.spyOn(apiClient, 'get').mockRejectedValue(new Error('network down'))
     await expect(loadNovelDetail(23876543)).rejects.toThrow('network down')
+  })
+})
+
+// ─── 小说收藏契约（票 #587；oracle = webview api/novel.ts addBookmark/deleteBookmark 逐字对齐） ───
+describe('小说收藏契约（/v2/novel/bookmark/add · /v1/novel/bookmark/delete）', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('addNovelBookmark：POST /v2/novel/bookmark/add 带 novel_id + restrict（缺省 public）', async () => {
+    const spy = vi.spyOn(apiClient, 'post').mockResolvedValue(undefined as never)
+    await addNovelBookmark(23876543)
+    expect(spy).toHaveBeenCalledWith('/v2/novel/bookmark/add', {
+      novel_id: '23876543',
+      restrict: 'public',
+    })
+    await addNovelBookmark(23876543, 'private')
+    expect(spy).toHaveBeenLastCalledWith('/v2/novel/bookmark/add', {
+      novel_id: '23876543',
+      restrict: 'private',
+    })
+  })
+
+  it('deleteNovelBookmark：POST /v1/novel/bookmark/delete 带 novel_id', async () => {
+    const spy = vi.spyOn(apiClient, 'post').mockResolvedValue(undefined as never)
+    await deleteNovelBookmark(23876543)
+    expect(spy).toHaveBeenCalledWith('/v1/novel/bookmark/delete', { novel_id: '23876543' })
+  })
+
+  it('失败路径：add/delete 拒绝时错误向上传播（收藏按钮静息回滚，不静默吞）', async () => {
+    vi.spyOn(apiClient, 'post').mockRejectedValue(new Error('bookmark failed'))
+    await expect(addNovelBookmark(23876543)).rejects.toThrow('bookmark failed')
+    await expect(deleteNovelBookmark(23876543)).rejects.toThrow('bookmark failed')
   })
 })

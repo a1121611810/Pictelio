@@ -31,6 +31,8 @@ const props = defineProps<{
   mutation?: UseBookmarkMutationReturn
   /** 启用长按唤出收藏面板（详情页专用；spec D3 列表卡片不加入口） */
   enableLongPress?: boolean
+  /** 收藏目标类型（spec #585 / 票 #587）：默认插画；小说介绍页传 'novel'（端点分派） */
+  targetKind?: 'illust' | 'novel'
 }>()
 
 // change 事件：动画播完后上抛（动画完成态，ADR-0112 决策 4；供收藏列表等宿主移除已取消收藏的项）
@@ -54,6 +56,7 @@ const bm =
     initialBookmarked: props.initialBookmarked,
     initialCount: props.bookmarkCount ?? 0,
     onChange: (bookmarked) => emit('change', bookmarked),
+    targetKind: props.targetKind,
   })
 
 // 长按通道（enableLongPress = false 时 handler 直接返回，不注册计时）

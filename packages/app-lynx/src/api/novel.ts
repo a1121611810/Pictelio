@@ -127,3 +127,24 @@ export async function fetchNovelData(novelId: number): Promise<{
   const html = await apiClient.requestRaw('GET', '/webview/v2/novel', { id: String(novelId) })
   return extractNovelDataFromHtml(html)
 }
+
+// ─── 小说收藏（spec #585 / 票 #587：介绍页收藏） ───
+// 端点逐字对齐 webview 端 api/novel.ts addBookmark/deleteBookmark（仓库内 oracle）：
+// POST /v2/novel/bookmark/add（novel_id + restrict）、POST /v1/novel/bookmark/delete（novel_id）。
+// 注意与插画收藏不同：小说 add 无 tags 载荷（Pixiv 端点差异，非省略）。
+
+export function addNovelBookmark(
+  novelId: number,
+  restrict: "public" | "private" = "public",
+): Promise<void> {
+  return apiClient.post("/v2/novel/bookmark/add", {
+    novel_id: String(novelId),
+    restrict,
+  })
+}
+
+export function deleteNovelBookmark(novelId: number): Promise<void> {
+  return apiClient.post("/v1/novel/bookmark/delete", {
+    novel_id: String(novelId),
+  })
+}
