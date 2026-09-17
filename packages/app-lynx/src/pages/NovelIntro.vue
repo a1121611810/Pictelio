@@ -8,7 +8,7 @@
 // 数据复用正文页详情端点（零新增 API）；代闸防竞态范式同 NovelDetail。
 // [lynx:fix] KeepAlive name：本页按 :id 加载，不入缓存白名单（同正文页——缓存旧 id 实例会显示错误内容）
 defineOptions({ name: 'novel-intro' })
-import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
+import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { currentParams, goBack, navigate } from '../router'
 import { loadNovelDetail, loadNovelSeries, addNovelWatchlist } from '../api/novel'
 import type { PixivNovel } from '../api/types'
@@ -114,6 +114,15 @@ onMounted(() => {
 onUnmounted(() => {
   teardownPrompt()
   loadGeneration++ // 卸载后任何在飞响应落地即作废
+})
+
+// 章节内跳转（同正文页范式）：路由参数变化 = 同一组件实例复用，代闸作废旧在飞 + 全量重载。
+// 介绍页自身是搜索入口落点（标签 → 搜索 → 另一小说结果），实例复用暴露概率高于普通详情页。
+watch(novelId, (id, prev) => {
+  if (!id || id === prev) return
+  captionOpen.value = false
+  showComments.value = false
+  void loadNovel()
 })
 
 // ─── 交互（全部 UI 改道相关动作，票 #576） ───
@@ -261,6 +270,13 @@ function startReading(): void {
       </view>
     </view>
 
+    <!-- 返回键：三态之上、弹层宿主之下（DOM 顺序即层序，原生 LynxView 不吃 z-index）——
+         弹层打开时盖住返回键，返回路径统一走 modalStack（系统返回键优先关弹层，#163）；
+         code-review P1：直连 goBack 的按钮若浮于弹层之上，会把「关面板」变成「弹掉整页」 -->
+    <view class="absolute top-2 left-1 py-1 pr-2" @tap="goBack">
+      <text class="text-[6.4vw] leading-none text-white">‹</text>
+    </view>
+
     <!-- 评论弹层（挂载契约同正文页：absolute inset-0 宿主脱离文档流） -->
     <view v-if="showComments" class="absolute inset-0">
       <CommentOverlay type="novel" :target-id="novelId" @close="showComments = false" />
@@ -269,11 +285,6 @@ function startReading(): void {
     <!-- 简介全文面板（票 #584：scrim 内展开） -->
     <view v-if="captionOpen" class="absolute inset-0">
       <NovelCaptionSheet :caption="captionText" @close="captionOpen = false" />
-    </view>
-
-    <!-- 返回键：模板末位（DOM 顺序即层序，原生 LynxView 不吃 z-index）浮于三态之上 -->
-    <view class="absolute top-2 left-1 py-1 pr-2" @tap="goBack">
-      <text class="text-[6.4vw] leading-none text-white">‹</text>
     </view>
   </view>
 </template>

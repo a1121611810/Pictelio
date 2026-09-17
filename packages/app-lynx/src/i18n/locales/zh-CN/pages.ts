@@ -46,7 +46,6 @@ const zhPages = {
 
   // ─── NovelDetail.vue（小说详情页） ───
   "novelDetail.title": "小说",
-  "novelDetail.charCount": "{{count}} 字",
   "novelDetail.export.a11y": "导出小说",
   "novelDetail.export.action": "导出",
   "novelDetail.export.queued": "已加入下载队列，请到下载页查看",

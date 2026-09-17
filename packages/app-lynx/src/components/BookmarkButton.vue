@@ -10,8 +10,9 @@
 //    同一次手势的 tap 被吞掉（不额外触发快速收藏）。列表卡片不开（列表不加入口，spec D3）。
 //  - playBurst：面板保存成功后由宿主经模板 ref 调用（与单击收藏播同一动效资产）。
 // @tap.stop：阻止冒泡到卡片 tap（进详情），需实测 vue-lynx 是否支持 .stop。
-// init-only props（illustId/initialBookmarked/bookmarkCount）：宿主必须按作品 remount（:key），
-// 否则状态机冻结在首卡（ADR-0163；真实缺陷：轮播收藏数恒首卡值，commit 44ee6401）。
+// init-only props（illustId/initialBookmarked/bookmarkCount/targetKind）：宿主必须按作品
+// remount（:key），否则状态机冻结在首卡（ADR-0163；真实缺陷：轮播收藏数恒首卡值，commit 44ee6401）。
+// targetKind 与 mutation 注入互斥：注入路径的端点语义随注入实例，props.targetKind 被忽略（warn）。
 // 宿主矩阵契约测试：BookmarkButton.host-matrix.test.ts。
 import { onBeforeUnmount, ref } from 'vue'
 import {
@@ -48,7 +49,11 @@ const emit = defineEmits<{
 // - onSuccess 350ms 后 emit('change')（动画完成态，ADR-0112 D5）
 // - onError 静息回滚 + errorMsg
 // - busy 锁由 composable 内部维护
-// 注入路径不重复建实例（同一份 ref，面板 saveWith 与本组件 toggle 互斥共用 busy 锁）
+// 注入路径不重复建实例（同一份 ref，面板 saveWith 与本组件 toggle 互斥共用 busy 锁）。
+// targetKind 仅自建路径生效：注入端点语义随宿主实例，误传会被静默吞——显式 warn（禁静默）。
+if (props.mutation && props.targetKind === 'novel') {
+  console.warn('[BookmarkButton] mutation 注入路径忽略 targetKind（端点语义随注入实例）')
+}
 const bm =
   props.mutation ??
   useBookmarkMutation({

@@ -46,7 +46,6 @@ const enPages = {
 
   // NovelDetail.vue
   "novelDetail.title": "Novel",
-  "novelDetail.charCount": "{{count}} characters",
   "novelDetail.export.a11y": "Export novel",
   "novelDetail.export.action": "Export",
   "novelDetail.export.queued": "Added to the download queue (see Downloads)",
