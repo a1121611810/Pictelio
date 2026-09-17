@@ -40,7 +40,13 @@ Lynx 客户端的小说详情页目前**无法选中正文文字**：段落是�
 1. **属性契约（硬约束，防实证坑回归）**：段落 `<text>` 用**静态字面量**属性 `text-selection="true"` / `flatten="false"` / `custom-context-menu="true"`；**禁止**改用动态绑定（`:custom-context-menu="expr"` 被 vue-lynx 吞掉，实测引擎菜单不会被替换）。该约束由模板源级守卫测试钉住。
 2. **段落结构不变**：仍是 `<list list-type="single">` + 每段一个 `<list-item>` + 单个 `<text>`（ADR-0134 虚拟化）；段落 `<text>` 增加稳定 `id`（`p-<idx>`）与 `:bindselectionchange`，`e.target.id` 即选中来源节点（实证：事件回传 target id）。
 3. **选中状态（BG composable，纯逻辑可测）**：`composables/useTextSelection.ts` —— 持有 `{ id, start, end, text, rect }`；`onSelectionChange(e)` 解析 payload（`start === -1` → 清空并收起）；rect/text 走异步 selector query，回调落地前用 `(id, start, end)` 比对 **generation-gate** 丢弃过期结果（即时导航硬约束 3）。
-4. **工具栏组件**：`components/TextSelectionToolbar.vue`（新）——props `{ anchor, copied }`，emits `copy` / `search`；胶囊浮层（`bg-inverse-surface` + `text-inverse-on-surface` + `rounded-[var(--md-shape-medium)]` + `shadow-[var(--md-elevation-3)]`，既有先例 `App.vue` exitHint / M3 反色浮层）；条目触控 ≥40×40px；不铺全屏透明层。
+4. **工具栏组件**：`components/TextSelectionToolbar.vue`（新）——props `{ anchor, copied }`，emits `copy` / `search`。
+   **视觉（2026-09-17 原型选定，方案 E）**：浅色 M3 浮层 + 条目「图标在上、文字在下」——
+   底 `bg-surface-container-high`（`--md-surface-container-high`）、圆角 `rounded-[var(--md-shape-medium)]`、
+   阴影 `shadow-[var(--md-elevation-3)]`、文字 `text-on-surface`；
+   条目 = 字形图标（复制 `📋` / 搜索 `🔍`）+ 下方标签（`text-[26rpx]`）；字形口径与 `GlobalFab` / `navTabs` 一致（**不新增图标资源**，lynx 侧无 SVG/图标资产）；条目触控面 ≥40×40px（实现按 132rpx 方形档，与 GlobalFab 内环同量级）；
+   不铺全屏透明层（ADR-0123）。原型与四张候选对照见 `docs/prototypes/lynx-novel-text-selection-toolbar.html`（分支 `prototype/lynx-text-selection-toolbar`）。
+   注：lynx 客户端**无暗色模式**（只有 6 套主题色板），故只按亮色实现。
 5. **定位（纯函数可测）**：`primitives/selectionToolbarGeometry.ts` —— 输入 `rect`（内容区 dp）+ 内容区宽度，输出 vw 样式串；规则 = 水平居中于选区、优先置于选区**上方**、顶部越界**翻转到下方**；锚点语义 `(0,0)` 根 + `left/top vw` + `translate(-50%,-100%)`（ADR-0131/0123）。**1vw = 1% 内容宽度**；dp→px 用 density（实测 1vw = 3.6dp @1080/480dpi）。
 6. **复制通道**：新增 Java 模块 `PictelioClipboardModule`（`@LynxMethod setText(String, Callback)`）——`ClipboardManager` + `ClipData.newPlainText` + `setPrimaryClip`；**注册只需 `LynxRuntimeInitializer` 一处**（#560 实证：Share/Downloader/WebDav 均 global-only 且设备可用）；**禁止向 `Callback.invoke` 传 null**（真机 `CallbackImpl` 崩溃，`PictelioGalleryModule` 先例）；Android 13+ 系统自带剪贴板预览，**不加自家 toast**。TS 侧 `utils/lynxClipboard.ts`：本地 interface + cast + 缺失时 `console.warn` **并返回失败**（先例 `utils/downloadSharer.ts` / `lynxShare.ts`；web-core 预览即走此降级、不得假成功——#568 教训）。
 7. **搜索通道**：`useSearchSheetStore().openSearch(keyword)`（跳搜索页 + 预填 + 一次性消费，既有入口先例 `Recommended.vue` / `NovelList.vue`）；长文本截断为纯函数 `truncateForSearch()`（取首个非空行，上限 30 字）。注意 `openSearch` 幂等：弹层已开时关键词被吞 —— 实施时若需要，在 store 增补显式语义（不改动既有调用点行为）。
@@ -54,7 +60,7 @@ Lynx 客户端的小说详情页目前**无法选中正文文字**：段落是�
 
 - **纯逻辑单测（node）**：`useTextSelection`（事件解析、`-1` 清空、generation-gate 丢弃过期回调、dismiss 清选）、`selectionToolbarGeometry`（上方/越界翻转、dp→vw 换算、边界值）、`truncateForSearch`（单行/超长/空输入）、`lexClipboard` 工厂（**IO 边界成功 + 失败双路径**，禁静默降级——AGENTS.md 测试硬约束 1/3）。
 - **契约测试**：Java 模块名/方法名与 TS 侧一致（从 `PictelioClipboardModule.java` 源码提取常量比对，参考 `backupRulesConsistency.test.ts` 模式）；模块注册在 `LynxRuntimeInitializer` 存在（源级断言）。
-- **模板源级守卫**（防实证坑回归，最高价值）：`NovelDetail` 段落 `<text>` 含静态字面量 `text-selection="true"` / `flatten="false"` / `custom-context-menu="true"`，且**不得出现** `:custom-context-menu` 形式的动态绑定；工具栏为 root 内 absolute 胶囊（不铺全屏层）。
+- **模板源级守卫**（防实证坑回归，最高价值）：`NovelDetail` 段落 `<text>` 含静态字面量 `text-selection="true"` / `flatten="false"` / `custom-context-menu="true"`，且**不得出现** `:custom-context-menu` 形式的动态绑定；工具栏为 root 内 absolute 胶囊（不铺全屏层），且使用选定视觉令牌（`bg-surface-container-high` + `shadow-[var(--md-elevation-3)]`，防视觉回退）。
 - **Java 单测**：`PictelioClipboardModule` 成功/失败路径（Robolectric，先例 `PictelioGalleryModuleTest`）。
 - **不新增 E2E**：`custom-context-menu` 在 web-core 预览零实现（#559 实证）→ 预览无法验证；真机/模拟器验收走清单（见下）。
 - **验收口径**：模拟器（R11S 口径 AVD）长按正文 → ① 出选区与手柄 ② 只出现自绘菜单（无引擎「复制/全选」叠加）③ 点复制后粘贴到输入框可见同文 ④ 点搜索后搜索页输入框预填 ⑤ 滚动/点空白后菜单消失 ⑥ 返回键先关菜单；`check:app-lynx` / `test:app-lynx` / `lint` 全绿；**正文滚动无肉眼劣化**（若需要，用既有 bench-scroll 口径对比 flatten=false 前后，作为一次性核查而非门禁）。
