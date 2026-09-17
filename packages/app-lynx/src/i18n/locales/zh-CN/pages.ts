@@ -40,6 +40,11 @@ const zhPages = {
   "novelDetail.export.a11y": "导出小说",
   "novelDetail.export.action": "导出",
   "novelDetail.export.queued": "已加入下载队列，请到下载页查看",
+  // 正文选中操作菜单（spec docs/specs/app-lynx-novel-text-selection.md）
+  "novelDetail.selection.copy": "复制",
+  "novelDetail.selection.search": "搜索",
+  "novelDetail.selection.copied": "已复制",
+  "novelDetail.selection.copyFailed": "复制失败",
   "novelDetail.bodyExtractFailed": "小说正文提取失败",
   "novelDetail.end": "— 完 —",
 

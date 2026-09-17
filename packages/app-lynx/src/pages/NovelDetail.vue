@@ -28,6 +28,8 @@ import CommentOverlay from '../components/CommentOverlay.vue'
 import NovelExportSheet from '../components/NovelExportSheet.vue'
 import SkeletonNovel from '../components/SkeletonNovel.vue'
 import WatchlistPromptDialog from '../components/WatchlistPromptDialog.vue'
+import TextSelectionToolbar from '../components/TextSelectionToolbar.vue'
+import { useTextSelection } from '../composables/useTextSelection'
 
 const novel = ref<PixivNovel | null>(null)
 const text = ref('')
@@ -165,6 +167,19 @@ const paragraphs = computed(() => {
 /** 列表 estimated 高度：正文段落中位高度（估算纯函数，见 primitives/novelParagraphEstimate） */
 const estimatedHeightPx = computed(() => novelAverageParagraphHeightPx(paragraphs.value))
 
+// ─── 正文选中与操作菜单（spec docs/specs/app-lynx-novel-text-selection.md）───
+// 页面唯一入口：会话（深模块）+ 工具栏视图；引擎事件、测矩、定位、收起、剪贴板、搜索全在模块内。
+const selection = useTextSelection({ paragraphs })
+
+/** 工具栏条目动作（组件只报 key，语义在会话内） */
+function onSelectionAction(key: 'copy' | 'search'): void {
+  if (key === 'copy') {
+    selection.copy()
+    return
+  }
+  selection.search()
+}
+
 // generation-gate：章节内跳转（watch novelId 触发重载）后旧响应不得覆盖新数据
 let loadGeneration = 0
 
@@ -241,7 +256,12 @@ function onWatchlistCancel(): void {
 </script>
 
 <template>
-  <view class="w-full h-full flex flex-col relative bg-surface">
+  <view
+    :id="selection.rootId"
+    class="w-full h-full flex flex-col relative bg-surface"
+    @tap="selection.onTapAway"
+    @longpress="selection.notifyLongPress"
+  >
     <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
       <!-- 左上角返回改走 requestBack：与系统返回共用同一守卫链（spec §US3） -->
       <view class="py-1 pr-2" @tap="requestBack"><text class="text-[6.4vw] leading-none text-surface-on">‹</text></view>
@@ -262,6 +282,8 @@ function onWatchlistCancel(): void {
       scroll-orientation="vertical"
       :lower-threshold-item-count="5"
       :main-thread-bindscroll="onNovelScrollMT"
+      :scroll-event-throttle="0"
+      @scroll="selection.onScroll"
       @scrolltolower="onNovelToBottom"
     >
       <list-item :key="'meta'" :item-key="'meta'" :estimated-main-axis-size-px="estimatedHeightPx" class="w-full">
@@ -310,12 +332,22 @@ function onWatchlistCancel(): void {
       </list-item>
       <list-item
         v-for="(p, idx) in paragraphs"
-        :key="`p-${idx}`"
-        :item-key="`p-${idx}`"
+        :key="selection.paragraphId(idx)"
+        :item-key="selection.paragraphId(idx)"
         :estimated-main-axis-size-px="estimatedHeightPx"
         class="w-full px-4 mb-4"
       >
-        <text class="text-body-large leading-[44rpx] text-surface-on">{{ p }}</text>
+        <!-- 正文选中（spec app-lynx-novel-text-selection）：三条属性**必须静态字面量**——
+             vue-lynx 会吞掉动态布尔绑定（设备实证），届时引擎自带菜单不会被替换 -->
+        <text
+          :id="selection.paragraphId(idx)"
+          class="text-body-large leading-[44rpx] text-surface-on"
+          text-selection="true"
+          flatten="false"
+          custom-context-menu="true"
+          :bindselectionchange="selection.onSelectionChange"
+          >{{ p }}</text
+        >
       </list-item>
       <list-item :key="'end'" :item-key="'end'" class="w-full">
         <view class="flex items-center justify-center p-6">
@@ -323,6 +355,7 @@ function onWatchlistCancel(): void {
         </view>
       </list-item>
     </list>
+
     <!-- 受限小说：列表结构性改动不涉及（不拉正文），保留原头部+遮罩形态 -->
     <view v-else class="w-full flex-1 min-h-0 p-4 relative">
       <view class="py-5 px-4 bg-surface-container-lowest mb-3">
@@ -360,6 +393,11 @@ function onWatchlistCancel(): void {
         <AiOverlay v-else-if="novel && isAiRestricted(novel)" :ai-type="novel.novel_ai_type ?? 0" />
       </view>
     </view>
+
+    <!-- 选中操作菜单（spec app-lynx-novel-text-selection §ID 4）：root 内、正文列表之后的绝对定位胶囊
+         （DOM 顺序即层序；必须避开 list 的 v-else-if / v-else 相邻约束）；不铺全屏层（ADR-0123），
+         「点空白收起」由引擎 start === -1 事件承担 -->
+    <TextSelectionToolbar :view="selection.view" @action="onSelectionAction" />
 
     <!-- 评论弹层（issue #164 / 布局流修复 issue #139 同族）：必须 absolute 脱离 flex 流，
          否则文档流内 w-full h-full 兄弟会被 h-full 的 list 顶出视口（弹层在屏幕外挂载） -->

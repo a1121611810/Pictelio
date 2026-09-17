@@ -40,6 +40,11 @@ const enPages = {
   "novelDetail.export.a11y": "Export novel",
   "novelDetail.export.action": "Export",
   "novelDetail.export.queued": "Added to the download queue (see Downloads)",
+  // 正文选中操作菜单（spec docs/specs/app-lynx-novel-text-selection.md）
+  "novelDetail.selection.copy": "Copy",
+  "novelDetail.selection.search": "Search",
+  "novelDetail.selection.copied": "Copied",
+  "novelDetail.selection.copyFailed": "Copy failed",
   "novelDetail.bodyExtractFailed": "Could not extract novel text",
   "novelDetail.end": "— End —",
 
