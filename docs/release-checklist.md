@@ -137,6 +137,22 @@ node scripts/release-bundle.mjs --version=<version>   # dist 默认 dist/，产�
 - `minWebVersion`（version.json 字段，web 层最低可用版本/floor）：release 默认**继承旧值**（覆写前读旧文件）；仅当要主动抬门槛时用 `--min-web=x.y.z` 覆写。旧文件缺失/解析失败只 warn 不阻断（不设门槛）。紧急提门槛也允许手改 version.json 单独 commit。
 - 覆盖发布（`-o`）不 bump 版本号 → App 端 `isNewer()` 判「无更新」→ 热修静默失效，**OTA 热修禁止走 `-o`**，必须走正常发布（或 web-only 模式）bump patch；`-o` 对三件套仅限同内容重传（重跑 `release-bundle.mjs` 同输入产物字节一致）。
 
+### 发布文案的模型总结（可选步骤，ADR-0166）
+
+文案选定之后、选版本号之前，脚本会问一句「是否让模型总结这份文案?」——答是则把素材交给配置好的 OpenAI 兼容服务改写成用户视角文案（`-i` 与 `-c` 共用；`-o` 不做）。四个键填在 `packages/app/.env`（该文件不进 git），**缺任一即为未配置**：跳过该步骤并打一行 warn。
+
+| 键 | 说明 |
+| --- | --- |
+| `PICTELIO_AI_BASE_URL` | 服务 base URL，脚本追加 `/chat/completions`（chat）或 `/responses`（responses） |
+| `PICTELIO_AI_API_KEY` | 服务方 API key |
+| `PICTELIO_AI_MODEL` | 模型名；**带思考的推理模型单次可能 >100s**，建议先用快档（实测 `deepseek-flash` 13s、`deepseek-v4-pro` 103s） |
+| `PICTELIO_AI_PROTOCOL` | `chat` 或 `responses`（显式填，不自动探测） |
+
+- 成稿整篇打印后由人拍板：`Y`/回车 用成稿，`n` 回退原文案，`e` 重新总结（`e` 始终以**原始文案**为输入重跑）。成稿替换同一条 changelog，四处落点（commit body / fastlane / Release notes / version.json）同文。
+- 调用失败一律可见：打 warn 说明成因（网络 / 401 / 402 / 404 / 429 / 5xx / 非 JSON / 空输出），再问「改用原文案继续?」——答 `n` 中止发布。最多 2 次尝试；429 / 5xx / 网络错误 / 非 JSON / 空输出重试一次，**4xx 与超时不重试**（超时默认 240s）。
+- 该步骤在 step 1（签名环境检查）之前：若 keystore 密码或 OTA 私钥未就绪，会先花一次模型调用再在 step 1 失败。
+- 已知后果：成稿带 Markdown 标记（`#` / `##` / `-` / `**`）流入 `version.json` 的 `changelog` 字段，而应用内更新弹窗与 Lynx 更新页按纯文本渲染，会**原样显示**这些标记（既有现状，5.1.0 起如此）。
+
 ### web-only 发布模式（`--web-only`，#255）
 
 **何时用**：只改 web 层（UI/逻辑/内容适配）的热修——不构建 APK、不需要 keystore 密码，分钟级完成一次 OTA 发布；已装用户的 app 静默吸收（下次启动生效），无需重装 APK。含原生变更（Java/Kotlin、Capacitor 插件、桥方法、Lynx bundle）的发布一律走正常发布。

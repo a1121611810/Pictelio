@@ -278,6 +278,20 @@ _Avoid_: 包、安装包
 发布脚本 step 6 与覆盖发布模式在 TTY 下逐行渲染每个变体 APK 上传状态（变体、状态、文件大小、已耗时、重试次数）的展示形态；非 TTY 降级为逐事件文本行。
 _Avoid_: 进度条（gh 不提供逐文件字节级进度，面板显示的是耗时而非字节）
 
+### 发布文案（Release notes / changelog）【2026-09-17 新增，ADR-0166】
+
+**发布文案（Release notes / changelog）**：
+一次发布对用户展示的版本说明。脚本内是**同一个 `changelog` 变量喂四处落点**：git commit body、fastlane `metadata/android/en-US/changelogs/<versionCode>.txt`、GitHub Release notes（此处由 `addCommitLinks` 追加 commit 链接）、`website/version.json` 的 `changelog` 字段（截断 5000 字符）。故这四处永远同文，不存在「一个版本两份文案」。
+_Avoid_: 用「changelog」单指 fastlane 文件或 Release notes 其一（四条落点共用一词）
+
+**模型总结（Model summary）**：
+发布脚本的**可选步骤**：文案选定之后、选版本号之前问一句「是否让模型总结这份文案?」，答是则把素材（提交清单或已粘贴的草稿）交给配置好的 OpenAI 兼容服务改写成用户视角文案，整篇打印后由人拍板（`Y` 用成稿 / `n` 回退原文案 / `e` 重新总结）。用户在 `-i`（交互，默认）与 `-c`（自定义粘贴）两种模式都会遇到这一步；`-o` 覆盖发布不做。实现 `scripts/lib/release-notes-ai.mjs`（ADR-0166）。
+_Avoid_: 用「AI 改写」描述（总结稿不新增素材里没有的内容，只做改写与收敛）
+
+**未配置模型（Unconfigured）**：
+四个键 `PICTELIO_AI_BASE_URL` / `_API_KEY` / `_MODEL` / `_PROTOCOL`（填在 `packages/app/.env`，该文件不进 git）缺任一即为未配置 → 跳过模型总结并打一行 warn，**不去问一个做不到的问题**。配置齐全但调用失败是另一回事：失败必须可见并让使用者显式选择（`改用原文案继续?`），禁止静默降级。
+_Avoid_: 把「未配置」与「调用失败」混为一谈（前者静默跳过但有 warn，后者要人拍板）
+
 ### 更新分发
 
 **Web Bundle（web 更新包）**：
