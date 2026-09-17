@@ -3,7 +3,7 @@
 /**
  * Pictelio 一键发布脚本
  *
- * 一条命令完成：选择 commits → 生成 changelog → 选版本 → 构建 APK → GitHub Release
+ * 一条命令完成：选择 commits → 生成 changelog →（可选）模型总结 → 选版本 → 构建 APK → GitHub Release
  *
  * 用法:
  *   pnpm run release         # 等价于 -i
@@ -23,6 +23,13 @@
  *                                   与 --web-only 互斥）
  *   PICTELIO_OTA_MIN_APK         - bundle 的最低宿主 APK 版本（透传 release-bundle.mjs，缺省不设下限）
  *   PICTELIO_KEY_PASSWORD        - key 密码（正常发布必须；web-only 不检查）
+ *
+ * 发布文案「模型总结」的可选配置（-i 与 -c 共用；值填在 packages/app/.env，该文件不进 git，
+ * 四个键缺任一 = 未配置 → 跳过该步骤并打 warn）:
+ *   PICTELIO_AI_BASE_URL         - OpenAI 兼容服务的 base URL（脚本追加 /chat/completions 或 /responses）
+ *   PICTELIO_AI_API_KEY          - 服务方 API key
+ *   PICTELIO_AI_MODEL            - 模型名（带思考的推理模型单次可能数分钟，建议先用快档）
+ *   PICTELIO_AI_PROTOCOL         - 协议形态：chat（chat/completions）或 responses（responses）
  */
 
 import { writeFile, mkdir, mkdtemp, unlink, rmdir } from "node:fs/promises";
@@ -55,6 +62,7 @@ import { planOverwrite, executeOverwrite, probeRemote } from "./release-overwrit
 import { uploadReleaseAssets, resolveUploader } from "./lib/release-uploader.mjs";
 import { probeProxyRouting } from "./lib/proxy-probe.mjs";
 import { createUploadPanel } from "./lib/release-panel.mjs";
+import { loadAiConfig, runSummaryStep, summarizeReleaseNotes } from "./lib/release-notes-ai.mjs";
 
 const rootDir = resolvePath(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolvePath(rootDir, "../.."); // monorepo 根（git 仓库根）
@@ -347,6 +355,37 @@ async function interactivePickVersion(currentVersion) {
         console.log("  ⚠ 请输入 1-4");
     }
   }
+}
+
+// ── 模型总结（可选步骤：-i 与 -c 两种模式共用）──
+// 配置读 packages/app/.env（该文件不进 git，四个键的值由使用者自填）；缺任一键 = 未配置 →
+// 打 warn 跳过本步骤（不去问一个做不到的问题）。读取与交互闭环都在 lib/release-notes-ai.mjs
+// （端口注入、有单测），这里只负责端口接线与日志口吻。
+const aiWarn = (message) => console.warn(`[release] ⚠ ${message}`);
+
+async function maybeSummarizeChangelog(changelog) {
+  const config = await loadAiConfig({ readText, env: process.env, warn: aiWarn });
+  if (!config.configured) {
+    aiWarn(
+      `未配置发布文案模型（缺或为空：${config.missing.join("、")}；填在 packages/app/.env 后可用），` +
+        `跳过「模型总结」，使用原始文案`,
+    );
+    return changelog;
+  }
+
+  const { notes, cancelled } = await runSummaryStep({
+    rawNotes: changelog,
+    config,
+    ask: askQuestion,
+    summarize: (params) =>
+      withSpinner(`模型总结中（${config.model}）...`, () => summarizeReleaseNotes(params)),
+    warn: aiWarn,
+  });
+  if (cancelled) {
+    console.log("[release] 已取消");
+    process.exit(0);
+  }
+  return notes;
 }
 
 // ── 覆盖发布模式（-o / --overwrite）──
@@ -704,6 +743,8 @@ async function main() {
       process.exit(0);
     }
 
+    changelog = await maybeSummarizeChangelog(changelog);
+
     const versionPick = await interactivePickVersion(currentVersion);
     newVersion = versionPick.version;
     publishedVersion = newVersion;
@@ -718,6 +759,8 @@ async function main() {
 
     const selectedCommits = await interactivePickCommits(commits);
     changelog = generateChangelogPreview(selectedCommits) || "小修复与改进";
+
+    changelog = await maybeSummarizeChangelog(changelog);
 
     const versionPick = await interactivePickVersion(currentVersion);
     newVersion = versionPick.version;
