@@ -298,7 +298,7 @@ The `refresh_token` is stored in Android Keystore-backed encrypted storage (`@ap
 `/packages/app/android/app/src/main/java/io/pictelio/app/MainActivity.java` (11 KB)
 
 The Android entry point. Key responsibilities:
-- **Client routing gate (#51):** Before any Capacitor/WebView initialization, reads `SharedPreferences("CapacitorStorage")` key `pictelio_client_kind`. If `"lynx"`, **must** call `super.onCreate(savedInstanceState)` first (Android hard constraint — `SuperNotCalledException` on real devices), then starts [`LynxActivity`](#lynxactivity) and calls `finish()` — no Capacitor bridge, plugin registration, or WebView checks are performed after `super.onCreate`. The dual-Activity approach was chosen because `BridgeActivity.onCreate` unconditionally creates a WebView (see [research](/docs/research/lynx-android-brownfield-integration.md)).
+- **Client routing gate (#51):** Before any Capacitor/WebView initialization, reads `SharedPreferences("CapacitorStorage")` key `pictelio_client_kind`. If `"lynx"`, **must** call `super.onCreate(savedInstanceState)` first (Android hard constraint — `SuperNotCalledException` on real devices), then starts [`LynxActivity`](#lynxactivity) and calls `finish()` — no Capacitor bridge, plugin registration, or WebView checks are performed after `super.onCreate`. The dual-Activity approach was chosen because `BridgeActivity.onCreate` unconditionally creates a WebView (see [research](/docs/research/lynx-android-brownfield-integration.md)). Since ADR-0164 (v5.2.0), a missing/never-written key resolves to **`lynx`** (default-engine flip) and the read+decision is centralized in `EngineRouting.resolve` rather than inline — see [Engine Availability Fallback](#engine-availability-fallback-adr-0153--adr-0164).
 - Registers all five custom plugins: **`ImageCachePlugin`**, **`AuthPlugin`**, **`OAuthPlugin`**, **`PixivApiPlugin`** (v3.18.0+, replaced PictelioHttpPlugin), **`ClientInfoPlugin`** (ADR-0062) — only when the webview path is taken
 - Configures WebView settings (JavaScript enabled, DOM storage, mixed content)
 - Sets up the back-gesture handler for predictive back navigation
@@ -456,9 +456,11 @@ v5.0.0 added a data-management cluster built on shared Java deep modules + thin 
 
 `/network-check` runs [`@pictelio/net-diagnostics`](/packages/net-diagnostics/) `evaluate()` over device capability bits + probe results, yielding per-probe status (green/yellow/red/skipped) + attribution (`auth`/`proxy`/`service`/`network`/`device`) + a sanitized copyable report. Input collected via `collectNetDiagInput` → `native/NetDiag`. See [ADR](/docs/adr/ADR-0153-engine-availability-fallback.md) and [spec](/docs/specs/network-self-check.md).
 
-### Engine Availability Fallback (ADR-0153)
+### Engine Availability Fallback (ADR-0153 & ADR-0164)
 
 The `full` APK no longer dead-ends on the static "upgrade WebView" page when system WebView < 85: `MainActivity` falls back to the Lynx engine for that launch **without** rewriting `pictelio_client_kind`. Availability is judged per-engine (WebView: `getCurrentWebViewPackage()` ≥ `MIN_WEBVIEW_VERSION`, fail-open on undetectable; Lynx: `CLIENT_KINDS` includes lynx ∧ `ensureInitialized()` no-throw ∧ `isNativeLibraryLoaded()`). A one-shot `pictelio_engine_fallback_notice` flag drives a dismissible notice; the fallback path's error page offers only "exit app" (no loop back). See [ADR-0153](/docs/adr/ADR-0153-engine-availability-fallback.md).
+
+**ADR-0164 (v5.2.0) generalizes this into a bidirectional fallback and flips the default engine.** The `pictelio_client_kind` "never chosen" default now resolves to **`lynx`** (the full flavor's `CLIENT_KINDS` first element is `{"lynx","webview"}`), so new installs and never-configured users boot Lynx. Engine decision is centralized in the flavor-neutral [`io.pictelio.app.engine`](/packages/app/android/app/src/main/java/io/pictelio/app/engine/) module: `EngineRouting.resolve` (shared by `PictelioApp` prewarm and `MainActivity` routing) runs a 12-cell `decide` matrix over `EngineProbe` inputs (`clientKinds` / `lynxAvailable` / `webviewOk` / `a11yActive`), `EnginePrefs` owns every engine key, and `EngineRoute` carries a stable ASCII reason code. Key semantics: two-tier "unsupported" (precheck `LynxRuntimeInitializer.isAvailable()` ∧ runtime hard errors — a 10s load timeout deliberately does **not** auto-switch); fallback is **not persisted** as preference (device fact, per ADR-0153) but a `pictelio_engine_lynx_failure_version` failure-memory key (exact `versionCode` match, cleared on upgrade) prevents repeated white-screens; a user `pictelio_engine_auto_fallback` switch (default on) gates the runtime-hard-error auto-switch; `a11y_webview` keeps TalkBack users on WebView when both engines are available. Anti-loop double-lock: per-launch `pictelio_engine_forced_webview` extra + cross-launch failure memory. The lynx "返回 WebView" button now writes `pictelio_client_kind="webview"` explicitly (previously it deleted the key, which after the default flip would loop straight back to Lynx). See [ADR-0164](/docs/adr/ADR-0164-default-engine-lynx-bidirectional-fallback.md).
 
 ### Bridge Thread Unblocking & POST Form Body (ADR-0159 / ADR-0161)
 
@@ -490,11 +492,13 @@ Pictelio uses an automated Android build pipeline with several scripts:
 
 | Script | Purpose |
 |--------|---------|
-| `/packages/app/scripts/release.mjs` | Full release: version bump → build → sign → GitHub release |
+| `/packages/app/scripts/release.mjs` | Full release: changelog (optional AI summary, ADR-0166) → version bump → build → sign → GitHub release |
 | `/packages/app/scripts/release-bundle.mjs` | OTA web-bundle packaging + Ed25519 signing (zip root = `index.html`), produces the manifest/zip/sig three-piece set (ADR-0122); also run standalone for local round-trip verification |
 | `/packages/app/scripts/dev-android.mjs` | One-command dev: Vite → Capacitor sync → Gradle → install |
 | `/packages/app/scripts/sync-android-version.mjs` | Syncs version name from `package.json` to `build.gradle` |
 | `/packages/app/scripts/sync-credentials.mjs` | Injects Pixiv API credentials for CI builds |
+
+**Release-notes AI summary (ADR-0166, v5.2.0):** [`lib/release-notes-ai.mjs`](/packages/app/scripts/lib/release-notes-ai.mjs) adds an optional model-drafting step to `pnpm release` — after changelog selection and before the version pick, it summarizes the commit list into user-facing copy via a generic OpenAI-compatible HTTP channel (`chat/completions` and `responses` protocols; `PICTELIO_AI_BASE_URL`/`_API_KEY`/`_MODEL`/`_PROTOCOL` in `packages/app/.env`, all without defaults). Missing/illegal config skips the step with a warn; any failure (network/4xx/5xx/empty) asks "改用原文案继续?" rather than silently degrading; a human `确认使用? (Y/n/e=重新总结)` gate always confirms the draft. The finalized `changelog` flows to all four release sinks (commit body, fastlane `changelog/<versionCode>.txt`, GitHub Release notes, `version.json`). See [ADR-0166](/docs/adr/ADR-0166-release-notes-model-summary.md).
 
 ### Build Commands
 
@@ -560,6 +564,7 @@ These rules are in addition to the base ProGuard rules from ADR-0001 (native plu
 | PictelioApiModule (Java) | `/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioApiModule.java` |
 | PictelioAppModule (Java) | `/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioAppModule.java` |
 | PictelioAuthModule (Java) | `/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioAuthModule.java` |
+| PictelioClipboardModule (Java) | `/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioClipboardModule.java` |
 | PictelioImageService (Java) | `/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioImageService.java` |
 | PictelioSecureStorageModule (Java) | `/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioSecureStorageModule.java` |
 | PictelioTemplateProvider (Java) | `/packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioTemplateProvider.java` |

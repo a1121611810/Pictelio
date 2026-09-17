@@ -89,6 +89,10 @@ The project uses `@chenglou/pretext` for novel text layout. `isPretextSupported`
 - Scroll-to-match with automatic scroll adjustment
 - Match highlighting in rendered text
 
+## app-lynx Text Selection & Action Menu (ADR-0165, v5.2.0)
+
+The lynx novel detail page — previously unable to select body text at all (only whole-chapter export) — gained long-press selection with a self-drawn M3 action menu (copy / search-in-Pixiv). Three platform facts had to be verified on-device: the selection attributes must be **static string literals** (`text-selection="true"` / `flatten="false"` / `custom-context-menu="true"` — a dynamic `:custom-context-menu` binding is silently dropped by vue-lynx and the engine's own ActionMode menu keeps appearing); the runtime has **no `navigator`/clipboard JS API**, so copy needs a new native [`PictelioClipboardModule`](/openwiki/integrations/android-native.md#lynx-native-modules) channel; and selection indices are **UTF-16 code units** that can split a surrogate pair (emoji), so the range must snap outward to a code-point boundary before `String.slice`. A framework-neutral `/packages/app-lynx/src/primitives/createTextSelection.ts` deep module owns the chain — event parsing → index slicing → async rect measurement (`getTextBoundingRect` fails on a full-paragraph range, so measurement converges to `len-1`) → toolbar placement → four dismissal paths (tap-away via host `@tap`, list scroll, modalStack back-key, chapter-switch/unmount). `/packages/app-lynx/src/components/TextSelectionToolbar.vue` is the dumb view; `useTextSelection.ts` is a thin Vue binding; copy success is judged only by the native `ok === "1"` (no optimistic/fake success). See [ADR-0165](/docs/adr/ADR-0165-lynx-text-selection-and-toolbar.md).
+
 ## Reader Settings
 
 `/packages/app/src/stores/readerSettingsStore.ts` — Persistent reader preferences stored as CSS custom properties on the novel container:
