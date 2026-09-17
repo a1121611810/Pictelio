@@ -33,3 +33,19 @@ describe("NovelDetail 覆盖层布局流（issue #139 同族）", () => {
     expect(source).not.toMatch(/<NovelExportSheet\s+v-if=/);
   });
 });
+
+// ─── 头部精简（spec #585 / 票 #589；oracle = 地图决策 #578：正文页 = 标题+作者+评论/导出）───
+describe("正文页头部精简（spec #585 / 票 #589）", () => {
+  it("统计行（字数·收藏）与系列行（含已追更 chip）已移除——信息由介绍页（NovelIntro）承载", () => {
+    expect(source).not.toContain("t('novelDetail.charCount'");
+    expect(source).not.toContain("t('novelDetail.seriesTitle'");
+    expect(source).not.toContain("t('novelDetail.watchAdded'");
+  });
+
+  it("标题 + 作者 + 评论入口 + 导出入口保留（票 #578：评论两端都留、导出不动）", () => {
+    expect(source).toContain('{{ novel?.title }}');
+    expect(source).toContain('by {{ novel?.user.name }}');
+    expect(source).toContain('@tap="showComments = true"');
+    expect(source).toContain('@tap="exportOpen = true"');
+  });
+});
