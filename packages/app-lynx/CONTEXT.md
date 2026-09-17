@@ -409,3 +409,17 @@ _Avoid_: 对 list 结构变更做「就地 patch + 祈祷」；用 scroll API �
 **卡内展开段（inline expansion section）**：
 注入类增强内容（如相关作品）在瀑布流中的渲染形态：作为**锚点卡 list-item 内部的条件段**（`openDetail` 冒泡域外的兄弟位），**不**作为独立 list-item 织入列表。紧贴锚点成立、滚动位置保留、绕开插入丢弃。先例：`RelatedInlineSection`（spec related-injection §5.2 v2）。
 _Avoid_: 向原生瀑布流中途插入 list-item（必丢，ADR-0162）；横滑条（原生 waterfall list-item 内不可靠，spec §5.2 v1 已证）
+
+### 正文选中与操作菜单（Text selection & selection toolbar）【2026-09-17 新增，地图 #558，spec docs/specs/app-lynx-novel-text-selection.md】
+
+**正文选中（novel text selection）**：
+小说正文段落上的**原生文字选中**能力（长按得选区与拖拽手柄）。开启方式 = `<text>` 上的**静态字面量属性** `text-selection="true"` + `flatten="false"`；`flatten=false` 是硬前提（扁平化文本不是真实平台视图，不可选，静态负控实证：`flatten="true"` 长按 0 次事件）。选中变化经 `:bindselectionchange` 到达 JS，payload `{start, end, direction}`；`start === -1` 表示选区被清除（点空白的信号来源）。范围 = 单段（含整段）。
+_Avoid_: 高亮（指划线批注，本能力不做持久化）；选区高亮色（`::selection` 视觉，非能力名）
+
+**操作菜单（selection toolbar）**：
+选中后浮出的自绘 M3 胶囊浮层（本条目动作 = 复制 / 搜索）。以 `custom-context-menu="true"`（同样**必须静态字面量**——动态布尔绑定被 vue-lynx 吞掉，引擎菜单不会被替换，实证坑）**替换**引擎自带菜单（ActionMode 「复制/全选」）。位置由 `getTextBoundingRect` 决定：返回值单位 = **内容区 dp**（与 `boundingClientRect` 同源），换算 vw = dp × density / 内容宽(px) × 100；优先置选区上方、顶部越界翻转到下方；`(0,0)` 锚点 + `left/top vw` + `translate`，不依赖 `pointer-events`（ADR-0123）。
+_Avoid_: ActionMode（被替换的引擎自带菜单）；Toast（lynx 原生无全局 toast，反馈是原位文案）
+
+**选中文本通道（selection channels）**：
+把选中文字送出去的出口。**复制** = 自建原生模块 `PictelioClipboard.setText`（Lynx JS 运行时**没有 `navigator`**，也无内置剪贴板 API）；**搜索** = 全局搜索弹层 `openSearch(关键词)`（跳搜索页 + 预填 + 一次性消费，长文本先截断到首行/上限）。两者失败都**必须可见**（禁止静默降级与假成功反馈）。
+_Avoid_: 用 `navigator.clipboard`（运行时不存在的对象，可选链会静默失败）；把「搜索」落到新路由页（搜索是弹层，没有 `/search` 路由）
