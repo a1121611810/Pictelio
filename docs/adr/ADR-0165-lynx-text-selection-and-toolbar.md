@@ -2,7 +2,7 @@
 
 - 状态：accepted
 - 日期：2026-09-17
-- 关联：wayfinder 地图 #558（决策全清）、#559（设备实证）、#560（复制通道）、spec `docs/specs/app-lynx-novel-text-selection.md`、`packages/app-lynx/CONTEXT.md`（词条：正文选中 / 操作菜单 / 选中文本通道）、ADR-0123（原生命中测试不认 `pointer-events`）、ADR-0131（内容区尺寸契约）、ADR-0134（正文列表虚拟化）
+- 关联：wayfinder 地图 #558（决策全清）、#559（设备实证）、#560（复制通道）、spec `docs/specs/app-lynx-novel-text-selection.md`、取证报告 `docs/research/lynx-text-selection-device-probe.md`（分支 `probe/text-selection-559`，含实现期复验证据与探针页）、`packages/app-lynx/CONTEXT.md`（词条：正文选中 / 操作菜单 / 选中文本通道）、ADR-0123（原生命中测试不认 `pointer-events`）、ADR-0131（内容区尺寸契约）、ADR-0134（正文列表虚拟化）
 
 ## 背景
 
@@ -10,7 +10,7 @@ lynx 小说详情页此前无法选中正文文字（只能整章导出）。要
 
 1. **选中属性必须静态字面量**：`:custom-context-menu="expr"`（动态布尔绑定）会被 vue-lynx 吞掉，引擎自带的 ActionMode 菜单（复制/全选）照旧弹出，自绘菜单无法接管；改成静态 `custom-context-menu="true"` 后引擎菜单消失。同批静态 `text-selection="true"` / `flatten="false"` 生效（`flatten="true"` 静态负控 → 长按 0 次 `selectionchange`，即 `flatten=false` 是选中的硬前提）。
 2. **运行时没有 `navigator`**：剪贴板既无 `navigator.clipboard`（对象不存在），引擎也没有内置剪贴板 JS API（`liblynx.so` 内 `clipboard` 零命中）→ 「复制」必须自建原生通道。
-3. **选中事件的索引是 UTF-16 码元，且可能落在代理对中间**：某段文本 35 码元 / 34 码点，选中末位字符引擎给 `(34,35)`（只有码元解释成立）；而选中 emoji 时引擎给 `(11,12)` = 高代理单元 —— 直接 `String.slice` 会得到半个字符（粘贴显示 ◇?）。同时 `getTextBoundingRect` 遇**整段** range 必失败（`code:1`），需把测量范围收敛到 `len-1`。
+3. **选中事件的索引是 UTF-16 码元，且可能落在代理对中间**：某段文本 35 码元 / 34 码点，选中末位字符引擎给 `(34,35)`（只有码元解释成立）；**判决实验**：长按 emoji 右侧的「与」给 `(14,15)`——码元解 = 「与」（手指所在字）、码点解 = 「英」，唯一确定码元域。而选中 emoji 时引擎给 `(11,12)` = 高代理单元 —— 直接 `String.slice` 会得到半个字符（粘贴显示 ◇?）。同时 `getTextBoundingRect` 遇**整段** range 必失败（`code:1`），需把测量范围收敛到 `len-1`。
 
 另有两个交互事实（同为设备实证）：
 
