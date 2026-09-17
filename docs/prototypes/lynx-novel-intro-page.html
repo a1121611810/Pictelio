@@ -1,0 +1,325 @@
+<!doctype html>
+<!--
+  PROTOTYPE（throwaway，随时可删）：lynx「小说介绍页」视觉方向 4 案。
+  问题（wayfinder 地图 #575）：信息架构已定（票 #577：封面/标题/作者/标签/简介/统计/系列/
+  评论入口 + 底部「开始阅读」+ 收藏），本原型只回答「这些内容怎么摆」。
+  用法：浏览器直接打开；?variant=A|B|C|D（默认 A）+ 底部切换条 / ←→ 方向键；
+  开关条「受限」= 预览受限态（票 #580 定案：简介遮罩 + 开始阅读置灰）。
+  ?chrome=off 出图模式（隐藏切换条）。
+  Token 取自 packages/app-lynx/src/styles/tokens.css 默认 sky 色板；舞台 1080 宽 @设计分辨率。
+  注：lynx 客户端无暗色模式，按亮色渲染；封面为纯 CSS 书籍封面（无图片依赖）。
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>原型：小说介绍页 4 案</title>
+<style>
+  :root {
+    --surface: #f8faff;
+    --on-surface: #191c20;
+    --on-surface-variant: #41474e;
+    --surface-container: #eceef4;
+    --surface-container-high: #e6e8ee;
+    --surface-container-highest: #e1e3e9;
+    --primary: #1a6fa8;
+    --on-primary: #ffffff;
+    --primary-container: #cfe5ff;
+    --on-primary-container: #001d32;
+    --secondary-container: #d6e3f0;
+    --on-secondary-container: #101c26;
+    --outline: #71787e;
+    --outline-variant: #c1c7ce;
+    --error: #b3261e;
+    --shape-small: 28px; --shape-medium: 34px; --shape-large: 46px;
+    --elev2: 0 2px 6px 2px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.2);
+    --elev3: 0 4px 8px 3px rgba(0,0,0,.15), 0 1px 3px rgba(0,0,0,.3);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 28px 0 40px; background: #dfe4ec;
+         font-family: -apple-system, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; }
+  body.clean { padding-bottom: 24px; }
+  body.clean #switcher { display: none; }
+  .stage { width: 1080px; margin: 0 auto; }
+  .phone { position: relative; width: 1080px; height: 1920px; overflow: hidden;
+           background: var(--surface); color: var(--on-surface); }
+  .cap { margin-top: 16px; font-size: 30px; color: #3a3f45; text-align: center; }
+
+  /* ── 纯 CSS 书籍封面（方形 1:1，小说封面规则）── */
+  .art { position: relative; aspect-ratio: 1/1; overflow: hidden; border-radius: 6px;
+         background: linear-gradient(155deg, #dbeeff 0%, #8fbde6 34%, #2e6ea3 72%, #123a5c 100%); }
+  .art::before, .art::after { content: ""; position: absolute; border: 3px solid rgba(255,255,255,.35); border-radius: 50%; }
+  .art::before { width: 78%; height: 78%; right: -26%; top: -18%; }
+  .art::after  { width: 52%; height: 52%; left: -16%; bottom: -14%; }
+  .art .glyph { position: absolute; left: 64px; top: 56px; font-size: 300px; line-height: 1; color: rgba(255,255,255,.92); font-weight: 600; }
+  .art .atitle { position: absolute; left: 64px; bottom: 210px; font-size: 96px; font-weight: 700; color: #fff; letter-spacing: 6px; }
+  .art .aauthor { position: absolute; left: 64px; bottom: 118px; font-size: 44px; color: rgba(255,255,255,.85); letter-spacing: 4px; }
+  .art .astars { position: absolute; right: 56px; bottom: 118px; font-size: 40px; color: rgba(255,255,255,.7); letter-spacing: 8px; }
+
+  /* ── 通用元件 ── */
+  .screen { position: absolute; inset: 0; display: none; flex-direction: column; }
+  .topbar { height: 184px; flex: none; display: flex; align-items: center; padding: 0 32px; gap: 20px;
+            font-size: 48px; background: var(--surface); position: relative; z-index: 3; }
+  .topbar .back { width: 96px; font-size: 72px; line-height: 1; margin-top: -8px; }
+  .topbar .tt { font-size: 44px; font-weight: 500; color: var(--on-surface-variant); }
+  .scroll { flex: 1; overflow-y: auto; scrollbar-width: none; }
+  .scroll::-webkit-scrollbar { display: none; }
+
+  .title { font-size: 62px; font-weight: 700; line-height: 1.25; margin: 0; }
+  .author-row { display: flex; align-items: center; gap: 20px; margin-top: 28px; }
+  .avatar { width: 80px; height: 80px; border-radius: 50%; background: var(--primary-container); color: var(--on-primary-container);
+            display: flex; align-items: center; justify-content: center; font-size: 40px; flex: none; }
+  .aname { font-size: 40px; color: var(--on-surface); }
+  .achev { font-size: 40px; color: var(--outline); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 16px; }
+  .chip { padding: 14px 28px; border-radius: var(--shape-small); background: var(--secondary-container);
+          color: var(--on-secondary-container); font-size: 30px; }
+  .chip.more { background: var(--surface-container-high); color: var(--on-surface-variant); }
+
+  .sec-label { font-size: 32px; font-weight: 600; color: var(--on-surface-variant); margin: 0 0 20px; }
+  .caption-text { font-size: 38px; line-height: 62px; color: var(--on-surface); margin: 0; }
+  .cap-maskable { position: relative; border-radius: var(--shape-small); }
+
+  .stats { display: flex; flex-wrap: wrap; gap: 16px; }
+  .stat { padding: 16px 28px; border-radius: var(--shape-small); background: var(--surface-container);
+          font-size: 30px; color: var(--on-surface-variant); }
+  .stat b { color: var(--on-surface); font-weight: 600; }
+
+  .row { display: flex; align-items: center; gap: 20px; padding: 30px 0; font-size: 38px; }
+  .row .grow { flex: 1; }
+  .row .sub { font-size: 30px; color: var(--on-surface-variant); margin-top: 8px; }
+  .row .chev { color: var(--outline); font-size: 44px; }
+  .watch-chip { flex: none; padding: 12px 26px; border-radius: 999px; border: 2px solid var(--primary);
+                color: var(--primary); font-size: 28px; }
+  .divider { height: 2px; background: var(--outline-variant); opacity: .5; margin: 12px 0; }
+
+  .cta { flex: none; display: flex; gap: 24px; padding: 28px 32px 44px; background: var(--surface);
+         border-top: 2px solid var(--outline-variant); position: relative; z-index: 3; }
+  .btn-fav { width: 128px; height: 128px; flex: none; border: none; border-radius: 999px;
+             background: var(--secondary-container); color: var(--on-secondary-container); font-size: 56px; }
+  .btn-read { flex: 1; height: 128px; border: none; border-radius: 999px; background: var(--primary);
+              color: var(--on-primary); font-size: 44px; font-weight: 600; letter-spacing: 4px; }
+
+  /* 受限态（票 #580：对齐正文页 RestrictOverlay 语义） */
+  .mask-layer { display: none; position: absolute; inset: 0; border-radius: inherit;
+                background: rgba(248,250,255,.88); align-items: center; justify-content: center; gap: 18px;
+                font-size: 32px; color: var(--on-surface-variant); z-index: 2; }
+  .r18 { padding: 8px 20px; border-radius: 18px; background: var(--error); color: #fff; font-size: 26px; }
+  .restricted .mask-layer { display: flex; }
+  .restricted .btn-read { background: var(--surface-container-highest); color: rgba(25,28,32,.38); }
+  .restricted .btn-fav { opacity: .45; }
+
+  /* ── A 沉浸封面：图先文后，封面贴顶全宽 1:1（对齐「封面比例显示」ADR-0118）── */
+  .v-a .hero { width: 1080px; }
+  .v-a .hero .art { border-radius: 0; }
+  .v-a .hero .glyph { font-size: 240px; } .v-a .hero .atitle { font-size: 84px; }
+  .v-a .pad { padding: 52px 48px 60px; }
+
+  /* ── B 书籍卡：封面居中供起来，仪式感的「一本书」── */
+  .v-b .scroll { text-align: center; }
+  .v-b .book { width: 620px; margin: 88px auto 0; border-radius: 24px; box-shadow: var(--elev3); }
+  .v-b .book .art { border-radius: 24px; }
+  .v-b .book .glyph { font-size: 210px; left: 48px; top: 44px; }
+  .v-b .book .atitle { font-size: 72px; left: 48px; bottom: 190px; }
+  .v-b .book .aauthor { font-size: 36px; left: 48px; bottom: 112px; }
+  .v-b .book .astars { font-size: 32px; right: 44px; bottom: 112px; }
+  .v-b .pad { padding: 64px 56px 60px; text-align: left; }
+  .v-b .title { text-align: center; }
+  .v-b .center { display: flex; justify-content: center; margin-top: 28px; }
+  .v-b .card { margin-top: 48px; background: var(--surface-container); border-radius: var(--shape-medium); padding: 40px 44px; }
+  .v-b .row { padding: 26px 8px; }
+  .v-b .cta { text-align: left; }
+
+  /* ── C 文本优先：杂志式排版，封面缩略让位给信息密度 ── */
+  .v-c .pad { padding: 52px 48px 60px; }
+  .v-c .head-row { display: flex; gap: 32px; align-items: flex-start; }
+  .v-c .head-row .title { flex: 1; font-size: 68px; }
+  .v-c .thumb { width: 152px; flex: none; border-radius: 16px; box-shadow: var(--elev2); }
+  .v-c .thumb .art { border-radius: 16px; }
+  .v-c .thumb .glyph { font-size: 56px; left: 24px; top: 20px; }
+  .v-c .thumb .atitle, .v-c .thumb .aauthor, .v-c .thumb .astars { display: none; }
+  .v-c .caption-text { font-size: 36px; line-height: 58px; }
+  .v-c .chips { margin-top: 32px; }
+
+  /* ── D 轮播同族：全屏封面 + 全屏 scrim（对齐推荐轮播滑页视觉）── */
+  .v-d .bgart { position: absolute; inset: 0; }
+  .v-d .bgart .art { width: 100%; height: 100%; aspect-ratio: auto; border-radius: 0; }
+  .v-d .bgart .glyph { font-size: 560px; left: 120px; top: 140px; }
+  .v-d .bgart .atitle, .v-d .bgart .aauthor, .v-d .bgart .astars { display: none; }
+  .v-d .scrim { position: absolute; left: 0; right: 0; bottom: 0; height: 1180px; z-index: 1;
+                background: linear-gradient(to top, rgba(8,20,32,.92) 30%, rgba(8,20,32,.55) 62%, rgba(8,20,32,0) 100%); }
+  .v-d .topbar { background: transparent; }
+  .v-d .dcontent { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; padding: 0 48px 52px; color: #fff; }
+  .v-d .dcontent .chip { background: rgba(255,255,255,.16); color: #fff; }
+  .v-d .dcontent .chip.more { background: rgba(255,255,255,.10); }
+  .v-d .dtitle { font-size: 72px; font-weight: 700; margin: 26px 0 0; }
+  .v-d .dauthor { font-size: 38px; color: rgba(255,255,255,.85); margin-top: 18px; }
+  .v-d .dseries { font-size: 32px; color: rgba(255,255,255,.7); margin-top: 14px; }
+  .v-d .dcap { position: relative; margin-top: 26px; font-size: 34px; line-height: 54px; color: rgba(255,255,255,.88);
+               display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .v-d .mask-layer { background: rgba(8,20,32,.82); }
+  .v-d .dcta { display: flex; gap: 24px; margin-top: 40px; }
+  .v-d .dfav { width: 128px; height: 128px; flex: none; border-radius: 999px; border: 3px solid rgba(255,255,255,.6);
+               background: transparent; color: #fff; font-size: 56px; }
+  .v-d .dread { flex: 1; height: 128px; border: none; border-radius: 999px; background: #fff; color: var(--primary);
+                font-size: 44px; font-weight: 600; letter-spacing: 4px; }
+  .v-d.restricted .dread { background: rgba(255,255,255,.28); color: rgba(255,255,255,.5); }
+  .v-d.restricted .dfav { opacity: .5; }
+
+  /* ── 切换条（原型专用）── */
+  #switcher { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 18px; padding: 14px 22px; border-radius: 999px;
+    background: #101418; color: #fff; font-size: 26px; box-shadow: 0 6px 20px rgba(0,0,0,.35); z-index: 99; }
+  #switcher button { all: unset; cursor: pointer; padding: 6px 16px; font-size: 30px; }
+  #switcher .k { opacity: .6; font-size: 22px; }
+  #switcher .tog { border: 2px solid rgba(255,255,255,.5); border-radius: 999px; font-size: 24px; padding: 8px 20px; }
+  #switcher .tog.on { background: #fff; color: #101418; border-color: #fff; }
+</style>
+</head>
+<body>
+<div class="stage">
+<div class="phone" id="phone">
+
+  <!-- A 沉浸封面 -->
+  <section class="screen v-a" id="scr-A">
+    <div class="topbar"><span class="back">‹</span><span class="tt">小说介绍</span></div>
+    <div class="scroll"><div class="hero pad0">
+      <div class="art"><span class="glyph">星</span><span class="atitle">星尘回收站</span><span class="aauthor">遠灯 綾辻</span><span class="astars">✦ ✦ ✦</span></div>
+    </div><div class="pad">
+      <h1 class="title">星尘回收站 · 第三话 雨停之前</h1>
+      <div class="author-row"><span class="avatar">遠</span><span class="aname">遠灯 綾辻</span><span class="achev">›</span></div>
+      <div class="chips" style="margin-top:36px"><span class="chip"># 奇幻</span><span class="chip"># 都市传说</span><span class="chip"># 百合</span><span class="chip more">+1</span></div>
+      <div class="divider"></div>
+      <h2 class="sec-label">简介</h2>
+      <div class="cap-maskable"><p class="caption-text">回收站只在雨夜开门。铃原澪把昨天弄丢的伞递进窗口，却取回了三年前离家的姐姐留下的一盒星尘——每颗星星里，都存着一句没能说完的话。雨停之前，她必须决定要不要把它们还给夜空。</p><div class="mask-layer"><span class="r18">R-18</span>受浏览限制，不予显示</div></div>
+      <div class="stats" style="margin-top:40px"><span class="stat">字数 <b>42,317</b></span><span class="stat">♥ <b>12,408</b></span><span class="stat">浏览 <b>318,522</b></span><span class="stat">💬 <b>1,204</b></span></div>
+      <div class="row" style="margin-top:36px"><div class="grow"><div>「星尘回收站」系列</div><div class="sub">第 3 话 · 全 12 话</div></div><span class="watch-chip">＋ 追更</span></div>
+      <div class="divider"></div>
+      <div class="row"><span>💬</span><div class="grow">查看评论</div><span class="chev">›</span></div>
+      <div style="height:60px"></div>
+    </div></div>
+    <div class="cta"><button class="btn-fav">♡</button><button class="btn-read">开始阅读</button></div>
+  </section>
+
+  <!-- B 书籍卡 -->
+  <section class="screen v-b" id="scr-B">
+    <div class="topbar"><span class="back">‹</span><span class="tt">小说介绍</span></div>
+    <div class="scroll"><div class="book">
+      <div class="art"><span class="glyph">星</span><span class="atitle">星尘回收站</span><span class="aauthor">遠灯 綾辻</span><span class="astars">✦ ✦ ✦</span></div>
+    </div><div class="pad">
+      <h1 class="title">星尘回收站<br>第三话 雨停之前</h1>
+      <div class="center"><div class="author-row" style="margin-top:0"><span class="avatar">遠</span><span class="aname">遠灯 綾辻</span></div></div>
+      <div class="center"><div class="chips" style="margin-top:32px"><span class="chip"># 奇幻</span><span class="chip"># 都市传说</span><span class="chip"># 百合</span><span class="chip more">+1</span></div></div>
+      <div class="card">
+        <h2 class="sec-label">简介</h2>
+        <div class="cap-maskable"><p class="caption-text" style="font-size:36px;line-height:58px">回收站只在雨夜开门。铃原澪把昨天弄丢的伞递进窗口，却取回了三年前离家的姐姐留下的一盒星尘——每颗星星里，都存着一句没能说完的话。雨停之前，她必须决定要不要把它们还给夜空。</p><div class="mask-layer"><span class="r18">R-18</span>受浏览限制，不予显示</div></div>
+      </div>
+      <div class="stats" style="margin-top:40px"><span class="stat">字数 <b>42,317</b></span><span class="stat">♥ <b>12,408</b></span><span class="stat">浏览 <b>318,522</b></span><span class="stat">💬 <b>1,204</b></span></div>
+      <div class="row" style="margin-top:36px"><div class="grow"><div>「星尘回收站」系列</div><div class="sub">第 3 话 · 全 12 话</div></div><span class="watch-chip">＋ 追更</span></div>
+      <div class="row"><span>💬</span><div class="grow">查看评论（1,204）</div><span class="chev">›</span></div>
+      <div style="height:60px"></div>
+    </div></div>
+    <div class="cta"><button class="btn-fav">♡</button><button class="btn-read">开始阅读</button></div>
+  </section>
+
+  <!-- C 文本优先 -->
+  <section class="screen v-c" id="scr-C">
+    <div class="topbar"><span class="back">‹</span><span class="tt">小说介绍</span></div>
+    <div class="scroll"><div class="pad">
+      <div class="head-row">
+        <h1 class="title">星尘回收站<br>第三话 雨停之前</h1>
+        <div class="thumb"><div class="art"><span class="glyph">星</span></div></div>
+      </div>
+      <div class="author-row"><span class="avatar">遠</span><span class="aname">遠灯 綾辻</span><span class="achev">›</span></div>
+      <div class="chips"><span class="chip"># 奇幻</span><span class="chip"># 都市传说</span><span class="chip"># 百合</span><span class="chip more">+1</span></div>
+      <div class="stats"><span class="stat">字数 <b>42,317</b></span><span class="stat">♥ <b>12,408</b></span><span class="stat">浏览 <b>318,522</b></span><span class="stat">💬 <b>1,204</b></span></div>
+      <div class="divider"></div>
+      <h2 class="sec-label">简介</h2>
+      <div class="cap-maskable"><p class="caption-text">回收站只在雨夜开门。铃原澪把昨天弄丢的伞递进窗口，却取回了三年前离家的姐姐留下的一盒星尘——每颗星星里，都存着一句没能说完的话。雨停之前，她必须决定要不要把它们还给夜空。</p><div class="mask-layer"><span class="r18">R-18</span>受浏览限制，不予显示</div></div>
+      <div class="divider"></div>
+      <div class="row"><div class="grow"><div>「星尘回收站」系列</div><div class="sub">第 3 话 · 全 12 话</div></div><span class="watch-chip">＋ 追更</span></div>
+      <div class="row"><span>💬</span><div class="grow">查看评论（1,204）</div><span class="chev">›</span></div>
+      <div style="height:60px"></div>
+    </div></div>
+    <div class="cta"><button class="btn-fav">♡</button><button class="btn-read">开始阅读</button></div>
+  </section>
+
+  <!-- D 轮播同族 -->
+  <section class="screen v-d" id="scr-D">
+    <div class="bgart"><div class="art"><span class="glyph">星</span><span class="atitle">星尘回收站</span><span class="aauthor">遠灯 綾辻</span></div></div>
+    <div class="scrim"></div>
+    <div class="topbar"><span class="back">‹</span></div>
+    <div class="dcontent">
+      <div class="chips"><span class="chip"># 奇幻</span><span class="chip"># 都市传说</span><span class="chip"># 百合</span><span class="chip more">+1</span></div>
+      <h1 class="dtitle">星尘回收站 · 第三话 雨停之前</h1>
+      <div class="dauthor">遠灯 綾辻</div>
+      <div class="dseries">「星尘回收站」系列 · 第 3 话 / 全 12 话 · 字数 42,317 · ♥ 12,408 · 💬 1,204</div>
+      <div class="dcap cap-maskable">回收站只在雨夜开门。铃原澪把昨天弄丢的伞递进窗口，却取回了三年前离家的姐姐留下的一盒星尘——每颗星星里，都存着一句没能说完的话。<div class="mask-layer"><span class="r18">R-18</span>受浏览限制，不予显示</div></div>
+      <div class="dcta"><button class="dfav">♡</button><button class="dread">开始阅读</button></div>
+    </div>
+  </section>
+
+</div>
+<div class="cap" id="cap"></div>
+</div>
+
+<div id="switcher">
+  <button id="prev">←</button>
+  <span id="label">A</span>
+  <button class="tog" id="rtog">受限</button>
+  <span class="k">?variant=A|B|C|D</span>
+  <button id="next">→</button>
+</div>
+
+<script>
+  const VARIANTS = {
+    A: { name: '沉浸封面 · 图先文后', note: '封面贴顶全宽 1:1（对齐「封面比例显示」语义），元信息全部在图下滚动；CTA 常驻贴底' },
+    B: { name: '书籍卡 · 居中仪式', note: '封面缩小居中供起来（elevation），下方对称表单；简介收进 surface 卡，整体是「一本书」的仪式感' },
+    C: { name: '文本优先 · 信息密度', note: '无大封面——标题大字 + 132px 缩略图，首屏即 tags/统计/简介/系列全览；适合「先读信息再看图」' },
+    D: { name: '轮播同族 · 全屏 scrim', note: '封面铺满全屏 + 底部渐变 scrim（对齐推荐轮播滑页视觉），页内不滚动，信息全叠在 scrim 上' },
+  };
+  const params = new URLSearchParams(location.search);
+  let current = (params.get('variant') || 'A').toUpperCase();
+  if (!VARIANTS[current]) current = 'A';
+  let restricted = params.get('r') === '1';
+  if (params.get('chrome') === 'off') document.body.classList.add('clean');
+
+  function render() {
+    document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
+    const scr = document.getElementById('scr-' + current);
+    scr.style.display = 'flex';
+    scr.classList.toggle('restricted', restricted);
+    document.getElementById('phone').classList.toggle('restricted', restricted);
+    document.getElementById('rtog').classList.toggle('on', restricted);
+    const v = VARIANTS[current];
+    document.getElementById('label').textContent = current + ' · ' + v.name;
+    document.getElementById('cap').innerHTML = '<b>' + current + ' · ' + v.name + '</b><br>' + v.note;
+    document.title = '原型 ' + current + ' — 小说介绍页';
+  }
+  function go(key) {
+    current = key;
+    const url = new URL(location.href); url.searchParams.set('variant', key);
+    history.replaceState(null, '', url);
+    render();
+  }
+  function toggleR() {
+    restricted = !restricted;
+    const url = new URL(location.href);
+    if (restricted) url.searchParams.set('r', '1'); else url.searchParams.delete('r');
+    history.replaceState(null, '', url);
+    render();
+  }
+  const order = Object.keys(VARIANTS);
+  document.getElementById('prev').onclick = () => go(order[(order.indexOf(current) + order.length - 1) % order.length]);
+  document.getElementById('next').onclick = () => go(order[(order.indexOf(current) + 1) % order.length]);
+  document.getElementById('rtog').onclick = toggleR;
+  addEventListener('keydown', (e) => {
+    const t = document.activeElement;
+    if (t && /INPUT|TEXTAREA/.test(t.tagName)) return;
+    if (e.key === 'ArrowLeft') document.getElementById('prev').click();
+    if (e.key === 'ArrowRight') document.getElementById('next').click();
+  });
+  render();
+</script>
+</body>
+</html>
