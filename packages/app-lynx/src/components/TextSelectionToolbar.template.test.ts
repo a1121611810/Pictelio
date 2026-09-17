@@ -28,9 +28,11 @@ describe('TextSelectionToolbar · 视觉与契约', () => {
     expect(code).toContain('rounded-[var(--md-shape-medium)]')
   })
 
-  it('条目不冒泡（@tap.stop：否则胶囊内点击会触发页面根的 tap-away 收起）', () => {
-    expect(code).toContain('@tap.stop')
-    expect(code).toContain('@tap.stop\n') // 胶囊级
+  it('条目不冒泡（@tap.stop：胶囊与条目两级都要，否则会触发页面根的 tap-away）', () => {
+    const stops = code.match(/@tap\.stop/g) ?? []
+    expect(stops.length).toBeGreaterThanOrEqual(2)
+    expect(code).toMatch(/@tap\.stop[\s>]/u) // 胶囊级（无值形式）
+    expect(code).toContain("@tap.stop=\"emit('action'") // 条目级
   })
 
   it('图标用 view 绘制（border/rotate），禁 emoji 或字形回退', () => {

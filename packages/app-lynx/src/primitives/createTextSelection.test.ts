@@ -14,7 +14,7 @@ import {
 const PARAGRAPHS: Record<string, string> = {
   'p-0': '第 1 段．这是一段用于选中实证的正文。',
   'p-1': '第 2 段．第二句用来观察选区手柄。',
-  // 含代理对（emoji）：引擎索引按码点计数，切片必须同单位（设备实证踩过：String.slice 劈开代理对）
+  // 含代理对（emoji）：引擎索引按 **UTF-16 码元**计数，且 range 可能落在代理对中间 → 切片前吸附（ADR-0165）
   'p-2': '第三段带 emoji 🌸 与英文混合。',
 }
 
@@ -447,7 +447,7 @@ describe('createTextSelection · review 回归锁', () => {
     expect(ctx.modals).toHaveLength(1)
   })
 
-  it('B3：整段选中（end === 码点数）→ 测量范围收敛到 len-1（全量 range 必失败）', async () => {
+  it('B3：整段选中（end === 码元数）→ 测量范围收敛到 len-1（全量 range 必失败）', async () => {
     const ctx = setup()
     const len = PARAGRAPHS['p-0'].length
     select(ctx, 0, len)
