@@ -14,6 +14,7 @@ import { themeColorClass } from './utils/themeColor'
 import { apiClient } from './api/client'
 import { queryKeys } from './api/queryKeys'
 import { useApiQuery } from './primitives/useApiQuery'
+import { initSafeArea, safeBottom, safeTop } from './utils/safeArea'
 
 const searchSheet = useSearchSheetStore()
 // 主题色（外观）：根 <page> 追加 .theme-* 色板类，整树 CSS 变量换色（默认 sky = 无色板类）
@@ -51,11 +52,21 @@ onMounted(() => {
   // 检查更新（仅自动检查，无手动入口）：启动延迟执行，发现新版本
   // 直接打开强制更新页（无中间提示层）
   useUpdateStore().runStartupUpdateCheck()
+  // 系统栏安全区（spec docs/specs/lynx-systembars.md §4.2）：订阅 pictelioInsets +
+  // 订阅后拉初值；Root padding-top/bottom 让系统栏区域染 surface 色（边到边基底）
+  initSafeArea()
 })
 </script>
 
 <template>
-  <page class="Root" :class="themeColorClass(settings.themeColor)">
+  <!-- 边到边基底（spec lynx-systembars D1/D2）：Root padding-top/bottom = 系统栏安全区，
+       系统栏区域染 .Root 的 surface 色（=「状态栏着色」诉求的平台正确实现）；
+       web-core 预览无 native → 恒 0，布局与历史形态等价 -->
+  <page
+    class="Root"
+    :class="themeColorClass(settings.themeColor)"
+    :style="{ paddingTop: safeTop + 'px', paddingBottom: safeBottom + 'px' }"
+  >
     <!-- [lynx:fix] 模板必须 PascalCase <RouterView>（kebab-case <router-view> 被
          vue-lynx 编译器当原生标签 → 空渲染/编译报错；ADR-0138 决策 8）。
          KeepAlive 缓存列表/静态页实例（ADR-0049）：详情返回列表不重载。

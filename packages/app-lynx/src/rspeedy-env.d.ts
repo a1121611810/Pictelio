@@ -96,6 +96,10 @@ declare global {
       httpGet(url: string, callback: (status: number, body: string) => void): void
       /** 原生内容区尺寸契约（ADR-0131）：cb(w, h) 物理 px；未布局/异常 cb(-1, -1)，JS 侧回退 SystemInfo */
       getViewportSize(callback: (w: number, h: number) => void): void
+      /** 系统栏安全 insets 拉取（spec lynx-systembars D2）：cb(top, bottom) px；异常 cb(0, 0)；JS 订阅 pictelioInsets 事件后调用 */
+      getSafeAreaInsets(callback: (top: number, bottom: number) => void): void
+      /** 全屏模式运行时切换（spec D5）：隐藏/显示系统栏；成功 cb()，失败 cb(errMsg) */
+      setSystemBarsHidden(hidden: boolean, callback: (err: string | null) => void): void
     }
     PictelioAuth: {
       loginWithRefreshToken(token: string, callback: (userInfo: string, err: string) => void): void

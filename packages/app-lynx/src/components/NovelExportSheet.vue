@@ -14,6 +14,7 @@ import {
 import { t } from '../i18n'
 import { useModalStack } from '../stores/modalStack'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import { safeBottom } from '../utils/safeArea'
 
 const props = defineProps<{
   /** 打开态（父页 v-if 挂载，本属性用于打开时重置选择） */
@@ -147,6 +148,8 @@ function onConfirm(): void {
           <text class="text-label-large font-medium text-primary-on">{{ t('novelExportSheet.export') }}</text>
         </view>
       </view>
+      <!-- 系统栏安全区（spec lynx-systembars §4.2）：底部面板抬离手势/导航区 -->
+      <view :style="{ height: safeBottom + 'px' }" />
     </view>
   </view>
 </template>

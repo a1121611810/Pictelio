@@ -7,6 +7,7 @@ import { onBeforeUnmount, onMounted } from 'vue'
 import { useModalStack } from '../stores/modalStack'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { t } from '../i18n'
+import { safeBottom } from '../utils/safeArea'
 
 defineProps<{
   /** 简介全文（父页保证非空时才可打开；受限态入口置灰不会挂载） */
@@ -53,5 +54,8 @@ onBeforeUnmount(() => {
         <text class="text-body-medium text-surface-on-variant leading-[1.6]">{{ caption }}</text>
       </scroll-view>
     </view>
+    <!-- 系统栏安全区（spec lynx-systembars §4.2）：底部面板抬离手势/导航区
+         （面板自带 pb-[10vw]，spacer 加在根容器避免覆盖其 padding 语义） -->
+    <view :style="{ height: safeBottom + 'px' }" />
   </view>
 </template>
