@@ -21,7 +21,6 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.lynx.react.bridge.JavaOnlyArray;
-import com.lynx.react.bridge.JavaOnlyMap;
 import com.lynx.tasm.LynxError;
 import com.lynx.tasm.LynxView;
 import com.lynx.tasm.LynxViewBuilder;
@@ -91,6 +90,9 @@ public class LynxActivity extends AppCompatActivity {
     /** 当前可见系统栏 insets（insets 回调更新；onDestroy 复位） */
     private static volatile int sInsetTop = 0;
     private static volatile int sInsetBottom = 0;
+    /** 最近一次已推送 JS 的 insets（值变化才发事件，spec D2 防抖不变量；onDestroy 复位） */
+    private static int sLastSentTop = -1;
+    private static int sLastSentBottom = -1;
 
     /** 可视内容区计算（spec D3 纯函数，供单测）：宽不消费水平 insets，高减上下可见栏且 ≥0。 */
     static int[] applyVisibleInsets(int w, int h, int insetTop, int insetBottom) {
@@ -170,7 +172,7 @@ public class LynxActivity extends AppCompatActivity {
         // 首帧能读到；该键是「本次由降级进入」的信号，不是首选引擎（首选引擎不落盘）。
         engineFallbackEntry = getIntent().getBooleanExtra(EXTRA_ENGINE_FALLBACK, false);
         if (engineFallbackEntry) {
-            getSharedPreferences("CapacitorStorage", MODE_PRIVATE)
+            getSharedPreferences(SYSTEMBARS_PREFS, MODE_PRIVATE)
                     .edit()
                     .putString(EngineFallbackNotice.KEY, EngineFallbackNotice.VALUE_TRUE)
                     .apply();
@@ -371,9 +373,13 @@ public class LynxActivity extends AppCompatActivity {
      * insets 变化推送 JS（事件通道，spec D2）：初始值由 JS 订阅后经
      * {@link PictelioAppModule#getSafeAreaInsets} 拉取（防 attach 期首帧事件早于
      * JS 订阅而丢失——benchNav 四次广播同族的竞态），事件只负责后续变化。
+     * 值变化才发（防抖不变量：框架可能以相同值重复回调）。
      */
     private void sendInsetsEvent() {
         if (lynxView == null) return;
+        if (sLastSentTop == sInsetTop && sLastSentBottom == sInsetBottom) return;
+        sLastSentTop = sInsetTop;
+        sLastSentBottom = sInsetBottom;
         lynxView.sendGlobalEvent(EVENT_INSETS, JavaOnlyArray.of(sInsetTop, sInsetBottom));
     }
 
@@ -596,6 +602,8 @@ public class LynxActivity extends AppCompatActivity {
         sContentH = -1;
         sInsetTop = 0;
         sInsetBottom = 0;
+        sLastSentTop = -1;
+        sLastSentBottom = -1;
         if (lynxView != null) {
             lynxView.destroy();
         }

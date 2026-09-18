@@ -95,6 +95,8 @@ public class LynxSystemBarsTest {
         int vis = activity.getWindow().getDecorView().getSystemUiVisibility();
         assertTrue("hide 后应置全屏位",
                 (vis & View.SYSTEM_UI_FLAG_FULLSCREEN) != 0);
+        assertTrue("hide 后应置导航栏隐藏位（systemBars 并集语义）",
+                (vis & View.SYSTEM_UI_FLAG_HIDE_NAVIGATION) != 0);
 
         LynxActivity.applySystemBarsHidden(activity, false);
         vis = activity.getWindow().getDecorView().getSystemUiVisibility();

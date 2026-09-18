@@ -93,7 +93,7 @@ flowchart LR
 **Java 单测（Robolectric）**：
 1. insets→contentSize 计算（给定模拟 insets 断言 `contentSize()` = 边界−可见栏；覆盖「全屏隐藏→bottom=0」翻转）——oracle = D3 + #594 数值基线
 2. `settings_fullscreen_mode` 键读取（true/false/缺失/损坏）
-3. `setSystemBarsHidden` 主线程执行 + controller 调用发生（Robolectric shadow）
+3. `setSystemBarsHidden`：静态核心 `applySystemBarsHidden` 由 Robolectric 断言（legacy 全屏位 + 导航栏隐藏位）；模块包装的 runOnUiThread 分支不单独测（LynxContext 构造不可测），归 T4 真机矩阵覆盖
 
 **JS 单测（vitest + happy-dom）**：
 1. safeArea signals：订阅后拉取初值 / 事件更新 / 无 native 恒 0 + warn 一次
@@ -112,7 +112,7 @@ flowchart LR
 
 | 票 | 内容 | 依赖 |
 |----|------|------|
-| T1 Java 骨架 | D1/D2/D3/D4：e2e + insets listener + contentSize 迁移 + setGlobalProps/事件 + setSystemBarsHidden + 冷启动读键（含 Java 单测） | — |
+| T1 Java 骨架 | D1/D2/D3/D4：e2e + insets listener + contentSize 迁移 + getSafeAreaInsets/事件 + setSystemBarsHidden + 冷启动读键（含 Java 单测） | — |
 | T2 JS 适配 | safeArea store + Root padding + 弹层家族 + 契约测试（含 JS 单测 + 预览回归） | T1（事件/载荷契约） |
 | T3 全屏开关 | settingsStore + Me.vue 行 + i18n keys + 原生调用接线 | T1 |
 | T4 验收矩阵 | §6 模拟器验收 + 截图对比 + ADR-0168 落盘（docs-before-commit） | T1-T3 |
