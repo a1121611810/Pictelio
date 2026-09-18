@@ -435,8 +435,8 @@ _Avoid_: 状态栏着色（`setStatusBarColor`，15+ 失效的逆行方案）；
 _Avoid_: 全局默认开（官方定位为游戏/媒体局部场景）；把它当「边到边」的对立开关；期望跨进程重启保留（持久化的是设置键，非系统栏状态本身）
 
 **系统栏 insets 管线（system-bars insets pipeline）**：
-lynx JS 消费系统栏 inset 的**唯一通道**（lynx JS 无内置 insets API：SystemInfo 无相关字段、`env(safe-area-inset-*)` 在 Android 恒 0 且静默）——原生 `setOnApplyWindowInsetsListener` 监听 → 初始值经 `__globalProps`（`safeAreaTop/safeAreaBottom`，渲染前注入）+ 变更经 `GlobalEventEmitter` 事件 `pictelioInsets`（数值载荷 `[top, bottom]`）→ JS `safeArea` signals → Root padding 与弹层底部 padding。**禁止** JS 侧估算 inset 经验常数（与「系统导航条 inset」词条同一纪律）。
-_Avoid_: 在 JS 读 SystemInfo/`env(safe-area-inset-*)` 拿 insets（Android 上不可用或恒 0，预览假绿家族）；硬编码 72px/48px 等状态栏高度
+lynx JS 消费系统栏 inset 的**唯一通道**（lynx JS 无内置 insets API：SystemInfo 无相关字段、`env(safe-area-inset-*)` 在 Android 恒 0 且静默）——原生 `setOnApplyWindowInsetsListener` 监听 → JS 订阅 `pictelioInsets` 事件并**订阅后立即经 `PictelioApp.getSafeAreaInsets` 拉取初值**（订阅后拉：insets 首次分发在视图 attach 期早于 JS 订阅，纯推模式首帧必丢）→ JS safeArea signals → Root padding 与弹层底部 padding。**禁止** JS 侧估算 inset 经验常数（与「系统导航条 inset」词条同一纪律）。
+_Avoid_: 在 JS 读 SystemInfo/`env(safe-area-inset-*)` 拿 insets（Android 上不可用或恒 0，预览假绿家族）；硬编码 72px/48px 等状态栏高度；依赖「订阅前的事件」送初值（attach 期事件必早于订阅，纯推必丢首帧）
 
 ### 正文选中与操作菜单（Text selection & selection toolbar）【2026-09-17 新增，地图 #558，spec docs/specs/app-lynx-novel-text-selection.md】
 

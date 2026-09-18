@@ -205,6 +205,45 @@ public class PictelioAppModule extends LynxModule {
     }
 
     /**
+     * 拉取当前系统栏安全 insets（spec docs/specs/lynx-systembars.md D2）。
+     *
+     * <p>JS 侧订阅 {@code pictelioInsets} 事件后调用本方法拉当前值——**订阅后拉**而非
+     * 依赖初始事件：insets 首次分发发生在视图 attach 期，几乎必然早于 JS 订阅
+     * （benchNav 四次广播同族的竞态），纯推模式首帧必丢。回调契约：
+     * {@code cb(top, bottom)}——数值 px，与 {@code SystemInfo.pixelWidth} 同基准；
+     * 异常 {@code cb(0, 0)}（不抛）。
+     */
+    @LynxMethod
+    public void getSafeAreaInsets(Callback callback) {
+        try {
+            callback.invoke(LynxActivity.currentSafeTop(), LynxActivity.currentSafeBottom());
+        } catch (Exception e) {
+            Log.w(TAG, "getSafeAreaInsets 失败", e);
+            callback.invoke(0, 0);
+        }
+    }
+
+    /**
+     * 全屏模式运行时切换（spec D5：设置内「全屏模式」开关的落地通道）。
+     * 主线程执行 {@link LynxActivity#applySystemBarsHidden}；未持有 Activity 引用时
+     * 静默成功（无宿主可切换，冷启动读键路径兜底）。回调契约：成功 {@code cb()}；
+     * 失败 {@code cb(errMsg)}。
+     */
+    @LynxMethod
+    public void setSystemBarsHidden(boolean hidden, Callback callback) {
+        try {
+            LynxActivity activity = LynxActivity.current();
+            if (activity != null) {
+                activity.runOnUiThread(() -> LynxActivity.applySystemBarsHidden(activity, hidden));
+            }
+            callback.invoke();
+        } catch (Exception e) {
+            Log.w(TAG, "setSystemBarsHidden(" + hidden + ") 失败", e);
+            callback.invoke(String.valueOf(e.getMessage()));
+        }
+    }
+
+    /**
      * 用系统浏览器强制打开外部 URL（检查更新跳 release 页）。
      *
      * <p>语义：外部浏览器为独立 task，app 退到后台——用户无法从浏览器"返回" app 内
