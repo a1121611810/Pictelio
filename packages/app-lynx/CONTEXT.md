@@ -302,9 +302,9 @@ FAB 展开后菜单项须**浮于遮罩之上**：`遮罩(z-10) < 菜单项(z-20
 
 ### 视口几何（Viewport geometry）
 
-**内容区（content area）**【2026-09-01 新增】：
-LynxView 实际渲染区域尺寸（物理 px）——**不等于全屏尺寸**：系统导航条 inset（手势条/3 键导航占位）使内容区高度小于全屏。经「内容区尺寸契约」`PictelioApp.getViewportSize(cb(w, h))` 查询（px；未布局完成 `cb(-1, -1)`）。所有「贴底」定位几何（放射导航 FAB 圆心/遮罩、底部浮动元素）一律以内容区高度为准，**禁止**直接用全屏尺寸换算定位底部元素（实测 FAB 底部被裁剩圆弧，见 ADR-0131）。
-_Avoid_: 用 `SystemInfo` 全屏高算底部几何、经验常数（各机型 inset 不同——模拟器手势条 96px/真机 OPPO 3 键导航更大）
+**内容区（content area / visible content area）**【2026-09-01 新增；2026-09-19 语义修订，spec docs/specs/lynx-systembars.md】：
+LynxView 实际渲染区域的**可视内容区**尺寸（物理 px）——语义 = **窗口减当前可见系统栏 insets**，不等于全屏尺寸。经「内容区尺寸契约」`PictelioApp.getViewportSize(cb(w, h))` 查询（px；未布局完成 `cb(-1, -1)`）。所有「贴底」定位几何（放射导航 FAB 圆心/遮罩、底部浮动元素）一律以内容区高度为准，**禁止**直接用全屏尺寸换算定位底部元素（实测 FAB 底部被裁剩圆弧，见 ADR-0131）。**边到边化后语义保持不变**（spec lynx-systembars D3）：窗口延伸到系统栏下后，原生侧改在 contentSize 记录处减去可见系统栏 insets 并随 insets 变化更新——消费方（GlobalFab/弹层几何）零改动。
+_Avoid_: 用 `SystemInfo` 全屏高算底部几何、经验常数（各机型 inset 不同——模拟器手势条 96px/真机 OPPO 3 键导航更大）、把边到边后的 getViewportSize 当全屏尺寸（语义仍是可视内容区）
 
 **全屏尺寸（SystemInfo）**【2026-09-01 新增】：
 原生运行时全局 `SystemInfo` 给出的**设备全屏**物理尺寸（`pixelWidth/pixelHeight/pixelRatio`），web-core 环境由浏览器视口兜底。语义 = 物理屏幕，不是内容区。仅作无契约/未布局时的兜底值。
@@ -423,6 +423,20 @@ _Avoid_: 对 list 结构变更做「就地 patch + 祈祷」；用 scroll API �
 **卡内展开段（inline expansion section）**：
 注入类增强内容（如相关作品）在瀑布流中的渲染形态：作为**锚点卡 list-item 内部的条件段**（`openDetail` 冒泡域外的兄弟位），**不**作为独立 list-item 织入列表。紧贴锚点成立、滚动位置保留、绕开插入丢弃。先例：`RelatedInlineSection`（spec related-injection §5.2 v2）。
 _Avoid_: 向原生瀑布流中途插入 list-item（必丢，ADR-0162）；横滑条（原生 waterfall list-item 内不可靠，spec §5.2 v1 已证）
+
+### 系统栏（System bars）【2026-09-19 新增，spec docs/specs/lynx-systembars.md，ADR 编号落地时定】
+
+**基底边到边（edge-to-edge base）**：
+lynx 客户端的固定窗口布局基底——窗口内容延伸至系统栏（状态栏/导航条）之下，系统栏区域由 App 的 Root padding 染 surface 色。实现 = `WindowCompat.enableEdgeToEdge`（LynxActivity）+ insets 管线 + Root padding。**Android 15+ 设备上系统对 targetSdk 35+ 强制此模式且无关闭途径**（`setStatusBarColor` 静默透明、Android 16 起 opt-out 属性禁用）——故它是基底而非可选项，也不设「边到边开关」（在 15+ 会静默失效）。 Android ≤14 主动开启以统一全版本形态（兼容层自动处理透明/图标深浅/三键 scrim/刘海）。
+_Avoid_: 状态栏着色（`setStatusBarColor`，15+ 失效的逆行方案）；用 `setDecorFitsSystemWindows(true)` 关 e2e（targetSdk 35+ 被锁死 false）；把「边到边开关」当需求
+
+**全屏模式（fullscreen mode）**：
+设置内开关控制的**隐藏系统栏**沉浸态（opt-in，默认关）：`WindowInsetsControllerCompat` hide/show + 边缘滑动 transient 唤出，运行时即时生效、随设置持久化、Activity 重建后重设。语义 = 在基底边到边之上**追加隐藏系统栏**，不改布局基底；系统栏隐藏时可视内容区随之扩大（insets 归零）。图片查看器等局部沉浸属另一语义（未立项）。
+_Avoid_: 全局默认开（官方定位为游戏/媒体局部场景）；把它当「边到边」的对立开关；期望跨进程重启保留（持久化的是设置键，非系统栏状态本身）
+
+**系统栏 insets 管线（system-bars insets pipeline）**：
+lynx JS 消费系统栏 inset 的**唯一通道**（lynx JS 无内置 insets API：SystemInfo 无相关字段、`env(safe-area-inset-*)` 在 Android 恒 0 且静默）——原生 `setOnApplyWindowInsetsListener` 监听 → 初始值经 `__globalProps`（`safeAreaTop/safeAreaBottom`，渲染前注入）+ 变更经 `GlobalEventEmitter` 事件 `pictelioInsets`（数值载荷 `[top, bottom]`）→ JS `safeArea` signals → Root padding 与弹层底部 padding。**禁止** JS 侧估算 inset 经验常数（与「系统导航条 inset」词条同一纪律）。
+_Avoid_: 在 JS 读 SystemInfo/`env(safe-area-inset-*)` 拿 insets（Android 上不可用或恒 0，预览假绿家族）；硬编码 72px/48px 等状态栏高度
 
 ### 正文选中与操作菜单（Text selection & selection toolbar）【2026-09-17 新增，地图 #558，spec docs/specs/app-lynx-novel-text-selection.md】
 
