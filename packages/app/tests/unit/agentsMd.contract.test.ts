@@ -104,6 +104,32 @@ describe("AGENTS.md 契约（首跳路由三表，#598 R4）", () => {
   });
 });
 
+describe("AGENTS.md 契约（技术栈与 package.json 一致）", () => {
+  // oracle = packages/app/package.json（版本号唯一权威源），防指令文件与依赖清单漂移
+  it("技术栈行的主版本号与 package.json 一致", () => {
+    const manifest = JSON.parse(
+      readFileSync(join(findRepoRoot(process.cwd()), "packages/app/package.json"), "utf8"),
+    ) as {
+      dependencies: Record<string, string>;
+      devDependencies: Record<string, string>;
+    };
+    const major = (v: string) =>
+      v
+        .replace(/^[\^~]/, "")
+        .split(".")
+        .slice(0, 2)
+        .join(".");
+    const expectMajor = (_dep: string, expected: string) => {
+      expect(agentsMd).toContain(expected);
+    };
+    expectMajor("solid-js", `SolidJS ${major(manifest.dependencies["solid-js"] ?? "")}`);
+    expectMajor("typescript", `TypeScript ${major(manifest.devDependencies["typescript"] ?? "")}`);
+    expectMajor("vite", `Vite ${major(manifest.devDependencies["vite"] ?? "")}`);
+    expectMajor("unocss", `UnoCSS ${major(manifest.devDependencies["unocss"] ?? "")}`);
+    expectMajor("capacitor", `Capacitor ${major(manifest.dependencies["@capacitor/core"] ?? "")}`);
+  });
+});
+
 describe("AGENTS.md 契约（CI 维护块与陈腐清零）", () => {
   it("OPENWIKI 标记对存活（CI 块级管理，openwiki@0.2.5 code-mode.js）", () => {
     expect(agentsMd).toContain("<!-- OPENWIKI:START -->");
