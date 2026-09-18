@@ -207,6 +207,8 @@ const enPages = {
   "me.client.restarting": "Restarting…",
   "me.client.autoFallback": "Auto-fallback to WebView",
   "me.client.autoFallbackDesc": "Switch to WebView automatically when Lynx fails; when off, failures only show a notice",
+  "me.client.fullscreenMode": "Fullscreen mode",
+  "me.client.fullscreenModeDesc": "Hide status and navigation bars; swipe from the edge to reveal them",
   "me.client.effectiveState": "Preferred {{preferred}} · effective this launch {{effective}}",
 
   // Engine fallback reason copy (ADR-0164 / #555): engine-state snapshot reason code → UI copy.

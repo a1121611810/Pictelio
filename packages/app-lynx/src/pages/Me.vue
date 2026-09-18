@@ -45,7 +45,7 @@ import { INPUT_PLACEHOLDER_COLOR } from '../utils/lynxPlatformColors'
 const auth = useAuthStore()
 const settings = useSettingsStore()
 const clientSwitch = useClientSwitchStore()
-const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, language, novelExportFormat, novelExportOptions, relatedInjection, rankingEntry, autoFallbackEngine } = storeToRefs(settings)
+const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, language, novelExportFormat, novelExportOptions, relatedInjection, rankingEntry, autoFallbackEngine, fullscreenMode } = storeToRefs(settings)
 
 const switching = ref(false)
 
@@ -83,6 +83,11 @@ const degradedReasonText = computed(() => {
 /** 自动回退开关（ADR-0164）：一键翻转，设备级 setter 自带持久化；与引擎切换互不影响，无需 switching 守卫 */
 function toggleAutoFallbackEngine() {
   settings.setAutoFallbackEngine(!autoFallbackEngine.value)
+}
+
+/** 全屏模式开关（spec docs/specs/lynx-systembars.md D5）：一键翻转 + 原生即时切换（setter 内） */
+function toggleFullscreenMode() {
+  settings.setFullscreenMode(!fullscreenMode.value)
 }
 
 // ─── WebDAV 备份（spec docs/specs/webdav-backup.md §7；仅原生 LynxView 渲染，§2）───
@@ -532,6 +537,28 @@ function toggleRankingEntry() {
             <!-- handle-container：32×32 与轨道同高，thumb 居中 → 距边 8px/4px -->
             <view class="w-8 h-8 flex items-center justify-center">
               <view class="rounded-full active:w-[7.467vw] active:h-[7.467vw]" :class="autoFallbackEngine ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
+            </view>
+          </view>
+        </view>
+        <!-- 全屏模式开关（spec docs/specs/lynx-systembars.md D5）：设备级默认关；
+             隐藏系统栏（immersive），拨动即时生效（原生切换 + insets 事件回流 → Root padding 重算） -->
+        <view
+          class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.fullscreenMode"
+          @tap="toggleFullscreenMode"
+        >
+          <view class="flex flex-col">
+            <text class="text-title-medium text-surface-on">{{ t('me.client.fullscreenMode') }}</text>
+            <text class="text-label-medium text-surface-on-variant mt-0.5">{{ t('me.client.fullscreenModeDesc') }}</text>
+          </view>
+          <view
+            class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
+            :class="fullscreenMode ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
+          >
+            <!-- handle-container：32×32 与轨道同高，thumb 居中 → 距边 8px/4px -->
+            <view class="w-8 h-8 flex items-center justify-center">
+              <view class="rounded-full active:w-[7.467vw] active:h-[7.467vw]" :class="fullscreenMode ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
             </view>
           </view>
         </view>

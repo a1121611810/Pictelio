@@ -61,6 +61,10 @@ const RANKING_ENTRY_KEY = "ranking_entry"
  *  只管 Lynx 运行时硬错误是否自动跳 WebView（不管预检降级）。键与 app 侧逐字一致，
  *  唯一所有者 = Java EnginePrefs.KEY_AUTO_FALLBACK，TS 侧镜像常量经一致性测试钉住 */
 const AUTO_FALLBACK_ENGINE_KEY = "pictelio_engine_auto_fallback"
+/** 全屏模式开关（spec docs/specs/lynx-systembars.md D5）：设备级布尔，默认关；
+ *  隐藏系统栏（immersive）——边到边基底之上的 opt-in 沉浸。键与 Java 侧
+ *  LynxActivity.KEY_FULLSCREEN_MODE 逐字一致（唯一所有者），经 safeAreaJavaContract 测试钉住 */
+const FULLSCREEN_MODE_KEY = "settings_fullscreen_mode"
 /** 小说导出（spec docs/specs/novel-export.md §6）：全局默认格式 + 三项内容开关（与 app 共享键） */
 const NOVEL_EXPORT_FORMAT_KEY = "settings_novel_export_format"
 const NOVEL_EXPORT_INCLUDE_METADATA_KEY = "settings_novel_export_include_metadata"
@@ -93,6 +97,7 @@ export const BACKUP_DEVICE_KEYS = [
   RELATED_INJECTION_KEY,
   RANKING_ENTRY_KEY,
   AUTO_FALLBACK_ENGINE_KEY,
+  FULLSCREEN_MODE_KEY,
   NOVEL_EXPORT_FORMAT_KEY,
   NOVEL_EXPORT_INCLUDE_METADATA_KEY,
   NOVEL_EXPORT_INCLUDE_COVER_KEY,
@@ -232,6 +237,8 @@ export const useSettingsStore = defineStore("settings", () => {
   const _rankingEntry = ref(true)
   /** 引擎自动回退开关（ADR-0164）：设备级，缺省开（用户设置，进备份域；区别于失败记忆等设备事实） */
   const _autoFallbackEngine = ref(true)
+  /** 全屏模式开关（spec lynx-systembars D5）：设备级，默认关（隐藏系统栏的 opt-in 沉浸） */
+  const _fullscreenMode = ref(false)
   const _novelExportFormat = ref<NovelExportFormat>(DEFAULT_NOVEL_EXPORT_FORMAT)
   const _novelExportOptions = ref<NovelExportOptions>({ ...DEFAULT_NOVEL_EXPORT_OPTIONS })
 
@@ -262,6 +269,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const relatedInjection = _relatedInjection
   const rankingEntry = _rankingEntry
   const autoFallbackEngine = _autoFallbackEngine
+  const fullscreenMode = _fullscreenMode
   const novelExportFormat = _novelExportFormat
   const novelExportOptions = _novelExportOptions
   const webdavEnabled = _webdavEnabled
@@ -359,6 +367,18 @@ export const useSettingsStore = defineStore("settings", () => {
       }
     } catch (e) {
       console.warn("[settingsStore] 引擎自动回退开关加载失败（维持默认）", e)
+    }
+
+    // 全屏模式开关（spec lynx-systembars D5）：设备级，未登录也恢复
+    try {
+      const raw = await prefs().get(FULLSCREEN_MODE_KEY)
+      if (raw === "true") _fullscreenMode.value = true
+      else if (raw === "false") _fullscreenMode.value = false
+      else if (raw !== null) {
+        console.warn("[settingsStore] 全屏模式开关值非法，维持默认 false:", raw)
+      }
+    } catch (e) {
+      console.warn("[settingsStore] 全屏模式开关加载失败（维持默认）", e)
     }
 
     // 小说导出：全局默认格式 + 三项内容开关（native 共享 SharedPreferences / dev idbKV）
@@ -560,6 +580,31 @@ export const useSettingsStore = defineStore("settings", () => {
     void prefs()
       .set(AUTO_FALLBACK_ENGINE_KEY, String(enabled))
       .catch((e) => console.warn("[settingsStore] 引擎自动回退开关写入失败", e))
+  }
+
+  /**
+   * 全屏模式开关（spec lynx-systembars D5）：写设备级键 + 原生运行时切换。
+   * 原生模式下调 PictelioApp.setSystemBarsHidden 即时生效（insets 事件回流 →
+   * Root padding 重算）；dev/web-core 无 NativeModules → 仅写键（console.debug 可见，
+   * 预览无系统栏概念）。冷启动由 LynxActivity.onCreate 读同键重设（重建自动恢复）。
+   */
+  function setFullscreenMode(enabled: boolean): void {
+    _fullscreenMode.value = enabled
+    void prefs()
+      .set(FULLSCREEN_MODE_KEY, String(enabled))
+      .catch((e) => console.warn("[settingsStore] 全屏模式开关写入失败", e))
+    const nm = getNativeModules()
+    // getNativeModules 的 PictelioApp 类型为 unknown（api/client 既有口径）——本调用面收窄
+    const app = nm?.PictelioApp as
+      | { setSystemBarsHidden?: (hidden: boolean, cb: (err: string | null) => void) => void }
+      | undefined
+    if (isNativeMode() && app && typeof app.setSystemBarsHidden === "function") {
+      app.setSystemBarsHidden(enabled, (err) => {
+        if (err) console.warn("[settingsStore] 全屏模式切换失败", err)
+      })
+    } else if (!isNativeMode()) {
+      console.debug("[settingsStore] 全屏模式切换跳过（非原生环境，仅持久化设置）")
+    }
   }
 
   function setNovelExportFormat(format: NovelExportFormat): void {
@@ -774,6 +819,10 @@ export const useSettingsStore = defineStore("settings", () => {
         if (raw !== "true" && raw !== "false") return false
         setAutoFallbackEngine(raw === "true")
         return true
+      case FULLSCREEN_MODE_KEY:
+        if (raw !== "true" && raw !== "false") return false
+        setFullscreenMode(raw === "true")
+        return true
       case NOVEL_EXPORT_FORMAT_KEY:
         if (!(NOVEL_EXPORT_FORMATS as readonly string[]).includes(raw)) return false
         setNovelExportFormat(raw as NovelExportFormat)
@@ -861,6 +910,7 @@ export const useSettingsStore = defineStore("settings", () => {
     relatedInjection,
     rankingEntry,
     autoFallbackEngine,
+    fullscreenMode,
     ugoiraDownloadFormat,
     novelExportFormat,
     novelExportOptions,
@@ -885,6 +935,7 @@ export const useSettingsStore = defineStore("settings", () => {
     setRelatedInjection,
     setRankingEntry,
     setAutoFallbackEngine,
+    setFullscreenMode,
     setNovelExportFormat,
     setNovelExportIncludeMetadata,
     setNovelExportIncludeCover,
