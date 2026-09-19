@@ -168,6 +168,32 @@ public class TranslationSseParserTest {
     }
 
     @Test
+    public void terminalErrorIsRecordedSoPartialTextIsNotReportedAsSuccess() throws Exception {
+        // 回归：已产出译文后收到失败终态，若只看「有没有译文」会判成功 → 半截译文写进缓存
+        TranslationSseParser parser = new TranslationSseParser();
+        Recorder sink = new Recorder();
+
+        parser.accept(data("{\"type\":\"response.output_text.delta\",\"delta\":\"[0] 半截译文\"}"), sink);
+        assertEquals(null, parser.terminalError());
+
+        parser.accept(
+                data("{\"type\":\"response.failed\",\"response\":{\"error\":{\"code\":\"server_error\",\"message\":\"boom\"}}}"),
+                sink);
+        assertTrue("终态错误必须被记录", parser.terminalError() != null);
+        assertTrue(parser.terminalError().contains("server_error"));
+        assertTrue("已产出的译文仍在（由调用方决定是否丢弃）", parser.hasText());
+    }
+
+    @Test
+    public void cleanCompletionHasNoTerminalError() throws Exception {
+        TranslationSseParser parser = new TranslationSseParser();
+        Recorder sink = new Recorder();
+        parser.accept(data("{\"type\":\"response.output_text.delta\",\"delta\":\"[0] ok\"}"), sink);
+        parser.accept(data("{\"type\":\"response.completed\"}"), sink);
+        assertEquals(null, parser.terminalError());
+    }
+
+    @Test
     public void malformedFrameDoesNotBreakTheStream() throws Exception {
         TranslationSseParser parser = new TranslationSseParser();
         Recorder sink = new Recorder();

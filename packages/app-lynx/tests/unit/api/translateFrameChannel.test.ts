@@ -133,8 +133,11 @@ describe('attachTranslateFrameListener（事件总线交付通道）', () => {
     expect(classifyNativeError('HTTP 401: invalid api key')).toBe('unauthorized')
     expect(classifyNativeError('HTTP 403: forbidden')).toBe('unauthorized')
     expect(classifyNativeError('HTTP 429: slow down')).toBe('rate_limit')
-    expect(classifyNativeError('HTTP 400: bad request')).toBe('network')
-    expect(classifyNativeError('网络错误：timeout')).toBe('network')
+    expect(classifyNativeError('HTTP 400: bad request')).toBe('invalid_request')
+    expect(classifyNativeError('HTTP 402: insufficient balance')).toBe('insufficient_balance')
+    expect(classifyNativeError('HTTP 404: model not found')).toBe('model_not_found')
+    expect(classifyNativeError('LLM 未返回任何译文（可能被服务端内容策略拦截）')).toBe('content_filter')
+    expect(classifyNativeError('网络错误：boom')).toBe('network')
     expect(classifyNativeError(undefined)).toBe('network')
   })
 

@@ -34,6 +34,14 @@ class TranslationSseParser {
      * 同样如此）。改为一帧交付整章译文，绕过该限制 —— 代价是失去逐段增量，但保证译文能到。
      */
     private final java.util.TreeMap<Integer, StringBuilder> paragraphText = new java.util.TreeMap<>();
+    /**
+     * 终态错误消息（response.failed / response.incomplete / error 三种终态事件）。
+     *
+     * <p>为什么必须记录：收尾逻辑此前只看「有没有译文段」—— 已产出部分译文后收到失败终态时，
+     * 会被判成 {@code done} 交付成功，store 于是把**失败的半截译文写进缓存**（违反
+     * spec「failed 不写缓存」）。有终态错误时终态必须判失败。
+     */
+    private String terminalError = null;
 
     /** 若无终态事件即断流，也要把已累积的译文交付（DeepSeek 常见形态） */
     void flushIfAny(Sink sink) {
@@ -41,6 +49,11 @@ class TranslationSseParser {
             emitConsolidated(sink);
             paragraphText.clear();
         }
+    }
+
+    /** 终态错误消息（null = 无终态错误） */
+    String terminalError() {
+        return terminalError;
     }
 
     /** 是否已产出过任何译文段 */
@@ -144,18 +157,21 @@ class TranslationSseParser {
                     JSONObject errObj = resp != null ? resp.optJSONObject("error") : null;
                     String code = errObj != null ? errObj.optString("code", "server") : "server";
                     String message = errObj != null ? errObj.optString("message", "stream failed") : "stream failed";
-                    sink.emit("", "LLM stream failed [" + code + "]: " + message);
+                    terminalError = "LLM stream failed [" + code + "]: " + message;
+                    sink.emit("", terminalError);
                     return Boolean.FALSE;
                 }
                 case "response.incomplete": {
                     JSONObject resp = event.optJSONObject("response");
                     JSONObject incomplete = resp != null ? resp.optJSONObject("incomplete_details") : null;
                     String reason = incomplete != null ? incomplete.optString("reason", "truncated") : "truncated";
-                    sink.emit("", "LLM output truncated: " + reason);
+                    terminalError = "LLM output truncated: " + reason;
+                    sink.emit("", terminalError);
                     return Boolean.FALSE;
                 }
                 case "error": {
-                    sink.emit("", "LLM error: " + event.optString("message", "server error"));
+                    terminalError = "LLM error: " + event.optString("message", "server error");
+                    sink.emit("", terminalError);
                     return Boolean.FALSE;
                 }
                 default:

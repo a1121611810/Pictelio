@@ -403,7 +403,13 @@ public class PictelioTranslateModule extends LynxModule {
                     STREAM_FRAMES.computeIfAbsent(streamId,
                             k -> new java.util.concurrent.ConcurrentLinkedQueue<>()).offer(buffer.poll());
                 }
-                if (!deltaSeen) {
+                String parserError = sseParser == null ? null : sseParser.terminalError();
+                if (parserError != null) {
+                    // 终态失败优先于「有译文」：否则半截译文会被判成功并写进缓存（spec §7.2）
+                    Log.w(TAG, "SSE 终态为失败 → 报错（即使已产出 " + frameQueue.size() + " 帧）");
+                    STREAM_TERMINAL.put(streamId, parserError);
+                    frameQueue.clear();
+                } else if (!deltaSeen) {
                     Log.w(TAG, "SSE 流结束但未产出任何译文段 → 报空流失败");
                     STREAM_TERMINAL.put(streamId, "LLM 未返回任何译文（可能被服务端内容策略拦截）");
                 } else {

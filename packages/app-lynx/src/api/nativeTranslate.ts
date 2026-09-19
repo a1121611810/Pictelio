@@ -250,11 +250,17 @@ export async function translateStream(
  */
 export function classifyNativeError(message: string | undefined): TranslationErrorCode {
   const m = message ?? ""
+  if (m.includes("content policy") || m.includes("content_filter") || m.includes("未返回任何译文")) {
+    return "content_filter"
+  }
   const http = /HTTP (\d{3})/.exec(m)
   if (http) {
     const status = Number(http[1])
     if (status === 401 || status === 403) return "unauthorized"
+    if (status === 402) return "insufficient_balance"
     if (status === 429) return "rate_limit"
+    if (status === 404 || status === 405) return "model_not_found"
+    if (status === 400) return "invalid_request"
     if (status >= 500) return "server"
     return "network"
   }
