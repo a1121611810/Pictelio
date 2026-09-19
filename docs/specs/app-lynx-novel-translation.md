@@ -191,6 +191,18 @@ export type TranslationChunk =
   | { type: 'done'; usage?: TranslationUsage }                     // 流成功结束
   | { type: 'error'; code: TranslationErrorCode; message: string; retryable: boolean };
 
+/**
+ * 原生交付信封（**跨端契约**，单一事实源 = ADR-0170「跨端信封契约」）。
+ * Java 侧受 lynx NativeModule callback 通道「一条流至多投递一帧」限制（ADR-0170
+ * 「交付通道实测」），故整章译文作为**单帧**经全局事件总线下发，JS 适配器展开为逐段
+ * delta（下游 pipeline / store 与上表 chunk 类型一致，无感）。
+ */
+export type NativeFrameEnvelope =
+  | { type: 'delta_all'; paragraphs: { index: number; text: string }[]; streamId?: string }
+  | { type: 'done'; streamId?: string }
+  | { type: 'error'; message: string; streamId?: string }
+  | { type: 'pending'; streamId?: string };   // 仅轮询通道
+
 export interface TranslationUsage {
   inputTokens: number;
   outputTokens: number;
@@ -770,6 +782,8 @@ DeepSeek Responses API 是 **Codex 集成路径**，与 OpenAI Responses 兼容�
 | Provider 接口契约 | `translate()` 返回 `AsyncIterator`；`abort()` 真中断；`error.code` 分类正确 | spec §4.2 / §4.4 |
 | Chunk 规约 | `response.output_text.delta` → `delta`；`response.reasoning_text.delta` → `reasoning_delta`；`response.completed` → `done`；`response.failed` / `response.incomplete` → `error` 或 `done`(incomplete=true) | 调研 `research/openai-responses-api.md` §Q2 / §Q4 |
 | SSE 帧解析 | 30+ Responses API 事件类型正确分派；DeepSeek 无 `[DONE]` 兼容；reasoning 与 text 双通道分离 | 调研 §Q3 |
+| 原生交付信封 | `delta_all` 段落数组（index + 已 trim 的 text）；`done` / `error` / `pending`；非法载荷必须 warn 并丢弃；按 streamId 归属过滤 | **ADR-0170「跨端信封契约」**（输出侧）/ 调研 §Q2（输入侧事件名） |
+| 错误码分类 | `HTTP 401/403 → unauthorized`、`429 → rate_limit`、`5xx → server`、其余 → network | ADR-0173 D7 + 仓库 `TranslationErrorCode` 联合类型 |
 | 缓存键 | FNV-1a 32-bit 拼接；sourceHash 改 → miss；model 改 → miss；baseURL 改 → miss | spec §4.5 / §9.5 |
 | 缓存写策略 | `partial` / `failed` / `aborted` 不写；`done` 之后才写 | spec §7.2 / §9.6 |
 | 状态机 | 8 状态 + 18 转移路径全覆盖；generation-gate 跨章节守门 | spec §7 |
@@ -903,11 +917,15 @@ agent-browser 入门禁（ADR-0084）；novel 端到端只有单测（参考 `pa
 - [ ] Base URL 下方 inline probe 状态正确（兼容 / 不兼容 / 仅 chat/completions / 无法探测）。
 - [ ] 「测试连接」按钮发起最小翻译测试，结果用 Snackbar 显示。
 - [ ] 详情页「翻译」按钮三态切换（未译 / 已译 / 配置中）；无 endpoint 时跳设置页。
-- [ ] 流式翻译实时渲染段落增量；按钮显示进度百分比。
+- [ ] 流式翻译渲染译文段落；按钮显示进度百分比。
+      **实现期修订**：原生路径受 lynx callback 通道限制（ADR-0170「交付通道实测」），
+      交付形态为「整章就绪后一次性推送」，**不提供逐字增量渐显**；进度按收到帧数推进。
 - [ ] 缓存命中秒出，显示「已缓存 ✓」标识。
 - [ ] 「原文 / 译文」 segmented button 切换 < 50ms；长按触发「重译」。
 - [ ] 章节切换触发 generation-gate + AbortController；旧响应被丢弃。
-- [ ] 失败提示 inline retry bar 显示具体错误码 + 「更换 endpoint」/「查看文档」按钮。
+- [ ] 失败提示 inline retry bar：按钮切「重试」+ 错误条显示**按错误码映射的中文文案**
+      （不渲染技术串）+ 「配置翻译」入口（§6.4 / ADR-0173 D7）。
+      设备取证：docs/verification/app-lynx-translation-emulator.md（成功 + 失败两条路径）。
 - [ ] OpenRouter / 智谱 / Qwen / 文心 等 endpoint 被硬拒绝并给清晰错误。
 - [ ] Azure URL 模板自动补 `/openai/v1` + `api-version: preview` header。
 - [ ] DeepSeek Responses API 兼容（无 `[DONE]`、reasoning 双通道分离、unsupported 字段 silently ignored）。

@@ -145,6 +145,13 @@ public class PictelioTranslateModule extends LynxModule {
     /** 待派发帧（worker 入队 / 主线程出队） */
     private final java.util.concurrent.ConcurrentLinkedQueue<String> frameQueue =
             new java.util.concurrent.ConcurrentLinkedQueue<>();
+    /**
+     * 交付事件名（**跨端契约**，单一事实源 = ADR-0170「跨端信封契约」）。
+     * JS 侧订阅同名事件（nativeTranslate.ts 的 attachTranslateFrameListener）；
+     * 改名会让译文静默不达，故由 TranslationSseParserTest 之外的单测钉住取值。
+     */
+    static final String EVENT_FRAME = "pictelioTranslateFrame";
+
     /** 主线程 Handler（帧 tick 与收尾派发共用） */
     private final android.os.Handler mainHandler =
             new android.os.Handler(android.os.Looper.getMainLooper());
@@ -463,7 +470,7 @@ public class PictelioTranslateModule extends LynxModule {
             if (frames != null) {
                 String frame;
                 while ((frame = frames.poll()) != null) {
-                    view.sendGlobalEvent("pictelioTranslateFrame",
+                    view.sendGlobalEvent(EVENT_FRAME,
                             com.lynx.react.bridge.JavaOnlyArray.of(withStreamId(frame, streamId)));
                     sent++;
                 }
@@ -474,7 +481,7 @@ public class PictelioTranslateModule extends LynxModule {
                         ? "{\"type\":\"done\"}"
                         : "{\"type\":\"error\",\"message\":\""
                             + terminal.replace("\"", "'") + "\"}";
-                view.sendGlobalEvent("pictelioTranslateFrame",
+                view.sendGlobalEvent(EVENT_FRAME,
                         com.lynx.react.bridge.JavaOnlyArray.of(withStreamId(payload, streamId)));
                 sent++;
                 STREAM_FRAMES.remove(streamId);
