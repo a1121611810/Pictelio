@@ -453,6 +453,14 @@ export function nativeTranslateProvider(): TranslationProvider {
       let failure: Error | null = null
       let aborted = false
 
+      let detached = false
+      let detachFrames: (() => void) | null = null
+      const detachOnce = (): void => {
+        if (detached) return
+        detached = true
+        detachFrames?.()
+      }
+
       const nudge = (): void => {
         wake?.()
         wake = null
@@ -515,12 +523,14 @@ export function nativeTranslateProvider(): TranslationProvider {
         }
         if (chunk.type === "done") {
           finished = true
+          if (pollTimer !== null) clearTimeout(pollTimer)
           queue.push({ type: "done" })
           nudge()
           return
         }
         if (chunk.type === "error") {
           finished = true
+          if (pollTimer !== null) clearTimeout(pollTimer)
           queue.push({
             type: "error",
             code: classifyNativeError(chunk.message),
@@ -537,6 +547,7 @@ export function nativeTranslateProvider(): TranslationProvider {
         if (aborted || signal.aborted || finished) return
         if (polls++ > POLL_MAX) {
           finished = true
+          detachOnce()
           queue.push({
             type: "error",
             code: "unknown",
@@ -556,6 +567,7 @@ export function nativeTranslateProvider(): TranslationProvider {
           .catch((err: unknown) => {
             if (aborted || signal.aborted) return
             finished = true
+            detachOnce()
             queue.push({
               type: "error",
               code: classifyNativeError(err instanceof Error ? err.message : String(err)),
@@ -591,6 +603,7 @@ export function nativeTranslateProvider(): TranslationProvider {
         .catch((err: unknown) => {
           if (aborted || signal.aborted) return
           finished = true
+          detachOnce()
           queue.push({
             type: "error",
             code: "unknown",
@@ -602,18 +615,14 @@ export function nativeTranslateProvider(): TranslationProvider {
       // 交付通道一：全局事件总线（benchNav 证明可达；callback 通道实测不可靠）
       // 终态（done/error）时解绑：否则每次翻译都会在全局 emitter 上多留一个监听器，
       // N 次翻译后每帧被 N 个监听器处理（无界泄漏，且旧监听器仍会收新流的帧）。
-      let detached = false
-      let detachFrames: (() => void) | null = null
-      const detachOnce = (): void => {
-        if (detached) return
-        detached = true
-        detachFrames?.()
-      }
       detachFrames = attachTranslateFrameListener((raw: unknown) => {
         handle(raw)
         if (finished || aborted) detachOnce()
       }, streamId)
       providerDetach = detachOnce
+      // 终态可能先于订阅到达（transport 同步 reject / 首次 poll 立即失败）：那时
+      // detachOnce 已置位但没有可解绑的订阅，这里补一次判定，否则监听器永久泄漏。
+      if (finished || aborted) detachOnce()
       // 交付通道二（兜底）：轮询拉取
       poll(streamId)
 
