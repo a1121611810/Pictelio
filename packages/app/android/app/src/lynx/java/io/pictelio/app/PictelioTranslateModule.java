@@ -127,6 +127,21 @@ public class PictelioTranslateModule extends LynxModule {
     // （模拟器实测：Java 下发 11 帧、JS store 只收到 1 帧；加 25ms 睡眠也无效，因为
     // 桥接层在 JS 线程空闲前就已丢弃）。故解析只入队，主线程按 tick 逐帧派发 ——
     // 消费节奏由 JS 可处理速率决定，不再丢帧。
+    /**
+     * 每流缓冲（streamId → 待交付帧队列 + 终态）。
+     *
+     * <p>为什么改成「JS 轮询拉取」而不是「原生推送回调」：实测 lynx NativeModule 的 callback
+     * 通道在**一条流内至多投递 1 次**（逐帧直发 / 加间隔 / 主线程逐帧派发 / 合并单帧，四种
+     * 策略下 JS 都只收到 0-1 帧）。改为每次 {@code translatePoll} 各自是一次独立回调调用，
+     * 由 JS 按节奏拉取 —— 单次回调足够可靠，且拉取次数不受流内限制。
+     */
+    private static final Map<String, java.util.concurrent.ConcurrentLinkedQueue<String>> STREAM_FRAMES =
+            new ConcurrentHashMap<>();
+    /** streamId → 终态（null = 进行中；"done" / 错误消息） */
+    private static final Map<String, String> STREAM_TERMINAL = new ConcurrentHashMap<>();
+    /** streamId → 已交付（供 poll 判定是否要清理） */
+    private static final Map<String, Boolean> STREAM_DELIVERED = new ConcurrentHashMap<>();
+
     /** 待派发帧（worker 入队 / 主线程出队） */
     private final java.util.concurrent.ConcurrentLinkedQueue<String> frameQueue =
             new java.util.concurrent.ConcurrentLinkedQueue<>();
@@ -348,7 +363,7 @@ public class PictelioTranslateModule extends LynxModule {
                     String errMsg = parseHttpError(resp);
                     // 打点：HTTP 失败原因（状态码 + 原始错误体，供真机排查；不打印 apiKey / 正文）
                     Log.w(TAG, "translateStream HTTP " + resp.code() + " body=" + errMsg);
-                    callback.invoke("", errMsg);
+                    STREAM_TERMINAL.put(streamId, errMsg);
                     return;
                 }
                 ResponseBody body = resp.body();
@@ -371,26 +386,78 @@ public class PictelioTranslateModule extends LynxModule {
                 }
                 Log.i(TAG, "SSE 流结束 terminal=" + terminalEmitted + " deltaSeen=" + deltaSeen
                         + " queued=" + frameQueue.size());
-                // 已解析的帧按 tick 派发干净后，再由主线程决定终态（done / 空流失败）
-                mainHandler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        drainOrFinish(terminalEmitted, streamId, callback);
-                    }
-                });
+                // 交付改由 JS 轮询拉取（translatePoll）：这里只把帧与终态登记进 per-stream 缓冲
+                java.util.concurrent.ConcurrentLinkedQueue<String> buffer =
+                        new java.util.concurrent.ConcurrentLinkedQueue<>(frameQueue);
+                while (!buffer.isEmpty()) {
+                    STREAM_FRAMES.computeIfAbsent(streamId,
+                            k -> new java.util.concurrent.ConcurrentLinkedQueue<>()).offer(buffer.poll());
+                }
+                if (!deltaSeen) {
+                    Log.w(TAG, "SSE 流结束但未产出任何译文段 → 报空流失败");
+                    STREAM_TERMINAL.put(streamId, "LLM 未返回任何译文（可能被服务端内容策略拦截）");
+                } else {
+                    STREAM_TERMINAL.put(streamId, "done");
+                }
+                Log.i(TAG, "SSE 流就绪待拉取 streamId=" + streamId
+                        + " frames=" + STREAM_FRAMES.getOrDefault(streamId, new java.util.concurrent.ConcurrentLinkedQueue<>()).size()
+                        + " terminal=" + STREAM_TERMINAL.get(streamId));
                 return;
             } catch (Throwable e) {
                 if (USER_ABORTED.contains(streamId)) {
+                    STREAM_TERMINAL.put(streamId, "aborted");
                     return; // 用户主动中断：静默
                 }
                 Log.w(TAG, "translateStream 异常", e);
                 String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-                callback.invoke("", "网络错误：" + msg);
+                STREAM_TERMINAL.put(streamId, "网络错误：" + msg);
             } finally {
                 ACTIVE_CALLS.remove(streamId);
                 USER_ABORTED.remove(streamId);
             }
         });
+    }
+
+    /**
+     * 拉取一帧（JS 轮询入口；每次调用都是一次独立回调，规避「一流一回调」限制）。
+     *
+     * <p>返回 JSON 字符串：{@code {"type":"delta_all",...}} 有待交付帧 /
+     * {@code {"type":"done"}} 已完结 / {@code {"type":"error","message":"..."}} 失败 /
+     * {@code {"type":"pending"}} 暂无（继续轮询）。
+     */
+    @LynxMethod
+    public void translatePoll(String streamId, Callback callback) {
+        try {
+            String terminal = STREAM_TERMINAL.get(streamId);
+            java.util.concurrent.ConcurrentLinkedQueue<String> frames = STREAM_FRAMES.get(streamId);
+            if (frames != null && !frames.isEmpty()) {
+                String frame = frames.poll();
+                callback.invoke(frame, "");
+                return;
+            }
+            if (terminal == null) {
+                JSONObject pending = new JSONObject();
+                pending.put("type", "pending");
+                callback.invoke(pending.toString(), "");
+                return;
+            }
+            if ("done".equals(terminal)) {
+                JSONObject done = new JSONObject();
+                done.put("type", "done");
+                callback.invoke(done.toString(), "");
+            } else {
+                JSONObject err = new JSONObject();
+                err.put("type", "error");
+                err.put("message", terminal);
+                callback.invoke(err.toString(), "");
+            }
+            // 终态已交付一次：清理注册表，避免泄漏
+            STREAM_FRAMES.remove(streamId);
+            STREAM_TERMINAL.remove(streamId);
+        } catch (Throwable t) {
+            Log.w(TAG, "translatePoll 异常", t);
+            callback.invoke("", "轮询失败：" + t.getClass().getSimpleName());
+        }
     }
 
     /**

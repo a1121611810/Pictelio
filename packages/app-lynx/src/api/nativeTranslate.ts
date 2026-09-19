@@ -241,6 +241,38 @@ export async function translateStream(
   })
 }
 
+/**
+ * 拉取一帧（**拉模式交付**）。
+ *
+ * <p>为什么需要它：实测 lynx NativeModule 的 callback 通道在一条流内至多投递 1 次
+ * （逐帧直发 / 加帧间隔 / 主线程逐帧派发 / 合并单帧四种策略下 JS 都只收到 0-1 帧）。
+ * 改为 JS 主动轮询：每次 poll 都是一次独立回调调用，单次回调足够可靠。
+ *
+ * @returns 帧 JSON（{@code delta_all} / {@code done} / {@code error} / {@code pending}）
+ */
+export async function translatePoll(streamId: string): Promise<unknown> {
+  const mod = nativeModule()
+  if (!mod) {
+    throw new Error("PictelioTranslate 不可用（仅 Android 原生）")
+  }
+  const modWithPoll = mod as NativeTranslateModule & {
+    translatePoll(streamId: string, cb: (v: string | null, e: string | null) => void): void
+  }
+  if (typeof modWithPoll.translatePoll !== "function") {
+    return Promise.reject(new Error("translatePoll 不可用（原生模块版本过旧）"))
+  }
+  return new Promise((resolve, reject) => {
+    modWithPoll.translatePoll(streamId, (value, err) => {
+      const errMsg = unquoteNativeString(err)
+      if (errMsg != null && errMsg.length > 0) {
+        reject(new Error(errMsg))
+        return
+      }
+      resolve(parseChunk(value))
+    })
+  })
+}
+
 /** 探测 endpoint 是否兼容 /v1/responses（spec §6.1 inline probe）。
  * 成功返回 {@code {status, detail, httpStatus, keyInvalid?}}（status ∈ ok|partial|incompatible|unknown，
  * keyInvalid = HTTP 400 且 body 指明密钥无效）；
@@ -324,75 +356,136 @@ export function nativeTranslateProvider(): TranslationProvider {
       const onAbort = (): void => {
         aborted = true
         failure = new DOMException("aborted", "AbortError")
+        if (pollTimer !== null) clearTimeout(pollTimer)
         void abortHandle?.abort()
         nudge()
       }
       signal.addEventListener("abort", onAbort, { once: true })
 
+      // 拉模式：先发起请求（拿到 streamId），再按节奏轮询 translatePoll 取帧。
+      // 不再依赖「原生多次回调」—— 该通道在一条流内只投递 1 次（见 translatePoll 注释）。
+      let pollTimer: ReturnType<typeof setTimeout> | null = null
+      let polls = 0
+      const POLL_MS = 250
+      const POLL_MAX = 600
+
+      const handle = (raw: unknown): void => {
+        if (raw === null || typeof raw !== "object") return
+        const chunk = raw as {
+          type?: string
+          paragraphIndex?: number
+          text?: string
+          message?: string
+          paragraphs?: { index: number; text: string }[]
+        }
+        if (chunk.type === "delta_all" && Array.isArray(chunk.paragraphs)) {
+          for (const one of chunk.paragraphs) {
+            queue.push({ type: "delta", paragraphIndex: one.index, text: one.text })
+          }
+          nudge()
+          return
+        }
+        if (chunk.type === "delta") {
+          queue.push({
+            type: "delta",
+            paragraphIndex: typeof chunk.paragraphIndex === "number" ? chunk.paragraphIndex : 0,
+            text: chunk.text ?? "",
+          })
+          nudge()
+          return
+        }
+        if (chunk.type === "reasoning_delta") {
+          queue.push({ type: "reasoning_delta", text: chunk.text ?? "" })
+          nudge()
+          return
+        }
+        if (chunk.type === "done") {
+          finished = true
+          queue.push({ type: "done" })
+          nudge()
+          return
+        }
+        if (chunk.type === "error") {
+          finished = true
+          queue.push({
+            type: "error",
+            code: "unknown",
+            message: chunk.message ?? "native stream failed",
+            retryable: true,
+          })
+          nudge()
+          return
+        }
+        // pending：继续轮询（下一 tick 再取）
+      }
+
+      const poll = (streamId: string): void => {
+        if (aborted || signal.aborted || finished) return
+        if (polls++ > POLL_MAX) {
+          finished = true
+          queue.push({
+            type: "error",
+            code: "unknown",
+            message: "翻译轮询超时（未在预期时间内完成）",
+            retryable: true,
+          })
+          nudge()
+          return
+        }
+        void translatePoll(streamId)
+          .then((frame) => {
+            handle(frame)
+            if (!finished && !aborted) {
+              pollTimer = setTimeout(() => poll(streamId), POLL_MS)
+            }
+          })
+          .catch((err: unknown) => {
+            if (aborted || signal.aborted) return
+            finished = true
+            queue.push({
+              type: "error",
+              code: "unknown",
+              message: err instanceof Error ? err.message : String(err),
+              retryable: true,
+            })
+            nudge()
+          })
+      }
+
+      // 关键：**不等待** translateStream 的 promise 来获取 streamId —— 该 promise 也经由那条
+      // 不可靠的回调通道 settle（实测常永不 settle），拿它当轮询起点会死锁。
+      // 改为 JS 侧先生成 streamId（与 translateStream 内部 _abortToken 同源生成器），
+      // 随即开始轮询；请求本身 fire-and-forget，其 promise 只用于登记 abort 句柄。
+      const streamId = newStreamId()
       void translateStream(
         JSON.stringify({
           baseURL: config.baseURL,
           model: config.model,
           input: request.paragraphs,
           instructions: buildSystemInstructions(config),
+          _abortToken: streamId,
         }),
-        (raw: unknown) => {
-          if (aborted) return
-          if (raw === null || typeof raw !== "object") return
-          const chunk = raw as {
-            type?: string
-            paragraphIndex?: number
-            text?: string
-            paragraphs?: { index: number; text: string }[]
-          }
-          // 整章单帧交付（Java 侧 emitConsolidated）：lynx 桥在一条流内只投递首个回调，
-          // 故 Java 把整章译文放进一帧，这里展开成逐段 delta（下游 pipeline/store 无感）。
-          if (chunk.type === "delta_all" && Array.isArray(chunk.paragraphs)) {
-            for (const one of chunk.paragraphs) {
-              queue.push({ type: "delta", paragraphIndex: one.index, text: one.text })
-            }
-            nudge()
-            return
-          }
-          if (chunk.type === "delta") {
-            queue.push({
-              type: "delta",
-              paragraphIndex:
-                typeof chunk.paragraphIndex === "number" ? chunk.paragraphIndex : 0,
-              text: chunk.text ?? "",
-            })
-            nudge()
-            return
-          }
-          if (chunk.type === "reasoning_delta") {
-            queue.push({ type: "reasoning_delta", text: chunk.text ?? "" })
-            nudge()
-          }
+        () => {
+          // 推送通道不可靠（一流一回调）→ 这里不消费，全部走轮询
         },
       )
-        .then((handle) => {
-          abortHandle = handle
-          if (aborted || signal.aborted) {
-            void handle.abort()
-            return
-          }
-          // 原生 done（流内 response.completed 或 Java 在流末尾合成）→ 收尾
-          finished = true
-          queue.push({ type: "done" })
-          nudge()
+        .then((h) => {
+          abortHandle = h
+          if (aborted || signal.aborted) void h.abort()
         })
         .catch((err: unknown) => {
           if (aborted || signal.aborted) return
-          const message = err instanceof Error ? err.message : String(err)
-          queue.push({ type: "error", code: "unknown", message, retryable: true })
           finished = true
+          queue.push({
+            type: "error",
+            code: "unknown",
+            message: err instanceof Error ? err.message : String(err),
+            retryable: true,
+          })
           nudge()
         })
-        .finally(() => {
-          signal.removeEventListener("abort", onAbort)
-          finished = true
-          nudge()
-        })
+      // 立即开始拉取（Java 侧可能尚未就绪 → 返回 pending，继续轮询即可）
+      poll(streamId)
 
       const iter: AsyncIterator<TranslationChunk> = {
         async next(): Promise<IteratorResult<TranslationChunk>> {
