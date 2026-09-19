@@ -117,6 +117,8 @@ public class PictelioTranslateModule extends LynxModule {
     // ── SSE 解析状态（每次 translateStream 新建一个解析器实例，见 SseParser） ──
     /** SSE 解析器（每次流新建一个，实例内保持段落锚定状态） */
     private TranslationSseParser sseParser;
+    /** 本次流是否至少产出过一个译文段（空流 = 失败，见 translateStream 收尾） */
+    private boolean deltaSeen = false;
 
     /**
      * 流式专用 OkHttp 客户端：**不带 callTimeout**。
@@ -129,7 +131,10 @@ public class PictelioTranslateModule extends LynxModule {
     private static final OkHttpClient STREAM_CLIENT = PixivApiCore.getSharedClient()
             .newBuilder()
             .callTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS)
-            .readTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
+            // 帧间静默上限：流建立后若这么久没有任何字节，视为服务端/链路已断。
+            // 必须有界：否则「连上了但正文永不送达」会让 UI 永久停在「N% 翻译中」
+            // （真机 + 模拟器都实测过这种形态）。
+            .readTimeout(45, java.util.concurrent.TimeUnit.SECONDS)
             .build();
 
     public PictelioTranslateModule(Context context) {
@@ -335,7 +340,17 @@ public class PictelioTranslateModule extends LynxModule {
                     callback.invoke("", "响应体为空");
                     return;
                 }
+                deltaSeen = false;
                 boolean terminalEmitted = parseSseStream(body.byteStream(), callback);
+                if (terminalEmitted && !deltaSeen) {
+                    // 流正常结束但**一个译文段都没产出**：常见于服务端内容策略拒答 /
+                    // 模型只回 reasoning。必须报错而不是当成成功 —— 否则 UI 显示「已完成」
+                    // 却没有任何译文（真机实测：DeepSeek 对 R-18 正文返回 200 且空输出）。
+                    Log.w(TAG, "SSE 流结束但未产出任何译文段 → 报空流失败");
+                    callback.invoke("", "LLM 未返回任何译文（可能被服务端内容策略拦截）");
+                    ACTIVE_CALLS.remove(streamId);
+                    return;
+                }
                 if (!terminalEmitted) {
                     // 流在无终态事件时结束（真机实测 DeepSeek：只有 in_progress → …delta…
                     // → output_item.done，无 response.completed，连接即结束）。
@@ -586,7 +601,12 @@ public class PictelioTranslateModule extends LynxModule {
         if (sseParser == null) sseParser = new TranslationSseParser();
         return sseParser.accept(
                 line,
-                (payload, error) -> callback.invoke(payload, error));
+                (payload, error) -> {
+                    if (payload != null && payload.contains("\"type\":\"delta\"")) {
+                        deltaSeen = true;
+                    }
+                    callback.invoke(payload, error);
+                });
     }
     /**
      * HTTP 错误响应解析（translateStream 非 2xx）：读 body 摘要，拼可读错误消息。
