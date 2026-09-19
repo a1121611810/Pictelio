@@ -73,6 +73,15 @@ jobs:
           $SDKMANAGER --sdk_root="$ANDROID_HOME" "platform-tools" "emulator" \
             "system-images;android-${{ inputs.apiLevel }};google_apis;x86_64"
 
+      # ubuntu runner 的 runner 用户默认无 /dev/kvm 组权限（纯 TCG 模拟启动会超时）——
+      # udev 规则放开为 0666（android-emulator-runner 官方同款解法）
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
       # AVD 创建与启动同步骤（跨步骤状态曾出现「✓ 创建成功但 emulator 找不到 AVD」——
       # 同步骤创建 + list 验证 + ini 文件断言，真失败不会再被掩盖）
       - name: Create AVD and boot emulator
