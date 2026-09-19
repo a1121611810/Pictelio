@@ -22,6 +22,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import okhttp3.Call;
 import okhttp3.MediaType;
@@ -56,7 +58,7 @@ import okhttp3.ResponseBody;
  *       网络错误。</li>
  *   <li>{@code abortStream(streamId, cb)}：cb("", "") 成功（无活动流也算成功，幂等）；取消
  *       OkHttp Call（触发 call.isCanceled() → translateStream 不回调 onError 终结态）。
- *       streamId 由 JS 端 UUID 生成（与 translateStream 的请求一一对应）。</li>
+ *       streamId 由 JS 端生成（UUID 或纯 JS 会话内唯一串——真机 PrimJS 无 crypto，见 nativeTranslate.ts），与 translateStream 的请求一一对应。</li>
  * </ul>
  *
  * <p>约束（ADR-0170 §D3）：
@@ -93,12 +95,40 @@ public class PictelioTranslateModule extends LynxModule {
 
     private static final MediaType JSON_MEDIA_TYPE = MediaType.get("application/json; charset=utf-8");
 
+    /** 段落锚标记：模型按 `[N]` 前缀逐段输出（与 api/translate.ts 的 input 形态同源）。 */
+    private static final Pattern PARAGRAPH_ANCHOR = Pattern.compile("\\[(\\d+)\\]");
+
     /** 流式 + probe 共用线程池（ADR-0170 §D3 后段）；与 PictelioApiModule.API_EXECUTOR 同款。 */
     private static final ExecutorService TRANSLATE_EXECUTOR = Executors.newCachedThreadPool();
 
     /** in-flight 流注册表（streamId → OkHttp Call）。abortStream 按 token 取消；translateStream
      * 终止时（done / error / 异常）remove。线程安全（translateStream / abortStream 跨线程调用）。 */
     private static final Map<String, Call> ACTIVE_CALLS = new ConcurrentHashMap<>();
+
+    /**
+     * 用户显式 abort 的 streamId 集合。
+     *
+     * <p>为什么需要它：OkHttp 的 {@code call.isCanceled()} 无法区分「用户点了停止」与
+     * 「客户端自己取消」（{@code callTimeout} 到期 / 连接中断）。历史实现一律当作前者而
+     * 静默 return → JS 侧 Promise 永不 settle → store 永久 translating（真机表现为按钮
+     * 卡在「N% 翻译中」，无错误、无日志）。现在只有出现在本集合里的 streamId 才静默退出，
+     * 其余取消一律走 error 回调。
+     */
+    private static final java.util.Set<String> USER_ABORTED = ConcurrentHashMap.newKeySet();
+
+    /**
+     * 流式专用 OkHttp 客户端：**不带 callTimeout**。
+     *
+     * <p>共享客户端（{@link PixivApiCore#getSharedClient()}）带 15s connect + 30s read +
+     * 45s callTimeout —— 那是为一次性 JSON 请求调的；流式响应天然可能长时间只发 keepalive
+     * 或 reasoning 帧，45s 上限会把正常长流掐断。这里保留 connect 超时（连接建立必须有界），
+     * read 放宽到 120s（帧间静默上限），callTimeout = 0（不限总时长，由 abortStream / 服务端收尾）。
+     */
+    private static final OkHttpClient STREAM_CLIENT = PixivApiCore.getSharedClient()
+            .newBuilder()
+            .callTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS)
+            .readTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
+            .build();
 
     public PictelioTranslateModule(Context context) {
         super(context);
@@ -160,6 +190,10 @@ public class PictelioTranslateModule extends LynxModule {
                 endpoint.put("sourceLang", DEFAULT_SOURCE_LANG);
                 endpoint.put("hasKey", hasKey);
                 endpoint.put("updatedAt", updatedAt);
+                // 成功路径也打点：此前只有失败分支有日志，导致「无 logcat 输出」被误读为
+                // 「原生方法从未被调用」（#617 真机排查踩坑）。不打印 apiKey（仅 hasKey 布尔）。
+                Log.i(TAG, "getEndpoint 成功 hasKey=" + hasKey + " baseURL=" + DEFAULT_BASE_URL
+                        + " model=" + DEFAULT_MODEL);
                 callback.invoke(endpoint.toString(), "");
             } catch (Throwable e) {
                 Log.w(TAG, "getEndpoint 失败", e);
@@ -215,6 +249,12 @@ public class PictelioTranslateModule extends LynxModule {
             JSONObject req = new JSONObject(requestJson);
             String baseUrl = req.optString("baseURL", "").trim();
             String model = req.optString("model", "").trim();
+            // 入口打点：字段名/长度可见，便于区分「JS 未发请求」与「字段契约不符」
+            // （此前 JS↔Java 载荷字段名不一致导致静默失败；不打印 apiKey 与正文）
+            Log.i(TAG, "translateStream 入口 baseURL=" + (baseUrl.isEmpty() ? "(empty)" : baseUrl)
+                    + " model=" + (model.isEmpty() ? "(empty)" : model)
+                    + " input=" + (req.optJSONArray("input") == null ? "null" : String.valueOf(req.optJSONArray("input").length()))
+                    + " abortToken=" + req.has("_abortToken"));
             if (baseUrl.isEmpty()) {
                 callback.invoke("", "baseURL 不能为空");
                 return;
@@ -223,7 +263,12 @@ public class PictelioTranslateModule extends LynxModule {
                 callback.invoke("", "model 不能为空");
                 return;
             }
-            if (!baseUrl.startsWith("https://")) {
+            // 允许 http:// 仅当指向本机回环/宿主别名（端到端测试窗口：emulator 的 10.0.2.2
+            // 映射宿主 mock SSE 服务）。真实 endpoint 仍强制 https（apiKey 明文不进网络）。
+            boolean loopback = baseUrl.startsWith("http://127.0.0.1")
+                    || baseUrl.startsWith("http://localhost")
+                    || baseUrl.startsWith("http://10.0.2.2");
+            if (!baseUrl.startsWith("https://") && !loopback) {
                 callback.invoke("", "baseURL 必须为 https:// 前缀");
                 return;
             }
@@ -247,7 +292,7 @@ public class PictelioTranslateModule extends LynxModule {
 
             streamId = req.optString("_abortToken", UUID.randomUUID().toString());
             JSONObject body = buildRequestBody(req, model, inputArr);
-            String url = baseUrl + (baseUrl.endsWith("/") ? "" : "/") + "v1/responses";
+            String url = responsesUrl(baseUrl);
             httpReq = new Request.Builder()
                     .url(url)
                     .addHeader("Authorization", "Bearer " + apiKey)
@@ -262,36 +307,53 @@ public class PictelioTranslateModule extends LynxModule {
         }
 
         // 入注册表——必须在 execute 前，否则 abort 早于网络发起就 race
-        OkHttpClient client = PixivApiCore.getSharedClient();
+        OkHttpClient client = STREAM_CLIENT;
         Call call = client.newCall(httpReq);
         ACTIVE_CALLS.put(streamId, call);
 
         TRANSLATE_EXECUTOR.execute(() -> {
             try (Response resp = call.execute()) {
-                if (call.isCanceled()) {
-                    // abortStream 触发取消 → 不回调（用户主动中断 vs 失败语义区分，ADR-0170 §D6 末段）
+                if (USER_ABORTED.contains(streamId)) {
+                    // 用户主动中断 → 不回调（与失败语义区分，ADR-0170 §D6 末段）。
+                    // 注意：这里**只**认显式 abort 集合，不能再用 call.isCanceled()——
+                    // 那会把超时/连接中断也当成用户取消而静默挂起（真机「永久 0%」缺陷）。
                     return;
                 }
                 if (!resp.isSuccessful()) {
                     String errMsg = parseHttpError(resp);
+                    // 打点：HTTP 失败原因（状态码 + 原始错误体，供真机排查；不打印 apiKey / 正文）
+                    Log.w(TAG, "translateStream HTTP " + resp.code() + " body=" + errMsg);
                     callback.invoke("", errMsg);
                     return;
                 }
                 ResponseBody body = resp.body();
+                Log.i(TAG, "translateStream HTTP " + resp.code() + " 开始读流 bodyBytes="
+                        + (body == null ? "null" : body.contentLength()));
                 if (body == null) {
                     callback.invoke("", "响应体为空");
                     return;
                 }
-                parseSseStream(body.byteStream(), callback);
+                boolean terminalEmitted = parseSseStream(body.byteStream(), callback);
+                if (!terminalEmitted) {
+                    // 流在无终态事件时结束（真机实测 DeepSeek：只有 in_progress → …delta…
+                    // → output_item.done，无 response.completed，连接即结束）。
+                    // 契约（ADR-0170 §D6）：translateStream **必须**以 done chunk 或 error 终结——
+                    // 否则 JS 侧 Promise 永不 settle，store 卡在 translating（按钮永久「N% 翻译中」）。
+                    Log.i(TAG, "SSE 流结束未见终态事件 → 合成 done（DeepSeek 无 response.completed）");
+                    JSONObject done = new JSONObject();
+                    done.put("type", "done");
+                    callback.invoke(done.toString(), "");
+                }
             } catch (Throwable e) {
-                if (call.isCanceled()) {
-                    return;
+                if (USER_ABORTED.contains(streamId)) {
+                    return; // 用户主动中断：静默
                 }
                 Log.w(TAG, "translateStream 异常", e);
                 String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
                 callback.invoke("", "网络错误：" + msg);
             } finally {
                 ACTIVE_CALLS.remove(streamId);
+                USER_ABORTED.remove(streamId);
             }
         });
     }
@@ -343,7 +405,7 @@ public class PictelioTranslateModule extends LynxModule {
                 body.put("input", new JSONArray().put("ping"));
                 body.put("max_output_tokens", 1);
                 body.put("stream", false);
-                String url = baseURL + (baseURL.endsWith("/") ? "" : "/") + "v1/responses";
+                String url = responsesUrl(baseURL);
                 Request req = new Request.Builder()
                         .url(url)
                         .addHeader("Authorization", "Bearer " + apiKey)
@@ -382,6 +444,8 @@ public class PictelioTranslateModule extends LynxModule {
             callback.invoke("", "streamId 不能为空");
             return;
         }
+        // 先登记「用户主动中断」再取消：worker 线程据此静默退出（而不是把它当失败回调）
+        USER_ABORTED.add(streamId);
         Call call = ACTIVE_CALLS.remove(streamId);
         if (call != null && !call.isCanceled()) {
             call.cancel();
@@ -393,6 +457,39 @@ public class PictelioTranslateModule extends LynxModule {
     // ── 私有辅助 ─────────────────────────────────────────
 
     /**
+     * 拼接 Responses API 端点 URL。
+     *
+     * <p>baseURL 语义与 JS 侧 api/translate.ts 对齐：用户填到 /v1 为止
+     * （https://api.openai.com/v1）。历史上 Java 又追加了一段 v1，导致 /v1/v1/responses ——
+     * 默认 endpoint 与文档给的填写形态 100% 404（真机 + mock 双双暴露）。
+     * 现在：baseURL 已以 /v1（或 /openai/v1）结尾则只补 /responses，否则补 /v1/responses。
+     */
+    private static String responsesUrl(String baseUrl) {
+        String base = baseUrl.replaceAll("/+$", "");
+        if (base.endsWith("/v1") || base.endsWith("/openai/v1")) {
+            return base + "/responses";
+        }
+        return base + "/v1/responses";
+    }
+
+    /**
+     * 构造 Responses API 的 {@code input}：JS 侧传段落**字符串数组**，本方法把段落按
+     * web 路径（{@code buildResponsesRequestBody}，api/translate.ts）同款形态拼装成单条
+     * user 消息 —— 段落以 {@code [N]} 前缀锚定、空行分隔，供 SSE 侧按 N 对齐回填。
+     *
+     * <p>两端同形是硬约束：native 与 web 路径的指令 / input 形态必须一致，否则同一 endpoint
+     * 换路径后译文结构不同（native 无 [N] 锚定 → 无法按段回填）。
+     */
+    private static String buildInput(JSONArray paragraphs) throws Exception {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < paragraphs.length(); i++) {
+            if (i > 0) sb.append("\n\n");
+            sb.append("[").append(i).append("] ").append(paragraphs.getString(i));
+        }
+        return sb.toString();
+    }
+
+    /**
      * 构造 Responses API 请求体：JS 端传入 input / max_output_tokens / reasoning / instructions，
      * Java 侧拼 model + stream=true。流式必传 stream=true（spec §9.3：DeepSeek 无 stream_options，
      * 但 stream=true 仍返回 SSE）。
@@ -400,10 +497,20 @@ public class PictelioTranslateModule extends LynxModule {
     private static JSONObject buildRequestBody(JSONObject req, String model, JSONArray inputArr) throws Exception {
         JSONObject body = new JSONObject();
         body.put("model", model);
-        body.put("input", inputArr);
+        body.put("input", buildInput(inputArr));
         body.put("stream", true);
         if (req.has("max_output_tokens")) {
             body.put("max_output_tokens", req.get("max_output_tokens"));
+        } else {
+            // 不传时服务端可能按上下文上限预留 → 首 token 被拖到数十秒（真机实测卡死窗口）。
+            // 与 JS 侧 estimateMaxOutput 同公式（≈ 输入字符数 / 2 × 2 + 512，clamp 256..16384）。
+            int chars = 0;
+            for (int i = 0; i < inputArr.length(); i++) {
+                String p = inputArr.optString(i, "");
+                chars += p.length();
+            }
+            long estimate = ((chars + 1) / 2) * 2 + 512;
+            body.put("max_output_tokens", Math.max(256, Math.min(16384, estimate)));
         }
         if (req.has("reasoning")) {
             body.put("reasoning", req.getJSONObject("reasoning"));
@@ -427,16 +534,21 @@ public class PictelioTranslateModule extends LynxModule {
      * 单帧 JSON 解析失败 → 跳过该帧（不中断流）；流末尾由 OkHttp Response close 触发
      * BufferedReader.readLine() 返回 null，自然退出。
      */
-    private void parseSseStream(InputStream in, Callback callback) throws IOException {
+    private boolean parseSseStream(InputStream in, Callback callback) throws IOException {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
             String line;
             String currentParagraphIndex = "0";
+            // 段落锚定状态：output_text.delta 的文本是**跨段连续流**（模型按 [N] 前缀逐段输出），
+            // 故在增量文本里跟踪最近出现的 [N] 标记，遇到标记即切换当前段落号；标记字符本身与
+            // 紧随其后的空格不进入译文（与 web 路径 strip 同语义）。
+            final int[] anchor = new int[]{0};
+            final StringBuilder carry = new StringBuilder();
             while ((line = reader.readLine()) != null) {
                 if (line.isEmpty()) {
                     continue; // SSE 帧分隔（空行）
                 }
                 if (!line.startsWith("data: ")) {
-                    continue;
+                    continue; // SSE 的 event: / id: / 注释行（事件类型在 data 载荷里，无需单独解析）
                 }
                 String payload = line.substring("data: ".length());
                 try {
@@ -444,10 +556,29 @@ public class PictelioTranslateModule extends LynxModule {
                     String type = event.optString("type");
                     switch (type) {
                         case "response.output_text.delta": {
+                            String delta = event.optString("delta");
+                            // 处理「跨帧截断的锚标记」：上一帧遗留的未完成前缀与本次拼接后再匹配
+                            String window = carry.toString() + delta;
+                            carry.setLength(0);
+                            Matcher m = PARAGRAPH_ANCHOR.matcher(window);
+                            int lastEnd = 0;
+                            boolean matched = false;
+                            while (m.find()) {
+                                anchor[0] = Integer.parseInt(m.group(1));
+                                lastEnd = m.end();
+                                matched = true;
+                            }
+                            String text = window.substring(matched ? lastEnd : 0);
+                            if (!matched && window.length() > 0 && window.charAt(window.length() - 1) == '[') {
+                                // 可能是被截断的 "["（下一帧补数字）：暂存，避免把标记吐进译文
+                                carry.append('[');
+                                text = window.substring(0, window.length() - 1);
+                            }
+                            currentParagraphIndex = String.valueOf(anchor[0]);
                             JSONObject chunk = new JSONObject();
                             chunk.put("type", "delta");
                             chunk.put("paragraphIndex", currentParagraphIndex);
-                            chunk.put("text", event.optString("delta"));
+                            chunk.put("text", text);
                             callback.invoke(chunk.toString(), "");
                             break;
                         }
@@ -458,7 +589,6 @@ public class PictelioTranslateModule extends LynxModule {
                             callback.invoke(chunk.toString(), "");
                             break;
                         }
-                        case "response.output_text.done":
                         case "response.completed": {
                             JSONObject done = new JSONObject();
                             done.put("type", "done");
@@ -470,7 +600,7 @@ public class PictelioTranslateModule extends LynxModule {
                                 }
                             }
                             callback.invoke(done.toString(), "");
-                            return;
+                            return true;
                         }
                         case "response.failed": {
                             JSONObject resp = event.optJSONObject("response");
@@ -478,19 +608,19 @@ public class PictelioTranslateModule extends LynxModule {
                             String code = errObj != null ? errObj.optString("code", "server") : "server";
                             String message = errObj != null ? errObj.optString("message", "流失败") : "流失败";
                             callback.invoke("", "LLM 流失败 [" + code + "]：" + message);
-                            return;
+                            return true;
                         }
                         case "response.incomplete": {
                             JSONObject resp = event.optJSONObject("response");
                             JSONObject incomplete = resp != null ? resp.optJSONObject("incomplete_details") : null;
                             String reason = incomplete != null ? incomplete.optString("reason", "输出截断") : "输出截断";
                             callback.invoke("", "LLM 输出截断：" + reason);
-                            return;
+                            return true;
                         }
                         case "error": {
                             String message = event.optString("message", "服务端错误");
                             callback.invoke("", "LLM 错误：" + message);
-                            return;
+                            return true;
                         }
                         default:
                             // 未识别事件（如 response.created / response.in_progress）→ 跳过
@@ -501,6 +631,7 @@ public class PictelioTranslateModule extends LynxModule {
                     Log.w(TAG, "SSE 帧解析失败: " + payload, e);
                 }
             }
+            return false;
         }
     }
 
@@ -537,23 +668,26 @@ public class PictelioTranslateModule extends LynxModule {
         String bodyLower = respBody == null ? "" : respBody.toLowerCase(Locale.ROOT);
         if (code >= 200 && code < 300) {
             result.put("status", "ok");
-            result.put("detail", "endpoint 存在且兼容 Responses API");
+            result.put("detail", "responses api reachable");
         } else if (code == 401 || code == 403) {
             result.put("status", "ok");
-            result.put("detail", "endpoint 存在（认证失败 = endpoint 在）");
+            // 401/403：端点存在（地址层成立），密钥无效 —— 同样标记，供凭据层判定
+            result.put("keyInvalid", true);
+            result.put("detail", "authentication failed (endpoint reachable)");
         } else if (code == 400 && (bodyLower.contains("invalid_api_key")
                 || bodyLower.contains("incorrect api key")
                 || bodyLower.contains("invalid api key"))) {
             result.put("status", "ok");
-            result.put("detail", "endpoint 存在（api key 校验失败 = endpoint 在）");
-        } else if (code == 404 && (bodyLower.contains("unknown url")
-                || bodyLower.contains("not found")
-                || bodyLower.contains("unknown endpoint"))) {
-            result.put("status", "partial");
-            result.put("detail", "endpoint 不支持 /v1/responses（可能仅 chat/completions）");
+            // 端点兼容性成立（地址对），但密钥无效 —— 显式标记，供「测试连接」区分凭据层失败
+            result.put("keyInvalid", true);
+            result.put("detail", "invalid api key (endpoint reachable)");
+        } else if (code == 404) {
+            // spec §9.1：404 / unknown url → 不兼容（此前误判为 partial）
+            result.put("status", "incompatible");
+            result.put("detail", "not a Responses API endpoint (HTTP 404)");
         } else if (code == 405) {
             result.put("status", "partial");
-            result.put("detail", "Method Not Allowed（仅 chat/completions 兼容）");
+            result.put("detail", "method not allowed (chat/completions only)");
         } else {
             result.put("status", "unknown");
             result.put("detail", "HTTP " + code);
