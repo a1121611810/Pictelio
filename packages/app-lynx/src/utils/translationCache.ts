@@ -123,12 +123,33 @@ function openDb(): Promise<IDBDatabase> {
   return openKvDb()
 }
 
+/** IndexedDB 可用性探测（真机 Lynx runtime 无 IDB / 挂起；web-core Worker 有）。
+ *  真机实测：indexedDB.open 的事件在 PrimJS 上可能永不触发 → 缓存层整体跳过，
+ *  禁止静默挂起翻译流程（IO 边界硬约束 #3）。 */
+function isIdbAvailable(): boolean {
+  return typeof indexedDB !== "undefined" && indexedDB !== null
+}
+
+/** 带超时的 openDb（真机 IDB 事件不触发时 3s 后 reject，避免永久挂起） */
+function openDbWithTimeout(): Promise<IDBDatabase> {
+  return Promise.race([
+    openDb(),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("[translationCache] indexedDB open timeout (3000ms)")), 3000),
+    ),
+  ])
+}
+
 /**
  * 读取单条缓存（不存在返回 null；IO 失败返回 null + warn，AGENTS.md 测试硬约束 #1+#3）。
  */
 export async function getTranslation(key: string): Promise<TranslationCacheEntry | null> {
+  if (!isIdbAvailable()) {
+    // 真机 Lynx runtime：无 IDB → 缓存层整体跳过（不挂起翻译流程）
+    return null
+  }
   try {
-    const db = await openDb()
+    const db = await openDbWithTimeout()
     return await new Promise<TranslationCacheEntry | null>((resolve, reject) => {
       const tx = db.transaction(STORE_TRANSLATIONS, 'readonly')
       const req = tx.objectStore(STORE_TRANSLATIONS).get(key)
@@ -175,6 +196,12 @@ export async function setTranslation(
   value: string[],
   metadata: { providerId?: string; modelId?: string } = {},
 ): Promise<void> {
+  if (!isIdbAvailable()) {
+    // 真机 Lynx runtime：无 IDB → 静默跳过写（warn 一次可观测）
+    console.warn('[translationCache] IDB unavailable, skip write', { key })
+    return
+  }
+
   const providerId = metadata.providerId ?? 'openai-responses'
   const modelId = metadata.modelId ?? 'unknown'
 
@@ -202,7 +229,7 @@ export async function setTranslation(
 
   let db: IDBDatabase
   try {
-    db = await openDb()
+    db = await openDbWithTimeout()
   } catch (err) {
     console.warn('[translationCache] open database failed, skip write', { key, err })
     return
@@ -296,8 +323,9 @@ async function evictOldestEntries(db: IDBDatabase, targetDeleteCount: number): P
  * 用户主动「清除翻译缓存」入口（spec §6.1 / §9.5）。
  */
 export async function clearTranslationCache(): Promise<void> {
+  if (!isIdbAvailable()) return
   try {
-    const db = await openDb()
+    const db = await openDbWithTimeout()
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(STORE_TRANSLATIONS, 'readwrite')
       tx.objectStore(STORE_TRANSLATIONS).clear()

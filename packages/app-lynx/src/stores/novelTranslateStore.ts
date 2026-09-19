@@ -149,6 +149,7 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
    */
   async function loadEndpointConfig(): Promise<LlmEndpointPublic | null> {
     const raw = await nativeGetEndpoint()
+    console.warn(`[novelTranslateStore] getEndpoint raw=${JSON.stringify(raw)}`)
     if (raw === null) return null
     if (typeof raw !== "object") {
       throw new Error("[novelTranslateStore] getEndpoint returned non-object")
@@ -283,6 +284,7 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
       return
     }
     // 缓存 miss / 长度不匹配 → 继续走 provider 路径
+    console.warn(`[novelTranslateStore] cacheMiss chapter=${chapterId}`)
     isCached.value[chapterId] = false
 
     // ── 启动新 translation ──
@@ -293,6 +295,7 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
 
     const promise = (async () => {
       const useNative = hasNativeModule()
+      console.warn(`[novelTranslateStore] path=${useNative ? "native" : "web"} chapter=${chapterId}`)
 
       try {
         if (useNative) {
