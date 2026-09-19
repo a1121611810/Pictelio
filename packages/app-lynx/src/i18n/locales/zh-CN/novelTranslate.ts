@@ -1,0 +1,62 @@
+// ─── 小说翻译域（spec docs/specs/app-lynx-novel-translation.md §8） ───
+// 子命名空间：endpoint / action / status / error；key 规范 novelTranslate.<子>.<语义>。
+// 源语言字典；en 侧必须镜像同结构（per-domain satisfies 编译期强制）。
+const zhNovelTranslate = {
+  // endpoint 子域（设置页表单文案）
+  "novelTranslate.endpoint.title": "LLM 翻译设置",
+  "novelTranslate.endpoint.baseUrl.label": "API 地址",
+  "novelTranslate.endpoint.baseUrl.hint": "形如 https://api.openai.com/v1",
+  "novelTranslate.endpoint.apiKey.label": "API Key",
+  "novelTranslate.endpoint.apiKey.hint": "密钥经 Keystore 端到端加密保存",
+  "novelTranslate.endpoint.model.label": "模型",
+  "novelTranslate.endpoint.model.hint": "如 gpt-5、deepseek-v4-pro 或任意兼容 /v1/responses 的模型",
+  "novelTranslate.endpoint.save": "保存",
+  "novelTranslate.endpoint.saved": "已保存",
+  "novelTranslate.endpoint.invalid.url": "API 地址格式不正确",
+  "novelTranslate.endpoint.invalid.key": "API Key 不能为空",
+  "novelTranslate.endpoint.invalid.model": "模型名称不能为空",
+  "novelTranslate.endpoint.probe.success": "连接成功",
+  "novelTranslate.endpoint.probe.failed": "无法连接：{{detail}}",
+  "novelTranslate.endpoint.probe.timeout": "探测超时",
+  "novelTranslate.endpoint.notConfigured": "尚未配置 LLM endpoint",
+  "novelTranslate.endpoint.deleteConfirm": "确认清除已保存的 endpoint 配置？",
+
+  // action 子域（按钮文案）
+  "novelTranslate.action.start": "翻译本章",
+  "novelTranslate.action.abort": "停止",
+  "novelTranslate.action.retry": "重试",
+  "novelTranslate.action.cached": "已缓存",
+  "novelTranslate.action.viewOriginal": "原文",
+  "novelTranslate.action.viewTranslation": "译文",
+  "novelTranslate.action.switchMode": "切换显示",
+
+  // status 子域（状态机语义）
+  "novelTranslate.status.idle": "未翻译",
+  "novelTranslate.status.pending": "准备中",
+  "novelTranslate.status.translating": "翻译中",
+  "novelTranslate.status.translatingQueued": "排队中",
+  "novelTranslate.status.partial": "部分译文",
+  "novelTranslate.status.failed": "翻译失败",
+  "novelTranslate.status.completed": "已完成",
+  "novelTranslate.status.aborted": "已取消",
+  "novelTranslate.status.progress.label": "进度 {{done}}/{{total}}",
+  "novelTranslate.status.progress.remaining": "剩余 {{remaining}} 章",
+
+  // error 子域（错误呈现）
+  "novelTranslate.error.network": "网络不可用",
+  "novelTranslate.error.unauthorized": "API Key 无效（401）",
+  "novelTranslate.error.rateLimit": "请求过于频繁（429）",
+  "novelTranslate.error.server": "LLM 服务暂时不可用",
+  "novelTranslate.error.unknown": "未知错误",
+  "novelTranslate.error.R18Blocked": "当前章节受限，无法翻译",
+  "novelTranslate.error.timeout": "请求超时",
+  "novelTranslate.error.canceled": "已取消",
+  "novelTranslate.error.notConfigured": "请先在设置中配置 LLM endpoint",
+  "novelTranslate.error.partialFailed": "部分段落翻译失败，已用原文填充",
+  "novelTranslate.error.retrying": "重试中…",
+  "novelTranslate.error.retryingFailed": "重试仍失败",
+  "novelTranslate.error.retryHint": "请稍后重试或检查 endpoint 配置",
+} as const;
+
+export default zhNovelTranslate;
+export type NovelTranslateKey = keyof typeof zhNovelTranslate;

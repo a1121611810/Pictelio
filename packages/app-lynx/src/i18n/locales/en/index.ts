@@ -4,8 +4,9 @@ import error_ from "./error";
 import time_ from "./time";
 import pages_ from "./pages";
 import misc_ from "./misc";
+import novelTranslate_ from "./novelTranslate";
 import type { Dict } from "../zh-CN";
 
-const en = { ...error_, ...time_, ...pages_, ...misc_ } as const satisfies Dict;
+const en = { ...error_, ...time_, ...pages_, ...misc_, ...novelTranslate_ } as const satisfies Dict;
 
 export default en;

@@ -4,8 +4,9 @@ import error_ from "./error";
 import time_ from "./time";
 import pages_ from "./pages";
 import misc_ from "./misc";
+import novelTranslate_ from "./novelTranslate";
 
-const zhCN = { ...error_, ...time_, ...pages_, ...misc_ } as const;
+const zhCN = { ...error_, ...time_, ...pages_, ...misc_, ...novelTranslate_ } as const;
 
 export default zhCN;
 export type I18nKey = keyof typeof zhCN;
