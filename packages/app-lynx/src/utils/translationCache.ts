@@ -16,6 +16,8 @@
 // - 成功 + 失败双路径都覆盖；
 // - 失败时 console.warn（模块前缀 `[translationCache]`），不静默吞错。
 
+import { openDb as openKvDb, STORE_TRANSLATIONS as STORE_TRANSLATIONS_FROM_KV } from './idbKV'
+
 // ─────────────────── 缓存键 ───────────────────
 
 /**
@@ -108,41 +110,17 @@ export function computeBaseURLHash(baseURL: string): string {
 
 // ─────────────────── IndexedDB schema ───────────────────
 
-const DB_NAME = 'pictelio_lynx'
-/** v2（现有 idbKV.ts）→ v3 加 translations store；旧 tokens / kv 数据不迁移（一次性重新登录） */
-const DB_VERSION = 3
-const STORE_TRANSLATIONS = 'translations'
+// DB 名 / version / store 与 idbKV.ts 单一事实源：translations store 由 idbKV.openDb
+// 在同 version 下统一创建（ADR-0171）。历史坑：本模块曾自开 v3 而 idbKV 持有 v2 连接
+// → onblocked 永不 resolve（真机实测翻译卡 "0% 翻译中"）。复用 openDb 杜绝版本分裂。
+const STORE_TRANSLATIONS = STORE_TRANSLATIONS_FROM_KV
 
 /** LRU 容量上限（ADR-0171 §3；与 webview 端 200 章同基线起步） */
 const LRU_CAPACITY = 200
 
-/**
- * 打开数据库。onupgradeneeded 统一管理：
- * - v1 → v2（idbKV.ts 既有：tokens → kv store 重建）
- * - v2 → v3（本 ADR 新增：translations store）
- *
- * 不为 `translations` store 建任何 index——键已是 buildTranslationCacheKey 输出、唯一；
- * 查询入口只有「按完整 key 查」+ 「LRU 遍历淘汰」（cursor）。
- * `sourceHash` / `modelId` / `novelId` 不建 index（避免升级复杂度爆炸；
- * 200 章量级内存成本 < 1ms，遍历 + 内存过滤即可）。
- */
+/** 打开数据库（复用 idbKV 共享 openDb：onblocked 显式 reject，禁静默挂起） */
 function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION)
-    req.onupgradeneeded = (): void => {
-      const db = req.result
-      // v1 → v2 升级路径保留（idbKV.ts 既有契约）：tokens / kv store 创建
-      if (!db.objectStoreNames.contains('kv')) {
-        db.createObjectStore('kv')
-      }
-      // v2 → v3 升级路径：新增 translations store
-      if (!db.objectStoreNames.contains(STORE_TRANSLATIONS)) {
-        db.createObjectStore(STORE_TRANSLATIONS)
-      }
-    }
-    req.onsuccess = (): void => resolve(req.result)
-    req.onerror = (): void => reject(req.error)
-  })
+  return openKvDb()
 }
 
 /**

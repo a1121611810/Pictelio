@@ -6,19 +6,35 @@ const DB_NAME = "pictelio_lynx"
 // [lynx:fix] version 2：旧版（ADR-0050 初版）已建同 DB（store "tokens"），
 // 若 version 保持 1 则 onupgradeneeded 不触发、kv store 不会创建 → 读写失败。
 // 升级到 2 强制触发创建 kv；旧 tokens 数据不迁移（一次性重新登录）。
-const DB_VERSION = 2
+// [lynx:fix] version 3（ADR-0171）：新增 translations store（翻译缓存）。
+// 关键坑：本模块每次调用都新开连接且不关闭 —— 若有 v2 连接存活，另开 v3 会触发
+// onblocked 而永不 resolve（真机实测：翻译按钮卡 "0% 翻译中"）。因此全部 store
+// 必须在同一 version 下创建，且 openDb 必须处理 onblocked（显式 reject 而非挂起）。
+const DB_VERSION = 3
 const STORE = "kv"
+/** 翻译缓存 store（ADR-0171）；与 kv 同 DB 同 version，由本模块统一建 */
+export const STORE_TRANSLATIONS = "translations"
 
-function openDb(): Promise<IDBDatabase> {
+/**
+ * 打开 DB（模块内共享；导出供 translationCache 复用，杜绝多 version 竞争）。
+ * onblocked：旧连接阻塞升级时显式 reject（禁静默挂起；IO 边界硬约束 #3）。
+ */
+export function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION)
     req.onupgradeneeded = () => {
-      if (!req.result.objectStoreNames.contains(STORE)) {
-        req.result.createObjectStore(STORE)
+      const db = req.result
+      if (!db.objectStoreNames.contains(STORE)) {
+        db.createObjectStore(STORE)
+      }
+      if (!db.objectStoreNames.contains(STORE_TRANSLATIONS)) {
+        db.createObjectStore(STORE_TRANSLATIONS)
       }
     }
     req.onsuccess = () => resolve(req.result)
     req.onerror = () => reject(req.error)
+    req.onblocked = () =>
+      reject(new Error("[idbKV] db upgrade blocked by open connection (onblocked)"))
   })
 }
 
