@@ -4,7 +4,8 @@
 - **设备**：`emulator-5554`（Android，x86_64 镜像）
 - **被测构建**：debug APK，`BENCH_NAV=1` + `PictelioTranslate` 原生模块
 - **LLM 端点**：本地 mock Responses SSE 服务（`packages/app/tests/android-e2e/tools/mock-responses-sse-server.mjs`）+ `adb reverse`
-- **复跑脚本**：`packages/app/tests/android-e2e/tools/verify-translation.sh mock`
+- **复跑脚本**：`packages/app/tests/android-e2e/tools/verify-translation.sh mock`（自包含：构建 → 新鲜度校验 → 安装 → 启动 → 定位并点击 → 采集两端证据；2026-09-20 起自带导航深链与「拒绝测旧包」防线）
+- **被测提交**：`f8a01bc7`（交付通道链路：4d13646c 事件总线 → 4975435a 包名修复 → 818014da 解析测试对齐 → f8a01bc7 脚本自包含）
 
 ## 7 步流程与结果
 
