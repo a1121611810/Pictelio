@@ -224,8 +224,8 @@ async function migrateLegacy(
 
 export const useSettingsStore = defineStore("settings", () => {
   // ── 私有 state（闭包内 ref，不 return —— 物理私有，替代原 `_` 命名约定）──
-  const _showR18 = ref(false)
-  const _showR18G = ref(false)
+  const _showR18 = ref(true)
+  const _showR18G = ref(true)
   const _aiFilterMode = ref<AiFilterMode>("show")
   const _ugoiraMode = ref<UgoiraExtractMode>("fflate")
   const _ugoiraDownloadFormat = ref<UgoiraFormat>("zip")
