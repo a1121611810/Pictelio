@@ -594,9 +594,14 @@ function classifyProvider(
   ): Promise<void> {
     // ── R18 闸门（应用层；spec §9.7）──
     const settings = useSettingsStore()
-    if (xRestrict > 0 && settings.isRestricted({ x_restrict: xRestrict })) {
+    // 翻译授权（spec §9.7 / ADR-0173）：**不复用内容显示谓词** —— 看见 R18 ≠ 允许把
+    // R18 正文发给第三方 LLM。未授权时直接拒绝且**不发请求**（正文零外发）。
+    if (xRestrict > 0 && settings.isTranslationRestricted(xRestrict)) {
       status.value = "aborted"
-      error.value = { code: "R18_BLOCKED", message: t("novelTranslate.error.R18Blocked") }
+      error.value = {
+        code: xRestrict === 2 ? "R18G_BLOCKED" : "R18_BLOCKED",
+        message: xRestrict === 2 ? t("novelTranslate.error.r18gBlocked") : t("novelTranslate.error.R18Blocked"),
+      }
       currentChapter.value = chapterId
       console.warn(
         `[novelTranslateStore] R18 gate blocked x_restrict=${xRestrict} chapter=${chapterId}`,

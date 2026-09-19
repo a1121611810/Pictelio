@@ -33,6 +33,10 @@ import { DEFAULT_THEME_COLOR, isThemeColorId, type ThemeColorId } from "../utils
 // ── 跨 client 契约键（ADR-0103：与 webview settingsStore defineFactory 同格式）──
 const r18Key = (uid: number) => `show_r18_${uid}`
 const r18gKey = (uid: number) => `show_r18g_${uid}`
+// 翻译授权（spec §9.7；ADR-0173）：**独立于内容显示开关** —— 「允许看见 R18 内容」
+// 与「允许把 R18 内容发给第三方 LLM」是两个不同的授权，前者不能替代后者。
+const translateR18Key = (uid: number) => `settings_translate_r18_${uid}`
+const translateR18gKey = (uid: number) => `settings_translate_r18g_${uid}`
 /** 老设备级键（webview 遗留，SharedPreferences）——native 环境迁移源 */
 const LEGACY_R18 = "show_r18"
 const LEGACY_R18G = "show_r18g"
@@ -226,6 +230,9 @@ export const useSettingsStore = defineStore("settings", () => {
   // ── 私有 state（闭包内 ref，不 return —— 物理私有，替代原 `_` 命名约定）──
   const _showR18 = ref(false)
   const _showR18G = ref(false)
+  // 翻译授权（默认 false：未经明确同意，R18 内容不外发给 LLM）
+  const _translateR18 = ref(false)
+  const _translateR18G = ref(false)
   const _aiFilterMode = ref<AiFilterMode>("show")
   const _ugoiraMode = ref<UgoiraExtractMode>("fflate")
   const _ugoiraDownloadFormat = ref<UgoiraFormat>("zip")
@@ -260,6 +267,8 @@ export const useSettingsStore = defineStore("settings", () => {
   // ── 公共 state（return —— setup store 自动解包，模板 / `.value` 皆可）──
   const showR18 = _showR18
   const showR18G = _showR18G
+  const translateR18 = _translateR18
+  const translateR18G = _translateR18G
   const aiFilterMode = _aiFilterMode
   const ugoiraMode = _ugoiraMode
   const ugoiraDownloadFormat = _ugoiraDownloadFormat
@@ -464,6 +473,8 @@ export const useSettingsStore = defineStore("settings", () => {
     if (id === null) {
       _showR18.value = false
       _showR18G.value = false
+      _translateR18.value = false
+      _translateR18G.value = false
       _aiFilterMode.value = "show"
       return
     }
@@ -476,6 +487,9 @@ export const useSettingsStore = defineStore("settings", () => {
       await migrateLegacy(storage, legacy[1], r18gKey(id))
       _showR18.value = (await storage.get(r18Key(id))) === "true"
       _showR18G.value = (await storage.get(r18gKey(id))) === "true"
+      // 翻译授权独立读取（spec §9.7）；缺失即 false
+      _translateR18.value = (await storage.get(translateR18Key(id))) === "true"
+      _translateR18G.value = (await storage.get(translateR18gKey(id))) === "true"
       const rawAi = await storage.get(aiFilterModeKey(id))
       if (rawAi === null) {
         _aiFilterMode.value = "show"
@@ -490,6 +504,8 @@ export const useSettingsStore = defineStore("settings", () => {
       console.warn("[settingsStore] 账号级设置加载失败（维持默认）", e)
       _showR18.value = false
       _showR18G.value = false
+      _translateR18.value = false
+      _translateR18G.value = false
       _aiFilterMode.value = "show"
     }
 
@@ -528,6 +544,40 @@ export const useSettingsStore = defineStore("settings", () => {
     void prefs()
       .set(r18gKey(id), String(enabled))
       .catch((e) => console.warn("[settingsStore] R18G 写入失败", e))
+  }
+
+  /**
+   * 设置「允许翻译 R18」授权（spec §9.7；账号级）。
+   * 与内容显示开关独立：开启前 UI 必须过一次风险确认（R18：账号封禁 / 模型训练风险）。
+   */
+  function setTranslateR18(enabled: boolean): void {
+    _translateR18.value = enabled
+    const id = uid()
+    if (id === null) return
+    void prefs()
+      .set(translateR18Key(id), String(enabled))
+      .catch((e) => console.warn("[settingsStore] 翻译 R18 授权写入失败", e))
+  }
+
+  /** 设置「允许翻译 R18G」授权（spec §9.7；强提示法律红线后） */
+  function setTranslateR18G(enabled: boolean): void {
+    _translateR18G.value = enabled
+    const id = uid()
+    if (id === null) return
+    void prefs()
+      .set(translateR18gKey(id), String(enabled))
+      .catch((e) => console.warn("[settingsStore] 翻译 R18G 授权写入失败", e))
+  }
+
+  /**
+   * 翻译授权闸门（spec §9.7 应用层）：
+   * `xRestrict=1` 需 `translate_r18`，`xRestrict=2` 需 `translate_r18g`。
+   * **不复用 isRestricted**：那是内容显示谓词（看见 ≠ 允许外发给第三方 LLM）。
+   */
+  function isTranslationRestricted(xRestrict: number): boolean {
+    if (xRestrict === 2) return !_translateR18G.value
+    if (xRestrict === 1) return !_translateR18.value
+    return false
   }
 
   /** 设置 AI 三态（账号级，未登录不落盘；ADR-0155） */
@@ -928,6 +978,8 @@ export const useSettingsStore = defineStore("settings", () => {
     // getters（公共 ref）
     showR18,
     showR18G,
+    translateR18,
+    translateR18G,
     aiFilterMode,
     ugoiraMode,
     detailQuality,
@@ -977,6 +1029,9 @@ export const useSettingsStore = defineStore("settings", () => {
     exportRawValues,
     importRawValues,
     isRestricted,
+    isTranslationRestricted,
+    setTranslateR18,
+    setTranslateR18G,
     isAiWork,
     isAiRestricted,
     isAiOnlyFiltered,

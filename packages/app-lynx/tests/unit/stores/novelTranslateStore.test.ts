@@ -36,6 +36,7 @@ const mocks = vi.hoisted(() => {
     cacheMakeKey: vi.fn(),
     providerIter: vi.fn(),
     settingsIsRestricted: vi.fn(),
+    settingsTranslationRestricted: vi.fn(),
     settingsLanguage: vi.fn(),
   }
 })
@@ -138,6 +139,8 @@ vi.mock('../../../src/utils/translationCache', () => ({
 vi.mock('../../../src/stores/settingsStore', () => ({
   useSettingsStore: () => ({
     isRestricted: mocks.settingsIsRestricted,
+    // 翻译授权谓词（spec §9.7 / ADR-0173）：与内容显示谓词独立
+    isTranslationRestricted: mocks.settingsTranslationRestricted,
     language: mocks.settingsLanguage(),
   }),
 }))
@@ -183,6 +186,7 @@ beforeEach(() => {
   delete (globalThis as Record<string, unknown>).NativeModules
   // settings 默认：未受限 + 中文
   mocks.settingsIsRestricted.mockReturnValue(false)
+  mocks.settingsTranslationRestricted.mockReturnValue(false)
   mocks.settingsLanguage.mockReturnValue('zh-CN')
   // cache 默认：miss（null）
   mocks.cacheGet.mockResolvedValue(null)
@@ -340,7 +344,7 @@ describe('novelTranslateStore.status 状态机（spec §7.2）', () => {
 
 describe('R18 闸门（spec §9.7 + ADR-0103）', () => {
   it('x_restrict=1 + showR18=false → status=aborted + error.code=R18_BLOCKED', async () => {
-    mocks.settingsIsRestricted.mockReturnValue(true)
+    mocks.settingsTranslationRestricted.mockReturnValue(true)
     const store = useNovelTranslateStore()
     await store.translateChapter(6, 6, ['p1'], 1)
     expect(store.status).toBe('aborted')
@@ -351,6 +355,7 @@ describe('R18 闸门（spec §9.7 + ADR-0103）', () => {
 
   it('x_restrict=0 → 不触发 R18 闸门，走 provider', async () => {
     mocks.settingsIsRestricted.mockReturnValue(false)
+  mocks.settingsTranslationRestricted.mockReturnValue(false)
     const store = useNovelTranslateStore()
     await store.translateChapter(7, 7, ['p1'], 0)
     expect(store.status).toBe('completed')
@@ -360,6 +365,7 @@ describe('R18 闸门（spec §9.7 + ADR-0103）', () => {
 
   it('x_restrict=1 + showR18=true → 不触发 R18 闸门，走 provider', async () => {
     mocks.settingsIsRestricted.mockReturnValue(false)
+  mocks.settingsTranslationRestricted.mockReturnValue(false)
     const store = useNovelTranslateStore()
     await store.translateChapter(8, 8, ['p1'], 1)
     expect(store.status).toBe('completed')
@@ -580,6 +586,45 @@ describe('译文渲染源（spec §5 / §6.3）', () => {
     expect(store.status).toBe('completed')
     expect(store.displayParagraphs).toEqual(['缓存译一', '缓存译二'])
     expect(mocks.providerIter).not.toHaveBeenCalled()
+  })
+})
+
+// ─────────────────── 翻译授权闸门（spec §9.7：与内容显示开关独立） ───────────────────
+
+describe('翻译授权闸门（R18 / R18G 分开）', () => {
+  it('xRestrict=1 未授权 → aborted + R18_BLOCKED，且**不发 provider 请求**', async () => {
+    mocks.settingsTranslationRestricted.mockReturnValue(true)
+    const store = useNovelTranslateStore()
+    await store.translateChapter(95, 95, ['R18 正文'], 1)
+
+    expect(store.status).toBe('aborted')
+    expect(store.error?.code).toBe('R18_BLOCKED')
+    expect(mocks.providerIter).not.toHaveBeenCalled()
+    expect(mocks.nativeTranslateStream).not.toHaveBeenCalled()
+  })
+
+  it('xRestrict=2 未授权 → aborted + R18G_BLOCKED（与 R18 分开的码与文案）', async () => {
+    mocks.settingsTranslationRestricted.mockReturnValue(true)
+    const store = useNovelTranslateStore()
+    await store.translateChapter(96, 96, ['R18G 正文'], 2)
+
+    expect(store.status).toBe('aborted')
+    expect(store.error?.code).toBe('R18G_BLOCKED')
+    expect(mocks.providerIter).not.toHaveBeenCalled()
+  })
+
+  it('已授权（谓词 false）→ 正常走 provider', async () => {
+    mocks.settingsTranslationRestricted.mockReturnValue(false)
+    const store = useNovelTranslateStore()
+    await store.translateChapter(97, 97, ['R18 正文'], 1)
+    expect(store.status).toBe('completed')
+  })
+
+  it('xRestrict=0 永不受授权闸门影响', async () => {
+    mocks.settingsTranslationRestricted.mockReturnValue(true)
+    const store = useNovelTranslateStore()
+    await store.translateChapter(98, 98, ['全年龄正文'], 0)
+    expect(store.status).toBe('completed')
   })
 })
 

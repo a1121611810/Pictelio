@@ -4,11 +4,14 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue"
 import { useNovelTranslateStore } from "../stores/novelTranslateStore"
+import { useSettingsStore } from "../stores/settingsStore"
+import { A11Y_ELEMENT_ENABLED } from "../utils/accessibility"
 import { t } from "../i18n"
 import { extractHostname } from "../utils/safeParseUrl"
 import type { LlmEndpointPublic } from "../api/translate"
 
 const store = useNovelTranslateStore()
+const settings = useSettingsStore()
 
 // ── 表单 state（与 store 解耦：编辑中不入 store，提交时一次性写入） ──
 const baseURL = ref<string>("")
@@ -24,6 +27,34 @@ const testResultText = ref<string>("")
 const testResultOk = ref<boolean | null>(null)
 let testResultTimer: ReturnType<typeof setTimeout> | null = null
 const savedAt = ref<number | null>(null)
+
+/**
+ * 翻译授权确认（spec §9.7：首次开启任一开关前给风险确认）。
+ * 复刻既有做法：lynx 无全局 modal/confirm，用行内面板承担二次确认。
+ */
+const consentFor = ref<"r18" | "r18g" | null>(null)
+
+/** 是否已授权（settingsStore 是唯一事实源） */
+const translateR18 = computed<boolean>(() => settings.translateR18)
+const translateR18G = computed<boolean>(() => settings.translateR18G)
+
+function requestTranslateConsent(kind: "r18" | "r18g"): void {
+  const enabled = kind === "r18" ? translateR18.value : translateR18G.value
+  // 关闭无需确认（收紧授权永远安全）
+  if (enabled) {
+    if (kind === "r18") settings.setTranslateR18(false)
+    else settings.setTranslateR18G(false)
+    return
+  }
+  consentFor.value = kind
+}
+
+function confirmTranslateConsent(): void {
+  const kind = consentFor.value
+  consentFor.value = null
+  if (kind === "r18") settings.setTranslateR18(true)
+  else if (kind === "r18g") settings.setTranslateR18G(true)
+}
 
 /** 兼容性探测的 debounce（spec §6.1：600ms）；重入即取消上一次 */
 let compatTimer: ReturnType<typeof setTimeout> | null = null
@@ -327,6 +358,8 @@ async function onClear(): Promise<void> {
       <view
         class="flex-1 h-[12vw] flex items-center justify-center rounded-[var(--md-shape-full)] border border-outline active:bg-layer-pressed-on-surface"
         :class="!formValid || testing ? 'opacity-50' : ''"
+        :accessibility-element="A11Y_ELEMENT_ENABLED"
+        :accessibility-label="t('novelTranslate.endpoint.test.button')"
         @tap="onTestConnection"
       >
         <text class="text-label-large text-surface-on">{{
@@ -338,11 +371,89 @@ async function onClear(): Promise<void> {
       <view
         class="flex-1 h-[12vw] flex items-center justify-center rounded-[var(--md-shape-full)] bg-primary active:bg-layer-pressed-on-primary"
         :class="!formValid || saving ? 'opacity-50' : ''"
+        :accessibility-element="A11Y_ELEMENT_ENABLED"
+        :accessibility-label="t('novelTranslate.endpoint.save')"
         @tap="onSave"
       >
         <text class="text-label-large text-on-primary">{{
           saving ? t("novelTranslate.status.pending") : t("novelTranslate.endpoint.save")
         }}</text>
+      </view>
+    </view>
+
+    <!-- 翻译授权（spec §9.7）：与内容显示开关独立 —— 看见 R18 ≠ 允许外发给 LLM -->
+    <view class="flex flex-col gap-2 border-t border-t-outline pt-3">
+      <view
+        class="flex flex-row items-center justify-between"
+        :accessibility-element="A11Y_ELEMENT_ENABLED"
+        :accessibility-label="t('novelTranslate.endpoint.translateR18')"
+        @tap="requestTranslateConsent('r18')"
+      >
+        <text class="text-body-medium text-surface-on">{{
+          t("novelTranslate.endpoint.translateR18")
+        }}</text>
+        <view
+          class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center"
+          :class="translateR18 ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
+        >
+          <view
+            class="rounded-full mx-[1.067vw]"
+            :class="translateR18 ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'"
+          />
+        </view>
+      </view>
+      <view
+        class="flex flex-row items-center justify-between"
+        :accessibility-element="A11Y_ELEMENT_ENABLED"
+        :accessibility-label="t('novelTranslate.endpoint.translateR18G')"
+        @tap="requestTranslateConsent('r18g')"
+      >
+        <text class="text-body-medium text-surface-on">{{
+          t("novelTranslate.endpoint.translateR18G")
+        }}</text>
+        <view
+          class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center"
+          :class="translateR18G ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
+        >
+          <view
+            class="rounded-full mx-[1.067vw]"
+            :class="translateR18G ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'"
+          />
+        </view>
+      </view>
+    </view>
+
+    <!-- 风险确认（首次开启；行内面板复刻既有确认模式） -->
+    <view v-if="consentFor !== null" class="flex flex-col gap-2 bg-error-container rounded-[var(--md-shape-medium)] p-3">
+      <text class="text-title-small text-on-error-container">{{
+        consentFor === "r18g"
+          ? t("novelTranslate.endpoint.consent.r18g.title")
+          : t("novelTranslate.endpoint.consent.r18.title")
+      }}</text>
+      <text class="text-body-small text-on-error-container">{{
+        consentFor === "r18g"
+          ? t("novelTranslate.endpoint.consent.r18g.body")
+          : t("novelTranslate.endpoint.consent.r18.body")
+      }}</text>
+      <view class="flex flex-row gap-2">
+        <view
+          class="flex-1 h-[10.667vw] flex items-center justify-center rounded-[var(--md-shape-full)] border border-outline"
+          @tap="consentFor = null"
+        >
+          <text class="text-label-large text-surface-on">{{
+            t("novelTranslate.endpoint.cancel")
+          }}</text>
+        </view>
+        <view
+          class="flex-1 h-[10.667vw] flex items-center justify-center rounded-[var(--md-shape-full)] bg-error"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="t('novelTranslate.endpoint.consent.enable')"
+          @tap="confirmTranslateConsent"
+        >
+          <text class="text-label-large text-on-error">{{
+            t("novelTranslate.endpoint.consent.enable")
+          }}</text>
+        </view>
       </view>
     </view>
 
