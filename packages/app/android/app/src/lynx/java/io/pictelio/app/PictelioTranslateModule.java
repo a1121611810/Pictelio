@@ -119,8 +119,24 @@ public class PictelioTranslateModule extends LynxModule {
     private TranslationSseParser sseParser;
     /** 本次流是否至少产出过一个译文段（空流 = 失败，见 translateStream 收尾） */
     private boolean deltaSeen = false;
-    /** 已下发给 JS 的 delta 帧计数（仅观测用） */
+    /** 已入队的 delta 帧计数（仅观测用） */
     private int deltaCount = 0;
+
+    // ── 帧派发（拉模式）─────────────────────────────────────────────
+    // 背景：解析线程若在一次 read 内连续 callback.invoke 多帧，Lynx 桥只投递其中一帧
+    // （模拟器实测：Java 下发 11 帧、JS store 只收到 1 帧；加 25ms 睡眠也无效，因为
+    // 桥接层在 JS 线程空闲前就已丢弃）。故解析只入队，主线程按 tick 逐帧派发 ——
+    // 消费节奏由 JS 可处理速率决定，不再丢帧。
+    /** 待派发帧（worker 入队 / 主线程出队） */
+    private final java.util.concurrent.ConcurrentLinkedQueue<String> frameQueue =
+            new java.util.concurrent.ConcurrentLinkedQueue<>();
+    /** 主线程 Handler（帧 tick 与收尾派发共用） */
+    private final android.os.Handler mainHandler =
+            new android.os.Handler(android.os.Looper.getMainLooper());
+    /** 帧 tick 间隔（ms）：约 60 帧/秒，够快且不淹 JS */
+    private static final long FRAME_TICK_MS = 16;
+    /** 本流是否已派发过至少一帧（用于错误收尾时判断是否需要补空流报错） */
+    private boolean framesDispatched = false;
 
     /**
      * 流式专用 OkHttp 客户端：**不带 callTimeout**。
@@ -344,27 +360,25 @@ public class PictelioTranslateModule extends LynxModule {
                 }
                 deltaSeen = false;
                 deltaCount = 0;
+                framesDispatched = false;
+                frameQueue.clear();
                 boolean terminalEmitted = parseSseStream(body.byteStream(), callback);
-                Log.i(TAG, "SSE 流结束 terminal=" + terminalEmitted + " deltaSeen=" + deltaSeen);
-                if (!deltaSeen) {
-                    // 流正常结束但**一个译文段都没产出**：常见于服务端内容策略拒答 /
-                    // 模型只回 reasoning。必须报错而不是当成成功 —— 否则 UI 显示「已完成」
-                    // 却没有任何译文（真机实测：DeepSeek 对 R-18 正文返回 200 且空输出）。
-                    Log.w(TAG, "SSE 流结束但未产出任何译文段 → 报空流失败");
-                    callback.invoke("", "LLM 未返回任何译文（可能被服务端内容策略拦截）");
-                    ACTIVE_CALLS.remove(streamId);
-                    return;
+                // 无终态事件即断流（DeepSeek 常见）：把已累积译文刷出，保证「有译文却没交付」不发生
+                if (!terminalEmitted && sseParser != null) {
+                    sseParser.flushIfAny((payload, error) -> {
+                        if (payload != null && !payload.isEmpty()) frameQueue.offer(payload);
+                    });
                 }
-                if (!terminalEmitted) {
-                    // 流在无终态事件时结束（真机实测 DeepSeek：只有 in_progress → …delta…
-                    // → output_item.done，无 response.completed，连接即结束）。
-                    // 契约（ADR-0170 §D6）：translateStream **必须**以 done chunk 或 error 终结——
-                    // 否则 JS 侧 Promise 永不 settle，store 卡在 translating（按钮永久「N% 翻译中」）。
-                    Log.i(TAG, "SSE 流结束未见终态事件 → 合成 done（DeepSeek 无 response.completed）");
-                    JSONObject done = new JSONObject();
-                    done.put("type", "done");
-                    callback.invoke(done.toString(), "");
-                }
+                Log.i(TAG, "SSE 流结束 terminal=" + terminalEmitted + " deltaSeen=" + deltaSeen
+                        + " queued=" + frameQueue.size());
+                // 已解析的帧按 tick 派发干净后，再由主线程决定终态（done / 空流失败）
+                mainHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        drainOrFinish(terminalEmitted, streamId, callback);
+                    }
+                });
+                return;
             } catch (Throwable e) {
                 if (USER_ABORTED.contains(streamId)) {
                     return; // 用户主动中断：静默
@@ -377,6 +391,50 @@ public class PictelioTranslateModule extends LynxModule {
                 USER_ABORTED.remove(streamId);
             }
         });
+    }
+
+    /**
+     * 主线程 tick：每次派发一帧；队列空时收敛终态。
+     *
+     * <p>为什么不在解析线程直接回调：一次 read 内连续 invoke 多帧时 Lynx 桥只投递其中一帧
+     * （模拟器实测 Java 11 帧 / JS 1 帧）。改为解析入队 + 主线程逐帧派发后，消费节奏由
+     * JS 可处理速率决定，不再丢帧。
+     *
+     * <p>空流（零译文段）直接报失败、**不合成 done**：服务端 200 但零输出（真机实测
+     * DeepSeek 对 R-18 正文如此）必须让用户看到错误，而不是「成功却无译文」。
+     */
+    private void drainOrFinish(boolean terminalEmitted, String streamId, Callback callback) {
+        if (USER_ABORTED.contains(streamId)) {
+            return; // 用户中断：静默收尾
+        }
+        String frame = frameQueue.poll();
+        if (frame != null) {
+            framesDispatched = true;
+            callback.invoke(frame, "");
+            mainHandler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    drainOrFinish(terminalEmitted, streamId, callback);
+                }
+            }, FRAME_TICK_MS);
+            return;
+        }
+        if (!deltaSeen) {
+            Log.w(TAG, "SSE 流结束但未产出任何译文段 → 报空流失败");
+            callback.invoke("", "LLM 未返回任何译文（可能被服务端内容策略拦截）");
+            return;
+        }
+        if (!terminalEmitted) {
+            Log.i(TAG, "SSE 流结束未见终态事件 → 合成 done（DeepSeek 无 response.completed）");
+            try {
+                JSONObject done = new JSONObject();
+                done.put("type", "done");
+                callback.invoke(done.toString(), "");
+            } catch (Exception e) {
+                Log.w(TAG, "合成 done 帧失败", e);
+                callback.invoke("", "流程收尾失败：" + e.getClass().getSimpleName());
+            }
+        }
     }
 
     /**
@@ -606,15 +664,18 @@ public class PictelioTranslateModule extends LynxModule {
         return sseParser.accept(
                 line,
                 (payload, error) -> {
+                    // 只入队：派发交给主线程 tick（见 frameQueue 注释）
                     if (payload != null && payload.contains("\"type\":\"delta\"")) {
                         deltaSeen = true;
-                        // 打点：确认帧真的交给了 JS（此前出现「Java 计数为真、JS 侧无日志」的断层）
-                        Log.i(TAG, "SSE 帧下发 delta（累计 " + deltaCount++ + "）");
+                        deltaCount++;
                     }
-                    try {
-                        callback.invoke(payload, error);
-                    } catch (Throwable t) {
-                        Log.w(TAG, "SSE 帧回调 JS 失败", t);
+                    if (error != null && !error.isEmpty()) {
+                        // 错误是终态：直接派发（单帧，不会被丢），并停止后续 tick
+                        callback.invoke("", error);
+                        return;
+                    }
+                    if (payload != null && !payload.isEmpty()) {
+                        frameQueue.offer(payload);
                     }
                 });
     }

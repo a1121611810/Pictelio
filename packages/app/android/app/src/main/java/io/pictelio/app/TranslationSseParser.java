@@ -26,6 +26,47 @@ class TranslationSseParser {
 
     private int anchorIndex = 0;
     private final StringBuilder anchorCarry = new StringBuilder();
+    /**
+     * 段落文本累积（index → text）。
+     *
+     * <p>为什么累积而不是逐帧下发：lynx 的 NativeModule 回调在「一次流内连续 invoke 多帧」
+     * 时只投递其中一帧（模拟器实测：Java 入队 9 帧、JS store 只消费 1 帧；拉模式逐帧派发
+     * 同样如此）。改为一帧交付整章译文，绕过该限制 —— 代价是失去逐段增量，但保证译文能到。
+     */
+    private final java.util.TreeMap<Integer, StringBuilder> paragraphText = new java.util.TreeMap<>();
+
+    /** 若无终态事件即断流，也要把已累积的译文交付（DeepSeek 常见形态） */
+    void flushIfAny(Sink sink) {
+        if (!paragraphText.isEmpty()) {
+            emitConsolidated(sink);
+            paragraphText.clear();
+        }
+    }
+
+    /** 是否已产出过任何译文段 */
+    boolean hasText() {
+        return !paragraphText.isEmpty();
+    }
+
+    /**
+     * 把累积的段落译文作为**单帧**下发（一帧 = 一次回调 = 不会被桥丢弃）。
+     * 形态与逐帧 delta 同构：{@code {type:"delta", paragraphIndex:N, text:"..."}}，
+     * 只是每段只发一次、内容为该段全文。
+     */
+    void emitConsolidated(Sink sink) {
+        for (java.util.Map.Entry<Integer, StringBuilder> e : paragraphText.entrySet()) {
+            try {
+                JSONObject chunk = new JSONObject();
+                chunk.put("type", "delta");
+                chunk.put("paragraphIndex", String.valueOf(e.getKey()));
+                // 段落级裁剪：锚标记前的 "\n\n" 段落分隔空白不属于译文
+                chunk.put("text", e.getValue().toString().trim());
+                sink.emit(chunk.toString(), "");
+            } catch (Exception ignored) {
+                // JSONObject.put 对 String 不抛；防御性忽略
+            }
+        }
+    }
 
     /**
      * 处理单行 SSE。
@@ -65,11 +106,9 @@ class TranslationSseParser {
                         anchorCarry.append('[');
                         text = window.substring(0, window.length() - 1);
                     }
-                    JSONObject chunk = new JSONObject();
-                    chunk.put("type", "delta");
-                    chunk.put("paragraphIndex", String.valueOf(anchorIndex));
-                    chunk.put("text", text);
-                    sink.emit(chunk.toString(), "");
+                    paragraphText
+                            .computeIfAbsent(anchorIndex, k -> new StringBuilder())
+                            .append(text);
                     return null;
                 }
                 case "response.reasoning_text.delta": {
@@ -80,6 +119,7 @@ class TranslationSseParser {
                     return null;
                 }
                 case "response.completed": {
+                    emitConsolidated(sink);
                     JSONObject done = new JSONObject();
                     done.put("type", "done");
                     JSONObject resp = event.optJSONObject("response");

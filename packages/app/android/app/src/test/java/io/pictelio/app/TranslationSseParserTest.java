@@ -90,6 +90,8 @@ public class TranslationSseParserTest {
         // 模型按 [N] 前缀逐段输出（与 web 路径 input 形态同源）
         parser.accept(data("{\"type\":\"response.output_text.delta\",\"delta\":\"\\n\\n[0] \u4f60\u597d\"}"), sink);
         parser.accept(data("{\"type\":\"response.output_text.delta\",\"delta\":\"\\n\\n[1] \u4e16\u754c\"}"), sink);
+        // 累积式交付（避开 Lynx 桥丢帧）：解析期不发帧，收尾时按段一次性下发
+        parser.emitConsolidated(sink);
 
         assertEquals(2, sink.payloads.size());
         JSONObject first = new JSONObject(sink.payloads.get(0));
@@ -110,14 +112,15 @@ public class TranslationSseParserTest {
         parser.accept(data("{\"type\":\"response.output_text.delta\",\"delta\":\"\\n\\n[\"}"), sink);
         parser.accept(data("{\"type\":\"response.output_text.delta\",\"delta\":\"0] \u6587\u672c\"}"), sink);
 
-        assertEquals(2, sink.payloads.size());
+        parser.emitConsolidated(sink);
+        assertEquals(1, sink.payloads.size());
         // 第一帧只含段落分隔空白：**不得**把 "[" 吐给 UI（下一帧的 "0]" 才补齐标记）。
         // 空白本身由 store 在段落级裁剪（与 web 路径 alignParagraphs 同语义）。
-        String firstText = new JSONObject(sink.payloads.get(0)).getString("text");
-        assertFalse("锚标记的 '[' 不得进入译文", firstText.contains("["));
-        JSONObject second = new JSONObject(sink.payloads.get(1));
-        assertEquals("0", second.getString("paragraphIndex"));
-        assertEquals("\u6587\u672c", second.getString("text"));
+        JSONObject chunk = new JSONObject(sink.payloads.get(0));
+        assertFalse("锚标记的 bracket 不得进入译文", chunk.getString("text").contains("["));
+
+        assertEquals("0", chunk.getString("paragraphIndex"));
+        assertEquals("\u6587\u672c", chunk.getString("text"));
     }
 
     @Test
@@ -162,6 +165,7 @@ public class TranslationSseParserTest {
         assertNull(parser.accept(data("{not json"), sink));
         // 后续正常帧仍然处理
         parser.accept(data("{\"type\":\"response.output_text.delta\",\"delta\":\"[0] ok\"}"), sink);
+        parser.emitConsolidated(sink);
         assertEquals(1, sink.payloads.size());
         assertFalse(sink.payloads.get(0).isEmpty());
         assertNotNull(new JSONObject(sink.payloads.get(0)).getString("text"));
