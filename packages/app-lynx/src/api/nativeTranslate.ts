@@ -305,12 +305,16 @@ export function attachTranslateFrameListener(
     // 到达探针（ADR-0170「验证探针」）：Java 侧的发送计数不证明到达，交付归因以本行为准。
     // console.warn 落 logcat（tag lynx / lynx_console.cc），无 UI 信号也能判定事件是否到达。
     const probe = parsed as { type?: string; paragraphs?: unknown[]; streamId?: string } | null
-    console.warn(
-      "[nativeTranslate][probe] 事件到达 type=" +
-        String(probe?.type ?? "unparsed") +
-        (Array.isArray(probe?.paragraphs) ? " paragraphs=" + probe.paragraphs.length : "") +
-        (probe?.streamId != null ? " streamId=" + probe.streamId : ""),
-    )
+    // 探针只在原生运行时打印：jsdom 测试环境没有 lynx 全局，避免测试期大量 console 流量
+    // （vitest worker 关闭时 onUserConsoleLog 仍在队列 → EnvironmentTeardownError 假失败）。
+    if (typeof lynx !== "undefined") {
+      console.warn(
+        "[nativeTranslate][probe] 事件到达 type=" +
+          String(probe?.type ?? "unparsed") +
+          (Array.isArray(probe?.paragraphs) ? " paragraphs=" + probe.paragraphs.length : "") +
+          (probe?.streamId != null ? " streamId=" + probe.streamId : ""),
+      )
+    }
     // 归属过滤：陈旧流（页面切走 / 上一次翻译未结束）的帧不得写进当前翻译。
     // 以**原生回显的 streamId**（它实际使用的 _abortToken）为权威 —— JS 侧生成器与原生
     // 取值可能不同（实测出现过 JS 期望 …-1 / 原生 …-2），用 JS 值判定会误丢本流帧。
