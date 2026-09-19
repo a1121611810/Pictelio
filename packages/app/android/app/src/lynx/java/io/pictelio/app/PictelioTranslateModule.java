@@ -139,8 +139,6 @@ public class PictelioTranslateModule extends LynxModule {
             new ConcurrentHashMap<>();
     /** streamId → 终态（null = 进行中；"done" / 错误消息） */
     private static final Map<String, String> STREAM_TERMINAL = new ConcurrentHashMap<>();
-    /** streamId → 已交付（供 poll 判定是否要清理） */
-    private static final Map<String, Boolean> STREAM_DELIVERED = new ConcurrentHashMap<>();
 
     /** 待派发帧（worker 入队 / 主线程出队） */
     private final java.util.concurrent.ConcurrentLinkedQueue<String> frameQueue =
@@ -166,7 +164,9 @@ public class PictelioTranslateModule extends LynxModule {
      * <p>共享客户端（{@link PixivApiCore#getSharedClient()}）带 15s connect + 30s read +
      * 45s callTimeout —— 那是为一次性 JSON 请求调的；流式响应天然可能长时间只发 keepalive
      * 或 reasoning 帧，45s 上限会把正常长流掐断。这里保留 connect 超时（连接建立必须有界），
-     * read 放宽到 120s（帧间静默上限），callTimeout = 0（不限总时长，由 abortStream / 服务端收尾）。
+     * read = 45s（帧间静默上限；实现期由 120s 收紧 —— 超时即视为链路已断，
+     * 否则「连上但正文永不送达」会让 UI 永久停在「N% 翻译中」），callTimeout = 0（不限总时长，
+     * 由 abortStream / 服务端收尾）。
      */
     private static final OkHttpClient STREAM_CLIENT = PixivApiCore.getSharedClient()
             .newBuilder()
@@ -468,6 +468,10 @@ public class PictelioTranslateModule extends LynxModule {
         for (String key : new java.util.HashSet<>(STREAM_TERMINAL.keySet())) {
             if (!key.equals(keepStreamId)) STREAM_TERMINAL.remove(key);
         }
+        // seq 计数器也要清（否则每流遗留一个 AtomicInteger，无界累积）
+        for (String key : new java.util.HashSet<>(STREAM_SEQ.keySet())) {
+            if (!key.equals(keepStreamId)) STREAM_SEQ.remove(key);
+        }
     }
 
     private void failStream(String streamId, String message) {
@@ -569,7 +573,9 @@ public class PictelioTranslateModule extends LynxModule {
             java.util.concurrent.ConcurrentLinkedQueue<String> frames = STREAM_FRAMES.get(streamId);
             if (frames != null && !frames.isEmpty()) {
                 String frame = frames.poll();
-                callback.invoke(frame, "");
+                // 与总线路径**同一套**注入（复审实测：轮询帧此前不带 seq/streamId，
+                // 导致 JS 的 seq 去重对轮询帧永不生效 → 同帧两路交付时译文重复）
+                callback.invoke(withSeq(withStreamId(frame, streamId), streamId), "");
                 return;
             }
             if (terminal == null) {
@@ -581,12 +587,12 @@ public class PictelioTranslateModule extends LynxModule {
             if ("done".equals(terminal)) {
                 JSONObject done = new JSONObject();
                 done.put("type", "done");
-                callback.invoke(done.toString(), "");
+                callback.invoke(withSeq(withStreamId(done.toString(), streamId), streamId), "");
             } else {
                 JSONObject err = new JSONObject();
                 err.put("type", "error");
                 err.put("message", terminal);
-                callback.invoke(err.toString(), "");
+                callback.invoke(withSeq(withStreamId(err.toString(), streamId), streamId), "");
             }
             // 终态握手完成 → 释放该流的缓冲（发布侧保留缓冲正是为了让这一步能取回帧）。
             // 幂等：重复 poll 仍会得到同一终态（缓冲已删则 terminal 仍在，见上分支），

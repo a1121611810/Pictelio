@@ -560,9 +560,13 @@ export function nativeTranslateProvider(): TranslationProvider {
         void translatePoll(streamId)
           .then((frame) => {
             handle(frame)
-            if (!finished && !aborted) {
-              pollTimer = setTimeout(() => poll(streamId), POLL_MS)
+            // 轮询交付终态帧时也必须解绑（复审实测：此路径此前 listeners=1 永久泄漏；
+            // 全仓无人调用 provider.abort()，故不能指望它兜底）
+            if (finished || aborted) {
+              detachOnce()
+              return
             }
+            pollTimer = setTimeout(() => poll(streamId), POLL_MS)
           })
           .catch((err: unknown) => {
             if (aborted || signal.aborted) return

@@ -501,7 +501,7 @@ Java 解析器与 JS 适配器之间的帧信封是本功能的**跨端契约**�
 | `type` | `"error"` | 失败终态，`message` 为可读原因 |
 | `type` | `"pending"` | 仅轮询通道：暂无帧，继续轮询 |
 | `streamId` | `string` | 帧归属键 = 原生实际使用的 `_abortToken`（**两端同值**：transport 复用调用方 token，Java 回显）。接收侧据此丢弃非本流帧 —— 陈旧流不得写进当前翻译 |
-| `seq` | `number` | per-stream 单调序号（发布与轮询两路共用同一计数器）。交付走「事件总线 + 轮询兜底」两路，保留缓冲后同一帧可能被两路都取到，接收侧按 `(streamId, seq)` 去重，避免重复 append 出重复译文 |
+| `seq` | `number` | per-stream 单调序号。**两条交付路径都必须注入**（事件总线与 `translatePoll` 共用同一计数器）—— 只给一路注入会让去重单向失效（实测同帧两路交付 → 译文重复 2~3 次）。接收侧按 `(streamId, seq)` 去重 |
 
 事件名：`pictelioTranslateFrame`；载荷：**帧 JSON 字符串**（本仓库 `sendGlobalEvent` 字符串载荷可达性由本 ADR 的端到端验收确认；此前 README 记载的「字符串不可用」已按其「实测修正」条目更新）。JS 侧对非法载荷（类型不符 / 无法解析）**必须 warn 并丢弃**，禁止静默。
 

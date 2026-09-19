@@ -197,6 +197,54 @@ describe('attachTranslateFrameListener（事件总线交付通道）', () => {
     expect(emitter.count('pictelioTranslateFrame')).toBe(0)
   })
 
+  it('轮询交付终态帧后监听器为 0（复审实测此处曾永久泄漏）', async () => {
+    const emitter = installFakeLynx()
+    ;(globalThis as { NativeModules?: unknown }).NativeModules = {
+      PictelioTranslate: {
+        translateStream: () => Promise.resolve({ abort: () => Promise.resolve() }),
+        translatePoll: (_id: string, cb: (v: string | null, e: string | null) => void) =>
+          cb(JSON.stringify({ type: 'error', message: 'boom' }), ''),
+      },
+    }
+    const provider = nativeTranslateProvider()
+    await provider
+      .translate(
+        { novelId: 1, chapterId: 'c1', paragraphs: ['a'], options: { xRestrict: 0 } },
+        { baseURL: 'https://x', apiKey: '', model: 'm' },
+        new AbortController().signal,
+      )
+      .next()
+    expect(emitter.count('pictelioTranslateFrame')).toBe(0)
+  })
+
+  it('两路交付同一帧（同 seq）只产出一次 delta', async () => {
+    // 复审实测：轮询帧此前不带 seq，去重单向失效 → 同帧两路交付译文重复 2-3 次
+    const emitter = installFakeLynx()
+    ;(globalThis as { NativeModules?: unknown }).NativeModules = {
+      PictelioTranslate: {
+        translateStream: () => Promise.resolve({ abort: () => Promise.resolve() }),
+        // 轮询先交付 seq=0 的帧，随后事件总线再交付同一 seq
+        translatePoll: (_id: string, cb: (v: string | null, e: string | null) => void) =>
+          cb(JSON.stringify({ type: 'delta_all', paragraphs: [{ index: 0, text: '译文' }], seq: 0 }), ''),
+      },
+    }
+    const provider = nativeTranslateProvider()
+    const iter = provider.translate(
+      { novelId: 1, chapterId: 'c1', paragraphs: ['a'], options: { xRestrict: 0 } },
+      { baseURL: 'https://x', apiKey: '', model: 'm' },
+      new AbortController().signal,
+    )
+    await new Promise((r) => setTimeout(r, 5))
+    // 事件总线交付同一 seq（真实场景下 Java 两路共用计数器）
+    emitter.emit(
+      'pictelioTranslateFrame',
+      JSON.stringify({ type: 'delta_all', paragraphs: [{ index: 0, text: '译文' }], seq: 0 }),
+    )
+    const first = await iter.next()
+    expect(first.done).toBe(false)
+    expect((first.value as { type: string }).type).toBe('delta')
+  })
+
   it('provider.abort() 后监听器被解绑（不泄漏）', async () => {
     const emitter = installFakeLynx()
     ;(globalThis as { NativeModules?: unknown }).NativeModules = {
