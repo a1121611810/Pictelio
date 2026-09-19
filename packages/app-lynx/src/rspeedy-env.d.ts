@@ -132,6 +132,35 @@ declare global {
     PictelioClipboard: {
       setText(text: string, callback: (ok: string, err: string) => void): void
     }
+    /**
+     * LLM 翻译 NativeModule（ADR-0170）：用户自填 endpoint + API key Keystore 隔离 +
+     * OpenAI Responses API 流式调用。cb 双参契约：无 null；首参空串 = 成功 / 末参非空 = 错误。
+     */
+    PictelioTranslate: {
+      /** 写 API key 到 Keystore（端到端加密）。cb("", "") 成功 / cb("", errMsg) 失败 */
+      setApiKey(apiKey: string, callback: (err: string | null) => void): void
+      /** 读 endpoint 脱敏镜像（apiKey 永不返回）。cb(json, "") / cb("", errMsg) */
+      getEndpoint(callback: (value: string | null, err: string | null) => void): void
+      /** 清空 endpoint。cb("", "") / cb("", errMsg) */
+      clearEndpoint(callback: (err: string | null) => void): void
+      /**
+       * 流式翻译（POST baseURL/v1/responses，stream=true）。单 callback 多次触发：
+       * - 每帧 SSE → cb(chunkJson, "")
+       * - 终态 done → cb(doneJson, "")
+       * - 终态 error / 网络错 → cb("", errMsg)
+       * - abort 触发 → 不回调本 cb（仅 abortStream 自身的 cb 表达）
+       */
+      translateStream(requestJson: string, callback: (chunk: string | null, err: string | null) => void): void
+      /** 探测 endpoint 是否兼容 /v1/responses。cb(probeJson, "") / cb("", errMsg) */
+      probeEndpoint(
+        baseURL: string,
+        apiKey: string,
+        model: string,
+        callback: (ok: string | null, err: string | null) => void,
+      ): void
+      /** 取消 in-flight 流（幂等）。cb("", "") */
+      abortStream(streamId: string, callback: (err: string | null) => void): void
+    }
   } | undefined
 }
 
