@@ -1,0 +1,161 @@
+name: System bars acceptance
+
+# lynx 系统栏策略验收矩阵（spec docs/specs/lynx-systembars.md §6，票 #616/#594 §三 补做通道）。
+# 手动触发：本地网络到 dl.google.com 不可达时，用 GitHub runner（外网无障碍 + KVM 模拟器）
+# 跑 API 35/36 实证。断言式——任一断言失败 job 即红（不是纯记录器）。
+on:
+  workflow_dispatch:
+    inputs:
+      apiLevel:
+        description: "System image API level（35/36）"
+        required: true
+        default: "36"
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance:
+    name: lynx 系统栏验收（API ${{ inputs.apiLevel }} 模拟器）
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      # 与 ci.yml android-unit-test 同款前置（gradle 配置依赖 gitignored 生成物）
+      - name: Generate credentials config
+        run: pnpm --dir packages/app run sync:credentials
+
+      - name: Build web assets
+        run: pnpm --dir packages/app run build
+
+      - name: Capacitor sync
+        run: pnpm --dir packages/app run cap:sync
+
+      # lynx 客户端本体：rspeedy bundle → android assets（LynxActivity 加载的就是它）
+      - name: Build lynx bundle
+        run: pnpm build:app-lynx
+
+      - name: Sync lynx bundle to android assets
+        run: pnpm sync:app-lynx-bundle
+
+      - name: Build full debug APK
+        working-directory: packages/app/android
+        run: GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew assembleFullDebug --no-daemon
+
+      - name: Install emulator image
+        run: |
+          set -e
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | $SDKMANAGER --sdk_root="$ANDROID_HOME" --licenses >/dev/null || true
+          yes | $SDKMANAGER --sdk_root="$ANDROID_HOME" "platform-tools" "emulator" \
+            "system-images;android-${{ inputs.apiLevel }};google_apis;x86_64" | tail -2
+
+      - name: Create AVD
+        run: |
+          set -e
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd \
+            -n sysbars -k "system-images;android-${{ inputs.apiLevel }};google_apis;x86_64" \
+            -d pixel_4 --force
+
+      - name: Boot emulator
+        run: |
+          set -e
+          test -w /dev/kvm && echo "KVM available"
+          "$ANDROID_HOME/emulator/emulator" -avd sysbars -no-window -no-audio \
+            -gpu swiftshader_indirect -no-boot-anim -no-snapshot-save \
+            > /tmp/emulator.log 2>&1 &
+          export PATH="$ANDROID_HOME/platform-tools:$PATH"
+          for i in $(seq 1 90); do
+            BOOT=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)
+            if [ "$BOOT" = "1" ]; then echo "BOOTED (${i}0s)"; exit 0; fi
+            sleep 10
+          done
+          echo "boot timeout"; tail -20 /tmp/emulator.log; exit 1
+
+      - name: Acceptance matrix (assertive)
+        working-directory: packages/app/android/app/build/outputs/apk/full/debug
+        run: |
+          set -euo pipefail
+          export PATH="$ANDROID_HOME/platform-tools:$PATH"
+          LOG=/tmp/acceptance.log
+          PKG=io.pictelio.app
+          : > "$LOG"
+          say() { echo "$1" | tee -a "$LOG"; }
+          pull_shot() { adb exec-out screencap -p > "/tmp/$1"; }
+
+          adb wait-for-device
+          adb install -r -d app-full-debug.apk | tee -a "$LOG"
+          adb shell am start -n $PKG/.MainActivity | tee -a "$LOG"
+          sleep 20
+
+          say "=== A1/A2: e2e 基底 ==="
+          DISPLAY_SIZE=$(adb shell wm size | grep -oE '[0-9]+x[0-9]+')
+          say "display: $DISPLAY_SIZE"
+          LYNX=$(adb shell "dumpsys activity top | grep 'LynxView{' | head -1")
+          say "lynxview: $LYNX"
+          EXPECT="0,0-$DISPLAY_SIZE"
+          echo "$LYNX" | grep -q "$EXPECT" || { say "A1 FAIL: LynxView != 全屏 $EXPECT"; exit 1; }
+          say "A1 PASS: LynxView 铺满全屏（$EXPECT）"
+          adb shell "dumpsys window | grep -E 'type=(status|navigation)Bars' | grep frame" | tee -a "$LOG"
+          pull_shot shot1-e2e-home.png
+          say "A2 PASS: 系统栏 inset 源可见（截图 shot1）"
+
+          say "=== A3: 全屏冷启动（settings_fullscreen_mode=true）==="
+          adb shell "run-as $PKG sh -c 'sed \"s|</map>|    <string name=\\\"settings_fullscreen_mode\\\">true</string>\\n</map>|\" shared_prefs/CapacitorStorage.xml > /tmp/c.xml && cat /tmp/c.xml > shared_prefs/CapacitorStorage.xml'"
+          adb shell "am force-stop $PKG; am start -n $PKG/.MainActivity" >/dev/null
+          sleep 15
+          HIDDEN=$(adb shell "dumpsys window | grep -E 'type=(status|navigation)Bars' | grep frame" | grep -c "visible=false" || true)
+          [ "$HIDDEN" = "2" ] || { say "A3 FAIL: 全屏冷启动后系统栏未隐藏（visible=false 计数=$HIDDEN）"; exit 1; }
+          say "A3 PASS: 双系统栏 visible=false"
+          pull_shot shot2-fullscreen.png
+
+          say "=== A4: transient 唤出 ==="
+          adb shell "input swipe 540 5 540 400 300" >/dev/null
+          sleep 1
+          SHOWN=$(adb shell "dumpsys window | grep 'type=statusBars' | grep frame" | grep -c "visible=true" || true)
+          [ "$SHOWN" = "1" ] || { say "A4 FAIL: 边缘滑动未唤出系统栏"; exit 1; }
+          say "A4a PASS: 唤出 visible=true"
+          sleep 3
+          AUTOHIDE=$(adb shell "dumpsys window | grep 'type=statusBars' | grep frame" | grep -c "visible=false" || true)
+          [ "$AUTOHIDE" = "1" ] || { say "A4 FAIL: 唤出后未自动隐藏"; exit 1; }
+          say "A4b PASS: ~3s 自动隐藏 visible=false"
+
+          say "=== A5: 关闭恢复 ==="
+          adb shell "run-as $PKG sh -c 'sed \"s|<string name=\\\"settings_fullscreen_mode\\\">true</string>|<string name=\\\"settings_fullscreen_mode\\\">false</string>|\" shared_prefs/CapacitorStorage.xml > /tmp/c.xml && cat /tmp/c.xml > shared_prefs/CapacitorStorage.xml'"
+          adb shell "am force-stop $PKG; am start -n $PKG/.MainActivity" >/dev/null
+          sleep 15
+          BACK=$(adb shell "dumpsys window | grep -E 'type=(status|navigation)Bars' | grep frame" | grep -c "visible=true" || true)
+          [ "$BACK" = "2" ] || { say "A5 FAIL: 恢复后系统栏未显示（visible=true 计数=$BACK）"; exit 1; }
+          say "A5 PASS: 双系统栏 visible=true 恢复"
+
+          say "=== ALL PASS ==="
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sysbars-acceptance-api${{ inputs.apiLevel }}
+          path: |
+            /tmp/acceptance.log
+            /tmp/shot*.png
+          if-no-files-found: warn
