@@ -797,7 +797,9 @@ function classifyProvider(
     let deltaFrames = 0
     let lastErrorCode: string | null = null
     let lastErrorMessage = ""
-    const result = await translator.translate(request, config, signal, (chunk: TranslationChunk) => {
+    let result: Awaited<ReturnType<typeof translator.translate>>
+    try {
+      result = await translator.translate(request, config, signal, (chunk: TranslationChunk) => {
       if (chunk.type === "delta") {
         deltaFrames += 1
         progress.value = {
@@ -819,7 +821,19 @@ function classifyProvider(
           lastErrorMessage = chunk.message
         }
       }
-    })
+      })
+    } catch (err) {
+      // 传输/管道整体失败（如原生 reject）：**必须收敛到终态** —— 真机曾出现
+      // 「所有块都失败但 status 永远停在 translating」的静默挂起（集成测试复现）。
+      console.warn("[novelTranslateStore] translate pipeline threw", err)
+      if (gen !== genNow) return
+      status.value = "failed"
+      error.value = {
+        code: lastErrorCode ?? "unknown",
+        message: lastErrorMessage || (err instanceof Error ? err.message : String(err)),
+      }
+      return
+    }
 
     if (gen !== genNow) return
     if (signal.aborted) {
