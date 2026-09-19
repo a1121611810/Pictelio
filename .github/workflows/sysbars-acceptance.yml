@@ -68,7 +68,9 @@ jobs:
           set -euo pipefail
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           yes | $SDKMANAGER --sdk_root="$ANDROID_HOME" --licenses >/dev/null || true
-          yes | $SDKMANAGER --sdk_root="$ANDROID_HOME" "platform-tools" "emulator" \
+          # 不用 yes| 安装：许可证已预接受不会交互式询问；yes 管道在 sdkmanager
+          # 提前关闭 stdin 时 Broken pipe，pipefail 会把「已装成功」误判为失败（实测踩过）
+          $SDKMANAGER --sdk_root="$ANDROID_HOME" "platform-tools" "emulator" \
             "system-images;android-${{ inputs.apiLevel }};google_apis;x86_64"
 
       # AVD 创建与启动同步骤（跨步骤状态曾出现「✓ 创建成功但 emulator 找不到 AVD」——
