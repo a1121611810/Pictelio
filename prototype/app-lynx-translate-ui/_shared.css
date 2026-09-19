@@ -1,0 +1,522 @@
+/* ─── Shared M3 tokens & phone frame (prototype only) ───
+ * 摘录自 packages/app-lynx/src/styles/tokens.css（M3 Sky 主题）；
+ * 原型为静态 HTML 演示，把 vw/rpx 替换为 rem（phone-frame 固定 375px 宽），
+ * 便于桌面浏览器直接预览。等比放大 1vw = 0.16rem（375px 设计稿 × 16 = 6000，等价 1vw = 6000/100 = 60 倍 = 0.267vw @375）。
+ * 简化方案：直接用 px 设计稿值除以 16（1rem=16px），不精确但视觉等价。
+ */
+
+:root {
+  /* ── M3 核心色（Sky #1a6fa8） ── */
+  --md-primary: #1a6fa8;
+  --md-on-primary: #ffffff;
+  --md-primary-container: #cfe5ff;
+  --md-on-primary-container: #001d33;
+  --md-secondary: #50606e;
+  --md-on-secondary: #ffffff;
+  --md-secondary-container: #d3e5f5;
+  --md-on-secondary-container: #0c1d29;
+  --md-tertiary: #3b6470;
+  --md-on-tertiary: #ffffff;
+  --md-tertiary-container: #bee9f8;
+  --md-on-tertiary-container: #001f28;
+  --md-error: #b3261e;
+  --md-on-error: #ffffff;
+  --md-error-container: #f9dedc;
+  --md-on-error-container: #410e0b;
+
+  /* ── M3 表面 / 容器 ── */
+  --md-surface: #f8faff;
+  --md-on-surface: #191c20;
+  --md-surface-variant: #dde3ea;
+  --md-on-surface-variant: #41474e;
+  --md-outline: #71787e;
+  --md-outline-variant: #c1c7ce;
+  --md-scrim: rgba(0, 0, 0, 0.5);
+  --md-surface-container-lowest: #ffffff;
+  --md-surface-container-low: #f2f4fa;
+  --md-surface-container: #eceef4;
+  --md-surface-container-high: #e6e8ee;
+  --md-surface-container-highest: #e1e3e9;
+  --md-inverse-surface: #2e3136;
+  --md-inverse-on-surface: #eff1f7;
+
+  /* ── M3 状态层 ── */
+  --md-state-layer-pressed-primary: rgba(26, 111, 168, 0.12);
+  --md-state-layer-pressed-on-surface: rgba(25, 28, 32, 0.12);
+  --md-state-disabled-container: rgba(25, 28, 32, 0.12);
+  --md-state-disabled-on-surface: rgba(25, 28, 32, 0.38);
+
+  /* ── M3 形状（dp → rem，375 设计稿：4dp = 0.25rem，8dp = 0.5rem，…） ── */
+  --md-shape-extra-small: 0.25rem;
+  --md-shape-small: 0.5rem;
+  --md-shape-medium: 0.75rem;
+  --md-shape-large: 1rem;
+  --md-shape-extra-large: 1.75rem;
+  --md-shape-full: 9999px;
+
+  /* ── M3 elevation ── */
+  --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
+  --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
+  --md-elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
+
+  /* ── M3 动效 ── */
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-gentle: 300ms;
+  --motion-standard: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* ── 全局 reset ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+}
+
+body {
+  font-family: -apple-system, "PingFang SC", "Noto Sans SC", "Microsoft YaHei",
+    BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #1a1d23;
+  color: var(--md-on-surface);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── 导航头 ── */
+.proto-header {
+  padding: 1.5rem 2rem;
+  background: var(--md-surface-container-lowest);
+  border-bottom: 1px solid var(--md-outline-variant);
+  color: var(--md-on-surface);
+}
+.proto-header__eyebrow {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--md-primary);
+  font-weight: 500;
+}
+.proto-header__title {
+  font-size: 1.5rem;
+  font-weight: 500;
+  margin: 0.25rem 0 0.5rem;
+  color: var(--md-on-surface);
+}
+.proto-header__desc {
+  color: var(--md-on-surface-variant);
+  font-size: 0.875rem;
+  max-width: 56rem;
+}
+.proto-header__meta {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--md-on-surface-variant);
+}
+.proto-header__meta strong {
+  color: var(--md-on-surface);
+  font-weight: 500;
+}
+.proto-header__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--md-primary);
+  text-decoration: none;
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  margin-left: -0.5rem;
+  border-radius: var(--md-shape-full);
+  transition: background var(--duration-fast) var(--motion-standard);
+}
+.proto-header__back:hover {
+  background: var(--md-state-layer-pressed-primary);
+}
+
+/* ── 原型主体容器 ── */
+.proto-stage {
+  padding: 2rem;
+  min-height: calc(100vh - 8rem);
+}
+.proto-section {
+  margin-bottom: 3rem;
+}
+.proto-section__heading {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  color: var(--md-on-surface);
+}
+.proto-section__heading h2 {
+  font-size: 1.125rem;
+  font-weight: 500;
+}
+.proto-section__heading .badge {
+  font-size: 0.75rem;
+  background: var(--md-tertiary-container);
+  color: var(--md-on-tertiary-container);
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--md-shape-full);
+  font-weight: 500;
+}
+.proto-section__lead {
+  font-size: 0.875rem;
+  color: var(--md-on-surface-variant);
+  max-width: 60rem;
+  margin-bottom: 1.5rem;
+}
+
+/* ── 三栏对比 ── */
+.proto-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 2rem;
+  max-width: 90rem;
+}
+
+/* ── 手机框（375 × 800 模拟 Lynx 屏幕） ── */
+.phone-frame {
+  width: 360px;
+  background: var(--md-surface);
+  border-radius: 2rem;
+  padding: 0.75rem;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  margin: 0 auto;
+}
+.phone-frame__variant {
+  font-size: 0.75rem;
+  color: var(--md-on-surface-variant);
+  text-align: center;
+  margin-top: 1rem;
+  letter-spacing: 0.05em;
+}
+.phone-frame__variant strong {
+  color: var(--md-on-surface);
+  display: block;
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+}
+.phone-screen {
+  background: var(--md-surface);
+  border-radius: 1.5rem;
+  overflow: hidden;
+  position: relative;
+  min-height: 720px;
+  display: flex;
+  flex-direction: column;
+}
+.phone-statusbar {
+  height: 1.5rem;
+  background: var(--md-surface-container-low);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  font-size: 0.6875rem;
+  color: var(--md-on-surface);
+  font-weight: 500;
+}
+.phone-statusbar__icons {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+.phone-statusbar__icons span {
+  font-size: 0.625rem;
+}
+
+/* ── M3 通用原语（被各原型复用） ── */
+
+/* Filled button */
+.m3-btn-filled {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0 1.5rem;
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  border: none;
+  border-radius: var(--md-shape-full);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  gap: 0.5rem;
+  transition: background var(--duration-fast) var(--motion-standard),
+              box-shadow var(--duration-fast) var(--motion-standard);
+}
+.m3-btn-filled:hover {
+  box-shadow: var(--md-elevation-1);
+}
+.m3-btn-filled:active {
+  background: var(--md-state-pressed-primary);
+}
+.m3-btn-filled:disabled {
+  background: var(--md-state-disabled-container);
+  color: var(--md-state-disabled-on-surface);
+  cursor: not-allowed;
+}
+
+/* Tonal button */
+.m3-btn-tonal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0 1.5rem;
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+  border: none;
+  border-radius: var(--md-shape-full);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  gap: 0.5rem;
+  transition: background var(--duration-fast) var(--motion-standard);
+}
+.m3-btn-tonal:hover {
+  box-shadow: var(--md-elevation-1);
+}
+.m3-btn-tonal:active {
+  background: var(--md-state-layer-pressed-primary);
+}
+
+/* Outlined button */
+.m3-btn-outlined {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0 1.5rem;
+  background: transparent;
+  color: var(--md-primary);
+  border: 1px solid var(--md-outline);
+  border-radius: var(--md-shape-full);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  gap: 0.5rem;
+  transition: background var(--duration-fast) var(--motion-standard);
+}
+.m3-btn-outlined:hover {
+  background: var(--md-state-layer-pressed-primary);
+}
+
+/* Text button */
+.m3-btn-text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0 0.75rem;
+  background: transparent;
+  color: var(--md-primary);
+  border: none;
+  border-radius: var(--md-shape-full);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  gap: 0.5rem;
+  transition: background var(--duration-fast) var(--motion-standard);
+}
+.m3-btn-text:hover {
+  background: var(--md-state-layer-pressed-primary);
+}
+
+/* Tonal chip / status badge */
+.m3-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--md-shape-small);
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+  border: 1px solid transparent;
+}
+.m3-chip--success {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+}
+.m3-chip--warning {
+  background: var(--md-tertiary-container);
+  color: var(--md-on-tertiary-container);
+}
+.m3-chip--error {
+  background: var(--md-error-container);
+  color: var(--md-on-error-container);
+}
+
+/* Text field (outlined) */
+.m3-field {
+  position: relative;
+  display: block;
+}
+.m3-field__input {
+  width: 100%;
+  min-height: 3.5rem;
+  padding: 1rem 1rem 0.5rem;
+  background: transparent;
+  border: 1px solid var(--md-outline);
+  border-radius: var(--md-shape-extra-small);
+  font-size: 0.875rem;
+  color: var(--md-on-surface);
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--duration-fast) var(--motion-standard);
+}
+.m3-field__input:focus {
+  border-color: var(--md-primary);
+  border-width: 2px;
+  padding: calc(1rem - 1px) calc(1rem - 1px) calc(0.5rem - 1px);
+}
+.m3-field__label {
+  position: absolute;
+  left: 1rem;
+  top: 0.875rem;
+  font-size: 0.875rem;
+  color: var(--md-on-surface-variant);
+  pointer-events: none;
+  background: transparent;
+  padding: 0 0.25rem;
+  transition: all var(--duration-fast) var(--motion-standard);
+}
+.m3-field__input:focus + .m3-field__label,
+.m3-field__input:not(:placeholder-shown) + .m3-field__label {
+  top: -0.5rem;
+  font-size: 0.75rem;
+  color: var(--md-primary);
+  background: var(--md-surface);
+}
+.m3-field__hint {
+  font-size: 0.75rem;
+  color: var(--md-on-surface-variant);
+  margin-top: 0.25rem;
+  padding-left: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+/* Divider */
+.m3-divider {
+  height: 1px;
+  background: var(--md-outline-variant);
+  margin: 0.75rem 0;
+}
+
+/* Screen header */
+.screen-header {
+  display: flex;
+  align-items: center;
+  height: 3.5rem;
+  padding: 0 1rem;
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+}
+.screen-header__title {
+  font-size: 1.375rem;
+  font-weight: 500;
+  flex: 1;
+}
+
+/* App bar（详情页样式） */
+.app-bar {
+  display: flex;
+  align-items: center;
+  height: 3.5rem;
+  padding: 0 0.5rem;
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+}
+.app-bar__icon-btn {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--md-shape-full);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--md-on-surface);
+  font-size: 1.25rem;
+  transition: background var(--duration-fast) var(--motion-standard);
+}
+.app-bar__icon-btn:hover {
+  background: var(--md-state-layer-pressed-on-surface);
+}
+.app-bar__title {
+  flex: 1;
+  font-size: 1.125rem;
+  font-weight: 500;
+  padding-left: 0.5rem;
+}
+
+/* Section label */
+.section-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--md-on-surface-variant);
+  padding: 1rem 1rem 0.5rem;
+}
+
+/* 注释 / 设计要点卡片 */
+.proto-notes {
+  background: var(--md-tertiary-container);
+  color: var(--md-on-tertiary-container);
+  border-radius: var(--md-shape-medium);
+  padding: 1rem 1.25rem;
+  font-size: 0.8125rem;
+  max-width: 60rem;
+  margin-top: 1.5rem;
+  line-height: 1.6;
+}
+.proto-notes strong {
+  font-weight: 600;
+}
+.proto-notes ul {
+  margin-top: 0.5rem;
+  padding-left: 1.25rem;
+}
+.proto-notes li {
+  margin-bottom: 0.25rem;
+}
+
+/* Footer note */
+.proto-footer {
+  text-align: center;
+  padding: 2rem;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  background: #1a1d23;
+}
+
+/* Comparison row: 3 phones side-by-side */
+.compare-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+@media (max-width: 1200px) {
+  .compare-grid {
+    grid-template-columns: 1fr;
+  }
+}

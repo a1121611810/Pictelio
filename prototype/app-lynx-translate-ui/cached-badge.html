@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>#5 缓存命中标识 · app-lynx 翻译面板原型</title>
+  <link rel="stylesheet" href="_shared.css">
+  <style>
+    .detail-header {
+      background: var(--md-surface);
+      padding: 0.75rem 1rem 1rem;
+    }
+    .detail-header__title {
+      font-size: 1.25rem;
+      font-weight: 500;
+      color: var(--md-on-surface);
+    }
+    .detail-header__meta {
+      font-size: 0.75rem;
+      color: var(--md-on-surface-variant);
+      margin-top: 0.25rem;
+    }
+
+    .detail-body {
+      flex: 1;
+      overflow-y: auto;
+      background: var(--md-surface);
+    }
+
+    /* segmented 控件（精简版） */
+    .segmented {
+      display: inline-flex;
+      background: var(--md-surface-container);
+      border-radius: var(--md-shape-full);
+      padding: 0.25rem;
+      gap: 0;
+    }
+    .segmented__btn {
+      padding: 0.5rem 1.25rem;
+      border-radius: var(--md-shape-full);
+      font-size: 0.8125rem;
+      font-weight: 500;
+      background: transparent;
+      color: var(--md-on-surface);
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      min-width: 4.5rem;
+      transition: background var(--duration-fast) var(--motion-standard),
+                  box-shadow var(--duration-fast) var(--motion-standard);
+    }
+    .segmented__btn.is-active {
+      background: var(--md-secondary-container);
+      color: var(--md-on-secondary-container);
+      box-shadow: var(--md-elevation-1);
+    }
+    .segmented__btn:not(.is-active):hover {
+      background: var(--md-state-layer-pressed-on-surface);
+    }
+    .row-spacer { flex: 1; }
+
+    /* 变体 1: segmented 右侧 */
+    .segmented-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      background: var(--md-surface);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    /* 变体 2: 独立一行 */
+    .separate-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--md-surface-container-low);
+      border-bottom: 1px solid var(--md-outline-variant);
+      font-size: 0.75rem;
+      color: var(--md-on-surface-variant);
+    }
+    .separate-row__cached {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      background: var(--md-primary-container);
+      color: var(--md-on-primary-container);
+      padding: 0.125rem 0.5rem;
+      border-radius: var(--md-shape-full);
+      font-weight: 500;
+    }
+
+    /* 变体 3: 浮层 chip */
+    .floating-chip {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.25rem 0.625rem;
+      background: var(--md-primary);
+      color: var(--md-on-primary);
+      border-radius: var(--md-shape-small);
+      font-size: 0.6875rem;
+      font-weight: 500;
+      box-shadow: var(--md-elevation-2);
+      z-index: 15;
+    }
+
+    /* 正文区 */
+    .content-area {
+      padding: 1rem 1.25rem;
+      font-size: 0.875rem;
+      line-height: 1.75;
+      color: var(--md-on-surface);
+    }
+    .content-area p {
+      margin-bottom: 0.75rem;
+    }
+    .content-area__translation {
+      background: var(--md-tertiary-container);
+      padding: 0.5rem 0.75rem;
+      border-radius: var(--md-shape-small);
+      margin-bottom: 0.75rem;
+      color: var(--md-on-tertiary-container);
+    }
+
+    /* cached chip 通用 */
+    .cached-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.25rem 0.625rem;
+      background: var(--md-primary-container);
+      color: var(--md-on-primary-container);
+      border-radius: var(--md-shape-small);
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <header class="proto-header">
+    <a class="proto-header__back" href="index.html">← 返回 hub</a>
+    <div class="proto-header__eyebrow">原型 #5 / 5 · 缓存命中标识</div>
+    <h1 class="proto-header__title">已缓存 ✓ 标识</h1>
+    <p class="proto-header__desc">
+      spec §6.3 + §6.5：标识显示在 segmented button 右侧。
+      对比三种位置：「segmented 右侧」/「独立一行」/「浮层 chip」。
+      注意：标识仅在 <code>status === 'completed'</code> 且 <code>fromCache === true</code> 时显示。
+    </p>
+  </header>
+
+  <main class="proto-stage">
+    <section class="proto-section">
+      <div class="proto-section__heading">
+        <h2>三位置对比（已译 + 命中缓存）</h2>
+        <span class="badge">3 placements</span>
+      </div>
+      <p class="proto-section__lead">
+        所有手机显示译文态正文；右上角 sticky 行不同方式呈现「✓ 已缓存」标识。
+      </p>
+
+      <div class="compare-grid">
+
+        <!-- Phone 1: segmented 右侧 (chosen) -->
+        <div>
+          <div class="phone-frame">
+            <div class="phone-screen">
+              <div class="phone-statusbar">
+                <span>20:31</span>
+                <div class="phone-statusbar__icons">
+                  <span>5G</span><span>100%</span>
+                </div>
+              </div>
+              <div class="app-bar">
+                <button class="app-bar__icon-btn">←</button>
+                <span class="app-bar__title">小说标题</span>
+                <button class="app-bar__icon-btn">⌕</button>
+                <button class="app-bar__icon-btn">⚙</button>
+              </div>
+
+              <div class="detail-header">
+                <div class="detail-header__title">深夜的便利商店</div>
+                <div class="detail-header__meta">作者名 · 12,345 字 · 248 评论</div>
+              </div>
+
+              <div class="detail-body">
+                <div class="segmented-row">
+                  <div class="segmented">
+                    <button class="segmented__btn">原文</button>
+                    <button class="segmented__btn is-active">译文</button>
+                  </div>
+                  <span class="row-spacer"></span>
+                  <span class="cached-chip">
+                    ✓ 已缓存
+                  </span>
+                </div>
+
+                <div class="content-area">
+                  <p class="content-area__translation">
+                    那是一个飘着细雨的夜晚。便利商店的自动门发出轻微的嗡嗡声，又一位顾客走了进来。
+                  </p>
+                  <p class="content-area__translation">
+                    我抬起头，习惯性地说出「欢迎光临」。但进来的那个人没有看商品架，而是径直走向柜台。
+                  </p>
+                  <p class="content-area__translation">
+                    她看上去二十岁出头，穿着一件淋湿的米色风衣，长发贴在脸颊上，眼神却异常平静。
+                  </p>
+                  <p class="content-area__translation">
+                    「我在找一个东西，」她开口说，声音很轻，「一个很小的东西。」
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="phone-frame__variant">
+            <strong>① Segmented 右侧 · CHOSEN</strong>
+            与 segmented 同 sticky 行；primary-container chip；不抢 segmented 焦点<br>
+            <span style="color: var(--md-primary);">→ 决策：长按 segmented 区域可触发「重译」（避免误触）</span>
+          </div>
+        </div>
+
+        <!-- Phone 2: 独立一行 -->
+        <div>
+          <div class="phone-frame">
+            <div class="phone-screen">
+              <div class="phone-statusbar">
+                <span>20:31</span>
+                <div class="phone-statusbar__icons">
+                  <span>5G</span><span>100%</span>
+                </div>
+              </div>
+              <div class="app-bar">
+                <button class="app-bar__icon-btn">←</button>
+                <span class="app-bar__title">小说标题</span>
+                <button class="app-bar__icon-btn">⌕</button>
+                <button class="app-bar__icon-btn">⚙</button>
+              </div>
+
+              <div class="detail-header">
+                <div class="detail-header__title">深夜的便利商店</div>
+                <div class="detail-header__meta">作者名 · 12,345 字 · 248 评论</div>
+              </div>
+
+              <div class="detail-body">
+                <div class="separate-row">
+                  <div class="segmented">
+                    <button class="segmented__btn">原文</button>
+                    <button class="segmented__btn is-active">译文</button>
+                  </div>
+                </div>
+                <div class="separate-row" style="border-bottom: 1px solid var(--md-outline-variant);">
+                  <span class="separate-row__cached">
+                    ✓ 已缓存
+                  </span>
+                  <span>·</span>
+                  <span>上次更新 2 小时前</span>
+                </div>
+
+                <div class="content-area">
+                  <p class="content-area__translation">
+                    那是一个飘着细雨的夜晚。便利商店的自动门发出轻微的嗡嗡声，又一位顾客走了进来。
+                  </p>
+                  <p class="content-area__translation">
+                    我抬起头，习惯性地说出「欢迎光临」。但进来的那个人没有看商品架，而是径直走向柜台。
+                  </p>
+                  <p class="content-area__translation">
+                    她看上去二十岁出头，穿着一件淋湿的米色风衣，长发贴在脸颊上，眼神却异常平静。
+                  </p>
+                  <p class="content-area__translation">
+                    「我在找一个东西，」她开口说，声音很轻，「一个很小的东西。」
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="phone-frame__variant">
+            <strong>② 独立一行</strong>
+            占用一行高度（~2rem）；可承载「缓存时间」等扩展元数据<br>
+            <span style="color: var(--md-on-surface-variant);">↳ 缺点：占用首屏空间；与 segmented 分两行视觉割裂</span>
+          </div>
+        </div>
+
+        <!-- Phone 3: 浮层 chip -->
+        <div>
+          <div class="phone-frame">
+            <div class="phone-screen">
+              <div class="phone-statusbar">
+                <span>20:31</span>
+                <div class="phone-statusbar__icons">
+                  <span>5G</span><span>100%</span>
+                </div>
+              </div>
+              <div class="app-bar">
+                <button class="app-bar__icon-btn">←</button>
+                <span class="app-bar__title">小说标题</span>
+                <button class="app-bar__icon-btn">⌕</button>
+                <button class="app-bar__icon-btn">⚙</button>
+              </div>
+
+              <div class="detail-header">
+                <div class="detail-header__title">深夜的便利商店</div>
+                <div class="detail-header__meta">作者名 · 12,345 字 · 248 评论</div>
+              </div>
+
+              <div class="detail-body" style="position: relative;">
+                <div class="segmented-row">
+                  <div class="segmented">
+                    <button class="segmented__btn">原文</button>
+                    <button class="segmented__btn is-active">译文</button>
+                  </div>
+                </div>
+
+                <div class="floating-chip">
+                  ✓ 已缓存
+                </div>
+
+                <div class="content-area">
+                  <p class="content-area__translation">
+                    那是一个飘着细雨的夜晚。便利商店的自动门发出轻微的嗡嗡声，又一位顾客走了进来。
+                  </p>
+                  <p class="content-area__translation">
+                    我抬起头，习惯性地说出「欢迎光临」。但进来的那个人没有看商品架，而是径直走向柜台。
+                  </p>
+                  <p class="content-area__translation">
+                    她看上去二十岁出头，穿着一件淋湿的米色风衣，长发贴在脸颊上，眼神却异常平静。
+                  </p>
+                  <p class="content-area__translation">
+                    「我在找一个东西，」她开口说，声音很轻，「一个很小的东西。」
+                  </p>
+                  <p class="content-area__translation">
+                    我把目光从收银机上移开，第一次认真打量她的脸。
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="phone-frame__variant">
+            <strong>③ 浮层 chip（top-right）</strong>
+            primary 色 chip + elevation 阴影；不参与 sticky 行布局<br>
+            <span style="color: var(--md-on-surface-variant);">↳ 缺点：与 segmented 视觉竞争；与 app-bar 距离过近易误读</span>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="proto-notes">
+        <strong>设计要点（spec §6.3 + §6.5 + Q20 收敛）</strong>
+        <ul>
+          <li><b>segmented 右侧：</b>M3 tonal chip（primary-container 底）；长按 segmented 区域可触发「重译」快捷入口，避免误触。</li>
+          <li><b>显示时机：</b>仅在 <code>status === 'completed'</code> 且 <code>fromCache === true</code> 时显示；本次新译完成的瞬间不显示「已缓存」（缓存写入 done 包内部）。</li>
+          <li><b>独立一行：</b>可承载「上次更新 2 小时前」等扩展信息；缺点 = 多占首屏空间 + 与 segmented 割裂。</li>
+          <li><b>浮层 chip：</b>视觉最显眼，但与 segmented 形成双焦点；与 app-bar 距离近易误读为「导航状态」。</li>
+          <li><b>未配置时的 fallback：</b>当 LLM endpoint 未配置时，segmented 控件显示但 disabled；不显示「已缓存」标识。</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="proto-footer">
+    <a href="index.html" style="color: rgba(255,255,255,0.7);">← 返回 hub</a>
+    ·
+    <a href="endpoint-form.html" style="color: rgba(255,255,255,0.7);">↺ 回到第一张原型</a>
+  </footer>
+</body>
+</html>

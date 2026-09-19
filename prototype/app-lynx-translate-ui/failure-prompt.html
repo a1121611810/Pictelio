@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>#4 失败提示 · app-lynx 翻译面板原型</title>
+  <link rel="stylesheet" href="_shared.css">
+  <style>
+    /* 详情页 header（精简版） */
+    .detail-header {
+      background: var(--md-surface);
+      padding: 0.75rem 1rem 1rem;
+    }
+    .detail-header__title {
+      font-size: 1.25rem;
+      font-weight: 500;
+      color: var(--md-on-surface);
+    }
+    .detail-header__meta {
+      font-size: 0.75rem;
+      color: var(--md-on-surface-variant);
+      margin-top: 0.25rem;
+    }
+
+    .detail-body {
+      flex: 1;
+      overflow-y: auto;
+      background: var(--md-surface);
+    }
+
+    /* 正文样式 */
+    .content-area {
+      padding: 1rem 1.25rem;
+      font-size: 0.875rem;
+      line-height: 1.75;
+      color: var(--md-on-surface);
+    }
+    .content-area p {
+      margin-bottom: 0.75rem;
+    }
+
+    /* 变体 1: inline retry bar */
+    .inline-retry {
+      background: var(--md-error-container);
+      color: var(--md-on-error-container);
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .inline-retry__head {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 500;
+      font-size: 0.875rem;
+    }
+    .inline-retry__icon {
+      font-size: 1.125rem;
+    }
+    .inline-retry__detail {
+      font-size: 0.75rem;
+      line-height: 1.5;
+      opacity: 0.85;
+      padding-left: 1.5rem;
+    }
+    .inline-retry__code {
+      font-family: 'SF Mono', Menlo, Consolas, monospace;
+      background: rgba(0, 0, 0, 0.05);
+      padding: 0 0.25rem;
+      border-radius: var(--md-shape-extra-small);
+    }
+    .inline-retry__reasons {
+      font-size: 0.75rem;
+      opacity: 0.7;
+      padding-left: 1.5rem;
+      margin-top: 0.125rem;
+    }
+    .inline-retry__actions {
+      display: flex;
+      gap: 0.5rem;
+      padding-left: 1.5rem;
+      margin-top: 0.25rem;
+    }
+    .inline-retry__btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.375rem 0.75rem;
+      background: var(--md-error);
+      color: var(--md-on-error);
+      border: none;
+      border-radius: var(--md-shape-full);
+      font-size: 0.75rem;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .inline-retry__btn--text {
+      background: transparent;
+      color: var(--md-on-error-container);
+      border: 1px solid currentColor;
+    }
+
+    /* 变体 2: Snackbar */
+    .m3-snackbar {
+      position: absolute;
+      bottom: 1rem;
+      left: 1rem;
+      right: 1rem;
+      min-height: 3rem;
+      background: var(--md-inverse-surface);
+      color: var(--md-inverse-on-surface);
+      border-radius: var(--md-shape-extra-small);
+      padding: 0 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      box-shadow: var(--md-elevation-3);
+      font-size: 0.8125rem;
+    }
+    .m3-snackbar__text { flex: 1; line-height: 1.4; }
+    .m3-snackbar__action {
+      color: var(--md-inverse-primary);
+      background: transparent;
+      border: none;
+      font-weight: 500;
+      font-family: inherit;
+      font-size: 0.8125rem;
+      padding: 0.5rem 0.5rem;
+      border-radius: var(--md-shape-full);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .m3-snackbar__action:hover {
+      background: rgba(255,255,255,0.08);
+    }
+
+    /* 变体 3: Sheet */
+    .sheet-scrim {
+      position: absolute;
+      inset: 0;
+      background: var(--md-scrim);
+      z-index: 20;
+    }
+    .sheet-panel {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--md-surface-container-lowest);
+      border-top-left-radius: var(--md-shape-extra-large);
+      border-top-right-radius: var(--md-shape-extra-large);
+      padding: 1.25rem 1rem 1.5rem;
+      z-index: 21;
+      max-height: 70%;
+      overflow-y: auto;
+    }
+    .sheet-handle {
+      width: 2rem;
+      height: 0.25rem;
+      background: var(--md-outline-variant);
+      border-radius: var(--md-shape-full);
+      margin: 0 auto 0.75rem;
+    }
+    .sheet-title {
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--md-on-surface);
+      margin-bottom: 0.5rem;
+    }
+    .sheet-body {
+      font-size: 0.8125rem;
+      color: var(--md-on-surface-variant);
+      line-height: 1.6;
+      margin-bottom: 1rem;
+    }
+    .sheet-body code {
+      font-family: 'SF Mono', Menlo, Consolas, monospace;
+      background: var(--md-surface-container);
+      padding: 0 0.25rem;
+      border-radius: var(--md-shape-extra-small);
+      color: var(--md-on-surface);
+      font-size: 0.75rem;
+    }
+    .sheet-providers {
+      background: var(--md-surface-container);
+      border-radius: var(--md-shape-medium);
+      padding: 0.75rem 1rem;
+      margin-bottom: 1rem;
+    }
+    .sheet-providers__heading {
+      font-size: 0.6875rem;
+      color: var(--md-on-surface-variant);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+    .sheet-providers ul {
+      list-style: none;
+      padding: 0;
+    }
+    .sheet-providers li {
+      font-size: 0.8125rem;
+      color: var(--md-on-surface);
+      padding: 0.25rem 0;
+    }
+    .sheet-actions {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: flex-end;
+    }
+
+    /* 提示 banner 顶部状态 */
+    .status-strip {
+      padding: 0.5rem 1rem;
+      background: var(--md-surface-container);
+      color: var(--md-on-surface-variant);
+      font-size: 0.75rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <header class="proto-header">
+    <a class="proto-header__back" href="index.html">← 返回 hub</a>
+    <div class="proto-header__eyebrow">原型 #4 / 5 · 失败提示</div>
+    <h1 class="proto-header__title">endpoint 失败 UX</h1>
+    <p class="proto-header__desc">
+      同一场景：「endpoint 不支持 OpenAI Responses API · HTTP 404 · /v1/responses」。
+      spec §6.4 收敛 = <strong>inline retry bar</strong>（错误是阻塞态，用户必须主动 retry / 更换）。
+      对比 inline retry bar / Snackbar / Sheet 三种容器。
+    </p>
+  </header>
+
+  <main class="proto-stage">
+    <section class="proto-section">
+      <div class="proto-section__heading">
+        <h2>三形态对比（错误态）</h2>
+        <span class="badge">3 containers</span>
+      </div>
+      <p class="proto-section__lead">
+        三种容器呈现同一阻塞错误：snippet 含 HTTP code、错误原因、provider 列表、「更换 endpoint」CTA。
+      </p>
+
+      <div class="compare-grid">
+
+        <!-- Phone 1: inline retry bar (chosen) -->
+        <div>
+          <div class="phone-frame">
+            <div class="phone-screen">
+              <div class="phone-statusbar">
+                <span>20:31</span>
+                <div class="phone-statusbar__icons">
+                  <span>5G</span><span>100%</span>
+                </div>
+              </div>
+              <div class="app-bar">
+                <button class="app-bar__icon-btn">←</button>
+                <span class="app-bar__title">小说标题</span>
+                <button class="app-bar__icon-btn">⌕</button>
+                <button class="app-bar__icon-btn">⚙</button>
+              </div>
+
+              <div class="detail-header">
+                <div class="detail-header__title">深夜的便利商店</div>
+                <div class="detail-header__meta">作者名 · 12,345 字 · 248 评论</div>
+              </div>
+
+              <div class="detail-body">
+                <div class="inline-retry">
+                  <div class="inline-retry__head">
+                    <span class="inline-retry__icon">⚠</span>
+                    翻译失败：endpoint 不支持 OpenAI Responses API
+                  </div>
+                  <div class="inline-retry__detail">
+                    <span class="inline-retry__code">HTTP 404 · /v1/responses</span>
+                  </div>
+                  <div class="inline-retry__reasons">
+                    常见原因：OpenRouter / 智谱 / 通义千问 / 文心 / LM Studio 等
+                  </div>
+                  <div class="inline-retry__actions">
+                    <button class="inline-retry__btn inline-retry__btn--text">
+                      查看文档
+                    </button>
+                    <button class="inline-retry__btn">
+                      更换 endpoint →
+                    </button>
+                  </div>
+                </div>
+
+                <div class="content-area" style="opacity: 0.45;">
+                  <p>那是一个飘着细雨的夜晚。便利商店的自动门发出轻微的嗡嗡声，又一位顾客走了进来。</p>
+                  <p>我抬起头，习惯性地说出「欢迎光临」。但进来的那个人没有看商品架，而是径直走向柜台。</p>
+                  <p>她看上去二十岁出头，穿着一件淋湿的米色风衣，长发贴在脸颊上，眼神却异常平静。</p>
+                  <p>「我在找一个东西，」她开口说，声音很轻，「一个很小的东西。」</p>
+                  <p>我把目光从收银机上移开，第一次认真打量她的脸。她的眼睛是那种深得看不见底的黑。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="phone-frame__variant">
+            <strong>① Inline retry bar · CHOSEN</strong>
+            sticky 顶部 + M3 error-container 背景；正文区变灰表示「暂不可译」<br>
+            <span style="color: var(--md-primary);">→ 决策：阻塞态错误不能自动消失；按钮直达修复路径</span>
+          </div>
+        </div>
+
+        <!-- Phone 2: Snackbar -->
+        <div>
+          <div class="phone-frame">
+            <div class="phone-screen">
+              <div class="phone-statusbar">
+                <span>20:31</span>
+                <div class="phone-statusbar__icons">
+                  <span>5G</span><span>100%</span>
+                </div>
+              </div>
+              <div class="app-bar">
+                <button class="app-bar__icon-btn">←</button>
+                <span class="app-bar__title">小说标题</span>
+                <button class="app-bar__icon-btn">⌕</button>
+                <button class="app-bar__icon-btn">⚙</button>
+              </div>
+
+              <div class="detail-header">
+                <div class="detail-header__title">深夜的便利商店</div>
+                <div class="detail-header__meta">作者名 · 12,345 字 · 248 评论</div>
+              </div>
+
+              <div class="status-strip">
+                ⚠ 翻译失败 · endpoint 不支持 OpenAI Responses API
+              </div>
+
+              <div class="detail-body">
+                <div class="content-area" style="opacity: 0.45;">
+                  <p>那是一个飘着细雨的夜晚。便利商店的自动门发出轻微的嗡嗡声，又一位顾客走了进来。</p>
+                  <p>我抬起头，习惯性地说出「欢迎光临」。但进来的那个人没有看商品架，而是径直走向柜台。</p>
+                  <p>她看上去二十岁出头，穿着一件淋湿的米色风衣，长发贴在脸颊上，眼神却异常平静。</p>
+                  <p>「我在找一个东西，」她开口说，声音很轻，「一个很小的东西。」</p>
+                  <p>我把目光从收银机上移开，第一次认真打量她的脸。她的眼睛是那种深得看不见底的黑。</p>
+                  <p>「请问是什么样的东西？」我问，手指不自觉地摸向柜台下面的小抽屉。</p>
+                </div>
+              </div>
+
+              <div class="m3-snackbar">
+                <span class="m3-snackbar__text">
+                  ⚠ 翻译失败 · HTTP 404 /v1/responses
+                </span>
+                <button class="m3-snackbar__action">更换 endpoint</button>
+              </div>
+            </div>
+          </div>
+          <div class="phone-frame__variant">
+            <strong>② Snackbar</strong>
+            M3 inverse-surface 浮层 + action button；4s 后自动消失<br>
+            <span style="color: var(--md-on-surface-variant);">↳ 缺点：阻塞态自动消失会丢失错误上下文；信息密度太低</span>
+          </div>
+        </div>
+
+        <!-- Phone 3: Sheet -->
+        <div>
+          <div class="phone-frame">
+            <div class="phone-screen">
+              <div class="phone-statusbar">
+                <span>20:31</span>
+                <div class="phone-statusbar__icons">
+                  <span>5G</span><span>100%</span>
+                </div>
+              </div>
+              <div class="app-bar">
+                <button class="app-bar__icon-btn">←</button>
+                <span class="app-bar__title">小说标题</span>
+                <button class="app-bar__icon-btn">⌕</button>
+                <button class="app-bar__icon-btn">⚙</button>
+              </div>
+
+              <div class="detail-header">
+                <div class="detail-header__title">深夜的便利商店</div>
+                <div class="detail-header__meta">作者名 · 12,345 字 · 248 评论</div>
+              </div>
+
+              <div class="detail-body">
+                <div class="content-area" style="opacity: 0.25;">
+                  <p>那是一个飘着细雨的夜晚。便利商店的自动门发出轻微的嗡嗡声，又一位顾客走了进来。</p>
+                  <p>我抬起头，习惯性地说出「欢迎光临」。</p>
+                  <p>她看上去二十岁出头，穿着一件淋湿的米色风衣。</p>
+                </div>
+              </div>
+
+              <div class="sheet-scrim"></div>
+
+              <div class="sheet-panel">
+                <div class="sheet-handle"></div>
+                <div class="sheet-title">⚠ endpoint 不兼容</div>
+                <div class="sheet-body">
+                  你的 endpoint <code>https://openrouter.ai/api/v1</code> 对 <code>/v1/responses</code> 返回 <code>HTTP 404</code>。
+                  当前仅支持 OpenAI Responses API 协议（<code>POST /v1/responses</code>）。
+                </div>
+                <div class="sheet-providers">
+                  <div class="sheet-providers__heading">兼容 Responses API 的服务</div>
+                  <ul>
+                    <li>· OpenAI（gpt-5 / gpt-5-mini / gpt-5-nano）</li>
+                    <li>· Azure OpenAI（deployment 名 + <code>api-version: preview</code> header）</li>
+                    <li>· DeepSeek（Codex 兼容模式）</li>
+                    <li>· vLLM 自托管（≥ 0.6.2）</li>
+                  </ul>
+                </div>
+                <div class="sheet-providers">
+                  <div class="sheet-providers__heading">常见不兼容服务</div>
+                  <ul>
+                    <li>· OpenRouter / 智谱 GLM / 通义千问 / 文心千帆</li>
+                    <li>· LocalAI / LM Studio / Ollama</li>
+                  </ul>
+                </div>
+                <div class="sheet-actions">
+                  <button class="m3-btn-text">关闭</button>
+                  <button class="m3-btn-filled">更换 endpoint →</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="phone-frame__variant">
+            <strong>③ Sheet（bottom）</strong>
+            M3 modal bottom sheet；详细信息 + 兼容性矩阵列表 + 双 CTA<br>
+            <span style="color: var(--md-on-surface-variant);">↳ 缺点：覆盖屏幕 70% 内容；首次失败即弹 modal 干扰阅读</span>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="proto-notes">
+        <strong>设计要点（spec §6.4 + §9.1 收敛）</strong>
+        <ul>
+          <li><b>inline retry bar：</b>阻塞态错误不能自动消失（spec §6.4 明确）；用户必须 retry 或更换 endpoint，切换章节后才清除。</li>
+          <li><b>错误细节：</b>展示 HTTP code + endpoint URL + 兼容/不兼容 provider 列表；「更换 endpoint」跳设置页。</li>
+          <li><b>Snackbar：</b>仅适合非阻塞通知（自动消失）；阻塞错误会丢失上下文。</li>
+          <li><b>Sheet：</b>信息密度高但首次失败即弹 modal 干扰阅读；适合「点 retry 失败后」二级诊断而非首次提示。</li>
+          <li><b>正文区状态：</b>inline retry bar 形态下，正文变灰（不可交互）+ 占位符「〔未翻译〕」（partial / failed 共用）。</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="proto-footer">
+    <a href="index.html" style="color: rgba(255,255,255,0.7);">← 返回 hub</a>
+    ·
+    <a href="cached-badge.html" style="color: rgba(255,255,255,0.7);">下一原型：缓存命中标识 →</a>
+  </footer>
+</body>
+</html>

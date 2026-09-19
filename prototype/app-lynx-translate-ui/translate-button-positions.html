@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>#2 翻译按钮位置 · app-lynx 翻译面板原型</title>
+  <link rel="stylesheet" href="_shared.css">
+  <style>
+    /* 详情页 header */
+    .detail-header {
+      background: var(--md-surface);
+      padding: 0.75rem 1rem 1rem;
+    }
+    .detail-header__top {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .detail-header__title {
+      font-size: 1.25rem;
+      font-weight: 500;
+      color: var(--md-on-surface);
+      line-height: 1.3;
+    }
+    .detail-header__meta {
+      font-size: 0.75rem;
+      color: var(--md-on-surface-variant);
+      margin-bottom: 0.75rem;
+    }
+
+    /* 翻译按钮（顶部 banner 变体） */
+    .translate-banner {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding-top: 0.5rem;
+      border-top: 1px solid var(--md-outline-variant);
+    }
+    .translate-banner__action {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.5rem 0.875rem;
+      border-radius: var(--md-shape-full);
+      font-size: 0.8125rem;
+      font-weight: 500;
+      background: var(--md-primary);
+      color: var(--md-on-primary);
+      border: none;
+      cursor: pointer;
+      min-height: 2.25rem;
+    }
+    .translate-banner__action--idle {
+      background: var(--md-primary);
+      color: var(--md-on-primary);
+    }
+    .translate-banner__action--configured {
+      background: var(--md-secondary-container);
+      color: var(--md-on-secondary-container);
+    }
+    .translate-banner__action--in-progress {
+      background: var(--md-state-disabled-container);
+      color: var(--md-state-disabled-on-surface);
+      cursor: not-allowed;
+    }
+    .translate-banner__action--retrans {
+      background: transparent;
+      color: var(--md-primary);
+      border: 1px solid var(--md-outline);
+    }
+    .translate-banner__mode {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.375rem 0.625rem;
+      border-radius: var(--md-shape-full);
+      font-size: 0.75rem;
+      background: var(--md-surface-container);
+      color: var(--md-on-surface-variant);
+      border: 1px solid var(--md-outline-variant);
+      margin-left: auto;
+    }
+    .translate-banner__spacer { flex: 1; }
+
+    /* 章节正文（模拟） */
+    .detail-content {
+      flex: 1;
+      background: var(--md-surface);
+      padding: 1rem 1.25rem;
+      overflow-y: auto;
+    }
+    .detail-content__heading {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--md-on-surface);
+      margin-bottom: 0.75rem;
+    }
+    .detail-content__body {
+      font-size: 0.875rem;
+      line-height: 1.75;
+      color: var(--md-on-surface);
+    }
+    .detail-content__body p {
+      margin-bottom: 0.75rem;
+    }
+
+    /* 章节标题旁变体的标题区 */
+    .title-with-action {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .title-with-action__title {
+      flex: 1;
+      font-size: 1.25rem;
+      font-weight: 500;
+      color: var(--md-on-surface);
+      line-height: 1.3;
+    }
+    .title-with-action__btn {
+      flex-shrink: 0;
+      min-width: 2.5rem;
+      height: 2.5rem;
+      border-radius: var(--md-shape-full);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--md-primary);
+      color: var(--md-on-primary);
+      border: none;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+
+    /* FAB 变体 */
+    .fab-stack {
+      position: absolute;
+      right: 1rem;
+      bottom: 5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      align-items: flex-end;
+    }
+    .fab-primary {
+      width: 3.5rem;
+      height: 3.5rem;
+      border-radius: var(--md-shape-large);
+      background: var(--md-primary);
+      color: var(--md-on-primary);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--md-elevation-3);
+      border: none;
+      cursor: pointer;
+      font-size: 1.25rem;
+    }
+    .fab-secondary {
+      width: 2.75rem;
+      height: 2.75rem;
+      border-radius: var(--md-shape-medium);
+      background: var(--md-primary-container);
+      color: var(--md-on-primary-container);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--md-elevation-2);
+      border: none;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    .fab-label {
+      background: var(--md-inverse-surface);
+      color: var(--md-inverse-on-surface);
+      padding: 0.25rem 0.5rem;
+      border-radius: var(--md-shape-extra-small);
+      font-size: 0.6875rem;
+      margin-right: 0.5rem;
+    }
+
+    /* segmented 控件（下方原型需要，提前备） */
+    .segmented {
+      display: inline-flex;
+      background: var(--md-surface-container);
+      border-radius: var(--md-shape-full);
+      padding: 0.25rem;
+      gap: 0;
+    }
+    .segmented__btn {
+      padding: 0.5rem 1rem;
+      border-radius: var(--md-shape-full);
+      font-size: 0.8125rem;
+      font-weight: 500;
+      background: transparent;
+      color: var(--md-on-surface);
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      min-width: 4rem;
+      transition: background var(--duration-fast) var(--motion-standard);
+    }
+    .segmented__btn.is-active {
+      background: var(--md-surface-container-lowest);
+      color: var(--md-on-surface);
+      box-shadow: var(--md-elevation-1);
+    }
+    .segmented__btn:not(.is-active):hover {
+      background: var(--md-state-layer-pressed-on-surface);
+    }
+  </style>
+</head>
+<body>
+  <header class="proto-header">
+    <a class="proto-header__back" href="index.html">← 返回 hub</a>
+    <div class="proto-header__eyebrow">原型 #2 / 5 · 翻译入口位置</div>
+    <h1 class="proto-header__title">详情页翻译按钮位置</h1>
+    <p class="proto-header__desc">
+      spec §6.2：位置选择 = <strong>顶部 banner</strong>（与「分享 / 收藏 / 章节列表」同级）。
+      这里同时给出另两种备选，供回头审视决策。FAB 选项需注意与现有「GlobalFab」共处关系。
+    </p>
+  </header>
+
+  <main class="proto-stage">
+    <section class="proto-section">
+      <div class="proto-section__heading">
+        <h2>三位置对比（idle 态）</h2>
+        <span class="badge">3 positions</span>
+      </div>
+      <p class="proto-section__lead">
+        所有手机显示小说详情页顶部 + 前几段正文片段；展示「翻译」入口在不同位置时的视觉重量。
+      </p>
+
+      <div class="compare-grid">
+
+        <!-- Phone 1: 顶部 banner (chosen) -->
+        <div>
+          <div class="phone-frame">
+            <div class="phone-screen" style="position: relative;">
+              <div class="phone-statusbar">
+                <span>20:31</span>
+                <div class="phone-statusbar__icons">
+                  <span>5G</span><span>100%</span>
+                </div>
+              </div>
+              <div class="app-bar">
+                <button class="app-bar__icon-btn">←</button>
+                <span class="app-bar__title">小说标题</span>
+                <button class="app-bar__icon-btn">⌕</button>
+                <button class="app-bar__icon-btn">⚙</button>
+                <button class="app-bar__icon-btn">⋯</button>
+              </div>
+
+              <div class="detail-header">
+                <div class="detail-header__top">
+                  <div style="flex: 1;">
+                    <div class="detail-header__title">深夜的便利商店</div>
+                    <div class="detail-header__meta">作者名 · 12,345 字 · 248 评论</div>
+                  </div>
+                </div>
+
+                <div class="translate-banner">
+                  <button class="translate-banner__action translate-banner__action--idle">
+                    🅰 翻译
+                  </button>
+                  <span class="translate-banner__mode">
+                    🌐 原文 ▾
+                  </span>
+                  <span class="translate-banner__spacer"></span>
+                </div>
+              </div>
+
+              <div class="detail-content">
+                <div class="detail-content__heading">第一章 · 夜班店员</div>
+                <div class="detail-content__body">
+                  <p>那是一个飘着细雨的夜晚。便利商店的自动门发出轻微的嗡嗡声，又一位顾客走了进来。</p>
+                  <p>我抬起头，习惯性地说出「欢迎光临」。但进来的那个人没有看商品架，而是径直走向柜台。</p>
+                  <p>她看上去二十岁出头，穿着一件淋湿的米色风衣，长发贴在脸颊上，眼神却异常平静。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="phone-frame__variant">
+            <strong>① 顶部 banner · CHOSEN</strong>
+            与「分享 / 收藏 / 章节列表」同级，可放「翻译 + 显示模式切换」双控件<br>
+            <span style="color: var(--md-primary);">→ 决策：banner 一行可塞 2 个控件，FAB 不允许多控件并存</span>
+          </div>
+        </div>
+
+        <!-- Phone 2: 章节标题旁 -->
+        <div>
+          <div class="phone-frame">
+            <div class="phone-screen" style="position: relative;">
+              <div class="phone-statusbar">
+                <span>20:31</span>
+                <div class="phone-statusbar__icons">
+                  <span>5G</span><span>100%</span>
+                </div>
+              </div>
+              <div class="app-bar">
+                <button class="app-bar__icon-btn">←</button>
+                <span class="app-bar__title">小说标题</span>
+                <button class="app-bar__icon-btn">⌕</button>
+                <button class="app-bar__icon-btn">⚙</button>
+                <button class="app-bar__icon-btn">⋯</button>
+              </div>
+
+              <div class="detail-header">
+                <div class="title-with-action">
+                  <div class="title-with-action__title">深夜的便利商店</div>
+                  <button class="title-with-action__btn">🅰</button>
+                </div>
+                <div class="detail-header__meta">作者名 · 12,345 字 · 248 评论</div>
+              </div>
+
+              <div class="detail-content">
+                <div class="detail-content__heading" style="display: flex; align-items: center; gap: 0.5rem;">
+                  第一章 · 夜班店员
+                  <span class="translate-banner__action translate-banner__action--configured" style="font-size: 0.6875rem; padding: 0.25rem 0.625rem; min-height: 1.75rem;">
+                    🌐 原文 ▾
+                  </span>
+                </div>
+                <div class="detail-content__body">
+                  <p>那是一个飘着细雨的夜晚。便利商店的自动门发出轻微的嗡嗡声，又一位顾客走了进来。</p>
+                  <p>我抬起头，习惯性地说出「欢迎光临」。但进来的那个人没有看商品架，而是径直走向柜台。</p>
+                  <p>她看上去二十岁出头，穿着一件淋湿的米色风衣，长发贴在脸颊上，眼神却异常平静。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="phone-frame__variant">
+            <strong>② 章节标题旁</strong>
+            翻译按钮放小说标题右上；显示模式切换挪到章节标题旁<br>
+            <span style="color: var(--md-on-surface-variant);">↳ 缺点：标题区拥挤 + 控件分散 → 焦点不清晰</span>
+          </div>
+        </div>
+
+        <!-- Phone 3: FAB -->
+        <div>
+          <div class="phone-frame">
+            <div class="phone-screen" style="position: relative;">
+              <div class="phone-statusbar">
+                <span>20:31</span>
+                <div class="phone-statusbar__icons">
+                  <span>5G</span><span>100%</span>
+                </div>
+              </div>
+              <div class="app-bar">
+                <button class="app-bar__icon-btn">←</button>
+                <span class="app-bar__title">小说标题</span>
+                <button class="app-bar__icon-btn">⌕</button>
+                <button class="app-bar__icon-btn">⚙</button>
+                <button class="app-bar__icon-btn">⋯</button>
+              </div>
+
+              <div class="detail-header">
+                <div class="detail-header__title">深夜的便利商店</div>
+                <div class="detail-header__meta">作者名 · 12,345 字 · 248 评论</div>
+              </div>
+
+              <div class="detail-content">
+                <div class="detail-content__heading">第一章 · 夜班店员</div>
+                <div class="detail-content__body">
+                  <p>那是一个飘着细雨的夜晚。便利商店的自动门发出轻微的嗡嗡声，又一位顾客走了进来。</p>
+                  <p>我抬起头，习惯性地说出「欢迎光临」。但进来的那个人没有看商品架，而是径直走向柜台。</p>
+                  <p>她看上去二十岁出头，穿着一件淋湿的米色风衣，长发贴在脸颊上，眼神却异常平静。</p>
+                </div>
+              </div>
+
+              <!-- FAB 叠层 -->
+              <div class="fab-stack">
+                <div style="display: flex; align-items: center;">
+                  <span class="fab-label">显示模式</span>
+                  <button class="fab-secondary">🌐</button>
+                </div>
+                <div style="display: flex; align-items: center;">
+                  <span class="fab-label">翻译</span>
+                  <button class="fab-primary">🅰</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="phone-frame__variant">
+            <strong>③ FAB</strong>
+            与现有 GlobalFab 视觉风格一致；但要再叠加一个翻译 FAB + 一个模式切换 FAB<br>
+            <span style="color: var(--md-on-surface-variant);">↳ 缺点：FAB 已用于章节切换；多层 FAB 干扰导航手势</span>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="proto-notes">
+        <strong>设计要点（spec §6.2 收敛）</strong>
+        <ul>
+          <li><b>顶部 banner：</b>选择理由 = 一次性能同时呈现「翻译 + 显示模式切换」两个控件；FAB 不允许（GlobalFab 已被章节切换占用）。</li>
+          <li><b>章节标题旁：</b>缺点 = 标题区拥挤 + 双控件分散到不同 row，焦点不清晰；切换章节后控件位置跳变。</li>
+          <li><b>FAB：</b>缺点 = 与现有 GlobalFab 重叠风险 + 多 FAB 堆叠违反 M3 single FAB 原则。</li>
+          <li><b>翻译按钮 5 态：</b>未译+有endpoint→「翻译」；未译+无 endpoint→「配置翻译」；已译→「重译」；翻译中→「翻译中 N%」；部分译→「续译」（自动，Q21）。</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="proto-footer">
+    <a href="index.html" style="color: rgba(255,255,255,0.7);">← 返回 hub</a>
+    ·
+    <a href="switch-control.html" style="color: rgba(255,255,255,0.7);">下一原型：整段切换控件 →</a>
+  </footer>
+</body>
+</html>

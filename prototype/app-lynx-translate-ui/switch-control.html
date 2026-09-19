@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>#3 整段切换控件 · app-lynx 翻译面板原型</title>
+  <link rel="stylesheet" href="_shared.css">
+  <style>
+    /* App bar / detail header 同 #2，复用 */
+    .detail-header {
+      background: var(--md-surface);
+      padding: 0.75rem 1rem 1rem;
+    }
+    .detail-header__title {
+      font-size: 1.25rem;
+      font-weight: 500;
+      color: var(--md-on-surface);
+      line-height: 1.3;
+    }
+    .detail-header__meta {
+      font-size: 0.75rem;
+      color: var(--md-on-surface-variant);
+      margin-top: 0.25rem;
+    }
+
+    /* 正文区 */
+    .detail-body {
+      flex: 1;
+      overflow-y: auto;
+      background: var(--md-surface);
+    }
+
+    /* 变体 1: 顶部 tab */
+    .top-tab-bar {
+      display: flex;
+      background: var(--md-surface);
+      border-bottom: 1px solid var(--md-outline-variant);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .top-tab {
+      flex: 1;
+      padding: 0.875rem 0;
+      text-align: center;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--md-on-surface-variant);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      position: relative;
+    }
+    .top-tab.is-active {
+      color: var(--md-primary);
+    }
+    .top-tab.is-active::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 25%;
+      right: 25%;
+      height: 0.1875rem;
+      background: var(--md-primary);
+      border-radius: var(--md-shape-full);
+    }
+
+    /* 变体 2: M3 segmented button */
+    .segmented {
+      display: inline-flex;
+      background: var(--md-surface-container);
+      border-radius: var(--md-shape-full);
+      padding: 0.25rem;
+      gap: 0;
+    }
+    .segmented__btn {
+      padding: 0.5rem 1.25rem;
+      border-radius: var(--md-shape-full);
+      font-size: 0.8125rem;
+      font-weight: 500;
+      background: transparent;
+      color: var(--md-on-surface);
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      min-width: 4.5rem;
+      transition: background var(--duration-fast) var(--motion-standard),
+                  box-shadow var(--duration-fast) var(--motion-standard);
+    }
+    .segmented__btn.is-active {
+      background: var(--md-secondary-container);
+      color: var(--md-on-secondary-container);
+      box-shadow: var(--md-elevation-1);
+    }
+    .segmented__btn:not(.is-active):hover {
+      background: var(--md-state-layer-pressed-on-surface);
+    }
+
+    .segmented-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      background: var(--md-surface);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    /* 变体 3: Icon toggle */
+    .icon-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--md-surface-container);
+      border-radius: var(--md-shape-full);
+      cursor: pointer;
+      border: none;
+      font-family: inherit;
+    }
+    .icon-toggle__icon {
+      font-size: 1rem;
+      color: var(--md-on-surface-variant);
+      transition: color var(--duration-fast) var(--motion-standard);
+    }
+    .icon-toggle__icon.is-active {
+      color: var(--md-primary);
+    }
+    .icon-toggle__divider {
+      width: 1px;
+      height: 1rem;
+      background: var(--md-outline-variant);
+    }
+    .icon-toggle__label {
+      font-size: 0.75rem;
+      color: var(--md-on-surface);
+    }
+
+    /* 正文样式 */
+    .content-area {
+      padding: 1rem 1.25rem;
+      font-size: 0.875rem;
+      line-height: 1.75;
+      color: var(--md-on-surface);
+    }
+    .content-area p {
+      margin-bottom: 0.75rem;
+    }
+    .content-area__translation {
+      background: var(--md-tertiary-container);
+      padding: 0.5rem 0.75rem;
+      border-radius: var(--md-shape-small);
+      margin-bottom: 0.75rem;
+      color: var(--md-on-tertiary-container);
+    }
+
+    /* "已缓存" 标签 */
+    .cached-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.25rem 0.625rem;
+      background: var(--md-primary-container);
+      color: var(--md-on-primary-container);
+      border-radius: var(--md-shape-small);
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+    .cached-chip--ghost {
+      background: transparent;
+      color: var(--md-primary);
+      border: 1px solid var(--md-outline-variant);
+    }
+
+    /* segmented 右侧的 cached chip 变体 */
+    .row-spacer { flex: 1; }
+  </style>
+</head>
+<body>
+  <header class="proto-header">
+    <a class="proto-header__back" href="index.html">← 返回 hub</a>
+    <div class="proto-header__eyebrow">原型 #3 / 5 · 整段切换控件</div>
+    <h1 class="proto-header__title">原文 / 译文 切换</h1>
+    <p class="proto-header__desc">
+      spec §6.3 收敛 = M3 segmented button（lift-up indicator）。
+      对比 <strong>顶部 tab</strong>（与传统 Material tab 一致）/ <strong>segmented button</strong>（M3 推荐）/ <strong>icon toggle</strong>（最紧凑）。
+      所有变体均为 sticky 行，滚动时保持可见。
+    </p>
+  </header>
+
+  <main class="proto-stage">
+    <section class="proto-section">
+      <div class="proto-section__heading">
+        <h2>三形态对比（译文态）</h2>
+        <span class="badge">3 controls</span>
+      </div>
+      <p class="proto-section__lead">
+        译文模式下展示切换控件；「译文」状态被激活时的视觉重量是核心评判指标。
+      </p>
+
+      <div class="compare-grid">
+
+        <!-- Phone 1: 顶部 tab -->
+        <div>
+          <div class="phone-frame">
+            <div class="phone-screen">
+              <div class="phone-statusbar">
+                <span>20:31</span>
+                <div class="phone-statusbar__icons">
+                  <span>5G</span><span>100%</span>
+                </div>
+              </div>
+              <div class="app-bar">
+                <button class="app-bar__icon-btn">←</button>
+                <span class="app-bar__title">小说标题</span>
+                <button class="app-bar__icon-btn">⌕</button>
+                <button class="app-bar__icon-btn">⚙</button>
+              </div>
+
+              <div class="detail-header">
+                <div class="detail-header__title">深夜的便利商店</div>
+                <div class="detail-header__meta">作者名 · 12,345 字 · 248 评论</div>
+              </div>
+
+              <div class="detail-body">
+                <div class="top-tab-bar">
+                  <button class="top-tab">原文</button>
+                  <button class="top-tab is-active">译文</button>
+                </div>
+
+                <div class="content-area">
+                  <p class="content-area__translation">
+                    那是一个飘着细雨的夜晚。便利商店的自动门发出轻微的嗡嗡声，又一位顾客走了进来。
+                  </p>
+                  <p class="content-area__translation">
+                    我抬起头，习惯性地说出「欢迎光临」。但进来的那个人没有看商品架，而是径直走向柜台。
+                  </p>
+                  <p class="content-area__translation">
+                    她看上去二十岁出头，穿着一件淋湿的米色风衣，长发贴在脸颊上，眼神却异常平静。
+                  </p>
+                  <p class="content-area__translation">
+                    「我在找一个东西，」她开口说，声音很轻，「一个很小的东西。」
+                  </p>
+                  <p class="content-area__translation">
+                    我把目光从收银机上移开，第一次认真打量她的脸。她的眼睛是那种深得看不见底的黑。
+                  </p>
+                  <p class="content-area__translation">
+                    「请问是什么样的东西？」我问，手指不自觉地摸向柜台下面的小抽屉。
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="phone-frame__variant">
+            <strong>① 顶部 tab · bottom indicator</strong>
+            与 Material Design 1/2 传统 tab 相同；选中态用底部短粗条（3dp）<br>
+            <span style="color: var(--md-on-surface-variant);">↳ 缺点：占用整行（与其他 tab 区分度差，与 app-lynx 「推荐/插画/小说」同形）</span>
+          </div>
+        </div>
+
+        <!-- Phone 2: segmented button (chosen) -->
+        <div>
+          <div class="phone-frame">
+            <div class="phone-screen">
+              <div class="phone-statusbar">
+                <span>20:31</span>
+                <div class="phone-statusbar__icons">
+                  <span>5G</span><span>100%</span>
+                </div>
+              </div>
+              <div class="app-bar">
+                <button class="app-bar__icon-btn">←</button>
+                <span class="app-bar__title">小说标题</span>
+                <button class="app-bar__icon-btn">⌕</button>
+                <button class="app-bar__icon-btn">⚙</button>
+              </div>
+
+              <div class="detail-header">
+                <div class="detail-header__title">深夜的便利商店</div>
+                <div class="detail-header__meta">作者名 · 12,345 字 · 248 评论</div>
+              </div>
+
+              <div class="detail-body">
+                <div class="segmented-row">
+                  <div class="segmented">
+                    <button class="segmented__btn">原文</button>
+                    <button class="segmented__btn is-active">译文</button>
+                  </div>
+                  <span class="row-spacer"></span>
+                  <span class="cached-chip">✓ 已缓存</span>
+                </div>
+
+                <div class="content-area">
+                  <p class="content-area__translation">
+                    那是一个飘着细雨的夜晚。便利商店的自动门发出轻微的嗡嗡声，又一位顾客走了进来。
+                  </p>
+                  <p class="content-area__translation">
+                    我抬起头，习惯性地说出「欢迎光临」。但进来的那个人没有看商品架，而是径直走向柜台。
+                  </p>
+                  <p class="content-area__translation">
+                    她看上去二十岁出头，穿着一件淋湿的米色风衣，长发贴在脸颊上，眼神却异常平静。
+                  </p>
+                  <p class="content-area__translation">
+                    「我在找一个东西，」她开口说，声音很轻，「一个很小的东西。」
+                  </p>
+                  <p class="content-area__translation">
+                    我把目光从收银机上移开，第一次认真打量她的脸。她的眼睛是那种深得看不见底的黑。
+                  </p>
+                  <p class="content-area__translation">
+                    「请问是什么样的东西？」我问，手指不自觉地摸向柜台下面的小抽屉。
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="phone-frame__variant">
+            <strong>② M3 Segmented button · CHOSEN</strong>
+            container-high 底色 + lift-up indicator + secondary-container 高亮；右侧放「已缓存 ✓」<br>
+            <span style="color: var(--md-primary);">→ 决策：双控件可水平并列，长按触发「重译」快捷入口</span>
+          </div>
+        </div>
+
+        <!-- Phone 3: icon toggle -->
+        <div>
+          <div class="phone-frame">
+            <div class="phone-screen">
+              <div class="phone-statusbar">
+                <span>20:31</span>
+                <div class="phone-statusbar__icons">
+                  <span>5G</span><span>100%</span>
+                </div>
+              </div>
+              <div class="app-bar">
+                <button class="app-bar__icon-btn">←</button>
+                <span class="app-bar__title">小说标题</span>
+                <button class="app-bar__icon-btn">⌕</button>
+                <button class="app-bar__icon-btn">⚙</button>
+              </div>
+
+              <div class="detail-header">
+                <div class="detail-header__title">深夜的便利商店</div>
+                <div class="detail-header__meta">作者名 · 12,345 字 · 248 评论</div>
+              </div>
+
+              <div class="detail-body">
+                <div class="segmented-row">
+                  <span class="row-spacer"></span>
+                  <button class="icon-toggle">
+                    <span class="icon-toggle__icon">あ</span>
+                    <span class="icon-toggle__divider"></span>
+                    <span class="icon-toggle__icon is-active">中</span>
+                    <span class="icon-toggle__label">译文</span>
+                  </button>
+                </div>
+
+                <div class="content-area">
+                  <p class="content-area__translation">
+                    那是一个飘着细雨的夜晚。便利商店的自动门发出轻微的嗡嗡声，又一位顾客走了进来。
+                  </p>
+                  <p class="content-area__translation">
+                    我抬起头，习惯性地说出「欢迎光临」。但进来的那个人没有看商品架，而是径直走向柜台。
+                  </p>
+                  <p class="content-area__translation">
+                    她看上去二十岁出头，穿着一件淋湿的米色风衣，长发贴在脸颊上，眼神却异常平静。
+                  </p>
+                  <p class="content-area__translation">
+                    「我在找一个东西，」她开口说，声音很轻，「一个很小的东西。」
+                  </p>
+                  <p class="content-area__translation">
+                    我把目光从收银机上移开，第一次认真打量她的脸。她的眼睛是那种深得看不见底的黑。
+                  </p>
+                  <p class="content-area__translation">
+                    「请问是什么样的东西？」我问，手指不自觉地摸向柜台下面的小抽屉。
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="phone-frame__variant">
+            <strong>③ Icon toggle</strong>
+            用「あ / 中」字面 icon 表意源语言/目标语言；最紧凑但语义较弱<br>
+            <span style="color: var(--md-on-surface-variant);">↳ 缺点：icon 含义需学习；首屏辨识度低</span>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="proto-notes">
+        <strong>设计要点（spec §6.3 收敛）</strong>
+        <ul>
+          <li><b>segmented button：</b>M3 推荐控件（spec §6.3）；lift-up indicator + secondary-container 高亮；切换瞬间无 loading（< 50ms 完成）。</li>
+          <li><b>已缓存 chip：</b>紧贴 segmented 右侧（Q20）；长按 segmented 区域可触发「重译」（避免误触）。</li>
+          <li><b>顶部 tab：</b>虽然辨识度强，但占整行 + 与 app-lynx 主导航 tab 同形，会被误以为是页面级导航。</li>
+          <li><b>icon toggle：</b>最紧凑但首屏辨识度低，不适合「首次进入详情页就需用」的强提示场景。</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="proto-footer">
+    <a href="index.html" style="color: rgba(255,255,255,0.7);">← 返回 hub</a>
+    ·
+    <a href="failure-prompt.html" style="color: rgba(255,255,255,0.7);">下一原型：失败提示 →</a>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>app-lynx 翻译面板 UI 形态原型 · wayfinder #624</title>
+  <link rel="stylesheet" href="_shared.css">
+  <style>
+    .hub-card {
+      display: flex;
+      flex-direction: column;
+      background: var(--md-surface-container-lowest);
+      border-radius: var(--md-shape-large);
+      box-shadow: var(--md-elevation-1);
+      overflow: hidden;
+      text-decoration: none;
+      color: var(--md-on-surface);
+      transition: box-shadow var(--duration-normal) var(--motion-standard),
+                  transform var(--duration-normal) var(--motion-standard);
+    }
+    .hub-card:hover {
+      box-shadow: var(--md-elevation-3);
+      transform: translateY(-2px);
+    }
+    .hub-card:active {
+      transform: translateY(0);
+    }
+    .hub-card__preview {
+      height: 8rem;
+      background: var(--md-surface-container);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3rem;
+      color: var(--md-primary);
+      border-bottom: 1px solid var(--md-outline-variant);
+    }
+    .hub-card__body {
+      padding: 1.25rem;
+    }
+    .hub-card__eyebrow {
+      font-size: 0.75rem;
+      color: var(--md-primary);
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .hub-card__title {
+      font-size: 1.125rem;
+      font-weight: 500;
+      margin: 0.25rem 0 0.5rem;
+    }
+    .hub-card__desc {
+      font-size: 0.8125rem;
+      color: var(--md-on-surface-variant);
+      line-height: 1.5;
+    }
+    .hub-card__variants {
+      margin-top: 0.75rem;
+      display: flex;
+      gap: 0.375rem;
+      flex-wrap: wrap;
+    }
+    .hub-card__variant {
+      font-size: 0.6875rem;
+      background: var(--md-secondary-container);
+      color: var(--md-on-secondary-container);
+      padding: 0.125rem 0.5rem;
+      border-radius: var(--md-shape-full);
+    }
+    .hub-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      max-width: 90rem;
+    }
+    .hub-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      max-width: 60rem;
+      margin-top: 1rem;
+    }
+    .hub-meta__item {
+      background: var(--md-surface-container);
+      padding: 0.75rem 1rem;
+      border-radius: var(--md-shape-medium);
+    }
+    .hub-meta__item dt {
+      font-size: 0.6875rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--md-on-surface-variant);
+      margin-bottom: 0.25rem;
+    }
+    .hub-meta__item dd {
+      font-size: 0.875rem;
+      color: var(--md-on-surface);
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <header class="proto-header">
+    <div class="proto-header__eyebrow">wayfinder #624 · throwaway prototype</div>
+    <h1 class="proto-header__title">app-lynx 翻译面板 UI 形态原型</h1>
+    <p class="proto-header__desc">
+      基于 <strong>spec §6 UX 形态</strong>（docs/specs/app-lynx-novel-translation.md）做的可视化演示。
+      目的：在 implement 之前把「设置页表单 / 翻译按钮位置 / 整段切换控件 / 失败提示 / 缓存命中标识」5 类交互的视觉决策定型。
+      所有页面使用 M3 Sky 主题 token（与 app-lynx 其他页面一致），静态 HTML 演示，<b>无对接真实业务逻辑</b>。
+    </p>
+    <dl class="hub-meta">
+      <div class="hub-meta__item">
+        <dt>关联 ticket</dt>
+        <dd>wayfinder #624</dd>
+      </div>
+      <div class="hub-meta__item">
+        <dt>关联 spec</dt>
+        <dd>docs/specs/app-lynx-novel-translation.md §6</dd>
+      </div>
+      <div class="hub-meta__item">
+        <dt>设计语言</dt>
+        <dd>M3 Sky theme（参考 tokens.css）</dd>
+      </div>
+      <div class="hub-meta__item">
+        <dt>viewport 设计稿</dt>
+        <dd>375 × 720 px（Lynx Android baseline）</dd>
+      </div>
+    </dl>
+  </header>
+
+  <main class="proto-stage">
+    <section class="proto-section">
+      <div class="proto-section__heading">
+        <h2>5 个原型</h2>
+        <span class="badge">5 prototypes</span>
+      </div>
+      <p class="proto-section__lead">
+        每张原型展示同一交互的 3 种形态对比，供 implement 阶段选择定型。
+        决策记录在每个原型的「设计要点」卡片里。
+      </p>
+      <div class="hub-grid">
+        <a href="endpoint-form.html" class="hub-card">
+          <div class="hub-card__preview">⚙</div>
+          <div class="hub-card__body">
+            <div class="hub-card__eyebrow">#1 · 设置页表单</div>
+            <div class="hub-card__title">LLM endpoint 表单</div>
+            <p class="hub-card__desc">
+              base URL / API key / model 三字段 + inline probe 校验状态。
+              三态对比：未配置 / 已配置 / 校验失败。
+            </p>
+            <div class="hub-card__variants">
+              <span class="hub-card__variant">未配置</span>
+              <span class="hub-card__variant">已配置</span>
+              <span class="hub-card__variant">校验失败</span>
+            </div>
+          </div>
+        </a>
+
+        <a href="translate-button-positions.html" class="hub-card">
+          <div class="hub-card__preview">🅰</div>
+          <div class="hub-card__body">
+            <div class="hub-card__eyebrow">#2 · 翻译入口位置</div>
+            <div class="hub-card__title">详情页翻译按钮位置</div>
+            <p class="hub-card__desc">
+              顶部 banner / 章节标题旁 / FAB 三种位置对比。
+              spec §6.2 已收敛「顶部 banner」，这里给其他备选供回头审视。
+            </p>
+            <div class="hub-card__variants">
+              <span class="hub-card__variant">顶部 banner</span>
+              <span class="hub-card__variant">章节标题旁</span>
+              <span class="hub-card__variant">FAB</span>
+            </div>
+          </div>
+        </a>
+
+        <a href="switch-control.html" class="hub-card">
+          <div class="hub-card__preview">⇄</div>
+          <div class="hub-card__body">
+            <div class="hub-card__eyebrow">#3 · 整段切换控件</div>
+            <div class="hub-card__title">原文 / 译文 切换</div>
+            <p class="hub-card__desc">
+              顶部 tab / M3 segmented button / icon 切换三种形态对比。
+              spec §6.3 已收敛 segmented button。
+            </p>
+            <div class="hub-card__variants">
+              <span class="hub-card__variant">顶部 tab</span>
+              <span class="hub-card__variant">Segmented button</span>
+              <span class="hub-card__variant">Icon 切换</span>
+            </div>
+          </div>
+        </a>
+
+        <a href="failure-prompt.html" class="hub-card">
+          <div class="hub-card__preview">⚠</div>
+          <div class="hub-card__body">
+            <div class="hub-card__eyebrow">#4 · 失败提示</div>
+            <div class="hub-card__title">endpoint 失败 UX</div>
+            <p class="hub-card__desc">
+              inline retry bar / Snackbar / Sheet 三种形态对比。
+              spec §6.4 已收敛 inline retry bar；这是阻塞态错误的关键。
+            </p>
+            <div class="hub-card__variants">
+              <span class="hub-card__variant">Inline retry bar</span>
+              <span class="hub-card__variant">Snackbar</span>
+              <span class="hub-card__variant">Sheet</span>
+            </div>
+          </div>
+        </a>
+
+        <a href="cached-badge.html" class="hub-card">
+          <div class="hub-card__preview">✓</div>
+          <div class="hub-card__body">
+            <div class="hub-card__eyebrow">#5 · 缓存命中标识</div>
+            <div class="hub-card__title">已缓存 ✓ 标识</div>
+            <p class="hub-card__desc">
+              segmented 右侧 / 独立一行 / 浮层 chip 三种位置对比。
+              spec §6.3+6.5 收敛于 segmented 右侧。
+            </p>
+            <div class="hub-card__variants">
+              <span class="hub-card__variant">Segmented 右侧</span>
+              <span class="hub-card__variant">独立一行</span>
+              <span class="hub-card__variant">浮层 chip</span>
+            </div>
+          </div>
+        </a>
+
+        <div class="hub-card" style="background: var(--md-tertiary-container);">
+          <div class="hub-card__preview" style="background: transparent; color: var(--md-on-tertiary-container);">📋</div>
+          <div class="hub-card__body">
+            <div class="hub-card__eyebrow" style="color: var(--md-on-tertiary-container);">README</div>
+            <div class="hub-card__title">设计决策摘要</div>
+            <p class="hub-card__desc" style="color: var(--md-on-tertiary-container);">
+              5 个原型的设计要点、打开方式、截图清单见 README.md。
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="proto-footer">
+    throwaway prototype · prototype/app-lynx-translate-ui 分支 · 不集成到项目
+  </footer>
+</body>
+</html>
