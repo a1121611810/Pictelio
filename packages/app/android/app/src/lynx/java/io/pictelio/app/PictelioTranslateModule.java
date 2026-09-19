@@ -11,10 +11,8 @@ import com.lynx.tasm.behavior.LynxContext;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Map;
@@ -115,6 +113,14 @@ public class PictelioTranslateModule extends LynxModule {
      * 其余取消一律走 error 回调。
      */
     private static final java.util.Set<String> USER_ABORTED = ConcurrentHashMap.newKeySet();
+
+    // ── SSE 解析状态（每次 translateStream 新建一个解析器实例，见 SseParser） ──
+    /** 当前段落号（由最近出现的 [N] 锚标记决定） */
+    private int anchorIndex = 0;
+    /** 跨帧截断的锚标记暂存（"
+
+[" 被切成两帧时的 "["） */
+    private final StringBuilder anchorCarry = new StringBuilder();
 
     /**
      * 流式专用 OkHttp 客户端：**不带 callTimeout**。
@@ -532,49 +538,89 @@ public class PictelioTranslateModule extends LynxModule {
      *   <li>裸 {@code error} 事件 → cb("", errMsg)</li>
      * </ul>
      * 单帧 JSON 解析失败 → 跳过该帧（不中断流）；流末尾由 OkHttp Response close 触发
-     * BufferedReader.readLine() 返回 null，自然退出。
+     * 底层 read() 返回 -1 时自然退出（手写行读，见下方注释）。
      */
     private boolean parseSseStream(InputStream in, Callback callback) throws IOException {
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+        // 逐字节按行读，**不用 BufferedReader**：BufferedReader 会预读填充缓冲，在
+        // "服务端已发完但连接未关" 的长连接上可能把已到达的帧留在自己缓冲里不吐出
+        // （真机实测：HTTP 200 后读循环再无事件、也无异常，翻译永不收敛）。
+        // 手写行读只消费到 '\n' 为止，读到即处理。
+        try (InputStream raw = in) {
             String line;
-            String currentParagraphIndex = "0";
-            // 段落锚定状态：output_text.delta 的文本是**跨段连续流**（模型按 [N] 前缀逐段输出），
-            // 故在增量文本里跟踪最近出现的 [N] 标记，遇到标记即切换当前段落号；标记字符本身与
-            // 紧随其后的空格不进入译文（与 web 路径 strip 同语义）。
-            final int[] anchor = new int[]{0};
-            final StringBuilder carry = new StringBuilder();
-            while ((line = reader.readLine()) != null) {
-                if (line.isEmpty()) {
-                    continue; // SSE 帧分隔（空行）
+            final byte[] lineBuf = new byte[8192];
+            int lineLen = 0;
+            int b;
+            while (true) {
+                b = raw.read();
+                if (b == -1) {
+                    if (lineLen > 0) {
+                        // 末尾无换行的残行也要处理（服务端可能不以 \n 收尾）
+                        processSseLine(new String(lineBuf, 0, lineLen, StandardCharsets.UTF_8), callback);
+                    }
+                    break;
                 }
-                if (!line.startsWith("data: ")) {
-                    continue; // SSE 的 event: / id: / 注释行（事件类型在 data 载荷里，无需单独解析）
+                if (b == '\n') {
+                    if (lineLen > 0) {
+                        String l = new String(lineBuf, 0, lineLen, StandardCharsets.UTF_8);
+                        Boolean terminal = processSseLine(l, callback);
+                        if (terminal != null) return terminal;
+                    }
+                    lineLen = 0;
+                    continue;
                 }
-                String payload = line.substring("data: ".length());
-                try {
+                if (b == '\r') continue; // CRLF：忽略 CR
+                if (lineLen < lineBuf.length) {
+                    lineBuf[lineLen++] = (byte) b;
+                } else {
+                    // 超长行（异常服务端）：截断处理，避免无限增长
+                    lineLen = 0;
+                }
+            }
+            return false;
+        }
+    }
+
+    /**
+     * 处理单行 SSE：返回 null = 继续读；返回 true/false = 已出现终态（调用方据此收尾）。
+     *
+     * <p>抽成独立方法便于单测（Robolectric 不需要真实 socket）。
+     */
+    private Boolean processSseLine(String line, Callback callback) {
+        {
+            // 段落锚定：output_text.delta 是**跨段连续流**（模型按 [N] 前缀逐段输出），
+            // 跟踪最近出现的 [N] 标记即切换当前段落号；标记本身不进译文（与 web 路径同语义）。
+            // anchorIndex / anchorCarry 是实例字段：状态跨行保持（同一次流内）。
+            if (line.isEmpty()) {
+                return null; // SSE 帧分隔（空行）
+            }
+            if (!line.startsWith("data: ")) {
+                return null; // SSE 的 event: / id: / 注释行（事件类型在 data 载荷里）
+            }
+            String payload = line.substring("data: ".length());
+            try {
                     JSONObject event = new JSONObject(payload);
                     String type = event.optString("type");
                     switch (type) {
                         case "response.output_text.delta": {
                             String delta = event.optString("delta");
                             // 处理「跨帧截断的锚标记」：上一帧遗留的未完成前缀与本次拼接后再匹配
-                            String window = carry.toString() + delta;
-                            carry.setLength(0);
+                            String window = anchorCarry.toString() + delta;
+                            anchorCarry.setLength(0);
                             Matcher m = PARAGRAPH_ANCHOR.matcher(window);
                             int lastEnd = 0;
                             boolean matched = false;
                             while (m.find()) {
-                                anchor[0] = Integer.parseInt(m.group(1));
+                                anchorIndex = Integer.parseInt(m.group(1));
                                 lastEnd = m.end();
                                 matched = true;
                             }
                             String text = window.substring(matched ? lastEnd : 0);
                             if (!matched && window.length() > 0 && window.charAt(window.length() - 1) == '[') {
                                 // 可能是被截断的 "["（下一帧补数字）：暂存，避免把标记吐进译文
-                                carry.append('[');
+                                anchorCarry.append('[');
                                 text = window.substring(0, window.length() - 1);
                             }
-                            currentParagraphIndex = String.valueOf(anchor[0]);
+                            String currentParagraphIndex = String.valueOf(anchorIndex);
                             JSONObject chunk = new JSONObject();
                             chunk.put("type", "delta");
                             chunk.put("paragraphIndex", currentParagraphIndex);
@@ -600,7 +646,7 @@ public class PictelioTranslateModule extends LynxModule {
                                 }
                             }
                             callback.invoke(done.toString(), "");
-                            return true;
+                            return Boolean.TRUE;
                         }
                         case "response.failed": {
                             JSONObject resp = event.optJSONObject("response");
@@ -608,30 +654,29 @@ public class PictelioTranslateModule extends LynxModule {
                             String code = errObj != null ? errObj.optString("code", "server") : "server";
                             String message = errObj != null ? errObj.optString("message", "流失败") : "流失败";
                             callback.invoke("", "LLM 流失败 [" + code + "]：" + message);
-                            return true;
+                            return Boolean.TRUE;
                         }
                         case "response.incomplete": {
                             JSONObject resp = event.optJSONObject("response");
                             JSONObject incomplete = resp != null ? resp.optJSONObject("incomplete_details") : null;
                             String reason = incomplete != null ? incomplete.optString("reason", "输出截断") : "输出截断";
                             callback.invoke("", "LLM 输出截断：" + reason);
-                            return true;
+                            return Boolean.TRUE;
                         }
                         case "error": {
                             String message = event.optString("message", "服务端错误");
                             callback.invoke("", "LLM 错误：" + message);
-                            return true;
+                            return Boolean.TRUE;
                         }
                         default:
                             // 未识别事件（如 response.created / response.in_progress）→ 跳过
                             break;
                     }
-                } catch (Exception e) {
-                    // 单帧解析失败 → 跳过该帧，继续读（不中断流；ADR-0170 §D6 后段）
-                    Log.w(TAG, "SSE 帧解析失败: " + payload, e);
-                }
+            } catch (Exception e) {
+                // 单帧解析失败 → 跳过该帧，继续读（不中断流；ADR-0170 §D6 后段）
+                Log.w(TAG, "SSE 帧解析失败: " + payload, e);
             }
-            return false;
+            return null;
         }
     }
 
