@@ -665,7 +665,9 @@ public class PictelioTranslateModule extends LynxModule {
                 line,
                 (payload, error) -> {
                     // 只入队：派发交给主线程 tick（见 frameQueue 注释）
-                    if (payload != null && payload.contains("\"type\":\"delta\"")) {
+                    if (payload != null
+                            && (payload.contains("\"type\":\"delta\"")
+                                || payload.contains("\"type\":\"delta_all\""))) {
                         deltaSeen = true;
                         deltaCount++;
                     }

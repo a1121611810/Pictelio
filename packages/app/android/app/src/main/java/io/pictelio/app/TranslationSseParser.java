@@ -54,17 +54,24 @@ class TranslationSseParser {
      * 只是每段只发一次、内容为该段全文。
      */
     void emitConsolidated(Sink sink) {
-        for (java.util.Map.Entry<Integer, StringBuilder> e : paragraphText.entrySet()) {
-            try {
-                JSONObject chunk = new JSONObject();
-                chunk.put("type", "delta");
-                chunk.put("paragraphIndex", String.valueOf(e.getKey()));
+        // **单帧交付**：lynx NativeModule 的多次回调在同一次流内只投递首帧（实测：无论逐帧直发、
+        // 加帧间隔、还是拉模式主线程逐帧派发，JS 侧都只收到 1 帧）。因此整章译文放进**一次**
+        // 回调：{type:"delta_all", paragraphs:[{index,text}...]}，由 JS 适配器展开为逐段 delta。
+        try {
+            org.json.JSONArray arr = new org.json.JSONArray();
+            for (java.util.Map.Entry<Integer, StringBuilder> e : paragraphText.entrySet()) {
+                JSONObject one = new JSONObject();
+                one.put("index", e.getKey());
                 // 段落级裁剪：锚标记前的 "\n\n" 段落分隔空白不属于译文
-                chunk.put("text", e.getValue().toString().trim());
-                sink.emit(chunk.toString(), "");
-            } catch (Exception ignored) {
-                // JSONObject.put 对 String 不抛；防御性忽略
+                one.put("text", e.getValue().toString().trim());
+                arr.put(one);
             }
+            JSONObject chunk = new JSONObject();
+            chunk.put("type", "delta_all");
+            chunk.put("paragraphs", arr);
+            sink.emit(chunk.toString(), "");
+        } catch (Exception e) {
+            // JSONObject/JSONArray 对 String/JSONObject 不抛；防御性忽略
         }
     }
 

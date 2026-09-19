@@ -21,9 +21,44 @@ adb shell am start -n "$ACT" \
   --es pictelio_dev_refresh_token "$TOKEN" --es pictelio_dev_force_r18 true \
   --es pictelio_dev_llm_base_url "$BASE" --es pictelio_dev_llm_model "$MODEL" \
   --es pictelio_dev_llm_api_key "$KEY" --es benchNav novel >/dev/null
-sleep 16
+# benchNav 广播有竞态（1.5/3/4.5/6s 四次），页面可能还没到位 —— 先确认在小说列表再点
+nav_ok=0
+for i in 1 2 3 4 5; do
+  sleep 6
+  adb exec-out screencap -p > /tmp/pictelio-e2e/nav-$i.png
+  # 小说列表页特征：顶部标题「小说」+ 列表卡（用像素密度粗判：标题区有深色文本像素）
+  if python3 - "$i" <<'PY'
+import sys
+from PIL import Image
+a = sys.argv[1]
+im = Image.open(f'/tmp/pictelio-e2e/nav-{a}.png').convert('L')
+# 标题带（y 380-460）应有足够深色像素；且不是插画详情（无「关注」按钮的蓝色大块）
+# 小说列表：tab 行（推荐/关注）y≈420-480 有两条深色文本块；详情页顶部左侧有大返回箭头
+tabrow = im.crop((0, 415, 1080, 485))
+dark_tab = sum(1 for p in tabrow.getdata() if p < 110)
+backrow = im.crop((0, 330, 300, 390))
+dark_back = sum(1 for p in backrow.getdata() if p < 110)
+sys.exit(0 if (dark_tab > 1500 and dark_back < 600) else 1)
+PY
+  then nav_ok=1; echo "[e2e] 小说列表已就绪（第 $i 次探测）"; break; fi
+done
+[ "$nav_ok" = "1" ] || { echo "[e2e] 未能确认到达小说列表"; exit 1; }
 adb shell input touchscreen tap 540 640; sleep 8     # 第一本小说 → 介绍页
-adb shell input touchscreen tap 626 1809; sleep 10   # 开始阅读 → 正文页
+adb exec-out screencap -p > /tmp/pictelio-e2e/intro.png
+# 介绍页：底部「开始阅读」大按钮（蓝色带位于 y>1600）
+YINTRO=$(python3 - <<'PY'
+from PIL import Image
+im = Image.open('/tmp/pictelio-e2e/intro.png').convert('RGB'); px = im.load()
+def blue(c):
+    r,g,b = c
+    return b > 110 and b - r > 40 and g > r and g < b
+ys = [y for y in range(1400, 2100) if blue(px[540,y])]
+print((ys[0]+ys[-1])//2 if ys else "NONE")
+PY
+)
+[ "$YINTRO" = "NONE" ] && { echo "[e2e] 介绍页未出现（可能没进介绍页）"; exit 1; }
+echo "[e2e] 介绍页开始阅读按钮 y=$YINTRO"
+adb shell input touchscreen tap 540 "$YINTRO"; sleep 10   # 开始阅读 → 正文页
 
 # 定位翻译按钮（蓝色带）并点击；点完必须看到「请求入口」日志，否则重点一次
 for attempt in 1 2 3; do

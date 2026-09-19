@@ -389,6 +389,16 @@ function registerBenchNavHandler(): void {
       console.warn('[router] benchNav 详情页直达载荷缺 illust_id，跳过')
     }
   })
+  // 小说正文页直达（同载荷约定）：翻译功能的真机/模拟器验证需要可重复直达正文页，
+  // 而列表→介绍页→正文的三段式点击链在合成点击下不稳定（会落到插画详情）。
+  emitter.addListener('pictelioBenchNavNovelDetail', (...args: unknown[]) => {
+    const id = args[0]
+    if (typeof id === 'number' && Number.isFinite(id) && id > 0) {
+      void navigate(`/novel/${id}`, { replace: true })
+    } else {
+      console.warn('[router] benchNav 小说正文直达载荷缺 novel_id，跳过')
+    }
+  })
 }
 // 模块加载即注册（先于 initRouter 的网络恢复；initRouter 中重复调用幂等）——
 // 否则广播窗口（onLoadSuccess+1.5/3s）落在 restoreToken 之后时事件被丢弃。

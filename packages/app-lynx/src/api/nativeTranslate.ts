@@ -339,7 +339,21 @@ export function nativeTranslateProvider(): TranslationProvider {
         (raw: unknown) => {
           if (aborted) return
           if (raw === null || typeof raw !== "object") return
-          const chunk = raw as { type?: string; paragraphIndex?: number; text?: string }
+          const chunk = raw as {
+            type?: string
+            paragraphIndex?: number
+            text?: string
+            paragraphs?: { index: number; text: string }[]
+          }
+          // 整章单帧交付（Java 侧 emitConsolidated）：lynx 桥在一条流内只投递首个回调，
+          // 故 Java 把整章译文放进一帧，这里展开成逐段 delta（下游 pipeline/store 无感）。
+          if (chunk.type === "delta_all" && Array.isArray(chunk.paragraphs)) {
+            for (const one of chunk.paragraphs) {
+              queue.push({ type: "delta", paragraphIndex: one.index, text: one.text })
+            }
+            nudge()
+            return
+          }
           if (chunk.type === "delta") {
             queue.push({
               type: "delta",

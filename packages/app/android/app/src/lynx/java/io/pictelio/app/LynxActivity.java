@@ -286,6 +286,27 @@ public class LynxActivity extends AppCompatActivity {
                         // 详情页直达（#542）：载荷通道实测仅数值存活（lynx 4.0.1 无 JavaOnlyString，
                         // 字符串不可走载荷），illust_id 经 intent extra "benchNavIllustId" 数值下发；
                         // 同窗口四次广播，JS 侧缺载荷显式 warn（非静默）。
+                        // 小说正文页直达（ADR-0173 验证用）：novel_id 经 extra 数值下发（同 illust-detail 载荷约定）
+                        if ("novel-detail".equals(benchNav)) {
+                            String rawNovelId = getIntent().getStringExtra("benchNavNovelId");
+                            Long novelId = null;
+                            try {
+                                if (rawNovelId != null) novelId = Long.parseLong(rawNovelId);
+                            } catch (NumberFormatException ignored) {
+                            }
+                            if (novelId != null) {
+                                final long target = novelId;
+                                for (long delay : new long[]{1500, 3000, 4500, 6000}) {
+                                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                                        if (!isFinishing())
+                                            lynxView.sendGlobalEvent("pictelioBenchNavNovelDetail",
+                                                    JavaOnlyArray.of(target));
+                                    }, delay);
+                                }
+                            } else {
+                                Log.w(TAG, "benchNav=novel-detail 缺 benchNavNovelId extra，跳过");
+                            }
+                        }
                         if ("illust-detail".equals(benchNav)) {
                             String rawId = getIntent().getStringExtra("benchNavIllustId");
                             Long illustId = null;
