@@ -375,7 +375,7 @@ public class PictelioTranslateModule extends LynxModule {
                     String errMsg = parseHttpError(resp);
                     // 打点：HTTP 失败原因（状态码 + 原始错误体，供真机排查；不打印 apiKey / 正文）
                     Log.w(TAG, "translateStream HTTP " + resp.code() + " body=" + errMsg);
-                    STREAM_TERMINAL.put(streamId, errMsg);
+                    registerTerminal(streamId, errMsg);
                     // 失败终态**必须**也走事件总线：轮询通道实测回调 0/158（ADR-0170），
                     // 只写 STREAM_TERMINAL 会让 UI 永久停在「n% 翻译中」（历史缺陷翻版）。
                     publishFramesViaEvent(streamId);
@@ -436,13 +436,13 @@ public class PictelioTranslateModule extends LynxModule {
                 return;
             } catch (Throwable e) {
                 if (USER_ABORTED.contains(streamId)) {
-                    STREAM_TERMINAL.put(streamId, "aborted");
+                    registerTerminal(streamId, "aborted");
                     publishFramesViaEvent(streamId);
                     return; // 用户主动中断：交付 aborted 终态，UI 据此收尾
                 }
                 Log.w(TAG, "translateStream 异常", e);
                 String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-                STREAM_TERMINAL.put(streamId, "网络错误：" + msg);
+                registerTerminal(streamId, "网络错误：" + msg);
                 // 同上：异常终态也必须交付（否则 UI 挂起）
                 publishFramesViaEvent(streamId);
             } finally {
