@@ -294,6 +294,9 @@ public class PictelioTranslateModule extends LynxModule {
         final Request httpReq;
         try {
             JSONObject req = new JSONObject(requestJson);
+            // streamId 必须在任何校验分支之前确定：校验失败也要能被 JS 侧读到（否则轮询
+            // 永远 pending → 用户永久「n% 翻译中」）。Java 用调用方的 _abortToken，两端一致。
+            streamId = req.optString("_abortToken", UUID.randomUUID().toString());
             String baseUrl = req.optString("baseURL", "").trim();
             String model = req.optString("model", "").trim();
             // 入口打点：字段名/长度可见，便于区分「JS 未发请求」与「字段契约不符」
@@ -303,11 +306,11 @@ public class PictelioTranslateModule extends LynxModule {
                     + " input=" + (req.optJSONArray("input") == null ? "null" : String.valueOf(req.optJSONArray("input").length()))
                     + " abortToken=" + req.has("_abortToken"));
             if (baseUrl.isEmpty()) {
-                callback.invoke("", "baseURL 不能为空");
+                failStream(streamId, "baseURL 不能为空");
                 return;
             }
             if (model.isEmpty()) {
-                callback.invoke("", "model 不能为空");
+                failStream(streamId, "model 不能为空");
                 return;
             }
             // 允许 http:// 仅当指向本机回环/宿主别名（端到端测试窗口：emulator 的 10.0.2.2
@@ -316,12 +319,12 @@ public class PictelioTranslateModule extends LynxModule {
                     || baseUrl.startsWith("http://localhost")
                     || baseUrl.startsWith("http://10.0.2.2");
             if (!baseUrl.startsWith("https://") && !loopback) {
-                callback.invoke("", "baseURL 必须为 https:// 前缀");
+                failStream(streamId, "baseURL 必须为 https:// 前缀");
                 return;
             }
             JSONArray inputArr = req.optJSONArray("input");
             if (inputArr == null || inputArr.length() == 0) {
-                callback.invoke("", "input 不能为空数组");
+                failStream(streamId, "input 不能为空数组");
                 return;
             }
 
@@ -332,12 +335,11 @@ public class PictelioTranslateModule extends LynxModule {
             // API key 仅在 Java 堆解密（不进 callback 链，ADR-0037）
             String read = new SecureStorageCompat(ctx).getItem(KEY_API_KEY);
             if (read == null || read.isEmpty()) {
-                callback.invoke("", "尚未配置 API key");
+                failStream(streamId, "尚未配置 API key");
                 return;
             }
             apiKey = read;
 
-            streamId = req.optString("_abortToken", UUID.randomUUID().toString());
             JSONObject body = buildRequestBody(req, model, inputArr);
             String url = responsesUrl(baseUrl);
             httpReq = new Request.Builder()
@@ -380,7 +382,7 @@ public class PictelioTranslateModule extends LynxModule {
                 Log.i(TAG, "translateStream HTTP " + resp.code() + " 开始读流 bodyBytes="
                         + (body == null ? "null" : body.contentLength()));
                 if (body == null) {
-                    callback.invoke("", "响应体为空");
+                    failStream(streamId, "响应体为空");
                     return;
                 }
                 deltaSeen = false;
@@ -438,6 +440,18 @@ public class PictelioTranslateModule extends LynxModule {
                 USER_ABORTED.remove(streamId);
             }
         });
+    }
+
+    /**
+     * 失败终态的统一出口：登记终态 + 经事件总线交付。
+     *
+     * <p>为什么需要它：多个 early-return 路径（响应体为空、用户在请求前已中断等）此前只
+     * 回调一次或直接 return，既不写终态也不发布 —— 轮询也救不回（实测回调 0/158），
+     * 用户看到的是永久「n% 翻译中」。
+     */
+    private void failStream(String streamId, String message) {
+        STREAM_TERMINAL.put(streamId, message);
+        publishFramesViaEvent(streamId);
     }
 
     /**
