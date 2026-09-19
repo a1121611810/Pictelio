@@ -16,7 +16,7 @@
 | # | 决策 | 结论 | 依据 |
 |---|------|------|------|
 | D1 | 基底 e2e | `WindowCompat.enableEdgeToEdge(window)` 于 `LynxActivity.onCreate`（`installSplashScreen` 与 `super.onCreate` 之后、`setContentView` 之前） | #592 F4.2；一行兼容 API 28→35+，自动处理透明/scrim/cutout |
-| D2 | insets 管线 | 原生 `setOnApplyWindowInsetsListener(lynxView)` → 初始值经 `setGlobalProps`（渲染前注入 `safeAreaTop/safeAreaBottom`，数值载荷）+ 变更经 `sendGlobalEvent("pictelioInsets", [top, bottom])`；JS 侧 `GlobalEventEmitter.addListener`（router.ts:315 `pictelioBack` 同款先例） | #593：lynx JS 零内置 insets 通道（SystemInfo 无字段、`env(safe-area-inset-*)` Android 恒 0 且静默）；维护者口径 = 原生注入 |
+| D2 | insets 管线 | 原生 `setOnApplyWindowInsetsListener(lynxView)` → JS 订阅 `pictelioInsets` 事件后经 **`PictelioAppModule.getSafeAreaInsets(cb)` 拉取初值**（数值载荷 `[top, bottom]`），后续变化由事件推送；JS 侧 `GlobalEventEmitter.addListener`（router.ts:315 `pictelioBack` 同款先例）。**修订（T1 实现期）**：初值从「globalProps 预注入」改为「订阅后拉取」——insets 首次分发发生在视图 attach 期，早于 JS 订阅（benchNav 四次广播同族竞态），纯推模式首帧必丢；拉取消除该竞态且少一个契约面 | #593：lynx JS 零内置 insets 通道；维护者口径 = 原生注入 |
 | D3 | 可视内容区语义保持 | `LynxActivity.sContentW/H`（ADR-0131）改为「LynxView 边界 − 当前可见系统栏 insets」，随 insets 回调更新 → **`getViewportSize` 对 JS 的契约语义不变**（可视内容区），GlobalFab/viewportGeometry/弹层定位**零改动** | #594：现语义=窗口−双栏；e2e 后 LynxView 布局变全屏，不减 insets 则 FAB 贴手势条 |
 | D4 | 状态栏图标深浅固定 | `isAppearanceLightStatusBars = true` 恒定（enableEdgeToEdge 之后覆盖调用）：app-lynx 无暗色 UI（全仓零 `prefers-color-scheme`），浅色底配深图标；lynx 暗色模式落地时再联动 | #592 F4.1：e2e 下唯一正规途径；避免系统暗色时 enableEdgeToEdge 联动出白图标 |
 | D5 | 全屏模式开关 | 设置键 `settings_fullscreen_mode`（"true"/"false"，**默认 false**，设备级、随备份域）；UI 行在 Me.vue 设置卡；写键 + 调新增 `PictelioAppModule.setSystemBarsHidden(hidden, cb)`（`WindowInsetsControllerCompat` hide/show + `BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`）；冷启动 LynxActivity 读同键重设（F3.2：hide 在窗口获得控制权即生效，onCreate 调用安全） | #595；immersive 运行时可切可逆、compat 覆盖 API 28+ |
@@ -29,23 +29,22 @@
 flowchart LR
   subgraph Java
     A[enableEdgeToEdge<br>+ insets listener] --> B{sContentW/H 更新<br>= LynxView 边界 − 可见系统栏 insets}
-    A -->|初始| C[setGlobalProps<br>safeAreaTop/Bottom]
     A -->|变更| D[sendGlobalEvent<br>pictelioInsets top,bottom]
     E[settings_fullscreen_mode 键] -->|onCreate 读| F[WindowInsetsControllerCompat<br>hide / show]
     G[PictelioAppModule<br>.setSystemBarsHidden] --> F
     F --> A
   end
   subgraph JS app-lynx
-    C --> H[safeArea signals<br>safeTop/safeBottom]
-    D --> H
+    D --> H[safeArea signals<br>safeTop/safeBottom]
     H --> I[App.vue Root<br>padding-top/bottom]
     H --> J[弹层家族<br>padding-bottom]
     B -.getViewportSize 契约不变.-> K[GlobalFab/弹层几何<br>零改动]
   end
   L[Me.vue 开关行<br>settingsStore.setFullscreenMode] -->|写 prefs + 调原生| G
+  M[initSafeArea 订阅后<br>getSafeAreaInsets 拉初值] --> H
 ```
 
-冷启动顺序：`installSplashScreen` → `super.onCreate` → `enableEdgeToEdge` → 图标深浅覆盖（D4）→ 建 LynxView → `setGlobalProps`（insets 初始值；首次 insets 尚未回调时给 0，回调后补事件）→ `renderTemplateUrl` → insets listener 注册。
+冷启动顺序：`installSplashScreen` → `super.onCreate` → `EdgeToEdge.enable(this)`（实际解析 androidx.activity 1.8.0，Java 入口为静态 `EdgeToEdge.enable`；core 无 `WindowCompat.enableEdgeToEdge` 变体——#592 报告 F4.2 该点已实证修正）→ 图标深浅覆盖（D4）→ 建 LynxView → `setContentView` → insets listener 注册 → `renderTemplateUrl` → JS 订阅后拉取初值（`getSafeAreaInsets`）。
 
 ## 4. 模块接口
 
@@ -53,8 +52,8 @@ flowchart LR
 
 | 元素 | 签名/位置 | 语义与不变量 |
 |------|----------|-------------|
-| insets 监听 | `LynxActivity`，`lynxView.setOnApplyWindowInsetsListener`（API 20+） | 消费 `WindowInsetsCompat.Type.systemBars()` + `displayCutout()`；记录 `sVisibleSystemBarInsets`；重算 `sContentW/H`（D3）；值变化才发事件（防抖重复回调） |
-| 初始注入 | `LynxView`（build 后、render 前）`setGlobalProps(JavaOnlyMap.of("safeAreaTop", t, "safeAreaBottom", b))` | **仅数值**（4.0.1 无 JavaOnlyString 坑，benchNavIllustDetail 先例）；未回调时 0 |
+| insets 监听 | `LynxActivity`，`lynxView.setOnApplyWindowInsetsListener`（API 20+） | 消费 `WindowInsetsCompat.Type.systemBars()` + `displayCutout()`；记录 `sInsetTop/Bottom`；重算 `sContentW/H`（D3）；值变化才发事件（防抖重复回调） |
+| 初值拉取 | `@LynxMethod getSafeAreaInsets(Callback)`（`PictelioAppModule`） | `cb(top, bottom)` 数值 px；异常 `cb(0, 0)`（不抛）；JS 订阅事件后调用 |
 | insets 事件 | `lynxView.sendGlobalEvent("pictelioInsets", JavaOnlyArray.of(top, bottom))` | 事件名/载荷顺序为 JS↔Java 契约（契约测试钉住） |
 | 全屏切换 | `@LynxMethod setSystemBarsHidden(boolean hidden, Callback cb)`（`PictelioAppModule`） | `WindowInsetsControllerCompat(window, decorView)`：hide/show `Type.systemBars()` + behavior transient-swipe；主线程执行；cb 沿用 null-free 惯例 |
 | 冷启动重设 | `LynxActivity.onCreate` 读 `SharedPreferences("CapacitorStorage")` 键 `settings_fullscreen_mode`（与 settingsStore 写入同键，`autoFallbackEngine` 双端共享先例） | `"true"` 时 apply hide；Activity 重建自动重设（F3.2） |
@@ -63,23 +62,23 @@ flowchart LR
 
 | 元素 | 位置 | 语义与不变量 |
 |------|------|-------------|
-| safeArea signals | 新 `src/utils/safeArea.ts`：`safeTop()`/`safeBottom()`（module-level ref）+ `initSafeArea()`（App.vue onMounted 调用） | 初始读 `lynx.__globalProps?.safeAreaTop/Bottom`（rspeedy-env.d.ts `GlobalProps` 接口补充声明）；`addListener('pictelioInsets', ...)` 更新；emitter 不可用（web-core 预览）→ 恒 0 + 一次性 warn（router:317 先例） |
+| safeArea signals | 新 `src/utils/safeArea.ts`：`safeTop()`/`safeBottom()`（module-level ref）+ `initSafeArea()`（App.vue onMounted 调用） | `addListener('pictelioInsets', ...)` 后**立即拉取** `NativeModules.PictelioApp.getSafeAreaInsets` 初值（订阅后拉，spec D2 修订）；事件更新；emitter/NativeModules 不可用（web-core 预览）→ 恒 0 + 一次性 warn（router:317 先例） |
 | Root 适配 | `App.vue` 根 `<page>`：`:style="{ paddingTop: safeTop()+'px', paddingBottom: safeBottom()+'px' }"` | 系统栏区域染 Root surface 色 = 「着色」效果的正确实现；列表/内容天然不被遮挡 |
-| 弹层底部 | 弹层家族根容器补 `padding-bottom: safeBottom`：SearchSheet、CommentOverlay、NovelExportSheet、NovelCaptionSheet、PagePickerSheet、WatchlistPromptDialog | absolute `bottom-0` 定位不受父 padding 影响，需各自消费；复用同一 composable |
+| 弹层底部 | 弹层家族根容器补 `padding-bottom: safeBottom`：SearchSheet、CommentOverlay、NovelExportSheet、NovelCaptionSheet、PagePickerSheet、WatchlistPromptDialog、BookmarkPanel（top-[20vh]+h-[80vh] 与贴底等价）；WatchlistPromptDialog 居中不触底，实际不消费（契约测试钉住偏离）。实现为面板末尾 spacer `<view :style="{ height: safeBottom + 'px' }" />`（规避 vw/padding 类覆盖语义） | absolute `bottom-0` 定位不受父 padding 影响，需各自消费；复用同一 composable |
 | 全屏开关状态 | `settingsStore`：`_fullscreenMode` ref + `setFullscreenMode(enabled)`（写 prefs 键 + 非静默 catch warn + 原生模式下调 `NativeModules.PictelioApp.setSystemBarsHidden`）；`loadSettings()` 恢复（损坏值 warn 维持默认，既有模式） | dev/web-core 无 NativeModules → 仅写键，catch 静默跳过原生调用（console.debug 可见） |
-| 设置 UI | `Me.vue` 设置卡新增行（复用 `autoFallbackEngine` 行式样：标题 + M3 switch）+ i18n key（`settings.fullscreenMode` 标题/副文案，双语言） | 开关即时生效（走原生调用），无需重启 |
+| 设置 UI | `Me.vue` 设置卡新增行（复用 `autoFallbackEngine` 行式样：标题 + M3 switch）+ i18n key（`me.client.fullscreenMode` 标题/副文案，双语言，跟随 Me 页既有命名空间） | 开关即时生效（走原生调用），无需重启 |
 
 ### 4.3 契约锚点（契约测试钉住，`backupRulesConsistency` 模式）
 
 - 键名 `settings_fullscreen_mode`：`settingsStore.ts` ↔ `LynxActivity`（Java 常量）
 - 事件名 `pictelioInsets` + 载荷 `[top, bottom]` 顺序：`safeArea.ts` ↔ `LynxActivity`
-- globalProps 字段 `safeAreaTop/safeAreaBottom`：`safeArea.ts` ↔ `LynxActivity` + rspeedy-env.d.ts
+- 拉取方法 `getSafeAreaInsets`（回调 `(top, bottom)`）：`safeArea.ts` ↔ `PictelioAppModule`
 
 ## 5. 状态与边界
 
 | 场景 | 行为 |
 |------|------|
-| 首次 insets 回调前 bundle 已渲染 | globalProps 给 0 → Root 无 padding → 回调后事件订正（闪一帧可接受，与现骨架屏时序同量级） |
+| 首次初值 | JS `initSafeArea()` 订阅事件后立即拉取 `getSafeAreaInsets` → 首帧 padding 即正确（无闪 0）；事件只管后续变化 |
 | 旋转/折叠屏 | `onApplyWindowInsets` 重新回调 → contentSize 重算 + 事件再发（数值载荷自描述） |
 | 全屏模式开启 | systemBars insets=0 → 事件 `(t, 0)` → Root bottom-padding 归零、列表/FAB 扩展到手势区；transient bars 短暂出现时 insets 回调恢复、收起再归零（框架保证重应用，F3.2） |
 | 键盘 | 不消费 `ime()` insets——键盘回避由 SDK 内建（KeyboardMonitor），行为与现状一致 |
@@ -94,10 +93,10 @@ flowchart LR
 **Java 单测（Robolectric）**：
 1. insets→contentSize 计算（给定模拟 insets 断言 `contentSize()` = 边界−可见栏；覆盖「全屏隐藏→bottom=0」翻转）——oracle = D3 + #594 数值基线
 2. `settings_fullscreen_mode` 键读取（true/false/缺失/损坏）
-3. `setSystemBarsHidden` 主线程执行 + controller 调用发生（Robolectric shadow）
+3. `setSystemBarsHidden`：静态核心 `applySystemBarsHidden` 由 Robolectric 断言（legacy 全屏位 + 导航栏隐藏位）；模块包装的 runOnUiThread 分支不单独测（LynxContext 构造不可测），归 T4 真机矩阵覆盖
 
 **JS 单测（vitest + happy-dom）**：
-1. safeArea signals：globalProps 初始 / 事件更新 / 无 native 恒 0 + warn 一次
+1. safeArea signals：订阅后拉取初值 / 事件更新 / 无 native 恒 0 + warn 一次
 2. settingsStore fullscreen：写键、损坏值 warn 维持默认、dev 模式跳过原生调用
 3. Root/弹层 padding 绑定（模板结构断言，oracle = 本 spec §4.2）
 
@@ -113,7 +112,7 @@ flowchart LR
 
 | 票 | 内容 | 依赖 |
 |----|------|------|
-| T1 Java 骨架 | D1/D2/D3/D4：e2e + insets listener + contentSize 迁移 + setGlobalProps/事件 + setSystemBarsHidden + 冷启动读键（含 Java 单测） | — |
+| T1 Java 骨架 | D1/D2/D3/D4：e2e + insets listener + contentSize 迁移 + getSafeAreaInsets/事件 + setSystemBarsHidden + 冷启动读键（含 Java 单测） | — |
 | T2 JS 适配 | safeArea store + Root padding + 弹层家族 + 契约测试（含 JS 单测 + 预览回归） | T1（事件/载荷契约） |
 | T3 全屏开关 | settingsStore + Me.vue 行 + i18n keys + 原生调用接线 | T1 |
 | T4 验收矩阵 | §6 模拟器验收 + 截图对比 + ADR-0168 落盘（docs-before-commit） | T1-T3 |

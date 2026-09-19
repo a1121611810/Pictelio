@@ -207,6 +207,8 @@ const zhPages = {
   "me.client.restarting": "正在重启切换…",
   "me.client.autoFallback": "自动回退 WebView",
   "me.client.autoFallbackDesc": "Lynx 运行出错时自动改用 WebView，关闭后出错仅提示",
+  "me.client.fullscreenMode": "全屏模式",
+  "me.client.fullscreenModeDesc": "隐藏状态栏与导航栏，边缘滑动可临时唤出",
   "me.client.effectiveState": "首选 {{preferred}} · 本次生效 {{effective}}",
 
   // ─── 引擎降级原因文案（ADR-0164 / #555）：生效状态快照 reason 码 → UI 文案

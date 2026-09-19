@@ -1,17 +1,24 @@
 package io.pictelio.app;
 
+import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.View;
+import android.view.WindowInsets;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.activity.EdgeToEdge;
 import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.graphics.Insets;
 import androidx.core.splashscreen.SplashScreen;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.lynx.react.bridge.JavaOnlyArray;
 import com.lynx.tasm.LynxError;
@@ -58,6 +65,14 @@ public class LynxActivity extends AppCompatActivity {
     /** 引擎降级入口标记（ADR-0153）：MainActivity 在 WebView 不可用但 Lynx 可用时置位 */
     public static final String EXTRA_ENGINE_FALLBACK = "pictelio_engine_fallback";
 
+    // ── 系统栏契约常量（spec docs/specs/lynx-systembars.md §4.3；JS↔Java 契约测试钉住）──
+    /** insets 变化事件名（JS safeArea.ts 订阅；载荷 [top, bottom] 数值，spec D2） */
+    public static final String EVENT_INSETS = "pictelioInsets";
+    /** 全屏模式设置键所在文件（settingsStore.setFullscreenMode 同文件写入，spec D5） */
+    public static final String SYSTEMBARS_PREFS = "CapacitorStorage";
+    /** 全屏模式设置键（"true" = 隐藏系统栏；默认缺省 = false） */
+    public static final String KEY_FULLSCREEN_MODE = "settings_fullscreen_mode";
+
     private LynxView lynxView;
     private final AtomicBoolean bundleLoaded = new AtomicBoolean(false);
 
@@ -67,11 +82,60 @@ public class LynxActivity extends AppCompatActivity {
     /** 当前 Activity 弱引用（PictelioAppModule.exitApp 使用，ADR-0066；onDestroy 清理） */
     private static WeakReference<LynxActivity> sInstance;
 
-    // ADR-0131：LynxView 内容区尺寸（px；首次布局后更新；-1 = 未布局）。
-    // SystemInfo 是全屏物理尺寸，内容区撇除系统导航条 inset（FAB 底部被裁根因），
-    // 故以实际内容区为准，经 PictelioAppModule.getViewportSize 回传 JS 订正底部几何。
+    // ADR-0131（spec lynx-systembars D3 修订）：可视内容区尺寸（px；首次布局后更新；-1 = 未布局）。
+    // e2e 后 LynxView 布局为全屏，contentSize = 边界 − 当前可见系统栏 insets（sInset*），
+    // 语义保持「可视内容区」——getViewportSize 对 JS 契约不变，GlobalFab/弹层几何零改动。
     private static volatile int sContentW = -1;
     private static volatile int sContentH = -1;
+    /** 当前可见系统栏 insets（insets 回调更新；onDestroy 复位） */
+    private static volatile int sInsetTop = 0;
+    private static volatile int sInsetBottom = 0;
+    /** 最近一次已推送 JS 的 insets（值变化才发事件，spec D2 防抖不变量；onDestroy 复位） */
+    private static int sLastSentTop = -1;
+    private static int sLastSentBottom = -1;
+
+    /** 可视内容区计算（spec D3 纯函数，供单测）：宽不消费水平 insets，高减上下可见栏且 ≥0。 */
+    static int[] applyVisibleInsets(int w, int h, int insetTop, int insetBottom) {
+        return new int[] { w, Math.max(h - insetTop - insetBottom, 0) };
+    }
+
+    private static void updateContentArea(int w, int h) {
+        int[] size = applyVisibleInsets(w, h, sInsetTop, sInsetBottom);
+        sContentW = size[0];
+        sContentH = size[1];
+    }
+
+    /** 当前可见系统栏 insets（JS 订阅后经 PictelioAppModule.getSafeAreaInsets 拉取，spec D2 修订） */
+    static int currentSafeTop() {
+        return sInsetTop;
+    }
+
+    static int currentSafeBottom() {
+        return sInsetBottom;
+    }
+
+    /**
+     * 全屏模式设置读取（spec D5）：仅 {@code "true"} 判真，缺失/损坏一律 false（默认关）。
+     */
+    static boolean isFullscreenModeRequested(Context ctx) {
+        return "true".equals(ctx.getSharedPreferences(SYSTEMBARS_PREFS, Context.MODE_PRIVATE)
+                .getString(KEY_FULLSCREEN_MODE, null));
+    }
+
+    /**
+     * hide/show 系统栏核心（spec D5 纯逻辑，静态包私有供单测——模块薄包装调它）。
+     * transient-swipe：隐藏后边缘滑动可临时唤出。Activity 重建走 onCreate 读键重设（F3.2）。
+     */
+    static void applySystemBarsHidden(AppCompatActivity activity, boolean hidden) {
+        WindowInsetsControllerCompat controller =
+                new WindowInsetsControllerCompat(activity.getWindow(), activity.getWindow().getDecorView());
+        controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+        if (hidden) {
+            controller.hide(WindowInsetsCompat.Type.systemBars());
+        } else {
+            controller.show(WindowInsetsCompat.Type.systemBars());
+        }
+    }
 
     /** 内容区尺寸 [w, h]（px）；未布局返回 null。 */
     static int[] contentSize() {
@@ -91,11 +155,24 @@ public class LynxActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         sInstance = new WeakReference<>(this);
 
+        // 系统栏基底边到边（spec lynx-systembars D1）：一行兼容 API 28→35+（透明/三键 scrim/
+        // 图标/cutout 由 compat 层处理）；Android 15+ 设备系统本就强制（targetSdk 36），
+        // 主动调用统一双门控两侧形态，≤14 不再出现独立黑/灰条（#594 基线实证的割裂现状）。
+        // 注：实际解析 androidx.activity 1.8.0（variables 的 1.11.0 pin 未被引用，传递依赖
+        // 决定），Java 侧入口是 EdgeToEdge.enable(activity) 静态方法（Kotlin 扩展
+        // enableEdgeToEdge() 的底层实现，#592 报告 F4.2 所述 core WindowCompat 变体不存在）。
+        EdgeToEdge.enable(this);
+        // D4：状态栏图标深浅恒定——app-lynx 无暗色 UI（浅色底恒深图标），覆盖 compat 库
+        // 随系统暗色的联动（系统暗色下错误地切浅色图标会在浅色 UI 上不可读）。
+        WindowInsetsControllerCompat appearanceController =
+                new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView());
+        appearanceController.setAppearanceLightStatusBars(true);
+
         // ADR-0153：降级入口标记 + 一次性通知键。写键必须在 LynxView 渲染前，保证 app-lynx
         // 首帧能读到；该键是「本次由降级进入」的信号，不是首选引擎（首选引擎不落盘）。
         engineFallbackEntry = getIntent().getBooleanExtra(EXTRA_ENGINE_FALLBACK, false);
         if (engineFallbackEntry) {
-            getSharedPreferences("CapacitorStorage", MODE_PRIVATE)
+            getSharedPreferences(SYSTEMBARS_PREFS, MODE_PRIVATE)
                     .edit()
                     .putString(EngineFallbackNotice.KEY, EngineFallbackNotice.VALUE_TRUE)
                     .apply();
@@ -230,14 +307,16 @@ public class LynxActivity extends AppCompatActivity {
         });
 
         setContentView(lynxView);
-        // ADR-0131：内容区尺寸契约——记录 LynxView 实际内容区（撇除系统导航条等 inset），
-        // 供 PictelioAppModule.getViewportSize 回传 JS 订正底部几何（放射 FAB 定位）。
+        // D2：insets 监听——系统栏可见性/几何变化（含冷启动首次分发、全屏开关 hide/show、
+        // 旋转）都经此重算可视内容区并推送 JS。不消费 insets（原样返回），子树照常分发。
+        lynxView.setOnApplyWindowInsetsListener(this::onWindowInsetsChanged);
+        // ADR-0131（D3 修订）：内容区尺寸契约——布局与 insets 双入口都经 updateContentArea
+        // 重算（可视内容区 = 边界 − 可见系统栏 insets），getViewportSize 语义不变。
         // 首次布局即触发，早于 bundle 渲染，getViewportSize 几乎必然命中有效值。
         // 生命周期：lambda 仅写静态字段、不捕获 this，随 lynxView destroy() 释放，无泄漏。
-        lynxView.addOnLayoutChangeListener((v, left, top, right, bottom, ol, ot, or, ob) -> {
+        lynxView.addOnLayoutChangeListener((v, left, top, right, bottom, ol, ot, or2, ob) -> {
             if (right - left > 0 && bottom - top > 0) {
-                sContentW = right - left;
-                sContentH = bottom - top;
+                updateContentArea(right - left, bottom - top);
             }
         });
         // ADR-0066：系统返回桥——拦截系统返回（手势/按键），bundle 就绪后仅转发 JS 决策
@@ -265,7 +344,43 @@ public class LynxActivity extends AppCompatActivity {
         // 10 秒未就绪则视为失败，退出 Splash 并展示错误页，避免启动屏/白屏卡死
         // （S8/ADR-0164 决策 2：超时属慢设备而非不支持，漏斗对 LOAD_TIMEOUT
         // 恒裁决错误页，永不自动跳 WebView）。
+        // D5 冷启动重设：设置键为 true 时隐藏系统栏——Activity 重建（引擎切换/配置变更）
+        // 必走 onCreate，天然满足「重建后重设」（#592 F3.2：新 Window 默认全显）。
+        if (isFullscreenModeRequested(this)) {
+            applySystemBarsHidden(this, true);
+        }
         scheduleLoadTimeout();
+    }
+
+    // ── 系统栏 insets 管线（spec lynx-systembars D2/D3）─────────────────
+
+    /**
+     * insets 回调：记录可见系统栏 insets（systemBars ∪ displayCutout，即 JS 安全区），
+     * 重算可视内容区并推送 JS。原样返回 insets 不消费——子树照常分发。
+     */
+    private WindowInsets onWindowInsetsChanged(View v, WindowInsets insets) {
+        Insets safe = WindowInsetsCompat.toWindowInsetsCompat(insets)
+                .getInsets(WindowInsetsCompat.Type.systemBars()
+                        | WindowInsetsCompat.Type.displayCutout());
+        sInsetTop = safe.top;
+        sInsetBottom = safe.bottom;
+        updateContentArea(v.getWidth(), v.getHeight());
+        sendInsetsEvent();
+        return insets;
+    }
+
+    /**
+     * insets 变化推送 JS（事件通道，spec D2）：初始值由 JS 订阅后经
+     * {@link PictelioAppModule#getSafeAreaInsets} 拉取（防 attach 期首帧事件早于
+     * JS 订阅而丢失——benchNav 四次广播同族的竞态），事件只负责后续变化。
+     * 值变化才发（防抖不变量：框架可能以相同值重复回调）。
+     */
+    private void sendInsetsEvent() {
+        if (lynxView == null) return;
+        if (sLastSentTop == sInsetTop && sLastSentBottom == sInsetBottom) return;
+        sLastSentTop = sInsetTop;
+        sLastSentBottom = sInsetBottom;
+        lynxView.sendGlobalEvent(EVENT_INSETS, JavaOnlyArray.of(sInsetTop, sInsetBottom));
     }
 
     // ── bundle 加载失败兜底（#51 修复：切换引擎后白屏死锁） ─────────────
@@ -481,10 +596,14 @@ public class LynxActivity extends AppCompatActivity {
         // 取消未触发的加载超时回调，避免 Activity 销毁后仍执行 setContentView
         cancelLoadTimeout();
         sInstance = null; // ADR-0066：清理 exitApp 目标引用
-        // ADR-0131：复位内容区尺寸（静态字段跨实例复用）——销毁后回到「未布局」哨兵，
-        // 保证新实例首次查询（若先于布局）命中「cb(-1,-1) → JS 回退 SystemInfo」契约语义。
+        // ADR-0131：复位内容区尺寸与 insets（静态字段跨实例复用）——销毁后回到「未布局」
+        // 哨兵，保证新实例首次查询（若先于布局）命中「cb(-1,-1) → JS 回退 SystemInfo」契约语义。
         sContentW = -1;
         sContentH = -1;
+        sInsetTop = 0;
+        sInsetBottom = 0;
+        sLastSentTop = -1;
+        sLastSentBottom = -1;
         if (lynxView != null) {
             lynxView.destroy();
         }

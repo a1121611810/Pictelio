@@ -25,6 +25,7 @@ import { useAuthStore } from '../stores/authStore'
 import { useModalStack } from '../stores/modalStack'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { INPUT_PLACEHOLDER_COLOR } from '../utils/lynxPlatformColors'
+import { safeBottom } from '../utils/safeArea'
 
 const props = defineProps<{
   /** 目标作品 id（面板内预填/标签库请求的作用域；变化即重载） */
@@ -333,6 +334,9 @@ onBeforeUnmount(() => {
           </text>
         </view>
       </view>
+      <!-- 系统栏安全区（spec lynx-systembars §4.2）：top-[20vh]+h-[80vh] 与 bottom-0 贴底
+           等价（ADR-0123 正向锚点），保存区末尾同样要抬离手势/导航区 -->
+      <view :style="{ height: safeBottom + 'px' }" />
     </view>
   </view>
 </template>

@@ -8,6 +8,7 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { t } from '../i18n'
 import { useModalStack } from '../stores/modalStack'
 import { proxyImageUrl } from '../utils/imageUrl'
+import { safeBottom } from '../utils/safeArea'
 import SkeletonImage from './SkeletonImage.vue'
 
 const props = defineProps<{
@@ -107,6 +108,8 @@ onBeforeUnmount(() => {
           <text class="text-label-large text-surface-on">{{ busy ? t('pagePicker.saving') : t('pagePicker.save', { count: selected.length }) }}</text>
         </view>
       </view>
+      <!-- 系统栏安全区（spec lynx-systembars §4.2）：底部面板抬离手势/导航区 -->
+      <view :style="{ height: safeBottom + 'px' }" />
     </view>
   </view>
 </template>

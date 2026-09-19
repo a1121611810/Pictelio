@@ -37,6 +37,7 @@ import {
 } from '@pictelio/search-core'
 import type { SearchScope, SearchSort } from '../api/types'
 import { INPUT_PLACEHOLDER_COLOR } from '../utils/lynxPlatformColors'
+import { safeBottom } from '../utils/safeArea'
 
 const searchHistory = useSearchHistoryStore()
 const searchSheet = useSearchSheetStore()
@@ -732,6 +733,8 @@ onBeforeUnmount(() => {
           </template>
         </template>
       </view>
+      <!-- 系统栏安全区（spec lynx-systembars §4.2）：底部面板抬离手势/导航区 -->
+      <view :style="{ height: safeBottom + 'px' }" />
     </view>
   </view>
 </template>
