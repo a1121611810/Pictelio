@@ -183,6 +183,10 @@ const xRestrict = computed<0 | 1 | 2>(() => {
 
 /** 是否启用翻译功能：未受限 + 有正文 */
 const translationEnabled = computed<boolean>(() => {
+  // DEV hook：模拟器测试强制放行 R-18（dev only；正式 release 必须 revert）
+  if ((globalThis as Record<string, unknown>).__FORCE_R18__ === true) {
+    return paragraphs.value.length > 0
+  }
   return paragraphs.value.length > 0 && xRestrict.value === 0
 })
 
