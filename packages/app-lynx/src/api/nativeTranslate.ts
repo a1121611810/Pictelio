@@ -13,7 +13,7 @@
 // web-core 预览 / node 测试无 NativeModules → 走降级适配器（明示失败，禁假成功 #568）。
 import { unquoteNativeString } from "../utils/tokenStorage"
 import { buildSystemInstructions } from "./translate"
-import type { TranslationChunk, TranslationProvider } from "./translate"
+import type { TranslationChunk, TranslationErrorCode, TranslationProvider } from "./translate"
 
 /** 原生 PictelioTranslate Module 接口（Lynx Native Module；回调契约见 PictelioTranslateModule.java） */
 export interface NativeTranslateModule {
@@ -242,6 +242,26 @@ export async function translateStream(
 }
 
 /**
+ * 原生错误消息 → 错误码（ADR-0173 D7：UI 按 code 选 i18n 文案，不直接渲染技术串）。
+ *
+ * <p>为什么必须分类：适配器此前一律产出 {@code unknown}，于是 HTTP 502 这类明确的
+ * 服务端错误在 UI 上显示为「未知错误」——用户拿不到任何可行动信息。
+ */
+export function classifyNativeError(message: string | undefined): TranslationErrorCode {
+  const m = message ?? ""
+  const http = /HTTP (\d{3})/.exec(m)
+  if (http) {
+    const status = Number(http[1])
+    if (status === 401 || status === 403) return "unauthorized"
+    if (status === 429) return "rate_limit"
+    if (status >= 500) return "server"
+    return "network"
+  }
+  if (m.includes("aborted")) return "aborted"
+  return "network"
+}
+
+/**
  * 订阅全局事件总线上的翻译帧（事件名 {@code pictelioTranslateFrame}）。
  *
  * <p>为什么需要这条通道：NativeModule 的 callback 在真机/模拟器上实测「一条流至多投递
@@ -255,6 +275,8 @@ export function attachTranslateFrameListener(
   onFrame: (frame: unknown) => void,
   expectedStreamId?: string,
 ): () => void {
+  /** 首个到达帧携带的 streamId = 原生实际使用的 id（权威值） */
+  let adoptedStreamId: string | null = null
   // 与 router.ts / utils/safeArea.ts 同模式：优先全局 lynx，回退 globalThis.lynx
   // （仓内测试夹具正是用 globalThis.lynx = { getJSModule: () => emitter }，见 safeArea.test.ts）
   const lynxGlobal = (
@@ -289,13 +311,18 @@ export function attachTranslateFrameListener(
         (Array.isArray(probe?.paragraphs) ? " paragraphs=" + probe.paragraphs.length : "") +
         (probe?.streamId != null ? " streamId=" + probe.streamId : ""),
     )
-    // 归属过滤：陈旧流（页面切走 / 上一次翻译未结束）的帧不得写进当前翻译
-    if (expectedStreamId != null && probe?.streamId != null && probe.streamId !== expectedStreamId) {
-      console.warn(
-        "[nativeTranslate] 丢弃非本流帧 streamId=" + probe.streamId +
-          "（期望 " + expectedStreamId + "）",
-      )
-      return
+    // 归属过滤：陈旧流（页面切走 / 上一次翻译未结束）的帧不得写进当前翻译。
+    // 以**原生回显的 streamId**（它实际使用的 _abortToken）为权威 —— JS 侧生成器与原生
+    // 取值可能不同（实测出现过 JS 期望 …-1 / 原生 …-2），用 JS 值判定会误丢本流帧。
+    if (expectedStreamId != null && probe?.streamId != null) {
+      if (adoptedStreamId === null) adoptedStreamId = probe.streamId
+      if (probe.streamId !== adoptedStreamId) {
+        console.warn(
+          "[nativeTranslate] 丢弃非本流帧 streamId=" + probe.streamId +
+            "（本流 " + adoptedStreamId + "）",
+        )
+        return
+      }
     }
     if (parsed === null || typeof parsed !== "object") {
       console.warn("[nativeTranslate] 翻译帧无法解析为帧对象，已丢弃 raw=", raw.slice(0, 120))
@@ -478,7 +505,7 @@ export function nativeTranslateProvider(): TranslationProvider {
           finished = true
           queue.push({
             type: "error",
-            code: "unknown",
+            code: classifyNativeError(chunk.message),
             message: chunk.message ?? "native stream failed",
             retryable: true,
           })
@@ -513,7 +540,7 @@ export function nativeTranslateProvider(): TranslationProvider {
             finished = true
             queue.push({
               type: "error",
-              code: "unknown",
+              code: classifyNativeError(err instanceof Error ? err.message : String(err)),
               message: err instanceof Error ? err.message : String(err),
               retryable: true,
             })

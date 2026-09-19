@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   attachTranslateFrameListener,
+  classifyNativeError,
   nativeTranslateProvider,
   translatePoll,
 } from '../../../src/api/nativeTranslate'
@@ -126,6 +127,17 @@ describe('attachTranslateFrameListener（事件总线交付通道）', () => {
     )
   })
 
+  it('原生错误消息 → 错误码分类（UI 据此选 i18n 文案，ADR-0173 D7）', () => {
+    // oracle：HTTP 状态码语义（401/403 凭证、429 限流、5xx 服务端、其余网络）
+    expect(classifyNativeError('HTTP 502: ')).toBe('server')
+    expect(classifyNativeError('HTTP 401: invalid api key')).toBe('unauthorized')
+    expect(classifyNativeError('HTTP 403: forbidden')).toBe('unauthorized')
+    expect(classifyNativeError('HTTP 429: slow down')).toBe('rate_limit')
+    expect(classifyNativeError('HTTP 400: bad request')).toBe('network')
+    expect(classifyNativeError('网络错误：timeout')).toBe('network')
+    expect(classifyNativeError(undefined)).toBe('network')
+  })
+
   it('轮询回调失败（原生 reject）→ 抛错，不得静默成功', async () => {
     // 硬约束 #1 的失败路径：translatePoll 的原生错误必须显式暴露
     ;(globalThis as { NativeModules?: unknown }).NativeModules = {
@@ -166,23 +178,25 @@ describe('attachTranslateFrameListener（事件总线交付通道）', () => {
     expect((first.value as { type: string }).type).toBe('error')
   })
 
-  it('非本流帧被丢弃（陈旧流不得写进当前翻译，ADR-0170 归属键条款）', () => {
+  it('首个到达帧确定本流，之后非本流帧被丢弃（ADR-0170 归属键条款）', () => {
+    // 权威 id = 原生回显值：JS 侧生成器与原生取值可能不同（实测 JS 期望 …-1 / 原生 …-2），
+    // 故以首个到达帧的 streamId 作为本流标识，之后的异 id 帧丢弃。
     const emitter = installFakeLynx()
     const mine: unknown[] = []
-    attachTranslateFrameListener((f) => mine.push(f), 'stream-A')
+    attachTranslateFrameListener((f) => mine.push(f), 'js-generated-id')
 
     emitter.emit(
       'pictelioTranslateFrame',
-      JSON.stringify({ type: 'delta_all', paragraphs: [{ index: 0, text: '别人的' }], streamId: 'stream-B' }),
+      JSON.stringify({ type: 'delta_all', paragraphs: [{ index: 0, text: '我的' }], streamId: 'native-id' }),
     )
-    expect(mine).toEqual([])
+    expect(mine).toEqual([{ type: 'delta_all', paragraphs: [{ index: 0, text: '我的' }], streamId: 'native-id' }])
+
+    emitter.emit(
+      'pictelioTranslateFrame',
+      JSON.stringify({ type: 'delta_all', paragraphs: [{ index: 0, text: '别人的' }], streamId: 'other-stream' }),
+    )
+    expect(mine).toHaveLength(1)
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('丢弃非本流帧'))
-
-    emitter.emit(
-      'pictelioTranslateFrame',
-      JSON.stringify({ type: 'delta_all', paragraphs: [{ index: 0, text: '我的' }], streamId: 'stream-A' }),
-    )
-    expect(mine).toEqual([{ type: 'delta_all', paragraphs: [{ index: 0, text: '我的' }], streamId: 'stream-A' }])
   })
 
   it('未声明期望 streamId 时不做归属过滤（向后兼容旧载荷）', () => {
