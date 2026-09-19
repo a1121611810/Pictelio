@@ -5,7 +5,8 @@
 - **被测构建**：debug APK，`BENCH_NAV=1` + `PictelioTranslate` 原生模块
 - **LLM 端点**：本地 mock Responses SSE 服务（`packages/app/tests/android-e2e/tools/mock-responses-sse-server.mjs`）+ `adb reverse`
 - **复跑脚本**：`packages/app/tests/android-e2e/tools/verify-translation.sh mock`（自包含：构建 → 新鲜度校验 → 安装 → 启动 → 定位并点击 → 采集两端证据；2026-09-20 起自带导航深链与「拒绝测旧包」防线）
-- **被测提交**：`f8a01bc7`（交付通道链路：4d13646c 事件总线 → 4975435a 包名修复 → 818014da 解析测试对齐 → f8a01bc7 脚本自包含）
+- **成功路径被测提交**：`f8a01bc7`（交付通道链路：4d13646c 事件总线 → 4975435a 包名修复 → 818014da 解析测试对齐 → f8a01bc7 脚本自包含）
+- **失败路径被测提交**：`9fcf615c`（`f8a01bc7` 的 HTTP 失败分支当时尚未 publish，不可能产生失败路径日志；见下方「失败路径验证」一节的 commit pin）
 
 ## 7 步流程与结果
 
@@ -25,7 +26,7 @@
 
 要点：按钮从「0% 翻译中」变为「✓ 重译」；segmented button（原文/译文）出现；正文段落已替换为 mock 端点的译文（`【译N】…`）。
 
-## 失败路径验证（同一脚本，端点不可达）
+## 失败路径验证（同一脚本，端点不可达；被测提交 `9fcf615c`）
 
 把 endpoint 指向不可达端口（`http://127.0.0.1:8899/v1`）复跑，验证"失败可见"：
 
