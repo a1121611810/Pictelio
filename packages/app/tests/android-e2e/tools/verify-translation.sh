@@ -19,15 +19,24 @@ else
 fi
 
 # 构建（带 pipefail）+ 新鲜度校验
-BUILD_START=$(date +%s)
+# 构建（带 pipefail）。先删掉 APK：gradle 在「只有 asset（JS bundle）变化」时会把打包任务
+# 判为 up-to-date 而不重写 APK，导致 APK 落后于 bundle —— 删掉即可让打包必然发生。
+APK_PATH=/Users/lilianda/develop/pixivizer/packages/app/android/app/build/outputs/apk/lynx/debug/app-lynx-debug.apk
+rm -f "$APK_PATH"
 (cd /Users/lilianda/develop/pixivizer && BENCH_NAV=1 NODE_ENV=production \
   pnpm --dir packages/app-lynx run build >/dev/null && \
   node packages/app-lynx/scripts/sync-android-assets.mjs >/dev/null && \
   cd packages/app/android && GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew assembleLynxDebug --no-daemon -q)
+# 判据：打包进 APK 的**源集**（main/java + lynx/java，以及 JS 产出的 bundle）不得比 APK 新。
+# 不比「构建开始时刻」—— gradle 判定 up-to-date 时不重写 APK（合法）；而编译失败被吞时
+# 这些源集一定领先于 APK（本检查要抓的正是后者）；test/ 源集不进 APK，故排除。
 APK=/Users/lilianda/develop/pixivizer/packages/app/android/app/build/outputs/apk/lynx/debug/app-lynx-debug.apk
-APK_TS=$(stat -f %m "$APK")
-if [ "$APK_TS" -lt "$BUILD_START" ]; then
-  echo "[e2e] ❌ APK 未在本次构建中更新（可能是编译失败被吞）—— 拒绝在旧包上测"
+STALE=$(find /Users/lilianda/develop/pixivizer/packages/app/android/app/src/main/java /Users/lilianda/develop/pixivizer/packages/app/android/app/src/lynx/java -type f -newer "$APK" 2>/dev/null | head -1)
+BUNDLE=/Users/lilianda/develop/pixivizer/packages/app/android/app/src/main/assets/main.lynx.bundle
+if [ -f "$BUNDLE" ] && [ "$BUNDLE" -nt "$APK" ]; then STALE="$BUNDLE"; fi
+if [ -n "$STALE" ]; then
+  echo "[e2e] APK is older than packaged sources: $STALE"
+  echo "[e2e] refusing to test a stale build (a swallowed compile failure looks like this)"
   exit 1
 fi
 adb install -r "$APK" >/dev/null 2>&1
@@ -38,44 +47,14 @@ adb shell am start -n "$ACT" \
   --es pictelio_dev_refresh_token "$TOKEN" --es pictelio_dev_force_r18 true \
   --es pictelio_dev_llm_base_url "$BASE" --es pictelio_dev_llm_model "$MODEL" \
   --es pictelio_dev_llm_api_key "$KEY" --es benchNav novel >/dev/null
-# benchNav 广播有竞态（1.5/3/4.5/6s 四次），页面可能还没到位 —— 先确认在小说列表再点
-nav_ok=0
-for i in 1 2 3 4 5; do
-  sleep 6
-  adb exec-out screencap -p > /tmp/pictelio-e2e/nav-$i.png
-  # 小说列表页特征：顶部标题「小说」+ 列表卡（用像素密度粗判：标题区有深色文本像素）
-  if python3 - "$i" <<'PY'
-import sys
-from PIL import Image
-a = sys.argv[1]
-im = Image.open(f'/tmp/pictelio-e2e/nav-{a}.png').convert('L')
-# 标题带（y 380-460）应有足够深色像素；且不是插画详情（无「关注」按钮的蓝色大块）
-# 小说列表：tab 行（推荐/关注）y≈420-480 有两条深色文本块；详情页顶部左侧有大返回箭头
-tabrow = im.crop((0, 415, 1080, 485))
-dark_tab = sum(1 for p in tabrow.getdata() if p < 110)
-backrow = im.crop((0, 330, 300, 390))
-dark_back = sum(1 for p in backrow.getdata() if p < 110)
-sys.exit(0 if (dark_tab > 1500 and dark_back < 600) else 1)
-PY
-  then nav_ok=1; echo "[e2e] 小说列表已就绪（第 $i 次探测）"; break; fi
-done
-[ "$nav_ok" = "1" ] || { echo "[e2e] 未能确认到达小说列表"; exit 1; }
-adb shell input touchscreen tap 540 640; sleep 8     # 第一本小说 → 介绍页
-adb exec-out screencap -p > /tmp/pictelio-e2e/intro.png
-# 介绍页：底部「开始阅读」大按钮（蓝色带位于 y>1600）
-YINTRO=$(python3 - <<'PY'
-from PIL import Image
-im = Image.open('/tmp/pictelio-e2e/intro.png').convert('RGB'); px = im.load()
-def blue(c):
-    r,g,b = c
-    return b > 110 and b - r > 40 and g > r and g < b
-ys = [y for y in range(1400, 2100) if blue(px[540,y])]
-print((ys[0]+ys[-1])//2 if ys else "NONE")
-PY
-)
-[ "$YINTRO" = "NONE" ] && { echo "[e2e] 介绍页未出现（可能没进介绍页）"; exit 1; }
-echo "[e2e] 介绍页开始阅读按钮 y=$YINTRO"
-adb shell input touchscreen tap 540 "$YINTRO"; sleep 10   # 开始阅读 → 正文页
+# 直达正文页（benchNav novel-detail）：三段式点击链（列表→介绍页→正文）在合成点击下
+# 会落到「插画详情」等错误页面，曾造成多次假失败。深链由 LynxActivity 转发全局事件
+# pictelioBenchNavNovelDetail + router 监听实现（与 illust-detail 同载荷约定）。
+NOVEL_ID="${NOVEL_ID:-25434593}"
+adb shell am force-stop "$PKG"; sleep 2
+adb logcat -c
+adb shell am start -n "$ACT" --es pictelio_dev_refresh_token "$TOKEN" --es pictelio_dev_force_r18 true --es pictelio_dev_llm_base_url "$BASE" --es pictelio_dev_llm_model "$MODEL" --es pictelio_dev_llm_api_key "$KEY" --es benchNav novel-detail --es benchNavNovelId "$NOVEL_ID" >/dev/null
+sleep 18
 
 # 定位翻译按钮（蓝色带）并点击；点完必须看到「请求入口」日志，否则重点一次
 for attempt in 1 2 3; do
