@@ -1,6 +1,6 @@
 # ADR-0168: lynx 系统栏策略——基底边到边 + 全屏模式设置开关
 
-- 状态: Accepted（2026-09-19，T4 验收通过：[docs/research/lynx-systembars-t4-acceptance.md](../research/lynx-systembars-t4-acceptance.md)；API 35+ 设备实证挂账，文档锚定见 #592）
+- 状态: Accepted（2026-09-19，T4 验收通过：[docs/research/lynx-systembars-t4-acceptance.md](../research/lynx-systembars-t4-acceptance.md)——Android 9/14/16 三级别全矩阵绿；API 36 经断言式 CI 验收 workflow 补测，ALL PASS）
 - 日期: 2026-09-19
 - 关联: wayfinder 地图 [#591](https://github.com/a1121611810/Pictelio/issues/591)（决策 [#595](https://github.com/a1121611810/Pictelio/issues/595)）；spec [docs/specs/lynx-systembars.md](../specs/lynx-systembars.md)；研究 [#592](https://github.com/a1121611810/Pictelio/issues/592)（平台事实）/ [#593](https://github.com/a1121611810/Pictelio/issues/593)（Lynx 能力）；基线 [#594](https://github.com/a1121611810/Pictelio/issues/594)；修订 ADR-0131（内容区契约，语义保持）
 

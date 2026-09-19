@@ -34,11 +34,24 @@
 | 三键导航形态 | 黑色独立条 | surface 染色 + 深色三键图标，**可读无遮挡**（D6 缺省形态；截图 `api28-e2e-home.png`） | ✅ |
 | 内容遮挡 | 无 | 无（登录卡完整可见） | ✅ |
 
-## 四、API 35/36 与预览
+## 四、API 36（Android 16）——已补测（2026-09-19，ALL PASS）
 
-- **API 36 模拟器**：镜像下载网络阻塞（#594 报告 §三，补做指引在内）。文档锚定（#592 F1.1/F1.2 双门控）已证 15+ 强制行为与 D1 主动开启等价（幂等）；实施发版前须在 API 35+ 真机/模拟器补一轮（挂账）。
+本地 dl.google.com 不可达，改经 GitHub Actions runner（外网无障碍 + KVM）跑断言式验收 workflow（`.github/workflows/sysbars-acceptance.yml`，手动触发；run 35416169153，约 7 分钟）。**五组断言全绿**：
+
+| 断言 | 实测 | 判定 |
+| --- | --- | --- |
+| A1 LynxView 铺满全屏 | 0,0-1080,**2280**（pixel_4 API 36 全屏） | ✅ |
+| A2 系统栏 inset 源可见（e2e 基底） | statusBars [0,0][1080,66] + navigationBars [0,2214][1080,66]，SUPPRESS_SCRIM | ✅ |
+| A3 全屏冷启动 | 双系统栏 `visible=false`（4/4 行） | ✅ |
+| A4 transient 唤出 | 边缘下滑 `visible=true` → ~3s 自动 `visible=false` | ✅ |
+| A5 关闭恢复 | 键改 false 重启 → 双系统栏 `visible=true` | ✅ |
+
+截图：`shot1-e2e-home.png`（e2e 基底）、`shot2-fullscreen.png`（全屏模式）。**Android 16 强制边到边 + 主动开启 + 全屏开关在最高目标级别全部实证**。workflow 成为常驻 QA 工具（#594 §三 挂账的永久补做通道）。
+
+## 五、API 35/36 挂账之外的说明与预览
+
 - **web-core 预览**：safeArea 恒 0（单测 4 例）→ 布局与历史形态等价；契约测试钉住消费面。
 
-## 五、结论
+## 六、结论
 
-T1-T3 交付在 Android 14 / Android 9 双级别全部验收通过：e2e 基底生效（LynxView 全屏）、系统栏区域染 surface 色（着色诉求达成）、零遮挡、FAB/几何契约不变（D3）、全屏开关冷启动 + transient + 恢复全链可用。**ADR-0168 转 Accepted**。残余：① API 35+ 设备实证（网络阻塞挂账）；② Me 页 UI 拨动 + 真机批次（含 FAB 环导航的实机验证）。
+T1-T3 交付在 Android 14 / Android 9 / **Android 16** 三级别全部验收通过：e2e 基底生效（LynxView 全屏）、系统栏区域染 surface 色（着色诉求达成）、零遮挡、FAB/几何契约不变（D3）、全屏开关冷启动 + transient + 恢复全链可用。**ADR-0168 转 Accepted**。残余：Me 页 UI 拨动的实机手指验收（模拟器输入注入对 scroll-view 滚动不生效——同真机 tap 失效家族；功能链路已由单测 + 冷启动实证 + 模板/契约测试三通道覆盖），随下次真机批次收口。
