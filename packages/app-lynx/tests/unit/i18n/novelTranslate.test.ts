@@ -89,6 +89,10 @@ const EXPECTED_KEYS: readonly string[] = [
   "novelTranslate.error.rateLimit",
   "novelTranslate.error.server",
   "novelTranslate.error.unknown",
+  "novelTranslate.error.insufficientBalance",
+  "novelTranslate.error.modelNotFound",
+  "novelTranslate.error.invalidRequest",
+  "novelTranslate.error.contentFilter",
   "novelTranslate.error.R18Blocked",
   "novelTranslate.error.timeout",
   "novelTranslate.error.canceled",
@@ -111,8 +115,9 @@ function extractPlaceholders(s: string): string[] {
 describe('i18n: novelTranslate 字典结构（spec §8）', () => {
   it('zh-CN 与 en 键数与 EXPECTED_KEYS 一致（spec §8 键名实现态）', () => {
     // spec §8 用「示意键名」（endpoint.section.title / baseURL.probe.ok…）描述设计意图；
-    // 实现按 4 子命名空间落为 75 键 —— 权威口径 = EXPECTED_KEYS（本表 + 组件用量守卫）。
-    // 历史：47 → 51（清除确认 + 分组标题）→ 67（ADR-0173：探测/凭据状态 + 动作键）→ 75（翻译授权 + 同意面板）。
+    // 实现按 4 子命名空间落为 79 键 —— 权威口径 = EXPECTED_KEYS（本表 + 组件用量守卫）。
+    // 历史：47 → 51 → 67（ADR-0173：探测/凭据状态 + 动作键）→ 75（翻译授权 + 同意面板）
+    //       → 79（错误码分类补全：insufficient_balance / model_not_found / invalid_request / content_filter）。
     expect(Object.keys(zh).length).toBe(EXPECTED_KEYS.length)
     expect(Object.keys(en).length).toBe(EXPECTED_KEYS.length)
   })
@@ -165,7 +170,7 @@ describe('i18n: novelTranslate 字典结构（spec §8）', () => {
     }
   })
 
-  it('endpoint 子域 42 键 + action 9 键 + status 10 键 + error 14 键 = 75', () => {
+  it('endpoint 42 键 + action 9 键 + status 10 键 + error 18 键 = 79', () => {
     const groups = {
       endpoint: EXPECTED_KEYS.filter((k) => k.startsWith('novelTranslate.endpoint.')),
       action: EXPECTED_KEYS.filter((k) => k.startsWith('novelTranslate.action.')),
@@ -175,6 +180,6 @@ describe('i18n: novelTranslate 字典结构（spec §8）', () => {
     expect(groups.endpoint.length).toBe(42)
     expect(groups.action.length).toBe(9)
     expect(groups.status.length).toBe(10)
-    expect(groups.error.length).toBe(14)
+    expect(groups.error.length).toBe(18)
   })
 })

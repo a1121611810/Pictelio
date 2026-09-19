@@ -68,6 +68,11 @@ const zhNovelTranslate = {
   "novelTranslate.error.rateLimit": "请求过于频繁（429）",
   "novelTranslate.error.server": "LLM 服务暂时不可用",
   "novelTranslate.error.unknown": "未知错误",
+  // 错误码分类补全（ADR-0173 D7 / spec §8.4）：此前这四类都落 unknown，用户拿不到可行动信息
+  "novelTranslate.error.insufficientBalance": "账户余额不足：请前往服务商充值",
+  "novelTranslate.error.modelNotFound": "模型不存在（404）：请检查模型名称",
+  "novelTranslate.error.invalidRequest": "请求参数无效（400）：请检查模型与 endpoint 配置",
+  "novelTranslate.error.contentFilter": "服务端未返回译文：内容可能被内容策略拦截",
   "novelTranslate.error.R18Blocked": "未授权翻译 R-18 内容：请在翻译设置中开启",
   "novelTranslate.error.r18gBlocked": "未授权翻译 R-18G 内容：此类内容涉及法律风险，请谨慎开启",
   "novelTranslate.endpoint.translateR18": "允许翻译 R-18",

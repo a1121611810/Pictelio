@@ -242,6 +242,15 @@ const translateErrorText = computed<string>(() => {
       return t('novelTranslate.error.R18Blocked')
     case 'PARTIAL_FAILED':
       return t('novelTranslate.error.partialFailed')
+    case 'insufficient_balance':
+      return t('novelTranslate.error.insufficientBalance')
+    case 'model_not_found':
+    case 'endpoint_not_responses':
+      return t('novelTranslate.error.modelNotFound')
+    case 'invalid_request':
+      return t('novelTranslate.error.invalidRequest')
+    case 'content_filter':
+      return t('novelTranslate.error.contentFilter')
     default:
       return t('novelTranslate.error.unknown')
   }
