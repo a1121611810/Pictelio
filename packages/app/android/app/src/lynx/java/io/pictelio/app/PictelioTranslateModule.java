@@ -119,30 +119,39 @@ public class PictelioTranslateModule extends LynxModule {
     private TranslationSseParser sseParser;
     /** 本次流是否至少产出过一个译文段（空流 = 失败，见 translateStream 收尾） */
     private boolean deltaSeen = false;
-    /** 已入队的 delta 帧计数（仅观测用） */
-    private int deltaCount = 0;
-
-    // ── 帧派发（拉模式）─────────────────────────────────────────────
+    // ── 帧交付（事件总线为主通道，轮询为候选兜底）───────────────────
     // 背景：解析线程若在一次 read 内连续 callback.invoke 多帧，Lynx 桥只投递其中一帧
     // （模拟器实测：Java 下发 11 帧、JS store 只收到 1 帧；加 25ms 睡眠也无效，因为
-    // 桥接层在 JS 线程空闲前就已丢弃）。故解析只入队，主线程按 tick 逐帧派发 ——
-    // 消费节奏由 JS 可处理速率决定，不再丢帧。
+    // 桥接层在 JS 线程空闲前就已丢弃）。故解析只入队，交付**不走 callback** ——
+    // 盖好归属章后由事件总线推送，消费节奏由 JS 可处理速率决定，不再丢帧。
     /**
      * 每流缓冲（streamId → 待交付帧队列 + 终态）。
      *
-     * <p>为什么改成「JS 轮询拉取」而不是「原生推送回调」：实测 lynx NativeModule 的 callback
-     * 通道在**一条流内至多投递 1 次**（逐帧直发 / 加间隔 / 主线程逐帧派发 / 合并单帧，四种
-     * 策略下 JS 都只收到 0-1 帧）。改为每次 {@code translatePoll} 各自是一次独立回调调用，
-     * 由 JS 按节奏拉取 —— 单次回调足够可靠，且拉取次数不受流内限制。
+     * <p>交付主通道 = 全局事件总线（{@code sendGlobalEvent}，见 {@link #publishFramesViaEvent}）。
+     * {@code translatePoll} 保留为**候选兜底**：实测其回调 0/158 次（ADR-0170「交付通道实测」），
+     * 尚不构成有效兜底。两路读同一批已盖章字符串，同一帧在两侧 {@code seq} 一致（接收侧据此去重）。
      */
     private static final Map<String, java.util.concurrent.ConcurrentLinkedQueue<String>> STREAM_FRAMES =
             new ConcurrentHashMap<>();
-    /** streamId → 终态（null = 进行中；"done" / 错误消息） */
+    /**
+     * streamId → 终态**已盖章 JSON 帧**（{@code type}/{@code streamId}/{@code seq}），
+     * 由 {@link #registerTerminal} 构造，事件总线与轮询两路交付的是同一个字符串。
+     *
+     * <p>缺席 = 进行中。**禁放原始文本**：裸文本会让 JS 侧解析失败并静默丢弃终态，
+     * UI 永久停在「n% 翻译中」（历史缺陷）。原始消息（{@code "done"} / 错误文本）另存
+     * {@link #STREAM_TERMINAL_MSG}，只供日志。
+     */
     private static final Map<String, String> STREAM_TERMINAL = new ConcurrentHashMap<>();
-    /** streamId → 终态原始消息（"done" / 错误文本；STREAM_TERMINAL 存已盖章 JSON） */
+    /** streamId → 终态原始消息（{@code "done"} / 错误文本）；仅日志用，不参与交付 */
     private static final Map<String, String> STREAM_TERMINAL_MSG = new ConcurrentHashMap<>();
 
-    /** 待派发帧（worker 入队 / 主线程出队） */
+    /**
+     * 本流的临时帧暂存：解析线程入队，流收尾时整体搬进 {@link #STREAM_FRAMES}。
+     *
+     * <p>**本身不携带归属**：它是实例字段，而模块是注册表单例 —— 两条流重叠时，后来的流
+     * 会把自己的帧也塞进同一队列，谁先抽走谁就替对方盖章（串段）。已核实为**可达**风险，
+     * 见 issue #649；任何新调用点都不得假设「这里只有本流的帧」。
+     */
     private final java.util.concurrent.ConcurrentLinkedQueue<String> frameQueue =
             new java.util.concurrent.ConcurrentLinkedQueue<>();
     /**
@@ -151,14 +160,6 @@ public class PictelioTranslateModule extends LynxModule {
      * 改名会让译文静默不达，故由 TranslationSseParserTest 之外的单测钉住取值。
      */
     static final String EVENT_FRAME = "pictelioTranslateFrame";
-
-    /** 主线程 Handler（帧 tick 与收尾派发共用） */
-    private final android.os.Handler mainHandler =
-            new android.os.Handler(android.os.Looper.getMainLooper());
-    /** 帧 tick 间隔（ms）：约 60 帧/秒，够快且不淹 JS */
-    private static final long FRAME_TICK_MS = 16;
-    /** 本流是否已派发过至少一帧（用于错误收尾时判断是否需要补空流报错） */
-    private boolean framesDispatched = false;
 
     /**
      * 流式专用 OkHttp 客户端：**不带 callTimeout**。
@@ -389,8 +390,6 @@ public class PictelioTranslateModule extends LynxModule {
                     return;
                 }
                 deltaSeen = false;
-                deltaCount = 0;
-                framesDispatched = false;
                 frameQueue.clear();
                 // 每流新建解析器（回归 B）：模块是注册表单例，实例级 sseParser 会让
                 // terminalError 等状态跨流残留 —— 一次失败后同页后续流全部被误判失败。
@@ -513,12 +512,6 @@ public class PictelioTranslateModule extends LynxModule {
                 withSeq(withStreamId(payload, streamId), streamId));
     }
 
-    /** 终态是否成功（供日志/判定；STREAM_TERMINAL 内是已盖章 JSON） */
-    private static boolean isDoneTerminal(String streamId) {
-        String msg = STREAM_TERMINAL_MSG.get(streamId);
-        return "done".equals(msg);
-    }
-
     /**
      * 给帧 JSON 注入 {@code streamId}。
      *
@@ -628,50 +621,6 @@ public class PictelioTranslateModule extends LynxModule {
         } catch (Throwable t) {
             Log.w(TAG, "translatePoll 异常", t);
             callback.invoke("", "轮询失败：" + t.getClass().getSimpleName());
-        }
-    }
-
-    /**
-     * 主线程 tick：每次派发一帧；队列空时收敛终态。
-     *
-     * <p>为什么不在解析线程直接回调：一次 read 内连续 invoke 多帧时 Lynx 桥只投递其中一帧
-     * （模拟器实测 Java 11 帧 / JS 1 帧）。改为解析入队 + 主线程逐帧派发后，消费节奏由
-     * JS 可处理速率决定，不再丢帧。
-     *
-     * <p>空流（零译文段）直接报失败、**不合成 done**：服务端 200 但零输出（真机实测
-     * DeepSeek 对 R-18 正文如此）必须让用户看到错误，而不是「成功却无译文」。
-     */
-    private void drainOrFinish(boolean terminalEmitted, String streamId, Callback callback) {
-        if (USER_ABORTED.contains(streamId)) {
-            return; // 用户中断：静默收尾
-        }
-        String frame = frameQueue.poll();
-        if (frame != null) {
-            framesDispatched = true;
-            callback.invoke(frame, "");
-            mainHandler.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    drainOrFinish(terminalEmitted, streamId, callback);
-                }
-            }, FRAME_TICK_MS);
-            return;
-        }
-        if (!deltaSeen) {
-            Log.w(TAG, "SSE 流结束但未产出任何译文段 → 报空流失败");
-            callback.invoke("", "LLM 未返回任何译文（可能被服务端内容策略拦截）");
-            return;
-        }
-        if (!terminalEmitted) {
-            Log.i(TAG, "SSE 流结束未见终态事件 → 合成 done（DeepSeek 无 response.completed）");
-            try {
-                JSONObject done = new JSONObject();
-                done.put("type", "done");
-                callback.invoke(done.toString(), "");
-            } catch (Exception e) {
-                Log.w(TAG, "合成 done 帧失败", e);
-                callback.invoke("", "流程收尾失败：" + e.getClass().getSimpleName());
-            }
         }
     }
 
@@ -902,15 +851,14 @@ public class PictelioTranslateModule extends LynxModule {
         return sseParser.accept(
                 line,
                 (payload, error) -> {
-                    // 只入队：派发交给主线程 tick（见 frameQueue 注释）
+                    // 只入队：交付由事件总线 / 轮询完成，不进 callback（见 frameQueue 注释）
                     if (payload != null
                             && (payload.contains("\"type\":\"delta\"")
                                 || payload.contains("\"type\":\"delta_all\""))) {
                         deltaSeen = true;
-                        deltaCount++;
                     }
                     if (error != null && !error.isEmpty()) {
-                        // 错误是终态：直接派发（单帧，不会被丢），并停止后续 tick
+                        // 错误是终态：走 callback 直接报错（单帧；一条流至多投递一次恰好够用）
                         callback.invoke("", error);
                         return;
                     }
