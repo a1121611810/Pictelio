@@ -468,3 +468,21 @@ public void abortStream(String token, Callback cb) {
 | 流式复用 `PixivApiCore.getSharedClient()`（D3） | 流式走**专用 OkHttp 客户端**（`callTimeout=0` / `readTimeout=120s`） | 共享客户端带 45s `callTimeout`，会掐断正常长流；掐断后 `call.isCanceled()` 又被当成「用户取消」而静默不回调 → JS promise 永不 settle（真机「永久 N% 翻译中」）。用户中断改由显式 `USER_ABORTED` 集合标记 |
 | 终态只认 `response.completed` | 流结束时若未见终态事件 → **合成 done** | 真机实测 DeepSeek 只发到 `output_item.done` 就断流（无 `response.completed`）；不合成则 promise 永不 settle。另：`response.output_text.done` 是 item 级事件，**不得**当流终态 |
 | `instructions` 由调用方传（spec §9.4） | 调用方传，段落以 `[N]` 前缀锚定；增量按最近锚点归属段落 | 段落回填需要按段对齐；web 与 native 两侧共用同一 `buildSystemInstructions` |
+| 多次 callback 逐帧推送（本文 D6 全节） | **交付主通道 = `sendGlobalEvent`（全局事件总线）**，callback 通道不再用于交付；轮询（`translatePoll`）保留为兜底 | 见下「交付通道实测」 |
+
+### 交付通道实测（2026-09-20，模拟器 emulator-5554）
+
+本模块的 `Callback` 通道在**一条流内不可靠**，四组对照实验（全部用 mock SSE 服务、逐次确认点击落点）：
+
+| 交付策略 | Java 侧 | JS 侧 |
+|---|---|---|
+| 解析期逐段 `callback.invoke` | 11 帧 | 1 帧 |
+| 同上 + 帧间 25ms 节流 | 11 帧 | 1 帧 |
+| 解析入队 + 主线程每 tick 派发一帧 | `queued=9` 全部派发 | 1 帧 |
+| 每段一次回调（累积式） | `queued=4` | 1 帧 |
+| 整章一帧 `delta_all` | `queued=2` | 0 帧 |
+| `translatePoll` 轮询（每次调用独立回调） | 158 次调用到达原生 | 适配器回调 **0 次** |
+
+结论：**该 Callback 通道对「一条流内多次投递」不可靠，且对部分调用完全不投递**。
+
+改为 `LynxView.sendGlobalEvent("pictelioTranslateFrame", [frameJson])`（与 benchNav 同一通道，事件可达 JS 侧 `GlobalEventEmitter`）后，模拟器端到端跑通：按钮变「重译」、正文渲染出译文段落。代价是交付形态从「逐段增量推送」变为「整章就绪后一次性推送」（解析期累积、收尾单帧），因为单帧回调/事件才可靠。

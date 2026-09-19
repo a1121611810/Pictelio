@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # 可自验证的模拟器 E2E：导航 → 定位按钮 → 点击 → **确认请求真的发出**（否则重试）
-set -e
+set -eo pipefail
+# 教训（2026-09-20）：曾经用 `gradle ... | grep -E 'error:'` 判构建结果 —— grep 无匹配即返回 0，
+# 于是「编译失败」连续几轮被当成成功，测的一直是旧 APK。构建步骤一律带 pipefail，
+# 并在安装前**校验 APK 时间戳**（比本次构建开始时刻新）。
 PKG=io.pictelio.app
 ACT=$PKG/io.pictelio.app.LynxActivity
 MODE="${1:-deepseek}"   # deepseek | mock
@@ -14,6 +17,20 @@ else
   BASE="https://api.deepseek.com"; MODEL="deepseek-flash"
   KEY=$(grep '^DEEPSEEK_API_KEY=' packages/app-lynx/.env | head -1 | sed 's/DEEPSEEK_API_KEY=//' | sed "s/^['\"]//;s/['\"]$//")
 fi
+
+# 构建（带 pipefail）+ 新鲜度校验
+BUILD_START=$(date +%s)
+(cd /Users/lilianda/develop/pixivizer && BENCH_NAV=1 NODE_ENV=production \
+  pnpm --dir packages/app-lynx run build >/dev/null && \
+  node packages/app-lynx/scripts/sync-android-assets.mjs >/dev/null && \
+  cd packages/app/android && GRADLE_USER_HOME=$(pwd)/.gradle ./gradlew assembleLynxDebug --no-daemon -q)
+APK=/Users/lilianda/develop/pixivizer/packages/app/android/app/build/outputs/apk/lynx/debug/app-lynx-debug.apk
+APK_TS=$(stat -f %m "$APK")
+if [ "$APK_TS" -lt "$BUILD_START" ]; then
+  echo "[e2e] ❌ APK 未在本次构建中更新（可能是编译失败被吞）—— 拒绝在旧包上测"
+  exit 1
+fi
+adb install -r "$APK" >/dev/null 2>&1
 
 adb shell am force-stop "$PKG"; sleep 2
 adb logcat -c
