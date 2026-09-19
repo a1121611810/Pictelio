@@ -174,6 +174,29 @@ describe('attachTranslateFrameListener（事件总线交付通道）', () => {
     expect(first.value).toMatchObject({ type: 'error', code: 'server' })
   })
 
+  it('transport 走 errMsg 契约失败后监听器为 0', async () => {
+    // 生产里原生失败是 cb("", errMsg)（见 translateStream 终止契约），不是 throw。
+    const emitter = installFakeLynx()
+    ;(globalThis as { NativeModules?: unknown }).NativeModules = {
+      PictelioTranslate: {
+        translateStream: (_json: string, cb: (c: string | null, e: string | null) => void) => {
+          setTimeout(() => cb('', 'HTTP 502'), 0)
+        },
+        translatePoll: (_id: string, cb: (v: string | null, e: string | null) => void) =>
+          cb(JSON.stringify({ type: 'pending' }), ''),
+      },
+    }
+    const provider = nativeTranslateProvider()
+    const iter = provider.translate(
+      { novelId: 1, chapterId: 'c1', paragraphs: ['a'], options: { xRestrict: 0 } },
+      { baseURL: 'https://x', apiKey: '', model: 'm' },
+      new AbortController().signal,
+    )
+    const first = await iter.next()
+    expect((first.value as { type: string }).type).toBe('error')
+    expect(emitter.count('pictelioTranslateFrame')).toBe(0)
+  })
+
   it('provider.abort() 后监听器被解绑（不泄漏）', async () => {
     const emitter = installFakeLynx()
     ;(globalThis as { NativeModules?: unknown }).NativeModules = {
