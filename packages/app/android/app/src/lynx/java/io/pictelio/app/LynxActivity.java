@@ -84,6 +84,16 @@ public class LynxActivity extends AppCompatActivity {
      *  JS 端 settingsStore.loadSettings 读取该键，若 === "true" 则强制 _showR18 / _showR18G = true。
      *  比事件总线更可靠：bundle 渲染时序无关，loadSettings 总会读到。 */
     private static final String DEV_EXTRA_FORCE_R18 = "pictelio_dev_force_r18";
+    /**
+     * 翻译 endpoint dev 播种 extras（BuildConfig.DEBUG 门禁）：
+     * {@code pictelio_dev_llm_base_url} / {@code pictelio_dev_llm_api_key} / {@code pictelio_dev_llm_model}。
+     * apiKey 走 Keystore（与 PictelioTranslateModule 同 alias），其余三项写 SharedPreferences
+     * —— 模拟器端到端验证无需做设置页 UI 自动化（与 refresh_token / force_r18 同族 dev 通道）。
+     */
+    private static final String DEV_EXTRA_LLM_BASE_URL = "pictelio_dev_llm_base_url";
+    private static final String DEV_EXTRA_LLM_API_KEY = "pictelio_dev_llm_api_key";
+    private static final String DEV_EXTRA_LLM_MODEL = "pictelio_dev_llm_model";
+
     /** SharedPreferences 文件（对齐 JS 侧 nativePrefs 走的 PictelioPrefs.PREFS_FILE）。 */
     private static final String DEV_FORCE_R18_PREFS_FILE = "CapacitorStorage";
     /** SharedPreferences key（JS 侧 settingsStore.loadSettings 读取同名键）。 */
@@ -405,7 +415,10 @@ public class LynxActivity extends AppCompatActivity {
             autoLoginWithRefreshToken(refreshToken);
         }
 
-        // 2) force R18：直接写 SharedPreferences（KeyError 前与 PictelioPrefsModule.set 同文件同键，
+        // 2) 翻译 endpoint 播种（baseURL / model 进 SharedPreferences，apiKey 进 Keystore）
+        applyLlmEndpointDevSeed(intent);
+
+        // 3) force R18：直接写 SharedPreferences（KeyError 前与 PictelioPrefsModule.set 同文件同键，
         // 保证 JS 端 nativePrefs().get("dev_force_r18") 命中；详见 SPEC 第 6 章节）
         if (intent.hasExtra(DEV_EXTRA_FORCE_R18)) {
             try {
@@ -418,6 +431,33 @@ public class LynxActivity extends AppCompatActivity {
             } catch (Throwable t) {
                 Log.w(TAG, "dev hook: dev_force_r18 写入 SharedPreferences 失败", t);
             }
+        }
+    }
+
+    /**
+     * 翻译 endpoint dev 播种：apiKey → Keystore（{@code SecureStorageCompat}，与
+     * PictelioTranslateModule.KEY_API_KEY 同 key），baseURL / model → SharedPreferences
+     * （与 JS 侧 nativePrefs 同文件）。三个 extra 全给才播种，避免半配置状态。
+     */
+    private void applyLlmEndpointDevSeed(android.content.Intent intent) {
+        String baseURL = intent.getStringExtra(DEV_EXTRA_LLM_BASE_URL);
+        String apiKey = intent.getStringExtra(DEV_EXTRA_LLM_API_KEY);
+        String model = intent.getStringExtra(DEV_EXTRA_LLM_MODEL);
+        if (baseURL == null || baseURL.isEmpty() || apiKey == null || apiKey.isEmpty()
+                || model == null || model.isEmpty()) {
+            return;
+        }
+        try {
+            new SecureStorageCompat(getApplicationContext()).setItem("translate_llm_api_key", apiKey);
+            getSharedPreferences(DEV_FORCE_R18_PREFS_FILE, MODE_PRIVATE)
+                    .edit()
+                    .putString("llm_endpoint_base_url", baseURL)
+                    .putString("llm_endpoint_model", model)
+                    .apply();
+            Log.i(TAG, "dev hook: 翻译 endpoint 已播种 baseURL=" + baseURL + " model=" + model
+                    + "（apiKey 已写 Keystore）");
+        } catch (Throwable t) {
+            Log.w(TAG, "dev hook: 翻译 endpoint 播种失败", t);
         }
     }
 

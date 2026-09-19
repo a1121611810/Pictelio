@@ -10,6 +10,9 @@ import com.lynx.tasm.behavior.LynxContext;
 
 import org.json.JSONObject;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 /**
  * 认证 Native Module（#53）——access_token Java 堆隔离，JS 零知。
  *
@@ -27,6 +30,17 @@ public class PictelioAuthModule extends LynxModule {
 
     private static final String TAG = "PictelioAuthModule";
 
+    /**
+     * OAuth 交换线程池（与 {@link PictelioApiModule#API_EXECUTOR} /
+     * {@link PictelioTranslateModule#TRANSLATE_EXECUTOR} 同款模式）。
+     *
+     * <p>必须离开主线程：LynxMethod 默认在主线程同步派发，而 refresh_token 交换是 OkHttp
+     * 网络请求——主线程调用直接抛 {@code NetworkOnMainThreadException}（emulator 实测：
+     * dev hook 自动登录恒失败 "登录失败: null"，栈顶即 android.os.StrictMode）。Lynx
+     * Callback 自行派发回 JS 线程，worker 线程调用安全（PictelioTranslateModule 同款）。
+     */
+    private static final ExecutorService AUTH_EXECUTOR = Executors.newCachedThreadPool();
+
     public PictelioAuthModule(Context context) {
         super(context);
     }
@@ -41,35 +55,38 @@ public class PictelioAuthModule extends LynxModule {
      */
     @LynxMethod
     public void loginWithRefreshToken(String refreshToken, Callback callback) {
-        try {
-            JSONObject result = PixivApiCore.oauthTokenExchange(refreshToken);
-            if (result == null) {
-                Log.w(TAG, "oauthTokenExchange 返回 null（HTTP 非 2xx / 空 body / 无 access_token）");
-                callback.invoke("", "登录凭证无效或已失效");
-                return;
-            }
-            // token 只进 Java 堆（JS 零知）
-            PixivApiCore.accessToken = result.optString("accessToken");
-            String rotated = result.optString("refreshToken");
-            if (!rotated.isEmpty()) {
-                PixivApiCore.refreshToken = rotated;
-            }
+        AUTH_EXECUTOR.execute(() -> {
+            try {
+                JSONObject result = PixivApiCore.oauthTokenExchange(refreshToken);
+                if (result == null) {
+                    Log.w(TAG, "oauthTokenExchange 返回 null（HTTP 非 2xx / 空 body / 无 access_token）");
+                    callback.invoke("", "登录凭证无效或已失效");
+                    return;
+                }
+                // token 只进 Java 堆（JS 零知）
+                PixivApiCore.accessToken = result.optString("accessToken");
+                String rotated = result.optString("refreshToken");
+                if (!rotated.isEmpty()) {
+                    PixivApiCore.refreshToken = rotated;
+                }
 
-            // 回调 JS：用户信息 + 新 refresh_token（供持久化），不含 access_token
-            JSONObject user = result.optJSONObject("user");
-            JSONObject info = new JSONObject();
-            info.put("userId", user != null ? user.optInt("id", 0) : 0);
-            info.put("userName", user != null ? user.optString("name", "") : "");
-            info.put("userAccount", user != null ? user.optString("account", "") : "");
-            if (user != null && user.optJSONObject("profile_image_urls") != null) {
-                info.put("profileImageUrls", user.getJSONObject("profile_image_urls"));
+                // 回调 JS：用户信息 + 新 refresh_token（供持久化），不含 access_token
+                JSONObject user = result.optJSONObject("user");
+                JSONObject info = new JSONObject();
+                info.put("userId", user != null ? user.optInt("id", 0) : 0);
+                info.put("userName", user != null ? user.optString("name", "") : "");
+                info.put("userAccount", user != null ? user.optString("account", "") : "");
+                if (user != null && user.optJSONObject("profile_image_urls") != null) {
+                    info.put("profileImageUrls", user.getJSONObject("profile_image_urls"));
+                }
+                info.put("refreshToken", rotated);
+                callback.invoke(info.toString(), "");
+            } catch (Exception e) {
+                Log.w(TAG, "loginWithRefreshToken 失败", e);
+                String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+                callback.invoke("", "登录失败: " + msg);
             }
-            info.put("refreshToken", rotated);
-            callback.invoke(info.toString(), "");
-        } catch (Exception e) {
-            Log.w(TAG, "loginWithRefreshToken 失败", e);
-            callback.invoke("", "登录失败: " + e.getMessage());
-        }
+        });
     }
 
     /** 备用：JS 直登录（web 模式 OAuth 结果）后 push access_token 到 Java 堆 */
