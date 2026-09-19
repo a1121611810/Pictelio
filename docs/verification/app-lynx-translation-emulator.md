@@ -39,7 +39,23 @@
 
 > 该路径此前**不可用**：失败终态只写进 per-stream 缓冲而从未发布到事件总线，UI 永久停在「n% 翻译中」（读者看不到任何错误）。这是 Spec 轴 code review 抓出的回归，修复见 `ca165b82` / `8b79e9d6`。
 >
-> 修复过程中还定位到一个**误删本流帧**的缺陷：JS 侧生成的 streamId 与原生实际使用的不同（实测 JS `…-1` / 原生 `…-2`），归属过滤把本流帧全丢了。现以**原生回显的 streamId** 为权威。
+> 修复过程中还定位到一个**误删本流帧**的缺陷：一条流曾生成两个 streamId（transport 覆写了调用方的 `_abortToken`），归属过滤把本流帧全丢了。现由 transport 复用调用方 token，两端必然一致。
+>
+> 截图：`app-lynx-translation-emulator-02-failed.png`（按钮「↻ 重试」+「LLM 服务暂时不可用」+「配置翻译」）。
+
+### 请求前校验失败（端点非 https，被测提交 `6a648ab5`）
+
+校验分支（缺 baseURL / 缺 model / 非 https 且非回环 / input 空 / 无 API key）此前**在 streamId 确定之前 return**，既不写终态也不发布 → JS 轮询永远 `pending` → 用户永久「n% 翻译中」。现统一走 `failStream()`（登记终态 + 发布）。
+
+设备证据（`--es pictelio_dev_llm_base_url 'http://example.com/v1'`）：
+
+```
+translateStream 入口 baseURL=http://example.com/v1 model=mock-model input=51 abortToken=true
+```
+
+UI：按钮「↻ 重试」+ 错误条「网络不可用」+「配置翻译」入口（截图 `app-lynx-translation-emulator-03-validation-failed.png`）。
+
+> 说明：缺失字段类校验（缺 model 等）在本机不可构造 —— dev hook 会在每次启动时重新播种 model；因此用**非 https 端点**这条同样走「请求前校验失败」的路径取证。
 
 ## 已知限制（如实记录）
 
