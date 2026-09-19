@@ -2,10 +2,10 @@ package io.pictelio.app;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -16,18 +16,18 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * TranslationSseParser 单测（spec §9.3 + ADR-0170 §实现期修订）。
+ * TranslationSseParser 单测。
  *
- * <p>Oracle 溯源（AGENTS.md 测试硬约束 #6）——期望值来自**独立来源**，不是从实现反推：
+ * <p>Oracle 溯源（AGENTS.md 测试硬约束 #6）——期望值来自独立来源，不是从实现反推：
  * <ul>
- *   <li>事件名与载荷形状 = OpenAI Responses API 事件规约（调研 #622 记录的官方事件族：
- *       response.output_text.delta / response.completed / response.failed / response.incomplete）；</li>
- *   <li>DeepSeek 兼容点（流可能不发 response.completed）= 调研 #625 与真机实测记录（ADR-0170 实现期修订）；</li>
+ *   <li>事件名与载荷形状 = OpenAI Responses API 事件规约（response.output_text.delta /
+ *       response.completed / response.failed / response.incomplete）；</li>
  *   <li>[N] 段落锚定语义 = api/translate.ts 的 input 形态（web 路径同源契约）。</li>
  * </ul>
  *
- * <p>本测试覆盖的三个真机缺陷：① output_text.done 被误当流终态；② 无终态事件时 promise 永不
- * settle；③ 单帧损坏不得中断整条流。
+ * <p><b>交付形态</b>：解析期累积、收尾时整章作为**单帧**
+ * {@code {type:"delta_all", paragraphs:[{index,text}]}} 下发（ADR-0170「交付通道实测」：
+ * NativeModule 的 callback 通道在一条流内不可靠，逐帧推送会丢帧）。
  */
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 28)
@@ -49,19 +49,24 @@ public class TranslationSseParserTest {
         return "data: " + json;
     }
 
+    /** 取单帧交付里的段落数组 */
+    private static JSONArray paragraphsOf(String payload) throws Exception {
+        JSONObject frame = new JSONObject(payload);
+        assertEquals("delta_all", frame.getString("type"));
+        return frame.getJSONArray("paragraphs");
+    }
+
     @Test
     public void lifecycleEventsAreIgnoredAndNullIsReturned() throws Exception {
         TranslationSseParser parser = new TranslationSseParser();
         Recorder sink = new Recorder();
 
-        // 生命周期事件（官方规约）：应被跳过，且不产生终态
         assertNull(parser.accept(data("{\"type\":\"response.created\"}"), sink));
         assertNull(parser.accept(data("{\"type\":\"response.in_progress\"}"), sink));
         assertNull(parser.accept(data("{\"type\":\"response.output_item.added\"}"), sink));
-        // 非 data 行（event: 前缀）与空行也应跳过
         assertNull(parser.accept("event: response.created", sink));
         assertNull(parser.accept("", sink));
-        assertTrue(sink.payloads.isEmpty());
+        assertTrue("生命周期事件不得下发任何帧", sink.payloads.isEmpty());
         assertTrue(sink.errors.isEmpty());
     }
 
@@ -74,12 +79,16 @@ public class TranslationSseParserTest {
         assertNull(parser.accept(data("{\"type\":\"response.output_text.done\"}"), sink));
         assertTrue("不得在 item 级事件上收尾", sink.payloads.isEmpty());
 
-        Boolean terminal = parser.accept(data("{\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":3}}}"), sink);
+        // 有译文时：收尾先整章单帧、随后 done 帧
+        parser.accept(data("{\"type\":\"response.output_text.delta\",\"delta\":\"[0] 你好\"}"), sink);
+        Boolean terminal = parser.accept(
+                data("{\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":3}}}"), sink);
         assertEquals(Boolean.TRUE, terminal);
-        assertEquals(1, sink.payloads.size());
-        JSONObject done = new JSONObject(sink.payloads.get(0));
+        assertEquals(2, sink.payloads.size());
+        assertEquals("delta_all", new JSONObject(sink.payloads.get(0)).getString("type"));
+        JSONObject done = new JSONObject(sink.payloads.get(1));
         assertEquals("done", done.getString("type"));
-        assertTrue(done.has("usage"));
+        assertTrue("usage 应透传", done.has("usage"));
     }
 
     @Test
@@ -88,19 +97,17 @@ public class TranslationSseParserTest {
         Recorder sink = new Recorder();
 
         // 模型按 [N] 前缀逐段输出（与 web 路径 input 形态同源）
-        parser.accept(data("{\"type\":\"response.output_text.delta\",\"delta\":\"\\n\\n[0] \u4f60\u597d\"}"), sink);
-        parser.accept(data("{\"type\":\"response.output_text.delta\",\"delta\":\"\\n\\n[1] \u4e16\u754c\"}"), sink);
-        // 累积式交付（避开 Lynx 桥丢帧）：解析期不发帧，收尾时按段一次性下发
+        parser.accept(data("{\"type\":\"response.output_text.delta\",\"delta\":\"\\n\\n[0] 你好\"}"), sink);
+        parser.accept(data("{\"type\":\"response.output_text.delta\",\"delta\":\"\\n\\n[1] 世界\"}"), sink);
         parser.emitConsolidated(sink);
 
-        assertEquals(2, sink.payloads.size());
-        JSONObject first = new JSONObject(sink.payloads.get(0));
-        assertEquals("delta", first.getString("type"));
-        assertEquals("0", first.getString("paragraphIndex"));
-        assertEquals("\u4f60\u597d", first.getString("text")); // 锚后的分隔空格不属于译文
-        JSONObject second = new JSONObject(sink.payloads.get(1));
-        assertEquals("1", second.getString("paragraphIndex"));
-        assertEquals("\u4e16\u754c", second.getString("text"));
+        assertEquals(1, sink.payloads.size());
+        JSONArray arr = paragraphsOf(sink.payloads.get(0));
+        assertEquals(2, arr.length());
+        assertEquals(0, arr.getJSONObject(0).getInt("index"));
+        assertEquals("你好", arr.getJSONObject(0).getString("text"));
+        assertEquals(1, arr.getJSONObject(1).getInt("index"));
+        assertEquals("世界", arr.getJSONObject(1).getString("text"));
     }
 
     @Test
@@ -110,17 +117,15 @@ public class TranslationSseParserTest {
 
         // 锚标记被切成两帧："\n\n[" + "0] 文本"
         parser.accept(data("{\"type\":\"response.output_text.delta\",\"delta\":\"\\n\\n[\"}"), sink);
-        parser.accept(data("{\"type\":\"response.output_text.delta\",\"delta\":\"0] \u6587\u672c\"}"), sink);
-
+        parser.accept(data("{\"type\":\"response.output_text.delta\",\"delta\":\"0] 文本\"}"), sink);
         parser.emitConsolidated(sink);
-        assertEquals(1, sink.payloads.size());
-        // 第一帧只含段落分隔空白：**不得**把 "[" 吐给 UI（下一帧的 "0]" 才补齐标记）。
-        // 空白本身由 store 在段落级裁剪（与 web 路径 alignParagraphs 同语义）。
-        JSONObject chunk = new JSONObject(sink.payloads.get(0));
-        assertFalse("锚标记的 bracket 不得进入译文", chunk.getString("text").contains("["));
 
-        assertEquals("0", chunk.getString("paragraphIndex"));
-        assertEquals("\u6587\u672c", chunk.getString("text"));
+        JSONArray arr = paragraphsOf(sink.payloads.get(0));
+        assertEquals(1, arr.length());
+        assertEquals(0, arr.getJSONObject(0).getInt("index"));
+        assertEquals("文本", arr.getJSONObject(0).getString("text"));
+        assertFalse("锚标记的 bracket 不得进入译文",
+                arr.getJSONObject(0).getString("text").contains("["));
     }
 
     @Test
@@ -128,7 +133,8 @@ public class TranslationSseParserTest {
         TranslationSseParser parser = new TranslationSseParser();
         Recorder sink = new Recorder();
 
-        assertNull(parser.accept(data("{\"type\":\"response.reasoning_text.delta\",\"delta\":\"thinking\"}"), sink));
+        assertNull(parser.accept(
+                data("{\"type\":\"response.reasoning_text.delta\",\"delta\":\"thinking\"}"), sink));
         assertEquals(1, sink.payloads.size());
         assertEquals("reasoning_delta", new JSONObject(sink.payloads.get(0)).getString("type"));
     }
@@ -152,7 +158,8 @@ public class TranslationSseParserTest {
         assertTrue(truncatedSink.errors.get(0).contains("max_output_tokens"));
 
         Recorder bareErrorSink = new Recorder();
-        assertEquals(Boolean.FALSE, parser.accept(data("{\"type\":\"error\",\"message\":\"boom\"}"), bareErrorSink));
+        assertEquals(Boolean.FALSE,
+                parser.accept(data("{\"type\":\"error\",\"message\":\"boom\"}"), bareErrorSink));
         assertEquals(1, bareErrorSink.errors.size());
     }
 
@@ -166,8 +173,9 @@ public class TranslationSseParserTest {
         // 后续正常帧仍然处理
         parser.accept(data("{\"type\":\"response.output_text.delta\",\"delta\":\"[0] ok\"}"), sink);
         parser.emitConsolidated(sink);
-        assertEquals(1, sink.payloads.size());
-        assertFalse(sink.payloads.get(0).isEmpty());
-        assertNotNull(new JSONObject(sink.payloads.get(0)).getString("text"));
+
+        JSONArray arr = paragraphsOf(sink.payloads.get(0));
+        assertEquals(1, arr.length());
+        assertEquals("ok", arr.getJSONObject(0).getString("text"));
     }
 }
