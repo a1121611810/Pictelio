@@ -342,7 +342,8 @@ public class PictelioTranslateModule extends LynxModule {
                 }
                 deltaSeen = false;
                 boolean terminalEmitted = parseSseStream(body.byteStream(), callback);
-                if (terminalEmitted && !deltaSeen) {
+                Log.i(TAG, "SSE 流结束 terminal=" + terminalEmitted + " deltaSeen=" + deltaSeen);
+                if (!deltaSeen) {
                     // 流正常结束但**一个译文段都没产出**：常见于服务端内容策略拒答 /
                     // 模型只回 reasoning。必须报错而不是当成成功 —— 否则 UI 显示「已完成」
                     // 却没有任何译文（真机实测：DeepSeek 对 R-18 正文返回 200 且空输出）。
