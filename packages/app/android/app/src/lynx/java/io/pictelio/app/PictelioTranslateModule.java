@@ -444,7 +444,7 @@ public class PictelioTranslateModule extends LynxModule {
                 String frame;
                 while ((frame = frames.poll()) != null) {
                     view.sendGlobalEvent("pictelioTranslateFrame",
-                            com.lynx.tasm.behavior.JavaOnlyArray.of(frame));
+                            com.lynx.react.bridge.JavaOnlyArray.of(frame));
                     sent++;
                 }
             }
@@ -455,7 +455,7 @@ public class PictelioTranslateModule extends LynxModule {
                         : "{\"type\":\"error\",\"message\":\""
                             + terminal.replace("\"", "'") + "\"}";
                 view.sendGlobalEvent("pictelioTranslateFrame",
-                        com.lynx.tasm.behavior.JavaOnlyArray.of(payload));
+                        com.lynx.react.bridge.JavaOnlyArray.of(payload));
                 sent++;
                 STREAM_FRAMES.remove(streamId);
                 STREAM_TERMINAL.remove(streamId);
