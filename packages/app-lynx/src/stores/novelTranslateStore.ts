@@ -19,15 +19,17 @@
 import { ref, type Ref } from "vue"
 import { defineStore } from "pinia"
 import { t } from "../i18n"
+import { getNativeModules, isNativeMode } from "../api/client"
+import { extractHostname } from "../utils/safeParseUrl"
+import { idbGet, idbRemove, idbSet } from "../utils/idbKV"
 import {
   getEndpoint as nativeGetEndpoint,
   setApiKey as nativeSetApiKey,
   clearEndpoint as nativeClearEndpoint,
   probeEndpoint as nativeProbeEndpoint,
-  translateStream as nativeTranslateStream,
-  abortStream as nativeAbortStream,
+  nativeTranslateProvider,
 } from "../api/nativeTranslate"
-import { openaiResponsesProvider } from "../api/translate"
+import { buildSystemInstructions, openaiResponsesProvider } from "../api/translate"
 import {
   createNovelTranslator,
   TranslationChunkError,
@@ -36,8 +38,9 @@ import {
   getTranslation,
   setTranslation,
   makeCacheKey,
-  computeBaseURLHash,
   computeSourceHash,
+  isTranslationCacheAvailable,
+  removeTranslation,
 } from "../utils/translationCache"
 import { useSettingsStore } from "./settingsStore"
 import type {
@@ -65,9 +68,57 @@ export interface TranslationErrorPayload {
 }
 
 /** useNovelTranslateStore 完整返回类型（消费者：组件 + 测试） */
+/** chunked pipeline 的块起始偏移（非枚举，只在 JS 内存传递，不进 JSON 载荷） */
+export const CHUNK_OFFSET = Symbol("chunkOffset")
+
+/**
+ * 端点兼容性（**地址层**事实，spec §6.1 / ADR-0173 D1）：由 dummy-key 探测产生，
+ * 与「凭据是否有效」正交。八态（含 idle 与实现新增的 incompatible）。
+ */
+export type EndpointCompatibilityStatus =
+  | "idle"
+  | "ok"
+  | "azure"
+  | "deepseek"
+  | "vllm"
+  | "partial"
+  | "incompatible"
+  | "unknown"
+
+export interface ProbeClassification {
+  status: EndpointCompatibilityStatus
+  detail: string
+  httpStatus: number
+}
+
+/** 凭据验证（**密钥层**事实，ADR-0173 D1/D4）：只由「测试连接」用真实 key 产生 */
+export type CredentialVerificationState = "unverified" | "verified" | "failed"
+
+export interface CredentialVerification {
+  state: CredentialVerificationState
+  /** 验证时刻（毫秒）；unverified 时为 null */
+  at: number | null
+  /**
+   * 该结论对应的 baseURL（非密；ADR-0173 D4③）。
+   * UI 必须拿它跟**当前输入框**比对 —— 否则用户改了地址但没保存时，
+   * 徽章还会显示旧地址的「已验证」（ADR 点名的最危险假象）。
+   */
+  baseUrl: string | null
+}
+
 export interface NovelTranslateStore {
   status: Ref<TranslationStatus>
   progress: Ref<TranslationProgress | null>
+  /** 端点兼容性（地址层） */
+  compatibility: Ref<EndpointCompatibilityStatus>
+  /** 凭据验证（密钥层） */
+  credential: Ref<CredentialVerification>
+  /** 当前章节译文段落（与 sourceParagraphs 等长；缺项 = 原文回退） */
+  translatedParagraphs: Ref<string[]>
+  /** 当前章节原文段落（displayParagraphs 的回退源） */
+  sourceParagraphs: Ref<string[]>
+  /** 渲染源：showTranslation 为真且译文非空 → 译文，否则原文（spec §6.3 整段切换） */
+  displayParagraphs: Ref<string[]>
   currentChapter: Ref<number | null>
   error: Ref<TranslationErrorPayload | null>
   isCached: Ref<Record<number, boolean>>
@@ -76,8 +127,15 @@ export interface NovelTranslateStore {
   loadEndpointConfig: () => Promise<LlmEndpointPublic | null>
   saveEndpointConfig: (config: LlmEndpointConfig) => Promise<void>
   clearEndpointConfig: () => Promise<void>
-  probeEndpoint: (config: LlmEndpointConfig) => Promise<boolean>
+  probeCompatibility: (baseURL: string) => Promise<ProbeClassification>
+  testConnection: (config: LlmEndpointConfig) => Promise<{ ok: boolean; code: string; detail: string }>
   translateChapter: (
+    novelId: number,
+    chapterId: number,
+    paragraphs: string[],
+    xRestrict?: 0 | 1 | 2,
+  ) => Promise<void>
+  retranslate: (
     novelId: number,
     chapterId: number,
     paragraphs: string[],
@@ -102,6 +160,145 @@ function resetNovelTranslateStoreForTest(): void {
   inFlightByChapter.clear()
 }
 
+// ─────────── endpoint 元数据持久化（ADR-0170 §D5.1） ───────────
+// apiKey 走 Java Keystore（永不出 Java 堆）；非密字段（baseURL / model / targetLang）
+// 走设置 KV —— 与 settingsStore 的 prefs seam 同模式：原生 SharedPreferences（跨 client 共享，
+// ADR-0103）/ web-core 预览与 node 测试走 idbKV。键名加 `llm` 前缀避开设置键命名空间。
+const LLM_PREFS_BASE_URL = "llm_endpoint_base_url"
+const LLM_PREFS_MODEL = "llm_endpoint_model"
+const LLM_PREFS_TARGET_LANG = "llm_endpoint_target_lang"
+// 凭据验证（ADR-0173 D4）：只存结果枚举 + 时间戳 + 用于失效判定的 baseURL，
+// **不存任何密钥材料**（连哈希都不存——无必要的离线校验面）。
+const LLM_PREFS_VERIFY_STATE = "llm_endpoint_verified_state"
+const LLM_PREFS_VERIFY_AT = "llm_endpoint_verified_at"
+const LLM_PREFS_VERIFY_BASE_URL = "llm_endpoint_verified_base_url"
+
+interface EndpointPrefsStorage {
+  get: (key: string) => Promise<string | null>
+  set: (key: string, value: string) => Promise<void>
+  remove: (key: string) => Promise<void>
+}
+
+/**
+ * endpoint 元数据 KV seam —— 与 settingsStore.prefs 同判定（ADR-0172 §2）：
+ * `isNativeMode() ? nativePrefs : idbKV`。原生模式下若 PictelioPrefs 缺失，**必须 warn**
+ * （静默回落 idbKV 在 PrimJS 上是死路：indexedDB 不存在）。
+ */
+function endpointPrefs(): EndpointPrefsStorage {
+  if (isNativeMode() && !getNativeModules()?.PictelioPrefs) {
+    console.warn("[novelTranslateStore] 原生模式缺 PictelioPrefs，endpoint 元数据将无法持久化")
+  }
+  const nativePrefs = getNativeModules()?.PictelioPrefs as
+    | {
+        prefsGet: (key: string, cb: (value: string | null) => void) => void
+        prefsSet: (key: string, value: string, cb: () => void) => void
+        prefsRemove: (key: string, cb: () => void) => void
+      }
+    | undefined
+  if (nativePrefs) {
+    return {
+      // 原生契约：键不存在返回空串（不传 null——CallbackImpl 对 null 参数崩）
+      get: (key) =>
+        new Promise((resolve) => {
+          nativePrefs.prefsGet(key, (value) => {
+            const v = typeof value === "string" ? value : null
+            resolve(v === null || v === "" ? null : v)
+          })
+        }),
+      set: (key, value) =>
+        new Promise((resolve) => {
+          nativePrefs.prefsSet(key, value, () => resolve())
+        }),
+      remove: (key) =>
+        new Promise((resolve) => {
+          nativePrefs.prefsRemove(key, () => resolve())
+        }),
+    }
+  }
+  return {
+    get: idbGet,
+    set: (key, value) => idbSet(key, value),
+    remove: idbRemove,
+  }
+}
+
+/** 读 endpoint 非密元数据（缺失 → undefined，调用方回退 Java 默认值） */
+async function readEndpointMetadata(): Promise<{
+  baseURL?: string
+  model?: string
+  targetLang?: string
+}> {
+  try {
+    const prefs = endpointPrefs()
+    const [baseURL, model, targetLang] = await Promise.all([
+      prefs.get(LLM_PREFS_BASE_URL),
+      prefs.get(LLM_PREFS_MODEL),
+      prefs.get(LLM_PREFS_TARGET_LANG),
+    ])
+    return {
+      baseURL: baseURL ?? undefined,
+      model: model ?? undefined,
+      targetLang: targetLang ?? undefined,
+    }
+  } catch (err) {
+    // 读失败不阻断翻译（回退 Java 默认值）；但必须可见（AGENTS.md 硬约束 #3）
+    console.warn("[novelTranslateStore] endpoint 元数据读取失败（回退默认值）", err)
+    return {}
+  }
+}
+
+/** 读凭据验证状态（缺失 / 读失败 → unverified；读失败必须可见） */
+async function readCredentialVerification(): Promise<CredentialVerification> {
+  try {
+    const prefs = endpointPrefs()
+    const [state, at, baseURL] = await Promise.all([
+      prefs.get(LLM_PREFS_VERIFY_STATE),
+      prefs.get(LLM_PREFS_VERIFY_AT),
+      prefs.get(LLM_PREFS_VERIFY_BASE_URL),
+    ])
+    if (state !== "verified" && state !== "failed") {
+      return { state: "unverified", at: null, baseUrl: null }
+    }
+    // 失效规则（ADR-0173 D4③）：记录的 baseURL 与当前配置不一致 → 视为未验证
+    const current = await prefs.get(LLM_PREFS_BASE_URL)
+    if (baseURL !== current) return { state: "unverified", at: null, baseUrl: null }
+    const ts = at === null ? null : Number(at)
+    return { state, at: ts !== null && Number.isFinite(ts) ? ts : null, baseUrl: baseURL }
+  } catch (err) {
+    console.warn("[novelTranslateStore] 凭据验证状态读取失败（按未验证处理）", err)
+    return { state: "unverified", at: null, baseUrl: null }
+  }
+}
+
+/** 写凭据验证状态（写失败必须可见；不阻断 UI） */
+async function writeCredentialVerification(
+  state: CredentialVerificationState,
+  baseURL: string,
+): Promise<void> {
+  try {
+    const prefs = endpointPrefs()
+    await prefs.set(LLM_PREFS_VERIFY_STATE, state)
+    await prefs.set(LLM_PREFS_VERIFY_AT, String(Date.now()))
+    await prefs.set(LLM_PREFS_VERIFY_BASE_URL, baseURL)
+  } catch (err) {
+    console.warn("[novelTranslateStore] 凭据验证状态写入失败", err)
+  }
+}
+
+/** 清凭据验证状态（清 endpoint / baseURL 变化时调用） */
+async function clearCredentialVerification(): Promise<void> {
+  try {
+    const prefs = endpointPrefs()
+    await Promise.all([
+      prefs.remove(LLM_PREFS_VERIFY_STATE),
+      prefs.remove(LLM_PREFS_VERIFY_AT),
+      prefs.remove(LLM_PREFS_VERIFY_BASE_URL),
+    ])
+  } catch (err) {
+    console.warn("[novelTranslateStore] 凭据验证状态清除失败", err)
+  }
+}
+
 // ─────────── 内部 helper ───────────
 
 /** 双通道探测 NativeModules（lynx 裸全局 + globalThis 兜底；ADR-0053 §1） */
@@ -115,6 +312,34 @@ function hasNativeModule(): boolean {
   }
 }
 
+/**
+ * 缓存键所需的 endpoint 元数据（真实 model / baseURL）。
+ *
+ * 读失败时只 warn 并回退空值 → 该次请求必然 miss（宁多多花一次请求，也不要因占位键
+ * 永不失效而命中另一模型/服务商产出的译文）。
+ */
+async function loadEndpointMetadataForCache(): Promise<{ model?: string; baseURL?: string }> {
+  try {
+    const meta = await readEndpointMetadata()
+    return { model: meta.model, baseURL: meta.baseURL }
+  } catch (err) {
+    console.warn("[novelTranslateStore] 缓存键 endpoint 元数据读取失败（本次按 miss 处理）", err)
+    return {}
+  }
+}
+
+/** web-core 预览的 endpoint 配置（native 路径不用；真机不进入此分支） */
+function webEndpointConfig(): LlmEndpointConfig {
+  const settings = useSettingsStore()
+  return {
+    baseURL: "",
+    apiKey: "",
+    model: "openai-responses",
+    targetLang: settings.language ?? "zh-CN",
+    sourceLang: "ja",
+  }
+}
+
 // ─────────── Store 实现 ───────────
 
 export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTranslateStore => {
@@ -125,6 +350,27 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
   const error = ref<TranslationErrorPayload | null>(null)
   const isCached = ref<Record<number, boolean>>({})
   const showTranslation = ref<boolean>(false)
+  // 译文正文（spec §5 数据流 / §6.3 整段切换）：store 是唯一持有者，
+  // 页面只读 displayParagraphs。历史缺陷：译文只进缓存、从不进渲染源 → 正文永不变化。
+  const translatedParagraphs = ref<string[]>([])
+  const sourceParagraphs = ref<string[]>([])
+  const displayParagraphs = ref<string[]>([])
+  // 两层状态（ADR-0173 D1）：地址层 / 密钥层，互不冒充
+  const compatibility = ref<EndpointCompatibilityStatus>("idle")
+  const credential = ref<CredentialVerification>({ state: "unverified", at: null, baseUrl: null })
+  /** 兼容性探测 generation：慢响应不得覆盖后发起的探测 */
+  let compatGen = 0
+
+  /** 重算渲染源（译文/原文切换 + 增量落地都经此） */
+  function refreshDisplay(): void {
+    const useTranslated = showTranslation.value && translatedParagraphs.value.length > 0
+    displayParagraphs.value = useTranslated
+      ? sourceParagraphs.value.map((p, i) => {
+          const t = translatedParagraphs.value[i]
+          return t !== undefined && t !== "" ? t : p
+        })
+      : sourceParagraphs.value.slice()
+  }
 
   // ─── generation-gate（章节切换旧响应不得覆盖新数据）───
   let gen = 0
@@ -139,6 +385,9 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
     error.value = null
     // isCached 保留：缓存语义跨章节持久（ADR-0171 §6）
     showTranslation.value = false
+    translatedParagraphs.value = []
+    sourceParagraphs.value = []
+    refreshDisplay()
   }
 
   /**
@@ -158,7 +407,16 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
     // hasKey=false → Keystore 无 apiKey = 未配置（Java 侧返回带默认值的脱敏镜像而非 null；
     // 必须在此归一为 null，否则上层会尝试用空 apiKey 调 provider 而挂起/超时）
     if (ep.hasKey === false) return null
-    return ep
+    // 非密元数据（baseURL / model / targetLang）叠加：Java 侧只持有默认值 + apiKey，
+    // 用户保存在设置页的值走 endpointPrefs（ADR-0170 §D5.1）；缺失则保留 Java 默认。
+    const meta = await readEndpointMetadata()
+    credential.value = await readCredentialVerification()
+    return {
+      ...ep,
+      baseURL: meta.baseURL ?? ep.baseURL,
+      model: meta.model ?? ep.model,
+      targetLang: meta.targetLang ?? ep.targetLang,
+    }
   }
 
   /**
@@ -166,36 +424,154 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
    * 不在 JS 堆持有 apiKey（ADR-0170 §D5.1）。
    */
   async function saveEndpointConfig(config: LlmEndpointConfig): Promise<void> {
+    // apiKey 走 Java 加密通道（Keystore），JS 侧不落盘
     await nativeSetApiKey(config.apiKey)
-    // baseURL/model/targetLang 等元数据：通过 setApiKey 之外的入口传递；
-    // 当前 nativeTranslate 模块仅暴露 setApiKey / getEndpoint / clearEndpoint
-    // 三个桥——getEndpoint 由 Java 侧从已存的 apiKey + 隐式默认重建脱敏镜像。
-    // baseURL/model 由用户在表单侧保存到本地设置（settingsStore）。
-    // 完整多字段持久化在后续 T8（多字段 endpoint 持久化）补齐；本 ticket
-    // 仅做 store 接线，UI 层使用本方法即可。
-    void config
+    // 非密元数据落设置 KV：翻译时随请求下发（baseURL / model），未保存则回退 Java 默认值。
+    // 必须在 apiKey 写入之后 —— apiKey 失败时不留「看似已配置」的半成品元数据。
+    const prefs = endpointPrefs()
+    try {
+      await prefs.set(LLM_PREFS_BASE_URL, config.baseURL)
+      await prefs.set(LLM_PREFS_MODEL, config.model)
+      if (config.targetLang) await prefs.set(LLM_PREFS_TARGET_LANG, config.targetLang)
+    } catch (err) {
+      // 写失败必须可见（AGENTS.md 硬约束 #3）：否则用户以为「保存成功了」
+      console.warn("[novelTranslateStore] endpoint 元数据保存失败", err)
+      throw err
+    }
+    // 失效规则（ADR-0173 D4①）：**任何一次保存都失效凭据验证** —— key 无法比较，
+    // 同一个 baseURL 下换了一把新 key 时，沿用旧的「已验证」正是 D1 禁止的假象。
+    await clearCredentialVerification()
+    credential.value = { state: "unverified", at: null, baseUrl: null }
   }
 
-  /** 清除 Keystore 中已存的 endpoint 配置（spec §6.1 入口） */
+  /** 清除 endpoint 配置：Keystore apiKey + 设置 KV 中的非密元数据（spec §6.1 入口） */
   async function clearEndpointConfig(): Promise<void> {
     await nativeClearEndpoint()
+    const prefs = endpointPrefs()
+    await Promise.all([
+      prefs.remove(LLM_PREFS_BASE_URL),
+      prefs.remove(LLM_PREFS_MODEL),
+      prefs.remove(LLM_PREFS_TARGET_LANG),
+    ])
+    // 失效规则（ADR-0173 D4②）：配置没了，验证状态必须一起没
+    await clearCredentialVerification()
+    credential.value = { state: "unverified", at: null, baseUrl: null }
+    compatibility.value = "idle"
+  }
+
+/**
+ * 原生 probe 的**真实**状态值域（PictelioTranslateModule.classifyProbe 只发这四种）——
+ * 白名单据此校验；契约测试钉住该值域，禁造不存在的 wire 值。
+ */
+const HOST_PROBE_STATUSES = ["ok", "partial", "incompatible", "unknown"] as const
+type HostProbeStatus = (typeof HOST_PROBE_STATUSES)[number]
+
+function isCompatibilityStatus(value: unknown): value is HostProbeStatus {
+  return typeof value === "string" && (HOST_PROBE_STATUSES as readonly string[]).includes(value)
+}
+
+/**
+ * provider 归属（azure / deepseek）：**JS 侧**判定，原生不回这些值。
+ * 原生只回答「通不通」，归属由地址推断（ADR-0173 D3 修订）。
+ */
+function classifyProvider(
+  hostStatus: HostProbeStatus,
+  baseURL: string,
+): EndpointCompatibilityStatus {
+  if (hostStatus !== "ok") return hostStatus
+  const host = extractHostname(baseURL)
+  if (host !== null && host.toLowerCase().endsWith(".openai.azure.com")) return "azure"
+  if (host !== null && host.toLowerCase().endsWith("api.deepseek.com")) return "deepseek"
+  return "ok"
+}
+
+  /** 探测用的假 key（ADR-0173 D2：探测永不携带用户密钥） */
+  const PROBE_DUMMY_API_KEY = "sk-pictelio-probe-not-a-real-key"
+  /** 探测用的占位模型（端点不认这个模型也能从状态码判出「是不是 Responses API」） */
+  const PROBE_MODEL = "gpt-5"
+
+  /**
+   * 探测**端点兼容性**（地址层，spec §6.1 inline probe；ADR-0173 D1/D2/D3）。
+   *
+   * - 只带 dummy key → 未配置密钥也能探测，也让「已保存的配置免密钥重测」成立；
+   * - 保留 Java 侧状态分类（此前实现压成 boolean，丢掉「仅 chat/completions」「无法探测」）；
+   * - NativeModule 缺失 / 网络错 → unknown（**不 reject**：探测是只读诊断，UI 需要能显示它）。
+   */
+  async function probeCompatibility(baseURL: string): Promise<ProbeClassification> {
+    const url = baseURL.trim()
+    const gen = ++compatGen
+    const commit = (status: EndpointCompatibilityStatus): void => {
+      // generation-gate：慢探测不得覆盖后发起的探测（AGENTS.md 即时导航硬约束 #3）
+      if (gen === compatGen) compatibility.value = status
+    }
+    if (url.length === 0) {
+      commit("idle")
+      // detail 是技术诊断串（非展示文案；UI 文案走 i18n 的 compat.idle）
+      return { status: "idle", detail: "empty baseURL", httpStatus: 0 }
+    }
+    try {
+      const result = await nativeProbeEndpoint(url, PROBE_DUMMY_API_KEY, PROBE_MODEL)
+      // 白名单校验：原生回未知串时回落 unknown（否则 COMPAT_KEYS 查不到 → t(undefined)）
+      const raw = result.status
+      const status: HostProbeStatus = isCompatibilityStatus(raw) ? raw : "unknown"
+      if (!isCompatibilityStatus(raw)) {
+        console.warn("[novelTranslateStore] 原生返回未知兼容性状态，回落 unknown", { raw })
+      }
+      const classified = classifyProvider(status, url)
+      commit(classified)
+      return { status: classified, detail: result.detail, httpStatus: result.httpStatus }
+    } catch (err) {
+      console.warn("[novelTranslateStore] probeCompatibility 失败", err)
+      commit("unknown")
+      return {
+        status: "unknown",
+        detail: err instanceof Error ? err.message : String(err),
+        httpStatus: 0,
+      }
+    }
   }
 
   /**
-   * 探测 endpoint 是否兼容 /v1/responses（spec §6.1 inline probe）。
-   * - success → 返回 true
-   * - failed（含 timeout / invalid.key / invalid.model） → 返回 false
-   * - NativeModule 缺失 → reject（UI 显式提示「仅 Android 原生」）
+   * 「测试连接」：用**真实 key** 验证凭据（密钥层，ADR-0173 D5）。
+   *
+   * 2xx → verified；401/403 → failed + invalid_key；其它 → failed + 对应 code。
+   * 结果与时间戳持久化（D4）。
    */
-  async function probeEndpoint(config: LlmEndpointConfig): Promise<boolean> {
+  async function testConnection(config: LlmEndpointConfig): Promise<{
+    ok: boolean
+    code: string
+    detail: string
+  }> {
+    const baseURL = config.baseURL.trim()
+    const stamp = (state: CredentialVerificationState): CredentialVerification => ({
+      state,
+      at: Date.now(),
+      baseUrl: baseURL,
+    })
     try {
-      const result = await nativeProbeEndpoint(config.baseURL, config.apiKey, config.model)
-      if (result.status === "ok") return true
-      console.warn("[novelTranslateStore] probeEndpoint failed", { result })
-      return false
+      const result = await nativeProbeEndpoint(baseURL, config.apiKey, config.model)
+      const httpStatus = result.httpStatus
+      const authenticated = httpStatus >= 200 && httpStatus < 300
+      // 400 + invalid_api_key body 也属「密钥无效」（原生 keyInvalid 标记，ADR-0173 D3 修订）
+      const invalidKey = result.keyInvalid === true || httpStatus === 401 || httpStatus === 403
+      if (authenticated) {
+        await writeCredentialVerification("verified", baseURL)
+        credential.value = stamp("verified")
+        return { ok: true, code: "ok", detail: result.detail }
+      }
+      await writeCredentialVerification("failed", baseURL)
+      credential.value = stamp("failed")
+      return {
+        ok: false,
+        code: invalidKey ? "invalid_key" : "http_" + String(httpStatus),
+        detail: result.detail,
+      }
     } catch (err) {
-      console.warn("[novelTranslateStore] probeEndpoint threw", err)
-      return false
+      const message = err instanceof Error ? err.message : String(err)
+      console.warn("[novelTranslateStore] testConnection 失败", err)
+      await writeCredentialVerification("failed", baseURL)
+      credential.value = stamp("failed")
+      return { ok: false, code: "network", detail: message }
     }
   }
 
@@ -249,20 +625,22 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
     error.value = null
 
     // ── 缓存命中查询（spec §9.5；不调用 provider）──
+    // 6 元组键必须带**真实** model 与 baseURL（ADR-0171 §1 / spec §9.10）：换模型或换
+    // endpoint 必须自动 miss，否则会命中另一模型/另一服务商产出的译文（脏数据）。
     const targetLang = settings.language ?? "zh-CN"
-    const modelPlaceholder = "openai-responses"
-
+    const endpointMeta = await loadEndpointMetadataForCache()
     const cacheKeyMeta = makeCacheKey({
       novelId,
       chapterId: String(chapterId),
       targetLang,
-      modelId: modelPlaceholder,
+      modelId: endpointMeta.model ?? "openai-responses",
       paragraphs,
-      // baseURL 占位（空串 hash 恒等）；完整 baseURL 持久化在 T8 接入
-      baseURL: "",
+      baseURL: endpointMeta.baseURL ?? "",
     })
 
-    const cached = await getTranslation(cacheKeyMeta.key)
+    // 缓存层不可用（真机 PrimJS 无 IndexedDB）→ 不发这次读，直接走 provider；
+    // 降级在 cache 层显式 warn（不静默）。
+    const cached = isTranslationCacheAvailable() ? await getTranslation(cacheKeyMeta.key) : null
     // 二次 in-flight 复用判定：缓存 IO 期间可能同 chapterId 被再次触发，复用现有 promise
     // （注意：cached 命中分支不需要新 promise，因同步路径上已置 pending；本 await 之后若复用，
     // 当前 invocation 继续执行 cached 路径——重复赋值同字段无副作用）
@@ -276,7 +654,10 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
       isCached.value[chapterId] = true
       progress.value = { chapterId, done: paragraphs.length, total: paragraphs.length }
       error.value = null
+      sourceParagraphs.value = paragraphs.slice()
+      translatedParagraphs.value = cached.paragraphs.slice()
       showTranslation.value = true
+      refreshDisplay()
       // 清理 placeholder：缓存命中是同步收敛，已无需等待 in-flight promise
       if (inFlightByChapter.get(chapterId) === placeholder) {
         inFlightByChapter.delete(chapterId)
@@ -348,112 +729,82 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
   }
 
   /**
-   * 内部：走 Native bridge（Android 原生 PictelioTranslate 流式 provider）。
-   * Native 路径下 apiKey 在 Java 堆组装；JS 仅传递 baseURL/model/paragraphs 元数据。
+   * 内部：跑一轮 chunked 翻译（native / web 两个 provider 共用同一条 pipeline）。
    *
-   * 注：translateStream 的契约 = onChunk 只接收中间 chunk（delta / reasoning_delta），
-   * 终态通过 Promise resolve('done') / reject(error) 表达。本函数把 onChunk 内联翻译
-   * 进度，并 await Promise 让 done 收敛；err 路径已由 nativeTranslateStream 内部 reject 抛到外层 catch。
+   * pipeline = createNovelTranslator（ADR-0169 D5）：段落切块 ≤2000 字 + 并发 3 + 每块独立
+   * 请求 + 段落对齐 + 失败块回退原文。native 与 web 只差 provider：
+   * - native：nativeTranslateProvider()（Java 侧解密 apiKey，JS 载荷不含 key）
+   * - web-core 预览：openaiResponsesProvider()（配置占位；真机不走此路径）
    *
-   * Native 路径依赖 endpoint 配置（ADR-0170 §D5.1）；endpoint null 时等同 NOT_CONFIGURED。
+   * 为什么 native 也走 chunked：真机实测整章一次性请求（200-350 段 / 上万字）会在 OkHttp
+   * read timeout 处断流，翻译永不收敛。
    */
-  async function runViaNativeBridge(
+  async function runWithProvider(
+    provider: TranslationProvider,
+    config: LlmEndpointConfig,
     args: { novelId: number; chapterId: number; paragraphs: string[]; xRestrict: 0 | 1 | 2 },
     signal: AbortSignal,
     genNow: number,
   ): Promise<void> {
-    const endpoint = await loadEndpointConfig()
-    if (gen !== genNow) return
-    if (endpoint === null) {
-      status.value = "failed"
-      error.value = {
-        code: "NOT_CONFIGURED",
-        message: t("novelTranslate.error.notConfigured"),
-      }
-      return
-    }
-
-    status.value = "translating"
-    const translated: string[] = args.paragraphs.slice()
-
-    const handle = await nativeTranslateStream(
-      JSON.stringify({
-        novelId: args.novelId,
-        chapterId: String(args.chapterId),
-        paragraphs: args.paragraphs,
-        xRestrict: args.xRestrict,
-      }),
-      (chunk: unknown) => {
-        if (signal.aborted) return
-        if (chunk === null || typeof chunk !== "object") return
-        const c = chunk as TranslationChunk
-        if (c.type === "delta") {
-          translated[c.paragraphIndex] = (translated[c.paragraphIndex] ?? "") + c.text
-          progress.value = {
-            chapterId: args.chapterId,
-            done: Math.min(c.paragraphIndex + 1, args.paragraphs.length),
-            total: args.paragraphs.length,
-          }
-        }
-        // reasoning_delta / 其它中间 chunk 不入 store
-      },
-    )
-
-    if (gen !== genNow) return
-    if (signal.aborted) {
-      await handle.abort()
-      status.value = "aborted"
-      return
-    }
-    status.value = "completed"
-    progress.value = {
-      chapterId: args.chapterId,
-      done: args.paragraphs.length,
-      total: args.paragraphs.length,
-    }
-    isCached.value[args.chapterId] = true
-    void writeCacheIfNeeded(args, translated)
-    showTranslation.value = true
-  }
-
-  /**
-   * 内部：走 OpenAIResponsesProvider（web-core dev 预览 + node 测试）。
-   * chunked pipeline via createNovelTranslator。Web 路径下 endpoint 配置由调用方注入（settings），
-   * 本函数取占位 config——provider mock 不关心 config 内容（单测场景）。
-   */
-  async function runViaWebProvider(
-    args: { novelId: number; chapterId: number; paragraphs: string[]; xRestrict: 0 | 1 | 2 },
-    signal: AbortSignal,
-    genNow: number,
-  ): Promise<void> {
-    const provider: TranslationProvider = openaiResponsesProvider()
-    const translator = createNovelTranslator({ provider })
-    const settings = useSettingsStore()
-    const config: LlmEndpointConfig = {
-      baseURL: "", // web 路径：baseURL 由调用方注入（settings）；本函数用占位
-      apiKey: "", // 同上；mock 环境下不消费
-      model: "openai-responses",
-      targetLang: settings.language ?? "zh-CN",
-      sourceLang: "ja",
-    }
+    // native 桥并发 = 1（串行）：真机实测 3 路并发时 DeepSeek 三条 SSE 全部长时间不发
+    // delta（互相饿死，体感 = 永久「0% 翻译中」）。串行代价可接受（进度单调前进），
+    // 换来「每块都能推进 + 单块失败不影响其他块」的确定性。
+    // web-core 预览保持默认并发 3（浏览器侧无此限制）。
     const request: TranslationRequest = {
       novelId: args.novelId,
       chapterId: String(args.chapterId),
       paragraphs: args.paragraphs,
       options: { xRestrict: args.xRestrict },
     }
+    // 块起始偏移：pipeline 按块 slice 出子请求，provider 适配器需要知道这块在原数组里的起点，
+    // 才能把「块内序号」还原成「绝对段落序号」。偏移经**非枚举符号属性**挂在子请求上
+    // （JSON.stringify 不枚举符号 → 不会污染下发给原生的载荷）。
+    const providerWithOffset: TranslationProvider = {
+      ...provider,
+      translate: (sub, cfg, sig) => {
+        const offset = args.paragraphs.indexOf(sub.paragraphs[0] ?? "")
+        Object.defineProperty(sub, CHUNK_OFFSET, {
+          value: offset >= 0 ? offset : 0,
+          enumerable: false,
+          configurable: true,
+        })
+        return provider.translate(sub, cfg, sig)
+      },
+    }
+    const translator = createNovelTranslator({
+      provider: providerWithOffset,
+      // native 桥并发 = 1（串行）：真机实测 3 路并发时 DeepSeek 三条 SSE 全部长时间不发
+      // delta（互相饿死，体感 = 永久「0% 翻译中」）。串行代价可接受（进度单调前进），
+      // 换来「每块都能推进 + 单块失败不影响其他块」的确定性。
+      // web-core 预览保持默认并发 3（浏览器侧无此限制）。
+      concurrency: provider.id === "native-bridge" ? 1 : undefined,
+    })
 
     status.value = "translating"
-    let lastDeltaIndex = 0
+    // 渲染源与增量译文：source 立即就位（先渲染后加载），译文按绝对段落序号累加
+    sourceParagraphs.value = args.paragraphs.slice()
+    translatedParagraphs.value = new Array<string>(args.paragraphs.length).fill("")
+    refreshDisplay()
+    // 进度按「已收到 delta 的帧数」推进，而非 chunk.paragraphIndex：
+    // chunked pipeline 把每块作为独立请求下发，块内段落序号从 0 重新计数，
+    // 直接用它会永远显示 0%（真机实测：按钮卡在「0% 翻译中」，直到全部块跑完）。
+    // 帧计数是单调的（每帧至少推进 1 段），并 clamp 到总段落数。
+    let deltaFrames = 0
     let lastErrorCode: string | null = null
     let lastErrorMessage = ""
     const result = await translator.translate(request, config, signal, (chunk: TranslationChunk) => {
       if (chunk.type === "delta") {
-        lastDeltaIndex = Math.max(lastDeltaIndex, chunk.paragraphIndex + 1)
+        deltaFrames += 1
         progress.value = {
           chapterId: args.chapterId,
-          done: Math.min(lastDeltaIndex, args.paragraphs.length),
+          done: Math.min(deltaFrames, args.paragraphs.length),
           total: args.paragraphs.length,
+        }
+        // 绝对段落序号 = 本块起始偏移 + 块内序号（chunked pipeline 每块重数 0..n-1）
+        const offset = (request as { [CHUNK_OFFSET]?: number })[CHUNK_OFFSET] ?? 0
+        const abs = offset + chunk.paragraphIndex
+        if (abs >= 0 && abs < translatedParagraphs.value.length) {
+          translatedParagraphs.value[abs] = (translatedParagraphs.value[abs] ?? "") + chunk.text
         }
       } else if (chunk.type === "error") {
         // 捕获首个 error chunk 的 code/message；translator 内部会吞错转 failed/partial，
@@ -471,15 +822,22 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
       return
     }
     if (result.status === "completed") {
-      status.value = "completed"
       progress.value = {
         chapterId: args.chapterId,
         done: args.paragraphs.length,
         total: args.paragraphs.length,
       }
+      // 权威来源：pipeline 的段落对齐结果（增量 transcript 可能有缺项/顺序差）
+      translatedParagraphs.value = result.paragraphs.slice()
       isCached.value[args.chapterId] = true
-      void writeCacheIfNeeded(args, result.paragraphs)
+      // 先落缓存再置 completed：spec §7.1 把 completed 定义为「已写入缓存」，
+      // 且把副作用 await 掉才能让调用方/测试观测到确定的终态（此前 void 掉会
+      // 在下一个用例里才落地，属测试隔离污染源）。
+      await writeCacheIfNeeded(args, result.paragraphs)
+      if (gen !== genNow) return
+      status.value = "completed"
       showTranslation.value = true
+      refreshDisplay()
     } else if (result.status === "partial") {
       status.value = "partial"
       progress.value = {
@@ -503,6 +861,48 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
   }
 
   /**
+   * 内部：native 路径入口 —— 取 endpoint 配置（缺失 = NOT_CONFIGURED）后交给共用 pipeline。
+   * apiKey 永不出 Java 堆：载荷只带 baseURL / model / input / instructions（ADR-0037 / ADR-0170 §D5.1）。
+   */
+  async function runViaNativeBridge(
+    args: { novelId: number; chapterId: number; paragraphs: string[]; xRestrict: 0 | 1 | 2 },
+    signal: AbortSignal,
+    genNow: number,
+  ): Promise<void> {
+    const endpoint = await loadEndpointConfig()
+    if (gen !== genNow) return
+    if (endpoint === null) {
+      status.value = "failed"
+      error.value = {
+        code: "NOT_CONFIGURED",
+        message: t("novelTranslate.error.notConfigured"),
+      }
+      return
+    }
+
+    const config: LlmEndpointConfig = {
+      baseURL: endpoint.baseURL,
+      apiKey: "", // native：key 在 Java 堆解密，JS 永不持有
+      model: endpoint.model,
+      targetLang: endpoint.targetLang,
+      sourceLang: endpoint.sourceLang,
+    }
+    await runWithProvider(nativeTranslateProvider(), config, args, signal, genNow)
+  }
+
+  /**
+   * 内部：web-core dev 预览路径（真机不进入；NativeModule 缺失时才走）。
+   * 与 native 共用 chunked pipeline；配置从设置/环境推导（web 预览的鉴权由调用方注入）。
+   */
+  async function runViaWebProvider(
+    args: { novelId: number; chapterId: number; paragraphs: string[]; xRestrict: 0 | 1 | 2 },
+    signal: AbortSignal,
+    genNow: number,
+  ): Promise<void> {
+    await runWithProvider(openaiResponsesProvider(), webEndpointConfig(), args, signal, genNow)
+  }
+
+  /**
    * 半成品策略（ADR-0171 §5）：只有 status='completed' 才写缓存；
    * 本函数仅由 status 收敛后调用，本身不重复校验 status。
    */
@@ -513,9 +913,16 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
     try {
       const settings = useSettingsStore()
       const targetLang = settings.language ?? "zh-CN"
-      const sourceHash = computeSourceHash(args.paragraphs)
-      const baseURLHash = computeBaseURLHash("")
-      const key = `${args.novelId}:${args.chapterId}:${targetLang}:openai-responses:${sourceHash}:${baseURLHash}`
+      const endpointMeta = await loadEndpointMetadataForCache()
+      // 与读路径同一个键构造器（写路径曾手写模板串 → 两侧漂移风险）
+      const { key } = makeCacheKey({
+        novelId: args.novelId,
+        chapterId: String(args.chapterId),
+        targetLang,
+        modelId: endpointMeta.model ?? "openai-responses",
+        paragraphs: args.paragraphs,
+        baseURL: endpointMeta.baseURL ?? "",
+      })
       await setTranslation(key, translated, {
         providerId: "openai-responses",
         modelId: "openai-responses",
@@ -525,9 +932,42 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
     }
   }
 
-  /** 切换原文/译文显示（同步：仅切 signal，触发 computed 重新计算段落来源） */
+  /**
+   * 重译当前章节（spec §6.2「已译 → 重译」；ADR-0173 D6）。
+   *
+   * 语义 = **先失效本章缓存，再重新翻译**（否则 getTranslation 命中旧译文，
+   * 用户看到「重译」却什么都没变）。只失效本章，不动其它章节（cache 层提供单键删除）。
+   */
+  async function retranslate(
+    novelId: number,
+    chapterId: number,
+    paragraphs: string[],
+    xRestrict: 0 | 1 | 2 = 0,
+  ): Promise<void> {
+    try {
+      const settings = useSettingsStore()
+      const endpointMeta = await loadEndpointMetadataForCache()
+      const { key } = makeCacheKey({
+        novelId,
+        chapterId: String(chapterId),
+        targetLang: settings.language ?? "zh-CN",
+        modelId: endpointMeta.model ?? "openai-responses",
+        paragraphs,
+        baseURL: endpointMeta.baseURL ?? "",
+      })
+      await removeTranslation(key)
+      isCached.value[chapterId] = false
+    } catch (err) {
+      // 缓存失效失败不阻断重译（最坏情况是命中旧译文，随后被新译文覆盖）；但必须可见
+      console.warn("[novelTranslateStore] retranslate 缓存失效失败", err)
+    }
+    await translateChapter(novelId, chapterId, paragraphs, xRestrict)
+  }
+
+  /** 切换原文/译文显示（同步：仅切 signal + 重算渲染源） */
   async function toggleMode(): Promise<void> {
     showTranslation.value = !showTranslation.value
+    refreshDisplay()
   }
 
   /** 取消当前 in-flight translation（UI 按钮 / 章节切换 / 路由离开） */
@@ -542,16 +982,23 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
   return {
     status,
     progress,
+    translatedParagraphs,
+    sourceParagraphs,
+    displayParagraphs,
     currentChapter,
     error,
     isCached,
     showTranslation,
     reset,
+    compatibility,
+    credential,
     loadEndpointConfig,
     saveEndpointConfig,
     clearEndpointConfig,
-    probeEndpoint,
+    probeCompatibility,
+    testConnection,
     translateChapter,
+    retranslate,
     toggleMode,
     abort,
   }
