@@ -284,24 +284,6 @@ export const useSettingsStore = defineStore("settings", () => {
   // ── 公共 actions（return）──
 
   /**
-   * 读账号级 PrefsStorage + DEV hook（spec wayfinder #618）：
-   * dev build + 全局 globalThis.__FORCE_R18__ === true 时强制返回 'true'，
-   * 便于模拟器测试 R18 翻译功能（无需手动开 R18 即可访问 R18 小说正文）。
-   * release build 由 __DEV__ = false 编译期门禁跳过（lynx.config.ts L110 注入）。
-   * 使用 globalThis 而非 window —— app-lynx 的 JS 运行在 lynx-bg Worker（utils/idbKV.ts L3 实证无 window）。
-   */
-  async function loadValue(
-    storage: PrefsStorage,
-    key: string,
-  ): Promise<{ value: string | null; source: "native-or-idb" }> {
-    // DEV hook: 强制开启 R-18 便于模拟器测试（main 上保留；release build 会因 __DEV__ = false 跳过）
-    if (__DEV__ && (globalThis as Record<string, unknown>).__FORCE_R18__ === true) {
-      return { value: "true", source: "native-or-idb" as const }
-    }
-    return { value: await storage.get(key), source: "native-or-idb" as const }
-  }
-
-  /**
    * 加载设置（initRouter 在 restoreToken 之后调用，此时 uid 已知）。
    * R18/R18G 走账号级共享存储 + 迁移；ugoira/detailQuality 走 idbKV（非账号级）。
    */
@@ -492,8 +474,8 @@ export const useSettingsStore = defineStore("settings", () => {
     try {
       await migrateLegacy(storage, legacy[0], r18Key(id))
       await migrateLegacy(storage, legacy[1], r18gKey(id))
-      _showR18.value = (await loadValue(storage, r18Key(id))).value === "true"
-      _showR18G.value = (await loadValue(storage, r18gKey(id))).value === "true"
+      _showR18.value = (await storage.get(r18Key(id))) === "true"
+      _showR18G.value = (await storage.get(r18gKey(id))) === "true"
       const rawAi = await storage.get(aiFilterModeKey(id))
       if (rawAi === null) {
         _aiFilterMode.value = "show"
