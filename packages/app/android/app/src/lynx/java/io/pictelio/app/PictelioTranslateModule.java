@@ -119,6 +119,8 @@ public class PictelioTranslateModule extends LynxModule {
     private TranslationSseParser sseParser;
     /** 本次流是否至少产出过一个译文段（空流 = 失败，见 translateStream 收尾） */
     private boolean deltaSeen = false;
+    /** 已下发给 JS 的 delta 帧计数（仅观测用） */
+    private int deltaCount = 0;
 
     /**
      * 流式专用 OkHttp 客户端：**不带 callTimeout**。
@@ -341,6 +343,7 @@ public class PictelioTranslateModule extends LynxModule {
                     return;
                 }
                 deltaSeen = false;
+                deltaCount = 0;
                 boolean terminalEmitted = parseSseStream(body.byteStream(), callback);
                 Log.i(TAG, "SSE 流结束 terminal=" + terminalEmitted + " deltaSeen=" + deltaSeen);
                 if (!deltaSeen) {
@@ -605,8 +608,14 @@ public class PictelioTranslateModule extends LynxModule {
                 (payload, error) -> {
                     if (payload != null && payload.contains("\"type\":\"delta\"")) {
                         deltaSeen = true;
+                        // 打点：确认帧真的交给了 JS（此前出现「Java 计数为真、JS 侧无日志」的断层）
+                        Log.i(TAG, "SSE 帧下发 delta（累计 " + deltaCount++ + "）");
                     }
-                    callback.invoke(payload, error);
+                    try {
+                        callback.invoke(payload, error);
+                    } catch (Throwable t) {
+                        Log.w(TAG, "SSE 帧回调 JS 失败", t);
+                    }
                 });
     }
     /**
