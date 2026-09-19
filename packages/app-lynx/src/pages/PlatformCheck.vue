@@ -70,10 +70,40 @@ function probeJsonRoundtrip(): { pass: boolean; actual: string } {
   return { pass, actual: JSON.stringify(parsed) }
 }
 
-// ── 同步矩阵项（1~4）：setup 时立即执行 ──
+// ── 矩阵项 6：Web API 面存在性（翻译链路依赖；lynx PrimJS 缺项 = 业务直接崩） ──
+// 真机实测（2026-09-19，emulator-5554 + PrimJS）：TextEncoder / TextDecoder / crypto /
+// indexedDB / confirm 全部 undefined —— 翻译缓存 FNV-1a 与 native 流 ID 曾因此抛
+// ReferenceError（按钮永久「0% 翻译中」）。本项把该平台事实常驻可见，防同类缺口再次
+// 只在真机上暴露。刻意用 typeof（不引用符号），缺失时不抛错。
+type ApiName = "TextEncoder" | "TextDecoder" | "crypto" | "indexedDB" | "confirm"
+const WEB_API_PROBES: readonly ApiName[] = ["TextEncoder", "TextDecoder", "crypto", "indexedDB", "confirm"]
+
+function probeWebApis(): { present: ApiName[]; missing: ApiName[] } {
+  const present: ApiName[] = []
+  const missing: ApiName[] = []
+  for (const name of WEB_API_PROBES) {
+    // eslint 复杂度：逐个显式 typeof，避免动态 globalThis 查表的类型噪声
+    const ok =
+      name === "TextEncoder"
+        ? typeof TextEncoder !== "undefined"
+        : name === "TextDecoder"
+          ? typeof TextDecoder !== "undefined"
+          : name === "crypto"
+            ? typeof crypto !== "undefined"
+            : name === "indexedDB"
+              ? typeof indexedDB !== "undefined"
+              : typeof confirm !== "undefined"
+    if (ok) present.push(name)
+    else missing.push(name)
+  }
+  return { present, missing }
+}
+
+// ── 同步矩阵项（1~4 + Web API 面）：setup 时立即执行 ──
 const urlGlobal = probeUrlGlobalHostname()
 const searchParams = probeUrlSearchParamsRoundtrip()
 const jsonRoundtrip = probeJsonRoundtrip()
+const webApis = probeWebApis()
 
 const items = ref<CheckItem[]>([
   {
@@ -101,6 +131,14 @@ const items = ref<CheckItem[]>([
     expect: '预期 PASS（含中文键与数字的对象深对比无损）',
   },
   {
+    name: 'Web API 面（翻译链路依赖）',
+    // 记录平台事实，不设 pass 门槛：缺项已由业务侧收口（utils/utf8.ts 纯 JS 实现 +
+    // newStreamId 纯 JS 降级 + isNativeMode 短路 IDB），故缺失不算失败。
+    status: webApis.missing.length === 0 ? 'pass' : 'skip',
+    actual: webApis.present.length > 0 ? `present: ${webApis.present.join(', ')}` : 'present: （无）',
+    expect: `缺失项记录平台事实（业务已收口，不禁用功能）：${webApis.missing.join(', ') || '无'}`,
+  },
+  {
     // 桥接项初始占位：native 回调到达后原位更新；web-core 无 NativeModules 保持 SKIP
     name: 'bridge 引号契约',
     status: 'skip',
@@ -116,7 +154,7 @@ function runBridgeProbe(): void {
   const mod = getNativeModules()?.PictelioPrefs as
     | { prefsGet(key: string, callback: (value: string, err: string | null) => void): void }
     | undefined
-  const item = items.value[4]
+  const item = items.value[5]
   if (!mod) {
     item.status = 'skip'
     item.actual = 'web-core 无 NativeModules → SKIP'

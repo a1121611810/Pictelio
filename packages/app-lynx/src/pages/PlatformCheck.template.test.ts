@@ -35,12 +35,15 @@ function extractBracedBody(source: string, decl: string): string | null {
 }
 
 describe('PlatformCheck.vue 自检矩阵项（spec §3.T4.2 清单锁定）', () => {
-  it('五个矩阵项名称全部存在', () => {
+  it('矩阵项名称全部存在（§3.T4.2 五项 + ADR-0172 Web API 面一项）', () => {
     expect(code).toContain('URL 全局 hostname')
     expect(code).toContain('safeParseUrl 解析')
     expect(code).toContain('URLSearchParams 往返')
     expect(code).toContain('JSON 往返')
     expect(code).toContain('bridge 引号契约')
+    // ADR-0172 §4：PrimJS 缺 TextEncoder/TextDecoder/crypto/indexedDB/confirm 的常驻观测项
+    expect(code).toContain('Web API 面（翻译链路依赖）')
+    expect(code).toContain('WEB_API_PROBES')
   })
 
   it('每项渲染三要素：名称 + PASS/FAIL/SKIP 判定 + 实际值', () => {

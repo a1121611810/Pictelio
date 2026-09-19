@@ -134,6 +134,9 @@ describe('迁移守卫：三处存量裸 URL 全局已收口（review P1-1 清�
     ['../api/client.ts', 'isTrustedPixivHost'],
     ['../utils/imageUrl.ts', 'isTrustedImageHost'],
     ['./proxyRedact.ts', 'redactProxyUrl'],
+    // 新增（ADR-0172 §3）：翻译层的 Azure 判定曾用 new URL(...).hostname —— 在 lynx 上
+    // .hostname 为 undefined → Azure endpoint 被静默判为非 Azure。已改走 extractHostname。
+    ['../api/translate.ts', 'isAzureBaseURL'],
   ])('%s 无裸 `new URL(`（%s 迁移）', (relPath) => {
     expect(strip(relPath)).not.toMatch(/new\s+URL\(/)
   })

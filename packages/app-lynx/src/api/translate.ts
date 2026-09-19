@@ -30,6 +30,9 @@
  *
  * @see ADR-0169 D2
  */
+// URL 解析唯一入口（ADR-0172 §3：lynx 侧禁用 URL 全局）
+import { extractHostname } from '../utils/safeParseUrl'
+
 export interface LlmEndpointConfig {
   /** 形如 "https://api.openai.com/v1"，不含 "/responses" 后缀 */
   baseURL: string
@@ -48,6 +51,8 @@ export interface LlmEndpointPublic {
   baseURL: string
   model: string
   targetLang: string
+  /** 源语言 BCP-47（Java 侧默认 "ja"；仅透传，当前不参与请求构造） */
+  sourceLang?: string
   /** 用于 UI 的 「key 已配置 ✓ / 未配置 ⚠」 状态 */
   hasKey: boolean
   /** 设置保存时间（毫秒时间戳）；用于设置页排序 */
@@ -162,14 +167,11 @@ export interface TranslationProvider {
  * 精确 hostname 后缀匹配（防伪后缀域）。
  */
 export function isAzureBaseURL(baseURL: string): boolean {
-  try {
-    // new URL 在 worker / node 双侧可用；防御性兜底（lynx 测过 URL.hostname 可用，
-    // 但理论上某些 minimal env 可能缺 URL 全局；ADR-0163 已对齐）。
-    const u = new URL(baseURL)
-    return u.hostname.toLowerCase().endsWith('.openai.azure.com')
-  } catch {
-    return false
-  }
+  // 经 safeParseUrl 收口（lynx 新代码 URL 解析唯一入口，ADR-0172 §3）：
+  // lynx 运行时 URL 全局不 throw 但 .hostname 为 undefined（ADR-0163 取证），
+  // 裸用 new URL 会把所有 Azure endpoint 静默判成非 Azure（漏补 /openai/v1 与 api-version）。
+  const host = extractHostname(baseURL)
+  return host !== null && host.toLowerCase().endsWith('.openai.azure.com')
 }
 
 /**
