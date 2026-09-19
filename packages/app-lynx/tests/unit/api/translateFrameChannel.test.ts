@@ -138,6 +138,60 @@ describe('attachTranslateFrameListener（事件总线交付通道）', () => {
     expect(classifyNativeError(undefined)).toBe('network')
   })
 
+  it('失败终态经事件总线 → store 收敛 failed（review 要求的修复核心防线）', async () => {
+    // 这是「失败终态必须交付」的回归防线：Java 侧 publish 出 error 帧 → 适配器 → store。
+    const emitter = installFakeLynx()
+    let sentToken = ''
+    ;(globalThis as { NativeModules?: unknown }).NativeModules = {
+      PictelioTranslate: {
+        translateStream: (json: string) => {
+          // 本流 id = 适配器实际发出的 _abortToken（Java 回显的就是它）
+          sentToken = (JSON.parse(json) as { _abortToken?: string })._abortToken ?? ''
+          return Promise.resolve({ abort: () => Promise.resolve() })
+        },
+        translatePoll: (_id: string, cb: (v: string | null, e: string | null) => void) =>
+          cb(JSON.stringify({ type: 'pending' }), ''),
+      },
+    }
+    const provider = nativeTranslateProvider()
+    const iter = provider.translate(
+      { novelId: 1, chapterId: 'c1', paragraphs: ['a'], options: { xRestrict: 0 } },
+      { baseURL: 'https://x', apiKey: '', model: 'm' },
+      new AbortController().signal,
+    )
+    await new Promise((r) => setTimeout(r, 10))
+    expect(sentToken).not.toBe('')
+    // 事件总线送失败终态（Java 在 HTTP 非 2xx / 异常 / abort 时就是这么发的）
+    emitter.emit(
+      'pictelioTranslateFrame',
+      JSON.stringify({ type: 'error', message: 'HTTP 502: ', streamId: sentToken }),
+    )
+    const first = await iter.next()
+    expect(first.done).toBe(false)
+    expect(first.value).toMatchObject({ type: 'error', code: 'server' })
+  })
+
+  it('provider.abort() 后监听器被解绑（不泄漏）', async () => {
+    const emitter = installFakeLynx()
+    ;(globalThis as { NativeModules?: unknown }).NativeModules = {
+      PictelioTranslate: {
+        translateStream: () => Promise.resolve({ abort: () => Promise.resolve() }),
+        translatePoll: (_id: string, cb: (v: string | null, e: string | null) => void) =>
+          cb(JSON.stringify({ type: 'pending' }), ''),
+      },
+    }
+    const provider = nativeTranslateProvider()
+    provider.translate(
+      { novelId: 1, chapterId: 'c1', paragraphs: ['a'], options: { xRestrict: 0 } },
+      { baseURL: 'https://x', apiKey: '', model: 'm' },
+      new AbortController().signal,
+    )
+    await new Promise((r) => setTimeout(r, 10))
+    expect(emitter.count('pictelioTranslateFrame')).toBe(1)
+    provider.abort()
+    expect(emitter.count('pictelioTranslateFrame')).toBe(0)
+  })
+
   it('轮询回调失败（原生 reject）→ 抛错，不得静默成功', async () => {
     // 硬约束 #1 的失败路径：translatePoll 的原生错误必须显式暴露
     ;(globalThis as { NativeModules?: unknown }).NativeModules = {
@@ -178,25 +232,25 @@ describe('attachTranslateFrameListener（事件总线交付通道）', () => {
     expect((first.value as { type: string }).type).toBe('error')
   })
 
-  it('首个到达帧确定本流，之后非本流帧被丢弃（ADR-0170 归属键条款）', () => {
-    // 权威 id = 原生回显值：JS 侧生成器与原生取值可能不同（实测 JS 期望 …-1 / 原生 …-2），
-    // 故以首个到达帧的 streamId 作为本流标识，之后的异 id 帧丢弃。
+  it('按本流 id 过滤：异 id 帧被丢弃（陈旧流不得写进当前翻译）', () => {
+    // id 由 transport 复用为 _abortToken，Java 回显同一个值 → 两端必然一致，
+    // 故直接用本流 id 判定即可（不再让首帧夺取归属权，否则陈旧流会顶替本流）。
     const emitter = installFakeLynx()
     const mine: unknown[] = []
-    attachTranslateFrameListener((f) => mine.push(f), 'js-generated-id')
+    attachTranslateFrameListener((f) => mine.push(f), 'my-stream')
 
     emitter.emit(
       'pictelioTranslateFrame',
-      JSON.stringify({ type: 'delta_all', paragraphs: [{ index: 0, text: '我的' }], streamId: 'native-id' }),
+      JSON.stringify({ type: 'delta_all', paragraphs: [{ index: 0, text: '别人的' }], streamId: 'stale-stream' }),
     )
-    expect(mine).toEqual([{ type: 'delta_all', paragraphs: [{ index: 0, text: '我的' }], streamId: 'native-id' }])
+    expect(mine).toEqual([])
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('丢弃非本流帧'))
 
     emitter.emit(
       'pictelioTranslateFrame',
-      JSON.stringify({ type: 'delta_all', paragraphs: [{ index: 0, text: '别人的' }], streamId: 'other-stream' }),
+      JSON.stringify({ type: 'delta_all', paragraphs: [{ index: 0, text: '我的' }], streamId: 'my-stream' }),
     )
     expect(mine).toHaveLength(1)
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('丢弃非本流帧'))
   })
 
   it('未声明期望 streamId 时不做归属过滤（向后兼容旧载荷）', () => {

@@ -169,18 +169,19 @@ export async function translateStream(
   if (!mod) {
     return Promise.reject(new Error("PictelioTranslate 不可用（仅 Android 原生）"))
   }
-  // streamId 由 JS 端生成（与 abortStream 对齐；不依赖 _abortToken 字段也能工作）。
+  // streamId：**优先复用调用方传入的 _abortToken**，其次才自生成。
+  // 修复（code review 复审）：此前无条件 newStreamId() 并覆写 body._abortToken，导致**一条流
+  // 两个 id** —— pipeline 用调用方 id 轮询/订阅，Java 却用覆写后的 id 打事件载荷，两边永不匹配
+  // （实测 JS …-1 / 原生 …-2，曾被误记为「平台差异」）。id 一致是归属过滤与轮询的前提。
   // 禁用 crypto.randomUUID：Lynx PrimJS（真机）无 crypto 全局（2026-09-19 实测 undefined）
-  // → 此前在此同步抛 ReferenceError，翻译流根本发不出去。
-  const streamId = newStreamId()
-  // 把 streamId 注入 requestJson._abortToken（Java 侧 translateStream 优先用此值作注册表 key，
-  // 缺省时 Java 侧自生 UUID；保持 JS / Java streamId 一致便于 abort）
   let body: Record<string, unknown>
   try {
     body = JSON.parse(requestJson)
   } catch {
     return Promise.reject(new Error("requestJson 不是合法 JSON"))
   }
+  const callerToken = typeof body._abortToken === "string" ? body._abortToken : ""
+  const streamId = callerToken.length > 0 ? callerToken : newStreamId()
   body._abortToken = streamId
   const finalJson = JSON.stringify(body)
 
@@ -275,8 +276,7 @@ export function attachTranslateFrameListener(
   onFrame: (frame: unknown) => void,
   expectedStreamId?: string,
 ): () => void {
-  /** 首个到达帧携带的 streamId = 原生实际使用的 id（权威值） */
-  let adoptedStreamId: string | null = null
+
   // 与 router.ts / utils/safeArea.ts 同模式：优先全局 lynx，回退 globalThis.lynx
   // （仓内测试夹具正是用 globalThis.lynx = { getJSModule: () => emitter }，见 safeArea.test.ts）
   const lynxGlobal = (
@@ -315,18 +315,16 @@ export function attachTranslateFrameListener(
           (probe?.streamId != null ? " streamId=" + probe.streamId : ""),
       )
     }
-    // 归属过滤：陈旧流（页面切走 / 上一次翻译未结束）的帧不得写进当前翻译。
-    // 以**原生回显的 streamId**（它实际使用的 _abortToken）为权威 —— JS 侧生成器与原生
-    // 取值可能不同（实测出现过 JS 期望 …-1 / 原生 …-2），用 JS 值判定会误丢本流帧。
-    if (expectedStreamId != null && probe?.streamId != null) {
-      if (adoptedStreamId === null) adoptedStreamId = probe.streamId
-      if (probe.streamId !== adoptedStreamId) {
-        console.warn(
-          "[nativeTranslate] 丢弃非本流帧 streamId=" + probe.streamId +
-            "（本流 " + adoptedStreamId + "）",
-        )
-        return
-      }
+    // 归属过滤：陈旧流的帧不得写进当前翻译。判定用**本流自己的 id**（transport 复用它作为
+    // _abortToken，Java 回显同一个值，两端必然一致）。
+    // 不再采用「首个到达帧确定本流」：那会让抢先到达的**陈旧流**夺取归属权，反而把本流帧
+    // 全丢掉（复审实测复现：首帧 STALE 被当本流写入，本流 done 被丢弃）。
+    if (expectedStreamId != null && probe?.streamId != null && probe.streamId !== expectedStreamId) {
+      console.warn(
+        "[nativeTranslate] 丢弃非本流帧 streamId=" + probe.streamId +
+          "（本流 " + expectedStreamId + "）",
+      )
+      return
     }
     if (parsed === null || typeof parsed !== "object") {
       console.warn("[nativeTranslate] 翻译帧无法解析为帧对象，已丢弃 raw=", raw.slice(0, 120))
@@ -435,6 +433,8 @@ export async function abortStream(streamId: string): Promise<void> {
 // 实例态：每次 translate() 返回一个新的迭代器（各自持有 abort 句柄），因此并发 3 块时
 // 互不干扰；chunk.paragraphIndex 是该次请求内的段落序号，与 sub-request 切片天然对齐。
 export function nativeTranslateProvider(): TranslationProvider {
+  /** 本 provider 当前的解绑函数（abort() 也要解绑，避免监听器泄漏） */
+  let providerDetach: (() => void) | null = null
   let abortHandle: { abort: () => Promise<void> } | null = null
 
   return {
@@ -599,6 +599,7 @@ export function nativeTranslateProvider(): TranslationProvider {
         handle(raw)
         if (finished || aborted) detachOnce()
       }, streamId)
+      providerDetach = detachOnce
       // 交付通道二（兜底）：轮询拉取
       poll(streamId)
 
@@ -622,6 +623,8 @@ export function nativeTranslateProvider(): TranslationProvider {
     },
 
     abort(): void {
+      // 显式 abort 也要解绑：调用方可能只调 provider.abort() 而不 abort signal（复审实测泄漏）
+      providerDetach?.()
       void abortHandle?.abort()
     },
   }
