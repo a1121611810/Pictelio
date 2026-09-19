@@ -56,6 +56,11 @@ class TranslationSseParser {
         return terminalError;
     }
 
+    /** 干净完成时清除错误（防御性：实例可能被复用） */
+    void clearTerminalError() {
+        terminalError = null;
+    }
+
     /** 是否已产出过任何译文段 */
     boolean hasText() {
         return !paragraphText.isEmpty();
@@ -139,6 +144,7 @@ class TranslationSseParser {
                     return null;
                 }
                 case "response.completed": {
+                    clearTerminalError();
                     emitConsolidated(sink);
                     JSONObject done = new JSONObject();
                     done.put("type", "done");

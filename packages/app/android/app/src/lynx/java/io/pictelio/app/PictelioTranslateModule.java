@@ -390,6 +390,10 @@ public class PictelioTranslateModule extends LynxModule {
                 deltaCount = 0;
                 framesDispatched = false;
                 frameQueue.clear();
+                // 每流新建解析器（回归 B）：模块是注册表单例，实例级 sseParser 会让
+                // terminalError 等状态跨流残留 —— 一次失败后同页后续流全部被误判失败。
+                sseParser = new TranslationSseParser();
+                STREAM_SEQ.remove(streamId);
                 boolean terminalEmitted = parseSseStream(body.byteStream(), callback);
                 // 无终态事件即断流（DeepSeek 常见）：把已累积译文刷出，保证「有译文却没交付」不发生
                 if (!terminalEmitted && sseParser != null) {
@@ -485,6 +489,25 @@ public class PictelioTranslateModule extends LynxModule {
                 + ",\"streamId\":\"" + streamId.replace("\"", "'") + "\"}";
     }
 
+    /** streamId → 下一个帧序号（发布与轮询共用，保证同一帧在两路拿到同一 seq） */
+    private static final Map<String, java.util.concurrent.atomic.AtomicInteger> STREAM_SEQ =
+            new ConcurrentHashMap<>();
+
+    /**
+     * 给帧打上 per-stream 单调 seq（含 termincal 帧）。
+     *
+     * <p>为什么需要：交付走「事件总线 + 轮询兜底」两路，保留缓冲后同一帧可能被两路都取到；
+     * 接收侧按 (streamId, seq) 去重即可避免重复 append 出重复译文（复审 finding A）。
+     */
+    private static String withSeq(String frameJson, String streamId) {
+        int close = frameJson.lastIndexOf('}');
+        if (close < 0) return frameJson;
+        int seq = STREAM_SEQ
+                .computeIfAbsent(streamId, k -> new java.util.concurrent.atomic.AtomicInteger())
+                .getAndIncrement();
+        return frameJson.substring(0, close) + ",\"seq\":" + seq + "}";
+    }
+
     /**
      * 经全局事件总线把该流的帧与终态推给 JS（事件名 {@code pictelioTranslateFrame}，载荷一帧 JSON）。
      *
@@ -511,7 +534,7 @@ public class PictelioTranslateModule extends LynxModule {
             if (frames != null) {
                 for (String frame : frames) {
                     view.sendGlobalEvent(EVENT_FRAME,
-                            com.lynx.react.bridge.JavaOnlyArray.of(withStreamId(frame, streamId)));
+                            com.lynx.react.bridge.JavaOnlyArray.of(withSeq(withStreamId(frame, streamId), streamId)));
                     sent++;
                 }
             }
@@ -522,7 +545,7 @@ public class PictelioTranslateModule extends LynxModule {
                         : "{\"type\":\"error\",\"message\":\""
                             + terminal.replace("\"", "'") + "\"}";
                 view.sendGlobalEvent(EVENT_FRAME,
-                        com.lynx.react.bridge.JavaOnlyArray.of(withStreamId(payload, streamId)));
+                        com.lynx.react.bridge.JavaOnlyArray.of(withSeq(withStreamId(payload, streamId), streamId)));
                 sent++;
                 // 缓冲保留：若事件未达，轮询仍能取回帧与终态（直到握手清理）
             }

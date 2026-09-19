@@ -194,6 +194,37 @@ public class TranslationSseParserTest {
     }
 
     @Test
+    public void aFreshParserHasNoLeakedTerminalError() throws Exception {
+        // 回归 B：模块是注册表单例，若解析器实例跨流复用，terminalError 会粘住 ——
+        // 一次失败之后同页每个 chunk 都被误判失败。修复 = 每流新建解析器；
+        // 本测试钉住「新实例不带旧错误」，并用第二次干净完成验证不再残留。
+        TranslationSseParser failing = new TranslationSseParser();
+        Recorder sink = new Recorder();
+        failing.accept(
+                data("{\"type\":\"response.failed\",\"response\":{\"error\":{\"code\":\"server_error\",\"message\":\"boom\"}}}"),
+                sink);
+        assertTrue(failing.terminalError() != null);
+
+        // 模拟「下一条流新建解析器」
+        TranslationSseParser fresh = new TranslationSseParser();
+        assertEquals("新流的解析器不得带旧流的终态错误", null, fresh.terminalError());
+        fresh.accept(data("{\"type\":\"response.output_text.delta\",\"delta\":\"[0] ok\"}"), sink);
+        fresh.accept(data("{\"type\":\"response.completed\"}"), sink);
+        assertEquals("干净完成不得被判失败", null, fresh.terminalError());
+    }
+
+    @Test
+    public void cleanCompletionClearsAPreviouslyRecordedError() throws Exception {
+        // 防御性：即使实例被复用，response.completed 也必须清掉旧错误
+        TranslationSseParser parser = new TranslationSseParser();
+        Recorder sink = new Recorder();
+        parser.accept(data("{\"type\":\"error\",\"message\":\"transient\"}"), sink);
+        assertTrue(parser.terminalError() != null);
+        parser.accept(data("{\"type\":\"response.completed\"}"), sink);
+        assertEquals(null, parser.terminalError());
+    }
+
+    @Test
     public void malformedFrameDoesNotBreakTheStream() throws Exception {
         TranslationSseParser parser = new TranslationSseParser();
         Recorder sink = new Recorder();

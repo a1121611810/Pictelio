@@ -475,14 +475,22 @@ export function nativeTranslateProvider(): TranslationProvider {
       const POLL_MS = 250
       const POLL_MAX = 600
 
+      // 已消费帧的序号（复审 finding A）：保留缓冲后事件总线与轮询兜底可能交付同一帧，
+      // 重复 append 会产出重复译文。Java 侧每帧带 per-stream 单调 seq，这里按它去重。
+      const seenSeq = new Set<number>()
       const handle = (raw: unknown): void => {
         if (raw === null || typeof raw !== "object") return
         const chunk = raw as {
           type?: string
+          seq?: number
           paragraphIndex?: number
           text?: string
           message?: string
           paragraphs?: { index: number; text: string }[]
+        }
+        if (typeof chunk.seq === "number") {
+          if (seenSeq.has(chunk.seq)) return
+          seenSeq.add(chunk.seq)
         }
         if (chunk.type === "delta_all" && Array.isArray(chunk.paragraphs)) {
           for (const one of chunk.paragraphs) {
