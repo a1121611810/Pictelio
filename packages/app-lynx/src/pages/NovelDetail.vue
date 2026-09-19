@@ -12,6 +12,7 @@ import { presentError } from '../utils/errorPresentation'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useDownloadStore } from '../stores/downloadStore'
+import { useNovelTranslateStore } from '../stores/novelTranslateStore'
 import { isDismissed, markDismissed, setWatchState } from '../stores/watchlistStore'
 import {
   createWatchlistPrompt,
@@ -19,6 +20,8 @@ import {
 } from '../primitives/createWatchlistPrompt'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
 import AiOverlay from '../components/AiOverlay.vue'
+import TranslateButton from '../components/TranslateButton.vue'
+import TranslateModeSwitch from '../components/TranslateModeSwitch.vue'
 import { t } from '../i18n'
 
 const settings = useSettingsStore()
@@ -167,6 +170,27 @@ const paragraphs = computed(() => {
 /** 列表 estimated 高度：正文段落中位高度（估算纯函数，见 primitives/novelParagraphEstimate） */
 const estimatedHeightPx = computed(() => novelAverageParagraphHeightPx(paragraphs.value))
 
+// ─── 小说翻译集成（spec docs/specs/app-lynx-novel-translation.md §6.2） ───
+// 单源 store：UI 状态全部经 useNovelTranslateStore 读写，本页只接线不持本地状态。
+// generation-gate 与现有 loadNovel 并存：翻译 chapterId = 当前 novelId（单本小说语义）。
+const translateStore = useNovelTranslateStore()
+
+/** 当前 novel 的 R18 等级（闸门输入；spec §9.7） */
+const xRestrict = computed<0 | 1 | 2>(() => {
+  const r = novel.value?.x_restrict
+  return r === 1 || r === 2 ? r : 0
+})
+
+/** 是否启用翻译功能：未受限 + 有正文 */
+const translationEnabled = computed<boolean>(() => {
+  return paragraphs.value.length > 0 && xRestrict.value === 0
+})
+
+/** 章节切换 / 卸载时复位 store（spec §5：generation-gate 防 stale 覆盖） */
+watch(novelId, (id, prev) => {
+  if (id && id !== prev) translateStore.reset()
+})
+
 // ─── 正文选中与操作菜单（spec docs/specs/app-lynx-novel-text-selection.md）───
 // 页面唯一入口：会话（深模块）+ 工具栏视图；引擎事件、测矩、定位、收起、剪贴板、搜索全在模块内。
 const selection = useTextSelection({ paragraphs })
@@ -226,6 +250,8 @@ onUnmounted(() => {
   teardownPrompt()
   clearTimeout(exportNoticeTimer)
   loadGeneration++ // 卸载后任何在飞响应落地即作废
+  translateStore.abort() // 取消 in-flight 翻译 + 清章节级状态
+  translateStore.reset()
 })
 
 // 章节内跳转（spec §6-2）：路由参数变化 = 同一组件实例复用，
@@ -311,6 +337,17 @@ function onWatchlistCancel(): void {
         >
           <text class="text-[6.4vw] leading-none">⬆</text>
           <text class="text-label-medium text-outline ml-1">{{ t('novelDetail.export.action') }}</text>
+        </view>
+        <!-- 翻译入口（spec §6.2 顶部 banner 位置）：FAB 内联；R18/AI 受限时隐藏 -->
+        <view v-if="translationEnabled" class="mt-3">
+          <TranslateButton
+            :novel-id="novelId"
+            :chapter-id="novelId"
+            :paragraphs="paragraphs"
+          />
+          <view v-if="translateStore.isCached[novelId] || translateStore.status === 'completed'" class="mt-2">
+            <TranslateModeSwitch :enabled="true" />
+          </view>
         </view>
         <!-- 入队内联提示（lynx 无全局 toast）：约 4s 后自动隐藏 -->
         <text v-if="exportNotice" class="text-label-medium text-primary mt-1.5">{{ exportNotice }}</text>
