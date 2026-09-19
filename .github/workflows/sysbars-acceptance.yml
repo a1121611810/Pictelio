@@ -65,22 +65,26 @@ jobs:
 
       - name: Install emulator image
         run: |
-          set -e
+          set -euo pipefail
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           yes | $SDKMANAGER --sdk_root="$ANDROID_HOME" --licenses >/dev/null || true
           yes | $SDKMANAGER --sdk_root="$ANDROID_HOME" "platform-tools" "emulator" \
-            "system-images;android-${{ inputs.apiLevel }};google_apis;x86_64" | tail -2
+            "system-images;android-${{ inputs.apiLevel }};google_apis;x86_64"
 
-      - name: Create AVD
+      # AVD 创建与启动同步骤（跨步骤状态曾出现「✓ 创建成功但 emulator 找不到 AVD」——
+      # 同步骤创建 + list 验证 + ini 文件断言，真失败不会再被掩盖）
+      - name: Create AVD and boot emulator
         run: |
-          set -e
-          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd \
-            -n sysbars -k "system-images;android-${{ inputs.apiLevel }};google_apis;x86_64" \
+          set -euo pipefail
+          export ANDROID_AVD_HOME="$HOME/.android/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          AVDMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
+          echo no | $AVDMANAGER create avd -n sysbars \
+            -k "system-images;android-${{ inputs.apiLevel }};google_apis;x86_64" \
             -d pixel_4 --force
-
-      - name: Boot emulator
-        run: |
-          set -e
+          $AVDMANAGER list avd
+          test -f "$ANDROID_AVD_HOME/sysbars.ini" || {
+            echo "AVD ini 缺失"; ls -la "$ANDROID_AVD_HOME"; exit 1; }
           test -w /dev/kvm && echo "KVM available"
           "$ANDROID_HOME/emulator/emulator" -avd sysbars -no-window -no-audio \
             -gpu swiftshader_indirect -no-boot-anim -no-snapshot-save \
