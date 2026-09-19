@@ -24,6 +24,7 @@ import {
   computeSourceHash,
   fnv1a32,
   getTranslation,
+  removeTranslation,
   makeCacheKey,
   setTranslation,
   clearTranslationCache,
@@ -446,4 +447,58 @@ describe('makeCacheKey 高层便捷方法', () => {
 
 afterEach(() => {
   vi.restoreAllMocks()
+})
+
+// ──────────────────── 真机 runtime 兼容（PrimJS 无 TextEncoder） ────────────────────
+
+describe('fnv1a32 在无 TextEncoder 的 runtime 下仍可用（Lynx PrimJS 兼容）', () => {
+  const originalTextEncoder = (globalThis as { TextEncoder?: unknown }).TextEncoder
+
+  afterEach(() => {
+    if (originalTextEncoder === undefined) {
+      delete (globalThis as { TextEncoder?: unknown }).TextEncoder
+    } else {
+      ;(globalThis as { TextEncoder?: unknown }).TextEncoder = originalTextEncoder
+    }
+  })
+
+  it('TextEncoder 未定义（真机 PrimJS）→ 已知 FNV-1a 32-bit 向量仍成立，不抛 ReferenceError', () => {
+    // 真机实测：TextEncoder === undefined（非「可用但行为不同」）
+    ;(globalThis as Record<string, unknown>).TextEncoder = undefined
+    expect(() => fnv1a32('')).not.toThrow()
+    expect(fnv1a32('')).toBe('811c9dc5')
+    expect(fnv1a32('a')).toBe('e40c292c')
+    expect(fnv1a32('foobar')).toBe('bf9cf968')
+  })
+
+  it('TextEncoder 未定义 + 多字节内容 → UTF-8 字节级哈希仍产出 8 位十六进制', () => {
+    ;(globalThis as Record<string, unknown>).TextEncoder = undefined
+    expect(fnv1a32('日本語')).toMatch(/^[0-9a-f]{8}$/)
+  })
+})
+// ──────────────────── removeTranslation（「重译」单章失效；ADR-0173 D6） ────────────────────
+
+describe('removeTranslation 单键删除（成功 / 降级双路径）', () => {
+  it('删除后该键读不到，其它键不受影响（只失效本章）', async () => {
+    await setTranslation('1:1:zh-CN:m:src:a', ['原文一'], { modelId: 'm' })
+    await setTranslation('2:2:zh-CN:m:src:b', ['原文二'], { modelId: 'm' })
+
+    await removeTranslation('2:2:zh-CN:m:src:b')
+
+    expect(await getTranslation('2:2:zh-CN:m:src:b')).toBeNull()
+    expect(await getTranslation('1:1:zh-CN:m:src:a')).not.toBeNull()
+  })
+
+  it('IndexedDB 不可用 → warn 且不抛（调用方随后必然重新请求，不会静默用旧译文）', async () => {
+    const original = (globalThis as { indexedDB?: unknown }).indexedDB
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    ;(globalThis as Record<string, unknown>).indexedDB = undefined
+    try {
+      await expect(removeTranslation('any')).resolves.toBeUndefined()
+      expect(warnSpy).toHaveBeenCalled()
+    } finally {
+      ;(globalThis as Record<string, unknown>).indexedDB = original
+      warnSpy.mockRestore()
+    }
+  })
 })

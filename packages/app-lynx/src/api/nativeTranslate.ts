@@ -12,6 +12,8 @@
 // API key 全程不出 Java 堆（ADR-0037 字节零进 JS 堆）；JS 侧永不持有明文 key（ADR-0170 §D5.1）。
 // web-core 预览 / node 测试无 NativeModules → 走降级适配器（明示失败，禁假成功 #568）。
 import { unquoteNativeString } from "../utils/tokenStorage"
+import { buildSystemInstructions } from "./translate"
+import type { TranslationChunk, TranslationProvider } from "./translate"
 
 /** 原生 PictelioTranslate Module 接口（Lynx Native Module；回调契约见 PictelioTranslateModule.java） */
 export interface NativeTranslateModule {
@@ -21,6 +23,26 @@ export interface NativeTranslateModule {
   translateStream(requestJson: string, cb: (chunk: string | null, err: string | null) => void): void
   probeEndpoint(baseURL: string, apiKey: string, model: string, cb: (ok: string | null, err: string | null) => void): void
   abortStream(streamId: string, cb: (err: string | null) => void): void
+}
+
+/** 会话内单调递增序号：streamId 只需在「同一 JS 会话 + Java ACTIVE_CALLS 注册表」内唯一
+ *  （JS / Java 两侧用同一个字符串即可对齐 abort），不要求 UUID 形态。 */
+let streamSeq = 0
+
+/**
+ * 生成流 ID。
+ *
+ * - 有 crypto.randomUUID（web-core 预览 / node 测试）→ 用标准 UUID；
+ * - 无 crypto（真机 Lynx PrimJS 实测 typeof crypto === "undefined"）→ 纯 JS 降级：
+ *   时间戳 + 单调序号，同会话内唯一，跨会话时间戳不同。
+ */
+function newStreamId(): string {
+  const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto
+  if (typeof c?.randomUUID === "function") {
+    return c.randomUUID()
+  }
+  streamSeq = (streamSeq + 1) >>> 0
+  return `s${Date.now().toString(36)}-${streamSeq.toString(36)}`
 }
 
 /** 探测原生模块（双通道：lynx 全局 NativeModules + globalThis.NativeModules；同 tokenStorage / lynxClipboard） */
@@ -133,7 +155,12 @@ export type TranslateChunk =
  * 用户主动中断由 abortStream() 表达，translateStream 不回调（避免 abort 被当失败）。
  *
  * 返回 Promise<() => void>：resolve 时返回 abort 函数；reject 时翻译未开始或立即失败。
- * 调用方通过 streamId = uuid 在外部持有；abort() 触发 abortStream 取消 OkHttp Call。 */
+ * 调用方通过 streamId 在外部持有；abort() 触发 abortStream 取消 OkHttp Call。
+ *
+ * 终止契约（ADR-0170 §D6；真机 DeepSeek 实测后补齐）：原生侧**保证**以 done chunk 或
+ * errMsg 终结 —— 服务端未发 {@code response.completed} 而直接断流时，Java 在流末尾合成
+ * done。本函数只把 errMsg 非空视为失败、{@code {type:"done"}} 视为成功；两者都没有
+ * （契约破坏）时拒绝 promise，绝不静默挂起。 */
 export async function translateStream(
   requestJson: string,
   onChunk: (chunk: TranslateChunk) => void,
@@ -142,8 +169,10 @@ export async function translateStream(
   if (!mod) {
     return Promise.reject(new Error("PictelioTranslate 不可用（仅 Android 原生）"))
   }
-  // streamId 由 JS 端生成（与 abortStream 对齐；不依赖 _abortToken 字段也能工作）
-  const streamId = crypto.randomUUID()
+  // streamId 由 JS 端生成（与 abortStream 对齐；不依赖 _abortToken 字段也能工作）。
+  // 禁用 crypto.randomUUID：Lynx PrimJS（真机）无 crypto 全局（2026-09-19 实测 undefined）
+  // → 此前在此同步抛 ReferenceError，翻译流根本发不出去。
+  const streamId = newStreamId()
   // 把 streamId 注入 requestJson._abortToken（Java 侧 translateStream 优先用此值作注册表 key，
   // 缺省时 Java 侧自生 UUID；保持 JS / Java streamId 一致便于 abort）
   let body: Record<string, unknown>
@@ -213,13 +242,14 @@ export async function translateStream(
 }
 
 /** 探测 endpoint 是否兼容 /v1/responses（spec §6.1 inline probe）。
- * 成功返回 {@code {status: "ok"|"partial"|"unknown", detail: string, httpStatus: number}}；
+ * 成功返回 {@code {status, detail, httpStatus, keyInvalid?}}（status ∈ ok|partial|incompatible|unknown，
+ * keyInvalid = HTTP 400 且 body 指明密钥无效）；
  * 失败 reject。 */
 export async function probeEndpoint(
   baseURL: string,
   apiKey: string,
   model: string,
-): Promise<{ status: string; detail: string; httpStatus: number }> {
+): Promise<{ status: string; detail: string; httpStatus: number; keyInvalid?: boolean }> {
   const mod = nativeModule()
   if (!mod) {
     return Promise.reject(new Error("PictelioTranslate 不可用（仅 Android 原生）"))
@@ -234,7 +264,9 @@ export async function probeEndpoint(
       }
       const parsed = parseChunk(ok)
       if (parsed && typeof parsed === "object" && "status" in parsed) {
-        resolve(parsed as { status: string; detail: string; httpStatus: number })
+        resolve(
+          parsed as { status: string; detail: string; httpStatus: number; keyInvalid?: boolean },
+        )
         return
       }
       reject(new Error("probeEndpoint 返回非预期格式"))
@@ -260,4 +292,115 @@ export async function abortStream(streamId: string): Promise<void> {
   }
   // web-core 无模块：abort 无意义；resolve（与原生「幂等」语义对齐——非错误路径）
   return Promise.resolve()
+}
+
+// ─────────────────── Native provider 适配器（ADR-0169 D5 + ADR-0170） ───────────────────
+//
+// 为什么需要它：native 路径曾把整章段落一次性塞进单个请求（真机实测 input 达 200-350 段 /
+// 上万字），DeepSeek 在 OkHttp read timeout 处断流且不发 response.completed → 翻译永不收敛。
+// 现复用 web 路径同款 chunked pipeline（createNovelTranslator：≤2000 字/块 + 并发 3 + 段落
+// 对齐 + 整批回退），native 只承担「一块 = 一次流式调用」。
+//
+// 实例态：每次 translate() 返回一个新的迭代器（各自持有 abort 句柄），因此并发 3 块时
+// 互不干扰；chunk.paragraphIndex 是该次请求内的段落序号，与 sub-request 切片天然对齐。
+export function nativeTranslateProvider(): TranslationProvider {
+  let abortHandle: { abort: () => Promise<void> } | null = null
+
+  return {
+    id: "native-bridge",
+
+    translate(request, config, signal): AsyncIterator<TranslationChunk> {
+      const queue: TranslationChunk[] = []
+      let wake: (() => void) | null = null
+      let finished = false
+      let failure: Error | null = null
+      let aborted = false
+
+      const nudge = (): void => {
+        wake?.()
+        wake = null
+      }
+
+      const onAbort = (): void => {
+        aborted = true
+        failure = new DOMException("aborted", "AbortError")
+        void abortHandle?.abort()
+        nudge()
+      }
+      signal.addEventListener("abort", onAbort, { once: true })
+
+      void translateStream(
+        JSON.stringify({
+          baseURL: config.baseURL,
+          model: config.model,
+          input: request.paragraphs,
+          instructions: buildSystemInstructions(config),
+        }),
+        (raw: unknown) => {
+          if (aborted) return
+          if (raw === null || typeof raw !== "object") return
+          const chunk = raw as { type?: string; paragraphIndex?: number; text?: string }
+          if (chunk.type === "delta") {
+            queue.push({
+              type: "delta",
+              paragraphIndex:
+                typeof chunk.paragraphIndex === "number" ? chunk.paragraphIndex : 0,
+              text: chunk.text ?? "",
+            })
+            nudge()
+            return
+          }
+          if (chunk.type === "reasoning_delta") {
+            queue.push({ type: "reasoning_delta", text: chunk.text ?? "" })
+            nudge()
+          }
+        },
+      )
+        .then((handle) => {
+          abortHandle = handle
+          if (aborted || signal.aborted) {
+            void handle.abort()
+            return
+          }
+          // 原生 done（流内 response.completed 或 Java 在流末尾合成）→ 收尾
+          finished = true
+          queue.push({ type: "done" })
+          nudge()
+        })
+        .catch((err: unknown) => {
+          if (aborted || signal.aborted) return
+          const message = err instanceof Error ? err.message : String(err)
+          queue.push({ type: "error", code: "unknown", message, retryable: true })
+          finished = true
+          nudge()
+        })
+        .finally(() => {
+          signal.removeEventListener("abort", onAbort)
+          finished = true
+          nudge()
+        })
+
+      const iter: AsyncIterator<TranslationChunk> = {
+        async next(): Promise<IteratorResult<TranslationChunk>> {
+          while (true) {
+            const value = queue.shift()
+            if (value !== undefined) return { value, done: false }
+            if (failure) throw failure
+            if (finished) return { value: undefined as never, done: true }
+            await new Promise<void>((resolve) => {
+              wake = resolve
+            })
+          }
+        },
+      }
+      ;(iter as unknown as { [Symbol.asyncIterator]: () => AsyncIterator<TranslationChunk> })[
+        Symbol.asyncIterator
+      ] = () => iter
+      return iter
+    },
+
+    abort(): void {
+      void abortHandle?.abort()
+    },
+  }
 }

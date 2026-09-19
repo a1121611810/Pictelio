@@ -15,6 +15,7 @@ import {
   clearEndpoint,
   getEndpoint,
   nativeTranslateModule,
+  nativeTranslateProvider,
   probeEndpoint,
   setApiKey,
   translateStream,
@@ -200,6 +201,39 @@ describe("translateStream 流式契约", () => {
   afterEach(() => {
     delete (globalThis as Record<string, unknown>).NativeModules
     vi.restoreAllMocks()
+  })
+
+  it("crypto 全局不可用（真机 PrimJS 实测 typeof crypto === 'undefined'）→ 仍生成 streamId 且透传 _abortToken", async () => {
+    // 真机实测 2026-09-19：PrimJS 无 crypto / crypto.randomUUID → 曾在此同步抛
+    // ReferenceError，翻译链路整体不可用。期望：降级到纯 JS 生成，streamId 非空、
+    // 且注入到 requestJson._abortToken（Java 侧注册表 key 与 abort 必须一致）。
+    const originalCrypto = (globalThis as { crypto?: unknown }).crypto
+    delete (globalThis as { crypto?: unknown }).crypto
+    try {
+      let capturedReqJson = ""
+      let capturedCb: ((c: string | null, e: string | null) => void) | null = null
+      mod.translateStream.mockImplementation(
+        (reqJson: string, cb: (c: string | null, e: string | null) => void) => {
+          capturedReqJson = reqJson
+          capturedCb = cb
+        },
+      )
+
+      const p = translateStream(JSON.stringify({ paragraphs: ["x"] }), () => {})
+      await new Promise((r) => setTimeout(r, 0))
+      expect(capturedCb).not.toBeNull()
+      capturedCb!(JSON.stringify({ type: "done" }), "")
+
+      const { streamId } = await p
+      expect(typeof streamId).toBe("string")
+      expect(streamId.length).toBeGreaterThan(0)
+      const sent = JSON.parse(capturedReqJson) as { _abortToken?: string }
+      expect(sent._abortToken).toBe(streamId)
+    } finally {
+      if (originalCrypto !== undefined) {
+        ;(globalThis as { crypto?: unknown }).crypto = originalCrypto
+      }
+    }
   })
 
   it("delta → reasoning_delta → done 序列：onChunk 收到中间帧，done 触发 abort handle resolve", async () => {
@@ -430,5 +464,98 @@ describe("abortStream Promise 包装", () => {
   it("无原生模块 → resolve（幂等：abort 在 web-core 无意义，不算错）", async () => {
     delete (globalThis as Record<string, unknown>).NativeModules
     await expect(abortStream("x")).resolves.toBeUndefined()
+  })
+})
+
+// ─────────────── native provider 适配器：Java 侧逐字字段契约 ───────────────
+//
+// 真机缺陷（2026-09-19 实测）：JS 曾下发 { novelId, chapterId, paragraphs, xRestrict }，
+// 而 PictelioTranslateModule.translateStream 逐字解析 { baseURL, model, input, instructions }——
+// 字段名不符 → cb("", "baseURL 不能为空") → 翻译永远发不出去。本组测试把该契约钉在
+// 适配器（真正构造载荷的唯一位置）上。
+
+describe("nativeTranslateProvider 载荷契约（与 Java 逐字字段对齐）", () => {
+  let mod: ReturnType<typeof createFakeModule>
+
+  beforeEach(() => {
+    mod = createFakeModule()
+    installNativeModule(mod)
+  })
+  afterEach(() => {
+    delete (globalThis as Record<string, unknown>).NativeModules
+    vi.restoreAllMocks()
+  })
+
+  it("translate() → 载荷含 baseURL / model / input / instructions，且不含 apiKey", async () => {
+    let capturedReqJson = ""
+    let capturedCb: ((c: string | null, e: string | null) => void) | null = null
+    mod.translateStream.mockImplementation(
+      (reqJson: string, cb: (c: string | null, e: string | null) => void) => {
+        capturedReqJson = reqJson
+        capturedCb = cb
+      },
+    )
+
+    const provider = nativeTranslateProvider()
+    const iter = provider.translate(
+      {
+        novelId: 1,
+        chapterId: "1",
+        paragraphs: ["第一段", "第二段"],
+        options: { xRestrict: 0 },
+      },
+      {
+        baseURL: "https://api.deepseek.com",
+        apiKey: "", // native：key 在 Java 堆，JS 侧恒为空
+        model: "deepseek-flash",
+        targetLang: "zh-CN",
+        sourceLang: "ja",
+      },
+      new AbortController().signal,
+    )
+
+    // 等适配器发起原生调用
+    await new Promise((r) => setTimeout(r, 0))
+    expect(capturedCb).not.toBeNull()
+
+    const payload = JSON.parse(capturedReqJson) as Record<string, unknown>
+    expect(payload.baseURL).toBe("https://api.deepseek.com")
+    expect(payload.model).toBe("deepseek-flash")
+    expect(payload.input).toEqual(["第一段", "第二段"])
+    // instructions 与 web 路径同一构造函数（prompt 单一事实源）
+    expect(String(payload.instructions)).toContain("professional novel translator")
+    // apiKey 字节零进 JS 堆（ADR-0037）
+    expect(capturedReqJson).not.toContain("apiKey")
+
+    // 原生 done（Java 在流末尾合成或 response.completed）→ 迭代器收尾出 done chunk
+    capturedCb!(JSON.stringify({ type: "done" }), "")
+    const chunks: unknown[] = []
+    while (true) {
+      const { value, done } = await iter.next()
+      if (done) break
+      chunks.push(value)
+    }
+    expect(chunks).toContainEqual({ type: "done" })
+  })
+
+  it("delta chunk 透传 paragraphIndex / text（Java 侧已完成 [N] 锚定）", async () => {
+    let capturedCb: ((c: string | null, e: string | null) => void) | null = null
+    mod.translateStream.mockImplementation(
+      (_reqJson: string, cb: (c: string | null, e: string | null) => void) => {
+        capturedCb = cb
+      },
+    )
+    const provider = nativeTranslateProvider()
+    const iter = provider.translate(
+      { novelId: 1, chapterId: "1", paragraphs: ["a", "b"], options: { xRestrict: 0 } },
+      { baseURL: "https://x", apiKey: "", model: "m" },
+      new AbortController().signal,
+    )
+    await new Promise((r) => setTimeout(r, 0))
+    capturedCb!(JSON.stringify({ type: "delta", paragraphIndex: 1, text: "译文" }), "")
+
+    const first = await iter.next()
+    expect(first.done).toBe(false)
+    expect(first.value).toEqual({ type: "delta", paragraphIndex: 1, text: "译文" })
   })
 })

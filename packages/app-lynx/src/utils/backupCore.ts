@@ -7,71 +7,14 @@
 // WEBDAV_ERROR_MESSAGES 注册表因被源级测试钉住字面量暂不抽取（B9 #508）。
 import { t } from "../i18n";
 import type { WebDavErrorKind } from "./webDavBridge"
+import { utf8Decode, utf8Encode } from "./utf8"
 
 
-// ── UTF-8 编解码（纯 JS）──
-// Lynx JS runtime 不提供 TextEncoder/TextDecoder（2026-09-11 真机实测：
-// 快照序列化处抛错 → 启动时自动备份失败，桥从未被调用）。共享核心必须两端可用，
-// 故不用 Web API，自行实现（含代理对）。
-export function utf8Encode(input: string): Uint8Array {
-  const bytes: number[] = [];
-  for (let i = 0; i < input.length; i++) {
-    let code = input.charCodeAt(i);
-    if (code >= 0xd800 && code <= 0xdbff && i + 1 < input.length) {
-      const next = input.charCodeAt(i + 1);
-      if (next >= 0xdc00 && next <= 0xdfff) {
-        code = 0x10000 + ((code - 0xd800) << 10) + (next - 0xdc00);
-        i++;
-      }
-    }
-    if (code < 0x80) {
-      bytes.push(code);
-    } else if (code < 0x800) {
-      bytes.push(0xc0 | (code >> 6), 0x80 | (code & 0x3f));
-    } else if (code < 0x10000) {
-      bytes.push(0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
-    } else {
-      bytes.push(
-        0xf0 | (code >> 18),
-        0x80 | ((code >> 12) & 0x3f),
-        0x80 | ((code >> 6) & 0x3f),
-        0x80 | (code & 0x3f),
-      );
-    }
-  }
-  return new Uint8Array(bytes);
-}
-
-export function utf8Decode(bytes: Uint8Array): string {
-  let out = "";
-  for (let i = 0; i < bytes.length; ) {
-    const b0 = bytes[i];
-    let code: number;
-    let size: number;
-    if (b0 < 0x80) {
-      code = b0;
-      size = 1;
-    } else if ((b0 & 0xe0) === 0xc0) {
-      code = b0 & 0x1f;
-      size = 2;
-    } else if ((b0 & 0xf0) === 0xe0) {
-      code = b0 & 0x0f;
-      size = 3;
-    } else {
-      code = b0 & 0x07;
-      size = 4;
-    }
-    for (let k = 1; k < size; k++) code = (code << 6) | (bytes[i + k] & 0x3f);
-    i += size;
-    if (code > 0xffff) {
-      const c = code - 0x10000;
-      out += String.fromCharCode(0xd800 + (c >> 10), 0xdc00 + (c & 0x3ff));
-    } else {
-      out += String.fromCharCode(code);
-    }
-  }
-  return out;
-}
+// ── UTF-8 编解码（纯 JS 单一事实源：utils/utf8.ts）──
+// Lynx JS runtime 不提供 TextEncoder/TextDecoder（2026-09-11 备份链路实测、
+// 2026-09-19 翻译链路复测）。实现已收敛到 utils/utf8.ts，此处仅转发导出，
+// 保持既有 import 路径与测试不变。
+export { utf8Decode, utf8Encode }
 
 /** 快照格式标识（spec §3.2） */
 export const BACKUP_FORMAT = "pictelio-backup"

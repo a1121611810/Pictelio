@@ -17,6 +17,9 @@
 // - 失败时 console.warn（模块前缀 `[translationCache]`），不静默吞错。
 
 import { openDb as openKvDb, STORE_TRANSLATIONS as STORE_TRANSLATIONS_FROM_KV } from './idbKV'
+import { isNativeMode } from '../api/client'
+import { utf8Encode } from './utf8'
+
 
 // ─────────────────── 缓存键 ───────────────────
 
@@ -81,8 +84,10 @@ export function buildTranslationCacheKey(k: TranslationCacheKey): string {
  */
 export function fnv1a32(s: string): string {
   let hash = 0x811c9dc5
-  // TextEncoder 在 worker / node 双侧可用；避免 spread `b` 的高位溢出（保持 unsigned 32-bit）
-  const bytes = new TextEncoder().encode(s)
+  // 禁用 TextEncoder：Lynx PrimJS（真机）不提供该 Web API（2026-09-19 实测 undefined），
+  // 直接调用抛 ReferenceError 会中断 translateChapter 同步段（按钮永久「0% 翻译中」）。
+  // 纯 JS utf8Encode（utils/utf8.ts）两端可用；避免 spread `b` 的高位溢出（保持 unsigned 32-bit）
+  const bytes = utf8Encode(s)
   for (let i = 0; i < bytes.length; i++) {
     hash = (hash ^ (bytes[i] & 0xff)) >>> 0
     hash = Math.imul(hash, 0x01000193) >>> 0
@@ -123,11 +128,29 @@ function openDb(): Promise<IDBDatabase> {
   return openKvDb()
 }
 
-/** IndexedDB 可用性探测（真机 Lynx runtime 无 IDB / 挂起；web-core Worker 有）。
- *  真机实测：indexedDB.open 的事件在 PrimJS 上可能永不触发 → 缓存层整体跳过，
+/** IndexedDB 可用性探测（真机 Lynx runtime 无可靠 IDB；web-core Worker 有）。
+ *  真机实测（2026-09-19）：native 模式下 indexedDB.open 的事件在 PrimJS 上不触发，
+ *  且 setTimeout 兜底亦不可靠 → 缓存层必须按环境整体跳过（对齐 settingsStore 的
+ *  `isNativeMode() ? nativePrefs() : devPrefs()` 模式；native 缓存通道待后续 ticket）。
  *  禁止静默挂起翻译流程（IO 边界硬约束 #3）。 */
+let warnedNoIdb = false
+
+/** 缓存层是否可用（导出给 store 判断"要不要发这次缓存读"，避免无意义的 IO 调用） */
+export function isTranslationCacheAvailable(): boolean {
+  return isIdbAvailable()
+}
+
 function isIdbAvailable(): boolean {
-  return typeof indexedDB !== "undefined" && indexedDB !== null
+  if (isNativeMode() || typeof indexedDB === "undefined" || indexedDB === null) {
+    if (!warnedNoIdb) {
+      warnedNoIdb = true
+      // 显式暴露降级（AGENTS.md 硬约束 #3）：真机 PrimJS 无 indexedDB → 翻译缓存整体不生效，
+      // 每章都会重新请求（重复计费）。native 缓存通道见 ADR-0172 §2 挂账。
+      console.warn("[translationCache] IndexedDB 不可用（native runtime）→ 翻译缓存停用，本章不读写缓存")
+    }
+    return false
+  }
+  return true
 }
 
 /** 带超时的 openDb（真机 IDB 事件不触发时 3s 后 reject，避免永久挂起） */
@@ -319,11 +342,37 @@ async function evictOldestEntries(db: IDBDatabase, targetDeleteCount: number): P
 }
 
 /**
+ * 删除单条缓存（「重译」用：只失效本章，不动其它章节）。
+ *
+ * IO 边界：不可用 / 失败 → warn 并返回（调用方随后必然重新请求，不会静默用旧译文）。
+ */
+export async function removeTranslation(key: string): Promise<void> {
+  if (!isIdbAvailable()) {
+    console.warn("[translationCache] removeTranslation 跳过：IndexedDB 不可用", { key })
+    return
+  }
+  try {
+    const db = await openDbWithTimeout()
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE_TRANSLATIONS, "readwrite")
+      tx.objectStore(STORE_TRANSLATIONS).delete(key)
+      tx.oncomplete = (): void => resolve()
+      tx.onerror = (): void => reject(tx.error)
+    })
+  } catch (err) {
+    console.warn("[translationCache] removeTranslation failed", { key, err })
+  }
+}
+
+/**
  * 清除整个 translations store（仅清 translations，不影响 kv store）。
  * 用户主动「清除翻译缓存」入口（spec §6.1 / §9.5）。
  */
 export async function clearTranslationCache(): Promise<void> {
-  if (!isIdbAvailable()) return
+  if (!isIdbAvailable()) {
+    console.warn("[translationCache] 清除缓存跳过：IndexedDB 不可用（本 runtime 无缓存可清）")
+    return
+  }
   try {
     const db = await openDbWithTimeout()
     await new Promise<void>((resolve, reject) => {
