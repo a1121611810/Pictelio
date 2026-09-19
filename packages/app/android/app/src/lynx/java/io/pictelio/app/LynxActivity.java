@@ -73,11 +73,27 @@ public class LynxActivity extends AppCompatActivity {
     /** 全屏模式设置键（"true" = 隐藏系统栏；默认缺省 = false） */
     public static final String KEY_FULLSCREEN_MODE = "settings_fullscreen_mode";
 
+    // ── Dev intent hooks（BuildConfig.DEBUG 门禁；release 完全跳过；emulator 端到端测试用）──
+    /**
+     * 自动登录 refresh_token extra key：adb `am start --es pictelio_dev_refresh_token <token>` 直接登录。
+     * 与 webview 侧手动填 refresh_token 路径等价（持久化到 Keystore + OAuth token 交换）。
+     */
+    private static final String DEV_EXTRA_REFRESH_TOKEN = "pictelio_dev_refresh_token";
+    /** 强制开启 R18 过滤 extra key（任何非空值即触发）。JS 端 listener 收到事件后置 globalThis.__FORCE_R18__ = true。 */
+    private static final String DEV_EXTRA_FORCE_R18 = "pictelio_dev_force_r18";
+    /** force R18 广播事件名（与 app-lynx 端 GlobalEventEmitter.addListener 契约对齐） */
+    private static final String DEV_EVENT_FORCE_R18 = "pictelioDevForceR18";
+    /** refresh_token 存储 key（对齐 app-lynx/src/utils/tokenStorage.ts 的 KEY 常量） */
+    private static final String REFRESH_TOKEN_KEY = "refresh_token";
+
     private LynxView lynxView;
     private final AtomicBoolean bundleLoaded = new AtomicBoolean(false);
 
     /** 本次是否为引擎降级进入——决定错误兜底页给「退出应用」还是「返回 WebView」（ADR-0153） */
     private boolean engineFallbackEntry;
+
+    /** 是否请求强制开启 R18（dev hook；BuildConfig.DEBUG 门禁下生效；onLoadSuccess 期间广播） */
+    private boolean devForceR18Requested;
 
     /** 当前 Activity 弱引用（PictelioAppModule.exitApp 使用，ADR-0066；onDestroy 清理） */
     private static WeakReference<LynxActivity> sInstance;
@@ -279,6 +295,20 @@ public class LynxActivity extends AppCompatActivity {
                             }
                         }
                     }
+
+                    // dev hook：强制开启 R18（BuildConfig.DEBUG 包裹，release 死代码移除）。
+                    // 仿 benchNav 窗口策略：bundle 渲染完成后再延 0.5/1.5/3s 三次广播，
+                    // 防 JS 端 listener 晚于投递注册导致首事件丢失；force R18 状态幂等，重复无害。
+                    if (devForceR18Requested) {
+                        for (long delay : new long[]{500L, 1500L, 3000L}) {
+                            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                                if (!isFinishing()) {
+                                    Log.i(TAG, "dev hook: 广播 pictelioDevForceR18（JS 端置 globalThis.__FORCE_R18__ = true）");
+                                    lynxView.sendGlobalEvent(DEV_EVENT_FORCE_R18, new JavaOnlyArray());
+                                }
+                            }, delay);
+                        }
+                    }
                 }
             }
 
@@ -341,6 +371,11 @@ public class LynxActivity extends AppCompatActivity {
         // renderTemplateUrl(url, initData)：initData 由 app-lynx 启动自恢复，无需注入
         lynxView.renderTemplateUrl("main.lynx.bundle", "");
 
+        // Dev intent hooks（emulator 端到端测试专用）：BuildConfig.DEBUG 门禁；release 完全跳过。
+        // 必须放在 renderTemplateUrl 之后——auto-login 需要 lynxView.getLynxContext()，
+        // force R18 广播由 onLoadSuccess 接力（避免 JS 未挂载提前投递丢事件）。
+        applyDevIntentHooks(getIntent());
+
         // 兜底：bundle 加载可能既不回调成功也不回调失败（如宿主层卡死），
         // 10 秒未就绪则视为失败，退出 Splash 并展示错误页，避免启动屏/白屏卡死
         // （S8/ADR-0164 决策 2：超时属慢设备而非不支持，漏斗对 LOAD_TIMEOUT
@@ -351,6 +386,77 @@ public class LynxActivity extends AppCompatActivity {
             applySystemBarsHidden(this, true);
         }
         scheduleLoadTimeout();
+    }
+
+    // ── Dev intent hooks（BuildConfig.DEBUG 门禁；emulator 端到端测试通道）────────
+
+    /**
+     * 处理 adb `am start --es ...` 注入的 dev extras：
+     * <ul>
+     *   <li>{@code pictelio_dev_refresh_token}：非空时立即调 PictelioSecureStorage 持久化 +
+     *       PictelioAuth.loginWithRefreshToken 完成 OAuth 交换（access_token 进 Java 堆，refresh_token
+     *       轮换后落 Keystore）。与 webview 侧手动粘贴 refresh_token 路径同语义。</li>
+     *   <li>{@code pictelio_dev_force_r18}：任意值（任何非空字符串视为 true）时标记 force R18 请求，
+     *       等待 bundle 渲染完成（onLoadSuccess）后再 0.5/1.5/3s 三次广播 {@link #DEV_EVENT_FORCE_R18}
+     *       ——JS 端 GlobalEventEmitter listener 收到后置 globalThis.__FORCE_R18__ = true，
+     *       后续 settingsStore 读取即生效。LynxView 4.0.1 公开 API 不含 evaluateJavaScript，
+     *       sendGlobalEvent + JS 契约是该版本下「JS 运行时变量注入」的最稳通道（事件语义
+     *       等同于 benchNav，与现有架构零侵入）。</li>
+     * </ul>
+     * 门禁：{@code BuildConfig.DEBUG}。release 构建该判断恒 false，方法体整体作为死代码被 R8 移除，
+     * 生产 APK 不含钩子（与 ADR-0136 benchNav 决策 1 同语义）。
+     */
+    private void applyDevIntentHooks(android.content.Intent intent) {
+        if (!BuildConfig.DEBUG) return; // release 完全跳过
+
+        // 1) refresh_token auto-login
+        String refreshToken = intent.getStringExtra(DEV_EXTRA_REFRESH_TOKEN);
+        if (refreshToken != null && !refreshToken.isEmpty()) {
+            autoLoginWithRefreshToken(refreshToken);
+        }
+
+        // 2) force R18：仅标记，广播延后到 onLoadSuccess（防 JS 未挂载首事件丢失）
+        if (intent.hasExtra(DEV_EXTRA_FORCE_R18)) {
+            devForceR18Requested = true;
+            Log.i(TAG, "dev hook: pictelio_dev_force_r18 extra 已捕获，bundle 渲染完成后广播 "
+                    + DEV_EVENT_FORCE_R18);
+        }
+    }
+
+    /**
+     * 调 PictelioSecureStorage.setItem + PictelioAuth.loginWithRefreshToken 完成登录态恢复。
+     * <p>模块实例化路径：lynxView.getLynxContext() 拿 Lynx 自身使用的 LynxContext（满足模块内部
+     * {@code (LynxContext) mContext} 转型的硬约束——直接传 Activity Context 会 ClassCastException）。
+     * 错误回调均走 Log.w 显式告警，禁静默降级（测试 hard constraint #3）。
+     */
+    private void autoLoginWithRefreshToken(String refreshToken) {
+        try {
+            com.lynx.tasm.behavior.LynxContext ctx = lynxView.getLynxContext();
+            PictelioSecureStorageModule storage = new PictelioSecureStorageModule(ctx);
+            PictelioAuthModule auth = new PictelioAuthModule(ctx);
+
+            // setItem 回调契约（见 PictelioSecureStorageModule.java）：单参失败信息（成功无参/null）。
+            storage.setItem(REFRESH_TOKEN_KEY, refreshToken, (Object... setArgs) -> {
+                String setErr = (setArgs != null && setArgs.length > 0 && setArgs[0] != null)
+                        ? setArgs[0].toString() : "";
+                if (!setErr.isEmpty()) {
+                    Log.w(TAG, "dev hook: refresh_token 持久化失败: " + setErr);
+                    return; // 持久化失败不继续 OAuth 交换（避免 Java 堆有 access 但下次启动丢登录态）
+                }
+                // loginWithRefreshToken 回调契约：cb(userInfoJson, errMsg) —— 失败第二参非空。
+                auth.loginWithRefreshToken(refreshToken, (Object... loginArgs) -> {
+                    String loginErr = (loginArgs != null && loginArgs.length >= 2 && loginArgs[1] != null)
+                            ? loginArgs[1].toString() : "";
+                    if (!loginErr.isEmpty()) {
+                        Log.w(TAG, "dev hook: loginWithRefreshToken 失败: " + loginErr);
+                    } else {
+                        Log.i(TAG, "dev hook: 自动登录成功（userInfo=" + loginArgs[0] + "）");
+                    }
+                });
+            });
+        } catch (Throwable t) {
+            Log.w(TAG, "dev hook: autoLoginWithRefreshToken 异常", t);
+        }
     }
 
     // ── 系统栏 insets 管线（spec lynx-systembars D2/D3）─────────────────
