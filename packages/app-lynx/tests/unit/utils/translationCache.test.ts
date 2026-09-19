@@ -380,30 +380,31 @@ describe('LRU 200 章上限（ADR-0171 §3）', () => {
     }
   })
 
-  it('超出 200 上限 → 触发 LRU 淘汰（不抛错即通过）', async () => {
-    // 实际生产环境跑全 201 条触发真实 LRU 行为（≥200 → 淘汰）；
-    // vitest 环境 IO 重复 200 次负担重；本测试只验证：
-    // 1. setTranslation 不抛错（DB open / count / put / 触发淘汰的最小链路）
-    // 2. 最新写入条目可读
-    // 真实 LRU 200 行为在 packages/app-lynx/tests/agent-browser/* 集成测试验证（见 ADR-0171 §3）。
+  it('写入第 201 条 → 最旧条目被淘汰（真跑 LRU，非「不抛错即通过」）', async () => {
+    // 真跑 LRU：写 201 条（超过 LRU_CAPACITY=200）后，最早的条目必须读不到，
+    // 且条目数不得超过容量。此前该用例只写 5 条并自陈「不抛错即通过」——
+    // 把 evictOldestEntries 整个删掉也会绿（code-review 指出的零防线）。
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const keys = Array.from({ length: 5 }, (_, i) =>
+    const makeKey = (novelId: number) =>
       buildTranslationCacheKey({
-        novelId: i,
+        novelId,
         chapterId: 'ch1',
         targetLang: 'zh-CN',
         modelId: 'gpt-5',
         sourceHash: 'a1b2c3d4',
         baseURLHash: 'e5f6a7b8',
-      }),
-    )
-    for (let i = 0; i < keys.length; i++) {
-      await setTranslation(keys[i], [`para-${i}`], { providerId: 'openai-responses' })
+      })
+    const CAPACITY = 200
+    for (let i = 0; i <= CAPACITY; i++) {
+      await setTranslation(makeKey(i), [`para-${i}`], { providerId: 'openai-responses' })
     }
     warnSpy.mockRestore()
-    const entry = await getTranslation(keys[keys.length - 1])
-    expect(entry).not.toBeNull()
-    expect(entry!.paragraphs).toEqual([`para-${keys.length - 1}`])
+
+    // 最旧（novelId=0）应被淘汰；最新（=200）必须可读
+    expect(await getTranslation(makeKey(0))).toBeNull()
+    const newest = await getTranslation(makeKey(CAPACITY))
+    expect(newest).not.toBeNull()
+    expect(newest!.paragraphs).toEqual([`para-${CAPACITY}`])
   })
 })
 
