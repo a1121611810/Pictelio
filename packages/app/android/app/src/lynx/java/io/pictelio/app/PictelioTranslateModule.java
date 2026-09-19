@@ -115,12 +115,8 @@ public class PictelioTranslateModule extends LynxModule {
     private static final java.util.Set<String> USER_ABORTED = ConcurrentHashMap.newKeySet();
 
     // ── SSE 解析状态（每次 translateStream 新建一个解析器实例，见 SseParser） ──
-    /** 当前段落号（由最近出现的 [N] 锚标记决定） */
-    private int anchorIndex = 0;
-    /** 跨帧截断的锚标记暂存（"
-
-[" 被切成两帧时的 "["） */
-    private final StringBuilder anchorCarry = new StringBuilder();
+    /** SSE 解析器（每次流新建一个，实例内保持段落锚定状态） */
+    private TranslationSseParser sseParser;
 
     /**
      * 流式专用 OkHttp 客户端：**不带 callTimeout**。
@@ -586,100 +582,12 @@ public class PictelioTranslateModule extends LynxModule {
      * <p>抽成独立方法便于单测（Robolectric 不需要真实 socket）。
      */
     private Boolean processSseLine(String line, Callback callback) {
-        {
-            // 段落锚定：output_text.delta 是**跨段连续流**（模型按 [N] 前缀逐段输出），
-            // 跟踪最近出现的 [N] 标记即切换当前段落号；标记本身不进译文（与 web 路径同语义）。
-            // anchorIndex / anchorCarry 是实例字段：状态跨行保持（同一次流内）。
-            if (line.isEmpty()) {
-                return null; // SSE 帧分隔（空行）
-            }
-            if (!line.startsWith("data: ")) {
-                return null; // SSE 的 event: / id: / 注释行（事件类型在 data 载荷里）
-            }
-            String payload = line.substring("data: ".length());
-            try {
-                    JSONObject event = new JSONObject(payload);
-                    String type = event.optString("type");
-                    switch (type) {
-                        case "response.output_text.delta": {
-                            String delta = event.optString("delta");
-                            // 处理「跨帧截断的锚标记」：上一帧遗留的未完成前缀与本次拼接后再匹配
-                            String window = anchorCarry.toString() + delta;
-                            anchorCarry.setLength(0);
-                            Matcher m = PARAGRAPH_ANCHOR.matcher(window);
-                            int lastEnd = 0;
-                            boolean matched = false;
-                            while (m.find()) {
-                                anchorIndex = Integer.parseInt(m.group(1));
-                                lastEnd = m.end();
-                                matched = true;
-                            }
-                            String text = window.substring(matched ? lastEnd : 0);
-                            if (!matched && window.length() > 0 && window.charAt(window.length() - 1) == '[') {
-                                // 可能是被截断的 "["（下一帧补数字）：暂存，避免把标记吐进译文
-                                anchorCarry.append('[');
-                                text = window.substring(0, window.length() - 1);
-                            }
-                            String currentParagraphIndex = String.valueOf(anchorIndex);
-                            JSONObject chunk = new JSONObject();
-                            chunk.put("type", "delta");
-                            chunk.put("paragraphIndex", currentParagraphIndex);
-                            chunk.put("text", text);
-                            callback.invoke(chunk.toString(), "");
-                            break;
-                        }
-                        case "response.reasoning_text.delta": {
-                            JSONObject chunk = new JSONObject();
-                            chunk.put("type", "reasoning_delta");
-                            chunk.put("text", event.optString("delta"));
-                            callback.invoke(chunk.toString(), "");
-                            break;
-                        }
-                        case "response.completed": {
-                            JSONObject done = new JSONObject();
-                            done.put("type", "done");
-                            JSONObject resp = event.optJSONObject("response");
-                            if (resp != null) {
-                                JSONObject usage = resp.optJSONObject("usage");
-                                if (usage != null) {
-                                    done.put("usage", usage);
-                                }
-                            }
-                            callback.invoke(done.toString(), "");
-                            return Boolean.TRUE;
-                        }
-                        case "response.failed": {
-                            JSONObject resp = event.optJSONObject("response");
-                            JSONObject errObj = resp != null ? resp.optJSONObject("error") : null;
-                            String code = errObj != null ? errObj.optString("code", "server") : "server";
-                            String message = errObj != null ? errObj.optString("message", "流失败") : "流失败";
-                            callback.invoke("", "LLM 流失败 [" + code + "]：" + message);
-                            return Boolean.TRUE;
-                        }
-                        case "response.incomplete": {
-                            JSONObject resp = event.optJSONObject("response");
-                            JSONObject incomplete = resp != null ? resp.optJSONObject("incomplete_details") : null;
-                            String reason = incomplete != null ? incomplete.optString("reason", "输出截断") : "输出截断";
-                            callback.invoke("", "LLM 输出截断：" + reason);
-                            return Boolean.TRUE;
-                        }
-                        case "error": {
-                            String message = event.optString("message", "服务端错误");
-                            callback.invoke("", "LLM 错误：" + message);
-                            return Boolean.TRUE;
-                        }
-                        default:
-                            // 未识别事件（如 response.created / response.in_progress）→ 跳过
-                            break;
-                    }
-            } catch (Exception e) {
-                // 单帧解析失败 → 跳过该帧，继续读（不中断流；ADR-0170 §D6 后段）
-                Log.w(TAG, "SSE 帧解析失败: " + payload, e);
-            }
-            return null;
-        }
+        // 解析逻辑抽到 TranslationSseParser（纯逻辑、可 Robolectric 单测；本模块此前零防线）
+        if (sseParser == null) sseParser = new TranslationSseParser();
+        return sseParser.accept(
+                line,
+                (payload, error) -> callback.invoke(payload, error));
     }
-
     /**
      * HTTP 错误响应解析（translateStream 非 2xx）：读 body 摘要，拼可读错误消息。
      * 限 256 字防日志/回调膨胀（LLM 错误响应体可能很大）。
