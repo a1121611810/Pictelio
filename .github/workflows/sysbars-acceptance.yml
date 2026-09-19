@@ -129,7 +129,8 @@ jobs:
           say "display: $DISPLAY_SIZE"
           LYNX=$(adb shell "dumpsys activity top | grep 'LynxView{' | head -1")
           say "lynxview: $LYNX"
-          EXPECT="0,0-$DISPLAY_SIZE"
+          # wm size 用 x 分隔、dumpsys 边界用 - 分隔（1080x2280 → 0,0-1080,2280）
+          EXPECT="0,0-${DISPLAY_SIZE/x/,}"
           echo "$LYNX" | grep -q "$EXPECT" || { say "A1 FAIL: LynxView != 全屏 $EXPECT"; exit 1; }
           say "A1 PASS: LynxView 铺满全屏（$EXPECT）"
           adb shell "dumpsys window | grep -E 'type=(status|navigation)Bars' | grep frame" | tee -a "$LOG"
