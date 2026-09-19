@@ -98,6 +98,24 @@ describe('native 路径集成（真实适配器 + 真实 pipeline）', () => {
     })
   })
 
+  it('错误终态（HTTP 502 等）→ 状态收敛 failed 且带可读消息，不得停在 translating', async () => {
+    // 真机回归：失败终态若不经交付通道，UI 永久停在「n% 翻译中」（ADR-0170 交付通道实测
+    // 记录轮询回调 0/158，故失败态也必须走事件总线）。本用例钉住「用户能看到错误」。
+    mocks.translateStream.mockImplementation(() => Promise.resolve({ abort: vi.fn() }))
+    mocks.translatePoll.mockImplementation(
+      (_id: string, cb: (v: string | null, e: string | null) => void) =>
+        cb(JSON.stringify({ type: 'error', message: 'HTTP 502: ' }), ''),
+    )
+
+    const store = useNovelTranslateStore()
+    await store.translateChapter(300, 300, ['第一段'], 0)
+
+    expect(store.status).toBe('failed')
+    expect(store.error?.message ?? '').toContain('502')
+    // 失败不得留下半截译文
+    expect(store.displayParagraphs.join('|')).not.toContain('·译')
+  })
+
   it('原生逐帧回调 → 译文进入渲染源（displayParagraphs）', async () => {
     // 拉模式契约：translateStream 只负责发起；帧由 translatePoll 逐次取回
     mocks.translateStream.mockImplementation(() => Promise.resolve({ abort: vi.fn() }))

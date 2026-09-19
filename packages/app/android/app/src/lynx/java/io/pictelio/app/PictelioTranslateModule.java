@@ -364,6 +364,9 @@ public class PictelioTranslateModule extends LynxModule {
                     // 打点：HTTP 失败原因（状态码 + 原始错误体，供真机排查；不打印 apiKey / 正文）
                     Log.w(TAG, "translateStream HTTP " + resp.code() + " body=" + errMsg);
                     STREAM_TERMINAL.put(streamId, errMsg);
+                    // 失败终态**必须**也走事件总线：轮询通道实测回调 0/158（ADR-0170），
+                    // 只写 STREAM_TERMINAL 会让 UI 永久停在「n% 翻译中」（历史缺陷翻版）。
+                    publishFramesViaEvent(streamId);
                     return;
                 }
                 ResponseBody body = resp.body();
@@ -409,16 +412,33 @@ public class PictelioTranslateModule extends LynxModule {
             } catch (Throwable e) {
                 if (USER_ABORTED.contains(streamId)) {
                     STREAM_TERMINAL.put(streamId, "aborted");
-                    return; // 用户主动中断：静默
+                    publishFramesViaEvent(streamId);
+                    return; // 用户主动中断：交付 aborted 终态，UI 据此收尾
                 }
                 Log.w(TAG, "translateStream 异常", e);
                 String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
                 STREAM_TERMINAL.put(streamId, "网络错误：" + msg);
+                // 同上：异常终态也必须交付（否则 UI 挂起）
+                publishFramesViaEvent(streamId);
             } finally {
                 ACTIVE_CALLS.remove(streamId);
                 USER_ABORTED.remove(streamId);
             }
         });
+    }
+
+    /**
+     * 给帧 JSON 注入 {@code streamId}。
+     *
+     * <p>为什么必须有：事件名全局唯一、载荷若不带归属键，陈旧流（页面切走、上一次翻译未完成）
+     * 的帧会被**新一次翻译的监听器**消费 → 段落写到错误块偏移 + 提前 done（静默产出错译文）。
+     * 接收侧按 streamId 过滤后可丢弃非本流帧。
+     */
+    private static String withStreamId(String frameJson, String streamId) {
+        int close = frameJson.lastIndexOf('}');
+        if (close < 0) return frameJson;
+        return frameJson.substring(0, close)
+                + ",\"streamId\":\"" + streamId.replace("\"", "'") + "\"}";
     }
 
     /**
@@ -444,7 +464,7 @@ public class PictelioTranslateModule extends LynxModule {
                 String frame;
                 while ((frame = frames.poll()) != null) {
                     view.sendGlobalEvent("pictelioTranslateFrame",
-                            com.lynx.react.bridge.JavaOnlyArray.of(frame));
+                            com.lynx.react.bridge.JavaOnlyArray.of(withStreamId(frame, streamId)));
                     sent++;
                 }
             }
@@ -455,7 +475,7 @@ public class PictelioTranslateModule extends LynxModule {
                         : "{\"type\":\"error\",\"message\":\""
                             + terminal.replace("\"", "'") + "\"}";
                 view.sendGlobalEvent("pictelioTranslateFrame",
-                        com.lynx.react.bridge.JavaOnlyArray.of(payload));
+                        com.lynx.react.bridge.JavaOnlyArray.of(withStreamId(payload, streamId)));
                 sent++;
                 STREAM_FRAMES.remove(streamId);
                 STREAM_TERMINAL.remove(streamId);

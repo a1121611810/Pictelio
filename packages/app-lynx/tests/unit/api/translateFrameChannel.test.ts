@@ -166,6 +166,33 @@ describe('attachTranslateFrameListener（事件总线交付通道）', () => {
     expect((first.value as { type: string }).type).toBe('error')
   })
 
+  it('非本流帧被丢弃（陈旧流不得写进当前翻译，ADR-0170 归属键条款）', () => {
+    const emitter = installFakeLynx()
+    const mine: unknown[] = []
+    attachTranslateFrameListener((f) => mine.push(f), 'stream-A')
+
+    emitter.emit(
+      'pictelioTranslateFrame',
+      JSON.stringify({ type: 'delta_all', paragraphs: [{ index: 0, text: '别人的' }], streamId: 'stream-B' }),
+    )
+    expect(mine).toEqual([])
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('丢弃非本流帧'))
+
+    emitter.emit(
+      'pictelioTranslateFrame',
+      JSON.stringify({ type: 'delta_all', paragraphs: [{ index: 0, text: '我的' }], streamId: 'stream-A' }),
+    )
+    expect(mine).toEqual([{ type: 'delta_all', paragraphs: [{ index: 0, text: '我的' }], streamId: 'stream-A' }])
+  })
+
+  it('未声明期望 streamId 时不做归属过滤（向后兼容旧载荷）', () => {
+    const emitter = installFakeLynx()
+    const frames: unknown[] = []
+    attachTranslateFrameListener((f) => frames.push(f))
+    emitter.emit('pictelioTranslateFrame', JSON.stringify({ type: 'done' }))
+    expect(frames).toEqual([{ type: 'done' }])
+  })
+
   it('连续订阅两次 → 两个监听器互不干扰（解绑只移除自己的）', () => {
     const emitter = installFakeLynx()
     const first: unknown[] = []

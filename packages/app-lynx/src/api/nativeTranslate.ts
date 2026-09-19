@@ -251,7 +251,10 @@ export async function translateStream(
  * @param onFrame 收到一帧（已 JSON 解析）时回调
  * @returns 取消订阅函数
  */
-export function attachTranslateFrameListener(onFrame: (frame: unknown) => void): () => void {
+export function attachTranslateFrameListener(
+  onFrame: (frame: unknown) => void,
+  expectedStreamId?: string,
+): () => void {
   // 与 router.ts / utils/safeArea.ts 同模式：优先全局 lynx，回退 globalThis.lynx
   // （仓内测试夹具正是用 globalThis.lynx = { getJSModule: () => emitter }，见 safeArea.test.ts）
   const lynxGlobal = (
@@ -277,6 +280,23 @@ export function attachTranslateFrameListener(onFrame: (frame: unknown) => void):
       return
     }
     const parsed = parseChunk(raw)
+    // 到达探针（ADR-0170「验证探针」）：Java 侧的发送计数不证明到达，交付归因以本行为准。
+    // console.warn 落 logcat（tag lynx / lynx_console.cc），无 UI 信号也能判定事件是否到达。
+    const probe = parsed as { type?: string; paragraphs?: unknown[]; streamId?: string } | null
+    console.warn(
+      "[nativeTranslate][probe] 事件到达 type=" +
+        String(probe?.type ?? "unparsed") +
+        (Array.isArray(probe?.paragraphs) ? " paragraphs=" + probe.paragraphs.length : "") +
+        (probe?.streamId != null ? " streamId=" + probe.streamId : ""),
+    )
+    // 归属过滤：陈旧流（页面切走 / 上一次翻译未结束）的帧不得写进当前翻译
+    if (expectedStreamId != null && probe?.streamId != null && probe.streamId !== expectedStreamId) {
+      console.warn(
+        "[nativeTranslate] 丢弃非本流帧 streamId=" + probe.streamId +
+          "（期望 " + expectedStreamId + "）",
+      )
+      return
+    }
     if (parsed === null || typeof parsed !== "object") {
       console.warn("[nativeTranslate] 翻译帧无法解析为帧对象，已丢弃 raw=", raw.slice(0, 120))
       return
@@ -547,7 +567,7 @@ export function nativeTranslateProvider(): TranslationProvider {
       detachFrames = attachTranslateFrameListener((raw: unknown) => {
         handle(raw)
         if (finished || aborted) detachOnce()
-      })
+      }, streamId)
       // 交付通道二（兜底）：轮询拉取
       poll(streamId)
 
