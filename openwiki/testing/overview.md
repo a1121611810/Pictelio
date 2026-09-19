@@ -80,6 +80,7 @@ Both `playwright` and `@vitest/browser-playwright` dependencies have been remove
 - **APK path (v4.0.0+):** `android/app/build/outputs/apk/full/debug/app-full-debug.apk` — reflects the Gradle flavor split (previously `app-debug.apk` under `apk/debug/`)
 - **Physical device support (issue #120):** Set `ANDROID_E2E_SERIAL` to target a connected physical device (e.g., OPPO R11s) instead of an emulator. Physical devices can reach Pixiv's network (unlike emulators behind GFW), enabling login-dependent specs. On physical devices, APK install is skipped (ColorOS "PC install attack" blocks adb install), and `pm clear` is replaced with `run-as` data directory cleanup.
 - **Polling-based write verification (`switch-client-oneway.spec.ts`):** SharedPreferences write via Capacitor bridge is async (`apply`, not `commit`). A fixed 2s sleep was unreliable on slow emulators. Now uses a 15s polling loop (1s interval) to wait for `pictelio_client_kind=lynx` to appear.
+- **System bars acceptance workflow (ADR-0168, v5.3.0):** a separate manual [`sysbars-acceptance.yml`](/.github/workflows/sysbars-acceptance.yml) runs the lynx system-bars acceptance matrix on a GitHub runner (KVM emulator, API 35/36 input) — the escape hatch when the local network to `dl.google.com` is blocked. It is **assertion-based** (any failing assertion red-lights the job, not a passive recorder) and covers the API 36 gap that the local T4 matrix could not run. The local matrix lives in [`docs/research/lynx-systembars-t4-acceptance.md`](/docs/research/lynx-systembars-t4-acceptance.md).
 
 ## CI & E2E Drift Prevention (ADR-0084, ADR-0085)
 
@@ -213,6 +214,8 @@ jest.mock("../stores/db", () => ({
 - Asserts the three XML sections stay identical to each other
 
 This is a reusable pattern for config-vs-source consistency: parse the constant from source, compare against the config, fail loudly on drift.
+
+The same JS↔Java literal-drift pattern was applied to the lynx system-bars contract (ADR-0168): [`safeAreaJavaContract.test.ts`](/packages/app-lynx/src/utils/safeAreaJavaContract.test.ts) pins the three anchors — the `settings_fullscreen_mode` key (settingsStore ↔ `LynxActivity`), the `pictelioInsets` event name + `[top, bottom]` payload order (safeArea.ts ↔ `LynxActivity`), and the `getSafeAreaInsets` method name. The Java side is covered by [`LynxSystemBarsTest.java`](/packages/app/android/app/src/test/java/io/pictelio/app/LynxSystemBarsTest.java) (Robolectric: insets→contentSize computation, fullscreen key read, `applySystemBarsHidden` static core).
 
 ### AI-Shared Test Utilities (`tests/ai-shared/`)
 
