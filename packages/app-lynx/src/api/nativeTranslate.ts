@@ -242,6 +242,40 @@ export async function translateStream(
 }
 
 /**
+ * 订阅全局事件总线上的翻译帧（事件名 {@code pictelioTranslateFrame}）。
+ *
+ * <p>为什么需要这条通道：NativeModule 的 callback 在真机/模拟器上实测「一条流至多投递
+ * 1 次」，且轮询调用也可能完全不回调；而 {@code sendGlobalEvent} 是 benchNav 一直在用的
+ * 成熟通道（事件可达 JS 侧 emitter）。
+ *
+ * @param onFrame 收到一帧（已 JSON 解析）时回调
+ * @returns 取消订阅函数
+ */
+export function attachTranslateFrameListener(onFrame: (frame: unknown) => void): () => void {
+  const lynxGlobal = (typeof lynx !== "undefined" ? lynx : undefined) as
+    | {
+        getJSModule?: (name: string) => {
+          addListener?: (event: string, cb: (...args: unknown[]) => void) => void
+          removeListener?: (event: string, cb: (...args: unknown[]) => void) => void
+        }
+      }
+    | undefined
+  const emitter = lynxGlobal?.getJSModule?.("GlobalEventEmitter")
+  if (!emitter || typeof emitter.addListener !== "function") {
+    console.warn("[nativeTranslate] 全局事件通道不可用，翻译帧交付退回轮询")
+    return () => {}
+  }
+  const listener = (...args: unknown[]): void => {
+    const raw = args[0]
+    onFrame(typeof raw === "string" ? parseChunk(raw) : null)
+  }
+  emitter.addListener("pictelioTranslateFrame", listener)
+  return () => {
+    emitter.removeListener?.("pictelioTranslateFrame", listener)
+  }
+}
+
+/**
  * 拉取一帧（**拉模式交付**）。
  *
  * <p>为什么需要它：实测 lynx NativeModule 的 callback 通道在一条流内至多投递 1 次
@@ -484,8 +518,11 @@ export function nativeTranslateProvider(): TranslationProvider {
           })
           nudge()
         })
-      // 立即开始拉取（Java 侧可能尚未就绪 → 返回 pending，继续轮询即可）
+      // 交付通道一：全局事件总线（benchNav 证明可达；callback 通道实测不可靠）
+      const detachFrames = attachTranslateFrameListener(handle)
+      // 交付通道二（兜底）：轮询拉取
       poll(streamId)
+      void detachFrames
 
       const iter: AsyncIterator<TranslationChunk> = {
         async next(): Promise<IteratorResult<TranslationChunk>> {

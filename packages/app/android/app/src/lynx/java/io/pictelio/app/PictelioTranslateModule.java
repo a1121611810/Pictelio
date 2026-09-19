@@ -402,6 +402,9 @@ public class PictelioTranslateModule extends LynxModule {
                 Log.i(TAG, "SSE 流就绪待拉取 streamId=" + streamId
                         + " frames=" + STREAM_FRAMES.getOrDefault(streamId, new java.util.concurrent.ConcurrentLinkedQueue<>()).size()
                         + " terminal=" + STREAM_TERMINAL.get(streamId));
+                // 交付通道：全局事件总线（**不经 callback**）。benchNav 证明该通道事件可达 JS，
+                // 而本模块的 callback 通道实测「一条流至多 1 帧 / 有时完全不回调」。
+                publishFramesViaEvent(streamId);
                 return;
             } catch (Throwable e) {
                 if (USER_ABORTED.contains(streamId)) {
@@ -416,6 +419,51 @@ public class PictelioTranslateModule extends LynxModule {
                 USER_ABORTED.remove(streamId);
             }
         });
+    }
+
+    /**
+     * 经全局事件总线把该流的帧与终态推给 JS（事件名 {@code pictelioTranslateFrame}，载荷一帧 JSON）。
+     *
+     * <p>为什么不用 callback：实测 callback 通道「一条流至多投递 1 次」，且轮询调用也可能
+     * 完全不回调；{@code sendGlobalEvent} 是 benchNav 的成熟通道（事件确实可达 JS）。
+     */
+    private void publishFramesViaEvent(String streamId) {
+        try {
+            com.lynx.tasm.behavior.LynxContext ctx =
+                    (mContext instanceof com.lynx.tasm.behavior.LynxContext)
+                            ? (com.lynx.tasm.behavior.LynxContext) mContext
+                            : null;
+            com.lynx.tasm.LynxView view = ctx != null ? ctx.getLynxView() : null;
+            if (view == null) {
+                Log.w(TAG, "全局事件通道不可用（无 LynxView）→ 翻译结果无法交付");
+                return;
+            }
+            java.util.concurrent.ConcurrentLinkedQueue<String> frames = STREAM_FRAMES.get(streamId);
+            int sent = 0;
+            if (frames != null) {
+                String frame;
+                while ((frame = frames.poll()) != null) {
+                    view.sendGlobalEvent("pictelioTranslateFrame",
+                            com.lynx.tasm.behavior.JavaOnlyArray.of(frame));
+                    sent++;
+                }
+            }
+            String terminal = STREAM_TERMINAL.get(streamId);
+            if (terminal != null) {
+                String payload = "done".equals(terminal)
+                        ? "{\"type\":\"done\"}"
+                        : "{\"type\":\"error\",\"message\":\""
+                            + terminal.replace("\"", "'") + "\"}";
+                view.sendGlobalEvent("pictelioTranslateFrame",
+                        com.lynx.tasm.behavior.JavaOnlyArray.of(payload));
+                sent++;
+                STREAM_FRAMES.remove(streamId);
+                STREAM_TERMINAL.remove(streamId);
+            }
+            Log.i(TAG, "事件总线交付 frames=" + sent);
+        } catch (Throwable t) {
+            Log.w(TAG, "事件总线交付失败", t);
+        }
     }
 
     /**
