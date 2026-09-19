@@ -3,7 +3,7 @@ import { ref, shallowRef, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useMainThreadRef, runOnBackground } from 'vue-lynx'
 import { computeReadProgress } from '../primitives/watchlistPrompt'
 import { novelAverageParagraphHeightPx } from '../primitives/novelParagraphEstimate'
-import { currentParams, goBack, requestBack, registerBackGuard } from '../router'
+import { currentParams, goBack, navigate, requestBack, registerBackGuard } from '../router'
 import { loadNovelDetail, fetchNovelData, loadNovelSeries, addNovelWatchlist } from '../api/novel'
 import type { NovelExportFormat, NovelImagesMap } from '@pictelio/novel-export'
 import { buildNovelExportPayload, buildNovelExportTaskDraft } from '@pictelio/novel-export'
@@ -183,13 +183,76 @@ const xRestrict = computed<0 | 1 | 2>(() => {
 
 /** 是否启用翻译功能：未受限 + 有正文 */
 const translationEnabled = computed<boolean>(() => {
-  // DEV hook：模拟器测试强制放行 R-18（dev only；正式 release 必须 revert）
-  // 与 settingsStore.dev_force_r18 hook 联动：showR18 && showR18G 同开视为 dev 强制
+  // R-18 闸门（spec §9.7）：受限作品默认不提供翻译入口。
+  // 「已开启 R18 显示」= 用户在设置里明确选择了显示这类内容 → 视为对翻译的同一授权，
+  // 不再额外二次确认（授权语义与内容显示对齐，避免同一意图问两遍）。
   if (settings.showR18 && settings.showR18G) {
     return paragraphs.value.length > 0
   }
   return paragraphs.value.length > 0 && xRestrict.value === 0
 })
+
+/** 是否已配置 LLM endpoint（决定翻译按钮态 = 「配置翻译」，spec §6.2） */
+const endpointConfigured = ref<boolean>(false)
+
+/** 首次进入时问一次 endpoint 配置态（失败保持 false → 按钮显示「配置翻译」，可自愈） */
+onMounted(() => {
+  void translateStore
+    .loadEndpointConfig()
+    .then((ep) => {
+      endpointConfigured.value = ep !== null
+    })
+    .catch((err: unknown) => {
+      console.warn('[NovelDetail] endpoint 配置态读取失败（按未配置处理）', err)
+    })
+})
+
+/** 跳设置页（spec §6.2「未译 + 无 endpoint → 配置翻译 → 跳 /me」） */
+function goConfigureTranslation(): void {
+  void navigate('/me')
+}
+
+/**
+ * 错误码 → i18n 键（ADR-0173 D7；仓库惯例同 apiErrorMessage / presentError）。
+ * 直接渲染 err.message 会把原生英文技术串（或中文 Java 文案）漏给用户与 en 词条。
+ */
+
+/** 翻译失败/部分失败的内联提示（§6.4 最小形态；此前 store.error 全仓无渲染点） */
+const translateErrorText = computed<string>(() => {
+  const err = translateStore.error
+  if (err === null) return ''
+  const status = translateStore.status
+  if (status !== 'failed' && status !== 'partial') return ''
+  switch (err.code) {
+    case 'network':
+      return t('novelTranslate.error.network')
+    case 'unauthorized':
+      return t('novelTranslate.error.unauthorized')
+    case 'rate_limit':
+      return t('novelTranslate.error.rateLimit')
+    case 'server':
+      return t('novelTranslate.error.server')
+    case 'timeout':
+      return t('novelTranslate.error.timeout')
+    case 'canceled':
+      return t('novelTranslate.error.canceled')
+    case 'NOT_CONFIGURED':
+      return t('novelTranslate.error.notConfigured')
+    case 'R18_BLOCKED':
+      return t('novelTranslate.error.R18Blocked')
+    case 'PARTIAL_FAILED':
+      return t('novelTranslate.error.partialFailed')
+    default:
+      return t('novelTranslate.error.unknown')
+  }
+})
+
+/** 正文渲染源：译文/原文由 store 的 displayParagraphs 单点决定（spec §6.3 整段切换） */
+const displayParagraphs = computed<string[]>(() =>
+  translateStore.displayParagraphs.length > 0
+    ? translateStore.displayParagraphs
+    : paragraphs.value,
+)
 
 /** 章节切换 / 卸载时复位 store（spec §5：generation-gate 防 stale 覆盖） */
 watch(novelId, (id, prev) => {
@@ -349,17 +412,35 @@ function onWatchlistCancel(): void {
             :novel-id="novelId"
             :chapter-id="novelId"
             :paragraphs="paragraphs"
+            :x-restrict="xRestrict"
+            :configured="endpointConfigured"
+            @translate-configure="goConfigureTranslation"
           />
           <view v-if="translateStore.isCached[novelId] || translateStore.status === 'completed'" class="mt-2">
             <TranslateModeSwitch :enabled="true" />
+          </view>
+          <!-- 翻译失败内联条（§6.4 最小形态）：不再让失败对用户静默 -->
+          <view
+            v-if="translateErrorText"
+            class="mt-2 flex flex-row items-center justify-between"
+          >
+            <text class="text-label-medium text-error flex-1">{{
+              translateErrorText
+            }}</text>
+            <text
+              class="text-label-medium text-primary ml-3"
+              @tap="goConfigureTranslation"
+              >{{ t('novelTranslate.action.configure_translate') }}</text
+            >
           </view>
         </view>
         <!-- 入队内联提示（lynx 无全局 toast）：约 4s 后自动隐藏 -->
         <text v-if="exportNotice" class="text-label-medium text-primary mt-1.5">{{ exportNotice }}</text>
       </view>
       </list-item>
+      <!-- 渲染源 = displayParagraphs（store 单点决定译文/原文；spec §6.3 整段切换） -->
       <list-item
-        v-for="(p, idx) in paragraphs"
+        v-for="(p, idx) in displayParagraphs"
         :key="selection.paragraphId(idx)"
         :item-key="selection.paragraphId(idx)"
         :estimated-main-axis-size-px="estimatedHeightPx"

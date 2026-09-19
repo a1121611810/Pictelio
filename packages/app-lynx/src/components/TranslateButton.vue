@@ -11,13 +11,30 @@ interface Props {
   novelId: number
   chapterId: number
   paragraphs: string[]
+  /** 当前作品的 R-18 等级（0 全年龄 / 1 R18 / 2 R18G）——必须透传给 store 闸门（spec §9.7） */
+  xRestrict: 0 | 1 | 2
+  /** 是否已配置 LLM endpoint（未配置时按钮态 = 「配置翻译」→ 跳设置页，spec §6.2） */
+  configured: boolean
 }
+
+/**
+ * 按钮态（spec §6.2 收敛为 4 态，ADR-0173 D6）：
+ * - configure：未配置 endpoint → 点击跳设置页（不再「点下去然后失败」）
+ * - translating：翻译中 → **可点 = abort**（此前 disabled → onTap 直接 return，用户无法停止）
+ * - retranslate：已缓存 → 点击失效本章缓存并重译
+ * - retry：翻译失败 → 点击重试
+ * - start：首次翻译
+ */
+type ButtonState = "configure" | "translating" | "retranslate" | "retry" | "start"
 
 const props = defineProps<Props>()
 const emit = defineEmits<{
   (e: "translate-start"): void
   (e: "translate-done"): void
   (e: "translate-error", code: string): void
+  /** 未配置 endpoint → 宿主负责跳设置页 */
+  (e: "translate-configure"): void
+  (e: "translate-abort"): void
 }>()
 
 const store = useNovelTranslateStore()
@@ -48,28 +65,67 @@ const progressFraction = computed<number>(() => {
   return Math.min(1, Math.max(0, p.done / p.total))
 })
 
-/** 是否按钮 disabled（含 R18 blocked / aborted 等终态；UI 表现为不可点击） */
-const disabled = computed<boolean>(() => {
-  if (store.status === "aborted" && store.error?.code === "R18_BLOCKED") return true
-  return isTranslatingThis.value
+/** 当前按钮态（唯一事实源；标签、可点性、点击行为全部由它派生） */
+const buttonState = computed<ButtonState>(() => {
+  if (isTranslatingThis.value) return "translating"
+  if (isDoneCached.value) return "retranslate"
+  if (isFailed.value) return "retry"
+  if (!props.configured) return "configure"
+  return "start"
 })
 
-/** 标签：FAB 内可见文案 */
-const label = computed<string>(() => {
-  if (isDoneCached.value) return t("novelTranslate.action.cached")
-  if (isFailed.value) return t("novelTranslate.action.retry")
-  if (isTranslatingThis.value) return t("novelTranslate.status.translating")
-  return t("novelTranslate.action.start")
-})
+/** 仅 R18 拦截是真正不可点（翻译中可点 = abort，见 buttonState） */
+const disabled = computed<boolean>(() =>
+  store.status === "aborted" && store.error?.code === "R18_BLOCKED",
+)
+
+/** 标签：FAB 内可见文案（显式映射表，i18n 键是字面量联合类型） */
+const LABEL_KEYS = {
+  translating: "novelTranslate.status.translating",
+  retranslate: "novelTranslate.action.retranslate",
+  retry: "novelTranslate.action.retry",
+  configure: "novelTranslate.action.configure_translate",
+  start: "novelTranslate.action.start",
+} as const
+
+const label = computed<string>(() => t(LABEL_KEYS[buttonState.value]))
 
 /** 用户点击：起翻译 */
 async function onTap(): Promise<void> {
   if (disabled.value) return
-  if (isFailed.value) {
+  // 翻译中 → abort（spec §6.2：翻译中点击 = 停止）
+  if (buttonState.value === "translating") {
+    store.abort()
+    emit("translate-abort")
+    return
+  }
+  // 未配置 endpoint → 跳设置页（spec §6.2「配置翻译」）
+  if (buttonState.value === "configure") {
+    emit("translate-configure")
+    return
+  }
+  // 已缓存 → 失效本章缓存后重译（ADR-0173 D6）；未捕获 rejection 在 PrimJS 上是静默失败
+  if (buttonState.value === "retranslate") {
+    emit("translate-start")
+    try {
+      await store.retranslate(props.novelId, props.chapterId, props.paragraphs, props.xRestrict)
+      if (store.status === "completed") emit("translate-done")
+      else if (store.status === "failed") emit("translate-error", store.error?.code ?? "unknown")
+    } catch (err) {
+      emit("translate-error", err instanceof Error ? err.message : "unknown")
+    }
+    return
+  }
+  if (buttonState.value === "retry") {
     // 重试路径：保留原 chapterId + paragraphs，由 store 接管新一轮 translation
     emit("translate-start")
     try {
-      await store.translateChapter(props.novelId, props.chapterId, props.paragraphs, 0)
+      await store.translateChapter(
+        props.novelId,
+        props.chapterId,
+        props.paragraphs,
+        props.xRestrict,
+      )
       if (store.status === "completed") emit("translate-done")
       else if (store.status === "failed") {
         emit("translate-error", store.error?.code ?? "unknown")
@@ -79,15 +135,15 @@ async function onTap(): Promise<void> {
     }
     return
   }
-  if (isDoneCached.value) {
-    // 已缓存：点击切换显示原文/译文（FAB 兼任开关）
-    void store.toggleMode()
-    return
-  }
   // 首次触发
   emit("translate-start")
   try {
-    await store.translateChapter(props.novelId, props.chapterId, props.paragraphs, 0)
+    await store.translateChapter(
+      props.novelId,
+      props.chapterId,
+      props.paragraphs,
+      props.xRestrict,
+    )
     if (store.status === "completed") emit("translate-done")
     else if (store.status === "failed") {
       emit("translate-error", store.error?.code ?? "unknown")

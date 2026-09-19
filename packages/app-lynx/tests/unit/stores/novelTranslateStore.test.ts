@@ -32,6 +32,7 @@ const mocks = vi.hoisted(() => {
     cacheGet: vi.fn(),
     cacheSet: vi.fn(),
     cacheClear: vi.fn(),
+    cacheRemove: vi.fn(),
     cacheMakeKey: vi.fn(),
     providerIter: vi.fn(),
     settingsIsRestricted: vi.fn(),
@@ -46,22 +47,86 @@ vi.mock('../../../src/api/nativeTranslate', () => ({
   probeEndpoint: mocks.nativeProbeEndpoint,
   translateStream: mocks.nativeTranslateStream,
   abortStream: mocks.nativeAbortStream,
+  // native provider 适配器：测试用桩 —— 与真实适配器同契约：一块一次 translateStream，
+  // 把原生 onChunk 回调转成异步迭代（delta… → done），失败转 error chunk。
+  // native provider：透传原生桥 mock（delta 帧由各用例的 translateStream mock 驱动），
+  // 与生产适配器同契约：原生 done → 迭代收尾；reject → error chunk。
+  nativeTranslateProvider: () => ({
+    id: 'native-bridge',
+    translate: () => {
+      // web-core 路径（未安装原生桥）→ 交回 providerIter（web provider mock）
+      if (!globalThis.NativeModules) {
+        const webIter = mocks.providerIter() as AsyncIterator<TranslationChunk>
+        const it: AsyncIterator<TranslationChunk> = {
+          async next() {
+            return webIter.next()
+          },
+        }
+        ;(it as unknown as { [Symbol.asyncIterator]: () => AsyncIterator<TranslationChunk> })[
+          Symbol.asyncIterator
+        ] = () => it
+        return it
+      }
+      // 原生桥 mock：await 建流（此时用例已设好 translateStream 的行为），
+      // 再把中间帧作为 iterator 元素吐出（真实适配器的顺序：先建流后收帧）
+      const queue: TranslationChunk[] = []
+      let finished = false
+      let failure: Error | null = null
+      let wake: (() => void) | null = null
+      const nudge = (): void => {
+        wake?.()
+        wake = null
+      }
+      void (mocks.nativeTranslateStream as unknown as (j?: string) => Promise<unknown>)()
+        .then(() => {
+          finished = true
+          nudge()
+        })
+        .catch((err: unknown) => {
+          failure = err instanceof Error ? err : new Error(String(err))
+          nudge()
+        })
+      const iter: AsyncIterator<TranslationChunk> = {
+        async next(): Promise<IteratorResult<TranslationChunk>> {
+          while (true) {
+            const value = queue.shift()
+            if (value !== undefined) return { value, done: false }
+            if (failure) throw failure
+            if (finished) return { value: undefined as unknown as TranslationChunk, done: true }
+            await new Promise<void>((resolve) => {
+              wake = resolve
+            })
+          }
+        },
+      }
+      ;(iter as unknown as { [Symbol.asyncIterator]: () => AsyncIterator<TranslationChunk> })[
+        Symbol.asyncIterator
+      ] = () => iter
+      return iter
+    },
+    abort: () => mocks.nativeAbortStream(),
+  }),
 }))
 
 vi.mock('../../../src/api/translate', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../../../src/api/translate')>()
   return {
     ...orig,
-    openaiResponsesProvider: () =>
+    // 注入 provider：translate 必须按调用返回**新的**迭代器（同 test 多块时各自独立）
+    openaiResponsesProvider: (options?: { provider?: TranslationProvider }) =>
+      options?.provider ??
       ({
         id: 'fake-provider',
         translate: () => mocks.providerIter(),
         abort: vi.fn(),
-      }) as TranslationProvider,
+      } as TranslationProvider),
   }
 })
 
 vi.mock('../../../src/utils/translationCache', () => ({
+  // 缓存可用性探测：测试默认"可用"（fake-indexeddb 已注入），用例可覆盖为 false
+  isTranslationCacheAvailable: () => true,
+  removeTranslation: mocks.cacheRemove,
   getTranslation: mocks.cacheGet,
   setTranslation: mocks.cacheSet,
   clearTranslationCache: mocks.cacheClear,
@@ -76,11 +141,6 @@ vi.mock('../../../src/stores/settingsStore', () => ({
     language: mocks.settingsLanguage(),
   }),
 }))
-
-import {
-  useNovelTranslateStore,
-  resetNovelTranslateStoreForTest,
-} from '../../../src/stores/novelTranslateStore'
 
 // ─── 测试 fixtures ───
 
@@ -107,8 +167,16 @@ function makeFakeIterator(chunks: TranslationChunk[], opts: { abort?: AbortSigna
   return iter
 }
 
+import {
+  resetNovelTranslateStoreForTest,
+  useNovelTranslateStore,
+} from '../../../src/stores/novelTranslateStore'
+
 beforeEach(() => {
-  vi.clearAllMocks()
+  // resetAllMocks（而非 clearAllMocks）：清掉上一个用例排队但未消费的
+  // mockResolvedValueOnce / mockImplementationOnce —— 否则会泄漏到下一个用例，
+  // 让「缓存 miss」用例意外命中缓存（测试隔离缺陷，非实现缺陷）。
+  vi.resetAllMocks()
   setActivePinia(createPinia())
   resetNovelTranslateStoreForTest()
   // 默认 mock 行为：web-core 路径（无 NativeModules）
@@ -126,11 +194,23 @@ beforeEach(() => {
     baseURLHash: 'b:0',
   }))
   // native 默认：缺模块
-  mocks.nativeGetEndpoint.mockRejectedValue(new Error('PictelioTranslate 不可用（仅 Android 原生）'))
-  mocks.nativeSetApiKey.mockRejectedValue(new Error('PictelioTranslate 不可用（仅 Android 原生）'))
-  mocks.nativeClearEndpoint.mockRejectedValue(new Error('PictelioTranslate 不可用（仅 Android 原生）'))
-  mocks.nativeProbeEndpoint.mockRejectedValue(new Error('PictelioTranslate 不可用（仅 Android 原生）'))
-  mocks.nativeTranslateStream.mockRejectedValue(new Error('PictelioTranslate 不可用（仅 Android 原生）'))
+  mocks.nativeGetEndpoint.mockImplementation(() =>
+    Promise.reject(new Error('PictelioTranslate 不可用（仅 Android 原生）')),
+  )
+  mocks.nativeSetApiKey.mockImplementation(() =>
+    Promise.reject(new Error('PictelioTranslate 不可用（仅 Android 原生）')),
+  )
+  mocks.nativeClearEndpoint.mockImplementation(() =>
+    Promise.reject(new Error('PictelioTranslate 不可用（仅 Android 原生）')),
+  )
+  mocks.nativeProbeEndpoint.mockImplementation(() =>
+    Promise.reject(new Error('PictelioTranslate 不可用（仅 Android 原生）')),
+  )
+  // 默认：无原生模块 → 调用即失败。用 mockImplementation 而非 mockRejectedValue：
+  // 后者会**覆盖**外层 describe 内 beforeEach（如 installNativeBridge）已设的实现（测试隔离坑）。
+  mocks.nativeTranslateStream.mockImplementation(() =>
+    Promise.reject(new Error('PictelioTranslate 不可用（仅 Android 原生）')),
+  )
   mocks.nativeAbortStream.mockResolvedValue(undefined)
   // provider iter 默认：成功 3 段
   mocks.providerIter.mockImplementation(() =>
@@ -458,6 +538,201 @@ describe('abort（spec §7.2）', () => {
   })
 })
 
+// ─────────────────── 译文渲染源（真机「进度走完但正文不变」回归） ───────────────────
+
+describe('译文渲染源（spec §5 / §6.3）', () => {
+  it('web 路径 completed 后 → displayParagraphs 返回译文，toggle 回原文', async () => {
+    mocks.providerIter.mockImplementation(() =>
+      makeFakeIterator([
+        { type: 'delta', paragraphIndex: 0, text: '[0] 译一' },
+        { type: 'delta', paragraphIndex: 1, text: '\n\n[1] 译二' },
+        { type: 'done', usage: { inputTokens: 0, outputTokens: 0 } },
+      ]),
+    )
+    const store = useNovelTranslateStore()
+    await store.translateChapter(90, 90, ['原文一', '原文二'], 0)
+
+    expect(store.status).toBe('completed')
+    // 渲染源必须包含译文（而非只把结果写进缓存 —— 真机缺陷：正文永不变化）
+    expect(store.displayParagraphs.join('|')).toContain('译一')
+    expect(store.displayParagraphs.join('|')).toContain('译二')
+
+    await store.toggleMode()
+    expect(store.displayParagraphs).toEqual(['原文一', '原文二'])
+  })
+
+  it('缓存命中 → displayParagraphs 直接来自缓存译文（不调 provider）', async () => {
+    mocks.cacheGet.mockResolvedValueOnce({
+      key: 'k',
+      novelId: 91,
+      chapterId: '91',
+      targetLang: 'zh-CN',
+      modelId: 'openai-responses',
+      baseURLHash: 'b:0',
+      sourceHash: 'src:2',
+      paragraphs: ['缓存译一', '缓存译二'],
+      createdAt: 1,
+      providerId: 'openai-responses',
+    })
+    const store = useNovelTranslateStore()
+    await store.translateChapter(91, 91, ['原文一', '原文二'], 0)
+
+    expect(store.status).toBe('completed')
+    expect(store.displayParagraphs).toEqual(['缓存译一', '缓存译二'])
+    expect(mocks.providerIter).not.toHaveBeenCalled()
+  })
+})
+
+// ─────────────────── 重译（先失效本章缓存；ADR-0173 D6） ───────────────────
+
+describe('retranslate：只失效本章缓存后重翻', () => {
+  it('删除键 = 读路径同一个键（6 元组），随后重新调用 provider', async () => {
+    mocks.cacheGet.mockResolvedValue(null)
+    mocks.cacheRemove.mockResolvedValue(undefined)
+    mocks.providerIter.mockImplementation(() =>
+      makeFakeIterator([
+        { type: 'delta', paragraphIndex: 0, text: '[0] 新译文' },
+        { type: 'done', usage: { inputTokens: 0, outputTokens: 0 } },
+      ]),
+    )
+
+    const store = useNovelTranslateStore()
+    await store.retranslate(92, 92, ['原文一'], 0)
+
+    // 失效用的键必须与读路径一致（否则删了个不存在的键，旧译文仍会命中）
+    const readKey = mocks.cacheMakeKey.mock.results[0]?.value?.key
+    expect(mocks.cacheRemove).toHaveBeenCalledWith(readKey)
+    // 重译后必须重新请求 provider（而不是命中旧缓存直接返回）
+    expect(mocks.providerIter).toHaveBeenCalled()
+    expect(store.status).toBe('completed')
+    expect(store.displayParagraphs.join('')).toContain('新译文')
+  })
+})
+
+// ─────────────────── 端点兼容性 / 凭据验证（ADR-0173） ───────────────────
+
+describe('端点兼容性探测（地址层；dummy key）', () => {
+  beforeEach(() => {
+    installNativeBridge()
+  })
+
+  it('探测只带 dummy key（不携带用户密钥）', async () => {
+    mocks.nativeProbeEndpoint.mockResolvedValueOnce({
+      status: 'ok',
+      detail: 'endpoint 存在',
+      httpStatus: 401,
+    })
+    const store = useNovelTranslateStore()
+    const result = await store.probeCompatibility('https://api.openai.com/v1')
+
+    expect(result.status).toBe('ok')
+    // B1 回归锚：分类必须写进 store 状态（此前只 return，UI chip 永远显示「未探测」）
+    expect(store.compatibility).toBe('ok')
+    const [baseURL, apiKey] = mocks.nativeProbeEndpoint.mock.calls[0] as [string, string]
+    expect(baseURL).toBe('https://api.openai.com/v1')
+    // 探测是地址层事实：401（认证失败）也说明 endpoint 在，绝不能带用户密钥
+    expect(apiKey).not.toContain('sk-user')
+    expect(apiKey.length).toBeGreaterThan(0)
+  })
+
+  it('六态原样透传（不再压成 boolean）', async () => {
+    const store = useNovelTranslateStore()
+    // 只喂**原生真实值域**（ADR-0173 D3 修订：host 只发这四种；azure/deepseek 由 JS 归属）
+    for (const status of ['partial', 'incompatible', 'unknown'] as const) {
+      mocks.nativeProbeEndpoint.mockResolvedValueOnce({ status, detail: 'd', httpStatus: 404 })
+      const result = await store.probeCompatibility('https://x.example/v1')
+      expect(result.status).toBe(status)
+      expect(store.compatibility).toBe(status)
+    }
+  })
+
+  it('探测抛错（原生缺失 / 网络错）→ unknown，不 reject（只读诊断须能显示）', async () => {
+    mocks.nativeProbeEndpoint.mockRejectedValueOnce(new Error('PictelioTranslate 不可用'))
+    const store = useNovelTranslateStore()
+    const result = await store.probeCompatibility('https://x.example/v1')
+    expect(result.status).toBe('unknown')
+  })
+
+  it('空 baseURL → idle（不做无意义的原生调用）', async () => {
+    const store = useNovelTranslateStore()
+    const result = await store.probeCompatibility('   ')
+    expect(result.status).toBe('idle')
+    expect(mocks.nativeProbeEndpoint).not.toHaveBeenCalled()
+  })
+})
+
+describe('凭据验证（密钥层；真实 key + 持久化 + 失效规则）', () => {
+  beforeEach(() => {
+    nativePrefsStore.clear()
+    installNativeBridge()
+  })
+
+  it('2xx → verified 且落盘（状态 + 时间戳 + 当时 baseURL）', async () => {
+    mocks.nativeProbeEndpoint.mockResolvedValueOnce({ status: 'ok', detail: 'd', httpStatus: 200 })
+    const store = useNovelTranslateStore()
+    const result = await store.testConnection({
+      baseURL: 'https://api.openai.com/v1',
+      apiKey: 'sk-user-key-0123456789012345',
+      model: 'gpt-5',
+    })
+
+    expect(result.ok).toBe(true)
+    expect(store.credential.state).toBe('verified')
+    expect(store.credential.at).toBeGreaterThan(0)
+    expect(nativePrefsStore.get('llm_endpoint_verified_state')).toBe('verified')
+    expect(nativePrefsStore.get('llm_endpoint_verified_base_url')).toBe('https://api.openai.com/v1')
+  })
+
+  it('401 → failed + invalid_key（密钥层失败，与地址层兼容性无关）', async () => {
+    mocks.nativeProbeEndpoint.mockResolvedValueOnce({ status: 'ok', detail: 'd', httpStatus: 401 })
+    const store = useNovelTranslateStore()
+    const result = await store.testConnection({
+      baseURL: 'https://api.openai.com/v1',
+      apiKey: 'sk-bad-key-01234567890123456',
+      model: 'gpt-5',
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.code).toBe('invalid_key')
+    expect(store.credential.state).toBe('failed')
+  })
+
+  it('持久化的验证记录在 baseURL 变化后失效（换地址不得沿用旧通过标记）', async () => {
+    nativePrefsStore.set('llm_endpoint_verified_state', 'verified')
+    nativePrefsStore.set('llm_endpoint_verified_at', String(Date.now()))
+    nativePrefsStore.set('llm_endpoint_verified_base_url', 'https://old.example/v1')
+    nativePrefsStore.set('llm_endpoint_base_url', 'https://new.example/v1')
+    mocks.nativeGetEndpoint.mockResolvedValue(endpointOK)
+
+    const store = useNovelTranslateStore()
+    await store.loadEndpointConfig()
+    expect(store.credential.state).toBe('unverified')
+  })
+
+  it('清除 endpoint → 验证状态一起清除（不留悬挂通过标记）', async () => {
+    nativePrefsStore.set('llm_endpoint_verified_state', 'verified')
+    nativePrefsStore.set('llm_endpoint_verified_base_url', 'https://api.openai.com/v1')
+    mocks.nativeClearEndpoint.mockResolvedValue(undefined)
+
+    const store = useNovelTranslateStore()
+    await store.clearEndpointConfig()
+    expect(store.credential.state).toBe('unverified')
+    expect(nativePrefsStore.has('llm_endpoint_verified_state')).toBe(false)
+  })
+
+  it('model 变化不使验证失效（地址与凭据都没变）', async () => {
+    nativePrefsStore.set('llm_endpoint_verified_state', 'verified')
+    nativePrefsStore.set('llm_endpoint_verified_at', '1')
+    nativePrefsStore.set('llm_endpoint_verified_base_url', 'https://api.openai.com/v1')
+    nativePrefsStore.set('llm_endpoint_base_url', 'https://api.openai.com/v1')
+    mocks.nativeGetEndpoint.mockResolvedValue(endpointOK)
+
+    const store = useNovelTranslateStore()
+    await store.loadEndpointConfig()
+    expect(store.credential.state).toBe('verified')
+  })
+})
+
 // ─────────────────── toggleMode ───────────────────
 
 describe('toggleMode', () => {
@@ -472,6 +747,103 @@ describe('toggleMode', () => {
 })
 
 // ─────────────────── endpoint 配置 IO 边界 ───────────────────
+
+// ─────────────────── native 桥载荷契约（真机链路，ADR-0170 §D5.1） ───────────────────
+//
+// 真机缺陷（2026-09-19 实测）：JS 曾下发 { novelId, chapterId, paragraphs, xRestrict }，
+// 而 Java PictelioTranslateModule.translateStream 逐字解析 { baseURL, model, input }——
+// 字段名不符导致 cb("", "baseURL 不能为空")，翻译永远发不出去。本组测试钉住该契约。
+
+const nativePrefsStore = new Map<string, string>()
+
+function installNativeBridge(): { streamResolve: (v: unknown) => void } {
+  const g = globalThis as Record<string, unknown>
+  g.NativeModules = {
+    PictelioTranslate: {},
+    PictelioPrefs: {
+      prefsGet: (key: string, cb: (value: string | null) => void) => {
+        // 原生契约：键不存在返回空串（JS 侧映射为 null）
+        cb(nativePrefsStore.get(key) ?? '')
+      },
+      prefsSet: (key: string, value: string, cb: () => void) => {
+        nativePrefsStore.set(key, value)
+        cb()
+      },
+      prefsRemove: (key: string, cb: () => void) => {
+        nativePrefsStore.delete(key)
+        cb()
+      },
+    },
+  }
+  // 原生桥 mock：建流后按段落逐帧回调 delta（与 Java 侧 [N] 锚定产出的 chunk 序列同形），
+  // 最后回调 done。帧在 **建流 resolve 之后** 的 microtask 发出 —— 与真机时序一致。
+  mocks.nativeTranslateStream.mockImplementation((json: string, onChunk?: (c: unknown) => void) => {
+    const parsed = JSON.parse(json) as { input?: string[] }
+    const inputs = parsed.input ?? []
+    return Promise.resolve({ abort: vi.fn(), streamId: 's1' }).then((handle) => {
+      setTimeout(() => {
+        for (let i = 0; i < inputs.length; i++) {
+          onChunk?.({ type: 'delta', paragraphIndex: i, text: inputs[i] + '·译' })
+        }
+        onChunk?.({ type: 'done' })
+      }, 0)
+      return handle
+    })
+  })
+  return {
+    // 保留旧签名：桩已即时 resolve，无需外部驱动（避免测试与实现耦合）
+    streamResolve: () => {},
+  }
+}
+
+describe('native 桥载荷契约（translateStream 逐字字段名）', () => {
+  beforeEach(() => {
+    nativePrefsStore.clear()
+  })
+
+  it('translateChapter(native) → 原生流失败也必达终态 failed（真机曾永久停在 translating）', async () => {
+    installNativeBridge()
+    mocks.nativeGetEndpoint.mockResolvedValue(endpointOK)
+    // 原生终态失败：translateStream reject（网络错 / 4xx / 契约破坏）
+    mocks.nativeTranslateStream.mockImplementation(() => Promise.reject(new Error('网络错误：timeout')))
+
+    const store = useNovelTranslateStore()
+    await store.translateChapter(78, 78, ['第一段'], 0)
+
+    expect(mocks.nativeTranslateStream).toHaveBeenCalled()
+    expect(store.status).toBe('failed')
+  })
+
+  it('loadEndpointConfig → 叠加设置 KV 中的非密元数据（覆盖 Java 默认值）', async () => {
+    installNativeBridge()
+    nativePrefsStore.set('llm_endpoint_base_url', 'https://api.deepseek.com/v1')
+    nativePrefsStore.set('llm_endpoint_model', 'deepseek-v4-pro')
+    mocks.nativeGetEndpoint.mockResolvedValue(endpointOK)
+
+    const store = useNovelTranslateStore()
+    const ep = await store.loadEndpointConfig()
+    expect(ep?.baseURL).toBe('https://api.deepseek.com/v1')
+    expect(ep?.model).toBe('deepseek-v4-pro')
+    expect(ep?.hasKey).toBe(true)
+  })
+
+  it('saveEndpointConfig → apiKey 走 Keystore，非密元数据落设置 KV', async () => {
+    installNativeBridge()
+    mocks.nativeSetApiKey.mockResolvedValue(undefined)
+
+    const store = useNovelTranslateStore()
+    await store.saveEndpointConfig({
+      baseURL: 'https://api.deepseek.com/v1',
+      apiKey: 'sk-secret',
+      model: 'deepseek-v4-pro',
+      targetLang: 'zh-CN',
+    })
+    expect(mocks.nativeSetApiKey).toHaveBeenCalledWith('sk-secret')
+    expect(nativePrefsStore.get('llm_endpoint_base_url')).toBe('https://api.deepseek.com/v1')
+    expect(nativePrefsStore.get('llm_endpoint_model')).toBe('deepseek-v4-pro')
+    expect(nativePrefsStore.get('llm_endpoint_target_lang')).toBe('zh-CN')
+  })
+})
 
 describe('endpoint 配置（spec §6.1）', () => {
   it('loadEndpointConfig → 透传 nativeGetEndpoint 返回值', async () => {
@@ -504,44 +876,5 @@ describe('endpoint 配置（spec §6.1）', () => {
     const store = useNovelTranslateStore()
     await store.clearEndpointConfig()
     expect(mocks.nativeClearEndpoint).toHaveBeenCalled()
-  })
-
-  it('probeEndpoint success → 返回 true', async () => {
-    mocks.nativeProbeEndpoint.mockResolvedValueOnce({ status: 'ok', detail: '', httpStatus: 200 })
-    const store = useNovelTranslateStore()
-    const ok = await store.probeEndpoint({
-      baseURL: 'https://api.openai.com/v1',
-      apiKey: 'sk-test',
-      model: 'gpt-5',
-    })
-    expect(ok).toBe(true)
-  })
-
-  it('probeEndpoint failed → 返回 false（不抛错；warn 暴露）', async () => {
-    mocks.nativeProbeEndpoint.mockResolvedValueOnce({ status: 'failed', detail: '401', httpStatus: 401 })
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const store = useNovelTranslateStore()
-    const ok = await store.probeEndpoint({
-      baseURL: 'https://api.openai.com/v1',
-      apiKey: 'sk-test',
-      model: 'gpt-5',
-    })
-    expect(ok).toBe(false)
-    expect(warnSpy).toHaveBeenCalled()
-    warnSpy.mockRestore()
-  })
-
-  it('probeEndpoint reject → 返回 false + warn（IO 边界失败路径）', async () => {
-    mocks.nativeProbeEndpoint.mockRejectedValueOnce(new Error('network'))
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const store = useNovelTranslateStore()
-    const ok = await store.probeEndpoint({
-      baseURL: 'https://api.openai.com/v1',
-      apiKey: 'sk-test',
-      model: 'gpt-5',
-    })
-    expect(ok).toBe(false)
-    expect(warnSpy).toHaveBeenCalled()
-    warnSpy.mockRestore()
   })
 })
