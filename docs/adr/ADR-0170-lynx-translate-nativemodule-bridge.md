@@ -465,7 +465,7 @@ public void abortStream(String token, Callback cb) {
 | JS 传 4 个 callback（chunk / done / error） | 单个 callback + `type` 判别（`delta` / `reasoning_delta` / `done`；错误走第二参） | 与 ADR-0053 §2 双参契约统一；lynx 侧同一 handler 多次回调实测稳定 |
 | `probeEndpoint(baseUrl, cb)`（D4.5） | `probeEndpoint(baseURL, apiKey, model, cb)` | 探测需向真实端点发最小 POST；前端传 **dummy key**，与凭据无关（ADR-0173 D2） |
 | 探测值域 `ok/azure/deepseek/vllm/partial/unknown` | 原生只发 `ok/partial/incompatible/unknown`（+`keyInvalid` 布尔） | 原生只能从 HTTP 状态码判「通不通」；provider 归属由 JS 按 hostname 判定（ADR-0173 D3）。404 由 `partial` 改判 `incompatible`（spec §9.1） |
-| 流式复用 `PixivApiCore.getSharedClient()`（D3） | 流式走**专用 OkHttp 客户端**（`callTimeout=0` / `readTimeout=120s`） | 共享客户端带 45s `callTimeout`，会掐断正常长流；掐断后 `call.isCanceled()` 又被当成「用户取消」而静默不回调 → JS promise 永不 settle（真机「永久 N% 翻译中」）。用户中断改由显式 `USER_ABORTED` 集合标记 |
+| 流式复用 `PixivApiCore.getSharedClient()`（D3） | 流式走**专用 OkHttp 客户端**（`callTimeout=0` / `readTimeout=45s`） | 共享客户端带 45s `callTimeout`，会掐断正常长流；掐断后 `call.isCanceled()` 又被当成「用户取消」而静默不回调 → JS promise 永不 settle（真机「永久 N% 翻译中」）。用户中断改由显式 `USER_ABORTED` 集合标记。<br>**实现期修订**：`readTimeout` 由 120s 收紧到 **45s** —— 帧间静默超过它视为链路已断；否则「连上了但正文永不送达」会让 UI 永久停在「N% 翻译中」（模拟器实测形态） |
 | 终态只认 `response.completed` | 流结束时若未见终态事件 → **合成 done** | 真机实测 DeepSeek 只发到 `output_item.done` 就断流（无 `response.completed`）；不合成则 promise 永不 settle。另：`response.output_text.done` 是 item 级事件，**不得**当流终态 |
 | `instructions` 由调用方传（spec §9.4） | 调用方传，段落以 `[N]` 前缀锚定；增量按最近锚点归属段落 | 段落回填需要按段对齐；web 与 native 两侧共用同一 `buildSystemInstructions` |
 | 多次 callback 逐帧推送（本文 D6 全节） | **交付主通道 = `sendGlobalEvent`（全局事件总线）**，callback 通道不再用于交付；轮询（`translatePoll`）保留为**候选**兜底（见下：其实测回调 0 次，当前不构成有效兜底） | 见下「交付通道实测」 |
@@ -500,6 +500,8 @@ Java 解析器与 JS 适配器之间的帧信封是本功能的**跨端契约**�
 | `type` | `"done"` | 流终态（可带 `usage`，透传自 `response.completed`） |
 | `type` | `"error"` | 失败终态，`message` 为可读原因 |
 | `type` | `"pending"` | 仅轮询通道：暂无帧，继续轮询 |
+| `streamId` | `string` | 帧归属键 = 原生实际使用的 `_abortToken`（**两端同值**：transport 复用调用方 token，Java 回显）。接收侧据此丢弃非本流帧 —— 陈旧流不得写进当前翻译 |
+| `seq` | `number` | per-stream 单调序号（发布与轮询两路共用同一计数器）。交付走「事件总线 + 轮询兜底」两路，保留缓冲后同一帧可能被两路都取到，接收侧按 `(streamId, seq)` 去重，避免重复 append 出重复译文 |
 
 事件名：`pictelioTranslateFrame`；载荷：**帧 JSON 字符串**（本仓库 `sendGlobalEvent` 字符串载荷可达性由本 ADR 的端到端验收确认；此前 README 记载的「字符串不可用」已按其「实测修正」条目更新）。JS 侧对非法载荷（类型不符 / 无法解析）**必须 warn 并丢弃**，禁止静默。
 
