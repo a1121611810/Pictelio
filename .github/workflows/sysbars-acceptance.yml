@@ -138,7 +138,8 @@ jobs:
           say "A2 PASS: 系统栏 inset 源可见（截图 shot1）"
 
           say "=== A3: 全屏冷启动（settings_fullscreen_mode=true）==="
-          adb shell "run-as $PKG sh -c 'sed \"s|</map>|    <string name=\\\"settings_fullscreen_mode\\\">true</string>\\n</map>|\" shared_prefs/CapacitorStorage.xml > /tmp/c.xml && cat /tmp/c.xml > shared_prefs/CapacitorStorage.xml'"
+          # run-as 内写 /tmp 在 API 36 模拟器 Permission denied——临时文件放应用私有 shared_prefs
+          adb shell "run-as $PKG sh -c 'sed \"s|</map>|    <string name=\\\"settings_fullscreen_mode\\\">true</string>\\n</map>|\" shared_prefs/CapacitorStorage.xml > shared_prefs/.c.tmp && cat shared_prefs/.c.tmp > shared_prefs/CapacitorStorage.xml && rm shared_prefs/.c.tmp'"
           adb shell "am force-stop $PKG; am start -n $PKG/.MainActivity" >/dev/null
           sleep 15
           HIDDEN=$(adb shell "dumpsys window | grep -E 'type=(status|navigation)Bars' | grep frame" | grep -c "visible=false" || true)
@@ -158,7 +159,7 @@ jobs:
           say "A4b PASS: ~3s 自动隐藏 visible=false"
 
           say "=== A5: 关闭恢复 ==="
-          adb shell "run-as $PKG sh -c 'sed \"s|<string name=\\\"settings_fullscreen_mode\\\">true</string>|<string name=\\\"settings_fullscreen_mode\\\">false</string>|\" shared_prefs/CapacitorStorage.xml > /tmp/c.xml && cat /tmp/c.xml > shared_prefs/CapacitorStorage.xml'"
+          adb shell "run-as $PKG sh -c 'sed \"s|<string name=\\\"settings_fullscreen_mode\\\">true</string>|<string name=\\\"settings_fullscreen_mode\\\">false</string>|\" shared_prefs/CapacitorStorage.xml > shared_prefs/.c.tmp && cat shared_prefs/.c.tmp > shared_prefs/CapacitorStorage.xml && rm shared_prefs/.c.tmp'"
           adb shell "am force-stop $PKG; am start -n $PKG/.MainActivity" >/dev/null
           sleep 15
           BACK=$(adb shell "dumpsys window | grep -E 'type=(status|navigation)Bars' | grep frame" | grep -c "visible=true" || true)
