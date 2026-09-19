@@ -326,6 +326,18 @@ function registerSystemBackHandler(): void {
  *  不用 __DEV__（NODE_ENV=production 恒 false，debug APK 也被误杀）；与原生
  *  BuildConfig.DEBUG 双保险：原生不发广播时 JS 监听悬空零影响。 */
 let benchNavRegistered = false
+function registerDevHookHandler(): void {
+  // dev intent hook（LynxActivity onCreate 时通过 am start --es pictelio_dev_force_r18=true 触发）
+  // 仅模拟器测试用；BuildConfig.DEBUG 由原生侧门禁，JS 侧默认 false
+  const lynxGlobal = typeof lynx !== 'undefined' ? lynx : (globalThis as { lynx?: LynxGlobal }).lynx
+  const emitter = lynxGlobal?.getJSModule?.('GlobalEventEmitter')
+  if (!emitter || typeof emitter.addListener !== 'function') return
+  emitter.addListener('pictelioDevForceR18', () => {
+    ;(globalThis as Record<string, unknown>).__FORCE_R18__ = true
+  })
+}
+
+
 function registerBenchNavHandler(): void {
   if (!__BENCH_NAV__) return // 未显式 BENCH_NAV=1 构建：整块消除
   if (benchNavRegistered) return
@@ -398,6 +410,7 @@ if (isNativeMode()) registerBenchNavHandler()
 
 /** 初始化（App 挂载时调用）：注册 401 刷新 + 恢复设置 + 首路由（replace 不入栈） */
 export async function initRouter(): Promise<void> {
+  if (isNativeMode()) registerDevHookHandler()
   const auth = useAuthStore()
   auth.registerUnauthorizedHandler()
   // 会话失效（401 刷新失败）→ 全屏错误页：清历史栈 + replace 进入（不可回退，meta.backBehavior: 'exit'）
