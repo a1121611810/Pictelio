@@ -222,6 +222,27 @@ describe('novelTranslateStore.status 状态机（spec §7.2）', () => {
     expect(store.error).not.toBeNull()
   })
 
+  it('pending → failed：native 模式 + getEndpoint 返回 hasKey=false → NOT_CONFIGURED（不回落到 provider）', async () => {
+    // Oracle：LlmEndpointPublic.hasKey=false 是「Keystore 无 apiKey」的唯一信号
+    // （Java PictelioTranslateModule.getEndpoint 返回带默认值的脱敏镜像而非 null）；
+    // loadEndpointConfig 必须将其归一为 null，否则会用空 apiKey 调 provider（挂起/超时）。
+    ;(globalThis as Record<string, unknown>).NativeModules = { PictelioTranslate: {} }
+    mocks.nativeGetEndpoint.mockResolvedValue({
+      baseURL: 'https://api.openai.com/v1',
+      model: 'gpt-5',
+      targetLang: 'zh-CN',
+      sourceLang: 'ja',
+      hasKey: false,
+      updatedAt: 0,
+    })
+    const store = useNovelTranslateStore()
+    await store.translateChapter(5, 5, ['p'], 0)
+    expect(store.status).toBe('failed')
+    expect(store.error?.code).toBe('NOT_CONFIGURED')
+    // provider 不得被调用（native 路径 + 未配置 = 立即失败）
+    expect(mocks.nativeTranslateStream).not.toHaveBeenCalled()
+  })
+
   it('reset()：所有状态归位（isCached 保留 = 语义跨章节持久）', async () => {
     const store = useNovelTranslateStore()
     await store.translateChapter(5, 5, ['p1'], 0)

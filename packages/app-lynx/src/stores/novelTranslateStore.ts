@@ -153,7 +153,11 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
     if (typeof raw !== "object") {
       throw new Error("[novelTranslateStore] getEndpoint returned non-object")
     }
-    return raw as LlmEndpointPublic
+    const ep = raw as LlmEndpointPublic
+    // hasKey=false → Keystore 无 apiKey = 未配置（Java 侧返回带默认值的脱敏镜像而非 null；
+    // 必须在此归一为 null，否则上层会尝试用空 apiKey 调 provider 而挂起/超时）
+    if (ep.hasKey === false) return null
+    return ep
   }
 
   /**
