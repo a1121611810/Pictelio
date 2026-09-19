@@ -510,6 +510,24 @@ export const useSettingsStore = defineStore("settings", () => {
       _showR18G.value = false
       _aiFilterMode.value = "show"
     }
+
+    // Dev hook：强制开启 R18（R18/R18G 同开）。
+    // 取代之前的事件总线（sendGlobalEvent "pictelioDevForceR18" + JS listener 置 globalThis.__FORCE_R18__）
+    // ——native 端 adb `am start --es pictelio_dev_force_r18=true` 触发 BuildConfig.DEBUG 门禁下的
+    // LynxActivity.applyDevIntentHooks，直接写 SharedPreferences "CapacitorStorage" 的
+    // dev_force_r18=true；本函数末尾读取该键并强制覆盖上方 _showR18 / _showR18G 计算结果。
+    // 持久化比事件总线更可靠：bundle 渲染竞态不会丢（loadSettings 总会读到），登出→重登录后
+    // 仍生效（键跨会话持久），JS 挂载时序无关。键名与 Java 端 LynxActivity.DEV_FORCE_R18_PREFS_KEY
+    // 逐字一致，唯一所有者 = Java 端，TS 侧镜像常量（契约测试如需可后续钉住）。
+    try {
+      const devForce = await prefs().get("dev_force_r18")
+      if (devForce === "true") {
+        _showR18.value = true
+        _showR18G.value = true
+      }
+    } catch (e) {
+      console.warn("[settingsStore] dev hook dev_force_r18 读取失败（忽略）", e)
+    }
   }
 
   function setShowR18(enabled: boolean): void {

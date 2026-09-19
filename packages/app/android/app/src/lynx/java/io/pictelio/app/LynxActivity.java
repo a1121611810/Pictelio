@@ -79,10 +79,15 @@ public class LynxActivity extends AppCompatActivity {
      * 与 webview 侧手动填 refresh_token 路径等价（持久化到 Keystore + OAuth token 交换）。
      */
     private static final String DEV_EXTRA_REFRESH_TOKEN = "pictelio_dev_refresh_token";
-    /** 强制开启 R18 过滤 extra key（任何非空值即触发）。JS 端 listener 收到事件后置 globalThis.__FORCE_R18__ = true。 */
+    /** 强制开启 R18 过滤 extra key（任何非空值即触发）。
+     *  写入 SharedPreferences "CapacitorStorage" 的 {@code dev_force_r18=true}；
+     *  JS 端 settingsStore.loadSettings 读取该键，若 === "true" 则强制 _showR18 / _showR18G = true。
+     *  比事件总线更可靠：bundle 渲染时序无关，loadSettings 总会读到。 */
     private static final String DEV_EXTRA_FORCE_R18 = "pictelio_dev_force_r18";
-    /** force R18 广播事件名（与 app-lynx 端 GlobalEventEmitter.addListener 契约对齐） */
-    private static final String DEV_EVENT_FORCE_R18 = "pictelioDevForceR18";
+    /** SharedPreferences 文件（对齐 JS 侧 nativePrefs 走的 PictelioPrefs.PREFS_FILE）。 */
+    private static final String DEV_FORCE_R18_PREFS_FILE = "CapacitorStorage";
+    /** SharedPreferences key（JS 侧 settingsStore.loadSettings 读取同名键）。 */
+    private static final String DEV_FORCE_R18_PREFS_KEY = "dev_force_r18";
     /** refresh_token 存储 key（对齐 app-lynx/src/utils/tokenStorage.ts 的 KEY 常量） */
     private static final String REFRESH_TOKEN_KEY = "refresh_token";
 
@@ -91,9 +96,6 @@ public class LynxActivity extends AppCompatActivity {
 
     /** 本次是否为引擎降级进入——决定错误兜底页给「退出应用」还是「返回 WebView」（ADR-0153） */
     private boolean engineFallbackEntry;
-
-    /** 是否请求强制开启 R18（dev hook；BuildConfig.DEBUG 门禁下生效；onLoadSuccess 期间广播） */
-    private boolean devForceR18Requested;
 
     /** 当前 Activity 弱引用（PictelioAppModule.exitApp 使用，ADR-0066；onDestroy 清理） */
     private static WeakReference<LynxActivity> sInstance;
@@ -295,20 +297,6 @@ public class LynxActivity extends AppCompatActivity {
                             }
                         }
                     }
-
-                    // dev hook：强制开启 R18（BuildConfig.DEBUG 包裹，release 死代码移除）。
-                    // 仿 benchNav 窗口策略：bundle 渲染完成后再延 0.5/1.5/3s 三次广播，
-                    // 防 JS 端 listener 晚于投递注册导致首事件丢失；force R18 状态幂等，重复无害。
-                    if (devForceR18Requested) {
-                        for (long delay : new long[]{500L, 1500L, 3000L}) {
-                            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                                if (!isFinishing()) {
-                                    Log.i(TAG, "dev hook: 广播 pictelioDevForceR18（JS 端置 globalThis.__FORCE_R18__ = true）");
-                                    lynxView.sendGlobalEvent(DEV_EVENT_FORCE_R18, new JavaOnlyArray());
-                                }
-                            }, delay);
-                        }
-                    }
                 }
             }
 
@@ -396,12 +384,14 @@ public class LynxActivity extends AppCompatActivity {
      *   <li>{@code pictelio_dev_refresh_token}：非空时立即调 PictelioSecureStorage 持久化 +
      *       PictelioAuth.loginWithRefreshToken 完成 OAuth 交换（access_token 进 Java 堆，refresh_token
      *       轮换后落 Keystore）。与 webview 侧手动粘贴 refresh_token 路径同语义。</li>
-     *   <li>{@code pictelio_dev_force_r18}：任意值（任何非空字符串视为 true）时标记 force R18 请求，
-     *       等待 bundle 渲染完成（onLoadSuccess）后再 0.5/1.5/3s 三次广播 {@link #DEV_EVENT_FORCE_R18}
-     *       ——JS 端 GlobalEventEmitter listener 收到后置 globalThis.__FORCE_R18__ = true，
-     *       后续 settingsStore 读取即生效。LynxView 4.0.1 公开 API 不含 evaluateJavaScript，
-     *       sendGlobalEvent + JS 契约是该版本下「JS 运行时变量注入」的最稳通道（事件语义
-     *       等同于 benchNav，与现有架构零侵入）。</li>
+     *   <li>{@code pictelio_dev_force_r18}：任意值（任何非空字符串视为 true）时直接写
+     *       {@link #DEV_FORCE_R18_PREFS_KEY} = "true" 到 SharedPreferences（{@link #DEV_FORCE_R18_PREFS_FILE}
+     *       文件，与 JS 侧 nativePrefs 走的 PictelioPrefs.PREFS_FILE 同源）。JS 端
+     *       settingsStore.loadSettings 读取该键，若 === "true" 则强制 _showR18 / _showR18G = true。
+     *       取代之前 sendGlobalEvent("pictelioDevForceR18") + JS listener 置 globalThis.__FORCE_R18__
+     *       的事件总线方案——bundle 渲染竞态不再丢事件（loadSettings 总会读到），且与 webview 侧
+     *       SharedPreferences "CapacitorStorage" 写入路径完全一致（key 字符串与 native prefs adapter
+     *       同契约，无 JS 端特殊处理）。</li>
      * </ul>
      * 门禁：{@code BuildConfig.DEBUG}。release 构建该判断恒 false，方法体整体作为死代码被 R8 移除，
      * 生产 APK 不含钩子（与 ADR-0136 benchNav 决策 1 同语义）。
@@ -415,11 +405,19 @@ public class LynxActivity extends AppCompatActivity {
             autoLoginWithRefreshToken(refreshToken);
         }
 
-        // 2) force R18：仅标记，广播延后到 onLoadSuccess（防 JS 未挂载首事件丢失）
+        // 2) force R18：直接写 SharedPreferences（KeyError 前与 PictelioPrefsModule.set 同文件同键，
+        // 保证 JS 端 nativePrefs().get("dev_force_r18") 命中；详见 SPEC 第 6 章节）
         if (intent.hasExtra(DEV_EXTRA_FORCE_R18)) {
-            devForceR18Requested = true;
-            Log.i(TAG, "dev hook: pictelio_dev_force_r18 extra 已捕获，bundle 渲染完成后广播 "
-                    + DEV_EVENT_FORCE_R18);
+            try {
+                getSharedPreferences(DEV_FORCE_R18_PREFS_FILE, MODE_PRIVATE)
+                        .edit()
+                        .putString(DEV_FORCE_R18_PREFS_KEY, "true")
+                        .apply();
+                Log.i(TAG, "dev hook: pictelio_dev_force_r18 extra 已捕获，dev_force_r18=true 已写入 "
+                        + DEV_FORCE_R18_PREFS_FILE);
+            } catch (Throwable t) {
+                Log.w(TAG, "dev hook: dev_force_r18 写入 SharedPreferences 失败", t);
+            }
         }
     }
 
