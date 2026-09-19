@@ -294,8 +294,8 @@ export const useSettingsStore = defineStore("settings", () => {
     storage: PrefsStorage,
     key: string,
   ): Promise<{ value: string | null; source: "native-or-idb" }> {
-    // DEV hook: 强制开启 R-18 便于模拟器测试（仅当 globalThis.__FORCE_R18__ === true 才生效；release APK 默认可控关闭）
-    if ((globalThis as Record<string, unknown>).__FORCE_R18__ === true) {
+    // DEV hook: 强制开启 R-18 便于模拟器测试（main 上保留；release build 会因 __DEV__ = false 跳过）
+    if (__DEV__ && (globalThis as Record<string, unknown>).__FORCE_R18__ === true) {
       return { value: "true", source: "native-or-idb" as const }
     }
     return { value: await storage.get(key), source: "native-or-idb" as const }
