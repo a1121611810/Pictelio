@@ -783,7 +783,7 @@ DeepSeek Responses API 是 **Codex 集成路径**，与 OpenAI Responses 兼容�
 | Chunk 规约 | `response.output_text.delta` → `delta`；`response.reasoning_text.delta` → `reasoning_delta`；`response.completed` → `done`；`response.failed` / `response.incomplete` → `error` 或 `done`(incomplete=true) | 调研 `research/openai-responses-api.md` §Q2 / §Q4 |
 | SSE 帧解析 | 30+ Responses API 事件类型正确分派；DeepSeek 无 `[DONE]` 兼容；reasoning 与 text 双通道分离 | 调研 §Q3 |
 | 原生交付信封 | `delta_all` 段落数组（index + 已 trim 的 text）；`done` / `error` / `pending`；非法载荷必须 warn 并丢弃；按 streamId 归属过滤 | **ADR-0170「跨端信封契约」**（输出侧）/ 调研 §Q2（输入侧事件名） |
-| 错误码分类 | `401/403 → unauthorized`、`402 → insufficient_balance`、`429 → rate_limit`、`404/405 → model_not_found`、`400 → invalid_request`、`5xx → server`、内容策略拒答 → `content_filter`、其余 → network | ADR-0173 D7 + 仓库 `TranslationErrorCode` 联合类型（以 `classifyNativeError` 的实现分支为准） |
+| 错误码分类 | `401/403 → unauthorized`、`402 → insufficient_balance`、`429 → rate_limit`、`404/405 → model_not_found`、`400 → invalid_request`、`5xx → server`、内容策略拒答 → `content_filter`、`aborted` → aborted、其余 → network | ADR-0173 D7 + 仓库 `TranslationErrorCode` 联合类型（以 `classifyNativeError` 的实现分支为准） |
 | 缓存键 | FNV-1a 32-bit 拼接；sourceHash 改 → miss；model 改 → miss；baseURL 改 → miss | spec §4.5 / §9.5 |
 | 缓存写策略 | `partial` / `failed` / `aborted` 不写；`done` 之后才写 | spec §7.2 / §9.6 |
 | 状态机 | 8 状态 + 18 转移路径全覆盖；generation-gate 跨章节守门 | spec §7 |

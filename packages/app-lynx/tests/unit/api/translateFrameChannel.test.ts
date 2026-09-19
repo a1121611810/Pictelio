@@ -218,14 +218,16 @@ describe('attachTranslateFrameListener（事件总线交付通道）', () => {
   })
 
   it('两路交付同一帧（同 seq）只产出一次 delta', async () => {
-    // 复审实测：轮询帧此前不带 seq，去重单向失效 → 同帧两路交付译文重复 2-3 次
+    // 复审 M2：旧版只断言「首块是 delta」，删掉去重实现仍绿 → 零防线。
+    // 现在**数重复条数**：真实场景下 Java 两路发送的是同一字符串（入缓冲时盖一次 seq）。
     const emitter = installFakeLynx()
     ;(globalThis as { NativeModules?: unknown }).NativeModules = {
       PictelioTranslate: {
         translateStream: () => Promise.resolve({ abort: () => Promise.resolve() }),
-        // 轮询先交付 seq=0 的帧，随后事件总线再交付同一 seq
-        translatePoll: (_id: string, cb: (v: string | null, e: string | null) => void) =>
-          cb(JSON.stringify({ type: 'delta_all', paragraphs: [{ index: 0, text: '译文' }], seq: 0 }), ''),
+        translatePoll: (_id: string, cb: (v: string | null, e: string | null) => void) => {
+          // 轮询交付与总线同一个 seq 的帧（Java 缓冲内是同一字符串）
+          cb(JSON.stringify({ type: 'delta_all', paragraphs: [{ index: 0, text: '译文' }], seq: 0 }), '')
+        },
       },
     }
     const provider = nativeTranslateProvider()
@@ -235,14 +237,23 @@ describe('attachTranslateFrameListener（事件总线交付通道）', () => {
       new AbortController().signal,
     )
     await new Promise((r) => setTimeout(r, 5))
-    // 事件总线交付同一 seq（真实场景下 Java 两路共用计数器）
+    // 事件总线交付同一 seq（同 streamId 语义）
     emitter.emit(
       'pictelioTranslateFrame',
       JSON.stringify({ type: 'delta_all', paragraphs: [{ index: 0, text: '译文' }], seq: 0 }),
     )
-    const first = await iter.next()
-    expect(first.done).toBe(false)
-    expect((first.value as { type: string }).type).toBe('delta')
+    await new Promise((r) => setTimeout(r, 5))
+
+    // 数出所有 delta：去重生效时必须只有 1 条（旧断言只看首块 → 删掉去重也绿）
+    const deltas: string[] = []
+    for (let i = 0; i < 6; i++) {
+      const n = await Promise.race([iter.next(), new Promise<null>((r) => setTimeout(() => r(null), 20))])
+      if (n === null) break
+      const v = n.value as { type: string; text?: string } | undefined
+      if (v && v.type === 'delta') deltas.push(v.text ?? '')
+      if (n.done) break
+    }
+    expect(deltas).toHaveLength(1)
   })
 
   it('provider.abort() 后监听器被解绑（不泄漏）', async () => {

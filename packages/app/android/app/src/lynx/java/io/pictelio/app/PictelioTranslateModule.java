@@ -139,6 +139,8 @@ public class PictelioTranslateModule extends LynxModule {
             new ConcurrentHashMap<>();
     /** streamId → 终态（null = 进行中；"done" / 错误消息） */
     private static final Map<String, String> STREAM_TERMINAL = new ConcurrentHashMap<>();
+    /** streamId → 终态原始消息（"done" / 错误文本；STREAM_TERMINAL 存已盖章 JSON） */
+    private static final Map<String, String> STREAM_TERMINAL_MSG = new ConcurrentHashMap<>();
 
     /** 待派发帧（worker 入队 / 主线程出队） */
     private final java.util.concurrent.ConcurrentLinkedQueue<String> frameQueue =
@@ -407,24 +409,27 @@ public class PictelioTranslateModule extends LynxModule {
                 java.util.concurrent.ConcurrentLinkedQueue<String> buffer =
                         new java.util.concurrent.ConcurrentLinkedQueue<>(frameQueue);
                 while (!buffer.isEmpty()) {
+                    // **入缓冲时盖一次章**（streamId + seq）：两路交付的是同一字符串，
+                    // 接收侧去重才能命中（复审实测：交付时盖章 → 同帧两路 seq 不同）
                     STREAM_FRAMES.computeIfAbsent(streamId,
-                            k -> new java.util.concurrent.ConcurrentLinkedQueue<>()).offer(buffer.poll());
+                            k -> new java.util.concurrent.ConcurrentLinkedQueue<>())
+                            .offer(withSeq(withStreamId(buffer.poll(), streamId), streamId));
                 }
                 String parserError = sseParser == null ? null : sseParser.terminalError();
                 if (parserError != null) {
                     // 终态失败优先于「有译文」：否则半截译文会被判成功并写进缓存（spec §7.2）
                     Log.w(TAG, "SSE 终态为失败 → 报错（即使已产出 " + frameQueue.size() + " 帧）");
-                    STREAM_TERMINAL.put(streamId, parserError);
+                    registerTerminal(streamId, parserError);
                     frameQueue.clear();
                 } else if (!deltaSeen) {
                     Log.w(TAG, "SSE 流结束但未产出任何译文段 → 报空流失败");
-                    STREAM_TERMINAL.put(streamId, "LLM 未返回任何译文（可能被服务端内容策略拦截）");
+                    registerTerminal(streamId, "LLM 未返回任何译文（可能被服务端内容策略拦截）");
                 } else {
-                    STREAM_TERMINAL.put(streamId, "done");
+                    registerTerminal(streamId, "done");
                 }
                 Log.i(TAG, "SSE 流就绪待拉取 streamId=" + streamId
                         + " frames=" + STREAM_FRAMES.getOrDefault(streamId, new java.util.concurrent.ConcurrentLinkedQueue<>()).size()
-                        + " terminal=" + STREAM_TERMINAL.get(streamId));
+                        + " terminal=" + STREAM_TERMINAL_MSG.get(streamId));
                 // 交付通道：全局事件总线（**不经 callback**）。benchNav 证明该通道事件可达 JS，
                 // 而本模块的 callback 通道实测「一条流至多 1 帧 / 有时完全不回调」。
                 publishFramesViaEvent(streamId);
@@ -468,6 +473,9 @@ public class PictelioTranslateModule extends LynxModule {
         for (String key : new java.util.HashSet<>(STREAM_TERMINAL.keySet())) {
             if (!key.equals(keepStreamId)) STREAM_TERMINAL.remove(key);
         }
+        for (String key : new java.util.HashSet<>(STREAM_TERMINAL_MSG.keySet())) {
+            if (!key.equals(keepStreamId)) STREAM_TERMINAL_MSG.remove(key);
+        }
         // seq 计数器也要清（否则每流遗留一个 AtomicInteger，无界累积）
         for (String key : new java.util.HashSet<>(STREAM_SEQ.keySet())) {
             if (!key.equals(keepStreamId)) STREAM_SEQ.remove(key);
@@ -475,8 +483,40 @@ public class PictelioTranslateModule extends LynxModule {
     }
 
     private void failStream(String streamId, String message) {
-        STREAM_TERMINAL.put(streamId, message);
+        registerTerminal(streamId, message);
         publishFramesViaEvent(streamId);
+    }
+
+    /**
+     * 登记终态：**此刻**就构造并盖章终态帧，两路交付同一字符串。
+     *
+     * @param message {@code "done"} 或错误消息（错误消息原样保留在日志用的 {@link #STREAM_TERMINAL_MSG}）
+     */
+    private void registerTerminal(String streamId, String message) {
+        STREAM_TERMINAL_MSG.put(streamId, message);
+        String payload;
+        try {
+            if ("done".equals(message)) {
+                JSONObject done = new JSONObject();
+                done.put("type", "done");
+                payload = done.toString();
+            } else {
+                JSONObject err = new JSONObject();
+                err.put("type", "error");
+                err.put("message", message);
+                payload = err.toString();
+            }
+        } catch (Exception e) {
+            payload = "{\"type\":\"error\",\"message\":\"terminal build failed\"}";
+        }
+        STREAM_TERMINAL.put(streamId,
+                withSeq(withStreamId(payload, streamId), streamId));
+    }
+
+    /** 终态是否成功（供日志/判定；STREAM_TERMINAL 内是已盖章 JSON） */
+    private static boolean isDoneTerminal(String streamId) {
+        String msg = STREAM_TERMINAL_MSG.get(streamId);
+        return "done".equals(msg);
     }
 
     /**
@@ -536,20 +576,19 @@ public class PictelioTranslateModule extends LynxModule {
             java.util.concurrent.ConcurrentLinkedQueue<String> frames = STREAM_FRAMES.get(streamId);
             int sent = 0;
             if (frames != null) {
+                // 缓冲内已是「盖过 streamId + seq 的成品」：两路发送**同一字符串**，
+                // 接收侧按 (streamId, seq) 去重才能真正命中（复审实测：交付时盖章会让
+                // 同一帧经两路拿到不同 seq，去重永不生效 → 重复译文）。
                 for (String frame : frames) {
                     view.sendGlobalEvent(EVENT_FRAME,
-                            com.lynx.react.bridge.JavaOnlyArray.of(withSeq(withStreamId(frame, streamId), streamId)));
+                            com.lynx.react.bridge.JavaOnlyArray.of(frame));
                     sent++;
                 }
             }
             String terminal = STREAM_TERMINAL.get(streamId);
             if (terminal != null) {
-                String payload = "done".equals(terminal)
-                        ? "{\"type\":\"done\"}"
-                        : "{\"type\":\"error\",\"message\":\""
-                            + terminal.replace("\"", "'") + "\"}";
                 view.sendGlobalEvent(EVENT_FRAME,
-                        com.lynx.react.bridge.JavaOnlyArray.of(withSeq(withStreamId(payload, streamId), streamId)));
+                        com.lynx.react.bridge.JavaOnlyArray.of(terminal));
                 sent++;
                 // 缓冲保留：若事件未达，轮询仍能取回帧与终态（直到握手清理）
             }
@@ -572,10 +611,8 @@ public class PictelioTranslateModule extends LynxModule {
             String terminal = STREAM_TERMINAL.get(streamId);
             java.util.concurrent.ConcurrentLinkedQueue<String> frames = STREAM_FRAMES.get(streamId);
             if (frames != null && !frames.isEmpty()) {
-                String frame = frames.poll();
-                // 与总线路径**同一套**注入（复审实测：轮询帧此前不带 seq/streamId，
-                // 导致 JS 的 seq 去重对轮询帧永不生效 → 同帧两路交付时译文重复）
-                callback.invoke(withSeq(withStreamId(frame, streamId), streamId), "");
+                // 缓冲内已盖章，直接透传（与总线发送的是同一字符串）
+                callback.invoke(frames.poll(), "");
                 return;
             }
             if (terminal == null) {
@@ -584,16 +621,7 @@ public class PictelioTranslateModule extends LynxModule {
                 callback.invoke(pending.toString(), "");
                 return;
             }
-            if ("done".equals(terminal)) {
-                JSONObject done = new JSONObject();
-                done.put("type", "done");
-                callback.invoke(withSeq(withStreamId(done.toString(), streamId), streamId), "");
-            } else {
-                JSONObject err = new JSONObject();
-                err.put("type", "error");
-                err.put("message", terminal);
-                callback.invoke(withSeq(withStreamId(err.toString(), streamId), streamId), "");
-            }
+            callback.invoke(terminal, "");
             // 终态握手完成 → 释放该流的缓冲（发布侧保留缓冲正是为了让这一步能取回帧）。
             // 幂等：重复 poll 仍会得到同一终态（缓冲已删则 terminal 仍在，见上分支），
             // 直到 pruneFinishedStreams 在开新流时统一清理。
