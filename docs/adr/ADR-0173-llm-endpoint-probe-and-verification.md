@@ -58,6 +58,14 @@ spec/ADR 里**没有**任何关于「已验证状态」「免密钥重测」「�
 - 存储键：`llm_endpoint_verified_state`（`verified|failed`）、`llm_endpoint_verified_at`（毫秒时间戳）、`llm_endpoint_verified_base_url`（判定失效用），与既有 `llm_endpoint_base_url|model|target_lang` 同存储（native 走 `PictelioPrefs` 共享 SharedPreferences，dev 走 idbKV）。
 - 读失败不阻断（维持 `unverified`），但必须 `console.warn`（AGENTS.md 测试硬约束 #3）。
 
+### D4b · 翻译授权独立于内容显示（spec §9.7 落地）
+
+设置页新增两个**账号级**授权开关（`settings_translate_r18_${uid}` / `settings_translate_r18g_${uid}`，**与内容显示开关 `show_r18_*` 完全独立**）：看见 R18 内容 ≠ 允许把 R18 正文发给第三方 LLM。首次开启任一开关前弹**行内风险确认**（R18：服务商可能记录 / 用于训练、账号可能受限；R18G：法律红线 + 可能上报）。
+
+应用层闸门（`settingsStore.isTranslationRestricted(xRestrict)`）：`xRestrict=1` 需前者、`=2` 需后者；未授权时**不发请求**（正文零外发），状态置 `aborted`，错误码区分 `R18_BLOCKED` / `R18G_BLOCKED`。
+
+早期实现复用了内容显示谓词（「开了 R18 显示就允许翻译」）——那是把两种授权混为一谈，本决策取代之。
+
 ### D5 · 「测试连接」按钮语义
 
 - 按钮标题恒为**动作**（`endpoint.test.button` = 「测试连接」），结果只出现在**结果区**（内联一行：成功/失败 + 原因）。
