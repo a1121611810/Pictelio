@@ -3,6 +3,20 @@
 // 源语言字典；en 侧必须镜像同结构（per-domain satisfies 编译期强制）。
 const zhNovelTranslate = {
   // endpoint 子域（设置页表单文案）
+  "novelTranslate.endpoint.test.button": "测试连接",
+  "novelTranslate.endpoint.test.running": "测试中…",
+  "novelTranslate.endpoint.compat.idle": "未探测端点兼容性",
+  "novelTranslate.endpoint.compat.ok": "✓ Responses API 兼容",
+  "novelTranslate.endpoint.compat.azure": "✓ Azure OpenAI Responses",
+  "novelTranslate.endpoint.compat.deepseek": "✓ DeepSeek (Codex 兼容)",
+  "novelTranslate.endpoint.compat.vllm": "✓ vLLM 自托管",
+  "novelTranslate.endpoint.compat.partial": "⚠ 仅 chat/completions 兼容",
+  "novelTranslate.endpoint.compat.incompatible": "✗ 不是 Responses API 端点",
+  "novelTranslate.endpoint.compat.unknown": "⚠ 无法探测端点",
+  "novelTranslate.endpoint.credential.unverified": "凭据未验证",
+  "novelTranslate.endpoint.credential.verified": "✓ 凭据有效（{{when}}）",
+  "novelTranslate.endpoint.credential.failed": "✗ 凭据验证失败",
+  "novelTranslate.endpoint.credential.invalidKey": "API Key 无效（401/403）",
   "novelTranslate.endpoint.title": "LLM 翻译设置",
   "novelTranslate.endpoint.baseUrl.label": "API 地址",
   "novelTranslate.endpoint.baseUrl.hint": "形如 https://api.openai.com/v1",
@@ -13,13 +27,17 @@ const zhNovelTranslate = {
   "novelTranslate.endpoint.save": "保存",
   "novelTranslate.endpoint.saved": "已保存",
   "novelTranslate.endpoint.invalid.url": "API 地址格式不正确",
-  "novelTranslate.endpoint.invalid.key": "API Key 不能为空",
+  "novelTranslate.endpoint.invalid.key": "API Key 至少 20 个字符",
   "novelTranslate.endpoint.invalid.model": "模型名称不能为空",
   "novelTranslate.endpoint.probe.success": "连接成功",
   "novelTranslate.endpoint.probe.failed": "无法连接：{{detail}}",
   "novelTranslate.endpoint.probe.timeout": "探测超时",
   "novelTranslate.endpoint.notConfigured": "尚未配置 LLM endpoint",
+  "novelTranslate.endpoint.clear": "清除配置",
   "novelTranslate.endpoint.deleteConfirm": "确认清除已保存的 endpoint 配置？",
+  "novelTranslate.endpoint.cancel": "取消",
+  "novelTranslate.endpoint.confirmClear": "确认清除",
+  "novelTranslate.endpoint.titleGroup": "翻译",
 
   // action 子域（按钮文案）
   "novelTranslate.action.start": "翻译本章",
@@ -29,6 +47,8 @@ const zhNovelTranslate = {
   "novelTranslate.action.viewOriginal": "原文",
   "novelTranslate.action.viewTranslation": "译文",
   "novelTranslate.action.switchMode": "切换显示",
+  "novelTranslate.action.configure_translate": "配置翻译",
+  "novelTranslate.action.retranslate": "重译",
 
   // status 子域（状态机语义）
   "novelTranslate.status.idle": "未翻译",

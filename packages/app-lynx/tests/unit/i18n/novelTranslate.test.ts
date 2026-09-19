@@ -32,6 +32,29 @@ const EXPECTED_KEYS: readonly string[] = [
   "novelTranslate.endpoint.probe.timeout",
   "novelTranslate.endpoint.notConfigured",
   "novelTranslate.endpoint.deleteConfirm",
+  // 清除流程行内二次确认（lynx 无浏览器 confirm()，见 SettingsEndpoint.vue）；
+  // ADR-0173 同批新增（探测六态 + 凭据三态 + 动作键）
+  // ADR-0173：动作按钮键（测试连接）+ 兼容性八态 + 凭据三态 + 动作二键
+  "novelTranslate.endpoint.test.button",
+  "novelTranslate.endpoint.test.running",
+  "novelTranslate.endpoint.compat.idle",
+  "novelTranslate.endpoint.compat.ok",
+  "novelTranslate.endpoint.compat.azure",
+  "novelTranslate.endpoint.compat.deepseek",
+  "novelTranslate.endpoint.compat.vllm",
+  "novelTranslate.endpoint.compat.partial",
+  "novelTranslate.endpoint.compat.incompatible",
+  "novelTranslate.endpoint.compat.unknown",
+  "novelTranslate.endpoint.credential.unverified",
+  "novelTranslate.endpoint.credential.verified",
+  "novelTranslate.endpoint.credential.failed",
+  "novelTranslate.endpoint.credential.invalidKey",
+  "novelTranslate.action.configure_translate",
+  "novelTranslate.action.retranslate",
+  "novelTranslate.endpoint.clear",
+  "novelTranslate.endpoint.cancel",
+  "novelTranslate.endpoint.confirmClear",
+  "novelTranslate.endpoint.titleGroup",
   // action (7)
   "novelTranslate.action.start",
   "novelTranslate.action.abort",
@@ -77,9 +100,10 @@ function extractPlaceholders(s: string): string[] {
 }
 
 describe('i18n: novelTranslate 字典结构（spec §8）', () => {
-  it('zh-CN 与 en 各含完整 47 键（与 spec §8 一致；非 50）', () => {
-    // spec 描述「50 个键」，但实际计数（17+7+10+13）= 47；本测试以 47 为准
-    // （spec 的 50 是收尾审计时随手估的；以可枚举的子命名空间计为权威口径）
+  it('zh-CN 与 en 键数与 EXPECTED_KEYS 一致（spec §8 键名实现态）', () => {
+    // spec §8 用「示意键名」（endpoint.section.title / baseURL.probe.ok…）描述设计意图；
+    // 实现按 4 子命名空间落为 67 键 —— 权威口径 = EXPECTED_KEYS（本表 + 组件用量守卫）。
+    // 历史：47 → 51（清除确认 + 分组标题）→ 67（ADR-0173：探测/凭据状态 + 动作键）。
     expect(Object.keys(zh).length).toBe(EXPECTED_KEYS.length)
     expect(Object.keys(en).length).toBe(EXPECTED_KEYS.length)
   })
@@ -122,6 +146,8 @@ describe('i18n: novelTranslate 字典结构（spec §8）', () => {
       'novelTranslate.endpoint.probe.failed',
       'novelTranslate.status.progress.label',
       'novelTranslate.status.progress.remaining',
+      // ADR-0173 D4：凭据验证徽章带时间戳占位符
+      'novelTranslate.endpoint.credential.verified',
     ]
     for (const k of withPlaceholders) {
       const zhPh = extractPlaceholders((zh as Record<string, string>)[k]).sort()
@@ -130,15 +156,15 @@ describe('i18n: novelTranslate 字典结构（spec §8）', () => {
     }
   })
 
-  it('endpoint 子域 17 键 + action 7 键 + status 10 键 + error 13 键 = 47', () => {
+  it('endpoint 子域 35 键 + action 9 键 + status 10 键 + error 13 键 = 67', () => {
     const groups = {
       endpoint: EXPECTED_KEYS.filter((k) => k.startsWith('novelTranslate.endpoint.')),
       action: EXPECTED_KEYS.filter((k) => k.startsWith('novelTranslate.action.')),
       status: EXPECTED_KEYS.filter((k) => k.startsWith('novelTranslate.status.')),
       error: EXPECTED_KEYS.filter((k) => k.startsWith('novelTranslate.error.')),
     }
-    expect(groups.endpoint.length).toBe(17)
-    expect(groups.action.length).toBe(7)
+    expect(groups.endpoint.length).toBe(35)
+    expect(groups.action.length).toBe(9)
     expect(groups.status.length).toBe(10)
     expect(groups.error.length).toBe(13)
   })

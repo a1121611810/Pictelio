@@ -5,6 +5,20 @@ import type { NovelTranslateKey } from "../zh-CN/novelTranslate";
 
 const enNovelTranslate = {
   // endpoint subdomain
+  "novelTranslate.endpoint.test.button": "Test Connection",
+  "novelTranslate.endpoint.test.running": "Testing…",
+  "novelTranslate.endpoint.compat.idle": "Endpoint compatibility not probed",
+  "novelTranslate.endpoint.compat.ok": "✓ Responses API compatible",
+  "novelTranslate.endpoint.compat.azure": "✓ Azure OpenAI Responses",
+  "novelTranslate.endpoint.compat.deepseek": "✓ DeepSeek (Codex compatible)",
+  "novelTranslate.endpoint.compat.vllm": "✓ vLLM self-hosted",
+  "novelTranslate.endpoint.compat.partial": "⚠ Only chat/completions compatible",
+  "novelTranslate.endpoint.compat.incompatible": "✗ Not a Responses API endpoint",
+  "novelTranslate.endpoint.compat.unknown": "⚠ Could not probe endpoint",
+  "novelTranslate.endpoint.credential.unverified": "Credentials not verified",
+  "novelTranslate.endpoint.credential.verified": "✓ Credentials valid ({{when}})",
+  "novelTranslate.endpoint.credential.failed": "✗ Credential check failed",
+  "novelTranslate.endpoint.credential.invalidKey": "API key invalid (401/403)",
   "novelTranslate.endpoint.title": "LLM Translation Settings",
   "novelTranslate.endpoint.baseUrl.label": "API Base URL",
   "novelTranslate.endpoint.baseUrl.hint": "e.g. https://api.openai.com/v1",
@@ -15,13 +29,17 @@ const enNovelTranslate = {
   "novelTranslate.endpoint.save": "Save",
   "novelTranslate.endpoint.saved": "Saved",
   "novelTranslate.endpoint.invalid.url": "Invalid base URL format",
-  "novelTranslate.endpoint.invalid.key": "API key is required",
+  "novelTranslate.endpoint.invalid.key": "API key must be at least 20 characters",
   "novelTranslate.endpoint.invalid.model": "Model name is required",
   "novelTranslate.endpoint.probe.success": "Connection successful",
   "novelTranslate.endpoint.probe.failed": "Cannot connect: {{detail}}",
   "novelTranslate.endpoint.probe.timeout": "Probe timed out",
   "novelTranslate.endpoint.notConfigured": "LLM endpoint not configured",
+  "novelTranslate.endpoint.clear": "Clear configuration",
   "novelTranslate.endpoint.deleteConfirm": "Clear saved endpoint configuration?",
+  "novelTranslate.endpoint.cancel": "Cancel",
+  "novelTranslate.endpoint.confirmClear": "Clear",
+  "novelTranslate.endpoint.titleGroup": "Translation",
 
   // action subdomain
   "novelTranslate.action.start": "Translate chapter",
@@ -31,6 +49,8 @@ const enNovelTranslate = {
   "novelTranslate.action.viewOriginal": "Original",
   "novelTranslate.action.viewTranslation": "Translation",
   "novelTranslate.action.switchMode": "Switch display",
+  "novelTranslate.action.configure_translate": "Configure translation",
+  "novelTranslate.action.retranslate": "Retranslate",
 
   // status subdomain
   "novelTranslate.status.idle": "Not translated",

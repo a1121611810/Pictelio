@@ -13,6 +13,7 @@ import { proxyImageUrl } from '../utils/imageUrl'
 import { ME_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { readEngineState, REASON_I18N_KEYS, type EngineKind, type EngineStateSnapshot } from '../utils/engineState'
 import GlassCard from '../components/GlassCard.vue'
+import SettingsEndpoint from '../components/SettingsEndpoint.vue'
 import { themeColorClass } from '../utils/themeColor'
 import {
   createLynxBackupDeps,
@@ -1090,6 +1091,11 @@ function toggleRankingEntry() {
             </view>
           </view>
         </view>
+      </view>
+
+      <!-- 翻译设置（spec docs/specs/app-lynx-novel-translation.md §6.1；T9 #637） -->
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+        <SettingsEndpoint />
       </view>
 
       <!-- 退出登录（危险操作独立沉底） -->
