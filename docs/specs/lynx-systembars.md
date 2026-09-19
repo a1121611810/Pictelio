@@ -66,7 +66,7 @@ flowchart LR
 | Root 适配 | `App.vue` 根 `<page>`：`:style="{ paddingTop: safeTop()+'px', paddingBottom: safeBottom()+'px' }"` | 系统栏区域染 Root surface 色 = 「着色」效果的正确实现；列表/内容天然不被遮挡 |
 | 弹层底部 | 弹层家族根容器补 `padding-bottom: safeBottom`：SearchSheet、CommentOverlay、NovelExportSheet、NovelCaptionSheet、PagePickerSheet、WatchlistPromptDialog | absolute `bottom-0` 定位不受父 padding 影响，需各自消费；复用同一 composable |
 | 全屏开关状态 | `settingsStore`：`_fullscreenMode` ref + `setFullscreenMode(enabled)`（写 prefs 键 + 非静默 catch warn + 原生模式下调 `NativeModules.PictelioApp.setSystemBarsHidden`）；`loadSettings()` 恢复（损坏值 warn 维持默认，既有模式） | dev/web-core 无 NativeModules → 仅写键，catch 静默跳过原生调用（console.debug 可见） |
-| 设置 UI | `Me.vue` 设置卡新增行（复用 `autoFallbackEngine` 行式样：标题 + M3 switch）+ i18n key（`settings.fullscreenMode` 标题/副文案，双语言） | 开关即时生效（走原生调用），无需重启 |
+| 设置 UI | `Me.vue` 设置卡新增行（复用 `autoFallbackEngine` 行式样：标题 + M3 switch）+ i18n key（`me.client.fullscreenMode` 标题/副文案，双语言，跟随 Me 页既有命名空间） | 开关即时生效（走原生调用），无需重启 |
 
 ### 4.3 契约锚点（契约测试钉住，`backupRulesConsistency` 模式）
 

@@ -600,10 +600,18 @@ export const useSettingsStore = defineStore("settings", () => {
       | undefined
     if (isNativeMode() && app && typeof app.setSystemBarsHidden === "function") {
       app.setSystemBarsHidden(enabled, (err) => {
-        if (err) console.warn("[settingsStore] 全屏模式切换失败", err)
+        if (err) {
+          // 原生切换失败：回滚内存态（UI 与真实系统栏状态一致，spec §5 边界行）；
+          // 设置键保留用户意图（下次启动 onCreate 重试）
+          _fullscreenMode.value = !enabled
+          console.warn("[settingsStore] 全屏模式切换失败", err)
+        }
       })
     } else if (!isNativeMode()) {
       console.debug("[settingsStore] 全屏模式切换跳过（非原生环境，仅持久化设置）")
+    } else {
+      // 原生环境但模块/方法缺失（版本漂移异常）：必须可见（硬约束 #3 禁静默）
+      console.warn("[settingsStore] NativeModules.PictelioApp.setSystemBarsHidden 不可用，仅持久化设置")
     }
   }
 

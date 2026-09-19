@@ -1154,6 +1154,37 @@ describe("settingsStore.fullscreenMode（spec lynx-systembars D5）", () => {
     debugSpy.mockRestore()
   })
 
+  it("原生切换失败：内存态回滚（UI 回读真实状态）+ warn（spec §5 边界行，IO 双路径）", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const map = new Map<string, string>()
+    prefsModule(map)
+    env.modules = {
+      ...env.modules,
+      PictelioApp: {
+        setSystemBarsHidden: (hidden: boolean, cb: (e: string | null) => void) => cb("native boom"),
+      },
+    }
+    store.setFullscreenMode(true)
+    // 设置键保留用户意图（下次启动 onCreate 重试）；内存态回滚到真实状态
+    await vi.waitFor(() => expect(map.get("settings_fullscreen_mode")).toBe("true"))
+    expect(store.fullscreenMode).toBe(false)
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("全屏模式切换失败"),
+      expect.anything(),
+    )
+    warnSpy.mockRestore()
+  })
+
+  it("原生环境但模块缺失：warn 可见（禁静默降级，版本漂移异常）", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    prefsModule(new Map<string, string>())
+    env.modules = {} // native 模式但无 PictelioApp
+    store.setFullscreenMode(true)
+    expect(store.fullscreenMode).toBe(true)
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("setSystemBarsHidden 不可用"))
+    warnSpy.mockRestore()
+  })
+
   it("applyRawKey：importRawValues 写回合法值、非法值跳过", async () => {
     prefsModule(new Map<string, string>())
     const res = await store.importRawValues({

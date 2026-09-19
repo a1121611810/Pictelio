@@ -36,8 +36,13 @@ export function initSafeArea(): void {
     // 原生侧 JavaOnlyArray.of(top, bottom) → 参数展开（router.ts:384 illust-detail 同款）
     const top = Number(args[0])
     const bottom = Number(args[1])
-    if (Number.isFinite(top)) safeTop.value = top
-    if (Number.isFinite(bottom)) safeBottom.value = bottom
+    // 非法载荷不污染现值，但 debug 可见（非静默；正常链路不应出现）
+    if (!Number.isFinite(top) || !Number.isFinite(bottom)) {
+      console.debug('[safeArea] pictelioInsets 非法载荷，忽略:', args[0], args[1])
+      return
+    }
+    safeTop.value = top
+    safeBottom.value = bottom
   })
 
   // 订阅后立即拉取初值（spec D2 修订核心：防首帧事件丢失）

@@ -78,9 +78,15 @@ describe('safeArea（系统栏安全区 signals）', () => {
     listeners[0](10, 20)
     expect(m.safeTop.value).toBe(10)
     expect(m.safeBottom.value).toBe(20)
-    // 非法值忽略（保持现值，不污染）
+    // 非法载荷整体拒绝（debug 可见，不部分应用污染现值）
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {})
     listeners[0](Number.NaN, 30)
     expect(m.safeTop.value).toBe(10)
+    expect(m.safeBottom.value).toBe(20)
+    expect(debugSpy).toHaveBeenCalledWith(expect.stringContaining('非法载荷'), expect.anything(), expect.anything())
+    debugSpy.mockRestore()
+    listeners[0](12, 30)
+    expect(m.safeTop.value).toBe(12)
     expect(m.safeBottom.value).toBe(30)
   })
 

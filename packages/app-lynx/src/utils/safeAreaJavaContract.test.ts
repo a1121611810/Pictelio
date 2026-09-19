@@ -60,6 +60,7 @@ describe('系统栏 JS↔Java 契约锚点', () => {
       'NovelExportSheet',
       'NovelCaptionSheet',
       'PagePickerSheet',
+      'BookmarkPanel', // top-[20vh]+h-[80vh] 与 bottom-0 贴底等价（ADR-0123 正向锚点），同族消费方
     ] as const
     for (const name of SHEETS) {
       const src = readFileSync(new URL(`../components/${name}.vue`, import.meta.url), 'utf8')
