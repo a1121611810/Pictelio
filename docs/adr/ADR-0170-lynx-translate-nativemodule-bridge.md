@@ -468,7 +468,7 @@ public void abortStream(String token, Callback cb) {
 | 流式复用 `PixivApiCore.getSharedClient()`（D3） | 流式走**专用 OkHttp 客户端**（`callTimeout=0` / `readTimeout=120s`） | 共享客户端带 45s `callTimeout`，会掐断正常长流；掐断后 `call.isCanceled()` 又被当成「用户取消」而静默不回调 → JS promise 永不 settle（真机「永久 N% 翻译中」）。用户中断改由显式 `USER_ABORTED` 集合标记 |
 | 终态只认 `response.completed` | 流结束时若未见终态事件 → **合成 done** | 真机实测 DeepSeek 只发到 `output_item.done` 就断流（无 `response.completed`）；不合成则 promise 永不 settle。另：`response.output_text.done` 是 item 级事件，**不得**当流终态 |
 | `instructions` 由调用方传（spec §9.4） | 调用方传，段落以 `[N]` 前缀锚定；增量按最近锚点归属段落 | 段落回填需要按段对齐；web 与 native 两侧共用同一 `buildSystemInstructions` |
-| 多次 callback 逐帧推送（本文 D6 全节） | **交付主通道 = `sendGlobalEvent`（全局事件总线）**，callback 通道不再用于交付；轮询（`translatePoll`）保留为兜底 | 见下「交付通道实测」 |
+| 多次 callback 逐帧推送（本文 D6 全节） | **交付主通道 = `sendGlobalEvent`（全局事件总线）**，callback 通道不再用于交付；轮询（`translatePoll`）保留为**候选**兜底（见下：其实测回调 0 次，当前不构成有效兜底） | 见下「交付通道实测」 |
 
 ### 交付通道实测（2026-09-20，模拟器 emulator-5554）
 
@@ -483,6 +483,24 @@ public void abortStream(String token, Callback cb) {
 | 整章一帧 `delta_all` | `queued=2` | 0 帧 |
 | `translatePoll` 轮询（每次调用独立回调） | 158 次调用到达原生 | 适配器回调 **0 次** |
 
-结论：**该 Callback 通道对「一条流内多次投递」不可靠，且对部分调用完全不投递**。
+上表 6 行 = 6 组策略（前 4 组为 callback 通道的对照实验，后 2 组为「合并单帧」与「轮询」两条替代路线）。
 
-改为 `LynxView.sendGlobalEvent("pictelioTranslateFrame", [frameJson])`（与 benchNav 同一通道，事件可达 JS 侧 `GlobalEventEmitter`）后，模拟器端到端跑通：按钮变「重译」、正文渲染出译文段落。代价是交付形态从「逐段增量推送」变为「整章就绪后一次性推送」（解析期累积、收尾单帧），因为单帧回调/事件才可靠。
+结论：**该 Callback 通道对「一条流内多次投递」不可靠，且对部分调用完全不投递**；轮询路线在同一批实测里回调 0 次，因此**不能**被当作可用兜底 —— 当前唯一可用的交付路径是事件总线。
+
+改为 `LynxView.sendGlobalEvent("pictelioTranslateFrame", [frameJson])`（与 benchNav 同一通道）后，模拟器端到端跑通：按钮变「重译」、正文渲染出译文段落。代价是交付形态从「逐段增量推送」变为「整章就绪后一次性推送」（解析期累积、收尾单帧），因为单帧事件才可靠。
+
+#### 跨端信封契约（单一事实源）
+
+Java 解析器与 JS 适配器之间的帧信封是本功能的**跨端契约**，以本节为准（两端实现与测试都锚这里，禁止各自从实现反推）：
+
+| 字段 | 类型 | 含义 |
+|---|---|---|
+| `type` | `"delta_all"` | 整章译文帧（每段只出现一次，携带该段全文） |
+| `paragraphs` | `{index:number, text:string}[]` | 段落数组；`index` 为 `[N]` 锚点序号，`text` 已做段落级 `trim`（锚前分隔空白不属于译文） |
+| `type` | `"done"` | 流终态（可带 `usage`，透传自 `response.completed`） |
+| `type` | `"error"` | 失败终态，`message` 为可读原因 |
+| `type` | `"pending"` | 仅轮询通道：暂无帧，继续轮询 |
+
+事件名：`pictelioTranslateFrame`；载荷：**帧 JSON 字符串**（本仓库 `sendGlobalEvent` 字符串载荷可达性由本 ADR 的端到端验收确认；此前 README 记载的「字符串不可用」已按其「实测修正」条目更新）。JS 侧对非法载荷（类型不符 / 无法解析）**必须 warn 并丢弃**，禁止静默。
+
+**验证探针（归因证据）**：JS 侧 `console.warn` 落 logcat（tag `lynx`, `lynx_console.cc`）—— 交付归因以 JS 侧探针为准，Java 侧 `事件总线交付 frames=N` 只证明发送次数，不证明到达。

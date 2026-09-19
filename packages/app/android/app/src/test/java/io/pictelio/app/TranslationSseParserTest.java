@@ -26,8 +26,12 @@ import java.util.List;
  * </ul>
  *
  * <p><b>交付形态</b>：解析期累积、收尾时整章作为**单帧**
- * {@code {type:"delta_all", paragraphs:[{index,text}]}} 下发（ADR-0170「交付通道实测」：
- * NativeModule 的 callback 通道在一条流内不可靠，逐帧推送会丢帧）。
+ * {@code {type:"delta_all", paragraphs:[{index,text}]}} 下发。该信封是**跨端契约**，
+ * 单一事实源 = ADR-0170「跨端信封契约」节；本测试的输出侧断言锚该节条款（不是从
+ * TranslationSseParser 的实现输出抄写）—— 只改实现信封、不按 ADR 改契约会让本测试红。
+ *
+ * <p>背景（ADR-0170「交付通道实测」）：NativeModule 的 callback 通道在一条流内至多投递
+ * 一帧，故必须整章单帧交付。
  */
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 28)

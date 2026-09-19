@@ -252,22 +252,36 @@ export async function translateStream(
  * @returns 取消订阅函数
  */
 export function attachTranslateFrameListener(onFrame: (frame: unknown) => void): () => void {
-  const lynxGlobal = (typeof lynx !== "undefined" ? lynx : undefined) as
-    | {
-        getJSModule?: (name: string) => {
-          addListener?: (event: string, cb: (...args: unknown[]) => void) => void
-          removeListener?: (event: string, cb: (...args: unknown[]) => void) => void
-        }
-      }
+  // 与 router.ts / utils/safeArea.ts 同模式：优先全局 lynx，回退 globalThis.lynx
+  // （仓内测试夹具正是用 globalThis.lynx = { getJSModule: () => emitter }，见 safeArea.test.ts）
+  const lynxGlobal = (
+    typeof lynx !== "undefined"
+      ? lynx
+      : (globalThis as { lynx?: unknown }).lynx
+  ) as LynxGlobal | undefined
+  const emitter = lynxGlobal?.getJSModule?.("GlobalEventEmitter") as
+    | LynxGlobalEventEmitter
     | undefined
-  const emitter = lynxGlobal?.getJSModule?.("GlobalEventEmitter")
   if (!emitter || typeof emitter.addListener !== "function") {
     console.warn("[nativeTranslate] 全局事件通道不可用，翻译帧交付退回轮询")
     return () => {}
   }
   const listener = (...args: unknown[]): void => {
     const raw = args[0]
-    onFrame(typeof raw === "string" ? parseChunk(raw) : null)
+    if (typeof raw !== "string") {
+      // 禁静默降级（测试硬约束 #3）：载荷类型不符 = 跨端契约破坏，必须留信号
+      console.warn(
+        "[nativeTranslate] 翻译帧载荷类型异常（期望 string），已丢弃：",
+        raw === null ? "null" : typeof raw,
+      )
+      return
+    }
+    const parsed = parseChunk(raw)
+    if (parsed === null || typeof parsed !== "object") {
+      console.warn("[nativeTranslate] 翻译帧无法解析为帧对象，已丢弃 raw=", raw.slice(0, 120))
+      return
+    }
+    onFrame(parsed)
   }
   emitter.addListener("pictelioTranslateFrame", listener)
   return () => {
@@ -391,6 +405,7 @@ export function nativeTranslateProvider(): TranslationProvider {
         aborted = true
         failure = new DOMException("aborted", "AbortError")
         if (pollTimer !== null) clearTimeout(pollTimer)
+        detachOnce()
         void abortHandle?.abort()
         nudge()
       }
@@ -500,7 +515,8 @@ export function nativeTranslateProvider(): TranslationProvider {
           _abortToken: streamId,
         }),
         () => {
-          // 推送通道不可靠（一流一回调）→ 这里不消费，全部走轮询
+          // translateStream 的 callback 通道不可靠（一条流至多一帧），故不在此消费：
+          // 帧由事件总线（主通道）交付，轮询作为兜底。
         },
       )
         .then((h) => {
@@ -519,10 +535,21 @@ export function nativeTranslateProvider(): TranslationProvider {
           nudge()
         })
       // 交付通道一：全局事件总线（benchNav 证明可达；callback 通道实测不可靠）
-      const detachFrames = attachTranslateFrameListener(handle)
+      // 终态（done/error）时解绑：否则每次翻译都会在全局 emitter 上多留一个监听器，
+      // N 次翻译后每帧被 N 个监听器处理（无界泄漏，且旧监听器仍会收新流的帧）。
+      let detached = false
+      let detachFrames: (() => void) | null = null
+      const detachOnce = (): void => {
+        if (detached) return
+        detached = true
+        detachFrames?.()
+      }
+      detachFrames = attachTranslateFrameListener((raw: unknown) => {
+        handle(raw)
+        if (finished || aborted) detachOnce()
+      })
       // 交付通道二（兜底）：轮询拉取
       poll(streamId)
-      void detachFrames
 
       const iter: AsyncIterator<TranslationChunk> = {
         async next(): Promise<IteratorResult<TranslationChunk>> {
