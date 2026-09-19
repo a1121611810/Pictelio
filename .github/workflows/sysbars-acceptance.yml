@@ -51,12 +51,13 @@ jobs:
       - name: Capacitor sync
         run: pnpm --dir packages/app run cap:sync
 
-      # lynx 客户端本体：rspeedy bundle → android assets（LynxActivity 加载的就是它）
+      # lynx 客户端本体：rspeedy bundle → android assets（LynxActivity 加载的就是它）。
+      # 直调包级脚本——root 的 build:app-lynx 走全局 vp（CI 无此工具，vp-skew 教训）
       - name: Build lynx bundle
-        run: pnpm build:app-lynx
+        run: pnpm --dir packages/app-lynx run build
 
       - name: Sync lynx bundle to android assets
-        run: pnpm sync:app-lynx-bundle
+        run: node packages/app-lynx/scripts/sync-android-assets.mjs
 
       - name: Build full debug APK
         working-directory: packages/app/android
