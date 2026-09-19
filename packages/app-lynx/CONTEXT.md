@@ -255,6 +255,20 @@ _Avoid_: 把绝对 next_url 原样传给原生模块
 app-lynx 的可选 M3 主色（seed）——用户在「我的 → 外观」选择，整树经根 `<page>` 上的 `.theme-*` 色板类切换（CSS 变量覆盖，非运行时算色）。可选集与持久化 id 的单一事实源是 `src/utils/themeColor.ts`（`THEME_COLOR_IDS` / `THEME_COLOR_OPTIONS`）；色板值预生成在 `src/styles/tokens.css`（每个非默认色板覆盖一组 `--md-*` 颜色角色，含 surface 中性色）。默认 `sky` 使用 `.theme-sky`（与基础 `page` 色板共用同一条 CSS 规则，观感不变）。持久化键 `settings_theme_color`（设备级；native 走 `PictelioPrefs` 共享 SharedPreferences，dev 走 IndexedDB），未登录也恢复。
 _Avoid_: 运行时用 JS 计算 / 动态写 CSS 变量（Lynx 动态样式支持面窄、双端不可靠）；给色板类只覆盖 `--md-primary`（secondary/surface/outline/state-layer 不同步会串色）；把主题色做成账号级键（外观是设备级偏好，登出不应重置）。
 
+### 翻译端点（Translation endpoint）【2026-09-19 新增，ADR-0173】
+
+**端点兼容性（endpoint compatibility）**：
+「这个地址是不是 OpenAI Responses 兼容端点」这一**地址层**事实。八态：`idle`（未探测）/ `ok` / `azure` / `deepseek` / `vllm` / `partial`（仅 chat-completions 兼容，如 OpenRouter/智谱/Qwen）/ `incompatible`（404/405）/ `unknown`（5xx 或网络错）。由输入 baseURL 后 **debounce 600ms 自动**探测产生，**携带 dummy key**——因此未配置密钥也能回答，且与「凭据是否有效」无关。
+_Avoid_: 用兼容性冒充凭据有效、把探测结果当作动作按钮的标题（「连接成功」按钮即此错）
+
+**凭据验证（credential verification）**：
+「用户填的 API key 能不能真正跑通」这一**密钥层**事实。三态：`unverified` / `verified` / `failed`，由用户点「测试连接」用真实 key 发起一次最小翻译产生，结果与时间戳持久化（**不存任何密钥材料**）。失效规则：保存 → 覆盖；清除 endpoint → 清除；baseURL 变化 → 清除（换地址仍挂旧通过标记是最危险的假象）；model 变化不失效。
+_Avoid_: 缺少密钥时沿用上一次的 verified 徽章、把时间戳当配置项参与缓存键
+
+**配置翻译（configure translation）**：
+翻译按钮在「未配置 endpoint」时的态：点击跳设置页，而不是尝试翻译后失败。与「开始翻译」「重译」并列的按钮态之一。
+_Avoid_: 未配置时静默失败、把未配置当作翻译错误上报
+
 ### 状态管理（State management）
 
 **Pinia setup store**【2026-09-03 新增，ADR-0139 + ADR-0140】：
