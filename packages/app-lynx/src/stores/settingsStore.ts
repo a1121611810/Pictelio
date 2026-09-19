@@ -716,8 +716,8 @@ export const useSettingsStore = defineStore("settings", () => {
    * 纯函数，读 ref —— 开关切换后所有依赖处即时重算，无需重新请求。
    */
   function isRestricted(item: { x_restrict: number }): boolean {
-    // DEV hook: 模拟器测试强制放行 R-18/R-18G，便于测试翻译流程（main 上保留，正式 release 必须 revert）
-    void _showR18; void _showR18G; void item
+    if (!_showR18.value && item.x_restrict === 1) return true
+    if (!_showR18G.value && item.x_restrict === 2) return true
     return false
   }
 
