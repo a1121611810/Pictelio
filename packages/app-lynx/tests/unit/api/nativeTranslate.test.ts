@@ -38,6 +38,7 @@ function createFakeModule(): NativeTranslateModule & {
     translateStream: vi.fn(),
     probeEndpoint: vi.fn(),
     abortStream: vi.fn(),
+    translatePoll: vi.fn(),
   }
 }
 
@@ -488,12 +489,25 @@ describe("nativeTranslateProvider 载荷契约（与 Java 逐字字段对齐）"
 
   it("translate() → 载荷含 baseURL / model / input / instructions，且不含 apiKey", async () => {
     let capturedReqJson = ""
-    let capturedCb: ((c: string | null, e: string | null) => void) | null = null
     mod.translateStream.mockImplementation(
-      (reqJson: string, cb: (c: string | null, e: string | null) => void) => {
+      (reqJson: string, _cb: (c: string | null, e: string | null) => void) => {
         capturedReqJson = reqJson
-        capturedCb = cb
+        return undefined
       },
+    )
+    // 拉模式：一帧整章译文 + 一帧 done
+    const frames = [
+      JSON.stringify({
+        type: "delta_all",
+        paragraphs: [
+          { index: 0, text: "译文一" },
+          { index: 1, text: "译文二" },
+        ],
+      }),
+      JSON.stringify({ type: "done" }),
+    ]
+    mod.translatePoll.mockImplementation((_id: string, cb: (v: string | null, e: string | null) => void) =>
+      cb(frames.shift() ?? JSON.stringify({ type: "pending" }), ""),
     )
 
     const provider = nativeTranslateProvider()
@@ -514,9 +528,8 @@ describe("nativeTranslateProvider 载荷契约（与 Java 逐字字段对齐）"
       new AbortController().signal,
     )
 
-    // 等适配器发起原生调用
-    await new Promise((r) => setTimeout(r, 0))
-    expect(capturedCb).not.toBeNull()
+    // 等适配器发起原生调用 + 首轮轮询
+    await new Promise((r) => setTimeout(r, 50))
 
     const payload = JSON.parse(capturedReqJson) as Record<string, unknown>
     expect(payload.baseURL).toBe("https://api.deepseek.com")
@@ -527,8 +540,7 @@ describe("nativeTranslateProvider 载荷契约（与 Java 逐字字段对齐）"
     // apiKey 字节零进 JS 堆（ADR-0037）
     expect(capturedReqJson).not.toContain("apiKey")
 
-    // 原生 done（Java 在流末尾合成或 response.completed）→ 迭代器收尾出 done chunk
-    capturedCb!(JSON.stringify({ type: "done" }), "")
+    // 拉模式：done 帧由 translatePoll 返回（见上面的 mock 序列）
     const chunks: unknown[] = []
     while (true) {
       const { value, done } = await iter.next()
@@ -539,11 +551,13 @@ describe("nativeTranslateProvider 载荷契约（与 Java 逐字字段对齐）"
   })
 
   it("delta chunk 透传 paragraphIndex / text（Java 侧已完成 [N] 锚定）", async () => {
-    let capturedCb: ((c: string | null, e: string | null) => void) | null = null
-    mod.translateStream.mockImplementation(
-      (_reqJson: string, cb: (c: string | null, e: string | null) => void) => {
-        capturedCb = cb
-      },
+    const frames = [
+      JSON.stringify({ type: "delta_all", paragraphs: [{ index: 1, text: "译文" }] }),
+      JSON.stringify({ type: "done" }),
+    ]
+    mod.translateStream.mockImplementation(() => undefined)
+    mod.translatePoll.mockImplementation((_id: string, cb: (v: string | null, e: string | null) => void) =>
+      cb(frames.shift() ?? JSON.stringify({ type: "pending" }), ""),
     )
     const provider = nativeTranslateProvider()
     const iter = provider.translate(
@@ -551,8 +565,7 @@ describe("nativeTranslateProvider 载荷契约（与 Java 逐字字段对齐）"
       { baseURL: "https://x", apiKey: "", model: "m" },
       new AbortController().signal,
     )
-    await new Promise((r) => setTimeout(r, 0))
-    capturedCb!(JSON.stringify({ type: "delta", paragraphIndex: 1, text: "译文" }), "")
+    await new Promise((r) => setTimeout(r, 300))
 
     const first = await iter.next()
     expect(first.done).toBe(false)

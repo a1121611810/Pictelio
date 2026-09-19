@@ -16,6 +16,7 @@ import { createPinia, setActivePinia } from 'pinia'
 const mocks = vi.hoisted(() => ({
   // 只 mock 传输层：原生桥回调
   translateStream: vi.fn(),
+  translatePoll: vi.fn(),
   abortStream: vi.fn(),
   getEndpoint: vi.fn(),
   probeEndpoint: vi.fn(),
@@ -62,6 +63,7 @@ describe('native 路径集成（真实适配器 + 真实 pipeline）', () => {
       PictelioAuth: {},
       PictelioTranslate: {
         translateStream: mocks.translateStream,
+        translatePoll: mocks.translatePoll,
         abortStream: mocks.abortStream,
         // 原生契约：cb(endpointJson, "") —— 回调载荷是 **JSON 字符串**
         getEndpoint: (cb: (v: string | null, e: string | null) => void) => {
@@ -97,18 +99,21 @@ describe('native 路径集成（真实适配器 + 真实 pipeline）', () => {
   })
 
   it('原生逐帧回调 → 译文进入渲染源（displayParagraphs）', async () => {
-    mocks.translateStream.mockImplementation(
-      (json: string, onChunk?: (c: unknown) => void) => {
-        const parsed = JSON.parse(json) as { input?: string[] }
-        const inputs = parsed.input ?? []
-        return Promise.resolve({ abort: vi.fn(), streamId: 's-int' }).then((handle) => {
-          for (let i = 0; i < inputs.length; i++) {
-            onChunk?.({ type: 'delta', paragraphIndex: i, text: inputs[i] + '·译' })
-          }
-          onChunk?.({ type: 'done' })
-          return handle
-        })
-      },
+    // 拉模式契约：translateStream 只负责发起；帧由 translatePoll 逐次取回
+    mocks.translateStream.mockImplementation(() => Promise.resolve({ abort: vi.fn() }))
+    const frames = [
+      JSON.stringify({
+        type: 'delta_all',
+        paragraphs: [
+          { index: 0, text: '第一段·译' },
+          { index: 1, text: '第二段·译' },
+        ],
+      }),
+      JSON.stringify({ type: 'done' }),
+    ]
+    mocks.translatePoll.mockImplementation(
+      (_id: string, cb: (v: string | null, e: string | null) => void) =>
+        cb(frames.shift() ?? JSON.stringify({ type: 'pending' }), ''),
     )
 
     const store = useNovelTranslateStore()
