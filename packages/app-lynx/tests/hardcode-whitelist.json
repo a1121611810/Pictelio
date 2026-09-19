@@ -20,6 +20,10 @@
     "reason": "API 层 message 快照/契约串（展示层已走 messageKey，ADR-0157 D6）"
   },
   {
+    "path": "api/nativeTranslate.ts",
+    "reason": "Native bridge 包装层 message 快照/契约串（错误串从 Java 侧透传，console.warn 用，与 ADR-0053 / 0157 D6 同款）"
+  },
+  {
     "path": "api/ugoira.ts",
     "reason": "API 层 message 快照/契约串（展示层已走 messageKey，ADR-0157 D6）"
   },
