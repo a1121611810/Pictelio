@@ -297,6 +297,7 @@ public class PictelioTranslateModule extends LynxModule {
             // streamId 必须在任何校验分支之前确定：校验失败也要能被 JS 侧读到（否则轮询
             // 永远 pending → 用户永久「n% 翻译中」）。Java 用调用方的 _abortToken，两端一致。
             streamId = req.optString("_abortToken", UUID.randomUUID().toString());
+            pruneFinishedStreams(streamId);
             String baseUrl = req.optString("baseURL", "").trim();
             String model = req.optString("model", "").trim();
             // 入口打点：字段名/长度可见，便于区分「JS 未发请求」与「字段契约不符」
@@ -449,6 +450,22 @@ public class PictelioTranslateModule extends LynxModule {
      * 回调一次或直接 return，既不写终态也不发布 —— 轮询也救不回（实测回调 0/158），
      * 用户看到的是永久「n% 翻译中」。
      */
+    /**
+     * 清理已完结流的缓冲（保留窗口很短的握手余量）。
+     *
+     * <p>为什么不立刻删：发布保留缓冲是为了让轮询兜底能取回帧（见 publishFramesViaEvent）。
+     * 但若永不清理，长时间使用会累积。策略：**开新流时清掉除自己以外的所有完结条目** ——
+     * 同时满足「同一时刻只有一条流在跑」（store concurrency=1）与「无界增长」两侧约束。
+     */
+    private void pruneFinishedStreams(String keepStreamId) {
+        for (String key : new java.util.HashSet<>(STREAM_FRAMES.keySet())) {
+            if (!key.equals(keepStreamId)) STREAM_FRAMES.remove(key);
+        }
+        for (String key : new java.util.HashSet<>(STREAM_TERMINAL.keySet())) {
+            if (!key.equals(keepStreamId)) STREAM_TERMINAL.remove(key);
+        }
+    }
+
     private void failStream(String streamId, String message) {
         STREAM_TERMINAL.put(streamId, message);
         publishFramesViaEvent(streamId);
@@ -485,11 +502,14 @@ public class PictelioTranslateModule extends LynxModule {
                 Log.w(TAG, "全局事件通道不可用（无 LynxView）→ 翻译结果无法交付");
                 return;
             }
+            // **不 drain**（复审 finding）：此前一边发送一边 poll() 移除，若此刻 JS 没有监听器
+            // （通道不可用 / 页面已销毁 / 时序窗口），帧就永久消失 —— 轮询兜底也只能读到 pending。
+            // 改为「快照发送 + 保留缓冲」，由 translatePoll 的终态握手负责清理：事件送达则不会
+            // 再轮询、缓冲随握手释放；事件未达则轮询仍能逐帧取回。
             java.util.concurrent.ConcurrentLinkedQueue<String> frames = STREAM_FRAMES.get(streamId);
             int sent = 0;
             if (frames != null) {
-                String frame;
-                while ((frame = frames.poll()) != null) {
+                for (String frame : frames) {
                     view.sendGlobalEvent(EVENT_FRAME,
                             com.lynx.react.bridge.JavaOnlyArray.of(withStreamId(frame, streamId)));
                     sent++;
@@ -504,8 +524,7 @@ public class PictelioTranslateModule extends LynxModule {
                 view.sendGlobalEvent(EVENT_FRAME,
                         com.lynx.react.bridge.JavaOnlyArray.of(withStreamId(payload, streamId)));
                 sent++;
-                STREAM_FRAMES.remove(streamId);
-                STREAM_TERMINAL.remove(streamId);
+                // 缓冲保留：若事件未达，轮询仍能取回帧与终态（直到握手清理）
             }
             Log.i(TAG, "事件总线交付 frames=" + sent);
         } catch (Throwable t) {
@@ -546,9 +565,9 @@ public class PictelioTranslateModule extends LynxModule {
                 err.put("message", terminal);
                 callback.invoke(err.toString(), "");
             }
-            // 终态已交付一次：清理注册表，避免泄漏
-            STREAM_FRAMES.remove(streamId);
-            STREAM_TERMINAL.remove(streamId);
+            // 终态握手完成 → 释放该流的缓冲（发布侧保留缓冲正是为了让这一步能取回帧）。
+            // 幂等：重复 poll 仍会得到同一终态（缓冲已删则 terminal 仍在，见上分支），
+            // 直到 pruneFinishedStreams 在开新流时统一清理。
         } catch (Throwable t) {
             Log.w(TAG, "translatePoll 异常", t);
             callback.invoke("", "轮询失败：" + t.getClass().getSimpleName());
