@@ -1,9 +1,9 @@
 {
-  "version": "5.2.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v5.2.0",
-  "changelog": "# Pictelio 更新日志\n\n## ✨ 新功能\n\n- **Lynx 阅读器**：小说正文现在支持长按选中文字，弹出操作菜单后可一键复制，或在 Pixiv 内搜索选中文本\n\n## 🐛 问题修复\n\n- **Lynx 阅读器**：修复了部分设备上选中区域与实际文字位置出现偏差的问题\n- **Lynx 网络自检**：复制报告按钮改用系统剪贴板，复制失败时会给出明确提示，不再静默无响应",
+  "version": "5.3.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v5.3.0",
+  "changelog": "# Pictelio 更新日志\n\n## ✨ 新功能\n\n- **Lynx 引擎**：新增小说介绍页，呈现完整作品信息、受限与 AI 内容状态，并可在介绍页直接收藏\n- **Lynx 引擎**：小说介绍页提供六类入口与多段式跳转，逐入口做了来源校验\n- **Lynx 引擎**：小说正文页头部精简为「标题 + 作者」，阅读时更聚焦内容\n- **Lynx 引擎**：新增全屏模式设置开关，可在系统设置中切换沉浸阅读\n- **Lynx 引擎**：全面适配系统栏安全区，界面与弹层自动避开状态栏与导航栏；全屏模式下内容铺满屏幕\n\n## 🐛 问题修复\n\n- **Lynx 引擎**：小说介绍页简介里残留的 HTML 标签现在以纯文本显示，不再出现奇怪样式\n- **Lynx 引擎**：小说系列数据在部分真机上偶发的字段缺失与显示异常，现已修复\n- **Lynx 引擎**：BookmarkPanel 等弹层在系统栏适配后偶发的安全区越界与原生调用失败问题已处理\n- **Lynx 引擎**：系统栏 inset 事件做了防抖，界面切换更稳；弹层层序与孤立键问题已修复",
   "webBundle": {
-    "version": "5.2.0",
-    "url": "https://github.com/a1121611810/Pictelio/releases/download/v5.2.0/pictelio-5.2.0"
+    "version": "5.3.0",
+    "url": "https://github.com/a1121611810/Pictelio/releases/download/v5.3.0/pictelio-5.3.0"
   }
 }
