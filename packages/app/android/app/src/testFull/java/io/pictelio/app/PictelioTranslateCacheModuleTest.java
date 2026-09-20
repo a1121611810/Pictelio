@@ -490,8 +490,10 @@ public class PictelioTranslateCacheModuleTest {
         }
         Thread.sleep(500);
 
+        // arity 契约（code-review P9）：stats 现为单参签名（无 String unused），
+        // 与 JS 侧 `stats(cb)` 对齐；invokeLynxMethod 只传一个 Callback。
         CapturedCallback statsCb = new CapturedCallback();
-        invokeLynxMethod("stats", "", statsCb);
+        invokeLynxMethod("stats", statsCb);
         assertTrue("stats callback 必须 invoke", statsCb.awaitMs(2000));
         String raw = (String) statsCb.valueRef.get();
         assertNotNull(raw);
@@ -506,12 +508,16 @@ public class PictelioTranslateCacheModuleTest {
                 "maxEntries 必须 = DEFAULT_MAX_ENTRIES",
                 PictelioTranslateCacheModule.DEFAULT_MAX_ENTRIES,
                 obj.getInt("maxEntries"));
+        // code-review S6：hitRate/missRate 必须是 JSON null（「未统计」），不是伪造的 0
+        assertTrue("hitRate 必须为 JSON null（不再伪造 0）", obj.isNull("hitRate"));
+        assertTrue("missRate 必须为 JSON null（不再伪造 0）", obj.isNull("missRate"));
     }
 
     @Test
     public void getCacheDirPath_returnsAbsolutePath() throws Exception {
         CapturedCallback cb = new CapturedCallback();
-        invokeLynxMethod("getCacheDirPath", "", cb);
+        // arity 契约（code-review P9）：单参签名，与 JS 侧 `getCacheDirPath(cb)` 对齐
+        invokeLynxMethod("getCacheDirPath", cb);
         assertTrue(cb.awaitMs(2000));
         String path = (String) cb.valueRef.get();
         assertNotNull(path);

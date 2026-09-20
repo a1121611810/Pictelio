@@ -334,9 +334,16 @@ public class PictelioTranslateCacheModule extends LynxModule {
 
     // ─────────────────── @LynxMethod 暴露面 ───────────────────
 
-    /** 调试用：暴露 cacheDir 绝对路径（路径不携带用户数据，仅目录位置） */
+    /**
+     * 调试用：暴露 cacheDir 绝对路径（路径不携带用户数据，仅目录位置）。
+     *
+     * <p>arity 契约（code-review P9）：JS 侧调 `getCacheDirPath(cb)`（单参）。Lynx 的
+     * `@LynxMethod` 在参数个数不匹配时会把函数塞进 String 槽、Callback 置 null → 调用即崩
+     * （本类 javadoc 已记「Callback 对 null 崩」）。故这里用**无参**签名，由 Lynx 把
+     * 唯一的函数实参绑到 Callback 上——与仓库既有 `getEndpoint(Callback)` 同形。
+     */
     @LynxMethod
-    public void getCacheDirPath(String unused, Callback callback) {
+    public void getCacheDirPath(Callback callback) {
         callback.invoke(myCacheDir().getAbsolutePath());
     }
 
@@ -450,8 +457,19 @@ public class PictelioTranslateCacheModule extends LynxModule {
         callback.invoke("");
     }
 
+    /**
+     * 缓存统计。
+     *
+     * <p>arity 契约（code-review P9）：JS 侧调 `stats(cb)`（单参）。同 {@link #getCacheDirPath}
+     * 的理由，用无参签名。
+     *
+     * <p>code-review S6：此前返回 `hitRate: 0` / `missRate: 0` 硬编码伪造值（注释自认
+     * 「JS 侧维护」但 JS 从未覆盖）——暴露假数据比不暴露更糟。现改为返回
+     * {@code hitRate}/{@code missRate} = **null**（JSON null，语义「未统计」），
+     * 由消费方自行判断；JS 侧类型也同步为 `number | null`。
+     */
     @LynxMethod
-    public void stats(String unused, Callback callback) {
+    public void stats(Callback callback) {
         File cd = myCacheDir();
         WRITE_EXECUTOR.execute(() -> {
             try {
@@ -462,10 +480,10 @@ public class PictelioTranslateCacheModule extends LynxModule {
                 ret.put("totalBytes", totalBytes);
                 ret.put("maxBytes", DEFAULT_MAX_BYTES);
                 ret.put("maxEntries", DEFAULT_MAX_ENTRIES);
-                // hitRate / missRate 在 JS 侧基于 store 计数器维护（Java 不持有计数器，
-                // 避免跨重启统计漂移）。这里返回 0，由 JS 端覆盖写入。
-                ret.put("hitRate", 0);
-                ret.put("missRate", 0);
+                // null = 「未统计」（Java 不持有命中计数器，避免跨重启统计漂移）。
+                // 不用 0：0 是合法命中率（全 miss），语义上不可区分，属伪造数据。
+                ret.put("hitRate", JSONObject.NULL);
+                ret.put("missRate", JSONObject.NULL);
                 callback.invoke(ret.toString(), "");
             } catch (Exception e) {
                 Log.w(TAG, "stats 失败", e);

@@ -296,6 +296,9 @@ public class PictelioTranslateModule extends LynxModule {
         final String streamId;
         final String apiKey;
         final Request httpReq;
+        // ADR-0178 D1 / ADR-0169 D5.3 整批回退开关：必须在 try 外声明 —— 后面的
+        // TRANSLATE_EXECUTOR lambda 要读它（同一方法内的 lambda 才能构成 effectively final）
+        final boolean wantStream;
         try {
             JSONObject req = new JSONObject(requestJson);
             // streamId 必须在任何校验分支之前确定：校验失败也要能被 JS 侧读到（否则轮询
@@ -345,7 +348,12 @@ public class PictelioTranslateModule extends LynxModule {
             }
             apiKey = read;
 
-            JSONObject body = buildRequestBody(req, model, inputArr);
+            // ADR-0178 D1 / ADR-0169 D5.3 整批回退：JS 侧 fallbackToWholeBatch 会传
+            // stream=false，要求「单次 POST + 完整 JSON 响应」。此前 Java 侧忽略该字段、
+            // 硬编码 stream=true → 真机上「整批回退」退化为「整章重发同一条 SSE」，
+            // 正好落在 store 注释记载的 read timeout 形态（code-review P1 阻塞项）。
+            wantStream = req.optBoolean("stream", true);
+            JSONObject body = buildRequestBody(req, model, inputArr, wantStream);
             String url = responsesUrl(baseUrl);
             httpReq = new Request.Builder()
                     .url(url)
@@ -385,9 +393,21 @@ public class PictelioTranslateModule extends LynxModule {
                 }
                 ResponseBody body = resp.body();
                 Log.i(TAG, "translateStream HTTP " + resp.code() + " 开始读流 bodyBytes="
-                        + (body == null ? "null" : body.contentLength()));
+                        + (body == null ? "null" : body.contentLength())
+                        + " stream=" + wantStream);
                 if (body == null) {
                     failStream(streamId, "响应体为空");
+                    return;
+                }
+                // ── 整批回退（stream=false）：单次 POST + 完整 JSON，不走 SSE 拆帧 ──
+                // ADR-0178 D1 / ADR-0169 D5.3 锁死形态。交付通道不变（frameQueue →
+                // STREAM_FRAMES → 事件总线 + 轮询），只是帧来源从 SSE 解析改为 JSON 解析。
+                if (!wantStream) {
+                    frameQueue.clear();
+                    STREAM_SEQ.remove(streamId);
+                    deliverWholeBatchJson(streamId, body.string());
+                    drainQueueToStreamBuffer(streamId);
+                    publishFramesViaEvent(streamId);
                     return;
                 }
                 frameQueue.clear();
@@ -405,15 +425,7 @@ public class PictelioTranslateModule extends LynxModule {
                 Log.i(TAG, "SSE 流结束 terminal=" + terminalEmitted + " hasText=" + (sseParser != null && sseParser.hasText())
                         + " queued=" + frameQueue.size());
                 // 交付改由 JS 轮询拉取（translatePoll）：这里只把帧与终态登记进 per-stream 缓冲
-                java.util.concurrent.ConcurrentLinkedQueue<String> buffer =
-                        new java.util.concurrent.ConcurrentLinkedQueue<>(frameQueue);
-                while (!buffer.isEmpty()) {
-                    // **入缓冲时盖一次章**（streamId + seq）：两路交付的是同一字符串，
-                    // 接收侧去重才能命中（复审实测：交付时盖章 → 同帧两路 seq 不同）
-                    STREAM_FRAMES.computeIfAbsent(streamId,
-                            k -> new java.util.concurrent.ConcurrentLinkedQueue<>())
-                            .offer(withSeq(withStreamId(buffer.poll(), streamId), streamId));
-                }
+                drainQueueToStreamBuffer(streamId);
                 String parserError = sseParser == null ? null : sseParser.terminalError();
                 boolean hasText = sseParser != null && sseParser.hasText();
                 if (parserError != null) {
@@ -490,6 +502,122 @@ public class PictelioTranslateModule extends LynxModule {
     private void failStream(String streamId, String message) {
         registerTerminal(streamId, message);
         publishFramesViaEvent(streamId);
+    }
+
+    /**
+     * 把 {@link #frameQueue} 内容搬进 per-stream 缓冲 {@link #STREAM_FRAMES}（入缓冲时盖章
+     * streamId + seq）。
+     *
+     * <p>抽成独立方法供两条路径共用：SSE 流式（parseSseStream 之后）与整批回退
+     * （{@link #deliverWholeBatchJson} 之后，ADR-0178 D1 / code-review P1）。
+     * 两路交付同一字符串，接收侧按 (streamId, seq) 去重才能命中 —— 若在交付时才盖章，
+     * 同帧经事件总线与轮询两路会拿到不同 seq，去重永不生效（导致重复译文）。
+     */
+    private void drainQueueToStreamBuffer(String streamId) {
+        java.util.concurrent.ConcurrentLinkedQueue<String> buffer =
+                new java.util.concurrent.ConcurrentLinkedQueue<>(frameQueue);
+        while (!buffer.isEmpty()) {
+            STREAM_FRAMES.computeIfAbsent(streamId,
+                    k -> new java.util.concurrent.ConcurrentLinkedQueue<>())
+                    .offer(withSeq(withStreamId(buffer.poll(), streamId), streamId));
+        }
+    }
+
+    /**
+     * 整批回退（stream=false）响应处理：解析完整 JSON → 产出一帧 {@code delta_all}
+     * + 登记终态。交付通道与流式路径一致（frameQueue → STREAM_FRAMES → 事件总线 + 轮询）。
+     *
+     * <p>帧契约与 {@link TranslationSseParser#emitConsolidated} 保持同形
+     * （{@code {type:"delta_all", paragraphs:[{index,text}]}}），JS 适配器无需区分来源。
+     *
+     * <p>终态判定（与 #654 同源，不得把截断/失败判成 done）：
+     * <ul>
+     *   <li>{@code status = failed} → error（error.message 优先）</li>
+     *   <li>{@code status = incomplete} → error（截断；code-review P4 同源语义）</li>
+     *   <li>零 output_text → error（空流 = 失败，与 #654 一致）</li>
+     *   <li>否则 → delta_all 帧 + done</li>
+     * </ul>
+     *
+     * <p>Oracle：ADR-0178 D1（整批回退形态）+ ADR-0169 D5.3 + #654（空流判定）
+     * + code-review P1/P4（真机路径必须真的走非流式 + 截断不得当成功）。
+     */
+    private void deliverWholeBatchJson(String streamId, String rawBody) {
+        try {
+            JSONObject json = new JSONObject(rawBody);
+            String status = json.optString("status", "completed");
+            if ("failed".equals(status)) {
+                JSONObject err = json.optJSONObject("error");
+                String msg = err != null ? err.optString("message", "response failed") : "response failed";
+                Log.w(TAG, "整批回退 status=failed → error：" + msg);
+                registerTerminal(streamId, msg);
+                return;
+            }
+            if ("incomplete".equals(status)) {
+                JSONObject det = json.optJSONObject("incomplete_details");
+                String reason = det != null ? det.optString("reason", "unknown") : "unknown";
+                Log.w(TAG, "整批回退 status=incomplete reason=" + reason + " → error（截断不当成功）");
+                registerTerminal(streamId, "整批回退输出被截断：" + reason);
+                return;
+            }
+            // 拼接所有 output_text 并按 `[N]` 锚定拆段（与 JS parseNumberedSegments 同语义：
+            // 模型按 spec 提示逐段输出，锚记为段首标记）
+            StringBuilder sb = new StringBuilder();
+            JSONArray output = json.optJSONArray("output");
+            if (output != null) {
+                for (int i = 0; i < output.length(); i++) {
+                    JSONObject item = output.optJSONObject(i);
+                    if (item == null) continue;
+                    JSONArray content = item.optJSONArray("content");
+                    if (content == null) continue;
+                    for (int j = 0; j < content.length(); j++) {
+                        JSONObject c = content.optJSONObject(j);
+                        if (c == null) continue;
+                        if ("output_text".equals(c.optString("type", ""))) {
+                            sb.append(c.optString("text", ""));
+                        }
+                    }
+                }
+            }
+            String all = sb.toString();
+            if (all.trim().isEmpty()) {
+                // 空流 = 失败（与 #654 同判定：不得把零译文判成 done 并写缓存）
+                Log.w(TAG, "整批回退响应零译文段 → 报空流失败");
+                registerTerminal(streamId, "LLM 未返回任何译文（可能被服务端内容策略拦截）");
+                return;
+            }
+            // `[N]` 锚定拆段
+            JSONArray paragraphs = new JSONArray();
+            java.util.regex.Matcher m = java.util.regex.Pattern
+                    .compile("(?m)^\\[(\\d+)\\]\\s*")
+                    .matcher(all);
+            java.util.List<int[]> marks = new java.util.ArrayList<>();
+            while (m.find()) marks.add(new int[]{m.start(), m.end(), Integer.parseInt(m.group(1))});
+            for (int i = 0; i < marks.size(); i++) {
+                int textStart = marks.get(i)[1];
+                int textEnd = (i + 1 < marks.size()) ? marks.get(i + 1)[0] : all.length();
+                JSONObject one = new JSONObject();
+                one.put("index", marks.get(i)[2]);
+                one.put("text", all.substring(textStart, textEnd).trim());
+                paragraphs.put(one);
+            }
+            if (paragraphs.length() == 0) {
+                // 无锚记：整章作为第 0 段（保留原文可读，不因格式偏差丢译文）
+                JSONObject one = new JSONObject();
+                one.put("index", 0);
+                one.put("text", all.trim());
+                paragraphs.put(one);
+            }
+            JSONObject chunk = new JSONObject();
+            chunk.put("type", "delta_all");
+            chunk.put("paragraphs", paragraphs);
+            frameQueue.offer(chunk.toString());
+            Log.i(TAG, "整批回退 delta_all paragraphs=" + paragraphs.length());
+            registerTerminal(streamId, "done");
+        } catch (Exception e) {
+            Log.w(TAG, "整批回退 JSON 解析失败", e);
+            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            registerTerminal(streamId, "整批回退响应解析失败：" + msg);
+        }
     }
 
     /**
@@ -768,16 +896,22 @@ public class PictelioTranslateModule extends LynxModule {
 
     /**
      * 构造 Responses API 请求体：JS 端传入 input / max_output_tokens / reasoning / instructions，
-     * Java 侧拼 model + stream=true。流式必传 stream=true（spec §9.3：DeepSeek 无 stream_options，
-     * 但 stream=true 仍返回 SSE）。
+     * Java 侧拼 model + stream。流式必传 stream=true（spec §9.3：DeepSeek 无 stream_options，
+     * 但 stream=true 仍返回 SSE）；整批回退传 stream=false（ADR-0178 D1 / ADR-0169 D5.3）。
+     *
+     * @param wantStream true = SSE 流（默认）；false = 单次 POST 拿完整 JSON（整批回退）
      */
-    private static JSONObject buildRequestBody(JSONObject req, String model, JSONArray inputArr) throws Exception {
+    private static JSONObject buildRequestBody(
+            JSONObject req, String model, JSONArray inputArr, boolean wantStream) throws Exception {
         JSONObject body = new JSONObject();
         body.put("model", model);
         body.put("input", buildInput(inputArr));
-        body.put("stream", true);
+        body.put("stream", wantStream);
         if (req.has("max_output_tokens")) {
-            body.put("max_output_tokens", req.get("max_output_tokens"));
+            // 整批回退时把上限 ×2（ADR-0178 D1 / ADR-0169 D5.3 锁死形态）：回退是一次性
+            // 提交整章，输出量比单块大；沿用块级估算会更容易触发 max_output_tokens 截断。
+            int base = req.getInt("max_output_tokens");
+            body.put("max_output_tokens", wantStream ? base : Math.min(16384, base * 2));
         } else {
             // 不传时服务端可能按上下文上限预留 → 首 token 被拖到数十秒（真机实测卡死窗口）。
             // 与 JS 侧 estimateMaxOutput 同公式（≈ 输入字符数 / 2 × 2 + 512，clamp 256..16384）。
