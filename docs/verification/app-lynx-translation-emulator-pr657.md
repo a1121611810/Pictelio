@@ -73,7 +73,7 @@
 | Step 2 流式增量渲染 | **✅ 已查清：实装中不存在**（见下节 —— 票面断言与实装不一致，需裁定） | — |
 | Step 3 原文/译文切换 <50ms + 长按重译 | **✅ 已查清**（见下节：长按入口未实装、切换耗时无法外部测量） | — |
 | Step 4 model 切换 namespace | **✅ 已补齐**（见下节；并查出 #641 缓存真机失效的真缺陷） | — |
-| Step 5 OpenRouter partial probe | 未验 | 需切 endpoint 到 OpenRouter |
+| Step 5 OpenRouter partial probe | **✅ 机制已验；票面期望值已过期**（见下节） | — |
 | Step 6 R18 闸门 | **✅ 已补齐**（见下节；并发现两处 UI 缺陷，已修） | — |
 | Step 7 章节切换 generation-gate | **✅ 实现面已验 + 发现并修复真缺陷**（见下节） | — |
 | F1 partial 占位渲染 | 未验 | 见上 |
@@ -239,6 +239,57 @@ ADR-0175 的「双通道探测」被 `nativeTranslate.ts` 与 `tokenStorage` 正
 - instrumented test（Espresso + `IdlingResource`）
 
 本报告**不主张**该条已通过 —— 只能说代码路径不含可解释 50ms+ 的同步开销。
+
+---
+
+## Step 5 补齐：inline probe 机制已验，**但票面的期望值已过期**
+
+### 新增的验证入口
+
+设置区（`SettingsEndpoint`）挂在 `/me` 底部，其 inline probe 只在**表单输入**时经
+`@input` debounce 触发 —— 从 tab 栏三段式点进去在合成点击下不稳定。故新增 benchNav 场景：
+
+```
+adb shell am start -n io.pictelio.app/io.pictelio.app.LynxActivity --es benchNav me
+```
+
+（`pictelioBenchNavMe: '/me'` + `case "me"`，与 `netdiag` / `platform-check` 同先例；
+`__BENCH_NAV__` 门禁保证生产构建整块消除。）
+
+### 机制验证（逐项通过）
+
+| 环节 | 证据 |
+|---|---|
+| 深链直达 /me | 页面渲染出「我的」+「LLM 翻译设置」区（含 #637 的「显示 / 清空」按钮） |
+| 输入触发 debounce | 改动 API 地址后出现 `PictelioTranslate.probeEndpoint` 的 MethodInvoker 调用 |
+| chip 渲染 | 输入框下方状态 chip 从「未探测端点兼容性」变为探测结果 |
+| 原生探测真发出 | logcat `NativeModule ... method: (PictelioTranslate.probeEn…` |
+
+### ❗ 但判定结果与票面不符：票面期望已过期
+
+输入 `https://openrouter.ai/api/v1` 后 chip 显示 **「✓ Responses API 兼容」**，
+而票面 step 5 期望 **「⚠ 仅 chat/completions 兼容」**。
+
+**直接探测上游（决定性）**：
+
+```bash
+# 该路径（假 key）
+POST https://openrouter.ai/api/v1/responses        → 401 {"error":{"message":"Missing Authentication header","code":401}}
+# 不存在的路径（对照）
+POST https://openrouter.ai/api/v1/definitely-not-a-real-endpoint  → 404
+```
+
+⇒ **404 vs 401 可区分**：OpenRouter 的 `/v1/responses` **确实存在**（不存在的路径返回 404，
+该路径返回 401「缺鉴权」）。故 probe 的「✓ 兼容」判定是**正确**的。
+
+**结论**：票面写「OpenRouter → 仅 chat/completions 兼容（405 / partial 分支）」反映的是**票面撰写时**
+的上游状态；OpenRouter 此后已支持 Responses API。**这是期望值过期，不是缺陷。**
+
+（`partial` 分支本身有单测覆盖：`novelTranslateStore.test.ts:975-983` 用参数化循环遍历全部
+probe status 断言「分类必须写进 store 状态」，含 `partial`。）
+
+**建议**：票面 step 5 的期望值改为「用一个**确实**只支持 chat/completions 的端点验证 partial 分支」
+（如自建 mock 返回 405），或标注该期望随上游演进已失效。
 
 ---
 
