@@ -289,6 +289,56 @@ describe('darkMode（暗色哑桥 + 三态校验）', () => {
       warnSpy.mockRestore()
     })
 
+    it('native 模式 emitter 不可用 → console.warn + pull 仍可写值（禁静默降级）', async () => {
+      // IO 边界 #a：GlobalEventEmitter 缺失（lynx getJSModule 返回无 addListener）
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      // 注入 PictelioApp.getDarkMode 把 cb 转发给外部控制；emitter 故意空实现。
+      // 用对象作 holder 绕开 TS strict 下对闭包内 let 的 narrowing 限制。
+      const holder: { cb: ((mode: string) => void) | null } = { cb: null }
+      ;(globalThis as Record<string, unknown>).lynx = {
+        getJSModule: () => ({
+          // 故意不实现 addListener
+        }),
+      }
+      ;(globalThis as Record<string, unknown>).NativeModules = {
+        PictelioApp: {
+          getDarkMode: (cb: (mode: string) => void) => {
+            holder.cb = cb
+          },
+        },
+      }
+      const m = await freshModule()
+      m.getDarkMode(() => {})
+      // pull 仍照常 fire，验证路径未整体死锁
+      expect(holder.cb).not.toBeNull()
+      holder.cb?.('dark')
+      expect(m.currentDarkMode.value).toBe('dark')
+      // 关键是 warn 可见（禁静默降级）
+      const calls = warn.mock.calls.map((c) => String(c[0]))
+      expect(calls.some((msg) => msg.includes('GlobalEventEmitter 不可用'))).toBe(true)
+    })
+
+    it('native 模式 getDarkMode 不可用 → console.warn + 系统暗色恒 light', async () => {
+      // IO 边界 #b：PictelioApp.getDarkMode 缺失（模拟原生插件未注册或方法被砍）
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      ;(globalThis as Record<string, unknown>).lynx = {
+        getJSModule: () => ({
+          addListener: () => {},
+          removeListener: () => {},
+        }),
+      }
+      ;(globalThis as Record<string, unknown>).NativeModules = {
+        PictelioApp: {
+          // 故意不实现 getDarkMode
+        },
+      }
+      const m = await freshModule()
+      m.getDarkMode(() => {})
+      expect(m.currentDarkMode.value).toBe('light')
+      const calls = warn.mock.calls.map((c) => String(c[0]))
+      expect(calls.some((m) => m.includes('PictelioApp.getDarkMode 不可用'))).toBe(true)
+    })
+
     it('订阅者回调异常：隔离硬约束（其他订阅者正常收到通知）', async () => {
       const mq = setupMatchMedia(false)
       const m = await freshModule()

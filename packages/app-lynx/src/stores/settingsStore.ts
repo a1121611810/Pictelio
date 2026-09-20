@@ -32,6 +32,7 @@ import { DEFAULT_THEME_COLOR, isThemeColorId, type ThemeColorId } from "../utils
 import {
   currentDarkMode,
   DEFAULT_DARK_MODE,
+  getDarkMode,
   isDarkModeId,
   type DarkModeId,
   type ResolvedDark,
@@ -301,6 +302,13 @@ export const useSettingsStore = defineStore("settings", () => {
     if (m === 'light') return 'light'
     return currentDarkMode.value
   })
+
+  // system 模式下 resolvedDark 读 currentDarkMode；为避免「system 模式下消费方从未订阅，
+  // currentDarkMode 停在 light 初值」的 stale 状态，setup 末尾触发一次 ensureInit 副作用
+  // （幂等：重复调用 no-op；空回调不消费，仅启动 native pull / matchMedia 监听）。
+  // spec §4.3：订阅后拉语义，setup 内触发等价于消费方首次订阅。
+  void currentDarkMode.value // 触达响应式依赖以防 future refactor 移除该引用告警
+  const _initHandle = getDarkMode(() => {})
   const language = _language
   const relatedInjection = _relatedInjection
   const rankingEntry = _rankingEntry
@@ -318,6 +326,33 @@ export const useSettingsStore = defineStore("settings", () => {
   const webdavExcludedKeys = _webdavExcludedKeys
 
   // ── 公共 actions（return）──
+
+  /**
+   * 外观类设备级键加载 helper（spec lynx-night-mode T1 §4.6 + ADR-0152 同模式收敛）：
+   * - 读 prefs → isValid 校验 → 非法/IO 异常均 console.warn + 维持现状（禁静默降级）
+   * - 仅外观类（themeColor / darkMode）走此 helper；其它键形态不同（language / fullscreenMode）不进
+   * - 失败回退策略：调用方传入的 assign 永不抛异常，prefs() 抛错被 catch 转 warn
+   */
+  async function loadAppearanceSetting<T extends string>(opts: {
+    key: string
+    isValid: (v: string) => v is T
+    assign: (v: T) => void
+    invalidWarn: () => string
+    ioWarn: () => string
+  }): Promise<void> {
+    try {
+      const raw = await prefs().get(opts.key)
+      if (raw !== null) {
+        if (opts.isValid(raw)) {
+          opts.assign(raw)
+        } else {
+          console.warn(opts.invalidWarn(), raw)
+        }
+      }
+    } catch (e) {
+      console.warn(opts.ioWarn(), e)
+    }
+  }
 
   /**
    * 加载设置（initRouter 在 restoreToken 之后调用，此时 uid 已知）。
@@ -342,34 +377,25 @@ export const useSettingsStore = defineStore("settings", () => {
       console.warn("[settingsStore] ugoira 下载格式加载失败（维持默认）", e)
     }
 
-    // 主题色（外观）：设备级，未登录也需要恢复（先于 uid 判定）
-    try {
-      const raw = await prefs().get(THEME_COLOR_KEY)
-      if (raw !== null) {
-        if (isThemeColorId(raw)) {
-          _themeColor.value = raw
-        } else {
-          console.warn("[settingsStore] 主题色值非法，维持默认:", raw)
-        }
-      }
-    } catch (e) {
-      console.warn("[settingsStore] 主题色加载失败（维持默认）", e)
-    }
-
-    // 暗色外观状态（spec lynx-night-mode T1）：设备级三态，未登录也需要恢复（先于 uid 判定）。
-    // 非法值 console.warn + 维持默认 system（清单单一事实源 = utils/darkMode.ts）。
-    try {
-      const raw = await prefs().get(DARK_MODE_KEY)
-      if (raw !== null) {
-        if (isDarkModeId(raw)) {
-          _darkMode.value = raw
-        } else {
-          console.warn("[settingsStore] 暗色外观值非法，维持默认 system:", raw)
-        }
-      }
-    } catch (e) {
-      console.warn("[settingsStore] 暗色外观加载失败（维持默认 system）", e)
-    }
+    // ── 外观类设备级键（themeColor + darkMode，同模式收敛到 helper）──
+    await loadAppearanceSetting({
+      key: THEME_COLOR_KEY,
+      isValid: isThemeColorId,
+      assign: (raw) => {
+        _themeColor.value = raw
+      },
+      invalidWarn: () => "[settingsStore] 主题色值非法，维持默认:",
+      ioWarn: () => "[settingsStore] 主题色加载失败（维持默认）",
+    })
+    await loadAppearanceSetting({
+      key: DARK_MODE_KEY,
+      isValid: isDarkModeId,
+      assign: (raw) => {
+        _darkMode.value = raw
+      },
+      invalidWarn: () => "[settingsStore.darkMode] 暗色外观值非法，维持默认 system:",
+      ioWarn: () => "[settingsStore.darkMode] 暗色外观加载失败（维持默认 system）",
+    })
 
     // UI 语言（spec docs/specs/i18n.md §4.1）：设备级，未登录也需要恢复；非法值维持跟随系统
     try {
@@ -670,7 +696,7 @@ export const useSettingsStore = defineStore("settings", () => {
     _darkMode.value = mode
     void prefs()
       .set(DARK_MODE_KEY, mode)
-      .catch((e) => console.warn("[settingsStore] 暗色外观写入失败", e))
+      .catch((e) => console.warn("[settingsStore.darkMode] 暗色外观写入失败", e))
   }
 
   /** UI 语言切换（B10）：同步 lynx i18n module ref，持久化设备级共享键 */

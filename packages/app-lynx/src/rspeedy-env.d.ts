@@ -101,9 +101,11 @@ declare global {
       /** 全屏模式运行时切换（spec D5）：隐藏/显示系统栏；成功 cb()，失败 cb(errMsg) */
       setSystemBarsHidden(hidden: boolean, callback: (err: string | null) => void): void
       /**
-       * 系统暗色检测（spec lynx-night-mode T1）：订阅后拉初值。
-       * cb(mode) 立即触发一次（mode = "light" | "dark"）；后续变化经 pictelioDarkMode
-       * 全局事件推送。契约载荷双路径容忍（与 utils/darkMode.ts parseNativePayload 同源）。
+       * 系统暗色检测（spec lynx-night-mode T1 §4.3）：订阅后拉初值（mirror safeArea D2 同构）。
+       * JS 侧先订阅 `pictelioDarkMode` 全局事件，再调本方法拉初值；cb 由原生侧异步触发
+       * （setTimeout 异步路径，非同步立即回调）。后续变化经 pictelioDarkMode 事件推送。
+       * 契约载荷双路径容忍：JSON `{"mode":"light"|"dark"}`（标准）+ 裸字符串（保守兜底）；
+       * 见 utils/darkMode.ts parseNativePayload（JS 单边容忍非隐式契约，Java 端仅产 JSON）。
        */
       getDarkMode(callback: (mode: string) => void): void
     }

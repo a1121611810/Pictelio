@@ -137,6 +137,10 @@ public class LynxActivity extends AppCompatActivity {
     // 复位同 sInset*（onDestroy 回到 -1，新实例首次读取命中兜底 light）。
     private static int sLastUiMode = -1;
 
+    // ADR-night-mode（T1）：最近一次已下发的暗色 mode 字符串（"light"/"dark"）。同 insets
+    // 字段语义，sendDarkModeEvent 内部短路去重；新增 caller 无需各自比 sLastUiMode。
+    private static String sLastDarkSent = "";
+
     /** 可视内容区计算（spec D3 纯函数，供单测）：宽不消费水平 insets，高减上下可见栏且 ≥0。 */
     static int[] applyVisibleInsets(int w, int h, int insetTop, int insetBottom) {
         return new int[] { w, Math.max(h - insetTop - insetBottom, 0) };
@@ -594,11 +598,14 @@ public class LynxActivity extends AppCompatActivity {
      * 暗色 uiMode 变化推送 JS（事件通道，spec lynx-night-mode T1 §4.3）：
      * 载荷 = JSON 字符串 {@code {"mode":"light"|"dark"}} —— 与 insets 双参数值契约区分。
      * 值变化才发（防抖不变量：同值不重复回调，配置变更可能以同 uiMode 重复触发）。
-     * lynxView 为 null 时静默 no-op（onDestroy 后被清空）。
+     * lynxView 为 null 时静默 no-op（onDestroy 后被清空）；同 mode 不发（sLastDarkSent 短路，
+     * 与 sendInsetsEvent 内部去重对齐，新增 caller 不必各自比 sLastUiMode）。
      */
     private void sendDarkModeEvent() {
         if (lynxView == null) return;
         String mode = currentDarkMode(sLastUiMode);
+        if (mode.equals(sLastDarkSent)) return;
+        sLastDarkSent = mode;
         lynxView.sendGlobalEvent(EVENT_DARK_MODE, JavaOnlyArray.of("{\"mode\":\"" + mode + "\"}"));
     }
 
@@ -803,6 +810,7 @@ public class LynxActivity extends AppCompatActivity {
         // ADR-night-mode（T1）：onResume 兜底比对 — 后台期间系统 uiMode 翻转若未触发
         // configChanges（个别厂商 / 后台省电冻结），resume 时强制补发事件，避免 JS 漏感知。
         // 安全：sLastUiMode 已被 onConfigurationChanged / onCreate 初始化；未初始化不补发。
+        // 防抖短路下沉到 sendDarkModeEvent 内部（sLastDarkSent），此处只需比对 uiMode 缓存。
         if (lynxView != null && sLastUiMode != -1) {
             int current = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
             if (current != sLastUiMode) {
