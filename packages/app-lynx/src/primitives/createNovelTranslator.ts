@@ -42,6 +42,17 @@ export interface ChunkRange {
  * @param paragraphs 原文段落数组
  * @param maxChars 单块最大字符数（默认 2000；ADR-0169 D5.1）
  */
+
+/**
+ * 构造 AbortError 实例。Lynx PrimJS 无 `DOMException`（实测 unhandled rejection:
+ * `DOMException is not defined` 会让 abort 路径在第一行就抛 → abortHandle.abort()
+ * 永远不执行）。改用 Error + name 标记，与 nativeTranslate.ts onAbort 的 polyfill
+ * 配套；下游用 `err.name === 'AbortError'` 判定。
+ */
+function makeAbortError(): Error {
+  return Object.assign(new Error('aborted'), { name: 'AbortError' })
+}
+
 export function chunkParagraphs(paragraphs: string[], maxChars = 2000): ChunkRange[] {
   if (paragraphs.length === 0) return []
   const chunks: ChunkRange[] = []
@@ -221,7 +232,9 @@ export async function runChunkPool<T>(
             break
           } catch (err) {
             lastErr = err
-            if (err instanceof DOMException && err.name === 'AbortError') return
+            // Lynx PrimJS 无 DOMException（实测 unhandled rejection: DOMException is not
+            // defined）；改判 name 即可，与 nativeTranslate.ts onAbort 的 polyfill 配套。
+            if (err instanceof Error && err.name === 'AbortError') return
             if (attempt >= maxRetries) break
             // 简化：固定 500ms 退避；与 webview 端 retryDelayMs 等价但简化为不依赖外部 import
             await sleep(500 * 2 ** attempt, signal)
@@ -245,7 +258,7 @@ export async function runChunkPool<T>(
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
-      reject(new DOMException('aborted', 'AbortError'))
+      reject(makeAbortError())
       return
     }
     const timer = setTimeout(() => {
@@ -254,7 +267,7 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
     }, ms)
     const onAbort = (): void => {
       clearTimeout(timer)
-      reject(new DOMException('aborted', 'AbortError'))
+      reject(makeAbortError())
     }
     signal?.addEventListener('abort', onAbort, { once: true })
   })
@@ -317,7 +330,7 @@ export async function fetchChunkViaProvider(
       }
     }
   } catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError') throw err
+    if (err instanceof Error && err.name === 'AbortError') throw err
     if (err instanceof TranslationChunkError) throw err
     // 其他未预期错误 → 包为 unknown
     throw new TranslationChunkError(
@@ -473,7 +486,7 @@ export function createNovelTranslator(
               onChunk,
             )
           } catch (err) {
-            if (err instanceof DOMException && err.name === 'AbortError') throw err
+            if (err instanceof Error && err.name === 'AbortError') throw err
             if (err instanceof TranslationChunkError) throw err
             throw err
           }

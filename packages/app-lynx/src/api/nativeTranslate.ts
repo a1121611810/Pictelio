@@ -468,7 +468,11 @@ export function nativeTranslateProvider(): TranslationProvider {
 
       const onAbort = (): void => {
         aborted = true
-        failure = new DOMException("aborted", "AbortError")
+        // Lynx PrimJS 无 DOMException（实测 unhandled rejection: DOMException is not defined
+        // 会让 abort 路径在 onAbort 第一行就抛 → abortHandle?.abort() 永远不执行 → #653 修
+        // 复无效）。改用 Error + name 标记，下游 createNovelTranslator 用 `err.name ===
+        // 'AbortError'` 判定（已同步修）。
+        failure = Object.assign(new Error("aborted"), { name: "AbortError" })
         if (pollTimer !== null) clearTimeout(pollTimer)
         detachOnce()
         void abortHandle?.abort()

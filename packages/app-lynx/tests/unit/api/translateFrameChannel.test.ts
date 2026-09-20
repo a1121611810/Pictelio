@@ -545,4 +545,53 @@ describe('native 取消通道（#653：JS abort 必须触达原生 abortStream�
     // 监听器仍须解绑（abort 失败不能阻塞 detach 路径）
     expect(emitter.count('pictelioTranslateFrame')).toBe(0)
   })
+
+  it('无 DOMException（Lynx PrimJS 真实环境）→ onAbort 不抛，abortStream 仍触达', async () => {
+    // 真机回归防线：Lynx PrimJS 实测 `DOMException is not defined`，原 onAbort 在
+    // `new DOMException("aborted", "AbortError")` 这一行直接抛 → 后面的
+    // `abortHandle?.abort()` 永远不执行 → 整个 #653 修复在设备上形同未做。
+    // 本用例钉住 polyfill 路径：临时删 globalThis.DOMException，模拟 PrimJS。
+    let abortStreamCalledWith: string | null = null
+    const originalDE = (globalThis as { DOMException?: unknown }).DOMException
+    // @ts-expect-error 模拟 Lynx PrimJS：无 DOMException 全局
+    delete (globalThis as { DOMException?: unknown }).DOMException
+    try {
+      ;(globalThis as { NativeModules?: unknown }).NativeModules = {
+        PictelioTranslate: {
+          translateStream: () => new Promise<{ abort: () => Promise<void> }>(() => {}),
+          translatePoll: (_id: string, cb: (v: string | null, e: string | null) => void) =>
+            cb(JSON.stringify({ type: 'pending' }), ''),
+          abortStream: (id: string, cb: (err: string | null) => void) => {
+            abortStreamCalledWith = id
+            cb(null)
+          },
+        },
+      }
+      const provider = nativeTranslateProvider()
+      const controller = new AbortController()
+      const iter = provider.translate(
+        { novelId: 1, chapterId: 'c1', paragraphs: ['原文'], options: { xRestrict: 0 } },
+        { baseURL: 'https://x', apiKey: '', model: 'm' },
+        controller.signal,
+      )
+      await new Promise((r) => setTimeout(r, 0))
+
+      // 必须不抛
+      expect(() => controller.abort()).not.toThrow()
+
+      // 关键断言：即便 DOMException 缺失，abortStream 仍被调用（=核心修复未回退）
+      expect(abortStreamCalledWith).not.toBeNull()
+      // 迭代器抛 AbortError（用 err.name 判，不依赖 instanceof DOMException）
+      try {
+        await iter.next()
+        expect.fail('iter.next() 应当抛 AbortError')
+      } catch (e) {
+        expect(e).toBeInstanceOf(Error)
+        expect((e as Error).name).toBe('AbortError')
+      }
+    } finally {
+      // 恢复 globalThis，避免污染后续用例
+      ;(globalThis as { DOMException?: unknown }).DOMException = originalDE
+    }
+  })
 })
