@@ -641,21 +641,21 @@ describe('主题色契约（themeColor ↔ tokens.css）', () => {
     expect(isThemeColorId('neon')).toBe(false)
   })
 
-  it('App.vue 将色板类绑定到根 <page>（接线契约）', () => {
+  it('App.vue 将色板类绑定到根 <page>（接线契约，T2：appearanceClasses 复合主题+暗色）', () => {
     const appVue = readFileSync(resolve(rootDir, 'src/App.vue'), 'utf-8')
     expect(appVue).toContain("import { useSettingsStore } from './stores/settingsStore'")
-    expect(appVue).toContain("import { themeColorClass } from './utils/themeColor'")
-    expect(appVue).toContain(':class="themeColorClass(settings.themeColor)"')
+    expect(appVue).toContain("import { appearanceClasses } from './utils/appearanceClasses'")
+    expect(appVue).toContain(':class="appearanceClasses(settings.themeColor, settings.resolvedDark)"')
   })
 
-  it('Me.vue 外观卡片为每个色板提供入口且 class 走 themeColorClass（防 class 双写漂移）', () => {
+  it('Me.vue 外观卡片为每个色板提供入口且 class 走 appearanceClasses（防 class 双写漂移，T2：暗色 resolved 下色块联动）', () => {
     const meVue = readFileSync(resolve(rootDir, 'src/pages/Me.vue'), 'utf-8')
     for (const option of THEME_COLOR_OPTIONS) {
       expect(meVue, `Me.vue 缺少 ${option.id} 色板入口`).toContain(
         `settings.setThemeColor('${option.id}')`,
       )
       expect(meVue, `Me.vue 缺少 ${option.id} 色板类绑定`).toContain(
-        `themeColorClass('${option.id}')`,
+        `...appearanceClasses('${option.id}', resolvedDark)`,
       )
     }
   })

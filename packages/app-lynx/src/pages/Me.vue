@@ -15,7 +15,7 @@ import { readEngineState, REASON_I18N_KEYS, type EngineKind, type EngineStateSna
 import GlassCard from '../components/GlassCard.vue'
 import SettingsEndpoint from '../components/SettingsEndpoint.vue'
 import M3Switch from '../components/M3Switch.vue'
-import { themeColorClass } from '../utils/themeColor'
+import { appearanceClasses } from '../utils/appearanceClasses'
 import {
   createLynxBackupDeps,
   createLynxBackupWiring,
@@ -47,7 +47,7 @@ import { INPUT_PLACEHOLDER_COLOR } from '../utils/lynxPlatformColors'
 const auth = useAuthStore()
 const settings = useSettingsStore()
 const clientSwitch = useClientSwitchStore()
-const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, language, novelExportFormat, novelExportOptions, relatedInjection, rankingEntry, autoFallbackEngine, fullscreenMode } = storeToRefs(settings)
+const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, darkMode, resolvedDark, language, novelExportFormat, novelExportOptions, relatedInjection, rankingEntry, autoFallbackEngine, fullscreenMode } = storeToRefs(settings)
 
 const switching = ref(false)
 
@@ -383,6 +383,12 @@ function toggleRelatedInjection() {
 function toggleRankingEntry() {
   settings.setRankingEntry(!rankingEntry.value)
 }
+
+// T2：外观模式三态切换（spec docs/specs/lynx-night-mode.md §3 + §4.7）—— 即时生效，
+// 经 settingsStore.setDarkMode 走设备级持久化 + Pinia ref 即时更新 → App.vue 根类重算
+function pickAppearanceMode(mode: 'light' | 'dark' | 'system') {
+  settings.setDarkMode(mode)
+}
 </script>
 
 <!--
@@ -561,16 +567,49 @@ function toggleRankingEntry() {
       </view>
 
       <!-- 外观组（主题色）：色板类 .theme-* 定义在 tokens.css，根 <page> 应用即整体换色；
-           色块自身加对应色板类（默认 sky 用 .theme-sky，与基础 page 色板共用规则）+ bg-primary 预览该色板主色。 -->
+           色块自身加对应色板类（默认 sky 用 .theme-sky，与基础 page 色板共用规则）+ bg-primary 预览该色板主色。
+           T2 增补（spec lynx-night-mode §4.7）：
+             - 顶部加「外观模式」M3 segmented button 三格（亮/暗/跟随），点击即时切换
+             - 色块同步挂 .dark 类 → 暗色 resolved 下显示对应主题的暗色色板真实主色（WYSIWYG） -->
       <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
         <text class="text-title-small font-medium text-surface-on">{{ t('me.appearance.title') }}</text>
         <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.appearance.themeColorHint') }}</text>
+        <!-- M3 segmented button（三档）：亮色 / 暗色 / 跟随系统 -->
+        <view class="flex flex-row gap-0 rounded-[var(--md-shape-full)] border border-outline overflow-hidden mb-4">
+          <view
+            class="flex-1 h-[10.667vw] flex items-center justify-center active:bg-layer-pressed-on-surface"
+            :class="darkMode === 'light' ? 'bg-secondary-container' : 'bg-surface-container-lowest'"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.appearanceLight"
+            @tap="pickAppearanceMode('light')"
+          >
+            <text class="text-label-large" :class="darkMode === 'light' ? 'text-secondary-on-container' : 'text-surface-on'">{{ t('me.appearance.modeLight') }}</text>
+          </view>
+          <view
+            class="flex-1 h-[10.667vw] flex items-center justify-center border-l border-l-outline active:bg-layer-pressed-on-surface"
+            :class="darkMode === 'dark' ? 'bg-secondary-container' : 'bg-surface-container-lowest'"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.appearanceDark"
+            @tap="pickAppearanceMode('dark')"
+          >
+            <text class="text-label-large" :class="darkMode === 'dark' ? 'text-secondary-on-container' : 'text-surface-on'">{{ t('me.appearance.modeDark') }}</text>
+          </view>
+          <view
+            class="flex-1 h-[10.667vw] flex items-center justify-center border-l border-l-outline active:bg-layer-pressed-on-surface"
+            :class="darkMode === 'system' ? 'bg-secondary-container' : 'bg-surface-container-lowest'"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.appearanceSystem"
+            @tap="pickAppearanceMode('system')"
+          >
+            <text class="text-label-large" :class="darkMode === 'system' ? 'text-secondary-on-container' : 'text-surface-on'">{{ t('me.appearance.modeSystem') }}</text>
+          </view>
+        </view>
         <view class="flex flex-row items-start justify-between">
           <view class="flex flex-col items-center gap-1">
             <!-- 天蓝（默认） -->
             <view
               class="w-10 h-10 rounded-full flex items-center justify-center border-[0.533vw]"
-              :class="[themeColor === 'sky' ? 'border-primary' : 'border-transparent', themeColorClass('sky')]"
+              :class="[themeColor === 'sky' ? 'border-primary' : 'border-transparent', ...appearanceClasses('sky', resolvedDark)]"
               :accessibility-element="A11Y_ELEMENT_ENABLED"
               :accessibility-label="ME_A11Y_LABELS.themeColorSky"
               @tap="settings.setThemeColor('sky')"
@@ -585,7 +624,7 @@ function toggleRankingEntry() {
             <!-- 紫罗兰 -->
             <view
               class="w-10 h-10 rounded-full flex items-center justify-center border-[0.533vw]"
-              :class="[themeColor === 'violet' ? 'border-primary' : 'border-transparent', themeColorClass('violet')]"
+              :class="[themeColor === 'violet' ? 'border-primary' : 'border-transparent', ...appearanceClasses('violet', resolvedDark)]"
               :accessibility-element="A11Y_ELEMENT_ENABLED"
               :accessibility-label="ME_A11Y_LABELS.themeColorViolet"
               @tap="settings.setThemeColor('violet')"
@@ -600,7 +639,7 @@ function toggleRankingEntry() {
             <!-- 樱花粉 -->
             <view
               class="w-10 h-10 rounded-full flex items-center justify-center border-[0.533vw]"
-              :class="[themeColor === 'pink' ? 'border-primary' : 'border-transparent', themeColorClass('pink')]"
+              :class="[themeColor === 'pink' ? 'border-primary' : 'border-transparent', ...appearanceClasses('pink', resolvedDark)]"
               :accessibility-element="A11Y_ELEMENT_ENABLED"
               :accessibility-label="ME_A11Y_LABELS.themeColorPink"
               @tap="settings.setThemeColor('pink')"
@@ -615,7 +654,7 @@ function toggleRankingEntry() {
             <!-- 松柏绿 -->
             <view
               class="w-10 h-10 rounded-full flex items-center justify-center border-[0.533vw]"
-              :class="[themeColor === 'green' ? 'border-primary' : 'border-transparent', themeColorClass('green')]"
+              :class="[themeColor === 'green' ? 'border-primary' : 'border-transparent', ...appearanceClasses('green', resolvedDark)]"
               :accessibility-element="A11Y_ELEMENT_ENABLED"
               :accessibility-label="ME_A11Y_LABELS.themeColorGreen"
               @tap="settings.setThemeColor('green')"
@@ -630,7 +669,7 @@ function toggleRankingEntry() {
             <!-- 落日橙 -->
             <view
               class="w-10 h-10 rounded-full flex items-center justify-center border-[0.533vw]"
-              :class="[themeColor === 'orange' ? 'border-primary' : 'border-transparent', themeColorClass('orange')]"
+              :class="[themeColor === 'orange' ? 'border-primary' : 'border-transparent', ...appearanceClasses('orange', resolvedDark)]"
               :accessibility-element="A11Y_ELEMENT_ENABLED"
               :accessibility-label="ME_A11Y_LABELS.themeColorOrange"
               @tap="settings.setThemeColor('orange')"
@@ -645,7 +684,7 @@ function toggleRankingEntry() {
             <!-- 深青 -->
             <view
               class="w-10 h-10 rounded-full flex items-center justify-center border-[0.533vw]"
-              :class="[themeColor === 'teal' ? 'border-primary' : 'border-transparent', themeColorClass('teal')]"
+              :class="[themeColor === 'teal' ? 'border-primary' : 'border-transparent', ...appearanceClasses('teal', resolvedDark)]"
               :accessibility-element="A11Y_ELEMENT_ENABLED"
               :accessibility-label="ME_A11Y_LABELS.themeColorTeal"
               @tap="settings.setThemeColor('teal')"

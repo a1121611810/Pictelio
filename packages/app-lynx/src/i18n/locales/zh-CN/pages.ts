@@ -236,6 +236,11 @@ const zhPages = {
   "me.appearance.colorGreen": "松柏绿",
   "me.appearance.colorOrange": "落日橙",
   "me.appearance.colorTeal": "深青",
+  // 外观模式（spec docs/specs/lynx-night-mode.md T2 §4.7）：M3 segmented button 三格
+  "me.appearance.mode": "外观模式",
+  "me.appearance.modeLight": "亮色",
+  "me.appearance.modeDark": "暗色",
+  "me.appearance.modeSystem": "跟随系统",
   "me.content.title": "内容",
   "me.content.hint": "默认隐藏 R-18 / R-18G 内容",
   "me.content.showR18": "显示 R-18 内容",

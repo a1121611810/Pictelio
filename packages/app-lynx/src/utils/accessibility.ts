@@ -85,6 +85,10 @@ export const ME_A11Y_LABELS = {
   languageFollowSystem: '界面语言跟随系统',
   languageZh: '界面语言简体中文',
   languageEn: '界面语言English',
+  // 外观模式（spec docs/specs/lynx-night-mode.md T2 §4.7）：M3 segmented button 三格
+  appearanceLight: '外观模式亮色',
+  appearanceDark: '外观模式暗色',
+  appearanceSystem: '外观模式跟随系统',
   logout: '退出登录',
 } as const
 

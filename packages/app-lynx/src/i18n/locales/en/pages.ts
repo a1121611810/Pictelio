@@ -237,6 +237,11 @@ const enPages = {
   "me.appearance.colorGreen": "Pine green",
   "me.appearance.colorOrange": "Sunset orange",
   "me.appearance.colorTeal": "Teal",
+  // 外观模式（spec docs/specs/lynx-night-mode.md T2 §4.7）：M3 segmented button three-segment
+  "me.appearance.mode": "Appearance",
+  "me.appearance.modeLight": "Light",
+  "me.appearance.modeDark": "Dark",
+  "me.appearance.modeSystem": "Follow system",
   "me.content.title": "Content",
   "me.content.hint": "R-18 / R-18G content is hidden by default",
   "me.content.showR18": "Show R-18 content",

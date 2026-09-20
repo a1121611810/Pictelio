@@ -411,3 +411,322 @@ page,
   --md-state-disabled-on-surface: rgba(22, 29, 29, 0.38);
 }
 
+/* ════════════════════════════════════════════════════════════════════════════
+ * 自动生成段（spec docs/specs/lynx-night-mode.md T2 §4.7）：勿手改
+ * 由 scripts/generate-theme-palettes.mjs 产出，覆盖 6 主题暗色版（复合选择器 .theme-X.dark）。
+ * 单一事实源 = src/utils/themeColor.ts（THEME_COLOR_OPTIONS 派生 className）。
+ * 亮色版沿用既有手调色板（ADR-0152 / commit f239b065）——保持视觉零回归。
+ * 重新生成：node scripts/generate-theme-palettes.mjs。
+ * ════════════════════════════════════════════════════════════════════════════ */
+/* ─── sky 主题暗色板（spec lynx-night-mode T2，从 seed #1a6fa8 经 M3 SchemeTonalSpot 派生 isDark=true） ─── */
+.theme-sky.dark {
+  --md-primary: #9bcbfa;
+  --md-on-primary: #003353;
+  --md-primary-container: #0d4a73;
+  --md-on-primary-container: #cee5ff;
+  --md-secondary: #b9c8da;
+  --md-on-secondary: #233240;
+  --md-secondary-container: #3a4857;
+  --md-on-secondary-container: #d5e4f7;
+  --md-tertiary: #d3bfe6;
+  --md-on-tertiary: #382a49;
+  --md-tertiary-container: #4f4061;
+  --md-on-tertiary-container: #eedbff;
+  --md-surface: #101418;
+  --md-on-surface: #e0e2e8;
+  --md-surface-variant: #42474e;
+  --md-on-surface-variant: #c2c7cf;
+  --md-outline: #8c9198;
+  --md-outline-variant: #42474e;
+  --md-surface-container-lowest: #0b0f12;
+  --md-surface-container-low: #181c20;
+  --md-surface-container: #1c2024;
+  --md-surface-container-high: #272a2f;
+  --md-surface-container-highest: #323539;
+  --md-inverse-surface: #e0e2e8;
+  --md-inverse-on-surface: #2d3135;
+  --md-inverse-primary: #2f628c;
+  --md-surface-dim: #101418;
+  --md-surface-bright: #36393e;
+  --md-primary-fixed: #cee5ff;
+  --md-on-primary-fixed: #001d32;
+  --md-primary-fixed-dim: #9bcbfa;
+  --md-on-primary-fixed-variant: #0d4a73;
+  --md-secondary-fixed: #d5e4f7;
+  --md-on-secondary-fixed: #0e1d2a;
+  --md-secondary-fixed-dim: #b9c8da;
+  --md-on-secondary-fixed-variant: #3a4857;
+  --md-tertiary-fixed: #eedbff;
+  --md-on-tertiary-fixed: #231533;
+  --md-tertiary-fixed-dim: #d3bfe6;
+  --md-on-tertiary-fixed-variant: #4f4061;
+  --md-surface-tint: #9bcbfa;
+  --md-state-pressed-primary: #9bcbfa;
+  --md-state-pressed-on-surface: #e0e2e8;
+  --md-state-pressed-surface: #272a2f;
+  --md-state-layer-pressed-primary: rgba(155, 203, 250, 0.12);
+  --md-state-layer-pressed-on-surface: rgba(224, 226, 232, 0.12);
+  --md-state-disabled-container: rgba(224, 226, 232, 0.12);
+  --md-state-disabled-on-surface: rgba(224, 226, 232, 0.38);
+}
+
+/* ─── violet 主题暗色板（spec lynx-night-mode T2，从 seed #65558f 经 M3 SchemeTonalSpot 派生 isDark=true） ─── */
+.theme-violet.dark {
+  --md-primary: #cfbdfe;
+  --md-on-primary: #36265d;
+  --md-primary-container: #4d3d75;
+  --md-on-primary-container: #e9ddff;
+  --md-secondary: #ccc2db;
+  --md-on-secondary: #332d41;
+  --md-secondary-container: #4a4458;
+  --md-on-secondary-container: #e8def8;
+  --md-tertiary: #efb8c8;
+  --md-on-tertiary: #4a2532;
+  --md-tertiary-container: #633b48;
+  --md-on-tertiary-container: #ffd9e3;
+  --md-surface: #141218;
+  --md-on-surface: #e6e0e9;
+  --md-surface-variant: #49454e;
+  --md-on-surface-variant: #cac4cf;
+  --md-outline: #948f99;
+  --md-outline-variant: #49454e;
+  --md-surface-container-lowest: #0f0d13;
+  --md-surface-container-low: #1d1b20;
+  --md-surface-container: #211f24;
+  --md-surface-container-high: #2b292f;
+  --md-surface-container-highest: #36343a;
+  --md-inverse-surface: #e6e0e9;
+  --md-inverse-on-surface: #322f35;
+  --md-inverse-primary: #65558f;
+  --md-surface-dim: #141218;
+  --md-surface-bright: #3b383e;
+  --md-primary-fixed: #e9ddff;
+  --md-on-primary-fixed: #211047;
+  --md-primary-fixed-dim: #cfbdfe;
+  --md-on-primary-fixed-variant: #4d3d75;
+  --md-secondary-fixed: #e8def8;
+  --md-on-secondary-fixed: #1e192b;
+  --md-secondary-fixed-dim: #ccc2db;
+  --md-on-secondary-fixed-variant: #4a4458;
+  --md-tertiary-fixed: #ffd9e3;
+  --md-on-tertiary-fixed: #31101d;
+  --md-tertiary-fixed-dim: #efb8c8;
+  --md-on-tertiary-fixed-variant: #633b48;
+  --md-surface-tint: #cfbdfe;
+  --md-state-pressed-primary: #cfbdfe;
+  --md-state-pressed-on-surface: #e6e0e9;
+  --md-state-pressed-surface: #2b292f;
+  --md-state-layer-pressed-primary: rgba(207, 189, 254, 0.12);
+  --md-state-layer-pressed-on-surface: rgba(230, 224, 233, 0.12);
+  --md-state-disabled-container: rgba(230, 224, 233, 0.12);
+  --md-state-disabled-on-surface: rgba(230, 224, 233, 0.38);
+}
+
+/* ─── pink 主题暗色板（spec lynx-night-mode T2，从 seed #8b4a61 经 M3 SchemeTonalSpot 派生 isDark=true） ─── */
+.theme-pink.dark {
+  --md-primary: #ffb0c9;
+  --md-on-primary: #541d33;
+  --md-primary-container: #6f3349;
+  --md-on-primary-container: #ffd9e3;
+  --md-secondary: #e2bdc7;
+  --md-on-secondary: #422931;
+  --md-secondary-container: #5a3f47;
+  --md-on-secondary-container: #ffd9e3;
+  --md-tertiary: #efbc94;
+  --md-on-tertiary: #48290c;
+  --md-tertiary-container: #623f20;
+  --md-on-tertiary-container: #ffdcc2;
+  --md-surface: #191113;
+  --md-on-surface: #efdfe1;
+  --md-surface-variant: #514347;
+  --md-on-surface-variant: #d5c2c6;
+  --md-outline: #9e8c90;
+  --md-outline-variant: #514347;
+  --md-surface-container-lowest: #140c0e;
+  --md-surface-container-low: #22191c;
+  --md-surface-container: #261d20;
+  --md-surface-container-high: #31282a;
+  --md-surface-container-highest: #3c3235;
+  --md-inverse-surface: #efdfe1;
+  --md-inverse-on-surface: #372e30;
+  --md-inverse-primary: #8b4a61;
+  --md-surface-dim: #191113;
+  --md-surface-bright: #403739;
+  --md-primary-fixed: #ffd9e3;
+  --md-on-primary-fixed: #3a071e;
+  --md-primary-fixed-dim: #ffb0c9;
+  --md-on-primary-fixed-variant: #6f3349;
+  --md-secondary-fixed: #ffd9e3;
+  --md-on-secondary-fixed: #2b151c;
+  --md-secondary-fixed-dim: #e2bdc7;
+  --md-on-secondary-fixed-variant: #5a3f47;
+  --md-tertiary-fixed: #ffdcc2;
+  --md-on-tertiary-fixed: #2e1500;
+  --md-tertiary-fixed-dim: #efbc94;
+  --md-on-tertiary-fixed-variant: #623f20;
+  --md-surface-tint: #ffb0c9;
+  --md-state-pressed-primary: #ffb0c9;
+  --md-state-pressed-on-surface: #efdfe1;
+  --md-state-pressed-surface: #31282a;
+  --md-state-layer-pressed-primary: rgba(255, 176, 201, 0.12);
+  --md-state-layer-pressed-on-surface: rgba(239, 223, 225, 0.12);
+  --md-state-disabled-container: rgba(239, 223, 225, 0.12);
+  --md-state-disabled-on-surface: rgba(239, 223, 225, 0.38);
+}
+
+/* ─── green 主题暗色板（spec lynx-night-mode T2，从 seed #3c6939 经 M3 SchemeTonalSpot 派生 isDark=true） ─── */
+.theme-green.dark {
+  --md-primary: #a1d399;
+  --md-on-primary: #0b390f;
+  --md-primary-container: #245023;
+  --md-on-primary-container: #bdf0b3;
+  --md-secondary: #baccb3;
+  --md-on-secondary: #253423;
+  --md-secondary-container: #3b4b38;
+  --md-on-secondary-container: #d6e8ce;
+  --md-tertiary: #a0cfd4;
+  --md-on-tertiary: #00363b;
+  --md-tertiary-container: #1e4d52;
+  --md-on-tertiary-container: #bcebf0;
+  --md-surface: #10140f;
+  --md-on-surface: #e0e4db;
+  --md-surface-variant: #424940;
+  --md-on-surface-variant: #c2c8bd;
+  --md-outline: #8c9388;
+  --md-outline-variant: #424940;
+  --md-surface-container-lowest: #0b0f0a;
+  --md-surface-container-low: #191d17;
+  --md-surface-container: #1d211b;
+  --md-surface-container-high: #272b25;
+  --md-surface-container-highest: #323630;
+  --md-inverse-surface: #e0e4db;
+  --md-inverse-on-surface: #2d322b;
+  --md-inverse-primary: #3c6839;
+  --md-surface-dim: #10140f;
+  --md-surface-bright: #363a34;
+  --md-primary-fixed: #bdf0b3;
+  --md-on-primary-fixed: #002203;
+  --md-primary-fixed-dim: #a1d399;
+  --md-on-primary-fixed-variant: #245023;
+  --md-secondary-fixed: #d6e8ce;
+  --md-on-secondary-fixed: #111f0f;
+  --md-secondary-fixed-dim: #baccb3;
+  --md-on-secondary-fixed-variant: #3b4b38;
+  --md-tertiary-fixed: #bcebf0;
+  --md-on-tertiary-fixed: #002022;
+  --md-tertiary-fixed-dim: #a0cfd4;
+  --md-on-tertiary-fixed-variant: #1e4d52;
+  --md-surface-tint: #a1d399;
+  --md-state-pressed-primary: #a1d399;
+  --md-state-pressed-on-surface: #e0e4db;
+  --md-state-pressed-surface: #272b25;
+  --md-state-layer-pressed-primary: rgba(161, 211, 153, 0.12);
+  --md-state-layer-pressed-on-surface: rgba(224, 228, 219, 0.12);
+  --md-state-disabled-container: rgba(224, 228, 219, 0.12);
+  --md-state-disabled-on-surface: rgba(224, 228, 219, 0.38);
+}
+
+/* ─── orange 主题暗色板（spec lynx-night-mode T2，从 seed #855317 经 M3 SchemeTonalSpot 派生 isDark=true） ─── */
+.theme-orange.dark {
+  --md-primary: #fcb974;
+  --md-on-primary: #492900;
+  --md-primary-container: #693c00;
+  --md-on-primary-container: #ffdcbd;
+  --md-secondary: #e1c1a3;
+  --md-on-secondary: #402c18;
+  --md-secondary-container: #59422c;
+  --md-on-secondary-container: #fedcbe;
+  --md-tertiary: #bfcc9a;
+  --md-on-tertiary: #2a3410;
+  --md-tertiary-container: #404b25;
+  --md-on-tertiary-container: #dbe8b5;
+  --md-surface: #19120c;
+  --md-on-surface: #eee0d5;
+  --md-surface-variant: #50453a;
+  --md-on-surface-variant: #d5c3b5;
+  --md-outline: #9d8e81;
+  --md-outline-variant: #50453a;
+  --md-surface-container-lowest: #130d07;
+  --md-surface-container-low: #211a14;
+  --md-surface-container: #261e18;
+  --md-surface-container-high: #302921;
+  --md-surface-container-highest: #3c332c;
+  --md-inverse-surface: #eee0d5;
+  --md-inverse-on-surface: #372f28;
+  --md-inverse-primary: #855317;
+  --md-surface-dim: #19120c;
+  --md-surface-bright: #403830;
+  --md-primary-fixed: #ffdcbd;
+  --md-on-primary-fixed: #2c1600;
+  --md-primary-fixed-dim: #fcb974;
+  --md-on-primary-fixed-variant: #693c00;
+  --md-secondary-fixed: #fedcbe;
+  --md-on-secondary-fixed: #291806;
+  --md-secondary-fixed-dim: #e1c1a3;
+  --md-on-secondary-fixed-variant: #59422c;
+  --md-tertiary-fixed: #dbe8b5;
+  --md-on-tertiary-fixed: #161f01;
+  --md-tertiary-fixed-dim: #bfcc9a;
+  --md-on-tertiary-fixed-variant: #404b25;
+  --md-surface-tint: #fcb974;
+  --md-state-pressed-primary: #fcb974;
+  --md-state-pressed-on-surface: #eee0d5;
+  --md-state-pressed-surface: #302921;
+  --md-state-layer-pressed-primary: rgba(252, 185, 116, 0.12);
+  --md-state-layer-pressed-on-surface: rgba(238, 224, 213, 0.12);
+  --md-state-disabled-container: rgba(238, 224, 213, 0.12);
+  --md-state-disabled-on-surface: rgba(238, 224, 213, 0.38);
+}
+
+/* ─── teal 主题暗色板（spec lynx-night-mode T2，从 seed #00696d 经 M3 SchemeTonalSpot 派生 isDark=true） ─── */
+.theme-teal.dark {
+  --md-primary: #80d4d8;
+  --md-on-primary: #003739;
+  --md-primary-container: #004f52;
+  --md-on-primary-container: #9cf1f5;
+  --md-secondary: #b1cccd;
+  --md-on-secondary: #1b3436;
+  --md-secondary-container: #324b4c;
+  --md-on-secondary-container: #cce8e9;
+  --md-tertiary: #b5c7e9;
+  --md-on-tertiary: #1f314c;
+  --md-tertiary-container: #364764;
+  --md-on-tertiary-container: #d5e3ff;
+  --md-surface: #0e1415;
+  --md-on-surface: #dde4e3;
+  --md-surface-variant: #3f4949;
+  --md-on-surface-variant: #bec8c9;
+  --md-outline: #899393;
+  --md-outline-variant: #3f4949;
+  --md-surface-container-lowest: #090f10;
+  --md-surface-container-low: #161d1d;
+  --md-surface-container: #1a2121;
+  --md-surface-container-high: #252b2b;
+  --md-surface-container-highest: #303636;
+  --md-inverse-surface: #dde4e3;
+  --md-inverse-on-surface: #2b3232;
+  --md-inverse-primary: #00696d;
+  --md-surface-dim: #0e1415;
+  --md-surface-bright: #343a3b;
+  --md-primary-fixed: #9cf1f5;
+  --md-on-primary-fixed: #002021;
+  --md-primary-fixed-dim: #80d4d8;
+  --md-on-primary-fixed-variant: #004f52;
+  --md-secondary-fixed: #cce8e9;
+  --md-on-secondary-fixed: #041f21;
+  --md-secondary-fixed-dim: #b1cccd;
+  --md-on-secondary-fixed-variant: #324b4c;
+  --md-tertiary-fixed: #d5e3ff;
+  --md-on-tertiary-fixed: #071c36;
+  --md-tertiary-fixed-dim: #b5c7e9;
+  --md-on-tertiary-fixed-variant: #364764;
+  --md-surface-tint: #80d4d8;
+  --md-state-pressed-primary: #80d4d8;
+  --md-state-pressed-on-surface: #dde4e3;
+  --md-state-pressed-surface: #252b2b;
+  --md-state-layer-pressed-primary: rgba(128, 212, 216, 0.12);
+  --md-state-layer-pressed-on-surface: rgba(221, 228, 227, 0.12);
+  --md-state-disabled-container: rgba(221, 228, 227, 0.12);
+  --md-state-disabled-on-surface: rgba(221, 228, 227, 0.38);
+}
+/* END auto-generated */

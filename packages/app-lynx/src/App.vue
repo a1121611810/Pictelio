@@ -10,7 +10,7 @@ import { useSearchSheetStore } from './stores/searchSheetStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { useEngineFallbackStore } from './stores/engineFallbackStore'
 import { t } from './i18n'
-import { themeColorClass } from './utils/themeColor'
+import { appearanceClasses } from './utils/appearanceClasses'
 import { apiClient } from './api/client'
 import { queryKeys } from './api/queryKeys'
 import { useApiQuery } from './primitives/useApiQuery'
@@ -64,7 +64,7 @@ onMounted(() => {
        web-core 预览无 native → 恒 0，布局与历史形态等价 -->
   <page
     class="Root"
-    :class="themeColorClass(settings.themeColor)"
+    :class="appearanceClasses(settings.themeColor, settings.resolvedDark)"
     :style="{ paddingTop: safeTop + 'px', paddingBottom: safeBottom + 'px' }"
   >
     <!-- [lynx:fix] 模板必须 PascalCase <RouterView>（kebab-case <router-view> 被
