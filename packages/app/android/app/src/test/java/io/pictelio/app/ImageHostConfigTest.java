@@ -92,16 +92,36 @@ public class ImageHostConfigTest {
         final List<String> urls = Collections.synchronizedList(new ArrayList<String>());
         final Map<String, Long> latencyByUrlContains = new HashMap<>();
         long defaultLatency = 100L;
+        /**
+         * 并发在飞探测计数 + 峰值（issue #658 的单飞 oracle）。
+         *
+         * <p>「探测恰好一轮（= 恰好 2 条 URL）」是**调度相关**的弱 oracle：它把「单飞是否生效」
+         * 与「多少线程恰好在探针完成前/后到达」耦合在一起 —— 10 线程在 CI 少核环境下交错不同，
+         * 就可能出现 `urls.size() != 2`（实测 CI 约 2/5 失败，本地 10/10 通过）。
+         *
+         * <p>单飞的**本质**是「任一时刻至多一轮探测在飞」。用峰值计数直接断言该性质：
+         * 不依赖调度，且比原断言**更锐利**（真出现两轮重叠时它必然 > 1，而不是碰巧条数不等于 2）。
+         */
+        final java.util.concurrent.atomic.AtomicInteger inFlight =
+                new java.util.concurrent.atomic.AtomicInteger();
+        final java.util.concurrent.atomic.AtomicInteger maxInFlight =
+                new java.util.concurrent.atomic.AtomicInteger();
 
         @Override
         public long probe(String probeUrl) {
-            urls.add(probeUrl);
-            for (Map.Entry<String, Long> e : latencyByUrlContains.entrySet()) {
-                if (probeUrl.contains(e.getKey())) {
-                    return e.getValue();
+            int now = inFlight.incrementAndGet();
+            maxInFlight.accumulateAndGet(now, Math::max);
+            try {
+                urls.add(probeUrl);
+                for (Map.Entry<String, Long> e : latencyByUrlContains.entrySet()) {
+                    if (probeUrl.contains(e.getKey())) {
+                        return e.getValue();
+                    }
                 }
+                return defaultLatency;
+            } finally {
+                inFlight.decrementAndGet();
             }
-            return defaultLatency;
         }
     }
 
@@ -394,8 +414,14 @@ public class ImageHostConfigTest {
     @Test
     public void resolve_fastestIp_concurrent_singleFlight_probeOnce() throws Exception {
         // 10 线程同时 resolve（种子过期）：单飞（volatile 快路径 + synchronized 双检 + 缓存双检）
-        // 保证探测恰好一次；所有 resolve 仍各产出可用镜像 URL（weighted/探针缓存均选 pixiv-re：
-        // u=0.5 → roll=100 → pixiv-re 边界 0<=0；探针等延迟 tie 也取先者 pixiv-re）。
+        // 保证**任一时刻至多一轮探测在飞**；所有 resolve 仍各产出可用镜像 URL
+        // （weighted/探针缓存均选 pixiv-re：u=0.5 → roll=100 → pixiv-re 边界 0<=0；
+        //  探针等延迟 tie 也取先者 pixiv-re）。
+        //
+        // issue #658：原断言 `urls.size() == PROBE_CALLS_PER_ROUND`（恰好一轮）是**调度相关**的，
+        // CI 少核交错下会假红（实测约 2/5，本地 10/10 通过、无法复现）。改为直接断言单飞的
+        // **性质** —— 峰值并发在飞数 ≤ 1（比原断言更锐利：真出现重叠必然 > 1），
+        // 外加「至少跑过一轮」的 sanity（保证探测确实发生，防空转恒真）。
         final RecordingProbe probe = new RecordingProbe();
         final ImageHostConfig c = newConfig(
                 config(true, "fastest-ip", null, BUILT_IN_HOSTS, "pixiv-nl", NOW - 1L),
@@ -423,7 +449,10 @@ public class ImageHostConfigTest {
         for (String r : results) {
             assertEquals("https://i.pixiv.re" + OFFICIAL_PATH, r);
         }
-        assertEquals("并发 resolve 只允许一轮探测", PROBE_CALLS_PER_ROUND, probe.urls.size());
+        // 核心断言（#658）：单飞 = 任何时刻至多一个 probe 在飞
+        assertEquals("并发 resolve 不得让两轮探测重叠（单飞）", 1, probe.maxInFlight.get());
+        // sanity：探测确实发生过（若为 0，说明根本没触发探测 → 断言会变成无意义的空转）
+        assertTrue("应至少跑过一轮探测", probe.urls.size() >= PROBE_CALLS_PER_ROUND);
     }
 
     // ── 配置复用（raw equals）与重解析 ──────────────────────
