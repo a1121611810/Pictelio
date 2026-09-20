@@ -685,7 +685,9 @@ export class OpenAIResponsesProvider implements TranslationProvider {
         type: 'error',
         code: errorCode,
         message: finalMessage,
-        retryable: errorCode === 'server' || errorCode === 'rate_limit' || errorCode === 'network',
+        // ADR-0178 D2: 仅 retryable=true 触发整批回退；rate_limit (429) 不自动 retry
+        // （避免触发 endpoint 限流放大；由用户手动 retry）。其余非 retryable 直接 failed。
+        retryable: errorCode === 'server' || errorCode === 'network' || errorCode === 'incomplete',
       }
       return
     }

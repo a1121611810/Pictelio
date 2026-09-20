@@ -537,7 +537,7 @@ describe('AbortSignal 取消语义（ADR-0169 D5.4 + D6）', () => {
     }
   })
 
-  it('HTTP 429 → emit error(rate_limit, retryable=true)', async () => {
+  it('HTTP 429 → emit error(rate_limit, retryable=false)（ADR-0178 D2：429 不自动 retry）', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ error: { code: 'rate_limit_exceeded' } }), {
         status: 429,
@@ -549,7 +549,8 @@ describe('AbortSignal 取消语义（ADR-0169 D5.4 + D6）', () => {
     expect(first.value?.type).toBe('error')
     if (first.value?.type === 'error') {
       expect(first.value.code).toBe('rate_limit')
-      expect(first.value.retryable).toBe(true)
+      // ADR-0178 D2: 429 不自动 retry（避免触发 endpoint 限流放大；由用户手动 retry）
+      expect(first.value.retryable).toBe(false)
     }
   })
 
