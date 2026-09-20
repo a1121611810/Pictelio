@@ -545,6 +545,84 @@ describe('同 chapterId in-flight 复用（spec §9.6）', () => {
     expect(mocks.cacheSet).not.toHaveBeenCalled()
   })
 
+  /**
+   * 补审 P2：**整批回退是 await**（可数秒），期间切章节会让旧章节的 `partial`/`failed`
+   * 收敛写进**新章节**（陈旧红色横幅 + 污染在飞状态）。
+   *
+   * <p>spec §7.2 末行只要求「chapter switch → abort + reset state」，但收敛路径必须
+   * 自己再过一次 generation-gate —— 否则 await 之后的写入全部绕过它。
+   */
+  it('整批回退期间切章节 → 旧章节的收敛不得写进新章节（P2）', async () => {
+    // 第 1 次（流式）：retryable 错误 → 触发整批回退
+    // 第 2 次（整批回退）：用**挂起** iterator，制造「回退在飞」的确定性窗口
+    const fallbackIter = makeDeferredIterator()
+    let call = 0
+    mocks.providerIter.mockImplementation(() => {
+      call += 1
+      return call === 1
+        ? makeFakeIterator([{ type: 'error', code: 'server', message: '5xx', retryable: true }])
+        : fallbackIter.iter
+    })
+    const store = useNovelTranslateStore()
+    const p = store.translateChapter(60, 60, ['旧章节'], 0)
+    await new Promise((r) => setTimeout(r, 20))
+    // 此时应在整批回退中（isRetryingHint 为真）
+    expect(store.isRetryingHint).toBe(true)
+
+    // 用户切章节
+    store.reset()
+    expect(store.status).toBe('idle')
+
+    // 让回退以失败收场（投递 error 帧后结束）
+    fallbackIter.push({ type: 'error', code: 'server', message: '还在失败', retryable: false })
+    fallbackIter.finish()
+    await p
+
+    // 关键断言：旧章节的 failed 收敛**不得**写进当前（已切走）的状态
+    expect(store.status).toBe('idle')
+    expect(store.error).toBeNull()
+    expect(mocks.cacheSet).not.toHaveBeenCalled()
+  })
+
+  /**
+   * 补审 P2（第二半）：**delta 回调**也必须过 generation-gate。
+   *
+   * <p>spec §7.2 明文：「**任何** chunk 进入 store 时，**先比对** `chunk.requestChapterId ===
+   * currentChapterId`；不匹配则丢弃（防跨章节污染）」。此前 delta 分支只做下标越界检查 ⇒
+   * 切章节后旧 iterator 已排队的帧会写进**新章节的同下标段落**。
+   */
+  it('切章节后旧 iterator 的 delta 帧不得写进新章节（P2 delta gate）', async () => {
+    const oldIter = makeDeferredIterator() // 旧章节 A：挂起，稍后投递陈旧帧
+    const newIter = makeDeferredIterator() // 新章节 B
+    let call = 0
+    mocks.providerIter.mockImplementation(() => {
+      call += 1
+      return call === 1 ? oldIter.iter : newIter.iter
+    })
+
+    const store = useNovelTranslateStore()
+    const pA = store.translateChapter(85, 85, ['A 原文'], 0)
+    await new Promise((r) => setTimeout(r, 10))
+    expect(store.status).toBe('translating')
+
+    // 切章节 → gen++ + 清空
+    store.reset()
+    // 新章节 B 起翻（新 gen，translatedParagraphs 重置为 B 的长度）
+    const pB = store.translateChapter(86, 86, ['B 原文'], 0)
+    await new Promise((r) => setTimeout(r, 10))
+
+    // 旧 iterator 投递**陈旧** delta（同下标 0）——不得写进 B 的段落
+    oldIter.push({ type: 'delta', paragraphIndex: 0, text: 'A 的陈旧译文' })
+    await new Promise((r) => setTimeout(r, 20))
+
+    expect(store.translatedParagraphs[0] ?? '').not.toContain('A 的陈旧译文')
+
+    // 收尾
+    oldIter.finish()
+    newIter.finish()
+    await Promise.all([pA, pB])
+  })
+
   it('translating 期间调**不同** chapterId → 并行触发（provider 调用 2 次）', async () => {
     const d1 = makeDeferredIterator()
     const d2 = makeDeferredIterator()

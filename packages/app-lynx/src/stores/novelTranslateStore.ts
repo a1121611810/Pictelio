@@ -852,7 +852,10 @@ function classifyProvider(
         // 绝对段落序号 = 本块起始偏移 + 块内序号（chunked pipeline 每块重数 0..n-1）
         const offset = (request as { [CHUNK_OFFSET]?: number })[CHUNK_OFFSET] ?? 0
         const abs = offset + chunk.paragraphIndex
-        if (abs >= 0 && abs < translatedParagraphs.value.length) {
+        // 补审 P2：spec §7.2 明文要求「**任何** chunk 进入 store 时先比对 chapterId/gen，
+        // 不匹配则丢弃」。此前这里只做下标越界检查 —— 切章节（reset bump gen）后，旧 iterator
+        // 已排队的帧仍会写进**新章节的同下标段落**（跨章节污染）。
+        if (gen === genNow && abs >= 0 && abs < translatedParagraphs.value.length) {
           translatedParagraphs.value[abs] = (translatedParagraphs.value[abs] ?? "") + chunk.text
         }
       } else if (chunk.type === "error") {
@@ -930,6 +933,12 @@ function classifyProvider(
       }
       // fallbackOk === "partial" | "failed"：继续走原收敛逻辑（保留 lastErrorCode）
       // 不修改 status，让下方原流程收敛到 partial/failed（终态与 spec §7.2 一致）
+      //
+      // 补审 P2：整批回退是 **await**（可数秒），期间用户可能切章节（`reset()` bump gen）
+      // 或已发起新章节翻译（`translateChapter` 亦 bump gen）。此时若继续走下方收敛逻辑，
+      // 会用**旧章节的 result** 给**新章节**写 status/progress/error（陈旧红色横幅 + 污染在飞状态）。
+      // ⇒ 收敛前必须重新过 generation-gate。
+      if (gen !== genNow) return
     }
 
     if (result.status === "completed") {

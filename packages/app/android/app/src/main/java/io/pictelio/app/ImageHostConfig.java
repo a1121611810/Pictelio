@@ -244,7 +244,16 @@ public final class ImageHostConfig {
         }
         Parsed fresh = parse(raw, clock);
         parsed = fresh;
-        probeCache = seedProbeCache(fresh);
+        // 种子覆盖必须**单调**（issue #658）：旧实现无条件 `probeCache = seedProbeCache(fresh)`，
+        // 而 `seedProbeCache` 对过期/缺失种子返回 null ⇒ 任何重解析都会把**刚完成的内存探针结果**
+        // 抹成 null ⇒ 下一次 resolve 的 `fastestIfValid` 返回 null ⇒ 白跑一轮真网络探测。
+        // CI 上表现为「冷启动 10 线程并发重解析 → urls.size() != 2」的间歇失败。
+        // 规则：只在「有种子，且该种子不比当前内存结果旧」时才覆盖。
+        ProbeCache seed = seedProbeCache(fresh);
+        ProbeCache cur = probeCache;
+        if (seed != null && (cur == null || seed.expiresAt >= cur.expiresAt)) {
+            probeCache = seed;
+        }
         return fresh;
     }
 

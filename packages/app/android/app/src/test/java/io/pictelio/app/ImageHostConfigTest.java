@@ -411,6 +411,42 @@ public class ImageHostConfigTest {
                 probe.urls.get(1));
     }
 
+    /**
+     * 【#658 P1 确定性复现（顺序版）】任何**重解析**都会用持久化种子覆盖内存探针结果。
+     *
+     * <p>`current()` 在 raw 变化时执行 `probeCache = seedProbeCache(fresh)`；当持久化种子
+     * **已过期**（本 fixture 恒为过期）时返回 null ⇒ **把已完成的内存探针结果抹成 null**
+     * ⇒ 下一次 resolve 的 `fastestIfValid` 返回 null ⇒ 触发**又一轮**探测（真网络请求）。
+     *
+     * <p>顺序构造（无并发，确定性强）：raw 变化 → 重解析不可避免 → 机制必然显现。
+     * 与 CI 上并发形态的关系：CI 的红来自"10 线程冷启动并发重解析"，本用例去掉了
+     * 并发这一**触发条件**，直接检验**机制本身**。
+     *
+     * <p>契约：探测结果不应因**配置内容的变化**而被丢弃（除非新种子更新）。
+     */
+    @Test
+    public void resolve_reparseWithStaleSeed_mustNotDropFreshProbeResult() throws Exception {
+        final RecordingProbe probe = new RecordingProbe();
+        final String[] rawHolder = {
+            config(true, "fastest-ip", null, BUILT_IN_HOSTS, "pixiv-nl", NOW - 1L) // 种子已过期
+        };
+        final ImageHostConfig c = new ImageHostConfig(
+                () -> rawHolder[0], new MutableClock(), fixedRandom(0.5), probe, Runnable::run);
+
+        assertEquals("https://i.pixiv.re" + OFFICIAL_PATH, c.resolve(OFFICIAL));
+        int afterFirst = probe.urls.size();
+        assertEquals("首轮应探测一轮", PROBE_CALLS_PER_ROUND, afterFirst);
+
+        // 改 raw 触发重解析：字符串必须**真的不同**（JSON 尾部空白不影响解析结果，
+        // 但 `Objects.equals(raw, p.raw)` 是字符串比较 → 必然重解析）。
+        // 注意：若用 config(...) 再生成一次，内容逐字节相同 → 走「复用」→ 不重解析（踩过）。
+        rawHolder[0] = config(true, "fastest-ip", null, BUILT_IN_HOSTS, "pixiv-nl", NOW - 1L) + " ";
+        assertEquals("https://i.pixiv.re" + OFFICIAL_PATH, c.resolve(OFFICIAL));
+
+        assertEquals("重解析（种子过期）不得丢弃刚完成的内存探针结果 → 不应再探测一轮",
+                afterFirst, probe.urls.size());
+    }
+
     @Test
     public void resolve_fastestIp_concurrent_singleFlight_probeOnce() throws Exception {
         // 10 线程同时 resolve（种子过期）：单飞（volatile 快路径 + synchronized 双检 + 缓存双检）
@@ -449,10 +485,14 @@ public class ImageHostConfigTest {
         for (String r : results) {
             assertEquals("https://i.pixiv.re" + OFFICIAL_PATH, r);
         }
-        // 核心断言（#658）：单飞 = 任何时刻至多一个 probe 在飞
-        assertEquals("并发 resolve 不得让两轮探测重叠（单飞）", 1, probe.maxInFlight.get());
-        // sanity：探测确实发生过（若为 0，说明根本没触发探测 → 断言会变成无意义的空转）
-        assertTrue("应至少跑过一轮探测", probe.urls.size() >= PROBE_CALLS_PER_ROUND);
+        // 核心断言（#658）：**恰好一轮**探测。
+        // 此前该断言在 CI 间歇失败（约 2/5），根因是 `current()` 无条件用「过期种子 = null」
+        // 覆盖刚完成的内存探针结果 → 重解析后再跑一轮（顺序多轮，非重叠）。
+        // 产品侧已修（种子覆盖改为单调）→ 该契约断言现在应**确定成立**。
+        // 注：不把 `maxInFlight` 当主断言 —— 生产 `probeExecutor()` 是**单线程**，
+        // 「至多一轮在飞」由 executor 自身保证、与 kickProbe 守卫无关 ⇒ 断言空转；
+        // 「轮次计数」才是与 executor 无关的正确 oracle。
+        assertEquals("并发 resolve 只允许一轮探测", PROBE_CALLS_PER_ROUND, probe.urls.size());
     }
 
     // ── 配置复用（raw equals）与重解析 ──────────────────────
