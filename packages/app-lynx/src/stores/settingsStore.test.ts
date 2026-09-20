@@ -381,6 +381,179 @@ describe("settingsStore — 主题色（外观）", () => {
   })
 })
 
+// 暗色外观三态（spec docs/specs/lynx-night-mode.md T1）：默认 system + 设备级持久化 +
+// 非法值 warn + 回退默认；resolvedDark 派生（手动即时映射；system 随哑桥源重算）。
+// oracle = spec §1 + ADR-0152 themeColor 同模式（清单单一事实源 + isDarkModeId 校验）。
+// currentDarkMode ref 是模块级单例（settingsStore 与本测试 import 同一实例），
+// 测试通过直接读写 currentDarkMode.value 触发响应；不复位模块（避免 settingsStore 内
+// 已绑定的 ref 引用与新实例不一致）。
+import { currentDarkMode as _bridgeDarkMode } from "../utils/darkMode"
+describe("settingsStore — 暗色外观三态（spec lynx-night-mode T1）", () => {
+  beforeEach(() => {
+    userRef().value = null
+    env.native = false
+    env.modules = {}
+    vi.mocked(idbGet).mockReset().mockResolvedValue(null)
+    vi.mocked(idbSet).mockReset().mockResolvedValue(undefined)
+    // 哑桥：node 测试环境无 matchMedia → 走兜底 light（与 darkMode.test.ts 同思路）
+    delete (globalThis as Record<string, unknown>).matchMedia
+    delete (globalThis as Record<string, unknown>).lynx
+    delete (globalThis as Record<string, unknown>).NativeModules
+    // 哑桥初值 light（每用例重置，避免其它 describe 注入的 matchMedia 干扰）
+    _bridgeDarkMode.value = "light"
+    setActivePinia(createPinia())
+    store = useSettingsStore()
+  })
+
+  it("默认 system（跟随系统，首次启动零配置成本）", () => {
+    expect(store.darkMode).toBe("system")
+    expect(store.resolvedDark).toBe("light") // currentDarkMode 兜底 light
+  })
+
+  it("setDarkMode(light)：即时映射 + 持久化（dev=IndexedDB）", async () => {
+    store.setDarkMode("light")
+    expect(store.darkMode).toBe("light")
+    expect(store.resolvedDark).toBe("light")
+    await vi.waitFor(() =>
+      expect(vi.mocked(idbSet)).toHaveBeenCalledWith("settings_dark_mode", "light"),
+    )
+  })
+
+  it("setDarkMode(dark)：即时映射（不论哑桥初值）", () => {
+    _bridgeDarkMode.value = "light"
+    store.setDarkMode("dark")
+    expect(store.darkMode).toBe("dark")
+    expect(store.resolvedDark).toBe("dark")
+  })
+
+  it("setDarkMode(system)：从哑桥源派生", () => {
+    _bridgeDarkMode.value = "dark"
+    store.setDarkMode("system")
+    expect(store.darkMode).toBe("system")
+    expect(store.resolvedDark).toBe("dark")
+    // 哑桥变化 → resolvedDark 即时重算
+    _bridgeDarkMode.value = "light"
+    expect(store.resolvedDark).toBe("light")
+  })
+
+  it("loadSettings 恢复合法值 light / dark / system", async () => {
+    for (const v of ["light", "dark", "system"] as const) {
+      vi.mocked(idbGet).mockImplementation(async (key: string) =>
+        key === "settings_dark_mode" ? v : null,
+      )
+      await store.loadSettings()
+      expect(store.darkMode).toBe(v)
+    }
+  })
+
+  it("loadSettings 恢复非法值 → 维持默认 system + console.warn（禁静默降级）", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    vi.mocked(idbGet).mockImplementation(async (key: string) =>
+      key === "settings_dark_mode" ? "auto" : null,
+    )
+    await store.loadSettings()
+    expect(store.darkMode).toBe("system")
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("暗色外观值非法"), "auto")
+    warn.mockRestore()
+  })
+
+  it("loadSettings 读取失败（IO 异常）→ 维持默认 system + warn（硬约束 #1/#3）", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    vi.mocked(idbGet).mockImplementation(async (key: string) => {
+      if (key === "settings_dark_mode") throw new Error("idb down")
+      return null
+    })
+    await store.loadSettings()
+    expect(store.darkMode).toBe("system")
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("暗色外观加载失败"), expect.any(Error))
+    warn.mockRestore()
+  })
+
+  it("loadSettings 未登录也恢复暗色状态（设备级，先于 uid 判定）", async () => {
+    vi.mocked(idbGet).mockImplementation(async (key: string) =>
+      key === "settings_dark_mode" ? "dark" : null,
+    )
+    userRef().value = null // 未登录
+    await store.loadSettings()
+    expect(store.darkMode).toBe("dark")
+  })
+
+  it("setDarkMode 写入失败 → 内存态即时更新 + warn，不静默吞（硬约束 #3）", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    vi.mocked(idbSet).mockRejectedValue(new Error("idb down"))
+    store.setDarkMode("dark")
+    expect(store.darkMode).toBe("dark")
+    await vi.waitFor(() =>
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("暗色外观写入失败"), expect.any(Error)),
+    )
+    warn.mockRestore()
+  })
+
+  it("原生模式：setDarkMode 经 PictelioPrefs 写 settings_dark_mode", async () => {
+    env.native = true
+    const written: string[] = []
+    env.modules = {
+      PictelioPrefs: {
+        prefsGet: (_k: string, cb: (v: string, e: string | null) => void) => cb("", null),
+        prefsSet: (k: string, v: string, cb: (e: string | null) => void) => {
+          written.push(`${k}=${v}`)
+          cb(null)
+        },
+        prefsRemove: (_k: string, cb: (e: string | null) => void) => cb(null),
+      },
+    }
+    store.setDarkMode("dark")
+    await vi.waitFor(() => expect(written).toContain("settings_dark_mode=dark"))
+  })
+
+  it("原生模式：loadSettings 从 prefs 恢复 settings_dark_mode", async () => {
+    env.native = true
+    env.modules = {
+      PictelioPrefs: {
+        prefsGet: (k: string, cb: (v: string, e: string | null) => void) =>
+          cb(k === "settings_dark_mode" ? JSON.stringify("dark") : "", null),
+        prefsSet: (_k: string, _v: string, cb: (e: string | null) => void) => cb(null),
+        prefsRemove: (_k: string, cb: (e: string | null) => void) => cb(null),
+      },
+    }
+    await store.loadSettings()
+    expect(store.darkMode).toBe("dark")
+  })
+
+  it("resolvedDark 是 computed：手动 light/dark 即时映射，system 跟随哑桥源", () => {
+    _bridgeDarkMode.value = "light"
+    // 初始：light + system → 跟随 light
+    store.setDarkMode("system")
+    expect(store.resolvedDark).toBe("light")
+    // 哑桥 → dark
+    _bridgeDarkMode.value = "dark"
+    expect(store.resolvedDark).toBe("dark")
+    // 切到手动 dark（无关哑桥）
+    store.setDarkMode("dark")
+    expect(store.resolvedDark).toBe("dark")
+    // 哑桥回到 light，dark 仍是 dark（手动不跟随）
+    _bridgeDarkMode.value = "light"
+    expect(store.resolvedDark).toBe("dark")
+    // 切回 system，跟随哑桥
+    store.setDarkMode("system")
+    expect(store.resolvedDark).toBe("light")
+  })
+
+  it("importRawValues：合法值应用，非法值跳过", async () => {
+    const res = await store.importRawValues({
+      settings_dark_mode: "dark",
+      settings_dark_mode_bogus: "bogus",
+    })
+    expect(store.darkMode).toBe("dark")
+    expect(res.applied).toContain("settings_dark_mode")
+    expect(res.skipped).toContain("settings_dark_mode_bogus")
+  })
+
+  it("BACKUP_DEVICE_KEYS 含 settings_dark_mode（设备级，进备份域）", () => {
+    expect(BACKUP_DEVICE_KEYS as readonly string[]).toContain("settings_dark_mode")
+  })
+})
+
 // 小说导出设置（oracle = spec docs/specs/novel-export.md §6：4 键 + 默认值 + 非法值 warn）
 describe("settingsStore — 小说导出设置（spec novel-export §6）", () => {
   beforeEach(() => {

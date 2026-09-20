@@ -3,6 +3,7 @@ package io.pictelio.app;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.Configuration;
 import android.util.Log;
 
 import com.lynx.jsbridge.LynxMethod;
@@ -240,6 +241,35 @@ public class PictelioAppModule extends LynxModule {
         } catch (Exception e) {
             Log.w(TAG, "setSystemBarsHidden(" + hidden + ") 失败", e);
             callback.invoke(String.valueOf(e.getMessage()));
+        }
+    }
+
+    /**
+     * 拉取当前系统暗色 uiMode（spec docs/specs/lynx-night-mode.md T1 §4.3）。
+     *
+     * <p>JS 侧订阅 {@code pictelioDarkMode} 事件后调用本方法拉当前值——**订阅后拉**
+     * 而非依赖初始事件：onCreate 初始化早于 JS 订阅（lynx 4.0.1 实测 bundle 渲染晚于
+     * Activity onConfigurationChanged 首回调），纯推模式首帧必丢；事件只负责后续变化
+     * （onConfigurationChanged 比对变化 + onResume 兜底补发）。回调契约：{@code cb(mode)}
+     * —— mode 为字符串 {@code "light"} 或 {@code "dark"}（与 JS utils/darkMode.ts
+     * parseNativePayload 裸字符串分支兼容）；异常 {@code cb("light")}（兜底禁静默降级）。
+     *
+     * <p>配置缺失（如未走 onCreate 路径）→ sLastUiMode = -1 → 走 Configuration 实读；
+     * 防御性兜底到 UI_MODE_NIGHT_NO（"light"），避免负值导致 UI_MODE_NIGHT_MASK 位运算后
+     * 误判为夜间模式。
+     */
+    @LynxMethod
+    public void getDarkMode(Callback callback) {
+        try {
+            int uiMode = LynxActivity.lastUiMode();
+            if (uiMode == -1) {
+                Configuration cfg = appContext().getResources().getConfiguration();
+                uiMode = cfg.uiMode & Configuration.UI_MODE_NIGHT_MASK;
+            }
+            callback.invoke(LynxActivity.currentDarkMode(uiMode));
+        } catch (Exception e) {
+            Log.w(TAG, "getDarkMode 失败", e);
+            callback.invoke("light");
         }
     }
 

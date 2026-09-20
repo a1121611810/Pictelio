@@ -11,7 +11,7 @@
 // 纯重构约束）。跨 store 消费：setup 内 `useAuthStore()` 读 currentUser（替换原模块级
 // `import { currentUser } from "./authStore"`），watch 在 setup 内注册（仅在首次
 // useSettingsStore() 时挂载；晚于原模块加载期，login/initRouter 调用前 pinia 已就绪）。
-import { ref, watch } from "vue"
+import { ref, computed, watch } from "vue"
 import { defineStore } from "pinia"
 import { idbGet, idbSet, idbRemove } from "../utils/idbKV"
 import { getNativeModules, isNativeMode } from "../api/client"
@@ -29,6 +29,13 @@ import {
   type NovelExportOptions,
 } from "@pictelio/novel-export"
 import { DEFAULT_THEME_COLOR, isThemeColorId, type ThemeColorId } from "../utils/themeColor"
+import {
+  currentDarkMode,
+  DEFAULT_DARK_MODE,
+  isDarkModeId,
+  type DarkModeId,
+  type ResolvedDark,
+} from "../utils/darkMode"
 
 // ── 跨 client 契约键（ADR-0103：与 webview settingsStore defineFactory 同格式）──
 const r18Key = (uid: number) => `show_r18_${uid}`
@@ -57,6 +64,9 @@ const UGOIRA_DOWNLOAD_FORMAT_KEY = "settings_ugoira_download_format"
 const DETAIL_QUALITY_KEY = "settings_detail_quality"
 /** 主题色（外观）：设备级共享键（native SharedPreferences / dev IndexedDB），未登录也恢复 */
 const THEME_COLOR_KEY = "settings_theme_color"
+/** 外观暗色状态（spec lynx-night-mode T1）：设备级三态 light/dark/system，默认 system；
+ *  与 THEME_COLOR_KEY 同级（外观设备级），沿用 PrefsStorage seam 读写 */
+const DARK_MODE_KEY = "settings_dark_mode"
 /** 相关作品注入行（spec docs/specs/related-injection.md）：设备级开关，默认开；键与 app 逐字一致 */
 const RELATED_INJECTION_KEY = "related_injection"
 /** 排行榜入口大卡（spec docs/specs/ranking.md §5.8）：设备级开关，默认开；键与 app 逐字一致 */
@@ -97,6 +107,7 @@ export const BACKUP_DEVICE_KEYS = [
   UGOIRA_DOWNLOAD_FORMAT_KEY,
   DETAIL_QUALITY_KEY,
   THEME_COLOR_KEY,
+  DARK_MODE_KEY,
   LANGUAGE_KEY,
   RELATED_INJECTION_KEY,
   RANKING_ENTRY_KEY,
@@ -238,6 +249,8 @@ export const useSettingsStore = defineStore("settings", () => {
   const _ugoiraDownloadFormat = ref<UgoiraFormat>("zip")
   const _detailQuality = ref<ImageQuality>("medium")
   const _themeColor = ref<ThemeColorId>(DEFAULT_THEME_COLOR)
+  // 外观暗色三态（spec lynx-night-mode T1）：默认 system（跟随系统），设备级
+  const _darkMode = ref<DarkModeId>(DEFAULT_DARK_MODE)
   /** UI 语言："" = 跟随系统；设备级，未登录也恢复 */
   const _language = ref<"" | "zh-CN" | "en">("")
   const _relatedInjection = ref(true)
@@ -274,6 +287,20 @@ export const useSettingsStore = defineStore("settings", () => {
   const ugoiraDownloadFormat = _ugoiraDownloadFormat
   const detailQuality = _detailQuality
   const themeColor = _themeColor
+  const darkMode = _darkMode
+  /**
+   * 派生归一输出（spec §1.2）：手动 light/dark 直接映射；system 模式订阅暗色哑桥源。
+   * 所有消费方（根类绑定 / 状态栏图标 / 暗色 token 切换）只读 resolvedDark，不重复解析。
+   * - darkMode === "light" → "light"
+   * - darkMode === "dark"  → "dark"
+   * - darkMode === "system" → currentDarkMode.value（哑桥 ref，system 模式跟随系统变化即时重算）
+   */
+  const resolvedDark = computed<ResolvedDark>(() => {
+    const m = _darkMode.value
+    if (m === 'dark') return 'dark'
+    if (m === 'light') return 'light'
+    return currentDarkMode.value
+  })
   const language = _language
   const relatedInjection = _relatedInjection
   const rankingEntry = _rankingEntry
@@ -327,6 +354,21 @@ export const useSettingsStore = defineStore("settings", () => {
       }
     } catch (e) {
       console.warn("[settingsStore] 主题色加载失败（维持默认）", e)
+    }
+
+    // 暗色外观状态（spec lynx-night-mode T1）：设备级三态，未登录也需要恢复（先于 uid 判定）。
+    // 非法值 console.warn + 维持默认 system（清单单一事实源 = utils/darkMode.ts）。
+    try {
+      const raw = await prefs().get(DARK_MODE_KEY)
+      if (raw !== null) {
+        if (isDarkModeId(raw)) {
+          _darkMode.value = raw
+        } else {
+          console.warn("[settingsStore] 暗色外观值非法，维持默认 system:", raw)
+        }
+      }
+    } catch (e) {
+      console.warn("[settingsStore] 暗色外观加载失败（维持默认 system）", e)
     }
 
     // UI 语言（spec docs/specs/i18n.md §4.1）：设备级，未登录也需要恢复；非法值维持跟随系统
@@ -618,6 +660,19 @@ export const useSettingsStore = defineStore("settings", () => {
       .catch((e) => console.warn("[settingsStore] 主题色写入失败", e))
   }
 
+  /**
+   * 设置外观暗色三态（spec lynx-night-mode T1）：写设备级键 + 即时切换。
+   * 不动 currentDarkMode（哑桥 ref），由 resolvedDark computed 自动归一：
+   * - 手动 light/dark：直接映射
+   * - system：跟随 currentDarkMode（native/web-core matchMedia 推送变化）
+   */
+  function setDarkMode(mode: DarkModeId): void {
+    _darkMode.value = mode
+    void prefs()
+      .set(DARK_MODE_KEY, mode)
+      .catch((e) => console.warn("[settingsStore] 暗色外观写入失败", e))
+  }
+
   /** UI 语言切换（B10）：同步 lynx i18n module ref，持久化设备级共享键 */
   function setLanguage(l: "" | "zh-CN" | "en"): void {
     _language.value = l
@@ -879,6 +934,10 @@ export const useSettingsStore = defineStore("settings", () => {
         if (!isThemeColorId(raw)) return false
         setThemeColor(raw)
         return true
+      case DARK_MODE_KEY:
+        if (!isDarkModeId(raw)) return false
+        setDarkMode(raw)
+        return true
       case LANGUAGE_KEY:
         if (raw !== "" && raw !== "en" && raw !== "zh-CN") return false
         setLanguage(raw)
@@ -984,6 +1043,8 @@ export const useSettingsStore = defineStore("settings", () => {
     ugoiraMode,
     detailQuality,
     themeColor,
+    darkMode,
+    resolvedDark,
     language,
     relatedInjection,
     rankingEntry,
@@ -1009,6 +1070,7 @@ export const useSettingsStore = defineStore("settings", () => {
     setUgoiraDownloadFormat,
     setDetailQuality,
     setThemeColor,
+    setDarkMode,
     setLanguage,
     setRelatedInjection,
     setRankingEntry,

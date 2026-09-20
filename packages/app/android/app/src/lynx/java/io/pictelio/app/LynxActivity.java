@@ -1,6 +1,7 @@
 package io.pictelio.app;
 
 import android.content.Context;
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -73,6 +74,13 @@ public class LynxActivity extends AppCompatActivity {
     /** 全屏模式设置键（"true" = 隐藏系统栏；默认缺省 = false） */
     public static final String KEY_FULLSCREEN_MODE = "settings_fullscreen_mode";
 
+    // ── 暗色检测契约常量（spec docs/specs/lynx-night-mode.md T1 §4.3；JS↔Java 契约测试钉住）──
+    /**
+     * 系统暗色变化事件名（JS utils/darkMode.ts 订阅；载荷 = JSON.stringify({mode: "light" | "dark"})，
+     * 与 insets 数值双参契约区分）。事件名单一事实源 —— JS 侧亦硬编码字面量。
+     */
+    public static final String EVENT_DARK_MODE = "pictelioDarkMode";
+
     // ── Dev intent hooks（BuildConfig.DEBUG 门禁；release 完全跳过；emulator 端到端测试用）──
     /**
      * 自动登录 refresh_token extra key：adb `am start --es pictelio_dev_refresh_token <token>` 直接登录。
@@ -122,6 +130,13 @@ public class LynxActivity extends AppCompatActivity {
     private static int sLastSentTop = -1;
     private static int sLastSentBottom = -1;
 
+    // ADR-night-mode（T1）：最近一次已观察到的 uiMode 位（Configuration.UI_MODE_NIGHT_MASK 比较）。
+    // 初次启动：onCreate 读 onConfigurationChanged 之前为 UNINITIALIZED；-1 = 未初始化哨兵。
+    // onConfigurationChanged 写新值并比对；onResume 兜底比对：后台期间系统 uiMode 翻转若未触发
+    // configChanges（API < 31 个别厂商 / 后台省电模式冻结），resume 时强制补发事件。
+    // 复位同 sInset*（onDestroy 回到 -1，新实例首次读取命中兜底 light）。
+    private static int sLastUiMode = -1;
+
     /** 可视内容区计算（spec D3 纯函数，供单测）：宽不消费水平 insets，高减上下可见栏且 ≥0。 */
     static int[] applyVisibleInsets(int w, int h, int insetTop, int insetBottom) {
         return new int[] { w, Math.max(h - insetTop - insetBottom, 0) };
@@ -140,6 +155,23 @@ public class LynxActivity extends AppCompatActivity {
 
     static int currentSafeBottom() {
         return sInsetBottom;
+    }
+
+    // ── 暗色 uiMode 核心逻辑（spec lynx-night-mode T1 §4.3；纯函数，JVM 可测）──
+
+    /**
+     * 当前是否夜间模式（Configuration.uiMode & UI_MODE_NIGHT_MASK == UI_MODE_NIGHT_YES）。
+     * 返回 "dark" / "light" 字符串（与 JS utils/darkMode.ts parseNativePayload 契约一致）。
+     * 静态纯函数 —— 无副作用、无 Activity 引用，Robolectric 可直接断言。
+     */
+    static String currentDarkMode(int uiMode) {
+        return (uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+                ? "dark" : "light";
+    }
+
+    /** 当前缓存的 uiMode（onDestroy 复位前有效）；未初始化 = -1 */
+    static int lastUiMode() {
+        return sLastUiMode;
     }
 
     /**
@@ -195,6 +227,10 @@ public class LynxActivity extends AppCompatActivity {
         WindowInsetsControllerCompat appearanceController =
                 new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView());
         appearanceController.setAppearanceLightStatusBars(true);
+
+        // ADR-night-mode（T1）：初始化 uiMode 缓存——onCreate 必须先于 onConfigurationChanged
+        // 首次回调（系统已声明 uiMode configChanges，免重建）；onResume 兜底比对以此为基准。
+        sLastUiMode = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
 
         // ADR-0153：降级入口标记 + 一次性通知键。写键必须在 LynxView 渲染前，保证 app-lynx
         // 首帧能读到；该键是「本次由降级进入」的信号，不是首选引擎（首选引擎不落盘）。
@@ -554,6 +590,18 @@ public class LynxActivity extends AppCompatActivity {
         lynxView.sendGlobalEvent(EVENT_INSETS, JavaOnlyArray.of(sInsetTop, sInsetBottom));
     }
 
+    /**
+     * 暗色 uiMode 变化推送 JS（事件通道，spec lynx-night-mode T1 §4.3）：
+     * 载荷 = JSON 字符串 {@code {"mode":"light"|"dark"}} —— 与 insets 双参数值契约区分。
+     * 值变化才发（防抖不变量：同值不重复回调，配置变更可能以同 uiMode 重复触发）。
+     * lynxView 为 null 时静默 no-op（onDestroy 后被清空）。
+     */
+    private void sendDarkModeEvent() {
+        if (lynxView == null) return;
+        String mode = currentDarkMode(sLastUiMode);
+        lynxView.sendGlobalEvent(EVENT_DARK_MODE, JavaOnlyArray.of("{\"mode\":\"" + mode + "\"}"));
+    }
+
     // ── bundle 加载失败兜底（#51 修复：切换引擎后白屏死锁） ─────────────
 
     /** 截断并清理 SDK 错误串，避免把本地路径/URL 等细节原样展示在用户可见错误页 */
@@ -752,6 +800,17 @@ public class LynxActivity extends AppCompatActivity {
         if (lynxView != null) {
             lynxView.onEnterForeground();
         }
+        // ADR-night-mode（T1）：onResume 兜底比对 — 后台期间系统 uiMode 翻转若未触发
+        // configChanges（个别厂商 / 后台省电冻结），resume 时强制补发事件，避免 JS 漏感知。
+        // 安全：sLastUiMode 已被 onConfigurationChanged / onCreate 初始化；未初始化不补发。
+        if (lynxView != null && sLastUiMode != -1) {
+            int current = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
+            if (current != sLastUiMode) {
+                Log.i(TAG, "onResume 兜底补发暗色事件（uiMode 翻转未走 configChanges）");
+                sLastUiMode = current;
+                sendDarkModeEvent();
+            }
+        }
     }
 
     @Override
@@ -759,6 +818,21 @@ public class LynxActivity extends AppCompatActivity {
         super.onPause();
         if (lynxView != null) {
             lynxView.onEnterBackground();
+        }
+    }
+
+    /**
+     * 系统配置变化回调（spec lynx-night-mode T1 §3）：manifest 已声明 uiMode configChanges，
+     * 免 Activity 重建；本回调仅比对 uiMode 并推事件，JS 侧 computed 归一输出即时反映。
+     * 同 insets 管线（onWindowInsetsChanged）：值变化才发，防抖不变量。
+     */
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        int nightMode = newConfig.uiMode & Configuration.UI_MODE_NIGHT_MASK;
+        if (nightMode != sLastUiMode) {
+            sLastUiMode = nightMode;
+            sendDarkModeEvent();
         }
     }
 
@@ -775,6 +849,8 @@ public class LynxActivity extends AppCompatActivity {
         sInsetBottom = 0;
         sLastSentTop = -1;
         sLastSentBottom = -1;
+        // ADR-night-mode：复位 uiMode 哨兵到 -1；新实例首 onCreate 重新读 Configuration
+        sLastUiMode = -1;
         if (lynxView != null) {
             lynxView.destroy();
         }
