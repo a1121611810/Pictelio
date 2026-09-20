@@ -109,20 +109,54 @@ map #644 收尾过程中需要把 spec §6「流式中断 → 自动整批回退
    - §11 A2 注释追加「retry 触发子集 = `retryable=true` 全集；429 例外」。
 
 2. **代码落点**（#643 实施）：
-   - `packages/app-lynx/src/api/translate.ts` → `OpenAIResponsesProvider.translate()` catch 块：所有错误 emit `error(code, message, retryable)`；其中 5xx/network/timeout/incomplete 设 `retryable=true`；429 设 `retryable=false`（特判）。
+   - `packages/app-lynx/src/api/translate.ts` → `OpenAIResponsesProvider.translate()` catch 块：所有错误 emit `error(code, message, retryable)`；其中 5xx/network/incomplete 设 `retryable=true`；429 设 `retryable=false`（特判）。
    - `packages/app-lynx/src/stores/novelTranslateStore.ts` → 新增 `fallbackToWholeBatch()`：触发整批回退（`stream=false` 单次 POST），成功 → `completed`；失败 → `partial`/`failed`。
    - `packages/app-lynx/src/components/novel/TranslationStatusBar.vue`（或等价组件）→ 「重试中…」微提示；用户 retry 按钮 1.5s debounce。
    - `packages/app-lynx/src/components/novel/ParagraphView.vue` → partial 段落 `〔未翻译〕` 灰色斜体占位。
 
+2b. **native（真机）路径实现**（code-review P1/P2 阻塞项修订；本 ADR 的 D1 原本只描述了形态，
+    未明确要求 Java 侧实装 —— review 指出 web 与 native 两条 provider 路径必须同形）：
+
+   - `packages/app-lynx/src/api/nativeTranslate.ts` → `translateStream` 载荷新增 `stream` 字段
+     （此前未下发，Java 侧无从得知回退意图）。
+   - `packages/app-android .../PictelioTranslateModule.java` →
+     - `buildRequestBody(req, model, inputArr, wantStream)`：`stream` 由载荷驱动（默认 true）；
+       `wantStream=false` 时 `max_output_tokens × 2`（clamp 16384）—— D1 的「× 2」字面要求。
+     - 新增 `deliverWholeBatchJson(streamId, rawBody)`：非流式响应解析 → 帧契约与
+       `TranslationSseParser.emitConsolidated` 同形（`{type:"delta_all", paragraphs:[…]}`）+
+       终态判定（`failed`/`incomplete`/零 output_text 均报错 → 不得判 done，与 #654 同源）。
+     - 新增 `drainQueueToStreamBuffer(streamId)`：抽出流式/非流式共用的缓冲搬运 + 盖章逻辑。
+   - `packages/app-lynx/src/api/nativeTranslate.ts` → `RETRYABLE_NATIVE_CODES`
+     （`server` / `network` / `incomplete`）+ `isRetryableNativeError()`：替换原先 4 处
+     `retryable: true` 硬编码（D2 子集在 native 路径上的落地）。
+
 3. **CI 防线**：
    - Vitest：retry 触发子集过滤测试（mock 6 类错误码，验证 4 类触发 + 2 类不触发）。
-   - Vitest：partial 段落 UI 渲染快照（未译段 = 灰色斜体 + 占位文字）。
-   - Vitest：用户 retry 按钮 debounce 测试（连续点 2 次只触发 1 次）。
+     **已实施**：`nativeTranslate.test.ts` 4 条矩阵（429 → `rate_limit`+false / 401 →
+     `unauthorized`+false / 500 → `server`+true / 空流 → `content_filter`+false）。
+   - Vitest：`stream=false` 分支截断判定 —— **已实施** 2 条（`status=incomplete` +
+     `max_output_tokens` → `incomplete`+false；其他 reason → `invalid_request`+false）。
+   - Vitest：native 载荷 `stream` 字段透传 —— **已实施** 2 条（默认 true / `stream:false`）。
+   - Vitest：partial 段落 UI 渲染快照（未译段 = 灰色斜体 + 占位文字）— **待补**（当前只有
+     store 层 `refreshDisplay` 行为覆盖）。
+   - Vitest：用户 retry 按钮 debounce 测试（连续点 2 次只触发 1 次）— **待补**（见 D3 注）。
    - 变异实验：删 `fallbackToWholeBatch()` 调用 → 错误不被自动回退 → 测试红。
 
 4. **设备取证**（#640 step 7）：
    - 模拟器 mock SSE 服务：制造 5xx 中断 → 整批回退 → 成功 → UI 显示「重试中…」3s 内消失 → 缓存命中。
    - 截图存档 `docs/verification/app-lynx-translation-emulator.md` 第 7 步。
+
+## 已知未落地项（诚实的缺口清单）
+
+以下三项在实施中被 review 指出，**当前未交付**，登记于此避免被误读为已完成：
+
+| # | 要求 | 出处 | 现状 |
+|---|---|---|---|
+| 1 | 回退期间进度重置为 0% | D1 | 未实现：`fallbackToWholeBatch` 只在成功时写 progress |
+| 2 | 用户 retry 按钮 1.5s debounce | D3 | 未实现：`TranslateButton.vue onTap` 无 debounce |
+| 3 | partial 进度不虚报 100% | issue #651 范围补充 | 未实现：`novelTranslateStore` 的 `partial` 分支仍 `done = total` |
+
+另：回退零译文 → `content_filter` 联动（D1 脚注）当前返回 `failed` 而非 `content_filter`。
 
 ---
 
