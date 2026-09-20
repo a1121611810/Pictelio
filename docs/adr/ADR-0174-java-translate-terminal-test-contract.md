@@ -74,7 +74,7 @@ public static final class FakeKeyStoreSpi extends KeyStoreSpi {
 - Robolectric 4.14.1 无 `AndroidKeyStore`（research §2.3 异常逐字：`java.security.KeyStoreException: AndroidKeyStore not found` ← `getOrCreateSecretKey` ← `setItem`）。
 - 假 provider 只伪造**密钥存储**（JVM 上不存在的那部分），密文仍由生产 `SecureStorageCompat.encryptString`（`SecureStorageCompat.java:55-57`）生成、由生产 `decryptString` 解密 —— **不是"手写自洽字段"**，仓库测试硬约束 #2 通过（ADR-0163 + AGENTS.md 测试硬约束 2「真实样例」）。
 - 仓库自己的判断一致：`SecureStorageCompatTest.java:27-28` 注释「AndroidKeyStore 密钥路径…依赖系统 KeyStore，Robolectric 覆盖不稳定 → 归入 #51 原生环境验证」。
-- 假 provider 安装前检查同名 provider 已存在则跳过；若同一 JVM 内多个测试类注册同名 provider 行为未定义（research §4 #4），但当前 41 个单测文件无此先例 —— 风险可接受。
+- 假 provider 安装前检查同名 provider 已存在则跳过；~~若同一 JVM 内多个测试类注册同名 provider 行为未定义（research §4 #4），但当前 41 个单测文件无此先例 —— 风险可接受~~ → **该风险已在 PR #657 实现为真实故障**（同跑 8 failed / 单跑全绿），现已收敛为全 JVM 唯一的共享夹具 `FakeAndroidKeyStore`（**修订见 §D4.1**）：SPI 不再逐类内联，单份 KEYS + 单次注册 + 抢注守卫。
 
 ### D3. 覆盖范围：5 条路径（全终态路径 + 成功路径）
 
@@ -104,6 +104,44 @@ public static final class FakeKeyStoreSpi extends KeyStoreSpi {
   - Robolectric **不会**重置类静态字段（research §2.4）。
 - UUID 隔离 = **零反射清 map，零新增生产 API**，与现有 JS 侧 token 形态完全一致（ADR-0170 §D7）。
 - **不**在生产侧新增「测试用清静态状态」API —— 违反 D1「缝即生产路径」原则。
+
+#### D4.1 修订（2026-09-20，PR #657 code-review S1/S2）：跨类隔离的真正泄漏源 = D2.2 假 provider；反射清态登记为偏离
+
+**实测故障（S1）**：本分支新增的 3 个测试类**同跑**即红、**单跑**全绿（隔离实验逐字）：
+
+```
+./gradlew :app:testFullDebugUnitTest --tests "io.pictelio.app.PictelioTranslateModuleCancelTest" \
+  --tests "io.pictelio.app.PictelioTranslateModuleSuccessTest" \
+  --tests "io.pictelio.app.PictelioTranslateModuleTerminalTest" --rerun
+→ 13 tests completed, 8 failed → BUILD FAILED in 3m 33s      # 修复前（另有 5 failed 的变体，见下）
+→ BUILD SUCCESSFUL in 6s                                     # 修复后
+```
+
+**根因（实测证据，逐字摘自加桩运行）**：
+
+```
+[PictelioTranslateModuleSuccessTest] effective SPI = io.pictelio.app.PictelioTranslateModuleCancelTest$FakeKeyStoreSpi | own SPI = io.pictelio.app.PictelioTranslateModuleSuccessTest$FakeKeyStoreSpi
+[PictelioTranslateModuleSuccessTest] getItem THREW javax.crypto.AEADBadTagException: Tag mismatch
+```
+
+泄漏路径（**与静态寄存器 `STREAM_*` / `USER_ABORTED` 无关**）：
+
+1. D2.2 的假 provider 是**每类各注册一份**（`providerSeeded` 是各类自己的静态），但 `java.security.Security` 由引导类加载器加载 = **JVM 全局**（Robolectric 不重置），且 `Security.addProvider` 对**同名** provider 是**不替换的空操作**（返回 `-1`；`get("KeyStore.AndroidKeyStore")` 仍是先注册者的类名）。
+2. 于是只有**第一个跑的测试类**被真正绑定；后续类的 `seedFakeAndroidKeyStore` 把新密钥写进自己的（已成孤儿的）静态 map，而 `SecureStorageCompat.getItem` 从**有效** store 取到的是前一个类留下的**旧密钥**；生产 alias 只有一个（`capacitor-storage_translate_llm_api_key`），同名 alias → 密文/密钥不配对 → GCM tag 校验失败。
+3. `AEADBadTagException` 在 `translateStream` 的请求构造段（`:341` 读 apiKey）抛出 → 被 `:357` catch 吞掉，**只回调 `请求构造失败：…`、不登记终态** → 测试轮询到 30s/15s 超时 → 判红。
+4. **失败分布本身就是判据**：赢得绑定的类 0 红，其余类**恰好**其「依赖 keystore」的用例变红（Cancel 2/4、Terminal 3/4、EmptyStream 2/3、Success 5/5）；不含 keystore 依赖的用例（`abortBeforeStart_noOp` 等）与纯字符串契约用例照常绿。
+5. 「哪个类赢得绑定」取决于 Gradle 类扫描顺序 → 同一命令两次运行得到 5 failed / 8 failed 两种结果（**顺序相关的假红**）。
+
+**修复（测试侧，零生产改动）**：抽出共享夹具 `FakeAndroidKeyStore`（`app/src/testFull/java/io/pictelio/app/`）——**单份** `Spi` + **单份** KEYS + 幂等 `install()`；4 个测试类删除各自的 SPI 内部类 / `providerSeeded` / `seedFakeAndroidKeyStore`，`@Before` 改调 `FakeAndroidKeyStore.seed(plaintext)`。`install()` 在「同名 provider 已被**别的**类抢注」时**显式抛错**（AGENTS.md 测试硬约束 #3「禁止静默降级」），而不是让调用方静默跑到超时。注册后不卸载：`@AfterClass` 卸载会让后续类回到「无 provider」态，反而引入新的顺序依赖。
+
+**为什么不选 `forkEvery = 1`**（每类独立 JVM）：它能隔离 JVM 全局状态，但代价是每个测试类重启 JVM + 重建 Robolectric sandbox（全量 409 用例 / 40+ 类），收益不抵耗时；本修复把「同名 provider 只能有一个绑定」这一客观约束做成**显式共享**，与 JVM 语义对齐。
+
+**S2：偏离 D4「不引入反射 / 静态状态重置」—— 登记并保留**：
+
+- 落地实现（#654 起，本分支的 4 个类）在 `@After` 用反射清 `STREAM_FRAMES` / `STREAM_TERMINAL` / `STREAM_TERMINAL_MSG` / `STREAM_SEQ` / `USER_ABORTED`；断言侧同样用反射读 `STREAM_TERMINAL`（跳过 `translatePoll` 的中间帧噪声）。
+- **本次实测结论**：该反射**既不是 S1 的成因，也不是其修复手段**（S1 完全由 D2.2 假 provider 的跨类绑定造成）—— 保留它是**有意的防御**，理由：`USER_ABORTED` 无重置入口（D4 首条），且流式 `finally` 与 `abortStream` 的时序只保证「平衡」不保证「用例边界为空」；`pruneFinishedStreams` 只在下一条流入场时清，跨类时上一条流的状态会残留到下一个类；`STREAM_SEQ` 每 streamId 一个计数器，长期运行无界增长。
+- 边界：反射**仅在测试源集**、只在 `@After`/断言读取处；D1「缝即生产路径」不受影响（所有驱动仍经 `translateStream` / `translatePoll` / `abortStream`，生产侧**零** `test-only` API）。
+- **本修订即 D4 首句的例外条款**：D4 的「零反射」表述在落地件上与事实不符，此处以 D4.1 为准（若要回归「零反射」，需另开 ticket 逐类验证 `USER_ABORTED` 时序稳定性）。
 
 ### D5. 成功路径陷阱：必须排空帧缓冲
 
@@ -154,7 +192,7 @@ public static final class FakeKeyStoreSpi extends KeyStoreSpi {
 - **CI 环境约束 = full 变体**：测试源集 `app/src/test/java` 是所有 flavor 变体共用，lynx 依赖只挂在 `lynxImplementation` / `fullImplementation`（research §2.2 + `build.gradle:240,260-264`）—— CI 必须跑 `testFullDebugUnitTest`（已是现状，`.github/workflows/ci.yml:103-105`）。**禁止**跑 `test` / `testWebviewDebugUnitTest`（webview 变体 200 编译错逐字命中；research §2.2）。
 - **Robolectric 4.14.1+ 要求**：假 `AndroidKeyStore` provider 的 `Provider(String, double, String)` 构造器（实测编译错：Android stub 缺该构造器）需要 Robolectric ≥ 4.14.1（JDK 21 兼容版本）—— 当前仓库版本已满足（research §0 环境声明）。
 - **成功率/稳定性**：research §4 #5 明说每个探针只跑过 1–2 次；P8（abort）含 `Thread.sleep(300)`，CI 负载下可能需放宽到 500ms。implement 阶段需在 CI 跑 3-5 轮验证稳定性。
-- **假 Keystore provider 的选择顺序风险**（research §4 #4）：探针每次安装前检查同名 provider 已存在则跳过；若同一 JVM 里别的测试类注册同名 provider，行为未定义。**当前 41 个单测文件无此先例**，风险可接受；future-safe：测试 fixture 改用 `@BeforeClass` 一次性安装 + `@AfterClass` 清理。
+- **假 Keystore provider 的选择顺序风险**（research §4 #4）：~~当前 41 个单测文件无此先例，风险可接受~~ → **该风险已实现为真实故障并修复**（PR #657 code-review S1：同跑 13 tests / 8 failed、单跑全绿；逐字证据与泄漏链路见 §D4.1）。现在由共享夹具 `FakeAndroidKeyStore` 单份 SPI + 单次注册 + 抢注守卫承担；新测试类**不得**再各自注册同名 provider。
 
 ---
 

@@ -20,21 +20,11 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
-import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
 
-import java.security.Key;
-import java.security.KeyStore;
-import java.security.Provider;
-import java.util.Collections;
-import java.util.Enumeration;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-
-import javax.crypto.KeyGenerator;
-import javax.crypto.SecretKey;
 
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -67,43 +57,12 @@ public class PictelioTranslateModuleSuccessTest {
         @Override public void handleException(Exception e) { }
     }
 
-    public static final class FakeKeyStoreSpi extends java.security.KeyStoreSpi {
-        static final Map<String, Key> KEYS = new ConcurrentHashMap<>();
-        @Override public Key engineGetKey(String a, char[] p) { return KEYS.get(a); }
-        @Override public KeyStore.Entry engineGetEntry(String a, KeyStore.ProtectionParameter p) {
-            Key k = KEYS.get(a);
-            return k == null ? null : new KeyStore.SecretKeyEntry((SecretKey) k);
-        }
-        @Override public boolean engineContainsAlias(String a) { return KEYS.containsKey(a); }
-        @Override public Enumeration<String> engineAliases() { return Collections.enumeration(KEYS.keySet()); }
-        @Override public int engineSize() { return KEYS.size(); }
-        @Override public boolean engineIsKeyEntry(String a) { return KEYS.containsKey(a); }
-        @Override public boolean engineIsCertificateEntry(String a) { return false; }
-        @Override public java.util.Date engineGetCreationDate(String a) { return null; }
-        @Override public String engineGetCertificateAlias(java.security.cert.Certificate c) { return null; }
-        @Override public void engineDeleteEntry(String a) { KEYS.remove(a); }
-        @Override public void engineStore(java.io.OutputStream out, char[] p) { }
-        @Override public void engineLoad(java.io.InputStream in, char[] p) { }
-        @Override public java.security.cert.Certificate engineGetCertificate(String a) { return null; }
-        @Override public java.security.cert.Certificate[] engineGetCertificateChain(String a) { return null; }
-        public void engineSetKeyEntry(String a, byte[] k, java.security.spec.AlgorithmParameterSpec p) { }
-        public void engineSetKeyEntry(String a, byte[] k, java.security.cert.Certificate[] chain) { }
-        public void engineSetKeyEntry(String a, java.security.Key k, char[] pw, java.security.spec.AlgorithmParameterSpec p2) { }
-        @Override public void engineSetKeyEntry(String a, java.security.Key k, char[] pw, java.security.cert.Certificate[] chain) {
-            KEYS.put(a, k);
-        }
-        @Override public void engineSetCertificateEntry(String a, java.security.cert.Certificate c) { }
-    }
-
-    private static final String KEY_ALIAS = "capacitor-storage_translate_llm_api_key";
-    private static final String PREFS_FILE = "WSSecureStorageSharedPreferences";
-
     private MockWebServer server;
     private PictelioTranslateModule module;
 
     @Before
     public void setUp() throws Exception {
-        seedFakeAndroidKeyStore("sk-test-success-0123456789");
+        FakeAndroidKeyStore.seed("sk-test-success-0123456789");
         server = new MockWebServer();
         server.start();
         module = new PictelioTranslateModule(
@@ -134,28 +93,6 @@ public class PictelioTranslateModuleSuccessTest {
         f.setAccessible(true);
         java.util.Map<String, ?> m = (java.util.Map<String, ?>) f.get(null);
         m.clear();
-    }
-
-    private static void seedFakeAndroidKeyStore(String plaintext) throws Exception {
-        Security_addProvider_once();
-        KeyGenerator gen = KeyGenerator.getInstance("AES");
-        gen.init(128);
-        SecretKey key = gen.generateKey();
-        FakeKeyStoreSpi.KEYS.put(KEY_ALIAS, key);
-        Context app = RuntimeEnvironment.getApplication();
-        app.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
-                .edit()
-                .putString(KEY_ALIAS, SecureStorageCompat.encryptString(plaintext, key))
-                .commit();
-    }
-
-    private static boolean providerSeeded = false;
-    private static synchronized void Security_addProvider_once() throws Exception {
-        if (providerSeeded) return;
-        java.security.Security.addProvider(new Provider("AndroidKeyStore", 1.0d, "fake") {
-            { put("KeyStore.AndroidKeyStore", FakeKeyStoreSpi.class.getName()); }
-        });
-        providerSeeded = true;
     }
 
     private static String request(String baseUrl, String id) {
