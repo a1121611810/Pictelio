@@ -169,12 +169,11 @@ async function onTap(): Promise<void> {
       class="text-[5.333vw] leading-none text-on-primary mr-1"
       >Aあ</text
     >
-    <!-- 进度态：简易文字 + 百分比 -->
-    <text
-      v-else-if="isTranslatingThis"
-      class="text-label-medium text-on-primary"
-      >{{ Math.round(progressFraction * 100) }}%</text
-    >
+    <!-- 进度态：简易文字 + 百分比；fallback 期间附加「重试中…」微提示（ADR-0178 D1） -->
+    <view v-else-if="isTranslatingThis" class="flex flex-col items-center">
+      <text class="text-label-medium text-on-primary">{{ Math.round(progressFraction * 100) }}%</text>
+      <text v-if="store.isRetryingHint" class="text-label-small text-on-primary opacity-80 mt-0.5">{{ t('novelTranslate.status.retrying') }}</text>
+    </view>
     <!-- 完成态：✓ -->
     <text
       v-else-if="isDoneCached"
