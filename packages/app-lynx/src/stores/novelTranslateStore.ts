@@ -398,6 +398,16 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
 
   /** 全量复位（UI 卸载 / 用户切章节时调用） */
   function reset(): void {
+    // spec §7.2 转移表末行：「任何 | chapter switch | idle | **abort() if in-flight**; reset state」。
+    // 此前只清状态、既不 abort 也不 bump gen → 三个后果（#640 step 7 取证时发现）：
+    //   ① 旧章节的 HTTP 请求继续跑，白烧 token 直到自然结束或轮询超时；
+    //   ② 旧请求 settle 时 `gen === genNow` 仍成立 → 越过 generation-gate，
+    //      把**旧章节的译文**写进 translatedParagraphs 并 refreshDisplay
+    //      → 新章节正文显示旧章节的译文（跨章节污染，正是 #649 关注的形态）；
+    //   ③ status 被旧结果推成 completed / failed，覆盖新章节的状态。
+    activeController?.abort()
+    activeController = null
+    gen += 1
     status.value = "idle"
     progress.value = null
     currentChapter.value = null
