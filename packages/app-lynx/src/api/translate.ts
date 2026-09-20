@@ -71,6 +71,14 @@ export interface TranslationRequest {
   chapterId: string
   /** 纯文本段落（已剥 HTML / 注音 / 行内样式） */
   paragraphs: string[]
+  /**
+   * 流式开关：默认 true（chunked SSE pipeline）；false = 整批单次 POST，
+   * 用于 store 层 fallbackToWholeBatch（ADR-0178 D1：stream 中断后整批回退）。
+   *
+   * <p>stream=false 时 provider 内部不做 chunked pipeline 切块，整章一次性提交，
+   * 返回单次 JSON 响应；不走 chunked pipeline。
+   */
+  stream?: boolean
   options: {
     /** 章节 R18 等级：0 / 1 / 2；用于应用层闸门（Q22）与 provider 元数据透传（Q13） */
     xRestrict: 0 | 1 | 2
