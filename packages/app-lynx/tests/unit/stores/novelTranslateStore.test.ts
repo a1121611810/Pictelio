@@ -118,7 +118,9 @@ vi.mock('../../../src/api/translate', async (importOriginal) => {
       options?.provider ??
       ({
         id: 'fake-provider',
-        translate: () => mocks.providerIter(),
+        // 透传 store 给的 signal（补审 S1：断言「reset 是否真的 abort 了 store 自己的 controller」
+        // 需要观测 provider 收到的那个 signal —— 用测试自己的 controller 观测不到 store 侧）
+        translate: (_sub: unknown, _cfg: unknown, sig?: AbortSignal) => mocks.providerIter(sig),
         abort: vi.fn(),
       } as TranslationProvider),
   }
@@ -621,6 +623,39 @@ describe('同 chapterId in-flight 复用（spec §9.6）', () => {
     oldIter.finish()
     newIter.finish()
     await Promise.all([pA, pB])
+  })
+
+  /**
+   * 补审 S1：`reset()` 的 **abort 半边**此前零防线。
+   *
+   * <p>旧用例的 abort 用的是**测试自己的** controller（`makeDeferredIterator(ac.signal)`
+   * + 用例内 `ac.abort()`）→ structurally 观测不到 store 侧 signal ⇒ 把 `reset()` 里的
+   * `activeController?.abort()` 删掉，全量 1808 测试**依旧全绿**。
+   *
+   * <p>本用例直接断言：`reset()` 之后，store 交给 provider 的那个 **signal 已 aborted**
+   * （spec §7.2 末行：「chapter switch → **abort() if in-flight**; reset state」）。
+   */
+  it('reset() 必须 abort store 自己的 in-flight signal（S1）', async () => {
+    let captured: AbortSignal | null = null
+    const d = makeDeferredIterator()
+    mocks.providerIter.mockImplementation((sig?: AbortSignal) => {
+      if (sig != null) captured = sig
+      return d.iter
+    })
+    const store = useNovelTranslateStore()
+    const p = store.translateChapter(82, 82, ['原文'], 0)
+    await new Promise((r) => setTimeout(r, 10))
+
+    expect(captured).not.toBeNull()
+    expect((captured as unknown as AbortSignal).aborted).toBe(false)
+
+    store.reset()
+
+    // 核心断言：store 必须 abort 它自己的 controller（不是靠测试代劳）
+    expect((captured as unknown as AbortSignal).aborted).toBe(true)
+
+    d.finish()
+    await p
   })
 
   it('translating 期间调**不同** chapterId → 并行触发（provider 调用 2 次）', async () => {

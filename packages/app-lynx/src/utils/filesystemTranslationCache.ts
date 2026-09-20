@@ -25,16 +25,25 @@ interface PictelioTranslateCacheModule {
 }
 
 /**
- * 双通道探测（与 `nativeTranslate.ts` 的 `nativeTranslateModule()` 同形；ADR-0053 §1）。
+ * 双通道探测（**裸通道优先回退**；语义见下）。
  *
- * <p><b>必须是「逐通道找模块」而不是「取第一个存在的容器」</b> —— 这是真机实测的教训：
- * - 真机 PrimJS 把 native module 挂成**裸 `NativeModules`** 全局（`nativeTranslate` 用同一
- *   顺序且工作正常）；
- * - happy-dom / node 测试环境会把 `NativeModules` 定义成**空对象**，遮蔽 `globalThis` 上的注入。
+ * <p><b>与仓库既有模式的关系（补审 S3 纠正）</b>：本函数**不是** `nativeTranslate.ts`
+ * 的 `nativeTranslateModule()` 的「同形」实现 —— 参考实现是 **container-first**
+ * （先取容器 `NativeModules ?? globalThis.NativeModules`，再取 `.PictelioTranslateCache`），
+ * 本函数是 **per-channel bare-first**（逐通道取模块本体，裸通道命中即返回）。
+ * 两者只在「首个容器存在但**无**该模块键、另一通道有」时不同：本实现会**继续回退**取到模块
+ * （更宽容、更安全）；参考实现会返回 `null`。
  *
- * <p>早期实现取「`NativeModules` 存在就用它」（happy-dom 下得到空对象）→ 改成只读
- * `globalThis.NativeModules`（绕开 happy-dom）→ **真机彻底失效**（真机走裸通道）。
- * 正确做法：两个通道都取模块本体，谁能拿到非空模块就用谁；裸通道优先（真机路径）。
+ * <p><b>为何不照抄 container-first</b>：真机 PrimJS 把 native module 挂成**裸 `NativeModules`**，
+ * 而测试环境（node）会把 `NativeModules` 定义成**空对象**遮蔽 `globalThis` 上的注入 ——
+ * 两者叠加时 container-first 会锁死空容器。（历史教训：早期实现取「`NativeModules` 存在就用它」
+ * → happy-dom 下拿到空对象；改成只读 `globalThis.NativeModules` → **真机彻底失效**。）
+ *
+ * <p><b>后续维护须知</b>：不要为了「与仓库一致」把本函数改回 container-first —— 那会复现
+ * #641 的真机失效。若要统一，应先把参考实现也改成 per-channel 语义（并有真机验证）。
+ *
+ * <p>2×2 通道矩阵由 `tests/unit/utils/filesystemTranslationCache.test.ts` 的
+ * 「空容器不遮蔽」组守门（容器空对象 / 无模块键两种失败模式）。
  */
 function nativeModule(): PictelioTranslateCacheModule | null {
   const bare = typeof NativeModules !== "undefined" ? NativeModules : undefined
