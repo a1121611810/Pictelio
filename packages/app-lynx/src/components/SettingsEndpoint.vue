@@ -6,6 +6,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue"
 import { useNovelTranslateStore } from "../stores/novelTranslateStore"
 import { useSettingsStore } from "../stores/settingsStore"
 import { A11Y_ELEMENT_ENABLED } from "../utils/accessibility"
+import M3Switch from "./M3Switch.vue"
 import { t } from "../i18n"
 import { extractHostname } from "../utils/safeParseUrl"
 import type { LlmEndpointPublic } from "../api/translate"
@@ -556,15 +557,9 @@ async function onClear(): Promise<void> {
         <text class="text-body-medium text-surface-on">{{
           t("novelTranslate.endpoint.translateR18")
         }}</text>
-        <view
-          class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center"
-          :class="translateR18 ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
-        >
-          <view
-            class="rounded-full mx-[1.067vw]"
-            :class="translateR18 ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'"
-          />
-        </view>
+        <M3Switch
+          :checked="translateR18"
+        />
       </view>
       <view
         class="flex flex-row items-center justify-between"
@@ -575,15 +570,9 @@ async function onClear(): Promise<void> {
         <text class="text-body-medium text-surface-on">{{
           t("novelTranslate.endpoint.translateR18G")
         }}</text>
-        <view
-          class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center"
-          :class="translateR18G ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
-        >
-          <view
-            class="rounded-full mx-[1.067vw]"
-            :class="translateR18G ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'"
-          />
-        </view>
+        <M3Switch
+          :checked="translateR18G"
+        />
       </view>
     </view>
 

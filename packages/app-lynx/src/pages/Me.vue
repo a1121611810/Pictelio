@@ -14,6 +14,7 @@ import { ME_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { readEngineState, REASON_I18N_KEYS, type EngineKind, type EngineStateSnapshot } from '../utils/engineState'
 import GlassCard from '../components/GlassCard.vue'
 import SettingsEndpoint from '../components/SettingsEndpoint.vue'
+import M3Switch from '../components/M3Switch.vue'
 import { themeColorClass } from '../utils/themeColor'
 import {
   createLynxBackupDeps,
@@ -531,15 +532,9 @@ function toggleRankingEntry() {
             <text class="text-title-medium text-surface-on">{{ t('me.client.autoFallback') }}</text>
             <text class="text-label-medium text-surface-on-variant mt-0.5">{{ t('me.client.autoFallbackDesc') }}</text>
           </view>
-          <view
-            class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
-            :class="autoFallbackEngine ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
-          >
-            <!-- handle-container：32×32 与轨道同高，thumb 居中 → 距边 8px/4px -->
-            <view class="w-8 h-8 flex items-center justify-center">
-              <view class="rounded-full active:w-[7.467vw] active:h-[7.467vw]" :class="autoFallbackEngine ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
-            </view>
-          </view>
+          <M3Switch
+            :checked="autoFallbackEngine"
+          />
         </view>
         <!-- 全屏模式开关（spec docs/specs/lynx-systembars.md D5）：设备级默认关；
              隐藏系统栏（immersive），拨动即时生效（原生切换 + insets 事件回流 → Root padding 重算） -->
@@ -553,15 +548,9 @@ function toggleRankingEntry() {
             <text class="text-title-medium text-surface-on">{{ t('me.client.fullscreenMode') }}</text>
             <text class="text-label-medium text-surface-on-variant mt-0.5">{{ t('me.client.fullscreenModeDesc') }}</text>
           </view>
-          <view
-            class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
-            :class="fullscreenMode ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
-          >
-            <!-- handle-container：32×32 与轨道同高，thumb 居中 → 距边 8px/4px -->
-            <view class="w-8 h-8 flex items-center justify-center">
-              <view class="rounded-full active:w-[7.467vw] active:h-[7.467vw]" :class="fullscreenMode ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
-            </view>
-          </view>
+          <M3Switch
+            :checked="fullscreenMode"
+          />
         </view>
         <!-- 生效双态行（ADR-0164）：仅降级生效时渲染（effective≠none 且≠preferred）；正常与双失败不显示 -->
         <view v-if="degradedEngineState" class="pt-3">
@@ -714,18 +703,9 @@ function toggleRankingEntry() {
           @tap="toggleR18"
         >
           <text class="text-title-medium text-surface-on">{{ t('me.content.showR18') }}</text>
-          <!-- M3 switch（官方 token v0.192 + _handle.scss）：轨道 52×32dp；
-               thumb 外层 32×32 handle-container 居中定位（未选中 16dp→距左 8px，
-               选中 24dp→距右 4px，按压 28dp 居中不溢出）；未选中轨道 2dp outline 边框 -->
-          <view
-            class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
-            :class="showR18 ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
-          >
-            <!-- handle-container：32×32 与轨道同高，thumb 居中 → 距边 8px/4px -->
-            <view class="w-8 h-8 flex items-center justify-center">
-              <view class="rounded-full active:w-[7.467vw] active:h-[7.467vw]" :class="showR18 ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
-            </view>
-          </view>
+          <M3Switch
+            :checked="showR18"
+          />
         </view>
         <view
           class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant"
@@ -734,15 +714,9 @@ function toggleRankingEntry() {
           @tap="toggleR18G"
         >
           <text class="text-title-medium text-surface-on">{{ t('me.content.showR18G') }}</text>
-          <view
-            class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
-            :class="showR18G ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
-          >
-            <!-- handle-container：32×32 与轨道同高，thumb 居中 → 距边 8px/4px -->
-            <view class="w-8 h-8 flex items-center justify-center">
-              <view class="rounded-full active:w-[7.467vw] active:h-[7.467vw]" :class="showR18G ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
-            </view>
-          </view>
+          <M3Switch
+            :checked="showR18G"
+          />
         </view>
 
         <!-- 相关作品注入行开关（spec docs/specs/related-injection.md）：设备级，默认开 -->
@@ -753,14 +727,9 @@ function toggleRankingEntry() {
           @tap="toggleRelatedInjection"
         >
           <text class="text-title-medium text-surface-on">{{ t('me.content.relatedInjection') }}</text>
-          <view
-            class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
-            :class="relatedInjection ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
-          >
-            <view class="w-8 h-8 flex items-center justify-center">
-              <view class="rounded-full active:w-[7.467vw] active:h-[7.467vw]" :class="relatedInjection ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
-            </view>
-          </view>
+          <M3Switch
+            :checked="relatedInjection"
+          />
         </view>
 
         <!-- 排行榜入口开关（spec docs/specs/ranking.md §5.8）：设备级，默认开 -->
@@ -771,14 +740,9 @@ function toggleRankingEntry() {
           @tap="toggleRankingEntry"
         >
           <text class="text-title-medium text-surface-on">{{ t('me.content.rankingEntry') }}</text>
-          <view
-            class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
-            :class="rankingEntry ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
-          >
-            <view class="w-8 h-8 flex items-center justify-center">
-              <view class="rounded-full active:w-[7.467vw] active:h-[7.467vw]" :class="rankingEntry ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
-            </view>
-          </view>
+          <M3Switch
+            :checked="rankingEntry"
+          />
         </view>
 
         <!-- AI 作品三态过滤（ADR-0155）：显示 / 遮罩 / 仅看；逐项静态 a11y label（注册表完整性测试要求） -->
@@ -1043,14 +1007,9 @@ function toggleRankingEntry() {
               <text class="text-title-medium text-surface-on">{{ t('me.export.includeMetadata') }}</text>
               <text class="text-label-medium text-surface-on-variant">{{ t('me.export.includeMetadataHint') }}</text>
             </view>
-            <view
-              class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
-              :class="novelExportOptions.includeMetadata ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
-            >
-              <view class="w-8 h-8 flex items-center justify-center">
-                <view class="rounded-full" :class="novelExportOptions.includeMetadata ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
-              </view>
-            </view>
+            <M3Switch
+              :checked="novelExportOptions.includeMetadata"
+            />
           </view>
           <view
             class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant"
@@ -1062,14 +1021,9 @@ function toggleRankingEntry() {
               <text class="text-title-medium text-surface-on">{{ t('me.export.includeCover') }}</text>
               <text class="text-label-medium text-surface-on-variant">{{ t('me.export.includeCoverHint') }}</text>
             </view>
-            <view
-              class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
-              :class="novelExportOptions.includeCover ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
-            >
-              <view class="w-8 h-8 flex items-center justify-center">
-                <view class="rounded-full" :class="novelExportOptions.includeCover ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
-              </view>
-            </view>
+            <M3Switch
+              :checked="novelExportOptions.includeCover"
+            />
           </view>
           <view
             class="flex flex-row items-center justify-between py-3.5"
@@ -1081,14 +1035,9 @@ function toggleRankingEntry() {
               <text class="text-title-medium text-surface-on">{{ t('me.export.includeImages') }}</text>
               <text class="text-label-medium text-surface-on-variant">{{ t('me.export.includeImagesHint') }}</text>
             </view>
-            <view
-              class="w-[13.867vw] h-[8.533vw] rounded-full flex flex-row items-center transition-colors duration-[var(--durationNormal)] ease-[var(--motion-standard)]"
-              :class="novelExportOptions.includeInlineImages ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start border-[0.533vw] border-outline'"
-            >
-              <view class="w-8 h-8 flex items-center justify-center">
-                <view class="rounded-full" :class="novelExportOptions.includeInlineImages ? 'w-[6.4vw] h-[6.4vw] bg-primary-on' : 'w-[4.267vw] h-[4.267vw] bg-outline'" />
-              </view>
-            </view>
+            <M3Switch
+              :checked="novelExportOptions.includeInlineImages"
+            />
           </view>
         </view>
       </view>
@@ -1124,10 +1073,9 @@ function toggleRankingEntry() {
           @tap="toggleWebdavEnabled"
         >
           <text class="text-title-medium text-surface-on">{{ t('me.webdav.enabled') }}</text>
-          <view class="w-[13.867vw] h-[8.533vw] rounded-full flex items-center px-[1.067vw]"
-            :class="settings.webdavEnabled ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start'">
-            <view class="w-[6.4vw] h-[6.4vw] rounded-full" :class="settings.webdavEnabled ? 'bg-primary-on' : 'bg-outline'" />
-          </view>
+          <M3Switch
+            :checked="settings.webdavEnabled"
+          />
         </view>
 
         <template v-if="settings.webdavEnabled">
