@@ -71,8 +71,8 @@
 |---|---|---|
 | Step 1 Keystore 持久化 | **✅ 已补齐**（见下节） | — |
 | Step 2 流式增量渲染 | 部分 | 只证「译文交付」（`hasText=true` + frames 交付），未证逐字渐显 |
-| Step 3 原文/译文切换 <50ms | 未验 | 需人工点击 + 计时 |
-| Step 4 model 切换 namespace | 未验 | 需改配置后重译 |
+| Step 3 原文/译文切换 <50ms + 长按重译 | 未验 | 需计时 + 长按手势 |
+| Step 4 model 切换 namespace | **✅ 已补齐**（见下节；并查出 #641 缓存真机失效的真缺陷） | — |
 | Step 5 OpenRouter partial probe | 未验 | 需切 endpoint 到 OpenRouter |
 | Step 6 R18 闸门 | **✅ 已补齐**（见下节；并发现两处 UI 缺陷，已修） | — |
 | Step 7 章节切换 generation-gate | **✅ 实现面已验 + 发现并修复真缺陷**（见下节） | — |
@@ -117,6 +117,53 @@ $ adb logcat -d | grep -c "translateStream 入口"
 两者叠加 = 用户点击后**界面毫无反应**（静默 no-op）。截图 `step6-r18g-blocked.png` 实证：拦截发生后按钮仍为蓝色可点态、无任何提示文案。
 
 **修复**（`TranslateButton` 的 disabled 纳入 `R18G_BLOCKED`；`NovelDetail.errorText` 对 `aborted + R18*_BLOCKED` 显示对应文案）+ 源码断言测试（`TranslateButton.template.test.ts`）+ 变异实验（撤掉 R18G 判断 → 必红）。
+
+---
+
+## Step 4 补齐：model 切换 → 缓存 namespace 隔离（并查出 #641 真机失效）
+
+用本地 mock SSE（`MOCK_SLOW_MS` 默认）+ 同一 R-18G 章节做**对照实验**（mock 无内容策略 → 5 块全部成功 → `completed` → 写缓存）：
+
+| Phase | model | `cacheMiss` | `translateStream 入口` | 判定 |
+|---|---|---|---|---|
+| 1 | `mock-A`（首次，缓存空） | 1 | 5 | 走 provider（预期） |
+| 2 | `mock-A`（重跑） | **0** | **0** | ✅ **缓存命中，零 provider 调用** |
+| 3 | `mock-B`（改 model） | **1** | **5** | ✅ **namespace 失效，重新翻译** |
+
+缓存目录实测落盘：
+```
+$ adb shell run-as io.pictelio.app ls -la cache/pictelio_translate_cache/
+-rw------- 4ead87fc5c5939ed59c555dfa9765a3d4c13a195070e1dd0361b448fba4e1f68.json   (53085 B)
+-rw------- manifest.json                                                          (118 B)
+```
+（sha256 命名的条目 + LRU manifest，与 ADR-0175 §D1/D2/D3 一致）
+
+### 过程中查出的真缺陷：#641 缓存**真机完全失效**
+
+Phase 1/2/3 首轮全部 `cacheMiss`，日志暴露根因：
+
+```
+[translationCache] IndexedDB 不可用（native runtime）→ 翻译缓存停用，本章不读写缓存
+[translationCache] IDB unavailable, skip write || {key: "25434593:…:mock-B:acee5f…"}
+```
+
+即 `isFilesystemTranslationCacheAvailable()` 在真机返回 **false** → 回落到 IDB → 原生无 IDB → 缓存整体停用。
+
+**根因**：`filesystemTranslationCache.ts` 的 `nativeModule()` 只读 `globalThis.NativeModules`。
+这条「只读 globalThis」是为了绕开 happy-dom 把 `NativeModules` 定义成空对象遮蔽注入 —— 但**真机 PrimJS 走的是裸 `NativeModules` 通道**（`nativeTranslate.ts` 用双通道探测，工作正常）。于是：
+
+- 真机：裸通道有模块、`globalThis` 没有 → 只读 globalThis → **判不可用** → 缓存停用
+- 测试：mock 注入到 `globalThis.NativeModules` → **恰好命中实现读的那个通道** → 19/19 全绿
+
+这是典型的「两侧自洽 mock 互相掩盖」——**33 条测试（14 Robolectric + 19 vitest）全绿，功能在真机 0% 生效**。
+
+**修复**：改为「**逐通道找模块本体**」（裸通道优先，其次 globalThis），与 `nativeTranslate.ts` 同形。补 2 条用例守「空容器不误判」（早期失败模式）；并注明「进程内无法分离两个通道 → 真机走裸通道这条只能由设备取证」。
+
+**修复后真机复验**：`IDB unavailable` 计数 **0**；缓存目录出现条目；Phase 2 命中、Phase 3 失效（上表）。
+
+### 教训（值得沉淀）
+
+ADR-0175 的「双通道探测」被 `nativeTranslate.ts` 与 `tokenStorage` 正确实现，但本模块为了迁就测试环境的遮蔽问题**改成了单通道** —— 测试全绿掩盖了真机失效。**探测逻辑不允许为测试环境妥协**：要么两个通道都试（本修复），要么在测试里同时提供两个通道。
 
 ---
 
