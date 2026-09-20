@@ -260,6 +260,13 @@ const translateErrorText = computed<string>(() => {
 const displayParagraphs = computed<string[]>(() =>
   translateStore.displayParagraphs.length > 0
     ? translateStore.displayParagraphs
+    : []
+)
+
+/** ADR-0178 D4 占位符字符串：与 store.refreshDisplay 内 t('novelTranslate.status.placeholder_untranslated') 必须同源 */
+const untranslatedPlaceholder = computed<string>(() =>
+  t('novelTranslate.status.placeholder_untranslated'),
+)
     : paragraphs.value,
 )
 
@@ -459,7 +466,9 @@ function onWatchlistCancel(): void {
              vue-lynx 会吞掉动态布尔绑定（设备实证），届时引擎自带菜单不会被替换 -->
         <text
           :id="selection.paragraphId(idx)"
-          class="text-body-large leading-[44rpx] text-surface-on"
+          :class="p === untranslatedPlaceholder
+            ? 'text-body-large leading-[44rpx] italic text-surface-on-variant'
+            : 'text-body-large leading-[44rpx] text-surface-on'"
           text-selection="true"
           flatten="false"
           custom-context-menu="true"

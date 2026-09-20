@@ -368,10 +368,16 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
   /** 重算渲染源（译文/原文切换 + 增量落地都经此） */
   function refreshDisplay(): void {
     const useTranslated = showTranslation.value && translatedParagraphs.value.length > 0
+    const isPartial = status.value === "partial"
+    const untranslatedPlaceholder = t("novelTranslate.status.placeholder_untranslated")
     displayParagraphs.value = useTranslated
       ? sourceParagraphs.value.map((p, i) => {
           const t = translatedParagraphs.value[i]
-          return t !== undefined && t !== "" ? t : p
+          if (t !== undefined && t !== "") return t
+          // ADR-0178 D4: partial 状态下的未译段不显示原文，用「〔未翻译〕」占位
+          // （UI 层用 .paragraph--untranslated 灰色斜体区分）
+          if (isPartial) return untranslatedPlaceholder
+          return p
         })
       : sourceParagraphs.value.slice()
   }
