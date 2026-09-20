@@ -587,6 +587,20 @@ export function nativeTranslateProvider(): TranslationProvider {
       // 改为 JS 侧先生成 streamId（与 translateStream 内部 _abortToken 同源生成器），
       // 随即开始轮询；请求本身 fire-and-forget，其 promise 只用于登记 abort 句柄。
       const streamId = newStreamId()
+      // 同步登记 abort 句柄（ADR-0170 :344 规定的形态：JS→Java 取消通道 =
+      // controller.signal.addEventListener("abort", () => translateModule.abortStream(token))）。
+      // 原本挂在 translateStream promise 的 .then 上（:611-615），但该 promise 只在 callback
+      // 通道投递 done 帧时 settle（实测常不 settle）→ 句柄永远 null → abort 失联 → 用户
+      // 主动 abort 永远到不了原生 OkHttp Call。同步赋值让 listener 与 provider.abort() 都
+      // 能拿到句柄；下游 .then 仅作「signal 入口前已 abort」边界兜底。
+      // catch 兜底：abortStream 失败必须 warn（AGENTS.md 测试硬约束 #3 禁静默降级），不得
+      // 以 unhandled rejection 形态冒泡。
+      abortHandle = {
+        abort: () =>
+          abortStream(streamId).catch((err: unknown) => {
+            console.warn("[nativeTranslate] abort 触发失败", err)
+          }),
+      }
       void translateStream(
         JSON.stringify({
           baseURL: config.baseURL,
@@ -601,7 +615,9 @@ export function nativeTranslateProvider(): TranslationProvider {
         },
       )
         .then((h) => {
-          abortHandle = h
+          // 「signal 入口前已 aborted」边界：此时 listener 注册后不会重 fire（addEventListener
+          // 不对已 aborted 信号触发），同步句柄已就位但 onAbort 路径未跑；此 then 是**唯一**
+          // 触达上游 abort 句柄的机会。Java abortStream 幂等，二次调用 no-op。
           if (aborted || signal.aborted) void h.abort()
         })
         .catch((err: unknown) => {

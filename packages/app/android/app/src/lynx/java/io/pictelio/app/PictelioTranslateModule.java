@@ -716,6 +716,11 @@ public class PictelioTranslateModule extends LynxModule {
         if (call != null && !call.isCanceled()) {
             call.cancel();
             Log.i(TAG, "abortStream 取消: " + streamId);
+        } else {
+            // 无活 worker（abortStream 比 translateStream 进入 ACTIVE_CALLS 更早到达，或 streamId
+            // 本身未注册 —— JS 端 #653 修复后该窗口从「不可达」变成「可达」）→ 该 streamId 不会
+            // 进入 translateStream 的 finally 清理，必须在此显式 remove，否则永久残留 → 内存泄漏。
+            USER_ABORTED.remove(streamId);
         }
         callback.invoke("", "");
     }
