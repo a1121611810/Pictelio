@@ -510,6 +510,41 @@ describe('同 chapterId in-flight 复用（spec §9.6）', () => {
    * <p>判据：两个不同 chapter 同时翻译时，provider 被调用 **2 次**（各自一次），
    * 且两者都在 in-flight（用挂起 iterator 保证第二个不被第一个阻塞）。
    */
+  /**
+   * #640 step 7：**章节切换（reset）必须 abort in-flight 并屏蔽旧结果**。
+   * spec §7.2 转移表末行：「任何 | chapter switch | idle | **abort() if in-flight**; reset state」。
+   * 此前 reset 只清状态 → 旧请求继续跑 + settle 时越过 generation-gate
+   * → 旧章节译文写进新章节（跨章节污染）。
+   */
+  it('reset() 中止 in-flight 且旧结果不再落地（#640 step 7）', async () => {
+    const ac = new AbortController()
+    const d = makeDeferredIterator(ac.signal)
+    mocks.providerIter.mockImplementation(() => d.iter)
+    const store = useNovelTranslateStore()
+    const p = store.translateChapter(80, 80, ['旧章节原文'], 0)
+    await new Promise((r) => setTimeout(r, 10))
+    // 旧章节进入 translating
+    expect(store.status).toBe('translating')
+
+    // 切章节：reset（NovelDetail 的 watch(novelId) 就是这么调的）
+    store.reset()
+    expect(store.status).toBe('idle')
+    expect(store.currentChapter).toBeNull()
+
+    // 旧 iterator 收到 abort（因为 reset 现在会 abort controller）
+    ac.abort()
+    // 旧请求即便投递了 delta + done，也不得把结果写进 store
+    d.push({ type: 'delta', paragraphIndex: 0, text: '旧章节译文' })
+    d.finish()
+    await p
+
+    // 关键断言：状态没被旧结果推成 completed / failed；译文没落地
+    expect(store.status).toBe('idle')
+    expect(store.translatedParagraphs).toEqual([])
+    expect(store.displayParagraphs).toEqual([])
+    expect(mocks.cacheSet).not.toHaveBeenCalled()
+  })
+
   it('translating 期间调**不同** chapterId → 并行触发（provider 调用 2 次）', async () => {
     const d1 = makeDeferredIterator()
     const d2 = makeDeferredIterator()
