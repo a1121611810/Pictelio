@@ -56,6 +56,9 @@ const server = http.createServer((req, res) => {
       output_index: 0,
     });
     const TINY = process.env.MOCK_TINY === "1";
+    // MOCK_SLOW_MS: 每段延迟毫秒数（默认 20ms = 几乎瞬时；abort 验证需 >=3000ms 才有窗口）。
+    // 用法：MOCK_SLOW_MS=5000 node mock-responses-sse-server.mjs
+    const PER_PARA_MS = Number(process.env.MOCK_SLOW_MS ?? (TINY ? 300 : 20));
     const count = TINY ? Math.min(3, paragraphs.length) : paragraphs.length;
     for (let i = 0; i < count; i++) {
       const text = `\n\n[${i}] ${translate(paragraphs[i], i)}`;
@@ -66,7 +69,7 @@ const server = http.createServer((req, res) => {
           delta: piece,
         });
       }
-      await new Promise((r) => setTimeout(r, TINY ? 300 : 20));
+      await new Promise((r) => setTimeout(r, PER_PARA_MS));
     }
     sse(res, "response.output_text.done", { type: "response.output_text.done", output_index: 0 });
     sse(res, "response.completed", {
