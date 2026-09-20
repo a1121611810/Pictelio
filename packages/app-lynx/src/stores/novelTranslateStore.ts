@@ -892,6 +892,10 @@ function classifyProvider(
         "[novelTranslateStore] fallbackToWholeBatch triggered",
         { code: lastErrorCode, message: lastErrorMessage },
       )
+      const zeroTextOverride: { code: string | null; message: string } = {
+        code: null,
+        message: "",
+      }
       const fallbackOk = await runWholeBatchFallback(
         provider,
         config,
@@ -899,7 +903,13 @@ function classifyProvider(
         args,
         signal,
         genNow,
+        zeroTextOverride,
       )
+      if (zeroTextOverride.code !== null) {
+        // P12：回退零译文 → content_filter（与 #654 联动），覆盖原错误码
+        lastErrorCode = zeroTextOverride.code
+        lastErrorMessage = zeroTextOverride.message
+      }
       if (fallbackOk === "completed") {
         // 已被 runWholeBatchFallback 收敛到 completed；函数内部已写缓存 + 置 status
         return
@@ -931,9 +941,11 @@ function classifyProvider(
       refreshDisplay()
     } else if (result.status === "partial") {
       status.value = "partial"
+      // code-review P10 / issue #651 范围补充：partial 不得虚报 100%。
+      // 进度 = 实际有译文的段落数（缺失段用 〔未翻译〕 占位，见 refreshDisplay）。
       progress.value = {
         chapterId: args.chapterId,
-        done: args.paragraphs.length,
+        done: translatedParagraphs.value.filter((p) => p !== undefined && p !== "").length,
         total: args.paragraphs.length,
       }
       error.value = {
@@ -1008,11 +1020,19 @@ function classifyProvider(
     args: { novelId: number; chapterId: number; paragraphs: string[]; xRestrict: 0 | 1 | 2 },
     signalArg: AbortSignal,
     genNow: number,
+    /**
+     * code-review P12 out 参数：回退**零译文**时写入 `content_filter`，
+     * 由调用方覆盖 lastErrorCode（ADR-0178 D1 与 #654 的联动语义）。
+     */
+    zeroTextOverride: { code: string | null; message: string },
   ): Promise<"completed" | "partial" | "failed" | "aborted"> {
     if (gen !== genNow) return "failed"
     if (signalArg.aborted) return "aborted"
     const wholeRequest: TranslationRequest = { ...originalRequest, stream: false }
     isRetryingHint.value = true
+    // ADR-0178 D1：回退期间进度重置为 0%（UI 从「已 n%」退回「重试中…」而非停在高位）
+    // code-review P10：此前未重置，回退开始时进度条停在旧值，用户误以为仍在推进。
+    progress.value = { chapterId: args.chapterId, done: 0, total: args.paragraphs.length }
     try {
       const iter = providerArg.translate(wholeRequest, configArg, signalArg)
       // 收集所有 chunk
@@ -1061,7 +1081,19 @@ function classifyProvider(
       // 不修改 status；status 由外层原流程收敛到 partial/failed（按有/无译文段分类）
       // code-review S3：此前这里是 `void paragraphTexts` + `return lastError === null ?
       // "failed" : "failed"`（两侧相同的死三元），属与 translate.ts 同型的缺陷，已删。
-      void lastError
+      //
+      // code-review P12：回退**零译文**时按 ADR-0178 D1 联动 #654 的 content_filter 语义
+      // （截断/空流 = 内容被拒或模型无输出），而不是泛化的 unknown/原错误码 —— 让 UI
+      // 能给出「服务端未返回译文」这类可行动提示。
+      // 零译文 + **无显式错误码** = #654 的空流场景（服务端 200 但零输出，
+      // 典型为内容策略拦截）→ 回传 content_filter，与 #654 的 Java 侧判定同源。
+      // 若回退本身带了显式错误（HTTP 5xx / 429 / network），那个错误才是诊断信息，
+      // 不得覆盖成 content_filter（否则用户看到「内容被拦截」而实际是服务端故障）。
+      const hasAnyText = paragraphTexts.some((p) => p !== undefined && p !== "")
+      if (!hasAnyText && lastError === null) {
+        zeroTextOverride.code = "content_filter"
+        zeroTextOverride.message = t("novelTranslate.error.contentFilter")
+      }
       return "failed"
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return "aborted"

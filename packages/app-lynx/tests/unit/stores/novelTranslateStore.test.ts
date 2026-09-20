@@ -536,6 +536,40 @@ describe('半成品策略（ADR-0171 §5）', () => {
     expect(mocks.cacheSet).toHaveBeenCalled()
   })
 
+  it('ADR-0178 P12：回退零译文 + 无显式错误 → content_filter（#654 联动）', async () => {
+    // 第一次（流式）：error retryable=true 触发回退
+    // 第二次（整批回退）：只给 done、零 delta → 零译文（= #654 空流场景）
+    mocks.providerIter
+      .mockImplementationOnce(() =>
+        makeFakeIterator([{ type: 'error', code: 'server', message: '5xx', retryable: true }]),
+      )
+      .mockImplementationOnce(() => makeFakeIterator([{ type: 'done' }]))
+    const store = useNovelTranslateStore()
+    await store.translateChapter(45, 45, ['p1'], 0)
+    expect(store.status).toBe('failed')
+    expect(store.error?.code).toBe('content_filter')
+    expect(mocks.cacheSet).not.toHaveBeenCalled()
+  })
+
+  it('ADR-0178 P12 反例：回退带显式错误码 → **不**被 content_filter 覆盖', async () => {
+    mocks.providerIter
+      .mockImplementationOnce(() =>
+        makeFakeIterator([{ type: 'error', code: 'server', message: '5xx stream', retryable: true }]),
+      )
+      .mockImplementationOnce(() =>
+        makeFakeIterator([{ type: 'error', code: 'rate_limit', message: '429', retryable: false }]),
+      )
+    const store = useNovelTranslateStore()
+    await store.translateChapter(46, 46, ['p1'], 0)
+    expect(store.status).toBe('failed')
+    // 有显式错误 = 有诊断信息；不得被 P12 的 content_filter 联动覆盖。
+    // （保留首个错误码 `server` 是既有设计：spec §7.2 收敛表 + 本文件上方
+    //  「整批回退也失败 → 走原 failed 收敛（保留 lastErrorCode）」用例已钉住。
+    //  P12 只负责「**零译文且无显式错误**」这一种 #654 空流场景。）
+    expect(store.error?.code).not.toBe('content_filter')
+    expect(store.error?.code).toBe('server')
+  })
+
   it('ADR-0178 D1 fallback：整批回退也失败 → 走原 failed 收敛（不写缓存）', async () => {
     // 第一次（流式）：error retryable=true
     // 第二次（整批回退）：error retryable=true（回退也失败）

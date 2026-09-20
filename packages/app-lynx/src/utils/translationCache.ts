@@ -177,9 +177,20 @@ function openDbWithTimeout(): Promise<IDBDatabase> {
  * 读取单条缓存（不存在返回 null；IO 失败返回 null + warn，AGENTS.md 测试硬约束 #1+#3）。
  */
 export async function getTranslation(key: string): Promise<TranslationCacheEntry | null> {
-  // ADR-0175：真机原生模式走 filesystem（PictelioTranslateCache NativeModule）
+  // ADR-0175：真机原生模式走 filesystem（PictelioTranslateCache NativeModule）。
+  // code-review P7：providerId 兼容校验必须与 IDB 分支同形（ADR-0175 D5.4 明文「同左」）——
+  // 此前 fs 分支直接 return，换 provider 后会命中陈旧条目而不报错。
   if (isFilesystemTranslationCacheAvailable()) {
-    return fsGetTranslation(key)
+    const entry = await fsGetTranslation(key)
+    if (entry === null) return null
+    if (entry.providerId !== 'openai-responses') {
+      console.warn(
+        `[translationCache] cached providerId=${entry.providerId} incompatible with current (openai-responses); treating as miss`,
+        { key },
+      )
+      return null
+    }
+    return entry
   }
   if (!isIdbAvailable()) {
     // 真机 Lynx runtime：无 IDB + 无 filesystem → 缓存层整体跳过（不挂起翻译流程）
