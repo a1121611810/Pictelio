@@ -952,6 +952,14 @@ function classifyProvider(
         code: lastErrorCode ?? "PARTIAL_FAILED",
         message: lastErrorMessage || t("novelTranslate.error.partialFailed"),
       }
+      // ADR-0178 D4：partial 必须切到译文模式 —— `refreshDisplay` 的渲染源由
+      // `showTranslation && translatedParagraphs.length > 0` 决定；此前该分支不置
+      // showTranslation，渲染源恒为**原文**切片，占位符与已译段都不可见
+      // （P13 覆盖补强时由测试连续暴露的第二层缺陷）。
+      showTranslation.value = true
+      // 且必须重算渲染源 —— `refreshDisplay` 的占位分支依赖 `status === 'partial'`，
+      // 而此前该分支**不调用** refreshDisplay，占位符永不出现在 displayParagraphs。
+      refreshDisplay()
     } else if (result.status === "aborted") {
       status.value = "aborted"
     } else {

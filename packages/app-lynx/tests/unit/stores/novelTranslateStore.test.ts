@@ -666,6 +666,64 @@ describe('译文渲染源（spec §5 / §6.3）', () => {
     expect(store.displayParagraphs).toEqual(['缓存译一', '缓存译二'])
     expect(mocks.providerIter).not.toHaveBeenCalled()
   })
+
+  // ─── ADR-0178 D4：partial 未译段占位（code-review P13 覆盖补强） ───
+  //
+  // partial 的产生条件（createNovelTranslator:526-533）= failedCount>0 && successCount>0，
+  // 即**至少两块**且成败混合。块阈值 2000 字符（ADR-0169 D5.1），故用两段各 2000+
+  // 字符的原文强制切成 2 块；块 0 成功、块 1 失败。
+
+  /** 造一段 >2000 字符的原文（保证与下一段落在不同 chunk） */
+  const longPara = (tag: string): string => tag + 'あ'.repeat(2100)
+
+  it('partial 状态 → 未译段渲染为〔未翻译〕占位（不是回退原文）', async () => {
+    let call = 0
+    mocks.providerIter.mockImplementation(() => {
+      call += 1
+      return call === 1
+        ? makeFakeIterator([{ type: 'delta', paragraphIndex: 0, text: '译一' }, { type: 'done', usage: { inputTokens: 0, outputTokens: 0 } }])
+        : makeFakeIterator([{ type: 'error', code: 'server', message: 'boom', retryable: false }])
+    })
+    const store = useNovelTranslateStore()
+    await store.translateChapter(92, 92, [longPara('A'), longPara('B')], 0)
+
+    expect(store.status).toBe('partial')
+    // D4：未译段必须是占位符（UI 层据该字符串加灰色斜体），**不是**原文
+    expect(store.displayParagraphs[0]).toBe('译一')
+    expect(store.displayParagraphs[1]).toBe('〔未翻译〕')
+    expect(store.displayParagraphs[1]).not.toContain('B')
+  })
+
+  it('partial 进度不虚报 100%（code-review P10b / issue #651 范围补充）', async () => {
+    let call = 0
+    mocks.providerIter.mockImplementation(() => {
+      call += 1
+      return call === 1
+        ? makeFakeIterator([{ type: 'delta', paragraphIndex: 0, text: '译一' }, { type: 'done', usage: { inputTokens: 0, outputTokens: 0 } }])
+        : makeFakeIterator([{ type: 'error', code: 'server', message: 'boom', retryable: false }])
+    })
+    const store = useNovelTranslateStore()
+    await store.translateChapter(93, 93, [longPara('A'), longPara('B')], 0)
+
+    expect(store.status).toBe('partial')
+    // 2 段里只有 1 段有译文 → done 必须是 1 而不是 2（此前虚报 total）
+    expect(store.progress?.done).toBe(1)
+    expect(store.progress?.total).toBe(2)
+  })
+
+  it('completed 状态 → 不出现〔未翻译〕占位（占位只属于 partial）', async () => {
+    mocks.providerIter.mockImplementationOnce(() =>
+      makeFakeIterator([
+        { type: 'delta', paragraphIndex: 0, text: '译一' },
+        { type: 'done', usage: { inputTokens: 0, outputTokens: 0 } },
+      ]),
+    )
+    const store = useNovelTranslateStore()
+    await store.translateChapter(94, 94, ['原文一'], 0)
+
+    expect(store.status).toBe('completed')
+    expect(store.displayParagraphs.join('|')).not.toContain('〔未翻译〕')
+  })
 })
 
 // ─────────────────── 翻译授权闸门（spec §9.7：与内容显示开关独立） ───────────────────
