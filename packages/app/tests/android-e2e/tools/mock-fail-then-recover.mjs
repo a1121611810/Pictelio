@@ -43,9 +43,7 @@ const server = http.createServer((req, res) => {
       /* ignore */
     }
     const input = typeof parsed.input === "string" ? parsed.input : "";
-    const paragraphs = input
-      .split("\n\n")
-      .map((line) => line.replace(/^\[\d+\]\s*/, ""));
+    const paragraphs = input.split("\n\n").map((line) => line.replace(/^\[\d+\]\s*/, ""));
     console.log(
       `[mock] request model=${parsed.model} paragraphs=${paragraphs.length} stream=${parsed.stream}`,
     );
@@ -87,9 +85,7 @@ const server = http.createServer((req, res) => {
             });
           }
         }
-        console.log(
-          "[mock] 流式返 5 段后发 response.failed (code=network) → 触发整批回退",
-        );
+        console.log("[mock] 流式返 5 段后发 response.failed (code=network) → 触发整批回退");
         // response.failed event: code=network → classifyNativeError → "network"
         // → isRetryableNativeError("network") === true → store fallbackToWholeBatch
         sse(res, "response.failed", {
@@ -134,12 +130,8 @@ const server = http.createServer((req, res) => {
     // ── 整批回退路径 (stream=false) ──
     // 单次 POST + 完整 JSON：拼所有 output_text，按 [N] 锚点拆段
     // Java 端 deliverWholeBatchJson 用 (?m)^\[(\d+)\]\s* 正则拆
-    const all = paragraphs
-      .map((p, i) => `[${i}] ${translate(p, i)}`)
-      .join("\n\n");
-    console.log(
-      `[mock] 整批回退响应返 ${paragraphs.length} 段 / ${all.length} 字符`,
-    );
+    const all = paragraphs.map((p, i) => `[${i}] ${translate(p, i)}`).join("\n\n");
+    console.log(`[mock] 整批回退响应返 ${paragraphs.length} 段 / ${all.length} 字符`);
     const responseBody = {
       id: "resp_mock_whole",
       status: "completed",
