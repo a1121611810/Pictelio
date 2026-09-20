@@ -269,6 +269,175 @@ _Avoid_: 缺少密钥时沿用上一次的 verified 徽章、把时间戳当配�
 翻译按钮在「未配置 endpoint」时的态：点击跳设置页，而不是尝试翻译后失败。与「开始翻译」「重译」并列的按钮态之一。
 _Avoid_: 未配置时静默失败、把未配置当作翻译错误上报
 
+### 翻译栈（Translation stack）【2026-09-20 收敛，map #644】
+
+app-lynx 端从零搭建的 BYOK 翻译栈（ADR-0169 至 0177 + spec #618）；webview 端翻译栈保持现状不动（map Q3 完全从零；spec §2 Out of scope #1）。本节把分散在 5 张 ADR + 2 篇 research 里的术语按 Provider / bridge / cache / stream state / platform / auth / test 七层集中（先前在 ADR-0171 §References 标注「implement 阶段补」）。
+
+**TranslationProvider**：
+provider-无关流式接口（ADR-0169 D1）；`async function*` 返回 `AsyncIterator<TranslationChunk>`；消费方 `for-await-of`。当前唯一实现 = OpenAIResponsesProvider；接口预留未来扩展（chat/completions 适配器 seam 已留）。
+_Avoid_: 写死协议细节（URL / header / event type）、provider 间硬编码字段差异
+
+**OpenAIResponsesProvider**：
+唯一当前实现（ADR-0169 D6）；走 OpenAI Responses API `POST /v1/responses`；30+ Responses 事件归一化为 5 种 TranslationChunk；网络走 `PictelioTranslate.fetchStream`；apiKey 在 Java 侧注入 header（ADR-0037 字节零进 JS 堆）。
+_Avoid_: 在 JS 堆组装 Authorization header、手写 DeepSeek 协议分支（统一走 Responses API）
+
+**TranslationChunk（五类型）**：
+流式契约（ADR-0169 D4）：
+- `{ type: 'delta', paragraphIndex, text }` 段落增量
+- `{ type: 'reasoning_delta', text }` reasoning（埋点，不展示）
+- `{ type: 'cached', paragraphs }` 缓存命中整章
+- `{ type: 'done', usage }` 流成功结束
+- `{ type: 'error', code, message, retryable }` 终态失败
+_Avoid_: 暴露 Responses 30+ 事件类型给消费方（已规约为 5 种）
+
+**TranslationErrorCode（11 态）**：
+`unauthorized` / `rate_limit` / `insufficient_balance` / `invalid_request` / `model_not_found` / `endpoint_not_responses` / `server` / `network` / `content_filter` / `aborted` / `unknown`。由 provider 适配层或 JS 侧 `classifyNativeError` 映射（HTTP 状态码 → 仓库错误码联合类型，401/403 → unauthorized、429 → rate_limit、5xx → server、其余 → network）。
+_Avoid_: 直接传 HTTP 状态码给 store（业务谓词必须经 classifier）
+
+**chunked pipeline（≤2000 字 / 块，并发度 ≤3）**：
+provider 内部把整章 paragraph 沿边界切为 ≤2000 字块（ADR-0169 D5.1）；并发 ≤3 块同时跑（D5.2，OpenAI TPM 安全余量）；失败块回退原文（不污染缓存，D5.3）；AbortSignal 静默退出（D5.4，不 emit error，store 单点感知 `aborted`）。
+_Avoid_: 单次整章请求（触发 max_output_tokens 截断）、并发 > 3（多段同时涌出顺序错乱）
+
+**整批回退（fallback to single batch）**：
+全章流中断时自动 `stream=false` + `max_output_tokens × 2` + 整章一次性提交（ADR-0169 D5.3 + spec §9.6.1）；不走 chunked pipeline。回退成功 → completed；回退失败 → failed。
+_Avoid_: 流中断后让用户手动重试、整批回退走 chunked pipeline
+
+**translation 状态机（spec §7.2）**：
+`idle` → `pending` → `translating` → `done | aborted` → `completed | partial | failed | aborted`；缓存写**唯一时机** = `done` 之后（spec §9.6，ADR-0171 §5）；`partial` / `failed` / `aborted` 永不写。`aborted` ≠ `failed`（前者不计费归因）。
+_Avoid_: 缓存写提前到 `translating`（半成品污染）、把 `aborted` 当 `failed` 上报
+
+**PictelioTranslate NativeModule**：
+Java 端 Lynx NativeModule（ADR-0170 D1）；与 PictelioAuth / PictelioApi / PictelioSecureStorage 同级；不复用 PixivApiPlugin（语义边界不同）。LynxActivity 注册在 PictelioApi 之后。
+_Avoid_: 复用 PixivApiPlugin（鉴权头不同 / 流式 vs 一次性 / Base URL 动态 vs 硬编码）
+
+**translateStream / translatePoll / abortStream**：
+Java 三个 `@LynxMethod`（ADR-0170:296 / :605 / :711）；JS 侧 `translateStream` 发起流 + `translatePoll` 拉批 + `abortStream` 取消。**生产读缝 = translatePoll**（ADR-0174 D1，与事件总线共享 STREAM_TERMINAL，单一事实源）。
+_Avoid_: 用单 callback 多次回调（实测 callback 通道不可靠，每流至多 1 帧）、开静态 test hook 跳过生产路径
+
+**信封契约（envelope contract）**：
+每帧载荷形态（ADR-0170 §1.4 收步、ADR-0170:492-506、commit `87ffb5a3` 修订）：`{type, streamId, seq, ...}`；`streamId` = 流的稳定标识（JS 侧 `newStreamId()` 生成）；`seq` **入缓冲时盖章**（不是发送时）；两路发送（轮询 + 总线）必须**同一字符串**（即同一帧被两路各盖一次章的根因已记录在 ADR-0170 §6）。
+_Avoid_: 发送时盖章（已被证伪 = 同一帧被两路各盖一次章，seq 不同则 JS 去重永不命中）、省略 streamId（陈旧流帧被新翻译消费）
+
+**AbortController 包装（JS 侧）**：
+JS 侧生成 streamId（`newStreamId()`，会话内 UUID 降级，因 PrimJS 无 `crypto.randomUUID`，ADR-0172 §1）+ `AbortController`；`signal.addEventListener("abort", () => translateModule.abortStream(streamId))` 直调 streamId（ADR-0176 D6 正式化 #653 实施）。
+_Avoid_: 等 translateStream promise 拿 streamId（该 promise 也走不可靠 callback，首轮轮询永不启动）、用 `Math.random()`
+
+**Native callback 契约（去 null）**：
+参考 ADR-0053 §2；`com.lynx.react.bridge.CallbackImpl` 对 null 参数抛异常（真机 99900 实证）；统一「首参空串 = 错」（`err` 为空串 / undefined = 成功）。所有 PictelioTranslate 方法遵循。
+_Avoid_: 回调 null 失败、成功时塞 null
+
+**TranslationCacheKey（六元组）**：
+`(novelId, chapterId, targetLang, modelId, sourceHash, baseURLHash)`（ADR-0171 §1，spec §4.5）；拼为 `<novelId>:<chapterId>:<targetLang>:<modelId>:<sourceHash>:<baseURLHash>` 字符串；object store key 直接用此串。
+_Avoid_: novel 级粒度（命中率低、改首章全 miss）、段级粒度（爆炸）、webview 端 key 不含 sourceHash
+
+**fnv1a32 / baseURLHash / sourceHash**：
+32-bit FNV-1a hex 哈希（ADR-0171 §4）；`sourceHash = fnv1a32(join(paragraphs, '\n'))`、`baseURLHash = fnv1a32(baseURL)`；碰撞概率 200 章内 ~4.7×10⁻⁶（仅致重翻，无正确性后果）。**拒绝 SHA-256 / MD5 / xxhash**（无原生 + 依赖膨胀）+ **拒绝 spark-md5**（spec §4.5 原笔误，implement 收敛为 FNV-1a）。
+_Avoid_: 引入 npm hash 库、用 secure context crypto.subtle、CRC32（实现更复杂）
+
+**半成品不写（don't write partial）**：
+缓存写**唯一时机** = `done` 之后（ADR-0171 §5，spec §9.6）；`partial` / `failed` / `aborted` 永不写。流中断 / 网络断 / endpoint 504 都不污染缓存。
+_Avoid_: 在 `translating` 状态写缓存（半成品）、`partial` 状态补写成功段
+
+**续翻（auto-continue，no prompt）**：
+用户回到未译章节 → 自动从头重翻 + 缓存命中秒完（spec §9.6）；**不弹「续翻」按钮、不弹「上次部分译文是否保留」对话框**（spec §6.2 按钮 5 态保留状态、移除弹窗）。
+_Avoid_: 弹「续翻」按钮（fake semantics）、弹「保留部分」对话框
+
+**LRU 200（200 章容量上限）**：
+每次 cache.write 后检查 count；超 200 → cursor 按 createdAt 升序淘汰至 199（ADR-0171 §3，spec §12 N11 与 webview 端同基线起步）。淘汰粒度 = 条目级（不区分 model / novel）。
+_Avoid_: 整本缓存淘汰（用户切回 1 章导致整本重翻）、按 novel 配额（先不加）
+
+**同章节 in-flight 复用**：
+store 维护 `Map<chapterId, Promise>`（ADR-0171 §6，spec §9.8）；同 chapterId 二次进入复用同一 Promise；不同 chapterId 完全并行；abort 只取消旧 chapter 的 in-flight。
+_Avoid_: 同 chapter 二次进入开新 provider + 新 AbortController（资源浪费）
+
+**Native 通道（cacheDir/translations）**【ADR-0175】：
+真机翻译缓存落地路径 = `cacheDir/translations/<key>.json`（单条 ~50KB）+ `manifest.json`（LRU 索引）；新建 `PictelioTranslationCacheModule`（仿 `ImageCachePlugin.keyToFilename` Base64URL-safe 命名）；manifest 按 createdAt 排序淘汰；POSIX rename 原子。
+_Avoid_: SharedPreferences（ADR-0171 §D 显式 REJECTED：~1MB 配额 vs ~10MB 载荷；无 cursor 不适配 LRU；两端都不走 Preferences 的一致性）、SQLite（本仓零 SQLiteOpenHelper 先例、~1MB APK 膨胀）、单文件全量重写（B 方案痛点）
+
+**Web-core 通道（IndexedDB）**【ADR-0171】：
+IndexedDB 路径 = `pictelio_lynx` DB → `translations` object store（DB v3）；复用 `idbKV.ts` 封装（ADR-0050）；200 章 LRU + sourceHash 失效（与 native 通道同语义）；不为 `translations` 建 index（key 已唯一，cursor 遍历即可）。
+_Avoid_: 单独的 IDB DB（避免升级复杂度）、为 `translations` 建多 index
+
+**三态 cache adapter**：
+`getCacheAdapter() = isNativeMode() ? nativeFsAdapter() : idbKVAdapter()`（ADR-0175 D4）；两边都不可用时 cache 整体 no-op（不报错，UI 体验 = 每次重译；与 ADR-0172 §2「native 模式缓存不生效」语义对齐，已通过 ADR-0175 落地）。
+_Avoid_: 探测超时 + 兜底（真机上 setTimeout 不可靠，造「看起来在工作」假象）
+
+**streamId（cross-side key）**：
+流的稳定标识（JS 侧生成，**不**要求 UUID 形态——同会话 + Java 注册表内唯一即可，因 PrimJS 无 `crypto`）；cross-side 共享 key（Java `ACTIVE_CALLS` / `STREAM_FRAMES` / `STREAM_TERMINAL` / `STREAM_SEQ` 均按 streamId 分桶，ADR-0170 :104/138/148/533）。
+_Avoid_: 用 callback promise 句柄传 streamId（该 promise 走不可靠 callback）、要求 UUID v4 严格匹配
+
+**TranslationStreamState（per-stream keying）**【ADR-0176】：
+per-stream 共享解析状态对象；含 `frameQueue`（ConcurrentLinkedQueue）+ `sseParser`（TranslationSseParser 实例）；按 streamId 收进 `ConcurrentHashMap<String, TranslationStreamState>`。**`deltaSeen` 已删除**（#654, commit `c7019273`），`deltaCount` 不在生产代码。
+_Avoid_: 实例级共享 state（M2 污染 = 陈旧流帧被新流 parser 接收）、instance 字段直接挂 module（`deltaSeen` 历史坑）
+
+**pruneFinishedStreams**：
+终态交付后清理注册表（ADR-0170:471-485）；`STREAM_FRAMES` / `STREAM_TERMINAL` / `STREAM_TERMINAL_MSG` / `STREAM_SEQ` 全部自我清理（防泄漏）；ADR-0176 D2 扩展到 TranslationStreamState 同步清理。
+_Avoid_: 终态不清理（map 永久增长）、复用相同 streamId 而不重置
+
+**污染机制 M1/M2/M3**：
+研究 #649 §3 证实的三种跨流污染（修复前可达）：
+- **M1** — drain attribution race（窄窗口）：drain 时用 worker id 盖章，跨流帧误归属
+- **M2** — parser content mixing（宽窗口）：陈旧流帧被新流 parser 实例接收混合
+- **M3** — 共享解析状态交叉：A 流 readTimeout 时把 B 流 parser 的 terminal 当作自己终态
+
+修复 = per-stream keying（ADR-0176 D1-D4）。
+_Avoid_: 用 concurrency:1 限制（仅约束单次 pipeline 内、不跨 run）、锁共享 state（失并发）
+
+**isNativeMode()**：
+双环境探测（ADR-0053 §1）；`typeof NativeModules !== "undefined" || !!globalThis.NativeModules`；true = 真机，false = web-core 预览。所有 Lynx 专有调用 guard。
+_Avoid_: 用 `process.env.NODE_ENV`（build-time 不可靠）、单点 typeof 探测
+
+**isIdbAvailable() / 假 AndroidKeyStore provider**【ADR-0174 / ADR-0172】：
+测试侧桥；Robolectric 4.14.1 无 AndroidKeyStore（实测异常字面量 `AndroidKeyStore not found` / `AndroidKeyStore KeyStore not available`）；假 provider 只伪造**密钥存储**（JVM 上不存在的那部分），密文仍由生产 `SecureStorageCompat.encryptString` 加密 / `decryptString` 解密（**非自洽 mock**，硬约束 #2）。
+_Avoid_: 假 keystore 同时伪造密文（与 SecureStorageCompat 解耦失去测试意义）、反射注入生产 Keystore
+
+**TestLynxContext**【ADR-0174 / research §2.1】：
+Robolectric 下驱动 PictelioTranslateModule 必需的 LynxContext 子类；LynxContext 抽象类只有 1 个抽象方法 `handleException(Exception)`，子类 5 行；构造成功，`getContext()` 返回内部 `MutableContextWrapper` 包着 app Context，`getLynxView() === null`（publishFramesViaEvent 因此安全退出，:559-567）。
+_Avoid_: 用普通 Context 构造 module（`appContext()` ClassCastException 被兜底 catch 抓成「请求构造失败」，不写终态）
+
+**utf8Encode / utf8Decode**【ADR-0172 §1】：
+纯 JS UTF-8 编解码；`TextEncoder` / `TextDecoder` 在 PrimJS **undefined**（2026-09-11 WebDAV 实证）；`translationCache.fnv1a32` 与 `backupCore` 都从这里取，**禁止各自复制**（既往就是两个模块各写一份、其中一个漏了纯 JS 化才复发）。
+_Avoid_: 直接用 `new TextEncoder()`（真机 ReferenceError）、各模块自实现一份
+
+**newStreamId()**【ADR-0172 §1】：
+JS 侧生成 streamId；有 `crypto.randomUUID` 时用标准 UUID，无 `crypto` 时降级「时间戳 + 会话内单调序号」；只要求同会话 + Java `ACTIVE_CALLS` 注册表内唯一（**不**要求 UUID 形态）。
+_Avoid_: 用 `Math.random()`（碰撞）、要求 UUID v4 严格匹配（PrimJS 端无 crypto 走不通）
+
+**应用层闸门 isTranslationRestricted(xRestrict)**【ADR-0173 D4b】：
+`xRestrict=1` 需 `settings_translate_r18_${uid}`、`=2` 需 `settings_translate_r18g_${uid}`；未授权**不发请求**（正文零外发），状态置 `aborted`，错误码区分 `R18_BLOCKED` / `R18G_BLOCKED`。
+_Avoid_: 复用内容显示谓词（把翻译授权 = 内容显示 = 两件不同的事混为一谈）
+
+**settings_translate_r18_${uid} / settings_translate_r18g_${uid}**【ADR-0173 D4b】：
+账号级授权开关；**与内容显示开关 `show_r18_*` 完全独立**（看见 R18 ≠ 允许把 R18 正文发给第三方 LLM）；首次开启前弹行内风险确认（R18：服务商记录 / 训练、账号受限；R18G：法律红线 + 可能上报）。
+_Avoid_: 设备级开关（多账号用户无法独立控制）、与内容显示开关复用
+
+**translatePoll 生产读缝（production read seam）**【ADR-0174 D1】：
+单测钉住「Java 终态契约」必须经 `translatePoll` 读 STREAM_TERMINAL（ADR-0170:607）；与事件总线共享同一 register。改坏 `registerTerminal` 的 `put`（裸文本）→ 寄存器里就是裸文本 → 生产读路径原样回传 → `JSONObject` 抛 `JSONException` → **红**（M1 变异实测 6/9）。
+_Avoid_: 开静态 test hook 跳过生产路径（缝自身仍构造 JSON，生产被改坏也照样绿 = 「事实 5」陷阱）
+
+**五路径 + 成功路径**【ADR-0174 D3】：
+单测必须覆盖：①参数校验失败 ②HTTP 非 2xx ③网络异常 ④用户 abort ⑤未配置 apiKey ⑥成功（delta + done）；每条断言 3 件 = `new JSONObject(payload)` 可解析 + `type ∈ {error, done}` + `streamId === _abortToken`。
+_Avoid_: 只测成功路径（production 改坏 error 路径不被发现）
+
+**成功路径必须排空帧缓冲**【ADR-0174 D5 / research §2.5】：
+`TranslationSseParser` 在 `response.completed` 也 emit 一个 `{"type":"done"}` 负载帧（`TranslationSseParserTest.java:86-95` 钉住），而 `translatePoll` 优先返回帧缓冲；「轮询到第一个 done 就断言」永远读不到终态寄存器 → M1 下仍绿（事实 5 同款）。修正：断言**每一次交付的载荷都是 JSON**（把缓冲排空）。
+_Avoid_: 「第一个 done 即断言」（被骗绿）
+
+**UUID 隔离**【ADR-0174 D4】：
+每用例 `UUID.randomUUID()` 作 `_abortToken`；与残留状态（`USER_ABORTED` 无重置入口）天然隔离；**无需反射清 map**，无需新增生产 API。
+_Avoid_: 用固定 token（与残留状态纠缠）、反射清类静态 map（生产无 reset 入口）
+
+**事件总线盲区（LynxView null under Robolectric）**【ADR-0174 D6 / research §2.6】：
+`publishFramesViaEvent`（ADR-0170:557-595）在 JVM 不可观测：`mContext instanceof LynxContext` + `ctx.getLynxView() != null` → Robolectric 下 `getLynxView() === null`（P4 实测）；M2 变异 9/9 绿。Resolution paths: (a) LynxView Robolectric shadow（需 `@Config(instrumentedPackages = "com.lynx.tasm")`，本仓零 shadow 先例）或 (b) 抽 event-bus 载荷构造为可测类。本阶段承认盲区（≤1 mutation test/release + android-e2e ≥4-segment 兜底）。
+_Avoid_: 用 mock LynxView（副作用未知）、跳过总线盲区（不让 CI 看到这块）
+
+**M1/M2 变异测试**【ADR-0174 §后果；AGENTS.md 测试硬约束 #2 真实样例 + #6 期望值溯源】：
+- M1 = `registerTerminal` 改回裸文本 `put`：6 红 / 3 绿（生产路径被改坏真变红）
+- M2 = `publishFramesViaEvent` 改读 STREAM_TERMINAL_MSG：9 绿（总线载荷在 JVM 单测盲区）
+
+JVM 单测钉得住「**两通道共同的那个字符串**」（:584 与 :607 读同一 STREAM_TERMINAL），钉不住总线这段代码本身。
+_Avoid_: 删除变异后全绿就当测试通过（mutation testing 必须做）
+
 ### 状态管理（State management）
 
 **Pinia setup store**【2026-09-03 新增，ADR-0139 + ADR-0140】：

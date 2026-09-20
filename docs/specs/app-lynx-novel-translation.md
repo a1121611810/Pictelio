@@ -2,7 +2,7 @@
 
 - 状态：ready-for-implementation（2026-09；配套 ADR-0169 / ADR-0170 / ADR-0171 + prototype #624）
 - 日期：2026-09-19
-- 关联：wayfinder map #617 / ADR-0169（Responses API 请求构造） / ADR-0170（chunked pipeline 与重试） / ADR-0171（缓存键与模型档位） / prototype #624（endpoint 配置 + 失败 UX 视觉定型）/ 调研产物 `research/openai-responses-api.md`（#622）/ `research/lynx-async-iterator-support.md`（#623）/ `research/llm-endpoint-compatibility.md`（#625）/ `research/deepseek-streaming-api.md`（#622 旁证）
+- 关联：wayfinder map #617 / #644 / ADR-0169（Responses API 请求构造）/ ADR-0170（chunked pipeline 与重试）/ ADR-0171（缓存键与模型档位）/ ADR-0172（PrimJS 运行时 API 面）/ ADR-0173（端点探测与凭据验证）/ **ADR-0174（Java 终态测试契约）** / **ADR-0175（filesystem cache 通道）** / **ADR-0176（per-stream keying）** / **ADR-0177（gradle variant gate）** / **ADR-0178（重试 + partial UI 形态参数）** / prototype #624（endpoint 配置 + 失败 UX 视觉定型）/ 调研产物 `research/openai-responses-api.md`（#622）/ `research/lynx-async-iterator-support.md`（#623）/ `research/llm-endpoint-compatibility.md`（#625）/ `research/deepseek-streaming-api.md`（#622 旁证）/ `research/app-lynx-translation-java-contract-test-mechanism.md`（#646）/ `research/app-lynx-translation-cross-stream-contamination.md`（#649）
 - 工单：tickets 由 to-tickets 阶段产出（不在本 spec 内）
 
 > 本 spec **完全限定在 app-lynx 客户端**（`packages/app-lynx/`），不动 webview 端（`packages/app/`）任何翻译栈；不复用 webview 端的 `createNovelTranslator` / `translationCache` / `translationStore` / `TranslateSheet` / `SettingsTranslate` / `prompts.ts`；不抽共享包。可参考 webview 端的**抽象边界**（provider 接口形态、缓存键设计、policy 决策点），但不直接搬运实现。
@@ -525,8 +525,22 @@ sequenceDiagram
 | `translating` | chunk `delta` | `translating` | translatedParagraphs[i] += text |
 | `translating` | chunk `done` 但 zero-delta（零译文段；content policy 拦截 / 模型拒答等） | `failed` | errorCode=content_filter; emit `lastError` |
 | `translating` | chunk `done` | `completed` | cache.write(); fromCache=false |
-| `translating` | chunk `error (retryable)` | 流式整批回退 → `translating` | retried via `stream=false` |
+| `translating` | chunk `error (retryable)` | `translating`（整批回退中；UI 保持 `translating` + 微提示「重试中…」） | retried via `stream=false, max_output_tokens × 2`；**0ms 退避**（即时触发）；成功后 → `completed` |
 | `translating` | chunk `error (non-retryable)` | `failed` | emit `lastError` |
+
+> **Retry 触发子集**（ADR-0178 D2）：仅 `retryable=true` 的错误码触发整批回退：
+> - `network` (TCP RST / 连接超时 / DNS) ✓
+> - `server` (HTTP 5xx) ✓
+> - `incomplete` (输出截断) ✓
+> - `unauthorized` (401/403) → `failed`（凭据错重试无意义）
+> - `insufficient_balance` (402) → `failed`
+> - `rate_limit` (429) → **`failed`**（不自动 retry，避免触发 endpoint 限流放大；由用户手动 retry）
+> - `invalid_request` (400) → `failed`（请求无效）
+> - `model_not_found` (404/405) → `failed`
+> - `content_filter`（内容策略拒答 / 空流 #654）→ `failed`
+> - `endpoint_not_responses` → `failed`
+>
+> **退避策略**（ADR-0178 D3）：自动整批回退 **0ms 退避**（即时触发；流已中断，UI 显示「重试中…」即可，用户感知延迟最小）；用户主动 retry 按钮 **1.5s debounce**（防双击连点）。
 | `translating` | user `abort()` | `aborted` | abortController.abort() |
 | `translating_queued` | chunk `delta` | `translating` | — |
 | `translating_queued` | user `abort()` | `aborted` | abortController.abort() |
@@ -534,6 +548,7 @@ sequenceDiagram
 | `partial` | user `abort()` | `aborted` | abortController.abort() |
 | `failed` | user `retry()` | `pending` | — |
 | `failed` | user `clear()` | `idle` | clear translatedParagraphs |
+| `translating` (整批回退中) | chunk `error` (回退本身失败) | `partial`（有 ≥1 译文段）或 `failed`（零译文段，与 #654 联动 → `content_filter`） | emit `lastError` |
 | `completed` | user `retranslate()` | `pending` | cache.delete(); reset state |
 | `completed` | user `clear()` | `idle` | cache.delete(); clear translatedParagraphs |
 | `completed` | cache miss (model change / source hash mismatch) | `idle` | fromCache=false; displayBlocks fallback |
@@ -604,6 +619,7 @@ sequenceDiagram
 | `status.partial` | 部分译文（{n} 段未译） | Partial translation ({n} paragraphs missing) |
 | `status.completed` | ✓ 翻译完成 | ✓ Translation complete |
 | `status.placeholder_untranslated` | 〔未翻译〕 | 〔Untranslated〕 |
+| `status.retrying` | 重试中… | Retrying… |
 
 ### 8.4 `novelTranslate.error.*`（错误提示）
 
@@ -716,8 +732,8 @@ DeepSeek Responses API 是 **Codex 集成路径**，与 OpenAI Responses 兼容�
 
 ### 9.6 流式中断 / 用户切走（Q21 自动从头重翻）
 
-**流式中断路径**：
-1. **网络断开**（mid-stream 5xx / TCP RST）：provider 捕获 → emit `error('network', retryable=true)` chunk → store 状态 `translating` → `partial` → 触发**整批回退**（Q6：stream=false 重试一次）→ 成功则 `completed`；失败则 `failed`。
+**流式中断路径**（ADR-0178 D1）：
+1. **网络断开**（mid-stream 5xx / TCP RST）：provider 捕获 → emit `error(code, retryable=true)` chunk → store **保持 `translating`**（**不切 partial**）→ 立即（0ms 退避）触发**整批回退**（`stream=false, max_output_tokens × 2`） → 成功则 `completed`；回退失败 → `partial`（有 ≥1 译文段）或 `failed`（零译文段 → `content_filter`）。UI 反馈：进度条「翻译中 N%」+ 底部微提示「重试中…」（≤3s 自动消失）。
 2. **用户切章节 / 关闭详情页**：`resetOnChapterSwitch()` 调用 `abortController.abort()` → 流断开 → 状态 `aborted`（不计费归因）。
 3. **用户回未译章节**（Q21）：`startTranslate()` 重发请求；缓存命中直接 `cached` chunk → 状态 `completed`（秒完）；缓存 miss 则从头翻译。
 
@@ -787,7 +803,12 @@ DeepSeek Responses API 是 **Codex 集成路径**，与 OpenAI Responses 兼容�
 | 错误码分类 | `401/403 → unauthorized`、`402 → insufficient_balance`、`429 → rate_limit`、`404/405 → model_not_found`、`400 → invalid_request`、`5xx → server`、内容策略拒答 → `content_filter`、`aborted` → aborted、其余 → network | ADR-0173 D7 + 仓库 `TranslationErrorCode` 联合类型（以 `classifyNativeError` 的实现分支为准） |
 | 缓存键 | FNV-1a 32-bit 拼接；sourceHash 改 → miss；model 改 → miss；baseURL 改 → miss | spec §4.5 / §9.5 |
 | 缓存写策略 | `partial` / `failed` / `aborted` 不写；`done` 之后才写 | spec §7.2 / §9.6 |
+| 缓存通道 | app-lynx 原生 = filesystem cacheDir（ADR-0175 D1）；SharedPreferences/SQLite 显式 REJECTED；LRU manifest 形态同 `ImageCachePlugin` | ADR-0175 |
 | 状态机 | 8 状态 + 18 转移路径全覆盖；generation-gate 跨章节守门 | spec §7 |
+| 自动整批回退触发子集 | `retryable=true`：`network` / `server` (5xx) / `incomplete` → 触发；`unauthorized` (401/403) / `insufficient_balance` (402) / `rate_limit` (429) / `invalid_request` (400) / `model_not_found` (404/405) / `content_filter` / `endpoint_not_responses` → **不触发**，直接 `failed`；`aborted` → `aborted` | ADR-0178 D2 |
+| 整批回退退避 | **0ms**（即时触发）；UI 保持 `translating` + 微提示「重试中…」；用户 retry 按钮 **1.5s debounce** | ADR-0178 D3 |
+| 整批回退形态 | `stream=false, max_output_tokens × 2`，整章一次性提交；不走 chunked pipeline | spec §6 / §9.6 / ADR-0169 D5.3 |
+| Partial UI 形态 | 段落位置与索引保留；内容用 `〔未翻译〕` 占位；**浅灰文字 + 斜体**；段落间距/字号与已译段一致 | ADR-0178 D4 |
 | i18n 键完整性 | 50 个键（§8）全部存在；zh-CN / en 镜像均非空 | spec §8 |
 | Inline probe | HTTP 401/403 → 兼容；404 → 不兼容；405 → 仅 chat/completions；网络错 → unknown | 调研 `research/llm-endpoint-compatibility.md` §Q7 |
 | Azure URL 模板 | baseURL `*.openai.azure.com` → 自动补 `/openai/v1` + `api-version: preview` header | spec §9.2 |
@@ -852,7 +873,7 @@ agent-browser 入门禁（ADR-0084）；novel 端到端只有单测（参考 `pa
 | N1 | LLM endpoint 设置页 UI（字段 / 默认值 / 错误提示） | [已收敛于本 spec §6.1 + §8.1] | prototype #624 视觉定型 |
 | N2 | Responses API 请求构造细节（`instructions` / `input` / `max_output_tokens` / `reasoning.effort` / `stream`） | ADR-0169（#619） | — |
 | N3 | Responses API 兼容性矩阵 | [已收敛于本 spec §9.1 / §9.3 + 调研 #625] | — |
-| N4 | 翻译状态持久化（app 关闭后重开，已译章节保留显示） | implement 阶段 | 默认持久化（IDB cache + LlmEndpointPublic） |
+| N4 | 翻译状态持久化（app 关闭后重开，已译章节保留显示） | implement 阶段 | 默认持久化（filesystem cacheDir + LlmEndpointPublic） |
 | N5 | 模型档位与切换（旧缓存自动失效） | [已收敛于本 spec §9.10] | ADR-0171（#621）定清理策略 |
 | N6 | 章节续翻触发（自动 vs 手动） | [已收敛于本 spec §9.6] | Q21：自动续翻（缓存命中秒完） |
 | N7 | 导出集成（译文纳入 novel-export） | 后续 map | 本 spec Out of scope |
@@ -900,7 +921,7 @@ agent-browser 入门禁（ADR-0084）；novel 端到端只有单测（参考 `pa
 | # | 假设 | 备选 |
 |---|------|------|
 | A1 | 章节 paragraphs 走 native bridge 拿（与现有 novel body 通路一致） | 走 HTTP 直拉（多一跳，OCR/caption 分离） |
-| A2 | 流式整批回退最多 1 次（再失败就 `failed`） | 整批回退 + 第二次整批重试（成本翻倍） |
+| A2 | 流式整批回退最多 1 次（再失败就 `failed`）；触发子集 = `retryable=true` 全集（429 例外）；0ms 退避；用户 retry 1.5s debounce（ADR-0178） | 整批回退 + 第二次整批重试（成本翻倍） |
 | A3 | 缓存只 cache 成功段落（半成品不写） | 半成品也 cache（节省重试成本，但展示不完整） |
 | A4 | model 字段由用户自由填写（不做白名单） | 限定 model 白名单（gpt-5 / deepseek-v4-pro 等） |
 | A5 | Base URL 不做自动补全（除 Azure） | 自动补 `/v1` 后缀（更友好但容错掩盖 typo） |
@@ -908,7 +929,7 @@ agent-browser 入门禁（ADR-0084）；novel 端到端只有单测（参考 `pa
 | A7 | inline probe 是 best-effort（不阻塞保存） | 必填探测成功才能保存（强校验但首次配置摩擦大） |
 | A8 | 并发请求同章节完全复用 in-flight（不发新请求） | 复用 in-flight 但带 dedupe 提示（用户感知） |
 | A9 | 续翻场景下流式 + 整批回退都用同一 provider | 续翻整批回退走备用 provider（容灾但复杂度高） |
-| A10 | 「清除翻译缓存」入口只清 IDB，不清 endpoint 配置 | 同时清 endpoint（一次性重置，更彻底但易误触） |
+| A10 | 「清除翻译缓存」入口只清 filesystem cacheDir，不清 endpoint 配置 | 同时清 endpoint（一次性重置，更彻底但易误触） |
 
 ---
 
