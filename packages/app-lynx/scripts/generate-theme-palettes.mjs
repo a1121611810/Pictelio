@@ -22,8 +22,53 @@
 //
 // 重新生成后必须重跑 pnpm test:app-lynx（unit.test.ts §暗色色板契约）确认完整覆盖。
 
-import { SchemeTonalSpot, MaterialDynamicColors, Hct, hexFromArgb, argbFromHex } from '@material/material-color-utilities'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync, statSync, readdirSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+/** 修补 @material/material-color-utilities 0.4.0 在 Node 22+ 的 ESM 解析缺陷：
+ * 内部若干 .js 文件 import 时漏写 .js 后缀（TypeScript 源风格），新版 Node 严格 ESM
+ * 会报 ERR_MODULE_NOT_FOUND。此补丁遍历包内所有 .js，给所有相对 import 补上 .js 后缀。
+ * 仅作用于 devDependencies 中的生成工具，运行时 Lynx bundle 不引用此包。
+ *
+ * 注意：pnpm 重装会清掉此补丁，因此脚本每次运行都自检 + 自愈一次。
+ * 必须在动态 import 之前完成（ESM 顶层 import 会先解析，故此处必须用动态 import 加载目标包）。
+ */
+function patchMaterialColorUtilities() {
+  let entryPath
+  try {
+    // 用 index.js 解析（package.json 受 exports 限制无法被 import.meta.resolve 解析）
+    const pkgMainUrl = import.meta.resolve('@material/material-color-utilities')
+    entryPath = dirname(fileURLToPath(pkgMainUrl))
+  } catch {
+    return
+  }
+  function walk(dir) {
+    for (const f of readdirSync(dir)) {
+      const p = join(dir, f)
+      const stat = statSync(p)
+      if (stat.isDirectory()) walk(p)
+      else if (f.endsWith('.js')) patch(p)
+    }
+  }
+  function patch(file) {
+    let src = readFileSync(file, 'utf-8')
+    const before = src
+    src = src.replace(/from '(\.\.?\/[^']+?)';/g, (m, p1) => {
+      if (p1.endsWith('.js') || p1.endsWith('.json') || p1.startsWith('node:')) return m
+      return `from '${p1}.js';`
+    })
+    if (src !== before) writeFileSync(file, src)
+  }
+  walk(entryPath)
+}
+
+patchMaterialColorUtilities()
+
+// 动态 import 必须在 patch 之后（ESM 顶层 import 会先解析，故放动态 import）
+const { SchemeTonalSpot, MaterialDynamicColors, Hct, hexFromArgb, argbFromHex } = await import(
+  '@material/material-color-utilities'
+)
 
 /** 6 主题 seed（与既有 .theme-X 亮色版的 primary 值一一对应；派生自 ADR-0152
  * themeColor.ts 的 THEME_COLOR_OPTIONS 锁定值）。这里硬编码一份以保证脚本
