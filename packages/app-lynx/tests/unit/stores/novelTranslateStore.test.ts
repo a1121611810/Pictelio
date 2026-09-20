@@ -769,6 +769,9 @@ describe('凭据验证（密钥层；真实 key + 持久化 + 失效规则）', 
     expect(result.ok).toBe(true)
     expect(store.credential.state).toBe('verified')
     expect(store.credential.at).toBeGreaterThan(0)
+    // #637 P3-6：往返耗时回传（此前原生未回传，UI 无法显示延迟数据）
+    expect(result.elapsedMs).toBeGreaterThanOrEqual(0)
+    expect(Number.isFinite(result.elapsedMs)).toBe(true)
     expect(nativePrefsStore.get('llm_endpoint_verified_state')).toBe('verified')
     expect(nativePrefsStore.get('llm_endpoint_verified_base_url')).toBe('https://api.openai.com/v1')
   })
@@ -784,6 +787,8 @@ describe('凭据验证（密钥层；真实 key + 持久化 + 失效规则）', 
 
     expect(result.ok).toBe(false)
     expect(result.code).toBe('invalid_key')
+    // 失败路径同样回传耗时（#637 P3-6）
+    expect(result.elapsedMs).toBeGreaterThanOrEqual(0)
     expect(store.credential.state).toBe('failed')
   })
 
@@ -966,5 +971,28 @@ describe('endpoint 配置（spec §6.1）', () => {
     const store = useNovelTranslateStore()
     await store.clearEndpointConfig()
     expect(mocks.nativeClearEndpoint).toHaveBeenCalled()
+  })
+
+  // ─── #637 P3-7：清缓存 UI 入口（此前 clearTranslationCache 零调用点） ───
+
+  it('clearAllTranslationCache → 调 clearTranslationCache + isCached 全量置 false', async () => {
+    const store = useNovelTranslateStore()
+    store.isCached = { 1: true, 2: true, 3: true }
+    mocks.cacheClear.mockResolvedValueOnce(undefined)
+    await store.clearAllTranslationCache()
+    expect(mocks.cacheClear).toHaveBeenCalled()
+    expect(store.isCached[1]).toBe(false)
+    expect(store.isCached[2]).toBe(false)
+    expect(store.isCached[3]).toBe(false)
+    expect(store.showTranslation).toBe(false)
+  })
+
+  it('clearAllTranslationCache 失败 → console.warn + 向上抛（可见，不静默吞）', async () => {
+    const store = useNovelTranslateStore()
+    mocks.cacheClear.mockRejectedValueOnce(new Error('IDB down'))
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await expect(store.clearAllTranslationCache()).rejects.toThrow('IDB down')
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
   })
 })

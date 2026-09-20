@@ -41,6 +41,7 @@ import {
   computeSourceHash,
   isTranslationCacheAvailable,
   removeTranslation,
+  clearTranslationCache,
 } from "../utils/translationCache"
 import { useSettingsStore } from "./settingsStore"
 import type {
@@ -130,7 +131,9 @@ export interface NovelTranslateStore {
   saveEndpointConfig: (config: LlmEndpointConfig) => Promise<void>
   clearEndpointConfig: () => Promise<void>
   probeCompatibility: (baseURL: string) => Promise<ProbeClassification>
-  testConnection: (config: LlmEndpointConfig) => Promise<{ ok: boolean; code: string; detail: string }>
+  testConnection: (
+    config: LlmEndpointConfig,
+  ) => Promise<{ ok: boolean; code: string; detail: string; elapsedMs: number }>
   translateChapter: (
     novelId: number,
     chapterId: number,
@@ -144,6 +147,8 @@ export interface NovelTranslateStore {
     xRestrict?: 0 | 1 | 2,
   ) => Promise<void>
   toggleMode: () => Promise<void>
+  /** 清除全部翻译缓存（#637 P3-7 用户主动入口） */
+  clearAllTranslationCache: () => Promise<void>
   abort: () => void
 }
 
@@ -558,8 +563,11 @@ function classifyProvider(
     ok: boolean
     code: string
     detail: string
+    /** 往返耗时（ms）—— #637 P3：UI 可显示延迟数据（此前原生未回传） */
+    elapsedMs: number
   }> {
     const baseURL = config.baseURL.trim()
+    const startedAt = Date.now()
     const stamp = (state: CredentialVerificationState): CredentialVerification => ({
       state,
       at: Date.now(),
@@ -567,6 +575,7 @@ function classifyProvider(
     })
     try {
       const result = await nativeProbeEndpoint(baseURL, config.apiKey, config.model)
+      const elapsedMs = Date.now() - startedAt
       const httpStatus = result.httpStatus
       const authenticated = httpStatus >= 200 && httpStatus < 300
       // 400 + invalid_api_key body 也属「密钥无效」（原生 keyInvalid 标记，ADR-0173 D3 修订）
@@ -574,7 +583,7 @@ function classifyProvider(
       if (authenticated) {
         await writeCredentialVerification("verified", baseURL)
         credential.value = stamp("verified")
-        return { ok: true, code: "ok", detail: result.detail }
+        return { ok: true, code: "ok", detail: result.detail, elapsedMs }
       }
       await writeCredentialVerification("failed", baseURL)
       credential.value = stamp("failed")
@@ -582,13 +591,15 @@ function classifyProvider(
         ok: false,
         code: invalidKey ? "invalid_key" : "http_" + String(httpStatus),
         detail: result.detail,
+        elapsedMs,
       }
     } catch (err) {
+      const elapsedMs = Date.now() - startedAt
       const message = err instanceof Error ? err.message : String(err)
       console.warn("[novelTranslateStore] testConnection 失败", err)
       await writeCredentialVerification("failed", baseURL)
       credential.value = stamp("failed")
-      return { ok: false, code: "network", detail: message }
+      return { ok: false, code: "network", detail: message, elapsedMs }
     }
   }
 
@@ -1118,6 +1129,28 @@ function classifyProvider(
     await translateChapter(novelId, chapterId, paragraphs, xRestrict)
   }
 
+  /**
+   * 清除**全部**翻译缓存（#637 P3-7：`clearTranslationCache()` 此前零调用点）。
+   * 用户主动入口（spec §6.1 / §9.5）；清完把 isCached 全量置 false（避免 UI 仍显示
+   * 「已缓存」但实际已 miss）。
+   */
+  async function clearAllTranslationCache(): Promise<void> {
+    try {
+      await clearTranslationCache()
+      // isCached 是 Record<chapterId, boolean>；全量重置为 false（保守：清完即全部 miss）
+      const next: Record<number, boolean> = {}
+      for (const k of Object.keys(isCached.value)) next[Number(k)] = false
+      isCached.value = next
+      showTranslation.value = false
+      translatedParagraphs.value = []
+      refreshDisplay()
+    } catch (err) {
+      // 清缓存失败必须可见（AGENTS.md 硬约束 #3）
+      console.warn("[novelTranslateStore] clearAllTranslationCache 失败", err)
+      throw err
+    }
+  }
+
   /** 切换原文/译文显示（同步：仅切 signal + 重算渲染源） */
   async function toggleMode(): Promise<void> {
     showTranslation.value = !showTranslation.value
@@ -1155,6 +1188,7 @@ function classifyProvider(
     translateChapter,
     retranslate,
     toggleMode,
+    clearAllTranslationCache,
     abort,
   }
 })

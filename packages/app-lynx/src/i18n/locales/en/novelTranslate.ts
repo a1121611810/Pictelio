@@ -42,6 +42,8 @@ const enNovelTranslate = {
   "novelTranslate.endpoint.probe.success": "Connection successful",
   "novelTranslate.endpoint.notConfigured": "LLM endpoint not configured",
   "novelTranslate.endpoint.clear": "Clear configuration",
+  "novelTranslate.endpoint.cache.clear": "Clear translation cache",
+  "novelTranslate.endpoint.cache.cleared": "Translation cache cleared",
   "novelTranslate.endpoint.deleteConfirm": "Clear saved endpoint configuration?",
   "novelTranslate.endpoint.cancel": "Cancel",
   "novelTranslate.endpoint.confirmClear": "Clear",

@@ -195,6 +195,8 @@ onUnmounted(() => {
   if (compatTimer !== null) clearTimeout(compatTimer)
   if (testResultTimer !== null) clearTimeout(testResultTimer)
   if (apiKeyVisibleTimer !== null) clearTimeout(apiKeyVisibleTimer)
+  if (saveErrorTimer !== null) clearTimeout(saveErrorTimer)
+  if (cacheClearedTimer !== null) clearTimeout(cacheClearedTimer)
 })
 
 /**
@@ -211,7 +213,11 @@ async function onTestConnection(): Promise<void> {
       model: model.value.trim(),
     })
     if (result.ok) {
-      showTestResult(true, t("novelTranslate.endpoint.probe.success"))
+      // #637 P3：显示往返延迟（此前原生未回传耗时）
+      showTestResult(
+        true,
+        t("novelTranslate.endpoint.probe.success") + ` (${result.elapsedMs}ms)`,
+      )
     } else {
       // 只显示结构化的原因，**不**回落显原生 detail（原生串是英文技术串，
       // 此前会拼出「无法连接：endpoint 存在（api key 校验失败 = endpoint 在）」这种自相矛盾的提示）
@@ -219,7 +225,7 @@ async function onTestConnection(): Promise<void> {
         result.code === "invalid_key"
           ? t("novelTranslate.endpoint.credential.invalidKey")
           : t("novelTranslate.endpoint.credential.failed")
-      showTestResult(false, text)
+      showTestResult(false, text + ` (${result.elapsedMs}ms)`)
     }
   } catch (err) {
     showTestResult(false, err instanceof Error ? err.message : String(err))
@@ -247,6 +253,9 @@ function onClearApiKey(): void {
 
 /** 用户是否已点过保存（用于空字段 inline error 的显示；#637 P1-4） */
 const formSubmitted = ref<boolean>(false)
+/** 清缓存内联反馈（#637 P3-7） */
+const cacheClearedText = ref<string>("")
+let cacheClearedTimer: ReturnType<typeof setTimeout> | null = null
 /** 保存失败 inline 提示（#637 P1-3：此前失败只 console.warn，用户零反馈） */
 const saveErrorText = ref<string>("")
 let saveErrorTimer: ReturnType<typeof setTimeout> | null = null
@@ -282,6 +291,21 @@ async function onSave(): Promise<void> {
     }, 4000)
   } finally {
     saving.value = false
+  }
+}
+
+/** 清除全部翻译缓存（#637 P3-7：之前 clearTranslationCache 零调用点） */
+async function onClearTranslationCache(): Promise<void> {
+  try {
+    await store.clearAllTranslationCache()
+    cacheClearedText.value = t("novelTranslate.endpoint.cache.cleared")
+    if (cacheClearedTimer !== null) clearTimeout(cacheClearedTimer)
+    cacheClearedTimer = setTimeout(() => {
+      cacheClearedText.value = ""
+      cacheClearedTimer = null
+    }, 4000)
+  } catch (err) {
+    console.warn("[SettingsEndpoint] clearAllTranslationCache 失败", err)
   }
 }
 
@@ -482,6 +506,11 @@ async function onClear(): Promise<void> {
       <text class="text-label-medium text-error">{{ saveErrorText }}</text>
     </view>
 
+    <!-- 清缓存内联反馈（#637 P3-7） -->
+    <view v-if="cacheClearedText" class="flex flex-row items-center gap-1">
+      <text class="text-label-medium text-primary">{{ cacheClearedText }}</text>
+    </view>
+
     <!-- 操作按钮 -->
     <view class="flex flex-row gap-2">
       <view
@@ -618,6 +647,19 @@ async function onClear(): Promise<void> {
           </view>
         </view>
       </template>
+    </view>
+
+    <!-- 清除翻译缓存（#637 P3-7）：不做二次确认（可重建，成本低）；
+         与「清除配置」区分（那个会毁凭据，需确认） -->
+    <view
+      class="h-[10.667vw] flex items-center justify-center"
+      :accessibility-element="A11Y_ELEMENT_ENABLED"
+      :accessibility-label="t('novelTranslate.endpoint.cache.clear')"
+      @tap="onClearTranslationCache"
+    >
+      <text class="text-label-large text-surface-on-variant">{{
+        t("novelTranslate.endpoint.cache.clear")
+      }}</text>
     </view>
   </view>
 </template>

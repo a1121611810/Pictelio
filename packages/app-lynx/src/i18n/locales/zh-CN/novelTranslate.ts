@@ -40,6 +40,8 @@ const zhNovelTranslate = {
   "novelTranslate.endpoint.probe.success": "连接成功",
   "novelTranslate.endpoint.notConfigured": "尚未配置 LLM endpoint",
   "novelTranslate.endpoint.clear": "清除配置",
+  "novelTranslate.endpoint.cache.clear": "清除翻译缓存",
+  "novelTranslate.endpoint.cache.cleared": "翻译缓存已清除",
   "novelTranslate.endpoint.deleteConfirm": "确认清除已保存的 endpoint 配置？",
   "novelTranslate.endpoint.cancel": "取消",
   "novelTranslate.endpoint.confirmClear": "确认清除",
