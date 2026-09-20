@@ -148,15 +148,27 @@ map #644 收尾过程中需要把 spec §6「流式中断 → 自动整批回退
 
 ## 已知未落地项（诚实的缺口清单）
 
-以下三项在实施中被 review 指出，**当前未交付**，登记于此避免被误读为已完成：
+### 状态更新（2026-09-20，PR #657 收尾轮）
+
+下表**最初**在 code review 后登记为「未交付」，随后在同轮收尾中**已全部交付**（commit `ed8ac21`
++ PR #662）。保留原表并逐条标注最终状态，便于追溯 review → 修复的闭环：
+
+| # | 要求 | 出处 | 最终状态 |
+|---|---|---|---|
+| 1 | 回退期间进度重置为 0% | D1 | ✅ **已实现**（`fallbackToWholeBatch` 起始处 `progress = {done:0, total}`） |
+| 2 | 用户 retry 按钮 1.5s debounce | D3 | ✅ **已实现**（`TranslateButton.onTap` 对 `retry`/`retranslate` 两条计费路径加 `RETRY_DEBOUNCE_MS = 1500`；自动整批回退不受影响，仍 0ms） |
+| 3 | partial 进度不虚报 100% | issue #651 范围补充 | ✅ **已实现**（`partial` 分支 `done = translatedParagraphs` 实际有译文段数） |
+| 4 | 回退零译文 → `content_filter` 联动 | D1 脚注 | ✅ **已实现（收窄）**：仅在「零译文 **且** 回退无显式错误码」时联动 —— 有显式错误（5xx/429/network）时那个错误才是诊断信息，覆盖成 `content_filter` 会让用户看到「内容被拦截」而实际是服务端故障 |
+
+### 仍未交付（截至 PR #657 收尾）
 
 | # | 要求 | 出处 | 现状 |
 |---|---|---|---|
-| 1 | 回退期间进度重置为 0% | D1 | 未实现：`fallbackToWholeBatch` 只在成功时写 progress |
-| 2 | 用户 retry 按钮 1.5s debounce | D3 | 未实现：`TranslateButton.vue onTap` 无 debounce |
-| 3 | partial 进度不虚报 100% | issue #651 范围补充 | 未实现：`novelTranslateStore` 的 `partial` 分支仍 `done = total` |
+| 5 | partial UI 的 **DOM 级**渲染快照测试 | D4 | 覆盖在 **store 层**（`displayParagraphs` 行为，含 §「partial 占位曾写了但走不到」的两层缺陷修复）；未上 DOM 渲染器 |
+| 6 | 用户 retry debounce 的 **DOM 级**测试 | D3 | 覆盖在**源码断言层**（`TranslateButton.template.test.ts`）；未上渲染器 |
 
-另：回退零译文 → `content_filter` 联动（D1 脚注）当前返回 `failed` 而非 `content_filter`。
+> 注：`reset()` 的 abort 语义（spec §7.2 末行）原不属本 ADR 范围，但在 #640 step 7 取证时发现
+> 实现缺失 → 已在 PR #662 补齐（`activeController?.abort()` + `gen += 1`）。
 
 ---
 
