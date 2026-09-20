@@ -222,6 +222,14 @@ const translateErrorText = computed<string>(() => {
   const err = translateStore.error
   if (err === null) return ''
   const status = translateStore.status
+  // #640 step 6：授权拦截走的是 `aborted`（不是 failed/partial）—— 此前该状态被排除，
+  // 导致 R18 / R18G 未授权时用户点了按钮**没有任何提示**（静默 no-op）。放开 aborted，
+  // 但仅对 R18*_BLOCKED 两类码显示（其余 aborted 是用户主动取消，不该报错）。
+  if (status === 'aborted') {
+    return err.code === 'R18_BLOCKED' || err.code === 'R18G_BLOCKED'
+      ? t(err.code === 'R18G_BLOCKED' ? 'novelTranslate.error.r18gBlocked' : 'novelTranslate.error.R18Blocked')
+      : ''
+  }
   if (status !== 'failed' && status !== 'partial') return ''
   switch (err.code) {
     case 'network':

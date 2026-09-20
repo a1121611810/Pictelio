@@ -74,10 +74,19 @@ const buttonState = computed<ButtonState>(() => {
   return "start"
 })
 
-/** 仅 R18 拦截是真正不可点（翻译中可点 = abort，见 buttonState） */
-const disabled = computed<boolean>(() =>
-  store.status === "aborted" && store.error?.code === "R18_BLOCKED",
-)
+/**
+ * R18 / R18G 内容授权拦截时不可点（翻译中可点 = abort，见 buttonState）。
+ *
+ * <p>#640 step 6 真机取证发现：此处原先只判 `R18_BLOCKED`，**漏了 `R18G_BLOCKED`** ——
+ * 未授权 R-18G 章节点击后 `store` 已正确置 `aborted + R18G_BLOCKED`（正文零外发，
+ * 由 `R18 gate blocked x_restrict=2` 日志证实），但按钮视觉上**仍可点**，用户看到的是
+ * 「点了没反应」的静默 no-op。
+ */
+const disabled = computed<boolean>(() => {
+  if (store.status !== "aborted") return false
+  const code = store.error?.code
+  return code === "R18_BLOCKED" || code === "R18G_BLOCKED"
+})
 
 /** 标签：FAB 内可见文案（显式映射表，i18n 键是字面量联合类型） */
 const LABEL_KEYS = {

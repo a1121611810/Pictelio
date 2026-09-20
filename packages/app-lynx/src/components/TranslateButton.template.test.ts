@@ -47,8 +47,20 @@ describe('TranslateButton 四态（ADR-0173 D6）', () => {
   it('翻译中可点 = abort（此前 disabled 时 onTap 直接 return，用户无法停止）', () => {
     expect(code).toContain('if (buttonState.value === "translating")')
     expect(code).toContain('store.abort()')
-    // disabled 只保留 R18 拦截
-    expect(code).toContain('store.error?.code === "R18_BLOCKED"')
+  })
+
+  /**
+   * #640 step 6 真机取证：未授权 R-18G 章节点击后 store 已正确置
+   * `aborted + R18G_BLOCKED`（正文零外发），但此处原先只判 `R18_BLOCKED`
+   * → 按钮视觉上仍可点 = 用户看到「点了没反应」的静默 no-op。
+   *
+   * <p>Oracle：store 的闸门分支（`novelTranslateStore.ts` R18 段）产出**两类**码 ——
+   * `xRestrict === 2 ? "R18G_BLOCKED" : "R18_BLOCKED"`；按钮的 disabled 必须与之对齐，
+   * 否则二者只在 R18 一侧一致。
+   */
+  it('R18 **与** R18G 拦截都不可点（#640 step 6：R18G 曾漏判）', () => {
+    expect(code).toContain('"R18_BLOCKED"')
+    expect(code).toContain('"R18G_BLOCKED"')
   })
 
   it('未配置 → 发 translate-configure 事件（宿主负责跳设置页）', () => {
