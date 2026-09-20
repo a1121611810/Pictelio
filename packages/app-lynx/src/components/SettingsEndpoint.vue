@@ -17,8 +17,14 @@ const settings = useSettingsStore()
 const baseURL = ref<string>("")
 const apiKey = ref<string>("")
 const model = ref<string>("")
-/** 目标语言（BCP-47；默认 zh-CN，见 novelTranslateStore.webEndpointConfig） */
-const targetLang = ref<string>("zh-CN")
+/**
+ * 目标语言（BCP-47）。
+ * 初始值 = 界面语言推导（与 `novelTranslateStore.webEndpointConfig()` 的
+ * `settings.language ?? "zh-CN"` 同源）；`loadFromKeystore` 会用已存值覆盖。
+ * code-review S5：此前注释称「默认 zh-CN，见 webEndpointConfig」，但 store 的默认是
+ * **settings.language 优先** —— 非中文界面用户首存会把 zh-CN 固化，静默覆盖语言偏好推导。
+ */
+const targetLang = ref<string>(settings.language ?? "zh-CN")
 /** 源语言（BCP-47；默认 ja，Pixiv 小说原文语言） */
 const sourceLang = ref<string>("ja")
 /** API Key 明文可见性（5s 后自动转回 password；ADR-0178 D3 同款交互） */

@@ -235,6 +235,23 @@ describe('mapEventToChunk 事件规约（OpenAI Responses 30+ → 5 种 chunk）
     }
   })
 
+  it('response.incomplete(max_messages) → error(invalid_request, retryable=false)（P8：不再自相矛盾）', () => {
+    const chunk = mapEventToChunk({
+      type: 'response.incomplete',
+      response: {
+        status: 'incomplete',
+        incomplete_details: { reason: 'max_messages' },
+      },
+    })
+    expect(chunk?.type).toBe('error')
+    if (chunk?.type === 'error') {
+      // 注释说「请求参数问题，重试同样参数无意义」→ retryable 必须 false
+      // （此前是 true，会触发一次注定无效的整批回退，违反 ADR-0178 D2 子集表）
+      expect(chunk.code).toBe('invalid_request')
+      expect(chunk.retryable).toBe(false)
+    }
+  })
+
   it('response.incomplete(content_filter) → error(content_filter, retryable=false)', () => {
     const chunk = mapEventToChunk({
       type: 'response.incomplete',
@@ -631,6 +648,49 @@ describe('AbortSignal 取消语义（ADR-0169 D5.4 + D6）', () => {
       expect(first.value.code).toBe('server')
       expect(first.value.retryable).toBe(true)
       expect(first.value.message).toBe('endpoint 5xx')
+    }
+  })
+
+  // ─── code-review P4 阻塞项：截断不得当成功（否则 store 会写 completed 缓存） ───
+
+  it('stream=false + status=incomplete(max_output_tokens) → error(incomplete, retryable=false)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          status: 'incomplete',
+          incomplete_details: { reason: 'max_output_tokens' },
+          output: [{ content: [{ type: 'output_text', text: '[0] 半截译文' }] }],
+        }),
+        { status: 200 },
+      ),
+    )
+    const p = new OpenAIResponsesProvider({ fetchImpl: fetchMock })
+    const req = { ...SAMPLE_REQUEST, stream: false }
+    const iter = p.translate(req, SAMPLE_CONFIG, controller.signal)
+    const first = await iter.next()
+    expect(first.value?.type).toBe('error')
+    if (first.value?.type === 'error') {
+      expect(first.value.code).toBe('incomplete')
+      // ADR-0178 A2：整批回退最多 1 次，回退本身失败即终态 → 不再 retry
+      expect(first.value.retryable).toBe(false)
+      expect(first.value.message).toContain('max_output_tokens')
+    }
+  })
+
+  it('stream=false + status=incomplete(其他 reason) → error(invalid_request)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ status: 'incomplete', incomplete_details: { reason: 'steered' } }), {
+        status: 200,
+      }),
+    )
+    const p = new OpenAIResponsesProvider({ fetchImpl: fetchMock })
+    const req = { ...SAMPLE_REQUEST, stream: false }
+    const iter = p.translate(req, SAMPLE_CONFIG, controller.signal)
+    const first = await iter.next()
+    expect(first.value?.type).toBe('error')
+    if (first.value?.type === 'error') {
+      expect(first.value.code).toBe('invalid_request')
+      expect(first.value.retryable).toBe(false)
     }
   })
 

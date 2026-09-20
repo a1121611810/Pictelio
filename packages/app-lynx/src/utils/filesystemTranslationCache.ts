@@ -18,7 +18,9 @@ interface PictelioTranslateCacheModule {
   setItem: (key: string, json: string, cb: (ok: string | null, err: string | null) => void) => void
   deleteItem: (key: string, cb: (ok: string | null, err: string | null) => void) => void
   clear: (cb: (ok: string | null, err: string | null) => void) => void
+  /** arity 契约：单参（Java 侧 `stats(Callback)`）—— 见 code-review P9 */
   stats: (cb: (json: string | null, err: string | null) => void) => void
+  /** arity 契约：单参（Java 侧 `getCacheDirPath(Callback)`） */
   getCacheDirPath: (cb: (path: string) => void) => void
 }
 
@@ -177,14 +179,19 @@ export async function clearTranslationCache(): Promise<boolean> {
 export async function stats(): Promise<{
   entryCount: number
   totalBytes: number
-  hitRate: number
-  missRate: number
+  maxBytes?: number
+  maxEntries?: number
+  /** null = 「未统计」（Java 不持有命中计数器）—— 不是 0（0 是合法命中率，语义不可区分） */
+  hitRate: number | null
+  missRate: number | null
 } | null> {
   if (!isFilesystemTranslationCacheAvailable()) return null
   return call<{
     entryCount: number
     totalBytes: number
-    hitRate: number
-    missRate: number
+    maxBytes?: number
+    maxEntries?: number
+    hitRate: number | null
+    missRate: number | null
   }>((cb) => nativeModule()!.stats(cb))
 }

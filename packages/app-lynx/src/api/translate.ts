@@ -406,12 +406,14 @@ export function mapEventToChunk(event: ResponsesEventBase): TranslationChunk | n
       }
     }
     // max_output_tokens → 'incomplete'（输出截断；ADR-0178 D2 归类为 retryable → 触发整批回退）
-    // max_messages / steered / 其他 → 'invalid_request'（请求参数问题，重试同样参数无意义）
+    // max_messages / steered / 其他 → 'invalid_request'（请求参数问题，重试同样参数无意义；
+    // retryable=false —— 与注释一致，且符合 ADR-0178 D2 子集表。此前 max_messages 被标
+    // retryable=true，与同行注释自相矛盾，会让 fallback 触发一次注定无效的重试）
     return {
       type: 'error',
       code: reason === 'max_output_tokens' ? 'incomplete' : 'invalid_request',
       message: `stream truncated: ${reason ?? 'unknown'}`,
-      retryable: reason === 'max_output_tokens' || reason === 'max_messages',
+      retryable: reason === 'max_output_tokens',
     }
   }
 
@@ -737,6 +739,21 @@ export class OpenAIResponsesProvider implements TranslationProvider {
             code: 'server',
             message: fullJson.error?.message ?? 'response failed',
             retryable: true,
+          }
+          return
+        }
+        // 截断响应：status === 'incomplete'（code-review P4 阻塞项）。
+        // 必须在此显式判定 —— 否则截断结果会走下方「拆段 + done」分支，被 store
+        // 判为 completed 并写缓存（截断章节以「已完成」入缓存 + 缺失尾段渲染空串），
+        // 同时违反 #654（空/截断不得判完成）与 ADR-0178 D4（未译段须为 partial + 占位）。
+        // retryable=false：ADR-0178 A2 规定整批回退最多 1 次，回退本身失败即终态。
+        if (fullJson.status === 'incomplete') {
+          const reason = fullJson.incomplete_details?.reason
+          yield {
+            type: 'error',
+            code: reason === 'max_output_tokens' ? 'incomplete' : 'invalid_request',
+            message: `whole-batch truncated: ${reason ?? 'unknown'}`,
+            retryable: false,
           }
           return
         }

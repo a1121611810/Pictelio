@@ -83,6 +83,7 @@ const zhNovelTranslate = {
   "novelTranslate.error.modelNotFound": "模型不存在（404）：请检查模型名称",
   "novelTranslate.error.invalidRequest": "请求参数无效（400）：请检查模型与 endpoint 配置",
   "novelTranslate.error.contentFilter": "服务端未返回译文：内容可能被内容策略拦截",
+  "novelTranslate.error.incomplete": "输出被截断（超出长度上限）：可重试或缩短章节",
   "novelTranslate.error.R18Blocked": "未授权翻译 R-18 内容：请在翻译设置中开启",
   "novelTranslate.error.r18gBlocked": "未授权翻译 R-18G 内容：此类内容涉及法律风险，请谨慎开启",
   "novelTranslate.endpoint.translateR18": "允许翻译 R-18",

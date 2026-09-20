@@ -474,6 +474,9 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
       prefs.remove(LLM_PREFS_BASE_URL),
       prefs.remove(LLM_PREFS_MODEL),
       prefs.remove(LLM_PREFS_TARGET_LANG),
+      // 调用点完备性（code-review P6）：SOURCE_LANG 与 TARGET_LANG 对称，漏清会让
+      // 换新 endpoint 后仍沿用旧源语言（translate.ts buildSystemInstructions 会读到）
+      prefs.remove(LLM_PREFS_SOURCE_LANG),
     ])
     // 失效规则（ADR-0173 D4②）：配置没了，验证状态必须一起没
     await clearCredentialVerification()
@@ -1056,8 +1059,10 @@ function classifyProvider(
       }
       // 整批回退本身失败 → 返回 'failed' 让外层按原逻辑收敛（保留 lastErrorCode）
       // 不修改 status；status 由外层原流程收敛到 partial/failed（按有/无译文段分类）
-      void paragraphTexts // 已通过 translatedParagraphs 被赋值时使用；这里保留以便未来扩展
-      return lastError === null ? "failed" : "failed"
+      // code-review S3：此前这里是 `void paragraphTexts` + `return lastError === null ?
+      // "failed" : "failed"`（两侧相同的死三元），属与 translate.ts 同型的缺陷，已删。
+      void lastError
+      return "failed"
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return "aborted"
       console.warn("[novelTranslateStore] fallbackToWholeBatch threw", err)

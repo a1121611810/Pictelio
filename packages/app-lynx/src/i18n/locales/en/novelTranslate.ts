@@ -84,6 +84,7 @@ const enNovelTranslate = {
   "novelTranslate.error.modelNotFound": "Model not found (404): please check the model name",
   "novelTranslate.error.invalidRequest": "Invalid request (400): please check the model and endpoint",
   "novelTranslate.error.contentFilter": "The provider returned no translation: content may have been filtered",
+  "novelTranslate.error.incomplete": "Output truncated (exceeded length limit): retry or shorten the chapter",
   "novelTranslate.error.R18Blocked": "Translating R-18 content is not authorized. Enable it in translation settings.",
   "novelTranslate.error.r18gBlocked": "Translating R-18G content is not authorized. This category carries legal risk; enable with care.",
   "novelTranslate.endpoint.translateR18": "Translate R-18",

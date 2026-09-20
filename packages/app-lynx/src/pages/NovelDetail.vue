@@ -251,6 +251,9 @@ const translateErrorText = computed<string>(() => {
       return t('novelTranslate.error.invalidRequest')
     case 'content_filter':
       return t('novelTranslate.error.contentFilter')
+    // ADR-0178 D2：输出截断（max_output_tokens）—— 调用点完备性：新码必须有 UI 映射
+    case 'incomplete':
+      return t('novelTranslate.error.incomplete')
     default:
       return t('novelTranslate.error.unknown')
   }
