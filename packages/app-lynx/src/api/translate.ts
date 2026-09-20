@@ -124,6 +124,7 @@ export type TranslationErrorCode =
   | 'endpoint_not_responses' // 404 / 405 → endpoint 不支持 /v1/responses
   | 'server' // 5xx
   | 'network' // fetch failed / DNS / proxy
+  | 'incomplete' // 输出截断（response.incomplete）/ 流未产出全部段落（ADR-0178 D2 retryable）
   | 'content_filter' // finish_reason=content_filter
   | 'aborted' // 用户中断
   | 'unknown'
@@ -404,10 +405,11 @@ export function mapEventToChunk(event: ResponsesEventBase): TranslationChunk | n
         retryable: false,
       }
     }
-    // max_output_tokens / max_messages / steered → 视为可重试（store 决策）
+    // max_output_tokens → 'incomplete'（输出截断；ADR-0178 D2 归类为 retryable → 触发整批回退）
+    // max_messages / steered / 其他 → 'invalid_request'（请求参数问题，重试同样参数无意义）
     return {
       type: 'error',
-      code: reason === 'max_messages' ? 'invalid_request' : 'invalid_request',
+      code: reason === 'max_output_tokens' ? 'incomplete' : 'invalid_request',
       message: `stream truncated: ${reason ?? 'unknown'}`,
       retryable: reason === 'max_output_tokens' || reason === 'max_messages',
     }

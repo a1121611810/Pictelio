@@ -218,7 +218,7 @@ describe('mapEventToChunk 事件规约（OpenAI Responses 30+ → 5 种 chunk）
     }
   })
 
-  it('response.incomplete(max_output_tokens) → error(invalid_request, retryable=true)', () => {
+  it('response.incomplete(max_output_tokens) → error(incomplete, retryable=true)（ADR-0178 D2）', () => {
     const chunk = mapEventToChunk({
       type: 'response.incomplete',
       response: {
@@ -228,7 +228,8 @@ describe('mapEventToChunk 事件规约（OpenAI Responses 30+ → 5 种 chunk）
     })
     expect(chunk?.type).toBe('error')
     if (chunk?.type === 'error') {
-      expect(chunk.code).toBe('invalid_request')
+      // ADR-0178 D2：max_output_tokens 截断 = 'incomplete'（retryable → 触发整批回退）
+      expect(chunk.code).toBe('incomplete')
       expect(chunk.message).toContain('max_output_tokens')
       expect(chunk.retryable).toBe(true)
     }

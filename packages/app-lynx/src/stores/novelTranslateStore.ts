@@ -169,6 +169,7 @@ function resetNovelTranslateStoreForTest(): void {
 const LLM_PREFS_BASE_URL = "llm_endpoint_base_url"
 const LLM_PREFS_MODEL = "llm_endpoint_model"
 const LLM_PREFS_TARGET_LANG = "llm_endpoint_target_lang"
+const LLM_PREFS_SOURCE_LANG = "llm_endpoint_source_lang"
 // 凭据验证（ADR-0173 D4）：只存结果枚举 + 时间戳 + 用于失效判定的 baseURL，
 // **不存任何密钥材料**（连哈希都不存——无必要的离线校验面）。
 const LLM_PREFS_VERIFY_STATE = "llm_endpoint_verified_state"
@@ -229,18 +230,21 @@ async function readEndpointMetadata(): Promise<{
   baseURL?: string
   model?: string
   targetLang?: string
+  sourceLang?: string
 }> {
   try {
     const prefs = endpointPrefs()
-    const [baseURL, model, targetLang] = await Promise.all([
+    const [baseURL, model, targetLang, sourceLang] = await Promise.all([
       prefs.get(LLM_PREFS_BASE_URL),
       prefs.get(LLM_PREFS_MODEL),
       prefs.get(LLM_PREFS_TARGET_LANG),
+      prefs.get(LLM_PREFS_SOURCE_LANG),
     ])
     return {
       baseURL: baseURL ?? undefined,
       model: model ?? undefined,
       targetLang: targetLang ?? undefined,
+      sourceLang: sourceLang ?? undefined,
     }
   } catch (err) {
     // 读失败不阻断翻译（回退 Java 默认值）；但必须可见（AGENTS.md 硬约束 #3）
@@ -427,6 +431,7 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
       baseURL: meta.baseURL ?? ep.baseURL,
       model: meta.model ?? ep.model,
       targetLang: meta.targetLang ?? ep.targetLang,
+      sourceLang: meta.sourceLang ?? ep.sourceLang,
     }
   }
 
@@ -444,6 +449,7 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
       await prefs.set(LLM_PREFS_BASE_URL, config.baseURL)
       await prefs.set(LLM_PREFS_MODEL, config.model)
       if (config.targetLang) await prefs.set(LLM_PREFS_TARGET_LANG, config.targetLang)
+      if (config.sourceLang) await prefs.set(LLM_PREFS_SOURCE_LANG, config.sourceLang)
     } catch (err) {
       // 写失败必须可见（AGENTS.md 硬约束 #3）：否则用户以为「保存成功了」
       console.warn("[novelTranslateStore] endpoint 元数据保存失败", err)

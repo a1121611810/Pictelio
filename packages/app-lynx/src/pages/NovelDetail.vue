@@ -260,14 +260,12 @@ const translateErrorText = computed<string>(() => {
 const displayParagraphs = computed<string[]>(() =>
   translateStore.displayParagraphs.length > 0
     ? translateStore.displayParagraphs
-    : []
+    : paragraphs.value,
 )
 
 /** ADR-0178 D4 占位符字符串：与 store.refreshDisplay 内 t('novelTranslate.status.placeholder_untranslated') 必须同源 */
 const untranslatedPlaceholder = computed<string>(() =>
   t('novelTranslate.status.placeholder_untranslated'),
-)
-    : paragraphs.value,
 )
 
 /** 章节切换 / 卸载时复位 store（spec §5：generation-gate 防 stale 覆盖） */

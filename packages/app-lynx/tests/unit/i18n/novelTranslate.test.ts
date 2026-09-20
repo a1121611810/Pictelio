@@ -20,16 +20,22 @@ const EXPECTED_KEYS: readonly string[] = [
   "novelTranslate.endpoint.baseUrl.hint",
   "novelTranslate.endpoint.apiKey.label",
   "novelTranslate.endpoint.apiKey.hint",
+  "novelTranslate.endpoint.apiKey.show",
+  "novelTranslate.endpoint.apiKey.hide",
+  "novelTranslate.endpoint.apiKey.clear",
   "novelTranslate.endpoint.model.label",
   "novelTranslate.endpoint.model.hint",
+  "novelTranslate.endpoint.targetLang.label",
+  "novelTranslate.endpoint.targetLang.hint",
+  "novelTranslate.endpoint.sourceLang.label",
+  "novelTranslate.endpoint.sourceLang.hint",
   "novelTranslate.endpoint.save",
   "novelTranslate.endpoint.saved",
+  "novelTranslate.endpoint.save.failed",
   "novelTranslate.endpoint.invalid.url",
   "novelTranslate.endpoint.invalid.key",
   "novelTranslate.endpoint.invalid.model",
   "novelTranslate.endpoint.probe.success",
-  "novelTranslate.endpoint.probe.failed",
-  "novelTranslate.endpoint.probe.timeout",
   "novelTranslate.endpoint.notConfigured",
   "novelTranslate.endpoint.deleteConfirm",
   // 清除流程行内二次确认（lynx 无浏览器 confirm()，见 SettingsEndpoint.vue）；
@@ -82,6 +88,7 @@ const EXPECTED_KEYS: readonly string[] = [
   "novelTranslate.status.completed",
   "novelTranslate.status.aborted",
   "novelTranslate.status.retrying",
+  "novelTranslate.status.placeholder_untranslated",
   "novelTranslate.status.progress.label",
   "novelTranslate.status.progress.remaining",
   // error (13)
@@ -116,7 +123,7 @@ function extractPlaceholders(s: string): string[] {
 describe('i18n: novelTranslate 字典结构（spec §8）', () => {
   it('zh-CN 与 en 键数与 EXPECTED_KEYS 一致（spec §8 键名实现态）', () => {
     // spec §8 用「示意键名」（endpoint.section.title / baseURL.probe.ok…）描述设计意图；
-    // 实现按 4 子命名空间落为 80 键 —— 权威口径 = EXPECTED_KEYS（本表 + 组件用量守卫）。
+    // 实现按 4 子命名空间落为 87 键 —— 权威口径 = EXPECTED_KEYS（本表 + 组件用量守卫）。
     // 历史：47 → 51 → 67（ADR-0173：探测/凭据状态 + 动作键）→ 75（翻译授权 + 同意面板）
     //       → 79（错误码分类补全：insufficient_balance / model_not_found / invalid_request / content_filter）。
     expect(Object.keys(zh).length).toBe(EXPECTED_KEYS.length)
@@ -171,16 +178,16 @@ describe('i18n: novelTranslate 字典结构（spec §8）', () => {
     }
   })
 
-  it('endpoint 42 键 + action 9 键 + status 11 键 + error 18 键 = 80', () => {
+  it('endpoint 48 键 + action 9 键 + status 12 键 + error 18 键 = 87', () => {
     const groups = {
       endpoint: EXPECTED_KEYS.filter((k) => k.startsWith('novelTranslate.endpoint.')),
       action: EXPECTED_KEYS.filter((k) => k.startsWith('novelTranslate.action.')),
       status: EXPECTED_KEYS.filter((k) => k.startsWith('novelTranslate.status.')),
       error: EXPECTED_KEYS.filter((k) => k.startsWith('novelTranslate.error.')),
     }
-    expect(groups.endpoint.length).toBe(42)
+    expect(groups.endpoint.length).toBe(48)
     expect(groups.action.length).toBe(9)
-    expect(groups.status.length).toBe(11)
+    expect(groups.status.length).toBe(12)
     expect(groups.error.length).toBe(18)
   })
 })
