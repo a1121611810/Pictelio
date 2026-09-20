@@ -15,6 +15,7 @@ import android.widget.TextView;
 
 import androidx.activity.EdgeToEdge;
 import androidx.activity.OnBackPressedCallback;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.splashscreen.SplashScreen;
@@ -141,6 +142,11 @@ public class LynxActivity extends AppCompatActivity {
     // 字段语义，sendDarkModeEvent 内部短路去重；新增 caller 无需各自比 sLastUiMode。
     private static String sLastDarkSent = "";
 
+    // ADR-night-mode（T3，解 ADR-0168 D4 钉死）：当前 status bar 是否隐藏（全屏模式）。
+    // 写入时机：onCreate 读 isFullscreenModeRequested 一次性落值（实例级，不持久化；
+    // Activity 重建回到 onCreate 重读）。消费方：applyStatusBarAppearanceFromUiMode 跳过全屏分支。
+    private boolean statusBarHidden = false;
+
     /** 可视内容区计算（spec D3 纯函数，供单测）：宽不消费水平 insets，高减上下可见栏且 ≥0。 */
     static int[] applyVisibleInsets(int w, int h, int insetTop, int insetBottom) {
         return new int[] { w, Math.max(h - insetTop - insetBottom, 0) };
@@ -173,6 +179,57 @@ public class LynxActivity extends AppCompatActivity {
                 ? "dark" : "light";
     }
 
+    /**
+     * uiMode → 是否暗外观（布尔版，与 currentDarkMode 同源）。
+     * 静态纯函数，专为不需要字符串契约的消费方（状态栏图标 / splash 主题）准备，
+     * 避免每次都做 .equals("dark") 比较。
+     */
+    static boolean isDarkUiMode(int uiMode) {
+        return (uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+    }
+
+    // ── 状态栏图标深浅决策（spec lynx-night-mode T3，解 ADR-0168 D4 钉死）──
+
+    /**
+     * 状态栏图标深浅决策纯函数（JVM 可测，无 Activity 引用）：
+     * <ul>
+     *   <li>isDarkMode=false（明外观，浅底 UI）→ true = setAppearanceLightStatusBars(true) = 深图标</li>
+     *   <li>isDarkMode=true（暗外观，深底 UI）→ false = setAppearanceLightStatusBars(false) = 浅图标</li>
+     * </ul>
+     * 语义来源（ADR-0168 D4 修订）：系统栏基底为边到边，status bar = App surface 延伸，
+     * 外观跟随 app-lynx resolvedDark（动态）而非固定钉死为 true（T1 之前的「app-lynx 无暗色
+     * UI」假设不成立——T2 引入了完整 12 色暗色板）。
+     */
+    static boolean isAppearanceLightStatusBarsFor(boolean isDarkMode) {
+        return !isDarkMode;
+    }
+
+    /**
+     * 状态栏可见性跳过决策（spec lynx-night-mode T3）：status bar 当前隐藏（全屏模式）
+     * 时外观设置无 UI 反馈点，返回 null 表示「不调用 setAppearanceLightStatusBars」；
+     * 非全屏模式时透传 {@link #isAppearanceLightStatusBarsFor}。
+     * 供单测覆盖全屏跳过分支（纯函数可测）。
+     */
+    @Nullable
+    static Boolean resolveStatusBarAppearance(boolean isDarkMode, boolean statusBarHidden) {
+        return statusBarHidden ? null : isAppearanceLightStatusBarsFor(isDarkMode);
+    }
+
+    /**
+     * API 等级 guard（spec lynx-night-mode T3，splash 双轨兜底轨）：
+     * Activity 的 {@link android.app.Activity#getSplashScreen}()（平台 API 31+,
+     * Android 12+, {@link android.os.Build.VERSION_CODES#S}）返回
+     * {@code android.window.SplashScreen}，其 {@code setSplashScreenTheme(int)} 在 API 31+
+     * 转发到底层平台实现。低版本此方法在 Activity 类不存在（必须显式 guard），且即使绕过
+     * SDK 检查，AndroidX core-splashscreen 1.2.0 也不暴露对应 API（仅有
+     * {@code setKeepOnScreenCondition} + {@code setOnExitAnimationListener}）。残留冷启动
+     * 窗口平台无解（API 28-30），已接受——见 spec §4.7 + §5「Out of Scope」。显式 guard 让
+     * 编译期意图清晰，避免后人误读为无条件调用。
+     */
+    static boolean shouldApplySplashScreenTheme(int sdkInt) {
+        return sdkInt >= android.os.Build.VERSION_CODES.S;
+    }
+
     /** 当前缓存的 uiMode（onDestroy 复位前有效）；未初始化 = -1 */
     static int lastUiMode() {
         return sLastUiMode;
@@ -184,6 +241,22 @@ public class LynxActivity extends AppCompatActivity {
     static boolean isFullscreenModeRequested(Context ctx) {
         return "true".equals(ctx.getSharedPreferences(SYSTEMBARS_PREFS, Context.MODE_PRIVATE)
                 .getString(KEY_FULLSCREEN_MODE, null));
+    }
+
+    /**
+     * 状态栏图标深浅联动（spec lynx-night-mode T3，解 ADR-0168 D4 钉死）：从当前 sLastUiMode
+     * 计算 appearance 决策并下发 WindowInsetsControllerCompat；全屏模式时由 resolveStatusBarAppearance
+     * 返回 null 跳过。不调用 recreate——同一 WindowInsetsControllerCompat 实例即时生效。
+     * 调用时机：onCreate 初始化（拆分）后、onConfigurationChanged / onResume 兜底分支（与
+     * sendDarkModeEvent 同触发源）。本方法只读 sLastUiMode + statusBarHidden，不写任何字段。
+     */
+    private void applyStatusBarAppearanceFromUiMode() {
+        Boolean appearance = resolveStatusBarAppearance(
+                isDarkUiMode(sLastUiMode), statusBarHidden);
+        if (appearance == null) return;
+        WindowInsetsControllerCompat controller =
+                new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView());
+        controller.setAppearanceLightStatusBars(appearance);
     }
 
     /**
@@ -213,9 +286,30 @@ public class LynxActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // T3（splash 双轨兜底轨）：读 Application 资源的 uiMode——必须在 installSplashScreen
+        // 之前可用（Application 在 Application.attachBaseContext 后即拥有 resources，先于本
+        // Activity attach）。主题选择基于此值；values-night 资源限定符已自处理主轨（运行时
+        // 资源解析自动按 uiMode 选 values/ 或 values-night/），本调用是 API 31+ 平台 splash
+        // 显式覆盖的兜底轨。
+        int initialUiMode = getApplication().getResources().getConfiguration().uiMode
+                & Configuration.UI_MODE_NIGHT_MASK;
+        boolean initialIsDark = (initialUiMode == Configuration.UI_MODE_NIGHT_YES);
+
         // SplashScreen.installSplashScreen 必须在 super.onCreate 之前（AndroidX 要求）
         SplashScreen splashScreen = SplashScreen.installSplashScreen(this);
         splashScreen.setKeepOnScreenCondition(() -> !bundleLoaded.get());
+        // T3（spec lynx-night-mode §splash 双轨 · 兜底轨）：平台 Activity.getSplashScreen()
+        // （API 31+, android.window.SplashScreen）的 setSplashScreenTheme(int) 覆盖 manifest
+        // 默认主题。AndroidX core-splashscreen 1.2.0 不暴露此 API（仅有 setKeepOnScreenCondition
+        // + setOnExitAnimationListener），因此走平台 Activity.getSplashScreen() 入口。低版本
+        // 内部为 no-op（残留冷启动窗口平台无解，已接受——见 spec §4.7 + §5「Out of Scope」）。
+        // 显式 guard 让编译期意图清晰，资源可解析性由 isDark 分支保证（Theme.SplashScreen.Dark
+        // 仅在 values-night/ 定义，Theme.SplashScreen.Light 仅在 values/ 定义；当前 uiMode
+        // 决定调用哪一支）。
+        if (shouldApplySplashScreenTheme(android.os.Build.VERSION.SDK_INT)) {
+            getSplashScreen().setSplashScreenTheme(
+                    initialIsDark ? R.style.Theme_SplashScreen_Dark : R.style.Theme_SplashScreen_Light);
+        }
         super.onCreate(savedInstanceState);
         sInstance = new WeakReference<>(this);
 
@@ -226,15 +320,16 @@ public class LynxActivity extends AppCompatActivity {
         // 决定），Java 侧入口是 EdgeToEdge.enable(activity) 静态方法（Kotlin 扩展
         // enableEdgeToEdge() 的底层实现，#592 报告 F4.2 所述 core WindowCompat 变体不存在）。
         EdgeToEdge.enable(this);
-        // D4：状态栏图标深浅恒定——app-lynx 无暗色 UI（浅色底恒深图标），覆盖 compat 库
-        // 随系统暗色的联动（系统暗色下错误地切浅色图标会在浅色 UI 上不可读）。
-        WindowInsetsControllerCompat appearanceController =
-                new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView());
-        appearanceController.setAppearanceLightStatusBars(true);
-
         // ADR-night-mode（T1）：初始化 uiMode 缓存——onCreate 必须先于 onConfigurationChanged
         // 首次回调（系统已声明 uiMode configChanges，免重建）；onResume 兜底比对以此为基准。
+        // 顺序上提到 EdgeToEdge.enable 之后、状态栏外观设置之前（外观决策依赖 sLastUiMode）。
         sLastUiMode = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
+        // T3（解 ADR-0168 D4 钉死）：状态栏图标深浅不再恒定钉死为 true，改为随当前
+        // resolved uiMode 动态（明外观 → 深图标 / 暗外观 → 浅图标）。全屏模式 (status bar
+        // 隐藏) 时由 resolveStatusBarAppearance 返回 null 跳过——当前实例 statusBarHidden
+        // 默认 false，后续 isFullscreenModeRequested 块会再更新；onConfigurationChanged /
+        // onResume 兜底分支也会再同步。
+        applyStatusBarAppearanceFromUiMode();
 
         // ADR-0153：降级入口标记 + 一次性通知键。写键必须在 LynxView 渲染前，保证 app-lynx
         // 首帧能读到；该键是「本次由降级进入」的信号，不是首选引擎（首选引擎不落盘）。
@@ -448,6 +543,9 @@ public class LynxActivity extends AppCompatActivity {
         // 必走 onCreate，天然满足「重建后重设」（#592 F3.2：新 Window 默认全显）。
         if (isFullscreenModeRequested(this)) {
             applySystemBarsHidden(this, true);
+            // T3：状态栏图标深浅决策全屏跳过分支——statusBarHidden 由 resolveStatusBarAppearance
+            // 读取，决定是否下发 setAppearanceLightStatusBars（隐藏栏 UI 无反馈点，省去无效调用）。
+            statusBarHidden = true;
         }
         scheduleLoadTimeout();
     }
@@ -817,6 +915,9 @@ public class LynxActivity extends AppCompatActivity {
                 Log.i(TAG, "onResume 兜底补发暗色事件（uiMode 翻转未走 configChanges）");
                 sLastUiMode = current;
                 sendDarkModeEvent();
+                // T3：状态栏图标深浅联动——与 sendDarkModeEvent 同触发源（uiMode 翻转），
+                // 不重新走 recreate（WindowInsetsControllerCompat 同一实例可即时生效）。
+                applyStatusBarAppearanceFromUiMode();
             }
         }
     }
@@ -833,6 +934,10 @@ public class LynxActivity extends AppCompatActivity {
      * 系统配置变化回调（spec lynx-night-mode T1 §3）：manifest 已声明 uiMode configChanges，
      * 免 Activity 重建；本回调仅比对 uiMode 并推事件，JS 侧 computed 归一输出即时反映。
      * 同 insets 管线（onWindowInsetsChanged）：值变化才发，防抖不变量。
+     *
+     * <p>T3：uiMode 翻转同时联动状态栏图标深浅（与 sendDarkModeEvent 同触发源）——
+     * Android 状态栏图标属性是 Java 侧独立状态，必须在 sendDarkModeEvent 之后同步下发，
+     * 否则 JS 切到暗外观后状态栏图标仍为深色与新背景不可读。
      */
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
@@ -841,6 +946,8 @@ public class LynxActivity extends AppCompatActivity {
         if (nightMode != sLastUiMode) {
             sLastUiMode = nightMode;
             sendDarkModeEvent();
+            // T3：状态栏图标深浅联动（解 ADR-0168 D4 钉死）
+            applyStatusBarAppearanceFromUiMode();
         }
     }
 

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  T3（spec lynx-night-mode §splash 双轨 · 主轨）：values-night 限定资源。
+
+  ┌───────────────────────────────────────────────────────────────────────────┐
+  │ ACCEPTED LIMITATION: API 28–30 force 模式残留窗口平台无解                 │
+  │ setSplashScreenTheme 在 androidx.core-splashscreen 1.2.0 中 API < 31 为 no-op；│
+  │ values-night 资源限定符主轨经系统资源解析自动接管，                                  │
+  │ 但低版本最低 1 帧冷启动窗口（manifest 主题解析到系统 native splash 之前）                │
+  │ 仍可能短暂呈现亮色残留。详情见 docs/specs/lynx-night-mode.md §4.7 + §5。             │
+  │ 详情见 docs/research/lynx-night-mode-t3-research.md（如果有）                            │
+  └───────────────────────────────────────────────────────────────────────────┘
+-->
+<resources>
+
+    <!-- 同名覆写主轨（T3 splash 双轨主轨）：values-night 自动被系统在 uiMode=night 解析，
+         自带 Theme.SplashScreen 父，避免重写全部属性。 -->
+    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <!-- 暗色 surface 取 M3 Dark scheme baseline surface tone（#1A1A1A ≈ surface darkest） -->
+        <item name="windowSplashScreenBackground">#1A1A1A</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="windowSplashScreenIconBackgroundColor">#1A1A1A</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
+    </style>
+
+    <!-- T3（spec lynx-night-mode §splash 双轨 · 兜底轨暗色变体）：API 31+ 平台
+         setSplashScreenTheme 显式覆盖主题。only-defined-in-values-night/，运行时被初值
+         uiMode=night 选中。亮色版同主题见 values/styles.xml。 -->
+    <style name="Theme.SplashScreen.Dark" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#1A1A1A</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="windowSplashScreenIconBackgroundColor">#1A1A1A</item>
+    </style>
+</resources>
