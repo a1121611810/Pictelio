@@ -12,6 +12,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
   abortStream,
+  classifyNativeError,
   clearEndpoint,
   getEndpoint,
   nativeTranslateModule,
@@ -570,5 +571,32 @@ describe("nativeTranslateProvider 载荷契约（与 Java 逐字字段对齐）"
     const first = await iter.next()
     expect(first.done).toBe(false)
     expect(first.value).toEqual({ type: "delta", paragraphIndex: 1, text: "译文" })
+  })
+})
+
+/**
+ * 空流契约（issue #654 + spec §7.2 新增转移行）。
+ *
+ * <p>Java 侧空流终态消息字面量 = {@code "LLM 未返回任何译文（可能被服务端内容策略拦截）"}，
+ * 必须在 JS 端 {@code classifyNativeError} 命中 {@code content_filter} 分支（与
+ * {@code content policy} / {@code content_filter} 同列，{@code nativeTranslate.ts:253}）。
+ *
+ * <p>这条契约两端守：Java Robolectric 在
+ * {@code PictelioTranslateModuleEmptyStreamTest}，JS Vitest 在本文件。任一端字面量
+ * 漂移会立刻在 CI 内变红。
+ */
+describe("classifyNativeError 空流识别（issue #654 跨端契约）", () => {
+  it("Java 侧空流错误消息字面量被分类为 content_filter", () => {
+    expect(
+      classifyNativeError("LLM 未返回任何译文（可能被服务端内容策略拦截）"),
+    ).toBe("content_filter")
+  })
+
+  it("裸 content_filter 字符串命中", () => {
+    expect(classifyNativeError("content_filter")).toBe("content_filter")
+  })
+
+  it("content policy 字符串命中", () => {
+    expect(classifyNativeError("blocked by content policy")).toBe("content_filter")
   })
 })

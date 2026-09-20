@@ -523,6 +523,7 @@ sequenceDiagram
 | `pending` | provider `connect FAIL` | `failed` | emit `lastError` |
 | `pending` | user `abort()` | `aborted` | abortController.abort() |
 | `translating` | chunk `delta` | `translating` | translatedParagraphs[i] += text |
+| `translating` | chunk `done` 但 zero-delta（零译文段；content policy 拦截 / 模型拒答等） | `failed` | errorCode=content_filter; emit `lastError` |
 | `translating` | chunk `done` | `completed` | cache.write(); fromCache=false |
 | `translating` | chunk `error (retryable)` | 流式整批回退 → `translating` | retried via `stream=false` |
 | `translating` | chunk `error (non-retryable)` | `failed` | emit `lastError` |

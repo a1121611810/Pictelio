@@ -115,10 +115,11 @@ public class PictelioTranslateModule extends LynxModule {
     private static final java.util.Set<String> USER_ABORTED = ConcurrentHashMap.newKeySet();
 
     // ── SSE 解析状态（每次 translateStream 新建一个解析器实例，见 SseParser） ──
-    /** SSE 解析器（每次流新建一个，实例内保持段落锚定状态） */
+    /** SSE 解析器（每次流新建一个，实例内保持段落锚定状态）。
+     *  「本流是否产出过译文段」由 {@link TranslationSseParser#hasText()} 提供 —— 字段级判据
+     *  已被 #654 删除（sink 看帧类型字符串会让 {@code response.completed} 自带的空 delta_all
+     *  帧把空流判成 done，与字段注释「空流 = 失败」相矛盾）。 */
     private TranslationSseParser sseParser;
-    /** 本次流是否至少产出过一个译文段（空流 = 失败，见 translateStream 收尾） */
-    private boolean deltaSeen = false;
     // ── 帧交付（事件总线为主通道，轮询为候选兜底）───────────────────
     // 背景：解析线程若在一次 read 内连续 callback.invoke 多帧，Lynx 桥只投递其中一帧
     // （模拟器实测：Java 下发 11 帧、JS store 只收到 1 帧；加 25ms 睡眠也无效，因为
@@ -389,7 +390,6 @@ public class PictelioTranslateModule extends LynxModule {
                     failStream(streamId, "响应体为空");
                     return;
                 }
-                deltaSeen = false;
                 frameQueue.clear();
                 // 每流新建解析器（回归 B）：模块是注册表单例，实例级 sseParser 会让
                 // terminalError 等状态跨流残留 —— 一次失败后同页后续流全部被误判失败。
@@ -402,7 +402,7 @@ public class PictelioTranslateModule extends LynxModule {
                         if (payload != null && !payload.isEmpty()) frameQueue.offer(payload);
                     });
                 }
-                Log.i(TAG, "SSE 流结束 terminal=" + terminalEmitted + " deltaSeen=" + deltaSeen
+                Log.i(TAG, "SSE 流结束 terminal=" + terminalEmitted + " hasText=" + (sseParser != null && sseParser.hasText())
                         + " queued=" + frameQueue.size());
                 // 交付改由 JS 轮询拉取（translatePoll）：这里只把帧与终态登记进 per-stream 缓冲
                 java.util.concurrent.ConcurrentLinkedQueue<String> buffer =
@@ -415,12 +415,18 @@ public class PictelioTranslateModule extends LynxModule {
                             .offer(withSeq(withStreamId(buffer.poll(), streamId), streamId));
                 }
                 String parserError = sseParser == null ? null : sseParser.terminalError();
+                boolean hasText = sseParser != null && sseParser.hasText();
                 if (parserError != null) {
                     // 终态失败优先于「有译文」：否则半截译文会被判成功并写进缓存（spec §7.2）
                     Log.w(TAG, "SSE 终态为失败 → 报错（即使已产出 " + frameQueue.size() + " 帧）");
                     registerTerminal(streamId, parserError);
                     frameQueue.clear();
-                } else if (!deltaSeen) {
+                } else if (!hasText) {
+                    // 空流 = 失败（oracle: deltaSeen 字段注释「空流 = 失败」 + 收尾分支注释
+                    // 「SSE 流结束但未产出任何译文段 → 报空流失败」 + 真机事实：DeepSeek 对
+                    // R-18 正文 200 但零输出）。原实现用实例字段 deltaSeen，sink 看帧类型字符串
+                    // 就置真（response.completed 自带的空 delta_all 帧），导致本分支永不触发
+                    // → done 被错误写进缓存。改用 sseParser.hasText()（issue #654）。
                     Log.w(TAG, "SSE 流结束但未产出任何译文段 → 报空流失败");
                     registerTerminal(streamId, "LLM 未返回任何译文（可能被服务端内容策略拦截）");
                 } else {
@@ -856,12 +862,10 @@ public class PictelioTranslateModule extends LynxModule {
         return sseParser.accept(
                 line,
                 (payload, error) -> {
-                    // 只入队：交付由事件总线 / 轮询完成，不进 callback（见 frameQueue 注释）
-                    if (payload != null
-                            && (payload.contains("\"type\":\"delta\"")
-                                || payload.contains("\"type\":\"delta_all\""))) {
-                        deltaSeen = true;
-                    }
+                    // 只入队：交付由事件总线 / 轮询完成，不进 callback（见 frameQueue 注释）。
+                    // 注意：本 sink 不再做「流是否产出过译文段」的判据（issue #654）——
+                    // 那条判据已迁到收尾分支的 sseParser.hasText()，避免 response.completed
+                    // 自带的空 delta_all 帧把空流骗成 done。
                     if (error != null && !error.isEmpty()) {
                         // 错误是终态：走 callback 直接报错（单帧；一条流至多投递一次恰好够用）
                         callback.invoke("", error);
