@@ -69,14 +69,72 @@
 
 | 步 | 状态 | 原因 |
 |---|---|---|
-| Step 1 Keystore 持久化 | 未验 | 脚本每次启动重新播种 dev hook；结构上无法证明持久化（#645 已指出） |
+| Step 1 Keystore 持久化 | **✅ 已补齐**（见下节） | — |
 | Step 2 流式增量渲染 | 部分 | 只证「译文交付」（`hasText=true` + frames 交付），未证逐字渐显 |
 | Step 3 原文/译文切换 <50ms | 未验 | 需人工点击 + 计时 |
 | Step 4 model 切换 namespace | 未验 | 需改配置后重译 |
 | Step 5 OpenRouter partial probe | 未验 | 需切 endpoint 到 OpenRouter |
 | Step 6 R18 闸门 | 部分 | 截图显示 R-18G 章节可进入且发出请求（说明闸门放行），未验「关闭后 disabled」 |
-| Step 7 章节切换 generation-gate | 未验 | 需人工计时切换 |
+| Step 7 章节切换 generation-gate | **✅ 实现面已验 + 发现并修复真缺陷**（见下节） | — |
 | F1 partial 占位渲染 | 未验 | 见上 |
+
+---
+
+## Step 1 补齐：Keystore 持久化（用 prefs 直读证明）
+
+#640 的收口修订指出：既有报告走的是 dev hook 播种，`verify-translation.sh:47-49` 每次启动都重新播种，
+**结构上无法证明持久化**。本轮改用「force-stop → 重启 → 直读 SharedPreferences」证明：
+
+```bash
+adb logcat -c
+adb shell am force-stop io.pictelio.app
+adb shell am start -n io.pictelio.app/io.pictelio.app.LynxActivity
+# 重启后直接读落盘状态（debug 构建允许 run-as）
+adb shell run-as io.pictelio.app cat shared_prefs/WSSecureStorageSharedPreferences.xml
+adb shell run-as io.pictelio.app cat shared_prefs/CapacitorStorage.xml
+```
+
+**结果（重启后仍在）**：
+
+| 键 | 文件 | 性质 |
+|---|---|---|
+| `capacitor-storage_translate_llm_api_key` | `WSSecureStorageSharedPreferences.xml` | **加密**（Keystore 支持）—— 证明密钥层持久化 |
+| `capacitor-storage_refresh_token` | 同上 | 加密 —— 证明 auth 恢复路径未被破坏 |
+| `llm_endpoint_base_url` = `https://api.deepseek.com` | `CapacitorStorage.xml` | 非密元数据 |
+| `llm_endpoint_model` = `deepseek-flash` | 同上 | 非密元数据 |
+
+**结论**：Step 1 的核心断言（「杀掉 app 重启 → endpoint 仍在」）**成立**，密钥层与非密元数据层均存活。
+（未覆盖：设置页「✓ 已保存」内联提示的截图 —— 那需要 UI 交互。）
+
+---
+
+## Step 7 补齐：章节切换发现并修复真缺陷
+
+#640 的收口修订把 step 7 标为「零取证 且 前提不成立」。前提问题（#649：`abortHandle` 从不赋值
+→ `abortStream` 不可达）已由 #653（`6e1ad678`）修复，并有设备取证
+（`docs/verification/app-lynx-translation-emulator-abort.md`：`abortStream 取消: smu97dwp2-1`）。
+
+本轮补查**章节切换这条触发路径**，发现 `novelTranslateStore.reset()`（`NovelDetail.vue` 的
+`watch(novelId)` 在切章节时调用）**既不 abort、也不 bump `gen`**，而 spec §7.2 转移表末行明确要求
+「任何 | chapter switch | idle | **abort() if in-flight**; reset state」。三个后果：
+
+1. 旧章节请求继续跑（白烧 token 到自然结束 / 轮询超时）；
+2. 旧请求 settle 时越过 generation-gate → **旧章节译文写进新章节的 `displayParagraphs`**（跨章节污染）；
+3. `status` 被旧结果推成 `completed` / `failed`，覆盖新章节状态。
+
+**修复**：`reset()` 补 `activeController?.abort()` + `gen += 1`。
+**验证**：新增用例（挂起 iterator + 可 abort signal 造确定 in-flight 窗口）；变异实验「退回只清状态」
+→ 该用例必红（实测）；vitest 1805/1805；vue-tsc exit 0。已提 PR #660。
+
+---
+
+## 关联
+
+- PR #657（实现）/ PR #660（step 7 缺陷修复）
+- `#654`（空流闸门 —— 真机确认生效）
+- `#640` step 1 / step 7（本报告补齐两项）
+- issue #651（partial 段落标记 —— F1 证据支持必要性）
+- ADR-0170（callback 通道不可靠）+ ADR-0178 D1/D4
 
 ---
 
