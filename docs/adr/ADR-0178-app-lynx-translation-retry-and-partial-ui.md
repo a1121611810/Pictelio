@@ -1,6 +1,6 @@
 # ADR-0178: app-lynx 翻译失败重试与 partial 段落标记的形态参数
 
-- **状态**: proposed（2026-09-20）
+- **状态**: accepted（2026-09-20，用户 review 通过）
 - **日期**: 2026-09-20
 - **关联**: wayfinder map [#644](https://github.com/a1121611810/Pictelio/issues/644)（app-lynx 翻译收尾遗留项收敛）；issue [#651](https://github.com/a1121611810/Pictelio/issues/651)（决策：失败重试策略与 partial 段落标记语义）；issue [#643](https://github.com/a1121611810/Pictelio/issues/643)（root ticket：失败重试与 partial 段落标记）；spec [docs/specs/app-lynx-novel-translation.md](../specs/app-lynx-novel-translation.md) §6 Q6「流式优先 + 整批回退」/ §7.1–7.2 状态机 / §9.5「缓存写只在 done 之后」/ §11 A2「流式整批回退最多 1 次」；ADR-0169（TranslationProvider 接口）；ADR-0170（native bridge / chunked pipeline）；ADR-0171（缓存键与模型档位）；ADR-0173 D7（端点探测与凭据验证 + 错误码联合类型）
 

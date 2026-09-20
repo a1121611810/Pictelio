@@ -1,6 +1,6 @@
 # ADR-0174: PictelioTranslate Java 终态交付契约的单测防线（机制采纳）
 
-- **状态**: proposed
+- **状态**: accepted（2026-09-20，用户 review 通过）
 - **日期**: 2026-09-20
 - **关联**: wayfinder map [#644](https://github.com/a1121611810/Pictelio/issues/644)（app-lynx 翻译收尾遗留项收敛）；issue [#647](https://github.com/a1121611810/Pictelio/issues/647)（决策：Java 交付契约防线——仅剩「总线载荷在 JVM 是盲区」这一项）；issue [#642](https://github.com/a1121611810/Pictelio/issues/642)（root ticket：PictelioTranslateModule 补 Robolectric 单测）；调研 [#646](https://github.com/a1121611810/Pictelio/issues/646)（CLOSED：在 JVM 单测驱动 PictelioTranslate 真实终态路径的可行机制）；ADR-0170（PictelioTranslate native bridge / 信封契约 / `translateStream` → `translatePoll` 交付通道）；ADR-0163（QA 防线三网——平台事实取证模式 + 转换矩阵）；ADR-0097（`passWithNoTests: false` 门禁）
 

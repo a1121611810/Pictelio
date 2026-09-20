@@ -1,6 +1,6 @@
 # ADR-0177: Android Gradle 单测变体门禁（`./gradlew test|build|check` 恒红陷阱收口）
 
-- **状态**：proposed（2026-09-20）
+- **状态**：accepted（2026-09-20，用户 review 通过）
 - **日期**：2026-09-20
 - **关联**：wayfinder map [#644](https://github.com/a1121611810/Pictelio/issues/644)（app-lynx 翻译收尾，#655 为本 ADR 父 ticket）；决策 ticket [#655](https://github.com/a1121611810/Pictelio/issues/655)（wayfinder:grilling）；研究 [#646](https://github.com/a1121611810/Pictelio/issues/646) §2.2（机制证明 + 上一 session 误诊证伪，本 ADR 唯一事实来源）；[`packages/app/android/app/build.gradle`](../../packages/app/android/app/build.gradle) flavor / sourceSets / dependencies 三段（`:54-69` / `:240-265` / `:268-275`）；[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) `android-unit-test` job（`:64-105`，门禁即 `./gradlew testFullDebugUnitTest`）；ADR-0170（姊妹 ADR：跨端信封契约——本 ADR 收敛其单元测试可达性）；ADR-0174（Java translate 终态契约测试——已先于本 ADR 落地，证明 C 可行）
 

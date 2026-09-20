@@ -1,6 +1,6 @@
 # ADR-0175: app-lynx 原生翻译缓存通道（真机文件系统路径）
 
-- **状态**：proposed（2026-09-20）
+- **状态**：accepted（2026-09-20，用户 review 通过）
 - **日期**：2026-09-20
 - **关联**：wayfinder map [#644](https://github.com/a1121611810/Pictelio/issues/644)（app-lynx 翻译收尾）/ issue [#650](https://github.com/a1121611810/Pictelio/issues/650)（决策：原生翻译缓存的存储通道与语义对齐）/ issue [#641](https://github.com/a1121611810/Pictelio/issues/641)（实现票：native 翻译缓存通道）/ ADR-0171 §D（SharedPreferences 显式 REJECTED，本 ADR 不再讨论）/ ADR-0172 §2（Lynx PrimJS 无 indexedDB，本 ADR 填 ADR-0171 留下的空缺）/ ADR-0103 §3（lynx 双 adapter 模式 = `isNativeMode() ? nativeAdapter : devAdapter`）/ ADR-0170（NativeModule 范式：单职责 + LynxMethod + 回调去 null）/ ADR-0090（三层图片缓存 = 同源码同形态先例）
 

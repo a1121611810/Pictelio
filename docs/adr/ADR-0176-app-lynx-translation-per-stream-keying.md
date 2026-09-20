@@ -1,6 +1,6 @@
 # ADR-0176: app-lynx 翻译 Java 端解析状态按 streamId 分桶（per-stream keying）
 
-- **状态**: proposed
+- **状态**: accepted（2026-09-20，用户 review 通过）
 - **日期**: 2026-09-20
 - **关联**: wayfinder map [#644](https://github.com/a1121611810/Pictelio/issues/644)（app-lynx 翻译收尾遗留项收敛）；issue [#652](https://github.com/a1121611810/Pictelio/issues/652)（决策：跨流状态隔离 —— 解析状态按 streamId 收进 per-stream 对象）；issue [#640](https://github.com/a1121611810/Pictelio/issues/640)（root ticket：P3 step 7）；调研 [#649](https://github.com/a1121611810/Pictelio/issues/649)（CLOSED：app-lynx 翻译跨流污染可达性论证）；ADR-0170 §D6 / 信封契约 / :471-485（per-stream 缓冲与 `pruneFinishedStreams` 范式）/ :503「陈旧流不得写进当前翻译」；ADR-0174 D1（生产读缝 `translatePoll`）；[#654](https://github.com/a1121611810/Pictelio/issues/654) 空流门禁（`deltaSeen` 实例字段已删除，commit `c7019273`）
 
