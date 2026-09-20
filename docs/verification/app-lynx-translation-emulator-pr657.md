@@ -70,8 +70,8 @@
 | 步 | 状态 | 原因 |
 |---|---|---|
 | Step 1 Keystore 持久化 | **✅ 已补齐**（见下节） | — |
-| Step 2 流式增量渲染 | 部分 | 只证「译文交付」（`hasText=true` + frames 交付），未证逐字渐显 |
-| Step 3 原文/译文切换 <50ms + 长按重译 | 未验 | 需计时 + 长按手势 |
+| Step 2 流式增量渲染 | **✅ 已查清：实装中不存在**（见下节 —— 票面断言与实装不一致，需裁定） | — |
+| Step 3 原文/译文切换 <50ms + 长按重译 | **✅ 已查清**（见下节：长按入口未实装、切换耗时无法外部测量） | — |
 | Step 4 model 切换 namespace | **✅ 已补齐**（见下节；并查出 #641 缓存真机失效的真缺陷） | — |
 | Step 5 OpenRouter partial probe | 未验 | 需切 endpoint 到 OpenRouter |
 | Step 6 R18 闸门 | **✅ 已补齐**（见下节；并发现两处 UI 缺陷，已修） | — |
@@ -164,6 +164,81 @@ Phase 1/2/3 首轮全部 `cacheMiss`，日志暴露根因：
 ### 教训（值得沉淀）
 
 ADR-0175 的「双通道探测」被 `nativeTranslate.ts` 与 `tokenStorage` 正确实现，但本模块为了迁就测试环境的遮蔽问题**改成了单通道** —— 测试全绿掩盖了真机失效。**探测逻辑不允许为测试环境妥协**：要么两个通道都试（本修复），要么在测试里同时提供两个通道。
+
+---
+
+## Step 2 查清：「段落增量渲染」在实装中**不存在**（票面断言与实装不一致）
+
+票面 step 2 的断言是「**段落增量渲染**（可视化截图记录）」。用慢速 mock（`MOCK_SLOW_MS=300`，51 段/chunk）逐秒采样：
+
+| 采样点 | `SSE 流结束` | 事件总线交付 | UI 实际状态 |
+|---|---|---|---|
+| t≈5s | 0 | 0 | 原文 |
+| t≈10s | 0 | 0 | 原文 |
+| **t≈20s** | **1** | **1** | **按钮「35%翻译中」+ 正文仍是原文** |
+| t≈35s | 1 | 1 | 同上 |
+| t≈50s | 2 | 2 | 同上 |
+
+截图 `step2-20s-progress-only.png` 实证：**进度条在走（35%），但正文一个字都没变**。
+
+### 根因（代码级）
+
+| 事实 | 位置 |
+|---|---|
+| `showTranslation` 只在**终态**（completed / partial / cache-hit / fallback 成功）置 `true` | `novelTranslateStore.ts:705 / 950 / 969 / 1094` |
+| delta 处理器只更新 `translatedParagraphs[abs]` 与 `progress`，**不调用 `refreshDisplay()`** | 同文件 delta 分支（`:847+`） |
+| `refreshDisplay` 的渲染源 = `showTranslation && translatedParagraphs.length > 0 ? 译文 : 原文` | `:378-390` |
+
+⇒ 翻译期间 `showTranslation === false` → `displayParagraphs` **恒等于原文切片** → 用户看到的是「原文 + 按钮上的百分比」，译文在**结束时整章切换**。
+
+### 附带发现：渐进粒度上限 = chunk 级（架构约束）
+
+`TranslationSseParser.emitConsolidated` 的注释与 ADR-0170 记录：lynx NativeModule **一次流只可靠投递一帧**（逐帧直发 / 加间隔 / 主线程派发 / 合并单帧四种策略实测均只收到 0-1 帧），故整块译文被打包成一帧 `delta_all`。因此即便是「渐进」，粒度也只会是 **chunk 级**（本章 5 块 → 5 次出现），不可能是逐段 / 逐字。
+
+### 结论与建议
+
+- 票面断言「段落增量渲染」**当前不成立**，且不是 bug —— 是「进度用百分比、内容终态切换」的设计选择 + 单帧交付的架构约束共同决定的。
+- 若要真做渐进显示：delta 分支首次收到 delta 时置 `showTranslation=true` + `refreshDisplay()`（约 3 行）。但这是 **UX 产品决策**（会在翻译过程中反复重排正文；lynx 侧每 chunk 重渲染的代价需评估），**不宜由实施方单方变更**。
+- 已按 #640 处理 step 6 的先例（措辞与实装不一致 → 改判定）记入本报告，建议票面改判定或另开 feature 票。
+
+---
+
+## Step 3 查清：长按重译入口**未实装**、切换耗时**无法外部测量**
+
+票面 step 3 含两条：「切换 < 50ms」+「**长按** segmented button → 弹「重译」入口」。
+
+### 3a 长按重译入口：未实装（且实装形态更优）
+
+`packages/app-lynx/src/components/TranslateModeSwitch.vue` 只有两个 `@tap`：
+
+```
+:39  @tap="pick('original')"
+:53  @tap="pick('translation')"
+```
+
+全仓 `longpress` 只出现在**文本选择**域（`useTextSelection` / `createTextSelection`），与翻译无关。
+
+**重译入口的实际实装**：在 `TranslateButton`（FAB）的 `retranslate` 态 —— `buttonState` 派生 + `LABEL_KEYS.retranslate`，点击走 `store.retranslate()`（先失效本章缓存再翻）。
+
+⇒ 这是**可见入口 vs 隐藏手势**的取舍：FAB 上的「重译」是常驻可见的，长按手势需要用户发现。属产品决策，建议票面改判定（与 step 6 同先例）。**不是缺陷**。
+
+### 3b 切换 < 50ms：代码路径支持，但**外部无法测量**
+
+代码路径（`novelTranslateStore.toggleMode` → `refreshDisplay`）：
+- 同步翻转 `showTranslation` signal
+- `refreshDisplay` 只做一次 `map`（把 `translatedParagraphs` 逐段填入 `sourceParagraphs`）—— O(段落数)，无网络、无 IO、无 await
+- 渲染由虚拟滚动承担（仅可见段重排）
+
+⇒ 逻辑耗时在微秒量级，**瓶颈只可能在 Lynx 渲染层**。
+
+**为何无法从外部证实 50ms**：本轮的测量手段是 `adb exec-out screencap`，单次截图往返 ~150–300ms，远大于 50ms 的门限 —— 用截图测「是否 < 50ms」在方法上就不成立（测的是截图延迟，不是切换延迟）。
+
+**建议**：若要保留该数值门槛，应改用**可测量的手段**（任选）：
+- `screenrecord --bugreport` 逐帧（高 fps 下可到 ~16ms 分辨率）
+- 在 `toggleMode` 里打 `Log.i` 时间戳 + 在渲染完成回调里打第二个（Lynx 侧可挂 layout 完成事件）
+- instrumented test（Espresso + `IdlingResource`）
+
+本报告**不主张**该条已通过 —— 只能说代码路径不含可解释 50ms+ 的同步开销。
 
 ---
 
