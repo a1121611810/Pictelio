@@ -117,6 +117,15 @@ public class PictelioTranslateModuleSuccessTest {
         clearStaticBuffer("STREAM_TERMINAL");
         clearStaticBuffer("STREAM_TERMINAL_MSG");
         clearStaticBuffer("STREAM_SEQ");
+        clearUserAborted();
+    }
+
+    /** 反射清 USER_ABORTED：与 TerminalTest/CancelTest 对齐，避免 CancelTest 残留影响。 */
+    private static void clearUserAborted() throws Exception {
+        java.lang.reflect.Field f = PictelioTranslateModule.class.getDeclaredField("USER_ABORTED");
+        f.setAccessible(true);
+        java.util.Set<?> s = (java.util.Set<?>) f.get(null);
+        s.clear();
     }
 
     @SuppressWarnings("unchecked")
@@ -172,14 +181,14 @@ public class PictelioTranslateModuleSuccessTest {
         return terminals.get(id);
     }
 
-    /** 等待 STREAM_TERMINAL 登记（成功路径必到达该分支）。 */
+    /** 等待 STREAM_TERMINAL 登记（成功路径必到达该分支）。30s 超时防止 full suite 跑慢时假阳。 */
     private JSONObject waitTerminal(String id) throws Exception {
-        for (int i = 0; i < 300; i++) {
+        for (int i = 0; i < 600; i++) {
             String t = streamTerminal(id);
             if (t != null) return new JSONObject(t);
             Thread.sleep(50);
         }
-        throw new AssertionError("15s 内未登记终态");
+        throw new AssertionError("30s 内未登记终态");
     }
 
     /**
