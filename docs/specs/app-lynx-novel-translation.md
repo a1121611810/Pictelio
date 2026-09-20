@@ -507,7 +507,7 @@ sequenceDiagram
 |---|---|---|
 | `idle` | 初始态；用户未触发翻译或上次翻译已 abort | 显示「翻译」按钮 |
 | `pending` | 任务已派发；provider 正在建立 SSE 连接 | 按钮 disabled，显示 spinner |
-| `translating` | 已收到 ≥1 个 delta chunk；段落增量渲染中 | 段落实时替换；按钮显示「翻译中 N%」 |
+| `translating` | 已收到 ≥1 个 delta chunk；进度累积中（内容终态整章切换） | 进度条持续更新 N%；正文仍为原文；按钮显示「翻译中 N%」 |
 | `translating_queued` | 流内收到排队事件（预留态） | 显示「队列中…」徽标 |
 | `partial` | 流中断后整批回退也失败；部分段落有译文 | inline retry bar；段落标 〔未翻译〕 |
 | `failed` | 终态失败（首次失败且无回退） | inline retry bar；按钮变「重试」 |
@@ -556,15 +556,16 @@ sequenceDiagram
 | `aborted` | chapter switch | `idle` | resetOnChapterSwitch() |
 | 任何 | `chapter switch` | `idle` | abort() if in-flight; reset state |
 
-> **幽灵验收项作废**（issue #656 契约项 4，2026-09-20）
+> **幽灵验收项作废**（issue #656 契约项 4 / #665，2026-09-20）
 >
-> 本表曾含两项实现期未采用的验收项，现**显式作废并记录**，不再作为要求：
+> 本表曾含**三项**实现期未采用的验收项，现**显式作废并记录**，不再作为要求：
 >
 > 1. **`fromCache: boolean` 字段** —— 实现改为 `isCached: Record<number, boolean>`（按 chapterId 记录「本章是否已缓存」，ADR-0171 §6：缓存语义跨章节持久）。`fromCache` 的无用途在于：UI 需要的是「本章是否命中缓存」（用于按钮态与 segmented bar），而不是「这次渲染的来源」。
 > 2. **`completed` → cache miss → `idle` 转移** —— 实现未采用这条。实际路径：缓存读发生在 `translateChapter` 入口（`pending` 之前），miss 不会把已完成状态推回 `idle`；model 切换后的 namespace 失效由**缓存键六元组**天然承担（ADR-0171 §1），无需状态机参与。`pending → translating` 的路径见上表首两行。
+> 3. **`translating` 状态 UI 反馈 = 「段落增量渲染 / 段落实时替换」**（issue #665，#640 step 2）—— 实现是「进度用百分比观测 + 译文在终态（`completed` / `partial` / cache-hit / fallback 成功）整章切换」。**根因（架构硬约束）**：lynx NativeModule 一次流只可靠投递一帧（ADR-0170 §单帧交付契约：直发 / 加帧间隔 / 主线程派发 / 合并单帧四种策略实测均只收到 0-1 帧），故整块译文打包成一帧 `delta_all`，**渐进粒度上限 = chunk 级**（本章 5 块 → 至多 5 次切换，不可能逐段/逐字）。权衡上选择「终态切换 + 缓存命中 < 50ms 切换」（§6.3 第 476 行）而非「chunk 级渐进」：后者 UX 收益小（5 次切换），但破坏失败/中断时的可观测性（半截译文 + 原文混排难定位错误段），且与 `displayBlocks` memo + 虚拟滚动的「先渲染后加载」硬约束相悖。
 >
 > 权威口径 = 本表（已作废行以删除线标出）+ `novelTranslateStore.ts` 的实现分支。
-> 若未来重新需要这两项，应新开 issue 并把理由写回本表，而不是直接复活作废行。
+> 若未来重新需要这三项，应新开 issue 并把理由写回本表，而不是直接复活作废行。
 
 **generation-gate 守门**：
 任何 chunk 进入 store 时，**先比对 `chunk.requestChapterId === currentChapterId`**；不匹配则丢弃（防跨章节污染）。`chapterId` 包含在 `TranslationRequest.chapterId` 字段，provider 在流起始处注入 chunk metadata。
