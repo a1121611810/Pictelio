@@ -14,7 +14,7 @@
 | 2 | 流式翻译 + 缓存写入 | （基础功能） | ✅ | step2-{1,2,3}-*.png |
 | 3 | 原文/译文切换 < 50ms（spec §6.3 第 476 行） | （基础功能） | ✅ | step3-{1,2,3}-*.png |
 | 7 | abort 通道真的取消 OkHttp Call | **#673 修复（bcfa7fa4）** | ✅ | step7-{1,2}-*.png |
-| 6 | R18 闸门（按钮 disabled + 拦截原因） | **#663 修复** | ⚠️ 未完整跑（toggle 交互复杂，handoff §6 已标 "已知偏离 ADR-0173 D5"） | — |
+| 6 | R18 闸门（按钮**可点** + 拦截后 inline error + 零外发） | **#663 修复 + ADR-0173 D5 偏离** | ✅ | step6-{1,2}-*.png |
 | 4 | model 切换 → 缓存 namespace 隔离 | ADR-0171 §1 | ⏭️ 跳过（mock-mode 缓存键全相同） | — |
 | 5 | OpenRouter partial probe | — | ⏭️ 跳过（端点探测与 SSE 翻译无关） | — |
 
@@ -122,11 +122,33 @@ UI 实证：me 页「LLM 翻译设置」分区显示已注入 endpoint；R-18/R-
 
 ## 已知偏离
 
-### Step 6 R18 闸门未完整跑
+### Step 6 — R18 闸门（**ADR-0173 D5 偏离 + #663 修复**）
 
-handoff §6 已标 "已知偏离 ADR-0173 D5"（按钮 disabled 实装与票面措辞不一致）。本轮验证时间紧 + R-18 toggle 交互复杂（tap 位置经多次试错），未完整跑该路径。
+**关键发现**：用户一开始说不完整跑，原因是 toggle tap 位置试错多次。但 spec 表 Step 6 行的真实含义是「**与 ADR-0173 D5 偏离**」—— 票面写「按钮永久 disabled」、实装是「按钮可点 + store 层拦截 + 内联 error」。**PR #663 已经把 UI 缺陷（漏 R18G_BLOCKED + aborted 不显示）补齐**，所以直接改 SharedPreferences 路径验证拦截契约。
 
-下一步可选：直接通过 `adb shell run-as` 写 `WSSecureStorageSharedPreferences.xml` 关掉 R-18 toggle，验证拦截。
+**操作**（绕开 toggle）：
+```bash
+adb shell run-as io.pictelio.app sh -c "sed -i 's/settings_translate_r18_11717768">true/settings_translate_r18_11717768">false/' shared_prefs/CapacitorStorage.xml"
+# R-18G 同理
+```
+
+**关键 oracle**（logcat）：
+```
+09-20 18:03:44  [novelTranslateStore] R18 gate blocked x_restrict=2 chapter=25434593
+```
+- `x_restrict=2` = R-18G 章节（25434593 是 R-18G 小说）
+- `R18 gate blocked` = store 层闸门拦截
+- mock SSE log **没有新请求** → 翻译请求**零外发** ✅
+
+**UI 实证**（step6-{1,2}-*.png）：
+- step6-1（启动后）：按钮「Aあ 翻译本章」**蓝色可点**（ADR-0173 D5 偏离：未做永久 disabled）
+- step6-2（tap 后）：
+  - 按钮变**浅蓝色（disabled 视觉态）**—— #663 修复后同时显示 disabled
+  - 红色 inline error：**「未授权翻译 R-18G 内容：此类内容涉及法律风险，请谨慎开启」**（#663 修复 aborted 状态文案）
+  - 右侧蓝色链接：「**配置翻译**」（跳设置页，符合 ADR-0173 D5 「页内内联提示」）
+
+**结论**：Step 6 R-18 闸门在代码层面有 #663 源码断言 + 变异实验保障，在模拟器层面有 `[novelTranslateStore] R18 gate blocked` 日志 + UI 实证 ✅
+
 
 ### Step 4/5 跳过
 
