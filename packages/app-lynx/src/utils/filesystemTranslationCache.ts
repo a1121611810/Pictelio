@@ -24,14 +24,28 @@ interface PictelioTranslateCacheModule {
   getCacheDirPath: (cb: (path: string) => void) => void
 }
 
-/** 双通道探测（与 nativeTranslateModule / tokenStorage / lynxClipboard 一致；ADR-0053 §1）
- *  不用 RN 的 `NativeModules` 全局——happy-dom 可能定义为空对象遮蔽 globalThis.NativeModules
- *  统一从 globalThis 读，避免误命中空对象。
+/**
+ * 双通道探测（与 `nativeTranslate.ts` 的 `nativeTranslateModule()` 同形；ADR-0053 §1）。
+ *
+ * <p><b>必须是「逐通道找模块」而不是「取第一个存在的容器」</b> —— 这是真机实测的教训：
+ * - 真机 PrimJS 把 native module 挂成**裸 `NativeModules`** 全局（`nativeTranslate` 用同一
+ *   顺序且工作正常）；
+ * - happy-dom / node 测试环境会把 `NativeModules` 定义成**空对象**，遮蔽 `globalThis` 上的注入。
+ *
+ * <p>早期实现取「`NativeModules` 存在就用它」（happy-dom 下得到空对象）→ 改成只读
+ * `globalThis.NativeModules`（绕开 happy-dom）→ **真机彻底失效**（真机走裸通道）。
+ * 正确做法：两个通道都取模块本体，谁能拿到非空模块就用谁；裸通道优先（真机路径）。
  */
 function nativeModule(): PictelioTranslateCacheModule | null {
-  const nm = (globalThis as { NativeModules?: { PictelioTranslateCache?: PictelioTranslateCacheModule } })
-    .NativeModules
-  return nm?.PictelioTranslateCache ?? null
+  const bare = typeof NativeModules !== "undefined" ? NativeModules : undefined
+  const fromBare = (
+    bare as { PictelioTranslateCache?: PictelioTranslateCacheModule } | undefined
+  )?.PictelioTranslateCache
+  if (fromBare != null) return fromBare
+  const fromGlobal = (
+    globalThis as { NativeModules?: { PictelioTranslateCache?: PictelioTranslateCacheModule } }
+  ).NativeModules?.PictelioTranslateCache
+  return fromGlobal ?? null
 }
 
 /** NativeModule 是否可用（导出给 translationCache.ts 探测） */

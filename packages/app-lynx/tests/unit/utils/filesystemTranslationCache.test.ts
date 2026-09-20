@@ -59,6 +59,32 @@ function uninstallModule() {
   delete (globalThis as unknown as { NativeModules?: unknown }).NativeModules
 }
 
+/**
+ * 空容器不遮蔽（真机回归的失败模式）。
+ *
+ * <p>背景（#641 真机实测）：happy-dom / node 会把 `NativeModules` 定义成**空对象**；
+ * 早期实现「取第一个存在的容器」→ 拿到空对象 → 误判不可用；改成只读
+ * `globalThis.NativeModules` 后**真机彻底失效**（真机 PrimJS 走**裸** `NativeModules` 通道）。
+ *
+ * <p>现在的语义是「逐通道找**模块本体**」：容器存在但没有 `PictelioTranslateCache` 时，
+ * 不得误判为「可用」，也不得因此遮蔽另一通道。
+ *
+ * <p>注意：进程内无法把「裸 `NativeModules`」与 `globalThis.NativeModules` 分离（同一次
+ * 全局查找），故「真机走裸通道」这条只能由设备取证 —— 见
+ * `docs/verification/app-lynx-translation-emulator-pr657.md`。本用例守的是「空容器不误判」。
+ */
+describe("空容器不遮蔽（#641 真机回归）", () => {
+  it("NativeModules 为空对象 → 不可用（不得误判为可用）", () => {
+    ;(globalThis as unknown as { NativeModules: Record<string, never> }).NativeModules = {}
+    expect(isFilesystemTranslationCacheAvailable()).toBe(false)
+  })
+
+  it("NativeModules 存在但无 PictelioTranslateCache 键 → 不可用", () => {
+    ;(globalThis as unknown as { NativeModules: { Other: object } }).NativeModules = { Other: {} }
+    expect(isFilesystemTranslationCacheAvailable()).toBe(false)
+  })
+})
+
 beforeEach(() => {
   vi.spyOn(console, "warn").mockImplementation(() => {})
 })
