@@ -59,6 +59,7 @@ const zhNovelTranslate = {
   "novelTranslate.status.failed": "翻译失败",
   "novelTranslate.status.completed": "已完成",
   "novelTranslate.status.aborted": "已取消",
+  "novelTranslate.status.retrying": "重试中…",
   "novelTranslate.status.progress.label": "进度 {{done}}/{{total}}",
   "novelTranslate.status.progress.remaining": "剩余 {{remaining}} 章",
 

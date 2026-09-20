@@ -61,6 +61,7 @@ const enNovelTranslate = {
   "novelTranslate.status.failed": "Translation failed",
   "novelTranslate.status.completed": "Completed",
   "novelTranslate.status.aborted": "Cancelled",
+  "novelTranslate.status.retrying": "Retrying…",
   "novelTranslate.status.progress.label": "Progress {{done}}/{{total}}",
   "novelTranslate.status.progress.remaining": "{{remaining}} chapters remaining",
 

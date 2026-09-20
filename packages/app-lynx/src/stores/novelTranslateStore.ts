@@ -123,6 +123,8 @@ export interface NovelTranslateStore {
   error: Ref<TranslationErrorPayload | null>
   isCached: Ref<Record<number, boolean>>
   showTranslation: Ref<boolean>
+  /** ADR-0178 D1 fallback 微提示：fallbackToWholeBatch 期间为 true；UI 显示「重试中…」 */
+  isRetryingHint: Ref<boolean>
   reset: () => void
   loadEndpointConfig: () => Promise<LlmEndpointPublic | null>
   saveEndpointConfig: (config: LlmEndpointConfig) => Promise<void>
@@ -348,6 +350,8 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
   const progress = ref<TranslationProgress | null>(null)
   const currentChapter = ref<number | null>(null)
   const error = ref<TranslationErrorPayload | null>(null)
+  /** ADR-0178 D1 fallback 微提示：fallbackToWholeBatch 期间为 true；UI 显示「重试中…」 */
+  const isRetryingHint = ref<boolean>(false)
   const isCached = ref<Record<number, boolean>>({})
   const showTranslation = ref<boolean>(false)
   // 译文正文（spec §5 数据流 / §6.3 整段切换）：store 是唯一持有者，
@@ -383,6 +387,7 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
     progress.value = null
     currentChapter.value = null
     error.value = null
+    isRetryingHint.value = false
     // isCached 保留：缓存语义跨章节持久（ADR-0171 §6）
     showTranslation.value = false
     translatedParagraphs.value = []
@@ -981,6 +986,7 @@ function classifyProvider(
     if (gen !== genNow) return "failed"
     if (signalArg.aborted) return "aborted"
     const wholeRequest: TranslationRequest = { ...originalRequest, stream: false }
+    isRetryingHint.value = true
     try {
       const iter = providerArg.translate(wholeRequest, configArg, signalArg)
       // 收集所有 chunk
@@ -1033,6 +1039,8 @@ function classifyProvider(
       if (err instanceof DOMException && err.name === "AbortError") return "aborted"
       console.warn("[novelTranslateStore] fallbackToWholeBatch threw", err)
       return "failed"
+    } finally {
+      isRetryingHint.value = false
     }
   }
 
@@ -1123,6 +1131,7 @@ function classifyProvider(
     error,
     isCached,
     showTranslation,
+    isRetryingHint,
     reset,
     compatibility,
     credential,
