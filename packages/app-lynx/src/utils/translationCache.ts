@@ -19,6 +19,13 @@
 import { openDb as openKvDb, STORE_TRANSLATIONS as STORE_TRANSLATIONS_FROM_KV } from './idbKV'
 import { isNativeMode } from '../api/client'
 import { utf8Encode } from './utf8'
+import {
+  isFilesystemTranslationCacheAvailable,
+  getTranslation as fsGetTranslation,
+  setTranslationEntry as fsSetTranslationEntry,
+  removeTranslation as fsRemoveTranslation,
+  clearTranslationCache as fsClearTranslationCache,
+} from './filesystemTranslationCache'
 
 
 // ─────────────────── 缓存键 ───────────────────
@@ -135,9 +142,12 @@ function openDb(): Promise<IDBDatabase> {
  *  禁止静默挂起翻译流程（IO 边界硬约束 #3）。 */
 let warnedNoIdb = false
 
-/** 缓存层是否可用（导出给 store 判断"要不要发这次缓存读"，避免无意义的 IO 调用） */
+/** 缓存层是否可用（导出给 store 判断"要不要发这次缓存读"，避免无意义的 IO 调用）。
+ *  优先 filesystem（ADR-0175 真机原生模式），否则 IndexedDB（dev web-core 预览）。
+ *  两者皆不可用 → false（调用方随后走 provider 重发翻译，不挂起流程）。
+ */
 export function isTranslationCacheAvailable(): boolean {
-  return isIdbAvailable()
+  return isFilesystemTranslationCacheAvailable() || isIdbAvailable()
 }
 
 function isIdbAvailable(): boolean {
@@ -167,8 +177,12 @@ function openDbWithTimeout(): Promise<IDBDatabase> {
  * 读取单条缓存（不存在返回 null；IO 失败返回 null + warn，AGENTS.md 测试硬约束 #1+#3）。
  */
 export async function getTranslation(key: string): Promise<TranslationCacheEntry | null> {
+  // ADR-0175：真机原生模式走 filesystem（PictelioTranslateCache NativeModule）
+  if (isFilesystemTranslationCacheAvailable()) {
+    return fsGetTranslation(key)
+  }
   if (!isIdbAvailable()) {
-    // 真机 Lynx runtime：无 IDB → 缓存层整体跳过（不挂起翻译流程）
+    // 真机 Lynx runtime：无 IDB + 无 filesystem → 缓存层整体跳过（不挂起翻译流程）
     return null
   }
   try {
@@ -219,6 +233,30 @@ export async function setTranslation(
   value: string[],
   metadata: { providerId?: string; modelId?: string } = {},
 ): Promise<void> {
+  // ADR-0175：真机原生模式走 filesystem；Java 侧自有 10MB LRU 淘汰，无需 JS 层处理
+  if (isFilesystemTranslationCacheAvailable()) {
+    const providerId = metadata.providerId ?? 'openai-responses'
+    const modelId = metadata.modelId ?? 'unknown'
+    const parsed = parseCacheKey(key)
+    if (!parsed) {
+      console.warn('[translationCache] invalid cache key format, skip write', { key })
+      return
+    }
+    const entry: TranslationCacheEntry = {
+      key,
+      novelId: parsed.novelId ?? 0,
+      chapterId: parsed.chapterId ?? '',
+      targetLang: parsed.targetLang ?? '',
+      modelId: parsed.modelId ?? modelId,
+      baseURLHash: parsed.baseURLHash ?? '',
+      sourceHash: parsed.sourceHash ?? '',
+      paragraphs: value,
+      createdAt: Date.now(),
+      providerId,
+    }
+    await fsSetTranslationEntry(entry)
+    return
+  }
   if (!isIdbAvailable()) {
     // 真机 Lynx runtime：无 IDB → 静默跳过写（warn 一次可观测）
     console.warn('[translationCache] IDB unavailable, skip write', { key })
@@ -347,6 +385,10 @@ async function evictOldestEntries(db: IDBDatabase, targetDeleteCount: number): P
  * IO 边界：不可用 / 失败 → warn 并返回（调用方随后必然重新请求，不会静默用旧译文）。
  */
 export async function removeTranslation(key: string): Promise<void> {
+  if (isFilesystemTranslationCacheAvailable()) {
+    await fsRemoveTranslation(key)
+    return
+  }
   if (!isIdbAvailable()) {
     console.warn("[translationCache] removeTranslation 跳过：IndexedDB 不可用", { key })
     return
@@ -369,6 +411,10 @@ export async function removeTranslation(key: string): Promise<void> {
  * 用户主动「清除翻译缓存」入口（spec §6.1 / §9.5）。
  */
 export async function clearTranslationCache(): Promise<void> {
+  if (isFilesystemTranslationCacheAvailable()) {
+    await fsClearTranslationCache()
+    return
+  }
   if (!isIdbAvailable()) {
     console.warn("[translationCache] 清除缓存跳过：IndexedDB 不可用（本 runtime 无缓存可清）")
     return
