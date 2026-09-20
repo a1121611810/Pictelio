@@ -210,7 +210,8 @@ export interface ResponsesRequest {
   /** 顶层 system 指令（spec §9.4：prefix 稳定 → 命中 prompt cache） */
   instructions: string
   input: Array<{ role: 'user'; content: string }>
-  stream: true
+  /** true = SSE 流（默认）；false = 单次 POST + JSON 响应（store 层 fallbackToWholeBatch 用） */
+  stream: boolean
   max_output_tokens: number
   reasoning?: { effort: 'minimal' | 'low' | 'medium' | 'high' }
 }
@@ -242,7 +243,7 @@ export function buildResponsesRequestBody(
     model: config.model,
     instructions,
     input: [{ role: 'user', content: inputText }],
-    stream: true,
+    stream: request.stream !== false, // 默认 true；store 层 fallbackToWholeBatch 显式传 false
     max_output_tokens: estimateMaxOutput(request.paragraphs),
     reasoning: { effort: 'minimal' },
   }
@@ -711,6 +712,55 @@ export class OpenAIResponsesProvider implements TranslationProvider {
       return
     }
 
+    // ADR-0178 D1 fallback 路径：request.stream === false 时不做 SSE 拆帧，
+    // 直接读完整 JSON 响应、emit 一组 delta + done 帧。
+    if (request.stream === false) {
+      try {
+        const fullJson = (await response.json()) as {
+          output?: Array<{
+            content?: Array<{
+              type?: string
+              text?: string
+            }>
+          }>
+          status?: 'completed' | 'failed' | 'incomplete'
+          incomplete_details?: { reason?: string }
+          error?: { code?: string; message?: string }
+          usage?: unknown
+        }
+        // 错误响应：status === 'failed'
+        if (fullJson.status === 'failed') {
+          yield {
+            type: 'error',
+            code: 'server',
+            message: fullJson.error?.message ?? 'response failed',
+            retryable: true,
+          }
+          return
+        }
+        // 收集所有 output text（按 [N] 锚定 prefix 拆段）
+        const allText = (fullJson.output ?? [])
+          .flatMap((o) => (o.content ?? []).filter((c) => c.type === 'output_text').map((c) => c.text ?? ''))
+          .join('')
+        // 按 [N] 拆段；缺锚定视为整段
+        const segments = parseNumberedSegments(allText, request.paragraphs.length)
+        for (let i = 0; i < segments.length; i += 1) {
+          yield { type: 'delta', paragraphIndex: i, text: segments[i] ?? '' }
+        }
+        yield { type: 'done' }
+      } catch (err) {
+        yield {
+          type: 'error',
+          code: 'unknown',
+          message: err instanceof Error ? err.message : 'whole-batch parse failed',
+          retryable: false,
+        }
+      } finally {
+        outerSignal.removeEventListener('abort', onOuterAbort)
+      }
+      return
+    }
+
     try {
       for await (const event of parseSSE(response.body, innerSignal)) {
         if (outerSignal.aborted) {
@@ -727,6 +777,34 @@ export class OpenAIResponsesProvider implements TranslationProvider {
       throw new DOMException('aborted', 'AbortError')
     }
   }
+}
+
+/**
+ * 把整批输出文本按 `[N] xxx\n[N+1] yyy` 锚定拆段（与 chunked pipeline delta 拆段一致）。
+ * 缺锚定时按 \n 拆；段数 < 请求段落数时末尾补空串。
+ */
+function parseNumberedSegments(text: string, expectedCount: number): string[] {
+  const out: string[] = []
+  const re = /^\[(\d+)\]\s*/gm
+  let cursor = 0
+  let lastIdx = 0
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text)) !== null) {
+    if (lastIdx < m.index) {
+      // 上一个 [N] 段内容 = text[lastIdx..m.index] 去掉 prefix
+      out.push(text.slice(lastIdx, m.index).replace(/^\[\d+\]\s*/, '').trimEnd())
+    }
+    lastIdx = m.index
+    cursor = Number(m[1])
+  }
+  // 尾段
+  if (lastIdx < text.length) {
+    out.push(text.slice(lastIdx).replace(/^\[\d+\]\s*/, '').trimEnd())
+  }
+  // 段数对齐到 expectedCount
+  while (out.length < expectedCount) out.push('')
+  if (out.length > expectedCount) out.length = expectedCount
+  return out
 }
 
 // ─────────────────────── Provider 工厂 ───────────────────────

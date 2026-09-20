@@ -565,6 +565,88 @@ describe('AbortSignal 取消语义（ADR-0169 D5.4 + D6）', () => {
       expect(first.value.retryable).toBe(true)
     }
   })
+
+  // ─────────────────── ADR-0178 D1 stream=false fallback 路径 ───────────────────
+
+  it('stream=false 整批回退：单次 POST + 拆 [N] 锚定 → N 条 delta + 1 条 done', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          status: 'completed',
+          output: [
+            {
+              content: [
+                { type: 'output_text', text: '[0] 你好\n[1] 世界\n[2] !' },
+              ],
+            },
+          ],
+          usage: { input_tokens: 100, output_tokens: 30, total_tokens: 130 },
+        }),
+        { status: 200 },
+      ),
+    )
+    const p = new OpenAIResponsesProvider({ fetchImpl: fetchMock })
+    const req = { ...SAMPLE_REQUEST, stream: false, paragraphs: ['hi', 'world', '!'] }
+    const iter = p.translate(req, SAMPLE_CONFIG, controller.signal)
+    const collected: TranslationChunk[] = []
+    while (true) {
+      const r = await iter.next()
+      if (r.done) break
+      collected.push(r.value)
+    }
+    // 期望 3 条 delta + 1 条 done
+    expect(collected).toHaveLength(4)
+    expect(collected[0]?.type).toBe('delta')
+    expect(collected[1]?.type).toBe('delta')
+    expect(collected[2]?.type).toBe('delta')
+    expect(collected[3]?.type).toBe('done')
+    // 验证 [N] 拆段
+    const d0 = collected[0] as Extract<TranslationChunk, { type: 'delta' }>
+    const d1 = collected[1] as Extract<TranslationChunk, { type: 'delta' }>
+    const d2 = collected[2] as Extract<TranslationChunk, { type: 'delta' }>
+    expect(d0.text).toBe('你好')
+    expect(d1.text).toBe('世界')
+    expect(d2.text).toBe('!')
+    // 验证 fetch 单次（不走 SSE 分块）
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('stream=false 整批回退：response.status=failed → emit error(server, retryable=true)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          status: 'failed',
+          error: { code: 'server_error', message: 'endpoint 5xx' },
+        }),
+        { status: 200 },
+      ),
+    )
+    const p = new OpenAIResponsesProvider({ fetchImpl: fetchMock })
+    const req = { ...SAMPLE_REQUEST, stream: false }
+    const iter = p.translate(req, SAMPLE_CONFIG, controller.signal)
+    const first = await iter.next()
+    expect(first.value?.type).toBe('error')
+    if (first.value?.type === 'error') {
+      expect(first.value.code).toBe('server')
+      expect(first.value.retryable).toBe(true)
+      expect(first.value.message).toBe('endpoint 5xx')
+    }
+  })
+
+  it('stream=false 整批回退：JSON 解析失败 → emit error(unknown, retryable=false)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response('not-json{{', { status: 200 }),
+    )
+    const p = new OpenAIResponsesProvider({ fetchImpl: fetchMock })
+    const req = { ...SAMPLE_REQUEST, stream: false }
+    const iter = p.translate(req, SAMPLE_CONFIG, controller.signal)
+    const first = await iter.next()
+    expect(first.value?.type).toBe('error')
+    if (first.value?.type === 'error') {
+      expect(first.value.code).toBe('unknown')
+      expect(first.value.retryable).toBe(false)
+    }
+  })
 })
 
 // ─────────────────── 缓存键 helper 见 tests/unit/utils/translationCache.test.ts ────────────────────
