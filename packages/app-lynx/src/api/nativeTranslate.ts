@@ -248,6 +248,27 @@ export async function translateStream(
  * <p>为什么必须分类：适配器此前一律产出 {@code unknown}，于是 HTTP 502 这类明确的
  * 服务端错误在 UI 上显示为「未知错误」——用户拿不到任何可行动信息。
  */
+/**
+ * ADR-0178 D2 触发子集：只有这三类错误码触发整批回退。
+ *
+ * <p>此前 native 路径 4 处 `retryable: true` 硬编码（与错误码无关），导致 429 / 401 / 402 /
+ * content_filter 全部会多打一次整章请求 —— 在主力平台（真机 native）上抹平了 web 路径
+ * 已修好的语义（a82dd29a：429 不自动 retry，防 endpoint 限流放大）。
+ *
+ * <p>与 `translate.ts` 的 `retryable: errorCode === 'server' || errorCode === 'network' ||
+ * errorCode === 'incomplete'` 保持同源。
+ */
+const RETRYABLE_NATIVE_CODES: ReadonlySet<TranslationErrorCode> = new Set([
+  "server",
+  "network",
+  "incomplete",
+])
+
+/** 判定某错误码是否可触发自动整批回退（ADR-0178 D2） */
+function isRetryableNativeError(code: TranslationErrorCode): boolean {
+  return RETRYABLE_NATIVE_CODES.has(code)
+}
+
 export function classifyNativeError(message: string | undefined): TranslationErrorCode {
   const m = message ?? ""
   if (m.includes("content policy") || m.includes("content_filter") || m.includes("未返回任何译文")) {
@@ -535,11 +556,13 @@ export function nativeTranslateProvider(): TranslationProvider {
         if (chunk.type === "error") {
           finished = true
           if (pollTimer !== null) clearTimeout(pollTimer)
+          const code = classifyNativeError(chunk.message)
           queue.push({
             type: "error",
-            code: classifyNativeError(chunk.message),
+            code,
             message: chunk.message ?? "native stream failed",
-            retryable: true,
+            // ADR-0178 D2 触发子集（不再硬编码 true）
+            retryable: isRetryableNativeError(code),
           })
           nudge()
           return
@@ -556,6 +579,7 @@ export function nativeTranslateProvider(): TranslationProvider {
             type: "error",
             code: "unknown",
             message: "翻译轮询超时（未在预期时间内完成）",
+            // 轮询超时 = 传输层卡死，等价 network（ADR-0178 D2 触发子集内）
             retryable: true,
           })
           nudge()
@@ -576,11 +600,12 @@ export function nativeTranslateProvider(): TranslationProvider {
             if (aborted || signal.aborted) return
             finished = true
             detachOnce()
+            const code = classifyNativeError(err instanceof Error ? err.message : String(err))
             queue.push({
               type: "error",
-              code: classifyNativeError(err instanceof Error ? err.message : String(err)),
+              code,
               message: err instanceof Error ? err.message : String(err),
-              retryable: true,
+              retryable: isRetryableNativeError(code),
             })
             nudge()
           })
@@ -612,6 +637,10 @@ export function nativeTranslateProvider(): TranslationProvider {
           input: request.paragraphs,
           instructions: buildSystemInstructions(config),
           _abortToken: streamId,
+          // ADR-0178 D1 整批回退（code-review P1）：此前该字段未下发，Java 侧硬编码
+          // stream=true → 真机「整批回退」退化为整章重发 SSE（已知会 read timeout）。
+          // 现显式透传；Java buildRequestBody 据此切非流式单次 POST。
+          stream: request.stream !== false,
         }),
         () => {
           // translateStream 的 callback 通道不可靠（一条流至多一帧），故不在此消费：
@@ -628,11 +657,13 @@ export function nativeTranslateProvider(): TranslationProvider {
           if (aborted || signal.aborted) return
           finished = true
           detachOnce()
+          const code = classifyNativeError(err instanceof Error ? err.message : String(err))
           queue.push({
             type: "error",
-            code: "unknown",
+            code,
             message: err instanceof Error ? err.message : String(err),
-            retryable: true,
+            // ADR-0178 D2 触发子集（不再硬编码 true）
+            retryable: isRetryableNativeError(code),
           })
           nudge()
         })

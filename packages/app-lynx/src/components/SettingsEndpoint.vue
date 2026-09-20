@@ -17,6 +17,19 @@ const settings = useSettingsStore()
 const baseURL = ref<string>("")
 const apiKey = ref<string>("")
 const model = ref<string>("")
+/**
+ * 目标语言（BCP-47）。
+ * 初始值 = 界面语言推导（与 `novelTranslateStore.webEndpointConfig()` 的
+ * `settings.language ?? "zh-CN"` 同源）；`loadFromKeystore` 会用已存值覆盖。
+ * code-review S5：此前注释称「默认 zh-CN，见 webEndpointConfig」，但 store 的默认是
+ * **settings.language 优先** —— 非中文界面用户首存会把 zh-CN 固化，静默覆盖语言偏好推导。
+ */
+const targetLang = ref<string>(settings.language ?? "zh-CN")
+/** 源语言（BCP-47；默认 ja，Pixiv 小说原文语言） */
+const sourceLang = ref<string>("ja")
+/** API Key 明文可见性（5s 后自动转回 password；ADR-0178 D3 同款交互） */
+const apiKeyVisible = ref<boolean>(false)
+let apiKeyVisibleTimer: ReturnType<typeof setTimeout> | null = null
 
 const saving = ref<boolean>(false)
 const testing = ref<boolean>(false)
@@ -26,7 +39,7 @@ const clearConfirming = ref<boolean>(false)
 const testResultText = ref<string>("")
 const testResultOk = ref<boolean | null>(null)
 let testResultTimer: ReturnType<typeof setTimeout> | null = null
-const savedAt = ref<number | null>(null)
+
 
 /**
  * 翻译授权确认（spec §9.7：首次开启任一开关前给风险确认）。
@@ -162,7 +175,7 @@ const keyValid = computed<boolean>(() => apiKey.value.trim().length >= 20)
 const modelValid = computed<boolean>(() => model.value.trim().length > 0)
 const formValid = computed<boolean>(() => urlValid.value && keyValid.value && modelValid.value)
 
-/** 加载已有配置到表单（仅 baseURL/model；apiKey 由用户重输，因 JS 堆不持有明文） */
+/** 加载已有配置到表单（仅 baseURL/model/targetLang/sourceLang；apiKey 由用户重输，因 JS 堆不持有明文） */
 async function loadFromKeystore(): Promise<void> {
   try {
     const ep = await store.loadEndpointConfig()
@@ -170,7 +183,9 @@ async function loadFromKeystore(): Promise<void> {
     if (ep !== null) {
       baseURL.value = ep.baseURL
       model.value = ep.model
-      savedAt.value = ep.updatedAt
+      // 偏好默认：目标 = store 端默认（settings.language ?? "zh-CN"）；源 = "ja"
+      if (ep.targetLang) targetLang.value = ep.targetLang
+      if (ep.sourceLang) sourceLang.value = ep.sourceLang
     }
   } catch (err) {
     console.warn("[SettingsEndpoint] loadEndpointConfig 失败", err)
@@ -185,6 +200,9 @@ onMounted(() => {
 onUnmounted(() => {
   if (compatTimer !== null) clearTimeout(compatTimer)
   if (testResultTimer !== null) clearTimeout(testResultTimer)
+  if (apiKeyVisibleTimer !== null) clearTimeout(apiKeyVisibleTimer)
+  if (saveErrorTimer !== null) clearTimeout(saveErrorTimer)
+  if (cacheClearedTimer !== null) clearTimeout(cacheClearedTimer)
 })
 
 /**
@@ -201,7 +219,11 @@ async function onTestConnection(): Promise<void> {
       model: model.value.trim(),
     })
     if (result.ok) {
-      showTestResult(true, t("novelTranslate.endpoint.probe.success"))
+      // #637 P3：显示往返延迟（此前原生未回传耗时）
+      showTestResult(
+        true,
+        t("novelTranslate.endpoint.probe.success") + ` (${result.elapsedMs}ms)`,
+      )
     } else {
       // 只显示结构化的原因，**不**回落显原生 detail（原生串是英文技术串，
       // 此前会拼出「无法连接：endpoint 存在（api key 校验失败 = endpoint 在）」这种自相矛盾的提示）
@@ -209,7 +231,7 @@ async function onTestConnection(): Promise<void> {
         result.code === "invalid_key"
           ? t("novelTranslate.endpoint.credential.invalidKey")
           : t("novelTranslate.endpoint.credential.failed")
-      showTestResult(false, text)
+      showTestResult(false, text + ` (${result.elapsedMs}ms)`)
     }
   } catch (err) {
     showTestResult(false, err instanceof Error ? err.message : String(err))
@@ -218,17 +240,46 @@ async function onTestConnection(): Promise<void> {
   }
 }
 
+/** API Key 显示/隐藏切换（5s 后自动转回 password；离屏清理见 onUnmounted） */
+function toggleApiKeyVisible(): void {
+  apiKeyVisible.value = !apiKeyVisible.value
+  if (apiKeyVisibleTimer !== null) clearTimeout(apiKeyVisibleTimer)
+  if (apiKeyVisible.value) {
+    apiKeyVisibleTimer = setTimeout(() => {
+      apiKeyVisible.value = false
+      apiKeyVisibleTimer = null
+    }, 5000)
+  }
+}
+
+/** 「清空」按钮：仅清 API Key 字段（保留 baseURL / model / targetLang / sourceLang） */
+function onClearApiKey(): void {
+  apiKey.value = ""
+}
+
+/** 用户是否已点过保存（用于空字段 inline error 的显示；#637 P1-4） */
+const formSubmitted = ref<boolean>(false)
+/** 清缓存内联反馈（#637 P3-7） */
+const cacheClearedText = ref<string>("")
+let cacheClearedTimer: ReturnType<typeof setTimeout> | null = null
+/** 保存失败 inline 提示（#637 P1-3：此前失败只 console.warn，用户零反馈） */
+const saveErrorText = ref<string>("")
+let saveErrorTimer: ReturnType<typeof setTimeout> | null = null
+
 /** 保存（写 Keystore：先 setApiKey，再触发 reload） */
 async function onSave(): Promise<void> {
+  formSubmitted.value = true
   if (!formValid.value || saving.value) return
   saving.value = true
+  saveErrorText.value = ""
   try {
     await store.saveEndpointConfig({
       baseURL: baseURL.value.trim(),
       apiKey: apiKey.value,
       model: model.value.trim(),
+      targetLang: targetLang.value,
+      sourceLang: sourceLang.value,
     })
-    savedAt.value = Date.now()
     // 失效规则由 store.saveEndpointConfig 统一负责（ADR-0173 D4①：任何保存都失效凭据层），
     // 组件不再写 store 状态（避免两处写入者）
 
@@ -236,9 +287,31 @@ async function onSave(): Promise<void> {
     await loadFromKeystore()
     apiKey.value = "" // 清空输入框；下次再填（不持久化到 JS 堆，ADR-0037）
   } catch (err) {
+    // #637 P1-3：失败必须给用户反馈（此前只 console.warn，用户零反馈）
     console.warn("[SettingsEndpoint] saveEndpointConfig 失败", err)
+    saveErrorText.value = t("novelTranslate.endpoint.save.failed")
+    if (saveErrorTimer !== null) clearTimeout(saveErrorTimer)
+    saveErrorTimer = setTimeout(() => {
+      saveErrorText.value = ""
+      saveErrorTimer = null
+    }, 4000)
   } finally {
     saving.value = false
+  }
+}
+
+/** 清除全部翻译缓存（#637 P3-7：之前 clearTranslationCache 零调用点） */
+async function onClearTranslationCache(): Promise<void> {
+  try {
+    await store.clearAllTranslationCache()
+    cacheClearedText.value = t("novelTranslate.endpoint.cache.cleared")
+    if (cacheClearedTimer !== null) clearTimeout(cacheClearedTimer)
+    cacheClearedTimer = setTimeout(() => {
+      cacheClearedText.value = ""
+      cacheClearedTimer = null
+    }, 4000)
+  } catch (err) {
+    console.warn("[SettingsEndpoint] clearAllTranslationCache 失败", err)
   }
 }
 
@@ -249,10 +322,11 @@ async function onClear(): Promise<void> {
   try {
     await store.clearEndpointConfig()
     endpointSnapshot.value = null
-    savedAt.value = null
     baseURL.value = ""
     apiKey.value = ""
     model.value = ""
+    targetLang.value = "zh-CN"
+    sourceLang.value = "ja"
   } catch (err) {
     console.warn("[SettingsEndpoint] clearEndpointConfig 失败", err)
   }
@@ -275,6 +349,8 @@ async function onClear(): Promise<void> {
         class="h-[12vw] px-4 bg-surface-container-low border border-outline rounded-[var(--md-shape-medium)] text-body-medium text-surface-on"
         :placeholder="t('novelTranslate.endpoint.baseUrl.hint')"
         placeholder-class="text-outline"
+        accessibility-element
+        :accessibility-label="t('novelTranslate.endpoint.baseUrl.label')"
         @input="scheduleCompatibilityProbe"
       />
       <!-- 端点兼容性 chip（地址层；debounce 600ms 自动探测，ADR-0173 D2/D3） -->
@@ -289,18 +365,64 @@ async function onClear(): Promise<void> {
       <text class="text-label-medium text-surface-on-variant">{{
         t("novelTranslate.endpoint.apiKey.label")
       }}</text>
-      <!-- B1 同款（Me.vue WebDAV 密码框）：静态 type="password"，敏感输入不可逆显；
-           动态 :type 绑定在 vue-lynx 上无法与 v-model 共存（模板编译报 _vModelDynamic） -->
+      <!-- 密码框 + show/hide toggle（5s 自动隐藏）+ 字段级清空（#637 P0-2）。
+           v-if/v-else 两分支绕过 vue-lynx 的 _vModelDynamic 编译问题（同字段只能静态 type） -->
       <input
+        v-if="!apiKeyVisible"
         v-model="apiKey"
         type="password"
         class="h-[12vw] px-4 bg-surface-container-low border border-outline rounded-[var(--md-shape-medium)] text-body-medium text-surface-on"
         :placeholder="t('novelTranslate.endpoint.apiKey.hint')"
         placeholder-class="text-outline"
+        accessibility-element
+        :accessibility-label="t('novelTranslate.endpoint.apiKey.label')"
       />
+      <input
+        v-else
+        v-model="apiKey"
+        class="h-[12vw] px-4 bg-surface-container-low border border-outline rounded-[var(--md-shape-medium)] text-body-medium text-surface-on"
+        :placeholder="t('novelTranslate.endpoint.apiKey.hint')"
+        placeholder-class="text-outline"
+        accessibility-element
+        :accessibility-label="t('novelTranslate.endpoint.apiKey.label')"
+      />
+      <view class="flex flex-row gap-2">
+        <view
+          class="h-[8vw] px-3 flex items-center justify-center rounded-[var(--md-shape-full)] border border-outline active:bg-layer-pressed-on-surface"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="
+            apiKeyVisible
+              ? t('novelTranslate.endpoint.apiKey.hide')
+              : t('novelTranslate.endpoint.apiKey.show')
+          "
+          @tap="toggleApiKeyVisible"
+        >
+          <text class="text-label-medium text-surface-on">{{
+            apiKeyVisible
+              ? t("novelTranslate.endpoint.apiKey.hide")
+              : t("novelTranslate.endpoint.apiKey.show")
+          }}</text>
+        </view>
+        <view
+          class="h-[8vw] px-3 flex items-center justify-center rounded-[var(--md-shape-full)] border border-outline active:bg-layer-pressed-on-surface"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="t('novelTranslate.endpoint.apiKey.clear')"
+          @tap="onClearApiKey"
+        >
+          <text class="text-label-medium text-surface-on">{{
+            t("novelTranslate.endpoint.apiKey.clear")
+          }}</text>
+        </view>
+      </view>
       <text v-if="!keyValid && apiKey.length > 0" class="text-label-small text-error">{{
         t("novelTranslate.endpoint.invalid.key")
       }}</text>
+      <!-- 空字段 inline error（#637 P1-4：此前 error 渲染带 length 守卫，空表单零反馈） -->
+      <text
+        v-if="apiKey.length === 0 && formSubmitted"
+        class="text-label-small text-error"
+        >{{ t("novelTranslate.endpoint.invalid.key") }}</text
+      >
     </view>
 
     <!-- model -->
@@ -313,10 +435,42 @@ async function onClear(): Promise<void> {
         class="h-[12vw] px-4 bg-surface-container-low border border-outline rounded-[var(--md-shape-medium)] text-body-medium text-surface-on"
         :placeholder="t('novelTranslate.endpoint.model.hint')"
         placeholder-class="text-outline"
+        accessibility-element
+        :accessibility-label="t('novelTranslate.endpoint.model.label')"
       />
       <text v-if="!modelValid && model.length > 0" class="text-label-small text-error">{{
         t("novelTranslate.endpoint.invalid.model")
       }}</text>
+    </view>
+
+    <!-- target language（#637 P0-1：数据层已就绪，纯 UI 缺口） -->
+    <view class="flex flex-col gap-1">
+      <text class="text-label-medium text-surface-on-variant">{{
+        t("novelTranslate.endpoint.targetLang.label")
+      }}</text>
+      <input
+        v-model="targetLang"
+        class="h-[12vw] px-4 bg-surface-container-low border border-outline rounded-[var(--md-shape-medium)] text-body-medium text-surface-on"
+        :placeholder="t('novelTranslate.endpoint.targetLang.hint')"
+        placeholder-class="text-outline"
+        accessibility-element
+        :accessibility-label="t('novelTranslate.endpoint.targetLang.label')"
+      />
+    </view>
+
+    <!-- source language -->
+    <view class="flex flex-col gap-1">
+      <text class="text-label-medium text-surface-on-variant">{{
+        t("novelTranslate.endpoint.sourceLang.label")
+      }}</text>
+      <input
+        v-model="sourceLang"
+        class="h-[12vw] px-4 bg-surface-container-low border border-outline rounded-[var(--md-shape-medium)] text-body-medium text-surface-on"
+        :placeholder="t('novelTranslate.endpoint.sourceLang.hint')"
+        placeholder-class="text-outline"
+        accessibility-element
+        :accessibility-label="t('novelTranslate.endpoint.sourceLang.label')"
+      />
     </view>
 
     <!-- 状态条：已配置 / 未配置 -->
@@ -351,6 +505,16 @@ async function onClear(): Promise<void> {
       >
         {{ testResultText }}
       </text>
+    </view>
+
+    <!-- 保存失败内联反馈（#637 P1-3） -->
+    <view v-if="saveErrorText" class="flex flex-row items-center gap-1">
+      <text class="text-label-medium text-error">{{ saveErrorText }}</text>
+    </view>
+
+    <!-- 清缓存内联反馈（#637 P3-7） -->
+    <view v-if="cacheClearedText" class="flex flex-row items-center gap-1">
+      <text class="text-label-medium text-primary">{{ cacheClearedText }}</text>
     </view>
 
     <!-- 操作按钮 -->
@@ -489,6 +653,19 @@ async function onClear(): Promise<void> {
           </view>
         </view>
       </template>
+    </view>
+
+    <!-- 清除翻译缓存（#637 P3-7）：不做二次确认（可重建，成本低）；
+         与「清除配置」区分（那个会毁凭据，需确认） -->
+    <view
+      class="h-[10.667vw] flex items-center justify-center"
+      :accessibility-element="A11Y_ELEMENT_ENABLED"
+      :accessibility-label="t('novelTranslate.endpoint.cache.clear')"
+      @tap="onClearTranslationCache"
+    >
+      <text class="text-label-large text-surface-on-variant">{{
+        t("novelTranslate.endpoint.cache.clear")
+      }}</text>
     </view>
   </view>
 </template>

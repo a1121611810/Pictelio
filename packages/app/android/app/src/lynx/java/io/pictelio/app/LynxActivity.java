@@ -229,6 +229,7 @@ public class LynxActivity extends AppCompatActivity {
         builder.registerModule("PictelioAuth", PictelioAuthModule.class);
         builder.registerModule("PictelioApi", PictelioApiModule.class);
         builder.registerModule("PictelioTranslate", PictelioTranslateModule.class);
+        builder.registerModule("PictelioTranslateCache", PictelioTranslateCacheModule.class);
         builder.registerModule("PictelioPrefs", PictelioPrefsModule.class);
         builder.registerModule("NetDiag", NetDiagModule.class);
         lynxView = builder.build(this);

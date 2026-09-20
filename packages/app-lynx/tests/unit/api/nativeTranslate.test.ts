@@ -12,6 +12,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
   abortStream,
+  classifyNativeError,
   clearEndpoint,
   getEndpoint,
   nativeTranslateModule,
@@ -550,6 +551,154 @@ describe("nativeTranslateProvider 载荷契约（与 Java 逐字字段对齐）"
     expect(chunks).toContainEqual({ type: "done" })
   })
 
+  it("translate(stream=false) → 载荷 stream=false（ADR-0178 D1 整批回退；code-review P1）", async () => {
+    let capturedReqJson = ""
+    mod.translateStream.mockImplementation(
+      (reqJson: string, _cb: (c: string | null, e: string | null) => void) => {
+        capturedReqJson = reqJson
+        return undefined
+      },
+    )
+    mod.translatePoll.mockImplementation((_id: string, cb: (v: string | null, e: string | null) => void) =>
+      cb(JSON.stringify({ type: "done" }), ""),
+    )
+    const provider = nativeTranslateProvider()
+    const iter = provider.translate(
+      {
+        novelId: 1,
+        chapterId: "1",
+        paragraphs: ["a"],
+        stream: false, // 整批回退
+        options: { xRestrict: 0 },
+      },
+      { baseURL: "https://x", apiKey: "", model: "m" },
+      new AbortController().signal,
+    )
+    await new Promise((r) => setTimeout(r, 50))
+    const payload = JSON.parse(capturedReqJson) as Record<string, unknown>
+    // 此前该字段未下发 → Java 硬编码 stream=true → 真机整批回退退化为整章重发 SSE
+    expect(payload.stream).toBe(false)
+    while (!(await iter.next()).done) {
+      // drain
+    }
+  })
+
+  it("translate(默认) → 载荷 stream=true（保持流式默认）", async () => {
+    let capturedReqJson = ""
+    mod.translateStream.mockImplementation(
+      (reqJson: string, _cb: (c: string | null, e: string | null) => void) => {
+        capturedReqJson = reqJson
+        return undefined
+      },
+    )
+    mod.translatePoll.mockImplementation((_id: string, cb: (v: string | null, e: string | null) => void) =>
+      cb(JSON.stringify({ type: "done" }), ""),
+    )
+    const provider = nativeTranslateProvider()
+    const iter = provider.translate(
+      { novelId: 1, chapterId: "1", paragraphs: ["a"], options: { xRestrict: 0 } },
+      { baseURL: "https://x", apiKey: "", model: "m" },
+      new AbortController().signal,
+    )
+    await new Promise((r) => setTimeout(r, 50))
+    const payload = JSON.parse(capturedReqJson) as Record<string, unknown>
+    expect(payload.stream).toBe(true)
+    while (!(await iter.next()).done) {
+      // drain
+    }
+  })
+
+  // ─── ADR-0178 D2 触发子集矩阵（code-review P3 阻塞项） ───
+  // 此前 native 路径 4 处硬编码 retryable: true（与错误码无关）→ 429/401/402/content_filter
+  // 全部会多打一次整章请求，在主力平台上抹平了 web 路径已修好的语义。
+  // oracle：ADR-0178 D2 子集表（触发 = server/network/incomplete）。
+
+  it("error frame HTTP 429 → code=rate_limit + retryable=false（不触发整批回退）", async () => {
+    mod.translateStream.mockImplementation(() => undefined)
+    mod.translatePoll.mockImplementation((_id: string, cb: (v: string | null, e: string | null) => void) =>
+      cb(JSON.stringify({ type: "error", message: "HTTP 429: rate limit exceeded" }), ""),
+    )
+    const provider = nativeTranslateProvider()
+    const iter = provider.translate(
+      { novelId: 1, chapterId: "1", paragraphs: ["a"], options: { xRestrict: 0 } },
+      { baseURL: "https://x", apiKey: "", model: "m" },
+      new AbortController().signal,
+    )
+    const first = await iter.next()
+    expect(first.value?.type).toBe("error")
+    if (first.value?.type === "error") {
+      expect(first.value.code).toBe("rate_limit")
+      expect(first.value.retryable).toBe(false)
+    }
+  })
+
+  it("error frame HTTP 401 → code=unauthorized + retryable=false", async () => {
+    mod.translateStream.mockImplementation(() => undefined)
+    mod.translatePoll.mockImplementation((_id: string, cb: (v: string | null, e: string | null) => void) =>
+      cb(JSON.stringify({ type: "error", message: "HTTP 401: unauthorized" }), ""),
+    )
+    const provider = nativeTranslateProvider()
+    const iter = provider.translate(
+      { novelId: 1, chapterId: "1", paragraphs: ["a"], options: { xRestrict: 0 } },
+      { baseURL: "https://x", apiKey: "", model: "m" },
+      new AbortController().signal,
+    )
+    const first = await iter.next()
+    if (first.value?.type === "error") {
+      expect(first.value.code).toBe("unauthorized")
+      expect(first.value.retryable).toBe(false)
+    } else {
+      throw new Error("期望 error chunk")
+    }
+  })
+
+  it("error frame HTTP 500 → code=server + retryable=true（触发整批回退）", async () => {
+    mod.translateStream.mockImplementation(() => undefined)
+    mod.translatePoll.mockImplementation((_id: string, cb: (v: string | null, e: string | null) => void) =>
+      cb(JSON.stringify({ type: "error", message: "HTTP 500: internal error" }), ""),
+    )
+    const provider = nativeTranslateProvider()
+    const iter = provider.translate(
+      { novelId: 1, chapterId: "1", paragraphs: ["a"], options: { xRestrict: 0 } },
+      { baseURL: "https://x", apiKey: "", model: "m" },
+      new AbortController().signal,
+    )
+    const first = await iter.next()
+    if (first.value?.type === "error") {
+      expect(first.value.code).toBe("server")
+      expect(first.value.retryable).toBe(true)
+    } else {
+      throw new Error("期望 error chunk")
+    }
+  })
+
+  it("error frame 空流消息 → code=content_filter + retryable=false（#654 联动）", async () => {
+    mod.translateStream.mockImplementation(() => undefined)
+    mod.translatePoll.mockImplementation((_id: string, cb: (v: string | null, e: string | null) => void) =>
+      cb(
+        JSON.stringify({
+          type: "error",
+          message: "LLM 未返回任何译文（可能被服务端内容策略拦截）",
+        }),
+        "",
+      ),
+    )
+    const provider = nativeTranslateProvider()
+    const iter = provider.translate(
+      { novelId: 1, chapterId: "1", paragraphs: ["a"], options: { xRestrict: 0 } },
+      { baseURL: "https://x", apiKey: "", model: "m" },
+      new AbortController().signal,
+    )
+    const first = await iter.next()
+    if (first.value?.type === "error") {
+      expect(first.value.code).toBe("content_filter")
+      // content_filter 不在 D2 触发子集内 → 不得再自动整章重试
+      expect(first.value.retryable).toBe(false)
+    } else {
+      throw new Error("期望 error chunk")
+    }
+  })
+
   it("delta chunk 透传 paragraphIndex / text（Java 侧已完成 [N] 锚定）", async () => {
     const frames = [
       JSON.stringify({ type: "delta_all", paragraphs: [{ index: 1, text: "译文" }] }),
@@ -570,5 +719,32 @@ describe("nativeTranslateProvider 载荷契约（与 Java 逐字字段对齐）"
     const first = await iter.next()
     expect(first.done).toBe(false)
     expect(first.value).toEqual({ type: "delta", paragraphIndex: 1, text: "译文" })
+  })
+})
+
+/**
+ * 空流契约（issue #654 + spec §7.2 新增转移行）。
+ *
+ * <p>Java 侧空流终态消息字面量 = {@code "LLM 未返回任何译文（可能被服务端内容策略拦截）"}，
+ * 必须在 JS 端 {@code classifyNativeError} 命中 {@code content_filter} 分支（与
+ * {@code content policy} / {@code content_filter} 同列，{@code nativeTranslate.ts:253}）。
+ *
+ * <p>这条契约两端守：Java Robolectric 在
+ * {@code PictelioTranslateModuleEmptyStreamTest}，JS Vitest 在本文件。任一端字面量
+ * 漂移会立刻在 CI 内变红。
+ */
+describe("classifyNativeError 空流识别（issue #654 跨端契约）", () => {
+  it("Java 侧空流错误消息字面量被分类为 content_filter", () => {
+    expect(
+      classifyNativeError("LLM 未返回任何译文（可能被服务端内容策略拦截）"),
+    ).toBe("content_filter")
+  })
+
+  it("裸 content_filter 字符串命中", () => {
+    expect(classifyNativeError("content_filter")).toBe("content_filter")
+  })
+
+  it("content policy 字符串命中", () => {
+    expect(classifyNativeError("blocked by content policy")).toBe("content_filter")
   })
 })

@@ -251,6 +251,9 @@ const translateErrorText = computed<string>(() => {
       return t('novelTranslate.error.invalidRequest')
     case 'content_filter':
       return t('novelTranslate.error.contentFilter')
+    // ADR-0178 D2：输出截断（max_output_tokens）—— 调用点完备性：新码必须有 UI 映射
+    case 'incomplete':
+      return t('novelTranslate.error.incomplete')
     default:
       return t('novelTranslate.error.unknown')
   }
@@ -261,6 +264,11 @@ const displayParagraphs = computed<string[]>(() =>
   translateStore.displayParagraphs.length > 0
     ? translateStore.displayParagraphs
     : paragraphs.value,
+)
+
+/** ADR-0178 D4 占位符字符串：与 store.refreshDisplay 内 t('novelTranslate.status.placeholder_untranslated') 必须同源 */
+const untranslatedPlaceholder = computed<string>(() =>
+  t('novelTranslate.status.placeholder_untranslated'),
 )
 
 /** 章节切换 / 卸载时复位 store（spec §5：generation-gate 防 stale 覆盖） */
@@ -459,7 +467,9 @@ function onWatchlistCancel(): void {
              vue-lynx 会吞掉动态布尔绑定（设备实证），届时引擎自带菜单不会被替换 -->
         <text
           :id="selection.paragraphId(idx)"
-          class="text-body-large leading-[44rpx] text-surface-on"
+          :class="p === untranslatedPlaceholder
+            ? 'text-body-large leading-[44rpx] italic text-surface-on-variant'
+            : 'text-body-large leading-[44rpx] text-surface-on'"
           text-selection="true"
           flatten="false"
           custom-context-menu="true"

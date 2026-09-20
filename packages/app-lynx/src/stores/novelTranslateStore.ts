@@ -41,6 +41,7 @@ import {
   computeSourceHash,
   isTranslationCacheAvailable,
   removeTranslation,
+  clearTranslationCache,
 } from "../utils/translationCache"
 import { useSettingsStore } from "./settingsStore"
 import type {
@@ -123,12 +124,16 @@ export interface NovelTranslateStore {
   error: Ref<TranslationErrorPayload | null>
   isCached: Ref<Record<number, boolean>>
   showTranslation: Ref<boolean>
+  /** ADR-0178 D1 fallback 微提示：fallbackToWholeBatch 期间为 true；UI 显示「重试中…」 */
+  isRetryingHint: Ref<boolean>
   reset: () => void
   loadEndpointConfig: () => Promise<LlmEndpointPublic | null>
   saveEndpointConfig: (config: LlmEndpointConfig) => Promise<void>
   clearEndpointConfig: () => Promise<void>
   probeCompatibility: (baseURL: string) => Promise<ProbeClassification>
-  testConnection: (config: LlmEndpointConfig) => Promise<{ ok: boolean; code: string; detail: string }>
+  testConnection: (
+    config: LlmEndpointConfig,
+  ) => Promise<{ ok: boolean; code: string; detail: string; elapsedMs: number }>
   translateChapter: (
     novelId: number,
     chapterId: number,
@@ -142,6 +147,8 @@ export interface NovelTranslateStore {
     xRestrict?: 0 | 1 | 2,
   ) => Promise<void>
   toggleMode: () => Promise<void>
+  /** 清除全部翻译缓存（#637 P3-7 用户主动入口） */
+  clearAllTranslationCache: () => Promise<void>
   abort: () => void
 }
 
@@ -167,6 +174,7 @@ function resetNovelTranslateStoreForTest(): void {
 const LLM_PREFS_BASE_URL = "llm_endpoint_base_url"
 const LLM_PREFS_MODEL = "llm_endpoint_model"
 const LLM_PREFS_TARGET_LANG = "llm_endpoint_target_lang"
+const LLM_PREFS_SOURCE_LANG = "llm_endpoint_source_lang"
 // 凭据验证（ADR-0173 D4）：只存结果枚举 + 时间戳 + 用于失效判定的 baseURL，
 // **不存任何密钥材料**（连哈希都不存——无必要的离线校验面）。
 const LLM_PREFS_VERIFY_STATE = "llm_endpoint_verified_state"
@@ -227,18 +235,21 @@ async function readEndpointMetadata(): Promise<{
   baseURL?: string
   model?: string
   targetLang?: string
+  sourceLang?: string
 }> {
   try {
     const prefs = endpointPrefs()
-    const [baseURL, model, targetLang] = await Promise.all([
+    const [baseURL, model, targetLang, sourceLang] = await Promise.all([
       prefs.get(LLM_PREFS_BASE_URL),
       prefs.get(LLM_PREFS_MODEL),
       prefs.get(LLM_PREFS_TARGET_LANG),
+      prefs.get(LLM_PREFS_SOURCE_LANG),
     ])
     return {
       baseURL: baseURL ?? undefined,
       model: model ?? undefined,
       targetLang: targetLang ?? undefined,
+      sourceLang: sourceLang ?? undefined,
     }
   } catch (err) {
     // 读失败不阻断翻译（回退 Java 默认值）；但必须可见（AGENTS.md 硬约束 #3）
@@ -348,6 +359,8 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
   const progress = ref<TranslationProgress | null>(null)
   const currentChapter = ref<number | null>(null)
   const error = ref<TranslationErrorPayload | null>(null)
+  /** ADR-0178 D1 fallback 微提示：fallbackToWholeBatch 期间为 true；UI 显示「重试中…」 */
+  const isRetryingHint = ref<boolean>(false)
   const isCached = ref<Record<number, boolean>>({})
   const showTranslation = ref<boolean>(false)
   // 译文正文（spec §5 数据流 / §6.3 整段切换）：store 是唯一持有者，
@@ -364,10 +377,16 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
   /** 重算渲染源（译文/原文切换 + 增量落地都经此） */
   function refreshDisplay(): void {
     const useTranslated = showTranslation.value && translatedParagraphs.value.length > 0
+    const isPartial = status.value === "partial"
+    const untranslatedPlaceholder = t("novelTranslate.status.placeholder_untranslated")
     displayParagraphs.value = useTranslated
       ? sourceParagraphs.value.map((p, i) => {
           const t = translatedParagraphs.value[i]
-          return t !== undefined && t !== "" ? t : p
+          if (t !== undefined && t !== "") return t
+          // ADR-0178 D4: partial 状态下的未译段不显示原文，用「〔未翻译〕」占位
+          // （UI 层用 .paragraph--untranslated 灰色斜体区分）
+          if (isPartial) return untranslatedPlaceholder
+          return p
         })
       : sourceParagraphs.value.slice()
   }
@@ -383,6 +402,7 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
     progress.value = null
     currentChapter.value = null
     error.value = null
+    isRetryingHint.value = false
     // isCached 保留：缓存语义跨章节持久（ADR-0171 §6）
     showTranslation.value = false
     translatedParagraphs.value = []
@@ -416,6 +436,7 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
       baseURL: meta.baseURL ?? ep.baseURL,
       model: meta.model ?? ep.model,
       targetLang: meta.targetLang ?? ep.targetLang,
+      sourceLang: meta.sourceLang ?? ep.sourceLang,
     }
   }
 
@@ -433,6 +454,7 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
       await prefs.set(LLM_PREFS_BASE_URL, config.baseURL)
       await prefs.set(LLM_PREFS_MODEL, config.model)
       if (config.targetLang) await prefs.set(LLM_PREFS_TARGET_LANG, config.targetLang)
+      if (config.sourceLang) await prefs.set(LLM_PREFS_SOURCE_LANG, config.sourceLang)
     } catch (err) {
       // 写失败必须可见（AGENTS.md 硬约束 #3）：否则用户以为「保存成功了」
       console.warn("[novelTranslateStore] endpoint 元数据保存失败", err)
@@ -452,6 +474,9 @@ export const useNovelTranslateStore = defineStore("novelTranslate", (): NovelTra
       prefs.remove(LLM_PREFS_BASE_URL),
       prefs.remove(LLM_PREFS_MODEL),
       prefs.remove(LLM_PREFS_TARGET_LANG),
+      // 调用点完备性（code-review P6）：SOURCE_LANG 与 TARGET_LANG 对称，漏清会让
+      // 换新 endpoint 后仍沿用旧源语言（translate.ts buildSystemInstructions 会读到）
+      prefs.remove(LLM_PREFS_SOURCE_LANG),
     ])
     // 失效规则（ADR-0173 D4②）：配置没了，验证状态必须一起没
     await clearCredentialVerification()
@@ -541,8 +566,11 @@ function classifyProvider(
     ok: boolean
     code: string
     detail: string
+    /** 往返耗时（ms）—— #637 P3：UI 可显示延迟数据（此前原生未回传） */
+    elapsedMs: number
   }> {
     const baseURL = config.baseURL.trim()
+    const startedAt = Date.now()
     const stamp = (state: CredentialVerificationState): CredentialVerification => ({
       state,
       at: Date.now(),
@@ -550,6 +578,7 @@ function classifyProvider(
     })
     try {
       const result = await nativeProbeEndpoint(baseURL, config.apiKey, config.model)
+      const elapsedMs = Date.now() - startedAt
       const httpStatus = result.httpStatus
       const authenticated = httpStatus >= 200 && httpStatus < 300
       // 400 + invalid_api_key body 也属「密钥无效」（原生 keyInvalid 标记，ADR-0173 D3 修订）
@@ -557,7 +586,7 @@ function classifyProvider(
       if (authenticated) {
         await writeCredentialVerification("verified", baseURL)
         credential.value = stamp("verified")
-        return { ok: true, code: "ok", detail: result.detail }
+        return { ok: true, code: "ok", detail: result.detail, elapsedMs }
       }
       await writeCredentialVerification("failed", baseURL)
       credential.value = stamp("failed")
@@ -565,13 +594,15 @@ function classifyProvider(
         ok: false,
         code: invalidKey ? "invalid_key" : "http_" + String(httpStatus),
         detail: result.detail,
+        elapsedMs,
       }
     } catch (err) {
+      const elapsedMs = Date.now() - startedAt
       const message = err instanceof Error ? err.message : String(err)
       console.warn("[novelTranslateStore] testConnection 失败", err)
       await writeCredentialVerification("failed", baseURL)
       credential.value = stamp("failed")
-      return { ok: false, code: "network", detail: message }
+      return { ok: false, code: "network", detail: message, elapsedMs }
     }
   }
 
@@ -797,6 +828,7 @@ function classifyProvider(
     let deltaFrames = 0
     let lastErrorCode: string | null = null
     let lastErrorMessage = ""
+    let lastErrorRetryable = false
     let result: Awaited<ReturnType<typeof translator.translate>>
     try {
       result = await translator.translate(request, config, signal, (chunk: TranslationChunk) => {
@@ -814,11 +846,12 @@ function classifyProvider(
           translatedParagraphs.value[abs] = (translatedParagraphs.value[abs] ?? "") + chunk.text
         }
       } else if (chunk.type === "error") {
-        // 捕获首个 error chunk 的 code/message；translator 内部会吞错转 failed/partial，
+        // 捕获首个 error chunk 的 code/message/retryable；translator 内部会吞错转 failed/partial，
         // 我们在外部收敛时把 code 透传到 store（避免错误码丢失为 'unknown'）。
         if (lastErrorCode === null) {
           lastErrorCode = chunk.code
           lastErrorMessage = chunk.message
+          lastErrorRetryable = chunk.retryable
         }
       }
       })
@@ -840,6 +873,55 @@ function classifyProvider(
       status.value = "aborted"
       return
     }
+
+    // ADR-0178 D1 fallbackToWholeBatch：chunked pipeline partial/failed 且首个 error
+    // chunk retryable=true → 整批回退（0ms 退避；stream=false 单次 POST + JSON 响应）。
+    // 触发条件：result.status 为 partial/failed 且 lastErrorRetryable=true。
+    // 最大 1 次（A2：流式整批回退最多 1 次）。
+    if (
+      (result.status === "partial" || result.status === "failed") &&
+      lastErrorRetryable
+    ) {
+      // 收敛终态前再次 gate（用户可能已在回退期间触发 abort）
+      if (gen !== genNow) return
+      if (signal.aborted) {
+        status.value = "aborted"
+        return
+      }
+      console.warn(
+        "[novelTranslateStore] fallbackToWholeBatch triggered",
+        { code: lastErrorCode, message: lastErrorMessage },
+      )
+      const zeroTextOverride: { code: string | null; message: string } = {
+        code: null,
+        message: "",
+      }
+      const fallbackOk = await runWholeBatchFallback(
+        provider,
+        config,
+        request,
+        args,
+        signal,
+        genNow,
+        zeroTextOverride,
+      )
+      if (zeroTextOverride.code !== null) {
+        // P12：回退零译文 → content_filter（与 #654 联动），覆盖原错误码
+        lastErrorCode = zeroTextOverride.code
+        lastErrorMessage = zeroTextOverride.message
+      }
+      if (fallbackOk === "completed") {
+        // 已被 runWholeBatchFallback 收敛到 completed；函数内部已写缓存 + 置 status
+        return
+      }
+      if (fallbackOk === "aborted") {
+        status.value = "aborted"
+        return
+      }
+      // fallbackOk === "partial" | "failed"：继续走原收敛逻辑（保留 lastErrorCode）
+      // 不修改 status，让下方原流程收敛到 partial/failed（终态与 spec §7.2 一致）
+    }
+
     if (result.status === "completed") {
       progress.value = {
         chapterId: args.chapterId,
@@ -859,15 +941,25 @@ function classifyProvider(
       refreshDisplay()
     } else if (result.status === "partial") {
       status.value = "partial"
+      // code-review P10 / issue #651 范围补充：partial 不得虚报 100%。
+      // 进度 = 实际有译文的段落数（缺失段用 〔未翻译〕 占位，见 refreshDisplay）。
       progress.value = {
         chapterId: args.chapterId,
-        done: args.paragraphs.length,
+        done: translatedParagraphs.value.filter((p) => p !== undefined && p !== "").length,
         total: args.paragraphs.length,
       }
       error.value = {
         code: lastErrorCode ?? "PARTIAL_FAILED",
         message: lastErrorMessage || t("novelTranslate.error.partialFailed"),
       }
+      // ADR-0178 D4：partial 必须切到译文模式 —— `refreshDisplay` 的渲染源由
+      // `showTranslation && translatedParagraphs.length > 0` 决定；此前该分支不置
+      // showTranslation，渲染源恒为**原文**切片，占位符与已译段都不可见
+      // （P13 覆盖补强时由测试连续暴露的第二层缺陷）。
+      showTranslation.value = true
+      // 且必须重算渲染源 —— `refreshDisplay` 的占位分支依赖 `status === 'partial'`，
+      // 而此前该分支**不调用** refreshDisplay，占位符永不出现在 displayParagraphs。
+      refreshDisplay()
     } else if (result.status === "aborted") {
       status.value = "aborted"
     } else {
@@ -919,6 +1011,105 @@ function classifyProvider(
     genNow: number,
   ): Promise<void> {
     await runWithProvider(openaiResponsesProvider(), webEndpointConfig(), args, signal, genNow)
+  }
+
+  /**
+   * ADR-0178 D1 fallback：chunked pipeline 失败后整批回退。
+   * - 调用 provider.translate with stream=false（OpenAIResponsesProvider 已实现）
+   * - 单次 POST + JSON 响应 → provider emit N 条 delta + 1 条 done
+   * - 成功 → 写缓存 + status='completed'；失败 → 返回 'partial'/'failed' 让外层收敛
+   * - 用户 abort → 返回 'aborted' 立即退出
+   * - generation gate：gen !== genNow 视为已 stale，return 'failed' 让外层不写状态
+   */
+  async function runWholeBatchFallback(
+    providerArg: TranslationProvider,
+    configArg: LlmEndpointConfig,
+    originalRequest: TranslationRequest,
+    args: { novelId: number; chapterId: number; paragraphs: string[]; xRestrict: 0 | 1 | 2 },
+    signalArg: AbortSignal,
+    genNow: number,
+    /**
+     * code-review P12 out 参数：回退**零译文**时写入 `content_filter`，
+     * 由调用方覆盖 lastErrorCode（ADR-0178 D1 与 #654 的联动语义）。
+     */
+    zeroTextOverride: { code: string | null; message: string },
+  ): Promise<"completed" | "partial" | "failed" | "aborted"> {
+    if (gen !== genNow) return "failed"
+    if (signalArg.aborted) return "aborted"
+    const wholeRequest: TranslationRequest = { ...originalRequest, stream: false }
+    isRetryingHint.value = true
+    // ADR-0178 D1：回退期间进度重置为 0%（UI 从「已 n%」退回「重试中…」而非停在高位）
+    // code-review P10：此前未重置，回退开始时进度条停在旧值，用户误以为仍在推进。
+    progress.value = { chapterId: args.chapterId, done: 0, total: args.paragraphs.length }
+    try {
+      const iter = providerArg.translate(wholeRequest, configArg, signalArg)
+      // 收集所有 chunk
+      let lastError: { code: string; message: string } | null = null
+      let paragraphTexts: string[] = new Array<string>(args.paragraphs.length).fill("")
+      let success = false
+      while (true) {
+        const r = await iter.next()
+        if (r.done) break
+        const chunk = r.value
+        if (chunk.type === "delta") {
+          // provider stream=false 拆段后 emit 的 delta 已带 paragraphIndex
+          if (
+            typeof chunk.paragraphIndex === "number" &&
+            chunk.paragraphIndex >= 0 &&
+            chunk.paragraphIndex < paragraphTexts.length
+          ) {
+            paragraphTexts[chunk.paragraphIndex] = (paragraphTexts[chunk.paragraphIndex] ?? "") + chunk.text
+          }
+        } else if (chunk.type === "done") {
+          success = true
+        } else if (chunk.type === "error") {
+          if (lastError === null) lastError = { code: chunk.code, message: chunk.message }
+        }
+      }
+      // 收敛前再次 gate
+      if (gen !== genNow) return "failed"
+      if (signalArg.aborted) return "aborted"
+      if (success && lastError === null && paragraphTexts.some((p) => p.length > 0)) {
+        // 全部成功 → completed
+        translatedParagraphs.value = paragraphTexts.slice()
+        progress.value = {
+          chapterId: args.chapterId,
+          done: args.paragraphs.length,
+          total: args.paragraphs.length,
+        }
+        isCached.value[args.chapterId] = true
+        await writeCacheIfNeeded(args, paragraphTexts)
+        if (gen !== genNow) return "failed"
+        status.value = "completed"
+        showTranslation.value = true
+        refreshDisplay()
+        return "completed"
+      }
+      // 整批回退本身失败 → 返回 'failed' 让外层按原逻辑收敛（保留 lastErrorCode）
+      // 不修改 status；status 由外层原流程收敛到 partial/failed（按有/无译文段分类）
+      // code-review S3：此前这里是 `void paragraphTexts` + `return lastError === null ?
+      // "failed" : "failed"`（两侧相同的死三元），属与 translate.ts 同型的缺陷，已删。
+      //
+      // code-review P12：回退**零译文**时按 ADR-0178 D1 联动 #654 的 content_filter 语义
+      // （截断/空流 = 内容被拒或模型无输出），而不是泛化的 unknown/原错误码 —— 让 UI
+      // 能给出「服务端未返回译文」这类可行动提示。
+      // 零译文 + **无显式错误码** = #654 的空流场景（服务端 200 但零输出，
+      // 典型为内容策略拦截）→ 回传 content_filter，与 #654 的 Java 侧判定同源。
+      // 若回退本身带了显式错误（HTTP 5xx / 429 / network），那个错误才是诊断信息，
+      // 不得覆盖成 content_filter（否则用户看到「内容被拦截」而实际是服务端故障）。
+      const hasAnyText = paragraphTexts.some((p) => p !== undefined && p !== "")
+      if (!hasAnyText && lastError === null) {
+        zeroTextOverride.code = "content_filter"
+        zeroTextOverride.message = t("novelTranslate.error.contentFilter")
+      }
+      return "failed"
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return "aborted"
+      console.warn("[novelTranslateStore] fallbackToWholeBatch threw", err)
+      return "failed"
+    } finally {
+      isRetryingHint.value = false
+    }
   }
 
   /**
@@ -983,6 +1174,28 @@ function classifyProvider(
     await translateChapter(novelId, chapterId, paragraphs, xRestrict)
   }
 
+  /**
+   * 清除**全部**翻译缓存（#637 P3-7：`clearTranslationCache()` 此前零调用点）。
+   * 用户主动入口（spec §6.1 / §9.5）；清完把 isCached 全量置 false（避免 UI 仍显示
+   * 「已缓存」但实际已 miss）。
+   */
+  async function clearAllTranslationCache(): Promise<void> {
+    try {
+      await clearTranslationCache()
+      // isCached 是 Record<chapterId, boolean>；全量重置为 false（保守：清完即全部 miss）
+      const next: Record<number, boolean> = {}
+      for (const k of Object.keys(isCached.value)) next[Number(k)] = false
+      isCached.value = next
+      showTranslation.value = false
+      translatedParagraphs.value = []
+      refreshDisplay()
+    } catch (err) {
+      // 清缓存失败必须可见（AGENTS.md 硬约束 #3）
+      console.warn("[novelTranslateStore] clearAllTranslationCache 失败", err)
+      throw err
+    }
+  }
+
   /** 切换原文/译文显示（同步：仅切 signal + 重算渲染源） */
   async function toggleMode(): Promise<void> {
     showTranslation.value = !showTranslation.value
@@ -1008,6 +1221,7 @@ function classifyProvider(
     error,
     isCached,
     showTranslation,
+    isRetryingHint,
     reset,
     compatibility,
     credential,
@@ -1019,6 +1233,7 @@ function classifyProvider(
     translateChapter,
     retranslate,
     toggleMode,
+    clearAllTranslationCache,
     abort,
   }
 })

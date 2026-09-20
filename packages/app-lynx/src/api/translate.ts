@@ -71,6 +71,14 @@ export interface TranslationRequest {
   chapterId: string
   /** 纯文本段落（已剥 HTML / 注音 / 行内样式） */
   paragraphs: string[]
+  /**
+   * 流式开关：默认 true（chunked SSE pipeline）；false = 整批单次 POST，
+   * 用于 store 层 fallbackToWholeBatch（ADR-0178 D1：stream 中断后整批回退）。
+   *
+   * <p>stream=false 时 provider 内部不做 chunked pipeline 切块，整章一次性提交，
+   * 返回单次 JSON 响应；不走 chunked pipeline。
+   */
+  stream?: boolean
   options: {
     /** 章节 R18 等级：0 / 1 / 2；用于应用层闸门（Q22）与 provider 元数据透传（Q13） */
     xRestrict: 0 | 1 | 2
@@ -116,6 +124,7 @@ export type TranslationErrorCode =
   | 'endpoint_not_responses' // 404 / 405 → endpoint 不支持 /v1/responses
   | 'server' // 5xx
   | 'network' // fetch failed / DNS / proxy
+  | 'incomplete' // 输出截断（response.incomplete）/ 流未产出全部段落（ADR-0178 D2 retryable）
   | 'content_filter' // finish_reason=content_filter
   | 'aborted' // 用户中断
   | 'unknown'
@@ -202,7 +211,8 @@ export interface ResponsesRequest {
   /** 顶层 system 指令（spec §9.4：prefix 稳定 → 命中 prompt cache） */
   instructions: string
   input: Array<{ role: 'user'; content: string }>
-  stream: true
+  /** true = SSE 流（默认）；false = 单次 POST + JSON 响应（store 层 fallbackToWholeBatch 用） */
+  stream: boolean
   max_output_tokens: number
   reasoning?: { effort: 'minimal' | 'low' | 'medium' | 'high' }
 }
@@ -234,7 +244,7 @@ export function buildResponsesRequestBody(
     model: config.model,
     instructions,
     input: [{ role: 'user', content: inputText }],
-    stream: true,
+    stream: request.stream !== false, // 默认 true；store 层 fallbackToWholeBatch 显式传 false
     max_output_tokens: estimateMaxOutput(request.paragraphs),
     reasoning: { effort: 'minimal' },
   }
@@ -395,12 +405,15 @@ export function mapEventToChunk(event: ResponsesEventBase): TranslationChunk | n
         retryable: false,
       }
     }
-    // max_output_tokens / max_messages / steered → 视为可重试（store 决策）
+    // max_output_tokens → 'incomplete'（输出截断；ADR-0178 D2 归类为 retryable → 触发整批回退）
+    // max_messages / steered / 其他 → 'invalid_request'（请求参数问题，重试同样参数无意义；
+    // retryable=false —— 与注释一致，且符合 ADR-0178 D2 子集表。此前 max_messages 被标
+    // retryable=true，与同行注释自相矛盾，会让 fallback 触发一次注定无效的重试）
     return {
       type: 'error',
-      code: reason === 'max_messages' ? 'invalid_request' : 'invalid_request',
+      code: reason === 'max_output_tokens' ? 'incomplete' : 'invalid_request',
       message: `stream truncated: ${reason ?? 'unknown'}`,
-      retryable: reason === 'max_output_tokens' || reason === 'max_messages',
+      retryable: reason === 'max_output_tokens',
     }
   }
 
@@ -685,7 +698,9 @@ export class OpenAIResponsesProvider implements TranslationProvider {
         type: 'error',
         code: errorCode,
         message: finalMessage,
-        retryable: errorCode === 'server' || errorCode === 'rate_limit' || errorCode === 'network',
+        // ADR-0178 D2: 仅 retryable=true 触发整批回退；rate_limit (429) 不自动 retry
+        // （避免触发 endpoint 限流放大；由用户手动 retry）。其余非 retryable 直接 failed。
+        retryable: errorCode === 'server' || errorCode === 'network' || errorCode === 'incomplete',
       }
       return
     }
@@ -697,6 +712,70 @@ export class OpenAIResponsesProvider implements TranslationProvider {
         code: 'unknown',
         message: 'response body is null',
         retryable: false,
+      }
+      return
+    }
+
+    // ADR-0178 D1 fallback 路径：request.stream === false 时不做 SSE 拆帧，
+    // 直接读完整 JSON 响应、emit 一组 delta + done 帧。
+    if (request.stream === false) {
+      try {
+        const fullJson = (await response.json()) as {
+          output?: Array<{
+            content?: Array<{
+              type?: string
+              text?: string
+            }>
+          }>
+          status?: 'completed' | 'failed' | 'incomplete'
+          incomplete_details?: { reason?: string }
+          error?: { code?: string; message?: string }
+          usage?: unknown
+        }
+        // 错误响应：status === 'failed'
+        if (fullJson.status === 'failed') {
+          yield {
+            type: 'error',
+            code: 'server',
+            message: fullJson.error?.message ?? 'response failed',
+            retryable: true,
+          }
+          return
+        }
+        // 截断响应：status === 'incomplete'（code-review P4 阻塞项）。
+        // 必须在此显式判定 —— 否则截断结果会走下方「拆段 + done」分支，被 store
+        // 判为 completed 并写缓存（截断章节以「已完成」入缓存 + 缺失尾段渲染空串），
+        // 同时违反 #654（空/截断不得判完成）与 ADR-0178 D4（未译段须为 partial + 占位）。
+        // retryable=false：ADR-0178 A2 规定整批回退最多 1 次，回退本身失败即终态。
+        if (fullJson.status === 'incomplete') {
+          const reason = fullJson.incomplete_details?.reason
+          yield {
+            type: 'error',
+            code: reason === 'max_output_tokens' ? 'incomplete' : 'invalid_request',
+            message: `whole-batch truncated: ${reason ?? 'unknown'}`,
+            retryable: false,
+          }
+          return
+        }
+        // 收集所有 output text（按 [N] 锚定 prefix 拆段）
+        const allText = (fullJson.output ?? [])
+          .flatMap((o) => (o.content ?? []).filter((c) => c.type === 'output_text').map((c) => c.text ?? ''))
+          .join('')
+        // 按 [N] 拆段；缺锚定视为整段
+        const segments = parseNumberedSegments(allText, request.paragraphs.length)
+        for (let i = 0; i < segments.length; i += 1) {
+          yield { type: 'delta', paragraphIndex: i, text: segments[i] ?? '' }
+        }
+        yield { type: 'done' }
+      } catch (err) {
+        yield {
+          type: 'error',
+          code: 'unknown',
+          message: err instanceof Error ? err.message : 'whole-batch parse failed',
+          retryable: false,
+        }
+      } finally {
+        outerSignal.removeEventListener('abort', onOuterAbort)
       }
       return
     }
@@ -717,6 +796,34 @@ export class OpenAIResponsesProvider implements TranslationProvider {
       throw new DOMException('aborted', 'AbortError')
     }
   }
+}
+
+/**
+ * 把整批输出文本按 `[N] xxx\n[N+1] yyy` 锚定拆段（与 chunked pipeline delta 拆段一致）。
+ * 缺锚定时按 \n 拆；段数 < 请求段落数时末尾补空串。
+ */
+function parseNumberedSegments(text: string, expectedCount: number): string[] {
+  const out: string[] = []
+  const re = /^\[(\d+)\]\s*/gm
+  let cursor = 0
+  let lastIdx = 0
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text)) !== null) {
+    if (lastIdx < m.index) {
+      // 上一个 [N] 段内容 = text[lastIdx..m.index] 去掉 prefix
+      out.push(text.slice(lastIdx, m.index).replace(/^\[\d+\]\s*/, '').trimEnd())
+    }
+    lastIdx = m.index
+    cursor = Number(m[1])
+  }
+  // 尾段
+  if (lastIdx < text.length) {
+    out.push(text.slice(lastIdx).replace(/^\[\d+\]\s*/, '').trimEnd())
+  }
+  // 段数对齐到 expectedCount
+  while (out.length < expectedCount) out.push('')
+  if (out.length > expectedCount) out.length = expectedCount
+  return out
 }
 
 // ─────────────────────── Provider 工厂 ───────────────────────

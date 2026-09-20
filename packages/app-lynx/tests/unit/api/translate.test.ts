@@ -218,7 +218,7 @@ describe('mapEventToChunk 事件规约（OpenAI Responses 30+ → 5 种 chunk）
     }
   })
 
-  it('response.incomplete(max_output_tokens) → error(invalid_request, retryable=true)', () => {
+  it('response.incomplete(max_output_tokens) → error(incomplete, retryable=true)（ADR-0178 D2）', () => {
     const chunk = mapEventToChunk({
       type: 'response.incomplete',
       response: {
@@ -228,9 +228,27 @@ describe('mapEventToChunk 事件规约（OpenAI Responses 30+ → 5 种 chunk）
     })
     expect(chunk?.type).toBe('error')
     if (chunk?.type === 'error') {
-      expect(chunk.code).toBe('invalid_request')
+      // ADR-0178 D2：max_output_tokens 截断 = 'incomplete'（retryable → 触发整批回退）
+      expect(chunk.code).toBe('incomplete')
       expect(chunk.message).toContain('max_output_tokens')
       expect(chunk.retryable).toBe(true)
+    }
+  })
+
+  it('response.incomplete(max_messages) → error(invalid_request, retryable=false)（P8：不再自相矛盾）', () => {
+    const chunk = mapEventToChunk({
+      type: 'response.incomplete',
+      response: {
+        status: 'incomplete',
+        incomplete_details: { reason: 'max_messages' },
+      },
+    })
+    expect(chunk?.type).toBe('error')
+    if (chunk?.type === 'error') {
+      // 注释说「请求参数问题，重试同样参数无意义」→ retryable 必须 false
+      // （此前是 true，会触发一次注定无效的整批回退，违反 ADR-0178 D2 子集表）
+      expect(chunk.code).toBe('invalid_request')
+      expect(chunk.retryable).toBe(false)
     }
   })
 
@@ -537,7 +555,7 @@ describe('AbortSignal 取消语义（ADR-0169 D5.4 + D6）', () => {
     }
   })
 
-  it('HTTP 429 → emit error(rate_limit, retryable=true)', async () => {
+  it('HTTP 429 → emit error(rate_limit, retryable=false)（ADR-0178 D2：429 不自动 retry）', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ error: { code: 'rate_limit_exceeded' } }), {
         status: 429,
@@ -549,7 +567,8 @@ describe('AbortSignal 取消语义（ADR-0169 D5.4 + D6）', () => {
     expect(first.value?.type).toBe('error')
     if (first.value?.type === 'error') {
       expect(first.value.code).toBe('rate_limit')
-      expect(first.value.retryable).toBe(true)
+      // ADR-0178 D2: 429 不自动 retry（避免触发 endpoint 限流放大；由用户手动 retry）
+      expect(first.value.retryable).toBe(false)
     }
   })
 
@@ -562,6 +581,131 @@ describe('AbortSignal 取消语义（ADR-0169 D5.4 + D6）', () => {
     if (first.value?.type === 'error') {
       expect(first.value.code).toBe('network')
       expect(first.value.retryable).toBe(true)
+    }
+  })
+
+  // ─────────────────── ADR-0178 D1 stream=false fallback 路径 ───────────────────
+
+  it('stream=false 整批回退：单次 POST + 拆 [N] 锚定 → N 条 delta + 1 条 done', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          status: 'completed',
+          output: [
+            {
+              content: [
+                { type: 'output_text', text: '[0] 你好\n[1] 世界\n[2] !' },
+              ],
+            },
+          ],
+          usage: { input_tokens: 100, output_tokens: 30, total_tokens: 130 },
+        }),
+        { status: 200 },
+      ),
+    )
+    const p = new OpenAIResponsesProvider({ fetchImpl: fetchMock })
+    const req = { ...SAMPLE_REQUEST, stream: false, paragraphs: ['hi', 'world', '!'] }
+    const iter = p.translate(req, SAMPLE_CONFIG, controller.signal)
+    const collected: TranslationChunk[] = []
+    while (true) {
+      const r = await iter.next()
+      if (r.done) break
+      collected.push(r.value)
+    }
+    // 期望 3 条 delta + 1 条 done
+    expect(collected).toHaveLength(4)
+    expect(collected[0]?.type).toBe('delta')
+    expect(collected[1]?.type).toBe('delta')
+    expect(collected[2]?.type).toBe('delta')
+    expect(collected[3]?.type).toBe('done')
+    // 验证 [N] 拆段
+    const d0 = collected[0] as Extract<TranslationChunk, { type: 'delta' }>
+    const d1 = collected[1] as Extract<TranslationChunk, { type: 'delta' }>
+    const d2 = collected[2] as Extract<TranslationChunk, { type: 'delta' }>
+    expect(d0.text).toBe('你好')
+    expect(d1.text).toBe('世界')
+    expect(d2.text).toBe('!')
+    // 验证 fetch 单次（不走 SSE 分块）
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('stream=false 整批回退：response.status=failed → emit error(server, retryable=true)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          status: 'failed',
+          error: { code: 'server_error', message: 'endpoint 5xx' },
+        }),
+        { status: 200 },
+      ),
+    )
+    const p = new OpenAIResponsesProvider({ fetchImpl: fetchMock })
+    const req = { ...SAMPLE_REQUEST, stream: false }
+    const iter = p.translate(req, SAMPLE_CONFIG, controller.signal)
+    const first = await iter.next()
+    expect(first.value?.type).toBe('error')
+    if (first.value?.type === 'error') {
+      expect(first.value.code).toBe('server')
+      expect(first.value.retryable).toBe(true)
+      expect(first.value.message).toBe('endpoint 5xx')
+    }
+  })
+
+  // ─── code-review P4 阻塞项：截断不得当成功（否则 store 会写 completed 缓存） ───
+
+  it('stream=false + status=incomplete(max_output_tokens) → error(incomplete, retryable=false)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          status: 'incomplete',
+          incomplete_details: { reason: 'max_output_tokens' },
+          output: [{ content: [{ type: 'output_text', text: '[0] 半截译文' }] }],
+        }),
+        { status: 200 },
+      ),
+    )
+    const p = new OpenAIResponsesProvider({ fetchImpl: fetchMock })
+    const req = { ...SAMPLE_REQUEST, stream: false }
+    const iter = p.translate(req, SAMPLE_CONFIG, controller.signal)
+    const first = await iter.next()
+    expect(first.value?.type).toBe('error')
+    if (first.value?.type === 'error') {
+      expect(first.value.code).toBe('incomplete')
+      // ADR-0178 A2：整批回退最多 1 次，回退本身失败即终态 → 不再 retry
+      expect(first.value.retryable).toBe(false)
+      expect(first.value.message).toContain('max_output_tokens')
+    }
+  })
+
+  it('stream=false + status=incomplete(其他 reason) → error(invalid_request)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ status: 'incomplete', incomplete_details: { reason: 'steered' } }), {
+        status: 200,
+      }),
+    )
+    const p = new OpenAIResponsesProvider({ fetchImpl: fetchMock })
+    const req = { ...SAMPLE_REQUEST, stream: false }
+    const iter = p.translate(req, SAMPLE_CONFIG, controller.signal)
+    const first = await iter.next()
+    expect(first.value?.type).toBe('error')
+    if (first.value?.type === 'error') {
+      expect(first.value.code).toBe('invalid_request')
+      expect(first.value.retryable).toBe(false)
+    }
+  })
+
+  it('stream=false 整批回退：JSON 解析失败 → emit error(unknown, retryable=false)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response('not-json{{', { status: 200 }),
+    )
+    const p = new OpenAIResponsesProvider({ fetchImpl: fetchMock })
+    const req = { ...SAMPLE_REQUEST, stream: false }
+    const iter = p.translate(req, SAMPLE_CONFIG, controller.signal)
+    const first = await iter.next()
+    expect(first.value?.type).toBe('error')
+    if (first.value?.type === 'error') {
+      expect(first.value.code).toBe('unknown')
+      expect(first.value.retryable).toBe(false)
     }
   })
 })

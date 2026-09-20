@@ -254,11 +254,11 @@ describe('novelTranslateStore.status 状态机（spec §7.2）', () => {
     expect(store.isCached[1]).toBe(true)
   })
 
-  it('translating → failed：provider 流 emit error chunk', async () => {
+  it('translating → failed：provider 流 emit error chunk（retryable=false → 不触发 fallback）', async () => {
     mocks.providerIter.mockImplementationOnce(() =>
       makeFakeIterator([
         { type: 'delta', paragraphIndex: 0, text: 'a' },
-        { type: 'error', code: 'rate_limit', message: 'too many', retryable: true },
+        { type: 'error', code: 'rate_limit', message: 'too many', retryable: false },
       ]),
     )
     const store = useNovelTranslateStore()
@@ -502,13 +502,92 @@ describe('半成品策略（ADR-0171 §5）', () => {
     expect(mocks.cacheSet).toHaveBeenCalled()
   })
 
-  it('status=failed 时不写缓存', async () => {
+  it('status=failed 时不写缓存（retryable=false → 不触发 fallback）', async () => {
     mocks.providerIter.mockImplementationOnce(() =>
-      makeFakeIterator([{ type: 'error', code: 'server', message: 'x', retryable: true }]),
+      makeFakeIterator([{ type: 'error', code: 'server', message: 'x', retryable: false }]),
     )
     const store = useNovelTranslateStore()
     await store.translateChapter(41, 41, ['p1'], 0)
     expect(store.status).toBe('failed')
+    expect(mocks.cacheSet).not.toHaveBeenCalled()
+  })
+
+  it('ADR-0178 D1 fallback：retryable=true 错误 → 整批回退（stream=false mock）成功 → completed + 写缓存', async () => {
+    // 第一次 providerIter 调用（chunked pipeline 流式）→ error retryable=true
+    // 第二次 providerIter 调用（整批回退，stream=false）→ success
+    mocks.providerIter
+      .mockImplementationOnce(() =>
+        makeFakeIterator([
+          { type: 'delta', paragraphIndex: 0, text: 'a' },
+          { type: 'error', code: 'server', message: '5xx', retryable: true },
+        ]),
+      )
+      .mockImplementationOnce(() =>
+        makeFakeIterator([
+          { type: 'delta', paragraphIndex: 0, text: '整批' },
+          { type: 'delta', paragraphIndex: 1, text: '回退' },
+          { type: 'done' },
+        ]),
+      )
+    const store = useNovelTranslateStore()
+    await store.translateChapter(43, 43, ['p1', 'p2'], 0)
+    expect(store.status).toBe('completed')
+    expect(store.error).toBeNull()
+    expect(mocks.cacheSet).toHaveBeenCalled()
+  })
+
+  it('ADR-0178 P12：回退零译文 + 无显式错误 → content_filter（#654 联动）', async () => {
+    // 第一次（流式）：error retryable=true 触发回退
+    // 第二次（整批回退）：只给 done、零 delta → 零译文（= #654 空流场景）
+    mocks.providerIter
+      .mockImplementationOnce(() =>
+        makeFakeIterator([{ type: 'error', code: 'server', message: '5xx', retryable: true }]),
+      )
+      .mockImplementationOnce(() => makeFakeIterator([{ type: 'done' }]))
+    const store = useNovelTranslateStore()
+    await store.translateChapter(45, 45, ['p1'], 0)
+    expect(store.status).toBe('failed')
+    expect(store.error?.code).toBe('content_filter')
+    expect(mocks.cacheSet).not.toHaveBeenCalled()
+  })
+
+  it('ADR-0178 P12 反例：回退带显式错误码 → **不**被 content_filter 覆盖', async () => {
+    mocks.providerIter
+      .mockImplementationOnce(() =>
+        makeFakeIterator([{ type: 'error', code: 'server', message: '5xx stream', retryable: true }]),
+      )
+      .mockImplementationOnce(() =>
+        makeFakeIterator([{ type: 'error', code: 'rate_limit', message: '429', retryable: false }]),
+      )
+    const store = useNovelTranslateStore()
+    await store.translateChapter(46, 46, ['p1'], 0)
+    expect(store.status).toBe('failed')
+    // 有显式错误 = 有诊断信息；不得被 P12 的 content_filter 联动覆盖。
+    // （保留首个错误码 `server` 是既有设计：spec §7.2 收敛表 + 本文件上方
+    //  「整批回退也失败 → 走原 failed 收敛（保留 lastErrorCode）」用例已钉住。
+    //  P12 只负责「**零译文且无显式错误**」这一种 #654 空流场景。）
+    expect(store.error?.code).not.toBe('content_filter')
+    expect(store.error?.code).toBe('server')
+  })
+
+  it('ADR-0178 D1 fallback：整批回退也失败 → 走原 failed 收敛（不写缓存）', async () => {
+    // 第一次（流式）：error retryable=true
+    // 第二次（整批回退）：error retryable=true（回退也失败）
+    mocks.providerIter
+      .mockImplementationOnce(() =>
+        makeFakeIterator([
+          { type: 'error', code: 'server', message: '5xx stream', retryable: true },
+        ]),
+      )
+      .mockImplementationOnce(() =>
+        makeFakeIterator([
+          { type: 'error', code: 'server', message: '5xx whole', retryable: true },
+        ]),
+      )
+    const store = useNovelTranslateStore()
+    await store.translateChapter(44, 44, ['p1'], 0)
+    expect(store.status).toBe('failed')
+    expect(store.error?.code).toBe('server')
     expect(mocks.cacheSet).not.toHaveBeenCalled()
   })
 
@@ -586,6 +665,64 @@ describe('译文渲染源（spec §5 / §6.3）', () => {
     expect(store.status).toBe('completed')
     expect(store.displayParagraphs).toEqual(['缓存译一', '缓存译二'])
     expect(mocks.providerIter).not.toHaveBeenCalled()
+  })
+
+  // ─── ADR-0178 D4：partial 未译段占位（code-review P13 覆盖补强） ───
+  //
+  // partial 的产生条件（createNovelTranslator:526-533）= failedCount>0 && successCount>0，
+  // 即**至少两块**且成败混合。块阈值 2000 字符（ADR-0169 D5.1），故用两段各 2000+
+  // 字符的原文强制切成 2 块；块 0 成功、块 1 失败。
+
+  /** 造一段 >2000 字符的原文（保证与下一段落在不同 chunk） */
+  const longPara = (tag: string): string => tag + 'あ'.repeat(2100)
+
+  it('partial 状态 → 未译段渲染为〔未翻译〕占位（不是回退原文）', async () => {
+    let call = 0
+    mocks.providerIter.mockImplementation(() => {
+      call += 1
+      return call === 1
+        ? makeFakeIterator([{ type: 'delta', paragraphIndex: 0, text: '译一' }, { type: 'done', usage: { inputTokens: 0, outputTokens: 0 } }])
+        : makeFakeIterator([{ type: 'error', code: 'server', message: 'boom', retryable: false }])
+    })
+    const store = useNovelTranslateStore()
+    await store.translateChapter(92, 92, [longPara('A'), longPara('B')], 0)
+
+    expect(store.status).toBe('partial')
+    // D4：未译段必须是占位符（UI 层据该字符串加灰色斜体），**不是**原文
+    expect(store.displayParagraphs[0]).toBe('译一')
+    expect(store.displayParagraphs[1]).toBe('〔未翻译〕')
+    expect(store.displayParagraphs[1]).not.toContain('B')
+  })
+
+  it('partial 进度不虚报 100%（code-review P10b / issue #651 范围补充）', async () => {
+    let call = 0
+    mocks.providerIter.mockImplementation(() => {
+      call += 1
+      return call === 1
+        ? makeFakeIterator([{ type: 'delta', paragraphIndex: 0, text: '译一' }, { type: 'done', usage: { inputTokens: 0, outputTokens: 0 } }])
+        : makeFakeIterator([{ type: 'error', code: 'server', message: 'boom', retryable: false }])
+    })
+    const store = useNovelTranslateStore()
+    await store.translateChapter(93, 93, [longPara('A'), longPara('B')], 0)
+
+    expect(store.status).toBe('partial')
+    // 2 段里只有 1 段有译文 → done 必须是 1 而不是 2（此前虚报 total）
+    expect(store.progress?.done).toBe(1)
+    expect(store.progress?.total).toBe(2)
+  })
+
+  it('completed 状态 → 不出现〔未翻译〕占位（占位只属于 partial）', async () => {
+    mocks.providerIter.mockImplementationOnce(() =>
+      makeFakeIterator([
+        { type: 'delta', paragraphIndex: 0, text: '译一' },
+        { type: 'done', usage: { inputTokens: 0, outputTokens: 0 } },
+      ]),
+    )
+    const store = useNovelTranslateStore()
+    await store.translateChapter(94, 94, ['原文一'], 0)
+
+    expect(store.status).toBe('completed')
+    expect(store.displayParagraphs.join('|')).not.toContain('〔未翻译〕')
   })
 })
 
@@ -724,6 +861,9 @@ describe('凭据验证（密钥层；真实 key + 持久化 + 失效规则）', 
     expect(result.ok).toBe(true)
     expect(store.credential.state).toBe('verified')
     expect(store.credential.at).toBeGreaterThan(0)
+    // #637 P3-6：往返耗时回传（此前原生未回传，UI 无法显示延迟数据）
+    expect(result.elapsedMs).toBeGreaterThanOrEqual(0)
+    expect(Number.isFinite(result.elapsedMs)).toBe(true)
     expect(nativePrefsStore.get('llm_endpoint_verified_state')).toBe('verified')
     expect(nativePrefsStore.get('llm_endpoint_verified_base_url')).toBe('https://api.openai.com/v1')
   })
@@ -739,6 +879,8 @@ describe('凭据验证（密钥层；真实 key + 持久化 + 失效规则）', 
 
     expect(result.ok).toBe(false)
     expect(result.code).toBe('invalid_key')
+    // 失败路径同样回传耗时（#637 P3-6）
+    expect(result.elapsedMs).toBeGreaterThanOrEqual(0)
     expect(store.credential.state).toBe('failed')
   })
 
@@ -921,5 +1063,28 @@ describe('endpoint 配置（spec §6.1）', () => {
     const store = useNovelTranslateStore()
     await store.clearEndpointConfig()
     expect(mocks.nativeClearEndpoint).toHaveBeenCalled()
+  })
+
+  // ─── #637 P3-7：清缓存 UI 入口（此前 clearTranslationCache 零调用点） ───
+
+  it('clearAllTranslationCache → 调 clearTranslationCache + isCached 全量置 false', async () => {
+    const store = useNovelTranslateStore()
+    store.isCached = { 1: true, 2: true, 3: true }
+    mocks.cacheClear.mockResolvedValueOnce(undefined)
+    await store.clearAllTranslationCache()
+    expect(mocks.cacheClear).toHaveBeenCalled()
+    expect(store.isCached[1]).toBe(false)
+    expect(store.isCached[2]).toBe(false)
+    expect(store.isCached[3]).toBe(false)
+    expect(store.showTranslation).toBe(false)
+  })
+
+  it('clearAllTranslationCache 失败 → console.warn + 向上抛（可见，不静默吞）', async () => {
+    const store = useNovelTranslateStore()
+    mocks.cacheClear.mockRejectedValueOnce(new Error('IDB down'))
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await expect(store.clearAllTranslationCache()).rejects.toThrow('IDB down')
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
   })
 })

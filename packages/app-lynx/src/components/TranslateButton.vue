@@ -90,6 +90,16 @@ const LABEL_KEYS = {
 
 const label = computed<string>(() => t(LABEL_KEYS[buttonState.value]))
 
+/**
+ * 用户 retry 按钮的 debounce（ADR-0178 D3：1.5s）。
+ *
+ * <p>code-review P11：此前 `onTap` 无任何节流 —— 用户连点会并发起多轮 translateChapter
+ * （每轮都是真实计费请求）。自动整批回退（store 层）是 0ms 即时，不受此影响；这里只保护
+ * **人工**点击路径。
+ */
+const RETRY_DEBOUNCE_MS = 1500
+let lastRetryAt = 0
+
 /** 用户点击：起翻译 */
 async function onTap(): Promise<void> {
   if (disabled.value) return
@@ -98,6 +108,12 @@ async function onTap(): Promise<void> {
     store.abort()
     emit("translate-abort")
     return
+  }
+  // ADR-0178 D3：retry / retranslate（均为「用户主动重发一次计费请求」）走 1.5s debounce
+  if (buttonState.value === "retry" || buttonState.value === "retranslate") {
+    const now = Date.now()
+    if (now - lastRetryAt < RETRY_DEBOUNCE_MS) return
+    lastRetryAt = now
   }
   // 未配置 endpoint → 跳设置页（spec §6.2「配置翻译」）
   if (buttonState.value === "configure") {
@@ -169,12 +185,11 @@ async function onTap(): Promise<void> {
       class="text-[5.333vw] leading-none text-on-primary mr-1"
       >Aあ</text
     >
-    <!-- 进度态：简易文字 + 百分比 -->
-    <text
-      v-else-if="isTranslatingThis"
-      class="text-label-medium text-on-primary"
-      >{{ Math.round(progressFraction * 100) }}%</text
-    >
+    <!-- 进度态：简易文字 + 百分比；fallback 期间附加「重试中…」微提示（ADR-0178 D1） -->
+    <view v-else-if="isTranslatingThis" class="flex flex-col items-center">
+      <text class="text-label-medium text-on-primary">{{ Math.round(progressFraction * 100) }}%</text>
+      <text v-if="store.isRetryingHint" class="text-label-small text-on-primary opacity-80 mt-0.5">{{ t('novelTranslate.status.retrying') }}</text>
+    </view>
     <!-- 完成态：✓ -->
     <text
       v-else-if="isDoneCached"
