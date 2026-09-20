@@ -271,6 +271,10 @@ public class LynxActivity extends AppCompatActivity {
                             // 平台一致性自检直达（spec docs/specs/qa-defense-lines.md §3.T4 / #550）：
                             // debug 自检页唯一入口（前端 /platform-check 不进导航）
                             case "platform-check" -> new String[]{"pictelioBenchNavPlatformCheck"};
+                            // 「我」页直达（#640 step 5）：LLM endpoint 设置区挂在 /me 底部，
+                            // 其 inline probe 需在表单里输入才触发 @input debounce；从 tab 栏
+                            // 三段式点进去在合成点击下不稳定。与 netdiag / platform-check 同先例。
+                            case "me" -> new String[]{"pictelioBenchNavMe"};
                             // 详情页直达（#542）走载荷通道（illust_id 数值经 extra 传入），不入本表
                             default -> new String[0];
                         };

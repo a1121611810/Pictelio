@@ -350,6 +350,10 @@ function registerBenchNavHandler(): void {
     // 平台一致性自检直达（spec docs/specs/qa-defense-lines.md §3.T4 / #550）：
     // debug 自检页唯一入口（不进导航），对齐 /network-check 深链先例。
     pictelioBenchNavPlatformCheck: '/platform-check',
+    // 「我」页直达（#640 step 5：LLM endpoint 设置页的 inline probe 需在表单里输入才触发
+    // `@input` debounce，而设置区挂在 /me 底部 —— 从 tab 栏三段式点进去在合成点击下不稳定。
+    // 与 NetDiag / PlatformCheck 同先例：为设备验证提供可重复入口）。
+    pictelioBenchNavMe: '/me',
   }
   for (const [eventName, target] of Object.entries(TARGETS)) {
     // 原生发送四次（1.5/3/4.5/6s，LynxActivity.onLoadSuccess）防 JS 挂载竞态；replace 幂等，重复到达无副作用
