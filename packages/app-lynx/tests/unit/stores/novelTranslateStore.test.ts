@@ -254,11 +254,11 @@ describe('novelTranslateStore.status 状态机（spec §7.2）', () => {
     expect(store.isCached[1]).toBe(true)
   })
 
-  it('translating → failed：provider 流 emit error chunk', async () => {
+  it('translating → failed：provider 流 emit error chunk（retryable=false → 不触发 fallback）', async () => {
     mocks.providerIter.mockImplementationOnce(() =>
       makeFakeIterator([
         { type: 'delta', paragraphIndex: 0, text: 'a' },
-        { type: 'error', code: 'rate_limit', message: 'too many', retryable: true },
+        { type: 'error', code: 'rate_limit', message: 'too many', retryable: false },
       ]),
     )
     const store = useNovelTranslateStore()
@@ -502,13 +502,58 @@ describe('半成品策略（ADR-0171 §5）', () => {
     expect(mocks.cacheSet).toHaveBeenCalled()
   })
 
-  it('status=failed 时不写缓存', async () => {
+  it('status=failed 时不写缓存（retryable=false → 不触发 fallback）', async () => {
     mocks.providerIter.mockImplementationOnce(() =>
-      makeFakeIterator([{ type: 'error', code: 'server', message: 'x', retryable: true }]),
+      makeFakeIterator([{ type: 'error', code: 'server', message: 'x', retryable: false }]),
     )
     const store = useNovelTranslateStore()
     await store.translateChapter(41, 41, ['p1'], 0)
     expect(store.status).toBe('failed')
+    expect(mocks.cacheSet).not.toHaveBeenCalled()
+  })
+
+  it('ADR-0178 D1 fallback：retryable=true 错误 → 整批回退（stream=false mock）成功 → completed + 写缓存', async () => {
+    // 第一次 providerIter 调用（chunked pipeline 流式）→ error retryable=true
+    // 第二次 providerIter 调用（整批回退，stream=false）→ success
+    mocks.providerIter
+      .mockImplementationOnce(() =>
+        makeFakeIterator([
+          { type: 'delta', paragraphIndex: 0, text: 'a' },
+          { type: 'error', code: 'server', message: '5xx', retryable: true },
+        ]),
+      )
+      .mockImplementationOnce(() =>
+        makeFakeIterator([
+          { type: 'delta', paragraphIndex: 0, text: '整批' },
+          { type: 'delta', paragraphIndex: 1, text: '回退' },
+          { type: 'done' },
+        ]),
+      )
+    const store = useNovelTranslateStore()
+    await store.translateChapter(43, 43, ['p1', 'p2'], 0)
+    expect(store.status).toBe('completed')
+    expect(store.error).toBeNull()
+    expect(mocks.cacheSet).toHaveBeenCalled()
+  })
+
+  it('ADR-0178 D1 fallback：整批回退也失败 → 走原 failed 收敛（不写缓存）', async () => {
+    // 第一次（流式）：error retryable=true
+    // 第二次（整批回退）：error retryable=true（回退也失败）
+    mocks.providerIter
+      .mockImplementationOnce(() =>
+        makeFakeIterator([
+          { type: 'error', code: 'server', message: '5xx stream', retryable: true },
+        ]),
+      )
+      .mockImplementationOnce(() =>
+        makeFakeIterator([
+          { type: 'error', code: 'server', message: '5xx whole', retryable: true },
+        ]),
+      )
+    const store = useNovelTranslateStore()
+    await store.translateChapter(44, 44, ['p1'], 0)
+    expect(store.status).toBe('failed')
+    expect(store.error?.code).toBe('server')
     expect(mocks.cacheSet).not.toHaveBeenCalled()
   })
 

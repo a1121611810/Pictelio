@@ -797,6 +797,7 @@ function classifyProvider(
     let deltaFrames = 0
     let lastErrorCode: string | null = null
     let lastErrorMessage = ""
+    let lastErrorRetryable = false
     let result: Awaited<ReturnType<typeof translator.translate>>
     try {
       result = await translator.translate(request, config, signal, (chunk: TranslationChunk) => {
@@ -814,11 +815,12 @@ function classifyProvider(
           translatedParagraphs.value[abs] = (translatedParagraphs.value[abs] ?? "") + chunk.text
         }
       } else if (chunk.type === "error") {
-        // 捕获首个 error chunk 的 code/message；translator 内部会吞错转 failed/partial，
+        // 捕获首个 error chunk 的 code/message/retryable；translator 内部会吞错转 failed/partial，
         // 我们在外部收敛时把 code 透传到 store（避免错误码丢失为 'unknown'）。
         if (lastErrorCode === null) {
           lastErrorCode = chunk.code
           lastErrorMessage = chunk.message
+          lastErrorRetryable = chunk.retryable
         }
       }
       })
@@ -840,6 +842,45 @@ function classifyProvider(
       status.value = "aborted"
       return
     }
+
+    // ADR-0178 D1 fallbackToWholeBatch：chunked pipeline partial/failed 且首个 error
+    // chunk retryable=true → 整批回退（0ms 退避；stream=false 单次 POST + JSON 响应）。
+    // 触发条件：result.status 为 partial/failed 且 lastErrorRetryable=true。
+    // 最大 1 次（A2：流式整批回退最多 1 次）。
+    if (
+      (result.status === "partial" || result.status === "failed") &&
+      lastErrorRetryable
+    ) {
+      // 收敛终态前再次 gate（用户可能已在回退期间触发 abort）
+      if (gen !== genNow) return
+      if (signal.aborted) {
+        status.value = "aborted"
+        return
+      }
+      console.warn(
+        "[novelTranslateStore] fallbackToWholeBatch triggered",
+        { code: lastErrorCode, message: lastErrorMessage },
+      )
+      const fallbackOk = await runWholeBatchFallback(
+        provider,
+        config,
+        request,
+        args,
+        signal,
+        genNow,
+      )
+      if (fallbackOk === "completed") {
+        // 已被 runWholeBatchFallback 收敛到 completed；函数内部已写缓存 + 置 status
+        return
+      }
+      if (fallbackOk === "aborted") {
+        status.value = "aborted"
+        return
+      }
+      // fallbackOk === "partial" | "failed"：继续走原收敛逻辑（保留 lastErrorCode）
+      // 不修改 status，让下方原流程收敛到 partial/failed（终态与 spec §7.2 一致）
+    }
+
     if (result.status === "completed") {
       progress.value = {
         chapterId: args.chapterId,
@@ -919,6 +960,80 @@ function classifyProvider(
     genNow: number,
   ): Promise<void> {
     await runWithProvider(openaiResponsesProvider(), webEndpointConfig(), args, signal, genNow)
+  }
+
+  /**
+   * ADR-0178 D1 fallback：chunked pipeline 失败后整批回退。
+   * - 调用 provider.translate with stream=false（OpenAIResponsesProvider 已实现）
+   * - 单次 POST + JSON 响应 → provider emit N 条 delta + 1 条 done
+   * - 成功 → 写缓存 + status='completed'；失败 → 返回 'partial'/'failed' 让外层收敛
+   * - 用户 abort → 返回 'aborted' 立即退出
+   * - generation gate：gen !== genNow 视为已 stale，return 'failed' 让外层不写状态
+   */
+  async function runWholeBatchFallback(
+    providerArg: TranslationProvider,
+    configArg: LlmEndpointConfig,
+    originalRequest: TranslationRequest,
+    args: { novelId: number; chapterId: number; paragraphs: string[]; xRestrict: 0 | 1 | 2 },
+    signalArg: AbortSignal,
+    genNow: number,
+  ): Promise<"completed" | "partial" | "failed" | "aborted"> {
+    if (gen !== genNow) return "failed"
+    if (signalArg.aborted) return "aborted"
+    const wholeRequest: TranslationRequest = { ...originalRequest, stream: false }
+    try {
+      const iter = providerArg.translate(wholeRequest, configArg, signalArg)
+      // 收集所有 chunk
+      let lastError: { code: string; message: string } | null = null
+      let paragraphTexts: string[] = new Array<string>(args.paragraphs.length).fill("")
+      let success = false
+      while (true) {
+        const r = await iter.next()
+        if (r.done) break
+        const chunk = r.value
+        if (chunk.type === "delta") {
+          // provider stream=false 拆段后 emit 的 delta 已带 paragraphIndex
+          if (
+            typeof chunk.paragraphIndex === "number" &&
+            chunk.paragraphIndex >= 0 &&
+            chunk.paragraphIndex < paragraphTexts.length
+          ) {
+            paragraphTexts[chunk.paragraphIndex] = (paragraphTexts[chunk.paragraphIndex] ?? "") + chunk.text
+          }
+        } else if (chunk.type === "done") {
+          success = true
+        } else if (chunk.type === "error") {
+          if (lastError === null) lastError = { code: chunk.code, message: chunk.message }
+        }
+      }
+      // 收敛前再次 gate
+      if (gen !== genNow) return "failed"
+      if (signalArg.aborted) return "aborted"
+      if (success && lastError === null && paragraphTexts.some((p) => p.length > 0)) {
+        // 全部成功 → completed
+        translatedParagraphs.value = paragraphTexts.slice()
+        progress.value = {
+          chapterId: args.chapterId,
+          done: args.paragraphs.length,
+          total: args.paragraphs.length,
+        }
+        isCached.value[args.chapterId] = true
+        await writeCacheIfNeeded(args, paragraphTexts)
+        if (gen !== genNow) return "failed"
+        status.value = "completed"
+        showTranslation.value = true
+        refreshDisplay()
+        return "completed"
+      }
+      // 整批回退本身失败 → 返回 'failed' 让外层按原逻辑收敛（保留 lastErrorCode）
+      // 不修改 status；status 由外层原流程收敛到 partial/failed（按有/无译文段分类）
+      void paragraphTexts // 已通过 translatedParagraphs 被赋值时使用；这里保留以便未来扩展
+      return lastError === null ? "failed" : "failed"
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return "aborted"
+      console.warn("[novelTranslateStore] fallbackToWholeBatch threw", err)
+      return "failed"
+    }
   }
 
   /**
