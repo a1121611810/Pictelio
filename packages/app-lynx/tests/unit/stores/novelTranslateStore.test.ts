@@ -156,6 +156,69 @@ const endpointOK: LlmEndpointPublic = {
   updatedAt: 1,
 }
 
+/**
+ * 造一段 >2000 字符的原文（保证与下一段落在不同 chunk）。
+ *
+ * <p>用途：可靠的 **partial** 构造 —— createNovelTranslator 的 partial 条件是
+ * `failedCount>0 && successCount>0`（至少两块 + 成败混合），而块阈值 2000 字符
+ * （ADR-0169 D5.1），短段落只会合成单块 → 永远出不来 partial。
+ *
+ * <p>#656 薄点 1 与 ADR-0178 D4 的用例共用此构造。
+ */
+const longPara = (tag: string): string => tag + 'あ'.repeat(2100)
+
+/**
+ * 造一个**挂起**的 iterator：返回的 `push()` 可后续投递 chunk，`finish()` 收尾。
+ *
+ * <p>用途（#656 薄点 1）：`abort` 语义的用例必须让 pipeline 停在 in-flight 态，
+ * 否则同步 settle 的 fake iterator 会与 `store.abort()` 竞态 —— 既有「abort」用例
+ * 因此只能写松断言（`not translating / not pending`），「aborted 不写缓存」这条
+ * 从来没被真正断言过。
+ */
+function makeDeferredIterator(signal?: AbortSignal): {
+  iter: AsyncIterator<TranslationChunk>
+  push: (c: TranslationChunk) => void
+  finish: () => void
+} {
+  const queue: TranslationChunk[] = []
+  let waiter: (() => void) | null = null
+  let done = false
+  const onAbort = (): void => {
+    done = true
+    waiter?.()
+    waiter = null
+  }
+  signal?.addEventListener('abort', onAbort, { once: true })
+  const iter: AsyncIterator<TranslationChunk> = {
+    async next(): Promise<IteratorResult<TranslationChunk>> {
+      // abort → 抛 AbortError（与真实 provider 一致；store 据此收敛 aborted）
+      if (signal?.aborted === true) throw new DOMException('aborted', 'AbortError')
+      while (queue.length === 0 && !done) {
+        await new Promise<void>((r) => {
+          waiter = r
+        })
+        if (signal?.aborted === true) throw new DOMException('aborted', 'AbortError')
+      }
+      const v = queue.shift()
+      if (v !== undefined) return { value: v, done: false }
+      return { value: undefined as unknown as TranslationChunk, done: true }
+    },
+  }
+  return {
+    iter,
+    push: (c) => {
+      queue.push(c)
+      waiter?.()
+      waiter = null
+    },
+    finish: () => {
+      done = true
+      waiter?.()
+      waiter = null
+    },
+  }
+}
+
 /** 构造一个 fake AsyncIterator<TranslationChunk>，按给定的 chunks 依次返回 */
 function makeFakeIterator(chunks: TranslationChunk[], opts: { abort?: AbortSignal } = {}): AsyncIterator<TranslationChunk> {
   let i = 0
@@ -439,6 +502,33 @@ describe('同 chapterId in-flight 复用（spec §9.6）', () => {
     // provider 仅被调用 1 次
     expect(providerCallCount).toBe(1)
   })
+
+  /**
+   * #656 薄点 3：**不同** chapterId 应当**并行**发起（与「同 chapterId 复用」互补的另一半）。
+   * 此前零覆盖 —— 若有人把去重键写成「单飞全局锁」而不是「按 chapterId」，这半边会静默失效。
+   *
+   * <p>判据：两个不同 chapter 同时翻译时，provider 被调用 **2 次**（各自一次），
+   * 且两者都在 in-flight（用挂起 iterator 保证第二个不被第一个阻塞）。
+   */
+  it('translating 期间调**不同** chapterId → 并行触发（provider 调用 2 次）', async () => {
+    const d1 = makeDeferredIterator()
+    const d2 = makeDeferredIterator()
+    let call = 0
+    mocks.providerIter.mockImplementation(() => {
+      call += 1
+      return call === 1 ? d1.iter : d2.iter
+    })
+    const store = useNovelTranslateStore()
+    const p1 = store.translateChapter(70, 70, ['p1'], 0)
+    const p2 = store.translateChapter(71, 71, ['p1'], 0)
+    await new Promise((r) => setTimeout(r, 10))
+    // 两个 chapter 各自拿到独立 iterator → 都未 settle，provider 被调 2 次
+    expect(call).toBe(2)
+    // 收尾，避免悬挂
+    d1.finish()
+    d2.finish()
+    await Promise.all([p1, p2])
+  })
 })
 
 // ─────────────────── 缓存命中 ───────────────────
@@ -591,18 +681,51 @@ describe('半成品策略（ADR-0171 §5）', () => {
     expect(mocks.cacheSet).not.toHaveBeenCalled()
   })
 
-  it('status=partial 时不写缓存', async () => {
-    // 构造 partial：provider 部分 chunk 失败 → createNovelTranslator 输出 partial；
-    // 本 store runViaWebProvider 路径在 status='partial' 时不调 writeCacheIfNeeded
-    mocks.providerIter.mockImplementationOnce(() =>
-      makeFakeIterator([
-        { type: 'error', code: 'unknown', message: 'boom', retryable: false },
-      ]),
-    )
+  /**
+   * issue #656 薄点 1：write-policy 断言此前是**松的** —— 原用例写的是
+   * `expect(['partial','failed']).toContain(store.status)`，即「partial 不写缓存」
+   * 这条根本没被断言（provider 只失败一次 → 单块 → createNovelTranslator 输出
+   * `failed`，永远走不到 partial 分支）。
+   *
+   * <p>可靠构造 partial 的条件（createNovelTranslator:526-533）=
+   * `failedCount>0 && successCount>0`，即**至少两块 + 成败混合**；块阈值 2000 字符
+   * （ADR-0169 D5.1）→ 用两段各 2100 字符强制切成 2 chunk。
+   */
+  it('status=partial 时不写缓存（#656 薄点 1：钉死 partial 写策略）', async () => {
+    let call = 0
+    mocks.providerIter.mockImplementation(() => {
+      call += 1
+      return call === 1
+        ? makeFakeIterator([
+            { type: 'delta', paragraphIndex: 0, text: '译一' },
+            { type: 'done', usage: { inputTokens: 0, outputTokens: 0 } },
+          ])
+        : makeFakeIterator([
+            { type: 'error', code: 'server', message: 'boom', retryable: false },
+          ])
+    })
     const store = useNovelTranslateStore()
-    await store.translateChapter(42, 42, ['p1', 'p2'], 0)
-    // status 收敛：单块失败 + 1 块无 delta → 'failed'（createNovelTranslator 语义）
-    expect(['partial', 'failed']).toContain(store.status)
+    await store.translateChapter(42, 42, [longPara('A'), longPara('B')], 0)
+    // 强制断言 partial（不再是 ['partial','failed'] 的松断言）
+    expect(store.status).toBe('partial')
+    expect(mocks.cacheSet).not.toHaveBeenCalled()
+  })
+
+  it('status=aborted 时不写缓存（#656 薄点 1：此前完全无断言）', async () => {
+    // 用挂起 iterator 让 pipeline 停在 in-flight，abort 才有确定作用点。
+    // 生产侧 provider 的 iterator 会响应 signal（抛 AbortError），fake 必须同形。
+    const ac = new AbortController()
+    const d = makeDeferredIterator(ac.signal)
+    mocks.providerIter.mockImplementation(() => d.iter)
+    const store = useNovelTranslateStore()
+    const p = store.translateChapter(50, 50, ['p1'], 0)
+    await new Promise((r) => setTimeout(r, 10))
+    d.push({ type: 'delta', paragraphIndex: 0, text: '半截' })
+    await new Promise((r) => setTimeout(r, 10))
+    store.abort() // store 内部 abort 会触发其 controller；这里同步触发 fake 的 signal
+    ac.abort()
+    await p
+    expect(store.status).toBe('aborted')
     expect(mocks.cacheSet).not.toHaveBeenCalled()
   })
 })
@@ -672,9 +795,6 @@ describe('译文渲染源（spec §5 / §6.3）', () => {
   // partial 的产生条件（createNovelTranslator:526-533）= failedCount>0 && successCount>0，
   // 即**至少两块**且成败混合。块阈值 2000 字符（ADR-0169 D5.1），故用两段各 2000+
   // 字符的原文强制切成 2 块；块 0 成功、块 1 失败。
-
-  /** 造一段 >2000 字符的原文（保证与下一段落在不同 chunk） */
-  const longPara = (tag: string): string => tag + 'あ'.repeat(2100)
 
   it('partial 状态 → 未译段渲染为〔未翻译〕占位（不是回退原文）', async () => {
     let call = 0

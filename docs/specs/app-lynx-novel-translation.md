@@ -524,7 +524,7 @@ sequenceDiagram
 | `pending` | user `abort()` | `aborted` | abortController.abort() |
 | `translating` | chunk `delta` | `translating` | translatedParagraphs[i] += text |
 | `translating` | chunk `done` 但 zero-delta（零译文段；content policy 拦截 / 模型拒答等） | `failed` | errorCode=content_filter; emit `lastError` |
-| `translating` | chunk `done` | `completed` | cache.write(); fromCache=false |
+| `translating` | chunk `done` | `completed` | cache.write(); `isCached[chapterId]=true`（原 `fromCache=false` 已作废，见 §7.2 末「幽灵验收项作废」） |
 | `translating` | chunk `error (retryable)` | `translating`（整批回退中；UI 保持 `translating` + 微提示「重试中…」） | retried via `stream=false, max_output_tokens × 2`；**0ms 退避**（即时触发）；成功后 → `completed` |
 | `translating` | chunk `error (non-retryable)` | `failed` | emit `lastError` |
 
@@ -551,10 +551,20 @@ sequenceDiagram
 | `translating` (整批回退中) | chunk `error` (回退本身失败) | `partial`（有 ≥1 译文段）或 `failed`（零译文段，与 #654 联动 → `content_filter`） | emit `lastError` |
 | `completed` | user `retranslate()` | `pending` | cache.delete(); reset state |
 | `completed` | user `clear()` | `idle` | cache.delete(); clear translatedParagraphs |
-| `completed` | cache miss (model change / source hash mismatch) | `idle` | fromCache=false; displayBlocks fallback |
+| ~~`completed`~~ | ~~cache miss (model change / source hash mismatch)~~ | ~~`idle`~~ | **已作废**（见下方「幽灵验收项作废」） |
 | `aborted` | user `startTranslate()` | `pending` | — |
 | `aborted` | chapter switch | `idle` | resetOnChapterSwitch() |
 | 任何 | `chapter switch` | `idle` | abort() if in-flight; reset state |
+
+> **幽灵验收项作废**（issue #656 契约项 4，2026-09-20）
+>
+> 本表曾含两项实现期未采用的验收项，现**显式作废并记录**，不再作为要求：
+>
+> 1. **`fromCache: boolean` 字段** —— 实现改为 `isCached: Record<number, boolean>`（按 chapterId 记录「本章是否已缓存」，ADR-0171 §6：缓存语义跨章节持久）。`fromCache` 的无用途在于：UI 需要的是「本章是否命中缓存」（用于按钮态与 segmented bar），而不是「这次渲染的来源」。
+> 2. **`completed` → cache miss → `idle` 转移** —— 实现未采用这条。实际路径：缓存读发生在 `translateChapter` 入口（`pending` 之前），miss 不会把已完成状态推回 `idle`；model 切换后的 namespace 失效由**缓存键六元组**天然承担（ADR-0171 §1），无需状态机参与。`pending → translating` 的路径见上表首两行。
+>
+> 权威口径 = 本表（已作废行以删除线标出）+ `novelTranslateStore.ts` 的实现分支。
+> 若未来重新需要这两项，应新开 issue 并把理由写回本表，而不是直接复活作废行。
 
 **generation-gate 守门**：
 任何 chunk 进入 store 时，**先比对 `chunk.requestChapterId === currentChapterId`**；不匹配则丢弃（防跨章节污染）。`chapterId` 包含在 `TranslationRequest.chapterId` 字段，provider 在流起始处注入 chunk metadata。
@@ -794,6 +804,15 @@ DeepSeek Responses API 是 **Codex 集成路径**，与 OpenAI Responses 兼容�
 
 ### 10.1 vitest 单测（environment: 'node'）
 
+> **口径对齐说明**（issue #656 契约项 5，2026-09-20）
+>
+> 下表是**权威口径**。它比 issue #639 票面的 12 组多了两组，实现期新增、已由测试覆盖：
+> - **原生交付信封**（`translateFrameChannel.test.ts` 17 条）—— 该组是 ADR-0170 的跨端契约，票面立项时 ADR-0170 尚未定稿，故未列入；
+> - **错误码分类**（`translate.test.ts` + `nativeTranslate.test.ts` 的 `classifyNativeError` 用例）—— 票面把错误码散落在「Provider 接口契约」里，实现期独立成组。
+>
+> 另新增两组（ADR-0178 落地时补）：**自动整批回退触发子集** / **整批回退退避** / **整批回退形态** / **Partial UI 形态**。
+> 票面与 spec 的口径漂移以**本表**为准；票面不再作为验收依据。
+
 | 测试组 | 用例 | oracle |
 |---|---|---|
 | Provider 接口契约 | `translate()` 返回 `AsyncIterator`；`abort()` 真中断；`error.code` 分类正确 | spec §4.2 / §4.4 |
@@ -804,7 +823,7 @@ DeepSeek Responses API 是 **Codex 集成路径**，与 OpenAI Responses 兼容�
 | 缓存键 | FNV-1a 32-bit 拼接；sourceHash 改 → miss；model 改 → miss；baseURL 改 → miss | spec §4.5 / §9.5 |
 | 缓存写策略 | `partial` / `failed` / `aborted` 不写；`done` 之后才写 | spec §7.2 / §9.6 |
 | 缓存通道 | app-lynx 原生 = filesystem cacheDir（ADR-0175 D1）；SharedPreferences/SQLite 显式 REJECTED；LRU manifest 形态同 `ImageCachePlugin` | ADR-0175 |
-| 状态机 | 8 状态 + 18 转移路径全覆盖；generation-gate 跨章节守门 | spec §7 |
+| 状态机 | 8 状态；覆盖口径 = **按路径分组**（issue #656 契约项 2 的裁定：store 无 `transition(event)` 显式契约，状态为直接赋值 → 「18 条转移穷尽」不可枚举，改为按 spec §7.2 转移表逐行覆盖的路径分组口径）；generation-gate 跨章节守门 | spec §7 |
 | 自动整批回退触发子集 | `retryable=true`：`network` / `server` (5xx) / `incomplete` → 触发；`unauthorized` (401/403) / `insufficient_balance` (402) / `rate_limit` (429) / `invalid_request` (400) / `model_not_found` (404/405) / `content_filter` / `endpoint_not_responses` → **不触发**，直接 `failed`；`aborted` → `aborted` | ADR-0178 D2 |
 | 整批回退退避 | **0ms**（即时触发）；UI 保持 `translating` + 微提示「重试中…」；用户 retry 按钮 **1.5s debounce** | ADR-0178 D3 |
 | 整批回退形态 | `stream=false, max_output_tokens × 2`，整章一次性提交；不走 chunked pipeline | spec §6 / §9.6 / ADR-0169 D5.3 |
@@ -815,6 +834,7 @@ DeepSeek Responses API 是 **Codex 集成路径**，与 OpenAI Responses 兼容�
 | R18 闸门 | `xRestrict=1/2` + 设置关闭 → 拒绝（不发请求）；开启 → 允许 | spec §9.7 |
 | 续翻 (Q21) | cache hit → `cached` chunk 直接 `completed`；cache miss → 全量翻译 | spec §9.6 |
 | 并发去重 | 同 chapterId 二次点击 → 复用 in-flight；不同 chapterId → 并行 | spec §9.8 |
+| 缓存写策略（三态钉死） | `partial` **强制断言**（不再 `toContain(['partial','failed'])` 松断言）；`aborted` 独立用例（用挂起 iterator 保证 abort 有确定作用点）；`failed`；三者皆不写缓存 | spec §7.2 / §9.6 / issue #656 薄点 1 |
 
 ### 10.2 不写 agent-browser E2E
 
