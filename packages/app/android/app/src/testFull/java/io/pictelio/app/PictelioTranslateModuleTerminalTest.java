@@ -209,4 +209,32 @@ public class PictelioTranslateModuleTerminalTest {
 
         assertErrorEnvelope(pollUntilTerminal(id), id, "baseURL 不能为空");
     }
+
+    /**
+     * 请求构造异常路径必须**登记终态 + 发布事件总线**（不只是 callback）。
+     *
+     * <p>Oracle：{@code failStream} 自身的 javadoc（「失败终态必须也走事件总线：轮询通道实测
+     * 回调 0/158」）+ ADR-0170（callback 通道不可靠）。此前该 catch 只 {@code callback.invoke}
+     * → 真机可达（Keystore 重建 / 密文失配使读 apiKey 抛异常）时 JS 侧只能轮询到 POLL_MAX
+     * 才超时，UI 长时间停在「n% 翻译中」。
+     *
+     * <p>构造触发方式：{@code model} 给一个 JSON 类型错（数字而非字符串）→
+     * {@code req.getString("instructions")} 之类的强取不会触发，但 {@code buildRequestBody}
+     * 里 {@code inputArr} 非数组会走 failStream；这里用**类型错的 input** 触发构造段异常
+     * （{@code optJSONArray} 返回 null → 走 "input 不能为空数组" 分支），故改用
+     * {@code max_output_tokens} 为字符串触发 {@code req.getInt} 抛异常 —— 那在
+     * buildRequestBody 内部，属于「请求构造失败」catch。
+     */
+    @Test
+    public void requestConstructionFailureRegistersTerminal() throws Exception {
+        String id = UUID.randomUUID().toString();
+        // max_output_tokens 给字符串 → buildRequestBody 内 req.getInt("max_output_tokens") 抛
+        String req = "{\"baseURL\":\"https://api.example.com\",\"model\":\"m\","
+                + "\"input\":[\"p1\"],\"max_output_tokens\":\"not-a-number\","
+                + "\"_abortToken\":\"" + id + "\"}";
+        module.translateStream(req, (args) -> {});
+
+        // 关键断言：终态**被登记**（此前只 callback → 这里会 15s 超时变红）
+        assertErrorEnvelope(pollUntilTerminal(id), id, "请求构造失败");
+    }
 }

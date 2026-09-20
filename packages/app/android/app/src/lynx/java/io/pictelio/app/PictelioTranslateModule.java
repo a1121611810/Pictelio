@@ -299,11 +299,28 @@ public class PictelioTranslateModule extends LynxModule {
         // ADR-0178 D1 / ADR-0169 D5.3 整批回退开关：必须在 try 外声明 —— 后面的
         // TRANSLATE_EXECUTOR lambda 要读它（同一方法内的 lambda 才能构成 effectively final）
         final boolean wantStream;
+
+        // streamId 解析单独先做（不与其他构造共 try）：
+        // 下面整段构造失败时仍能拿到 streamId → 走 failStream 登记终态 + 发布事件总线。
+        // 此前该 catch 只 `callback.invoke("", …)`，而 callback 通道实测「一条流至多 1 帧 /
+        // 有时完全不回调」（见下方 publishFramesViaEvent 注释）→ 真机可达（Keystore 重建 /
+        // 密文失配导致读 apiKey 抛异常）时 JS 侧只能轮询到 POLL_MAX 才超时，UI 长时间停在
+        // 「n% 翻译中」，与 failStream 自身声明的「所有失败终态必须登记 + 发布」不符。
+        final JSONObject req;
         try {
-            JSONObject req = new JSONObject(requestJson);
+            req = new JSONObject(requestJson);
             // streamId 必须在任何校验分支之前确定：校验失败也要能被 JS 侧读到（否则轮询
             // 永远 pending → 用户永久「n% 翻译中」）。Java 用调用方的 _abortToken，两端一致。
             streamId = req.optString("_abortToken", UUID.randomUUID().toString());
+        } catch (Throwable e) {
+            // 连 JSON 都解析不了 → 连 streamId 都不存在，没有可登记的 per-stream 槽位，
+            // 只能走 callback（尽力而为；JS 侧会因拿不到终态而轮询超时收敛）
+            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            Log.w(TAG, "translateStream 请求 JSON 解析失败", e);
+            callback.invoke("", "请求构造失败：" + msg);
+            return;
+        }
+        try {
             pruneFinishedStreams(streamId);
             String baseUrl = req.optString("baseURL", "").trim();
             String model = req.optString("model", "").trim();
@@ -364,7 +381,10 @@ public class PictelioTranslateModule extends LynxModule {
                     .build();
         } catch (Throwable e) {
             String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-            callback.invoke("", "请求构造失败：" + msg);
+            // 有 streamId → 必须走 failStream（登记终态 + 发布事件总线）。
+            // 只 callback 会让 JS 侧轮询到 POLL_MAX 才收敛（callback 通道实测不可靠）。
+            Log.w(TAG, "translateStream 请求构造失败", e);
+            failStream(streamId, "请求构造失败：" + msg);
             return;
         }
 
