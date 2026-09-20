@@ -74,9 +74,49 @@
 | Step 3 原文/译文切换 <50ms | 未验 | 需人工点击 + 计时 |
 | Step 4 model 切换 namespace | 未验 | 需改配置后重译 |
 | Step 5 OpenRouter partial probe | 未验 | 需切 endpoint 到 OpenRouter |
-| Step 6 R18 闸门 | 部分 | 截图显示 R-18G 章节可进入且发出请求（说明闸门放行），未验「关闭后 disabled」 |
+| Step 6 R18 闸门 | **✅ 已补齐**（见下节；并发现两处 UI 缺陷，已修） | — |
 | Step 7 章节切换 generation-gate | **✅ 实现面已验 + 发现并修复真缺陷**（见下节） | — |
 | F1 partial 占位渲染 | 未验 | 见上 |
+
+---
+
+## Step 6 补齐：R18 闸门「关闭授权 → 点击不发请求」
+
+#640 的收口修订指出既有报告证的是**相反方向**（授权开启态）。本轮按票面要求验「**关闭**后」：
+
+```bash
+# 1. 关掉 R18G 翻译授权（改 prefs；设备 sed 不支持 -i → pull/改/push）
+adb shell am force-stop io.pictelio.app
+adb shell run-as io.pictelio.app cat shared_prefs/CapacitorStorage.xml > /tmp/cap.xml
+# 把 settings_translate_r18g_<uid> 从 true 改为 false，push 回去
+# 2. 清 logcat 后深链到 R-18G 章节
+adb logcat -c
+adb shell am start -n io.pictelio.app/io.pictelio.app.LynxActivity \
+  --es benchNav novel-detail --es benchNavNovelId 25434593
+# 3. 点击「翻译本章」
+adb shell input touchscreen tap 539 962
+```
+
+**结果**（核心断言成立）：
+
+```
+15:24:22 W lynx: "[novelTranslateStore] R18 gate blocked x_restrict=2 chapter=25434593"
+$ adb logcat -d | grep -c "translateStream 入口"
+0                                    ← 点击**未发起任何请求**（正文零外发）
+```
+
+即票面要求的「点击不发起请求」✅ 成立。
+
+### 但同时暴露两处 UI 缺陷（已修，PR #663）
+
+| # | 缺陷 | 位置 | 后果 |
+|---|---|---|---|
+| 1 | `disabled` 只判 `R18_BLOCKED`，**漏 `R18G_BLOCKED`** | `TranslateButton.vue:77-80` | 未授权 R-18G 章节点击后 store 已正确拦截，但按钮**视觉上仍可点** |
+| 2 | 错误文案只在 `failed` / `partial` 时渲染，`aborted` 被排除 | `NovelDetail.vue:225` | 授权拦截的提示**根本不显示**（store 置的是 `aborted`） |
+
+两者叠加 = 用户点击后**界面毫无反应**（静默 no-op）。截图 `step6-r18g-blocked.png` 实证：拦截发生后按钮仍为蓝色可点态、无任何提示文案。
+
+**修复**（`TranslateButton` 的 disabled 纳入 `R18G_BLOCKED`；`NovelDetail.errorText` 对 `aborted + R18*_BLOCKED` 显示对应文案）+ 源码断言测试（`TranslateButton.template.test.ts`）+ 变异实验（撤掉 R18G 判断 → 必红）。
 
 ---
 
