@@ -6,6 +6,7 @@ import {
   type SeriesNavigation,
 } from "@pictelio/novel-export"
 import { apiClient } from "./client"
+import type { NovelId, SeriesId, UserId } from "./id"
 import { toSeriesId } from "./id"
 import type {
   PixivNovelListResponse,
@@ -52,7 +53,7 @@ function normalizeNovelSeries(raw: unknown): PixivNovelDetailResponse["novel"]["
   return { id: toSeriesId(id), title }
 }
 
-export function loadNovelDetail(novelId: number): Promise<PixivNovelDetailResponse> {
+export function loadNovelDetail(novelId: NovelId): Promise<PixivNovelDetailResponse> {
   return apiClient.get<PixivNovelDetailResponse>("/v2/novel/detail", {
     novel_id: String(novelId),
   }).then((res) => ({
@@ -64,7 +65,7 @@ export function loadNovelNext(url: string, signal?: AbortSignal): Promise<PixivN
   return apiClient.get<PixivNovelListResponse>(url, undefined, signal)
 }
 
-export function loadUserNovels(userId: number, signal?: AbortSignal): Promise<PixivNovelListResponse> {
+export function loadUserNovels(userId: UserId, signal?: AbortSignal): Promise<PixivNovelListResponse> {
   return apiClient.get<PixivNovelListResponse>(
     "/v1/user/novels",
     { user_id: String(userId), filter: "for_ios" },
@@ -73,7 +74,7 @@ export function loadUserNovels(userId: number, signal?: AbortSignal): Promise<Pi
 }
 
 export function loadBookmarks(
-  userId: number,
+  userId: UserId,
   restrict: "public" | "private" = "public",
   signal?: AbortSignal,
 ): Promise<PixivNovelListResponse> {
@@ -89,7 +90,7 @@ export function loadBookmarks(
 
 /** 系列详情（含追更状态 watchlist_added、是否完结 is_concluded） */
 export function loadNovelSeries(
-  seriesId: number,
+  seriesId: SeriesId,
   signal?: AbortSignal,
 ): Promise<NovelSeriesDetailResponse> {
   return apiClient.get<NovelSeriesDetailResponse>(
@@ -100,12 +101,12 @@ export function loadNovelSeries(
 }
 
 /** 追更系列（POST form: series_id） */
-export function addNovelWatchlist(seriesId: number): Promise<void> {
+export function addNovelWatchlist(seriesId: SeriesId): Promise<void> {
   return apiClient.post<void>("/v1/watchlist/novel/add", { series_id: String(seriesId) })
 }
 
 /** 取消追更（POST form: series_id） */
-export function deleteNovelWatchlist(seriesId: number): Promise<void> {
+export function deleteNovelWatchlist(seriesId: SeriesId): Promise<void> {
   return apiClient.post<void>("/v1/watchlist/novel/delete", { series_id: String(seriesId) })
 }
 
@@ -129,7 +130,7 @@ export function loadWatchlistNovelsNext(
  * - 原生模式：NativeModules.PictelioApi.request 转发 Java（JS 零知 access_token，
  *   PixivApiCore 对非 JSON 响应原样返回 data 字符串）。
  */
-export async function fetchNovelText(novelId: number): Promise<string> {
+export async function fetchNovelText(novelId: NovelId): Promise<string> {
   const html = await apiClient.requestRaw('GET', '/webview/v2/novel', { id: String(novelId) })
   const text = extractNovelTextFromHtml(html)
   if (!text) throw new Error("小说正文提取失败")
@@ -140,7 +141,7 @@ export async function fetchNovelText(novelId: number): Promise<string> {
  * 加载小说正文 + 系列导航 + 内嵌图片映射（与 app api/novel.ts fetchNovelData 同语义）。
  * 复用共享包 extractNovelDataFromHtml；补齐 lynx 侧缺失的 images 提取。
  */
-export async function fetchNovelData(novelId: number): Promise<{
+export async function fetchNovelData(novelId: NovelId): Promise<{
   text: string
   navigation: SeriesNavigation
   images: NovelImagesMap
@@ -155,7 +156,7 @@ export async function fetchNovelData(novelId: number): Promise<{
 // 注意与插画收藏不同：小说 add 无 tags 载荷（Pixiv 端点差异，非省略）。
 
 export function addNovelBookmark(
-  novelId: number,
+  novelId: NovelId,
   restrict: "public" | "private" = "public",
 ): Promise<void> {
   return apiClient.post("/v2/novel/bookmark/add", {
@@ -164,7 +165,7 @@ export function addNovelBookmark(
   })
 }
 
-export function deleteNovelBookmark(novelId: number): Promise<void> {
+export function deleteNovelBookmark(novelId: NovelId): Promise<void> {
   return apiClient.post("/v1/novel/bookmark/delete", {
     novel_id: String(novelId),
   })

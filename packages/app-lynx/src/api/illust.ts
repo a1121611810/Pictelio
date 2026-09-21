@@ -1,5 +1,6 @@
 // ─── 插画 API（复用现有 app 端点） ───
 import { apiClient } from "./client"
+import type { IllustId, UserId } from "./id"
 import type {
   PixivBookmarkDetailResponse,
   PixivIllustListResponse,
@@ -27,7 +28,7 @@ export function loadFollow(
 }
 
 export function loadBookmarks(
-  userId: number,
+  userId: UserId,
   restrict: "public" | "private" = "public",
   signal?: AbortSignal,
 ): Promise<PixivIllustListResponse> {
@@ -39,7 +40,7 @@ export function loadBookmarks(
   )
 }
 
-export function loadDetail(illustId: number, signal?: AbortSignal): Promise<PixivIllustDetailResponse> {
+export function loadDetail(illustId: IllustId, signal?: AbortSignal): Promise<PixivIllustDetailResponse> {
   return apiClient.get<PixivIllustDetailResponse>(
     "/v1/illust/detail",
     { illust_id: String(illustId) },
@@ -47,7 +48,7 @@ export function loadDetail(illustId: number, signal?: AbortSignal): Promise<Pixi
   )
 }
 
-export function loadUgoiraMetadata(illustId: number): Promise<PixivUgoiraMetadata> {
+export function loadUgoiraMetadata(illustId: IllustId): Promise<PixivUgoiraMetadata> {
   return apiClient
     .get<PixivUgoiraMetadataResponse>("/v1/ugoira/metadata", { illust_id: String(illustId) })
     .then((r) => r.ugoira_metadata)
@@ -55,7 +56,7 @@ export function loadUgoiraMetadata(illustId: number): Promise<PixivUgoiraMetadat
 
 // ─── 相关作品（spec docs/specs/related-injection.md）───
 // 注意是 v2——/v1/illust/related 实测 404（端点不存在），/v2/illust/related 实测 200（模拟器 2026-09-12）
-export function loadRelated(illustId: number, signal?: AbortSignal): Promise<PixivIllustListResponse> {
+export function loadRelated(illustId: IllustId, signal?: AbortSignal): Promise<PixivIllustListResponse> {
   return apiClient.get<PixivIllustListResponse>(
     "/v2/illust/related",
     { illust_id: String(illustId), filter: "for_ios" },
@@ -68,7 +69,7 @@ export function loadNext(url: string, signal?: AbortSignal): Promise<PixivIllust
 }
 
 export function loadUserIllusts(
-  userId: number,
+  userId: UserId,
   type: "illust" | "manga" = "illust",
   signal?: AbortSignal,
 ): Promise<PixivIllustListResponse> {
@@ -91,7 +92,7 @@ export function loadUserIllusts(
  * 标签集与可见性——服务端无 edit 端点，不先 delete（避免收藏状态闪断）。
  */
 export function addBookmark(
-  illustId: number,
+  illustId: IllustId,
   restrict: RestrictType = "public",
   tags?: string[],
 ): Promise<void> {
@@ -110,7 +111,7 @@ export function addBookmark(
  * 响应形状见 PixivBookmarkDetailResponse（bookmark_detail 可空、字段宽容解析）。
  */
 export function loadBookmarkDetail(
-  illustId: number,
+  illustId: IllustId,
   signal?: AbortSignal,
 ): Promise<PixivBookmarkDetailResponse> {
   return apiClient.get<PixivBookmarkDetailResponse>(
@@ -126,7 +127,7 @@ export function loadBookmarkDetail(
  * 由调用方（T4 面板数据层）从 authStore 解析当前用户 id。
  */
 export function loadUserBookmarkTags(
-  userId: number,
+  userId: UserId,
   restrict: RestrictType = "public",
   offset?: number,
   signal?: AbortSignal,
@@ -141,7 +142,7 @@ export function loadUserBookmarkTags(
   return apiClient.get<PixivUserBookmarkTagsResponse>("/v1/user/bookmark-tags/illust", params, signal)
 }
 
-export function deleteBookmark(illustId: number): Promise<void> {
+export function deleteBookmark(illustId: IllustId): Promise<void> {
   return apiClient.post("/v1/illust/bookmark/delete", {
     illust_id: String(illustId),
   })

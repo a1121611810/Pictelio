@@ -8,6 +8,7 @@ import { currentParams, navigate, goBack } from '../router'
 import { getUserDetail } from '../api/user'
 import { loadUserIllusts, loadNext } from '../api/illust'
 import { loadUserNovels, loadNovelNext } from '../api/novel'
+import { toUserId } from '../api/id'
 import type {
   PixivUserDetailResponse,
   PixivIllust,
@@ -59,7 +60,7 @@ const illustFeed = ref(
         fetchPage: (signal, nextUrl) =>
           nextUrl
             ? loadNext(nextUrl, signal).then(mapIllusts)
-            : loadUserIllusts(userId, 'illust', signal).then(mapIllusts),
+            : loadUserIllusts(toUserId(userId), 'illust', signal).then(mapIllusts),
       },
     ],
   }),
@@ -123,7 +124,7 @@ const novelFeed = ref(
         fetchPage: (signal, nextUrl) =>
           nextUrl
             ? loadNovelNext(nextUrl, signal).then(mapNovels)
-            : loadUserNovels(userId, signal).then(mapNovels),
+            : loadUserNovels(toUserId(userId), signal).then(mapNovels),
       },
     ],
   }),
@@ -231,7 +232,7 @@ function openFollowers() {
 
 onMounted(async () => {
   try {
-    detail.value = await getUserDetail(userId)
+    detail.value = await getUserDetail(toUserId(userId))
   } catch (err) {
     detailError.value = presentError(err, t('userHome.loadProfileFailed'))
   }

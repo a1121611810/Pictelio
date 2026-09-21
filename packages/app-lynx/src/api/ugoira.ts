@@ -2,6 +2,7 @@
 // 元数据 + zip 下载（/pixiv-img 代理）+ 共享包 @pictelio/ugoira 取帧
 // + 帧转 base64 data URL（原生 <image> 无 blob URL，base64 是官方支持格式）。
 import { loadUgoiraMetadata } from "./illust"
+import { toIllustId } from "./id"
 import { unzipFrames, parseZipEocd, parseZipCentralDir, computeFrameOffsetFromLocal, deflateInflate, type UgoiraZipEntry } from "@pictelio/ugoira"
 import { proxyImageUrl } from "../utils/imageUrl"
 import { requestFetch } from "../utils/fetchWrapper"
@@ -114,7 +115,7 @@ export async function downloadUgoiraFrames(
   mode: UgoiraExtractMode = "fflate",
   signal?: AbortSignal,
 ): Promise<UgoiraFrameData[]> {
-  const meta = await loadUgoiraMetadata(illustId)
+  const meta = await loadUgoiraMetadata(toIllustId(illustId))
   const zipUrl = proxyImageUrl(meta.zip_urls.medium)
   if (mode === "range") {
     try {
@@ -164,7 +165,7 @@ export async function ugoiraExtractFrames(
   illustId: number,
   signal?: AbortSignal,
 ): Promise<UgoiraFrameBundle> {
-  const meta = await loadUgoiraMetadata(illustId)
+  const meta = await loadUgoiraMetadata(toIllustId(illustId))
   const zipUrl = meta.zip_urls.medium // 原生模式必须是绝对 CDN URL（issue #218：相对路径被拒）
   const framesJson = JSON.stringify(meta.frames)
   const nm = getNativeModules() as { PictelioApi?: PictelioApiUgoiraExtract } | undefined
@@ -224,7 +225,7 @@ export async function ugoiraExtractStreamFrames(
   onBatch: (frames: UgoiraFrameData[]) => void,
   signal?: AbortSignal,
 ): Promise<UgoiraFrameData[]> {
-  const meta = await loadUgoiraMetadata(illustId)
+  const meta = await loadUgoiraMetadata(toIllustId(illustId))
   const zipUrl = meta.zip_urls.medium
   const framesJson = JSON.stringify(meta.frames)
   const nm = getNativeModules() as { PictelioApi?: PictelioApiUgoiraStream } | undefined
