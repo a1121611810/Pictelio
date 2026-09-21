@@ -3,7 +3,7 @@
 > 来源：wayfinder 地图 [#682](https://github.com/a1121611810/Pictelio/issues/682)；研究 [#683](https://github.com/a1121611810/Pictelio/issues/683)（Lynx 运行时系统暗色检测）/ [#684](https://github.com/a1121611810/Pictelio/issues/684)（splash 深色化）；访谈 [#685](https://github.com/a1121611810/Pictelio/issues/685)（入口交互）；父 spec [#686](https://github.com/a1121611810/Pictelio/issues/686)。
 >
 > ADR 落点：新 ADR（含 ADR-0168 状态栏钉死修订）由 T5 提交；本文件为 T1/T2/T3/T4 实施期 spec oracle。
-> 状态：T1 已实施（commit 67b8300d），本文件随 T2/T3/T4/T5 进展同步修订。
+> 状态：**T1–T5 全部实施并关闭（2026-09-21）**；ADR 已合并为 [ADR-0180](../adr/ADR-0180-lynx-dark-mode.md)。遗留：D7 splash 兜底轨的**手动模式**覆盖未接线（当前仅系统跟随生效），列 follow-up [#692](https://github.com/a1121611810/Pictelio/issues/692)。
 
 ## 1. Problem Statement
 
@@ -16,18 +16,18 @@ lynx 客户端（缺省引擎）只有亮色界面：夜间/弱光环境刺眼�
 - 外观设置提供 **亮色 / 暗色 / 跟随系统** 三态，默认跟随系统，设备级持久化，切换即时生效
 - 6 个主题色全部拥有 M3 dark scheme（12 套静态色板，构建期生成，零运行时算色）
 - 「跟随系统」经原生通道检测（与 ADR-0168 insets 管线同构），web-core 预览走 `matchMedia` 兜底
-- 原生层联动：状态栏图标色随外观即时切换（T3）；splash 双轨深色化（`values-night` 主轨 + API 31+ 持久化主题兜底，T3）
+- 原生层联动：状态栏图标色随外观即时切换（T3）；splash 双轨深色化（`values-night` 主轨 + API 31+ 持久化主题兜底，T3——**兜底轨手动模式覆盖现状见 §4.7 / follow-up #692**）
 - 设置入口落在「我的」页外观卡片顶部（主题色上方），M3 segmented button 三格（T2）
 
 ## 3. 票分（T1-T5）
 
 | 票 | 范围 | 当前状态 |
 |---|---|---|
-| **T1** | 状态核心 + 系统检测通道（基础层，无可见 UI） | ✅ commit 67b8300d |
-| T2 | 12 色板 + 根类绑定 + segmented 入口 + 色块联动 + i18n/a11y | 未开工 |
-| T3 | 状态栏图标动态切换 + splash 双轨 + IconBackground plate | 未开工 |
-| T4 | 硬编码浅色值审计与修复 | 未开工 |
-| T5 | 新 ADR（含 ADR-0168 修订）+ CONTEXT.md 词条 + map 收官 | 未开工 |
+| **T1** | 状态核心 + 系统检测通道（基础层，无可见 UI） | ✅ closed（`67b8300d` + `b26178f`） |
+| T2 | 12 色板 + 根类绑定 + segmented 入口 + 色块联动 + i18n/a11y | ✅ closed（`33eaee4b` + `78cf676d`） |
+| T3 | 状态栏图标动态切换 + splash 双轨 + IconBackground plate | ✅ closed（`2133233f`；splash 手动模式覆盖 → follow-up #692） |
+| T4 | 硬编码浅色值审计与修复 | ✅ closed（`f1480620` + `48286393`） |
+| T5 | 新 ADR（含 ADR-0168 修订）+ CONTEXT.md 词条 + map 收官 | ✅ closed（ADR-0180 + 词条 + map #682 收官） |
 
 T2 / T3 可并行（T2 依赖 `resolvedDark`、T3 依赖 `resolvedDark`，互不依赖对方）。
 
@@ -112,11 +112,11 @@ T2 / T3 可并行（T2 依赖 `resolvedDark`、T3 依赖 `resolvedDark`，互不
 
 ### 4.7 设计约束
 
-- 6 主题 × 亮暗全做（12 套静态色板，tokens.css +~300 行）—— T2 实施
-- 暗色类挂根 `<page>`，与 `.theme-*` 正交组合；页面零改动 —— T2
-- 状态栏 `isAppearanceLightStatusBars` 随 `resolvedDark` 动态（解 ADR-0168 D4 钉死）—— T3
-- splash `values-night` 主轨 + API 31+ `setSplashScreenTheme` 兜底 —— T3
-- 全 app 硬编码浅色值审计（图片查看器 / R18 遮罩 / 小说正文 / skeleton）—— T4
+- 6 主题 × 亮暗全做（12 套静态色板，tokens.css +~300 行）—— T2 实施 ✅
+- 暗色类挂根 `<page>`，与 `.theme-*` 正交组合；页面零改动 —— T2 ✅
+- 状态栏 `isAppearanceLightStatusBars` 随 `resolvedDark` 动态（解 ADR-0168 D4 钉死）—— T3 ✅
+- splash `values-night` 主轨（系统跟随全 API 覆盖）✅ + API 31+ `setSplashScreenTheme` 兜底（**手动模式接线 → follow-up [#692](https://github.com/a1121611810/Pictelio/issues/692)**）—— T3
+- 全 app 硬编码浅色值审计（图片查看器 / R18 遮罩 / 小说正文 / skeleton）—— T4 ✅
 
 ## 5. Out of Scope
 
@@ -125,7 +125,7 @@ T2 / T3 可并行（T2 依赖 `resolvedDark`、T3 依赖 `resolvedDark`，互不
 - 账号级外观偏好
 - 定时/地理位置自动切换
 - 暗色下图片**内容**本身处理
-- API 28–30 手动模式 splash 最早帧残留浅色窗口（平台无解，已接受）
+- ~~API 28–30 手动模式 splash 最早帧残留浅色窗口（平台无解，已接受）~~ **（修订 2026-09-21）**：当前实现下手动模式 splash 在所有 API 级别均未覆盖（读系统 uiMode）；`setSplashScreenTheme`（API 31+）接线后，API 28–30 残留早浅色帧平台无解、已接受——整体列 follow-up [#692](https://github.com/a1121611810/Pictelio/issues/692)
 
 ## 6. 进一步说明
 

@@ -5,7 +5,7 @@
 - 关联: wayfinder 地图 [#682](https://github.com/a1121611810/Pictelio/issues/682)；spec [docs/specs/lynx-night-mode.md](../specs/lynx-night-mode.md)（[#686](https://github.com/a1121611810/Pictelio/issues/686)）；审计 [docs/specs/lynx-night-mode-audit.md](../specs/lynx-night-mode-audit.md)；研究 [#683](https://github.com/a1121611810/Pictelio/issues/683)（检测通道）/ [#684](https://github.com/a1121611810/Pictelio/issues/684)（splash 双轨）；访谈 [#685](https://github.com/a1121611810/Pictelio/issues/685)（入口交互）；实施 [#687](https://github.com/a1121611810/Pictelio/issues/687) / [#688](https://github.com/a1121611810/Pictelio/issues/688) / [#689](https://github.com/a1121611810/Pictelio/issues/689) / [#690](https://github.com/a1121611810/Pictelio/issues/690) / [#691](https://github.com/a1121611810/Pictelio/issues/691)
 - **修订**: ADR-0168 D4（状态栏图标色恒真钉死 → 随 resolvedDark 动态）
 - **延续**: ADR-0152（主题色静态 M3 色板；其「暗色/亮暗跟随一并做……另行立项」即本决策）
-- 关联: ADR-0164（lynx 缺省引擎）/ ADR-0172（Lynx 运行时 web API 约束）
+- 关联 ADR: ADR-0164（lynx 缺省引擎）/ ADR-0172（Lynx 运行时 web API 约束）
 
 ## 背景
 
@@ -25,7 +25,7 @@ lynx 客户端（缺省引擎，ADR-0164）此前只有亮色界面：夜间/弱
 
 **D6 · 状态栏图标色（修订 ADR-0168 D4）**：ADR-0168 D4 的 `isAppearanceLightStatusBars = true`（当时依据「app-lynx 无暗色 UI」）改为**随 `resolvedDark` 动态**（亮→深图标 / 暗→浅图标）；全屏模式（状态栏隐藏）跳过该设置；决策纯函数 `isAppearanceLightStatusBarsFor` / `resolveStatusBarAppearance` 单测钉死。
 
-**D7 · splash 双轨**：「最早帧由系统在应用代码运行前按 manifest 主题 + 系统 uiMode 绘制，运行时不可改写」是平台事实——主轨 = `values-night` 限定资源（`system` 模式全 API 零风险）；兜底轨 = API 31+ `Activity.getSplashScreen().setSplashScreenTheme`（经 PackageManager 持久化）覆盖手动模式的下一次冷启动；splash 图标用 `windowSplashScreenIconBackgroundColor` 明暗双 plate（保留现有浅色系图标资产）。**API 28–30 手动模式残留限浅色最早帧为平台无解，已接受**。
+**D7 · splash 双轨（手动模式覆盖为 follow-up）**：「最早帧由系统在应用代码运行前按 manifest 主题 + 系统 uiMode 绘制，运行时不可改写」是平台事实——主轨 = `values-night` 限定资源（**系统跟随（system）模式全 API 级别完整覆盖，零风险**）；兜底轨 = API 31+ `Activity.getSplashScreen().setSplashScreenTheme`（`PackageManager` 持久化口径，下一次冷启动生效）。**当前实现状态（2026-09-21）**：兜底轨输入 = 系统 uiMode（与主轨同源）；**手动模式（force dark/light）的 splash 同步未接线**（全仓 Java 未读 `settings_dark_mode`）——需「单一事实源接线 + 一次性滞后的重应用时机设计 + 持久化主题名在配置翻转下的解析语义实证」，全部列入 follow-up [#692](https://github.com/a1121611810/Pictelio/issues/692)（含设备走查矩阵）。splash 图标用 `windowSplashScreenIconBackgroundColor` 明暗双 plate（保留现有浅色系图标资产）。**API 28–30 残留**：即使 #692 接线后，手动模式在该区间仍无 `setSplashScreenTheme` 平台通道（残留最早帧浅色），已接受。
 
 **D8 · 硬编码色审计与机器防线**：全 app 审计（tokens.css 暗色补档 `--md-error*` / `--md-scrim*` / `--md-state-pressed-error` / `--md-shape-*` / `--md-elevation-*` / `--md-scroll-indicator`；新增 `--colorOverlayForeground` 修复 AiOverlay 引未定义变量）；机器防线 `tests/hardcodeColorGate.test.ts`（扫描 src 硬编码色 + 注释豁免 + 白名单登记，防回潮）。
 

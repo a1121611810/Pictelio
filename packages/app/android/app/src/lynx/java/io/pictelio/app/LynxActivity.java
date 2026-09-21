@@ -131,18 +131,18 @@ public class LynxActivity extends AppCompatActivity {
     private static int sLastSentTop = -1;
     private static int sLastSentBottom = -1;
 
-    // ADR-night-mode（T1）：最近一次已观察到的 uiMode 位（Configuration.UI_MODE_NIGHT_MASK 比较）。
+    // ADR-0180（T1）：最近一次已观察到的 uiMode 位（Configuration.UI_MODE_NIGHT_MASK 比较）。
     // 初次启动：onCreate 读 onConfigurationChanged 之前为 UNINITIALIZED；-1 = 未初始化哨兵。
     // onConfigurationChanged 写新值并比对；onResume 兜底比对：后台期间系统 uiMode 翻转若未触发
     // configChanges（API < 31 个别厂商 / 后台省电模式冻结），resume 时强制补发事件。
     // 复位同 sInset*（onDestroy 回到 -1，新实例首次读取命中兜底 light）。
     private static int sLastUiMode = -1;
 
-    // ADR-night-mode（T1）：最近一次已下发的暗色 mode 字符串（"light"/"dark"）。同 insets
+    // ADR-0180（T1）：最近一次已下发的暗色 mode 字符串（"light"/"dark"）。同 insets
     // 字段语义，sendDarkModeEvent 内部短路去重；新增 caller 无需各自比 sLastUiMode。
     private static String sLastDarkSent = "";
 
-    // ADR-night-mode（T3，解 ADR-0168 D4 钉死）：当前 status bar 是否隐藏（全屏模式）。
+    // ADR-0180（T3，解 ADR-0168 D4 钉死）：当前 status bar 是否隐藏（全屏模式）。
     // 写入时机：onCreate 读 isFullscreenModeRequested 一次性落值（实例级，不持久化；
     // Activity 重建回到 onCreate 重读）。消费方：applyStatusBarAppearanceFromUiMode 跳过全屏分支。
     private boolean statusBarHidden = false;
@@ -320,7 +320,7 @@ public class LynxActivity extends AppCompatActivity {
         // 决定），Java 侧入口是 EdgeToEdge.enable(activity) 静态方法（Kotlin 扩展
         // enableEdgeToEdge() 的底层实现，#592 报告 F4.2 所述 core WindowCompat 变体不存在）。
         EdgeToEdge.enable(this);
-        // ADR-night-mode（T1）：初始化 uiMode 缓存——onCreate 必须先于 onConfigurationChanged
+        // ADR-0180（T1）：初始化 uiMode 缓存——onCreate 必须先于 onConfigurationChanged
         // 首次回调（系统已声明 uiMode configChanges，免重建）；onResume 兜底比对以此为基准。
         // 顺序上提到 EdgeToEdge.enable 之后、状态栏外观设置之前（外观决策依赖 sLastUiMode）。
         sLastUiMode = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
@@ -905,7 +905,7 @@ public class LynxActivity extends AppCompatActivity {
         if (lynxView != null) {
             lynxView.onEnterForeground();
         }
-        // ADR-night-mode（T1）：onResume 兜底比对 — 后台期间系统 uiMode 翻转若未触发
+        // ADR-0180（T1）：onResume 兜底比对 — 后台期间系统 uiMode 翻转若未触发
         // configChanges（个别厂商 / 后台省电冻结），resume 时强制补发事件，避免 JS 漏感知。
         // 安全：sLastUiMode 已被 onConfigurationChanged / onCreate 初始化；未初始化不补发。
         // 防抖短路下沉到 sendDarkModeEvent 内部（sLastDarkSent），此处只需比对 uiMode 缓存。
@@ -964,7 +964,7 @@ public class LynxActivity extends AppCompatActivity {
         sInsetBottom = 0;
         sLastSentTop = -1;
         sLastSentBottom = -1;
-        // ADR-night-mode：复位 uiMode 哨兵到 -1；新实例首 onCreate 重新读 Configuration
+        // ADR-0180：复位 uiMode 哨兵到 -1；新实例首 onCreate 重新读 Configuration
         sLastUiMode = -1;
         if (lynxView != null) {
             lynxView.destroy();
