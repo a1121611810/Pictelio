@@ -30,6 +30,7 @@ import {
   nativeTranslateProvider,
 } from "../api/nativeTranslate"
 import { buildSystemInstructions, openaiResponsesProvider } from "../api/translate"
+import { toNovelId } from "../api/id"
 import {
   createNovelTranslator,
   TranslationChunkError,
@@ -797,7 +798,7 @@ function classifyProvider(
     // 换来「每块都能推进 + 单块失败不影响其他块」的确定性。
     // web-core 预览保持默认并发 3（浏览器侧无此限制）。
     const request: TranslationRequest = {
-      novelId: args.novelId,
+      novelId: toNovelId(args.novelId),
       chapterId: String(args.chapterId),
       paragraphs: args.paragraphs,
       options: { xRestrict: args.xRestrict },

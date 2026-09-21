@@ -11,7 +11,8 @@ import { computed, ref } from "vue"
 import { t, apiErrorMessage } from "../i18n"
 import type { PixivComment } from "../api/types"
 import { MAX_COMMENT_LENGTH, commentTransport } from "../api/comment"
-import type { CommentContentType, CommentsTransport } from "../api/comment"
+import type { CommentContentType, CommentTargetId, CommentsTransport } from "../api/comment"
+import { toIllustId, toNovelId } from "../api/id"
 import { toApiError } from "../utils/errors"
 
 export type CommentListStatus = "idle" | "loading" | "ready" | "error"
@@ -68,6 +69,11 @@ export function useComments(config: {
   let disposed = false
   let loadingMore = false // loadMore 重入门控（state 无该字段，内部自持）
 
+  /** targetId 边界转换：number → CommentTargetId（按 type 派发，避免调用方埋 cast） */
+  function toTargetId(): CommentTargetId {
+    return config.type === "illust" ? toIllustId(config.targetId) : toNovelId(config.targetId)
+  }
+
   /** 错误归一为展示文案：messageKey 优先（classifyError 产出可走 i18n），fallback 回退 */
   function toErrorText(e: unknown, fallback: string): string {
     return apiErrorMessage(toApiError(e, fallback))
@@ -76,7 +82,7 @@ export function useComments(config: {
   /** 加载根评论的公共路径（open 与 post 成功后复用） */
   async function refresh(): Promise<void> {
     try {
-      const res = await transport.loadRootComments(config.type, config.targetId, ac.signal)
+      const res = await transport.loadRootComments(config.type, toTargetId(), ac.signal)
       if (disposed || ac.signal.aborted) return
       commentsRef.value = res.comments
       nextUrlRef.value = res.next_url
@@ -172,7 +178,7 @@ export function useComments(config: {
     postingRef.value = true
     actionErrorRef.value = null
     try {
-      await transport.postComment(config.type, config.targetId, text, parentId)
+      await transport.postComment(config.type, toTargetId(), text, parentId)
     } catch (e) {
       postingRef.value = false
       if (!disposed) {

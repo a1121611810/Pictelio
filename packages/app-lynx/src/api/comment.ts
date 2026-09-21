@@ -1,6 +1,7 @@
 // ─── Pixiv 评论 API 端点适配层（app-lynx MVP，issue #162） ───
 // 端点映射与 webview 版（packages/app/src/api/comment.ts）逐行同构。
 import { apiClient } from "./client"
+import type { IllustId, NovelId } from "./id"
 import type { PixivCommentReplyResponse, PixivCommentRootResponse } from "./types"
 
 /** 评论内容类型：插画或小说 */
@@ -39,10 +40,17 @@ export const MAX_COMMENT_LENGTH = 2000
 
 // ── 传输接口：useComments 通过它取数/写数，测试可注入内存替身 ──
 
+/**
+ * 评论作用对象 ID：插画评论时为 IllustId，小说评论时为 NovelId。
+ * 联合类型允许两种形态，调用方按 `type` 参数选择具体形态；
+ * 跨类型误传（例：illust 评论用 NovelId）由 TS 2345 拒绝。
+ */
+export type CommentTargetId = IllustId | NovelId
+
 export interface CommentsTransport {
   loadRootComments(
     type: CommentContentType,
-    targetId: number,
+    targetId: CommentTargetId,
     signal?: AbortSignal,
   ): Promise<PixivCommentRootResponse>
   loadRootCommentsNext(url: string, signal?: AbortSignal): Promise<PixivCommentRootResponse>
@@ -53,7 +61,7 @@ export interface CommentsTransport {
   ): Promise<PixivCommentReplyResponse>
   postComment(
     type: CommentContentType,
-    targetId: number,
+    targetId: CommentTargetId,
     text: string,
     parentCommentId?: number,
   ): Promise<void>
@@ -64,7 +72,7 @@ export interface CommentsTransport {
 
 export function loadRootComments(
   type: CommentContentType,
-  targetId: number,
+  targetId: CommentTargetId,
   signal?: AbortSignal,
 ): Promise<PixivCommentRootResponse> {
   return apiClient.get<PixivCommentRootResponse>(
@@ -96,7 +104,7 @@ export function loadReplies(
 
 export function postComment(
   type: CommentContentType,
-  targetId: number,
+  targetId: CommentTargetId,
   text: string,
   parentCommentId?: number,
 ): Promise<void> {

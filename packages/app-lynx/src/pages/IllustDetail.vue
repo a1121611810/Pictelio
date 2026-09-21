@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { currentParams, navigate, goBack } from '../router'
 import { loadDetail, loadUgoiraMetadata } from '../api/illust'
+import { toIllustId } from '../api/id'
 import { followUser, unfollowUser } from '../api/user'
 import { useAuthStore } from '../stores/authStore'
 import type { PixivIllust } from '../api/types'
@@ -211,7 +212,7 @@ function openAuthor() {
 
 onMounted(async () => {
   try {
-    const res = await loadDetail(illustId.value)
+    const res = await loadDetail(toIllustId(illustId.value))
     illust.value = res.illust
     // P0-T3：同步作者关注状态（详情 API 可能不返回 is_followed，缺省 false）
     following.value = !!res.illust.user.is_followed

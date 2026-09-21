@@ -34,7 +34,7 @@ describe("NovelIntro 三态与数据链路（#586）", () => {
   });
 
   it("数据链路：loadNovelDetail + 代闸 loadGeneration + presentError 兜底（非静默降级）", () => {
-    expect(source).toContain("loadNovelDetail(novelId.value)");
+    expect(source).toContain("loadNovelDetail(toNovelId(novelId.value))");
     expect(source).toContain("loadGeneration");
     expect(source).toContain("presentError(err, t('error.fallback.loadFailed'))");
   });
