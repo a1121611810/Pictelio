@@ -5,6 +5,7 @@ import { filterFeedIllusts } from "@/utils/r18Filter";
 import type { PixivIllust } from "@/api/types";
 import { relatedInjection } from "./settingsStore";
 import { queryKeys } from "@/api/queryKeys";
+import { toIllustId } from "@/api/id";
 
 /**
  * 相关作品注入行状态机（spec docs/specs/related-injection.md §3/§4）。
@@ -65,7 +66,7 @@ export function recordRelatedAnchor(tab: RelatedFeedTab, illustId: number): void
 async function fetchRelatedIllusts(illustId: number): Promise<PixivIllust[]> {
   const res = await queryClient.fetchQuery({
     queryKey: queryKeys.related(illustId),
-    queryFn: ({ signal }) => loadRelated(illustId, signal),
+    queryFn: ({ signal }) => loadRelated(toIllustId(illustId), signal),
     staleTime: RELATED_STALE_TIME_MS,
   });
   return res.illusts;

@@ -18,6 +18,7 @@ import {
   type NovelImagesMap,
   type NovelSeriesDetailResponse,
 } from "@/api/novel";
+import { toNovelId } from "@/api/id";
 
 // ─── Constants ───
 
@@ -223,9 +224,10 @@ export async function setEntry(id: number, data: CacheEntry): Promise<void> {
  */
 
 export async function loadNovelEntry(id: number): Promise<NovelCacheEntry> {
+  const novelId = toNovelId(id);
   const [detailRes, novelDataRes] = await Promise.all([
-    tryAsync(loadDetail(id)),
-    tryAsync(fetchNovelData(id)),
+    tryAsync(loadDetail(novelId)),
+    tryAsync(fetchNovelData(novelId)),
   ]);
   const [detailErr, detail] = detailRes;
   const [novelDataErr, novelData] = novelDataRes;

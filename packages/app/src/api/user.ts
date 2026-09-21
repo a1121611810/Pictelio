@@ -1,7 +1,8 @@
 import { apiClient } from "./client";
 import type { PixivUserDetailResponse, PixivUserFollowingResponse, RestrictType } from "./types";
+import type { UserId } from "./id";
 
-export function getUserDetail(userId: number): Promise<PixivUserDetailResponse> {
+export function getUserDetail(userId: UserId): Promise<PixivUserDetailResponse> {
   return apiClient.get<PixivUserDetailResponse>("/v1/user/detail", {
     user_id: String(userId),
     filter: "for_ios",
@@ -9,7 +10,7 @@ export function getUserDetail(userId: number): Promise<PixivUserDetailResponse> 
 }
 
 export function getUserFollowing(
-  userId: number,
+  userId: UserId,
   restrict: RestrictType = "public",
   offset?: number,
 ): Promise<PixivUserFollowingResponse> {
@@ -24,7 +25,7 @@ export function getUserFollowing(
 }
 
 export function getUserFollowers(
-  userId: number,
+  userId: UserId,
   offset?: number,
 ): Promise<PixivUserFollowingResponse> {
   const params: Record<string, string> = {

@@ -5,10 +5,11 @@ import { useComments } from "../primitives/useComments";
 import CommentList from "./CommentList";
 import CommentInput from "./CommentInput";
 import { t } from "../i18n";
+import type { IllustId, NovelId } from "../api/id";
 
 interface CommentOverlayProps {
   type: CommentContentType;
-  targetId: number;
+  targetId: IllustId | NovelId;
   isOpen: boolean;
   onClose: () => void;
 }

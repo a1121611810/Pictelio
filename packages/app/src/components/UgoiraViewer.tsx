@@ -3,9 +3,10 @@ import { downloadAndExtractUgoira, type UgoiraFrame } from "../api/illust";
 import { ugoiraMode } from "../stores/settingsStore";
 import PixivImage from "./PixivImage";
 import { t } from "../i18n";
+import type { IllustId } from "../api/id";
 
 interface Props {
-  illustId: number;
+  illustId: IllustId;
   coverUrl: string;
   onClose: () => void;
   /** 内联模式：在页面内原地播放，不占全屏 */

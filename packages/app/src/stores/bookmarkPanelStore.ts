@@ -1,4 +1,5 @@
 import { createSignal, type Accessor } from "solid-js";
+import type { IllustId } from "../api/id";
 
 /**
  * 收藏面板全局状态（#545）：面板唯一实例挂 __root（BookmarkPanelHost），
@@ -14,7 +15,7 @@ import { createSignal, type Accessor } from "solid-js";
 /** 面板打开请求：目标作品上下文 + 保存成功回调（由调用方闭包） */
 export interface BookmarkPanelRequest {
   /** 目标插画 id（面板内所有请求的作用域；换目标重开由面板 generation gate 兜竞态） */
-  illustId: number;
+  illustId: IllustId;
   /** 打开时作品的已收藏态快照（仅上下文展示；真值以面板预填结果为准） */
   isBookmarked: boolean;
   /** 作品自带标签名列表（建议来源，spec D5/D7） */

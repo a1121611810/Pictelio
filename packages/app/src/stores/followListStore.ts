@@ -6,6 +6,7 @@ import type { PixivUserPreview, PixivUserFollowingResponse } from "../api/types"
 import { queryKeys } from "../api/queryKeys";
 import { queryClient } from "../api/queryClient";
 import { apiClient } from "../api/client";
+import { toUserId } from "../api/id";
 
 export type FollowMode = "following" | "followers";
 
@@ -50,7 +51,7 @@ const store = createTQFeedStore<FollowItem, "followList", { mode: FollowMode; us
                     items: r.user_previews.map(toFollowItem),
                     next_url: r.next_url,
                   }))
-              : getUserFollowing(deps.userId).then((r) => ({
+              : getUserFollowing(toUserId(deps.userId)).then((r) => ({
                   items: r.user_previews.map(toFollowItem),
                   next_url: r.next_url,
                 })),
@@ -66,7 +67,7 @@ const store = createTQFeedStore<FollowItem, "followList", { mode: FollowMode; us
                     items: r.user_previews.map(toFollowItem),
                     next_url: r.next_url,
                   }))
-              : getUserFollowers(deps.userId).then((r) => ({
+              : getUserFollowers(toUserId(deps.userId)).then((r) => ({
                   items: r.user_previews.map(toFollowItem),
                   next_url: r.next_url,
                 })),
