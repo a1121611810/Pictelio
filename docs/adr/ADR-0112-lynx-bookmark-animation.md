@@ -20,6 +20,8 @@
 
 ## 决策
 
+> **勘误（2026-09-21，票 #707 / spec `docs/specs/bookmark-color.md`）**：决策 1 下文中的「填红」「褥灰」描述的是**当时**的配色实现（`text-error` 红 / `text-outline` 灰）。2026-09-21 起配色改为方案 E「Dark Glass」：未收藏 = `inverse-surface` 底 + `inverse-on-surface` 心形；已收藏 = `tertiary` 底 + `on-tertiary` 心形。**本 ADR 的动效决策（环形扩散/收拢 + spring 弹心 + 乐观触发 + change 延后上抛）全部不变**，仅「心形用什么颜色」不再是红色。同时 chip 容器改为 hug content（`self-start`，详见该 spec）。
+
 1. **动效形态 = 原型变体 E（M3 规范版）**：state-layer 环 + 主心 Expressive spring 弹心。收藏 = 环 emphasized-decelerate 扩散（350ms）+ 主心 pop（scale 0.75→1.18→0.97→1，300ms）填红；取消 = 环 emphasized-accelerate 收拢（250ms）+ 主心 standard 下沉回稳（scale 1→0.88→1，200ms）褪灰。环是 M3 icon button state-layer ripple 语义的规范内延伸；overshoot 弹心属 M3 Expressive spring 体系（用户拍板口径 2）。
 2. **令牌合规**：缓动/时长一律引用 `tokens.css` 变量（`--motion-emphasized-decelerate` / `--motion-emphasized-accelerate` / `--motion-standard` / `--durationGentle` / `--durationNormal`，另按 M3 duration scale 新增 `--durationMedium1`=250ms / `--durationMedium3`=350ms 两档承载环动画），禁止 bezier/ms 字面量（原型字面量仅是 web-core 预览不解析 var() 的临时措施；生产 var() 原生解析已验证）。
 3. **乐观触发**：tap 即播动效 + 翻转 `bookmarked`/`count` + 发 API；失败静息回滚（**不播**反向动画）+ `errorMsg`（既有错误槽）。`busy` 锁保留防连点并发。对齐主 app `followListStore` optimistic toggle 先例。否决悲观（等 API 再播）：网络延迟 300ms~2s 会废掉即时反馈这一 delight 动效的核心价值。

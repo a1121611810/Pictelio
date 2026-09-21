@@ -1,5 +1,13 @@
 <script setup lang="ts">
 // 收藏按钮（列表卡片 ♥ + 详情页 ♥ 复用）
+// 配色（方案 E，spec docs/specs/bookmark-color.md §E「Dark Glass」）：
+//  - chip 容器：M3 inverse-surface 实色（亮主题 = 深灰 #2e3136；暗主题自动 = 浅色），
+//    跳过 rgba + backdrop-filter（lynx 原生 backdrop-filter 不可用，C8 platform fact）；
+//    chip 与底图（亮 surface / 暗图 / scrim 黑底）都拉出反差，永远可读。
+//  - 未收藏：心形 inverse-on-surface、计数 inverse-on-surface。视觉像一颗「暗背景嵌白心」胶囊。
+//  - 已收藏：chip 切 tertiary 实色（#3b6470 / 暗主题亮色 accent），心形 on-tertiary、计数 tertiary-container
+//    （比心形略弱、形成 chip 内部层次）。
+//  - ring 颜色 = chip 内前景色（未收藏 = inverse-on-surface、已收藏 = on-tertiary）。
 // ADR-0112：M3 动效（state-layer 环扩散/收拢 + Expressive spring 弹心）+ 乐观触发。
 // T4 迁移（ADR-0141）：状态机从 primitives/createBookmarkToggle 改为 composable
 // useBookmarkMutation（useMutation 替代 deps.add/remove；getter 形态保持不变 → 模板零变化）。
@@ -131,14 +139,15 @@ defineExpose({ playBurst })
 
 <template>
   <view
-    class="flex flex-row items-center"
+    class="bookmark-chip flex flex-row items-center gap-1 rounded-full px-2.5 py-1.5 self-start"
+    :class="bm.bookmarked.value ? 'is-bookmarked' : ''"
     @tap.stop="onTap"
     @touchstart="onTouchStart"
     @touchmove="onTouchMove"
     @touchend="onTouchEnd"
   >
     <view class="relative flex items-center justify-center">
-      <!-- state-layer 环层（主心下层）：收藏红环扩散 / 取消灰环收拢 -->
+      <!-- state-layer 环层（主心下层）：chip 内部前景色边圈，收藏扩散 / 取消收拢 -->
       <view
         v-for="r in rings"
         :key="r.id"
@@ -146,17 +155,24 @@ defineExpose({ playBurst })
       >
         <view
           class="rounded-full border-2 border-solid w-[5.6vw] h-[5.6vw]"
-          :class="r.mode === 'out' ? 'border-error bookmark-ring-out' : 'border-outline bookmark-ring-in'"
+          :class="r.mode === 'out' ? 'bookmark-ring-out' : 'bookmark-ring-in'"
         />
       </view>
       <!-- 主心（transform 承载用 view 不用 text，ADR-0108 决策 2；:key 重挂载重播 pop） -->
       <view :key="animSeq" :class="animSeq > 0 ? (lastTarget ? 'bookmark-pop-add' : 'bookmark-pop-remove') : ''">
         <!-- ♥\uFE0E：U+FE0E 强制 text presentation——裸 U+2665 在 Lynx 原生被解析为彩色 emoji
              字形（固有色 #fa242f），CSS color 完全失效（心形恒红，真机实测 2026-08-25，ADR-0112） -->
-        <text class="text-[6.4vw] leading-none" :class="bm.bookmarked.value ? 'text-error' : 'text-outline'">♥︎</text>
+        <text
+          class="text-[6.4vw] leading-none"
+          :class="bm.bookmarked.value ? 'text-tertiary-on' : 'text-inverse-on-surface'"
+        >♥︎</text>
       </view>
     </view>
-    <text v-if="bookmarkCount !== undefined" class="text-label-medium text-outline ml-1">{{ bm.count.value }}</text>
+    <text
+      v-if="bookmarkCount !== undefined"
+      class="text-label-medium ml-1"
+      :class="bm.bookmarked.value ? 'text-tertiary-container' : 'text-inverse-on-surface'"
+    >{{ bm.count.value }}</text>
     <text v-if="bm.errorMsg.value" class="text-label-medium text-error ml-1">{{ bm.errorMsg.value }}</text>
   </view>
 </template>
@@ -165,6 +181,34 @@ defineExpose({ playBurst })
      类名 bookmark-pop-* / bookmark-ring-* 全仓唯一。
      红线：缓动/时长一律引用 M3 令牌变量，禁止 bezier/ms 字面量。 -->
 <style>
+/* Chip 容器（方案 E 实色版，避开 lynx backdrop-filter platform fact）：
+   未收藏 = M3 inverse-surface 深色；已收藏 = M3 tertiary 深蓝青。
+   反差与底图（surface / scrim / 亮暗图）解耦——背景颜色始终高于底图对比度。
+   深主题下 .dark 块中 inverse-surface 派生为浅色、tertiary 派生为浅色 accent，
+   使 chip 主线齿牙始终与背景拉反差（不需反色逻辑）。
+   尺寸 hug content —— 靠 template 的 self-start（align-self: flex-start）。真因：Lynx 的
+   view 默认 display:flex / flex-direction:column / align-items:normal(≈stretch)，chip 作为
+   flex item 被横向 stretch 到父容器宽（web-core 实测 chip 1116px == 父 `mt-5` 宽 1116px）。
+   禁用 display: inline-flex 兜底：flex item 的 display 会被 blockify（CSS Flexbox §4.1），
+   实测 computed display 仍是 "flex"、宽度不变 —— 该声明对拉伸完全无效（前一轮误修即此坑）。
+   先例：NovelIntro.vue AI 徽章同用 self-start 挡 scrim 内同款拉伸。 */
+.bookmark-chip {
+  background-color: var(--md-inverse-surface);
+}
+.bookmark-chip.is-bookmarked {
+  background-color: var(--md-tertiary);
+}
+
+/* 环颜色跟随 chip 状态（未收藏 = inverse-on-surface；已收藏 = on-tertiary） */
+.bookmark-chip .bookmark-ring-out,
+.bookmark-chip .bookmark-ring-in {
+  border-color: var(--md-inverse-on-surface);
+}
+.bookmark-chip.is-bookmarked .bookmark-ring-out,
+.bookmark-chip.is-bookmarked .bookmark-ring-in {
+  border-color: var(--md-on-tertiary);
+}
+
 /* 主心 spring pop（M3 Expressive spring 近似）：300ms = --durationGentle */
 @keyframes bookmark-pop-add {
   0% { transform: scale(0.75); }

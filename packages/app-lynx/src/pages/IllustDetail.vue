@@ -336,8 +336,12 @@ onMounted(async () => {
           <!-- 双轨收藏（T5 #534）：单击 = 快速收藏（toggle，恒公开、动效不变）；
                长按 500ms = 打开收藏面板（enable-long-press + @long-press）。
                mutation 注入 = 面板 saveWith 与本心形共用同一状态机实例 -->
+          <!-- 宿主行是 row flex + items-center（兄弟 ↓保存 更矮）；BookmarkButton 自带 self-start
+               （为 column 宿主 hug content，见 docs/specs/bookmark-color.md），行内需显式覆盖回居中。
+               self-center 在产物中位于 self-start 之后（同级声明后者胜），不靠 !important。 -->
           <BookmarkButton
             ref="heartRef"
+            class="self-center"
             :illust-id="illust.id"
             :initial-bookmarked="illust.is_bookmarked"
             :bookmark-count="illust.total_bookmarks"

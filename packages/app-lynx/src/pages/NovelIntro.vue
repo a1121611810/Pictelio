@@ -251,7 +251,10 @@ function startReading(): void {
 
         <!-- 底部固定动作区（票 #577）：收藏 + 「开始阅读」主按钮（受限态置灰） -->
         <view class="mt-4 flex flex-row items-center">
+          <!-- 宿主行是 row flex + items-center，兄弟 CTA h-[12.8vw] 更高；BookmarkButton 自带 self-start
+               （为 column 宿主 hug content），此处显式覆盖回居中（产物中 .self-center 在 .self-start 之后）。 -->
           <BookmarkButton
+            class="self-center"
             :key="novel.id"
             target-kind="novel"
             :illust-id="novel.id"

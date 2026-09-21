@@ -74,3 +74,77 @@ describe('BookmarkButton 状态机注入（T5：心形与面板共用一份状�
     expect(code).toContain('startBurst(true)')
   })
 })
+
+describe('BookmarkButton chip 容器与配色（spec docs/specs/bookmark-color.md §E「Dark Glass」）', () => {
+  it('外层 view 加 chip 容器类 + 圆角全圆 + 状态绑定修饰类', () => {
+    // 最外层 view 用 bookmark-chip 类 + rounded-full；状态路由用 is-bookmarked 修饰
+    expect(code).toContain('bookmark-chip ')
+    expect(code).toContain('rounded-full')
+    expect(code).toContain("bm.bookmarked.value ? 'is-bookmarked' : ''")
+  })
+
+  it('chip 容器必须 hug content（self-start 挡 column flex 父容器的横向拉伸）', () => {
+    // 真因与 oracle（2026-09-21 web-core 实测 evidence，非推测）：
+    //  - Lynx 的 view 默认 display:flex / flex-direction:column / align-items:normal(≈stretch)
+    //    → chip 作为 flex item 被横向 stretch（实测 chip 宽 1116px == 父 `mt-5` 宽 1116px）；
+    //  - display: inline-flex 无效：flex item 的 display 被 blockify 成 flex（CSS Flexbox §4.1），
+    //    实测 computed display === "flex"、宽不变 → 该声明不可能修好拉伸（前一轮误修坑）；
+    //  - self-start = align-self: flex-start（@lynx-js/tailwind-preset 的 alignSelf 插件提供，
+    //    构建产物 .self-start { align-self: flex-start } 实证）→ 实测 150px = 内容宽；
+    //  - 同款先例：NovelIntro.vue:187 AI 徽章用 self-start 挡 scrim 内拉伸。
+    expect(code).toMatch(/bookmark-chip[\s"][^"]*\bself-start\b/)
+    // 反向锁 1：preset 不提供 .inline-flex utility —— 加这个类名等于空类
+    expect(code).not.toMatch(/bookmark-chip[\s"][^"]*\binline-flex\b/)
+    // 反向锁 2：.bookmark-chip 规则里不得再出现任何 display 声明（inline-flex 兜底已被证伪）
+    expect(code).not.toMatch(/\.bookmark-chip\s*\{[^}]*display:/)
+  })
+
+  it('未收藏主心走 inverse-on-surface（chip 上的前景色，非 outline 灰）', () => {
+    expect(code).toContain("bm.bookmarked.value ? 'text-tertiary-on' : 'text-inverse-on-surface'")
+  })
+
+  it('未收藏计数走 inverse-on-surface（与心形同调，保证 chip 内可读）', () => {
+    expect(code).toContain("bm.bookmarked.value ? 'text-tertiary-container' : 'text-inverse-on-surface'")
+  })
+
+  it('严禁再使用 error 色表达「已收藏」（语义错位 = 「危险」而非「喜欢」）', () => {
+    // 原 text-error / border-error 表达收藏色被 chip 化取代；保留只在错误文案位置
+    // 断言：主心与环上不再出现 text-error/border-error（仅错误文案出现 text-error，该行单独走）
+    const heartColorClasses = code.match(/'text-[a-z-]+'/g) ?? []
+    // 主心 heart 必须从 {text-tertiary-on, text-inverse-on-surface} 中选，禁出现 text-error
+    expect(heartColorClasses).not.toContain("'text-error'")
+    // ring 类同名断言：不再出现 border-error
+    expect(code).not.toMatch(/['"]border-error['"]/)
+  })
+
+  it('ring 颜色不靠内联 class 绑定，靠 chip 状态 cascade 控制（避免开关错位）', () => {
+    // ring view 只绑动画类 bookmark-ring-out/in；颜色交给 <style> 里的 .bookmark-chip[.is-bookmarked] .bookmark-ring-*
+    expect(code).toContain("r.mode === 'out' ? 'bookmark-ring-out' : 'bookmark-ring-in'")
+    // 不出现 ring 内联 border-color 类
+    expect(code).not.toMatch(/'border-(on-tertiary|inverse-on-surface|error|outline)'/)
+  })
+
+  it('ring 颜色引用真实存在的 M3 token（--md-inverse-on-surface；禁自造名静默失效）', () => {
+    // 真实缺陷（2026-09-21 code-review Standards F1）：曾写成 var(--md-on-inverse-surface) ——
+    // 该名字全仓未定义（tokens.css 定义的是 --md-inverse-on-surface）→ 无 fallback 的 var() 在
+    // computed-value 阶段失效，border-color 退为 currentColor，环色错误但单测全绿。
+    expect(code).toContain('border-color: var(--md-inverse-on-surface)')
+    expect(code).not.toContain('var(--md-on-inverse-surface)')
+  })
+
+  it('chip 背景走 M3 token 实色（避开 lynx backdrop-filter platform fact）', () => {
+    // CSS 规则 .bookmark-chip 用 var(--md-inverse-surface)、is-bookmarked 用 var(--md-tertiary)
+    expect(code).toContain('.bookmark-chip {')
+    expect(code).toContain('background-color: var(--md-inverse-surface)')
+    expect(code).toContain('.bookmark-chip.is-bookmarked {')
+    expect(code).toContain('background-color: var(--md-tertiary)')
+  })
+
+  it('chip 背景严禁使用 rgba + backdrop-filter（lynx 原生不支持 backdrop-filter，C8 platform fact）', () => {
+    // 检测代码本体中的「使用 backdrop-filter 为 chip 设置背景」的形态。
+    // 这种形态 web-core 预览可见，但原生 lynx 会表现为透明（platform fact）。
+    // 只检 CSS 生产代码本体（去注释后的 code），避开本页注释误命中。
+    expect(code).not.toMatch(/\.[\w-]+\s*\{[^}]*backdrop-filter[^}]*\}/)
+    expect(code).not.toMatch(/backdrop-filter:\s*blur/)
+  })
+})

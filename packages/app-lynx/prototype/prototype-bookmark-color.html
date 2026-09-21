@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PROTOTYPE — lynx 收藏按钮 chip 容器解药</title>
+<!--
+  真实痛点：收藏按钮直接叠在插画图上 + 底部 scrim 黑渐变，
+    - 图色接近心形/数字（亮图白底 + 灰/红心形 = 看不见）
+    - 图未铺满时 scrim 黑渐变压住收藏
+    - 图本身偏黑 + scrim 黑 = 整片黑、收藏按钮既看得出又很丑
+  解药：chip 容器（心形外裹一层 surface 半透明圆/胶囊），
+    内部颜色不再受底图影响，外部对比度始终保证。
+  6 套 chip 配色方案，在 3 种背景（亮图/暗图/scrim 黑）下并列对比。
+-->
+<style>
+  :root {
+    --md-primary: #1a6fa8;
+    --md-on-primary: #ffffff;
+    --md-primary-container: #cfe5ff;
+    --md-on-primary-container: #001d33;
+    --md-tertiary: #3b6470;
+    --md-on-tertiary: #ffffff;
+    --md-tertiary-container: #bee9f8;
+    --md-on-tertiary-container: #001f28;
+    --md-error: #b3261e;
+    --md-error-container: #f9dedc;
+    --md-surface: #f8faff;
+    --md-surface-container-low: #f2f4fa;
+    --md-surface-container: #eceef4;
+    --md-surface-container-high: #e6e8ee;
+    --md-on-surface: #191c20;
+    --md-on-surface-variant: #41474e;
+    --md-outline: #71787e;
+    --md-outline-variant: #c1c7ce;
+    --md-shape-full: 9999px;
+    --md-shape-large: 16px;
+    /* 动效 */
+    --dGentle: 300ms;
+    --dNormal: 200ms;
+    --dMedium3: 350ms;
+    --motion-em-d: cubic-bezier(0.05, 0.7, 0.1, 1);
+    --motion-em-a: cubic-bezier(0.3, 0, 0.8, 0.15);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft Yahei", sans-serif; background: #0e0f13; color: #cfd6e4; }
+
+  header { padding: 16px 24px 12px; background: #181b22; border-bottom: 1px solid #2a2d33; }
+  header h1 { margin: 0 0 6px; font-size: 16px; color: #fff; font-weight: 600; }
+  header .hint { font-size: 12px; color: #9aa3b4; line-height: 1.55; }
+  header .hint b { color: #fff; }
+  header code { background: #2a2d33; padding: 1px 6px; border-radius: 4px; font-size: 11px; color: #e8eaef; }
+  header .alert { margin-top: 8px; padding: 8px 12px; background: rgba(179, 38, 30, 0.12); border-left: 3px solid var(--md-error); border-radius: 6px; font-size: 12px; color: #ffd7d4; line-height: 1.6; }
+
+  /* ── 状态切换条：背景图切换 ── */
+  .state-bar {
+    position: fixed; top: 14px; right: 14px; z-index: 100;
+    background: rgba(24, 27, 34, 0.96); backdrop-filter: blur(8px);
+    border: 1px solid #2a2d33; border-radius: 999px;
+    padding: 5px; display: flex; gap: 4px; align-items: center;
+    box-shadow: 0 6px 22px rgba(0,0,0,.4);
+  }
+  .state-bar .lb { color: #9aa3b4; font-size: 11px; padding: 0 8px; }
+  .state-bar button {
+    border: 0; background: transparent; color: #cfd6e4;
+    padding: 5px 12px; border-radius: 999px; font-size: 12px; cursor: pointer;
+  }
+  .state-bar button:hover { background: rgba(255,255,255,0.08); }
+  .state-bar button.active { background: var(--md-primary); color: #fff; }
+
+  /* ── 痛点区 ── */
+  .pain {
+    padding: 18px 24px 4px;
+  }
+  .pain h2 {
+    margin: 0 0 8px; font-size: 14px; color: var(--md-error);
+    text-transform: uppercase; letter-spacing: 0.04em;
+    font-weight: 700;
+  }
+  .pain .pain-sub { font-size: 12px; color: #9aa3b4; margin-bottom: 12px; }
+  .pain-row {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+    margin-bottom: 28px;
+  }
+  .pain-card {
+    aspect-ratio: 5 / 4;
+    border-radius: 10px;
+    position: relative; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px;
+    border: 1px solid #2a2d33;
+  }
+  .pain-card .pain-tag {
+    position: absolute; top: 8px; left: 8px;
+    font-size: 10px; color: #fff; background: rgba(0,0,0,0.55);
+    padding: 2px 8px; border-radius: 4px;
+    backdrop-filter: blur(4px);
+  }
+  .pain-card.bright {
+    background:
+      radial-gradient(circle at 30% 30%, #fce8d2 0%, transparent 50%),
+      radial-gradient(circle at 70% 70%, #ffe0e8 0%, transparent 60%),
+      linear-gradient(160deg, #faf5ed 0%, #f0e6e4 100%);
+  }
+  .pain-card.dark {
+    background:
+      radial-gradient(circle at 35% 30%, #4a5470 0%, transparent 50%),
+      radial-gradient(circle at 70% 70%, #2a3050 0%, transparent 60%),
+      linear-gradient(160deg, #1a2030 0%, #2a1820 100%);
+  }
+  .pain-card.scrim {
+    background:
+      radial-gradient(circle at 50% 30%, #5a6878 0%, transparent 50%),
+      linear-gradient(180deg, #2a3340 0%, #1a2030 100%);
+  }
+  .pain-card.scrim::after {
+    content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 60%;
+    background: linear-gradient(to top, rgba(0,0,0,0.82), rgba(0,0,0,0.2) 45%, rgba(0,0,0,0));
+  }
+  /* 无 chip 收藏按钮（痛点用）—— 跟 BookmarkButton 当前实现一致 */
+  .bm-nochip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 0; background: transparent; border: 0;
+    position: relative;
+    z-index: 2;
+  }
+  .bm-nochip .heart { font-size: 24px; line-height: 1; }
+  .bm-nochip .count { font-size: 14px; }
+  .pain-card.bright .bm-nochip .heart { color: var(--md-outline); }
+  .pain-card.bright .bm-nochip .count { color: var(--md-outline); }
+  .pain-card.dark .bm-nochip .heart { color: var(--md-outline); }
+  .pain-card.dark .bm-nochip .count { color: var(--md-outline); }
+  .pain-card.dark .bm-nochip.is-bookmarked .heart { color: var(--md-error); }
+  .pain-card.dark .bm-nochip.is-bookmarked .count { color: var(--md-error); }
+  .pain-card.scrim .bm-nochip .heart { color: var(--md-outline); }
+  .pain-card.scrim .bm-nochip .count { color: var(--md-outline); }
+  .pain-card.scrim .bm-nochip.is-bookmarked .heart { color: var(--md-error); }
+  .pain-card.scrim .bm-nochip.is-bookmarked .count { color: var(--md-error); }
+  .pain-label { position: absolute; bottom: 8px; left: 8px; right: 8px; z-index: 3; }
+  .pain-label .l { font-size: 11px; color: rgba(255,255,255,0.92); line-height: 1.4; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
+  .pain-label .l b { color: #ffd7d4; }
+  .pain-card.bright .pain-label .l { color: rgba(0,0,0,0.55); text-shadow: none; }
+  .pain-card.bright .pain-label .l b { color: var(--md-error); }
+
+  /* ═══ 解药区 ═══ */
+  .solve { padding: 24px; background: #181b22; border-top: 1px solid #2a2d33; border-bottom: 1px solid #2a2d33; }
+  .solve h2 {
+    margin: 0 0 6px; font-size: 14px; color: var(--md-tertiary);
+    text-transform: uppercase; letter-spacing: 0.04em;
+    font-weight: 700;
+  }
+  .solve .solve-sub { font-size: 12px; color: #9aa3b4; margin-bottom: 16px; line-height: 1.55; }
+  .solve .solve-sub b { color: #fff; }
+
+  /* 6 列 × 3 行 矩阵 */
+  .matrix {
+    display: grid;
+    grid-template-columns: 240px repeat(6, minmax(160px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .col-head, .row-head, .cell {
+    background: #1c2027; border: 1px solid #2a2d33; border-radius: 10px;
+  }
+  .col-head {
+    padding: 12px;
+    display: flex; flex-direction: column; gap: 4px;
+    min-height: 92px;
+  }
+  .col-head .key {
+    display: inline-block; width: 22px; height: 22px;
+    background: var(--md-primary); color: #fff;
+    border-radius: 6px; text-align: center; line-height: 22px;
+    font-size: 13px; font-weight: 700; flex: none;
+  }
+  .col-head .name { font-size: 12.5px; color: #fff; font-weight: 600; line-height: 1.3; }
+  .col-head .desc { font-size: 10.5px; color: #9aa3b4; line-height: 1.45; }
+  .row-head {
+    padding: 14px;
+    display: flex; flex-direction: column; justify-content: center;
+    min-height: 110px;
+  }
+  .row-head .label { font-size: 12px; color: #fff; font-weight: 600; margin-bottom: 6px; }
+  .row-head .swatch {
+    width: 100%; height: 32px; border-radius: 6px;
+    border: 1px solid #2a2d33;
+  }
+  .row-head .swatch.bright { background: linear-gradient(135deg, #fce8d2 0%, #f0e6e4 100%); }
+  .row-head .swatch.dark { background: linear-gradient(135deg, #1a2030 0%, #2a1820 100%); }
+  .row-head .swatch.scrim {
+    background: linear-gradient(180deg, #2a3340 0%, #1a2030 100%); position: relative;
+  }
+  .row-head .swatch.scrim::after {
+    content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 60%;
+    background: linear-gradient(to top, rgba(0,0,0,0.82), rgba(0,0,0,0.2) 45%, rgba(0,0,0,0));
+    border-radius: 0 0 6px 6px;
+  }
+  .cell {
+    padding: 0;
+    aspect-ratio: 1.6 / 1;
+    position: relative; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 110px;
+  }
+  .cell.bright {
+    background:
+      radial-gradient(circle at 30% 30%, #fce8d2 0%, transparent 50%),
+      radial-gradient(circle at 70% 70%, #ffe0e8 0%, transparent 60%),
+      linear-gradient(160deg, #faf5ed 0%, #f0e6e4 100%);
+  }
+  .cell.dark {
+    background:
+      radial-gradient(circle at 35% 30%, #4a5470 0%, transparent 50%),
+      radial-gradient(circle at 70% 70%, #2a3050 0%, transparent 60%),
+      linear-gradient(160deg, #1a2030 0%, #2a1820 100%);
+  }
+  .cell.scrim {
+    background:
+      radial-gradient(circle at 50% 30%, #5a6878 0%, transparent 50%),
+      linear-gradient(180deg, #2a3340 0%, #1a2030 100%);
+  }
+  .cell.scrim::after {
+    content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 60%;
+    background: linear-gradient(to top, rgba(0,0,0,0.82), rgba(0,0,0,0.2) 45%, rgba(0,0,0,0));
+    z-index: 0;
+  }
+  .cell-content { position: relative; z-index: 2; }
+
+  /* ═════ 收藏按钮 - chip 容器基础 ═════ */
+  .bm-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 6px 10px; border: 0; cursor: pointer;
+    border-radius: var(--md-shape-full);
+    -webkit-tap-highlight-color: transparent;
+    transition: background 200ms;
+  }
+  .bm-chip .heart-wrap {
+    width: 18px; height: 18px;
+    display: inline-flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .bm-chip .heart {
+    font-size: 16px; line-height: 1;
+    transition: color 150ms;
+    display: inline-block;
+  }
+  .bm-chip .count { font-size: 12px; line-height: 1; font-weight: 500; }
+
+  /* ring state-layer */
+  .bm-chip .ring-host {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+  .bm-chip .ring-host .ring {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 2px solid transparent; opacity: 0;
+  }
+  .bm-chip.ringing-out .ring-host .ring.out { animation: ringOut var(--dMedium3) var(--motion-em-d) both; }
+  .bm-chip.ringing-in .ring-host .ring.in { animation: ringIn 200ms var(--motion-em-a) both; }
+  @keyframes ringOut { from { opacity: 0.5; transform: scale(0.6); } to { opacity: 0; transform: scale(2.1); } }
+  @keyframes ringIn { from { opacity: 0.4; transform: scale(1.8); } to { opacity: 0; transform: scale(0.6); } }
+  @keyframes heartPopAdd {
+    0% { transform: scale(0.75); } 55% { transform: scale(1.18); }
+    80% { transform: scale(0.97); } 100% { transform: scale(1); }
+  }
+  @keyframes heartPopRemove {
+    0% { transform: scale(1); } 50% { transform: scale(0.88); } 100% { transform: scale(1); }
+  }
+  .bm-chip.animate-add .heart { animation: heartPopAdd var(--dGentle) var(--motion-em-d) both; }
+  .bm-chip.animate-remove .heart { animation: heartPopRemove var(--dNormal) var(--motion-em-d) both; }
+
+  /* ═══════════════════════════════════════
+     方案 A — Subtle glass chip（推荐默认）
+     glassmorphism: 半透白 surface + backdrop blur
+     亮图下心形深色，暗图/scrim 下心形 on-surface 仍清晰
+     ═══════════════════════════════════════ */
+  .scheme-a .bm-chip {
+    background: rgba(255, 255, 255, 0.62);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+  }
+  .scheme-a .bm-chip .heart { color: var(--md-on-surface-variant); }
+  .scheme-a .bm-chip .count { color: var(--md-on-surface-variant); }
+  .scheme-a .bm-chip.is-bookmarked .heart { color: var(--md-tertiary); }
+  .scheme-a .bm-chip.is-bookmarked .count { color: var(--md-on-tertiary-container); }
+  .scheme-a .bm-chip.is-bookmarked {
+    background: rgba(190, 233, 248, 0.72);
+    border-color: rgba(143, 209, 232, 0.32);
+  }
+  .scheme-a .bm-chip .ring.out { border-color: var(--md-tertiary); }
+  .scheme-a .bm-chip .ring.in { border-color: var(--md-outline); }
+
+  /* ═══════════════════════════════════════
+     方案 B — Tonal Filled chip（强烈反馈）
+     已收藏 = 实色 tertiary-container 胶囊；未收藏 = 半透明 surface
+     ═══════════════════════════════════════ */
+  .scheme-b .bm-chip {
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .scheme-b .bm-chip .heart { color: var(--md-on-surface-variant); }
+  .scheme-b .bm-chip .count { color: var(--md-on-surface-variant); }
+  .scheme-b .bm-chip.is-bookmarked {
+    background: var(--md-tertiary-container);
+  }
+  .scheme-b .bm-chip.is-bookmarked .heart { color: var(--md-on-tertiary-container); }
+  .scheme-b .bm-chip.is-bookmarked .count { color: var(--md-on-tertiary-container); }
+  .scheme-b .bm-chip .ring.out { border-color: var(--md-tertiary); }
+  .scheme-b .bm-chip .ring.in { border-color: var(--md-on-surface-variant); }
+
+  /* ═══════════════════════════════════════
+     方案 C — Outlined glass chip（克制）
+     chip 永远白玻璃 + 1px outline，状态用 outline 颜色变
+     ═══════════════════════════════════════ */
+  .scheme-c .bm-chip {
+    background: rgba(255, 255, 255, 0.78);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--md-outline-variant);
+  }
+  .scheme-c .bm-chip .heart { color: var(--md-on-surface-variant); }
+  .scheme-c .bm-chip .count { color: var(--md-on-surface-variant); }
+  .scheme-c .bm-chip.is-bookmarked .heart { color: var(--md-tertiary); }
+  .scheme-c .bm-chip.is-bookmarked .count { color: var(--md-on-tertiary-container); }
+  .scheme-c .bm-chip.is-bookmarked {
+    border-color: var(--md-tertiary);
+  }
+  .scheme-c .bm-chip .ring.out { border-color: var(--md-tertiary); }
+  .scheme-c .bm-chip .ring.in { border-color: var(--md-outline); }
+
+  /* ═══════════════════════════════════════
+     方案 D — Theme primary chip（与品牌一体）
+     心形 = primary Sky 蓝，chip = primary-container；与 FAB/Tag 同源
+     ═══════════════════════════════════════ */
+  .scheme-d .bm-chip {
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .scheme-d .bm-chip .heart { color: var(--md-primary); }
+  .scheme-d .bm-chip .count { color: var(--md-primary); }
+  .scheme-d .bm-chip.is-bookmarked {
+    background: var(--md-primary-container);
+  }
+  .scheme-d .bm-chip.is-bookmarked .heart { color: var(--md-on-primary-container); }
+  .scheme-d .bm-chip.is-bookmarked .count { color: var(--md-on-primary-container); }
+  .scheme-d .bm-chip .ring.out { border-color: var(--md-primary); }
+  .scheme-d .bm-chip .ring.in { border-color: var(--md-on-surface-variant); }
+
+  /* ═══════════════════════════════════════
+     方案 E — Dark glass chip（scrim/scene 下更亮）
+     永远用深色 chip（surface-container-high）+ 白字心形
+     ═══════════════════════════════════════ */
+  .scheme-e .bm-chip {
+    background: rgba(25, 28, 32, 0.62);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+  .scheme-e .bm-chip .heart { color: rgba(255, 255, 255, 0.85); }
+  .scheme-e .bm-chip .count { color: rgba(255, 255, 255, 0.85); }
+  .scheme-e .bm-chip.is-bookmarked {
+    background: rgba(59, 100, 112, 0.85);
+    border-color: rgba(143, 209, 232, 0.35);
+  }
+  .scheme-e .bm-chip.is-bookmarked .heart { color: #fff; }
+  .scheme-e .bm-chip.is-bookmarked .count { color: var(--md-tertiary-container); font-weight: 600; }
+  .scheme-e .bm-chip .ring.out { border-color: #fff; }
+  .scheme-e .bm-chip .ring.in { border-color: rgba(255, 255, 255, 0.7); }
+
+  /* ═══════════════════════════════════════
+     方案 F — 现状（无 chip 对照）
+     完全等价当前 BookmarkButton 实现——未收藏 outline 灰；已收藏 error 红
+     演示"无 chip 时各种背景下的可读性局限"
+     ═══════════════════════════════════════ */
+  .scheme-f .bm-chip {
+    background: transparent;
+    border: 0;
+    padding: 6px 4px;
+  }
+  .scheme-f .bm-chip .heart { color: var(--md-on-surface-variant); }
+  .scheme-f .bm-chip .count { color: var(--md-on-surface-variant); }
+  .scheme-f .bm-chip.is-bookmarked .heart { color: var(--md-error); }
+  .scheme-f .bm-chip.is-bookmarked .count { color: var(--md-error); }
+  .scheme-f .bm-chip .ring.out { border-color: var(--md-error); }
+  .scheme-f .bm-chip .ring.in { border-color: var(--md-outline); }
+
+  footer {
+    padding: 16px 24px; color: #6b7384; font-size: 11px; line-height: 1.6;
+    background: #181b22;
+  }
+  footer b { color: #cfd6e4; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>PROTOTYPE — lynx 收藏按钮：chip 容器解药（6 套配色 × 3 种背景）</h1>
+  <div class="hint">
+    你的真实问题：<b>收藏按钮在不同图片背景下都看不清</b>——图亮时心形被吃，图暗/未铺满时跟底部 scrim 黑叠加更糊。
+    解药 = <b>给收藏按钮加 chip 容器</b>（心形外裹一层 surface 半透明圆胶囊），内部颜色不受底图影响。
+  </div>
+  <div class="alert">
+    <b>关键约束</b> · Lynx 真机上 <code>backdrop-filter: blur()</code> 在原生 LynxView 不一定可用（platform fact）；web-core 预览可见。生产方案需要用 <code>surface-container-high</code> 实色 + 高 alpha（如 92%）替代。
+  </div>
+</header>
+
+<div class="state-bar">
+  <span class="lb">全局态</span>
+  <button data-state="unbookmarked">未收藏</button>
+  <button data-state="bookmarked" class="active">已收藏</button>
+</div>
+
+<!-- ─────────────────────────────────────────────
+     第一部分：痛点展示（无 chip - 跟当前实现一致）
+     ───────────────────────────────────────────── -->
+<section class="pain">
+  <h2>① 痛点：当前 BookmarkButton（无 chip）</h2>
+  <div class="pain-sub">直接叠在图上，背景一变就看不清。下方 3 张 = 你描述的 3 个真实场景。</div>
+  <div class="pain-row">
+    <div class="pain-card bright">
+      <span class="pain-tag">场景 1</span>
+      <div class="bm-nochip is-bookmarked"><span class="heart">♥︎</span><span class="count">135</span></div>
+      <div class="pain-label"><div class="l"><b>亮图（白底/粉色插画）</b>：心形 outline 灰被吃掉，error 红也只勉强浮起；数字同样隐形。</div></div>
+    </div>
+    <div class="pain-card dark">
+      <span class="pain-tag">场景 2</span>
+      <div class="bm-nochip is-bookmarked"><span class="heart">♥︎</span><span class="count">135</span></div>
+      <div class="pain-label"><div class="l"><b>暗图（深色插画）</b>：error 红勉强可读但<b>很跳脱</b>（scrim 黑 + 红 = 警报感）；数字色更弱。</div></div>
+    </div>
+    <div class="pain-card scrim">
+      <span class="pain-tag">场景 3</span>
+      <div class="bm-nochip is-bookmarked"><span class="heart">♥︎</span><span class="count">135</span></div>
+      <div class="pain-label"><div class="l"><b>图未铺满 + scrim 黑底</b>：心形直接溶进黑渐变，跟 scrim 黑一体；数字直接糊掉。</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────
+     第二部分：解药 - 6 套 chip 方案在 3 背景下并列对比
+     ───────────────────────────────────────────── -->
+<section class="solve">
+  <h2>② 解药：6 套 chip 容器方案 × 3 种背景</h2>
+  <div class="solve-sub">
+    <b>怎么挑</b>：先看每一列在 3 种背景下的可读性（同一列三行是否都清晰），再看哪一列的视觉语言合你口味。<b>A · Subtle glass</b> 最温和且全场景可读；<b>F · 现状</b> 列仅供对照（=你吐槽的当前实现）。
+  </div>
+
+  <div class="matrix">
+    <!-- 列头：6 套方案 -->
+    <div></div>
+    <div class="col-head scheme-a"><span class="key">A</span><span class="name">Subtle glass</span><span class="desc">半透白 + blur，跟亮图/暗图/scrim 都能浮起。推荐默认。</span></div>
+    <div class="col-head scheme-b"><span class="key">B</span><span class="name">Tonal filled</span><span class="desc">已收藏 = 实色 tertiary-container，最强烈的反馈。</span></div>
+    <div class="col-head scheme-c"><span class="key">C</span><span class="name">Outlined glass</span><span class="desc">白玻璃 + 1px outline，已收藏时 outline 变 tertiary，最克制。</span></div>
+    <div class="col-head scheme-d"><span class="key">D</span><span class="name">Theme primary</span><span class="desc">心形 = primary Sky 蓝，已收藏 = primary-container；与 FAB/Tag 同源。</span></div>
+    <div class="col-head scheme-e"><span class="key">E</span><span class="name">Dark glass</span><span class="desc">永远深色 surface + 白心形，暗图/scrim 下最适合；亮图下心形偏冷。</span></div>
+    <div class="col-head scheme-f"><span class="key">F</span><span class="name">现状（无 chip）</span><span class="desc">= 当前 BookmarkButton，无任何容器。对照看"加 chip"的差异。</span></div>
+
+    <!-- 行 1：亮图 -->
+    <div class="row-head">
+      <div class="label">亮图（白底）</div>
+      <div class="swatch bright"></div>
+    </div>
+    <div class="cell bright"><div class="cell-content">[bm chips]</div></div>
+    <div class="cell bright"><div class="cell-content">[bm chips]</div></div>
+    <div class="cell bright"><div class="cell-content">[bm chips]</div></div>
+    <div class="cell bright"><div class="cell-content">[bm chips]</div></div>
+    <div class="cell bright"><div class="cell-content">[bm chips]</div></div>
+    <div class="cell bright"><div class="cell-content">[bm chips]</div></div>
+
+    <!-- 行 2：暗图 -->
+    <div class="row-head">
+      <div class="label">暗图（深色）</div>
+      <div class="swatch dark"></div>
+    </div>
+    <div class="cell dark"><div class="cell-content">[bm chips]</div></div>
+    <div class="cell dark"><div class="cell-content">[bm chips]</div></div>
+    <div class="cell dark"><div class="cell-content">[bm chips]</div></div>
+    <div class="cell dark"><div class="cell-content">[bm chips]</div></div>
+    <div class="cell dark"><div class="cell-content">[bm chips]</div></div>
+    <div class="cell dark"><div class="cell-content">[bm chips]</div></div>
+
+    <!-- 行 3：scrim 黑底 -->
+    <div class="row-head">
+      <div class="label">scrim 黑底（图未铺满）</div>
+      <div class="swatch scrim"></div>
+    </div>
+    <div class="cell scrim"><div class="cell-content">[bm chips]</div></div>
+    <div class="cell scrim"><div class="cell-content">[bm chips]</div></div>
+    <div class="cell scrim"><div class="cell-content">[bm chips]</div></div>
+    <div class="cell scrim"><div class="cell-content">[bm chips]</div></div>
+    <div class="cell scrim"><div class="cell-content">[bm chips]</div></div>
+    <div class="cell scrim"><div class="cell-content">[bm chips]</div></div>
+  </div>
+</section>
+
+<footer>
+  <b>下一步</b> · 选定方案后：① chip 容器用 <code>surface-container-high</code>（92% 不透明）兜底真机 LynxView 无 backdrop-filter 的 platform fact；② <code>color</code> 走 M3 token；③ 动效资产（ring + pop）沿用 BookmarkButton.vue 既有实现；④ 落到 <code>packages/app-lynx/src/components/BookmarkButton.vue</code> 真实代码；⑤ 补 <code>BookmarkButton.template.test.ts</code> 锁 chip 圆角、背景色 token、heart 颜色常量。
+  <br />
+  <b>真机对照</b> · web-core 预览（<code>pnpm dev</code> 跑 lynx 包）可见 chip 完整形态；真机 <code>backdrop-filter</code> 是否生效待 native-run.rs 验证；不见效时方案 A/C chip 改实色 <code>surface-container-high</code> 即可。
+</footer>
+
+<!-- ─────────────────────────────────────────────
+     JS：填充每格的 chip 按钮（两态：unbookmarked / bookmarked）
+     ───────────────────────────────────────────── -->
+<script>
+  const SCHEMES = ['a', 'b', 'c', 'd', 'e', 'f'];
+  const BGS = ['bright', 'dark', 'scrim'];
+  const counts = { bright: 135, dark: 847, scrim: 17 };
+
+  // 直接遍历全部 18 个 cell（matrix 是 3 行 × 6 列布局，DOM 顺序对应行优先）
+  (function rebuild() {
+    const matrix = document.querySelector('.matrix');
+    const allCells = matrix.querySelectorAll('.cell');
+    allCells.forEach((cell, idx) => {
+      const bgIdx = Math.floor(idx / 6);   // 0=bright, 1=dark, 2=scrim
+      const schemeIdx = idx % 6;            // 0..5 -> scheme A..F
+      const bg = BGS[bgIdx];
+      const scheme = SCHEMES[schemeIdx];
+      // 关键：cell 自己挂上 scheme 类（CSS 选择器 .scheme-a .bm-chip 才会命中）
+      cell.classList.add('scheme-' + scheme);
+      cell.innerHTML = `
+        <div class="cell-content" style="display:flex; flex-direction:row; gap:8px; align-items:center; flex-wrap:wrap; justify-content:center;">
+          <button class="bm-chip" data-scheme="${scheme}" data-bg="${bg}" data-state="unbookmarked">
+            <span class="heart-wrap">
+              <span class="ring-host"><span class="ring out"></span><span class="ring in"></span></span>
+              <span class="heart">♥︎</span>
+            </span>
+            <span class="count">${counts[bg]}</span>
+          </button>
+          <button class="bm-chip is-bookmarked" data-scheme="${scheme}" data-bg="${bg}" data-state="bookmarked">
+            <span class="heart-wrap">
+              <span class="ring-host"><span class="ring out"></span><span class="ring in"></span></span>
+              <span class="heart">♥︎</span>
+            </span>
+            <span class="count">${(counts[bg] + 1).toLocaleString('en-US')}</span>
+          </button>
+        </div>
+      `;
+    });
+  })();
+
+  // ─── 状态切换（仅影响痛点 demo；矩阵 chip 永远显示两态对比） ───
+  function applyState(state) {
+    document.querySelectorAll('.bm-nochip').forEach(btn => {
+      btn.classList.toggle('is-bookmarked', state === 'bookmarked');
+    });
+    document.querySelectorAll('.state-bar button').forEach(b => {
+      b.classList.toggle('active', b.dataset.state === state);
+    });
+  }
+  document.querySelectorAll('.state-bar button').forEach(b => {
+    b.addEventListener('click', () => applyState(b.dataset.state));
+  });
+
+  // ─── 矩阵 chip 点击 toggle + 动效 ───
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('[data-scheme]');
+    if (!btn) return;
+    e.preventDefault();
+    const was = btn.classList.contains('is-bookmarked');
+    btn.classList.remove('animate-add', 'animate-remove', 'ringing-out', 'ringing-in');
+    void btn.offsetWidth;
+    btn.classList.add(was ? 'animate-remove' : 'animate-add');
+    btn.classList.add(was ? 'ringing-in' : 'ringing-out');
+    btn.classList.toggle('is-bookmarked', !was);
+  });
+
+  // 痛点 demo 默认已收藏（让"红心"配色暴露问题）
+  applyState('bookmarked');
+</script>
+
+</body>
+</html>
