@@ -13,9 +13,9 @@ import type {
   PixivNovelListResponse,
   PixivNovelDetailResponse,
   PixivNovel,
+  SeriesNavigation,
   PixivUser,
   RestrictType,
-  SeriesNavigation,
 } from "./types";
 
 // ─── 小说内嵌图片 / 正文提取：共享包 @pictelio/novel-export（消费方零改动） ───
@@ -34,7 +34,14 @@ export async function fetchNovelData(novelId: number): Promise<{
   images: NovelImagesMap;
 }> {
   const html = await loadText(novelId);
-  return extractNovelDataFromHtml(html);
+  // novel-export 包的 SeriesNavigation 用 raw `number`（与本包 NovelId
+  // 结构同形，运行时相同）；在此桥接边界处类型层 cast。
+  // 待 novel-export 升级为 Branded 后移除此 cast。
+  return extractNovelDataFromHtml(html) as unknown as {
+    text: string;
+    navigation: SeriesNavigation;
+    images: NovelImagesMap;
+  };
 }
 
 export function loadRecommended(): Promise<PixivNovelListResponse> {

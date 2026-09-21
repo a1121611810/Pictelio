@@ -19,16 +19,17 @@ import {
   searchTransport,
 } from "./search"
 import { BOOKMARK_BANDS, DEFAULT_SEARCH_FILTERS } from "@pictelio/search-core"
+import { toIllustId, toNovelId, toSeriesId, toUserId } from "./id"
 import { ApiErrorType, type PixivIllust, type PixivIllustListResponse, type PixivNovel, type PixivNovelListResponse } from "./types"
 
 // ─── 真实契约样例 —— 字段形状来自 api/types.ts（与 webview 同源契约） ───
 
 const ILLUST_ITEM: PixivIllust = {
-  id: 123456789,
+  id: toIllustId(123456789),
   title: "星空の少女",
   type: "illust",
   user: {
-    id: 987654321,
+    id: toUserId(987654321),
     name: "test_user",
     account: "test_user",
     profile_image_urls: {
@@ -61,10 +62,10 @@ const ILLUST_ITEM: PixivIllust = {
 }
 
 const NOVEL_ITEM: PixivNovel = {
-  id: 987654321,
+  id: toNovelId(987654321),
   title: "星空の物語",
   user: {
-    id: 987654321,
+    id: toUserId(987654321),
     name: "test_user",
     account: "test_user",
     profile_image_urls: {
@@ -85,7 +86,7 @@ const NOVEL_ITEM: PixivNovel = {
   ],
   page_count: 1,
   text_length: 2314,
-  series: { id: 111, title: "星空シリーズ" },
+  series: { id: toSeriesId(111), title: "星空シリーズ" },
   is_bookmarked: false,
   total_bookmarks: 58,
   x_restrict: 0,

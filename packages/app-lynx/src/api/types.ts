@@ -1,7 +1,9 @@
 // ─── Pixiv API 类型（app-lynx MVP 子集，字段名与现有 app 同源） ───
 
+import type { IllustId, NovelId, SeriesId, UserId } from "./id";
+
 export interface PixivUser {
-  id: number;
+  id: UserId;
   name: string;
   account: string;
   profile_image_urls: {
@@ -38,7 +40,7 @@ export interface PixivIllustTag {
 }
 
 export interface PixivIllust {
-  id: number;
+  id: IllustId;
   title: string;
   type: "illust" | "manga" | "ugoira";
   user: PixivUser;
@@ -70,14 +72,14 @@ export interface PixivIllustDetailResponse {
 }
 
 export interface PixivNovel {
-  id: number;
+  id: NovelId;
   title: string;
   user: PixivUser;
   image_urls: PixivIllustImageUrls;
   tags: { name: string; translated_name?: string }[];
   page_count: number;
   text_length: number;
-  series?: { id: number; title: string };
+  series?: { id: SeriesId; title: string };
   is_bookmarked: boolean;
   total_bookmarks: number;
   total_view?: number;
@@ -105,7 +107,7 @@ export interface PixivNovelDetailResponse {
 /** 系列详情响应（GET /v2/novel/series）：追更状态与是否完结从这里取 */
 export interface NovelSeriesDetailResponse {
   novel_series_detail: {
-    id: number;
+    id: SeriesId;
     title: string;
     content_count: number;
     /** 已完结（追更弹窗不据此过滤，D3：完结系列也弹） */
@@ -121,7 +123,7 @@ export interface NovelSeriesDetailResponse {
  * 要开「最新一话」得用 [latest_content_id]（那才是作品 id）。
  */
 export interface WatchlistSeries {
-  id: number;
+  id: SeriesId;
   title: string;
   /** 系列封面。被屏蔽的条目为 null。 */
   url: string | null;
@@ -129,7 +131,7 @@ export interface WatchlistSeries {
   mask_text?: string | null;
   published_content_count: number;
   /** 最新一话的作品 id（小说 id） */
-  latest_content_id: number;
+  latest_content_id: NovelId;
   /** ISO 时间串；卡片只显示前 10 位（日期部分）。 */
   latest_content_date: string;
   user: PixivUser;
@@ -252,7 +254,7 @@ export interface ApiError {
 // ─── 评论（issue #162，字段与现有 app 同源） ───
 
 export interface PixivCommentUser {
-  id: number;
+  id: UserId;
   name: string;
   account: string;
   profile_image_urls?: {

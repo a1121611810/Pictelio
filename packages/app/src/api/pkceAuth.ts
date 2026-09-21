@@ -1,6 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { setAccessToken } from "./client";
 import type { PixivAuthResponse } from "./types";
+import { toUserId } from "./id";
 
 const isNative = Capacitor.isNativePlatform();
 
@@ -51,7 +52,7 @@ export async function exchangeCode(code: string, codeVerifier: string): Promise<
       refresh_token: result.refreshToken,
       token_type: "bearer",
       user: {
-        id: result.userId,
+        id: toUserId(result.userId),
         name: result.userName,
         account: result.userAccount,
         profile_image_urls: result.profileImageUrls ?? {},

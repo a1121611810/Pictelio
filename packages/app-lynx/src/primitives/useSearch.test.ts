@@ -12,6 +12,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest"
 import { FILTER_DEBOUNCE_MS, SEARCH_DEBOUNCE_MS, mergeSearchResults, useSearch } from "./useSearch"
 import type { SearchTransport } from "../api/search"
 import { BOOKMARK_BANDS, DEFAULT_SEARCH_FILTERS, type SearchFilters } from "@pictelio/search-core"
+import { toIllustId, toNovelId, toUserId } from "../api/id"
 import {
   ApiErrorType,
   type PixivIllust,
@@ -25,11 +26,11 @@ import {
 
 function makeIllust(id: number, createDate: string, totalBookmarks = 100): PixivIllust {
   return {
-    id,
+    id: toIllustId(id),
     title: `作品${id}`,
     type: "illust",
     user: {
-      id: id * 10,
+      id: toUserId(id * 10),
       name: "test_user",
       account: "test_user",
       profile_image_urls: {
@@ -60,10 +61,10 @@ function makeIllust(id: number, createDate: string, totalBookmarks = 100): Pixiv
 
 function makeNovel(id: number, createDate: string): PixivNovel {
   return {
-    id,
+    id: toNovelId(id),
     title: `小说${id}`,
     user: {
-      id: id * 10,
+      id: toUserId(id * 10),
       name: "test_user",
       account: "test_user",
       profile_image_urls: {

@@ -6,6 +6,7 @@ import {
   type SeriesNavigation,
 } from "@pictelio/novel-export"
 import { apiClient } from "./client"
+import { toSeriesId } from "./id"
 import type {
   PixivNovelListResponse,
   PixivNovelDetailResponse,
@@ -48,7 +49,7 @@ function normalizeNovelSeries(raw: unknown): PixivNovelDetailResponse["novel"]["
     console.warn("[novelApi] novel.series 缺 id/title（响应契约疑变）", raw)
     return undefined
   }
-  return { id, title }
+  return { id: toSeriesId(id), title }
 }
 
 export function loadNovelDetail(novelId: number): Promise<PixivNovelDetailResponse> {

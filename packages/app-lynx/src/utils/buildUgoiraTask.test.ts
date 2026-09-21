@@ -1,14 +1,15 @@
 // buildUgoiraTask 单测（oracle = spec docs/specs/download-manager.md §3.1/§5）。
 import { describe, it, expect } from 'vitest'
 import { buildUgoiraTask } from './galleryDownload'
+import { toIllustId, toUserId } from '../api/id'
 import type { PixivIllust } from '../api/types'
 
 function illust(over?: Partial<PixivIllust>): PixivIllust {
   return {
-    id: 123,
+    id: toIllustId(123),
     title: '动图A',
     type: 'ugoira',
-    user: { id: 1, name: 'u', account: 'u', profile_image_urls: { medium: '' } } as PixivIllust['user'],
+    user: { id: toUserId(1), name: 'u', account: 'u', profile_image_urls: { medium: '' } } as PixivIllust['user'],
     image_urls: {
       square_medium: 's',
       medium: 'https://i.pximg.net/medium.jpg',

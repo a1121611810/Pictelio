@@ -3,6 +3,7 @@
 // vi.useFakeTimers 控制双防抖 / 超时时序；异步链用 flush() 推进微任务。
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { PixivIllust, PixivNovel } from '../api/types'
+import { toIllustId, toNovelId, toUserId } from '../api/id'
 import { createMixFeed, type MixFeedItem, type MixFeedSource } from './createMixFeed'
 
 /** fake 源一页返回形状 */
@@ -15,7 +16,7 @@ afterEach(() => {
 // ─── fake 数据构造 ───
 
 function mkUser(id: number) {
-  return { id, name: 'user', account: 'user', profile_image_urls: {} }
+  return { id: toUserId(id), name: 'user', account: 'user', profile_image_urls: {} }
 }
 
 function mkIllust(key: string, id: number): MixFeedItem {
@@ -24,7 +25,7 @@ function mkIllust(key: string, id: number): MixFeedItem {
     key,
     id,
     data: {
-      id,
+      id: toIllustId(id),
       title: `illust-${key}`,
       type: 'illust',
       user: mkUser(id),
@@ -49,7 +50,7 @@ function mkNovel(key: string, id: number): MixFeedItem {
     key,
     id,
     data: {
-      id,
+      id: toNovelId(id),
       title: `novel-${key}`,
       user: mkUser(id),
       image_urls: { square_medium: '', medium: '', large: '' },
