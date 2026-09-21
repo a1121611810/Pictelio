@@ -7,6 +7,7 @@ import { contentType } from "./uiStore";
 import { user } from "./authStore";
 import { adaptNovelResponse } from "./shared/novelHelpers";
 import { t } from "../i18n";
+import { toUserId, type UserId } from "../api/id";
 // ── Signals ──
 
 const [bookmarkRestrictState, setBookmarkRestrict] = createSignal<RestrictType>("public");
@@ -16,7 +17,7 @@ const [fallbackError, setFallbackError] = createSignal<ApiError | null>(null);
 
 // ── Deps type ──
 
-type NovelDeps = { userId: number | null; restrict: RestrictType };
+type NovelDeps = { userId: UserId | null; restrict: RestrictType };
 
 // ── Factory instance ──
 
@@ -25,7 +26,7 @@ const store = createTQFeedStore<PixivNovel, "bookmarks", NovelDeps>({
   currentTab: () => "bookmarks" as const,
   enabled: () => contentType() === "novel" && !!user(),
   lazy: true,
-  getDeps: () => ({ userId: user()?.id ?? 0, restrict: bookmarkRestrictState() }),
+  getDeps: () => ({ userId: user()?.id ?? toUserId(0), restrict: bookmarkRestrictState() }),
   staleTime: 30_000,
   gcTime: 5 * 60_000,
   errorStrategy: "allMustFail",
@@ -40,7 +41,7 @@ const store = createTQFeedStore<PixivNovel, "bookmarks", NovelDeps>({
           queryFn: (deps, pageParam, signal) =>
             adaptNovelResponse(
               pageParam,
-              () => loadBookmarks(deps.userId ?? 0, deps.restrict),
+              () => loadBookmarks(deps.userId ?? toUserId(0), deps.restrict),
               signal,
             ),
         },

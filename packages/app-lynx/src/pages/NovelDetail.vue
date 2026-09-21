@@ -5,6 +5,7 @@ import { computeReadProgress } from '../primitives/watchlistPrompt'
 import { novelAverageParagraphHeightPx } from '../primitives/novelParagraphEstimate'
 import { currentParams, goBack, navigate, requestBack, registerBackGuard } from '../router'
 import { loadNovelDetail, fetchNovelData, loadNovelSeries, addNovelWatchlist } from '../api/novel'
+import { toNovelId, toSeriesId } from '../api/id'
 import type { NovelExportFormat, NovelImagesMap } from '@pictelio/novel-export'
 import { buildNovelExportPayload, buildNovelExportTaskDraft } from '@pictelio/novel-export'
 import type { PixivNovel } from '../api/types'
@@ -94,11 +95,11 @@ function setupPrompt(): void {
   prompt.value = createWatchlistPrompt({
     getSeries: () => novel.value?.series ?? null,
     loadWatchState: async (seriesId) =>
-      (await loadNovelSeries(seriesId)).novel_series_detail.watchlist_added,
+      (await loadNovelSeries(toSeriesId(seriesId))).novel_series_detail.watchlist_added,
     isDismissed,
     markDismissed,
     setWatchState,
-    addWatchlist: addNovelWatchlist,
+    addWatchlist: (seriesId) => addNovelWatchlist(toSeriesId(seriesId)),
   })
 }
 
@@ -311,7 +312,7 @@ async function loadNovel(): Promise<void> {
   teardownPrompt()
   try {
     // 先取详情判定受限态：受限小说不再拉正文（遮罩是内容不可达而非仅视觉遮挡）
-    const detailRes = await loadNovelDetail(novelId.value)
+    const detailRes = await loadNovelDetail(toNovelId(novelId.value))
     if (gen !== loadGeneration) return
     novel.value = detailRes.novel
     // prompt 在详情落地后创建：getSeries 此时已知，系列预取才能发起；
@@ -319,7 +320,7 @@ async function loadNovel(): Promise<void> {
     setupPrompt()
     // AI 遮罩态同样不拉正文（与 R18 一致：遮罩是内容不可达而非仅视觉遮挡，ADR-0155）
     if (!isRestricted(detailRes.novel) && !isAiRestricted(detailRes.novel)) {
-      const data = await fetchNovelData(novelId.value)
+      const data = await fetchNovelData(toNovelId(novelId.value))
       if (gen !== loadGeneration) return
       // 保留原 fetchNovelText 的空正文语义：提取失败 → 走 catch 展示错误
       if (!data.text) throw new Error(t('novelDetail.bodyExtractFailed')) // i18n: 构造时快照（瞬态）

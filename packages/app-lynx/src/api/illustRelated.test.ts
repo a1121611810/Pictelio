@@ -10,6 +10,7 @@ vi.mock("./client", () => ({
 }));
 
 import { loadRelated } from "./illust";
+import { toIllustId } from "./id";
 
 describe("loadRelated（lynx 相关作品）", () => {
   beforeEach(() => {
@@ -18,7 +19,7 @@ describe("loadRelated（lynx 相关作品）", () => {
 
   it("GET /v2/illust/related，携带 illust_id 与 filter=for_ios", async () => {
     getMock.mockResolvedValue({ illusts: [], next_url: null });
-    await loadRelated(123);
+    await loadRelated(toIllustId(123));
     expect(getMock).toHaveBeenCalledWith(
       "/v2/illust/related",
       { illust_id: "123", filter: "for_ios" },
@@ -29,13 +30,13 @@ describe("loadRelated（lynx 相关作品）", () => {
   it("透传 AbortSignal", async () => {
     getMock.mockResolvedValue({ illusts: [], next_url: null });
     const controller = new AbortController();
-    await loadRelated(456, controller.signal);
+    await loadRelated(toIllustId(456), controller.signal);
     const [, , signalArg] = getMock.mock.calls[0];
     expect(signalArg).toBe(controller.signal);
   });
 
   it("失败路径：网络错误向上传播（调用方 consumeAnchor 捕获并 warn）", async () => {
     getMock.mockRejectedValue(new Error("network down"));
-    await expect(loadRelated(789)).rejects.toThrow("network down");
+    await expect(loadRelated(toIllustId(789))).rejects.toThrow("network down");
   });
 });

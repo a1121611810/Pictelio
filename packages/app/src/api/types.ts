@@ -1,4 +1,6 @@
 // ─── 认证 ───
+import type { IllustId, NovelId, SeriesId, UserId } from "./id";
+
 export interface PixivAuthResponse {
   access_token: string;
   expires_in: number;
@@ -8,7 +10,7 @@ export interface PixivAuthResponse {
 }
 
 export interface PixivUser {
-  id: number;
+  id: UserId;
   name: string;
   account: string;
   profile_image_urls: {
@@ -39,7 +41,7 @@ export interface PixivIllustTag {
 }
 
 export interface PixivIllust {
-  id: number;
+  id: IllustId;
   title: string;
   type: "illust" | "manga" | "ugoira";
   user: PixivUser;
@@ -63,14 +65,14 @@ export interface PixivIllust {
 
 // ─── 小说 ───
 export interface PixivNovel {
-  id: number;
+  id: NovelId;
   title: string;
   user: PixivUser;
   image_urls: PixivIllustImageUrls;
   tags: { name: string; translated_name?: string }[];
   page_count: number;
   text_length: number;
-  series?: { id: number; title: string };
+  series?: { id: SeriesId; title: string };
   has_chapters?: boolean;
   is_original?: boolean;
   is_bookmarked: boolean;
@@ -93,9 +95,9 @@ export interface PixivNovelDetailResponse {
   novel: PixivNovel;
 }
 
-// ─── 小说导航 ───
+// ─── 小说导航（系列章节导航；id 是 NovelId 而非 ChapterId，因 Pixiv 序列里章节等同独立小说 ID）───
 interface NovelNavItem {
-  id: number;
+  id: NovelId;
   title: string;
   viewable?: boolean;
 }
@@ -174,7 +176,7 @@ export interface PixivUserBookmarkTagsResponse {
 
 // ─── 评论 ───
 export interface PixivCommentUser {
-  id: number;
+  id: UserId;
   name: string;
   account: string;
   profile_image_urls: { medium?: string };

@@ -2,14 +2,15 @@
 import { describe, it, expect } from 'vitest'
 import { buildUgoiraTask } from './galleryDownload'
 import { enqueue, findTask, restore, serialize } from './downloadQueueCore'
+import { toIllustId, toUserId } from '../api/id'
 import type { PixivIllust } from '../api/types'
 
 function illust(): PixivIllust {
   return {
-    id: 123,
+    id: toIllustId(123),
     title: '动图A',
     type: 'ugoira',
-    user: { id: 1, name: 'u', account: 'u', profile_image_urls: { medium: '' } } as PixivIllust['user'],
+    user: { id: toUserId(1), name: 'u', account: 'u', profile_image_urls: { medium: '' } } as PixivIllust['user'],
     image_urls: { square_medium: 's', medium: 'm', large: 'l' },
     width: 100,
     height: 100,

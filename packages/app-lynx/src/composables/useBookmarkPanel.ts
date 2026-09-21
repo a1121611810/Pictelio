@@ -22,6 +22,7 @@
 //   不读 errorMsg 文案（FIX-2 显式成败通道）。
 import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { loadBookmarkDetail, loadUserBookmarkTags } from '../api/illust'
+import { toIllustId, toUserId } from '../api/id'
 import type { PixivBookmarkDetail, RestrictType } from '../api/types'
 import { apiErrorMessage, t } from '../i18n'
 import { toApiError } from '../utils/errors'
@@ -167,7 +168,7 @@ export function useBookmarkPanel(options: UseBookmarkPanelOptions): UseBookmarkP
     const restrictAtLoad = restrict.value
     universeStatus.value = 'loading'
     try {
-      const res = await loadUserBookmarkTags(userId, restrictAtLoad, undefined, controller.signal)
+      const res = await loadUserBookmarkTags(toUserId(userId), restrictAtLoad, undefined, controller.signal)
       if (disposed || myGen !== universeGen || controller.signal.aborted) return
       if (res.bookmark_tags === undefined) {
         // 字段契约恒在（PixivUserBookmarkTagsResponse.bookmark_tags）——缺失即契约破坏，显式告警
@@ -235,7 +236,7 @@ export function useBookmarkPanel(options: UseBookmarkPanelOptions): UseBookmarkP
     // 上方 watch 重拉私密库（与 webview 的 restrict 依赖效应同语义）
     void loadUniverse()
     try {
-      const res = await loadBookmarkDetail(options.getIllustId(), controller.signal)
+      const res = await loadBookmarkDetail(toIllustId(options.getIllustId()), controller.signal)
       if (disposed || myGen !== detailGen || controller.signal.aborted) return
       // `bookmark_detail` 字段整体缺失 = 契约破坏（契约恒返回 null 或对象）：按预填失败处理
       // （禁存）——无法区分「未收藏」与「服务端未返回」，不得用空预填覆盖既有收藏（D6）

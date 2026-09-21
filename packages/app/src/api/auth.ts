@@ -1,6 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { setAccessToken } from "./client";
 import type { PixivAuthResponse } from "./types";
+import { toUserId } from "./id";
 import { AuthPlugin } from "@/native/AuthPlugin";
 import { PixivApi } from "@/native/PixivApi";
 
@@ -35,7 +36,7 @@ export async function refreshToken(token: string): Promise<PixivAuthResponse> {
       refresh_token: result.refreshToken,
       token_type: "bearer",
       user: {
-        id: result.userId,
+        id: toUserId(result.userId),
         name: result.userName,
         account: result.userAccount,
         profile_image_urls: result.profileImageUrls ?? {},
@@ -79,7 +80,7 @@ export async function exchangeCodeForToken(
       refresh_token: result.refreshToken,
       token_type: "bearer",
       user: {
-        id: result.userId,
+        id: toUserId(result.userId),
         name: result.userName,
         account: result.userAccount,
         profile_image_urls: result.profileImageUrls ?? {},

@@ -3,6 +3,7 @@
 // 在途响应不得覆盖新结果（实例隔离 + createMixFeed 的 dispose/abort）；nextUrl 非空走翻页端点。
 import { describe, expect, it, vi, beforeEach } from "vitest"
 import type { RankingQuery } from "@pictelio/ranking-core"
+import { toIllustId, toUserId } from "../api/id"
 import type { PixivIllust, PixivIllustListResponse } from "../api/types"
 
 const { loadRankingMock, loadRankingNextMock } = vi.hoisted(() => ({
@@ -19,10 +20,10 @@ import { createRankingFeed } from "./createRankingFeed"
 
 function mkIllust(id: number, createDate = "2026-01-01"): PixivIllust {
   return {
-    id,
+    id: toIllustId(id),
     title: `t${id}`,
     type: "illust",
-    user: { id: 1, name: "u", account: "u", profile_image_urls: {} },
+    user: { id: toUserId(1), name: "u", account: "u", profile_image_urls: {} },
     image_urls: { square_medium: "", medium: "", large: "" },
     width: 1,
     height: 1,

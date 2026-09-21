@@ -10,6 +10,7 @@ import {
   addNovelWatchlist,
   deleteNovelWatchlist,
 } from '../api/novel'
+import { toSeriesId } from '../api/id'
 import type { WatchlistSeries } from '../api/types'
 import { isWatchlistSeriesMasked } from '../api/types'
 import { createWatchlistFeed } from '../primitives/watchlistFeed'
@@ -92,8 +93,8 @@ const unwatchToggle = ref<WatchlistToggleState | null>(null)
 function askUnwatch(item: WatchlistSeries) {
   unwatchTarget.value = item
   unwatchToggle.value = createWatchlistToggle(item.id, true, {
-    add: addNovelWatchlist,
-    remove: deleteNovelWatchlist,
+    add: (seriesId) => addNovelWatchlist(toSeriesId(seriesId)),
+    remove: (seriesId) => deleteNovelWatchlist(toSeriesId(seriesId)),
     onChange: (added) => {
       if (added) return
       // 取消成功：从 feed 内部 items 移除（防下次分页 sync 复活，review P1-2）

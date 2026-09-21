@@ -1,5 +1,6 @@
 import { apiClient } from "./client";
 import { ApiErrorType } from "./types";
+import type { IllustId, UserId } from "./id";
 import {
   unzipFrames,
   parseZipEocd,
@@ -46,7 +47,7 @@ export function loadFollow(
 }
 
 export function loadDetail(
-  illustId: number,
+  illustId: IllustId,
   signal?: AbortSignal,
 ): Promise<PixivIllustDetailResponse> {
   return apiClient.get<PixivIllustDetailResponse>(
@@ -59,7 +60,7 @@ export function loadDetail(
 /** 相关作品（spec docs/specs/related-injection.md）：官方 related 端点，响应与 recommended 同构。
  *  注意是 v2——/v1/illust/related 实测 404（端点不存在），/v2/illust/related 实测 200（模拟器 2026-09-12） */
 export function loadRelated(
-  illustId: number,
+  illustId: IllustId,
   signal?: AbortSignal,
 ): Promise<PixivIllustListResponse> {
   return apiClient.get<PixivIllustListResponse>(
@@ -74,7 +75,7 @@ export function loadNext(url: string, signal?: AbortSignal): Promise<PixivIllust
 }
 
 export function loadBookmarks(
-  userId: number,
+  userId: UserId,
   restrict: RestrictType = "public",
   signal?: AbortSignal,
 ): Promise<PixivIllustListResponse> {
@@ -86,7 +87,7 @@ export function loadBookmarks(
 }
 
 export async function loadUgoiraMetadata(
-  illustId: number,
+  illustId: IllustId,
   signal?: AbortSignal,
 ): Promise<PixivUgoiraMetadataResponse["ugoira_metadata"]> {
   const res = await apiClient.get<PixivUgoiraMetadataResponse>(
@@ -221,7 +222,7 @@ async function extractRange(
  * @returns 解压后的帧列表（blob URL，调用方负责释放）
  */
 export async function downloadAndExtractUgoira(
-  illustId: number,
+  illustId: IllustId,
   onProgress?: (pct: number) => void,
   mode: UgoiraExtractMode = "fflate",
 ): Promise<{ frames: UgoiraFrame[]; blobUrls: string[] }> {
@@ -297,7 +298,7 @@ export async function downloadAndExtractUgoira(
  * @throws zip 损坏/缺帧 → `ugoira:` 可读错误（调用方回退全量路径或展示错误态）
  */
 export async function streamUgoiraFrames(
-  illustId: number,
+  illustId: IllustId,
   onFrame: (url: string, delay: number, index: number, total: number) => void,
   onProgress?: (pct: number) => void,
   signal?: AbortSignal,
@@ -347,7 +348,7 @@ export async function streamUgoiraFrames(
  * 不先 delete——服务端无 edit 端点，先删会让收藏状态闪断。
  */
 export function addBookmark(
-  illustId: number,
+  illustId: IllustId,
   restrict: RestrictType = "public",
   tags?: string[],
 ): Promise<void> {
@@ -361,7 +362,7 @@ export function addBookmark(
   return apiClient.post("/v2/illust/bookmark/add", body);
 }
 
-export function deleteBookmark(illustId: number): Promise<void> {
+export function deleteBookmark(illustId: IllustId): Promise<void> {
   return apiClient.post("/v1/illust/bookmark/delete", {
     illust_id: String(illustId),
   });
@@ -383,7 +384,7 @@ export function deleteBookmark(illustId: number): Promise<void> {
  * 键存在但显式 null 仍返回 null（未收藏的防御分支，与 lynx 侧同语义）。
  */
 export async function loadBookmarkDetail(
-  illustId: number,
+  illustId: IllustId,
   signal?: AbortSignal,
 ): Promise<PixivBookmarkDetail | null> {
   const res = await apiClient.get<PixivBookmarkDetailResponse | null>(
@@ -410,7 +411,7 @@ export async function loadBookmarkDetail(
  * （next_url 分页兼容，spec D4：本期首屏 + 追加可选）。
  */
 export function loadUserBookmarkTags(
-  userId: number,
+  userId: UserId,
   restrict: RestrictType = "public",
   offset?: number,
   signal?: AbortSignal,
@@ -429,21 +430,21 @@ export function loadUserBookmarkTags(
   );
 }
 
-export function followUser(userId: number, restrict?: "public" | "private"): Promise<void> {
+export function followUser(userId: UserId, restrict?: "public" | "private"): Promise<void> {
   return apiClient.post("/v1/user/follow/add", {
     user_id: String(userId),
     restrict: restrict ?? "public",
   });
 }
 
-export function unfollowUser(userId: number): Promise<void> {
+export function unfollowUser(userId: UserId): Promise<void> {
   return apiClient.post("/v1/user/follow/delete", {
     user_id: String(userId),
   });
 }
 
 export function loadUserIllusts(
-  userId: number,
+  userId: UserId,
   type: ContentType = "illust",
   signal?: AbortSignal,
 ): Promise<PixivIllustListResponse> {

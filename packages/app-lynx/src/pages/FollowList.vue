@@ -10,6 +10,7 @@ import {
   followUser,
   unfollowUser,
 } from '../api/user'
+import { toUserId } from '../api/id'
 import type { PixivUserPreview } from '../api/types'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { presentError } from '../utils/errorPresentation'
@@ -52,7 +53,7 @@ async function fetchFirstPage() {
   errorMsg.value = ''
   pageErrorMsg.value = ''
   try {
-    const res = isFollowing.value ? await getUserFollowing(userId) : await getUserFollowers(userId)
+    const res = isFollowing.value ? await getUserFollowing(toUserId(userId)) : await getUserFollowers(toUserId(userId))
     // 关注列表里的用户本就已关注，但 API 的 is_followed 可能不返回（undefined→falsy 会误显示"关注"按钮）
     users.value = res.user_previews.map((u) => {
       if (isFollowing.value && u.user.is_followed === undefined) u.user.is_followed = true

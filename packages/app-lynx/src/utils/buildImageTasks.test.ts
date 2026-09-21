@@ -2,14 +2,15 @@
 // image-save-download §3 D3 文件名契约；复用 originalPageUrls/extForUrl 字面语义）。
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { buildImageTasks } from './galleryDownload'
+import { toIllustId, toUserId } from '../api/id'
 import type { PixivIllust } from '../api/types'
 
 function illust(over?: Partial<PixivIllust>): PixivIllust {
   return {
-    id: 123,
+    id: toIllustId(123),
     title: '作品A',
     type: 'illust',
-    user: { id: 1, name: 'u', account: 'u', profile_image_urls: { medium: '' } } as PixivIllust['user'],
+    user: { id: toUserId(1), name: 'u', account: 'u', profile_image_urls: { medium: '' } } as PixivIllust['user'],
     image_urls: {
       square_medium: 's',
       medium: 'https://i.pximg.net/medium.jpg',

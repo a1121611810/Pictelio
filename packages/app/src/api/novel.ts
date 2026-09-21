@@ -13,10 +13,11 @@ import type {
   PixivNovelListResponse,
   PixivNovelDetailResponse,
   PixivNovel,
+  SeriesNavigation,
   PixivUser,
   RestrictType,
-  SeriesNavigation,
 } from "./types";
+import type { NovelId, SeriesId, UserId } from "./id";
 
 // ─── 小说内嵌图片 / 正文提取：共享包 @pictelio/novel-export（消费方零改动） ───
 // 原实现已迁入共享包；此处 re-export 保持既有 import 路径可用（ADR-0154 D1）。
@@ -28,13 +29,20 @@ const isNative = Capacitor.isNativePlatform();
 /**
  * 获取正文 + 系列导航数据 + 内嵌图片映射。
  */
-export async function fetchNovelData(novelId: number): Promise<{
+export async function fetchNovelData(novelId: NovelId): Promise<{
   text: string;
   navigation: SeriesNavigation;
   images: NovelImagesMap;
 }> {
   const html = await loadText(novelId);
-  return extractNovelDataFromHtml(html);
+  // novel-export 包的 SeriesNavigation 用 raw `number`（与本包 NovelId
+  // 结构同形，运行时相同）；在此桥接边界处类型层 cast。
+  // 待 novel-export 升级为 Branded 后移除此 cast。
+  return extractNovelDataFromHtml(html) as unknown as {
+    text: string;
+    navigation: SeriesNavigation;
+    images: NovelImagesMap;
+  };
 }
 
 export function loadRecommended(): Promise<PixivNovelListResponse> {
@@ -44,7 +52,7 @@ export function loadRecommended(): Promise<PixivNovelListResponse> {
 }
 
 export function loadBookmarks(
-  userId: number,
+  userId: UserId,
   restrict: RestrictType = "public",
 ): Promise<PixivNovelListResponse> {
   return apiClient.get<PixivNovelListResponse>("/v1/user/bookmarks/novel", {
@@ -53,13 +61,13 @@ export function loadBookmarks(
   });
 }
 
-const detailDeduper = createDedupedRequest<number, PixivNovelDetailResponse>((novelId) =>
+const detailDeduper = createDedupedRequest<NovelId, PixivNovelDetailResponse>((novelId) =>
   apiClient.get<PixivNovelDetailResponse>("/v2/novel/detail", {
     novel_id: String(novelId),
   }),
 );
 
-export function loadDetail(novelId: number): Promise<PixivNovelDetailResponse> {
+export function loadDetail(novelId: NovelId): Promise<PixivNovelDetailResponse> {
   return detailDeduper.request(novelId);
 }
 
@@ -68,7 +76,7 @@ export function loadDetail(novelId: number): Promise<PixivNovelDetailResponse> {
  * 此 endpoint 位于 app-api.pixiv.net（与 apiClient 同一域名），接受 OAuth Bearer token。
  * 参数名是 id（非 novel_id），返回 HTML 而非 JSON，因此手动实现。
  */
-async function loadTextRaw(novelId: number): Promise<string> {
+async function loadTextRaw(novelId: NovelId): Promise<string> {
   const params = new URLSearchParams({ id: String(novelId) });
 
   if (!isNative) {
@@ -103,9 +111,9 @@ async function loadTextRaw(novelId: number): Promise<string> {
   return res.data;
 }
 
-const textDeduper = createDedupedRequest<number, string>((novelId) => loadTextRaw(novelId));
+const textDeduper = createDedupedRequest<NovelId, string>((novelId) => loadTextRaw(novelId));
 
-export function loadText(novelId: number): Promise<string> {
+export function loadText(novelId: NovelId): Promise<string> {
   return textDeduper.request(novelId);
 }
 
@@ -124,7 +132,7 @@ export interface NovelSeriesDetailResponse {
 }
 
 export function loadSeries(
-  seriesId: number,
+  seriesId: SeriesId,
   lastOrder?: number,
 ): Promise<NovelSeriesDetailResponse> {
   const params: Record<string, string> = { series_id: String(seriesId) };
@@ -156,21 +164,21 @@ export function loadFollow(restrict: RestrictType = "public"): Promise<PixivNove
  * Pixiv App-API: GET /v1/user/novels
  * @param userId 目标用户 ID
  */
-export function loadUserNovels(userId: number): Promise<PixivNovelListResponse> {
+export function loadUserNovels(userId: UserId): Promise<PixivNovelListResponse> {
   return apiClient.get<PixivNovelListResponse>("/v1/user/novels", {
     user_id: String(userId),
     filter: "for_ios",
   });
 }
 
-export function addBookmark(novelId: number, restrict: RestrictType = "public"): Promise<void> {
+export function addBookmark(novelId: NovelId, restrict: RestrictType = "public"): Promise<void> {
   return apiClient.post("/v2/novel/bookmark/add", {
     novel_id: String(novelId),
     restrict,
   });
 }
 
-export function deleteBookmark(novelId: number): Promise<void> {
+export function deleteBookmark(novelId: NovelId): Promise<void> {
   return apiClient.post("/v1/novel/bookmark/delete", {
     novel_id: String(novelId),
   });

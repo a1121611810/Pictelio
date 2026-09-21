@@ -8,10 +8,11 @@ import {
   commitBookmarkTagToken,
 } from "../utils/bookmarkTagSelection";
 import { t, apiErrorMessage } from "../i18n";
+import { toUserId, type IllustId } from "../api/id";
 
 interface BookmarkPanelProps {
   /** 目标插画 id（面板内所有请求的作用域；变化即重置 + 中止旧请求） */
-  illustId: number;
+  illustId: IllustId;
   /** 打开时作品的已收藏态（外部快照，仅作上下文展示；真值以预填结果为准） */
   isBookmarked: boolean;
   /** 作品自带标签名列表（建议来源，spec docs/specs/bookmark-tags.md D5/D7） */
@@ -162,7 +163,7 @@ const BookmarkPanel: Component<BookmarkPanelProps> = (props) => {
   let universeAbort: AbortController | null = null;
 
   createEffect(
-    () => ({ open: props.isOpen, restrict: restrict(), userId: user()?.id ?? 0 }),
+    () => ({ open: props.isOpen, restrict: restrict(), userId: user()?.id ?? toUserId(0) }),
     (s) => {
       universeGen++;
       universeAbort?.abort();

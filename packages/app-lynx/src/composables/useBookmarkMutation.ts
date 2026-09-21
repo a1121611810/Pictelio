@@ -46,6 +46,7 @@ import { t } from '../i18n'
 import { apiClient } from '../api/client'
 import { addBookmark } from '../api/illust'
 import { addNovelBookmark, deleteNovelBookmark } from '../api/novel'
+import { toIllustId, toNovelId } from '../api/id'
 import type { RestrictType } from '../api/types'
 import { mutationKeys } from '../api/queryKeys'
 
@@ -114,26 +115,26 @@ export function useBookmarkMutation(
           // 小说收藏端点无 tags 载荷（Pixiv 端点差异）——面板路径当前无小说宿主；
           // 万一被调用，显式 warn 后按 restrict 保存（禁静默丢载荷，测试硬约束 3）
           console.warn('[useBookmarkMutation] novel saveWith 不支持 tags，按 restrict 保存', vars.tags)
-          await addNovelBookmark(illustId, vars.restrict)
+          await addNovelBookmark(toNovelId(illustId), vars.restrict)
           return
         }
         // 面板保存恒为「收藏/覆盖」方向（spec D5/D6 + ADR-0160 D2 覆盖式编辑）：
         // 经 T3 addBookmark 序列化 restrict + tags（空格 join 单值、tags[] 字段名）。
-        await addBookmark(illustId, vars.restrict, vars.tags)
+        await addBookmark(toIllustId(illustId), vars.restrict, vars.tags)
         return
       }
       if (vars.target) {
         // 快速收藏恒公开（spec D3）：显式 restrict=public + 无 tags（零决策）；
         // 经 addBookmark 单点序列化，避免此处再手拼 payload（FIX-1）
         if (isNovel) {
-          await addNovelBookmark(illustId, 'public')
+          await addNovelBookmark(toNovelId(illustId), 'public')
           return
         }
-        await addBookmark(illustId, 'public')
+        await addBookmark(toIllustId(illustId), 'public')
         return
       }
       if (isNovel) {
-        await deleteNovelBookmark(illustId)
+        await deleteNovelBookmark(toNovelId(illustId))
         return
       }
       await apiClient.post('/v1/illust/bookmark/delete', { illust_id: String(illustId) })

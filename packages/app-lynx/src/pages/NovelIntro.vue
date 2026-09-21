@@ -11,6 +11,7 @@ defineOptions({ name: 'novel-intro' })
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { currentParams, goBack, navigate } from '../router'
 import { loadNovelDetail, loadNovelSeries, addNovelWatchlist } from '../api/novel'
+import { toNovelId, toSeriesId } from '../api/id'
 import type { PixivNovel } from '../api/types'
 import { presentError } from '../utils/errorPresentation'
 import { proxyImageUrl } from '../utils/imageUrl'
@@ -72,11 +73,11 @@ function setupPrompt(): void {
   prompt.value = createWatchlistPrompt({
     getSeries: () => novel.value?.series ?? null,
     loadWatchState: async (seriesId) =>
-      (await loadNovelSeries(seriesId)).novel_series_detail.watchlist_added,
+      (await loadNovelSeries(toSeriesId(seriesId))).novel_series_detail.watchlist_added,
     isDismissed,
     markDismissed,
     setWatchState,
-    addWatchlist: addNovelWatchlist,
+    addWatchlist: (seriesId) => addNovelWatchlist(toSeriesId(seriesId)),
   })
 }
 
@@ -94,7 +95,7 @@ async function loadNovel(): Promise<void> {
   errorMsg.value = ''
   teardownPrompt()
   try {
-    const res = await loadNovelDetail(novelId.value)
+    const res = await loadNovelDetail(toNovelId(novelId.value))
     if (gen !== loadGeneration) return
     novel.value = res.novel
     // prompt 仅承载 watchAdded 预取（chip 显示）；详情落地后系列才已知

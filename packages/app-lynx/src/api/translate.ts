@@ -21,6 +21,10 @@
 // - Azure URL 模板：baseURL 匹配 *.openai.azure.com 时自动补 `/openai/v1` 段
 //   + header `api-version: preview`（spec §9.2）。
 
+// URL 解析唯一入口（ADR-0172 §3：lynx 侧禁用 URL 全局）
+import type { NovelId } from './id'
+import { extractHostname } from '../utils/safeParseUrl'
+
 // ───────────────────────── 类型 ─────────────────────────
 
 /**
@@ -30,8 +34,6 @@
  *
  * @see ADR-0169 D2
  */
-// URL 解析唯一入口（ADR-0172 §3：lynx 侧禁用 URL 全局）
-import { extractHostname } from '../utils/safeParseUrl'
 
 export interface LlmEndpointConfig {
   /** 形如 "https://api.openai.com/v1"，不含 "/responses" 后缀 */
@@ -66,7 +68,7 @@ export interface LlmEndpointPublic {
  * @see ADR-0169 D3
  */
 export interface TranslationRequest {
-  novelId: number
+  novelId: NovelId
   /** Pixiv 小说系列内章节 ID；单本小说 = novelId */
   chapterId: string
   /** 纯文本段落（已剥 HTML / 注音 / 行内样式） */

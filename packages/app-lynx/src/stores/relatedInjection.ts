@@ -8,6 +8,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { loadRelated } from '../api/illust'
+import { toIllustId } from '../api/id'
 import type { PixivIllust } from '../api/types'
 import { useSettingsStore } from './settingsStore'
 
@@ -42,7 +43,7 @@ async function fetchRelatedIllusts(settings: ReturnType<typeof useSettingsStore>
     if (Date.now() - hit.at < RELATED_CACHE_TTL_MS) return hit.items
     cache.delete(anchorId)
   }
-  const res = await loadRelated(anchorId)
+  const res = await loadRelated(toIllustId(anchorId))
   const items = res.illusts
     .filter((i) => !settings.isRestricted(i) && !settings.isAiRestricted(i))
     .slice(0, RELATED_ROW_SIZE)

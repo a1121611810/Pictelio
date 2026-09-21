@@ -4,15 +4,16 @@
 // （多页 meta_pages original ?? large / 单页 meta_single_page ?? large，真实响应字段结构）。
 import { describe, expect, it, vi } from "vitest"
 import { buildSaveFileName, extForUrl, originalPageUrls, saveIllustPages } from "./galleryDownload"
+import { toIllustId, toUserId } from "../api/id"
 import type { PixivIllust } from "../api/types"
 
 /** 真实响应字段结构样例（meta_pages.original / meta_single_page.original_image_url） */
 function makeIllust(overrides: Partial<PixivIllust> = {}): PixivIllust {
   return {
-    id: 123456,
+    id: toIllustId(123456),
     title: "多页作品",
     type: "illust",
-    user: { id: 1, name: "a", account: "a", profile_image_urls: {} },
+    user: { id: toUserId(1), name: "a", account: "a", profile_image_urls: {} },
     image_urls: {
       square_medium: "https://i.pximg.net/c/250x250/sq.jpg",
       medium: "https://i.pximg.net/c/540x540/m.jpg",

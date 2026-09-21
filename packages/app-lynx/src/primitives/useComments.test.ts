@@ -4,6 +4,7 @@
 import { describe, expect, it, vi } from "vitest"
 import { useComments } from "./useComments"
 import { ApiErrorType } from "../api/types"
+import { toUserId } from "../api/id"
 import type {
   PixivComment,
   PixivCommentReplyResponse,
@@ -16,7 +17,7 @@ function makeComment(id: number, text = `评论${id}`): PixivComment {
     id,
     comment: text,
     date: "2024-01-01T00:00:00+09:00",
-    user: { id: id * 10, name: "作者", account: "author" },
+    user: { id: toUserId(id * 10), name: "作者", account: "author" },
     has_replies: false,
   }
 }

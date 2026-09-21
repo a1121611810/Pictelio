@@ -7,6 +7,7 @@ import { queryKeys } from "../api/queryKeys";
 import { normalizeQueryError } from "../api/normalizeQueryError";
 import { apiClient } from "../api/client";
 import { queryClient } from "../api/queryClient";
+import { toUserId } from "../api/id";
 /**
  * userIllustsStore 暂不迁移到 createTQFeedStore。
  *
@@ -47,7 +48,7 @@ const illustQuery = createRoot(() =>
           if (pageParam) {
             return apiClient.get<{ illusts: PixivIllust[]; next_url: string | null }>(pageParam);
           }
-          return loadUserIllusts(s.userId, s.type);
+          return loadUserIllusts(toUserId(s.userId), s.type);
         },
         getNextPageParam: (lastPage: { next_url: string | null }) => lastPage.next_url ?? undefined,
         initialPageParam: undefined as string | undefined,
@@ -78,7 +79,7 @@ const novelQuery = createRoot(() =>
           if (pageParam) {
             return apiClient.get<{ novels: PixivNovel[]; next_url: string | null }>(pageParam);
           }
-          return loadUserNovels(s.userId);
+          return loadUserNovels(toUserId(s.userId));
         },
         getNextPageParam: (lastPage: { next_url: string | null }) => lastPage.next_url ?? undefined,
         initialPageParam: undefined as string | undefined,
