@@ -1,5 +1,6 @@
 import { apiClient } from "./client";
 import type { PixivCommentRootResponse, PixivCommentReplyResponse } from "./types";
+import type { IllustId, NovelId } from "./id";
 
 /** 评论内容类型：插画或小说 */
 export type CommentContentType = "illust" | "novel";
@@ -39,7 +40,7 @@ export const MAX_COMMENT_LENGTH = 2000;
 
 export function loadRootComments(
   type: CommentContentType,
-  targetId: number,
+  targetId: IllustId | NovelId,
   signal?: AbortSignal,
 ): Promise<PixivCommentRootResponse> {
   return apiClient.get<PixivCommentRootResponse>(
@@ -71,7 +72,7 @@ export function loadReplies(
 
 export function postComment(
   type: CommentContentType,
-  targetId: number,
+  targetId: IllustId | NovelId,
   comment: string,
   parentCommentId?: number,
 ): Promise<void> {

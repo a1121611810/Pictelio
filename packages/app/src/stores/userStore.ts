@@ -1,6 +1,7 @@
 import { getUserDetail } from "../api/user";
 import { type PixivProfile, type PixivUser } from "../api/types";
 import { user } from "./authStore";
+import { toUserId } from "../api/id";
 
 const [profile, setProfile] = createSignal<PixivProfile | null>(null);
 const [viewedUser, setViewedUser] = createSignal<PixivUser | null>(null);
@@ -24,7 +25,7 @@ export async function loadProfile(userId?: number, forceRefresh?: boolean) {
       return;
     }
   }
-  const [err, data] = await tryAsync(getUserDetail(id));
+  const [err, data] = await tryAsync(getUserDetail(toUserId(id)));
   if (err) {
     console.warn("[userStore] Failed to load profile", err);
   } else {

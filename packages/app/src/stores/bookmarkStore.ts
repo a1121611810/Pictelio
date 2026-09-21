@@ -4,17 +4,18 @@ import { user } from "./authStore";
 import type { PixivIllust, RestrictType } from "../api/types";
 import { filterFeedIllusts } from "../utils/r18Filter";
 import { apiClient } from "../api/client";
+import { toUserId, type UserId } from "../api/id";
 
 // ── Restrict signal ──
 const [restrict, setRestrictSignal] = createSignal<RestrictType>("public");
 
 // ── Factory ──
-const store = createTQFeedStore<PixivIllust, "bookmarks", { userId: number }>({
+const store = createTQFeedStore<PixivIllust, "bookmarks", { userId: UserId }>({
   name: "bookmarks",
   currentTab: () => "bookmarks" as const,
   enabled: () => !!user()?.id,
   lazy: true,
-  getDeps: () => ({ userId: user()?.id ?? 0 }),
+  getDeps: () => ({ userId: user()?.id ?? toUserId(0) }),
   staleTime: 30_000,
   gcTime: 5 * 60_000,
   errorStrategy: "allMustFail",

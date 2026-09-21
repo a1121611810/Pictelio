@@ -13,6 +13,7 @@ import {
   loadUgoiraMetadata,
   type UgoiraFrame,
 } from "../api/illust";
+import { toIllustId, type IllustId } from "../api/id";
 import { ApiErrorType, type ApiError } from "../api/types";
 import type { PixivIllust } from "../api/types";
 import ErrorDisplay from "../components/ErrorDisplay";
@@ -199,7 +200,7 @@ const IllustDetail: Component = () => {
   }
 
   /** 在后台加载 ugoira ZIP 并解压帧，返回进度百分比信号 */
-  async function startUgoiraLoad(illustId: number) {
+  async function startUgoiraLoad(illustId: IllustId) {
     setUgoiraProgress(0);
     setUgoiraReady(false);
     setUgoiraFrames([]);
@@ -487,7 +488,7 @@ const IllustDetail: Component = () => {
       setError(null);
       setIllust(null);
 
-      loadDetail(id, controller.signal)
+      loadDetail(toIllustId(id), controller.signal)
         .then((res) => {
           if (cancelled) return;
           const i = res.illust;

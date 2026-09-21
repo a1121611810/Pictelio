@@ -10,6 +10,7 @@ import {
 import { createSentinel } from "./visibility";
 import { SHEET_LAZY_MARGIN } from "./rootMargins";
 import { t } from "../i18n";
+import type { IllustId, NovelId } from "../api/id";
 
 export interface UseCommentsResult {
   comments: Accessor<PixivComment[]>;
@@ -28,7 +29,7 @@ export interface UseCommentsResult {
 
 export function useComments(
   type: Accessor<CommentContentType>,
-  targetId: Accessor<number>,
+  targetId: Accessor<IllustId | NovelId>,
   enabled: Accessor<boolean>,
 ): UseCommentsResult {
   const [rootComments, setRootComments] = createSignal<PixivComment[]>([]);
