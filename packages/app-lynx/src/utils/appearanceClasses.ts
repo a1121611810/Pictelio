@@ -2,7 +2,8 @@
 // 输入 themeColorId + resolvedDark → 根类数组。
 // - 亮色模式：返回 ['theme-X']
 // - 暗色模式：返回 ['theme-X', 'dark']（复合选择器 .theme-X.dark 特异性更高，覆盖亮色版同名变量）
-// - 与 themeColorClass 模式同源：未知 id → warn + 回退默认 + 单类返回
+// - id → className（含未知回退 + warn）复用 themeColor.ts 的 themeColorClass：**单一实现**
+//   （本地镜像会产生第二份 warn 前缀，非法值告警来源分裂）
 //
 // 设计约束：
 // - 根 <page> 同时挂 .theme-X 与 .dark 两个类 → 复合选择器特异性 0,2,0 > 0,1,0，CSS 变量
@@ -10,7 +11,7 @@
 // - 状态栏图标色（spec T3）只读 resolvedDark，不重复派生；
 // - 切换瞬时：根类变化 → 整树 CSS 变量重算，Lynx 元素重排；
 // - a11y / i18n / Me.vue 入口的色块预览均消费 resolvedDark，与根类严格同步。
-import { THEME_COLOR_OPTIONS } from "./themeColor"
+import { themeColorClass } from "./themeColor"
 import type { ResolvedDark } from "./darkMode"
 
 /** 暗色附加类（spec §4.7 决策：与 .theme-X 复合组成 .theme-X.dark） */
@@ -21,22 +22,13 @@ export const DARK_CLASS = "dark"
  * Vue 模板直接 :class="appearanceClasses(themeColor, resolvedDark)" 即可。
  *
  * 行为约束：
- * - 未知 themeColorId → console.warn + 回退默认 + 单类返回（静默降级禁）
+ * - 未知 themeColorId → console.warn + 回退默认 + 单类返回（静默降级禁；告警前缀
+ *   `[themeColor]` —— 与 themeColorClass 同一条实现，非本模块自有前缀）
  * - resolvedDark === 'dark' → 附加 .dark 类（与既有 .theme-X 复合）
  * - resolvedDark === 'light' → 仅 .theme-X 单类
  */
 export function appearanceClasses(themeColorId: string, resolvedDark: ResolvedDark): string[] {
-  const themeClass = themeClassFor(themeColorId)
+  const themeClass = themeColorClass(themeColorId)
   if (resolvedDark === "dark") return [themeClass, DARK_CLASS]
   return [themeClass]
-}
-
-/** themeColorId → CSS className（未知 id warn + 回退默认；与 themeColorClass 同模式） */
-function themeClassFor(themeColorId: string): string {
-  const option = THEME_COLOR_OPTIONS.find((o) => o.id === themeColorId)
-  if (!option) {
-    console.warn("[appearanceClasses] 未知 themeColorId，回退默认色板:", themeColorId)
-    return THEME_COLOR_OPTIONS[0].className
-  }
-  return option.className
 }

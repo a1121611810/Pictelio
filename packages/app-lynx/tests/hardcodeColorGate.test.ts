@@ -11,11 +11,15 @@
 // - 仅扫描 src/**（不扫 tests/、dist/、scripts/）——脚本生成产物允许 hex
 // - 注释中允许 hex（如 BookmarkButton.vue:155 ADR-0112 取证），但非注释命中即违规
 // - .vue 文件：template 与 style 块扫 hex/rgb；script 块整体扫（含 i18n / data）
-// - 区分「颜色 hex」（#xxx/#xxxx/#xxxxxx/#xxxxxxxx = 3/4/6/8 位）与「issue 编号」
-//   （任意位数）：issue 编号通常 1-4 位，与颜色 hex 长度集合（3/4/6/8）有重叠但
-//   形态不同——issue 编号前面是空格/标号，hex 后面必有非字母数字边界。
+// - 「颜色 hex」（#xxx/#xxxx/#xxxxxx/#xxxxxxxx = 3/4/6/8 位）与「issue 编号」：**形态不可分辨**
+//   ——3 位 hex 与 3 位 issue 号同形（#129 两义）；扫描器只按形态命中，不做语义区分。
+//   该歧义由既有约定兜住：issue 号只出现在注释里（注释豁免 → stripComments 剔除），
+//   非注释上下文里的 #129 只能是颜色字面量；真出现误报则登记白名单（理由可追溯）。
+//   已知可接受，见下方「3 位 hex 与 issue 号不可分辨」自检用例。
 //
-// 与 hardcode-gate.test.ts 的差异：本门扫「颜色」而非「中文」，两者并行无重叠。
+// 与 i18n 的 hardcode-gate.test.ts 关注点不同、**非重复**：那道门扫「硬编码中文文案」
+// （i18n.md §6 文案回潮），本门扫「硬编码颜色字面量」（lynx-night-mode-audit §5 色彩回潮）；
+// 两者可能命中同一文件，但命中原因与修复动作互不相干（改 i18n 键 vs 改 --md-* token）。
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
@@ -60,6 +64,8 @@ function* walk(dir: string): Generator<string> {
     if (entry.name === "node_modules" || entry.name === "dist") continue;
     const p = path.join(dir, entry.name);
     if (entry.isDirectory()) yield* walk(p);
+    // 注：扩展名过滤已排除 tokens.css（.css 不在此列）——TOKENS 比对是与 TOKENS 常量同步的
+    // 兜底（防后续把 .css 纳入扫描时漏豁免），当前恒不触发。
     else if (/\.(vue|ts)$/.test(entry.name) && p !== TOKENS) yield p;
   }
 }
@@ -110,15 +116,18 @@ describe("硬编码浅色值回潮门禁（spec lynx-night-mode-audit.md §5）"
     expect(hits).not.toContain("#129");
   });
 
-  it("扫描器自检：issue 编号与色 hex 区分（3 位 hex 与 3 位 issue 编号不同形）", () => {
+  it("扫描器自检：3 位 hex 与 issue 号不可分辨（已知可接受，非注释上下文一律命中）", () => {
     const sample = `
       <!-- issue #129 中性标记 -->
       color: #129;
       background: #abc;
     `;
     const hits = collectHardcodedColors(sample);
-    // #129 后置边界为字母数字 - 但 issue 编号在 HTML 注释中被 stripComments 剔除
-    expect(hits).toContain("#abc"); // 合法 hex
+    // 注释内的 #129 已被 stripComments 剔除（上一条用例已覆盖该方向）；此处如实断言剩余结果：
+    // 非注释上下文里的 #129 与合法 3 位 hex（#fff 形态）**完全同形**，扫描器无法分辨
+    // ——已知可接受：真实源码中 issue 号只出现在注释里，非注释 #129 只能是颜色字面量。
+    expect(hits).toContain("#abc");
+    expect(hits).toContain("#129");
   });
 
   it("扫描器自检：JS 行注释豁免", () => {
@@ -128,6 +137,30 @@ describe("硬编码浅色值回潮门禁（spec lynx-night-mode-audit.md §5）"
     `;
     const hits = collectHardcodedColors(sample);
     expect(hits).toContain("#1a6fa8");
+  });
+
+  it("白名单非空 + 每条登记路径在磁盘存在 + 理由非空（防陈旧豁免掩盖新违规）", () => {
+    // 空集防护：白名单被整体清空会让下方「白名单外零命中」失去豁免语义（豁免文件反而翻红）
+    expect(WHITELIST.length).toBeGreaterThan(0);
+    const missing = WHITELIST.filter(
+      (e) => !fs.existsSync(path.resolve(SRC, e.path)),
+    ).map((e) => e.path);
+    expect(
+      missing,
+      `白名单条目指向的文件已不存在（陈旧豁免，应删除或改名）：${missing.join(", ")}`,
+    ).toEqual([]);
+    const noReason = WHITELIST.filter((e) => e.reason.trim().length === 0).map((e) => e.path);
+    expect(noReason, `白名单条目缺少理由（豁免必须可追溯）：${noReason.join(", ")}`).toEqual([]);
+  });
+
+  it("扫描覆盖面下界：walk(src) 文件数不塌陷 + 关键文件在集内（防遍历失效恒真通过）", () => {
+    const files = [...walk(SRC)];
+    // 下界（防 walk 选择性失效 → offenders 恒空 → 门禁恒真）：当前 src 约 311 个 .vue/.ts
+    expect(files.length).toBeGreaterThanOrEqual(300);
+    const rels = new Set(files.map((p) => path.relative(SRC, p).split(path.sep).join("/")));
+    for (const rel of ["App.vue", "pages/Me.vue", "utils/themeColor.ts", "utils/appearanceClasses.ts"]) {
+      expect(rels.has(rel), `${rel} 未被扫描（walk 覆盖失效）`).toBe(true);
+    }
   });
 
   it("白名单外零命中（src 内禁硬编码浅色值）", () => {

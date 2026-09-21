@@ -31,8 +31,15 @@ export function isThemeColorId(value: string): value is ThemeColorId {
   return ID_SET.has(value)
 }
 
-/** 主题色 → tokens.css 色板类（未知 id 回退默认色板并 warn，禁止静默降级） */
-export function themeColorClass(id: ThemeColorId): string {
+/**
+ * 主题色 → tokens.css 色板类（未知 id 回退默认色板并 warn，禁止静默降级）。
+ *
+ * 入参刻意放宽为 `string`（非 `ThemeColorId`）：调用点在类型边界之前无法保证已注册 id
+ * （持久化读值 / 根类绑定透传），校验责任内聚本函数。**唯一实现**——
+ * appearanceClasses 复用本函数，禁止第二份「id → className + warn」镜像（前缀双轨会
+ * 让同一非法值出两条不同来源的告警，掩盖真实来源）。
+ */
+export function themeColorClass(id: string): string {
   const option = THEME_COLOR_OPTIONS.find((o) => o.id === id)
   if (!option) {
     console.warn("[themeColor] 未知主题色 id，回退默认色板:", id)

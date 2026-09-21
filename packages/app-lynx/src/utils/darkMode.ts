@@ -4,7 +4,9 @@
 //   * native 路径：PictelioAppModule.getDarkMode(cb) 订阅后拉初值（ADR-0168 subscribe-then-pull 同构）
 //     + pictelioDarkMode 全局事件推后续变化。
 //   * web-core 预览：matchMedia("(prefers-color-scheme: dark)") 拉初值 + change 监听。
-// - 当前系统暗色值 = currentDarkMode ref，所有派生只读它；订阅入口另导出便于非响应式场景。
+// - 当前系统暗色值 = currentDarkMode ref，所有派生只读它；生产侧经 ensureDarkModeInit()
+//   启桥后响应式读取，命令式订阅入口（getDarkMode / subscribeDarkMode / unsubscribeDarkMode）
+//   为模块 seam，非响应式场景预留。
 // - 模块前缀：[darkMode]（与 settingsStore 主前缀分桶；themeColor 模块亦同）。
 import { ref } from 'vue'
 
@@ -111,10 +113,9 @@ function ensureInit(): void {
     (typeof NativeModules !== 'undefined' ? NativeModules : undefined) ??
     (globalThis as { NativeModules?: { PictelioApp?: PictelioAppNativeDark } }).NativeModules
   const app = nm?.PictelioApp
-  const isNative = !!(nm?.PictelioApp)
 
-  // ── native 路径 ──
-  if (isNative) {
+  // ── native 路径（判定 = PictelioApp 模块存在：isNativeMode 同口径，避免第三份重复判定）──
+  if (app) {
     // 先订阅（镜像 safeArea.ts D2 修订：订阅后拉，防首帧事件丢失）
     const lynxGlobal =
       typeof lynx !== 'undefined' ? lynx : (globalThis as { lynx?: LynxGlobal }).lynx
@@ -168,7 +169,18 @@ function ensureInit(): void {
 }
 
 /**
- * 订阅后拉取入口（ADR-0168 subscribe-then-pull 同构）。
+ * 初始化暗色哑桥入口（幂等；**不注册回调、不消费初值**）。
+ * 语义 = 「只把桥接起来」：启动 native pull / matchMedia 监听，让 currentDarkMode 反映真实
+ * 系统态。生产消费方（settingsStore setup）用自己的 computed 读 currentDarkMode 响应式派生，
+ * 不需要回调——故用本函数而非 getDarkMode(() => {})（后者会留下无主订阅回调）。
+ */
+export function ensureDarkModeInit(): void {
+  ensureInit()
+}
+
+/**
+ * 订阅 + 立即回放入口（ADR-0168 subscribe-then-pull 同构；**非原生的 pull**——
+ * 语义 = 订阅 + 立即以当前值回放一次，便于消费方拿到首帧态）。
  * - 立即以 currentDarkMode 当前值回调 cb（首帧即正确态）。
  * - 注册 cb 至订阅集合，后续 currentDarkMode 变化时通知。
  * - 返回 unsubscribe 函数；亦可走显式 unsubscribeDarkMode 退订。
@@ -183,7 +195,10 @@ export function getDarkMode(cb: (mode: ResolvedDark) => void): () => void {
 }
 
 /**
- * 仅订阅（不立即回调）。用于 settingsStore 内部只需监听变化、不需首帧快照的场景。
+ * 仅订阅（不立即回调）——**模块 seam，非响应式场景预留**。
+ * 当前生产侧不直接调用：settingsStore 走 {@link ensureDarkModeInit} 启桥 + 读
+ * currentDarkMode ref（响应式，computed resolvedDark 自动重算）；本函数给「命令式回调」
+ * 消费方（原生事件式通知 / 无 Vue 响应式上下文）预留，与 getDarkMode 共用订阅集合。
  * 返回 unsubscribe 函数（与 getDarkMode 返回形态一致，便于退订对称）。
  */
 export function subscribeDarkMode(cb: (mode: ResolvedDark) => void): () => void {
@@ -194,7 +209,8 @@ export function subscribeDarkMode(cb: (mode: ResolvedDark) => void): () => void 
   }
 }
 
-/** 显式退订（与 getDarkMode / subscribeDarkMode 返回的 unsubscribe 函数兼容） */
+/** 显式退订（与 getDarkMode / subscribeDarkMode 返回的 unsubscribe 函数兼容）——
+ *  模块 seam 的一部分：非响应式场景预留，当前无生产调用方。 */
 export function unsubscribeDarkMode(handle: () => void): void {
   handle()
 }

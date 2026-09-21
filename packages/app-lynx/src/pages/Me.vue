@@ -16,6 +16,7 @@ import GlassCard from '../components/GlassCard.vue'
 import SettingsEndpoint from '../components/SettingsEndpoint.vue'
 import M3Switch from '../components/M3Switch.vue'
 import { appearanceClasses } from '../utils/appearanceClasses'
+import type { DarkModeId } from '../utils/darkMode'
 import {
   createLynxBackupDeps,
   createLynxBackupWiring,
@@ -386,7 +387,8 @@ function toggleRankingEntry() {
 
 // T2：外观模式三态切换（spec docs/specs/lynx-night-mode.md §3 + §4.7）—— 即时生效，
 // 经 settingsStore.setDarkMode 走设备级持久化 + Pinia ref 即时更新 → App.vue 根类重算
-function pickAppearanceMode(mode: 'light' | 'dark' | 'system') {
+// 入参类型取清单单一事实源 DarkModeId（手写联合会与 DARK_MODE_OPTIONS 漂移）
+function pickAppearanceMode(mode: DarkModeId) {
   settings.setDarkMode(mode)
 }
 </script>
@@ -574,6 +576,10 @@ function pickAppearanceMode(mode: 'light' | 'dark' | 'system') {
       <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
         <text class="text-title-small font-medium text-surface-on">{{ t('me.appearance.title') }}</text>
         <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.appearance.themeColorHint') }}</text>
+        <!-- 模式组标签（i18n 键 me.appearance.mode 的真实渲染点）：原实现只有模式名（亮色/暗色/
+             跟随系统），缺组标签导致该键成孤儿；样式镜像同区 themeColorHint 的 label-medium 用法，
+             紧贴 segmented 上方（mb-2），其余视觉不变 -->
+        <text class="text-label-medium text-surface-on-variant mb-2">{{ t('me.appearance.mode') }}</text>
         <!-- M3 segmented button（三档）：亮色 / 暗色 / 跟随系统 -->
         <view class="flex flex-row gap-0 rounded-[var(--md-shape-full)] border border-outline overflow-hidden mb-4">
           <view

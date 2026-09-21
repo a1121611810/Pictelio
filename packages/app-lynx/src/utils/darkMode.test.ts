@@ -3,6 +3,7 @@
 // 1) web-core 预览：matchMedia 成功路径（拉初值 + change 触发更新）
 // 2) web-core 预览：matchMedia 不可用路径（warn + 恒 light）
 // 3) native 路径：PictelioApp.getDarkMode 拉初值 + pictelioDarkMode 事件推变化
+// 4) 初始化入口 ensureDarkModeInit（无回调消费方，settingsStore 生产路径）：幂等启桥 + 不注册订阅者
 // IO 边界强制覆盖（成功 + 失败双路径，禁静默降级）——safeArea.test.ts 同结构。
 // vitest environment: node（vitest.config.ts 默认）；matchMedia 在 node 环境缺失，
 // 通过 globalThis.matchMedia 注入可控 mock（不依赖 window/happy-dom）。
@@ -200,6 +201,22 @@ describe('darkMode（暗色哑桥 + 三态校验）', () => {
       // currentDarkMode 仍为 light，无误覆盖
       expect(m.currentDarkMode.value).toBe('light')
     })
+
+    it('ensureDarkModeInit：幂等启桥（拉到真实系统态）且后续 change 仍生效', async () => {
+      const mq = setupMatchMedia(true)
+      const m = await freshModule()
+      // 调用前：初值兜底 light（模块无副作用）
+      expect(m.currentDarkMode.value).toBe('light')
+      // 启桥后：无需任何订阅者即拉到真实系统态
+      m.ensureDarkModeInit()
+      expect(m.currentDarkMode.value).toBe('dark')
+      // 幂等：重复调用不改变结果
+      m.ensureDarkModeInit()
+      expect(m.currentDarkMode.value).toBe('dark')
+      // 监听已注册（后续变化仍重算）
+      mq.fire(false)
+      expect(m.currentDarkMode.value).toBe('light')
+    })
   })
 
   describe('native 路径（PictelioApp.getDarkMode + pictelioDarkMode 事件）', () => {
@@ -222,6 +239,20 @@ describe('darkMode（暗色哑桥 + 三态校验）', () => {
       n.firePull('light')
       expect(m.currentDarkMode.value).toBe('light')
       expect(cb).toHaveBeenCalledWith('light')
+    })
+
+    it('ensureDarkModeInit：native 侧订阅已注册 + pull 已发起（无回调消费方也能取到系统态）', async () => {
+      const n = setupNative()
+      const m = await freshModule()
+      m.ensureDarkModeInit()
+      // 事件通道已挂（启桥的一部分）：后续变化经事件写入
+      const listeners = n.emitter.listeners['pictelioDarkMode']
+      expect(listeners?.length).toBe(1)
+      listeners[0](JSON.stringify({ mode: 'dark' }))
+      expect(m.currentDarkMode.value).toBe('dark')
+      // pull 通道已发起：原生回调写入当前值
+      n.firePull('light')
+      expect(m.currentDarkMode.value).toBe('light')
     })
 
     it('pictelioDarkMode 事件（标准 JSON 载荷）：mode=dark 即时更新 + 通知订阅者', async () => {

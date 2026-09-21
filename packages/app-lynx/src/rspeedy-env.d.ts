@@ -108,6 +108,14 @@ declare global {
        * 见 utils/darkMode.ts parseNativePayload（JS 单边容忍非隐式契约，Java 端仅产 JSON）。
        */
       getDarkMode(callback: (mode: string) => void): void
+      /**
+       * 暗色外观三态运行时重下发（follow-up #692，spec §4.7；mirror setSystemBarsHidden 范式）：
+       * JS 侧 `settingsStore.setDarkMode` 落盘 `settings_dark_mode` 后调用；原生侧重读该键
+       * （唯一读点 = LynxActivity.readDarkModeRaw + normalizeDarkMode）重下发状态栏图标深浅 +
+       * splash 持久化主题。无入参——避免「JS 传值 / 原生读键」两套来源。
+       * 回调契约：成功 cb(null)；失败 cb(errMsg)。未持有 Activity 引用时静默成功（无宿主可下发）。
+       */
+      applyDarkModePreference(callback: (err: string | null) => void): void
     }
     PictelioAuth: {
       loginWithRefreshToken(token: string, callback: (userInfo: string, err: string) => void): void

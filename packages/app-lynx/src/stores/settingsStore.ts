@@ -32,7 +32,7 @@ import { DEFAULT_THEME_COLOR, isThemeColorId, type ThemeColorId } from "../utils
 import {
   currentDarkMode,
   DEFAULT_DARK_MODE,
-  getDarkMode,
+  ensureDarkModeInit,
   isDarkModeId,
   type DarkModeId,
   type ResolvedDark,
@@ -66,7 +66,9 @@ const DETAIL_QUALITY_KEY = "settings_detail_quality"
 /** 主题色（外观）：设备级共享键（native SharedPreferences / dev IndexedDB），未登录也恢复 */
 const THEME_COLOR_KEY = "settings_theme_color"
 /** 外观暗色状态（spec lynx-night-mode T1）：设备级三态 light/dark/system，默认 system；
- *  与 THEME_COLOR_KEY 同级（外观设备级），沿用 PrefsStorage seam 读写 */
+ *  与 THEME_COLOR_KEY 同级（外观设备级），沿用 PrefsStorage seam 读写。
+ *  键与 Java 侧 LynxActivity.KEY_DARK_MODE 逐字一致（原生唯一读点），
+ *  经 darkModeJavaContract 契约测试钉住（JS 写入 ⇄ 原生读点） */
 const DARK_MODE_KEY = "settings_dark_mode"
 /** 相关作品注入行（spec docs/specs/related-injection.md）：设备级开关，默认开；键与 app 逐字一致 */
 const RELATED_INJECTION_KEY = "related_injection"
@@ -305,10 +307,9 @@ export const useSettingsStore = defineStore("settings", () => {
 
   // system 模式下 resolvedDark 读 currentDarkMode；为避免「system 模式下消费方从未订阅，
   // currentDarkMode 停在 light 初值」的 stale 状态，setup 末尾触发一次 ensureInit 副作用
-  // （幂等：重复调用 no-op；空回调不消费，仅启动 native pull / matchMedia 监听）。
+  // （幂等：重复调用 no-op；不注册回调、不消费初值——本 store 只用响应式 ref 派生）。
   // spec §4.3：订阅后拉语义，setup 内触发等价于消费方首次订阅。
-  void currentDarkMode.value // 触达响应式依赖以防 future refactor 移除该引用告警
-  const _initHandle = getDarkMode(() => {})
+  ensureDarkModeInit()
   const language = _language
   const relatedInjection = _relatedInjection
   const rankingEntry = _rankingEntry
@@ -687,16 +688,58 @@ export const useSettingsStore = defineStore("settings", () => {
   }
 
   /**
-   * 设置外观暗色三态（spec lynx-night-mode T1）：写设备级键 + 即时切换。
+   * 设置外观暗色三态（spec lynx-night-mode T1）：写设备级键 + 即时切换 + 原生即时下发。
    * 不动 currentDarkMode（哑桥 ref），由 resolvedDark computed 自动归一：
    * - 手动 light/dark：直接映射
    * - system：跟随 currentDarkMode（native/web-core matchMedia 推送变化）
+   *
+   * 原生即时下发（follow-up #692，镜像 setFullscreenMode 范式）：写入 resolve 之后调
+   * PictelioApp.applyDarkModePreference——原生侧重读本键（LynxActivity.readDarkModeRaw）
+   * 重下发状态栏图标深浅 + splash 持久化主题，故**必须落盘后再下发**（否则原生读到旧值）；
+   * dev/web-core 无 NativeModules → 仅写键（console.debug 可见）；原生环境方法缺失
+   * （版本漂移异常）→ console.warn（硬约束 #3 禁静默）。冷启动由 LynxActivity.onCreate
+   * 读同键重设（重建自动恢复）。
    */
   function setDarkMode(mode: DarkModeId): void {
     _darkMode.value = mode
     void prefs()
       .set(DARK_MODE_KEY, mode)
-      .catch((e) => console.warn("[settingsStore.darkMode] 暗色外观写入失败", e))
+      .then(
+        () => applyDarkModeToNative(),
+        (e: unknown) => {
+          console.warn("[settingsStore.darkMode] 暗色外观写入失败", e)
+        },
+      )
+      .catch((e: unknown) => {
+        // 下发路径自身抛错（原生桥异常）：不吞（硬约束 #3）
+        console.warn("[settingsStore.darkMode] 原生暗色外观下发异常", e)
+      })
+  }
+
+  /**
+   * 把已落盘的偏好下发给原生（`PictelioApp.applyDarkModePreference`）。无入参——原生侧
+   * 自读 settings_dark_mode（单一读点 = LynxActivity.readDarkModeRaw + normalizeDarkMode），
+   * 避免同一偏好出现「JS 传值 / 原生读键」两套来源。
+   * 分支口径照抄 setFullscreenMode：原生可用 → 调；非原生 → debug 跳过；原生缺方法 → warn。
+   */
+  function applyDarkModeToNative(): void {
+    const nm = getNativeModules()
+    // getNativeModules 的 PictelioApp 类型为 unknown（api/client 既有口径）——本调用面收窄
+    const app = nm?.PictelioApp as
+      | { applyDarkModePreference?: (cb: (err: string | null) => void) => void }
+      | undefined
+    if (isNativeMode() && app && typeof app.applyDarkModePreference === "function") {
+      app.applyDarkModePreference((err) => {
+        if (err) console.warn("[settingsStore.darkMode] 原生暗色外观下发失败", err)
+      })
+    } else if (!isNativeMode()) {
+      console.debug("[settingsStore.darkMode] 暗色外观下发跳过（非原生环境，仅持久化设置）")
+    } else {
+      // 原生环境但模块/方法缺失（版本漂移异常）：必须可见（硬约束 #3 禁静默）
+      console.warn(
+        "[settingsStore.darkMode] NativeModules.PictelioApp.applyDarkModePreference 不可用，仅持久化设置",
+      )
+    }
   }
 
   /** UI 语言切换（B10）：同步 lynx i18n module ref，持久化设备级共享键 */

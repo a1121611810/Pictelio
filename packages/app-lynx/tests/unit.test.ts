@@ -587,7 +587,9 @@ describe('主题色契约（themeColor ↔ tokens.css）', () => {
       '--md-state-pressed-error',
     ])
     // 派生 token：基础 page 已定义完整值，各主题无需重定义（仅暗色 .theme-X.dark 派生）。
-    // - --md-scroll-indicator 由 outline 派生，亮色主题沿用基础页 block 的值
+    // - --md-scroll-indicator：**显式排除**（非缺值）——取值由 outline 派生（rgba 形态，
+    //   不进 hex 角色集），亮色主题沿用基础 page block 值；「基础块 + 6 个暗色块均定义该
+    //   token」的覆盖断言在 tests/unit/utils/appearanceClasses.test.ts（单一处，避免双份 oracle）。
     const derivedFromThemeable = new Set(['--md-scroll-indicator'])
     const roles = new Set<string>()
     for (const m of block.matchAll(/(--md-[a-z0-9-]+)\s*:/g)) {

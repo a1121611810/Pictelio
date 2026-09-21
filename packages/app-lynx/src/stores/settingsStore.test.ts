@@ -524,6 +524,117 @@ describe("settingsStore — 暗色外观三态（spec lynx-night-mode T1）", ()
     expect(store.darkMode).toBe("dark")
   })
 
+  // ── follow-up #692：setDarkMode 的原生下发（落盘后 applyDarkModePreference）──
+  // oracle = 冻结契约「在 prefs().set(DARK_MODE_KEY, mode) resolve 之后下发」+
+  // 原生侧重读同一键（LynxActivity.readDarkModeRaw）→ 逆序会下发旧偏好。
+  /** 原生预置：PictelioPrefs 写探针 + 可选 PictelioApp（缺省 = 模块缺失；{} = 无该方法的版本漂移） */
+  function nativePrefsWithApp(
+    app?: Record<string, unknown>,
+    opts: { failSet?: boolean } = {},
+  ): { written: string[] } {
+    env.native = true
+    const written: string[] = []
+    env.modules = {
+      PictelioPrefs: {
+        prefsGet: (_k: string, cb: (v: string, e: string | null) => void) => cb("", null),
+        prefsSet: (k: string, v: string, cb: (e: string | null) => void) => {
+          if (opts.failSet) {
+            cb("disk full")
+            return
+          }
+          written.push(`${k}=${v}`)
+          cb(null)
+        },
+        prefsRemove: (_k: string, cb: (e: string | null) => void) => cb(null),
+      },
+      ...(app ? { PictelioApp: app } : {}),
+    }
+    return { written }
+  }
+
+  it("原生模式：setDarkMode 落盘成功后下发 applyDarkModePreference（#692 接线）", async () => {
+    const applied: string[] = []
+    const { written } = nativePrefsWithApp({
+      applyDarkModePreference: (cb: (err: string | null) => void) => {
+        applied.push("called")
+        cb(null)
+      },
+    })
+    store.setDarkMode("dark")
+    await vi.waitFor(() => expect(applied.length).toBe(1))
+    // 顺序契约：先落盘再下发（原生侧重读同一键）
+    expect(written).toContain("settings_dark_mode=dark")
+  })
+
+  it("原生模式：下发回调 err → console.warn（禁静默降级）", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    nativePrefsWithApp({
+      applyDarkModePreference: (cb: (err: string | null) => void) => cb("no activity"),
+    })
+    store.setDarkMode("light")
+    await vi.waitFor(() =>
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("原生暗色外观下发失败"),
+        "no activity",
+      ),
+    )
+    warn.mockRestore()
+  })
+
+  it("原生环境但 applyDarkModePreference 缺失（版本漂移）→ console.warn（禁静默）", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    nativePrefsWithApp({})
+    store.setDarkMode("system")
+    await vi.waitFor(() =>
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("applyDarkModePreference 不可用"),
+      ),
+    )
+    warn.mockRestore()
+  })
+
+  it("非原生（dev/web-core）→ 不下发，仅 console.debug 跳过说明", async () => {
+    const debug = vi.spyOn(console, "debug").mockImplementation(() => {})
+    env.native = false
+    env.modules = {
+      PictelioApp: {
+        applyDarkModePreference: () => {
+          throw new Error("非原生环境不得调用原生桥")
+        },
+      },
+    }
+    store.setDarkMode("dark")
+    await vi.waitFor(() =>
+      expect(debug).toHaveBeenCalledWith(
+        expect.stringContaining("暗色外观下发跳过（非原生环境"),
+      ),
+    )
+    debug.mockRestore()
+  })
+
+  it("写入失败 → 不下发（原生读不到新值，避免下发旧偏好）", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const applied: string[] = []
+    nativePrefsWithApp(
+      {
+        applyDarkModePreference: (cb: (err: string | null) => void) => {
+          applied.push("called")
+          cb(null)
+        },
+      },
+      { failSet: true },
+    )
+    store.setDarkMode("dark")
+    await vi.waitFor(() =>
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("暗色外观写入失败"),
+        expect.anything(),
+      ),
+    )
+    expect(applied).toEqual([])
+    warn.mockRestore()
+  })
+
   it("resolvedDark 是 computed：手动 light/dark 即时映射，system 跟随哑桥源", () => {
     _bridgeDarkMode.value = "light"
     // 初始：light + system → 跟随 light
