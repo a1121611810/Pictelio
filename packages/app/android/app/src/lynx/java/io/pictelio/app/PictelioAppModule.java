@@ -22,6 +22,9 @@ import io.pictelio.app.engine.EnginePrefs;
  *   <li>{@code getClientKind(cb)}：成功 {@code cb(kind, null)}；失败 {@code cb(null, errMsg)}</li>
  *   <li>{@code restart(cb)}：成功 {@code cb(null)}；失败 {@code cb(errMsg)}</li>
  *   <li>{@code exitApp(cb)}：成功 {@code cb(null)}；失败 {@code cb(errMsg)}（ADR-0066）</li>
+ *   <li>{@code setSystemBarsHidden(hidden, cb)}：成功 {@code cb()}；失败 {@code cb(errMsg)}</li>
+ *   <li>{@code applyDarkModePreference(cb)}：成功 {@code cb()}；失败 {@code cb(errMsg)}
+ *       （#692：外观三态运行时重下发——状态栏图标 + splash 持久化主题）</li>
  *   <li>{@code exportDiagLog(text, cb)}：成功 {@code cb(null)}；失败 {@code cb(errMsg)}
  *       （T0-DIAG 临时通道：无可用分享应用时日志已写盘，回调可读提示而非失败）</li>
  * </ul>
@@ -240,6 +243,35 @@ public class PictelioAppModule extends LynxModule {
             callback.invoke();
         } catch (Exception e) {
             Log.w(TAG, "setSystemBarsHidden(" + hidden + ") 失败", e);
+            callback.invoke(String.valueOf(e.getMessage()));
+        }
+    }
+
+    /**
+     * 暗色外观三态运行时重下发（follow-up #692，spec docs/specs/lynx-night-mode.md §4.7；
+     * ADR-0180 D7）。
+     *
+     * <p>JS 侧切换「亮色/暗色/跟随系统」（{@code settingsStore.setDarkMode}）后调用——重读
+     * SharedPreferences {@code "CapacitorStorage"} 的 {@code settings_dark_mode}
+     * （键/归一/读点单一所有者 = {@link LynxActivity#KEY_DARK_MODE} =
+     * {@code LynxActivity.readDarkModeRaw} + {@code normalizeDarkMode}），重下发状态栏图标
+     * 深浅（立即生效，全屏模式跳过）并按归一值重设 splash 持久化主题（API 31+，
+     * PackageManager 口径 → 下一次冷启动生效）。
+     *
+     * <p>主线程执行 {@link LynxActivity#applyDarkModePreference}；未持有 Activity 引用时
+     * 静默成功（无宿主可下发，冷启动读写路径兜底）。回调契约（逐字沿用
+     * {@link #setSystemBarsHidden} 范式）：成功 {@code cb()}；失败 {@code cb(errMsg)}。
+     */
+    @LynxMethod
+    public void applyDarkModePreference(Callback callback) {
+        try {
+            LynxActivity activity = LynxActivity.current();
+            if (activity != null) {
+                activity.runOnUiThread(activity::applyDarkModePreference);
+            }
+            callback.invoke();
+        } catch (Exception e) {
+            Log.w(TAG, "applyDarkModePreference 失败", e);
             callback.invoke(String.valueOf(e.getMessage()));
         }
     }

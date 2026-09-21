@@ -19,18 +19,43 @@
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@android:color/white</item>
         <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
-        <!-- T3（解 ADR-0168 D4 钉死，spec lynx-night-mode §splash 双轨 · 深色 plate）：
-             API 31+（Android 12+）系统 splash 在 launcher icon 非全屏时使用本色作为 plate；
-             亮色模式下与背景同色（视觉一致性）。暗色覆写见 values-night/styles.xml。 -->
+        <!-- T3（解 ADR-0168 D4 钉死，spec lynx-night-mode §4.7 · 亮色 plate）：
+             亮色 plate 与底同色为**有意**——launcher 前景图标自带白底，plate 与底同色才无可见
+             圆盘边（现状零视觉回归）。暗色覆写见 values-night/styles.xml（面 #101418 + plate #1C2024）。
+             注：主轨（system 跟随）的 plate 项仅在父主题切到 Theme.SplashScreen.IconBackground
+             后才被平台消费（API 31+ 平台属性映射）——当前父为 Theme.SplashScreen，主轨 plate
+             接线是 follow-up 决策（改父会同时改动 API 28–30 残留窗口的 windowBackground），
+             超出 #692 范围，此处值为「已登记未生效」。 -->
         <item name="windowSplashScreenIconBackgroundColor">@android:color/white</item>
         <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>
 
-    <!-- T3（spec lynx-night-mode §splash 双轨 · 兜底轨亮色变体）：API 31+ 平台 setSplashScreenTheme 显式覆盖主题。
-         only-defined-in-values/，运行时被初值 uiMode=light 选中。暗色覆写见 values-night/styles.xml。 -->
-    <style name="Theme.SplashScreen.Light" parent="Theme.SplashScreen">
+    <!-- T3（spec lynx-night-mode §4.7 · splash 双轨兜底轨）+ follow-up #692 接线：
+         API 31+ 平台 setSplashScreenTheme 显式覆盖主题，输入 = settings_dark_mode 三态。
+         本文件（values/）与 values-night/ **各定义一份同名主题**（Light + Dark）——两条理由：
+         1) system 模式调用点传 Resources.ID_NULL 复位 manifest 主题后，主轨由 values-night
+            资源限定符接管，与本主题无关；
+         2) 手动 light/dark 经 PackageManager 持久化（下一次冷启动生效），冷启动时系统 uiMode
+            可能与手动选择相反，主题名必须在**两种配置下都可解析**，否则解析失败回落 manifest 主题
+            （手动覆盖失效）。
+         父主题必须是 Theme.SplashScreen.IconBackground（不是 Theme.SplashScreen）：
+         API 31+ 的 IconBackground 覆写把平台的 android:windowSplashScreenIconBackgroundColor
+         指向本 app 的 windowSplashScreenIconBackgroundColor——缺这条父链时，下面写的 plate 色
+         对系统 splash 完全无效（核实依据：本地 core-splashscreen-1.2.0 AAR
+         res/values-v31/values-v31.xml 的 Theme.SplashScreen.IconBackground 定义）。 -->
+    <style name="Theme.SplashScreen.Light" parent="Theme.SplashScreen.IconBackground">
         <item name="windowSplashScreenBackground">@android:color/white</item>
         <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <!-- 手动 light：白底 + 白 plate（与主轨亮色一致；plate==底 为有意，见上） -->
         <item name="windowSplashScreenIconBackgroundColor">@android:color/white</item>
+    </style>
+
+    <!-- 暗色兜底轨变体（values-night/ 同名同值一份 → 名跨配置稳定，见上「各定义一份」）：
+         底 #101418 / plate #1C2024 —— 取值来源见 values-night/styles.xml 注释（app-lynx
+         .theme-sky.dark 的 md-surface / md-surface-container 令牌）。 -->
+    <style name="Theme.SplashScreen.Dark" parent="Theme.SplashScreen.IconBackground">
+        <item name="windowSplashScreenBackground">#101418</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="windowSplashScreenIconBackgroundColor">#1C2024</item>
     </style>
 </resources>
