@@ -77,13 +77,13 @@ fetchNovelData(novelId: number)           // 接受任何 number
 - **跨 flavor / 跨包影响**：零。`src/api/id.ts` 是 utils 内部工具，不导出公共 API（除 5 类型 + 5 factory）；store / 组件 / 路由层通过 response 自动获得 Branded，无感知。
 - **遗留挂账（显式，禁「后续处理」口头带过）**：
   - **P2.3**（按需触发）：少数 store 内部桥接点仍以 raw `number` 持有 ID（cache key + 临时变量），未来若演化需要 typed iteration 需独立票；当前 scope 内已最小化。
-  - **P3 候选**：
-    - 双端 `id.ts` byte-identical 同步守卫（fixture 化 CI 检查）
-    - `packages/novel-export` Branded 化（移除 `fetchNovelData` 的 `as unknown as` cast）
-    - 工厂函数值域检查（`assert(raw > 0)`）
-    - `CommentId` / `TagId` 是否打标（按业务演化决定）
-    - `TranslateErrorCode` 加 assertNever（P1 挂账延续）
-    - `chapterId: string` 重新设计为 `ChapterId | string` 或纯 `ChapterId`
+  - **P3 评估（2026-09-21，[#706](https://github.com/a1121611810/Pictelio/issues/706)）**——6 项候选逐项结论（grep 实证）：
+    - 双端 `id.ts` byte-identical 同步守卫 → **已落地**：`tests/unit/differential/byteIdenticalSeamConsistency.test.ts`（含 assertNever seam；逐字节断言 + 空集防护 + 突变验证；随 `pnpm test:all` 进 CI 门禁）。
+    - 工厂函数值域检查（`assert(raw > 0)`）→ **关闭**：`toUserId(0)` 是 3 处生产哨兵（`bookmarkStore.ts:18` / `novelBookmarkStore.ts:29,44`），值域断言会击穿哨兵；且为「零运行时代价」（D1）引入运行期检查，冲突。
+    - `chapterId: string` 重新设计 → **关闭（按设计）**：string 是 provider IR / native bridge / cache key 的序列化边界形态（`String(chapterId)` 转换点，store 内部是 `number`）；非 ID 身份问题。
+    - `TranslateErrorCode` 加 assertNever → **关闭（无适用点）**：详见 [ADR-0181](ADR-0181-assertnever-exhaustive-checking.md) 同项结论（无 switch over 该联合）。
+    - `packages/novel-export` Branded 化（移除 cast）→ **保留候选（需独立设计决策）**：跨包品牌身份不互通（`unique symbol` 各包独立声明，novel-export 自建 brand 与 app/app-lynx 的 brand 不可赋值），cast 仍需存在于某处；共享 brand 需 novel-export 导出符号 → 破坏 D3 byte-identical 策略。当前 `as unknown as` 是显式边界（structural 兼容、运行时相同）。
+    - `CommentId` / `TagId` 打标 → **保留候选（待业务驱动）**：ADR 明文「按业务演化决定」，当前无驱动不动。
 - **排除面**：CommentId / TagId / BookmarkId（P3）；`number | Branded` 兼容期；跨包 import；新共享包 `@pictelio/ids`；class 模式；Symbol 注册表；值域验证。
 
 ## 实施记录
