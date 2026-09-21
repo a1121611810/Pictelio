@@ -57,7 +57,7 @@
 
 ### 数据契约
 
-- 唯一外部依赖 = 推荐小说响应字段 `is_bookmarked` / `total_bookmarks` / `text_length`（`PixivNovel` 既有类型）。**交付现状**：真实响应 fixture 因 refresh_token 被设备端轮换暂无法抓取 → 已**显式挂账 issue #708**（contract 测试仅验证端点/参数/透传与失败路径，不假装钉死字段存在性）。
+- 唯一外部依赖 = 推荐小说响应字段 `is_bookmarked` / `total_bookmarks` / `text_length`（`PixivNovel` 既有类型）。**已用真实响应钉死**：2026-09-21 抓取真实端点（HTTP 200、原始 88,626 B / 33 条，每条均带三字段），落 fixture `packages/app-lynx/tests/fixtures/novel-recommended.real.json`（保留 3 条字段逐字、覆盖 `x_restrict` 0/1/2），契约测试直接读该 fixture 断言字段可用性。
 - 缺字段降级（**已实现**）：`total_bookmarks` 缺失 → 计数不渲染；`text_length` 缺失或不 > 0 → 字数行不渲染；两者都在 `Recommended.vue` 的 `mapNovels` 打 `[recommended]` 前缀 `console.warn`（测试硬约束 #3：禁静默降级）。
 
 ## Testing Decisions
@@ -68,9 +68,9 @@
 
 1. **主缝（组件行为，既有）**：`components/BookmarkButton.host-matrix.test.ts` 的 FakeNode 渲染器 + 真实组件 + mock api——新增「轮播小说宿主」用例：novel 形态 init-only props 正确初始化、单击走 novel 端点且 `restrict=public`、`:key` 变化强制重建（对照插画侧既有 `(b) 复用宿主形态` 用例）。
 2. **补充缝（页面接线，新文件）**：`tests/recommendedNovelBookmark.test.ts`——按 `tests/novelIntroEntryGuards.test.ts` 的源级守卫惯例，锁「小说分支渲染 ♥ + `target-kind="novel"` + 跨 kind 唯一键 + 字数保留」，并断言不破坏三段式改道护栏。
-3. **数据缝（端点契约，既有范式）**：沿 `tests/novel-detail-api.test.ts`（真实样例 + 端点对齐 Pixiv-Shaft + 成功/失败双路径），为 `/v1/novel/recommended` 落端点/透传/失败路径断言。**字段存在性的真实响应 fixture 属未完成项，已挂账 issue #708**（不写入“已验证”）。
+3. **数据缝（端点契约 + 真实样例）**：`tests/novelRecommendedApi.test.ts` 读**真实响应 fixture**（`tests/fixtures/novel-recommended.real.json`，逐字入库）断言端点/参数/透传、页面依赖的三字段可用性（含 fixture 自身有效性断言：非空 + 覆盖三档 `x_restrict`，防 fixture 变空后全称断言恒真）与失败路径。
 
-非自动化证据：**已落 `docs/verification/app-lynx-recommended-novel-bookmark-emulator-2026-09-21.md`**（设备实跑命令 + 截图：小说滑页 ♥540 + 5011 字、点 ♥ 不跳页且计数双向翻转后还原）；web-core 400/320 两档因 refresh_token 被设备端轮换**未完成**（待新 token；此为唯一未闭环的验收项）。
+非自动化证据：**已落 `docs/verification/app-lynx-recommended-novel-bookmark-emulator-2026-09-21.md`**——设备实跑命令 + 3 张截图（小说滑页 ♥540 + 5011 字、点 ♥ 不跳页且计数双向翻转后还原）；web-core **400 / 320** 两档实测（320 用 mock 小说优先 feed 做几何验证，截图入库，三元素无碰撞）。
 
 ## Out of Scope
 
