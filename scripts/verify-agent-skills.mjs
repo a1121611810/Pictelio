@@ -21,6 +21,8 @@ const REQUIRED_MARKERS = {
     "期望值",
     "调用点完备性",
     "机器防线",
+    "输入源接线",
+    "silent misconfiguration",
   ],
 };
 
