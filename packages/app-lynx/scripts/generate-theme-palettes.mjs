@@ -82,8 +82,15 @@ const THEMES = [
   { id: 'teal', seed: '#00696d' },
 ]
 
-/** M3 角色清单（与既有亮色 page 色板同构；排除 error/scrim/shape/elevation）。
- * 顺序与 tokens.css 既有 page 块保持一致，方便阅读与 diff。 */
+/** M3 角色清单（与既有亮色 page 色板同构）。
+ * 顺序与 tokens.css 既有 page 块保持一致，方便阅读与 diff。
+ *
+ * T4 扩展（spec docs/specs/lynx-night-mode-audit.md §4.1）：
+ * - 加入 error / error-container / on-error / on-error-container / state-pressed-error
+ *   （独立 errorPalette 派生，与 brand seed 解耦）
+ * - 加入 scrim / scrim-overlay（明暗同值但暗色块显式声明防回落到 light 单一来源）
+ * - 加入 shape-* / elevation-* / scroll-indicator（同上：与亮色同值但显式声明）
+ */
 const ROLES = [
   '--md-primary',
   '--md-on-primary',
@@ -97,6 +104,10 @@ const ROLES = [
   '--md-on-tertiary',
   '--md-tertiary-container',
   '--md-on-tertiary-container',
+  '--md-error',
+  '--md-on-error',
+  '--md-error-container',
+  '--md-on-error-container',
   '--md-surface',
   '--md-on-surface',
   '--md-surface-variant',
@@ -126,16 +137,51 @@ const ROLES = [
   '--md-tertiary-fixed-dim',
   '--md-on-tertiary-fixed-variant',
   '--md-surface-tint',
+  '--md-scrim',
+  '--md-scrim-overlay',
+  '--md-shape-extra-small',
+  '--md-shape-small',
+  '--md-shape-medium',
+  '--md-shape-large',
+  '--md-shape-extra-large',
+  '--md-shape-full',
+  '--md-elevation-1',
+  '--md-elevation-2',
+  '--md-elevation-3',
   '--md-state-pressed-primary',
   '--md-state-pressed-on-surface',
   '--md-state-pressed-surface',
+  '--md-state-pressed-error',
   '--md-state-layer-pressed-primary',
   '--md-state-layer-pressed-on-surface',
   '--md-state-disabled-container',
   '--md-state-disabled-on-surface',
+  '--md-scroll-indicator',
 ]
 
-/** 从 DynamicScheme 读角色 → hex 字符串（on*Container 强制走 tone 10 = 与基础 page 同模式） */
+/** 与模式无关的常量值（shape 6 档 / elevation 3 档 / scrim / scrim-overlay）——
+ * 暗色色板与亮色同值，但显式声明以防 token 隐式重构时漏改（M3 shape 不分模式；
+ * elevation 用纯黑 rgba 阴影；scrim 为通用遮罩语义）。 */
+const MODE_INDEPENDENT_VALUES = {
+  '--md-scrim': 'rgba(0, 0, 0, 0.5)',
+  '--md-scrim-overlay': 'linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.2) 45%, rgba(0, 0, 0, 0))',
+  '--md-shape-extra-small': '1.067vw',
+  '--md-shape-small': '2.133vw',
+  '--md-shape-medium': '3.2vw',
+  '--md-shape-large': '4.267vw',
+  '--md-shape-extra-large': '7.467vw',
+  '--md-shape-full': '9999px',
+  '--md-elevation-1': '0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15)',
+  '--md-elevation-2': '0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15)',
+  '--md-elevation-3': '0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3)',
+}
+
+/** 从 DynamicScheme 读角色 → hex 字符串（on*Container 强制走 tone 10 = 与基础 page 同模式）
+ *
+ * T4 扩展：
+ * - 加入 error / error-container / on-error / on-error-container / state-pressed-error
+ *   （errorPalette 独立派生；state-pressed-error 走 on-error container）
+ * - 加入 scroll-indicator（outline + 35% alpha，与 scrollbar thumb 一致） */
 function readScheme(scheme) {
   const md = new MaterialDynamicColors()
   const get = (dynColor) => hexFromArgb(dynColor.getArgb(scheme))
@@ -155,6 +201,10 @@ function readScheme(scheme) {
     '--md-on-tertiary': get(md.onTertiary()),
     '--md-tertiary-container': get(md.tertiaryContainer()),
     '--md-on-tertiary-container': onTertiaryContainer,
+    '--md-error': get(md.error()),
+    '--md-on-error': get(md.onError()),
+    '--md-error-container': get(md.errorContainer()),
+    '--md-on-error-container': get(md.onErrorContainer()),
     '--md-surface': get(md.surface()),
     '--md-on-surface': get(md.onSurface()),
     '--md-surface-variant': get(md.surfaceVariant()),
@@ -188,10 +238,15 @@ function readScheme(scheme) {
     '--md-state-pressed-primary': get(md.primary()),
     '--md-state-pressed-on-surface': get(md.onSurface()),
     '--md-state-pressed-surface': get(md.surfaceContainerHigh()),
+    '--md-state-pressed-error': get(md.onErrorContainer()),
     '--md-state-layer-pressed-primary': `rgba(${hexToRgb(get(md.primary())).join(', ')}, 0.12)`,
     '--md-state-layer-pressed-on-surface': `rgba(${hexToRgb(get(md.onSurface())).join(', ')}, 0.12)`,
     '--md-state-disabled-container': `rgba(${hexToRgb(get(md.onSurface())).join(', ')}, 0.12)`,
     '--md-state-disabled-on-surface': `rgba(${hexToRgb(get(md.onSurface())).join(', ')}, 0.38)`,
+    // scroll-indicator：outline tone 50 (light) / tone 60 (dark) + 35% alpha（M3 scrollbar thumb）
+    '--md-scroll-indicator': `rgba(${hexToRgb(get(md.outline())).join(', ')}, 0.35)`,
+    // 与模式无关的常量（shape / elevation / scrim）
+    ...MODE_INDEPENDENT_VALUES,
   }
 }
 

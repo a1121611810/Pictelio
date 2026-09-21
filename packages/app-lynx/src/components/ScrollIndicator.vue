@@ -4,8 +4,8 @@
 // 传入（计算走 T1 calcScrollIndicator，组件不重复实现）。
 // 显隐 = opacity（0/1），**禁止 v-if**（ADR-0135 教训：v-if 每帧 flip 重建视图）。
 // 位置锚点 = 父容器 relative（RefreshableList 系），右缘竖条 width 2.4px / radius 2px
-// 需内联 style（原生不认 Tailwind 透明度语法，颜色用 rgba 字符串——spec §Implementation
-// Decisions 教训）。
+// 需内联 style（Lynx 渲染器对部分 Tailwind 类支持有限，颜色用 var(--md-scroll-indicator)
+// ——M3 scrollbar thumb 通用语义：明暗自动跟随，spec docs/specs/lynx-night-mode-audit.md §3.2 P1-1）。
 defineProps<{
   topPx: number
   heightPx: number
@@ -21,7 +21,7 @@ defineProps<{
       height: `${heightPx}px`,
       width: '2.4px',
       borderRadius: '2px',
-      backgroundColor: 'rgba(73,69,79,0.35)',
+      backgroundColor: 'var(--md-scroll-indicator)',
       opacity: visible ? 1 : 0,
     }"
   />

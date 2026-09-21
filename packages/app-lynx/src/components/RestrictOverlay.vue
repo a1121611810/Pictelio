@@ -35,7 +35,7 @@ function swallow() {}
         class="text-label-medium font-semibold px-2 py-0.5 rounded-[var(--md-shape-extra-small)]"
         :class="level === 2 ? 'bg-error text-error-on' : 'bg-error-container text-error-on-container'"
       >{{ badge }}</text>
-      <text class="text-label-medium text-white mt-2" style="opacity: 0.8">{{ t('restrictOverlay.blocked') }}</text>
+      <text class="text-label-medium text-[var(--colorOverlayForeground)] mt-2" style="opacity: 0.8">{{ t('restrictOverlay.blocked') }}</text>
     </view>
   </view>
 </template>

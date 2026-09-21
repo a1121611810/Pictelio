@@ -90,9 +90,11 @@ onBeforeUnmount(() => {
                 <text class="text-[3.2vw] leading-none text-surface-on">✓</text>
               </view>
             </view>
-            <!-- 页码条：bottom 禁用（ADR-0123 锚点约定）→ 页码贴角标行下方左侧，v-if 显隐 -->
+            <!-- 页码条：bottom 禁用（ADR-0123 锚点约定）→ 页码贴角标行下方左侧，v-if 显隐。
+                 走 --md-scrim token（M3 通用遮罩语义，明暗均为 rgba(0,0,0,0.5)）；原硬编码
+                 rgba(0,0,0,0.45) 在 T4 替换（spec docs/specs/lynx-night-mode-audit.md §3.2 P1-2）。 -->
             <view v-if="!isSelected(i)" class="absolute left-0 top-[7vw] w-full">
-              <text class="text-label-small text-surface-on bg-[rgba(0,0,0,0.45)] px-1">P{{ i + 1 }}</text>
+              <text class="text-label-small text-[var(--colorOverlayForeground)] bg-[var(--md-scrim)] px-1">P{{ i + 1 }}</text>
             </view>
           </view>
         </view>

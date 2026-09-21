@@ -81,6 +81,10 @@ page,
   --md-state-layer-pressed-on-surface: rgba(25, 28, 32, 0.12); /* 12% on-surface */
   --md-state-disabled-container: rgba(25, 28, 32, 0.12); /* on-surface 12% */
   --md-state-disabled-on-surface: rgba(25, 28, 32, 0.38); /* on-surface 38% */
+  --md-scroll-indicator: rgba(73, 69, 79, 0.35); /* outline tone 50 + 35% alpha；暗色块经
+                                                  * generate-theme-palettes.mjs 自动派生
+                                                  * 为对应 tone 60 + 35% alpha
+                                                  * （spec lynx-night-mode-audit.md §3.2 P1-1） */
 
   /* ── 兼容别名：旧 Fluent 语义 → M3 令牌（存量引用不断） ── */
   --colorNeutralBackground1: var(--md-surface-container-lowest); /* 卡片/顶栏底 */
@@ -104,6 +108,8 @@ page,
   --colorPaletteYellowBackground3: var(--md-tertiary-container);
   --colorPaletteGreenBackground3: #2e7d32;
   --colorOverlayDark: var(--md-scrim);
+  --colorOverlayForeground: #ffffff; /* scrim 上的前景文本色（明暗皆白，M3 scrim 通用语义）；
+                                     * 此前 AiOverlay.vue 引用未定义变量致文本无色（T4 修复） */
 
   /* ── M3 形状（shape tokens，dp → vw @375 设计稿） ──
    * extra-small 4dp=1.067vw / small 8dp=2.133vw / medium 12dp=3.2vw /
@@ -432,6 +438,10 @@ page,
   --md-on-tertiary: #382a49;
   --md-tertiary-container: #4f4061;
   --md-on-tertiary-container: #eedbff;
+  --md-error: #ffb4ab;
+  --md-on-error: #690005;
+  --md-error-container: #93000a;
+  --md-on-error-container: #ffdad6;
   --md-surface: #101418;
   --md-on-surface: #e0e2e8;
   --md-surface-variant: #42474e;
@@ -461,13 +471,26 @@ page,
   --md-tertiary-fixed-dim: #d3bfe6;
   --md-on-tertiary-fixed-variant: #4f4061;
   --md-surface-tint: #9bcbfa;
+  --md-scrim: rgba(0, 0, 0, 0.5);
+  --md-scrim-overlay: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.2) 45%, rgba(0, 0, 0, 0));
+  --md-shape-extra-small: 1.067vw;
+  --md-shape-small: 2.133vw;
+  --md-shape-medium: 3.2vw;
+  --md-shape-large: 4.267vw;
+  --md-shape-extra-large: 7.467vw;
+  --md-shape-full: 9999px;
+  --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
+  --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
+  --md-elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
   --md-state-pressed-primary: #9bcbfa;
   --md-state-pressed-on-surface: #e0e2e8;
   --md-state-pressed-surface: #272a2f;
+  --md-state-pressed-error: #ffdad6;
   --md-state-layer-pressed-primary: rgba(155, 203, 250, 0.12);
   --md-state-layer-pressed-on-surface: rgba(224, 226, 232, 0.12);
   --md-state-disabled-container: rgba(224, 226, 232, 0.12);
   --md-state-disabled-on-surface: rgba(224, 226, 232, 0.38);
+  --md-scroll-indicator: rgba(140, 145, 152, 0.35);
 }
 
 /* ─── violet 主题暗色板（spec lynx-night-mode T2，从 seed #65558f 经 M3 SchemeTonalSpot 派生 isDark=true） ─── */
@@ -484,6 +507,10 @@ page,
   --md-on-tertiary: #4a2532;
   --md-tertiary-container: #633b48;
   --md-on-tertiary-container: #ffd9e3;
+  --md-error: #ffb4ab;
+  --md-on-error: #690005;
+  --md-error-container: #93000a;
+  --md-on-error-container: #ffdad6;
   --md-surface: #141218;
   --md-on-surface: #e6e0e9;
   --md-surface-variant: #49454e;
@@ -513,13 +540,26 @@ page,
   --md-tertiary-fixed-dim: #efb8c8;
   --md-on-tertiary-fixed-variant: #633b48;
   --md-surface-tint: #cfbdfe;
+  --md-scrim: rgba(0, 0, 0, 0.5);
+  --md-scrim-overlay: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.2) 45%, rgba(0, 0, 0, 0));
+  --md-shape-extra-small: 1.067vw;
+  --md-shape-small: 2.133vw;
+  --md-shape-medium: 3.2vw;
+  --md-shape-large: 4.267vw;
+  --md-shape-extra-large: 7.467vw;
+  --md-shape-full: 9999px;
+  --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
+  --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
+  --md-elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
   --md-state-pressed-primary: #cfbdfe;
   --md-state-pressed-on-surface: #e6e0e9;
   --md-state-pressed-surface: #2b292f;
+  --md-state-pressed-error: #ffdad6;
   --md-state-layer-pressed-primary: rgba(207, 189, 254, 0.12);
   --md-state-layer-pressed-on-surface: rgba(230, 224, 233, 0.12);
   --md-state-disabled-container: rgba(230, 224, 233, 0.12);
   --md-state-disabled-on-surface: rgba(230, 224, 233, 0.38);
+  --md-scroll-indicator: rgba(148, 143, 153, 0.35);
 }
 
 /* ─── pink 主题暗色板（spec lynx-night-mode T2，从 seed #8b4a61 经 M3 SchemeTonalSpot 派生 isDark=true） ─── */
@@ -536,6 +576,10 @@ page,
   --md-on-tertiary: #48290c;
   --md-tertiary-container: #623f20;
   --md-on-tertiary-container: #ffdcc2;
+  --md-error: #ffb4ab;
+  --md-on-error: #690005;
+  --md-error-container: #93000a;
+  --md-on-error-container: #ffdad6;
   --md-surface: #191113;
   --md-on-surface: #efdfe1;
   --md-surface-variant: #514347;
@@ -565,13 +609,26 @@ page,
   --md-tertiary-fixed-dim: #efbc94;
   --md-on-tertiary-fixed-variant: #623f20;
   --md-surface-tint: #ffb0c9;
+  --md-scrim: rgba(0, 0, 0, 0.5);
+  --md-scrim-overlay: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.2) 45%, rgba(0, 0, 0, 0));
+  --md-shape-extra-small: 1.067vw;
+  --md-shape-small: 2.133vw;
+  --md-shape-medium: 3.2vw;
+  --md-shape-large: 4.267vw;
+  --md-shape-extra-large: 7.467vw;
+  --md-shape-full: 9999px;
+  --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
+  --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
+  --md-elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
   --md-state-pressed-primary: #ffb0c9;
   --md-state-pressed-on-surface: #efdfe1;
   --md-state-pressed-surface: #31282a;
+  --md-state-pressed-error: #ffdad6;
   --md-state-layer-pressed-primary: rgba(255, 176, 201, 0.12);
   --md-state-layer-pressed-on-surface: rgba(239, 223, 225, 0.12);
   --md-state-disabled-container: rgba(239, 223, 225, 0.12);
   --md-state-disabled-on-surface: rgba(239, 223, 225, 0.38);
+  --md-scroll-indicator: rgba(158, 140, 144, 0.35);
 }
 
 /* ─── green 主题暗色板（spec lynx-night-mode T2，从 seed #3c6939 经 M3 SchemeTonalSpot 派生 isDark=true） ─── */
@@ -588,6 +645,10 @@ page,
   --md-on-tertiary: #00363b;
   --md-tertiary-container: #1e4d52;
   --md-on-tertiary-container: #bcebf0;
+  --md-error: #ffb4ab;
+  --md-on-error: #690005;
+  --md-error-container: #93000a;
+  --md-on-error-container: #ffdad6;
   --md-surface: #10140f;
   --md-on-surface: #e0e4db;
   --md-surface-variant: #424940;
@@ -617,13 +678,26 @@ page,
   --md-tertiary-fixed-dim: #a0cfd4;
   --md-on-tertiary-fixed-variant: #1e4d52;
   --md-surface-tint: #a1d399;
+  --md-scrim: rgba(0, 0, 0, 0.5);
+  --md-scrim-overlay: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.2) 45%, rgba(0, 0, 0, 0));
+  --md-shape-extra-small: 1.067vw;
+  --md-shape-small: 2.133vw;
+  --md-shape-medium: 3.2vw;
+  --md-shape-large: 4.267vw;
+  --md-shape-extra-large: 7.467vw;
+  --md-shape-full: 9999px;
+  --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
+  --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
+  --md-elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
   --md-state-pressed-primary: #a1d399;
   --md-state-pressed-on-surface: #e0e4db;
   --md-state-pressed-surface: #272b25;
+  --md-state-pressed-error: #ffdad6;
   --md-state-layer-pressed-primary: rgba(161, 211, 153, 0.12);
   --md-state-layer-pressed-on-surface: rgba(224, 228, 219, 0.12);
   --md-state-disabled-container: rgba(224, 228, 219, 0.12);
   --md-state-disabled-on-surface: rgba(224, 228, 219, 0.38);
+  --md-scroll-indicator: rgba(140, 147, 136, 0.35);
 }
 
 /* ─── orange 主题暗色板（spec lynx-night-mode T2，从 seed #855317 经 M3 SchemeTonalSpot 派生 isDark=true） ─── */
@@ -640,6 +714,10 @@ page,
   --md-on-tertiary: #2a3410;
   --md-tertiary-container: #404b25;
   --md-on-tertiary-container: #dbe8b5;
+  --md-error: #ffb4ab;
+  --md-on-error: #690005;
+  --md-error-container: #93000a;
+  --md-on-error-container: #ffdad6;
   --md-surface: #19120c;
   --md-on-surface: #eee0d5;
   --md-surface-variant: #50453a;
@@ -669,13 +747,26 @@ page,
   --md-tertiary-fixed-dim: #bfcc9a;
   --md-on-tertiary-fixed-variant: #404b25;
   --md-surface-tint: #fcb974;
+  --md-scrim: rgba(0, 0, 0, 0.5);
+  --md-scrim-overlay: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.2) 45%, rgba(0, 0, 0, 0));
+  --md-shape-extra-small: 1.067vw;
+  --md-shape-small: 2.133vw;
+  --md-shape-medium: 3.2vw;
+  --md-shape-large: 4.267vw;
+  --md-shape-extra-large: 7.467vw;
+  --md-shape-full: 9999px;
+  --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
+  --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
+  --md-elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
   --md-state-pressed-primary: #fcb974;
   --md-state-pressed-on-surface: #eee0d5;
   --md-state-pressed-surface: #302921;
+  --md-state-pressed-error: #ffdad6;
   --md-state-layer-pressed-primary: rgba(252, 185, 116, 0.12);
   --md-state-layer-pressed-on-surface: rgba(238, 224, 213, 0.12);
   --md-state-disabled-container: rgba(238, 224, 213, 0.12);
   --md-state-disabled-on-surface: rgba(238, 224, 213, 0.38);
+  --md-scroll-indicator: rgba(157, 142, 129, 0.35);
 }
 
 /* ─── teal 主题暗色板（spec lynx-night-mode T2，从 seed #00696d 经 M3 SchemeTonalSpot 派生 isDark=true） ─── */
@@ -692,6 +783,10 @@ page,
   --md-on-tertiary: #1f314c;
   --md-tertiary-container: #364764;
   --md-on-tertiary-container: #d5e3ff;
+  --md-error: #ffb4ab;
+  --md-on-error: #690005;
+  --md-error-container: #93000a;
+  --md-on-error-container: #ffdad6;
   --md-surface: #0e1415;
   --md-on-surface: #dde4e3;
   --md-surface-variant: #3f4949;
@@ -721,12 +816,25 @@ page,
   --md-tertiary-fixed-dim: #b5c7e9;
   --md-on-tertiary-fixed-variant: #364764;
   --md-surface-tint: #80d4d8;
+  --md-scrim: rgba(0, 0, 0, 0.5);
+  --md-scrim-overlay: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.2) 45%, rgba(0, 0, 0, 0));
+  --md-shape-extra-small: 1.067vw;
+  --md-shape-small: 2.133vw;
+  --md-shape-medium: 3.2vw;
+  --md-shape-large: 4.267vw;
+  --md-shape-extra-large: 7.467vw;
+  --md-shape-full: 9999px;
+  --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
+  --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
+  --md-elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
   --md-state-pressed-primary: #80d4d8;
   --md-state-pressed-on-surface: #dde4e3;
   --md-state-pressed-surface: #252b2b;
+  --md-state-pressed-error: #ffdad6;
   --md-state-layer-pressed-primary: rgba(128, 212, 216, 0.12);
   --md-state-layer-pressed-on-surface: rgba(221, 228, 227, 0.12);
   --md-state-disabled-container: rgba(221, 228, 227, 0.12);
   --md-state-disabled-on-surface: rgba(221, 228, 227, 0.38);
+  --md-scroll-indicator: rgba(137, 147, 147, 0.35);
 }
 /* END auto-generated */

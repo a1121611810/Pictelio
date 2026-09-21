@@ -47,10 +47,14 @@ function extractThemeableRoles(css: string): string[] {
     '--md-scrim-overlay',
     '--md-state-pressed-error',
   ])
+  // 派生 token：基础 page 已定义完整值，各主题无需重定义（仅暗色 .theme-X.dark 派生）。
+  // - --md-scroll-indicator 由 outline 派生，亮色主题沿用基础页 block 的值
+  const derivedFromThemeable = new Set(['--md-scroll-indicator'])
   const roles = new Set<string>()
   for (const m of block.matchAll(/(--md-[a-z0-9-]+)\s*:/g)) {
     const name = m[1]!
     if (seedIndependent.has(name)) continue
+    if (derivedFromThemeable.has(name)) continue
     if (name.startsWith('--md-shape-') || name.startsWith('--md-elevation-')) continue
     roles.add(name)
   }
