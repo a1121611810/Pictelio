@@ -74,8 +74,10 @@ TypeScript `strict: true` 已开（`packages/app/tsconfig.json:8`），但 `noFa
   - **`JSON.stringify(value)` 副作用**：极端值（循环引用 / `BigInt`）会抛 `TypeError`；穷尽性检查的运行期兜底本就极少触发，可接受。
 - **跨 flavor / 跨包影响**：零。`assertNever.ts` 是 utils 内部工具，不导出公共 API；store / 组件 / 路由层无需感知。
 - **遗留挂账（显式，禁「后续处理」口头带过）**：
-  - **P2 独立 ADR**：Branded Types for API IDs（`IllustId` / `NovelId` / `UserId` / `SeriesId` / `ChapterId`），影响面涉及 `api/illust.ts` / `api/novel.ts` / `api/types.ts` + 50+ 调用现场。
-  - **P3 按需扩展**：`TranslateErrorCode` 等运行时演化联合加 assertNever；双端 byte-identical 同步守卫（fixture 化 CI 检查）。
+  - **P2 独立 ADR**：Branded Types for API IDs → **已兑现**：[ADR-0182](ADR-0182-branded-types-for-api-ids.md)（[#700](https://github.com/a1121611810/Pictelio/issues/700)–[#705](https://github.com/a1121611810/Pictelio/issues/705)，2026-09-21 合并 main）。
+  - **P3 评估（2026-09-21，[#706](https://github.com/a1121611810/Pictelio/issues/706)）**：
+    - `TranslateErrorCode` 加 assertNever → **关闭（无适用点）**：全仓无 switch over `TranslateErrorCode`；`classifyTranslateError` 的 switch 对象是 HTTP `status: number`（开放域，无法穷尽）；唯一消费方是布尔谓词（`createNovelTranslator.ts` 的 `code === X || ...`）。本挂账原基于对 switch 目标的误读，实证撤销。
+    - 双端 byte-identical 同步守卫 → **已落地**：`tests/unit/differential/byteIdenticalSeamConsistency.test.ts`（assertNever + id.ts 两 seam 逐字节断言，空集防护 + 突变验证）；随 `pnpm test:all` 进 CI 门禁。
 - **排除面**：Branded Types（P2）；稳定二元枚举（`Theme` / `ImageQuality` / `RestrictType` / `ContentType`）；i18n locale 文件；API 类型层；settings registry；app-lynx `isAiRestricted` / `shouldHideByAi`（ternary 已天然安全）；app-lynx Vitest 基础设施（独立议题）；openwiki 文档（CI 定时任务）。
 
 ## 实施记录
