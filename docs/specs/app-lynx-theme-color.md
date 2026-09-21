@@ -8,7 +8,7 @@
 
 ## Problem Statement
 
-app-lynx 此前只有一套固定的 M3 亮色板（seed Sky #1a6fa8，写死在 `tokens.css` 的 `page` 选择器）。用户无法更换主题色；竞品（PixShaft 的 Material You+主色、pixiv-viewer 的暗色+主题色、Pix-EzViewer 的 M2/M3 自定义主题）普遍支持自定义主色，这是功能对比矩阵中已登记的差距。
+app-lynx 此前只有一套固定的 M3 亮色板（Sky 主色锚点 #1a6fa8，写死在 `tokens.css` 的 `page` 选择器；seed/锚点术语口径见 `docs/specs/lynx-night-mode.md` §4.8）。用户无法更换主题色；竞品（PixShaft 的 Material You+主色、pixiv-viewer 的暗色+主题色、Pix-EzViewer 的 M2/M3 自定义主题）普遍支持自定义主色，这是功能对比矩阵中已登记的差距。
 
 ## Solution
 

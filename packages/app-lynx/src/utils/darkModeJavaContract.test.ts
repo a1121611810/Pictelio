@@ -20,9 +20,10 @@ import { describe, expect, it } from 'vitest'
 /**
  * 剥注释：块注释 → XML 注释 → 行注释（口径同 tests/hardcodeColorGate.test.ts 的 source-scan 模式）。
  * 顺序：块注释必须先行——否则块注释内部的 `//` 会被行注释规则先截断，留下半截 `/*`。
- * 已知边界：字符串字面量内的 `//`（如 `"http://…"`）也会被截断。本组读取的四个源文件已核对
- * 无该形态（Java 侧 LynxActivity.java 无字符串内 `//`、无 `<!--`）；若将来出现，需升级为
- * 词法级去除（或改用既有 AST 工具）。
+ * 已知边界（实测，review 轮3）：字符串字面量内的 `//` 会被截断——`PictelioAppModule.java` 的
+ * `"https://"` 即已命中（截断发生在该行；当前被断言的两个符号不受影响）。本组实际读取 6 源
+ * （LynxActivity / PictelioAppModule / styles.xml ×2 / settingsStore.ts / darkMode.ts）+ tokens.css；
+ * 若未来把断言内容放到同一行的 `://` 之后会误红——需升级为词法级去除（或改用既有 AST 工具）。
  */
 function stripComments(source: string): string {
   return source
@@ -200,9 +201,10 @@ describe('暗色外观 JS↔Java 契约锚点', () => {
     expect(LYNX_ACTIVITY_CODE).toContain('Configuration.UI_MODE_NIGHT_MASK')
   })
 
-  it('onResume 兜底补发：spec 决策 3 后台翻转兜底契约', () => {
+  it('onResume 覆写存在性（组合形态由「发射链 / prefs 组合点代码形态」组 b) 用例断言）', () => {
     // 旧断言 `toContain('onResume 兜底补发')` 可被一行注释满足（review round-2 B1）——
     // 已换为方法体级的真实形态断言，见下方「发射链 / prefs 组合点代码形态」组（onResume 项）。
+    // 本例仅保留签名存在性（review 轮3 N5：用例名与断言强度对齐）。
     expect(LYNX_ACTIVITY_CODE).toMatch(ON_RESUME_SIG)
   })
 })
@@ -277,8 +279,8 @@ describe('review round-2 发射链 / prefs 组合点代码形态（剥注释后�
         `${label}：剥注释后注释夹具仍命中 → 剥注释失效（断言恒真）`,
       ).toBe(false)
     }
-    // 夹具表规模下界（防表被清空后本自检恒真通过）
-    expect(DETECTOR_FIXTURES.length).toBe(5)
+    // 夹具表规模下界（防表被清空后本自检恒真通过；下界而非等值——新增检测器补夹具时不需改此数）
+    expect(DETECTOR_FIXTURES.length).toBeGreaterThanOrEqual(5)
   })
 
   it('方法体抽取自检：花括号配平（不吞下一个方法体、方法体非空）', () => {
@@ -315,18 +317,22 @@ describe('review round-2 发射链 / prefs 组合点代码形态（剥注释后�
   })
 
   it('d) 状态栏组合点：resolveIsDark(normalizeDarkMode(readDarkModeRaw(this)) 成形（唯一读点接线）', () => {
+    // 方法体级切片（review 轮3 N1：防其它位置的同形态「顶包」）
+    const sig = /private void applyStatusBarAppearance\(\s*\)/
+    expect(LYNX_ACTIVITY_CODE, 'LynxActivity.java 缺少 applyStatusBarAppearance').toMatch(sig)
+    const body = methodBodyOrFail(LYNX_ACTIVITY_CODE, sig, 'applyStatusBarAppearance')
     expect(
-      LYNX_ACTIVITY_CODE.includes(STATUS_BAR_COMBO),
+      body.includes(STATUS_BAR_COMBO),
       '状态栏外观决策未按「raw 读 + 归一 + 决策」单表达式接线（可能退化为只读系统 uiMode = #692 的零读点缺陷）',
     ).toBe(true)
-    // 两处组合点（状态栏 / splash）都必须走同一读点形态；计数为**下界**（允许未来新增消费者）
-    const readPoints = LYNX_ACTIVITY_CODE.match(/readDarkModeRaw\(this\)/g) ?? []
-    expect(readPoints.length, 'readDarkModeRaw(this) 读点数不足 2（状态栏 / splash 组合点至少各一）').toBeGreaterThanOrEqual(2)
   })
 
   it('e) splash 组合点：splashThemeIdFor(normalizeDarkMode(readDarkModeRaw(this)) 成形（兜底轨输入同源）', () => {
+    const sig = /private void applySplashScreenThemeFromPref\(\s*\)/
+    expect(LYNX_ACTIVITY_CODE, 'LynxActivity.java 缺少 applySplashScreenThemeFromPref').toMatch(sig)
+    const body = methodBodyOrFail(LYNX_ACTIVITY_CODE, sig, 'applySplashScreenThemeFromPref')
     expect(
-      LYNX_ACTIVITY_CODE.includes(SPLASH_COMBO),
+      body.includes(SPLASH_COMBO),
       'splash 兜底轨未按同一读点组合点取输入（可能退化为手写主题 id 或系统 uiMode）',
     ).toBe(true)
   })
@@ -335,10 +341,10 @@ describe('review round-2 发射链 / prefs 组合点代码形态（剥注释后�
     const sig = /private void sendDarkModeEvent\(\s*\)/
     expect(LYNX_ACTIVITY_CODE, 'LynxActivity.java 缺少 sendDarkModeEvent 方法').toMatch(sig)
     const body = methodBodyOrFail(LYNX_ACTIVITY_CODE, sig, 'sendDarkModeEvent')
-    const detector = /sLastDarkSent[\s\S]{0,40}?return[\s\S]{0,200}?sendGlobalEvent/
+    const detector = /sLastDarkSent[\s\S]{0,40}?return;[\s\S]{0,90}?sLastDarkSent\s*=\s*\w+[\s\S]{0,200}?sendGlobalEvent/
     expect(
       detector.test(body),
-      'sendDarkModeEvent 缺少「sLastDarkSent 短路 → sendGlobalEvent 发射」组合（去重不变量断裂或发射丢失）',
+      'sendDarkModeEvent 缺少「sLastDarkSent 短路 → 记录 → sendGlobalEvent 发射」三段式（去重不变量断裂 / 记录丢失 / 发射丢失）',
     ).toBe(true)
     // 负极对照：同形态仅存在于注释中时，剥注释后不得命中（防检测器被注释满足）
     const commentOnly = '// if (mode.equals(sLastDarkSent)) return;\n// sLastDarkSent = mode;\n// sendGlobalEvent(e)'
@@ -497,6 +503,12 @@ describe('#692 跨语言色值契约（tokens.css 暗色色板 ⇄ values-night 
       '#101418',
     )
     expect(VALUES_NIGHT_STYLES_CODE, `values-night/styles.xml 缺少暗面 ${surface}`).toContain(surface)
+    // 计数下界（review 轮3 D）：values-night 有**两处**暗面声明（AppTheme.NoActionBarLaunch + Theme.SplashScreen.Dark），
+    // 只断 toContain 时删掉任一处仍绿；计数 ≥2 让「双轨各一份」成为硬约束
+    expect(
+      (VALUES_NIGHT_STYLES_CODE.match(/#101418/g) ?? []).length,
+      'values-night 暗面声明少于 2 处（双轨各一份约束被破坏）',
+    ).toBeGreaterThanOrEqual(2)
   })
 
   it('暗 plate #1C2024 登记于两文件且 ≠ 暗面（离底有差 → 前景圆盘可见）', () => {
@@ -510,6 +522,11 @@ describe('#692 跨语言色值契约（tokens.css 暗色色板 ⇄ values-night 
     ] as const) {
       expect(css, `${name} 缺少暗色 plate #1C2024`).toContain('#1C2024')
     }
+    // 计数下界（review 轮3 D）：values-night 的 plate 亦为两处声明（launch 覆写 + Dark 主题），删任一处仍绿的洞由此关闭
+    expect(
+      (VALUES_NIGHT_STYLES_CODE.match(/#1C2024/g) ?? []).length,
+      'values-night plate 声明少于 2 处（双轨各一份约束被破坏）',
+    ).toBeGreaterThanOrEqual(2)
     // 离底有差（亮色轨 plate==底 为有意；暗色轨必须可分辨，否则前景圆盘不可见）
     expect(container.toLowerCase()).not.toBe(surface.toLowerCase())
   })

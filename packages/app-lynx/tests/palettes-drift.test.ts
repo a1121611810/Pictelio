@@ -13,8 +13,9 @@
 //   生成脚本以「锚点 = 亮色 primary」为准。
 //
 // 说明与口径：
-//   - 脚本以 `--stdout` 运行时不写任何文件（在 injectIntoTokens 之前 process.exit），本测试另以
-//     「运行前后 tokens.css 内容不变」显式断言该只读契约，防止测试自身篡改仓库产物。
+//   - 脚本以 `--stdout` 运行时不写**仓库产物**（在 injectIntoTokens 之前 process.exit；tokens.css 等不变），
+//     本测试另以「运行前后 tokens.css 内容不变」显式断言该只读契约，防止测试自身篡改仓库产物。
+//     注意：`patchMaterialColorUtilities` 的模块级副作用不在此承诺内（可能首次自愈 node_modules，见下条）。
 //   - 脚本的 patchMaterialColorUtilities 是**模块级副作用**：它会遍历 node_modules 内
 //     @material/material-color-utilities 的 .js 给相对 import 补 .js 后缀（Node 22+ 严格 ESM
 //     解析缺陷自愈）。仅作用于 devDependency，测试环境（Node + devDeps 已安装）可安全触发；

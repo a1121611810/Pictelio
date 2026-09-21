@@ -20,7 +20,7 @@
          取值来源（app-lynx src/styles/tokens.css，符号锚、不写行号防漂移）：#101418 = .theme-sky.dark
          的 md-surface 令牌（CSS 写作「双连字符 + md-surface」）；#1C2024 = md-surface-container（面上方一阶）
          —— 暗色 plate 与底有差，
-         因此 launcher 前景上的圆盘可见（与亮色「plate==底」的有意处理相对）。
+         因此**兜底轨**（Theme.SplashScreen.Dark）接线后 launcher 前景圆盘可见（与亮色「plate==底」的有意处理相对）。
          注：本主轨主题的 plate 项仅在父主题切到 Theme.SplashScreen.IconBackground 后才被平台
          消费（API 31+ 平台属性映射；见 values/styles.xml 同项注释）——当前父仍为
          Theme.SplashScreen（主轨 plate 接线为 follow-up 决策，改父会同时改动 API 28–30

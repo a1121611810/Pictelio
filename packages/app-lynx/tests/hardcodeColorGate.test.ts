@@ -153,9 +153,13 @@ describe("硬编码浅色值回潮门禁（spec lynx-night-mode-audit.md §5）"
     expect(noReason, `白名单条目缺少理由（豁免必须可追溯）：${noReason.join(", ")}`).toEqual([]);
   });
 
-  it("扫描覆盖面下界：walk(src) 文件数不塌陷 + 关键文件在集内（防遍历失效恒真通过）", () => {
+  it("扫描覆盖面下界：walk(src) 生产文件数不塌陷 + 关键文件在集内（防遍历失效恒真通过）", () => {
     const files = [...walk(SRC)];
-    // 下界（防 walk 选择性失效 → offenders 恒空 → 门禁恒真）：当前 src 约 311 个 .vue/.ts
+    // 主下界只计**实际参与扫描的生产文件**（排除 .test.ts 豁免项——review 轮3 N6：豁免项计入会稀释覆盖面语义）；
+    // 当前 src 生产文件约 195 个，留 ~15% 余量防正常波动
+    const prodFiles = files.filter((p) => !/\.test\.ts$/.test(p));
+    expect(prodFiles.length).toBeGreaterThanOrEqual(165);
+    // walk 总量兜底（含测试文件；防遍历整体塌陷）
     expect(files.length).toBeGreaterThanOrEqual(300);
     const rels = new Set(files.map((p) => path.relative(SRC, p).split(path.sep).join("/")));
     for (const rel of ["App.vue", "pages/Me.vue", "utils/themeColor.ts", "utils/appearanceClasses.ts"]) {

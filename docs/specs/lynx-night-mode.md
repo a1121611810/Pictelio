@@ -53,9 +53,9 @@ T2 / T3 可并行（T2 依赖 `resolvedDark`、T3 依赖 `resolvedDark`，互不
 |---|---|---|---|
 | 事件名 | `pictelioDarkMode` | `EVENT_DARK_MODE = "pictelioDarkMode"` | 用例「事件名 pictelioDarkMode：Java 发送 ⇄ JS 订阅」（`darkModeJavaContract.test.ts`） |
 | 拉取方法 | `PictelioApp.getDarkMode(cb)` | `@LynxMethod getDarkMode(Callback)` | 用例「拉取方法 getDarkMode：Java 提供 ⇄ JS 调用」（同文件） |
-| 载荷 | `JSON.stringify({mode: 'light' \| 'dark'})`（标准）+ 裸字符串兼容（保守兜底，详见 §4.4） | `JavaOnlyArray.of(JSON.stringify({mode: currentDarkMode(uiMode)}))` | 用例「载荷契约：Java JSON 字符串（{"mode":...}）⇄ JS 双路径解析」（同文件；钉 Java **转义引号形态** `"{\"mode\":\""`——防断言被 Javadoc 注释满足） |
+| 载荷 | `JSON.stringify({mode: 'light' \| 'dark'})`（标准）+ 裸字符串兼容（保守兜底，详见 §4.4） | `JavaOnlyArray.of("{\"mode\":\"" + mode + "\"}")`（手写转义字符串拼接——非 `JSON.stringify` 调用） | 用例「载荷契约：Java JSON 字符串（{"mode":...}）⇄ JS 双路径解析」（同文件；钉 Java **转义引号形态** `"{\"mode\":\""`——防断言被 Javadoc 注释满足） |
 | 初值拉取时机 | `ensureDarkModeInit()`（模块内 `ensureInit`）在 `getDarkMode` / `subscribeDarkMode` 首次调用时触发（订阅后拉） | 同上 | 用例「`ensureDarkModeInit`：native 侧订阅已注册 + pull 已发起（无回调消费方也能取到系统态）」+「`getDarkMode` 重复调用：幂等（ensureInit 一次）」（`darkMode.test.ts`） |
-| 推变化源 | 冷启动订阅后由原生推送；JS 侧不轮询 | `onConfigurationChanged` 读 `Configuration.uiMode` 与 `UI_MODE_NIGHT_MASK`（manifest 已声明 `uiMode` configChanges，免 Activity 重建）；判定收敛到纯函数 `shouldEmitDarkEvent`，命中后 `sendDarkModeEvent()` → `sendGlobalEvent` via `GlobalEventEmitter` | ① 纯函数矩阵：用例「`shouldEmitDarkEvent_fullMatrix_matchesSpecDecisionTable`」（`LynxDarkModeTest`，Robolectric）；② 调用点源级断言：用例「a) onConfigurationChanged：`shouldEmitDarkEvent` 判定后 200 字符内 `sendDarkModeEvent()`」（`darkModeJavaContract.test.ts`——**JS 侧扫 Java 源 + 剥注释**）。**`onConfigurationChanged + UI_MODE_NIGHT_MASK` 字面量断言归 `darkModeJavaContract.test.ts`**（用例「配置变化回调 onConfigurationChanged 钉字面量：与 manifest configChanges 一致」），**不在 `LynxDarkModeTest`** |
+| 推变化源 | 冷启动订阅后由原生推送；JS 侧不轮询 | `onConfigurationChanged` 读 `Configuration.uiMode` 与 `UI_MODE_NIGHT_MASK`（manifest 已声明 `uiMode` configChanges，免 Activity 重建）；判定收敛到纯函数 `shouldEmitDarkEvent`，命中后 `sendDarkModeEvent()` → `sendGlobalEvent` via `GlobalEventEmitter` | ① 纯函数矩阵：用例「`shouldEmitDarkEvent_fullMatrix_matchesSpecDecisionTable`」（`LynxDarkModeTest`，Robolectric）；② 调用点源级断言：用例「a) onConfigurationChanged：`shouldEmitDarkEvent` 判定后 200 字符内 `sendDarkModeEvent()`」（`darkModeJavaContract.test.ts`——**JS 侧扫 Java 源 + 剥注释**）。**`onConfigurationChanged + UI_MODE_NIGHT_MASK` 字面量断言归 `darkModeJavaContract.test.ts`**（用例「配置变化回调 onConfigurationChanged 钉字面量：与 manifest configChanges 一致」），**不在 `LynxDarkModeTest`**（后者内的 `currentDarkMode(UI_MODE_NIGHT_MASK)` 纯函数断言是另一用例，两者口径不同；review 轮3 措辞澄清） |
 | 后台兜底 | — | `onResume` 走**同一判定** `shouldEmitDarkEvent`（比对缓存 `sLastUiMode`，变化则补发，防后台期间系统翻转） | ① 用例「b) onResume：同组合（后台期间系统翻转未走 configChanges 的兜底补发）」（`darkModeJavaContract.test.ts`，剥注释）；② 纯函数矩阵 `shouldEmitDarkEvent`（同 `LynxDarkModeTest`） |
 
 **通道分流（JS 侧 `packages/app-lynx/src/utils/darkMode.ts` `ensureInit`）**：
@@ -75,10 +75,10 @@ T2 / T3 可并行（T2 依赖 `resolvedDark`、T3 依赖 `resolvedDark`，互不
 
 `parseNativePayload` 容忍两种格式：
 
-1. **标准**：`JSON.stringify({mode: 'light' | 'dark'})`（spec 决定，Java 端 `currentDarkMode` 函数只产这一种）
+1. **标准**：载荷文本 `{"mode":"light"|"dark"}`（spec 决定；Java 端以手写转义字符串拼接产出同一文本——非 `JSON.stringify` 调用）
 2. **兼容**：裸字符串 `'light' | 'dark'`（早期调试期 / 跨端复用余地——Java `currentDarkMode` 函数也曾产裸字符串早期版本；JS 侧保留为单边容忍，避免历史遗留数据丢失真值）
 
-**为何不是隐式契约**：JS 单边容忍裸字符串不等于 Java 端允许未来切换；如果 Java 端某日改用其它载荷格式，必须**先升 spec**。当前 Java 端只走 JSON 一条路径（`JavaOnlyArray.of(JSON.stringify(...))`），JS 双路径并存是**过渡期契约**而非长期设计。
+**为何不是隐式契约**：JS 单边容忍裸字符串不等于 Java 端允许未来切换；如果 Java 端某日改用其它载荷格式，必须**先升 spec**。当前 Java 端只走 JSON 一条路径（`JavaOnlyArray.of(...)` 手写转义字符串拼接形态——非 `JSON.stringify` 调用），JS 双路径并存是**过渡期契约**而非长期设计。
 
 ### 4.5 测试矩阵（T1 快照）
 

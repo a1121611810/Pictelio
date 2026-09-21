@@ -5,7 +5,7 @@
   },
   {
     "path": "utils/lynxPlatformColors.ts",
-    "reason": "Lynx 平台属性 placeholder-color 非 CSS 通道（var() 在平台属性不生效）；常量值 = tokens.css 亮色段 --md-on-surface-variant（#41474e），模板测试守值。改色需同步 tokens.css。暗色模式下 placeholder-color 仍为 #41474e（Lynx 平台属性不解析 var()），与暗色 surface 对比度受限——已显式挂账 issue #693（ADR-0180 §遗留挂账 + docs/specs/lynx-night-mode.md §5），关闭 #693 时同步删本豁免。"
+    "reason": "Lynx 平台属性 placeholder-color 非 CSS 通道（var() 在平台属性不生效）；常量值 = tokens.css 亮色段 --md-on-surface-variant（#41474e），模板测试守值。改色需同步 tokens.css。暗色模式下 placeholder-color 仍为 #41474e（Lynx 平台属性不解析 var()），与暗色 surface 对比度受限——已显式挂账 issue #693（见 ADR-0180 后果段「遗留挂账」清单），关闭 #693 时同步删本豁免。"
   },
   {
     "path": "components/RankingEntryCard.vue",

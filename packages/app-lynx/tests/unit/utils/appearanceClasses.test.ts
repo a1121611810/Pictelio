@@ -213,6 +213,19 @@ describe('T2 暗色色板契约（tokens.css .theme-X.dark）', () => {
         `${selector} 缺少 --md-scroll-indicator（暗色沿用亮色灰）`,
       ).toContain('--md-scroll-indicator')
     }
+    // 值级防线（review 轮3 N2）：暗色块该 token 不得退化成亮色基线灰（rgba(73, 69, 79, …)）——
+    // 上方存在性断言无法发现「值被改回亮色灰」，本条把「暗色派生」钉到值级
+    for (const option of THEME_COLOR_OPTIONS) {
+      const selector = `.${option.className}.dark`
+      const start = tokensCss.indexOf(selector + ' {')
+      const block = tokensCss.slice(start, tokensCss.indexOf('}', start))
+      const valueMatch = /--md-scroll-indicator:\s*([^;]+);/.exec(block)
+      expect(valueMatch, `${selector} 缺少 --md-scroll-indicator 值`).toBeTruthy()
+      expect(
+        valueMatch![1],
+        `${selector} 的 --md-scroll-indicator 退化为亮色基线灰（对比度漂移）`,
+      ).not.toContain('73, 69, 79')
+    }
     // 定义点计数下界（1 基础块 + 6 暗色块）：防上方循环因清单塌陷而恒真通过
     const occurrences = [...tokensCss.matchAll(/--md-scroll-indicator:/g)].length
     expect(occurrences).toBeGreaterThanOrEqual(1 + THEME_COLOR_OPTIONS.length)
