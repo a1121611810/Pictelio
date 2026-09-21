@@ -3,6 +3,7 @@
 // 纯函数、零框架依赖，node 可单测。UI 组件只负责渲染与事件接线。
 // 文案经 i18n t() 产出（调用点在模板/computed 内，语言切换即时生效；zh 渲染逐字不变）。
 import { t } from '../i18n'
+import { assertNever } from './assertNever'
 import {
   canPause,
   canStart,
@@ -100,6 +101,8 @@ export function statusLabel(status: DownloadStatus): string {
       return t('downloadsViewModel.status.completed')
     case 'failed':
       return t('downloadsViewModel.status.failed')
+    default:
+      return assertNever(status)
   }
 }
 
