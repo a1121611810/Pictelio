@@ -1,4 +1,5 @@
 import type { SearchResultItem } from "../api/types";
+import { assertNever } from "./assertNever";
 
 /**
  * AI 作品处理模式（账号级设置 ai_filter_mode_${uid}，app 与 app-lynx 共享键；ADR-0155）。
@@ -39,9 +40,17 @@ export function isAiWork(item: {
  * - only：非 AI 作品隐藏
  */
 export function isAiHiddenByType(aiType: number, mode: AiFilterMode): boolean {
-  if (mode === "show") return false;
   const ai = aiType >= 1;
-  return mode === "mask" ? ai : !ai;
+  switch (mode) {
+    case "show":
+      return false;
+    case "mask":
+      return ai;
+    case "only":
+      return !ai;
+    default:
+      return assertNever(mode);
+  }
 }
 
 /** 作品字段版 isAiHiddenByType（插画/小说通用） */
