@@ -255,6 +255,22 @@ _Avoid_: 把绝对 next_url 原样传给原生模块
 app-lynx 的可选 M3 主色（seed）——用户在「我的 → 外观」选择，整树经根 `<page>` 上的 `.theme-*` 色板类切换（CSS 变量覆盖，非运行时算色）。可选集与持久化 id 的单一事实源是 `src/utils/themeColor.ts`（`THEME_COLOR_IDS` / `THEME_COLOR_OPTIONS`）；色板值预生成在 `src/styles/tokens.css`（每个非默认色板覆盖一组 `--md-*` 颜色角色，含 surface 中性色）。默认 `sky` 使用 `.theme-sky`（与基础 `page` 色板共用同一条 CSS 规则，观感不变）。持久化键 `settings_theme_color`（设备级；native 走 `PictelioPrefs` 共享 SharedPreferences，dev 走 IndexedDB），未登录也恢复。
 _Avoid_: 运行时用 JS 计算 / 动态写 CSS 变量（Lynx 动态样式支持面窄、双端不可靠）；给色板类只覆盖 `--md-primary`（secondary/surface/outline/state-layer 不同步会串色）；把主题色做成账号级键（外观是设备级偏好，登出不应重置）。
 
+**外观模式（appearance mode）**【2026-09-21 新增，ADR-0180】：
+明暗外观的三态选择 `light | dark | system`（亮色 / 暗色 / 跟随系统），默认 `system`——用户在「我的 → 外观」卡片顶部的 M3 segmented button 切换，点击即时生效。单一事实源 `src/utils/darkMode.ts`（`DARK_MODE_IDS` / `DEFAULT_DARK_MODE`）；持久化键 `settings_dark_mode`（设备级，与 `settings_theme_color` 同级，**不与 webview 互通**——webview 按计划弃用）。
+_Avoid_: 只做 on/off 开关（无跟随系统，偏离 M3 与 Android 基线预期）；把「外观模式」当账号级偏好；与 webview 的 `theme` 键做同步/迁移（弃用计划，零互通）。
+
+**归一暗色态（resolvedDark）**【2026-09-21 新增，ADR-0180】：
+`settingsStore.resolvedDark`（值域 `light | dark`）——三态与系统订阅的**唯一归一输出**：手动 light/dark 直接映射，`system` 模式读系统检测通道的当前值。所有消费方（根类绑定 / 状态栏图标 / 色块联动）只读它，不重复解析三态。
+_Avoid_: 各消费方各自判断 `darkMode === 'system' ? 系统值 : darkMode`（解析逻辑散落）；把 `system` 当成第三种实际外观（它是跟随指示，不是态）。
+
+**暗色色板（dark palette）**【2026-09-21 新增，ADR-0180】：
+6 主题 × 亮暗 = 12 套静态 M3 色板的后半——暗色版为 `.theme-X.dark` **复合选择器**（特异性 (0,2,0) 高于单类 `.theme-X` 的 (0,1,0)，CSS 级覆盖亮色版同名 `--md-*` 变量）；根 `<page>` 同时挂 `.theme-X` + `.dark` 两类的输出由 `appearanceClasses(themeColorId, resolvedDark)` 纯函数派生。色板由 `scripts/generate-theme-palettes.mjs` 从 seed 经 M3 `SchemeTonalSpot` 构建期生成（零运行时算色，ADR-0152 延续）；暗色板角色集与亮色同构（brand 三色 + surface 中性色 + outline + inverse + fixed + state layer + error/scrim/shape/elevation 补档）。
+_Avoid_: 运行时算色 / 动态写 CSS 变量（同「主题色」词条纪律）；给暗色只覆盖 primary（串色，同「主题色」）；在亮色主题缺 `.dark` 时误判为低优先级 bug（未挂 `.dark` 类即亮色版语义，正交组合是有意设计）。
+
+**暗色检测通道（dark mode detection channel）**【2026-09-21 新增，ADR-0180，研究 #683】：
+lynx JS 获取系统暗色状态的**唯一通道**——Lynx JS 运行时无 `matchMedia`、vue-lynx 对官方 `__globalProps` 零接线（研究实证），故自建：`PictelioAppModule.getDarkMode(cb)` 订阅后拉初值 + `pictelioDarkMode` 全局事件推变化（ADR-0168 insets 同构；Android 侧 `onConfigurationChanged` 读 `Configuration.uiMode` + `onResume` 比对补发兜底后台翻转）；web-core 预览用 `matchMedia` 兜底。契约（事件名/载荷 `{"mode":"light"|"dark"}`/方法名）由 `darkModeJavaContract.test.ts` 双向钉死。
+_Avoid_: 在 lynx JS 里直接调 `matchMedia`（运行时不存在）；把官方宿主通道当可用（vue-lynx 未接线）；纯推模式不拉初值（首帧事件早于订阅必丢，同 insets 管线纪律）。
+
 ### 翻译端点（Translation endpoint）【2026-09-19 新增，ADR-0173】
 
 **端点兼容性（endpoint compatibility）**：
