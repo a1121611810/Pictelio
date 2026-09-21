@@ -8,7 +8,9 @@
 // - 真实缺陷 = commit 44ee6401：推荐页单卡轮播宿主（Recommended.vue / CarouselSwiper 槽位）
 //   中 BookmarkButton 绑定 currentItem 且无 :key，实例跨 slide 持久 → 收藏数恒显示首卡值
 //   （用户观察恒 135），且点任意卡的 ♥ 实际收藏的是首卡（illustId 冻结）；
-//   修复 = :key="currentItem.data.id" 每卡强制重挂载（Recommended.vue [lynx:fix] 注释）；
+//   修复 = :key="currentItem.key"（feed 跨 kind 唯一键 `i-<id>` / `n-<id>`，2026-09-21 票 #707 起；
+//   旧值 currentItem.data.id 在插画/小说 id 数值相同时会让 Vue 跨 kind 复用同一实例）每卡强制重挂载
+//   （Recommended.vue [lynx:fix] 注释）；
 // - 快速收藏载荷 restrict=public = spec docs/specs/bookmark-tags.md D3（与
 //   useBookmarkMutation.test.ts 同口径）。
 //
@@ -18,10 +20,10 @@
 //
 // | 组件                | init-only 读取点                                        | 宿主形态                                                                     | 风险结论 |
 // |--------------------|--------------------------------------------------------|-----------------------------------------------------------------------------|---------|
-// | BookmarkButton.vue | setup 一次传入 useBookmarkMutation({ illustId, initialBookmarked, initialCount }) | ① 列表宿主：IllustList / Following / Bookmarks / UserHome（v-for / list-item 每卡独立实例）；② 复用宿主：Recommended.vue 轮播槽位（实例跨 slide 持久）；③ 详情单实例：IllustDetail.vue（注入页面级 mutation） | ①③ 无风险；② 曾发生状态冻结（44ee6401 真实缺陷），已 :key remount 修复，本文件锁死该契约 |
+// | BookmarkButton.vue | setup 一次传入 useBookmarkMutation({ illustId, initialBookmarked, initialCount }) | ① 列表宿主：IllustList / Following / Bookmarks / UserHome（v-for / list-item 每卡独立实例）；② 复用宿主：Recommended.vue 轮播槽位（实例跨 slide 持久，分「插画滑页」与「小说滑页 targetKind=novel」两种形态——见本文件 (c)）；③ 详情单实例：IllustDetail.vue（注入页面级 mutation） | ①③ 无风险；② 曾发生状态冻结（44ee6401 真实缺陷），已 :key remount 修复，本文件锁死该契约 |
 // | IllustDetail.vue   | setup 一次传入 useBookmarkMutation({ illustId: illust.id, initialBookmarked: false, initialCount: 0 }) | 单作品页面级实例（路由切换即重建页面）                                        | 无风险（不存在同一实例跨作品复用） |
 // | BookmarkPanel.vue  | useBookmarkPanel({ getIllustId: () => props.illustId, ... }) —— getter 形态 | 详情页弹层（v-if 挂载）                                                  | 无风险（响应式 getter，非 init-only；是 init-only 的正确替代写法对照） |
-// | CarouselSwiper.vue | spec 点名的「嫌疑宿主侧」：自身实例跨 slide 持久，但 slides 数组为响应式、无 init-only 的 per-item props | 唯一宿主 = Recommended.vue                                              | 组件本身无 init-only 风险；风险在其槽位内容（即 BookmarkButton，见上），宿主侧由 :key="refreshEpoch"（swiper 本体）+ :key="currentItem.data.id"（BookmarkButton）双保险 |
+// | CarouselSwiper.vue | spec 点名的「嫌疑宿主侧」：自身实例跨 slide 持久，但 slides 数组为响应式、无 init-only 的 per-item props | 唯一宿主 = Recommended.vue                                              | 组件本身无 init-only 风险；风险在其槽位内容（即 BookmarkButton，见上），宿主侧由 :key="refreshEpoch"（swiper 本体）+ :key="currentItem.key"（BookmarkButton）双保险 |
 //
 // 其余 defineProps 组件（RestrictOverlay / CoverImage / TagChipRow / GlassCard 等）均把 props
 // 用于模板内响应式绑定或 getter 透传，无「setup 一次性消费 props 构造状态」的形态，无 init-only 风险。
@@ -244,7 +246,7 @@ function subtreeText(el: FakeNode): string {
   return out
 }
 
-/** 心形元素：直接持有 ♥（U+2665）文本子节点的元素（模板里类绑定 text-error / text-outline 之所在） */
+/** 心形元素：直接持有 ♥（U+2665）文本子节点的元素（模板里类绑定 text-tertiary-on / text-inverse-on-surface 之所在 —— chip 容器配色（spec §E「Dark Glass」）：未收藏 = inverse-surface 上的前景色，已收藏 = tertiary 上的 on-tertiary，对应心形色类名） */
 function findHeart(scope: FakeNode): FakeNode {
   const hit = findByPredicate(
     scope,
@@ -334,11 +336,11 @@ describe('BookmarkButton 宿主矩阵（T3：init-only props 契约，ADR-0163 /
       // 各自初始渲染 = 各自 props（oracle：props 在 setup 一次性建状态机，列表每卡独立实例 → 互不串）
       expect(subtreeText(card101!)).toContain('10')
       expect(subtreeText(card101!)).not.toContain('20')
-      expect(heartClass(card101!)).toContain('text-outline') // 未收藏
-      expect(heartClass(card101!)).not.toContain('text-error')
+      expect(heartClass(card101!)).toContain('text-inverse-on-surface') // 未收藏
+      expect(heartClass(card101!)).not.toContain('text-tertiary-on')
       expect(subtreeText(card202!)).toContain('20')
-      expect(heartClass(card202!)).toContain('text-error') // 已收藏
-      expect(heartClass(card202!)).not.toContain('text-outline')
+      expect(heartClass(card202!)).toContain('text-tertiary-on') // 已收藏
+      expect(heartClass(card202!)).not.toContain('text-inverse-on-surface')
       expect(postSpy).not.toHaveBeenCalled()
 
       // 点第一张卡的 ♥：只影响实例 A（乐观 +1、收藏向），实例 B 不动
@@ -350,10 +352,10 @@ describe('BookmarkButton 宿主矩阵（T3：init-only props 契约，ADR-0163 /
         restrict: 'public', // spec D3 恒公开
       })
       expect(subtreeText(card101!)).toContain('11') // 乐观 +1
-      expect(heartClass(card101!)).toContain('text-error')
+      expect(heartClass(card101!)).toContain('text-tertiary-on')
       // 互不影响：B 卡计数与收藏态纹丝不动
       expect(subtreeText(card202!)).toContain('20')
-      expect(heartClass(card202!)).toContain('text-error')
+      expect(heartClass(card202!)).toContain('text-tertiary-on')
     })
   })
 
@@ -373,7 +375,7 @@ describe('BookmarkButton 宿主矩阵（T3：init-only props 契约，ADR-0163 /
         }),
       )
       expect(subtreeText(container)).toContain('10')
-      expect(heartClass(container)).toContain('text-outline')
+      expect(heartClass(container)).toContain('text-inverse-on-surface')
 
       // 宿主切到下一张卡（props A→B），但实例未 remount
       hostProps.illustId = 202
@@ -384,8 +386,8 @@ describe('BookmarkButton 宿主矩阵（T3：init-only props 契约，ADR-0163 /
       // init-only 契约：setup 只读一次 props，此后 props 变更不生效 → 渲染仍是 A 的初始值
       expect(subtreeText(container)).toContain('10')
       expect(subtreeText(container)).not.toContain('20')
-      expect(heartClass(container)).toContain('text-outline')
-      expect(heartClass(container)).not.toContain('text-error')
+      expect(heartClass(container)).toContain('text-inverse-on-surface')
+      expect(heartClass(container)).not.toContain('text-tertiary-on')
 
       // 冻结的危害面（44ee6401 用户可见缺陷机理）：此刻点 ♥ 实际收藏的是首卡 101 而非当前卡 202
       tap(container)
@@ -400,13 +402,13 @@ describe('BookmarkButton 宿主矩阵（T3：init-only props 契约，ADR-0163 /
       ).toBe(true)
       // 状态机本身仍在以 A 为基准工作：乐观 +1（10→11）+ 收藏向翻转
       expect(subtreeText(container)).toContain('11')
-      expect(heartClass(container)).toContain('text-error')
+      expect(heartClass(container)).toContain('text-tertiary-on')
     })
 
     it('复用宿主的修复形态：:key 随作品变化 → 强制 remount → 状态机随新卡 props 重建（回归 commit 44ee6401 修复语义）', async () => {
       spyPost()
       const BookmarkButton = loadBookmarkButton()
-      // 模拟修复后的宿主：key 绑定作品 id（Recommended.vue :key="currentItem.data.id"）
+      // 模拟修复后的宿主：key 绑定 feed 跨 kind 唯一键（Recommended.vue :key="currentItem.key"）
       const hostProps = reactive({ illustId: 101, initialBookmarked: false, bookmarkCount: 10, key: 101 })
       const { container } = mountHost(() =>
         h(BookmarkButton, {
@@ -417,7 +419,7 @@ describe('BookmarkButton 宿主矩阵（T3：init-only props 契约，ADR-0163 /
         }),
       )
       expect(subtreeText(container)).toContain('10')
-      expect(heartClass(container)).toContain('text-outline')
+      expect(heartClass(container)).toContain('text-inverse-on-surface')
 
       // 切到下一张卡：key 与 props 同时变化 → 旧实例卸载、新实例以 B 的 props 重建
       hostProps.illustId = 202
@@ -427,8 +429,87 @@ describe('BookmarkButton 宿主矩阵（T3：init-only props 契约，ADR-0163 /
       await flush()
 
       expect(subtreeText(container)).toContain('20')
-      expect(heartClass(container)).toContain('text-error')
-      expect(heartClass(container)).not.toContain('text-outline')
+      expect(heartClass(container)).toContain('text-tertiary-on')
+      expect(heartClass(container)).not.toContain('text-inverse-on-surface')
+    })
+  })
+
+  // ── (c) 轮播小说宿主形态（Recommended.vue 小说滑页 · spec docs/specs/app-lynx-recommended-novel-bookmark.md）──
+  describe('(c) 轮播小说宿主形态：targetKind="novel"（推荐页小说滑页，票 #707）', () => {
+    it('novel 形态：init-only props 正确初始化；单击走 novel 端点（add=v2 恒 restrict=public、delete=v1）且收藏态与计数翻转', async () => {
+      const postSpy = spyPost()
+      const BookmarkButton = loadBookmarkButton()
+      const { container } = mountHost(() =>
+        // 模拟 Recommended.vue 小说滑页：key 取 feed 的跨 kind 唯一键（n-<id>）而非裸 id
+        h(BookmarkButton, {
+          key: 'n-901',
+          targetKind: 'novel',
+          illustId: 901,
+          initialBookmarked: false,
+          bookmarkCount: 7,
+        }),
+      )
+      // 初始渲染 = props（oracle：useBookmarkMutation 在 setup 一次性读 props，novel 形态共用同一状态机）
+      expect(subtreeText(container)).toContain('7')
+      expect(heartClass(container)).toContain('text-inverse-on-surface')
+
+      // 单击 → 收藏小说：端点/载荷逐字对齐既有契约 tests/novel-detail-api.test.ts（oracle = Pixiv-Shaft）
+      tap(container)
+      await flush()
+      expect(postSpy).toHaveBeenCalledOnce()
+      expect(postSpy).toHaveBeenCalledWith('/v2/novel/bookmark/add', {
+        novel_id: '901',
+        restrict: 'public',
+      })
+      expect(subtreeText(container)).toContain('8') // 乐观 +1
+      expect(heartClass(container)).toContain('text-tertiary-on')
+
+      // 再单击 → 取消收藏（add=v2 / delete=v1 的不对称是既有事实，非笔误）
+      tap(container)
+      await flush()
+      expect(postSpy).toHaveBeenLastCalledWith('/v1/novel/bookmark/delete', { novel_id: '901' })
+      expect(subtreeText(container)).toContain('7')
+      expect(heartClass(container)).toContain('text-inverse-on-surface')
+    })
+
+    it('小说滑页换卡：:key 随作品变化 → 强制 remount → 状态机随新小说重建（ADR-0163；跨 kind 唯一键避免插画/小说 id 撞车复用）', async () => {
+      const postSpy = spyPost()
+      const BookmarkButton = loadBookmarkButton()
+      const hostProps = reactive({
+        key: 'n-901',
+        illustId: 901,
+        initialBookmarked: false,
+        bookmarkCount: 7,
+      })
+      const { container } = mountHost(() =>
+        h(BookmarkButton, {
+          key: hostProps.key,
+          targetKind: 'novel',
+          illustId: hostProps.illustId,
+          initialBookmarked: hostProps.initialBookmarked,
+          bookmarkCount: hostProps.bookmarkCount,
+        }),
+      )
+      expect(subtreeText(container)).toContain('7')
+      expect(heartClass(container)).toContain('text-inverse-on-surface')
+
+      // 滑到下一本小说：key 与 props 同时变化 → 旧实例卸载、新实例以 B 的 props 重建
+      hostProps.key = 'n-902'
+      hostProps.illustId = 902
+      hostProps.initialBookmarked = true
+      hostProps.bookmarkCount = 42
+      await flush()
+
+      expect(subtreeText(container)).toContain('42')
+      expect(heartClass(container)).toContain('text-tertiary-on')
+      expect(heartClass(container)).not.toContain('text-inverse-on-surface')
+
+      // 冻结的危害面（44ee6401 机理）：换卡后点 ♥ 必须作用于**新**小说（902），不得仍是首卡 901
+      // （novel B 初始态 = 已收藏 → 点击方向为取消收藏，断言 delete 路径）
+      tap(container)
+      await flush()
+      expect(postSpy).toHaveBeenCalledOnce()
+      expect(postSpy).toHaveBeenCalledWith('/v1/novel/bookmark/delete', { novel_id: '902' })
     })
   })
 })

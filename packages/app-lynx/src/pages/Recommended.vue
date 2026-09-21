@@ -53,7 +53,18 @@ function mapNovels(r: {
   next_url: string | null
 }): { items: MixFeedItem[]; nextUrl: string | null } {
   return {
-    items: r.novels.map((n) => ({ kind: 'novel' as const, key: `n-${n.id}`, id: n.id, data: n })),
+    items: r.novels.map((n) => {
+      // 缺字段显式告警（测试硬约束 #3 / spec 数据契约：禁止静默降级）——
+      // total_bookmarks 缺失 → BookmarkButton 隐含隐藏计数（props undefined）；text_length 缺失 → 字数行不渲染。
+      // 两者都不应影响其它字段渲染（推荐页不能因单条脏数据整页失败）。
+      if (typeof n.total_bookmarks !== 'number') {
+        console.warn('[recommended] 推荐小说缺少 total_bookmarks（契约破坏），该条隐藏收藏数', n.id)
+      }
+      if (typeof n.text_length !== 'number') {
+        console.warn('[recommended] 推荐小说缺少 text_length（契约破坏），该条隐藏字数', n.id)
+      }
+      return { kind: 'novel' as const, key: `n-${n.id}`, id: n.id, data: n }
+    }),
     nextUrl: r.next_url,
   }
 }
@@ -279,15 +290,33 @@ onActivated(() => {
                读一次 props——轮播宿主实例跨 slide 持久时收藏数/收藏态/illustId 全部冻结在首卡
                （收藏数恒 135 + 点 ♥ 收藏到错误作品），key 变化强制重建实例 -->
           <BookmarkButton
-            :key="currentItem.data.id"
+            :key="currentItem.key"
             :illust-id="currentItem.data.id"
             :initial-bookmarked="currentItem.data.is_bookmarked"
             :bookmark-count="currentItem.data.total_bookmarks"
           />
         </view>
-        <text v-else-if="currentItem" class="text-label-medium text-white/70 mt-3">{{
-          t('recommended.charCount', { count: currentItem.data.text_length })
-        }}</text>
+        <!-- 小说滑页：与插画**同槽位同形**的 ♥（票 #707 / spec docs/specs/app-lynx-recommended-novel-bookmark.md）
+             - target-kind="novel"：走小说收藏端点（add=/v2/novel/bookmark/add + restrict=public，delete=/v1/novel/bookmark/delete，
+               不对称是既有事实）；同为「快速收藏」通道，**不开**长按面板（ADR-0160 D7：小说标签不在本期）；
+               @tap.stop 由组件内部抑制，点 ♥ 不会冒泡到 scrim 的「进介绍页」@tap；
+             - :key 取 feed 的**跨 kind 唯一键**（i-/n- 前缀，createMixFeed 的 MixFeedItem.key）而非裸 id：
+               插画与小说 id 数值相同时，裸 id 会让 Vue 在两个分支间复用同一个 BookmarkButton 实例
+               → init-only props 冻结（ADR-0163 / 44ee6401 同类风险）；
+             - 「N 字」保留并退为 ♥ 下方次行（Q4-A / Q8-A 版面决策：收藏数与字数并存）。 -->
+        <view v-else-if="currentItem" class="mt-5">
+          <BookmarkButton
+            :key="currentItem.key"
+            target-kind="novel"
+            :illust-id="currentItem.data.id"
+            :initial-bookmarked="currentItem.data.is_bookmarked"
+            :bookmark-count="currentItem.data.total_bookmarks"
+          />
+          <!-- 字数：缺 text_length 时不渲染（禁止显示「0 字」；缺字段已在 mapNovels 显式 warn，不静默） -->
+          <text v-if="currentItem.data.text_length > 0" class="text-label-medium text-white/70 mt-2">{{
+            t('recommended.charCount', { count: currentItem.data.text_length })
+          }}</text>
+        </view>
       </view>
 
       <!-- 分页加载失败（fetchMore）内联提示：保留当前滑页，可重试 -->
