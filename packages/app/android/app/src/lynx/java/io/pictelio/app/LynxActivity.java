@@ -273,12 +273,15 @@ public class LynxActivity extends AppCompatActivity {
     }
 
     /**
-     * onResume 兜底补发判定（spec §4.3 表「后台兜底」行）：缓存已初始化（≠ -1）且与当前
-     * uiMode 不同 → 需补发（后台期间系统翻转未触发 configChanges 的厂商差异）。
-     * 纯函数化以便 JVM 直测（原实现内联在 onResume 分支，无法单测 = 只能手抄断言）。
+     * 暗色事件发射判定（spec §4.3 表「配置变更」+「后台兜底」两行的**唯一判定式**）：
+     * 缓存已初始化（≠ -1）且夜间位与缓存不同 → 需发射。含两种触发源——{@link #onConfigurationChanged}
+     * 的即时翻转，以及 {@link #onResume} 的后台补发（后台期间系统翻转未触发 configChanges 的厂商差异）。
+     *
+     * <p>纯函数化以便 JVM 直测（原实现内联在两个生命周期分支内，只能手抄断言 = 删掉实现也不会红）。
+     * 消费方即上述两处；反射/静态字段读取无用——判定的 oracle 是 spec 决策表，故以输入输出矩阵覆盖。
      */
-    static boolean shouldBackfillDark(int lastUiMode, int currentUiMode) {
-        return lastUiMode != -1 && lastUiMode != currentUiMode;
+    static boolean shouldEmitDarkEvent(int lastUiMode, int nightMode) {
+        return lastUiMode != -1 && nightMode != lastUiMode;
     }
 
     // ── 状态栏图标深浅决策（spec lynx-night-mode T3，解 ADR-0168 D4 钉死）──
@@ -345,7 +348,7 @@ public class LynxActivity extends AppCompatActivity {
      *
      * <p>调用时机（全部集中在本方法，杜绝多处各自读键）：onCreate 初始化顺序中（先读
      * uiMode 缓存 + 全屏态，再首次下发）、onConfigurationChanged（系统 uiMode 翻转）、
-     * onResume 兜底分支（经 {@link #shouldBackfillDark}）、全屏切换
+     * onResume 兜底分支（经 {@link #shouldEmitDarkEvent}）、全屏切换
      * （{@link #syncStatusBarHidden}）、手动三态切换（{@link #applyDarkModePreference}）。
      * 只读 prefs + 字段，不写任何状态。
      */
@@ -1046,14 +1049,15 @@ public class LynxActivity extends AppCompatActivity {
         // ADR-0180（T1）：onResume 兜底比对 — 后台期间系统 uiMode 翻转若未触发
         // configChanges（个别厂商 / 后台省电冻结），resume 时强制补发事件，避免 JS 漏感知。
         // 安全：sLastUiMode 已被 onConfigurationChanged / onCreate 初始化；未初始化不补发
-        // （判定收敛到纯函数 shouldBackfillDark，可单测）。
+        // （判定收敛到纯函数 shouldEmitDarkEvent，可单测）。
         // 防抖短路下沉到 sendDarkModeEvent 内部（sLastDarkSent），此处只需比对 uiMode 缓存。
+        // 判定与发射必须相邻（≤ 数行）：JS 侧 darkModeJavaContract.test.ts 以源级断言钉住本形态。
         if (lynxView != null) {
             int current = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
-            if (shouldBackfillDark(sLastUiMode, current)) {
-                Log.i(TAG, "onResume 兜底补发暗色事件（uiMode 翻转未走 configChanges）");
+            if (shouldEmitDarkEvent(sLastUiMode, current)) {
                 sLastUiMode = current;
                 sendDarkModeEvent();
+                Log.i(TAG, "onResume 兜底补发暗色事件（uiMode 翻转未走 configChanges）");
                 // T3 + #692：状态栏图标深浅联动——与 sendDarkModeEvent 同触发源（uiMode 翻转），
                 // 不重新走 recreate（WindowInsetsControllerCompat 同一实例可即时生效）。
                 applyStatusBarAppearance();
@@ -1078,12 +1082,16 @@ public class LynxActivity extends AppCompatActivity {
      * Android 状态栏图标属性是 Java 侧独立状态，必须在 sendDarkModeEvent 之后同步下发，
      * 否则 JS 切到暗外观后状态栏图标仍为深色与新背景不可读。手动三态下 uiMode 翻转不改
      * 外观（applyStatusBarAppearance 内按 prefs 决策），下发幂等无害。
+     *
+     * <p>判定与发射必须相邻（≤ 数行）：JS 侧 darkModeJavaContract.test.ts 以源级断言钉住
+     * 「每个发射点由 {@link #shouldEmitDarkEvent} 决策 + 判定后紧随 {@code sendDarkModeEvent()}」
+     * 的形态，防止调用被删或判定被绕开。
      */
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
         int nightMode = newConfig.uiMode & Configuration.UI_MODE_NIGHT_MASK;
-        if (nightMode != sLastUiMode) {
+        if (shouldEmitDarkEvent(sLastUiMode, nightMode)) {
             sLastUiMode = nightMode;
             sendDarkModeEvent();
             // T3 + #692：状态栏图标深浅联动（解 ADR-0168 D4 钉死 + 手动三态接线）

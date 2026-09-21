@@ -133,7 +133,8 @@ function ensureInit(): void {
         setMode(mode)
       })
     }
-    if (!app || typeof app.getDarkMode !== 'function') {
+    // 此分支已在 `if (app)` 块内：`!app` 恒假（review round-2 清理的死条件），只判方法缺失
+    if (typeof app.getDarkMode !== 'function') {
       console.warn('[darkMode] NativeModules.PictelioApp.getDarkMode 不可用，系统暗色恒 light')
       return
     }

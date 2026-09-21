@@ -86,7 +86,15 @@ page,
                                                   * tone 50）+ 35% alpha；**亮色 6 主题共用此基础值
                                                   * （有意设计：中性滚动条不随主题染色）**，暗色 6 套各自
                                                   * 按各主题 outline(tone 60) + 35% alpha 派生 —— 见各
-                                                  * .theme-X.dark 块（scripts/generate-theme-palettes.mjs） */
+                                                  * .theme-X.dark 块（scripts/generate-theme-palettes.mjs）
+                                                  *
+                                                  * 明暗不对称**显式声明**（M4，review round-2）：
+                                                  * - 亮色：共用基线 neutral、不随主题染色（有意收敛——
+                                                  *   滚动条属系统级中性 affordance）；
+                                                  * - 暗色：各主题 outline 派生（有意——与暗色板其余角色
+                                                  *   同源派生口径，避免亮色灰叠暗面导致对比度漂移）。
+                                                  * 两侧差异为**设计选择，非遗漏**；对称性由
+                                                  * tests/unit/utils/appearanceClasses.test.ts 覆盖断言守值。 */
 
   /* ── 兼容别名：旧 Fluent 语义 → M3 令牌（存量引用不断） ── */
   --colorNeutralBackground1: var(--md-surface-container-lowest); /* 卡片/顶栏底 */
@@ -422,7 +430,7 @@ page,
 /* ════════════════════════════════════════════════════════════════════════════
  * 自动生成段（spec docs/specs/lynx-night-mode.md T2 §4.7）：勿手改
  * 由 scripts/generate-theme-palettes.mjs 产出，覆盖 6 主题暗色版（复合选择器 .theme-X.dark）。
- * seed 清单在脚本内维护（THEMES）；产物与亮色 --md-primary 由 tests/palettes-drift.test.ts 双向锁死。
+ * 亮色 primary 锚点清单在脚本内维护（THEMES[].lightPrimaryAnchor）；产物与亮色 --md-primary 由 tests/palettes-drift.test.ts 双向锁死。
  * 亮色版沿用既有手调色板（ADR-0152 / commit f239b065）——保持视觉零回归。
  * 重新生成：node scripts/generate-theme-palettes.mjs。
  * ════════════════════════════════════════════════════════════════════════════ */

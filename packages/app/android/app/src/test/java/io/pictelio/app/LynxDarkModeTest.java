@@ -31,7 +31,8 @@ import org.robolectric.shadows.ShadowLog;
  *   <li>{@code resolveIsDark} 三态 × uiMode：ADR-0180 D6（状态栏图标随 resolvedDark）+ spec §4.1
  *       （system = 跟随系统）</li>
  *   <li>{@code splashThemeIdFor}（system → 0 = 交还 values-night 主轨）：ADR-0180 D7 + spec §4.7/§5</li>
- *   <li>{@code shouldBackfillDark}：spec §4.3 表「后台兜底」行（onResume 比对缓存补发）</li>
+ *   <li>{@code shouldEmitDarkEvent}：spec §4.3 表「配置变更」+「后台兜底」两行的唯一发射判定
+ *       （onConfigurationChanged 即时发射 / onResume 兜底补发同一式）</li>
  * </ul>
  *
  * <p>反自证声明（#692 code-review 整改）：本文件**不含**反射 set/get 静态字段、手抄 onResume
@@ -39,6 +40,12 @@ import org.robolectric.shadows.ShadowLog;
  * 删掉实现也不会红，零回归价值。改为纯函数输入输出矩阵 + 真实 SharedPreferences 读点语料：
  * 后者是 issue #692 的核心缺陷防线（原生侧此前对 {@code settings_dark_mode} 零读点 → 手动模式
  * 的状态栏图标与 splash 全部未接线）。
+ *
+ * <p>JVM 不可达部分的上层防线（本文件之外）：两个发射点（{@code onResume} /
+ * {@code onConfigurationChanged}）的「判定 + 紧随 {@code sendDarkModeEvent()}」形态、
+ * {@code onDestroy} 的 {@code sLastDarkSent} 复位、状态栏与 splash 的 prefs 组合点，均由
+ * app-lynx {@code src/utils/darkModeJavaContract.test.ts} 以 **Java 源码源级断言**钉死——
+ * 本文件只覆盖判定纯函数本身（round-2 复审 B2：删调用 / 写死载荷时须有机器防线）。
  */
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 31)
@@ -189,32 +196,69 @@ public class LynxDarkModeTest {
         assertEquals(0, LynxActivity.splashThemeIdFor(""));
     }
 
-    // ── shouldBackfillDark(last, current)：onResume 兜底比对（spec §4.3 表「后台兜底」行）──
+    // ── shouldEmitDarkEvent(last, night)：暗色事件的唯一发射判定
+    //    （spec §4.3 表「配置变更」+「后台兜底」两行；onConfigurationChanged / onResume 共用）──
+    //
+    // 回归对象（**删掉实现或改判据即变红**）：两个生命周期发射点的判定收敛到本纯函数。此前的
+    // round-2 复审缺陷 = `if (nightMode != sLastUiMode) { sendDarkModeEvent(); }` 这类内联式
+    // 「零机器防线」——把 `sendDarkModeEvent()` 删掉、或把判定写死，测试仍全绿。
 
     @Test
-    public void shouldBackfillDark_uninitializedNeverBackfills() {
-        assertFalse("sLastUiMode == -1（onCreate 未走 / onDestroy 后）不补发",
-                LynxActivity.shouldBackfillDark(-1, Configuration.UI_MODE_NIGHT_YES));
-        assertFalse(LynxActivity.shouldBackfillDark(-1, Configuration.UI_MODE_NIGHT_NO));
-        assertFalse(LynxActivity.shouldBackfillDark(-1, -1));
+    public void shouldEmitDarkEvent_uninitializedSentinel_neverEmits() {
+        // -1 = onCreate 未走 / onDestroy 复位后：缓存未初始化 → 无从比对 → 不发射
+        // （新实例首帧真值由 onCreate 读 Configuration 后主动下发，不依赖本判定）
+        assertFalse("sLastUiMode == -1（未初始化）不发射",
+                LynxActivity.shouldEmitDarkEvent(-1, Configuration.UI_MODE_NIGHT_YES));
+        assertFalse(LynxActivity.shouldEmitDarkEvent(-1, Configuration.UI_MODE_NIGHT_NO));
+        assertFalse("哨兵不得被当成合法夜间位（-1 ≠ nightMode → 误判发射）",
+                LynxActivity.shouldEmitDarkEvent(-1, -1));
     }
 
     @Test
-    public void shouldBackfillDark_sameValueNeverBackfills() {
-        assertFalse("同值不补发（防抖不变量）",
-                LynxActivity.shouldBackfillDark(Configuration.UI_MODE_NIGHT_NO,
+    public void shouldEmitDarkEvent_sameNightBit_neverEmits() {
+        assertFalse("同值不发射（防抖不变量：配置变更可能以同 uiMode 重复触发）",
+                LynxActivity.shouldEmitDarkEvent(Configuration.UI_MODE_NIGHT_NO,
                         Configuration.UI_MODE_NIGHT_NO));
-        assertFalse(LynxActivity.shouldBackfillDark(Configuration.UI_MODE_NIGHT_YES,
+        assertFalse(LynxActivity.shouldEmitDarkEvent(Configuration.UI_MODE_NIGHT_YES,
                 Configuration.UI_MODE_NIGHT_YES));
     }
 
     @Test
-    public void shouldBackfillDark_flipBackfills() {
-        assertTrue("后台期间系统翻转 → resume 补发",
-                LynxActivity.shouldBackfillDark(Configuration.UI_MODE_NIGHT_NO,
+    public void shouldEmitDarkEvent_nightBitFlip_emitsBothDirections() {
+        assertTrue("亮 → 暗：onConfigurationChanged 即时发射 / onResume 兜底补发",
+                LynxActivity.shouldEmitDarkEvent(Configuration.UI_MODE_NIGHT_NO,
                         Configuration.UI_MODE_NIGHT_YES));
-        assertTrue(LynxActivity.shouldBackfillDark(Configuration.UI_MODE_NIGHT_YES,
-                Configuration.UI_MODE_NIGHT_NO));
+        assertTrue("暗 → 亮：反向同样发射（不得单向闩锁，同 #689 缺陷形态）",
+                LynxActivity.shouldEmitDarkEvent(Configuration.UI_MODE_NIGHT_YES,
+                        Configuration.UI_MODE_NIGHT_NO));
+    }
+
+    @Test
+    public void shouldEmitDarkEvent_fullMatrix_matchesSpecDecisionTable() {
+        // 全矩阵（last × night 的 13 个真实组合）：expected 列**逐行硬编码**（spec §4.3 决策表的
+        // 手抄，即唯一判真条件 = last ≠ -1 且 night ≠ last），**不**在测试里现算同一公式——
+        // 否则测试即实现的镜像，恒真、删掉实现也不会红（本文件反自证声明）。
+        final int uninit = -1; // 未初始化哨兵（onCreate 前 / onDestroy 后）
+        final int yes = Configuration.UI_MODE_NIGHT_YES;
+        final int no = Configuration.UI_MODE_NIGHT_NO;
+        final int undefined = Configuration.UI_MODE_NIGHT_UNDEFINED; // 0：夜间位未定义
+        final int maskOnly = Configuration.UI_MODE_NIGHT_MASK;       // 0x30：仅掩码位，非合法判定值
+        int[][] matrix = {
+                // last, night, expected
+                { uninit, yes, 0 }, { uninit, no, 0 }, { uninit, uninit, 0 },
+                { yes, yes, 0 }, { yes, no, 1 }, { yes, maskOnly, 1 },
+                { no, no, 0 }, { no, yes, 1 }, { no, undefined, 1 },
+                { undefined, undefined, 0 }, { undefined, yes, 1 },
+                { maskOnly, maskOnly, 0 }, { maskOnly, no, 1 },
+        };
+        for (int[] row : matrix) {
+            String label = "shouldEmitDarkEvent(last=" + row[0] + ", night=" + row[1] + ")";
+            if (row[2] == 1) {
+                assertTrue(label, LynxActivity.shouldEmitDarkEvent(row[0], row[1]));
+            } else {
+                assertFalse(label, LynxActivity.shouldEmitDarkEvent(row[0], row[1]));
+            }
+        }
     }
 
     // ── 读点接线（#692 核心缺陷防线：原生侧对 settings_dark_mode 的真实读点）──

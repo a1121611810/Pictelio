@@ -33,7 +33,7 @@ app-lynx 此前只有一套固定的 M3 亮色板（seed Sky #1a6fa8，写死在
 ## Implementation Decisions
 
 - **单一事实源**：`src/utils/themeColor.ts` 导出 `THEME_COLOR_IDS` / `ThemeColorId` / `DEFAULT_THEME_COLOR` / `THEME_COLOR_OPTIONS` / `isThemeColorId` / `themeColorClass`。色板值本身在 `tokens.css`（静态、可构建期生成）。
-- **色板生成**：M3 `SchemeTonalSpot`（`@material/material-color-utilities`）从 seed 生成；`on*Container` 取 tone 10（对齐基础 `page` 色板的旧 M3 风格）。当前 5 个非默认 seed：violet #6750a4、pink #b3426f、green #2e7d32、orange #b26a00、teal #00696d。注意：列出的 hex 是 **seed 输入**，生成后的 `--md-primary` 是派生的 tone-40 色（如 violet seed #6750a4 → `--md-primary` #65558f），两者不等属正常 M3 行为。
+- **色板生成**：M3 `SchemeTonalSpot`（`@material/material-color-utilities`）从 seed 生成；`on*Container` 取 tone 10（对齐基础 `page` 色板的旧 M3 风格）。当前 5 个非默认 seed：violet #6750a4、pink #b3426f、green #2e7d32、orange #b26a00、teal #00696d。注意：列出的 hex 是 **seed 输入**，生成后的 `--md-primary` 是派生的 tone-40 色（如 violet seed #6750a4 → `--md-primary` #65558f），两者不等属正常 M3 行为。（术语注：后续**暗色派生链路**的输入为「亮色 primary 锚点」= 此处派生结果；两层「seed / 锚点」术语的澄清见 [lynx-night-mode spec](lynx-night-mode.md) §4.8。）
 - **应用方式**：根 `<page>` 类绑定（`themeColorClass(settings.themeColor)`）；默认 sky 返回 `theme-sky`（与基础 `page` 同规则，观感不变）。**不做**运行时颜色计算或动态写 CSS 变量（Lynx 动态样式支持面窄）。
 - **持久化**：`settingsStore` 复用既有 `PrefsStorage` seam（`prefs()`），键 `settings_theme_color`；`loadSettings` 中先于 uid 判定读取（设备级）；非法值 `console.warn` 后维持默认；写入失败 `console.warn`。
 - **UI**：Me 页新增「外观」卡片，6 个色块；色块本身加对应 `.theme-*` 类 + `bg-primary` 预览该色板主色；选中态 `border-primary` + ✓。每个色块在 `ME_A11Y_LABELS` 注册独立标注（`themeColorSky/Violet/Pink/Green/Orange/Teal`）。

@@ -47,16 +47,16 @@ T2 / T3 可并行（T2 依赖 `resolvedDark`、T3 依赖 `resolvedDark`，互不
 
 ### 4.3 系统检测通道（哑桥双路径）
 
-**契约锚点**（与 ADR-0168 insets 管线同构）：
+**契约锚点**（与 ADR-0168 insets 管线同构；本表引用一律以**符号名 / 用例名**锚定，不写行号——与 §4.6 同纪律）：
 
-| 元素 | JS 侧 | Java 侧 | 契约测试钉死文件 |
+| 元素 | JS 侧 | Java 侧 | 契约锚点（用例名 / 符号名） |
 |---|---|---|---|
-| 事件名 | `pictelioDarkMode` | `EVENT_DARK_MODE = "pictelioDarkMode"` | `darkModeJavaContract.test.ts:26` |
-| 拉取方法 | `PictelioApp.getDarkMode(cb)` | `@LynxMethod getDarkMode(Callback)` | `darkModeJavaContract.test.ts:31` |
-| 载荷 | `JSON.stringify({mode: 'light' \| 'dark'})`（标准）+ 裸字符串兼容（保守兜底，详见 §4.4） | `JavaOnlyArray.of(JSON.stringify({mode: currentDarkMode(uiMode)}))` | `darkModeJavaContract.test.ts:36` |
-| 初值拉取时机 | `ensureInit()` 在 `getDarkMode` / `subscribeDarkMode` 首次调用时触发（订阅后拉） | 同上 | `darkMode.test.ts:194` |
-| 推变化源 | `setOnApplyWindowInsetsListener` 同款 — `onConfigurationChanged` 读 `Configuration.uiMode` 与 `UI_MODE_NIGHT_MASK`（manifest 已声明 `uiMode` configChanges，免 Activity 重建） | `sendGlobalEvent` via `GlobalEventEmitter` | `LynxDarkModeTest.java`（用例名锚定：「`onConfigurationChanged + UI_MODE_NIGHT_MASK` 字面量断言」，review 修复轮后归 `LynxDarkModeTest` 契约常量例） |
-| 后台兜底 | — | `onResume` 比对缓存 `sLastUiMode`，变化则补发（防后台期间系统翻转） | 用例名锚定：「`onResume` 兜底补发」字面量（`LynxDarkModeTest` 契约常量例）+ 纯函数矩阵 `shouldBackfillDark`（review 修复轮新增） |
+| 事件名 | `pictelioDarkMode` | `EVENT_DARK_MODE = "pictelioDarkMode"` | 用例「事件名 pictelioDarkMode：Java 发送 ⇄ JS 订阅」（`darkModeJavaContract.test.ts`） |
+| 拉取方法 | `PictelioApp.getDarkMode(cb)` | `@LynxMethod getDarkMode(Callback)` | 用例「拉取方法 getDarkMode：Java 提供 ⇄ JS 调用」（同文件） |
+| 载荷 | `JSON.stringify({mode: 'light' \| 'dark'})`（标准）+ 裸字符串兼容（保守兜底，详见 §4.4） | `JavaOnlyArray.of(JSON.stringify({mode: currentDarkMode(uiMode)}))` | 用例「载荷契约：Java JSON 字符串（{"mode":...}）⇄ JS 双路径解析」（同文件；钉 Java **转义引号形态** `"{\"mode\":\""`——防断言被 Javadoc 注释满足） |
+| 初值拉取时机 | `ensureDarkModeInit()`（模块内 `ensureInit`）在 `getDarkMode` / `subscribeDarkMode` 首次调用时触发（订阅后拉） | 同上 | 用例「`ensureDarkModeInit`：native 侧订阅已注册 + pull 已发起（无回调消费方也能取到系统态）」+「`getDarkMode` 重复调用：幂等（ensureInit 一次）」（`darkMode.test.ts`） |
+| 推变化源 | 冷启动订阅后由原生推送；JS 侧不轮询 | `onConfigurationChanged` 读 `Configuration.uiMode` 与 `UI_MODE_NIGHT_MASK`（manifest 已声明 `uiMode` configChanges，免 Activity 重建）；判定收敛到纯函数 `shouldEmitDarkEvent`，命中后 `sendDarkModeEvent()` → `sendGlobalEvent` via `GlobalEventEmitter` | ① 纯函数矩阵：用例「`shouldEmitDarkEvent_fullMatrix_matchesSpecDecisionTable`」（`LynxDarkModeTest`，Robolectric）；② 调用点源级断言：用例「a) onConfigurationChanged：`shouldEmitDarkEvent` 判定后 200 字符内 `sendDarkModeEvent()`」（`darkModeJavaContract.test.ts`——**JS 侧扫 Java 源 + 剥注释**）。**`onConfigurationChanged + UI_MODE_NIGHT_MASK` 字面量断言归 `darkModeJavaContract.test.ts`**（用例「配置变化回调 onConfigurationChanged 钉字面量：与 manifest configChanges 一致」），**不在 `LynxDarkModeTest`** |
+| 后台兜底 | — | `onResume` 走**同一判定** `shouldEmitDarkEvent`（比对缓存 `sLastUiMode`，变化则补发，防后台期间系统翻转） | ① 用例「b) onResume：同组合（后台期间系统翻转未走 configChanges 的兜底补发）」（`darkModeJavaContract.test.ts`，剥注释）；② 纯函数矩阵 `shouldEmitDarkEvent`（同 `LynxDarkModeTest`） |
 
 **通道分流（JS 侧 `packages/app-lynx/src/utils/darkMode.ts` `ensureInit`）**：
 
@@ -109,7 +109,8 @@ T2 / T3 可并行（T2 依赖 `resolvedDark`、T3 依赖 `resolvedDark`，互不
 | JS↔Java 契约钉死（6 项字面量） | `darkModeJavaContract.test.ts` | 6 |
 | settingsStore 暗色 14 例 | `settingsStore.test.ts` | 14 |
 | Robolectric 16 例（含 `currentDarkMode` 纯函数 + 防抖 + 兜底 + SDK 行为） | `LynxDarkModeTest.java` | 16 |
-| **总计** | | **57** |
+
+**合计口径**：上表行值逐行相加 = **58**；原文「**总计 57**」与本表行值不符，**已删除总计行**——本表不维护去重总数（避免第二份计数陈旧，与本节抬头「权威计数以各测试文件实际用例为准」同口径）。行值只表示「该维度在 T1 时点该钉住几条行为」，不等于当前用例数。
 
 ### 4.6 设备级键 + 备份域完整性守卫
 
@@ -140,7 +141,7 @@ T2 / T3 可并行（T2 依赖 `resolvedDark`、T3 依赖 `resolvedDark`，互不
 | splash 兜底轨 | `dark` → `Theme.SplashScreen.Dark` / `light` → `Theme.SplashScreen.Light` / `system` → `Resources.ID_NULL`（复位 manifest 默认主题，禁兜底到任一手动主题）；平台门槛 API 31+（低版本 = §5 接受项） |
 | 主题名稳定性 | 两支主题在 `values/` 与 `values-night/` **双配置双定义**（同名集合一致——反配置下手动档仍可解析） |
 | plate 接线 | 两支主题父主题 = `Theme.SplashScreen.IconBackground`（缺该父链时 plate 色对系统 splash 无效）；暗面板 `#1C2024` ≠ 暗面 `#101418`，亮面板 == 亮底（有意） |
-| 状态栏即时重设 | JS 切换后经 `PictelioAppModule.applyDarkModePreference`（`@LynxMethod`，主线程转交）重下发；`onResume` 兜底（`shouldBackfillDark`） |
+| 状态栏即时重设 | JS 切换后经 `PictelioAppModule.applyDarkModePreference`（`@LynxMethod`，主线程转交）重下发；`onResume` 兜底走**同一判定** `shouldEmitDarkEvent`（无独立 `shouldBackfillDark`——两触发源共用一函数） |
 | 全屏交互 | 状态栏隐藏态经单一写点 `syncStatusBarHidden`（修旧实现「仅 onCreate 写一次 → 退出全屏后外观不重设」的闩锁）；全屏分支 `resolveStatusBarAppearance` 返回 null 跳过外观下发 |
 
 **机器防线（四类契约测试）**：
@@ -149,10 +150,14 @@ T2 / T3 可并行（T2 依赖 `resolvedDark`、T3 依赖 `resolvedDark`，互不
 |---|---|---|
 | 读点存在性 + 键名同源 | `darkModeJavaContract.test.ts` | Java 读点字面量（`settings_dark_mode` / `Resources.ID_NULL` / `syncStatusBarHidden`）+ JS 写入侧常量逐字一致 + `applyDarkModePreference` 两侧成对 |
 | 跨语言色值 | `darkModeJavaContract.test.ts` | `values-night` 暗面 ≡ `.theme-sky.dark --md-surface`；暗 plate ≠ 暗面（离底有差 → 前景圆盘可见） |
-| 产物漂移 / seed 一致性 | `tests/palettes-drift.test.ts` | tokens.css 自动生成段 ≡ 生成脚本 `--stdout`（逐字节）；脚本 seed ↔ 亮色 `--md-primary` 6/6 对等 |
+| 产物漂移 / 锚点一致性 | `tests/palettes-drift.test.ts` | tokens.css 自动生成段 ≡ 生成脚本 `--stdout`（逐字节，行尾空白归一）+ `--stdout` 只读（运行前后 tokens.css 不变）；脚本内 **`lightPrimaryAnchor` ≡ 亮色 `--md-primary` 6/6 对等** |
 | 豁免与覆盖面空集防护 | `tests/hardcodeColorGate.test.ts` | 白名单非空 + 条目路径存在 + 理由非空；`walk(src)` 文件数下界 + 关键文件在集内（防遍历失效恒真） |
 
-**走查 gate**：上述防线只证明「读点存在 + 键名/色值同源」，**证明不了设备可见行为**（Lynx 样式引擎解析、平台 splash 语义、厂商 ROM 差异）——发版前按 [lynx-night-mode-walkthrough.md](./lynx-night-mode-walkthrough.md) 的 T2/T3/T4 矩阵执行，结果落档后关闭 [#692](https://github.com/a1121611810/Pictelio/issues/692)。
+> **防线边界（重要）**：源级断言证明的是「读点 / 调用点**存在**（剥注释后仍成立）」与组合**形态**成形（如 `resolveIsDark(normalizeDarkMode(readDarkModeRaw(this)))` 逐字成形）；它**不含运行期值流粘合**——`settings_dark_mode` 写入 → 读点取到新值 → 决策 → 状态栏/splash 实际按新值下发这条端到端链路不在单测射程内，由**人工过查**（review 修复轮的 M 项）**+ 设备走查 T3 矩阵**覆盖。**不得把「读点存在」读成「值流已验证」。**
+
+> **术语（防「seed」一词两义）**：生成脚本清单字段 `lightPrimaryAnchor` = **亮色 primary 锚点**（双职责：亮色主色值 + 暗色派生 M3 `SchemeTonalSpot` 的 seed 输入）。[app-lynx-theme-color.md](./app-lynx-theme-color.md) 早期「列出的 hex 是 seed 输入、生成后 `--md-primary` 是派生 tone-40」属**历史口径差异**（那批 #6750a4 等是亮色板生成时的输入，与产物 primary #65558f 不等）——暗色色板与本 spec **以「`lightPrimaryAnchor` ≡ 亮色 `--md-primary`」为准**（`tests/palettes-drift.test.ts` 文件头同口径）。
+
+**走查 gate**：上述防线只证明「读点存在 + 键名/色值同源」，**证明不了设备可见行为**（Lynx 样式引擎解析、平台 splash 语义、厂商 ROM 差异）——发版前按 [lynx-night-mode-walkthrough.md](./lynx-night-mode-walkthrough.md) 的 T2/T3/T4 矩阵执行（发版侧钩子见 [release-checklist.md](../release-checklist.md) §发版前 QA 防线），结果落档后关闭 [#692](https://github.com/a1121611810/Pictelio/issues/692)。
 
 ## 5. Out of Scope
 
@@ -166,6 +171,6 @@ T2 / T3 可并行（T2 依赖 `resolvedDark`、T3 依赖 `resolvedDark`，互不
 ## 6. 进一步说明
 
 - **真机/模拟器探针**：T1 是基础层，无可见 UI 变化（仅 JS 内部 ref 变化）；设备级探针随 T3 splash 联动一并做（Lynx 原生 `<list>` 结构 + 系统栏视觉变化点）。T1 单元层 contract 钉死（`darkModeJavaContract.test.ts`）作为 oracle 证据。**设备可见行为的最终口径 = 发版前走查矩阵**（[lynx-night-mode-walkthrough.md](./lynx-night-mode-walkthrough.md)，gate 见 §4.8）。
-- **happy-dom 不当模拟**：vitest environment: node（vitest.config.ts:35）；测试通过 `globalThis.matchMedia` 注入 mock，不依赖 window/happy-dom；Lynx 行为靠 Robolectric + 真实 Configuration fixture 钉死。
+- **happy-dom 不当模拟**：vitest `test.environment: 'node'`（`packages/app-lynx/vitest.config.ts`）；测试通过 `globalThis.matchMedia` 注入 mock，不依赖 window/happy-dom；Lynx 行为靠 Robolectric + 真实 Configuration fixture 钉死。
 - **错误模型不破坏调用方**：所有降级路径 warn + 维持兜底，不抛异常、不改变外部接口签名。
 - **主题色 vs 暗色模块同源**：themeColor.ts 与 darkMode.ts 是 ADR-0152 立项时的孪生兄弟，统一走「清单单一事实源 + is*Id + 非法 warn + 回退默认」模式；暗色模块新增未引入新模式或绕过既有约定。

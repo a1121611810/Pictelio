@@ -17,8 +17,8 @@
 
     <!-- 同名覆写主轨（T3 splash 双轨主轨）：values-night 自动被系统在 uiMode=night 解析，
          自带 Theme.SplashScreen 父，避免重写全部属性。
-         取值来源（app-lynx src/styles/tokens.css）：#101418 = .theme-sky.dark 的 md-surface 令牌
-         （:445，令牌名在 CSS 中带双连字符前缀）；#1C2024 = md-surface-container（:453，面上方一阶）
+         取值来源（app-lynx src/styles/tokens.css，符号锚、不写行号防漂移）：#101418 = .theme-sky.dark
+         的 md-surface 令牌（CSS 写作「双连字符 + md-surface」）；#1C2024 = md-surface-container（面上方一阶）
          —— 暗色 plate 与底有差，
          因此 launcher 前景上的圆盘可见（与亮色「plate==底」的有意处理相对）。
          注：本主轨主题的 plate 项仅在父主题切到 Theme.SplashScreen.IconBackground 后才被平台

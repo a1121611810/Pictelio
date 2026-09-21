@@ -264,7 +264,7 @@ _Avoid_: 只做 on/off 开关（无跟随系统，偏离 M3 与 Android 基线�
 _Avoid_: 各消费方各自判断 `darkMode === 'system' ? 系统值 : darkMode`（解析逻辑散落）；把 `system` 当成第三种实际外观（它是跟随指示，不是态）。
 
 **暗色色板（dark palette）**【2026-09-21 新增，ADR-0180】：
-6 主题 × 亮暗 = 12 套静态 M3 色板的后半——暗色版为 `.theme-X.dark` **复合选择器**（特异性 (0,2,0) 高于单类 `.theme-X` 的 (0,1,0)，CSS 级覆盖亮色版同名 `--md-*` 变量）；根 `<page>` 同时挂 `.theme-X` + `.dark` 两类的输出由 `appearanceClasses(themeColorId, resolvedDark)` 纯函数派生。色板由 `scripts/generate-theme-palettes.mjs` 从 seed 经 M3 `SchemeTonalSpot` 构建期生成（零运行时算色，ADR-0152 延续）；暗色板角色集与亮色同构（brand 三色 + surface 中性色 + outline + inverse + fixed + state layer + error/scrim/shape/elevation 补档）。
+6 主题 × 亮暗 = 12 套静态 M3 色板的后半——暗色版为 `.theme-X.dark` **复合选择器**（特异性 (0,2,0) 高于单类 `.theme-X` 的 (0,1,0)，CSS 级覆盖亮色版同名 `--md-*` 变量）；根 `<page>` 同时挂 `.theme-X` + `.dark` 两类的输出由 `appearanceClasses(themeColorId, resolvedDark)` 纯函数派生。色板由 `scripts/generate-theme-palettes.mjs` 从**亮色 primary 锚点**（暗色派生阶段的输入；术语澄清见 `docs/specs/lynx-night-mode.md` §4.8）经 M3 `SchemeTonalSpot` 构建期生成（零运行时算色，ADR-0152 延续）；暗色板角色集与亮色同构（brand 三色 + surface 中性色 + outline + inverse + fixed + state layer + error/scrim/shape/elevation 补档）。
 _Avoid_: 运行时算色 / 动态写 CSS 变量（同「主题色」词条纪律）；给暗色只覆盖 primary（串色，同「主题色」）；在亮色主题缺 `.dark` 时误判为低优先级 bug（未挂 `.dark` 类即亮色版语义，正交组合是有意设计）。
 
 **暗色检测通道（dark mode detection channel）**【2026-09-21 新增，ADR-0180，研究 #683】：

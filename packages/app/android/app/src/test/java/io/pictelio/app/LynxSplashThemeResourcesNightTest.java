@@ -10,10 +10,15 @@ import org.robolectric.annotation.Config;
 /**
  * splash 主题资源冻结值测试（night 配置；spec lynx-night-mode.md §4.7/§5；ADR-0180 D7）。
  *
+ * <p>断言范围声明（round-2 复审 M6）：本文件只断言**资源值已登记**（{@code obtainStyledAttributes}
+ * 读得到 values-night/ 的声明），**不**断言「该值在设备端生效」——主轨 {@code AppTheme.NoActionBarLaunch}
+ * 的父保持 {@code Theme.SplashScreen}，其 plate 项「已登记未生效」（有意差异；生效性走查见
+ * docs/specs/lynx-night-mode-walkthrough.md T3-3c）。
+ *
  * <p>oracle 溯源（冻结契约，非从实现反推）：
  * <ul>
  *   <li>主轨 {@code AppTheme.NoActionBarLaunch}（system 跟随）：底 {@code #101418}
- *       （app-lynx {@code .theme-sky.dark --md-surface}）+ plate {@code #1C2024}
+ *       （app-lynx {@code .theme-sky.dark} 的 {@code --md-surface}，符号锚）+ plate {@code #1C2024}
  *       （{@code --md-surface-container}，上一阶）——旧值 {@code #1A1A1A} 已废（M3 baseline
  *       近似值，与皮肤暗色面不一致）</li>
  *   <li>{@code Theme.SplashScreen.Light} 在 values-night/ **也必须存在且为白**：手动 light 被
@@ -30,9 +35,9 @@ import org.robolectric.annotation.Config;
 public class LynxSplashThemeResourcesNightTest {
 
     private static final int WHITE = 0xFFFFFFFF;
-    /** app-lynx .theme-sky.dark --md-surface（tokens.css:445） */
+    /** app-lynx {@code .theme-sky.dark} 的 {@code --md-surface}（符号锚；不写 tokens.css 行号——必然漂移） */
     private static final int DARK_SURFACE = 0xFF101418;
-    /** app-lynx .theme-sky.dark --md-surface-container（tokens.css:453）——plate 上一阶 */
+    /** app-lynx {@code .theme-sky.dark} 的 {@code --md-surface-container}——plate 上一阶（符号锚，同上） */
     private static final int DARK_PLATE = 0xFF1C2024;
 
     private static final int ATTR_BACKGROUND =
@@ -41,8 +46,13 @@ public class LynxSplashThemeResourcesNightTest {
             androidx.core.splashscreen.R.attr.windowSplashScreenIconBackgroundColor;
 
     @Test
-    public void launchTheme_nightOverride_usesSkyDarkSurfaceAndPlate() {
-        // 主轨（system 跟随）：暗色配置下系统按 manifest 主题绘制最早帧 → 底/plate 必须同暗色面
+    public void launchTheme_nightOverride_resourceValuesRegistered_plateNotEffective() {
+        // 主轨（system 跟随）暗色配置：**资源值断言** —— 底/plate 均已登记为暗色面。
+        // 生效性边界（M6，必须逐字保留本限定）：底（windowSplashScreenBackground）由系统 splash
+        // 直接消费；plate 项**已登记未生效**——主轨父保持 Theme.SplashScreen（非 IconBackground），
+        // 平台不把 android:windowSplashScreenIconBackgroundColor 映射回本 app attr。故本用例名/注释
+        // 不得声称「主轨暗色 splash 有可见圆盘」；生效性 = docs/specs/lynx-night-mode-walkthrough.md
+        // T3-3c（走查项，非 JVM 断言）。
         assertEquals(DARK_SURFACE,
                 LynxSplashThemeResourcesTest.attrColor(R.style.AppTheme_NoActionBarLaunch, ATTR_BACKGROUND));
         assertEquals(DARK_PLATE,

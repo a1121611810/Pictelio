@@ -1,14 +1,24 @@
 #!/usr/bin/env node
 // ─── app-lynx 暗色主题色板生成脚本（spec docs/specs/lynx-night-mode.md T2 §4.7）───
 //
-// 用途：从 6 个 seed 色经 M3 SchemeTonalSpot 生成 6 套暗色色板（追加到 tokens.css）。
+// 用途：从 6 个亮色 primary 锚点（`THEMES[].lightPrimaryAnchor`，同时充当暗色方案的 M3 seed
+// 输入）经 M3 SchemeTonalSpot 生成 6 套暗色色板（追加到 tokens.css）。
 // 亮色版沿用既有手调色板（ADR-0152 / commit f239b065）——保持视觉零回归。
 //
+// 术语（review round-2 M3 澄清，防「seed」一词两义固化）：
+//   - 清单字段 = `lightPrimaryAnchor` = **亮色 --md-primary 值**（双职责：既是亮色主色值，
+//     又是暗色方案 SchemeTonalSpot 的 seed 输入）——暗色块注释里写的「从 seed #xxx 派生」
+//     指的就是这个锚点作为 M3 seed 输入，两者不矛盾。
+//   - 与 docs/specs/app-lynx-theme-color.md 早期「列出的 hex 是 **seed 输入**，生成后的
+//     --md-primary 是派生的 tone-40 色（如 violet seed #6750a4 → --md-primary #65558f）」
+//     属**历史口径差异**：那批 hex（#6750a4 等）是当年生成亮色板时的输入，与产物不等；
+//     本脚本维护的锚点则是**产物侧亮色 primary 值**（#65558f），两套口径不是同一批数。
+//
 // 决策（spec §4.7 范围内二选一）：暗色版走 `.theme-X.dark` 复合选择器：
-//   - seed 清单在本脚本内维护（见 THEMES）：themeColor.ts 只持有 id → className，不持有 seed
-//     值，因此它**不是** seed 的单一事实源（旧注释曾如此声称，与事实不符已更正）
+//   - 锚点清单在本脚本内维护（见 THEMES）：themeColor.ts 只持有 id → className，不持有锚点
+//     值，因此它**不是**锚点的单一事实源（旧注释曾如此声称，与事实不符已更正）
 //   - 防漂移：tests/palettes-drift.test.ts 双向锁死 —— (a) tokens.css 自动生成段 ≡ 本脚本
-//     `--stdout` 输出；(b) 脚本内 6 个 seed ≡ tokens.css 6 个亮色 .theme-X 的 --md-primary
+//     `--stdout` 输出；(b) 脚本内 6 个 lightPrimaryAnchor ≡ tokens.css 6 个亮色 .theme-X 的 --md-primary
 //   - 根 <page> 同时挂 .theme-X + .dark 两个类 → 复合选择器特异性更高，覆盖亮色版的同名变量
 //   - 与既有亮色版正交组合：移除 .dark 类即回到亮色版
 //
@@ -79,16 +89,18 @@ const { SchemeTonalSpot, MaterialDynamicColors, Hct, hexFromArgb, argbFromHex } 
   '@material/material-color-utilities'
 )
 
-/** 6 主题 seed（与既有 .theme-X 亮色版的 primary 值一一对应；取自 ADR-0152 锁定的主题色值）。
- * seed 清单由本脚本维护（themeColor.ts 不持有 seed）；与 tokens.css 亮色 --md-primary 的
- * 逐一对等一致性由 tests/palettes-drift.test.ts 断言（正则双向抽取，非人工同步）。 */
+/** 6 主题 lightPrimaryAnchor 清单（= 既有 .theme-X 亮色版的 --md-primary 值；取自 ADR-0152
+ * 锁定的主题色值）。双职责：亮色主色值 + 暗色方案 M3 SchemeTonalSpot 的 seed 输入。
+ * 锚点清单由本脚本维护（themeColor.ts 不持有锚点）；与 tokens.css 亮色 --md-primary 的
+ * 逐一对等一致性由 tests/palettes-drift.test.ts 断言（正则双向抽取，非人工同步）。
+ * 术语口径见文件头「术语」（与 docs/specs/app-lynx-theme-color.md 早期 seed 描述为历史差异）。 */
 const THEMES = [
-  { id: 'sky', seed: '#1a6fa8' },
-  { id: 'violet', seed: '#65558f' },
-  { id: 'pink', seed: '#8b4a61' },
-  { id: 'green', seed: '#3c6939' },
-  { id: 'orange', seed: '#855317' },
-  { id: 'teal', seed: '#00696d' },
+  { id: 'sky', lightPrimaryAnchor: '#1a6fa8' },
+  { id: 'violet', lightPrimaryAnchor: '#65558f' },
+  { id: 'pink', lightPrimaryAnchor: '#8b4a61' },
+  { id: 'green', lightPrimaryAnchor: '#3c6939' },
+  { id: 'orange', lightPrimaryAnchor: '#855317' },
+  { id: 'teal', lightPrimaryAnchor: '#00696d' },
 ]
 
 /** M3 角色清单（与既有亮色 page 色板同构）。
@@ -96,7 +108,7 @@ const THEMES = [
  *
  * T4 扩展（spec docs/specs/lynx-night-mode-audit.md §4.1）：
  * - 加入 error / error-container / on-error / on-error-container / state-pressed-error
- *   （独立 errorPalette 派生，与 brand seed 解耦）
+ *   （独立 errorPalette 派生，与品牌锚点解耦）
  * - 加入 scrim / scrim-overlay（明暗同值但暗色块显式声明防回落到 light 单一来源）
  * - 加入 shape-* / elevation-* / scroll-indicator（同上：与亮色同值但显式声明）
  */
@@ -292,14 +304,16 @@ function formatRoleBlock(roleMap, indent = '  ') {
   return ROLES.map((name) => `${indent}${name}: ${roleMap[name]};`).join('\n')
 }
 
-/** 生成单个暗色色板的 CSS 块（复合选择器 .theme-X.dark） */
-function generateBlock(themeId, seedHex) {
-  const seedArgb = argbFromHex(seedHex)
+/** 生成单个暗色色板的 CSS 块（复合选择器 .theme-X.dark）。
+ *  注意：下方模板串会**逐字节落到 tokens.css**（tests/palettes-drift.test.ts (a) 比对），
+ *  改一个字符都必须重跑本脚本；模板里的「从 seed …」= 锚点作为暗色方案 M3 seed 输入（见文件头「术语」）。 */
+function generateBlock(themeId, anchorHex) {
+  const seedArgb = argbFromHex(anchorHex)
   // isDark = true：M3 SchemeTonalSpot 派生暗色 scheme
   const scheme = new SchemeTonalSpot(Hct.fromInt(seedArgb), true, 0.0)
   const roleMap = readScheme(scheme)
   const classSelector = `.theme-${themeId}.dark`
-  return `/* ─── ${themeId} 主题暗色板（spec lynx-night-mode T2，从 seed ${seedHex} 经 M3 SchemeTonalSpot 派生 isDark=true） ─── */
+  return `/* ─── ${themeId} 主题暗色板（spec lynx-night-mode T2，从 seed ${anchorHex} 经 M3 SchemeTonalSpot 派生 isDark=true） ─── */
 ${classSelector} {
 ${formatRoleBlock(roleMap)}
 }
@@ -311,7 +325,7 @@ function generateHeader() {
   return `/* ════════════════════════════════════════════════════════════════════════════
  * 自动生成段（spec docs/specs/lynx-night-mode.md T2 §4.7）：勿手改
  * 由 scripts/generate-theme-palettes.mjs 产出，覆盖 6 主题暗色版（复合选择器 .theme-X.dark）。
- * seed 清单在脚本内维护（THEMES）；产物与亮色 --md-primary 由 tests/palettes-drift.test.ts 双向锁死。
+ * 亮色 primary 锚点清单在脚本内维护（THEMES[].lightPrimaryAnchor）；产物与亮色 --md-primary 由 tests/palettes-drift.test.ts 双向锁死。
  * 亮色版沿用既有手调色板（ADR-0152 / commit f239b065）——保持视觉零回归。
  * 重新生成：node scripts/generate-theme-palettes.mjs。
  * ════════════════════════════════════════════════════════════════════════════ */
@@ -322,7 +336,7 @@ function generateHeader() {
 function generateAll() {
   let out = generateHeader()
   for (const theme of THEMES) {
-    out += generateBlock(theme.id, theme.seed) + '\n'
+    out += generateBlock(theme.id, theme.lightPrimaryAnchor) + '\n'
   }
   return out
 }

@@ -95,6 +95,7 @@ adb shell dumpsys window | grep -i appearance
 
 - plate 接线依赖父主题 `Theme.SplashScreen.IconBackground`（缺该父链时 plate 色对系统 splash 无效）——本项即该父链的**设备端证据**。
 - **T3-3c（已登记差异，走查定夺）**：系统跟随模式（主轨 `AppTheme.NoActionBarLaunch`）的 plate **未接线**——其父保持 `Theme.SplashScreen`。原因：base `Theme.SplashScreen.IconBackground` 附带 `android:windowBackground=compat_splash_screen` 与 `splashScreenIconSize` 覆写，换父会改变 API 28–30 compat 渲染路径（`Theme.SplashScreen.Light/Dark` 两支仅经 API 31+ 平台通道使用，无此影响，故已接线）。走查时对比「manual 暗色 splash（有圆盘）」vs「system 暗色 splash（无圆盘）」差异，决定是否将主轨一并切换（若切换，需补 <31 回归项）。
+- **T3-3c 追加项 · icon-size 轨间差异（同一父链差异的另一面）**：已接线的兜底轨继承 `Theme.SplashScreen.IconBackground` 的 `splashScreenIconSize = @dimen/splashscreen_icon_size_with_background`（**240dp，含背景尺寸**）与 `android:windowBackground = @drawable/compat_splash_screen`；主轨（父 `Theme.SplashScreen`）走 `splashscreen_icon_size_no_background`（**288dp**）与 `compat_splash_screen_no_icon_background`（数值出处：本地 `core-splashscreen-1.2.0` AAR `res/values/values.xml`；API 31+ 另因兜底轨父链接线 `android:windowSplashScreenIconBackgroundColor` → 平台按「带背景」形态渲染）。**故 API 31+ 上「manual 暗色 splash」与「system 暗色 splash」的 splash 图标大小不同**——走查时把 icon-size 与圆盘一并对比（复用 `t3-splash-manual-dark.png` / `t3-splash-system-dark.png` 两帧量同一屏宽下的图标占比），并决定是否统一：统一 = ① 主轨切父，或 ② 兜底轨显式覆写 `splashScreenIconSize`；两条都需补 API 28–30 compat 回归项（同 T3-3c 的切换代价）。
 
 ### T3-4 改设置 → 重启的一次性滞后窗口
 

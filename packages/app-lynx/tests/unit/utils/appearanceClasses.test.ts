@@ -199,6 +199,9 @@ describe('T2 暗色色板契约（tokens.css .theme-X.dark）', () => {
     // 该 token 被 extractThemeableRoles 显式排除（由 outline 派生的 rgba，不进 hex 角色集），
     // 排除**不等于**可以缺值：亮色各主题沿用基础 page 块值，暗色各主题必须自重定义，
     // 否则暗色下仍用亮色灰（对比度漂移）。
+    // 明暗不对称 = **设计选择，非遗漏**（M4，review round-2）：亮色共用基线 neutral、不随主题染色
+    // （有意收敛）；暗色各主题按 outline 派生（与暗色板其余角色同源派生口径）——
+    // 显式对称性声明见 tokens.css 基础块该 token 的注释。
     expect(
       extractBlock(tokensCss, 'page,'),
       '基础 page 块缺少 --md-scroll-indicator（亮色各主题的取值来源）',
