@@ -175,6 +175,8 @@ describe("M3 token 契约（Material Design 3 改造）", () => {
   it("RestrictOverlay M3 遮罩走 token 且样式块无 backdrop-filter 路线（issue #97）", () => {
     const overlaySrc = readFileSync(resolve(here, "../components/RestrictOverlay.vue"), "utf-8")
     expect(overlaySrc).toContain("var(--md-scrim)")
+    // spec lynx-night-mode T4 闭环：scrim 上文字必须走 --colorOverlayForeground（替代 text-white）
+    expect(overlaySrc).toContain("var(--colorOverlayForeground)")
     // backdrop-filter 路线已废弃（web-core/原生均不支持）——只约束样式块，注释允许提及
     const styleBlock = overlaySrc.split("<style")[1] ?? ""
     expect(styleBlock).not.toContain("backdrop-filter")
@@ -187,6 +189,8 @@ describe("M3 token 契约（Material Design 3 改造）", () => {
   it("AiOverlay M3 遮罩走 token 且样式块无 backdrop-filter/字面色值（ADR-0155）", () => {
     const overlaySrc = readFileSync(resolve(here, "../components/AiOverlay.vue"), "utf-8")
     expect(overlaySrc).toContain("var(--md-scrim)")
+    // spec lynx-night-mode T4 闭环：scrim 上文字必须走 --colorOverlayForeground
+    expect(overlaySrc).toContain("var(--colorOverlayForeground)")
     const styleBlock = overlaySrc.split("<style")[1] ?? ""
     expect(styleBlock).not.toContain("backdrop-filter")
     expect(styleBlock).not.toContain("@supports")

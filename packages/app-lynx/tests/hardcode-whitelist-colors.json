@@ -5,11 +5,11 @@
   },
   {
     "path": "utils/lynxPlatformColors.ts",
-    "reason": "Lynx 平台属性 placeholder-color 非 CSS 通道（var() 在平台属性不生效）；常量值 = tokens.css 亮色段 --md-on-surface-variant（#41474e），模板测试守值。改色需同步 tokens.css。"
+    "reason": "Lynx 平台属性 placeholder-color 非 CSS 通道（var() 在平台属性不生效）；常量值 = tokens.css 亮色段 --md-on-surface-variant（#41474e），模板测试守值。改色需同步 tokens.css。暗色模式下 placeholder-color 仍为 #41474e（Lynx 平台属性不解析 var()），与暗色 surface 对比度受限——巡检期再议。"
   },
   {
     "path": "components/RankingEntryCard.vue",
-    "reason": "P2 §3.3：text-white 系列叠在 --md-scrim-overlay 上（M3 scrim 暗色叠白字，明暗通用）；巡检期后续 token 化为 --colorOverlayForeground（与 AiOverlay/RestrictOverlay 对齐）。当前功能正确。"
+    "reason": "P2 §3.3：text-white 叠在 --md-scrim-overlay 上（M3 scrim 暗色叠白字，明暗通用）；P0-5 RestrictOverlay / AiOverlay 的 --colorOverlayForeground 迁移已闭环（T4），RankingEntryCard 留 P2 巡检期后续 token 化。当前功能正确。"
   },
   {
     "path": "pages/IllustDetail.vue",
