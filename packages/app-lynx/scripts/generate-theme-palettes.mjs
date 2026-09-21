@@ -5,22 +5,26 @@
 // 亮色版沿用既有手调色板（ADR-0152 / commit f239b065）——保持视觉零回归。
 //
 // 决策（spec §4.7 范围内二选一）：暗色版走 `.theme-X.dark` 复合选择器：
-//   - 单一事实源 = themeColor.ts 的 THEME_COLOR_OPTIONS（id 派生 className + seed）
+//   - seed 清单在本脚本内维护（见 THEMES）：themeColor.ts 只持有 id → className，不持有 seed
+//     值，因此它**不是** seed 的单一事实源（旧注释曾如此声称，与事实不符已更正）
+//   - 防漂移：tests/palettes-drift.test.ts 双向锁死 —— (a) tokens.css 自动生成段 ≡ 本脚本
+//     `--stdout` 输出；(b) 脚本内 6 个 seed ≡ tokens.css 6 个亮色 .theme-X 的 --md-primary
 //   - 根 <page> 同时挂 .theme-X + .dark 两个类 → 复合选择器特异性更高，覆盖亮色版的同名变量
 //   - 与既有亮色版正交组合：移除 .dark 类即回到亮色版
 //
 // 产物：
 //   tokens.css 末尾追加 6 个 `.theme-X.dark { ... }` 块；角色集与既有亮色版同构。
-//   state-layer 用 on-surface 12%/38% alpha（暗色 M3 派生标准），与亮色版 12% primary 区分。
+//   state-layer 用 on-surface 12%/38% alpha（暗色 M3 派生标准）；pressed 实色与亮色方向对偶
+//   （亮色 = primary + 12% 黑 → 变暗；暗色 = primary + 12% 白 → 变亮）。
 //
 // 零运行时算色：产物为静态 CSS，Lynx bundle 不引入 material-color-utilities
 // （ADR-0152 决策延续：避免 Lynx bundle 增大 + 动态 CSS 变量写入支持面窄）。
 //
 // 用法：node scripts/generate-theme-palettes.mjs [--dry] [--stdout]
 //   --dry     仅打印生成内容，不改写 tokens.css
-//   --stdout  打印到 stdout（供 CI/测试调用）
+//   --stdout  打印到 stdout（不改文件）——调用方：tests/palettes-drift.test.ts（产物 ≡ 脚本比对）
 //
-// 重新生成后必须重跑 pnpm test:app-lynx（unit.test.ts §暗色色板契约）确认完整覆盖。
+// 重新生成后必须重跑 pnpm test:app-lynx（unit.test.ts §主题色契约 + palettes-drift.test.ts）。
 
 import { readFileSync, writeFileSync, statSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -40,7 +44,12 @@ function patchMaterialColorUtilities() {
     // 用 index.js 解析（package.json 受 exports 限制无法被 import.meta.resolve 解析）
     const pkgMainUrl = import.meta.resolve('@material/material-color-utilities')
     entryPath = dirname(fileURLToPath(pkgMainUrl))
-  } catch {
+  } catch (e) {
+    // 禁静默降级：定位失败会让下方动态 import 直接抛错（错误信息远离根因），必须留痕
+    console.warn(
+      '[generate-theme-palettes] 无法定位 @material/material-color-utilities，跳过 ESM 后缀补丁：',
+      e,
+    )
     return
   }
   function walk(dir) {
@@ -70,9 +79,9 @@ const { SchemeTonalSpot, MaterialDynamicColors, Hct, hexFromArgb, argbFromHex } 
   '@material/material-color-utilities'
 )
 
-/** 6 主题 seed（与既有 .theme-X 亮色版的 primary 值一一对应；派生自 ADR-0152
- * themeColor.ts 的 THEME_COLOR_OPTIONS 锁定值）。这里硬编码一份以保证脚本
- * 独立可跑；单元测试会从 tokens.css 与 themeColor.ts 双向校验一致性。 */
+/** 6 主题 seed（与既有 .theme-X 亮色版的 primary 值一一对应；取自 ADR-0152 锁定的主题色值）。
+ * seed 清单由本脚本维护（themeColor.ts 不持有 seed）；与 tokens.css 亮色 --md-primary 的
+ * 逐一对等一致性由 tests/palettes-drift.test.ts 断言（正则双向抽取，非人工同步）。 */
 const THEMES = [
   { id: 'sky', seed: '#1a6fa8' },
   { id: 'violet', seed: '#65558f' },
@@ -234,8 +243,11 @@ function readScheme(scheme) {
     '--md-tertiary-fixed-dim': get(md.tertiaryFixedDim()),
     '--md-on-tertiary-fixed-variant': get(md.onTertiaryFixedVariant()),
     '--md-surface-tint': get(md.surfaceTint()),
-    // state-layer 色：暗色版走 M3 标准的 on-surface 12%/38% alpha
-    '--md-state-pressed-primary': get(md.primary()),
+    // state-layer 色：暗色版走 M3 标准的 on-surface 12%/38% alpha。
+    // pressed 实色与亮色版**方向对偶**：亮色 = primary + 12% 黑（更暗），暗色 = primary + 12% 白
+    // （更亮）。这里若直接取 primary，主按钮暗色按下会与常态逐字相等（零视觉反馈），
+    // 由 tests/unit/utils/appearanceClasses.test.ts + tests/palettes-drift.test.ts 双向钉住。
+    '--md-state-pressed-primary': mixHex(get(md.primary()), '#FFFFFF', 0.12),
     '--md-state-pressed-on-surface': get(md.onSurface()),
     '--md-state-pressed-surface': get(md.surfaceContainerHigh()),
     '--md-state-pressed-error': get(md.onErrorContainer()),
@@ -243,7 +255,9 @@ function readScheme(scheme) {
     '--md-state-layer-pressed-on-surface': `rgba(${hexToRgb(get(md.onSurface())).join(', ')}, 0.12)`,
     '--md-state-disabled-container': `rgba(${hexToRgb(get(md.onSurface())).join(', ')}, 0.12)`,
     '--md-state-disabled-on-surface': `rgba(${hexToRgb(get(md.onSurface())).join(', ')}, 0.38)`,
-    // scroll-indicator：outline tone 50 (light) / tone 60 (dark) + 35% alpha（M3 scrollbar thumb）
+    // scroll-indicator：暗色按**各主题** outline（M3 暗色 scheme = tone 60）+ 35% alpha 派生，
+    // 与 scrollbar thumb 口径一致。亮色 6 主题共用基础 page 块的 M3 基线 neutral 值
+    // （≈ onSurfaceVariant，有意设计：中性滚动条不随主题染色）——见 tokens.css 基础块注释。
     '--md-scroll-indicator': `rgba(${hexToRgb(get(md.outline())).join(', ')}, 0.35)`,
     // 与模式无关的常量（shape / elevation / scrim）
     ...MODE_INDEPENDENT_VALUES,
@@ -258,6 +272,19 @@ function hexToRgb(hex) {
     parseInt(h.slice(2, 4), 16),
     parseInt(h.slice(4, 6), 16),
   ]
+}
+
+/** [r,g,b] → #rrggbb（小写两位补零） */
+function rgbToHex(rgb) {
+  return '#' + rgb.map((v) => v.toString(16).padStart(2, '0')).join('')
+}
+
+/** base 与 overlay 按 weight（overlay 占比）线性混合 → #rrggbb。
+ * 与亮色手调口径同源：weight=0.12 + overlay=#000000 即 round(base × 0.88)（逐通道取整）。 */
+function mixHex(baseHex, overlayHex, weight) {
+  const base = hexToRgb(baseHex)
+  const overlay = hexToRgb(overlayHex)
+  return rgbToHex(base.map((v, i) => Math.round(v * (1 - weight) + overlay[i] * weight)))
 }
 
 /** 把角色对象格式化为 CSS 声明行（保证稳定顺序便于 diff） */
@@ -284,7 +311,7 @@ function generateHeader() {
   return `/* ════════════════════════════════════════════════════════════════════════════
  * 自动生成段（spec docs/specs/lynx-night-mode.md T2 §4.7）：勿手改
  * 由 scripts/generate-theme-palettes.mjs 产出，覆盖 6 主题暗色版（复合选择器 .theme-X.dark）。
- * 单一事实源 = src/utils/themeColor.ts（THEME_COLOR_OPTIONS 派生 className）。
+ * seed 清单在脚本内维护（THEMES）；产物与亮色 --md-primary 由 tests/palettes-drift.test.ts 双向锁死。
  * 亮色版沿用既有手调色板（ADR-0152 / commit f239b065）——保持视觉零回归。
  * 重新生成：node scripts/generate-theme-palettes.mjs。
  * ════════════════════════════════════════════════════════════════════════════ */

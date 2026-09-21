@@ -81,10 +81,12 @@ page,
   --md-state-layer-pressed-on-surface: rgba(25, 28, 32, 0.12); /* 12% on-surface */
   --md-state-disabled-container: rgba(25, 28, 32, 0.12); /* on-surface 12% */
   --md-state-disabled-on-surface: rgba(25, 28, 32, 0.38); /* on-surface 38% */
-  --md-scroll-indicator: rgba(73, 69, 79, 0.35); /* outline tone 50 + 35% alpha；暗色块经
-                                                  * generate-theme-palettes.mjs 自动派生
-                                                  * 为对应 tone 60 + 35% alpha
-                                                  * （spec lynx-night-mode-audit.md §3.2 P1-1） */
+  --md-scroll-indicator: rgba(73, 69, 79, 0.35); /* M3 基线 neutral 派生（#49454F ≈ 基线
+                                                  * onSurfaceVariant / neutral tone 30，非 outline
+                                                  * tone 50）+ 35% alpha；**亮色 6 主题共用此基础值
+                                                  * （有意设计：中性滚动条不随主题染色）**，暗色 6 套各自
+                                                  * 按各主题 outline(tone 60) + 35% alpha 派生 —— 见各
+                                                  * .theme-X.dark 块（scripts/generate-theme-palettes.mjs） */
 
   /* ── 兼容别名：旧 Fluent 语义 → M3 令牌（存量引用不断） ── */
   --colorNeutralBackground1: var(--md-surface-container-lowest); /* 卡片/顶栏底 */
@@ -420,7 +422,7 @@ page,
 /* ════════════════════════════════════════════════════════════════════════════
  * 自动生成段（spec docs/specs/lynx-night-mode.md T2 §4.7）：勿手改
  * 由 scripts/generate-theme-palettes.mjs 产出，覆盖 6 主题暗色版（复合选择器 .theme-X.dark）。
- * 单一事实源 = src/utils/themeColor.ts（THEME_COLOR_OPTIONS 派生 className）。
+ * seed 清单在脚本内维护（THEMES）；产物与亮色 --md-primary 由 tests/palettes-drift.test.ts 双向锁死。
  * 亮色版沿用既有手调色板（ADR-0152 / commit f239b065）——保持视觉零回归。
  * 重新生成：node scripts/generate-theme-palettes.mjs。
  * ════════════════════════════════════════════════════════════════════════════ */
@@ -482,7 +484,7 @@ page,
   --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
   --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
   --md-elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
-  --md-state-pressed-primary: #9bcbfa;
+  --md-state-pressed-primary: #a7d1fb;
   --md-state-pressed-on-surface: #e0e2e8;
   --md-state-pressed-surface: #272a2f;
   --md-state-pressed-error: #ffdad6;
@@ -551,7 +553,7 @@ page,
   --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
   --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
   --md-elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
-  --md-state-pressed-primary: #cfbdfe;
+  --md-state-pressed-primary: #d5c5fe;
   --md-state-pressed-on-surface: #e6e0e9;
   --md-state-pressed-surface: #2b292f;
   --md-state-pressed-error: #ffdad6;
@@ -620,7 +622,7 @@ page,
   --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
   --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
   --md-elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
-  --md-state-pressed-primary: #ffb0c9;
+  --md-state-pressed-primary: #ffb9cf;
   --md-state-pressed-on-surface: #efdfe1;
   --md-state-pressed-surface: #31282a;
   --md-state-pressed-error: #ffdad6;
@@ -689,7 +691,7 @@ page,
   --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
   --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
   --md-elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
-  --md-state-pressed-primary: #a1d399;
+  --md-state-pressed-primary: #acd8a5;
   --md-state-pressed-on-surface: #e0e4db;
   --md-state-pressed-surface: #272b25;
   --md-state-pressed-error: #ffdad6;
@@ -758,7 +760,7 @@ page,
   --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
   --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
   --md-elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
-  --md-state-pressed-primary: #fcb974;
+  --md-state-pressed-primary: #fcc185;
   --md-state-pressed-on-surface: #eee0d5;
   --md-state-pressed-surface: #302921;
   --md-state-pressed-error: #ffdad6;
@@ -827,7 +829,7 @@ page,
   --md-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
   --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
   --md-elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
-  --md-state-pressed-primary: #80d4d8;
+  --md-state-pressed-primary: #8fd9dd;
   --md-state-pressed-on-surface: #dde4e3;
   --md-state-pressed-surface: #252b2b;
   --md-state-pressed-error: #ffdad6;
