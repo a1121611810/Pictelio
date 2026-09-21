@@ -11,7 +11,7 @@ tags: [code-review, configuration, silent-misconfiguration, traceability, wiring
 > 调研日期：2026-09-21
 > 用途：支撑 Pictelio `code-review` skill 的下一步增强（审计一/审计三/触发式卡点表）。skill 现状结构见 `.agents/skills/code-review/SKILL.md`。
 > 方法：一手来源优先（论文原文抽页、官方文档、作者本人文章）；每个论断附出处 URL。来源清单（§5）标注了访问方式：**直读** = 本调研直接抓取页面内容；**快照** = 经搜索结果的页面内容快照读取；**元数据** = 只读到题录/摘要级信息。未找到可靠来源的方向已在 §3.8 显式标注。
-> 触发案例：lynx 夜间模式 T3/T5（ADR-0180 D7）。spec/ADR 曾承诺「splash 兜底轨覆盖手动模式（`settings_dark_mode` = dark）的下一次冷启动」；实现兜底轨只读**系统 uiMode**，全仓 Java 从未读取该设置键——**承诺的数据源从未被接线**。第一轮 review 验证了「`setSplashScreenTheme` 有版本 guard、不会崩」（机制存在性）通过；第二轮做「文档 vs 实现」对照才发现数据流断开。ADR-0180 当前版本已订正为「交付现状 + follow-up #692」，这一「订正 + 显式挂账」处置本身就是本文 §4 推荐纪律的现行先例。
+> 触发案例：lynx 夜间模式 T3/T5（ADR-0180 D7）。spec/ADR 曾承诺「splash 兜底轨覆盖手动模式（`settings_dark_mode` = dark）的下一次冷启动」；实现兜底轨只读**系统 uiMode**，全仓 Java 从未读取该设置键——**承诺的数据源从未被接线**。第一轮 review 验证了「`setSplashScreenTheme` 有版本 guard、不会崩」（机制存在性）通过；第二轮做「文档 vs 实现」对照才发现数据流断开。ADR-0180 已按「订正 + 显式挂账」处置（本文 §4 推荐纪律的现行先例）；该接线与配套机器防线随后于 **review 修复轮（2026-09-21，#692）** 落地，真机走查仍为发版 gate。
 
 ---
 
@@ -22,7 +22,7 @@ tags: [code-review, configuration, silent-misconfiguration, traceability, wiring
 3. **语言级先例证明「声明即断言读取」可行**：TypeScript `noUnusedLocals`（"Report errors on unused local variables."）、Go/Rust 的 unused 检查——语法符号层面早已自动化，**设置键是字符串，逃过了编译器，但没逃过逻辑**。机器防线必须自建。
 4. **需求→代码双向追溯是安全关键行业的法定动作**（DO-178C：**每条源码都必须能追溯到一条需求**，不可追溯的代码被当作 extraneous 处理；反面 = 每条需求承诺的数据/行为必须有落地实现）。「spec 说行为 X 由 Y 驱动 → 必须存在 Y 的读点」正是这个追溯链在普通项目的轻量版。
 5. **review 实证研究解释了为什么两轮 review 才抓到**：现代 code review 的动机与产出都**不以缺陷为中心**（Bacchelli & Bird：finding defects 是首要动机，但实际产出以改进建议、知识转移为主；"code and change understanding is the key aspect"），review 的检查对象是 diff——**缺席的文件/从未被写下的读点不进 diff**。SmartBear 明确写着：omission（该有而没有）**是最难被发现的缺陷类型**，"difficult to review something that isn't there"，而 checklist 是对抗 omission 的最有效手段——这正是本次 skill 增强的形态依据。
-6. **防线的正解是「读点断言」类适应度函数**：ArchUnit 把架构约束写成测试（且默认**禁止 should 子句面对空集**——防「规则静默地什么都没检查」，与本类缺陷同构）；本项目已有同形态模板（`settingsStore.test.ts:938-957` 源码扫描双守卫）。把「每条设置键必须有生产读点」编码成测试，是现有工具链缺口的直接补位。
+6. **防线的正解是「读点断言」类适应度函数**：ArchUnit 把架构约束写成测试（且默认**禁止 should 子句面对空集**——防「规则静默地什么都没检查」，与本类缺陷同构）；本项目已有同形态模板（`settingsStore.test.ts` 的「键清单 ⊆ 备份域」+「备份域每项有 `applyRawKey` 分支」双 source-scan 守卫）。把「每条设置键必须有生产读点」编码成测试，是现有工具链缺口的直接补位。
 7. **AI 辅助要谨慎**：ASE 2025 实证 LLM 在「代码是否符合自然语言规格」判定上存在系统性失败（误判率高，且更复杂的提示反而加剧）——LLM 适合做**读点清单生成/候选枚举**，不适合当一致性判据；判据必须是 grep/索引的机器证据。
 
 ---
@@ -102,7 +102,7 @@ tags: [code-review, configuration, silent-misconfiguration, traceability, wiring
 - ConfigX（§1.1）是研究原型，不是可下载的通用工具链（是否开源未见一手证据）。
 - 未发现任何通用工具能直接解决「Android SharedPreferences key / JS 设置键的读点检查」；**结论：该检查需要项目自建**，但形态已被上述四类工具体系充分验证（声明/引用可达、flag 引用扫描、语言级 unused 检查、数据流路径查询）。
 - 本项目已存在同形态的**自建模板**（source-scan guards）：
-  - `packages/app-lynx/src/stores/settingsStore.test.ts:938-957` 两条守卫：① `settingsStore.ts` 内所有 `*_KEY` 字面量 ⊆ `BACKUP_DEVICE_KEYS`；② `BACKUP_DEVICE_KEYS` 每项均有 `applyRawKey` 分支（读源码 + 正则抽取 + 集合关系断言）。
+  - `packages/app-lynx/src/stores/settingsStore.test.ts` 的两条 source-scan 守卫（**用例名即锚点，本文不引行号**——#692 实施轮实测：守卫位置随用例增长从 `:940` 漂到 `:10xx`，行号锚点在交付当天即失准）：①「`settingsStore.ts` 内所有 `*_KEY` 字面量 ⊆ `BACKUP_DEVICE_KEYS`（设备级键完整性守卫）」；②「`BACKUP_DEVICE_KEYS` 每项均有 `applyRawKey` 分支（导入侧完整性守卫）」（读源码 + 正则抽取 + 集合关系断言）。
   - 注意：这两条守卫覆盖的是「**写入/导入侧**完备性」。本类缺陷（**读取/消费侧**缺失）恰好在其盲区——守卫全绿而读点为零，与本次案例完全吻合。
 
 ### 2.6 mutation testing：能证「测试对实现敏感」，不能证「接线存在」
@@ -140,7 +140,7 @@ tags: [code-review, configuration, silent-misconfiguration, traceability, wiring
   - 出处：https://www.archunit.org/userguide/html/000_Index.html （直读）。
 - **一个可直接借用的设计教训——防「规则静默地什么都没检查」**：ArchUnit 默认**禁止 should 子句被空集求值**（`archRule.failOnEmptyShould`），原文理由：包名一旦改名，规则会在**不检查任何类**的情况下「通过」——"The rule will now always evaluate successfully without any reported error. **However, it actually does not check any classes at all anymore.**"
   - 同构风险：读点断言若写成「所有键都有读点」，而键集合抽取正则失效（抽到空集），断言语义上恒真。**任何「全称量词」守卫都必须断言集合非空、且数量下界**（本项目模板已含此意：`expect(declared.length).toBeGreaterThan(10)`）。
-- **本项目形态**：Vitest 内做 source-scan + 集合断言（`settingsStore.test.ts:938-957`），等价于「设置域适应度函数」；可扩展为「读点断言」（§4 R3）。
+- **本项目形态**：Vitest 内做 source-scan + 集合断言（`settingsStore.test.ts` 的键完整性双守卫），等价于「设置域适应度函数」；可扩展为「读点断言」（§4 R3）。
 
 ### 3.4 code review 实证：为什么系统性漏掉设计/数据流级缺陷
 
@@ -222,7 +222,7 @@ tags: [code-review, configuration, silent-misconfiguration, traceability, wiring
 
 **加什么**：
 
-- 模板 A（**键完整性 ← 已有**）：`settingsStore.test.ts:938-957` 两条 source-scan 守卫（`*_KEY` ⊆ `BACKUP_DEVICE_KEYS`；`BACKUP_DEVICE_KEYS` 每项有 `applyRawKey` 分支）。
+- 模板 A（**键完整性 ← 已有**）：`settingsStore.test.ts` 两条 source-scan 守卫（`*_KEY` ⊆ `BACKUP_DEVICE_KEYS`；`BACKUP_DEVICE_KEYS` 每项有 `applyRawKey` 分支）。
 - 模板 B（**读点存在性 ← 新增建议**）：同形态的 source-scan 断言——对 spec 单一事实源（如 `DARK_MODE_IDS`、键常量清单）逐个断言「生产源码（排除 test/mock）中存在读取引用」；抽取器必须**断言集合非空且数量下界**（防正则失效导致全称断言恒真——ArchUnit `failOnEmptyShould` 的教训，§3.3）。
 - 模板 C（**跨语言键契约 ← 新增建议**）：原生侧（Java）读取的 prefs 键名、序列化封装（本仓库测试可见 `prefsGet` 返回值经 `JSON.stringify` 包裹）、读取时机（冷启动 vs onResume），必须与 JS 写入侧有**成对契约测试**或单一事实源常量表；键名漂移 = 无声失效。
 - Oracle 要求（对接测试硬约束 #2/#4）：这些守卫的**期望值来源必须是 spec 键清单/单一事实源常量**，不得从实现自身导出（禁止「用实现里出现的键集合断言实现里出现的键集合」的自洽式写法；本项目模板已用字面量正则 + 上界常量，属于可接受形态）。
@@ -307,6 +307,6 @@ tags: [code-review, configuration, silent-misconfiguration, traceability, wiring
 
 **项目内部锚点**
 
-24. `docs/adr/ADR-0180-lynx-dark-mode.md` D7（splash 双轨；手动模式未接线 + follow-up #692 的现行处置）。
+24. `docs/adr/ADR-0180-lynx-dark-mode.md` D7（splash 双轨；手动模式接线 + 真机走查 gate 的现行处置——2026-09-21 review 修复轮落地）。
 25. `docs/specs/lynx-night-mode.md`（`settings_dark_mode` 键声明、备份域守卫说明）。
-26. `packages/app-lynx/src/stores/settingsStore.test.ts:938-957`（source-scan 双守卫模板）；`packages/app-lynx/src/stores/settingsStore.ts:70`（`DARK_MODE_KEY`）。
+26. `packages/app-lynx/src/stores/settingsStore.test.ts`（source-scan 双守卫模板，以用例名为锚点）；`packages/app-lynx/src/stores/settingsStore.ts` 的 `DARK_MODE_KEY` 常量（写入侧键名）。

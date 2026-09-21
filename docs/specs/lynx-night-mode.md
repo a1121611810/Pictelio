@@ -2,8 +2,8 @@
 
 > 来源：wayfinder 地图 [#682](https://github.com/a1121611810/Pictelio/issues/682)；研究 [#683](https://github.com/a1121611810/Pictelio/issues/683)（Lynx 运行时系统暗色检测）/ [#684](https://github.com/a1121611810/Pictelio/issues/684)（splash 深色化）；访谈 [#685](https://github.com/a1121611810/Pictelio/issues/685)（入口交互）；父 spec [#686](https://github.com/a1121611810/Pictelio/issues/686)。
 >
-> ADR 落点：新 ADR（含 ADR-0168 状态栏钉死修订）由 T5 提交；本文件为 T1/T2/T3/T4 实施期 spec oracle。
-> 状态：**T1–T5 全部实施并关闭（2026-09-21）**；ADR 已合并为 [ADR-0180](../adr/ADR-0180-lynx-dark-mode.md)。遗留：D7 splash 兜底轨的**手动模式**覆盖未接线（当前仅系统跟随生效），列 follow-up [#692](https://github.com/a1121611810/Pictelio/issues/692)。
+> ADR 落点：[ADR-0180](../adr/ADR-0180-lynx-dark-mode.md)（D6 含 ADR-0168 状态栏钉死修订）；本文件为 T1/T2/T3/T4 实施期 spec oracle，已按交付现状修订。
+> 状态：**T1–T5 全部实施并关闭（2026-09-21）**。同日 **review 修复轮**把原 follow-up #692 的「手动模式接线」落回代码（读点 / `ID_NULL` / 主题名双定义 / plate / 状态栏即时重设，终态见 §4.8）。遗留 = **真机走查 gate**（矩阵 [lynx-night-mode-walkthrough.md](./lynx-night-mode-walkthrough.md) + [#692](https://github.com/a1121611810/Pictelio/issues/692)）与暗色 placeholder 对比度（[#693](https://github.com/a1121611810/Pictelio/issues/693)）。
 
 ## 1. Problem Statement
 
@@ -16,7 +16,7 @@ lynx 客户端（缺省引擎）只有亮色界面：夜间/弱光环境刺眼�
 - 外观设置提供 **亮色 / 暗色 / 跟随系统** 三态，默认跟随系统，设备级持久化，切换即时生效
 - 6 个主题色全部拥有 M3 dark scheme（12 套静态色板，构建期生成，零运行时算色）
 - 「跟随系统」经原生通道检测（与 ADR-0168 insets 管线同构），web-core 预览走 `matchMedia` 兜底
-- 原生层联动：状态栏图标色随外观即时切换（T3）；splash 双轨深色化（`values-night` 主轨 + API 31+ 持久化主题兜底，T3——**兜底轨手动模式覆盖现状见 §4.7 / follow-up #692**）
+- 原生层联动：状态栏图标色随外观即时切换（T3）；splash 双轨深色化（`values-night` 主轨 + API 31+ 持久化主题兜底，T3——兜底轨输入源 = `settings_dark_mode` 三态，接线终态见 §4.8）
 - 设置入口落在「我的」页外观卡片顶部（主题色上方），M3 segmented button 三格（T2）
 
 ## 3. 票分（T1-T5）
@@ -25,7 +25,7 @@ lynx 客户端（缺省引擎）只有亮色界面：夜间/弱光环境刺眼�
 |---|---|---|
 | **T1** | 状态核心 + 系统检测通道（基础层，无可见 UI） | ✅ closed（`67b8300d` + `b26178f`） |
 | T2 | 12 色板 + 根类绑定 + segmented 入口 + 色块联动 + i18n/a11y | ✅ closed（`33eaee4b` + `78cf676d`） |
-| T3 | 状态栏图标动态切换 + splash 双轨 + IconBackground plate | ✅ closed（`2133233f`；splash 手动模式覆盖 → follow-up #692） |
+| T3 | 状态栏图标动态切换 + splash 双轨 + IconBackground plate | ✅ closed（`2133233f`；手动模式接线在 review 修复轮补完，见 §4.8） |
 | T4 | 硬编码浅色值审计与修复 | ✅ closed（`f1480620` + `48286393`） |
 | T5 | 新 ADR（含 ADR-0168 修订）+ CONTEXT.md 词条 + map 收官 | ✅ closed（ADR-0180 + 词条 + map #682 收官） |
 
@@ -55,8 +55,8 @@ T2 / T3 可并行（T2 依赖 `resolvedDark`、T3 依赖 `resolvedDark`，互不
 | 拉取方法 | `PictelioApp.getDarkMode(cb)` | `@LynxMethod getDarkMode(Callback)` | `darkModeJavaContract.test.ts:31` |
 | 载荷 | `JSON.stringify({mode: 'light' \| 'dark'})`（标准）+ 裸字符串兼容（保守兜底，详见 §4.4） | `JavaOnlyArray.of(JSON.stringify({mode: currentDarkMode(uiMode)}))` | `darkModeJavaContract.test.ts:36` |
 | 初值拉取时机 | `ensureInit()` 在 `getDarkMode` / `subscribeDarkMode` 首次调用时触发（订阅后拉） | 同上 | `darkMode.test.ts:194` |
-| 推变化源 | `setOnApplyWindowInsetsListener` 同款 — `onConfigurationChanged` 读 `Configuration.uiMode` 与 `UI_MODE_NIGHT_MASK`（manifest 已声明 `uiMode` configChanges，免 Activity 重建） | `sendGlobalEvent` via `GlobalEventEmitter` | `LynxDarkModeTest.java:151`（`onConfigurationChanged + UI_MODE_NIGHT_MASK` 字面量断言） |
-| 后台兜底 | — | `onResume` 比对缓存 `sLastUiMode`，变化则补发（防后台期间系统翻转） | `LynxDarkModeTest.java:174`（`onResume 兜底补发` 字面量） |
+| 推变化源 | `setOnApplyWindowInsetsListener` 同款 — `onConfigurationChanged` 读 `Configuration.uiMode` 与 `UI_MODE_NIGHT_MASK`（manifest 已声明 `uiMode` configChanges，免 Activity 重建） | `sendGlobalEvent` via `GlobalEventEmitter` | `LynxDarkModeTest.java`（用例名锚定：「`onConfigurationChanged + UI_MODE_NIGHT_MASK` 字面量断言」，review 修复轮后归 `LynxDarkModeTest` 契约常量例） |
+| 后台兜底 | — | `onResume` 比对缓存 `sLastUiMode`，变化则补发（防后台期间系统翻转） | 用例名锚定：「`onResume` 兜底补发」字面量（`LynxDarkModeTest` 契约常量例）+ 纯函数矩阵 `shouldBackfillDark`（review 修复轮新增） |
 
 **通道分流（JS 侧 `packages/app-lynx/src/utils/darkMode.ts` `ensureInit`）**：
 
@@ -80,7 +80,14 @@ T2 / T3 可并行（T2 依赖 `resolvedDark`、T3 依赖 `resolvedDark`，互不
 
 **为何不是隐式契约**：JS 单边容忍裸字符串不等于 Java 端允许未来切换；如果 Java 端某日改用其它载荷格式，必须**先升 spec**。当前 Java 端只走 JSON 一条路径（`JavaOnlyArray.of(JSON.stringify(...))`），JS 双路径并存是**过渡期契约**而非长期设计。
 
-### 4.5 测试矩阵
+### 4.5 测试矩阵（T1 快照）
+
+> **口径**：本表是 **T1 交付时点（commit `67b8300d` + `b26178f`）的快照**，用于记录「T1 该钉住哪些行为」，**不是当前用例计数**——T3/T4 与 #692 review 修复轮追加的防线不在本表内：
+> - `darkModeJavaContract.test.ts` 后续扩展了「三态设置键原生读点」「`Resources.ID_NULL` 复位哨兵」「`syncStatusBarHidden` 单一写点」「`applyDarkModePreference` 下发」「splash 主题名跨配置稳定 + plate 接线」「跨语言色值（tokens.css ⇄ values-night）」等 describe 块；
+> - Robolectric 侧新增 `LynxStatusBarLatchTest` / `LynxSplashThemeResourcesTest` / `LynxSplashThemeResourcesNightTest` 等文件；
+> - Vitest 侧新增 `tests/palettes-drift.test.ts`（产物漂移）。
+>
+> **权威计数以各测试文件实际用例为准**（本文不维护第二份计数，避免陈旧）。
 
 | 维度 | 测试文件 | 用例数 |
 |---|---|---|
@@ -106,17 +113,46 @@ T2 / T3 可并行（T2 依赖 `resolvedDark`、T3 依赖 `resolvedDark`，互不
 
 ### 4.6 设备级键 + 备份域完整性守卫
 
-- `BACKUP_DEVICE_KEYS` 注册 `settings_dark_mode`（settingsStore.ts:110）
-- `applyRawKey` switch case 处理 `settings_dark_mode`（settingsStore.ts:937）
-- 双向守卫测试：`settingsStore.test.ts:936-941`（所有 `*_KEY` ⊆ `BACKUP_DEVICE_KEYS`）+ `:944-948`（`BACKUP_DEVICE_KEYS` 每项均有 `applyRawKey` 分支）
+> **引用口径**：本节按**符号名**锚定，不写行号——`settingsStore.ts` / `settingsStore.test.ts` 在 #692 实施轮持续增长，行号锚点在交付当天即失准（守卫测试从 `:940` 漂到 `:10xx` 只用了一次实施）。检索请用符号名 / 用例名。
 
-### 4.7 设计约束
+- `BACKUP_DEVICE_KEYS` 注册 `settings_dark_mode`（`settingsStore.ts` 的 `DARK_MODE_KEY` 常量进 `BACKUP_DEVICE_KEYS` 清单）
+- `applyRawKey` 的 switch case 处理 `settings_dark_mode`（`settingsStore.ts`）
+- 双向守卫测试（`settingsStore.test.ts`，两条 source-scan 守卫，用例名即锚点）：
+  - 「`settingsStore.ts` 内所有 `*_KEY` 字面量 ⊆ `BACKUP_DEVICE_KEYS`（设备级键完整性守卫）」
+  - 「`BACKUP_DEVICE_KEYS` 每项均有 `applyRawKey` 分支（导入侧完整性守卫）」
 
-- 6 主题 × 亮暗全做（12 套静态色板，tokens.css +~300 行）—— T2 实施 ✅
+### 4.7 设计约束（终态）
+
+- 6 主题 × 亮暗全做（12 套静态色板，tokens.css +~300 行）—— T2 ✅
 - 暗色类挂根 `<page>`，与 `.theme-*` 正交组合；页面零改动 —— T2 ✅
-- 状态栏 `isAppearanceLightStatusBars` 随 `resolvedDark` 动态（解 ADR-0168 D4 钉死）—— T3 ✅
-- splash `values-night` 主轨（系统跟随全 API 覆盖）✅ + API 31+ `setSplashScreenTheme` 兜底（**手动模式接线 → follow-up [#692](https://github.com/a1121611810/Pictelio/issues/692)**）—— T3
-- 全 app 硬编码浅色值审计（图片查看器 / R18 遮罩 / 小说正文 / skeleton）—— T4 ✅
+- 状态栏 `isAppearanceLightStatusBars` 随 `resolvedDark` 动态（解 ADR-0168 D4 钉死）—— T3 ✅；原生输入源接线 + 即时重设见 §4.8
+- splash 双轨：`values-night` 主轨（system 跟随全 API 覆盖）✅ + API 31+ `setSplashScreenTheme` 兜底轨（输入 = `settings_dark_mode` 三态；手动 light/dark 显式覆盖、system 经 `Resources.ID_NULL` 交还主轨）—— T3 ✅（review 修复轮接线，见 §4.8）
+- 全 app 硬编码浅色值审计（图片查看器 / R18 遮罩 / 小说正文 / skeleton / 滚动指示条）—— T4 ✅；设备端确认归发版前走查（[walkthrough](./lynx-night-mode-walkthrough.md) §4）
+
+### 4.8 原生接线与机器防线（#692 review 修复轮终态）
+
+**原生输入源接线**（`packages/app/android/app/src/lynx/java/io/pictelio/app/LynxActivity.java`）：
+
+| 项 | 终态 |
+|---|---|
+| 读点 | 读 `SharedPreferences("CapacitorStorage")` 的 `settings_dark_mode`（`KEY_DARK_MODE` 常量；与 JS 写入侧同文件同键） |
+| 决策纯函数 | `resolveIsDark(三态, uiMode)`：`light`/`dark` 手动映射；`system` 及未识别值跟随 `Configuration.uiMode & UI_MODE_NIGHT_MASK`（fail-safe）；非法值 `Log.w` + 回退 `system` |
+| splash 兜底轨 | `dark` → `Theme.SplashScreen.Dark` / `light` → `Theme.SplashScreen.Light` / `system` → `Resources.ID_NULL`（复位 manifest 默认主题，禁兜底到任一手动主题）；平台门槛 API 31+（低版本 = §5 接受项） |
+| 主题名稳定性 | 两支主题在 `values/` 与 `values-night/` **双配置双定义**（同名集合一致——反配置下手动档仍可解析） |
+| plate 接线 | 两支主题父主题 = `Theme.SplashScreen.IconBackground`（缺该父链时 plate 色对系统 splash 无效）；暗面板 `#1C2024` ≠ 暗面 `#101418`，亮面板 == 亮底（有意） |
+| 状态栏即时重设 | JS 切换后经 `PictelioAppModule.applyDarkModePreference`（`@LynxMethod`，主线程转交）重下发；`onResume` 兜底（`shouldBackfillDark`） |
+| 全屏交互 | 状态栏隐藏态经单一写点 `syncStatusBarHidden`（修旧实现「仅 onCreate 写一次 → 退出全屏后外观不重设」的闩锁）；全屏分支 `resolveStatusBarAppearance` 返回 null 跳过外观下发 |
+
+**机器防线（四类契约测试）**：
+
+| 类别 | 文件 | 断言要点 |
+|---|---|---|
+| 读点存在性 + 键名同源 | `darkModeJavaContract.test.ts` | Java 读点字面量（`settings_dark_mode` / `Resources.ID_NULL` / `syncStatusBarHidden`）+ JS 写入侧常量逐字一致 + `applyDarkModePreference` 两侧成对 |
+| 跨语言色值 | `darkModeJavaContract.test.ts` | `values-night` 暗面 ≡ `.theme-sky.dark --md-surface`；暗 plate ≠ 暗面（离底有差 → 前景圆盘可见） |
+| 产物漂移 / seed 一致性 | `tests/palettes-drift.test.ts` | tokens.css 自动生成段 ≡ 生成脚本 `--stdout`（逐字节）；脚本 seed ↔ 亮色 `--md-primary` 6/6 对等 |
+| 豁免与覆盖面空集防护 | `tests/hardcodeColorGate.test.ts` | 白名单非空 + 条目路径存在 + 理由非空；`walk(src)` 文件数下界 + 关键文件在集内（防遍历失效恒真） |
+
+**走查 gate**：上述防线只证明「读点存在 + 键名/色值同源」，**证明不了设备可见行为**（Lynx 样式引擎解析、平台 splash 语义、厂商 ROM 差异）——发版前按 [lynx-night-mode-walkthrough.md](./lynx-night-mode-walkthrough.md) 的 T2/T3/T4 矩阵执行，结果落档后关闭 [#692](https://github.com/a1121611810/Pictelio/issues/692)。
 
 ## 5. Out of Scope
 
@@ -125,11 +161,11 @@ T2 / T3 可并行（T2 依赖 `resolvedDark`、T3 依赖 `resolvedDark`，互不
 - 账号级外观偏好
 - 定时/地理位置自动切换
 - 暗色下图片**内容**本身处理
-- ~~API 28–30 手动模式 splash 最早帧残留浅色窗口（平台无解，已接受）~~ **（修订 2026-09-21）**：当前实现下手动模式 splash 在所有 API 级别均未覆盖（读系统 uiMode）；`setSplashScreenTheme`（API 31+）接线后，API 28–30 残留早浅色帧平台无解、已接受——整体列 follow-up [#692](https://github.com/a1121611810/Pictelio/issues/692)
+- **API 28–30 手动模式 splash 残留**（接受项，终态边界）：`setSplashScreenTheme` 是 API 31+ 平台通道——API 28–30 上手动 light/dark 与系统 uiMode 相反时，splash 最早帧仍按 `values-night` 主轨（系统 uiMode）解析，与手动选择相反；平台无解、已接受（走查 T3-5 记录即可，不修）。
 
 ## 6. 进一步说明
 
-- **真机/模拟器探针**：T1 是基础层，无可见 UI 变化（仅 JS 内部 ref 变化）；设备级探针在 T3 splash 联动一并做（Lynx 原生 `<list>` 结构 + 系统栏视觉变化点）。T1 单元层 contract 钉死（`darkModeJavaContract.test.ts`）作为 oracle 证据。
+- **真机/模拟器探针**：T1 是基础层，无可见 UI 变化（仅 JS 内部 ref 变化）；设备级探针随 T3 splash 联动一并做（Lynx 原生 `<list>` 结构 + 系统栏视觉变化点）。T1 单元层 contract 钉死（`darkModeJavaContract.test.ts`）作为 oracle 证据。**设备可见行为的最终口径 = 发版前走查矩阵**（[lynx-night-mode-walkthrough.md](./lynx-night-mode-walkthrough.md)，gate 见 §4.8）。
 - **happy-dom 不当模拟**：vitest environment: node（vitest.config.ts:35）；测试通过 `globalThis.matchMedia` 注入 mock，不依赖 window/happy-dom；Lynx 行为靠 Robolectric + 真实 Configuration fixture 钉死。
 - **错误模型不破坏调用方**：所有降级路径 warn + 维持兜底，不抛异常、不改变外部接口签名。
 - **主题色 vs 暗色模块同源**：themeColor.ts 与 darkMode.ts 是 ADR-0152 立项时的孪生兄弟，统一走「清单单一事实源 + is*Id + 非法 warn + 回退默认」模式；暗色模块新增未引入新模式或绕过既有约定。

@@ -2,7 +2,7 @@
 
 > 来源：父 spec [#686](https://github.com/a1121611810/Pictelio/issues/686) Implementation Decision 13；本任务票 [#690](https://github.com/a1121611810/Pictelio/issues/690)。
 > 起点：T1（commit 67b8300d + b26178f）/ T2（33eaee4b + 78cf676d）/ T3（2133233f）已合并；暗色可见后系统性扫描。
-> 状态：T4 已完成（commit 待生成）；本文件随实施同步修订。
+> 状态：T4 已完成并合并（commit `f1480620` + `48286393`，2026-09-21）；#692 review 修复轮为门禁补入「空集 + 覆盖面」防护（§5），本文件按交付现状修订。
 
 ## 1. Audit Scope
 
@@ -53,7 +53,7 @@
 
 | # | 文件 | 理由 |
 |---|---|---|
-| EX-1 | `errorPrototype/ErrorPagePreview.vue:16,19,25,29,33` | web-core 预览下 M3 token 不解析（`:root` 变量未注入 shadowRoot；既有约束）；生产 `pages/ErrorPage.vue` 走 token。注释已说明。文件已在 `tests/hardcode-whitelist.json` 收尾审计豁免登记 |
+| EX-1 | `errorPrototype/ErrorPagePreview.vue:16,19,25,29,33` | web-core 预览下 M3 token 不解析（`:root` 变量未注入 shadowRoot；既有约束）；生产 `pages/ErrorPage.vue` 走 token。注释已说明。文件已在 `tests/hardcode-whitelist-colors.json` 收尾审计豁免登记（文件级豁免语义见 §5） |
 | EX-2 | `components/BookmarkButton.vue:155`（注释中 `#fa242f`） | U+FE0E 字形说明性注释，非运行时色值；ADR-0112 取证记录 |
 
 ## 4. 修复方案
@@ -79,11 +79,17 @@ P1-1 / P1-2：替换 `rgba(...)` 字面量为 `var(--md-scroll-indicator)` / `va
 
 ## 5. 机器防线
 
-新增 `tests/hardcodeColorGate.test.ts`（仿 `hardcode-gate.test.ts` 模式）：
-- 扫描 `src/**/*.{vue,ts}`，排除 `styles/tokens.css`、`*.test.ts`、白名单文件
-- 检测三类硬编码色：`#[0-9a-fA-F]{3,8}` / `rgb(...)` / `rgba(...)` / 命名色（`text-white`、`text-black`、`bg-white/NN` 等仅在非 scrim 上下文为违规）
-- 白名单：`tests/hardcode-whitelist-colors.json`（起步 = `errorPrototype/ErrorPagePreview.vue` + 注释豁免）
-- 契约测试断言：白名单外零命中，违例即失败（CI 红 → review block）
+`tests/hardcodeColorGate.test.ts`（仿 `hardcode-gate.test.ts` 模式）：
+
+- 扫描 `src/**/*.{vue,ts}`；排除 `styles/tokens.css`、`*.test.ts` / `*.d.ts`、白名单文件——`scripts/`、`tests/`、`dist/` 不扫（生成产物允许 hex）
+- 检测三类硬编码色：hex（3/4/6/8 位）/ `rgb(...)` / `rgba(...)` / Tailwind 命名色（`text-white`、`text-black`、`bg-white/NN` 等）；CSS / JS / Vue 注释豁免（取证与 ADR 引用可写具体色值）
+- 白名单：`tests/hardcode-whitelist-colors.json`——**6 条，文件级豁免语义**（每条登记 `path` + 非空 `reason`；登记路径下的**全部**命中一律豁免，不做行级/上下文级细分）：
+  - `errorPrototype/ErrorPagePreview.vue`（web-core 预览 token 不解析）
+  - `utils/lynxPlatformColors.ts`（Lynx 平台属性 `placeholder-color` 不解析 `var()`；暗色对比度受限 → [#693](https://github.com/a1121611810/Pictelio/issues/693)）
+  - `components/RankingEntryCard.vue` / `pages/IllustDetail.vue` / `pages/NovelIntro.vue` / `pages/Recommended.vue`（P2 §3.3：白字叠 scrim，明暗通用）
+- 条件：白名单外零命中，违例即失败（CI 红 → review block）
+- **空集与覆盖面防护（#692 review 轮补入）**：① 白名单非空 + 每条登记路径在磁盘存在 + `reason` 非空——防「陈旧豁免掩盖新违规」与「白名单被清空导致豁免语义反转」；② `walk(src)` 文件数下界 + 关键文件在集内——防遍历失效 → offenders 恒空 → 门禁恒真通过
+- 与 `hardcode-gate.test.ts` 的分工**非重复**：后者扫硬编码中文文案（i18n 回潮），本门扫硬编码颜色字面量（色彩回潮）
 
 ## 6. 验证清单
 
@@ -104,5 +110,5 @@ P1-1 / P1-2：替换 `rgba(...)` 字面量为 `var(--md-scroll-indicator)` / `va
 ## 8. 已知遗留风险
 
 - `text-white` 系列（P2 范围）仍存在 scrim overlay 上下文，未 token 化巡检——若未来引入「亮色 scrim 上下文」（如 macOS light mode scrim），需扩 token
-- `white-space:nowrap` 等 CSS 字面 `white-space` 命中命名色 grep，需在颜色门禁正则中显式排除 CSS 属性名
+- ~~`white-space:nowrap` 等 CSS 字面 `white-space` 命中命名色 grep~~（**已在实现中消解**）：命名色正则以 utility 前缀锚定（`text|bg|border|…` + `-white|black|…`），CSS 属性名 `white-space` 形态上不命中——留档说明，无需额外排除规则
 - Lynx 真机验证 `ColorFilter` / `ColorMatrix` 等原生层着色不在本任务范围（spec T3 已覆盖状态栏）

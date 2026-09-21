@@ -256,7 +256,7 @@ app-lynx 的可选 M3 主色（seed）——用户在「我的 → 外观」选�
 _Avoid_: 运行时用 JS 计算 / 动态写 CSS 变量（Lynx 动态样式支持面窄、双端不可靠）；给色板类只覆盖 `--md-primary`（secondary/surface/outline/state-layer 不同步会串色）；把主题色做成账号级键（外观是设备级偏好，登出不应重置）。
 
 **外观模式（appearance mode）**【2026-09-21 新增，ADR-0180】：
-明暗外观的三态选择 `light | dark | system`（亮色 / 暗色 / 跟随系统），默认 `system`——用户在「我的 → 外观」卡片顶部的 M3 segmented button 切换，点击即时生效。单一事实源 `src/utils/darkMode.ts`（`DARK_MODE_IDS` / `DEFAULT_DARK_MODE`）；持久化键 `settings_dark_mode`（设备级，与 `settings_theme_color` 同级，**不与 webview 互通**——webview 按计划弃用）。
+明暗外观的三态选择 `light | dark | system`（亮色 / 暗色 / 跟随系统），默认 `system`——用户在「我的 → 外观」卡片顶部的 M3 segmented button 切换，点击即时生效。单一事实源 `src/utils/darkMode.ts`（`DARK_MODE_IDS` / `DEFAULT_DARK_MODE`）；持久化键 `settings_dark_mode`（设备级，与 `settings_theme_color` 同级，**不与 webview 互通**——webview 按计划弃用）。状态栏图标与 **splash 主题同跟随 resolvedDark**（原生侧读同一 prefs 键；见「暗色检测通道」）。
 _Avoid_: 只做 on/off 开关（无跟随系统，偏离 M3 与 Android 基线预期）；把「外观模式」当账号级偏好；与 webview 的 `theme` 键做同步/迁移（弃用计划，零互通）。
 
 **归一暗色态（resolvedDark）**【2026-09-21 新增，ADR-0180】：
@@ -268,7 +268,7 @@ _Avoid_: 各消费方各自判断 `darkMode === 'system' ? 系统值 : darkMode`
 _Avoid_: 运行时算色 / 动态写 CSS 变量（同「主题色」词条纪律）；给暗色只覆盖 primary（串色，同「主题色」）；在亮色主题缺 `.dark` 时误判为低优先级 bug（未挂 `.dark` 类即亮色版语义，正交组合是有意设计）。
 
 **暗色检测通道（dark mode detection channel）**【2026-09-21 新增，ADR-0180，研究 #683】：
-lynx JS 获取系统暗色状态的**唯一通道**——Lynx JS 运行时无 `matchMedia`、vue-lynx 对官方 `__globalProps` 零接线（研究实证），故自建：`PictelioAppModule.getDarkMode(cb)` 订阅后拉初值 + `pictelioDarkMode` 全局事件推变化（ADR-0168 insets 同构；Android 侧 `onConfigurationChanged` 读 `Configuration.uiMode` + `onResume` 比对补发兜底后台翻转）；web-core 预览用 `matchMedia` 兜底。契约（事件名/载荷 `{"mode":"light"|"dark"}`/方法名）由 `darkModeJavaContract.test.ts` 双向钉死。
+lynx JS 获取系统暗色状态的**唯一通道**——Lynx JS 运行时无 `matchMedia`、vue-lynx 对官方 `__globalProps` 零接线（研究实证），故自建：`PictelioAppModule.getDarkMode(cb)` 订阅后拉初值 + `pictelioDarkMode` 全局事件推变化（ADR-0168 insets 同构；Android 侧 `onConfigurationChanged` 读 `Configuration.uiMode` + `onResume` 比对补发兜底后台翻转）；web-core 预览用 `matchMedia` 兜底。契约（事件名/载荷 `{"mode":"light"|"dark"}`/方法名）由 `darkModeJavaContract.test.ts` 双向钉死。**原生侧同时读取同一 prefs 键**（`SharedPreferences("CapacitorStorage")` 的 `settings_dark_mode`）驱动状态栏图标与 splash（读取时机：冷启动 + 设置变更通知 + `onResume` 兜底；键名两侧逐字一致由契约测试钉死，#692 接线）。
 _Avoid_: 在 lynx JS 里直接调 `matchMedia`（运行时不存在）；把官方宿主通道当可用（vue-lynx 未接线）；纯推模式不拉初值（首帧事件早于订阅必丢，同 insets 管线纪律）。
 
 ### 翻译端点（Translation endpoint）【2026-09-19 新增，ADR-0173】
