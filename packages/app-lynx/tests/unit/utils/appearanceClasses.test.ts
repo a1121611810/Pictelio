@@ -218,7 +218,9 @@ describe('T2 暗色色板契约（tokens.css .theme-X.dark）', () => {
     for (const option of THEME_COLOR_OPTIONS) {
       const selector = `.${option.className}.dark`
       const start = tokensCss.indexOf(selector + ' {')
-      const block = tokensCss.slice(start, tokensCss.indexOf('}', start))
+      const block = tokensCss
+        .slice(start, tokensCss.indexOf('}', start))
+        .replace(/\/\*[\s\S]*?\*\//g, '') // 剥块注释（与同仓 source-scan 纪律一致；防注释文本误红）
       const valueMatch = /--md-scroll-indicator:\s*([^;]+);/.exec(block)
       expect(valueMatch, `${selector} 缺少 --md-scroll-indicator 值`).toBeTruthy()
       expect(

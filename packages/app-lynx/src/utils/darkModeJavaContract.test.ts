@@ -504,14 +504,14 @@ describe('#692 跨语言色值契约（tokens.css 暗色色板 ⇄ values-night 
     )
     expect(VALUES_NIGHT_STYLES_CODE, `values-night/styles.xml 缺少暗面 ${surface}`).toContain(surface)
     // 计数下界（review 轮3 D）：values-night 有**两处**暗面声明（AppTheme.NoActionBarLaunch + Theme.SplashScreen.Dark），
-    // 只断 toContain 时删掉任一处仍绿；计数 ≥2 让「双轨各一份」成为硬约束
+    // 只断 toContain 时删掉任一处仍绿；计数 ≥2 覆盖「两处声明存在」（逐轨归属由主题 name/parent 断言另行兜住）
     expect(
       (VALUES_NIGHT_STYLES_CODE.match(/#101418/g) ?? []).length,
-      'values-night 暗面声明少于 2 处（双轨各一份约束被破坏）',
+      'values-night 暗面声明少于 2 处（launch 轨 / Dark 主题轨）',
     ).toBeGreaterThanOrEqual(2)
   })
 
-  it('暗 plate #1C2024 登记于两文件且 ≠ 暗面（离底有差 → 前景圆盘可见）', () => {
+  it('暗 plate #1C2024 登记于两文件且 ≠ 暗面（离底有差 → 兜底轨前景圆盘可见；主轨生效性见走查 T3-3c）', () => {
     const surface = skyDarkHex.get('--md-surface')!
     const container = skyDarkHex.get('--md-surface-container')!
     // 冻结锚点：暗 plate = .theme-sky.dark 的 --md-surface-container（面上方一阶）
@@ -523,9 +523,10 @@ describe('#692 跨语言色值契约（tokens.css 暗色色板 ⇄ values-night 
       expect(css, `${name} 缺少暗色 plate #1C2024`).toContain('#1C2024')
     }
     // 计数下界（review 轮3 D）：values-night 的 plate 亦为两处声明（launch 覆写 + Dark 主题），删任一处仍绿的洞由此关闭
+    // （同上：计数覆盖「两处声明存在」，逐轨归属由 name/parent 断言另行兜住）
     expect(
       (VALUES_NIGHT_STYLES_CODE.match(/#1C2024/g) ?? []).length,
-      'values-night plate 声明少于 2 处（双轨各一份约束被破坏）',
+      'values-night plate 声明少于 2 处（launch 轨 / Dark 主题轨）',
     ).toBeGreaterThanOrEqual(2)
     // 离底有差（亮色轨 plate==底 为有意；暗色轨必须可分辨，否则前景圆盘不可见）
     expect(container.toLowerCase()).not.toBe(surface.toLowerCase())

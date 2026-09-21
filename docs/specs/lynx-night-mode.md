@@ -149,7 +149,7 @@ T2 / T3 可并行（T2 依赖 `resolvedDark`、T3 依赖 `resolvedDark`，互不
 | 类别 | 文件 | 断言要点 |
 |---|---|---|
 | 读点存在性 + 键名同源 | `darkModeJavaContract.test.ts` | Java 读点字面量（`settings_dark_mode` / `Resources.ID_NULL` / `syncStatusBarHidden`）+ JS 写入侧常量逐字一致 + `applyDarkModePreference` 两侧成对 |
-| 跨语言色值 | `darkModeJavaContract.test.ts` | `values-night` 暗面 ≡ `.theme-sky.dark --md-surface`；暗 plate ≠ 暗面（离底有差 → 前景圆盘可见） |
+| 跨语言色值 | `darkModeJavaContract.test.ts` | `values-night` 暗面 ≡ `.theme-sky.dark --md-surface`；暗 plate ≠ 暗面（离底有差 → **兜底轨**前景圆盘可见；主轨生效性见走查 T3-3c） |
 | 产物漂移 / 锚点一致性 | `tests/palettes-drift.test.ts` | tokens.css 自动生成段 ≡ 生成脚本 `--stdout`（逐字节，行尾空白归一）+ `--stdout` 只读（运行前后 tokens.css 不变）；脚本内 **`lightPrimaryAnchor` ≡ 亮色 `--md-primary` 6/6 对等** |
 | 豁免与覆盖面空集防护 | `tests/hardcodeColorGate.test.ts` | 白名单非空 + 条目路径存在 + 理由非空；`walk(src)` 文件数下界 + 关键文件在集内（防遍历失效恒真） |
 
