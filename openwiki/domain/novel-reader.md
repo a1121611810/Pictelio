@@ -1,9 +1,9 @@
 ---
 type: Concept
 title: Novel Reader
-description: The novel reading experience — virtualized text layout with in-text search highlighting, reading progress tracking, series navigation, three feed layout modes, Pretext library integration, AI translation (DeepSeek BYOK, S1-S7 complete pipeline), and multi-format export (9 formats via @pictelio/novel-export, ADR-0154).
-tags: [novel, reader, virtual-scroll, pretext, text-layout, translation]
-timestamp: 2026-07-31T23:47:05+08:00
+description: The novel reading experience — virtualized text layout with in-text search highlighting, reading progress tracking, series navigation, three feed layout modes, Pretext library integration, AI translation (webview DeepSeek BYOK S1-S7 pipeline + lynx OpenAI Responses API BYOK pipeline, ADR-0169–0178), and multi-format export (9 formats via @pictelio/novel-export, ADR-0154).
+tags: [novel, reader, virtual-scroll, pretext, text-layout, translation, lynx]
+timestamp: 2026-09-21T16:24:16+08:00
 ---
 
 # Novel Reader
@@ -185,6 +185,37 @@ When blocked, `startTranslate()` shows an in-sheet error and **sends nothing** (
 ### Tests
 
 6 files / 86 cases cover the feature: `tests/unit/api/translate.test.ts` (contract tests using the official DeepSeek response-schema sample, dual-mode branches via a `@capacitor/core` mock), `tests/unit/primitives/createNovelTranslator.test.ts` (paragraph alignment + degradation warnings, chunking boundaries, first-screen ordering, retry/backoff, abort), `tests/unit/stores/translationStore.test.ts` (policy decisions, tier/thinking persistence, failure tracking), `tests/unit/utils/translationCache.test.ts` (LRU eviction, hash invalidation, composite keys), `tests/unit/utils/detectLanguage.test.ts`, and `tests/unit/primitives/novelTextLayoutCache.test.ts` (variant separation) — consistent with the [testing hard constraints](/openwiki/testing/overview.md).
+
+## Lynx Novel Translation (ADR-0169–ADR-0178, v5.4.0)
+
+The lynx client (`packages/app-lynx/`) gained its **own, from-scratch** novel translation feature in v5.4.0. It deliberately does **not** reuse the webview translation stack above (`createNovelTranslator` / `translationCache` / `translationStore` / `TranslateSheet` / `SettingsTranslate` / `prompts.ts`) and does **not** extract a shared `@pictelio/novel-translate` package — it only borrows the webview's abstract boundaries (provider-interface shape, cache-key design, policy decision points). See [ADR-0169](/docs/adr/ADR-0169-translation-provider-interface.md) through [ADR-0178](/docs/adr/ADR-0178-app-lynx-translation-retry-and-partial-ui.md) and [spec](/docs/specs/app-lynx-novel-translation.md).
+
+```mermaid
+flowchart LR
+    NBT["TranslateButton.vue"] --> NTS["novelTranslateStore.ts"]
+    NTS --> CT["createNovelTranslator.ts"]
+    CT --> TR["api/translate.ts"]
+    TR --> OAI["OpenAI Responses API POST /v1/responses"]
+    CT --> PT["PictelioTranslate (Java)"]
+    PT --> KS[Android Keystore]
+    NTS --> TC["utils/translationCache.ts"]
+    TC --> FS["filesystem cache (native channel)"]
+```
+
+*Lynx translation flow: the `TranslateButton` FAB and toggle read/write only the `novelTranslateStore` seam; the provider goes through the Responses API, the API key never leaves the Java Keystore, and the cache persists through a native filesystem channel.*
+
+- **User-filled LLM endpoint** — settings expose base URL / API key / model name (no provider presets; the user fills all fields). The single protocol is the **OpenAI Responses API** (`POST /v1/responses`, ADR-0169); providers that don't implement it are hard-rejected with a clear error. `targetLang` (default `zh-CN`) and `sourceLang` (default `ja`) round out the config.
+- **API key isolation** — the key is stored in Android Keystore via a new Java `PictelioTranslate` native module (ADR-0170) and **never enters the JS heap** (mirroring `PictelioAuth`/`PictelioApi`, ADR-0037). JS only sees a "configured / not configured" signal plus a non-secret base-URL suffix.
+- **Streaming-first, batch-fallback** — the provider returns `AsyncIterator<TranslationChunk>`; a stream interruption automatically falls back to one whole-batch retry, surfaced via the `isRetryingHint` flag (ADR-0178).
+- **8-state machine + generation gate** — `idle / pending / translating / translating_queued / partial / failed / completed / aborted` (ADR-0169 §Q19). A generation counter discards late responses from a switched chapter, an `AbortController` cancels in-flight calls, and a per-chapter in-flight Promise map reuses the running translation instead of starting a duplicate.
+- **Chapter-granular cache** — keyed by `novelId | chapterId | targetLang | modelId | sourceHash | baseURLHash` (ADR-0171, ADR-0176); only `completed` chapters are written (half-done results are never cached); a cache hit flips the toggle on instantly without spending tokens. In native PrimJS mode the cache persists through a **native filesystem channel** because IndexedDB is unavailable (ADR-0175).
+- **R18/R18G consent gate** — an application-layer gate (`settings.isRestricted(novel)`) aborts **before any content leaves the device** with `error.code = 'R18_BLOCKED'` / `'R18G_BLOCKED'`; the translation-authorization switches default `false`, so R18 content is never sent to the LLM without explicit user consent.
+- **Translate button** — [`TranslateButton.vue`](/packages/app-lynx/src/components/TranslateButton.vue) derives its state from the store: `configure` (no endpoint → jump to settings), `translating` (tap = abort), `retranslate` (invalidate + re-translate), `retry`, `start`, plus a "已缓存 ✓" indicator. [`TranslateModeSwitch.vue`](/packages/app-lynx/src/components/TranslateModeSwitch.vue) provides the 原文/译文 whole-paragraph toggle.
+- **Store seam** — [`stores/novelTranslateStore.ts`](/packages/app-lynx/src/stores/novelTranslateStore.ts) is the single seam all translation UI and side effects read/write; the chunked pipeline lives in `primitives/createNovelTranslator.ts` and the provider/endpoint contracts in `api/translate.ts`.
+
+### Endpoint probe & credential verification (ADR-0173)
+
+Endpoint compatibility (address-layer) is probed with a **dummy key** (`probeCompatibility`) and is orthogonal to credential validity; credential verification (`testConnection`) uses the real key and persists only the result enum + timestamp + base URL (never key material). The UI compares the recorded base URL against the current input to avoid showing a stale "verified" badge after the address changed.
 
 ## Series Navigation
 
