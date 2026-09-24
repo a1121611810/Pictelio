@@ -3,9 +3,13 @@
 // 开关（默认开 = 介绍页先行），六入口小说分支统一改经 utils/novelNavigation.ts 的
 // openNovel() 单点缝隙。本文件逐入口钉住：
 //   ① 源码必须经缝隙调用（含 `openNovel(`）；
-//   ② `/intro` 字面量不得回流入口内联（该导航串全仓唯一合法居所 = 缝隙模块自身）。
+//   ② `/intro` 导航串不得回流入口内联（该导航串全仓唯一合法居所 = 缝隙模块自身）。
 // 另钉缝隙模块双态自钉（介绍页与裸正文两个模板串同时存在）与路由共存量（D3 零改动）。
 // oracle：ADR-0183 D2（单点缝隙）/ D3（路由层零改动），出处 docs/adr/ADR-0183-lynx-novel-intro-toggle.md。
+//
+// 负断言口径（review R1 P-1 加固）：② 以「收尾反引号」锚定（'/intro`'）——真实导航字面量
+// `/novel/${id}/intro` 必含该形态，而注释里对路由的转述（如「旧串 /novel/:id/intro」）不带
+// 反引号、不会误伤打红。写注释提及该路由时用转述，勿写带反引号的完整模板串。
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
@@ -28,7 +32,8 @@ describe('六入口小说导航缝隙（openNovel 单点，ADR-0183 / 票 #713�
     it(`${entry.file}：小说分支经 openNovel 缝隙导航，/intro 导航串不回流内联`, () => {
       const source = readFileSync(resolve(pkgRoot, entry.file), 'utf-8')
       expect(source).toContain('openNovel(')
-      expect(source).not.toContain('/intro')
+      // 收尾反引号锚定：命中真实导航模板串，放过注释转述（见文件头「负断言口径」）
+      expect(source).not.toContain('/intro`')
     })
   }
 
