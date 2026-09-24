@@ -71,6 +71,13 @@ ADR-0080 以「均衡评估」盘点全 workspace 依赖：patch/minor 建议升
 
 **D6 · 门禁与验收**：准入 = `pnpm check:all` + `pnpm lint:all` + `pnpm test:all` 全绿（test:all 含 app 单测 + agent-browser E2E）。批次 B（solidjs rc）为高风险批次，独立提交便于回退定位。Android 构建链（Capacitor 8.5 / Gradle）不在本次范围（`pnpm outdated` 未报过时）。
 
+## 执行结果（2026-09-25 终态）
+
+- 分支 `chore/dependency-upgrade-2026-09`，批次化提交：批次 A（28ed5b4d）→ 批次 B（c21e6182）→ C1（6a41443f）→ C2（59954ba4）→ C3（4187984c），任一批次可独立 revert。
+- 终验门禁：`check:all` 9 包 ✓、`lint:all` ✓、`test:all` ✓（app 单测 1957 + agent-browser E2E 1982 + 各 core 包全绿）。
+- 执行期新增暂缓/钉版 4 条（均已记录 D3/D5 并写明触发条件）：vue 3.5.40（上游类型回归）、query-persist-client-core 5.101.4（solid-query 冻结 query-core）、app vitest 4.1.10（vp 硬依赖）、TS7 门禁 alias `typescript-compiler-api`。
+- 执行期间 agent-browser E2E 一度全红（约 1 小时窗口），经基线 commit 归因二分 + OAuth 直连探针证实为 Pixiv 侧临时限流窗口，与依赖升级无关，窗口过后全量复跑自愈。
+
 ## 后果
 
 - 正面：安全补丁与 bug 修复全量跟进；solidjs rc 线对齐 vite-plugin 要求；TS7 带来检查提速（Corsa）；为 vite-plus 1.0 / lynx 工具链解卡后的快速跟进铺垫。
