@@ -18,7 +18,7 @@ ADR-0080 以「均衡评估」盘点全 workspace 依赖：patch/minor 建议升
 
 ## 决策
 
-**D1 · patch/minor 常规升（批次 A，17 项）**——semver 兼容，直接升，门禁兜底：
+**D1 · patch/minor 常规升（批次 A，原 17 项，执行期 vue / query-persist-client-core 两项移入 D5 暂缓）**——semver 兼容，直接升，门禁兜底：
 
 | 包 | 从 → 到 | 宿主 |
 |---|---|---|
@@ -26,7 +26,7 @@ ADR-0080 以「均衡评估」盘点全 workspace 依赖：patch/minor 建议升
 | @tanstack/virtual-core | 3.17.7 → 3.17.11 | app |
 | @fluentui/web-components | 3.0.3 → 3.1.3 | app |
 | @fluentui/tokens | alpha.23 → alpha.24 | app |
-| @tanstack/query-persist-client-core | 5.101.4 → 5.103.2 | app |
+| @tanstack/query-persist-client-core | 5.101.4（维持，执行期回退，见 D5） | app |
 | @chenglou/pretext | 0.0.8 → 0.0.9 | app |
 | fast-check | 4.9.0 → 4.10.2 | app / net-diagnostics / update-check |
 | happy-dom | 20.11.2 → 20.14.5 | app |
@@ -35,7 +35,7 @@ ADR-0080 以「均衡评估」盘点全 workspace 依赖：patch/minor 建议升
 | vite | 8.2.1 → 8.3.0 | app |
 | appium / webdriverio | 3.6.0→3.7.0 / 9.30.1→9.32.0 | app（e2e 工具） |
 | @types/node | 26.2.0 → 26.6.2 | app / app-lynx |
-| vue | 3.5.40 → 3.5.43 | app-lynx |
+| vue | 3.5.40（维持，执行期回退，见 D5） | app-lynx |
 | @tanstack/vue-query | 5.102.8 → 5.103.2 | app-lynx |
 | @lynx-js/tailwind-preset | 0.5.0 → 0.5.1 | app-lynx（peer tailwind ^3.4 ✓） |
 | astro | 7.1.3 → 7.3.4 | website |
@@ -66,11 +66,13 @@ ADR-0080 以「均衡评估」盘点全 workspace 依赖：patch/minor 建议升
 | app-lynx typescript | `@lynx-js/rspeedy@0.13.6` peer `typescript 5.1.6 - 5.9.x`（当前 5.9.3 已在顶） | rspeedy 升级批次落地 |
 | vite-plus 1.0.0-rc.0 | prerelease（延续 ADR-0080 政策） | 1.0 stable |
 | @lynx-js/web-core@0.23.1 豁免清单 | T1 锁定（ADR-0080），与 rspeedy 批次绑定 | 同上 |
+| **vue 3.5.41+**（app-lynx，执行期实测新增） | `vue-tsc --noEmit` 在 3.5.41/3.5.42/3.5.43 全报 `Excessive stack depth comparing 'DefineComponent' and 'Component'`（3 个 `createApp` 入口），3.5.40 绿；vue-tsc@3.3.11 已是最新无解 | vue 3.5.44+ 或 vue-tsc 新版修复后复测 |
+| **@tanstack/query-persist-client-core 5.103.2**（app，执行期实测新增） | `@tanstack/solid-query@6.0.0-rc.3`（latest）被 time-based 解析冻结在 `query-core@5.101.4`；persist-client 升 5.103.2 产生双 query-core 实例（`#private` 字段 nominal 失配，app tsc 红） | solid-query 6 rc 发版对齐 query-core 5.103+ 后同步升级 |
 
 **D6 · 门禁与验收**：准入 = `pnpm check:all` + `pnpm lint:all` + `pnpm test:all` 全绿（test:all 含 app 单测 + agent-browser E2E）。批次 B（solidjs rc）为高风险批次，独立提交便于回退定位。Android 构建链（Capacitor 8.5 / Gradle）不在本次范围（`pnpm outdated` 未报过时）。
 
 ## 后果
 
 - 正面：安全补丁与 bug 修复全量跟进；solidjs rc 线对齐 vite-plugin 要求；TS7 带来检查提速（Corsa）；为 vite-plus 1.0 / lynx 工具链解卡后的快速跟进铺垫。
-- 代价：solidjs rc.9 行为漂移风险由测试兜底；vitest 5 / vue-router 5 / TS 7 各自的破坏性变更在实施票中逐项消化；暂缓项保留 5 条明确触发条件。
+- 代价：solidjs rc.9 行为漂移风险由测试兜底；vitest 5 / vue-router 5 / TS 7 各自的破坏性变更在实施票中逐项消化；暂缓项保留明确触发条件（评估期 5 条 + 执行期实测新增 2 条）。
 - 回退策略：批次独立 commit；任一门禁红且不可收敛 → 单批 `git revert`，并在本 ADR 修订记录回退与再评估触发。
