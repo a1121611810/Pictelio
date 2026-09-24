@@ -20,6 +20,23 @@ import { ME_A11Y_LABELS, LOGIN_A11Y_LABELS, UPDATE_A11Y_LABELS, ERROR_A11Y_LABEL
 import { THEME_COLOR_OPTIONS, DEFAULT_THEME_COLOR, isThemeColorId, themeColorClass } from '../src/utils/themeColor'
 import zhMisc from '../src/i18n/locales/zh-CN/misc'
 
+// vitest 5 硬约束：vi.mock 必须在模块顶层（嵌套定义直接报错）。
+// 部分 mock：保留原模块其他导出（isOAuthCredsInjected 等），仅覆盖 loginWithRefreshToken
+// ——供「登录成功后不写 localStorage」用例验证成功后也绝不写存储。
+vi.mock('../src/api/auth', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/api/auth')>()
+  return {
+    ...actual,
+    loginWithRefreshToken: vi.fn(async () => ({
+      access_token: 'at',
+      refresh_token: 'rt',
+      expires_in: 3600,
+      token_type: 'bearer',
+      user: { id: 1, name: 'u', account: 'u', profile_image_urls: {} },
+    })),
+  }
+})
+
 describe('imageUrl.proxyImageUrl', () => {
   it('将 i.pximg.net URL 重写为本地代理路径', () => {
     expect(
@@ -465,21 +482,7 @@ describe('authStore 安全：refresh_token 不持久化', () => {
   })
 
   it('登录成功后不写 localStorage', async () => {
-    // mock 登录成功路径：OAuth 返回有效响应，验证成功后也绝不写存储
-    // 部分 mock：保留原模块其他导出（isOAuthCredsInjected 等），仅覆盖 loginWithRefreshToken
-    vi.mock('../src/api/auth', async (importOriginal) => {
-      const actual = await importOriginal<typeof import('../src/api/auth')>()
-      return {
-        ...actual,
-        loginWithRefreshToken: vi.fn(async () => ({
-          access_token: 'at',
-          refresh_token: 'rt',
-          expires_in: 3600,
-          token_type: 'bearer',
-          user: { id: 1, name: 'u', account: 'u', profile_image_urls: {} },
-        })),
-      }
-    })
+    // mock 已提升至文件顶层（vitest 5 硬约束）：仅覆盖 loginWithRefreshToken
     const store = useAuthStore()
     const lsSet = (globalThis.localStorage as { setItem: ReturnType<typeof vi.fn> }).setItem
     await store.loginWithToken('some-token')
