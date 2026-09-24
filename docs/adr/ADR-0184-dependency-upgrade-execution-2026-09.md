@@ -42,7 +42,7 @@ ADR-0080 以「均衡评估」盘点全 workspace 依赖：patch/minor 建议升
 
 **D2 · solidjs rc 线同批升（批次 B，4 件强制同批）**——`@solidjs/vite-plugin@3.0.0-next.44` peer 要求 `solid-js ^2.0.0-rc.9`：
 
-- `solid-js` rc.6 → **rc.9**；`@solidjs/web` rc.6 → **rc.9**；`@solidjs/router` next.21 → **next.28**；`@solidjs/vite-plugin` next.39 → **next.44**。
+- `solid-js` rc.6 → **rc.9**；`@solidjs/web` rc.6 → **rc.9**；`@solidjs/router` next.21 → **next.27**（next.28 发布于 24h 冷却期内被 `minimumReleaseAge` 正确拦截，冷却过后可顺移）；`@solidjs/vite-plugin` next.39 → **next.44**。
 - 破坏面由 1282 单测 + agent-browser E2E 兜底；@solid-primitives/* 已是各自 latest，不动。
 
 **D3 · 无生态死锁 major：门禁兜底试升（批次 C）**——门禁红且一轮修复不收敛即回退并在本 ADR 记录：
