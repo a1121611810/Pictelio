@@ -60,6 +60,7 @@ export const ME_A11Y_LABELS = {
   r18gToggle: '显示R18G内容',
   relatedInjectionToggle: '相关作品注入开关',
   rankingEntryToggle: '排行榜入口开关',
+  novelIntroFirstToggle: '小说先进介绍页开关',
   // 引擎自动回退开关（ADR-0164 / #555：Me 客户端卡 M3 switch 行）
   autoFallbackEngine: '自动回退WebView开关',
   // 全屏模式开关（spec lynx-systembars D5：Me 客户端卡 M3 switch 行）

@@ -247,6 +247,8 @@ const zhPages = {
   "me.content.showR18G": "显示 R-18G 内容",
   "me.content.relatedInjection": "相关作品注入",
   "me.content.rankingEntry": "排行榜入口",
+  "me.content.novelIntroFirst": "小说先进介绍页",
+  "me.content.novelIntroFirstDesc": "关闭后，点击小说将直接进入正文",
   "me.content.ai": "AI 作品",
   "me.content.aiShow": "显示",
   "me.content.aiMask": "遮罩",

@@ -48,7 +48,7 @@ import { INPUT_PLACEHOLDER_COLOR } from '../utils/lynxPlatformColors'
 const auth = useAuthStore()
 const settings = useSettingsStore()
 const clientSwitch = useClientSwitchStore()
-const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, darkMode, resolvedDark, language, novelExportFormat, novelExportOptions, relatedInjection, rankingEntry, autoFallbackEngine, fullscreenMode } = storeToRefs(settings)
+const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, darkMode, resolvedDark, language, novelExportFormat, novelExportOptions, relatedInjection, rankingEntry, novelIntroFirst, autoFallbackEngine, fullscreenMode } = storeToRefs(settings)
 
 const switching = ref(false)
 
@@ -383,6 +383,10 @@ function toggleRelatedInjection() {
 }
 function toggleRankingEntry() {
   settings.setRankingEntry(!rankingEntry.value)
+}
+// 小说先进介绍页开关（spec docs/specs/lynx-novel-intro-toggle.md / ADR-0183）：一键翻转，setter 自带持久化
+function toggleNovelIntroFirst() {
+  settings.setNovelIntroFirst(!novelIntroFirst.value)
 }
 
 // T2：外观模式三态切换（spec docs/specs/lynx-night-mode.md §3 + §4.7）—— 即时生效，
@@ -787,6 +791,23 @@ function pickAppearanceMode(mode: DarkModeId) {
           <text class="text-title-medium text-surface-on">{{ t('me.content.rankingEntry') }}</text>
           <M3Switch
             :checked="rankingEntry"
+          />
+        </view>
+
+        <!-- 小说先进介绍页开关（spec docs/specs/lynx-novel-intro-toggle.md / ADR-0183）：设备级，默认开；
+             描述两行式照 autoFallback 行范式（行级 @tap 翻转 + M3Switch，ADR-0179 组件） -->
+        <view
+          class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.novelIntroFirstToggle"
+          @tap="toggleNovelIntroFirst"
+        >
+          <view class="flex flex-col">
+            <text class="text-title-medium text-surface-on">{{ t('me.content.novelIntroFirst') }}</text>
+            <text class="text-label-medium text-surface-on-variant mt-0.5">{{ t('me.content.novelIntroFirstDesc') }}</text>
+          </view>
+          <M3Switch
+            :checked="novelIntroFirst"
           />
         </view>
 
