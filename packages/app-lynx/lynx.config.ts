@@ -42,7 +42,7 @@ const proxyUrl =
   process.env.HTTPS_PROXY ||
   process.env.http_proxy ||
   process.env.HTTP_PROXY ||
-  'http://127.0.0.1:10808'
+  'http://127.0.0.1:7897'
 
 // ─── 启动更新检查开关（.env PICTELIO_DISABLE_UPDATE_CHECK） ───
 // 仅 dev 调试生效：true → 强制跳过启动更新检查（不走 checkForUpdate，不进强制更新页）。

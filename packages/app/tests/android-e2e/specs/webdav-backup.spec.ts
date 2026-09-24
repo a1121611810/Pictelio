@@ -5,13 +5,13 @@
  *   WEBDAV_E2E_ENABLED=1 ANDROID_E2E_SKIP_BUILD=1 ANDROID_E2E_AVD=pictelio_ui \
  *     node /tmp/pictelio-dav-server.cjs &   # 或任意 WebDAV 服务器（DAV_PORT/WEBDAV_E2E_URL 可配）
  *   adb reverse tcp:8081 tcp:8081
- *   adb shell settings put global http_proxy 10.0.2.2:10808   # 本机需代理出网时
+ *   adb shell settings put global http_proxy 10.0.2.2:7897   # 本机需代理出网时
  *   pnpm vitest run -c tests/android-e2e/vitest.config.ts specs/webdav-backup.spec.ts
  *
  * 前置（本文件不负责启动）：
  * - 宿主最小 WebDAV 服务器：/tmp/pictelio-dav-server.cjs 监听 0.0.0.0:8081，根 /tmp/pictelio-dav
  * - adb reverse tcp:8081 tcp:8081（debug 网络安全配置仅放行回环 cleartext）
- * - 模拟器全局代理 → 宿主（adb shell settings put global http_proxy 10.0.2.2:10808），否则登录不可达
+ * - 模拟器全局代理 → 宿主（adb shell settings put global http_proxy 10.0.2.2:7897），否则登录不可达
  * - PIXIV_REFRESH_TOKEN（packages/app/.env）用于登录
  *
  * 期望值来源（oracle，独立于实现）：

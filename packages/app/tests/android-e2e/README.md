@@ -50,7 +50,7 @@ AVD 检测启动 → boot 等待 → chromedriver 预置 → 编译安装 APK �
 | 变量                       | 作用                                                                                                                                                                                                           |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ANDROID_E2E_AVD`          | 指定 AVD（如 `pictelio_ui`），默认自动选择                                                                                                                                                                     |
-| `ANDROID_E2E_HTTP_PROXY`   | 可选；设为宿主代理（如 `10.0.2.2:10808`）时为模拟器设全局 HTTP 代理（`settings put global http_proxy`），用于宿主网络直连 pixiv 受限（DNS 污染）的环境；teardown 会清除（`settings delete`）。默认不设、零影响 |
+| `ANDROID_E2E_HTTP_PROXY`   | 可选；设为宿主代理（如 `10.0.2.2:7897`）时为模拟器设全局 HTTP 代理（`settings put global http_proxy`），用于宿主网络直连 pixiv 受限（DNS 污染）的环境；teardown 会清除（`settings delete`）。默认不设、零影响 |
 | `ANDROID_E2E_BUILD_MODE`   | 设为 `e2e` 时改跑 `pnpm build:android:e2e`（保留 E2E 钩子），默认普通构建，见「构建模式」                                                                                                                      |
 | `ANDROID_E2E_SKIP_BUILD=1` | 跳过 `pnpm build:android`，直接使用既有 APK（快速迭代）                                                                                                                                                        |
 | `ANDROID_E2E_APPIUM_PORT`  | Appium 端口，默认 4723                                                                                                                                                                                         |
@@ -138,7 +138,7 @@ node /tmp/pictelio-dav-server.cjs          # 监听 0.0.0.0:8081，根 /tmp/pict
 adb reverse tcp:8081 tcp:8081
 
 # 3) 本机无直连外网时，让模拟器走宿主代理（否则登录不可达）
-adb shell settings put global http_proxy 10.0.2.2:10808
+adb shell settings put global http_proxy 10.0.2.2:7897
 
 # 4) 运行（复用已构建 APK；PIXIV_REFRESH_TOKEN 由 packages/app/.env 提供）
 cd packages/app && set -a && . ./.env && set +a

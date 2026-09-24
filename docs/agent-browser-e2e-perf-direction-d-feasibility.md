@@ -67,7 +67,7 @@ LLM 断言（方向 C）、图片 mock（方向 E）、并行/重试（方向 F�
 
 ### 2.2 代理环境变量会劫持 daemon 的本地 CDP 连接（测试环境事项）
 
-本项目开发环境设置 `http_proxy=http://127.0.0.1:10808`、`all_proxy=socks5://127.0.0.1:10808`。
+本项目开发环境设置 `http_proxy=http://127.0.0.1:7897`、`all_proxy=socks5://127.0.0.1:7897`。
 实测在此环境下 agent-browser daemon 启动/连接 Chrome 全部失败（`CDP response channel closed`
 / `Connection reset without closing handshake`），**与 batch 无关，是 daemon 的本地 CDP
 WebSocket 被代理拦截**。清除代理环境变量后 connect/eval/batch 全部正常。

@@ -2,7 +2,7 @@
 
 ## 背景
 
-正常发布 step 6（`scripts/release.mjs`）与覆盖发布（`scripts/release-overwrite.mjs`）把三个变体 APK 一次性交给单条 `gh release upload <tag> --repo <repo> --clobber ...`，脚本层只有一个聚合 spinner「上传 APK (第 x 次)」；任一包失败时整批重传（含已成功的包）。实测（v4.4.0，2026-08-06，代理 127.0.0.1:10808）一次成功上传 86MB 耗时 **456s**（出口约 190KB/s）：失败重试的代价是整批 86MB 重来，且界面无法定位是哪个包慢或卡住。
+正常发布 step 6（`scripts/release.mjs`）与覆盖发布（`scripts/release-overwrite.mjs`）把三个变体 APK 一次性交给单条 `gh release upload <tag> --repo <repo> --clobber ...`，脚本层只有一个聚合 spinner「上传 APK (第 x 次)」；任一包失败时整批重传（含已成功的包）。实测（v4.4.0，2026-08-06，代理 127.0.0.1:7897）一次成功上传 86MB 耗时 **456s**（出口约 190KB/s）：失败重试的代价是整批 86MB 重来，且界面无法定位是哪个包慢或卡住。
 
 ## 决策
 
@@ -27,5 +27,5 @@
 
 ## 关联
 
-- 实测数据：v4.4.0 上传 456s（代理 127.0.0.1:10808）
+- 实测数据：v4.4.0 上传 456s（代理 127.0.0.1:7897）
 - 术语：packages/app/CONTEXT.md（发布上传）

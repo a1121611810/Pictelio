@@ -60,7 +60,7 @@
  * ── 前置条件 ────────────────────────────────────────────────────────────
  * - AVD `pictelio_ui`（1080×2160 / density 480 / WebView 113），坐标常量绑定该
  *   规格（`assertDeviceGeometry` 快速失败防漂移）；flavor=webview 时整文件 skip。
- * - 设备全局代理（`ANDROID_E2E_HTTP_PROXY=10.0.2.2:10808`）：模拟器 DNS 被污染，
+ * - 设备全局代理（`ANDROID_E2E_HTTP_PROXY=10.0.2.2:7897`）：模拟器 DNS 被污染，
  *   不设代理则推荐流与图片都拉不到（实测）。
  * - 登录：`setupAndroidE2e` 的 `pm clear` 会清掉 Keystore 里的 refresh_token，
  *   故先按 fab 回归同款流程在 **webview 侧**注入 token 登录（`loginViaWebview`），
@@ -575,7 +575,7 @@ function dumpLogcat(tag: string): void {
 // ─── host 侧直连 Pixiv（独立 oracle；凭据全部取自仓库既有文件）──
 
 function hostProxy(): string {
-  return process.env.HTTPS_PROXY ?? process.env.https_proxy ?? "http://127.0.0.1:10808";
+  return process.env.HTTPS_PROXY ?? process.env.https_proxy ?? "http://127.0.0.1:7897";
 }
 
 function pixivCredentials(): { clientId: string; clientSecret: string } {

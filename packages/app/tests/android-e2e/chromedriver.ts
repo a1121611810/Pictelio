@@ -8,7 +8,7 @@
  * 若 uiautomator2-driver 自带的 chromedriver 目录无匹配二进制 → 通过代理 curl
  * 下载对应版本 zip 并解压到该目录，Appium 扫描本地即可复用，不再走网络。
  *
- * 依赖的 zip URL 走 googleapis，本机必须能访问代理（如 127.0.0.1:10808）。
+ * 依赖的 zip URL 走 googleapis，本机必须能访问代理（如 127.0.0.1:7897）。
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";

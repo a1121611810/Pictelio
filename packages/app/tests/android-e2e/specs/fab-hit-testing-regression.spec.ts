@@ -17,7 +17,7 @@
  * 1. `adb shell input text` 会截断/吞字符长 token——实测输入框只落了 43 字符
  *    （refresh_token 实际 ~100+），歪 token 发不出有效请求，登录必然失败；
  * 2. pictelio_low 的 DNS 普遍被污染（解到被墙 IP，app-api.pixiv.net TCP 15s 超时）；
- *    宿主代理（10.0.2.2:10808）可用，见 setup.ts 的 ANDROID_E2E_HTTP_PROXY。
+ *    宿主代理（10.0.2.2:7897）可用，见 setup.ts 的 ANDROID_E2E_HTTP_PROXY。
  * 故改用跨引擎登录态共享（既有设计，#126/#127：webview 侧登录写入 WSSecureStorage 后，
  * pictelio_client_kind=lynx 重启进 LynxActivity 会恢复登录态渲染主界面；
  * 「Lynx 侧完整 UI 操作在当前 SDK 下不可自动化……用日志/契约层兜底」为仓库既有约定）：

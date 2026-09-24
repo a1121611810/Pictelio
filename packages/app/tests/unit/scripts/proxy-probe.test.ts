@@ -56,14 +56,14 @@ describe("probeProxyRouting", () => {
   });
 
   it("HTTPS_PROXY 配置且 NO_PROXY 未覆盖 → 代理", () => {
-    const r = probeProxyRouting(uploads, { HTTPS_PROXY: "http://127.0.0.1:10808" });
+    const r = probeProxyRouting(uploads, { HTTPS_PROXY: "http://127.0.0.1:7897" });
     expect(r.mode).toBe("proxy");
-    expect(r.proxyUrl).toBe("http://127.0.0.1:10808");
+    expect(r.proxyUrl).toBe("http://127.0.0.1:7897");
   });
 
   it("NO_PROXY=github.com 命中子域 → 直连（研究关键推论）", () => {
     const r = probeProxyRouting(uploads, {
-      HTTPS_PROXY: "http://127.0.0.1:10808",
+      HTTPS_PROXY: "http://127.0.0.1:7897",
       NO_PROXY: "github.com",
     });
     expect(r.mode).toBe("direct");
@@ -72,7 +72,7 @@ describe("probeProxyRouting", () => {
 
   it("NO_PROXY=api.github.com,uploads.github.com 精确域名 → 直连", () => {
     const r = probeProxyRouting(uploads, {
-      HTTPS_PROXY: "http://127.0.0.1:10808",
+      HTTPS_PROXY: "http://127.0.0.1:7897",
       NO_PROXY: "api.github.com,uploads.github.com",
     });
     expect(r.mode).toBe("direct");
@@ -81,15 +81,15 @@ describe("probeProxyRouting", () => {
 
   it("NO_PROXY 只含 api.github.com → uploads 仍走代理", () => {
     const r = probeProxyRouting(uploads, {
-      HTTPS_PROXY: "http://127.0.0.1:10808",
+      HTTPS_PROXY: "http://127.0.0.1:7897",
       NO_PROXY: "api.github.com",
     });
     expect(r.mode).toBe("proxy");
-    expect(r.proxyUrl).toBe("http://127.0.0.1:10808");
+    expect(r.proxyUrl).toBe("http://127.0.0.1:7897");
   });
 
   it("NO_PROXY=* → 直连", () => {
-    const r = probeProxyRouting(uploads, { HTTPS_PROXY: "http://127.0.0.1:10808", NO_PROXY: "*" });
+    const r = probeProxyRouting(uploads, { HTTPS_PROXY: "http://127.0.0.1:7897", NO_PROXY: "*" });
     expect(r.mode).toBe("direct");
   });
 
@@ -108,12 +108,12 @@ describe("probeProxyRouting", () => {
     expect(r.proxyUrl).toBe("http://127.0.0.1:10809");
     // HTTPS_PROXY 优先于 ALL_PROXY
     const r2 = probeProxyRouting(uploads, {
-      HTTPS_PROXY: "http://127.0.0.1:10808",
+      HTTPS_PROXY: "http://127.0.0.1:7897",
       ALL_PROXY: "http://127.0.0.1:10809",
     });
-    expect(r2.proxyUrl).toBe("http://127.0.0.1:10808");
+    expect(r2.proxyUrl).toBe("http://127.0.0.1:7897");
     // HTTP_PROXY 不参与 https 目标判定（uploads 是 https）
-    expect(probeProxyRouting(uploads, { HTTP_PROXY: "http://127.0.0.1:10808" }).mode).toBe(
+    expect(probeProxyRouting(uploads, { HTTP_PROXY: "http://127.0.0.1:7897" }).mode).toBe(
       "direct",
     );
   });
@@ -125,7 +125,7 @@ describe("describeUploadRouting", () => {
   });
   it("代理描述含代理地址", () => {
     expect(
-      describeUploadRouting("uploads.github.com", { HTTPS_PROXY: "http://127.0.0.1:10808" }),
-    ).toContain("http://127.0.0.1:10808");
+      describeUploadRouting("uploads.github.com", { HTTPS_PROXY: "http://127.0.0.1:7897" }),
+    ).toContain("http://127.0.0.1:7897");
   });
 });

@@ -193,7 +193,7 @@ describe("classifyError", () => {
     });
     expect(err.type).toBe(ApiErrorType.PROXY);
     expect(err.message).toContain("代理");
-    expect(err.message).toContain("127.0.0.1:10808");
+    expect(err.message).toContain("127.0.0.1:7897");
   });
 
   it("returns PROXY type even when status suggests SERVER", async () => {

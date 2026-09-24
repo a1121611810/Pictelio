@@ -29,7 +29,7 @@ const proxyUrl =
   process.env.HTTPS_PROXY ||
   process.env.http_proxy ||
   process.env.HTTP_PROXY ||
-  "http://127.0.0.1:10808";
+  "http://127.0.0.1:7897";
 // 脱敏：代理 URL 可能含 user:pass 凭据（含 scheme-less / protocol-relative 格式），
 // 日志只打印主机部分。逻辑与 app-lynx 的 src/utils/proxyRedact.ts 一致。
 const redactProxyUrl = (url: string): string => {

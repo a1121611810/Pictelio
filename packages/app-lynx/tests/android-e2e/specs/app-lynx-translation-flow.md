@@ -14,7 +14,7 @@
 - 模拟器：API 34 (Android 14) Apple Silicon — `Pixel 6` profile
 - 真机（备份）：Pixel 6 / 小米 13
 - 真实 LLM endpoint：OpenAI gpt-5 / DeepSeek-V4（备）
-- 网络：海外代理（`https_proxy` / `HTTPS_PROXY`，回退 `http://127.0.0.1:10808`）
+- 网络：海外代理（`https_proxy` / `HTTPS_PROXY`，回退 `http://127.0.0.1:7897`）
 - Pixel env：`packages/app-lynx/.env` 的 `PIXIV_REFRESH_TOKEN` / `DEEPSEEK_API_KEY`（**不要 echo**）
 - Dev hook：`BENCH_NAV=1 NODE_ENV=production pnpm --dir packages/app-lynx run build` 后 `pnpm --dir packages/app/android run build:android:debug`
 

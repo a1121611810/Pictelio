@@ -70,7 +70,7 @@ let illustId = "";
 // ─── host 侧直连 Pixiv（独立 oracle；凭据取仓库既有 credentials.json5，不硬编码）──
 
 function hostProxy(): string {
-  return process.env.HTTPS_PROXY ?? process.env.https_proxy ?? "http://127.0.0.1:10808";
+  return process.env.HTTPS_PROXY ?? process.env.https_proxy ?? "http://127.0.0.1:7897";
 }
 
 function pixivCredentials(): { clientId: string; clientSecret: string } {

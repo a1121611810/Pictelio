@@ -27,7 +27,7 @@
  *
  * 前置：`BENCH_NAV=1 pnpm build:android`（整链注入，见 README benchNav 节——
  * build:android 内部重跑 lynx build，单独注入会被覆盖）；设备全局代理按需
- * （ANDROID_E2E_HTTP_PROXY=10.0.2.2:10808，DNS 污染环境必备）；PIXIV_REFRESH_TOKEN。
+ * （ANDROID_E2E_HTTP_PROXY=10.0.2.2:7897，DNS 污染环境必备）；PIXIV_REFRESH_TOKEN。
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";

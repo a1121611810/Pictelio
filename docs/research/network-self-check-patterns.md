@@ -100,7 +100,7 @@
 | | 内容 |
 |---|---|
 | **测什么** | 系统是否处于 VPN（`TRANSPORT_VPN`）；本地代理端口是否在监听；经代理的 CONNECT 隧道是否可用 |
-| **用什么技术测** | Android `NetworkCapabilities` 的 `TRANSPORT_VPN`（[官方文档](https://developer.android.com/reference/android/net/NetworkCapabilities)）；本地端口探测；隧道内一次轻量 HTTP。<br>**Pictelio 已有实现**：`classifyError` 对本地代理失败有专门分支，文案为"本地代理连接失败（127.0.0.1:10808），请检查代理软件是否运行"（`packages/app/src/api/client.ts:152`）。 |
+| **用什么技术测** | Android `NetworkCapabilities` 的 `TRANSPORT_VPN`（[官方文档](https://developer.android.com/reference/android/net/NetworkCapabilities)）；本地端口探测；隧道内一次轻量 HTTP。<br>**Pictelio 已有实现**：`classifyError` 对本地代理失败有专门分支，文案为"本地代理连接失败（127.0.0.1:7897），请检查代理软件是否运行"（`packages/app/src/api/client.ts:152`）。 |
 | **失败时给用户看什么** | 明确"你的代理软件没在运行"——这是**唯一能把责任正确交还用户**的一层；反之代理开着仍失败，就不该说"检查你的网络"。 |
 | **产品实例** | Telegram 代理 **Check Status**（Checking/Warning，并提示会向代理管理员暴露 IP，见 1.12）；Chrome NetLog 的 `PAC_FILE_DECIDER` / `PROXY_RESOLUTION_SERVICE` / `SOCKS5_CONNECT`（见 5.6）。 |
 

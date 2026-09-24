@@ -20,7 +20,7 @@ describe("i18n 原型（@solid-primitives/i18n）", () => {
     await vi.waitFor(() => {
       expect(t("error.action.retry")).toBe("Retry");
     });
-    expect(t("error.hint.proxy")).toBe("Make sure the local proxy 127.0.0.1:10808 is running");
+    expect(t("error.hint.proxy")).toBe("Make sure the local proxy 127.0.0.1:7897 is running");
     expect(currentLocale()).toBe("en");
   });
 

@@ -186,7 +186,7 @@ gallery-dl#9331 <https://github.com/mikf/gallery-dl/issues/9331>）：
 **可操作错误指引（Actionable Error Guidance）**：
 错误 UI 中根据 `ApiError.type` 渲染的、告诉用户具体该做什么的提示文字和按钮组合。例如：
 
-- `PROXY` → "请检查本地代理 127.0.0.1:10808 是否运行"
+- `PROXY` → "请检查本地代理 127.0.0.1:7897 是否运行"
 - `NETWORK` → "请检查网络连接"
 - `UNAUTHORIZED` → "请重新登录"
 

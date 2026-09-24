@@ -1,6 +1,6 @@
 # vue-lynx 性能基准与 IFR 文档总结（统一基准矩阵 / VDOM vs Vapor / IFR）
 
-> 记录日期：2026-08-07（实测抓取，走代理 `http://127.0.0.1:10808`，大陆直连超时）
+> 记录日期：2026-08-07（实测抓取，走代理 `http://127.0.0.1:7897`，大陆直连超时）
 > 来源（vue-lynx 官方文档站 Vercel 预览部署，Rspress；`.md` 后缀会 404，须去掉后缀访问）：
 > - 统一基准矩阵：<https://vue-lynx-git-vapor-huxpros-projects.vercel.app/zh/guide/benchmark-unified>（正文含完整数据页 <https://vue-lynx-git-vapor-huxpros-projects.vercel.app/benchmark/unified.html>）
 > - 框架测试 VDOM vs Vapor：<https://vue-lynx-git-vapor-huxpros-projects.vercel.app/zh/guide/benchmark-vapor>
@@ -255,7 +255,7 @@ Lynx for Web 上几乎不挪动 e2e（DOM 构建占主导）；**native 上载�
 4. **代价预算**：gzip ×2.2、MT 段 +78–195 KiB、TTI 上界 ×1.36；首帧收益预期带 **−12%…−19%**（不是常数），4× 重节流 + 大 bundle 时可能反转——上线前在目标设备实测。
 5. **交互性能（收藏动画、下拉刷新、点击反馈）别指望 IFR/ET**——它们是首帧/内存杠杆；交互杠杆是 Vapor（点状更新 8.3×）或主线程方案（见 [[lynx-touch-fx-reference]]）。
 6. **首屏优化先量静态占比**：block/code 模板收益随首屏静态子树占比缩放；动态 v-for 主导的屏（如推荐瀑布流）模板收益 ≈ 噪声。
-7. 文档站访问注意：`vue.lynxjs.org` 大陆不可达，Vercel 预览部署 `.md` 后缀会 404，须去掉后缀；均走代理 `http://127.0.0.1:10808`。
+7. 文档站访问注意：`vue.lynxjs.org` 大陆不可达，Vercel 预览部署 `.md` 后缀会 404，须去掉后缀；均走代理 `http://127.0.0.1:7897`。
 
 **复现命令**（如后续需要自行复测）：
 ```bash
@@ -278,7 +278,7 @@ pnpm --filter vue-lynx-ifr-bench run check && pnpm --filter vue-lynx-ifr-bench r
 ### 6.1 方法
 
 - **环境**：pictelio_ui（Android 34 arm64）、pictelio_low（Android 9 API 28），
-  均窗口模式 + swiftshader 软件渲染，`http_proxy=10.0.2.2:10808` 访问 Pixiv。
+  均窗口模式 + swiftshader 软件渲染，`http_proxy=10.0.2.2:7897` 访问 Pixiv。
 - **4 个 APK 变体**：IFR off/on × 原始 router（默认登录页）/ 乐观 router（默认推荐页）。
 - **Splash 开关**：LynxActivity 临时加 `pictelio_splash` SharedPreferences 开关
   （仅控制 `setKeepOnScreenCondition` 是否保持到 bundle 加载完；Android 12+ 系统 splash 本身强制显示）。

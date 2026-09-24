@@ -4,7 +4,7 @@
 > 按 codebase-design 深化 → prototype 自行验证 → 四维打分选型流程执行。
 > **原型分支（throwaway，留档作 oracle）**：`prototype/ugoira-playback-fix`（commit `770de17`）。
 > 环境：`pictelio_ui`（emulator-5556，android-34，WebView 113，Lynx 4.0.1，720x1280@320dpi）；
-> 代理 `10.0.2.2:10808`；作品：148861562（52 帧 ugoira，lynx 侧）/ 149104861（12.9MB zip、406 帧，app 侧）。
+> 代理 `10.0.2.2:7897`；作品：148861562（52 帧 ugoira，lynx 侧）/ 149104861（12.9MB zip、406 帧，app 侧）。
 
 ## 一、P1：lynx 播放闪烁 —— 候选验证（呈现层，4 变体）
 

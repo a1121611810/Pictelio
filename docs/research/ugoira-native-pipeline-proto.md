@@ -11,7 +11,7 @@
 |---|---|
 | 模拟器 | `pictelio_ui`（emulator-5556，android-34，WebView 113） |
 | APK | full flavor debug（`assembleFullDebug`，含 lynx bundle 296KB） |
-| 网络 | 模拟器 `settings put global http_proxy 10.0.2.2:10808`（宿主代理） |
+| 网络 | 模拟器 `settings put global http_proxy 10.0.2.2:7897`（宿主代理） |
 | 作品 | 148861562（issue #218 复现作品，ugoira，52 帧） |
 | 登录 | `PIXIV_REFRESH_TOKEN`（本机 zshrc）adp input 注入 |
 

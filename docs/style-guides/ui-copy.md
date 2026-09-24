@@ -15,7 +15,7 @@
 | R4 | **避免客套词**（please / thank you / sorry）：直接说明发生了什么、下一步做什么 | `Check your network connection` | `Please check your network connection` |
 | R5 | **单句提示不加句尾句号**（UI fragment）；多句提示按句加句号 | `Session expired. Sign in again` | `Session expired, please sign in again` |
 | R6 | **不用逗号粘连两个独立句**（comma splice），拆成两句或用句号 | `Too many requests. Try again later` | `Too many requests, please try again later` |
-| R7 | **避免行话与内部概念**：说用户目标，不说实现（代理/引擎等面向高级用户的设置页除外，此时用用户认知的词） | `Make sure the local proxy 127.0.0.1:10808 is running`（高级设置场景可接受） | `SOCKS5 endpoint unreachable (ECONNREFUSED)` |
+| R7 | **避免行话与内部概念**：说用户目标，不说实现（代理/引擎等面向高级用户的设置页除外，此时用用户认知的词） | `Make sure the local proxy 127.0.0.1:7897 is running`（高级设置场景可接受） | `SOCKS5 endpoint unreachable (ECONNREFUSED)` |
 | R8 | **语言自动名（autonym）不翻译**：语言选择器里 `简体中文` / `English` 恒以本名显示 | — | `Simplified Chinese`（作为选择器选项文本） |
 | R9 | **插值占位符**用 `{{name}}`，占位符名用 camelCase；译文不得增删占位符 | `{{count}} results` | `{count} results` |
 

@@ -162,7 +162,7 @@ export function classifyError(status: number, error: unknown, responseBody?: unk
   ) {
     return {
       type: ApiErrorType.PROXY,
-      message: "本地代理连接失败（127.0.0.1:10808），请检查代理软件是否运行",
+      message: "本地代理连接失败（127.0.0.1:7897），请检查代理软件是否运行",
       messageKey: "error.api.proxy",
     };
   }

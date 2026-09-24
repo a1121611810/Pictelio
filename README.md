@@ -75,7 +75,7 @@ pnpm install
 pnpm dev          # Vite dev server at localhost:5173
 ```
 
-> Web dev needs an HTTP proxy to reach Pixiv. The project reads `https_proxy` / `HTTP_PROXY` env vars and falls back to `http://127.0.0.1:10808`.
+> Web dev needs an HTTP proxy to reach Pixiv. The project reads `https_proxy` / `HTTP_PROXY` env vars and falls back to `http://127.0.0.1:7897`.
 
 ```
 https_proxy=http://127.0.0.1:7890 pnpm dev

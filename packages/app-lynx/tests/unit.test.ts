@@ -501,11 +501,11 @@ describe('proxyRedact.redactProxyUrl（代理凭据脱敏）', () => {
   })
 
   it('scheme-less 无凭据 host:port 正常', () => {
-    expect(redactProxyUrl('127.0.0.1:10808')).toBe('http://127.0.0.1:10808')
+    expect(redactProxyUrl('127.0.0.1:7897')).toBe('http://127.0.0.1:7897')
   })
 
   it('无凭据完整 URL 保留 protocol+host', () => {
-    expect(redactProxyUrl('http://127.0.0.1:10808')).toBe('http://127.0.0.1:10808')
+    expect(redactProxyUrl('http://127.0.0.1:7897')).toBe('http://127.0.0.1:7897')
   })
 
   it('输出中绝不含 userinfo 片段', () => {

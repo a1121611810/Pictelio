@@ -48,7 +48,7 @@ export async function setupAndroidE2e(avdName?: string): Promise<AndroidE2eConte
   const { avd, serial } = await ensureEmulator(requestedAvd);
   assertDeviceOnline(serial);
 
-  // 可选设备全局代理（ANDROID_E2E_HTTP_PROXY，如 10.0.2.2:10808 = 宿主 v2ray）。
+  // 可选设备全局代理（ANDROID_E2E_HTTP_PROXY，如 10.0.2.2:7897 = 宿主 v2ray）。
   // 默认不设、对他人环境零影响；由运行方按网络环境显式提供——典型场景：宿主直连
   // pixiv 受限（模拟器 DNS 被污染、app-api.pixiv.net TCP 超时），设备走宿主代理后
   // API 立即可达（2026-09-14 fab spec 诊断实测）。teardown 统一 `settings delete`

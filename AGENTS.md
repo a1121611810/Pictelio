@@ -289,7 +289,7 @@ Grill 澄清 → to-spec → to-tickets → implement
 - **Lint / 格式化**：`vite-plus` 内置 oxlint / oxfmt，配置在 `vite.config.ts` 的 `lint` / `fmt` 字段（oxlint：typescript/unicorn/oxc 插件，correctness=error；忽略 dist/、android/、node_modules/、.codegraph/）
 - **Android**：`minSdkVersion = 28`（`variables.gradle`）；自定义 Capacitor 插件在 `MainActivity.java` 经 `registerPlugin()` 注册（**必须在 `super.onCreate()` 之前**）；平台要求 / WebView 门槛 / 引擎降级矩阵 → `docs/platform-compatibility.md`
 - **发布签名**：Release 用 `android/app/pictelio-release.keystore`，密码经环境变量注入，keystore 禁止提交 → `docs/release-signing.md`
-- **代理配置**：开发时自动读取 `https_proxy` / `HTTPS_PROXY` / `http_proxy` / `HTTP_PROXY`，回退 `http://127.0.0.1:10808`
+- **代理配置**：开发时自动读取 `https_proxy` / `HTTPS_PROXY` / `http_proxy` / `HTTP_PROXY`，回退 `http://127.0.0.1:7897`
 - **Node**：22.22.2+（ADR-0080），pnpm 11.9.0（`devEngines` 强制校验）
 
 ## 测试
