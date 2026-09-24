@@ -113,9 +113,7 @@ describe("probeProxyRouting", () => {
     });
     expect(r2.proxyUrl).toBe("http://127.0.0.1:7897");
     // HTTP_PROXY 不参与 https 目标判定（uploads 是 https）
-    expect(probeProxyRouting(uploads, { HTTP_PROXY: "http://127.0.0.1:7897" }).mode).toBe(
-      "direct",
-    );
+    expect(probeProxyRouting(uploads, { HTTP_PROXY: "http://127.0.0.1:7897" }).mode).toBe("direct");
   });
 });
 

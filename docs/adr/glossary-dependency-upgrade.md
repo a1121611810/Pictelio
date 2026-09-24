@@ -1,6 +1,7 @@
 # 依赖升级评估 — 术语表
 
 > 范围：2026-08 全 workspace 依赖盘点中使用的评估策略、供应链约束与升级决策术语。配套 ADR：[ADR-0080-dependency-upgrade-analysis.md](./ADR-0080-dependency-upgrade-analysis.md)。
+> 2026-09-25 起新增「执行批次」术语（文末），配套 [ADR-0184-dependency-upgrade-execution-2026-09.md](./ADR-0184-dependency-upgrade-execution-2026-09.md)。
 
 ## 核心术语
 
@@ -37,3 +38,16 @@
 - **T1 锁定 ≠ 冷却期豁免**：`minimumReleaseAgeExclude` 既是「新包冷却」的豁免（免于 24h 等待），也是「已验证版本」的刻意锁定；解除需决策。
 - **`devEngines` 下限 ≠ 运行时 Node 要求**：`devEngines` 是开发/安装期契约（CI 与本机），jsdom 30 抬的是它；运行时（Android WebView / 构建产物）不受影响。
 - **TS7 的 `types` 默认 `[]` ≠ 显式 `"types": []`**：ugoira/update-check 已显式声明空数组，行为与 TS7 默认一致（不受影响）；app 未声明 `types` 字段，TS7 下会丢失 `@types/*` 自动引入（受影响）。
+
+## 执行批次术语（2026-09-25）
+
+| 术语 | 定义 |
+|------|------|
+| **执行批次（Execution batch）** | ADR-0080 评估批次的后续动作批次：把「建议升级」清单实际落地。与评估批次的区别 = 改动 `package.json` + lockfile 并跑全量门禁，而非只产出决策记录。 |
+| **生态 peer 卡点（Ecosystem peer block）** | 目标版本自身可装，但生态位上游（本仓库无法升级的锚点包）的 `peerDependencies` 拒绝其依赖线，强行升级会破坏构建。暂缓的最硬证据形态；触发条件写明「锚点包发版解卡」。 |
+| **vue-lynx 锚点（vue-lynx anchor）** | `vue-lynx@0.5.1`（npm 最新版，2026-09-25 核实）peer 锁 `@rsbuild/core ^1.0.0` + `@rsbuild/plugin-vue ^1.2.6`，把 lynx 构建线整体锚死在 rsbuild 1——rspeedy 0.17 / plugin-vue 2.0 / web-core 0.26 均因此暂缓。 |
+| **rc 线同批升级（Prerelease-line co-bump）** | 同一 prerelease 线的多个包必须同批升级（如 solid-js rc.9 + @solidjs/web rc.9 + @solidjs/router next.27 + @solidjs/vite-plugin next.44，后者 peer 前者 ≥rc.9）。拆开单升必挂。另注意：prerelease 不占 `latest` tag，`pnpm outdated` 会**漏报**，须 `pnpm view <pkg> versions` 兜底核实；同线内选版还须过 `minimumReleaseAge` 冷却（router next.28 即因此落 next.27）。 |
+| **门禁兜底试升（Gated trial upgrade）** | 无生态死锁的 major（vitest 5 / TS 7 / vue-router 5）采用的策略：直接升 + 全量门禁（check:all / lint:all / test:all）验证；门禁红且一轮修复内不能收敛 → 回退现版本并在 ADR 记录触发条件。 |
+| **engines 兼容上限（Engines ceiling）** | devDependency 的 `engines.node` 高于 CI Node 基线（当前 22）时的封顶约束。本批次实例：agent-browser ≥0.35 全线要求 node ≥24 → 定格 0.34.0，触发 = CI 升 Node 24。 |
+| **CI Node 基线（CI Node baseline）** | `.github/workflows/ci.yml` 的 `node-version: 22`（本机 24.18 不代表 CI）。所有 devDependency 升级的 engines 核验以 22 为准。 |
+| **vp 内嵌测试器（vp bundled runner）** | app 的 `vp test` 走 vite-plus 内嵌测试链路；`package.json` 里的 `vitest` devDep 只服务直跑入口（`test:agent-browser` / `test:android:e2e` / 各 core 包 `vitest run`）。升 vitest 5 后两条链路须分别验证。 |

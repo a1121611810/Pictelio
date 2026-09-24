@@ -12,6 +12,7 @@
     "verbatimModuleSyntax": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
+    "types": ["node"],
     "paths": { "@/*": ["./src/*"] }
   },
   "include": ["src", "tests/android-e2e"]

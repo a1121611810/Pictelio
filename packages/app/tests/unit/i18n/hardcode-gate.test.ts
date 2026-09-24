@@ -5,7 +5,10 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import ts from "typescript";
+// TS7（tsgo 原生编译器）主入口不再携带编译器 JS API（仅剩 version 存根）。
+// 本门禁依赖 createSourceFile/ScriptKind 等完整 API，经 npm alias 钉在 TS6：
+// 别名 "typescript-compiler-api" 声明在 packages/app/package.json devDependencies。
+import ts from "typescript-compiler-api";
 
 const SRC = path.resolve(__dirname, "../../../src");
 const WHITELIST = JSON.parse(
