@@ -51,7 +51,7 @@ ADR-0080 以「均衡评估」盘点全 workspace 依赖：patch/minor 建议升
 |---|---|---|
 | vitest（7 包直跑） | 4.1.10 → **5.0.1**；**app 除外**，定格 ^4.1.10（执行期修订，见下） | engines ^22.12 ✓；peer vite ^8 ✓；stryker-vitest-runner@10 peer `>=2.0.0` ✓（ugoira mutation 实测通过）。**执行期发现 `vite-plus@0.2.8` 硬依赖 `vitest@4.1.10`（dependencies 非 peer）**：app 的 `vp test` 走 vp 内嵌 4.1.10，外部 devDep 若升 5 只会制造双实例 peer 警告——app 的 vitest 与 vp 绑定，vp 1.0（批次 E 触发）时统一。 |
 | vue-router（app-lynx） | 4.6.4 → **5.3.1** | peer vue ^3.5.34 ✓、pinia ^4 ✓；路由守卫 760 单测兜底 |
-| typescript（app + 6 纯逻辑包） | 6.0.3 / 5.9.3 → **7.0.2** | app 需显式 `"types"` 应对 TS7 默认 `[]`（ADR-0080 已识别）；core 包已显式 `types: []` 不受影响；**app-lynx 除外**（见 D5） |
+| typescript（app + 6 纯逻辑包） | 6.0.3 / 5.9.3 → **7.0.2** | app 需显式 `"types": ["node"]` 应对 TS7 默认 `[]`（ADR-0080 已识别）；core 包已显式 `types: []` 不受影响；**app-lynx 除外**（见 D5）。**执行期发现**：TS7 npm 包主入口只剩版本存根（tsgo 原生编译器不再携带编译器 JS API，`exports` 仅 version + unstable 子路径）——app 的 i18n 回潮门禁（P1 防线）依赖 `createSourceFile`/`ScriptKind` 完整 API，经 npm alias `typescript-compiler-api: npm:typescript@^6.0.3` 钉 TS6，门禁逻辑零改动；全仓仅 2 处消费（双端 hardcode-gate 测试，lynx 侧保持 5.9 不受影响） |
 
 **D4 · engines 封顶暂缓（批次 E-1）**：
 

@@ -4,7 +4,7 @@
 
 ## 项目概览
 
-- **技术栈**: SolidJS 2.0（rc）+ TypeScript 6.0 (strict) + Vite 8.3 + UnoCSS 66.10 + Capacitor 8.5；小说正文布局用 `@chenglou/pretext`
+- **技术栈**: SolidJS 2.0（rc）+ TypeScript 7.0 (strict) + Vite 8.3 + UnoCSS 66.10 + Capacitor 8.5；小说正文布局用 `@chenglou/pretext`
 - **Monorepo**: pnpm workspace 五子包：`pictelio-app`（SolidJS 主体）/ `pictelio-app-lynx` / `@pictelio/ugoira` / `@pictelio/update-check` / `pictelio-website`
 - **入口**: `packages/app/src/main.tsx`（settings 同步、Fluent 主题、渲染、auth 恢复）→ `App.tsx` → `router.tsx`（路由定义与 App 分离）
 - **设计系统**: `pictelio-app` **强制**遵循 Microsoft Fluent Design System 2（详见「Fluent Design 规范」）；`pictelio-app-lynx` 使用 Material Design 3（见「约定」app-lynx 样式）
