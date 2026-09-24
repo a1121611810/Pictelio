@@ -49,7 +49,7 @@ ADR-0080 以「均衡评估」盘点全 workspace 依赖：patch/minor 建议升
 
 | 包 | 从 → 到 | 约束核实 |
 |---|---|---|
-| vitest（8 包） | 4.1.10 → **5.0.1** | engines ^22.12 ✓；peer vite ^8 ✓；stryker-vitest-runner@10 peer `>=2.0.0` ✓；`vp test`（vp 内嵌）与外部 `vitest run`（agent-browser / android-e2e / core 包）两条链路分别验证 |
+| vitest（7 包直跑） | 4.1.10 → **5.0.1**；**app 除外**，定格 ^4.1.10（执行期修订，见下） | engines ^22.12 ✓；peer vite ^8 ✓；stryker-vitest-runner@10 peer `>=2.0.0` ✓（ugoira mutation 实测通过）。**执行期发现 `vite-plus@0.2.8` 硬依赖 `vitest@4.1.10`（dependencies 非 peer）**：app 的 `vp test` 走 vp 内嵌 4.1.10，外部 devDep 若升 5 只会制造双实例 peer 警告——app 的 vitest 与 vp 绑定，vp 1.0（批次 E 触发）时统一。 |
 | vue-router（app-lynx） | 4.6.4 → **5.3.1** | peer vue ^3.5.34 ✓、pinia ^4 ✓；路由守卫 760 单测兜底 |
 | typescript（app + 6 纯逻辑包） | 6.0.3 / 5.9.3 → **7.0.2** | app 需显式 `"types"` 应对 TS7 默认 `[]`（ADR-0080 已识别）；core 包已显式 `types: []` 不受影响；**app-lynx 除外**（见 D5） |
 
