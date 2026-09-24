@@ -2,7 +2,7 @@
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'novels' })
 import { computed, ref, onMounted, onUnmounted } from 'vue'
-import { navigate } from '../router'
+import { openNovel } from '../utils/novelNavigation'
 import { loadRecommendedNovels, loadFollow, loadNovelNext } from '../api/novel'
 import type { PixivNovel, PixivNovelListResponse } from '../api/types'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
@@ -137,7 +137,7 @@ function switchMode(m: 'recommend' | 'follow') {
 }
 
 function openDetail(id: number) {
-  void navigate(`/novel/${id}/intro`) // 三段式：先进介绍页（票 #588）
+  openNovel(id) // 小说导航缝隙（ADR-0183）：介绍页先行可经设置关闭
 }
 
 /** 标签点击 → 全局搜索弹层（原始 tag.name，ADR-0133；同 Recommended.vue 语义） */

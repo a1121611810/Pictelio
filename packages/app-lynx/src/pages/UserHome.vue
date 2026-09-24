@@ -5,6 +5,7 @@
 // 实例（切回已加载 tab 不重新请求，对齐原「按需加载一次」行为）。
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { currentParams, navigate, goBack } from '../router'
+import { openNovel } from '../utils/novelNavigation'
 import { getUserDetail } from '../api/user'
 import { loadUserIllusts, loadNext } from '../api/illust'
 import { loadUserNovels, loadNovelNext } from '../api/novel'
@@ -214,9 +215,7 @@ function switchTab(tab: 'illust' | 'novel') {
 function openIllust(id: number) {
   void navigate(`/illust/${id}`)
 }
-function openNovel(id: number) {
-  void navigate(`/novel/${id}/intro`) // 三段式：先进介绍页（票 #588）
-}
+// 小说导航走 openNovel 缝隙（ADR-0183，见 utils/novelNavigation.ts）：介绍页先行可经设置关闭
 
 // 图片区点击（spec：列表交互）：受限条目（R18/R18G 且开关关闭）不跳详情，其余进详情。
 // 外层 .stop 继续保证遮罩点击不穿透；RestrictOverlay 自身 @tap="swallow" 双保险。

@@ -2,7 +2,8 @@
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'watchlist' })
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
-import { navigate, goBack } from '../router'
+import { goBack } from '../router'
+import { openNovel } from '../utils/novelNavigation'
 import { useModalStack } from '../stores/modalStack'
 import {
   loadWatchlistNovels,
@@ -80,10 +81,10 @@ async function loadMore() {
   sync()
 }
 
-/** 决策 D4：直达最新一话（latest_content_id 是作品 id）；三段式改道先进介绍页（票 #588） */
+/** 决策 D4：直达最新一话（latest_content_id 是作品 id）；小说经 openNovel 缝隙导航（ADR-0183，介绍页先行可关） */
 function openLatest(item: WatchlistSeries) {
   if (isWatchlistSeriesMasked(item)) return
-  void navigate(`/novel/${item.latest_content_id}/intro`)
+  openNovel(item.latest_content_id)
 }
 
 // ─── 取消追更（M3 Dialog 二次确认 + createWatchlistToggle 状态机） ───
