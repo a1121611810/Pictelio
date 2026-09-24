@@ -34,7 +34,7 @@ ADR-0167 给 Lynx 端全部六个小说入口（小说列表 / 收藏 / 用户�
 
 ### D4：设置 UI 落点 = `Me.vue`「内容」组新增一行
 
-标题「小说先进介绍页」（i18n `me.content.novelIntroFirst`，zh-CN/en 双语），行级 `@tap` 翻转 + `<M3Switch :checked>`，逐字照 `relatedInjection` 行范式（含 a11y 注册表 key）。webview 端不出现此设置（无介绍页概念）。
+标题「小说先进介绍页」（i18n `me.content.novelIntroFirst`，zh-CN/en 双语）+ 描述键（说明关闭后直达正文语义）。开关行接线照 `relatedInjection` / `rankingEntry` 行范式（行级 `@tap` 翻转 + a11y 注册表 key 单点持有 + `<M3Switch :checked>` 受控绑定）；标题/描述两行式照同页 autoFallback 行先例（spec 要求标题+描述双键）。webview 端不出现此设置（无介绍页概念）。
 
 ### D5：webview 客户端不在范围
 
