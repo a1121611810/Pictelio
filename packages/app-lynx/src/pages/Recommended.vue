@@ -14,6 +14,7 @@
 defineOptions({ name: 'recommended' })
 import { ref, computed, onMounted, onActivated, onUnmounted, watch } from 'vue'
 import { navigate } from '../router'
+import { openNovel } from '../utils/novelNavigation'
 import { loadRecommended, loadNext } from '../api/illust'
 import { loadRecommendedNovels, loadNovelNext } from '../api/novel'
 import type { PixivIllust, PixivNovel } from '../api/types'
@@ -169,11 +170,14 @@ function onIndexChange(index: number) {
 // [真机修复] scrim 抽到页面级遮罩：按当前页索引取当前条目作为遮罩内容（文字不进被平移的 flex-row）
 const currentItem = computed(() => visibleItems.value[currentIndex.value] as MixFeedItem | undefined)
 
-// 详情跳转：按 kind 前缀；受限条目（理论上已被过滤）再加一道守卫。
-// 小说走三段式（票 #588）：先进介绍页 /novel/:id/intro；插画保持直达详情。
+// 详情跳转：按 kind 分流；受限条目（理论上已被过滤）再加一道守卫。
+// 小说经 openNovel 缝隙导航（ADR-0183：介绍页先行可经设置关闭）；插画保持直达详情不变。
 function openItem(item: MixFeedItem) {
-  const prefix = item.kind === 'illust' ? '/illust/' : '/novel/'
-  void navigate(`${prefix}${item.id}${item.kind === 'illust' ? '' : '/intro'}`)
+  if (item.kind === 'illust') {
+    void navigate(`/illust/${item.id}`)
+    return
+  }
+  openNovel(item.id)
 }
 function onSlideTap(item: MixFeedItem) {
   if (!isRestricted(item.data) && !shouldHideByAi(item.data)) openItem(item)

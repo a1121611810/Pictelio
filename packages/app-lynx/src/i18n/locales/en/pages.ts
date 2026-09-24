@@ -248,6 +248,8 @@ const enPages = {
   "me.content.showR18G": "Show R-18G content",
   "me.content.relatedInjection": "Related works injection",
   "me.content.rankingEntry": "Rankings entry",
+  "me.content.novelIntroFirst": "Show novel intro first",
+  "me.content.novelIntroFirstDesc": "When off, tapping a novel goes straight to the text",
   "me.content.ai": "AI works",
   "me.content.aiShow": "Show",
   "me.content.aiMask": "Mask",

@@ -1239,6 +1239,121 @@ describe("settingsStore.rankingEntry（spec #519）", () => {
   })
 })
 
+// novel_intro_first 设备级开关（spec docs/specs/lynx-novel-intro-toggle.md / ADR-0183）：
+// 默认开 = 介绍页先行（ADR-0167 三段式现状）；关闭后六入口点击小说直达正文页。
+// 导航偏好属设备/个人习惯，非账号内容授权 → 设备级（键不带 uid），与 rankingEntry 同范式。
+describe("settingsStore.novelIntroFirst（spec #711 / ADR-0183）", () => {
+  function prefsModule(map: Map<string, string>) {
+    env.native = true
+    env.modules = {
+      PictelioPrefs: {
+        prefsGet: (k: string, cb: (v: string, e: string | null) => void) =>
+          cb(map.has(k) ? JSON.stringify(map.get(k)!) : "", null),
+        prefsSet: (k: string, v: string, cb: (e: string | null) => void) => {
+          map.set(k, v)
+          cb(null)
+        },
+        prefsRemove: (k: string, cb: (e: string | null) => void) => {
+          map.delete(k)
+          cb(null)
+        },
+      },
+    }
+  }
+
+  beforeEach(() => {
+    env.native = false
+    vi.mocked(idbGet).mockReset().mockResolvedValue(null)
+    vi.mocked(idbSet).mockReset().mockResolvedValue(undefined)
+    vi.mocked(idbRemove).mockReset().mockResolvedValue(undefined)
+    setActivePinia(createPinia())
+    store = useSettingsStore()
+  })
+
+  it("默认开启（介绍页先行 = 升级零感知）", () => {
+    expect(store.novelIntroFirst).toBe(true)
+  })
+
+  it("setNovelIntroFirst 持久化到 prefs（键 novel_intro_first，native 路径）", async () => {
+    const map = new Map<string, string>()
+    prefsModule(map)
+    store.setNovelIntroFirst(false)
+    await vi.waitFor(() => expect(map.get("novel_intro_first")).toBe("false"))
+    expect(store.novelIntroFirst).toBe(false)
+  })
+
+  it("loadSettings 从 prefs 恢复持久化开关（未登录也恢复，设备级）", async () => {
+    const map = new Map<string, string>([["novel_intro_first", "false"]])
+    prefsModule(map)
+    userRef().value = null
+    await store.loadSettings()
+    expect(store.novelIntroFirst).toBe(false)
+  })
+
+  it("loadSettings 非法值不覆盖当前值（warn 可见，禁静默降级）", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const map = new Map<string, string>([["novel_intro_first", "bogus"]])
+    prefsModule(map)
+    await store.loadSettings()
+    expect(store.novelIntroFirst).toBe(true)
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("小说介绍页"), "bogus")
+    warnSpy.mockRestore()
+  })
+
+  it("loadSettings 读取失败 → 维持默认 + warn（硬约束 #1/#3）", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    env.native = false
+    vi.mocked(idbGet).mockImplementation(async (key: string) => {
+      if (key === "novel_intro_first") throw new Error("read fail")
+      return null
+    })
+    await store.loadSettings()
+    expect(store.novelIntroFirst).toBe(true)
+    await vi.waitFor(() =>
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("小说介绍页开关加载失败"),
+        expect.anything(),
+      ),
+    )
+    warnSpy.mockRestore()
+  })
+
+  it("prefs 写入失败 → 内存态已更新 + warn 可见（不抛出，硬约束 #3）", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    env.native = true
+    env.modules = {
+      PictelioPrefs: {
+        prefsGet: (_k: string, cb: (v: string, e: string | null) => void) => cb("", null),
+        prefsSet: (_k: string, _v: string, cb: (e: string | null) => void) => cb("disk full"),
+        prefsRemove: (_k: string, cb: (e: string | null) => void) => cb(null),
+      },
+    }
+    store.setNovelIntroFirst(false)
+    expect(store.novelIntroFirst).toBe(false)
+    await vi.waitFor(() =>
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("小说介绍页"), expect.anything()),
+    )
+    warnSpy.mockRestore()
+  })
+
+  it("applyRawKey：importRawValues 写回合法值、非法值跳过（备份恢复路径）", async () => {
+    prefsModule(new Map<string, string>())
+    const res = await store.importRawValues({
+      novel_intro_first: "false",
+      novel_intro_first_bogus: "bogus",
+    })
+    expect(store.novelIntroFirst).toBe(false)
+    expect(res.applied).toContain("novel_intro_first")
+    expect(res.skipped).toContain("novel_intro_first_bogus")
+  })
+
+  it("exportRawValues 含 novel_intro_first（设备级开关进备份域）", async () => {
+    prefsModule(new Map<string, string>([["novel_intro_first", "false"]]))
+    const raw = await store.exportRawValues()
+    expect(raw.novel_intro_first).toBe("false")
+  })
+})
+
 // 引擎自动回退开关（ADR-0164 / #555 T3）：设备级布尔缺省开；键 pictelio_engine_auto_fallback
 // 与 app 侧逐字一致（唯一所有者 = Java EnginePrefs.KEY_AUTO_FALLBACK，字面量已核对引擎源码）。
 // 期望值 oracle = spec engine-default-lynx §3 键表（缺省 true，值域 "true"/"false"）。

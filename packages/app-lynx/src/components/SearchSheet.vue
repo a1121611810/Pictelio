@@ -18,6 +18,7 @@
 // （docs/research/global-search-patterns.md §4.2）。
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { navigate } from '../router'
+import { openNovel } from '../utils/novelNavigation'
 import { t, type I18nKey } from '../i18n'
 import type { SearchState, SearchResultItem } from '../primitives/useSearch'
 import { useSearch } from '../primitives/useSearch'
@@ -264,11 +265,12 @@ function onHistoryTap(word: string): void {
   controller.search(word)
 }
 
-/** 提交点③ 点击结果行：写历史 + 关层 + 跳详情（回原页位置感由导航历史保持）；小说先进介绍页（票 #588） */
+/** 提交点③ 点击结果行：写历史 + 关层 + 跳详情（回原页位置感由导航历史保持）；小说经 openNovel 缝隙导航（ADR-0183） */
 function onResultTap(row: SearchResultItem): void {
   searchHistory.addHistory(keyword.value)
   searchSheet.closeSearch()
-  void navigate(row.type === 'novel' ? `/novel/${row.entity.id}/intro` : `/illust/${row.entity.id}`)
+  if (row.type === 'novel') openNovel(row.entity.id)
+  else void navigate(`/illust/${row.entity.id}`)
 }
 
 function onHistoryRemove(word: string): void {
