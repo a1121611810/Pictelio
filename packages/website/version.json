@@ -1,9 +1,9 @@
 {
-  "version": "5.4.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v5.4.0",
-  "changelog": "# Pictelio 更新日志\n\n## ✨ 新功能\n\n- **Lynx 引擎**：外观模式上线，可在设置中切换明暗主题，支持跟随系统；状态栏与启动页会随主题同步切换\n- **Lynx 引擎**：小说阅读内置翻译流程——首次使用会弹出同意闸门，翻译按钮带四种状态指示，失败时可直接重试，翻译结果本地缓存\n- **Lynx 引擎**：推荐页的小说滑页新增收藏入口（♥）\n\n## ⚡ 体验优化\n\n- **Lynx 引擎**：应用中 12 处开关控件统一替换为标准 M3 组件，视觉与交互更一致\n\n##  问题修复\n\n- **Lynx 引擎**：夜间模式存在多处硬编码浅色值，暗色下偶有刺眼色块，现已统一修正\n- **Lynx 引擎**：收藏按钮芯片此前会被父容器拉长显示失真，现已修正\n- **Lynx 引擎**：真机上文件系统缓存曾不生效导致重复加载，现已恢复\n- **Lynx 引擎**：触发 R18G 内容限制时，原仅静默拦截；现按钮置灰并显示拦截原因\n- **Lynx 引擎**：阅读/翻译场景下重置会取消进行中的请求并屏蔽旧响应，避免旧结果覆盖新内容\n- **Lynx 引擎**：翻译链路先前存在「失败却报成功」或「空流被忽略」的情况；此外部分设备因 IndexedDB 不可用曾导致初始化失败，现已加上错误提示并支持降级处理",
+  "version": "5.5.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v5.5.0",
+  "changelog": "# Pictelio 更新日志\n\n## ✨ 新功能\n\n- **Lynx 小说阅读**：打开小说时默认先进入介绍页；如不需要，可在「设置」中关闭该开关，设置按设备保存",
   "webBundle": {
-    "version": "5.4.0",
-    "url": "https://github.com/a1121611810/Pictelio/releases/download/v5.4.0/pictelio-5.4.0"
+    "version": "5.5.0",
+    "url": "https://github.com/a1121611810/Pictelio/releases/download/v5.5.0/pictelio-5.5.0"
   }
 }
