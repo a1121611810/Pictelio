@@ -77,6 +77,7 @@ ADR-0080 以「均衡评估」盘点全 workspace 依赖：patch/minor 建议升
 - 终验门禁：`check:all` 9 包 ✓、`lint:all` ✓、`test:all` ✓（app 单测 1957 + agent-browser E2E 1982 + 各 core 包全绿）。
 - 执行期新增暂缓/钉版 4 条（均已记录 D3/D5 并写明触发条件）：vue 3.5.40（上游类型回归）、query-persist-client-core 5.101.4（solid-query 冻结 query-core）、app vitest 4.1.10（vp 硬依赖）、TS7 门禁 alias `typescript-compiler-api`。
 - 执行期间 agent-browser E2E 一度全红（约 1 小时窗口），经基线 commit 归因二分 + OAuth 直连探针证实为 Pixiv 侧临时限流窗口，与依赖升级无关，窗口过后全量复跑自愈。
+- T6 终验审计补漏：初次 `pnpm outdated` 盘点因输出截断（`tail -120` 切掉字母序更靠前的行）漏报 Capacitor 线——终验全量对账时补升 `@capacitor/{core,android,cli}` ^8.5.2 + `@aparajita/capacitor-secure-storage` 8.0.1（均为 patch），三门禁复验全绿。教训：盘点必须消费完整清单（禁 tail 截断）。
 
 ## 后果
 
