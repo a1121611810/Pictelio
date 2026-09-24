@@ -74,6 +74,10 @@ const DARK_MODE_KEY = "settings_dark_mode"
 const RELATED_INJECTION_KEY = "related_injection"
 /** 排行榜入口大卡（spec docs/specs/ranking.md §5.8）：设备级开关，默认开；键与 app 逐字一致 */
 const RANKING_ENTRY_KEY = "ranking_entry"
+/** 小说介绍页开关（spec docs/specs/lynx-novel-intro-toggle.md / ADR-0183）：设备级布尔，默认开
+ *  （介绍页先行 = ADR-0167 三段式现状，升级零感知）；关闭后六入口点击小说直达正文页。
+ *  lynx 专属语义（webview 无介绍页概念），不跨引擎共享键。 */
+const NOVEL_INTRO_FIRST_KEY = "novel_intro_first"
 /** 引擎自动回退开关（ADR-0164 / spec engine-default-lynx §3）：设备级布尔，缺省开；
  *  只管 Lynx 运行时硬错误是否自动跳 WebView（不管预检降级）。键与 app 侧逐字一致，
  *  唯一所有者 = Java EnginePrefs.KEY_AUTO_FALLBACK，TS 侧镜像常量经一致性测试钉住 */
@@ -114,6 +118,7 @@ export const BACKUP_DEVICE_KEYS = [
   LANGUAGE_KEY,
   RELATED_INJECTION_KEY,
   RANKING_ENTRY_KEY,
+  NOVEL_INTRO_FIRST_KEY,
   AUTO_FALLBACK_ENGINE_KEY,
   FULLSCREEN_MODE_KEY,
   NOVEL_EXPORT_FORMAT_KEY,
@@ -258,6 +263,8 @@ export const useSettingsStore = defineStore("settings", () => {
   const _language = ref<"" | "zh-CN" | "en">("")
   const _relatedInjection = ref(true)
   const _rankingEntry = ref(true)
+  /** 小说介绍页开关（ADR-0183）：设备级，默认开 = 介绍页先行 */
+  const _novelIntroFirst = ref(true)
   /** 引擎自动回退开关（ADR-0164）：设备级，缺省开（用户设置，进备份域；区别于失败记忆等设备事实） */
   const _autoFallbackEngine = ref(true)
   /** 全屏模式开关（spec lynx-systembars D5）：设备级，默认关（隐藏系统栏的 opt-in 沉浸） */
@@ -313,6 +320,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const language = _language
   const relatedInjection = _relatedInjection
   const rankingEntry = _rankingEntry
+  const novelIntroFirst = _novelIntroFirst
   const autoFallbackEngine = _autoFallbackEngine
   const fullscreenMode = _fullscreenMode
   const novelExportFormat = _novelExportFormat
@@ -433,6 +441,18 @@ export const useSettingsStore = defineStore("settings", () => {
       }
     } catch (e) {
       console.warn("[settingsStore] 排行榜入口开关加载失败（维持默认）", e)
+    }
+
+    // 小说介绍页开关（spec docs/specs/lynx-novel-intro-toggle.md / ADR-0183）：设备级，未登录也恢复
+    try {
+      const raw = await prefs().get(NOVEL_INTRO_FIRST_KEY)
+      if (raw === "true") _novelIntroFirst.value = true
+      else if (raw === "false") _novelIntroFirst.value = false
+      else if (raw !== null) {
+        console.warn("[settingsStore] 小说介绍页开关值非法，维持默认 true:", raw)
+      }
+    } catch (e) {
+      console.warn("[settingsStore] 小说介绍页开关加载失败（维持默认）", e)
     }
 
     // 引擎自动回退开关（ADR-0164）：设备级，未登录也恢复
@@ -766,6 +786,14 @@ export const useSettingsStore = defineStore("settings", () => {
       .catch((e) => console.warn("[settingsStore] 排行榜入口开关写入失败", e))
   }
 
+  /** 小说介绍页开关（ADR-0183）：导航偏好属设备/个人习惯，非账号内容授权，不区分 uid */
+  function setNovelIntroFirst(enabled: boolean): void {
+    _novelIntroFirst.value = enabled
+    void prefs()
+      .set(NOVEL_INTRO_FIRST_KEY, String(enabled))
+      .catch((e) => console.warn("[settingsStore] 小说介绍页开关写入失败", e))
+  }
+
   /** 引擎自动回退开关（ADR-0164）：双端共享键（Java 侧 EnginePrefs 同读此键） */
   function setAutoFallbackEngine(enabled: boolean): void {
     _autoFallbackEngine.value = enabled
@@ -1019,6 +1047,10 @@ export const useSettingsStore = defineStore("settings", () => {
         if (raw !== "true" && raw !== "false") return false
         setRankingEntry(raw === "true")
         return true
+      case NOVEL_INTRO_FIRST_KEY:
+        if (raw !== "true" && raw !== "false") return false
+        setNovelIntroFirst(raw === "true")
+        return true
       case AUTO_FALLBACK_ENGINE_KEY:
         if (raw !== "true" && raw !== "false") return false
         setAutoFallbackEngine(raw === "true")
@@ -1117,6 +1149,7 @@ export const useSettingsStore = defineStore("settings", () => {
     language,
     relatedInjection,
     rankingEntry,
+    novelIntroFirst,
     autoFallbackEngine,
     fullscreenMode,
     ugoiraDownloadFormat,
@@ -1143,6 +1176,7 @@ export const useSettingsStore = defineStore("settings", () => {
     setLanguage,
     setRelatedInjection,
     setRankingEntry,
+    setNovelIntroFirst,
     setAutoFallbackEngine,
     setFullscreenMode,
     setNovelExportFormat,
