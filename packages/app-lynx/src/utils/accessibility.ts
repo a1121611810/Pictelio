@@ -25,6 +25,8 @@ export const ME_A11Y_LABELS = {
   networkCheck: '网络自检',
   // 通知中心入口（ADR-0188 D7 / #728）：账户组行 + 行尾未读圆点
   notifications: '通知',
+  // 静音标签管理入口（ADR-0187 D5 / #732）：内容组行（AI 三态分段之后）
+  muteTags: '管理静音标签',
   // WebDAV 备份（spec docs/specs/webdav-backup.md §7）：主开关 + 三个动作 + 撤销
   webdavToggle: '启用WebDAV备份',
   webdavTest: 'WebDAV连接测试',
@@ -173,6 +175,15 @@ export const NOTIFICATIONS_A11Y_LABELS = {
   pageTitle: '通知',
   back: '返回',
   openItem: '打开通知',
+} as const
+
+/** 静音标签管理页 accessibility 标注（ADR-0187 D5 / #732：/mute-tags 页 + 移除按钮）
+ *  注册表完整性约束同 NOTIFICATIONS_A11Y_LABELS：每个 key 必须被 MuteTags.vue 模板消费
+ *  （tagMuteTemplate.test.ts 钉住）；行级标签 = 原始标签名（动态，不进注册表）。 */
+export const MUTE_TAGS_A11Y_LABELS = {
+  pageTitle: '静音标签',
+  back: '返回',
+  remove: '移除该静音标签',
 } as const
 
 /** 追更询问弹窗 accessibility 标注（issue #224：NovelDetail 返回拦截询问 Dialog） */

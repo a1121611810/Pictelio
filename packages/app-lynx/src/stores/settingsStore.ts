@@ -53,6 +53,12 @@ const DEV_LEGACY_R18 = "settings_show_r18"
 const DEV_LEGACY_R18G = "settings_show_r18g"
 /** AI 三态过滤（ADR-0155）：账号级共享键（与 app 同契约），无 legacy 键 */
 const aiFilterModeKey = (uid: number) => `ai_filter_mode_${uid}`
+/**
+ * 标签静音（ADR-0187 / #732）：账号级集合键，键名与 webview muteTagStore 逐字一致
+ * （ADR-0103 契约，PictelioPrefs → SharedPreferences "CapacitorStorage" 跨引擎同步）。
+ * 值 = JSON string[]，元素为 trim 后的原始标签名（存储态已 trim，匹配侧再 trim 容错）。
+ */
+const muteTagsKey = (uid: number) => `mute_tags_${uid}`
 /** AI 模式：show 显示 / mask 遮罩 / only 仅看 */
 export type AiFilterMode = "show" | "mask" | "only"
 function isAiFilterMode(v: unknown): v is AiFilterMode {
@@ -106,8 +112,8 @@ const LANGUAGE_KEY = "settings_language"
 
 /**
  * 备份域设备级键清单（spec docs/specs/webdav-backup.md §3.1）：与 app settingsStore
- * 的持久化设置键对齐；sets 在 app-lynx 暂无对应 store（无屏蔽/举报功能），
- * 因此 lynx 备份的 sets 为空对象（跨引擎恢复时由 app 侧 sets 覆盖）。
+ * 的持久化设置键对齐；集合型账号级键（mute_tags_${uid}，ADR-0187 / #732）走
+ * backupAccountKeys 不在本清单，lynx 备份的 sets 仍为空对象（跨引擎恢复时由 app 侧 sets 覆盖）。
  */
 export const BACKUP_DEVICE_KEYS = [
   UGOIRA_MODE_KEY,
@@ -137,7 +143,7 @@ export const BACKUP_DEVICE_KEYS = [
 
 /** 备份域账号级键（spec §3.1；恢复按当前 uid 过滤，spec §6） */
 export function backupAccountKeys(uid: number): string[] {
-  return [r18Key(uid), r18gKey(uid), aiFilterModeKey(uid)]
+  return [r18Key(uid), r18gKey(uid), aiFilterModeKey(uid), muteTagsKey(uid)]
 }
 
 /**
@@ -245,6 +251,28 @@ async function migrateLegacy(
   await storage.remove(legacyKey)
 }
 
+/**
+ * 静音标签集合解析（ADR-0187 D1）：仅接受 JSON string[]。
+ * 读到损坏/非法值 → console.warn 可见 + 空集合（禁静默降级，测试硬约束 #3）。
+ */
+export function parseMuteTagsRaw(raw: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (Array.isArray(parsed) && parsed.every((s) => typeof s === "string")) {
+      return parsed
+    }
+    console.warn("[settingsStore] 静音标签集合值非法，维持空集合:", raw)
+  } catch {
+    console.warn("[settingsStore] 静音标签集合解析失败，维持空集合:", raw)
+  }
+  return []
+}
+
+/** 标签静音判定输入（PixivIllust.tags / PixivNovel.tags 的最小结构） */
+export interface TagMuteCheckable {
+  tags?: { name: string }[] | null
+}
+
 export const useSettingsStore = defineStore("settings", () => {
   // ── 私有 state（闭包内 ref，不 return —— 物理私有，替代原 `_` 命名约定）──
   const _showR18 = ref(false)
@@ -253,6 +281,10 @@ export const useSettingsStore = defineStore("settings", () => {
   const _translateR18 = ref(false)
   const _translateR18G = ref(false)
   const _aiFilterMode = ref<AiFilterMode>("show")
+  /** 标签静音集合（ADR-0187 / #732）：账号级，内存态为存储顺序的 string[]（元素已 trim） */
+  const _muteTags = ref<string[]>([])
+  /** 静音成功轻提示载荷（当前提示的标签名；null = 无）——App.vue 宿主渲染，store 不快照文案 */
+  const _muteTagHint = ref<string | null>(null)
   const _ugoiraMode = ref<UgoiraExtractMode>("fflate")
   const _ugoiraDownloadFormat = ref<UgoiraFormat>("zip")
   const _detailQuality = ref<ImageQuality>("medium")
@@ -293,6 +325,8 @@ export const useSettingsStore = defineStore("settings", () => {
   const translateR18 = _translateR18
   const translateR18G = _translateR18G
   const aiFilterMode = _aiFilterMode
+  /** 静音成功轻提示载荷（#732 / ADR-0187 D5）：null = 无；App.vue 宿主 v-if 渲染 */
+  const muteTagHint = _muteTagHint
   const ugoiraMode = _ugoiraMode
   const ugoiraDownloadFormat = _ugoiraDownloadFormat
   const detailQuality = _detailQuality
@@ -565,6 +599,7 @@ export const useSettingsStore = defineStore("settings", () => {
       _translateR18.value = false
       _translateR18G.value = false
       _aiFilterMode.value = "show"
+      _muteTags.value = []
       return
     }
     const storage = prefs()
@@ -588,6 +623,9 @@ export const useSettingsStore = defineStore("settings", () => {
         console.warn("[settingsStore] AI 模式值非法，维持默认 show:", rawAi)
         _aiFilterMode.value = "show"
       }
+      // 标签静音集合（ADR-0187 / #732）：缺失即空集合；损坏由 parseMuteTagsRaw warn 可见
+      const rawMuteTags = await storage.get(muteTagsKey(id))
+      _muteTags.value = rawMuteTags === null ? [] : parseMuteTagsRaw(rawMuteTags)
     } catch (e) {
       // 存储不可用：维持默认（静默降级规则：warn 可见）
       console.warn("[settingsStore] 账号级设置加载失败（维持默认）", e)
@@ -596,6 +634,7 @@ export const useSettingsStore = defineStore("settings", () => {
       _translateR18.value = false
       _translateR18G.value = false
       _aiFilterMode.value = "show"
+      _muteTags.value = []
     }
 
     // Dev hook：强制开启 R18（R18/R18G 同开）。
@@ -677,6 +716,68 @@ export const useSettingsStore = defineStore("settings", () => {
     void prefs()
       .set(aiFilterModeKey(id), mode)
       .catch((e) => console.warn("[settingsStore] AI 模式写入失败", e))
+  }
+
+  // ── 标签静音（ADR-0187 / #732）：账号级集合 + 匹配谓词 ──
+  // 匹配语义（ADR-0187 D2）：任一 tags[].name 经 trim 后与集合精确相等——无大小写折叠、
+  // 无全半角归一、不匹配 translated_name；空 tags / undefined / 空集合一律放行。
+
+  /** 静音标签集合快照（响应式 accessor：computed/渲染内调用建立依赖；整集快照读） */
+  function mutedTags(): Set<string> {
+    return new Set(_muteTags.value)
+  }
+
+  /** 写内存 + 落盘（未登录不落盘，账号级语义）；写失败 warn 可见（禁静默降级） */
+  function setMuteTags(tags: string[]): void {
+    _muteTags.value = tags
+    const id = uid()
+    if (id === null) return
+    void prefs()
+      .set(muteTagsKey(id), JSON.stringify(tags))
+      .catch((e) => console.warn("[settingsStore] 静音标签写入失败", e))
+  }
+
+  /** 静音轻提示展示时长（与 router exitHint 同值，App.vue 提示条宿主同形态） */
+  const MUTE_TAG_HINT_MS = 2000
+  let muteTagHintTimer: ReturnType<typeof setTimeout> | undefined
+
+  /** 静音标签并持久化（trim、幂等）；未登录 no-op（webview muteTagStore 同语义） */
+  function muteTag(name: string): void {
+    const id = uid()
+    if (id === null) return
+    const trimmed = name.trim()
+    if (trimmed === "") return
+    if (!_muteTags.value.includes(trimmed)) {
+      setMuteTags([..._muteTags.value, trimmed])
+    }
+    // 轻提示（ADR-0187 D5）：长按必有反馈，重复静音同样提示（webview 同语义）；
+    // 连续静音重置计时，避免前一条提示提前消失
+    _muteTagHint.value = trimmed
+    if (muteTagHintTimer !== undefined) clearTimeout(muteTagHintTimer)
+    muteTagHintTimer = setTimeout(() => {
+      muteTagHintTimer = undefined
+      _muteTagHint.value = null
+    }, MUTE_TAG_HINT_MS)
+  }
+
+  /** 取消静音并持久化；未静音时 no-op；未登录 no-op */
+  function unmuteTag(name: string): void {
+    const id = uid()
+    if (id === null) return
+    if (!_muteTags.value.includes(name)) return
+    setMuteTags(_muteTags.value.filter((t) => t !== name))
+  }
+
+  /**
+   * 静音判定（数据组装点过滤谓词）：item.tags 任一 name.trim() 命中集合。
+   * 空集合短路（免逐条 trim）；空 tags / undefined 放行。
+   */
+  function isTagMuted(item: TagMuteCheckable | null | undefined): boolean {
+    const list = _muteTags.value
+    if (list.length === 0) return false
+    const tags = item?.tags
+    if (!tags || tags.length === 0) return false
+    return tags.some((tag) => list.includes(tag.name.trim()))
   }
 
   function setUgoiraDownloadFormat(format: UgoiraFormat): void {
@@ -958,6 +1059,8 @@ export const useSettingsStore = defineStore("settings", () => {
         _showR18.value = false
         _showR18G.value = false
         _aiFilterMode.value = "show"
+        _muteTags.value = []
+        _muteTagHint.value = null
       }
     },
     { flush: "sync" },
@@ -1131,6 +1234,18 @@ export const useSettingsStore = defineStore("settings", () => {
       setAiFilterMode(raw)
       return true
     }
+    if (key === muteTagsKey(id)) {
+      // 静音标签集合（ADR-0187 / #732）：仅接受 JSON string[]（损坏 → skipped）
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(raw)
+      } catch {
+        return false
+      }
+      if (!Array.isArray(parsed) || !parsed.every((s) => typeof s === "string")) return false
+      setMuteTags(parsed)
+      return true
+    }
     return false
   }
 
@@ -1201,5 +1316,11 @@ export const useSettingsStore = defineStore("settings", () => {
     isAiRestricted,
     isAiOnlyFiltered,
     shouldHideByAi,
+    // 标签静音（ADR-0187 / #732）
+    mutedTags,
+    muteTag,
+    unmuteTag,
+    isTagMuted,
+    muteTagHint,
   }
 })

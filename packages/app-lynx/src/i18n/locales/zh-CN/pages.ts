@@ -227,6 +227,12 @@ const zhPages = {
   "notifications.a11y.unread": "未读",
   "notifications.a11y.read": "已读",
 
+  // ─── MuteTags.vue（静音标签管理页，ADR-0187 / #732） ───
+  "muteTags.title": "静音标签",
+  "muteTags.empty.title": "暂无静音标签",
+  "muteTags.empty.hint": "长按作品标签即可静音",
+  "muteTags.remove": "移除",
+
   // ─── 引擎降级原因文案（ADR-0164 / #555）：生效状态快照 reason 码 → UI 文案
   //     （Me 客户端卡双态行；T4 App.vue 提示条复用）。码集 = EngineRoute.Reason 全 10 码 + unknown 兜底 ───
   "engineFallback.reason.preferred": "按首选引擎运行",
@@ -269,6 +275,7 @@ const zhPages = {
   "me.content.aiShow": "显示",
   "me.content.aiMask": "遮罩",
   "me.content.aiOnly": "仅看",
+  "me.content.muteTags": "管理静音标签",
   "me.ugoira.title": "动图播放",
   "me.ugoira.hint": "Ugoira 动图取帧方式",
   "me.ugoira.fflate": "fflate（默认）",

@@ -227,6 +227,12 @@ const enPages = {
   "notifications.a11y.unread": "Unread",
   "notifications.a11y.read": "Read",
 
+  // MuteTags.vue (muted-tag management page, ADR-0187 / #732)
+  "muteTags.title": "Muted tags",
+  "muteTags.empty.title": "No muted tags",
+  "muteTags.empty.hint": "Long-press a tag on artwork to mute it",
+  "muteTags.remove": "Remove",
+
   // Engine fallback reason copy (ADR-0164 / #555): engine-state snapshot reason code → UI copy.
   // Code set = EngineRoute.Reason (10 codes) + unknown fallback.
   "engineFallback.reason.preferred": "Running on your preferred engine",
@@ -270,6 +276,7 @@ const enPages = {
   "me.content.aiShow": "Show",
   "me.content.aiMask": "Mask",
   "me.content.aiOnly": "Only",
+  "me.content.muteTags": "Manage muted tags",
   "me.ugoira.title": "Ugoira playback",
   "me.ugoira.hint": "How ugoira frames are loaded",
   "me.ugoira.fflate": "fflate (default)",

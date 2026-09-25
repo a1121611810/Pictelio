@@ -146,10 +146,11 @@ async function loadWebdavCredentials(): Promise<void> {
   webdavLoginPassword.value = (await loadWebdavPassword()) ?? ''
   webdavBackupPassword.value = (await loadBackupPassword()) ?? ''
   webdavHasPreRestore.value = (await loadPreRestoreSnapshot()) !== null
-  // M3：敏感项候选 = 当前账号级键（show_r18_* / show_r18g_* / ai_filter_mode_*）
+  // M3：敏感项候选 = 当前账号级键（show_r18_* / show_r18g_* / ai_filter_mode_* / mute_tags_*——
+  // 静音词表为账号级内容设置，ADR-0187 D1 进备份域后同列敏感候选）
   const raw = await settings.exportRawValues()
   webdavSensitiveKeys.value = Object.keys(raw).filter(
-    (k) => k.startsWith('show_r18_') || k.startsWith('show_r18g_') || k.startsWith('ai_filter_mode_'),
+    (k) => k.startsWith('show_r18_') || k.startsWith('show_r18g_') || k.startsWith('ai_filter_mode_') || k.startsWith('mute_tags_'),
   )
 }
 
@@ -350,6 +351,11 @@ function openNetworkCheck() {
 /** 通知中心入口（ADR-0188 D7 / #728）：功能入口卡区行 */
 function openNotifications() {
   void navigate('/notifications')
+}
+
+/** 静音标签管理入口（ADR-0187 D5 / #732）：内容组行（AI 三态分段之后） */
+function openMuteTags() {
+  void navigate('/mute-tags')
 }
 
 function pickClient(kind: ClientKind) {
@@ -868,6 +874,17 @@ function pickAppearanceMode(mode: DarkModeId) {
               <text class="text-label-large" :class="aiFilterMode === 'only' ? 'text-secondary-on-container' : 'text-surface-on'">{{ t('me.content.aiOnly') }}</text>
             </view>
           </view>
+        </view>
+
+        <!-- 静音标签管理入口（ADR-0187 D5 / #732）：内容组末行，跳 /mute-tags -->
+        <view
+          class="flex flex-row items-center justify-between py-3.5 pt-4 mt-1 border-t-[1px] border-t-surface-variant"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.muteTags"
+          @tap="openMuteTags"
+        >
+          <text class="text-title-medium text-surface-on">{{ t('me.content.muteTags') }}</text>
+          <text class="text-title-medium text-surface-on-variant">›</text>
         </view>
       </view>
 

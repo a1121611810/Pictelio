@@ -1,22 +1,27 @@
 <script setup lang="ts">
 // 列表卡片自适应标签行（ADR-0149 / spec docs/specs/app-lynx-adaptive-list-tags.md）。
 // 行为：单行；按实测容器宽度「装多少算多少」；剩余宽 >= 16px 再放一个省略号截断 chip；其余折叠为 +N。
+// 可点 chip = TagPressChip（#732 / ADR-0187 D5）：点击 tag-tap（页面开搜索）+ 长按
+// tag-long-press（页面静音）；截断 chip 与 +N 是折叠 affordance，只发 overflow-tap。
 // 平台约束（ADR-0149 spike 双端实测）：
 // - Lynx 无 offsetWidth / ResizeObserver / canvas.measureText；只能 createSelectorQuery + boundingClientRect；
 // - selectAll().invoke() 双端不支持（code 5）→ 逐元素 select；
 // - list-item 内禁止 absolute（真机高度测量会把 absolute 算进内容高度）→ 先渲染全部 chip（overflow-hidden 裁）再按结果重渲染。
 // 不变量（测量宽度 = 渲染宽度）：measuring 与 ready 两阶段使用同一 CHIP_CLASS 与同一行宽（w-full），
 // 因此实测 chip 宽度即为 ready 渲染时的宽度；一旦两阶段的 padding / 字型 / 行宽分叉，fit 会失真。
-// 组件保持纯展示：不 import store；点击发 tag-tap / overflow-tap，由页面决定行为。
+// 组件保持纯展示：不 import store；点击/长按发事件，由页面决定行为。
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { computeAdaptiveTagFit, type AdaptiveTagFit } from '../utils/adaptiveTagFit'
 import { measureRects, type SelectorQuery } from '../primitives/measureRects'
 import { resolveTagChips, type TagChip, type TagChipSource } from '../utils/tagChips'
+import TagPressChip from './TagPressChip.vue'
 
 const props = defineProps<{ tags: TagChipSource[] }>()
 const emit = defineEmits<{
   /** 点击某个标签 chip（携带原始标签名，供页面开搜索） */
   (e: 'tag-tap', name: string): void
+  /** 长按某个标签 chip（携带原始标签名，页面静音，ADR-0187 D5 / #732） */
+  (e: 'tag-long-press', name: string): void
   /** 点击 +N 或省略号截断 chip（页面决定，通常进作品详情） */
   (e: 'overflow-tap'): void
 }>()
@@ -124,16 +129,18 @@ watch(
     :id="uid + '-row'"
     class="w-full flex flex-row items-center gap-1 overflow-hidden"
   >
-    <!-- ready：可见 chip +（可选）省略号截断 chip +（可选）+N -->
+    <!-- ready：可见 chip +（可选）省略号截断 chip +（可选）+N。
+         可见 chip 用 TagPressChip（#732 长按静音）：CHIP_CLASS 经 class 透传合并到组件根
+         view——attr 继承单根组件，「测量=渲染」不变量保持（类与盒模型逐字一致） -->
     <template v-if="phase === 'ready' && fit">
-      <view
+      <TagPressChip
         v-for="chip in visibleChips"
         :key="chip.name"
-        :class="CHIP_CLASS"
-        @tap.stop="emit('tag-tap', chip.name)"
-      >
-        <text class="text-label-medium font-medium text-secondary-on-container">{{ chip.text }}</text>
-      </view>
+        :text="chip.text"
+        :chip-class="CHIP_CLASS"
+        @tap="emit('tag-tap', chip.name)"
+        @long-press="emit('tag-long-press', chip.name)"
+      />
       <view
         v-if="partialChip"
         :class="[CHIP_CLASS, 'overflow-hidden']"
@@ -148,7 +155,8 @@ watch(
       </view>
     </template>
 
-    <!-- measuring：先渲染全部 chip 供测量（overflow-hidden 裁切，单行不换行） -->
+    <!-- measuring：先渲染全部 chip 供测量（overflow-hidden 裁切，单行不换行）；
+         测量相用纯 view（无手势绑定）——id 锚点 + 零副作用，类同 CHIP_CLASS 保持不变量 -->
     <template v-else-if="phase === 'measuring'">
       <view v-for="(chip, i) in allChips" :key="chip.name" :id="uid + '-c' + i" :class="CHIP_CLASS">
         <text class="text-label-medium font-medium text-secondary-on-container">{{ chip.text }}</text>
@@ -160,14 +168,14 @@ watch(
 
     <!-- fallback：测量不可用 → 固定上限（不显示 +N，避免误导） -->
     <template v-else>
-      <view
+      <TagPressChip
         v-for="chip in fallbackChips"
         :key="chip.name"
-        :class="CHIP_CLASS"
-        @tap.stop="emit('tag-tap', chip.name)"
-      >
-        <text class="text-label-medium font-medium text-secondary-on-container">{{ chip.text }}</text>
-      </view>
+        :text="chip.text"
+        :chip-class="CHIP_CLASS"
+        @tap="emit('tag-tap', chip.name)"
+        @long-press="emit('tag-long-press', chip.name)"
+      />
     </template>
   </view>
 </template>

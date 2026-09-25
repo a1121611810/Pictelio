@@ -62,6 +62,7 @@ vi.mock('../src/pages/UpdatePage.vue', () => ({ default: {} }))
 vi.mock('../src/pages/ErrorPage.vue', () => ({ default: {} }))
 vi.mock('../src/pages/Watchlist.vue', () => ({ default: {} }))
 vi.mock('../src/pages/Notifications.vue', () => ({ default: {} }))
+vi.mock('../src/pages/MuteTags.vue', () => ({ default: {} }))
 vi.mock('../src/pages/DownloadManager.vue', () => ({ default: {} }))
 vi.mock('../src/pages/NetworkCheck.vue', () => ({ default: {} }))
 vi.mock('../src/pages/Ranking.vue', () => ({ default: {} }))
@@ -78,9 +79,9 @@ async function loadRouter(): Promise<RouterModule> {
 }
 
 describe('路由表完整性（spec D3）', () => {
-  it('21 条路由：path/name 齐全；/update、/error 无 requiresAuth 且带 backBehavior exit（P0-1）', async () => {
+  it('22 条路由：path/name 齐全；/update、/error 无 requiresAuth 且带 backBehavior exit（P0-1）', async () => {
     const mod = await loadRouter()
-    expect(mod.routes).toHaveLength(21)
+    expect(mod.routes).toHaveLength(22)
     const nameOf = (p: string) => mod.routes.find((r) => r.path === p)?.name
     expect(nameOf('/login')).toBe('login')
     expect(nameOf('/recommended')).toBe('recommended')
@@ -89,6 +90,9 @@ describe('路由表完整性（spec D3）', () => {
     // 通知中心（ADR-0188 D7 / #728）：业务次级页，requiresAuth 守卫鉴权
     expect(nameOf('/notifications')).toBe('notifications')
     expect(mod.routes.find((r) => r.path === '/notifications')?.meta?.requiresAuth).toBe(true)
+    // 静音标签管理页（ADR-0187 D5 / #732）：业务次级页，requiresAuth 守卫鉴权
+    expect(nameOf('/mute-tags')).toBe('mute-tags')
+    expect(mod.routes.find((r) => r.path === '/mute-tags')?.meta?.requiresAuth).toBe(true)
     // 小说介绍页（spec #585 / 票 #586）：与 /novel/:id 平级共存，同标 requiresAuth
     expect(nameOf('/novel/:id/intro')).toBe('novel-intro')
     expect(mod.routes.find((r) => r.path === '/novel/:id/intro')?.meta?.requiresAuth).toBe(true)

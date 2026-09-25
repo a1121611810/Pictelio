@@ -138,6 +138,11 @@ function onTagTap(name: string): void {
   useSearchSheetStore().openSearch(name)
 }
 
+/** 标签长按静音（ADR-0187 D5 / #732）：加入词表 + 轻提示（App.vue 宿主消费 muteTagHint） */
+function onTagLongPress(name: string): void {
+  settings.muteTag(name)
+}
+
 /**
  * +N/截断 chip：介绍页无「全部标签」承 surface（D 案页内不滚动），按 AdaptiveTagRow
  * 「页面决定」契约收敛为以首个标签发起搜索（探索语义，非静默死交互）
@@ -212,12 +217,13 @@ function startReading(): void {
           @tap="openAuthor"
         >{{ novel.user.name }}</text>
 
-        <!-- 标签胶囊行（票 #577：复用「标签自适应折叠」；chip → 全局搜索弹层） -->
+        <!-- 标签胶囊行（票 #577：复用「标签自适应折叠」；chip → 全局搜索弹层；长按 → 静音 #732） -->
         <AdaptiveTagRow
           v-if="novel.tags.length > 0"
           class="mt-2"
           :tags="novel.tags"
           @tag-tap="onTagTap"
+          @tag-long-press="onTagLongPress"
           @overflow-tap="onTagOverflow"
         />
 

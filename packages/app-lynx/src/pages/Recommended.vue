@@ -152,9 +152,11 @@ async function refreshFeed() {
 // ─── 受限过滤（渲染层）：数据层照常加载，受限条目从可视滑页流中滤掉 ───
 // isRestricted 依赖 settingsStore 的 showR18/showR18G（响应式），computed 自动随开关重算。
 // AI 三态（ADR-0155）：本页 R18 走「过滤隐藏」，AI 同口径——mask 隐藏 AI / only 隐藏非 AI。
+// 标签静音（ADR-0187 / #732）：命中词表条目同在本组装点移除（「静音=不可见」）。
 const shouldHideByAi = useSettingsStore().shouldHideByAi
+const isTagMuted = useSettingsStore().isTagMuted
 const visibleItems = computed(() =>
-  items.value.filter((it) => !isRestricted(it.data) && !shouldHideByAi(it.data)),
+  items.value.filter((it) => !isRestricted(it.data) && !shouldHideByAi(it.data) && !isTagMuted(it.data)),
 )
 
 // ─── 轮播回调 ───
@@ -187,6 +189,11 @@ function onSlideTap(item: MixFeedItem) {
 // 页面层接线 openSearch——与 webview SearchableTag「点击即搜」语义一致（预填 + 自动搜索）。
 function onTagTap(name: string) {
   useSearchSheetStore().openSearch(name)
+}
+
+/** 标签长按静音（ADR-0187 D5 / #732）：加入词表 + 轻提示（App.vue 宿主消费 muteTagHint） */
+function onTagLongPress(name: string) {
+  useSettingsStore().muteTag(name)
 }
 
 // 沉浸式封面图（全 bleed 用大图，退化 medium/square_medium）
@@ -279,8 +286,9 @@ onActivated(() => {
         @tap="currentItem && onSlideTap(currentItem)"
       >
         <IllustTypeBadgeRow v-if="currentItem && currentItem.kind === 'illust'" :illust="currentItem.data" />
-        <!-- 标签胶囊行（ADR-0118：3+N、translated_name||name、# 前缀、纯展示；位置 = 类型徽章下方、标题上方） -->
-        <TagChipRow v-if="currentItem" :tags="currentItem.data.tags" class="mt-2" @tag-tap="onTagTap" />
+        <!-- 标签胶囊行（ADR-0118：3+N、translated_name||name、# 前缀、纯展示；位置 = 类型徽章下方、标题上方）；
+             长按静音（ADR-0187 D5 / #732）：tag-long-press → muteTag -->
+        <TagChipRow v-if="currentItem" :tags="currentItem.data.tags" class="mt-2" @tag-tap="onTagTap" @tag-long-press="onTagLongPress" />
         <text
           v-if="currentItem"
           class="text-title-large font-semibold text-white leading-[1.3] [max-line:2]"

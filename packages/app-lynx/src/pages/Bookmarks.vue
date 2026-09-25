@@ -31,6 +31,7 @@ const isAiRestricted = settings.isAiRestricted
 import RestrictOverlay from '../components/RestrictOverlay.vue'
 import AiRestrictedIllustCard from '../components/AiRestrictedIllustCard.vue'
 import { useAiOnlyVisible } from '../composables/useAiOnlyVisible'
+import { useTagMuteVisible } from '../composables/useTagMuteVisible'
 import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
 import AiRestrictedNovelCard from '../components/AiRestrictedNovelCard.vue'
 import RefreshableList from '../components/RefreshableList.vue'
@@ -75,8 +76,9 @@ const illustEndOfFeed = ref(false)
 const illustSettled = ref(false)
 // 取消收藏后从列表移除（BookmarkButton change 事件）：feed 内部状态不直接暴露 → 隐藏集过滤渲染
 const removedIllustIds = ref<Set<number>>(new Set())
-// 仅看态：非 AI 条目一并从渲染流移除（服务端分页判空仍基于 feed.items，不受影响）
-const aiVisibleIllusts = useAiOnlyVisible(illusts)
+// 仅看态：非 AI 条目一并从渲染流移除（服务端分页判空仍基于 feed.items，不受影响）；
+// 标签静音（ADR-0187 / #732）：命中词表条目数据层移除（「静音=不可见」，非遮罩）
+const aiVisibleIllusts = useTagMuteVisible(useAiOnlyVisible(illusts))
 const visibleIllusts = computed(() =>
   aiVisibleIllusts.value.filter((i) => !removedIllustIds.value.has(i.id)),
 )
@@ -136,8 +138,8 @@ const novelFeed = ref(
   }),
 )
 const novels = ref<PixivNovel[]>([])
-/** 仅看态：非 AI 小说从渲染流移除 */
-const visibleNovels = useAiOnlyVisible(novels)
+/** 仅看态：非 AI 小说从渲染流移除；标签静音命中条目一并移除（ADR-0187 / #732） */
+const visibleNovels = useTagMuteVisible(useAiOnlyVisible(novels))
 const novelLoading = ref(false)
 const novelLoadingMore = ref(false)
 const novelErrorMsg = ref('')

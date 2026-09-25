@@ -54,12 +54,14 @@ const rawResults = computed(() => state.value.results)
 const effectiveAiMode = computed(() =>
   resolveAiMode(settings.aiFilterMode, state.value.filters.aiOverride),
 )
-/** 仅看态移除非 AI 行（ADR-0155 only 语义）；mask 走行遮罩，不在数据层移除 */
+/** 仅看态移除非 AI 行（ADR-0155 only 语义）；mask 走行遮罩，不在数据层移除。
+ *  标签静音（ADR-0187 D4 / #732）：命中词表行在**数据层移除**——不进 isRowMasked
+ *  （静音=不可见，无需遮罩态，spec docs/specs/tag-mute.md 边界） */
 const visibleResults = computed(() => {
   const rows = rawResults.value
-  return effectiveAiMode.value === 'only'
-    ? rows.filter((r) => !settings.isAiWork(r.entity))
-    : rows
+  const aiVisible =
+    effectiveAiMode.value === 'only' ? rows.filter((r) => !settings.isAiWork(r.entity)) : rows
+  return aiVisible.filter((r) => !settings.isTagMuted(r.entity))
 })
 
 // ── [lynx:fix] 结果列表整树重建防御（ADR-0107 D4 同款，IllustList/Bookmarks 先例）──

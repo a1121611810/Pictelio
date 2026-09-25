@@ -107,6 +107,14 @@ onMounted(() => {
         <text class="text-base text-inverse-on-surface">再按一次退出应用</text>
       </view>
     </view>
+    <!-- 标签静音轻提示（ADR-0187 D5 / #732）：与 exitHint 同形态（M3 snackbar：inverse-surface
+         底 + 胶囊居中定位，ADR-0123 无全宽盒）；载荷 = settings.muteTagHint（标签名纯数据，
+         2s 自动清除在 store 内），文案经 t() 渲染（store 不快照文案，webview MuteTagHint 同语义） -->
+    <view v-if="settings.muteTagHint" class="absolute z-50" style="left: 50vw; bottom: 12vw; transform: translate(-50%, 0)">
+      <view class="h-[12.8vw] bg-inverse-surface rounded-[var(--md-shape-extra-small)] px-5 flex items-center shadow-[var(--md-elevation-3)]">
+        <text class="text-base text-inverse-on-surface">{{ t('muteTag.mutedHint', { name: settings.muteTagHint ?? '' }) }}</text>
+      </view>
+    </view>
   </page>
 </template>
 
