@@ -217,6 +217,24 @@ function pickBestError(errors: (ApiError | null)[]): ApiError | null {
 
 // ─── 工厂 ───
 
+/**
+ * #722：渲染期 data 读点的安全封装。
+ *
+ * 两段防护缺一不可：
+ * - pending 态：由查询注册的 placeholderData 提供空页占位（data 首读即定义，不 park
+ *   路由 transition）；
+ * - error 态：适配层 data 投影在 status='error' 且无数据时**抛 state.error**（review
+ *   实测），渲染期读会逃逸到路由边界。此处捕获并返回 undefined，错误呈现交给
+ *   error() 通道（读 q.error 普通字段，不抛）。
+ */
+function safeData(q: { data?: unknown }): { pages?: unknown[] } | undefined {
+  try {
+    return q.data as { pages?: unknown[] } | undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function createTQFeedStore<
   TItem extends { id: number; create_date: string },
   TTab extends string,
@@ -353,7 +371,7 @@ export function createTQFeedStore<
       if (sub && sub !== "all") {
         const q = queryMap.get(`${config.currentTab()}:${sub}`);
         if (!q) return [];
-        return config.filterFn(flattenPages(q.data ?? {}) as TItem[]);
+        return config.filterFn(flattenPages(safeData(q) ?? {}) as TItem[]);
       }
 
       // "all" 模式
@@ -366,12 +384,12 @@ export function createTQFeedStore<
 
       // single → 单数据源
       if (allCfg.type === "single") {
-        return config.filterFn(flattenPages(sources[0].data ?? {}) as TItem[]);
+        return config.filterFn(flattenPages(safeData(sources[0]) ?? {}) as TItem[]);
       }
 
       // merge → 多数据源排序合并 + 可选去重
       const results = sources
-        .map((q) => sortByDate(flattenPages(q.data ?? {}) as TItem[]))
+        .map((q) => sortByDate(flattenPages(safeData(q) ?? {}) as TItem[]))
         .filter((r) => r.length > 0);
 
       if (results.length === 0) return [];
@@ -389,12 +407,12 @@ export function createTQFeedStore<
       if (keys.length === 0) return null;
       if (keys.length === 1) {
         const q = queryMap.get(keys[0]);
-        return q ? getLastNextUrl(q.data ?? {}) : null;
+        return q ? getLastNextUrl(safeData(q) ?? {}) : null;
       }
       // merge 模式：取第一个有值的 next_url
       for (const k of keys) {
         const q = queryMap.get(k);
-        const url = q ? getLastNextUrl(q.data ?? {}) : null;
+        const url = q ? getLastNextUrl(safeData(q) ?? {}) : null;
         if (url) return url;
       }
       return null;
@@ -463,7 +481,7 @@ export function createTQFeedStore<
     // ── 4. 缓存判断 ──
 
     const isCached = (): boolean => {
-      return activeQueries().some((q) => ((q.data as any)?.pages?.length ?? 0) > 0);
+      return activeQueries().some((q) => (safeData(q)?.pages?.length ?? 0) > 0);
     };
 
     // ── 5. 动作 ──

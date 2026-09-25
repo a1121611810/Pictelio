@@ -110,6 +110,55 @@ describe("createTQFeedStore placeholderData 契约（#722：防渲染期 pending
     }
   });
 
+  it("行为（失败路径，#722 动机场景）：fetch 拒绝后 loading 落 false、error 可见、items() 仍为 []", async () => {
+    qc.client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    captured.options.length = 0;
+
+    // 受控失败：resolveFetch 变体——用 reject 触发 error 路径
+    let rejectFetch: ((e: unknown) => void) | null = null;
+    const store = createTQFeedStore<Item, "tab", undefined>({
+      name: "test_placeholder_fail",
+      currentTab: () => "tab" as const,
+      enabled: () => true,
+      lazy: true,
+      getDeps: () => undefined,
+      staleTime: 30_000,
+      errorStrategy: "priority",
+      filterFn: (items) => items,
+      tabs: {
+        tab: {
+          allMode: { type: "single", subTabs: ["main"] },
+          queries: {
+            main: {
+              queryKey: () => ["test_placeholder_fail_main"],
+              queryFn: () =>
+                new Promise((_res, rej) => {
+                  rejectFetch = rej;
+                }),
+            },
+          },
+        },
+      },
+    });
+
+    store.activate();
+    const { flush } = await import("solid-js");
+    flush();
+    const p = store.ensureLoaded();
+    await Promise.resolve();
+    expect(rejectFetch, "queryFn 应已发起（fetch 挂起中）").toBeTruthy();
+    rejectFetch!(new Error("simulated network failure"));
+    await p.catch(() => {});
+    await Promise.resolve();
+    flush();
+
+    // 失败后：骨架让位（loading=false）、错误可见、items() 不抛且为空
+    expect(() => store.items()).not.toThrow();
+    expect(store.items()).toEqual([]);
+    expect(store.loading()).toBe(false);
+    expect(store.error()).not.toBeNull();
+  });
+
   it("enabled=false 契约保持（ADR-0042 按需查询：不自动 fetch）", () => {
     qc.client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     captured.options.length = 0;
