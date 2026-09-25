@@ -15,8 +15,12 @@ const NOW = new Date("2026-09-12T15:00:00Z");
 
 describe("rankingCacheKey", () => {
   it("由 (mode, date) 唯一决定（格式固定）", () => {
-    expect(rankingCacheKey({ mode: "daily", date: "2026-09-01" }, NOW)).toBe("ranking_daily_2026-09-01");
-    expect(rankingCacheKey({ mode: "weekly", date: "2026-09-01" }, NOW)).toBe("ranking_weekly_2026-09-01");
+    expect(rankingCacheKey({ mode: "daily", date: "2026-09-01" }, NOW)).toBe(
+      "ranking_daily_2026-09-01",
+    );
+    expect(rankingCacheKey({ mode: "weekly", date: "2026-09-01" }, NOW)).toBe(
+      "ranking_weekly_2026-09-01",
+    );
   });
 
   it("今日（date=null）与显式等于今日（JST）的日期归一到同一键", () => {
@@ -28,7 +32,9 @@ describe("rankingCacheKey", () => {
   });
 
   it("非今日的显式日期不被归一（含 JST 昨天）", () => {
-    expect(rankingCacheKey({ mode: "daily", date: "2026-09-12" }, NOW)).toBe("ranking_daily_2026-09-12");
+    expect(rankingCacheKey({ mode: "daily", date: "2026-09-12" }, NOW)).toBe(
+      "ranking_daily_2026-09-12",
+    );
   });
 
   it("不同 mode 同日期互异（7 档两两不同）", () => {
@@ -45,7 +51,11 @@ describe("rankingCacheKey", () => {
   it("JST 跨日界：UTC 14:59 时 09-12 是今日，15:00 后不是", () => {
     const before = new Date("2026-09-12T14:59:00Z");
     expect(rankingCacheKey({ mode: "daily", date: null }, before)).toBe("ranking_daily_today");
-    expect(rankingCacheKey({ mode: "daily", date: "2026-09-12" }, before)).toBe("ranking_daily_today");
-    expect(rankingCacheKey({ mode: "daily", date: "2026-09-12" }, NOW)).toBe("ranking_daily_2026-09-12");
+    expect(rankingCacheKey({ mode: "daily", date: "2026-09-12" }, before)).toBe(
+      "ranking_daily_today",
+    );
+    expect(rankingCacheKey({ mode: "daily", date: "2026-09-12" }, NOW)).toBe(
+      "ranking_daily_2026-09-12",
+    );
   });
 });

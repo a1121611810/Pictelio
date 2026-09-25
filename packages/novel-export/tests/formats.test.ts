@@ -11,7 +11,17 @@ import {
 } from "../src/index";
 
 // 期望值直接取自 spec 字面量，不从实现反推。
-const EXPECTED_FORMATS = ["txt", "html", "md", "docx", "pdf", "epub", "rtf", "json", "fb2"] as const;
+const EXPECTED_FORMATS = [
+  "txt",
+  "html",
+  "md",
+  "docx",
+  "pdf",
+  "epub",
+  "rtf",
+  "json",
+  "fb2",
+] as const;
 
 const EXPECTED_MIME: Record<NovelExportFormat, string> = {
   txt: "text/plain",

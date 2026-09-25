@@ -20,7 +20,9 @@ describe("formatReport", () => {
     engine: "lynx",
     appVersion: "9.9.9",
     device: { transports: ["wifi"], validated: true, captivePortal: false, metered: false },
-    probes: [{ id: "dns", ok: false, errorClass: "dns", rawError: "failed Bearer super.secret.token" }],
+    probes: [
+      { id: "dns", ok: false, errorClass: "dns", rawError: "failed Bearer super.secret.token" },
+    ],
     capturedAt: "2026-09-11T00:00:00Z",
   };
 

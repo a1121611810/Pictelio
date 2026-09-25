@@ -90,8 +90,8 @@ describe("createStreamFrameSource（ADR-0127 流式取帧器）", () => {
   });
 
   it("乱序 zip（物理序倒置）：按 fileOrder 输出且字节一致（防御设计）", () => {
-    const reversedNames = [...NAMES].reverse();
-    const zip = buildStoreZip(reversedNames, [...FRAMES].reverse());
+    const reversedNames = NAMES.toReversed();
+    const zip = buildStoreZip(reversedNames, FRAMES.toReversed());
     const { events } = runStream(zip, NAMES, 128);
     expect(events.map((e) => e.name)).toEqual(NAMES);
     const reference = unzipSync(zip);

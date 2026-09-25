@@ -2,7 +2,13 @@
  * 导出文档模型（IR）构造：NovelExportPayload / NovelExportTaskDraft。
  * 对齐 docs/specs/novel-export.md §3.2/§3.3/§3.4 与 ADR-0154 D3。
  */
-import { parseNovelBlocks, parseInlineRuns, type InlineRun, type JumpBlock, type NovelBlock } from "./blocks";
+import {
+  parseNovelBlocks,
+  parseInlineRuns,
+  type InlineRun,
+  type JumpBlock,
+  type NovelBlock,
+} from "./blocks";
 import { extForNovelExportFormat, type NovelExportFormat } from "./formats";
 import type { NovelImageUrls, NovelImagesMap } from "./types";
 

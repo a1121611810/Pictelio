@@ -35,19 +35,39 @@ describe("novelExportTaskId — 内容开关签名", () => {
 
   it("签名顺序 metadata/cover/images，on=1 off=0", () => {
     expect(
-      novelExportTaskId(42, "pdf", { includeMetadata: true, includeCover: false, includeInlineImages: false }),
+      novelExportTaskId(42, "pdf", {
+        includeMetadata: true,
+        includeCover: false,
+        includeInlineImages: false,
+      }),
     ).toBe("novel_42_pdf_100");
     expect(
-      novelExportTaskId(7, "epub", { includeMetadata: false, includeCover: true, includeInlineImages: true }),
+      novelExportTaskId(7, "epub", {
+        includeMetadata: false,
+        includeCover: true,
+        includeInlineImages: true,
+      }),
     ).toBe("novel_7_epub_011");
     expect(
-      novelExportTaskId(7, "json", { includeMetadata: false, includeCover: false, includeInlineImages: false }),
+      novelExportTaskId(7, "json", {
+        includeMetadata: false,
+        includeCover: false,
+        includeInlineImages: false,
+      }),
     ).toBe("novel_7_json_000");
   });
 
   it("同格式同开关签名稳定（可去重），改开关则另存一条", () => {
-    const a: NovelExportOptions = { includeMetadata: true, includeCover: true, includeInlineImages: true };
-    const b: NovelExportOptions = { includeMetadata: true, includeCover: true, includeInlineImages: false };
+    const a: NovelExportOptions = {
+      includeMetadata: true,
+      includeCover: true,
+      includeInlineImages: true,
+    };
+    const b: NovelExportOptions = {
+      includeMetadata: true,
+      includeCover: true,
+      includeInlineImages: false,
+    };
     expect(novelExportTaskId(1, "txt", a)).toBe(novelExportTaskId(1, "txt", a));
     expect(novelExportTaskId(1, "txt", a)).not.toBe(novelExportTaskId(1, "txt", b));
   });
@@ -94,7 +114,12 @@ describe("buildNovelExportTaskDraft", () => {
   });
 
   it("临时覆盖格式不写回 payload.options，仅影响 id/文件名/目标格式", () => {
-    const draft = buildNovelExportTaskDraft({ payload, format: "epub", title: "t", thumbnailUrl: "u" });
+    const draft = buildNovelExportTaskDraft({
+      payload,
+      format: "epub",
+      title: "t",
+      thumbnailUrl: "u",
+    });
     expect(draft.targetFormat).toBe("epub");
     expect(draft.id).toContain("_epub_");
     expect(draft.fileName).toBe("Pictelio_42.epub");

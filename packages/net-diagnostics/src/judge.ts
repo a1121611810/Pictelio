@@ -97,7 +97,12 @@ function probeView(input: DiagInput, id: string): DiagCheckView {
   const desc = CHECK_PLAN.find((c) => c.id === id)!;
   const base = { id: desc.id, layer: desc.layer, title: desc.title };
   if (desc.disabledReason) {
-    return { ...base, status: "skipped", detail: "已跳过：" + desc.disabledReason, attribution: "unknown" };
+    return {
+      ...base,
+      status: "skipped",
+      detail: "已跳过：" + desc.disabledReason,
+      attribution: "unknown",
+    };
   }
   const p = probeById(input, id);
   if (!p) {
@@ -121,7 +126,13 @@ function probeView(input: DiagInput, id: string): DiagCheckView {
   const attribution = failAttribution(id, p);
   const http = p.httpStatus !== undefined ? "（HTTP " + p.httpStatus + "）" : "";
   if (id === "dns") {
-    return { ...base, status: "fail", detail: "域名解析失败", hint: "请检查 DNS 或切换网络", attribution };
+    return {
+      ...base,
+      status: "fail",
+      detail: "域名解析失败",
+      hint: "请检查 DNS 或切换网络",
+      attribution,
+    };
   }
   if (id === "tcp") {
     return {
@@ -133,7 +144,13 @@ function probeView(input: DiagInput, id: string): DiagCheckView {
     };
   }
   if (id === "tls") {
-    return { ...base, status: "fail", detail: "TLS 握手失败", hint: "可能是 SNI 阻断或证书问题", attribution };
+    return {
+      ...base,
+      status: "fail",
+      detail: "TLS 握手失败",
+      hint: "可能是 SNI 阻断或证书问题",
+      attribution,
+    };
   }
   if (id === "edge") {
     return {
@@ -144,10 +161,22 @@ function probeView(input: DiagInput, id: string): DiagCheckView {
     };
   }
   if (attribution === "auth") {
-    return { ...base, status: "fail", detail: "登录已失效" + http, hint: "请重新登录", attribution };
+    return {
+      ...base,
+      status: "fail",
+      detail: "登录已失效" + http,
+      hint: "请重新登录",
+      attribution,
+    };
   }
   if (p.httpStatus === 429) {
-    return { ...base, status: "warn", detail: "请求被限流（HTTP 429）", hint: "请稍后重试", attribution: "service" };
+    return {
+      ...base,
+      status: "warn",
+      detail: "请求被限流（HTTP 429）",
+      hint: "请稍后重试",
+      attribution: "service",
+    };
   }
   if (attribution === "service") {
     return { ...base, status: "fail", detail: "Pixiv 服务端错误" + http, attribution };

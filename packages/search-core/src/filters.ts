@@ -56,9 +56,9 @@ export const BOOKMARK_BANDS: readonly BookmarkBand[] = [
   { min: 1000, max: null },
 ];
 
-const PERIOD_PRESETS: readonly PeriodPreset[] = ["1d", "1w", "1m", "6m", "1y"];
-const RATIO_PATTERNS: readonly RatioPattern[] = ["landscape", "portrait", "square"];
-const AI_OVERRIDES: readonly AiOverride[] = ["follow", "all", "hide"];
+const PERIOD_PRESETS: ReadonlySet<PeriodPreset> = new Set(["1d", "1w", "1m", "6m", "1y"]);
+const RATIO_PATTERNS: ReadonlySet<RatioPattern> = new Set(["landscape", "portrait", "square"]);
+const AI_OVERRIDES: ReadonlySet<AiOverride> = new Set(["follow", "all", "hide"]);
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -100,8 +100,10 @@ export function normalizeFilters(raw: {
 }): SearchFilters {
   // ── period ──
   let period: SearchPeriod = { kind: "any" };
-  const p = raw.period as { kind?: unknown; preset?: unknown; start?: unknown; end?: unknown } | undefined;
-  if (p && p.kind === "preset" && PERIOD_PRESETS.includes(p.preset as PeriodPreset)) {
+  const p = raw.period as
+    | { kind?: unknown; preset?: unknown; start?: unknown; end?: unknown }
+    | undefined;
+  if (p && p.kind === "preset" && PERIOD_PRESETS.has(p.preset as PeriodPreset)) {
     period = { kind: "preset", preset: p.preset as PeriodPreset };
   } else if (
     p &&
@@ -129,20 +131,17 @@ export function normalizeFilters(raw: {
 
   // ── ratio ──
   const r = raw.ratio;
-  const ratio: RatioPattern | null = RATIO_PATTERNS.includes(r as RatioPattern)
+  const ratio: RatioPattern | null = RATIO_PATTERNS.has(r as RatioPattern)
     ? (r as RatioPattern)
     : null;
 
   // ── minPixels：正整数（px 下限） ──
   const w = raw.minPixels;
-  const minPixels: number | null =
-    typeof w === "number" && Number.isInteger(w) && w > 0 ? w : null;
+  const minPixels: number | null = typeof w === "number" && Number.isInteger(w) && w > 0 ? w : null;
 
   // ── aiOverride ──
   const a = raw.aiOverride;
-  const aiOverride: AiOverride = AI_OVERRIDES.includes(a as AiOverride)
-    ? (a as AiOverride)
-    : "follow";
+  const aiOverride: AiOverride = AI_OVERRIDES.has(a as AiOverride) ? (a as AiOverride) : "follow";
 
   return { period, bookmark, ratio, minPixels, aiOverride };
 }

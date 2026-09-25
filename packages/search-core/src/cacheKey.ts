@@ -16,7 +16,8 @@ export function buildCacheKey(
   if (isDefaultFilters(filters)) return base;
   const seg: string[] = [];
   if (filters.period.kind === "preset") seg.push(`fp=${filters.period.preset}`);
-  else if (filters.period.kind === "custom") seg.push(`fd=${filters.period.start}_${filters.period.end}`);
+  else if (filters.period.kind === "custom")
+    seg.push(`fd=${filters.period.start}_${filters.period.end}`);
   if (filters.bookmark !== null) {
     const idx = BOOKMARK_BANDS.findIndex(
       (b) => b.min === filters.bookmark!.min && b.max === filters.bookmark!.max,

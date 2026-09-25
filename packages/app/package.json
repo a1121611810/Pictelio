@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vp dev",
     "build": "vp build",
-    "check": "vp check && tsc --noEmit -p tsconfig.json",
+    "check": "vp -C ../.. fmt --check && vp -C ../.. lint && tsc --noEmit -p tsconfig.json",
     "preview": "vp preview",
     "test": "vp test",
     "test:watch": "vp test --watch",
@@ -15,9 +15,9 @@
     "test:android:e2e": "vitest run -c tests/android-e2e/vitest.config.ts",
     "appium:setup": "APPIUM_HOME=$HOME/.appium appium driver install uiautomator2 && APPIUM_HOME=$HOME/.appium appium driver doctor uiautomator2",
     "test:all": "vp run test && vp run test:agent-browser",
-    "lint": "vp lint",
-    "fmt": "vp fmt --write",
-    "fmt:check": "vp fmt --check",
+    "lint": "vp -C ../.. lint",
+    "fmt": "vp -C ../.. fmt --write",
+    "fmt:check": "vp -C ../.. fmt --check",
     "cap:init": "vp exec cap init pictelio io.pictelio.app",
     "cap:add:android": "vp exec cap add android",
     "cap:copy": "vp exec cap copy android",
@@ -80,9 +80,9 @@
     "typescript-compiler-api": "npm:typescript@^6.0.3",
     "unocss": "^66.10.5",
     "unplugin-auto-import": "^21.1.0",
-    "vite": "^8.3.0",
-    "vite-plus": "^0.2.8",
-    "vitest": "^4.1.10",
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.0.0-rc.0",
+    "vite-plus": "1.0.0-rc.0",
+    "vitest": "5.0.1",
     "webdriverio": "^9.32.0"
   }
 }

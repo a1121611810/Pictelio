@@ -26,7 +26,10 @@ describe("encodeFiltersQuery / decodeFiltersQuery", () => {
   });
 
   it("自定义期间 fd 编解码（含下划线分隔）", () => {
-    const f = { ...DEFAULT_SEARCH_FILTERS, period: { kind: "custom", start: "2026-08-01", end: "2026-08-15" } as const };
+    const f = {
+      ...DEFAULT_SEARCH_FILTERS,
+      period: { kind: "custom", start: "2026-08-01", end: "2026-08-15" } as const,
+    };
     expect(encodeFiltersQuery(f)).toEqual({ fd: "2026-08-01_2026-08-15" });
     expect(decodeFiltersQuery({ fd: "2026-08-01_2026-08-15" })).toEqual(f);
   });

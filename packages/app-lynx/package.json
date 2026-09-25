@@ -10,8 +10,8 @@
     "preview": "rspeedy preview",
     "check": "vue-tsc --noEmit -p src/tsconfig.json",
     "test": "vitest run",
-    "lint": "echo 'oxlint via rspeedy build (MVP)'",
-    "fmt": "echo 'oxfmt not wired for lynx MVP'",
+    "lint": "echo 'lint 暂豁免：app-lynx 存量风格债清偿后接入 root vp lint（范围裁定见 ADR-0185）'",
+    "fmt": "echo 'fmt 暂豁免：app-lynx 待清债后接入 root vp fmt（范围裁定见 ADR-0185）'",
     "test:lynx-web": "bash scripts/test-lynx-web.sh"
   },
   "dependencies": {

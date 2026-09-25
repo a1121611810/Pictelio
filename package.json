@@ -44,15 +44,12 @@
     "test:app:all": "pnpm vp run --filter pictelio-app test:all",
     "test:watch": "pnpm vp run --filter pictelio-app test:watch",
     "test:agent-browser": "pnpm vp run --filter pictelio-app test:agent-browser",
-    "lint": "vp run --filter pictelio-app lint",
-    "lint:app": "vp run --filter pictelio-app lint",
-    "lint:app-lynx": "vp run --filter pictelio-app-lynx lint",
-    "lint:all": "pnpm vp run --parallel --filter pictelio-app --filter pictelio-app-lynx --filter pictelio-website --filter @pictelio/ugoira --filter @pictelio/novel-export lint",
-    "fmt": "vp run --filter pictelio-app fmt",
-    "fmt:app": "vp run --filter pictelio-app fmt",
-    "fmt:app-lynx": "vp run --filter pictelio-app-lynx fmt",
-    "fmt:all": "vp run --parallel --filter pictelio-app --filter pictelio-app-lynx --filter pictelio-website --filter @pictelio/ugoira --filter @pictelio/novel-export fmt",
-    "fmt:check": "vp run --filter pictelio-app fmt:check",
+    "lint": "pnpm vp lint",
+    "lint:all": "pnpm vp lint",
+    "fmt": "pnpm vp fmt --write",
+    "fmt:all": "pnpm vp fmt --write",
+    "fmt:check": "pnpm vp fmt --check",
+    "outdated": "pnpm vp outdated",
     "build:android": "vp run --filter pictelio-app build:android",
     "build:android:e2e": "vp run --filter pictelio-app build:android:e2e",
     "build:android:release": "vp run --filter pictelio-app build:android:release",
@@ -71,7 +68,12 @@
     "openwiki:update": "openwiki --update",
     "prepare": "husky"
   },
-  "packageManager": "pnpm@11.9.0",
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
+    "husky": "^9.1.7",
+    "vite-plus": "1.0.0-rc.0"
+  },
   "devEngines": {
     "node": {
       "version": ">=22.22.2",
@@ -83,9 +85,5 @@
       "onFail": "error"
     }
   },
-  "devDependencies": {
-    "@commitlint/cli": "^21.2.3",
-    "@commitlint/config-conventional": "^21.2.3",
-    "husky": "^9.1.7"
-  }
+  "packageManager": "pnpm@11.9.0"
 }

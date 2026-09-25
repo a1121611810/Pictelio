@@ -14,29 +14,26 @@
 // - error 字段区分「检查失败」与「无更新」：失败时带原因并 console.warn（禁止静默降级）。
 
 export interface CheckResult {
-  hasUpdate: boolean
-  latestVersion: string
-  latestReleaseUrl: string
-  latestChangelog: string
+  hasUpdate: boolean;
+  latestVersion: string;
+  latestReleaseUrl: string;
+  latestChangelog: string;
   /** web 层强制门槛 floor（OTA web bundle）：undefined = 未设门槛（fail-open 判定由消费端做） */
-  minWebVersion?: string
+  minWebVersion?: string;
   /** OTA bundle 元数据：version + 三件套资产前缀 URL（拼 -manifest.json / .sig / -web-bundle.zip） */
-  webBundle?: WebBundleMeta
+  webBundle?: WebBundleMeta;
   /** 检查失败原因（undefined = 检查成功且已解析远端数据） */
-  error?: string
+  error?: string;
 }
 
 /** version.json 的 webBundle 子对象（checksum/minApkVersion 只存在于签名的 manifest，不进本契约） */
 export interface WebBundleMeta {
-  version: string
-  url: string
+  version: string;
+  url: string;
 }
 
 /** 可注入的 fetch 依赖（标准 DOM 类型；缺省用全局 fetch，app-lynx 传 requestFetch） */
-export type FetchLike = (
-  input: RequestInfo | URL,
-  init?: RequestInit,
-) => Promise<Response>
+export type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
 // ── 版本比较（无 semver 依赖） ──
 
@@ -50,21 +47,21 @@ export function isNewer(local: string, remote: string): boolean {
     .trim()
     .replace(/^v/i, "")
     .split(".")
-    .map((s) => Number(s) || 0)
+    .map((s) => Number(s) || 0);
   const rParts = remote
     .trim()
     .replace(/^v/i, "")
     .split(".")
-    .map((s) => Number(s) || 0)
+    .map((s) => Number(s) || 0);
 
   // 只比较 major.minor.patch（标准 semver 三段）
   for (let i = 0; i < 3; i++) {
-    const l = lParts[i] ?? 0
-    const r = rParts[i] ?? 0
-    if (r > l) return true
-    if (r < l) return false
+    const l = lParts[i] ?? 0;
+    const r = rParts[i] ?? 0;
+    if (r > l) return true;
+    if (r < l) return false;
   }
-  return false // equal
+  return false; // equal
 }
 
 // ── 核心 fetch ──
@@ -77,8 +74,8 @@ export function isNewer(local: string, remote: string): boolean {
  * （oracle：docs/specs/ota-web-bundle.md「版本与数据源」）。
  */
 export function isBelowMin(local: string, floor?: string): boolean {
-  if (!floor?.trim()) return false
-  return isNewer(local, floor)
+  if (!floor?.trim()) return false;
+  return isNewer(local, floor);
 }
 
 /**
@@ -86,44 +83,46 @@ export function isBelowMin(local: string, floor?: string): boolean {
  * 字段存在但非法 = 契约破坏，必须 warn 可见（禁静默降级），同样按不存在处理。
  */
 function parseWebBundle(raw: unknown): WebBundleMeta | undefined {
-  if (raw === undefined || raw === null) return undefined
+  if (raw === undefined || raw === null) return undefined;
   if (typeof raw !== "object") {
-    console.warn("[update-check] webBundle 字段存在但非法（非对象），按无 bundle 更新处理")
-    return undefined
+    console.warn("[update-check] webBundle 字段存在但非法（非对象），按无 bundle 更新处理");
+    return undefined;
   }
-  const { version, url } = raw as { version?: unknown; url?: unknown }
+  const { version, url } = raw as { version?: unknown; url?: unknown };
   if (typeof version !== "string" || !version.trim() || typeof url !== "string" || !url.trim()) {
-    console.warn("[update-check] webBundle 字段残缺（version/url 缺失或非法），按无 bundle 更新处理")
-    return undefined
+    console.warn(
+      "[update-check] webBundle 字段残缺（version/url 缺失或非法），按无 bundle 更新处理",
+    );
+    return undefined;
   }
-  return { version: version.trim(), url: url.trim() }
+  return { version: version.trim(), url: url.trim() };
 }
 
 /** minWebVersion 脏数据防御：缺失静默视为未设门槛；存在但非法 → warn（契约破坏可见） */
 function parseMinWebVersion(raw: unknown): string | undefined {
-  if (raw === undefined || raw === null) return undefined
+  if (raw === undefined || raw === null) return undefined;
   if (typeof raw !== "string" || !raw.trim()) {
     console.warn(
       `[update-check] minWebVersion 字段存在但非法（${JSON.stringify(raw)}），按未设门槛处理`,
-    )
-    return undefined
+    );
+    return undefined;
   }
-  return raw.trim()
+  return raw.trim();
 }
 
 // 通过 raw.githubusercontent.com 获取版本信息（直连，不被 Pixiv 代理拦截）；
 // repo 曾用名 pixivizer，已重命名为 Pictelio；若 repo 迁移需同步此处。
 const UPDATE_URL =
-  "https://raw.githubusercontent.com/a1121611810/Pictelio/main/packages/website/version.json"
+  "https://raw.githubusercontent.com/a1121611810/Pictelio/main/packages/website/version.json";
 
-const CHECK_TIMEOUT_MS = 10_000
+const CHECK_TIMEOUT_MS = 10_000;
 
 const EMPTY_RESULT: CheckResult = {
   hasUpdate: false,
   latestVersion: "",
   latestReleaseUrl: "",
   latestChangelog: "",
-}
+};
 
 /**
  * 拉取远端最新版本并与本地 APK 版本比较。
@@ -137,50 +136,50 @@ export async function checkForUpdate(
   localVersion: string,
   fetchImpl?: FetchLike,
 ): Promise<CheckResult> {
-  const fetchFn: FetchLike = fetchImpl ?? ((input, init) => fetch(input, init))
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS)
+  const fetchFn: FetchLike = fetchImpl ?? ((input, init) => fetch(input, init));
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
 
-  let res: Response
+  let res: Response;
   try {
-    res = await fetchFn(UPDATE_URL, { signal: controller.signal })
+    res = await fetchFn(UPDATE_URL, { signal: controller.signal });
   } catch (err) {
-    clearTimeout(timeoutId)
-    console.warn("[update-check] 检查更新失败:", err)
-    return { ...EMPTY_RESULT, error: err instanceof Error ? err.message : String(err) }
+    clearTimeout(timeoutId);
+    console.warn("[update-check] 检查更新失败:", err);
+    return { ...EMPTY_RESULT, error: err instanceof Error ? err.message : String(err) };
   }
-  clearTimeout(timeoutId)
+  clearTimeout(timeoutId);
 
   if (!res.ok) {
-    console.warn(`[update-check] 检查更新失败: HTTP ${res.status}`)
-    return { ...EMPTY_RESULT, error: `HTTP ${res.status}` }
+    console.warn(`[update-check] 检查更新失败: HTTP ${res.status}`);
+    return { ...EMPTY_RESULT, error: `HTTP ${res.status}` };
   }
 
-  let parsed: unknown
+  let parsed: unknown;
   try {
-    parsed = await res.json()
+    parsed = await res.json();
   } catch (err) {
     // 200 但响应体非 JSON（如网关错误页）：解析失败同样按检查失败处理
-    console.warn("[update-check] 解析 version.json 失败:", err)
-    return { ...EMPTY_RESULT, error: err instanceof Error ? err.message : String(err) }
+    console.warn("[update-check] 解析 version.json 失败:", err);
+    return { ...EMPTY_RESULT, error: err instanceof Error ? err.message : String(err) };
   }
   // res.json() 对「合法 JSON 但非对象」的 body（字面量 null / 数组 / 字符串）原样返回，
   // 同样按检查失败处理——「调用方无需 try/catch」的契约不能被脏 body 击穿
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    console.warn("[update-check] version.json 响应体非对象，按检查失败处理")
-    return { ...EMPTY_RESULT, error: "invalid body: not an object" }
+    console.warn("[update-check] version.json 响应体非对象，按检查失败处理");
+    return { ...EMPTY_RESULT, error: "invalid body: not an object" };
   }
   const data = parsed as {
-    version?: unknown
-    url?: unknown
-    release_url?: unknown
-    changelog?: unknown
-    minWebVersion?: unknown
-    webBundle?: unknown
-  }
+    version?: unknown;
+    url?: unknown;
+    release_url?: unknown;
+    changelog?: unknown;
+    minWebVersion?: unknown;
+    webBundle?: unknown;
+  };
 
-  const remoteVersion = typeof data.version === "string" ? data.version : ""
-  const hasUpdate = remoteVersion ? isNewer(localVersion, remoteVersion) : false
+  const remoteVersion = typeof data.version === "string" ? data.version : "";
+  const hasUpdate = remoteVersion ? isNewer(localVersion, remoteVersion) : false;
 
   // trim 口径：新字段（minWebVersion/webBundle）入库前 trim；存量字段保持原样透传
   // （isNewer 内部自带 trim，行为不变——避免对既有消费方的语义漂移）
@@ -188,9 +187,13 @@ export async function checkForUpdate(
     hasUpdate,
     latestVersion: remoteVersion,
     latestReleaseUrl:
-      typeof data.url === "string" ? data.url : typeof data.release_url === "string" ? data.release_url : "",
+      typeof data.url === "string"
+        ? data.url
+        : typeof data.release_url === "string"
+          ? data.release_url
+          : "",
     latestChangelog: typeof data.changelog === "string" ? data.changelog : "",
     minWebVersion: parseMinWebVersion(data.minWebVersion),
     webBundle: parseWebBundle(data.webBundle),
-  }
+  };
 }

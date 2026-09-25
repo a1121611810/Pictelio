@@ -21,7 +21,9 @@ describe("resolvePeriodRange", () => {
       end: "2026-09-13",
     });
     // 14:59Z 仍是 JST 09-12 23:59
-    expect(resolvePeriodRange({ kind: "preset", preset: "1d" }, new Date("2026-09-12T14:59:00Z"))).toEqual({
+    expect(
+      resolvePeriodRange({ kind: "preset", preset: "1d" }, new Date("2026-09-12T14:59:00Z")),
+    ).toEqual({
       start: "2026-09-12",
       end: "2026-09-12",
     });
@@ -52,10 +54,16 @@ describe("resolvePeriodRange", () => {
   });
 
   it("非法自定义 → null（调用方省略参数，不静默半区间）", () => {
-    expect(resolvePeriodRange({ kind: "custom", start: "2026-08-15", end: "2026-08-01" }, NOW)).toBeNull();
-    expect(resolvePeriodRange({ kind: "custom", start: "2026/08/01", end: "2026-08-15" }, NOW)).toBeNull();
+    expect(
+      resolvePeriodRange({ kind: "custom", start: "2026-08-15", end: "2026-08-01" }, NOW),
+    ).toBeNull();
+    expect(
+      resolvePeriodRange({ kind: "custom", start: "2026/08/01", end: "2026-08-15" }, NOW),
+    ).toBeNull();
     // end 超过今天（JST）
-    expect(resolvePeriodRange({ kind: "custom", start: "2026-09-01", end: "2026-09-14" }, NOW)).toBeNull();
+    expect(
+      resolvePeriodRange({ kind: "custom", start: "2026-09-01", end: "2026-09-14" }, NOW),
+    ).toBeNull();
     expect(resolvePeriodRange({ kind: "custom", start: "", end: "2026-08-15" }, NOW)).toBeNull();
   });
 });

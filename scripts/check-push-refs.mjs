@@ -111,7 +111,9 @@ export async function runPrePushChecks({
     if (remoteSha === ZERO) {
       // 新分支：与 origin/main 的 merge-base 比较；取不到时退化为仅看顶端提交
       const base = await mergeBase(localSha, "origin/main", gitCwd);
-      files = base ? await diffNames(base, localSha, gitCwd) : await diffTreeNames(localSha, gitCwd);
+      files = base
+        ? await diffNames(base, localSha, gitCwd)
+        : await diffTreeNames(localSha, gitCwd);
     } else {
       // 已存在分支：remote_sha 本地缺失 → 精准 fetch 重试（ADR-0142 D1）
       if (!(await hasCommitObject(remoteSha, gitCwd))) {

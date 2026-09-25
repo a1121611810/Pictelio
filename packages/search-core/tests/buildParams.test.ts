@@ -72,22 +72,36 @@ describe("buildIllustSearchRequest", () => {
   });
 
   it("非热门 + 收藏数带宽：闭区间 min/max 落参（七档 oracle=官方 bookmark_ranges）", () => {
-    const r = buildIllustSearchRequest(input({ filters: { ...DEFAULT_SEARCH_FILTERS, bookmark: BOOKMARK_BANDS[3]! } }));
+    const r = buildIllustSearchRequest(
+      input({ filters: { ...DEFAULT_SEARCH_FILTERS, bookmark: BOOKMARK_BANDS[3]! } }),
+    );
     expect(r.params.bookmark_num_min).toBe("100");
     expect(r.params.bookmark_num_max).toBe("299");
-    const open = buildIllustSearchRequest(input({ filters: { ...DEFAULT_SEARCH_FILTERS, bookmark: BOOKMARK_BANDS[6]! } }));
+    const open = buildIllustSearchRequest(
+      input({ filters: { ...DEFAULT_SEARCH_FILTERS, bookmark: BOOKMARK_BANDS[6]! } }),
+    );
     expect(open.params.bookmark_num_min).toBe("1000");
     expect(open.params.bookmark_num_max).toBeUndefined();
   });
 
   it("期间自定义合法区间透传；非法区间省略（不静默半区间）", () => {
     const ok = buildIllustSearchRequest(
-      input({ filters: { ...DEFAULT_SEARCH_FILTERS, period: { kind: "custom", start: "2026-08-01", end: "2026-08-15" } } }),
+      input({
+        filters: {
+          ...DEFAULT_SEARCH_FILTERS,
+          period: { kind: "custom", start: "2026-08-01", end: "2026-08-15" },
+        },
+      }),
     );
     expect(ok.params.start_date).toBe("2026-08-01");
     expect(ok.params.end_date).toBe("2026-08-15");
     const bad = buildIllustSearchRequest(
-      input({ filters: { ...DEFAULT_SEARCH_FILTERS, period: { kind: "custom", start: "2026-08-15", end: "2026-08-01" } } }),
+      input({
+        filters: {
+          ...DEFAULT_SEARCH_FILTERS,
+          period: { kind: "custom", start: "2026-08-15", end: "2026-08-01" },
+        },
+      }),
     );
     expect(bad.params.start_date).toBeUndefined();
     expect(bad.params.end_date).toBeUndefined();
@@ -126,7 +140,11 @@ describe("buildNovelSearchRequest", () => {
     const r = buildNovelSearchRequest(
       input({
         sort: "popular_desc",
-        filters: { ...DEFAULT_SEARCH_FILTERS, period: { kind: "preset", preset: "1d" }, bookmark: BOOKMARK_BANDS[0]! },
+        filters: {
+          ...DEFAULT_SEARCH_FILTERS,
+          period: { kind: "preset", preset: "1d" },
+          bookmark: BOOKMARK_BANDS[0]!,
+        },
       }),
     );
     expect(r.endpoint).toBe("/v1/search/popular-preview/novel");
