@@ -45,6 +45,8 @@ Pixiv 的 refresh_token 在每次成功 refresh 后轮换。多套件/多进程�
 
 Solid 2.0-rc.9 的 effect 内创建的 promise 会被作为该 effect 的 flight 持有（异步揭示语义：写入暂存、flush 揭示）。当 flight 中的 promise 永不 settle（#722：`PixivApi.prefetchImage` 原生回调在弱网/代理抖动下缺席），事务永久 park——`schedule()` 因 `globalQueue.Kt` 真值不再排队、`flush()` 早退——**全局所有信号写入被无限期暂存**，DOM 冻结在最后一次提交态。判别：`__pictelioDebug.isLoading()` 长期为 true 且 `selfTest()` 写读不一致。修复 = 让每个被 effect 创建的 promise 必定 settle（`withNativeImageTimeout` 20s 超时拒绝）。
 
+已知边界：超时拒绝后调用方重试时，Java 侧同 URL 的在途下载无取消通道（JS→native 无取消契约，ADR-0143 未覆盖）——弱网下可能出现同 URL 并发重复下载，仅浪费带宽不影响正确性；图片下载本体在 Java 侧有独立 connect/call 超时兜底。
+
 ## e2e-start 打点与 __pictelioDebug 探针
 
 - `__root.tsx` 启动链逐级 `[e2e-start]` 标记（E2E_ON 门控）：IIFE / registerBackGesture / hydrateAll / initializeAuth / loadAccountR18 / navigate / setIsLoading——缺失的标记即悬挂点。

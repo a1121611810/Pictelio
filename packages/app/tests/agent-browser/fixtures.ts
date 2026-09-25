@@ -43,6 +43,19 @@ function saveRotatedToken(token: string): void {
   }
 }
 
+/** #723：从 app localStorage 回读最新轮换 token，变化则回写状态文件（两处登录分支共用） */
+async function readAndSaveRotatedToken(driver: AgentBrowserDriver, token: string): Promise<void> {
+  try {
+    const stored = await driver.evaluate(
+      `localStorage.getItem("capacitor-storage_refresh_token") || ""`,
+    );
+    const latest = String(stored).replace(/"/g, "").trim();
+    if (latest && latest !== token) saveRotatedToken(latest);
+  } catch (e) {
+    console.warn("[fixture] 轮换 token 读取失败（保持现状）", e);
+  }
+}
+
 /** 阶段重试上限（I 类：每次间隔 500ms，60 次 × 0.5s = 30s，总超时上限不变） */
 const MAX_ATTEMPTS = 60;
 
@@ -119,15 +132,7 @@ async function initLoggedInDriver(
       if (await snapshotHas(driver, marker)) {
         console.log("[fixture] 检测到已登录状态（token 自动恢复），跳过登录");
         // #723：自动登录路径的 performRefresh 同样可能轮换 token → 回读回写状态文件
-        try {
-          const stored = await driver.evaluate(
-            `localStorage.getItem("capacitor-storage_refresh_token") || ""`,
-          );
-          const latest = String(stored).replace(/"/g, "").trim();
-          if (latest && latest !== token) saveRotatedToken(latest);
-        } catch (e) {
-          console.warn("[fixture] 轮换 token 读取失败（保持现状）", e);
-        }
+        await readAndSaveRotatedToken(driver, token);
         return driver;
       }
     }
@@ -155,15 +160,7 @@ async function initLoggedInDriver(
       if (await snapshotHas(driver, marker)) {
         console.log("[fixture] 登录完成");
         // #723：登录成功 = refresh_token 已轮换 → 回写共享状态文件，供后续 spec 使用
-        try {
-          const stored = await driver.evaluate(
-            `localStorage.getItem("capacitor-storage_refresh_token") || ""`,
-          );
-          const latest = String(stored).replace(/"/g, "").trim();
-          if (latest && latest !== token) saveRotatedToken(latest);
-        } catch (e) {
-          console.warn("[fixture] 轮换 token 读取失败（保持现状）", e);
-        }
+        await readAndSaveRotatedToken(driver, token);
         return driver;
       }
     }
