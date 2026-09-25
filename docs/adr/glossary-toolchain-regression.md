@@ -1,0 +1,42 @@
+# 术语表：工具链回归战役（ADR-0185 / ADR-0186）
+
+> 本表统一 vite-plus 升级回归战役中的术语，防跨文档漂移。权威源 = ADR-0185/0186。
+
+## 加载门槛（isLoading Gate）
+
+`packages/app/src/routes/__root.tsx` 中 `<Show when={!isLoading()}>` 包裹的全屏 LoadingSpinner 层。`isLoading` 在「initializeAuth + hydrated（settings 水合 + 屏蔽/举报/图片源偏好）+ loadAccountR18」全部完成后释放。该门槛悬挂时路由内容永不渲染，且 Splash 因 `markContentReady` 永不触发而永挂。
+
+## Splash 永挂（Splash Hang）
+
+原生 Splash 永不退出的表象。两种成因在本战役中均实证：
+1. **加载门槛悬挂**（P1，存量）：isLoading 不释放 → HomePage.onMount 不执行 → markContentReady 不触发；
+2. **设备代理缺失**（P3，环境）：启动链上网络请求黑洞化 → 同上。
+
+判别：CDP 读 `location.pathname`——若已到达 /home 而画面仍 Splash/加载层，即门槛悬挂；若停在 /login 且桥零流量，查代理与点击事件。
+
+## 桥级登录管线（Bridge-level Login Pipeline）
+
+`handleSubmit` 触发后的 androidBridge 流量序列（成功判据）：
+`AuthPlugin.refreshToken → PixivApi.setAccessToken → PixivApi.addListener → App.addListener → SecureStorage.internalSetItem → PixivApi.syncToken → Preferences.get×4 → Preferences.remove×2`。
+最后两项 remove 为 `loadAccountR18` 的孤儿键清理（age_confirmed / is_adult）——它们的出现在即证明 `loadAccountR18` 已跑完，其后只有 `navigate("/home")`。
+
+## bundle A/B 对照法（Bundle A/B Swap）
+
+把「升级回归」与「存量/环境」切干净的标准实验：
+1. `git worktree add /tmp/xx <旧基线>` → pnpm install → 旧链构建 dist；
+2. 整目录替换 `packages/app/android/app/src/main/assets/public` → `gradlew assembleDebug`（增量 <1min）→ `adb install -r -d`；
+3. 同设备、同 token 状态、同交互协议逐场景对比；完毕恢复新 bundle 产物。
+判据：新旧症状一致 = 存量/环境；不一致 = 升级回归。
+
+## CDP 取证通道（CDP Forensics Channel）
+
+WebView 引擎的运行时取证：`adb forward tcp:9222 localabstract:webview_devtools_remote_<pid>` 后经 DevTools 协议 `Runtime.evaluate` 直调桥方法计时、`Page.addScriptToEvaluateOnNewDocument` 启动插桩。
+坑：`Capacitor.Plugins.X` 每次访问返回新包装对象，替换其方法不可靠；必须 hook `window.androidBridge.postMessage` 本体（消息字段为 `data.pluginId`）。`fluent-*` 自定义元素上 `document.querySelectorAll` 大小写不敏感，但元素可能位于 shadow root 内需逐层下探。
+
+## 设备代理（Device Proxy）
+
+模拟器 E2E 的前置条件：`adb shell settings put global http_proxy 10.0.2.2:7897`（10.0.2.2 = 宿主回环别名）。缺失时 OAuth（oauth.secure.pixiv.net）与 GitHub（raw.githubusercontent.com）直连黑洞，表象含 Splash 永挂 / 登录超时。宿主 10808 已死，7897 为当前活跃代理。
+
+## token 轮换互踩（Refresh Token Rotation War）
+
+Pixiv 的 refresh_token 在每次成功 refresh 后轮换。多套件/多进程并发消费同一份 `.env` token 时，先成功者使后者 400（invalid_grant）→ 登录 gate 大面积 skip。判据：host 直调 OAuth 实测 200 而套件内 400。缓解：串行跑登录类套件；发现轮换立即回填 `.env`。
