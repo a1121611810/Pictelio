@@ -21,6 +21,22 @@ const [user, setUser] = createSignal<PixivUser | null>(null);
 const [isLoggedIn, setIsLoggedIn] = createSignal(false);
 const [isLoading, setIsLoading] = createSignal(true);
 
+// #722 诊断：模块双实例检测——内部写后读 vs __root 外部读不一致 = authStore 被
+// chunk 复制成两份（各自独立信号域）
+if (E2E_ON) {
+  (window as unknown as Record<string, unknown>).__authStoreInstance = Math.random()
+    .toString(36)
+    .slice(2, 8);
+}
+export function debugIsLoading(): boolean {
+  const v = isLoading();
+  if (E2E_ON)
+    console.log(
+      `[e2e-start] internal isLoading=${v} instance=${(window as unknown as Record<string, unknown>).__authStoreInstance}`,
+    );
+  return v;
+}
+
 /** 上次 token 刷新的时间戳 */
 let lastRefreshTime = 0;
 /** 预判性刷新阈值：前台恢复后距离上次刷新超过此值则预刷新（10 分钟） */

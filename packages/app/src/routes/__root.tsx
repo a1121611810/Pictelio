@@ -196,7 +196,12 @@ const RootLayout: Component = (props: { children?: any }) => {
       );
 
       // 后台预热 LRU 缓存（从 Android 文件系统读取最近图片，不阻塞启动流程）
-      warmCacheFromDisk();
+      // #722 A/B 实验：e2e 构建可用 localStorage flag 切换 warm 开关（同 APK 对照）
+      if (E2E_ON && localStorage.getItem("e2e-skip-warm") === "1") {
+        e2eMark("warmCacheFromDisk SKIPPED (e2e flag)");
+      } else {
+        warmCacheFromDisk();
+      }
 
       // Register native back gesture handler. Overlay closure is handled by backGestureStore
       // Once components push overlays in Phase 5; for now the service closes top overlay if any.
@@ -235,7 +240,12 @@ const RootLayout: Component = (props: { children?: any }) => {
       await hydrated;
       e2eMark("hydrated done (pre-release)");
       setIsLoading(false);
-      e2eMark("setIsLoading(false) called");
+      if (E2E_ON) {
+        e2eMark("setIsLoading(false) called, syncRead=" + isLoading());
+        void Promise.resolve().then(() => e2eMark("microRead=" + isLoading()));
+        setTimeout(() => e2eMark("t100ms read=" + isLoading() + " path=" + location.pathname), 100);
+        setTimeout(() => e2eMark("t3s read=" + isLoading() + " path=" + location.pathname), 3000);
+      }
       // 兜底关闭 Splash：非 Feed 页面（login 等）
       // 由 Login.tsx 或 Feed.tsx 负责主动触发，此处兜底确保不会泄漏
       const currentPath = location.pathname;
