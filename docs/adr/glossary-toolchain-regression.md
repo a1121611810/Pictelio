@@ -52,6 +52,10 @@ park，同事务内的信号写入不提交。
 正是本节机制（`useFeedActivation` 的 ensure 延迟到宏任务，隔离实测见 spec §4.4）。
 `withNativeImageTimeout` 作为独立防御保留（消除「桥调用永不 settle」类威胁）。
 
+已知边界（withNativeImageTimeout 的唯一限制）：超时拒绝后调用方重试时，Java 侧同 URL 的
+在途下载无取消通道（JS→native 无取消契约，ADR-0143 未覆盖）——弱网下可能出现同 URL 并发
+重复下载，仅浪费带宽不影响正确性；图片下载本体在 Java 侧有独立 connect/call 超时兜底。
+
 
 ## e2e-start 打点与 __pictelioDebug 探针
 

@@ -25,7 +25,7 @@
 
 现象：pm clear + 注入 token 后启动，auth 管线全链成功（androidBridge 流量实证：`AuthPlugin.refreshToken → PixivApi.setAccessToken/addListener → SecureStorage.internalSetItem → PixivApi.syncToken → loadAccountR18 的 Preferences.get×4 + remove×2` 全部完成），路由也 `navigate("/home")` 生效（CDP location.pathname=/home），但 `__root` 的 isLoading 门槛 DOM（1959 字节 loading overlay）永不释放 → Splash 永挂。
 
-证据链：新旧 bundle（0.2.8 产物 vs 1.0-rc 产物）症状逐字节一致；`hydrated` 链（hydrateAll + loadReportedIds/loadBlockedIds/loadImageHostPreference）嫌疑最大，其中 `indexedDB.databases()` 全程为空（app 的 `pictelio` 库从未建成）而探针库 10ms 打开——idb 初始化悬挂是头号嫌疑（`db.ts` openDB 无 `onblocked` 处理为已知弱点，但该文件服务 novelCache 不直接在 hydrated 链上，精确根因待下钻）。
+证据链：新旧 bundle（0.2.8 产物 vs 1.0-rc 产物）症状逐字节一致；`hydrated` 链（hydrateAll + loadReportedIds/loadBlockedIds/loadImageHostPreference）嫌疑最大，其中 `indexedDB.databases()` 全程为空（app 的 `pictelio` 库从未建成）而探针库 10ms 打开——idb 初始化悬挂是头号嫌疑（`db.ts` openDB 无 `onblocked` 处理为已知弱点，但该文件服务 novelCache 不直接在 hydrated 链上，精确根因待下钻）。（⚠ 本节假设已于 2026-09-25 被 spec §2 的 pending 异步读 park 根因取代，见下「修复落地」）
 
 影响：webview 引擎 E2E（transition-matrix R4、agent-browser 登录依赖用例）在模拟器上被阻断；lynx 引擎不受影响；host Chrome 不复现（历史 CI 绿）。
 

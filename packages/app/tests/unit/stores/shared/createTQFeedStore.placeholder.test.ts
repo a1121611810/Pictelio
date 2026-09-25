@@ -4,8 +4,8 @@
  * 说明（review P2）：本文件的行为用例（激活窗口 / 失败路径 / refreshing 窗口）覆盖机制可观察面；契约用例是
  * **characterization（实现字面量契约）**——钉住「查询注册 placeholderData 且返回空页占位」
  * 以防后人删改（删除即 #722 复发）。tdd 红态证据：失败路径用例首跑实测抛 'simulated network failure'（见 commit d3735228）；
- * pending 读抛错机制的上游证据 = signals rc.9 `dev-shared.js` 对无 committed 值节点的
- * 非跟踪读抛 NotReadyError。
+ * 失败路径红态的上游证据 = signals rc.9 `dev-shared.js:5729-5740`（errored derive 对
+ * late reader 抛 `owner._x._error`）；pending 侧红态 = 同文件 NotReadyError 分支。
  *
  * oracle 溯源（#722 现场取证，见 docs/specs/webview-boot-freeze-722.md §2）：
  * - 现象：webview 已登录启动 navigate(/home) 后 isLoading 门槛永不释放（Splash 永挂）。
@@ -153,6 +153,8 @@ describe("createTQFeedStore placeholderData 契约（#722：防渲染期 pending
     await p.catch(() => {});
     await Promise.resolve();
     flush();
+    // 钉死窗口（review P2）：等待错误标记真正落到投影，使红态可复现、防线可自证
+    await vi.waitFor(() => expect(store.error()).not.toBeNull());
 
     // 失败后：骨架让位（loading=false）、错误可见、items() 不抛且为空
     expect(() => store.items()).not.toThrow();
@@ -171,6 +173,9 @@ describe("createTQFeedStore placeholderData 契约（#722：防渲染期 pending
     void store.ensureLoaded();
     await Promise.resolve();
     flush();
+    // 前置钉死（review P3）：确认 fetch 确已发起且在途——否则 refreshing=false 会因
+    // fetchStatus!=='fetching' 空转通过，与 isPlaceholderData 排除项无关
+    await vi.waitFor(() => expect(store.loading()).toBe(true));
 
     // 适配层在 placeholder 生效期把 status 投影为 'success'：旧式 refreshing 判定
     // （fetchStatus==='fetching' && status!=='pending'）会在此窗口误报下拉刷新；

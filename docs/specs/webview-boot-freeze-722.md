@@ -85,7 +85,8 @@ transition 置入 park 态等待该 flight。当该 fetch 因弱网悬挂或失�
       sub-flows 关注页、F1-F4 收藏夹）均为**时限型断言超时**（11-30s 预算），复核：同一会话内小说
       Feed 最终正常载入（36 卡片 + 37 图，请求序列 200 + 自动分页），插画系用例全过；归因为环境
       时序（宿主代理 7897 慢 + Pixiv 限流，spec 内注释亦记载 #418 同类退避至 ~19-30s），非 #722
-      修复引入（修复前同批亦失败）。
+      修复引入（修复前同批亦失败）。**口径说明**：本条为原口径「skip 归零/降至既有 flake 水位」的
+      降级说明；5 例残余时限型失败无法即修，已显式挂账 **#726**（含逐例耗时/预算/归因与校准建议）。
 
 ### 4.4 review 隔离裁决（code-review P1 收口，2026-09-25）
 - **useFeedActivation 宏任务延迟**：**隔离实验证明其为必要修复项**（非实验残留）——
@@ -113,5 +114,6 @@ transition 置入 park 态等待该 flight。当该 fetch 因弱网悬挂或失�
   → 关闭。
 - #724：lynx /illusts FAB 点击无响应（阻断 transition-matrix R2；与 #722 无关，独立排查）。
 - #725：userIllustsStore placeholderData 零参 no-op + /user/:id 渲染期 pending 读未防（review P2 挂账）。
+- #726：agent-browser 残余时限型失败（小说 Feed/详情、image-save S2、关注页、收藏夹）——环境时序归因，等待预算校准建议在内。
 - #723（已关闭）：token 轮换互踩（fixtures token-state 机制）。
 - 诊断基建：已随 49cc3825/78e68ba3 落地（imageLoader 超时 + e2e-start/__pictelioDebug）。

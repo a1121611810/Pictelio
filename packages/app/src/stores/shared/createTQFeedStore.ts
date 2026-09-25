@@ -14,6 +14,7 @@
 
 import type { Accessor } from "solid-js";
 import { useInfiniteQuery } from "@tanstack/solid-query";
+import { NotReadyError } from "solid-js";
 import { queryClient } from "../../api/queryClient";
 import { normalizeQueryError } from "../../api/normalizeQueryError";
 import { ApiErrorType, type ApiError } from "../../api/types";
@@ -227,10 +228,18 @@ function pickBestError(errors: (ApiError | null)[]): ApiError | null {
  *   实测），渲染期读会逃逸到路由边界。此处捕获并返回 undefined，错误呈现交给
  *   error() 通道（读 q.error 普通字段，不抛）。
  */
-function safeData(q: { data?: unknown }): { pages?: unknown[] } | undefined {
+function safeData(q: { data?: unknown; error?: unknown }): { pages?: unknown[] } | undefined {
   try {
     return q.data as { pages?: unknown[] } | undefined;
-  } catch {
+  } catch (e) {
+    // pending 协议抛出（NotReadyError）必须重抛：它是「查询失去 placeholderData 防线」的
+    // 信号（本文件防线所防之事），吞掉会把可见挂起/park 退化为静默空 feed（硬约束 #3）。
+    if (e instanceof NotReadyError) throw e;
+    // error 态由 error() 通道显式暴露（q.error 普通字段）→ 不 warn 免每次渲染刷屏；
+    // 其余异常（无 error 标记的读取失败）必须可见（硬约束 #3）
+    if (q.error == null) {
+      console.warn("[createTQFeedStore] data 读取异常，已降级为空 feed", e);
+    }
     return undefined;
   }
 }
