@@ -30,6 +30,11 @@ import {
   type HistoryEntry,
 } from "@/stores/historyStore";
 import { aiFilterMode } from "@/stores/settingsStore";
+import {
+  refreshUnreadBadge,
+  registerNotificationResumeListener,
+  unreadCount,
+} from "@/stores/notificationStore";
 import { isAiHiddenByType } from "@/utils/aiFilter";
 import UserAvatar from "@/components/UserAvatar";
 import FluentIcon, { type FluentIconName } from "@/components/ui/FluentIcon";
@@ -165,6 +170,10 @@ const SideNavShell: Component<SideNavShellProps> = (props) => {
 
   onSettled(() => {
     scrollToTop();
+    // 通知未读角标静默刷新（ADR-0188 D7 webview 侧刷新时机：入口挂载即刷；
+    // 失败 warn 保留上次计数、不打扰页面）+ 回前台 ≥5min 节流监听（幂等注册，otaService 先例）。
+    void refreshUnreadBadge();
+    registerNotificationResumeListener();
   });
 
   const selectTab = (next: HomeTab) => {
@@ -188,6 +197,27 @@ const SideNavShell: Component<SideNavShellProps> = (props) => {
           aria-label={t("home.sidenav.searchAria")}
         >
           <FluentIcon name="search" />
+        </button>
+        {/* 通知中心入口（ADR-0188 D7）：搜索下方铃铛；未读时 fluent-badge 圆点（装饰性，
+            状态语义由按钮 aria-label 切换承载）。40px+ 触控目标（h-11 w-11 = 44px）。 */}
+        <button
+          class="relative mb-2 flex h-11 w-11 cursor-pointer items-center justify-center rounded-[var(--borderRadiusMedium)] border-none text-[var(--colorNeutralForeground2)] outline-none transition-all hover:bg-[var(--colorNeutralBackground1)] hover:text-[var(--colorNeutralForeground1)] active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--colorStrokeFocus2)] appearance-none"
+          onClick={() => void navigate("/notifications")}
+          aria-label={
+            unreadCount() > 0
+              ? t("notifications.sidenav.unreadAria")
+              : t("notifications.sidenav.bellAria")
+          }
+        >
+          <FluentIcon name="alert" />
+          <Show when={unreadCount() > 0}>
+            <fluent-badge
+              appearance="filled"
+              color="danger"
+              class="absolute right-1 top-1"
+              aria-hidden="true"
+            />
+          </Show>
         </button>
         {SHELL_TABS.map((item) => (
           <button

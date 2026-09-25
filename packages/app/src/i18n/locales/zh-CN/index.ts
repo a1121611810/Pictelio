@@ -7,6 +7,7 @@ import routes_ from "./routes";
 import components1_ from "./components1";
 import components2_ from "./components2";
 import muteTag_ from "./muteTag";
+import notifications_ from "./notifications";
 import core_ from "./core";
 
 const zhCN = {
@@ -17,6 +18,7 @@ const zhCN = {
   ...components1_,
   ...components2_,
   ...muteTag_,
+  ...notifications_,
   ...core_,
 } as const;
 
