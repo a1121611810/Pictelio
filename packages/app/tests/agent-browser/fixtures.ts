@@ -19,6 +19,7 @@ const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * 大面积 skip。本文件在每次登录成功后把 app 内（localStorage）的最新轮换 token 写入
  * 共享状态文件，后续 spec 优先读取 —— 保证链上每次交换都用当前有效值。
  */
+// 恢复手段：删除 .token-state.json 即回退 .env 优先级（状态文件遮蔽 .env）
 const TOKEN_STATE_FILE = new URL("./.token-state.json", import.meta.url);
 
 function resolveLoginToken(): string | undefined {
@@ -117,6 +118,16 @@ async function initLoggedInDriver(
     for (const marker of LOGGED_IN_MARKERS) {
       if (await snapshotHas(driver, marker)) {
         console.log("[fixture] 检测到已登录状态（token 自动恢复），跳过登录");
+        // #723：自动登录路径的 performRefresh 同样可能轮换 token → 回读回写状态文件
+        try {
+          const stored = await driver.evaluate(
+            `localStorage.getItem("capacitor-storage_refresh_token") || ""`,
+          );
+          const latest = String(stored).replace(/"/g, "").trim();
+          if (latest && latest !== token) saveRotatedToken(latest);
+        } catch (e) {
+          console.warn("[fixture] 轮换 token 读取失败（保持现状）", e);
+        }
         return driver;
       }
     }

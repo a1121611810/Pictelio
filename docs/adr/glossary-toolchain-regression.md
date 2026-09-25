@@ -40,3 +40,13 @@ WebView 引擎的运行时取证：`adb forward tcp:9222 localabstract:webview_d
 ## token 轮换互踩（Refresh Token Rotation War）
 
 Pixiv 的 refresh_token 在每次成功 refresh 后轮换。多套件/多进程并发消费同一份 `.env` token 时，先成功者使后者 400（invalid_grant）→ 登录 gate 大面积 skip。判据：host 直调 OAuth 实测 200 而套件内 400。缓解：串行跑登录类套件；发现轮换立即回填 `.env`。
+
+## Flight 永挂 → 事务停摆（#722 根因链）
+
+Solid 2.0-rc.9 的 effect 内创建的 promise 会被作为该 effect 的 flight 持有（异步揭示语义：写入暂存、flush 揭示）。当 flight 中的 promise 永不 settle（#722：`PixivApi.prefetchImage` 原生回调在弱网/代理抖动下缺席），事务永久 park——`schedule()` 因 `globalQueue.Kt` 真值不再排队、`flush()` 早退——**全局所有信号写入被无限期暂存**，DOM 冻结在最后一次提交态。判别：`__pictelioDebug.isLoading()` 长期为 true 且 `selfTest()` 写读不一致。修复 = 让每个被 effect 创建的 promise 必定 settle（`withNativeImageTimeout` 20s 超时拒绝）。
+
+## e2e-start 打点与 __pictelioDebug 探针
+
+- `__root.tsx` 启动链逐级 `[e2e-start]` 标记（E2E_ON 门控）：IIFE / registerBackGesture / hydrateAll / initializeAuth / loadAccountR18 / navigate / setIsLoading——缺失的标记即悬挂点。
+- `window.__pictelioDebug`（e2e 构建专属）：`isLoading()` / `isLoggedIn()` 读写探针、`selfTest()` Solid 信号写读自检、`release()` / `flushNow()` 手动干预。
+- 用法：CDP `Runtime.evaluate` 读取；生产构建 `__E2E__` define 替换为 false 后整块 DCE 消除。

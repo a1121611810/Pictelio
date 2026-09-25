@@ -161,15 +161,15 @@ async function performRefresh(token: string) {
 export async function loginWithToken(token: string) {
   _authPromise = null; // 主动登录重置 Promise 链
   const resp = await refreshToken(token);
-  console.log("[e2e-start] loginWithToken: refreshToken done");
+  if (E2E_ON) console.log("[e2e-start] loginWithToken: refreshToken done");
   syncToken(resp.access_token);
   setRefreshTokenSig(resp.refresh_token);
   setUser(resp.user);
   setIsLoggedIn(true);
   await setupUnauthorizedHandler();
-  console.log("[e2e-start] loginWithToken: setupUnauthorizedHandler done");
+  if (E2E_ON) console.log("[e2e-start] loginWithToken: setupUnauthorizedHandler done");
   await saveRefreshToken(resp.refresh_token);
-  console.log("[e2e-start] loginWithToken: saveRefreshToken done");
+  if (E2E_ON) console.log("[e2e-start] loginWithToken: saveRefreshToken done");
   _authPromise = Promise.resolve();
 }
 

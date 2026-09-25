@@ -47,5 +47,6 @@
 
 ## 后续
 
-- P1/P2 已开 issue 票据化：[#722](https://github.com/a1121611810/Pictelio/issues/722)（webview 加载门槛悬挂）、[#723](https://github.com/a1121611810/Pictelio/issues/723)（token 轮换互踩）；修复走独立 effort（术语 → spec → tickets → implement）；
+- P1/P2 已开 issue 票据化：[#722](https://github.com/a1121611810/Pictelio/issues/722)（webview 加载门槛悬挂）、[#723](https://github.com/a1121611810/Pictelio/issues/723)（token 轮换互踩）。
+- **修复落地（2026-09-25，commit 49cc3825 起同分支交付）**：#722 = imageLoader `withNativeImageTimeout`（原生桥调用统一 20s 超时拒绝，flight 必定 settle，事务不再停摆）+ e2e 诊断基建（`__pictelioDebug` / e2e-start 打点）；#723 = agent-browser fixture 登录成功后回写轮换 token 至共享状态文件（`.token-state.json`，gitignored）并优先读取。工作流偏差声明：修复直接在本 chore 分支实施（未单独走 spec/tickets 文件），以本 ADR + issue 评论 + 接线测试作为规格与验收记录。
 - 升级本体（chore/vite-plus-1rc 分支）回归通过，可合并。

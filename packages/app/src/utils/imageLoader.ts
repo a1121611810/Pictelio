@@ -264,15 +264,18 @@ export function withNativeImageTimeout<T>(
   label: string,
   timeoutMs = NATIVE_IMAGE_TIMEOUT_MS,
 ): Promise<T> {
-  return Promise.race([
+  // 定时器在任一分支 settle 后清理：热路径（每屏数十次调用）不留 20s 死定时器
+  let timer: ReturnType<typeof setTimeout>;
+  const race = Promise.race([
     p,
-    new Promise<never>((_, reject) =>
-      setTimeout(
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(
         () => reject(new Error(`[imageLoader] ${label} timeout (${timeoutMs}ms)`)),
         timeoutMs,
-      ),
-    ),
+      );
+    }),
   ]);
+  return race.finally(() => clearTimeout(timer)) as Promise<T>;
 }
 
 /**
@@ -305,6 +308,10 @@ async function loadImageInner(originalUrl: string): Promise<LoadedImage> {
     const [cacheErr, cached] = await tryAsync(
       withNativeImageTimeout(imageCache!.getImage({ key: originalUrl }), "getImage"),
     );
+    if (cacheErr) {
+      // 测试硬约束 #3：本地磁盘缓存读取超时（20s）是显著异常，静默当 miss 不可观测
+      console.warn("[ImageCache] getImage failed/timeouts, treat as cache miss", cacheErr);
+    }
     if (!cacheErr && cached?.base64) {
       cacheSet(originalUrl);
       return { url: resolveImageUrl(originalUrl), cleanup: () => {} };

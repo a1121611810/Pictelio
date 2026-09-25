@@ -340,55 +340,50 @@ const IllustFeedPanel: Component<{ tab: FeedTab }> = (props) => {
       <Show when={props.tab === "recommended"}>
         <RankingStripEntry refreshEpoch={feedEpoch()} />
       </Show>
-      {/* #722 二分实验：e2e 下桩化 FeedList（保留 useFeedActivation 数据加载与排行入口） */}
-      {E2E_ON ? (
-        <IllustRowSkeleton />
-      ) : (
-        <FeedList
-          source={{
-            items: renderItems,
-            loading: () => src().loading(),
-            refreshing: () => src().refreshing(),
-            loadingMore: () => src().loadingMore(),
-            nextUrl: () => src().nextUrl(),
-            fetchMore: () => src().fetchMore(),
-            // 下拉刷新 = 新会话：清空该 tab 注入行 + 恢复排行榜入口
-            refresh: () => {
-              clearRelatedRows(props.tab);
-              setFeedEpoch((n) => n + 1);
-              return src().refresh();
-            },
-            error: () => src().error(),
-            paginationError: () => src().paginationError(),
-          }}
-          containerClass="flex flex-col gap-[var(--spacingVerticalM)] px-4 pt-3"
-          refreshMode="overlay"
-          skeleton={() => <IllustRowSkeleton />}
-          empty={() => <EmptyHint />}
-          // 预取 URL 与 IllustSingleCard 的 cover() 取值保持一致（large 优先），确保预热 key = 展示 src；
-          // 注入行条目不参与主列表预取
-          prefetchUrl={(item) =>
-            "relatedRow" in item ? undefined : (item.image_urls.large ?? item.image_urls.medium)
-          }
-          renderItem={(item) =>
-            "relatedRow" in item ? (
-              <RelatedStripRow
-                row={item.relatedRow}
-                onNavigate={(id) => void navigate(`/illust/${id}`)}
-                onDismiss={() => removeRelatedRow(props.tab, item.relatedRow.anchorId)}
-              />
-            ) : (
-              <IllustSingleCard
-                illust={item}
-                onClick={() => {
-                  recordRelatedAnchor(props.tab, item.id);
-                  void navigate(`/illust/${item.id}`);
-                }}
-              />
-            )
-          }
-        />
-      )}
+      <FeedList
+        source={{
+          items: renderItems,
+          loading: () => src().loading(),
+          refreshing: () => src().refreshing(),
+          loadingMore: () => src().loadingMore(),
+          nextUrl: () => src().nextUrl(),
+          fetchMore: () => src().fetchMore(),
+          // 下拉刷新 = 新会话：清空该 tab 注入行 + 恢复排行榜入口
+          refresh: () => {
+            clearRelatedRows(props.tab);
+            setFeedEpoch((n) => n + 1);
+            return src().refresh();
+          },
+          error: () => src().error(),
+          paginationError: () => src().paginationError(),
+        }}
+        containerClass="flex flex-col gap-[var(--spacingVerticalM)] px-4 pt-3"
+        refreshMode="overlay"
+        skeleton={() => <IllustRowSkeleton />}
+        empty={() => <EmptyHint />}
+        // 预取 URL 与 IllustSingleCard 的 cover() 取值保持一致（large 优先），确保预热 key = 展示 src；
+        // 注入行条目不参与主列表预取
+        prefetchUrl={(item) =>
+          "relatedRow" in item ? undefined : (item.image_urls.large ?? item.image_urls.medium)
+        }
+        renderItem={(item) =>
+          "relatedRow" in item ? (
+            <RelatedStripRow
+              row={item.relatedRow}
+              onNavigate={(id) => void navigate(`/illust/${id}`)}
+              onDismiss={() => removeRelatedRow(props.tab, item.relatedRow.anchorId)}
+            />
+          ) : (
+            <IllustSingleCard
+              illust={item}
+              onClick={() => {
+                recordRelatedAnchor(props.tab, item.id);
+                void navigate(`/illust/${item.id}`);
+              }}
+            />
+          )
+        }
+      />
     </>
   );
 };
