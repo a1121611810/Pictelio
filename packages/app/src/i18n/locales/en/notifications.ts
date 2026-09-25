@@ -9,12 +9,7 @@ const enNotifications = {
   "notifications.empty": "No notifications",
   "notifications.noContent": "(no content)",
 
-  // ── 组头行（view_more 非空，点击就地展开子列表，单向不收起）──
-  "notifications.header.expandAria": 'Expand notifications for "{{title}}"',
-
-  // ── 行可达性标签（未读/已读语义 + 主体文本组合）──
-  "notifications.a11y.unread": "unread",
-  "notifications.a11y.read": "read",
+  // ── 行可达性标签（打开语义 + 主体文本组合）──
   "notifications.a11y.openItem": "Open notification:",
 
   // ── 侧栏铃铛入口（SideNavShell，ADR-0188 D7）──

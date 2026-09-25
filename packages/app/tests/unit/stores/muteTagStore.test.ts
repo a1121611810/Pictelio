@@ -124,7 +124,7 @@ describe("muteTagStore（账号级键 mute_tags_${uid}，ADR-0187）", () => {
   });
 
   it("reset 清空集合并持久化空数组", async () => {
-    const { muteTag, resetMuteTags, mutedTags, isTagMuted } = await loadStore();
+    const { muteTag, resetMuteTags, mutedTags, isTagMuted, mem } = await loadStore();
     await muteTag("R-18G");
     await muteTag("グロ");
     resetMuteTags();
@@ -132,6 +132,8 @@ describe("muteTagStore（账号级键 mute_tags_${uid}，ADR-0187）", () => {
 
     expect(mutedTags().size).toBe(0);
     expect(isTagMuted("R-18G")).toBe(false);
+    // 持久化断言（review Nit1）：空集合必须落盘，重启后不复活旧词表
+    expect(mem.dump().get("mute_tags_42")).toBe("[]");
   });
 
   it("损坏数据（非 JSON）→ 空集合 + console.warn 可见（禁静默降级）", async () => {

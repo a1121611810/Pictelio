@@ -1,7 +1,7 @@
 // 标签静音真值表（ADR-0187 D2/D3）：webview 侧经 filterFeedIllusts 间接断言
 // （hasMutedTag 是 r18Filter.ts 私有函数，参考 r18FilterTruthTable.test.ts 经
-// vi.mock 注入静音集合的模式）。fixture 独立于实现（sharedTagMuteTruthTable），
-// lynx 侧 isTagMuted 落地后以同一组用例做双端差分（本票仅落 webview 侧）。
+// vi.mock 注入静音集合的模式）。fixture 独立于实现（sharedTagMuteTruthTable）。
+// 双端差分已闭环：lynx 侧同表见 packages/app-lynx/tests/differential/tagMuteTruthTable.test.ts。
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { filterFeedIllusts } from "@/utils/r18Filter";
 import type { PixivIllust } from "@/api/types";

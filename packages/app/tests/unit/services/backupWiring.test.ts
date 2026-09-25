@@ -29,6 +29,7 @@ vi.mock("@capacitor/preferences", () => ({
 }));
 
 import {
+  BACKUP_RUNTIME_KEYS,
   BACKUP_SET_KEYS,
   PRE_RESTORE_KEY,
   clearPreRestoreSnapshot,
@@ -228,5 +229,30 @@ describe("backupWiring — 审稿补强（S10/M5/M6）", () => {
     const spy = vi.spyOn(Preferences, "remove").mockRejectedValueOnce(new Error("io"));
     await expect(clearPreRestoreSnapshot()).rejects.toThrow("io");
     spy.mockRestore();
+  });
+});
+
+describe("backupWiring — 运行时键排除契约（review SF2：ADR-0188 D5 已读时间戳不进备份域）", () => {
+  // oracle = notificationStore 源码常量（真实数据源，禁手写字面量自洽）
+  const notificationStoreSrc = readFileSync(
+    path.resolve(testDir, "../../../src/stores/notificationStore.ts"),
+    "utf8",
+  );
+  const lastReadKey = notificationStoreSrc.match(/NOTIFICATIONS_LAST_READ_KEY = "([^"]+)"/)?.[1];
+
+  it("BACKUP_RUNTIME_KEYS 含 notifications_last_read_time 字面量（与 store 常量逐字一致）", () => {
+    expect(lastReadKey).toBe("notifications_last_read_time");
+    expect(BACKUP_RUNTIME_KEYS).toContain(lastReadKey);
+  });
+
+  it("collect() 跳过该键（已读时间戳进备份 → 恢复覆盖他机阅读进度，回归即红灯）", async () => {
+    const { settings } = makeStore({ settings_ugoira_mode: "fflate" });
+    settings.define<string>({ key: lastReadKey!, default: "" });
+    await settings.hydrateAll(); // write gate：生产启动必先 hydrate
+    settings.get(lastReadKey!)!.set("2026-09-25T00:00:00+09:00");
+
+    const { raw } = await createBackupWiring({ settings }).collect();
+    expect(raw[lastReadKey!]).toBeUndefined();
+    expect(raw.settings_ugoira_mode).toBe("fflate"); // 正常键不受排除影响
   });
 });

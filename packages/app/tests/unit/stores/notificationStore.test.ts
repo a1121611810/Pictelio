@@ -78,6 +78,7 @@ import {
   parseCreatedTimeMs,
   refreshUnreadBadge,
   registerNotificationResumeListener,
+  resetNotificationThrottleForTest,
   unreadCount,
 } from "@/stores/notificationStore";
 import type { PixivNotificationItem, PixivNotificationListResponse } from "@/api/types";
@@ -220,6 +221,34 @@ describe("buildNotificationRows 组头插入（spec §US2 / 边界 9）", () => 
     const rows = buildNotificationRows([header, plain], { [header.id]: true });
     expect(new Set(rows.map((r) => r.key)).size).toBe(rows.length);
   });
+
+  it("两个组头各自独立展开互不影响（expandedHeaders 注册表按 id 隔离）", () => {
+    // fixture 条目 id 脱敏后同值（100000000），双组头场景以 mock 数据给两个不同 id，
+    // 钉住「展开 A 不影响 B / 仅展开 B 时 A 无子区」的注册表隔离语义
+    const headerA = { ...header, id: 1001 };
+    const headerB = { ...header, id: 2002 };
+
+    // 仅展开 A：B 保持纯组头行，A 的子区就地插入其后
+    const onlyA = buildNotificationRows([headerA, plain, headerB], { [headerA.id]: true });
+    expect(onlyA.map((r) => r.kind)).toEqual(["header", "children", "item", "header"]);
+    expect(onlyA[1]!.headerId).toBe(1001);
+
+    // 仅展开 B：A 无子区（互不串扰）
+    const onlyB = buildNotificationRows([headerA, plain, headerB], { [headerB.id]: true });
+    expect(onlyB.map((r) => r.kind)).toEqual(["header", "item", "header", "children"]);
+    expect(onlyB[3]!.headerId).toBe(2002);
+
+    // 双双展开：两个子区各自跟随其组头，注册表互不影响
+    const both = buildNotificationRows([headerA, headerB], {
+      [headerA.id]: true,
+      [headerB.id]: true,
+    });
+    expect(both.map((r) => r.kind)).toEqual(["header", "children", "header", "children"]);
+    expect(both.filter((r) => r.kind === "children").map((r) => r.headerId)).toEqual([1001, 2002]);
+    // key 含 id 前缀，双组头同存不冲突（fixture 同值 id 会在此撞 key）
+    expect(new Set(both.map((r) => r.key)).size).toBe(both.length);
+    expect(both.map((r) => r.key)).toEqual(["h-1001", "c-1001", "h-2002", "c-2002"]);
+  });
 });
 
 describe("本地已读记忆（设备级键 notifications_last_read_time，双端逐字同键）", () => {
@@ -318,6 +347,48 @@ describe("registerNotificationResumeListener（appStateChange 节流先例，ota
 
   it("节流阈值为 ≥5 分钟（ADR-0188 D7）", () => {
     expect(RESUME_REFRESH_MIN_INTERVAL_MS).toBe(5 * 60 * 1000);
+  });
+
+  it("原生前台恢复节流双分支：首次/≥5min 刷新，<5min 与 isActive=false 跳过（fake timers）", async () => {
+    vi.useFakeTimers();
+    try {
+      // 本文件此前的 refreshUnreadBadge 用例会把 lastBadgeRefreshAt 推进到真实当前时刻，
+      // fake 时钟从该时刻附近起步 → 必须先重置，否则首个恢复事件被误节流
+      resetNotificationThrottleForTest();
+      isNativeMock.mockReturnValue(true);
+      loadNotificationsMock.mockResolvedValue(loadFixture("notification-list.json"));
+      settingsValues.set(NOTIFICATIONS_LAST_READ_KEY, "2026-09-20T00:00:00+09:00"); // 未读=1
+
+      let onStateChange!: (state: { isActive: boolean }) => void;
+      addListenerMock.mockImplementation((_event: string, cb: typeof onStateChange) => {
+        onStateChange = cb;
+        return Promise.resolve({ remove: () => {} });
+      });
+      registerNotificationResumeListener();
+      expect(addListenerMock).toHaveBeenCalledTimes(1);
+      expect(addListenerMock.mock.calls[0]?.[0]).toBe("appStateChange");
+
+      // 分支 A：本会话尚未成功刷新（lastBadgeRefreshAt=0）→ 回前台即静默拉取
+      onStateChange({ isActive: true });
+      await vi.waitFor(() => expect(unreadCount()).toBe(1));
+      expect(loadNotificationsMock).toHaveBeenCalledTimes(1);
+
+      // 回后台：isActive=false 忽略（不拉取）
+      onStateChange({ isActive: false });
+      expect(loadNotificationsMock).toHaveBeenCalledTimes(1);
+
+      // 分支 B：距上次成功刷新 <5min（4:59）→ 跳过（节流，不打扰当前页）
+      await vi.advanceTimersByTimeAsync(RESUME_REFRESH_MIN_INTERVAL_MS - 1000);
+      onStateChange({ isActive: true });
+      expect(loadNotificationsMock).toHaveBeenCalledTimes(1);
+
+      // 分支 C：越过 5min 阈值（5:01）→ 再次静默拉取
+      await vi.advanceTimersByTimeAsync(2000);
+      onStateChange({ isActive: true });
+      await vi.waitFor(() => expect(loadNotificationsMock).toHaveBeenCalledTimes(2));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

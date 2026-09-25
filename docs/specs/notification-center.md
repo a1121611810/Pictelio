@@ -49,7 +49,7 @@ Pictelio 无任何通知能力（关注/收藏/评论等事件用户不可感知
 2. **content null / 字段缺失**：宽容解析（全 optional）；`content` 为 null 的行渲染为「（无内容通知）」占位文本，可点击路由（target_url 仍有效）。
 3. **next_url null**：列表尽头，加载更多 affordance 隐藏。view-more 的 `older_than` 游标同理。
 4. **HTML 剥离**：`<b>…</b>` 保留内文；其它标签剔除；实体（`&amp;` 等）解码；结果 trim。禁止把 HTML 注入 DOM（innerHTML 禁用）。
-5. **图片代理**：`content.*_image/_icon` 的 `i.pximg.net`/`s.pximg.net` URL 必须经图片代理重写（webview `/pixiv-img/`、lynx 图片服务）；`s.pximg.net` 公共图标亦同通道；加载失败 → 隐藏图区（不占位、不重试风暴）。
+5. **图片代理**：`content.left_image`/`right_image`（`i.pximg.net` 内容缩略图）必须经图片代理重写（webview `/pixiv-img/`、lynx 图片服务）；`content.*_icon`（`s.pximg.net` 公共图标）**v1 沿用仓库既有直通行为**——代理通道硬编码 `i.pximg.net` 目标承载不了多域（Java 零改动约束），且 s.pximg 无 Referer 防盗链；多域代理扩展挂账（follow-up issue）。加载失败 → 隐藏图区（不占位、不重试风暴）。
 6. **未读时间比较**：`created_datetime`（+09:00 ISO）与本地时间戳比较统一转毫秒（`Date.parse`）；解析失败该条不计未读（warn）。
 7. **R18 内容缩略图**：通知缩略图不做 R18 遮罩（v1 简化，通知面非浏览面；挂账）。
 8. **401**：走 client 既有自动刷新 + 单飞重试，无新逻辑。
@@ -98,4 +98,4 @@ Pictelio 无任何通知能力（关注/收藏/评论等事件用户不可感知
 
 - 真实样例探针脚本（一次性、凭据不落盘）：`/tmp/pixiv-notif-probe.sh`、`/tmp/pixiv-viewmore-probe.sh`（不入库）。
 - fixture 脱敏规则：用户名→假名、≥6 位数字 id→假 id（保持类型/URL 形状/HTML 结构不变）；`is_read`/`view_more`/枚举值原样保留。
-- 真机验收批次：通知图片代理链路（i.pximg 经代理）、组头展开真数据流、角标刷新时机，发版前按 checklist 执行。
+- 真机验收批次：通知图片代理链路（i.pximg 经代理）、组头展开真数据流（ADR-0162 结构规避——子列表内嵌组头 item 内条件段——的设备取证）、角标刷新时机，发版前按 checklist 执行。

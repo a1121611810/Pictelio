@@ -35,7 +35,7 @@ import {
   type BackupFileInfo,
   type PreparedRestore,
 } from "../../utils/backupService";
-import { BackupFormatError } from "../../utils/backupCore";
+import { BackupFormatError, isAccountScopedKey } from "../../utils/backupCore";
 import {
   loadBackupPassword,
   loadWebdavPassword,
@@ -127,18 +127,15 @@ const SettingsWebdav: Component = () => {
   const [restoreError, setRestoreError] = createSignal("");
   const [hasPreRestore, setHasPreRestore] = createSignal(false);
 
-  /** 敏感项候选：当前账号级键（show_r18_* / show_r18g_* / ai_filter_mode_*） */
+  /**
+   * 敏感项候选：当前账号级键（spec §7）。单一事实源 = backupCore 的
+   * ACCOUNT_KEY_PREFIXES（经 isAccountScopedKey 判定）——禁止回潮手工前缀枚举
+   * （mute_tags_ 曾因四处手工同步而漏列，review SF1）。
+   */
   async function refreshSensitiveKeys() {
     const wiring = createBackupWiring();
     const { raw } = await wiring.collect();
-    setSensitiveKeys(
-      Object.keys(raw).filter(
-        (k) =>
-          k.startsWith("show_r18_") ||
-          k.startsWith("show_r18g_") ||
-          k.startsWith("ai_filter_mode_"),
-      ),
-    );
+    setSensitiveKeys(Object.keys(raw).filter((k) => isAccountScopedKey(k)));
   }
 
   // Solid 2.0 双参 createEffect（compute, effect）：开关打开时惰性加载凭据与敏感项

@@ -71,10 +71,13 @@ function rowBodyText(row: NotificationRow): string {
   return notificationPlainText(row.item.content?.text) || t("notifications.noContent");
 }
 
-/** 行可达性标签：打开语义 + 未读/已读（服务端只读字段作标注，未读推导不消费）+ 主体文本 */
+/**
+ * 行可达性标签：打开语义 + 主体文本。
+ * 不拼服务端 is_read 的已读/未读语义——ADR-0188 D5 v1 不消费该只读字段，
+ * 且与角标的本地已读口径（notifications_last_read_time）同屏冲突（review SF3）。
+ */
 function rowA11yLabel(row: NotificationRow): string {
-  const state = row.item.is_read ? t("notifications.a11y.read") : t("notifications.a11y.unread");
-  return `${t("notifications.a11y.openItem")} ${state} ${rowBodyText(row)}`;
+  return `${t("notifications.a11y.openItem")} ${rowBodyText(row)}`;
 }
 
 /** 行内共同布局（缩略图 + 两行文本 + 相对时间）；组头附 chevron 展开指示 */

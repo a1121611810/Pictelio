@@ -3,6 +3,9 @@
 // oracle：spec 字面（format 标识 / schemaVersion 1 / 账号级键三类前缀 / 错误文案分类）
 // 与 RFC/规格派生的边界（schemaVersion 过高拒绝、merge-by-keys 不触碰额外键）。
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 import {
   utf8Decode,
   utf8Encode,
@@ -252,6 +255,31 @@ describe("backupCore — UTF-8 纯 JS 编解码（Lynx runtime 无 TextEncoder�
   it("与 TextEncoder 字节序列一致（Node 环境可用的独立 oracle）", () => {
     for (const s of ["a", "中文", "混合🐧x", "\u0000\u0080\u0800"]) {
       expect(Array.from(utf8Encode(s))).toEqual(Array.from(new TextEncoder().encode(s)));
+    }
+  });
+});
+
+describe("backupCore — 敏感项候选面单一事实源（review SF1 防再漏）", () => {
+  // 背景：SettingsWebdav.refreshSensitiveKeys 曾手工枚举 show_r18_/show_r18g_/ai_filter_mode_
+  // 三个前缀，ACCOUNT_KEY_PREFIXES 新增 mute_tags_ 时该清单漏改（四处手工同步的根因）。
+  // 本守卫从源码面钉死：候选判定必须由 isAccountScopedKey 派生，禁止回潮手工清单。
+  const testDir = path.dirname(fileURLToPath(import.meta.url));
+  const webdavSrc = readFileSync(
+    path.resolve(testDir, "../../../src/components/settings/SettingsWebdav.tsx"),
+    "utf8",
+  );
+
+  it("ACCOUNT_KEY_PREFIXES 的每个前缀都命中敏感项候选判定（isAccountScopedKey）", () => {
+    for (const prefix of ACCOUNT_KEY_PREFIXES) {
+      expect(isAccountScopedKey(`${prefix}42`)).toBe(true);
+    }
+  });
+
+  it("SettingsWebdav 敏感项候选由 isAccountScopedKey 派生，无手工前缀清单", () => {
+    expect(webdavSrc).toContain("isAccountScopedKey");
+    // 手工前缀枚举（形如 k.startsWith("show_r18_")）即漏改根因，任一前缀字面量出现即红灯
+    for (const prefix of ACCOUNT_KEY_PREFIXES) {
+      expect(webdavSrc).not.toContain(`"${prefix}"`);
     }
   });
 });

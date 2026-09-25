@@ -39,7 +39,12 @@ export async function loadMuteTags(): Promise<void> {
   await muteTagsFactory.forId(id).hydrate();
 }
 
-/** 静音标签并持久化（trim、幂等）。未登录不落盘（账号级语义）。 */
+/**
+ * 静音标签并持久化（trim、幂等）。未登录不落盘（账号级语义）。
+ * 写入结果：handle.set 为同步 void、持久化 `void persistNow(...)` fire-and-forget（registry
+ * 契约不回传落盘结果）→ 轻提示在写入发起后即展示；落盘失败可见性经 registry warn 管线
+ * （`[settings] write mute_tags_42`，禁静默），spec 边界 #7 的 UI 失败提示挂账。
+ */
 export async function muteTag(name: string): Promise<void> {
   const id = uid();
   if (id === null) return;

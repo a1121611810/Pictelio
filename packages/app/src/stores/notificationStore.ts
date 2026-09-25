@@ -182,8 +182,8 @@ export async function refreshUnreadBadge(): Promise<void> {
       getNextPageParam: (last: PixivNotificationListResponse) => last.next_url ?? undefined,
       pages: 1,
       staleTime: 0,
-    } as never);
-    const pages = (data as { pages?: PixivNotificationListResponse[] }).pages ?? [];
+    });
+    const pages = data.pages ?? [];
     setUnreadCountSig(countUnreadNotifications(pages[0]?.notifications ?? [], loadLastReadMs()));
     lastBadgeRefreshAt = Date.now();
   } catch (e) {

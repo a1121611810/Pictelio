@@ -26,7 +26,7 @@ Pictelio 的内容过滤链目前只有三个谓词：R18/R18G 分级（账号�
 ## 决策
 
 **D1 数据模型与存储——账号级共享键 `mute_tags_${uid}`，沿用 ADR-0103 契约。**
-类型 `string[]`（JSON 数组），元素为 trim 后的原始标签名。webview 侧经 settings registry 账号级机制（对齐 `show_r18_${uid}` 的 defineFactory 路径）暴露集合 API（`values(): Set<string>` / `add` / `remove` / `has` / `load`，形态对齐 `createPersistedSetSetting`）；lynx 侧经 `prefs()`（PictelioPrefs → SharedPreferences "CapacitorStorage"）读写同键。双端键名逐字一致 + 契约测试钉住（先例：`ranking_entry` 双端逐字同键测试）。纳入备份域：webview 加入备份 sets 清单（`backupCore.ts`/`backupWiring.ts`），lynx 加入 `backupAccountKeys`。
+类型 `string[]`（JSON 数组），元素为 trim 后的原始标签名。webview 侧经 settings registry 账号级机制（对齐 `show_r18_${uid}` 的 defineFactory 路径）暴露集合 API（`values(): Set<string>` / `add` / `remove` / `has` / `load`，形态对齐 `createPersistedSetSetting`）；lynx 侧经 `prefs()`（PictelioPrefs → SharedPreferences "CapacitorStorage"）读写同键。双端键名逐字一致 + 契约测试钉住（先例：`ranking_entry` 双端逐字同键测试）。纳入备份域（**账号级 accountKeys 通道**，非 sets 域——uid 过滤与跨引擎恢复都必须走 accountKeys）：webview `ACCOUNT_KEY_PREFIXES` 增 `mute_tags_`（敏感项排除候选面从该前缀表单一事实源派生），lynx 加入 `backupAccountKeys` 与 `applyRawKey` 恢复分支。
 否决「设备级独立键」（`searchHistoryStore` 式 idbKV）：静音词表是用户口味数据，与 R18/AI 同类，跨设备/跨引擎迁移价值高（换引擎不丢词表），且备份域已为账号级 sets 预留形状。
 
 **D2 匹配语义——trim 后对原始 `tag.name` 精确相等，不做归一。**
@@ -63,6 +63,6 @@ Pictelio 的内容过滤链目前只有三个谓词：R18/R18G 分级（账号�
 ## 后果
 
 - 正面：webview 一处改动覆盖 10 表面；lynx 首次获得集合型账号级 store，跨引擎恢复词表可用（备份 sets 不再单边为空）。
-- 取舍（已接受）：webview 搜索与浏览历史不过滤静音标签（与 R18/屏蔽现状口径一致，盲区在 `docs/specs/tag-mute.md` 挂账）；匹配不含翻译名与归一化；长按无确认（依赖管理页恢复）。
+- 取舍（已接受）：webview 搜索与浏览历史不过滤静音标签（与 R18/屏蔽现状口径一致，盲区在 `docs/specs/tag-mute.md` 挂账）；匹配不含翻译名与归一化；长按无确认（依赖管理页恢复）；静音集合在组装点以非响应式快照读取（集合变化仅影响后续组装——规避 ADR-0162 原生 list 中途移除风险，webview/lynx 行为一致）；webview 写失败 UI 提示挂账（registry fire-and-forget，warn 管线可见），lynx 已做落盘成功/失败双分支提示。
 - 中性：静音是本地词表，卸载/清数据即失（WebDAV 备份可迁移）；不与官方 mute 同步。
 - 后续候选（不在本期）：搜索/历史盲区补齐、静音时的 toast 撤销操作、按标签维度统计被滤条数。
