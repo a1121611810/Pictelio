@@ -77,7 +77,8 @@ describe("通知契约 fixture（真实抓包脱敏样例，ADR-0188 D2）", () 
     // 普通条目锚点：子条目/单条 view_more 为 null（view-more 响应内同构实证）
     expect(fixture.notifications.some((n) => n.view_more === null)).toBe(true);
 
-    // 图片字段锚点：s.pximg.net 公共图标与 i.pximg.net 内容缩略图并存（代理重写输入）
+    // 图片字段锚点：s.pximg.net 公共图标与 i.pximg.net 内容缩略图并存
+    // （i.pximg 走 /pixiv-img/ 代理；s.pximg v1 直通——spec 边界 5 订正 + 挂账 #734）
     expect(
       fixture.notifications.some((n) => n.content?.left_icon?.startsWith("https://s.pximg.net/")),
     ).toBe(true);

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'me' })
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onActivated } from 'vue'
 import { storeToRefs } from 'pinia'
 import { navigate, resetHistory, ensureAuth } from '../router'
 import { useGlobalFabStore } from '../stores/globalFab'
@@ -308,14 +308,19 @@ function onWebdavUndo(): void {
 
 // ─── 全局放射 FAB 桥（ADR-0120）：注册空动作（内环空 = 仅外环导航），卸载时注销 ───
 let unreg: (() => void) | undefined
+// 角标刷新挂 onActivated 而非 onMounted：Me 在 App.vue KeepAlive include 内，
+// onMounted 每会话仅触发一次，会话内新通知到达后角标无法 0→1（code-review Round 2 F3）；
+// onActivated 首挂载与每次重入均触发，恰好覆盖原意图。
+onActivated(() => {
+  // 通知未读角标静默刷新（ADR-0188 D7 lynx 侧刷新时机）：失败 warn、不影响页面（store 内部兜底）
+  void notificationStore.refreshUnreadBadge()
+})
 onMounted(async () => {
   unreg = useGlobalFabStore().usePage('me', {})
   // 引擎生效状态快照（fire-and-forget）：失败/无快照 → null 不渲染（读取侧 warn）
   void readEngineState().then((s) => {
     engineState.value = s
   })
-  // 通知未读角标静默刷新（ADR-0188 D7 lynx 侧刷新时机）：失败 warn、不影响页面（store 内部兜底）
-  void notificationStore.refreshUnreadBadge()
   await ensureAuth()
   refreshWebdavLastBackupLabel()
   if (settings.webdavEnabled) await loadWebdavCredentials()

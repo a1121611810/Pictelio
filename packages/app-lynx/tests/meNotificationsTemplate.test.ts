@@ -31,8 +31,16 @@ describe("Me.vue 通知中心入口（ADR-0188 D7 / #728）", () => {
     expect(meVue).not.toContain("[background-color:var(")
   })
 
-  it("挂载时静默刷新未读（refreshUnreadBadge，fire-and-forget）", () => {
-    expect(meVue).toContain("void notificationStore.refreshUnreadBadge()")
+  it("角标刷新挂 onActivated（KeepAlive 重入亦刷新；onMounted 每会话仅一次会漏会话内 0→1，Round 2 F3）", () => {
+    // 期望值出处：spec:19 US4「再来新通知时角标重新出现」+ ADR-0188 D7 lynx 刷新时机 +
+    // App.vue:75 KeepAlive include 含 'me'（onActivated 首挂载与每次重入均触发）
+    const activatedIdx = meVue.indexOf("onActivated(")
+    expect(activatedIdx).toBeGreaterThan(-1)
+    const refreshIdx = meVue.indexOf("void notificationStore.refreshUnreadBadge()")
+    expect(refreshIdx).toBeGreaterThan(activatedIdx)
+    // refreshUnreadBadge 必须位于 onActivated 回调体内（而非 onMounted）——取两者之间无 "onMounted(" 界定
+    const mountedIdx = meVue.indexOf("onMounted(", activatedIdx)
+    expect(mountedIdx).toBeGreaterThan(refreshIdx)
   })
 
   it("ME_A11Y_LABELS.notifications 登记且与其它键无重复（注册表唯一性口径与 unit.test 一致）", () => {

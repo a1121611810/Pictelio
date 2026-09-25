@@ -48,7 +48,7 @@
 4. **已渲染列表不回溯**：长按静音后当前已挂载列表不移除已渲染卡片（避免列表跳动）；下拉刷新/分页后生效。测试断言「组装层过滤」，不断言视图热更新。
 5. **排行榜名次保序（lynx）**：先赋名次（预过滤下标+1）后过滤，移除留洞；webview 由 `flattenIllusts` 既有保序路径天然继承（过滤在 flatten 前应用与 R18 同位）。
 6. **相关注入行（lynx）**：`relatedInjection.ts` 过滤链追加静音一环；锚点本身被静音时不再注入（锚点过滤后判空跳过）。
-7. **加载失败/持久化失败**：读失败 → 空集合并 `console.warn`（模块前缀），禁静默降级；写失败 → lynx 提示「静音未生效」（`prefs().set` 可 await）；webview registry set 为 fire-and-forget（`SettingHandle.set(): void`），写失败可见性经 registry warn 管线，UI 级失败提示挂账（code-review Round 1 裁定）。
+7. **加载失败/持久化失败**：读失败 → 空集合并 `console.warn`（模块前缀），禁静默降级；写失败 → lynx 提示「静音未生效」（`prefs().set` 可 await）；webview registry set 为 fire-and-forget（`SettingHandle.set(): void`），写失败可见性经 registry warn 管线，UI 级失败提示挂账（#735）。
 8. **webview 盲区**：搜索结果与浏览历史不过滤（现状口径，R18/屏蔽同样不覆盖）。
 9. **快照语义（Round 1 修订）**：静音集合在组装点以**非响应式快照**读取（webview `untrack`、lynx plain Set 缓存）——集合变化只影响后续组装（刷新/分页重新装配），不触发已渲染列表热重算（同时规避 ADR-0162 原生 list 中途移除风险；webview 侧亦保持行为一致）。
 
