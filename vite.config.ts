@@ -71,6 +71,8 @@ export default defineConfig({
             "__PUBLIC_CONFIG__",
             // ESM 下重建的 CJS 惯用名（scripts/deploy.mjs）
             "__dirname",
+            // #722 e2e 诊断窗（__root.tsx）
+            "__pictelioDebug",
           ],
         },
       ],

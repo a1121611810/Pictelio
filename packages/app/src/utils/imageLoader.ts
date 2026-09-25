@@ -249,6 +249,33 @@ export function loadImage(originalUrl: string): Promise<LoadedImage> {
 }
 
 /**
+ * 原生图片桥调用的统一超时（#722，ADR-0186 P1 修复）。
+ *
+ * Capacitor 桥调用在原生回调缺席时**永不 settle**（桥层无默认超时）。弱网/代理黑洞下
+ * getImage/prefetchImage 的 Java 下载回调可能长时间不返回，而该 promise 在 Solid 2.0 中
+ * 被创建它的 effect flight 持有——flight 永挂 = 调度事务永久停摆 = 全局信号写入冻结
+ * （表象：isLoading 门槛/Splash 永挂）。统一超时拒绝使 flight 必定 settle，
+ * 调用方走既有 catch 重试/降级路径。
+ */
+export const NATIVE_IMAGE_TIMEOUT_MS = 20_000;
+
+export function withNativeImageTimeout<T>(
+  p: Promise<T>,
+  label: string,
+  timeoutMs = NATIVE_IMAGE_TIMEOUT_MS,
+): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`[imageLoader] ${label} timeout (${timeoutMs}ms)`)),
+        timeoutMs,
+      ),
+    ),
+  ]);
+}
+
+/**
  * 同步检查某 URL 是否存在进行中的加载（loadImage 的 inflight 去重窗口内）。
  *
  * 供渐进加载原语（createProgressiveImage）判断「full 预取已在途」：
@@ -274,7 +301,10 @@ async function loadImageInner(originalUrl: string): Promise<LoadedImage> {
   if (isNative) {
     // 1) 先检查 Android 文件缓存
     const imageCache = getImageCache();
-    const [cacheErr, cached] = await tryAsync(imageCache!.getImage({ key: originalUrl }));
+    // #722：桥调用统一超时（原生回调缺席时 promise 永挂 → Solid flight 停摆）
+    const [cacheErr, cached] = await tryAsync(
+      withNativeImageTimeout(imageCache!.getImage({ key: originalUrl }), "getImage"),
+    );
     if (!cacheErr && cached?.base64) {
       cacheSet(originalUrl);
       return { url: resolveImageUrl(originalUrl), cleanup: () => {} };
@@ -282,7 +312,9 @@ async function loadImageInner(originalUrl: string): Promise<LoadedImage> {
 
     // 2) 未命中：通过 PixivApi 让 Java 侧下载+缓存（二进制不进 JS 堆）
     // 下载源决策已下沉 Java（ADR-0143），JS 传官方 URL 保缓存键契约
-    const [prefetchErr] = await tryAsync(PixivApi.prefetchImage({ url: originalUrl }));
+    const [prefetchErr] = await tryAsync(
+      withNativeImageTimeout(PixivApi.prefetchImage({ url: originalUrl }), "prefetchImage"),
+    );
     if (prefetchErr) {
       // prefetch 失败时不标记 L1，让调用方（LazyDetailImage）重试
       console.warn("[ImageCache] Prefetch failed, caller will retry", prefetchErr);

@@ -8,9 +8,39 @@
  * 该缺陷曾导致弹窗未消失、登录页未就绪时误判已登录，后续用例卡死。
  */
 
+import { readFileSync, writeFileSync } from "node:fs";
 import { AgentBrowserDriver } from "./driver";
 
 const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * token 轮换互踩缓解（#723）：Pixiv 每次 refresh 成功即轮换 refresh_token，多套件
+ * 并发/先后消费同一份 .env token 时，先登录者使后者 400（invalid_grant）→ 登录 gate
+ * 大面积 skip。本文件在每次登录成功后把 app 内（localStorage）的最新轮换 token 写入
+ * 共享状态文件，后续 spec 优先读取 —— 保证链上每次交换都用当前有效值。
+ */
+const TOKEN_STATE_FILE = new URL("./.token-state.json", import.meta.url);
+
+function resolveLoginToken(): string | undefined {
+  try {
+    const state = JSON.parse(readFileSync(TOKEN_STATE_FILE, "utf8")) as { refreshToken?: string };
+    if (state.refreshToken) return state.refreshToken;
+  } catch {
+    /* 状态文件不存在/损坏 → 回退 .env */
+  }
+  return process.env.PIXIV_REFRESH_TOKEN;
+}
+
+function saveRotatedToken(token: string): void {
+  try {
+    writeFileSync(
+      TOKEN_STATE_FILE,
+      JSON.stringify({ refreshToken: token, updatedAt: new Date().toISOString() }),
+    );
+  } catch (e) {
+    console.warn("[fixture] 轮换 token 状态文件写入失败（不影响本次会话）", e);
+  }
+}
 
 /** 阶段重试上限（I 类：每次间隔 500ms，60 次 × 0.5s = 30s，总超时上限不变） */
 const MAX_ATTEMPTS = 60;
@@ -46,7 +76,7 @@ async function isOnLoginPage(driver: AgentBrowserDriver): Promise<boolean> {
  * 重试（重新 launch）可恢复，避免整个 suite 被一次环境抖动击穿。
  */
 export async function createLoggedInDriver(): Promise<AgentBrowserDriver> {
-  const token = process.env.PIXIV_REFRESH_TOKEN;
+  const token = resolveLoginToken();
   if (!token) {
     throw new Error("PIXIV_REFRESH_TOKEN 未设置");
   }
@@ -113,6 +143,16 @@ async function initLoggedInDriver(
     for (const marker of LOGGED_IN_MARKERS) {
       if (await snapshotHas(driver, marker)) {
         console.log("[fixture] 登录完成");
+        // #723：登录成功 = refresh_token 已轮换 → 回写共享状态文件，供后续 spec 使用
+        try {
+          const stored = await driver.evaluate(
+            `localStorage.getItem("capacitor-storage_refresh_token") || ""`,
+          );
+          const latest = String(stored).replace(/"/g, "").trim();
+          if (latest && latest !== token) saveRotatedToken(latest);
+        } catch (e) {
+          console.warn("[fixture] 轮换 token 读取失败（保持现状）", e);
+        }
         return driver;
       }
     }

@@ -13,6 +13,8 @@ import { clearPersistedFeedsAndCache } from "../api/feedQueryPersist";
 import { PixivApi } from "@/native/PixivApi";
 import { tryAsync } from "@/utils/tryAsync";
 
+/** #722 诊断开关：仅 e2e 构建为 true（vitest 下 __E2E__ 未定义，typeof 守卫防 ReferenceError） */
+const E2E_ON = typeof __E2E__ !== "undefined" && __E2E__;
 const [accessTokenSig, setAccessTokenSig] = createSignal<string | null>(null);
 const [refreshTokenSig, setRefreshTokenSig] = createSignal<string | null>(null);
 const [user, setUser] = createSignal<PixivUser | null>(null);
@@ -79,9 +81,14 @@ export async function initializeAuth() {
   _authPromise = (async () => {
     // restoreRefreshToken 内部完成：备份完整性检查（失效则清 token）→ 读取（含旧 Preferences 迁移）→ Native 注入
     let token = await restoreRefreshToken();
+    if (E2E_ON)
+      console.log(
+        `[e2e-start] initializeAuth restoreRefreshToken token=${token ? "present" : "null"}`,
+      );
     if (token) {
       setRefreshTokenSig(token);
       await setupUnauthorizedHandler();
+      if (E2E_ON) console.log("[e2e-start] initializeAuth setupUnauthorizedHandler done");
       // 设置 tokenReady barrier：在此 barrier resolve 之前所有 API 请求被阻塞在 client.ts 入口
       let resolveTokenReady: () => void;
       setTokenReadyPromise(
@@ -96,6 +103,7 @@ export async function initializeAuth() {
       });
       setRefreshPromise(promise);
       await promise;
+      if (E2E_ON) console.log("[e2e-start] initializeAuth performRefresh settled");
     }
   })();
   return _authPromise;
@@ -153,12 +161,15 @@ async function performRefresh(token: string) {
 export async function loginWithToken(token: string) {
   _authPromise = null; // 主动登录重置 Promise 链
   const resp = await refreshToken(token);
+  console.log("[e2e-start] loginWithToken: refreshToken done");
   syncToken(resp.access_token);
   setRefreshTokenSig(resp.refresh_token);
   setUser(resp.user);
   setIsLoggedIn(true);
   await setupUnauthorizedHandler();
+  console.log("[e2e-start] loginWithToken: setupUnauthorizedHandler done");
   await saveRefreshToken(resp.refresh_token);
+  console.log("[e2e-start] loginWithToken: saveRefreshToken done");
   _authPromise = Promise.resolve();
 }
 

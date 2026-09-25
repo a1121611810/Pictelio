@@ -1,4 +1,5 @@
-import type { Component } from "solid-js";
+import { type Component, flush } from "solid-js";
+
 import { isLoggedIn, isLoading, setIsLoading, initializeAuth } from "@/stores/authStore";
 import { setIsCheckingUpdate, setCheckCompleted, loadAccountR18 } from "@/stores/settingsStore";
 import { settings } from "@/settings";
@@ -27,6 +28,8 @@ import { t } from "@/i18n";
 import { markContentReady } from "@/native/splashBridge";
 /** 启动后检查更新的延迟时间（ms），确保页面渲染完成后再弹窗 */
 const STARTUP_CHECK_DELAY_MS = 500;
+/** #722 诊断开关：仅 e2e 构建为 true（vitest 下 __E2E__ 未定义，typeof 守卫防 ReferenceError） */
+const E2E_ON = typeof __E2E__ !== "undefined" && __E2E__;
 /** "再按一次退出应用" toast 的显示时长（ms） */
 const EXIT_HINT_DURATION_MS = 2000;
 
@@ -56,6 +59,23 @@ const RootLayout: Component = (props: { children?: any }) => {
   const location = useLocation();
   const [showExitHint, setShowExitHint] = createSignal(false);
   let exitHintTimer: ReturnType<typeof setTimeout>;
+
+  // #722 诊断：e2e 构建下暴露 isLoading 门槛的读写探针（生产 __E2E__=false 消除）。
+  // 区分「信号写入丢失」与「渲染管线冻结」：读值 false 而 DOM 仍是门槛层 = 后者。
+  {
+    (window as unknown as Record<string, unknown>).__pictelioDebug = {
+      isLoading: () => isLoading(),
+      isLoggedIn: () => isLoggedIn(),
+      release: () => setIsLoading(false),
+      flushNow: () => flush(),
+      // Solid 信号机制自检：新建信号 → 写 → 读，应返回 2
+      selfTest: () => {
+        const [g, s] = createSignal(1);
+        s(2);
+        return { writeRead: g(), twice: (s(3), g()) };
+      },
+    };
+  }
 
   // 启动后自动备份（T8，spec §7）：开关关时零 IO；失败仅 warn 不阻塞启动。
   createEffect(
@@ -146,12 +166,34 @@ const RootLayout: Component = (props: { children?: any }) => {
       // loadAccountR18 回写 settings 必须发生在 hydrateAll 打开写门槛（phase=warm）之后，
       // 故在 auth 分支内先 await hydrated；isLoading 释放同样以 hydrated 完成为前提
       // （保证 feed 首帧渲染时屏蔽列表/举报列表/R18 过滤等已就绪）。
-      const hydrated = Promise.all([
-        settings.hydrateAll(),
-        loadReportedIds(),
-        loadBlockedIds(),
-        loadImageHostPreference(),
-      ]).then(() => undefined);
+      // #722 诊断：e2e 构建下逐成员打点（生产 __E2E__=false 被消除，零开销）。
+      const e2eT0 = performance.now();
+      const e2eMark = (step: string) => {
+        if (E2E_ON) console.log(`[e2e-start] +${Math.round(performance.now() - e2eT0)}ms ${step}`);
+      };
+      e2eMark("IIFE start");
+      const pHydrateAll = settings.hydrateAll();
+      const pReported = loadReportedIds();
+      const pBlocked = loadBlockedIds();
+      const pImageHost = loadImageHostPreference();
+      if (E2E_ON) {
+        void pHydrateAll.then(() => e2eMark("hydrateAll done"));
+        void pReported.then(
+          () => e2eMark("loadReportedIds done"),
+          (e) => console.error("[e2e-start] loadReportedIds ERR", e),
+        );
+        void pBlocked.then(
+          () => e2eMark("loadBlockedIds done"),
+          (e) => console.error("[e2e-start] loadBlockedIds ERR", e),
+        );
+        void pImageHost.then(
+          () => e2eMark("loadImageHostPreference done"),
+          (e) => console.error("[e2e-start] loadImageHostPreference ERR", e),
+        );
+      }
+      const hydrated = Promise.all([pHydrateAll, pReported, pBlocked, pImageHost]).then(
+        () => undefined,
+      );
 
       // 后台预热 LRU 缓存（从 Android 文件系统读取最近图片，不阻塞启动流程）
       warmCacheFromDisk();
@@ -167,26 +209,35 @@ const RootLayout: Component = (props: { children?: any }) => {
         // OTA 门槛过渡面激活期间返回键 = 退出应用（#253，对齐 lynx /update 语义）
         shouldExitOnBack: () => gateActive(),
       });
+      e2eMark("registerBackGesture done");
 
       const [authErr] = await tryAsync(
         (async () => {
           await initializeAuth();
+          e2eMark("initializeAuth done");
           await hydrated;
+          e2eMark("hydrated done (auth block)");
           await loadAccountR18();
+          e2eMark("loadAccountR18 done");
           if (isLoggedIn()) {
             if (location.pathname !== "/home") {
               await navigate("/home", { replace: true });
+              e2eMark("navigate /home done");
             }
           } else {
             if (location.pathname !== "/login") {
               await navigate("/login", { replace: true });
+              e2eMark("navigate /login done");
             }
           }
         })(),
       );
+      e2eMark(`auth block settled (authErr=${authErr ? String(authErr).slice(0, 80) : "none"})`);
       // 水合完成（写门槛 warm + 屏蔽/举报/R18 就绪）后才释放 isLoading 渲染内容
       await hydrated;
+      e2eMark("hydrated done (pre-release)");
       setIsLoading(false);
+      e2eMark("setIsLoading(false) called");
       // 兜底关闭 Splash：非 Feed 页面（login 等）
       // 由 Login.tsx 或 Feed.tsx 负责主动触发，此处兜底确保不会泄漏
       const currentPath = location.pathname;

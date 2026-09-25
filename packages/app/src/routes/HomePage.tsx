@@ -340,50 +340,55 @@ const IllustFeedPanel: Component<{ tab: FeedTab }> = (props) => {
       <Show when={props.tab === "recommended"}>
         <RankingStripEntry refreshEpoch={feedEpoch()} />
       </Show>
-      <FeedList
-        source={{
-          items: renderItems,
-          loading: () => src().loading(),
-          refreshing: () => src().refreshing(),
-          loadingMore: () => src().loadingMore(),
-          nextUrl: () => src().nextUrl(),
-          fetchMore: () => src().fetchMore(),
-          // 下拉刷新 = 新会话：清空该 tab 注入行 + 恢复排行榜入口
-          refresh: () => {
-            clearRelatedRows(props.tab);
-            setFeedEpoch((n) => n + 1);
-            return src().refresh();
-          },
-          error: () => src().error(),
-          paginationError: () => src().paginationError(),
-        }}
-        containerClass="flex flex-col gap-[var(--spacingVerticalM)] px-4 pt-3"
-        refreshMode="overlay"
-        skeleton={() => <IllustRowSkeleton />}
-        empty={() => <EmptyHint />}
-        // 预取 URL 与 IllustSingleCard 的 cover() 取值保持一致（large 优先），确保预热 key = 展示 src；
-        // 注入行条目不参与主列表预取
-        prefetchUrl={(item) =>
-          "relatedRow" in item ? undefined : (item.image_urls.large ?? item.image_urls.medium)
-        }
-        renderItem={(item) =>
-          "relatedRow" in item ? (
-            <RelatedStripRow
-              row={item.relatedRow}
-              onNavigate={(id) => void navigate(`/illust/${id}`)}
-              onDismiss={() => removeRelatedRow(props.tab, item.relatedRow.anchorId)}
-            />
-          ) : (
-            <IllustSingleCard
-              illust={item}
-              onClick={() => {
-                recordRelatedAnchor(props.tab, item.id);
-                void navigate(`/illust/${item.id}`);
-              }}
-            />
-          )
-        }
-      />
+      {/* #722 二分实验：e2e 下桩化 FeedList（保留 useFeedActivation 数据加载与排行入口） */}
+      {E2E_ON ? (
+        <IllustRowSkeleton />
+      ) : (
+        <FeedList
+          source={{
+            items: renderItems,
+            loading: () => src().loading(),
+            refreshing: () => src().refreshing(),
+            loadingMore: () => src().loadingMore(),
+            nextUrl: () => src().nextUrl(),
+            fetchMore: () => src().fetchMore(),
+            // 下拉刷新 = 新会话：清空该 tab 注入行 + 恢复排行榜入口
+            refresh: () => {
+              clearRelatedRows(props.tab);
+              setFeedEpoch((n) => n + 1);
+              return src().refresh();
+            },
+            error: () => src().error(),
+            paginationError: () => src().paginationError(),
+          }}
+          containerClass="flex flex-col gap-[var(--spacingVerticalM)] px-4 pt-3"
+          refreshMode="overlay"
+          skeleton={() => <IllustRowSkeleton />}
+          empty={() => <EmptyHint />}
+          // 预取 URL 与 IllustSingleCard 的 cover() 取值保持一致（large 优先），确保预热 key = 展示 src；
+          // 注入行条目不参与主列表预取
+          prefetchUrl={(item) =>
+            "relatedRow" in item ? undefined : (item.image_urls.large ?? item.image_urls.medium)
+          }
+          renderItem={(item) =>
+            "relatedRow" in item ? (
+              <RelatedStripRow
+                row={item.relatedRow}
+                onNavigate={(id) => void navigate(`/illust/${id}`)}
+                onDismiss={() => removeRelatedRow(props.tab, item.relatedRow.anchorId)}
+              />
+            ) : (
+              <IllustSingleCard
+                illust={item}
+                onClick={() => {
+                  recordRelatedAnchor(props.tab, item.id);
+                  void navigate(`/illust/${item.id}`);
+                }}
+              />
+            )
+          }
+        />
+      )}
     </>
   );
 };
@@ -426,9 +431,12 @@ function clearAllRelatedRows(): void {
   clearRelatedRows("bookmarks");
 }
 
+/** #722 诊断开关：仅 e2e 构建为 true（vitest 下 __E2E__ 未定义，typeof 守卫防 ReferenceError） */
+const E2E_ON = typeof __E2E__ !== "undefined" && __E2E__;
 const HomePage: Component = () => {
   onSettled(() => {
     // 首页是登录后启动首屏：挂载后通知原生关闭 Splash Screen（幂等）
+    if (E2E_ON) console.log("[e2e-start] HomePage onSettled (routes rendered)");
     markContentReady();
     window.addEventListener("contentTypeChanged", clearAllRelatedRows);
     return () => window.removeEventListener("contentTypeChanged", clearAllRelatedRows);
