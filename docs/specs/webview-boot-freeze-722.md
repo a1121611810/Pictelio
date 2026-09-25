@@ -1,0 +1,60 @@
+# Spec: webview 引擎已登录启动冻结（#722）
+
+- 状态: Draft（根因边界已确证，最终修复依赖上游 Solid 调查）
+- 日期: 2026-09-25
+- 关联: [#722](https://github.com/a1121611810/Pictelio/issues/722)、[ADR-0186](../adr/ADR-0186-vite-plus-1rc-regression-campaign.md)、[glossary-toolchain-regression.md](../adr/glossary-toolchain-regression.md)
+
+## 1. 问题陈述
+
+webview 引擎（Capacitor WebView）**已登录**冷启动后，应用卡在加载门槛（`__root` 的 isLoading fallback，LoadingSpinner「加载中」）永不进入主界面；原生 Splash 因 `markContentReady` 不触发而同步永挂。
+
+- **影响面**：webview 引擎的已登录启动；lynx 引擎（默认）不受影响；未登录启动正常（/login 可渲染）。
+- **复现环境**：模拟器 pictelio_ui（Android 14 / WebView 113）确定复现；host Chrome dev 亦复现（平台无关）。
+- **非目标**：lynx 引擎、vite-plus 升级回归（已确证干净，ADR-0186）。
+
+## 2. 根因边界（多探针交叉实证）
+
+冻结态事实（CDP Runtime.evaluate + patched signals dist 取证）：
+
+1. 启动链**全部完成**：`initializeAuth → hydrated → loadAccountR18 → navigate("/home")` 各级 e2e-start 标记齐全，`setIsLoading(false)` 已调用。
+2. **信号写入进入提案态后 commit 永不发生**：`latest(() => isLoading()) === false`（提案已是目标值）而 `isLoading() === true`（committed 恒旧值）、`isPending(() => isLoading()) === true`（事务永不完成）。
+3. 新鲜信号自检同样失败（`createSignal(0); s(1); g()` 永远返回 0，含微任务/100ms 后）→ **全局写入揭示失效，非单个节点问题**。
+4. 调度器取证（patch prod/core/scheduler.js）：schedule() 正常排队、flush 正常运行、无 halt/disarm/lane 异常/NotReadyError 抛出 → **park 的精确 reporter 未定位**（rc.9 proposal/hold/verdict 内部语义）。
+5. JS 事件循环 IDLE（Profiler 4558 samples 中 4558 = idle）而进程 R 态 45-68% CPU（原生侧旋转）。
+6. 触发器：/home 路由渲染树（桩化面板 11+ boots 全绿；真面板 14+ boots 全挂）；与登录态强相关。
+
+## 3. 已排除假设（证据）
+
+| 假设 | 排除实验 |
+|---|---|
+| prefetchImage/getImage 桥调用永挂（flight 停摆） | imageLoader 20s 统一超时后 BENCH 构建 8/8 仍冻结 |
+| hydrateAll ∥ auth 并发写竞态（FT-2） | 串行化变体 8/8 仍冻结（已恢复 FT-2） |
+| warmCacheFromDisk | 同 APK flag A/B：跳过/激活两相位均冻结 |
+| runStartupAutoBackup | 单独门控 6 boots 仍冻结 |
+| @solidjs/router next.27 park 机制 | 升级 next.28 6/6 仍冻结 |
+| vite-plus 1.0-rc 升级引入 | bundle A/B：main@6e499698 同症（host+device） |
+| WebView 113 缺失 API | signals dist 无 113 缺失原语（withResolvers/groupBy 等） |
+| 调度器 halt/disarm/lane 异常 | 探针实证无 |
+| 代码分包模块复制 | 移除 codeSplitting groups 后仍冻结 |
+
+## 4. 修复方案（分层）
+
+### 4.1 已落地（防御性）
+- `withNativeImageTimeout`（20s）：原生图片桥调用统一超时——消除「永不 settle 的桥调用」这一类 flight 威胁（该类问题的独立修复价值不受本次主因未定位影响）。
+- e2e 诊断基建：`__pictelioDebug` 探针、e2e-start 逐级打点（生产 DCE 消除）。
+
+### 4.2 最终修复路线（按优先级）
+- **R1（首选）：solid-js/@solidjs/signals 上游调查**——以本 spec §2 证据链 + 最小复现（Capacitor WebView + 已登录 /home + Solid 2.0-rc.9）报上游 issue；关注 proposal/hold/verdict 提交语义。signals rc.10+ 发布后升级验证。
+- **R2（应用层规避，R1 期间的过渡）**：webview 引擎已登录启动的「卡门槛」用户可杀进程重启（重启后仍登录但可能复现）或切 lynx 引擎；文档层已在 issue 说明。
+- **R3（数据点）**：`enabled:false` 的 TanStack 查询在 Solid 2.0 transition 下的 pending 语义调研（若确证为 park 触发器，给查询补 `initialData` 使初始 status=success）。
+
+### 4.3 验收条件
+- [ ] 模拟器 pictelio_ui：已登录冷启动 10/10 boots 门禁释放（/home 渲染 nav+cards 或 /login 正常）。
+- [ ] transition-matrix R4 通过（webview 搜索基线）。
+- [ ] agent-browser 登录依赖用例恢复（skip 归零或降至既有 flake 水位）。
+
+## 5. 票据拆分
+
+- #722（本 spec 主票）：R1 上游调查 + R3 数据点验证 + 验收条件达成后关闭。
+- #723（已关闭）：token 轮换互踩（fixtures token-state 机制）。
+- 诊断基建：已随 49cc3825/78e68ba3 落地（imageLoader 超时 + e2e-start/__pictelioDebug）。

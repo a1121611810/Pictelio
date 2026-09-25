@@ -274,6 +274,25 @@ export function createTQFeedStore<
                  */
                 enabled: false,
 
+                /**
+                 * #722 修复：提供立即求值的 placeholderData，使查询 data 在首读即
+                 * 干净返回，避免「渲染期读取 pending 异步 data」抛 NotReadyError。
+                 *
+                 * Solid 2.0-rc.9 + solid-query v6：pending 查询的 data 是异步访问器，
+                 * 渲染期读取抛 NotReadyError 并 park 所在的路由 transition；当该 fetch
+                 * 因弱网悬挂/失败（代理抖动、重试耗尽）时 rc.9 的 park 唤醒路径不覆盖
+                 * 此形态 → transition 永久 park → 同事务内的全局信号写入（含 isLoading
+                 * 门槛）永不提交 → 加载门槛/Splash 冻结（#722 实证：latest=false /
+                 * isPending=true / committed 恒 true；NotReadyError 探针全部来自
+                 * solid-query 调用栈）。
+                 *
+                 * 选 placeholderData 而非 initialData：placeholder 不改变 status
+                 * （仍为 pending）→ loading 首载粘滞（#366）语义逐字保持，骨架屏行为
+                 * 与单测契约不变；initialData 会把 status 置为 success 从而改写 loading
+                 * 语义（6 项单测破防）。tanstack 视 placeholder 为占位，真实 fetch 照常。
+                 */
+                placeholderData: () => ({ pages: [], pageParams: [] }),
+
                 staleTime: configStaleTime,
                 gcTime: configGcTime,
               };
@@ -385,9 +404,11 @@ export function createTQFeedStore<
         // 首载粘滞（#366）：merge 多源 + 命令式 ensureInfiniteQueryData 组合下，
         // isFetching 信号会在 fetch 仍在进行时失真翻 false → 骨架被提前卸载，
         // 内容区出现数秒空白窗（体检 P3 的 s15 帧实证）。语义修正：
-        // 已激活 && 查询尚无数据（status=pending）&& 无错误 ⇒ 视为首载中。
-        // 查询成功（status=success，含合法空 feed）或出错后由 error 分支接管。
-        return activated() && q.status === "pending" && !q.error;
+        // 已激活 && 查询尚无真实数据（status=pending，或仍在使用 #722 的
+        // placeholderData 占位）&& 无错误 ⇒ 视为首载中。
+        // 查询成功（status=success 且真实数据已到）或出错后由 error 分支接管。
+        const placeholder = (q as { isPlaceholderData?: boolean }).isPlaceholderData === true;
+        return activated() && (q.status === "pending" || placeholder) && !q.error;
       });
 
     // ── 分页错误标记 ──

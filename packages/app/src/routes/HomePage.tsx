@@ -244,10 +244,17 @@ function useFeedActivation(src: () => FeedSource<PixivIllust> | FeedSource<Pixiv
   createEffect(
     () => src(),
     (s) => {
-      void s.ensure?.();
-      if (s.activate) {
-        s.activate();
-      }
+      // #722 关键修复：ensure 的 fetch promise 若在本 apply 段（route transition 的
+      // flush 作用域内）创建，会被 Solid 2.0-rc.9 作为 flight 持有事务；弱网下
+      // 桥调用 45s+ 才拒绝 → transition 永久 park → isLoading 写入永不揭示
+      // （加载门槛/Splash 冻结）。宏任务延迟使 fetch promise 脱离 transition
+      // 作用域，transition 正常 settle 后数据异步到达（ADR-0043 同款模式）。
+      setTimeout(() => {
+        void s.ensure?.();
+        if (s.activate) {
+          s.activate();
+        }
+      }, 0);
     },
   );
 }
