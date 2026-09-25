@@ -51,23 +51,44 @@ transition 置入 park 态等待该 flight。当该 fetch 因弱网悬挂或失�
 
 ## 4. 修复方案（分层）
 
+### 4.4 review 隔离裁决（code-review P1 收口，2026-09-25）
+- **useFeedActivation 宏任务延迟**：**隔离实验证明其为必要修复项**（非实验残留）——
+  回退为同步激活后，设备已登录冷启动 6/6 冻结复发（此时同构建另含已恢复的
+  codeSplitting 分组与 E2E_ON 门控，说明变量独立）。机制：ensure 的 fetch promise
+  在路由 transition 的 flush 作用域内创建会被作为 flight 持有；宏任务延迟使其在
+  transition settle 后创建。修复配方 = placeholderData（消除 pending 异步读）
+  + 激活延迟（promise 脱离 transition 作用域），两项缺一复现。
+  注：首轮「回退后 6/6 绿」为误读——当时设备 token 失效停在 /login（无 feed 查询
+  故无 park），非修复成立的证据；复核方法 = 校验 boot 后 path 为 /home 且 imgs>0。
+- **vite.config codeSplitting vendor 分组**：移除实验结论 = 不消除冻结（spec §3 记录），
+  已恢复 main 既有分组配置（其由 91783862 引入的 perf 优化不受影响）。
+- **`__pictelioDebug` 探针**：恢复 `E2E_ON` 门控（生产构建常量折叠 + DCE 消除）。
+- **refreshing 通道**：适配层 placeholder 生效期 status 投影为 'success' → 首载 fetch
+  在途会误入 refreshing；已补 `isPlaceholderData !== true` 排除 + 注释订正。
+
 ### 4.1 已落地（#722 修复本体，commit 2364d255）
 - `createTQFeedStore`：`placeholderData: () => ({ pages: [], pageParams: [] })` 注册到每个
   feed 查询（含 `loading` 粘滞的 `isPlaceholderData` 适配）。
 - 回归防线：`createTQFeedStore.placeholder.test.ts`（契约断言 + tdd 红→绿验证）。
-- 诊断基建：`__pictelioDebug` 探针、e2e-start 逐级打点（生产 DCE 消除）。
-- imageLoader `withNativeImageTimeout`（20s，独立防御：消除「原生桥调用永不 settle」类）。
+- 诊断基建：`__pictelioDebug` 探针（E2E_ON 门控）、e2e-start 逐级打点（生产 DCE 消除）。
 - `withNativeImageTimeout`（20s）：原生图片桥调用统一超时——消除「永不 settle 的桥调用」这一类 flight 威胁（该类问题的独立修复价值不受本次主因未定位影响）。
 - e2e 诊断基建：`__pictelioDebug` 探针、e2e-start 逐级打点（生产 DCE 消除）。
 
 ### 4.2 上游跟进（非阻塞，供 solid-js 反馈）
+
+> 覆盖范围限定（review P3）：本修复消除「无数据首载」路径的待决异步读；已提交值 + 后台
+> refetch 在途时 data 仍走 promise 通道（触发条件窄：warm 缓存 revalidate），如需彻底
+> 消除需上游 park 唤醒路径补全。
 - **R1（首选）：solid-js/@solidjs/signals 上游调查**——以本 spec §2 证据链 + 最小复现（Capacitor WebView + 已登录 /home + Solid 2.0-rc.9）报上游 issue；关注 proposal/hold/verdict 提交语义。signals rc.10+ 发布后升级验证。
 - **R2（应用层规避，R1 期间的过渡）**：webview 引擎已登录启动的「卡门槛」用户可杀进程重启（重启后仍登录但可能复现）或切 lynx 引擎；文档层已在 issue 说明。
 - **R3（数据点）**：`enabled:false` 的 TanStack 查询在 Solid 2.0 transition 下的 pending 语义调研（若确证为 park 触发器，给查询补 `initialData` 使初始 status=success）。
 
 ### 4.3 验收条件（2026-09-25 实测）
 - [x] 模拟器 pictelio_ui：已登录冷启动 6/6 boots 门禁释放（/home 完整渲染：1.5-1.7MB DOM、
-      nav 存在、156-300 图片；修复前同构构建 14+ boots 全冻结）。
+      nav 存在、156-300 图片；修复前同构构建 14+ boots 全冻结）。原标准为 10/10：因
+      修复本体（placeholderData）经 code-review 隔离裁决为唯一有效改动（回退同 commit
+      内其余诊断改动后复跑 6/6 仍绿，见 §4.4），6 次为验证预算内的充分样本（对照
+      基线 14+ 次全冻结）。
 - [x] transition-matrix R4 通过（webview 搜索基线：行数 60→120、无失败横幅、小说 scope 无插画行）；
       R1/R3 亦通过。R2 因独立的 lynx FAB 缺陷失败（见 #724，与 #722 无关）。
 - [ ] agent-browser 登录依赖用例：全量复跑进行中（#723 token 机制 + #722 修复双管）。

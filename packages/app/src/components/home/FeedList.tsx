@@ -59,7 +59,6 @@ interface FeedListProps<T> {
 }
 
 export function FeedList<T>(props: FeedListProps<T>): JSX.Element {
-  console.log("[e2e-feed] body start");
   // 注意：source 必须通过 props.source 响应式访问（tab 切换时父组件传新 source 对象）
   // Solid 2.0：组件体顶层 props 读会 dev warn，改为 accessor（JSX 内调用）
   const refreshMode = () => props.refreshMode ?? "overlay";
@@ -106,7 +105,6 @@ export function FeedList<T>(props: FeedListProps<T>): JSX.Element {
     },
   );
 
-  console.log("[e2e-feed] body end (pre-JSX)");
   const list = () => (
     <>
       <div

@@ -1,6 +1,10 @@
 /**
  * createTQFeedStore placeholderData 契约（#722 / ADR-0186 P1 修复）。
  *
+ * 说明（review P2）：本文件第 1 个用例是**行为断言**（机制可观察面）；第 2/3 个用例是
+ * **characterization（实现字面量契约）**——钉住「查询注册 placeholderData 且返回空页占位」
+ * 以防后人删改（删除即 #722 复发）。tdd 红态证据见 commit message / spec §4.1。
+ *
  * oracle 溯源（#722 现场取证，见 docs/specs/webview-boot-freeze-722.md §2）：
  * - 现象：webview 已登录启动 navigate(/home) 后 isLoading 门槛永不释放（Splash 永挂）。
  * - 机制：Solid 2.0-rc.9 + solid-query v6 下，pending 查询的 data 是异步访问器；
@@ -74,6 +78,22 @@ function makeStore() {
 }
 
 describe("createTQFeedStore placeholderData 契约（#722：防渲染期 pending 异步读 park 路由 transition）", () => {
+  it("行为：activate 后（fetch 未 resolve）items() 同步返回 [] 且 loading 粘滞 true", async () => {
+    qc.client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    captured.options.length = 0;
+    const store = makeStore();
+    store.activate();
+    // Solid 2.0 批处理语义：activate 写入经 flush 同步应用（与 #366 契约测试同口径）
+    const { flush } = await import("solid-js");
+    flush();
+
+    // 行为断言（#722 机制的可观察面）：pending 期读 items() 必须同步拿到 []（不再抛
+    // NotReadyError / 不 park）；loading 保持首载粘滞（#366）。
+    expect(() => store.items()).not.toThrow();
+    expect(store.items()).toEqual([]);
+    expect(store.loading()).toBe(true);
+  });
+
   it("每个查询注册 placeholderData 且返回空页占位（pages 空数组）", () => {
     qc.client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     captured.options.length = 0;
@@ -82,9 +102,11 @@ describe("createTQFeedStore placeholderData 契约（#722：防渲染期 pending
 
     expect(captured.options.length).toBeGreaterThan(0);
     for (const opts of captured.options) {
-      const ph = opts.placeholderData;
-      expect(ph, "查询必须携带 placeholderData（#722 修复契约）").toBeTypeOf("function");
-      expect((ph as () => unknown)()).toEqual({ pages: [], pageParams: [] });
+      const ph = opts.placeholderData as unknown;
+      expect(ph, "查询必须携带 placeholderData（#722 修复契约）").toBeDefined();
+      // 值或工厂形态均可（适配层二者皆支持）；解出后必须是空页占位
+      const value = typeof ph === "function" ? (ph as () => unknown)() : ph;
+      expect(value).toEqual({ pages: [], pageParams: [] });
     }
   });
 

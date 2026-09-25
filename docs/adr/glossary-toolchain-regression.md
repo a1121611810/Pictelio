@@ -41,7 +41,12 @@ WebView 引擎的运行时取证：`adb forward tcp:9222 localabstract:webview_d
 
 Pixiv 的 refresh_token 在每次成功 refresh 后轮换。多套件/多进程并发消费同一份 `.env` token 时，先成功者使后者 400（invalid_grant）→ 登录 gate 大面积 skip。判据：host 直调 OAuth 实测 200 而套件内 400。缓解：串行跑登录类套件；发现轮换立即回填 `.env`。
 
-## Flight 永挂 → 事务停摆（#722 根因链）
+## Flight 永挂 → 事务停摆（#722 早期假设，**已被 2364d255 取代**）
+
+> 注（2026-09-25 收口）：本节记录的是 #722 排查期的中间假设（原生图片回调缺席导致 flight
+> 永挂）。最终确证的根因是 **pending 查询异步读 park 路由 transition**（见下方「NotReadyError
+> park」节与 spec），修复 = `placeholderData`。本节的 `withNativeImageTimeout` 仍作为独立
+> 防御保留（消除「桥调用永不 settle」类威胁）。
 
 Solid 2.0-rc.9 的 effect 内创建的 promise 会被作为该 effect 的 flight 持有（异步揭示语义：写入暂存、flush 揭示）。当 flight 中的 promise 永不 settle（#722：`PixivApi.prefetchImage` 原生回调在弱网/代理抖动下缺席），事务永久 park——`schedule()` 因 `globalQueue.Kt` 真值不再排队、`flush()` 早退——**全局所有信号写入被无限期暂存**，DOM 冻结在最后一次提交态。判别：`__pictelioDebug.isLoading()` 长期为 true 且 `selfTest()` 写读不一致。修复 = 让每个被 effect 创建的 promise 必定 settle（`withNativeImageTimeout` 20s 超时拒绝）。
 
@@ -52,3 +57,13 @@ Solid 2.0-rc.9 的 effect 内创建的 promise 会被作为该 effect 的 flight
 - `__root.tsx` 启动链逐级 `[e2e-start]` 标记（E2E_ON 门控）：IIFE / registerBackGesture / hydrateAll / initializeAuth / loadAccountR18 / navigate / setIsLoading——缺失的标记即悬挂点。
 - `window.__pictelioDebug`（e2e 构建专属）：`isLoading()` / `isLoggedIn()` 读写探针、`selfTest()` Solid 信号写读自检、`release()` / `flushNow()` 手动干预。
 - 用法：CDP `Runtime.evaluate` 读取；生产构建 `__E2E__` define 替换为 false 后整块 DCE 消除。
+
+## NotReadyError park（#722 最终根因）
+
+Solid 2.0-rc.9 + solid-query v6：pending 查询的 `data` 是异步访问器，渲染期读取抛
+`NotReadyError` 并把所在路由 transition 置入 park 等待该 flight；fetch 在弱网下悬挂/失败时
+rc.9 的 park 唤醒路径不覆盖该形态 → transition 永久 park → 同事务内全局信号写入（含
+isLoading 门槛）永不提交（探针：`latest`=目标值 / `isPending`=true / committed 恒旧值）。
+修复 = 查询注册 `placeholderData`（空页占位）使 data 首读即定义。判别：冻结态
+`__pictelioDebug.latestIsLoading()` 与 `isLoading()` 不一致 + NotReadyError 调用栈在
+solid-query chunk。

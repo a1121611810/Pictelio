@@ -62,7 +62,8 @@ const RootLayout: Component = (props: { children?: any }) => {
 
   // #722 诊断：e2e 构建下暴露 isLoading 门槛的读写探针（生产 __E2E__=false 消除）。
   // 区分「信号写入丢失」与「渲染管线冻结」：读值 false 而 DOM 仍是门槛层 = 后者。
-  {
+  // 门控强制：e2e 构建专属（生产 __E2E__=false → 常量折叠 + DCE 消除；review P0）
+  if (E2E_ON) {
     (window as unknown as Record<string, unknown>).__pictelioDebug = {
       isLoading: () => isLoading(),
       isLoggedIn: () => isLoggedIn(),

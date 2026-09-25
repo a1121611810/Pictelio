@@ -286,11 +286,18 @@ export function createTQFeedStore<
                  * isPending=true / committed 恒 true；NotReadyError 探针全部来自
                  * solid-query 调用栈）。
                  *
-                 * 选 placeholderData 而非 initialData：placeholder 不改变 status
-                 * （仍为 pending）→ loading 首载粘滞（#366）语义逐字保持，骨架屏行为
-                 * 与单测契约不变；initialData 会把 status 置为 success 从而改写 loading
-                 * 语义（6 项单测破防）。tanstack 视 placeholder 为占位，真实 fetch 照常。
+                 * 选 placeholderData 而非 initialData：placeholder 不写缓存、不阻断
+                 * refetch（消费点仅 data 投影），且以 isPlaceholderData 暴露「占位中」
+                 * 语义供消费方精确判定（initialData 会直接置 status=success 并写入
+                 * 缓存，6 项 loading 契约单测破防）。
+                 * 注意（review 实测）：本适配层在 placeholder 生效期把 status 投影为
+                 * 'success'（非仍为 pending）——loading 首载粘滞（#366）已改用
+                 * `status==='pending' || isPlaceholderData===true` 表达；refreshing
+                 * 判定同口径排除 isPlaceholderData（否则首载 fetch 在途会误报刷新）。
                  */
+                // 工厂形态（而非模块级常量对象）：泛型 InfiniteData<PageResponse<TItem>, unknown>
+                // 无法由宽松常量满足（TS2769）；每次占位读取新建空页对象的微分配为
+                // ADR 级可接受成本（placeholder 读取频率 = 每次状态投影）
                 placeholderData: () => ({ pages: [], pageParams: [] }),
 
                 staleTime: configStaleTime,
@@ -407,8 +414,7 @@ export function createTQFeedStore<
         // 已激活 && 查询尚无真实数据（status=pending，或仍在使用 #722 的
         // placeholderData 占位）&& 无错误 ⇒ 视为首载中。
         // 查询成功（status=success 且真实数据已到）或出错后由 error 分支接管。
-        const placeholder = (q as { isPlaceholderData?: boolean }).isPlaceholderData === true;
-        return activated() && (q.status === "pending" || placeholder) && !q.error;
+        return activated() && (q.status === "pending" || q.isPlaceholderData === true) && !q.error;
       });
 
     // ── 分页错误标记 ──
@@ -426,7 +432,14 @@ export function createTQFeedStore<
     //   core isRefetching      = isFetching && status !== "pending" && 非分页方向
     const refreshing: Accessor<boolean> = () =>
       activeQueries().some(
-        (q) => q.fetchStatus === "fetching" && q.status !== "pending" && fetchDirection(q) == null,
+        (q) =>
+          q.fetchStatus === "fetching" &&
+          q.status !== "pending" &&
+          // #722（review P2）：适配层在 placeholderData 生效期把 status 投影为 'success'，
+          // 首载 fetch 在途时会误入本式（旧语义 false → true，违背 ADR-0078 刷新语义分离）。
+          // isPlaceholderData 即「真实数据未到」的权威判据，显式排除。
+          q.isPlaceholderData !== true &&
+          fetchDirection(q) == null,
       );
 
     const loadingMore: Accessor<boolean> = () =>

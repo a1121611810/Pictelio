@@ -281,11 +281,35 @@ export default defineConfig(
 
       build: {
         target: "esnext",
-        // #722 修复（ADR-0186）：移除 vendor 分组分包。本地 APK 场景下分包无网络收益
-        // （ADR：单 bundle），而 rc.9 signals 的异步揭示调度器在跨 chunk 模块复制时
-        // 出现信号域分裂（tanstack-vendor chunk 内含 @solidjs/signals 副本，NRE 探针
-        // 实证）→ transition 内写入永久暂存 → 加载门槛冻结。单 bundle 保证信号模块
-        // 全局唯一。本地 APK 无网络加载惩罚，体积不敏感。
+        rolldownOptions: {
+          output: {
+            codeSplitting: {
+              groups: [
+                {
+                  name: "fluent-vendor",
+                  test: /node_modules[\\/]@fluentui/,
+                  priority: 20,
+                },
+                {
+                  name: "tanstack-vendor",
+                  test: /node_modules[\\/]@tanstack/,
+                  priority: 20,
+                },
+                {
+                  name: "vendor",
+                  test: /node_modules/,
+                  priority: 10,
+                },
+                {
+                  name: "common",
+                  minShareCount: 2,
+                  minSize: 10000,
+                  priority: 5,
+                },
+              ],
+            },
+          },
+        },
       },
 
       // lint / fmt 配置已上移至仓库根 vite.config.ts（唯一配置源，单进程覆盖全部

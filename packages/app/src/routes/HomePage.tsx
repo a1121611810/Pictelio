@@ -244,11 +244,13 @@ function useFeedActivation(src: () => FeedSource<PixivIllust> | FeedSource<Pixiv
   createEffect(
     () => src(),
     (s) => {
-      // #722 关键修复：ensure 的 fetch promise 若在本 apply 段（route transition 的
-      // flush 作用域内）创建，会被 Solid 2.0-rc.9 作为 flight 持有事务；弱网下
-      // 桥调用 45s+ 才拒绝 → transition 永久 park → isLoading 写入永不揭示
-      // （加载门槛/Splash 冻结）。宏任务延迟使 fetch promise 脱离 transition
-      // 作用域，transition 正常 settle 后数据异步到达（ADR-0043 同款模式）。
+      // #722 修复（第二必要项，隔离验证：回退本延迟 → 设备 6/6 冷启动冻结复发）：
+      // ensure 触发的 feed fetch promise 若在本 apply 段（路由 transition 的 flush
+      // 作用域）内创建，会被 Solid 2.0-rc.9 作为该 transition 的 flight 持有；弱网下
+      // fetch 悬挂/失败时 park 唤醒路径不覆盖 → transition 永久 park → 全局信号写入
+      // （含 isLoading 门槛）永不提交。宏任务延迟使 promise 在 transition settle 后
+      // 创建，与 placeholderData（消除 pending 异步读）共同构成完整修复。
+      // 与 #722 spec §4.4 隔离裁决一致；ADR-0043 同款「延迟首载」模式先例。
       setTimeout(() => {
         void s.ensure?.();
         if (s.activate) {
