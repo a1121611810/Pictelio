@@ -1,6 +1,6 @@
 # Spec：标签级静音（Tag Mute）
 
-> 状态：`implemented` 待回写 ｜ 日期：2026-09-26 ｜ 依据：ADR-0187 + `docs/adr/glossary-tag-mute.md`
+> 状态：implemented（2026-09-26，双端落地 + code-review 三轮闭环零阻塞）｜ 日期：2026-09-26 ｜ 依据：ADR-0187 + `docs/adr/glossary-tag-mute.md`
 > 双端范围：webview（packages/app）+ lynx（packages/app-lynx）
 
 ## Problem Statement

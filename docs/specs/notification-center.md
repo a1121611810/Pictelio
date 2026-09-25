@@ -1,6 +1,6 @@
 # Spec：通知中心（Notification Center）
 
-> 状态：`implemented` 待回写 ｜ 日期：2026-09-26 ｜ 依据：ADR-0188 + `docs/adr/glossary-notification-center.md`
+> 状态：implemented（2026-09-26，双端落地 + code-review 三轮闭环零阻塞）｜ 日期：2026-09-26 ｜ 依据：ADR-0188 + `docs/adr/glossary-notification-center.md`
 > 双端范围：webview（packages/app）+ lynx（packages/app-lynx）｜ API oracle：2026-09-26 真实抓包（脱敏 fixture 随测试落库）+ Pixiv-Shaft 一手实现交叉
 
 ## Problem Statement
