@@ -29,6 +29,7 @@ const RAW = {
   show_r18_42: "true",
   show_r18g_42: "false",
   ai_filter_mode_42: "mask",
+  mute_tags_42: '["R-18G","AI生成"]',
   show_r18_99: "true",
   blocked_user_ids: '["1","2"]',
 };
@@ -57,6 +58,7 @@ describe("backupCore — 备份域分区", () => {
     ]);
     expect(Object.keys(accountKeys).toSorted()).toEqual([
       "ai_filter_mode_42",
+      "mute_tags_42",
       "show_r18_42",
       "show_r18_99",
       "show_r18g_42",
@@ -75,11 +77,18 @@ describe("backupCore — 备份域分区", () => {
   });
 
   it("isAccountScopedKey / accountUidOf：前缀 + 数字后缀判定", () => {
-    expect(ACCOUNT_KEY_PREFIXES).toEqual(["show_r18_", "show_r18g_", "ai_filter_mode_"]);
+    expect(ACCOUNT_KEY_PREFIXES).toEqual([
+      "show_r18_",
+      "show_r18g_",
+      "ai_filter_mode_",
+      "mute_tags_",
+    ]);
     expect(isAccountScopedKey("show_r18_42")).toBe(true);
+    expect(isAccountScopedKey("mute_tags_42")).toBe(true);
     expect(isAccountScopedKey("settings_ugoira_mode")).toBe(false);
     expect(accountUidOf("show_r18_42")).toBe(42);
     expect(accountUidOf("ai_filter_mode_7")).toBe(7);
+    expect(accountUidOf("mute_tags_42")).toBe(42);
     expect(accountUidOf("show_r18_abc")).toBeNull(); // 后缀非数字
     expect(accountUidOf("settings_ugoira_mode")).toBeNull();
   });
@@ -184,12 +193,13 @@ describe("backupCore — 恢复计划（spec §6 merge-by-keys + uid 过滤）",
     expect(plan99.apply.show_r18_99).toBe("true");
     expect(plan99.skippedAccountKeys.toSorted()).toEqual([
       "ai_filter_mode_42",
+      "mute_tags_42",
       "show_r18_42",
       "show_r18g_42",
     ]);
 
     const planNull = planRestore(snapshotWith(), null);
-    expect(planNull.skippedAccountKeys).toHaveLength(4);
+    expect(planNull.skippedAccountKeys).toHaveLength(5);
     expect(Object.keys(planNull.apply).every((k) => !isAccountScopedKey(k))).toBe(true);
   });
 
@@ -208,8 +218,8 @@ describe("backupCore — 恢复计划（spec §6 merge-by-keys + uid 过滤）",
     const s = snapshotWith();
     const sum = summarize(s, 42);
     expect(sum.deviceKeyCount).toBe(Object.keys(s.deviceKeys).length);
-    expect(sum.accountKeyCount).toBe(4);
-    expect(sum.accountKeyCountForUid).toBe(3); // 42 的三个键
+    expect(sum.accountKeyCount).toBe(5);
+    expect(sum.accountKeyCountForUid).toBe(4); // 42 的四个键
     expect(sum.setCount).toBe(2);
     expect(summarize(s, null).accountKeyCountForUid).toBe(0);
   });

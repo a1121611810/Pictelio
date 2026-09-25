@@ -16,6 +16,7 @@ import { cleanup, render } from "@solidjs/testing-library";
 
 const mocks = vi.hoisted(() => ({
   onOpenBlocklist: vi.fn(),
+  onOpenMuteTags: vi.fn(),
   onClearData: vi.fn(),
   onDeleteAccount: vi.fn(),
   onActionToast: vi.fn(),
@@ -26,8 +27,12 @@ vi.mock("@/components/settings/SettingsAppearance", () => ({
   default: () => <div data-testid="sec-appearance" />,
 }));
 vi.mock("@/components/settings/SettingsContent", () => ({
-  default: (props: { onOpenBlocklist?: () => void }) => (
-    <div data-testid="sec-content" data-prop-on-open-blocklist={String(!!props.onOpenBlocklist)} />
+  default: (props: { onOpenBlocklist?: () => void; onOpenMuteTags?: () => void }) => (
+    <div
+      data-testid="sec-content"
+      data-prop-on-open-blocklist={String(!!props.onOpenBlocklist)}
+      data-prop-on-open-mute-tags={String(!!props.onOpenMuteTags)}
+    />
   ),
 }));
 vi.mock("@/components/settings/SettingsImage", () => ({
@@ -83,6 +88,7 @@ describe("SettingsSections 8 卡分组装配", () => {
         isLoggedIn={() => true}
         onLogout={mocks.onLogout}
         onOpenBlocklist={mocks.onOpenBlocklist}
+        onOpenMuteTags={mocks.onOpenMuteTags}
         onClearData={mocks.onClearData}
         onDeleteAccount={mocks.onDeleteAccount}
         onActionToast={mocks.onActionToast}
@@ -111,12 +117,13 @@ describe("SettingsSections 8 卡分组装配", () => {
     ).toBeNull();
   });
 
-  it("props 接线：内容卡接 onOpenBlocklist，图片卡接 onActionToast", () => {
+  it("props 接线：内容卡接 onOpenBlocklist/onOpenMuteTags，图片卡接 onActionToast", () => {
     render(() => (
       <SettingsSections
         isLoggedIn={() => true}
         onLogout={mocks.onLogout}
         onOpenBlocklist={mocks.onOpenBlocklist}
+        onOpenMuteTags={mocks.onOpenMuteTags}
         onClearData={mocks.onClearData}
         onDeleteAccount={mocks.onDeleteAccount}
         onActionToast={mocks.onActionToast}
@@ -127,6 +134,11 @@ describe("SettingsSections 8 卡分组装配", () => {
       document
         .querySelector('[data-testid="sec-content"]')!
         .getAttribute("data-prop-on-open-blocklist"),
+    ).toBe("true");
+    expect(
+      document
+        .querySelector('[data-testid="sec-content"]')!
+        .getAttribute("data-prop-on-open-mute-tags"),
     ).toBe("true");
     expect(
       document
@@ -141,6 +153,7 @@ describe("SettingsSections 8 卡分组装配", () => {
         isLoggedIn={() => true}
         onLogout={mocks.onLogout}
         onOpenBlocklist={mocks.onOpenBlocklist}
+        onOpenMuteTags={mocks.onOpenMuteTags}
         onClearData={mocks.onClearData}
         onDeleteAccount={mocks.onDeleteAccount}
         onActionToast={mocks.onActionToast}

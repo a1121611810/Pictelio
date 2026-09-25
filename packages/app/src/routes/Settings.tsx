@@ -5,6 +5,7 @@ import { clearImageCache } from "../utils/imageLoader";
 import { clearAll as clearNovelCache } from "../stores/novelCache";
 import { clearTranslationCache } from "../utils/translationCache";
 import { resetBlockedIds } from "../stores/blockStore";
+import { resetMuteTags } from "../stores/muteTagStore";
 import { resetReportedIds } from "../stores/reportStore";
 import { resetSettingsStore as resetUiStore } from "../stores/settingsStore";
 import PageTransition from "../components/PageTransition";
@@ -21,6 +22,7 @@ function openDeleteAccountPage() {
 const Settings: Component = () => {
   const navigate = useNavigate();
   const [showBlocklist, setShowBlocklist] = createSignal(false);
+  const [showMuteTags, setShowMuteTags] = createSignal(false);
   const [actionToast, setActionToast] = createSignal<string | null>(null);
   const [dialogState, setDialogState] = createSignal<
     { type: "clear" } | { type: "deleteAccount" } | null
@@ -62,6 +64,7 @@ const Settings: Component = () => {
         await clearNovelCache();
         await clearTranslationCache();
         resetBlockedIds();
+        resetMuteTags();
         resetReportedIds();
         await Preferences.clear();
         await resetUiStore();
@@ -118,6 +121,7 @@ const Settings: Component = () => {
             isLoggedIn={isLoggedIn}
             onLogout={handleLogout}
             onOpenBlocklist={() => setShowBlocklist(true)}
+            onOpenMuteTags={() => setShowMuteTags(true)}
             onClearData={() => setDialogState({ type: "clear" })}
             onDeleteAccount={() => setDialogState({ type: "deleteAccount" })}
             onActionToast={setActionToast}
@@ -127,6 +131,8 @@ const Settings: Component = () => {
         <SettingsDialogs
           showBlocklist={showBlocklist()}
           onCloseBlocklist={() => setShowBlocklist(false)}
+          showMuteTags={showMuteTags()}
+          onCloseMuteTags={() => setShowMuteTags(false)}
           dialogType={dialogState()?.type ?? null}
           onCloseDialog={() => setDialogState(null)}
           onConfirmClear={handleClearLocalData}

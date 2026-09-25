@@ -81,8 +81,15 @@ export const BACKUP_SCHEMA_VERSION = 1;
 /**
  * 账号级键前缀（spec §3.1；ADR-0103 契约键）。
  * 恢复时按当前登录 uid 过滤（spec §6）——非本账号的账号级键跳过。
+ * mute_tags_（静音标签，ADR-0187）：账号级集合走 accountKeys 域，与 show_r18_* 同一
+ * 归档通道；恢复经 setRawValues 命中已注册的 factory handle（登录装载时 forId 已注册）。
  */
-export const ACCOUNT_KEY_PREFIXES = ["show_r18_", "show_r18g_", "ai_filter_mode_"] as const;
+export const ACCOUNT_KEY_PREFIXES = [
+  "show_r18_",
+  "show_r18g_",
+  "ai_filter_mode_",
+  "mute_tags_",
+] as const;
 
 /** 备份引擎标识（快照元数据，仅供展示；恢复不依赖来源引擎） */
 export type BackupEngine = "webview" | "lynx";

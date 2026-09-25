@@ -6,6 +6,7 @@ import time_ from "./time";
 import routes_ from "./routes";
 import components1_ from "./components1";
 import components2_ from "./components2";
+import muteTag_ from "./muteTag";
 import core_ from "./core";
 import type { Dict } from "../zh-CN";
 
@@ -16,6 +17,7 @@ const en = {
   ...routes_,
   ...components1_,
   ...components2_,
+  ...muteTag_,
   ...core_,
 } as const satisfies Dict;
 
