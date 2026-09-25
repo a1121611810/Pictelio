@@ -18,16 +18,16 @@ This wiki helps humans and agents understand the architecture, workflows, integr
 
 | Attribute | Value |
 |-----------|-------|
-| App version | 5.4.0 (`pictelio-app`) |
-| Framework | SolidJS 2.0 (RC) — migrated from 1.9 in ADR-0144 |
-| Language | TypeScript 6.0 (strict) |
+| App version | 5.5.0 (`pictelio-app`) |
+| Framework | SolidJS 2.0 (RC) — migrated from 1.9 in ADR-0144; rc.9 after ADR-0184 |
+| Language | TypeScript 7.0 (strict) — `typescript-compiler-api` alias to TS 6 for the i18n hardcode gate (ADR-0184) |
 | Bundler | Rolldown (production) via vite-plus; Vite dev server |
-| Styling | UnoCSS 66.7 + Microsoft Fluent Design System 2 + A2 cardization (Win11 correction, ADR-0074) |
-| Routing | @solidjs/router 2.0.0-next.21 |
+| Styling | UnoCSS 66.10 + Microsoft Fluent Design System 2 + A2 cardization (Win11 correction, ADR-0074) |
+| Routing | @solidjs/router 2.0.0-next.27 |
 | Data Fetching | @tanstack/solid-query 6.0.0-rc.3 |
 | Local DB | Local `localStorage` collection (`historyStore.ts`) — replaced `@tanstack/solid-db` in ADR-0144 |
 | i18n | `@solid-primitives/i18n` (zh-CN source + en), ADR-0157 |
-| Mobile Runtime | Capacitor 8.5 (Android target) |
+| Mobile Runtime | Capacitor 8.5.2 (Android target) |
 | Package Manager | pnpm 11.9 |
 | Monorepo Packages | `pictelio-app` (SPA), `pictelio-website` (Astro landing page, GitHub Pages), `pictelio-app-lynx` (vue-lynx MVP), `@pictelio/update-check`, `@pictelio/ugoira`, `@pictelio/ranking-core`, `@pictelio/search-core`, `@pictelio/net-diagnostics`, `@pictelio/novel-export` |
 
@@ -241,6 +241,8 @@ Architecture Decision Records live in `/docs/adr/`. Notable ones:
 | 0180 | lynx dark mode — three-state `light | dark | system` appearance + 12 static palettes (6 themes × light/dark) + self-built native detection channel + status-bar/splash sync (revises ADR-0168 D4); see [ADR-0180](/docs/adr/ADR-0180-lynx-dark-mode.md) and [spec](/docs/specs/lynx-night-mode.md) |
 | 0181 | compile-time exhaustive checking — `assertNever(value: never)` utility in byte-identical dual-client copies; see [ADR-0181](/docs/adr/ADR-0181-assertnever-exhaustive-checking.md) |
 | 0182 | branded types for API IDs — `unique symbol`-branded `IllustId`/`NovelId`/`UserId`/`SeriesId`/`ChapterId` reject cross-type ID mix-ups at compile time; see [ADR-0182](/docs/adr/ADR-0182-branded-types-for-api-ids.md) |
+| 0183 | lynx novel intro-page toggle — device-level `novel_intro_first` setting (default on) lets high-frequency readers skip the `/novel/:id/intro` page and jump straight to the body; a single `openNovel()` seam in `src/utils/novelNavigation.ts` replaces six inline intro navigations, route layer unchanged; see [ADR-0183](/docs/adr/ADR-0183-lynx-novel-intro-toggle.md) |
+| 0184 | workspace dependency upgrade execution (2026-09) — ADR-0080's "evaluate only" batch is now executed: solidjs rc.6→rc.9 (`@solidjs/router` next.21→next.27, `@solidjs/vite-plugin` next.39→next.44), TypeScript → 7.0.2 (with a TS6 `typescript-compiler-api` alias for the i18n gate), vitest → 5.0.1 (app held at 4.1.10 by vite-plus), vue-router 4.6.4→5.3.1, Capacitor 8.5.2, UnoCSS 66.10, Vite 8.3; agent-browser / tailwind 4 / lynx toolchain held with explicit triggers; see [ADR-0184](/docs/adr/ADR-0184-dependency-upgrade-execution-2026-09.md) and [glossary](/docs/adr/glossary-dependency-upgrade.md) |
 
 ## Key Source Files
 
@@ -298,7 +300,7 @@ A **CodeGraph MCP server** is registered in [`.mcp.json`](/.mcp.json) (`codegrap
 
 ## Repo Evolution (Recent History)
 
-The repository has been actively refactored through **v5.4.0**. Key themes in recent commits:
+The repository has been actively refactored through **v5.5.0**. Key themes in recent commits:
 
 - **Store migration:** All list stores migrated from hand-written `createStore` patterns to the `createTQFeedStore` factory wrapping TanStack Query's `createInfiniteQuery` (ADR-0016, ADR-0022). This eliminated 200-300 lines of boilerplate.
 - **Feed store split + legacy cleanup:** The monolithic `feedStore.ts` (illusts) and `novelStore.ts` (novels) have been split into dedicated per-tab stores using the same factory. `recommendedStore.ts` and `followStore.ts` (with `novelRecommendedStore.ts`, `novelFollowStore.ts`, and `novelBookmarkStore.ts`) now power the home page feed panels directly via `IllustFeedPanel`/`NovelFeedPanel` — the standalone `RecommendedFeed`/`FollowFeed` components and `NovelRecommendedFeed`/`NovelFollowFeed` route panels were later **deleted** in the ADR-0083 dead-code cleanup. Both legacy monolithic stores and their tests have been **deleted** (commit `b30366f`). Shared helpers extracted to `feedHelpers.ts` and `novelHelpers.ts`.
@@ -360,6 +362,8 @@ The repository has been actively refactored through **v5.4.0**. Key themes in re
 - **lynx novel translation (ADR-0169–ADR-0178, v5.4.0):** app-lynx gained a **from-scratch** novel translation feature that deliberately does not reuse the webview translation stack (`createNovelTranslator` / `translationCache` / `translationStore` / `TranslateSheet` / `prompts.ts`) nor extract a shared package. Users self-fill an LLM endpoint (base URL + API key + model — no provider presets) over the OpenAI Responses API (`POST /v1/responses`), with the API key held only in Android Keystore + Java heap via a new `PictelioTranslate` native module (never in the JS heap). The pipeline is chunked and streaming-first (`AsyncIterator<TranslationChunk>`) with a whole-batch fallback, driven by an 8-state machine and a chapter-granular cache (`novelId | chapterId | targetLang | modelId | sourceHash | baseURLHash`; only fully-completed chapters are written), plus an application-layer R18/R18G consent gate and a state-derived translate FAB (`configure` / `translating`→abort / `retranslate` / `retry` / `start`). See [Novel Reader](/openwiki/domain/novel-reader.md#lynx-novel-translation-adr-0169adr-0178-v540).
 - **lynx dark mode (ADR-0180, v5.4.0):** a three-state `light | dark | system` appearance (default `system`, persisted as `settings_dark_mode`) with 12 static pre-generated M3 palettes (6 themes × light/dark via `.theme-X.dark`) and a self-built native detection channel (`getDarkMode` + `pictelioDarkMode` event, mirroring the ADR-0168 insets subscribe-then-pull pattern). `settingsStore.resolvedDark` is the single normalized output, bound to the root `<page>` via `appearanceClasses(themeColorId, resolvedDark)`; status-bar icons and the splash theme sync with it (revising ADR-0168 D4's pinned-light icons). See [Architecture Overview](/openwiki/architecture/overview.md#app-lynx-vue-lynx-client) and [ADR-0180](/docs/adr/ADR-0180-lynx-dark-mode.md).
 - **lynx M3 switch + TS hardening (ADR-0179/ADR-0181/ADR-0182, v5.4.0):** 12 inline M3 switch markups consolidated into a single [`<M3Switch>`](/packages/app-lynx/src/components/M3Switch.vue) component (single source of truth for the M3 v0.192 geometry/tokens), plus two compile-time defense tools — `assertNever` exhaustive-checking and `unique symbol`-branded API IDs (`IllustId`/`NovelId`/`UserId`/`SeriesId`/`ChapterId`) that reject cross-type ID mix-ups at compile time. See [Architecture Overview](/openwiki/architecture/overview.md#app-lynx-vue-lynx-client).
+- **lynx novel intro-page toggle (ADR-0183, v5.5.0):** the ADR-0167 three-segment intro page became **optional** for high-frequency readers — a device-level `novel_intro_first` setting (default on, in `settingsStore`, key excluded from account scoping) lets users jump straight from any of the six novel entry points to the body page. Navigation is now funneled through a single `openNovel()` seam ([`novelNavigation.ts`](/packages/app-lynx/src/utils/novelNavigation.ts)) that reads the switch and emits either `/novel/:id/intro` or `/novel/:id`; the route layer is unchanged (no redirects, deep links to the intro page stay reachable), and the `novelIntroEntryGuards.test.ts` negative assertion was rewritten to pin the seam call + `/intro`-string-only-in-seam invariant. Setting UI lives in `Me.vue`'s content group. See [Novel Reader](/openwiki/domain/novel-reader.md#app-lynx-novel-intro-page--three-segment-navigation-adr-0167) and [ADR-0183](/docs/adr/ADR-0183-lynx-novel-intro-toggle.md).
+- **workspace dependency upgrade execution (ADR-0184, v5.5.0):** the ADR-0080 evaluate-only batch was executed as the `chore/dependency-upgrade-2026-09` branch. Direct deps were brought to the current ecosystem max: solidjs rc line rc.6→**rc.9** (`@solidjs/router` next.21→**next.27**, `@solidjs/vite-plugin` next.39→next.44), TypeScript → **7.0.2** (with a `typescript-compiler-api` npm alias pinned to TS 6 because TS7's `tsgo` ships no compiler JS API and the i18n hardcode gate depends on `createSourceFile`/`ScriptKind`), vitest → **5.0.1** (app held at 4.1.10 because `vite-plus` hard-depends on it), vue-router 4.6.4→**5.3.1**, Capacitor → **8.5.2**, UnoCSS → **66.10**, Vite → **8.3**. Held with explicit re-evaluation triggers: agent-browser 0.34 (engines.node ≥24), tailwind 4, the lynx rspeedy/web-core toolchain, vue 3.5.40 (vue-tsc type regression), and query-persist-client-core (frozen by solid-query's query-core). Gate = `check:all` + `lint:all` + `test:all` green. See [ADR-0184](/docs/adr/ADR-0184-dependency-upgrade-execution-2026-09.md) and [glossary](/docs/adr/glossary-dependency-upgrade.md).
 
 
 ## Backlog
