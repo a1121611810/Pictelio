@@ -12,6 +12,8 @@ import { t } from "../i18n";
 import { markContentReady } from "@/native/splashBridge";
 
 const isNative = Capacitor.isNativePlatform();
+/** #722 诊断开关：仅 e2e 构建为 true（vitest 下 __E2E__ 未定义，typeof 守卫防 ReferenceError） */
+const E2E_ON = typeof __E2E__ !== "undefined" && __E2E__;
 
 const Login: Component = () => {
   const navigate = useNavigate();
@@ -44,8 +46,11 @@ const Login: Component = () => {
     const [loginErr] = await tryAsync(
       (async () => {
         await loginWithToken(tokenInput().trim());
+        if (E2E_ON) console.log("[e2e-start] Login loginWithToken done");
         await loadAccountR18();
+        if (E2E_ON) console.log("[e2e-start] Login loadAccountR18 done");
         navigate("/home", { replace: true });
+        if (E2E_ON) console.log("[e2e-start] Login navigate /home called");
       })(),
     );
     setSubmitting(false);

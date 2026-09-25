@@ -38,13 +38,21 @@ describe("evaluate", () => {
   });
 
   it("no transport -> device fail", () => {
-    const r = evaluate(base({ device: { transports: ["none"], validated: false, captivePortal: false, metered: false } }));
+    const r = evaluate(
+      base({
+        device: { transports: ["none"], validated: false, captivePortal: false, metered: false },
+      }),
+    );
     expect(r.overall).toBe("fail");
     expect(r.attribution).toBe("device");
   });
 
   it("captive portal -> device attribution and captive headline", () => {
-    const r = evaluate(base({ device: { transports: ["wifi"], validated: false, captivePortal: true, metered: false } }));
+    const r = evaluate(
+      base({
+        device: { transports: ["wifi"], validated: false, captivePortal: true, metered: false },
+      }),
+    );
     expect(r.attribution).toBe("device");
     expect(r.headline).toContain("登录");
   });
@@ -56,24 +64,32 @@ describe("evaluate", () => {
   });
 
   it("http 401 -> auth and /login action", () => {
-    const r = evaluate(withProbe("http", { id: "http", ok: false, errorClass: "auth", httpStatus: 401 }));
+    const r = evaluate(
+      withProbe("http", { id: "http", ok: false, errorClass: "auth", httpStatus: 401 }),
+    );
     expect(r.attribution).toBe("auth");
     expect(r.actionTarget).toBe("/login");
   });
 
   it("http 5xx -> service", () => {
-    const r = evaluate(withProbe("http", { id: "http", ok: false, errorClass: "http_status", httpStatus: 503 }));
+    const r = evaluate(
+      withProbe("http", { id: "http", ok: false, errorClass: "http_status", httpStatus: 503 }),
+    );
     expect(r.attribution).toBe("service");
   });
 
   it("missing probe -> skipped", () => {
     const b = base();
-    const edge = evaluate({ ...b, probes: b.probes.filter((p) => p.id !== "edge") }).checks.find((c) => c.id === "edge");
+    const edge = evaluate({ ...b, probes: b.probes.filter((p) => p.id !== "edge") }).checks.find(
+      (c) => c.id === "edge",
+    );
     expect(edge?.status).toBe("skipped");
   });
 
   it("degraded web without device -> device skipped not fail", () => {
-    const dev = evaluate(base({ device: undefined, degraded: true })).checks.find((c) => c.id === "device");
+    const dev = evaluate(base({ device: undefined, degraded: true })).checks.find(
+      (c) => c.id === "device",
+    );
     expect(dev?.status).toBe("skipped");
   });
 
@@ -82,7 +98,10 @@ describe("evaluate", () => {
     const input: DiagInput = {
       ...b,
       device: { transports: ["wifi"], validated: false, captivePortal: false, metered: false },
-      probes: [...b.probes.filter((p) => p.id !== "tcp"), { id: "tcp", ok: false, errorClass: "timeout" }],
+      probes: [
+        ...b.probes.filter((p) => p.id !== "tcp"),
+        { id: "tcp", ok: false, errorClass: "timeout" },
+      ],
     };
     expect(evaluate(input).overall).toBe("fail");
   });

@@ -4,7 +4,7 @@
 
 ## 项目概览
 
-- **技术栈**: SolidJS 2.0（rc）+ TypeScript 7.0 (strict) + Vite 8.3 + UnoCSS 66.10 + Capacitor 8.5；小说正文布局用 `@chenglou/pretext`
+- **技术栈**: SolidJS 2.0（rc）+ TypeScript 7.0 (strict) + Vite 8.3（vite-plus 1.0-rc 统一工具链）+ UnoCSS 66.10 + Capacitor 8.5；小说正文布局用 `@chenglou/pretext`
 - **Monorepo**: pnpm workspace 五子包：`pictelio-app`（SolidJS 主体）/ `pictelio-app-lynx` / `@pictelio/ugoira` / `@pictelio/update-check` / `pictelio-website`
 - **入口**: `packages/app/src/main.tsx`（settings 同步、Fluent 主题、渲染、auth 恢复）→ `App.tsx` → `router.tsx`（路由定义与 App 分离）
 - **设计系统**: `pictelio-app` **强制**遵循 Microsoft Fluent Design System 2（详见「Fluent Design 规范」）；`pictelio-app-lynx` 使用 Material Design 3（见「约定」app-lynx 样式）
@@ -137,11 +137,12 @@ OpenWiki 提供人工整理的高层次项目概览，与 CodeGraph（精确代�
 
 ## 命令
 
-项目根目录执行，pnpm workspace 委托：**裸命令** → `pictelio-app`；`<命令>:<包名>` → 对应包；`:all` → 并行全部（ADR-0059；权威清单 = 根 `package.json`）：
+项目根目录执行，pnpm workspace 委托（ADR-0059，权威清单 = 根 `package.json`）：`lint` / `fmt:check` / `outdated` = 仓库级单命令；其余裸命令 → `pictelio-app`；`<命令>:<包名>` → 对应包；`:all` → 并行全部：
 
 | 命令 | 说明 |
 | --- | --- |
-| `pnpm dev` / `build` / `check` / `test` / `lint` / `fmt` | app：dev(5173) / 检查+构建 / 类型检查 / Vitest / oxlint / oxfmt |
+| `pnpm dev` / `build` / `check` / `test` | app：dev(5173) / 构建 / fmt+lint+tsc / Vitest |
+| `pnpm lint` / `fmt` / `fmt:check` / `outdated` | 仓库级单命令（root vite.config.ts 单配置源；**无** `:包名` 变体） |
 | `pnpm <命令>:app-lynx\|:website\|:ugoira` / `:all` | 委托对应包 / 并行全部 |
 | `pnpm dev:android` / `build:android(:release)` | 热重载 / Debug 或签名 Release APK（需密码环境变量） |
 | `pnpm test:agent-browser` / `test:android:e2e` | AI E2E（入门禁）/ 模拟器 E2E（手动按需） |
@@ -286,7 +287,7 @@ Grill 澄清 → to-spec → to-tickets → implement
 - **TS / 组件 / 状态 / 别名**：`strict: true`（+ noUnusedLocals 等 4 项，ESNext / bundler）；SolidJS 函数组件 `Component<Props>`、默认导出；createSignal / createStore 顶层导出；`@/` → `src/`
 - **app-lynx 样式（Tailwind 硬性约定）**：`packages/app-lynx` 样式**默认优先 Tailwind utility**（`tailwind.config.ts`：spacing=vw / fontSize=rpx / M3 色板）；禁止手写 scoped CSS；特殊语义用 arbitrary utility（`min-h-[40vw]`、`[max-line:1]`）；web-core 预览禁 rem
 - **注释 / 命名**：中文注释为主（API 层与类型定义偏英文）；组件 PascalCase、工具/API/primitives camelCase
-- **Lint / 格式化**：`vite-plus` 内置 oxlint / oxfmt，配置在 `vite.config.ts` 的 `lint` / `fmt` 字段（oxlint：typescript/unicorn/oxc 插件，correctness=error；忽略 dist/、android/、node_modules/、.codegraph/）
+- **Lint / 格式化**：vite-plus 内置 oxlint / oxfmt，唯一配置源 = 仓库根 `vite.config.ts`（correctness=error；app-lynx / website / docs / `**/*.md` 等豁免 → ADR-0185）
 - **Android**：`minSdkVersion = 28`（`variables.gradle`）；自定义 Capacitor 插件在 `MainActivity.java` 经 `registerPlugin()` 注册（**必须在 `super.onCreate()` 之前**）；平台要求 / WebView 门槛 / 引擎降级矩阵 → `docs/platform-compatibility.md`
 - **发布签名**：Release 用 `android/app/pictelio-release.keystore`，密码经环境变量注入，keystore 禁止提交 → `docs/release-signing.md`
 - **代理配置**：开发时自动读取 `https_proxy` / `HTTPS_PROXY` / `http_proxy` / `HTTP_PROXY`，回退 `http://127.0.0.1:7897`

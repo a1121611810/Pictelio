@@ -14,6 +14,7 @@
 
 import type { Accessor } from "solid-js";
 import { useInfiniteQuery } from "@tanstack/solid-query";
+import { NotReadyError } from "solid-js";
 import { queryClient } from "../../api/queryClient";
 import { normalizeQueryError } from "../../api/normalizeQueryError";
 import { ApiErrorType, type ApiError } from "../../api/types";
@@ -217,6 +218,32 @@ function pickBestError(errors: (ApiError | null)[]): ApiError | null {
 
 // ─── 工厂 ───
 
+/**
+ * #722：渲染期 data 读点的安全封装。
+ *
+ * 两段防护缺一不可：
+ * - pending 态：由查询注册的 placeholderData 提供空页占位（data 首读即定义，不 park
+ *   路由 transition）；
+ * - error 态：适配层 data 投影在 status='error' 且无数据时**抛 state.error**（review
+ *   实测），渲染期读会逃逸到路由边界。此处捕获并返回 undefined，错误呈现交给
+ *   error() 通道（读 q.error 普通字段，不抛）。
+ */
+function safeData(q: { data?: unknown; error?: unknown }): { pages?: unknown[] } | undefined {
+  try {
+    return q.data as { pages?: unknown[] } | undefined;
+  } catch (e) {
+    // pending 协议抛出（NotReadyError）必须重抛：它是「查询失去 placeholderData 防线」的
+    // 信号（本文件防线所防之事），吞掉会把可见挂起/park 退化为静默空 feed（硬约束 #3）。
+    if (e instanceof NotReadyError) throw e;
+    // error 态由 error() 通道显式暴露（q.error 普通字段）→ 不 warn 免每次渲染刷屏；
+    // 其余异常（无 error 标记的读取失败）必须可见（硬约束 #3）
+    if (q.error == null) {
+      console.warn("[createTQFeedStore] data 读取异常，已降级为空 feed", e);
+    }
+    return undefined;
+  }
+}
+
 export function createTQFeedStore<
   TItem extends { id: number; create_date: string },
   TTab extends string,
@@ -274,6 +301,32 @@ export function createTQFeedStore<
                  */
                 enabled: false,
 
+                /**
+                 * #722 修复：提供立即求值的 placeholderData，使查询 data 在首读即
+                 * 干净返回，避免「渲染期读取 pending 异步 data」抛 NotReadyError。
+                 *
+                 * Solid 2.0-rc.9 + solid-query v6：pending 查询的 data 是异步访问器，
+                 * 渲染期读取抛 NotReadyError 并 park 所在的路由 transition；当该 fetch
+                 * 因弱网悬挂/失败（代理抖动、重试耗尽）时 rc.9 的 park 唤醒路径不覆盖
+                 * 此形态 → transition 永久 park → 同事务内的全局信号写入（含 isLoading
+                 * 门槛）永不提交 → 加载门槛/Splash 冻结（#722 实证：latest=false /
+                 * isPending=true / committed 恒 true；NotReadyError 探针全部来自
+                 * solid-query 调用栈）。
+                 *
+                 * 选 placeholderData 而非 initialData：placeholder 不写缓存、不阻断
+                 * refetch（消费点仅 data 投影），且以 isPlaceholderData 暴露「占位中」
+                 * 语义供消费方精确判定（initialData 会直接置 status=success 并写入
+                 * 缓存，6 项 loading 契约单测破防）。
+                 * 注意（review 实测）：本适配层在 placeholder 生效期把 status 投影为
+                 * 'success'（非仍为 pending）——loading 首载粘滞（#366）已改用
+                 * `status==='pending' || isPlaceholderData===true` 表达；refreshing
+                 * 判定同口径排除 isPlaceholderData（否则首载 fetch 在途会误报刷新）。
+                 */
+                // 工厂形态（而非模块级常量对象）：泛型 InfiniteData<PageResponse<TItem>, unknown>
+                // 无法由宽松常量满足（TS2769）；每次占位读取新建空页对象的微分配为
+                // ADR 级可接受成本（placeholder 读取频率 = 每次状态投影）
+                placeholderData: () => ({ pages: [], pageParams: [] }),
+
                 staleTime: configStaleTime,
                 gcTime: configGcTime,
               };
@@ -327,7 +380,7 @@ export function createTQFeedStore<
       if (sub && sub !== "all") {
         const q = queryMap.get(`${config.currentTab()}:${sub}`);
         if (!q) return [];
-        return config.filterFn(flattenPages(q.data ?? {}) as TItem[]);
+        return config.filterFn(flattenPages(safeData(q) ?? {}) as TItem[]);
       }
 
       // "all" 模式
@@ -340,12 +393,12 @@ export function createTQFeedStore<
 
       // single → 单数据源
       if (allCfg.type === "single") {
-        return config.filterFn(flattenPages(sources[0].data ?? {}) as TItem[]);
+        return config.filterFn(flattenPages(safeData(sources[0]) ?? {}) as TItem[]);
       }
 
       // merge → 多数据源排序合并 + 可选去重
       const results = sources
-        .map((q) => sortByDate(flattenPages(q.data ?? {}) as TItem[]))
+        .map((q) => sortByDate(flattenPages(safeData(q) ?? {}) as TItem[]))
         .filter((r) => r.length > 0);
 
       if (results.length === 0) return [];
@@ -363,12 +416,12 @@ export function createTQFeedStore<
       if (keys.length === 0) return null;
       if (keys.length === 1) {
         const q = queryMap.get(keys[0]);
-        return q ? getLastNextUrl(q.data ?? {}) : null;
+        return q ? getLastNextUrl(safeData(q) ?? {}) : null;
       }
       // merge 模式：取第一个有值的 next_url
       for (const k of keys) {
         const q = queryMap.get(k);
-        const url = q ? getLastNextUrl(q.data ?? {}) : null;
+        const url = q ? getLastNextUrl(safeData(q) ?? {}) : null;
         if (url) return url;
       }
       return null;
@@ -385,9 +438,10 @@ export function createTQFeedStore<
         // 首载粘滞（#366）：merge 多源 + 命令式 ensureInfiniteQueryData 组合下，
         // isFetching 信号会在 fetch 仍在进行时失真翻 false → 骨架被提前卸载，
         // 内容区出现数秒空白窗（体检 P3 的 s15 帧实证）。语义修正：
-        // 已激活 && 查询尚无数据（status=pending）&& 无错误 ⇒ 视为首载中。
-        // 查询成功（status=success，含合法空 feed）或出错后由 error 分支接管。
-        return activated() && q.status === "pending" && !q.error;
+        // 已激活 && 查询尚无真实数据（status=pending，或仍在使用 #722 的
+        // placeholderData 占位）&& 无错误 ⇒ 视为首载中。
+        // 查询成功（status=success 且真实数据已到）或出错后由 error 分支接管。
+        return activated() && (q.status === "pending" || q.isPlaceholderData === true) && !q.error;
       });
 
     // ── 分页错误标记 ──
@@ -405,7 +459,14 @@ export function createTQFeedStore<
     //   core isRefetching      = isFetching && status !== "pending" && 非分页方向
     const refreshing: Accessor<boolean> = () =>
       activeQueries().some(
-        (q) => q.fetchStatus === "fetching" && q.status !== "pending" && fetchDirection(q) == null,
+        (q) =>
+          q.fetchStatus === "fetching" &&
+          q.status !== "pending" &&
+          // #722（review P2）：适配层在 placeholderData 生效期把 status 投影为 'success'，
+          // 首载 fetch 在途时会误入本式（旧语义 false → true，违背 ADR-0078 刷新语义分离）。
+          // isPlaceholderData 即「真实数据未到」的权威判据，显式排除。
+          q.isPlaceholderData !== true &&
+          fetchDirection(q) == null,
       );
 
     const loadingMore: Accessor<boolean> = () =>
@@ -429,7 +490,7 @@ export function createTQFeedStore<
     // ── 4. 缓存判断 ──
 
     const isCached = (): boolean => {
-      return activeQueries().some((q) => ((q.data as any)?.pages?.length ?? 0) > 0);
+      return activeQueries().some((q) => (safeData(q)?.pages?.length ?? 0) > 0);
     };
 
     // ── 5. 动作 ──

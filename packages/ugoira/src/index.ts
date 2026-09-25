@@ -45,7 +45,9 @@ function readU16(bytes: Uint8Array, off: number): number {
   return (bytes[off]! | (bytes[off + 1]! << 8)) >>> 0;
 }
 function readU32(bytes: Uint8Array, off: number): number {
-  return (bytes[off]! | (bytes[off + 1]! << 8) | (bytes[off + 2]! << 16) | (bytes[off + 3]! << 24)) >>> 0;
+  return (
+    (bytes[off]! | (bytes[off + 1]! << 8) | (bytes[off + 2]! << 16) | (bytes[off + 3]! << 24)) >>> 0
+  );
 }
 function assertRange(bytes: Uint8Array, off: number, len: number, what: string): void {
   if (off < 0 || off + len > bytes.length) {
@@ -73,7 +75,9 @@ export function parseZipEocd(bytes: Uint8Array, opts?: { fileSize?: number }): Z
     const entryCount = readU16(bytes, i + 10);
     // 中央目录范围必须落在文件内（用文件总长而非片段长度校验）
     if (cdOffset + cdSize > fileSize) {
-      throw new Error(`ugoira: EOCD 中央目录范围越界 (cdOffset=${cdOffset} cdSize=${cdSize} fileSize=${fileSize})`);
+      throw new Error(
+        `ugoira: EOCD 中央目录范围越界 (cdOffset=${cdOffset} cdSize=${cdSize} fileSize=${fileSize})`,
+      );
     }
     return { cdOffset, cdSize, entryCount };
   }
@@ -86,7 +90,11 @@ export function parseZipEocd(bytes: Uint8Array, opts?: { fileSize?: number }): Z
  * 解析中央目录，返回每帧条目（含本地文件头偏移与压缩方法）。
  * 逐条校验签名（0x02014b50）与边界，遇非法即抛错（防越界读）。
  */
-export function parseZipCentralDir(bytes: Uint8Array, cdOffset: number, cdSize: number): UgoiraZipEntry[] {
+export function parseZipCentralDir(
+  bytes: Uint8Array,
+  cdOffset: number,
+  cdSize: number,
+): UgoiraZipEntry[] {
   assertRange(bytes, cdOffset, cdSize, "中央目录");
   const entries: UgoiraZipEntry[] = [];
   let p = cdOffset;

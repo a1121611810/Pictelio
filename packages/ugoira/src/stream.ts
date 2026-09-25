@@ -86,6 +86,7 @@ export function createStreamFrameSource(fileOrder: string[]): StreamFrameSource 
         // fflate 解析错误（损坏 zip / 非法签名）→ 统一可读错误
         throw new Error(
           `ugoira: zip 流式解析失败（损坏或格式不支持）: ${e instanceof Error ? e.message : String(e)}`,
+          { cause: e },
         );
       }
       if (final && (buffered.size > 0 || readyNext < fileOrder.length)) {

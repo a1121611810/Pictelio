@@ -54,7 +54,9 @@ describe("extractNovelDataFromHtml（真实 Pixiv HTML）", () => {
   });
 
   it("缺失 seriesNavigation 时 navigation.nextNovel 为 undefined，images 为空对象", () => {
-    const result = extractNovelDataFromHtml(`<script>window.pixiv={novel:{"text":"no nav"}};</script>`);
+    const result = extractNovelDataFromHtml(
+      `<script>window.pixiv={novel:{"text":"no nav"}};</script>`,
+    );
     expect(result.text).toBe("no nav");
     expect(result.navigation.nextNovel).toBeUndefined();
     expect(result.images).toEqual({});

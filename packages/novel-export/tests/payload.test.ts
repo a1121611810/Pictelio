@@ -82,7 +82,12 @@ describe("buildNovelExportPayload — meta 映射", () => {
 
   it("无 caption 时不含 description 字段", () => {
     const noCaption: PixivNovelLike = { ...REAL_NOVEL, caption: undefined };
-    const p = buildNovelExportPayload({ novel: noCaption, text: "", images: null, options: DEFAULT_NOVEL_EXPORT_OPTIONS });
+    const p = buildNovelExportPayload({
+      novel: noCaption,
+      text: "",
+      images: null,
+      options: DEFAULT_NOVEL_EXPORT_OPTIONS,
+    });
     expect("description" in p.meta).toBe(false);
   });
 
@@ -92,17 +97,32 @@ describe("buildNovelExportPayload — meta 映射", () => {
       image_urls: { square_medium: "s", medium: "m" },
     };
     expect(
-      buildNovelExportPayload({ novel: mediumOnly, text: "", images: null, options: DEFAULT_NOVEL_EXPORT_OPTIONS }).meta.coverUrl,
+      buildNovelExportPayload({
+        novel: mediumOnly,
+        text: "",
+        images: null,
+        options: DEFAULT_NOVEL_EXPORT_OPTIONS,
+      }).meta.coverUrl,
     ).toBe("m");
 
     const squareOnly: PixivNovelLike = { ...REAL_NOVEL, image_urls: { square_medium: "s" } };
     expect(
-      buildNovelExportPayload({ novel: squareOnly, text: "", images: null, options: DEFAULT_NOVEL_EXPORT_OPTIONS }).meta.coverUrl,
+      buildNovelExportPayload({
+        novel: squareOnly,
+        text: "",
+        images: null,
+        options: DEFAULT_NOVEL_EXPORT_OPTIONS,
+      }).meta.coverUrl,
     ).toBe("s");
 
     const none: PixivNovelLike = { ...REAL_NOVEL, image_urls: {} };
     expect(
-      buildNovelExportPayload({ novel: none, text: "", images: null, options: DEFAULT_NOVEL_EXPORT_OPTIONS }).meta.coverUrl,
+      buildNovelExportPayload({
+        novel: none,
+        text: "",
+        images: null,
+        options: DEFAULT_NOVEL_EXPORT_OPTIONS,
+      }).meta.coverUrl,
     ).toBeUndefined();
   });
 });
@@ -141,18 +161,44 @@ describe("buildNovelExportPayload — blocks 映射", () => {
       { type: "text", index: 0, text: "第一段", inlineRuns: [{ start: 2, end: 3, tag: "bold" }] },
       { type: "pageBreak" },
       { type: "image", imageId: "100", url: "https://example.com/1200.jpg" },
-      { type: "jump", kind: "illust", target: "illust/456", url: "https://www.pixiv.net/artworks/456" },
+      {
+        type: "jump",
+        kind: "illust",
+        target: "illust/456",
+        url: "https://www.pixiv.net/artworks/456",
+      },
     ]);
   });
 
   it("jump URL 映射：illust/novel/user/external/unknown", () => {
-    const text = "[jump:illust/456]\n[jump:novel/123]\n[jump:user/789]\n[jump:https://example.com/a]\n[jump:unknown-thing]";
-    const payload = buildNovelExportPayload({ novel: REAL_NOVEL, text, images: null, options: DEFAULT_NOVEL_EXPORT_OPTIONS });
+    const text =
+      "[jump:illust/456]\n[jump:novel/123]\n[jump:user/789]\n[jump:https://example.com/a]\n[jump:unknown-thing]";
+    const payload = buildNovelExportPayload({
+      novel: REAL_NOVEL,
+      text,
+      images: null,
+      options: DEFAULT_NOVEL_EXPORT_OPTIONS,
+    });
     expect(payload.blocks).toEqual([
-      { type: "jump", kind: "illust", target: "illust/456", url: "https://www.pixiv.net/artworks/456" },
-      { type: "jump", kind: "novel", target: "novel/123", url: "https://www.pixiv.net/novel/show.php?id=123" },
+      {
+        type: "jump",
+        kind: "illust",
+        target: "illust/456",
+        url: "https://www.pixiv.net/artworks/456",
+      },
+      {
+        type: "jump",
+        kind: "novel",
+        target: "novel/123",
+        url: "https://www.pixiv.net/novel/show.php?id=123",
+      },
       { type: "jump", kind: "user", target: "user/789", url: "https://www.pixiv.net/users/789" },
-      { type: "jump", kind: "external", target: "https://example.com/a", url: "https://example.com/a" },
+      {
+        type: "jump",
+        kind: "external",
+        target: "https://example.com/a",
+        url: "https://example.com/a",
+      },
       { type: "jump", kind: "unknown", target: "unknown-thing", url: "unknown-thing" },
     ]);
   });

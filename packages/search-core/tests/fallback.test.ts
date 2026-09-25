@@ -8,7 +8,13 @@ import { resolveAiMode } from "../src/ai";
 import { BOOKMARK_BANDS } from "../src/filters";
 
 describe("filterByBookmarkBand", () => {
-  const items = [{ n: 1, total_bookmarks: 9 }, { n: 2, total_bookmarks: 10 }, { n: 3, total_bookmarks: 29 }, { n: 4, total_bookmarks: 30 }, { n: 5, total_bookmarks: 1000 }];
+  const items = [
+    { n: 1, total_bookmarks: 9 },
+    { n: 2, total_bookmarks: 10 },
+    { n: 3, total_bookmarks: 29 },
+    { n: 4, total_bookmarks: 30 },
+    { n: 5, total_bookmarks: 1000 },
+  ];
   const getBm = (i: { total_bookmarks: number }) => i.total_bookmarks;
 
   it("null 带宽原样返回", () => {
@@ -26,7 +32,9 @@ describe("filterByBookmarkBand", () => {
       { type: "novel" as const, entity: { total_bookmarks: 5000 } },
     ];
     expect(
-      filterByBookmarkBand(rows, BOOKMARK_BANDS[6]!, (r) => r.entity.total_bookmarks).map((r) => r.entity.total_bookmarks),
+      filterByBookmarkBand(rows, BOOKMARK_BANDS[6]!, (r) => r.entity.total_bookmarks).map(
+        (r) => r.entity.total_bookmarks,
+      ),
     ).toEqual([5000]);
   });
 });

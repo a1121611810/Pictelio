@@ -11,7 +11,9 @@ export function encodeFiltersQuery(f: SearchFilters): Record<string, string> {
   if (f.period.kind === "preset") q.fp = f.period.preset;
   else if (f.period.kind === "custom") q.fd = `${f.period.start}_${f.period.end}`;
   if (f.bookmark !== null) {
-    const idx = BOOKMARK_BANDS.findIndex((b) => b.min === f.bookmark!.min && b.max === f.bookmark!.max);
+    const idx = BOOKMARK_BANDS.findIndex(
+      (b) => b.min === f.bookmark!.min && b.max === f.bookmark!.max,
+    );
     if (idx >= 0) q.fb = String(idx);
   }
   if (f.ratio !== null) q.fr = f.ratio;

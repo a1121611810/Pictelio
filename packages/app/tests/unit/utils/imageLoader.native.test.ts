@@ -224,3 +224,27 @@ describe("loadImage native × 图床开启（缓存键契约）", () => {
     });
   });
 });
+
+describe("#722 接线防线：loadImageInner 桥调用必须包超时（flight 永挂 → 事务停摆）", () => {
+  it("prefetchImage 永不 settle → loadImage 在 20s 超时后拒绝", async () => {
+    vi.useFakeTimers();
+    try {
+      const { PixivApi } = await import("@/native/PixivApi");
+      const { loadImage } = await import("@/utils/imageLoader");
+      // 永不 settle 的 deferred（模拟弱网/代理黑洞下原生回调缺席）
+      vi.mocked(PixivApi.prefetchImage).mockReturnValue(new Promise(() => {}));
+      const pending = loadImage("https://i.pximg.net/img.jpg");
+      // loadImage 对外契约：prefetch 失败统一抛 "Prefetch failed"（超时 warn 在内部日志可见）
+      const assertion = expect(pending).rejects.toThrow(/Prefetch failed/);
+      await vi.advanceTimersByTimeAsync(20_000 + 1);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("默认超时值为 20s（ADR-0186 P1 修复参数 oracle）", async () => {
+    const { NATIVE_IMAGE_TIMEOUT_MS } = await import("@/utils/imageLoader");
+    expect(NATIVE_IMAGE_TIMEOUT_MS).toBe(20_000);
+  });
+});

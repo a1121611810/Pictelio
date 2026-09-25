@@ -244,10 +244,19 @@ function useFeedActivation(src: () => FeedSource<PixivIllust> | FeedSource<Pixiv
   createEffect(
     () => src(),
     (s) => {
-      void s.ensure?.();
-      if (s.activate) {
-        s.activate();
-      }
+      // #722 修复（第二必要项，隔离验证：回退本延迟 → 设备 6/6 冷启动冻结复发）：
+      // ensure 触发的 feed fetch promise 若在本 apply 段（路由 transition 的 flush
+      // 作用域）内创建，会被 Solid 2.0-rc.9 作为该 transition 的 flight 持有；弱网下
+      // fetch 悬挂/失败时 park 唤醒路径不覆盖 → transition 永久 park → 全局信号写入
+      // （含 isLoading 门槛）永不提交。宏任务延迟使 promise 在 transition settle 后
+      // 创建，与 placeholderData（消除 pending 异步读）共同构成完整修复。
+      // 与 #722 spec §4.4 隔离裁决一致；ADR-0043 同款「延迟首载」模式先例。
+      setTimeout(() => {
+        void s.ensure?.();
+        if (s.activate) {
+          s.activate();
+        }
+      }, 0);
     },
   );
 }
@@ -426,9 +435,12 @@ function clearAllRelatedRows(): void {
   clearRelatedRows("bookmarks");
 }
 
+/** #722 诊断开关：仅 e2e 构建为 true（vitest 下 __E2E__ 未定义，typeof 守卫防 ReferenceError） */
+const E2E_ON = typeof __E2E__ !== "undefined" && __E2E__;
 const HomePage: Component = () => {
   onSettled(() => {
     // 首页是登录后启动首屏：挂载后通知原生关闭 Splash Screen（幂等）
+    if (E2E_ON) console.log("[e2e-start] HomePage onSettled (routes rendered)");
     markContentReady();
     window.addEventListener("contentTypeChanged", clearAllRelatedRows);
     return () => window.removeEventListener("contentTypeChanged", clearAllRelatedRows);

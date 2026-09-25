@@ -29,7 +29,7 @@ function main() {
 
   if (!existsSync(websiteDist)) {
     console.error(
-      "❌ packages/website/dist/ 不存在。请先运行: pnpm --filter pictelio-website build"
+      "❌ packages/website/dist/ 不存在。请先运行: pnpm --filter pictelio-website build",
     );
     process.exit(1);
   }

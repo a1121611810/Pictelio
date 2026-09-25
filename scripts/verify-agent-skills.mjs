@@ -47,7 +47,7 @@ if (!existsSync(skillsRoot)) {
 
 const dirs = readdirSync(skillsRoot)
   .filter((d) => statSync(join(skillsRoot, d)).isDirectory())
-  .sort();
+  .toSorted();
 
 for (const dir of dirs) {
   const skillFile = join(skillsRoot, dir, "SKILL.md");

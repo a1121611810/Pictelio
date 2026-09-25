@@ -40,7 +40,10 @@ function shiftMonths(iso: string, months: number): string {
  * 预设档窗口语义为 **UI 约定**（官方未承诺换算细节）：end=今天（JST）；
  * start：1d=今天；1w=今天-6 天（最近 7 天含今天）；1m/6m/1y=日历回退 1/6/12 个月。
  */
-export function resolvePeriodRange(period: SearchPeriod, now: Date = new Date()): PeriodRange | null {
+export function resolvePeriodRange(
+  period: SearchPeriod,
+  now: Date = new Date(),
+): PeriodRange | null {
   if (period.kind === "any") return null;
   const end = jstToday(now);
   if (period.kind === "custom") {
@@ -52,7 +55,8 @@ export function resolvePeriodRange(period: SearchPeriod, now: Date = new Date())
   }
   if (period.preset === "1d") return { start: end, end };
   if (period.preset === "1w") return { start: shiftDays(end, -6), end };
-  const months = period.preset === "1m" ? -1 : period.preset === "6m" ? -6 : period.preset === "1y" ? -12 : null;
+  const months =
+    period.preset === "1m" ? -1 : period.preset === "6m" ? -6 : period.preset === "1y" ? -12 : null;
   if (months === null) return null;
   return { start: shiftMonths(end, months), end };
 }

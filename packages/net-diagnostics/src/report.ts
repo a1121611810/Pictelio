@@ -15,7 +15,12 @@ export function redactSecrets(text: string): string {
   return out;
 }
 
-const STATUS_LABEL: Record<string, string> = { ok: "OK", warn: "WARN", fail: "FAIL", skipped: "SKIP" };
+const STATUS_LABEL: Record<string, string> = {
+  ok: "OK",
+  warn: "WARN",
+  fail: "FAIL",
+  skipped: "SKIP",
+};
 
 export function formatReport(input: DiagInput): string {
   const report = evaluate(input);
@@ -45,7 +50,9 @@ export function formatReport(input: DiagInput): string {
     const latency = c.latencyMs !== undefined ? " " + c.latencyMs + "ms" : "";
     lines.push("- [" + STATUS_LABEL[c.status] + "] " + c.title + latency + " — " + c.detail);
   }
-  const raw = input.probes.map((p) => p.rawError).filter((x): x is string => typeof x === "string" && x.length > 0);
+  const raw = input.probes
+    .map((p) => p.rawError)
+    .filter((x): x is string => typeof x === "string" && x.length > 0);
   if (raw.length > 0) {
     lines.push("");
     lines.push("技术详情:");

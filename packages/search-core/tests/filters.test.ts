@@ -31,7 +31,9 @@ describe("countActiveFilters / isDefaultFilters", () => {
   });
 
   it("逐维度计数（含 AI 覆盖非 follow）", () => {
-    expect(countActiveFilters({ ...DEFAULT_SEARCH_FILTERS, period: { kind: "preset", preset: "1d" } })).toBe(1);
+    expect(
+      countActiveFilters({ ...DEFAULT_SEARCH_FILTERS, period: { kind: "preset", preset: "1d" } }),
+    ).toBe(1);
     expect(countActiveFilters({ ...DEFAULT_SEARCH_FILTERS, bookmark: BOOKMARK_BANDS[0]! })).toBe(1);
     expect(countActiveFilters({ ...DEFAULT_SEARCH_FILTERS, aiOverride: "hide" })).toBe(1);
     expect(
@@ -66,15 +68,23 @@ describe("normalizeFilters（不可信输入逐字段校验，非法回默认）
   });
 
   it("custom 区间格式/顺序校验", () => {
-    expect(normalizeFilters({ period: { kind: "custom", start: "2026-08-01", end: "2026-08-15" } }).period).toEqual({
+    expect(
+      normalizeFilters({ period: { kind: "custom", start: "2026-08-01", end: "2026-08-15" } })
+        .period,
+    ).toEqual({
       kind: "custom",
       start: "2026-08-01",
       end: "2026-08-15",
     });
-    expect(normalizeFilters({ period: { kind: "custom", start: "2026-08-15", end: "2026-08-01" } }).period).toEqual({
+    expect(
+      normalizeFilters({ period: { kind: "custom", start: "2026-08-15", end: "2026-08-01" } })
+        .period,
+    ).toEqual({
       kind: "any",
     });
-    expect(normalizeFilters({ period: { kind: "custom", start: "x", end: "y" } }).period).toEqual({ kind: "any" });
+    expect(normalizeFilters({ period: { kind: "custom", start: "x", end: "y" } }).period).toEqual({
+      kind: "any",
+    });
   });
 
   it("非法逐字段回默认", () => {

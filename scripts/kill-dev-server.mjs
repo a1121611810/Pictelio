@@ -20,18 +20,18 @@
  *   node scripts/kill-dev-server.mjs --port 4321        # 指定端口（不校验项目白名单）
  */
 
-import { exec, execSync } from 'node:child_process';
-import { createInterface } from 'node:readline';
-import os from 'node:os';
-import path from 'node:path';
-import process from 'node:process';
+import { exec, execSync } from "node:child_process";
+import { createInterface } from "node:readline";
+import os from "node:os";
+import path from "node:path";
+import process from "node:process";
 
 // -------------------- 配置常量 --------------------
 
 /** 包名到开发服务器端口的映射（数组表示该包可能占用的多个端口） */
 const PROJECT_PORTS = {
   app: [5173],
-  'app-lynx': [3000, 3001], // rspeedy 在 3000 被占时自动切到 3001
+  "app-lynx": [3000, 3001], // rspeedy 在 3000 被占时自动切到 3001
   website: [4321],
 };
 
@@ -39,7 +39,7 @@ const PROJECT_NAME_LIST = Object.keys(PROJECT_PORTS);
 
 /** 脚本位于 <repo>/scripts/kill-dev-server.mjs，repo 根目录是上一级 */
 const SCRIPT_DIR = path.dirname(path.resolve(process.argv[1]));
-const REPO_ROOT = path.resolve(SCRIPT_DIR, '..');
+const REPO_ROOT = path.resolve(SCRIPT_DIR, "..");
 
 /** 优雅终止等待时间（毫秒） */
 const GRACEFUL_TIMEOUT_MS = 5_000;
@@ -94,21 +94,21 @@ function parseArgs(argv) {
     const arg = argv[i];
     const next = argv[i + 1];
 
-    if (arg === '-h' || arg === '--help') {
+    if (arg === "-h" || arg === "--help") {
       result.help = true;
-    } else if (arg === '-f' || arg === '--force' || arg === '-y' || arg === '--yes') {
+    } else if (arg === "-f" || arg === "--force" || arg === "-y" || arg === "--yes") {
       result.force = true;
-    } else if (arg === '--dry-run') {
+    } else if (arg === "--dry-run") {
       result.dryRun = true;
-    } else if ((arg === '-p' || arg === '--port') && next && !next.startsWith('-')) {
+    } else if ((arg === "-p" || arg === "--port") && next && !next.startsWith("-")) {
       result.port = Number(next);
       i++;
-    } else if (arg.startsWith('--port=')) {
-      result.port = Number(arg.slice('--port='.length));
-    } else if (arg.startsWith('-p') && arg.length > 2 && !Number.isNaN(Number(arg.slice(2)))) {
+    } else if (arg.startsWith("--port=")) {
+      result.port = Number(arg.slice("--port=".length));
+    } else if (arg.startsWith("-p") && arg.length > 2 && !Number.isNaN(Number(arg.slice(2)))) {
       // -p4321
       result.port = Number(arg.slice(2));
-    } else if (!arg.startsWith('-') && result.target === null) {
+    } else if (!arg.startsWith("-") && result.target === null) {
       result.target = arg;
     } else {
       throw new Error(`未知参数: ${arg}`);
@@ -124,10 +124,12 @@ function printHelp() {
     `用法: kill-dev-server [项目名|all] [选项]
 
 项目名:
-  app         终止 packages/app 的开发服务器 (端口 ${PROJECT_PORTS.app.join('/')})`,
+  app         终止 packages/app 的开发服务器 (端口 ${PROJECT_PORTS.app.join("/")})`,
   ];
   for (const name of PROJECT_NAME_LIST.slice(1)) {
-    lines.push(`  ${name.padEnd(10)}终止 packages/${name} 的开发服务器 (端口 ${PROJECT_PORTS[name].join('/')})`);
+    lines.push(
+      `  ${name.padEnd(10)}终止 packages/${name} 的开发服务器 (端口 ${PROJECT_PORTS[name].join("/")})`,
+    );
   }
   lines.push(`  all         终止全部开发服务器（等效 dev:all 的完整端口集）
 
@@ -142,7 +144,7 @@ function printHelp() {
   node scripts/kill-dev-server.mjs website --force
   pnpm run kill:all
 `);
-  log(lines.join('\n'));
+  log(lines.join("\n"));
 }
 
 // -------------------- 端口解析 --------------------
@@ -159,7 +161,7 @@ function resolvePorts(args) {
     throw new Error(`无效端口: ${args.port}，必须是 1-65535 的整数`);
   }
 
-  if (args.target === 'all') {
+  if (args.target === "all") {
     // 全部端口去重
     const ports = [...new Set(PROJECT_NAME_LIST.flatMap((name) => PROJECT_PORTS[name]))];
     return { ports, projectName: null };
@@ -170,10 +172,10 @@ function resolvePorts(args) {
   }
 
   if (args.target) {
-    throw new Error(`未知项目: ${args.target}。可用: ${PROJECT_NAME_LIST.join(', ')} 或 all`);
+    throw new Error(`未知项目: ${args.target}。可用: ${PROJECT_NAME_LIST.join(", ")} 或 all`);
   }
 
-  throw new Error('未指定目标，请提供项目名、all 或 --port');
+  throw new Error("未指定目标，请提供项目名、all 或 --port");
 }
 
 // -------------------- 系统调用封装 --------------------
@@ -187,7 +189,7 @@ const platform = os.platform();
  */
 function execAsync(command) {
   return new Promise((resolve, reject) => {
-    exec(command, { encoding: 'utf8', maxBuffer: 1024 * 1024 }, (err, stdout) => {
+    exec(command, { encoding: "utf8", maxBuffer: 1024 * 1024 }, (err, stdout) => {
       if (err && err.code !== 1) {
         reject(err);
         return;
@@ -204,11 +206,11 @@ function execAsync(command) {
  */
 function execSyncTrim(command) {
   try {
-    return execSync(command, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+    return execSync(command, { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }).trim();
   } catch (err) {
     // lsof 无结果时返回 1，stdout 为空，视为正常空结果
-    if (err.status === 1 && (!err.stdout || err.stdout.toString().trim() === '')) {
-      return '';
+    if (err.status === 1 && (!err.stdout || err.stdout.toString().trim() === "")) {
+      return "";
     }
     throw err;
   }
@@ -220,15 +222,15 @@ function execSyncTrim(command) {
  * @returns {Promise<number[]>}
  */
 async function findPidsByPort(port) {
-  if (platform === 'win32') {
+  if (platform === "win32") {
     const output = await execAsync(`netstat -ano | findstr :${port}`);
     const pids = new Set();
-    for (const line of output.split('\n')) {
+    for (const line of output.split("\n")) {
       const parts = line.trim().split(/\s+/);
       if (parts.length < 5) continue;
       const state = parts[parts.length - 2];
       const pidStr = parts[parts.length - 1];
-      if (state === 'LISTENING' && /^\d+$/.test(pidStr)) {
+      if (state === "LISTENING" && /^\d+$/.test(pidStr)) {
         pids.add(Number(pidStr));
       }
     }
@@ -239,7 +241,7 @@ async function findPidsByPort(port) {
   const output = execSyncTrim(`lsof -i :${port} -sTCP:LISTEN -nP -t`);
   if (!output) return [];
   return output
-    .split('\n')
+    .split("\n")
     .map((s) => s.trim())
     .filter((s) => /^\d+$/.test(s))
     .map(Number);
@@ -251,7 +253,7 @@ async function findPidsByPort(port) {
  * @returns {Promise<string | null>}
  */
 async function getProcessCwd(pid) {
-  if (platform === 'linux') {
+  if (platform === "linux") {
     try {
       return execSyncTrim(`readlink -f /proc/${pid}/cwd`);
     } catch {
@@ -259,10 +261,10 @@ async function getProcessCwd(pid) {
     }
   }
 
-  if (platform === 'win32') {
+  if (platform === "win32") {
     try {
       const output = await execAsync(
-        `powershell -Command "(Get-Process -Id ${pid} -ErrorAction Stop).Path"`
+        `powershell -Command "(Get-Process -Id ${pid} -ErrorAction Stop).Path"`,
       );
       // Path 是 exe 路径，不是 cwd；Windows 下 cwd 获取较复杂，这里返回 null 交给命令行校验
       return output.trim() || null;
@@ -277,7 +279,7 @@ async function getProcessCwd(pid) {
     // 输出格式：
     // COMMAND   PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
     // node    65707 lilianda  cwd    DIR   1,14      832 6531621 /path/to/cwd
-    const lines = output.split('\n');
+    const lines = output.split("\n");
     const dataLine = lines.find((l) => /\bcwd\b/.test(l));
     if (!dataLine) return null;
     const parts = dataLine.trim().split(/\s+/);
@@ -293,10 +295,10 @@ async function getProcessCwd(pid) {
  * @returns {Promise<string | null>}
  */
 async function getProcessCommandLine(pid) {
-  if (platform === 'win32') {
+  if (platform === "win32") {
     try {
       const output = await execAsync(
-        `powershell -Command "Get-CimInstance Win32_Process -Filter 'ProcessId = ${pid}' | Select-Object -ExpandProperty CommandLine"`
+        `powershell -Command "Get-CimInstance Win32_Process -Filter 'ProcessId = ${pid}' | Select-Object -ExpandProperty CommandLine"`,
       );
       return output.trim() || null;
     } catch {
@@ -353,7 +355,7 @@ async function terminateProcessUnix(pid, allowSigKill) {
   }
 
   try {
-    process.kill(pid, 'SIGTERM');
+    process.kill(pid, "SIGTERM");
   } catch (err) {
     error(`  发送 SIGTERM 到 ${pid} 失败: ${err.message}`);
     return false;
@@ -371,7 +373,7 @@ async function terminateProcessUnix(pid, allowSigKill) {
   }
 
   try {
-    process.kill(pid, 'SIGKILL');
+    process.kill(pid, "SIGKILL");
   } catch (err) {
     error(`  发送 SIGKILL 到 ${pid} 失败: ${err.message}`);
     return false;
@@ -417,7 +419,7 @@ function matchProject(pid, projectName, cwd, cmdline) {
   const candidates = projectName ? [projectName] : PROJECT_NAME_LIST;
 
   for (const name of candidates) {
-    const projectPath = path.resolve(REPO_ROOT, 'packages', name);
+    const projectPath = path.resolve(REPO_ROOT, "packages", name);
 
     // 策略 1：cwd 严格匹配包目录
     if (cwd === projectPath) {
@@ -466,7 +468,7 @@ async function main() {
     exit(1);
   }
 
-  log(`🔍 检查端口 ${ports.join(', ')} 占用情况...`);
+  log(`🔍 检查端口 ${ports.join(", ")} 占用情况...`);
 
   // 收集所有端口的占用进程并做白名单过滤
   const targets = [];
@@ -483,8 +485,8 @@ async function main() {
       const cmdline = await getProcessCommandLine(pid);
 
       log(`\n  PID:      ${pid}`);
-      log(`  CWD:      ${cwd || '未知'}`);
-      log(`  Command:  ${cmdline || '未知'}`);
+      log(`  CWD:      ${cwd || "未知"}`);
+      log(`  Command:  ${cmdline || "未知"}`);
 
       const matched = matchProject(pid, projectName, cwd, cmdline);
       if (matched) {
@@ -516,15 +518,15 @@ async function main() {
     });
     rl.close();
     if (!/^y(es)?$/i.test(answer.trim())) {
-      log('已取消');
+      log("已取消");
       exit(0);
     }
   }
 
   log(`\n🛑 终止进程...`);
   let successCount = 0;
-  for (const { pid, port } of targets) {
-    if (platform === 'win32') {
+  for (const { pid } of targets) {
+    if (platform === "win32") {
       if (await terminateProcessWindows(pid)) successCount++;
     } else {
       if (await terminateProcessUnix(pid, true)) successCount++;
@@ -541,6 +543,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  error('未处理的错误:', err.message);
+  error("未处理的错误:", err.message);
   exit(1);
 });

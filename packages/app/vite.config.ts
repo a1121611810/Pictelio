@@ -48,8 +48,9 @@ console.log(`[vite] 🔧 使用代理: ${redactProxyUrl(proxyUrl)}`);
 // 因此将其断言为 unknown；运行时行为不变。
 const proxyAgent = new HttpsProxyAgent(proxyUrl) as unknown;
 
-// Vite+ 的 UserConfig 拼接了 Vite 全量类型 + Rolldown 类型 + lint/fmt/test 扩展，
-// 类型比对时 TS 递归深度超限。整体断言为 any 规避，运行时仍由 Vite/Vite+ 校验配置。
+// Vite+ 1.0 的 UserConfig 拼接 Vite 全量类型 + Rolldown 类型，`plugins` 数组联合
+// 展开时 TS 递归深度超限（TS2321，与 lint/fmt 块无关，实测纯 build 配置同样触发）。
+// 整体断言为 any 规避，运行时仍由 Vite/Vite+ 校验配置。
 export default defineConfig(
   ({ mode }) =>
     ({
@@ -311,117 +312,7 @@ export default defineConfig(
         },
       },
 
-      // ── Vite+ lint / fmt 统一配置 ──────────────────────────────
-      lint: {
-        ignorePatterns: [
-          "dist/**",
-          "android/**",
-          "node_modules/**",
-          ".codegraph/**",
-          ".playwright-cli/**",
-          ".worktrees/**",
-          "pnpm-lock.yaml",
-          "*.d.ts",
-        ],
-        options: {
-          typeAware: false,
-          typeCheck: false,
-          maxWarnings: 0,
-        },
-        categories: {
-          correctness: "error",
-          suspicious: "warn",
-          pedantic: "off",
-          perf: "warn",
-          style: "off",
-          restriction: "off",
-          nursery: "off",
-        },
-        plugins: ["typescript", "unicorn", "oxc"],
-        rules: {
-          // SolidJS 的 <div ref={el}> 会在运行时赋值，oxlint 的 no-unassigned-vars 无法理解该模式
-          "no-unassigned-vars": "off",
-          // 允许 _ 前缀的未使用变量，保持解构/回调参数可读性
-          "no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
-          // 下划线命名豁免：tanstack-virtual 内部 API（_didMount/_willUpdate）、
-          // 构建注入常量（__CREDENTIALS__/__PUBLIC_CONFIG__）、模块私有命名约定（_root/_raw/_credsPath/_authPromise）
-          "no-underscore-dangle": [
-            "warn",
-            {
-              allow: [
-                "_didMount",
-                "_willUpdate",
-                "_root",
-                "_raw",
-                "_credsPath",
-                "_authPromise",
-                "__CREDENTIALS__",
-                "__PUBLIC_CONFIG__",
-              ],
-            },
-          ],
-          // 循环内串行 await 是有意写法（分页、重试、顺序依赖请求），并行化是行为变更
-          // （与测试文件 override 的既有豁免保持一致）
-          "no-await-in-loop": "off",
-          // IndexedDB 事务事件（onsuccess/onerror）与 img.onload 的一次性属性赋值是惯用法
-          "prefer-add-event-listener": "off",
-        },
-        overrides: [
-          {
-            files: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
-            // Override 设置 plugins 会替换（而非合并）基线列表，必须包含所有所需插件
-            plugins: ["typescript", "unicorn", "oxc", "vitest"],
-            env: { node: true },
-            rules: {
-              "no-console": "off",
-              "require-mock-type-parameters": "off",
-              "no-unused-vars": [
-                "error",
-                { argsIgnorePattern: "^_", varsIgnorePattern: "^_|^vi$|^beforeEach$|^afterEach$" },
-              ],
-              "no-underscore-dangle": "off",
-              "consistent-function-scoping": "off",
-              "no-await-in-loop": "off",
-              // T0 门禁（ADR-0097）：测试必须有断言，防"无断言测试"（conformance 弱测试）
-              "expect-expect": "error",
-              "no-conditional-expect": "off",
-              "require-to-throw-message": "off",
-              "no-standalone-expect": "off",
-            },
-          },
-          {
-            files: ["scripts/**/*.mjs", "*.config.ts"],
-            env: { node: true },
-            rules: {
-              "no-console": "off",
-            },
-          },
-        ],
-      },
-
-      fmt: {
-        ignorePatterns: [
-          "dist/**",
-          "android/**",
-          "node_modules/**",
-          ".codegraph/**",
-          ".playwright-cli/**",
-          ".worktrees/**",
-          "pnpm-lock.yaml",
-          "*.d.ts",
-        ],
-        options: {
-          lineWidth: 100,
-          indentStyle: "space",
-          indentWidth: 2,
-          quoteStyle: "double",
-          jsxQuoteStyle: "double",
-          quoteProps: "as-needed",
-          semicolons: "always",
-          trailingComma: "all",
-          arrowParens: "always",
-          bracketSpacing: true,
-        },
-      },
+      // lint / fmt 配置已上移至仓库根 vite.config.ts（唯一配置源，单进程覆盖全部
+      // workspace 包，ADR-0185）；本文件只保留 dev / build / preview 关注面。
     }) as any,
 );
