@@ -1,9 +1,11 @@
 /**
  * createTQFeedStore placeholderData 契约（#722 / ADR-0186 P1 修复）。
  *
- * 说明（review P2）：本文件第 1 个用例是**行为断言**（机制可观察面）；第 2/3 个用例是
+ * 说明（review P2）：本文件的行为用例（激活窗口 / 失败路径 / refreshing 窗口）覆盖机制可观察面；契约用例是
  * **characterization（实现字面量契约）**——钉住「查询注册 placeholderData 且返回空页占位」
- * 以防后人删改（删除即 #722 复发）。tdd 红态证据见 commit message / spec §4.1。
+ * 以防后人删改（删除即 #722 复发）。tdd 红态证据：失败路径用例首跑实测抛 'simulated network failure'（见 commit d3735228）；
+ * pending 读抛错机制的上游证据 = signals rc.9 `dev-shared.js` 对无 committed 值节点的
+ * 非跟踪读抛 NotReadyError。
  *
  * oracle 溯源（#722 现场取证，见 docs/specs/webview-boot-freeze-722.md §2）：
  * - 现象：webview 已登录启动 navigate(/home) 后 isLoading 门槛永不释放（Splash 永挂）。
@@ -157,6 +159,24 @@ describe("createTQFeedStore placeholderData 契约（#722：防渲染期 pending
     expect(store.items()).toEqual([]);
     expect(store.loading()).toBe(false);
     expect(store.error()).not.toBeNull();
+  });
+
+  it("行为（refreshing 语义，review P1 防线）：首载 fetch 在途窗口 loading=true 且 refreshing=false", async () => {
+    qc.client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    captured.options.length = 0;
+    const store = makeStore(); // queryFn 永不 resolve → 首载 fetch 长期在途
+    store.activate();
+    const { flush } = await import("solid-js");
+    flush();
+    void store.ensureLoaded();
+    await Promise.resolve();
+    flush();
+
+    // 适配层在 placeholder 生效期把 status 投影为 'success'：旧式 refreshing 判定
+    // （fetchStatus==='fetching' && status!=='pending'）会在此窗口误报下拉刷新；
+    // 修复以 isPlaceholderData 排除（ADR-0078 语义分离：refreshing 仅指 refetch 第一页）。
+    expect(store.loading(), "首载窗口应为加载中").toBe(true);
+    expect(store.refreshing(), "首载窗口不得误报下拉刷新").toBe(false);
   });
 
   it("enabled=false 契约保持（ADR-0042 按需查询：不自动 fetch）", () => {

@@ -41,16 +41,17 @@ WebView 引擎的运行时取证：`adb forward tcp:9222 localabstract:webview_d
 
 Pixiv 的 refresh_token 在每次成功 refresh 后轮换。多套件/多进程并发消费同一份 `.env` token 时，先成功者使后者 400（invalid_grant）→ 登录 gate 大面积 skip。判据：host 直调 OAuth 实测 200 而套件内 400。缓解：串行跑登录类套件；发现轮换立即回填 `.env`。
 
-## Flight 永挂 → 事务停摆（#722 早期假设，**已被 2364d255 取代**）
+## Flight 持有 → 事务停摆（机制仍成立；#722 的早期归因已被取代）
 
-> 注（2026-09-25 收口）：本节记录的是 #722 排查期的中间假设（原生图片回调缺席导致 flight
-> 永挂）。最终确证的根因是 **pending 查询异步读 park 路由 transition**（见下方「NotReadyError
-> park」节与 spec），修复 = `placeholderData`。本节的 `withNativeImageTimeout` 仍作为独立
-> 防御保留（消除「桥调用永不 settle」类威胁）。
+**机制（仍成立，供 #722 第二必要项引用）**：在路由 transition 的 flush 作用域内创建的
+promise 会被该 transition 作为 flight 持有；promise 永不 settle（或长期悬挂）时 transition
+park，同事务内的信号写入不提交。
 
-Solid 2.0-rc.9 的 effect 内创建的 promise 会被作为该 effect 的 flight 持有（异步揭示语义：写入暂存、flush 揭示）。当 flight 中的 promise 永不 settle（#722：`PixivApi.prefetchImage` 原生回调在弱网/代理抖动下缺席），事务永久 park——`schedule()` 因 `globalQueue.Kt` 真值不再排队、`flush()` 早退——**全局所有信号写入被无限期暂存**，DOM 冻结在最后一次提交态。判别：`__pictelioDebug.isLoading()` 长期为 true 且 `selfTest()` 写读不一致。修复 = 让每个被 effect 创建的 promise 必定 settle（`withNativeImageTimeout` 20s 超时拒绝）。
+**#722 归因（已被取代）**：排查期曾把根因定位为「原生图片回调缺席导致 flight 永挂」；
+最终确证的第一必要项是 pending 查询异步读 park（见「NotReadyError park」节），第二必要项
+正是本节机制（`useFeedActivation` 的 ensure 延迟到宏任务，隔离实测见 spec §4.4）。
+`withNativeImageTimeout` 作为独立防御保留（消除「桥调用永不 settle」类威胁）。
 
-已知边界：超时拒绝后调用方重试时，Java 侧同 URL 的在途下载无取消通道（JS→native 无取消契约，ADR-0143 未覆盖）——弱网下可能出现同 URL 并发重复下载，仅浪费带宽不影响正确性；图片下载本体在 Java 侧有独立 connect/call 超时兜底。
 
 ## e2e-start 打点与 __pictelioDebug 探针
 

@@ -52,8 +52,11 @@
   - **#722（commit 2364d255，详见 [spec](../specs/webview-boot-freeze-722.md)）**：根因 = feed 查询 pending 态
     的 `data` 为 Solid 2.0-rc.9 异步访问器，`/home` 渲染期读取抛 `NotReadyError` park 路由 transition；
     fetch 在弱网下悬挂/失败时 rc.9 唤醒路径不覆盖该形态 → transition 永久 park → 全局信号写入
-    （含 isLoading 门槛）永不提交。修复 = `createTQFeedStore` 注册 `placeholderData`（data 首读即
-    定义，脱离异步待决读）+ `loading` 粘滞改 `isPlaceholderData`（#366 语义等价）+ 契约回归测试。
+    （含 isLoading 门槛）永不提交。修复 = 双必要项（隔离实测见 spec §4.4）：① `createTQFeedStore`
+    注册 `placeholderData`（data 首读即定义；`loading`/`refreshing` 判定同口径适配
+    `isPlaceholderData`）+ ② `useFeedActivation` 的 ensure 延迟到宏任务（fetch promise 脱离
+    transition flush 作用域）；另含失败路径 `safeData()` 安全封装（error 态不抛）。收口 commits：
+    2364d255 / d36d2c09 / d3735228。
     验收：设备已登录冷启动 6/6 全绿（修复前 14+ boots 全冻结）；transition-matrix R1/R3/**R4** 通过。
   - **#723**：agent-browser fixture 登录后回写轮换 token 至 `.token-state.json` 并优先读取。
   - **辅助防御（49cc3825/78e68ba3）**：imageLoader `withNativeImageTimeout`（20s）消除「原生桥调用

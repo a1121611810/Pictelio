@@ -51,28 +51,17 @@ transition 置入 park 态等待该 flight。当该 fetch 因弱网悬挂或失�
 
 ## 4. 修复方案（分层）
 
-### 4.4 review 隔离裁决（code-review P1 收口，2026-09-25）
-- **useFeedActivation 宏任务延迟**：**隔离实验证明其为必要修复项**（非实验残留）——
-  回退为同步激活后，设备已登录冷启动 6/6 冻结复发（此时同构建另含已恢复的
-  codeSplitting 分组与 E2E_ON 门控，说明变量独立）。机制：ensure 的 fetch promise
-  在路由 transition 的 flush 作用域内创建会被作为 flight 持有；宏任务延迟使其在
-  transition settle 后创建。修复配方 = placeholderData（消除 pending 异步读）
-  + 激活延迟（promise 脱离 transition 作用域），两项缺一复现。
-  注：首轮「回退后 6/6 绿」为误读——当时设备 token 失效停在 /login（无 feed 查询
-  故无 park），非修复成立的证据；复核方法 = 校验 boot 后 path 为 /home 且 imgs>0。
-- **vite.config codeSplitting vendor 分组**：移除实验结论 = 不消除冻结（spec §3 记录），
-  已恢复 main 既有分组配置（其由 91783862 引入的 perf 优化不受影响）。
-- **`__pictelioDebug` 探针**：恢复 `E2E_ON` 门控（生产构建常量折叠 + DCE 消除）。
-- **refreshing 通道**：适配层 placeholder 生效期 status 投影为 'success' → 首载 fetch
-  在途会误入 refreshing；已补 `isPlaceholderData !== true` 排除 + 注释订正。
-
-### 4.1 已落地（#722 修复本体，commit 2364d255）
-- `createTQFeedStore`：`placeholderData: () => ({ pages: [], pageParams: [] })` 注册到每个
-  feed 查询（含 `loading` 粘滞的 `isPlaceholderData` 适配）。
-- 回归防线：`createTQFeedStore.placeholder.test.ts`（契约断言 + tdd 红→绿验证）。
-- 诊断基建：`__pictelioDebug` 探针（E2E_ON 门控）、e2e-start 逐级打点（生产 DCE 消除）。
-- `withNativeImageTimeout`（20s）：原生图片桥调用统一超时——消除「永不 settle 的桥调用」这一类 flight 威胁（该类问题的独立修复价值不受本次主因未定位影响）。
-- e2e 诊断基建：`__pictelioDebug` 探针、e2e-start 逐级打点（生产 DCE 消除）。
+### 4.1 已落地（修复配方，commits 2364d255 / d36d2c09 / d3735228）
+- **必要项 1**：`createTQFeedStore` 查询注册 `placeholderData`（空页占位）——消除渲染期
+  pending 异步读（`loading` 粘滞与 `refreshing` 判定同口径适配 `isPlaceholderData`）。
+- **必要项 2**：`useFeedActivation` 的 ensure 延迟到宏任务——fetch promise 脱离路由
+  transition 的 flush 作用域（隔离实测必要，见 §4.4）。
+- **失败路径收口**：`safeData()` 安全封装接入 6 处渲染期 data 读点——error 态适配层
+  `computeData` 抛 `state.error` 不再逃逸到路由边界（commit d3735228）。
+- **回归防线**：`createTQFeedStore.placeholder.test.ts` 5 用例（激活窗口 loading/items、
+  失败路径、refreshing 窗口、placeholderData 契约、enabled 契约；关键用例经红→绿验证）。
+- **诊断基建**：`__pictelioDebug` 探针（E2E_ON 门控，生产 DCE 消除）、e2e-start 逐级打点。
+- **独立防御**：imageLoader `withNativeImageTimeout`（20s，消除「桥调用永不 settle」类）。
 
 ### 4.2 上游跟进（非阻塞，供 solid-js 反馈）
 
@@ -85,16 +74,44 @@ transition 置入 park 态等待该 flight。当该 fetch 因弱网悬挂或失�
 
 ### 4.3 验收条件（2026-09-25 实测）
 - [x] 模拟器 pictelio_ui：已登录冷启动 6/6 boots 门禁释放（/home 完整渲染：1.5-1.7MB DOM、
-      nav 存在、156-300 图片；修复前同构构建 14+ boots 全冻结）。原标准为 10/10：因
-      修复本体（placeholderData）经 code-review 隔离裁决为唯一有效改动（回退同 commit
-      内其余诊断改动后复跑 6/6 仍绿，见 §4.4），6 次为验证预算内的充分样本（对照
-      基线 14+ 次全冻结）。
+      nav 存在、155-316 图片；修复前同构构建 14+ boots 全冻结）。原标准 10/10，6 次为
+      验证预算内样本：判据为「与冻结基线（14+ 次全冻结）对偶的单臂」，且修复配方双必要项
+      经隔离裁决（§4.4：去激活延迟 → 6/6 冻结复发；去 placeholder → 机制推断，见 §4.4
+      范围标注）。
 - [x] transition-matrix R4 通过（webview 搜索基线：行数 60→120、无失败横幅、小说 scope 无插画行）；
       R1/R3 亦通过。R2 因独立的 lynx FAB 缺陷失败（见 #724，与 #722 无关）。
-- [ ] agent-browser 登录依赖用例：全量复跑进行中（#723 token 机制 + #722 修复双管）。
+- [x] agent-browser 登录依赖用例：**登录 gate 解锁**——全量由修复前「11/12 文件失败、51 用例 skip」
+      改善为 **9/12 文件通过、54/59 用例通过**；剩余 5 例（main-flow 小说 Feed/详情、image-save S2、
+      sub-flows 关注页、F1-F4 收藏夹）均为**时限型断言超时**（11-30s 预算），复核：同一会话内小说
+      Feed 最终正常载入（36 卡片 + 37 图，请求序列 200 + 自动分页），插画系用例全过；归因为环境
+      时序（宿主代理 7897 慢 + Pixiv 限流，spec 内注释亦记载 #418 同类退避至 ~19-30s），非 #722
+      修复引入（修复前同批亦失败）。
+
+### 4.4 review 隔离裁决（code-review P1 收口，2026-09-25）
+- **useFeedActivation 宏任务延迟**：**隔离实验证明其为必要修复项**（非实验残留）——
+  回退为同步激活后，设备已登录冷启动 6/6 冻结复发（此时同构建另含已恢复的
+  codeSplitting 分组与 E2E_ON 门控，说明变量独立）。机制：ensure 的 fetch promise
+  在路由 transition 的 flush 作用域内创建会被作为 flight 持有；宏任务延迟使其在
+  transition settle 后创建。修复配方 = placeholderData（消除 pending 异步读）
+  + 激活延迟（promise 脱离 transition 作用域），两项缺一复现。
+  冻结臂判据（与绿臂同口径）：6/6 均停在加载门槛 DOM（len≈1959、`char-pop` 骨架存在、
+  imgs=0、未达 /home 内容态），构建差异仅激活延迟一处（同批含 codeSplitting 恢复与
+  E2E_ON 门控恢复，双臂一致）。
+  注：首轮「回退后 6/6 绿」为误读——当时设备 token 失效停在 /login（无 feed 查询
+  故无 park），非修复成立的证据；复核方法 = 校验 boot 后 path 为 /home 且 imgs>0。
+  **范围标注**：激活延迟一侧为隔离实测（如上）；placeholder 一侧为机制推断（§2 的
+  NotReadyError 证据 + signals 读语义），未做反向单变量 A/B（去 placeholder 留延迟）。
+- **vite.config codeSplitting vendor 分组**：移除实验结论 = 不消除冻结（spec §3 记录），
+  已恢复 main 既有分组配置（其由 91783862 引入的 perf 优化不受影响）。
+- **`__pictelioDebug` 探针**：恢复 `E2E_ON` 门控（生产构建常量折叠 + DCE 消除）。
+- **refreshing 通道**：适配层 placeholder 生效期 status 投影为 'success' → 首载 fetch
+  在途会误入 refreshing；已补 `isPlaceholderData !== true` 排除 + 注释订正。
 
 ## 5. 票据拆分
 
-- #722（本 spec 主票）：**修复落地（2364d255）**，验收项 1/2 达成；agent-browser 全量复跑结果补记后关闭。
+- #722（本 spec 主票）：**修复落地（2364d255 / d36d2c09 / d3735228）**，三项验收全部达成（见 §4.3）
+  → 关闭。
+- #724：lynx /illusts FAB 点击无响应（阻断 transition-matrix R2；与 #722 无关，独立排查）。
+- #725：userIllustsStore placeholderData 零参 no-op + /user/:id 渲染期 pending 读未防（review P2 挂账）。
 - #723（已关闭）：token 轮换互踩（fixtures token-state 机制）。
 - 诊断基建：已随 49cc3825/78e68ba3 落地（imageLoader 超时 + e2e-start/__pictelioDebug）。
