@@ -215,8 +215,6 @@ const RootLayout: Component = (props: { children?: any }) => {
         (async () => {
           await initializeAuth();
           e2eMark("initializeAuth done");
-          await hydrated;
-          e2eMark("hydrated done (auth block)");
           await loadAccountR18();
           e2eMark("loadAccountR18 done");
           if (isLoggedIn()) {
