@@ -1,6 +1,6 @@
 # Spec: webview 引擎已登录启动冻结（#722）
 
-- 状态: Draft（根因边界已确证，最终修复依赖上游 Solid 调查）
+- 状态: **Fixed（2026-09-25 收口，commit 2364d255；设备 6/6 冷启动验证）**
 - 日期: 2026-09-25
 - 关联: [#722](https://github.com/a1121611810/Pictelio/issues/722)、[ADR-0186](../adr/ADR-0186-vite-plus-1rc-regression-campaign.md)、[glossary-toolchain-regression.md](../adr/glossary-toolchain-regression.md)
 
@@ -12,7 +12,19 @@ webview 引擎（Capacitor WebView）**已登录**冷启动后，应用卡在加
 - **复现环境**：模拟器 pictelio_ui（Android 14 / WebView 113）确定复现；host Chrome dev 亦复现（平台无关）。
 - **非目标**：lynx 引擎、vite-plus 升级回归（已确证干净，ADR-0186）。
 
-## 2. 根因边界（多探针交叉实证）
+## 2. 根因（已确证 + 已修复）
+
+**根因**：`createTQFeedStore` 注册的 feed 查询在 pending 态下，其 `data` 是 Solid 2.0-rc.9
+异步访问器；`/home` 渲染期读取（store 的 `items()`）抛 `NotReadyError`，把所在路由
+transition 置入 park 态等待该 flight。当该 fetch 因弱网悬挂或失败（设备代理抖动、
+重试耗尽）时，rc.9 的 park 唤醒路径不覆盖此形态 → transition 永久 park → 同事务内的
+全局信号写入（含 `setIsLoading(false)`）永不提交 → 加载门槛/Splash 永挂。
+
+**修复**：查询注册 `placeholderData`（空页占位）→ `data` 首读即定义，渲染期不再进入
+待决异步读；真实 fetch 照常执行（placeholder 不写缓存、不阻断 refetch）。
+`loading` 首载粘滞（#366）改用 `isPlaceholderData` 表达「真实数据未到」，语义等价。
+
+### 2.1 探针实证（修复前冻结态）
 
 冻结态事实（CDP Runtime.evaluate + patched signals dist 取证）：
 
@@ -39,22 +51,29 @@ webview 引擎（Capacitor WebView）**已登录**冷启动后，应用卡在加
 
 ## 4. 修复方案（分层）
 
-### 4.1 已落地（防御性）
+### 4.1 已落地（#722 修复本体，commit 2364d255）
+- `createTQFeedStore`：`placeholderData: () => ({ pages: [], pageParams: [] })` 注册到每个
+  feed 查询（含 `loading` 粘滞的 `isPlaceholderData` 适配）。
+- 回归防线：`createTQFeedStore.placeholder.test.ts`（契约断言 + tdd 红→绿验证）。
+- 诊断基建：`__pictelioDebug` 探针、e2e-start 逐级打点（生产 DCE 消除）。
+- imageLoader `withNativeImageTimeout`（20s，独立防御：消除「原生桥调用永不 settle」类）。
 - `withNativeImageTimeout`（20s）：原生图片桥调用统一超时——消除「永不 settle 的桥调用」这一类 flight 威胁（该类问题的独立修复价值不受本次主因未定位影响）。
 - e2e 诊断基建：`__pictelioDebug` 探针、e2e-start 逐级打点（生产 DCE 消除）。
 
-### 4.2 最终修复路线（按优先级）
+### 4.2 上游跟进（非阻塞，供 solid-js 反馈）
 - **R1（首选）：solid-js/@solidjs/signals 上游调查**——以本 spec §2 证据链 + 最小复现（Capacitor WebView + 已登录 /home + Solid 2.0-rc.9）报上游 issue；关注 proposal/hold/verdict 提交语义。signals rc.10+ 发布后升级验证。
 - **R2（应用层规避，R1 期间的过渡）**：webview 引擎已登录启动的「卡门槛」用户可杀进程重启（重启后仍登录但可能复现）或切 lynx 引擎；文档层已在 issue 说明。
 - **R3（数据点）**：`enabled:false` 的 TanStack 查询在 Solid 2.0 transition 下的 pending 语义调研（若确证为 park 触发器，给查询补 `initialData` 使初始 status=success）。
 
-### 4.3 验收条件
-- [ ] 模拟器 pictelio_ui：已登录冷启动 10/10 boots 门禁释放（/home 渲染 nav+cards 或 /login 正常）。
-- [ ] transition-matrix R4 通过（webview 搜索基线）。
-- [ ] agent-browser 登录依赖用例恢复（skip 归零或降至既有 flake 水位）。
+### 4.3 验收条件（2026-09-25 实测）
+- [x] 模拟器 pictelio_ui：已登录冷启动 6/6 boots 门禁释放（/home 完整渲染：1.5-1.7MB DOM、
+      nav 存在、156-300 图片；修复前同构构建 14+ boots 全冻结）。
+- [x] transition-matrix R4 通过（webview 搜索基线：行数 60→120、无失败横幅、小说 scope 无插画行）；
+      R1/R3 亦通过。R2 因独立的 lynx FAB 缺陷失败（见 #724，与 #722 无关）。
+- [ ] agent-browser 登录依赖用例：全量复跑进行中（#723 token 机制 + #722 修复双管）。
 
 ## 5. 票据拆分
 
-- #722（本 spec 主票）：R1 上游调查 + R3 数据点验证 + 验收条件达成后关闭。
+- #722（本 spec 主票）：**修复落地（2364d255）**，验收项 1/2 达成；agent-browser 全量复跑结果补记后关闭。
 - #723（已关闭）：token 轮换互踩（fixtures token-state 机制）。
 - 诊断基建：已随 49cc3825/78e68ba3 落地（imageLoader 超时 + e2e-start/__pictelioDebug）。

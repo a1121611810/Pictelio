@@ -48,5 +48,18 @@
 ## 后续
 
 - P1/P2 已开 issue 票据化：[#722](https://github.com/a1121611810/Pictelio/issues/722)（webview 加载门槛悬挂）、[#723](https://github.com/a1121611810/Pictelio/issues/723)（token 轮换互踩）。
-- **修复落地（2026-09-25，commit 49cc3825 起同分支交付）**：#722 = imageLoader `withNativeImageTimeout`（原生桥调用统一 20s 超时拒绝，flight 必定 settle，事务不再停摆）+ e2e 诊断基建（`__pictelioDebug` / e2e-start 打点）；#723 = agent-browser fixture 登录成功后回写轮换 token 至共享状态文件（`.token-state.json`，gitignored）并优先读取。工作流偏差声明：修复直接在本 chore 分支实施（未单独走 spec/tickets 文件），以本 ADR + issue 评论 + 接线测试作为规格与验收记录。
+- **修复落地（2026-09-25，同分支多 commit 交付）**：
+  - **#722（commit 2364d255，详见 [spec](../specs/webview-boot-freeze-722.md)）**：根因 = feed 查询 pending 态
+    的 `data` 为 Solid 2.0-rc.9 异步访问器，`/home` 渲染期读取抛 `NotReadyError` park 路由 transition；
+    fetch 在弱网下悬挂/失败时 rc.9 唤醒路径不覆盖该形态 → transition 永久 park → 全局信号写入
+    （含 isLoading 门槛）永不提交。修复 = `createTQFeedStore` 注册 `placeholderData`（data 首读即
+    定义，脱离异步待决读）+ `loading` 粘滞改 `isPlaceholderData`（#366 语义等价）+ 契约回归测试。
+    验收：设备已登录冷启动 6/6 全绿（修复前 14+ boots 全冻结）；transition-matrix R1/R3/**R4** 通过。
+  - **#723**：agent-browser fixture 登录后回写轮换 token 至 `.token-state.json` 并优先读取。
+  - **辅助防御（49cc3825/78e68ba3）**：imageLoader `withNativeImageTimeout`（20s）消除「原生桥调用
+    永不 settle」类、e2e 诊断基建（`__pictelioDebug`/e2e-start，生产 DCE 消除）。
+  - **独立缺陷**：lynx FAB 不展开（阻断 transition-matrix R2）→ #724。
+- **方法论沉淀**：bundle A/B 对照（worktree 回基线构建）、CDP 桥流量 hook（androidBridge.postMessage
+  重写）、signals dist 探针 patch（schedule/flush/NotReadyError 抛点）、e2e 二分实验（桩化粒度
+  逐级收敛至 /home 面板树）——详见 glossary-toolchain-regression.md。
 - 升级本体（chore/vite-plus-1rc 分支）回归通过，可合并。
