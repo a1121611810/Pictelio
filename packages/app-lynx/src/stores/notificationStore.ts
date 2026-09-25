@@ -75,19 +75,27 @@ export function isGroupHeader(item: PixivNotificationItem): boolean {
   return item.view_more != null
 }
 
-/** 渲染行：item = 普通通知行 / header = 组头行 / children = 展开后的子列表区（就地插入） */
+/**
+ * 渲染行（ADR-0162 结构规避）：行模型只含两类——
+ *   - header：组头行（view_more 非空），expanded 标记该组是否已展开；展开后子列表
+ *     （NotificationChildren）**内嵌该行 list-item 根 view 内**条件渲染——独立 children
+ *     list-item 会在展开瞬间向原生 <list> 中途插入 item（ADR-0162「插入 = 静默丢弃」），
+ *     结构上规避（RelatedInlineSection 卡内展开段先例）。
+ *   - item：普通通知行。
+ */
 export interface NotificationRow {
-  kind: "item" | "header" | "children"
+  kind: "item" | "header"
   item: PixivNotificationItem
-  /** children 行持有组头 id（渲染 useNotificationChildren(id) 子组件） */
-  headerId?: number
-  /** list-item :key（子区 key 绑组头 id——单组头单子区） */
+  /** header 行：组头是否已展开（子列表内嵌该行内；展开单向不收起） */
+  expanded?: boolean
+  /** list-item :key（`h-${id}` / `n-${id}`，id 全局唯一 → key 全列表稳定唯一） */
   key: string
 }
 
 /**
- * 组头展开「就地插入」：子区行紧跟其组头行之后、其余条目顺序不变。
- * 展开单向不收起（spec 边界 9）→ expandedHeaders 只增不减。
+ * 组头展开行模型：展开状态单向不收起（spec 边界 9）→ expandedHeaders 只增不减；
+ * 行顺序恒等于服务端顺序（展开不增删行，只改 header 行的 expanded 标记——原生 <list>
+ * 行数不变，规避 ADR-0162 中途插入/移除两类平台陷阱）。
  */
 export function buildNotificationRows(
   items: PixivNotificationItem[],
@@ -96,10 +104,12 @@ export function buildNotificationRows(
   const rows: NotificationRow[] = []
   for (const item of items) {
     if (isGroupHeader(item)) {
-      rows.push({ kind: "header", item, key: `h-${item.id}` })
-      if (expandedHeaders[item.id]) {
-        rows.push({ kind: "children", item, headerId: item.id, key: `c-${item.id}` })
-      }
+      rows.push({
+        kind: "header",
+        item,
+        expanded: expandedHeaders[item.id] === true,
+        key: `h-${item.id}`,
+      })
     } else {
       rows.push({ kind: "item", item, key: `n-${item.id}` })
     }

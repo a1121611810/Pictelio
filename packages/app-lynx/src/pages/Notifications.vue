@@ -2,9 +2,12 @@
 // ─── 通知中心页（ADR-0188 / spec docs/specs/notification-center.md / #728）───
 // 数据层：useNotificationsList（Vue Query 无限分页，queryKeys.notifications.list()，
 // next_url 透传）；拉取**成功后**推进设备级已读时间戳（notifyListLoaded，失败不推进）。
-// 行模型：buildNotificationRows——组头行（view_more 非空）点击就地插入子列表区
-// （NotificationChildren 子组件，展开单向不收起）；普通行点击经 resolveNotificationTarget
-// 路由（pixiv:// 三 scheme / http(s) 外链 / 其它 scheme 静默忽略）。
+// 行模型：buildNotificationRows——组头行（view_more 非空）点击就地展开子列表区；
+// 子列表（NotificationChildren 子组件）**内嵌组头行 list-item 根 view 内**条件渲染
+// （ADR-0162 结构规避：独立 children list-item = 展开瞬间向原生 <list> 中途插入 item，
+// 文档化平台事实「插入 = 静默丢弃」；RelatedInlineSection 卡内展开段先例）。
+// 普通行点击经 resolveNotificationTarget 路由（pixiv:// 三 scheme / http(s) 外链 /
+// 其它 scheme 静默忽略）。
 // 页面骨架对齐 Watchlist.vue / Ranking.vue：三态单链（ADR-0150）+ RefreshableList + footer。
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）；本页不在 include 白名单
 // （卸载即释放，重进重拉 → 挂载刷新即角标刷新时机，ADR-0188 D7 lynx 侧）。
@@ -99,11 +102,6 @@ function openRow(row: NotificationRow): void {
   openNotificationTarget(row.item.target_url)
 }
 
-/** 子区行 → 组头 id（模板表达式不用 `!` 断言——vue-lynx 模板编译器兼容面收敛在 script） */
-function childrenHeaderId(row: NotificationRow): number {
-  return row.kind === 'children' && row.headerId !== undefined ? row.headerId : 0
-}
-
 // ─── 缩略图：经图片服务重写通道（proxyImageUrl，禁直连 pximg CDN 域）───
 // left_image（内容缩略图）优先，left_icon（公共图标）兜底；重写后为空串（非白名单域）或
 // 加载失败 → 隐藏图区（不占位卡，spec 边界 5；按行 key 记失败，防重试风暴）。
@@ -131,11 +129,12 @@ function headerTitle(item: NotificationRow['item']): string {
   return item.view_more?.title ?? ''
 }
 
-/** 行可达性标签：未读/已读语义 + 主体文本（a11y 注册表 + i18n 组合） */
+/** 行可达性标签：动作 + 主体文本（a11y 注册表 + i18n 组合）。
+ *  不拼服务端已读/未读语义：ADR-0188 D5 v1 不消费服务端已读字段，本地已读口径
+ *  （设备级时间戳推导）与服务端同屏会冲突——标签保留动作 + 文本描述。 */
 function rowA11y(row: NotificationRow): string {
-  const state = row.item.is_read ? t('notifications.a11y.read') : t('notifications.a11y.unread')
   const body = row.kind === 'header' ? headerTitle(row.item) || rowText(row.item) : rowText(row.item) || t('notifications.noContent')
-  return `${NOTIFICATIONS_A11Y_LABELS.openItem} ${state} ${body}`
+  return `${NOTIFICATIONS_A11Y_LABELS.openItem} ${body}`
 }
 </script>
 
@@ -214,7 +213,7 @@ function rowA11y(row: NotificationRow): string {
         <!-- [lynx:fix] 单一稳定根 view（list-item 根不得在 v-if/v-else 间交替，Watchlist 同款约束）；
              行种类差异全部内收为平行分支 -->
         <view class="w-full">
-          <!-- 组头行：view_more 非空 → 点击展开子列表（就地插入，单向不收起） -->
+          <!-- 组头行：view_more 非空 → 点击展开子列表（展开单向不收起） -->
           <view
             v-if="row.kind === 'header'"
             class="flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)] active:bg-layer-pressed-on-surface"
@@ -236,14 +235,16 @@ function rowA11y(row: NotificationRow): string {
             <text class="self-center text-title-medium text-outline ml-2">›</text>
           </view>
 
-          <!-- 子列表区：就地插入组头之后（NotificationChildren 持独立 children query） -->
-          <view v-else-if="row.kind === 'children'" class="mx-3 mb-1.5">
-            <NotificationChildren :header-id="childrenHeaderId(row)" />
+          <!-- 子列表内嵌段（ADR-0162 结构规避，方案 B）：条件渲染在组头行 list-item 根 view
+               内部——行数不变，展开不向原生 list 中途插入 item（「插入 = 静默丢弃」）；
+               NotificationChildren 持独立 children query -->
+          <view v-if="row.kind === 'header' && row.expanded" class="mx-3 mb-1.5">
+            <NotificationChildren :header-id="row.item.id" />
           </view>
 
           <!-- 普通通知行：点击按 target_url 路由（未知 scheme 静默忽略） -->
           <view
-            v-else
+            v-else-if="row.kind === 'item'"
             class="flex flex-row items-start m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)] active:bg-layer-pressed-on-surface"
             :accessibility-element="A11Y_ELEMENT_ENABLED"
             :accessibility-label="rowA11y(row)"

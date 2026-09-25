@@ -12,6 +12,10 @@
 //   http(s)://           → 系统浏览器（utils/nativeUrl 单点）
 //   其它 scheme          → 静默忽略（不抛错，Shaft 同语义）
 
+import { navigate } from "../router"
+import { openExternalUrl } from "./nativeUrl"
+import { openNovel } from "./novelNavigation"
+
 /** 解析结果：route = 端内路由 / external = 系统外链 / ignore = 静默忽略 */
 export type NotificationTarget =
   | { kind: "user"; id: number }
@@ -52,10 +56,7 @@ export function resolveNotificationTarget(
   return { kind: "ignore" }
 }
 
-// ── 运行时跳转层（utils→router 先例：utils/novelNavigation.ts）───
-import { navigate } from "../router"
-import { openExternalUrl } from "./nativeUrl"
-import { openNovel } from "./novelNavigation"
+// ── 运行时跳转层（utils→router 先例：utils/novelNavigation.ts；import 见文件顶部）───
 
 /**
  * 解析并跳转一条通知的 target_url。

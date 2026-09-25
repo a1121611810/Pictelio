@@ -221,11 +221,10 @@ const enPages = {
   "notifications.footer.loading": "Loading…",
   "notifications.footer.end": "No more",
   "notifications.children.loading": "Loading…",
-  "notifications.children.more": "Load earlier",
   "notifications.children.end": "No more",
   "notifications.children.error": "Failed to load, tap to retry",
-  "notifications.a11y.unread": "Unread",
-  "notifications.a11y.read": "Read",
+  // Row-level a11y labels carry no read/unread semantics (ADR-0188 D5 v1 does not
+  // consume the server-side read field; local read tracking would conflict on screen).
 
   // MuteTags.vue (muted-tag management page, ADR-0187 / #732)
   "muteTags.title": "Muted tags",

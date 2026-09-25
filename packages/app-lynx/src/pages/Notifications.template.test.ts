@@ -2,6 +2,11 @@
 // 期望值出处：ADR-0188 D4/D6/D7 + spec 边界 3/4/5/9 + ADR-0150（三态单链）/
 // ADR-0061（a11y element+label）/ issue #140（list-item 图片显式高度）/
 // ADR-0107 D4（refreshEpoch 重建）。模板断言 = 本仓既有源级守卫约定（Ranking.template.test 同款）。
+//
+// 组头展开结构规避（ADR-0162 方案 B / RelatedInlineSection 卡内展开段先例）：展开后的子列表
+// 内嵌组头行 list-item 根 view 内条件渲染——独立 children list-item 会在展开瞬间向原生
+// <list> 中途插入 item（ADR-0162 文档化平台事实「插入 = 静默丢弃」），行模型与模板双守卫钉住。
+// [取证挂账] 真机组头展开行为取证挂发版前批次（模拟器 E2E transition-matrix 批次一并执行）。
 import { describe, it, expect } from "vitest"
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
@@ -52,19 +57,60 @@ describe("Notifications.vue 骨架硬约束", () => {
     expect(childrenSrc).not.toMatch(/<text[^>]*@tap/)
   })
 
-  it("a11y：注册表 label 全部被模板消费且配套 element（ADR-0061）", () => {
+  it("a11y：注册表 label 全部被模板消费且配套 element（ADR-0061；retry 消费于组头子组件）", () => {
     const registryMatch = /NOTIFICATIONS_A11Y_LABELS = \{([^}]*)\}/.exec(a11y)
     expect(registryMatch).not.toBeNull()
     const keys = [...(registryMatch![1]!.matchAll(/(\w+):/g))].map((m) => m[1]!)
     expect(keys.length).toBeGreaterThan(0)
     for (const key of keys) {
-      expect(src).toContain(`NOTIFICATIONS_A11Y_LABELS.${key}`)
+      // 主页面或组头子组件（NotificationChildren，如 retry 重试行）至少一处消费
+      expect(
+        src.includes(`NOTIFICATIONS_A11Y_LABELS.${key}`) ||
+          childrenSrc.includes(`NOTIFICATIONS_A11Y_LABELS.${key}`),
+      ).toBe(true)
     }
-    for (const m of src.matchAll(/:accessibility-label="NOTIFICATIONS_A11Y_LABELS\.\w+"/g)) {
-      // 每处 label 引用的宿主 view 必须开启 element（模板内逐处成对）
-      const around = src.slice(Math.max(0, (m.index ?? 0) - 200), (m.index ?? 0) + 100)
-      expect(around).toContain("A11Y_ELEMENT_ENABLED")
+    for (const s of [src, childrenSrc]) {
+      for (const m of s.matchAll(/:accessibility-label="NOTIFICATIONS_A11Y_LABELS\.\w+"/g)) {
+        // 每处 label 引用的宿主 view 必须开启 element（模板内逐处成对）
+        const around = s.slice(Math.max(0, (m.index ?? 0) - 200), (m.index ?? 0) + 100)
+        expect(around).toContain("A11Y_ELEMENT_ENABLED")
+      }
     }
+  })
+
+  it("行 a11y 标签不拼服务端 is_read 语义（ADR-0188 D5 v1 不消费；本地已读口径同屏冲突）", () => {
+    expect(src).not.toContain("is_read")
+    expect(src).not.toContain("notifications.a11y.unread")
+    expect(src).not.toContain("notifications.a11y.read")
+  })
+})
+
+describe("组头展开结构规避（ADR-0162 方案 B：子列表内嵌组头行 list-item 内）", () => {
+  it("行模型只含 header/item 两类，无独立 children 行（展开不向原生 <list> 插入 item）", () => {
+    expect(store).toMatch(/kind: "item" \| "header"/)
+    expect(store).not.toContain('kind: "children"')
+    expect(src).not.toContain("row.kind === 'children'")
+    // 旧独立子区 key（c- 前缀 list-item）不回流
+    expect(src).not.toContain("`c-${")
+  })
+
+  it("NotificationChildren 渲染在组头行 list-item 的根 view 内、组头内容之下（expanded 驱动）", () => {
+    // 第一个 <list-item> 块 = 行模板（footer list-item 在其后）；块内必须同时包含
+    // 组头分支与子列表组件（子列表位于组头 item 内部，非兄弟 list-item）
+    const rowBlock = /<list-item[\s\S]*?<\/list-item>/.exec(src)
+    expect(rowBlock).not.toBeNull()
+    expect(rowBlock![0]).toContain("row.kind === 'header'")
+    expect(rowBlock![0]).toContain("<NotificationChildren")
+    expect(rowBlock![0]).toContain("row.expanded")
+    // 组头内容分支在前，子列表内嵌段在后（组头内容之下）
+    expect(rowBlock![0].indexOf("row.kind === 'header'")).toBeLessThan(
+      rowBlock![0].indexOf("<NotificationChildren"),
+    )
+  })
+
+  it("子列表内部无 list-item 语义（内嵌于 item 内，footer 为普通 view 区块）", () => {
+    expect(childrenSrc).not.toContain("<list-item")
+    expect(childrenSrc).toContain("notifications.children.end")
   })
 })
 

@@ -3,7 +3,10 @@
 // 每个展开的组头渲染一个本组件：setup 内调用 useNotificationChildren（Vue 组合式函数
 // 必须在组件上下文调用）——独立 query 键 ['pictelio','notifications','children',id]，
 // 首屏 view-more?notification_id=，翻页透传 older_than 游标。子条目 view_more 恒 null。
-// 展开单向不收起（spec 边界 9）→ 组件随组头插入后常驻，无需收起态。
+// 展开单向不收起（spec 边界 9）→ 组件随组头展开常驻，无需收起态。
+// [ADR-0162 结构规避] 本组件**内嵌组头行 list-item 根 view 内**条件渲染（非独立
+// list-item，展开不向原生 <list> 中途插入 item）；因此内部全部为普通 view 区块——
+// 不得使用 list-item / footer list-item 语义（item 内不能嵌套 list-item）。
 import { computed } from 'vue'
 import {
   flattenNotifications,
@@ -64,14 +67,14 @@ function retry(): void {
       v-if="firstError"
       class="py-2"
       :accessibility-element="A11Y_ELEMENT_ENABLED"
-      :accessibility-label="NOTIFICATIONS_A11Y_LABELS.openItem"
+      :accessibility-label="NOTIFICATIONS_A11Y_LABELS.retry"
       @tap="retry"
     >
       <text class="text-body-small text-error">{{ t('notifications.children.error') }}</text>
     </view>
     <view
-      v-for="(child, idx) in children"
-      :key="`${headerId}-${child.id}-${idx}`"
+      v-for="child in children"
+      :key="`${headerId}-${child.id}`"
       class="py-2 pr-2 border-b-[1px] border-b-outline-variant"
       :accessibility-element="A11Y_ELEMENT_ENABLED"
       :accessibility-label="NOTIFICATIONS_A11Y_LABELS.openItem"
@@ -80,7 +83,8 @@ function retry(): void {
       <text class="text-body-small text-surface-on leading-snug [max-line:2]">{{ rowText(child) || t('notifications.noContent') }}</text>
       <text class="text-label-small text-outline mt-1">{{ formatRelativeTime(child.created_datetime) }}</text>
     </view>
-    <!-- 子列表分页 footer：older_than 游标继续（next_url null → 尽头 affordance 隐藏加载更多） -->
+    <!-- 子列表分页区块（普通 view，非 list-item footer——本组件内嵌 item 内）：
+         older_than 游标继续（next_url null → 尽头 affordance 隐藏加载更多） -->
     <view
       v-if="query.isFetchingNextPage.value || pageError || endOfFeed"
       class="h-8 flex items-center"

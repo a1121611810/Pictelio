@@ -4,7 +4,8 @@
 //   - 已读推进条件：成功才推进（notifyListLoaded(false) 零写）；写入值为可解析 ISO；
 //     写失败 warn 不清角标
 //   - 分页 accumulate：flattenNotifications 多页保序（fixture 真实样例）
-//   - 组头插入：buildNotificationRows 就地插入 + 展开单向 + key 稳定唯一
+//   - 组头展开标记：buildNotificationRows header 行携带 expanded（子列表内嵌组头行内，
+//     ADR-0162 结构规避——不产生独立 children list-item）+ 展开单向 + key 稳定唯一
 // mock 模式对齐 settingsStore.test / searchHistoryStore.test：vi.mock idbKV（node 无 indexedDB）、
 // vi.mock api/client（isNativeMode=false → dev KV 路径）、vi.mock api/queryClient（隔离模块级
 // setQueryDefaults 副作用）。Pinia 用 setActivePinia 直驱（watchlistStore 同款姿态）。
@@ -115,30 +116,31 @@ describe("flattenNotifications 分页 accumulate（fixture 真实样例）", () 
   })
 })
 
-describe("buildNotificationRows 组头插入（spec §US2 / 边界 9）", () => {
+describe("buildNotificationRows 组头展开标记（spec §US2 / 边界 9 / ADR-0162 结构规避）", () => {
   const list = loadFixture("notification-list.json").notifications
   // fixture[0] 为组头（view_more 非空），fixture[2] 为普通条目
   const header = list[0]!
   const plain = list[2]!
 
-  it("未展开组头：无子区行，顺序不变", () => {
+  it("未展开组头：expanded=false，顺序不变，行模型只含 header/item 两类", () => {
     const rows = buildNotificationRows([header, plain], {})
     expect(rows.map((r) => r.kind)).toEqual(["header", "item"])
     expect(rows[0]!.key).toBe(`h-${header.id}`)
+    expect(rows[0]!.expanded).toBe(false)
     expect(rows[1]!.key).toBe(`n-${plain.id}`)
   })
 
-  it("展开组头：children 行就地插入组头之后、后续条目之前", () => {
+  it("展开组头：header 行携带 expanded 标记（子列表内嵌该行 list-item 内，无独立 children 行）", () => {
     const rows = buildNotificationRows([plain, header, plain], { [header.id]: true })
-    expect(rows.map((r) => r.kind)).toEqual(["item", "header", "children", "item"])
-    expect(rows[2]!.headerId).toBe(header.id)
-    expect(rows[2]!.key).toBe(`c-${header.id}`)
+    expect(rows.map((r) => r.kind)).toEqual(["item", "header", "item"])
+    expect(rows[1]!.expanded).toBe(true)
+    expect(rows[1]!.key).toBe(`h-${header.id}`)
   })
 
-  it("展开单向不收起：expanded 只增不减（重复构建保持子区）", () => {
+  it("展开单向不收起：expanded 只增不减（重复构建保持展开标记）", () => {
     const expanded = { [header.id]: true }
-    expect(buildNotificationRows([header], expanded).length).toBe(2)
-    expect(buildNotificationRows([header], { ...expanded }).length).toBe(2)
+    expect(buildNotificationRows([header], expanded)[0]!.expanded).toBe(true)
+    expect(buildNotificationRows([header], { ...expanded })[0]!.expanded).toBe(true)
   })
 
   it("key 稳定唯一（list-item :key 契约）", () => {

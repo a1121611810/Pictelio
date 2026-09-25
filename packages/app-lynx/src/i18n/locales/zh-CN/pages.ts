@@ -221,11 +221,10 @@ const zhPages = {
   "notifications.footer.loading": "加载中…",
   "notifications.footer.end": "没有更多了",
   "notifications.children.loading": "加载中…",
-  "notifications.children.more": "加载更早的通知",
   "notifications.children.end": "没有更多了",
   "notifications.children.error": "加载失败，点击重试",
-  "notifications.a11y.unread": "未读",
-  "notifications.a11y.read": "已读",
+  // 行级 a11y 标签不拼已读/未读语义（ADR-0188 D5 v1 不消费服务端已读字段，
+  // 本地已读口径同屏冲突）——无 notifications.a11y.* 键。
 
   // ─── MuteTags.vue（静音标签管理页，ADR-0187 / #732） ───
   "muteTags.title": "静音标签",

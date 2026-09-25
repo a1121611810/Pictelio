@@ -90,10 +90,12 @@ describe("路由与 Me 入口行（票面落点）", () => {
   })
 })
 
-describe("静音轻提示宿主（ADR-0187 D5，App.vue exitHint 同形态）", () => {
-  it("App.vue 消费 muteTagHint：M3 snackbar（inverse-surface）+ 胶囊定位（ADR-0123）+ i18n 渲染", () => {
+describe("静音轻提示宿主（ADR-0187 D5 + spec tag-mute 边界 #7，App.vue exitHint 同形态）", () => {
+  it("App.vue 消费 muteTagHint：M3 snackbar（inverse-surface）+ 胶囊定位（ADR-0123）+ i18n 双分支渲染", () => {
     expect(appVue).toContain("v-if=\"settings.muteTagHint\"")
+    // 双分支文案（载荷 kind 分流）：成功「已静音」/ 落盘失败「静音未生效」（spec 边界 #7）
     expect(appVue).toContain("t('muteTag.mutedHint'")
+    expect(appVue).toContain("t('muteTag.muteFailedHint')")
     const codeApp = code(appVue)
     expect(codeApp).toContain("bg-inverse-surface")
     expect(codeApp).toContain("text-inverse-on-surface")

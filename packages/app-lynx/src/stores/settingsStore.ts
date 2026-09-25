@@ -283,8 +283,25 @@ export const useSettingsStore = defineStore("settings", () => {
   const _aiFilterMode = ref<AiFilterMode>("show")
   /** 标签静音集合（ADR-0187 / #732）：账号级，内存态为存储顺序的 string[]（元素已 trim） */
   const _muteTags = ref<string[]>([])
-  /** 静音成功轻提示载荷（当前提示的标签名；null = 无）——App.vue 宿主渲染，store 不快照文案 */
-  const _muteTagHint = ref<string | null>(null)
+  /**
+   * 静音集合非响应式快照（ADR-0162 结构规避 / spec docs/specs/tag-mute.md 边界 #4）：
+   * 组装点判定谓词 isTagMuted 只读本快照（plain Set，Vue 不追踪）——长按静音后已组装
+   * 列表的 computed 不因集合变化热重算收缩（原生 <list> 中途移除 list-item = 留空位
+   * 风险），变更只影响后续组装（刷新/分页重新组装时按新快照过滤）。
+   * 快照写入口 = loadSettings 装载 / setMuteTags 写入 / 登出重置，全部经
+   * syncMuteTagsSnapshot 与响应式副本同源；响应式读取仅供管理页 UI（mutedTags()）。
+   */
+  let _muteTagsSnapshot: ReadonlySet<string> = new Set<string>()
+  /** 快照同步（集合变更唯一对齐点：内存响应式副本 → 非响应式快照） */
+  function syncMuteTagsSnapshot(): void {
+    _muteTagsSnapshot = new Set(_muteTags.value)
+  }
+  /**
+   * 静音轻提示载荷（#732 / ADR-0187 D5 + spec tag-mute 边界 #7）：null = 无。
+   * kind 分流文案——"muted" = 落盘成功（或集合已生效）的「已静音」；"failed" = 落盘
+   * 失败的「静音未生效」。App.vue 宿主渲染（store 不快照文案），2s 自动清除在 store 内。
+   */
+  const _muteTagHint = ref<{ kind: "muted" | "failed"; name: string } | null>(null)
   const _ugoiraMode = ref<UgoiraExtractMode>("fflate")
   const _ugoiraDownloadFormat = ref<UgoiraFormat>("zip")
   const _detailQuality = ref<ImageQuality>("medium")
@@ -325,7 +342,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const translateR18 = _translateR18
   const translateR18G = _translateR18G
   const aiFilterMode = _aiFilterMode
-  /** 静音成功轻提示载荷（#732 / ADR-0187 D5）：null = 无；App.vue 宿主 v-if 渲染 */
+  /** 静音轻提示载荷（#732 / ADR-0187 D5 + spec 边界 #7）：null = 无；App.vue 宿主 v-if 渲染 */
   const muteTagHint = _muteTagHint
   const ugoiraMode = _ugoiraMode
   const ugoiraDownloadFormat = _ugoiraDownloadFormat
@@ -600,6 +617,7 @@ export const useSettingsStore = defineStore("settings", () => {
       _translateR18G.value = false
       _aiFilterMode.value = "show"
       _muteTags.value = []
+      syncMuteTagsSnapshot()
       return
     }
     const storage = prefs()
@@ -626,6 +644,7 @@ export const useSettingsStore = defineStore("settings", () => {
       // 标签静音集合（ADR-0187 / #732）：缺失即空集合；损坏由 parseMuteTagsRaw warn 可见
       const rawMuteTags = await storage.get(muteTagsKey(id))
       _muteTags.value = rawMuteTags === null ? [] : parseMuteTagsRaw(rawMuteTags)
+      syncMuteTagsSnapshot()
     } catch (e) {
       // 存储不可用：维持默认（静默降级规则：warn 可见）
       console.warn("[settingsStore] 账号级设置加载失败（维持默认）", e)
@@ -635,6 +654,7 @@ export const useSettingsStore = defineStore("settings", () => {
       _translateR18G.value = false
       _aiFilterMode.value = "show"
       _muteTags.value = []
+      syncMuteTagsSnapshot()
     }
 
     // Dev hook：强制开启 R18（R18/R18G 同开）。
@@ -722,42 +742,68 @@ export const useSettingsStore = defineStore("settings", () => {
   // 匹配语义（ADR-0187 D2）：任一 tags[].name 经 trim 后与集合精确相等——无大小写折叠、
   // 无全半角归一、不匹配 translated_name；空 tags / undefined / 空集合一律放行。
 
-  /** 静音标签集合快照（响应式 accessor：computed/渲染内调用建立依赖；整集快照读） */
+  /**
+   * 静音标签集合响应式快照（管理页 UI 专用：MuteTags.vue computed 内调用建立依赖，
+   * 集合变化即时反映列表）。**组装点判定禁止经此读取**——响应式读会建立依赖、集合
+   * 变化触发列表 computed 热重算（ADR-0162 中途移除风险）；组装判定走 isTagMuted（快照）。
+   */
   function mutedTags(): Set<string> {
     return new Set(_muteTags.value)
   }
 
-  /** 写内存 + 落盘（未登录不落盘，账号级语义）；写失败 warn 可见（禁静默降级） */
-  function setMuteTags(tags: string[]): void {
+  /** 写内存 + 快照同步 + 落盘（未登录不落盘，账号级语义）；写失败 warn 可见（禁静默降级）。
+   *  返回落盘结果句柄（null = 未登录不落盘；true = 落盘成功；false = 落盘失败，已 warn），
+   *  供 muteTag 决定轻提示时序（spec tag-mute 边界 #7）；既有 fire-and-forget 调用方
+   *  （unmuteTag / 备份恢复 applyRawKey）忽略返回值，行为不变。 */
+  function setMuteTags(tags: string[]): Promise<boolean> | null {
     _muteTags.value = tags
+    syncMuteTagsSnapshot()
     const id = uid()
-    if (id === null) return
-    void prefs()
+    if (id === null) return null
+    return prefs()
       .set(muteTagsKey(id), JSON.stringify(tags))
-      .catch((e) => console.warn("[settingsStore] 静音标签写入失败", e))
+      .then(
+        () => true,
+        (e: unknown) => {
+          console.warn("[settingsStore] 静音标签写入失败", e)
+          return false
+        },
+      )
   }
 
   /** 静音轻提示展示时长（与 router exitHint 同值，App.vue 提示条宿主同形态） */
   const MUTE_TAG_HINT_MS = 2000
   let muteTagHintTimer: ReturnType<typeof setTimeout> | undefined
 
-  /** 静音标签并持久化（trim、幂等）；未登录 no-op（webview muteTagStore 同语义） */
-  function muteTag(name: string): void {
-    const id = uid()
-    if (id === null) return
-    const trimmed = name.trim()
-    if (trimmed === "") return
-    if (!_muteTags.value.includes(trimmed)) {
-      setMuteTags([..._muteTags.value, trimmed])
-    }
-    // 轻提示（ADR-0187 D5）：长按必有反馈，重复静音同样提示（webview 同语义）；
-    // 连续静音重置计时，避免前一条提示提前消失
-    _muteTagHint.value = trimmed
+  /** 置提示载荷 + 计时自动清除（连续提示重置计时） */
+  function showMuteTagHint(kind: "muted" | "failed", name: string): void {
+    _muteTagHint.value = { kind, name }
     if (muteTagHintTimer !== undefined) clearTimeout(muteTagHintTimer)
     muteTagHintTimer = setTimeout(() => {
       muteTagHintTimer = undefined
       _muteTagHint.value = null
     }, MUTE_TAG_HINT_MS)
+  }
+
+  /** 静音标签并持久化（trim、幂等）；未登录 no-op（webview muteTagStore 同语义）。
+   *  轻提示时序（spec tag-mute 边界 #7）：**落盘成功后**才提示「已静音」；落盘失败提示
+   *  「静音未生效」（+ setMuteTags 内既有 warn，禁静默降级）。重复静音（集合已含）
+   *  内存态即生效 → 直接提示成功，不重写盘。连续提示重置计时，避免前一条提前消失。 */
+  function muteTag(name: string): void {
+    const id = uid()
+    if (id === null) return
+    const trimmed = name.trim()
+    if (trimmed === "") return
+    if (_muteTags.value.includes(trimmed)) {
+      // 幂等重复静音：集合已含（此前已落盘）→ 内存态已生效，直接提示成功
+      showMuteTagHint("muted", trimmed)
+      return
+    }
+    // setMuteTags 已同步内存集合与快照；落盘结果驱动提示时序（null = 未登录不落盘，
+    // 函数头已拦截，防御性 no-hint）
+    void setMuteTags([..._muteTags.value, trimmed])?.then((ok) =>
+      showMuteTagHint(ok ? "muted" : "failed", trimmed),
+    )
   }
 
   /** 取消静音并持久化；未静音时 no-op；未登录 no-op */
@@ -770,14 +816,16 @@ export const useSettingsStore = defineStore("settings", () => {
 
   /**
    * 静音判定（数据组装点过滤谓词）：item.tags 任一 name.trim() 命中集合。
+   * **只读非响应式快照**（ADR-0162 结构规避 / spec tag-mute 边界 #4）：computed/渲染内
+   * 调用不建立依赖——集合变化不触发已组装列表热重算（原生 <list> 中途移除 = 留空位），
+   * 变更在后续组装（刷新/分页替换列表数据）时生效。
    * 空集合短路（免逐条 trim）；空 tags / undefined 放行。
    */
   function isTagMuted(item: TagMuteCheckable | null | undefined): boolean {
-    const list = _muteTags.value
-    if (list.length === 0) return false
+    if (_muteTagsSnapshot.size === 0) return false
     const tags = item?.tags
     if (!tags || tags.length === 0) return false
-    return tags.some((tag) => list.includes(tag.name.trim()))
+    return tags.some((tag) => _muteTagsSnapshot.has(tag.name.trim()))
   }
 
   function setUgoiraDownloadFormat(format: UgoiraFormat): void {
@@ -1060,6 +1108,7 @@ export const useSettingsStore = defineStore("settings", () => {
         _showR18G.value = false
         _aiFilterMode.value = "show"
         _muteTags.value = []
+        syncMuteTagsSnapshot()
         _muteTagHint.value = null
       }
     },

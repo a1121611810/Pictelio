@@ -169,12 +169,14 @@ export const WATCHLIST_A11Y_LABELS = {
 } as const
 
 /** 通知中心页 accessibility 标注（ADR-0188 / #728：/notifications 页 + 组头展开）
- *  注册表完整性约束同 ME_A11Y_LABELS：每个 key 必须被 Notifications.vue 模板消费
- *  （本票 template 测试钉住）；未读/已读语义经 i18n notifications.a11y.* 组合进行内标签。 */
+ *  注册表完整性约束同 ME_A11Y_LABELS：每个 key 必须被 Notifications.vue 或组头子组件
+ *  NotificationChildren.vue 模板消费（本票 template 测试钉住）；retry = 子列表首屏失败
+ *  重试行（通知子组件消费）；行级未读/已读语义不进注册表（ADR-0188 D5 v1 不消费 is_read）。 */
 export const NOTIFICATIONS_A11Y_LABELS = {
   pageTitle: '通知',
   back: '返回',
   openItem: '打开通知',
+  retry: '重试加载',
 } as const
 
 /** 静音标签管理页 accessibility 标注（ADR-0187 D5 / #732：/mute-tags 页 + 移除按钮）

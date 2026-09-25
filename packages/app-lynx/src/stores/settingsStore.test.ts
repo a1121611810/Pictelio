@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { readFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
-import { ref } from "vue"
+import { ref, effect } from "vue"
 import { setActivePinia, createPinia } from "pinia"
 import { useSettingsStore, BACKUP_DEVICE_KEYS, backupAccountKeys, parseMuteTagsRaw } from "./settingsStore"
 import { idbGet, idbSet, idbRemove } from "../utils/idbKV"
@@ -1848,33 +1848,53 @@ describe("settingsStore.muteTags（ADR-0187 / #732）", () => {
     expect(vi.mocked(idbSet)).not.toHaveBeenCalled()
   })
 
-  it("登出：watch currentUser → 集合与轻提示载荷重置", () => {
+  it("登出：watch currentUser → 集合与轻提示载荷重置", async () => {
     userRef().value = { id: 42 }
     store.muteTag("R-18G")
-    expect(store.muteTagHint).toBe("R-18G")
+    await vi.waitFor(() => expect(store.muteTagHint).toEqual({ kind: "muted", name: "R-18G" }))
     userRef().value = null
     expect(store.mutedTags().size).toBe(0)
     expect(store.muteTagHint).toBeNull()
   })
 
-  // ── 静音轻提示（ADR-0187 D5）：载荷置位 + 2s 自动清除 ──
+  // ── 静音轻提示（ADR-0187 D5 + spec tag-mute 边界 #7）：落盘成功才提示「已静音」、
+  //    落盘失败提示「静音未生效」；载荷 = { kind, name }，App.vue 宿主按 kind 分流文案 ──
 
-  it("muteTag 轻提示：置载荷（重复静音同样提示），2s 自动清除", () => {
+  it("muteTag 轻提示：落盘成功后置「已静音」载荷（重复静音同样提示），2s 自动清除", async () => {
     vi.useFakeTimers()
     try {
       userRef().value = { id: 42 }
       store.muteTag("R-18G")
-      expect(store.muteTagHint).toBe("R-18G")
+      // 提示时序：落盘成功后才置载荷（不再是同步先弹）
+      expect(store.muteTagHint).toBeNull()
+      await vi.advanceTimersByTimeAsync(0) // 冲微任务队列（idbSet resolve → 提示置位）
+      expect(store.muteTagHint).toEqual({ kind: "muted", name: "R-18G" })
       vi.advanceTimersByTime(1999)
-      expect(store.muteTagHint).toBe("R-18G")
+      expect(store.muteTagHint).toEqual({ kind: "muted", name: "R-18G" })
       vi.advanceTimersByTime(1)
       expect(store.muteTagHint).toBeNull()
-      // 重复静音（幂等不重复入集）仍提示
+      // 重复静音（幂等不重复入集、不重写盘）仍提示成功（集合已生效）
       store.muteTag("R-18G")
-      expect(store.muteTagHint).toBe("R-18G")
+      expect(store.muteTagHint).toEqual({ kind: "muted", name: "R-18G" })
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it("muteTag 落盘失败：提示「静音未生效」载荷 + 既有 warn（spec 边界 #7，禁静默）", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    userRef().value = { id: 42 }
+    vi.mocked(idbSet).mockRejectedValueOnce(new Error("idb down"))
+    store.muteTag("R-18G")
+    await vi.waitFor(() =>
+      expect(store.muteTagHint).toEqual({ kind: "failed", name: "R-18G" }),
+    )
+    expect(warn).toHaveBeenCalledWith("[settingsStore] 静音标签写入失败", expect.anything())
+    // 内存集合仍已更新（下次组装生效）；恢复落盘后重复静音走成功分支
+    vi.mocked(idbSet).mockResolvedValue(undefined)
+    store.muteTag("R-18G") // 已在集合 → 幂等，直接提示成功
+    expect(store.muteTagHint).toEqual({ kind: "muted", name: "R-18G" })
+    warn.mockRestore()
   })
 
   // ── isTagMuted 快速语义（全量真值表见 tests/differential/tagMuteTruthTable.test.ts）──
@@ -1890,6 +1910,64 @@ describe("settingsStore.muteTags（ADR-0187 / #732）", () => {
     // 空集合短路
     store.unmuteTag("R-18G")
     expect(store.isTagMuted({ tags: [{ name: "R-18G" }] })).toBe(false)
+  })
+})
+
+// 静音快照契约（ADR-0162 结构规避 / spec docs/specs/tag-mute.md 边界 #4「已渲染列表不回溯」）：
+// isTagMuted 只读非响应式快照——集合变化不触发组装点 computed/effect 热重算（原生 <list>
+// 中途移除 list-item = 留空位风险），变更只影响后续组装；快照与响应式 mutedTags() 各写入口同源。
+describe("settingsStore 静音快照契约（ADR-0162 / spec 边界 #4）", () => {
+  beforeEach(() => {
+    userRef().value = { id: 42 }
+    env.native = false
+    env.modules = {}
+    vi.mocked(idbGet).mockReset().mockResolvedValue(null)
+    vi.mocked(idbSet).mockReset().mockResolvedValue(undefined)
+    vi.mocked(idbRemove).mockReset().mockResolvedValue(undefined)
+  })
+
+  it("isTagMuted 不建立响应式依赖：集合变化不触发 effect 重算（热移除风险规避）", () => {
+    let runs = 0
+    let hit = false
+    effect(() => {
+      runs++
+      hit = store.isTagMuted({ tags: [{ name: "R-18G" }] })
+    })
+    expect(runs).toBe(1)
+    expect(hit).toBe(false)
+    store.muteTag("R-18G")
+    // 快照读：集合变化不重算（若误读响应式 _muteTags，effect 重跑 runs=2 → 红）
+    expect(runs).toBe(1)
+    // 后续组装（重新调用谓词）按新快照判定
+    expect(store.isTagMuted({ tags: [{ name: "R-18G" }] })).toBe(true)
+  })
+
+  it("写集合后快照立即更新：muteTag/unmuteTag 后 isTagMuted 即时反映", () => {
+    store.muteTag("R-18G")
+    expect(store.isTagMuted({ tags: [{ name: "R-18G" }] })).toBe(true)
+    store.unmuteTag("R-18G")
+    expect(store.isTagMuted({ tags: [{ name: "R-18G" }] })).toBe(false)
+  })
+
+  it("快照与响应式 mutedTags() 一致性：写入/装载/登出各写入口同源", async () => {
+    const probe = (name: string) => store.isTagMuted({ tags: [{ name }] })
+    const consistent = () => Array.from(store.mutedTags()).every((t) => probe(t)) && !probe("未静音标签X")
+    // 写入路径（muteTag / unmuteTag 经 setMuteTags 同步）
+    store.muteTag("A")
+    store.muteTag("B")
+    store.unmuteTag("A")
+    expect(consistent()).toBe(true)
+    // 装载路径（loadSettings 覆盖内存集合与快照）
+    vi.mocked(idbGet).mockImplementation(async (k: string) =>
+      k === "mute_tags_42" ? JSON.stringify(["C"]) : null,
+    )
+    await store.loadSettings()
+    expect(Array.from(store.mutedTags())).toEqual(["C"])
+    expect(consistent()).toBe(true)
+    // 登出路径（watch 重置集合与快照）
+    userRef().value = null
+    expect(store.mutedTags().size).toBe(0)
+    expect(probe("C")).toBe(false)
   })
 })
 
