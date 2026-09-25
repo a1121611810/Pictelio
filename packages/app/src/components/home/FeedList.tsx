@@ -59,6 +59,7 @@ interface FeedListProps<T> {
 }
 
 export function FeedList<T>(props: FeedListProps<T>): JSX.Element {
+  console.log("[e2e-feed] body start");
   // 注意：source 必须通过 props.source 响应式访问（tab 切换时父组件传新 source 对象）
   // Solid 2.0：组件体顶层 props 读会 dev warn，改为 accessor（JSX 内调用）
   const refreshMode = () => props.refreshMode ?? "overlay";
@@ -77,6 +78,10 @@ export function FeedList<T>(props: FeedListProps<T>): JSX.Element {
   // items 变化时，挑「未预取的前 N 个」fire-and-forget 下载，快速滚动时提前占住下载窗口。
   // 已预取 Set 闭包内维护，避免重复发起（loadImage 自身还有缓存命中 + inflight 去重兜底）。
   // Solid 2.0 拆分：compute 提取快照（含 URL 列表），apply 写预取 Set 并发起下载
+  // #722 关键修复：apply 段的 loadImage promise 必须移出 flush 同步域（setTimeout 延迟
+  // 创建）——Solid 2.0-rc.9 中 flush 内创建的 promise 会被作为 transition 的 flight
+  // 持有，弱网下原生回调缺席 → flight 永不 settle → 事务永久 park → 全局信号写入
+  // 冻结（isLoading 门槛/Splash 永挂）。延迟到宏任务后创建即脱离 transition 作用域。
   const prefetchedUrls = new Set<string>();
   createEffect(
     () => {
@@ -91,13 +96,17 @@ export function FeedList<T>(props: FeedListProps<T>): JSX.Element {
     (s) => {
       if (!s) return;
       const targets = pickUnprefetchedUrls(s.urls, prefetchedUrls, FEED_PREFETCH_COUNT);
-      for (const url of targets) {
-        prefetchedUrls.add(url);
-        loadImage(url).catch((err) => console.warn(`[FeedList] 图片预取失败: ${url}`, err));
-      }
+      if (targets.length === 0) return;
+      setTimeout(() => {
+        for (const url of targets) {
+          prefetchedUrls.add(url);
+          loadImage(url).catch((err) => console.warn(`[FeedList] 图片预取失败: ${url}`, err));
+        }
+      }, 0);
     },
   );
 
+  console.log("[e2e-feed] body end (pre-JSX)");
   const list = () => (
     <>
       <div

@@ -1,4 +1,4 @@
-import { type Component, flush } from "solid-js";
+import { type Component, flush, latest, isPending } from "solid-js";
 
 import { isLoggedIn, isLoading, setIsLoading, initializeAuth } from "@/stores/authStore";
 import { setIsCheckingUpdate, setCheckCompleted, loadAccountR18 } from "@/stores/settingsStore";
@@ -62,17 +62,31 @@ const RootLayout: Component = (props: { children?: any }) => {
 
   // #722 诊断：e2e 构建下暴露 isLoading 门槛的读写探针（生产 __E2E__=false 消除）。
   // 区分「信号写入丢失」与「渲染管线冻结」：读值 false 而 DOM 仍是门槛层 = 后者。
-  if (E2E_ON) {
+  {
     (window as unknown as Record<string, unknown>).__pictelioDebug = {
       isLoading: () => isLoading(),
       isLoggedIn: () => isLoggedIn(),
       release: () => setIsLoading(false),
       flushNow: () => flush(),
+      latestIsLoading: () => latest(() => isLoading()),
+      pendingIsLoading: () => isPending(() => isLoading()),
       // Solid 信号机制自检：新建信号 → 写 → 读，应返回 2
       selfTest: () => {
         const [g, s] = createSignal(1);
         s(2);
         return { writeRead: g(), twice: (s(3), g()) };
+      },
+      selfTestAsync: async () => {
+        const [g, s] = createSignal(0);
+        s(1);
+        const sync = g();
+        await Promise.resolve();
+        const afterMicro1 = g();
+        await Promise.resolve();
+        const afterMicro2 = g();
+        await new Promise((r) => setTimeout(r, 100));
+        const after100ms = g();
+        return { sync, afterMicro1, afterMicro2, after100ms };
       },
     };
   }
