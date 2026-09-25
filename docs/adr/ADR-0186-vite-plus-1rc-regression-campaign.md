@@ -47,5 +47,5 @@
 
 ## 后续
 
-- P1/P2 已开 issue 票据化（修复走独立 effort：术语 → spec → tickets → implement）；
+- P1/P2 已开 issue 票据化：[#722](https://github.com/a1121611810/Pictelio/issues/722)（webview 加载门槛悬挂）、[#723](https://github.com/a1121611810/Pictelio/issues/723)（token 轮换互踩）；修复走独立 effort（术语 → spec → tickets → implement）；
 - 升级本体（chore/vite-plus-1rc 分支）回归通过，可合并。

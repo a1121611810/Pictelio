@@ -13,7 +13,9 @@ export default defineConfig({
   lint: {
     ignorePatterns: [
       "**/dist/**",
-      "**/android/**",
+      // 收窄到 app 的 android 平台目录（ADR-0186 review P2）：通配 **/android/** 会
+      // 误伤 packages/app/tests/unit/android/ 的 R8 keep 规则契约测试
+      "packages/app/android/**",
       "**/node_modules/**",
       "**/.codegraph/**",
       "**/.playwright-cli/**",
@@ -108,12 +110,10 @@ export default defineConfig({
       {
         files: [
           "scripts/**/*.mjs",
-          "packages/app/scripts/**/*.mjs",
-          "packages/app-lynx/scripts/**/*.mjs",
+          "packages/*/scripts/**/*.mjs",
           "*.config.ts",
-          "packages/app/*.config.ts",
-          "packages/app-lynx/*.config.ts",
-          "packages/*/*.config.ts",
+          // 含嵌套 vitest/stryker 等配置（tests/*/vitest.config.ts）
+          "packages/**/*.config.ts",
         ],
         env: { node: true },
         rules: {
@@ -126,7 +126,9 @@ export default defineConfig({
   fmt: {
     ignorePatterns: [
       "**/dist/**",
-      "**/android/**",
+      // 收窄到 app 的 android 平台目录（ADR-0186 review P2）：通配 **/android/** 会
+      // 误伤 packages/app/tests/unit/android/ 的 R8 keep 规则契约测试
+      "packages/app/android/**",
       "**/node_modules/**",
       "**/.codegraph/**",
       "**/.playwright-cli/**",

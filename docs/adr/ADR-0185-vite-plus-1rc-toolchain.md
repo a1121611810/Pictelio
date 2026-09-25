@@ -33,6 +33,8 @@ vite-plus 1.0.0-rc.0（2026-09-22，npm `latest` tag，MIT）相对 app 原钉�
 |---|---|
 | `packages/app-lynx/**` | 首次纳入暴露 ~150 条存量风格债（`_` 前缀约定 / no-shadow / no-array-sort 等），属独立重构票；spike 证实 oxlint 1.85 **可直接解析 .vue**，开闸只欠清债 |
 | `packages/website/**` | .astro 不在 oxlint/oxfmt 支持面 |
+| `.husky/**` | shell 钩子薄壳（ADR-0142），非应用代码 |
+| `**/tests/fixtures/**` | 字节一致性契约数据（sample-payload.json 与 Java test resource 逐字节比对） |
 | `docs/**`、`scripts/audit-real-interaction/**` | 研究产物 / 真机审计取证脚本（字节原状保证复跑口径） |
 | `**/*.md` | oxfmt 0.70 md 规则变更；openwiki 为 CI 生成物禁手改，AGENTS.md 有行数锚点契约 |
 
@@ -50,7 +52,7 @@ vite-plus 1.0.0-rc.0（2026-09-22，npm `latest` tag，MIT）相对 app 原钉�
 | 全仓 `test:all`（9 包） | exit 0 |
 | app web `vp build` | ✓ 943ms（别名对齐后） |
 | root lint | 626 文件 0 warnings 0 errors |
-| root fmt `--check` | 660 文件全过（46 文件一次性归一） |
+| root fmt `--check` | 658 文件全过（46 文件一次性归一） |
 | `pnpm check`（app：root fmt+lint+tsc） | exit 0（连续两次） |
 | `vp run --cache` 二次命中 | 3/3（100%），2.42s |
 | CI android job 影响面 | 脚本路径未变（`pnpm --dir packages/app run build` → vp build，别名后可用）；Robolectric 侧无工具链接触 |

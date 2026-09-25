@@ -107,7 +107,9 @@ describe("AGENTS.md 契约（首跳路由三表，#598 R4）", () => {
 describe("AGENTS.md 契约（技术栈与 package.json 一致）", () => {
   // oracle = packages/app/package.json（版本号唯一权威源），防指令文件与依赖清单漂移
   // vite 自 ADR-0185 起为 npm 别名（vite-plus-core），Vite 本体版本由 vite-plus 内置，
-  // 文档锚点改读 vite-plus 依赖版本
+  // 文档锚点改读 vite-plus 依赖版本。
+  // 已知盲区（ADR-0186 review P3）：技术栈行的独立陈述「Vite 8.3」自此无 oracle
+  // （vite-plus-core 内置 vite 升版时该数字会静默陈旧），1.0 stable 后以 vp toolchain 数据补挂。
   it("技术栈行的主版本号与 package.json 一致", () => {
     const manifest = JSON.parse(
       readFileSync(join(findRepoRoot(process.cwd()), "packages/app/package.json"), "utf8"),

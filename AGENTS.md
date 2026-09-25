@@ -142,7 +142,7 @@ OpenWiki 提供人工整理的高层次项目概览，与 CodeGraph（精确代�
 | 命令 | 说明 |
 | --- | --- |
 | `pnpm dev` / `build` / `check` / `test` | app：dev(5173) / 构建 / fmt+lint+tsc / Vitest |
-| `pnpm lint` / `fmt:check` / `outdated` | 仓库级单命令（root vite.config.ts 单配置源） |
+| `pnpm lint` / `fmt` / `fmt:check` / `outdated` | 仓库级单命令（root vite.config.ts 单配置源；**无** `:包名` 变体） |
 | `pnpm <命令>:app-lynx\|:website\|:ugoira` / `:all` | 委托对应包 / 并行全部 |
 | `pnpm dev:android` / `build:android(:release)` | 热重载 / Debug 或签名 Release APK（需密码环境变量） |
 | `pnpm test:agent-browser` / `test:android:e2e` | AI E2E（入门禁）/ 模拟器 E2E（手动按需） |
