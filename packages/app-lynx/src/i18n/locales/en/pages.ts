@@ -199,6 +199,7 @@ const enPages = {
   "me.watchlist": "Watchlist",
   "me.downloads": "Downloads",
   "me.networkCheck": "Network check",
+  "me.notifications": "Notifications",
   "me.client.title": "Client",
   "me.client.hint": "Takes effect after choosing an engine and restarting",
   "me.client.webview": "WebView (existing)",
@@ -210,6 +211,21 @@ const enPages = {
   "me.client.fullscreenMode": "Fullscreen mode",
   "me.client.fullscreenModeDesc": "Hide status and navigation bars; swipe from the edge to reveal them",
   "me.client.effectiveState": "Preferred {{preferred}} · effective this launch {{effective}}",
+
+  // Notifications.vue (ADR-0188 / #728)
+  "notifications.title": "Notifications",
+  "notifications.retry": "Retry",
+  "notifications.empty.title": "No notifications",
+  "notifications.empty.hint": "Events like follows and likes will appear here",
+  "notifications.noContent": "(no content)",
+  "notifications.footer.loading": "Loading…",
+  "notifications.footer.end": "No more",
+  "notifications.children.loading": "Loading…",
+  "notifications.children.more": "Load earlier",
+  "notifications.children.end": "No more",
+  "notifications.children.error": "Failed to load, tap to retry",
+  "notifications.a11y.unread": "Unread",
+  "notifications.a11y.read": "Read",
 
   // Engine fallback reason copy (ADR-0164 / #555): engine-state snapshot reason code → UI copy.
   // Code set = EngineRoute.Reason (10 codes) + unknown fallback.

@@ -1,0 +1,200 @@
+{
+  "notifications": [
+    {
+      "id": 100000000,
+      "created_datetime": "2026-09-26T03:38:49+09:00",
+      "type": 8,
+      "content": {
+        "text": "<b>ユーザーA</b>さんがあなたをフォローしました。",
+        "left_icon": "https://s.pximg.net/common/images/no_profile.png",
+        "left_image": null,
+        "right_icon": null,
+        "right_image": null
+      },
+      "view_more": {
+        "unread_exists": true,
+        "title": "フォローされた"
+      },
+      "target_url": "pixiv://users/100000000",
+      "is_read": false
+    },
+    {
+      "id": 100000000,
+      "created_datetime": "2026-09-06T03:42:48+09:00",
+      "type": 7,
+      "content": {
+        "text": "<b>ユーザーB</b>さんが<b>第 1 章：🌈 森林奇遇！神秘的彩虹蘑菇</b>にすき！しました。",
+        "left_icon": null,
+        "left_image": "https://i.pximg.net/novel-cover-original/img/2025/12/06/01/33/08/sci100000000_3a7329cd3c6ffe1129fdf3013b71ae51.png",
+        "right_icon": null,
+        "right_image": null
+      },
+      "view_more": {
+        "unread_exists": true,
+        "title": "すき！された"
+      },
+      "target_url": "pixiv://novels/100000000",
+      "is_read": false
+    },
+    {
+      "id": 100000000,
+      "created_datetime": "2026-09-04T00:31:28+09:00",
+      "type": 7,
+      "content": {
+        "text": "<b>ユーザーB</b>さんが<b>第 4 章：🌟 加速的变化！完全变身完成</b>にすき！しました。",
+        "left_icon": null,
+        "left_image": "https://i.pximg.net/novel-cover-original/img/2025/12/06/01/33/08/sci100000000_3a7329cd3c6ffe1129fdf3013b71ae51.png",
+        "right_icon": null,
+        "right_image": null
+      },
+      "view_more": null,
+      "target_url": "pixiv://novels/100000000",
+      "is_read": false
+    },
+    {
+      "id": 100000000,
+      "created_datetime": "2026-08-30T11:47:37+09:00",
+      "type": 7,
+      "content": {
+        "text": "<b>ユーザーB</b>さんが<b>身体的记忆</b>にすき！しました。",
+        "left_icon": null,
+        "left_image": "https://i.pximg.net/novel-cover-original/img/2025/12/06/00/32/22/ci100000000_a3c9e54d02e100111111d100222222f79e90c.png",
+        "right_icon": null,
+        "right_image": null
+      },
+      "view_more": {
+        "unread_exists": true,
+        "title": "すき！された"
+      },
+      "target_url": "pixiv://novels/100000000",
+      "is_read": false
+    },
+    {
+      "id": 100000000,
+      "created_datetime": "2026-07-10T19:45:57+09:00",
+      "type": 7,
+      "content": {
+        "text": "<b>ユーザーB</b>さんが<b>第 2 章：🔄 微妙的预兆！身体开始变化</b>にすき！しました。",
+        "left_icon": null,
+        "left_image": "https://i.pximg.net/novel-cover-original/img/2025/12/06/01/33/08/sci100000000_3a7329cd3c6ffe1129fdf3013b71ae51.png",
+        "right_icon": null,
+        "right_image": null
+      },
+      "view_more": {
+        "unread_exists": true,
+        "title": "すき！された"
+      },
+      "target_url": "pixiv://novels/100000000",
+      "is_read": false
+    },
+    {
+      "id": 100000000,
+      "created_datetime": "2026-07-05T04:48:57+09:00",
+      "type": 7,
+      "content": {
+        "text": "<b>ユーザーB</b>さんが<b>第 9 章：👨‍👩‍👧‍👦 永远的朋友！幸福的结局</b>にすき！しました。",
+        "left_icon": null,
+        "left_image": "https://i.pximg.net/novel-cover-original/img/2025/12/06/01/33/08/sci100000000_3a7329cd3c6ffe1129fdf3013b71ae51.png",
+        "right_icon": null,
+        "right_image": null
+      },
+      "view_more": {
+        "unread_exists": true,
+        "title": "すき！された"
+      },
+      "target_url": "pixiv://novels/100000000",
+      "is_read": false
+    },
+    {
+      "id": 100000000,
+      "created_datetime": "2026-07-04T06:32:16+09:00",
+      "type": 7,
+      "content": {
+        "text": "<b>ユーザーB</b>さんが<b>第 8 章：💍 新的开始！确定恋爱关系</b>にすき！しました。",
+        "left_icon": null,
+        "left_image": "https://i.pximg.net/novel-cover-original/img/2025/12/06/01/33/08/sci100000000_3a7329cd3c6ffe1129fdf3013b71ae51.png",
+        "right_icon": null,
+        "right_image": null
+      },
+      "view_more": {
+        "unread_exists": true,
+        "title": "すき！された"
+      },
+      "target_url": "pixiv://novels/100000000",
+      "is_read": false
+    },
+    {
+      "id": 100000000,
+      "created_datetime": "2026-07-04T06:32:15+09:00",
+      "type": 7,
+      "content": {
+        "text": "<b>ユーザーB</b>さんが<b>第 7 章：💖 真正的自我！发现内心真爱</b>にすき！しました。",
+        "left_icon": null,
+        "left_image": "https://i.pximg.net/novel-cover-original/img/2025/12/06/01/33/08/sci100000000_3a7329cd3c6ffe1129fdf3013b71ae51.png",
+        "right_icon": null,
+        "right_image": null
+      },
+      "view_more": {
+        "unread_exists": true,
+        "title": "すき！された"
+      },
+      "target_url": "pixiv://novels/100000000",
+      "is_read": false
+    },
+    {
+      "id": 100000000,
+      "created_datetime": "2026-07-04T06:32:14+09:00",
+      "type": 7,
+      "content": {
+        "text": "<b>ユーザーB</b>さんが<b>第 6 章：💘 爱情的萌芽！第一次心动</b>にすき！しました。",
+        "left_icon": null,
+        "left_image": "https://i.pximg.net/novel-cover-original/img/2025/12/06/01/33/08/sci100000000_3a7329cd3c6ffe1129fdf3013b71ae51.png",
+        "right_icon": null,
+        "right_image": null
+      },
+      "view_more": {
+        "unread_exists": true,
+        "title": "すき！された"
+      },
+      "target_url": "pixiv://novels/100000000",
+      "is_read": false
+    },
+    {
+      "id": 100000000,
+      "created_datetime": "2026-07-04T06:32:11+09:00",
+      "type": 7,
+      "content": {
+        "text": "<b>ユーザーB</b>さんが<b>第 5 章：👗 新的生活！适应女生身份</b>にすき！しました。",
+        "left_icon": null,
+        "left_image": "https://i.pximg.net/novel-cover-original/img/2025/12/06/01/33/08/sci100000000_3a7329cd3c6ffe1129fdf3013b71ae51.png",
+        "right_icon": null,
+        "right_image": null
+      },
+      "view_more": {
+        "unread_exists": true,
+        "title": "すき！された"
+      },
+      "target_url": "pixiv://novels/100000000",
+      "is_read": false
+    },
+    {
+      "id": 100000000,
+      "created_datetime": "2026-07-04T06:31:49+09:00",
+      "type": 7,
+      "content": {
+        "text": "<b>ユーザーB</b>さんが<b>第 3 章：💫 明显的转变！越来越女性化</b>にすき！しました。",
+        "left_icon": null,
+        "left_image": "https://i.pximg.net/novel-cover-original/img/2025/12/06/01/33/08/sci100000000_3a7329cd3c6ffe1129fdf3013b71ae51.png",
+        "right_icon": null,
+        "right_image": null
+      },
+      "view_more": {
+        "unread_exists": true,
+        "title": "すき！された"
+      },
+      "target_url": "pixiv://novels/100000000",
+      "is_read": false
+    }
+  ],
+  "next_url": null
+}

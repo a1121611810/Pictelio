@@ -8,6 +8,7 @@ import { useGlobalFabStore } from '../stores/globalFab'
 import { useAuthStore } from '../stores/authStore'
 import { useClientSwitchStore, supportsClientSwitch, type ClientKind } from '../stores/clientSwitchStore'
 import { useSettingsStore } from '../stores/settingsStore'
+import { useNotificationStore } from '../stores/notificationStore'
 import type { ImageQuality } from '../utils/imageQuality'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { ME_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
@@ -48,6 +49,8 @@ import { INPUT_PLACEHOLDER_COLOR } from '../utils/lynxPlatformColors'
 const auth = useAuthStore()
 const settings = useSettingsStore()
 const clientSwitch = useClientSwitchStore()
+// 通知角标（ADR-0188 D7 / #728）：Me 挂载静默刷新未读，行尾圆点数据源
+const notificationStore = useNotificationStore()
 const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, darkMode, resolvedDark, language, novelExportFormat, novelExportOptions, relatedInjection, rankingEntry, novelIntroFirst, autoFallbackEngine, fullscreenMode } = storeToRefs(settings)
 
 const switching = ref(false)
@@ -310,6 +313,8 @@ onMounted(async () => {
   void readEngineState().then((s) => {
     engineState.value = s
   })
+  // 通知未读角标静默刷新（ADR-0188 D7 lynx 侧刷新时机）：失败 warn、不影响页面（store 内部兜底）
+  void notificationStore.refreshUnreadBadge()
   await ensureAuth()
   refreshWebdavLastBackupLabel()
   if (settings.webdavEnabled) await loadWebdavCredentials()
@@ -340,6 +345,11 @@ function openDownloads() {
 
 function openNetworkCheck() {
   void navigate('/network-check')
+}
+
+/** 通知中心入口（ADR-0188 D7 / #728）：功能入口卡区行 */
+function openNotifications() {
+  void navigate('/notifications')
 }
 
 function pickClient(kind: ClientKind) {
@@ -476,6 +486,21 @@ function pickAppearanceMode(mode: DarkModeId) {
         >
           <text class="text-title-medium text-surface-on">{{ t('me.networkCheck') }}</text>
           <text class="text-title-medium text-surface-on-variant">›</text>
+        </view>
+        <!-- 通知中心入口（ADR-0188 D7 / #728）：行尾未读圆点（M3 error 语义色，纯 CSS） -->
+        <view
+          class="flex flex-row items-center justify-between py-3.5"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.notifications"
+          @tap="openNotifications"
+        >
+          <text class="text-title-medium text-surface-on">{{ t('me.notifications') }}</text>
+          <view class="flex flex-row items-center">
+            <!-- 未读圆点（装饰性：状态语义由行级 accessibility-label 承载，不加独立标注——
+                 unit.test.ts 钉死 Me 页 element/label 与 ME_A11Y_LABELS 注册表严格配平） -->
+            <view v-if="notificationStore.unreadCount > 0" class="w-[2.667vw] h-[2.667vw] rounded-full bg-error mr-2" />
+            <text class="text-title-medium text-surface-on-variant">›</text>
+          </view>
         </view>
       </GlassCard>
 

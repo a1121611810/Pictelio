@@ -229,6 +229,49 @@ export interface PixivUserBookmarkTagsResponse {
   next_url: string | null;
 }
 
+// ─── 通知中心（ADR-0188 D2 / spec docs/specs/notification-center.md）───
+// schema = 2026-09-26 真实抓包实证（脱敏 fixture 见 src/api/__fixtures__/notification-*.json）。
+// 宽容解析姿态：除 id/created_datetime 外全 optional（对齐 PixivBookmarkDetail 先例）——
+// `type` 仅两个实测样本值（7=すき！/8=フォロー），渲染必须看 content.text、type 只作 hint，
+// 未来新增类型不得破坏解析。
+
+/** 通知正文片段：`text` 是含 `<b>` 的 HTML 片段——渲染必须经 notificationPlainText 剥标签，禁注入 HTML 通道 */
+export interface PixivNotificationContent {
+  text?: string;
+  left_icon?: string;
+  left_image?: string;
+  right_icon?: string;
+  right_image?: string;
+}
+
+/** 组头（view_more 非空的条目，如「フォローされた」）：点击经 view-more 端点摊平子列表 */
+export interface PixivNotificationViewMore {
+  unread_exists?: boolean;
+  title?: string;
+}
+
+/**
+ * 单条通知。`view_more` 非空 = 组头；子条目（view-more 响应内）`view_more` 为 null。
+ * `is_read` 为服务端只读字段（v1 不消费，未读由本地已读时间戳推导，ADR-0188 D5）。
+ */
+export interface PixivNotificationItem {
+  id: number;
+  /** +09:00 ISO 时间串（Date.parse 可解析；解析失败该条不计未读并 warn） */
+  created_datetime: string;
+  type?: number;
+  content?: PixivNotificationContent | null;
+  view_more?: PixivNotificationViewMore | null;
+  /** pixiv:// scheme（users/illusts/novels）或 http(s) 外链；解析见 utils/notificationTarget */
+  target_url?: string;
+  is_read?: boolean;
+}
+
+/** GET /v1/notification/list 与 /v1/notification/view-more 同构 envelope；next_url 透传分页（后者携带 older_than 游标） */
+export interface PixivNotificationListResponse {
+  notifications: PixivNotificationItem[];
+  next_url: string | null;
+}
+
 // ─── 错误类型 ───
 
 export enum ApiErrorType {
