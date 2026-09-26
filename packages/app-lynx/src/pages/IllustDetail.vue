@@ -125,7 +125,8 @@ const dl = useDownloadStore()
 function enqueuePages(selectedPages: number[]): number {
   const i = illust.value
   if (!i || i.type === 'ugoira' || !selectedPages.length) return 0
-  const drafts = buildImageTasks(i, selectedPages)
+  // 作者目录开关入队时刻读值（ADR-0192 D7：dir 入队即快照，事后改设置不影响已入队任务）
+  const drafts = buildImageTasks(i, selectedPages, { authorDir: settings.downloadByAuthorDir })
   if (drafts.length === 0) {
     saveStatus.value = t('illustDetail.save.noOriginal') // i18n: 赋值时快照（瞬态）
     queuedNotice.value = false
@@ -148,7 +149,10 @@ async function enqueueUgoira() {
   if (!i || i.type !== 'ugoira') return
   try {
     const meta = await loadUgoiraMetadata(i.id)
-    const draft = buildUgoiraTask(i, meta.zip_urls.medium, settings.ugoiraDownloadFormat, meta.frames)
+    // 作者目录开关入队时刻读值（同 enqueuePages：dir 入队即快照）
+    const draft = buildUgoiraTask(i, meta.zip_urls.medium, settings.ugoiraDownloadFormat, meta.frames, {
+      authorDir: settings.downloadByAuthorDir,
+    })
     dl.enqueue([draft])
     saveStatus.value = t('illustDetail.save.queued', { count: 1 }) // i18n: 赋值时快照（瞬态）
     queuedNotice.value = true

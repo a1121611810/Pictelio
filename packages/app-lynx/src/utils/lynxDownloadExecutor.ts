@@ -14,6 +14,8 @@ export interface LynxDownloaderNative {
     targetFormat: string,
     framesJson: string,
     payloadJson: string,
+    /** 作者目录段（ADR-0192 D7；空串 = 无子目录，字节不变） */
+    dir: string,
     cb: (uri: string, err: string) => void,
   ): void
   pollProgress(id: string, cb: (payload: string, err: string) => void): void
@@ -63,7 +65,8 @@ export function createLynxDownloadExecutor(
 
       const framesJson = task.frames ? JSON.stringify(task.frames) : ''
       const payloadJson = task.payloadJson ?? ''
-      native.start(task.id, task.sourceUrl, task.fileName, task.kind, task.targetFormat, framesJson, payloadJson, (uri, err) => {
+      // 作者目录段（ADR-0192 D7）：入队即快照的 task.dir 逐字透传；缺省 = 空串字节不变
+      native.start(task.id, task.sourceUrl, task.fileName, task.kind, task.targetFormat, framesJson, payloadJson, task.dir ?? '', (uri, err) => {
         stopPolling(task.id)
         if (active.get(task.id) !== cb) return
         active.delete(task.id)
