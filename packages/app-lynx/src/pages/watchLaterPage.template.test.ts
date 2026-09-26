@@ -80,8 +80,18 @@ describe('WatchLater.vue 快照卡（行卡字段与交互，spec US5/US10/US6�
   })
 
   it('删除按钮存在，@tap.stop 调 store.remove(kind, id)（防卡片导航误触）', () => {
-    expect(page).toMatch(/@tap\.stop="store\.remove\(\w+\.kind, \w+\.id\)"/)
+    expect(page).toMatch(/@tap\.stop="\w+\(item\)"/)
     expect(page).toContain(`t('later.remove')`)
+  })
+
+  it('删除后 list 整树重建：refreshEpoch 代递增驱动 <list :key>（ADR-0162 危险面 / ADR-0107 D4）', () => {
+    // 原生 list 删除条目走子节点 patch 会触发 vue-lynx RemoveNode 索引错位（框架 bug），
+    // 必须 key 变化整树替换（MyPixiv.vue / Watchlist.vue 同款防御）
+    expect(page).toMatch(/const refreshEpoch = ref\(0\)/)
+    expect(page).toMatch(/refreshEpoch\.value\+\+/)
+    expect(page).toMatch(/<list[^>]*:key="refreshEpoch"/)
+    // remove 经页面包装函数接线（remove 成功后 epoch 同 tick ++）
+    expect(page).toMatch(/function removeItem\(\w+: WatchLaterItem\): void \{[\s\S]*?store\.remove\([\s\S]*?refreshEpoch\.value\+\+[\s\S]*?\n\}/)
   })
 
   it('行点击导航按 kind 分派：illust → /illust/:id；novel → openNovel（novel_intro_first seam）', () => {

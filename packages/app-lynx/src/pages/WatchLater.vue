@@ -2,6 +2,7 @@
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）；本页无缓存语义，不入 include
 defineOptions({ name: 'watchLater' })
 import { goBack, navigate } from '../router'
+import { ref } from 'vue'
 import { openNovel } from '../utils/novelNavigation'
 import { useWatchLaterStore, type WatchLaterItem } from '../stores/watchLaterStore'
 import { proxyImageUrl } from '../utils/imageUrl'
@@ -20,6 +21,20 @@ const store = useWatchLaterStore()
 
 // 空态图标 = 详情入口同款时钟字形（VS15 U+FE0E 强制 text presentation，ADR-0112 平台事实）
 const LATER_ICON = '\u23F1\uFE0E'
+
+/** list 强制重建代（删除成功后 ++，驱动 :key 整树替换）：原生 list 删除条目走子节点
+ * patch 会触发 vue-lynx patch RemoveNode 索引错位（框架 bug，ADR-0107 D4）；
+ * 本页是用户主动删除的危险面（ADR-0162），错位代价最高，必须整树重建防御 */
+const refreshEpoch = ref(0)
+
+/**
+ * 单条删除（spec US10）：store.remove 本地同步快照，成功即 epoch 同 tick ++
+ * （MyPixiv.vue 刷新同款写法）→ <list :key> 变化走整树替换，不发生子节点 patch。
+ */
+function removeItem(item: WatchLaterItem): void {
+  store.remove(item.kind, item.id)
+  refreshEpoch.value++
+}
 
 /**
  * 行点击 → 实时详情页（spec US6）：插画直达 `/illust/:id`（Bookmarks/IllustList 同款惯例）；
@@ -50,8 +65,9 @@ function openItem(item: WatchLaterItem): void {
       <EmptyState :icon="LATER_ICON" :title="t('later.empty.title')" :hint="t('later.empty.hint')" />
     </view>
 
-    <!-- 本地全量渲染（原生 list 元素回收长列表，容量上限内内存可控）；无 scrolltolower 分页 -->
-    <list v-else class="w-full flex-1" list-type="single" scroll-orientation="vertical">
+    <!-- 本地全量渲染（原生 list 元素回收长列表，容量上限内内存可控）；无 scrolltolower 分页；
+         :key = refreshEpoch：删除后整树重建（ADR-0107 D4，见 removeItem 注释） -->
+    <list v-else :key="refreshEpoch" class="w-full flex-1" list-type="single" scroll-orientation="vertical">
       <list-item
         v-for="item in store.items"
         :key="`${item.kind}-${item.id}`"
@@ -87,7 +103,7 @@ function openItem(item: WatchLaterItem): void {
               class="self-center ml-2 h-[10.667vw] px-3 flex items-center justify-center border border-outline rounded-[var(--md-shape-full)]"
               :accessibility-element="A11Y_ELEMENT_ENABLED"
               :accessibility-label="WATCH_LATER_A11Y_LABELS.remove"
-              @tap.stop="store.remove(item.kind, item.id)"
+              @tap.stop="removeItem(item)"
             >
               <text class="text-label-large text-primary">{{ t('later.remove') }}</text>
             </view>
