@@ -201,6 +201,8 @@ export interface PixivUserDetailResponse {
 export interface PixivUserPreview {
   user: PixivUser;
   illusts: PixivIllust[];
+  /** 好P友端点 /v1/user/mypixiv 响应含该字段（UserPreview 形状 = { user, illusts, novels, is_muted }）——与 webview 侧同形对齐，本批不消费（ADR-0193 D1） */
+  novels: unknown[];
   is_muted: boolean;
 }
 
