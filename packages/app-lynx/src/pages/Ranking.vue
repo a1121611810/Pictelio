@@ -28,6 +28,7 @@ import { useSettingsStore } from '../stores/settingsStore'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import PageTopBar from '../components/PageTopBar.vue'
 import EmptyState from '../components/EmptyState.vue'
+import FeedListFooter from '../components/FeedListFooter.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
 import AiOverlay from '../components/AiOverlay.vue'
 import RefreshableList from '../components/RefreshableList.vue'
@@ -320,13 +321,17 @@ onUnmounted(() => feed.dispose())
         class="w-full h-10 flex items-center justify-center"
         full-span
       >
-        <text v-if="loadingMore" class="text-body-medium text-outline">{{ t('ranking.footer.loading') }}</text>
-        <!-- 分页失败：底部内联可点重试（spec §5.3） -->
-        <view v-else-if="pageErrorMsg" class="flex flex-row items-center" @tap="loadMore">
-          <text class="text-body-medium text-error">{{ pageErrorMsg }}</text>
-          <text class="text-body-medium text-primary ml-2">{{ t('ranking.page.retry') }}</text>
-        </view>
-        <text v-else class="text-body-medium text-outline">{{ t('ranking.footer.end') }}</text>
+        <!-- 三态文案组件化（FeedListFooter，ADR-0194）；外层 list-item 保留；
+             分页失败 = 底部内联可点重试（spec §5.3），重试形态经 retry-text + @retry 保留 -->
+        <FeedListFooter
+          :loading="loadingMore"
+          :error="pageErrorMsg"
+          :end="endOfFeed"
+          :loading-text="t('ranking.footer.loading')"
+          :end-text="t('ranking.footer.end')"
+          :retry-text="t('ranking.page.retry')"
+          @retry="loadMore"
+        />
       </list-item>
     </list>
     </template>

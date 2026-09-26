@@ -19,6 +19,7 @@ import SkeletonImage from '../components/SkeletonImage.vue'
 import RefreshableList from '../components/RefreshableList.vue'
 import PageTopBar from '../components/PageTopBar.vue'
 import EmptyState from '../components/EmptyState.vue'
+import FeedListFooter from '../components/FeedListFooter.vue'
 import { t } from '../i18n'
 
 const userId = Number(currentParams.value.id)
@@ -213,7 +214,8 @@ const refreshEpoch = ref(0)
         </view>
       </list-item>
       <list-item v-if="loadingMore" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text class="text-body-medium text-outline">{{ t('followList.footer.loading') }}</text>
+        <!-- 三态文案组件化（FeedListFooter，ADR-0194）；本页存量仅 loading 态（外层 list-item 保留） -->
+        <FeedListFooter :loading="loadingMore" :loading-text="t('followList.footer.loading')" />
       </list-item>
     </list>
     </template>

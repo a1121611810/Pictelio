@@ -21,6 +21,7 @@ import { proxyImageUrl } from '../utils/imageUrl'
 import { WATCHLIST_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import RefreshableList from '../components/RefreshableList.vue'
 import EmptyState from '../components/EmptyState.vue'
+import FeedListFooter from '../components/FeedListFooter.vue'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import { t } from '../i18n'
 
@@ -255,9 +256,14 @@ onUnmounted(() => {
         </view>
       </list-item>
       <list-item v-if="loadingMore || pageErrorMsg || endOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text v-if="loadingMore" class="text-body-medium text-outline">{{ t('watchlist.footer.loading') }}</text>
-        <text v-else-if="pageErrorMsg" class="text-body-medium text-error">{{ pageErrorMsg }}</text>
-        <text v-else class="text-body-medium text-outline">{{ t('watchlist.footer.end') }}</text>
+        <!-- 三态文案组件化（FeedListFooter，ADR-0194）；外层 list-item 保留（原生 list 只认 list-item 子节点） -->
+        <FeedListFooter
+          :loading="loadingMore"
+          :error="pageErrorMsg"
+          :end="endOfFeed"
+          :loading-text="t('watchlist.footer.loading')"
+          :end-text="t('watchlist.footer.end')"
+        />
       </list-item>
     </list>
     </template>

@@ -31,6 +31,7 @@ import { NOTIFICATIONS_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/access
 import NotificationChildren from '../components/NotificationChildren.vue'
 import PageTopBar from '../components/PageTopBar.vue'
 import EmptyState from '../components/EmptyState.vue'
+import FeedListFooter from '../components/FeedListFooter.vue'
 import RefreshableList from '../components/RefreshableList.vue'
 import { t } from '../i18n'
 
@@ -260,9 +261,14 @@ function rowA11y(row: NotificationRow): string {
         class="w-full h-10 flex items-center justify-center"
         full-span
       >
-        <text v-if="list.isFetchingNextPage.value" class="text-body-medium text-outline">{{ t('notifications.footer.loading') }}</text>
-        <text v-else-if="pageError" class="text-body-medium text-error">{{ pageError.message }}</text>
-        <text v-else class="text-body-medium text-outline">{{ t('notifications.footer.end') }}</text>
+        <!-- 三态文案组件化（FeedListFooter，ADR-0194）；外层 list-item 保留 -->
+        <FeedListFooter
+          :loading="list.isFetchingNextPage.value"
+          :error="pageError?.message"
+          :end="list.hasNextPage.value === false && rows.length > 0"
+          :loading-text="t('notifications.footer.loading')"
+          :end-text="t('notifications.footer.end')"
+        />
       </list-item>
     </list>
     </template>

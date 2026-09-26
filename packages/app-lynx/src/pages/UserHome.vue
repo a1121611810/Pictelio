@@ -25,6 +25,7 @@ import SkeletonImage from '../components/SkeletonImage.vue'
 import PageTopBar from '../components/PageTopBar.vue'
 import SubTabBar from '../components/SubTabBar.vue'
 import EmptyState from '../components/EmptyState.vue'
+import FeedListFooter from '../components/FeedListFooter.vue'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import BookmarkButton from '../components/BookmarkButton.vue'
@@ -351,9 +352,14 @@ onUnmounted(() => {
         </view>
       </list-item>
       <list-item v-if="illustLoadingMore || illustPageErrorMsg || illustEndOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text v-if="illustLoadingMore" class="text-body-medium text-outline">{{ t('userHome.footer.loading') }}</text>
-        <text v-else-if="illustPageErrorMsg" class="text-body-medium text-error">{{ illustPageErrorMsg }}</text>
-        <text v-else class="text-body-medium text-outline">{{ t('userHome.footer.end') }}</text>
+        <!-- 三态文案组件化（FeedListFooter，ADR-0194）；外层 list-item 保留（原生 list 只认 list-item 子节点） -->
+        <FeedListFooter
+          :loading="illustLoadingMore"
+          :error="illustPageErrorMsg"
+          :end="illustEndOfFeed"
+          :loading-text="t('userHome.footer.loading')"
+          :end-text="t('userHome.footer.end')"
+        />
       </list-item>
     </list>
     </template>
@@ -412,9 +418,14 @@ onUnmounted(() => {
         </view>
       </list-item>
       <list-item v-if="novelLoadingMore || novelPageErrorMsg || novelEndOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text v-if="novelLoadingMore" class="text-body-medium text-outline">{{ t('userHome.footer.loading') }}</text>
-        <text v-else-if="novelPageErrorMsg" class="text-body-medium text-error">{{ novelPageErrorMsg }}</text>
-        <text v-else class="text-body-medium text-outline">{{ t('userHome.footer.end') }}</text>
+        <!-- 三态文案组件化（FeedListFooter，ADR-0194）；外层 list-item 保留（原生 list 只认 list-item 子节点） -->
+        <FeedListFooter
+          :loading="novelLoadingMore"
+          :error="novelPageErrorMsg"
+          :end="novelEndOfFeed"
+          :loading-text="t('userHome.footer.loading')"
+          :end-text="t('userHome.footer.end')"
+        />
       </list-item>
     </list>
     </template>
