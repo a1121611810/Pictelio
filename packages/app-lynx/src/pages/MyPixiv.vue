@@ -39,6 +39,8 @@ const busyId = ref<number | null>(null)
 const settled = ref(false)
 /** 到底态（FeedListFooter 三态之一）：next_url 耗尽 */
 const endOfFeed = ref(false)
+/** list 强制重建代（fetchFirstPage 成功后 ++，驱动 :key 替换；声明先于 fetchFirstPage 首次使用） */
+const refreshEpoch = ref(0)
 
 /** 首载会话代（spec D3 竞态防护）：刷新/重试开启新会话，在飞旧响应落地即作废 */
 let fetchSeq = 0
@@ -145,9 +147,6 @@ function openUser(id: number): void {
 onMounted(fetchFirstPage)
 // 刷新入口（ADR-0107）：fetchFirstPage 幂等（重置 users/nextUrl/error 槽 + 会话代递增），
 // 直接绑定 RefreshableList :refresh；刷新状态机内收组件，页面零自持刷新态
-
-/** list 强制重建代（fetchFirstPage 成功后 ++，驱动 :key 替换） */
-const refreshEpoch = ref(0)
 </script>
 
 <template>
