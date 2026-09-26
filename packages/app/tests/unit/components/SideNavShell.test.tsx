@@ -50,6 +50,14 @@ const historyStore = vi.hoisted(() => ({
   removeHistoryEntry: vi.fn(),
 }));
 
+const notificationStore = vi.hoisted(() => ({
+  unreadCount: vi.fn(() => 0),
+  refreshUnreadBadge: vi.fn(),
+  registerNotificationResumeListener: vi.fn(),
+}));
+
+const navigateMock = vi.hoisted(() => vi.fn());
+
 vi.mock("@/stores/uiStore", () => ({
   get currentTab() {
     return uiStore.currentTab;
@@ -79,16 +87,14 @@ vi.mock("@/stores/historyStore", () => ({
   removeHistoryEntry: historyStore.removeHistoryEntry,
 }));
 
-vi.mock("@/components/home/ContentTypeToggle", () => ({
-  default: () => null,
+vi.mock("@/stores/notificationStore", () => notificationStore);
+
+vi.mock("@solidjs/router", () => ({
+  useNavigate: () => navigateMock,
 }));
 
 vi.mock("@/components/UserAvatar", () => ({
   default: () => <span data-testid="mock-avatar" />,
-}));
-
-vi.mock("@solidjs/router", () => ({
-  useNavigate: () => vi.fn(),
 }));
 
 import SideNavShell from "@/components/home/SideNavShell";
@@ -105,6 +111,8 @@ describe("SideNavShell", () => {
     uiStore.contentType.mockReturnValue("illust");
     authStore.user.mockReturnValue(null);
     authStore.isLoggedIn.mockReturnValue(false);
+    notificationStore.unreadCount.mockReturnValue(0);
+    navigateMock.mockClear();
   });
 
   afterEach(() => {
@@ -176,6 +184,8 @@ describe("SideNavShell 全局 currentTab 反向同步", () => {
     uiStore.contentType.mockReturnValue("illust");
     authStore.user.mockReturnValue(null);
     authStore.isLoggedIn.mockReturnValue(false);
+    notificationStore.unreadCount.mockReturnValue(0);
+    navigateMock.mockClear();
   });
 
   afterEach(() => {
@@ -257,5 +267,64 @@ describe("SideNavShell 全局 currentTab 反向同步", () => {
         "page",
       );
     }
+  });
+});
+
+/**
+ * 通知中心铃铛入口契约（ADR-0188 D7 / #733）。
+ *
+ * oracle：
+ * - 位置 = 搜索按钮下方（ADR-0188 D7「SideNavShell 顶列搜索按钮下方加铃铛按钮」）；
+ * - 未读 → fluent-badge 圆点渲染 + aria-label 切换为「有未读」（badge 装饰性，
+ *   状态语义由按钮 label 承载，与 lynx Me 行尾圆点同构）；
+ * - 挂载时机 = onSettled 内 refreshUnreadBadge + registerNotificationResumeListener
+ *   （幂等注册，otaService 先例形态）。
+ */
+describe("SideNavShell 通知铃铛入口", () => {
+  beforeEach(() => {
+    uiStore.__setBacking("recommended");
+    uiStore.setCurrentTab.mockClear();
+    uiStore.contentType.mockReturnValue("illust");
+    authStore.user.mockReturnValue(null);
+    authStore.isLoggedIn.mockReturnValue(false);
+    notificationStore.unreadCount.mockReturnValue(0);
+    notificationStore.refreshUnreadBadge.mockClear();
+    notificationStore.registerNotificationResumeListener.mockClear();
+    navigateMock.mockClear();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("导航列含铃铛入口（搜索下方），点击导航 /notifications", () => {
+    renderShell(() => <div data-testid="panel" />);
+    const bell = screen.getByRole("button", { name: "通知" });
+    // 位置锚点：铃铛紧跟搜索按钮（同一导航列内的相邻兄弟）
+    expect(bell.previousElementSibling).toBe(screen.getByRole("button", { name: "搜索" }));
+    fireEvent.click(bell);
+    expect(navigateMock).toHaveBeenCalledWith("/notifications");
+  });
+
+  it("未读 > 0：fluent-badge 圆点渲染 + aria-label 切换「有未读」", () => {
+    notificationStore.unreadCount.mockReturnValue(3);
+    renderShell(() => <div data-testid="panel" />);
+    flush();
+    expect(screen.getByRole("button", { name: "通知（有未读）" })).toBeDefined();
+    expect(document.querySelector("fluent-badge")).not.toBeNull();
+  });
+
+  it("未读 = 0：无 badge，aria-label 为常规通知入口", () => {
+    notificationStore.unreadCount.mockReturnValue(0);
+    renderShell(() => <div data-testid="panel" />);
+    flush();
+    expect(screen.getByRole("button", { name: "通知" })).toBeDefined();
+    expect(document.querySelector("fluent-badge")).toBeNull();
+  });
+
+  it("挂载即静默刷新角标 + 注册前台恢复监听（幂等注册由 store 内守卫承担）", () => {
+    renderShell(() => <div data-testid="panel" />);
+    expect(notificationStore.refreshUnreadBadge).toHaveBeenCalledTimes(1);
+    expect(notificationStore.registerNotificationResumeListener).toHaveBeenCalledTimes(1);
   });
 });

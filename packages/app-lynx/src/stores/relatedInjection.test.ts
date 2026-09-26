@@ -8,6 +8,8 @@ const mockState = vi.hoisted(() => ({
   relatedInjection: true,
   showR18: false,
   showR18G: false,
+  /** 静音词表（ADR-0187 / #732）：真实 isTagMuted 语义镜像（tags[].name.trim() ∈ 集合） */
+  mutedTags: new Set<string>(),
   loadRelated: vi.fn(),
 }));
 
@@ -17,6 +19,13 @@ vi.mock("./settingsStore", () => ({
     isRestricted: (i: { x_restrict: number }) =>
       (!mockState.showR18 && i.x_restrict === 1) || (!mockState.showR18G && i.x_restrict === 2),
     isAiRestricted: (_i: unknown) => false,
+    isTagMuted: (item: { tags?: { name: string }[] | null }): boolean => {
+      const list = mockState.mutedTags;
+      if (list.size === 0) return false;
+      const tags = item?.tags;
+      if (!tags || tags.length === 0) return false;
+      return tags.some((tag) => list.has(tag.name.trim()));
+    },
   }),
 }));
 
@@ -39,6 +48,11 @@ function illust(id: number, xRestrict = 0) {
   };
 }
 
+/** 带标签的作品（静音过滤链用例） */
+function taggedIllust(id: number, names: string[]) {
+  return { ...illust(id), tags: names.map((name) => ({ name })) };
+}
+
 /** 每个 tab 独立会话：tab 隔离验证用 */
 const tabs: RelatedFeedTab[] = ["recommend", "follow"];
 
@@ -48,6 +62,7 @@ describe("relatedInjection store（lynx，spec §4）", () => {
     mockState.relatedInjection = true;
     mockState.showR18 = false;
     mockState.showR18G = false;
+    mockState.mutedTags.clear();
     mockState.loadRelated.mockReset();
   });
 
@@ -101,6 +116,26 @@ describe("relatedInjection store（lynx，spec §4）", () => {
     await store.consumeAnchor("recommend", []);
     await flush();
     expect(store.rows("recommend")[0].items.map((i) => i.id)).toEqual([7]);
+  });
+
+  // 标签静音过滤链（ADR-0187 D4 / #732）：命中词表条目在注入行组装层移除
+  it("静音标签命中条目被过滤（含 trim 命中）；空 tags / 无命中放行", async () => {
+    const store = useRelatedInjectionStore();
+    mockState.mutedTags.add("R-18G");
+    mockState.mutedTags.add("グロ");
+    mockState.loadRelated.mockResolvedValue({
+      illusts: [
+        taggedIllust(51, ["風景", "R-18G"]), // 任一标签命中 → 移除
+        taggedIllust(52, ["  グロ  "]), // 作品侧未 trim 的 name 与存储态 trim 后相等 → 移除
+        taggedIllust(53, ["風景"]), // 未命中 → 保留
+        taggedIllust(54, []), // 空 tags → 放行
+        illust(55), // 无 tags 字段 → 放行
+      ],
+    });
+    store.recordAnchor("recommend", 50);
+    await store.consumeAnchor("recommend", []);
+    await flush();
+    expect(store.rows("recommend")[0].items.map((i) => i.id)).toEqual([53, 54, 55]);
   });
 
   it("上限 MAX_RELATED_ANCHORS=3 与同锚点去重", async () => {

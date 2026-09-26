@@ -3,6 +3,9 @@
 // oracle：spec 字面（format 标识 / schemaVersion 1 / 账号级键三类前缀 / 错误文案分类）
 // 与 RFC/规格派生的边界（schemaVersion 过高拒绝、merge-by-keys 不触碰额外键）。
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 import {
   utf8Decode,
   utf8Encode,
@@ -29,6 +32,7 @@ const RAW = {
   show_r18_42: "true",
   show_r18g_42: "false",
   ai_filter_mode_42: "mask",
+  mute_tags_42: '["R-18G","AI生成"]',
   show_r18_99: "true",
   blocked_user_ids: '["1","2"]',
 };
@@ -57,6 +61,7 @@ describe("backupCore — 备份域分区", () => {
     ]);
     expect(Object.keys(accountKeys).toSorted()).toEqual([
       "ai_filter_mode_42",
+      "mute_tags_42",
       "show_r18_42",
       "show_r18_99",
       "show_r18g_42",
@@ -75,11 +80,18 @@ describe("backupCore — 备份域分区", () => {
   });
 
   it("isAccountScopedKey / accountUidOf：前缀 + 数字后缀判定", () => {
-    expect(ACCOUNT_KEY_PREFIXES).toEqual(["show_r18_", "show_r18g_", "ai_filter_mode_"]);
+    expect(ACCOUNT_KEY_PREFIXES).toEqual([
+      "show_r18_",
+      "show_r18g_",
+      "ai_filter_mode_",
+      "mute_tags_",
+    ]);
     expect(isAccountScopedKey("show_r18_42")).toBe(true);
+    expect(isAccountScopedKey("mute_tags_42")).toBe(true);
     expect(isAccountScopedKey("settings_ugoira_mode")).toBe(false);
     expect(accountUidOf("show_r18_42")).toBe(42);
     expect(accountUidOf("ai_filter_mode_7")).toBe(7);
+    expect(accountUidOf("mute_tags_42")).toBe(42);
     expect(accountUidOf("show_r18_abc")).toBeNull(); // 后缀非数字
     expect(accountUidOf("settings_ugoira_mode")).toBeNull();
   });
@@ -184,12 +196,13 @@ describe("backupCore — 恢复计划（spec §6 merge-by-keys + uid 过滤）",
     expect(plan99.apply.show_r18_99).toBe("true");
     expect(plan99.skippedAccountKeys.toSorted()).toEqual([
       "ai_filter_mode_42",
+      "mute_tags_42",
       "show_r18_42",
       "show_r18g_42",
     ]);
 
     const planNull = planRestore(snapshotWith(), null);
-    expect(planNull.skippedAccountKeys).toHaveLength(4);
+    expect(planNull.skippedAccountKeys).toHaveLength(5);
     expect(Object.keys(planNull.apply).every((k) => !isAccountScopedKey(k))).toBe(true);
   });
 
@@ -208,8 +221,8 @@ describe("backupCore — 恢复计划（spec §6 merge-by-keys + uid 过滤）",
     const s = snapshotWith();
     const sum = summarize(s, 42);
     expect(sum.deviceKeyCount).toBe(Object.keys(s.deviceKeys).length);
-    expect(sum.accountKeyCount).toBe(4);
-    expect(sum.accountKeyCountForUid).toBe(3); // 42 的三个键
+    expect(sum.accountKeyCount).toBe(5);
+    expect(sum.accountKeyCountForUid).toBe(4); // 42 的四个键
     expect(sum.setCount).toBe(2);
     expect(summarize(s, null).accountKeyCountForUid).toBe(0);
   });
@@ -242,6 +255,31 @@ describe("backupCore — UTF-8 纯 JS 编解码（Lynx runtime 无 TextEncoder�
   it("与 TextEncoder 字节序列一致（Node 环境可用的独立 oracle）", () => {
     for (const s of ["a", "中文", "混合🐧x", "\u0000\u0080\u0800"]) {
       expect(Array.from(utf8Encode(s))).toEqual(Array.from(new TextEncoder().encode(s)));
+    }
+  });
+});
+
+describe("backupCore — 敏感项候选面单一事实源（review SF1 防再漏）", () => {
+  // 背景：SettingsWebdav.refreshSensitiveKeys 曾手工枚举 show_r18_/show_r18g_/ai_filter_mode_
+  // 三个前缀，ACCOUNT_KEY_PREFIXES 新增 mute_tags_ 时该清单漏改（四处手工同步的根因）。
+  // 本守卫从源码面钉死：候选判定必须由 isAccountScopedKey 派生，禁止回潮手工清单。
+  const testDir = path.dirname(fileURLToPath(import.meta.url));
+  const webdavSrc = readFileSync(
+    path.resolve(testDir, "../../../src/components/settings/SettingsWebdav.tsx"),
+    "utf8",
+  );
+
+  it("ACCOUNT_KEY_PREFIXES 的每个前缀都命中敏感项候选判定（isAccountScopedKey）", () => {
+    for (const prefix of ACCOUNT_KEY_PREFIXES) {
+      expect(isAccountScopedKey(`${prefix}42`)).toBe(true);
+    }
+  });
+
+  it("SettingsWebdav 敏感项候选由 isAccountScopedKey 派生，无手工前缀清单", () => {
+    expect(webdavSrc).toContain("isAccountScopedKey");
+    // 手工前缀枚举（形如 k.startsWith("show_r18_")）即漏改根因，任一前缀字面量出现即红灯
+    for (const prefix of ACCOUNT_KEY_PREFIXES) {
+      expect(webdavSrc).not.toContain(`"${prefix}"`);
     }
   });
 });

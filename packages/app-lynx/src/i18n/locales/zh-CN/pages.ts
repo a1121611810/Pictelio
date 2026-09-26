@@ -199,6 +199,7 @@ const zhPages = {
   "me.watchlist": "追更列表",
   "me.downloads": "下载管理",
   "me.networkCheck": "网络自检",
+  "me.notifications": "通知",
   "me.client.title": "客户端",
   "me.client.hint": "选择渲染引擎后保存并重启生效",
   "me.client.webview": "WebView（现有）",
@@ -210,6 +211,26 @@ const zhPages = {
   "me.client.fullscreenMode": "全屏模式",
   "me.client.fullscreenModeDesc": "隐藏状态栏与导航栏，边缘滑动可临时唤出",
   "me.client.effectiveState": "首选 {{preferred}} · 本次生效 {{effective}}",
+
+  // ─── Notifications.vue（通知中心页，ADR-0188 / #728） ───
+  "notifications.title": "通知",
+  "notifications.retry": "重试",
+  "notifications.empty.title": "暂无通知",
+  "notifications.empty.hint": "关注、收藏等新动态会展示在这里",
+  "notifications.noContent": "（无内容通知）",
+  "notifications.footer.loading": "加载中…",
+  "notifications.footer.end": "没有更多了",
+  "notifications.children.loading": "加载中…",
+  "notifications.children.end": "没有更多了",
+  "notifications.children.error": "加载失败，点击重试",
+  // 行级 a11y 标签不拼已读/未读语义（ADR-0188 D5 v1 不消费服务端已读字段，
+  // 本地已读口径同屏冲突）——无 notifications.a11y.* 键。
+
+  // ─── MuteTags.vue（静音标签管理页，ADR-0187 / #732） ───
+  "muteTags.title": "静音标签",
+  "muteTags.empty.title": "暂无静音标签",
+  "muteTags.empty.hint": "长按作品标签即可静音",
+  "muteTags.remove": "移除",
 
   // ─── 引擎降级原因文案（ADR-0164 / #555）：生效状态快照 reason 码 → UI 文案
   //     （Me 客户端卡双态行；T4 App.vue 提示条复用）。码集 = EngineRoute.Reason 全 10 码 + unknown 兜底 ───
@@ -253,6 +274,7 @@ const zhPages = {
   "me.content.aiShow": "显示",
   "me.content.aiMask": "遮罩",
   "me.content.aiOnly": "仅看",
+  "me.content.muteTags": "管理静音标签",
   "me.ugoira.title": "动图播放",
   "me.ugoira.hint": "Ugoira 动图取帧方式",
   "me.ugoira.fflate": "fflate（默认）",

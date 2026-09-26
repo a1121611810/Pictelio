@@ -2,6 +2,7 @@
 // 榜单页（/ranking）：维度切换 + 日期回看 + R-18 指引（spec docs/specs/ranking.md §5.3/§5.6/§5.7/§6.3；#517/#518）。
 // 数据层复用 createMixFeed 单源（createRankingFeed），名次 = 渲染流下标 + 1，跨页保序；
 // 受限条目（R18/R18G/AI）保留并盖遮罩、名次不变（本端口径）；本端无日历（Lynx input 不支持日期）。
+// 标签静音（ADR-0187 D4 / #732）：先赋名次（预过滤下标+1）后过滤，移除条目留名次空洞（不前移）。
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'ranking' })
 import { computed, ref, onMounted, onUnmounted } from 'vue'
@@ -19,6 +20,7 @@ import type { PixivIllust } from '../api/types'
 import { thumbUrl } from '../utils/imageUrl'
 import { openExternalUrl } from '../utils/nativeUrl'
 import { createRankingFeed } from '../primitives/createRankingFeed'
+import { assignRanksThenDropMuted, type RankedRow } from '../primitives/rankingRows'
 import { isTodayDate } from '../primitives/rankingDate'
 import { shouldShowR18Notice } from '../primitives/rankingNotice'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
@@ -52,14 +54,21 @@ const endOfFeed = ref(false)
 /** 首载是否已成功落定（成功含 0 条）——三态判定输入（ADR-0150） */
 const settled = ref(false)
 
-/** 页级首载三态（ADR-0150）：骨架 / 错误 / 空态 / 内容 的唯一判定源 */
+/** 页级首载三态（ADR-0150）：骨架 / 错误 / 空态 / 内容 的唯一判定源。
+ *  hasItems 用静音过滤后的行数（ADR-0187 / #732：全部被静音移除时同「空」态） */
 const view = computed(() =>
   deriveFirstLoadView({
-    hasItems: illusts.value.length > 0,
+    hasItems: visibleRows.value.length > 0,
     loading: loading.value,
     settled: settled.value,
     hasError: !!errorMsg.value,
   }),
+)
+
+/** 渲染行（ADR-0187 D4 / #732）：先按服务端流下标赋名次，后应用静音过滤（移除留名次空洞，
+ *  后续名次不前移，ADR-0158 保序精神）；R18/AI 不在此列——保留条目盖遮罩、名次不变 */
+const visibleRows = computed<RankedRow<PixivIllust>[]>(() =>
+  assignRanksThenDropMuted(illusts.value, settings.isTagMuted),
 )
 
 const isToday = computed(() => isTodayDate(date.value))
@@ -275,38 +284,39 @@ onUnmounted(() => feed.dispose())
       @scrolltolower="loadMore"
       @scroll="onScroll"
     >
-      <list-item v-for="(item, idx) in illusts" :key="item.id" :item-key="String(item.id)" class="w-full">
+      <list-item v-for="row in visibleRows" :key="row.item.id" :item-key="String(row.item.id)" class="w-full">
         <view
           class="flex flex-row items-center mx-3 p-2.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]"
-          @tap="openRow(item)"
+          @tap="openRow(row.item)"
         >
+          <!-- 名次（ADR-0187 D4 / #732）：预过滤名次渲染，静音移除条目留洞不前移；前三名 primary 高亮 -->
           <text
             class="w-8 text-center text-title-small font-medium"
-            :class="idx < 3 ? 'text-primary' : 'text-outline'"
-          >{{ idx + 1 }}</text>
+            :class="row.rank <= 3 ? 'text-primary' : 'text-outline'"
+          >{{ row.rank }}</text>
           <!-- 缩略图：list-item 图片必须显式高度（原生 LynxView aspect-ratio 解析为 0，issue #140）；
                受限条目保留并盖遮罩（RestrictOverlay/AiOverlay 流内模式，spec §5.6） -->
           <view
             class="w-[14vw] h-[14vw] shrink-0 rounded-[var(--md-shape-medium)] overflow-hidden ml-2 flex items-center justify-center"
-            :class="isRestricted(item) || isAiRestricted(item) ? 'bg-[var(--md-scrim)]' : ''"
+            :class="isRestricted(row.item) || isAiRestricted(row.item) ? 'bg-[var(--md-scrim)]' : ''"
           >
             <RestrictOverlay
-              v-if="isRestricted(item)"
+              v-if="isRestricted(row.item)"
               :overlay="false"
-              :level="item.x_restrict === 2 ? 2 : 1"
+              :level="row.item.x_restrict === 2 ? 2 : 1"
             />
             <AiOverlay
-              v-else-if="isAiRestricted(item)"
+              v-else-if="isAiRestricted(row.item)"
               :overlay="false"
-              :ai-type="item.illust_ai_type ?? 0"
+              :ai-type="row.item.illust_ai_type ?? 0"
             />
-            <SkeletonImage v-else :src="thumbUrl(item.image_urls)" height="14vw" lazy-load />
+            <SkeletonImage v-else :src="thumbUrl(row.item.image_urls)" height="14vw" lazy-load />
           </view>
           <view class="flex flex-col ml-3 flex-1">
-            <text class="text-title-small font-medium text-surface-on [max-line:1]">{{ item.title }}</text>
-            <text class="text-body-small text-surface-on-variant mt-0.5 [max-line:1]">{{ item.user.name }}</text>
+            <text class="text-title-small font-medium text-surface-on [max-line:1]">{{ row.item.title }}</text>
+            <text class="text-body-small text-surface-on-variant mt-0.5 [max-line:1]">{{ row.item.user.name }}</text>
           </view>
-          <text class="text-label-medium text-outline ml-2">★{{ item.total_bookmarks }}</text>
+          <text class="text-label-medium text-outline ml-2">★{{ row.item.total_bookmarks }}</text>
         </view>
       </list-item>
       <list-item

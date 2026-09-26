@@ -4,6 +4,7 @@ import { settings } from "@/settings";
 // mock "@/settings"（getter 注入 harness），桶文件新增具名导入会击穿这些 mock
 import { jsonCodec } from "@/settings/codecs";
 import { user } from "@/stores/authStore";
+import { loadMuteTags } from "./muteTagStore";
 import { isAiFilterMode, type AiFilterMode } from "../utils/aiFilter";
 import type { UgoiraExtractMode } from "../api/illust";
 import { UGOIRA_FORMATS, type UgoiraFormat } from "../utils/downloadQueueCore";
@@ -190,7 +191,8 @@ export async function setRankingEntry(enabled: boolean): Promise<void> {
 }
 
 /**
- * 登录后加载当前账号的 R18/R18G + AI 三态（__root 在 initializeAuth 后 + 各登录成功分支调用）。
+ * 登录后加载当前账号的 R18/R18G + AI 三态 + 静音标签（__root 在 initializeAuth 后 +
+ * 各登录成功分支调用）。账号级键均需 uid 就绪，故统一在此装载（feed 首帧渲染前完成）。
  * 顺带一次性清理已移除年龄功能的孤儿键（幂等：键不存在 remove 为 no-op）。
  */
 export async function loadAccountR18(): Promise<void> {
@@ -200,6 +202,7 @@ export async function loadAccountR18(): Promise<void> {
     r18Factory.forId(id).hydrate(),
     r18gFactory.forId(id).hydrate(),
     aiFilterModeFactory.forId(id).hydrate(),
+    loadMuteTags(), // 静音标签（mute_tags_${uid}，ADR-0187）
   ]);
   await Promise.all([settings.remove("age_confirmed"), settings.remove("is_adult")]).catch((e) =>
     console.warn("[settingsStore] 孤儿键清理失败", e),

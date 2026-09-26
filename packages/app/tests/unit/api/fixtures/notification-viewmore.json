@@ -1,0 +1,80 @@
+{
+  "notifications": [
+    {
+      "id": 100000000,
+      "created_datetime": "2026-09-26T03:38:49+09:00",
+      "type": 8,
+      "content": {
+        "text": "<b>ユーザーA</b>さんがあなたをフォローしました。",
+        "left_icon": "https://s.pximg.net/common/images/no_profile.png",
+        "left_image": null,
+        "right_icon": null,
+        "right_image": null
+      },
+      "view_more": null,
+      "target_url": "pixiv://users/100000000",
+      "is_read": true
+    },
+    {
+      "id": 100000000,
+      "created_datetime": "2026-09-22T14:40:51+09:00",
+      "type": 8,
+      "content": {
+        "text": "<b>ユーザーA</b>さんがあなたをフォローしました。",
+        "left_icon": "https://s.pximg.net/common/images/no_profile.png",
+        "left_image": null,
+        "right_icon": null,
+        "right_image": null
+      },
+      "view_more": null,
+      "target_url": "pixiv://users/100000000",
+      "is_read": true
+    },
+    {
+      "id": 100000000,
+      "created_datetime": "2026-09-12T12:54:27+09:00",
+      "type": 8,
+      "content": {
+        "text": "<b>ユーザーA</b>さんがあなたをフォローしました。",
+        "left_icon": "https://s.pximg.net/common/images/no_profile.png",
+        "left_image": null,
+        "right_icon": null,
+        "right_image": null
+      },
+      "view_more": null,
+      "target_url": "pixiv://users/100000000",
+      "is_read": true
+    },
+    {
+      "id": 100000000,
+      "created_datetime": "2026-09-09T19:38:30+09:00",
+      "type": 8,
+      "content": {
+        "text": "<b>ユーザーA</b>さんがあなたをフォローしました。",
+        "left_icon": "https://s.pximg.net/common/images/no_profile.png",
+        "left_image": null,
+        "right_icon": null,
+        "right_image": null
+      },
+      "view_more": null,
+      "target_url": "pixiv://users/100000000",
+      "is_read": true
+    },
+    {
+      "id": 100000000,
+      "created_datetime": "2026-08-29T16:51:43+09:00",
+      "type": 8,
+      "content": {
+        "text": "<b>ユーザーA</b>さんがあなたをフォローしました。",
+        "left_icon": "https://s.pximg.net/common/images/no_profile.png",
+        "left_image": null,
+        "right_icon": null,
+        "right_image": null
+      },
+      "view_more": null,
+      "target_url": "pixiv://users/100000000",
+      "is_read": true
+    }
+  ],
+  "next_url": "https://app-api.pixiv.net/v1/notification/view-more?notification_id=100000000&limit=30&older_than=100111111"
+}

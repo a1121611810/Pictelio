@@ -233,6 +233,11 @@ const zhMisc = {
   "bookmarkPanel.saving": "保存中…",
   "bookmarkPanel.save": "收藏",
   "bookmarkPanel.saveEdit": "保存修改",
+
+  // ─── App.vue（静音轻提示宿主，ADR-0187 D5 / #732 + spec tag-mute 边界 #7；
+  //     载荷={kind,name}，store 不快照文案；muteFailedHint = 落盘失败分支） ───
+  "muteTag.mutedHint": "已静音「{{name}}」",
+  "muteTag.muteFailedHint": "静音未生效",
 } as const;
 
 export default zhMisc;

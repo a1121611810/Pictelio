@@ -29,6 +29,11 @@ vi.mock("@/stores/blockStore", () => ({
   blockedIds: () => new Set(blockedIds),
 }));
 
+// 静音词表隔离（ADR-0187）：性质定义只覆盖 R18/屏蔽维度，词表恒空 → 谓词短路放行
+vi.mock("@/stores/muteTagStore", () => ({
+  mutedTags: vi.fn(() => new Set<string>()),
+}));
+
 import { showR18, showR18G } from "@/stores/settingsStore";
 
 // ── 生成器 ──

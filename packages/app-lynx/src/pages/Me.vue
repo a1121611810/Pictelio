@@ -1,13 +1,14 @@
 <script setup lang="ts">
 // [lynx:fix] KeepAlive include 匹配需要组件 name（ADR-0049）
 defineOptions({ name: 'me' })
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onActivated } from 'vue'
 import { storeToRefs } from 'pinia'
 import { navigate, resetHistory, ensureAuth } from '../router'
 import { useGlobalFabStore } from '../stores/globalFab'
 import { useAuthStore } from '../stores/authStore'
 import { useClientSwitchStore, supportsClientSwitch, type ClientKind } from '../stores/clientSwitchStore'
 import { useSettingsStore } from '../stores/settingsStore'
+import { useNotificationStore } from '../stores/notificationStore'
 import type { ImageQuality } from '../utils/imageQuality'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { ME_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
@@ -48,6 +49,8 @@ import { INPUT_PLACEHOLDER_COLOR } from '../utils/lynxPlatformColors'
 const auth = useAuthStore()
 const settings = useSettingsStore()
 const clientSwitch = useClientSwitchStore()
+// 通知角标（ADR-0188 D7 / #728）：Me 挂载静默刷新未读，行尾圆点数据源
+const notificationStore = useNotificationStore()
 const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, darkMode, resolvedDark, language, novelExportFormat, novelExportOptions, relatedInjection, rankingEntry, novelIntroFirst, autoFallbackEngine, fullscreenMode } = storeToRefs(settings)
 
 const switching = ref(false)
@@ -143,10 +146,11 @@ async function loadWebdavCredentials(): Promise<void> {
   webdavLoginPassword.value = (await loadWebdavPassword()) ?? ''
   webdavBackupPassword.value = (await loadBackupPassword()) ?? ''
   webdavHasPreRestore.value = (await loadPreRestoreSnapshot()) !== null
-  // M3：敏感项候选 = 当前账号级键（show_r18_* / show_r18g_* / ai_filter_mode_*）
+  // M3：敏感项候选 = 当前账号级键（show_r18_* / show_r18g_* / ai_filter_mode_* / mute_tags_*——
+  // 静音词表为账号级内容设置，ADR-0187 D1 进备份域后同列敏感候选）
   const raw = await settings.exportRawValues()
   webdavSensitiveKeys.value = Object.keys(raw).filter(
-    (k) => k.startsWith('show_r18_') || k.startsWith('show_r18g_') || k.startsWith('ai_filter_mode_'),
+    (k) => k.startsWith('show_r18_') || k.startsWith('show_r18g_') || k.startsWith('ai_filter_mode_') || k.startsWith('mute_tags_'),
   )
 }
 
@@ -304,6 +308,13 @@ function onWebdavUndo(): void {
 
 // ─── 全局放射 FAB 桥（ADR-0120）：注册空动作（内环空 = 仅外环导航），卸载时注销 ───
 let unreg: (() => void) | undefined
+// 角标刷新挂 onActivated 而非 onMounted：Me 在 App.vue KeepAlive include 内，
+// onMounted 每会话仅触发一次，会话内新通知到达后角标无法 0→1（code-review Round 2 F3）；
+// onActivated 首挂载与每次重入均触发，恰好覆盖原意图。
+onActivated(() => {
+  // 通知未读角标静默刷新（ADR-0188 D7 lynx 侧刷新时机）：失败 warn、不影响页面（store 内部兜底）
+  void notificationStore.refreshUnreadBadge()
+})
 onMounted(async () => {
   unreg = useGlobalFabStore().usePage('me', {})
   // 引擎生效状态快照（fire-and-forget）：失败/无快照 → null 不渲染（读取侧 warn）
@@ -340,6 +351,16 @@ function openDownloads() {
 
 function openNetworkCheck() {
   void navigate('/network-check')
+}
+
+/** 通知中心入口（ADR-0188 D7 / #728）：功能入口卡区行 */
+function openNotifications() {
+  void navigate('/notifications')
+}
+
+/** 静音标签管理入口（ADR-0187 D5 / #732）：内容组行（AI 三态分段之后） */
+function openMuteTags() {
+  void navigate('/mute-tags')
 }
 
 function pickClient(kind: ClientKind) {
@@ -476,6 +497,21 @@ function pickAppearanceMode(mode: DarkModeId) {
         >
           <text class="text-title-medium text-surface-on">{{ t('me.networkCheck') }}</text>
           <text class="text-title-medium text-surface-on-variant">›</text>
+        </view>
+        <!-- 通知中心入口（ADR-0188 D7 / #728）：行尾未读圆点（M3 error 语义色，纯 CSS） -->
+        <view
+          class="flex flex-row items-center justify-between py-3.5"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.notifications"
+          @tap="openNotifications"
+        >
+          <text class="text-title-medium text-surface-on">{{ t('me.notifications') }}</text>
+          <view class="flex flex-row items-center">
+            <!-- 未读圆点（装饰性：状态语义由行级 accessibility-label 承载，不加独立标注——
+                 unit.test.ts 钉死 Me 页 element/label 与 ME_A11Y_LABELS 注册表严格配平） -->
+            <view v-if="notificationStore.unreadCount > 0" class="w-[2.667vw] h-[2.667vw] rounded-full bg-error mr-2" />
+            <text class="text-title-medium text-surface-on-variant">›</text>
+          </view>
         </view>
       </GlassCard>
 
@@ -843,6 +879,17 @@ function pickAppearanceMode(mode: DarkModeId) {
               <text class="text-label-large" :class="aiFilterMode === 'only' ? 'text-secondary-on-container' : 'text-surface-on'">{{ t('me.content.aiOnly') }}</text>
             </view>
           </view>
+        </view>
+
+        <!-- 静音标签管理入口（ADR-0187 D5 / #732）：内容组末行，跳 /mute-tags -->
+        <view
+          class="flex flex-row items-center justify-between py-3.5 pt-4 mt-1 border-t-[1px] border-t-surface-variant"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.muteTags"
+          @tap="openMuteTags"
+        >
+          <text class="text-title-medium text-surface-on">{{ t('me.content.muteTags') }}</text>
+          <text class="text-title-medium text-surface-on-variant">›</text>
         </view>
       </view>
 

@@ -1,11 +1,14 @@
 import type { Component } from "solid-js";
 import BlocklistSheet from "../BlocklistSheet";
+import MuteTagSheet from "../MuteTagSheet";
 import FluentDialog from "../ui/FluentDialog";
 import { t } from "../../i18n";
 
 interface SettingsDialogsProps {
   showBlocklist: boolean;
   onCloseBlocklist: () => void;
+  showMuteTags: boolean;
+  onCloseMuteTags: () => void;
   dialogType: "clear" | "deleteAccount" | null;
   onCloseDialog: () => void;
   onConfirmClear: () => void;
@@ -21,6 +24,16 @@ const SettingsDialogs: Component<SettingsDialogsProps> = (props) => {
           isOpen={props.showBlocklist}
           onClose={() => {
             props.onCloseBlocklist();
+          }}
+        />
+      </Show>
+
+      {/* MuteTagSheet */}
+      <Show when={props.showMuteTags}>
+        <MuteTagSheet
+          isOpen={props.showMuteTags}
+          onClose={() => {
+            props.onCloseMuteTags();
           }}
         />
       </Show>

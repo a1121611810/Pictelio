@@ -18,6 +18,10 @@ vi.mock("@/stores/blockStore", () => ({
   blockedIds: vi.fn(() => new Set<number>()),
 }));
 
+vi.mock("@/stores/muteTagStore", () => ({
+  mutedTags: vi.fn(() => new Set<string>()),
+}));
+
 import { showR18, showR18G } from "@/stores/settingsStore";
 
 function createNovel(id: number, xRestrict: number): PixivNovel {

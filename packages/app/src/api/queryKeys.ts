@@ -59,4 +59,10 @@ export const queryKeys = {
    * rankingCacheKey 单点生成（已把「今日」与显式今日归一）；入口与榜单页共用同键。
    */
   ranking: (cacheKey: string) => ["ranking", cacheKey] as const,
+
+  /** 通知列表（ADR-0188 D3）：useInfiniteQuery，next_url 透传分页；入口角标与通知页共用同键 */
+  notificationList: () => ["notification", "list"] as const,
+
+  /** 组头摊平子列表：独立 query 键（view-more 端点，older_than 游标分页） */
+  notificationChildren: (id: number) => ["notification", "children", id] as const,
 } as const;

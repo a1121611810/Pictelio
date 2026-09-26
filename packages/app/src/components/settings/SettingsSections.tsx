@@ -17,6 +17,7 @@ interface SettingsSectionsProps {
   isLoggedIn: () => boolean;
   onLogout: () => void;
   onOpenBlocklist: () => void;
+  onOpenMuteTags: () => void;
   onClearData: () => void;
   onDeleteAccount: () => void;
   onActionToast: (msg: string) => void;
@@ -36,7 +37,10 @@ const SettingsSections: Component<SettingsSectionsProps> = (props) => {
       </SettingsCard>
 
       <SettingsCard tone="elevated">
-        <SettingsContent onOpenBlocklist={props.onOpenBlocklist} />
+        <SettingsContent
+          onOpenBlocklist={props.onOpenBlocklist}
+          onOpenMuteTags={props.onOpenMuteTags}
+        />
       </SettingsCard>
 
       <SettingsCard tone="elevated">

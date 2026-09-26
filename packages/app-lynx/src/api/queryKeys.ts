@@ -71,6 +71,14 @@ export const queryKeys = {
     novel: (page: number = 1) => ['pictelio', 'watchlist', 'novel', page] as const,
   },
 
+  notifications: {
+    all: ['pictelio', 'notifications'] as const,
+    /** 通知列表（ADR-0188 D3）：useApiInfiniteQuery，next_url 透传分页 */
+    list: () => ['pictelio', 'notifications', 'list'] as const,
+    /** 组头摊平子列表：独立 query 键（view-more 端点，older_than 游标分页） */
+    children: (id: number) => ['pictelio', 'notifications', 'children', id] as const,
+  },
+
   settings: {
     all: ['pictelio', 'settings'] as const,
     updateCheck: () => ['pictelio', 'settings', 'update-check'] as const,

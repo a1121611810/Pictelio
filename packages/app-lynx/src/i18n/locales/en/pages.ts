@@ -199,6 +199,7 @@ const enPages = {
   "me.watchlist": "Watchlist",
   "me.downloads": "Downloads",
   "me.networkCheck": "Network check",
+  "me.notifications": "Notifications",
   "me.client.title": "Client",
   "me.client.hint": "Takes effect after choosing an engine and restarting",
   "me.client.webview": "WebView (existing)",
@@ -210,6 +211,26 @@ const enPages = {
   "me.client.fullscreenMode": "Fullscreen mode",
   "me.client.fullscreenModeDesc": "Hide status and navigation bars; swipe from the edge to reveal them",
   "me.client.effectiveState": "Preferred {{preferred}} · effective this launch {{effective}}",
+
+  // Notifications.vue (ADR-0188 / #728)
+  "notifications.title": "Notifications",
+  "notifications.retry": "Retry",
+  "notifications.empty.title": "No notifications",
+  "notifications.empty.hint": "Events like follows and likes will appear here",
+  "notifications.noContent": "(no content)",
+  "notifications.footer.loading": "Loading…",
+  "notifications.footer.end": "No more",
+  "notifications.children.loading": "Loading…",
+  "notifications.children.end": "No more",
+  "notifications.children.error": "Failed to load, tap to retry",
+  // Row-level a11y labels carry no read/unread semantics (ADR-0188 D5 v1 does not
+  // consume the server-side read field; local read tracking would conflict on screen).
+
+  // MuteTags.vue (muted-tag management page, ADR-0187 / #732)
+  "muteTags.title": "Muted tags",
+  "muteTags.empty.title": "No muted tags",
+  "muteTags.empty.hint": "Long-press a tag on artwork to mute it",
+  "muteTags.remove": "Remove",
 
   // Engine fallback reason copy (ADR-0164 / #555): engine-state snapshot reason code → UI copy.
   // Code set = EngineRoute.Reason (10 codes) + unknown fallback.
@@ -254,6 +275,7 @@ const enPages = {
   "me.content.aiShow": "Show",
   "me.content.aiMask": "Mask",
   "me.content.aiOnly": "Only",
+  "me.content.muteTags": "Manage muted tags",
   "me.ugoira.title": "Ugoira playback",
   "me.ugoira.hint": "How ugoira frames are loaded",
   "me.ugoira.fflate": "fflate (default)",

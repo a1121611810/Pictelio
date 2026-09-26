@@ -3,7 +3,7 @@
 // - pendingAnchor：点击插画卡进详情前记录，页面 onActivated（KeepAlive 回前台）消费，一次性；
 // - rows：每个 tab 会话内最多 MAX_RELATED_ANCHORS 行；刷新 / 切 tab 清空；
 // - 行带 loading 态：消费即占位，related 成功填充 / 失败移除并 warn；
-// - 过滤链：settings.isRestricted + isAiRestricted（lynx 无屏蔽列表能力）；
+// - 过滤链：settings.isRestricted + isAiRestricted + isTagMuted（静音标签，ADR-0187 / #732；lynx 无屏蔽列表能力）；
 // - 去重：同锚点不重复注入；行内容排除锚点与主列表已展示 id。
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -45,7 +45,10 @@ async function fetchRelatedIllusts(settings: ReturnType<typeof useSettingsStore>
   }
   const res = await loadRelated(toIllustId(anchorId))
   const items = res.illusts
-    .filter((i) => !settings.isRestricted(i) && !settings.isAiRestricted(i))
+    .filter(
+      (i) =>
+        !settings.isRestricted(i) && !settings.isAiRestricted(i) && !settings.isTagMuted(i),
+    )
     .slice(0, RELATED_ROW_SIZE)
   if (cache.size >= RELATED_CACHE_MAX) {
     // 简单 FIFO 淘汰：删最早写入的 key（Map 迭代序 = 插入序）

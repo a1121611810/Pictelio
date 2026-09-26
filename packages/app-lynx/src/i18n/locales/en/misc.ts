@@ -236,6 +236,11 @@ const enMisc = {
   "bookmarkPanel.saving": "Saving…",
   "bookmarkPanel.save": "Bookmark",
   "bookmarkPanel.saveEdit": "Save changes",
+
+  // App.vue (tag-mute snackbar host, ADR-0187 D5 / #732 + spec tag-mute boundary 7;
+  // payload = {kind, name}; muteFailedHint = persist-failure branch)
+  "muteTag.mutedHint": "Muted \"{{name}}\"",
+  "muteTag.muteFailedHint": "Mute not applied",
 } as const satisfies Record<ZhMiscKey, string>;
 
 export default enMisc;

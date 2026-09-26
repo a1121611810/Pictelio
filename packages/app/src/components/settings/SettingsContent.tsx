@@ -24,6 +24,7 @@ const AI_FILTER_OPTIONS: { value: AiFilterMode; label: I18nKey }[] = [
 
 interface SettingsContentProps {
   onOpenBlocklist: () => void;
+  onOpenMuteTags: () => void;
 }
 
 const SettingsContent: Component<SettingsContentProps> = (props) => {
@@ -213,6 +214,54 @@ const SettingsContent: Component<SettingsContentProps> = (props) => {
             </p>
             <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
               {t("settings.content.blocklistDesc")}
+            </p>
+          </div>
+        </div>
+        {/* Chevron right */}
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+          class="flex-shrink-0 text-[var(--colorNeutralForeground3)] ml-2"
+        >
+          <path
+            d="M8.22 4.22a.75.75 0 0 1 1.06 0l7.25 7.25a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06-1.06L15.19 12 8.22 5.28a.75.75 0 0 1 0-1.06z"
+            fill="currentColor"
+          />
+        </svg>
+      </div>
+
+      {/* 管理静音标签（ADR-0187：标签级静音，行形态对齐屏蔽列表行） */}
+      <div
+        class="flex items-center justify-between py-3 cursor-pointer hover:bg-[var(--colorNeutralBackground1Hover)] active:scale-[0.98] transition-transform duration-[var(--durationFast)] ease-[var(--curveEasyEase)] focus-visible:outline focus-visible:outline-[length:var(--strokeWidthThick)] focus-visible:outline-offset-[var(--strokeWidthThick)] focus-visible:outline-[color:var(--colorStrokeFocus2)] rounded-[var(--borderRadiusMedium)] -mx-2 px-2"
+        onClick={() => props.onOpenMuteTags()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            props.onOpenMuteTags();
+          }
+        }}
+        role="button"
+        tabindex="0"
+        aria-label={t("muteTag.settingsRow.title")}
+      >
+        <div class="flex items-center gap-3">
+          <div class="relative w-6 h-6 flex-shrink-0 text-[var(--colorNeutralForeground2)]">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M2 4.28a.75.75 0 0 1 1.06-1.06l17.72 17.72a.75.75 0 1 1-1.06 1.06l-2.56-2.56H3.75A1.75 1.75 0 0 1 2 17.69V4.28zm3.06-1.28h11.19c.97 0 1.75.78 1.75 1.75v13.41c0 .3-.08.59-.21.84L5.06 3zm2.69 10.75h6.5a.75.75 0 0 0 0-1.5h-6.5a.75.75 0 0 0 0 1.5z"
+                fill="currentColor"
+              />
+            </svg>
+          </div>
+          <div>
+            <p class="[font-size:var(--fontSizeBase400)] font-semibold text-[var(--colorNeutralForeground1)] leading-snug">
+              {t("muteTag.settingsRow.title")}
+            </p>
+            <p class="[font-size:var(--fontSizeBase200)] text-[var(--colorNeutralForeground3)] leading-snug">
+              {t("muteTag.settingsRow.desc")}
             </p>
           </div>
         </div>

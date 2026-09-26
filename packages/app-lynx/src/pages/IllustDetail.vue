@@ -18,6 +18,7 @@ import CommentOverlay from '../components/CommentOverlay.vue'
 import PagePickerSheet from '../components/PagePickerSheet.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import UgoiraViewer from '../components/UgoiraViewer.vue'
+import TagPressChip from '../components/TagPressChip.vue'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
 import { buildImageTasks, buildUgoiraTask } from '../utils/galleryDownload'
 import { useDownloadStore } from '../stores/downloadStore'
@@ -53,6 +54,11 @@ const panelOpenedBookmarked = ref(false)
 
 /** 作品标签建议来源（原形 name，与 webview 面板 workTags 同源；spec D5） */
 const workTags = computed(() => illust.value?.tags?.map((tag) => tag.name) ?? [])
+
+/** 标签长按静音（ADR-0187 D5 / #732）：加入词表 + 轻提示（App.vue 宿主消费 muteTagHint） */
+function onTagLongPress(name: string): void {
+  settings.muteTag(name)
+}
 
 function openBookmarkPanel(): void {
   panelOpenedBookmarked.value = bm.bookmarked.value
@@ -379,22 +385,23 @@ onMounted(async () => {
         <view class="flex flex-row flex-wrap mt-3">
           <!-- 标签行（ADR-0133 可点化）：点击 → 全局搜索弹层预填该标签（原始 tag.name，
                显示仍 translated_name 优先）——与 webview SearchableTag 语义一致。
-               @tap.stop 统一防冒泡（详情页父级暂无 tap，为嵌套安全保留）。
-               [居中修复] 布局（固定高/flex 居中/边框/圆角）由 view 承载——lynx 的 text
-               是纯文本节点，flex 对 text 无效（此前 items-center 不生效导致文案偏上，
-               实测放大切片确认）；text 内层**不得**加 leading-none——lynx text 的
+               长按静音（ADR-0187 D5 / #732）：TagPressChip 手势绑 view 层（原生 text 节点
+               不收手势），长按 500ms → muteTag + 轻提示（App.vue 宿主渲染 muteTagHint），
+               吞 tap 守卫保证长按后不触发搜索。
+               [居中修复] 布局（固定高/flex 居中/边框/圆角）由 chip 容器 view 承载——lynx 的
+               text 是纯文本节点，flex 对 text 无效（此前 items-center 不生效导致文案偏上，
+               实测放大切片确认）；text 内层不得加 leading-none——lynx text 的
                line-height:1 会把字形顶到行框顶（flex 居中行框而非字形，反而更偏上，
                实测对比确认），默认行高 + view items-center 即对称居中。 -->
-          <view
+          <TagPressChip
             v-for="tag in illust.tags.slice(0, 8)"
             :key="tag.name"
-            class="h-[8.533vw] px-2 m-1 border border-outline rounded-[var(--md-shape-small)] flex items-center justify-center bg-surface"
-            @tap.stop="useSearchSheetStore().openSearch(tag.name)"
-          >
-            <text class="text-label-large text-surface-on-variant">
-              #{{ tag.translated_name || tag.name }}
-            </text>
-          </view>
+            :text="'#' + (tag.translated_name || tag.name)"
+            chip-class="h-[8.533vw] px-2 m-1 border border-outline rounded-[var(--md-shape-small)] flex items-center justify-center bg-surface"
+            text-class="text-label-large text-surface-on-variant"
+            @tap="useSearchSheetStore().openSearch(tag.name)"
+            @long-press="onTagLongPress(tag.name)"
+          />
         </view>
       </view>
     </scroll-view>

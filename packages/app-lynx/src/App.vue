@@ -19,6 +19,16 @@ import { initSafeArea, safeBottom, safeTop } from './utils/safeArea'
 const searchSheet = useSearchSheetStore()
 // 主题色（外观）：根 <page> 追加 .theme-* 色板类，整树 CSS 变量换色（默认 sky = 无色板类）
 const settings = useSettingsStore()
+// 标签静音轻提示文案（ADR-0187 D5 + spec tag-mute 边界 #7）：载荷 kind 分流——
+// muted = 「已静音 {name}」（落盘成功/集合已生效）；failed = 「静音未生效」（落盘失败）。
+// store 不快照文案（载荷纯数据），文案经 t() 渲染。
+function muteTagHintText(): string {
+  const hint = settings.muteTagHint
+  if (!hint) return ''
+  return hint.kind === 'failed'
+    ? t('muteTag.muteFailedHint')
+    : t('muteTag.mutedHint', { name: hint.name })
+}
 // 引擎降级说明（ADR-0153）：WebView 不可用时原生写入一次性键，首帧消费后展示可关闭提示
 const engineFallback = useEngineFallbackStore()
 
@@ -105,6 +115,15 @@ onMounted(() => {
     <view v-if="exitHint" class="absolute z-50" style="left: 50vw; bottom: 12vw; transform: translate(-50%, 0)">
       <view class="h-[12.8vw] bg-inverse-surface rounded-[var(--md-shape-extra-small)] px-5 flex items-center shadow-[var(--md-elevation-3)]">
         <text class="text-base text-inverse-on-surface">再按一次退出应用</text>
+      </view>
+    </view>
+    <!-- 标签静音轻提示（ADR-0187 D5 / #732 + spec tag-mute 边界 #7）：与 exitHint 同形态
+         （M3 snackbar：inverse-surface 底 + 胶囊居中定位，ADR-0123 无全宽盒）；载荷 =
+         settings.muteTagHint（{kind,name} 纯数据，落盘成功/失败分流文案，2s 自动清除在
+         store 内），文案经 t() 渲染（store 不快照文案，webview MuteTagHint 同语义） -->
+    <view v-if="settings.muteTagHint" class="absolute z-50" style="left: 50vw; bottom: 12vw; transform: translate(-50%, 0)">
+      <view class="h-[12.8vw] bg-inverse-surface rounded-[var(--md-shape-extra-small)] px-5 flex items-center shadow-[var(--md-elevation-3)]">
+        <text class="text-base text-inverse-on-surface">{{ muteTagHintText() }}</text>
       </view>
     </view>
   </page>

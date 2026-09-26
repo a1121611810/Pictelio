@@ -19,6 +19,7 @@ import ScrollRestorationConfirm from "@/routes/ScrollRestorationConfirm";
 import DownloadManager from "@/routes/DownloadManager";
 import NetworkCheck from "@/routes/NetworkCheck";
 import Ranking from "@/routes/Ranking";
+import Notifications from "@/routes/Notifications";
 
 /** /user/:id/followers 和 /my/followers 共享的视图 */
 const FollowersPage = () => <FollowListPage mode="followers" />;
@@ -45,6 +46,7 @@ export const routes: RouteDefinition[] = [
       { path: "/downloads", component: DownloadManager },
       { path: "/network-check", component: NetworkCheck },
       { path: "/ranking", component: Ranking },
+      { path: "/notifications", component: Notifications },
       { path: "/user/:id", component: PersonalCenter },
       { path: "/user/:id/illusts", component: UserIllusts },
       { path: "/user/:id/following", component: () => <FollowListPage mode="following" /> },

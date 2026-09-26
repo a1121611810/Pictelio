@@ -37,10 +37,15 @@ export const BACKUP_SET_KEYS = ["blocked_user_ids", "reported_ids"] as const;
 export const PRE_RESTORE_KEY = "webdav_pre_restore_snapshot";
 
 /**
- * 备份域排除的运行时键（spec §3.1 连接配置只列 server/user/dir/auto-switch）：
- * 上次备份时间是运行时状态，进快照会在恢复时扰动自动备份调度（review S10）。
+ * 备份域排除的运行时/设备级键（spec §3.1 连接配置只列 server/user/dir/auto-switch）：
+ * - settings_webdav_last_backup：上次备份时间是运行时状态，进快照会在恢复时扰动自动备份调度（review S10）；
+ * - notifications_last_read_time：通知中心本地已读记忆（ADR-0188 D5），设备级体验数据、
+ *   双端逐字同键，不随备份跨设备迁移（否则恢复后另一台设备的阅读进度被覆盖）。
  */
-export const BACKUP_RUNTIME_KEYS = ["settings_webdav_last_backup"] as const;
+export const BACKUP_RUNTIME_KEYS = [
+  "settings_webdav_last_backup",
+  "notifications_last_read_time",
+] as const;
 
 export interface CollectedBackupData {
   raw: Record<string, string>;

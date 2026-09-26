@@ -51,7 +51,12 @@ describe('AdaptiveTagRow.vue 结构契约（ADR-0149）', () => {
 
   it('可点元素是 <view>（真机 <text> 不收 @tap）且都 @tap.stop 防冒泡', () => {
     const stopCount = (code.match(/@tap\.stop/g) ?? []).length
-    expect(stopCount).toBeGreaterThanOrEqual(3) // 可见 chip / 截断 chip / +N / 降级 chip
+    // 截断 chip / +N 在本文件内绑 @tap.stop；标签 chip 的 stop 收敛进 TagPressChip（#732）
+    expect(stopCount).toBeGreaterThanOrEqual(2)
+    expect(src).toContain('TagPressChip')
+    const chipSrc = readFileSync(fileURLToPath(new URL('./TagPressChip.vue', import.meta.url)), 'utf8')
+    expect(chipSrc).toContain('@tap.stop')
+    expect(chipSrc).toContain('@touchstart')
   })
 
   it('测量重试不得在递归里重置预算（防死循环）', () => {

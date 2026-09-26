@@ -15,6 +15,7 @@ import BookmarkButton from '../components/BookmarkButton.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
 import AiRestrictedIllustCard from '../components/AiRestrictedIllustCard.vue'
 import { useAiOnlyVisible } from '../composables/useAiOnlyVisible'
+import { useTagMuteVisible } from '../composables/useTagMuteVisible'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 
 const settings = useSettingsStore()
@@ -49,8 +50,9 @@ const feed = ref(
 )
 
 const illusts = ref<PixivIllust[]>([])
-/** 仅看态：非 AI 条目从渲染流移除（服务端分页判空仍基于 feed.items，不受影响） */
-const visibleIllusts = useAiOnlyVisible(illusts)
+/** 仅看态：非 AI 条目从渲染流移除（服务端分页判空仍基于 feed.items，不受影响）；
+ *  标签静音（ADR-0187 / #732）：命中词表条目数据层移除（「静音=不可见」，非遮罩） */
+const visibleIllusts = useTagMuteVisible(useAiOnlyVisible(illusts))
 const loading = ref(false)
 const loadingMore = ref(false)
 const errorMsg = ref('')

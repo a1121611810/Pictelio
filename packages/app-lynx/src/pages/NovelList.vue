@@ -10,6 +10,7 @@ import { useSettingsStore } from '../stores/settingsStore'
 import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
 import AiRestrictedNovelCard from '../components/AiRestrictedNovelCard.vue'
 import { useAiOnlyVisible } from '../composables/useAiOnlyVisible'
+import { useTagMuteVisible } from '../composables/useTagMuteVisible'
 import RefreshableList from '../components/RefreshableList.vue'
 import { useGlobalFabStore } from '../stores/globalFab'
 import AdaptiveTagRow from '../components/AdaptiveTagRow.vue'
@@ -61,8 +62,9 @@ function makeFeed(m: 'recommend' | 'follow') {
 
 const feed = ref(makeFeed(mode.value))
 const novels = ref<PixivNovel[]>([])
-/** 仅看态：非 AI 条目从渲染流移除（服务端分页判空仍基于 feed.items，不受影响） */
-const visibleNovels = useAiOnlyVisible(novels)
+/** 仅看态：非 AI 条目从渲染流移除（服务端分页判空仍基于 feed.items，不受影响）；
+ *  标签静音（ADR-0187 / #732）：命中词表条目数据层移除（「静音=不可见」，非遮罩） */
+const visibleNovels = useTagMuteVisible(useAiOnlyVisible(novels))
 
 const loading = ref(false)
 const loadingMore = ref(false)
@@ -143,6 +145,11 @@ function openDetail(id: number) {
 /** 标签点击 → 全局搜索弹层（原始 tag.name，ADR-0133；同 Recommended.vue 语义） */
 function onTagTap(name: string) {
   useSearchSheetStore().openSearch(name)
+}
+
+/** 标签长按静音（ADR-0187 D5 / #732）：加入词表 + 轻提示（App.vue 宿主消费 muteTagHint） */
+function onTagLongPress(name: string) {
+  settings.muteTag(name)
 }
 
 // ─── 全局放射 FAB 桥（ADR-0120）：注册本页动作到 globalFab，卸载时注销 ───
@@ -261,11 +268,12 @@ onUnmounted(() => {
               </text>
             </view>
             <!-- 自适应标签行（ADR-0149）：装多少算多少 + 省略号截断 + 「+N」；
-                 chip 点击 → 全局搜索，+N/截断 chip → 进详情 -->
+                 chip 点击 → 全局搜索，长按 → 静音（#732），+N/截断 chip → 进详情 -->
             <AdaptiveTagRow
               class="mt-2"
               :tags="item.tags"
               @tag-tap="onTagTap"
+              @tag-long-press="onTagLongPress"
               @overflow-tap="openDetail(item.id)"
             />
           </view>
