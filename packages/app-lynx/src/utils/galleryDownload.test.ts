@@ -341,6 +341,28 @@ describe("命名模板：未知占位符 warn 恰一次（spec T7，测试硬约
     expect(warn).toHaveBeenCalledTimes(2)
     warn.mockRestore()
   })
+
+  it("非 \\w 键（如中文 {作者名}）原样保留且 warn 恰一次（检测口径宽于替换口径）", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const ctx = namingCtx(sampleSingle, 0)
+    const singleUrl = "https://i.pximg.net/img-original/single.jpg"
+    const seen = new Set<string>()
+    expect(buildSaveFileNameFromTemplate("{id}_{作者名}", ctx, singleUrl, seen)).toBe(
+      "123456_{作者名}.jpg",
+    )
+    // 同一非 \w 未知名（跨调用、同集合）仅首次命中 warn
+    expect(buildSaveFileNameFromTemplate("{id}_{作者名}", ctx, singleUrl, seen)).toBe(
+      "123456_{作者名}.jpg",
+    )
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(String(warn.mock.calls[0]?.[0])).toContain("{作者名}")
+    // 另一个非 \w 未知名 → 再告警一次
+    expect(buildSaveFileNameFromTemplate("{id}_{作者名}_{公開日}", ctx, singleUrl, seen)).toBe(
+      "123456_{作者名}_{公開日}.jpg",
+    )
+    expect(warn).toHaveBeenCalledTimes(2)
+    warn.mockRestore()
+  })
 })
 
 describe("命名模板：净化（spec T8/T9，镜像 Java GallerySaver.sanitizeFileName）", () => {
@@ -387,7 +409,7 @@ describe("命名模板：净化（spec T8/T9，镜像 Java GallerySaver.sanitize
 
 describe("命名模板：截断与读取期净化（spec T10 + D6）", () => {
   it("T10 最终名（含扩展名）≤120：双段 128 触顶时基段截断到 120-ext-1，边界相等可达", () => {
-    // 双段 64+64=128 > 120：基段截断到 120 - "jpg".length - 1 = 116，最终名（含 .jpg）恰 120
+    // 双段 64+64=128 > 120：基段截断到 120 - ".jpg".length - 1 = 116，最终名（含 .jpg）恰 120
     // （spec D3 逐字语义：展开 + 扩展名拼装后的最终文件名 ≤120，.ext 恒完整）
     const combo = makeIllust({
       page_count: 1,

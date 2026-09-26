@@ -142,6 +142,16 @@ function expandTemplateBase(tpl: string, ctx: SaveNamingContext, warnSeen: Set<s
         return raw
     }
   })
+  // 未知占位符**检测**口径宽于替换口径（spec D2 禁静默）：\w 之外的键（如中文 {作者名}）
+  // 不参与替换、原样保留，但同样须告警——漏检会让用户拼错的占位符无任何提示地落盘。
+  for (const m of expanded.matchAll(/\{([^{}]+)\}/g)) {
+    const name = m[1]!
+    if (/^\w+$/.test(name)) continue // \w 键已由替换分支处理（含未知告警去重）
+    if (!warnSeen.has(name)) {
+      warnSeen.add(name)
+      console.warn(`[galleryDownload] 命名模板含未知占位符 {${name}}，原样保留`)
+    }
+  }
   return expanded.trim()
 }
 
