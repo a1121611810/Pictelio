@@ -27,6 +27,8 @@ public class GallerySaverPlugin extends Plugin {
     public void saveImage(PluginCall call) {
         String url = call.getString("url");
         String fileName = call.getString("fileName");
+        // 可选子目录（ADR-0192 D8：双 flavor 桥契约同形；本批 webview UI 不接线，零行为变化）
+        String dir = call.getString("dir");
         if (url == null || url.isEmpty() || fileName == null || fileName.isEmpty()) {
             call.reject("url and fileName are required");
             return;
@@ -34,7 +36,8 @@ public class GallerySaverPlugin extends Plugin {
 
         try {
             GallerySaver.SaveResult r = GallerySaver.save(getContext(),
-                    PixivApiPlugin.imageLoader(getContext()), url, fileName);
+                    PixivApiPlugin.imageLoader(getContext()), url, fileName,
+                    dir == null ? "" : dir);
             JSObject result = new JSObject();
             result.put("uri", r.uri.toString());
             result.put("mediaStore", r.mediaStore);
