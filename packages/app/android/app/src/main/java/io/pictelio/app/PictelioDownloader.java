@@ -43,6 +43,17 @@ public final class PictelioDownloader {
      */
     public static String download(Context context, PixivImageLoader loader, String id,
             String sourceUrl, String fileName, ProgressListener listener) throws IOException {
+        return download(context, loader, id, sourceUrl, fileName, "", listener);
+    }
+
+    /**
+     * {@link #download} + 可选作者目录段（ADR-0192 D4/D7 / spec D5/D7）：dir = JS 侧展开好的
+     * 目录段（非模板——模板解析不过桥），空串/null = 现行为字节不变；图片链落
+     * Pictures/Pictelio/[dir]。
+     */
+    public static String download(Context context, PixivImageLoader loader, String id,
+            String sourceUrl, String fileName, String dir, ProgressListener listener)
+            throws IOException {
         if (id == null || id.isEmpty()) {
             throw new IOException("下载失败：任务 id 为空");
         }
@@ -60,7 +71,7 @@ public final class PictelioDownloader {
                     listener.onProgress(done, total);
                 }
             }, token::get);
-            GallerySaver.SaveResult result = GallerySaver.saveFile(context, source, fileName);
+            GallerySaver.SaveResult result = GallerySaver.saveFile(context, source, fileName, dir);
             return result.uri.toString();
         } finally {
             CANCELS.remove(id);
@@ -73,6 +84,16 @@ public final class PictelioDownloader {
      */
     public static String downloadUgoira(Context context, PixivImageLoader loader, String id,
             String zipUrl, String format, String fileName, String framesJson,
+            ProgressListener listener) throws IOException {
+        return downloadUgoira(context, loader, id, zipUrl, format, fileName, "", framesJson, listener);
+    }
+
+    /**
+     * {@link #downloadUgoira} + 可选作者目录段（语义同 {@link #download} 六参重载）：非图片
+     * 导出链基座 = Downloads/Pictelio，dir 追加在后（Downloads/Pictelio/[dir]）。
+     */
+    public static String downloadUgoira(Context context, PixivImageLoader loader, String id,
+            String zipUrl, String format, String fileName, String dir, String framesJson,
             ProgressListener listener) throws IOException {
         if (id == null || id.isEmpty()) {
             throw new IOException("下载失败：任务 id 为空");
@@ -98,7 +119,8 @@ public final class PictelioDownloader {
                 throw new IOException("下载已取消");
             }
             File exported = UgoiraExporter.export(context, zip, format, id, framesJson);
-            GallerySaver.SaveResult result = GallerySaver.saveDownloadFile(context, exported, fileName);
+            GallerySaver.SaveResult result =
+                    GallerySaver.saveDownloadFile(context, exported, fileName, dir);
             return result.uri.toString();
         } finally {
             CANCELS.remove(id);
@@ -116,6 +138,16 @@ public final class PictelioDownloader {
     public static String downloadNovel(Context context, PixivImageLoader loader, String id,
             String payloadJson, String format, String fileName, ProgressListener listener)
             throws IOException {
+        return downloadNovel(context, loader, id, payloadJson, format, fileName, "", listener);
+    }
+
+    /**
+     * {@link #downloadNovel} + 可选作者目录段（语义同 {@link #download} 六参重载）：非图片
+     * 导出链基座 = Downloads/Pictelio，dir 追加在后（Downloads/Pictelio/[dir]）。
+     */
+    public static String downloadNovel(Context context, PixivImageLoader loader, String id,
+            String payloadJson, String format, String fileName, String dir,
+            ProgressListener listener) throws IOException {
         if (id == null || id.isEmpty()) {
             throw new IOException("导出失败：任务 id 为空");
         }
@@ -142,7 +174,8 @@ public final class PictelioDownloader {
             if (listener != null) {
                 listener.onProgress(90, 100);
             }
-            GallerySaver.SaveResult result = GallerySaver.saveDownloadFile(context, exported, fileName);
+            GallerySaver.SaveResult result =
+                    GallerySaver.saveDownloadFile(context, exported, fileName, dir);
             return result.uri.toString();
         } finally {
             CANCELS.remove(id);

@@ -15,6 +15,7 @@ import { t } from '../i18n'
 import { useModalStack } from '../stores/modalStack'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { safeBottom } from '../utils/safeArea'
+import BottomSheet from './BottomSheet.vue'
 
 const props = defineProps<{
   /** 打开态（父页 v-if 挂载，本属性用于打开时重置选择） */
@@ -80,29 +81,16 @@ function onConfirm(): void {
 </script>
 
 <template>
-  <!-- 根 view：relative 定位上下文；与宿主内容平级、DOM 顺序靠后 → 天然覆盖上层 -->
+  <!-- 根 view：relative 定位上下文；与宿主内容平级、DOM 顺序靠后 → 天然覆盖上层。
+       弹层壳（scrim + 面板 + 标题栏 + ×）收口 BottomSheet 公共组件（ADR-0194 D5/D6）；
+       panel-height="content" = 迁移前「面板无固定高（纯内容高）」变体的逐字节保留 -->
   <view class="w-full h-full relative">
-    <!-- 遮罩：absolute inset-0，@tap 关闭 -->
-    <view class="absolute inset-0 bg-scrim" @tap="onClose" />
-
-    <!-- 底部面板：@tap.stop 防面板内点击穿透到遮罩 -->
-    <view
-      class="absolute bottom-0 left-0 right-0 bg-surface-container-lowest rounded-t-[var(--md-shape-extra-large)] flex flex-col"
-      @tap.stop
+    <BottomSheet
+      panel-height="content"
+      :title="t('novelExportSheet.title')"
+      :close-accessibility-label="t('novelExportSheet.closeA11y')"
+      @close="onClose"
     >
-      <!-- 顶部：居中标题 + 关闭 -->
-      <view class="flex flex-row items-center h-[11.733vw] px-4 flex-shrink-0">
-        <view class="w-[8vw]" />
-        <text class="flex-1 text-center text-title-large font-medium text-surface-on">{{ t('novelExportSheet.title') }}</text>
-        <view
-          class="w-[8vw] h-[8vw] flex items-center justify-center"
-          :accessibility-element="A11Y_ELEMENT_ENABLED"
-          :accessibility-label="t('novelExportSheet.closeA11y')"
-          @tap="onClose"
-        >
-          <text class="text-[6.4vw] leading-none text-surface-on-variant">×</text>
-        </view>
-      </view>
 
       <!-- 格式选择：M3 chip 行（视觉同 Me.vue 导出格式 chip：选中 secondary-container，未选 outline） -->
       <view class="px-4 pt-2">
@@ -150,6 +138,6 @@ function onConfirm(): void {
       </view>
       <!-- 系统栏安全区（spec lynx-systembars §4.2）：底部面板抬离手势/导航区 -->
       <view :style="{ height: safeBottom + 'px' }" />
-    </view>
+    </BottomSheet>
   </view>
 </template>

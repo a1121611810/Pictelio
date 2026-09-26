@@ -22,6 +22,10 @@ import { presentError } from '../utils/errorPresentation'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { useSettingsStore } from '../stores/settingsStore'
 import SkeletonImage from '../components/SkeletonImage.vue'
+import PageTopBar from '../components/PageTopBar.vue'
+import SubTabBar from '../components/SubTabBar.vue'
+import EmptyState from '../components/EmptyState.vue'
+import FeedListFooter from '../components/FeedListFooter.vue'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import BookmarkButton from '../components/BookmarkButton.vue'
@@ -250,12 +254,13 @@ onUnmounted(() => {
 
 <template>
   <view class="w-full h-full flex flex-col bg-surface">
-    <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
-      <view class="py-1 pr-2" @tap="goBack"><text class="text-[6.4vw] leading-none text-surface-on">‹</text></view>
-      <text class="flex-1 text-title-large font-medium text-surface-on [max-line:1]">
-        {{ detail?.user.name || t('userHome.titleFallback') }}
-      </text>
-    </view>
+    <!-- M3 TopAppBar：次级页，返回 + 标题（PageTopBar 变体 b，ADR-0194）；长用户名单行截断经 title-class 保留 -->
+    <PageTopBar
+      back
+      :title="detail?.user.name || t('userHome.titleFallback')"
+      title-class="[max-line:1]"
+      @back="goBack"
+    />
 
     <text v-if="detailError" class="text-body-small text-error p-4">{{ detailError }}</text>
 
@@ -283,23 +288,15 @@ onUnmounted(() => {
       </view>
     </view>
 
-    <!-- 作品 tab -->
-    <view class="flex flex-row border-b-[1px] border-b-outline-variant bg-surface-container-lowest">
-      <view
-        class="flex-1 h-[12.8vw] flex items-center justify-center"
-        :class="activeTab === 'illust' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
-        @tap="switchTab('illust')"
-      >
-        <text class="text-title-small font-medium">{{ t('userHome.tab.illust') }}</text>
-      </view>
-      <view
-        class="flex-1 h-[12.8vw] flex items-center justify-center"
-        :class="activeTab === 'novel' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
-        @tap="switchTab('novel')"
-      >
-        <text class="text-title-small font-medium">{{ t('userHome.tab.novel') }}</text>
-      </view>
-    </view>
+    <!-- 作品 tab（SubTabBar 收口，ADR-0194；选中态指示条类串在组件单点逐字保留） -->
+    <SubTabBar
+      :items="[
+        { key: 'illust', label: t('userHome.tab.illust') },
+        { key: 'novel', label: t('userHome.tab.novel') }
+      ]"
+      :model-value="activeTab"
+      @change="switchTab"
+    />
 
     <!-- 插画三态（ADR-0150）：骨架 → 错误 → 空态 → 内容，互斥单链 -->
     <view v-if="activeTab === 'illust' && illustView === 'skeleton'" class="w-full flex-1 min-h-0 flex flex-row flex-wrap content-start p-1.5">
@@ -307,11 +304,7 @@ onUnmounted(() => {
     </view>
     <text v-else-if="activeTab === 'illust' && illustView === 'error'" class="text-body-small text-error p-4">{{ errorMsg }}</text>
     <view v-else-if="activeTab === 'illust' && illustView === 'empty'" class="flex-1 flex items-center justify-center">
-      <view class="flex flex-col items-center">
-        <text class="text-[10.667vw] leading-none text-outline-variant">▦</text>
-        <text class="text-body-large text-surface-on mt-3">{{ t('userHome.empty.title') }}</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ t('userHome.empty.hint') }}</text>
-      </view>
+      <EmptyState icon="▦" :title="t('userHome.empty.title')" :hint="t('userHome.empty.hint')" />
     </view>
 
     <!-- 插画 waterfall -->
@@ -359,9 +352,14 @@ onUnmounted(() => {
         </view>
       </list-item>
       <list-item v-if="illustLoadingMore || illustPageErrorMsg || illustEndOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text v-if="illustLoadingMore" class="text-body-medium text-outline">{{ t('userHome.footer.loading') }}</text>
-        <text v-else-if="illustPageErrorMsg" class="text-body-medium text-error">{{ illustPageErrorMsg }}</text>
-        <text v-else class="text-body-medium text-outline">{{ t('userHome.footer.end') }}</text>
+        <!-- 三态文案组件化（FeedListFooter，ADR-0194）；外层 list-item 保留（原生 list 只认 list-item 子节点） -->
+        <FeedListFooter
+          :loading="illustLoadingMore"
+          :error="illustPageErrorMsg"
+          :end="illustEndOfFeed"
+          :loading-text="t('userHome.footer.loading')"
+          :end-text="t('userHome.footer.end')"
+        />
       </list-item>
     </list>
     </template>
@@ -377,11 +375,7 @@ onUnmounted(() => {
     </view>
     <text v-else-if="activeTab === 'novel' && novelView === 'error'" class="text-body-small text-error p-4">{{ errorMsg }}</text>
     <view v-else-if="activeTab === 'novel' && novelView === 'empty'" class="flex-1 flex items-center justify-center">
-      <view class="flex flex-col items-center">
-        <text class="text-[10.667vw] leading-none text-outline-variant">▦</text>
-        <text class="text-body-large text-surface-on mt-3">{{ t('userHome.empty.title') }}</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ t('userHome.empty.hint') }}</text>
-      </view>
+      <EmptyState icon="▦" :title="t('userHome.empty.title')" :hint="t('userHome.empty.hint')" />
     </view>
 
     <!-- 小说列表 -->
@@ -424,9 +418,14 @@ onUnmounted(() => {
         </view>
       </list-item>
       <list-item v-if="novelLoadingMore || novelPageErrorMsg || novelEndOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text v-if="novelLoadingMore" class="text-body-medium text-outline">{{ t('userHome.footer.loading') }}</text>
-        <text v-else-if="novelPageErrorMsg" class="text-body-medium text-error">{{ novelPageErrorMsg }}</text>
-        <text v-else class="text-body-medium text-outline">{{ t('userHome.footer.end') }}</text>
+        <!-- 三态文案组件化（FeedListFooter，ADR-0194）；外层 list-item 保留（原生 list 只认 list-item 子节点） -->
+        <FeedListFooter
+          :loading="novelLoadingMore"
+          :error="novelPageErrorMsg"
+          :end="novelEndOfFeed"
+          :loading-text="t('userHome.footer.loading')"
+          :end-text="t('userHome.footer.end')"
+        />
       </list-item>
     </list>
     </template>

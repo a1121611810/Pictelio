@@ -32,6 +32,14 @@ vi.mock('../src/stores/settingsStore', () => ({
     loadSettings: async () => {},
   }),
 }))
+// 稍后看 store（ADR-0191 / #751 T3）：initRouter 在 loadSettings 后 hydrate——
+// 本套件无 active pinia，与 authStore/settingsStore 同款 mock 隔离（真实行为在
+// watchLaterStore.test.ts 覆盖）
+vi.mock('../src/stores/watchLaterStore', () => ({
+  useWatchLaterStore: () => ({
+    hydrate: async () => {},
+  }),
+}))
 vi.mock('../src/stores/modalStack', () => ({
   useModalStack: () => ({
     hasOpenModal: () => false,
@@ -61,7 +69,11 @@ vi.mock('../src/pages/FollowList.vue', () => ({ default: {} }))
 vi.mock('../src/pages/UpdatePage.vue', () => ({ default: {} }))
 vi.mock('../src/pages/ErrorPage.vue', () => ({ default: {} }))
 vi.mock('../src/pages/Watchlist.vue', () => ({ default: {} }))
+// 稍后看列表页（ADR-0191 / #753 T4）：占位组件（路由只需 component 引用，不渲染）
+vi.mock('../src/pages/WatchLater.vue', () => ({ default: {} }))
 vi.mock('../src/pages/Notifications.vue', () => ({ default: {} }))
+// 好P友列表页（ADR-0193 / #754 T7）：占位组件（路由只需 component 引用，不渲染）
+vi.mock('../src/pages/MyPixiv.vue', () => ({ default: {} }))
 vi.mock('../src/pages/MuteTags.vue', () => ({ default: {} }))
 vi.mock('../src/pages/DownloadManager.vue', () => ({ default: {} }))
 vi.mock('../src/pages/NetworkCheck.vue', () => ({ default: {} }))
@@ -79,9 +91,9 @@ async function loadRouter(): Promise<RouterModule> {
 }
 
 describe('路由表完整性（spec D3）', () => {
-  it('22 条路由：path/name 齐全；/update、/error 无 requiresAuth 且带 backBehavior exit（P0-1）', async () => {
+  it('24 条路由：path/name 齐全；/update、/error 无 requiresAuth 且带 backBehavior exit（P0-1）', async () => {
     const mod = await loadRouter()
-    expect(mod.routes).toHaveLength(22)
+    expect(mod.routes).toHaveLength(24)
     const nameOf = (p: string) => mod.routes.find((r) => r.path === p)?.name
     expect(nameOf('/login')).toBe('login')
     expect(nameOf('/recommended')).toBe('recommended')
@@ -93,6 +105,14 @@ describe('路由表完整性（spec D3）', () => {
     // 静音标签管理页（ADR-0187 D5 / #732）：业务次级页，requiresAuth 守卫鉴权
     expect(nameOf('/mute-tags')).toBe('mute-tags')
     expect(mod.routes.find((r) => r.path === '/mute-tags')?.meta?.requiresAuth).toBe(true)
+    // 稍后看列表页（ADR-0191 D5 / #753 T4）：业务次级页，requiresAuth（先例 = /watchlist）；
+    // 术语红线：路由名 watchLater，与追更 watchlist 物理隔离
+    expect(nameOf('/later')).toBe('watchLater')
+    expect(mod.routes.find((r) => r.path === '/later')?.meta?.requiresAuth).toBe(true)
+    // 好P友列表页（ADR-0193 D2 / #754 T7）：业务次级页，requiresAuth 守卫鉴权；
+    // 好P友是双向关系（/v1/user/mypixiv），与 following/follower 单向关系不同族
+    expect(nameOf('/mypixiv')).toBe('mypixiv')
+    expect(mod.routes.find((r) => r.path === '/mypixiv')?.meta?.requiresAuth).toBe(true)
     // 小说介绍页（spec #585 / 票 #586）：与 /novel/:id 平级共存，同标 requiresAuth
     expect(nameOf('/novel/:id/intro')).toBe('novel-intro')
     expect(mod.routes.find((r) => r.path === '/novel/:id/intro')?.meta?.requiresAuth).toBe(true)
@@ -138,6 +158,20 @@ describe('shim 生命周期状态机（真实 createMemoryHistory）', () => {
     await mod.initRouter() // restoreOk=false → /login，bootstrap 完成
     expect(mod.router.currentRoute.value.path).toBe('/login')
     await mod.navigate('/bookmarks')
+    expect(mod.router.currentRoute.value.path).toBe('/login')
+  })
+
+  it('未登录访问 /later → 守卫拦截（requiresAuth 生效，ADR-0191 D5）', async () => {
+    const mod = await loadRouter()
+    await mod.initRouter()
+    await mod.navigate('/later')
+    expect(mod.router.currentRoute.value.path).toBe('/login')
+  })
+
+  it('未登录访问 /mypixiv → 守卫拦截（requiresAuth 生效，ADR-0193 D2）', async () => {
+    const mod = await loadRouter()
+    await mod.initRouter()
+    await mod.navigate('/mypixiv')
     expect(mod.router.currentRoute.value.path).toBe('/login')
   })
 

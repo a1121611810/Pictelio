@@ -34,6 +34,17 @@ const zhPages = {
   "illustDetail.save.queued": "已加入下载队列（{{count}} 项），请到下载页查看",
   "illustDetail.save.ugoiraInfoFailed": "获取动图信息失败",
 
+  // ─── 稍后看（WatchLater，ADR-0191 / #751 T3 / #753 T4）：双详情入口 + 列表页 + Me 入口 ───
+  "later.action.add": "稍后看",
+  "later.action.added": "已在稍后看",
+  "later.title": "稍后看",
+  "later.empty.title": "还没有稍后看内容",
+  "later.empty.hint": "在作品详情或小说介绍页点「稍后看」，即可暂存到这里",
+  "later.remove": "移除",
+  "later.badge.illust": "插画",
+  "later.badge.novel": "小说",
+  "later.me.entry": "稍后看",
+
   // ─── NovelIntro.vue（小说介绍页，地图 #575 / spec #585） ───
   "novelIntro.retry": "重试",
   "novelIntro.startReading": "开始阅读",
@@ -131,6 +142,17 @@ const zhPages = {
   "followList.follow": "关注",
   "followList.footer.loading": "加载中…",
 
+  // ─── MyPixiv.vue（好P友列表页，ADR-0193 / #754 T7；术语表「好P友（MyPixiv）」：
+  // 双向关系用户列表，禁「好友/朋友/相互关注列表」别称） ───
+  "mypixiv.title": "好P友",
+  "mypixiv.empty.title": "还没有好P友",
+  "mypixiv.empty.hint": "互相关注即可成为好P友",
+  "mypixiv.retry": "重试",
+  "mypixiv.loadMoreFailed": "加载更多失败",
+  "mypixiv.actionFailed": "操作失败",
+  "mypixiv.footer.loading": "加载中…",
+  "mypixiv.footer.end": "没有更多了",
+
   // ─── Following.vue（关注 Feed 页） ───
   "following.backA11y": "返回",
   "following.title": "关注",
@@ -197,6 +219,7 @@ const zhPages = {
   "me.title": "我的",
   "me.bookmarks": "我的收藏",
   "me.watchlist": "追更列表",
+  "me.mypixiv": "好P友",
   "me.downloads": "下载管理",
   "me.networkCheck": "网络自检",
   "me.notifications": "通知",
@@ -292,6 +315,14 @@ const zhPages = {
   "me.quality.original": "原图",
   "me.download.title": "下载",
   "me.download.formatHint": "动图导出格式（全局统一，不可逐图）",
+  "me.download.templateLabel": "命名模板",
+  "me.download.templateHint": "占位符：{id} 作品ID、{title} 标题、{author} 作者、{p} 多页页号（单页不出现）",
+  "me.download.templatePlaceholder": "Pictelio_{id}",
+  "me.download.templatePreview": "示例：{{value}}",
+  "me.download.templateReset": "恢复默认",
+  "me.download.templateFallbackHint": "模板为空或非法，已恢复默认命名",
+  "me.download.authorDir": "按作者建目录",
+  "me.download.authorDirDesc": "开启后保存的图片按作者名归入子目录",
   "me.export.title": "导出",
   "me.export.formatHint": "小说导出格式（全局默认，导出面板可临时覆盖）",
   "me.export.includeMetadata": "包含元数据",

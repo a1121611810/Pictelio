@@ -3,7 +3,8 @@
 // D 轮播同族视觉（票 #583）：全屏封面 aspectFill 铺满 + 底部渐变 scrim 承载全部元信息；页内不滚动。
 // 信息架构（票 #577）：AI 徽章 / 系列行(+已追更 chip) / 标题 / 作者行(→用户主页) / 标签行(→搜索) /
 // 简介 2 行截断（点开弹 NovelCaptionSheet 读全文，#584）/ 统计行 / 评论入口 + 底部两行 CTA 区：
-//   Row 1 = 四个次级动作（收藏·追更·下载·系列目录，等宽四列，spec #734 §US5 D2 / §5.1）；
+//   Row 1 = 次级动作（收藏·追更·下载·系列目录·稍后看，等宽 flex-1 列；原四动作 + 稍后看第五动作
+//   = ADR-0191 D5 / #751 T3；ADR-0189 挂账的极窄屏 < 320px 2×2 降级矩阵不含 < 320px 真机，沿用既有预案）；
 //   Row 2 = 全宽主 CTA「开始阅读」（沿用既有 h-[12.8vw] rounded-full primary 范式）。
 // 受限/AI 语义（票 #580/#581）：谓词复用正文页同款（settings.isRestricted / isAiRestricted）——
 // 封面/标题/作者可见，简介位遮罩（RestrictOverlay/AiOverlay 同款），两行 CTA + 简介展开入口置灰
@@ -25,10 +26,12 @@ import { proxyImageUrl } from '../utils/imageUrl'
 import { stripNovelCaptionHtml } from '../utils/novelCaption'
 import { isNovelDownloaded } from '../utils/novelDownloadStatus'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import { LATER_ICON } from '../utils/watchLaterGlyph'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useDownloadStore } from '../stores/downloadStore'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
 import { isDismissed, markDismissed, setWatchState, getWatchState } from '../stores/watchlistStore'
+import { useWatchLaterStore, toNovelSnapshot } from '../stores/watchLaterStore'
 import { createWatchlistPrompt, type WatchlistPromptController } from '../primitives/createWatchlistPrompt'
 import { useNovelWatchlistToggle } from '../composables/useNovelWatchlistToggle'
 import CoverImage from '../components/CoverImage.vue'
@@ -211,6 +214,19 @@ function onSeriesSelect(novelId: number): void {
   void navigate(`/novel/${novelId}`)
 }
 
+// ─── 稍后看（WatchLater，ADR-0191 D5 / #751 T3）：动作行第五动作 ───
+// 时钟字形 = utils/watchLaterGlyph 单一事实源（VS15 依据见该模块头注释）
+const watchLater = useWatchLaterStore()
+/** 已加入态：高亮跟随 store.has()（ActionButton active = text-tertiary，与追更/已下载同范式） */
+const laterAdded = computed(() => watchLater.has('novel', novelId.value))
+
+/** toggle 稍后看：快照从页面已有 novel 构造（零新增请求，spec D2） */
+function toggleWatchLater(): void {
+  const n = novel.value
+  if (!n) return
+  watchLater.toggle(toNovelSnapshot(n))
+}
+
 /**
  * 构造导出载荷并加入下载队列（沿用 NovelDetail §8.1 同形态）。
  * 介绍页不预取正文（fetchNovelData 不在本页 setup 调用），`text` 字段走 captionText 兜底——
@@ -368,7 +384,8 @@ const WatchlistAction = defineComponent({
         </view>
 
         <!-- 底部固定动作区（spec #734 §US5 D1 / ADR-0189 D1）：
-             Row 1 = 4 个次级按钮（收藏·追更·下载·系列目录，等宽四列），追更/系列目录仅 series 存在时渲染；
+             Row 1 = 次级动作（收藏·追更·下载·系列目录·稍后看，等宽 flex-1 列；
+             稍后看第五动作 = ADR-0191 D5 / #751 T3），追更/系列目录仅 series 存在时渲染；
              Row 2 = 全宽主 CTA「开始阅读」。两行按钮在 R-18/R-18G/AI 屏蔽态一致置灰（#580 / spec D6）。
              ADR-0123：opacity-50 + pointer-events-none 仅用于真正的 disabled 态（ActionButton 内部），
              不用于全屏遮罩期望下层穿透的反模式；BookmarkButton 无 disabled prop → 外层 wrap 一道置灰。 -->
@@ -415,6 +432,20 @@ const WatchlistAction = defineComponent({
             :disabled="masked"
             @tap="openSeriesSheet"
           />
+          <!-- 稍后看（WatchLater，ADR-0191 D5）：第五动作 toggle，已加入态高亮（active → text-tertiary）；
+               masked 与同行动作一致置灰。@tap.stop 挂包裹 view（裸修饰符，BottomSheet 面板根同款）——
+               ActionButton 上抛的是无载荷自定义 emit，.stop 修饰符须由原生 view 承载；
+               快照从已有 novel 构造（零新增请求） -->
+          <view class="flex-1 min-w-0" @tap.stop>
+            <ActionButton
+              class="w-full"
+              :icon="LATER_ICON"
+              :label="laterAdded ? t('later.action.added') : t('later.action.add')"
+              :active="laterAdded"
+              :disabled="masked"
+              @tap="toggleWatchLater"
+            />
+          </view>
         </view>
 
         <!-- Row 2 全宽主 CTA「开始阅读」（沿用 #580 范式：masked 态 bg-white/20 + text-white/50） -->

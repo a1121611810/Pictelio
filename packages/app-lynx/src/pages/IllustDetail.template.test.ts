@@ -73,3 +73,12 @@ describe('IllustDetail 作者行命中区（#542）', () => {
     expect(code).toContain('@tap="toggleFollowAuthor"')
   })
 })
+
+describe('IllustDetail 下载入队命名接线（ADR-0192 D7 / spec D6：模板与开关入队即快照）', () => {
+  it('enqueuePages / enqueueUgoira 双链同时传 authorDir 与 template（同一读取点 = settingsStore）', () => {
+    // 命名模板接线（spec D6/US2/US15）：入队时刻读 settings.downloadFileTemplate 快照，
+    // 与 downloadByAuthorDir 同一读取点；缺一即为半交付（模板设置形同虚设）
+    expect((code.match(/template: settings\.downloadFileTemplate/g) ?? []).length).toBe(2)
+    expect((code.match(/authorDir: settings\.downloadByAuthorDir/g) ?? []).length).toBe(2)
+  })
+})

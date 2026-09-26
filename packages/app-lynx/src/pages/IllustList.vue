@@ -13,6 +13,10 @@ import { useRelatedInjectionStore } from '../stores/relatedInjection'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
+import PageTopBar from '../components/PageTopBar.vue'
+import SubTabBar from '../components/SubTabBar.vue'
+import EmptyState from '../components/EmptyState.vue'
+import FeedListFooter from '../components/FeedListFooter.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
@@ -226,29 +230,18 @@ onUnmounted(() => {
 
 <template>
   <view class="w-full h-full flex flex-col bg-surface">
-    <!-- M3 TopAppBar：顶层页，居中标题，无返回箭头 -->
-    <view class="flex flex-row items-center justify-center h-[17.067vw] px-4 bg-surface">
-      <text class="text-title-large font-medium text-surface-on">{{ t('illustList.title') }}</text>
-    </view>
+    <!-- M3 TopAppBar：顶层页，居中标题，无返回箭头（PageTopBar 变体 a，ADR-0194） -->
+    <PageTopBar :title="t('illustList.title')" />
 
-    <!-- 推荐/关注切换（M3 secondary tabs）：容器 border-b 分割线 + surface-container-lowest 底，
-         选中态 = text-primary + 底部 0.8vw primary 指示条（Bookmarks 页已验证的可靠写法） -->
-    <view class="flex flex-row border-b-[1px] border-b-outline-variant bg-surface-container-lowest">
-      <view
-        class="flex-1 h-[12.8vw] flex items-center justify-center"
-        :class="mode === 'recommend' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
-        @tap="switchMode('recommend')"
-      >
-        <text class="text-title-small font-medium">{{ t('illustList.tab.recommend') }}</text>
-      </view>
-      <view
-        class="flex-1 h-[12.8vw] flex items-center justify-center"
-        :class="mode === 'follow' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
-        @tap="switchMode('follow')"
-      >
-        <text class="text-title-small font-medium">{{ t('illustList.tab.follow') }}</text>
-      </view>
-    </view>
+    <!-- 推荐/关注切换（M3 secondary tabs：选中态 = text-primary + 底部 0.8vw primary 指示条）（SubTabBar 收口，ADR-0194；选中态指示条类串在组件单点逐字保留） -->
+    <SubTabBar
+      :items="[
+        { key: 'recommend', label: t('illustList.tab.recommend') },
+        { key: 'follow', label: t('illustList.tab.follow') }
+      ]"
+      :model-value="mode"
+      @change="switchMode"
+    />
 
     <!-- 排行榜入口大卡（spec docs/specs/ranking.md §5.1）：推荐 tab 内容链之前；
          开关关闭时不渲染（不建数据源） -->
@@ -266,11 +259,7 @@ onUnmounted(() => {
     <text v-else-if="view === 'error'" class="text-body-small text-error p-4">{{ errorMsg }}</text>
     <!-- 空态：仅「已成功落定为空」才显示（spec 加固 3：杜绝「无数据 → 纯空白」） -->
     <view v-else-if="view === 'empty'" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <view class="flex flex-col items-center">
-        <text class="text-[10.667vw] leading-none text-outline-variant">{{ emptyMeta.icon }}</text>
-        <text class="text-body-large text-surface-on mt-3">{{ emptyMeta.title }}</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ emptyMeta.hint }}</text>
-      </view>
+      <EmptyState :icon="emptyMeta.icon" :title="emptyMeta.title" :hint="emptyMeta.hint" />
     </view>
 
     <RefreshableList
@@ -343,9 +332,14 @@ onUnmounted(() => {
       </list-item>
       </template>
       <list-item v-if="loadingMore || pageErrorMsg || endOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text v-if="loadingMore" class="text-body-medium text-outline">{{ t('illustList.footer.loading') }}</text>
-        <text v-else-if="pageErrorMsg" class="text-body-medium text-error">{{ pageErrorMsg }}</text>
-        <text v-else class="text-body-medium text-outline">{{ t('illustList.footer.end') }}</text>
+        <!-- 三态文案组件化（FeedListFooter，ADR-0194）；外层 list-item 保留（原生 list 只认 list-item 子节点） -->
+        <FeedListFooter
+          :loading="loadingMore"
+          :error="pageErrorMsg"
+          :end="endOfFeed"
+          :loading-text="t('illustList.footer.loading')"
+          :end-text="t('illustList.footer.end')"
+        />
       </list-item>
     </list>
     </template>

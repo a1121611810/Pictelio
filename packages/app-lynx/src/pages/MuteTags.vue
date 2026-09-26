@@ -11,6 +11,8 @@ defineOptions({ name: 'mute-tags' })
 import { computed } from 'vue'
 import { goBack } from '../router'
 import { useSettingsStore } from '../stores/settingsStore'
+import PageTopBar from '../components/PageTopBar.vue'
+import EmptyState from '../components/EmptyState.vue'
 import { MUTE_TAGS_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { t } from '../i18n'
 
@@ -27,31 +29,19 @@ function removeTag(name: string): void {
 
 <template>
   <view class="w-full h-full flex flex-col bg-surface">
-    <!-- M3 TopAppBar：次级页，返回箭头 + 居中标题（对齐 Watchlist 头部模式） -->
-    <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
-      <view
-        class="py-1 pr-2"
-        :accessibility-element="A11Y_ELEMENT_ENABLED"
-        :accessibility-label="MUTE_TAGS_A11Y_LABELS.back"
-        @tap="goBack"
-      >
-        <text class="text-[6.4vw] leading-none text-surface-on">‹</text>
-      </view>
-      <text
-        class="flex-1 text-title-large font-medium text-surface-on"
-        :accessibility-element="A11Y_ELEMENT_ENABLED"
-        :accessibility-label="MUTE_TAGS_A11Y_LABELS.pageTitle"
-        >{{ t('muteTags.title') }}</text
-      >
-    </view>
+    <!-- M3 TopAppBar：次级页，返回箭头 + 标题（PageTopBar 变体 b，ADR-0194）；
+         a11y 注册表 value 经 props 注入（组件不自持业务 a11y 文案） -->
+    <PageTopBar
+      back
+      :title="t('muteTags.title')"
+      :back-a11y-label="MUTE_TAGS_A11Y_LABELS.back"
+      :title-a11y-label="MUTE_TAGS_A11Y_LABELS.pageTitle"
+      @back="goBack"
+    />
 
     <!-- 空态 -->
     <view v-if="tags.length === 0" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <view class="flex flex-col items-center">
-        <text class="text-[10.667vw] leading-none text-outline-variant">◇</text>
-        <text class="text-body-large text-surface-on mt-3">{{ t('muteTags.empty.title') }}</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ t('muteTags.empty.hint') }}</text>
-      </view>
+      <EmptyState icon="◇" :title="t('muteTags.empty.title')" :hint="t('muteTags.empty.hint')" />
     </view>
 
     <!-- 列表态：本地集合（量级小）不做虚拟化，纵列平铺于 scroll-view -->

@@ -20,6 +20,8 @@ import { setWatchState } from '../stores/watchlistStore'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { WATCHLIST_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import RefreshableList from '../components/RefreshableList.vue'
+import EmptyState from '../components/EmptyState.vue'
+import FeedListFooter from '../components/FeedListFooter.vue'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import { t } from '../i18n'
 
@@ -139,7 +141,10 @@ onUnmounted(() => {
 
 <template>
   <view class="w-full h-full flex flex-col bg-surface">
-    <!-- M3 TopAppBar：次级页，返回箭头 + 居中标题（对齐 NovelDetail 头部模式） -->
+    <!-- M3 TopAppBar：次级页，返回箭头 + 居中标题（对齐 NovelDetail 头部模式）；
+         [T1 不迁移] a11y 注册表源级锁（unit.test.ts「WATCHLIST_A11Y_LABELS 全部被 Watchlist.vue
+         消费且配套 element」逐字断言 :accessibility-label 绑定于本页）——PageTopBar 化需语义改测试，
+         与「既有页面测试零语义修改」硬门禁冲突，故保留手写头（ADR-0194 跳过清单） -->
     <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
       <view
         class="py-1 pr-2"
@@ -186,11 +191,7 @@ onUnmounted(() => {
     </view>
     <!-- 空态 -->
     <view v-else-if="view === 'empty'" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <view class="flex flex-col items-center">
-        <text class="text-[10.667vw] leading-none text-outline-variant">✦</text>
-        <text class="text-body-large text-surface-on mt-3">{{ t('watchlist.empty.title') }}</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ t('watchlist.empty.hint') }}</text>
-      </view>
+      <EmptyState icon="✦" :title="t('watchlist.empty.title')" :hint="t('watchlist.empty.hint')" />
     </view>
 
     <RefreshableList v-else :refresh="refreshFeed" @back-to-top="refreshEpoch++">
@@ -255,9 +256,14 @@ onUnmounted(() => {
         </view>
       </list-item>
       <list-item v-if="loadingMore || pageErrorMsg || endOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text v-if="loadingMore" class="text-body-medium text-outline">{{ t('watchlist.footer.loading') }}</text>
-        <text v-else-if="pageErrorMsg" class="text-body-medium text-error">{{ pageErrorMsg }}</text>
-        <text v-else class="text-body-medium text-outline">{{ t('watchlist.footer.end') }}</text>
+        <!-- 三态文案组件化（FeedListFooter，ADR-0194）；外层 list-item 保留（原生 list 只认 list-item 子节点） -->
+        <FeedListFooter
+          :loading="loadingMore"
+          :error="pageErrorMsg"
+          :end="endOfFeed"
+          :loading-text="t('watchlist.footer.loading')"
+          :end-text="t('watchlist.footer.end')"
+        />
       </list-item>
     </list>
     </template>

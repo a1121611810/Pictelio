@@ -22,7 +22,9 @@ const settings = useSettingsStore()
 const isRestricted = settings.isRestricted
 const isAiRestricted = settings.isAiRestricted
 import RefreshableList from '../components/RefreshableList.vue'
-import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import PageTopBar from '../components/PageTopBar.vue'
+import EmptyState from '../components/EmptyState.vue'
+import FeedListFooter from '../components/FeedListFooter.vue'
 import { t } from '../i18n'
 
 // ─── 分页收敛（ADR-0104）：迁移到 createMixFeed 深模块 ───
@@ -127,18 +129,15 @@ onUnmounted(() => {
 
 <template>
   <view class="w-full h-full flex flex-col bg-surface">
-    <!-- M3 TopAppBar：顶层页，居中标题；移除底部导航栏后补返回箭头（ADR-0120） -->
-    <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
-      <view
-        class="py-1 pr-2"
-        :accessibility-element="A11Y_ELEMENT_ENABLED"
-        :accessibility-label="t('following.backA11y')"
-        @tap="requestBack"
-      >
-        <text class="text-[6.4vw] leading-none text-surface-on">‹</text>
-      </view>
-      <text class="flex-1 text-center text-title-large font-medium text-surface-on">{{ t('following.title') }}</text>
-    </view>
+    <!-- M3 TopAppBar：返回 + 居中标题（PageTopBar 变体 b，ADR-0194）；移除底部导航栏后补返回箭头
+         （ADR-0120）；返回走 requestBack 守卫链，a11y label 动态 t() 与居中差异经 props 保留 -->
+    <PageTopBar
+      back
+      :title="t('following.title')"
+      title-class="text-center"
+      :back-a11y-label="t('following.backA11y')"
+      @back="requestBack"
+    />
 
     <!-- 首载三态（ADR-0150）：骨架 → 错误 → 空态 → 内容，互斥单链；不依赖 loading 标志 -->
     <!-- [lynx:fix] 骨架屏不占满全屏高度（h-full 会溢出覆盖底部导航栏，拦截 tap，issue #129） -->
@@ -155,11 +154,7 @@ onUnmounted(() => {
       </view>
     </view>
     <view v-else-if="view === 'empty'" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <view class="flex flex-col items-center">
-        <text class="text-[10.667vw] leading-none text-outline-variant">♡</text>
-        <text class="text-body-large text-surface-on mt-3">{{ t('following.empty.title') }}</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ t('following.empty.hint') }}</text>
-      </view>
+      <EmptyState icon="♡" :title="t('following.empty.title')" :hint="t('following.empty.hint')" />
     </view>
 
     <RefreshableList v-else :refresh="refreshFeed" @back-to-top="refreshEpoch++">
@@ -208,9 +203,14 @@ onUnmounted(() => {
         </view>
       </list-item>
       <list-item v-if="loadingMore || pageErrorMsg || endOfFeed" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
-        <text v-if="loadingMore" class="text-body-medium text-outline">{{ t('following.footer.loading') }}</text>
-        <text v-else-if="pageErrorMsg" class="text-body-medium text-error">{{ pageErrorMsg }}</text>
-        <text v-else class="text-body-medium text-outline">{{ t('following.footer.end') }}</text>
+        <!-- 三态文案组件化（FeedListFooter，ADR-0194）；外层 list-item 保留（原生 list 只认 list-item 子节点） -->
+        <FeedListFooter
+          :loading="loadingMore"
+          :error="pageErrorMsg"
+          :end="endOfFeed"
+          :loading-text="t('following.footer.loading')"
+          :end-text="t('following.footer.end')"
+        />
       </list-item>
     </list>
     </template>

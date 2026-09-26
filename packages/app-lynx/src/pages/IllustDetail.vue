@@ -17,10 +17,13 @@ import BookmarkPanel from '../components/BookmarkPanel.vue'
 import CommentOverlay from '../components/CommentOverlay.vue'
 import PagePickerSheet from '../components/PagePickerSheet.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
+import PageTopBar from '../components/PageTopBar.vue'
 import UgoiraViewer from '../components/UgoiraViewer.vue'
 import TagPressChip from '../components/TagPressChip.vue'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
+import { useWatchLaterStore, toIllustSnapshot } from '../stores/watchLaterStore'
 import { buildImageTasks, buildUgoiraTask } from '../utils/galleryDownload'
+import { LATER_ICON } from '../utils/watchLaterGlyph'
 import { useDownloadStore } from '../stores/downloadStore'
 import { t } from '../i18n'
 
@@ -125,7 +128,11 @@ const dl = useDownloadStore()
 function enqueuePages(selectedPages: number[]): number {
   const i = illust.value
   if (!i || i.type === 'ugoira' || !selectedPages.length) return 0
-  const drafts = buildImageTasks(i, selectedPages)
+  // 作者目录开关 + 命名模板入队时刻读值（ADR-0192 D7：dir/模板入队即快照，事后改设置不影响已入队任务）
+  const drafts = buildImageTasks(i, selectedPages, {
+    authorDir: settings.downloadByAuthorDir,
+    template: settings.downloadFileTemplate,
+  })
   if (drafts.length === 0) {
     saveStatus.value = t('illustDetail.save.noOriginal') // i18n: 赋值时快照（瞬态）
     queuedNotice.value = false
@@ -148,7 +155,11 @@ async function enqueueUgoira() {
   if (!i || i.type !== 'ugoira') return
   try {
     const meta = await loadUgoiraMetadata(i.id)
-    const draft = buildUgoiraTask(i, meta.zip_urls.medium, settings.ugoiraDownloadFormat, meta.frames)
+    // 作者目录开关 + 命名模板入队时刻读值（同 enqueuePages：dir/模板入队即快照）
+    const draft = buildUgoiraTask(i, meta.zip_urls.medium, settings.ugoiraDownloadFormat, meta.frames, {
+      authorDir: settings.downloadByAuthorDir,
+      template: settings.downloadFileTemplate,
+    })
     dl.enqueue([draft])
     saveStatus.value = t('illustDetail.save.queued', { count: 1 }) // i18n: 赋值时快照（瞬态）
     queuedNotice.value = true
@@ -176,6 +187,19 @@ function onSaveEntry() {
     return
   }
   enqueuePages([0])
+}
+
+// ─── 稍后看（WatchLater，ADR-0191 D5 / #751 T3）：动作区 toggle ───
+// 时钟字形 = utils/watchLaterGlyph 单一事实源（VS15 依据见该模块头注释）
+const watchLater = useWatchLaterStore()
+/** 已加入态：高亮跟随 store.has()（按 (kind, id) 去重；读路由 id，路由复用换 id 即时重算） */
+const laterAdded = computed(() => watchLater.has('illust', illustId.value))
+
+/** toggle 稍后看：快照从页面已有 illust 构造（零新增请求，spec D2） */
+function toggleWatchLater(): void {
+  const i = illust.value
+  if (!i) return
+  watchLater.toggle(toIllustSnapshot(i))
 }
 
 function onConfirmPicker(selectedPages: number[]) {
@@ -242,10 +266,8 @@ onMounted(async () => {
        避免 w-full h-full 溢出覆盖顶栏触摸层（与 issue #129 同型） -->
   <!-- relative：为根 view 内 absolute 的评论弹层提供定位上下文（不改 flex 布局） -->
   <view class="w-full h-full flex flex-col relative bg-surface">
-    <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
-      <view class="py-1 pr-2" @tap="goBack"><text class="text-[6.4vw] leading-none text-surface-on">‹</text></view>
-      <text class="flex-1 text-title-large font-medium text-surface-on">{{ t('illustDetail.title') }}</text>
-    </view>
+    <!-- M3 TopAppBar：次级页，返回 + 标题（PageTopBar 变体 b，ADR-0194） -->
+    <PageTopBar back :title="t('illustDetail.title')" @back="goBack" />
 
     <!-- [lynx:fix] 骨架屏：加载中显示 shimmer 占位（图片区 1:1 + 文字条），数据就绪后切换 scroll-view -->
     <view v-if="loading" class="w-full flex-1 min-h-0 bg-surface">
@@ -369,6 +391,13 @@ onMounted(async () => {
           >
             <text class="text-[6.4vw] leading-none">💬</text>
             <text class="text-label-medium text-outline ml-1">{{ illust.total_comments }}</text>
+          </view>
+          <!-- 稍后看（WatchLater，ADR-0191 D5）：toggle + 已加入态高亮（text-tertiary，
+               沿用动作行激活态范式）；@tap.stop 防冒泡误触（TagPressChip 同款）；
+               快照从已有 illust 构造（零新增请求） -->
+          <view class="ml-4 flex flex-row items-center" @tap.stop="toggleWatchLater">
+            <text class="text-[6.4vw] leading-none" :class="laterAdded ? 'text-tertiary' : 'text-outline'">{{ LATER_ICON }}</text>
+            <text class="text-label-medium ml-1" :class="laterAdded ? 'text-tertiary' : 'text-outline'">{{ laterAdded ? t('later.action.added') : t('later.action.add') }}</text>
           </view>
         </view>
         <!-- 保存状态（内联，无全局 toast 通道）：入队后附「查看下载」跳转 -->

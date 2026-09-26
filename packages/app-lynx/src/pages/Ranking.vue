@@ -26,6 +26,9 @@ import { shouldShowR18Notice } from '../primitives/rankingNotice'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import { useSettingsStore } from '../stores/settingsStore'
 import SkeletonImage from '../components/SkeletonImage.vue'
+import PageTopBar from '../components/PageTopBar.vue'
+import EmptyState from '../components/EmptyState.vue'
+import FeedListFooter from '../components/FeedListFooter.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
 import AiOverlay from '../components/AiOverlay.vue'
 import RefreshableList from '../components/RefreshableList.vue'
@@ -159,12 +162,8 @@ onUnmounted(() => feed.dispose())
 
 <template>
   <view class="w-full h-full flex flex-col bg-surface">
-    <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
-      <view class="py-1 pr-2" @tap="goBack">
-        <text class="text-[6.4vw] leading-none text-surface-on">‹</text>
-      </view>
-      <text class="flex-1 text-title-large font-medium text-surface-on">{{ t('ranking.page.title') }}</text>
-    </view>
+    <!-- M3 TopAppBar：次级页，返回 + 标题（PageTopBar 变体 b，ADR-0194） -->
+    <PageTopBar back :title="t('ranking.page.title')" @back="goBack" />
 
     <!-- 维度 chip 行：窄屏换行展示，不横向滚动 -->
     <view
@@ -263,11 +262,7 @@ onUnmounted(() => feed.dispose())
       </view>
     </view>
     <view v-else-if="view === 'empty'" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <view class="flex flex-col items-center">
-        <text class="text-[10.667vw] leading-none text-outline-variant">▲</text>
-        <text class="text-body-large text-surface-on mt-3">{{ t('ranking.page.empty') }}</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ t('ranking.page.emptyHint') }}</text>
-      </view>
+      <EmptyState icon="▲" :title="t('ranking.page.empty')" :hint="t('ranking.page.emptyHint')" />
     </view>
 
     <RefreshableList v-else :refresh="refreshFeed" @back-to-top="refreshEpoch++">
@@ -326,13 +321,17 @@ onUnmounted(() => feed.dispose())
         class="w-full h-10 flex items-center justify-center"
         full-span
       >
-        <text v-if="loadingMore" class="text-body-medium text-outline">{{ t('ranking.footer.loading') }}</text>
-        <!-- 分页失败：底部内联可点重试（spec §5.3） -->
-        <view v-else-if="pageErrorMsg" class="flex flex-row items-center" @tap="loadMore">
-          <text class="text-body-medium text-error">{{ pageErrorMsg }}</text>
-          <text class="text-body-medium text-primary ml-2">{{ t('ranking.page.retry') }}</text>
-        </view>
-        <text v-else class="text-body-medium text-outline">{{ t('ranking.footer.end') }}</text>
+        <!-- 三态文案组件化（FeedListFooter，ADR-0194）；外层 list-item 保留；
+             分页失败 = 底部内联可点重试（spec §5.3），重试形态经 retry-text + @retry 保留 -->
+        <FeedListFooter
+          :loading="loadingMore"
+          :error="pageErrorMsg"
+          :end="endOfFeed"
+          :loading-text="t('ranking.footer.loading')"
+          :end-text="t('ranking.footer.end')"
+          :retry-text="t('ranking.page.retry')"
+          @retry="loadMore"
+        />
       </list-item>
     </list>
     </template>

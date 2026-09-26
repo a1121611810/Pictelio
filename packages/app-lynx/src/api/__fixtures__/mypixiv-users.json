@@ -1,0 +1,35 @@
+{
+  "user_previews": [
+    {
+      "user": {
+        "id": 116130401,
+        "name": "巷屠生",
+        "account": "user_mhyz7782",
+        "profile_image_urls": {
+          "medium": "https://i.pximg.net/user-profile/img/2025/05/09/16/13/45/27338565_bc9feab2e8e574b475ec86e8669f1d3b_170.jpg"
+        },
+        "is_followed": true,
+        "is_accept_request": true
+      },
+      "illusts": [],
+      "novels": [],
+      "is_muted": false
+    },
+    {
+      "user": {
+        "id": 69931305,
+        "name": "Anna Wimbledon",
+        "account": "user_avxc7842",
+        "profile_image_urls": {
+          "medium": "https://i.pximg.net/user-profile/img/2023/08/09/07/41/04/24784896_3eb8b1ac3f180bc491634e943fc1eeb5_170.png"
+        },
+        "is_followed": true,
+        "is_accept_request": false
+      },
+      "illusts": [],
+      "novels": [],
+      "is_muted": true
+    }
+  ],
+  "next_url": "https://app-api.pixiv.net/v1/user/mypixiv?user_id=100000000&offset=30"
+}

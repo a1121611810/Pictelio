@@ -40,6 +40,12 @@ export interface DownloadTask {
   sourceUrl: string
   targetFormat: string
   fileName: string
+  /**
+   * 作者目录段（ADR-0192 D4/D7 / spec docs/specs/lynx-download-naming.md D5/D7）：JS 侧
+   * 展开好的目录段（基座 Pictures/Pictelio 或 Downloads/Pictelio 之后的追加段，非模板）。
+   * 空串/缺省 = 无子目录（现行为字节不变）；入队即快照，事后改设置不影响已入队任务。
+   */
+  dir?: string
   status: DownloadStatus
   /** 0–100 */
   progress: number
@@ -122,6 +128,7 @@ function newTask(draft: DownloadTaskDraft, now: number): DownloadTask {
     updatedAt: now,
   }
   if (draft.page !== undefined) t.page = draft.page
+  if (draft.dir !== undefined) t.dir = draft.dir
   if (draft.frames !== undefined) t.frames = draft.frames.map((f) => ({ ...f }))
   if (draft.payloadJson !== undefined) t.payloadJson = draft.payloadJson
   return t
@@ -351,6 +358,7 @@ function normalizeTask(v: unknown, warn: (msg: string, err?: unknown) => void): 
     sourceUrl,
     targetFormat,
     fileName,
+    dir,
     status,
     progress,
     page,
@@ -390,6 +398,7 @@ function normalizeTask(v: unknown, warn: (msg: string, err?: unknown) => void): 
     updatedAt,
   }
   if (typeof page === 'number') t.page = page
+  if (typeof dir === 'string') t.dir = dir
   if (Array.isArray(frames)) {
     const clean: UgoiraFrameTiming[] = []
     for (const f of frames) {

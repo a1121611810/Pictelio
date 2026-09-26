@@ -34,6 +34,17 @@ const enPages = {
   "illustDetail.save.queued": "Added {{count}} items to the download queue (see Downloads)",
   "illustDetail.save.ugoiraInfoFailed": "Could not load ugoira info",
 
+  // Watch Later (ADR-0191 / #751 T3 / #753 T4): shared by illust detail + novel intro entries
+  "later.action.add": "Watch Later",
+  "later.action.added": "In Watch Later",
+  "later.title": "Watch Later",
+  "later.empty.title": "Nothing saved for later yet",
+  "later.empty.hint": "Tap Watch Later on artwork details or novel intro to save it here",
+  "later.remove": "Remove",
+  "later.badge.illust": "Illustration",
+  "later.badge.novel": "Novel",
+  "later.me.entry": "Watch Later",
+
   // NovelIntro.vue (novel intro page, map #575 / spec #585)
   "novelIntro.retry": "Retry",
   "novelIntro.startReading": "Start reading",
@@ -131,6 +142,16 @@ const enPages = {
   "followList.follow": "Follow",
   "followList.footer.loading": "Loading…",
 
+  // MyPixiv.vue (MyPixiv friends list, ADR-0193 / #754 T7; glossary term "MyPixiv")
+  "mypixiv.title": "My Pixiv",
+  "mypixiv.empty.title": "No My Pixiv friends yet",
+  "mypixiv.empty.hint": "Follow each other to become My Pixiv friends",
+  "mypixiv.retry": "Retry",
+  "mypixiv.loadMoreFailed": "Could not load more",
+  "mypixiv.actionFailed": "Action failed",
+  "mypixiv.footer.loading": "Loading…",
+  "mypixiv.footer.end": "No more content",
+
   // Following.vue
   "following.backA11y": "Back",
   "following.title": "Following",
@@ -197,6 +218,7 @@ const enPages = {
   "me.title": "Me",
   "me.bookmarks": "My bookmarks",
   "me.watchlist": "Watchlist",
+  "me.mypixiv": "My Pixiv",
   "me.downloads": "Downloads",
   "me.networkCheck": "Network check",
   "me.notifications": "Notifications",
@@ -294,6 +316,14 @@ const enPages = {
   "me.quality.original": "Original",
   "me.download.title": "Download",
   "me.download.formatHint": "Ugoira export format (one global setting, not per image)",
+  "me.download.templateLabel": "File name template",
+  "me.download.templateHint": "Placeholders: {id} work ID, {title} title, {author} author, {p} multi-page index (single-page works omit it)",
+  "me.download.templatePlaceholder": "Pictelio_{id}",
+  "me.download.templatePreview": "Preview: {{value}}",
+  "me.download.templateReset": "Reset to default",
+  "me.download.templateFallbackHint": "Template was empty or invalid; reset to the default naming",
+  "me.download.authorDir": "Per-author folders",
+  "me.download.authorDirDesc": "Saved images go into a subfolder named after the author",
   "me.export.title": "Export",
   "me.export.formatHint": "Default novel export format (the export panel can override it per export)",
   "me.export.includeMetadata": "Include metadata",

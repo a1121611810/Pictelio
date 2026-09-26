@@ -37,6 +37,7 @@ import {
   type DarkModeId,
   type ResolvedDark,
 } from "../utils/darkMode"
+import { DEFAULT_DOWNLOAD_TEMPLATE, normalizeDownloadTemplate } from "../utils/galleryDownload"
 
 // ── 跨 client 契约键（ADR-0103：与 webview settingsStore defineFactory 同格式）──
 const r18Key = (uid: number) => `show_r18_${uid}`
@@ -92,6 +93,12 @@ const AUTO_FALLBACK_ENGINE_KEY = "pictelio_engine_auto_fallback"
  *  隐藏系统栏（immersive）——边到边基底之上的 opt-in 沉浸。键与 Java 侧
  *  LynxActivity.KEY_FULLSCREEN_MODE 逐字一致（唯一所有者），经 safeAreaJavaContract 测试钉住 */
 const FULLSCREEN_MODE_KEY = "settings_fullscreen_mode"
+/** 下载命名模板（ADR-0192 / spec docs/specs/lynx-download-naming.md D1）：设备级键，默认
+ *  Pictelio_{id}。占位符集合/净化/截断单一事实源在 utils/galleryDownload.ts
+ *  （DEFAULT_DOWNLOAD_TEMPLATE / normalizeDownloadTemplate，文件名单一事实源不分散——ADR-0145） */
+const DOWNLOAD_FILE_TEMPLATE_KEY = "download_file_template"
+/** 按作者建目录（ADR-0192 D1）：设备级布尔，默认关；开启后相对目录 = 基座 + 净化作者段 */
+const DOWNLOAD_BY_AUTHOR_DIR_KEY = "download_by_author_dir"
 /** 小说导出（spec docs/specs/novel-export.md §6）：全局默认格式 + 三项内容开关（与 app 共享键） */
 const NOVEL_EXPORT_FORMAT_KEY = "settings_novel_export_format"
 const NOVEL_EXPORT_INCLUDE_METADATA_KEY = "settings_novel_export_include_metadata"
@@ -127,6 +134,8 @@ export const BACKUP_DEVICE_KEYS = [
   NOVEL_INTRO_FIRST_KEY,
   AUTO_FALLBACK_ENGINE_KEY,
   FULLSCREEN_MODE_KEY,
+  DOWNLOAD_FILE_TEMPLATE_KEY,
+  DOWNLOAD_BY_AUTHOR_DIR_KEY,
   NOVEL_EXPORT_FORMAT_KEY,
   NOVEL_EXPORT_INCLUDE_METADATA_KEY,
   NOVEL_EXPORT_INCLUDE_COVER_KEY,
@@ -232,8 +241,10 @@ function devPrefs(): PrefsStorage {
   return { get: idbGet, set: idbSet, remove: idbRemove }
 }
 
-/** 环境适配：原生 LynxView → 共享 SharedPreferences；web-core dev → IndexedDB */
-function prefs(): PrefsStorage {
+/** 环境适配：原生 LynxView → 共享 SharedPreferences；web-core dev → IndexedDB。
+ *  导出供账号级集合键消费方复用（watchLaterStore 的 watch_later_${uid}，ADR-0191 D4）——
+ *  seam 单源，禁止第二处 hand-roll native/idb 分流。 */
+export function prefs(): PrefsStorage {
   return isNativeMode() ? nativePrefs() : devPrefs()
 }
 
@@ -318,6 +329,10 @@ export const useSettingsStore = defineStore("settings", () => {
   const _autoFallbackEngine = ref(true)
   /** 全屏模式开关（spec lynx-systembars D5）：设备级，默认关（隐藏系统栏的 opt-in 沉浸） */
   const _fullscreenMode = ref(false)
+  /** 下载命名模板（ADR-0192 D1）：设备级，默认 Pictelio_{id}（内存态恒为净化后的值） */
+  const _downloadFileTemplate = ref(DEFAULT_DOWNLOAD_TEMPLATE)
+  /** 按作者建目录（ADR-0192 D1）：设备级，默认关（目录 = 基座，现行为字节不变） */
+  const _downloadByAuthorDir = ref(false)
   const _novelExportFormat = ref<NovelExportFormat>(DEFAULT_NOVEL_EXPORT_FORMAT)
   const _novelExportOptions = ref<NovelExportOptions>({ ...DEFAULT_NOVEL_EXPORT_OPTIONS })
 
@@ -374,6 +389,8 @@ export const useSettingsStore = defineStore("settings", () => {
   const novelIntroFirst = _novelIntroFirst
   const autoFallbackEngine = _autoFallbackEngine
   const fullscreenMode = _fullscreenMode
+  const downloadFileTemplate = _downloadFileTemplate
+  const downloadByAuthorDir = _downloadByAuthorDir
   const novelExportFormat = _novelExportFormat
   const novelExportOptions = _novelExportOptions
   const webdavEnabled = _webdavEnabled
@@ -528,6 +545,34 @@ export const useSettingsStore = defineStore("settings", () => {
       }
     } catch (e) {
       console.warn("[settingsStore] 全屏模式开关加载失败（维持默认）", e)
+    }
+
+    // 下载命名模板（ADR-0192 D1）：设备级，未登录也恢复；读取期净化（分隔符/控制字符 → _、
+    // trim、超长截断），空/全净化为空 → 维持默认 + warn（禁静默降级）
+    try {
+      const raw = await prefs().get(DOWNLOAD_FILE_TEMPLATE_KEY)
+      if (raw !== null) {
+        const norm = normalizeDownloadTemplate(raw)
+        if (norm.fallback) {
+          console.warn("[settingsStore] 下载命名模板为空/非法，维持默认:", raw)
+        } else {
+          _downloadFileTemplate.value = norm.value
+        }
+      }
+    } catch (e) {
+      console.warn("[settingsStore] 下载命名模板加载失败（维持默认）", e)
+    }
+
+    // 按作者建目录开关（ADR-0192 D1）：设备级，未登录也恢复
+    try {
+      const raw = await prefs().get(DOWNLOAD_BY_AUTHOR_DIR_KEY)
+      if (raw === "true") _downloadByAuthorDir.value = true
+      else if (raw === "false") _downloadByAuthorDir.value = false
+      else if (raw !== null) {
+        console.warn("[settingsStore] 按作者建目录开关值非法，维持默认 false:", raw)
+      }
+    } catch (e) {
+      console.warn("[settingsStore] 按作者建目录开关加载失败（维持默认）", e)
     }
 
     // 小说导出：全局默认格式 + 三项内容开关（native 共享 SharedPreferences / dev idbKV）
@@ -984,6 +1029,31 @@ export const useSettingsStore = defineStore("settings", () => {
     }
   }
 
+  /**
+   * 下载命名模板（ADR-0192 D6）：写入前净化（分隔符/控制字符 → _、trim、超长截断），
+   * 内存态与落盘值恒为净化后的模板。空串/全净化为空 → 回落默认模板并返回 true（fallback），
+   * UI 必须给出可见提示（禁静默回落）。
+   */
+  function setDownloadFileTemplate(raw: string): boolean {
+    const norm = normalizeDownloadTemplate(raw)
+    if (norm.fallback) {
+      console.warn("[settingsStore] 下载命名模板为空/非法，回落默认值")
+    }
+    _downloadFileTemplate.value = norm.value
+    void prefs()
+      .set(DOWNLOAD_FILE_TEMPLATE_KEY, norm.value)
+      .catch((e) => console.warn("[settingsStore] 下载命名模板写入失败", e))
+    return norm.fallback
+  }
+
+  /** 按作者建目录开关（ADR-0192 D1）：设备级布尔，写内存 + 落盘 */
+  function setDownloadByAuthorDir(enabled: boolean): void {
+    _downloadByAuthorDir.value = enabled
+    void prefs()
+      .set(DOWNLOAD_BY_AUTHOR_DIR_KEY, String(enabled))
+      .catch((e) => console.warn("[settingsStore] 按作者建目录开关写入失败", e))
+  }
+
   function setNovelExportFormat(format: NovelExportFormat): void {
     _novelExportFormat.value = format
     void prefs()
@@ -1211,6 +1281,17 @@ export const useSettingsStore = defineStore("settings", () => {
         if (raw !== "true" && raw !== "false") return false
         setFullscreenMode(raw === "true")
         return true
+      case DOWNLOAD_FILE_TEMPLATE_KEY: {
+        // 净化后为空（空串/全净化为空）→ 拒绝应用（跳过，维持本机现状）
+        const norm = normalizeDownloadTemplate(raw)
+        if (norm.fallback) return false
+        setDownloadFileTemplate(norm.value)
+        return true
+      }
+      case DOWNLOAD_BY_AUTHOR_DIR_KEY:
+        if (raw !== "true" && raw !== "false") return false
+        setDownloadByAuthorDir(raw === "true")
+        return true
       case NOVEL_EXPORT_FORMAT_KEY:
         if (!(NOVEL_EXPORT_FORMATS as readonly string[]).includes(raw)) return false
         setNovelExportFormat(raw as NovelExportFormat)
@@ -1316,6 +1397,8 @@ export const useSettingsStore = defineStore("settings", () => {
     novelIntroFirst,
     autoFallbackEngine,
     fullscreenMode,
+    downloadFileTemplate,
+    downloadByAuthorDir,
     ugoiraDownloadFormat,
     novelExportFormat,
     novelExportOptions,
@@ -1343,6 +1426,8 @@ export const useSettingsStore = defineStore("settings", () => {
     setNovelIntroFirst,
     setAutoFallbackEngine,
     setFullscreenMode,
+    setDownloadFileTemplate,
+    setDownloadByAuthorDir,
     setNovelExportFormat,
     setNovelExportIncludeMetadata,
     setNovelExportIncludeCover,

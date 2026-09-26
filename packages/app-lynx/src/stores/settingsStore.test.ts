@@ -1987,3 +1987,149 @@ describe("parseMuteTagsRaw（ADR-0187 / #732）", () => {
     warn.mockRestore()
   })
 })
+
+// ─── 下载命名（ADR-0192 / spec docs/specs/lynx-download-naming.md D1/D6）───
+// 设备级键：download_file_template（默认 Pictelio_{id}，读取/写入均经 normalizeDownloadTemplate
+// 净化——单一事实源在 utils/galleryDownload.ts）+ download_by_author_dir（默认 false）。
+describe("settingsStore — 下载命名模板与按作者建目录（ADR-0192）", () => {
+  beforeEach(() => {
+    userRef().value = null
+    env.native = false
+    env.modules = {}
+    vi.mocked(idbGet).mockReset().mockResolvedValue(null)
+    vi.mocked(idbSet).mockReset().mockResolvedValue(undefined)
+  })
+
+  it("默认值：模板 Pictelio_{id}、作者目录关（零默认行为变化基线）", () => {
+    expect(store.downloadFileTemplate).toBe("Pictelio_{id}")
+    expect(store.downloadByAuthorDir).toBe(false)
+  })
+
+  it("setDownloadFileTemplate：净化后写内存 + prefs 持久化（dev=idbKV）", () => {
+    expect(store.setDownloadFileTemplate(" a/b{id} ")).toBe(false)
+    expect(store.downloadFileTemplate).toBe("a_b{id}")
+    expect(vi.mocked(idbSet)).toHaveBeenCalledWith("download_file_template", "a_b{id}")
+  })
+
+  it("setDownloadFileTemplate：超长截断到 200", () => {
+    store.setDownloadFileTemplate("x".repeat(500))
+    expect(store.downloadFileTemplate).toHaveLength(200)
+    expect(vi.mocked(idbSet)).toHaveBeenCalledWith("download_file_template", "x".repeat(200))
+  })
+
+  it("setDownloadFileTemplate：空串/全净化为空 → 回落默认 + 返回 fallback + warn（禁静默回落）", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    expect(store.setDownloadFileTemplate("")).toBe(true)
+    expect(store.downloadFileTemplate).toBe("Pictelio_{id}")
+    expect(store.setDownloadFileTemplate("   ")).toBe(true)
+    expect(store.downloadFileTemplate).toBe("Pictelio_{id}")
+    expect(warn).toHaveBeenCalledTimes(2)
+    warn.mockRestore()
+  })
+
+  it("loadSettings 恢复持久化模板与作者目录开关（设备级，未登录也恢复）", async () => {
+    vi.mocked(idbGet).mockImplementation(async (key: string) => {
+      if (key === "download_file_template") return "{author}_{title}"
+      if (key === "download_by_author_dir") return "true"
+      return null
+    })
+    await store.loadSettings()
+    expect(store.downloadFileTemplate).toBe("{author}_{title}")
+    expect(store.downloadByAuthorDir).toBe(true)
+  })
+
+  it("loadSettings 模板读取期净化：控制字符 → _；空/全净化为空 → 维持默认 + warn", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    vi.mocked(idbGet).mockImplementation(async (key: string) =>
+      key === "download_file_template" ? "a\u0001b" : null,
+    )
+    await store.loadSettings()
+    expect(store.downloadFileTemplate).toBe("a_b")
+    expect(warn).not.toHaveBeenCalled()
+    vi.mocked(idbGet).mockImplementation(async (key: string) =>
+      key === "download_file_template" ? "   " : null,
+    )
+    await store.loadSettings()
+    // 非法值维持现状（不覆盖当前值，同 themeColor 非法值语义）+ warn 可见
+    expect(store.downloadFileTemplate).toBe("a_b")
+    expect(warn).toHaveBeenCalledTimes(1)
+    warn.mockRestore()
+  })
+
+  it("loadSettings 作者目录开关值非法 → 维持默认 false + warn", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    vi.mocked(idbGet).mockImplementation(async (key: string) =>
+      key === "download_by_author_dir" ? "yes" : null,
+    )
+    await store.loadSettings()
+    expect(store.downloadByAuthorDir).toBe(false)
+    expect(warn).toHaveBeenCalledTimes(1)
+    warn.mockRestore()
+  })
+
+  it("setDownloadByAuthorDir：写内存 + prefs 持久化", () => {
+    store.setDownloadByAuthorDir(true)
+    expect(store.downloadByAuthorDir).toBe(true)
+    expect(vi.mocked(idbSet)).toHaveBeenCalledWith("download_by_author_dir", "true")
+  })
+
+  it("原生模式：经 PictelioPrefs 读写两个键（unquote JSON 引号）", async () => {
+    env.native = true
+    const written: string[] = []
+    env.modules = {
+      PictelioPrefs: {
+        prefsGet: (k: string, cb: (v: string, e: string | null) => void) =>
+          cb(k === "download_file_template" ? JSON.stringify("{id}_{title}") : "", null),
+        prefsSet: (k: string, v: string, cb: (e: string | null) => void) => {
+          written.push(`${k}=${v}`)
+          cb(null)
+        },
+        prefsRemove: (_k: string, cb: (e: string | null) => void) => cb(null),
+      },
+    }
+    await store.loadSettings()
+    expect(store.downloadFileTemplate).toBe("{id}_{title}")
+    store.setDownloadByAuthorDir(true)
+    store.setDownloadFileTemplate("{author}")
+    await vi.waitFor(() =>
+      expect(written).toEqual(
+        expect.arrayContaining(["download_by_author_dir=true", "download_file_template={author}"]),
+      ),
+    )
+  })
+
+  it("备份域：importRawValues 应用合法模板/开关，空模板跳过；exportRawValues 导出两键", async () => {
+    const res = await store.importRawValues({
+      download_file_template: "{author}_{id}",
+      download_by_author_dir: "true",
+    })
+    expect(res.applied).toContain("download_file_template")
+    expect(res.applied).toContain("download_by_author_dir")
+    expect(store.downloadFileTemplate).toBe("{author}_{id}")
+    expect(store.downloadByAuthorDir).toBe(true)
+
+    const skipped = await store.importRawValues({
+      download_file_template: "   ",
+      download_by_author_dir: "yes",
+    })
+    expect(skipped.skipped).toContain("download_file_template")
+    expect(skipped.skipped).toContain("download_by_author_dir")
+    expect(store.downloadFileTemplate).toBe("{author}_{id}")
+    expect(store.downloadByAuthorDir).toBe(true)
+
+    // exportRawValues 走 prefs 读（dev=idbGet mock）：模拟落盘态返回两键已存值
+    vi.mocked(idbGet).mockReset().mockImplementation(async (key: string) => {
+      if (key === "download_file_template") return "{author}_{id}"
+      if (key === "download_by_author_dir") return "true"
+      return null
+    })
+    const raw = await store.exportRawValues()
+    expect(raw.download_file_template).toBe("{author}_{id}")
+    expect(raw.download_by_author_dir).toBe("true")
+  })
+
+  it("BACKUP_DEVICE_KEYS 含两个下载命名键（设备级，进备份域）", () => {
+    expect(BACKUP_DEVICE_KEYS as readonly string[]).toContain("download_file_template")
+    expect(BACKUP_DEVICE_KEYS as readonly string[]).toContain("download_by_author_dir")
+  })
+})

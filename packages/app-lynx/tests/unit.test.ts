@@ -1503,17 +1503,27 @@ describe('全局搜索弹层 accessibility 标注（issue #295）', () => {
     expect(new Set(labels).size).toBe(labels.length)
   })
 
-  it('SEARCH_A11Y_LABELS 全部被 SearchSheet.vue 模板消费', () => {
+  it('SEARCH_A11Y_LABELS 全部被 SearchSheet.vue 模板消费（close 随壳收口 BottomSheet：经 close-accessibility-label prop 注入，ADR-0194 D5/D6）', () => {
     for (const key of Object.keys(SEARCH_A11Y_LABELS)) {
-      expect(searchSheetVueSource).toContain(`:accessibility-label="SEARCH_A11Y_LABELS.${key}"`)
+      if (key === 'close') {
+        // × 关闭 a11y 已随弹层壳收口 BottomSheet——registry value 经 prop 原样注入（渲染产物不变）
+        expect(searchSheetVueSource).toContain(
+          ':close-accessibility-label="SEARCH_A11Y_LABELS.close"',
+        )
+      } else {
+        expect(searchSheetVueSource).toContain(`:accessibility-label="SEARCH_A11Y_LABELS.${key}"`)
+      }
     }
   })
 
   it('每个 accessibility-label 都配套开启 accessibility-element（view 默认不进 a11y 树）', () => {
-    const labelCount = (searchSheetVueSource.match(/:accessibility-label="SEARCH_A11Y_LABELS\.\w+"/g) ?? []).length
+    const labelCount =
+      (searchSheetVueSource.match(/:accessibility-label="SEARCH_A11Y_LABELS\.\w+"/g) ?? []).length +
+      (searchSheetVueSource.match(/:close-accessibility-label="SEARCH_A11Y_LABELS\.\w+"/g) ?? [])
+        .length
     const elementCount = (searchSheetVueSource.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
     expect(labelCount).toBe(Object.keys(SEARCH_A11Y_LABELS).length + 1) // retry 出现两处（首载错误 + 分页内联）
-    expect(elementCount).toBe(labelCount)
+    expect(elementCount).toBe(labelCount - 1) // close 的 element 配对随壳在 BottomSheet 单点（BottomSheet.template.test.ts 锁 3/3）
   })
 
   it('输入框 / 关闭按钮标注存在（模拟器 E2E 闭环锚点）', () => {

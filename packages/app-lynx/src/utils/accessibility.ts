@@ -21,6 +21,11 @@ export const ME_A11Y_LABELS = {
   switchToLynx: '切换客户端到Lynx',
   bookmarks: '我的收藏',
   watchlist: '追更列表',
+  // 稍后看入口（ADR-0191 D5 / #753 T4）：账户组行 + 行尾计数徽标（徽标为装饰性，
+  // 语义由行级 label 承载——通知未读圆点同款约定）
+  watchLater: '稍后看',
+  // 好P友入口（ADR-0193 D3 / #754 T7）：账户组行（稍后看行后邻位）
+  mypixiv: '好P友',
   downloads: '下载管理',
   networkCheck: '网络自检',
   // 通知中心入口（ADR-0188 D7 / #728）：账户组行 + 行尾未读圆点
@@ -47,6 +52,9 @@ export const ME_A11Y_LABELS = {
   downloadFormatApng: '动图下载格式APNG',
   downloadFormatZip: '动图下载格式ZIP',
   downloadFormatTar: '动图下载格式TAR',
+  // 下载命名（ADR-0192 / spec docs/specs/lynx-download-naming.md D9）：模板重置 + 作者目录开关
+  downloadTemplateReset: '恢复命名模板默认值',
+  downloadAuthorDirToggle: '按作者建目录开关',
   // 小说导出（spec docs/specs/novel-export.md §6/§7.2）：默认格式 9 项 + 三项内容开关
   novelExportFormatTxt: '小说导出格式TXT',
   novelExportFormatHtml: '小说导出格式HTML',
@@ -166,6 +174,18 @@ export const WATCHLIST_A11Y_LABELS = {
   unwatch: '取消追更该系列',
   unwatchConfirm: '确认取消追更',
   unwatchCancel: '保留追更',
+} as const
+
+/** 稍后看列表页 accessibility 标注（ADR-0191 / #753 T4：/later 页）
+ *  注册表完整性约束同 NOTIFICATIONS_A11Y_LABELS：每个 key 必须被 WatchLater.vue 模板消费
+ *  （watchLaterPage.template.test.ts 钉住）。
+ *  术语红线（glossary 易混辨析 #1）：注册表名 WATCH_LATER_*，与追更 WATCHLIST_A11Y_LABELS
+ *  物理隔离、零交叉。 */
+export const WATCH_LATER_A11Y_LABELS = {
+  pageTitle: '稍后看',
+  back: '返回',
+  openItem: '打开稍后看作品',
+  remove: '移除该稍后看条目',
 } as const
 
 /** 通知中心页 accessibility 标注（ADR-0188 / #728：/notifications 页 + 组头展开）

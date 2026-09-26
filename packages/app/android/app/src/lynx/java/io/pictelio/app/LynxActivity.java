@@ -552,6 +552,10 @@ public class LynxActivity extends AppCompatActivity {
                             // 其 inline probe 需在表单里输入才触发 @input debounce；从 tab 栏
                             // 三段式点进去在合成点击下不稳定。与 netdiag / platform-check 同先例。
                             case "me" -> new String[]{"pictelioBenchNavMe"};
+                            // 稍后看列表页直达（ADR-0191 D5 / #753）：模拟器验收通道
+                            case "later" -> new String[]{"pictelioBenchNavLater"};
+                            // 好P友列表页直达（ADR-0193 D5 / #754）：模拟器验收通道
+                            case "mypixiv" -> new String[]{"pictelioBenchNavMyPixiv"};
                             // 详情页直达（#542）走载荷通道（illust_id 数值经 extra 传入），不入本表
                             default -> new String[0];
                         };

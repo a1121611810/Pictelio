@@ -29,6 +29,9 @@ import { formatRelativeTime } from '../utils/dateFormat'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import { NOTIFICATIONS_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import NotificationChildren from '../components/NotificationChildren.vue'
+import PageTopBar from '../components/PageTopBar.vue'
+import EmptyState from '../components/EmptyState.vue'
+import FeedListFooter from '../components/FeedListFooter.vue'
 import RefreshableList from '../components/RefreshableList.vue'
 import { t } from '../i18n'
 
@@ -140,23 +143,15 @@ function rowA11y(row: NotificationRow): string {
 
 <template>
   <view class="w-full h-full flex flex-col bg-surface">
-    <!-- M3 TopAppBar：次级页，返回箭头 + 标题（对齐 Watchlist 头部模式） -->
-    <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
-      <view
-        class="py-1 pr-2"
-        :accessibility-element="A11Y_ELEMENT_ENABLED"
-        :accessibility-label="NOTIFICATIONS_A11Y_LABELS.back"
-        @tap="goBack"
-      >
-        <text class="text-[6.4vw] leading-none text-surface-on">‹</text>
-      </view>
-      <text
-        class="flex-1 text-title-large font-medium text-surface-on"
-        :accessibility-element="A11Y_ELEMENT_ENABLED"
-        :accessibility-label="NOTIFICATIONS_A11Y_LABELS.pageTitle"
-        >{{ t('notifications.title') }}</text
-      >
-    </view>
+    <!-- M3 TopAppBar：次级页，返回箭头 + 标题（PageTopBar 变体 b，ADR-0194）；
+         a11y 注册表 value 经 props 注入（组件不自持业务 a11y 文案） -->
+    <PageTopBar
+      back
+      :title="t('notifications.title')"
+      :back-a11y-label="NOTIFICATIONS_A11Y_LABELS.back"
+      :title-a11y-label="NOTIFICATIONS_A11Y_LABELS.pageTitle"
+      @back="goBack"
+    />
 
     <!-- 有数据时刷新失败：Vue Query 保留已加载页（不同于首屏失败），顶部内联错误条兜底（ADR-0104 槽位语义） -->
     <text v-if="view === 'content' && pageError" class="text-body-small text-error p-4">{{ pageError.message }}</text>
@@ -185,11 +180,7 @@ function rowA11y(row: NotificationRow): string {
     </view>
     <!-- 空态 -->
     <view v-else-if="view === 'empty'" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <view class="flex flex-col items-center">
-        <text class="text-[10.667vw] leading-none text-outline-variant">◇</text>
-        <text class="text-body-large text-surface-on mt-3">{{ t('notifications.empty.title') }}</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ t('notifications.empty.hint') }}</text>
-      </view>
+      <EmptyState icon="◇" :title="t('notifications.empty.title')" :hint="t('notifications.empty.hint')" />
     </view>
 
     <RefreshableList v-else :refresh="refreshFeed" @back-to-top="refreshEpoch++">
@@ -270,9 +261,14 @@ function rowA11y(row: NotificationRow): string {
         class="w-full h-10 flex items-center justify-center"
         full-span
       >
-        <text v-if="list.isFetchingNextPage.value" class="text-body-medium text-outline">{{ t('notifications.footer.loading') }}</text>
-        <text v-else-if="pageError" class="text-body-medium text-error">{{ pageError.message }}</text>
-        <text v-else class="text-body-medium text-outline">{{ t('notifications.footer.end') }}</text>
+        <!-- 三态文案组件化（FeedListFooter，ADR-0194）；外层 list-item 保留 -->
+        <FeedListFooter
+          :loading="list.isFetchingNextPage.value"
+          :error="pageError?.message"
+          :end="list.hasNextPage.value === false && rows.length > 0"
+          :loading-text="t('notifications.footer.loading')"
+          :end-text="t('notifications.footer.end')"
+        />
       </list-item>
     </list>
     </template>

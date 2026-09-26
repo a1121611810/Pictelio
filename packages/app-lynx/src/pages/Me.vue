@@ -9,8 +9,10 @@ import { useAuthStore } from '../stores/authStore'
 import { useClientSwitchStore, supportsClientSwitch, type ClientKind } from '../stores/clientSwitchStore'
 import { useSettingsStore, type AiFilterMode } from '../stores/settingsStore'
 import { useNotificationStore } from '../stores/notificationStore'
+import { useWatchLaterStore } from '../stores/watchLaterStore'
 import type { ImageQuality } from '../utils/imageQuality'
 import type { UgoiraExtractMode } from '../api/ugoira'
+import { buildSaveFileNameFromTemplate, DEFAULT_DOWNLOAD_TEMPLATE } from '../utils/galleryDownload'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { ME_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { readEngineState, REASON_I18N_KEYS, type EngineKind, type EngineStateSnapshot } from '../utils/engineState'
@@ -53,7 +55,9 @@ const settings = useSettingsStore()
 const clientSwitch = useClientSwitchStore()
 // 通知角标（ADR-0188 D7 / #728）：Me 挂载静默刷新未读，行尾圆点数据源
 const notificationStore = useNotificationStore()
-const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, darkMode, resolvedDark, language, novelExportFormat, novelExportOptions, relatedInjection, rankingEntry, novelIntroFirst, autoFallbackEngine, fullscreenMode } = storeToRefs(settings)
+// 稍后看计数徽标数据源（ADR-0191 D5 / #753 T4）
+const watchLaterStore = useWatchLaterStore()
+const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, darkMode, resolvedDark, language, novelExportFormat, novelExportOptions, relatedInjection, rankingEntry, novelIntroFirst, autoFallbackEngine, fullscreenMode, downloadByAuthorDir } = storeToRefs(settings)
 
 const switching = ref(false)
 
@@ -326,6 +330,8 @@ onMounted(async () => {
   await ensureAuth()
   refreshWebdavLastBackupLabel()
   if (settings.webdavEnabled) await loadWebdavCredentials()
+  // 命名模板输入框对齐 store（loadSettings 为异步，晚于本页挂载完成时以装载结果为准）
+  templateInput.value = settings.downloadFileTemplate
 })
 
 onUnmounted(() => {
@@ -345,6 +351,16 @@ function openBookmarks() {
 
 function openWatchlist() {
   void navigate('/watchlist')
+}
+
+/** 稍后看列表入口（ADR-0191 D5 / #753 T4）：功能入口卡区行 */
+function openWatchLater() {
+  void navigate('/later')
+}
+
+/** 好P友列表入口（ADR-0193 D3 / #754 T7）：功能入口卡区行（稍后看行后邻位） */
+function openMyPixiv() {
+  void navigate('/mypixiv')
 }
 
 function openDownloads() {
@@ -415,6 +431,39 @@ function confirmUgoiraRange() {
 // issue #148 T2：详情画质档位（medium=标准 / large=高清 / original=原图）
 function pickDetailQuality(q: ImageQuality) {
   settings.setDetailQuality(q)
+}
+
+// ─── 下载命名（ADR-0192 / spec docs/specs/lynx-download-naming.md D6/D9）：模板输入 + 作者目录开关 ───
+// 预览样例上下文（固定单页样例：默认模板展开 = Pictelio_12345678.jpg，ADR-0192 D6 示例；
+// 样例 id/title/author 为纯展示占位值，不进 i18n——与 client 组 "SolidJS + Capacitor" 同口径）
+const TEMPLATE_PREVIEW_CTX = { id: 12345678, title: 'Sample', author: 'Author', page: 0, pageCount: 1 }
+// 预览 URL 仅用于 extForUrl 扩展名推断（sample.jpg → jpg）——中性示例串，禁硬编码 Pixiv CDN URL
+const TEMPLATE_PREVIEW_URL = 'sample.jpg'
+
+const templateInput = ref(settings.downloadFileTemplate)
+const templateFallbackHint = ref(false)
+/** 净化后示例预览（读 store 值，提交/重置即时重算） */
+const templatePreview = computed(() =>
+  buildSaveFileNameFromTemplate(settings.downloadFileTemplate, TEMPLATE_PREVIEW_CTX, TEMPLATE_PREVIEW_URL),
+)
+
+/** 提交模板（@input 逐键 + @confirm 键盘确认双通道）：净化持久化 + 非法回落可见提示（禁静默回落）；
+ *  @input 不回写输入框（避免逐键光标跳动），@confirm 键盘确认后回写净化值（trim/截断可见） */
+function commitTemplate(writeBack: boolean) {
+  templateFallbackHint.value = settings.setDownloadFileTemplate(templateInput.value)
+  if (writeBack) templateInput.value = settings.downloadFileTemplate
+}
+
+/** 一键恢复默认模板（ADR-0192 D9），清除回落提示 */
+function resetTemplate() {
+  settings.setDownloadFileTemplate(DEFAULT_DOWNLOAD_TEMPLATE)
+  templateInput.value = settings.downloadFileTemplate
+  templateFallbackHint.value = false
+}
+
+/** 按作者建目录开关：一键翻转，设备级 setter 自带持久化（目录段由命名纯函数生成） */
+function toggleDownloadByAuthorDir() {
+  settings.setDownloadByAuthorDir(!downloadByAuthorDir.value)
 }
 
 function toggleR18() {
@@ -501,6 +550,33 @@ function pickAppearanceMode(mode: DarkModeId) {
           @tap="openWatchlist"
         >
           <text class="text-title-medium text-surface-on">{{ t('me.watchlist') }}</text>
+          <text class="text-title-medium text-surface-on-variant">›</text>
+        </view>
+        <!-- 稍后看入口（ADR-0191 D5 / #753 T4）：账户组第三行，行尾条目计数徽标（数据源同 store；
+             徽标为装饰性，语义由行级 accessibility-label 承载——通知未读圆点同款约定） -->
+        <view
+          class="flex flex-row items-center justify-between py-3.5"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.watchLater"
+          @tap="openWatchLater"
+        >
+          <text class="text-title-medium text-surface-on">{{ t('later.me.entry') }}</text>
+          <view class="flex flex-row items-center">
+            <view class="min-w-[5.333vw] h-[5.333vw] px-[1.6vw] rounded-[var(--md-shape-full)] bg-secondary-container flex items-center justify-center mr-2">
+              <text class="text-label-small text-secondary-on-container">{{ watchLaterStore.count }}</text>
+            </view>
+            <text class="text-title-medium text-surface-on-variant">›</text>
+          </view>
+        </view>
+        <!-- 好P友入口（ADR-0193 D3 / #754 T7）：账户组行（稍后看行后邻位）；双向好P友关系列表，
+             与 following/follower 单向关系不同族（术语表辨析 #5） -->
+        <view
+          class="flex flex-row items-center justify-between py-3.5"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.mypixiv"
+          @tap="openMyPixiv"
+        >
+          <text class="text-title-medium text-surface-on">{{ t('me.mypixiv') }}</text>
           <text class="text-title-medium text-surface-on-variant">›</text>
         </view>
         <view
@@ -941,6 +1017,52 @@ function pickAppearanceMode(mode: DarkModeId) {
             @tap="settings.setUgoiraDownloadFormat('tar')"
           >
             <text class="text-label-large" :class="ugoiraDownloadFormat === 'tar' ? 'text-secondary-on-container' : 'text-surface-on'">TAR</text>
+          </view>
+        </view>
+
+        <!-- 下载命名（ADR-0192 / spec docs/specs/lynx-download-naming.md D9）：命名模板输入 + 预览回显 -->
+        <view class="mt-4 pt-3 border-t-[1px] border-t-surface-variant">
+          <text class="text-title-medium text-surface-on">{{ t('me.download.templateLabel') }}</text>
+          <text class="text-label-medium text-surface-on-variant mt-0.5">{{ t('me.download.templateHint') }}</text>
+          <!-- lynx input（默认普通文本键盘）：v-model 先于 @input（vue-lynx 保证，WebDAV 输入同款）；
+               @input 逐键持久化 + 预览回显，@confirm 键盘确认后回写净化值（trim/截断可见） -->
+          <input
+            v-model="templateInput"
+            class="self-stretch h-[14.933vw] box-border bg-surface-container-highest rounded-t-[var(--md-shape-extra-small)] text-body-large text-surface-on px-4 mt-2"
+            :placeholder="t('me.download.templatePlaceholder')"
+            :placeholder-color="INPUT_PLACEHOLDER_COLOR"
+            @input="commitTemplate(false)"
+            @confirm="commitTemplate(true)"
+          />
+          <view class="flex flex-row items-center justify-between mt-2">
+            <text class="text-label-medium text-surface-on-variant flex-1">{{ t('me.download.templatePreview', { value: templatePreview }) }}</text>
+            <view
+              class="px-3 py-1 rounded-[var(--md-shape-full)] bg-surface-container-high ml-2"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="ME_A11Y_LABELS.downloadTemplateReset"
+              @tap="resetTemplate"
+            >
+              <text class="text-label-medium text-surface-on">{{ t('me.download.templateReset') }}</text>
+            </view>
+          </view>
+          <!-- 非法输入（空串/全净化为空）回落默认值：可见提示（spec D6 禁静默回落） -->
+          <text v-if="templateFallbackHint" class="text-label-medium text-error mt-1">
+            {{ t('me.download.templateFallbackHint') }}
+          </text>
+          <!-- 按作者建目录开关（M3Switch ADR-0179 范式）：开启后相对目录 = 基座 + 净化作者段 -->
+          <view
+            class="flex flex-row items-center justify-between mt-2"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.downloadAuthorDirToggle"
+            @tap="toggleDownloadByAuthorDir"
+          >
+            <view class="flex flex-col">
+              <text class="text-title-medium text-surface-on">{{ t('me.download.authorDir') }}</text>
+              <text class="text-label-medium text-surface-on-variant mt-0.5">{{ t('me.download.authorDirDesc') }}</text>
+            </view>
+            <M3Switch
+              :checked="downloadByAuthorDir"
+            />
           </view>
         </view>
       </view>

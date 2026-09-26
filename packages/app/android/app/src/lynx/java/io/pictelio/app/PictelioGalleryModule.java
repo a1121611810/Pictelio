@@ -78,4 +78,31 @@ public class PictelioGalleryModule extends LynxModule {
             }
         });
     }
+
+    /**
+     * 保存单张图到相册的指定子目录（ADR-0192 D4 / spec docs/specs/lynx-download-naming.md D7，
+     * lynx 薄壳）。dir = JS 侧展开好的目录段（作者名段，非模板——模板解析不过桥，ADR-0192 D1）；
+     * null/空串按无子目录处理（走基座）。既有三参 {@link #saveImage} 保持不动（兼容 +
+     * 空目录字节不变）。回调契约同 {@link #saveImage}：成功 cb(uri, "")，失败 cb("", errMsg)。
+     */
+    @LynxMethod
+    public void saveImageTo(String url, String fileName, String dir, Callback callback) {
+        if (url == null || url.isEmpty() || fileName == null || fileName.isEmpty()) {
+            callback.invoke("", "url 和 fileName 不能为空");
+            return;
+        }
+        final String subPath = dir == null ? "" : dir;
+        final Context appContext = appContext();
+        SAVE_EXECUTOR.execute(() -> {
+            try {
+                GallerySaver.SaveResult r = GallerySaver.save(appContext,
+                        imageLoader(appContext), url, fileName, subPath);
+                callback.invoke(r.uri.toString(), "");
+            } catch (Throwable e) {
+                Log.w(TAG, "saveImageTo 失败: " + url, e);
+                String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+                callback.invoke("", msg);
+            }
+        });
+    }
 }
