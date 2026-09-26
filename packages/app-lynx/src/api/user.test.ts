@@ -97,7 +97,8 @@ describe("api/user getMyPixivUsers（GET /v1/user/mypixiv，ADR-0193 D1）", () 
             },
           },
           illusts: [],
-          novels: [],
+          // novels 缺省（following/follower 响应无该字段 → 类型可选，编译期防线）；
+          // mypixiv 响应有则照常透传（真实样例 fixture 已覆盖）
           is_muted: false,
         },
       ],
