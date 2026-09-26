@@ -7,15 +7,17 @@ import { navigate, resetHistory, ensureAuth } from '../router'
 import { useGlobalFabStore } from '../stores/globalFab'
 import { useAuthStore } from '../stores/authStore'
 import { useClientSwitchStore, supportsClientSwitch, type ClientKind } from '../stores/clientSwitchStore'
-import { useSettingsStore } from '../stores/settingsStore'
+import { useSettingsStore, type AiFilterMode } from '../stores/settingsStore'
 import { useNotificationStore } from '../stores/notificationStore'
 import type { ImageQuality } from '../utils/imageQuality'
+import type { UgoiraExtractMode } from '../api/ugoira'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { ME_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { readEngineState, REASON_I18N_KEYS, type EngineKind, type EngineStateSnapshot } from '../utils/engineState'
 import GlassCard from '../components/GlassCard.vue'
 import SettingsEndpoint from '../components/SettingsEndpoint.vue'
 import M3Switch from '../components/M3Switch.vue'
+import M3SegmentedButton, { type M3SegmentOption } from '../components/M3SegmentedButton.vue'
 import { appearanceClasses } from '../utils/appearanceClasses'
 import type { DarkModeId } from '../utils/darkMode'
 import {
@@ -374,6 +376,28 @@ function pickClient(kind: ClientKind) {
 // T6：动图播放方案——Range 需二次确认
 const ugoiraConfirm = ref(false)
 
+// ─── M3 segmented button options（spec docs/specs/app-lynx-m3-segmented-button.md §4.2：
+// 必须 computed 构建，t() 语言切换时 label 自动重算；a11yLabel 原样引用 ME_A11Y_LABELS 注册表）───
+const appearanceOptions = computed<M3SegmentOption<DarkModeId>[]>(() => [
+  { value: 'light', label: t('me.appearance.modeLight'), a11yLabel: ME_A11Y_LABELS.appearanceLight },
+  { value: 'dark', label: t('me.appearance.modeDark'), a11yLabel: ME_A11Y_LABELS.appearanceDark },
+  { value: 'system', label: t('me.appearance.modeSystem'), a11yLabel: ME_A11Y_LABELS.appearanceSystem },
+])
+const aiFilterOptions = computed<M3SegmentOption<AiFilterMode>[]>(() => [
+  { value: 'show', label: t('me.content.aiShow'), a11yLabel: ME_A11Y_LABELS.aiFilterShow },
+  { value: 'mask', label: t('me.content.aiMask'), a11yLabel: ME_A11Y_LABELS.aiFilterMask },
+  { value: 'only', label: t('me.content.aiOnly'), a11yLabel: ME_A11Y_LABELS.aiFilterOnly },
+])
+const ugoiraModeOptions = computed<M3SegmentOption<UgoiraExtractMode>[]>(() => [
+  { value: 'fflate', label: t('me.ugoira.fflate'), a11yLabel: ME_A11Y_LABELS.ugoiraFflate },
+  { value: 'range', label: t('me.ugoira.range'), a11yLabel: ME_A11Y_LABELS.ugoiraRange },
+])
+const detailQualityOptions = computed<M3SegmentOption<ImageQuality>[]>(() => [
+  { value: 'medium', label: t('me.quality.medium'), a11yLabel: ME_A11Y_LABELS.detailQualityMedium },
+  { value: 'large', label: t('me.quality.large'), a11yLabel: ME_A11Y_LABELS.detailQualityLarge },
+  { value: 'original', label: t('me.quality.original'), a11yLabel: ME_A11Y_LABELS.detailQualityOriginal },
+])
+
 function pickUgoiraMode(m: 'fflate' | 'range') {
   if (m === 'fflate') {
     ugoiraConfirm.value = false
@@ -620,36 +644,8 @@ function pickAppearanceMode(mode: DarkModeId) {
              跟随系统），缺组标签导致该键成孤儿；样式镜像同区 themeColorHint 的 label-medium 用法，
              紧贴 segmented 上方（mb-2），其余视觉不变 -->
         <text class="text-label-medium text-surface-on-variant mb-2">{{ t('me.appearance.mode') }}</text>
-        <!-- M3 segmented button（三档）：亮色 / 暗色 / 跟随系统 -->
-        <view class="flex flex-row gap-0 rounded-[var(--md-shape-full)] border border-outline overflow-hidden mb-4">
-          <view
-            class="flex-1 h-[10.667vw] flex items-center justify-center active:bg-layer-pressed-on-surface"
-            :class="darkMode === 'light' ? 'bg-secondary-container' : 'bg-surface-container-lowest'"
-            :accessibility-element="A11Y_ELEMENT_ENABLED"
-            :accessibility-label="ME_A11Y_LABELS.appearanceLight"
-            @tap="pickAppearanceMode('light')"
-          >
-            <text class="text-label-large" :class="darkMode === 'light' ? 'text-secondary-on-container' : 'text-surface-on'">{{ t('me.appearance.modeLight') }}</text>
-          </view>
-          <view
-            class="flex-1 h-[10.667vw] flex items-center justify-center border-l border-l-outline active:bg-layer-pressed-on-surface"
-            :class="darkMode === 'dark' ? 'bg-secondary-container' : 'bg-surface-container-lowest'"
-            :accessibility-element="A11Y_ELEMENT_ENABLED"
-            :accessibility-label="ME_A11Y_LABELS.appearanceDark"
-            @tap="pickAppearanceMode('dark')"
-          >
-            <text class="text-label-large" :class="darkMode === 'dark' ? 'text-secondary-on-container' : 'text-surface-on'">{{ t('me.appearance.modeDark') }}</text>
-          </view>
-          <view
-            class="flex-1 h-[10.667vw] flex items-center justify-center border-l border-l-outline active:bg-layer-pressed-on-surface"
-            :class="darkMode === 'system' ? 'bg-secondary-container' : 'bg-surface-container-lowest'"
-            :accessibility-element="A11Y_ELEMENT_ENABLED"
-            :accessibility-label="ME_A11Y_LABELS.appearanceSystem"
-            @tap="pickAppearanceMode('system')"
-          >
-            <text class="text-label-large" :class="darkMode === 'system' ? 'text-secondary-on-container' : 'text-surface-on'">{{ t('me.appearance.modeSystem') }}</text>
-          </view>
-        </view>
+        <!-- M3 segmented button（三档）：亮色 / 暗色 / 跟随系统（spec §4.4：分解写法，副作用走 pickAppearanceMode；mb-4 随 class 透传落在容器根） -->
+        <M3SegmentedButton class="mb-4" :model-value="darkMode" :options="appearanceOptions" @update:modelValue="pickAppearanceMode" />
         <view class="flex flex-row items-start justify-between">
           <view class="flex flex-col items-center gap-1">
             <!-- 天蓝（默认） -->
@@ -850,35 +846,8 @@ function pickAppearanceMode(mode: DarkModeId) {
         <!-- AI 作品三态过滤（ADR-0155）：显示 / 遮罩 / 仅看；逐项静态 a11y label（注册表完整性测试要求） -->
         <view class="flex flex-row items-center justify-between py-3.5">
           <text class="text-title-medium text-surface-on">{{ t('me.content.ai') }}</text>
-          <view class="flex flex-row gap-0 rounded-[var(--md-shape-full)] border border-outline overflow-hidden">
-            <view
-              class="flex-1 h-[10.667vw] flex items-center justify-center active:bg-layer-pressed-on-surface"
-              :class="aiFilterMode === 'show' ? 'bg-secondary-container' : 'bg-surface-container-lowest'"
-              :accessibility-element="A11Y_ELEMENT_ENABLED"
-              :accessibility-label="ME_A11Y_LABELS.aiFilterShow"
-              @tap="settings.setAiFilterMode('show')"
-            >
-              <text class="text-label-large" :class="aiFilterMode === 'show' ? 'text-secondary-on-container' : 'text-surface-on'">{{ t('me.content.aiShow') }}</text>
-            </view>
-            <view
-              class="flex-1 h-[10.667vw] flex items-center justify-center active:bg-layer-pressed-on-surface"
-              :class="aiFilterMode === 'mask' ? 'bg-secondary-container' : 'bg-surface-container-lowest'"
-              :accessibility-element="A11Y_ELEMENT_ENABLED"
-              :accessibility-label="ME_A11Y_LABELS.aiFilterMask"
-              @tap="settings.setAiFilterMode('mask')"
-            >
-              <text class="text-label-large" :class="aiFilterMode === 'mask' ? 'text-secondary-on-container' : 'text-surface-on'">{{ t('me.content.aiMask') }}</text>
-            </view>
-            <view
-              class="flex-1 h-[10.667vw] flex items-center justify-center active:bg-layer-pressed-on-surface"
-              :class="aiFilterMode === 'only' ? 'bg-secondary-container' : 'bg-surface-container-lowest'"
-              :accessibility-element="A11Y_ELEMENT_ENABLED"
-              :accessibility-label="ME_A11Y_LABELS.aiFilterOnly"
-              @tap="settings.setAiFilterMode('only')"
-            >
-              <text class="text-label-large" :class="aiFilterMode === 'only' ? 'text-secondary-on-container' : 'text-surface-on'">{{ t('me.content.aiOnly') }}</text>
-            </view>
-          </view>
+          <!-- 段级 a11y 由组件自持；段间分隔线随组件自动生成（本组 bug 修复随迁移生效，spec §1/§2） -->
+          <M3SegmentedButton :model-value="aiFilterMode" :options="aiFilterOptions" @update:modelValue="settings.setAiFilterMode" />
         </view>
 
         <!-- 静音标签管理入口（ADR-0187 D5 / #732）：内容组末行，跳 /mute-tags -->
@@ -897,27 +866,8 @@ function pickAppearanceMode(mode: DarkModeId) {
       <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
         <text class="text-title-small font-medium text-surface-on">{{ t('me.ugoira.title') }}</text>
         <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.ugoira.hint') }}</text>
-        <!-- M3 segmented button：容器 outline 边框 + 全圆角，40dp 高，选中段 secondary-container -->
-        <view class="flex flex-row gap-0 rounded-[var(--md-shape-full)] border border-outline overflow-hidden">
-          <view
-            class="flex-1 h-[10.667vw] flex items-center justify-center active:bg-layer-pressed-on-surface"
-            :class="ugoiraMode === 'fflate' ? 'bg-secondary-container' : 'bg-surface-container-lowest'"
-            :accessibility-element="A11Y_ELEMENT_ENABLED"
-            :accessibility-label="ME_A11Y_LABELS.ugoiraFflate"
-            @tap="pickUgoiraMode('fflate')"
-          >
-            <text class="text-label-large" :class="ugoiraMode === 'fflate' ? 'text-secondary-on-container' : 'text-surface-on'">{{ t('me.ugoira.fflate') }}</text>
-          </view>
-          <view
-            class="flex-1 h-[10.667vw] flex items-center justify-center border-l border-l-outline active:bg-layer-pressed-on-surface"
-            :class="ugoiraMode === 'range' ? 'bg-secondary-container' : 'bg-surface-container-lowest'"
-            :accessibility-element="A11Y_ELEMENT_ENABLED"
-            :accessibility-label="ME_A11Y_LABELS.ugoiraRange"
-            @tap="pickUgoiraMode('range')"
-          >
-            <text class="text-label-large" :class="ugoiraMode === 'range' ? 'text-secondary-on-container' : 'text-surface-on'">{{ t('me.ugoira.range') }}</text>
-          </view>
-        </view>
+        <!-- M3 segmented button：容器 outline 边框 + 全圆角，40dp 高，选中段 secondary-container（range 档二次确认仍走 pickUgoiraMode） -->
+        <M3SegmentedButton :model-value="ugoiraMode" :options="ugoiraModeOptions" @update:modelValue="pickUgoiraMode" />
         <text class="text-label-medium text-surface-on-variant mt-2 leading-snug">
           {{ t('me.ugoira.rangeHint') }}
         </text>
@@ -928,35 +878,7 @@ function pickAppearanceMode(mode: DarkModeId) {
         <text class="text-title-small font-medium text-surface-on">{{ t('me.quality.title') }}</text>
         <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.quality.hint') }}</text>
         <!-- M3 segmented button（三档）：容器 outline 边框 + 全圆角，40dp 高，选中段 secondary-container -->
-        <view class="flex flex-row gap-0 rounded-[var(--md-shape-full)] border border-outline overflow-hidden">
-          <view
-            class="flex-1 h-[10.667vw] flex items-center justify-center active:bg-layer-pressed-on-surface"
-            :class="detailQuality === 'medium' ? 'bg-secondary-container' : 'bg-surface-container-lowest'"
-            :accessibility-element="A11Y_ELEMENT_ENABLED"
-            :accessibility-label="ME_A11Y_LABELS.detailQualityMedium"
-            @tap="pickDetailQuality('medium')"
-          >
-            <text class="text-label-large" :class="detailQuality === 'medium' ? 'text-secondary-on-container' : 'text-surface-on'">{{ t('me.quality.medium') }}</text>
-          </view>
-          <view
-            class="flex-1 h-[10.667vw] flex items-center justify-center border-l border-l-outline active:bg-layer-pressed-on-surface"
-            :class="detailQuality === 'large' ? 'bg-secondary-container' : 'bg-surface-container-lowest'"
-            :accessibility-element="A11Y_ELEMENT_ENABLED"
-            :accessibility-label="ME_A11Y_LABELS.detailQualityLarge"
-            @tap="pickDetailQuality('large')"
-          >
-            <text class="text-label-large" :class="detailQuality === 'large' ? 'text-secondary-on-container' : 'text-surface-on'">{{ t('me.quality.large') }}</text>
-          </view>
-          <view
-            class="flex-1 h-[10.667vw] flex items-center justify-center border-l border-l-outline active:bg-layer-pressed-on-surface"
-            :class="detailQuality === 'original' ? 'bg-secondary-container' : 'bg-surface-container-lowest'"
-            :accessibility-element="A11Y_ELEMENT_ENABLED"
-            :accessibility-label="ME_A11Y_LABELS.detailQualityOriginal"
-            @tap="pickDetailQuality('original')"
-          >
-            <text class="text-label-large" :class="detailQuality === 'original' ? 'text-secondary-on-container' : 'text-surface-on'">{{ t('me.quality.original') }}</text>
-          </view>
-        </view>
+        <M3SegmentedButton :model-value="detailQuality" :options="detailQualityOptions" @update:modelValue="pickDetailQuality" />
       </view>
 
       <!-- 下载格式组（spec download-manager §5）：全局统一，不可逐图 -->

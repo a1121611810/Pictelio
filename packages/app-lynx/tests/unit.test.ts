@@ -1309,19 +1309,35 @@ describe('Me 页 accessibility 标注注册表（issue #103）', () => {
     expect(A11Y_ELEMENT_ENABLED).toBe(true)
   })
 
-  it('注册表 label 全部被 Me.vue 模板消费（纯增量标注，漏一个即失败）', () => {
+  it('注册表 label 全部被 Me.vue 消费（纯增量标注，漏一个即失败）', () => {
+    // 段级 a11y 已迁入 M3SegmentedButton options（ADR-0190 / spec docs/specs/app-lynx-m3-segmented-button.md §4.2），
+    // 注册表完整性不变量保持：每个 key 仍被 Me.vue 消费（模板绑定或 options a11yLabel 两种形态之一）。
     for (const key of Object.keys(ME_A11Y_LABELS)) {
-      expect(meVueSource).toContain(`:accessibility-label="ME_A11Y_LABELS.${key}"`)
+      const inTemplate = meVueSource.includes(`:accessibility-label="ME_A11Y_LABELS.${key}"`)
+      const inOptions = meVueSource.includes(`a11yLabel: ME_A11Y_LABELS.${key}`)
+      expect(inTemplate || inOptions).toBe(true)
     }
   })
 
-  it('每个 accessibility-label 都配套开启 accessibility-element（view 默认不进 a11y 树）', () => {
-    // 模板里每处 label 引用都必须伴随 element 开启，且数量与注册表严格一致，
-    // 防止「登记了 label 却漏开 element」或「绕过注册表硬编码 label」。
+  it('模板内 label/element 数量配对 + 迁移段 key 经 options 消费', () => {
+    // a. 模板内配对：段级 :accessibility-label 迁入 options 后，模板内 label 与 element 同降为 61，
+    //    两者数量必须相等，「每处 label 引用都伴随 element 开启」的模板内配对关系不破。
     const labelCount = (meVueSource.match(/:accessibility-label="ME_A11Y_LABELS\.\w+"/g) ?? []).length
     const elementCount = (meVueSource.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
-    expect(labelCount).toBe(Object.keys(ME_A11Y_LABELS).length)
-    expect(elementCount).toBe(labelCount)
+    expect(labelCount).toBe(elementCount)
+    // b. 迁移的 11 个段 key 必须经 options 消费（M3SegmentedButton 段级 a11y 的唯一接线点）。
+    const segmentedKeys = [
+      'appearanceLight', 'appearanceDark', 'appearanceSystem',
+      'aiFilterShow', 'aiFilterMask', 'aiFilterOnly',
+      'ugoiraFflate', 'ugoiraRange',
+      'detailQualityMedium', 'detailQualityLarge', 'detailQualityOriginal',
+    ] as const
+    for (const key of segmentedKeys) {
+      expect(meVueSource).toContain(`a11yLabel: ME_A11Y_LABELS.${key}`)
+    }
+    // c. 段内 accessibility-element 与 a11yLabel 的配对现由组件保证
+    //    （M3SegmentedButton.template.test.ts 正向断言），本文件守
+    //    「Me.vue 侧消费完整性 + 模板内配对」。
   })
 
   it('「切回 WebView」入口与页面标题标注存在（模拟器 E2E 双向闭环锚点）', () => {

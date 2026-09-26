@@ -30,6 +30,7 @@ const rootDir = resolve(here, '..', '..', '..')
 const tokensCss = readFileSync(resolve(rootDir, 'src/styles/tokens.css'), 'utf-8')
 const appVue = readFileSync(resolve(rootDir, 'src/App.vue'), 'utf-8')
 const meVue = readFileSync(resolve(rootDir, 'src/pages/Me.vue'), 'utf-8')
+const m3SegmentedVue = readFileSync(resolve(rootDir, 'src/components/M3SegmentedButton.vue'), 'utf-8')
 
 /** 取以 `selector` 起始的规则块（首个 `{` 到首个 `}`）——色板块均为单层，无嵌套花括号 */
 function extractBlock(css: string, selector: string): string {
@@ -272,12 +273,22 @@ describe('T2 App.vue 根类接线', () => {
 })
 
 describe('T2 Me.vue 外观模式入口（M3 segmented button 三格）', () => {
-  it('Me.vue 外观模式入口 = darkMode 三态消费 + 模板契约', () => {
-    // Me.vue 经 pickAppearanceMode(mode) 统一调用 settings.setDarkMode(mode)，
-    // 模板三段分别传 'light' / 'dark' / 'system' 字面量 → setDarkMode 必含此三字面量
-    expect(meVue).toContain("pickAppearanceMode('light')")
-    expect(meVue).toContain("pickAppearanceMode('dark')")
-    expect(meVue).toContain("pickAppearanceMode('system')")
+  it('Me.vue 外观模式入口 = darkMode 三态消费 + 组件调用契约', () => {
+    // 迁移后（spec docs/specs/app-lynx-m3-segmented-button.md §4 / ADR-0190，#741 后续）：
+    // 模板不再有逐段 pickAppearanceMode('light') 绑定，改为单个 <M3SegmentedButton> 组件调用
+    // （spec §4.4 分解写法：副作用处理器 pickAppearanceMode 接 update 事件，三段选项集中在
+    // appearanceOptions computed）。三态 i18n 键改由 options computed 消费。
+    for (const key of ['modeLight', 'modeDark', 'modeSystem']) {
+      expect(meVue, 'appearanceOptions computed 未消费 me.appearance.' + key).toContain(
+        'me.appearance.' + key,
+      )
+    }
+    expect(meVue, '模板缺少 <M3SegmentedButton> 组件调用').toContain('<M3SegmentedButton')
+    expect(meVue, '组件调用未接 update 事件到 pickAppearanceMode').toContain(
+      '@update:modelValue="pickAppearanceMode"',
+    )
+    expect(meVue, '组件调用未绑定 darkMode 到 model-value').toContain(':model-value="darkMode"')
+    // 副作用处理器仍统一走 settings.setDarkMode(mode)（setter 路径由 T1 钉死，语义未变）
     expect(meVue).toContain('settings.setDarkMode(mode)')
   })
 
@@ -295,14 +306,22 @@ describe('T2 Me.vue 外观模式入口（M3 segmented button 三格）', () => {
     expect(new Set(labels).size).toBe(3)
   })
 
-  it('外观模式入口模板三段均消费 a11y 注册表 + accessibility-element', () => {
-    expect(meVue).toContain(':accessibility-label="ME_A11Y_LABELS.appearanceLight"')
-    expect(meVue).toContain(':accessibility-label="ME_A11Y_LABELS.appearanceDark"')
-    expect(meVue).toContain(':accessibility-label="ME_A11Y_LABELS.appearanceSystem"')
-    // 三段均开 accessibility-element（与既有 segmented button 模式一致）
-    const segBlock = meVue.match(/M3 segmented button（三档）：亮色 \/ 暗色 \/ 跟随系统[\s\S]*?<\/view>\s*<\/view>/)
-    expect(segBlock).not.toBeNull()
-    expect(segBlock![0].match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g)?.length).toBe(3)
+  it('外观模式入口三段均消费 a11y 注册表（options a11yLabel 形态）', () => {
+    // 段级 a11y 配对随组件化下移：Me.vue 不再逐段挂 :accessibility-label，
+    // 改为 appearanceOptions 各项以 a11yLabel 形态引用 ME_A11Y_LABELS 注册表（spec §4.2）
+    for (const key of ['appearanceLight', 'appearanceDark', 'appearanceSystem']) {
+      expect(meVue, 'appearanceOptions 缺少 a11yLabel: ME_A11Y_LABELS.' + key).toContain(
+        'a11yLabel: ME_A11Y_LABELS.' + key,
+      )
+    }
+    // 迁移回归锚：accessibility-element 绑定随段级配对下移组件模板；
+    // 组件自身 template test（M3SegmentedButton.test.ts）已有更强断言，此处仅钉存在性
+    expect(m3SegmentedVue, '组件模板缺少 accessibility-element 绑定（段级 a11y 未下移）').toContain(
+      ':accessibility-element="A11Y_ELEMENT_ENABLED"',
+    )
+    expect(m3SegmentedVue, '组件模板未消费 option.a11yLabel').toContain(
+      ':accessibility-label="option.a11yLabel"',
+    )
   })
 
   it('Me.vue 真实渲染组标签 me.appearance.mode（i18n 键非孤儿）', () => {
