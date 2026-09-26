@@ -1,9 +1,9 @@
 {
-  "version": "6.0.0",
-  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v6.0.0",
-  "changelog": "# Pictelio 更新日志\n\n## 🐛 问题修复\n\n- **信息流加载**：此前加载与刷新时偶发卡顿，现已通过占位数据策略消除渲染期异步读取挂起，滑动更顺畅\n- **FeedList 组件**：此前在特定场景下出现渲染异常，现已恢复正常\n- **图片加载**：原生图片桥接调用现在有统一超时，加载失败时不再长时间无响应\n- **数据错误处理**：渲染期数据读取失败时不再抛出异常，避免页面崩溃",
+  "version": "6.1.0",
+  "url": "https://github.com/a1121611810/Pictelio/releases/tag/v6.1.0",
+  "changelog": "# Pictelio 更新日志\n\n## ✨ 新功能\n\n- **通知中心**：新增集中查看消息的独立页面。WebView 引擎入口在顶部铃铛图标，Lynx 引擎入口在「我」页面；若存在未读消息，对应入口会显示未读角标\n- **标签静音**：WebView 与 Lynx 引擎均支持长按标签将其静音，或在新增的管理页统一查看与解除；静音后的标签下内容不再出现在信息流中\n\n## 🐛 问题修复\n\n- **通知中心 角标（Lynx）**：此前从被缓存的页面切回时，入口的未读角标可能停留在旧值；现已按当前实际未读数刷新\n- **标签静音**：WebView 与 Lynx 现在以同一份数据作为静音来源，备份与恢复后两端的静音列表保持一致\n- **标签静音 管理页（Lynx）**：修正了分组展示与无障碍提示",
   "webBundle": {
-    "version": "6.0.0",
-    "url": "https://github.com/a1121611810/Pictelio/releases/download/v6.0.0/pictelio-6.0.0"
+    "version": "6.1.0",
+    "url": "https://github.com/a1121611810/Pictelio/releases/download/v6.1.0/pictelio-6.1.0"
   }
 }
