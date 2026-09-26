@@ -43,6 +43,7 @@ const zhPages = {
   "later.remove": "移除",
   "later.badge.illust": "插画",
   "later.badge.novel": "小说",
+  "later.me.entry": "稍后看",
 
   // ─── NovelIntro.vue（小说介绍页，地图 #575 / spec #585） ───
   "novelIntro.retry": "重试",

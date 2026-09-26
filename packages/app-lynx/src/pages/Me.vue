@@ -9,6 +9,7 @@ import { useAuthStore } from '../stores/authStore'
 import { useClientSwitchStore, supportsClientSwitch, type ClientKind } from '../stores/clientSwitchStore'
 import { useSettingsStore, type AiFilterMode } from '../stores/settingsStore'
 import { useNotificationStore } from '../stores/notificationStore'
+import { useWatchLaterStore } from '../stores/watchLaterStore'
 import type { ImageQuality } from '../utils/imageQuality'
 import type { UgoiraExtractMode } from '../api/ugoira'
 import { buildSaveFileNameFromTemplate, DEFAULT_DOWNLOAD_TEMPLATE } from '../utils/galleryDownload'
@@ -54,6 +55,8 @@ const settings = useSettingsStore()
 const clientSwitch = useClientSwitchStore()
 // 通知角标（ADR-0188 D7 / #728）：Me 挂载静默刷新未读，行尾圆点数据源
 const notificationStore = useNotificationStore()
+// 稍后看计数徽标数据源（ADR-0191 D5 / #753 T4）
+const watchLaterStore = useWatchLaterStore()
 const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, darkMode, resolvedDark, language, novelExportFormat, novelExportOptions, relatedInjection, rankingEntry, novelIntroFirst, autoFallbackEngine, fullscreenMode, downloadByAuthorDir } = storeToRefs(settings)
 
 const switching = ref(false)
@@ -350,6 +353,11 @@ function openWatchlist() {
   void navigate('/watchlist')
 }
 
+/** 稍后看列表入口（ADR-0191 D5 / #753 T4）：功能入口卡区行 */
+function openWatchLater() {
+  void navigate('/later')
+}
+
 function openDownloads() {
   void navigate('/downloads')
 }
@@ -537,6 +545,22 @@ function pickAppearanceMode(mode: DarkModeId) {
         >
           <text class="text-title-medium text-surface-on">{{ t('me.watchlist') }}</text>
           <text class="text-title-medium text-surface-on-variant">›</text>
+        </view>
+        <!-- 稍后看入口（ADR-0191 D5 / #753 T4）：账户组第三行，行尾条目计数徽标（数据源同 store；
+             徽标为装饰性，语义由行级 accessibility-label 承载——通知未读圆点同款约定） -->
+        <view
+          class="flex flex-row items-center justify-between py-3.5"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.watchLater"
+          @tap="openWatchLater"
+        >
+          <text class="text-title-medium text-surface-on">{{ t('later.me.entry') }}</text>
+          <view class="flex flex-row items-center">
+            <view class="min-w-[5.333vw] h-[5.333vw] px-[1.6vw] rounded-[var(--md-shape-full)] bg-secondary-container flex items-center justify-center mr-2">
+              <text class="text-label-small text-secondary-on-container">{{ watchLaterStore.count }}</text>
+            </view>
+            <text class="text-title-medium text-surface-on-variant">›</text>
+          </view>
         </view>
         <view
           class="flex flex-row items-center justify-between py-3.5"

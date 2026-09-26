@@ -21,6 +21,9 @@ export const ME_A11Y_LABELS = {
   switchToLynx: '切换客户端到Lynx',
   bookmarks: '我的收藏',
   watchlist: '追更列表',
+  // 稍后看入口（ADR-0191 D5 / #753 T4）：账户组行 + 行尾计数徽标（徽标为装饰性，
+  // 语义由行级 label 承载——通知未读圆点同款约定）
+  watchLater: '稍后看',
   downloads: '下载管理',
   networkCheck: '网络自检',
   // 通知中心入口（ADR-0188 D7 / #728）：账户组行 + 行尾未读圆点

@@ -43,6 +43,7 @@ const enPages = {
   "later.remove": "Remove",
   "later.badge.illust": "Illustration",
   "later.badge.novel": "Novel",
+  "later.me.entry": "Watch Later",
 
   // NovelIntro.vue (novel intro page, map #575 / spec #585)
   "novelIntro.retry": "Retry",
