@@ -24,6 +24,8 @@ export const ME_A11Y_LABELS = {
   // 稍后看入口（ADR-0191 D5 / #753 T4）：账户组行 + 行尾计数徽标（徽标为装饰性，
   // 语义由行级 label 承载——通知未读圆点同款约定）
   watchLater: '稍后看',
+  // 好P友入口（ADR-0193 D3 / #754 T7）：账户组行（稍后看行后邻位）
+  mypixiv: '好P友',
   downloads: '下载管理',
   networkCheck: '网络自检',
   // 通知中心入口（ADR-0188 D7 / #728）：账户组行 + 行尾未读圆点

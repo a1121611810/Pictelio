@@ -358,6 +358,11 @@ function openWatchLater() {
   void navigate('/later')
 }
 
+/** 好P友列表入口（ADR-0193 D3 / #754 T7）：功能入口卡区行（稍后看行后邻位） */
+function openMyPixiv() {
+  void navigate('/mypixiv')
+}
+
 function openDownloads() {
   void navigate('/downloads')
 }
@@ -561,6 +566,17 @@ function pickAppearanceMode(mode: DarkModeId) {
             </view>
             <text class="text-title-medium text-surface-on-variant">›</text>
           </view>
+        </view>
+        <!-- 好P友入口（ADR-0193 D3 / #754 T7）：账户组行（稍后看行后邻位）；双向好P友关系列表，
+             与 following/follower 单向关系不同族（术语表辨析 #5） -->
+        <view
+          class="flex flex-row items-center justify-between py-3.5"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.mypixiv"
+          @tap="openMyPixiv"
+        >
+          <text class="text-title-medium text-surface-on">{{ t('me.mypixiv') }}</text>
+          <text class="text-title-medium text-surface-on-variant">›</text>
         </view>
         <view
           class="flex flex-row items-center justify-between py-3.5"
