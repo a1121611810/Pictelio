@@ -104,12 +104,7 @@ public final class GallerySaver {
         }
         String safe = sanitizeFileName(fileName);
         String mime = mimeFor(safe);
-        // 子目录段第二道防御性净化（JS 侧 sanitizeNameSegment 同规则镜像）；
-        // 空白 → 无子目录（现行为字节不变）。净化后为空的输入已被 trim 短路，不会触达 IOException 分支。
-        String sub = subPath == null ? "" : subPath.trim();
-        if (!sub.isEmpty()) {
-            sub = sanitizeFileName(sub);
-        }
+        String sub = sanitizedSubPath(subPath);
         Context app = context.getApplicationContext();
         if (Build.VERSION.SDK_INT >= 29) {
             return saveToMediaStore(app, source, safe, mime, sub);
@@ -124,17 +119,34 @@ public final class GallerySaver {
      */
     public static SaveResult saveDownloadFile(Context context, File source, String fileName)
             throws IOException {
+        return saveDownloadFile(context, source, fileName, "");
+    }
+
+    /**
+     * {@link #saveDownloadFile} + 可选相对子目录（ADR-0192 D4 / spec D7）：subPath 为 JS 侧
+     * 展开好的作者目录段；空串/null = 现行为字节不变（老调用点零改动）；非空时防御性净化后
+     * 追加到基座 Downloads/Pictelio 之后（MediaStore RELATIVE_PATH 与 API 28 回退两条路同规则）。
+     */
+    public static SaveResult saveDownloadFile(Context context, File source, String fileName,
+            String subPath) throws IOException {
         if (source == null || !source.exists()) {
             throw new IOException("保存失败：源文件不存在");
         }
         String safe = sanitizeFileName(fileName);
         String mime = mimeFor(safe);
+        String sub = sanitizedSubPath(subPath);
         Context app = context.getApplicationContext();
         if (Build.VERSION.SDK_INT >= 29) {
-            return saveToDownloads(app, source, safe, mime);
+            return saveToDownloads(app, source, safe, mime, sub);
         }
-        return saveToFallbackDir(app, source, safe, mime,
-                Environment.DIRECTORY_DOWNLOADS, DOWNLOAD_DIR_NAME);
+        File downloadsDir = app.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+        if (downloadsDir == null) {
+            throw new IOException("保存失败：外部存储不可用");
+        }
+        File dir = sub.isEmpty()
+                ? new File(downloadsDir, DOWNLOAD_DIR_NAME)
+                : new File(new File(downloadsDir, DOWNLOAD_DIR_NAME), sub);
+        return writeToFallbackDir(app, source, safe, mime, dir);
     }
 
     // ── API 29+：MediaStore（IS_PENDING 两段式） ──────────────
@@ -148,12 +160,12 @@ public final class GallerySaver {
         return writeToMediaStore(app, uri, source);
     }
 
-    /** API 29+：非图片产物入 MediaStore.Downloads（Downloads/Pictelio）。 */
+    /** API 29+：非图片产物入 MediaStore.Downloads（Downloads/Pictelio [+ 子目录段]）。 */
     private static SaveResult saveToDownloads(Context app, File source, String displayName,
-            String mime) throws IOException {
+            String mime, String subPath) throws IOException {
         ContentResolver cr = app.getContentResolver();
         Uri uri = cr.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-                buildDownloadValues(displayName, mime));
+                buildDownloadValues(displayName, mime, subPath));
         return writeToMediaStore(app, uri, source);
     }
 
@@ -212,13 +224,22 @@ public final class GallerySaver {
         return values;
     }
 
-    /** Downloads 插入 values（包可见纯构造，测试锚定字段契约） */
+    /** Downloads 插入 values（包可见纯构造，测试锚定字段契约；基座路径版） */
     static ContentValues buildDownloadValues(String displayName, String mime) {
+        return buildDownloadValues(displayName, mime, "");
+    }
+
+    /**
+     * Downloads 插入 values（包可见纯构造，测试锚定字段契约 + ADR-0192 D4）：
+     * subPath 非空时 RELATIVE_PATH = Downloads/Pictelio + "/" + 净化子目录段。
+     */
+    static ContentValues buildDownloadValues(String displayName, String mime, String subPath) {
         ContentValues values = new ContentValues();
         values.put(MediaStore.MediaColumns.DISPLAY_NAME, displayName);
         values.put(MediaStore.MediaColumns.MIME_TYPE, mime);
+        String base = Environment.DIRECTORY_DOWNLOADS + "/" + DOWNLOAD_DIR_NAME;
         values.put(MediaStore.MediaColumns.RELATIVE_PATH,
-                Environment.DIRECTORY_DOWNLOADS + "/Pictelio");
+                subPath == null || subPath.isEmpty() ? base : base + "/" + subPath);
         values.put(MediaStore.MediaColumns.IS_PENDING, 1);
         return values;
     }
@@ -292,6 +313,19 @@ public final class GallerySaver {
             throw new IOException("保存失败：文件名非法「" + fileName + "」");
         }
         return cleaned;
+    }
+
+    /**
+     * 子目录段第二道防御性净化（ADR-0192 D4；JS 侧 sanitizeNameSegment 同规则镜像）：
+     * 空白 → 无子目录（现行为字节不变）。非空段经 {@link #sanitizeFileName}——分隔符
+     * 替换保证单段目录名（不可能注入路径穿越）。
+     */
+    private static String sanitizedSubPath(String subPath) throws IOException {
+        String sub = subPath == null ? "" : subPath.trim();
+        if (!sub.isEmpty()) {
+            sub = sanitizeFileName(sub);
+        }
+        return sub;
     }
 
     /** 扩展名推断：取 URL 路径尾段（剥离 query），白名单外一律 jpg */

@@ -184,6 +184,57 @@ public class GallerySaverTest {
                 new File(r.uri.getPath()).getAbsolutePath());
     }
 
+    // ── saveDownloadFile 子目录（ADR-0192 D4 / spec D7）：非图片导出链基座 Downloads/Pictelio ──
+
+    /** 就位一个本地源文件（saveDownloadFile 直接吃 File，不走 loader） */
+    private File seedExport(String name, byte[] bytes) throws IOException {
+        File f = new File(context.getCacheDir(), name);
+        Files.write(f.toPath(), bytes);
+        return f;
+    }
+
+    @Test
+    public void saveDownloadFile_api28Fallback_authorSubPath_writesUnderDownloadsPictelioAuthor()
+            throws IOException {
+        File source = seedExport("export-a.zip", new byte[]{1, 2, 3});
+
+        GallerySaver.SaveResult r =
+                GallerySaver.saveDownloadFile(context, source, "Pictelio_6.zip", "画师名");
+
+        assertFalse(r.mediaStore);
+        File base = new File(
+                context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), "Pictelio");
+        File expected = new File(new File(base, "画师名"), "Pictelio_6.zip");
+        assertEquals(expected.getAbsolutePath(), new File(r.uri.getPath()).getAbsolutePath());
+        assertArrayEquals(new byte[]{1, 2, 3}, Files.readAllBytes(expected.toPath()));
+    }
+
+    @Test
+    public void saveDownloadFile_api28Fallback_emptySubPath_keepsLegacyDirectory() throws IOException {
+        File source = seedExport("export-b.zip", new byte[]{4});
+
+        GallerySaver.SaveResult r = GallerySaver.saveDownloadFile(context, source, "Pictelio_7.zip", "");
+
+        File expected = new File(new File(
+                context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), "Pictelio"),
+                "Pictelio_7.zip");
+        assertEquals(expected.getAbsolutePath(), new File(r.uri.getPath()).getAbsolutePath());
+    }
+
+    @Test
+    public void saveDownloadFile_api28Fallback_subPathSanitized_pathTraversalNeutralized()
+            throws IOException {
+        File source = seedExport("export-c.zip", new byte[]{5});
+
+        GallerySaver.SaveResult r =
+                GallerySaver.saveDownloadFile(context, source, "Pictelio_8.zip", "a/b\\c");
+
+        File base = new File(
+                context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), "Pictelio");
+        assertEquals(new File(new File(base, "a_b_c"), "Pictelio_8.zip").getAbsolutePath(),
+                new File(r.uri.getPath()).getAbsolutePath());
+    }
+
     @Test
     public void save_cacheMiss_downloadsFromOfficialUrl() throws IOException {
         try (MockWebServer server = new MockWebServer()) {
