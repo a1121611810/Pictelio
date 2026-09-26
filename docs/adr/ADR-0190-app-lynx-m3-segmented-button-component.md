@@ -50,6 +50,8 @@ M3Switch 是**纯视觉**（a11y 与 `@tap` 上推父级行——整行一个焦
 | Me.vue | 外观模式 / AI 作品 / 动图播放 / 详情画质 | 3/3/2/3 | AI 组 = 本 bug 主角，修复随迁移生效；外观模式用分解写法接 `pickAppearanceMode` 副作用 |
 | TranslateModeSwitch.vue | 小说翻译 原文/译文 | 2 | `disabled` prop 接 `!enabled`；store 派生 modelValue |
 
+> **修订（2026-09-26，#739 视觉验收迭代）**：AI 作品组布局由「label 同行窄控件」改为「标签独占一行 + 整宽 segmented」（对齐外观组「模式」标签范式）。接口与行为契约不变；Grill 阶段"保持同行"的推荐被真机验收 falsified，教训记入 spec §6 #2。
+
 迁移后行为零变化：选中值、持久化键、副作用、a11y label 字符串、行容器布局全部原样保留；唯一变化是 markup 收进组件 + AI 组获得分隔线。
 
 ## 否决的替代方案

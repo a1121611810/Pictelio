@@ -843,9 +843,11 @@ function pickAppearanceMode(mode: DarkModeId) {
           />
         </view>
 
-        <!-- AI 作品三态过滤（ADR-0155）：显示 / 遮罩 / 仅看；逐项静态 a11y label（注册表完整性测试要求） -->
-        <view class="flex flex-row items-center justify-between py-3.5">
-          <text class="text-title-medium text-surface-on">{{ t('me.content.ai') }}</text>
+        <!-- AI 作品三态过滤（ADR-0155）：显示 / 遮罩 / 仅看；逐项静态 a11y label（注册表完整性测试要求）。
+             布局：组标签独占一行 + 整宽 segmented（对齐外观组「模式」标签范式；同行窄控件文字拥挤，
+             视觉验收未过——#739 review 迭代，修订 spec §4.4/§6 #2） -->
+        <view class="py-3.5">
+          <text class="text-title-medium text-surface-on mb-3">{{ t('me.content.ai') }}</text>
           <!-- 段级 a11y 由组件自持；段间分隔线随组件自动生成（本组 bug 修复随迁移生效，spec §1/§2） -->
           <M3SegmentedButton :model-value="aiFilterMode" :options="aiFilterOptions" @update:modelValue="settings.setAiFilterMode" />
         </view>

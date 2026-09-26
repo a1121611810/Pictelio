@@ -146,12 +146,12 @@ const aiOptions = computed<M3SegmentOption<AiFilterMode>[]>(() => [
 | callsite | 段数 | modelValue 源 | update 处理器 | 特殊 |
 |---|---|---|---|---|
 | Me.vue L624 外观模式 | 3 | `darkMode`（storeToRefs） | `pickAppearanceMode`（含主题应用副作用 → 分解写法） | 容器外 `mb-4` 保留在父级 |
-| Me.vue L853 AI 作品 | 3 | `aiFilterMode`（storeToRefs） | `settings.setAiFilterMode`（可直接 v-model 桥接或保留分解写法） | **本 bug 主角**；同行窄布局的行容器（label + 控件）原样保留 |
+| Me.vue L853 AI 作品 | 3 | `aiFilterMode`（storeToRefs） | `settings.setAiFilterMode`（保留分解写法） | **本 bug 主角**；布局迭代为「标签独占一行 + 整宽 segmented」（见 §6 #2 修订记录） |
 | Me.vue L901 动图播放 | 2 | `ugoiraMode` | `pickUgoiraMode` | 组标题/hint/尾注文案原样保留 |
 | Me.vue L931 详情画质 | 3 | `detailQuality` | `pickDetailQuality` | 同上 |
 | TranslateModeSwitch.vue | 2 | `showTranslation` 派生（`'original' | 'translation'`） | `pick`（disabled 门控 + `store.toggleMode`） | `disabled` prop 接 `!props.enabled`；壳注释 spec 引用更新 |
 
-**行为零变化承诺**：5 处的选中值、持久化键、副作用逻辑、a11y label 字符串、行容器布局全部原样保留；唯一变化是 markup 收进组件 + AI 组获得分隔线。
+**行为零变化承诺**：5 处的选中值、持久化键、副作用逻辑、a11y label 字符串全部原样保留；markup 收进组件 + AI 组获得分隔线。行容器布局 4 处原样保留，AI 组在视觉验收迭代中改为「标签独占一行 + 整宽控件」（§6 #2 修订记录）。
 
 > **显式挂账（code-review #1 裁定）**：组件 `select()` 同值短路使「重按已选段」为 no-op——唯一非幂等处理器 `pickUgoiraMode('range')`（二次确认弹窗）在已选态重按不再重演，workaround = 切走再切回；其余处理器均幂等，用户无感。此为组件化的固有语义（防无效 emit），不回退。
 
@@ -204,7 +204,7 @@ const aiOptions = computed<M3SegmentOption<AiFilterMode>[]>(() => [
 ## 6. Out of Scope
 
 1. **WebView 端分段控件改造**：`packages/app` 的 `SettingsContent.tsx` 有独立先例（Fluent Design 2 上下文），另属不同 module；跨端统一另立 effort。
-2. **AI 作品组布局变更**：保持"label 同行、控件占行宽余量"的窄布局（与页内 M3Switch 行同构）。"丑"的成因是分隔线缺失，宽度差异不是缺陷（Grill 阶段用户已确认）。
+2. ~~**AI 作品组布局变更**~~ **已修订（2026-09-26，#739 视觉验收迭代）**：真机截图验收未过（同行窄控件文字拥挤、宽高局促），已由"label 同行"改为"标签独占一行 + 整宽 segmented"（对齐外观组「模式」标签范式）。**教训挂账**：Grill 阶段 Q2"保持同行布局"的推荐被真机验收 falsified——原型中 216px 固定宽的同行控件观感尚可，但真机余量宽度随文案/字号收缩后局促；涉及"挤/窄"类视觉诉求时，原型须用真实余量宽度验证或直接从整宽基线起评。
 3. **滑动指示器变体（C 案）**：原型对比后否决——分段线填充式（B 案）与全仓 M3 基线一致，C 案作为原型产物留存 throwaway 分支，不进入实现。
 4. **登录/下载等 primary 圆角按钮**：`bg-primary` 实心按钮非 segmented 模式，不在本 spec。
 5. **`<M3Radio>` / `<M3Checkbox>` 等控件族扩展**：仍无重复迹象（ADR-0179 的 YAGNI 断言对它们继续成立）；待 falsified 时再立项。
