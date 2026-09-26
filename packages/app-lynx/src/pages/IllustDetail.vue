@@ -21,6 +21,7 @@ import PageTopBar from '../components/PageTopBar.vue'
 import UgoiraViewer from '../components/UgoiraViewer.vue'
 import TagPressChip from '../components/TagPressChip.vue'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
+import { useWatchLaterStore, toIllustSnapshot } from '../stores/watchLaterStore'
 import { buildImageTasks, buildUgoiraTask } from '../utils/galleryDownload'
 import { useDownloadStore } from '../stores/downloadStore'
 import { t } from '../i18n'
@@ -177,6 +178,21 @@ function onSaveEntry() {
     return
   }
   enqueuePages([0])
+}
+
+// ─── 稍后看（WatchLater，ADR-0191 D5 / #751 T3）：动作区 toggle ───
+// 时钟字形 + VS15（U+FE0E 强制 text presentation，ADR-0112 平台事实：Lynx 原生把
+// emoji presentation 字形渲染为彩色 emoji 且 CSS 变色失效，♥\uFE0E 同款修复）
+const LATER_ICON = '\u23F1\uFE0E'
+const watchLater = useWatchLaterStore()
+/** 已加入态：高亮跟随 store.has()（按 (kind, id) 去重；读路由 id，路由复用换 id 即时重算） */
+const laterAdded = computed(() => watchLater.has('illust', illustId.value))
+
+/** toggle 稍后看：快照从页面已有 illust 构造（零新增请求，spec D2） */
+function toggleWatchLater(): void {
+  const i = illust.value
+  if (!i) return
+  watchLater.toggle(toIllustSnapshot(i))
 }
 
 function onConfirmPicker(selectedPages: number[]) {
@@ -368,6 +384,13 @@ onMounted(async () => {
           >
             <text class="text-[6.4vw] leading-none">💬</text>
             <text class="text-label-medium text-outline ml-1">{{ illust.total_comments }}</text>
+          </view>
+          <!-- 稍后看（WatchLater，ADR-0191 D5）：toggle + 已加入态高亮（text-tertiary，
+               沿用动作行激活态范式）；@tap.stop 防冒泡误触（TagPressChip 同款）；
+               快照从已有 illust 构造（零新增请求） -->
+          <view class="ml-4 flex flex-row items-center" @tap.stop="toggleWatchLater">
+            <text class="text-[6.4vw] leading-none" :class="laterAdded ? 'text-tertiary' : 'text-outline'">{{ LATER_ICON }}</text>
+            <text class="text-label-medium ml-1" :class="laterAdded ? 'text-tertiary' : 'text-outline'">{{ laterAdded ? t('later.action.added') : t('later.action.add') }}</text>
           </view>
         </view>
         <!-- 保存状态（内联，无全局 toast 通道）：入队后附「查看下载」跳转 -->

@@ -34,6 +34,10 @@ const zhPages = {
   "illustDetail.save.queued": "已加入下载队列（{{count}} 项），请到下载页查看",
   "illustDetail.save.ugoiraInfoFailed": "获取动图信息失败",
 
+  // ─── 稍后看（WatchLater，ADR-0191 / #751）：插画详情 + 小说介绍页两入口共用 ───
+  "later.action.add": "稍后看",
+  "later.action.added": "已在稍后看",
+
   // ─── NovelIntro.vue（小说介绍页，地图 #575 / spec #585） ───
   "novelIntro.retry": "重试",
   "novelIntro.startReading": "开始阅读",
