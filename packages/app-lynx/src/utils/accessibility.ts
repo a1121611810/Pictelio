@@ -171,6 +171,18 @@ export const WATCHLIST_A11Y_LABELS = {
   unwatchCancel: '保留追更',
 } as const
 
+/** 稍后看列表页 accessibility 标注（ADR-0191 / #753 T4：/later 页）
+ *  注册表完整性约束同 NOTIFICATIONS_A11Y_LABELS：每个 key 必须被 WatchLater.vue 模板消费
+ *  （watchLaterPage.template.test.ts 钉住）。
+ *  术语红线（glossary 易混辨析 #1）：注册表名 WATCH_LATER_*，与追更 WATCHLIST_A11Y_LABELS
+ *  物理隔离、零交叉。 */
+export const WATCH_LATER_A11Y_LABELS = {
+  pageTitle: '稍后看',
+  back: '返回',
+  openItem: '打开稍后看作品',
+  remove: '移除该稍后看条目',
+} as const
+
 /** 通知中心页 accessibility 标注（ADR-0188 / #728：/notifications 页 + 组头展开）
  *  注册表完整性约束同 ME_A11Y_LABELS：每个 key 必须被 Notifications.vue 或组头子组件
  *  NotificationChildren.vue 模板消费（本票 template 测试钉住）；retry = 子列表首屏失败

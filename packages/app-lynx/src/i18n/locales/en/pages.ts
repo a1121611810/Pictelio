@@ -34,9 +34,15 @@ const enPages = {
   "illustDetail.save.queued": "Added {{count}} items to the download queue (see Downloads)",
   "illustDetail.save.ugoiraInfoFailed": "Could not load ugoira info",
 
-  // Watch Later (ADR-0191 / #751): shared by illust detail + novel intro entries
+  // Watch Later (ADR-0191 / #751 T3 / #753 T4): shared by illust detail + novel intro entries
   "later.action.add": "Watch Later",
   "later.action.added": "In Watch Later",
+  "later.title": "Watch Later",
+  "later.empty.title": "Nothing saved for later yet",
+  "later.empty.hint": "Tap Watch Later on artwork details or novel intro to save it here",
+  "later.remove": "Remove",
+  "later.badge.illust": "Illustration",
+  "later.badge.novel": "Novel",
 
   // NovelIntro.vue (novel intro page, map #575 / spec #585)
   "novelIntro.retry": "Retry",

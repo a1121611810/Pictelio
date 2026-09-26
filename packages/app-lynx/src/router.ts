@@ -54,6 +54,7 @@ import FollowList from './pages/FollowList.vue'
 import UpdatePage from './pages/UpdatePage.vue'
 import ErrorPage from './pages/ErrorPage.vue'
 import Watchlist from './pages/Watchlist.vue'
+import WatchLater from './pages/WatchLater.vue'
 import Notifications from './pages/Notifications.vue'
 import MuteTags from './pages/MuteTags.vue'
 import DownloadManager from './pages/DownloadManager.vue'
@@ -86,6 +87,9 @@ export const routes: RouteRecordRaw[] = [
   { path: '/bookmarks', name: 'bookmarks', component: Bookmarks, meta: { requiresAuth: true } },
   { path: '/me', name: 'me', component: Me, meta: { requiresAuth: true } },
   { path: '/watchlist', name: 'watchlist', component: Watchlist, meta: { requiresAuth: true } },
+  // 稍后看列表页（ADR-0191 D5 / #753 T4）：本地快照全量渲染，requiresAuth（先例 = /watchlist）。
+  // 术语红线（glossary 易混辨析 #1）：路由 /later + name watchLater，与追更 watchlist 物理隔离
+  { path: '/later', name: 'watchLater', component: WatchLater, meta: { requiresAuth: true } },
   // 通知中心（ADR-0188 D7 / #728）：次级业务页（非 NAV_TABS 外环 tab），Me 入口行进入
   { path: '/notifications', name: 'notifications', component: Notifications, meta: { requiresAuth: true } },
   // 静音标签管理页（ADR-0187 D5 / #732）：次级业务页，Me 内容组入口行进入
@@ -348,6 +352,9 @@ function registerBenchNavHandler(): void {
     // T3（#328）扩展：收藏/追更/用户页直达（含用户系页面需真实 id——自账 id 运行时解析）
     pictelioBenchNavBookmarks: '/bookmarks',
     pictelioBenchNavWatchlist: '/watchlist',
+    // 稍后看列表页直达（ADR-0191 D5 / #753 T4）：模拟器验收通道（benchNav 打开 /later 验证
+    // 快照列表、行点击导航与删除/计数联动）
+    pictelioBenchNavLater: '/later',
     // T4（spec app-lynx-benchnav-meta-exit-hooks）：/update、/error 直达（meta-exit 回归 S6 触发通道）
     pictelioBenchNavUpdate: '/update',
     pictelioBenchNavError: '/error',
