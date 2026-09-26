@@ -52,9 +52,10 @@ describe('NovelExportSheet.vue 结构契约（spec §3.1/§7.2）', () => {
     expect(src).toContain('selected.value = props.defaultFormat')
   })
 
-  it('遮罩 + 面板 + modalStack 挂载契约（CommentOverlay 同款，返回键优先关面板）', () => {
-    expect(src).toContain('absolute inset-0 bg-scrim')
-    expect(src).toContain('@tap.stop')
+  it('弹层壳收口 BottomSheet（ADR-0194 D5/D6，壳类串单点锁在 BottomSheet.template.test.ts）+ modalStack 挂载契约（CommentOverlay 同款，返回键优先关面板）', () => {
+    expect(src).toContain('<BottomSheet')
+    expect(src).toContain('panel-height="content"') // 迁移前「面板无固定高」变体逐字节保留
+    expect(src).toContain('@close="onClose"')
     expect(src).toContain('useModalStack().registerModal')
     expect(src).toContain('unregisterModal?.()')
   })
@@ -81,10 +82,12 @@ describe('NovelExportSheet.vue 结构契约（spec §3.1/§7.2）', () => {
     expect(code).not.toMatch(/\b\d*\.?\d+rem\b/)
   })
 
-  it('每处 accessibility-label 都配套 accessibility-element（ADR-0061）', () => {
-    const labels = (code.match(/accessibility-label=/g) ?? []).length
-    const elements = (code.match(/accessibility-element=/g) ?? []).length
-    expect(labels).toBeGreaterThanOrEqual(3)
+  it('每处 accessibility-label 都配套 accessibility-element（ADR-0061；× 关闭 a11y 已随壳收口 BottomSheet，余下 2 处）', () => {
+    // 正则以「:」前缀锚定平台属性（:close-accessibility-label= 是 BottomSheet 的 prop 名，
+    // 含 accessibility-label 子串但不属 a11y 平台属性，不计入）
+    const labels = (code.match(/:accessibility-label=/g) ?? []).length
+    const elements = (code.match(/:accessibility-element=/g) ?? []).length
+    expect(labels).toBeGreaterThanOrEqual(2)
     expect(elements).toBe(labels)
   })
 })
