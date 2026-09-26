@@ -100,6 +100,42 @@ export function loadNovelSeries(
   )
 }
 
+/**
+ * 加载系列章节列表（spec app-lynx-novel-intro-action-row §3.2 / US1）。
+ *
+ * 端点同 `loadNovelSeries`（GET /v2/novel/series），仅追加可选 `last_order` 增量参数。
+ * 响应包含 `novels[]`（章节 PixivNovel 列表）与 `next_url`（下一页游标，null = 无更多）；
+ * `novel_series_detail` 顶部元数据照旧携带，与 lynx 既有消费面（watchlist 预取）零冲突。
+ *
+ * 对齐 webview `packages/app/src/api/novel.ts:134-143` 的 `loadSeries` 形态（含参数拼接规则）。
+ *
+ * @param seriesId  系列 id
+ * @param lastOrder 可选：服务端当前已加载最大 order（分页追加时传入，避免章节重复）
+ * @param signal    可选：AbortSignal
+ */
+export function loadNovelSeriesChapters(
+  seriesId: SeriesId,
+  lastOrder?: number,
+  signal?: AbortSignal,
+): Promise<NovelSeriesDetailResponse> {
+  const params: Record<string, string> = { series_id: String(seriesId) }
+  if (lastOrder != null) {
+    params.last_order = String(lastOrder)
+  }
+  return apiClient.get<NovelSeriesDetailResponse>("/v2/novel/series", params, signal)
+}
+
+/**
+ * 章节列表翻页：透传服务端 next_url（保留 query，含 `last_order` 游标）。
+ * 对齐 webview `packages/app/src/api/novel.ts:145-147` 的 `loadSeriesNext` 形态。
+ */
+export function loadNovelSeriesChaptersNext(
+  url: string,
+  signal?: AbortSignal,
+): Promise<NovelSeriesDetailResponse> {
+  return apiClient.get<NovelSeriesDetailResponse>(url, undefined, signal)
+}
+
 /** 追更系列（POST form: series_id） */
 export function addNovelWatchlist(seriesId: SeriesId): Promise<void> {
   return apiClient.post<void>("/v1/watchlist/novel/add", { series_id: String(seriesId) })

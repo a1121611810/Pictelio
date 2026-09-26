@@ -104,7 +104,16 @@ export interface PixivNovelDetailResponse {
 // 字段名逐字对齐 Pixiv-Shaft ceui/loxia/Models.kt（NovelSeriesDetail / WatchlistSeries /
 // WatchlistResponse），端点对齐 ceui/lisa/http/AppApi.kt 与 ceui/loxia/API.kt。
 
-/** 系列详情响应（GET /v2/novel/series）：追更状态与是否完结从这里取 */
+/**
+ * 系列详情响应（GET /v2/novel/series）。
+ *
+ * 字段分层（spec app-lynx-novel-intro-action-row §3.2）：
+ * - `novel_series_detail` = 顶层追更元数据（id/title/content_count/is_concluded/watchlist_added），
+ *   对齐 lynx 既有消费面 `loadNovelSeries`；兼容 NovelDetail / NovelIntro watchlist 预取，不破坏既有契约
+ *   （验收 #5：NovelIntro.vue:76 读 `novel_series_detail.watchlist_added` 必须继续工作）
+ * - `novels` / `next_url` = 章节列表与分页游标；同端点 `/v2/novel/series` 服务端一并返回，
+ *   分页时 `last_order` 增量追加；与 webview 端 `packages/app/src/api/novel.ts:120-132` 同源 envelope
+ */
 export interface NovelSeriesDetailResponse {
   novel_series_detail: {
     id: SeriesId;
@@ -115,6 +124,10 @@ export interface NovelSeriesDetailResponse {
     /** 是否已加入追更列表 */
     watchlist_added: boolean;
   };
+  /** 章节列表（分页返回时增量追加；类型 narrowing 与 webview 同源） */
+  novels: PixivNovel[];
+  /** 下一页 URL；null = 无更多 */
+  next_url: string | null;
 }
 
 /**

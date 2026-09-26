@@ -4,7 +4,10 @@
 // - requestBack：命中 shouldPromptWatchlist（oracle 见 watchlistPrompt.test.ts）→ 拦截开弹窗
 // - confirm：busy 锁；成功 setWatchState+关弹窗；失败 dialogError+warn
 // - decline/cancel：都 dismiss + 关弹窗；继续返回与否由页面层决定（primitive 不导航）
-import { describe, it, expect, vi } from "vitest"
+// - ADR-0189 D5：deps.getWatchState（reactive cache）→ watchAdded 派生来源；
+//   外部 setWatchState 写入 cache 后 watchAdded 立即反映（同页 / 跨页同步）
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { reactive } from "vue"
 import {
   createWatchlistPrompt,
   type WatchlistPromptDeps,
@@ -13,11 +16,13 @@ import {
   WATCHLIST_PROMPT_MIN_DWELL_MS,
   WATCHLIST_PROMPT_SCROLL_THRESHOLD,
 } from "./watchlistPrompt"
+import * as watchlistStore from "../stores/watchlistStore"
 
 interface FakeDeps extends WatchlistPromptDeps {
   series: { id: number; title: string } | null
   dismissed: Set<number>
-  watchStates: Map<number, boolean>
+  /** 镜像真实 watchlistStore：reactive Record，setWatchState 写入触发 Vue 响应式 */
+  watchStates: Record<number, boolean>
   addedCalls: number[]
 }
 
@@ -29,7 +34,9 @@ function makeDeps(overrides?: {
   now?: () => number
 }): FakeDeps {
   const dismissed = new Set<number>()
-  const watchStates = new Map<number, boolean>()
+  // reactive Record —— 与 watchlistStore 行为一致（set/get 触发响应式通知），
+  // 让 computed watchAdded 在 setWatchState 写入后能正确重算
+  const watchStates = reactive<Record<number, boolean>>({})
   const addedCalls: number[] = []
   const series = overrides?.series === undefined ? { id: 42, title: "测试系列" } : overrides.series
   return {
@@ -50,8 +57,9 @@ function makeDeps(overrides?: {
       dismissed.add(id)
     },
     setWatchState: (id, added) => {
-      watchStates.set(id, added)
+      watchStates[id] = added
     },
+    getWatchState: (id) => watchStates[id],
     now: overrides?.now,
   }
 }
@@ -67,7 +75,7 @@ describe("createWatchlistPrompt · 预取", () => {
     const deps = makeDeps({ loadWatchState: () => Promise.resolve(true) })
     const p = createWatchlistPrompt(deps)
     await vi.waitFor(() => expect(p.watchAdded).toBe(true))
-    expect(deps.watchStates.get(42)).toBe(true)
+    expect(deps.watchStates[42]).toBe(true)
     p.dispose()
   })
 
@@ -102,7 +110,7 @@ describe("createWatchlistPrompt · 预取", () => {
     resolveLoad(true)
     await Promise.resolve()
     expect(p.watchAdded).toBeNull()
-    expect(deps.watchStates.size).toBe(0)
+    expect(Object.keys(deps.watchStates).length).toBe(0)
   })
 })
 
@@ -205,7 +213,7 @@ describe("createWatchlistPrompt · confirm", () => {
     expect(p.requestBack()).toBe(true)
     await p.confirm()
     expect(deps.addedCalls).toEqual([42])
-    expect(deps.watchStates.get(42)).toBe(true)
+    expect(deps.watchStates[42]).toBe(true)
     expect(p.watchAdded).toBe(true)
     expect(p.dialogOpen).toBe(false)
     p.dispose()
@@ -227,7 +235,7 @@ describe("createWatchlistPrompt · confirm", () => {
     expect(p.dialogOpen).toBe(true)
     expect(warn.mock.calls[0]?.[0]).toContain("[watchlist]")
     // 追更失败不得翻转状态：watchStates 仅保留预取写入的 false
-    expect(deps.watchStates.get(42)).toBe(false)
+    expect(deps.watchStates[42]).toBe(false)
     expect(p.watchAdded).toBe(false)
     warn.mockRestore()
     p.dispose()
@@ -269,7 +277,7 @@ describe("createWatchlistPrompt · confirm", () => {
     resolveAdd()
     await pending
     // 在飞 confirm 落地被 generation-gate 拦截：状态保持预取时的 false，弹窗不复开
-    expect(deps.watchStates.get(42)).toBe(false)
+    expect(deps.watchStates[42]).toBe(false)
     expect(p.watchAdded).toBe(false)
     expect(p.dialogOpen).toBe(false)
   })
@@ -319,5 +327,85 @@ describe("createWatchlistPrompt · dispose", () => {
     expect(p.dialogOpen).toBe(false)
     expect(p.dialogBusy).toBe(false)
     expect(p.dialogError).toBe("")
+  })
+})
+
+describe("createWatchlistPrompt · reactive cache 同步（ADR-0189 D5）", () => {
+  // 使用真实 watchlistStore（reactive Record）——验证 setWatchState 写入 → computed 派生翻转
+  beforeEach(() => {
+    watchlistStore.resetWatchlistStoreForTest()
+  })
+
+  afterEach(() => {
+    watchlistStore.resetWatchlistStoreForTest()
+  })
+
+  /** 真 store 接线：与页面 wiring 完全一致；loadWatchState/addWatchlist 可由用例覆盖 */
+  function makeRealDeps(overrides?: {
+    series?: { id: number; title: string } | null
+    loadWatchState?: (seriesId: number) => Promise<boolean>
+    addWatchlist?: (seriesId: number) => Promise<void>
+    now?: () => number
+  }): WatchlistPromptDeps {
+    const series =
+      overrides?.series === undefined ? { id: 42, title: "测试系列" } : overrides.series
+    return {
+      getSeries: () => series,
+      loadWatchState: overrides?.loadWatchState ?? (() => Promise.resolve(false)),
+      addWatchlist: overrides?.addWatchlist ?? (() => Promise.resolve()),
+      isDismissed: watchlistStore.isDismissed,
+      markDismissed: watchlistStore.markDismissed,
+      setWatchState: watchlistStore.setWatchState,
+      getWatchState: watchlistStore.getWatchState,
+      now: overrides?.now,
+    }
+  }
+
+  it("外部调 setWatchState(true) → watchAdded 立即变 true（介绍页 toggle 后 chip 翻转）", async () => {
+    const p = createWatchlistPrompt(makeRealDeps())
+    // 等预取落地：cache[42] = false, fetchedWatchAdded = false
+    await vi.waitFor(() => expect(p.watchAdded).toBe(false))
+    // 模拟介绍页 inline toggle（useNovelWatchlistToggle 调 watchlistStore.setWatchState）
+    watchlistStore.setWatchState(42, true)
+    // computed 派生翻转（无需手动 watch 兜底）
+    expect(p.watchAdded).toBe(true)
+    p.dispose()
+  })
+
+  it("外部调 setWatchState(false) → watchAdded 立即变 false", async () => {
+    // 预取 true（已追更）；外部写入 false 模拟用户取消
+    const p = createWatchlistPrompt(makeRealDeps({ loadWatchState: () => Promise.resolve(true) }))
+    await vi.waitFor(() => expect(p.watchAdded).toBe(true))
+    watchlistStore.setWatchState(42, false)
+    expect(p.watchAdded).toBe(false)
+    p.dispose()
+  })
+
+  it("API fetch false + 外部 setWatchState(true) → watchAdded = true（cache 优先于 fetch）", async () => {
+    const p = createWatchlistPrompt(makeRealDeps({ loadWatchState: () => Promise.resolve(false) }))
+    await vi.waitFor(() => expect(p.watchAdded).toBe(false))
+    watchlistStore.setWatchState(42, true)
+    expect(p.watchAdded).toBe(true)
+    p.dispose()
+  })
+
+  it("外部 setWatchState(true) 后再 setWatchState(false) → watchAdded = false（最新写入生效）", async () => {
+    const p = createWatchlistPrompt(makeRealDeps({ loadWatchState: () => Promise.resolve(true) }))
+    await vi.waitFor(() => expect(p.watchAdded).toBe(true))
+    watchlistStore.setWatchState(42, false)
+    expect(p.watchAdded).toBe(false)
+    watchlistStore.setWatchState(42, true)
+    expect(p.watchAdded).toBe(true)
+    p.dispose()
+  })
+
+  it("confirm 成功后外部 read 同步看到 true（跨 controller 共享 cache）", async () => {
+    const p = createWatchlistPrompt(makeRealDeps())
+    await vi.waitFor(() => expect(p.watchAdded).toBe(false))
+    // 不开弹窗：直接走 confirm 路径需要 dialog open。这里通过外部 setWatchState 模拟 confirm 落地的 cache 写入
+    watchlistStore.setWatchState(42, true)
+    expect(watchlistStore.getWatchState(42)).toBe(true)
+    expect(p.watchAdded).toBe(true)
+    p.dispose()
   })
 })

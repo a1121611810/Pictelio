@@ -22,5 +22,9 @@
   {
     "path": "pages/Recommended.vue",
     "reason": "P2 §3.3：text-white / text-white/NN 叠在 --md-scrim-overlay 上（M3 scrim 暗色渐变 + 白字，明暗通用）。"
+  },
+  {
+    "path": "components/ActionButton.vue",
+    "reason": "P2 §3.3：text-white/85（默认态文字）/ bg-white/10（active 态背景）叠在 --md-scrim-overlay 上（M3 scrim 暗色渐变 + 白字，明暗通用），与 pages/NovelIntro.vue 同 scrim 语义；token 化巡检期再议。spec #734 §5.1 ActionButton 同族视觉规范。"
   }
 ]

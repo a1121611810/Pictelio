@@ -152,6 +152,18 @@ _Avoid_: 把「小说可收藏」理解成列表卡可收藏（列表卡只读�
 介绍页底部主按钮，进入正文页**固定从头开始**。无续读——阅读进度持久化未立项（需数据模型 + 双端语义对齐，另立地图，见 #575 Out of scope）。
 _Avoid_: 静默记忆阅读位置、与 webview 端进度语义混为一谈
 
+**小说介绍页操作行（novel intro action row）【2026-09-26 新增，票 #734】**：
+介绍页底部 D 案 scrim 区内的两行动作布局——第一行四个次级按钮（**收藏 · 追更 · 下载 · 系列目录**），第二行主 CTA「开始阅读」全宽。次级按钮视觉等宽、图标 + 短文字 chip 形态；屏蔽态一致置灰（同 `startReading` / `openCaption` 判定）。**可见性约束**：追更与系列目录按钮**仅当 `novel.series` 存在时渲染**（Pixiv 单本无追更 / 系列概念），下载按钮始终渲染。**布局变更**：2026-09-26 之前收藏与「开始阅读」同行，之后收藏上移至次级行。
+_Avoid_: 收藏保留在主 CTA 行（视觉权重混淆）、所有按钮堆一行（密度过载）、追更/系列按钮无条件渲染（违反 Pixiv 数据模型）
+
+**已下载（downloaded status）【2026-09-26 新增，票 #734】**：
+小说被**至少成功导出一次**的派生状态。来源：`downloadQueueCore` 中 `kind='novel' && illustId === targetId && status='completed'` 至少一条命中。**纯本地状态、无独立持久层**；进入 App / 重启 / 清空下载队列后归零。派生入口 = `utils/novelDownloadStatus.ts` 的 `isNovelDownloaded(state, novelId)`（pure function，单测强制覆盖空 / 进行中 / 已完成 / 多任务匹配）。**已下载 ≠ 可在 App 内离线阅读**——本期仅导出到文件系统；离线阅读功能未立项（独立 spec）。
+_Avoid_: 误把"已下载"理解为"在 App 内可离线读"（混了导出与离线缓存两个概念）、为该状态新建独立持久层（与下载队列重叠职责）
+
+**追更直击切换（watchlist direct toggle）【2026-09-26 新增，票 #734】**：
+介绍页追更按钮的交互形态——点击 = 立即追更 / 取消追更，无二次确认弹窗。乐观触发 + 失败静息回滚（沿用 `useBookmarkMutation` 范式，6 条不变量 1:1）。与正文页 `createWatchlistPrompt`（返回键弹窗）**共存**——前者服务快速决策（介绍页），后者服务深度交互（读完走人）。两者通过 `watchlistStore.setWatchState(seriesId, added)` 共享 reactive 缓存，零事件总线。composable = `useNovelWatchlistToggle`，`:key="novel.series.id"` 强制重挂载避免跨实例状态冻结（同 `BookmarkButton` 范式）。
+_Avoid_: 介绍页引入二次确认弹窗（与"看封面就决策"心智不符）、双入口信号源独立（漂移风险）
+
 ### 列表操作（List actions）
 列表页唯一的浮动操作入口（M3 FAB menu），固定于列表容器右下角。常态为一个刷新 FAB（56dp，primary-container）；点击后 FAB 变身为 close button（图标 ✕，同尺寸原位），浮出 scrim，并从 FAB top-trailing edge 展开两个 medium-button 规格菜单项：「刷新」「回顶」。执行任一操作后自动收起。双端同构（LynxView / web-core 同一实现与动画）。
 _Avoid_: 堆叠 FAB、speed dial、下拉刷新手势（已废弃，ADR-0107）、页面自持刷新 UI 态（刷新旋转 / 在飞锁；首载三态 loading 快照见「页级首载骨架」）

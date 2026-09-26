@@ -49,4 +49,18 @@ describe('六入口小说导航缝隙（openNovel 单点，ADR-0183 / 票 #713�
     expect(router).toContain("path: '/novel/:id',")
     expect(router).not.toContain("redirect: '/novel/:id/intro'")
   })
+
+  // spec #734 §10 修改清单第 11 行 / ADR-0167 D2 / ADR-0189：
+  // 介绍页增加 4 个动作按钮（收藏·追更·下载·系列目录）不引入路由级 redirect。
+  // 这是 UI 改造约束（routes 必须保留 /novel/:id 直接可达性），不是行为改造。
+  // benchNav 测试通道与未来合法深链依赖此 invariant——验收：正向可达 + 双向禁 redirect。
+  it('spec #734 §10 清单 11：介绍页含 4 动作按钮（收藏·追更·下载·系列目录）仍守『不路由级重定向』invariant（ADR-0167 D2 / ADR-0189）', () => {
+    const router = readFileSync(resolve(pkgRoot, 'src/router.ts'), 'utf-8')
+    // 正向：/novel/:id 仍为独立 entry route（path 字段可达，未被改成 redirect 占位或 children 嵌套）
+    expect(router).toMatch(/path:\s*['"`]\/novel\/:id['"`]/)
+    // 正向：介绍页路由仍为平级 entry（防被折叠进 /novel/:id 的 children 形成隐式重定向）
+    expect(router).toContain("path: '/novel/:id/intro'")
+    // 反向：双向禁 redirect（intro→body 与 body→intro 任一形态均不允许）
+    expect(router).not.toMatch(/redirect:\s*['"`][^'"`]*\/novel\/:id[^'"`]*['"`]/)
+  })
 })

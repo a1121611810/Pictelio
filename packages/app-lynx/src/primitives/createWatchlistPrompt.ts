@@ -4,13 +4,18 @@
 // deps 注入（对齐 createBookmarkToggle 风格），node 可单测——测试用假 deps，
 // 不碰真实 API 模块。
 //
+// ADR-0189 D5「跨入口 reactive cache」：watchAdded = reactive cache 优先 → API 预取结果 → null。
+// 介绍页 inline toggle（useNovelWatchlistToggle）调 setWatchState 写入 cache 后，
+// 同一页面或后续页面的 controller 通过 computed watchAdded 自动反映新态——
+// 系行「已追更」chip 与按钮视觉保持一致（不再依赖 `shallowRef` 重建）。
+//
 // oracle：docs/specs/app-lynx-novel-series-watchlist.md §US4 接口契约 + §2 决策记录
 // - D1：滚动 ≥70% 或到达底部，且停留 ≥10s（判定细节在 ./watchlistPrompt.ts）
 // - D2：decline/cancel 记入本会话「暂不」，不再询问
 // - 预取失败 → watchAdded = null + console.warn（保守不弹，禁静默降级）
 // - decline 与 cancel 语义差：都 dismiss + 关弹窗；**是否继续原返回动作由页面层区分**
 //   （decline 继续返回 / cancel 留在详情页），primitive 只暴露两个不同方法名。
-import { ref } from "vue"
+import { computed, ref } from "vue"
 import { shouldPromptWatchlist } from "./watchlistPrompt"
 
 export interface WatchlistPromptDeps {
@@ -24,6 +29,12 @@ export interface WatchlistPromptDeps {
   markDismissed: (seriesId: number) => void
   /** 写入追更状态缓存（watchlistStore.setWatchState） */
   setWatchState: (seriesId: number, added: boolean) => void
+  /**
+   * 读取 reactive cache（watchlistStore.getWatchState）。computed watchAdded 的派生来源——
+   * 用户在介绍页 inline toggle 后 cache 更新 → chip 立即反映新态（ADR-0189 D5）。
+   * 必须与 setWatchState 操作同一 backing store，否则两路脱钩。
+   */
+  getWatchState: (seriesId: number) => boolean | undefined
   /** 追更请求（T1 addNovelWatchlist 的适配；deps 注入保持单测不碰真实 API） */
   addWatchlist: (seriesId: number) => Promise<void>
   /** 测试注入时钟，默认 Date.now */
@@ -62,31 +73,53 @@ export function createWatchlistPrompt(
   const dialogOpen = ref(false)
   const dialogBusy = ref(false)
   const dialogError = ref("")
-  const watchAdded = ref<boolean | null>(null)
+
+  // ADR-0189 D5：watchAdded 派生语义——reactive cache 优先 → API 预取结果 → null
+  // currentSeriesId 是同步变量（创建时由 loadWatchState 立即赋值，await 之前已设），
+  // 无需包 ref——computed 只在 cache / fetchedWatchAdded 变化时重算，不依赖 currentSeriesId 的赋值时机
+  let currentSeriesId = -1
+  /** API 预取的"基准态"；cache 缺失时回退到它 */
+  const fetchedWatchAdded = ref<boolean | null>(null)
+  /**
+   * watchAdded 派生值：reactive cache（deps.getWatchState）优先 → 预取结果 → null。
+   * computed 自动响应 cache 写入 → 介绍页 toggle 后 chip 同步翻转，无需外部 trigger 兜底。
+   */
+  const watchAdded = computed<boolean | null>(() => {
+    const cached = deps.getWatchState(currentSeriesId)
+    if (cached !== undefined) return cached
+    return fetchedWatchAdded.value
+  })
 
   let generation = 0
   let scrollProgress = 0
   let reachedBottom = false
 
   // 预取追更状态（创建时一次）：generation-gate 防 dispose/章节切换后慢响应污染
+  async function runPrefetch(seriesId: number): Promise<void> {
+    const gen = generation
+    currentSeriesId = seriesId
+    try {
+      const added = await deps.loadWatchState(seriesId)
+      if (gen !== generation) return
+      // review P2-2：cache 已置 true 时（confirm / 用户 toggle），陈旧预取不得覆盖 cache
+      // 注意：必须直读 cache，不能用 watchAdded.value —— computed 已从 fetchedWatchAdded 派生 true，
+      // 会让 guard 永远触发、cache 永远写不进去（regression 教训，2026-09-26）
+      if (deps.getWatchState(seriesId) === true) return
+      fetchedWatchAdded.value = added
+      // 预取结果回写 cache：让其它 controller（同页/跨页）能 read 到 API 已知态
+      deps.setWatchState(seriesId, added)
+    } catch (err) {
+      if (gen !== generation) return
+      // 预取失败 → watchAdded 保持 null（shouldPromptWatchlist 保守不弹）
+      throw err
+    }
+  }
+
   const seriesAtCreate = deps.getSeries()
   if (seriesAtCreate) {
-    const seriesId = seriesAtCreate.id
-    const gen = generation
-    void deps
-      .loadWatchState(seriesId)
-      .then((added) => {
-        if (gen !== generation) return
-        // review P2-2：confirm 已先行置 true 时，陈旧预取落地不得覆盖
-        if (watchAdded.value === true) return
-        watchAdded.value = added
-        deps.setWatchState(seriesId, added)
-      })
-      .catch((err) => {
-        if (gen !== generation) return
-        // 预取失败 → watchAdded 保持 null（shouldPromptWatchlist 保守不弹）
-        console.warn("[watchlist] 追更状态预取失败，本次不弹询问", err)
-      })
+    void runPrefetch(seriesAtCreate.id).catch((err) => {
+      console.warn("[watchlist] 追更状态预取失败，本次不弹询问", err)
+    })
   }
 
   function notifyScroll(progress: number, bottom: boolean): void {
@@ -125,8 +158,8 @@ export function createWatchlistPrompt(
     try {
       await deps.addWatchlist(series.id)
       if (gen !== generation) return
+      // 写入 reactive cache → computed watchAdded 自动翻 true（无需手动同步）
       deps.setWatchState(series.id, true)
-      watchAdded.value = true
       dialogOpen.value = false
     } catch (err) {
       if (gen !== generation) return

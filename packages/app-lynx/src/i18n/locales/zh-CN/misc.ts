@@ -238,6 +238,29 @@ const zhMisc = {
   //     载荷={kind,name}，store 不快照文案；muteFailedHint = 落盘失败分支） ───
   "muteTag.mutedHint": "已静音「{{name}}」",
   "muteTag.muteFailedHint": "静音未生效",
+
+  // ─── composables/useNovelWatchlistToggle.ts（追更失败提示，spec docs/specs/
+  //     app-lynx-novel-intro-action-row.md §US2；与 useBookmarkMutation.actionFailed 同形态） ───
+  "useNovelWatchlistToggle.actionFailed": "操作失败，请重试",
+
+  // ─── components/SeriesSheet.vue（系列目录底部弹层，spec §US3；
+  //     loadFailed / loadMoreFailed 走 tt() 包装，empty / current 走 t() 直接调用） ───
+  "seriesSheet.empty": "该系列暂无章节",
+  "seriesSheet.current": "当前",
+  "seriesSheet.loadFailed": "加载章节列表失败",
+  "seriesSheet.loadMoreFailed": "加载更多章节失败",
+
+  // ─── NovelIntro.vue 底部操作行按钮标签（spec §US5；
+  //     与 pages.ts 的 novelIntro.* 同前缀以保持命名一致，按钮语义为简短动词） ───
+  // 收藏按钮文案由 BookmarkButton 自管 i18n 内部 keys 承载（F2 review 已移除 dead key）
+  // 追更按钮
+  "novelIntro.actionWatch": "追更",
+  "novelIntro.actionWatched": "已追更",
+  // 下载按钮（点击复用 NovelExportSheet；「已下载」仍可点击重开格式选择器，D11）
+  "novelIntro.actionDownload": "下载",
+  "novelIntro.actionDownloaded": "已下载",
+  // 系列目录按钮（仅 series 存在时渲染）
+  "novelIntro.actionSeries": "目录",
 } as const;
 
 export default zhMisc;

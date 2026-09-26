@@ -14,7 +14,7 @@ import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useDownloadStore } from '../stores/downloadStore'
 import { useNovelTranslateStore } from '../stores/novelTranslateStore'
-import { isDismissed, markDismissed, setWatchState } from '../stores/watchlistStore'
+import { isDismissed, markDismissed, setWatchState, getWatchState } from '../stores/watchlistStore'
 import {
   createWatchlistPrompt,
   type WatchlistPromptController,
@@ -99,6 +99,9 @@ function setupPrompt(): void {
     isDismissed,
     markDismissed,
     setWatchState,
+    // ADR-0189 D5：computed watchAdded 派生来源——弹窗 confirm / 介绍页 inline toggle
+    // 写入 cache 后，正文页 dialogOpen 守卫 / 模板引用保持一致
+    getWatchState,
     addWatchlist: (seriesId) => addNovelWatchlist(toSeriesId(seriesId)),
   })
 }

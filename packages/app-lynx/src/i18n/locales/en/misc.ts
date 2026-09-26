@@ -241,6 +241,29 @@ const enMisc = {
   // payload = {kind, name}; muteFailedHint = persist-failure branch)
   "muteTag.mutedHint": "Muted \"{{name}}\"",
   "muteTag.muteFailedHint": "Mute not applied",
+
+  // composables/useNovelWatchlistToggle.ts (follow failure hint, spec docs/specs/
+  // app-lynx-novel-intro-action-row.md §US2; mirrors useBookmarkMutation.actionFailed)
+  "useNovelWatchlistToggle.actionFailed": "Action failed, please try again",
+
+  // components/SeriesSheet.vue (series TOC bottom sheet, spec §US3;
+  // loadFailed / loadMoreFailed go through tt() wrapper, empty / current call t() directly)
+  "seriesSheet.empty": "No chapters in this series",
+  "seriesSheet.current": "Current",
+  "seriesSheet.loadFailed": "Failed to load chapter list",
+  "seriesSheet.loadMoreFailed": "Failed to load more chapters",
+
+  // NovelIntro.vue bottom action-row button labels (spec §US5;
+  // shares novelIntro.* prefix with pages.ts; short verb CTAs, no trailing period)
+  // Bookmark button labels live in BookmarkButton's own i18n (F2 review removed dead keys)
+  // Watch button
+  "novelIntro.actionWatch": "Follow",
+  "novelIntro.actionWatched": "Following",
+  // Download button (reuses NovelExportSheet; Bookmarked stays clickable per D11)
+  "novelIntro.actionDownload": "Download",
+  "novelIntro.actionDownloaded": "Downloaded",
+  // Series TOC button (rendered only when novel.series exists)
+  "novelIntro.actionSeries": "Series",
 } as const satisfies Record<ZhMiscKey, string>;
 
 export default enMisc;
