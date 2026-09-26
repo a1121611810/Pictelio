@@ -287,6 +287,10 @@ _Avoid_: 运行时算色 / 动态写 CSS 变量（同「主题色」词条纪律
 lynx JS 获取系统暗色状态的**唯一通道**——Lynx JS 运行时无 `matchMedia`、vue-lynx 对官方 `__globalProps` 零接线（研究实证），故自建：`PictelioAppModule.getDarkMode(cb)` 订阅后拉初值 + `pictelioDarkMode` 全局事件推变化（ADR-0168 insets 同构；Android 侧 `onConfigurationChanged` 读 `Configuration.uiMode` + `onResume` 比对补发兜底后台翻转）；web-core 预览用 `matchMedia` 兜底。契约（事件名/载荷 `{"mode":"light"|"dark"}`/方法名）由 `darkModeJavaContract.test.ts` 双向钉死。**原生侧同时读取同一 prefs 键**（`SharedPreferences("CapacitorStorage")` 的 `settings_dark_mode`）驱动状态栏图标与 splash（读取时机：冷启动 + 设置变更通知 + `onResume` 兜底；键名两侧逐字一致由契约测试钉死，#692 接线）。
 _Avoid_: 在 lynx JS 里直接调 `matchMedia`（运行时不存在）；把官方宿主通道当可用（vue-lynx 未接线）；纯推模式不拉初值（首帧事件早于订阅必丢，同 insets 管线纪律）。
 
+**分段控件（segmented button）**【2026-09-26 新增，spec docs/specs/app-lynx-m3-segmented-button.md】：
+设置页内多选一枚举值的 M3 控件形态——容器 outline 全圆角 + 段间 `border-l border-l-outline` 分隔线 + 选中段 `bg-secondary-container`（40dp 高、`text-label-large`）。**唯一权威实现 = `<M3SegmentedButton>` 组件**；段间分隔线由段 index 生成（index>0 自动附加），禁止手写 inline 分段 markup（机器门禁 `tests/m3-segmented-button-migration-gate.test.ts` 把守，仿 m3-switch 范式）。当前 5 处 callsite：外观模式 / AI 作品三态（ADR-0155）/ 动图播放 / 详情画质（Me.vue）+ 小说翻译显示模式（TranslateModeSwitch）。
+_Avoid_: 复制 inline 分段 markup（5 份拷贝曾致「修 2 漏 1」drift：7eb0f5eb 补分隔线漏改 AI 作品组，三段融成白边条）；手写"哪段该有 border-l"（由组件按 index 生成，N 段 = N-1 条）
+
 ### 翻译端点（Translation endpoint）【2026-09-19 新增，ADR-0173】
 
 **端点兼容性（endpoint compatibility）**：

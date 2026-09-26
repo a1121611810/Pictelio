@@ -194,7 +194,7 @@ function thumbClass(checked: boolean): string {
 
 1. **WebView 端 `<fluent-switch>` 改造**：Fluent Design 2 与 M3 设计系统不同；强行复用 `<M3Switch>` 跨设计系统不合理。如要统一跨端开关视觉，另立 effort（前置：先解决双客户端设计系统差异的策略问题）。
 2. **auto-fallback 渲染塌陷**：v3 已 fix（track 加 `flex-shrink-0`），不再开独立 ticket。如未来再发同型塌陷（描述文案进一步加长），可继续用 `flex-shrink-0` 模式。
-3. **M3 控件族扩展**（`<M3Radio>` / `<M3Checkbox>` / `<M3SegmentedButton>`）：本 ticket 仅抽出开关；其他控件的抽取是后续 effort（且当前无重复迹象，YAGNI）。
+3. **M3 控件族扩展**（`<M3Radio>` / `<M3Checkbox>` / `<M3SegmentedButton>`）：本 ticket 仅抽出开关；其他控件的抽取是后续 effort（且当前无重复迹象，YAGNI）。**更新（2026-09-26）**：`<M3SegmentedButton>` 的 YAGNI 断言已被 falsified（5 处拷贝 drift：7eb0f5eb 漏改 AI 作品组分隔线）并收口——见 docs/specs/app-lynx-m3-segmented-button.md + ADR-0190；`<M3Radio>` / `<M3Checkbox>` 的 YAGNI 断言继续成立。
 4. **`M3Switch` props 扩展**（`disabled` / `variant` / `loading` / `ariaLabel`）：当前 12 处需求均无；YAGNI。
 5. **M3 几何常数 token 化**（将 `13.867vw` 等移入 `tokens.css` 为 `--m3-switch-track-width` 等）：当前 inline arbitrary value 在 12 处表现一致，无 token 化紧迫性；待 M3 控件族扩展时再做统一抽象。
 6. **业务逻辑改动**：自动回退引擎、全屏模式、R18/R18G 等开关的语义、设置键、持久化逻辑均**不**触碰。
