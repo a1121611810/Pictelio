@@ -58,17 +58,17 @@ describe('SearchSheet 文案 i18n 抽取（#511 第 2 类：zh 渲染产物逐�
 })
 
 describe('SearchSheet 弹层结构（spec D5 / 原型变体 A）', () => {
-  it('整体：遮罩 @tap 关闭 + 80vh 面板 @tap.stop + 根 view absolute inset-0 z-40（离流锚 page 根；盖 GlobalFab/页面 z-30 分页 FAB，review P1-1）', () => {
+  it('整体：弹层壳收口 BottomSheet（ADR-0194 D5/D6，壳类串单点锁在 BottomSheet.template.test.ts）+ 根 view absolute inset-0 z-40（离流锚 page 根；盖 GlobalFab/页面 z-30 分页 FAB，review P1-1）', () => {
     expect(source).toContain('class="absolute inset-0 z-40"')
-    expect(source).toContain('class="absolute inset-0 bg-scrim" @tap="onClose"')
-    expect(source).toContain('h-[80vh]')
-    expect(source).toContain('@tap.stop')
+    expect(source).toContain('<BottomSheet')
+    expect(source).toContain(':close-accessibility-label="SEARCH_A11Y_LABELS.close"')
+    expect(source).toContain('@close="onClose"')
   })
 
   it('标题栏「搜索」+ × 关闭；输入行占位「输入标签 / 关键词」+ 有词清除 ×', () => {
-    expect(source).toContain(">{{ t('searchSheet.title') }}</text>")
+    expect(source).toContain(`:title="t('searchSheet.title')"`) // 标题文案经 prop 注入 BottomSheet
     expect(source).toContain(`:placeholder="t('searchSheet.placeholder')"`)
-    expect(source).toContain('@tap="onClose"') // × 关闭走统一关闭路径
+    expect(source).toContain('@close="onClose"') // scrim/× 关闭统一经 BottomSheet @close
     expect(source).toContain('@tap="onClearInput"')
   })
 
@@ -224,8 +224,8 @@ describe('SearchSheet 数据流与生命周期', () => {
     expect(source).toContain('void controller.loadMore()')
   })
 
-  it('关闭：遮罩 / × 统一 @tap="onClose" → closeSearch()（返回键由 searchSheetStore 注册的 modalStack 承担）', () => {
-    expect(source).toContain('@tap="onClose"')
+  it('关闭：scrim/× 统一 BottomSheet @close="onClose" → closeSearch()（返回键由 searchSheetStore 注册的 modalStack 承担）', () => {
+    expect(source).toContain('@close="onClose"')
     const fn = /function onClose\(\): void \{[\s\S]*?\n\}/.exec(source)
     expect(fn).not.toBeNull()
     expect(fn![0]).toContain('closeSearch()')

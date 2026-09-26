@@ -29,6 +29,7 @@ import { useSettingsStore } from '../stores/settingsStore'
 import { thumbUrl } from '../utils/imageUrl'
 import { SEARCH_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import SkeletonImage from './SkeletonImage.vue'
+import BottomSheet from './BottomSheet.vue'
 import {
   BOOKMARK_BANDS,
   countActiveFilters,
@@ -341,27 +342,14 @@ onBeforeUnmount(() => {
        在屏幕外挂载）；z-40 vs GlobalFab 同层时 DOM 后序胜出（App.vue 先 GlobalFab
        后 SearchSheet），也盖过页面内 z-30 分页 FAB（RefreshableList，review P1-1）。 -->
   <view class="absolute inset-0 z-40">
-    <!-- 遮罩：absolute inset-0，@tap 关闭（关闭即重置：App.vue v-if 卸载） -->
-    <view class="absolute inset-0 bg-scrim" @tap="onClose" />
-
-    <!-- 底部面板：@tap.stop 防面板内点击穿透到遮罩（CommentOverlay 同款） -->
-    <view
-      class="absolute bottom-0 left-0 right-0 h-[80vh] bg-surface-container-lowest rounded-t-[var(--md-shape-extra-large)] flex flex-col"
-      @tap.stop
+    <!-- 弹层壳（scrim + 80vh 面板 + 标题栏 + ×）收口 BottomSheet 公共组件（ADR-0194 D5/D6：
+         命中测试语义单点化）；根 z-40 离流锚与开合 v-if 留在本组件（z 序挂法逐例保留，
+         review P1-1：盖过页面内 z-30 分页 FAB） -->
+    <BottomSheet
+      :title="t('searchSheet.title')"
+      :close-accessibility-label="SEARCH_A11Y_LABELS.close"
+      @close="onClose"
     >
-      <!-- 标题栏：居中「搜索」+ × 关闭 -->
-      <view class="flex flex-row items-center h-[11.733vw] px-4 flex-shrink-0">
-        <view class="w-[8vw]" />
-        <text class="flex-1 text-center text-title-large font-medium text-surface-on">{{ t('searchSheet.title') }}</text>
-        <view
-          class="w-[8vw] h-[8vw] flex items-center justify-center"
-          :accessibility-element="A11Y_ELEMENT_ENABLED"
-          :accessibility-label="SEARCH_A11Y_LABELS.close"
-          @tap="onClose"
-        >
-          <text class="text-[6.4vw] leading-none text-surface-on-variant">×</text>
-        </view>
-      </view>
 
       <!-- 输入行：占位「输入标签 / 关键词」+ 有词时清除 ×；输入 → controller.search（300ms 防抖在控制器内）；
            回车 / 键盘搜索键 → @confirm（submit 事件映射，web-core 实证）→ 提交点①写历史 -->
@@ -739,6 +727,6 @@ onBeforeUnmount(() => {
       </view>
       <!-- 系统栏安全区（spec lynx-systembars §4.2）：底部面板抬离手势/导航区 -->
       <view :style="{ height: safeBottom + 'px' }" />
-    </view>
+    </BottomSheet>
   </view>
 </template>
