@@ -23,6 +23,7 @@ import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { useSettingsStore } from '../stores/settingsStore'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import PageTopBar from '../components/PageTopBar.vue'
+import SubTabBar from '../components/SubTabBar.vue'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import BookmarkButton from '../components/BookmarkButton.vue'
@@ -285,23 +286,15 @@ onUnmounted(() => {
       </view>
     </view>
 
-    <!-- 作品 tab -->
-    <view class="flex flex-row border-b-[1px] border-b-outline-variant bg-surface-container-lowest">
-      <view
-        class="flex-1 h-[12.8vw] flex items-center justify-center"
-        :class="activeTab === 'illust' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
-        @tap="switchTab('illust')"
-      >
-        <text class="text-title-small font-medium">{{ t('userHome.tab.illust') }}</text>
-      </view>
-      <view
-        class="flex-1 h-[12.8vw] flex items-center justify-center"
-        :class="activeTab === 'novel' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
-        @tap="switchTab('novel')"
-      >
-        <text class="text-title-small font-medium">{{ t('userHome.tab.novel') }}</text>
-      </view>
-    </view>
+    <!-- 作品 tab（SubTabBar 收口，ADR-0194；选中态指示条类串在组件单点逐字保留） -->
+    <SubTabBar
+      :items="[
+        { key: 'illust', label: t('userHome.tab.illust') },
+        { key: 'novel', label: t('userHome.tab.novel') }
+      ]"
+      :model-value="activeTab"
+      @change="switchTab"
+    />
 
     <!-- 插画三态（ADR-0150）：骨架 → 错误 → 空态 → 内容，互斥单链 -->
     <view v-if="activeTab === 'illust' && illustView === 'skeleton'" class="w-full flex-1 min-h-0 flex flex-row flex-wrap content-start p-1.5">

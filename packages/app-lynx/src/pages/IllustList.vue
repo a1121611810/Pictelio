@@ -14,6 +14,7 @@ import { deriveFirstLoadView } from '../utils/firstLoadView'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import PageTopBar from '../components/PageTopBar.vue'
+import SubTabBar from '../components/SubTabBar.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
@@ -230,24 +231,15 @@ onUnmounted(() => {
     <!-- M3 TopAppBar：顶层页，居中标题，无返回箭头（PageTopBar 变体 a，ADR-0194） -->
     <PageTopBar :title="t('illustList.title')" />
 
-    <!-- 推荐/关注切换（M3 secondary tabs）：容器 border-b 分割线 + surface-container-lowest 底，
-         选中态 = text-primary + 底部 0.8vw primary 指示条（Bookmarks 页已验证的可靠写法） -->
-    <view class="flex flex-row border-b-[1px] border-b-outline-variant bg-surface-container-lowest">
-      <view
-        class="flex-1 h-[12.8vw] flex items-center justify-center"
-        :class="mode === 'recommend' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
-        @tap="switchMode('recommend')"
-      >
-        <text class="text-title-small font-medium">{{ t('illustList.tab.recommend') }}</text>
-      </view>
-      <view
-        class="flex-1 h-[12.8vw] flex items-center justify-center"
-        :class="mode === 'follow' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
-        @tap="switchMode('follow')"
-      >
-        <text class="text-title-small font-medium">{{ t('illustList.tab.follow') }}</text>
-      </view>
-    </view>
+    <!-- 推荐/关注切换（M3 secondary tabs：选中态 = text-primary + 底部 0.8vw primary 指示条）（SubTabBar 收口，ADR-0194；选中态指示条类串在组件单点逐字保留） -->
+    <SubTabBar
+      :items="[
+        { key: 'recommend', label: t('illustList.tab.recommend') },
+        { key: 'follow', label: t('illustList.tab.follow') }
+      ]"
+      :model-value="mode"
+      @change="switchMode"
+    />
 
     <!-- 排行榜入口大卡（spec docs/specs/ranking.md §5.1）：推荐 tab 内容链之前；
          开关关闭时不渲染（不建数据源） -->

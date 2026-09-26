@@ -10,6 +10,7 @@ import { useSettingsStore } from '../stores/settingsStore'
 import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
 import AiRestrictedNovelCard from '../components/AiRestrictedNovelCard.vue'
 import PageTopBar from '../components/PageTopBar.vue'
+import SubTabBar from '../components/SubTabBar.vue'
 import { useAiOnlyVisible } from '../composables/useAiOnlyVisible'
 import { useTagMuteVisible } from '../composables/useTagMuteVisible'
 import RefreshableList from '../components/RefreshableList.vue'
@@ -190,25 +191,15 @@ onUnmounted(() => {
     <!-- M3 TopAppBar：顶层页，居中标题，无返回箭头（PageTopBar 变体 a，ADR-0194） -->
     <PageTopBar :title="t('novels.title')" />
 
-    <!-- 推荐/关注切换（M3 secondary tabs：选中 primary 文字 + 底部 0.8vw primary 指示条，
-         容器 border-b 分割线；Bookmarks.vue 已验证的可靠写法，修复 web-core 下 flex-col
-         内容 + 独立指示器横条导致的向上偏移） -->
-    <view class="flex flex-row border-b-[1px] border-b-outline-variant bg-surface-container-lowest">
-      <view
-        class="flex-1 h-[12.8vw] flex items-center justify-center"
-        :class="mode === 'recommend' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
-        @tap="switchMode('recommend')"
-      >
-        <text class="text-title-small font-medium">{{ t('novels.tab.recommend') }}</text>
-      </view>
-      <view
-        class="flex-1 h-[12.8vw] flex items-center justify-center"
-        :class="mode === 'follow' ? 'text-primary border-b-[0.8vw] border-b-primary' : 'text-outline'"
-        @tap="switchMode('follow')"
-      >
-        <text class="text-title-small font-medium">{{ t('novels.tab.follow') }}</text>
-      </view>
-    </view>
+    <!-- 推荐/关注切换（M3 secondary tabs：选中 primary 文字 + 底部 0.8vw primary 指示条）（SubTabBar 收口，ADR-0194；选中态指示条类串在组件单点逐字保留） -->
+    <SubTabBar
+      :items="[
+        { key: 'recommend', label: t('novels.tab.recommend') },
+        { key: 'follow', label: t('novels.tab.follow') }
+      ]"
+      :model-value="mode"
+      @change="switchMode"
+    />
 
     <!-- 首载三态（ADR-0150）：骨架 → 错误 → 空态 → 内容，互斥单链；不依赖 loading 标志 -->
     <!-- [lynx:fix] 骨架屏高度约束在导航栏下方内容区内（不占满全屏，issue #129） -->
