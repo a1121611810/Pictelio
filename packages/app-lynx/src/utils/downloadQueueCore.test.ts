@@ -330,6 +330,34 @@ describe('持久化 serialize / restore（spec §4.4）', () => {
     expect(restore('')).toEqual({ tasks: [] })
   })
 
+  // dir 作者目录段（ADR-0192 D4/D7 / spec docs/specs/lynx-download-naming.md D5/D7）
+  it('dir 段：入队快照保留、空串与缺省等价（无子目录），往返保持字段', () => {
+    const s = enqueue(
+      { tasks: [] },
+      [
+        draft('with_dir', { dir: '画师名' }),
+        draft('empty_dir', { dir: '' }),
+        draft('no_dir'),
+      ],
+      1,
+    )
+    expect(findTask(s, 'with_dir')?.dir).toBe('画师名')
+    expect(findTask(s, 'empty_dir')?.dir).toBe('')
+    expect(findTask(s, 'no_dir')?.dir).toBeUndefined()
+    const restored = restore(serialize(s))
+    expect(restored.tasks).toEqual(s.tasks)
+  })
+
+  it('dir 非字符串（损坏记录）被丢弃，条目其余字段保留', () => {
+    const raw = JSON.stringify({
+      version: 1,
+      tasks: [{ ...task({ id: 'a' }), dir: 42 }],
+    })
+    const restored = restore(raw)
+    expect(restored.tasks[0]?.id).toBe('a')
+    expect(restored.tasks[0]?.dir).toBeUndefined()
+  })
+
   it('损坏 JSON → 空队列 + warn', () => {
     const c = captureWarn()
     expect(restore('{not json', c.warn)).toEqual({ tasks: [] })

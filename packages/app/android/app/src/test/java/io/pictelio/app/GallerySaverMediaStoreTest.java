@@ -166,6 +166,69 @@ public class GallerySaverMediaStoreTest {
                 provider.inserts.get(0).getAsString(MediaStore.MediaColumns.RELATIVE_PATH));
     }
 
+    // ── 下载队列链落盘（ADR-0192 D4/D7 / spec D5/D7）：saveFile（图片任务）与 ──
+    // ── saveDownloadFile（ugoira/小说导出）的 subPath 契约。oracle = 各基座常量字面量：──
+    // ── MediaStore.Downloads 的 RELATIVE_PATH 基座 = Environment.DIRECTORY_DOWNLOADS ──
+    // ── + "/" + DOWNLOAD_DIR_NAME，即字面量 "Download/Pictelio"（物理目录单数 Download）。──
+
+    private static final String DOWNLOADS_BASE =
+            "Download" + "/" + "Pictelio";
+
+    @Test
+    public void saveFile_mediaStore_authorSubPath_landsUnderPicturesPictelioAuthor()
+            throws IOException {
+        seedCache(new byte[]{1});
+
+        // 下载队列图片任务走 saveFile（非 save）——PictelioDownloader.download 的落盘入口
+        GallerySaver.SaveResult r =
+                GallerySaver.saveFile(context, seedExport("q.jpg", new byte[]{2}), "Pictelio_9_p0.jpg", "画师名");
+
+        assertTrue(r.mediaStore);
+        assertEquals("Pictures/Pictelio/画师名",
+                provider.inserts.get(0).getAsString(MediaStore.MediaColumns.RELATIVE_PATH));
+    }
+
+    @Test
+    public void saveDownloadFile_mediaStore_emptySubPath_keepsLegacyRelativePath() throws IOException {
+        GallerySaver.SaveResult r =
+                GallerySaver.saveDownloadFile(context, seedExport("q.zip", new byte[]{3}), "Pictelio_10.zip", "");
+
+        assertTrue(r.mediaStore);
+        assertEquals(DOWNLOADS_BASE,
+                provider.inserts.get(0).getAsString(MediaStore.MediaColumns.RELATIVE_PATH));
+    }
+
+    @Test
+    public void saveDownloadFile_mediaStore_authorSubPath_appendsToRelativePath() throws IOException {
+        GallerySaver.SaveResult r = GallerySaver.saveDownloadFile(context,
+                seedExport("q.zip", new byte[]{4}), "Pictelio_11.zip", "画师名");
+
+        assertTrue(r.mediaStore);
+        ContentValues values = provider.inserts.get(0);
+        assertEquals(DOWNLOADS_BASE + "/" + "画师名",
+                values.getAsString(MediaStore.MediaColumns.RELATIVE_PATH));
+        // 子目录只动目录段：displayName / pending 语义不变
+        assertEquals("Pictelio_11.zip", values.getAsString(MediaStore.MediaColumns.DISPLAY_NAME));
+        assertEquals(Integer.valueOf(1), values.getAsInteger(MediaStore.MediaColumns.IS_PENDING));
+    }
+
+    @Test
+    public void saveDownloadFile_mediaStore_subPathSanitized_pathTraversalNeutralized()
+            throws IOException {
+        GallerySaver.saveDownloadFile(context, seedExport("q.zip", new byte[]{5}),
+                "Pictelio_12.zip", "a/b\\c");
+
+        assertEquals(DOWNLOADS_BASE + "/" + "a_b_c",
+                provider.inserts.get(0).getAsString(MediaStore.MediaColumns.RELATIVE_PATH));
+    }
+
+    /** 就位一个本地源文件（saveFile / saveDownloadFile 直接吃 File） */
+    private File seedExport(String name, byte[] bytes) throws IOException {
+        File f = new File(context.getCacheDir(), name);
+        java.nio.file.Files.write(f.toPath(), bytes);
+        return f;
+    }
+
     /** 记录型 MediaProvider 假件。字节断言走 ShadowContentResolver.registerOutputStreamSupplier
      *  （4.14 的 shadow openOutputStream 不路由 provider.openFile，这是官方注册通道）。 */
     private static final class RecordingMediaStoreProvider extends ContentProvider {

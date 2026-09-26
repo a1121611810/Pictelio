@@ -77,3 +77,33 @@ describe('buildImageTasks（spec §3.1）', () => {
     expect(buildImageTasks(i, [0])[0]!.thumbnailUrl).toBe('https://i.pximg.net/medium.jpg')
   })
 })
+
+// ── dir 作者目录段（ADR-0192 D5/D7 / spec docs/specs/lynx-download-naming.md T11/T12）───
+describe('buildImageTasks dir 字段（开关矩阵）', () => {
+  it('缺省（未传 naming）→ dir = ""（现行为字节不变）', () => {
+    const i = illust({ meta_single_page: { original_image_url: 'o.jpg' } })
+    expect(buildImageTasks(i, [0])[0]!.dir).toBe('')
+  })
+
+  it('开关关 → dir = ""（字节不变）；开关开 → dir = 净化作者段', () => {
+    const i = illust({ meta_single_page: { original_image_url: 'o.jpg' } })
+    expect(buildImageTasks(i, [0], { authorDir: false })[0]!.dir).toBe('')
+    expect(buildImageTasks(i, [0], { authorDir: true })[0]!.dir).toBe('u')
+  })
+
+  it('作者名含分隔符/空白 → 经 buildAuthorDirSegment 净化（同一命名纯函数）', () => {
+    const i = illust({
+      user: { id: toUserId(1), name: ' a/b\\c ', account: 'u', profile_image_urls: { medium: '' } } as PixivIllust['user'],
+      meta_single_page: { original_image_url: 'o.jpg' },
+    })
+    const tasks = buildImageTasks(i, [0], { authorDir: true })
+    expect(tasks.map((t) => t.dir)).toEqual(['a_b_c'])
+  })
+
+  it('开关开 + 作者名缺失 → dir = "" + warn（禁静默退化）', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const i = illust({ user: undefined, meta_single_page: { original_image_url: 'o.jpg' } } as Partial<PixivIllust>)
+    expect(buildImageTasks(i, [0], { authorDir: true })[0]!.dir).toBe('')
+    expect(warn).toHaveBeenCalled()
+  })
+})

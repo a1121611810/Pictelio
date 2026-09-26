@@ -39,7 +39,7 @@ public class PictelioDownloaderModule extends LynxModule {
 
     @LynxMethod
     public void start(String id, String sourceUrl, String fileName, String kind, String targetFormat,
-            String framesJson, String payloadJson, Callback callback) {
+            String framesJson, String payloadJson, String dir, Callback callback) {
         if (id == null || id.isEmpty() || sourceUrl == null || sourceUrl.isEmpty()
                 || fileName == null || fileName.isEmpty()) {
             callback.invoke("", "id、sourceUrl、fileName 均不能为空");
@@ -55,6 +55,9 @@ public class PictelioDownloaderModule extends LynxModule {
             return;
         }
         final Context app = appContext();
+        // 作者目录段（ADR-0192 D4/D7）：可选参数，缺省/null = 空串（字节不变）；
+        // 仅透传，不在壳层做目录语义（净化在 GallerySaver，命名单一事实源在 JS）
+        final String authorDir = dir == null ? "" : dir;
         EXECUTOR.execute(() -> {
             try {
                 PictelioDownloader.ProgressListener listener =
@@ -62,13 +65,13 @@ public class PictelioDownloaderModule extends LynxModule {
                 String uri;
                 if ("ugoira".equals(kind)) {
                     uri = PictelioDownloader.downloadUgoira(app, PictelioGalleryModule.imageLoader(app),
-                            id, sourceUrl, targetFormat, fileName, framesJson, listener);
+                            id, sourceUrl, targetFormat, fileName, authorDir, framesJson, listener);
                 } else if ("novel".equals(kind)) {
                     uri = PictelioDownloader.downloadNovel(app, PictelioGalleryModule.imageLoader(app),
-                            id, payloadJson, targetFormat, fileName, listener);
+                            id, payloadJson, targetFormat, fileName, authorDir, listener);
                 } else {
                     uri = PictelioDownloader.download(app, PictelioGalleryModule.imageLoader(app),
-                            id, sourceUrl, fileName, listener);
+                            id, sourceUrl, fileName, authorDir, listener);
                 }
                 PROGRESS.remove(id);
                 callback.invoke(uri, "");

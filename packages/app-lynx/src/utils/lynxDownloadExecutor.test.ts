@@ -46,6 +46,7 @@ function harness() {
         _t: string,
         _fj: string,
         _pj: string,
+        _d: string,
         cb: (uri: string, err: string) => void,
       ) => {
         startCbs.set(id, cb)
@@ -124,7 +125,7 @@ describe('createLynxDownloadExecutor（spec §4.3）', () => {
     expect(h.deleted).toEqual(['content://a'])
   })
 
-  it('novel 任务透传 kind/targetFormat/payloadJson（spec novel-export §8）', () => {
+  it('novel 任务透传 kind/targetFormat/payloadJson 与 dir 缺省空串（spec novel-export §8 + ADR-0192 D7）', () => {
     const h = harness()
     const a = callbacks()
     const t: DownloadTask = {
@@ -143,6 +144,25 @@ describe('createLynxDownloadExecutor（spec §4.3）', () => {
       'pdf',
       '',
       '{"schema":1}',
+      '',
+      expect.any(Function),
+    )
+  })
+
+  it('任务 dir 字段逐字透传 start 载荷（ADR-0192 D7：入队快照 → 桥参数序一致）', () => {
+    const h = harness()
+    const a = callbacks()
+    const t: DownloadTask = { ...task('img_9_p0'), dir: '画师名' }
+    h.exec.start(t, 1, a.cb)
+    expect(h.native.start).toHaveBeenCalledWith(
+      'img_9_p0',
+      t.sourceUrl,
+      t.fileName,
+      'image',
+      'jpg',
+      '',
+      '',
+      '画师名',
       expect.any(Function),
     )
   })

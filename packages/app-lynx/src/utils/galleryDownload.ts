@@ -252,14 +252,29 @@ export async function saveIllustPages(opts: {
 }
 
 /**
+ * 任务构造命名选项（ADR-0192 D7 / spec D5）：设置经调用方注入（纯函数不偷读 store），
+ * dir 由 buildAuthorDirSegment 统一产出——队列链与单存相册链共用同一命名纯函数（spec D6）。
+ */
+export interface TaskNamingOptions {
+  /** 按作者建目录开关（设备级设置 download_by_author_dir 的入队时刻快照） */
+  authorDir?: boolean
+}
+
+/**
  * 从作品 + 选中页构造下载队列任务（spec docs/specs/download-manager.md §3.1）：
  * 一页 = 一条输出文件任务；源恒原图（复用 originalPageUrls 语义），格式取 URL 扩展名；
- * 文件名沿用 buildSaveFileName（单一事实源在 JS，与旧保存链路逐字节一致）。
+ * 文件名沿用 buildSaveFileName（单一事实源在 JS，与旧保存链路逐字节一致）；
+ * dir = 作者目录段（naming.authorDir 开启时为净化作者名段，缺省/关闭 = 空串字节不变）。
  * 页无可用原图 URL 时跳过并 console.warn（无静默降级）。
  */
-export function buildImageTasks(illust: PixivIllust, pages: readonly number[]): DownloadTaskDraft[] {
+export function buildImageTasks(
+  illust: PixivIllust,
+  pages: readonly number[],
+  naming?: TaskNamingOptions,
+): DownloadTaskDraft[] {
   const urls = originalPageUrls(illust)
   const total = pages.length
+  const dir = buildAuthorDirSegment(naming?.authorDir === true, illust.user?.name)
   const drafts: DownloadTaskDraft[] = []
   for (const page of pages) {
     const url = urls[page]
@@ -277,6 +292,7 @@ export function buildImageTasks(illust: PixivIllust, pages: readonly number[]): 
       sourceUrl: url,
       targetFormat: extForUrl(url),
       fileName: buildSaveFileName(illust.id, total > 1 ? page : undefined, url),
+      dir,
     })
   }
   return drafts
@@ -284,7 +300,8 @@ export function buildImageTasks(illust: PixivIllust, pages: readonly number[]): 
 
 /**
  * ugoira 导出任务（spec §3.1/§5）：sourceUrl 恒**官方 ZIP URL**（非 /pixiv-img 代理路径——
- * 原生执行器按官方 URL 走图床/防盗链链路）；fileName = Pictelio_<id>.<fmt>。
+ * 原生执行器按官方 URL 走图床/防盗链链路）；fileName = Pictelio_<id>.<fmt>；
+ * dir = 作者目录段（Java 侧落 Downloads/Pictelio/<作者>，spec D5）。
  * 格式来自全局设置（T13），任务创建即快照。
  */
 export function buildUgoiraTask(
@@ -292,6 +309,7 @@ export function buildUgoiraTask(
   zipUrl: string,
   format: string,
   frames: readonly UgoiraFrameTiming[] = [],
+  naming?: TaskNamingOptions,
 ): DownloadTaskDraft {
   const draft: DownloadTaskDraft = {
     id: `ugoira_${illust.id}_${format}`,
@@ -302,6 +320,7 @@ export function buildUgoiraTask(
     sourceUrl: zipUrl,
     targetFormat: format,
     fileName: `Pictelio_${illust.id}.${format}`,
+    dir: buildAuthorDirSegment(naming?.authorDir === true, illust.user?.name),
   }
   if (frames.length > 0) {
     draft.frames = frames.map((f) => ({ file: f.file, delay: f.delay }))
