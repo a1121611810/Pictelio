@@ -11,6 +11,7 @@ import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
 import AiRestrictedNovelCard from '../components/AiRestrictedNovelCard.vue'
 import PageTopBar from '../components/PageTopBar.vue'
 import SubTabBar from '../components/SubTabBar.vue'
+import EmptyState from '../components/EmptyState.vue'
 import { useAiOnlyVisible } from '../composables/useAiOnlyVisible'
 import { useTagMuteVisible } from '../composables/useTagMuteVisible'
 import RefreshableList from '../components/RefreshableList.vue'
@@ -214,11 +215,7 @@ onUnmounted(() => {
     <text v-else-if="view === 'error'" class="text-body-small text-error p-4">{{ errorMsg }}</text>
     <!-- 空态：仅「已成功落定为空」才显示（spec 加固 3：杜绝「无数据 → 纯空白」） -->
     <view v-else-if="view === 'empty'" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <view class="flex flex-col items-center">
-        <text class="text-[10.667vw] leading-none text-outline-variant">✎</text>
-        <text class="text-body-large text-surface-on mt-3">{{ emptyMeta.title }}</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ emptyMeta.hint }}</text>
-      </view>
+      <EmptyState icon="✎" :title="emptyMeta.title" :hint="emptyMeta.hint" />
     </view>
 
     <RefreshableList v-else :refresh="refreshFeed" :fab="false" @back-to-top="refreshEpoch++">

@@ -22,6 +22,7 @@ import { useSettingsStore } from '../stores/settingsStore'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import PageTopBar from '../components/PageTopBar.vue'
 import SubTabBar from '../components/SubTabBar.vue'
+import EmptyState from '../components/EmptyState.vue'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
@@ -276,11 +277,7 @@ onUnmounted(() => {
     <text v-else-if="activeTab === 'illust' && illustView === 'error'" class="text-body-small text-error p-4">{{ errorMsg }}</text>
     <!-- 插画空态：仅「已成功落定为空」才显示 -->
     <view v-else-if="activeTab === 'illust' && illustView === 'empty'" class="flex-1 flex items-center justify-center">
-      <view class="flex flex-col items-center">
-        <text class="text-[10.667vw] leading-none text-outline-variant">♡</text>
-        <text class="text-body-large text-surface-on mt-3">{{ t('bookmarks.empty.title') }}</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ t('bookmarks.empty.hint') }}</text>
-      </view>
+      <EmptyState icon="♡" :title="t('bookmarks.empty.title')" :hint="t('bookmarks.empty.hint')" />
     </view>
 
     <!-- 插画 waterfall -->
@@ -353,11 +350,7 @@ onUnmounted(() => {
     <text v-else-if="activeTab === 'novel' && novelView === 'error'" class="text-body-small text-error p-4">{{ errorMsg }}</text>
     <!-- 小说空态：仅「已成功落定为空」才显示 -->
     <view v-else-if="activeTab === 'novel' && novelView === 'empty'" class="flex-1 flex items-center justify-center">
-      <view class="flex flex-col items-center">
-        <text class="text-[10.667vw] leading-none text-outline-variant">♡</text>
-        <text class="text-body-large text-surface-on mt-3">{{ t('bookmarks.empty.title') }}</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ t('bookmarks.empty.hint') }}</text>
-      </view>
+      <EmptyState icon="♡" :title="t('bookmarks.empty.title')" :hint="t('bookmarks.empty.hint')" />
     </view>
 
     <!-- 小说列表 -->

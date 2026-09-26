@@ -30,6 +30,7 @@ import { deriveFirstLoadView } from '../utils/firstLoadView'
 import { NOTIFICATIONS_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import NotificationChildren from '../components/NotificationChildren.vue'
 import PageTopBar from '../components/PageTopBar.vue'
+import EmptyState from '../components/EmptyState.vue'
 import RefreshableList from '../components/RefreshableList.vue'
 import { t } from '../i18n'
 
@@ -178,11 +179,7 @@ function rowA11y(row: NotificationRow): string {
     </view>
     <!-- 空态 -->
     <view v-else-if="view === 'empty'" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <view class="flex flex-col items-center">
-        <text class="text-[10.667vw] leading-none text-outline-variant">◇</text>
-        <text class="text-body-large text-surface-on mt-3">{{ t('notifications.empty.title') }}</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ t('notifications.empty.hint') }}</text>
-      </view>
+      <EmptyState icon="◇" :title="t('notifications.empty.title')" :hint="t('notifications.empty.hint')" />
     </view>
 
     <RefreshableList v-else :refresh="refreshFeed" @back-to-top="refreshEpoch++">

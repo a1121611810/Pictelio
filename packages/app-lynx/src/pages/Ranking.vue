@@ -27,6 +27,7 @@ import { deriveFirstLoadView } from '../utils/firstLoadView'
 import { useSettingsStore } from '../stores/settingsStore'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import PageTopBar from '../components/PageTopBar.vue'
+import EmptyState from '../components/EmptyState.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
 import AiOverlay from '../components/AiOverlay.vue'
 import RefreshableList from '../components/RefreshableList.vue'
@@ -260,11 +261,7 @@ onUnmounted(() => feed.dispose())
       </view>
     </view>
     <view v-else-if="view === 'empty'" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <view class="flex flex-col items-center">
-        <text class="text-[10.667vw] leading-none text-outline-variant">▲</text>
-        <text class="text-body-large text-surface-on mt-3">{{ t('ranking.page.empty') }}</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ t('ranking.page.emptyHint') }}</text>
-      </view>
+      <EmptyState icon="▲" :title="t('ranking.page.empty')" :hint="t('ranking.page.emptyHint')" />
     </view>
 
     <RefreshableList v-else :refresh="refreshFeed" @back-to-top="refreshEpoch++">

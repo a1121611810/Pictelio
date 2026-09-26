@@ -24,6 +24,7 @@ import { useSettingsStore } from '../stores/settingsStore'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import PageTopBar from '../components/PageTopBar.vue'
 import SubTabBar from '../components/SubTabBar.vue'
+import EmptyState from '../components/EmptyState.vue'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import BookmarkButton from '../components/BookmarkButton.vue'
@@ -302,11 +303,7 @@ onUnmounted(() => {
     </view>
     <text v-else-if="activeTab === 'illust' && illustView === 'error'" class="text-body-small text-error p-4">{{ errorMsg }}</text>
     <view v-else-if="activeTab === 'illust' && illustView === 'empty'" class="flex-1 flex items-center justify-center">
-      <view class="flex flex-col items-center">
-        <text class="text-[10.667vw] leading-none text-outline-variant">▦</text>
-        <text class="text-body-large text-surface-on mt-3">{{ t('userHome.empty.title') }}</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ t('userHome.empty.hint') }}</text>
-      </view>
+      <EmptyState icon="▦" :title="t('userHome.empty.title')" :hint="t('userHome.empty.hint')" />
     </view>
 
     <!-- 插画 waterfall -->
@@ -372,11 +369,7 @@ onUnmounted(() => {
     </view>
     <text v-else-if="activeTab === 'novel' && novelView === 'error'" class="text-body-small text-error p-4">{{ errorMsg }}</text>
     <view v-else-if="activeTab === 'novel' && novelView === 'empty'" class="flex-1 flex items-center justify-center">
-      <view class="flex flex-col items-center">
-        <text class="text-[10.667vw] leading-none text-outline-variant">▦</text>
-        <text class="text-body-large text-surface-on mt-3">{{ t('userHome.empty.title') }}</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ t('userHome.empty.hint') }}</text>
-      </view>
+      <EmptyState icon="▦" :title="t('userHome.empty.title')" :hint="t('userHome.empty.hint')" />
     </view>
 
     <!-- 小说列表 -->

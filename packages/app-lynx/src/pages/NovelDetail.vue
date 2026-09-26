@@ -385,8 +385,10 @@ function onWatchlistCancel(): void {
     @tap="selection.onTapAway"
     @longpress="selection.notifyLongPress"
   >
+    <!-- 左上角返回改走 requestBack：与系统返回共用同一守卫链（spec §US3）；
+         [T1 不迁移] 返回守卫源级锁（unit.test.ts 断言本页含 @tap="requestBack"）——
+         PageTopBar 化需语义改测试，与「既有页面测试零语义修改」硬门禁冲突，保留手写头 -->
     <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
-      <!-- 左上角返回改走 requestBack：与系统返回共用同一守卫链（spec §US3） -->
       <view class="py-1 pr-2" @tap="requestBack"><text class="text-[6.4vw] leading-none text-surface-on">‹</text></view>
       <text class="flex-1 text-title-large font-medium text-surface-on">{{ t('novelDetail.title') }}</text>
     </view>

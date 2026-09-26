@@ -23,6 +23,7 @@ const isRestricted = settings.isRestricted
 const isAiRestricted = settings.isAiRestricted
 import RefreshableList from '../components/RefreshableList.vue'
 import PageTopBar from '../components/PageTopBar.vue'
+import EmptyState from '../components/EmptyState.vue'
 import { t } from '../i18n'
 
 // ─── 分页收敛（ADR-0104）：迁移到 createMixFeed 深模块 ───
@@ -152,11 +153,7 @@ onUnmounted(() => {
       </view>
     </view>
     <view v-else-if="view === 'empty'" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <view class="flex flex-col items-center">
-        <text class="text-[10.667vw] leading-none text-outline-variant">♡</text>
-        <text class="text-body-large text-surface-on mt-3">{{ t('following.empty.title') }}</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ t('following.empty.hint') }}</text>
-      </view>
+      <EmptyState icon="♡" :title="t('following.empty.title')" :hint="t('following.empty.hint')" />
     </view>
 
     <RefreshableList v-else :refresh="refreshFeed" @back-to-top="refreshEpoch++">

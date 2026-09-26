@@ -12,6 +12,7 @@ import { computed } from 'vue'
 import { goBack } from '../router'
 import { useSettingsStore } from '../stores/settingsStore'
 import PageTopBar from '../components/PageTopBar.vue'
+import EmptyState from '../components/EmptyState.vue'
 import { MUTE_TAGS_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { t } from '../i18n'
 
@@ -40,11 +41,7 @@ function removeTag(name: string): void {
 
     <!-- 空态 -->
     <view v-if="tags.length === 0" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <view class="flex flex-col items-center">
-        <text class="text-[10.667vw] leading-none text-outline-variant">◇</text>
-        <text class="text-body-large text-surface-on mt-3">{{ t('muteTags.empty.title') }}</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ t('muteTags.empty.hint') }}</text>
-      </view>
+      <EmptyState icon="◇" :title="t('muteTags.empty.title')" :hint="t('muteTags.empty.hint')" />
     </view>
 
     <!-- 列表态：本地集合（量级小）不做虚拟化，纵列平铺于 scroll-view -->

@@ -18,6 +18,7 @@ import { deriveFirstLoadView } from '../utils/firstLoadView'
 import SkeletonImage from '../components/SkeletonImage.vue'
 import RefreshableList from '../components/RefreshableList.vue'
 import PageTopBar from '../components/PageTopBar.vue'
+import EmptyState from '../components/EmptyState.vue'
 import { t } from '../i18n'
 
 const userId = Number(currentParams.value.id)
@@ -165,11 +166,7 @@ const refreshEpoch = ref(0)
       </view>
     </view>
     <view v-else-if="view === 'empty'" class="w-full flex-1 min-h-0 flex items-center justify-center">
-      <view class="flex flex-col items-center">
-        <text class="text-[10.667vw] leading-none text-outline-variant">◎</text>
-        <text class="text-body-large text-surface-on mt-3">{{ isFollowing ? t('followList.empty.following') : t('followList.empty.followers') }}</text>
-        <text class="text-body-medium text-surface-on-variant mt-1.5">{{ isFollowing ? t('followList.empty.followingHint') : t('followList.empty.followersHint') }}</text>
-      </view>
+      <EmptyState icon="◎" :title="isFollowing ? t('followList.empty.following') : t('followList.empty.followers')" :hint="isFollowing ? t('followList.empty.followingHint') : t('followList.empty.followersHint')" />
     </view>
 
     <RefreshableList v-else :refresh="fetchFirstPage" @back-to-top="refreshEpoch++">
