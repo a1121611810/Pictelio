@@ -52,7 +52,8 @@ describe('WatchLater.vue 列表页骨架（ADR-0191 D5 / spec D7）', () => {
 
   it('空态：EmptyState + 时钟字形 VS15（U+FE0E）+ later.empty.* 文案', () => {
     expect(page).toContain('<EmptyState')
-    expect(page).toContain("const LATER_ICON = '\\u23F1\\uFE0E'")
+    // 字形单一事实源经 utils/watchLaterGlyph 导入（VS15 依据由 watchLaterGlyph 单测钉住）
+    expect(page).toContain("import { LATER_ICON } from '../utils/watchLaterGlyph'")
     expect(page).toContain(':icon="LATER_ICON"')
     expect(page).toContain(`:title="t('later.empty.title')"`)
     expect(page).toContain(`:hint="t('later.empty.hint')"`)

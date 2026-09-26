@@ -44,7 +44,8 @@ describe('IllustDetail 稍后看入口（ADR-0191 D5）', () => {
   })
 
   it('时钟字形带 VS15（U+FE0E 强制 text presentation，ADR-0112 平台事实）', () => {
-    expect(illust).toContain("const LATER_ICON = '\\u23F1\\uFE0E'")
+    // 字形单一事实源经 utils/watchLaterGlyph 导入（VS15 依据由 watchLaterGlyph 单测钉住）
+    expect(illust).toContain("import { LATER_ICON } from '../utils/watchLaterGlyph'")
     expect(illust).toContain('{{ LATER_ICON }}')
   })
 })
@@ -85,6 +86,7 @@ describe('NovelIntro 稍后看入口（ADR-0191 D5：动作行第五动作）', 
   })
 
   it('时钟字形带 VS15（U+FE0E 强制 text presentation，ADR-0112 平台事实）', () => {
-    expect(intro).toContain("const LATER_ICON = '\\u23F1\\uFE0E'")
+    // 字形单一事实源经 utils/watchLaterGlyph 导入（VS15 依据由 watchLaterGlyph 单测钉住）
+    expect(intro).toContain("import { LATER_ICON } from '../utils/watchLaterGlyph'")
   })
 })

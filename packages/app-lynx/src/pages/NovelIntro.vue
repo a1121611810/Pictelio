@@ -26,6 +26,7 @@ import { proxyImageUrl } from '../utils/imageUrl'
 import { stripNovelCaptionHtml } from '../utils/novelCaption'
 import { isNovelDownloaded } from '../utils/novelDownloadStatus'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import { LATER_ICON } from '../utils/watchLaterGlyph'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useDownloadStore } from '../stores/downloadStore'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
@@ -214,9 +215,7 @@ function onSeriesSelect(novelId: number): void {
 }
 
 // ─── 稍后看（WatchLater，ADR-0191 D5 / #751 T3）：动作行第五动作 ───
-// 时钟字形 + VS15（U+FE0E 强制 text presentation，ADR-0112 平台事实：Lynx 原生把
-// emoji presentation 字形渲染为彩色 emoji 且 CSS 变色失效，♥\uFE0E 同款修复）
-const LATER_ICON = '\u23F1\uFE0E'
+// 时钟字形 = utils/watchLaterGlyph 单一事实源（VS15 依据见该模块头注释）
 const watchLater = useWatchLaterStore()
 /** 已加入态：高亮跟随 store.has()（ActionButton active = text-tertiary，与追更/已下载同范式） */
 const laterAdded = computed(() => watchLater.has('novel', novelId.value))

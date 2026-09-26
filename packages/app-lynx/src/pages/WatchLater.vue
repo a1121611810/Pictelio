@@ -7,6 +7,7 @@ import { openNovel } from '../utils/novelNavigation'
 import { useWatchLaterStore, type WatchLaterItem } from '../stores/watchLaterStore'
 import { proxyImageUrl } from '../utils/imageUrl'
 import { WATCH_LATER_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import { LATER_ICON } from '../utils/watchLaterGlyph'
 import PageTopBar from '../components/PageTopBar.vue'
 import EmptyState from '../components/EmptyState.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
@@ -18,9 +19,6 @@ import { t } from '../i18n'
 // 快照卡**不渲染 RestrictOverlay**（ADR-0191 D5 裁定）：快照无 tags/页数等完整作品数据、
 // 无法可靠判定 R-18/AI 受限态，且用户主动加入即已知情；点开详情后的受限处置交由详情页既有链路。
 const store = useWatchLaterStore()
-
-// 空态图标 = 详情入口同款时钟字形（VS15 U+FE0E 强制 text presentation，ADR-0112 平台事实）
-const LATER_ICON = '\u23F1\uFE0E'
 
 /** list 强制重建代（删除成功后 ++，驱动 :key 整树替换）：原生 list 删除条目走子节点
  * patch 会触发 vue-lynx patch RemoveNode 索引错位（框架 bug，ADR-0107 D4）；

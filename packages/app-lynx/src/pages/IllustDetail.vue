@@ -23,6 +23,7 @@ import TagPressChip from '../components/TagPressChip.vue'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
 import { useWatchLaterStore, toIllustSnapshot } from '../stores/watchLaterStore'
 import { buildImageTasks, buildUgoiraTask } from '../utils/galleryDownload'
+import { LATER_ICON } from '../utils/watchLaterGlyph'
 import { useDownloadStore } from '../stores/downloadStore'
 import { t } from '../i18n'
 
@@ -189,9 +190,7 @@ function onSaveEntry() {
 }
 
 // ─── 稍后看（WatchLater，ADR-0191 D5 / #751 T3）：动作区 toggle ───
-// 时钟字形 + VS15（U+FE0E 强制 text presentation，ADR-0112 平台事实：Lynx 原生把
-// emoji presentation 字形渲染为彩色 emoji 且 CSS 变色失效，♥\uFE0E 同款修复）
-const LATER_ICON = '\u23F1\uFE0E'
+// 时钟字形 = utils/watchLaterGlyph 单一事实源（VS15 依据见该模块头注释）
 const watchLater = useWatchLaterStore()
 /** 已加入态：高亮跟随 store.has()（按 (kind, id) 去重；读路由 id，路由复用换 id 即时重算） */
 const laterAdded = computed(() => watchLater.has('illust', illustId.value))
