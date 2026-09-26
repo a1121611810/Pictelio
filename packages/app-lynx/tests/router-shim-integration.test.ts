@@ -72,6 +72,8 @@ vi.mock('../src/pages/Watchlist.vue', () => ({ default: {} }))
 // 稍后看列表页（ADR-0191 / #753 T4）：占位组件（路由只需 component 引用，不渲染）
 vi.mock('../src/pages/WatchLater.vue', () => ({ default: {} }))
 vi.mock('../src/pages/Notifications.vue', () => ({ default: {} }))
+// 好P友列表页（ADR-0193 / #754 T7）：占位组件（路由只需 component 引用，不渲染）
+vi.mock('../src/pages/MyPixiv.vue', () => ({ default: {} }))
 vi.mock('../src/pages/MuteTags.vue', () => ({ default: {} }))
 vi.mock('../src/pages/DownloadManager.vue', () => ({ default: {} }))
 vi.mock('../src/pages/NetworkCheck.vue', () => ({ default: {} }))
@@ -89,9 +91,9 @@ async function loadRouter(): Promise<RouterModule> {
 }
 
 describe('路由表完整性（spec D3）', () => {
-  it('23 条路由：path/name 齐全；/update、/error 无 requiresAuth 且带 backBehavior exit（P0-1）', async () => {
+  it('24 条路由：path/name 齐全；/update、/error 无 requiresAuth 且带 backBehavior exit（P0-1）', async () => {
     const mod = await loadRouter()
-    expect(mod.routes).toHaveLength(23)
+    expect(mod.routes).toHaveLength(24)
     const nameOf = (p: string) => mod.routes.find((r) => r.path === p)?.name
     expect(nameOf('/login')).toBe('login')
     expect(nameOf('/recommended')).toBe('recommended')
@@ -107,6 +109,10 @@ describe('路由表完整性（spec D3）', () => {
     // 术语红线：路由名 watchLater，与追更 watchlist 物理隔离
     expect(nameOf('/later')).toBe('watchLater')
     expect(mod.routes.find((r) => r.path === '/later')?.meta?.requiresAuth).toBe(true)
+    // 好P友列表页（ADR-0193 D2 / #754 T7）：业务次级页，requiresAuth 守卫鉴权；
+    // 好P友是双向关系（/v1/user/mypixiv），与 following/follower 单向关系不同族
+    expect(nameOf('/mypixiv')).toBe('mypixiv')
+    expect(mod.routes.find((r) => r.path === '/mypixiv')?.meta?.requiresAuth).toBe(true)
     // 小说介绍页（spec #585 / 票 #586）：与 /novel/:id 平级共存，同标 requiresAuth
     expect(nameOf('/novel/:id/intro')).toBe('novel-intro')
     expect(mod.routes.find((r) => r.path === '/novel/:id/intro')?.meta?.requiresAuth).toBe(true)
@@ -159,6 +165,13 @@ describe('shim 生命周期状态机（真实 createMemoryHistory）', () => {
     const mod = await loadRouter()
     await mod.initRouter()
     await mod.navigate('/later')
+    expect(mod.router.currentRoute.value.path).toBe('/login')
+  })
+
+  it('未登录访问 /mypixiv → 守卫拦截（requiresAuth 生效，ADR-0193 D2）', async () => {
+    const mod = await loadRouter()
+    await mod.initRouter()
+    await mod.navigate('/mypixiv')
     expect(mod.router.currentRoute.value.path).toBe('/login')
   })
 

@@ -142,6 +142,16 @@ const enPages = {
   "followList.follow": "Follow",
   "followList.footer.loading": "Loading…",
 
+  // MyPixiv.vue (MyPixiv friends list, ADR-0193 / #754 T7; glossary term "MyPixiv")
+  "mypixiv.title": "My Pixiv",
+  "mypixiv.empty.title": "No My Pixiv friends yet",
+  "mypixiv.empty.hint": "Follow each other to become My Pixiv friends",
+  "mypixiv.retry": "Retry",
+  "mypixiv.loadMoreFailed": "Could not load more",
+  "mypixiv.actionFailed": "Action failed",
+  "mypixiv.footer.loading": "Loading…",
+  "mypixiv.footer.end": "No more content",
+
   // Following.vue
   "following.backA11y": "Back",
   "following.title": "Following",
@@ -208,6 +218,7 @@ const enPages = {
   "me.title": "Me",
   "me.bookmarks": "My bookmarks",
   "me.watchlist": "Watchlist",
+  "me.mypixiv": "My Pixiv",
   "me.downloads": "Downloads",
   "me.networkCheck": "Network check",
   "me.notifications": "Notifications",

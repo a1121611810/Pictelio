@@ -35,6 +35,8 @@ const FILES = [
   '../pages/Bookmarks.vue',
   '../pages/UserHome.vue',
   '../pages/FollowList.vue',
+  // 好P友列表页（ADR-0193 D2 / #754 T7）：网络首载页，纳入同一三态防线
+  '../pages/MyPixiv.vue',
   '../components/CommentOverlay.vue',
   '../components/SearchSheet.vue',
 ]

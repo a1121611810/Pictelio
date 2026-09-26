@@ -82,7 +82,8 @@ onMounted(() => {
          KeepAlive 缓存列表/静态页实例（ADR-0049）：详情返回列表不重载。
          详情页不在 include 白名单——按 :id 加载，缓存旧 id 实例会显示错误内容 -->
     <RouterView v-slot="{ Component }">
-      <KeepAlive :include="['recommended', 'illusts', 'novels', 'me', 'ranking']">
+      <!-- 好P友列表（ADR-0193 D3 / #754 T7）进白名单：进用户主页返回不重挂载、不重发首载 -->
+      <KeepAlive :include="['recommended', 'illusts', 'novels', 'me', 'ranking', 'mypixiv']">
         <component :is="Component" />
       </KeepAlive>
     </RouterView>

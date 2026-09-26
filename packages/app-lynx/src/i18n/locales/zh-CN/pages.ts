@@ -142,6 +142,17 @@ const zhPages = {
   "followList.follow": "关注",
   "followList.footer.loading": "加载中…",
 
+  // ─── MyPixiv.vue（好P友列表页，ADR-0193 / #754 T7；术语表「好P友（MyPixiv）」：
+  // 双向关系用户列表，禁「好友/朋友/相互关注列表」别称） ───
+  "mypixiv.title": "好P友",
+  "mypixiv.empty.title": "还没有好P友",
+  "mypixiv.empty.hint": "互相关注即可成为好P友",
+  "mypixiv.retry": "重试",
+  "mypixiv.loadMoreFailed": "加载更多失败",
+  "mypixiv.actionFailed": "操作失败",
+  "mypixiv.footer.loading": "加载中…",
+  "mypixiv.footer.end": "没有更多了",
+
   // ─── Following.vue（关注 Feed 页） ───
   "following.backA11y": "返回",
   "following.title": "关注",
@@ -208,6 +219,7 @@ const zhPages = {
   "me.title": "我的",
   "me.bookmarks": "我的收藏",
   "me.watchlist": "追更列表",
+  "me.mypixiv": "好P友",
   "me.downloads": "下载管理",
   "me.networkCheck": "网络自检",
   "me.notifications": "通知",

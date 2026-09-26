@@ -55,6 +55,7 @@ import UpdatePage from './pages/UpdatePage.vue'
 import ErrorPage from './pages/ErrorPage.vue'
 import Watchlist from './pages/Watchlist.vue'
 import WatchLater from './pages/WatchLater.vue'
+import MyPixiv from './pages/MyPixiv.vue'
 import Notifications from './pages/Notifications.vue'
 import MuteTags from './pages/MuteTags.vue'
 import DownloadManager from './pages/DownloadManager.vue'
@@ -92,6 +93,9 @@ export const routes: RouteRecordRaw[] = [
   { path: '/later', name: 'watchLater', component: WatchLater, meta: { requiresAuth: true } },
   // 通知中心（ADR-0188 D7 / #728）：次级业务页（非 NAV_TABS 外环 tab），Me 入口行进入
   { path: '/notifications', name: 'notifications', component: Notifications, meta: { requiresAuth: true } },
+  // 好P友列表页（ADR-0193 D2 / #754 T7）：次级业务页，Me 入口行进入；好P友是双向关系
+  // （/v1/user/mypixiv），与 following/follower 单向关系不同族（术语表辨析 #5）
+  { path: '/mypixiv', name: 'mypixiv', component: MyPixiv, meta: { requiresAuth: true } },
   // 静音标签管理页（ADR-0187 D5 / #732）：次级业务页，Me 内容组入口行进入
   { path: '/mute-tags', name: 'mute-tags', component: MuteTags, meta: { requiresAuth: true } },
   { path: '/ranking', name: 'ranking', component: Ranking, meta: { requiresAuth: true } },
@@ -355,6 +359,8 @@ function registerBenchNavHandler(): void {
     // 稍后看列表页直达（ADR-0191 D5 / #753 T4）：模拟器验收通道（benchNav 打开 /later 验证
     // 快照列表、行点击导航与删除/计数联动）
     pictelioBenchNavLater: '/later',
+    // 好P友列表页直达（ADR-0193 D5 / #754 T7）：benchNav 打开 /mypixiv 验证列表渲染/空态
+    pictelioBenchNavMyPixiv: '/mypixiv',
     // T4（spec app-lynx-benchnav-meta-exit-hooks）：/update、/error 直达（meta-exit 回归 S6 触发通道）
     pictelioBenchNavUpdate: '/update',
     pictelioBenchNavError: '/error',
