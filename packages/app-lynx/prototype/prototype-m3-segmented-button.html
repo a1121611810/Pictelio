@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PROTOTYPE · M3SegmentedButton 组件化效果预览（throwaway）</title>
+<!--
+  ─────────────────────────────────────────────────────────────
+  问题：M3SegmentedButton 组件化前后，Lynx 设置页分段控件长什么样？
+  计划：3 个变体，?variant=A|B|C 切换 + 浮动底栏；独立 HTML 双击即开
+        （对齐仓库惯例 prototype-bookmark-color.html）。
+  变体：A = 现状（迁移前，AI 组无分隔线 = bug 现场）
+        B = 目标（组件化：分隔线由 index 自动生成，5 处统一）← 已定方案
+        C = 备选（iOS 风滑动指示器，结构不同，供对比）
+  token：逐字拷贝 src/styles/tokens.css .theme-sky（亮）/ .theme-sky.dark（暗）。
+  尺寸：390px 手机框；h-40px ≈ h-[10.667vw]@375；字号 label-large=14px /
+        label-medium=12px / title-medium=16px（28rpx/24rpx/32rpx@375）。
+  注意：本文件是 throwaway 原型，不是生产代码；标注 *.note 为原型专属注解。
+  ─────────────────────────────────────────────────────────────
+-->
+<style>
+  /* ── M3 token：Sky 亮色（tokens.css .theme-sky 原值） ── */
+  .theme-sky {
+    --md-primary:#1a6fa8; --md-on-primary:#ffffff;
+    --md-secondary-container:#d3e5f5; --md-on-secondary-container:#0c1d29;
+    --md-surface:#f8faff; --md-on-surface:#191c20;
+    --md-on-surface-variant:#41474e;
+    --md-outline:#71787e; --md-outline-variant:#c1c7ce;
+    --md-surface-container-lowest:#ffffff;
+    --md-state-pressed-surface:#e4e9f1;
+    --md-elevation-1:0 1px 2px rgba(0,0,0,.3),0 1px 3px 1px rgba(0,0,0,.15);
+    --md-secondary-fixed-dim:#b7c9d9;
+  }
+  /* ── M3 token：Sky 暗色（tokens.css .theme-sky.dark 原值） ── */
+  .theme-sky.dark {
+    --md-primary:#9bcbfa; --md-on-primary:#003353;
+    --md-secondary-container:#3a4857; --md-on-secondary-container:#d5e4f7;
+    --md-surface:#101418; --md-on-surface:#e0e2e8;
+    --md-on-surface-variant:#c2c7cf;
+    --md-outline:#8c9198; --md-outline-variant:#42474e;
+    --md-surface-container-lowest:#0b0f12;
+    --md-state-pressed-surface:#272a2f;
+    --md-elevation-1:0 1px 2px rgba(0,0,0,.3),0 1px 3px 1px rgba(0,0,0,.15);
+    --md-secondary-fixed-dim:#b9c8da;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body {
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans SC",sans-serif;
+    background:#22262c; display:flex; flex-direction:column; align-items:center;
+    min-height:100vh; padding:24px 12px 130px;
+  }
+  .page-caption { color:#9aa3ad; font-size:12px; margin-bottom:14px; text-align:center; line-height:1.7; }
+  .phone {
+    width:390px; max-width:100%; background:var(--md-surface);
+    border-radius:28px; padding:4px 0 28px;
+    box-shadow:0 12px 44px rgba(0,0,0,.5);
+  }
+  .header { padding:16px 16px 6px; font-size:17px; font-weight:600; color:var(--md-on-surface); }
+  .card {
+    background:var(--md-surface-container-lowest);
+    border-radius:12px; box-shadow:var(--md-elevation-1);
+    margin:12px 12px 0; padding:16px;
+  }
+  .card-title { font-size:14px; font-weight:600; color:var(--md-on-surface); }
+  .card-hint { font-size:12px; color:var(--md-on-surface-variant); margin-top:4px; margin-bottom:12px; }
+
+  /* ── M3 segmented button（A/B：填充式，与 Me.vue 逐 class 对应） ── */
+  .seg-wrap {
+    display:flex; border:1px solid var(--md-outline);
+    border-radius:9999px; overflow:hidden; position:relative;
+  }
+  .seg {
+    flex:1; height:40px; display:flex; align-items:center; justify-content:center;
+    background:var(--md-surface-container-lowest); position:relative; z-index:1;
+    cursor:pointer; user-select:none;
+    transition:background-color 200ms cubic-bezier(0.33,0,0.67,1);
+  }
+  .seg.on { background:var(--md-secondary-container); }
+  .seg.div { border-left:1px solid var(--md-outline); }
+  .seg:active { filter:brightness(.94); }
+  .seg-text { font-size:14px; color:var(--md-on-surface); transition:color 200ms cubic-bezier(0.33,0,0.67,1); }
+  .seg-text.on { color:var(--md-on-secondary-container); }
+
+  /* ── C：滑动指示器式（结构不同：无分隔线，滑块 pill） ── */
+  .seg-wrap.slider .seg { background:transparent; border-left:none; }
+  .seg-wrap.slider .seg:active { filter:none; }
+  .seg-wrap.slider .seg-text { color:var(--md-on-surface); }
+  .seg-wrap.slider .seg-text.on { color:var(--md-on-secondary-container); font-weight:500; }
+  .pill {
+    position:absolute; top:0; bottom:0; left:0; z-index:0;
+    background:var(--md-secondary-container); border-radius:9999px;
+    transition:transform 300ms cubic-bezier(0.33,0,0,1);
+  }
+
+  /* ── AI 作品行（同行窄布局，与 Me.vue L851 一致） ── */
+  .row-inline { display:flex; align-items:center; justify-content:space-between; padding:14px 0; }
+  .row-inline .seg-wrap { width:216px; flex-shrink:0; }
+  .row-title { font-size:16px; color:var(--md-on-surface); }
+
+  /* ── 原型专属注解（非生产 UI） ── */
+  .note { font-size:11px; margin-top:10px; line-height:1.6; }
+  .note.bug  { color:#e46962; }
+  .note.ok   { color:#7ed99a; }
+  .note.alt  { color:#9aa3ad; }
+
+  /* ── 浮动切换底栏（视觉上独立于被评估的设计） ── */
+  #bar {
+    position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
+    display:flex; align-items:center; gap:8px;
+    background:#191c20; color:#fff; padding:10px 14px; border-radius:9999px;
+    box-shadow:0 6px 24px rgba(0,0,0,.5); z-index:99;
+  }
+  #bar button {
+    background:transparent; border:none; color:#fff; font-size:15px;
+    cursor:pointer; padding:4px 10px; border-radius:8px; white-space:nowrap;
+  }
+  #bar button:hover { background:rgba(255,255,255,.15); }
+  #variantLabel { font-size:13px; min-width:230px; text-align:center; }
+  #variantLabel small { display:block; color:#9aa0a6; font-size:11px; margin-top:2px; }
+  #readout {
+    position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px;
+    color:#cdd3da; background:rgba(16,20,24,.88); padding:6px 12px;
+    border-radius:8px; z-index:99; white-space:nowrap;
+  }
+</style>
+</head>
+<body>
+  <div class="page-caption">
+    <b>M3SegmentedButton 效果原型</b>（throwaway · 问题：组件化前后设置页分段控件长什么样？）<br/>
+    底部切换变体 · 也可改 URL <code>?variant=A|B|C</code> · ←/→ 键循环
+  </div>
+
+  <div id="stage" class="theme-sky">
+    <div class="phone">
+      <div class="header">设置</div>
+      <div id="groups"></div>
+    </div>
+  </div>
+
+  <div id="readout"></div>
+  <div id="bar">
+    <button id="prev" aria-label="上一个变体">←</button>
+    <div id="variantLabel"></div>
+    <button id="themeBtn" aria-label="切换亮暗">🌙 暗色</button>
+    <button id="next" aria-label="下一个变体">→</button>
+  </div>
+
+<script>
+// ── 设置页 4 组分段控件（文案 = zh-CN/pages.ts 真实值） ──
+const GROUPS = [
+  { id:'appearance', title:'外观', hint:'主题色与显示模式', layout:'full',
+    options:[{v:'light',l:'亮色'},{v:'dark',l:'暗色'},{v:'system',l:'跟随系统'}] },
+  { id:'ai', title:'AI 作品', hint:null, layout:'inline',
+    options:[{v:'show',l:'显示'},{v:'mask',l:'遮罩'},{v:'only',l:'仅看'}] },
+  { id:'ugoira', title:'动图播放',
+    hint:'Range 流式按需取帧、内存更低；若失败自动切换 fflate 全量播放，不中断。',
+    layout:'full',
+    options:[{v:'fflate',l:'fflate（默认）'},{v:'range',l:'Range 流式'}] },
+  { id:'quality', title:'详情画质', hint:'列表缩略图 / 详情大图清晰度', layout:'full',
+    options:[{v:'medium',l:'标准'},{v:'large',l:'高清'},{v:'original',l:'原图'}] },
+];
+
+// ── 3 个变体 ──
+const VARIANTS = {
+  A: { name:'A · 现状（迁移前）', sub:'AI 组无分隔线 = 线上 bug 现场', mode:'fill', dividers:'current' },
+  B: { name:'B · 目标（组件化）', sub:'分隔线 index 自动生成 · 5 处统一 ← 已定方案', mode:'fill', dividers:'all' },
+  C: { name:'C · 备选（滑动指示器）', sub:'iOS 风滑块 · 无分隔线 · 仅供对比', mode:'slider', dividers:'none' },
+};
+const ORDER = ['A','B','C'];
+
+const state = {
+  variant: new URLSearchParams(location.search).get('variant') || 'A',
+  theme: 'light',
+  groups: { appearance:'system', ai:'show', ugoira:'fflate', quality:'medium' },
+};
+if (!VARIANTS[state.variant]) state.variant = 'A';
+
+// A 变体忠实还原线上：除 AI 组外都有分隔线（7eb0f5eb 漏改 AI 组）
+function hasDividers(variantDef, group) {
+  if (variantDef.dividers === 'all') return true;
+  if (variantDef.dividers === 'none') return false;
+  return group.id !== 'ai';
+}
+
+function segmentedHtml(g, v) {
+  const sel = state.groups[g.id];
+  const n = g.options.length;
+  if (v.mode === 'slider') {
+    const idx = Math.max(0, g.options.findIndex(o => o.v === sel));
+    return '<div class="seg-wrap slider" data-g="' + g.id + '">'
+      + '<div class="pill" style="width:' + (100/n) + '%;transform:translateX(' + (idx*100) + '%)"></div>'
+      + g.options.map(o =>
+          '<div class="seg" data-v="' + o.v + '"><span class="seg-text' + (o.v===sel?' on':'') + '">' + o.l + '</span></div>'
+        ).join('')
+      + '</div>';
+  }
+  const div = hasDividers(v, g);
+  return '<div class="seg-wrap" data-g="' + g.id + '">'
+    + g.options.map((o,i) =>
+        '<div class="seg' + (o.v===sel?' on':'') + ((i>0 && div)?' div':'') + '" data-v="' + o.v + '">'
+        + '<span class="seg-text' + (o.v===sel?' on':'') + '">' + o.l + '</span></div>'
+      ).join('')
+    + '</div>';
+}
+
+function noteHtml(v) {
+  if (state.variant === 'A') return '<div class="note bug">⚠ 现状：未选段底色 = 卡片底色（#fff）且段间无分隔线 → 三段融成一条白边条，只剩外框和选中段可见</div>';
+  if (state.variant === 'B') return '<div class="note ok">✓ 组件化后：index &gt; 0 的段自动生成 border-l-outline，AI 组与参照组逐 class 一致</div>';
+  return '<div class="note alt">◦ 备选方向：滑动指示器（结构不同），若定 B 则此变体废弃</div>';
+}
+
+function render() {
+  const v = VARIANTS[state.variant];
+  const stage = document.getElementById('stage');
+  stage.className = 'theme-sky' + (state.theme === 'dark' ? ' dark' : '');
+
+  document.getElementById('groups').innerHTML = GROUPS.map(g => {
+    if (g.layout === 'inline') {
+      return '<div class="card"><div class="row-inline">'
+        + '<span class="row-title">' + g.title + '</span>'
+        + segmentedHtml(g, v)
+        + '</div>' + noteHtml(v) + '</div>';
+    }
+    return '<div class="card">'
+      + '<div class="card-title">' + g.title + '</div>'
+      + (g.hint ? '<div class="card-hint">' + g.hint + '</div>' : '<div style="height:12px"></div>')
+      + segmentedHtml(g, v)
+      + (g.id === 'ai' ? noteHtml(v) : '')
+      + '</div>';
+  }).join('');
+
+  document.getElementById('variantLabel').innerHTML =
+    '<b>' + v.name + '</b><small>' + v.sub + '</small>';
+  document.getElementById('themeBtn').textContent =
+    state.theme === 'dark' ? '☀️ 亮色' : '🌙 暗色';
+  updateReadout();
+}
+
+function updateReadout() {
+  const divCount = GROUPS.reduce((acc, g) => {
+    const v = VARIANTS[state.variant];
+    acc[g.id] = v.mode === 'slider' ? 0 : (hasDividers(v, g) ? g.options.length - 1 : 0);
+    return acc;
+  }, {});
+  document.getElementById('readout').textContent =
+    'state = { variant: "' + state.variant + '", theme: "' + state.theme + '", '
+    + 'selected: ' + JSON.stringify(state.groups) + ', dividers: ' + JSON.stringify(divCount) + ' }';
+}
+
+// 选中更新（原地更新，保 sliding 动画）
+document.getElementById('groups').addEventListener('click', e => {
+  const seg = e.target.closest('.seg');
+  if (!seg) return;
+  const wrap = seg.closest('.seg-wrap');
+  const gid = wrap.dataset.g;
+  const g = GROUPS.find(x => x.id === gid);
+  state.groups[gid] = seg.dataset.v;
+  const sel = state.groups[gid];
+  const idx = g.options.findIndex(o => o.v === sel);
+  wrap.querySelectorAll('.seg').forEach((s, i) => {
+    const on = g.options[i].v === sel;
+    s.classList.toggle('on', on && !wrap.classList.contains('slider'));
+    s.querySelector('.seg-text').classList.toggle('on', on);
+  });
+  const pill = wrap.querySelector('.pill');
+  if (pill) pill.style.transform = 'translateX(' + (idx * 100) + '%)';
+  updateReadout();
+});
+
+function cycle(dir) {
+  const i = ORDER.indexOf(state.variant);
+  state.variant = ORDER[(i + dir + ORDER.length) % ORDER.length];
+  const url = new URL(location.href);
+  url.searchParams.set('variant', state.variant);
+  history.replaceState(null, '', url);
+  render();
+}
+document.getElementById('prev').addEventListener('click', () => cycle(-1));
+document.getElementById('next').addEventListener('click', () => cycle(1));
+document.getElementById('themeBtn').addEventListener('click', () => {
+  state.theme = state.theme === 'dark' ? 'light' : 'dark';
+  render();
+});
+document.addEventListener('keydown', e => {
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  if (e.key === 'ArrowLeft') cycle(-1);
+  if (e.key === 'ArrowRight') cycle(1);
+});
+
+render();
+</script>
+</body>
+</html>
