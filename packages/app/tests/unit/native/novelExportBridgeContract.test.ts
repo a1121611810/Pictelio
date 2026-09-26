@@ -61,15 +61,16 @@ describe("小说导出桥契约（spec novel-export §8）", () => {
       "targetFormat",
       "framesJson",
       "payloadJson",
+      "dir",
       "callback",
     ]);
     const call = LYNX_TS.match(/native\.start\(([\s\S]*?)\(uri, err\)/);
     expect(call, "lynxDownloadExecutor 未找到 native.start 调用").not.toBeNull();
     const tsArgs = call![1]!
       .split(",")
-      .map((a) => a.trim().replace(/^task\./, ""))
+      .map((a) => a.trim().replace(/^task\./, "").replace(/\s*\?\? ''$/, ""))
       .filter((a) => a.length > 0);
-    // 末位 callback 由 TS 传箭头函数（已在 match 中切走），故与 Java 前 7 个形参对齐
+    // 末位 callback 由 TS 传箭头函数（已在 match 中切走），故与 Java 前 8 个形参对齐
     expect(tsArgs).toEqual(java.slice(0, -1));
   });
 
