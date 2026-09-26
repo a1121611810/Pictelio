@@ -26,6 +26,7 @@ import { shouldShowR18Notice } from '../primitives/rankingNotice'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import { useSettingsStore } from '../stores/settingsStore'
 import SkeletonImage from '../components/SkeletonImage.vue'
+import PageTopBar from '../components/PageTopBar.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
 import AiOverlay from '../components/AiOverlay.vue'
 import RefreshableList from '../components/RefreshableList.vue'
@@ -159,12 +160,8 @@ onUnmounted(() => feed.dispose())
 
 <template>
   <view class="w-full h-full flex flex-col bg-surface">
-    <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
-      <view class="py-1 pr-2" @tap="goBack">
-        <text class="text-[6.4vw] leading-none text-surface-on">‹</text>
-      </view>
-      <text class="flex-1 text-title-large font-medium text-surface-on">{{ t('ranking.page.title') }}</text>
-    </view>
+    <!-- M3 TopAppBar：次级页，返回 + 标题（PageTopBar 变体 b，ADR-0194） -->
+    <PageTopBar back :title="t('ranking.page.title')" @back="goBack" />
 
     <!-- 维度 chip 行：窄屏换行展示，不横向滚动 -->
     <view

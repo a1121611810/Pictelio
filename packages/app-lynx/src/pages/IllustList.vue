@@ -13,6 +13,7 @@ import { useRelatedInjectionStore } from '../stores/relatedInjection'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
+import PageTopBar from '../components/PageTopBar.vue'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
 import BookmarkButton from '../components/BookmarkButton.vue'
 import RestrictOverlay from '../components/RestrictOverlay.vue'
@@ -226,10 +227,8 @@ onUnmounted(() => {
 
 <template>
   <view class="w-full h-full flex flex-col bg-surface">
-    <!-- M3 TopAppBar：顶层页，居中标题，无返回箭头 -->
-    <view class="flex flex-row items-center justify-center h-[17.067vw] px-4 bg-surface">
-      <text class="text-title-large font-medium text-surface-on">{{ t('illustList.title') }}</text>
-    </view>
+    <!-- M3 TopAppBar：顶层页，居中标题，无返回箭头（PageTopBar 变体 a，ADR-0194） -->
+    <PageTopBar :title="t('illustList.title')" />
 
     <!-- 推荐/关注切换（M3 secondary tabs）：容器 border-b 分割线 + surface-container-lowest 底，
          选中态 = text-primary + 底部 0.8vw primary 指示条（Bookmarks 页已验证的可靠写法） -->

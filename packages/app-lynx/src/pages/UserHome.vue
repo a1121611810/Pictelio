@@ -22,6 +22,7 @@ import { presentError } from '../utils/errorPresentation'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { useSettingsStore } from '../stores/settingsStore'
 import SkeletonImage from '../components/SkeletonImage.vue'
+import PageTopBar from '../components/PageTopBar.vue'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import BookmarkButton from '../components/BookmarkButton.vue'
@@ -250,12 +251,13 @@ onUnmounted(() => {
 
 <template>
   <view class="w-full h-full flex flex-col bg-surface">
-    <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
-      <view class="py-1 pr-2" @tap="goBack"><text class="text-[6.4vw] leading-none text-surface-on">‹</text></view>
-      <text class="flex-1 text-title-large font-medium text-surface-on [max-line:1]">
-        {{ detail?.user.name || t('userHome.titleFallback') }}
-      </text>
-    </view>
+    <!-- M3 TopAppBar：次级页，返回 + 标题（PageTopBar 变体 b，ADR-0194）；长用户名单行截断经 title-class 保留 -->
+    <PageTopBar
+      back
+      :title="detail?.user.name || t('userHome.titleFallback')"
+      title-class="[max-line:1]"
+      @back="goBack"
+    />
 
     <text v-if="detailError" class="text-body-small text-error p-4">{{ detailError }}</text>
 

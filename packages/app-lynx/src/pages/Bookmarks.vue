@@ -20,6 +20,7 @@ import { thumbUrl } from '../utils/imageUrl'
 import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { useSettingsStore } from '../stores/settingsStore'
 import SkeletonImage from '../components/SkeletonImage.vue'
+import PageTopBar from '../components/PageTopBar.vue'
 import SkeletonCard from '../components/SkeletonCard.vue'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import IllustTypeBadgeRow from '../components/IllustTypeBadgeRow.vue'
@@ -254,10 +255,8 @@ onUnmounted(() => {
 
 <template>
   <view class="w-full h-full flex flex-col bg-surface">
-    <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
-      <view class="py-1 pr-2" @tap="goBack"><text class="text-[6.4vw] leading-none text-surface-on">‹</text></view>
-      <text class="flex-1 text-title-large font-medium text-surface-on">{{ t('bookmarks.title') }}</text>
-    </view>
+    <!-- M3 TopAppBar：次级页，返回 + 标题（PageTopBar 变体 b，ADR-0194） -->
+    <PageTopBar back :title="t('bookmarks.title')" @back="goBack" />
 
     <!-- 插画/小说 tab -->
     <view class="flex flex-row border-b-[1px] border-b-outline-variant bg-surface-container-lowest">

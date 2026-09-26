@@ -22,7 +22,7 @@ const settings = useSettingsStore()
 const isRestricted = settings.isRestricted
 const isAiRestricted = settings.isAiRestricted
 import RefreshableList from '../components/RefreshableList.vue'
-import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
+import PageTopBar from '../components/PageTopBar.vue'
 import { t } from '../i18n'
 
 // ─── 分页收敛（ADR-0104）：迁移到 createMixFeed 深模块 ───
@@ -127,18 +127,15 @@ onUnmounted(() => {
 
 <template>
   <view class="w-full h-full flex flex-col bg-surface">
-    <!-- M3 TopAppBar：顶层页，居中标题；移除底部导航栏后补返回箭头（ADR-0120） -->
-    <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
-      <view
-        class="py-1 pr-2"
-        :accessibility-element="A11Y_ELEMENT_ENABLED"
-        :accessibility-label="t('following.backA11y')"
-        @tap="requestBack"
-      >
-        <text class="text-[6.4vw] leading-none text-surface-on">‹</text>
-      </view>
-      <text class="flex-1 text-center text-title-large font-medium text-surface-on">{{ t('following.title') }}</text>
-    </view>
+    <!-- M3 TopAppBar：返回 + 居中标题（PageTopBar 变体 b，ADR-0194）；移除底部导航栏后补返回箭头
+         （ADR-0120）；返回走 requestBack 守卫链，a11y label 动态 t() 与居中差异经 props 保留 -->
+    <PageTopBar
+      back
+      :title="t('following.title')"
+      title-class="text-center"
+      :back-a11y-label="t('following.backA11y')"
+      @back="requestBack"
+    />
 
     <!-- 首载三态（ADR-0150）：骨架 → 错误 → 空态 → 内容，互斥单链；不依赖 loading 标志 -->
     <!-- [lynx:fix] 骨架屏不占满全屏高度（h-full 会溢出覆盖底部导航栏，拦截 tap，issue #129） -->

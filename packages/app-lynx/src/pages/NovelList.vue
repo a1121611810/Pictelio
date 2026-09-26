@@ -9,6 +9,7 @@ import { createMixFeed, type MixFeedItem } from '../primitives/createMixFeed'
 import { useSettingsStore } from '../stores/settingsStore'
 import RestrictedNovelCard from '../components/RestrictedNovelCard.vue'
 import AiRestrictedNovelCard from '../components/AiRestrictedNovelCard.vue'
+import PageTopBar from '../components/PageTopBar.vue'
 import { useAiOnlyVisible } from '../composables/useAiOnlyVisible'
 import { useTagMuteVisible } from '../composables/useTagMuteVisible'
 import RefreshableList from '../components/RefreshableList.vue'
@@ -186,10 +187,8 @@ onUnmounted(() => {
 
 <template>
   <view class="w-full h-full flex flex-col bg-surface">
-    <!-- M3 TopAppBar：顶层页，居中标题，无返回箭头 -->
-    <view class="flex flex-row items-center justify-center h-[17.067vw] px-4 bg-surface">
-      <text class="text-title-large font-medium text-surface-on">{{ t('novels.title') }}</text>
-    </view>
+    <!-- M3 TopAppBar：顶层页，居中标题，无返回箭头（PageTopBar 变体 a，ADR-0194） -->
+    <PageTopBar :title="t('novels.title')" />
 
     <!-- 推荐/关注切换（M3 secondary tabs：选中 primary 文字 + 底部 0.8vw primary 指示条，
          容器 border-b 分割线；Bookmarks.vue 已验证的可靠写法，修复 web-core 下 flex-col

@@ -17,6 +17,7 @@ import BookmarkPanel from '../components/BookmarkPanel.vue'
 import CommentOverlay from '../components/CommentOverlay.vue'
 import PagePickerSheet from '../components/PagePickerSheet.vue'
 import SkeletonImage from '../components/SkeletonImage.vue'
+import PageTopBar from '../components/PageTopBar.vue'
 import UgoiraViewer from '../components/UgoiraViewer.vue'
 import TagPressChip from '../components/TagPressChip.vue'
 import { useSearchSheetStore } from '../stores/searchSheetStore'
@@ -242,10 +243,8 @@ onMounted(async () => {
        避免 w-full h-full 溢出覆盖顶栏触摸层（与 issue #129 同型） -->
   <!-- relative：为根 view 内 absolute 的评论弹层提供定位上下文（不改 flex 布局） -->
   <view class="w-full h-full flex flex-col relative bg-surface">
-    <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
-      <view class="py-1 pr-2" @tap="goBack"><text class="text-[6.4vw] leading-none text-surface-on">‹</text></view>
-      <text class="flex-1 text-title-large font-medium text-surface-on">{{ t('illustDetail.title') }}</text>
-    </view>
+    <!-- M3 TopAppBar：次级页，返回 + 标题（PageTopBar 变体 b，ADR-0194） -->
+    <PageTopBar back :title="t('illustDetail.title')" @back="goBack" />
 
     <!-- [lynx:fix] 骨架屏：加载中显示 shimmer 占位（图片区 1:1 + 文字条），数据就绪后切换 scroll-view -->
     <view v-if="loading" class="w-full flex-1 min-h-0 bg-surface">

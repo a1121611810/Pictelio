@@ -29,6 +29,7 @@ import { formatRelativeTime } from '../utils/dateFormat'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
 import { NOTIFICATIONS_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import NotificationChildren from '../components/NotificationChildren.vue'
+import PageTopBar from '../components/PageTopBar.vue'
 import RefreshableList from '../components/RefreshableList.vue'
 import { t } from '../i18n'
 
@@ -140,23 +141,15 @@ function rowA11y(row: NotificationRow): string {
 
 <template>
   <view class="w-full h-full flex flex-col bg-surface">
-    <!-- M3 TopAppBar：次级页，返回箭头 + 标题（对齐 Watchlist 头部模式） -->
-    <view class="flex flex-row items-center h-[17.067vw] px-4 bg-surface">
-      <view
-        class="py-1 pr-2"
-        :accessibility-element="A11Y_ELEMENT_ENABLED"
-        :accessibility-label="NOTIFICATIONS_A11Y_LABELS.back"
-        @tap="goBack"
-      >
-        <text class="text-[6.4vw] leading-none text-surface-on">‹</text>
-      </view>
-      <text
-        class="flex-1 text-title-large font-medium text-surface-on"
-        :accessibility-element="A11Y_ELEMENT_ENABLED"
-        :accessibility-label="NOTIFICATIONS_A11Y_LABELS.pageTitle"
-        >{{ t('notifications.title') }}</text
-      >
-    </view>
+    <!-- M3 TopAppBar：次级页，返回箭头 + 标题（PageTopBar 变体 b，ADR-0194）；
+         a11y 注册表 value 经 props 注入（组件不自持业务 a11y 文案） -->
+    <PageTopBar
+      back
+      :title="t('notifications.title')"
+      :back-a11y-label="NOTIFICATIONS_A11Y_LABELS.back"
+      :title-a11y-label="NOTIFICATIONS_A11Y_LABELS.pageTitle"
+      @back="goBack"
+    />
 
     <!-- 有数据时刷新失败：Vue Query 保留已加载页（不同于首屏失败），顶部内联错误条兜底（ADR-0104 槽位语义） -->
     <text v-if="view === 'content' && pageError" class="text-body-small text-error p-4">{{ pageError.message }}</text>
