@@ -51,6 +51,24 @@ describe('M3SegmentedButton 迁移完备性门禁（防回退到 inline 分段 m
     expect(out).toContain('components/M3SegmentedButton.vue')
   })
 
+  it('段形态双重锚：单行同现 h-[10.667vw] 与 border-l-outline（inline 分段指纹）仅白名单命中', () => {
+    // 与容器特征串互补：重排容器类序 / 省略 overflow-hidden 的 inline 分段写法仍被段形态捕获。
+    // 组件本体把两类特征拆在不同字符串字面量行，天然不命中；命中者 = 手写 inline 分段 markup。
+    const out = execSync(
+      `grep -rlE "h-\\[10\\.667vw\\].*border-l-outline|border-l-outline.*h-\\[10\\.667vw\\]" "${SRC}" || true`,
+      { encoding: 'utf8' },
+    )
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((abs: string) => abs.slice(SRC.length + 1))
+    const offenders = out.filter((rel) => !SIGNATURE_ALLOWLIST.includes(rel))
+    expect(
+      offenders,
+      `inline 分段指纹（单行 h-[10.667vw] + border-l-outline）在以下非白名单文件出现：${offenders.join(', ') || '（无）'}`,
+    ).toEqual([])
+  })
+
   it('Me.vue 内 <M3SegmentedButton 调用 ≥ 4（外观模式 / AI 作品 / 动图播放 / 详情画质 4 组）', () => {
     const meSrc = read('pages/Me.vue')
     const count = (meSrc.match(/<M3SegmentedButton\b/g) || []).length

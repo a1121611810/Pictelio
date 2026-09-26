@@ -10,7 +10,8 @@ export interface M3SegmentOption<T extends string> {
   value: T
   /** label = 已解析文案（调用方传 t() 的结果；options 须用 computed 构建以随语言切换重算） */
   label: string
-  /** a11yLabel = 静态 a11y label（调用方引用 ME_A11Y_LABELS 注册表 key，注册表完整性测试继续生效） */
+  /** a11yLabel = 段的无障碍标签：Me.vue 引用 ME_A11Y_LABELS 注册表静态 key（注册表完整性测试继续
+   *  生效）；亦允许 t() 动态结果（TranslateModeSwitch 先例）——两种形态都是契约 */
   a11yLabel: string
 }
 </script>

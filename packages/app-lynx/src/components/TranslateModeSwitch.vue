@@ -35,7 +35,7 @@ const options = computed<M3SegmentOption<TranslateMode>[]>(() => [
 ])
 
 async function pick(mode: TranslateMode): Promise<void> {
-  if (!props.enabled) return
+  // enabled 门控由组件 disabled 短路保证（M3SegmentedButton select()），此处不再重复守卫
   const want = mode === "translation"
   if (store.showTranslation !== want) await store.toggleMode()
 }

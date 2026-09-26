@@ -315,7 +315,7 @@ describe('T2 Me.vue 外观模式入口（M3 segmented button 三格）', () => {
       )
     }
     // 迁移回归锚：accessibility-element 绑定随段级配对下移组件模板；
-    // 组件自身 template test（M3SegmentedButton.test.ts）已有更强断言，此处仅钉存在性
+    // 组件自身 template test（M3SegmentedButton.template.test.ts）已有更强断言，此处仅钉存在性
     expect(m3SegmentedVue, '组件模板缺少 accessibility-element 绑定（段级 a11y 未下移）').toContain(
       ':accessibility-element="A11Y_ELEMENT_ENABLED"',
     )
