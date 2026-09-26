@@ -169,6 +169,32 @@ describe("saveIllustPages 编排器（spec §4）", () => {
     })
     warn.mockRestore()
   })
+
+  it("naming.template 端到端：单存链与队列链共用同一命名纯函数；缺省与默认逐字节一致", async () => {
+    const saveOne = vi.fn().mockResolvedValue(undefined)
+    const url = "https://i.pximg.net/img-original/single.jpg"
+    // 自定义模板：展开净化后的占位符（{p} 单页剥离连接符残段）
+    await saveIllustPages({
+      pages: [0],
+      illustId: 123456,
+      urlForPage: () => url,
+      saveOne,
+      naming: { template: "{id}_p{p}" },
+    })
+    expect(saveOne.mock.calls[0]?.[1]).toBe("123456.jpg")
+    // 多页：模板不含 {p} 自动追加 _p<页号>（与默认后缀同形）
+    await saveIllustPages({
+      pages: [0],
+      illustId: 123456,
+      urlForPage: () => url,
+      saveOne,
+      naming: { template: "X_{id}" },
+    })
+    expect(saveOne.mock.calls[1]?.[1]).toBe("X_123456.jpg")
+    // 缺省 naming/template → buildSaveFileName 硬编码默认路径，字节不变
+    await saveIllustPages({ pages: [0], illustId: 123456, urlForPage: () => url, saveOne })
+    expect(saveOne.mock.calls[2]?.[1]).toBe("Pictelio_123456.jpg")
+  })
 })
 
 // ─── 下载命名模板矩阵（ADR-0192 / spec docs/specs/lynx-download-naming.md Testing T1–T12）───

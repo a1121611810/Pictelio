@@ -145,21 +145,21 @@ function expandTemplateBase(tpl: string, ctx: SaveNamingContext, warnSeen: Set<s
 }
 
 /**
- * 模板 → 最终保存文件名（ADR-0192 D2/D3/D4，纯函数；下载队列/单存相册两条链共用）。
+ * 模板展开 + 截断 + 扩展名拼装内核（ADR-0192 D2/D3/D4；下载队列/单存相册/ugoira 导出
+ * 三条链共用——ugoira 链扩展名 = 目标导出格式而非 URL 推断，故 ext 作参数）。
  *
  * @param template 命名模板（未净化原文——本函数内做读取期净化，空/非法回落默认并 warn）
  * @param ctx      作品上下文（id / title / author / 页号 / 页数）
- * @param url      原图 URL（仅用于扩展名推断，复用 extForUrl）
+ * @param ext      输出扩展名（图片链 = extForUrl(url)；ugoira 链 = 目标导出格式）
  * @param warnSeen 未知占位符告警去重集合（省缺 = 模块级集合；测试注入新鲜集合）
  * @returns `<展开名>[_p<N>].<ext>`；默认模板逐字节复现 buildSaveFileName 既有输出
  */
-export function buildSaveFileNameFromTemplate(
+function expandTemplateFileName(
   template: string,
   ctx: SaveNamingContext,
-  url: string,
-  warnSeen: Set<string> = unknownPlaceholderWarned,
+  ext: string,
+  warnSeen: Set<string>,
 ): string {
-  const ext = extForUrl(url)
   const norm = normalizeDownloadTemplate(template)
   if (norm.fallback) {
     console.warn("[galleryDownload] 命名模板为空/非法，回落默认模板")
@@ -180,6 +180,32 @@ export function buildSaveFileNameFromTemplate(
     base = base.slice(0, DOWNLOAD_FILENAME_MAX_LENGTH)
   }
   return `${base}.${ext}`
+}
+
+/**
+ * 模板 → 最终保存文件名（ADR-0192 D2/D3/D4，纯函数；下载队列/单存相册链共用）。
+ * 扩展名由原图 URL 推断（复用 extForUrl）。
+ */
+export function buildSaveFileNameFromTemplate(
+  template: string,
+  ctx: SaveNamingContext,
+  url: string,
+  warnSeen: Set<string> = unknownPlaceholderWarned,
+): string {
+  return expandTemplateFileName(template, ctx, extForUrl(url), warnSeen)
+}
+
+/**
+ * 模板 → ugoira 导出文件名（spec §5 / ADR-0192 D7）：扩展名恒 = 目标导出格式
+ * （ZIP URL 无白名单图片扩展名，不可走 extForUrl 推断），与图片链同一展开/截断内核。
+ */
+export function buildUgoiraFileNameFromTemplate(
+  template: string,
+  ctx: SaveNamingContext,
+  format: string,
+  warnSeen: Set<string> = unknownPlaceholderWarned,
+): string {
+  return expandTemplateFileName(template, ctx, format, warnSeen)
 }
 
 /**
@@ -216,6 +242,7 @@ export interface SaveOutcome {
 /**
  * 顺序批量保存选中页（spec §4）：单张失败不中断批次，逐张完成后回调进度，
  * 失败明细 console.warn（无静默降级）并由调用方以状态文本汇报聚合结果。
+ * naming.template 透传命名模板展开（与队列链同一命名纯函数，spec D6）；缺省字节不变。
  */
 export async function saveIllustPages(opts: {
   /** 选中的 0-based 页号 */
@@ -226,18 +253,30 @@ export async function saveIllustPages(opts: {
   /** IO 边界（原生桥），测试注入 */
   saveOne: (url: string, fileName: string) => Promise<void>
   onProgress?: (done: number, total: number, page: number) => void
+  /** 命名选项（单存链当前仅消费 template——相册保存无作者目录维度） */
+  naming?: TaskNamingOptions
 }): Promise<SaveOutcome> {
   const outcome: SaveOutcome = { saved: 0, failures: [] }
   const total = opts.pages.length
   let done = 0
+  const template = opts.naming?.template
   for (const page of opts.pages) {
     const url = opts.urlForPage(page)
     if (!url) {
       outcome.failures.push({ page, message: '无可用原图 URL' })
       console.warn(`[galleryDownload] 第 ${page + 1} 页保存失败: 无可用原图 URL`)
     } else {
+      const fileName =
+        template === undefined
+          ? buildSaveFileName(opts.illustId, total > 1 ? page : undefined, url)
+          : buildSaveFileNameFromTemplate(template, {
+              id: opts.illustId,
+              title: "",
+              page: total > 1 ? page : 0,
+              pageCount: total > 1 ? 2 : 1,
+            }, url)
       try {
-        await opts.saveOne(url, buildSaveFileName(opts.illustId, total > 1 ? page : undefined, url))
+        await opts.saveOne(url, fileName)
         outcome.saved++
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e)
@@ -258,14 +297,21 @@ export async function saveIllustPages(opts: {
 export interface TaskNamingOptions {
   /** 按作者建目录开关（设备级设置 download_by_author_dir 的入队时刻快照） */
   authorDir?: boolean
+  /**
+   * 命名模板（设备级设置 download_file_template 的入队时刻快照，spec D6/US2/US15）。
+   * 缺省 = 既有 buildSaveFileName 硬编码默认路径（字节不变）；传入时经
+   * buildSaveFileNameFromTemplate 内部 normalizeDownloadTemplate 归一（settings 读出的
+   * 值已归一，此处双保险）。
+   */
+  template?: string
 }
 
 /**
  * 从作品 + 选中页构造下载队列任务（spec docs/specs/download-manager.md §3.1）：
  * 一页 = 一条输出文件任务；源恒原图（复用 originalPageUrls 语义），格式取 URL 扩展名；
- * 文件名沿用 buildSaveFileName（单一事实源在 JS，与旧保存链路逐字节一致）；
- * dir = 作者目录段（naming.authorDir 开启时为净化作者名段，缺省/关闭 = 空串字节不变）。
- * 页无可用原图 URL 时跳过并 console.warn（无静默降级）。
+ * 文件名 = naming.template 展开缺省走 buildSaveFileName 硬编码默认（单一事实源在 JS，
+ * 缺省与旧链路逐字节一致）；dir = 作者目录段（naming.authorDir 开启时为净化作者名段，
+ * 缺省/关闭 = 空串字节不变）。页无可用原图 URL 时跳过并 console.warn（无静默降级）。
  */
 export function buildImageTasks(
   illust: PixivIllust,
@@ -275,6 +321,15 @@ export function buildImageTasks(
   const urls = originalPageUrls(illust)
   const total = pages.length
   const dir = buildAuthorDirSegment(naming?.authorDir === true, illust.user?.name)
+  const template = naming?.template
+  /** 与 buildSaveFileName 合成上下文同构（total>1 ⇔ 多页），缺省模板路径逐字节对齐 */
+  const namingCtxFor = (page: number): SaveNamingContext => ({
+    id: illust.id,
+    title: illust.title,
+    author: illust.user?.name,
+    page: total > 1 ? page : 0,
+    pageCount: total > 1 ? 2 : 1,
+  })
   const drafts: DownloadTaskDraft[] = []
   for (const page of pages) {
     const url = urls[page]
@@ -291,7 +346,10 @@ export function buildImageTasks(
       page,
       sourceUrl: url,
       targetFormat: extForUrl(url),
-      fileName: buildSaveFileName(illust.id, total > 1 ? page : undefined, url),
+      fileName:
+        template === undefined
+          ? buildSaveFileName(illust.id, total > 1 ? page : undefined, url)
+          : buildSaveFileNameFromTemplate(template, namingCtxFor(page), url),
       dir,
     })
   }
@@ -300,7 +358,8 @@ export function buildImageTasks(
 
 /**
  * ugoira 导出任务（spec §3.1/§5）：sourceUrl 恒**官方 ZIP URL**（非 /pixiv-img 代理路径——
- * 原生执行器按官方 URL 走图床/防盗链链路）；fileName = Pictelio_<id>.<fmt>；
+ * 原生执行器按官方 URL 走图床/防盗链链路）；fileName = naming.template 展开缺省
+ * `Pictelio_<id>.<fmt>`（扩展名恒目标格式，非 ZIP URL 推断）；
  * dir = 作者目录段（Java 侧落 Downloads/Pictelio/<作者>，spec D5）。
  * 格式来自全局设置（T13），任务创建即快照。
  */
@@ -311,6 +370,7 @@ export function buildUgoiraTask(
   frames: readonly UgoiraFrameTiming[] = [],
   naming?: TaskNamingOptions,
 ): DownloadTaskDraft {
+  const template = naming?.template
   const draft: DownloadTaskDraft = {
     id: `ugoira_${illust.id}_${format}`,
     illustId: illust.id,
@@ -319,7 +379,16 @@ export function buildUgoiraTask(
     kind: 'ugoira',
     sourceUrl: zipUrl,
     targetFormat: format,
-    fileName: `Pictelio_${illust.id}.${format}`,
+    fileName:
+      template === undefined
+        ? `Pictelio_${illust.id}.${format}`
+        : buildUgoiraFileNameFromTemplate(template, {
+            id: illust.id,
+            title: illust.title,
+            author: illust.user?.name,
+            page: 0,
+            pageCount: 1,
+          }, format),
     dir: buildAuthorDirSegment(naming?.authorDir === true, illust.user?.name),
   }
   if (frames.length > 0) {

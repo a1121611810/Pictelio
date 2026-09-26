@@ -76,6 +76,37 @@ describe('buildImageTasks（spec §3.1）', () => {
     const i = illust({ meta_single_page: { original_image_url: 'o.jpg' } })
     expect(buildImageTasks(i, [0])[0]!.thumbnailUrl).toBe('https://i.pximg.net/medium.jpg')
   })
+
+  // ── 命名模板端到端（ADR-0192 D7 / spec D5：settings 模板经 naming.template 注入同一纯函数）───
+  it('自定义模板端到端：fileName 展开净化后的作者/标题；缺省 template 与默认逐字节一致', () => {
+    const i = illust({
+      title: '作品 A',
+      user: { id: toUserId(1), name: '画/师', account: 'u', profile_image_urls: { medium: '' } } as PixivIllust['user'],
+      meta_single_page: { original_image_url: 'https://i.pximg.net/o.jpg' },
+    })
+    expect(buildImageTasks(i, [0], { template: '{author}_{title}_{id}' })[0]!.fileName).toBe(
+      '画_师_作品 A_123.jpg',
+    )
+    // 缺省 template → buildSaveFileName 硬编码默认路径，字节不变
+    expect(buildImageTasks(i, [0])[0]!.fileName).toBe('Pictelio_123.jpg')
+    expect(buildImageTasks(i, [0], { template: undefined })[0]!.fileName).toBe('Pictelio_123.jpg')
+  })
+
+  it('自定义模板多页且不含 {p}：自动追加 _p<选中页号>（与默认后缀同形）；单选一页与默认路径同取无后缀形态', () => {
+    const i = illust({
+      page_count: 2,
+      meta_pages: [
+        { image_urls: { square_medium: 's', medium: 'm0', large: 'l0', original: 'o0.png' } },
+        { image_urls: { square_medium: 's', medium: 'm1', large: 'l1', original: 'o1.png' } },
+      ],
+    })
+    expect(buildImageTasks(i, [1, 0], { template: '{id}' }).map((t) => t.fileName)).toEqual([
+      '123_p1.png',
+      '123_p0.png',
+    ])
+    // 单选一页（total=1）：与缺省 buildSaveFileName 路径逐字节同形态（无 _pN 后缀）
+    expect(buildImageTasks(i, [1], { template: '{id}' }).map((t) => t.fileName)).toEqual(['123.png'])
+  })
 })
 
 // ── dir 作者目录段（ADR-0192 D5/D7 / spec docs/specs/lynx-download-naming.md T11/T12）───

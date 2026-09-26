@@ -53,6 +53,21 @@ describe('buildUgoiraTask（spec §3.1/§5）', () => {
     expect(buildUgoiraTask(illust(), ZIP, 'tar').fileName).toBe('Pictelio_123.tar')
     expect(buildUgoiraTask(illust(), ZIP, 'mp4').targetFormat).toBe('mp4')
   })
+
+  // ── 命名模板端到端（ADR-0192 D7 / spec D5：ugoira 链同样消费 naming.template）───
+  it('自定义模板端到端：基段展开模板，扩展名恒取目标格式（非 ZIP URL 推断）；缺省字节不变', () => {
+    const i = illust({
+      title: '动图 A',
+      user: { id: toUserId(1), name: '画/师', account: 'u', profile_image_urls: { medium: '' } } as PixivIllust['user'],
+    })
+    expect(buildUgoiraTask(i, ZIP, 'gif', [], { template: '{author}_{title}_{id}' }).fileName).toBe(
+      '画_师_动图 A_123.gif',
+    )
+    // ZIP URL 无白名单扩展名 → 若误走 URL 推断会得 .jpg；此处必须仍为目标格式
+    expect(buildUgoiraTask(i, ZIP, 'webm', [], { template: '{id}' }).fileName).toBe('123.webm')
+    // 缺省 template → 既有字面路径，字节不变
+    expect(buildUgoiraTask(illust(), ZIP, 'mp4').fileName).toBe('Pictelio_123.mp4')
+  })
 })
 
 // ── dir 作者目录段（ADR-0192 D5/D7：ugoira 导出基座 = Downloads/Pictelio + 作者段）───
