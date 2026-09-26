@@ -32,6 +32,14 @@ vi.mock('../src/stores/settingsStore', () => ({
     loadSettings: async () => {},
   }),
 }))
+// 稍后看 store（ADR-0191 / #751 T3）：initRouter 在 loadSettings 后 hydrate——
+// 本套件无 active pinia，与 authStore/settingsStore 同款 mock 隔离（真实行为在
+// watchLaterStore.test.ts 覆盖）
+vi.mock('../src/stores/watchLaterStore', () => ({
+  useWatchLaterStore: () => ({
+    hydrate: async () => {},
+  }),
+}))
 vi.mock('../src/stores/modalStack', () => ({
   useModalStack: () => ({
     hasOpenModal: () => false,
