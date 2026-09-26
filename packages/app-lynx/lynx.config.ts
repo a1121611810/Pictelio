@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import JSON5 from 'json5'
+import { pluginLivereload } from './rspeedy-plugin-livereload.ts'
 
 const _root = dirname(fileURLToPath(import.meta.url))
 
@@ -170,5 +171,10 @@ export default defineConfig({
       config: 'tailwind.config.ts',
       exclude: [/[\\/]node_modules[\\/]/],
     }),
+    // dev livereload（spec: docs/specs/app-lynx-dev-livereload.md）
+    // 背景：vue-lynx 插件在 web 环境硬禁用 HMR/liveReload（!isWeb 短路），
+    // 导致 lynx dev 在浏览器中保存后无任何自动刷新机制。
+    // 本插件在 web 环境 entry 前注入 live-reload client，实现保存后自动刷新。
+    ...(process.env.NODE_ENV !== 'production' ? [pluginLivereload()] : []),
   ],
 })
