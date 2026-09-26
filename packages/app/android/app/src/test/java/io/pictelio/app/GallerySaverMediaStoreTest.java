@@ -126,6 +126,46 @@ public class GallerySaverMediaStoreTest {
                 provider.inserts.get(0).getAsString(MediaStore.MediaColumns.MIME_TYPE));
     }
 
+    // ── subPath 子目录（ADR-0192 D4 / spec docs/specs/lynx-download-naming.md D7）──
+    // oracle = GallerySaver.RELATIVE_PATH 基座常量 + "/" + 净化作者段；空串 = 现行为字节不变。
+
+    @Test
+    public void save_mediaStore_emptySubPath_keepsLegacyRelativePath() throws IOException {
+        seedCache(new byte[]{1});
+
+        GallerySaver.SaveResult r = GallerySaver.save(context, loader, URL, "Pictelio_123456_p0.jpg", "");
+
+        assertTrue(r.mediaStore);
+        assertEquals("Pictures/Pictelio",
+                provider.inserts.get(0).getAsString(MediaStore.MediaColumns.RELATIVE_PATH));
+    }
+
+    @Test
+    public void save_mediaStore_authorSubPath_appendsToRelativePath() throws IOException {
+        seedCache(new byte[]{1});
+
+        GallerySaver.SaveResult r = GallerySaver.save(context, loader, URL, "Pictelio_123456_p0.jpg", "画师名");
+
+        assertTrue(r.mediaStore);
+        ContentValues values = provider.inserts.get(0);
+        assertEquals("Pictures/Pictelio/画师名",
+                values.getAsString(MediaStore.MediaColumns.RELATIVE_PATH));
+        // 子目录只动目录段：displayName / pending 语义不变
+        assertEquals("Pictelio_123456_p0.jpg", values.getAsString(MediaStore.MediaColumns.DISPLAY_NAME));
+        assertEquals(Integer.valueOf(1), values.getAsInteger(MediaStore.MediaColumns.IS_PENDING));
+    }
+
+    @Test
+    public void save_mediaStore_subPathSanitized_pathTraversalNeutralized() throws IOException {
+        seedCache(new byte[]{1});
+
+        // 子目录段经 sanitizeFileName：分隔符 → _（防路径穿越，镜像 JS 侧 sanitizeNameSegment）
+        GallerySaver.save(context, loader, URL, "Pictelio_1_p0.jpg", "a/b\\c");
+
+        assertEquals("Pictures/Pictelio/a_b_c",
+                provider.inserts.get(0).getAsString(MediaStore.MediaColumns.RELATIVE_PATH));
+    }
+
     /** 记录型 MediaProvider 假件。字节断言走 ShadowContentResolver.registerOutputStreamSupplier
      *  （4.14 的 shadow openOutputStream 不路由 provider.openFile，这是官方注册通道）。 */
     private static final class RecordingMediaStoreProvider extends ContentProvider {

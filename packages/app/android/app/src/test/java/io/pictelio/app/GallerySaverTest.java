@@ -141,6 +141,49 @@ public class GallerySaverTest {
         assertTrue(new File(r.uri.getPath()).getName().endsWith("_evil.jpg"));
     }
 
+    // ── subPath 子目录（ADR-0192 D4）：API 28 回退目录在基座 Pictelio 下拼净化子目录段 ──
+
+    @Test
+    public void save_api28Fallback_authorSubPath_writesUnderBaseAndAuthorDir() throws IOException {
+        byte[] bytes = seedCache(URL, new byte[]{7});
+
+        GallerySaver.SaveResult r = GallerySaver.save(context, loader, URL, "Pictelio_123456_p0.jpg", "画师名");
+
+        assertFalse(r.mediaStore);
+        File base = new File(
+                context.getExternalFilesDir(android.os.Environment.DIRECTORY_PICTURES), "Pictelio");
+        File expected = new File(new File(base, "画师名"), "Pictelio_123456_p0.jpg");
+        assertEquals(expected.getAbsolutePath(), new File(r.uri.getPath()).getAbsolutePath());
+        assertArrayEquals(bytes, Files.readAllBytes(expected.toPath()));
+    }
+
+    @Test
+    public void save_api28Fallback_emptySubPath_keepsLegacyDirectory() throws IOException {
+        seedCache(URL, new byte[]{8});
+
+        GallerySaver.SaveResult r = GallerySaver.save(context, loader, URL, "Pictelio_123456_p0.jpg", "");
+
+        File expected = new File(new File(
+                context.getExternalFilesDir(android.os.Environment.DIRECTORY_PICTURES), "Pictelio"),
+                "Pictelio_123456_p0.jpg");
+        assertEquals(expected.getAbsolutePath(), new File(r.uri.getPath()).getAbsolutePath());
+    }
+
+    @Test
+    public void save_api28Fallback_subPathSanitized_pathTraversalNeutralized() throws IOException {
+        seedCache(URL, new byte[]{9});
+
+        // 子目录段经 sanitizeFileName：../evil → .._evil（单段目录名，不可能逃出基座）
+        GallerySaver.SaveResult r = GallerySaver.save(context, loader, URL, "Pictelio_1_p0.jpg", "a/b\\c");
+
+        File base = new File(
+                context.getExternalFilesDir(android.os.Environment.DIRECTORY_PICTURES), "Pictelio");
+        assertTrue(new File(r.uri.getPath()).getAbsolutePath()
+                .startsWith(base.getAbsolutePath() + File.separator));
+        assertEquals(new File(new File(base, "a_b_c"), "Pictelio_1_p0.jpg").getAbsolutePath(),
+                new File(r.uri.getPath()).getAbsolutePath());
+    }
+
     @Test
     public void save_cacheMiss_downloadsFromOfficialUrl() throws IOException {
         try (MockWebServer server = new MockWebServer()) {

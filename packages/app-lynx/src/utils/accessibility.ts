@@ -47,6 +47,9 @@ export const ME_A11Y_LABELS = {
   downloadFormatApng: '动图下载格式APNG',
   downloadFormatZip: '动图下载格式ZIP',
   downloadFormatTar: '动图下载格式TAR',
+  // 下载命名（ADR-0192 / spec docs/specs/lynx-download-naming.md D9）：模板重置 + 作者目录开关
+  downloadTemplateReset: '恢复命名模板默认值',
+  downloadAuthorDirToggle: '按作者建目录开关',
   // 小说导出（spec docs/specs/novel-export.md §6/§7.2）：默认格式 9 项 + 三项内容开关
   novelExportFormatTxt: '小说导出格式TXT',
   novelExportFormatHtml: '小说导出格式HTML',
