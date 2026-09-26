@@ -232,8 +232,10 @@ function devPrefs(): PrefsStorage {
   return { get: idbGet, set: idbSet, remove: idbRemove }
 }
 
-/** 环境适配：原生 LynxView → 共享 SharedPreferences；web-core dev → IndexedDB */
-function prefs(): PrefsStorage {
+/** 环境适配：原生 LynxView → 共享 SharedPreferences；web-core dev → IndexedDB。
+ *  导出供账号级集合键消费方复用（watchLaterStore 的 watch_later_${uid}，ADR-0191 D4）——
+ *  seam 单源，禁止第二处 hand-roll native/idb 分流。 */
+export function prefs(): PrefsStorage {
   return isNativeMode() ? nativePrefs() : devPrefs()
 }
 

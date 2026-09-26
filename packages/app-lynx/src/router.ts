@@ -18,6 +18,7 @@ import { evaluateBackRoute, createBackGuardRegistry, runBackGuards, hasBackEntry
 import { isNativeMode, getNativeModules } from './api/client'
 import { useAuthStore } from './stores/authStore'
 import { useSettingsStore } from './stores/settingsStore'
+import { useWatchLaterStore } from './stores/watchLaterStore'
 import { useModalStack } from './stores/modalStack'
 import { registerSessionErrorHandler } from './utils/errorPresentation'
 import { runStartupAutoBackup } from './services/backupWiring'
@@ -427,6 +428,10 @@ export async function initRouter(): Promise<void> {
   const ok = await auth.restoreToken()
   // ADR-0103：账号级设置需 uid 已知（restoreToken 之后）再加载
   await useSettingsStore().loadSettings()
+  // 稍后看 hydrate（ADR-0191 D4 / #751 T3）：认证就绪后装载一次账号键数据；此后
+  // 登录/登出的 uid 变化由 store 内部 watch 重载。非阻塞（void）——首个路由恒为
+  // 推荐页/登录页，不含稍后看入口，毫秒级读盘不阻塞首帧。
+  void useWatchLaterStore().hydrate()
   // T8：启动时自动备份——必须在 loadSettings 之后（否则读到默认 false 静默跳过）；
   // 失败仅 warn，不阻塞启动（spec §7）
   void runStartupAutoBackup()
