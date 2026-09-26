@@ -87,22 +87,18 @@ describe('SeriesSheet.vue 弹层结构（spec §5.3 modalStack 模式）', () =>
     expect(code).toContain('class="absolute inset-0"')
   })
 
-  it('半透明遮罩：absolute inset-0 + bg-scrim（M3 scrim token）+ @tap 关闭', () => {
-    // ADR-0123 红线：遮罩必须挂 @tap（lynx 原生 hit-testing 不识别 pointer-events）
-    expect(code).toContain('class="absolute inset-0 bg-scrim"')
-    expect(code).toMatch(/class="absolute inset-0 bg-scrim"[\s\S]{0,200}@tap="emit\('close'\)"/)
+  it('半透明遮罩收口 BottomSheet（ADR-0194 D5/D6；遮罩类串与 @tap 关闭单点锁在 BottomSheet.template.test.ts），a11y 文案经 prop 注入', () => {
+    expect(code).toContain('<BottomSheet')
+    expect(code).toContain(':scrim-accessibility-label="t(\'novelIntro.closeA11y\')"')
+    expect(code).toContain(':close-accessibility-label="t(\'novelIntro.closeA11y\')"')
   })
 
-  it('底部面板：max-h-[80vh] + rounded-t M3 + @tap.stop 防穿透', () => {
-    expect(code).toContain('max-h-[80vh]')
-    expect(code).toContain('rounded-t-[var(--md-shape-extra-large)]')
-    // 面板 @tap.stop 防冒泡到 scrim
-    expect(code).toMatch(/class="absolute bottom-0 left-0 right-0 max-h-\[80vh\][\s\S]{0,300}@tap\.stop/)
+  it('底部面板 max-h-[80vh] 变体经 panel-height="fit" 逐字节保留（类串单点锁在 BottomSheet.template.test.ts）', () => {
+    expect(code).toContain('panel-height="fit"')
   })
 
-  it('拖把式顶栏（视觉提示，可点关闭）+ 系列名标题', () => {
-    expect(code).toContain('w-12 h-1 rounded-full')
-    expect(code).toContain('w-full flex justify-center pt-2 pb-1')
+  it('拖把手柄变体经 :handle 逐字节保留（把手类串单点锁在 BottomSheet.template.test.ts，可点关闭）+ 系列名标题', () => {
+    expect(code).toMatch(/^\s+handle$/m)
     expect(code).toContain('{{ seriesTitle }}')
   })
 })
@@ -183,17 +179,17 @@ describe('SeriesSheet.vue ADR-0123 合规（禁 pointer-events-none 兜底）', 
     expect(code).not.toMatch(/pointer-events-none/)
   })
 
-  it('全屏覆盖层（根 view）必须挂 @tap 句柄或 v-if 条件渲染——本组件走 @tap="emit(\'close\')"', () => {
-    // 遮罩 @tap 直接关闭；面板 @tap.stop 防穿透；拖把 @tap 关闭
-    const scrimClose = (code.match(/@tap="emit\('close'\)"/g) ?? []).length
-    expect(scrimClose).toBeGreaterThanOrEqual(2) // 遮罩 + 拖把
+  it('全屏覆盖层（根 view）v-if 条件渲染（宿主控制挂载）——scrim/把手 @tap 关闭收口 BottomSheet 单点', () => {
+    // 关闭上抛统一走 @close="emit('close')"；scrim/把手 @tap 与 @tap.stop 由 BottomSheet 持有
+    //（组件测试锁定），本组件不再手写命中测试面
+    expect(code).toContain('@close="emit(\'close\')"')
   })
 })
 
 // ─── 验收 #5/#6：scrim 关闭 + modalStack 返回键 ───
 describe('SeriesSheet.vue 关闭路径（scrim 点击 + modalStack 返回键）', () => {
-  it('验收 #4：scrim 点击触发 close emit（@tap="emit(\'close\')" 存在于遮罩）', () => {
-    expect(code).toContain('@tap="emit(\'close\')"')
+  it('验收 #4：scrim 点击触发 close emit（BottomSheet @close="emit(\'close\')"，scrim @tap 在组件单点）', () => {
+    expect(code).toContain('@close="emit(\'close\')"')
   })
 
   it('返回键拦截：useModalStack 注册 + 卸载注销（与 CommentOverlay / NovelExportSheet 同款）', () => {

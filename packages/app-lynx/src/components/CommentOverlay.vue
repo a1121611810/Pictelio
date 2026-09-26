@@ -16,6 +16,7 @@ import { useModalStack } from '../stores/modalStack'
 import { safeBottom } from '../utils/safeArea'
 import CommentItem from './CommentItem.vue'
 import CommentInputBar from './CommentInputBar.vue'
+import BottomSheet from './BottomSheet.vue'
 
 const props = defineProps<{
   type: CommentContentType
@@ -84,24 +85,14 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <!-- 根 view：relative 提供 absolute 弹层的定位上下文；与宿主内容平级、DOM 顺序靠后 → 天然覆盖上层 -->
+  <!-- 根 view：relative 提供 absolute 弹层的定位上下文；与宿主内容平级、DOM 顺序靠后 → 天然覆盖上层。
+       弹层壳（scrim + 80vh 面板 + 标题栏 + ×）收口 BottomSheet 公共组件（ADR-0194 D5/D6：
+       命中测试语义单点化）；挂载仍由宿主 v-if 控制，本组件不自管 open 状态 -->
   <view class="w-full h-full relative">
-    <!-- 遮罩：absolute inset-0，@tap 关闭（调 onClose） -->
-    <view class="absolute inset-0 bg-scrim" @tap="onClose" />
-
-    <!-- 底部面板：@tap.stop 防面板内点击穿透到遮罩 -->
-    <view
-      class="absolute bottom-0 left-0 right-0 h-[80vh] bg-surface-container-lowest rounded-t-[var(--md-shape-extra-large)] flex flex-col"
-      @tap.stop
+    <BottomSheet
+      :title="t('commentOverlay.title', { count: state.comments.length })"
+      @close="onClose"
     >
-      <!-- M3 bottom sheet 顶部：居中标题（title-large）+ 关闭按钮 -->
-      <view class="flex flex-row items-center h-[11.733vw] px-4 flex-shrink-0">
-        <view class="w-[8vw]" />
-        <text class="flex-1 text-center text-title-large font-medium text-surface-on">{{ t('commentOverlay.title', { count: state.comments.length }) }}</text>
-        <view class="w-[8vw] h-[8vw] flex items-center justify-center" @tap="onClose">
-          <text class="text-[6.4vw] leading-none text-surface-on-variant">×</text>
-        </view>
-      </view>
 
       <!-- 首屏加载：骨架（idle/loading 均归骨架；复用 App.vue 全局 shimmer） -->
       <view v-if="view === 'skeleton'" class="w-full flex-1 min-h-0 px-4 pt-4">
@@ -199,6 +190,6 @@ onBeforeUnmount(() => {
       </view>
       <!-- 系统栏安全区（spec lynx-systembars §4.2）：底部面板抬离手势/导航区 -->
       <view :style="{ height: safeBottom + 'px' }" />
-    </view>
+    </BottomSheet>
   </view>
 </template>

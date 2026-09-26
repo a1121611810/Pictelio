@@ -30,6 +30,7 @@ import { presentError } from '../utils/errorPresentation'
 import { A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { t, type I18nKey } from '../i18n'
 import { useModalStack } from '../stores/modalStack'
+import BottomSheet from './BottomSheet.vue'
 
 const props = defineProps<{
   /** 系列 id（系列行点击进入传 series.id） */
@@ -136,34 +137,18 @@ defineExpose({ loadMore })
 </script>
 
 <template>
-  <!-- 根：absolute inset-0 宿主（modalStack 模式 + ADR-0123 交互面）
-       不挂 @tap——关闭由内层 scrim @tap 触发（避免重复触发与冒泡路径分叉） -->
+  <!-- 根：absolute inset-0 宿主（modalStack 模式 + ADR-0123 交互面）。
+       弹层壳（scrim + max-h-[80vh] 面板）收口 BottomSheet 公共组件（ADR-0194 D5/D6）：
+       拖把手柄变体（可点关闭，替代「标题栏 + ×」）+ panel-height="fit" =
+       迁移前「内容自适应上限 80vh」逐字节保留；scrim/把手 a11y 文案经 prop 注入 -->
   <view class="absolute inset-0">
-    <!-- 半透明遮罩：@tap 关闭（ADR-0123 红线：全屏覆盖层必须可点关闭）
-         bg-scrim = M3 scrim token（spec §5.3 推荐 bg-black/50；项目约定用 token） -->
-    <view
-      class="absolute inset-0 bg-scrim"
-      :accessibility-element="A11Y_ELEMENT_ENABLED"
-      :accessibility-label="t('novelIntro.closeA11y')"
-      @tap="emit('close')"
-    />
-
-    <!-- 底部面板：max-h-[80vh] + 圆角顶部（M3 弹层高度约束）+ @tap.stop 防穿透到 scrim -->
-    <view
-      class="absolute bottom-0 left-0 right-0 max-h-[80vh] bg-surface-container-lowest
-        rounded-t-[var(--md-shape-extra-large)] flex flex-col"
-      @tap.stop
+    <BottomSheet
+      handle
+      panel-height="fit"
+      :scrim-accessibility-label="t('novelIntro.closeA11y')"
+      :close-accessibility-label="t('novelIntro.closeA11y')"
+      @close="emit('close')"
     >
-      <!-- 拖把式顶栏（视觉提示，可点关闭） -->
-      <view class="w-full flex justify-center pt-2 pb-1">
-        <view
-          class="w-12 h-1 rounded-full bg-outline"
-          :accessibility-element="A11Y_ELEMENT_ENABLED"
-          :accessibility-label="t('novelIntro.closeA11y')"
-          @tap="emit('close')"
-        />
-      </view>
-
       <!-- 标题：系列名（spec §5.3） -->
       <text
         class="block px-6 pt-2 pb-3 text-title-medium font-semibold text-surface-on"
@@ -260,6 +245,6 @@ defineExpose({ loadMore })
           <view class="h-1" />
         </list-item>
       </list>
-    </view>
+    </BottomSheet>
   </view>
 </template>
