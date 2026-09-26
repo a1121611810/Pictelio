@@ -153,6 +153,8 @@ const aiOptions = computed<M3SegmentOption<AiFilterMode>[]>(() => [
 
 **行为零变化承诺**：5 处的选中值、持久化键、副作用逻辑、a11y label 字符串、行容器布局全部原样保留；唯一变化是 markup 收进组件 + AI 组获得分隔线。
 
+> **显式挂账（code-review #1 裁定）**：组件 `select()` 同值短路使「重按已选段」为 no-op——唯一非幂等处理器 `pickUgoiraMode('range')`（二次确认弹窗）在已选态重按不再重演，workaround = 切走再切回；其余处理器均幂等，用户无感。此为组件化的固有语义（防无效 emit），不回退。
+
 ### 4.5 不引入第二个 Adapter
 
 与 ADR-0179 §4.6 同理：WebView 端（`packages/app` 的 `SettingsContent.tsx`）有自己的 segmented 先例（spec `docs/specs/ai-artwork-three-state-filter.md` L97 记录的 `role=group + aria-pressed` 形态），属 Fluent Design 2 上下文的不同 module，本次不为 `<M3SegmentedButton>` 预留跨端复用。
@@ -194,9 +196,10 @@ const aiOptions = computed<M3SegmentOption<AiFilterMode>[]>(() => [
 
 `packages/app-lynx/tests/m3-segmented-button-migration-gate.test.ts`（CI 必跑，随 T2/T3 迁移完成而转绿）：
 
-- 整仓 `packages/app-lynx/src/` 下 `rounded-[var(--md-shape-full)] border border-outline overflow-hidden` 仅 `M3SegmentedButton.vue` 命中（其他出现 = inline 回潮）
-- `<M3SegmentedButton` 调用总数 ≥ 5
-- `M3SegmentedButton.vue` 存在且含容器特征串（防组件被误删）
+- 整仓 `packages/app-lynx/src/` 下容器特征串 `rounded-[var(--md-shape-full)] border border-outline overflow-hidden` 仅命中白名单两项：`M3SegmentedButton.vue` 本体 + `M3SegmentedButton.template.test.ts`（断言字面量）；白名单外出现 = inline 回潮
+- 段形态双重锚（code-review #1 加固）：单行同现 `h-[10.667vw]` 与 `border-l-outline`（inline 分段指纹，容器类序重排 / 省略 `overflow-hidden` 无法绕过）同样仅白名单命中
+- `<M3SegmentedButton` 调用按文件计数：Me.vue ≥ 4（外观/AI 作品/动图播放/详情画质）、TranslateModeSwitch.vue ≥ 1
+- `M3SegmentedButton.vue` 存在且含容器特征串（防组件被误删 / 防 grep 路径漂移导致门禁空转）
 
 ## 6. Out of Scope
 

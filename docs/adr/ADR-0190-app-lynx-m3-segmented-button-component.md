@@ -74,6 +74,7 @@ M3Switch 是**纯视觉**（a11y 与 `@tap` 上推父级行——整行一个焦
 - **接口比 M3Switch 厚**（a11y + emit 自持）：由交互粒度决定（见「哲学对照」），非缺陷。
 - **options 须 computed 构建**：t() 语言切换重算依赖响应式；契约已写入 spec §4.2，template test 锁示例。
 - **泛型 SFC**：`generic="T extends string"` 依赖 Vue 3.5 SFC 特性（当前 vue 3.5.40 满足）；T1 落地即过 `pnpm check:app-lynx` 验证。
+- **重按已选段 no-op（code-review 挂账）**：`select()` 同值短路使重按已选段不再触发处理器——唯一非幂等处理器 `pickUgoiraMode('range')` 的二次确认不再重演（workaround：切走再切回）。固有语义，不回退；已记入 spec §4.4。
 - **TranslateModeSwitch UX 微变化风险**：disabled 语义由组件统一（容器 opacity-50），与原 inline 写法等价——由 template test 断言锁死。
 
 ### 排除面
