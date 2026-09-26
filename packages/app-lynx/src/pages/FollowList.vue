@@ -12,12 +12,11 @@ import {
 } from '../api/user'
 import { toUserId } from '../api/id'
 import type { PixivUserPreview } from '../api/types'
-import { proxyImageUrl } from '../utils/imageUrl'
 import { presentError } from '../utils/errorPresentation'
 import { deriveFirstLoadView } from '../utils/firstLoadView'
-import SkeletonImage from '../components/SkeletonImage.vue'
 import RefreshableList from '../components/RefreshableList.vue'
 import PageTopBar from '../components/PageTopBar.vue'
+import UserRow from '../components/UserRow.vue'
 import EmptyState from '../components/EmptyState.vue'
 import FeedListFooter from '../components/FeedListFooter.vue'
 import { t } from '../i18n'
@@ -188,30 +187,18 @@ const refreshEpoch = ref(0)
         :item-key="String(item.user.id)"
         class="w-full"
       >
-        <view class="flex flex-row items-center m-1.5 mx-3 p-3.5 bg-surface-container-lowest rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
-          <view class="flex-1 flex flex-row items-center" @tap="openUser(item.user.id)">
-            <SkeletonImage
-              :src="proxyImageUrl(item.user.profile_image_urls?.medium || item.user.profile_image_urls?.px_170x170 || '')"
-              aspect-ratio="1 / 1"
-              min-h="11vw"
-              class="w-[10.667vw] h-[10.667vw] rounded-full"
-              lazy-load
-            />
-            <view class="flex flex-col ml-3.5 flex-1">
-              <text class="text-title-small font-medium text-surface-on [max-line:1]">{{ item.user.name }}</text>
-              <text class="text-label-medium text-outline mt-0.5">@{{ item.user.account }}</text>
-            </view>
-          </view>
-          <view
-            class="ml-2 px-4 h-[10.667vw] flex items-center justify-center rounded-[var(--md-shape-full)]"
-            :class="item.user.is_followed ? 'border border-outline bg-transparent active:bg-layer-pressed-primary' : 'bg-primary active:bg-state-pressed-primary'"
-            @tap="toggleFollow(item)"
-          >
-            <text class="text-body-medium" :class="item.user.is_followed ? 'text-primary' : 'text-primary-on'">
-              {{ item.user.is_followed ? t('followList.following') : t('followList.follow') }}
-            </text>
-          </view>
-        </view>
+        <!-- 用户行组件化（UserRow，ADR-0194 / ADR-0193 D2 先抽后接）；头像/名/按钮类串在组件单点。
+             业务语义留本页：is_followed 归一化（following 列表 undefined→true）、busyId 防重入、
+             toggleFollow 乐观更新、openUser 路由决策 -->
+        <UserRow
+          :user="item.user"
+          :is-followed="!!item.user.is_followed"
+          :busy="busyId !== null"
+          :follow-label="t('followList.follow')"
+          :followed-label="t('followList.following')"
+          @row-tap="openUser(item.user.id)"
+          @toggle="toggleFollow(item)"
+        />
       </list-item>
       <list-item v-if="loadingMore" :key="'footer'" item-key="footer" class="w-full h-10 flex items-center justify-center" full-span>
         <!-- 三态文案组件化（FeedListFooter，ADR-0194）；本页存量仅 loading 态（外层 list-item 保留） -->
