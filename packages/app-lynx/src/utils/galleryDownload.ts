@@ -49,7 +49,8 @@ export const DOWNLOAD_TEMPLATE_MAX_LENGTH = 200
 /** title / author 单段截断上限（ADR-0192 D3） */
 export const DOWNLOAD_SEGMENT_MAX_LENGTH = 64
 
-/** 最终文件名（不含扩展名）截断上限（ADR-0192 D3；扩展名恒完整保留） */
+/** 最终文件名（含扩展名）长度上限（ADR-0192 D3 / spec D3：展开 + 扩展名拼装后的最终
+ * 文件名 ≤120；超限按段回退截断，扩展名恒完整保留） */
 export const DOWNLOAD_FILENAME_MAX_LENGTH = 120
 
 /**
@@ -148,6 +149,9 @@ function expandTemplateBase(tpl: string, ctx: SaveNamingContext, warnSeen: Set<s
  * 模板展开 + 截断 + 扩展名拼装内核（ADR-0192 D2/D3/D4；下载队列/单存相册/ugoira 导出
  * 三条链共用——ugoira 链扩展名 = 目标导出格式而非 URL 推断，故 ext 作参数）。
  *
+ * 截断口径（spec D3 逐字语义）：**展开 + 扩展名拼装后的最终文件名 ≤120**，
+ * 即基段预算 = 120 - ext.length - 1（下限 1），扩展名恒完整保留。
+ *
  * @param template 命名模板（未净化原文——本函数内做读取期净化，空/非法回落默认并 warn）
  * @param ctx      作品上下文（id / title / author / 页号 / 页数）
  * @param ext      输出扩展名（图片链 = extForUrl(url)；ugoira 链 = 目标导出格式）
@@ -172,12 +176,13 @@ function expandTemplateFileName(
   }
   const multiPage = ctx.pageCount > 1
   // 模板不含 {p} 且多页 → 自动追加 _p<页号>（与既有 _p<N> 后缀逐字节同形，spec D4）；
-  // 截断保留页号段（超长截断后仍保证逐页文件名互不碰撞）。
+  // 页号段与扩展名都计入 ≤120 预算（截断保留页号段，逐页文件名互不碰撞）。
+  const budget = Math.max(1, DOWNLOAD_FILENAME_MAX_LENGTH - ext.length - 1)
   if (multiPage && !norm.value.includes("{p}")) {
     const suffix = `_p${ctx.page}`
-    base = base.slice(0, Math.max(0, DOWNLOAD_FILENAME_MAX_LENGTH - suffix.length)) + suffix
+    base = base.slice(0, Math.max(1, budget - suffix.length)) + suffix
   } else {
-    base = base.slice(0, DOWNLOAD_FILENAME_MAX_LENGTH)
+    base = base.slice(0, budget)
   }
   return `${base}.${ext}`
 }

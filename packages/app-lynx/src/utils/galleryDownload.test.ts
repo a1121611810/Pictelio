@@ -386,8 +386,9 @@ describe("命名模板：净化（spec T8/T9，镜像 Java GallerySaver.sanitize
 })
 
 describe("命名模板：截断与读取期净化（spec T10 + D6）", () => {
-  it("T10 组合展开触顶 120 时基段截断且 .ext 完整；多页页号段保留", () => {
-    // 双段 64+64=128 > 120：最终基段截断到 120，.jpg 完整（单页样例，无后缀路径）
+  it("T10 最终名（含扩展名）≤120：双段 128 触顶时基段截断到 120-ext-1，边界相等可达", () => {
+    // 双段 64+64=128 > 120：基段截断到 120 - "jpg".length - 1 = 116，最终名（含 .jpg）恰 120
+    // （spec D3 逐字语义：展开 + 扩展名拼装后的最终文件名 ≤120，.ext 恒完整）
     const combo = makeIllust({
       page_count: 1,
       title: "T".repeat(100),
@@ -396,14 +397,42 @@ describe("命名模板：截断与读取期净化（spec T10 + D6）", () => {
       meta_single_page: { original_image_url: "https://i.pximg.net/s.jpg" },
     })
     const name = buildSaveFileNameFromTemplate("{author}{title}", namingCtx(combo, 0), "https://i.pximg.net/s.jpg")
-    expect(name).toBe("A".repeat(DOWNLOAD_SEGMENT_MAX_LENGTH) + "T".repeat(DOWNLOAD_FILENAME_MAX_LENGTH - DOWNLOAD_SEGMENT_MAX_LENGTH) + ".jpg")
-    // 多页：单段 64 截断后仍追加完整 `_p<N>`（上一用例 T6 已覆盖具体值）
-    const longTitle = makeIllust({ title: "タ".repeat(300) })
-    const multiName = buildSaveFileNameFromTemplate("{title}", namingCtx(longTitle, 0), sampleJpgUrl)
-    const multiBase = multiName.slice(0, multiName.lastIndexOf("."))
-    expect(multiBase.length).toBeLessThanOrEqual(DOWNLOAD_FILENAME_MAX_LENGTH)
-    expect(multiName.endsWith(".jpg")).toBe(true)
-    expect(multiBase.endsWith("_p0")).toBe(true)
+    expect(name).toBe(
+      "A".repeat(DOWNLOAD_SEGMENT_MAX_LENGTH) +
+        "T".repeat(DOWNLOAD_FILENAME_MAX_LENGTH - 1 - "jpg".length - DOWNLOAD_SEGMENT_MAX_LENGTH) +
+        ".jpg",
+    )
+    expect(name).toHaveLength(DOWNLOAD_FILENAME_MAX_LENGTH)
+  })
+
+  it("T10 .jpeg（4 字符扩展名）：预算按 ext 长度收缩，最终名仍恰 120 且 .jpeg 完整", () => {
+    const combo = makeIllust({
+      page_count: 1,
+      title: "T".repeat(100),
+      user: { id: toUserId(1), name: "A".repeat(100), account: "a", profile_image_urls: {} },
+      meta_pages: [],
+      meta_single_page: { original_image_url: "https://i.pximg.net/s.jpeg" },
+    })
+    const name = buildSaveFileNameFromTemplate("{author}{title}", namingCtx(combo, 0), "https://i.pximg.net/s.jpeg")
+    expect(name.endsWith(".jpeg")).toBe(true)
+    expect(name).toHaveLength(DOWNLOAD_FILENAME_MAX_LENGTH)
+    expect(name.startsWith("A".repeat(DOWNLOAD_SEGMENT_MAX_LENGTH))).toBe(true)
+  })
+
+  it("T10 多页：页号段计入最终名 ≤120 预算且完整保留（双段触顶边界恰 120）", () => {
+    // 双段 128 触顶 + _p11 后缀（4 字符）：基段截断到 116 - 4 = 112，最终名恰 120
+    const longTitle = makeIllust({
+      title: "T".repeat(100),
+      user: { id: toUserId(1), name: "A".repeat(100), account: "a", profile_image_urls: {} },
+    })
+    const multiName = buildSaveFileNameFromTemplate("{author}{title}", namingCtx(longTitle, 11), sampleJpgUrl)
+    expect(multiName).toHaveLength(DOWNLOAD_FILENAME_MAX_LENGTH)
+    expect(multiName.endsWith("_p11.jpg")).toBe(true)
+    // 单段触不到 120 上限（段级 64 先行收口）：页号段仍完整保留、最终名 ≤120
+    const single = makeIllust({ title: "タ".repeat(300) })
+    const name = buildSaveFileNameFromTemplate("{title}", namingCtx(single, 0), sampleJpgUrl)
+    expect(name.length).toBeLessThanOrEqual(DOWNLOAD_FILENAME_MAX_LENGTH)
+    expect(name.endsWith("_p0.jpg")).toBe(true)
   })
 
   it("normalizeDownloadTemplate：空/全净化为空 → 回落默认（fallback=true）；超长截断；分隔符净化", () => {
