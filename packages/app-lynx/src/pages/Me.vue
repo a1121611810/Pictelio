@@ -437,7 +437,8 @@ function pickDetailQuality(q: ImageQuality) {
 // 预览样例上下文（固定单页样例：默认模板展开 = Pictelio_12345678.jpg，ADR-0192 D6 示例；
 // 样例 id/title/author 为纯展示占位值，不进 i18n——与 client 组 "SolidJS + Capacitor" 同口径）
 const TEMPLATE_PREVIEW_CTX = { id: 12345678, title: 'Sample', author: 'Author', page: 0, pageCount: 1 }
-const TEMPLATE_PREVIEW_URL = 'https://i.pximg.net/img-original/12345678_p0.jpg'
+// 预览 URL 仅用于 extForUrl 扩展名推断（sample.jpg → jpg）——中性示例串，禁硬编码 Pixiv CDN URL
+const TEMPLATE_PREVIEW_URL = 'sample.jpg'
 
 const templateInput = ref(settings.downloadFileTemplate)
 const templateFallbackHint = ref(false)

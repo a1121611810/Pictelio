@@ -81,4 +81,11 @@ describe('Me 页下载命名区块（spec D9）', () => {
     expect(preview).toBe('Pictelio_12345678.jpg')
     expect(meVue).toContain("id: 12345678, title: 'Sample', author: 'Author', page: 0, pageCount: 1")
   })
+
+  it('预览样例零硬编码 CDN URL（AGENTS.md 红线：HTML/CSS/JS 禁 i.pximg.net）：中性示例串 + 显式扩展名', () => {
+    // 预览 URL 仅用于 extForUrl 扩展名推断，中性 'sample.jpg' 即可（ext 推断 = jpg），
+    // 展开结果与真实 URL 形状逐字节一致
+    expect(meVue).not.toContain('i.pximg.net')
+    expect(meVue).toContain("const TEMPLATE_PREVIEW_URL = 'sample.jpg'")
+  })
 })
