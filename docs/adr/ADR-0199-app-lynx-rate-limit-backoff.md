@@ -41,7 +41,7 @@ app-lynx 的 Pixiv API 客户端（`packages/app-lynx/src/api/client.ts`）已�
 装载校验失败（缺键除外）`console.warn` + 维持默认（禁静默降级，测试硬约束 #3）。client 侧新增模块级注册口 `setRateLimitBackoffConfig()`（镜像 `setOnUnauthorized` / `setAuthReadyProvider` 既有范式），settingsStore 装载与改参时注入——client 不反向依赖 Pinia。`enabled = false` = 回到现状（429 立即抛出，零重试）。UI = Me 页新增「网络」组（开关 + 三个离散档位选择行）。
 
 **D5 交互语义。**
-退避等待期间 `AbortSignal` 取消 → 立即中止不重试；GET 去重共享同一 promise = 共享同一次退避（不放大请求量）；每次退避重试 `console.warn`（`[client]` 前缀）留痕。POST 一并退避：429 = 请求被限流器拒绝、未达业务层，重放安全（业界口径与 401 重放同侧）。
+退避等待期间 `AbortSignal` 取消 → 立即中止不重试；GET 去重（**无 signal 的调用**）共享同一 promise = 共享同一次退避（不放大请求量；带 signal 的调用不参与去重，各自独立退避——见 R1）；每次退避重试 `console.warn`（`[client]` 前缀）留痕。POST 一并退避：429 = 请求被限流器拒绝、未达业务层，重放安全（业界口径与 401 重放同侧）。
 
 **D6 范围边界。**
 仅 app-lynx；webview（`packages/app`）不动，双端不对称是拍板的结构边界。翻译通道 429（第三方 LLM 端点，`api/translate.ts`）与 OAuth 刷新端点限频（pixez 式刷新节流）**不在本域**，留独立立项。主动限速（gallery-dl `sleep-request` 式请求间隔）不做——移动端单用户低并发，被动退避够用（调研 §4）。
@@ -66,3 +66,5 @@ app-lynx 的 Pixiv API 客户端（`packages/app-lynx/src/api/client.ts`）已�
 - 5xx / 网络错误的退避重试（独立立项，需重估弱网体验语义）
 - OAuth 刷新端点限频节流（pixez 式刷新门）
 - 主动请求间隔（gallery-dl `sleep-request` 式）
+- `AbortSignal.reason` 设备取证（R6 挂账：下次设备 spike 确认 lynx 运行时该字段可用性，或删 `.reason` 直用兜底退化路径）
+- fetch 飞行中 abort 的错误归类（现状归 `UNKNOWN`；属 signal 透传的既有行为，非本 effort 引入）

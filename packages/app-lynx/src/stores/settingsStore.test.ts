@@ -2222,6 +2222,17 @@ describe("settingsStore.rateLimitBackoff（ADR-0199 D4）", () => {
     expect(setRateLimitBackoffConfigMock).toHaveBeenLastCalledWith(DEFAULT_RATE_LIMIT_BACKOFF_CONFIG)
   })
 
+  it("loadSettings 合法档位 0（空串守卫的反面对）→ 仍被接受为「零重试」档", async () => {
+    // review round 2 nit-3：round-1 的空串守卫只应拒「空/空白」，不得误伤合法档位 0
+    //（trim 守卫写成 trim() === "0" 之类的形态会让本用例红）。
+    prefsModule(new Map<string, string>([["settings_rate_limit_max_retries", "0"]]))
+    await store.loadSettings()
+    expect(store.rateLimitMaxRetries).toBe(0)
+    expect(setRateLimitBackoffConfigMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ maxRetries: 0 }),
+    )
+  })
+
   it("loadSettings 非法值（四键全非法）→ 各自 warn + 维持默认 + 注入默认（禁静默降级）", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
     prefsModule(

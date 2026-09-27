@@ -41,7 +41,7 @@
 - **配置 seam**：client 模块级注册口（镜像既有 setOnUnauthorized / setAuthReadyProvider 范式），settingsStore 装载与改参时注入；client 不反向依赖 Pinia。默认配置在纯函数模块内定义，未注入时 client 行为 = 默认参数退避。
 - **设置四键**（设备级，prefs seam，进备份域设备键清单）：`settings_rate_limit_backoff_enabled`（默认 true）/ `settings_rate_limit_max_retries`（默认 3，0–5 整数）/ `settings_rate_limit_base_delay_ms`（默认 1000，档位 500/1000/2000/5000）/ `settings_rate_limit_max_delay_ms`（默认 30000，档位 10000/30000/60000；档位集恒 ≥ base 档位集）。装载遇非法值 console.warn + 维持默认（禁静默降级）。
 - **Me 页「网络」组**：开关行（M3Switch）+ 三个离散档位选择行（chip 形态，镜像自动备份周期行范式）；新增 i18n 域键（zh/en 双份）与 a11y 标签注册表条目（严格配平不变量自动接管）。分组卡位置：客户端组之后、外观组之前。
-- **交互语义**：退避等待期 AbortSignal 取消 → 立即中止；GET 去重共享同一 promise（共享退避）；每次退避重试 console.warn（模块前缀）留痕；耗尽后抛限流终态 ApiError，params 记录实际重试次数。参数变更即时生效（store 注入，无需重启）。
+- **交互语义**：退避等待期 AbortSignal 取消 → 立即中止；GET 去重（无 signal 的调用）共享同一 promise（共享退避）；每次退避重试 console.warn（模块前缀）留痕；耗尽后抛限流终态 ApiError，params 记录实际重试次数。参数变更即时生效（store 注入，无需重启）。
 - **零 Java 改动**：原生回调契约（status/data/rotated）不动。
 
 ## Testing Decisions
