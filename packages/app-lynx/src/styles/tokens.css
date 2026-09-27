@@ -83,8 +83,8 @@ page,
   --md-state-disabled-on-surface: rgba(25, 28, 32, 0.38); /* on-surface 38% */
   --md-scroll-indicator: rgba(73, 69, 79, 0.35); /* M3 基线 neutral 派生（#49454F ≈ 基线
                                                   * onSurfaceVariant / neutral tone 30，非 outline
-                                                  * tone 50）+ 35% alpha；**亮色 6 主题共用此基础值
-                                                  * （有意设计：中性滚动条不随主题染色）**，暗色 6 套各自
+                                                  * tone 50）+ 35% alpha；**亮色 7 主题共用此基础值
+                                                  * （有意设计：中性滚动条不随主题染色）**，暗色 7 套各自
                                                   * 按各主题 outline(tone 60) + 35% alpha 派生 —— 见各
                                                   * .theme-X.dark 块（scripts/generate-theme-palettes.mjs）
                                                   *

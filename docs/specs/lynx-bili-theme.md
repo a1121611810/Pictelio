@@ -101,7 +101,7 @@ app-lynx 目前提供 6 支主题色（sky/violet/pink/green/orange/teal），�
 
 1. **漂移锁**（`palettes-drift.test.ts`，既有）：(a) tokens.css 自动生成段 ≡ 脚本 `--stdout`；(b) 脚本锚点 ≡ 亮色 `--md-primary`。扩到 7 支后，忘改任一侧直接红。
 2. **角色集不变量**（`unit.test.ts` 主题色契约，既有）：`for (const option of THEME_COLOR_OPTIONS)` 逐主题断言 48 角色全覆盖——bili 自动进循环，缺角色即红。
-3. **暗色块存在性 + WCAG 对比度**（`appearanceClasses.test.ts`，既有）：逐主题断言 `.theme-X.dark` 存在、on/主色对比达标——bili 自动覆盖；仅计数断言需 6→7。
+3. **暗色块存在性 + WCAG 对比度**（`appearanceClasses.test.ts`）：逐主题断言 `.theme-X.dark` 存在；on-角色对底色 ≥ 4.5:1 的绝对比值断言**由本 effort 按 ADR-0198 D7 新增**（此前仅有相对序 luma 断言）——亮/暗双循环，bili 自动覆盖；计数断言 6→7。
 4. **themeColor 纯函数**（既有）：`themeColorClass`/`isThemeColorId` 对新 id 的行为由清单驱动自动覆盖；未知 id 回退 + warn 路径保持既有断言。
 5. **模拟器验收**（人工 seam）：设置页切换 bili → 截图取证（亮/暗两态 + 至少一个内容页），对照映射表主色目视核验；7 色块行换行行为确认。
 

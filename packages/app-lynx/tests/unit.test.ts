@@ -591,7 +591,7 @@ describe('主题色契约（themeColor ↔ tokens.css）', () => {
     ])
     // 派生 token：基础 page 已定义完整值，各主题无需重定义（仅暗色 .theme-X.dark 派生）。
     // - --md-scroll-indicator：**显式排除**（非缺值）——取值由 outline 派生（rgba 形态，
-    //   不进 hex 角色集），亮色主题沿用基础 page block 值；「基础块 + 6 个暗色块均定义该
+    //   不进 hex 角色集），亮色主题沿用基础 page block 值；「基础块 + 7 个暗色块均定义该
     //   token」的覆盖断言在 tests/unit/utils/appearanceClasses.test.ts（单一处，避免双份 oracle）。
     const derivedFromThemeable = new Set(['--md-scroll-indicator'])
     const roles = new Set<string>()
@@ -1320,7 +1320,7 @@ describe('Me 页 accessibility 标注注册表（issue #103）', () => {
   })
 
   it('模板内 label/element 数量配对 + 迁移段 key 经 options 消费', () => {
-    // a. 模板内配对：段级 :accessibility-label 迁入 options 后，模板内 label 与 element 同降为 61，
+    // a. 模板内配对：段级 :accessibility-label 迁入 options 后，模板内 label 与 element 同降为 62，
     //    两者数量必须相等，「每处 label 引用都伴随 element 开启」的模板内配对关系不破。
     const labelCount = (meVueSource.match(/:accessibility-label="ME_A11Y_LABELS\.\w+"/g) ?? []).length
     const elementCount = (meVueSource.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length

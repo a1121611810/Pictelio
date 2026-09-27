@@ -261,6 +261,47 @@ describe('T2 暗色色板契约（tokens.css .theme-X.dark）', () => {
   })
 })
 
+describe('色板 WCAG 对比度契约（ADR-0198 D7：手写色板值的值级防线）', () => {
+  /** WCAG 相对亮度（含 sRGB gamma 展开）——与上方 luma（线性、仅相对序口径）不同名不同义 */
+  function wcagLuminance([r, g, b]: [number, number, number]): number {
+    const channel = (v: number) => {
+      const c = v / 255
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+    }
+    return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+  }
+
+  /** WCAG 对比度比值：(较亮 L + 0.05) / (较暗 L + 0.05) */
+  function contrastRatio(a: [number, number, number], b: [number, number, number]): number {
+    const [hi, lo] = [wcagLuminance(a), wcagLuminance(b)].sort((x, y) => y - x)
+    return (hi + 0.05) / (lo + 0.05)
+  }
+
+  /** 彩底文字三组（primary/secondary/tertiary）+ 正文/底色一组：AA 正文门槛 4.5:1。
+   *  期望值出处：tokens.css 真实文件（oracle），阈值出处 WCAG 2.x AA + ADR-0198 D7。 */
+  const READABILITY_PAIRS = [
+    ['--md-primary', '--md-on-primary'],
+    ['--md-secondary', '--md-on-secondary'],
+    ['--md-tertiary', '--md-on-tertiary'],
+    ['--md-surface', '--md-on-surface'],
+  ] as const
+
+  it('每支主题亮/暗色板的 on-角色对底色 ≥ 4.5:1（手写值滑变即红，防「只查键存在不查值」的全绿假象）', () => {
+    for (const option of THEME_COLOR_OPTIONS) {
+      for (const selector of [`.${option.className} {`, `.${option.className}.dark {`]) {
+        const block = extractBlock(tokensCss, selector)
+        for (const [baseToken, onToken] of READABILITY_PAIRS) {
+          const ratio = contrastRatio(hexToRgb(hexOf(block, baseToken)), hexToRgb(hexOf(block, onToken)))
+          expect(
+            ratio,
+            `${selector} ${onToken} 对 ${baseToken} 对比度 ${ratio.toFixed(2)} < 4.5（AA 正文门槛）`,
+          ).toBeGreaterThanOrEqual(4.5)
+        }
+      }
+    }
+  })
+})
+
 describe('T2 App.vue 根类接线', () => {
   it('App.vue 导入 appearanceClasses + resolvedDark', () => {
     expect(appVue).toContain("import { appearanceClasses } from './utils/appearanceClasses'")

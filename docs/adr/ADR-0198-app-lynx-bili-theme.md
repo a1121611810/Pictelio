@@ -35,7 +35,9 @@ L1（锚点喂 TonalSpot 全自动生成）产物是「M3 的粉」而非 bilibi
 
 **D6 命名。** id/类名 `bili` / `theme-bili`；用户可见文案 zh `哔哩粉`、en `Bilibili Pink`；a11y `主题色哔哩粉`。禁止使用 `--bili-*` 前缀（调研已证伪该前缀）。
 
-**D7 测试防线。** `palettes-drift.test.ts` `EXPECTED_THEME_COUNT` 6→7、`appearanceClasses.test.ts` 清单计数断言 6→7；角色集不变量（unit.test.ts）与漂移锁对其余部分**自动覆盖**第 7 支，不新增手写 oracle。对比度断言（primary/secondary/tertiary ≥ 4.5:1）按 `appearanceClasses.test.ts` 既有 WCAG 口径补进该测试文件的逐主题循环。
+**D7 测试防线。** `palettes-drift.test.ts` `EXPECTED_THEME_COUNT` 6→7、`appearanceClasses.test.ts` 清单计数断言 6→7；角色集不变量（unit.test.ts）与漂移锁对其余部分**自动覆盖**第 7 支，不新增手写 oracle。对比度断言（primary/secondary/tertiary/surface 的 on-角色对底色 ≥ 4.5:1，亮/暗双循环）**由本 effort 在 appearanceClasses.test.ts 新增**——该文件此前的 `luma` 仅做相对序断言（pressed 比 primary 亮、暗 surface 更深），无绝对比值门槛；新增口径 = WCAG 2.x 相对亮度（含 sRGB gamma 展开），oracle 取 tokens.css 真实文件，以变异验证（bili on-primary 滑变 → 1.75:1 红）证明有牙。
+>
+> _更正记录（2026-09-27，code-review round 1）_：本条初稿写「按既有 WCAG 口径补进」，暗示绝对比值断言已存在——不实，spec 同句一并订正；防线在 review 闭环中以 `test(app-lynx)` 提交落地。
 
 ## 风险与边界
 
