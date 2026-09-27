@@ -93,20 +93,41 @@ final class PixivApiCore {
     }
 
     /**
-     * 执行 HTTP 请求，遇 401 自动刷新 token 后重试一次。
-     * #53：package-private static，供 PictelioApiModule（Lynx）同包转发。
-     * #114：返回类型从 JSObject 改为 JSONObject（去 Capacitor 依赖）。
-     *
-     * @param rotationListener 401 刷新且 refresh_token 轮换时回调（webview 通知 JS；Lynx 传 null）
+     * 执行 HTTP 请求（旧 5 参签名，ADR-0200 变更③保留）：webview PixivApiPlugin 与
+     * OAuth 调用点一字不动——委托 {@link #executeRequest(String, String, String, String,
+     * boolean, RefreshTokenRotationListener)} 时 acceptLanguage 传 null = 不加语言头，
+     * 行为零变化（ADR-0200 D4 / E6）。
      */
     static JSONObject executeRequest(String method, String url, String body, boolean isRetry,
             RefreshTokenRotationListener rotationListener)
+            throws IOException, JSONException {
+        return executeRequest(method, url, body, null, isRetry, rotationListener);
+    }
+
+    /**
+     * 执行 HTTP 请求，遇 401 自动刷新 token 后重试一次。
+     * #53：package-private static，供 PictelioApiModule（Lynx）同包转发。
+     * #114：返回类型从 JSObject 改为 JSONObject（去 Capacitor 依赖）。
+     * ADR-0200 变更③：新增可空参 acceptLanguage 重载——lynx 通道经
+     * PictelioApiModule.resolveAcceptLanguage 解析 settings_language 后传入；
+     * 401 刷新重试递归透传同一头值（spec E4：重放请求语言头同样携带）。
+     *
+     * @param acceptLanguage Accept-Language 头值（可空参 = 不加头；null/"" 均不加，
+     *                       webview 旧签名委托即此路径）；头决定标签 translated_name 语言
+     * @param rotationListener 401 刷新且 refresh_token 轮换时回调（webview 通知 JS；Lynx 传 null）
+     */
+    static JSONObject executeRequest(String method, String url, String body, String acceptLanguage,
+            boolean isRetry, RefreshTokenRotationListener rotationListener)
             throws IOException, JSONException {
         Request.Builder builder = new Request.Builder()
                 .url(url)
                 .addHeader("Authorization", "Bearer " + (accessToken != null ? accessToken : ""))
                 .addHeader("Referer", OAuthConfig.REFERER)
                 .addHeader("User-Agent", OAuthConfig.USER_AGENT);
+        // ADR-0200：Accept-Language 置于 User-Agent 之后；可空参 = 不加头（webview 旧签名委托）
+        if (acceptLanguage != null && !acceptLanguage.isEmpty()) {
+            builder.addHeader("Accept-Language", acceptLanguage);
+        }
 
         if ("POST".equalsIgnoreCase(method)) {
             MediaType mediaType = MediaType.parse(OAuthConfig.CONTENT_TYPE);
@@ -144,11 +165,11 @@ final class PixivApiCore {
                     if (rotationListener != null && !rotated.isEmpty()) {
                         rotationListener.onRefreshTokenRotated(rotated);
                     }
-                    return executeRequest(method, url, body, true, rotationListener);
+                    return executeRequest(method, url, body, acceptLanguage, true, rotationListener);
                 }
                 if (accessToken != tokenBefore) {
                     // 他人已完成刷新：共享新 token 重试一次（isRetry 防循环）
-                    return executeRequest(method, url, body, true, rotationListener);
+                    return executeRequest(method, url, body, acceptLanguage, true, rotationListener);
                 }
             }
 

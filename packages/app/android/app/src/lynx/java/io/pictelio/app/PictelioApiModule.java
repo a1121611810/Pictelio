@@ -41,7 +41,7 @@ import okhttp3.Response;
  *   <li>{@code request(method, path, body, cb)}：cb(status, data, rotatedToken)——status 为
  *       HTTP 状态码（int），data 为响应体字符串（JSON），rotatedToken 为 401 刷新轮换后的
  *       refresh_token（未轮换为空串）；网络/转发异常 cb(0, errMsg, "")。2xx = 成功。
- *       Java 侧附加 Bearer + Referer/UA + 401 刷新</li>
+ *       Java 侧附加 Bearer + Referer/UA + Accept-Language（ADR-0200）+ 401 刷新</li>
  *   <li>{@code ugoiraExtract(zipUrl, framesJson, cb)}：cb(code, payload)——code 0 = 成功，
  *       payload 为帧 file:// URL 的 JSON 数组字符串（按 framesJson 时序，与 zip 条目名匹配）；
  *       code 1 = 失败，payload 为可读错误信息（HTTP 码 / zip 损坏 / 缺帧 / IO 错误）。
@@ -91,8 +91,14 @@ public class PictelioApiModule extends LynxModule {
 
     /**
      * API 转发：JS 传 method + path（可含 query 字符串）+ body；
-     * Java 侧拼完整 URL、附加 Bearer/Referer/UA，401 自动刷新重试一次。
-     * 回调第三参为 401 刷新轮换后的 refresh_token（未轮换为空串），供 JS 持久化。
+     * Java 侧拼完整 URL、附加 Bearer/Referer/UA + Accept-Language（ADR-0200），
+     * 401 自动刷新重试一次。回调第三参为 401 刷新轮换后的 refresh_token（未轮换为空串），
+     * 供 JS 持久化。
+     *
+     * <p>ADR-0200 变更①：worker 线程内每请求读一次 {@code settings_language}
+     * （SharedPreferences 首载后内存读，无主线程代价），经 {@link #resolveAcceptLanguage}
+     * 解析为头值传给 {@link PixivApiCore}——语言经 prefs 跨层而非桥参数，OTA 版本偏斜
+     * （新 JS + 旧 APK / 旧 JS + 新 APK）下桥契约零破坏（ADR-0200 D2 / R4）。
      *
      * <p>#130：异步执行——提交线程池后立即返回，网络与回调在 worker 线程完成。
      */
@@ -103,8 +109,9 @@ public class PictelioApiModule extends LynxModule {
         final String[] rotated = {""};
         API_EXECUTOR.execute(() -> {
             try {
-                JSONObject result = PixivApiCore.executeRequest(method, url, body, false,
-                        token -> rotated[0] = token);
+                String acceptLanguage = resolveAcceptLanguage(readLanguageSetting());
+                JSONObject result = PixivApiCore.executeRequest(method, url, body, acceptLanguage,
+                        false, token -> rotated[0] = token);
                 callback.invoke(result.optInt("status", 0), result.optString("data", ""), rotated[0]);
             } catch (Throwable e) {
                 Log.w(TAG, "request 失败: " + method + " " + path, e);
@@ -113,6 +120,49 @@ public class PictelioApiModule extends LynxModule {
                 callback.invoke(0, errMsg, "");
             }
         });
+    }
+
+    /** lynx UI 语言设置键（settingsStore 持久化于 "CapacitorStorage"，值域 ""/"zh-CN"/"en"） */
+    private static final String SETTINGS_KEY_LANGUAGE = "settings_language";
+
+    /**
+     * 读取 settings_language（ADR-0200 变更①，worker 线程内调用）。
+     *
+     * <p>E1 失败语义（ADR-0200 D5，禁静默降级——测试硬约束 #3）：Context 不可用或
+     * 读取抛异常 → {@link Log#w} 留痕后返回 null，由 {@link #resolveAcceptLanguage(null)}
+     * 落 zh-CN，请求照发不失败。
+     *
+     * @return settings_language 存储值（键不存在为 ""）；失败返回 null
+     */
+    private String readLanguageSetting() {
+        try {
+            Context ctx = appContext();
+            if (ctx == null) {
+                Log.w(TAG, "appContext() 不可用，Accept-Language 回落 zh-CN（ADR-0200 E1）");
+                return null;
+            }
+            return PictelioPrefsModule.get(ctx, SETTINGS_KEY_LANGUAGE);
+        } catch (Exception e) {
+            Log.w(TAG, "读取 settings_language 失败，Accept-Language 回落 zh-CN（ADR-0200 E1）", e);
+            return null;
+        }
+    }
+
+    /**
+     * Accept-Language 头值解析（ADR-0200 变更②，包私有静态纯函数，JVM 直测）。
+     *
+     * <p>解析表（oracle = ADR-0200 D1）：
+     * <ul>
+     *   <li>{@code "en"} → {@code en}（用户显式选英文）</li>
+     *   <li>其余一切（{@code "zh-CN"}、{@code ""}、null、任意非法值）→ {@code zh-CN}</li>
+     * </ul>
+     *
+     * <p>{@code ""}（跟随系统）落 zh-CN 的理由：真机 LynxView 无 {@code navigator}，
+     * TS 侧 detectSystemLocale 实际落 zh-CN——头值与<b>真机 UI 实际生效语言</b>保持一致，
+     * 与 TS 侧口径相同（ADR-0200 D1 表 / R1）；系统语言注入若未来落地，同批复验本表。
+     */
+    static String resolveAcceptLanguage(String stored) {
+        return "en".equals(stored) ? "en" : "zh-CN";
     }
 
     /**
