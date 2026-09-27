@@ -3,6 +3,11 @@
 // 原生模式（LynxView）：T7 迁移到 Native Module（Java 堆隔离 access_token），
 // 此处预留接口边界 —— fetch 抽象 + 401 刷新 Promise queue。
 import { ApiErrorType, type ApiError } from "./types"
+import {
+  DEFAULT_RATE_LIMIT_BACKOFF_CONFIG,
+  runWithRateLimitBackoff,
+  type RateLimitBackoffConfig,
+} from "./rateLimitBackoff"
 import { requestFetch } from "../utils/fetchWrapper"
 import { saveRefreshToken } from "../utils/tokenStorage"
 import { withTimeout } from "../utils/withTimeout"
@@ -17,7 +22,8 @@ export interface PixivApiClient {
    *
    * 调用者须知：
    * - 错误模式：HTTP >=400 一律抛 ApiError（复用 classifyError 归类，与 get/post 的
-   *   execute 行为一致）；401 经 execWithAuthRetry 自动刷新一次后重试；
+   *   execute 行为一致）；401 经 execWithAuthRetry 自动刷新一次后重试；429 经
+   *   runWithRateLimitBackoff 退避重试（耗尽抛出附 params.attempts，ADR-0199 D5）；
    *   原生模式模块缺失抛 { type: ApiErrorType.NETWORK, message: '原生 API 模块不可用' }。
    * - 双模式差异：web 模式复用 rewriteUrl + shouldAttachAuth + getAccessToken 构造
    *   headers（User-Agent/Referer/Bearer）后 fetch 并 res.text()；原生模式经
@@ -47,6 +53,20 @@ export function setOnUnauthorized(handler: (() => Promise<void>) | null) {
 }
 export function setAuthPermanentFailure(v: boolean) {
   authPermanentFailure = v
+}
+
+// ─── 限流退避配置 seam（ADR-0199 D4：settingsStore 装载/改参时注入，镜像 setOnUnauthorized 范式）───
+// client 不反向依赖 Pinia；未注入时按默认参数退避（DEFAULT_RATE_LIMIT_BACKOFF_CONFIG）。
+let rateLimitBackoffConfig: RateLimitBackoffConfig = DEFAULT_RATE_LIMIT_BACKOFF_CONFIG
+
+/** 注入限流退避参数（null = 回落默认）。参数变更即时生效（下一次请求即用新值）。 */
+export function setRateLimitBackoffConfig(config: RateLimitBackoffConfig | null): void {
+  rateLimitBackoffConfig = config ?? DEFAULT_RATE_LIMIT_BACKOFF_CONFIG
+}
+
+/** 退避重试留痕（ADR-0199 D5 观测口径）：每次重试前打一条 warn（attempt 从 1 计），GET/POST/requestRaw 三条路径共用 */
+function onRateLimitRetry(attempt: number, delayMs: number): void {
+  console.warn("[client] 429 限流退避重试", attempt, `${delayMs}ms`)
 }
 
 // ─── 认证就绪门（web 模式）───
@@ -491,7 +511,14 @@ function request<T>(
       const existing = inflightGetRequests.get(key)
       if (existing) return existing as Promise<T>
     }
-    const promise = execWithAuthRetry<T>(() => execute<T>(method, path, data, undefined, signal))
+    const promise = execWithAuthRetry<T>(() =>
+      // 限流退避（ADR-0199 D5）：内层 429 → full jitter 延迟重试；外层 401 刷新重放
+      // 与本层正交——刷新后的重放请求重新走一遍退避。signal 透传：等待期取消立即中止。
+      runWithRateLimitBackoff(() => execute<T>(method, path, data, undefined, signal), rateLimitBackoffConfig, {
+        signal,
+        onRetry: onRateLimitRetry,
+      }),
+    )
     if (!signal) {
       inflightGetRequests.set(key, promise)
       // 双回调清理：单 finally 的派生 promise 在 reject 时无 handler → unhandled rejection（#53 测试暴露）
@@ -502,20 +529,30 @@ function request<T>(
     }
     return promise
   }
-  return execWithAuthRetry<T>(() => execute<T>(method, path, data, body, signal))
+  // POST 分支（apiClient.post 不透传生命周期 signal → 退避选项不带 signal，等待不可取消）
+  return execWithAuthRetry<T>(() =>
+    runWithRateLimitBackoff(() => execute<T>(method, path, data, body, signal), rateLimitBackoffConfig, {
+      onRetry: onRateLimitRetry,
+    }),
+  )
 }
 
 /**
  * requestRaw 实现：返回原始响应体文本（web 模式 res.text() / 原生模式回调 data）。
- * 401 自动刷新包装与 request 一致（execWithAuthRetry）；不参与 GET 去重——
- * 原始文本响应按调用方语义直接返回，避免共享 promise 造成正文串扰。
+ * 401 自动刷新包装与 request 一致（execWithAuthRetry）；429 限流退避同样接线
+ * （runWithRateLimitBackoff 内层包装，ADR-0199 D5；无 signal → 退避等待不可取消）。
+ * 不参与 GET 去重——原始文本响应按调用方语义直接返回，避免共享 promise 造成正文串扰。
  */
 function requestRaw(
   method: "GET" | "POST",
   path: string,
   params?: Record<string, string>,
 ): Promise<string> {
-  return execWithAuthRetry<string>(() => executeRaw(method, path, params))
+  return execWithAuthRetry<string>(() =>
+    runWithRateLimitBackoff(() => executeRaw(method, path, params), rateLimitBackoffConfig, {
+      onRetry: onRateLimitRetry,
+    }),
+  )
 }
 
 export const apiClient: PixivApiClient = {

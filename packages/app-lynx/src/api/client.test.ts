@@ -6,17 +6,35 @@
 // - requestFetch 读 globalThis.fetch ——用 vi.stubGlobal('fetch', ...) mock；
 // - 原生回调契约来自 PixivApiModule：(status, data, rotatedRefreshToken)，
 //   data 即原始响应字符串（PixivApiCore 对非 JSON 响应原样返回）。
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { apiClient, setAccessToken, setOnUnauthorized, setAuthPermanentFailure, setAuthReadyProvider, rewriteUrl } from "./client"
-import { ApiErrorType } from "./types"
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest"
+import {
+  apiClient,
+  setAccessToken,
+  setOnUnauthorized,
+  setAuthPermanentFailure,
+  setAuthReadyProvider,
+  setRateLimitBackoffConfig,
+  rewriteUrl,
+} from "./client"
+import { ApiErrorType, type ApiError } from "./types"
 import { PIXIV_USER_AGENT, PIXIV_REFERER, PIXIV_API_BASE } from "./userAgent"
 
 // 真实结构样例：/webview/v2/novel 返回的 HTML（含 window.pixiv.novel.text）
 const NOVEL_HTML = `<script>window.pixiv = { novel: { "text": "第一行\\n第二行" } }</script>`
 
+/** web 模式 fetch 返回的 JSON Response 构造（status 429 等错误也走 JSON body） */
+const jsonResponse = (status: number, body: unknown = {}) => new Response(JSON.stringify(body), { status })
+
 // 认证就绪门（client.setAuthReadyProvider）默认清空，防跨用例泄漏；用例内按需注册。
+// 限流退避配置（ADR-0199 D4 seam）同理：null = 回落默认参数，防上一用例注入的
+// enabled:false / 自定义档位泄漏进下一用例（before + after 双侧清，用例中途失败也不残留）。
 beforeEach(() => {
   setAuthReadyProvider(null)
+  setRateLimitBackoffConfig(null)
+})
+
+afterEach(() => {
+  setRateLimitBackoffConfig(null)
 })
 
 describe("client.requestRaw web 模式（fetch + /pixiv-api 代理）", () => {
@@ -277,5 +295,232 @@ describe("rewriteUrl 原生分支（ADR-0104：绝对 next_url 归一化，防�
 
   it("/pixiv-img 相对路径原样（交给 PictelioImageService 原生重写）", () => {
     expect(rewriteUrl("/pixiv-img/xxx.png")).toBe("/pixiv-img/xxx.png")
+  })
+})
+
+// ─── 429 限流退避接线（ADR-0199 D5：runWithRateLimitBackoff 包在 execWithAuthRetry 内层） ───
+// oracle 溯源：重试次数/终态形状以 ADR-0199 D3/D5 为准（重试上限不含首次；耗尽终态
+// 附 params.attempts）；web 模式用 fake timers 驱动退避 sleep（默认 base=1000ms，
+// full jitter 上界 30s，一次性推进 2 分钟必覆盖）；断言「429 才重试、其他错误原样抛」。
+
+/** web/原生退避用例共用的探测 promise：立即挂 handler 防 unhandled rejection（reject 先于断言发生） */
+function probe<T>(p: Promise<T>): Promise<{ ok: true; v: T } | { ok: false; e: unknown }> {
+  return p.then(
+    (v) => ({ ok: true as const, v }),
+    (e: unknown) => ({ ok: false as const, e }),
+  )
+}
+
+describe("client 429 限流退避（web 模式接线，ADR-0199 D5）", () => {
+  const fetchMock = vi.fn()
+  let warnSpy: MockInstance
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    setOnUnauthorized(null)
+    setAuthPermanentFailure(false)
+    setAccessToken("web-token")
+    vi.stubGlobal("fetch", fetchMock)
+    vi.stubGlobal("NativeModules", undefined) // 无原生模块 → isNativeMode false
+    // 静音退避留痕 warn（留痕内容的断言在各用例内做）
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+  })
+  afterEach(() => {
+    warnSpy.mockRestore()
+    vi.useRealTimers() // fake timers 用后必须还原，防泄漏进真实定时器用例
+    vi.unstubAllGlobals()
+  })
+
+  it("429→429→200 退避重试：fetch 共 3 次、最终 resolve、warn 留痕（attempt 从 1 计）", async () => {
+    vi.useFakeTimers()
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(429))
+      .mockResolvedValueOnce(jsonResponse(429))
+      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
+    const out = await (async () => {
+      const p = probe(apiClient.get<{ ok: boolean }>("/v1/illust/recommended"))
+      await vi.advanceTimersByTimeAsync(120_000)
+      return p
+    })()
+    expect(out.ok).toBe(true)
+    if (!out.ok) return
+    expect(out.v).toEqual({ ok: true })
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    // onRetry 留痕契约：每次退避重试一条 "[client] 429 限流退避重试" attempt delayMs+"ms"
+    expect(warnSpy).toHaveBeenCalledWith("[client] 429 限流退避重试", 1, expect.any(String))
+    expect(warnSpy).toHaveBeenCalledWith("[client] 429 限流退避重试", 2, expect.any(String))
+    expect(warnSpy.mock.calls.filter((c) => c[0] === "[client] 429 限流退避重试")).toHaveLength(2)
+  })
+
+  it("持续 429 → 重试耗尽 reject RATE_LIMIT + params.attempts=3，fetch 共 4 次（首次+3 重试）", async () => {
+    vi.useFakeTimers()
+    fetchMock.mockResolvedValue(jsonResponse(429))
+    const p = probe(apiClient.get("/v1/illust/recommended"))
+    await vi.advanceTimersByTimeAsync(120_000)
+    const out = await p
+    expect(out.ok).toBe(false)
+    if (out.ok) return
+    expect(out.e).toMatchObject({ type: ApiErrorType.RATE_LIMIT, params: { attempts: 3 } })
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+  })
+
+  it("setRateLimitBackoffConfig({enabled:false}) → 零重试 fetch 1 次立即 reject（无 attempts）", async () => {
+    setRateLimitBackoffConfig({ enabled: false, maxRetries: 3, baseDelayMs: 1000, maxDelayMs: 30_000 })
+    fetchMock.mockResolvedValue(jsonResponse(429))
+    const out = await probe(apiClient.get("/v1/illust/recommended"))
+    expect(out.ok).toBe(false)
+    if (out.ok) return
+    expect(out.e).toMatchObject({ type: ApiErrorType.RATE_LIMIT })
+    expect((out.e as ApiError).params).toBeUndefined() // 首次即失败：不附重试计数
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("500 → 非限流错误不重试，fetch 共 1 次原样抛 SERVER", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(500))
+    const out = await probe(apiClient.get("/v1/illust/recommended"))
+    expect(out.ok).toBe(false)
+    if (out.ok) return
+    expect(out.e).toMatchObject({ type: ApiErrorType.SERVER, status: 500 })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("401→刷新→重放 429→退避→200：refreshHandler 1 次、fetch 共 4 次（重放请求同样享受退避）", async () => {
+    vi.useFakeTimers()
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(401))
+      .mockResolvedValueOnce(jsonResponse(429))
+      .mockResolvedValueOnce(jsonResponse(429))
+      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
+    const refreshHandler = vi.fn(async () => {
+      setAccessToken("refreshed-token")
+    })
+    setOnUnauthorized(refreshHandler)
+    const p = probe(apiClient.get<{ ok: boolean }>("/v1/illust/recommended"))
+    await vi.advanceTimersByTimeAsync(120_000)
+    const out = await p
+    expect(out.ok).toBe(true)
+    expect(refreshHandler).toHaveBeenCalledTimes(1)
+    // 401 → 重放 429 → 退避 429 → 退避 200：401 层（外）与退避层（内）正交
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+    expect(warnSpy.mock.calls.filter((c) => c[0] === "[client] 429 限流退避重试")).toHaveLength(2)
+  })
+
+  it("POST 分支同样接退避：429→200 重试成功，fetch 共 2 次", async () => {
+    vi.useFakeTimers()
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(429))
+      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
+    const p = probe(apiClient.post<{ ok: boolean }>("/v1/illust/bookmark/add", { illust_id: "1" }))
+    await vi.advanceTimersByTimeAsync(120_000)
+    const out = await p
+    expect(out.ok).toBe(true)
+    if (!out.ok) return
+    expect(out.v).toEqual({ ok: true })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it("requestRaw 同样接退避：429→200 重试成功，fetch 共 2 次", async () => {
+    vi.useFakeTimers()
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(429))
+      .mockResolvedValueOnce(new Response(NOVEL_HTML, { status: 200 }))
+    const p = probe(apiClient.requestRaw("GET", "/webview/v2/novel", { id: "123" }))
+    await vi.advanceTimersByTimeAsync(120_000)
+    const out = await p
+    expect(out.ok).toBe(true)
+    if (!out.ok) return
+    expect(out.v).toBe(NOVEL_HTML)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe("client 429 限流退避（原生模式接线，PictelioApi 回调契约）", () => {
+  let warnSpy: MockInstance
+
+  beforeEach(() => {
+    setOnUnauthorized(null)
+    setAuthPermanentFailure(false)
+    setAccessToken("") // 原生模式 access_token 在 Java 堆，JS 零知
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+  })
+  afterEach(() => {
+    warnSpy.mockRestore()
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it("回调 429→429→200 → 退避重试成功，PictelioApi.request 共 3 次", async () => {
+    vi.useFakeTimers()
+    let call = 0
+    const requestMock = vi.fn(
+      (_m: string, _p: string, _b: string, cb: (s: number, d: string, r: string) => void) => {
+        call += 1
+        if (call <= 2) cb(429, JSON.stringify({ message: "rate limited" }), "")
+        else cb(200, JSON.stringify({ ok: true }), "")
+      },
+    )
+    vi.stubGlobal("NativeModules", { PictelioApi: { request: requestMock } })
+    const p = probe(apiClient.get<{ ok: boolean }>("/v1/illust/recommended"))
+    await vi.advanceTimersByTimeAsync(120_000)
+    const out = await p
+    expect(out.ok).toBe(true)
+    if (!out.ok) return
+    expect(out.v).toEqual({ ok: true })
+    expect(requestMock).toHaveBeenCalledTimes(3)
+  })
+
+  it("回调持续 429 → 重试耗尽 reject RATE_LIMIT + params.attempts=3，request 共 4 次", async () => {
+    vi.useFakeTimers()
+    const requestMock = vi.fn(
+      (_m: string, _p: string, _b: string, cb: (s: number, d: string, r: string) => void) =>
+        cb(429, JSON.stringify({ message: "rate limited" }), ""),
+    )
+    vi.stubGlobal("NativeModules", { PictelioApi: { request: requestMock } })
+    const p = probe(apiClient.get("/v1/illust/recommended"))
+    await vi.advanceTimersByTimeAsync(120_000)
+    const out = await p
+    expect(out.ok).toBe(false)
+    if (out.ok) return
+    expect(out.e).toMatchObject({ type: ApiErrorType.RATE_LIMIT, params: { attempts: 3 } })
+    expect(requestMock).toHaveBeenCalledTimes(4)
+  })
+})
+
+describe("GET 去重与退避交互（ADR-0199 D5：共享 promise = 共享退避）", () => {
+  const fetchMock = vi.fn()
+  let warnSpy: MockInstance
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    setOnUnauthorized(null)
+    setAuthPermanentFailure(false)
+    setAccessToken("web-token")
+    vi.stubGlobal("fetch", fetchMock)
+    vi.stubGlobal("NativeModules", undefined)
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+  })
+  afterEach(() => {
+    warnSpy.mockRestore()
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it("无 signal 并发相同 GET：fetch 恒 429 一次后 200 → fetch 共 2 次（非 4），两调用同值 resolve", async () => {
+    vi.useFakeTimers()
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(429))
+      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
+    // 同步发起两次相同 path+params 的 GET（无 signal → 参与去重，共享同一 in-flight promise）
+    const p1 = apiClient.get<{ ok: boolean }>("/v1/illust/recommended")
+    const p2 = apiClient.get<{ ok: boolean }>("/v1/illust/recommended")
+    const both = Promise.all([probe(p1), probe(p2)])
+    await vi.advanceTimersByTimeAsync(120_000)
+    const [r1, r2] = await both
+    expect(r1.ok).toBe(true)
+    expect(r2.ok).toBe(true)
+    if (!r1.ok || !r2.ok) return
+    expect(r1.v).toEqual({ ok: true })
+    expect(r1.v).toBe(r2.v) // 同一 promise → 同一响应对象（不是各发各的两次退避）
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 })
