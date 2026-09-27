@@ -57,7 +57,7 @@ TS execute()/executeRaw() web 分支                          [变更④]
 | E3 | 旧 APK + 新 JS / 新 APK + 旧 JS | 均正常（语言经 prefs 不经桥；JS 侧不读该头） |
 | E4 | 429 退避 / 401 刷新重放（ADR-0199） | 正交不受影响——重试请求经同一 `execute`，语言头同样携带 |
 | E5 | 非 Pixiv 域请求（`shouldAttachAuth`=false 路径） | 头照加（UA/Referer 同姿势，无域差别） |
-| E6 | `PixivApiCore` 其他调用方（webview `PixivApiPlugin`、OAuth） | 走 5 参旧签名 → `null` → 不加头，行为零变化 |
+| E6 | `PixivApiCore` 其他调用方（webview `PixivApiPlugin`、诊断探针 `NetDiagProbe`；OAuth 端点走 PictelioAuth 自有通道，不经本方法） | 走 5 参旧签名 → `null` → 不加头，行为零变化 |
 
 ## 5. 变更清单
 

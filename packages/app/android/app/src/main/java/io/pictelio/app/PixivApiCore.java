@@ -93,10 +93,11 @@ final class PixivApiCore {
     }
 
     /**
-     * 执行 HTTP 请求（旧 5 参签名，ADR-0200 变更③保留）：webview PixivApiPlugin 与
-     * OAuth 调用点一字不动——委托 {@link #executeRequest(String, String, String, String,
-     * boolean, RefreshTokenRotationListener)} 时 acceptLanguage 传 null = 不加语言头，
-     * 行为零变化（ADR-0200 D4 / E6）。
+     * 执行 HTTP 请求（旧 5 参签名，ADR-0200 变更③保留）：lynx 以外的全部调用方
+     * （webview {@code PixivApiPlugin}、诊断探针 {@code NetDiagProbe}；OAuth 端点走
+     * PictelioAuth 自有通道不经本方法）一字不动——委托
+     * {@link #executeRequest(String, String, String, String, boolean, RefreshTokenRotationListener)}
+     * 时 acceptLanguage 传 null = 不加语言头，行为零变化（ADR-0200 D4 / E6）。
      */
     static JSONObject executeRequest(String method, String url, String body, boolean isRetry,
             RefreshTokenRotationListener rotationListener)

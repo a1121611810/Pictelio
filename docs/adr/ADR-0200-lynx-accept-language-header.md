@@ -7,7 +7,7 @@
 
 ## 背景
 
-app-lynx 的标签显示只透传 Pixiv API 返回的 `tags[].translated_name`，缺失即回落日文原名（`utils/tagChips.ts:38` 的 `translated_name || name` 显式契约）。而请求侧**全端从不携带任何语言请求头**：原生通道 Java `PixivApiCore.executeRequest` 只发 Authorization / Referer / User-Agent；web 通道 TS `execute()` 同样只有 UA / Referer / Authorization。App API 无语言头时按默认语言返回，`translated_name` 大面积为 `null`——代码注释自证（`collectTagNeighbors.ts:188`「实测大量为 null」），且已倒逼出下游妥协：ADR-0197 D10 标签邻居检索被迫用日文原名、静音标签不匹配译名（`settingsStore.ts:788`）。
+app-lynx 的标签显示只透传 Pixiv API 返回的 `tags[].translated_name`，缺失即回落日文原名（`utils/tagChips.ts:38` 的 `translated_name || name` 显式契约）。而请求侧**全端从不携带任何语言请求头**：原生通道 Java `PixivApiCore.executeRequest` 只发 Authorization / Referer / User-Agent；web 通道 TS `execute()` 同样只有 UA / Referer / Authorization。App API 无语言头时按默认语言返回，`translated_name` 大面积为 `null`——代码注释自证（`collectTagNeighbors.ts:188`「实测大量为 null」），且已倒逼出下游妥协：ADR-0197 D10 标签邻居检索被迫用日文原名、静音标签不匹配译名（`settingsStore.ts:871`）。
 
 竞品对照：Pixez 每个请求带 `Accept-Language: zh-CN` 静态默认头，pixiv Crowdin 众包翻译（2021 起）直接全部生效，热门标签中文覆盖率很高；Pixiv-Shaft 提供「内容语言」设置映射为同名头；Pixeval 在 API 译名之外做扩展机器翻译。三者共同点：**都把「激活官方译文」当作底线，而 Pictelio 缺的恰是这一步**——补语言头是改动最小、收益最大的一层。
 
