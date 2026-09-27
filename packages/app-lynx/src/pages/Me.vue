@@ -813,6 +813,21 @@ function pickAppearanceMode(mode: DarkModeId) {
             </view>
             <text class="text-label-small text-surface-on-variant">{{ t('me.appearance.colorTeal') }}</text>
           </view>
+          <view class="flex flex-col items-center gap-1">
+            <!-- 哔哩粉 -->
+            <view
+              class="w-10 h-10 rounded-full flex items-center justify-center border-[0.533vw]"
+              :class="[themeColor === 'bili' ? 'border-primary' : 'border-transparent', ...appearanceClasses('bili', resolvedDark)]"
+              :accessibility-element="A11Y_ELEMENT_ENABLED"
+              :accessibility-label="ME_A11Y_LABELS.themeColorBili"
+              @tap="settings.setThemeColor('bili')"
+            >
+              <view class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                <text v-if="themeColor === 'bili'" class="text-primary-on text-label-small">✓</text>
+              </view>
+            </view>
+            <text class="text-label-small text-surface-on-variant">{{ t('me.appearance.colorBili') }}</text>
+          </view>
         </view>
         <!-- 界面语言（spec docs/specs/i18n.md §3：跟随系统 + 手动覆盖 + 即时切换；autonym 按 ui-copy R8 不翻译） -->
         <view class="mt-4 pt-3 border-t-[1px] border-t-surface-variant">

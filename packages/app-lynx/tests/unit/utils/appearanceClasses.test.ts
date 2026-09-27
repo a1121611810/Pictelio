@@ -165,7 +165,7 @@ describe('T2 根类组合纯函数 appearanceClasses', () => {
 describe('T2 暗色色板契约（tokens.css .theme-X.dark）', () => {
   const themeableRoles = extractThemeableRoles(tokensCss)
 
-  it('tokens.css 含全部 6 主题暗色色板类（复合选择器 .theme-X.dark）', () => {
+  it('tokens.css 含全部 7 主题暗色色板类（复合选择器 .theme-X.dark）', () => {
     for (const option of THEME_COLOR_OPTIONS) {
       const selector = `.${option.className}.dark`
       expect(tokensCss, `tokens.css 缺少 ${selector}`).toContain(selector)
@@ -196,7 +196,7 @@ describe('T2 暗色色板契约（tokens.css .theme-X.dark）', () => {
     expect(luma(darkSurface), '暗色 surface 应显著低于亮色（高对比）').toBeLessThan(luma(lightSurface) - 100)
   })
 
-  it('--md-scroll-indicator：基础 page 块定义 + 6 个暗色块各自重定义（派生口径 = 非缺值）', () => {
+  it('--md-scroll-indicator：基础 page 块定义 + 7 个暗色块各自重定义（派生口径 = 非缺值）', () => {
     // 该 token 被 extractThemeableRoles 显式排除（由 outline 派生的 rgba，不进 hex 角色集），
     // 排除**不等于**可以缺值：亮色各主题沿用基础 page 块值，暗色各主题必须自重定义，
     // 否则暗色下仍用亮色灰（对比度漂移）。
@@ -229,7 +229,7 @@ describe('T2 暗色色板契约（tokens.css .theme-X.dark）', () => {
         `${selector} 的 --md-scroll-indicator 退化为亮色基线灰（对比度漂移）`,
       ).not.toContain('73, 69, 79')
     }
-    // 定义点计数下界（1 基础块 + 6 暗色块）：防上方循环因清单塌陷而恒真通过
+    // 定义点计数下界（1 基础块 + 7 暗色块）：防上方循环因清单塌陷而恒真通过
     const occurrences = [...tokensCss.matchAll(/--md-scroll-indicator:/g)].length
     expect(occurrences).toBeGreaterThanOrEqual(1 + THEME_COLOR_OPTIONS.length)
   })
@@ -255,9 +255,9 @@ describe('T2 暗色色板契约（tokens.css .theme-X.dark）', () => {
       ).toBeGreaterThan(luma(hexToRgb(primary)))
       checked.push(selector)
     }
-    // 精确计数：6 个暗色块逐个覆盖（清单固定 6 支，防循环空转）
+    // 精确计数：7 个暗色块逐个覆盖（清单固定 7 支，防循环空转）
     expect(checked.length).toBe(THEME_COLOR_OPTIONS.length)
-    expect(THEME_COLOR_OPTIONS.length).toBe(6)
+    expect(THEME_COLOR_OPTIONS.length).toBe(7)
   })
 })
 

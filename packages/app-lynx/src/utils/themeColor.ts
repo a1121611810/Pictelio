@@ -11,6 +11,7 @@ export const THEME_COLOR_OPTIONS = [
   { id: "green", className: "theme-green" },
   { id: "orange", className: "theme-orange" },
   { id: "teal", className: "theme-teal" },
+  { id: "bili", className: "theme-bili" },
 ] as const
 
 export type ThemeColorId = (typeof THEME_COLOR_OPTIONS)[number]["id"]
