@@ -15,6 +15,12 @@ import { ref, effect } from "vue"
 import { setActivePinia, createPinia } from "pinia"
 import { useSettingsStore, BACKUP_DEVICE_KEYS, backupAccountKeys, parseMuteTagsRaw } from "./settingsStore"
 import { idbGet, idbSet, idbRemove } from "../utils/idbKV"
+import {
+  DEFAULT_RATE_LIMIT_BACKOFF_CONFIG,
+  RATE_LIMIT_BASE_DELAY_MS_OPTIONS,
+  RATE_LIMIT_MAX_DELAY_MS_OPTIONS,
+  RATE_LIMIT_MAX_RETRIES_OPTIONS,
+} from "../api/rateLimitBackoff"
 
 vi.mock("../utils/idbKV", () => ({
   idbGet: vi.fn(),
@@ -43,12 +49,15 @@ const env = vi.hoisted(() => ({
   native: false,
   modules: {} as Record<string, unknown>,
 }))
+/** 限流退避注入点 spy（ADR-0199 D4）：mock 掉真实 client setter，供组装值断言（vi.mock 工厂提升，须 hoisted） */
+const setRateLimitBackoffConfigMock = vi.hoisted(() => vi.fn())
 vi.mock("../api/client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../api/client")>()
   return {
     ...actual,
     isNativeMode: vi.fn(() => env.native),
     getNativeModules: vi.fn(() => env.modules),
+    setRateLimitBackoffConfig: setRateLimitBackoffConfigMock,
   }
 })
 
@@ -2131,5 +2140,271 @@ describe("settingsStore — 下载命名模板与按作者建目录（ADR-0192�
   it("BACKUP_DEVICE_KEYS 含两个下载命名键（设备级，进备份域）", () => {
     expect(BACKUP_DEVICE_KEYS as readonly string[]).toContain("download_file_template")
     expect(BACKUP_DEVICE_KEYS as readonly string[]).toContain("download_by_author_dir")
+  })
+})
+
+// 限流退避四参数（ADR-0199 D4 / #779 T2）：设备级键 + DEFAULT_RATE_LIMIT_BACKOFF_CONFIG 默认
+// + 档位常量校验装载 + 装载/setter 后组装注入 client（setRateLimitBackoffConfig，本文件顶部
+// 已在 ../api/client mock 工厂中替换为 spy）即时生效。
+// IO 边界双路径（硬约束 #1）：装载成功 + 非法值/IO 失败降级 warn（禁静默降级）。
+describe("settingsStore.rateLimitBackoff（ADR-0199 D4）", () => {
+  /** prefs seam（与 autoFallbackEngine describe 同款 mock：native Callback 值带 JSON 引号） */
+  function prefsModule(map: Map<string, string>) {
+    env.native = true
+    env.modules = {
+      PictelioPrefs: {
+        prefsGet: (k: string, cb: (v: string, e: string | null) => void) =>
+          cb(map.has(k) ? JSON.stringify(map.get(k)!) : "", null),
+        prefsSet: (k: string, v: string, cb: (e: string | null) => void) => {
+          map.set(k, v)
+          cb(null)
+        },
+        prefsRemove: (k: string, cb: (e: string | null) => void) => {
+          map.delete(k)
+          cb(null)
+        },
+      },
+    }
+  }
+
+  beforeEach(() => {
+    env.native = true
+    env.modules = {}
+    userRef().value = null
+    setRateLimitBackoffConfigMock.mockClear()
+    vi.mocked(idbGet).mockReset().mockResolvedValue(null)
+    vi.mocked(idbSet).mockReset().mockResolvedValue(undefined)
+    vi.mocked(idbRemove).mockReset().mockResolvedValue(undefined)
+    setActivePinia(createPinia())
+    store = useSettingsStore()
+  })
+
+  it("默认值 = DEFAULT_RATE_LIMIT_BACKOFF_CONFIG 四字段（enabled true / retries 3 / base 1000 / max 30000）", () => {
+    expect(store.rateLimitBackoffEnabled).toBe(DEFAULT_RATE_LIMIT_BACKOFF_CONFIG.enabled)
+    expect(store.rateLimitMaxRetries).toBe(DEFAULT_RATE_LIMIT_BACKOFF_CONFIG.maxRetries)
+    expect(store.rateLimitBaseDelayMs).toBe(DEFAULT_RATE_LIMIT_BACKOFF_CONFIG.baseDelayMs)
+    expect(store.rateLimitMaxDelayMs).toBe(DEFAULT_RATE_LIMIT_BACKOFF_CONFIG.maxDelayMs)
+    expect(store.rateLimitBackoffEnabled).toBe(true)
+    expect(store.rateLimitMaxRetries).toBe(3)
+    expect(store.rateLimitBaseDelayMs).toBe(1000)
+    expect(store.rateLimitMaxDelayMs).toBe(30000)
+  })
+
+  it("loadSettings 合法值 → 四 ref 恢复且 setRateLimitBackoffConfig 以组装值调用", async () => {
+    prefsModule(
+      new Map<string, string>([
+        ["settings_rate_limit_backoff_enabled", "false"],
+        ["settings_rate_limit_max_retries", "2"],
+        ["settings_rate_limit_base_delay_ms", "500"],
+        ["settings_rate_limit_max_delay_ms", "60000"],
+      ]),
+    )
+    await store.loadSettings()
+    expect(store.rateLimitBackoffEnabled).toBe(false)
+    expect(store.rateLimitMaxRetries).toBe(2)
+    expect(store.rateLimitBaseDelayMs).toBe(500)
+    expect(store.rateLimitMaxDelayMs).toBe(60000)
+    expect(setRateLimitBackoffConfigMock).toHaveBeenLastCalledWith({
+      enabled: false,
+      maxRetries: 2,
+      baseDelayMs: 500,
+      maxDelayMs: 60000,
+    })
+  })
+
+  it("loadSettings 缺键 → 维持默认且注入默认配置", async () => {
+    prefsModule(new Map<string, string>())
+    await store.loadSettings()
+    expect(store.rateLimitBackoffEnabled).toBe(true)
+    expect(store.rateLimitMaxRetries).toBe(3)
+    expect(store.rateLimitBaseDelayMs).toBe(1000)
+    expect(store.rateLimitMaxDelayMs).toBe(30000)
+    expect(setRateLimitBackoffConfigMock).toHaveBeenLastCalledWith(DEFAULT_RATE_LIMIT_BACKOFF_CONFIG)
+  })
+
+  it("loadSettings 非法值（四键全非法）→ 各自 warn + 维持默认 + 注入默认（禁静默降级）", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    prefsModule(
+      new Map<string, string>([
+        ["settings_rate_limit_backoff_enabled", "yes"],
+        ["settings_rate_limit_max_retries", "9"],
+        ["settings_rate_limit_base_delay_ms", "700"],
+        ["settings_rate_limit_max_delay_ms", "999"],
+      ]),
+    )
+    await store.loadSettings()
+    expect(store.rateLimitBackoffEnabled).toBe(true)
+    expect(store.rateLimitMaxRetries).toBe(3)
+    expect(store.rateLimitBaseDelayMs).toBe(1000)
+    expect(store.rateLimitMaxDelayMs).toBe(30000)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("限流退避开关值非法"), "yes")
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("最大重试次数非法"), "9")
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("初始等待非法"), "700")
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("最长等待非法"), "999")
+    // 非法值不覆盖 ref → 注入的仍是默认配置
+    expect(setRateLimitBackoffConfigMock).toHaveBeenLastCalledWith(DEFAULT_RATE_LIMIT_BACKOFF_CONFIG)
+    warn.mockRestore()
+  })
+
+  it("loadSettings 读取失败（IO 异常）→ 维持默认 + warn，不注入（硬约束 #1/#3）", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    env.native = false
+    vi.mocked(idbGet).mockImplementation(async (key: string) => {
+      if (key === "settings_rate_limit_backoff_enabled") throw new Error("idb down")
+      return null
+    })
+    await store.loadSettings()
+    expect(store.rateLimitBackoffEnabled).toBe(true)
+    expect(store.rateLimitMaxRetries).toBe(3)
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("限流退避设置加载失败"),
+      expect.any(Error),
+    )
+    // 整块 catch → 本次装载不注入（try 内注入点未到达）
+    expect(setRateLimitBackoffConfigMock).not.toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it("四个 setter → prefs.set 载荷正确 + 组装注入随当前四 ref 更新", () => {
+    prefsModule(new Map<string, string>())
+    store.setRateLimitBackoffEnabled(false)
+    expect(setRateLimitBackoffConfigMock).toHaveBeenLastCalledWith({
+      enabled: false,
+      maxRetries: 3,
+      baseDelayMs: 1000,
+      maxDelayMs: 30000,
+    })
+    store.setRateLimitMaxRetries(5)
+    expect(setRateLimitBackoffConfigMock).toHaveBeenLastCalledWith({
+      enabled: false,
+      maxRetries: 5,
+      baseDelayMs: 1000,
+      maxDelayMs: 30000,
+    })
+    store.setRateLimitBaseDelayMs(500)
+    expect(setRateLimitBackoffConfigMock).toHaveBeenLastCalledWith({
+      enabled: false,
+      maxRetries: 5,
+      baseDelayMs: 500,
+      maxDelayMs: 30000,
+    })
+    store.setRateLimitMaxDelayMs(60000)
+    expect(setRateLimitBackoffConfigMock).toHaveBeenLastCalledWith({
+      enabled: false,
+      maxRetries: 5,
+      baseDelayMs: 500,
+      maxDelayMs: 60000,
+    })
+    // 落盘载荷（native 路径，键值对齐 setter 入参的 String() 形态）
+    expect(env.modules.PictelioPrefs).toBeTruthy()
+    store.setRateLimitMaxRetries(0)
+    // 档位边界 0 也可写（含首次请求零重试语义，ADR-0199 术语口径）
+    expect(setRateLimitBackoffConfigMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ maxRetries: 0 }),
+    )
+  })
+
+  it("native 路径：setter 经 PictelioPrefs 落盘四键", async () => {
+    const map = new Map<string, string>()
+    prefsModule(map)
+    store.setRateLimitBackoffEnabled(false)
+    store.setRateLimitMaxRetries(4)
+    store.setRateLimitBaseDelayMs(2000)
+    store.setRateLimitMaxDelayMs(10000)
+    await vi.waitFor(() =>
+      expect(map.get("settings_rate_limit_backoff_enabled")).toBe("false"),
+    )
+    expect(map.get("settings_rate_limit_max_retries")).toBe("4")
+    expect(map.get("settings_rate_limit_base_delay_ms")).toBe("2000")
+    expect(map.get("settings_rate_limit_max_delay_ms")).toBe("10000")
+  })
+
+  it("setter 写入失败 → 内存态已更新 + warn 可见（不抛出，硬约束 #3）", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    prefsModule(new Map<string, string>())
+    env.modules = {
+      ...env.modules,
+      PictelioPrefs: {
+        ...(env.modules.PictelioPrefs as Record<string, unknown>),
+        prefsSet: (_k: string, _v: string, cb: (e: string | null) => void) => cb("disk full"),
+      },
+    }
+    store.setRateLimitMaxRetries(1)
+    expect(store.rateLimitMaxRetries).toBe(1)
+    await vi.waitFor(() =>
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("最大重试次数写入失败"), expect.anything()),
+    )
+    warn.mockRestore()
+  })
+
+  it("exportRawValues 含四新键（存储中已设过值时）", async () => {
+    prefsModule(
+      new Map<string, string>([
+        ["settings_rate_limit_backoff_enabled", "false"],
+        ["settings_rate_limit_max_retries", "1"],
+        ["settings_rate_limit_base_delay_ms", "2000"],
+        ["settings_rate_limit_max_delay_ms", "10000"],
+      ]),
+    )
+    const raw = await store.exportRawValues()
+    expect(raw.settings_rate_limit_backoff_enabled).toBe("false")
+    expect(raw.settings_rate_limit_max_retries).toBe("1")
+    expect(raw.settings_rate_limit_base_delay_ms).toBe("2000")
+    expect(raw.settings_rate_limit_max_delay_ms).toBe("10000")
+  })
+
+  it("importRawValues 往返：合法四键 applied（ref 更新 + 注入），档位外值 skipped", async () => {
+    prefsModule(new Map<string, string>())
+    const res = await store.importRawValues({
+      settings_rate_limit_backoff_enabled: "false",
+      settings_rate_limit_max_retries: "1",
+      settings_rate_limit_base_delay_ms: "2000",
+      settings_rate_limit_max_delay_ms: "10000",
+    })
+    expect(res.applied).toContain("settings_rate_limit_backoff_enabled")
+    expect(res.applied).toContain("settings_rate_limit_max_retries")
+    expect(res.applied).toContain("settings_rate_limit_base_delay_ms")
+    expect(res.applied).toContain("settings_rate_limit_max_delay_ms")
+    expect(store.rateLimitBackoffEnabled).toBe(false)
+    expect(store.rateLimitMaxRetries).toBe(1)
+    expect(store.rateLimitBaseDelayMs).toBe(2000)
+    expect(store.rateLimitMaxDelayMs).toBe(10000)
+    expect(setRateLimitBackoffConfigMock).toHaveBeenLastCalledWith({
+      enabled: false,
+      maxRetries: 1,
+      baseDelayMs: 2000,
+      maxDelayMs: 10000,
+    })
+
+    const skipped = await store.importRawValues({
+      settings_rate_limit_backoff_enabled: "on",
+      settings_rate_limit_max_retries: "9",
+      settings_rate_limit_base_delay_ms: "700",
+      settings_rate_limit_max_delay_ms: "999",
+    })
+    expect(skipped.skipped).toContain("settings_rate_limit_backoff_enabled")
+    expect(skipped.skipped).toContain("settings_rate_limit_max_retries")
+    expect(skipped.skipped).toContain("settings_rate_limit_base_delay_ms")
+    expect(skipped.skipped).toContain("settings_rate_limit_max_delay_ms")
+    // skipped 不改写本机现状
+    expect(store.rateLimitMaxRetries).toBe(1)
+    expect(store.rateLimitBaseDelayMs).toBe(2000)
+  })
+
+  it("BACKUP_DEVICE_KEYS 含四个限流退避键（设备级，进备份域）", () => {
+    for (const key of [
+      "settings_rate_limit_backoff_enabled",
+      "settings_rate_limit_max_retries",
+      "settings_rate_limit_base_delay_ms",
+      "settings_rate_limit_max_delay_ms",
+    ]) {
+      expect(BACKUP_DEVICE_KEYS as readonly string[]).toContain(key)
+    }
+  })
+
+  it("档位常量形状（6/4/3，来自 rateLimitBackoff.ts 单一事实源）", () => {
+    expect([...RATE_LIMIT_MAX_RETRIES_OPTIONS]).toEqual([0, 1, 2, 3, 4, 5])
+    expect([...RATE_LIMIT_BASE_DELAY_MS_OPTIONS]).toEqual([500, 1000, 2000, 5000])
+    expect([...RATE_LIMIT_MAX_DELAY_MS_OPTIONS]).toEqual([10000, 30000, 60000])
   })
 })

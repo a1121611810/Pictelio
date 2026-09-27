@@ -251,6 +251,15 @@ const zhPages = {
   "me.client.fullscreenMode": "全屏模式",
   "me.client.fullscreenModeDesc": "隐藏状态栏与导航栏，边缘滑动可临时唤出",
   "me.client.effectiveState": "首选 {{preferred}} · 本次生效 {{effective}}",
+  // ─── Me.vue 网络组（ADR-0199 D4 / #779：限流退避四参数设置；delaySeconds 渲染档位秒数） ───
+  "me.network.title": "网络",
+  "me.network.hint": "请求被 Pixiv 限流时自动等待重试",
+  "me.network.backoff": "限流退避",
+  "me.network.backoffDesc": "收到 429 时自动等待并重试；关闭后立即报错",
+  "me.network.maxRetries": "最大重试次数",
+  "me.network.baseDelay": "初始等待",
+  "me.network.maxDelay": "最长等待",
+  "me.network.delaySeconds": "{{seconds}} 秒",
 
   // ─── Notifications.vue（通知中心页，ADR-0188 / #728） ───
   "notifications.title": "通知",

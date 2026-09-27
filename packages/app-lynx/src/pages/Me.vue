@@ -31,6 +31,11 @@ import {
 } from '../services/backupWiring'
 import { isNativeMode } from '../api/client'
 import {
+  RATE_LIMIT_BASE_DELAY_MS_OPTIONS,
+  RATE_LIMIT_MAX_DELAY_MS_OPTIONS,
+  RATE_LIMIT_MAX_RETRIES_OPTIONS,
+} from '../api/rateLimitBackoff'
+import {
   applyPreparedRestore,
   backupNow,
   listBackups,
@@ -57,7 +62,7 @@ const clientSwitch = useClientSwitchStore()
 const notificationStore = useNotificationStore()
 // 稍后看计数徽标数据源（ADR-0191 D5 / #753 T4）
 const watchLaterStore = useWatchLaterStore()
-const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, darkMode, resolvedDark, language, novelExportFormat, novelExportOptions, relatedInjection, rankingEntry, novelIntroFirst, autoFallbackEngine, fullscreenMode, downloadByAuthorDir } = storeToRefs(settings)
+const { showR18, showR18G, aiFilterMode, ugoiraMode, ugoiraDownloadFormat, detailQuality, themeColor, darkMode, resolvedDark, language, novelExportFormat, novelExportOptions, relatedInjection, rankingEntry, novelIntroFirst, autoFallbackEngine, fullscreenMode, downloadByAuthorDir, rateLimitBackoffEnabled, rateLimitMaxRetries, rateLimitBaseDelayMs, rateLimitMaxDelayMs } = storeToRefs(settings)
 
 const switching = ref(false)
 
@@ -100,6 +105,32 @@ function toggleAutoFallbackEngine() {
 /** 全屏模式开关（spec docs/specs/lynx-systembars.md D5）：一键翻转 + 原生即时切换（setter 内） */
 function toggleFullscreenMode() {
   settings.setFullscreenMode(!fullscreenMode.value)
+}
+
+// ─── 限流退避四参数（ADR-0199 D4 / #779）：网络组开关 + 三档位行（设备级 setter 自带落盘
+//     与组装注入 client 即时生效）；档位集合 = api/rateLimitBackoff.ts 单一事实源常量 ───
+
+/** 限流退避开关（镜像 toggleAutoFallbackEngine 范式）：一键翻转；关闭后 429 立即报错零重试 */
+function toggleRateLimitBackoff() {
+  settings.setRateLimitBackoffEnabled(!rateLimitBackoffEnabled.value)
+}
+
+/** 档位选择（镜像 pickWebdavAutoBackupDays 范式） */
+function pickRateLimitMaxRetries(retries: number): void {
+  settings.setRateLimitMaxRetries(retries)
+}
+
+function pickRateLimitBaseDelayMs(ms: number): void {
+  settings.setRateLimitBaseDelayMs(ms)
+}
+
+function pickRateLimitMaxDelayMs(ms: number): void {
+  settings.setRateLimitMaxDelayMs(ms)
+}
+
+/** 档位毫秒 → 秒显示值（500→0.5、1000→1、…、60000→60；单一换算点供两个 delay 行复用） */
+function toSeconds(ms: number): number {
+  return ms / 1000
 }
 
 // ─── WebDAV 备份（spec docs/specs/webdav-backup.md §7；仅原生 LynxView 渲染，§2）───
@@ -706,6 +737,89 @@ function pickAppearanceMode(mode: DarkModeId) {
           <text class="text-label-medium text-surface-on-variant mt-1">{{ degradedReasonText }}</text>
         </view>
         <text v-if="switching" class="text-body-small text-primary mt-3">{{ t('me.client.restarting') }}</text>
+      </view>
+
+      <!-- 网络组（ADR-0199 D4 / #779：限流退避四参数设置；卡片/行结构镜像客户端组） -->
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
+        <text
+          class="text-title-small font-medium text-surface-on"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.networkGroupTitle"
+          >{{ t('me.network.title') }}</text
+        >
+        <text class="text-label-medium text-surface-on-variant mt-1 mb-3">{{ t('me.network.hint') }}</text>
+        <!-- 限流退避开关行（镜像 autoFallbackEngine 行逐字范式）：关闭后 429 立即报错零重试 -->
+        <view
+          class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant"
+          :accessibility-element="A11Y_ELEMENT_ENABLED"
+          :accessibility-label="ME_A11Y_LABELS.rateLimitBackoff"
+          @tap="toggleRateLimitBackoff"
+        >
+          <view class="flex flex-col">
+            <text class="text-title-medium text-surface-on">{{ t('me.network.backoff') }}</text>
+            <text class="text-label-medium text-surface-on-variant mt-0.5">{{ t('me.network.backoffDesc') }}</text>
+          </view>
+          <M3Switch
+            :checked="rateLimitBackoffEnabled"
+          />
+        </view>
+        <!-- 最大重试次数档位行（镜像 webdavAutoBackupDays chips 行；档位集 = 单一事实源常量） -->
+        <view class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant">
+          <text class="text-title-medium text-surface-on">{{ t('me.network.maxRetries') }}</text>
+          <view
+            class="flex flex-row gap-2"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.rateLimitMaxRetries"
+          >
+            <view
+              v-for="n in RATE_LIMIT_MAX_RETRIES_OPTIONS"
+              :key="n"
+              class="px-3 py-1 rounded-[var(--md-shape-full)]"
+              :class="rateLimitMaxRetries === n ? 'bg-primary' : 'bg-surface-container-high'"
+              @tap="pickRateLimitMaxRetries(n)"
+            >
+              <text class="text-label-medium" :class="rateLimitMaxRetries === n ? 'text-primary-on' : 'text-surface-on'">{{ n }}</text>
+            </view>
+          </view>
+        </view>
+        <!-- 初始等待档位行：毫秒档位按 delaySeconds 插值渲染秒数（500→0.5 … 5000→5） -->
+        <view class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant">
+          <text class="text-title-medium text-surface-on">{{ t('me.network.baseDelay') }}</text>
+          <view
+            class="flex flex-row gap-2"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.rateLimitBaseDelay"
+          >
+            <view
+              v-for="ms in RATE_LIMIT_BASE_DELAY_MS_OPTIONS"
+              :key="ms"
+              class="px-3 py-1 rounded-[var(--md-shape-full)]"
+              :class="rateLimitBaseDelayMs === ms ? 'bg-primary' : 'bg-surface-container-high'"
+              @tap="pickRateLimitBaseDelayMs(ms)"
+            >
+              <text class="text-label-medium" :class="rateLimitBaseDelayMs === ms ? 'text-primary-on' : 'text-surface-on'">{{ t('me.network.delaySeconds', { seconds: toSeconds(ms) }) }}</text>
+            </view>
+          </view>
+        </view>
+        <!-- 最长等待档位行：10/30/60 秒（末行不带分隔线，镜像客户端组末行收尾） -->
+        <view class="flex flex-row items-center justify-between py-3.5">
+          <text class="text-title-medium text-surface-on">{{ t('me.network.maxDelay') }}</text>
+          <view
+            class="flex flex-row gap-2"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ME_A11Y_LABELS.rateLimitMaxDelay"
+          >
+            <view
+              v-for="ms in RATE_LIMIT_MAX_DELAY_MS_OPTIONS"
+              :key="ms"
+              class="px-3 py-1 rounded-[var(--md-shape-full)]"
+              :class="rateLimitMaxDelayMs === ms ? 'bg-primary' : 'bg-surface-container-high'"
+              @tap="pickRateLimitMaxDelayMs(ms)"
+            >
+              <text class="text-label-medium" :class="rateLimitMaxDelayMs === ms ? 'text-primary-on' : 'text-surface-on'">{{ t('me.network.delaySeconds', { seconds: toSeconds(ms) }) }}</text>
+            </view>
+          </view>
+        </view>
       </view>
 
       <!-- 外观组（主题色）：色板类 .theme-* 定义在 tokens.css，根 <page> 应用即整体换色；

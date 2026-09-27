@@ -248,6 +248,15 @@ const enPages = {
   "me.client.fullscreenMode": "Fullscreen mode",
   "me.client.fullscreenModeDesc": "Hide status and navigation bars; swipe from the edge to reveal them",
   "me.client.effectiveState": "Preferred {{preferred}} · effective this launch {{effective}}",
+  // Network group in Me.vue (ADR-0199 D4 / #779): rate-limit backoff settings; delaySeconds renders chip seconds
+  "me.network.title": "Network",
+  "me.network.hint": "Automatically wait and retry when rate-limited by Pixiv",
+  "me.network.backoff": "Rate-limit backoff",
+  "me.network.backoffDesc": "Wait and retry automatically on HTTP 429; off fails immediately",
+  "me.network.maxRetries": "Max retries",
+  "me.network.baseDelay": "Initial delay",
+  "me.network.maxDelay": "Max delay",
+  "me.network.delaySeconds": "{{seconds}}s",
 
   // Notifications.vue (ADR-0188 / #728)
   "notifications.title": "Notifications",

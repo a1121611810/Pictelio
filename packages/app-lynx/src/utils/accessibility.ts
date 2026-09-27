@@ -77,6 +77,12 @@ export const ME_A11Y_LABELS = {
   autoFallbackEngine: '自动回退WebView开关',
   // 全屏模式开关（spec lynx-systembars D5：Me 客户端卡 M3 switch 行）
   fullscreenMode: '全屏模式开关',
+  // 网络组（ADR-0199 D4 / #779 T2：Me 网络卡组标题 + 限流退避开关行 + 三个档位行容器）
+  networkGroupTitle: '网络',
+  rateLimitBackoff: '限流退避',
+  rateLimitMaxRetries: '最大重试次数',
+  rateLimitBaseDelay: '初始等待',
+  rateLimitMaxDelay: '最长等待',
   // AI 作品三态过滤（ADR-0155）
   aiFilterShow: 'AI作品显示全部',
   aiFilterMask: 'AI作品遮罩',

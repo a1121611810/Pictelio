@@ -14,7 +14,13 @@
 import { ref, computed, watch } from "vue"
 import { defineStore } from "pinia"
 import { idbGet, idbSet, idbRemove } from "../utils/idbKV"
-import { getNativeModules, isNativeMode } from "../api/client"
+import { getNativeModules, isNativeMode, setRateLimitBackoffConfig } from "../api/client"
+import {
+  DEFAULT_RATE_LIMIT_BACKOFF_CONFIG,
+  RATE_LIMIT_BASE_DELAY_MS_OPTIONS,
+  RATE_LIMIT_MAX_DELAY_MS_OPTIONS,
+  RATE_LIMIT_MAX_RETRIES_OPTIONS,
+} from "../api/rateLimitBackoff"
 import { useAuthStore } from "./authStore"
 import { unquoteNativeString } from "../utils/tokenStorage"
 import { setLocale, followSystemLocale } from "../i18n"
@@ -114,6 +120,12 @@ const WEBDAV_AUTO_BACKUP_KEY = "settings_webdav_auto_backup"
 const WEBDAV_AUTO_BACKUP_DAYS_KEY = "settings_webdav_auto_backup_days"
 const WEBDAV_LAST_BACKUP_KEY = "settings_webdav_last_backup"
 const WEBDAV_EXCLUDED_KEYS_KEY = "settings_webdav_excluded_keys"
+/** 限流退避四参数（ADR-0199 D4 / #779 T2）：设备级键；档位集合单一事实源 = api/rateLimitBackoff.ts
+ *  （设置页只暴露效果类四参数，算法类参数不进设置页——ADR-0199 D3） */
+const RATE_LIMIT_BACKOFF_ENABLED_KEY = "settings_rate_limit_backoff_enabled"
+const RATE_LIMIT_MAX_RETRIES_KEY = "settings_rate_limit_max_retries"
+const RATE_LIMIT_BASE_DELAY_MS_KEY = "settings_rate_limit_base_delay_ms"
+const RATE_LIMIT_MAX_DELAY_MS_KEY = "settings_rate_limit_max_delay_ms"
 /** UI 语言（spec docs/specs/i18n.md §4.1）：设备级共享键，与 app i18n PREF_KEY_LANGUAGE 逐字一致；"" = 跟随系统 */
 const LANGUAGE_KEY = "settings_language"
 
@@ -148,6 +160,10 @@ export const BACKUP_DEVICE_KEYS = [
   WEBDAV_AUTO_BACKUP_DAYS_KEY,
   WEBDAV_LAST_BACKUP_KEY,
   WEBDAV_EXCLUDED_KEYS_KEY,
+  RATE_LIMIT_BACKOFF_ENABLED_KEY,
+  RATE_LIMIT_MAX_RETRIES_KEY,
+  RATE_LIMIT_BASE_DELAY_MS_KEY,
+  RATE_LIMIT_MAX_DELAY_MS_KEY,
 ] as const
 
 /** 备份域账号级键（spec §3.1；恢复按当前 uid 过滤，spec §6） */
@@ -346,6 +362,13 @@ export const useSettingsStore = defineStore("settings", () => {
   const _webdavLastBackup = ref("")
   const _webdavExcludedKeys = ref<string[]>([])
 
+  // 限流退避四参数（ADR-0199 D4）：设备级，默认 = DEFAULT_RATE_LIMIT_BACKOFF_CONFIG
+  //（enabled true / maxRetries 3 / baseDelayMs 1000 / maxDelayMs 30000）
+  const _rateLimitBackoffEnabled = ref(DEFAULT_RATE_LIMIT_BACKOFF_CONFIG.enabled)
+  const _rateLimitMaxRetries = ref(DEFAULT_RATE_LIMIT_BACKOFF_CONFIG.maxRetries)
+  const _rateLimitBaseDelayMs = ref(DEFAULT_RATE_LIMIT_BACKOFF_CONFIG.baseDelayMs)
+  const _rateLimitMaxDelayMs = ref(DEFAULT_RATE_LIMIT_BACKOFF_CONFIG.maxDelayMs)
+
   // ── 跨 store 组合：读 authStore.currentUser.id 推导 uid（替换原模块级 currentUser import）
   const auth = useAuthStore()
   /** 当前账号 ID（未登录 null）——登出由下方 watch 兜底重置 refs */
@@ -401,6 +424,10 @@ export const useSettingsStore = defineStore("settings", () => {
   const webdavAutoBackupDays = _webdavAutoBackupDays
   const webdavLastBackup = _webdavLastBackup
   const webdavExcludedKeys = _webdavExcludedKeys
+  const rateLimitBackoffEnabled = _rateLimitBackoffEnabled
+  const rateLimitMaxRetries = _rateLimitMaxRetries
+  const rateLimitBaseDelayMs = _rateLimitBaseDelayMs
+  const rateLimitMaxDelayMs = _rateLimitMaxDelayMs
 
   // ── 公共 actions（return）──
 
@@ -652,6 +679,55 @@ export const useSettingsStore = defineStore("settings", () => {
       }
     } catch (e) {
       console.warn("[settingsStore] WebDAV 连接配置加载失败（维持默认）", e)
+    }
+
+    // 限流退避四参数（ADR-0199 D4 / #779 T2）：设备级，未登录也恢复。
+    // enabled 只认 "true"/"false"；maxRetries 只认整数 0–5（Number 判定，同 webdav days 范式）；
+    // 两个 delay 只认对应档位常量成员（非法/IO 失败 → warn + 维持默认，禁静默降级）。
+    // 装载完成后一次注入 client（setRateLimitBackoffConfig，从四 ref 组装）即时生效。
+    try {
+      const p = prefs()
+      const backoffEnabled = await p.get(RATE_LIMIT_BACKOFF_ENABLED_KEY)
+      if (backoffEnabled === "true") _rateLimitBackoffEnabled.value = true
+      else if (backoffEnabled === "false") _rateLimitBackoffEnabled.value = false
+      else if (backoffEnabled !== null) {
+        console.warn("[settingsStore] 限流退避开关值非法，维持默认 true:", backoffEnabled)
+      }
+      const maxRetries = await p.get(RATE_LIMIT_MAX_RETRIES_KEY)
+      if (maxRetries !== null) {
+        const n = Number(maxRetries)
+        if (Number.isInteger(n) && (RATE_LIMIT_MAX_RETRIES_OPTIONS as readonly number[]).includes(n)) {
+          _rateLimitMaxRetries.value = n
+        } else {
+          console.warn("[settingsStore] 限流退避最大重试次数非法，维持默认 3:", maxRetries)
+        }
+      }
+      const baseDelay = await p.get(RATE_LIMIT_BASE_DELAY_MS_KEY)
+      if (baseDelay !== null) {
+        const n = Number(baseDelay)
+        if (Number.isInteger(n) && (RATE_LIMIT_BASE_DELAY_MS_OPTIONS as readonly number[]).includes(n)) {
+          _rateLimitBaseDelayMs.value = n
+        } else {
+          console.warn("[settingsStore] 限流退避初始等待非法，维持默认 1000:", baseDelay)
+        }
+      }
+      const maxDelay = await p.get(RATE_LIMIT_MAX_DELAY_MS_KEY)
+      if (maxDelay !== null) {
+        const n = Number(maxDelay)
+        if (Number.isInteger(n) && (RATE_LIMIT_MAX_DELAY_MS_OPTIONS as readonly number[]).includes(n)) {
+          _rateLimitMaxDelayMs.value = n
+        } else {
+          console.warn("[settingsStore] 限流退避最长等待非法，维持默认 30000:", maxDelay)
+        }
+      }
+      setRateLimitBackoffConfig({
+        enabled: _rateLimitBackoffEnabled.value,
+        maxRetries: _rateLimitMaxRetries.value,
+        baseDelayMs: _rateLimitBaseDelayMs.value,
+        maxDelayMs: _rateLimitMaxDelayMs.value,
+      })
+    } catch (e) {
+      console.warn("[settingsStore] 限流退避设置加载失败（维持默认）", e)
     }
 
     const id = uid()
@@ -1132,6 +1208,50 @@ export const useSettingsStore = defineStore("settings", () => {
       .catch((e) => console.warn("[settingsStore] WebDAV 排除清单写入失败", e))
   }
 
+  // ── 限流退避四参数 actions（ADR-0199 D4 / #779 T2）：写内存 + 落盘 + 组装注入 client 即时生效 ──
+
+  /** 组装四 ref 重注入 client（任意一参数变更后的统一注入点；与 loadSettings 末尾同构） */
+  function applyRateLimitBackoffConfig(): void {
+    setRateLimitBackoffConfig({
+      enabled: _rateLimitBackoffEnabled.value,
+      maxRetries: _rateLimitMaxRetries.value,
+      baseDelayMs: _rateLimitBaseDelayMs.value,
+      maxDelayMs: _rateLimitMaxDelayMs.value,
+    })
+  }
+
+  function setRateLimitBackoffEnabled(enabled: boolean): void {
+    _rateLimitBackoffEnabled.value = enabled
+    void prefs()
+      .set(RATE_LIMIT_BACKOFF_ENABLED_KEY, String(enabled))
+      .catch((e) => console.warn("[settingsStore] 限流退避开关写入失败", e))
+    applyRateLimitBackoffConfig()
+  }
+
+  function setRateLimitMaxRetries(retries: number): void {
+    _rateLimitMaxRetries.value = retries
+    void prefs()
+      .set(RATE_LIMIT_MAX_RETRIES_KEY, String(retries))
+      .catch((e) => console.warn("[settingsStore] 限流退避最大重试次数写入失败", e))
+    applyRateLimitBackoffConfig()
+  }
+
+  function setRateLimitBaseDelayMs(ms: number): void {
+    _rateLimitBaseDelayMs.value = ms
+    void prefs()
+      .set(RATE_LIMIT_BASE_DELAY_MS_KEY, String(ms))
+      .catch((e) => console.warn("[settingsStore] 限流退避初始等待写入失败", e))
+    applyRateLimitBackoffConfig()
+  }
+
+  function setRateLimitMaxDelayMs(ms: number): void {
+    _rateLimitMaxDelayMs.value = ms
+    void prefs()
+      .set(RATE_LIMIT_MAX_DELAY_MS_KEY, String(ms))
+      .catch((e) => console.warn("[settingsStore] 限流退避最长等待写入失败", e))
+    applyRateLimitBackoffConfig()
+  }
+
   /**
    * 遮罩判定：该条目是否因 R18/R18G 开关处于受限态（issue #91：过滤 → 遮罩）。
    * 纯函数，读 ref —— 开关切换后所有依赖处即时重算，无需重新请求。
@@ -1344,6 +1464,34 @@ export const useSettingsStore = defineStore("settings", () => {
           return false
         }
       }
+      case RATE_LIMIT_BACKOFF_ENABLED_KEY:
+        if (raw !== "true" && raw !== "false") return false
+        setRateLimitBackoffEnabled(raw === "true")
+        return true
+      case RATE_LIMIT_MAX_RETRIES_KEY: {
+        const n = Number(raw)
+        if (!Number.isInteger(n) || !(RATE_LIMIT_MAX_RETRIES_OPTIONS as readonly number[]).includes(n)) {
+          return false
+        }
+        setRateLimitMaxRetries(n)
+        return true
+      }
+      case RATE_LIMIT_BASE_DELAY_MS_KEY: {
+        const n = Number(raw)
+        if (!Number.isInteger(n) || !(RATE_LIMIT_BASE_DELAY_MS_OPTIONS as readonly number[]).includes(n)) {
+          return false
+        }
+        setRateLimitBaseDelayMs(n)
+        return true
+      }
+      case RATE_LIMIT_MAX_DELAY_MS_KEY: {
+        const n = Number(raw)
+        if (!Number.isInteger(n) || !(RATE_LIMIT_MAX_DELAY_MS_OPTIONS as readonly number[]).includes(n)) {
+          return false
+        }
+        setRateLimitMaxDelayMs(n)
+        return true
+      }
       default:
         break
     }
@@ -1410,6 +1558,10 @@ export const useSettingsStore = defineStore("settings", () => {
     webdavAutoBackupDays,
     webdavLastBackup,
     webdavExcludedKeys,
+    rateLimitBackoffEnabled,
+    rateLimitMaxRetries,
+    rateLimitBaseDelayMs,
+    rateLimitMaxDelayMs,
     // actions
     loadSettings,
     setShowR18,
@@ -1440,6 +1592,10 @@ export const useSettingsStore = defineStore("settings", () => {
     setWebdavAutoBackupDays,
     setWebdavLastBackup,
     setWebdavExcludedKeys,
+    setRateLimitBackoffEnabled,
+    setRateLimitMaxRetries,
+    setRateLimitBaseDelayMs,
+    setRateLimitMaxDelayMs,
     exportRawValues,
     importRawValues,
     isRestricted,
