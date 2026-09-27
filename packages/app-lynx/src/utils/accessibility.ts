@@ -95,6 +95,7 @@ export const ME_A11Y_LABELS = {
   themeColorGreen: '主题色松柏绿',
   themeColorOrange: '主题色落日橙',
   themeColorTeal: '主题色深青',
+  themeColorBili: '主题色哔哩粉',
   languageFollowSystem: '界面语言跟随系统',
   languageZh: '界面语言简体中文',
   languageEn: '界面语言English',
