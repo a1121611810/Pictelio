@@ -434,6 +434,79 @@ describe("client 429 限流退避（web 模式接线，ADR-0199 D5）", () => {
   })
 })
 
+// ─── 退避等待期 abort 取消（ADR-0199 D5：GET 路径 signal 透传 = vue-query queryFn 生产主路径）───
+// 生产上 queryFn 把 AbortSignal 一路透传到 client.get → 组件卸载/参数变更即取消，
+// 因此「等待期取消」是常态路径而非边角。断言口径两条：
+//   1) 拒因 = abort 语义（透传 signal.reason），且不得被 execute 的 catch 归类成 NETWORK ApiError；
+//   2) fetch 调用次数 = 取消后不得再重试（含推进远超名义窗口后仍不重试）。
+// 观测用 fake timers：random 钉 0.5 → 默认档 base=1000 首次退避名义 500ms，
+// 推进 100ms 即确认「已进入等待窗口且未到期」（不依赖真实等待）。
+describe("client 429 退避等待期 abort（web 模式，signal 透传）", () => {
+  const fetchMock = vi.fn()
+  let warnSpy: MockInstance
+  let randomSpy: MockInstance
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    setOnUnauthorized(null)
+    setAuthPermanentFailure(false)
+    setAccessToken("web-token")
+    vi.stubGlobal("fetch", fetchMock)
+    vi.stubGlobal("NativeModules", undefined) // 无原生模块 → isNativeMode false
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.5) // 首次退避名义 = 0.5 × 1000 = 500ms
+  })
+  afterEach(() => {
+    randomSpy.mockRestore() // 防影响后续用例的退避窗口推算
+    warnSpy.mockRestore()
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it("退避等待中 abort → 立即 reject（abort 语义、非 NETWORK）、fetch 恰 1 次；推进远超窗口仍不重试", async () => {
+    vi.useFakeTimers()
+    fetchMock.mockResolvedValue(jsonResponse(429))
+    const controller = new AbortController()
+    const p = probe(apiClient.get("/v1/illust/recommended", undefined, controller.signal))
+    await vi.advanceTimersByTimeAsync(0) // 首个 429 归因落定 → 退避 sleep 进入等待窗口
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(100) // 窗口内推进 100ms（< 名义 500ms）：仍在等待，未重试
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    controller.abort()
+    await vi.advanceTimersByTimeAsync(0)
+    const out = await p
+    expect(out.ok).toBe(false)
+    if (out.ok) return
+    // 拒因 = abort 语义：透传 signal.reason；不得被归类成 ApiError（那会污染 UI 的错误文案）
+    expect(String(out.e)).toMatch(/abort/i)
+    expect((out.e as ApiError).type).toBeUndefined()
+    expect(vi.getTimerCount()).toBe(0) // 取消即清理等待定时器，无残留
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    // 推进远超退避窗口（3 次重试名义上界 500+1000+2000ms，封顶 30s）→ 取消后一次都不再发
+    await vi.advanceTimersByTimeAsync(120_000)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("请求前已 abort 的 signal → 首个 429 后立即 reject、fetch 恰 1 次、零定时器残留", async () => {
+    vi.useFakeTimers()
+    // mock fetch 不实现 signal 语义（首个请求照发并返回 429）——本用例考验的是退避层：
+    // 先验已 abort 必须在进入等待前短路，不得挂定时器、不得重试。
+    fetchMock.mockResolvedValue(jsonResponse(429))
+    const controller = new AbortController()
+    controller.abort() // 请求发起前已取消（defaultSleep 的 signal.aborted 早退分支）
+    const p = probe(apiClient.get("/v1/illust/recommended", undefined, controller.signal))
+    await vi.advanceTimersByTimeAsync(0)
+    const out = await p
+    expect(out.ok).toBe(false)
+    if (out.ok) return
+    expect(String(out.e)).toMatch(/abort/i)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(vi.getTimerCount()).toBe(0) // 早退分支不注册等待定时器
+    await vi.advanceTimersByTimeAsync(120_000)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe("client 429 限流退避（原生模式接线，PictelioApi 回调契约）", () => {
   let warnSpy: MockInstance
 
