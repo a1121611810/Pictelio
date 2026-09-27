@@ -10,6 +10,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { ILLUST_DETAIL_A11Y_LABELS } from '../utils/accessibility'
 
 const src = readFileSync(fileURLToPath(new URL('./IllustDetail.vue', import.meta.url)), 'utf8')
 /** 去 HTML 注释与整行行注释（约束说明会提到目标串，断言须落在代码本文上） */
@@ -80,5 +81,47 @@ describe('IllustDetail 下载入队命名接线（ADR-0192 D7 / spec D6：模板
     // 与 downloadByAuthorDir 同一读取点；缺一即为半交付（模板设置形同虚设）
     expect((code.match(/template: settings\.downloadFileTemplate/g) ?? []).length).toBe(2)
     expect((code.match(/authorDir: settings\.downloadByAuthorDir/g) ?? []).length).toBe(2)
+  })
+})
+
+// ─── 标签近邻入口接线（ADR-0197 D14 / spec docs/specs/tag-neighbors.md user story 1/2）───
+// 期望值出处：ADR-0197 D14「入口为作品详情页动作行新增一项，作用于作品级」；
+// user story 2「与既有的保存/评论/稍后看并排出现在动作行里」。
+// a11y 键消费完整性沿 ME_A11Y_LABELS / NOTIFICATIONS_A11Y_LABELS 的既有约定。
+describe('IllustDetail 标签近邻入口（ADR-0197 D14）', () => {
+  it('入口与其它作品级动作同处一个动作行容器', () => {
+    // 位置断言：以动作行的开启标签为界，入口须落在「保存 / 评论 / 稍后看」之后
+    const actionRow = code.indexOf('class="mt-2 flex flex-row items-center flex-wrap"')
+    expect(actionRow).toBeGreaterThan(-1)
+    const entry = code.indexOf('@tap.stop="openTagNeighbors"')
+    expect(entry).toBeGreaterThan(actionRow)
+    // 三项既有动作都在入口之前
+    expect(code.indexOf('@tap="onSaveEntry"')).toBeLessThan(entry)
+    expect(code.indexOf('@tap.stop="toggleWatchLater"')).toBeLessThan(entry)
+  })
+
+  it('动作行必须允许换行：5 项在 360dp 宽机型上放不下，不 wrap 会压缩并折行', () => {
+    // 真机走查实证（pictelio_ui 模拟器 1080x2160）：加第 5 项后单行 flex 子项被压缩，
+    // 中文标签与收藏数一起折行（「标签近邻」→「标签近/邻」、收藏数「349」→「34/9」）。
+    expect(code).toContain('class="mt-2 flex flex-row items-center flex-wrap"')
+    expect(code).not.toContain('class="mt-2 flex flex-row items-center"')
+  })
+
+  it('跳转前先写入源作品，且用全量 tags 而非模板截断数组', () => {
+    expect(code).toContain('tagNeighbors.setSourceIllust(illust.value)')
+    expect(code).toContain('navigate(`/illust/${illust.value.id}/tag-neighbors`)')
+    // 模板渲染用 slice(0, 8)；近邻计算必须用全量 illust 对象本身
+    expect(code).not.toContain('setSourceIllust(workTags')
+  })
+
+  it('a11y 注册表键全部被消费且 label/element 配平', () => {
+    expect(ILLUST_DETAIL_A11Y_LABELS.tagNeighborsEntry).toBe('查看标签近邻作品')
+    for (const key of Object.keys(ILLUST_DETAIL_A11Y_LABELS)) {
+      expect(code).toContain(`:accessibility-label="ILLUST_DETAIL_A11Y_LABELS.${key}"`)
+    }
+    const labelCount = (code.match(/:accessibility-label="ILLUST_DETAIL_A11Y_LABELS\.\w+"/g) ?? []).length
+    const elementCount = (code.match(/:accessibility-element="A11Y_ELEMENT_ENABLED"/g) ?? []).length
+    expect(labelCount).toBe(Object.keys(ILLUST_DETAIL_A11Y_LABELS).length)
+    expect(elementCount).toBe(labelCount)
   })
 })

@@ -34,6 +34,21 @@ const enPages = {
   "illustDetail.save.queued": "Added {{count}} items to the download queue (see Downloads)",
   "illustDetail.save.ugoiraInfoFailed": "Could not load ugoira info",
 
+  // Tag neighbors (ADR-0197 / spec docs/specs/tag-neighbors.md)
+  "tagNeighbors.entry": "Similar by tags",
+  "tagNeighbors.title": "Similar by tags",
+  "tagNeighbors.similarity": "{{score}} match",
+  "tagNeighbors.commonTags": "{{common}}/{{total}} shared tags",
+  "tagNeighbors.source.author": "Same artist",
+  "tagNeighbors.source.sitewide": "Site-wide",
+  "tagNeighbors.skip.tooFewTags": "This artwork has only 1 tag, so similarity cannot be compared. Searched site-wide instead.",
+  "tagNeighbors.empty": "No similar artworks found",
+  "tagNeighbors.gated": "{{count}} item(s) hidden by your content and muted-tag settings",
+  "tagNeighbors.retry": "Retry",
+  "tagNeighbors.broadening": "Broadening the tag range…",
+  "tagNeighbors.broadeningDone": "Searched site-wide with {{count}} tags",
+  "tagNeighbors.broadeningDismiss": "Don't show again",
+
   // Watch Later (ADR-0191 / #751 T3 / #753 T4): shared by illust detail + novel intro entries
   "later.action.add": "Watch Later",
   "later.action.added": "In Watch Later",

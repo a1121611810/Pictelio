@@ -39,6 +39,8 @@ const FILES = [
   '../pages/MyPixiv.vue',
   '../components/CommentOverlay.vue',
   '../components/SearchSheet.vue',
+  // 标签近邻结果页（ADR-0197 D9 / #767 T2）：网络首载页，纳入同一三态防线
+  '../pages/TagNeighbors.vue',
 ]
 
 describe('页级首载骨架 跨页接线（ADR-0150 / T5 #436）', () => {

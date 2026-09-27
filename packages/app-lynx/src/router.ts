@@ -58,6 +58,7 @@ import WatchLater from './pages/WatchLater.vue'
 import MyPixiv from './pages/MyPixiv.vue'
 import Notifications from './pages/Notifications.vue'
 import MuteTags from './pages/MuteTags.vue'
+import TagNeighbors from './pages/TagNeighbors.vue'
 import DownloadManager from './pages/DownloadManager.vue'
 import NetworkCheck from './pages/NetworkCheck.vue'
 import Ranking from './pages/Ranking.vue'
@@ -98,6 +99,9 @@ export const routes: RouteRecordRaw[] = [
   { path: '/mypixiv', name: 'mypixiv', component: MyPixiv, meta: { requiresAuth: true } },
   // 静音标签管理页（ADR-0187 D5 / #732）：次级业务页，Me 内容组入口行进入
   { path: '/mute-tags', name: 'mute-tags', component: MuteTags, meta: { requiresAuth: true } },
+  // 标签近邻结果页（ADR-0197 D14 / #767 T2）：作品详情页动作行进入的次级业务页。
+  // 作品级能力，故挂在 /illust/:id 之下（多图作品不引入「当前页」概念，标签是作品级的）。
+  { path: '/illust/:id/tag-neighbors', name: 'tag-neighbors', component: TagNeighbors, meta: { requiresAuth: true } },
   { path: '/ranking', name: 'ranking', component: Ranking, meta: { requiresAuth: true } },
   { path: '/downloads', name: 'downloads', component: DownloadManager, meta: { requiresAuth: true } },
   { path: '/update', name: 'update', component: UpdatePage, meta: { backBehavior: 'exit' } },
