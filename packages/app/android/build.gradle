@@ -5,12 +5,16 @@
 // - JDK 21 在 Gradle 9.6.1（JDK 17-26）和 AGP 9.2.1 上均完全支持
 // - 升级参考：https://developer.android.com/build/releases/gradle-plugin#agp-gradle-compatibility
 
+// 阿里云镜像仅本地构建注册（CI 不注册）：镜像在 GitHub 美区 runner 上偶发不可达，
+// 且 Gradle 对已注册仓库的网络错误是硬失败、不会回退到后面的官方源
+// （实证 run 36239607963 2026-09-26）。两处内联判断：buildscript 块先于文件级 def 求值，无法引用。
 buildscript {
-    
+
     repositories {
-        // 国内镜像（阿里云），加速依赖下载，失败时回退到官方源
-        maven { url 'https://maven.aliyun.com/repository/public' }
-        maven { url 'https://maven.aliyun.com/repository/google' }
+        if (System.getenv('GITHUB_ACTIONS') != 'true') {
+            maven { url 'https://maven.aliyun.com/repository/public' }
+            maven { url 'https://maven.aliyun.com/repository/google' }
+        }
         google()
         mavenCentral()
     }
@@ -27,9 +31,10 @@ apply from: "variables.gradle"
 
 allprojects {
     repositories {
-        // 国内镜像（阿里云），加速依赖下载，失败时回退到官方源
-        maven { url 'https://maven.aliyun.com/repository/public' }
-        maven { url 'https://maven.aliyun.com/repository/google' }
+        if (System.getenv('GITHUB_ACTIONS') != 'true') {
+            maven { url 'https://maven.aliyun.com/repository/public' }
+            maven { url 'https://maven.aliyun.com/repository/google' }
+        }
         google()
         mavenCentral()
     }
