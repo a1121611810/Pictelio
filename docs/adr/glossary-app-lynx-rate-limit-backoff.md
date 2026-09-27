@@ -29,7 +29,7 @@
 ## 行为语义
 
 - 退避**只由 429 触发**。NETWORK（无响应）/ SERVER（5xx）不自动重试（维持既有「用户感知错误、手动重试」口径）；UNAUTHORIZED 走既有 401 刷新单飞（`execWithAuthRetry`），与本域正交组合（先鉴权重放、后限流退避由内向外各自生效）。
-- 退避等待期间 `AbortSignal` 取消 → 立即中止，不再重试；无 signal 的请求等待到底。GET 去重共享同一 promise = 共享同一次退避过程（不会 N 个调用方各退各的）。
+- 退避等待期间 `AbortSignal` 取消 → 立即中止，不再重试；无 signal 的请求等待到底。GET 去重（**无 signal 的调用**）共享同一 promise = 共享同一次退避过程，不放大请求量；带 signal 的调用不参与去重（共享 promise 会让一方 abort 取消所有人），各自独立退避。
 - 退避耗尽后抛出的仍是 `RATE_LIMIT` 终态 `ApiError`（附加实际重试次数），UI 文案与现状同源，仅日志可见重试轨迹（`console.warn`，模块前缀 `[client]`）。
 - 参数持久化为设备级键 `settings_rate_limit_*`（native SharedPreferences "CapacitorStorage" / dev IndexedDB，经 `prefs()` seam），进 WebDAV 备份域；装载遇非法值 `console.warn` + 维持默认（禁静默降级，测试硬约束 #3）。
 

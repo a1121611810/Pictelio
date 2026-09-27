@@ -682,7 +682,8 @@ export const useSettingsStore = defineStore("settings", () => {
     }
 
     // 限流退避四参数（ADR-0199 D4 / #779 T2）：设备级，未登录也恢复。
-    // enabled 只认 "true"/"false"；maxRetries 只认整数 0–5（Number 判定，同 webdav days 范式）；
+    // enabled 只认 "true"/"false"；maxRetries 只认整数 0–5（Number 判定，同 webdav days 范式；
+    // 空串/纯空白先拒——Number("") === 0 恰是合法档位，须显式排除）；
     // 两个 delay 只认对应档位常量成员（非法/IO 失败 → warn + 维持默认，禁静默降级）。
     // 装载完成后一次注入 client（setRateLimitBackoffConfig，从四 ref 组装）即时生效。
     try {
@@ -696,7 +697,13 @@ export const useSettingsStore = defineStore("settings", () => {
       const maxRetries = await p.get(RATE_LIMIT_MAX_RETRIES_KEY)
       if (maxRetries !== null) {
         const n = Number(maxRetries)
-        if (Number.isInteger(n) && (RATE_LIMIT_MAX_RETRIES_OPTIONS as readonly number[]).includes(n)) {
+        // trim 后为空先拒（ADR-0199 D4）：Number("") === 0 且 0 是合法档位——不拒则
+        // 损坏值（空串/纯空白）被静默判为「零重试」档，绕过下方 warn（硬约束 #3 禁静默降级）
+        if (
+          maxRetries.trim() !== "" &&
+          Number.isInteger(n) &&
+          (RATE_LIMIT_MAX_RETRIES_OPTIONS as readonly number[]).includes(n)
+        ) {
           _rateLimitMaxRetries.value = n
         } else {
           console.warn("[settingsStore] 限流退避最大重试次数非法，维持默认 3:", maxRetries)
@@ -1469,6 +1476,9 @@ export const useSettingsStore = defineStore("settings", () => {
         setRateLimitBackoffEnabled(raw === "true")
         return true
       case RATE_LIMIT_MAX_RETRIES_KEY: {
+        // trim 后为空先拒（ADR-0199 D4）：Number("") === 0 且 0 是合法档位——不拒则
+        // 空串被静默应用为零重试档（硬约束 #3 禁静默降级；与装载块同口径）
+        if (raw.trim() === "") return false
         const n = Number(raw)
         if (!Number.isInteger(n) || !(RATE_LIMIT_MAX_RETRIES_OPTIONS as readonly number[]).includes(n)) {
           return false

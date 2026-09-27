@@ -2407,4 +2407,74 @@ describe("settingsStore.rateLimitBackoff（ADR-0199 D4）", () => {
     expect([...RATE_LIMIT_BASE_DELAY_MS_OPTIONS]).toEqual([500, 1000, 2000, 5000])
     expect([...RATE_LIMIT_MAX_DELAY_MS_OPTIONS]).toEqual([10000, 30000, 60000])
   })
+
+  // ── nit-4（校验边角）：Number("") === 0 且 0 是 max_retries 合法档位 —— 空串/纯空白
+  //    必须先拒，否则损坏值被静默判为「零重试」档、绕过 warn 约定（硬约束 #3 禁静默降级）。
+  //    触发面：手工构造的备份文件 / 存储损坏（键存在但值为空）。
+  it("loadSettings 空串 max_retries → warn + 维持默认 3（不得静默判为档位 0）", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    prefsModule(new Map<string, string>([["settings_rate_limit_max_retries", ""]]))
+    await store.loadSettings()
+    expect(store.rateLimitMaxRetries).toBe(3)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("最大重试次数非法"), "")
+    // 未覆盖 ref → 注入的仍是默认配置（非零重试档）
+    expect(setRateLimitBackoffConfigMock).toHaveBeenLastCalledWith(DEFAULT_RATE_LIMIT_BACKOFF_CONFIG)
+    warn.mockRestore()
+  })
+
+  it("loadSettings 纯空白 max_retries（\"  \"）→ warn + 维持默认 3（与空串同口径）", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    prefsModule(new Map<string, string>([["settings_rate_limit_max_retries", "  "]]))
+    await store.loadSettings()
+    expect(store.rateLimitMaxRetries).toBe(3)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("最大重试次数非法"), "  ")
+    warn.mockRestore()
+  })
+
+  it("importRawValues：空串 max_retries 进 skipped（不得 applied 为零重试档）", async () => {
+    prefsModule(new Map<string, string>())
+    const res = await store.importRawValues({ settings_rate_limit_max_retries: "" })
+    expect(res.skipped).toContain("settings_rate_limit_max_retries")
+    expect(res.applied).not.toContain("settings_rate_limit_max_retries")
+    expect(store.rateLimitMaxRetries).toBe(3)
+    // 未应用 → 不触发组装注入（本机现状零改动）
+    expect(setRateLimitBackoffConfigMock).not.toHaveBeenCalled()
+  })
+
+  it("importRawValues：纯空白 max_retries 进 skipped（与空串同口径）", async () => {
+    prefsModule(new Map<string, string>())
+    const res = await store.importRawValues({ settings_rate_limit_max_retries: "  " })
+    expect(res.skipped).toContain("settings_rate_limit_max_retries")
+    expect(store.rateLimitMaxRetries).toBe(3)
+  })
+
+  // base/max delay 现状钉住：Number("") === 0 不在各自档位集（base 无 0 / max 无 0）→ 天然拒绝。
+  // 若未来档位集纳入 0，本组用例立即失败示警：需与 max_retries 同法加 trim 前置守卫。
+  it("loadSettings 空串 base/max delay → 天然拒绝（0 不在档位集）+ warn + 维持默认", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    prefsModule(
+      new Map<string, string>([
+        ["settings_rate_limit_base_delay_ms", ""],
+        ["settings_rate_limit_max_delay_ms", "  "],
+      ]),
+    )
+    await store.loadSettings()
+    expect(store.rateLimitBaseDelayMs).toBe(1000)
+    expect(store.rateLimitMaxDelayMs).toBe(30000)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("初始等待非法"), "")
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("最长等待非法"), "  ")
+    warn.mockRestore()
+  })
+
+  it("importRawValues：空串 base/max delay 进 skipped（天然拒绝，现状钉住）", async () => {
+    prefsModule(new Map<string, string>())
+    const res = await store.importRawValues({
+      settings_rate_limit_base_delay_ms: "",
+      settings_rate_limit_max_delay_ms: "  ",
+    })
+    expect(res.skipped).toContain("settings_rate_limit_base_delay_ms")
+    expect(res.skipped).toContain("settings_rate_limit_max_delay_ms")
+    expect(store.rateLimitBaseDelayMs).toBe(1000)
+    expect(store.rateLimitMaxDelayMs).toBe(30000)
+  })
 })

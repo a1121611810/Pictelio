@@ -34,7 +34,7 @@ app-lynx 的 Pixiv API 客户端（`packages/app-lynx/src/api/client.ts`）已�
 | 键 | 默认 | 允许值 |
 |---|---|---|
 | `settings_rate_limit_backoff_enabled` | `true` | `true` / `false` |
-| `settings_rate_limit_max_retries` | `3` | 整数 0–5 |
+| `settings_rate_limit_max_retries` | `3` | 整数 0–5（空串/纯空白视为非法——`Number("") === 0` 恰是合法档位，须显式排除） |
 | `settings_rate_limit_base_delay_ms` | `1000` | `500` / `1000` / `2000` / `5000` |
 | `settings_rate_limit_max_delay_ms` | `30000` | `10000` / `30000` / `60000`（档位恒 ≥ base 档位，无倒挂） |
 
@@ -53,11 +53,12 @@ app-lynx 的 Pixiv API 客户端（`packages/app-lynx/src/api/client.ts`）已�
 
 | # | 风险 | 处置 |
 |---|------|------|
-| R1 | 退避重试加剧限流（重试风暴） | full jitter 打散 + maxRetries 上限（最坏单请求 4 次尝试）+ maxDelay 封顶三重防；GET 去重保证并发调用方共享同一退避 |
+| R1 | 退避重试加剧限流（重试风暴） | full jitter 打散 + maxRetries 上限（最坏单请求 4 次尝试）+ maxDelay 封顶三重防；GET 去重让**无 signal 的**并发调用方共享同一退避（带 signal 的调用不参与去重——共享 promise 会让一方 abort 取消所有人，属既有取舍；此类调用各自独立退避） |
 | R2 | 弱网/被限流时请求「变慢」的感知 | 等待只发生在 429（服务端明确要求等待）；`enabled` 开关一键回现状；耗尽后错误信息带实际重试次数，UI 可解释 |
 | R3 | POST 重放的副作用疑虑 | 429 意味着请求未达业务层，无副作用可言；401 对 POST 重放（`execWithAuthRetry`）已是既有先例 |
 | R4 | 设置误配（如 0 次重试） | 全部为离散档位选择（无自由输入），装载校验 warn + 维持默认；`maxDelay` 档位集恒 ≥ `baseDelay` 档位集，无倒挂配置 |
 | R5 | 原生通道 Java 侧行为漂移 | 本 effort 零 Java 改动（原生回调契约不动）；429 在 Java 侧按现状透传 status |
+| R6 | `AbortSignal.reason`（退避等待取消拒因）为 lynx 运行时平台面，无设备取证 | 已用 `?? new Error("aborted")` 兜底（最坏退化为通用拒因，行为不破）；`addEventListener("abort")` 有在仓先例（updateStore / nativeTranslate）。下次设备 spike 补一句取证，或删 `.reason` 直用兜底 |
 
 ## Future work（不在本 ADR 承诺）
 
