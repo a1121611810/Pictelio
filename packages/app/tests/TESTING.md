@@ -62,6 +62,13 @@ expect(pressed).toBe("true");
 4. **重构行为不变约束**：重构中涉及字段名、常量、默认值改动时，必须检查对应契约测试是否存在（缺失则补上），并在 commit message 标注行为变化点。
 5. **期望值出处可追溯（oracle 溯源，对应 AGENTS.md 硬约束 #6）**：测试断言的期望值必须能指向独立来源——规格/验收样例、真实数据/字面量、独立实现（差分测试）、性质/不变量；禁止从被测实现反推、自洽 mock 推导或同义反复重算。建议在测试文件头注释注明期望值来源。执行机制：仓库级 `.agents/skills/code-review/SKILL.md` 在 code-review 的 Spec 轴强制 Oracle check 与 Test strength（依据 `docs/research/ai-generated-test-quality.md`）。
 
+6. **异步测试确定性（时序 flaky 防线，app 与 app-lynx 两包适用）**〔本详版新增条目：AGENTS.md「测试硬约束」摘要尚未收录；且本文件与摘要的编号存在既有偏移（本文件 #5 = 摘要 #6），引用时以条文内容为准〕：单测禁止用固定墙钟等待做同步——`await new Promise((r) => setTimeout(r, N))` 这类「睡一觉再断言」在负载下必然被击穿（真实 I/O 先于断言发生的时间不可预测，CI runner 的过订阅量级尤甚）。三条硬要求：
+   - **等条件，不等时间**：用 `vi.waitFor(() => expect(...))` 等被观测事实发生（仓内范式：`notificationStore.test.ts`、`settingsStore.test.ts`）。负向断言（「不得写入 / 不得调用」）必须挂在**确定发生的事件**之后（例如消费方再次索取下一帧、状态已收敛），否则断言的实际是「还没轮到」。
+   - **失败路径必须收尾**：涉及 in-flight 异步的用例用 `try/finally` 结束挂起迭代器、`await` 在飞 promise。断言失败即泄漏的 invocation 会在**下一个用例**的窗口里继续跑，制造与被测代码无关的失败——这是跨用例污染型 flaky 的通用成因，也是「失败信息与真实缺陷对不上」的常见来源。
+   - **计数断言按标识映射**：并发 mock 的分发按业务标识（如 chapterId）而非调用序号。序号映射（「第 1 次给 A、其余给 B」）会把多余的第 N 次调用静默派给最后一个分支，使「多调一次」只表现为计数差、难以归因。
+   - **防线先例**：`packages/app-lynx/tests/unit/stores/novelTranslateStore.test.ts` 的 `describe.each` 时序档（正常 + 「provider 前 I/O 慢 250ms」恶意档）——恶意档常驻运行，把上述写法变成确定性红灯，而不是等 CI 偶发。诊断与复现方法见 `docs/research/flaky-novel-translate-store-diagnosis.md`。
+   - **存量**：本条为新增禁令，仓内仍有未清存量（例如 #758 收口范围外的固定墙钟等待，见 #761 清单）；新增/改动用例一律按本条执行，存量按清单排期。
+
 ### E2E 状态构造基建（driver）
 
 依赖外部状态（如更新弹窗需要远端版本更高）的路径，通过页面级注入构造状态，不依赖真实网络：
