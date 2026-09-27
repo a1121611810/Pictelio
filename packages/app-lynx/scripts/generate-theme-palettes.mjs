@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // ─── app-lynx 暗色主题色板生成脚本（spec docs/specs/lynx-night-mode.md T2 §4.7）───
 //
-// 用途：从 6 个亮色 primary 锚点（`THEMES[].lightPrimaryAnchor`，同时充当暗色方案的 M3 seed
-// 输入）经 M3 SchemeTonalSpot 生成 6 套暗色色板（追加到 tokens.css）。
+// 用途：从 7 个亮色 primary 锚点（`THEMES[].lightPrimaryAnchor`，同时充当暗色方案的 M3 seed
+// 输入）经 M3 SchemeTonalSpot 生成 7 套暗色色板（追加到 tokens.css）。
 // 亮色版沿用既有手调色板（ADR-0152 / commit f239b065）——保持视觉零回归。
 //
 // 术语（review round-2 M3 澄清，防「seed」一词两义固化）：
@@ -18,12 +18,12 @@
 //   - 锚点清单在本脚本内维护（见 THEMES）：themeColor.ts 只持有 id → className，不持有锚点
 //     值，因此它**不是**锚点的单一事实源（旧注释曾如此声称，与事实不符已更正）
 //   - 防漂移：tests/palettes-drift.test.ts 双向锁死 —— (a) tokens.css 自动生成段 ≡ 本脚本
-//     `--stdout` 输出；(b) 脚本内 6 个 lightPrimaryAnchor ≡ tokens.css 6 个亮色 .theme-X 的 --md-primary
+//     `--stdout` 输出；(b) 脚本内 7 个 lightPrimaryAnchor ≡ tokens.css 7 个亮色 .theme-X 的 --md-primary
 //   - 根 <page> 同时挂 .theme-X + .dark 两个类 → 复合选择器特异性更高，覆盖亮色版的同名变量
 //   - 与既有亮色版正交组合：移除 .dark 类即回到亮色版
 //
 // 产物：
-//   tokens.css 末尾追加 6 个 `.theme-X.dark { ... }` 块；角色集与既有亮色版同构。
+//   tokens.css 末尾追加 7 个 `.theme-X.dark { ... }` 块；角色集与既有亮色版同构。
 //   state-layer 用 on-surface 12%/38% alpha（暗色 M3 派生标准）；pressed 实色与亮色方向对偶
 //   （亮色 = primary + 12% 黑 → 变暗；暗色 = primary + 12% 白 → 变亮）。
 //
@@ -89,7 +89,7 @@ const { SchemeTonalSpot, MaterialDynamicColors, Hct, hexFromArgb, argbFromHex } 
   '@material/material-color-utilities'
 )
 
-/** 6 主题 lightPrimaryAnchor 清单（= 既有 .theme-X 亮色版的 --md-primary 值；取自 ADR-0152
+/** 7 主题 lightPrimaryAnchor 清单（= 既有 .theme-X 亮色版的 --md-primary 值；取自 ADR-0152
  * 锁定的主题色值）。双职责：亮色主色值 + 暗色方案 M3 SchemeTonalSpot 的 seed 输入。
  * 锚点清单由本脚本维护（themeColor.ts 不持有锚点）；与 tokens.css 亮色 --md-primary 的
  * 逐一对等一致性由 tests/palettes-drift.test.ts 断言（正则双向抽取，非人工同步）。
@@ -101,6 +101,7 @@ const THEMES = [
   { id: 'green', lightPrimaryAnchor: '#3c6939' },
   { id: 'orange', lightPrimaryAnchor: '#855317' },
   { id: 'teal', lightPrimaryAnchor: '#00696d' },
+  { id: 'bili', lightPrimaryAnchor: '#d03171' },
 ]
 
 /** M3 角色清单（与既有亮色 page 色板同构）。
@@ -268,7 +269,7 @@ function readScheme(scheme) {
     '--md-state-disabled-container': `rgba(${hexToRgb(get(md.onSurface())).join(', ')}, 0.12)`,
     '--md-state-disabled-on-surface': `rgba(${hexToRgb(get(md.onSurface())).join(', ')}, 0.38)`,
     // scroll-indicator：暗色按**各主题** outline（M3 暗色 scheme = tone 60）+ 35% alpha 派生，
-    // 与 scrollbar thumb 口径一致。亮色 6 主题共用基础 page 块的 M3 基线 neutral 值
+    // 与 scrollbar thumb 口径一致。亮色 7 主题共用基础 page 块的 M3 基线 neutral 值
     // （≈ onSurfaceVariant，有意设计：中性滚动条不随主题染色）——见 tokens.css 基础块注释。
     '--md-scroll-indicator': `rgba(${hexToRgb(get(md.outline())).join(', ')}, 0.35)`,
     // 与模式无关的常量（shape / elevation / scrim）
@@ -324,7 +325,7 @@ ${formatRoleBlock(roleMap)}
 function generateHeader() {
   return `/* ════════════════════════════════════════════════════════════════════════════
  * 自动生成段（spec docs/specs/lynx-night-mode.md T2 §4.7）：勿手改
- * 由 scripts/generate-theme-palettes.mjs 产出，覆盖 6 主题暗色版（复合选择器 .theme-X.dark）。
+ * 由 scripts/generate-theme-palettes.mjs 产出，覆盖 7 主题暗色版（复合选择器 .theme-X.dark）。
  * 亮色 primary 锚点清单在脚本内维护（THEMES[].lightPrimaryAnchor）；产物与亮色 --md-primary 由 tests/palettes-drift.test.ts 双向锁死。
  * 亮色版沿用既有手调色板（ADR-0152 / commit f239b065）——保持视觉零回归。
  * 重新生成：node scripts/generate-theme-palettes.mjs。
@@ -332,7 +333,7 @@ function generateHeader() {
 `
 }
 
-/** 生成 6 套暗色色板 */
+/** 生成 7 套暗色色板 */
 function generateAll() {
   let out = generateHeader()
   for (const theme of THEMES) {

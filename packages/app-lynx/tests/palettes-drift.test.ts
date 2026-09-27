@@ -2,8 +2,8 @@
 //
 // 覆盖两处此前只靠人工同步、零校验的关系：
 //   (a) 产物 ≡ 脚本输出：tokens.css 自动生成段 ≡ `node scripts/generate-theme-palettes.mjs --stdout`
-//   (b) lightPrimaryAnchor ↔ 亮色 primary：脚本内 THEMES 的 6 个 `lightPrimaryAnchor`
-//       ≡ tokens.css 6 个亮色 .theme-X 的 --md-primary
+//   (b) lightPrimaryAnchor ↔ 亮色 primary：脚本内 THEMES 的 7 个 `lightPrimaryAnchor`
+//       ≡ tokens.css 7 个亮色 .theme-X 的 --md-primary
 //
 // 术语（review round-2 M3 澄清，防「seed」一词两义固化）：
 //   脚本清单字段 = `lightPrimaryAnchor`（= **亮色 --md-primary 值**，双职责：亮色主色值 +
@@ -42,7 +42,7 @@ const START_MARKER = '自动生成段'
 const END_MARKER = '/* END auto-generated */'
 
 /** 期望的暗色色板支数（lightPrimaryAnchor 清单口径，防正则塌陷后恒真通过） */
-const EXPECTED_THEME_COUNT = 6
+const EXPECTED_THEME_COUNT = 7
 
 /** spawn 看门狗（ms）：生成脚本只读本地 node_modules + 打印，正常 < 5s；CI 冷缓存也不应超 30s */
 const SPAWN_TIMEOUT_MS = 30_000
@@ -106,7 +106,7 @@ describe('色板生成器漂移防线（产物 ↔ 脚本）', () => {
     // 产物侧
     const section = extractGeneratedSection(tokensCss)
     expect(section.length).toBeGreaterThan(0)
-    // 脚本侧：非空 + 恰好 6 个暗色块（防脚本输出被截断/清单塌陷时两侧「一起空」仍通过）
+    // 脚本侧：非空 + 恰好 7 个暗色块（防脚本输出被截断/清单塌陷时两侧「一起空」仍通过）
     expect(run.stdout.length).toBeGreaterThan(0)
     const emittedBlocks = [...run.stdout.matchAll(/^\.theme-[a-z0-9-]+\.dark \{$/gm)].length
     expect(emittedBlocks).toBe(EXPECTED_THEME_COUNT)
@@ -128,7 +128,7 @@ describe('色板生成器漂移防线（产物 ↔ 脚本）', () => {
     expect(after, '生成脚本 --stdout 路径改写了 tokens.css（只读契约被破坏）').toBe(before)
   }, 60_000)
 
-  it('(b) 脚本 lightPrimaryAnchor 清单 ↔ tokens.css 亮色 --md-primary 逐一对等（6/6）', () => {
+  it('(b) 脚本 lightPrimaryAnchor 清单 ↔ tokens.css 亮色 --md-primary 逐一对等（7/7）', () => {
     // 脚本侧：THEMES 数组条目（字段名 = lightPrimaryAnchor，见文件头「术语」）
     const anchors = [
       ...scriptSrc.matchAll(
@@ -155,7 +155,7 @@ describe('色板生成器漂移防线（产物 ↔ 脚本）', () => {
         `.theme-${id}：脚本 lightPrimaryAnchor ${anchor} ≠ 亮色 --md-primary ${primary} —— 锚点已漂移，请同步两处`,
       ).toBe(primary!.toLowerCase())
     }
-    // 计数与集合防塌陷：6 条且互不相同（锚点全等会让上面循环空转通过）
+    // 计数与集合防塌陷：7 条且互不相同（锚点全等会让上面循环空转通过）
     expect(lightPrimaries.length).toBe(EXPECTED_THEME_COUNT)
     expect(new Set(lightPrimaries).size).toBe(EXPECTED_THEME_COUNT)
   })
