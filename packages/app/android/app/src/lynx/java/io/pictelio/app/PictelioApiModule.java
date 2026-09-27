@@ -61,6 +61,10 @@ public class PictelioApiModule extends LynxModule {
 
     private static final String API_BASE = PixivApiCore.apiBase();
 
+    /** lynx UI 语言设置键（settingsStore 持久化于 "CapacitorStorage"，值域 ""/"zh-CN"/"en"）。
+     *  跨端同源钉见 app-lynx tests/differential/i18nLanguageKeyConsistency.test.ts（ADR-0200 D1）。 */
+    private static final String SETTINGS_KEY_LANGUAGE = "settings_language";
+
     /** #130：API 转发线程池。executeRequest 为阻塞 IO（CONNECT 15s + READ 30s），
      * 不能占用 Lynx 调用线程；newCachedThreadPool 无固定上限、按请求伸缩
      * （与 PictelioImageService 同款模式），空闲线程自动回收。 */
@@ -121,9 +125,6 @@ public class PictelioApiModule extends LynxModule {
             }
         });
     }
-
-    /** lynx UI 语言设置键（settingsStore 持久化于 "CapacitorStorage"，值域 ""/"zh-CN"/"en"） */
-    private static final String SETTINGS_KEY_LANGUAGE = "settings_language";
 
     /**
      * 读取 settings_language（ADR-0200 变更①，worker 线程内调用）。

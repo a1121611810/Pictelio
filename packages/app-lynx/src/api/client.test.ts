@@ -664,4 +664,21 @@ describe("client web 模式 Accept-Language 头（ADR-0200 D3 + spec §2.2）", 
     await apiClient.get("/v1/illust/recommended", { offset: "after-switch" })
     expect(fetchMock.mock.calls[1][1].headers["Accept-Language"]).toBe("en")
   })
+
+  it("401 重放：初始与重放请求均携带 Accept-Language（spec E4，review round 1 P2-1）", async () => {
+    // 第一次 401 → execWithAuthRetry 刷新后重放同一 fn；Response 不可复用 → 逐次构造
+    fetchMock
+      .mockImplementationOnce(() => jsonResponse(401, {}))
+      .mockImplementationOnce(() => jsonResponse(200, { ok: true }))
+    const refreshHandler = vi.fn(async () => {
+      setAccessToken("refreshed-token")
+    })
+    setOnUnauthorized(refreshHandler)
+    await expect(apiClient.get("/v1/illust/detail", { id: "e4" })).resolves.toEqual({ ok: true })
+    expect(refreshHandler).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    // 重放走 execute 全量重建 headers → 语言头不得丢失（与初始请求一致）
+    expect(fetchMock.mock.calls[0][1].headers["Accept-Language"]).toBe("zh-CN")
+    expect(fetchMock.mock.calls[1][1].headers["Accept-Language"]).toBe("zh-CN")
+  })
 })
