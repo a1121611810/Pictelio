@@ -1,14 +1,16 @@
 #!/usr/bin/env node
-// check-push-refs：pre-push 静态校验编排器（ADR-0142 / spec #349 / ticket #352）
+// check-push-refs：pre-push 静态校验编排器（ADR-0142 / spec #349 / ticket #352；fmt 门禁见 ADR-0195）
 // 接管 stdin pre-push 协议（逐行 <local ref> <local sha> <remote ref> <remote sha>）：
 //   1) remote_sha 本地缺失 → 精准 fetch 重试；fetch 失败 → warn + fail-open 放行
 //      （push 本身必联网，fetch 失败时 push 也必失败，fail-open 不会放行坏代码）
 //   2) 真分叉（remote_sha 非 local_sha 祖先）→ fail-closed 人话报错（exit 1）
-//   3) 三域触碰校验：packages/app/(src|tests/agent-browser) → E2E 锚点静态校验；
+//   3) fmt 门禁：被推文件过 oxfmt（对齐 CI check job；路径无关，故不并入下面的按目录域）
+//   4) 三域触碰校验：packages/app/(src|tests/agent-browser) → E2E 锚点静态校验；
 //      packages/app-lynx/(src|tests) → app-lynx 单测；.agents/ → 仓库级 skill 校验
 // .husky/pre-push 为透传 stdin 的薄壳；本脚本承载全部逻辑以便单测（真实 git fixture）。
 import { execFile } from "node:child_process";
-import { dirname, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   hasCommitObject,
@@ -65,6 +67,35 @@ function defaultRunDomainCheck(script, cwd) {
   });
 }
 
+// oxfmt 对「传入路径全被 fmt.ignorePatterns 排除（.md / docs / app-lynx / website 等）」
+// 的专用信号：exit 2 + 该文案（走 stderr）。此时无覆盖目标 → 放行，不能当失败拦下，
+// 否则只推文档的 push 会被误拦。契约由 check-push-refs.test.ts 的真实调用用例钉住。
+const FMT_SKIP_MARKER = "Expected at least one target file";
+
+// 退出码 → 裁决。exit 2 只在带 marker 时算 skip：其它 exit 2（调用/工具链错误）按失败处理，
+// 避免把工具故障静默当成「无目标」放行（禁止静默降级）。
+export function classifyFmtResult(code, stderr) {
+  if (code === 0) return "pass";
+  if (code === 2 && stderr.includes(FMT_SKIP_MARKER)) return "skip";
+  return "fail";
+}
+
+// 路径以数组传入（execFile 不经 shell，空格/特殊字符安全）；单次调用承载全部路径——
+// 现实 push 的 diff 规模远低于 ARG_MAX。走根脚本同款 pnpm→vp 解析（ADR-0185），
+// 避免裸 vp 命中用户级旧版（vp-skew）。
+export function defaultRunFmtCheck(targets, cwd) {
+  return new Promise((resolvePromise) => {
+    execFile("pnpm", ["vp", "fmt", "--check", ...targets], { cwd }, (err, stdout, stderr) => {
+      resolvePromise({
+        // spawn 失败（ENOENT 等）err.code 是字符串 → 归一为非零，按失败拦截
+        code: err ? (typeof err.code === "number" ? err.code : 1) : 0,
+        stdout: stdout ?? "",
+        stderr: stderr ?? "",
+      });
+    });
+  });
+}
+
 // 分叉/历史改写的人话报错（ADR-0142 D2）：分支引用给 rebase 指引（按实际远端与分支名生成），
 // 非分支引用（tag 等）rebase 不适用，给覆盖指引。
 function divergenceMessage(remoteRef, remote) {
@@ -92,11 +123,14 @@ export async function runPrePushChecks({
   // 远端名（pre-push 协议 argv $1）；新分支 merge-base 路径的 origin/main 硬编码为既有假设
   remote = "origin",
   runDomainCheck = defaultRunDomainCheck,
+  runFmtCheck = defaultRunFmtCheck,
   log = console.log,
   warn = console.warn,
   error = console.error,
 } = {}) {
   const touched = new Set();
+  // 被推文件并集（跨 ref 去重）：fmt 门禁的输入，与按目录分流的 touched 正交
+  const pushedFiles = new Set();
   let diverged = false;
 
   for (const line of stdinText.split("\n")) {
@@ -143,6 +177,7 @@ export async function runPrePushChecks({
       files = await diffNames(remoteSha, localSha, gitCwd);
     }
 
+    for (const f of files) pushedFiles.add(f);
     for (const d of DOMAINS) {
       if (files.some((f) => d.pattern.test(f))) touched.add(d.key);
     }
@@ -150,6 +185,31 @@ export async function runPrePushChecks({
 
   // 分叉/历史改写：拦截，且不跑域校验（rebase 后下一次 push 再校验）
   if (diverged) return 1;
+
+  // fmt 门禁（先于域校验：最便宜的进程、命中率最高的一类漂移）。
+  // 只查「被推文件」而非全仓：全仓会把工作区里未提交的 WIP（后台 agent 半成品）算进来，
+  // 误伤与之无关的 push。删除的文件不在工作区 → 由 existsSync 过滤掉。
+  if (pushedFiles.size > 0) {
+    const targets = [...pushedFiles].filter((f) => existsSync(join(gitCwd, f)));
+    if (targets.length > 0) {
+      const r = await runFmtCheck(targets, gitCwd);
+      const verdict = classifyFmtResult(r.code, r.stderr);
+      if (verdict === "fail") {
+        // 失败清单在 stdout（marker 在 stderr），末尾截断避免刷屏
+        const detail = `${r.stdout}${r.stderr}`.trim().split("\n").slice(-20).join("\n");
+        error(
+          "❌ 被推文件未通过 oxfmt 格式校验（CI 的 check job 会以同一门禁拦下）\n" +
+            (detail ? `${detail}\n` : "") +
+            "  - 运行 `pnpm fmt` 修复后重试\n" +
+            "  - 确认为误报时可用 git push --no-verify 绕过",
+        );
+        return 1;
+      }
+      if (verdict === "skip") {
+        log("pre-push: 被推文件均不在 oxfmt 覆盖面（.md / docs / app-lynx 等），跳过格式校验");
+      }
+    }
+  }
 
   // 未触碰任何相关目录：零开销放行
   if (touched.size === 0) return 0;

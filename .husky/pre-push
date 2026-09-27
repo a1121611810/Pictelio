@@ -1,8 +1,9 @@
 #!/bin/sh
-# pre-push hook: 静态校验薄壳（ADR-0142）
+# pre-push hook: 静态校验薄壳（ADR-0142；fmt 门禁 ADR-0195）
 # 全部逻辑在 scripts/check-push-refs.mjs（本钩子仅透传 stdin 的 pre-push 协议）：
-#   1) 三域触碰校验：packages/app/(src|tests/agent-browser) → E2E 锚点静态校验；
+#   1) fmt 门禁：被推文件过 oxfmt（对齐 CI check job）
+#   2) 三域触碰校验：packages/app/(src|tests/agent-browser) → E2E 锚点静态校验；
 #      packages/app-lynx/(src|tests) → app-lynx 单测；.agents/ → 仓库级 skill 校验
-#   2) remote_sha 本地缺失 → 精准 fetch 重试；fetch 失败 → warn + fail-open 放行
-#   3) 真分叉（远端含本地没有的提交）→ 人话报错（git fetch origin && git rebase origin/main）
+#   3) remote_sha 本地缺失 → 精准 fetch 重试；fetch 失败 → warn + fail-open 放行
+#   4) 真分叉（远端含本地没有的提交）→ 人话报错（git fetch origin && git rebase origin/main）
 exec node "$(dirname "$0")/../scripts/check-push-refs.mjs" "$1"

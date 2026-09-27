@@ -1,7 +1,9 @@
-// check-push-refs 编排器测试（ADR-0142 / spec #349 / ticket #352）
+// check-push-refs 编排器测试（ADR-0142 / spec #349 / ticket #352；fmt 门禁 ADR-0195）
 // 期望值来源（oracle 溯源）：真实 git 双仓库 fixture 的已知提交拓扑；
 // git 数据零 mock（契约测试硬约束），仅域校验脚本调用（check-e2e-anchors 等）
 // 以记录型桩替代——那些脚本有各自的测试，此处只验证编排器的调度与分支语义。
+// fmt 门禁同法桩化（只验退出码 → 裁决映射），另有「真实调用」用例直接钉住 oxfmt
+// 的退出码契约（exit 2 + marker = 无覆盖目标），避免桩与真实行为脱节。
 //
 // 可达性说明（code-review P2-5b）：spec Testing Decisions 中的「remote_sha 缺失 →
 // fetch 成功 → 正常校验」分支在逻辑上不可达——remote_sha 缺失 ⟹ 其不在本地历史中
@@ -11,8 +13,19 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { execFile } from "node:child_process";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { runPrePushChecks } from "../../../../../scripts/check-push-refs.mjs";
+import { dirname, join, resolve as resolvePath } from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+  runPrePushChecks,
+  classifyFmtResult,
+  defaultRunFmtCheck,
+} from "../../../../../scripts/check-push-refs.mjs";
+
+// 仓库根（仅「真实调用」用例使用）：本文件位于 packages/app/tests/unit/scripts/
+const REPO_ROOT = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../../../..");
+// oxfmt 对「传入路径全被 ignore 规则排除」的真实文案（stderr），取自实测输出
+const FMT_SKIP_STDERR =
+  "Expected at least one target file. All matched files may have been excluded by ignore rules.";
 
 // 真实 git 双仓库 fixture（init/clone/push × N 子进程）：默认 5s 预算在全量并发
 // 跑下必超时（单跑 ~13s），文件级放宽到 30s——只影响本文件。
@@ -83,9 +96,11 @@ async function advanceRemote(f) {
   return shaB;
 }
 
-// 运行编排器并捕获输出；runDomainCheck 默认记录调用并返回 0
-async function run({ stdinText, gitCwd, checkResults = {} }) {
+// 运行编排器并捕获输出；runDomainCheck / runFmtCheck 默认记录调用并返回通过
+// （fmt 桩返回真实 oxfmt 的 {code, stdout, stderr} 形状，裁决映射见 classifyFmtResult）
+async function run({ stdinText, gitCwd, checkResults = {}, fmt = { code: 0 } }) {
   const calls = [];
+  const fmtCalls = [];
   const logs = [];
   const warns = [];
   const errors = [];
@@ -97,11 +112,15 @@ async function run({ stdinText, gitCwd, checkResults = {} }) {
       calls.push(script);
       return checkResults[script] ?? 0;
     },
+    runFmtCheck: async (targets, cwd) => {
+      fmtCalls.push({ targets, cwd });
+      return { code: fmt.code ?? 0, stdout: fmt.stdout ?? "", stderr: fmt.stderr ?? "" };
+    },
     log: (m) => logs.push(m),
     warn: (m) => warns.push(m),
     error: (m) => errors.push(m),
   });
-  return { code, calls, logs, warns, errors };
+  return { code, calls, fmtCalls, logs, warns, errors };
 }
 
 describe("正常路径（remote_sha 存在且为祖先）", () => {
@@ -135,15 +154,20 @@ describe("正常路径（remote_sha 存在且为祖先）", () => {
     expect(r.calls).toEqual([APP_SCRIPT, LYNX_SCRIPT, AGENTS_SCRIPT]);
   });
 
-  it("零触碰（仅 docs/adr）→ 零开销放行，不调度任何校验", async () => {
+  it("仅 docs/adr（fmt 忽略面）→ 域校验零调度；fmt 门禁按被推文件跑一次后放行", async () => {
     const f = await makeFixture();
     const shaC = await commitFiles(f.local, { "docs/adr/ADR-x.md": "doc" }, "docs only");
     const r = await run({
       stdinText: `refs/heads/main ${shaC} refs/heads/main ${f.shaA}\n`,
       gitCwd: f.local,
+      // 真实 oxfmt 对全忽略面路径的返回（实测）：exit 2 + marker
+      fmt: { code: 2, stderr: FMT_SKIP_STDERR },
     });
     expect(r.code).toBe(0);
     expect(r.calls).toEqual([]);
+    expect(r.fmtCalls).toEqual([{ targets: ["docs/adr/ADR-x.md"], cwd: f.local }]);
+    expect(r.logs.join("\n")).toContain("跳过格式校验");
+    expect(r.errors).toEqual([]);
   });
 
   it("域 pattern 第二分支探针：tests/agent-browser → app 域；app-lynx/tests → app-lynx 域", async () => {
@@ -201,6 +225,80 @@ describe("正常路径（remote_sha 存在且为祖先）", () => {
   });
 });
 
+describe("fmt 门禁（ADR-0195）", () => {
+  it("被推文件格式漂移 → exit 1 + 修复指引，且短路域校验（不再跑锚点）", async () => {
+    const f = await makeFixture();
+    const shaC = await commitFiles(f.local, { "packages/app/src/x.ts": "x" }, "touch app");
+    const r = await run({
+      stdinText: `refs/heads/main ${shaC} refs/heads/main ${f.shaA}\n`,
+      gitCwd: f.local,
+      fmt: { code: 1, stdout: "Checking formatting...\n\npackages/app/src/x.ts (0ms)\n" },
+    });
+    expect(r.code).toBe(1);
+    expect(r.errors.join("\n")).toContain("packages/app/src/x.ts"); // 失败清单原样透出
+    expect(r.errors.join("\n")).toContain("pnpm fmt");
+    expect(r.errors.join("\n")).toContain("git push --no-verify");
+    expect(r.calls).toEqual([]); // fmt 失败即返回，域校验未跑
+  });
+
+  it("exit 2 但无 skip marker（工具链/调用错误）→ 按失败拦截，不静默放行", async () => {
+    const f = await makeFixture();
+    const shaC = await commitFiles(f.local, { "packages/app/src/x.ts": "x" }, "touch app");
+    const r = await run({
+      stdinText: `refs/heads/main ${shaC} refs/heads/main ${f.shaA}\n`,
+      gitCwd: f.local,
+      fmt: { code: 2, stderr: "ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL Command failed" },
+    });
+    expect(r.code).toBe(1);
+    expect(r.logs.join("\n")).not.toContain("跳过格式校验");
+  });
+
+  it("被推变更只有删除（文件已不在工作区）→ 无 fmt 目标，不调用", async () => {
+    const f = await makeFixture();
+    await git(["rm", "a.txt"], f.local);
+    await git(["commit", "-m", "rm a.txt"], f.local);
+    const shaC = await git(["rev-parse", "HEAD"], f.local);
+    const r = await run({
+      stdinText: `refs/heads/main ${shaC} refs/heads/main ${f.shaA}\n`,
+      gitCwd: f.local,
+    });
+    expect(r.code).toBe(0);
+    expect(r.fmtCalls).toEqual([]);
+  });
+
+  it("多 ref：被推文件跨 ref 取并集去重，fmt 只跑一次", async () => {
+    const f = await makeFixture();
+    const shaC = await commitFiles(f.local, { "packages/app/src/x.ts": "x" }, "touch app");
+    const shaD = await commitFiles(f.local, { "packages/app/src/y.ts": "y" }, "touch app 2");
+    const r = await run({
+      stdinText:
+        `refs/heads/main ${shaC} refs/heads/main ${f.shaA}\n` +
+        `refs/heads/side ${shaD} refs/heads/side ${ZERO}\n`,
+      gitCwd: f.local,
+    });
+    expect(r.code).toBe(0);
+    expect(r.fmtCalls).toHaveLength(1);
+    expect(r.fmtCalls[0].targets.toSorted()).toEqual([
+      "packages/app/src/x.ts",
+      "packages/app/src/y.ts",
+    ]);
+    expect(r.fmtCalls[0].cwd).toBe(f.local); // 路径按被推工作区解析
+  });
+});
+
+describe("oxfmt 退出码契约（真实调用，oracle = 工具真实输出）", () => {
+  it("已格式化文件 → pass；落在 ignore 面的路径 → skip（exit 2 + marker）", async () => {
+    const ok = await defaultRunFmtCheck(["packages/app/src/utils/assertNever.ts"], REPO_ROOT);
+    expect(classifyFmtResult(ok.code, ok.stderr)).toBe("pass");
+
+    const ignored = await defaultRunFmtCheck(
+      ["docs/adr/0001-proguard-keep-strategy.md"],
+      REPO_ROOT,
+    );
+    expect(classifyFmtResult(ignored.code, ignored.stderr)).toBe("skip");
+  });
+});
+
 describe("remote_sha 本地缺失的三层降级（ADR-0142 D1/D2）", () => {
   it("缺失 → fetch 成功 → 分叉（v4.31.0 事故场景）→ exit 1 + 人话 rebase 指引，不跑域校验", async () => {
     const f = await makeFixture();
@@ -214,6 +312,7 @@ describe("remote_sha 本地缺失的三层降级（ADR-0142 D1/D2）", () => {
     expect(r.errors.join("\n")).toContain("git fetch origin && git rebase origin/main");
     expect(r.errors.join("\n")).not.toContain("Invalid revision range");
     expect(r.calls).toEqual([]);
+    expect(r.fmtCalls).toEqual([]); // 分叉拦截早于 fmt 门禁（rebase 后下次 push 再校验）
     // fetch 副作用：远端对象已进入本地
     const has = await git(["cat-file", "-e", `${shaB}^{commit}`], f.local).then(
       () => true,
@@ -271,6 +370,7 @@ describe("协议边界回归（行为不变约束）", () => {
     });
     expect(r.code).toBe(0);
     expect(r.calls).toEqual([]);
+    expect(r.fmtCalls).toEqual([]); // 无被推文件 → fmt 门禁零开销
   });
 
   it("多 ref 逐行处理：main（app 域）+ annotated tag（agents 域）→ 两域调度且去重", async () => {
