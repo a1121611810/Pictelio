@@ -76,10 +76,18 @@ TS execute()/executeRaw() web 分支                          [变更④]
 - A3（门禁）`pnpm check:app-lynx` / `test:app-lynx` / 根 `pnpm lint` / `fmt:check` / Java 单测全绿；
 - A4（模拟器）debug 包装入模拟器 + 登录后，推荐 feed 标签胶囊可见中文译名（如 `#东方Project`、`#原创`），logcat 无新增异常。
 
-## 7. Tickets
+## 7. Tickets（实施回写，2026-09-28 收口）
 
-| 票 | 内容 | 依赖 |
-|---|------|------|
-| T1 #783 | Java 原生通道语言头（变更①②③ + Java 测试） | — |
-| T2 #784 | TS web 通道语言头（变更④ + client.test.ts） | — |
-| T3 #785 | 门禁收口 + 模拟器验收（A3/A4）+ 本节回写 | T1、T2 |
+| 票 | 内容 | 状态 | 证据 |
+|---|------|------|------|
+| T1 #783 | Java 原生通道语言头（变更①②③ + Java 测试 10 用例） | ✅ | 77d3457b |
+| T2 #784 | TS web 通道语言头（变更④ + client.test.ts 4 用例） | ✅ | 1e9606ae |
+| T3 #785 | 门禁收口 + 模拟器验收 + review 闭环 + 本节回写 | ✅ | 25400480 / 6c7225c8（review round 1 修复） |
+
+**验收结论（spec §6）**：
+- A1 ✅ 解析五分支 Java 10/10 + TS 差分契约钉（`i18nLanguageKeyConsistency` 4 用例，含双变异验证）
+- A2 ✅ `apiClient.get` / `requestRaw` 头断言 + `setLocale` 切换 + 快照语义 + 401 重放（E4）头一致
+- A3 ✅ Java `testFullDebugUnitTest` BUILD SUCCESSFUL；TS 192 文件 / 2655 用例；`check:app-lynx` / 根 `lint` / `fmt:check` 全绿
+- A4 ✅ 模拟器（full debug 变体）实测：基线截图 feed 标签 `#艦これ` `#バニーガール` 全日文（/tmp/lynx_before_feed.png）→ 装新包后 feed 胶囊 `#原创` `#女孩子`、详情页标签行同款中文（/tmp/lynx_after_feed.png、/tmp/lynx_after_detail2.png）；logcat 零 PictelioApiModule 异常
+
+**code-review**：round 1 双轴 PASS（0 P0/P1），4 P2 全部处置（P2-1/P2-2 落测试防线并双变异验证、P2-3/P2-4 文档订正）、nit-2 采纳（常量上移）、nit-1/nit-3 留观察（既有语义非本次引入）。
