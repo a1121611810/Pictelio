@@ -120,7 +120,9 @@ vi.mock('../../../src/api/translate', async (importOriginal) => {
         id: 'fake-provider',
         // 透传 store 给的 signal（补审 S1：断言「reset 是否真的 abort 了 store 自己的 controller」
         // 需要观测 provider 收到的那个 signal —— 用测试自己的 controller 观测不到 store 侧）
-        translate: (_sub: unknown, _cfg: unknown, sig?: AbortSignal) => mocks.providerIter(sig),
+        // 第二参透传请求（T2/#762）：计数断言按 **chapterId** 映射而非调用序号 ——
+        // 序号映射会把多余的第 3 次调用静默派给第二个 iterator（误诊放大器）。
+        translate: (sub: unknown, _cfg: unknown, sig?: AbortSignal) => mocks.providerIter(sig, sub),
         abort: vi.fn(),
       } as TranslationProvider),
   }
@@ -181,10 +183,17 @@ function makeDeferredIterator(signal?: AbortSignal): {
   iter: AsyncIterator<TranslationChunk>
   push: (c: TranslationChunk) => void
   finish: () => void
+  /**
+   * 已被索取下一帧的次数（T2/#762）。用途：负向断言（「陈旧帧**不得**写入」）必须挂在
+   * 一个确定发生的事件之后——`for await` 语义下，消费方必须先处理完上一帧才会再次
+   * `next()`，故该计数增长即等价于「上一帧已被处理」。
+   */
+  getNextCallCount: () => number
 } {
   const queue: TranslationChunk[] = []
   let waiter: (() => void) | null = null
   let done = false
+  let nextCallCount = 0
   const onAbort = (): void => {
     done = true
     waiter?.()
@@ -193,6 +202,7 @@ function makeDeferredIterator(signal?: AbortSignal): {
   signal?.addEventListener('abort', onAbort, { once: true })
   const iter: AsyncIterator<TranslationChunk> = {
     async next(): Promise<IteratorResult<TranslationChunk>> {
+      nextCallCount += 1
       // abort → 抛 AbortError（与真实 provider 一致；store 据此收敛 aborted）
       if (signal?.aborted === true) throw new DOMException('aborted', 'AbortError')
       while (queue.length === 0 && !done) {
@@ -218,6 +228,7 @@ function makeDeferredIterator(signal?: AbortSignal): {
       waiter?.()
       waiter = null
     },
+    getNextCallCount: () => nextCallCount,
   }
 }
 
@@ -486,7 +497,56 @@ describe('generation-gate（spec §5 + §7.2）', () => {
 
 // ─────────────────── 同 chapterId in-flight 复用 ───────────────────
 
-describe('同 chapterId in-flight 复用（spec §9.6）', () => {
+/**
+ * 时序档（T1/#759 引入夹具 → T3/#763 常驻化为门禁）：该块每个用例在**两档**下各跑一次——
+ * 正常档（既有行为）+ 恶意档（provider 启动前那最后一次 await 的缓存读被拉长）。
+ *
+ * <p>provider 启动前 store 必须穿过两段 await（端点元数据读 + 缓存读），缓存 miss 是常态，
+ * 且它**就是 provider 启动前最后一个 await**——把它拉长即可让「固定墙钟 `sleep(N)` 后立即
+ * 断言」的写法确定性失败（诊断报告 `docs/research/flaky-novel-translate-store-diagnosis.md`）。
+ * 任何人都再把等待写回固定墙钟，恶意档会确定性变红，而不是等 CI 在负载下偶发失败。
+ *
+ * <p>恶意档延迟可由 `PIXIVIZER_TEST_CACHE_DELAY_MS` 覆盖：非法 / 空 / 非正值一律**回退默认**
+ * （`Number('') === 0`、`Number('abc') === NaN`，若按「`> 0` 才注入」判定，一次 shell 里的空
+ * 赋值就会把守卫静默降级成正常档的复制而测试照样全绿——正是硬约束 #3 禁的静默降级）；
+ * 上界 1000ms 留出等待预算余量，避免「档位本身跑不动」的失败盖过守卫信号。
+ */
+const rawHostileDelayMs = Number(process.env.PIXIVIZER_TEST_CACHE_DELAY_MS)
+const HOSTILE_CACHE_DELAY_MS =
+  Number.isFinite(rawHostileDelayMs) && rawHostileDelayMs > 0
+    ? Math.min(rawHostileDelayMs, 1000)
+    : 250
+const TIMING_PROFILES = [
+  { profile: '正常时序', cacheDelayMs: 0 },
+  {
+    profile: `恶意时序·provider 前 I/O 慢 ${HOSTILE_CACHE_DELAY_MS}ms`,
+    cacheDelayMs: HOSTILE_CACHE_DELAY_MS,
+  },
+] as const
+
+/** 缓存读 mock 的「慢 miss」版本（延迟注入用；resolve 值与非注入档一致 = null） */
+function slowCacheMiss(delayMs: number): Promise<null> {
+  return new Promise<null>((resolve) => setTimeout(() => resolve(null), delayMs))
+}
+
+/**
+ * 条件等待预算（T2/#762）：远大于注入延迟（≤1000ms）+ 负载抖动，失败时能拿到断言差异。
+ *
+ * <p>单次 2500ms，且**单次等待的用例最多 1 处**，故最坏 2.5s < vitest 5s 单测超时；唯一有
+ * 3 处等待的用例（P2 delta gate）显式放宽自身超时——否则预算累加会越过 5s 变成
+ * "Test timed out"，而掩盖失败原因（本轮审计口径要防的正是这个）。
+ */
+const WAIT_FOR_OPTS = { timeout: 2500 } as const
+
+// 溯源修正（T2/#762）：in-flight 复用的**正条**是 spec §9.8（并发请求同一章节：去重/合并），
+// 本块标题原引 §9.6（流式中断/用户切走）系锚点错位；§7.2 转移表仍是 reset/abort 的出处。
+describe.each(TIMING_PROFILES)('同 chapterId in-flight 复用（spec §9.8）[$profile]', ({ cacheDelayMs }) => {
+  beforeEach(() => {
+    if (cacheDelayMs > 0) {
+      mocks.cacheGet.mockImplementation(() => slowCacheMiss(cacheDelayMs))
+    }
+  })
+
   it('translating 期间再次调同一 chapterId → 不重复触发 provider', async () => {
     let providerCallCount = 0
     mocks.providerIter.mockImplementation(() => {
@@ -524,27 +584,33 @@ describe('同 chapterId in-flight 复用（spec §9.6）', () => {
     mocks.providerIter.mockImplementation(() => d.iter)
     const store = useNovelTranslateStore()
     const p = store.translateChapter(80, 80, ['旧章节原文'], 0)
-    await new Promise((r) => setTimeout(r, 10))
-    // 旧章节进入 translating
-    expect(store.status).toBe('translating')
+    try {
+      // 条件等待（T2/#762）：等状态**真的**推进到 translating，而不是赌一个固定墙钟窗口
+      await vi.waitFor(() => expect(store.status).toBe('translating'), WAIT_FOR_OPTS)
 
-    // 切章节：reset（NovelDetail 的 watch(novelId) 就是这么调的）
-    store.reset()
-    expect(store.status).toBe('idle')
-    expect(store.currentChapter).toBeNull()
+      // 切章节：reset（NovelDetail 的 watch(novelId) 就是这么调的）
+      store.reset()
+      expect(store.status).toBe('idle')
+      expect(store.currentChapter).toBeNull()
 
-    // 旧 iterator 收到 abort（因为 reset 现在会 abort controller）
-    ac.abort()
-    // 旧请求即便投递了 delta + done，也不得把结果写进 store
-    d.push({ type: 'delta', paragraphIndex: 0, text: '旧章节译文' })
-    d.finish()
-    await p
+      // 旧 iterator 收到 abort（因为 reset 现在会 abort controller）
+      ac.abort()
+      // 旧请求即便投递了 delta + done，也不得把结果写进 store
+      d.push({ type: 'delta', paragraphIndex: 0, text: '旧章节译文' })
+      d.finish()
+      await p
 
-    // 关键断言：状态没被旧结果推成 completed / failed；译文没落地
-    expect(store.status).toBe('idle')
-    expect(store.translatedParagraphs).toEqual([])
-    expect(store.displayParagraphs).toEqual([])
-    expect(mocks.cacheSet).not.toHaveBeenCalled()
+      // 关键断言：状态没被旧结果推成 completed / failed；译文没落地
+      expect(store.status).toBe('idle')
+      expect(store.translatedParagraphs).toEqual([])
+      expect(store.displayParagraphs).toEqual([])
+      expect(mocks.cacheSet).not.toHaveBeenCalled()
+    } finally {
+      // 收尾（T2/#762）：断言失败路径也必须结束 in-flight —— 否则泄漏的 invocation
+      // 会在**下一个用例**的窗口里才启动 provider（CI `expected 3 to be 2` 的成因）。
+      d.finish()
+      await p
+    }
   })
 
   /**
@@ -567,23 +633,32 @@ describe('同 chapterId in-flight 复用（spec §9.6）', () => {
     })
     const store = useNovelTranslateStore()
     const p = store.translateChapter(60, 60, ['旧章节'], 0)
-    await new Promise((r) => setTimeout(r, 20))
-    // 此时应在整批回退中（isRetryingHint 为真）
-    expect(store.isRetryingHint).toBe(true)
+    try {
+      // 条件等待（T2/#762）：等**真的**进入整批回退（isRetryingHint 为真）。该窗口需要
+      // 两次 provider 启动（流式失败 → 回退），固定 20ms 在负载下必然被击穿。
+      await vi.waitFor(() => expect(store.isRetryingHint).toBe(true), WAIT_FOR_OPTS)
 
-    // 用户切章节
-    store.reset()
-    expect(store.status).toBe('idle')
+      // 用户切章节
+      store.reset()
+      expect(store.status).toBe('idle')
 
-    // 让回退以失败收场（投递 error 帧后结束）
-    fallbackIter.push({ type: 'error', code: 'server', message: '还在失败', retryable: false })
-    fallbackIter.finish()
-    await p
+      // 让回退以失败收场（投递 error 帧后结束）
+      fallbackIter.push({ type: 'error', code: 'server', message: '还在失败', retryable: false })
+      fallbackIter.finish()
+      await p
 
-    // 关键断言：旧章节的 failed 收敛**不得**写进当前（已切走）的状态
-    expect(store.status).toBe('idle')
-    expect(store.error).toBeNull()
-    expect(mocks.cacheSet).not.toHaveBeenCalled()
+      // 关键断言：旧章节的 failed 收敛**不得**写进当前（已切走）的状态
+      expect(store.status).toBe('idle')
+      expect(store.error).toBeNull()
+      expect(mocks.cacheSet).not.toHaveBeenCalled()
+    } finally {
+      // 收尾（T2/#762）：失败路径也必须结束在飞回退，避免悬挂与跨用例污染
+      fallbackIter.finish()
+      await p
+    }
+    // 本用例两次调用同属 chapter 60（无法按 chapterId 区分），故只能数次数：任何多余调用
+    // （如别处泄漏的 invocation）必须在此现形，而不是被序号映射静默派给回退 iterator
+    expect(mocks.providerIter).toHaveBeenCalledTimes(2)
   })
 
   /**
@@ -593,36 +668,66 @@ describe('同 chapterId in-flight 复用（spec §9.6）', () => {
    * currentChapterId`；不匹配则丢弃（防跨章节污染）」。此前 delta 分支只做下标越界检查 ⇒
    * 切章节后旧 iterator 已排队的帧会写进**新章节的同下标段落**。
    */
-  it('切章节后旧 iterator 的 delta 帧不得写进新章节（P2 delta gate）', async () => {
+  // 本用例有 3 处条件等待 ⇒ 显式放宽单测超时（3 × 2500ms 预算可越过默认 5s）
+  it('切章节后旧 iterator 的 delta 帧不得写进新章节（P2 delta gate）', { timeout: 20_000 }, async () => {
     const oldIter = makeDeferredIterator() // 旧章节 A：挂起，稍后投递陈旧帧
     const newIter = makeDeferredIterator() // 新章节 B
-    let call = 0
-    mocks.providerIter.mockImplementation(() => {
-      call += 1
-      return call === 1 ? oldIter.iter : newIter.iter
+    // 按章节标识映射（T2/#762；替代原「第 1 次→oldIter、其余→newIter」的序号映射）
+    const iterByChapter = new Map<string, AsyncIterator<TranslationChunk>>([
+      ['85', oldIter.iter],
+      ['86', newIter.iter],
+    ])
+    const startedChapters: string[] = []
+    const unexpectedChapters: string[] = []
+    mocks.providerIter.mockImplementation((_sig?: AbortSignal, sub?: { chapterId?: string }) => {
+      const chapter = sub?.chapterId ?? '<无章节>'
+      startedChapters.push(chapter)
+      const iter = iterByChapter.get(chapter)
+      if (iter === undefined) {
+        // 记账 + warn（硬约束 #3 禁静默降级）；不抛：抛出的异常会被 store 收敛成 failed，
+        // 反而丢掉可见性（末尾的 `expect(unexpectedChapters).toEqual([])` 才是断言点）
+        console.warn(`[novelTranslateStore.test] 未预期的 provider 调用（chapterId=${chapter}）`)
+        unexpectedChapters.push(chapter)
+        return makeFakeIterator([])
+      }
+      return iter
     })
 
     const store = useNovelTranslateStore()
     const pA = store.translateChapter(85, 85, ['A 原文'], 0)
-    await new Promise((r) => setTimeout(r, 10))
-    expect(store.status).toBe('translating')
+    let pB: Promise<void> | null = null
+    try {
+      // 条件等待（T2/#762）：等 A **真的**抵达 provider 并进入 translating
+      await vi.waitFor(() => expect(store.status).toBe('translating'), WAIT_FOR_OPTS)
 
-    // 切章节 → gen++ + 清空
-    store.reset()
-    // 新章节 B 起翻（新 gen，translatedParagraphs 重置为 B 的长度）
-    const pB = store.translateChapter(86, 86, ['B 原文'], 0)
-    await new Promise((r) => setTimeout(r, 10))
+      // 切章节 → gen++ + 清空
+      store.reset()
+      expect(store.status).toBe('idle')
 
-    // 旧 iterator 投递**陈旧** delta（同下标 0）——不得写进 B 的段落
-    oldIter.push({ type: 'delta', paragraphIndex: 0, text: 'A 的陈旧译文' })
-    await new Promise((r) => setTimeout(r, 20))
+      // 新章节 B 起翻（新 gen，translatedParagraphs 重置为 B 的长度）
+      pB = store.translateChapter(86, 86, ['B 原文'], 0)
+      // 等 B 也抵达 provider（第 2 次启动）—— 之后才投递 A 的陈旧帧，场景才成立
+      await vi.waitFor(() => expect(startedChapters).toContain('86'), WAIT_FOR_OPTS)
+      expect(startedChapters).toEqual(['85', '86'])
+      expect(unexpectedChapters).toEqual([])
 
-    expect(store.translatedParagraphs[0] ?? '').not.toContain('A 的陈旧译文')
+      // 旧 iterator 投递**陈旧** delta（同下标 0）——不得写进 B 的段落
+      const before = oldIter.getNextCallCount()
+      oldIter.push({ type: 'delta', paragraphIndex: 0, text: 'A 的陈旧译文' })
+      // 同步点（T2/#762）：等旧迭代器**再次**被索取下一帧 —— `for await` 语义下，只有上一帧
+      // 被消费方处理完才会发生。负向断言必须挂在确定事件之后，否则断言的是「还没轮到」。
+      await vi.waitFor(
+        () => expect(oldIter.getNextCallCount()).toBeGreaterThan(before),
+        WAIT_FOR_OPTS,
+      )
 
-    // 收尾
-    oldIter.finish()
-    newIter.finish()
-    await Promise.all([pA, pB])
+      expect(store.translatedParagraphs[0] ?? '').not.toContain('A 的陈旧译文')
+    } finally {
+      // 收尾（T2/#762）：断言失败路径也必须结束两条在飞流水线
+      oldIter.finish()
+      newIter.finish()
+      await Promise.all([pA, pB ?? Promise.resolve()])
+    }
   })
 
   /**
@@ -644,38 +749,64 @@ describe('同 chapterId in-flight 复用（spec §9.6）', () => {
     })
     const store = useNovelTranslateStore()
     const p = store.translateChapter(82, 82, ['原文'], 0)
-    await new Promise((r) => setTimeout(r, 10))
+    try {
+      // 条件等待（T2/#762）：等 provider **真的**被调用（captured 非空），不再赌 10ms 墙钟
+      await vi.waitFor(() => expect(captured).not.toBeNull(), WAIT_FOR_OPTS)
+      expect((captured as unknown as AbortSignal).aborted).toBe(false)
 
-    expect(captured).not.toBeNull()
-    expect((captured as unknown as AbortSignal).aborted).toBe(false)
+      store.reset()
 
-    store.reset()
-
-    // 核心断言：store 必须 abort 它自己的 controller（不是靠测试代劳）
-    expect((captured as unknown as AbortSignal).aborted).toBe(true)
-
-    d.finish()
-    await p
+      // 核心断言：store 必须 abort 它自己的 controller（不是靠测试代劳）
+      expect((captured as unknown as AbortSignal).aborted).toBe(true)
+    } finally {
+      // 收尾（T2/#762）：断言失败路径也必须结束 in-flight —— 这正是 CI 里
+      // `expected 3 to be 2` 的泄漏源（旧写法失败后 `d.finish(); await p` 永不执行）
+      d.finish()
+      await p
+    }
   })
 
   it('translating 期间调**不同** chapterId → 并行触发（provider 调用 2 次）', async () => {
-    const d1 = makeDeferredIterator()
-    const d2 = makeDeferredIterator()
-    let call = 0
-    mocks.providerIter.mockImplementation(() => {
-      call += 1
-      return call === 1 ? d1.iter : d2.iter
+    const d70 = makeDeferredIterator()
+    const d71 = makeDeferredIterator()
+    // 按章节标识映射（T2/#762）：原「第 1 次→d1、其余→d2」的序号映射会把多余的第 3 次
+    // 调用静默派给 d2 —— 那正是 CI `expected 3 to be 2` 长期难以归因的原因。
+    const iterByChapter = new Map<string, AsyncIterator<TranslationChunk>>([
+      ['70', d70.iter],
+      ['71', d71.iter],
+    ])
+    const startedChapters: string[] = []
+    const unexpectedChapters: string[] = []
+    mocks.providerIter.mockImplementation((_sig?: AbortSignal, sub?: { chapterId?: string }) => {
+      const chapter = sub?.chapterId ?? '<无章节>'
+      startedChapters.push(chapter)
+      const iter = iterByChapter.get(chapter)
+      if (iter === undefined) {
+        // 记账 + warn（硬约束 #3 禁静默降级）；不抛：抛出的异常会被 store 收敛成 failed，
+        // 反而丢掉可见性（末尾的 `expect(unexpectedChapters).toEqual([])` 才是断言点）
+        console.warn(`[novelTranslateStore.test] 未预期的 provider 调用（chapterId=${chapter}）`)
+        unexpectedChapters.push(chapter)
+        return makeFakeIterator([])
+      }
+      return iter
     })
     const store = useNovelTranslateStore()
-    const p1 = store.translateChapter(70, 70, ['p1'], 0)
-    const p2 = store.translateChapter(71, 71, ['p1'], 0)
-    await new Promise((r) => setTimeout(r, 10))
-    // 两个 chapter 各自拿到独立 iterator → 都未 settle，provider 被调 2 次
-    expect(call).toBe(2)
-    // 收尾，避免悬挂
-    d1.finish()
-    d2.finish()
-    await Promise.all([p1, p2])
+    const p70 = store.translateChapter(70, 70, ['p70'], 0)
+    const p71 = store.translateChapter(71, 71, ['p71'], 0)
+    try {
+      // 条件等待（T2/#762）：等两个章节都**真的**抵达 provider
+      await vi.waitFor(() => expect(startedChapters.length).toBe(2), WAIT_FOR_OPTS)
+      expect(startedChapters.toSorted()).toEqual(['70', '71'])
+    } finally {
+      // 收尾（T2/#762）：断言失败路径也必须结束两条在飞流水线，避免悬挂与跨用例污染
+      d70.finish()
+      d71.finish()
+      await Promise.all([p70, p71])
+    }
+    // 收尾后仍必须恰好两次：任何多余调用（例如前例泄漏的 invocation）都会以**未预期章节**
+    // 的形式被记账，而不是被序号映射吞掉
+    expect(startedChapters.toSorted()).toEqual(['70', '71'])
+    expect(unexpectedChapters).toEqual([])
   })
 })
 
