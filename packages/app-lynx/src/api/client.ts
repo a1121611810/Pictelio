@@ -13,6 +13,8 @@ import { saveRefreshToken } from "../utils/tokenStorage"
 import { withTimeout } from "../utils/withTimeout"
 import { PIXIV_USER_AGENT, PIXIV_REFERER, PIXIV_CONTENT_TYPE, PIXIV_API_BASE, PIXIV_AUTH_BASE } from "./userAgent"
 import { extractHostname } from "../utils/safeParseUrl"
+// 生效语言唯一事实源（i18n 只依赖 vue 与词典，无环）：web 通道 Accept-Language 取值来源
+import { locale } from "../i18n"
 
 export interface PixivApiClient {
   get<T>(path: string, params?: Record<string, string>, signal?: AbortSignal): Promise<T>
@@ -368,6 +370,11 @@ async function execute<T>(
   const headers: Record<string, string> = {
     "User-Agent": PIXIV_USER_AGENT,
     Referer: PIXIV_REFERER,
+    // Accept-Language 决定标签 translated_name 等内容的返回语言（ADR-0200 D3）：
+    // 值跟随 i18n 生效语言（"zh-CN" | "en"，即合法 BCP-47 语言标签）；locale.value
+    // 在此处读取 = headers 构造时快照，在飞请求不受运行时切换影响（spec E2）。
+    // 原生模式分支不加——语言头由 Java 侧解析注入（ADR-0200 D2，零桥签名变更）。
+    "Accept-Language": locale.value,
   }
   // 先重写 URL，再基于结果决定是否附加 Bearer。
   // rewriteUrl 仅把已知 Pixiv 主机映射为 /pixiv-* 代理路径；外部绝对 URL
@@ -454,6 +461,8 @@ async function executeRaw(
   const headers: Record<string, string> = {
     "User-Agent": PIXIV_USER_AGENT,
     Referer: PIXIV_REFERER,
+    // 同 execute web 分支（ADR-0200 D3）：语言头构造时快照；原生分支由 Java 侧负责（D2）
+    "Accept-Language": locale.value,
   }
   // 与 execute 一致：先重写 URL，再基于结果决定是否附加 Bearer——
   // 外部绝对 URL / 非 Pixiv 域不带 Authorization，防止 access_token 泄漏。

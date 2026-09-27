@@ -18,6 +18,7 @@ import {
 } from "./client"
 import { ApiErrorType, type ApiError } from "./types"
 import { PIXIV_USER_AGENT, PIXIV_REFERER, PIXIV_API_BASE } from "./userAgent"
+import { setLocale } from "../i18n"
 
 // 真实结构样例：/webview/v2/novel 返回的 HTML（含 window.pixiv.novel.text）
 const NOVEL_HTML = `<script>window.pixiv = { novel: { "text": "第一行\\n第二行" } }</script>`
@@ -595,5 +596,72 @@ describe("GET 去重与退避交互（ADR-0199 D5：共享 promise = 共享退�
     expect(r1.v).toEqual({ ok: true })
     expect(r1.v).toBe(r2.v) // 同一 promise → 同一响应对象（不是各发各的两次退避）
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+})
+
+// ─── Accept-Language 头（ADR-0200 D3：web 通道 TS headers 注入 locale.value） ───
+// oracle 溯源（测试硬约束 #6）：断言依据 = ADR-0200 D1/D3 与 spec §2.2——
+// web 分支 headers = { UA, Referer, "Accept-Language": locale.value, [Authorization] }；
+// 头值域 = i18n SUPPORTED_LOCALES（"zh-CN" | "en"，即合法 BCP-47 语言标签）。
+// 原生模式（PictelioApi 转发）不加语言头——Java 侧负责（ADR-0200 D2，转发契约不涉 headers）。
+describe("client web 模式 Accept-Language 头（ADR-0200 D3 + spec §2.2）", () => {
+  const fetchMock = vi.fn()
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    setOnUnauthorized(null)
+    setAuthPermanentFailure(false)
+    setAccessToken("web-token")
+    // locale 用例隔离：i18n locale 是模块级 ref，setLocale 切过的值会跨用例泄漏；
+    // 且模块初始值随环境 navigator.language 浮动——before + after 双侧显式钉
+    // "zh-CN"（参照上方 setRateLimitBackoffConfig 的双侧清范式）。
+    setLocale("zh-CN")
+    vi.stubGlobal("fetch", fetchMock)
+    vi.stubGlobal("NativeModules", undefined) // 无原生模块 → isNativeMode false
+  })
+  afterEach(() => {
+    setLocale("zh-CN")
+    vi.unstubAllGlobals()
+  })
+
+  it("apiClient.get：fetch headers 含 Accept-Language: zh-CN（默认 locale）", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(200, { ok: true }))
+    await apiClient.get("/v1/illust/recommended")
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/pixiv-api/v1/illust/recommended",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "User-Agent": PIXIV_USER_AGENT,
+          Referer: PIXIV_REFERER,
+          "Accept-Language": "zh-CN",
+        }),
+      }),
+    )
+  })
+
+  it("apiClient.requestRaw：fetch headers 同样含 Accept-Language: zh-CN（executeRaw web 分支）", async () => {
+    fetchMock.mockResolvedValue(new Response(NOVEL_HTML, { status: 200 }))
+    await apiClient.requestRaw("GET", "/webview/v2/novel", { id: "123" })
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/pixiv-api/webview/v2/novel?id=123",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "Accept-Language": "zh-CN",
+        }),
+      }),
+    )
+  })
+
+  it("setLocale('en') 后新请求头值变 en；在飞请求头为构造时快照不受切换影响（spec E2）", async () => {
+    // 两次请求各自消费 body → mock 必须每次返回新 Response（mockResolvedValue 复用同一对象会 "Body already read"）
+    fetchMock.mockImplementation(() => jsonResponse(200, { ok: true }))
+    // 在飞请求：有 token 时 execute 无前置 await，headers 在调用同一 tick 同步构造 → 快照 zh-CN
+    const inflight = apiClient.get("/v1/illust/recommended")
+    setLocale("en")
+    await inflight
+    expect(fetchMock.mock.calls[0][1].headers["Accept-Language"]).toBe("zh-CN")
+    // 切换后的新请求即带新值（不同 params 避开 GET 去重）
+    await apiClient.get("/v1/illust/recommended", { offset: "after-switch" })
+    expect(fetchMock.mock.calls[1][1].headers["Accept-Language"]).toBe("en")
   })
 })
