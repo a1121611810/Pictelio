@@ -230,5 +230,28 @@ export const DOWNLOAD_A11Y_LABELS = {
   cancelDelete: '取消删除',
 } as const
 
+/** 标签近邻结果页 accessibility 标注（ADR-0197 D14 / spec docs/specs/tag-neighbors.md
+ *  user story 32）。注册表完整性约束同 NOTIFICATIONS_A11Y_LABELS：每个 key 必须被
+ *  TagNeighbors.vue 模板消费（TagNeighbors.template.test.ts 钉住），
+ *  且模板内 :accessibility-label 引用数 == :accessibility-element 引用数。 */
+export const TAG_NEIGHBORS_A11Y_LABELS = {
+  pageTitle: '标签近邻',
+  back: '返回',
+  openItem: '打开该近邻作品',
+  retry: '重试加载',
+  /** 「正在放宽标签范围…」提示行的关闭按钮（阶段 2 兜底提示，spec user story 15） */
+  dismissBroadening: '不再提示放宽标签范围',
+} as const
+
+/** 作品详情页动作行 accessibility 标注（ADR-0197 D14：新增「标签近邻」入口）
+ *
+ *  ⚠️ 覆盖范围说明：详情页动作行**原本完全没有 a11y 标注**（收藏 / 保存 / 评论 /
+ *  稍后看 四项都未标注，属既有技术债）。本注册表**只覆盖本功能新增的那一项**，
+ *  避免把无关的历史欠账混进本票。补齐存量四项应另开票。
+ *  约束同 ME_A11Y_LABELS：key 必须被 IllustDetail.vue 消费。 */
+export const ILLUST_DETAIL_A11Y_LABELS = {
+  tagNeighborsEntry: '查看标签近邻作品',
+} as const
+
 // Lynx 元素属性不支持 Vue 插值表达式，模板中用 :accessibility-element 绑定此常量
 export const A11Y_ELEMENT_ENABLED = true

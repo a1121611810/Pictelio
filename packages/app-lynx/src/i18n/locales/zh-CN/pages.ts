@@ -34,6 +34,23 @@ const zhPages = {
   "illustDetail.save.queued": "已加入下载队列（{{count}} 项），请到下载页查看",
   "illustDetail.save.ugoiraInfoFailed": "获取动图信息失败",
 
+  // ─── 标签近邻（Tag neighbors，ADR-0197 / spec docs/specs/tag-neighbors.md）───
+  // 术语红线：规范名「标签近邻」；禁用「溯源/以图搜图」（站外溯源，另一能力）
+  // 与「相关作品」（官方 /v2/illust/related 黑盒关联）。见 CONTEXT.md 词条。
+  "tagNeighbors.entry": "标签近邻",
+  "tagNeighbors.title": "标签近邻",
+  "tagNeighbors.similarity": "{{score}} 相似",
+  "tagNeighbors.commonTags": "{{common}}/{{total}} 共同标签",
+  "tagNeighbors.source.author": "同作者",
+  "tagNeighbors.source.sitewide": "全站",
+  "tagNeighbors.skip.tooFewTags": "该作品只有 1 个标签，无法按标签相似度比较，已改用全站检索",
+  "tagNeighbors.empty": "没有找到标签相近的作品",
+  "tagNeighbors.gated": "已按你的内容与静音设置隐藏 {{count}} 项",
+  "tagNeighbors.retry": "重试",
+  "tagNeighbors.broadening": "正在放宽标签范围…",
+  "tagNeighbors.broadeningDone": "已放宽到 {{count}} 个标签检索全站",
+  "tagNeighbors.broadeningDismiss": "不再提示",
+
   // ─── 稍后看（WatchLater，ADR-0191 / #751 T3 / #753 T4）：双详情入口 + 列表页 + Me 入口 ───
   "later.action.add": "稍后看",
   "later.action.added": "已在稍后看",

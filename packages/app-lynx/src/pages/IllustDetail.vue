@@ -25,9 +25,12 @@ import { useWatchLaterStore, toIllustSnapshot } from '../stores/watchLaterStore'
 import { buildImageTasks, buildUgoiraTask } from '../utils/galleryDownload'
 import { LATER_ICON } from '../utils/watchLaterGlyph'
 import { useDownloadStore } from '../stores/downloadStore'
+import { useTagNeighborStore } from '../stores/tagNeighbor'
+import { ILLUST_DETAIL_A11Y_LABELS, A11Y_ELEMENT_ENABLED } from '../utils/accessibility'
 import { t } from '../i18n'
 
 const settings = useSettingsStore()
+const tagNeighbors = useTagNeighborStore()
 
 const illust = ref<PixivIllust | null>(null)
 const loading = ref(true)
@@ -240,6 +243,16 @@ function openAuthor() {
   void navigate(`/user/${illust.value.user.id}`)
 }
 
+// 标签近邻入口（ADR-0197 D14 / #767 T2）：动作行第 5 项。
+// 先把**全量 tags** 写入共享 store 再跳转——注意不能用模板里 `illust.tags.slice(0, 8)`
+// 渲染用的截断数组：近邻相似度需要全部标签（实测作者列表每条自带 tags，无需逐图再查）。
+// 塞 store 而非路由参数传递：作品对象体积大，跨组件共享数据走全局缓存（AGENTS.md 数据层分流）。
+function openTagNeighbors() {
+  if (!illust.value) return
+  tagNeighbors.setSourceIllust(illust.value)
+  void navigate(`/illust/${illust.value.id}/tag-neighbors`)
+}
+
 onMounted(async () => {
   try {
     const res = await loadDetail(toIllustId(illustId.value))
@@ -360,7 +373,11 @@ onMounted(async () => {
         </view>
         <text v-if="followError" class="text-label-medium text-error mt-1">{{ followError }}</text>
         <text class="text-body-small text-outline mt-1.5">{{ illust.width }} × {{ illust.height }}</text>
-        <view class="mt-2 flex flex-row items-center">
+        <!-- 动作行：flex-wrap 是必需项，不是装饰。行内 5 项（心形+收藏数 / 保存 / 评论 / 稍后看 /
+             标签近邻）在 360dp 宽机型上单行放不下；不加 wrap 时 flex 子项被压缩，**中文标签与
+             收藏数一起折行**（「标签近邻」→「标签近/邻」、「349」→「34/9」），真机走查实证。
+             wrap 后各项整体落到下一行，不压缩、不截断。 -->
+        <view class="mt-2 flex flex-row items-center flex-wrap">
           <!-- 双轨收藏（T5 #534）：单击 = 快速收藏（toggle，恒公开、动效不变）；
                长按 500ms = 打开收藏面板（enable-long-press + @long-press）。
                mutation 注入 = 面板 saveWith 与本心形共用同一状态机实例 -->
@@ -398,6 +415,19 @@ onMounted(async () => {
           <view class="ml-4 flex flex-row items-center" @tap.stop="toggleWatchLater">
             <text class="text-[6.4vw] leading-none" :class="laterAdded ? 'text-tertiary' : 'text-outline'">{{ LATER_ICON }}</text>
             <text class="text-label-medium ml-1" :class="laterAdded ? 'text-tertiary' : 'text-outline'">{{ laterAdded ? t('later.action.added') : t('later.action.add') }}</text>
+          </view>
+          <!-- 标签近邻（ADR-0197 D14 / #767 T2）：作品级入口，作用于当前作品而非某一页
+               （标签是作品级的，多图作品不引入「当前页」概念）。动作行第 5 项。
+               先把源作品塞进共享 store 再跳转，结果页据此免去重复拉取详情；
+               符号用 ◇（U+25C7）纯文本字形，沿用 ↓ 的 ADR-0112 教训（规避 emoji 字形）。 -->
+          <view
+            class="ml-4 flex flex-row items-center"
+            :accessibility-element="A11Y_ELEMENT_ENABLED"
+            :accessibility-label="ILLUST_DETAIL_A11Y_LABELS.tagNeighborsEntry"
+            @tap.stop="openTagNeighbors"
+          >
+            <text class="text-[5.6vw] leading-none text-outline">◇</text>
+            <text class="text-label-medium text-outline ml-1">{{ t('tagNeighbors.entry') }}</text>
           </view>
         </view>
         <!-- 保存状态（内联，无全局 toast 通道）：入队后附「查看下载」跳转 -->
