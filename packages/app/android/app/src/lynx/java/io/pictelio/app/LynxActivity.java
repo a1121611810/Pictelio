@@ -33,40 +33,31 @@ import java.lang.ref.WeakReference;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.pictelio.app.BuildConfig;
-import io.pictelio.app.engine.Engine;
-import io.pictelio.app.engine.EnginePrefs;
-import io.pictelio.app.engine.EngineRouting;
 
 /**
- * Lynx client 宿主 Activity（#51，双 client 启动分支）。
+ * Lynx client 宿主 Activity（#51；沙盒 #610 起为单引擎 LAUNCHER 入口）。
  *
- * <p>由 MainActivity 入口路由分发（SharedPreferences("CapacitorStorage")
- * 的 {@code pictelio_client_kind} == "lynx" 时跳转）。纯 LynxView 全屏，
- * 无 Capacitor bridge 参与（研究：BridgeActivity 无法跳过 bridge 初始化，
- * 故采用双 Activity 方案）。
+ * <p>沙盒 #610 后本类是唯一的 LAUNCHER Activity——WebView/Capacitor 线整体下线，
+ * 不再有 MainActivity 入口路由分发。纯 LynxView 全屏，无 Capacitor bridge 参与。
  *
  * <p>生命周期：onResume/onPause/onDestroy 转发 LynxView
  * onEnterForeground/onEnterBackground/destroy()（LynxView 无自带生命周期）。
  *
  * <p>返回键（ADR-0066）：系统返回（手势/按键）由 {@link OnBackPressedCallback} 拦截，
  * bundle 就绪后经 {@code sendGlobalEvent("pictelioBack")} 转发 JS 决策——有路由历史返回
- * 上一页、根路由提示 + 2s 双击退出（webview client 同语义）；bundle 未就绪时 JS 侧无
+ * 上一页、根路由提示 + 2s 双击退出；bundle 未就绪时 JS 侧无
  * 监听者，原生兜底 {@link #finish()}。页面内「‹ 返回」按钮由 app-lynx 前端路由处理，
  * 与系统返回桥互不影响。
  *
- * <p>运行时失败漏斗（ADR-0164 决策 2/10，spec §6）：init 抛错、bundle 加载失败、
- * 致命渲染错误、10s 加载超时四个生产者统一收敛到 {@link #onFatal}，由
- * {@link EngineRouting#onLynxFailure} 单点裁决——自动回退开关开 ∧ 包含 webview 能力时
- * 先写失败记忆再携 forced extra 跳 MainActivity（决策 10①：该次落地启动不重新决策，
- * 结构防回环）；10s 超时永不自动跳（慢设备 ≠ 不支持），开关关 / lynx 单引擎包落
- * {@link #showErrorFallback} 错误页（决策 2：仅运行时硬错误才自动跳）。
+ * <p>运行时失败（原 ADR-0164 失败漏斗）：init 抛错、bundle 加载失败、
+ * 致命渲染错误、10s 加载超时四个生产者统一收敛到 {@link #showErrorFallback}。
+ * 单引擎后不存在「可降级到的 WebView」，故不再有失败记忆与自动跳转——
+ * 任何致命错误一律落错误页。10s 超时同样只落错误页，绝不自动跳
+ * （慢设备 ≠ 不支持，该约束自 ADR-0164 起保持不变）。
  */
 public class LynxActivity extends AppCompatActivity {
 
     private static final String TAG = "LynxActivity";
-
-    /** 引擎降级入口标记（ADR-0153）：MainActivity 在 WebView 不可用但 Lynx 可用时置位 */
-    public static final String EXTRA_ENGINE_FALLBACK = "pictelio_engine_fallback";
 
     // ── 系统栏契约常量（spec docs/specs/lynx-systembars.md §4.3；JS↔Java 契约测试钉住）──
     /** insets 变化事件名（JS safeArea.ts 订阅；载荷 [top, bottom] 数值，spec D2） */
@@ -129,9 +120,6 @@ public class LynxActivity extends AppCompatActivity {
 
     private LynxView lynxView;
     private final AtomicBoolean bundleLoaded = new AtomicBoolean(false);
-
-    /** 本次是否为引擎降级进入——决定错误兜底页给「退出应用」还是「返回 WebView」（ADR-0153） */
-    private boolean engineFallbackEntry;
 
     /** 当前 Activity 弱引用（PictelioAppModule.exitApp 使用，ADR-0066；onDestroy 清理） */
     private static WeakReference<LynxActivity> sInstance;
@@ -473,16 +461,6 @@ public class LynxActivity extends AppCompatActivity {
         // system 跟随系统 uiMode），全屏模式（status bar 隐藏）跳过——决策见 applyStatusBarAppearance。
         applyStatusBarAppearance();
 
-        // ADR-0153：降级入口标记 + 一次性通知键。写键必须在 LynxView 渲染前，保证 app-lynx
-        // 首帧能读到；该键是「本次由降级进入」的信号，不是首选引擎（首选引擎不落盘）。
-        engineFallbackEntry = getIntent().getBooleanExtra(EXTRA_ENGINE_FALLBACK, false);
-        if (engineFallbackEntry) {
-            getSharedPreferences(SYSTEMBARS_PREFS, MODE_PRIVATE)
-                    .edit()
-                    .putString(EngineFallbackNotice.KEY, EngineFallbackNotice.VALUE_TRUE)
-                    .apply();
-        }
-
         // LynxEnv 兜底初始化（进程复用场景：Application.onCreate 未走 initLynx → LynxEnv
         // 未初始化会报 error 102）。LynxEnv.init 幂等（hasInit），与 PictelioApp 共用
         // LynxRuntimeInitializer 单点（issue #122），重复调用安全。
@@ -492,7 +470,7 @@ public class LynxActivity extends AppCompatActivity {
             String safe = sanitizeError(String.valueOf(t.getMessage()));
             Log.w(TAG, "LynxEnv 兜底初始化失败: " + safe);
             bundleLoaded.set(true); // 退出 Splash，展示错误兜底
-            onFatal(EngineRouting.LynxFailureKind.INIT, "Lynx 环境初始化失败：" + safe);
+            onFatal("Lynx 环境初始化失败：" + safe);
             return;
         }
 
@@ -623,14 +601,14 @@ public class LynxActivity extends AppCompatActivity {
                 Log.w(TAG, "bundle 加载失败: " + safe);
                 bundleLoaded.set(true); // 失败也退出 Splash，由页面展示错误态
                 cancelLoadTimeout();
-                onFatal(EngineRouting.LynxFailureKind.BUNDLE_LOAD, "Lynx bundle 加载失败：" + safe);
+                onFatal("Lynx bundle 加载失败：" + safe);
             }
 
             // ── 渲染期错误兜底（ADR-0064，issue #132/#135）──
             // bundle 渲染阶段（非加载阶段）的错误走这里，而非 onLoadFailed。
             // 实测根因（error 990200 InstantiationException：R8 移除 $$PropsSetter
             // 无参构造器）即在此路径——若只挂钩 onLoadFailed 则白屏无出口。
-            // 双回调都挂（SDK 分类入口 + 统一入口），漏斗 onFatal 原子防重（errorShown 首胜）。
+            // 双回调都挂（SDK 分类入口 + 统一入口），onFatal 原子防重（errorShown 首胜）。
             @Override
             public void onReceivedNativeError(LynxError error) {
                 handleRenderError(error);
@@ -880,7 +858,7 @@ public class LynxActivity extends AppCompatActivity {
             Log.w(TAG, "Lynx 渲染致命错误（code=" + code + "）→ 展示错误兜底");
             bundleLoaded.set(true); // 退出 Splash（若尚未退出）
             cancelLoadTimeout();
-            onFatal(EngineRouting.LynxFailureKind.RENDER_FATAL, "Lynx 渲染失败：" + sanitizeError(msg));
+            onFatal("Lynx 渲染失败：" + sanitizeError(msg));
         } else {
             Log.w(TAG, "Lynx 渲染错误（code=" + code + "）已忽略（非致命）：" + sanitizeError(msg));
         }
@@ -893,7 +871,7 @@ public class LynxActivity extends AppCompatActivity {
         if (!bundleLoaded.get()) {
             Log.w(TAG, "bundle 加载超时（" + LOAD_TIMEOUT_MS + "ms）→ 展示错误兜底");
             bundleLoaded.set(true); // 退出 Splash
-            onFatal(EngineRouting.LynxFailureKind.LOAD_TIMEOUT, "Lynx bundle 加载超时");
+            onFatal("Lynx bundle 加载超时");
         }
     };
 
@@ -905,58 +883,22 @@ public class LynxActivity extends AppCompatActivity {
         mainHandler.removeCallbacks(loadTimeoutRunnable);
     }
 
-    // ── 运行时失败漏斗（spec §6，ADR-0164 决策 2/10：四生产者 → 单一裁决点）──
+    // ── 运行时失败收敛（原 spec §6 / ADR-0164 失败漏斗；沙盒 #610 单引擎化后简化）──
 
     /**
-     * 致命失败唯一入口（init 抛错 / onLoadFailed / 致命渲染错误 / 10s watchdog 收敛于此）：
-     * 经 {@link EngineRouting#onLynxFailure} 裁决——HOP_TO_WEBVIEW 则携 forced extra
-     * 跳 MainActivity（失败记忆已在裁决内先写，hop 途中崩溃也不丢）；否则落既有错误
-     * 兜底页（S7 开关关 / S8 超时 / E9 lynx 单引擎包）。
+     * 致命失败唯一入口（init 抛错 / onLoadFailed / 致命渲染错误 / 10s watchdog 收敛于此）。
      *
-     * <p>防重契约：{@code errorShown} 首胜语义全局保持。本方法仅在 HOP 分支原子抢占
-     * 置位；错误页分支沿用 {@link #showErrorFallback} 自身的原子防重（该方法按原样
-     * 保留，防重不依赖漏斗前置状态）。两分支共用同一哨兵，任一 fatal 路径首胜后
-     * 其余静默——故不可在本方法入口先 getAndSet 置位，否则错误页分支会被自身的
-     * 哨兵短路成静默无操作（兜底页永不渲染 = ADR-0064 白屏回归）。
+     * <p>沙盒 #610：WebView 线整体下线后不存在「可降级到的宿主」，失败记忆与
+     * 自动跳转一并删除——任何致命错误一律落 {@link #showErrorFallback} 错误页。
+     * 10s 加载超时同样只落错误页，绝不自动跳（该约束自 ADR-0164 起保持不变：
+     * 慢设备 ≠ 不支持）。
+     *
+     * <p>防重契约不变：{@code errorShown} 首胜语义全局保持，防重由
+     * {@link #showErrorFallback} 自身的原子 getAndSet 完成。多个 fatal 生产者
+     * 并发时仅第一个渲染错误页，其余静默——防重不依赖本方法的前置状态。
      */
-    private void onFatal(EngineRouting.LynxFailureKind kind, String message) {
-        // 竞态容忍口径：两生产者同时通过快速路径时，onLynxFailure 可能被求值两次——
-        // 失败记忆写入幂等（同 versionCode）；若 A（超时→错误页）先夺 errorShown 锁，
-        // B 已写的记忆仍生效（下次启动 S4 直达 WebView），窗口极窄、后果良性自愈。
-        if (errorShown.get()) return; // 首胜快速路径（分支内仍有原子抢占）
-        EngineRouting.FailureVerdict verdict = EngineRouting.onLynxFailure(
-                getApplicationContext(), LynxProbe.create(getApplication()), kind);
-        if (verdict == EngineRouting.FailureVerdict.HOP_TO_WEBVIEW) {
-            if (errorShown.getAndSet(true)) return; // 原子抢占：仅第一次致命错误执行跳转
-            hopToWebview();
-            return;
-        }
-        showErrorFallback(message); // 内部 errorShown 原子防重（方法保持原样）
-    }
-
-    /**
-     * S6 自动跳转执行（ADR-0164 决策 10）：反射定位 MainActivity（lynx-only 包无此类，
-     * 沿用 {@link #switchBackToWebview} 的既有探测；漏斗仅在 CLIENT_KINDS 含 webview
-     * 时裁决 HOP，ClassNotFound 属防御分支），携 forced extra（该次落地启动不重新
-     * 决策——回环断路器）与 stay 原因码重启 WebView 宿主。
-     * 与显式切换不同：此处不写任何偏好——降级绝不落盘首选（ADR-0153 决策 2），
-     * 失败记忆已在 {@link EngineRouting#onLynxFailure} 内先写。
-     */
-    private void hopToWebview() {
-        Class<?> mainActivityClass;
-        try {
-            mainActivityClass = Class.forName("io.pictelio.app.MainActivity");
-        } catch (ClassNotFoundException e) {
-            Log.w(TAG, "当前包无 MainActivity（lynx-only），无法自动跳转 WebView");
-            return;
-        }
-        android.content.Intent intent = new android.content.Intent(this, mainActivityClass);
-        intent.putExtra(EngineRouting.EXTRA_FORCED_WEBVIEW, true);
-        intent.putExtra(EngineRouting.EXTRA_STAY_REASON, EngineRouting.STAY_REASON_RUNTIME_FAILURE);
-        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
-                | android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-        startActivity(intent);
-        finish();
+    private void onFatal(String message) {
+        showErrorFallback(message); // 内部 errorShown 原子防重
     }
 
     /**
@@ -989,55 +931,16 @@ public class LynxActivity extends AppCompatActivity {
             root.addView(detail, new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-            // ADR-0153：降级进入的实例不提供「返回 WebView」——用户首选仍是 webview 且
-            // WebView 仍不可用，返回 MainActivity 会再次降级，形成回环。只给退出应用。
-            if (engineFallbackEntry) {
-                Button exitButton = new Button(this);
-                exitButton.setText("退出应用");
-                exitButton.setOnClickListener(v -> finish());
-                root.addView(exitButton, new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-            } else if (hasWebviewClient()) {
-                Button backButton = new Button(this);
-                backButton.setText("返回 WebView");
-                backButton.setOnClickListener(v -> switchBackToWebview());
-                root.addView(backButton, new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-            }
+            // 沙盒 #610：单引擎后错误页无「返回 WebView」可给（该宿主已下线），
+            // 也不再有「降级进入」实例的区分——统一给一个退出出口。
+            Button exitButton = new Button(this);
+            exitButton.setText("退出应用");
+            exitButton.setOnClickListener(v -> finish());
+            root.addView(exitButton, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
             setContentView(root);
         });
-    }
-
-    /** 当前包是否含 webview 能力（full 包才可切回；BuildConfig 按 flavor 注入） */
-    private boolean hasWebviewClient() {
-        for (String kind : BuildConfig.CLIENT_KINDS) {
-            if ("webview".equals(kind)) return true;
-        }
-        return false;
-    }
-
-    /**
-     * 显式选择 webview 首选并重启 MainActivity（webview 宿主，ADR-0164 决策 9）。
-     * 旧实现删 pictelio_client_kind 键——缺省翻转为 lynx 后「删键 = 回 lynx = 死循环」，
-     * 故改为 {@link EnginePrefs#setPreferredExplicit}（写首选 + 清失败记忆，S12 显式选择语义：
-     * 下次启动 S9 首选 webview 照旧，且不被残留失败记忆 S4 弹回）。
-     * 用反射探测 MainActivity：lynx-only 包无该类（编译期也不可引用，
-     * 故 Intent 目标同样走反射），full 包存在且 Manifest 已注册为非 LAUNCHER。
-     */
-    private void switchBackToWebview() {
-        Class<?> mainActivityClass;
-        try {
-            mainActivityClass = Class.forName("io.pictelio.app.MainActivity");
-        } catch (ClassNotFoundException e) {
-            Log.w(TAG, "当前包无 MainActivity（lynx-only），无法切回 WebView");
-            return;
-        }
-        EnginePrefs.setPreferredExplicit(this, Engine.WEBVIEW);
-        android.content.Intent intent = new android.content.Intent(this, mainActivityClass);
-        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK | android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-        startActivity(intent);
-        finish();
     }
 
     private int dp(int value) {
