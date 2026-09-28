@@ -45,10 +45,23 @@ const RankingInner: Component = () => {
   const [mode, setMode] = createSignal<RankModeId>(DEFAULT_RANK_MODE);
   const [date, setDate] = createSignal<string | null>(null);
 
+  /**
+   * ensureLoaded 的 rejection 由调用方吞（契约见 createTQFeedStore.loading.test.ts：
+   * 「ensureInfiniteQueryData 会抛出，调用方（页面）吞错由 error() 呈现」）。
+   * 此前此处是裸 `void`，未挂 handler ⇒ 任何预取失败都冒成 **unhandled rejection**
+   * （与 RankingStripEntry 的 `.catch()` 写法不一致）。#811：显式吞 + warn，错误态仍由
+   * store.error() 呈现（吞的是 promise rejection，不是 UI 错误，不构成静默降级）。
+   */
+  const ensureLoadedSafe = (reason: string): void => {
+    store.ensureLoaded().catch((e: unknown) => {
+      console.warn(`[Ranking] ensureLoaded failed (${reason})`, e);
+    });
+  };
+
   /** 切换后改缓存键并发起请求；旧键数据留在缓存，切回即命中 */
   const applyQuery = (next: { mode: RankModeId; date: string | null }) => {
     store.setQuery(next);
-    void store.ensureLoaded();
+    ensureLoadedSafe("switch-dimension");
   };
 
   const selectMode = (m: RankModeId) => {
@@ -87,7 +100,7 @@ const RankingInner: Component = () => {
     });
 
   onSettled(() => {
-    void store.ensureLoaded();
+    ensureLoadedSafe("enter-page");
   });
 
   return (
