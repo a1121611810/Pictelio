@@ -163,6 +163,16 @@ node scripts/release-bundle.mjs --version=<version>   # dist 默认 dist/，产�
 - **与 `-o` 的边界**：`--web-only` 与 `-o` 互斥（脚本拒绝）——OTA 热修一律走 web-only bump patch；`PICTELIO_RELEASE_SKIP_OTA=1` 与 `--web-only` 也互斥（web-only 的唯一交付物就是三件套，跳过打包 = version.json 指向不存在的资产）。
 - **中途失败**：与正常发布共用自动回滚（step 2/3 失败回滚 package.json / build.gradle / changelog / version.json），可安全重跑。
 
+## 非 main 分支发布（`PICTELIO_RELEASE_BRANCH`，#816）
+
+**何时用**：从过渡分支/长期特性分支发版（首个用例：6.2.0 过渡版从 `release/transition-6.2.0` 发 tag——tag 必须指向该分支的 commit）。
+
+- **命令**：`PICTELIO_RELEASE_BRANCH=release/transition-6.2.0 pnpm run release`（交互流程与其余步骤完全不变）。
+- **三处一并切换**：分支校验、远端分叉预检（`origin/<branch>`）、step 5 `git push origin <branch> --tags`。**必须一起切**——只放开 push 而预检仍比对 main，就会产生 P2 注释要防的故障：tag 指向一个远端不存在的 commit。
+- **安全约束**：不设变量时行为与从前逐字相同（恒为 `main`）；设了变量**仍强制**人必须处在该分支上（不会出现「人在 A 分支、发到 B 分支」）；非 main 时在分支校验处与发布确认页各打一条 ⚠ 告警，确认页会显式列出「目标分支」。
+- **不适用**：`pnpm release -o` 覆盖发布不动 tag/commit，无需此开关。
+- 单测：`tests/unit/scripts/release-branch.test.ts`（开关解析/校验/告警）+ `release-preflight.test.ts`（非 main 分支的真 git 拓扑，含「指定分支分叉但 main 干净」的阳性/阴性对照，证明参数确实换了被检引用）。
+
 ## 上传网络说明（2026-08 研究结论，详见 `docs/research/github-release-upload-acceleration.md` 与 ADR-0067）
 
 - `uploads.github.com` 慢的根因是**国际链路**（CNAME 到新加坡 Azure 20.205.243.161），与客户端选型无关；发布脚本会在上传前打印「本次将走直连/代理」。
