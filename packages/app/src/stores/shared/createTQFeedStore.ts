@@ -505,14 +505,27 @@ export function createTQFeedStore<
         keys.map((k) => {
           const def = queryDefMap.get(k);
           if (!def) return Promise.resolve();
+          const deps = config.getDeps();
           return queryClient.ensureInfiniteQueryData({
-            queryKey: def.queryKey(config.getDeps(), undefined),
+            queryKey: def.queryKey(deps, undefined),
+            // queryFn 与 queryKey 同出 queryDefMap：原实现只传 queryKey，靠「该 query 已
+            // 由 useInfiniteQuery 装配在缓存里」才不炸。#811：未装配时 TanStack 按
+            // `build()` 用传入 options 新建 query，而 options 无 queryFn →
+            // `Missing queryFn: '["bookmarks",1,"public"]'` 抛成 unhandled rejection。
+            // 对**已装配**的 query 传 queryFn 是严格 no-op——query-core 的
+            // `QueryCache.build()` 在 `this.get(queryHash)` 命中时直接返回既有 query，
+            // 传入的 options 被整个丢弃（node_modules/@tanstack/query-core@5.101.4
+            // build/legacy/queryCache.cjs:45-61，已逐行核对）。
+            queryFn: ({ pageParam, signal }) =>
+              def.queryFn(deps, pageParam as string | undefined, signal),
+            // `as any` 移除后由 tsc 指出的真实缺项（同上方 useInfiniteQuery 同一约定）
+            initialPageParam: undefined as string | undefined,
             staleTime: 30_000,
             // query-core 5.101.4 的 ensureQueryData 对已有数据默认直接返回、永不重验证
             //（code review P1：无此项则注释承诺的 SWR 不存在）——显式开启后陈旧缓存
             // 同步返回 + 后台重拉，恢复「访问即见数据、后台换新」的 SWR 语义
             revalidateIfStale: true,
-          } as any);
+          });
         }),
       );
     };
@@ -530,8 +543,13 @@ export function createTQFeedStore<
             queryClient
               .ensureInfiniteQueryData({
                 queryKey,
+                // 同 ensureLoaded：queryFn 与 queryKey 同出 queryDefMap，去掉 `as any`
+                // 让「queryFn 必填」成为编译期事实（#811）
+                queryFn: ({ pageParam, signal }) =>
+                  def.queryFn(deps, pageParam as string | undefined, signal),
+                initialPageParam: undefined as string | undefined,
                 staleTime,
-              } as any)
+              })
               .catch((err: unknown) => {
                 // 预取失败：重置该 query 回干净 pending 态（保留 observer 的 queryFn 装配，
                 // removeQueries 会连装配一起拆掉导致二次加载 Missing queryFn），避免用户
