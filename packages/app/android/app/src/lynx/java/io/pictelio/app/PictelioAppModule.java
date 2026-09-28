@@ -13,6 +13,8 @@ import com.lynx.tasm.behavior.LynxContext;
 
 import io.pictelio.app.engine.EnginePrefs;
 
+import org.json.JSONArray;
+
 /**
  * client 切换重启 Native Module（#51）。
  *
@@ -117,16 +119,35 @@ public class PictelioAppModule extends LynxModule {
 
     /**
      * 返回当前包支持的 client 引擎列表（ADR-0062）。
-     * full → ["webview","lynx"]；webview → ["webview"]；lynx → ["lynx"]。
-     * JS 侧据此决定是否渲染引擎切换入口。
+     * 单引擎包 → {@code ["lynx"]}。JS 侧据此决定是否渲染引擎切换入口。
+     *
+     * <p><b>#806</b>：必须以 <b>JSON 文本</b>形式送达。
+     * {@link Callback#invoke} 的签名是变参 {@code invoke(Object...)}：
+     * <ul>
+     *   <li>传 {@code String[]} → 数组被<b>摊平成位置参数</b>，JS 实收字符串；</li>
+     *   <li>传 {@link org.json.JSONArray} → 亦不会转成 JS 数组（实测 {@code typeof} 为
+     *       object、{@code Array.isArray} 为 false、{@code JSON.stringify} 得 null）。</li>
+     * </ul>
+     * 两种写法都让 JS 侧 {@code normalizeKinds} 拿不到数组 → {@code availableKinds=null}
+     * → {@code supportsClientSwitch(null)} 按「未知 = 视为支持」兜底返回 true
+     * → <b>单引擎包也渲染出引擎切换卡片</b>。该缺陷先于单引擎化存在（full 包上被
+     * 「正确答案恰好是显示」掩盖），在 {@code CLIENT_KINDS = {"lynx"}} 时才显形。
      */
     @LynxMethod
     public void getClientKinds(Callback callback) {
         try {
-            callback.invoke(BuildConfig.CLIENT_KINDS);
+            JSONArray kinds = new JSONArray();
+            for (String kind : BuildConfig.CLIENT_KINDS) {
+                kinds.put(kind);
+            }
+            callback.invoke(kinds.toString());
         } catch (Exception e) {
             Log.w(TAG, "getClientKinds 失败", e);
-            callback.invoke(String.valueOf(e.getMessage()));
+            // #806：错误必须落**第二参**（与 TS 声明 (kinds, err) 同形，也与同族的
+            // getClientKind 一致）。此前走 `callback.invoke(错误串)` 单参，等于把错误
+            // 消息塞进 kinds 槽——JS 的 `if (!err)` 会判为成功并去解析它 → null
+            // → 门控退化，单引擎包重现客户端卡，且全程无告警。
+            callback.invoke(null, String.valueOf(e.getMessage()));
         }
     }
 

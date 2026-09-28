@@ -27,14 +27,33 @@ function nativeAppModule() {
 interface PictelioAppModule {
   setClientKind(kind: string, callback: (err: string | null) => void): void
   getClientKind(callback: (kind: string | null, err: string | null) => void): void
-  getClientKinds(callback: (kinds: string[], err: string | null) => void): void
+  getClientKinds(callback: (kinds: string, err: string | null) => void): void
   restart(callback: (err: string | null) => void): void
 }
 
-/** 过滤 Native 返回的 client 列表为合法 ClientKind（ADR-0062）；非法值剔除 */
+/**
+ * 过滤 Native 返回的 client 列表为合法 ClientKind（ADR-0062）；非法值剔除。
+ *
+ * #806：Native 侧改为送达 **JSON 文本**（Lynx 的 `Callback.invoke(Object...)` 是变参，
+ * 直接传 `String[]` 会被摊平成位置参数；传 `JSONArray` 亦不会转成 JS 数组——实测
+ * `typeof` 为 object 而 `Array.isArray` 为 false、`JSON.stringify` 得 null）。故此处
+ * 对字符串先 `JSON.parse`；解析失败仍按既有契约「非数组 → null」处理，不额外兼容
+ * 裸单词（那会破坏 tests/unit.test.ts 已钉死的契约）。
+ */
 export function normalizeKinds(raw: unknown): ClientKind[] | null {
-  if (!Array.isArray(raw)) return null
-  const kinds = raw.filter((k): k is ClientKind => k === "webview" || k === "lynx")
+  let value: unknown = raw
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value)
+    } catch {
+      // 兜底必须留痕：静默 null 会让门控退化成「未知=视为支持」，
+      // 单引擎包重现客户端卡且无任何线索（AGENTS.md 测试硬约束 #3）。
+      console.warn("[clientSwitchStore] getClientKinds 送达非 JSON 文本，已按能力未知处理:", value)
+      return null
+    }
+  }
+  if (!Array.isArray(value)) return null
+  const kinds = value.filter((k): k is ClientKind => k === "webview" || k === "lynx")
   return kinds.length > 0 ? kinds : null
 }
 

@@ -715,10 +715,20 @@ function pickAppearanceMode(mode: DarkModeId) {
             :checked="autoFallbackEngine"
           />
         </view>
-        <!-- 全屏模式开关（spec docs/specs/lynx-systembars.md D5）：设备级默认关；
-             隐藏系统栏（immersive），拨动即时生效（原生切换 + insets 事件回流 → Root padding 重算） -->
+        <!-- 生效双态行（ADR-0164）：仅降级生效时渲染（effective≠none 且≠preferred）；正常与双失败不显示 -->
+        <view v-if="degradedEngineState" class="pt-3">
+          <text class="text-label-medium text-surface-on-variant">{{ effectiveStateText }}</text>
+          <text class="text-label-medium text-surface-on-variant mt-1">{{ degradedReasonText }}</text>
+        </view>
+        <text v-if="switching" class="text-body-small text-primary mt-3">{{ t('me.client.restarting') }}</text>
+      </view>
+
+      <!-- 全屏模式组（#806）：从客户端组移出。它与引擎无关，是 Lynx 侧沉浸式功能
+           （spec docs/specs/lynx-systembars.md D5：隐藏系统栏 + 边缘滑动唤出），
+           不得随单引擎隐藏客户端组而一并消失。 -->
+      <view class="bg-surface-container-lowest mt-3 mx-3 p-4 rounded-[var(--md-shape-medium)] shadow-[var(--md-elevation-1)]">
         <view
-          class="flex flex-row items-center justify-between py-3.5 border-b-[1px] border-b-surface-variant"
+          class="flex flex-row items-center justify-between py-3.5"
           :accessibility-element="A11Y_ELEMENT_ENABLED"
           :accessibility-label="ME_A11Y_LABELS.fullscreenMode"
           @tap="toggleFullscreenMode"
@@ -731,12 +741,6 @@ function pickAppearanceMode(mode: DarkModeId) {
             :checked="fullscreenMode"
           />
         </view>
-        <!-- 生效双态行（ADR-0164）：仅降级生效时渲染（effective≠none 且≠preferred）；正常与双失败不显示 -->
-        <view v-if="degradedEngineState" class="pt-3">
-          <text class="text-label-medium text-surface-on-variant">{{ effectiveStateText }}</text>
-          <text class="text-label-medium text-surface-on-variant mt-1">{{ degradedReasonText }}</text>
-        </view>
-        <text v-if="switching" class="text-body-small text-primary mt-3">{{ t('me.client.restarting') }}</text>
       </view>
 
       <!-- 网络组（ADR-0199 D4 / #779：限流退避四参数设置；卡片/行结构镜像客户端组） -->

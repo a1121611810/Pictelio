@@ -36,6 +36,28 @@ type ClientKind = "webview" | "lynx";
 getClientKinds(): ClientKind[]; // e.g. ["webview"] | ["webview", "lynx"] | ["lynx"]
 ```
 
+> **修订（#806，2026-09-28）——lynx 侧送达形态是 JSON 文本，不是数组。**
+>
+> 上面的 `ClientKind[]` 描述对 **webview 侧（Capacitor）**成立；对 lynx 侧不成立。
+> `com.lynx.react.bridge.Callback` 的唯一签名是 `void invoke(Object... args)`（**变参**，`javap` 实证），
+> 因此：
+> - 传 `String[]` → 数组被**摊平成位置参数**，JS 实收字符串 `"lynx"`；
+> - 传 `JSONArray` → 亦不转成 JS 数组（真机 logcat：`typeof="object"`、
+>   `Array.isArray=false`、`JSON.stringify` 得 `null`）。
+>
+> 两种写法都让 `normalizeKinds` 的 `Array.isArray` 判定失败 → `availableKinds = null`
+> → 本 ADR §2 的「未知 = 视为支持」兜底返回 true → **单引擎包也渲染出客户端卡**。
+> 该缺陷先于单引擎化存在（full 包上被「正确答案恰好是显示」掩盖），
+> 直到 `CLIENT_KINDS = {"lynx"}` 才显形——即 §2 的门控**从未真正生效过**。
+>
+> 现行 lynx 侧契约：`callback.invoke(kinds.toString())` 送达 **JSON 文本**，
+> JS 侧 `normalizeKinds` 先 `JSON.parse`；解析失败仍按「非数组 → null」处理并 `console.warn` 留痕。
+> 机器防线：`packages/app-lynx/src/utils/clientSwitchJavaContract.test.ts`
+> （含**反向钉子**——把 Java 改回 `callback.invoke(BuildConfig.CLIENT_KINDS)` 必红）。
+>
+> ⚠️ 本次**有意不兼容裸单词**（旧摊平形态）：`tests/unit.test.ts` 已钉死
+> 「非数组 → null」契约，放开裸单词会与之冲突。
+
 ### 3. Native 强制归一开关残留
 
 用户从 full 包切换过引擎后换装独立包时，`SharedPreferences("CapacitorStorage").pictelio_client_kind` 可能残留另一引擎值（如 `=lynx` 但装的是 webview 包）。

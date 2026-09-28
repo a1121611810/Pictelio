@@ -63,6 +63,7 @@ Pictelio 的内容过滤链目前只有三个谓词：R18/R18G 分级（账号�
 ## 后果
 
 - 正面：webview 一处改动覆盖 10 表面；lynx 首次获得集合型账号级 store，跨引擎恢复词表可用（备份 sets 不再单边为空）。
+- **订正（#799，2026-09-28）——上条「跨引擎恢复词表可用」当前不适用，不是永久作废。** 该结论写下时未验证两端是否同一物理存储；现核对：`PictelioPrefsModule.PREFS_FILE = "CapacitorStorage"`（`packages/app/android/app/src/lynx/java/io/pictelio/app/PictelioPrefsModule.java:36`，`getSharedPreferences(PREFS_FILE, MODE_PRIVATE)`）与 webview 的 `@capacitor/preferences`（`packages/app/src/settings/backends/preferences.ts`，Android 侧映射同名 SharedPreferences）**指向同一 prefs 文件**，故**机制成立**。但本项目**当前只针对 Lynx 排期**（#606/#607），不存在「换引擎」场景 ⇒ **收益当前不适用**。⚠️ WebView 线是**暂时下线后重写、非永久废弃**：重写后的存储层**是否仍与 lynx 共用同一通道未验证**（现存两条通道本就是各走各的），届时本条**重新评估**——不要把旧结论直接继承，也不要当作已证伪。
 - 取舍（已接受）：webview 搜索与浏览历史不过滤静音标签（与 R18/屏蔽现状口径一致，盲区在 `docs/specs/tag-mute.md` 挂账）；匹配不含翻译名与归一化；长按无确认（依赖管理页恢复）；静音集合在组装点以非响应式快照读取（集合变化仅影响后续组装——规避 ADR-0162 原生 list 中途移除风险，webview/lynx 行为一致）；webview 写失败 UI 提示挂账（registry fire-and-forget，warn 管线可见），lynx 已做落盘成功/失败双分支提示。
 - 中性：静音是本地词表，卸载/清数据即失（WebDAV 备份可迁移）；不与官方 mute 同步。
 - 后续候选（不在本期）：搜索/历史盲区补齐、静音时的 toast 撤销操作、按标签维度统计被滤条数。
