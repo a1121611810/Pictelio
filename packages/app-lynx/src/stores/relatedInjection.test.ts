@@ -2,7 +2,7 @@
 // Oracle 溯源：状态语义与 app 端 relatedInjectionStore.test.ts 同源（spec §4）。
 // isRestricted mock = 真实两态契约的镜像（!showR18∧x=1 ∨ !showR18G∧x=2；两态矩阵本身由
 // settingsStore.test.ts 12 例真实实现守卫，此处不重写实现，仅消费契约）。
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, type MockInstance } from "vitest";
 
 const mockState = vi.hoisted(() => ({
   relatedInjection: true,
@@ -79,7 +79,10 @@ describe("relatedInjection store（lynx，spec §4）", () => {
   // 禁静默降级（仓库测试硬约束 3）：每个分支都要有可断言的原因码。
   // oracle 溯源 = relatedInjection.ts consumeAnchor 内各分支的 console.warn 文本。
   describe("SKIP 原因码可观测性（#816）", () => {
-    let warnSpy: ReturnType<typeof vi.spyOn>
+    // `ReturnType<typeof vi.spyOn>` 会抹掉被监视函数的签名，`calls` 退化成 any[][]
+    // ⇒ 下面 map 的回调参数被隐式 any（TS7006）。用 MockInstance<typeof console.warn>
+    // 保留 `...data: any[]` 元组形状，调用点参数类型随之恢复。
+    let warnSpy: MockInstance<typeof console.warn>
 
     beforeEach(() => {
       warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})

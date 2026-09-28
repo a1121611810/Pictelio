@@ -20,7 +20,10 @@ const setAccessToken = vi.fn()
 const setOnUnauthorized = vi.fn()
 const setAuthPermanentFailure = vi.fn()
 const reportSessionError = vi.fn()
-const performRefreshInner = vi.fn<() => Promise<boolean>>()
+// 真身 `performRefresh` 的原生分支会把 refresh_token 交给
+// `loginWithRefreshToken(token, cb)`（authStore.ts:58），替身也须按 (token) 收参——
+// 原先声明成 `() => Promise<boolean>`，而下方 nativeAuth 用 token 调它 ⇒ TS2554。
+const performRefreshInner = vi.fn<(token: string) => Promise<boolean>>()
 
 vi.mock("../utils/tokenStorage", () => ({
   loadRefreshToken: () => loadRefreshToken(),
