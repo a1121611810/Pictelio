@@ -297,12 +297,12 @@ Grill 澄清 → to-spec → to-tickets → implement
 
 - **框架**：Vitest 4.1（`vp test`）+ `happy-dom`（SolidJS server 姿态问题，ADR-0144）
 - **位置**：`tests/unit/**`（按源目录）、`tests/agent-browser/specs/**`、`src/**/*.test.ts`；编写约定详版 = `packages/app/tests/TESTING.md`（本节为摘要）
-- **E2E 编排**：agent-browser 6 个 spec 入门禁；android-e2e 19 个 spec 手动按需（发版前转换矩阵门 `transition-matrix.spec.ts` @release-gate，ADR-0163），清单见 `packages/app/tests/android-e2e/specs/`
+- **E2E 编排**：agent-browser 6 spec 本地门禁（pre-push 静态锚点）；android-e2e 19 spec 手动（发版前转换矩阵门 `transition-matrix.spec.ts` @release-gate，ADR-0163），见 `packages/app/tests/android-e2e/specs/`
 - `passWithNoTests: false` — T0 门禁（ADR-0097，防空壳漂移 ADR-0084）
 
 ### 门禁边界（#539 拍板，2026-09-15）
 
-- **CI 门禁**（`.github/workflows/ci.yml`）= `check:all` + `lint:all` + `test:all`（app 单测 + agent-browser E2E）+ Robolectric Java 单测
+- **CI 门禁**（`.github/workflows/ci.yml`）= `check:all` + `lint:all` + `test:all`（vitest 单测；E2E 不进 CI，ADR-0084）+ Robolectric Java 单测
 - **关键行为必须有 CI 内单测防线**（语义翻转、手势契约、跨端契约、状态机）：「CI 内无机器防线」阻塞判定以本条为口径——单测防线已存在即不阻塞，android-e2e-only 不作为阻塞项复现
 
 ### 测试硬约束（违反视为架构违规；详版见 `packages/app/tests/TESTING.md`，编号一一对应）
