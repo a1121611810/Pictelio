@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { ApiErrorType, type PixivIllust, type ApiError } from "@/api/types";
+import { QueryClient } from "@tanstack/solid-query";
+import {
+  ApiErrorType,
+  type PixivIllust,
+  type PixivIllustListResponse,
+  type ApiError,
+} from "@/api/types";
 
 // ── Mock TanStack Query ──
 // Mock the full @tanstack/solid-query module and replace useInfiniteQuery
@@ -45,6 +51,19 @@ vi.mock("@tanstack/solid-query", async (importOriginal) => {
   };
 });
 
+// ── Mock 全局 QueryClient 单例 ──
+// createTQFeedStore 只经 `queryClient.ensureInfiniteQueryData` 触达缓存，因此必须给它一个
+// **真** client 才能 spy 到 ensureLoaded 真正传下去的 options（@tanstack/solid-query 整体
+// mock 只替换 useInfiniteQuery，QueryClient 类仍是 actual 展开出来的真类）。
+// 注入方式沿用同目录 createTQFeedStore.prefetch.test.ts 的既有惯用法（vi.hoisted + getter）。
+const qc = vi.hoisted(() => ({ client: undefined as QueryClient | undefined }));
+
+vi.mock("@/api/queryClient", () => ({
+  get queryClient() {
+    return qc.client!;
+  },
+}));
+
 // Mock api/illust (only loadBookmarks is needed now; loadNext is internal to TQ)
 const mockLoadBookmarks = vi.fn();
 
@@ -86,7 +105,17 @@ function makeIllust(id: number): PixivIllust {
   } as PixivIllust;
 }
 
+/** ensureInfiniteQueryData 实收 options 的最小形状：只留本用例要断言的两个字段 */
+type EnsureOptions = {
+  queryKey: readonly unknown[];
+  queryFn?: (ctx: { pageParam: unknown; signal?: AbortSignal | undefined }) => Promise<unknown>;
+};
+
 async function loadStore() {
+  // 每个用例一份**全新空缓存** client：#811 的复现条件正是「该 query 从未被上面的
+  // useInfiniteQuery（已 mock）装配进缓存」，复用同一实例会让缓存跨用例残留、稀释该条件。
+  // retry: false —— 断言一旦失败立刻红，不被 TanStack 默认 3 次指数退避拖慢。
+  qc.client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   vi.resetModules();
   const store = await import("@/stores/bookmarkStore");
   store.activate();
@@ -102,6 +131,12 @@ describe("bookmarkStore", () => {
     mockIsFetchingNextPage = false;
     mockError = null;
     mockHasNextPage = false;
+    // loadBookmarks 的真实返回形状（src/api/illust.ts:77 → PixivIllustListResponse）：
+    // 给了实现，ensureLoaded 传下去的 queryFn 才真的能取到数，「存在」之外还能验「可用」。
+    mockLoadBookmarks.mockResolvedValue({
+      illusts: [makeIllust(1)],
+      next_url: null,
+    } satisfies PixivIllustListResponse);
   });
 
   describe("initial state", () => {
@@ -233,14 +268,31 @@ describe("bookmarkStore", () => {
       // rejection 与「测试文件收尾」赛跑——谁先到谁说了算，于是 CI 上偶发、rerun 又绿，
       // 表现为「2051 passed / 1 error」。本例显式 await ⇒ 抖动变成确定性断言。
       const { ensureLoaded } = await loadStore();
+      const spy = vi.spyOn(qc.client!, "ensureInfiniteQueryData");
       let err: unknown = null;
       try {
         await ensureLoaded();
       } catch (e) {
         err = e;
       }
-      // 只钉这一个失败模式：mock 的 loadBookmarks 无实现，可能抛别的错，不在本题范围
+      // 只钉这一个失败模式：mock 的 loadBookmarks 已给真实形状实现，此处 err 若非空必是别处所致
       expect(String((err as Error | null)?.message ?? "")).not.toMatch(/Missing queryFn/);
+
+      // ── 肯定路径（#811 的真契约）──
+      // 上一条只是「没抛这个错」：把实现换成「总是抛别的错」照样绿。真正的契约是
+      // 「ensureInfiniteQueryData 收到的 options 自带一个可用的 queryFn」——
+      // #811 的修复点正是 createTQFeedStore.ts:519 补传 queryFn。
+      expect(spy).toHaveBeenCalledTimes(1);
+      const options = spy.mock.calls[0]![0] as EnsureOptions;
+      // queryKey 形状对齐 bookmarkStore.ts:31 的 ["bookmarks", userId, restrict]
+      expect(options.queryKey).toEqual(["bookmarks", 1, "public"]);
+      expect(typeof options.queryFn).toBe("function");
+
+      // 再钉一层「存在即可用」：实调一次并断言取到数。换成
+      // `() => Promise.reject()` 之类的假 queryFn，会在这一行转红。
+      const page = await options.queryFn!({ pageParam: undefined, signal: undefined });
+      expect(page).toEqual({ items: [makeIllust(1)], next_url: null });
+      expect(mockLoadBookmarks).toHaveBeenCalledWith(1, "public", undefined);
     });
 
     it("is a no-op (TQ handles auto-fetching reactively)", async () => {

@@ -131,6 +131,33 @@ describe("createTQFeedStore prefetchAllTabs（#375 空闲预取）", () => {
     expect(staleTimes.every((t) => t === Number.POSITIVE_INFINITY)).toBe(true);
   });
 
+  // #811 机器防线的**直接**层：本文件是 13 个 store 的共同底座，断言钉在这里，
+  // 比任何单个 store 的传递性覆盖更靠内。缺它 ⇒ 底座哪天把 queryFn 删回去，
+  // 只能靠「某个 store 的某条用例碰巧也炸」来发现。
+  it("ensureLoaded 传给 ensureInfiniteQueryData 的 options 自带可用 queryFn（#811 回归）", async () => {
+    const store = makeStore();
+    const spy = vi.spyOn(qc.client!, "ensureInfiniteQueryData");
+    await store.ensureLoaded();
+    expect(spy).toHaveBeenCalled();
+    // 每次调用的 options 都必须带 queryFn：只传 queryKey 时，QueryCache.build()
+    // 会用它新建一个无 queryFn 的 query 并抛 `Missing queryFn`（未装配场景）。
+    for (const call of spy.mock.calls) {
+      const options = call[0] as {
+        queryFn?: (ctx: {
+          pageParam: unknown;
+          signal?: AbortSignal | undefined;
+        }) => Promise<unknown>;
+      };
+      expect(typeof options.queryFn, "ensureLoaded 必须补传 queryFn（#811）").toBe("function");
+    }
+    // 再钉一层「存在即可用」：实调一次并断言取到数。换成空壳 / rejecting 的假
+    // queryFn，会在这一行转红——只验 `typeof === "function"` 挡不住这种。
+    const first = spy.mock.calls[0]![0] as {
+      queryFn: (ctx: { pageParam: unknown; signal?: AbortSignal | undefined }) => Promise<unknown>;
+    };
+    await expect(first.queryFn({ pageParam: undefined, signal: undefined })).resolves.toBeDefined();
+  });
+
   it("失败传播与缓存清理：预取 reject 向上传播（调度器 warn 不成死代码），error entry 被清除让首访回到干净骨架路径", async () => {
     let fail = true;
     const store = createTQFeedStore<Item, string, undefined>({
