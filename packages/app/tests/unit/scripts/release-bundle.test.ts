@@ -18,7 +18,7 @@ import {
   verify as cryptoVerify,
 } from "node:crypto";
 import { crc32 } from "node:zlib";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import {
   DOMAIN_PREFIX,
   bundleAssetUrlBase,
@@ -55,11 +55,9 @@ import {
 // 5. 密钥：测试内 crypto.generateKeyPairSync("ed25519") 临时生成，禁止使用
 //    ~/.pictelio-keys（真实签名材料永不进入测试）。
 
-const REPO_APP_ROOT = resolve(__dirname, "../../..");
-const JAVA_VERIFIER_PATH = resolve(
-  REPO_APP_ROOT,
-  "android/app/src/webview/java/io/pictelio/app/OtaSignatureVerifier.java",
-);
+// 原 `REPO_APP_ROOT` / `JAVA_VERIFIER_PATH`（webview flavor 的 OtaSignatureVerifier.java）
+// 已随 #610 手术删除，跨端常量比对随之移除（详见下方 DOMAIN_PREFIX 用例的注释）。
+// #804 决定 OTA 以何形态重建时，需连同该常量比对一并加回。
 
 // 系统 unzip 可用性（macOS/Linux 自带；不可用时跳过对应 describe）
 const hasUnzip = (() => {
@@ -423,13 +421,11 @@ describe("signManifest / verifyTrio（round-trip + 篡改拒绝）", () => {
     );
   });
 
-  it("DOMAIN_PREFIX 与 Android 侧 OtaSignatureVerifier.java 源码常量逐字一致（跨端契约）", () => {
-    const source = readFileSync(JAVA_VERIFIER_PATH, "utf-8");
-    const m = source.match(/DOMAIN_PREFIX\s*=\s*"((?:[^"\\]|\\.)*)"/u);
-    expect(m).not.toBeNull();
-    // Java 源码里 \n 是转义序列，展开后比对
-    const javaDomain = m![1].replace(/\\n/gu, "\n").replace(/\\\\/g, "\\");
-    expect(DOMAIN_PREFIX).toBe(javaDomain);
+  it("DOMAIN_PREFIX 冻结为 OTA 签名域常量（改动会破坏与既有 OTA 包的兼容性）", () => {
+    // #808 步 2：原用例还从 Android 侧 `OtaSignatureVerifier.java` 提取 DOMAIN_PREFIX
+    // 做跨端逐字比对；该类位于 src/webview，已随 #610 手术删除 ⇒ 跨端比对移除。
+    // 保留冻结值断言：它守护的是「已发布 OTA 包仍能验签通过」这一兼容性前提。
+    // ⚠️ 实质存废归 #804（更新通道处置）。
     expect(DOMAIN_PREFIX).toBe("Pictelio-OTA-bundle-v1\n");
   });
 });

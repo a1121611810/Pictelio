@@ -1,6 +1,12 @@
-// 小说导出跨层桥契约（spec docs/specs/novel-export.md §8；模式对齐 native/bridge-contract.test.ts）
-// oracle = 各层真实源码：TS native 接口声明 ↔ Java @PluginMethod/@LynxMethod 参数与 kind 路由。
+// 小说导出跨层桥契约（spec docs/specs/novel-export.md §8；模式对齐已随 OTA 退役的
+// native/bridge-contract.test.ts）
+// oracle = 各层真实源码：TS executor 声明 ↔ Java @LynxMethod 参数与 kind 路由。
 // 防漂移：参数顺序/元数、payloadJson、kind=novel 路由任一处漂移即报警（不只是子串包含）。
+//
+// #808 步 2（#610 手术）适配：`PictelioDownloaderPlugin.java`（webview flavor）已随
+// 手术删除，Capacitor 薄壳无 Lynx 对应物，相关断言摘除。存活的防线**全部保留**，其中
+// 「lynx 桥 start 参数顺序与元数 == Java 声明」最关键——位置参数摊平正是 #806 修的
+// 同一类陷阱（`Callback.invoke(Object...)` 变参）。
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -8,10 +14,6 @@ import { fileURLToPath } from "node:url";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const APP = resolve(TEST_DIR, "../../.."); // packages/app
-const WEBVIEW_PLUGIN = readFileSync(
-  resolve(APP, "android/app/src/webview/java/io/pictelio/app/PictelioDownloaderPlugin.java"),
-  "utf-8",
-);
 const LYNX_MODULE = readFileSync(
   resolve(APP, "android/app/src/lynx/java/io/pictelio/app/PictelioDownloaderModule.java"),
   "utf-8",
@@ -38,12 +40,10 @@ function javaParamNames(source: string, method: string): string[] {
 }
 
 describe("小说导出桥契约（spec novel-export §8）", () => {
-  it("两端 Java 薄壳均接受 payloadJson 并路由 kind=novel", () => {
-    for (const src of [WEBVIEW_PLUGIN, LYNX_MODULE]) {
-      expect(src).toContain("payloadJson");
-      expect(src).toContain('"novel"');
-      expect(src).toContain("downloadNovel");
-    }
+  it("Lynx 薄壳接受 payloadJson 并路由 kind=novel", () => {
+    expect(LYNX_MODULE).toContain("payloadJson");
+    expect(LYNX_MODULE).toContain('"novel"');
+    expect(LYNX_MODULE).toContain("downloadNovel");
   });
 
   it("原生执行器深模块 downloadNovel 调用 NovelExporter.export", () => {
@@ -79,18 +79,11 @@ describe("小说导出桥契约（spec novel-export §8）", () => {
     expect(tsArgs).toEqual(java.slice(0, -1));
   });
 
-  it("webview 桥 start 键集合 == Java call.getString 键集合 == TS options 键集合", () => {
-    // 只取 start 方法段（deleteFile 也读 call.getString("uri")，不得混入契约面）
-    const startSection = WEBVIEW_PLUGIN.split("public void start(")[1]!.split("@PluginMethod")[0]!;
-    const javaKeys = [...startSection.matchAll(/call\.getString\("(\w+)"\)/g)].map((m) => m[1]!);
-    expect(new Set(javaKeys)).toEqual(
-      new Set(["id", "sourceUrl", "fileName", "kind", "targetFormat", "framesJson", "payloadJson"]),
-    );
-    const obj = CAP_TS.match(/\.start\(\{([\s\S]*?)\}\)/);
-    expect(obj, "capacitorDownloadExecutor 未找到 native.start({...}) 调用").not.toBeNull();
-    const tsKeys = [...obj![1]!.matchAll(/^\s*(\w+):/gm)].map((m) => m[1]!);
-    expect(new Set(tsKeys)).toEqual(new Set(javaKeys));
-  });
+  // 原「webview 桥 start 键集合 == Java call.getString 键集合 == TS options 键集合」
+  // 已随 #610 手术移除：它的 Java oracle（`call.getString(...)`，Capacitor 薄壳）随
+  // `PictelioDownloaderPlugin.java` 一起消失，留下的「TS 键集合 == 硬编码列表」只是
+  // 自洽反推，不构成独立 oracle（AGENTS.md 测试硬约束 6）。SPA 侧
+  // `capacitorDownloadExecutor.ts` 本身归决策 ④ 退役（#803），届时一并处理。
 
   it("TS 侧两端 executor 声明并透传 payloadJson（载荷字段名不漂移）", () => {
     for (const src of [CAP_TS, LYNX_TS]) {

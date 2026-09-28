@@ -39,8 +39,12 @@ const APP_MODULE_CODE = stripComments(
   ),
 )
 
-// ⚠️ 手术组原用 `APP_BUILD_GRADLE_CODE`（读 `packages/app/android/app/build.gradle`）。
-// 该常量随之移除以免 noUnusedLocals 报错；#808 步 2 恢复那组断言时须一并加回。
+const APP_BUILD_GRADLE_CODE = stripComments(
+  readFileSync(
+    fileURLToPath(new URL('../../../app/android/app/build.gradle', import.meta.url)),
+    'utf8',
+  ),
+)
 
 const ME_VUE_CODE = stripComments(
   readFileSync(fileURLToPath(new URL('../pages/Me.vue', import.meta.url)), 'utf8'),
@@ -96,16 +100,15 @@ describe('#806 引擎切换桥：错误路径不得伪装成成功（review S1�
   })
 })
 
-// ⚠️ 「CLIENT_KINDS 事实源：单引擎取值」整组断言**不在本文件**，随 #610 手术主体合入。
-// 理由（2026-09-28 摘取 #806 时实测）：那组断言描述的是**手术完成后**的状态
-// （gradle 无 flavorDimensions、CLIENT_KINDS 塌缩为 defaultConfig 的唯一事实源）。
-// 在手术前的 main 上它们要么红，要么**蒙对**——main 的 `lynx` flavor 同样声明
-// `'{"lynx"}'`，正则会过，但语义完全不同（是三个 flavor 之一，不是「唯一事实源」）。
-// 「靠错误理由变绿」比没有防线更危险，故整组随其守护的状态一起走。
-// 恢复锚点：#808 步 2（手术主体 + ci.yml 同笔）。
-//
-// 下方两组（送达形态 / 错误路径）与 Me.vue 门控组只依赖 Java 方法体与 Me.vue，
-// 与手术无关，故留在本文件。
+describe('#806 CLIENT_KINDS 事实源：gradle → Java → JS 单引擎取值', () => {
+  it('build.gradle 声明 CLIENT_KINDS 为 {"lynx"}（单引擎塌缩后的唯一事实源）', () => {
+    expect(APP_BUILD_GRADLE_CODE).toMatch(/buildConfigField\s+"String\[\]"\s*,\s*"CLIENT_KINDS"\s*,\s*'?\{"lynx"\}'?/)
+  })
+
+  it('build.gradle 已无 flavorDimensions client（单引擎化后不再按 flavor 注入）', () => {
+    expect(APP_BUILD_GRADLE_CODE).not.toContain('flavorDimensions')
+  })
+})
 
 describe('#806 Me.vue 门控：客户端卡仍挂在 supportsClientSwitch 上', () => {
   it('客户端组由 supportsClientSwitch 门控（删掉 v-if 必须红）', () => {

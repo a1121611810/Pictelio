@@ -109,10 +109,13 @@ export function supportsClientSwitch(kinds: unknown): boolean {
 }
 
 // ─── 引擎降级（ADR-0164 / spec docs/specs/engine-default-lynx-bidirectional-fallback.md §3）───
-// 以下键的字面量唯一所有者是 Java 侧 EnginePrefs
-//（packages/app/android/app/src/main/java/io/pictelio/app/engine/EnginePrefs.java），
-// TS 侧为镜像常量——由 tests/unit/utils/engineKeysConsistency.test.ts 从两侧源码
-// 提取字面量比对钉住，任一方漂移即红灯；禁止在别处内联这些字符串。
+// 下列键的字面量原由 Java 侧 EnginePrefs 拥有，#610 手术已随引擎机制整体删除；
+// 键名字面量**就地保留**在 packages/app/android/app/src/lynx/java/io/pictelio/app/
+// PictelioAppModule.java（CLIENT_KEY = "pictelio_client_kind"）——存量
+// SharedPreferences 里已有该键，删之即丢用户选择。
+// ⚠️ 原 tests/unit/utils/engineKeysConsistency.test.ts（两侧比对防线）已随
+// EnginePrefs.java 一并删除（#808 步 2）。本组键此后**无跨端 oracle**：改字面量时
+// 必须同步核对 PictelioAppModule 侧，勿假定两侧自动一致。
 
 /** Lynx 失败记忆（失败时 versionCode 十进制字符串；Java 名 KEY_FAILURE_MEMORY）。 */
 export const KEY_FAILURE_MEMORY = "pictelio_engine_lynx_failure_version";
@@ -235,8 +238,10 @@ export async function writeEngineFallbackOptout(): Promise<void> {
 
 /**
  * 降级原因码 → i18n 键（spec §3.1：持久层只存稳定 ASCII 码，UI 侧映射文案）。
- * code 集合与 Java `EngineRoute.Reason` 枚举由
- * tests/unit/utils/engineReasonCodesConsistency.test.ts 双向钉住。
+ * code 集合原由 Java `EngineRoute.Reason` 枚举拥有，该类已随 #610 手术删除；
+ * 原 tests/unit/utils/engineReasonCodesConsistency.test.ts 的双向钉随之移除（#808 步 2）。
+ * ⚠️ 本表此后无独立 oracle，视为**规格的直译**：改动前须回查
+ * docs/specs/engine-default-lynx-bidirectional-fallback.md §3.1 的契约码集。
  */
 export const REASON_I18N_KEYS = {
   preferred: "engineFallback.reason.preferred",

@@ -24,7 +24,8 @@ import path from "node:path";
 // ── 路径（相对本测试文件：packages/app/tests/unit/android/） ──
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const proguardFile = path.resolve(testDir, "../../../android/app/proguard-rules.pro");
-const buildGradleFile = path.resolve(testDir, "../../../android/app/build.gradle");
+// 原 build.gradle 依赖面读取（buildGradleFile / buildGradle）随 work-runtime 断言
+// 一并移除——依赖声明已随 #610 手术删除（详见下方注释）。#804 决定 OTA 存废时加回。
 
 /** 提取 keep 规则行（去注释、归一化空白，便于逐条精确断言） */
 function extractKeepRules(source: string): string[] {
@@ -39,7 +40,6 @@ function extractKeepRules(source: string): string[] {
 
 describe("R8 keep 规则（Room 反射实例化面，ADR-0124）", () => {
   const keepRules = extractKeepRules(readFileSync(proguardFile, "utf8"));
-  const buildGradle = readFileSync(buildGradleFile, "utf8");
 
   it("声明 Room 数据库生成类无参构造器的 keep 规则（必须带成员规格）", () => {
     expect(keepRules).toContain("-keep class * extends androidx.room.RoomDatabase { <init>(); }");
@@ -53,14 +53,14 @@ describe("R8 keep 规则（Room 反射实例化面，ADR-0124）", () => {
     expect(degenerate).toEqual([]);
   });
 
-  it("work-runtime 依赖声明与 keep 规则同在（webview + full 两个 flavor，注释内声明不算数）", () => {
-    // 剥离行注释后提取，防“依赖被注释掉仍计数假绿”
-    const stripped = buildGradle.replace(/^\s*\/\/.*$/gm, "");
-    const webviewFlavor =
-      stripped.match(/^\s*webviewImplementation\s+"androidx\.work:work-runtime:\S+"/m) ?? [];
-    const fullFlavor =
-      stripped.match(/^\s*fullImplementation\s+"androidx\.work:work-runtime:\S+"/m) ?? [];
-    expect(webviewFlavor).toHaveLength(1);
-    expect(fullFlavor).toHaveLength(1);
-  });
+  // 原「work-runtime 依赖声明与 keep 规则同在（webview + full 两个 flavor）」断言
+  // 已随 #610 手术移除：手术把 `webviewImplementation "androidx.work:work-runtime"`
+  // **整条删除**（不是改成通用 implementation），因为 work-runtime 是 OTA 慢通道
+  // （proguard-rules.pro 注释：ADR-0122）��而 OTA 随 webview flavor 下线。
+  // ⚠️ 该断言的存废实质归属 #804（更新通道处置）——若 OTA 以 Lynx 形态重建，
+  // 依赖与本断言须一并加回，否则 R8 会再次剥离 WorkDatabase_Impl 的无参构造器
+  // （ADR-0124 记录的 Release 启动闪退）。
+  //
+  // 下面两条 Room keep 规则断言**不受影响**（Room 仍随 app 使用），继续守护
+  // ADR-0064 的成员规格语义。
 });
