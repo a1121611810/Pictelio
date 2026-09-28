@@ -11,37 +11,15 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ensureEmulator } from "../avd";
-import { assertDebugApkInstalled, forceStopApp, startMainActivity } from "../prefs";
+import { assertDebugApkInstalled, forceStopApp, readAppLogcat, startMainActivity } from "../prefs";
 import { buildDebugApk, installApk } from "../build-install";
 import { adbPath, APP_PACKAGE, runCapture, runOrThrow } from "../env";
 
 const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/**
- * 读取 logcat，优先按 app 进程 pid 过滤，进程已死则回退全量。
- *
- * 之所以不能直接 `logcat -d`：logcat 是环形 buffer，而 `waitForActivity` 每秒一次
- * `dumpsys activity activities` 本身就会刷出大量 ActivityTaskManager/WindowManager 日志，
- * 叠加模拟器系统日志后，最早产生的 Lynx 初始化行会被**挤出 buffer**——实测 2026-09-28
- * 单引擎包上稳定复现：`logcat -d | grep LynxEnv` 为空，而按 pid 抓同一次启动
- * 立刻拿到 `I LynxEnv: LynxEnv start init` 与 `Loading native libraries succeeded`。
- * 那是**采样窗口问题**，不是渲染没发生——别据此判产品回归。
- *
- * 进程不存在时**回退全量而非抛错**：实测偶发 `Destroy timeout of remove-task` 会让
- * `am start` 拉起的进程被 ActivityManager 连带杀掉且不再拉起（ActivityTaskManager 侧
- * 无 FATAL、无崩溃栈），此时按 pid 抓会拿到空串，抛错会把这个**环境竞态**误报成
- * 产品回归。回退全量仍能拿到死前的日志，断言照常；若断言随之转红，那才是真信号。
- */
-function readAppLogcat(serial: string): string {
-  const pid = runCapture(adbPath(), ["-s", serial, "shell", "pidof", APP_PACKAGE]).stdout.trim();
-  if (!pid) {
-    console.warn(
-      "[android-e2e] pidof 无输出——app 进程不在（可能是 remove-task 竞态误杀），回退抓全量 logcat",
-    );
-    return runCapture(adbPath(), ["-s", serial, "logcat", "-d"]).stdout;
-  }
-  return runCapture(adbPath(), ["-s", serial, "logcat", "-d", `--pid=${pid}`]).stdout;
-}
+// logcat 采集统一走 prefs.readAppLogcat（按 app 进程 pid 过滤；进程未创建时返回空串）。
+// 口径与理由见该函数注释：环形 buffer 会把 Lynx 初始化行挤掉，必须按 pid 抓；
+// 而 `am start` 后 Activity 记录先于进程出现约 150ms，抛错会误报成「app 崩溃」。
 
 /** 等待前台 Activity 变为期望值（adb 轮询）。 */
 async function waitForActivity(

@@ -11,7 +11,7 @@
  * 以及实测 2026-09-28 在 pictelio_ui 上抓到的成功日志串，非被测实现反推。
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { devLoginIntentArgs, loginViaDevIntent } from "../prefs";
+import { devLoginIntentArgs, loginViaDevIntent, readAppLogcat } from "../prefs";
 
 const adbPath = vi.hoisted(() => vi.fn(() => "/fake/adb"));
 const runOrThrow = vi.hoisted(() => vi.fn());
@@ -75,15 +75,54 @@ describe("devLoginIntentArgs", () => {
   });
 });
 
+describe("readAppLogcat", () => {
+  it("进程存在时按 --pid 过滤抓取（成功路径）", () => {
+    runCapture.mockImplementation((_bin: string, args: string[]) =>
+      args.includes("pidof")
+        ? { code: 0, stdout: "4242", stderr: "" }
+        : { code: 0, stdout: "I LynxEnv : LynxEnv start init", stderr: "" },
+    );
+    expect(readAppLogcat("emulator-5554")).toContain("LynxEnv start init");
+    const logcatCall = runCapture.mock.calls.find((c) => (c[1] as string[]).includes("logcat"))!;
+    expect(logcatCall[1]).toEqual(["-s", "emulator-5554", "logcat", "-d", "--pid=4242"]);
+  });
+
+  it("进程尚未创建时返回空串且不抛错（降级路径，让调用方轮询继续）", () => {
+    runCapture.mockImplementation((_bin: string, args: string[]) =>
+      args.includes("pidof") ? { code: 0, stdout: "", stderr: "" } : { code: 0, stdout: "", stderr: "" },
+    );
+    // 关键：抛错会把「am start 后 Activity 记录先于进程出现约 150ms」这种常态
+    // 误报成「app 崩溃」，并直接绕过调用方的等待循环
+    expect(() => readAppLogcat("emulator-5554")).not.toThrow();
+    expect(readAppLogcat("emulator-5554")).toBe("");
+    // 且不得回退抓全量——全量里是系统噪声，匹配不到 app 的信号
+    const logcatCalls = runCapture.mock.calls.filter((c) => (c[1] as string[]).includes("logcat"));
+    expect(logcatCalls.every((c) => !(c[1] as string[]).some((a) => a.startsWith("--pid=")))).toBe(
+      true,
+    );
+  });
+});
+
 describe("loginViaDevIntent", () => {
-  it("token 来自环境变量时下发 am start，并在见到成功标记后返回", () => {
+  it("token 来自环境变量时先 force-stop 再带 extra 启动，并在见到成功标记后返回", async () => {
     logcatHasSuccess();
     const prev = process.env.PIXIV_REFRESH_TOKEN;
     process.env.PIXIV_REFRESH_TOKEN = "ENV_TOKEN";
     try {
-      loginViaDevIntent("emulator-5554");
-      expect(runOrThrow).toHaveBeenCalledTimes(1);
-      const [bin, args] = runOrThrow.mock.calls[0]!;
+      await loginViaDevIntent("emulator-5554");
+      // **必须先 force-stop**：LynxActivity 不覆写 onNewIntent + singleTask，
+      // app 已运行时 am start 只会「delivered to currently running top-most instance」
+      // 而 hook 静默不执行（实测成功标记 0 次；force-stop 后 1 次）。
+      expect(runOrThrow).toHaveBeenCalledTimes(2);
+      expect(runOrThrow.mock.calls[0]![1]).toEqual([
+        "-s",
+        "emulator-5554",
+        "shell",
+        "am",
+        "force-stop",
+        "io.pictelio.app",
+      ]);
+      const [bin, args] = runOrThrow.mock.calls[1]!;
       expect(bin).toBe("/fake/adb");
       expect(args).toEqual([
         "-s",
@@ -103,35 +142,54 @@ describe("loginViaDevIntent", () => {
     }
   });
 
-  it("显式参数优先于环境变量", () => {
+  it("显式参数优先于环境变量", async () => {
     logcatHasSuccess();
     const prev = process.env.PIXIV_REFRESH_TOKEN;
     process.env.PIXIV_REFRESH_TOKEN = "ENV_TOKEN";
     try {
-      loginViaDevIntent("emulator-5554", "EXPLICIT");
-      expect(runOrThrow.mock.calls[0]![1].at(-1)).toBe("'EXPLICIT'");
+      await loginViaDevIntent("emulator-5554", "EXPLICIT");
+      expect(runOrThrow.mock.calls[1]![1].at(-1)).toBe("'EXPLICIT'");
     } finally {
       if (prev === undefined) delete process.env.PIXIV_REFRESH_TOKEN;
       else process.env.PIXIV_REFRESH_TOKEN = prev;
     }
   });
 
-  it("进程尚未起来时回退抓全量 logcat（不因 pidof 空而失败）", () => {
+  it("pidof 先空后有：轮询等进程出现后仍能完成登录（am start 后 Activity 记录先于进程约 150ms）", async () => {
+    let pidCalls = 0;
     runCapture.mockImplementation((_bin: string, args: string[]) => {
-      if (args.includes("pidof")) return { code: 0, stdout: "", stderr: "" };
-      return { code: 0, stdout: "dev hook: 自动登录成功", stderr: "" };
+      if (args.includes("pidof")) {
+        pidCalls += 1;
+        return { code: 0, stdout: pidCalls <= 2 ? "" : "4242", stderr: "" };
+      }
+      return { code: 0, stdout: "I LynxActivity: dev hook: 自动登录成功", stderr: "" };
     });
-    loginViaDevIntent("emulator-5554", "T");
-    const logcatCalls = runCapture.mock.calls.filter((c) => (c[1] as string[]).includes("logcat"));
-    expect(logcatCalls.length).toBeGreaterThan(0);
-    expect((logcatCalls[0]![1] as string[]).some((a) => a.startsWith("--pid="))).toBe(false);
+    await loginViaDevIntent("emulator-5554", "T");
+    expect(pidCalls).toBeGreaterThan(2);
   });
 
-  it("token 缺失 → 抛可操作的错，且不发起登录（降级路径）", () => {
+  it("轮询间隔真实生效：短 timeout 下轮询次数受控（防 `void sleep` 退化）", async () => {
+    let pidCalls = 0;
+    runCapture.mockImplementation((_bin: string, args: string[]) => {
+      if (args.includes("pidof")) pidCalls += 1;
+      return { code: 0, stdout: pidCalls <= 2 ? "" : "4242", stderr: "" };
+    });
+    // 永不出现成功标记 → 走超时分支
+    runCapture.mockImplementation((_bin: string, args: string[]) => {
+      if (args.includes("pidof")) pidCalls += 1;
+      return { code: 0, stdout: "I LynxActivity: 启动中", stderr: "" };
+    });
+    await expect(loginViaDevIntent("emulator-5554", "T", 30)).rejects.toThrow(/登录超时/);
+    // 30ms 预算 + 1s 间隔 → 最多 2 轮。若 `await sleep` 退化成 `void sleep`，
+    // 循环不再等待，30ms 内能跑上万轮（曾把 mock 调用记录撑到 OOM）。
+    expect(pidCalls).toBeLessThanOrEqual(3);
+  });
+
+  it("token 缺失 → 抛可操作的错，且不发起登录（降级路径）", async () => {
     const prev = process.env.PIXIV_REFRESH_TOKEN;
     delete process.env.PIXIV_REFRESH_TOKEN;
     try {
-      expect(() => loginViaDevIntent("emulator-5554")).toThrow(/PIXIV_REFRESH_TOKEN/);
+      await expect(loginViaDevIntent("emulator-5554")).rejects.toThrow(/PIXIV_REFRESH_TOKEN/);
       // 关键：静默发一个空 token 的 am start 会让 hook 什么都不做，
       // 表现为「登录态莫名失效」而不是显式失败——必须断言没有下发
       expect(runOrThrow).not.toHaveBeenCalled();
@@ -140,8 +198,8 @@ describe("loginViaDevIntent", () => {
     }
   });
 
-  it("一直等不到成功标记 → 超时抛错并带上 logcat 尾部（不做静默降级）", () => {
+  it("一直等不到成功标记 → 超时抛错并带上 logcat 尾部（不做静默降级）", async () => {
     logcatNeverSucceeds();
-    expect(() => loginViaDevIntent("emulator-5554", "T", 30)).toThrow(/dev hook 登录超时/);
+    await expect(loginViaDevIntent("emulator-5554", "T", 30)).rejects.toThrow(/dev hook 登录超时/);
   });
 });

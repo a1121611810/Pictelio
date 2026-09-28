@@ -129,7 +129,7 @@ beforeAll(async () => {
 
   // 登录：dev intent hook（setup 的 pm clear 清掉了 Keystore 里的 token，只能真实登录）。
   // 深链启动由用例内的 launchDeepLink 负责（force-stop → 清 logcat → am start），故此处不再播种引擎。
-  loginViaDevIntent(serial);
+  await loginViaDevIntent(serial);
 }, 600_000);
 
 afterAll(() => {

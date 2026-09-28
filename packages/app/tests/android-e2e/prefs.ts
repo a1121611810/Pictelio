@@ -371,18 +371,32 @@ export function devLoginIntentArgs(token: string): string[] {
 const DEV_LOGIN_SUCCESS_MARK = "dev hook: 自动登录成功";
 
 /**
- * 读取 app 进程的 logcat；进程尚未起来（pidof 空）时回退全量。
- * 与 lynx-boot-renders 的同名辅助同构：按 pid 过滤避免环形 buffer 把目标行挤掉。
+ * 读取 **app 进程**的 logcat（`--pid` 过滤），供所有渲染/登录就绪判定共用。
+ *
+ * 两条设计约束，都来自实测（2026-09-28，单引擎包，pictelio_ui）：
+ *
+ * ① **必须按 pid 过滤**：logcat 是环形 buffer，而 e2e 大量使用
+ *    `dumpsys activity activities` 轮询（本身就会刷出成百上千行
+ *    ActivityTaskManager/WindowManager 日志），叠加模拟器系统日志后，
+ *    最早产生的 Lynx 初始化行会被挤出 buffer——实测 `logcat -d | grep LynxEnv`
+ *    为空，按 pid 抓同一次启动立刻拿到 `LynxEnv start init`。
+ *
+ * ② **进程不存在时返回空串，绝不抛错**：`am start` 返回后，ActivityTaskManager 的
+ *    Activity 记录会**先于**进程创建出现（实测 `START` 23:39:49.923 vs
+ *    `Start proc` 23:39:50.070，差约 150ms）。因此「`dumpsys` 已看到目标 Activity」
+ *    **不代表**进程已起，紧接着的 `pidof` 仍可能为空。
+ *    调用方（`waitForLynxRenderReady` 等）本来就在轮询里，返回空串让轮询继续才是
+ *    正确行为；抛错会把「进程还没起」误报成「app 崩溃/被杀」。
  */
-function readAppProcessLogcat(serial: string): string {
+export function readAppLogcat(serial: string): string {
   const pid = runCapture(adbPath(), ["-s", serial, "shell", "pidof", APP_PACKAGE]).stdout.trim();
-  return runCapture(adbPath(), [
-    "-s",
-    serial,
-    "logcat",
-    "-d",
-    ...(pid ? [`--pid=${pid}`] : []),
-  ]).stdout;
+  if (!pid) {
+    console.warn(
+      `[android-e2e] pidof ${APP_PACKAGE} 为空（app 进程尚未创建，或已被杀）——本次返回空日志，由调用方轮询重试`,
+    );
+    return "";
+  }
+  return runCapture(adbPath(), ["-s", serial, "logcat", "-d", `--pid=${pid}`]).stdout;
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -391,11 +405,17 @@ const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms
  * 用 dev intent hook 登录（等价 webview 登录页注入的 refresh_token，
  * 但不依赖 WebView 客户端——单引擎化后 webview 登录页已不存在）。
  *
- * **本函数是阻塞的：发起 `am start` 后轮询 logcat 直到看到成功标记才返回。**
- * `am start` 只保证 intent 已投递，`autoLoginWithRefreshToken` 的 OAuth 交换与
- * SecureStorage 落盘是异步的——若调用方紧接着 `forceStopApp`（多数 spec 的阶段 B），
- * 会把登录打断，表现为「登录态莫名失效」。等成功标记即消除了这个竞态，
- * 且比各 spec 各自 sleep 固定秒数更可靠。
+ * **本函数会先 force-stop 再启动，因此是自包含的启动入口**，调用方不必关心
+ * 前置时序。原因是 `LynxActivity` **不覆写 `onNewIntent`**（实测 `grep onNewIntent`
+ * 0 命中）而 manifest 是 `launchMode="singleTask"`：app 已在运行时再 `am start`，
+ * intent 只会走 onNewIntent 通道（无处理者），`applyDevIntentHooks(getIntent())`
+ * 那唯一一次调用（LynxActivity.java:660，挂在 LynxView 初始化路径 `renderTemplateUrl`
+ * 之后）**不会再次执行** ⇒ 登录静默不发生。故必须先杀掉进程走完整启动流程。
+ *
+ * 本函数是阻塞的：发起 `am start` 后轮询 logcat 直到看到成功标记才返回。
+ * `autoLoginWithRefreshToken` 的 OAuth 交换与 SecureStorage 落盘是异步的——
+ * 调用方若紧接着再做 force-stop/重启，会把登录打断，表现为「登录态莫名失效」。
+ * 等成功标记即消除了这个竞态，且比各 spec 各自 sleep 固定秒数更可靠。
  *
  * **实机验证（2026-09-28，pictelio_ui + 单引擎 debug 包）**：logcat 打出
  * `I LynxActivity: dev hook: 自动登录成功（userInfo={"userId":…,"userName":…}）`，
@@ -405,29 +425,31 @@ const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms
  * 超时即抛错并带上 logcat 尾部——**不做静默降级**：登录失败若被吞掉，
  * 下游用例会以「内容为空」的形式给出完全误导的失败信息。
  */
-export function loginViaDevIntent(
+export async function loginViaDevIntent(
   serial: string,
   token = process.env.PIXIV_REFRESH_TOKEN,
   timeoutMs = 90_000,
-): void {
+): Promise<void> {
   if (!token) {
     throw new Error(
       "[android-e2e] dev hook 登录缺少 PIXIV_REFRESH_TOKEN。" +
         "请确认 packages/app/.env 存在该键，或显式传入 token 参数。",
     );
   }
+  // 先杀进程，保证下面的 am start 走完整启动流程并触发 applyDevIntentHooks
+  forceStopApp(serial);
   runOrThrow(adbPath(), ["-s", serial, ...devLoginIntentArgs(token)], TIMEOUTS.adb);
 
   const deadline = Date.now() + timeoutMs;
   let tail = "";
   while (Date.now() < deadline) {
-    tail = readAppProcessLogcat(serial);
+    tail = readAppLogcat(serial);
     if (tail.includes(DEV_LOGIN_SUCCESS_MARK)) {
       console.log("[android-e2e] ✓ dev hook 登录完成（已在 logcat 见到成功标记）");
       return;
     }
     // 失败不做特殊分支：dev hook 的失败路径日志串未在源码中固定，交给超时分支统一暴露
-    void sleep(1_000);
+    await sleep(1_000);
   }
   throw new Error(
     `[android-e2e] dev hook 登录超时（${timeoutMs / 1000}s），未等到「${DEV_LOGIN_SUCCESS_MARK}」。\n` +

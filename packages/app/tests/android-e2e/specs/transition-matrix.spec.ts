@@ -712,7 +712,7 @@ describe.skipIf(SKIPPED)(
       forceStopApp(serial);
       startMainActivity(serial);
       await waitForTopActivity(LYNX_ACTIVITY);
-      loginViaDevIntent(serial);
+      await loginViaDevIntent(serial);
     }, 900_000);
 
     afterAll(async () => {

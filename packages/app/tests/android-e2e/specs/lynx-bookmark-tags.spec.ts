@@ -890,7 +890,7 @@ describe.skipIf(SKIPPED)(
       assertDeviceGeometry();
 
       // 阶段 A：dev intent hook 登录（pm clear 后 Keystore 里没有 token，只能真实登录）
-      loginViaDevIntent(serial);
+      await loginViaDevIntent(serial);
 
       // 阶段 B：干净重启进已登录主界面
       // client_kind 无需播种：单引擎下入口恒为 LynxActivity，写什么都归一为 lynx

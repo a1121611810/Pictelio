@@ -101,7 +101,7 @@ describe("T5 设置迁移契约（ADR-0103）", () => {
       return;
     }
     // 登录：dev intent hook（webview 登录页注入已随 #610 删除）
-    loginViaDevIntent(serial);
+    await loginViaDevIntent(serial);
 
     // 迁移文件断言（本 spec 唯一的真实 oracle，必须先于任何 UI 断言——此处已无 UI 断言）：
     // 预置老键 show_r18=true 应已播种为账号键 show_r18_${uid}=true 并删老键。

@@ -44,8 +44,14 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
-import { currentTopActivity, forceStopApp, loginViaDevIntent, startMainActivity } from "../prefs";
-import { adbPath, APP_PACKAGE, LYNX_ACTIVITY, runCapture, runOrThrow } from "../env";
+import {
+  currentTopActivity,
+  forceStopApp,
+  loginViaDevIntent,
+  readAppLogcat,
+  startMainActivity,
+} from "../prefs";
+import { adbPath, LYNX_ACTIVITY, runCapture, runOrThrow } from "../env";
 import { setupAndroidE2e, type AndroidE2eContext } from "../setup";
 import { createCanvas, loadImage } from "canvas";
 
@@ -187,13 +193,17 @@ function dumpHasEditText(xml: string): boolean {
   return /class="android\.widget\.EditText"/u.test(xml);
 }
 
-/** logcat 按 pid 过滤 dump（--pid 需 API≥24，两 AVD 均满足）；进程不存在视为致命（调用方等待中会超时）。 */
+/**
+ * logcat 按 pid 过滤 dump（--pid 需 API≥24，两 AVD 均满足）。
+ *
+ * 委托 `prefs.readAppLogcat`：进程尚未创建时**返回空串**而不是抛错——
+ * `am start` 返回后 ActivityTaskManager 的 Activity 记录**先于**进程出现
+ * （实测 `START` 23:39:49.923 vs `Start proc` 23:39:50.070，差约 150ms），
+ * 而本函数被 `waitForLynxRenderReady` 的轮询循环调用，抛错会把「进程还没起」
+ * 误报成「app 崩溃或被杀」，并直接绕过整个等待逻辑。
+ */
 function logcatDumpByPid(serial: string): string {
-  const pid = runCapture(adbPath(), ["-s", serial, "shell", "pidof", APP_PACKAGE]).stdout.trim();
-  if (!pid) {
-    throw new Error(`进程 ${APP_PACKAGE} 不存在（已崩溃或被杀），无法按 pid 过滤 logcat`);
-  }
-  return runCapture(adbPath(), ["-s", serial, "shell", "logcat", "-d", "--pid", pid]).stdout;
+  return readAppLogcat(serial);
 }
 
 /** logcat 尾部 N 行（诊断输出用；获取失败不阻断，返回占位说明）。 */
@@ -291,7 +301,7 @@ describe.skipIf(SKIPPED)(
       // ── 阶段 A：dev intent hook 登录 ──
       // 单引擎布局无 webview 登录页（APK 内无 WebView），走 am start 的
       // refresh_token 钩子；token 缺省读 PIXIV_REFRESH_TOKEN（globalSetup 注入）
-      loginViaDevIntent(serial);
+      await loginViaDevIntent(serial);
 
       // ── 阶段 B：干净重启进已登录主界面 ──
       // client_kind 无需播种：单引擎下入口恒为 LynxActivity，写什么都归一为 lynx
