@@ -182,9 +182,8 @@ const CARD_TAP_CANDIDATES = [
 ];
 /** 列表滚动一屏（上滑，RefreshableList 只认下拉为刷新，上滑安全） */
 const SWIPE_SCROLL_UP: readonly [number, number, number, number] = [540, 1700, 540, 500];
-/** 搜索结果列表内上滑（起止点均在结果区内部，避免跨到 scope/sort chip 上误触） */
 /**
- * 结果列表上滑（#816 R2 复校正）。
+ * 结果列表上滑（#816 R2 复校正）。起止点均在结果区内部，避免跨到 scope/sort chip 上误触。
  *
  * 旧值起点 y=**2050** 已在内容区底界 `CONTENT_BOTTOM=2016` 之下（系统手势条 inset 内），
  * 落点不在 `<list class="flex-1 min-h-0">` 的盒内 ⇒ 列表收不到滚动。
@@ -275,8 +274,8 @@ function detectBookmarkRowOnFrame(p: Pixels, region: Region): { y0: number; y1: 
   return detectBookmarkRow(region, gray);
 }
 
-/** 内容区右界（横跨全屏宽；胶囊实测横跨 x 0..1078） */
-/** 收藏行探测扫描域（scrim 底部带；上界 = 内容区底界，避开系统栏） */
+/** 收藏行探测扫描域（scrim 底部带；右界 = `CONTENT_RIGHT` 1080 横跨全屏宽、
+ *  收藏胶囊实测横跨 x 0..1078；上界 = 内容区底界 2016，避开系统栏） */
 const REGION_BOOKMARK_SCAN: Region = { x0: 0, y0: 1700, x1: CONTENT_RIGHT, y1: CONTENT_BOTTOM };
 
 // 放射 FAB 落点：**推导所得，非魔数**（#816 R2 真因教训）。
@@ -354,10 +353,10 @@ function assertDeviceGeometry(s: string): void {
   const contentHeight = Number(rng?.[1]);
   expect(
     contentHeight,
-    `稳定区高度应为 2016（状态栏 72 + 手势条 72 之外）；实测 ${contentHeight}。` +
-      `本 spec 的 FAB / 采样窗口常量按 2016 校准，换 ROM 或切换导航模式后需重新校准` +
+    `稳定区高度应为 ${CONTENT_BOTTOM}（状态栏 72 + 手势条 72 之外）；实测 ${contentHeight}。` +
+      `本 spec 的 FAB / 采样窗口常量按 ${CONTENT_BOTTOM} 校准，换 ROM 或切换导航模式后需重新校准` +
       `（gestural ↔ threebutton 会改变底部系统条高度）。`,
-  ).toBe(2016);
+  ).toBe(CONTENT_BOTTOM);
 }
 
 /** APK 内 lynx bundle 必须含 benchNav 深链钩子（BENCH_NAV=1 整链构建），否则快速失败并给指令。 */
@@ -724,7 +723,8 @@ describe.skipIf(SKIPPED)(
      * 故按**三态**记账：
      *   judged  = 断言真跑了并给出通过/不通过的判定；
      *   skipped = 断言显式 `t.skip()` 声明「本形态不可判定」并带原因；
-     *   两者皆 0 = **既没判定也没声明** ⇒ 只可能是有代码直接 `return` 了 ⇒ 判红。
+     *   两者皆 0 = **既没判定也没声明** ⇒ 判红。⚠️ 但这**不唯一**指向 `return`
+     *   （见外层门处的成因清单）——写「只可能」会被四种同样产生双 0 的情形打脸。
      * skipped 的情形不判红，但会 `console.warn` 高亮「本轮未验证」，且 vitest 已把该
      * test 记为 **skipped**（不是 passed），信息不丢失、也不冒充通过。
      *
@@ -771,7 +771,9 @@ describe.skipIf(SKIPPED)(
       // ⚠️ 二版（逐行 AND，判 0 次即红）**太强**：把「内容形态导致的不可判定」
       //   报成产品回归，得到一个随机红的发版门（实测同代码两跑：一轮 skip 一轮通过）。
       // 三版（当前）：按三态记账——`judged===0 && skipped===0` 才判红，
-      //   该条件**只可能**由「直接 return、既不判定也不 skip」造成，正是首版要堵的洞。
+      //   该条件**主要**指向「直接 return、既不判定也不 skip」，正是首版要堵的洞；
+      //   但**不是唯一成因**——`-t` 过滤 / beforeAll 失败 / 前面断言抛错 / 超时
+      //   都会让台账停在双 0。故报错文案并列列出成因，不替读者猜。
       //   显式 skip 的行不判红，但 warn 高亮「本轮未验证」，且 vitest 已记 skipped。
       //
       // 反事实检验（务必保留）：把 R1 断言③ / R3 收藏行对的 skip 分支改回 `return`，
@@ -1106,10 +1108,14 @@ describe.skipIf(SKIPPED)(
       if (undetected.length > 0) {
         // ⚠️ #819：此处曾是 `return` —— vitest 记 **passed**，init-only props
         // （收藏数冻结在首卡）这条 C 类缺陷的帧证据防线形同虚设。改 ctx.skip()。
+        // 记账必须在 t.skip() **之前**：`t.skip()` 是 throw（vitest
+        // run.C5UmxDPh.js:3362 抛 PendingError 中止执行），放在其后不可达 ⇒
+        // 台账双 0 会被外层门误报成「return 回潮」并判红。
+        coreOutcome.r3.skipped += 1;
         t.skip(
           `R3 收藏行断言不可判定：${undetected.join(",")} 帧未探测到深色收藏胶囊` +
             `（内容形态不符，如非推荐流卡片）；不据此判定「props 冻结」。` +
-            `换卡 ×2 的图片区前进断言已判定（见上），但内容断言无判定 ⇒ 不记台账。`,
+            `换卡 ×2 的图片区前进断言已判定（见上），但内容断言无判定 ⇒ 记 skipped 不记 judged。`,
         );
       }
       let judgedPairs = 0;
