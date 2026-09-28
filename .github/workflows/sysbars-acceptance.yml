@@ -41,15 +41,10 @@ jobs:
           distribution: temurin
           java-version: 21
 
+      # 沙盒 #610：Web 构建与 Capacitor sync 随 WebView 线整体下线。
       # 与 ci.yml android-unit-test 同款前置（gradle 配置依赖 gitignored 生成物）
       - name: Generate credentials config
         run: pnpm --dir packages/app run sync:credentials
-
-      - name: Build web assets
-        run: pnpm --dir packages/app run build
-
-      - name: Capacitor sync
-        run: pnpm --dir packages/app run cap:sync
 
       # lynx 客户端本体：rspeedy bundle → android assets（LynxActivity 加载的就是它）。
       # 直调包级脚本——root 的 build:app-lynx 走全局 vp（CI 无此工具，vp-skew 教训）
