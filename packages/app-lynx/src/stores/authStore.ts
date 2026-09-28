@@ -184,10 +184,23 @@ export const useAuthStore = defineStore("auth", () => {
   /** 注册 401 自动刷新处理器（客户端在请求失败时调用） */
   function registerUnauthorizedHandler() {
     setOnUnauthorized(async () => {
-      const token = _refreshToken.value
+      // 内存态优先；**为空时回落到持久层**（#815）——
+      // 启动竞态下（restoreToken 的 OAuth 交换未完成）内存尚未填充，若此处直接放弃，
+      // 一次启动窗口内的 401 就会把「尚未恢复」升级为「永久失效」：
+      //   19:52:29.835  401 → 内存无 token → 跳过刷新 → 报会话失效 → 弹全屏 /error
+      // 而持久层（Keystore / IndexedDB）此时**确实有** token（实测密文存在），
+      // 回落读取即可完成刷新，登录态自愈。
+      let token = _refreshToken.value
       if (!token) {
-        console.warn("[authStore] 401 触发刷新但内存无 refresh_token（登录态已丢失），跳过刷新")
-        return
+        token = await loadRefreshToken().catch(() => null)
+        if (token) {
+          console.warn(
+            "[authStore] 401 触发刷新时内存无 refresh_token，已从持久层回落读取（启动竞态，自愈）",
+          )
+        } else {
+          console.warn("[authStore] 401 触发刷新但内存与持久层均无 refresh_token，跳过刷新")
+          return
+        }
       }
       const ok = await performRefresh(token)
       // 会话失效判定：仅「已登录会话的 401 刷新失败且进入永久失效清理态」触发全屏错误页。
