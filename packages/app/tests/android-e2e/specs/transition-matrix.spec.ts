@@ -11,8 +11,12 @@
  * ── 单引擎化后本门从 4 行降为 3 行（#610 处置）────────────────────────────
  * 原 R4「webview 搜索（基线对照）」整行删除：它断言的是 WebView SPA 的 DOM 契约
  * （`data-testid="illust-card"`、`role=status` 横幅、SideNavShell aria-label 搜索入口）。
- * 那些 testid 虽仍在 `packages/app/src/` 源码里，但**该 JS 不进 APK**（去 Capacitor 化后
- * `public/` 资产不再打包），断言已不可观测。连带删除其专属死代码
+ * **不可观测的原因不是「前端没打进包」**——实测（2026-09-28，unzip 主线 debug APK）
+ * 包内仍有 27 条 `assets/public/*` 外加 `assets/capacitor.config.json`；
+ * 而是去 Capacitor 化后**没有任何 Activity 承载 WebView**（`MainActivity` /
+ * `MainActivityWebview` 已删，唯一入口是 launcher `LynxActivity`），
+ * 于是 Appium 永远等不到 WEBVIEW context，DOM 断言无从落地。
+ * 连带删除其专属死代码
  * （`loginViaWebview` / `probeWebviewNumber` / `ROW_COUNT_EXPR` / `ILLUST_ROW_EXPR` / `BANNER_EXPR`）。
  * **本门不再有「双引擎基线对照」**——单引擎下不存在第二个渲染面可比。
  * spec §3.T2 的「4 行转换矩阵」表述已同步改为 3 行。

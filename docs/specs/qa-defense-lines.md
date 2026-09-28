@@ -47,7 +47,11 @@
 | R2 | lynx SearchSheet | 搜多结果词→滚到底→等第二页 | 断言翻页后行数增加且无「加载更多失败」横幅；再切「小说」scope→列表无插画行 |
 | R3 | lynx 推荐轮播 | 滑动 ≥2 张 | 每张卡收藏数两两不同（对比帧文本）；卡内容随 index 变化 |
 
-> **R4 已删除（单引擎化 #610 处置）**：原第 4 行是「webview 搜索（基线对照）」，断言的是 WebView SPA 的 DOM 契约（`data-testid="illust-card"`、`role=status` 横幅）。该 JS 在去 Capacitor 化后**不进 APK**，断言不可观测，属被测对象消失而非遗漏。连带删除 spec 内的 `loginViaWebview` / `probeWebviewNumber` / 三个 DOM 表达式常量。
+> **R4 已删除（单引擎化 #610 处置）**：原第 4 行是「webview 搜索（基线对照）」，断言的是 WebView SPA 的 DOM 契约（`data-testid="illust-card"`、`role=status` 横幅）。不可观测的原因是**没有 Activity 承载 WebView**（`MainActivity` / `MainActivityWebview` 已删，唯一入口是 launcher `LynxActivity`）⇒ Appium 永远等不到 WEBVIEW context。
+>
+> 注意：**不是**因为 webview 前端产物没打进包——实测主线 debug APK 内仍有 27 条 `assets/public/*` 与 `assets/capacitor.config.json`（`git ls-files` 为空只说明未跟踪，不代表不在包内）。这批资产是死资源，不影响可观测性判断，但应随收口一并清理。
+>
+> 连带删除 spec 内的 `loginViaWebview` / `probeWebviewNumber` / 三个 DOM 表达式常量。
 >
 > **门覆盖面已收窄，勿再按 4 行理解**：单引擎下不存在第二个渲染面，**本门不再有「双引擎基线对照」**。
 
