@@ -1,6 +1,10 @@
 # ADR-0164: 默认引擎翻转为 Lynx 与双向引擎降级
 
-- 状态：accepted
+- 状态：accepted；**「缺省 Lynx」部分仍生效，「双向引擎降级」部分已失效**（2026-09-28 单引擎化，`c6ade216`）
+  - 仍生效：Lynx 是唯一渲染引擎；`CLIENT_KINDS[0]` 为缺省引擎的单一事实来源。
+  - 已失效：本文的双向降级机制（`EngineRoute` / `EnginePrefs` / 降级原因码 / 失败记忆 / 无引擎双失败页）**已随手术整体删除**——无第二个引擎可降级。`docs/adr/glossary-client-switch.md` 中的引擎决策相关词条与 `docs/specs/engine-default-lynx-bidirectional-fallback.md` §8 取证格表（`engine-fallback-matrix.spec.ts` M1–M3'）**一并失效，不可再作为发版 gate 执行**。
+  - **本文不是被推翻，是被执行完毕后的收敛**：其决策目的是「让 Lynx 成为缺省且永不误降级」，单引擎化把该结论固化为结构性保证，代价是降级能力本身不再需要。
+  - 后续如有 WebView 线重建，本 ADR 的双向降级章节**须重新评估**，不可直接复用。
 - 日期：2026-09-16
 - 关联：ADR-0153（本决策将其「WebView 不可用 → Lynx」单向降级推广为双向，并翻转缺省语义）、ADR-0062（能力隐藏与 `CLIENT_KINDS`）、ADR-0064（Lynx 渲染错误兜底页）、ADR-0102（Lynx task 恢复）、ADR-0136（DEBUG 门控深链钩子范式）、ADR-0159（桥线程与落盘）、ADR-0163（QA 防线与转换矩阵门）、`docs/adr/glossary-client-switch.md`（新增词条：引擎决策模块 / 自动回退开关 / 失败记忆 / 生效状态快照 / 降级原因码 / 强制 WebView / 双失败 / 无障碍回退 / E2E 降级取证键）、`docs/specs/engine-default-lynx-bidirectional-fallback.md`
 

@@ -59,9 +59,13 @@
 | 生产构建           | `pnpm build`                                        | ✅ 成功生成 `dist/`                                          |
 | Android Debug 构建 | `cd android && ./gradlew assembleDebug --no-daemon` | ✅ `BUILD SUCCESSFUL`（213 个任务，27 执行，186 up-to-date） |
 
-> 注：Android Debug 构建仅作冒烟测试；正式发布前仍需使用真实 keystore 执行 `pnpm build:android:release:all` 生成三个签名 APK（full / webview / lynx）。
+> 注：Android Debug 构建仅作冒烟测试；正式发布前仍需使用真实 keystore 执行 `pnpm build:android:release` 生成**单个**签名 APK。
 >
-> 注（引擎切换）：`build:android*` 与 `release` 发布流水线已内置 Lynx bundle 构建与同步（`pnpm --dir ../app-lynx run build` → `node ../app-lynx/scripts/sync-android-assets.mjs`），无需手工执行 `pnpm sync:app-lynx-bundle`。若 full/lynx 包 APK 缺 `main.lynx.bundle`，切换渲染引擎后 LynxActivity 将加载失败（历史白屏问题，见 #51）；构建完成后可检查 `packages/app/android/app/src/main/assets/main.lynx.bundle` 是否存在。
+> 注（单引擎）：`build:android:release` 已内置 Lynx bundle 构建与同步（`pnpm --dir ../app-lynx run build` → `node ../app-lynx/scripts/sync-android-assets.mjs`）。若 APK 缺 `main.lynx.bundle`，LynxActivity 将加载失败（历史白屏问题，见 #51）；构建完成后可检查 `packages/app/android/app/src/main/assets/main.lynx.bundle` 是否存在。
+>
+> ⚠️ **2026-09-28 单引擎化后变更**（[c6ade216](https://github.com/a1121611810/Pictelio/pull/810)）：`full` / `webview` flavor 与 WebView / Capacitor 构建链已整体删除。
+> - `pnpm build:android:release:all`（三 APK）与 `pnpm cap:sync` **已不存在**，照抄会 command not found。
+> - 一个版本只产**一个** APK，无「选哪个包发布」这一步。
 
 ---
 
@@ -184,8 +188,8 @@ node scripts/release-bundle.mjs --version=<version>   # dist 默认 dist/，产�
 
 除既有构建/签名/上传步骤外，每次发版前必须完成以下各项：
 
-1. **双引擎转换清单全过**：按 `docs/agents/qa-transition-checklist.md`（手工版转换矩阵 R1-R4，内容断言口径）逐行执行，lynx + webview 双引擎全过方可发布。
+1. ⚠️ **原「双引擎转换清单」前提已消失，待重新定义**（单引擎化后无法执行）：`docs/agents/qa-transition-checklist.md` 的 R1-R4 全部以 webview 引擎存在为前提（其前置条件原文写「full 包即可」），现无 webview 可切换 ⇒ **该清单不可执行**。替代 gate 待 [#805](https://github.com/a1121611810/Pictelio/issues/805) 重新定义。⚠️ **在重新定义前本项视为未设防，不得当作「已过」**。重新定义时须注意：R1-R4 每行都源自一个真实缺陷回归，**逐行判定「该缺陷在单引擎下是否仍可能复现」，不可整份丢弃**。
 2. **pre-release 分阶段发布**：GitHub Releases 先以 pre-release 标记发布（beta 通道），挂 ≥3 天收集真机反馈后再转 stable（`gh release edit <tag> --prerelease=false`，或在 Release 页面取消 pre-release 勾选）。本项目不经 Play 分发，pre-release 标记即分阶段发布（ADR-0163「发布侧适配」）。
 3. **发布中发现缺陷先登记再修**：转换矩阵覆盖范围内的任何缺陷，先在 `docs/agents/qa-transition-checklist.md` 登记（标记回归行或新增矩阵行），再进入修复流程，确保修复自带回归防线。
-4. **引擎降级取证（ADR-0164）**：`pictelio_ui` 与 `pictelio_low` 各跑一轮 `specs/engine-fallback-matrix.spec.ts`（M1–M3'，命令见 `docs/android-e2e-gate.md`）；并对 release full 包 APK 做取证键消除断言——`unzip -p <apk> 'classes*.dex' | grep -c pictelio_debug_force_lynx_unavailable` 必须为 **0**（DEBUG 取证键在 release 被 R8 死代码消除的验收动作，非零 = 发布包含测试后门，禁止发布）。
+4. ⚠️ **原「引擎降级取证（ADR-0164）」已失效**（单引擎化后无法执行）：`specs/engine-fallback-matrix.spec.ts` 的 M1–M3' 四格取证全部测「Lynx 不可用 → 降级到 WebView」，现无 WebView 可降 ⇒ **四格均不再适用**。其中的取证键消除断言（`unzip -p <apk> 'classes*.dex' | grep -c pictelio_debug_force_lynx_unavailable` 必须为 0）**已成假绿**——该键已随引擎机制从生产代码删除，只剩 `tests/android-e2e/prefs.ts` 与 app-lynx 测试中的字符串残留，**恒为 0 恒过，不再具备「发布包含测试后门」的检出能力**。替代 gate 待 [#805](https://github.com/a1121611810/Pictelio/issues/805) 重新定义；在其之前本项**不得计为已过**。
 5. **lynx 夜间模式真机走查 gate（#692）**：发版前**必须执行并落档** [`docs/specs/lynx-night-mode-walkthrough.md`](specs/lynx-night-mode-walkthrough.md) 的 T2/T3/T4 矩阵（状态栏图标 4 组合、splash 4 组合、plate / icon-size 轨间差异、一次性滞后边界、API 28–30 残留、T4 五项），结果写入 `docs/research/lynx-night-mode-walkthrough-acceptance.md`，并与 [`docs/adr/ADR-0180-lynx-dark-mode.md`](adr/ADR-0180-lynx-dark-mode.md) 状态行的「真机走查 gate」对齐；矩阵未执行/未落档 = gate 未解除，不得发版（落档文件为新建、当前不存在属预期——**文件存在且矩阵全勾**才是解除判据；机器防线（契约测试）只证明读点/键名/色值同源，证明不了设备可见行为——见 spec §4.8「防线边界」）。

@@ -1,5 +1,11 @@
 # 核查：Pictelio 双客户端能力清单（一手代码证据）
 
+> ⚠️ **时点声明（2026-09-28 补）**：本文是 **2026-09-27 的时点代码核查**，是一手证据快照，价值在于「当时确实是这样」而非「现在是这样」。
+> 2026-09-28 单引擎化手术（[#610](https://github.com/a1121611810/Pictelio/issues/610)，合入 commit `c6ade216`）已把 `full` / `webview` flavor 与 WebView / Capacitor 构建链**整体删除**。
+> ⚠️ **上文「证据路径」中的 `packages/app/android/app/src/{main,full,webview,lynx}/java/` 已部分失效**——`full` / `webview` 源集目录不再存在（`main` 保留，`lynx` 保留）。照该路径复核 `full` / `webview` 相关条目会得到「文件不存在」，那**不是**核查失败，是这些条目已随手术移除。
+> 本文的**方法与 lynx 侧结论仍然有效**；webview 侧条目**不再反映当前状态**。正文按原样保留，作为该时点的证据底座。
+> 当前状态以 AGENTS.md 与 `openwiki/`（CI 定时重生成）为准；文档收口见 [#805](https://github.com/a1121611810/Pictelio/issues/805)。
+
 > 核查日期：2026-09-27
 > 核查方式：**不依赖** `docs/research/competitor-features-comparison.md` / `webview-vs-lynx-comparison.md`（2026-09-26 浅读版）的结论，直接读源码：路由表、页面组件、store 清单、Java 层模块、构建 flavor、i18n 词典。
 > 证据路径：`packages/app/src/router.tsx`、`packages/app-lynx/src/router.ts`、`packages/app/src/{routes,stores,components}/`、`packages/app-lynx/src/{pages,stores,components,composables,primitives,utils}/`、`packages/app/android/app/src/{main,full,webview,lynx}/java/`、`packages/app/android/app/build.gradle`。

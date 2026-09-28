@@ -1,5 +1,11 @@
 # ADR-0062：独立包引擎切换 UI 隐藏与 Native 能力暴露
 
+> **状态（2026-09-28 补）**：**目标已达成并被单引擎化内化，运行时判定部分已失效。**
+> 单引擎化手术（[#610](https://github.com/a1121611810/Pictelio/issues/610)，合入 commit `c6ade216`）删除了 `full` / `webview` flavor，`BuildConfig.CLIENT_KINDS` 塌缩为 `{"lynx"}`。
+> - 仍在生效：JS 侧「仅当 `CLIENT_KINDS` 同时含 `webview` 与 `lynx` 才渲染切换 UI」这条**判定规则本身**仍作为代码形态存在，只是判定结果恒为「不渲染」。
+> - 已失效：本文「背景」所述的三分包（`full` / `webview` / `lynx`）与独立 APK 结构**已不存在**；`MainActivityWebview` / `MainActivity` / Capacitor 构建链随之删除。`#610` 修的正是这个门控的失效缺陷（单引擎包误显客户端卡）。
+> - 本文正文**按原样保留**作为决策史，不重写。
+
 ## 背景
 
 三分包（full / webview / lynx 独立 APK，见 issues #113–#119）落地后，webview-only 和 lynx-only 包**不再包含另一引擎的运行时**：

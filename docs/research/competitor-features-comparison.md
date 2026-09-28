@@ -1,5 +1,10 @@
 # 调研：同类 Pixiv 第三方客户端功能对比（vs Pictelio）
 
+> ⚠️ **时点声明（2026-09-28 补）**：本文是 **2026-09-26 的时点调研记录**。矩阵把 Pictelio 的 `pictelio-app`（webview）与 `pictelio-app-lynx` **分列两行**做对比，该并列结构依赖「同一产品下的两个可切换客户端」这一前提。
+> 2026-09-28 单引擎化手术（[#610](https://github.com/a1121611810/Pictelio/issues/610)，合入 commit `c6ade216`）已把 `full` / `webview` flavor 与 WebView / Capacitor 构建链**整体删除**，当前为 **Lynx 单引擎**。
+> 本文的**竞品侧能力盘点与对比方法仍然有效**；但矩阵中 Pictelio 两行的对照关系已失效，**不可再作为「双客户端能力」引用**。正文按原样保留，作为该时点的证据与时间坐标。
+> 当前状态以 AGENTS.md 与 `openwiki/`（CI 定时重生成）为准；文档收口见 [#805](https://github.com/a1121611810/Pictelio/issues/805)。
+
 > 调研日期：2026-09-26
 > 调研方式：官方仓库 README / Release notes / 各项目 Wiki 浅读，结合 AGENTS.md + OpenWiki 中已记录的 Pictelio v5.5.0（pictelio-app 5.5.0 / pictelio-app-lynx pre-alpha）当前能力做矩阵对比。功能存在性以公开资料为准；未单独核验实现细节的标「未核验」。
 > 关联文档：`openwiki/quickstart.md`、`openwiki/architecture/overview.md`、`openwiki/architecture/api-layer.md`、`openwiki/architecture/image-pipeline.md`、`openwiki/domain/feed-and-browsing.md`、`openwiki/domain/novel-reader.md`、`openwiki/integrations/android-native.md`、`docs/research/bookmark-tags-similar-clients.md`。

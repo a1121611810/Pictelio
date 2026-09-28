@@ -1,5 +1,10 @@
 # 调研：Pictelio 双客户端能力分化 vs 同类 Pixiv 第三方客户端
 
+> ⚠️ **时点声明（2026-09-28 补）**：本文是 **2026-09-26 的时点调研记录**，正文整体建立在「双客户端 + `full` / `webview` / `lynx` 三个构建 flavor」的前提上。
+> 2026-09-28 单引擎化手术（[#610](https://github.com/a1121611810/Pictelio/issues/610)，合入 commit `c6ade216`）已把 `full` / `webview` flavor 与 WebView / Capacitor 构建链**整体删除**，当前为 **Lynx 单引擎**。
+> 本文的**竞品对比方法与竞品侧结论仍然有效**；但其中「Pictelio webview vs lynx 能力分化」一节的比较对象已不存在，**不再反映当前状态**。正文按原样保留，作为该时点的证据与时间坐标。
+> 当前状态以 AGENTS.md 与 `openwiki/`（CI 定时重生成）为准；文档收口见 [#805](https://github.com/a1121611810/Pictelio/issues/805)。
+
 > 调研日期：2026-09-26
 > 调研方式：两个客户端分别独立对比竞品；`pictelio-app` webview 客户端（SolidJS 2.0 + Capacitor 8.5 + Fluent 2，v5.5.0 已发布）+ `pictelio-app-lynx` lynx 客户端（vue-lynx + Material 3，pre-alpha）。每个客户端独立评估，**对比维度只采用已落地能力**（commit/源码可核验），未落地能力明确标"未做"。
 > 关联文档：`openwiki/quickstart.md`、`openwiki/architecture/overview.md`、`openwiki/architecture/api-layer.md`、`openwiki/architecture/image-pipeline.md`、`openwiki/domain/feed-and-browsing.md`、`openwiki/domain/novel-reader.md`、`openwiki/integrations/android-native.md`、`docs/research/competitor-features-comparison.md`（总览基线）、`docs/specs/app-lynx-novel-translation.md` + `app-lynx-novel-series-watchlist.md` + `app-lynx-global-search.md`（lynx 专项）。
