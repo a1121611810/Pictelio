@@ -65,7 +65,7 @@
  * - 断言证据：截图逐帧落盘 test-results/android-e2e/transition-matrix/。
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createCanvas, loadImage } from "canvas";
@@ -83,6 +83,7 @@ import {
   currentTopActivity,
   forceStopApp,
   loginViaDevIntent,
+  readAppLogcat,
   startMainActivity,
 } from "../prefs";
 import {
@@ -571,18 +572,18 @@ async function waitForTopActivity(activity: string, timeoutMs = 60_000): Promise
 }
 
 /**
- * 按 pid 读 logcat 尾部（lynx-bookmark-tags 同款：自带 16MB maxBuffer 防
- * OnPatchFinishForFiber 逐帧日志 ENOBUFS，-t 限尾防 60fps 噪声）。
+ * 按 pid 读 logcat 尾部（渲染就绪探测 + 证据留档）。
+ *
+ * #817：原先此处是一份**私有副本**（与 lynx-bookmark-tags 逐字同款），连同它的
+ * `"(进程不存在)"` 占位串一起。副本有三处问题：① logcat 采集口径分裂（本轮
+ * 统一只做了 2/4 处）；② pid 为空时返回占位串而非空串，会被 `waitForLynxRenderReady`
+ * 的正则当日志内容反复匹配，且**不** warn（违反「禁止静默降级」）；
+ * ③ 自带 spawnSync 绕开了 env.runCapture 的 cleanEnv。
+ * 现统一走 `prefs.readAppLogcat({ lines })`——`env.runCapture` 本就支持
+ * maxBuffer 形参（4th），16MB 逐帧缓冲与 `-t` 限尾都已收进该函数。
  */
 function logcatTailByPid(lines = 2000): string {
-  const pid = runCapture(adbPath(), ["-s", serial, "shell", "pidof", APP_PACKAGE]).stdout.trim();
-  if (!pid) return "(进程不存在)";
-  const r = spawnSync(
-    adbPath(),
-    ["-s", serial, "shell", "logcat", "-d", "--pid", pid, "-t", String(lines)],
-    { encoding: "utf-8", timeout: 30_000, maxBuffer: 16 * 1024 * 1024 },
-  );
-  return (r.stdout ?? "").trim();
+  return readAppLogcat(serial, { lines });
 }
 
 /** 等待 Lynx 渲染就绪（`onPageChanged|OnPatchFinishForFiber`，T7 口径，多 spec 同款）。 */
@@ -600,7 +601,8 @@ async function waitForLynxRenderReady(timeoutMs = 60_000): Promise<void> {
 
 /**
  * benchNav 深链启动（probe spec 同款）：force-stop → 清 logcat →
- * `am start --es benchNav <scenario>`（MainActivity 转发 extras → LynxActivity 四次广播）。
+ * `am start --es benchNav <scenario>`（**LynxActivity 自行读取**——`LynxActivity.java:504`
+ * getStringExtra("benchNav") 后按场景 sendGlobalEvent；单引擎下已无 MainActivity 转发环节）。
  */
 async function launchBenchNav(scenario: "illust" | "carousel"): Promise<void> {
   forceStopApp(serial);
@@ -695,12 +697,28 @@ async function waitForContentLoaded(
   );
 }
 
-
 // ─── 用例 ───
 
 describe.skipIf(SKIPPED)(
   `@release-gate T2 转换矩阵首版（issue #548，pictelio_ui）${SKIPPED ? `（SKIP：${SKIP_REASON}）` : ""}`,
   () => {
+    /**
+     * 实质判定计数台账（#817 code-review 两轴共识阻塞修复）。
+     *
+     * **为什么需要它**：本门多处「采样窗取不到被测对象 ⇒ 不可判定」分支。修掉
+     * `return` 判绿之前，这些分支让 vitest 记 **passed**——发版门对「相关作品段注入」
+     * （ADR-0162）与「收藏行两两不同」（init-only props）这两条**内容断言**丧失强制力，
+     * 且 `:xxx` 的「✓ R1/R3 通过」日志会宣称验证了实际未验证的事。
+     *
+     * 现在两处都改用 `ctx.skip()`（报 skipped 而非 passed），这里再补一道**外层**：
+     * 若 3 行全部不可判定，门判红——「什么都没验到」不等于「通过」。
+     *
+     * 计数对象只含**内容断言**（spec §3.T2 承诺的那些帧对比）：
+     * R1 断言③「相关作品」段注入、R3「收藏行」两两不同。R1 断言①② 与 R2 三条
+     * 是无条件的 `expect`，不可判定时走 `ctx.skip()`/正常判定，不进本台账。
+     */
+    const coreJudged = { r1Injected: 0, r3BookmarkPairs: 0 };
+
     beforeAll(async () => {
       const token = process.env.PIXIV_REFRESH_TOKEN ?? "";
       expect(token.length).toBeGreaterThan(0);
@@ -727,9 +745,19 @@ describe.skipIf(SKIPPED)(
       } catch {
         // 收尾失败不阻断
       }
+      // ── 外层门：内容断言一条都没判过 ⇒ 判红 ──────────────────────────────
+      // 反事实检验：把 R1 断言③ / R3 收藏行对的「不可判定即 return」改回去，
+      // 本断言仍绿；但那时两行会报 passed 且日志宣称已验证 —— 正是本条要堵的洞。
+      expect(
+        coreJudged.r1Injected + coreJudged.r3BookmarkPairs,
+        `发版门未做出任何内容判定（R1「相关作品」段注入 ${coreJudged.r1Injected} 次、` +
+          `R3「收藏行」两两不同 ${coreJudged.r3BookmarkPairs} 对）。` +
+          `三行全部落在「采样窗取不到被测对象」分支时，**什么都没验到 ≠ 通过**。` +
+          `取证：test-results/android-e2e/transition-matrix/ 下各 r1-*/r3-* 帧 + logcat。`,
+      ).toBeGreaterThan(0);
     });
 
-    it("R1 lynx /illusts：点中部卡片进详情 → 系统返回 → 锚点卡注入「相关作品」段 + 滚动不回顶", async () => {
+    it("R1 lynx /illusts：点中部卡片进详情 → 系统返回 → 锚点卡注入「相关作品」段 + 滚动不回顶", async (t) => {
       // 深链到 /illusts（benchNav illust），等列表内容渲染完成
       await launchBenchNav("illust");
       await waitForContentLoaded("r1-illusts", REGION_TOPREF, 25);
@@ -790,6 +818,7 @@ describe.skipIf(SKIPPED)(
       const notTopWindow = notTopRegion(tapPoint.y);
       const notTop = await diffRegion(s2, s1, notTopWindow);
       const vsTopRef = await diffRegion(s2, topRef, REGION_TOPREF);
+      let notTopJudged = false;
       // 判别力自检：窗太窄/内容不随滚动变化时，「真回顶」在该窗内未必有差异 ⇒ 判据失效。
       // 此时**显式 skip**，不拿一个无判别力的窗去判红（与断言③ 同一纪律）。
       const notTopPower = await diffRegion(s1, topRef, notTopWindow);
@@ -799,6 +828,7 @@ describe.skipIf(SKIPPED)(
         minPower: NOT_TOP_TH,
       });
       if (notTopVerdict.verdict === "indeterminate") {
+        notTopJudged = false;
         console.log(
           `[transition-matrix] ⏭ R1 断言①不可判定，已跳过（${notTopVerdict.reason}）：判别窗 ` +
             `y${notTopWindow.y0}..${notTopWindow.y1}（高 ${notTopWindow.y1 - notTopWindow.y0}px），` +
@@ -806,6 +836,7 @@ describe.skipIf(SKIPPED)(
             `锚点卡过靠上时该窗必然退化——**不判为「回顶回归」**，滚动保持由断言② 兜底`,
         );
       } else {
+        notTopJudged = true;
         expect(
           notTop,
           `返回后应停留在下滑后的滚动位置而非列表顶部（判别窗 y${notTopWindow.y0}..` +
@@ -842,18 +873,24 @@ describe.skipIf(SKIPPED)(
       const injected = await diffRegion(s1, s2, below);
       const belowSamples = geomRegionSamples(below);
       if (injected <= INJECT_TH) {
-        console.log(
-          `[transition-matrix] ⏭ R1 断言③不可判定，已跳过：注入段差异 ${injected} ≤ ${INJECT_TH}。` +
+        // ⚠️ #817：此处曾是 `return` —— vitest 记 **passed**，发版门对 ADR-0162
+        // 「相关作品」段注入回归彻底失效，且下方「✓ R1 通过」日志会宣称验证了
+        // 实际未验证的事。改为 `ctx.skip()`：报 skipped 而非 passed，诚实。
+        // 本次不记入台账 ⇒ afterAll 的外层门会因「无任何内容判定」判红。
+        t.skip(
+          `R1 断言③不可判定：注入段差异 ${injected} ≤ ${INJECT_TH}。` +
             `采样窗 y ${below.y0}..${below.y1}、采样点 ${belowSamples}；` +
-            `锚点上方保持率 ${preservedRatio.toFixed(4)}，返回帧与 s1 差异 ${notTop}。` +
+            `锚点上方保持率 ${preservedRatio.toFixed(4)}，返回帧与 s1 差异 ${notTop}` +
+            `${notTopJudged ? "（断言①亦不可判定）" : ""}。` +
             `锚点卡不在视口内或该内容形态不产生卡内展开段——**不判为「渲染缝回归」**` +
             `（consumeAnchor 日志显示「注入完成 items=N」时数据已到位，差异低是采样对象不可见）`,
         );
-        return;
       }
+      coreJudged.r1Injected += 1;
       console.log(
-        `[transition-matrix] ✓ R1 通过：未回顶（与 s1 差异 ${notTop} ≤ ${NOT_TOP_TH}）` +
-          `+ 滚动保持 + 相关作品段注入（差异 ${injected} > ${INJECT_TH}，证据 r1-*.png）`,
+        `[transition-matrix] ✓ R1 通过：` +
+          `${notTopJudged ? `未回顶（与 s1 差异 ${notTop} ≤ ${NOT_TOP_TH}）` : "断言①不可判定（未回顶未判）"}` +
+          ` + 滚动保持 + 相关作品段注入（差异 ${injected} > ${INJECT_TH}，证据 r1-*.png）`,
       );
     }, 300_000);
 
@@ -983,7 +1020,7 @@ describe.skipIf(SKIPPED)(
       );
     }, 420_000);
 
-    it("R3 lynx 推荐轮播：滑动换卡 ≥2 次 → 图片区前进 + 收藏行帧两两不同", async () => {
+    it("R3 lynx 推荐轮播：滑动换卡 ≥2 次 → 图片区前进 + 收藏行帧两两不同", async (t) => {
       await launchBenchNav("carousel");
       await waitForContentLoaded("r3-recommended", REGION_CAROUSEL_IMAGE, 25);
       const c0 = await waitForStableFrame("r3-card0", REGION_CAROUSEL_IMAGE);
@@ -1021,12 +1058,16 @@ describe.skipIf(SKIPPED)(
       }
       const undetected = rowSpans.map((s, i) => (s ? null : `card${i}`)).filter(Boolean);
       if (undetected.length > 0) {
-        console.log(
-          `[transition-matrix] ⏭ R3 跳过收藏行断言：${undetected.join(",")} 帧未探测到深色收藏胶囊` +
-            `（内容形态不符，如非推荐流卡片）；不据此判定「props 冻结」`,
+        // ⚠️ #817：此处曾是 `return` —— vitest 记 **passed**，init-only props
+        // （收藏数冻结在首卡）这条 C 类缺陷的帧证据防线形同虚设。改 ctx.skip()。
+        t.skip(
+          `R3 收藏行断言不可判定：${undetected.join(",")} 帧未探测到深色收藏胶囊` +
+            `（内容形态不符，如非推荐流卡片）；不据此判定「props 冻结」。` +
+            `换卡 ×2 的图片区前进断言已判定（见上），但内容断言无判定 ⇒ 不记台账。`,
         );
-        return;
       }
+      let judgedPairs = 0;
+      let skippedPairs = 0;
       for (let a = 0; a < frames.length; a++) {
         for (let b = a + 1; b < frames.length; b++) {
           // 以被测对象（较深的一帧）为准取窗：两帧布局一致时窗相同；不一致时取交集避免漏采样
@@ -1035,9 +1076,11 @@ describe.skipIf(SKIPPED)(
           const verdict = judgeBookmarkRow(row, d, BOOKMARK_LOOSE_TH, MIN_BOOKMARK_SAMPLES);
           // 窗未覆盖任何实质内容 ⇒ 差异 0 不可信（防「蒙对」：不能把采样失误当成状态冻结）
           if (verdict.verdict === "skip") {
+            skippedPairs += 1;
             console.log(`[transition-matrix] ⏭ R3 跳过第 ${a + 1}/${b + 1} 对：${verdict.reason}`);
             continue;
           }
+          judgedPairs += 1;
           expect(
             d,
             `第 ${a + 1} 与第 ${b + 1} 张卡的收藏行窗口内容相同（低对比差异 ${d} 应 > ${BOOKMARK_LOOSE_TH}；` +
@@ -1046,10 +1089,19 @@ describe.skipIf(SKIPPED)(
           ).toBeGreaterThan(verdict.expected);
         }
       }
+      // ⚠️ #817：三对全被 `continue` 吞掉时旧代码照样打「✓ R3 通过：…收藏行三帧两两不同」——
+      // 日志宣称验证了实际未验证的事。零判定 ⇒ skip 而非绿。
+      if (judgedPairs === 0) {
+        t.skip(
+          `R3 收藏行三帧两两不同：${skippedPairs} 对全部因采样窗无实质内容而不可判定` +
+            `（不得据此判定「props 冻结」，也不得视为通过）`,
+        );
+      }
+      coreJudged.r3BookmarkPairs += judgedPairs;
       console.log(
-        "[transition-matrix] ✓ R3 通过：换卡 ×2 + 收藏行三帧两两不同（证据 r3-card*.png）",
+        `[transition-matrix] ✓ R3 通过：换卡 ×2 + 收藏行三帧两两不同` +
+          `（实质判定 ${judgedPairs} 对 / 跳过 ${skippedPairs} 对，证据 r3-card*.png）`,
       );
     }, 240_000);
-
   },
 );

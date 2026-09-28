@@ -41,7 +41,6 @@ import { setupAndroidE2e, type AndroidE2eContext } from "../setup";
 import {
   adbPath,
   APP_PACKAGE,
-  E2E_FLAVOR,
   LYNX_ACTIVITY,
   MAIN_ACTIVITY,
   REPO_ROOT,
@@ -61,11 +60,10 @@ const EVIDENCE_DIR = resolve(
 );
 
 const TARGET_AVD = process.env.ANDROID_E2E_AVD || "pictelio_ui";
-const SKIPPED = TARGET_AVD !== "pictelio_ui" || E2E_FLAVOR === "webview";
-const SKIP_REASON =
-  TARGET_AVD !== "pictelio_ui"
-    ? `调查取证绑定 pictelio_ui（复现环境口径），当前 ANDROID_E2E_AVD=${TARGET_AVD}`
-    : `本调查需要 full 包（Lynx 引擎）；当前 ANDROID_E2E_FLAVOR=webview`;
+// ⚠️ #817 移除了 `|| E2E_FLAVOR === "webview"` 守卫（恒不可达 + 静默掩盖 flavor 配错）。
+// flavor 口径现在由 env.ts 收口显式抛错。
+const SKIPPED = TARGET_AVD !== "pictelio_ui";
+const SKIP_REASON = `调查取证绑定 pictelio_ui（复现环境口径），当前 ANDROID_E2E_AVD=${TARGET_AVD}`;
 if (SKIPPED) {
   console.log(`[lynx-detail-image-probe] SKIP: ${SKIP_REASON}`);
 }

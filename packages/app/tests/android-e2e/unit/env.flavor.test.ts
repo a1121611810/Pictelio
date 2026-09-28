@@ -10,7 +10,7 @@
  *
  * 这些是 IO 边界函数（读环境变量），按项目测试硬约束须覆盖成功与降级双路径。
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   APK_PATH,
   APP_PACKAGE,
@@ -96,5 +96,35 @@ describe("模块级派生态（本测试进程未设 ANDROID_E2E_FLAVOR ⇒ 走 
 
   it("ENTRY_ACTIVITIES 去重后只剩一个入口（单引擎无降级路径）", () => {
     expect(ENTRY_ACTIVITIES).toEqual(["io.pictelio.app.LynxActivity"]);
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.resetModules();
+});
+
+describe("非单引擎 flavor 的显式失败（#817）", () => {
+  // 反事实检验：把 env.ts 的 throw 去掉，本用例转红——此前各 spec 用
+  // `E2E_FLAVOR === "webview" ⇒ 整文件 skip` 兜着，配置写错只会静默跳过。
+  it("ANDROID_E2E_FLAVOR=full 时 import env 直接抛错并指向正确指令", async () => {
+    vi.resetModules();
+    vi.stubEnv("ANDROID_E2E_FLAVOR", "full");
+    await expect(import("../env")).rejects.toThrow(
+      new RegExp(apkRelativePath("full").replace(/[/.]/gu, "\\$&")),
+    );
+  });
+
+  it("ANDROID_E2E_FLAVOR=webview 时同样抛错", async () => {
+    vi.resetModules();
+    vi.stubEnv("ANDROID_E2E_FLAVOR", "webview");
+    await expect(import("../env")).rejects.toThrow(/release\/transition-6\.2\.0/);
+  });
+
+  it("缺省（无环境变量）不抛错，走 single", async () => {
+    vi.resetModules();
+    vi.stubEnv("ANDROID_E2E_FLAVOR", undefined);
+    const mod = await import("../env");
+    expect(mod.E2E_FLAVOR).toBe("single");
   });
 });

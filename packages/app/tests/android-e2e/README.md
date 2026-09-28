@@ -43,7 +43,8 @@ pnpm test:android:e2e
 
 默认自动选择第一个可用 AVD（pictelio_ui 优先）。冒烟测试会完整走通：
 AVD 检测启动 → boot 等待 → chromedriver 预置 → 编译安装 APK → Appium server → session →
-断言当前 Activity 为 `io.pictelio.app.MainActivity` → NATIVE_APP ↔ WEBVIEW context 切换。
+断言当前 Activity 为 `io.pictelio.app.LynxActivity`（单引擎唯一入口；`MainActivity` /
+`MainActivityWebview` 已随 #610 去 Capacitor 删除，故不再有 NATIVE_APP ↔ WEBVIEW context 切换）。
 
 ### 环境变量
 

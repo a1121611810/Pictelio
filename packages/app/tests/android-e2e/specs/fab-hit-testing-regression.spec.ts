@@ -193,19 +193,6 @@ function dumpHasEditText(xml: string): boolean {
   return /class="android\.widget\.EditText"/u.test(xml);
 }
 
-/**
- * logcat 按 pid 过滤 dump（--pid 需 API≥24，两 AVD 均满足）。
- *
- * 委托 `prefs.readAppLogcat`：进程尚未创建时**返回空串**而不是抛错——
- * `am start` 返回后 ActivityTaskManager 的 Activity 记录**先于**进程出现
- * （实测 `START` 23:39:49.923 vs `Start proc` 23:39:50.070，差约 150ms），
- * 而本函数被 `waitForLynxRenderReady` 的轮询循环调用，抛错会把「进程还没起」
- * 误报成「app 崩溃或被杀」，并直接绕过整个等待逻辑。
- */
-function logcatDumpByPid(serial: string): string {
-  return readAppLogcat(serial);
-}
-
 /** logcat 尾部 N 行（诊断输出用；获取失败不阻断，返回占位说明）。 */
 function logcatTail(serial: string, lines = 50): string {
   try {
@@ -225,7 +212,12 @@ function logcatTail(serial: string, lines = 50): string {
 async function waitForLynxRenderReady(serial: string, timeoutMs = 60_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (/onPageChanged|OnPatchFinishForFiber/u.test(logcatDumpByPid(serial))) {
+    // prefs.readAppLogcat：按 pid 过滤（--pid 需 API≥24，两 AVD 均满足）；进程尚未创建时
+    // **返回空串**而不是抛错——`am start` 返回后 ActivityTaskManager 的 Activity 记录
+    // **先于**进程出现（实测 `START` 23:39:49.923 vs `Start proc` 23:39:50.070，
+    // 差约 150ms），而此处正在轮询循环里，抛错会把「进程还没起」误报成
+    // 「app 崩溃或被杀」并直接绕过整个等待逻辑。
+    if (/onPageChanged|OnPatchFinishForFiber/u.test(readAppLogcat(serial))) {
       console.log("[fab] ✓ Lynx 渲染就绪（logcat: onPageChanged/OnPatchFinishForFiber）");
       return;
     }

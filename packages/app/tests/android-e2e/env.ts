@@ -51,6 +51,26 @@ export function apkRelativePath(flavor: E2eFlavor): string {
  */
 export const E2E_FLAVOR: E2eFlavor = resolveE2eFlavor(process.env.ANDROID_E2E_FLAVOR);
 
+/**
+ * 非单引擎 flavor 的**显式失败**（#817）。
+ *
+ * 背景：本分支 build.gradle 已无 productFlavors（实测 `productFlavors` 计数 0），
+ * `ANDROID_E2E_FLAVOR=full|webview` 会指向**本次构建根本没产出**的 APK 路径。
+ * 此前各 spec 用 `E2E_FLAVOR === "webview" ⇒ 整文件 skip` 兜着——但那条守卫
+ * ①恒不可达（永远走不到）、②静默，把「配置写错」伪装成「该设备上不可跑」。
+ *
+ * 改在 env.ts 收口：任何 spec / 工具只要 import env 就会立刻炸，并给出正确指令。
+ * 不放在各 spec 里逐个删守卫——那样「漏一个 spec 又静默跳过」的洞会留着。
+ */
+if (E2E_FLAVOR !== "single") {
+  throw new Error(
+    `[android-e2e] ANDROID_E2E_FLAVOR=${E2E_FLAVOR} 在本分支不可用：build.gradle 已无 ` +
+      `productFlavors（去 Capacitor 后唯一入口是 launcher LynxActivity），` +
+      `不存在 flavor 维度产物 ${apkRelativePath(E2E_FLAVOR)}。` +
+      `请去掉该环境变量（缺省即 single）；若确需跑双引擎，切到 release/transition-6.2.0 分支。`,
+  );
+}
+
 /** debug APK 产物路径（随 flavor 变化） */
 export const APK_PATH = resolve(APP_ROOT, apkRelativePath(E2E_FLAVOR));
 

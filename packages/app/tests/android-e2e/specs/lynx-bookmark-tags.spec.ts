@@ -86,16 +86,14 @@ import { resolve } from "node:path";
 import JSON5 from "json5";
 import { createCanvas, loadImage } from "canvas";
 import { setupAndroidE2e, type AndroidE2eContext } from "../setup";
+import { adbPath, LYNX_ACTIVITY, REPO_ROOT, runCapture, runOrThrow } from "../env";
 import {
-  adbPath,
-  APP_PACKAGE,
-  E2E_FLAVOR,
-  LYNX_ACTIVITY,
-  REPO_ROOT,
-  runCapture,
-  runOrThrow,
-} from "../env";
-import { currentTopActivity, forceStopApp, loginViaDevIntent, startMainActivity } from "../prefs";
+  currentTopActivity,
+  forceStopApp,
+  loginViaDevIntent,
+  readAppLogcat,
+  startMainActivity,
+} from "../prefs";
 
 const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -105,11 +103,11 @@ mkdirSync(EVIDENCE_DIR, { recursive: true });
 
 // ── AVD pin（仿 fab 回归 / switch-client-roundtrip-low）：坐标常量绑定 pictelio_ui ──
 const TARGET_AVD = process.env.ANDROID_E2E_AVD || "pictelio_ui";
-const SKIPPED = TARGET_AVD !== "pictelio_ui" || E2E_FLAVOR === "webview";
-const SKIP_REASON =
-  TARGET_AVD !== "pictelio_ui"
-    ? `本用例坐标常量绑定 pictelio_ui（1080×2160/density 480），当前 ANDROID_E2E_AVD=${TARGET_AVD}`
-    : `本用例需要 full 包（Lynx 引擎）；当前 ANDROID_E2E_FLAVOR=webview，已整文件跳过`;
+// ⚠️ #817 移除了 `|| E2E_FLAVOR === "webview"` 守卫：该分支在本分支恒不可达
+// （build.gradle 已无 productFlavors），静默 skip 会把「ANDROID_E2E_FLAVOR 配错」
+// 伪装成「该设备上不可跑」。flavor 口径现在由 env.ts 收口显式抛错。
+const SKIPPED = TARGET_AVD !== "pictelio_ui";
+const SKIP_REASON = `本用例坐标常量绑定 pictelio_ui（1080×2160/density 480），当前 ANDROID_E2E_AVD=${TARGET_AVD}`;
 if (SKIPPED) {
   console.log(`[lynx-bookmark-tags] SKIP: ${SKIP_REASON}`);
 }
@@ -541,22 +539,15 @@ async function waitForLynxRenderReady(timeoutMs = 60_000): Promise<void> {
 /**
  * 按 pid 读 logcat 尾部（渲染就绪探测 + 证据留档）。
  *
- * **两个必须处理的坑（都实测踩过）**：
- * 1. lynx 的 `ElementManager::OnPatchFinishForFiber` 是**逐帧日志（~60fps）**，
- *    `logcat -d --pid <pid>` 单次可达数 MB；`runCapture` 没有 maxBuffer 参数
- *    （spawnSync 默认 1MB）→ 直接抛 `ENOBUFS`（实测把用例 ② 打成红）。
- *    故此处自带 spawnSync + 16MB maxBuffer。
- * 2. 全量 dump 无意义（60fps 噪声），用 `-t 2000` 只取尾部 2000 行。
+ * #817：原为**私有副本**（与 transition-matrix 逐字同款）。副本把 logcat 采集
+ * 口径分裂成 4 处中的 2 处，且 pid 为空时返回 `"(进程不存在)"` 占位串——会被
+ * `waitForLynxRenderReady` 的正则当日志内容反复匹配，也**不** warn。
+ * 现统一走 `prefs.readAppLogcat({ lines })`：16MB maxBuffer（Lynx
+ * `ElementManager::OnPatchFinishForFiber` 是 ~60fps 逐帧日志，1MB 缺省会抛
+ * ENOBUFS，实测把用例 ② 打成红）与 `-t` 限尾均已收进该函数。
  */
 function logcatTailByPid(lines = 2000): string {
-  const pid = runCapture(adbPath(), ["-s", serial, "shell", "pidof", APP_PACKAGE]).stdout.trim();
-  if (!pid) return "(进程不存在)";
-  const r = spawnSync(
-    adbPath(),
-    ["-s", serial, "shell", "logcat", "-d", "--pid", pid, "-t", String(lines)],
-    { encoding: "utf-8", timeout: 30_000, maxBuffer: 16 * 1024 * 1024 },
-  );
-  return (r.stdout ?? "").trim();
+  return readAppLogcat(serial, { lines });
 }
 
 /** 把关键 logcat 行留档（剔除逐帧噪声）。 */

@@ -2,8 +2,8 @@
  * transition-matrix 发版门的**纯几何 / 判据逻辑**（issue #814，不碰 adb / 模拟器）。
  *
  * 抽出理由：spec 是 CLI 编排脚本（顶层执行 describe + 真实截图），无法直接单测——
- * 与 prefs.parseEngineState / prefs.poll 同款「编排与纯逻辑分离」惯例（先例见
- * tests/android-e2e/unit/prefs.*.test.ts）。
+ * 与 prefs.pollPrefs / prefs.loginViaDevIntent 同款「编排与纯逻辑分离」惯例
+ * （先例见 tests/android-e2e/unit/prefs.poll.test.ts）。
  *
  * ⚠️ oracle 溯源（非从实现反推）：全部期望值来自 **2026-09-28 实跑的真实证据帧**
  * （`test-results/android-e2e/transition-matrix/*.png`，#814 复跑 3 红 1 绿），
@@ -245,7 +245,8 @@ export function fabInnerItemPx(
  * 内环「搜索」项落点（px）= `innerPair[0]`。
  *
  * 恒定 `INNER_START` 的依据（不随内环项数变化，故不需在 spec 里数项数）：
- *   - `createGlobalFab.ts:131` 无条件 `items.unshift` 式首推 `GLOBAL_SEARCH_INNER_ITEM`；
+ *   - `createGlobalFab.ts:131` 的 `const items: FabInnerItem[] = [GLOBAL_SEARCH_INNER_ITEM]`
+ *     以**数组字面量首元素**固定搜索项首位（激活页动作在其后 `push`）；
  *   - `GlobalFab.vue` 模板 `v-for="e in innerPair"` **不按 `visible()` 过滤**，序号即渲染序；
  *   - `spread(start, end, count)` 的第 0 项恒为 `start`（`i=0` 时分母项为 0）。
  *   ⇒ 搜索项角度恒 `INNER_START`，页面注册几个动作都只影响后续项的角度。
