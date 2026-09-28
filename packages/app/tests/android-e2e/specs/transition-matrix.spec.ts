@@ -79,9 +79,12 @@ import {
   belowAnchorRegion,
   bookmarkSampleRegion,
   detectBookmarkRow,
+  fabCenterPx,
+  fabSearchItemPx,
   judgeBookmarkRow,
   judgeContentLoaded,
   regionSamples as geomRegionSamples,
+  roundPx,
   type GrayAt,
 } from "../transition-geometry";
 
@@ -107,8 +110,10 @@ if (SKIPPED) {
 // - /illusts 的榜单入口大卡是 RefreshableList 的**兄弟节点**（不在列表流内）→ 永不随列表
 //   滚动，恒占 y≈380..1150。任何 y<1200 的点击都会命中它并导航到 /ranking（首跑 R1/R2
 //   即因此误入榜单页）→ 卡片点击点位必须取 y≥1350（列表视口 1150..2088 内）。
-// - 内环「搜索」项实机在 (906,1760)（本会话多次实弹打开 SearchSheet）；几何推导值
-//   (901,1824) 偏低 64px 会落到环项之间（首跑 R2 因搜索层未开 → 输入落空 → 误触榜单卡）。
+// - 内环「搜索」项首跑写成魔数 (906,1760)，而实机在 **(903,1682)**（2026-09-28 20:27
+//   `r2-after-fab.png` 逐像素簇实测：三个 115px 内环小圆盘中心 903,1682 / 795,1742 /
+//   741,1852）——魔数落在环项之间的空隙，点下去菜单收起、回到列表，#816 R2 红真因。
+//   现改为按 GlobalFab.vue 几何推导（`fabSearchItemPx()`），见下方常量区。
 // - scope chip 行实机 y≈776（本轮实弹切「小说」成功）；几何推导值 860 实际命中
 //   **sort 行**（最新/最早/热门）——两行仅差约 84px，必须按实测取。
 // - 轮播收藏行（♥ + 收藏数）实机 y≈1915..1975；首跑窗口 1955..2070 只覆盖数字下缘 →
@@ -130,18 +135,20 @@ if (SKIPPED) {
 //   换 ROM / 换导航模式（gestural↔threebutton）导致稳定区高度变化时**快速失败**，
 //   而非静默点到空处——原实现只校验分辨率/密度，漏掉了这一维。
 //
-// - 放射 FAB（menu 模式，/illusts 为 4 顶层 tab 之一）：fabCx = 100-4.267-14.933/2 = 88.2665vw，
-//   fabCy = 201.6-4.267-14.933/2 = 188.2665vw（201.6vw = 稳定区 2016px / 1080px 宽 × 100）
-//   → (953, 1889)；
+// - 放射 FAB 与内环落点：**已由 `fabCenterPx()` / `fabSearchItemPx()` 按 GlobalFab.vue 几何推导**
+//   （常量在下方 CONTENT_BOTTOM / CONTENT_RIGHT 之后声明）。口径订正记录见上方两段。
 // - SearchSheet 底部面板 = 80vh：vh 基准存在 2088（= 2160-72）/2016（再减手势条 72）两种实测口径，
 //   面板顶分别为 490/547 —— 下列输入框坐标取两种口径的交集规避；
 // - 轮播滑动起点取封面图区（scrim 遮罩 pointer-events 不生效、不响应滑动——Recommended.vue 真机修复注记）。
-/** 放射 FAB 主按钮（menu 模式；y 按稳定区 2016 口径，见上方订正） */
-const FAB_TAP = { x: 953, y: 1889 };
-/** 内环「搜索」项（首跑校准：实机 (906,1760)，几何推导值偏低 64px 会落到环项之间） */
-const FAB_SEARCH_ITEM_TAP = { x: 906, y: 1760 };
-/** SearchSheet 输入框（两种 vh 口径下均落在输入行内：617..795 的交集 674..738 附近） */
-const SEARCH_INPUT_TAP = { x: 400, y: 700 };
+/**
+ * SearchSheet 输入框（2026-09-28 #816 R2 复校正：由像素实测替代旧「两口径取交集」的猜测）。
+ *
+ * 旧值 (400,700)：`r2-search-sheet.png`（20:45 R2 实跑）沿 x=400 竖扫，输入框淡紫填充带
+ * (225,227,233) 实为 **y 560..680**；y=700 已落到带外纯白 (255,255,255) → **点在框下 20px 空隙**，
+ * 输入框从未获得焦点，`input text "original"` 全部落空 ⇒ 结果区恒空 ⇒ 翻页「第 0 次上滑即停滞」。
+ * 框实测范围 x 48..1034 / y 560..680，取中心 (541,620)（该点为纯填充、未压占位符字形）。
+ */
+const SEARCH_INPUT_TAP = { x: 541, y: 620 };
 /** 「小说」scope chip（首跑校准：实机 y≈776；几何推导值 860 命中 sort 行——两行仅差 ~84px） */
 const SCOPE_NOVEL_TAP = { x: 512, y: 776 };
 /** /illusts 卡片点击点位网格（首跑/三跑校准：榜单卡恒占 y≤1150 → 全部取 y≥1250；
@@ -163,7 +170,18 @@ const CARD_TAP_CANDIDATES = [
 /** 列表滚动一屏（上滑，RefreshableList 只认下拉为刷新，上滑安全） */
 const SWIPE_SCROLL_UP: readonly [number, number, number, number] = [540, 1700, 540, 500];
 /** 搜索结果列表内上滑（起止点均在结果区内部，避免跨到 scope/sort chip 上误触） */
-const SWIPE_RESULTS_UP: readonly [number, number, number, number] = [540, 2050, 540, 1350];
+/**
+ * 结果列表上滑（#816 R2 复校正）。
+ *
+ * 旧值起点 y=**2050** 已在内容区底界 `CONTENT_BOTTOM=2016` 之下（系统手势条 inset 内），
+ * 落点不在 `<list class="flex-1 min-h-0">` 的盒内 ⇒ 列表收不到滚动。
+ * 现场证据（20:48 实跑 r2-scroll-0..9 逐段复算 diffRegion）：
+ *   - HUD 记到 `dY: -700.0`、`Yv: -2.332` ⇒ 手势**确实送达**了 App 根，但列表逐像素不动；
+ *   - 基线 vs scroll-0 的整屏 2157 差异里 **1658 落在 y0..120**（benchNav 调试 HUD，每次手势
+ *     都变），内容区仅 118/187/87；scroll-0 vs scroll-9 整屏只差 104 ⇒ 列表压根没滚。
+ * 起点改到 1900（落在最后一条可见结果行上），终点 1300（仍在列表顶 1188 之下）。
+ */
+const SWIPE_RESULTS_UP: readonly [number, number, number, number] = [540, 1900, 540, 1300];
 /** 轮播左滑换卡（起点/终点均在封面图区，scrim 区不响应滑动） */
 const SWIPE_CAROUSEL_NEXT: readonly [number, number, number, number] = [900, 700, 180, 700];
 
@@ -249,6 +267,27 @@ function detectBookmarkRowOnFrame(p: Pixels, region: Region): { y0: number; y1: 
 const CONTENT_RIGHT = 1080;
 /** 收藏行探测扫描域（scrim 底部带；上界 = 内容区底界，避开系统栏） */
 const REGION_BOOKMARK_SCAN: Region = { x0: 0, y0: 1700, x1: CONTENT_RIGHT, y1: CONTENT_BOTTOM };
+
+// 放射 FAB 落点：**推导所得，非魔数**（#816 R2 真因教训）。
+//
+// 声明位置在 CONTENT_BOTTOM / CONTENT_RIGHT 之后，因为推导要以内容区（稳定区）尺寸为输入——
+// 这正是本轮连续写错坐标的根源：全屏 2160 / app 2088 / 稳定区 2016 三种口径差 144px。
+// 公式镜像 packages/app-lynx/src/components/GlobalFab.vue（改组件几何须同步 transition-geometry.ts
+// 并跑 unit/transition-geometry.test.ts）：
+//   fabCx = 100 - 4.267 - 14.933/2 = 88.2665vw；fabCy = H − 4.267 − 14.933/2
+//   polar(a, r) = (cx + sin(a)·r, cy − cos(a)·r)；内环 r = 20vw
+/**
+ * 放射 FAB 主按钮圆心（取整 = **(953, 1889)**，与本轮像素实测验证过有效的手写常量逐位相同；
+ * 20:27 证据帧实测簇心 (952,1888)）。
+ */
+const FAB_TAP = roundPx(fabCenterPx(CONTENT_BOTTOM, CONTENT_RIGHT));
+/**
+ * 内环「搜索」项圆心（取整 = (901, 1680)；实测 (903,1682)）。
+ *
+ * 首跑写死 (906,1760)：距推导圆心 80px > 圆盘半径 57.6px ⇒ 点在环项之间的**空隙**，
+ * 菜单收起、回到列表，报错却写「SearchSheet 未打开」，把排查引向布局回归。已由单测钉死。
+ */
+const FAB_SEARCH_ITEM_TAP = roundPx(fabSearchItemPx(CONTENT_BOTTOM, CONTENT_RIGHT));
 
 // ── 帧对比阈值（差异采样点数，步长 2；fab spec 同量纲。首跑如误判优先校准这里）──
 /** 稳定判定：两次连拍差异 ≤ 此值视为画面已静止 */
