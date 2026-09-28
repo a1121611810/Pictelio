@@ -59,7 +59,7 @@
 > |------|------|--------|
 > | `judged > 0` | 真跑了并给出通过/不通过的判定 | 正常判红（断言不通过时） |
 > | `judged = 0, skipped > 0` | 显式声明「本形态不可判定」并写明原因 | **不判红**，但 `console.warn` 高亮「本轮未验证」；vitest 已把该 test 记为 skipped（非 passed） |
-> | `judged = 0, skipped = 0` | 既没判定也没声明 | **判红**——只可能是有代码把不可判定分支写回 `return` |
+> | `judged = 0, skipped = 0` | 既没判定也没声明 | **判红**。**成因不唯一**：① 不可判定分支被写回 `return`（要堵的洞）；② 该用例本轮**根本没执行**（`-t` 过滤 / `describe.skipIf` / `beforeAll` 失败 / 前面断言抛错 / 超时）。排查顺序：先看 vitest 结果的 passed/skipped 计数与 `beforeAll` 报错，再谈代码回潮 |
 >
 > 「求和」太弱（R3 判过就能替 R1 背书）；「逐行 AND」太强（把内容形态导致的不可判定报成产品回归，得到随机红的发版门）。三态是唯一同时满足「不放过 `return` 回潮」与「不因内容形态随机红」的形态。**反事实检验**：把 skip 分支改回 `return`，实测该行立刻转红，且同轮 R3 判过 3 对也遮不住（证明是逐行而非求和）。
 >
@@ -67,7 +67,7 @@
 >
 > **门覆盖面已收窄，勿再按 4 行理解**：单引擎下不存在第二个渲染面，**本门不再有「双引擎基线对照」**。
 
-实现约束：复用既有 helpers（`driver.ts`/`appium.ts`/代理方法学，先读 `lynx-boot-renders.spec.ts` 摸清惯例）；导航一律用 benchNav 深链（真机 @tap 不可靠）——单引擎下由 `LynxActivity` 自行读取 `benchNav` extra（`LynxActivity.java:504`），不经已删除的 MainActivity 转发；登录走 `prefs.loginViaDevIntent()`（dev intent hook，debug 包门禁）；R1 的注入段断言用页面文本「相关作品」+锚点卡定位。
+实现约束：复用既有 helpers（`driver.ts`/`appium.ts`/代理方法学，先读 `lynx-boot-renders.spec.ts` 摸清惯例）；导航一律用 benchNav 深链（真机 @tap 不可靠）——单引擎下由 `LynxActivity` 自行读取 `benchNav` extra（`LynxActivity.java:504`），不经已删除的 MainActivity 转发；登录走 `prefs.loginViaDevIntent()`（dev intent hook，debug 包门禁）；**R1 的注入段断言用「锚点卡下方区域帧对比」代理**（`belowAnchorRegion` 上的像素差 > `INJECT_TH`）——lynx 无文本读取通道（见下方口径），**不用**页面文本「相关作品」定位；且该代理只证明「该区域内容变化」，不区分变化来源，行文按代理口径表述。
 
 ### T3 宿主矩阵测试（app-lynx 单测，P1）
 

@@ -129,9 +129,11 @@ export default defineConfig({
     // 本分支新增的 `env.flavor.test.ts` 正是 `E2E_FLAVOR` 缺省翻转的唯一防线，
     // 把既有缺口升级成阻塞，故并入 CI 可见范围。
     // 两点隔离保证它们在 app 主配置下也成立：
-    //   ① 每个文件自带 `// @vitest-environment node` 头注释，覆盖默认 happy-dom；
-    //   ② `prefs.devLogin.test.ts` 用 `vi.mock("../env")` 顶掉 adb 依赖，
-    //      `env.flavor.test.ts` / `transition-geometry.test.ts` 是纯函数。
+    //   ① 依赖 node 环境的文件（`env.flavor` / `prefs.devLogin`）自带
+    //      `// @vitest-environment node` 头注释，覆盖默认 happy-dom；其余
+    //      （`prefs.poll` / `transition-geometry`）是纯函数，实测不碰
+    //      `node:` / `process` / `Buffer`，happy-dom 下同样可跑；
+    //   ② `prefs.devLogin.test.ts` 用 `vi.mock("../env")` 顶掉 adb 依赖。
     include: ["tests/unit/**/*.test.{ts,tsx}", "tests/android-e2e/unit/**/*.test.{ts,tsx}"],
     // SolidJS 2.0：@solidjs/vite-plugin 对 node 环境走「server 姿态」（solid-js 解析到
     // server 构建，signal 写入为惰性数据）。全仓单测依赖真实 client signal 语义，

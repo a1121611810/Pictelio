@@ -1,6 +1,18 @@
 # 发版前 QA 转换清单（双引擎转换矩阵 · 手工版）
 
-> **每行源自真实缺陷回归（ADR-0162/0163），发版前必过；发现缺陷先登记本清单再修。**
+> ## ⚠️ 本清单已随单引擎化（#610）下线，不可按本文勾选「已过」
+>
+> 单引擎化删除 `MainActivity` / `MainActivityWebview` 与引擎路由，唯一入口是 launcher
+> `LynxActivity`（`build.gradle` 已无 `productFlavors`）。因此本文的：
+> - **R4「webview 引擎基线对照」**与所有「切到 webview 引擎（`/client-switch`）」步骤**不可执行**；
+> - 所有 `am start -n io.pictelio.app/.MainActivity` 深链指向**已不存在的 Activity**；
+> - 前置条件「full 包即可」同样失效。
+>
+> 替代发版门：`docs/android-e2e-gate.md`（历史存档）+ `docs/specs/qa-defense-lines.md`
+> §3.T2（矩阵**现为 3 行**：R1/R2/R3 全部 Lynx）。该清单待 #805 重新定义。
+> 同一挂账见 `docs/release-checklist.md`（发版前第 1 项：「在重新定义前本项视为未设防」）。
+
+> **每行源自真实缺陷回归（ADR-0162/0163）；发现缺陷先登记再修。**
 >
 > 断言口径为**内容断言**（数值/内容对比），禁止单纯「页面存在」类存在性检查（#374 口径修订）。spec 唯一事实源：`docs/specs/qa-defense-lines.md` §3.T2（首版矩阵 R1-R4，每行 = 一个已收口缺陷的回归）。
 

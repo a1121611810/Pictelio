@@ -344,6 +344,10 @@ async function execute<T>(
   // #815：认证就绪门必须覆盖**原生分支**（该分支在下方提前 return，末尾的门到不了）。
   // 原生模式 access_token 由异步 OAuth 交换产出，交换完成前 Java 堆同样为空 ⇒
   // 启动窗口内的请求裸奔 → 401 → 401 handler 读空内存 → 永久失效。
+  //
+  // ⚠️ 门只收 GET，POST 不设门（#819 补注）：`loginWithRefreshToken` 不经本客户端，
+  // 启动窗口内没有走本客户端的 POST 读路径；给 POST 加门会给恢复期的写操作
+  // 引入额外延迟。若将来新增经本客户端的启动期 POST，须重新评估。
   if (method === "GET" && !accessToken) {
     await awaitAuthReady()
   }

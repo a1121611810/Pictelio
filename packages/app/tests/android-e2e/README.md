@@ -76,7 +76,8 @@ AVD 检测启动 → boot 等待 → chromedriver 预置 → 编译安装 APK �
   即默认落在 `pictelio_ui`（android-34，可真实运行 App）。
 - 以下用例必须 pin AVD：
   - `fab-hit-testing-regression`：spec 内已 pin 缺省 `pictelio_ui`（坐标常量按 1080×2160 /
-    density 480 的 vw 几何推导）。显式 `ANDROID_E2E_AVD=pictelio_low` 会整文件 skip。
+    density 480 的**稳定区 2016px** vw 几何推导——#819 订正，全屏 2160 口径已废弃，
+    差 144px 会让点击落到手势条上）。显式 `ANDROID_E2E_AVD=pictelio_low` 会整文件 skip。
   - `transition-matrix`：同样 pin `pictelio_ui`，同一套坐标常量理由。
   - pin 缺省不禁止显式覆盖：`ANDROID_E2E_AVD=pictelio_low` 始终有效。
 - `ensureEmulator` 的抢用保护：检测到已在线模拟器但不是目标 AVD 时**直接抛错**（提示先关闭
