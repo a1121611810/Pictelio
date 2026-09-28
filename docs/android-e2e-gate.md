@@ -1,8 +1,38 @@
-# Android 模拟器 E2E 门禁（切换渲染引擎链路）
+# Android 模拟器 E2E 门禁（切换渲染引擎链路）—— **已下线，历史存档**
+
+> ## ⚠️ 本文描述的门禁已随单引擎化（#610）下线
+>
+> **2026-09-28 起本文不再是可执行门禁，仅作历史存档。** 下文的运行命令、
+> 双 AVD 用法、路径触发清单里点名的 spec 与源码文件**大部分已不存在**：
+>
+> - **被删的 spec**：`switch-client-oneway` / `switch-client-roundtrip` /
+>   `switch-client-roundtrip-3x` / `switch-client-roundtrip-low` /
+>   `engine-fallback-matrix` / `webview-only-upgrade` / `client-kind-contract`，
+>   以及 webview 侧的 `network-check` / `bookmark-tags` / `webdav-backup`。
+>   它们测的是「WebView ↔ Lynx 客户端切换」「引擎可用性回退」「webview 客户端本身」，
+>   这些被测对象已随 #610 一并删除（处置原则与 #808 手术一致：**按被测对象存废，
+>   不按测试重不重要**）。
+> - **被删的源码**：`MainActivity.java` / `MainActivityWebview.java` / `engine/` 决策模块 /
+>   `src/webview` 源集 / `src/full` 源集。`build.gradle` 已无 `productFlavors`，
+>   唯一入口是 launcher `LynxActivity`。
+> - **`setup.ts` 不再播种** `pictelio_client_kind=webview`（下文的基线说明已过时）。
+> - **`ANDROID_E2E_FLAVOR`** 默认值已从 `full` 改为 `single`（单引擎布局）。
+>
+> **当前的门禁以这两处为准**：
+> 1. 套件总览与运行方式 → `packages/app/tests/android-e2e/README.md`
+> 2. 发版前手动门（`@release-gate`，单引擎后为 3 行 Lynx 转换矩阵）→
+>    `packages/app/tests/android-e2e/specs/transition-matrix.spec.ts` 与
+>    `docs/specs/qa-defense-lines.md` §3.T2
+>
+> 需要按历史决策追溯时看 `docs/adr/ADR-0153` / `ADR-0159` / `ADR-0164`（ADR 记录当时状态，本就不随代码改写）。
+
+---
 
 > ADR：[ADR-0061-android-emulator-e2e-gate.md](./adr/ADR-0061-android-emulator-e2e-gate.md)
 > 术语表：[glossary-android-emulator-e2e.md](./adr/glossary-android-emulator-e2e.md)
 > 基建 README：`packages/app/tests/android-e2e/README.md`
+
+> 以下为 #610 之前的原始内容。
 
 「切换渲染引擎」（WebView ↔ Lynx）链路横跨 WebView JS → Capacitor 桥 → SharedPreferences → MainActivity 入口路由 → LynxActivity，纯 Web 测试无法覆盖原生段。本门禁通过 Android 模拟器真实跑通完整链路，纳入质量关卡。
 

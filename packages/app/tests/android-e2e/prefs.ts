@@ -367,17 +367,49 @@ export function devLoginIntentArgs(token: string): string[] {
   ];
 }
 
+/** 登录成功标记。oracle = LynxActivity 内 `dev hook: 自动登录成功` 那一行（实测 2026-09-28） */
+const DEV_LOGIN_SUCCESS_MARK = "dev hook: 自动登录成功";
+
+/**
+ * 读取 app 进程的 logcat；进程尚未起来（pidof 空）时回退全量。
+ * 与 lynx-boot-renders 的同名辅助同构：按 pid 过滤避免环形 buffer 把目标行挤掉。
+ */
+function readAppProcessLogcat(serial: string): string {
+  const pid = runCapture(adbPath(), ["-s", serial, "shell", "pidof", APP_PACKAGE]).stdout.trim();
+  return runCapture(adbPath(), [
+    "-s",
+    serial,
+    "logcat",
+    "-d",
+    ...(pid ? [`--pid=${pid}`] : []),
+  ]).stdout;
+}
+
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
 /**
  * 用 dev intent hook 登录（等价 webview 登录页注入的 refresh_token，
  * 但不依赖 WebView 客户端——单引擎化后 webview 登录页已不存在）。
+ *
+ * **本函数是阻塞的：发起 `am start` 后轮询 logcat 直到看到成功标记才返回。**
+ * `am start` 只保证 intent 已投递，`autoLoginWithRefreshToken` 的 OAuth 交换与
+ * SecureStorage 落盘是异步的——若调用方紧接着 `forceStopApp`（多数 spec 的阶段 B），
+ * 会把登录打断，表现为「登录态莫名失效」。等成功标记即消除了这个竞态，
+ * 且比各 spec 各自 sleep 固定秒数更可靠。
  *
  * **实机验证（2026-09-28，pictelio_ui + 单引擎 debug 包）**：logcat 打出
  * `I LynxActivity: dev hook: 自动登录成功（userInfo={"userId":…,"userName":…}）`，
  * 随后 `PictelioSecureStorage.setItem.refresh_token` 持久化。
  *
  * token 缺省取 `process.env.PIXIV_REFRESH_TOKEN`（globalSetup 从 packages/app/.env 注入）。
+ * 超时即抛错并带上 logcat 尾部——**不做静默降级**：登录失败若被吞掉，
+ * 下游用例会以「内容为空」的形式给出完全误导的失败信息。
  */
-export function loginViaDevIntent(serial: string, token = process.env.PIXIV_REFRESH_TOKEN): void {
+export function loginViaDevIntent(
+  serial: string,
+  token = process.env.PIXIV_REFRESH_TOKEN,
+  timeoutMs = 90_000,
+): void {
   if (!token) {
     throw new Error(
       "[android-e2e] dev hook 登录缺少 PIXIV_REFRESH_TOKEN。" +
@@ -385,6 +417,22 @@ export function loginViaDevIntent(serial: string, token = process.env.PIXIV_REFR
     );
   }
   runOrThrow(adbPath(), ["-s", serial, ...devLoginIntentArgs(token)], TIMEOUTS.adb);
+
+  const deadline = Date.now() + timeoutMs;
+  let tail = "";
+  while (Date.now() < deadline) {
+    tail = readAppProcessLogcat(serial);
+    if (tail.includes(DEV_LOGIN_SUCCESS_MARK)) {
+      console.log("[android-e2e] ✓ dev hook 登录完成（已在 logcat 见到成功标记）");
+      return;
+    }
+    // 失败不做特殊分支：dev hook 的失败路径日志串未在源码中固定，交给超时分支统一暴露
+    void sleep(1_000);
+  }
+  throw new Error(
+    `[android-e2e] dev hook 登录超时（${timeoutMs / 1000}s），未等到「${DEV_LOGIN_SUCCESS_MARK}」。\n` +
+      `logcat 尾部（去敏后前 2000 字符）：\n${tail.slice(0, 2_000)}`,
+  );
 }
 
 /** 查询当前前台 Activity（dumpsys activity），归一化为 "package.Class" 形式 */

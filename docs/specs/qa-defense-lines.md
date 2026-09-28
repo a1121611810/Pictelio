@@ -39,16 +39,19 @@
 
 ### T2 转换矩阵 spec（android-e2e，P1）
 
-新文件 `packages/app/tests/android-e2e/specs/transition-matrix.spec.ts`，**发版前手动门**（describe 标注 `@release-gate`）。矩阵首版 4 行（每行 = 一个已收口缺陷的回归）：
+新文件 `packages/app/tests/android-e2e/specs/transition-matrix.spec.ts`，**发版前手动门**（describe 标注 `@release-gate`）。矩阵**现为 3 行**（每行 = 一个已收口缺陷的回归，全部 Lynx）：
 
 | 行 | 表面 | 动作序列 | 内容断言（禁存在性） |
 |----|------|----------|---------------------|
 | R1 | lynx `/illusts` 推荐 | 点中部卡片→详情→返回 | 返回后锚点卡内存在「相关作品」段（`relatedRowFor` 渲染物）；滚动位置不回顶（对比返回前后截图/首屏元素一致） |
 | R2 | lynx SearchSheet | 搜多结果词→滚到底→等第二页 | 断言翻页后行数增加且无「加载更多失败」横幅；再切「小说」scope→列表无插画行 |
 | R3 | lynx 推荐轮播 | 滑动 ≥2 张 | 每张卡收藏数两两不同（对比帧文本）；卡内容随 index 变化 |
-| R4 | webview 搜索 | 同 R2 序列 | 同 R2 断言（webview 侧基线对照） |
 
-实现约束：复用既有 helpers（`driver.ts`/`appium.ts`/登录种入/代理方法学，先读 `switch-client-roundtrip.spec.ts` 与 `lynx-boot-renders.spec.ts` 摸清惯例）；导航一律用 benchNav 深链（真机 @tap 不可靠）；R1 的注入段断言用页面文本「相关作品」+锚点卡定位。
+> **R4 已删除（单引擎化 #610 处置）**：原第 4 行是「webview 搜索（基线对照）」，断言的是 WebView SPA 的 DOM 契约（`data-testid="illust-card"`、`role=status` 横幅）。该 JS 在去 Capacitor 化后**不进 APK**，断言不可观测，属被测对象消失而非遗漏。连带删除 spec 内的 `loginViaWebview` / `probeWebviewNumber` / 三个 DOM 表达式常量。
+>
+> **门覆盖面已收窄，勿再按 4 行理解**：单引擎下不存在第二个渲染面，**本门不再有「双引擎基线对照」**。
+
+实现约束：复用既有 helpers（`driver.ts`/`appium.ts`/代理方法学，先读 `lynx-boot-renders.spec.ts` 摸清惯例）；导航一律用 benchNav 深链（真机 @tap 不可靠）——单引擎下由 `LynxActivity` 自行读取 `benchNav` extra（`LynxActivity.java:504`），不经已删除的 MainActivity 转发；登录走 `prefs.loginViaDevIntent()`（dev intent hook，debug 包门禁）；R1 的注入段断言用页面文本「相关作品」+锚点卡定位。
 
 ### T3 宿主矩阵测试（app-lynx 单测，P1）
 

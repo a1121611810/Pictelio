@@ -1,15 +1,23 @@
 // @vitest-environment node
 /**
- * @release-gate 发版前手动门：T2 转换矩阵首版（issue #548，spec docs/specs/qa-defense-lines.md §3.T2）。
+ * @release-gate 发版前手动门：T2 转换矩阵（issue #548，spec docs/specs/qa-defense-lines.md §3.T2）。
  *
  * **不进每-PR CI（#539 裁决）；发版前必跑 + 大 PR 手动触发。**
  * 运行前置 = Appium（pnpm appium:setup）+ AVD(pictelio_ui) + 代理（ANDROID_E2E_HTTP_PROXY=10.0.2.2:7897，
  * 等价 `adb shell settings put global http_proxy 10.0.2.2:7897`，setup.ts 统一下发/teardown 清除）
- * + 登录态（PIXIV_REFRESH_TOKEN，既有 spec 的种入方式：webview 侧 token 注入登录 → WSSecureStorage
- * 跨引擎种子恢复，ADR-0050/#126）+ **`BENCH_NAV=1 pnpm build:android`**（benchNav 深链钩子整链注入，
- * 单独注入 build:app-lynx 会被覆盖——#542 实测坑；beforeAll 用 bundle grep 快速失败）。
+ * + 登录态（PIXIV_REFRESH_TOKEN，经 `prefs.loginViaDevIntent()` 注入）+ **`BENCH_NAV=1 pnpm build:android`**
+ * （benchNav 深链钩子整链注入，单独注入 build:app-lynx 会被覆盖——#542 实测坑；beforeAll 用 bundle grep 快速失败）。
  *
- * **首跑已完成（2026-09-16，pictelio_ui，4/4 绿）**：R1 43.5s / R2 58.3s / R3 34.9s / R4 17.6s。
+ * ── 单引擎化后本门从 4 行降为 3 行（#610 处置）────────────────────────────
+ * 原 R4「webview 搜索（基线对照）」整行删除：它断言的是 WebView SPA 的 DOM 契约
+ * （`data-testid="illust-card"`、`role=status` 横幅、SideNavShell aria-label 搜索入口）。
+ * 那些 testid 虽仍在 `packages/app/src/` 源码里，但**该 JS 不进 APK**（去 Capacitor 化后
+ * `public/` 资产不再打包），断言已不可观测。连带删除其专属死代码
+ * （`loginViaWebview` / `probeWebviewNumber` / `ROW_COUNT_EXPR` / `ILLUST_ROW_EXPR` / `BANNER_EXPR`）。
+ * **本门不再有「双引擎基线对照」**——单引擎下不存在第二个渲染面可比。
+ * spec §3.T2 的「4 行转换矩阵」表述已同步改为 3 行。
+ *
+ * **首跑已完成（2026-09-16，pictelio_ui，双引擎时期，4/4 绿）**：R1 43.5s / R2 58.3s / R3 34.9s / R4 17.6s。
  * 首跑历经 5 轮校准（三失败全为**测试常量/度量**问题，非产品缺陷——R3 证据帧实证收藏数
  * 1168→33 正常变化而标准度量读不出）。校准要点（详见下方各常量与判据注释）：
  * ① 榜单入口大卡恒占 y≤1150 且不随列表滚动 → 对比区/点击点必须取其下（列表视口 1150..2088）；
@@ -18,7 +26,7 @@
  * ④ 低对比内容（♥ 收藏数半透明灰字）需「通道和差」度量，逐通道 >24 恒判恒等；
  * ⑤ 列表长度无界（original 达 30+ 屏）→ 翻页判据取「10 次滑动内底部带持续更新」而非「测到底」。
  *
- * ── 矩阵 4 行（spec §3.T2，每行 = 一个已收口缺陷的回归）─────────────────────
+ * ── 矩阵 3 行（spec §3.T2，每行 = 一个已收口缺陷的回归，全部 Lynx）──────────
  * R1 lynx `/illusts`（benchNav 深链）→ 点中部卡片进详情 → 系统返回：
  *    断言 ①返回后页面不是列表顶部（与深链后首帧对比，内容不同）；
  *         ②滚动位置保持（锚点卡上方区域与进详情前逐像素一致）；
@@ -35,25 +43,21 @@
  *                    ②底部 scrim 收藏行区域（♥ + 收藏数文本所在窗口）帧两两不同
  *                      （spec「收藏数两两不同（对比帧文本）」——C 类 props 冻结缺陷
  *                      「收藏数恒 135」的帧证据：冻结时该窗口跨卡恒等）。
- * R4 webview 搜索（同 R2 序列，基线对照；客户端切换用既有 roundtrip 的契约层惯例）：
- *    DOM 可直读，断言全部为数值/文本内容对比：结果行数增加（data-testid 计数）、
- *    无「加载更多失败」role=status 文本、切「小说」scope 后插画行数 = 0 且小说行数 > 0。
  *
  * ── 为什么 lynx 侧断言是「帧对比」而不是文本直读（口径声明，spec §0 允许）─────
  * Lynx 4.0.1 原生 LynxView 的 accessibility 树不暴露 view/text（TalkBack 绑定仍空树），
  * uiautomator dump 在 pictelio_ui 上必被 SIGKILL（exit 137）——「无 UI 自动化通道，
  * 全部定位走截图 + 像素分析」是仓库既有实测结论（lynx-bookmark-tags / fab spec 文件头）。
  * spec §0 对内容断言的定义包含「段存在性/数值对比」，§3.T2 对 R1/R3 明书「对比返回前后
- * 截图」「对比帧文本」——故 lynx 侧以**区域化帧对比**（差异必须落在语义区域：锚点下方/
- * 收藏行窗口/列表底部）承载内容断言，禁止整帧无差别 diff（那是 #374 存在性口径的换皮）；
- * webview 侧（R4）则按修订口径用数值/文本直读。R4 与 R2 同序列构成双引擎基线对照。
+ * 截图」「对比帧文本」——故本门以**区域化帧对比**（差异必须落在语义区域：锚点下方/
+ * 收藏行窗口/列表底部）承载内容断言，禁止整帧无差别 diff（那是 #374 存在性口径的换皮）。
  *
  * ── 驱动方式（全部沿用既有 spec 已验证的交互，无新发明）────────────────────
- * - 深链：`am start -n <pkg>/<MainActivity> --es benchNav <scenario>`（MainActivity 转发
- *   extras → LynxActivity onLoadSuccess 四次广播 → JS navigate，ADR-0136/#542 先例）；
+ * - 深链：`am start -n <pkg>/.LynxActivity --es benchNav <scenario>`——benchNav extra
+ *   由 LynxActivity 自行读取（`LynxActivity.java:504` getStringExtra("benchNav") +
+ *   `:660` applyDevIntentHooks），**不经过已删除的 MainActivity 转发**；
  * - 点击/滑动：adb `input tap|swipe|motionevent|keyevent`（fab / lynx-bookmark-tags 先例）；
- * - 登录：webview token 注入（roundtrip / fab / probe 同款内联实现，helpers 未提取故本文件照抄）；
- * - 客户端切换：writeClientKind 契约层 + 重启（roundtrip 先例）；
+ * - 登录：dev intent hook（prefs.loginViaDevIntent，替换原 webview 登录页注入）；
  * - 断言证据：截图逐帧落盘 test-results/android-e2e/transition-matrix/。
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -65,15 +69,18 @@ import { setupAndroidE2e, type AndroidE2eContext } from "../setup";
 import {
   adbPath,
   APP_PACKAGE,
-  E2E_FLAVOR,
   LYNX_ACTIVITY,
   MAIN_ACTIVITY,
   REPO_ROOT,
   runCapture,
   runOrThrow,
 } from "../env";
-import { clickByText } from "../helpers";
-import { currentTopActivity, forceStopApp, startMainActivity, writeClientKind } from "../prefs";
+import {
+  currentTopActivity,
+  forceStopApp,
+  loginViaDevIntent,
+  startMainActivity,
+} from "../prefs";
 import {
   MIN_BOOKMARK_SAMPLES,
   belowAnchorRegion,
@@ -98,11 +105,8 @@ mkdirSync(EVIDENCE_DIR, { recursive: true });
 
 // ── AVD pin（仿 lynx-bookmark-tags / fab 回归）：坐标常量绑定 pictelio_ui ──
 const TARGET_AVD = process.env.ANDROID_E2E_AVD || "pictelio_ui";
-const SKIPPED = TARGET_AVD !== "pictelio_ui" || E2E_FLAVOR === "webview";
-const SKIP_REASON =
-  TARGET_AVD !== "pictelio_ui"
-    ? `坐标常量绑定 pictelio_ui（1080×2160/density 480），当前 ANDROID_E2E_AVD=${TARGET_AVD}`
-    : `本用例需要 full 包（Lynx 引擎 + benchNav 深链）；当前 ANDROID_E2E_FLAVOR=webview，已整文件跳过`;
+const SKIPPED = TARGET_AVD !== "pictelio_ui";
+const SKIP_REASON = `坐标常量绑定 pictelio_ui（1080×2160/density 480），当前 ANDROID_E2E_AVD=${TARGET_AVD}`;
 if (SKIPPED) {
   console.log(`[transition-matrix] SKIP: ${SKIP_REASON}`);
 }
@@ -687,71 +691,6 @@ async function waitForContentLoaded(
   );
 }
 
-// ─── 登录（webview 契约注入；与 fab / probe spec 同款内联实现，helpers 未提取）───
-
-async function loginViaWebview(loginCtx: AndroidE2eContext): Promise<void> {
-  const driver = loginCtx.driver;
-  await driver.switchToWebView(60_000);
-
-  // 年龄确认页（/age-confirmation）：点「已满 18 岁」通过；已确认过则直接放行
-  await driver.raw.waitUntil(
-    async () => {
-      const url = await driver.raw.getUrl();
-      if (!url.includes("/age-confirmation")) return true;
-      await clickByText(loginCtx, "已满 18 岁");
-      return false;
-    },
-    { timeout: 60_000, timeoutMsg: "年龄确认页未通过", interval: 1_000 },
-  );
-
-  await driver.raw.waitUntil(
-    async () =>
-      (await driver.raw.$("fluent-textarea").isExisting()) &&
-      (await driver.raw.$("fluent-button=登录").isExisting()),
-    { timeout: 30_000, timeoutMsg: "登录页未渲染", interval: 1_000 },
-  );
-  const token = process.env.PIXIV_REFRESH_TOKEN ?? "";
-  expect(token.length).toBeGreaterThan(0);
-  await driver.raw.execute(
-    `(() => {
-      const ta = document.querySelector('fluent-textarea');
-      const inner = ta && ta.shadowRoot ? ta.shadowRoot.querySelector('textarea') : null;
-      if (!inner) return;
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
-      setter.call(inner, ${JSON.stringify(token)});
-      inner.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-      inner.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-    })()`,
-  );
-  await driver.raw.waitUntil(
-    async () => (await driver.raw.$("fluent-button=登录").getAttribute("disabled")) === null,
-    { timeout: 10_000, timeoutMsg: "token 注入后登录按钮未启用", interval: 300 },
-  );
-  await clickByText(loginCtx, "登录");
-  await driver.raw.waitUntil(async () => !(await driver.raw.getUrl()).includes("/login"), {
-    timeout: 90_000,
-    timeoutMsg: "登录失败（仍停留在 /login）",
-    interval: 2_000,
-  });
-  console.log("[transition-matrix] ✓ webview 登录完成（refresh_token 已落共享 WSSecureStorage）");
-}
-
-// ─── webview 数值探针（document.title 通道；switchToLynxFromSettings 先例：
-//      execute 返回值被 Chromedriver 包裹不可靠读取，改写 title 再 getTitle 读回）───
-
-async function probeWebviewNumber(jsExpr: string): Promise<number> {
-  await ctx.driver.raw.execute(`(() => { document.title = "E2E-PROBE-" + (${jsExpr}); })()`);
-  const title = String(await ctx.driver.raw.getTitle().catch(() => ""));
-  const m = /^E2E-PROBE-(-?\d+)$/u.exec(title);
-  return m ? Number(m[1]) : Number.NaN;
-}
-
-/** 搜索结果行总数（插画卡 + 小说卡；DOM 契约 = data-testid，ImageCard/NovelCard 源码钉死）。 */
-const ROW_COUNT_EXPR = `document.querySelectorAll('[data-testid="illust-card"],[data-testid="novel-card"]').length`;
-/** 插画结果行数（R4 scope 断言用）。 */
-const ILLUST_ROW_EXPR = `document.querySelectorAll('[data-testid="illust-card"]').length`;
-/** 「加载更多失败」横幅在否（InlineRetryBar role=status 文本；1 = 在）。 */
-const BANNER_EXPR = `[...document.querySelectorAll('[role="status"]')].some((el) => (el.textContent ?? '').includes('加载更多失败')) ? 1 : 0`;
 
 // ─── 用例 ───
 
@@ -767,15 +706,13 @@ describe.skipIf(SKIPPED)(
       serial = ctx.serial;
       assertDeviceGeometry(serial);
 
-      // 阶段 A：webview 登录（setupAndroidE2e 的 pm clear 清掉 Keystore token，只能真实登录）
-      writeClientKind(serial, "webview");
+      // 登录：setupAndroidE2e 的 pm clear 清掉了 Keystore 里的 token，只能真实登录。
+      // 单引擎布局下走 LynxActivity 的 dev intent hook（prefs.loginViaDevIntent），
+      // 不再需要 webview 登录页注入——webview 客户端已随 #610 移除。
       forceStopApp(serial);
       startMainActivity(serial);
-      await waitForTopActivity(MAIN_ACTIVITY);
-      await loginViaWebview(ctx);
-
-      // 阶段 B：契约层切 lynx（跨引擎登录态共享：WSSecureStorage → 种子恢复）
-      expect(writeClientKind(serial, "lynx")).toBe("lynx");
+      await waitForTopActivity(LYNX_ACTIVITY);
+      loginViaDevIntent(serial);
     }, 900_000);
 
     afterAll(async () => {
@@ -783,7 +720,6 @@ describe.skipIf(SKIPPED)(
       try {
         if (!serial) return;
         forceStopApp(serial);
-        writeClientKind(serial, "webview"); // 恢复默认，避免污染后续用例
       } catch {
         // 收尾失败不阻断
       }
@@ -1111,91 +1047,5 @@ describe.skipIf(SKIPPED)(
       );
     }, 240_000);
 
-    it("R4 webview 搜索（基线对照）：同 R2 序列 → 行数数值增加 + 无失败横幅 + 小说 scope 无插画行", async () => {
-      // 契约层切回 webview（switch-client-roundtrip 第三段同款惯例），重启后重取 WEBVIEW context
-      writeClientKind(serial, "webview");
-      forceStopApp(serial);
-      startMainActivity(serial);
-      await waitForTopActivity(MAIN_ACTIVITY);
-      const driver = ctx.driver;
-      await driver.switchToWebView(30_000);
-
-      // /home → SideNavShell 搜索入口（aria-label「搜索」；openSettingsFromHome 同款语义定位）
-      await driver.raw.waitUntil(
-        async () => await driver.raw.$("[aria-label='搜索']").isExisting(),
-        { timeout: 30_000, timeoutMsg: "/home 未渲染 SideNavShell 搜索入口", interval: 500 },
-      );
-      await driver.raw.execute(
-        `(() => { const el = document.querySelector("[aria-label='搜索']"); if (el) el.click(); })()`,
-      );
-      await driver.raw.waitUntil(
-        async () => (await driver.raw.getUrl().catch(() => "")).includes("/search"),
-        { timeout: 30_000, timeoutMsg: "点击搜索入口后未进入 /search", interval: 2_000 },
-      );
-
-      // 输入多结果词：TagInput 内原生 input（native setter + input 事件 + Enter 提交 tag，
-      // 与登录 token 注入同一 idiom）；tag 提交触发 store 搜索链
-      await driver.raw.waitUntil(
-        async () => await driver.raw.$("div.surface-card input[type='text']").isExisting(),
-        { timeout: 30_000, timeoutMsg: "/search 主搜索框未渲染", interval: 500 },
-      );
-      await driver.raw.execute(
-        `(() => {
-          const input = document.querySelector("div.surface-card input[type='text']");
-          const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-          setter.call(input, 'original');
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-        })()`,
-      );
-      await driver.raw.waitUntil(
-        async () => {
-          const n = await probeWebviewNumber(ROW_COUNT_EXPR);
-          return Number.isFinite(n) && n > 0;
-        },
-        {
-          timeout: 60_000,
-          timeoutMsg: "webview 搜索结果未渲染（original 应有多结果）",
-          interval: 2_000,
-        },
-      );
-
-      // 断言① 翻页后行数增加（数值对比；哨兵 IntersectionObserver 由滚动到底触发）
-      const countBefore = await probeWebviewNumber(ROW_COUNT_EXPR);
-      let countAfter = countBefore;
-      for (let i = 0; i < 6 && countAfter <= countBefore; i++) {
-        await driver.raw.execute(`(() => { window.scrollTo(0, document.body.scrollHeight); })()`);
-        await SLEEP(2_500);
-        countAfter = await probeWebviewNumber(ROW_COUNT_EXPR);
-      }
-      expect(
-        countAfter,
-        `滚动到底后结果行数应增加（翻页前 ${countBefore} → 翻页后 ${countAfter}）`,
-      ).toBeGreaterThan(countBefore);
-
-      // 断言② 无「加载更多失败」横幅（文本对比；InlineRetryBar role=status 承载该文案）
-      const banner = await probeWebviewNumber(BANNER_EXPR);
-      expect(banner, "搜索结果页出现「加载更多失败」横幅").toBe(0);
-
-      // 断言③ 切「小说」scope：插画行归零、小说行出现（数值对比；searchResults 双卡 data-testid 契约）
-      await clickByText(ctx, "小说");
-      await driver.raw.waitUntil(
-        async () => {
-          const illust = await probeWebviewNumber(ILLUST_ROW_EXPR);
-          const novel = await probeWebviewNumber(
-            `document.querySelectorAll('[data-testid="novel-card"]').length`,
-          );
-          return Number.isFinite(illust) && Number.isFinite(novel) && illust === 0 && novel > 0;
-        },
-        {
-          timeout: 60_000,
-          timeoutMsg: "切「小说」scope 后结果未刷新为纯小说行（插画行残留或空结果）",
-          interval: 2_000,
-        },
-      );
-      console.log(
-        `[transition-matrix] ✓ R4 通过：行数 ${countBefore} → ${countAfter}，无失败横幅，小说 scope 插画行 = 0`,
-      );
-    }, 300_000);
   },
 );

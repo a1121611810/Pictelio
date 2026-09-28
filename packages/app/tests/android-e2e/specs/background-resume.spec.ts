@@ -1,11 +1,18 @@
 /**
- * 缩小恢复验收（spec #200 / ADR-0102）：full 包 lynx 模式「退后台→点桌面图标→
- * 仍停留在原页面」——Android task 恢复契约的回归守护。
+ * 缩小恢复验收（spec #200 / ADR-0102）：单引擎 lynx「退后台→点桌面图标→仍停留在原页面」
+ * ——Android task 恢复契约的回归守护。
  *
- * 背景（ADR-0102，模拟器实证）：MainActivity 是 singleTask 路由壳，每次路由后
- * finish，永远没有存活实例可收 launcher 重投递的 onNewIntent → 每次点图标都重建
- * MainActivity 并新开 LynxActivity（全新 JS runtime + task 无限堆叠，实测 2 次叠 3 层）。
- * 修复：非 task 根时 finish 让位，由系统恢复旧实例。
+ * 背景（ADR-0102，模拟器实证）：过渡期的 MainActivity 路由壳每次路由后 finish，
+ * 永远没有存活实例可收 launcher 重投递的 onNewIntent → 每次点图标都重建 Activity
+ * 并新开 LynxActivity（全新 JS runtime + task 无限堆叠，实测 2 次叠 3 层）。
+ *
+ * 单引擎化（#610）后 MainActivity 路由壳已删除，launcher 入口即 LynxActivity，
+ * 本 spec 守护的契约变为：**manifest 的 `android:launchMode="singleTask"`
+ * + LynxActivity 不覆写 `onNewIntent`** ⇒ 退后台点桌面图标时，launcher 的
+ * MAIN/LAUNCHER intent 被重投递给存活的 task 根实例（AndroidManifest.xml:39），
+ * 既不重建 Activity 实例、也不新建 Lynx JS runtime。机制一旦被破坏（改 launchMode /
+ * 引入会重建实例的 onNewIntent / 恢复路径上强制重启 runtime），下面的实例数、
+ * 新 runtime 日志、PID 三项断言会立刻变红。
  *
  * 断言策略（lynx UI 对 uiautomator 不透明，页面内容不可直接断言）——用机制证据：
  * 1. 顶层 Activity 仍为 LynxActivity（未退出）
@@ -18,12 +25,10 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { setupAndroidE2e, type AndroidE2eContext } from "../setup";
-import { writeClientKind, forceStopApp, startMainActivity, currentTopActivity } from "../prefs";
-import { adbPath, APP_PACKAGE, runCapture } from "../env";
+import { forceStopApp, startMainActivity, currentTopActivity } from "../prefs";
+import { adbPath, APP_PACKAGE, LYNX_ACTIVITY, runCapture } from "../env";
 
 const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
-/** LynxActivity 类名（currentTopActivity 归一化形式） */
-const LYNX_ACTIVITY = "io.pictelio.app.LynxActivity";
 
 /** task 中 LynxActivity 实例数（dumpsys activity，Hist 记录数；实例堆叠的直接度量） */
 function lynxInstanceCount(serial: string): number {
@@ -55,8 +60,8 @@ describe("android-e2e 缩小恢复：退后台→点桌面图标→仍为原实�
 
   beforeAll(async () => {
     ctx = await setupAndroidE2e();
-    // 预置 lynx 客户端（MainActivity 入口路由据此分发到 LynxActivity）
-    writeClientKind(ctx.serial, "lynx");
+    // 单引擎布局：launcher 入口恒为 LynxActivity，无需预置 client_kind
+    // （CLIENT_KINDS 已塌缩为 {lynx}，写入任何值都会被归一为 lynx）
     forceStopApp(ctx.serial);
     startMainActivity(ctx.serial);
   }, 600_000);
@@ -70,7 +75,7 @@ describe("android-e2e 缩小恢复：退后台→点桌面图标→仍为原实�
     try {
       await ctx.driver.raw.waitUntil(async () => currentTopActivity(serial) === LYNX_ACTIVITY, {
         timeout: 60_000,
-        timeoutMsg: "预置 lynx 后未进入 LynxActivity",
+        timeoutMsg: "启动后未进入 LynxActivity",
         interval: 1_000,
       });
       // 等待 LynxView 完成首次渲染（renderTemplateUrl 已发生）后再清窗口
@@ -93,7 +98,7 @@ describe("android-e2e 缩小恢复：退后台→点桌面图标→仍为原实�
         // 退后台（模拟 Home 手势）
         await driver.raw.background(-1);
         await SLEEP(1_000);
-        // 点桌面图标（launcher MAIN/LAUNCHER intent → 路由壳重投递路径）
+        // 点桌面图标（launcher MAIN/LAUNCHER intent → singleTask task 根重投递路径）
         await driver.raw.activateApp(APP_PACKAGE);
         // 恢复后仍在 LynxActivity
         await driver.raw.waitUntil(async () => currentTopActivity(serial) === LYNX_ACTIVITY, {

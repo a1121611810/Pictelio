@@ -63,9 +63,12 @@
  * - 设备全局代理（`ANDROID_E2E_HTTP_PROXY=10.0.2.2:7897`）：模拟器 DNS 被污染，
  *   不设代理则推荐流与图片都拉不到（实测）。
  * - 登录：`setupAndroidE2e` 的 `pm clear` 会清掉 Keystore 里的 refresh_token，
- *   故先按 fab 回归同款流程在 **webview 侧**注入 token 登录（`loginViaWebview`），
- *   再切 `pictelio_client_kind=lynx` 重启——lynx 经 `PictelioAuth` 从共享
- *   `WSSecureStorage` 种子恢复登录态（跨引擎登录态共享，ADR-0050/#126）。
+ *   故走 LynxActivity 的 **dev intent hook**（`prefs.loginViaDevIntent`）真实登录：
+ *   `am start -n io.pictelio.app/.LynxActivity --es pictelio_dev_refresh_token <token>`
+ *   → `LynxActivity.applyDevIntentHooks()` 调 `autoLoginWithRefreshToken` 持久化并登录
+ *   （门禁 BuildConfig.DEBUG，只有 debug 包有该钩子）。单引擎化后 webview 登录页已不存在
+ *   （APK 内无 WebView），跨引擎共享 WSSecureStorage 种子恢复那条路随之失效。
+ *   `pictelio_client_kind` 无需播种：单引擎下入口恒为 LynxActivity，写什么都归一为 lynx。
  * - `PIXIV_REFRESH_TOKEN`（packages/app/.env）与 `credentials.json5`：host 侧
  *   独立 oracle 用（与 webview 验收同源）。
  *
@@ -88,13 +91,11 @@ import {
   APP_PACKAGE,
   E2E_FLAVOR,
   LYNX_ACTIVITY,
-  MAIN_ACTIVITY,
   REPO_ROOT,
   runCapture,
   runOrThrow,
 } from "../env";
-import { clickByText } from "../helpers";
-import { currentTopActivity, forceStopApp, startMainActivity, writeClientKind } from "../prefs";
+import { currentTopActivity, forceStopApp, loginViaDevIntent, startMainActivity } from "../prefs";
 
 const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -765,56 +766,6 @@ function persistJson(name: string, value: unknown): void {
   writeFileSync(resolve(EVIDENCE_DIR, name), JSON.stringify(value, null, 1));
 }
 
-// ─── 登录（webview 契约注入；与 switch-client-oneway / fab 回归同款内联实现）──
-
-async function loginViaWebview(): Promise<void> {
-  const driver = ctx!.driver;
-  await driver.switchToWebView(60_000);
-
-  // 年龄确认页（/age-confirmation）：点「已满 18 岁」通过；已确认过则直接放行
-  await driver.raw.waitUntil(
-    async () => {
-      const url = await driver.raw.getUrl();
-      if (!url.includes("/age-confirmation")) return true;
-      await clickByText(ctx!, "已满 18 岁");
-      return false;
-    },
-    { timeout: 60_000, timeoutMsg: "年龄确认页未通过", interval: 1_000 },
-  );
-
-  await driver.raw.waitUntil(
-    async () =>
-      (await driver.raw.$("fluent-textarea").isExisting()) &&
-      (await driver.raw.$("fluent-button=登录").isExisting()),
-    { timeout: 30_000, timeoutMsg: "登录页未渲染", interval: 1_000 },
-  );
-
-  const token = process.env.PIXIV_REFRESH_TOKEN ?? "";
-  expect(token.length).toBeGreaterThan(0);
-  await driver.raw.execute(
-    `(() => {
-      const ta = document.querySelector('fluent-textarea');
-      const inner = ta && ta.shadowRoot ? ta.shadowRoot.querySelector('textarea') : null;
-      if (!inner) return;
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
-      setter.call(inner, ${JSON.stringify(token)});
-      inner.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-      inner.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-    })()`,
-  );
-  await driver.raw.waitUntil(
-    async () => (await driver.raw.$("fluent-button=登录").getAttribute("disabled")) === null,
-    { timeout: 10_000, timeoutMsg: "token 注入后登录按钮未启用", interval: 300 },
-  );
-  await clickByText(ctx!, "登录");
-  await driver.raw.waitUntil(async () => !(await driver.raw.getUrl()).includes("/login"), {
-    timeout: 90_000,
-    timeoutMsg: "登录失败（仍停留在 /login）",
-    interval: 2_000,
-  });
-  console.log("[lynx-bookmark-tags] ✓ webview 登录完成（refresh_token 已落共享 WSSecureStorage）");
-}
-
 // ─── 导航：lynx 无深链（见文件头），用设备级点击进详情 ───
 
 /** 推荐页「首屏已出内容」判定：骨架屏近乎纯色，加载后色彩桶数骤增（实测 3 → 94）。 */
@@ -938,15 +889,11 @@ describe.skipIf(SKIPPED)(
       serial = ctx.serial;
       assertDeviceGeometry();
 
-      // 阶段 A：webview 登录（pm clear 后 Keystore 里没有 token，只能真实登录）
-      writeClientKind(serial, "webview");
-      forceStopApp(serial);
-      startMainActivity(serial);
-      await waitForTopActivity(MAIN_ACTIVITY);
-      await loginViaWebview();
+      // 阶段 A：dev intent hook 登录（pm clear 后 Keystore 里没有 token，只能真实登录）
+      loginViaDevIntent(serial);
 
-      // 阶段 B：契约层切 lynx（跨引擎登录态共享 → 种子恢复）
-      expect(writeClientKind(serial, "lynx")).toBe("lynx");
+      // 阶段 B：干净重启进已登录主界面
+      // client_kind 无需播种：单引擎下入口恒为 LynxActivity，写什么都归一为 lynx
       forceStopApp(serial);
       runOrThrow(adbPath(), ["-s", serial, "logcat", "-c"]);
       startMainActivity(serial);
@@ -973,7 +920,8 @@ describe.skipIf(SKIPPED)(
       try {
         if (!serial) return;
         forceStopApp(serial);
-        writeClientKind(serial, "webview"); // 恢复默认，避免污染后续用例
+        // 单引擎布局下无「默认引擎」可恢复（写入的 client_kind 一律归一为 lynx），
+        // force-stop 即完成收尾，不播种 prefs 避免污染后续用例
       } catch {
         // 收尾失败不阻断
       }
