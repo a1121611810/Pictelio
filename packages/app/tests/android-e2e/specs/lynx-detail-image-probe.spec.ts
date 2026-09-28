@@ -11,9 +11,12 @@
  *
  * 流程（复用既有 harness，全程无 UI 点击）：
  *   1. setupAndroidE2e（AVD + Appium + APK，可选 ANDROID_E2E_HTTP_PROXY 设备全局代理）
- *   2. webview 侧 CDP 注入 token 登录（fab/bookmark-tags 同款；lynx 经共享
- *      WSSecureStorage 种子恢复，ADR-0050/#126）
- *   3. 切 pictelio_client_kind=lynx → 重启 → **benchNav 深链直达详情页**
+ *   2. LynxActivity 的 **dev intent hook** 登录（`prefs.loginViaDevIntent`，
+ *      `am start --es pictelio_dev_refresh_token` → `applyDevIntentHooks()` 持久化并登录，
+ *      门禁 BuildConfig.DEBUG）——单引擎化后 webview 登录页已不存在（APK 内无 WebView），
+ *      原「webview 注入 → 切 lynx 种子恢复」两段式随之失效；client_kind 亦无需播种
+ *      （单引擎下入口恒为 LynxActivity，写什么都归一为 lynx）
+ *   3. **benchNav 深链直达详情页**
  *      （`--es benchNav illust-detail --es benchNavIllustId <id>`，#542 建成的通道，
  *      取代 bookmark-tags spec 的「轮播首卡点击进入」像素定位法）
  *   4. 等 20s（四次广播 6s + 详情请求 + 图片并发窗口）→ logcat -d 全量落盘 + 分类
@@ -38,15 +41,13 @@ import { setupAndroidE2e, type AndroidE2eContext } from "../setup";
 import {
   adbPath,
   APP_PACKAGE,
-  E2E_FLAVOR,
   LYNX_ACTIVITY,
   MAIN_ACTIVITY,
   REPO_ROOT,
   runCapture,
   runOrThrow,
 } from "../env";
-import { clickByText } from "../helpers";
-import { forceStopApp, startMainActivity, writeClientKind } from "../prefs";
+import { forceStopApp, loginViaDevIntent } from "../prefs";
 
 const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -59,11 +60,10 @@ const EVIDENCE_DIR = resolve(
 );
 
 const TARGET_AVD = process.env.ANDROID_E2E_AVD || "pictelio_ui";
-const SKIPPED = TARGET_AVD !== "pictelio_ui" || E2E_FLAVOR === "webview";
-const SKIP_REASON =
-  TARGET_AVD !== "pictelio_ui"
-    ? `调查取证绑定 pictelio_ui（复现环境口径），当前 ANDROID_E2E_AVD=${TARGET_AVD}`
-    : `本调查需要 full 包（Lynx 引擎）；当前 ANDROID_E2E_FLAVOR=webview`;
+// ⚠️ #819 移除了 `|| E2E_FLAVOR === "webview"` 守卫（恒不可达 + 静默掩盖 flavor 配错）。
+// flavor 口径现在由 env.ts 收口显式抛错。
+const SKIPPED = TARGET_AVD !== "pictelio_ui";
+const SKIP_REASON = `调查取证绑定 pictelio_ui（复现环境口径），当前 ANDROID_E2E_AVD=${TARGET_AVD}`;
 if (SKIPPED) {
   console.log(`[lynx-detail-image-probe] SKIP: ${SKIP_REASON}`);
 }
@@ -80,55 +80,6 @@ function assertDeepLinkHookPresent(): void {
         "（整链注入；build:android 内部重跑 lynx build，单独注入 build:app-lynx 会被覆盖，#542 实测坑）",
     );
   }
-}
-
-/** webview 侧 CDP 注入 token 登录（fab 回归同款；lynx 经共享 WSSecureStorage 恢复） */
-async function loginViaWebview(loginCtx: AndroidE2eContext): Promise<void> {
-  const { driver } = loginCtx;
-  await driver.switchToWebView(60_000);
-
-  await driver.raw.waitUntil(
-    async () => {
-      const url = await driver.raw.getUrl();
-      if (!url.includes("/age-confirmation")) return true;
-      await clickByText(loginCtx, "已满 18 岁");
-      return false;
-    },
-    { timeout: 60_000, timeoutMsg: "年龄确认页未通过", interval: 1_000 },
-  );
-
-  await driver.raw.waitUntil(
-    async () =>
-      (await driver.raw.$("fluent-textarea").isExisting()) &&
-      (await driver.raw.$("fluent-button=登录").isExisting()),
-    { timeout: 30_000, timeoutMsg: "登录页未渲染", interval: 1_000 },
-  );
-  const token = process.env.PIXIV_REFRESH_TOKEN!;
-  await driver.raw.execute(
-    `(() => {
-      const ta = document.querySelector('fluent-textarea');
-      const inner = ta && ta.shadowRoot ? ta.shadowRoot.querySelector('textarea') : null;
-      if (!inner) return;
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
-      setter.call(inner, ${JSON.stringify(token)});
-      inner.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-      inner.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-    })()`,
-  );
-  await driver.raw.waitUntil(
-    async () => {
-      const btn = await driver.raw.$("fluent-button=登录");
-      return (await btn.getAttribute("disabled")) === null;
-    },
-    { timeout: 10_000, timeoutMsg: "token 注入后登录按钮未启用", interval: 300 },
-  );
-  await clickByText(loginCtx, "登录");
-  await driver.raw.waitUntil(async () => !(await driver.raw.getUrl()).includes("/login"), {
-    timeout: 90_000,
-    timeoutMsg: "登录失败（仍停留在 /login）",
-    interval: 2_000,
-  });
-  console.log(`[probe] ✓ webview 登录成功: ${await driver.raw.getUrl()}`);
 }
 
 /** 截图到本地文件（exec-out 二进制直传，不经 utf-8 编码） */
@@ -174,16 +125,9 @@ beforeAll(async () => {
   ctx = await setupAndroidE2e(TARGET_AVD);
   const serial = ctx.serial;
 
-  // ① webview 侧登录（token → 共享 WSSecureStorage）
-  writeClientKind(serial, "webview");
-  forceStopApp(serial);
-  startMainActivity(serial);
-  await SLEEP(6_000);
-  await loginViaWebview(ctx);
-
-  // ② 切 lynx 重启（benchNav 钩子仅 lynx 生效）
-  forceStopApp(serial);
-  writeClientKind(serial, "lynx");
+  // 登录：dev intent hook（setup 的 pm clear 清掉了 Keystore 里的 token，只能真实登录）。
+  // 深链启动由用例内的 launchDeepLink 负责（force-stop → 清 logcat → am start），故此处不再播种引擎。
+  await loginViaDevIntent(serial);
 }, 600_000);
 
 afterAll(() => {

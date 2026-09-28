@@ -23,6 +23,9 @@
  *                                   与 --web-only 互斥）
  *   PICTELIO_OTA_MIN_APK         - bundle 的最低宿主 APK 版本（透传 release-bundle.mjs，缺省不设下限）
  *   PICTELIO_KEY_PASSWORD        - key 密码（正常发布必须；web-only 不检查）
+ *   PICTELIO_RELEASE_BRANCH      - 发布目标分支（缺省 main；设了则分支校验/分叉预检/push 目标
+ *                                   三处一并切到该分支。过渡版发版用：
+ *                                   PICTELIO_RELEASE_BRANCH=release/transition-6.2.0 pnpm release）
  *
  * 发布文案「模型总结」的可选配置（-i 与 -c 共用；值填在 packages/app/.env，该文件不进 git，
  * 四个键缺任一 = 未配置 → 跳过该步骤并打 warn）:
@@ -57,7 +60,12 @@ import {
 import { truncateChangelog } from "./lib/changelog.mjs";
 import { bundlePathsFor, resolveOtaPrivateKeyPath } from "./lib/release-bundle-core.mjs";
 import { parseWebOnlyArgs, buildVersionJson } from "./lib/release-webonly.mjs";
-import { assertMainNotDiverged } from "./lib/release-preflight.mjs";
+import { assertReleaseBranchNotDiverged } from "./lib/release-preflight.mjs";
+import {
+  assertOnReleaseBranch,
+  releaseBranchWarning,
+  resolveReleaseBranch,
+} from "./lib/release-branch.mjs";
 import { planOverwrite, executeOverwrite, probeRemote } from "./release-overwrite.mjs";
 import { uploadReleaseAssets, resolveUploader } from "./lib/release-uploader.mjs";
 import { probeProxyRouting } from "./lib/proxy-probe.mjs";
@@ -150,15 +158,15 @@ function ok(...m) {
   console.log(`[release] ✅`, ...m);
 }
 
-// P2：发布必须在 main 分支执行，避免 commit/tag 落在非 main 分支
-// 而 push 仍推 main，导致 tag 指向不在远端 main 上的 commit。
-function ensureOnMainBranch() {
-  const branch = runOutput("git", ["branch", "--show-current"]);
-  if (branch !== "main") {
-    throw new Error(
-      `发布必须在 main 分支执行（当前分支: ${branch || "(detached HEAD)"}）。请先 git checkout main 再重跑`,
-    );
-  }
+// P2：发布必须在「发布目标分支」执行，避免 commit/tag 落在非目标分支
+// 而 push 仍推目标分支，导致 tag 指向不在远端分支上的 commit。
+// 目标分支默认 main；PICTELIO_RELEASE_BRANCH 可显式覆盖（解析/校验/告警在
+// lib/release-branch.mjs，可单测——main() 有 TTY 早退，内联逻辑在 CI 里跑不到）。
+// 三处（分支校验 / 分叉预检 / push 目标）共用同一个值，避免「只放开一两处」的半开状态。
+function ensureOnReleaseBranch(branch) {
+  assertOnReleaseBranch({ current: runOutput("git", ["branch", "--show-current"]), branch });
+  const warning = releaseBranchWarning(branch);
+  if (warning) log(`⚠ ${warning}`);
 }
 
 // ── 核心流程 ──
@@ -710,8 +718,10 @@ async function main() {
   log("Pictelio 一键发布脚本");
   console.log("");
 
-  // P2：发布前强制校验 main 分支
-  ensureOnMainBranch();
+  // P2：发布前强制校验「发布目标分支」（默认 main，可由 PICTELIO_RELEASE_BRANCH 覆盖）
+  // 三处（分支校验 / 分叉预检 / push 目标）共用这一个值，避免半开状态
+  const releaseBranch = resolveReleaseBranch(process.env);
+  ensureOnReleaseBranch(releaseBranch);
 
   // 覆盖发布模式：对已发布版本更新文案/资产，不 bump 版本号
   if (isOverwrite) {
@@ -797,13 +807,16 @@ async function main() {
 
   // ADR-0142 D3 / ticket #353：远端分叉预检——确认前 fail-fast，零半成品
   // （分叉时中止：版本号未 bump、无 commit/tag；fetch 失败仅 warn，由 pre-push 钩子兜底）
-  await assertMainNotDiverged({ cwd: repoRoot });
+  await assertReleaseBranchNotDiverged({ cwd: repoRoot, branch: releaseBranch });
 
   // ── 发布计划确认 ──
   console.log("─".repeat(40));
   log("即将执行以下发布操作：");
   console.log(`  版本: ${currentVersion} → ${newVersion} (versionCode: ${versionCode})`);
   console.log(`  标签: ${tag}`);
+  console.log(
+    `  目标分支: ${releaseBranch}${releaseBranch === "main" ? "" : "  ⚠ 非 main（PICTELIO_RELEASE_BRANCH 覆盖）"}`,
+  );
   // #255：web-only 的步骤文案与 prerelease 语义对齐实际执行内容
   console.log(
     isWebOnly
@@ -985,7 +998,7 @@ async function main() {
         await runWithSpinner(`git push (第 ${attempt} 次)`, "git", [
           "push",
           "origin",
-          "main",
+          releaseBranch,
           "--tags",
         ]);
         return;

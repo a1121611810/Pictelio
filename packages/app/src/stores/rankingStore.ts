@@ -161,12 +161,21 @@ export function createRankingStore(initial?: RankingQuery): RankingStoreResult {
 
   const ensureLoaded = async (): Promise<void> => {
     const current = untrack(query);
+    // queryFn 与 queryKey 同源装配：原实现只传 queryKey + `as never` 逃逸类型，
+    // 靠「该 query 已由上面的 useInfiniteQuery 装配」才不炸——未装配时 TanStack
+    // `build()` 用传入 options 新建 query，无 queryFn → `Missing queryFn` 抛成
+    // unhandled rejection（与 createTQFeedStore.ensureLoaded 同一族缺陷，#811）。
+    // 对已装配的 query 传 queryFn 是严格 no-op（QueryCache.build 命中即丢弃 options）。
     await queryClient.ensureInfiniteQueryData({
       queryKey: queryKeys.ranking(rankingCacheKey(current)),
+      queryFn: ({ pageParam, signal }) =>
+        pageParam ? fetchRankingNext(pageParam, signal) : fetchRanking(current, signal),
+      getNextPageParam: (last: PixivIllustListResponse) => last.next_url ?? undefined,
+      initialPageParam: undefined as string | undefined,
       staleTime: staleTimeFor(current),
       // 陈旧缓存同步返回 + 后台重拉（SWR），与 feed store 同语义
       revalidateIfStale: true,
-    } as never);
+    });
   };
 
   const refresh = async (): Promise<unknown> => {

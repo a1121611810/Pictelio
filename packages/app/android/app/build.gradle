@@ -17,8 +17,16 @@ android {
         applicationId "io.pictelio.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 60100
-        versionName "6.1.0"
+        // 单引擎线（#802 起）：线上 v6.1.0 已是 60100，同号则无法覆盖安装，故抬到 602xx。
+        // 现值 60201（过渡版 v6.2.1 已发布占用）——事实源是 packages/app/package.json 的 version，
+        // 由 `pnpm sync:android-version`（scripts/sync-android-version.mjs）按
+        // major×10000+minor×100+patch 推导写回；**直接改本行会被该脚本覆盖回旧值**。
+        // ⚠️ 本分支已合回单引擎 main（PR #818）：原注释「不合进 main / main 走 60300」
+        // 是过渡分支并行期的假设，随合并作废。
+        // 待定：合回后 versionCode 序列尚未拍板（另起主线 60300，还是顺延 60202），
+        // 见 #819；未定案前不动本值。
+        versionCode 60201
+        versionName "6.2.1"
         buildConfigField "String", "OTA_ED25519_PUBLIC_KEY_B64", "\"${otaPublicKeyB64}\""
         // 沙盒 #610：client flavor 维度下线（WebView/Capacitor 线整体删除），
         // 入口写死 Lynx。占位符机制保留但不再按 flavor 注入。

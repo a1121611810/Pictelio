@@ -11,7 +11,6 @@ import { ensureAppiumServer, assertUiautomator2DriverInstalled } from "./appium"
 import { ensureEmulator, assertDeviceOnline } from "./avd";
 import { ensureChromedriver } from "./chromedriver";
 import { buildDebugApk, installApk } from "./build-install";
-import { writeClientKind } from "./prefs";
 import { adbPath, APP_PACKAGE, runCapture, runOrThrow, sdkRoot, TIMEOUTS } from "./env";
 
 // uiautomator2 driver 的 session 创建在 vitest 进程内执行（remote()），
@@ -84,9 +83,9 @@ export async function setupAndroidE2e(avdName?: string): Promise<AndroidE2eConte
     console.log(`[android-e2e] ✓ 真机 ${serial} 已预装 ${APP_PACKAGE}（外部预装约定）`);
   }
 
-  // 冒烟基线：清掉 app 数据（含可能残留的 pictelio_client_kind=lynx，否则
-  // MainActivity 入口路由会分发到 LynxActivity，冒烟断言 MainActivity 必失败）。
-  // 后续 #105 S1 契约测试会在本步之后显式写入目标值。
+  // 冒烟基线：清掉 app 数据，保证每个 spec 从同一初始状态起步（登录态、
+  // client_kind、缓存全部复位）。单引擎布局下入口恒为 launcher LynxActivity，
+  // 无需再为「MainActivity 分发」做任何播种。
   // 真机（ANDROID_E2E_SERIAL）：部分 ROM（ColorOS）pm clear 无 CLEAR_APP_USER_DATA
   // 权限、adb install 被「PC install attack」防护拦截 → 只用 run-as 清数据目录
   //（debug 包可 run-as，幂等，无需卸载/重装）。
@@ -109,14 +108,10 @@ export async function setupAndroidE2e(avdName?: string): Promise<AndroidE2eConte
     console.log(`[android-e2e] ✓ 已清空 ${APP_PACKAGE} 数据（冒烟基线干净）`);
   }
 
-  // ADR-0164 翻转后「无键 = lynx」（缺省即 Lynx）。既有 spec 的隐式基线是
-  // 「全新安装 = webview」，播种把该前提显式化（显式 webview → S9 首选 webview 照旧），
-  // 保住既有 spec 基线；「无键 → LynxActivity」翻转契约由 client-kind-contract
-  // 自带的二次 pm clear 用例显式断言。
-  writeClientKind(serial, "webview");
-  console.log(
-    `[android-e2e] ✓ 已播种 pictelio_client_kind=webview（ADR-0164 缺省翻转后的 E2E 基线）`,
-  );
+  // 单引擎化后**不再播种 pictelio_client_kind**：MainActivity 分发器已随 #610 删除，
+  // 唯一入口是 launcher LynxActivity，且 PictelioAppModule.getClientKind 会把任何
+  // 写入值归一为 lynx（CLIENT_KINDS 塌缩为 {"lynx"}）。继续播种 webview 只会让每个
+  // spec 的基线里都躺着一个必然被归一化的陈旧值，误导后来者以为 webview 仍是基线。
 
   const appium = await ensureAppiumServer();
 

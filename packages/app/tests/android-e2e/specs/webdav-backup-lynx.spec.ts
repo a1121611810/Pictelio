@@ -27,7 +27,6 @@ import {
   forceStopApp,
   readClientPrefs,
   startMainActivity,
-  writeClientKind,
   writePrefKey,
 } from "../prefs";
 
@@ -71,7 +70,6 @@ describe.skipIf(!ENABLED)("WebDAV 备份 lynx 原生链路（模拟器）", () =
   afterAll(async () => {
     try {
       forceStopApp(ctx.serial);
-      writeClientKind(ctx.serial, "webview"); // 恢复默认引擎，避免影响其他 spec
     } catch {
       /* 收尾失败不阻断 */
     }
@@ -82,7 +80,9 @@ describe.skipIf(!ENABLED)("WebDAV 备份 lynx 原生链路（模拟器）", () =
     const before = findBackupFiles();
 
     forceStopApp(ctx.serial);
-    writeClientKind(ctx.serial, "lynx");
+    // ⚠️ #819 删除了 writeClientKind(...,"lynx")：单引擎下入口恒为 LynxActivity，
+    // PictelioAppModule.getClientKind 把任何写入值归一为 lynx（ADR-0062）——
+    // 该写入无被测行为、断言恒真（与 lynx-network-check / fab / lynx-bookmark-tags 同批处置）。
     writePrefKey(ctx.serial, "settings_webdav_enabled", "true");
     writePrefKey(ctx.serial, "settings_webdav_url", DAV_URL);
     writePrefKey(ctx.serial, "settings_webdav_username", "e2e");

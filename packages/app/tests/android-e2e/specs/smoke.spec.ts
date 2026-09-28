@@ -1,8 +1,14 @@
 /**
  * 冒烟测试（issue #104 验收核心）：
  * 1. 完整走通 AVD 检测启动 → APK 编译安装 → Appium server → session 创建；
- * 2. 断言当前 Activity 为 io.pictelio.app.MainActivity（显式等待，不用固定 sleep）；
- * 3. 验证 NATIVE_APP ↔ WEBVIEW context 双向切换。
+ * 2. 断言当前 Activity 为单引擎唯一入口 io.pictelio.app.LynxActivity
+ *    （显式等待，不用固定 sleep）。
+ *
+ * ── 单引擎化处置（#610 后）────────────────────────────────────────────
+ * 原第 3 条「NATIVE_APP ↔ WEBVIEW context 双向切换」已删除：单引擎 APK 内
+ * **不存在 WebView**，实测该用例稳定失败于「等待 WEBVIEW context 超时（30s）」
+ * （smoke / network-check 两条同一失败形态）。被测对象随 #610 一起消失，
+ * 按「按被测对象存废处置」（与 #808 手术同一原则）删除，不改成永远 skip。
  *
  * 失败时自动收集证据（Activity / 截屏 / logcat 尾部）到 test-results/android-e2e/。
  */
@@ -21,7 +27,7 @@ describe("android-e2e 冒烟", () => {
     await ctx?.teardown();
   });
 
-  it("启动 App 后当前 Activity 为 MainActivity", async () => {
+  it("启动 App 后当前 Activity 为 LynxActivity（单引擎唯一入口）", async () => {
     const { driver } = ctx;
     try {
       // launch() 内已 waitForActivity，这里再显式断言一次作为测试断言本体
@@ -30,36 +36,6 @@ describe("android-e2e 冒烟", () => {
       expect(activity).toBe(MAIN_ACTIVITY);
     } catch (e) {
       await driver.collectEvidence("main-activity-assert-failed").catch(() => {});
-      throw e;
-    }
-  });
-
-  it("可在 NATIVE_APP 与 WEBVIEW context 间切换", async () => {
-    const { driver } = ctx;
-    try {
-      // 初始应在 NATIVE_APP
-      expect(await driver.currentContext()).toBe("NATIVE_APP");
-
-      // 等待 WEBVIEW context 出现并切换（Capacitor WebView 加载后才会出现）
-      const webviewContext = await driver.switchToWebView();
-      expect(webviewContext).toContain("WEBVIEW");
-      expect(await driver.currentContext()).toBe(webviewContext);
-
-      // WEBVIEW 下应能拿到真实 DOM（SolidJS 挂载点 #root）
-      await driver.raw.waitUntil(
-        async () => {
-          const root = await driver.raw.$("#root");
-          return root.isExisting();
-        },
-        { timeout: 30_000, timeoutMsg: "WEBVIEW 下等待 #root 挂载超时", interval: 1_000 },
-      );
-
-      // 切回 NATIVE_APP，Activity 仍是 MainActivity
-      await driver.switchToNative();
-      expect(await driver.currentContext()).toBe("NATIVE_APP");
-      expect(await driver.currentActivity()).toBe(MAIN_ACTIVITY);
-    } catch (e) {
-      await driver.collectEvidence("context-switch-failed").catch(() => {});
       throw e;
     }
   });

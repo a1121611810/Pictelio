@@ -6,10 +6,13 @@
  * 直达 /network-check，再以原生 NetDiag 完成日志为证据（页面确实挂载并调用探测）。
  *
  * oracle：logcat 出现 Lynx 初始化 + NetDiagModule「diagnose 完成」（探测真实执行）。
+ *
+ * 单引擎化（#610）后本 spec 不播种 client_kind：入口恒为 LynxActivity，benchNav extra
+ * 由其自行读取，原先的 writeClientKind 断言恒真、无被测行为，已随之一并删除。
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ensureEmulator } from "../avd";
-import { assertDebugApkInstalled, forceStopApp, writeClientKind } from "../prefs";
+import { assertDebugApkInstalled, forceStopApp } from "../prefs";
 import { buildDebugApk, installApk } from "../build-install";
 import { adbPath, APP_PACKAGE, MAIN_ACTIVITY, runCapture, runOrThrow } from "../env";
 
@@ -46,10 +49,12 @@ describe("android-e2e app-lynx 网络自检", () => {
     await buildDebugApk();
     await installApk(serial);
     runOrThrow(adbPath(), ["-s", serial, "shell", "pm", "clear", APP_PACKAGE], 60_000);
-    expect(writeClientKind(serial, "lynx")).toBe("lynx");
+    // client_kind 无需播种：单引擎布局下入口恒为 LynxActivity，写入值一律被归一为 lynx，
+    // 原来的 writeClientKind 断言恒真、无被测行为（#610 后删除）。
     forceStopApp(serial);
     runOrThrow(adbPath(), ["-s", serial, "logcat", "-c"]);
-    // 先清 logcat，再带 benchNav 深链启动（MainActivity 读 clientKind=lynx 转发 extras 到 LynxActivity）
+    // 清 logcat 后带 benchNav 深链启动；benchNav extra 由 LynxActivity 自行读取
+    // （env.ts 的 MAIN_ACTIVITY 即 LynxActivity，已删除的 MainActivity 不再转发）
     runOrThrow(adbPath(), [
       "-s",
       serial,
@@ -66,8 +71,9 @@ describe("android-e2e app-lynx 网络自检", () => {
 
   afterAll(() => {
     try {
+      // 单引擎布局下无「默认引擎」可恢复（写入的 client_kind 一律归一为 lynx），
+      // force-stop 即完成收尾，不播种 prefs 避免污染后续用例
       forceStopApp(serial);
-      writeClientKind(serial, "webview"); // 恢复默认，避免污染后续用例
     } catch {
       // 收尾失败不阻断
     }

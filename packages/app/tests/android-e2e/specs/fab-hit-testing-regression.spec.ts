@@ -11,107 +11,153 @@
  * - 修复后：行点击导航 → 屏幕大变化（绿）
  * 并做 FAB 控制组（FAB 点击应始终有反应，证明应用未假死且坐标基线正确）。
  *
- * ── 登录策略（2026-09-14 实弹诊断后重写，ADR-0159）──────────────────────────
+ * ── 登录策略（单引擎化 #610 后重写）──────────────────────────────────────
  * 旧实现的「Lynx 侧 adb 盲打登录」（uiautomator 定位输入框 + `input text` 键入 token）
- * 有两条实证根因，不可靠且不可修复：
- * 1. `adb shell input text` 会截断/吞字符长 token——实测输入框只落了 43 字符
- *    （refresh_token 实际 ~100+），歪 token 发不出有效请求，登录必然失败；
- * 2. pictelio_low 的 DNS 普遍被污染（解到被墙 IP，app-api.pixiv.net TCP 15s 超时）；
- *    宿主代理（10.0.2.2:7897）可用，见 setup.ts 的 ANDROID_E2E_HTTP_PROXY。
- * 故改用跨引擎登录态共享（既有设计，#126/#127：webview 侧登录写入 WSSecureStorage 后，
- * pictelio_client_kind=lynx 重启进 LynxActivity 会恢复登录态渲染主界面；
- * 「Lynx 侧完整 UI 操作在当前 SDK 下不可自动化……用日志/契约层兜底」为仓库既有约定）：
- * - 阶段 A（webview 登录）：确保 client_kind=webview + 重启 → switchToWebView →
- *   token 注入 fluent-textarea shadow DOM → 等登录按钮 enabled → 点击 → 等离开 /login
- *   （与 switch-client-oneway / roundtrip 内联登录流程同款；提取为共享 helper 需改
- *   helpers.ts + 三份切换 spec，超出本次改动文件范围，先在本文件实现）；
- * - 阶段 B（契约层切 lynx）：writeClientKind("lynx") + 重启 → LynxActivity 前台 →
+ * 不可靠：`adb shell input text` 会截断/吞字符长 token（实测只落 43 字符，refresh_token
+ * 实际 ~100+），歪 token 发不出有效请求。
+ * 更靠后的「webview 侧登录 → 跨引擎共享 WSSecureStorage」也随单引擎化一并失效：
+ * APK 内已无 WebView ⇒ Appium 永远等不到 WEBVIEW context，登录页在运行时不存在。
+ * 故改走原生 dev intent hook（prefs.loginViaDevIntent，实机已验证）：
+ * `am start -n io.pictelio.app/.LynxActivity --es pictelio_dev_refresh_token <token>`
+ * → LynxActivity.applyDevIntentHooks() 调 autoLoginWithRefreshToken 持久化并登录
+ * （门禁 BuildConfig.DEBUG，只有 debug 包有该钩子）。当前阶段划分：
+ * - 阶段 A（dev hook 登录）：setup 已 pm clear，Keystore 里没有 token，必须真实登录；
+ * - 阶段 B（干净重启）：force-stop → 清 logcat → 启动 → LynxActivity 前台 →
  *   渲染就绪（logcat `onPageChanged|OnPatchFinishForFiber`，T7 口径，60s 独立超时，
  *   超时附 logcat 尾部 50 行）；
- * - 阶段 C（登录态确认）：不再等 `PictelioSecureStorage.setItem.refresh_token` marker
- *   （该 marker 只在登录写入路径出现，WSSecureStorage 种子恢复路径不触发），改为软校验
- *   「uiautomator dump 不再出现登录页 EditText」（登录页唯一表单元素；已登录 /recommended
- *   无输入框）+ LynxActivity 保持前台，60s 超时；dump 不可用时 warn 跳过软校验
- *   （Lynx a11y 树空是已知 SDK 限制），漏判由 FAB 控制组用例兜底（登录页无 FAB 必红）。
+ * - 阶段 C（登录态确认）：uiautomator dump 不再出现登录页 EditText（登录页唯一表单
+ *   元素；已登录 /recommended 无输入框）+ LynxActivity 保持前台，60s 超时；dump 不可用
+ *   时 warn 跳过软校验（Lynx a11y 树空是已知 SDK 限制），漏判由 FAB 控制组用例兜底
+ *   （登录页无 FAB 必红）。
  *
  * ── AVD 迁移：pictelio_low → pictelio_ui ──────────────────────────────────
- * pictelio_low（android-28）WebView 为 66 < 85：client_kind=webview 重启会触发
- * ADR-0153 自动降级直接进 LynxActivity（MainActivity.java:69-77，webviewOk=false 且
- * Lynx 可用），WEBVIEW context 不存在 → 阶段 A webview 登录在该 AVD 结构性不可行
- * （ADR-0159 根因 3「跑错设备」同类陷阱）。webview 登录需要 WebView ≥ 85，
- * 故整体迁移到 pictelio_ui（android-34，WebView 113，1080×2160 / density 480），
- * 显式 ANDROID_E2E_AVD=pictelio_low 时整文件 skip（防假失败）。
+ * 本用例的坐标常量（FAB_TAP / ME_RING_TAP / BOOKMARKS_ROW_TAP / SCRIM_CLOSE_TAP）
+ * 是按 pictelio_ui（android-34，1080×2160 / density 480）的 vw 几何静态推导的，
+ * 换设备会静默失准（点空 → 假绿/假红）。故缺省 pin 到 pictelio_ui，并显式
+ * ANDROID_E2E_AVD=pictelio_low 时整文件 skip（beforeAll 的 assertDeviceGeometry
+ * 也会按分辨率/密度兜底）。**不可因为「不再需要 WebView」就放开到 pictelio_low。**
  *
- * 纯 adb + Appium 混合驱动：阶段 A 用 WebdriverIO（Appium session，webview context），
- * 阶段 B/C 与用例本体用纯 adb（仿 lynx-boot-renders.spec.ts 轻量模式）。
- * 用例本体坐标常量按 pictelio_ui 重新推导（vw 几何模型，推导式见常量注释；
+ * 纯 adb 驱动（仿 lynx-boot-renders.spec.ts 轻量模式；登录走 am start hook，无需
+ * Appium webview context）。用例本体坐标常量推导式见常量注释；
  * 模型经旧 pictelio_low 常量校准——用同一公式反推 720×1280/320 可逐像素复现
  * 旧值 (635,1195)/(384,1187)，误差 ≤1px；beforeAll 校验分辨率防 AVD 漂移）。
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
-import { currentTopActivity, forceStopApp, startMainActivity, writeClientKind } from "../prefs";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
-  adbPath,
-  APP_PACKAGE,
-  E2E_FLAVOR,
-  LYNX_ACTIVITY,
-  MAIN_ACTIVITY,
-  runCapture,
-  runOrThrow,
-} from "../env";
-import { clickByText } from "../helpers";
+  currentTopActivity,
+  forceStopApp,
+  loginViaDevIntent,
+  readAppLogcat,
+  startMainActivity,
+} from "../prefs";
+import { adbPath, LYNX_ACTIVITY, REPO_ROOT, runCapture, runOrThrow } from "../env";
 import { setupAndroidE2e, type AndroidE2eContext } from "../setup";
+import { CONTENT_BOTTOM, CONTENT_RIGHT, fabCenterPx, roundPx } from "../transition-geometry";
 import { createCanvas, loadImage } from "canvas";
 
 const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * AVD pin（ADR-0159 根因 3 防回归，仿 switch-client-roundtrip-low）：
- * - 缺省 pin 到 pictelio_ui（WebView 113，webview 登录可达）；用 || 而非 ??：
- *   空字符串（CI 里 ANDROID_E2E_AVD= 的常见形态）会绕过 ?? 但不该绕过本缺省；
- * - 显式 ANDROID_E2E_AVD=pictelio_low 时整文件 skip：该 AVD WebView 66 < 85，
- *   client_kind=webview 重启触发 ADR-0153 自动降级进 LynxActivity，webview 登录
- *   结构性不可行（否则红在 switchToWebView 超时，属「跑错设备」假失败）；
- * - ANDROID_E2E_FLAVOR=webview 时整文件 skip：单引擎 webview 包无 LynxActivity，
- *   阶段 B/C 不可达。
+ * AVD pin（坐标常量绑定 pictelio_ui，防「跑错设备」静默失准）：
+ * - 缺省 pin 到 pictelio_ui（1080×2160 / density 480，与坐标推导式同源）；
+ *   用 || 而非 ??：空字符串（CI 里 ANDROID_E2E_AVD= 的常见形态）会绕过 ??
+ *   但不该绕过本缺省；
+ * - 非 pictelio_ui（含 pictelio_low）时整文件 skip：坐标常量在其他分辨率/密度下
+ *   点空或点偏，表现为无意义的假红/假绿；**不得因「不再需要 WebView」而放开
+ *   pictelio_low**。beforeAll 的 assertDeviceGeometry 是第二道防线。
  */
 const TARGET_AVD = process.env.ANDROID_E2E_AVD || "pictelio_ui";
-const SKIPPED = TARGET_AVD === "pictelio_low" || E2E_FLAVOR === "webview";
+const SKIPPED = TARGET_AVD !== "pictelio_ui";
 const SKIP_REASON =
-  TARGET_AVD === "pictelio_low"
-    ? `本用例阶段 A 需 webview 登录（WebView ≥ 85）；pictelio_low WebView 66 < 85 会触发 ` +
-      `ADR-0153 自动降级（MainActivity → LynxActivity，无 WEBVIEW context），已整文件跳过。` +
-      `请在 pictelio_ui 运行（缺省即 pictelio_ui）`
-    : `本用例需要 full 包（Lynx 引擎）；当前 ANDROID_E2E_FLAVOR=webview，已整文件跳过`;
+  "本用例的固定坐标常量绑定 pictelio_ui（1080×2160 / density 480，见 assertDeviceGeometry）；" +
+  `当前 ANDROID_E2E_AVD=${TARGET_AVD}，坐标会静默失准，已整文件跳过。` +
+  "请在 pictelio_ui 运行（缺省即 pictelio_ui）";
 if (SKIPPED) {
   console.log(`[fab] SKIP: ${SKIP_REASON}`);
 }
 
-// ── 固定坐标（AVD pictelio_ui：物理 1080×2160，density 480，1vw = 10.8px）──
-// 推导模型（GlobalFab.vue vw 几何 + 状态栏 inset，经旧 pictelio_low 常量校准）：
-// - LynxView 顶 = 状态栏 inset（24dp × 3 = 72px），底 = 屏幕底（手势导航无底部 inset，
-//   与 pictelio_low 旧常量反推一致）；vw 基准 = 屏宽 1080，
-//   H_vw = (2160 - 72) / 1080 × 100 ≈ 193.33；
-// - 主 FAB：fabCx = 100 - 4.267 - 14.933/2 = 88.2665vw；
-//   fabCy = H_vw - 4.267 - 14.933/2 = H_vw - 11.7335vw（menu 模式）；
-// - 外环「我的」项：R_OUTER = 35vw、末角 -88°（OUTER_END，polar: x=cx+sin(a)·r, y=cy-cos(a)·r）；
-// - Me 页「我的收藏」行：TopAppBar 17.067vw + 卡片(mt-3 3.2vw + p-4 4.267vw +
-//   头像行 14.933vw + pb-4 4.267vw) + 行半高(py-3.5 3.733vw + 16dp 文本半高) + 72 inset；
-// - 遮罩空白区：屏宽中点、约 23% 屏高（远离 FAB 与环，点空白收起菜单）。
-// ⚠ 坐标为静态推导（未实机逐点校准），验收首跑如几何断言失败，优先怀疑
-//   状态栏 inset / 底部导航假设，用 uiautomator dump bounds 实测后微调。
-const FAB_TAP = { x: 953, y: 2033 };
-const ME_RING_TAP = { x: 576, y: 2020 };
-const BOOKMARKS_ROW_TAP = { x: 300, y: 611 };
+// ── 坐标（AVD pictelio_ui：物理 1080×2160，density 480，1vw = 10.8px）──
+//
+// ⚠️ #819 **坐标系口径订正**：本块原按 **H_vw = (2160 - 72) / 1080 × 100 ≈ 193.33**
+// （= 全屏高减去顶部状态栏）推导，于是 FAB_TAP.y = 2033、ME_RING_TAP.y = 2020。
+// 但 ADR-0131 的 `screenHeightVw` 在 `contentSize` 命中时返回的是**稳定区**高度，
+// 而稳定区**两端**都扣了系统栏——`dumpsys window displays` 实测
+// `app=1080x2088 rng=1080x936-2160x2016` ⇒ 底界 **2016**（顶部 72 状态栏 +
+// 底部 72 手势条，共 144px）。
+// 结果：点 (953, 2033) 落在**手势条**上，FAB 根本不响应；断言只看到一个
+// 「差异 8」的裸数字（其余全是状态栏时钟 + Lynx debug 触摸标记的红点）。
+//
+// 现复用 `transition-geometry` 的推导（与 transition-matrix.spec.ts **同一份事实源**，
+// 且有单测钉住），FAB 圆心 = (953, 1889)：
+//   oracle（2026-09-29 实测帧 test-results/android-e2e/fab-probe/fab-open.png，
+//   在 (953,1889) 轻点即展开）：主 FAB 亮簇 bbox x872..1033 / y1808..1969
+//   ⇒ 圆心 (952.5, 1888.5)。与 `fabCenterPx(2016, 1080)` 推导值 (953.3, 1889.3)
+//   差 ≤0.8px；该 bbox 也与 `transition-geometry.fabCenterPx` 注释里早已记录的
+//   `r2-after-fab.png` 口径（x872..1032 / y1808..1968）独立吻合。
+const FAB_TAP = roundPx(fabCenterPx(CONTENT_BOTTOM, CONTENT_RIGHT));
+
+// 外环「我的」项：实测落点 (576, 1887)，相对 FAB 圆心 r=377px、角度 -89.7°
+// （同帧另三项：推荐 (890,1520) r=374 -9.7°、插画 (735,1612) r=352 -38.2°、
+// 小说 (621,1749) r=360 -67.1° —— 半径一致 ⇒ 外环 R_OUTER ≈ 376px）。
+// x 沿用原常量 576（本就正确）；y 改取 **FAB 圆心 y**：该项几乎正左方（-89.7°），
+// 与圆心同高是几何必然，写成常量会再次把两处独立漂移绑在一起。
+const ME_RING_TAP = { x: 576, y: FAB_TAP.y };
+
+// Me 页「我的收藏」行（#819 订正）。
+// oracle = 2026-09-29 实测帧 test-results/android-e2e/fab-hit-testing/row-before-tap.png
+// 逐行像素扫描（卡片内 x 60..700 的深色文字带）：Hintaooda y492..558 / @1121611810
+// y591..640 / **我的收藏 y746..788（中心 767）** / 追更列表 913 / 稍后看 1061 /
+// 好P友 1209 / 下载管理 1353 / 网络自检 1500 / 通知 1647（行距稳定 ≈146.5px）。
+// 原写死 y=611 正落在「@1121611810」(中心 616) 与「我的收藏」(中心 767) 之间的
+// 分隔区——既不是可点行，也不是任何文字 ⇒ tap 无反应，断言只看到「差异 8」。
+// 同样属于「按旧布局推导的坐标」这一类，与上面 FAB/外环同源。
+const BOOKMARKS_ROW_TAP = { x: 300, y: 767 };
+
+// 遮罩空白区（点空白收起菜单）：远离 FAB 与环。
 const SCRIM_CLOSE_TAP = { x: 540, y: 506 };
 
-/** 校验目标 AVD 分辨率与密度（坐标常量按 pictelio_ui 1080×2160/density 480 实测 config 推导，防 AVD 漂移静默失效）。 */
+/**
+ * 校验目标 AVD 的几何（坐标常量按 pictelio_ui 1080×2160/density 480 **稳定区 2016px** 实测 config 推导，防 AVD 漂移静默失效）。
+ *
+ * ⚠️ 三项都要验，缺一不可（原实现只验 `wm size` / `wm density`，漏掉了系统栏高度）：
+ * FAB 坐标由 `fabCenterPx(CONTENT_BOTTOM=2016, 1080)` 推导，而 `contentSize.h` 是**稳定区**
+ * 高度而非全屏 2160。换 ROM 或切换导航模式（gestural ↔ threebutton）会让稳定区高度变化，
+ * 此时旧常量会**静默点到空处**——2026-09-28 实测：全屏口径 2033 vs 实际 1889，偏 144px，
+ * 落在 FAB 盒外。像素级 UI 断言在坐标错位时表现为「功能坏了」，极易被误判为产品回归。
+ */
 function assertDeviceGeometry(serial: string): void {
   const size = runCapture(adbPath(), ["-s", serial, "shell", "wm", "size"]).stdout;
   const density = runCapture(adbPath(), ["-s", serial, "shell", "wm", "density"]).stdout;
   expect(size).toMatch(/1080x2160/u);
   expect(density).toMatch(/480/u);
+
+  // 稳定区高度（= Lynx contentSize.h 口径，也是 FAB 圆心推导的 H 基准）
+  const displays = runCapture(adbPath(), [
+    "-s",
+    serial,
+    "shell",
+    "dumpsys",
+    "window",
+    "displays",
+  ]).stdout;
+  const rng = /rng=\d+x\d+-\d+x(\d+)/u.exec(displays);
+  expect(
+    rng,
+    `无法从 dumpsys window displays 解析稳定区高度（FAB_TAP 坐标依赖它）。原始输出片段：${displays
+      .split("\n")
+      .find((l) => l.includes("rng="))
+      ?.trim()}`,
+  ).not.toBeNull();
+  const contentHeight = Number(rng?.[1]);
+  expect(
+    contentHeight,
+    `稳定区高度应为 ${CONTENT_BOTTOM}（全屏 2160 减去顶部状态栏 72 + 底部手势条 72）；实测 ${contentHeight}。` +
+      `本 spec 的 FAB / Me 页行常量按 ${CONTENT_BOTTOM} 校准，换 ROM 或切换导航模式后需重新校准` +
+      `（gestural ↔ threebutton 会改变底部系统条高度）。`,
+  ).toBe(CONTENT_BOTTOM);
 }
 
 /** 等待前台 Activity 变为期望值（adb 轮询，prefs.currentTopActivity 归一化全名比对）。 */
@@ -140,12 +186,25 @@ function assertLynxActivityForeground(serial: string, context: string): void {
   }
 }
 
-/** 截屏（exec-out 直接取 PNG 字节流）。maxBuffer 放宽到 20MB——Node spawnSync
- *  默认 1MB，1080×2160 的 PNG 字节流会 ENOBUFS（pictelio_ui 实测）。 */
-function screenshot(serial: string): Buffer {
-  return execFileSync(adbPath(), ["-s", serial, "exec-out", "screencap", "-p"], {
+/** 证据落盘目录（被 gitignore，仅本地取证用） */
+const EVIDENCE_DIR = resolve(REPO_ROOT, "packages/app/test-results/android-e2e/fab-hit-testing");
+mkdirSync(EVIDENCE_DIR, { recursive: true });
+
+/**
+ * 截屏（exec-out 直接取 PNG 字节流）。maxBuffer 放宽到 20MB——Node spawnSync
+ *  默认 1MB，1080×2160 的 PNG 字节流会 ENOBUFS（pictelio_ui 实测）。
+ *
+ * #819：传入 `label` 时同时落盘。此前本 spec 的全部帧只在内存里参与 `pngDiff`，
+ * 断言失败时**零证据**——只能看到一个裸数字（实测「差异 8」），无从判断是
+ * 没点击、点错位置、还是页面确实变了（状态栏时钟本身就会贡献几十像素差）。
+ * 落盘后失败即可对着两帧逐段复算差异来源。
+ */
+function screenshot(serial: string, label?: string): Buffer {
+  const buf = execFileSync(adbPath(), ["-s", serial, "exec-out", "screencap", "-p"], {
     maxBuffer: 20 * 1024 * 1024,
   });
+  if (label) writeFileSync(resolve(EVIDENCE_DIR, `${label}.png`), buf);
+  return buf;
 }
 
 /** 像素 diff（canvas 解码 PNG；采样步长 2，逐通道阈值 24），返回差异采样点数。 */
@@ -205,25 +264,6 @@ function dumpHasEditText(xml: string): boolean {
   return /class="android\.widget\.EditText"/u.test(xml);
 }
 
-/** logcat 按 pid 过滤 dump（--pid 需 API≥24，两 AVD 均满足）；进程不存在视为致命（调用方等待中会超时）。 */
-function logcatDumpByPid(serial: string): string {
-  const pid = runCapture(adbPath(), ["-s", serial, "shell", "pidof", APP_PACKAGE]).stdout.trim();
-  if (!pid) {
-    throw new Error(`进程 ${APP_PACKAGE} 不存在（已崩溃或被杀），无法按 pid 过滤 logcat`);
-  }
-  return runCapture(adbPath(), ["-s", serial, "shell", "logcat", "-d", "--pid", pid]).stdout;
-}
-
-/** logcat 尾部 N 行（诊断输出用；获取失败不阻断，返回占位说明）。 */
-function logcatTail(serial: string, lines = 50): string {
-  try {
-    return runCapture(adbPath(), ["-s", serial, "shell", "logcat", "-d", "-t", String(lines)])
-      .stdout;
-  } catch {
-    return "(logcat tail 获取失败)";
-  }
-}
-
 /**
  * 等待 Lynx 渲染就绪（T7 加固项，沿用 ADR-0159 根因 4 口径）。
  * 信号：`onPageChanged|OnPatchFinishForFiber`（Lynx SDK 页面更新日志，页面首帧渲染后必现；
@@ -233,7 +273,12 @@ function logcatTail(serial: string, lines = 50): string {
 async function waitForLynxRenderReady(serial: string, timeoutMs = 60_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (/onPageChanged|OnPatchFinishForFiber/u.test(logcatDumpByPid(serial))) {
+    // prefs.readAppLogcat：按 pid 过滤（--pid 需 API≥24，两 AVD 均满足）；进程尚未创建时
+    // **返回空串**而不是抛错——`am start` 返回后 ActivityTaskManager 的 Activity 记录
+    // **先于**进程出现（实测 `START` 23:39:49.923 vs `Start proc` 23:39:50.070，
+    // 差约 150ms），而此处正在轮询循环里，抛错会把「进程还没起」误报成
+    // 「app 崩溃或被杀」并直接绕过整个等待逻辑。
+    if (/onPageChanged|OnPatchFinishForFiber/u.test(readAppLogcat(serial))) {
       console.log("[fab] ✓ Lynx 渲染就绪（logcat: onPageChanged/OnPatchFinishForFiber）");
       return;
     }
@@ -241,76 +286,14 @@ async function waitForLynxRenderReady(serial: string, timeoutMs = 60_000): Promi
   }
   throw new Error(
     `等待 Lynx 渲染就绪超时（${timeoutMs / 1000}s，信号: onPageChanged|OnPatchFinishForFiber）。\n` +
-      `logcat 尾部 50 行:\n${logcatTail(serial, 50)}`,
+      `logcat 尾部 50 行:\n${readAppLogcat(serial, { lines: 50 })}`,
   );
-}
-
-/**
- * 阶段 A：webview 侧真实登录（与 switch-client-oneway / roundtrip 内联流程同款）。
- * 前置：app 已以 client_kind=webview 重启且 MainActivity 前台（调用方负责）。
- * 流程：switchToWebView → 年龄确认（已过则跳过）→ token 注入 fluent-textarea
- * shadow DOM（custom element 直 setValue 报 invalid element state，必须操作内部
- * <textarea>：原生 value setter + composed input 事件）→ 等登录按钮 enabled →
- * 点击 → 等离开 /login（90s）。
- */
-async function loginViaWebview(ctx: AndroidE2eContext): Promise<void> {
-  const { driver } = ctx;
-  await driver.switchToWebView(60_000);
-
-  // 年龄确认页（/age-confirmation）：点「已满 18 岁」通过；已确认过则直接放行
-  await driver.raw.waitUntil(
-    async () => {
-      const url = await driver.raw.getUrl();
-      if (!url.includes("/age-confirmation")) return true;
-      await clickByText(ctx, "已满 18 岁");
-      return false;
-    },
-    { timeout: 60_000, timeoutMsg: "年龄确认页未通过", interval: 1_000 },
-  );
-
-  // 登录页：等输入框与登录按钮渲染
-  await driver.raw.waitUntil(
-    async () =>
-      (await driver.raw.$("fluent-textarea").isExisting()) &&
-      (await driver.raw.$("fluent-button=登录").isExisting()),
-    { timeout: 30_000, timeoutMsg: "登录页未渲染", interval: 1_000 },
-  );
-  const token = process.env.PIXIV_REFRESH_TOKEN!;
-  await driver.raw.execute(
-    `(() => {
-      const ta = document.querySelector('fluent-textarea');
-      const inner = ta && ta.shadowRoot ? ta.shadowRoot.querySelector('textarea') : null;
-      if (!inner) return;
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
-      setter.call(inner, ${JSON.stringify(token)});
-      inner.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-      inner.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-    })()`,
-  );
-  // 条件等待：登录按钮从 disabled 变为 enabled（token 注入生效），替代固定 sleep
-  await driver.raw.waitUntil(
-    async () => {
-      const btn = await driver.raw.$("fluent-button=登录");
-      return (await btn.getAttribute("disabled")) === null;
-    },
-    { timeout: 10_000, timeoutMsg: "token 注入后登录按钮未启用", interval: 300 },
-  );
-  await clickByText(ctx, "登录");
-
-  // 等待登录完成（离开 /login 进入主界面）
-  await driver.raw.waitUntil(async () => !(await driver.raw.getUrl()).includes("/login"), {
-    timeout: 90_000,
-    timeoutMsg: "登录失败（仍停留在 /login）",
-    interval: 2_000,
-  });
-  console.log(`[fab] ✓ webview 登录成功，当前 URL: ${await driver.raw.getUrl()}`);
 }
 
 /**
  * 阶段 C：确认「已登录的 Lynx 主界面」。
- * Oracle：webview 登录的 token 落 WSSecureStorage，lynx 重启经
- * PictelioAuth.loginWithRefreshToken 种子恢复——该路径不产生
- * `PictelioSecureStorage.setItem.refresh_token` 登录写入 marker，故不能等 marker；
+ * Oracle：dev hook 登录把 refresh_token 持久化进 SecureStorage，重启后由
+ * PictelioAuth 恢复登录态——该路径同样不产生登录页专属 marker，故不能等 marker；
  * 改为软校验「uiautomator dump 不再出现登录页 EditText」（登录页唯一表单元素，
  * 已登录 /recommended 无输入框）+ LynxActivity 保持前台（离开即刻报错）。
  * dump 不可用（Lynx a11y 树空是已知 SDK 限制；pictelio_ui 上 uiautomator dump
@@ -348,7 +331,7 @@ async function waitForLynxLoggedInHome(serial: string, timeoutMs = 60_000): Prom
   }
   throw new Error(
     `等待已登录 Lynx 主界面超时（${timeoutMs / 1000}s：登录页 EditText 仍在或 LynxActivity 离场）。\n` +
-      `logcat 尾部 50 行:\n${logcatTail(serial, 50)}`,
+      `logcat 尾部 50 行:\n${readAppLogcat(serial, { lines: 50 })}`,
   );
 }
 
@@ -368,16 +351,13 @@ describe.skipIf(SKIPPED)(
       // 本 spec 坐标常量绑定 pictelio_ui 1080×2160/density 480（wm 实测校验，防 AVD 漂移）
       assertDeviceGeometry(serial);
 
-      // ── 阶段 A：webview 登录 ──
-      // 确定性基线：显式写 webview + 重启（setup 内已 pm clear，此处防串行执行残留）
-      writeClientKind(serial, "webview");
-      forceStopApp(serial);
-      startMainActivity(serial);
-      await waitForTopActivity(serial, MAIN_ACTIVITY, 60_000);
-      await loginViaWebview(ctx);
+      // ── 阶段 A：dev intent hook 登录 ──
+      // 单引擎布局无 webview 登录页（APK 内无 WebView），走 am start 的
+      // refresh_token 钩子；token 缺省读 PIXIV_REFRESH_TOKEN（globalSetup 注入）
+      await loginViaDevIntent(serial);
 
-      // ── 阶段 B：契约层切 lynx（跨引擎登录态共享：WSSecureStorage → 种子恢复）──
-      expect(writeClientKind(serial, "lynx")).toBe("lynx");
+      // ── 阶段 B：干净重启进已登录主界面 ──
+      // client_kind 无需播种：单引擎下入口恒为 LynxActivity，写什么都归一为 lynx
       forceStopApp(serial);
       runOrThrow(adbPath(), ["-s", serial, "logcat", "-c"]);
       startMainActivity(serial);
@@ -385,7 +365,7 @@ describe.skipIf(SKIPPED)(
       // T7 口径：渲染就绪轮询（不再固定 sleep 盲等；超时附 logcat 尾部 50 行）
       await waitForLynxRenderReady(serial);
 
-      // ── 阶段 C：确认已登录的 Lynx 主界面（种子恢复不触发登录写入 marker，见函数注释）──
+      // ── 阶段 C：确认已登录的 Lynx 主界面（登录态恢复不产生登录页 marker，见函数注释）──
       await waitForLynxLoggedInHome(serial);
       await SLEEP(5_000); // 主界面 settle：FAB 挂载完成（/recommended）
     }, 600_000);
@@ -396,19 +376,23 @@ describe.skipIf(SKIPPED)(
       try {
         if (!serial) return;
         forceStopApp(serial);
-        writeClientKind(serial, "webview"); // 恢复默认，避免污染后续用例
+        // 单引擎布局下无「默认引擎」可恢复（写入的 client_kind 一律归一为 lynx），
+        // force-stop 即完成收尾，不播种 prefs 避免污染后续用例
       } catch {
         // 收尾失败不阻断
       }
     });
 
     it("控制组：FAB 点击有反应（菜单展开，证明应用未假死）", async () => {
-      const before = screenshot(serial);
+      const before = screenshot(serial, "ctl-before-fab-tap");
       tap(serial, FAB_TAP.x, FAB_TAP.y);
       await SLEEP(1_200);
-      const after = screenshot(serial);
+      const after = screenshot(serial, "ctl-after-fab-tap");
       const changed = await pngDiff(before, after);
-      expect(changed).toBeGreaterThan(100);
+      expect(
+        changed,
+        "FAB 点击后画面无变化——证据 ctl-before/ctl-after-fab-tap.png",
+      ).toBeGreaterThan(100);
       // 收起菜单（点遮罩空白区），恢复关闭态
       tap(serial, SCRIM_CLOSE_TAP.x, SCRIM_CLOSE_TAP.y);
       await SLEEP(1_200);
@@ -421,12 +405,16 @@ describe.skipIf(SKIPPED)(
       tap(serial, ME_RING_TAP.x, ME_RING_TAP.y);
       await SLEEP(3_000);
       // 2. 探针：点「我的收藏」行 → 应导航（修复前被全屏容器吞掉 → 0 变化）
-      const before = screenshot(serial);
+      const before = screenshot(serial, "row-before-tap");
       tap(serial, BOOKMARKS_ROW_TAP.x, BOOKMARKS_ROW_TAP.y);
       await SLEEP(2_000);
-      const after = screenshot(serial);
+      const after = screenshot(serial, "row-after-tap");
       const changed = await pngDiff(before, after);
-      expect(changed).toBeGreaterThan(500);
+      expect(
+        changed,
+        `点「我的收藏」行后画面几乎没变（差异 ${changed}，阈值 500）——证据 ` +
+          `row-before-tap.png / row-after-tap.png。若两帧只差状态栏时钟，说明点击未生效。`,
+      ).toBeGreaterThan(500);
     }, 45_000);
   },
 );

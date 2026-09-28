@@ -63,9 +63,12 @@
  * - 设备全局代理（`ANDROID_E2E_HTTP_PROXY=10.0.2.2:7897`）：模拟器 DNS 被污染，
  *   不设代理则推荐流与图片都拉不到（实测）。
  * - 登录：`setupAndroidE2e` 的 `pm clear` 会清掉 Keystore 里的 refresh_token，
- *   故先按 fab 回归同款流程在 **webview 侧**注入 token 登录（`loginViaWebview`），
- *   再切 `pictelio_client_kind=lynx` 重启——lynx 经 `PictelioAuth` 从共享
- *   `WSSecureStorage` 种子恢复登录态（跨引擎登录态共享，ADR-0050/#126）。
+ *   故走 LynxActivity 的 **dev intent hook**（`prefs.loginViaDevIntent`）真实登录：
+ *   `am start -n io.pictelio.app/.LynxActivity --es pictelio_dev_refresh_token <token>`
+ *   → `LynxActivity.applyDevIntentHooks()` 调 `autoLoginWithRefreshToken` 持久化并登录
+ *   （门禁 BuildConfig.DEBUG，只有 debug 包有该钩子）。单引擎化后 webview 登录页已不存在
+ *   （APK 内无 WebView），跨引擎共享 WSSecureStorage 种子恢复那条路随之失效。
+ *   `pictelio_client_kind` 无需播种：单引擎下入口恒为 LynxActivity，写什么都归一为 lynx。
  * - `PIXIV_REFRESH_TOKEN`（packages/app/.env）与 `credentials.json5`：host 侧
  *   独立 oracle 用（与 webview 验收同源）。
  *
@@ -83,18 +86,14 @@ import { resolve } from "node:path";
 import JSON5 from "json5";
 import { createCanvas, loadImage } from "canvas";
 import { setupAndroidE2e, type AndroidE2eContext } from "../setup";
+import { adbPath, LYNX_ACTIVITY, REPO_ROOT, runCapture, runOrThrow } from "../env";
 import {
-  adbPath,
-  APP_PACKAGE,
-  E2E_FLAVOR,
-  LYNX_ACTIVITY,
-  MAIN_ACTIVITY,
-  REPO_ROOT,
-  runCapture,
-  runOrThrow,
-} from "../env";
-import { clickByText } from "../helpers";
-import { currentTopActivity, forceStopApp, startMainActivity, writeClientKind } from "../prefs";
+  currentTopActivity,
+  forceStopApp,
+  loginViaDevIntent,
+  readAppLogcat,
+  startMainActivity,
+} from "../prefs";
 
 const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -104,11 +103,11 @@ mkdirSync(EVIDENCE_DIR, { recursive: true });
 
 // ── AVD pin（仿 fab 回归 / switch-client-roundtrip-low）：坐标常量绑定 pictelio_ui ──
 const TARGET_AVD = process.env.ANDROID_E2E_AVD || "pictelio_ui";
-const SKIPPED = TARGET_AVD !== "pictelio_ui" || E2E_FLAVOR === "webview";
-const SKIP_REASON =
-  TARGET_AVD !== "pictelio_ui"
-    ? `本用例坐标常量绑定 pictelio_ui（1080×2160/density 480），当前 ANDROID_E2E_AVD=${TARGET_AVD}`
-    : `本用例需要 full 包（Lynx 引擎）；当前 ANDROID_E2E_FLAVOR=webview，已整文件跳过`;
+// ⚠️ #819 移除了 `|| E2E_FLAVOR === "webview"` 守卫：该分支在本分支恒不可达
+// （build.gradle 已无 productFlavors），静默 skip 会把「ANDROID_E2E_FLAVOR 配错」
+// 伪装成「该设备上不可跑」。flavor 口径现在由 env.ts 收口显式抛错。
+const SKIPPED = TARGET_AVD !== "pictelio_ui";
+const SKIP_REASON = `本用例坐标常量绑定 pictelio_ui（1080×2160/density 480），当前 ANDROID_E2E_AVD=${TARGET_AVD}`;
 if (SKIPPED) {
   console.log(`[lynx-bookmark-tags] SKIP: ${SKIP_REASON}`);
 }
@@ -116,16 +115,33 @@ if (SKIPPED) {
 // ── 坐标常量（推导见文件头注释；均为「屏幕物理像素」）──
 /** 推荐页轮播首卡的点击点（图片区内，避开底部 scrim 信息区与右侧 FAB） */
 const CAROUSEL_CARD_TAP = { x: 540, y: 900 };
-/** 可见性 chip 行 y（实测 720..834 的中心） */
-const CHIP_ROW_Y = 777;
-/** 「私密」chip 中心 x（实测 bbox 230..388） */
-const PRIVATE_CHIP_X = 309;
-/** 「公开」chip 采样框（用于断言其变回未选中态） */
-const PUBLIC_CHIP_BOX = { x0: 55, x1: 200, y0: 730, y1: 825 };
-/** 「私密」chip 采样框（断言其进入选中态） */
-const PRIVATE_CHIP_BOX = { x0: 240, x1: 380, y0: 730, y1: 825 };
-/** 保存按钮所在色带（bbox 由像素现算，这里只给扫描窗口） */
-const SAVE_BAND_WINDOW = { y0: 1870, y1: 2050 };
+// ── 可见性 chip 行（#819 订正）────────────────────────────────────────
+// oracle = 2026-09-29 实测帧 test-results/android-e2e/lynx-bookmark-tags/
+//          act2a-before-private.png（面板已打开、初始「公开」选中），按精确色值扫包围盒：
+//   选中「公开」chip rgb(207,229,255) bbox x46..205  y893..1007 ⇒ 中心 (126, 950)；
+//   未选「私密」chip rgb(230,232,238) bbox x210..388 y893..1007 ⇒ 中心 (299, 950)。
+// 原常量 CHIP_ROW_Y=777 / PUBLIC_CHIP_BOX.y=730..825 / PRIVATE_CHIP_X=309 是**旧面板布局**
+// 的取值：面板加高后整行下移约 173px。旧 y=777 处实测 rgb(255,255,255) = 面板纯白背景，
+// 既无 chip 也无文字 ⇒ `saturatedRatio` 恒 0 ⇒ 用例 ② 前置自检恒红。
+// 与 FAB / Me 页行两处同源：都是「按旧布局推导的坐标」。
+/** 详情页滑动预算（#819 由 9 提到 14：单页插画图高差异大，9 次是最坏情况下的贴边值）。 */
+const DETAIL_SCROLL_BUDGET = 14;
+
+/** 两个 chip 共用的行中心 y（实测两个 bbox 均为 y893..1007，中心 950） */
+const CHIP_ROW_Y = 950;
+/** 「私密」chip 中心 x（实测 bbox 210..388） */
+const PRIVATE_CHIP_X = 299;
+/** 「公开」chip 采样框（用于断言其变回未选中态；内缩于实测 bbox x46..205 / y893..1007
+ *  以避开抗锯齿边缘与面板圆角） */
+const PUBLIC_CHIP_BOX = { x0: 60, x1: 195, y0: 905, y1: 995 };
+/** 「私密」chip 采样框（实测 bbox x210..388 / y893..1007，同样内缩；断言其进入选中态） */
+const PRIVATE_CHIP_BOX = { x0: 225, x1: 375, y0: 905, y1: 995 };
+/** 「收藏」保存按钮的色带扫描窗（#819 订正）。
+ *  oracle = act2a-before-private.png 按按钮色 rgb(26,111,168) 扫出 bbox
+  x46..1033 / **y1973..2101**（988×129，横跨近全宽）。原窗 y1870..2050 只有
+  下半截压在按钮上、且 2016 以上的部分落在手势条 inset 里——判据虽仍能过但贴边。
+  现取 y1975..2015：完全在按钮内，且完全在内容区底界（2016）之上。 */
+const SAVE_BAND_WINDOW = { y0: 1975, y1: 2015 };
 
 const PIXIV_UA = "PixivIOSApp/7.18.3 (iOS 18.5; iPhone15,4)";
 
@@ -238,18 +254,33 @@ function swipeUp(): void {
 /**
  * 心形定位（像素特征，不写死坐标）。
  *
- * 窗口 x ∈ [40, 130]：心形是 `text-[6.4vw]` 的固定字形，左对齐于 `p-4`（43.2px），
- * 实测跨两个不同作品稳定落在 x 50..92；右侧的「↓ 保存」字形在 x≈170 之外，天然排除。
+ * ⚠️ #819 **极性判据订正**（oracle = 2026-09-29 实跑证据帧
+ * `test-results/android-e2e/lynx-bookmark-tags/detail-scroll-8.png`，逐像素实测）：
+ * 本函数原先在扫「**暗色或红色**心形」，而 lynx 详情页实际把心形渲染成
+ * **深色胶囊底 + 白色心形笔画**。极性反了 ⇒ 分量尺寸落在胶囊（170×103）
+ * 或其它暗块上，`w ∈ [34,60] / h ∈ [38,64]` 永远不命中 ⇒ `findHeartGlyph`
+ * 恒返回 null ⇒ 9 次滑动全部落空 ⇒ 报「未能进入插画详情页」。
+ * **报错文案把人说向「进不去详情页」，实际页面上「作品详情」标题、心形、
+ * 收藏数 97 全都在**（又一次「报错文案指向错误根因」）。
  *
- * 判据（对 5 张真实截图校准）：连通块 bbox 满足 w ∈ [34,60]、h ∈ [38,64]、
- * h/w ∈ [1.0,1.4]、实心像素 ≥ 300，取实心数最大者。
- * **只按尺寸/长宽比就够，不要再加「心形缺口」之类的形状判据**——实测那个判据会把
- * 正确答案筛掉（心形顶部缺口位置随字体渲染浮动），而尺寸判据已能把同区域里的
- * 作者头像（h=109）、标题文字（w=62）、「581 × 1029」（h=23）、工具行「保存」（h=34）
- * 全部排除（早期版本因窗口过窄把头像裁成 79×109 而误判为心形，导致 tap 落到
- * 可点的作者行 → 误跳到用户页；这就是必须保留本窗口与尺寸判据的原因）。
+ * 现改为两段式：
+ *   ① 找出**深色胶囊**（暗色连通块）——心形与收藏数共处的容器；
+ *   ② 在每个胶囊**内部**找「严格内嵌的亮色连通域」= 白色心形笔画。
+ *
+ * **尺寸窗口原样保留**（w ∈ [34,60]、h ∈ [38,64]、h/w ∈ [1.0,1.4]、实心 ≥ 300）——
+ * 实测心形笔画恰为 **43×49、中心 (100,1698)**，落在窗口正中。窗口没错，
+ * 错的只是「按什么颜色去找」。这同时说明尺寸判据本身仍有效。
+ *
+ * 「严格内嵌」是必须的排除条件：胶囊四角在深色 bbox 里会露出 4 块白色背景
+ * （实测各 521~565 px，形状与心形不冲突但尺寸接近），心形笔画 bbox 完全落在
+ * 胶囊 bbox 内部，四角块则贴边甚至越界。
+ *
+ * 扫描窗 x ∈ [40, 130) 保留：心形中心 x=100 在窗内，而右侧「↓ 保存」「标签近邻」
+ * 等可点行在 x≈170 之外，天然排除（早期版本因窗口过窄把头像裁成 79×109
+ * 误判为心形，tap 落到可点的作者行跳到用户页——该教训继续有效）。
  */
 function findHeartGlyph(p: Pixels): { x: number; y: number } | null {
+  // ── ① 深色连通块（胶囊容器）──
   const dark: [number, number][] = [];
   const xEnd = Math.min(130, Math.floor(p.w * 0.15));
   for (let y = Math.floor(p.h * 0.5); y < Math.floor(p.h * 0.99); y += 2) {
@@ -260,15 +291,81 @@ function findHeartGlyph(p: Pixels): { x: number; y: number } | null {
       if (isInk || isRed) dark.push([x, y]);
     }
   }
+  const capsules = connectedBoxes(dark, 8);
+  // 容器下限：心形所在胶囊实测 170×103（x<130 窗内被裁成 ≥84×103）。取足够大的下界，
+  // 既容纳胶囊，又能与「标题文字」「作者头像」等小块区分开。
+  const capsulesBig = capsules.filter((b) => b.y1 - b.y0 + 1 >= 70 && b.x1 - b.x0 + 1 >= 50);
+
+  // ── ② 胶囊内部「严格内嵌的亮色连通域」= 白色心形笔画 ──
+  let best: { n: number; cx: number; cy: number } | null = null;
+  for (const cap of capsulesBig) {
+    const bright: [number, number][] = [];
+    for (let y = cap.y0; y <= cap.y1; y += 1) {
+      for (let x = cap.x0; x <= cap.x1; x += 1) {
+        const [r, g, b] = pixelAt(p, x, y);
+        // 近白且近灰（排除彩色插画像素）
+        if (Math.min(r, g, b) > 190 && Math.max(r, g, b) - Math.min(r, g, b) < 40) {
+          bright.push([x, y]);
+        }
+      }
+    }
+    for (const blob of connectedBoxes(bright, 6)) {
+      // 严格内嵌：至少留 3px 边距 ⇒ 排除胶囊四角露出的白色背景（它们贴边）
+      if (
+        blob.x0 <= cap.x0 + 3 ||
+        blob.y0 <= cap.y0 + 3 ||
+        blob.x1 >= cap.x1 - 3 ||
+        blob.y1 >= cap.y1 - 3
+      ) {
+        continue;
+      }
+      const w = blob.x1 - blob.x0 + 1;
+      const h = blob.y1 - blob.y0 + 1;
+      const ratio = h / w;
+      if (
+        w >= 34 &&
+        w <= 60 &&
+        h >= 38 &&
+        h <= 64 &&
+        ratio >= 1.0 &&
+        ratio <= 1.4 &&
+        blob.n >= 300
+      ) {
+        if (!best || blob.n > best.n) {
+          best = {
+            n: blob.n,
+            cx: Math.round((blob.x0 + blob.x1) / 2),
+            cy: Math.round((blob.y0 + blob.y1) / 2),
+          };
+        }
+      }
+    }
+  }
+  return best ? { x: best.cx, y: best.cy } : null;
+}
+
+interface Box {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  n: number;
+}
+
+/**
+ * 8 连通域 + 按 `cell` 像素分桶，返回每个分量的包围盒与实心像素数。
+ * 纯函数，供心形定位复用（原先内联在 findHeartGlyph 里，两段式判据需要用两次）。
+ */
+function connectedBoxes(pts: [number, number][], cell: number): Box[] {
   const cells = new Map<string, [number, number][]>();
-  for (const [x, y] of dark) {
-    const key = `${Math.floor(x / 8)},${Math.floor(y / 8)}`;
+  for (const [x, y] of pts) {
+    const key = `${Math.floor(x / cell)},${Math.floor(y / cell)}`;
     const bucket = cells.get(key);
     if (bucket) bucket.push([x, y]);
     else cells.set(key, [[x, y]]);
   }
   const seen = new Set<string>();
-  let best: { n: number; cx: number; cy: number } | null = null;
+  const out: Box[] = [];
   for (const key of cells.keys()) {
     if (seen.has(key)) continue;
     const stack = [key];
@@ -290,46 +387,48 @@ function findHeartGlyph(p: Pixels): { x: number; y: number } | null {
     }
     const xs = comp.map((c) => c[0]);
     const ys = comp.map((c) => c[1]);
-    const w = Math.max(...xs) - Math.min(...xs) + 1;
-    const h = Math.max(...ys) - Math.min(...ys) + 1;
-    const ratio = h / w;
-    if (
-      w >= 34 &&
-      w <= 60 &&
-      h >= 38 &&
-      h <= 64 &&
-      ratio >= 1.0 &&
-      ratio <= 1.4 &&
-      comp.length >= 300
-    ) {
-      if (!best || comp.length > best.n) {
-        best = {
-          n: comp.length,
-          cx: Math.round((Math.min(...xs) + Math.max(...xs)) / 2),
-          cy: Math.round((Math.min(...ys) + Math.max(...ys)) / 2),
-        };
-      }
-    }
+    out.push({
+      x0: Math.min(...xs),
+      y0: Math.min(...ys),
+      x1: Math.max(...xs),
+      y1: Math.max(...ys),
+      n: comp.length,
+    });
   }
-  return best ? { x: best.cx, y: best.cy } : null;
+  return out;
 }
 
 /**
- * 心形是否处于「已收藏」态：`text-error` 红 (179,38,30) vs 未收藏 `text-outline`
- * 灰 (113,120,126)（同一坐标窗口实测 红 80/110、灰 0/110）。
- * 阈值取 0.5 —— lynx debug 的触摸点红标记只覆盖 1~2 行/列（≤20/110），不会误判。
+ * 心形胶囊是否处于「已收藏」态。
+ *
+ * ⚠️ #819 **判据订正**：原判据找 `text-error` 红（r>150 且 g<110 且 b<110），阈值 0.5。
+ * 它在本 UI 上**永远为假**——不是「偶尔漏检」，而是结构性失效：
+ *   oracle（2026-09-29 两帧同坐标窗口 (100,1698) ±22/±19、步长 4 = 120 采样点实测）：
+ *     未收藏 detail-scroll-8.png：胶囊底 **rgb(46,49,54)**，心形笔画 rgb(239,241,247)
+ *                                → 旧判红命中 **0** / 120
+ *     已收藏 act0-post-tap.png：胶囊底 **rgb(59,100,112)**（青），心形仍为白
+ *                                → 旧判红命中 **0** / 120
+ *   两态都是 0 ⇒ `heartFilled` 恒 false ⇒ `enterDetailAndResolveId` 的第 3 次重试
+ *   分支必然命中 ⇒ 该 spec **结构性不可通过**（前 2 次尝试也是这么耗尽的）。
+ *
+ * 现按「胶囊底色的青度」判定（主题色随 M3 配色变，红不是稳定信号）：
+ *   判青 = (g - r) ≥ 25 且 (b - r) ≥ 25 且 g < 200（后两条排除白色心形笔画本身：
+ *   rgb(239,241,247) 的 g-r=2 / b-r=8，天然不满足，无需单列）。
+ * 同帧实测：已收藏 **37/120 = 0.308**；未收藏 **0/120**；同坐标空白区域对照 **0/120**。
+ * 阈值取 **0.15**：距实测信号 2 倍余量，距阴性 0 有 15% 硬间隔。
  */
+const HEART_FILLED_RATIO = 0.15;
 function heartFilled(p: Pixels, spot: { x: number; y: number }): boolean {
-  let red = 0;
+  let teal = 0;
   let n = 0;
   for (let y = spot.y - 22; y <= spot.y + 22; y += 4) {
     for (let x = spot.x - 19; x <= spot.x + 19; x += 4) {
       n++;
       const [r, g, b] = pixelAt(p, x, y);
-      if (r > 150 && g < 110 && b < 110) red++;
+      if (g - r >= 25 && b - r >= 25 && g < 200) teal++;
     }
   }
-  return n > 0 && red / n >= 0.5;
+  return n > 0 && teal / n >= HEART_FILLED_RATIO;
 }
 
 /**
@@ -540,22 +639,15 @@ async function waitForLynxRenderReady(timeoutMs = 60_000): Promise<void> {
 /**
  * 按 pid 读 logcat 尾部（渲染就绪探测 + 证据留档）。
  *
- * **两个必须处理的坑（都实测踩过）**：
- * 1. lynx 的 `ElementManager::OnPatchFinishForFiber` 是**逐帧日志（~60fps）**，
- *    `logcat -d --pid <pid>` 单次可达数 MB；`runCapture` 没有 maxBuffer 参数
- *    （spawnSync 默认 1MB）→ 直接抛 `ENOBUFS`（实测把用例 ② 打成红）。
- *    故此处自带 spawnSync + 16MB maxBuffer。
- * 2. 全量 dump 无意义（60fps 噪声），用 `-t 2000` 只取尾部 2000 行。
+ * #819：原为**私有副本**（与 transition-matrix 逐字同款）。副本把 logcat 采集
+ * 口径分裂成 4 处中的 2 处，且 pid 为空时返回 `"(进程不存在)"` 占位串——会被
+ * `waitForLynxRenderReady` 的正则当日志内容反复匹配，也**不** warn。
+ * 现统一走 `prefs.readAppLogcat({ lines })`：16MB maxBuffer（Lynx
+ * `ElementManager::OnPatchFinishForFiber` 是 ~60fps 逐帧日志，1MB 缺省会抛
+ * ENOBUFS，实测把用例 ② 打成红）与 `-t` 限尾均已收进该函数。
  */
 function logcatTailByPid(lines = 2000): string {
-  const pid = runCapture(adbPath(), ["-s", serial, "shell", "pidof", APP_PACKAGE]).stdout.trim();
-  if (!pid) return "(进程不存在)";
-  const r = spawnSync(
-    adbPath(),
-    ["-s", serial, "shell", "logcat", "-d", "--pid", pid, "-t", String(lines)],
-    { encoding: "utf-8", timeout: 30_000, maxBuffer: 16 * 1024 * 1024 },
-  );
-  return (r.stdout ?? "").trim();
+  return readAppLogcat(serial, { lines });
 }
 
 /** 把关键 logcat 行留档（剔除逐帧噪声）。 */
@@ -765,56 +857,6 @@ function persistJson(name: string, value: unknown): void {
   writeFileSync(resolve(EVIDENCE_DIR, name), JSON.stringify(value, null, 1));
 }
 
-// ─── 登录（webview 契约注入；与 switch-client-oneway / fab 回归同款内联实现）──
-
-async function loginViaWebview(): Promise<void> {
-  const driver = ctx!.driver;
-  await driver.switchToWebView(60_000);
-
-  // 年龄确认页（/age-confirmation）：点「已满 18 岁」通过；已确认过则直接放行
-  await driver.raw.waitUntil(
-    async () => {
-      const url = await driver.raw.getUrl();
-      if (!url.includes("/age-confirmation")) return true;
-      await clickByText(ctx!, "已满 18 岁");
-      return false;
-    },
-    { timeout: 60_000, timeoutMsg: "年龄确认页未通过", interval: 1_000 },
-  );
-
-  await driver.raw.waitUntil(
-    async () =>
-      (await driver.raw.$("fluent-textarea").isExisting()) &&
-      (await driver.raw.$("fluent-button=登录").isExisting()),
-    { timeout: 30_000, timeoutMsg: "登录页未渲染", interval: 1_000 },
-  );
-
-  const token = process.env.PIXIV_REFRESH_TOKEN ?? "";
-  expect(token.length).toBeGreaterThan(0);
-  await driver.raw.execute(
-    `(() => {
-      const ta = document.querySelector('fluent-textarea');
-      const inner = ta && ta.shadowRoot ? ta.shadowRoot.querySelector('textarea') : null;
-      if (!inner) return;
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
-      setter.call(inner, ${JSON.stringify(token)});
-      inner.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-      inner.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-    })()`,
-  );
-  await driver.raw.waitUntil(
-    async () => (await driver.raw.$("fluent-button=登录").getAttribute("disabled")) === null,
-    { timeout: 10_000, timeoutMsg: "token 注入后登录按钮未启用", interval: 300 },
-  );
-  await clickByText(ctx!, "登录");
-  await driver.raw.waitUntil(async () => !(await driver.raw.getUrl()).includes("/login"), {
-    timeout: 90_000,
-    timeoutMsg: "登录失败（仍停留在 /login）",
-    interval: 2_000,
-  });
-  console.log("[lynx-bookmark-tags] ✓ webview 登录完成（refresh_token 已落共享 WSSecureStorage）");
-}
-
 // ─── 导航：lynx 无深链（见文件头），用设备级点击进详情 ───
 
 /** 推荐页「首屏已出内容」判定：骨架屏近乎纯色，加载后色彩桶数骤增（实测 3 → 94）。 */
@@ -827,6 +869,29 @@ function recommendedLoaded(p: Pixels): boolean {
     }
   }
   return buckets.size > 25;
+}
+
+/**
+ * 当前详情页是否是**多页作品**（漫画/多图）——#819。
+ *
+ * 推荐流每天轮换，同一个 spec 有时抽到单页插画、有时抽到 26 页漫画。多页作品的
+ * 详情页顶部是**分页器**而非信息区，滑动被翻页吃掉，无论滑多少次都到不了
+ * 底部的心形胶囊 ⇒ 固定滑动预算必然耗尽。实测同一轮里：
+ *   26 页漫画 detail-scroll-8.png：右上分页药丸 **9453** 个灰像素（主色 rgb(128,128,128)）
+ *   单页插画 act2a-before-private.png：同窗 **0** 个
+ * 判据取灰像素数 ≥ 2000（阴性 0、阳性 9453，间隔极大）。
+ */
+function multiPageWork(p: Pixels): boolean {
+  let gray = 0;
+  for (let y = 820; y < 980; y += 2) {
+    for (let x = 820; x < 1060; x += 2) {
+      const [r, g, b] = pixelAt(p, x, y);
+      const mx = Math.max(r, g, b);
+      const mn = Math.min(r, g, b);
+      if (mx - mn < 18 && mx > 70 && mx < 190) gray++;
+    }
+  }
+  return gray >= 2000;
 }
 
 /** 返回上一页（进错页面时的重置动作）。 */
@@ -849,15 +914,43 @@ function pressBack(): void {
  * 任一环不成立即判定「不是插画详情页 / 没点中」→ 返回 + 重试（最多 3 次）。
  */
 async function enterDetailAndResolveId(): Promise<string> {
+  /** 轮播横向滑动换下一张卡（与 transition-matrix 的 SWIPE_CAROUSEL_NEXT 同款手势）。
+   *  #819：原重试逻辑 pressBack 后仍点同一张卡——推荐轮播不自转，三次尝试撞的是
+   *  **同一张**作品，抽到多页漫画就必然三次全灭。 */
+  const swipeCarouselNext = (): void => {
+    runOrThrow(adbPath(), ["-s", serial, "shell", "input", "swipe", "900", "700", "180", "700"]);
+  };
+
+  /** 每次尝试的实际卡点（#819）：三个失败分支的报错文案原先被混成一句，
+   *  会把「心形没检出 / 收藏集合不符 / 心形未变色」都说成「进不去详情页」，
+   *  而后两种的失败现场页面上心形与收藏数明明都在。 */
+  const attempts: string[] = [];
   for (let attempt = 1; attempt <= 3; attempt++) {
     // 推荐页首屏出内容（骨架屏近乎纯色，加载后色彩桶数骤增，实测 3 → 94）
     await waitFor("recommended-loaded", recommendedLoaded, 90_000, 2_000);
+    if (attempt > 1) {
+      swipeCarouselNext();
+      await SLEEP(2_500);
+    }
     tap(CAROUSEL_CARD_TAP.x, CAROUSEL_CARD_TAP.y);
     await SLEEP(6_000);
 
     // 滚到详情页底部（信息区 + 操作行）：每滑一次找一次心形，命中即停
+    // 多页作品：滑动被翻页吃掉，滑到天亮也到不了底部信息区 ⇒ 立刻换卡重试，
+    // 不浪费滑动预算（#819）
+    const firstFrame = await toPixels(screenshot("detail-scroll-0"));
+    if (multiPageWork(firstFrame)) {
+      attempts.push(`第 ${attempt} 次：抽到多页作品（详情页顶部为分页器），换下一张卡重试`);
+      console.warn(
+        `[lynx-bookmark-tags] 第 ${attempt} 次：抽到多页作品（右上分页器），返回并换下一张卡`,
+      );
+      pressBack();
+      await SLEEP(4_000);
+      continue;
+    }
+
     let heart: { x: number; y: number } | null = null;
-    for (let i = 0; i < 9 && !heart; i++) {
+    for (let i = 0; i < DETAIL_SCROLL_BUDGET && !heart; i++) {
       heart = findHeartGlyph(await toPixels(screenshot(`detail-scroll-${i}`)));
       if (!heart) {
         swipeUp();
@@ -865,6 +958,9 @@ async function enterDetailAndResolveId(): Promise<string> {
       }
     }
     if (!heart) {
+      attempts.push(
+        `第 ${attempt} 次：${DETAIL_SCROLL_BUDGET} 次滑动后仍未检出心形（findHeartGlyph 恒 null）`,
+      );
       console.warn(`[lynx-bookmark-tags] 第 ${attempt} 次尝试：滚到底仍未检出心形 → 返回重试`);
       pressBack();
       await SLEEP(4_000);
@@ -881,6 +977,9 @@ async function enterDetailAndResolveId(): Promise<string> {
     const added = pubAfter.filter((id) => !pubBefore.includes(id));
     const removed = pubBefore.filter((id) => !pubAfter.includes(id));
     if (added.length !== 1 || removed.length !== 0) {
+      attempts.push(
+        `第 ${attempt} 次：单击心形后服务端收藏集合 +${added.length}/-${removed.length}（期望 +1/-0）`,
+      );
       console.warn(
         `[lynx-bookmark-tags] 第 ${attempt} 次尝试：单击心形未产生唯一新收藏（+${added.length}/-${removed.length}）→ 判定不是插画详情页，回滚本次新增后重试`,
       );
@@ -896,8 +995,9 @@ async function enterDetailAndResolveId(): Promise<string> {
 
     // 自验证步骤 2：同坐标心形必须变红（证明 tap 命中心形本身而非旁边的可点行）
     if (!heartFilled(afterTap, heart)) {
+      attempts.push(`第 ${attempt} 次：心形胶囊未变已收藏色（heartFilled 判据未命中）`);
       console.warn(
-        `[lynx-bookmark-tags] 第 ${attempt} 次尝试：心形未变红（tap 未命中）→ 回滚收藏并重试`,
+        `[lynx-bookmark-tags] 第 ${attempt} 次尝试：心形未变已收藏色（heartFilled 未命中）→ 回滚收藏并重试`,
       );
       hostDeleteBookmark(candidate);
       pressBack();
@@ -923,8 +1023,15 @@ async function enterDetailAndResolveId(): Promise<string> {
     );
     return illustId;
   }
+  // #819：原先三个失败分支（无心形 / 收藏集合不符 / 心形未变色）共用一句
+  // 「未能进入插画详情页」，而实际三种里**只有第一种**与「进不去页面」有关。
+  // 另两种的失败现场页面上明明就摆着心形与收藏数——文案会把人引向改产品。
+  // 现逐条列出实际卡点 + 各自证据文件。
   throw new Error(
-    "3 次尝试均未能进入 lynx 插画详情页（证据见 detail-scroll-*.png / act0-*.png / wait-recommended-loaded.png）",
+    `3 次尝试均未走完「插画详情页自验证」闭环。各次卡点：\n` +
+      attempts.map((a) => `  - ${a}`).join("\n") +
+      `\n证据：detail-scroll-*.png（进详情页后的滚动帧）、act0-post-tap.png（点心形后的帧）、` +
+      `wait-recommended-loaded.png（推荐流入口帧）、act0-undo-tap.png（出现即说明闭环已走到还原步）`,
   );
 }
 
@@ -938,15 +1045,11 @@ describe.skipIf(SKIPPED)(
       serial = ctx.serial;
       assertDeviceGeometry();
 
-      // 阶段 A：webview 登录（pm clear 后 Keystore 里没有 token，只能真实登录）
-      writeClientKind(serial, "webview");
-      forceStopApp(serial);
-      startMainActivity(serial);
-      await waitForTopActivity(MAIN_ACTIVITY);
-      await loginViaWebview();
+      // 阶段 A：dev intent hook 登录（pm clear 后 Keystore 里没有 token，只能真实登录）
+      await loginViaDevIntent(serial);
 
-      // 阶段 B：契约层切 lynx（跨引擎登录态共享 → 种子恢复）
-      expect(writeClientKind(serial, "lynx")).toBe("lynx");
+      // 阶段 B：干净重启进已登录主界面
+      // client_kind 无需播种：单引擎下入口恒为 LynxActivity，写什么都归一为 lynx
       forceStopApp(serial);
       runOrThrow(adbPath(), ["-s", serial, "logcat", "-c"]);
       startMainActivity(serial);
@@ -973,7 +1076,8 @@ describe.skipIf(SKIPPED)(
       try {
         if (!serial) return;
         forceStopApp(serial);
-        writeClientKind(serial, "webview"); // 恢复默认，避免污染后续用例
+        // 单引擎布局下无「默认引擎」可恢复（写入的 client_kind 一律归一为 lynx），
+        // force-stop 即完成收尾，不播种 prefs 避免污染后续用例
       } catch {
         // 收尾失败不阻断
       }

@@ -222,6 +222,27 @@ describe("bookmarkStore", () => {
   });
 
   describe("ensureLoaded", () => {
+    it("query 未装配在缓存时不得抛 Missing queryFn（#811 回归）", async () => {
+      // 复现条件就在本文件里：useInfiniteQuery 被整体 mock ⇒ 真实 queryClient 缓存里
+      // 永远不会出现 ["bookmarks",1,"public"]。原实现只传 queryKey（并用 `as any`
+      // 逃过「queryFn 必填」的类型检查），ensureInfiniteQueryData 遂走
+      // QueryCache.build() 新建一个无 queryFn 的 query → TanStack 抛
+      // `Missing queryFn: '["bookmarks",1,"public"]'`。
+      //
+      // 为什么以前是**间歇**的：既有两条用例都不 await ensureLoaded()，浮空 promise 的
+      // rejection 与「测试文件收尾」赛跑——谁先到谁说了算，于是 CI 上偶发、rerun 又绿，
+      // 表现为「2051 passed / 1 error」。本例显式 await ⇒ 抖动变成确定性断言。
+      const { ensureLoaded } = await loadStore();
+      let err: unknown = null;
+      try {
+        await ensureLoaded();
+      } catch (e) {
+        err = e;
+      }
+      // 只钉这一个失败模式：mock 的 loadBookmarks 无实现，可能抛别的错，不在本题范围
+      expect(String((err as Error | null)?.message ?? "")).not.toMatch(/Missing queryFn/);
+    });
+
     it("is a no-op (TQ handles auto-fetching reactively)", async () => {
       mockData = undefined;
       const { ensureLoaded } = await loadStore();

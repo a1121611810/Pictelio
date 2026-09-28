@@ -260,6 +260,63 @@ describe("client.requestRaw 原生模式（PictelioApi.request 转发，JS 零�
       message: "原生 API 模块不可用",
     })
   })
+
+  // ── #815 启动竞态（原生模式同样需要认证就绪门）──────────────────────────
+  // 旧实现 `if (accessToken || !authReadyProvider) return` 让**原生模式完全跳过**这道门
+  // （理由是「access_token 在 Java 堆、不经此门」）。但 access_token 是异步 OAuth 交换的
+  // 产物，交换完成前 Java 堆同样为空 ⇒ 启动窗口内的请求裸奔 → 401 → 401 handler 读空内存
+  // → 跳过刷新 → 上报会话失效（一次性 401 升级为永久失效）。
+  // 实测时序（2026-09-28 19:52，logcat）：
+  //   28.419 useApiQuery health 请求发出 → 28.465 loginWithRefreshToken 发出
+  //   → 29.835 401 ×2（交换未完成，内存无 refresh_token）
+  it("原生模式 + 认证恢复在飞 → 等恢复落定后再转发（#815：不再跳过就绪门）", async () => {
+    const requestMock = vi.fn(
+      (_m: string, _p: string, _b: string, cb: (s: number, d: string, r: string) => void) =>
+        cb(200, NOVEL_HTML, ""),
+    )
+    vi.stubGlobal("NativeModules", { PictelioApi: { request: requestMock } })
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let providerCalls = 0
+    setAuthReadyProvider(async () => {
+      providerCalls++
+      await gate
+      return true
+    })
+
+    const p = apiClient.requestRaw("GET", "/webview/v2/novel", { id: "123" })
+    await Promise.resolve()
+    // 恢复门未落定：原生转发**不得**已发出（这正是 #815 的裸奔窗口）
+    expect(providerCalls).toBe(1)
+    expect(requestMock).not.toHaveBeenCalled()
+    release()
+    await p
+    expect(requestMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("原生模式 + 恢复失败（provider 返回 false）→ 仍转发，不永久挂起（#815 保持可用性）", async () => {
+    const requestMock = vi.fn(
+      (_m: string, _p: string, _b: string, cb: (s: number, d: string, r: string) => void) =>
+        cb(200, NOVEL_HTML, ""),
+    )
+    vi.stubGlobal("NativeModules", { PictelioApi: { request: requestMock } })
+    setAuthReadyProvider(async () => false)
+    await apiClient.requestRaw("GET", "/webview/v2/novel", { id: "123" })
+    expect(requestMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("原生模式 + 无 provider（web-core 预览等）→ 放行，不挂起（#815 保持既有行为）", async () => {
+    const requestMock = vi.fn(
+      (_m: string, _p: string, _b: string, cb: (s: number, d: string, r: string) => void) =>
+        cb(200, NOVEL_HTML, ""),
+    )
+    vi.stubGlobal("NativeModules", { PictelioApi: { request: requestMock } })
+    setAuthReadyProvider(null)
+    await apiClient.requestRaw("GET", "/webview/v2/novel", { id: "123" })
+    expect(requestMock).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe("rewriteUrl 原生分支（ADR-0104：绝对 next_url 归一化，防双域名 404）", () => {

@@ -53,6 +53,7 @@
     "build:android": "vp run --filter pictelio-app build:android",
     "build:android:release": "vp run --filter pictelio-app build:android:release",
     "release": "vp run --filter pictelio-app release",
+    "release:transition": "PICTELIO_RELEASE_BRANCH=release/transition-6.2.0 vp run --filter pictelio-app release",
     "deploy": "node scripts/deploy.mjs",
     "deploy:dry": "node scripts/deploy.mjs --dry-run",
     "sync:app-lynx-bundle": "node packages/app-lynx/scripts/sync-android-assets.mjs",

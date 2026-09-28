@@ -43,7 +43,8 @@ pnpm test:android:e2e
 
 默认自动选择第一个可用 AVD（pictelio_ui 优先）。冒烟测试会完整走通：
 AVD 检测启动 → boot 等待 → chromedriver 预置 → 编译安装 APK → Appium server → session →
-断言当前 Activity 为 `io.pictelio.app.MainActivity` → NATIVE_APP ↔ WEBVIEW context 切换。
+断言当前 Activity 为 `io.pictelio.app.LynxActivity`（单引擎唯一入口；`MainActivity` /
+`MainActivityWebview` 已随 #610 去 Capacitor 删除，故不再有 NATIVE_APP ↔ WEBVIEW context 切换）。
 
 ### 环境变量
 
@@ -62,28 +63,21 @@ AVD 检测启动 → boot 等待 → chromedriver 预置 → 编译安装 APK �
 `window.pictelioE2e` E2E 钩子）；设置 `ANDROID_E2E_BUILD_MODE=e2e` 时改跑
 `pnpm build:android:e2e`（web 构建带 `--mode e2e`，define `__E2E__=true` 保留钩子）。
 
-- **依赖 `window.pictelioE2e` 钩子的用例**：`switch-client-oneway` / `switch-client-roundtrip` /
-  `switch-client-roundtrip-3x`（经 `/client-switch` 页的钩子触发切换）。用普通构建跑这些用例
-  会红在「E2E 钩子应存在」类断言上——先确认 `ANDROID_E2E_BUILD_MODE=e2e`。
-- `switch-client-roundtrip-low` 走契约层（`prefs.ts` adb 写 pref + 重启），不依赖钩子，两种构建均可。
+- **依赖 `window.pictelioE2e` 钩子的用例**：单引擎化后**已无此类用例**。原先依赖该钩子的
+  `switch-client-oneway` / `switch-client-roundtrip` / `switch-client-roundtrip-3x` 已随
+  webview 客户端一起删除（被测对象不存在）。若将来新增依赖该钩子的用例，记得用
+  `ANDROID_E2E_BUILD_MODE=e2e` 编译，否则会红在「E2E 钩子应存在」类断言上。
 - 快速迭代：`ANDROID_E2E_SKIP_BUILD=1` 跳过编译直接复用既有 APK。构建模式随产物本身固化，
   **切换 BUILD_MODE 后必须重新编译**，SKIP_BUILD 复用的旧产物不会因此改变模式。
 
 ### AVD 选择（ANDROID_E2E_AVD）
 
 - 默认自动选择：`avd.ts` 按 `KNOWN_AVDS` 顺序（`pictelio_ui` → `pictelio_low`）取第一个存在的，
-  即默认落在 `pictelio_ui`（android-34，WebView ≥ 85，可真实运行 App）。
-- 以下用例必须在 `pictelio_low`（android-28，WebView < 85）上运行：
-  - `switch-client-roundtrip-low`：spec 内已 pin 缺省 `pictelio_low`，并在 setup 连设备之前用
-    环境常量做整文件 skip guard（解析到其他 AVD 时跳过，防 ADR-0153「未自动降级」假失败，
-    ADR-0159 根因 3）；
-  - `fab-hit-testing-regression`：spec 内已 pin 缺省 `pictelio_ui`（阶段 A webview 登录需
-    WebView ≥ 85；坐标常量按 1080×2160 / density 480 的 vw 几何推导。显式
-    `ANDROID_E2E_AVD=pictelio_low` 会整文件 skip——该 AVD WebView 66 < 85，
-    client_kind=webview 重启触发 ADR-0153 自动降级，无 WEBVIEW context）；
-  - `webview-only-upgrade`：spec **未** pin AVD，需按其头注释显式
-    `ANDROID_E2E_AVD=pictelio_low`（另有 `ANDROID_E2E_FLAVOR=webview` 的 skip guard；
-    不显式指定时会被自动选到 pictelio_ui）。
+  即默认落在 `pictelio_ui`（android-34，可真实运行 App）。
+- 以下用例必须 pin AVD：
+  - `fab-hit-testing-regression`：spec 内已 pin 缺省 `pictelio_ui`（坐标常量按 1080×2160 /
+    density 480 的 vw 几何推导）。显式 `ANDROID_E2E_AVD=pictelio_low` 会整文件 skip。
+  - `transition-matrix`：同样 pin `pictelio_ui`，同一套坐标常量理由。
   - pin 缺省不禁止显式覆盖：`ANDROID_E2E_AVD=pictelio_low` 始终有效。
 - `ensureEmulator` 的抢用保护：检测到已在线模拟器但不是目标 AVD 时**直接抛错**（提示先关闭
   或设置 `ANDROID_E2E_AVD`），不抢用，避免误测错设备；无在线模拟器时才以 `-no-window` 启动目标 AVD。
@@ -125,8 +119,10 @@ Lynx 侧：`await ctx.driver.switchToNative()` 后用 accessibility id（`$("~la
 
 ## WebDAV 备份链路（spec docs/specs/webdav-backup.md，默认跳过）
 
-`specs/webdav-backup.spec.ts` 覆盖 WebDAV 备份的真实原生链路（唯一需要外部 WebDAV 服务器的用例），
-默认跳过（`WEBDAV_E2E_ENABLED=1` 才运行），避免无服务器环境 CI 失败。
+单引擎化后 WebDAV 备份 E2E **只剩 lynx 一条**：`specs/webdav-backup.spec.ts`（webview 侧，
+经 WebView 设置页填连接配置 + DOM 点击）已随 webview 客户端删除。
+现存的是 `specs/webdav-backup-lynx.spec.ts`，默认跳过（`WEBDAV_E2E_ENABLED=1` 才运行），
+避免无服务器环境 CI 失败。
 
 前置与运行：
 
@@ -143,21 +139,17 @@ adb shell settings put global http_proxy 10.0.2.2:7897
 # 4) 运行（复用已构建 APK；PIXIV_REFRESH_TOKEN 由 packages/app/.env 提供）
 cd packages/app && set -a && . ./.env && set +a
 WEBDAV_E2E_ENABLED=1 ANDROID_E2E_SKIP_BUILD=1 ANDROID_E2E_AVD=pictelio_ui \
-  pnpm vitest run -c tests/android-e2e/vitest.config.ts specs/webdav-backup.spec.ts
+  pnpm vitest run -c tests/android-e2e/vitest.config.ts specs/webdav-backup-lynx.spec.ts
 ```
 
 断言 oracle（独立于实现）：服务器磁盘上的真实备份文件（可解析为 spec §3.2 快照）、
 spec §8 密码红线（快照不含任何 password 键）、§5/§6 流程文案。
 
-> 实测坑：WebDriver `execute` 的脚本体必须显式 `return`（IIFE 返回值会被丢弃 → 恒 null）；
-> WebView 的 `innerText` 返回 null，断言用 `textContent`。
-
-`specs/webdav-backup-lynx.spec.ts`（同一开关）覆盖 **lynx 引擎的原生链路**：
+`specs/webdav-backup-lynx.spec.ts` 覆盖 lynx 引擎的原生链路：
 因 Lynx 4.0.1 accessibility 树不暴露内容节点、lynx UI 自动化不可行，改为「写 prefs
-（`pictelio_client_kind=lynx` + webdav 配置）→ 启动 → LynxActivity →
-router.loadSettings → runStartupAutoBackup → PictelioWebDavModule → 真实服务器」，
-断言服务器落盘快照的 `engine=lynx`、真实 `appVersion`、以及 `last_backup` 回写
-真实 SharedPreferences。全程无需 UI 点击。
+（webdav 配置）→ 启动 → LynxActivity → router.loadSettings → runStartupAutoBackup →
+PictelioWebDavModule → 真实服务器」，断言服务器落盘快照的 `engine=lynx`、真实
+`appVersion`、以及 `last_backup` 回写真实 SharedPreferences。全程无需 UI 点击。
 
 > 真机发现：Lynx JS runtime **没有 `TextEncoder`/`TextDecoder`**，快照序列化处抛错会让
 > lynx 自动备份在调用桥之前就失败（node/jsdom 单测覆盖不到）；现改用纯 JS UTF-8 实现

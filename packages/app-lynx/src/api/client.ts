@@ -71,12 +71,25 @@ function onRateLimitRetry(attempt: number, delayMs: number): void {
   console.warn("[client] 429 限流退避重试", attempt, `${delayMs}ms`)
 }
 
-// ─── 认证就绪门（web 模式）───
+// ─── 认证就绪门（web + 原生两模式）───
 // 启动竞态：子页面 onMounted 早于 App.onMounted（Vue 子先父后），页面的首帧数据请求
-// 会跑在 initRouter→restoreToken 之前；web 模式无 access_token 时若直接抛 UNAUTHORIZED，
-// 三态判定会把它当「已失败」渲染红字（骨架被替换）。由 authStore 注册本提供者：
-// 无 token 的请求先请它触发/等待恢复落定，再判定是否真的未登录。
-// 原生模式 access_token 在 Java 堆（不经此门）。
+// 会跑在 initRouter→restoreToken 之前；此时无 access_token，若直接发出则必得 401。
+// 由 authStore 注册本提供者：无 token 的请求先请它触发/等待恢复落定，再判定是否真的未登录。
+//
+// ⚠️ 2026-09-28 #815 订正：原生模式**同样需要这道门**。
+// 旧实现 `if (accessToken || !authReadyProvider) return` 隐含「原生模式 access_token 在
+// Java 堆、不经此门」——但 access_token 是 `loginWithRefreshToken` 的**异步 OAuth 交换**
+// 产物，交换完成前 Java 堆也是空的。实测启动窗口（issue #815）：
+//     19:52:28.419  useApiQuery health 请求发出（access_token 未就绪）
+//     19:52:28.430  getItem.refresh_token 发出
+//     19:52:28.465  loginWithRefreshToken 发出（交换在飞）
+//     19:52:29.835  401 ×2 —— 交换未完成，authStore 内存仍无 refresh_token
+//                →「401 触发刷新但内存无 refresh_token（登录态已丢失），跳过刷新」
+// ⇒ 请求裸奔 → 401 → 401 handler 读空内存 → **永久失效**（不是重试一次，是再也恢复不了）。
+// 该 401 又被当作「已登录会话失效」上报，跳全屏错误页 /error，requiresAuth 路由被弹回，
+// 发版门 R1 全程落在推荐页上跑。
+// 原生模式的判据是「恢复是否落定」而非「JS 侧有无 accessToken」——后者在原生模式恒为空，
+// 不能用来判断就绪。
 let authReadyProvider: (() => Promise<boolean>) | null = null
 const AUTH_READY_WAIT_MS = 10_000
 
@@ -84,9 +97,16 @@ export function setAuthReadyProvider(fn: (() => Promise<boolean>) | null): void 
   authReadyProvider = fn
 }
 
-/** web 模式无 token：等恢复落定（带上限，防恢复挂起把请求无限拖住）后再判定未登录 */
+/**
+ * 无 token 的请求：等认证恢复落定（带上限，防恢复挂起把请求无限拖住）后再判定未登录。
+ *
+ * web-core 预览无 authStore 注册方 ⇒ 直接放行（无可恢复的登录态）。
+ * 原生模式 accessToken 恒空（JS 零知，真实 token 在 Java 堆），因此**不能**用
+ * `accessToken` 非空作为「已就绪」判据，一律交给 authReadyProvider 判定。
+ */
 async function awaitAuthReady(): Promise<void> {
-  if (accessToken || !authReadyProvider) return
+  if (!authReadyProvider) return
+  if (accessToken) return
   await withTimeout(authReadyProvider(), AUTH_READY_WAIT_MS).catch(() => {})
 }
 
@@ -321,6 +341,13 @@ async function execute<T>(
 ): Promise<T> {
   if (authPermanentFailure) throw new Error("认证已失效，请重新登录")
 
+  // #815：认证就绪门必须覆盖**原生分支**（该分支在下方提前 return，末尾的门到不了）。
+  // 原生模式 access_token 由异步 OAuth 交换产出，交换完成前 Java 堆同样为空 ⇒
+  // 启动窗口内的请求裸奔 → 401 → 401 handler 读空内存 → 永久失效。
+  if (method === "GET" && !accessToken) {
+    await awaitAuthReady()
+  }
+
   // #53 原生模式：API 转发 Native（Java 附加 Bearer + 401 刷新），JS 零知 access_token
   if (isNativeMode()) {
     const api = getNativeModules()?.PictelioApi as {
@@ -410,6 +437,14 @@ async function executeRaw(
   params?: Record<string, string>,
 ): Promise<string> {
   if (authPermanentFailure) throw new Error("认证已失效，请重新登录")
+
+  // #815：认证就绪门必须覆盖**原生分支**。
+  // 原生分支在下方 `return new Promise(api.request)` 处提前返回，末尾的 awaitAuthReady
+  // 永远到不了 ⇒ 启动窗口内的请求裸奔（access_token 尚未由异步 OAuth 交换产出）
+  // → 401 → 401 handler 读空内存 → 永久失效。故提到分支之前统一把关。
+  if (method === "GET" && !accessToken) {
+    await awaitAuthReady()
+  }
 
   // #53 原生模式：API 转发 Native（Java 附加 Bearer + 401 刷新），JS 零知 access_token。
   // 与 execute 的差异：回调 data 即原始响应体字符串（PixivApiCore 对非 JSON 响应原样

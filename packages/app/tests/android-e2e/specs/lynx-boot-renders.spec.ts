@@ -11,16 +11,15 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ensureEmulator } from "../avd";
-import {
-  assertDebugApkInstalled,
-  forceStopApp,
-  startMainActivity,
-  writeClientKind,
-} from "../prefs";
+import { assertDebugApkInstalled, forceStopApp, readAppLogcat, startMainActivity } from "../prefs";
 import { buildDebugApk, installApk } from "../build-install";
 import { adbPath, APP_PACKAGE, runCapture, runOrThrow } from "../env";
 
 const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// logcat 采集统一走 prefs.readAppLogcat（按 app 进程 pid 过滤；进程未创建时返回空串）。
+// 口径与理由见该函数注释：环形 buffer 会把 Lynx 初始化行挤掉，必须按 pid 抓；
+// 而 `am start` 后 Activity 记录先于进程出现约 150ms，抛错会误报成「app 崩溃」。
 
 /** 等待前台 Activity 变为期望值（adb 轮询）。 */
 async function waitForActivity(
@@ -48,9 +47,9 @@ describe("Lynx 客户端启动即渲染（白屏回归）", () => {
     assertDebugApkInstalled(serial);
     await buildDebugApk(); // ANDROID_E2E_SKIP_BUILD=1 时跳过
     await installApk(serial);
-    // 基线清空 + 写入 lynx + 启动（复用 S1 契约层的跨进程分发契约）
+    // 基线清空 + 启动。单引擎布局：launcher 入口恒为 LynxActivity，
+    // 无需预置 client_kind（CLIENT_KINDS 已塌缩为 {"lynx"}）。
     runOrThrow(adbPath(), ["-s", serial, "shell", "pm", "clear", APP_PACKAGE], 60_000);
-    expect(writeClientKind(serial, "lynx")).toBe("lynx");
     forceStopApp(serial);
     // 清 logcat 基线，捕获本次启动的渲染错误（若有）
     runOrThrow(adbPath(), ["-s", serial, "logcat", "-c"]);
@@ -59,8 +58,7 @@ describe("Lynx 客户端启动即渲染（白屏回归）", () => {
 
   afterAll(() => {
     try {
-      forceStopApp(serial);
-      writeClientKind(serial, "webview"); // 恢复默认，避免污染后续用例
+      if (serial) forceStopApp(serial);
     } catch {
       // 收尾失败不阻断
     }
@@ -70,7 +68,7 @@ describe("Lynx 客户端启动即渲染（白屏回归）", () => {
     await waitForActivity(serial, "LynxActivity");
     // 留出 web-core bundle 加载 + 首帧渲染时间
     await SLEEP(5_000);
-    const log = runCapture(adbPath(), ["-s", serial, "logcat", "-d"]).stdout;
+    const log = readAppLogcat(serial);
     // 正向：lynx 运行时已初始化（渲染非白屏的充要信号之一；空 logcat 也算失败）
     expect(log).toMatch(/LynxEnv start init|Loading native libraries succeeded/);
     // 白屏签名：ES module TDZ / lynx loadCard 失败。出现即回归（bundle 加载即崩→白屏）。

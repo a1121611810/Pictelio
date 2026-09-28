@@ -16,32 +16,89 @@ export const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "
 /** monorepo 根目录 */
 export const REPO_ROOT = resolve(APP_ROOT, "..", "..");
 
-/** E2E 目标 flavor（ANDROID_E2E_FLAVOR=webview 时跑单引擎 webview 包；默认 full） */
-export type E2eFlavor = "full" | "webview";
-export const E2E_FLAVOR: E2eFlavor =
-  process.env.ANDROID_E2E_FLAVOR === "webview" ? "webview" : "full";
+/**
+ * E2E 目标构建布局。
+ *
+ * - `single`：**单引擎**（main 线）。#610 去 Capacitor 后 build.gradle 已无
+ *   productFlavors，`java.srcDir 'src/lynx/java'` 提升进 main，产物落在
+ *   `apk/debug/app-debug.apk`（实测 2026-09-28：aapt2 badging
+ *   `launchable-activity: io.pictelio.app.LynxActivity`，无 MainActivity 类）。
+ * - `full` / `webview`：过渡分支 `release/transition-6.2.0` 的双引擎布局
+ *   （`apk/<flavor>/debug/app-<flavor>-debug.apk`）。
+ */
+export type E2eFlavor = "single" | "full" | "webview";
+
+/** 环境变量原值 → flavor。**只认显式值，缺省 single**（不做产物探测，见下）。 */
+export function resolveE2eFlavor(raw: string | undefined): E2eFlavor {
+  return raw === "full" || raw === "webview" || raw === "single" ? raw : "single";
+}
+
+/** flavor → debug APK 相对路径（相对 packages/app） */
+export function apkRelativePath(flavor: E2eFlavor): string {
+  return flavor === "single"
+    ? "android/app/build/outputs/apk/debug/app-debug.apk"
+    : `android/app/build/outputs/apk/${flavor}/debug/app-${flavor}-debug.apk`;
+}
 
 /**
- * debug APK 产物路径。`pnpm build:android` 的 `assembleDebug` 会构建全部 flavor，
- * 故同一构建产物即可切换 E2E 目标包（ADR-0062 flavor 拆分）。
+ * E2E 目标 flavor。`ANDROID_E2E_FLAVOR` 显式指定，缺省 `single`（main 单引擎）。
+ *
+ * **刻意不做「按产物存在性自动探测」**：`outputs/apk/` 下会残留其它分支的陈旧
+ * flavor 目录——实测在 main 上跑完 `pnpm build:android` 后，`full/`、`lynx/`、
+ * `webview/` 里仍躺着过渡分支 6.2.1 的包。自动探测会把单引擎 main 误判成
+ * `full`，进而指向一个本次构建根本没产出的 APK。要跑过渡分支须显式
+ * `ANDROID_E2E_FLAVOR=full`。
  */
-export const APK_PATH = resolve(
-  APP_ROOT,
-  `android/app/build/outputs/apk/${E2E_FLAVOR}/debug/app-${E2E_FLAVOR}-debug.apk`,
-);
+export const E2E_FLAVOR: E2eFlavor = resolveE2eFlavor(process.env.ANDROID_E2E_FLAVOR);
+
+/**
+ * 非单引擎 flavor 的**显式失败**（#819）。
+ *
+ * 背景：本分支 build.gradle 已无 productFlavors（实测 `productFlavors` 计数 0），
+ * `ANDROID_E2E_FLAVOR=full|webview` 会指向**本次构建根本没产出**的 APK 路径。
+ * 此前各 spec 用 `E2E_FLAVOR === "webview" ⇒ 整文件 skip` 兜着——但那条守卫
+ * ①恒不可达（永远走不到）、②静默，把「配置写错」伪装成「该设备上不可跑」。
+ *
+ * 改在 env.ts 收口：任何 spec / 工具只要 import env 就会立刻炸，并给出正确指令。
+ * 不放在各 spec 里逐个删守卫——那样「漏一个 spec 又静默跳过」的洞会留着。
+ */
+if (E2E_FLAVOR !== "single") {
+  throw new Error(
+    `[android-e2e] ANDROID_E2E_FLAVOR=${E2E_FLAVOR} 在本分支不可用：build.gradle 已无 ` +
+      `productFlavors（去 Capacitor 后唯一入口是 launcher LynxActivity），` +
+      `不存在 flavor 维度产物 ${apkRelativePath(E2E_FLAVOR)}。` +
+      `请去掉该环境变量（缺省即 single）；若确需跑双引擎，切到 release/transition-6.2.0 分支。`,
+  );
+}
+
+/** debug APK 产物路径（随 flavor 变化） */
+export const APK_PATH = resolve(APP_ROOT, apkRelativePath(E2E_FLAVOR));
 
 /** App 包名与主入口 Activity（按 flavor 变化；冒烟测试断言目标） */
 export const APP_PACKAGE = "io.pictelio.app";
-export const MAIN_ACTIVITY =
-  E2E_FLAVOR === "webview" ? `${APP_PACKAGE}.MainActivityWebview` : `${APP_PACKAGE}.MainActivity`;
 export const LYNX_ACTIVITY = `${APP_PACKAGE}.LynxActivity`;
+
+/** flavor → 主入口 Activity 全限定类名 */
+export function mainActivityFor(flavor: E2eFlavor, pkg: string): string {
+  if (flavor === "webview") return `${pkg}.MainActivityWebview`;
+  if (flavor === "full") return `${pkg}.MainActivity`;
+  return `${pkg}.LynxActivity`;
+}
+
+/**
+ * 主入口 Activity。`single` 布局下 Lynx 是唯一引擎，入口即 LynxActivity——
+ * 单引擎 APK 里**不存在** MainActivity / MainActivityWebview 两个类，
+ * 仍按 `io.pictelio.app.MainActivity` 拉起会在 `am start` 阶段直接失败。
+ */
+export const MAIN_ACTIVITY = mainActivityFor(E2E_FLAVOR, APP_PACKAGE);
 
 /**
  * 全部可能的入口 Activity。低 WebView 设备上 full 包的 MainActivity 会在
  * onCreate 内立即 finish 并路由/降级（ADR-0153），session 就绪等待必须接受
- * 「任一入口」而非单一 MainActivity。
+ * 「任一入口」而非单一 MainActivity。单引擎布局下两者重合，去重避免重复等待。
  */
-export const ENTRY_ACTIVITIES = [MAIN_ACTIVITY, LYNX_ACTIVITY] as const;
+export const ENTRY_ACTIVITIES: readonly string[] =
+  MAIN_ACTIVITY === LYNX_ACTIVITY ? [LYNX_ACTIVITY] : [MAIN_ACTIVITY, LYNX_ACTIVITY];
 
 /** 复用本机固定 AVD（ADR-0061：不新建/删除）。pictelio_ui（android-34）优先：
  *  WebView ≥ 85（项目 minWebviewVersion），可真实运行 App；pictelio_low（android-28）

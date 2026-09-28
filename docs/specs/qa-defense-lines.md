@@ -39,16 +39,35 @@
 
 ### T2 转换矩阵 spec（android-e2e，P1）
 
-新文件 `packages/app/tests/android-e2e/specs/transition-matrix.spec.ts`，**发版前手动门**（describe 标注 `@release-gate`）。矩阵首版 4 行（每行 = 一个已收口缺陷的回归）：
+新文件 `packages/app/tests/android-e2e/specs/transition-matrix.spec.ts`，**发版前手动门**（describe 标注 `@release-gate`）。矩阵**现为 3 行**（每行 = 一个已收口缺陷的回归，全部 Lynx）：
 
 | 行 | 表面 | 动作序列 | 内容断言（禁存在性） |
 |----|------|----------|---------------------|
 | R1 | lynx `/illusts` 推荐 | 点中部卡片→详情→返回 | 返回后锚点卡内存在「相关作品」段（`relatedRowFor` 渲染物）；滚动位置不回顶（对比返回前后截图/首屏元素一致） |
 | R2 | lynx SearchSheet | 搜多结果词→滚到底→等第二页 | 断言翻页后行数增加且无「加载更多失败」横幅；再切「小说」scope→列表无插画行 |
 | R3 | lynx 推荐轮播 | 滑动 ≥2 张 | 每张卡收藏数两两不同（对比帧文本）；卡内容随 index 变化 |
-| R4 | webview 搜索 | 同 R2 序列 | 同 R2 断言（webview 侧基线对照） |
 
-实现约束：复用既有 helpers（`driver.ts`/`appium.ts`/登录种入/代理方法学，先读 `switch-client-roundtrip.spec.ts` 与 `lynx-boot-renders.spec.ts` 摸清惯例）；导航一律用 benchNav 深链（真机 @tap 不可靠）；R1 的注入段断言用页面文本「相关作品」+锚点卡定位。
+> **R4 已删除（单引擎化 #610 处置）**：原第 4 行是「webview 搜索（基线对照）」，断言的是 WebView SPA 的 DOM 契约（`data-testid="illust-card"`、`role=status` 横幅）。不可观测的原因是**没有 Activity 承载 WebView**（`MainActivity` / `MainActivityWebview` 已删，唯一入口是 launcher `LynxActivity`）⇒ Appium 永远等不到 WEBVIEW context。
+>
+> 注意：**不是**因为 webview 前端产物没打进包——实测主线 debug APK 内仍有 27 条 `assets/public/*` 与 `assets/capacitor.config.json`（`git ls-files` 为空只说明未跟踪，不代表不在包内）。这批资产是死资源，不影响可观测性判断，但应随收口一并清理。
+
+> **内容断言的「不可判定」口径（三态记账，#819 二次订正）**：R1 断言③ 与 R3 收藏行是**帧对比型内容断言**，可判定性**依赖内容形态**——实测同一份代码、同一台 AVD，因推荐流内容不同，两跑一审判过并通过（`belowAnchorRegion` 差异 **26080** ≫ 阈值 800）、一轮不可判定（差异 **214** ≤ 800）。
+>
+> 因此不可判定时**必须走 `t.skip()`（记 skipped，不记 passed）**，且外层门按**三态**判定，而非「逐行 AND」也非「求和 > 0」：
+>
+> | 台账 | 含义 | 外层门 |
+> |------|------|--------|
+> | `judged > 0` | 真跑了并给出通过/不通过的判定 | 正常判红（断言不通过时） |
+> | `judged = 0, skipped > 0` | 显式声明「本形态不可判定」并写明原因 | **不判红**，但 `console.warn` 高亮「本轮未验证」；vitest 已把该 test 记为 skipped（非 passed） |
+> | `judged = 0, skipped = 0` | 既没判定也没声明 | **判红**——只可能是有代码把不可判定分支写回 `return` |
+>
+> 「求和」太弱（R3 判过就能替 R1 背书）；「逐行 AND」太强（把内容形态导致的不可判定报成产品回归，得到随机红的发版门）。三态是唯一同时满足「不放过 `return` 回潮」与「不因内容形态随机红」的形态。**反事实检验**：把 skip 分支改回 `return`，实测该行立刻转红，且同轮 R3 判过 3 对也遮不住（证明是逐行而非求和）。
+>
+> 连带删除 spec 内的 `loginViaWebview` / `probeWebviewNumber` / 三个 DOM 表达式常量。
+>
+> **门覆盖面已收窄，勿再按 4 行理解**：单引擎下不存在第二个渲染面，**本门不再有「双引擎基线对照」**。
+
+实现约束：复用既有 helpers（`driver.ts`/`appium.ts`/代理方法学，先读 `lynx-boot-renders.spec.ts` 摸清惯例）；导航一律用 benchNav 深链（真机 @tap 不可靠）——单引擎下由 `LynxActivity` 自行读取 `benchNav` extra（`LynxActivity.java:504`），不经已删除的 MainActivity 转发；登录走 `prefs.loginViaDevIntent()`（dev intent hook，debug 包门禁）；R1 的注入段断言用页面文本「相关作品」+锚点卡定位。
 
 ### T3 宿主矩阵测试（app-lynx 单测，P1）
 
