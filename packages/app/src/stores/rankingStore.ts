@@ -168,7 +168,7 @@ export function createRankingStore(initial?: RankingQuery): RankingStoreResult {
     // 对已装配的 query 传 queryFn 是严格 no-op（QueryCache.build 命中即丢弃 options）。
     await queryClient.ensureInfiniteQueryData({
       queryKey: queryKeys.ranking(rankingCacheKey(current)),
-      queryFn: ({ pageParam, signal }: { pageParam: string | undefined; signal?: AbortSignal }) =>
+      queryFn: ({ pageParam, signal }) =>
         pageParam ? fetchRankingNext(pageParam, signal) : fetchRanking(current, signal),
       getNextPageParam: (last: PixivIllustListResponse) => last.next_url ?? undefined,
       initialPageParam: undefined as string | undefined,
