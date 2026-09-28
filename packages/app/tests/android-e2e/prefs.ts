@@ -339,6 +339,54 @@ export function startMainActivity(serial: string): void {
   );
 }
 
+/** dev hook 的 intent extra key。oracle = LynxActivity.java:98 DEV_EXTRA_REFRESH_TOKEN */
+const DEV_EXTRA_REFRESH_TOKEN = "pictelio_dev_refresh_token";
+
+/**
+ * dev hook 登录的 am start 参数（纯函数，便于单测）。
+ *
+ * oracle = `LynxActivity.applyDevIntentHooks()`（LynxActivity.java:697-706）：
+ * 非空时调 `autoLoginWithRefreshToken(token)` 持久化进 SecureStorage 并登录。
+ * 门禁 `BuildConfig.DEBUG` ⇒ 只有 debug 包有该钩子，release 包被 R8 整段移除。
+ *
+ * 显式打 `io.pictelio.app/.LynxActivity` 而非 `MAIN_ACTIVITY`：该钩子只在
+ * LynxActivity 内实现，落到别的 Activity 上 intent 会被静默忽略。
+ */
+export function devLoginIntentArgs(token: string): string[] {
+  // token 是设备 shell 侧参数，单引号包裹并转义内嵌单引号，防注入与截断
+  const quoted = `'${token.replace(/'/gu, `'\\''`)}'`;
+  return [
+    "shell",
+    "am",
+    "start",
+    "-n",
+    `${APP_PACKAGE}/.LynxActivity`,
+    "--es",
+    DEV_EXTRA_REFRESH_TOKEN,
+    quoted,
+  ];
+}
+
+/**
+ * 用 dev intent hook 登录（等价 webview 登录页注入的 refresh_token，
+ * 但不依赖 WebView 客户端——单引擎化后 webview 登录页已不存在）。
+ *
+ * **实机验证（2026-09-28，pictelio_ui + 单引擎 debug 包）**：logcat 打出
+ * `I LynxActivity: dev hook: 自动登录成功（userInfo={"userId":…,"userName":…}）`，
+ * 随后 `PictelioSecureStorage.setItem.refresh_token` 持久化。
+ *
+ * token 缺省取 `process.env.PIXIV_REFRESH_TOKEN`（globalSetup 从 packages/app/.env 注入）。
+ */
+export function loginViaDevIntent(serial: string, token = process.env.PIXIV_REFRESH_TOKEN): void {
+  if (!token) {
+    throw new Error(
+      "[android-e2e] dev hook 登录缺少 PIXIV_REFRESH_TOKEN。" +
+        "请确认 packages/app/.env 存在该键，或显式传入 token 参数。",
+    );
+  }
+  runOrThrow(adbPath(), ["-s", serial, ...devLoginIntentArgs(token)], TIMEOUTS.adb);
+}
+
 /** 查询当前前台 Activity（dumpsys activity），归一化为 "package.Class" 形式 */
 export function currentTopActivity(serial: string): string | null {
   const r = runCapture(adbPath(), ["-s", serial, "shell", "dumpsys", "activity", "activities"]);

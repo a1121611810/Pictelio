@@ -2,11 +2,11 @@
  * Android 模拟器 E2E 的 global setup（轻量版）。
  *
  * 只做一件事：把 `packages/app/.env` 中的变量注入 `process.env`（若尚未设置），
- * 使登录类 spec（switch-client-oneway/roundtrip/roundtrip-3x）能读到
- * `PIXIV_REFRESH_TOKEN`，与 agent-browser E2E 的 `ai-shared/globalSetup.ts`
- * `loadEnvFile()` 行为一致。
+ * 使需要登录的 spec 能读到 `PIXIV_REFRESH_TOKEN`——单引擎布局下走
+ * `prefs.loginViaDevIntent()`（LynxActivity 的 dev intent hook），
+ * 与 agent-browser E2E 的 `ai-shared/globalSetup.ts` `loadEnvFile()` 行为一致。
  *
- * 刻意不启动 Vite dev server（Android E2E 编译真实 APK 走 WebView，不需要 dev server）。
+ * 刻意不启动 Vite dev server（Android E2E 编译真实 APK，不需要 dev server）。
  */
 import { readFileSync, existsSync } from "node:fs";
 import { resolve as pathResolve } from "node:path";
