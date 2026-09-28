@@ -72,6 +72,105 @@ describe("relatedInjection store（lynx，spec §4）", () => {
     expect(store.rows("recommend")).toHaveLength(0);
   });
 
+  // ── #816 可观测性守卫：每个提前 return 都必须打原因码日志 ────────────────
+  // 定位背景（issue #816）：设备实测「进详情→返回」后注入段未渲染，而 logcat 对
+  // relatedInjection **零命中**——因为当时 5 个 return 分支全部静默，无法区分
+  // 「无锚点 / tab 不匹配 / 开关关 / 重复 / 超上限 / 拉到空」。
+  // 禁静默降级（仓库测试硬约束 3）：每个分支都要有可断言的原因码。
+  // oracle 溯源 = relatedInjection.ts consumeAnchor 内各分支的 console.warn 文本。
+  describe("SKIP 原因码可观测性（#816）", () => {
+    let warnSpy: ReturnType<typeof vi.spyOn>
+
+    beforeEach(() => {
+      warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+      vi.spyOn(console, "log").mockImplementation(() => {})
+    })
+
+    const warned = (): string => warnSpy.mock.calls.map((c) => String(c[0])).join("\n")
+
+    it("SKIP_NO_ANCHOR：无待消费锚点时打原因码", async () => {
+      const store = useRelatedInjectionStore();
+      await store.consumeAnchor("recommend", []);
+      expect(warned()).toContain("SKIP_NO_ANCHOR");
+    })
+
+    it("SKIP_TAB_MISMATCH：锚点 tab 与当前 tab 不符时打原因码且**保留锚点**", async () => {
+      const store = useRelatedInjectionStore();
+      mockState.loadRelated.mockResolvedValue({ illusts: [illust(21)] });
+      store.recordAnchor("recommend", 20);
+      // 在 follow tab 消费 → tab 不匹配，锚点必须留在 pending 供正确 tab 取用
+      await store.consumeAnchor("follow", []);
+      expect(warned()).toContain("SKIP_TAB_MISMATCH");
+      // 锚点未被消费掉：随后在正确 tab 消费仍能注入
+      await store.consumeAnchor("recommend", []);
+      await flush();
+      expect(store.rows("recommend")).toHaveLength(1);
+    })
+
+    it("SKIP_DISABLED：设置 relatedInjection 关闭时打原因码", async () => {
+      mockState.relatedInjection = false;
+      const store = useRelatedInjectionStore();
+      store.recordAnchor("recommend", 22);
+      await store.consumeAnchor("recommend", []);
+      expect(warned()).toContain("SKIP_DISABLED");
+      expect(mockState.loadRelated).not.toHaveBeenCalled();
+    })
+
+    it("SKIP_DUPLICATE：同锚点已有注入行时打原因码且不重复拉取", async () => {
+      const store = useRelatedInjectionStore();
+      mockState.loadRelated.mockResolvedValue({ illusts: [illust(31)] });
+      store.recordAnchor("recommend", 30);
+      await store.consumeAnchor("recommend", []);
+      await flush();
+      expect(store.rows("recommend")).toHaveLength(1);
+      mockState.loadRelated.mockClear();
+      store.recordAnchor("recommend", 30);
+      await store.consumeAnchor("recommend", []);
+      expect(warned()).toContain("SKIP_DUPLICATE");
+      expect(mockState.loadRelated).not.toHaveBeenCalled();
+    })
+
+    it("SKIP_MAX_ANCHORS：达到上限时打原因码", async () => {
+      const store = useRelatedInjectionStore();
+      mockState.loadRelated.mockResolvedValue({ illusts: [illust(41)] });
+      for (let i = 0; i < MAX_RELATED_ANCHORS; i++) {
+        store.recordAnchor("recommend", 100 + i);
+        await store.consumeAnchor("recommend", []);
+        await flush();
+      }
+      expect(store.rows("recommend")).toHaveLength(MAX_RELATED_ANCHORS);
+      warnSpy.mockClear();
+      store.recordAnchor("recommend", 999);
+      await store.consumeAnchor("recommend", []);
+      expect(warned()).toContain("SKIP_MAX_ANCHORS");
+    })
+
+    it("SKIP_EMPTY_RESULT：拉到 0 条可用结果时打原因码并移除占位行", async () => {
+      const store = useRelatedInjectionStore();
+      // 全部被主列表排除 + R18 过滤 → 可用 0 条
+      // id 用 80 段避开同文件其它用例的 50/51（锚点 id 撞车会让前例残留行干扰断言）
+      mockState.loadRelated.mockResolvedValue({ illusts: [illust(81), illust(82, 1)] });
+      store.recordAnchor("recommend", 80);
+      await store.consumeAnchor("recommend", [81]);
+      await flush();
+      expect(store.rows("recommend")).toHaveLength(0);
+      expect(warned()).toContain("SKIP_EMPTY_RESULT");
+    })
+
+    it("成功路径打 info 级日志（含 items 数），便于区分「静默 return」与「成功但未渲染」", async () => {
+      const store = useRelatedInjectionStore();
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+      mockState.loadRelated.mockResolvedValue({ illusts: [illust(61), illust(62)] });
+      store.recordAnchor("recommend", 60);
+      await store.consumeAnchor("recommend", []);
+      await flush();
+      const logs = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+      expect(logs).toContain("开始拉取相关作品");
+      expect(logs).toContain("注入完成");
+      expect(logs).toContain("items=2");
+    })
+  });
+
   it("成功路径：注入行排除锚点与主列表 id，过滤 R18", async () => {
     const store = useRelatedInjectionStore();
     mockState.loadRelated.mockResolvedValue({ illusts: [illust(1), illust(2), illust(3, 1), illust(4)] });
