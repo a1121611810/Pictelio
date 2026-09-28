@@ -271,3 +271,53 @@ export function fabSearchItemPx(contentBottomPx: number, deviceWidthPx: number):
 export function roundPx(p: Point): Point {
   return { x: Math.round(p.x), y: Math.round(p.y) };
 }
+
+// ─── R1 断言①「未回顶」判据窗（#816 二次订正）───
+
+/** 判据窗默认下界（= REGION_TOPREF 顶；榜单卡恒占 y≤1150 且永不滚动，低于此无判别力） */
+export const NOT_TOP_WINDOW_Y0 = 1200;
+/** 窗高下限：低于此高度不足以分辨「顶部」与「下滑」⇒ 判据失效 */
+export const NOT_TOP_WINDOW_MIN_HEIGHT = 200;
+/** 锚点行上方留白（与断言② 的 above 区同口径） */
+export const ANCHOR_ROW_CLEARANCE = 80;
+
+/**
+ * 断言①判据窗 = `REGION_TOPREF` 中**锚点行以上**的部分。
+ *
+ * 为什么必须排除注入段：返回后锚点卡下方会插入「相关作品」段（relatedRowFor），
+ * 该段把同列后续卡片整体下推约 166px——这是**产品正确行为**，却正落在原判据窗
+ * （y1200..2016）内。现场实测（20:55 完整门 R1 红 9358）：差异 9095/9358 集中在
+ * y1800..2016，而 y1600..1800 仅 55；纵向配准最佳对齐 dy=0 ⇒ 不是滚动位移。
+ * 注入段渲染在锚点卡**下方**，故取锚点行以上即天然免疫。
+ *
+ * oracle（20:55 实跑证据帧逐段复算）：`tapPoint.y=1800` → 窗 y1200..1720，
+ * 判别力（top↔scrolled）**105,158** = 阈值 2000 的 53 倍；纯净度（scrolled↔returned）
+ * 由 9358 降到 **263**。判别力未降、污染已除。
+ */
+export function notTopWindow(tapY: number): Region {
+  return {
+    x0: 0,
+    y0: NOT_TOP_WINDOW_Y0,
+    x1: 1080,
+    y1: Math.max(NOT_TOP_WINDOW_Y0 + 1, tapY - ANCHOR_ROW_CLEARANCE),
+  };
+}
+
+/**
+ * 断言① 可判定性：窗高够 + 窗内判别力够 ⇒ 才允许判红/判绿。
+ *
+ * 缺这一层会把「窗退化」误报成「回顶回归」——正是本轮之前反复踩的坑
+ * （报错文案预设了一个未验证的机制，把人引向错误的产品改动）。
+ * 判别力不足时**显式返回不可判定**，由调用方打日志并 skip。
+ */
+export function judgeNotTopWindow(params: {
+  window: Region;
+  /** 窗内 top↔scrolled 差异：真回顶时该窗会剧变，值大才说明窗有判别力 */
+  power: number;
+  minPower: number;
+}): { verdict: "judge" | "indeterminate"; reason?: "too-short" | "no-power" } {
+  const height = params.window.y1 - params.window.y0;
+  if (height < NOT_TOP_WINDOW_MIN_HEIGHT) return { verdict: "indeterminate", reason: "too-short" };
+  if (params.power <= params.minPower) return { verdict: "indeterminate", reason: "no-power" };
+  return { verdict: "judge" };
+}

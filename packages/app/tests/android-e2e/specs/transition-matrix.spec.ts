@@ -83,6 +83,8 @@ import {
   fabSearchItemPx,
   judgeBookmarkRow,
   judgeContentLoaded,
+  judgeNotTopWindow,
+  notTopWindow as notTopRegion,
   regionSamples as geomRegionSamples,
   roundPx,
   type GrayAt,
@@ -829,20 +831,49 @@ describe.skipIf(SKIPPED)(
       await SLEEP(4_000); // 返回渲染 + 注入行网络请求（相关作品拉取）缓冲
       const s2 = await waitForStableFrame("r1-returned", REGION_TOPREF, 30_000);
 
-      // ── 断言① 未回顶（#816 订正）：改与**下滑基线 s1** 比对 ──────────────
-      // 旧实现与 topRef（深链后的首帧）比。缺陷：深链后首帧**常常尚未加载完**
+      // ── 断言① 未回顶（#816 二次订正）：判据窗必须**排除注入段** ──────────
+      // 首版与 topRef（深链后的首帧）比。缺陷：深链后首帧**常常尚未加载完**
       // （榜单卡 + 骨架），返回帧是完整首屏 ⇒ 两者天然差异大 ⇒ 代理失效。
       // 实测踩中假绿：列表实际**已回到顶部**（锚点卡在第 2 屏、注入段不可见），
       // 旧断言仍「通过」（notTop > 2000）。
-      // 真实判据 = 返回帧滚动位置 ≈ 进详情前位置，即与 s1 比。
-      const notTop = await diffRegion(s2, s1, REGION_TOPREF);
+      // 二版（34df4489）改与**下滑基线 s1** 比——方向正确，但**窗选错了**：
+      //   本轮 R1 红在 9358，现场取证（stable-r1-returned.png 的 y1650..2016 裁图）：
+      //   返回帧里锚点卡「方方土 ♥5823」下方多出 **「相关作品 / 收起」** 注入段，
+      //   其下卡片整体下推约 166px；而判据窗 REGION_TOPREF（y1200..2016）**正好含这块**。
+      //   逐段复算：y1150..1400=131、y1400..1600=102、y1600..1800=55、**y1800..2016=9095**
+      //   （占 9358 的 97%）；纵向配准最佳对齐 **dy=0**（±10px 即涨到 29289）⇒ **不是滚动位移**。
+      //   旁证：`top vs returned = 124964` ≫ 阈值 ⇒ 列表确实**没有回顶**（此前那次
+      //   「疑似 KeepAlive 回顶」告警是误判，订正维持）。
+      // 三版：窗停在**锚点行以上**——注入段渲染在锚点卡下方，不可能出现在该窗内。
+      //   收窄后判别力实测未损（top↔scrolled）：y1200..1720 = **105,158**（阈值 2000 的 53 倍）；
+      //   纯净度（scrolled↔returned）由 9358 降到 **263**。判别力未降、污染已除。
+      const notTopWindow = notTopRegion(tapPoint.y);
+      const notTop = await diffRegion(s2, s1, notTopWindow);
       const vsTopRef = await diffRegion(s2, topRef, REGION_TOPREF);
-      expect(
-        notTop,
-        `返回后应停留在下滑后的滚动位置而非列表顶部（与下滑基线 s1 差异 ${notTop} 应 ≤ ${NOT_TOP_TH}）。` +
-          `附：与深链首帧 topRef 差异 ${vsTopRef} 仅作参考——深链首帧常未加载完，` +
-          `拿它当「顶部」基准会假绿（实测：实际已回顶，旧断言仍通过）`,
-      ).toBeLessThanOrEqual(NOT_TOP_TH);
+      // 判别力自检：窗太窄/内容不随滚动变化时，「真回顶」在该窗内未必有差异 ⇒ 判据失效。
+      // 此时**显式 skip**，不拿一个无判别力的窗去判红（与断言③ 同一纪律）。
+      const notTopPower = await diffRegion(s1, topRef, notTopWindow);
+      const notTopVerdict = judgeNotTopWindow({
+        window: notTopWindow,
+        power: notTopPower,
+        minPower: NOT_TOP_TH,
+      });
+      if (notTopVerdict.verdict === "indeterminate") {
+        console.log(
+          `[transition-matrix] ⏭ R1 断言①不可判定，已跳过（${notTopVerdict.reason}）：判别窗 ` +
+            `y${notTopWindow.y0}..${notTopWindow.y1}（高 ${notTopWindow.y1 - notTopWindow.y0}px），` +
+            `窗内 top↔scrolled 判别力 ${notTopPower} ≤ ${NOT_TOP_TH} ⇒ 该窗分不出「顶部」与「下滑」。` +
+            `锚点卡过靠上时该窗必然退化——**不判为「回顶回归」**，滚动保持由断言② 兜底`,
+        );
+      } else {
+        expect(
+          notTop,
+          `返回后应停留在下滑后的滚动位置而非列表顶部（判别窗 y${notTopWindow.y0}..` +
+            `${notTopWindow.y1}，与下滑基线 s1 差异 ${notTop} 应 ≤ ${NOT_TOP_TH}）。` +
+            `附：整窗 topRef 差异 ${vsTopRef}、窗内判别力 ${notTopPower}` +
+            `（均远大于阈值 = 「不是顶部」这一侧证据充分）`,
+        ).toBeLessThanOrEqual(NOT_TOP_TH);
+      }
 
       // 断言② 滚动保持：锚点卡上方区域与进详情前逐像素一致（同卡同偏移）
       const above: Region = { x0: 0, y0: 400, x1: 1080, y1: Math.max(420, tapPoint.y - 80) };

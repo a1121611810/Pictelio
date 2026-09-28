@@ -19,6 +19,8 @@ import {
   fabSearchItemPx,
   judgeBookmarkRow,
   judgeContentLoaded,
+  judgeNotTopWindow,
+  notTopWindow,
   regionSamples,
   roundPx,
   type GrayAt,
@@ -229,5 +231,54 @@ describe("roundPx（落点取整到 adb input tap 的可移植写法）", () => 
     expect(Math.hypot(p.x - c.x, p.y - c.y)).toBeLessThanOrEqual(1);
     // 落点须比圆盘半径（57.6px）更靠内，留出命中余量
     expect(Math.hypot(906 - p.x, 1760 - p.y)).toBeGreaterThan(((10.67 / 100) * DEVICE_W_PX) / 2);
+  });
+});
+
+// ─── R1 断言①判据窗（#816 二次订正：窗含注入段 ⇒ 把合法注入误判成回顶）───
+//
+// oracle 全部来自 20:55 完整门 R1 失败那轮的证据帧（stable-r1-{top,scrolled,returned}.png）
+// 逐段复算：差异 9095/9358 集中在 y1800..2016，y1600..1800 仅 55；纵向配准最佳 dy=0
+// ⇒ 不是滚动位移，而是锚点卡下方「相关作品」注入段把后续卡片下推 ~166px。
+describe("notTopWindow（判据窗须停在锚点行以上）", () => {
+  it("tapPoint.y=1800 → 窗 y1200..1720（与断言② above 区同 clearance）", () => {
+    expect(notTopWindow(1800)).toEqual({ x0: 0, y0: 1200, x1: 1080, y1: 1720 });
+  });
+
+  it("tapPoint.y=1650 → 窗 y1200..1570", () => {
+    expect(notTopWindow(1650)).toEqual({ x0: 0, y0: 1200, x1: 1080, y1: 1570 });
+  });
+
+  it("窗下界恒 ≥1200 —— 榜单卡恒占 y≤1150 且永不滚动，低于此无判别力", () => {
+    // tapPoint.y=1250（候选网格最小值）时 1250-80=1170 < 1200 ⇒ 必须夹住
+    expect(notTopWindow(1250).y0).toBe(1200);
+    expect(notTopWindow(1250).y1).toBeGreaterThanOrEqual(1201);
+  });
+
+  it("判别力实测：tapPoint=1800 的窗内 top↔scrolled = 105158（阈值 2000 的 53 倍）", () => {
+    // 该数字由 20:55 证据帧实测；此处固化的是「窗有判别力」这一事实
+    const power = 105_158;
+    const minPower = 2000;
+    expect(power).toBeGreaterThan(minPower * 50);
+    expect(judgeNotTopWindow({ window: notTopWindow(1800), power, minPower }).verdict).toBe(
+      "judge",
+    );
+  });
+});
+
+describe("judgeNotTopWindow（窗退化 ⇒ 显式不可判定，不判成回顶回归）", () => {
+  it("窗高 40px（锚点贴顶）→ indeterminate:too-short", () => {
+    // oracle：tapPoint.y=1250 时窗仅 y1200..1201，高 1px
+    const v = judgeNotTopWindow({ window: notTopWindow(1250), power: 99_999, minPower: 2000 });
+    expect(v).toEqual({ verdict: "indeterminate", reason: "too-short" });
+  });
+
+  it("窗够高但判别力不足 → indeterminate:no-power（内容不随滚动变化）", () => {
+    const v = judgeNotTopWindow({ window: notTopWindow(1800), power: 1200, minPower: 2000 });
+    expect(v).toEqual({ verdict: "indeterminate", reason: "no-power" });
+  });
+
+  it("窗高与判别力都够 → judge（正常判红/判绿）", () => {
+    const v = judgeNotTopWindow({ window: notTopWindow(1800), power: 105_158, minPower: 2000 });
+    expect(v).toEqual({ verdict: "judge" });
   });
 });
