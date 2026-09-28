@@ -1,0 +1,246 @@
+<!doctype html>
+<!-- PROTOTYPE — throwaway. 视觉验证分层 #788「机器可读设计规则表形态」草稿。不是产物，勿提交 main。 -->
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<title>PROTOTYPE · design-rules 表形态草稿（#788）</title>
+<style>
+  :root {
+    --bg: #14161a; --panel: #1c1f26; --panel2: #232732; --line: #2e3340;
+    --fg: #e6e9ef; --dim: #9aa3b2; --accent: #4cc2ff; --ok: #3fb950;
+    --warn: #d29922; --bad: #f85149; --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.6 system-ui, -apple-system, "PingFang SC", sans-serif; }
+  header { padding:18px 22px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); z-index:5; }
+  h1 { margin:0 0 4px; font-size:17px; }
+  .sub { color:var(--dim); font-size:12.5px; }
+  .banner { background:#3d1d1d; border:1px solid #6b2b2b; color:#ffb4ab; padding:8px 12px; border-radius:6px; margin:10px 0 0; font-size:12.5px; }
+  main { padding:18px 22px 60px; max-width:1400px; }
+  h2 { font-size:15px; margin:26px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--line); }
+  .tabs { display:flex; gap:6px; margin-top:12px; flex-wrap:wrap; }
+  .tab { background:var(--panel); border:1px solid var(--line); color:var(--dim); padding:7px 13px; border-radius:6px; cursor:pointer; font-size:13px; }
+  .tab.on { background:var(--panel2); color:var(--fg); border-color:var(--accent); }
+  .panel { display:none; } .panel.on { display:block; }
+  .grid { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+  @media (max-width:1000px){ .grid { grid-template-columns:1fr; } }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px; }
+  pre { background:#0e1014; border:1px solid var(--line); border-radius:6px; padding:12px; overflow:auto; font-family:var(--mono); font-size:12.2px; margin:0; max-height:520px; }
+  .ctl { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+  label.sw { display:inline-flex; align-items:center; gap:6px; background:var(--panel2); border:1px solid var(--line); padding:6px 10px; border-radius:6px; cursor:pointer; font-size:12.5px; }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th,td { text-align:left; padding:7px 9px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--dim); font-weight:600; font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; }
+  .tag { display:inline-block; padding:1px 7px; border-radius:20px; font-size:11px; font-weight:600; }
+  .t-ok{background:#12351c;color:#7ee787} .t-bad{background:#3d1d1d;color:#ffb4ab}
+  .t-warn{background:#3a2f12;color:#f0c674} .t-new{background:#12324a;color:#79c0ff}
+  .num { font-family:var(--mono); }
+  .big { font-size:26px; font-weight:700; font-family:var(--mono); }
+  .kpi { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+  .kpi > div { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 14px; flex:1; min-width:120px; }
+  .kpi .lbl { color:var(--dim); font-size:11.5px; }
+  .steps { counter-reset:s; }
+  .step { border-left:3px solid var(--accent); background:var(--panel); border-radius:0 8px 8px 0; padding:12px 14px; margin-bottom:10px; }
+  .step h3 { margin:0 0 5px; font-size:13.5px; }
+  .step p { margin:0; color:var(--dim); font-size:12.5px; }
+  .q { background:#12324a; border:1px solid #1f4d75; border-radius:8px; padding:13px 15px; margin:12px 0; }
+  .q b { color:#79c0ff; }
+  .muted { color:var(--dim); }
+  .warnbox { background:#3a2f12; border:1px solid #6b5320; color:#f0c674; padding:11px 14px; border-radius:7px; font-size:12.5px; margin:12px 0; }
+  code { background:#0e1014; padding:1px 5px; border-radius:4px; font-family:var(--mono); font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>PROTOTYPE · 机器可读设计规则表（design-rules）形态草稿</h1>
+  <div class="sub">wayfinder #786 地图 · 票 #788「机器可读设计规则表的形态原型」 · 2026-09-28 · <b>throwaway，非产物</b></div>
+  <div class="banner">
+    <b>目的不是定稿，是把粒度摆上台面让你反应。</b>底座事实来自 #787 实测（四道门全绿、五项空白真实违规仅 2 处）+ #797 决议（只进仓库内 skill、混合判定）。
+  </div>
+  <div class="tabs">
+    <div class="tab on" data-p="draft">① 规则表草稿</div>
+    <div class="tab" data-p="walk">② 引导走查（5 问）</div>
+    <div class="tab" data-p="play">③ 自由试玩（开关）</div>
+    <div class="tab" data-p="shapes">④ 形态对比（3 方案）</div>
+  </div>
+</header>
+<main>
+
+<!-- ══════════ ① 草稿 ══════════ -->
+<section class="panel on" id="p-draft">
+  <div class="card">
+    <b>位置建议</b>：<code>packages/app-lynx/design-rules.json</code>（与 <code>src/styles/tokens.css</code>、<code>scripts/</code> 同域）。
+    <span class="muted">选 JSON 而非 YAML 的硬理由：仓内<b>无 yaml 依赖</b>（已查 package.json），引入 = 新增依赖 + 进 lockfile；JSON 用 <code>node:fs</code> 零依赖读，且能被 <code>.mjs</code> 脚本与 vitest 双端消费。</span>
+  </div>
+
+  <h2>草稿 A：完整形态（本票要你对着调粒度的实物）</h2>
+  <pre id="json"></pre>
+
+  <h2>草稿 B：只留「枚举型 + 扫描面 + 白名单」三段（更瘦的备选）</h2>
+  <pre id="json2"></pre>
+</section>
+
+<!-- ══════════ ② 引导走查 ══════════ -->
+<section class="panel" id="p-walk">
+  <h2>对着实物走 5 问</h2>
+  <div class="steps" id="steps"></div>
+</section>
+
+<!-- ══════════ ③ 自由试玩 ══════════ -->
+<section class="panel" id="p-play">
+  <h2>自由试玩：拨开关，看这张表会怎么变</h2>
+  <div class="ctl">
+    <label class="sw"><input type="checkbox" id="c1" checked> Lynx 用 M3 口径（关掉 = 用 Fluent 口径）</label>
+    <label class="sw"><input type="checkbox" id="c2" checked> .css 纳入扫描面</label>
+    <label class="sw"><input type="checkbox" id="c3" checked> WebView 侧纳入</label>
+    <label class="sw"><input type="checkbox" id="c4" checked> 保留「待清」标记</label>
+    <label class="sw"><input type="checkbox" id="c5" checked> 枚举型约束（5 档/4 曲线）</label>
+    <label class="sw"><input type="checkbox" id="c6"> 类别批量豁免</label>
+  </div>
+  <div class="kpi" id="kpi"></div>
+  <div class="grid">
+    <div class="card"><b>派生后的表</b><pre id="json3" style="max-height:420px"></pre></div>
+    <div class="card"><b>这个组合的后果</b><div id="conseq"></div></div>
+  </div>
+</section>
+
+<!-- ══════════ ④ 形态对比 ══════════ -->
+<section class="panel" id="p-shapes">
+  <h2>三种形态对比（草稿 A 是 B 与 C 的合体）</h2>
+  <table>
+    <thead><tr><th>维度</th><th>B · 极瘦表</th><th>C · 全量 DSL</th><th>A · 混合（推荐草稿）</th></tr></thead>
+    <tbody id="cmp"></tbody>
+  </table>
+  <div class="q" style="margin-top:16px">
+    <b>为什么推荐 A：</b>C（全量 DSL，把 regex/扫描器都搬进表）表达力最强，但 #787 已证<b>三道门自带反恒真断言、192 文件全绿</b> ⇒ 扫描器是可信赖的底座，<b>不必重写</b>；把 regex 搬进 JSON 反而会丢掉那些自检。B（只留枚举）太瘦，无法表达「哪些扩展名/目录算扫描面」。A 只把<b>决策</b>（枚举值、扫描面、白名单、豁免）入表，把<b>实现</b>（regex、walk）留在门里。
+  </div>
+</section>
+
+</main>
+
+<script>
+const RULES = {
+  $schema: "design-rules/v1",
+  engines: {
+    "app-lynx": {
+      designSystem: "material-3",
+      note: "#787 实测：--durationMedium1:250ms / --durationMedium3:350ms / M3 motion 曲线 均不在 AGENTS.md Fluent 白名单内 ⇒ 必须按引擎分口径",
+      durations: { allow: ["150ms","200ms","300ms","250ms","350ms"] },
+      easings:  { allow: ["cubic-bezier(0.2,0,0,1)","cubic-bezier(0.05,0.7,0.1,1)","cubic-bezier(0.3,0,0.8,0.15)"] },
+      shapes:   { tokenPrefix: "--md-shape-" },
+      elevations:{ tokenPrefix: "--md-elevation-" }
+    },
+    "app": {
+      designSystem: "fluent-2",
+      note: "packages/app 当前零静态门；#797 决议：只保留零成本流程层，不投新增视觉基建。#788 决议：本段【只保留口径、不配 rules】—— 表达「口径留着、暂不设防」，webview 重写回归时有现成落点",
+      rules: [],
+      durations: { allow: ["100ms","150ms","200ms","300ms","500ms"] },
+      easings:  { allow: ["cubic-bezier(0,0,0,1)","cubic-bezier(0.33,0,0.67,1)","cubic-bezier(0.33,0,0,1)","linear"] }
+    }
+  },
+  scanSurface: {
+    include: ["src/**/*.{vue,ts,css}"],
+    exclude: ["src/styles/tokens.css", "prototype/**"],
+    note: "mdTokenRefs.test.ts:27 的 /\\.(vue|ts|css)$/ 是仓内唯一把 .css 纳入的先例；hardcodeColorGate.test.ts:69 当前不扫 .css。prototype/** 显式排除（#788 决议）：一次性探索稿，不进门，避免被人当模板复制"
+  },
+  rules: [
+    { id: "color.literal",     engine: "app-lynx", enforce: ["hex","rgb()","tailwind-named"], scan: ["vue","ts","css"], implementedBy: "hardcodeColorGate" },
+    { id: "color.danglingRef", engine: "app-lynx", enforce: ["undefined-var(--md-*)"],   scan: ["vue","ts","css"], implementedBy: "mdTokenRefs" },
+    { id: "i18n.hardcodedCn",  engine: "app-lynx", enforce: ["cjk-literal"],              scan: ["vue","ts"],     implementedBy: "hardcode-gate" },
+    { id: "motion.duration",   engine: "app-lynx", enforce: ["enum"],                     scan: ["vue","css"],    implementedBy: null, status: "new" },
+    { id: "motion.easing",     engine: "app-lynx", enforce: ["enum"],                     scan: ["vue","css"],    implementedBy: null, status: "new" },
+    { id: "shape.radius",      engine: "app-lynx", enforce: ["token-only"],               scan: ["vue","css"],    implementedBy: null, status: "new" },
+    { id: "elevation.shadow",  engine: "app-lynx", enforce: ["token-only"],               scan: ["vue","css"],    implementedBy: null, status: "new" },
+    { id: "type.fontSize",     engine: "app-lynx", enforce: ["token-only","icon-glyph-exempt"], scan: ["vue"], implementedBy: null, status: "new" }
+  ],
+  whitelist: [
+    { rule: "shape.radius", path: "components/TextSelectionToolbar.vue", reason: "#787 实测唯一真字面量（rounded-[0.65vw] ×2）；胶囊工具条 0.65vw 非 M3 shape 档位", pendingCleanup: true, issue: null },
+    { rule: "color.literal", path: "errorPrototype/ErrorPagePreview.vue", reason: "web-core 预览不解析 var(--md-*)", pendingCleanup: false },
+    { rule: "color.literal", path: "utils/lynxPlatformColors.ts", reason: "Lynx 平台属性 placeholder-color 非 CSS 通道", pendingCleanup: false, issue: 693 },
+    { rule: "color.literal", path: "components/RankingEntryCard.vue", reason: "text-white 叠 --md-scrim-overlay", pendingCleanup: true },
+    { rule: "color.literal", path: "pages/IllustDetail.vue", reason: "text-white 叠 bg-scrim 页角标", pendingCleanup: true },
+    { rule: "color.literal", path: "pages/NovelIntro.vue", reason: "scrim 叠白字族", pendingCleanup: true },
+    { rule: "color.literal", path: "pages/Recommended.vue", reason: "scrim 叠白字族", pendingCleanup: true },
+    { rule: "color.literal", path: "components/ActionButton.vue", reason: "scrim 叠白字族", pendingCleanup: true }
+  ],
+  exemptions: { commentExempt: true, note: "取证/ADR 引用具体色值不被误报（hardcodeColorGate stripComments 三类注释）" }
+};
+
+const LEAN = {
+  $schema: "design-rules/v1",
+  enum: { durations: ["100ms","150ms","200ms","300ms","500ms"], easings: ["cubic-bezier(0,0,0,1)","cubic-bezier(0.33,0,0.67,1)","cubic-bezier(0.33,0,0,1)","linear"] },
+  scan: { include: ["src/**/*.vue"], exclude: ["src/styles/tokens.css"] },
+  whitelist: [ { path: "components/TextSelectionToolbar.vue", reason: "…", pending: true } ]
+};
+
+const CMP = [
+  ["表达什么", "只有枚举值", "枚举 + regex + 扫描算法 + 豁免语法（全量 DSL）", "枚举 + 扫描面 + 白名单 + 豁免开关"],
+  ["regex 放哪", "留在门里", "搬进 JSON（字符串转义地狱）", "留在门里（保留反恒真自检）"],
+  ["能否表达扫描面", "勉强（一个 include 数组）", "能", "能（按 rule 分别声明）"],
+  ["能否区分引擎口径", "不能（Fluent 写死）", "能", "能（engines 段）"],
+  ["改造现有三道门", "不改造、只喂枚举", "全部重写", "增量：门读表派生"],
+  ["JSON 可读性", "很好", "差（转义后不可读）", "好"],
+  ["风险", "表达力不足", "丢掉三道门的反恒真断言 ⇒ 静默恒真", "表与实现双份事实源漂移（需漂移锁）"]
+];
+
+const STEPS = [
+  { q: "表里要不要按引擎分口径？", a: "要。这是 #787 撞出来的硬事实：app-lynx 走 M3，--durationMedium1:250ms 不在 AGENTS.md 的 Fluent 5 档里。若不分口径，规则表会把 M3 正确写法全部误杀 —— 这是本表最容易犯、且后果最贵的一个错。" },
+  { q: "regex 搬进表，还是留在门里？", a: "留在门里。#787 证三道门自带反恒真断言（扫描器自检须命中已知违规 / 抽取器集合非空有下界 / walk 文件数不塌陷）且 192 文件全绿。表若吞掉 regex，这些自检就失去依附对象。" },
+  { q: "白名单要哪些字段？", a: "现状是 {path, reason}（颜色 8 条 + i18n 45 条 = 53 条）。草稿加 rule（一条规则可被多路径豁免）+ pendingCleanup（#797 要求「存量收进白名单并标注待清，规则本身立刻阻断」）。issue 号沿用现状惯例（如 #693）。" },
+  { q: ".css 要不要进扫描面？", a: "草稿默认进。依据：mdTokenRefs.test.ts:27 的 /\\.(vue|ts|css)$/ 是仓内唯一把 .css 纳入的先例；hardcodeColorGate.test.ts:69 当前不扫 .css。tokens.css 本身进 exclude（它定义令牌，必然含字面量）。" },
+  { q: "枚举型（5 档时长 / 4 曲线）怎么落？", a: "两段式：engines.<engine>.durations.allow / easings.allow 存值域，门只做「命中值 ∈ allow」的判定。关键是这个 allow 必须挂在 engine 下，不能是全局单值 —— 否则又退回 Fluent 口径。" }
+];
+
+const el = (id) => document.getElementById(id);
+const j = (o) => JSON.stringify(o, null, 2);
+
+el("json").textContent = j(RULES);
+el("json2").textContent = j(LEAN);
+el("cmp").innerHTML = CMP.map(r => `<tr>${r.map((c,i)=>`<td${i?"":' style="color:var(--dim)"'}>${c}</td>`).join("")}</tr>`).join("");
+el("steps").innerHTML = STEPS.map(s => `<div class="step"><h3>${s.q}</h3><p>${s.a}</p></div>`).join("");
+
+function render() {
+  const t = JSON.parse(JSON.stringify(RULES));
+  if (!el("c1").checked) t.engines["app-lynx"] = t.engines["app"];
+  if (!el("c2").checked) t.scanSurface.include = ["src/**/*.{vue,ts}"];
+  if (!el("c3").checked) t.rules = t.rules.filter(r => r.engine === "app-lynx");
+  if (!el("c4").checked) t.whitelist.forEach(w => delete w.pendingCleanup);
+  if (!el("c5").checked) { delete t.engines["app-lynx"].durations; delete t.engines["app-lynx"].easings; }
+  if (el("c6").checked) t.bulkExemptions = [{ category: "scrim-overlay", reason: "整类豁免：--md-scrim 叠白字族（7 条路径）" }];
+  el("json3").textContent = j(t);
+
+  const lynx = t.engines["app-lynx"];
+  const newRules = t.rules.filter(r => r.status === "new").length;
+  const pend = t.whitelist.filter(w => w.pendingCleanup).length;
+  el("kpi").innerHTML = `
+    <div><div class="lbl">规则总数</div><div class="big">${t.rules.length}</div></div>
+    <div><div class="lbl">新增（无门）</div><div class="big" style="color:var(--warn)">${newRules}</div></div>
+    <div><div class="lbl">白名单条目</div><div class="big">${t.whitelist.length}</div></div>
+    <div><div class="lbl">待清条目</div><div class="big" style="color:${pend?"var(--warn)":"var(--dim)"}">${pend}</div></div>
+    <div><div class="lbl">时长值域</div><div class="num" style="font-size:13px">${lynx.durations?lynx.durations.allow.join(" "):"—"}</div></div>`;
+
+  const c = [];
+  if (!el("c1").checked) c.push(["bad","❌ Lynx 改用 Fluent 口径","M3 的 250ms / 350ms 与 M3 motion 曲线会被判违规 ⇒ 误杀 <code>--durationMedium1/3</code> 的正确用法。#787 实测这些 token 正在被使用。"]);
+  else c.push(["ok","✅ Lynx 走 M3 口径","值域含 250ms/350ms 与 M3 三条曲线，不误杀。代价：表与 AGENTS.md 的 Fluent 段是<b>两套</b>口径，需在表头写明以表为准。"]);
+  if (!el("c2").checked) c.push(["warn","⚠️ .css 出扫描面","退回现状。<code>src/styles/*.css</code> 里若出现硬编码颜色将无人拦截（现状恒不触发）。"]);
+  else c.push(["ok","✅ .css 进扫描面","与 <code>mdTokenRefs.test.ts</code> 先例一致；<code>tokens.css</code> 进 exclude。"]);
+  if (!el("c3").checked) c.push(["ok","✅ #788 决议：不覆盖 WebView 侧","`engines.app` 段保留但 <b>rules 为空</b> = 表达「口径留着、暂不设防」。符合 #797「不为 app 侧投新增视觉基建」，重写回归时有现成落点。"]);
+  else c.push(["bad","❌ 给 app 侧配了 rules","#797 决议是<b>不为 app 侧投新增基建</b>；#788 已定 engines.app 段 <b>rules 留空</b>。此开关打开等于推翻两张票。"]);
+  if (!el("c4").checked) c.push(["warn","⚠️ 去掉「待清」标记","违反 #797「存量收进白名单并<b>标注待清</b>」⇒ 存量豁免会变成永久静默。"]);
+  else c.push(["ok","✅ 保留「待清」标记","#787 实测只有 1 条真待清（TextSelectionToolbar 圆角），标记成本极低。"]);
+  if (!el("c5").checked) c.push(["bad","❌ 去掉枚举型约束","时长/缓动将<b>无法判违规</b>，只剩「是否用令牌」的弱检查。"]);
+  else c.push(["ok","✅ 枚举型在表内","时长/缓动从「零防线」升级为「表驱动可判」。"]);
+  if (el("c6").checked) c.push(["warn","⚠️ 启用类别批量豁免","#787 实测待清仅 1 条 ⇒ 批量豁免是为不存在的规模设计的；且整类豁免腐化后<b>静默漏网</b>（ADR-0180 D7 同型）。"]);
+  el("conseq").innerHTML = c.map(([k,t,m])=>`<div style="margin-bottom:10px"><span class="tag t-${k}">${t}</span><div style="margin-top:4px">${m}</div></div>`).join("");
+}
+
+["c1","c2","c3","c4","c5","c6"].forEach(id => el(id).addEventListener("change", render));
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => {
+  document.querySelectorAll(".tab").forEach(x => x.classList.remove("on"));
+  document.querySelectorAll(".panel").forEach(x => x.classList.remove("on"));
+  t.classList.add("on"); el("p-" + t.dataset.p).classList.add("on");
+}));
+render();
+</script>
+</body>
+</html>
