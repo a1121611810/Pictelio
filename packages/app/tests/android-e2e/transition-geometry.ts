@@ -164,3 +164,110 @@ export function judgeContentLoaded(params: {
   if (params.stable) return { verdict: "stable-but-low-buckets" };
   return { verdict: "loading" };
 }
+
+// ─── 放射 FAB 几何（2026-09-28 #816 R2 订正）───
+//
+// 为什么要推导而不是写死坐标：本轮 R2 的真因就是「FAB_SEARCH_ITEM_TAP 是魔数」。
+// 该常量首跑写成 (906,1760)，与实机差 87px 横 / 213px 纵 → 落在两环之间的空隙里，
+// 点下去菜单收起、回到列表，报错却写「SearchSheet 未打开」（把人引向布局回归）。
+// 与 `FAB_TAP` 同款失败模式已连续三轮复发，故把落点改为**由组件几何算出**：
+// 组件改了半径/起始角/边距，spec 自动跟随；不改就由单测拦下。
+//
+// 数值唯一事实源 = packages/app-lynx/src/components/GlobalFab.vue
+//   :40-46  FAB_RIGHT_VW=4.267 / FAB_SIZE_VW=14.933 / R_INNER_VW=20
+//   :86-88  fabCx = 100 - RIGHT - SIZE/2；fabCy = screenHeightVw - RIGHT - SIZE/2
+//   :117-120 polar(): x = cx + sin(a)·r，y = cy - cos(a)·r
+//   :130    INNER_START = -14
+// 改组件几何时**必须**同步本段并跑 unit/transition-geometry.test.ts。
+
+/** GlobalFab.vue 的 vw 几何常量（镜像组件，不可在此处自行调参） */
+export const FAB_GEOMETRY_VW = {
+  /** FAB 右尾随边距 = bottom-4 */
+  right: 4.267,
+  /** 主 FAB 直径 = 56dp */
+  size: 14.933,
+  /** 内环半径 */
+  innerRadius: 20,
+  /** 内环起始角（0°=正上方，顺时针为负往左） */
+  innerStartDeg: -14,
+} as const;
+
+/** 物理像素点 */
+export interface Point {
+  x: number;
+  y: number;
+}
+
+function vwToPx(vw: number, deviceWidthPx: number): number {
+  return (vw * deviceWidthPx) / 100;
+}
+
+/**
+ * 逻辑屏高（vw）= 内容区高 / 屏宽 × 100。
+ *
+ * ADR-0131：`screenHeightVw` 在 `contentSize` 命中时返回 `(contentSize.h / contentSize.w) * 100`，
+ * 而 `contentSize.h` 是**稳定区**高度（撇除系统导航条 inset），**不是全屏**。
+ * 本轮已两次因口径混淆写错坐标（全屏 2160 vs 稳定区 2016，差 144px）。
+ */
+export function contentHeightVw(contentBottomPx: number, deviceWidthPx: number): number {
+  return (contentBottomPx / deviceWidthPx) * 100;
+}
+
+/**
+ * 主 FAB 圆心（px）。
+ *
+ * oracle：`r2-after-fab.png` 实测主 FAB 亮簇包围盒 x872..1032 / y1808..1968
+ * （160×160，`w-[14.93vw]`=161px）⇒ 圆心 (952, 1888)；推导值 (953.3, 1889.3)，
+ * 差 ≤1.3px（簇心 vs 抗锯齿边缘）。推导值与 spec 原写死的 FAB_TAP(953,1889) 一致。
+ */
+export function fabCenterPx(contentBottomPx: number, deviceWidthPx: number): Point {
+  const h = contentHeightVw(contentBottomPx, deviceWidthPx);
+  const cx = 100 - FAB_GEOMETRY_VW.right - FAB_GEOMETRY_VW.size / 2;
+  const cy = h - FAB_GEOMETRY_VW.right - FAB_GEOMETRY_VW.size / 2;
+  return { x: vwToPx(cx, deviceWidthPx), y: vwToPx(cy, deviceWidthPx) };
+}
+
+/** 内环某项圆心（px）：`polar(angleDeg, R_INNER_VW, fabCy)`，镜像组件 `polar()`。 */
+export function fabInnerItemPx(
+  angleDeg: number,
+  contentBottomPx: number,
+  deviceWidthPx: number,
+): Point {
+  const center = fabCenterPx(contentBottomPx, deviceWidthPx);
+  const rad = (angleDeg * Math.PI) / 180;
+  return {
+    x: center.x + Math.sin(rad) * vwToPx(FAB_GEOMETRY_VW.innerRadius, deviceWidthPx),
+    y: center.y - Math.cos(rad) * vwToPx(FAB_GEOMETRY_VW.innerRadius, deviceWidthPx),
+  };
+}
+
+/**
+ * 内环「搜索」项落点（px）= `innerPair[0]`。
+ *
+ * 恒定 `INNER_START` 的依据（不随内环项数变化，故不需在 spec 里数项数）：
+ *   - `createGlobalFab.ts:131` 无条件 `items.unshift` 式首推 `GLOBAL_SEARCH_INNER_ITEM`；
+ *   - `GlobalFab.vue` 模板 `v-for="e in innerPair"` **不按 `visible()` 过滤**，序号即渲染序；
+ *   - `spread(start, end, count)` 的第 0 项恒为 `start`（`i=0` 时分母项为 0）。
+ *   ⇒ 搜索项角度恒 `INNER_START`，页面注册几个动作都只影响后续项的角度。
+ *
+ * oracle：`r2-after-fab.png` 实测三个内环小圆盘（10.67vw=115px）——放大镜 🔍 (903,1682)、
+ * ↻ 刷新 (795,1742)、↑ 回顶 (741,1852)。/illusts 注册 refresh + backToTop ⇒ 内环共 3 项，
+ * `spread(-14,-80,3)` = [-14,-47,-80]；推导 (901.0,1679.7)/(795.3,1742.0)/(740.6,1851.8)，
+ * 逐点差 ≤2.3px（搜索项偏差最大，因其角度固定、而另两项角度随 count 变）⇒ 公式与实机一致。
+ */
+export function fabSearchItemPx(contentBottomPx: number, deviceWidthPx: number): Point {
+  return fabInnerItemPx(FAB_GEOMETRY_VW.innerStartDeg, contentBottomPx, deviceWidthPx);
+}
+
+/**
+ * 落点取整到整像素。
+ *
+ * 理由（不夸大为「adb 拒绝浮点」——实测 `input tap 953.28 1889.28` 退出码仍为 0）：
+ *   ① `adb shell input tap` 的实参解析随 Android 版本而异，**整数是唯一可移植写法**；
+ *   ② 环项触控目标是 115px 圆盘、FAB 是 161px 方块，亚像素毫无意义；
+ *   ③ 取整后主 FAB 落点 (953.28,1889.28) → **(953, 1889)**，与本轮像素实测并
+ *      验证过有效的手写常量逐位相同 ⇒ 推导与经验值自洽。
+ */
+export function roundPx(p: Point): Point {
+  return { x: Math.round(p.x), y: Math.round(p.y) };
+}

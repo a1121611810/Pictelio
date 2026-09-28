@@ -8,13 +8,19 @@
 import { describe, expect, it } from "vitest";
 import {
   DARK_ROW_MAX_BRIGHTNESS,
+  FAB_GEOMETRY_VW,
   MIN_BOOKMARK_SAMPLES,
   belowAnchorRegion,
   bookmarkSampleRegion,
+  contentHeightVw,
   detectBookmarkRow,
+  fabCenterPx,
+  fabInnerItemPx,
+  fabSearchItemPx,
   judgeBookmarkRow,
   judgeContentLoaded,
   regionSamples,
+  roundPx,
   type GrayAt,
   type Region,
 } from "../transition-geometry";
@@ -134,5 +140,94 @@ describe("judgeContentLoaded（R2 桶数不可信）", () => {
     expect(judgeContentLoaded({ buckets: 3, minBuckets: 25, stable: false }).verdict).toBe(
       "loading",
     );
+  });
+});
+
+// ─── 放射 FAB 几何（#816 R2 真因：落点是魔数，点了空隙）───
+//
+// oracle 全部来自 `r2-after-fab.png`（2026-09-28 20:27 R2 复跑证据帧）的逐像素簇实测：
+// 主 FAB 亮簇包围盒 x872..1032 / y1808..1968 ⇒ 圆心 (952,1888)；三个 115px 内环小圆盘
+// 中心 (903,1682) 搜索 / (795,1742) 刷新 / (741,1852) 回顶。推导与实测差 ≤2.3px。
+const CONTENT_BOTTOM_PX = 2016;
+const DEVICE_W_PX = 1080;
+/** 实测簇是「亮度过阈的连通域」，边缘抗锯齿会吃掉 1~2px ⇒ 容差 3px */
+const PX_TOL = 3;
+
+describe("contentHeightVw（稳定区口径，ADR-0131）", () => {
+  it("2016/1080×100 = 186.67vw —— 不是全屏 200vw", () => {
+    // oracle：dumpsys window displays → rng=1080x936-2160x2016 ⇒ 稳定区高 2016
+    expect(contentHeightVw(CONTENT_BOTTOM_PX, DEVICE_W_PX)).toBeCloseTo(186.6667, 3);
+  });
+
+  it("若误传全屏 2160 则得 200vw —— 正是 FAB y 偏 144px 的口径错误", () => {
+    // 全屏口径会让 fabCy 偏 (2160-2016)/1080*100 = 13.33vw = 144px
+    expect(contentHeightVw(2160, DEVICE_W_PX)).toBeCloseTo(200, 3);
+  });
+});
+
+describe("fabCenterPx（主 FAB 圆心）", () => {
+  it("推导值 (953.3,1889.3) 与 spec 原写死的 FAB_TAP(953,1889) 一致", () => {
+    const c = fabCenterPx(CONTENT_BOTTOM_PX, DEVICE_W_PX);
+    expect(c.x).toBeCloseTo(953.28, 2);
+    expect(c.y).toBeCloseTo(1889.28, 2);
+  });
+
+  it("与 r2-after-fab.png 实测簇心 (952,1888) 差 ≤3px", () => {
+    const c = fabCenterPx(CONTENT_BOTTOM_PX, DEVICE_W_PX);
+    expect(Math.abs(c.x - 952)).toBeLessThanOrEqual(PX_TOL);
+    expect(Math.abs(c.y - 1888)).toBeLessThanOrEqual(PX_TOL);
+  });
+});
+
+describe("fabInnerItemPx / fabSearchItemPx（内环落点）", () => {
+  it("polar() 在三个实测角度上都对得上（证公式本身，而非只对搜索项凑）", () => {
+    // /illusts 内环 3 项 ⇒ spread(-14,-80,3) = [-14,-47,-80]
+    for (const [angleDeg, mx, my] of [
+      [-14, 903, 1682],
+      [-47, 795, 1742],
+      [-80, 741, 1852],
+    ] as const) {
+      const p = fabInnerItemPx(angleDeg, CONTENT_BOTTOM_PX, DEVICE_W_PX);
+      expect(Math.abs(p.x - mx), `angle ${angleDeg} x`).toBeLessThanOrEqual(PX_TOL);
+      expect(Math.abs(p.y - my), `angle ${angleDeg} y`).toBeLessThanOrEqual(PX_TOL);
+    }
+  });
+
+  it("搜索项 = (901.0,1679.7)，与实测 (903,1682) 差 ≤3px", () => {
+    const p = fabSearchItemPx(CONTENT_BOTTOM_PX, DEVICE_W_PX);
+    expect(p.x).toBeCloseTo(901.03, 1);
+    expect(p.y).toBeCloseTo(1679.7, 1);
+  });
+
+  it("旧魔数 (906,1760) 落在搜索圆盘外 —— 即本轮 R2 红真因，不可用", () => {
+    // 内环圆盘直径 10.67vw = 115px ⇒ 半径 57.6px；旧点距圆心 √(5²+80²)=80px > 57.6
+    const p = fabSearchItemPx(CONTENT_BOTTOM_PX, DEVICE_W_PX);
+    const radiusPx = ((10.67 / 100) * DEVICE_W_PX) / 2;
+    const oldDist = Math.hypot(906 - p.x, 1760 - p.y);
+    expect(oldDist).toBeGreaterThan(radiusPx);
+  });
+
+  it("搜索项落点与内环项数无关（恒为 spread()[0] = INNER_START）", () => {
+    // 签名里没有 count：依据是 spread(start,end,n)[0] ≡ start。改 count 只会移动后续项。
+    const a = fabSearchItemPx(CONTENT_BOTTOM_PX, DEVICE_W_PX);
+    const b = fabInnerItemPx(FAB_GEOMETRY_VW.innerStartDeg, CONTENT_BOTTOM_PX, DEVICE_W_PX);
+    expect(a).toEqual(b);
+    expect(FAB_GEOMETRY_VW.innerStartDeg).toBe(-14);
+  });
+});
+
+describe("roundPx（落点取整到 adb input tap 的可移植写法）", () => {
+  it("主 FAB 推导取整后 = 手写常量 (953,1889) —— 推导与经验值自洽", () => {
+    // 取整前 fabCenterPx(2016,1080) = (953.28, 1889.28)；(953,1889) 是 20:27 复跑实证有效的点
+    expect(roundPx(fabCenterPx(CONTENT_BOTTOM_PX, DEVICE_W_PX))).toEqual({ x: 953, y: 1889 });
+  });
+
+  it("搜索项取整后 = (901,1680)，仍在 115px 圆盘内（距圆心 ≤57px）", () => {
+    const p = roundPx(fabSearchItemPx(CONTENT_BOTTOM_PX, DEVICE_W_PX));
+    expect(p).toEqual({ x: 901, y: 1680 });
+    const c = fabSearchItemPx(CONTENT_BOTTOM_PX, DEVICE_W_PX);
+    expect(Math.hypot(p.x - c.x, p.y - c.y)).toBeLessThanOrEqual(1);
+    // 落点须比圆盘半径（57.6px）更靠内，留出命中余量
+    expect(Math.hypot(906 - p.x, 1760 - p.y)).toBeGreaterThan(((10.67 / 100) * DEVICE_W_PX) / 2);
   });
 });
