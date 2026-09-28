@@ -574,7 +574,7 @@ async function waitForTopActivity(activity: string, timeoutMs = 60_000): Promise
 /**
  * 按 pid 读 logcat 尾部（渲染就绪探测 + 证据留档）。
  *
- * #817：原先此处是一份**私有副本**（与 lynx-bookmark-tags 逐字同款），连同它的
+ * #819：原先此处是一份**私有副本**（与 lynx-bookmark-tags 逐字同款），连同它的
  * `"(进程不存在)"` 占位串一起。副本有三处问题：① logcat 采集口径分裂（本轮
  * 统一只做了 2/4 处）；② pid 为空时返回占位串而非空串，会被 `waitForLynxRenderReady`
  * 的正则当日志内容反复匹配，且**不** warn（违反「禁止静默降级」）；
@@ -703,21 +703,39 @@ describe.skipIf(SKIPPED)(
   `@release-gate T2 转换矩阵首版（issue #548，pictelio_ui）${SKIPPED ? `（SKIP：${SKIP_REASON}）` : ""}`,
   () => {
     /**
-     * 实质判定计数台账（#817 code-review 两轴共识阻塞修复）。
+     * 内容判定台账（#819 code-review 两轴共识阻塞修复，#819 二次订正为**三态**）。
      *
      * **为什么需要它**：本门多处「采样窗取不到被测对象 ⇒ 不可判定」分支。修掉
      * `return` 判绿之前，这些分支让 vitest 记 **passed**——发版门对「相关作品段注入」
      * （ADR-0162）与「收藏行两两不同」（init-only props）这两条**内容断言**丧失强制力，
      * 且 `:xxx` 的「✓ R1/R3 通过」日志会宣称验证了实际未验证的事。
      *
-     * 现在两处都改用 `ctx.skip()`（报 skipped 而非 passed），这里再补一道**外层**：
-     * 若 3 行全部不可判定，门判红——「什么都没验到」不等于「通过」。
+     * 现在两处都改用 `ctx.skip()`（报 skipped 而非 passed），这里再补一道**外层**，
+     * 堵住「有人把 skip 又改回 return」这条回潮路径。
+     *
+     * ⚠️ **为什么是三态而不是布尔**（二次订正的实测依据）：
+     * 这两行的可判定性**依赖内容形态**，不是恒可判定也不是恒不可判定。实测两跑对照
+     * （同一份代码、同一台 AVD，只因推荐流内容不同）：
+     *   · 全量跑那轮：`belowAnchorRegion` 差异 **214** ≤ INJECT_TH(800) ⇒ R1 断言③
+     *     走 skip 分支，台账判 0 次；
+     *   · 单跑那轮：同一窗口差异 **26080** ≫ 800 ⇒ R1 断言③ 真判过并通过，台账 1 次。
+     * 若外层门写成「逐行 AND，判 0 次即判红」，就会把**内容形态造成的不可判定**
+     * 报成**产品回归**，得到一个随机红的发版门——比它要堵的洞更糟。
+     * 故按**三态**记账：
+     *   judged  = 断言真跑了并给出通过/不通过的判定；
+     *   skipped = 断言显式 `t.skip()` 声明「本形态不可判定」并带原因；
+     *   两者皆 0 = **既没判定也没声明** ⇒ 只可能是有代码直接 `return` 了 ⇒ 判红。
+     * skipped 的情形不判红，但会 `console.warn` 高亮「本轮未验证」，且 vitest 已把该
+     * test 记为 **skipped**（不是 passed），信息不丢失、也不冒充通过。
      *
      * 计数对象只含**内容断言**（spec §3.T2 承诺的那些帧对比）：
      * R1 断言③「相关作品」段注入、R3「收藏行」两两不同。R1 断言①② 与 R2 三条
      * 是无条件的 `expect`，不可判定时走 `ctx.skip()`/正常判定，不进本台账。
      */
-    const coreJudged = { r1Injected: 0, r3BookmarkPairs: 0 };
+    const coreOutcome = {
+      r1: { judged: 0, skipped: 0 },
+      r3: { judged: 0, skipped: 0 },
+    };
 
     beforeAll(async () => {
       const token = process.env.PIXIV_REFRESH_TOKEN ?? "";
@@ -745,16 +763,43 @@ describe.skipIf(SKIPPED)(
       } catch {
         // 收尾失败不阻断
       }
-      // ── 外层门：内容断言一条都没判过 ⇒ 判红 ──────────────────────────────
-      // 反事实检验：把 R1 断言③ / R3 收藏行对的「不可判定即 return」改回去，
-      // 本断言仍绿；但那时两行会报 passed 且日志宣称已验证 —— 正是本条要堵的洞。
+      // ── 外层门：只堵「既没判定也没声明」这条回潮路径（#819 二次订正）────────
+      //
+      // ⚠️ 首版（求和 `r1Injected + r3BookmarkPairs > 0`）**太弱**：R1 单独不可判定时，
+      //   只要 R3 判过一对就满足 ⇒ 门照样绿。R1 行承诺的就是「相关作品」段注入，
+      //   R3 判过并不能替它背书。求和 = 允许「A 行没验、B 行验了」蒙混过关。
+      // ⚠️ 二版（逐行 AND，判 0 次即红）**太强**：把「内容形态导致的不可判定」
+      //   报成产品回归，得到一个随机红的发版门（实测同代码两跑：一轮 skip 一轮通过）。
+      // 三版（当前）：按三态记账——`judged===0 && skipped===0` 才判红，
+      //   该条件**只可能**由「直接 return、既不判定也不 skip」造成，正是首版要堵的洞。
+      //   显式 skip 的行不判红，但 warn 高亮「本轮未验证」，且 vitest 已记 skipped。
+      //
+      // 反事实检验（务必保留）：把 R1 断言③ / R3 收藏行对的 skip 分支改回 `return`，
+      // `skipped` 与 `judged` 双 0 ⇒ 本断言立刻转红——回潮路径被堵死。
+      const rows: ReadonlyArray<readonly [string, { judged: number; skipped: number }]> = [
+        ["R1 断言③「相关作品」段注入", coreOutcome.r1],
+        ["R3「收藏行」两两不同", coreOutcome.r3],
+      ];
+      const silent = rows.filter(([, o]) => o.judged === 0 && o.skipped === 0).map(([n]) => n);
       expect(
-        coreJudged.r1Injected + coreJudged.r3BookmarkPairs,
-        `发版门未做出任何内容判定（R1「相关作品」段注入 ${coreJudged.r1Injected} 次、` +
-          `R3「收藏行」两两不同 ${coreJudged.r3BookmarkPairs} 对）。` +
-          `三行全部落在「采样窗取不到被测对象」分支时，**什么都没验到 ≠ 通过**。` +
+        silent,
+        `发版门内容断言既未判定也未声明不可判定：${silent.join(" + ")}。` +
+          `这是「不可判定分支被写回 return」的形态——vitest 会记 passed 且日志宣称已验证，` +
+          `而实际什么都没验到（「什么都没验到」≠「通过」）。` +
+          `修法：用 t.skip() 显式声明不可判定并写明原因。` +
+          `本轮台账：${rows.map(([n, o]) => `${n} judged=${o.judged}/skipped=${o.skipped}`).join("；")}。` +
           `取证：test-results/android-e2e/transition-matrix/ 下各 r1-*/r3-* 帧 + logcat。`,
-      ).toBeGreaterThan(0);
+      ).toEqual([]);
+
+      const unverified = rows.filter(([, o]) => o.judged === 0).map(([n]) => n);
+      if (unverified.length > 0) {
+        console.warn(
+          `[transition-matrix] ⚠️ 本轮发版门**未验证**：${unverified.join(" + ")}` +
+            `（内容形态导致采样窗取不到被测对象，已显式 skip 并记为 skipped 而非 passed）。` +
+            `该 test 在 vitest 结果里显示为 skipped；不判红是刻意取舍——` +
+            `按「内容形态不可判定」判红只会得到随机红的发版门。留证与挂账见 #819。`,
+        );
+      }
     });
 
     it("R1 lynx /illusts：点中部卡片进详情 → 系统返回 → 锚点卡注入「相关作品」段 + 滚动不回顶", async (t) => {
@@ -873,10 +918,11 @@ describe.skipIf(SKIPPED)(
       const injected = await diffRegion(s1, s2, below);
       const belowSamples = geomRegionSamples(below);
       if (injected <= INJECT_TH) {
-        // ⚠️ #817：此处曾是 `return` —— vitest 记 **passed**，发版门对 ADR-0162
+        // ⚠️ #819：此处曾是 `return` —— vitest 记 **passed**，发版门对 ADR-0162
         // 「相关作品」段注入回归彻底失效，且下方「✓ R1 通过」日志会宣称验证了
         // 实际未验证的事。改为 `ctx.skip()`：报 skipped 而非 passed，诚实。
-        // 本次不记入台账 ⇒ afterAll 的外层门会因「无任何内容判定」判红。
+        // 同时记 skipped（区别于「既没判定也没声明」），供 afterAll 外层门区分二者。
+        coreOutcome.r1.skipped += 1;
         t.skip(
           `R1 断言③不可判定：注入段差异 ${injected} ≤ ${INJECT_TH}。` +
             `采样窗 y ${below.y0}..${below.y1}、采样点 ${belowSamples}；` +
@@ -886,7 +932,7 @@ describe.skipIf(SKIPPED)(
             `（consumeAnchor 日志显示「注入完成 items=N」时数据已到位，差异低是采样对象不可见）`,
         );
       }
-      coreJudged.r1Injected += 1;
+      coreOutcome.r1.judged += 1;
       console.log(
         `[transition-matrix] ✓ R1 通过：` +
           `${notTopJudged ? `未回顶（与 s1 差异 ${notTop} ≤ ${NOT_TOP_TH}）` : "断言①不可判定（未回顶未判）"}` +
@@ -1058,7 +1104,7 @@ describe.skipIf(SKIPPED)(
       }
       const undetected = rowSpans.map((s, i) => (s ? null : `card${i}`)).filter(Boolean);
       if (undetected.length > 0) {
-        // ⚠️ #817：此处曾是 `return` —— vitest 记 **passed**，init-only props
+        // ⚠️ #819：此处曾是 `return` —— vitest 记 **passed**，init-only props
         // （收藏数冻结在首卡）这条 C 类缺陷的帧证据防线形同虚设。改 ctx.skip()。
         t.skip(
           `R3 收藏行断言不可判定：${undetected.join(",")} 帧未探测到深色收藏胶囊` +
@@ -1089,15 +1135,16 @@ describe.skipIf(SKIPPED)(
           ).toBeGreaterThan(verdict.expected);
         }
       }
-      // ⚠️ #817：三对全被 `continue` 吞掉时旧代码照样打「✓ R3 通过：…收藏行三帧两两不同」——
+      // ⚠️ #819：三对全被 `continue` 吞掉时旧代码照样打「✓ R3 通过：…收藏行三帧两两不同」——
       // 日志宣称验证了实际未验证的事。零判定 ⇒ skip 而非绿。
       if (judgedPairs === 0) {
+        coreOutcome.r3.skipped += 1;
         t.skip(
           `R3 收藏行三帧两两不同：${skippedPairs} 对全部因采样窗无实质内容而不可判定` +
             `（不得据此判定「props 冻结」，也不得视为通过）`,
         );
       }
-      coreJudged.r3BookmarkPairs += judgedPairs;
+      coreOutcome.r3.judged += judgedPairs;
       console.log(
         `[transition-matrix] ✓ R3 通过：换卡 ×2 + 收藏行三帧两两不同` +
           `（实质判定 ${judgedPairs} 对 / 跳过 ${skippedPairs} 对，证据 r3-card*.png）`,

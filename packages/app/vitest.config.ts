@@ -121,7 +121,18 @@ export default defineConfig({
     // 生产构建仍由 vite.config.ts 的 --mode e2e define 控制，零泄漏不变。
   },
   test: {
-    include: ["tests/unit/**/*.test.{ts,tsx}"],
+    // #818：`tests/android-e2e/unit/**` 是 android-e2e 契约工具的**纯函数单测**
+    // （不碰 adb / 模拟器，issue #523），但原 include 只收 `tests/unit/**`，而
+    // 跑该目录的唯一脚本 `test:android:e2e` 会连带跑 14 个需编译 APK + 模拟器的
+    // spec —— 于是这批单测**默认永不执行**，也不进 `pnpm test:all` / CI
+    // （.github/workflows/ci.yml 只跑 `pnpm test:all`）。
+    // 本分支新增的 `env.flavor.test.ts` 正是 `E2E_FLAVOR` 缺省翻转的唯一防线，
+    // 把既有缺口升级成阻塞，故并入 CI 可见范围。
+    // 两点隔离保证它们在 app 主配置下也成立：
+    //   ① 每个文件自带 `// @vitest-environment node` 头注释，覆盖默认 happy-dom；
+    //   ② `prefs.devLogin.test.ts` 用 `vi.mock("../env")` 顶掉 adb 依赖，
+    //      `env.flavor.test.ts` / `transition-geometry.test.ts` 是纯函数。
+    include: ["tests/unit/**/*.test.{ts,tsx}", "tests/android-e2e/unit/**/*.test.{ts,tsx}"],
     // SolidJS 2.0：@solidjs/vite-plugin 对 node 环境走「server 姿态」（solid-js 解析到
     // server 构建，signal 写入为惰性数据）。全仓单测依赖真实 client signal 语义，
     // 必须用 DOM 环境走 client 姿态（ADR-0144）。

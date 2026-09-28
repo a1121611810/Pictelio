@@ -52,7 +52,7 @@ export function apkRelativePath(flavor: E2eFlavor): string {
 export const E2E_FLAVOR: E2eFlavor = resolveE2eFlavor(process.env.ANDROID_E2E_FLAVOR);
 
 /**
- * 非单引擎 flavor 的**显式失败**（#817）。
+ * 非单引擎 flavor 的**显式失败**（#819）。
  *
  * 背景：本分支 build.gradle 已无 productFlavors（实测 `productFlavors` 计数 0），
  * `ANDROID_E2E_FLAVOR=full|webview` 会指向**本次构建根本没产出**的 APK 路径。

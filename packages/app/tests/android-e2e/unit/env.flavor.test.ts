@@ -104,7 +104,7 @@ afterEach(() => {
   vi.resetModules();
 });
 
-describe("非单引擎 flavor 的显式失败（#817）", () => {
+describe("非单引擎 flavor 的显式失败（#819）", () => {
   // 反事实检验：把 env.ts 的 throw 去掉，本用例转红——此前各 spec 用
   // `E2E_FLAVOR === "webview" ⇒ 整文件 skip` 兜着，配置写错只会静默跳过。
   it("ANDROID_E2E_FLAVOR=full 时 import env 直接抛错并指向正确指令", async () => {
