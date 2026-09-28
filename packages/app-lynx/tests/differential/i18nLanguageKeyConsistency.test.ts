@@ -53,4 +53,12 @@ describe('differential: settings_language 双端契约', () => {
     )
     expect(retrySites).toHaveLength(2)
   })
+
+  it('Java 初始调用胶水钉：request() 把解析结果传入 executeRequest（review round 2 nit-2）', () => {
+    // 防线纵深：差分钉若只覆盖递归点，lynx 初始调用被变异为传 null 时全防线不红——
+    // 此钉锁住 PictelioApiModule.request 的胶水行（解析结果作第 4 参）。
+    expect(lynxApiModuleSource).toContain(
+      'PixivApiCore.executeRequest(method, url, body, acceptLanguage,',
+    )
+  })
 })
