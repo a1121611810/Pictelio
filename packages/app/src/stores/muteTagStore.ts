@@ -43,7 +43,11 @@ export async function loadMuteTags(): Promise<void> {
  * 静音标签并持久化（trim、幂等）。未登录不落盘（账号级语义）。
  * 写入结果：handle.set 为同步 void、持久化 `void persistNow(...)` fire-and-forget（registry
  * 契约不回传落盘结果）→ 轻提示在写入发起后即展示；落盘失败可见性经 registry warn 管线
- * （`[settings] write mute_tags_42`，禁静默），spec 边界 #7 的 UI 失败提示挂账。
+ * （`[settings] write mute_tags_42`，禁静默），spec 边界 #7 的 UI 失败提示挂账见 #735。
+ * #735 已关闭，原因是**当前不排期**（webview 暂下线后重写，非永久废弃）：重写后
+ * `SettingHandle.set(): void` 这个 fire-and-forget 架构本身可能不复存在，届时该问题
+ * 会随重写自然消解或以新形态出现，应在新架构上一次性解决，**不要把旧补丁搬过去**。
+ * 故本条挂账在暂下线期间不再跟踪，非终局判定。
  */
 export async function muteTag(name: string): Promise<void> {
   const id = uid();
