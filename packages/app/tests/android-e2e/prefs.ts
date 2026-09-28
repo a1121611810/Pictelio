@@ -1,13 +1,19 @@
 /**
  * SharedPreferences 契约工具（S1，issue #105）。
  *
- * 验证「WebView 侧写入 pictelio_client_kind → MainActivity 重启读取分发」这条
- * 跨进程数据契约。通过 adb 直接读/写真实 CapacitorStorage.xml（run-as 访问
- * debug 包私有目录），不 mock——沿用「真实数据源比对」契约测试原则。
+ * 验证「JS/native 侧写入 CapacitorStorage 键 → 重启后被读取」这类跨进程数据契约。
+ * 通过 adb 直接读/写真实 CapacitorStorage.xml（run-as 访问 debug 包私有目录），不 mock
+ * ——沿用「真实数据源比对」契约测试原则。写后即回读校验（write-then-verify），
+ * 从而秒级区分「写入问题」与「读取/分发问题」。
  *
- * 写值的方式：debug 包可用 run-as 进入 app 数据目录写文件。直接覆写
- * CapacitorStorage.xml 模拟 app 写入后的状态，重启后断言 MainActivity 的分发
- * 行为，从而秒级区分「写入问题」与「分发问题」。
+ * ⚠️ 单引擎化后（#610）：`pictelio_client_kind` **不再决定任何行为**——
+ * `MainActivity` 分发器与引擎路由均已删除，唯一入口是 launcher `LynxActivity`，
+ * 且 `PictelioAppModule.getClientKind` 会把任何写入值归一为 lynx（ADR-0062）。
+ * 因此本文件保留的 `writeClientKind` 只剩「通用 pref 覆写 + 回读校验」语义，
+ * **不再**具备「切换引擎」的被测价值；相关引擎状态快照工具（`ENGINE_KEYS` /
+ * `parseEngineState` / `readEngineState` / `pollEngineState`）已随
+ * `engine-fallback-matrix` 等 spec 一并删除（其 oracle `EnginePrefs.java` /
+ * `EngineRoute.snapshotLine()` 在源码树中已不存在）。
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -173,56 +179,6 @@ export function writeClientKind(serial: string, kind: "webview" | "lynx"): strin
   return kind;
 }
 
-/** EnginePrefs.KEY_* 的 TS 镜像（唯一所有者 = Java
- *  android/.../engine/EnginePrefs.java；键字面量漂移由一致性测试/本文件注释锚定）。
- *  E2E 侧只读这些键做取证播种，不在此处发明新键。 */
-export const ENGINE_KEYS = {
-  /** 首选引擎（"lynx" | "webview"；翻转后缺省语义 = lynx） */
-  preferredKind: "pictelio_client_kind",
-  /** 运行时自动回退开关（"true" | "false"；缺省 true） */
-  autoFallback: "pictelio_engine_auto_fallback",
-  /** Lynx 失败记忆（versionCode 十进制字符串；与当前版本精确相等才命中） */
-  failureMemory: "pictelio_engine_lynx_failure_version",
-  /** 生效状态快照（每次 EngineRouting.resolve 覆写） */
-  state: "pictelio_engine_state",
-  /** webview 提示条「不再提示」 */
-  fallbackOptout: "pictelio_engine_fallback_optout",
-  /** E2E 取证键：强制 Lynx 探针返回 false（仅 DEBUG 构建被读取，release 无此分支） */
-  debugForceLynxUnavailable: "pictelio_debug_force_lynx_unavailable",
-} as const;
-
-/** 生效状态快照（EngineRoute.snapshotLine 解析结果；spec §3 / §3.1） */
-export interface EngineStateSnapshot {
-  /** 首选引擎（"lynx" | "webview"） */
-  preferred: string;
-  /** 本次生效引擎；null = effective=none（双失败，无引擎生效，落升级页） */
-  effective: string | null;
-  /** 降级原因码（spec §3.1 稳定 ASCII） */
-  reason: string;
-}
-
-/**
- * 解析快照行 `preferred=<kind|none> effective=<kind|none> reason=<code>`
- * （格式唯一来源 = Java EngineRoute.snapshotLine()）。畸形行 → null（E11：
- * 禁止静默——解析失败按「无快照」处理，不构造部分合法的假数据）。
- * 纯函数，单测直接覆盖（unit/prefs.engineState.test.ts）。
- */
-export function parseEngineState(raw: string | null): EngineStateSnapshot | null {
-  if (raw === null) return null;
-  // 锚定整行（^…$）：值被污染（前后混入其他内容）时按畸形处理，不误提取
-  const m = /^preferred=(\S+) effective=(\S+) reason=(\S+)$/u.exec(raw);
-  if (!m) return null;
-  const preferred = m[1];
-  const effectiveRaw = m[2];
-  const reason = m[3];
-  if (preferred === undefined || effectiveRaw === undefined || reason === undefined) return null;
-  return {
-    preferred,
-    effective: effectiveRaw === "none" ? null : effectiveRaw,
-    reason,
-  };
-}
-
 /**
  * 读取 CapacitorStorage.xml 中任意字符串键的值（run-as 直读，debug 包可读）。
  * 文件不存在或键不存在 → null。用于取证键写入后的落盘校验。
@@ -231,48 +187,6 @@ export function readPrefValue(serial: string, key: string): string | null {
   const { fileExists, rawXml } = readPrefsXml(serial);
   if (!fileExists) return null;
   return extractStringValue(rawXml, key);
-}
-
-/**
- * 读取引擎生效状态快照（KEY_STATE 行 → 结构化；配合 pollEngineState 轮询）。
- * 键不存在 / 行畸形 → null。
- */
-export function readEngineState(serial: string): EngineStateSnapshot | null {
-  return parseEngineState(readPrefValue(serial, ENGINE_KEYS.state));
-}
-
-/**
- * 轮询引擎状态快照直到谓词满足（pollPrefs 的引擎态镜像，#557 T5）。
- *
- * 为什么必须轮询：快照由 Java 侧 SharedPreferences.apply() 异步落盘（见
- * pollPrefs 注释的同款竞态），adb 直读是落盘瞬间的文件——「快照已发布」断言
- * 必须按固定间隔重读。
- *
- * @param predicate 判定快照是否满足期望（满足即停；传 `(s) => s !== null` 即
- *   「等快照首次出现」，随后用 expect toEqual 做精确断言——失败时 vitest 差异
- *   直接给出真实快照，诊断优于在谓词里静默等满超时）
- * @returns 满足谓词的那次快照
- * @throws Error 超时未满足：消息含最后一次快照原始值（诊断用）
- */
-export async function pollEngineState(
-  serial: string,
-  predicate: (state: EngineStateSnapshot | null) => boolean,
-  timeoutMs = 30_000,
-  intervalMs = 1_000,
-  readFn: (serial: string) => EngineStateSnapshot | null = readEngineState,
-): Promise<EngineStateSnapshot | null> {
-  const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    const state = readFn(serial);
-    if (predicate(state)) return state;
-    if (Date.now() >= deadline) {
-      throw new Error(
-        `[android-e2e] pollEngineState 轮询超时（timeoutMs=${timeoutMs}, intervalMs=${intervalMs}）。` +
-          `最后一次 ${ENGINE_KEYS.state} 原始值: ${readPrefValue(serial, ENGINE_KEYS.state) ?? "(键不存在)"}`,
-      );
-    }
-    await new Promise<void>((r) => setTimeout(r, intervalMs));
-  }
 }
 
 /**
@@ -352,10 +266,10 @@ const DEV_EXTRA_REFRESH_TOKEN = "pictelio_dev_refresh_token";
  * 显式打 `io.pictelio.app/.LynxActivity` 而非 `MAIN_ACTIVITY`：该钩子只在
  * LynxActivity 内实现，落到别的 Activity 上 intent 会被静默忽略。
  */
-export function devLoginIntentArgs(token: string): string[] {
+export function devLoginIntentArgs(token: string, forceR18 = true): string[] {
   // token 是设备 shell 侧参数，单引号包裹并转义内嵌单引号，防注入与截断
   const quoted = `'${token.replace(/'/gu, `'\\''`)}'`;
-  return [
+  const args = [
     "shell",
     "am",
     "start",
@@ -365,10 +279,31 @@ export function devLoginIntentArgs(token: string): string[] {
     DEV_EXTRA_REFRESH_TOKEN,
     quoted,
   ];
+  // 强制 R-18 可见（默认开）。不强制时，受限作品会渲染成灰色占位「受浏览限制，不予显示」——
+  // 既没有真实像素（像素判据恒等），又点不进去（导航断言必败）。项目内已有先例：
+  // tools/verify-translation.sh:47 与 tools/README.md:42 都带这个 extra。
+  if (forceR18) args.push("--es", DEV_EXTRA_FORCE_R18, "true");
+  return args;
 }
+
+/** 强制 R-18 可见的 dev hook extra。oracle = LynxActivity.java:103 DEV_EXTRA_FORCE_R18 */
+const DEV_EXTRA_FORCE_R18 = "pictelio_dev_force_r18";
 
 /** 登录成功标记。oracle = LynxActivity 内 `dev hook: 自动登录成功` 那一行（实测 2026-09-28） */
 const DEV_LOGIN_SUCCESS_MARK = "dev hook: 自动登录成功";
+
+/** logcat 采集的 maxBuffer（字节）。Lynx 的 `ElementManager::OnPatchFinishForFiber`
+ *  是 ~60fps 逐帧日志，单次 dump 可达数 MB；env.runCapture 的缺省 1MB 会抛 ENOBUFS
+ *  （实测把 lynx-bookmark-tags 用例 ② 打成红）。 */
+const MAX_LOGCAT_BUFFER = 16 * 1024 * 1024;
+
+/** readAppLogcat 的可选参数 */
+export interface AppLogcatOptions {
+  /** `-t <lines>`：只取尾部若干行（全量 dump 被逐帧噪声淹没）；省略 = 全量 */
+  lines?: number;
+  /** spawnSync maxBuffer 覆盖，默认 16MB（见 MAX_LOGCAT_BUFFER） */
+  maxBufferBytes?: number;
+}
 
 /**
  * 读取 **app 进程**的 logcat（`--pid` 过滤），供所有渲染/登录就绪判定共用。
@@ -388,7 +323,7 @@ const DEV_LOGIN_SUCCESS_MARK = "dev hook: 自动登录成功";
  *    调用方（`waitForLynxRenderReady` 等）本来就在轮询里，返回空串让轮询继续才是
  *    正确行为；抛错会把「进程还没起」误报成「app 崩溃/被杀」。
  */
-export function readAppLogcat(serial: string): string {
+export function readAppLogcat(serial: string, opts: AppLogcatOptions = {}): string {
   const pid = runCapture(adbPath(), ["-s", serial, "shell", "pidof", APP_PACKAGE]).stdout.trim();
   if (!pid) {
     console.warn(
@@ -396,7 +331,11 @@ export function readAppLogcat(serial: string): string {
     );
     return "";
   }
-  return runCapture(adbPath(), ["-s", serial, "logcat", "-d", `--pid=${pid}`]).stdout;
+  // `-t <lines>`：全量 dump 无意义（Lynx 的 OnPatchFinishForFiber 是 ~60fps 逐帧日志），
+  // 取尾部若干行足够覆盖渲染信号，同时把 ENOBUFS 概率压到最低。省略时取全量。
+  const args = ["-s", serial, "logcat", "-d", `--pid=${pid}`];
+  if (opts.lines !== undefined) args.push("-t", String(opts.lines));
+  return runCapture(adbPath(), args, TIMEOUTS.adb, opts.maxBufferBytes ?? MAX_LOGCAT_BUFFER).stdout;
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -429,6 +368,7 @@ export async function loginViaDevIntent(
   serial: string,
   token = process.env.PIXIV_REFRESH_TOKEN,
   timeoutMs = 90_000,
+  forceR18 = true,
 ): Promise<void> {
   if (!token) {
     throw new Error(
@@ -438,7 +378,7 @@ export async function loginViaDevIntent(
   }
   // 先杀进程，保证下面的 am start 走完整启动流程并触发 applyDevIntentHooks
   forceStopApp(serial);
-  runOrThrow(adbPath(), ["-s", serial, ...devLoginIntentArgs(token)], TIMEOUTS.adb);
+  runOrThrow(adbPath(), ["-s", serial, ...devLoginIntentArgs(token, forceR18)], TIMEOUTS.adb);
 
   const deadline = Date.now() + timeoutMs;
   let tail = "";
@@ -453,8 +393,22 @@ export async function loginViaDevIntent(
   }
   throw new Error(
     `[android-e2e] dev hook 登录超时（${timeoutMs / 1000}s），未等到「${DEV_LOGIN_SUCCESS_MARK}」。\n` +
-      `logcat 尾部（去敏后前 2000 字符）：\n${tail.slice(0, 2_000)}`,
+      `logcat 尾部（已去敏，前 2000 字符）：\n${redactSecrets(tail).slice(0, 2_000)}`,
   );
+}
+
+/**
+ * 日志去敏：把 refresh_token 明文替换掉。
+ *
+ * #817 前这里只有 `slice(0, 2000)` 却把结果称作「去敏后」——名不副实。token 经
+ * `am start --es pictelio_dev_refresh_token <token>` 下发，若 Lynx/Java 侧任何一行
+ * 日志回显了它，就会**原样**进这条错误消息，随后被 vitest 写进
+ * `test-results/` 与 CI 输出。本函数按已知 token 精确替换（token 长度 ≥40，
+ * 不可能与其它日志内容自然碰撞），是纯函数，单测直接覆盖。
+ */
+export function redactSecrets(text: string, token = process.env.PIXIV_REFRESH_TOKEN): string {
+  if (!token || token.length < 8) return text;
+  return text.split(token).join("[REDACTED]");
 }
 
 /** 查询当前前台 Activity（dumpsys activity），归一化为 "package.Class" 形式 */
