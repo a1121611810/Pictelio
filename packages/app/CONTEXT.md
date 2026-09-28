@@ -2,6 +2,10 @@
 
 本上下文描述 Pictelio 中作品（插画、小说）的列表浏览与详情阅读之间的导航概念，以及错误处理领域模型。
 
+> ⚠️ **单引擎化订正（2026-09-28，[#610](https://github.com/a1121611810/Pictelio/issues/610) / `c6ade216`）**：`full` / `webview` flavor 与 WebView / Capacitor 构建链已整体删除，当前为 **Lynx 单引擎**。
+> 本文件中「引擎可用性与降级」「引擎切换与双向降级（Engine Routing）」两节的**机制描述已失效**（`EngineRoute` / `EnginePrefs` 等 Java 侧引擎路由实现已随手术删除，无第二引擎可降级）。
+> 词条**按原样保留**——它们记录的是该领域语言在双引擎期的定义，仍是决策史的一部分；但**不可再作为当前实现的事实依据**。已逐节标注。词条正文中「webview 与 lynx 两 client 共享同一 X」这类表述，读取时应理解为**共享存储契约仍然成立，但当前只有 lynx 一个消费方**。收口见 [#805](https://github.com/a1121611810/Pictelio/issues/805)。
+
 ## 术语
 
 ### WebDAV 备份（跨端功能，wayfinder #455）
@@ -351,6 +355,8 @@ _Avoid_: AI 等级、把「遮罩」端间统一为叠加层（app 端不新建�
 
 ### 引擎可用性与降级（Engine availability & fallback）
 
+> ⚠️ **本节机制已于 2026-09-28 随单引擎化失效**（`EngineRoute` / `EnginePrefs` 及降级链实现已删除，无第二引擎）。词条保留作领域语言历史定义，**不是当前实现的事实描述**。
+
 **首选引擎（Preferred client）**：
 `pictelio_client_kind` 所记录的用户选择（`webview` / `lynx`），持久化于 SharedPreferences "CapacitorStorage"；只有用户显式切换才会改变。
 _Avoid_: 当前客户端、当前引擎（易与生效引擎混淆）
@@ -418,6 +424,8 @@ _Avoid_: 榜单时间范围（那是搜索的期间语义，二者不是一回�
 _Avoid_: 序号 / 排名编号（避免暗示「连续编号」，名次是位置不是计数）
 
 ### 引擎切换与双向降级（Engine Routing）【2026-09-16 新增，跨上下文，spec docs/specs/engine-default-lynx-bidirectional-fallback.md】
+
+> ⚠️ **本节机制已于 2026-09-28 随单引擎化失效**：失败记忆、强制 WebView、无障碍回退、双向降级所依赖的引擎路由实现已整体删除。词条保留作领域语言历史定义，**不是当前实现的事实描述**。
 
 **失败记忆（Failure memory）**：
 设备级键 `pictelio_engine_lynx_failure_version`，记录 Lynx 上次硬运行时失败时的应用 versionCode。与当前版本精确相等才命中，应用升级自动遗忘；只在自动回退开关开启时读写。消除「每次冷启动白屏一次再弹回」，不是用户偏好——降级永远不改写首选引擎。

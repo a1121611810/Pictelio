@@ -1,6 +1,6 @@
 # Pictelio
 
-双渲染客户端的 Pixiv 第三方客户端——缺省 **Lynx** 客户端（vue-lynx，Material Design 3），可切换 **WebView** 客户端（SolidJS，Fluent Design 2）；通过 Capacitor 打包为 Android 原生应用。
+Lynx 单引擎的 Pixiv 第三方客户端（vue-lynx + Material Design 3），经 Gradle 构建链直接产出 Android 原生应用（构建链已去 Capacitor 化）。
 
 ## 项目概览
 

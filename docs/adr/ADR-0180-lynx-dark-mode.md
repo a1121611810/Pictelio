@@ -1,6 +1,9 @@
 # ADR-0180: lynx 夜间模式——三态明暗外观 + 自建暗色检测通道 + 双轨 splash
 
 - 状态: Accepted（2026-09-21）· T1–T5 代码完成并合并；**同日 review 修复轮**（原生输入源接线 / 机器防线 / 文档忠实性）后，进入**真机走查 gate**（见 [`docs/specs/lynx-night-mode-walkthrough.md`](../specs/lynx-night-mode-walkthrough.md) + [#692](https://github.com/a1121611810/Pictelio/issues/692)）
+- 单引擎化订正（2026-09-28，[#610](https://github.com/a1121611810/Pictelio/issues/610) / `c6ade216`）：本 ADR 的**决策与实现均不受影响**（夜间模式只在 lynx 侧），仅订正正文两处前提表述——
+  1. 正文「webview 客户端已有明暗主题，但按计划将弃用（**已记入 AGENTS.md 注意事项**）」中的 AGENTS.md 引用是**悬空的**：AGENTS.md 从未有条目记录该弃用计划。AGENTS.md 首段已于 2026-09-28 改写为「Lynx 单引擎」，WebView 线的去留**不进 AGENTS.md**。
+  2. 本 ADR 明确**不做**与 webview 主题的设置互通——该结论在单引擎下**自动成立**（无第二个主题可互通），无需变更。
 - 日期: 2026-09-21
 - 关联: wayfinder 地图 [#682](https://github.com/a1121611810/Pictelio/issues/682)；spec [docs/specs/lynx-night-mode.md](../specs/lynx-night-mode.md)（[#686](https://github.com/a1121611810/Pictelio/issues/686)）；走查矩阵 [docs/specs/lynx-night-mode-walkthrough.md](../specs/lynx-night-mode-walkthrough.md)；审计 [docs/specs/lynx-night-mode-audit.md](../specs/lynx-night-mode-audit.md)；研究 [#683](https://github.com/a1121611810/Pictelio/issues/683)（检测通道）/ [#684](https://github.com/a1121611810/Pictelio/issues/684)（splash 双轨）；访谈 [#685](https://github.com/a1121611810/Pictelio/issues/685)（入口交互）；实施 [#687](https://github.com/a1121611810/Pictelio/issues/687) / [#688](https://github.com/a1121611810/Pictelio/issues/688) / [#689](https://github.com/a1121611810/Pictelio/issues/689) / [#690](https://github.com/a1121611810/Pictelio/issues/690) / [#691](https://github.com/a1121611810/Pictelio/issues/691)；关联 ADR-0164（lynx 缺省引擎）/ ADR-0172（Lynx 运行时 web API 约束）
 - 修订: ADR-0168 D4（状态栏图标色恒真钉死 → 随 resolvedDark 动态）
