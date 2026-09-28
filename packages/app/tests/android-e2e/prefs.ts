@@ -190,8 +190,14 @@ export function forceStopApp(serial: string): void {
   runOrThrow(adbPath(), ["-s", serial, "shell", "am", "force-stop", APP_PACKAGE], TIMEOUTS.adb);
 }
 
-/** 通过 am start 启动主入口 Activity（按 flavor：full → MainActivity；webview → MainActivityWebview）
- *  —— 走入口 onCreate 的版本门禁 / 引擎路由分发。 */
+/**
+ * 通过 am start 启动主入口 Activity。
+ *
+ * 单引擎布局下 `E2E_FLAVOR` 缺省 `single`，唯一入口恒为 `LynxActivity`；
+ * `full` / `webview` 分支只留在 `env.mainActivityFor` 的纯函数映射里（供单测覆盖），
+ * 运行时由 `env.ts` 的「非 single 即显式抛错」守卫挡住——`build.gradle` 已无
+ * `productFlavors`，不存在可跑那两个 flavor 的包。
+ */
 export function startMainActivity(serial: string): void {
   runOrThrow(
     adbPath(),
