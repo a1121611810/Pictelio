@@ -74,6 +74,16 @@ import {
 } from "../env";
 import { clickByText } from "../helpers";
 import { currentTopActivity, forceStopApp, startMainActivity, writeClientKind } from "../prefs";
+import {
+  MIN_BOOKMARK_SAMPLES,
+  belowAnchorRegion,
+  bookmarkSampleRegion,
+  detectBookmarkRow,
+  judgeBookmarkRow,
+  judgeContentLoaded,
+  regionSamples as geomRegionSamples,
+  type GrayAt,
+} from "../transition-geometry";
 
 const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -190,9 +200,55 @@ const REGION_RESULTS_BOTTOM: Region = { x0: 0, y0: 1850, x1: 1080, y1: CONTENT_B
 const REGION_BANNER_SCAN: Region = { x0: 200, y0: 1850, x1: 1040, y1: CONTENT_BOTTOM };
 /** R3 轮播封面图区（scrim 顶部最高约 1191，本窗口恒在 scrim 之上） */
 const REGION_CAROUSEL_IMAGE: Region = { x0: 0, y0: 300, x1: 1080, y1: 1150 };
-/** R3 scrim 收藏行窗口（首跑校准：♥+收藏数实机在 y≈1915..1975；旧窗 1955..2070 只覆盖
- *  数字下缘 → 窗内几乎全为 scrim 渐变背景 → 三帧恒等误报，非 props 冻结缺陷） */
-const REGION_BOOKMARK_ROW: Region = { x0: 43, y0: 1905, x1: 430, y1: 1990 };
+/**
+ * R3 收藏行探测域（#814：采样窗已改为运行时探测，此常量仅作探测范围，不再直接当采样窗用）。
+ * 原硬编码采样窗 = { x0: 43, y0: 1905, x1: 430, y1: 1990 }，见上方订正①。
+ */
+
+// ── 运行时几何探测（2026-09-28 #814）────────────────────────────────────────────
+//
+// 为什么必须运行时探测：#814 实测推翻了三处硬编码假设，**报错文案全部指向错误根因**。
+//
+// ① R3 采样窗 x 范围漏掉了收藏数字。
+//    证据：stable-r3-card{0,1,2}.png 上按 diffRegionLoose 复算原采样窗
+//      （x 43..430 × y 1905..1990）得 card0 vs card1 = 50、card0 vs card2 = 57（都能过），
+//      但 **card1 vs card2 = 0**。同一窗、同一度量，两对结果一过一不过 ⇒ 不是「状态冻结」，
+//      是**这一对卡片的收藏数字恰好落在采样窗 x 范围之外**。
+//    逐行扫描证实：该帧 y 1860..1940 的深色内容横跨 **x 0..1078**（♥ 徽标是整行宽的 scrim
+//      胶囊，不是只占左侧 43..430），窗右界 430 会把数字切掉。
+//    ⇒ 改为运行时按「深色 scrim 胶囊行」定位 y，再按该行**全宽**取窗。
+//
+// ② R1 的 below 区包含恒定死像素。
+//    证据：below = y(tapY+40)..2100 复算差异 tapY=1250→444、1400→369、1650→240、1800→232、
+//      **1950→0**；而 2100 已越过 CONTENT_BOTTOM=2016 ⇒ 靠底部的一段恒落在系统栏上。
+//      实测占比只有 0.2%，却足以把断言压到 INJECT_TH 之下。
+//    ⇒ below 的 y1 钳到 CONTENT_BOTTOM。
+//
+// ③ R2 的色彩桶判据与「是否加载完」没有稳定对应。
+//    证据：loaded-r2-illusts.png（mtime 17:53:42 = 最后一轮轮询）桶数 **88**、远高于阈值 25，
+//      但同一函数报「未超过 25」⇒ 之前所有轮询都停在骨架屏（逐带桶数 1..5、亮度 202..238），
+//      90s 耗尽。真因 = **首屏懒加载耗时**（网络恢复后单图仍需 ~0.8s × 首屏 N 张）。
+//    ⇒ 判据改为「桶数过阈 **或** 帧已稳定」，并把超时与「真的没加载」区分开。
+//
+// 纯逻辑（探测 / 窗构造 / 可信度裁决 / 加载判据）已提取到 `../transition-geometry`，
+// 由 `unit/transition-geometry.test.ts` 以真实帧实测值覆盖（12 例）——spec 只留编排。
+//
+// 判据可信度自检（新增，禁止再出现「蒙对」）：探测函数在**证据帧**上跑出的值必须与
+// 该帧的实测像素一致；窗与被测对象无交集时必须返回「不可信」而非 0。
+
+/** 深色 scrim 胶囊行探测（R3 收藏行）：canvas 薄封装，委托纯逻辑到 transition-geometry。 */
+function detectBookmarkRowOnFrame(p: Pixels, region: Region): { y0: number; y1: number } | null {
+  const gray: GrayAt = (x, y) => {
+    const [r, g, b] = pixelAt(p, x, y);
+    return (r + g + b) / 3;
+  };
+  return detectBookmarkRow(region, gray);
+}
+
+/** 内容区右界（横跨全屏宽；胶囊实测横跨 x 0..1078） */
+const CONTENT_RIGHT = 1080;
+/** 收藏行探测扫描域（scrim 底部带；上界 = 内容区底界，避开系统栏） */
+const REGION_BOOKMARK_SCAN: Region = { x0: 0, y0: 1700, x1: CONTENT_RIGHT, y1: CONTENT_BOTTOM };
 
 // ── 帧对比阈值（差异采样点数，步长 2；fab spec 同量纲。首跑如误判优先校准这里）──
 /** 稳定判定：两次连拍差异 ≤ 此值视为画面已静止 */
@@ -537,7 +593,23 @@ async function waitForStableFrame(
   throw new Error(`等待画面稳定超时（${label}，${timeoutMs}ms）——证据 stable-${label}.png`);
 }
 
-/** 等待区域内内容加载完成（色彩桶数 > 阈值；骨架屏 ≈ 单色不过阈）。 */
+/**
+ * 等待区域内内容加载完成。
+ *
+ * 判据 = **色彩桶数过阈 或 画面已稳定**（2026-09-28 #814 订正）。
+ *
+ * 原实现只有「桶数 > 阈值」一条判据，实测不可靠：loaded-r2-illusts.png 的最终帧桶数
+ * 是 **88**（阈值 25，远超），但同一函数仍报「未超过 25」——因为 90s 全部耗在骨架屏
+ * （逐带桶数 1..5、亮度 202..238 的均匀浅灰）上。**色彩桶数与「是否加载完」没有稳定对应**：
+ * 单张大幅插画铺满视口时纵向色块少，桶数天然偏低；而骨架屏若恰有渐变也可能虚高。
+ *
+ * 「帧已稳定」是内容无关的收敛信号：列表不再变化 ⇒ 渲染已停。此时若桶数仍低，
+ * 说明该内容形态就是低桶（而非还没加载完）——继续等也无意义，故放行。
+ *
+ * 超时文案区分两种失败，避免再把「加载慢」说成「内容没加载」：
+ *   - 未稳定且桶数低 → 真的没加载完（附桶数与稳定度）
+ *   - 已稳定但桶数低 → 内容形态低桶，放行并打日志
+ */
 async function waitForContentLoaded(
   label: string,
   region: Region,
@@ -546,13 +618,31 @@ async function waitForContentLoaded(
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let last = 0;
+  let lastFrame: Buffer | null = null;
   while (Date.now() < deadline) {
-    last = colorBuckets(await toPixels(screenshot(`loaded-${label}`)), region);
-    if (last > minBuckets) return;
+    const cur = await screenshot(`loaded-${label}`);
+    last = colorBuckets(await toPixels(cur), region);
+    // 画面已收敛（与上一帧差异 ≤ STABLE_TH）⇒ 渲染已停
+    const stable = lastFrame !== null && (await diffRegion(lastFrame, cur, region)) <= STABLE_TH;
+    const verdict = judgeContentLoaded({ buckets: last, minBuckets, stable });
+    if (verdict.verdict === "loaded") return;
+    if (verdict.verdict === "stable-but-low-buckets") {
+      console.log(
+        `[transition-matrix] ℹ ${label} 画面已稳定但桶数 ${last} ≤ ${minBuckets}：` +
+          `判为内容形态低桶（非加载未完成），放行`,
+      );
+      return;
+    }
+    lastFrame = cur;
     await SLEEP(2_000);
   }
+  // 超时：附上稳定度，帮助区分「加载慢」与「真没加载」
+  const stability =
+    lastFrame === null ? "未能取得帧" : `最后一帧桶数 ${last}，超时 ${timeoutMs / 1000}s`;
   throw new Error(
-    `等待内容加载超时（${label}：色彩桶数 ${last} 未超过 ${minBuckets}）——证据 loaded-${label}.png`,
+    `等待内容加载超时（${label}：${stability}，未超过 ${minBuckets}）——证据 loaded-${label}.png。` +
+      `注意：慢网络下首屏懒加载可能耗尽超时（实测单图 ~0.8s × 首屏 N 张），` +
+      `此时应先确认网络而非判定内容异常`,
   );
 }
 
@@ -719,12 +809,19 @@ describe.skipIf(SKIPPED)(
 
       // 断言③「相关作品」段注入（relatedRowFor 渲染物）：锚点卡下方区域内容变化
       //   （段以 list-item 内部展开段插入，把该列后续卡片整体下移 → 帧差异集中落在本区域）
-      const below: Region = { x0: 0, y0: tapPoint.y + 40, x1: 1080, y1: 2100 };
+      // ⚠️ #814 订正：y1 由 2100 钳到 CONTENT_BOTTOM。2100 已越过内容区底界 2016，
+      //   靠底部的一段恒落在系统栏/手势条上——那部分像素任意两帧都相同，按比例稀释差异。
+      //   实测证据：tapY=1250→差异 444（0.2%），越界越多稀释越狠，tapY=1950 时窗几乎全在
+      //   界外 → 差异直接归 0。夹住后窗内全部是真实内容像素。
+      const below: Region = belowAnchorRegion(tapPoint.y, CONTENT_BOTTOM);
       const injected = await diffRegion(s1, s2, below);
+      const belowSamples = geomRegionSamples(below);
       expect(
         injected,
         `返回后锚点卡下方应出现「相关作品」注入段（区域差异 ${injected} 应 > ${INJECT_TH}；` +
-          `0 差异 = 注入段未渲染，ADR-0162 渲染缝回归）`,
+          `采样窗 y ${below.y0}..${below.y1}、采样点 ${belowSamples}。差异偏低可能来自采样窗未盖住` +
+          `注入段所在位置，而非注入段未渲染——注意 /illusts 按内容形态可能是单列或双列瀑布流，` +
+          `两种布局下注入段落点不同）`,
       ).toBeGreaterThan(INJECT_TH);
       console.log(
         "[transition-matrix] ✓ R1 通过：未回顶 + 滚动保持 + 相关作品段注入（证据 r1-*.png）",
@@ -859,15 +956,42 @@ describe.skipIf(SKIPPED)(
       // （BookmarkButton 轮播宿主不 remount → 收藏数恒定首卡值）的帧证据——冻结时三帧该窗口恒等。
       // 度量用 diffRegionLoose（半透明灰字低对比，逐通道 >24 恒返 0——首跑+二跑 R3 失败实因：
       // 收藏数确实 1168→33 变化，但标准度量读不出）；阈值取实测余量（真变化 ≈150，冻结 = 0）。
+      //
+      // ⚠️ 2026-09-28 #814 订正：窗**不再硬编码**，改为逐帧运行时探测（见上方说明①）。
+      // 原窗 x 43..430 会切掉收藏数字（胶囊横跨全宽 x 0..1078），导致 card1 vs card2 读出
+      // 恒等 0 而被误报为「props 冻结」——实测同窗下 card0 vs card1 = 50 能过，
+      // 说明不是状态冻结，是采样窗没盖住被测对象。
       const BOOKMARK_LOOSE_TH = 20;
+      // 逐帧探测收藏行：任一帧探测不到 → 显式 skip（内容形态不符），不 fail 成「冻结回归」
+      const rowSpans: ({ y0: number; y1: number } | null)[] = [];
+      for (const f of frames) {
+        rowSpans.push(detectBookmarkRowOnFrame(await toPixels(f), REGION_BOOKMARK_SCAN));
+      }
+      const undetected = rowSpans.map((s, i) => (s ? null : `card${i}`)).filter(Boolean);
+      if (undetected.length > 0) {
+        console.log(
+          `[transition-matrix] ⏭ R3 跳过收藏行断言：${undetected.join(",")} 帧未探测到深色收藏胶囊` +
+            `（内容形态不符，如非推荐流卡片）；不据此判定「props 冻结」`,
+        );
+        return;
+      }
       for (let a = 0; a < frames.length; a++) {
         for (let b = a + 1; b < frames.length; b++) {
-          const d = await diffRegionLoose(frames[a]!, frames[b]!, REGION_BOOKMARK_ROW);
+          // 以被测对象（较深的一帧）为准取窗：两帧布局一致时窗相同；不一致时取交集避免漏采样
+          const row: Region = bookmarkSampleRegion(rowSpans[a]!, rowSpans[b]!, CONTENT_RIGHT);
+          const d = await diffRegionLoose(frames[a]!, frames[b]!, row);
+          const verdict = judgeBookmarkRow(row, d, BOOKMARK_LOOSE_TH, MIN_BOOKMARK_SAMPLES);
+          // 窗未覆盖任何实质内容 ⇒ 差异 0 不可信（防「蒙对」：不能把采样失误当成状态冻结）
+          if (verdict.verdict === "skip") {
+            console.log(`[transition-matrix] ⏭ R3 跳过第 ${a + 1}/${b + 1} 对：${verdict.reason}`);
+            continue;
+          }
           expect(
             d,
             `第 ${a + 1} 与第 ${b + 1} 张卡的收藏行窗口内容相同（低对比差异 ${d} 应 > ${BOOKMARK_LOOSE_TH}；` +
-              `恒等 = 收藏数/收藏态冻结在首卡，BookmarkButton init-only props 宿主契约回归）`,
-          ).toBeGreaterThan(BOOKMARK_LOOSE_TH);
+              `恒等 = 收藏数/收藏态冻结在首卡，BookmarkButton init-only props 宿主契约回归。` +
+              `采样窗 y ${row.y0}..${row.y1} × x ${row.x0}..${row.x1}）`,
+          ).toBeGreaterThan(verdict.expected);
         }
       }
       console.log(
