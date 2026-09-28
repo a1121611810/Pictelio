@@ -8,7 +8,7 @@
 // ② TS 适配器 gallerySaver.ts：dir 缺省空串走 saveImage（旧原生包兼容）、非空走 saveImageTo；
 // ③ 深模块 GallerySaver：基座常量 RELATIVE_PATH = "Pictures/Pictelio"、subPath 追加形态、
 //    sanitizeFileName 防御性净化规则与 JS sanitizeNameSegment 逐字镜像（双端同规则）；
-// ④ Capacitor 契约同形（ADR-0192 D8）：GallerySaverPlugin.saveImage 可选 dir 载荷键；
+// ④ ~~Capacitor 契约同形（ADR-0192 D8）~~ —— #610 起 Capacitor 线整体下线，断言移除；
 // ⑤ 下载队列桥（T6）：PictelioDownloaderModule.start 载荷 dir 参数（可选、缺省空串）、
 //    TS 执行器 lynxDownloadExecutor 逐字透传 task.dir、深模块 PictelioDownloader 三入口
 //    dir 重载交给 GallerySaver subPath（图片链 Pictures/Pictelio、导出链 Downloads/Pictelio）。
@@ -28,10 +28,9 @@ const javaDeepModule = readFileSync(
   fileURLToPath(new URL('../../../app/android/app/src/main/java/io/pictelio/app/GallerySaver.java', import.meta.url)),
   'utf8',
 )
-const javaCapacitorPlugin = readFileSync(
-  fileURLToPath(new URL('../../../app/android/app/src/webview/java/io/pictelio/app/GallerySaverPlugin.java', import.meta.url)),
-  'utf8',
-)
+// #610：WebView/Capacitor 线整体下线，GallerySaverPlugin.java 随之删除。
+// 原 ADR-0192 D8 的「Capacitor 契约同形」断言（读 src/webview/java/…）失去被测对象，
+// 连同其源文件读取一并移除。Lynx 侧（①/③/⑤）断言不受影响，继续钉死。
 const tsAdapter = readFileSync(fileURLToPath(new URL('./gallerySaver.ts', import.meta.url)), 'utf8')
 const tsNaming = readFileSync(fileURLToPath(new URL('./galleryDownload.ts', import.meta.url)), 'utf8')
 const javaDownloaderModule = readFileSync(
@@ -99,11 +98,6 @@ describe('相册保存桥 TS ⇄ Java 契约（ADR-0192 D4/D7）', () => {
     expect(javaDeepModule).toContain('fileName.replaceAll("[/\\\\\\\\\\\\x00-\\\\x1f]", "_")')
   })
 
-  it('Capacitor 契约同形（ADR-0192 D8）：GallerySaverPlugin.saveImage 读可选 dir 载荷', () => {
-    expect(javaCapacitorPlugin).toContain('call.getString("dir")')
-    // webview 同走深模块 subPath 重载（dir null → 空串字节不变）
-    expect(javaCapacitorPlugin).toContain('dir == null ? "" : dir')
-  })
 })
 
 // ── 下载队列桥 TS ⇄ Java 契约（T6 / ADR-0192 D4/D7 / spec D5/D7）───
