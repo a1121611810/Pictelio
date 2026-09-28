@@ -44,6 +44,8 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   currentTopActivity,
   forceStopApp,
@@ -51,8 +53,9 @@ import {
   readAppLogcat,
   startMainActivity,
 } from "../prefs";
-import { adbPath, LYNX_ACTIVITY, runCapture, runOrThrow } from "../env";
+import { adbPath, LYNX_ACTIVITY, REPO_ROOT, runCapture, runOrThrow } from "../env";
 import { setupAndroidE2e, type AndroidE2eContext } from "../setup";
+import { CONTENT_BOTTOM, CONTENT_RIGHT, fabCenterPx, roundPx } from "../transition-geometry";
 import { createCanvas, loadImage } from "canvas";
 
 const SLEEP = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -76,22 +79,44 @@ if (SKIPPED) {
   console.log(`[fab] SKIP: ${SKIP_REASON}`);
 }
 
-// ── 固定坐标（AVD pictelio_ui：物理 1080×2160，density 480，1vw = 10.8px）──
-// 推导模型（GlobalFab.vue vw 几何 + 状态栏 inset，经旧 pictelio_low 常量校准）：
-// - LynxView 顶 = 状态栏 inset（24dp × 3 = 72px），底 = 屏幕底（手势导航无底部 inset，
-//   与 pictelio_low 旧常量反推一致）；vw 基准 = 屏宽 1080，
-//   H_vw = (2160 - 72) / 1080 × 100 ≈ 193.33；
-// - 主 FAB：fabCx = 100 - 4.267 - 14.933/2 = 88.2665vw；
-//   fabCy = H_vw - 4.267 - 14.933/2 = H_vw - 11.7335vw（menu 模式）；
-// - 外环「我的」项：R_OUTER = 35vw、末角 -88°（OUTER_END，polar: x=cx+sin(a)·r, y=cy-cos(a)·r）；
-// - Me 页「我的收藏」行：TopAppBar 17.067vw + 卡片(mt-3 3.2vw + p-4 4.267vw +
-//   头像行 14.933vw + pb-4 4.267vw) + 行半高(py-3.5 3.733vw + 16dp 文本半高) + 72 inset；
-// - 遮罩空白区：屏宽中点、约 23% 屏高（远离 FAB 与环，点空白收起菜单）。
-// ⚠ 坐标为静态推导（未实机逐点校准），验收首跑如几何断言失败，优先怀疑
-//   状态栏 inset / 底部导航假设，用 uiautomator dump bounds 实测后微调。
-const FAB_TAP = { x: 953, y: 2033 };
-const ME_RING_TAP = { x: 576, y: 2020 };
-const BOOKMARKS_ROW_TAP = { x: 300, y: 611 };
+// ── 坐标（AVD pictelio_ui：物理 1080×2160，density 480，1vw = 10.8px）──
+//
+// ⚠️ #817 **坐标系口径订正**：本块原按 **H_vw = (2160 - 72) / 1080 × 100 ≈ 193.33**
+// （= 全屏高减去顶部状态栏）推导，于是 FAB_TAP.y = 2033、ME_RING_TAP.y = 2020。
+// 但 ADR-0131 的 `screenHeightVw` 在 `contentSize` 命中时返回的是**稳定区**高度，
+// 而稳定区**两端**都扣了系统栏——`dumpsys window displays` 实测
+// `app=1080x2088 rng=1080x936-2160x2016` ⇒ 底界 **2016**（顶部 72 状态栏 +
+// 底部 72 手势条，共 144px）。
+// 结果：点 (953, 2033) 落在**手势条**上，FAB 根本不响应；断言只看到一个
+// 「差异 8」的裸数字（其余全是状态栏时钟 + Lynx debug 触摸标记的红点）。
+//
+// 现复用 `transition-geometry` 的推导（与 transition-matrix.spec.ts **同一份事实源**，
+// 且有单测钉住），FAB 圆心 = (953, 1889)：
+//   oracle（2026-09-29 实测帧 test-results/android-e2e/fab-probe/fab-open.png，
+//   在 (953,1889) 轻点即展开）：主 FAB 亮簇 bbox x872..1033 / y1808..1969
+//   ⇒ 圆心 (952.5, 1888.5)。与 `fabCenterPx(2016, 1080)` 推导值 (953.3, 1889.3)
+//   差 ≤0.8px；该 bbox 也与 `transition-geometry.fabCenterPx` 注释里早已记录的
+//   `r2-after-fab.png` 口径（x872..1032 / y1808..1968）独立吻合。
+const FAB_TAP = roundPx(fabCenterPx(CONTENT_BOTTOM, CONTENT_RIGHT));
+
+// 外环「我的」项：实测落点 (576, 1887)，相对 FAB 圆心 r=377px、角度 -89.7°
+// （同帧另三项：推荐 (890,1520) r=374 -9.7°、插画 (735,1612) r=352 -38.2°、
+// 小说 (621,1749) r=360 -67.1° —— 半径一致 ⇒ 外环 R_OUTER ≈ 376px）。
+// x 沿用原常量 576（本就正确）；y 改取 **FAB 圆心 y**：该项几乎正左方（-89.7°），
+// 与圆心同高是几何必然，写成常量会再次把两处独立漂移绑在一起。
+const ME_RING_TAP = { x: 576, y: FAB_TAP.y };
+
+// Me 页「我的收藏」行（#817 订正）。
+// oracle = 2026-09-29 实测帧 test-results/android-e2e/fab-hit-testing/row-before-tap.png
+// 逐行像素扫描（卡片内 x 60..700 的深色文字带）：Hintaooda y492..558 / @1121611810
+// y591..640 / **我的收藏 y746..788（中心 767）** / 追更列表 913 / 稍后看 1061 /
+// 好P友 1209 / 下载管理 1353 / 网络自检 1500 / 通知 1647（行距稳定 ≈146.5px）。
+// 原写死 y=611 正落在「@1121611810」(中心 616) 与「我的收藏」(中心 767) 之间的
+// 分隔区——既不是可点行，也不是任何文字 ⇒ tap 无反应，断言只看到「差异 8」。
+// 同样属于「按旧布局推导的坐标」这一类，与上面 FAB/外环同源。
+const BOOKMARKS_ROW_TAP = { x: 300, y: 767 };
+
+// 遮罩空白区（点空白收起菜单）：远离 FAB 与环。
 const SCRIM_CLOSE_TAP = { x: 540, y: 506 };
 
 /** 校验目标 AVD 分辨率与密度（坐标常量按 pictelio_ui 1080×2160/density 480 实测 config 推导，防 AVD 漂移静默失效）。 */
@@ -128,12 +153,25 @@ function assertLynxActivityForeground(serial: string, context: string): void {
   }
 }
 
-/** 截屏（exec-out 直接取 PNG 字节流）。maxBuffer 放宽到 20MB——Node spawnSync
- *  默认 1MB，1080×2160 的 PNG 字节流会 ENOBUFS（pictelio_ui 实测）。 */
-function screenshot(serial: string): Buffer {
-  return execFileSync(adbPath(), ["-s", serial, "exec-out", "screencap", "-p"], {
+/** 证据落盘目录（被 gitignore，仅本地取证用） */
+const EVIDENCE_DIR = resolve(REPO_ROOT, "packages/app/test-results/android-e2e/fab-hit-testing");
+mkdirSync(EVIDENCE_DIR, { recursive: true });
+
+/**
+ * 截屏（exec-out 直接取 PNG 字节流）。maxBuffer 放宽到 20MB——Node spawnSync
+ *  默认 1MB，1080×2160 的 PNG 字节流会 ENOBUFS（pictelio_ui 实测）。
+ *
+ * #817：传入 `label` 时同时落盘。此前本 spec 的全部帧只在内存里参与 `pngDiff`，
+ * 断言失败时**零证据**——只能看到一个裸数字（实测「差异 8」），无从判断是
+ * 没点击、点错位置、还是页面确实变了（状态栏时钟本身就会贡献几十像素差）。
+ * 落盘后失败即可对着两帧逐段复算差异来源。
+ */
+function screenshot(serial: string, label?: string): Buffer {
+  const buf = execFileSync(adbPath(), ["-s", serial, "exec-out", "screencap", "-p"], {
     maxBuffer: 20 * 1024 * 1024,
   });
+  if (label) writeFileSync(resolve(EVIDENCE_DIR, `${label}.png`), buf);
+  return buf;
 }
 
 /** 像素 diff（canvas 解码 PNG；采样步长 2，逐通道阈值 24），返回差异采样点数。 */
@@ -323,12 +361,15 @@ describe.skipIf(SKIPPED)(
     });
 
     it("控制组：FAB 点击有反应（菜单展开，证明应用未假死）", async () => {
-      const before = screenshot(serial);
+      const before = screenshot(serial, "ctl-before-fab-tap");
       tap(serial, FAB_TAP.x, FAB_TAP.y);
       await SLEEP(1_200);
-      const after = screenshot(serial);
+      const after = screenshot(serial, "ctl-after-fab-tap");
       const changed = await pngDiff(before, after);
-      expect(changed).toBeGreaterThan(100);
+      expect(
+        changed,
+        "FAB 点击后画面无变化——证据 ctl-before/ctl-after-fab-tap.png",
+      ).toBeGreaterThan(100);
       // 收起菜单（点遮罩空白区），恢复关闭态
       tap(serial, SCRIM_CLOSE_TAP.x, SCRIM_CLOSE_TAP.y);
       await SLEEP(1_200);
@@ -341,12 +382,16 @@ describe.skipIf(SKIPPED)(
       tap(serial, ME_RING_TAP.x, ME_RING_TAP.y);
       await SLEEP(3_000);
       // 2. 探针：点「我的收藏」行 → 应导航（修复前被全屏容器吞掉 → 0 变化）
-      const before = screenshot(serial);
+      const before = screenshot(serial, "row-before-tap");
       tap(serial, BOOKMARKS_ROW_TAP.x, BOOKMARKS_ROW_TAP.y);
       await SLEEP(2_000);
-      const after = screenshot(serial);
+      const after = screenshot(serial, "row-after-tap");
       const changed = await pngDiff(before, after);
-      expect(changed).toBeGreaterThan(500);
+      expect(
+        changed,
+        `点「我的收藏」行后画面几乎没变（差异 ${changed}，阈值 500）——证据 ` +
+          `row-before-tap.png / row-after-tap.png。若两帧只差状态栏时钟，说明点击未生效。`,
+      ).toBeGreaterThan(500);
     }, 45_000);
   },
 );

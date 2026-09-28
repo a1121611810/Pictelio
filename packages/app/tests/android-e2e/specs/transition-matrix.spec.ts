@@ -87,6 +87,8 @@ import {
   startMainActivity,
 } from "../prefs";
 import {
+  CONTENT_BOTTOM,
+  CONTENT_RIGHT,
   MIN_BOOKMARK_SAMPLES,
   belowAnchorRegion,
   bookmarkSampleRegion,
@@ -215,7 +217,6 @@ interface Region {
  * 全部钳到 `CONTENT_BOTTOM` 后，窗口内全部是真实内容像素。
  * （`REGION_BOOKMARK_ROOM` 1905..1990 本就在区内，未越界，故不动。）
  */
-const CONTENT_BOTTOM = 2016;
 /** R1「未回顶」对比窗口（首跑校准：榜单入口大卡是 RefreshableList 兄弟节点、恒占
  *  y≈380..1150 且永不滚动——旧窗 400..1040 整块落在静态卡上 → 差异恒 ≈0，与列表位置
  *  无关（首跑/二跑 R1 失败实因）。列表真实视口 = 榜单卡之下 1150..2016） */
@@ -275,7 +276,6 @@ function detectBookmarkRowOnFrame(p: Pixels, region: Region): { y0: number; y1: 
 }
 
 /** 内容区右界（横跨全屏宽；胶囊实测横跨 x 0..1078） */
-const CONTENT_RIGHT = 1080;
 /** 收藏行探测扫描域（scrim 底部带；上界 = 内容区底界，避开系统栏） */
 const REGION_BOOKMARK_SCAN: Region = { x0: 0, y0: 1700, x1: CONTENT_RIGHT, y1: CONTENT_BOTTOM };
 

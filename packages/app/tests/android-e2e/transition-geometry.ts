@@ -18,6 +18,22 @@
  */
 
 /** 采样区域（物理像素窗口） */
+/**
+ * 内容区底界（px，稳定区下沿）——#817 由 transition-matrix 提升为共享导出。
+ *
+ * oracle = `dumpsys window displays` 实测（pictelio_ui，API 34）：
+ * `init=1080x2160 cur=1080x2160 app=1080x2088 rng=1080x936-2160x2016`。
+ * 稳定区两端都扣系统栏：顶部状态栏 72 + 底部手势条 72，共 **144px**。
+ *
+ * ⚠️ 这是本项目反复踩的坑（#814 / #816 / #817 三轮）：FAB 等**贴底**控件的 vw 几何
+ * 必须用稳定区高度而非全屏 2160，否则整条推导下移 144px —— 点击落到手势条上，
+ * 控件根本不响应，而断言只看到一个「画面没变」的裸数字。
+ */
+export const CONTENT_BOTTOM = 2016;
+
+/** 内容区右界（px）——横跨全屏宽。#817 由 transition-matrix 提升为共享导出。 */
+export const CONTENT_RIGHT = 1080;
+
 export interface Region {
   x0: number;
   y0: number;
