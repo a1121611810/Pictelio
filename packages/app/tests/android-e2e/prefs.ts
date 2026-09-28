@@ -9,11 +9,13 @@
  * ⚠️ 单引擎化后（#610）：`pictelio_client_kind` **不再决定任何行为**——
  * `MainActivity` 分发器与引擎路由均已删除，唯一入口是 launcher `LynxActivity`，
  * 且 `PictelioAppModule.getClientKind` 会把任何写入值归一为 lynx（ADR-0062）。
- * 因此本文件保留的 `writeClientKind` 只剩「通用 pref 覆写 + 回读校验」语义，
- * **不再**具备「切换引擎」的被测价值；相关引擎状态快照工具（`ENGINE_KEYS` /
- * `parseEngineState` / `readEngineState` / `pollEngineState`）已随
- * `engine-fallback-matrix` 等 spec 一并删除（其 oracle `EnginePrefs.java` /
- * `EngineRoute.snapshotLine()` 在源码树中已不存在）。
+ * 因此播种该键的工具（`writeClientKind`）与相关引擎状态快照工具（`ENGINE_KEYS` /
+ * `parseEngineState` / `readEngineState` / `pollEngineState`）**均已删除**——
+ * 前者无被测行为（写入值被归一，断言恒真），后者的 spec
+ * （`engine-fallback-matrix` 等）与 oracle（`EnginePrefs.java` /
+ * `EngineRoute.snapshotLine()`）在源码树中已不存在。
+ * 通用 pref 读写（`readPrefValue` / `writePrefKey` / `readClientPrefs` /
+ * `pollPrefs`）不受影响，继续服务仍存活的键契约断言。
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -125,61 +127,6 @@ export async function pollPrefs(
 }
 
 /**
- * 覆写设备上 CapacitorStorage.xml 的 pictelio_client_kind 值（模拟 app 写入）。
- * 用 run-as sh -c 相对路径写文件（run-as 的 cwd 即 app 数据目录，绝对路径
- * 重定向被 SELinux 拒）。先 cat 原文件替换值再写回，文件不存在则新建。
- * 返回覆写后的实际值（供断言比对，防止 shell 转义问题）。
- */
-export function writeClientKind(serial: string, kind: "webview" | "lynx"): string {
-  const cur = readClientPrefs(serial);
-  let xml: string;
-  if (cur.fileExists) {
-    // 兼容两种序列化形式的替换
-    xml = cur.rawXml
-      .replace(
-        /<string name="pictelio_client_kind">[^<]*<\/string>/u,
-        `<string name="pictelio_client_kind">${kind}</string>`,
-      )
-      .replace(
-        /name="pictelio_client_kind"\s+value="[^"]*"/u,
-        `name="pictelio_client_kind" value="${kind}"`,
-      );
-    if (!xml.includes("pictelio_client_kind")) {
-      // 原文件没有该键，插入到 <map> 内；空 map 是自闭合 <map /> 需单独处理
-      // （新装 app 的 CapacitorStorage.xml 实测为 <map />，2026-08-29 T0 踩中）
-      xml = /<map\s*\/>/u.test(xml)
-        ? xml.replace(
-            /<map\s*\/>/u,
-            `<map>\n    <string name="pictelio_client_kind">${kind}</string>\n</map>`,
-          )
-        : xml.replace(/<map>/u, `<map>\n    <string name="pictelio_client_kind">${kind}</string>`);
-    }
-  } else {
-    xml = `<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\n<map>\n    <string name="pictelio_client_kind">${kind}</string>\n</map>\n`;
-  }
-  // run-as sh -c 相对路径写（base64 避免 shell 转义陷阱）。
-  // 注意：整段 run-as 命令必须作为 adb shell 的单个字符串参数（adb 会把数组
-  // 元素重新拼接，拆成多参数会导致 sh -c 脚本被误拆）。
-  const b64 = Buffer.from(xml, "utf8").toString("base64");
-  const script = `mkdir -p shared_prefs && echo ${b64} | base64 -d > ${PREFS_REL} && chmod 660 ${PREFS_REL} && cat ${PREFS_REL}`;
-  const adbCmd = `run-as ${APP_PACKAGE} sh -c '${script}'`;
-  const r = runCapture(adbPath(), ["-s", serial, "shell", adbCmd]);
-  if (r.code !== 0) {
-    throw new Error(
-      `[android-e2e] 覆写 ${APP_PACKAGE} 的 pictelio_client_kind=${kind} 失败（code ${r.code}）。` +
-        `stderr: ${r.stderr}\n请确认 debug 包可 run-as（安装的是 debug APK）`,
-    );
-  }
-  const written = readClientPrefs(serial);
-  if (written.clientKind !== kind) {
-    throw new Error(
-      `[android-e2e] 写入后校验失败：期望 ${kind}，实际 ${written.clientKind}（${written.rawXml}）`,
-    );
-  }
-  return kind;
-}
-
-/**
  * 读取 CapacitorStorage.xml 中任意字符串键的值（run-as 直读，debug 包可读）。
  * 文件不存在或键不存在 → null。用于取证键写入后的落盘校验。
  */
@@ -210,7 +157,7 @@ export function writePrefKey(serial: string, key: string, value: string): void {
             new RegExp(`name="${key}"\\s+value="[^"]*"`, "u"),
             `name="${key}" value="${value}"`,
           )
-      : // 空 map 自闭合 <map /> 兼容（同 writeClientKind，2026-08-29 T0 踩中）
+      : // 空 map 自闭合 <map /> 兼容（新装 app 的 CapacitorStorage.xml 实测为 <map />，2026-08-29 T0 踩中）
         /<map\s*\/>/u.test(cur.rawXml)
         ? cur.rawXml.replace(
             /<map\s*\/>/u,
@@ -400,7 +347,7 @@ export async function loginViaDevIntent(
 /**
  * 日志去敏：把 refresh_token 明文替换掉。
  *
- * #817 前这里只有 `slice(0, 2000)` 却把结果称作「去敏后」——名不副实。token 经
+ * #819 前这里只有 `slice(0, 2000)` 却把结果称作「去敏后」——名不副实。token 经
  * `am start --es pictelio_dev_refresh_token <token>` 下发，若 Lynx/Java 侧任何一行
  * 日志回显了它，就会**原样**进这条错误消息，随后被 vitest 写进
  * `test-results/` 与 CI 输出。本函数按已知 token 精确替换（token 长度 ≥40，

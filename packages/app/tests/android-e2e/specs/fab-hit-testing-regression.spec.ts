@@ -81,7 +81,7 @@ if (SKIPPED) {
 
 // ── 坐标（AVD pictelio_ui：物理 1080×2160，density 480，1vw = 10.8px）──
 //
-// ⚠️ #817 **坐标系口径订正**：本块原按 **H_vw = (2160 - 72) / 1080 × 100 ≈ 193.33**
+// ⚠️ #819 **坐标系口径订正**：本块原按 **H_vw = (2160 - 72) / 1080 × 100 ≈ 193.33**
 // （= 全屏高减去顶部状态栏）推导，于是 FAB_TAP.y = 2033、ME_RING_TAP.y = 2020。
 // 但 ADR-0131 的 `screenHeightVw` 在 `contentSize` 命中时返回的是**稳定区**高度，
 // 而稳定区**两端**都扣了系统栏——`dumpsys window displays` 实测
@@ -106,7 +106,7 @@ const FAB_TAP = roundPx(fabCenterPx(CONTENT_BOTTOM, CONTENT_RIGHT));
 // 与圆心同高是几何必然，写成常量会再次把两处独立漂移绑在一起。
 const ME_RING_TAP = { x: 576, y: FAB_TAP.y };
 
-// Me 页「我的收藏」行（#817 订正）。
+// Me 页「我的收藏」行（#819 订正）。
 // oracle = 2026-09-29 实测帧 test-results/android-e2e/fab-hit-testing/row-before-tap.png
 // 逐行像素扫描（卡片内 x 60..700 的深色文字带）：Hintaooda y492..558 / @1121611810
 // y591..640 / **我的收藏 y746..788（中心 767）** / 追更列表 913 / 稍后看 1061 /
@@ -119,12 +119,45 @@ const BOOKMARKS_ROW_TAP = { x: 300, y: 767 };
 // 遮罩空白区（点空白收起菜单）：远离 FAB 与环。
 const SCRIM_CLOSE_TAP = { x: 540, y: 506 };
 
-/** 校验目标 AVD 分辨率与密度（坐标常量按 pictelio_ui 1080×2160/density 480 实测 config 推导，防 AVD 漂移静默失效）。 */
+/**
+ * 校验目标 AVD 的几何（坐标常量按 pictelio_ui 1080×2160/density 480 **稳定区 2016px** 实测 config 推导，防 AVD 漂移静默失效）。
+ *
+ * ⚠️ 三项都要验，缺一不可（原实现只验 `wm size` / `wm density`，漏掉了系统栏高度）：
+ * FAB 坐标由 `fabCenterPx(CONTENT_BOTTOM=2016, 1080)` 推导，而 `contentSize.h` 是**稳定区**
+ * 高度而非全屏 2160。换 ROM 或切换导航模式（gestural ↔ threebutton）会让稳定区高度变化，
+ * 此时旧常量会**静默点到空处**——2026-09-28 实测：全屏口径 2033 vs 实际 1889，偏 144px，
+ * 落在 FAB 盒外。像素级 UI 断言在坐标错位时表现为「功能坏了」，极易被误判为产品回归。
+ */
 function assertDeviceGeometry(serial: string): void {
   const size = runCapture(adbPath(), ["-s", serial, "shell", "wm", "size"]).stdout;
   const density = runCapture(adbPath(), ["-s", serial, "shell", "wm", "density"]).stdout;
   expect(size).toMatch(/1080x2160/u);
   expect(density).toMatch(/480/u);
+
+  // 稳定区高度（= Lynx contentSize.h 口径，也是 FAB 圆心推导的 H 基准）
+  const displays = runCapture(adbPath(), [
+    "-s",
+    serial,
+    "shell",
+    "dumpsys",
+    "window",
+    "displays",
+  ]).stdout;
+  const rng = /rng=\d+x\d+-\d+x(\d+)/u.exec(displays);
+  expect(
+    rng,
+    `无法从 dumpsys window displays 解析稳定区高度（FAB_TAP 坐标依赖它）。原始输出片段：${displays
+      .split("\n")
+      .find((l) => l.includes("rng="))
+      ?.trim()}`,
+  ).not.toBeNull();
+  const contentHeight = Number(rng?.[1]);
+  expect(
+    contentHeight,
+    `稳定区高度应为 ${CONTENT_BOTTOM}（全屏 2160 减去顶部状态栏 72 + 底部手势条 72）；实测 ${contentHeight}。` +
+      `本 spec 的 FAB / Me 页行常量按 ${CONTENT_BOTTOM} 校准，换 ROM 或切换导航模式后需重新校准` +
+      `（gestural ↔ threebutton 会改变底部系统条高度）。`,
+  ).toBe(CONTENT_BOTTOM);
 }
 
 /** 等待前台 Activity 变为期望值（adb 轮询，prefs.currentTopActivity 归一化全名比对）。 */
@@ -161,7 +194,7 @@ mkdirSync(EVIDENCE_DIR, { recursive: true });
  * 截屏（exec-out 直接取 PNG 字节流）。maxBuffer 放宽到 20MB——Node spawnSync
  *  默认 1MB，1080×2160 的 PNG 字节流会 ENOBUFS（pictelio_ui 实测）。
  *
- * #817：传入 `label` 时同时落盘。此前本 spec 的全部帧只在内存里参与 `pngDiff`，
+ * #819：传入 `label` 时同时落盘。此前本 spec 的全部帧只在内存里参与 `pngDiff`，
  * 断言失败时**零证据**——只能看到一个裸数字（实测「差异 8」），无从判断是
  * 没点击、点错位置、还是页面确实变了（状态栏时钟本身就会贡献几十像素差）。
  * 落盘后失败即可对着两帧逐段复算差异来源。
@@ -231,16 +264,6 @@ function dumpHasEditText(xml: string): boolean {
   return /class="android\.widget\.EditText"/u.test(xml);
 }
 
-/** logcat 尾部 N 行（诊断输出用；获取失败不阻断，返回占位说明）。 */
-function logcatTail(serial: string, lines = 50): string {
-  try {
-    return runCapture(adbPath(), ["-s", serial, "shell", "logcat", "-d", "-t", String(lines)])
-      .stdout;
-  } catch {
-    return "(logcat tail 获取失败)";
-  }
-}
-
 /**
  * 等待 Lynx 渲染就绪（T7 加固项，沿用 ADR-0159 根因 4 口径）。
  * 信号：`onPageChanged|OnPatchFinishForFiber`（Lynx SDK 页面更新日志，页面首帧渲染后必现；
@@ -263,7 +286,7 @@ async function waitForLynxRenderReady(serial: string, timeoutMs = 60_000): Promi
   }
   throw new Error(
     `等待 Lynx 渲染就绪超时（${timeoutMs / 1000}s，信号: onPageChanged|OnPatchFinishForFiber）。\n` +
-      `logcat 尾部 50 行:\n${logcatTail(serial, 50)}`,
+      `logcat 尾部 50 行:\n${readAppLogcat(serial, { lines: 50 })}`,
   );
 }
 
@@ -308,7 +331,7 @@ async function waitForLynxLoggedInHome(serial: string, timeoutMs = 60_000): Prom
   }
   throw new Error(
     `等待已登录 Lynx 主界面超时（${timeoutMs / 1000}s：登录页 EditText 仍在或 LynxActivity 离场）。\n` +
-      `logcat 尾部 50 行:\n${logcatTail(serial, 50)}`,
+      `logcat 尾部 50 行:\n${readAppLogcat(serial, { lines: 50 })}`,
   );
 }
 

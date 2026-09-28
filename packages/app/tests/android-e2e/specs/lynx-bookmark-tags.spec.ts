@@ -103,7 +103,7 @@ mkdirSync(EVIDENCE_DIR, { recursive: true });
 
 // ── AVD pin（仿 fab 回归 / switch-client-roundtrip-low）：坐标常量绑定 pictelio_ui ──
 const TARGET_AVD = process.env.ANDROID_E2E_AVD || "pictelio_ui";
-// ⚠️ #817 移除了 `|| E2E_FLAVOR === "webview"` 守卫：该分支在本分支恒不可达
+// ⚠️ #819 移除了 `|| E2E_FLAVOR === "webview"` 守卫：该分支在本分支恒不可达
 // （build.gradle 已无 productFlavors），静默 skip 会把「ANDROID_E2E_FLAVOR 配错」
 // 伪装成「该设备上不可跑」。flavor 口径现在由 env.ts 收口显式抛错。
 const SKIPPED = TARGET_AVD !== "pictelio_ui";
@@ -115,7 +115,7 @@ if (SKIPPED) {
 // ── 坐标常量（推导见文件头注释；均为「屏幕物理像素」）──
 /** 推荐页轮播首卡的点击点（图片区内，避开底部 scrim 信息区与右侧 FAB） */
 const CAROUSEL_CARD_TAP = { x: 540, y: 900 };
-// ── 可见性 chip 行（#817 订正）────────────────────────────────────────
+// ── 可见性 chip 行（#819 订正）────────────────────────────────────────
 // oracle = 2026-09-29 实测帧 test-results/android-e2e/lynx-bookmark-tags/
 //          act2a-before-private.png（面板已打开、初始「公开」选中），按精确色值扫包围盒：
 //   选中「公开」chip rgb(207,229,255) bbox x46..205  y893..1007 ⇒ 中心 (126, 950)；
@@ -124,19 +124,19 @@ const CAROUSEL_CARD_TAP = { x: 540, y: 900 };
 // 的取值：面板加高后整行下移约 173px。旧 y=777 处实测 rgb(255,255,255) = 面板纯白背景，
 // 既无 chip 也无文字 ⇒ `saturatedRatio` 恒 0 ⇒ 用例 ② 前置自检恒红。
 // 与 FAB / Me 页行两处同源：都是「按旧布局推导的坐标」。
-/** 详情页滑动预算（#817 由 9 提到 14：单页插画图高差异大，9 次是最坏情况下的贴边值）。 */
+/** 详情页滑动预算（#819 由 9 提到 14：单页插画图高差异大，9 次是最坏情况下的贴边值）。 */
 const DETAIL_SCROLL_BUDGET = 14;
+
+/** 两个 chip 共用的行中心 y（实测两个 bbox 均为 y893..1007，中心 950） */
 const CHIP_ROW_Y = 950;
 /** 「私密」chip 中心 x（实测 bbox 210..388） */
 const PRIVATE_CHIP_X = 299;
 /** 「公开」chip 采样框（用于断言其变回未选中态；内缩于实测 bbox x46..205 / y893..1007
  *  以避开抗锯齿边缘与面板圆角） */
 const PUBLIC_CHIP_BOX = { x0: 60, x1: 195, y0: 905, y1: 995 };
-/** 「私密」chip 采样框（断言其进入选中态） */
-/** 「私密」chip 采样框（实测 bbox x210..388 / y893..1007，同样内缩） */
+/** 「私密」chip 采样框（实测 bbox x210..388 / y893..1007，同样内缩；断言其进入选中态） */
 const PRIVATE_CHIP_BOX = { x0: 225, x1: 375, y0: 905, y1: 995 };
-/** 保存按钮所在色带（bbox 由像素现算，这里只给扫描窗口） */
-/** 「收藏」保存按钮的色带扫描窗（#817 订正）。
+/** 「收藏」保存按钮的色带扫描窗（#819 订正）。
  *  oracle = act2a-before-private.png 按按钮色 rgb(26,111,168) 扫出 bbox
   x46..1033 / **y1973..2101**（988×129，横跨近全宽）。原窗 y1870..2050 只有
   下半截压在按钮上、且 2016 以上的部分落在手势条 inset 里——判据虽仍能过但贴边。
@@ -252,10 +252,9 @@ function swipeUp(): void {
 }
 
 /**
-/**
  * 心形定位（像素特征，不写死坐标）。
  *
- * ⚠️ #817 **极性判据订正**（oracle = 2026-09-29 实跑证据帧
+ * ⚠️ #819 **极性判据订正**（oracle = 2026-09-29 实跑证据帧
  * `test-results/android-e2e/lynx-bookmark-tags/detail-scroll-8.png`，逐像素实测）：
  * 本函数原先在扫「**暗色或红色**心形」，而 lynx 详情页实际把心形渲染成
  * **深色胶囊底 + 白色心形笔画**。极性反了 ⇒ 分量尺寸落在胶囊（170×103）
@@ -402,7 +401,7 @@ function connectedBoxes(pts: [number, number][], cell: number): Box[] {
 /**
  * 心形胶囊是否处于「已收藏」态。
  *
- * ⚠️ #817 **判据订正**：原判据找 `text-error` 红（r>150 且 g<110 且 b<110），阈值 0.5。
+ * ⚠️ #819 **判据订正**：原判据找 `text-error` 红（r>150 且 g<110 且 b<110），阈值 0.5。
  * 它在本 UI 上**永远为假**——不是「偶尔漏检」，而是结构性失效：
  *   oracle（2026-09-29 两帧同坐标窗口 (100,1698) ±22/±19、步长 4 = 120 采样点实测）：
  *     未收藏 detail-scroll-8.png：胶囊底 **rgb(46,49,54)**，心形笔画 rgb(239,241,247)
@@ -640,7 +639,7 @@ async function waitForLynxRenderReady(timeoutMs = 60_000): Promise<void> {
 /**
  * 按 pid 读 logcat 尾部（渲染就绪探测 + 证据留档）。
  *
- * #817：原为**私有副本**（与 transition-matrix 逐字同款）。副本把 logcat 采集
+ * #819：原为**私有副本**（与 transition-matrix 逐字同款）。副本把 logcat 采集
  * 口径分裂成 4 处中的 2 处，且 pid 为空时返回 `"(进程不存在)"` 占位串——会被
  * `waitForLynxRenderReady` 的正则当日志内容反复匹配，也**不** warn。
  * 现统一走 `prefs.readAppLogcat({ lines })`：16MB maxBuffer（Lynx
@@ -873,7 +872,7 @@ function recommendedLoaded(p: Pixels): boolean {
 }
 
 /**
- * 当前详情页是否是**多页作品**（漫画/多图）——#817。
+ * 当前详情页是否是**多页作品**（漫画/多图）——#819。
  *
  * 推荐流每天轮换，同一个 spec 有时抽到单页插画、有时抽到 26 页漫画。多页作品的
  * 详情页顶部是**分页器**而非信息区，滑动被翻页吃掉，无论滑多少次都到不了
@@ -916,13 +915,13 @@ function pressBack(): void {
  */
 async function enterDetailAndResolveId(): Promise<string> {
   /** 轮播横向滑动换下一张卡（与 transition-matrix 的 SWIPE_CAROUSEL_NEXT 同款手势）。
-   *  #817：原重试逻辑 pressBack 后仍点同一张卡——推荐轮播不自转，三次尝试撞的是
+   *  #819：原重试逻辑 pressBack 后仍点同一张卡——推荐轮播不自转，三次尝试撞的是
    *  **同一张**作品，抽到多页漫画就必然三次全灭。 */
   const swipeCarouselNext = (): void => {
     runOrThrow(adbPath(), ["-s", serial, "shell", "input", "swipe", "900", "700", "180", "700"]);
   };
 
-  /** 每次尝试的实际卡点（#817）：三个失败分支的报错文案原先被混成一句，
+  /** 每次尝试的实际卡点（#819）：三个失败分支的报错文案原先被混成一句，
    *  会把「心形没检出 / 收藏集合不符 / 心形未变色」都说成「进不去详情页」，
    *  而后两种的失败现场页面上心形与收藏数明明都在。 */
   const attempts: string[] = [];
@@ -938,7 +937,7 @@ async function enterDetailAndResolveId(): Promise<string> {
 
     // 滚到详情页底部（信息区 + 操作行）：每滑一次找一次心形，命中即停
     // 多页作品：滑动被翻页吃掉，滑到天亮也到不了底部信息区 ⇒ 立刻换卡重试，
-    // 不浪费滑动预算（#817）
+    // 不浪费滑动预算（#819）
     const firstFrame = await toPixels(screenshot("detail-scroll-0"));
     if (multiPageWork(firstFrame)) {
       attempts.push(`第 ${attempt} 次：抽到多页作品（详情页顶部为分页器），换下一张卡重试`);
@@ -1024,7 +1023,7 @@ async function enterDetailAndResolveId(): Promise<string> {
     );
     return illustId;
   }
-  // #817：原先三个失败分支（无心形 / 收藏集合不符 / 心形未变色）共用一句
+  // #819：原先三个失败分支（无心形 / 收藏集合不符 / 心形未变色）共用一句
   // 「未能进入插画详情页」，而实际三种里**只有第一种**与「进不去页面」有关。
   // 另两种的失败现场页面上明明就摆着心形与收藏数——文案会把人引向改产品。
   // 现逐条列出实际卡点 + 各自证据文件。
