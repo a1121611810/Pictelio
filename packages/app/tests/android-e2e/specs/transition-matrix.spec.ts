@@ -874,11 +874,34 @@ describe.skipIf(SKIPPED)(
       const sheetBandScope: Region = { x0: 100, y0: 800, x1: 980, y1: 960 };
       const bInput = await avgBrightness(afterSearchItem, sheetBandInput);
       const bScope = await avgBrightness(afterSearchItem, sheetBandScope);
-      expect(
-        bInput > 180 && bScope > 180,
-        `点击搜索项后 SearchSheet 未打开（输入行带亮度 ${bInput.toFixed(0)}、scope 行带 ` +
-          `${bScope.toFixed(0)}，均应 ≥180；未打开时后续输入落空并误触列表卡片，证据 r2-search-sheet.png）`,
-      ).toBe(true);
+      if (bInput > 180 && bScope > 180) {
+        // 面板已打开 → 亮度判据通过，继续输入流程
+      } else {
+        // ⚠️ #816 订正：先判「面板是否出现」，未出现时**报网络层失败**而非布局回归。
+        // 实测（2026-09-28 20:01，本轮唯一红项）：输入行带亮度 150、scope 行带 131，
+        // 逐行扫描显示 y=1400 以下**整片纯白 251** ⇒ SearchSheet 浅色面板压根没出现，
+        // 150/131 是**列表页残留内容**（榜单卡 + 空网格），不是「半亮的打开中态」。
+        // 同一帧另有红字「未知错误」= client.ts classifyError 的 status<=0 兜底
+        // ⇒ **网络层无响应**（老问题，见 #802 模拟器内图片 CDN 9–11s/张）。
+        // 旧文案「SearchSheet 未打开」会把网络问题误导成布局/坐标回归，
+        // 导致后续照文案去调 FAB 坐标——那正是 ab026592 反复白跑的原因。
+        const belowSheet: Region = { x0: 0, y0: 1400, x1: 1080, y1: CONTENT_BOTTOM };
+        const blankness = await avgBrightness(afterSearchItem, belowSheet);
+        console.log(
+          `[transition-matrix] R2 面板未出现：输入行带 ${bInput.toFixed(0)}、scope 行带 ` +
+            `${bScope.toFixed(0)}（应 ≥180）；面板区 y1400..${CONTENT_BOTTOM} 平均亮度 ` +
+            `${blankness.toFixed(0)}（≈251 即整片纯白 = 列表空白区，非面板）`,
+        );
+        throw new Error(
+          `SearchSheet 未打开，且画面呈「列表空白 + 未知错误」形态 —— ` +
+            `面板区 y1400..${CONTENT_BOTTOM} 平均亮度 ${blankness.toFixed(0)}（纯白即面板未出现）。` +
+            `实测该形态伴随「未知错误」红字，对应 client.ts classifyError 的 status<=0 兜底` +
+            `= **网络层无响应**（非 HTTP 错误码）。` +
+            `请先确认网络/登录态（见 #802 模拟器内图片 CDN 9–11s/张），` +
+            `**不要**据本条去调 FAB 坐标或面板高度——那是布局回归的方向，且已证伪。` +
+            `证据 r2-search-sheet.png`,
+        );
+      }
 
       // 输入多结果词（即输即搜，300ms 防抖在 controller 内；短词无 fab spec 记录的截断风险）
       tap(SEARCH_INPUT_TAP.x, SEARCH_INPUT_TAP.y);
