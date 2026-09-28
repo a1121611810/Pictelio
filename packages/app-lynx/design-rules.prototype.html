@@ -125,8 +125,11 @@ const RULES = {
     "app-lynx": {
       designSystem: "material-3",
       note: "#787 实测：--durationMedium1:250ms / --durationMedium3:350ms / M3 motion 曲线 均不在 AGENTS.md Fluent 白名单内 ⇒ 必须按引擎分口径",
-      durations: { allow: ["150ms","200ms","300ms","250ms","350ms"] },
-      easings:  { allow: ["cubic-bezier(0.2,0,0,1)","cubic-bezier(0.05,0.7,0.1,1)","cubic-bezier(0.3,0,0.8,0.15)"] },
+      // #789 决策 2：枚举语义 = 「命中值必须 ∈ allow」，不是「只许这几个字面量」
+      // 依据：src 内 367 处 duration/ease/rounded/shadow/text 任意值全部 var() 支撑、零字面量
+      // ⇒ 判 ∈ 值域天然放过 duration-[var(--durationNormal)] 这类 AGENTS.md 规定的正确写法
+      durations: { allow: ["150ms","200ms","300ms","250ms","350ms"], semantics: "membership" },
+      easings:  { allow: ["cubic-bezier(0.2,0,0,1)","cubic-bezier(0.05,0.7,0.1,1)","cubic-bezier(0.3,0,0.8,0.15)"], semantics: "membership" },
       shapes:   { tokenPrefix: "--md-shape-" },
       elevations:{ tokenPrefix: "--md-elevation-" }
     },
@@ -139,9 +142,9 @@ const RULES = {
     }
   },
   scanSurface: {
-    include: ["src/**/*.{vue,ts,css}"],
+    include: ["src/**/*.{vue,ts}"],
     exclude: ["src/styles/tokens.css", "prototype/**"],
-    note: "mdTokenRefs.test.ts:27 的 /\\.(vue|ts|css)$/ 是仓内唯一把 .css 纳入的先例；hardcodeColorGate.test.ts:69 当前不扫 .css。prototype/** 显式排除（#788 决议）：一次性探索稿，不进门，避免被人当模板复制"
+    note: "#789 决议（覆盖 #788 当时的 .css 假设）：维持不扫 .css —— 实测两个 .css 均无可判违规的样式（tailwind.css = 3 行 @tailwind 指令入口零规则；tokens.css = 令牌定义文件，847 个 --* 声明，天然排除）。真实样式源是 7 个 .vue 的 <style> 块，已在扫 .vue 的门覆盖内。prototype/** 显式排除（#788 决议）：一次性探索稿，不进门"
   },
   rules: [
     { id: "color.literal",     engine: "app-lynx", enforce: ["hex","rgb()","tailwind-named"], scan: ["vue","ts","css"], implementedBy: "hardcodeColorGate" },
@@ -151,7 +154,8 @@ const RULES = {
     { id: "motion.easing",     engine: "app-lynx", enforce: ["enum"],                     scan: ["vue","css"],    implementedBy: null, status: "new" },
     { id: "shape.radius",      engine: "app-lynx", enforce: ["token-only"],               scan: ["vue","css"],    implementedBy: null, status: "new" },
     { id: "elevation.shadow",  engine: "app-lynx", enforce: ["token-only"],               scan: ["vue","css"],    implementedBy: null, status: "new" },
-    { id: "type.fontSize",     engine: "app-lynx", enforce: ["token-only","icon-glyph-exempt"], scan: ["vue"], implementedBy: null, status: "new" }
+    { id: "type.fontSize",     engine: "app-lynx", enforce: ["token-only","icon-glyph-exempt"], scan: ["vue"], implementedBy: null, status: "new" },
+    { id: "focus.bare",        engine: "app-lynx", enforce: ["never"], scan: [], implementedBy: null, status: "explicitly-not-done", reason: "#789 决策 1：浏览器 CSS 关注点，Lynx 无该伪类形态 ⇒ 建规则等于建一条恒真通过的空门" }
   ],
   whitelist: [
     { rule: "shape.radius", path: "components/TextSelectionToolbar.vue", reason: "#787 实测唯一真字面量（rounded-[0.65vw] ×2）；胶囊工具条 0.65vw 非 M3 shape 档位", pendingCleanup: true, issue: null },
