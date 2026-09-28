@@ -143,7 +143,11 @@ public class PictelioAppModule extends LynxModule {
             callback.invoke(kinds.toString());
         } catch (Exception e) {
             Log.w(TAG, "getClientKinds 失败", e);
-            callback.invoke(String.valueOf(e.getMessage()));
+            // #806：错误必须落**第二参**（与 TS 声明 (kinds, err) 同形，也与同族的
+            // getClientKind 一致）。此前走 `callback.invoke(错误串)` 单参，等于把错误
+            // 消息塞进 kinds 槽——JS 的 `if (!err)` 会判为成功并去解析它 → null
+            // → 门控退化，单引擎包重现客户端卡，且全程无告警。
+            callback.invoke(null, String.valueOf(e.getMessage()));
         }
     }
 

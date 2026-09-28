@@ -1692,10 +1692,10 @@ describe('clientSwitchStore.normalizeKinds / supportsClientSwitch（ADR-0062 包
       vi.resetModules()
     })
 
-    it('full 包：getClientKinds 返回 [webview,lynx] → availableKinds 填充', async () => {
+    it('full 包：getClientKinds 送达 JSON 文本 [webview,lynx] → availableKinds 填充', async () => {
       vi.stubGlobal('NativeModules', {
         PictelioApp: {
-          getClientKinds: (cb: (kinds: string[], err: string | null) => void) => cb(['webview', 'lynx'], null),
+          getClientKinds: (cb: (kinds: string, err: string | null) => void) => cb('["webview","lynx"]', null),
           getClientKind: (cb: (kind: string, err: string | null) => void) => cb('webview', null),
         },
       })
@@ -1708,10 +1708,10 @@ describe('clientSwitchStore.normalizeKinds / supportsClientSwitch（ADR-0062 包
       expect(mod.supportsClientSwitch(store.availableKinds)).toBe(true)
     })
 
-    it('lynx-only 包：getClientKinds 返回 [lynx] → availableKinds=[lynx]，切换不支持', async () => {
+    it('lynx-only 包：getClientKinds 送达 JSON 文本 [lynx] → availableKinds=[lynx]，切换不支持', async () => {
       vi.stubGlobal('NativeModules', {
         PictelioApp: {
-          getClientKinds: (cb: (kinds: string[], err: string | null) => void) => cb(['lynx'], null),
+          getClientKinds: (cb: (kinds: string, err: string | null) => void) => cb('["lynx"]', null),
           getClientKind: (cb: (kind: string, err: string | null) => void) => cb('lynx', null),
         },
       })
@@ -1724,10 +1724,10 @@ describe('clientSwitchStore.normalizeKinds / supportsClientSwitch（ADR-0062 包
       expect(mod.supportsClientSwitch(store.availableKinds)).toBe(false)
     })
 
-    it('webview-only 包：getClientKinds 返回 [webview] → 切换不支持', async () => {
+    it('webview-only 包：getClientKinds 送达 JSON 文本 [webview] → 切换不支持', async () => {
       vi.stubGlobal('NativeModules', {
         PictelioApp: {
-          getClientKinds: (cb: (kinds: string[], err: string | null) => void) => cb(['webview'], null),
+          getClientKinds: (cb: (kinds: string, err: string | null) => void) => cb('["webview"]', null),
           getClientKind: (cb: (kind: string, err: string | null) => void) => cb('webview', null),
         },
       })

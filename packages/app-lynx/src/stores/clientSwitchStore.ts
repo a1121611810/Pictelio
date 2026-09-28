@@ -27,7 +27,7 @@ function nativeAppModule() {
 interface PictelioAppModule {
   setClientKind(kind: string, callback: (err: string | null) => void): void
   getClientKind(callback: (kind: string | null, err: string | null) => void): void
-  getClientKinds(callback: (kinds: string[], err: string | null) => void): void
+  getClientKinds(callback: (kinds: string, err: string | null) => void): void
   restart(callback: (err: string | null) => void): void
 }
 
@@ -46,6 +46,9 @@ export function normalizeKinds(raw: unknown): ClientKind[] | null {
     try {
       value = JSON.parse(value)
     } catch {
+      // 兜底必须留痕：静默 null 会让门控退化成「未知=视为支持」，
+      // 单引擎包重现客户端卡且无任何线索（AGENTS.md 测试硬约束 #3）。
+      console.warn("[clientSwitchStore] getClientKinds 送达非 JSON 文本，已按能力未知处理:", value)
       return null
     }
   }
